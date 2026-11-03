@@ -248,10 +248,6 @@
       "message": "身分證字號",
       "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_INDIVIDUAL_ID_CARD_NO）"
     },
-    "seller.KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL": {
-      "message": "收款聯絡信箱",
-      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_PAYOUT_CONTACT_EMAIL）"
-    },
     "seller.KYCField.KYC_FIELD_PRODUCT_TYPE": {
       "message": "主要商品類型",
       "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_PRODUCT_TYPE）"

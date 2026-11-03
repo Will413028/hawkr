@@ -1,10 +1,12 @@
 package kyc
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"testing"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -12,38 +14,57 @@ import (
 
 func text(s string) *string { return &s }
 
-// 收款聯絡信箱（D23）是送出時的必填：其餘都齊全的個人申請只缺它時，送出的違規正好指向 payout_contact_email，補上之後通過。
-func TestCompleteRequiresThePayoutContactEmail(t *testing.T) {
-	row := store.SellerKycApplication{SellerType: string(model.KYCIndividual)}
-	err := complete(row)
-	var ae *apperr.Error
-	if !errors.As(err, &ae) || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != "payout_contact_email" {
-		t.Fatalf("缺信箱的送出檢查=%v", err)
-	}
-	if got := missingFields(row); len(got) != 1 || got[0] != "payout_contact_email" {
-		t.Fatalf("missing_fields=%v", got)
-	}
-	row.PayoutContactEmail = text("seller@example.com")
-	if err := complete(row); err != nil {
-		t.Fatalf("齊全的申請：%v", err)
-	}
-}
-
-// 送出只要求市集登記資料（企業的公司名稱與統編）與收款聯絡信箱；身分、銀行與證件由金流商收集，不在必填之內。
+// 送出只要求市集登記資料（企業的公司名稱與統編）；身分、銀行、證件與收款聯絡信箱不在申請的必填之內（信箱是帳號的聯絡信箱，送出時另外檢查）。
 func TestRequirementsAreMarketplaceDataOnly(t *testing.T) {
 	var fields []string
 	for _, r := range requirements {
 		fields = append(fields, r.field)
 	}
-	if want := []string{"business.company_name", "business.tax_id", "payout_contact_email"}; !slices.Equal(fields, want) {
+	if want := []string{"business.company_name", "business.tax_id"}; !slices.Equal(fields, want) {
 		t.Fatalf("requirements=%v，預期 %v", fields, want)
 	}
+	if err := complete(store.SellerKycApplication{SellerType: string(model.KYCIndividual)}); err != nil {
+		t.Fatalf("空的個人申請：%v", err)
+	}
 	company := store.SellerKycApplication{SellerType: string(model.KYCCompany)}
-	if got, want := missingFields(company), []string{"business.company_name", "business.tax_id", "payout_contact_email"}; !slices.Equal(got, want) {
+	if got, want := missingFields(company), []string{"business.company_name", "business.tax_id"}; !slices.Equal(got, want) {
 		t.Fatalf("企業缺：%v", got)
 	}
-	company.CompanyName, company.TaxID, company.PayoutContactEmail = text("範例小農有限公司"), text("12345678"), text("seller@example.com")
+	company.CompanyName, company.TaxID = text("範例小農有限公司"), text("12345678")
 	if err := complete(company); err != nil {
 		t.Fatalf("沒有身分、銀行與證件的企業申請：%v", err)
+	}
+}
+
+type fakeIdentity struct {
+	email identity.ContactEmail
+	ok    bool
+	err   error
+}
+
+func (f fakeIdentity) ContactEmail(context.Context, int64) (identity.ContactEmail, bool, error) {
+	return f.email, f.ok, f.err
+}
+
+// 聯絡信箱：沒有、或 provider 回報的值不是可用的信箱，回 failed_precondition 與 CONTACT_EMAIL_REQUIRED；有的回正規化後的位址（收款帳戶的 CHECK 要小寫）。
+func TestContactEmailIsRequiredAndNormalized(t *testing.T) {
+	for name, id := range map[string]fakeIdentity{
+		"none":      {},
+		"empty":     {email: identity.ContactEmail{Address: "", Source: identity.ContactEmailVerified}, ok: true},
+		"malformed": {email: identity.ContactEmail{Address: "not-an-email", Source: identity.ContactEmailVerified}, ok: true},
+	} {
+		_, err := (&Service{d: Deps{Identity: id}}).contactEmail(context.Background(), 1)
+		var ae *apperr.Error
+		if !errors.As(err, &ae) || ae.Kind() != apperr.KindFailedPrecondition || ae.Reason != apperr.ReasonContactEmailRequired {
+			t.Errorf("%s：err=%v，預期 FailedPrecondition 與 CONTACT_EMAIL_REQUIRED", name, err)
+		}
+	}
+	got, err := (&Service{d: Deps{Identity: fakeIdentity{email: identity.ContactEmail{Address: "Pay.Out@Example.COM", Source: identity.ContactEmailVerified}, ok: true}}}).contactEmail(context.Background(), 1)
+	if err != nil || got != "pay.out@example.com" {
+		t.Fatalf("contactEmail=%q, %v", got, err)
+	}
+	boom := errors.New("boom")
+	if _, err := (&Service{d: Deps{Identity: fakeIdentity{err: boom}}}).contactEmail(context.Background(), 1); !errors.Is(err, boom) {
+		t.Fatalf("identity 的錯誤要原樣回傳：%v", err)
 	}
 }

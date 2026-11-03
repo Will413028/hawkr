@@ -8,7 +8,7 @@
  *      按一下以 SaveKYCDraft（不帶 etag）建立申請
  *   2. 有申請且可編輯（草稿、被退回）→ 整頁長表單，分區塊：
  *        - 公司資訊（僅企業用戶）
- *        - 商家營運資訊（聯絡方式、店家地址、收款聯絡信箱）
+ *        - 商家營運資訊（聯絡方式、店家地址）
  *        - 補充文件（僅企業用戶，選填）
  *        - 確認送出（個人資料告知）
  *      平台只收市集審核的資料；身分與銀行資料在審核通過後由金流商收集。
@@ -50,7 +50,6 @@ import { Input } from "@/components/ui/Input";
 import { TownFields } from "@/features/account/screens/addresses/TownFields";
 import { AgreementCheckbox } from "@/features/seller/components/AgreementCheckbox";
 import { useAuth } from "@/lib/auth/context";
-import { useLoginEmail } from "@/lib/hooks/useLoginEmail";
 import { useResettableError } from "@/lib/hooks/useResettableError";
 import {
 	useInvalidateSellerSelf,
@@ -98,7 +97,6 @@ import {
 	kycFieldOfPath,
 	kycFormKeyOfDraftPath,
 	kycFormOf,
-	kycInputErrors,
 	kycIssueMessages,
 	kycTypeOf,
 	lookupBusinessRegistration,
@@ -110,7 +108,6 @@ import {
 	type SellerType,
 	saveKycDraft,
 	submitKyc,
-	withPayoutEmailDefault,
 } from "@/lib/seller/kyc";
 import { PAYUNI_LOCK_ON_SUBMIT_NOTICE } from "@/lib/seller/payuni-locked-fields";
 import { fetchMyStore, updateMyStore } from "@/lib/seller/repo";
@@ -220,7 +217,6 @@ export default function CertificationsClient() {
 	const { status: authStatus } = useAuth();
 	const { data: seller, loading: sellerLoading } = useSellerSelf();
 	const { application, loading: kycLoading, error: kycLoadError } = useMyKyc();
-	const { email: loginEmail, loading: profileLoading } = useLoginEmail();
 	const [hydrated, setHydrated] = React.useState(false);
 	const [error, setError] = useResettableError();
 
@@ -292,7 +288,7 @@ export default function CertificationsClient() {
 	// Initial load — hydrate the form once from the application (resume) and the store
 	React.useEffect(() => {
 		if (authStatus === "unknown") return;
-		if (sellerLoading || kycLoading || profileLoading) return;
+		if (sellerLoading || kycLoading) return;
 		if (hydrated) return;
 		const defaults = storeDefaults(seller);
 		setStoreAddress(defaults.address);
@@ -301,20 +297,11 @@ export default function CertificationsClient() {
 		if (application) {
 			adoptApplication(application);
 			const loaded = kycFormOf(application);
-			setForm(
-				kycEditable(application)
-					? withPayoutEmailDefault(loaded, loginEmail)
-					: loaded,
-			);
+			setForm(loaded);
 			setDocs(kycDocsOf(application));
 			resumeRef.current = resumeSectionOf(application.missingFields);
 		} else {
-			setForm(
-				withPayoutEmailDefault(
-					withStoreDefaults(EMPTY_KYC_FORM, defaults.form),
-					loginEmail,
-				),
-			);
+			setForm(withStoreDefaults(EMPTY_KYC_FORM, defaults.form));
 		}
 		if (kycLoadError) {
 			setError(
@@ -328,8 +315,6 @@ export default function CertificationsClient() {
 		authStatus,
 		sellerLoading,
 		kycLoading,
-		profileLoading,
-		loginEmail,
 		hydrated,
 		seller,
 		application,
@@ -646,9 +631,9 @@ export default function CertificationsClient() {
 			setError(null);
 			try {
 				const defaults = storeDefaults(seller);
-				const nextForm = withPayoutEmailDefault(
-					withStoreDefaults({ ...EMPTY_KYC_FORM, sellerType }, defaults.form),
-					loginEmail,
+				const nextForm = withStoreDefaults(
+					{ ...EMPTY_KYC_FORM, sellerType },
+					defaults.form,
 				);
 				etagRef.current = "";
 				baselineRef.current = EMPTY_KYC_FORM;
@@ -684,7 +669,6 @@ export default function CertificationsClient() {
 		},
 		[
 			seller,
-			loginEmail,
 			draftRequest,
 			adoptApplication,
 			cacheSaved,
@@ -795,7 +779,6 @@ export default function CertificationsClient() {
 
 	/* ===== Submit gate — the server decides what is still missing ===== */
 
-	const { payoutEmailErr } = kycInputErrors(form);
 	const localContactErrors = storeContactErrors(storeContact);
 	const contactErrors: StoreContactErrors =
 		storeServerErrors && storeServerErrors.contact === storeContact
@@ -842,10 +825,6 @@ export default function CertificationsClient() {
 			}
 			if (storeAddressErr) {
 				setSubmitError(storeAddressErr);
-				return;
-			}
-			if (payoutEmailErr) {
-				setSubmitError(payoutEmailErr);
 				return;
 			}
 			if (!(await flushStore())) {
@@ -938,12 +917,7 @@ export default function CertificationsClient() {
 			etagRef.current = "";
 			baselineRef.current = EMPTY_KYC_FORM;
 			baselineDocsRef.current = EMPTY_KYC_DOCS;
-			setForm(
-				withPayoutEmailDefault(
-					withStoreDefaults(EMPTY_KYC_FORM, storeDefaults(seller).form),
-					loginEmail,
-				),
-			);
+			setForm(withStoreDefaults(EMPTY_KYC_FORM, storeDefaults(seller).form));
 			setDocs(EMPTY_KYC_DOCS);
 			setSubmitOk(false);
 		} catch (e) {
@@ -1234,14 +1208,10 @@ export default function CertificationsClient() {
 							/>
 						)}
 						<SectionOther
-							form={form}
-							setForm={setForm}
 							contactErrors={contactErrors}
-							payoutEmailErr={payoutEmailErr}
 							addressErr={storeAddressErr}
 							storeContact={storeContact}
 							setStoreContact={setStoreContact}
-							errorOf={errorOf}
 							storeAddress={storeAddress}
 							setStoreAddress={setStoreAddress}
 						/>
@@ -1585,36 +1555,25 @@ function SectionCompany({
 }
 
 function SectionOther({
-	form,
-	setForm,
 	contactErrors,
-	payoutEmailErr,
 	addressErr,
 	storeContact,
 	setStoreContact,
-	errorOf,
 	storeAddress,
 	setStoreAddress,
 }: {
-	form: KycForm;
-	setForm: React.Dispatch<React.SetStateAction<KycForm>>;
 	contactErrors: StoreContactErrors;
-	payoutEmailErr: string | null;
 	addressErr: string | undefined;
 	storeContact: StoreContact;
 	setStoreContact: React.Dispatch<React.SetStateAction<StoreContact>>;
-	errorOf: ErrorOf;
 	storeAddress: StoreAddressState;
 	setStoreAddress: React.Dispatch<React.SetStateAction<StoreAddressState>>;
 }) {
-	const fieldLabel = useKycFieldLabel();
 	return (
 		<section className="seller-card seller-cert__form-section" id="cert-other">
 			<header>
 				<h2>商家營運資訊</h2>
-				<p>
-					店家地址會同步到你的店鋪頁；收款聯絡信箱是金流商聯絡你收款事宜用的。
-				</p>
+				<p>店家地址會同步到你的店鋪頁。</p>
 			</header>
 			<div className="seller-cert__grid">
 				<TextField
@@ -1662,15 +1621,6 @@ function SectionOther({
 					onChange={(v) => setStoreAddress((p) => ({ ...p, detail: v }))}
 					hint={addressErr}
 					error={addressErr}
-					required
-				/>
-				<TextField
-					label={fieldLabel(KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL)}
-					type="email"
-					value={form.payoutContactEmail}
-					onChange={(v) => setForm((p) => ({ ...p, payoutContactEmail: v }))}
-					hint={payoutEmailErr ?? "金流商會用這個信箱聯絡你收款事宜"}
-					error={payoutEmailErr ?? errorOf("payoutContactEmail")}
 					required
 				/>
 			</div>

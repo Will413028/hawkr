@@ -330,7 +330,7 @@ func fullKYC(t model.KYCSellerType) model.KYCApplication {
 			{Slot: model.SlotIDCardFront, Position: 0, AssetID: "asset front", ObjectKey: "certification/secret-key"},
 			{Slot: model.SlotCompanyDocument, Position: 0, AssetID: "co-1"}, {Slot: model.SlotCompanyDocument, Position: 1, AssetID: "co-2"},
 		},
-		MissingFields: []string{"business.company_name", "business.tax_id", "payout_contact_email"},
+		MissingFields: []string{"business.company_name", "business.tax_id"},
 		Flow:          &flow,
 		LastRejection: &model.KYCRejection{Reason: "模糊", DecidedAt: now, Issues: []model.KYCIssue{
 			{Field: "real_name", Code: model.IssueMismatch, Message: "與證件上的姓名不同"},
@@ -405,7 +405,7 @@ func TestKYCResponseCarriesOnlyMaskedValuesAndNoDocumentImages(t *testing.T) {
 	if got := out.GetOutstandingIssues(); len(got) != 1 || !proto.Equal(got[0], wantIssues[1]) {
 		t.Fatalf("outstanding_issues=%v", got)
 	}
-	if want := []pb.KYCField{pb.KYCField_KYC_FIELD_BUSINESS_COMPANY_NAME, pb.KYCField_KYC_FIELD_BUSINESS_TAX_ID, pb.KYCField_KYC_FIELD_PAYOUT_CONTACT_EMAIL}; !slices.Equal(out.GetMissingFields(), want) {
+	if want := []pb.KYCField{pb.KYCField_KYC_FIELD_BUSINESS_COMPANY_NAME, pb.KYCField_KYC_FIELD_BUSINESS_TAX_ID}; !slices.Equal(out.GetMissingFields(), want) {
 		t.Fatalf("missing_fields=%v", out.GetMissingFields())
 	}
 	flow := out.GetFlow()

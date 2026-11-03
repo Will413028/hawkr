@@ -101,45 +101,89 @@ func (f *fixture) paymentEvent(id, external string) (http.Header, []byte) {
 	return h, []byte(external)
 }
 
-// 申請上的收款聯絡信箱（D23）存的是正規化後的值，核准時複製到帳戶列，建立 job 從列上讀出來交給 provider；之後申請的草稿再怎麼改，列上的值不變。
-// mutation：核准不複製信箱（寫入固定值或申請以外的來源）→ 列上的信箱與 provider 收到的信箱都不是申請上的值，失敗。
-func TestApprovalCopiesThePayoutContactEmailToTheAccountRowAndTheCreateCallSendsIt(t *testing.T) {
+// setContactEmails 設定帳號的已驗證 email 與自填信箱（nil 是沒有）。
+func (f *fixture) setContactEmails(t *testing.T, accountID int64, verified, selfEntered *string) {
+	t.Helper()
+	ctx := context.Background()
+	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE identity.accounts SET email = $2, self_entered_email = $3 WHERE id = $1", accountID, verified, selfEntered)
+	must(t, err)
+}
+
+// 核准時從 identity 讀帳號的聯絡信箱（已驗證的 email 優先於自填的），正規化後快照到帳戶列，建立 job 從列上讀出來交給 provider；之後帳號的信箱再改，列上的值不變。
+// mutation：改成自填優先 → 列上是 self@example.com，失敗；核准不複製信箱（寫入固定值）→ 列上的信箱與 provider 收到的都不是帳號的，失敗；之後帳號信箱變動時列跟著變 → 最後一段失敗。
+func TestApprovalSnapshotsTheAccountContactEmailVerifiedFirst(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
 	accountID, s := f.open(t)
-	in := kycDraft(accountID, idA, bankAcct)
-	in.PayoutContactEmail = ptr("  Pay.Out@Example.COM ")
-	d := f.savedDraft(t, in)
-	if d.PayoutContactEmail == nil || *d.PayoutContactEmail != "pay.out@example.com" {
-		t.Fatalf("草稿的信箱=%v，預期去空白並轉小寫", d.PayoutContactEmail)
-	}
+	f.setContactEmails(t, accountID, ptr("Pay.Out@Example.COM"), ptr("self@example.com"))
+	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
 	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
 	must(t, approve(f, sub))
-	var stored string
-	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT contact_email FROM seller.payment_accounts WHERE store_id = $1", s.StoreID).Scan(&stored))
-	if stored != "pay.out@example.com" {
-		t.Fatalf("列上的信箱=%q", stored)
+	if got := f.accountEmail(t, s.StoreID); got != "pay.out@example.com" {
+		t.Fatalf("列上的信箱=%q，預期已驗證的 email（小寫）", got)
 	}
+	f.setContactEmails(t, accountID, ptr("changed@example.com"), nil)
 	f.ensureAccount(t, s.StoreID)
 	if got := f.payment.EnsureEmails(); !slices.Equal(got, []string{"pay.out@example.com"}) {
-		t.Fatalf("provider 收到的信箱=%v", got)
+		t.Fatalf("provider 收到的信箱=%v，預期核准當下的快照", got)
+	}
+	if got := f.accountEmail(t, s.StoreID); got != "pay.out@example.com" {
+		t.Fatalf("帳號信箱變動後列上的信箱=%q，預期不同步", got)
 	}
 }
 
-// reapprove 模擬同一家店再一次核准：舊的申請已取消（唯一索引只允許一筆沒取消的申請），賣家用新信箱送出新申請並核准。
+// 沒有已驗證的 email 時用自填的，同樣正規化。
+// mutation：核准只讀已驗證的 email → 核准因沒有聯絡信箱被拒，失敗。
+func TestApprovalSnapshotsTheSelfEnteredEmailWhenThereIsNoVerifiedOne(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	accountID, s := f.open(t)
+	f.setContactEmails(t, accountID, nil, ptr("self@example.com"))
+	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
+	must(t, err)
+	must(t, approve(f, sub))
+	if got := f.accountEmail(t, s.StoreID); got != "self@example.com" {
+		t.Fatalf("列上的信箱=%q", got)
+	}
+}
+
+// reapprove 模擬同一家店再一次核准：舊的申請已取消（唯一索引只允許一筆沒取消的申請），帳號換了聯絡信箱後賣家送出新申請並核准。
 func (f *fixture) reapprove(t *testing.T, accountID int64, email string) {
 	t.Helper()
 	ctx := context.Background()
 	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.kyc_applications SET status = 'CANCELLED', decided_at = NULL WHERE store_id IN (SELECT store_id FROM seller.stores WHERE account_id = $1)", accountID)
 	must(t, err)
-	in := kycDraft(accountID, idA, bankAcct)
-	in.PayoutContactEmail = ptr(email)
-	d := f.savedDraft(t, in)
+	f.setContactEmails(t, accountID, nil, &email)
+	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
 	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
 	must(t, approve(f, sub))
+}
+
+// 帳號沒有聯絡信箱（沒有已驗證的 email，也沒有自填的）時送出被拒：failed_precondition 與 CONTACT_EMAIL_REQUIRED，申請維持草稿；補上之後可以送出。
+// mutation：SubmitKYC 拿掉聯絡信箱的檢查 → 送出成功，失敗。
+func TestSubmitKYCRequiresAContactEmail(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	accountID, _ := f.open(t)
+	f.setContactEmails(t, accountID, nil, nil)
+	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	_, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Kind() != apperr.KindFailedPrecondition || ae.Reason != apperr.ReasonContactEmailRequired {
+		t.Fatalf("err=%v，預期 FailedPrecondition 與 CONTACT_EMAIL_REQUIRED", err)
+	}
+	if got := f.count(t, "SELECT count(*) FROM seller.kyc_applications WHERE status = 'DRAFT'"); got != 1 {
+		t.Fatalf("申請應仍是草稿，草稿數=%d", got)
+	}
+	f.setContactEmails(t, accountID, nil, ptr("seller@example.com"))
+	_, err = f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
+	must(t, err)
 }
 
 func (f *fixture) accountEmail(t *testing.T, storeID int64) string {
@@ -150,7 +194,7 @@ func (f *fixture) accountEmail(t *testing.T, storeID int64) string {
 	return email
 }
 
-// 再次核准時帳戶列已存在：還沒有外部帳戶（建立失敗或 job 沒跑）的列改用新申請的信箱，建立才會送最新的；已經有外部帳戶的列保留原信箱（D23 延後改信箱）。
+// 再次核准時帳戶列已存在：還沒有外部帳戶（建立失敗或 job 沒跑）的列改用核准當下帳號的信箱，建立才會送最新的；已經有外部帳戶的列保留原信箱（D23 延後改信箱）。
 // mutation：InsertPaymentAccount 改回 ON CONFLICT DO NOTHING → 第一段的信箱仍是舊的，失敗；拿掉 WHERE external_account_id IS NULL → 第二段的信箱被覆寫，失敗。
 func TestReapprovalReplacesTheContactEmailOnlyWhileTheExternalAccountDoesNotExist(t *testing.T) {
 	t.Parallel()

@@ -28,12 +28,10 @@ import {
 	kycFieldOfPath,
 	kycFormKeyOfDraftPath,
 	kycFormOf,
-	kycInputErrors,
 	kycIssueMessages,
 	mergeLatestForm,
 	missingItemsOf,
 	resumeSectionOf,
-	withPayoutEmailDefault,
 } from "./kyc";
 
 const ut = uiTextFor("zh-TW");
@@ -73,46 +71,35 @@ describe("SaveKYCDraft：建立與更新", () => {
 
 	it("已經有申請：每次寫入都帶 etag，只列有改的欄位", () => {
 		const request = draft(
-			{ productType: "水果", payoutContactEmail: "pay@example.com" },
-			{ baseline: { productType: "水果" }, etag: "e1" },
+			{ productType: "蔬果", companyName: "山田" },
+			{ baseline: { productType: "水果", companyName: "山田" }, etag: "e1" },
 		);
 		const body = json(request);
 		expect(body.application.etag).toBe("e1");
-		expect(body.updateMask).toBe("payoutContactEmail");
-		expect(body.application.payoutContactEmail).toBe("pay@example.com");
+		expect(body.updateMask).toBe("productType");
+		expect(body.application.productType).toBe("蔬果");
 	});
 
 	it("沒有任何改動不送請求", () => {
 		expect(
 			draft(
-				{ payoutContactEmail: "a@b.co" },
-				{ baseline: { payoutContactEmail: "a@b.co" }, etag: "e1" },
+				{ productType: "水果" },
+				{ baseline: { productType: "水果" }, etag: "e1" },
 			),
 		).toBeNull();
 	});
 
-	it("格式不合的收款聯絡信箱不送：伺服器會因為一欄不合法整筆不寫入", () => {
+	it("產品類型清空：列進 mask、值是空字串（草稿可以空）", () => {
 		const request = draft(
-			{ productType: "水果", payoutContactEmail: "not-an-email" },
-			{ etag: "e1" },
+			{ productType: "" },
+			{ baseline: { productType: "水果" }, etag: "e1" },
 		);
 		expect(json(request).updateMask).toBe("productType");
 	});
 
-	it("收款聯絡信箱清空：列進 mask、值是空字串（草稿可以空）", () => {
-		const request = draft(
-			{ payoutContactEmail: "" },
-			{ baseline: { payoutContactEmail: "a@b.co" }, etag: "e1" },
-		);
-		expect(json(request).updateMask).toBe("payoutContactEmail");
-	});
-
-	it("建立：預設帶入的收款聯絡信箱隨建立一起送", () => {
-		const request = draft({
-			sellerType: "individual",
-			payoutContactEmail: "login@example.com",
-		});
-		expect(request?.application?.payoutContactEmail).toBe("login@example.com");
+	it("建立：所有非零值隨建立一起送", () => {
+		const request = draft({ sellerType: "individual", productType: "蔬果" });
+		expect(request?.application?.productType).toBe("蔬果");
 		expect(request?.application?.subject.case).toBe("individual");
 	});
 
@@ -122,7 +109,6 @@ describe("SaveKYCDraft：建立與更新", () => {
 				sellerType: "business",
 				companyName: "山田有限公司",
 				taxId: "12345678",
-				payoutContactEmail: "a@b.co",
 			},
 			{ etag: "e1" },
 		);
@@ -229,11 +215,9 @@ describe("存檔後的 baseline（以送出的值為基準，與伺服器正規�
 		});
 
 	it("送出後沿用送出的值，不會每次都重送", () => {
-		const sent = { ...EMPTY_KYC_FORM, payoutContactEmail: "a@b.co" };
-		const baseline = baselineAfterSave(EMPTY_KYC_FORM, sent, [
-			"payout_contact_email",
-		]);
-		expect(baseline.payoutContactEmail).toBe("a@b.co");
+		const sent = { ...EMPTY_KYC_FORM, productType: "水果" };
+		const baseline = baselineAfterSave(EMPTY_KYC_FORM, sent, ["product_type"]);
+		expect(baseline.productType).toBe("水果");
 		expect(request(sent, baseline)).toBeNull();
 	});
 
@@ -241,11 +225,11 @@ describe("存檔後的 baseline（以送出的值為基準，與伺服器正規�
 		const sent: KycForm = {
 			...EMPTY_KYC_FORM,
 			sellerType: "business",
-			payoutContactEmail: "A@B.co ",
+			productType: "水果 ",
 			companyPhone: "02-12345678",
 		};
 		const baseline = baselineAfterSave(EMPTY_KYC_FORM, sent, [
-			"payout_contact_email",
+			"product_type",
 			"business.company_phone",
 		]);
 		expect(request(sent, baseline)).toBeNull();
@@ -259,63 +243,15 @@ describe("存檔後的 baseline（以送出的值為基準，與伺服器正規�
 		expect(json(request(typed, baseline)).updateMask).toBe("productType");
 	});
 
-	it("沒送出的欄位（不合格式的收款聯絡信箱）baseline 不變，仍與輸入不同", () => {
+	it("沒送出的欄位 baseline 不變，仍與輸入不同", () => {
 		const sent: KycForm = {
 			...EMPTY_KYC_FORM,
 			productType: "水果",
-			payoutContactEmail: "bad",
+			companyName: "山田",
 		};
 		const baseline = baselineAfterSave(EMPTY_KYC_FORM, sent, ["product_type"]);
-		expect(baseline.payoutContactEmail).toBe("");
+		expect(baseline.companyName).toBe("");
 		expect(baseline.productType).toBe("水果");
-	});
-});
-
-describe("收款聯絡信箱預設帶入登入信箱（D23）", () => {
-	it("還沒有值：帶入登入信箱", () => {
-		expect(
-			withPayoutEmailDefault(EMPTY_KYC_FORM, "login@example.com")
-				.payoutContactEmail,
-		).toBe("login@example.com");
-	});
-
-	it("已經有值（賣家改過的）不覆蓋", () => {
-		const form = { ...EMPTY_KYC_FORM, payoutContactEmail: "pay@example.com" };
-		expect(
-			withPayoutEmailDefault(form, "login@example.com").payoutContactEmail,
-		).toBe("pay@example.com");
-	});
-
-	it("登入沒有信箱（例如 LINE）：維持空，不帶入空白字串以外的東西", () => {
-		expect(
-			withPayoutEmailDefault(EMPTY_KYC_FORM, undefined).payoutContactEmail,
-		).toBe("");
-		expect(
-			withPayoutEmailDefault(EMPTY_KYC_FORM, "  ").payoutContactEmail,
-		).toBe("");
-	});
-
-	it("帶入的值與 baseline 不同：自動存檔會把它寫進申請", () => {
-		const defaulted = withPayoutEmailDefault(
-			EMPTY_KYC_FORM,
-			"login@example.com",
-		);
-		const request = buildSaveKycDraftRequest({
-			form: defaulted,
-			docs: EMPTY_KYC_DOCS,
-			baseline: EMPTY_KYC_FORM,
-			baselineDocs: EMPTY_KYC_DOCS,
-			etag: "e1",
-		});
-		expect(json(request).updateMask).toBe("payoutContactEmail");
-	});
-
-	it("輸入檢查：格式錯誤有訊息，空的（草稿）沒有", () => {
-		expect(kycInputErrors(EMPTY_KYC_FORM).payoutEmailErr).toBeNull();
-		expect(
-			kycInputErrors({ ...EMPTY_KYC_FORM, payoutContactEmail: "bad" })
-				.payoutEmailErr,
-		).toBe("Email 格式不正確");
 	});
 });
 
@@ -327,7 +263,6 @@ describe("建立時別處已經建立了申請", () => {
 	};
 	const existing = create(KYCApplicationSchema, {
 		etag: "e9",
-		payoutContactEmail: "pay@example.com",
 		subject: { case: "business", value: { companyName: "範例鮮果" } },
 	});
 
@@ -343,7 +278,7 @@ describe("建立時別處已經建立了申請", () => {
 	it("原樣採用既有申請：不帶店家預設值，也不會被當成待存的修改", () => {
 		const adopted = adoptExistingApplication(existing);
 		expect(adopted.form.companyPhone).toBe("");
-		expect(adopted.form.payoutContactEmail).toBe("pay@example.com");
+		expect(adopted.form.companyName).toBe("範例鮮果");
 		expect(adopted.etag).toBe("e9");
 		expect(
 			buildSaveKycDraftRequest({
@@ -361,13 +296,11 @@ describe("續填：位置與缺項由 missing_fields 決定", () => {
 	it("第一個還有缺項的區塊", () => {
 		expect(
 			resumeSectionOf([
-				KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL,
+				KYCField.KYC_FIELD_WEBSITE_URL,
 				KYCField.KYC_FIELD_BUSINESS_TAX_ID,
 			]),
 		).toBe("company");
-		expect(resumeSectionOf([KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL])).toBe(
-			"other",
-		);
+		expect(resumeSectionOf([KYCField.KYC_FIELD_WEBSITE_URL])).toBe("other");
 	});
 
 	it("沒有缺項不指定位置", () => {
@@ -378,13 +311,13 @@ describe("續填：位置與缺項由 missing_fields 決定", () => {
 		expect(
 			missingItemsOf(ut, [
 				KYCField.KYC_FIELD_BUSINESS_TAX_ID,
-				KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL,
+				KYCField.KYC_FIELD_WEBSITE_URL,
 				KYCField.KYC_FIELD_BANK_NAME,
 				KYCField.KYC_FIELD_UNSPECIFIED,
 			]),
 		).toEqual([
 			{ sectionId: "company", label: "統一編號" },
-			{ sectionId: "other", label: "收款聯絡信箱" },
+			{ sectionId: "other", label: "官方網站" },
 		]);
 	});
 
@@ -430,10 +363,9 @@ describe("補充文件欄位的錯誤提示", () => {
 });
 
 describe("申請 → 表單", () => {
-	it("地址、賣家型態與收款聯絡信箱", () => {
+	it("地址與賣家型態", () => {
 		const form = kycFormOf(
 			create(KYCApplicationSchema, {
-				payoutContactEmail: "pay@example.com",
 				subject: {
 					case: "business",
 					value: {
@@ -447,7 +379,6 @@ describe("申請 → 表單", () => {
 		expect(form.companyAddressDetail).toBe("某路");
 		expect(form.companyTownCode).toBe("63000010");
 		expect(form.companyCountyCode).toBe("63000");
-		expect(form.payoutContactEmail).toBe("pay@example.com");
 		expect(parseDate("1990-02-03")).toEqual({ year: 1990, month: 2, day: 3 });
 		expect(parseDate("bad")).toBeUndefined();
 	});
@@ -458,17 +389,17 @@ describe("版本衝突：保留輸入、顯示最新", () => {
 		const oldBaseline = {
 			...EMPTY_KYC_FORM,
 			productType: "舊",
-			payoutContactEmail: "old@example.com",
+			companyName: "舊公司",
 		};
 		const current = { ...oldBaseline, productType: "我改的" };
 		const latest = {
 			...oldBaseline,
 			productType: "別處改的",
-			payoutContactEmail: "new@example.com",
+			companyName: "新公司",
 		};
 		const merged = mergeLatestForm(current, oldBaseline, latest);
 		expect(merged.productType).toBe("我改的");
-		expect(merged.payoutContactEmail).toBe("new@example.com");
+		expect(merged.companyName).toBe("新公司");
 	});
 
 	it("存檔回應把剛傳的補充文件換成申請上的圖片，保留本機預覽", () => {
@@ -552,8 +483,8 @@ describe("GetMyKYC", () => {
 describe("SaveKYCDraft 的欄位錯誤", () => {
 	it("欄位錯誤的路徑對應回表單欄位", () => {
 		expect(kycFormKeyOfDraftPath("application.business.tax_id")).toBe("taxId");
-		expect(kycFormKeyOfDraftPath("application.payout_contact_email")).toBe(
-			"payoutContactEmail",
+		expect(kycFormKeyOfDraftPath("application.product_type")).toBe(
+			"productType",
 		);
 		expect(kycFormKeyOfDraftPath("application.english_name")).toBeUndefined();
 		expect(kycFormKeyOfDraftPath("application.etag")).toBeUndefined();
@@ -605,14 +536,14 @@ describe("待處理的退回問題", () => {
 	it("欄位的說明對到表單欄位，同一處的多項說明接在一起", () => {
 		const messages = kycIssueMessages(
 			app(
-				issue(KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL, "信箱無法收信"),
+				issue(KYCField.KYC_FIELD_PRODUCT_TYPE, "類型不明確"),
 				issue(KYCField.KYC_FIELD_BUSINESS_TAX_ID, "與登記不符"),
 				issue(KYCField.KYC_FIELD_BUSINESS_TAX_ID, "請重新確認"),
 				issue(KYCField.KYC_FIELD_UNSPECIFIED, "不該出現"),
 			),
 		);
 		expect(messages.form).toEqual({
-			payoutContactEmail: "信箱無法收信",
+			productType: "類型不明確",
 			taxId: "與登記不符；請重新確認",
 		});
 	});

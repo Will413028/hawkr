@@ -29,7 +29,7 @@ func devSeedStores() []seller.DevSeedStore {
 			KYC: seller.KYCDraftInput{
 				SellerType: &individual, RealName: ptr("李翠綠"), BirthDate: ptr("1980-05-20"), IDCardNo: ptr("A123456789"),
 				IDCardIssueDate: ptr("2020-03-15"), IDCardIssueType: ptr("換發"), IDCardIssueLocation: ptr("臺南市"),
-				EnglishName: ptr("Green Organic Farm"), BankName: ptr("臺灣銀行"), BankCode: ptr("004"), BankAccount: ptr("123456789012"), PayoutContactEmail: ptr("seller-1009@example.com"),
+				EnglishName: ptr("Green Organic Farm"), BankName: ptr("臺灣銀行"), BankCode: ptr("004"), BankAccount: ptr("123456789012"),
 				ProductType: ptr("有機蔬果"),
 			},
 		},
@@ -44,7 +44,7 @@ func devSeedStores() []seller.DevSeedStore {
 			KYC: seller.KYCDraftInput{
 				SellerType: &individual, RealName: ptr("陳海鮮"), BirthDate: ptr("1985-11-02"), IDCardNo: ptr("A123456789"),
 				IDCardIssueDate: ptr("2021-06-01"), IDCardIssueType: ptr("換發"), IDCardIssueLocation: ptr("澎湖縣"),
-				EnglishName: ptr("Penghu Fresh Seafood"), BankName: ptr("臺灣銀行"), BankCode: ptr("004"), BankAccount: ptr("987654321098"), PayoutContactEmail: ptr("seller-1004@example.com"),
+				EnglishName: ptr("Penghu Fresh Seafood"), BankName: ptr("臺灣銀行"), BankCode: ptr("004"), BankAccount: ptr("987654321098"),
 				ProductType: ptr("水產海鮮"),
 			},
 		},

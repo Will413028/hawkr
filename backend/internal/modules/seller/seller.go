@@ -124,7 +124,7 @@ func New(d Deps) *Module {
 	})
 	payments := payment.New(payment.Deps{DB: d.DB, Jobs: d.Jobs, Provider: d.Payment, Exposure: exposures, Identities: kyc.NewFingerprints(d.KYCMAC), Now: d.Now, Logger: d.Logger})
 	kycService := kyc.New(kyc.Deps{
-		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Exposure: exposures, Payment: payments, Keys: d.KYCKeys, MAC: d.KYCMAC, Registry: d.Registry, Now: d.Now, Logger: d.Logger,
+		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Exposure: exposures, Payment: payments, Identity: d.Identity, Keys: d.KYCKeys, MAC: d.KYCMAC, Registry: d.Registry, Now: d.Now, Logger: d.Logger,
 	})
 	return &Module{
 		onboarding: onboarding.New(onboarding.Deps{

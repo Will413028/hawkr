@@ -222,7 +222,6 @@ const KYCField$json = {
     {'1': 'KYC_FIELD_BUSINESS_REP_ID_CARD_NO', '2': 26},
     {'1': 'KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS', '2': 27},
     {'1': 'KYC_FIELD_BUSINESS_COMPANY_ADDRESS', '2': 28},
-    {'1': 'KYC_FIELD_PAYOUT_CONTACT_EMAIL', '2': 29},
   ],
   '4': [
     {'1': 11, '2': 11},
@@ -231,6 +230,7 @@ const KYCField$json = {
     {'1': 19, '2': 19},
     {'1': 23, '2': 23},
     {'1': 24, '2': 24},
+    {'1': 29, '2': 29},
   ],
   '5': [
     'KYC_FIELD_FOOD_BUSINESS',
@@ -238,7 +238,8 @@ const KYCField$json = {
     'KYC_FIELD_CONTACT_PHONE',
     'KYC_FIELD_BUSINESS_COMPANY_TYPE',
     'KYC_FIELD_BUSINESS_COMPANY_TOWN_CODE',
-    'KYC_FIELD_BUSINESS_COMPANY_ADDRESS_DETAIL'
+    'KYC_FIELD_BUSINESS_COMPANY_ADDRESS_DETAIL',
+    'KYC_FIELD_PAYOUT_CONTACT_EMAIL'
   ],
 };
 
@@ -257,12 +258,12 @@ final $typed_data.Uint8List kYCFieldDescriptor = $convert.base64Decode(
     'X0JVU0lORVNTX0NPTVBBTllfUkVHSVNURVJfREFURRAWEiQKIEtZQ19GSUVMRF9CVVNJTkVTU1'
     '9DT01QQU5ZX1BIT05FEBkSJQohS1lDX0ZJRUxEX0JVU0lORVNTX1JFUF9JRF9DQVJEX05PEBoS'
     'KAokS1lDX0ZJRUxEX0JVU0lORVNTX0NPTVBBTllfRE9DVU1FTlRTEBsSJgoiS1lDX0ZJRUxEX0'
-    'JVU0lORVNTX0NPTVBBTllfQUREUkVTUxAcEiIKHktZQ19GSUVMRF9QQVlPVVRfQ09OVEFDVF9F'
-    'TUFJTBAdIgQICxALIgQIDRANIgQIDhAOIgQIExATIgQIFxAXIgQIGBAYKhdLWUNfRklFTERfRk'
-    '9PRF9CVVNJTkVTUyoXS1lDX0ZJRUxEX0NPTlRBQ1RfRU1BSUwqF0tZQ19GSUVMRF9DT05UQUNU'
-    'X1BIT05FKh9LWUNfRklFTERfQlVTSU5FU1NfQ09NUEFOWV9UWVBFKiRLWUNfRklFTERfQlVTSU'
-    '5FU1NfQ09NUEFOWV9UT1dOX0NPREUqKUtZQ19GSUVMRF9CVVNJTkVTU19DT01QQU5ZX0FERFJF'
-    'U1NfREVUQUlM');
+    'JVU0lORVNTX0NPTVBBTllfQUREUkVTUxAcIgQICxALIgQIDRANIgQIDhAOIgQIExATIgQIFxAX'
+    'IgQIGBAYIgQIHRAdKhdLWUNfRklFTERfRk9PRF9CVVNJTkVTUyoXS1lDX0ZJRUxEX0NPTlRBQ1'
+    'RfRU1BSUwqF0tZQ19GSUVMRF9DT05UQUNUX1BIT05FKh9LWUNfRklFTERfQlVTSU5FU1NfQ09N'
+    'UEFOWV9UWVBFKiRLWUNfRklFTERfQlVTSU5FU1NfQ09NUEFOWV9UT1dOX0NPREUqKUtZQ19GSU'
+    'VMRF9CVVNJTkVTU19DT01QQU5ZX0FERFJFU1NfREVUQUlMKh5LWUNfRklFTERfUEFZT1VUX0NP'
+    'TlRBQ1RfRU1BSUw=');
 
 @$core.Deprecated('Use kYCIssueCodeDescriptor instead')
 const KYCIssueCode$json = {
@@ -1975,13 +1976,6 @@ const KYCApplication$json = {
     {'1': 'product_type', '3': 14, '4': 1, '5': 9, '10': 'productType'},
     {'1': 'website_url', '3': 16, '4': 1, '5': 9, '10': 'websiteUrl'},
     {
-      '1': 'payout_contact_email',
-      '3': 33,
-      '4': 1,
-      '5': 9,
-      '10': 'payoutContactEmail'
-    },
-    {
       '1': 'id_card_front',
       '3': 19,
       '4': 1,
@@ -2112,8 +2106,14 @@ const KYCApplication$json = {
     {'1': 15, '2': 16},
     {'1': 17, '2': 18},
     {'1': 18, '2': 19},
+    {'1': 33, '2': 34},
   ],
-  '10': ['contact_email', 'contact_phone', 'food_business'],
+  '10': [
+    'contact_email',
+    'contact_phone',
+    'food_business',
+    'payout_contact_email'
+  ],
 };
 
 /// Descriptor for `KYCApplication`. Decode as a `google.protobuf.DescriptorProto`.
@@ -2129,27 +2129,26 @@ final $typed_data.Uint8List kYCApplicationDescriptor = $convert.base64Decode(
     'UghiYW5rQ29kZRImCgxiYW5rX2FjY291bnQYDCABKAlCA+BBBFILYmFua0FjY291bnQSMwoTYm'
     'Fua19hY2NvdW50X21hc2tlZBgNIAEoCUID4EEDUhFiYW5rQWNjb3VudE1hc2tlZBIhCgxwcm9k'
     'dWN0X3R5cGUYDiABKAlSC3Byb2R1Y3RUeXBlEh8KC3dlYnNpdGVfdXJsGBAgASgJUgp3ZWJzaX'
-    'RlVXJsEjAKFHBheW91dF9jb250YWN0X2VtYWlsGCEgASgJUhJwYXlvdXRDb250YWN0RW1haWwS'
-    'RgoNaWRfY2FyZF9mcm9udBgTIAEoCzIiLmhhd2tyLnNlbGxlci52MWFscGhhMS5LWUNEb2N1bW'
-    'VudFILaWRDYXJkRnJvbnQSRAoMaWRfY2FyZF9iYWNrGBQgASgLMiIuaGF3a3Iuc2VsbGVyLnYx'
-    'YWxwaGExLktZQ0RvY3VtZW50UgppZENhcmRCYWNrEj8KCWJhbmtfYm9vaxgVIAEoCzIiLmhhd2'
-    'tyLnNlbGxlci52MWFscGhhMS5LWUNEb2N1bWVudFIIYmFua0Jvb2sSRgoKaW5kaXZpZHVhbBgW'
-    'IAEoCzIkLmhhd2tyLnNlbGxlci52MWFscGhhMS5JbmRpdmlkdWFsS1lDSABSCmluZGl2aWR1YW'
-    'wSQAoIYnVzaW5lc3MYFyABKAsyIi5oYXdrci5zZWxsZXIudjFhbHBoYTEuQnVzaW5lc3NLWUNI'
-    'AFIIYnVzaW5lc3MSNwoEZmxvdxgYIAEoCzIeLmhhd2tyLnNlbGxlci52MWFscGhhMS5LWUNGbG'
-    '93QgPgQQNSBGZsb3cSTwoObGFzdF9yZWplY3Rpb24YGSABKAsyIy5oYXdrci5zZWxsZXIudjFh'
-    'bHBoYTEuS1lDUmVqZWN0aW9uQgPgQQNSDWxhc3RSZWplY3Rpb24SSwoObWlzc2luZ19maWVsZH'
-    'MYGiADKA4yHy5oYXdrci5zZWxsZXIudjFhbHBoYTEuS1lDRmllbGRCA+BBA1INbWlzc2luZ0Zp'
-    'ZWxkcxJYChRtaXNzaW5nX3N0b3JlX2ZpZWxkcxgfIAMoDjIhLmhhd2tyLnNlbGxlci52MWFscG'
-    'hhMS5TdG9yZUZpZWxkQgPgQQNSEm1pc3NpbmdTdG9yZUZpZWxkcxJTChJvdXRzdGFuZGluZ19p'
-    'c3N1ZXMYICADKAsyHy5oYXdrci5zZWxsZXIudjFhbHBoYTEuS1lDSXNzdWVCA+BBA1IRb3V0c3'
-    'RhbmRpbmdJc3N1ZXMSQAoLc3VibWl0X3RpbWUYGyABKAsyGi5nb29nbGUucHJvdG9idWYuVGlt'
-    'ZXN0YW1wQgPgQQNSCnN1Ym1pdFRpbWUSQAoLZGVjaWRlX3RpbWUYHCABKAsyGi5nb29nbGUucH'
-    'JvdG9idWYuVGltZXN0YW1wQgPgQQNSCmRlY2lkZVRpbWUSQAoLY3JlYXRlX3RpbWUYHSABKAsy'
-    'Gi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCmNyZWF0ZVRpbWUSQAoLdXBkYXRlX3'
-    'RpbWUYHiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCnVwZGF0ZVRpbWVC'
-    'CQoHc3ViamVjdEoECA8QEEoECBEQEkoECBIQE1INY29udGFjdF9lbWFpbFINY29udGFjdF9waG'
-    '9uZVINZm9vZF9idXNpbmVzcw==');
+    'RlVXJsEkYKDWlkX2NhcmRfZnJvbnQYEyABKAsyIi5oYXdrci5zZWxsZXIudjFhbHBoYTEuS1lD'
+    'RG9jdW1lbnRSC2lkQ2FyZEZyb250EkQKDGlkX2NhcmRfYmFjaxgUIAEoCzIiLmhhd2tyLnNlbG'
+    'xlci52MWFscGhhMS5LWUNEb2N1bWVudFIKaWRDYXJkQmFjaxI/CgliYW5rX2Jvb2sYFSABKAsy'
+    'Ii5oYXdrci5zZWxsZXIudjFhbHBoYTEuS1lDRG9jdW1lbnRSCGJhbmtCb29rEkYKCmluZGl2aW'
+    'R1YWwYFiABKAsyJC5oYXdrci5zZWxsZXIudjFhbHBoYTEuSW5kaXZpZHVhbEtZQ0gAUgppbmRp'
+    'dmlkdWFsEkAKCGJ1c2luZXNzGBcgASgLMiIuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkJ1c2luZX'
+    'NzS1lDSABSCGJ1c2luZXNzEjcKBGZsb3cYGCABKAsyHi5oYXdrci5zZWxsZXIudjFhbHBoYTEu'
+    'S1lDRmxvd0ID4EEDUgRmbG93Ek8KDmxhc3RfcmVqZWN0aW9uGBkgASgLMiMuaGF3a3Iuc2VsbG'
+    'VyLnYxYWxwaGExLktZQ1JlamVjdGlvbkID4EEDUg1sYXN0UmVqZWN0aW9uEksKDm1pc3Npbmdf'
+    'ZmllbGRzGBogAygOMh8uaGF3a3Iuc2VsbGVyLnYxYWxwaGExLktZQ0ZpZWxkQgPgQQNSDW1pc3'
+    'NpbmdGaWVsZHMSWAoUbWlzc2luZ19zdG9yZV9maWVsZHMYHyADKA4yIS5oYXdrci5zZWxsZXIu'
+    'djFhbHBoYTEuU3RvcmVGaWVsZEID4EEDUhJtaXNzaW5nU3RvcmVGaWVsZHMSUwoSb3V0c3Rhbm'
+    'RpbmdfaXNzdWVzGCAgAygLMh8uaGF3a3Iuc2VsbGVyLnYxYWxwaGExLktZQ0lzc3VlQgPgQQNS'
+    'EW91dHN0YW5kaW5nSXNzdWVzEkAKC3N1Ym1pdF90aW1lGBsgASgLMhouZ29vZ2xlLnByb3RvYn'
+    'VmLlRpbWVzdGFtcEID4EEDUgpzdWJtaXRUaW1lEkAKC2RlY2lkZV90aW1lGBwgASgLMhouZ29v'
+    'Z2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgpkZWNpZGVUaW1lEkAKC2NyZWF0ZV90aW1lGB'
+    '0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgpjcmVhdGVUaW1lEkAKC3Vw'
+    'ZGF0ZV90aW1lGB4gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgp1cGRhdG'
+    'VUaW1lQgkKB3N1YmplY3RKBAgPEBBKBAgREBJKBAgSEBNKBAghECJSDWNvbnRhY3RfZW1haWxS'
+    'DWNvbnRhY3RfcGhvbmVSDWZvb2RfYnVzaW5lc3NSFHBheW91dF9jb250YWN0X2VtYWls');
 
 @$core.Deprecated('Use saveKYCDraftRequestDescriptor instead')
 const SaveKYCDraftRequest$json = {

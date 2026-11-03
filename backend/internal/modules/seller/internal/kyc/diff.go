@@ -84,7 +84,6 @@ var fieldDiffs = map[string]fieldDiff{
 	"bank_account":           secret(colBankAccount, func(r store.SellerKycApplication) []byte { return r.BankAccountEnc }),
 	"product_type":           plain(func(r store.SellerKycApplication) *string { return r.ProductType }),
 	"website_url":            plain(func(r store.SellerKycApplication) *string { return r.WebsiteUrl }),
-	"payout_contact_email":   plain(func(r store.SellerKycApplication) *string { return r.PayoutContactEmail }),
 
 	"individual.id_card_no":          secret(colIDCardNo, func(r store.SellerKycApplication) []byte { return r.IDCardNoEnc }),
 	"business.company_name":          plain(func(r store.SellerKycApplication) *string { return r.CompanyName }),

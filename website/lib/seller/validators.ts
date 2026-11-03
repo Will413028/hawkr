@@ -15,20 +15,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** 客服電子信箱的長度上限：PayUni 的 MerEmail、Email 與 MBCMail 至多 50 字，店家欄位的上限與它相同。 */
 export const SUPPORT_EMAIL_MAX_LENGTH = 50;
 
-/** 收款聯絡信箱的長度上限，與伺服器的 `payout_contact_email` 相同。 */
-export const PAYOUT_CONTACT_EMAIL_MAX_LENGTH = 254;
-
-/** 收款聯絡信箱：送出時必填；草稿可以空，所以空字串由呼叫端決定要不要檢查。 */
-export function validatePayoutContactEmail(value: string): string | null {
-	const v = value.trim();
-	if (!v) return "請輸入收款聯絡信箱";
-	if (!EMAIL_RE.test(v)) return "Email 格式不正確";
-	if ([...v].length > PAYOUT_CONTACT_EMAIL_MAX_LENGTH) {
-		return `收款聯絡信箱最多 ${PAYOUT_CONTACT_EMAIL_MAX_LENGTH} 字`;
-	}
-	return null;
-}
-
 export function validateEmail(value: string): string | null {
 	const v = value.trim();
 	if (!v) return "請輸入客服電子信箱";

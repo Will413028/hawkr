@@ -2,11 +2,9 @@ package model
 
 import (
 	"errors"
-	"net/mail"
 	"regexp"
 	"strings"
 	"time"
-	"unicode"
 	"unicode/utf8"
 	"uuid"
 
@@ -249,7 +247,7 @@ type KYCApplication struct {
 	BankName, BankCode                                    *string
 	BankAccountMasked                                     *string
 	ProductType                                           *string
-	WebsiteURL, PayoutContactEmail                        *string
+	WebsiteURL                                            *string
 	CompanyName, TaxID                                    *string
 	CompanyRegisterDate                                   *string
 	CompanyTownCode, CompanyAddressDetail, CompanyPhone   *string
@@ -424,7 +422,7 @@ type KYCDraftInput struct {
 	IDCardIssueDate, IDCardIssueType, IDCardIssueLocation *string
 	EnglishName                                           *string
 	BankName, BankCode, BankAccount, ProductType          *string
-	WebsiteURL, PayoutContactEmail                        *string
+	WebsiteURL                                            *string
 	CompanyName, TaxID, CompanyRegisterDate               *string
 	CompanyTownCode, CompanyAddressDetail, CompanyPhone   *string
 	RepIDCardNo                                           *string
@@ -662,22 +660,6 @@ func NormalizeMobile(raw string) (string, bool) {
 	return p, mobileRe.MatchString(p)
 }
 
-// NormalizeEmail 去掉前後空白、轉小寫，要求恰好一個 @、兩側非空、沒有空白、至多 254 字，且網域有點（user@localhost 不算）。
-// 這些條件與資料庫的信箱 CHECK（payout_contact_email、contact_email、support_email）一致；mail.ParseAddress 接受的帶引號本地
-// 部分（"a@b"@c.com）會多出一個 @，所以要在解析之後再檢查一次。
-func NormalizeEmail(raw string) (string, bool) {
-	addr, err := mail.ParseAddress(strings.TrimSpace(raw))
-	if err != nil || addr.Name != "" {
-		return "", false
-	}
-	email := strings.ToLower(addr.Address)
-	at := strings.Index(email, "@")
-	ok := at > 0 && at < len(email)-1 && strings.Count(email, "@") == 1 &&
-		strings.Contains(email[at+1:], ".") && len(email) <= 254 &&
-		strings.IndexFunc(email, unicode.IsSpace) < 0
-	return email, ok
-}
-
 // ValidEnglishName 檢查 PayUni 商店英文名稱的字元集與長度（至多 50 字）。
 func ValidEnglishName(name string) bool {
 	return utf8.RuneCountInString(name) <= 50 && englishNameRe.MatchString(name)
@@ -692,7 +674,7 @@ func KYCFieldNames() []string {
 		"id_card_front", "id_card_back", "bank_book", "individual.id_card_no",
 		"business.company_name", "business.tax_id", "business.company_register_date",
 		"business.company_address", "business.company_phone", "business.rep_id_card_no",
-		"business.company_documents", "payout_contact_email",
+		"business.company_documents",
 	}
 }
 

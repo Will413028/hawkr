@@ -469,7 +469,15 @@ func (s *Service) Approve(ctx context.Context, in model.ApproveKYCInput) (model.
 		if _, err := payuni.RequestBind(ctx, q, s.d.Jobs, payuni.BindIntent{Store: locked, Application: row}, now); err != nil {
 			return err
 		}
-		if err := s.d.Payment.RequestAccount(ctx, q, row.StoreID, row.PayoutContactEmail, now); err != nil {
+		var contact *string
+		if s.d.Payment.Configured() {
+			email, err := s.contactEmail(ctx, locked.AccountID)
+			if err != nil {
+				return err
+			}
+			contact = &email
+		}
+		if err := s.d.Payment.RequestAccount(ctx, q, row.StoreID, contact, now); err != nil {
 			return err
 		}
 		if err := s.d.Exposure.Announce(ctx, q, now, row.StoreID); err != nil {

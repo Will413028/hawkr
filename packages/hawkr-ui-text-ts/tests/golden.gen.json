@@ -129,8 +129,6 @@
   {"key":"seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS","fn":"seller.KYCField","value":"KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS","audience":"default","locale":"en","want":"補充文件"},
   {"key":"seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_ADDRESS","fn":"seller.KYCField","value":"KYC_FIELD_BUSINESS_COMPANY_ADDRESS","audience":"default","locale":"zh-TW","want":"公司地址"},
   {"key":"seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_ADDRESS","fn":"seller.KYCField","value":"KYC_FIELD_BUSINESS_COMPANY_ADDRESS","audience":"default","locale":"en","want":"公司地址"},
-  {"key":"seller.KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL","fn":"seller.KYCField","value":"KYC_FIELD_PAYOUT_CONTACT_EMAIL","audience":"default","locale":"zh-TW","want":"收款聯絡信箱"},
-  {"key":"seller.KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL","fn":"seller.KYCField","value":"KYC_FIELD_PAYOUT_CONTACT_EMAIL","audience":"default","locale":"en","want":"收款聯絡信箱"},
   {"key":"seller.KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED","fn":"seller.KYCFlowStatus","value":"KYC_FLOW_STATUS_NOT_STARTED","audience":"default","locale":"zh-TW","want":"待認證"},
   {"key":"seller.KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED","fn":"seller.KYCFlowStatus","value":"KYC_FLOW_STATUS_NOT_STARTED","audience":"default","locale":"en","want":"待認證"},
   {"key":"seller.KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED","fn":"seller.KYCFlowStatus","value":"KYC_FLOW_STATUS_NOT_STARTED","audience":"staff","locale":"zh-TW","want":"尚未申請"},

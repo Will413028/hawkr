@@ -71,7 +71,6 @@ export type UiTextKey =
 	| "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_LOCATION"
 	| "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_TYPE"
 	| "seller.KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO"
-	| "seller.KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL"
 	| "seller.KYCField.KYC_FIELD_PRODUCT_TYPE"
 	| "seller.KYCField.KYC_FIELD_REAL_NAME"
 	| "seller.KYCField.KYC_FIELD_WEBSITE_URL"
@@ -369,7 +368,6 @@ const SELLER_KYCFIELD: Readonly<Partial<Record<number, UiTextKey>>> = {
 	26: "seller.KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO",
 	27: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS",
 	28: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_ADDRESS",
-	29: "seller.KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL",
 };
 
 /** seller.KYCField 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */

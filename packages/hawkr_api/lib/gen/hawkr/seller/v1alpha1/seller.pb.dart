@@ -3503,7 +3503,6 @@ class KYCApplication extends $pb.GeneratedMessage {
     $1.Timestamp? updateTime,
     $core.Iterable<StoreField>? missingStoreFields,
     $core.Iterable<KYCIssue>? outstandingIssues,
-    $core.String? payoutContactEmail,
   }) {
     final result = KYCApplication._();
     if (id != null) result.id = id;
@@ -3538,8 +3537,6 @@ class KYCApplication extends $pb.GeneratedMessage {
       result.missingStoreFields.addAll(missingStoreFields);
     if (outstandingIssues != null)
       result.outstandingIssues.addAll(outstandingIssues);
-    if (payoutContactEmail != null)
-      result.payoutContactEmail = payoutContactEmail;
     return result;
   }
 
@@ -3616,7 +3613,6 @@ class KYCApplication extends $pb.GeneratedMessage {
         defaultEnumValue: StoreField.STORE_FIELD_UNSPECIFIED)
     ..pPM<KYCIssue>(32, _omitFieldNames ? '' : 'outstandingIssues',
         subBuilder: KYCIssue.$_createMessage)
-    ..aOS(33, _omitFieldNames ? '' : 'payoutContactEmail')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3927,16 +3923,6 @@ class KYCApplication extends $pb.GeneratedMessage {
   /// 重新送出、核准或取消之後是空的。client 以它標出要補的欄位與文件，不必自己推導退回是否仍然有效。
   @$pb.TagNumber(32)
   $pb.PbList<KYCIssue> get outstandingIssues => $_getList(28);
-
-  /// 收款聯絡信箱：核准後建立收款帳戶時交給金流商的聯絡信箱。草稿可以空，送出時必填；伺服器去掉前後空白並轉小寫，至多 254 字。
-  @$pb.TagNumber(33)
-  $core.String get payoutContactEmail => $_getSZ(29);
-  @$pb.TagNumber(33)
-  set payoutContactEmail($core.String value) => $_setString(29, value);
-  @$pb.TagNumber(33)
-  $core.bool hasPayoutContactEmail() => $_has(29);
-  @$pb.TagNumber(33)
-  void clearPayoutContactEmail() => $_clearField(33);
 }
 
 class SaveKYCDraftRequest extends $pb.GeneratedMessage {
@@ -7618,7 +7604,8 @@ class SellerAppServiceApi {
   /// 不必先儲存；can_resubmit 為 false 的狀態回 failed_precondition，訊息是 KYCFlow.resubmit_unavailabilities 的第一句。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
   /// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（real_name、id_card_front、business.tax_id……，與 KYCField 一對一）。申請本身齊全之後，
   /// PayUni 綁定需要的店家資料（地址、聯絡人姓名與手機、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
-  /// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。 身分比對沒有通過時回
+  /// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。帳號沒有聯絡信箱（IdentityAppService.GetContactEmail 沒有回信箱）時回
+  /// failed_precondition 與 ErrorReason CONTACT_EMAIL_REQUIRED，client 引導在 IdentityAppService.SetContactEmail 填一個再重送。 身分比對沒有通過時回
   /// failed_precondition，訊息固定，不透露是哪個欄位或哪個帳號。每個帳號每小時最多送出 5 次，超過回
   /// resource_exhausted（帶 RetryInfo）。
   $async.Future<SubmitKYCResponse> submitKYC(

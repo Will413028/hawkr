@@ -14,6 +14,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/agreement"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
@@ -26,10 +27,16 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/auditreason"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/emailaddr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
 )
+
+// Identity 是 KYC 需要的 identity 公開 API：帳號的聯絡信箱（送出時要有，核准時快照到收款帳戶）。
+type Identity interface {
+	ContactEmail(ctx context.Context, accountID int64) (identity.ContactEmail, bool, error)
+}
 
 // Deps 外部依賴；clock 由組裝點注入。Keys 與 MAC 必填（seller.New 檢查）：個資不能在沒有加密的情況下寫入。
 type Deps struct {
@@ -40,9 +47,10 @@ type Deps struct {
 	// Exposure 是可曝光的公告：申請的狀態是 KYC 流程的輸入，每個改變它的寫入在 transaction 的最後呼叫。
 	Exposure *exposure.Service
 	// Payment 是收款帳戶：核准的 transaction 內寫「建立中」的列並排入建立 job（Stripe 計畫 D16）。
-	Payment *payment.Service
-	Keys    *seal.Keyring
-	MAC     *seal.MAC
+	Payment  *payment.Service
+	Identity Identity
+	Keys     *seal.Keyring
+	MAC      *seal.MAC
 	// Registry 是登記資料來源（公司型申請送件時的查詢快照）；必填：公開資料，沒有「沒有設定」的情形。
 	Registry Registry
 	Now      func() time.Time
@@ -57,10 +65,25 @@ type Service struct {
 
 // New 建立服務。
 func New(d Deps) *Service {
-	if d.Registry == nil || d.Payment == nil {
-		panic("kyc: Registry and Payment are required")
+	if d.Registry == nil || d.Payment == nil || d.Identity == nil {
+		panic("kyc: Registry, Payment and Identity are required")
 	}
 	return &Service{d: d, p: protector{keys: d.Keys, mac: d.MAC}}
+}
+
+// contactEmail 回傳帳號的聯絡信箱（已驗證的優先，沒有才用自填的），正規化成收款帳戶的格式（小寫、格式與長度的檢查同 payment_accounts_contact_email_check）；
+// 沒有，或 provider 回報的值不是可用的信箱，回 failed_precondition 與 CONTACT_EMAIL_REQUIRED。在呼叫方的 transaction 內讀取。
+func (s *Service) contactEmail(ctx context.Context, accountID int64) (string, error) {
+	c, ok, err := s.d.Identity.ContactEmail(ctx, accountID)
+	if err != nil {
+		return "", err
+	}
+	if ok {
+		if email, valid := emailaddr.Normalize(c.Address); valid {
+			return email, nil
+		}
+	}
+	return "", apperr.FailedPrecondition("請先填寫聯絡信箱").WithReason(apperr.ReasonContactEmailRequired)
 }
 
 func errVersionConflict() error { return apperr.VersionConflict("申請資料已被修改") }
@@ -385,6 +408,9 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitKYCInput) (model.KY
 		if err := complete(row); err != nil {
 			return err
 		}
+		if _, err := s.contactEmail(ctx, locked.AccountID); err != nil {
+			return err
+		}
 		missingStore, err := s.missingStoreFields(ctx, q, row.StoreID)
 		if err != nil {
 			return err
@@ -554,7 +580,6 @@ type requirement struct {
 var requirements = []requirement{
 	{"business.company_name", "請填寫公司名稱", func(r store.SellerKycApplication) bool { return r.CompanyName == nil }},
 	{"business.tax_id", "請填寫統一編號", func(r store.SellerKycApplication) bool { return r.TaxID == nil }},
-	{"payout_contact_email", "請填寫收款聯絡信箱", func(r store.SellerKycApplication) bool { return r.PayoutContactEmail == nil }},
 }
 
 // missingFields 回傳還缺的欄位路徑（依 requirements 的順序）。

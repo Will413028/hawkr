@@ -92,7 +92,8 @@ service SellerAppService {
   // 不必先儲存；can_resubmit 為 false 的狀態回 failed_precondition，訊息是 KYCFlow.resubmit_unavailabilities 的第一句。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
   // invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（real_name、id_card_front、business.tax_id……，與 KYCField 一對一）。申請本身齊全之後，
   // PayUni 綁定需要的店家資料（地址、聯絡人姓名與手機、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
-  // client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。 身分比對沒有通過時回
+  // client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。帳號沒有聯絡信箱（IdentityAppService.GetContactEmail 沒有回信箱）時回
+  // failed_precondition 與 ErrorReason CONTACT_EMAIL_REQUIRED，client 引導在 IdentityAppService.SetContactEmail 填一個再重送。 身分比對沒有通過時回
   // failed_precondition，訊息固定，不透露是哪個欄位或哪個帳號。每個帳號每小時最多送出 5 次，超過回
   // resource_exhausted（帶 RetryInfo）。
   rpc SubmitKYC(SubmitKYCRequest) returns (SubmitKYCResponse);
@@ -613,7 +614,9 @@ enum KYCField {
   KYC_FIELD_BUSINESS_REP_ID_CARD_NO = 26;
   KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS = 27;
   KYC_FIELD_BUSINESS_COMPANY_ADDRESS = 28;
-  KYC_FIELD_PAYOUT_CONTACT_EMAIL = 29;
+  // 29 是刪掉的 KYC_FIELD_PAYOUT_CONTACT_EMAIL（收款聯絡信箱改為帳號層級，IdentityAppService.GetContactEmail）。
+  reserved 29;
+  reserved "KYC_FIELD_PAYOUT_CONTACT_EMAIL";
 }
 
 // KYCIssueCode 是退回時一個問題的原因類別：封閉集合，client 可以依它分支；具體的說明在 KYCIssue.message。
@@ -831,6 +834,9 @@ message BusinessKYC {
 message KYCApplication {
   reserved 15, 17, 18;
   reserved "contact_email", "contact_phone", "food_business";
+  // 33 是刪掉的 payout_contact_email（收款聯絡信箱改為帳號層級，IdentityAppService.GetContactEmail；SubmitKYC 要求帳號有聯絡信箱）。
+  reserved 33;
+  reserved "payout_contact_email";
 
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   KYCStatus status = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -849,8 +855,6 @@ message KYCApplication {
   string bank_account_masked = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
   string product_type = 14;
   string website_url = 16;
-  // 收款聯絡信箱：核准後建立收款帳戶時交給金流商的聯絡信箱。草稿可以空，送出時必填；伺服器去掉前後空白並轉小寫，至多 254 字。
-  string payout_contact_email = 33;
   KYCDocument id_card_front = 19;
   KYCDocument id_card_back = 20;
   KYCDocument bank_book = 21;

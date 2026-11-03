@@ -219,6 +219,9 @@ func (f *adminFixture) newSeller(t *testing.T, name string) (int64, seller.Store
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := f.id.SetSelfEnteredEmail(context.Background(), authenticated.Principal.ID, "seller@example.com"); err != nil {
+		t.Fatal(err)
+	}
 	s, err := f.module.Apply(context.Background(), seller.ApplyInput{AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: authenticated.Principal.ID, StoreName: name, TownCode: "63000050", AddressDetail: "測試路一號"})
 	if err != nil {
 		t.Fatal(err)
@@ -484,7 +487,7 @@ func TestListStoresPagesOverConnectAndGetStoreCarriesTheKYCSummary(t *testing.T)
 	draft, err := f.module.SaveKYCDraft(ctx, seller.KYCDraftInput{
 		AccountID: accountID, SellerType: ptr(seller.KYCIndividual), RealName: ptr("王小明"), BirthDate: ptr("1990-05-06"), IDCardNo: ptr("A123456789"),
 		EnglishName: ptr("Wang Farm"), BankName: ptr("臺灣銀行"), BankCode: ptr("004"), BankAccount: ptr("012345678901"),
-		ProductType: ptr("蔬果"), PayoutContactEmail: ptr("seller@example.com"),
+		ProductType: ptr("蔬果"),
 		IDCardFront: &seller.KYCDocumentRef{StagedToken: "front"}, IDCardBack: &seller.KYCDocumentRef{StagedToken: "back"}, BankBook: &seller.KYCDocumentRef{StagedToken: "book"},
 	})
 	if err != nil {
@@ -905,7 +908,7 @@ func (f *adminFixture) submitKYC(t *testing.T, storeID int64, idCard, bank strin
 	draft, err := f.module.SaveKYCDraft(ctx, seller.KYCDraftInput{
 		AccountID: accountID, SellerType: ptr(seller.KYCIndividual), RealName: ptr("王小明"), BirthDate: ptr("1990-05-06"), IDCardNo: ptr(idCard),
 		EnglishName: ptr("Wang Farm"), BankName: ptr("臺灣銀行"), BankCode: ptr("004"), BankAccount: ptr(bank),
-		ProductType: ptr("蔬果"), PayoutContactEmail: ptr("seller@example.com"),
+		ProductType: ptr("蔬果"),
 		IDCardFront: &seller.KYCDocumentRef{StagedToken: "front"}, IDCardBack: &seller.KYCDocumentRef{StagedToken: "back"}, BankBook: &seller.KYCDocumentRef{StagedToken: "book"},
 	})
 	if err != nil {

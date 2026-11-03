@@ -248,13 +248,13 @@ func must(t *testing.T, err error) {
 
 func ptr[T any](v T) *T { return &v }
 
-// account 建立一個帳號。先多建兩個，讓 account_id 與第一個 store_id 不同值：互換 ID 的缺陷才藏不住。
+// account 建立一個帳號（有自填的聯絡信箱 seller@example.com，KYC 才送得出去）。先多建兩個，讓 account_id 與第一個 store_id 不同值：互換 ID 的缺陷才藏不住。
 func (f *fixture) account(t *testing.T) int64 {
 	t.Helper()
 	ctx := context.Background()
 	var id int64
 	for range 3 {
-		must(t, f.db.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&id))
+		must(t, f.db.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts (self_entered_email) VALUES ('seller@example.com') RETURNING id").Scan(&id))
 	}
 	return id
 }

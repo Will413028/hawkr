@@ -8,6 +8,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/emailaddr"
 	"github.com/Will413028/hawkr/backend/internal/platform/phone"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 	"github.com/Will413028/hawkr/backend/internal/platform/twaddr"
@@ -138,7 +139,7 @@ func normalizeContact(p *Profile) error {
 		p.ContactMobile = &mobile
 	}
 	if p.SupportEmail != nil {
-		email, ok := NormalizeEmail(*p.SupportEmail)
+		email, ok := emailaddr.Normalize(*p.SupportEmail)
 		if !ok || utf8.RuneCountInString(email) > SupportEmailMaxRunes {
 			return apperr.InvalidInputOn([]string{"SupportEmail"}, "客服電子信箱格式不正確，至多 %d 字", SupportEmailMaxRunes)
 		}

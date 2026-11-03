@@ -3,7 +3,7 @@
  *
  * 申請是店家的單例資源：沒有申請 ID，也沒有 Create。`GetMyKYC` 回 not_found 就是還沒有申請（或已取消）；
  * 沒有申請時不帶 etag 的 `SaveKYCDraft` 建立它，之後每次寫入帶讀到的 etag。表單是整份字串狀態，
- * 伺服器版本是 baseline：只有和 baseline 不同的欄位才列進 update_mask。平台只收市集審核的資料（統編與公司資料、收款聯絡信箱、
+ * 伺服器版本是 baseline：只有和 baseline 不同的欄位才列進 update_mask。平台只收市集審核的資料（統編與公司資料、
  * 補充文件）；身分與銀行資料由金流商收集，不在這個表單裡。還缺什麼由伺服器的 `missing_fields` 決定，client 不重寫完整性規則。
  */
 
@@ -28,7 +28,6 @@ import { sellerAppClient } from "../connect/seller";
 import { optionalText, type UiText } from "../i18n/ui-text";
 import type { AgreementAcceptanceInput } from "./agreements";
 import type { StatusBannerTone } from "./status-tone";
-import { validatePayoutContactEmail } from "./validators";
 
 export type SellerType = "individual" | "business";
 
@@ -48,7 +47,6 @@ export interface KycForm {
 	companyTownCode: string;
 	companyAddressDetail: string;
 	companyPhone: string;
-	payoutContactEmail: string;
 }
 
 export const EMPTY_KYC_FORM: KycForm = {
@@ -61,7 +59,6 @@ export const EMPTY_KYC_FORM: KycForm = {
 	companyTownCode: "",
 	companyAddressDetail: "",
 	companyPhone: "",
-	payoutContactEmail: "",
 };
 
 /** 一張補充文件圖片：已在申請上的（assetId）或剛上傳還沒存檔的（stagedToken），preview 是顯示用的網址。 */
@@ -108,7 +105,6 @@ export function kycFormOf(app: KYCApplication | null): KycForm {
 		companyTownCode: townCode,
 		companyAddressDetail: business?.companyAddress?.addressDetail ?? "",
 		companyPhone: business?.companyPhone ?? "",
-		payoutContactEmail: app.payoutContactEmail,
 	};
 }
 
@@ -155,7 +151,6 @@ const MASK_PATHS_OF_FORM_KEY: Partial<Record<keyof KycForm, string[]>> = {
 	companyCountyCode: ["business.company_address"],
 	companyAddressDetail: ["business.company_address"],
 	companyPhone: ["business.company_phone"],
-	payoutContactEmail: ["payout_contact_email"],
 };
 
 /**
@@ -182,33 +177,6 @@ export function baselineAfterSave(
 }
 
 /* ===== 輸入驗證（只決定「這個值能不能送」，缺不缺由伺服器決定） ===== */
-
-function isValidPayoutEmail(v: string): boolean {
-	return v === "" || validatePayoutContactEmail(v) === null;
-}
-
-export function kycInputErrors(form: KycForm): {
-	payoutEmailErr: string | null;
-} {
-	return {
-		payoutEmailErr: form.payoutContactEmail
-			? validatePayoutContactEmail(form.payoutContactEmail)
-			: null,
-	};
-}
-
-/**
- * 收款聯絡信箱還沒有值時預設帶入登入信箱（D23）；已經有值（包含賣家改過的）不動。登入信箱是空的（例如 LINE 沒有信箱）
- * 就維持空，送出時由伺服器要求填寫。
- */
-export function withPayoutEmailDefault(
-	form: KycForm,
-	loginEmail: string | undefined,
-): KycForm {
-	const email = (loginEmail ?? "").trim();
-	if (form.payoutContactEmail.trim() !== "" || email === "") return form;
-	return { ...form, payoutContactEmail: email };
-}
 
 /* ===== 表單 → SaveKYCDraft ===== */
 
@@ -241,8 +209,7 @@ export interface KycDraftSource {
 
 /**
  * 表單相對於 baseline 的差異，組成 `SaveKYCDraft`。沒有申請（沒有 etag）時是建立：subject 一定設，所有非零值都送；
- * 已經有申請時只列有改的欄位，etag 必帶。沒有改動回 null。格式不合的收款聯絡信箱不送——
- * 伺服器會因為任何一欄不合法而整筆不寫入，那會讓其他欄位的暫存一起失敗。
+ * 已經有申請時只列有改的欄位，etag 必帶。沒有改動回 null。
  */
 export function buildSaveKycDraftRequest(
 	src: KycDraftSource,
@@ -261,16 +228,14 @@ export function buildSaveKycDraftRequest(
 	const bizPath = (key: keyof typeof BusinessKYCSchema.field) =>
 		`business.${BusinessKYCSchema.field[key].name}`;
 
-	const text = (key: "productType" | "payoutContactEmail", allowed = true) => {
+	const text = (key: "productType") => {
 		const value = form[key];
-		if (!allowed) return;
 		if (value === baseline[key]) return;
 		paths.push(appPath(key));
 		app[key] = value;
 	};
 
 	text("productType");
-	text("payoutContactEmail", isValidPayoutEmail(form.payoutContactEmail));
 
 	if (business) {
 		const bizText = (key: "companyName" | "taxId" | "companyPhone") => {
@@ -356,7 +321,6 @@ interface FieldMeta {
 export const KYC_FIELDS: Partial<Record<KYCField, FieldMeta>> = {
 	[KYCField.KYC_FIELD_PRODUCT_TYPE]: { section: "company" },
 	[KYCField.KYC_FIELD_WEBSITE_URL]: { section: "other" },
-	[KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL]: { section: "other" },
 	[KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME]: { section: "company" },
 	[KYCField.KYC_FIELD_BUSINESS_TAX_ID]: { section: "company" },
 	[KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE]: { section: "company" },
@@ -466,7 +430,6 @@ export function adoptSavedDocs(
 
 const FORM_KEY_OF_FIELD: Partial<Record<KYCField, keyof KycForm>> = {
 	[KYCField.KYC_FIELD_PRODUCT_TYPE]: "productType",
-	[KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL]: "payoutContactEmail",
 	[KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME]: "companyName",
 	[KYCField.KYC_FIELD_BUSINESS_TAX_ID]: "taxId",
 	[KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE]: "companyRegisterDate",

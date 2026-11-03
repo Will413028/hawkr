@@ -151,7 +151,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	account := func() int64 {
 		var accountID int64
 		for range 3 { // account_id 與 store_id 不同值，互換 ID 的缺陷才藏不住
-			if err := d.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&accountID); err != nil {
+			if err := d.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts (self_entered_email) VALUES ('seller@example.com') RETURNING id").Scan(&accountID); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -182,7 +182,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		draft, err := m.SaveKYCDraft(ctx, seller.KYCDraftInput{
 			AccountID: accountID, SellerType: &kind, RealName: str("王小明"), BirthDate: str("1990-05-06"), IDCardNo: str(idCard),
 			EnglishName: str("Wang Farm"), BankName: str("臺灣銀行"), BankCode: str("004"), BankAccount: str(bank),
-			ProductType: str("蔬果"), PayoutContactEmail: str("seller@example.com"),
+			ProductType: str("蔬果"),
 			IDCardFront: &seller.KYCDocumentRef{StagedToken: "front"}, IDCardBack: &seller.KYCDocumentRef{StagedToken: "back"}, BankBook: &seller.KYCDocumentRef{StagedToken: "book"},
 		})
 		must(err)

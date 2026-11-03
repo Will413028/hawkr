@@ -127,13 +127,18 @@ func setup(t *testing.T) *fixture {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()}, Now: time.Now, Logger: log})
-	_, sellerToken, err := id.DevNewSession(ctx)
+	sellerAccount, sellerToken, err := id.DevNewSession(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, otherToken, err := id.DevNewSession(ctx)
+	otherAccount, otherToken, err := id.DevNewSession(ctx)
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, account := range []int64{sellerAccount, otherAccount} {
+		if _, err := id.SetSelfEnteredEmail(ctx, account, "seller@example.com"); err != nil {
+			t.Fatal(err)
+		}
 	}
 	adminToken, err := dev.AdminToken("dev_admin_connect")
 	if err != nil {

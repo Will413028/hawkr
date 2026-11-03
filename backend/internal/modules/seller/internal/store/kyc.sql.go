@@ -70,7 +70,7 @@ func (q *Queries) ActiveKYCGrant(ctx context.Context, arg ActiveKYCGrantParams) 
 }
 
 const adminKYCApplications = `-- name: AdminKYCApplications :many
-SELECT application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, payout_contact_email, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
+SELECT application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
 FROM seller.kyc_applications
 WHERE status <> 'DRAFT' AND submitted_at IS NOT NULL
   AND ($1::text IS NULL OR status = $1::text)
@@ -136,7 +136,6 @@ func (q *Queries) AdminKYCApplications(ctx context.Context, arg AdminKYCApplicat
 			&i.BankAccountHashKey,
 			&i.ProductType,
 			&i.WebsiteUrl,
-			&i.PayoutContactEmail,
 			&i.CompanyName,
 			&i.TaxID,
 			&i.TaxIDHash,
@@ -166,7 +165,7 @@ func (q *Queries) AdminKYCApplications(ctx context.Context, arg AdminKYCApplicat
 }
 
 const adminKYCApplicationsOldestFirst = `-- name: AdminKYCApplicationsOldestFirst :many
-SELECT application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, payout_contact_email, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
+SELECT application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
 FROM seller.kyc_applications
 WHERE status <> 'DRAFT' AND submitted_at IS NOT NULL
   AND ($1::text IS NULL OR status = $1::text)
@@ -230,7 +229,6 @@ func (q *Queries) AdminKYCApplicationsOldestFirst(ctx context.Context, arg Admin
 			&i.BankAccountHashKey,
 			&i.ProductType,
 			&i.WebsiteUrl,
-			&i.PayoutContactEmail,
 			&i.CompanyName,
 			&i.TaxID,
 			&i.TaxIDHash,
@@ -260,7 +258,7 @@ func (q *Queries) AdminKYCApplicationsOldestFirst(ctx context.Context, arg Admin
 }
 
 const currentKYCApplication = `-- name: CurrentKYCApplication :one
-SELECT application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, payout_contact_email, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
+SELECT application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
 FROM seller.kyc_applications
 WHERE store_id = $1 AND status <> 'CANCELLED'
 `
@@ -291,7 +289,6 @@ func (q *Queries) CurrentKYCApplication(ctx context.Context, storeID int64) (Sel
 		&i.BankAccountHashKey,
 		&i.ProductType,
 		&i.WebsiteUrl,
-		&i.PayoutContactEmail,
 		&i.CompanyName,
 		&i.TaxID,
 		&i.TaxIDHash,
@@ -421,7 +418,7 @@ INSERT INTO seller.kyc_applications (
     application_id, store_id, seller_type, real_name, birth_date,
     id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location,
     english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key,
-    product_type, website_url, payout_contact_email,
+    product_type, website_url,
     company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date,
     company_town_code, company_address_detail, company_phone,
     rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key,
@@ -431,13 +428,13 @@ VALUES (
     $1, $2, $3, $4, $5,
     $6, $7, $8, $9, $10, $11,
     $12, $13, $14, $15, $16, $17,
-    $18, $19, $20,
-    $21, $22, $23, $24, $25,
-    $26, $27, $28,
-    $29, $30, $31,
-    $32, $32
+    $18, $19,
+    $20, $21, $22, $23, $24,
+    $25, $26, $27,
+    $28, $29, $30,
+    $31, $31
 )
-RETURNING application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, payout_contact_email, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
+RETURNING application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
 `
 
 type InsertKYCApplicationParams struct {
@@ -460,7 +457,6 @@ type InsertKYCApplicationParams struct {
 	BankAccountHashKey   *string
 	ProductType          *string
 	WebsiteUrl           *string
-	PayoutContactEmail   *string
 	CompanyName          *string
 	TaxID                *string
 	TaxIDHash            []byte
@@ -497,7 +493,6 @@ func (q *Queries) InsertKYCApplication(ctx context.Context, arg InsertKYCApplica
 		arg.BankAccountHashKey,
 		arg.ProductType,
 		arg.WebsiteUrl,
-		arg.PayoutContactEmail,
 		arg.CompanyName,
 		arg.TaxID,
 		arg.TaxIDHash,
@@ -534,7 +529,6 @@ func (q *Queries) InsertKYCApplication(ctx context.Context, arg InsertKYCApplica
 		&i.BankAccountHashKey,
 		&i.ProductType,
 		&i.WebsiteUrl,
-		&i.PayoutContactEmail,
 		&i.CompanyName,
 		&i.TaxID,
 		&i.TaxIDHash,
@@ -756,7 +750,7 @@ func (q *Queries) InsertKYCReviewIssue(ctx context.Context, arg InsertKYCReviewI
 }
 
 const kYCApplicationByID = `-- name: KYCApplicationByID :one
-SELECT application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, payout_contact_email, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
+SELECT application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
 FROM seller.kyc_applications
 WHERE application_id = $1
 `
@@ -786,7 +780,6 @@ func (q *Queries) KYCApplicationByID(ctx context.Context, applicationID uuid.UUI
 		&i.BankAccountHashKey,
 		&i.ProductType,
 		&i.WebsiteUrl,
-		&i.PayoutContactEmail,
 		&i.CompanyName,
 		&i.TaxID,
 		&i.TaxIDHash,
@@ -809,7 +802,7 @@ func (q *Queries) KYCApplicationByID(ctx context.Context, applicationID uuid.UUI
 }
 
 const kYCApplicationsMissingHashKey = `-- name: KYCApplicationsMissingHashKey :many
-SELECT a.application_id, a.store_id, a.status, a.version, a.seller_type, a.real_name, a.birth_date, a.id_card_no_enc, a.id_card_hash, a.id_card_hash_key, a.id_card_issue_date, a.id_card_issue_type, a.id_card_issue_location, a.english_name, a.bank_name, a.bank_code, a.bank_account_enc, a.bank_account_hash, a.bank_account_hash_key, a.product_type, a.website_url, a.payout_contact_email, a.company_name, a.tax_id, a.tax_id_hash, a.tax_id_hash_key, a.company_register_date, a.company_town_code, a.company_address_detail, a.company_phone, a.rep_id_card_no_enc, a.rep_id_card_hash, a.rep_id_card_hash_key, a.submitted_at, a.submission_seq, a.decided_at, a.created_at, a.updated_at, a.pii_purged_at
+SELECT a.application_id, a.store_id, a.status, a.version, a.seller_type, a.real_name, a.birth_date, a.id_card_no_enc, a.id_card_hash, a.id_card_hash_key, a.id_card_issue_date, a.id_card_issue_type, a.id_card_issue_location, a.english_name, a.bank_name, a.bank_code, a.bank_account_enc, a.bank_account_hash, a.bank_account_hash_key, a.product_type, a.website_url, a.company_name, a.tax_id, a.tax_id_hash, a.tax_id_hash_key, a.company_register_date, a.company_town_code, a.company_address_detail, a.company_phone, a.rep_id_card_no_enc, a.rep_id_card_hash, a.rep_id_card_hash_key, a.submitted_at, a.submission_seq, a.decided_at, a.created_at, a.updated_at, a.pii_purged_at
 FROM seller.kyc_applications a
 WHERE a.pii_purged_at IS NULL
   AND ($1::uuid IS NULL OR a.application_id > $1::uuid)
@@ -867,7 +860,6 @@ func (q *Queries) KYCApplicationsMissingHashKey(ctx context.Context, arg KYCAppl
 			&i.BankAccountHashKey,
 			&i.ProductType,
 			&i.WebsiteUrl,
-			&i.PayoutContactEmail,
 			&i.CompanyName,
 			&i.TaxID,
 			&i.TaxIDHash,
@@ -1208,7 +1200,7 @@ func (q *Queries) ListKYCReveals(ctx context.Context, arg ListKYCRevealsParams) 
 }
 
 const lockKYCApplication = `-- name: LockKYCApplication :one
-SELECT application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, payout_contact_email, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
+SELECT application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
 FROM seller.kyc_applications
 WHERE application_id = $1
 FOR UPDATE
@@ -1240,7 +1232,6 @@ func (q *Queries) LockKYCApplication(ctx context.Context, applicationID uuid.UUI
 		&i.BankAccountHashKey,
 		&i.ProductType,
 		&i.WebsiteUrl,
-		&i.PayoutContactEmail,
 		&i.CompanyName,
 		&i.TaxID,
 		&i.TaxIDHash,
@@ -1496,7 +1487,7 @@ SET status = $1,
     updated_at = $4,
     version = version + 1
 WHERE application_id = $5 AND version = $6 AND status = $7
-RETURNING application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, payout_contact_email, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
+RETURNING application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
 `
 
 type TransitionKYCApplicationParams struct {
@@ -1544,7 +1535,6 @@ func (q *Queries) TransitionKYCApplication(ctx context.Context, arg TransitionKY
 		&i.BankAccountHashKey,
 		&i.ProductType,
 		&i.WebsiteUrl,
-		&i.PayoutContactEmail,
 		&i.CompanyName,
 		&i.TaxID,
 		&i.TaxIDHash,
@@ -1621,22 +1611,21 @@ SET status = 'DRAFT',
     bank_account_hash_key = $15,
     product_type = $16,
     website_url = $17,
-    payout_contact_email = $18,
-    company_name = $19,
-    tax_id = $20,
-    tax_id_hash = $21,
-    tax_id_hash_key = $22,
-    company_register_date = $23,
-    company_town_code = $24,
-    company_address_detail = $25,
-    company_phone = $26,
-    rep_id_card_no_enc = $27,
-    rep_id_card_hash = $28,
-    rep_id_card_hash_key = $29,
-    updated_at = $30,
+    company_name = $18,
+    tax_id = $19,
+    tax_id_hash = $20,
+    tax_id_hash_key = $21,
+    company_register_date = $22,
+    company_town_code = $23,
+    company_address_detail = $24,
+    company_phone = $25,
+    rep_id_card_no_enc = $26,
+    rep_id_card_hash = $27,
+    rep_id_card_hash_key = $28,
+    updated_at = $29,
     version = version + 1
-WHERE application_id = $31 AND version = $32 AND status IN ('DRAFT', 'REJECTED', 'APPROVED')
-RETURNING application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, payout_contact_email, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
+WHERE application_id = $30 AND version = $31 AND status IN ('DRAFT', 'REJECTED', 'APPROVED')
+RETURNING application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
 `
 
 type UpdateKYCDraftParams struct {
@@ -1657,7 +1646,6 @@ type UpdateKYCDraftParams struct {
 	BankAccountHashKey   *string
 	ProductType          *string
 	WebsiteUrl           *string
-	PayoutContactEmail   *string
 	CompanyName          *string
 	TaxID                *string
 	TaxIDHash            []byte
@@ -1696,7 +1684,6 @@ func (q *Queries) UpdateKYCDraft(ctx context.Context, arg UpdateKYCDraftParams) 
 		arg.BankAccountHashKey,
 		arg.ProductType,
 		arg.WebsiteUrl,
-		arg.PayoutContactEmail,
 		arg.CompanyName,
 		arg.TaxID,
 		arg.TaxIDHash,
@@ -1735,7 +1722,6 @@ func (q *Queries) UpdateKYCDraft(ctx context.Context, arg UpdateKYCDraftParams) 
 		&i.BankAccountHashKey,
 		&i.ProductType,
 		&i.WebsiteUrl,
-		&i.PayoutContactEmail,
 		&i.CompanyName,
 		&i.TaxID,
 		&i.TaxIDHash,

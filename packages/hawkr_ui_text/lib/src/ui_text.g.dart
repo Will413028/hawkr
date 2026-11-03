@@ -113,7 +113,6 @@ return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 26) => '負責人身分證字號',
 (UiLocale.zhTW || UiLocale.en, 27) => '補充文件',
 (UiLocale.zhTW || UiLocale.en, 28) => '公司地址',
-(UiLocale.zhTW || UiLocale.en, 29) => '收款聯絡信箱',
 _ => null,
 };
 }

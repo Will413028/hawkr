@@ -57,6 +57,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.identity.v1alpha1.ContactEmailSource",
+      "dartClass": "ContactEmailSource",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState",
       "dartClass": "DeleteAccountResponse_DeletionState",
       "dartLibrary": "package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pbenum.dart",

@@ -202,7 +202,6 @@ type SellerKycApplication struct {
 	BankAccountHashKey   *string
 	ProductType          *string
 	WebsiteUrl           *string
-	PayoutContactEmail   *string
 	CompanyName          *string
 	TaxID                *string
 	TaxIDHash            []byte

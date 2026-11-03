@@ -915,7 +915,7 @@ CREATE INDEX measure_identities_hash ON seller.measure_identities (hash);
 -- 個資：id_card_no、rep_id_card_no（企業負責人）與 bank_account 是 AES-256-GCM 的密文（platform/seal，AAD 是申請 ID
 -- 加欄位名），real_name 與 birth_date 明文（後台以姓名模糊搜尋，ADR 2026-07-20）。每個識別欄位另有一個 blind index
 -- （HMAC，輸入帶欄位標籤；*_hash_key 是算出它的金鑰 ID），給處分的身分快照用。送給 PayUni 的聯絡資料（聯絡人、聯絡手機、
--- 客服信箱）是店家的欄位（stores），不在申請上。收款聯絡信箱（payout_contact_email）是申請上的欄位：賣家送出時確認，核准時複製到 payment_accounts.contact_email；草稿可以空，送出之後必填由 kyc_applications_complete_check 表達。公司地址以內政部的鄉鎮市區代碼表示（同 stores）。
+-- 客服信箱）是店家的欄位（stores），不在申請上。收款聯絡信箱不在申請上：它是帳號的聯絡信箱（identity，D23 2026-11-03 修訂），送出時要求帳號有，核准時快照到 payment_accounts.contact_email。公司地址以內政部的鄉鎮市區代碼表示（同 stores）。
 -- version 是樂觀鎖（etag 的來源）：所有寫入者必帶讀到的版本。
 -- 個資清理：店家關閉滿保留期後 purge 套件清掉全部個人欄位（密文、blind index、姓名、生日、證件資訊、聯絡方式、公司與
 -- 地址），記下 pii_purged_at；審核的事實（狀態、時間、審核紀錄）與不具名的欄位（seller_type、product_type）保留。kyc_applications_purged_check 列出被清掉的欄位：清理過的列這些一定是 NULL。處分的身分快照不在這裡
@@ -942,7 +942,6 @@ CREATE TABLE seller.kyc_applications (
     bank_account_hash_key   TEXT,
     product_type            TEXT,
     website_url             TEXT,
-    payout_contact_email    TEXT,
     company_name            TEXT,
     tax_id                  TEXT,
     tax_id_hash             BYTEA,
@@ -974,9 +973,6 @@ CREATE TABLE seller.kyc_applications (
     CONSTRAINT kyc_applications_bank_code_check CHECK (bank_code ~ '^[0-9]{3}([0-9]{4})?$'),
     CONSTRAINT kyc_applications_product_type_check CHECK (char_length(product_type) BETWEEN 1 AND 100),
     CONSTRAINT kyc_applications_website_check CHECK (website_url ~ '^https?://[^/?#]+' AND char_length(website_url) <= 500),
-    CONSTRAINT kyc_applications_payout_contact_email_check CHECK (
-        payout_contact_email = lower(payout_contact_email) AND char_length(payout_contact_email) <= 254 AND payout_contact_email ~ '^[^@[:space:]]+@[^@[:space:]]+$'
-    ),
     CONSTRAINT kyc_applications_company_name_check CHECK (char_length(company_name) BETWEEN 1 AND 200),
     CONSTRAINT kyc_applications_tax_id_check CHECK (tax_id ~ '^[0-9]{8}$'),
     CONSTRAINT kyc_applications_company_register_date_check CHECK (company_register_date >= DATE '1900-01-01'),
@@ -1011,7 +1007,6 @@ CREATE TABLE seller.kyc_applications (
     CONSTRAINT kyc_applications_complete_check CHECK (
         status NOT IN ('SUBMITTED', 'APPROVED', 'REJECTED') OR (
             submitted_at IS NOT NULL AND (pii_purged_at IS NOT NULL OR (
-                payout_contact_email IS NOT NULL AND
                 (seller_type = 'INDIVIDUAL' OR
                  (seller_type = 'COMPANY' AND company_name IS NOT NULL AND tax_id IS NOT NULL))
             ))
@@ -1022,7 +1017,7 @@ CREATE TABLE seller.kyc_applications (
             real_name IS NULL AND birth_date IS NULL AND id_card_no_enc IS NULL AND id_card_hash IS NULL AND id_card_hash_key IS NULL AND
             id_card_issue_date IS NULL AND id_card_issue_type IS NULL AND id_card_issue_location IS NULL AND english_name IS NULL AND
             bank_name IS NULL AND bank_code IS NULL AND bank_account_enc IS NULL AND bank_account_hash IS NULL AND
-            bank_account_hash_key IS NULL AND website_url IS NULL AND payout_contact_email IS NULL AND
+            bank_account_hash_key IS NULL AND website_url IS NULL AND
             company_name IS NULL AND tax_id IS NULL AND tax_id_hash IS NULL AND tax_id_hash_key IS NULL AND
             company_register_date IS NULL AND company_town_code IS NULL AND company_address_detail IS NULL AND company_phone IS NULL AND
             rep_id_card_no_enc IS NULL AND rep_id_card_hash IS NULL AND rep_id_card_hash_key IS NULL
@@ -1227,7 +1222,6 @@ CREATE TABLE seller.kyc_review_issues (
         'bank_account',
         'product_type',
         'website_url',
-        'payout_contact_email',
         'id_card_front',
         'id_card_back',
         'bank_book',
@@ -1636,7 +1630,7 @@ CREATE INDEX store_blocks_buyer ON seller.store_blocks (buyer_id, store_id);
 -- status 是中立的五個狀態，由轉帳能力的狀態與 status_details 推導；transfers_active 與 payouts_active 是外部帳戶的能力是否啟用（開通閘門看 transfers_active，
 -- ENABLED 等於 transfers_active）。requirements 是快照的原始內容，status_reason 是導出目前狀態的金流商原因碼（只給後台）。create_failed_at 是建立重試用完的時刻
 -- （只有還沒有外部 ID 的列才有；後台待辦 review_payment_account_create_failed 的開始時間，重試建立時清空）。
--- contact_email 是核准時從 KYC 申請的 payout_contact_email 複製來的聯絡信箱，建立外部帳戶時送給金流商；外部帳戶建立前每次核准以新申請的信箱覆寫，建立後保留原值（改信箱 D23 延後）；列隨店家個資清理一起刪除，所以不另設清除欄位。
+-- contact_email 是核准時從 identity 的帳號聯絡信箱（已驗證的優先，否則自填的）快照來的聯絡信箱，建立外部帳戶時送給金流商，之後不自動同步；外部帳戶建立前每次核准以當時的信箱覆寫，建立後保留原值（改信箱 D23 延後）；列隨店家個資清理一起刪除，所以不另設清除欄位。
 -- create_idempotency_key 是寫入「建立中」的列時產生的隨機 UUID（v4），建立外部帳戶的每次重試都用它當冪等鍵（Stripe 建議每個邏輯請求用隨機 UUID；
 -- 不用 store_id，兩個資料庫共用同一個 Stripe 帳號時才不會撞到別人的帳戶）。
 CREATE TABLE seller.payment_accounts (
