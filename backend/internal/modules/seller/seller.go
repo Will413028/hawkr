@@ -289,7 +289,7 @@ func CurrentAgreement(k AgreementKind) (Agreement, bool) {
 func AgreementKinds() []AgreementKind { return model.AgreementKinds() }
 
 // CurrentApplyAcceptances 是 Apply 要求的同意（SELLER_TERMS 的現行版本），CurrentKYCAcceptances 是 SubmitKYC 要求的同意
-// （KYC_PRIVACY_NOTICE 與 PAYUNI_TERMS 的現行版本）：給測試組出合法的輸入，不是 client 版本的來源（client 讀 GetSellerAgreements）。
+// （KYC_PRIVACY_NOTICE 的現行版本）：給測試組出合法的輸入，不是 client 版本的來源（client 讀 GetSellerAgreements）。
 func CurrentApplyAcceptances() []AgreementAcceptance {
 	return currentAcceptances(model.ApplyAgreements)
 }

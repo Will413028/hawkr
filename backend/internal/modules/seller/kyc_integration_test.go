@@ -926,10 +926,10 @@ func TestKYCInputValidation(t *testing.T) {
 	}
 	// 送出時一次列出全部缺的欄位。
 	blank, _ := f.open(t)
-	minimal := f.savedDraft(t, KYCDraftInput{AccountID: blank, SellerType: individual()})
+	minimal := f.savedDraft(t, KYCDraftInput{AccountID: blank, SellerType: ptr(KYCCompany)})
 	_, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: blank, ExpectedVersion: minimal.Version})
 	var ae *apperr.Error
-	if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) < 8 {
+	if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) != 3 {
 		t.Fatalf("submit an empty draft: %v", err)
 	}
 }
@@ -1302,15 +1302,15 @@ func TestKYCSameStagedTokenCannotFillTwoDocumentSlots(t *testing.T) {
 	}
 }
 
-// missing_fields 與送出檢查同一份規則：缺的欄位依 KYCFieldNames 的順序，個人與企業各自專屬的項目依型態，補齊之後是空的，
-// 而且送出缺項時回的違規正好是這份清單。
+// missing_fields 與送出檢查同一份規則：缺的欄位依 KYCFieldNames 的順序，企業專屬的項目依型態，補齊之後是空的，
+// 而且送出缺項時回的違規正好是這份清單。身分、銀行與證件不在必填之內。
 func TestKYCMissingFieldsFollowTheSubmissionRule(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, _ := f.open(t)
 	empty := f.savedDraft(t, KYCDraftInput{AccountID: accountID, SellerType: individual()})
-	wantIndividual := []string{"real_name", "english_name", "bank_name", "bank_code", "bank_account", "id_card_front", "id_card_back", "bank_book", "individual.id_card_no", "payout_contact_email"}
+	wantIndividual := []string{"payout_contact_email"}
 	if !slices.Equal(empty.MissingFields, wantIndividual) {
 		t.Fatalf("個人賣家缺：%v", empty.MissingFields)
 	}
@@ -1328,17 +1328,67 @@ func TestKYCMissingFieldsFollowTheSubmissionRule(t *testing.T) {
 	}
 	switched, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: empty.Version, SellerType: ptr(KYCCompany)})
 	must(t, err)
-	for _, want := range []string{"business.company_name", "business.tax_id", "business.rep_id_card_no"} {
-		if !slices.Contains(switched.MissingFields, want) {
-			t.Fatalf("企業賣家缺：%v", switched.MissingFields)
-		}
-	}
-	if slices.Contains(switched.MissingFields, "individual.id_card_no") {
-		t.Fatalf("企業賣家不缺個人的身分證號：%v", switched.MissingFields)
+	if want := []string{"business.company_name", "business.tax_id", "payout_contact_email"}; !slices.Equal(switched.MissingFields, want) {
+		t.Fatalf("企業賣家缺：%v", switched.MissingFields)
 	}
 	other, _ := f.open(t)
 	if full := f.savedDraft(t, kycDraft(other, idB, bankAcct)); len(full.MissingFields) != 0 {
 		t.Fatalf("齊全時應該是空的：%v", full.MissingFields)
+	}
+}
+
+// 送出只要求市集登記資料與收款聯絡信箱：不帶身分、銀行、證件的個人與企業申請都能送出並核准。
+// mutation：把 real_name 加回 requirements → 本測試與 TestRequirementsAreMarketplaceDataOnly 失敗；
+// kyc_applications_complete_check 改回含身分與銀行欄位 → 送出被資料庫的約束擋下，本測試失敗（只在 CI 的 integration 驗證）。
+func TestSubmitAndApproveWithoutIdentityBankOrDocuments(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	for name, draft := range map[string]func(accountID int64) KYCDraftInput{
+		"個人": func(accountID int64) KYCDraftInput {
+			return KYCDraftInput{AccountID: accountID, SellerType: individual(), ProductType: ptr("蔬果"), PayoutContactEmail: ptr("seller@example.com")}
+		},
+		"企業": func(accountID int64) KYCDraftInput {
+			return KYCDraftInput{
+				AccountID: accountID, SellerType: ptr(KYCCompany), ProductType: ptr("蔬果"), PayoutContactEmail: ptr("seller@example.com"),
+				CompanyName: ptr("範例小農有限公司"), TaxID: ptr(taxIDOne),
+			}
+		},
+	} {
+		accountID, _ := f.open(t)
+		d := f.savedDraft(t, draft(accountID))
+		if len(d.MissingFields) != 0 {
+			t.Fatalf("%s：missing_fields=%v", name, d.MissingFields)
+		}
+		sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
+		if err != nil || sub.Status != KYCStatusSubmitted {
+			t.Fatalf("%s：送出 err=%v status=%v", name, err, sub.Status)
+		}
+		must(t, approve(f, sub))
+		mine, err := f.module.MyKYC(ctx, accountID)
+		must(t, err)
+		if mine.Status != KYCStatusApproved {
+			t.Fatalf("%s：核准後 status=%v", name, mine.Status)
+		}
+	}
+}
+
+// 送出帶了 PAYUNI_TERMS 被拒：種類不屬於 SubmitKYC，申請維持草稿。
+// mutation：把 PAYUNI_TERMS 加回 SubmitKYCAgreements → 本測試失敗。
+func TestSubmitKYCRejectsPayUniTerms(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	accountID, _ := f.open(t)
+	d := f.savedDraft(t, KYCDraftInput{AccountID: accountID, SellerType: individual(), PayoutContactEmail: ptr("seller@example.com")})
+	withPayUni := append(CurrentKYCAcceptances(), AgreementAcceptance{Kind: AgreementPayUniTerms, Version: CurrentAgreementsOrFail(t, AgreementPayUniTerms).Version})
+	_, err := f.module.SubmitKYC(context.Background(), SubmitKYCInput{AcceptedAgreements: withPayUni, AccountID: accountID, ExpectedVersion: d.Version})
+	if apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("err=%v", err)
+	}
+	mine, err := f.module.MyKYC(context.Background(), accountID)
+	must(t, err)
+	if mine.Status != KYCStatusDraft {
+		t.Fatalf("申請被送出：%v", mine.Status)
 	}
 }
 

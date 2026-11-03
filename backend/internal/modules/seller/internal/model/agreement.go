@@ -37,7 +37,7 @@ var (
 	// ApplyAgreements 是 ApplyStore 要求的文件。
 	ApplyAgreements = []AgreementKind{AgreementSellerTerms}
 	// SubmitKYCAgreements 是 SubmitKYC 要求的文件。
-	SubmitKYCAgreements = []AgreementKind{AgreementKYCPrivacyNotice, AgreementPayUniTerms}
+	SubmitKYCAgreements = []AgreementKind{AgreementKYCPrivacyNotice}
 )
 
 // AgreementAcceptance 是賣家對一份文件的同意：Version 是 client 顯示給賣家的版本。

@@ -1011,10 +1011,9 @@ CREATE TABLE seller.kyc_applications (
     CONSTRAINT kyc_applications_complete_check CHECK (
         status NOT IN ('SUBMITTED', 'APPROVED', 'REJECTED') OR (
             submitted_at IS NOT NULL AND (pii_purged_at IS NOT NULL OR (
-                real_name IS NOT NULL AND english_name IS NOT NULL AND bank_name IS NOT NULL AND
-                bank_code IS NOT NULL AND bank_account_enc IS NOT NULL AND payout_contact_email IS NOT NULL AND
-                ((seller_type = 'INDIVIDUAL' AND id_card_no_enc IS NOT NULL) OR
-                 (seller_type = 'COMPANY' AND company_name IS NOT NULL AND tax_id IS NOT NULL AND rep_id_card_no_enc IS NOT NULL))
+                payout_contact_email IS NOT NULL AND
+                (seller_type = 'INDIVIDUAL' OR
+                 (seller_type = 'COMPANY' AND company_name IS NOT NULL AND tax_id IS NOT NULL))
             ))
         )
     ),

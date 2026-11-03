@@ -742,8 +742,7 @@ func TestSubmitKYCReportsEveryMissingItemAsAFieldViolation(t *testing.T) {
 	})
 	_, err := f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: individual.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
 	wantCode(t, err, connect.CodeInvalidArgument, "")
-	want := []string{"bank_account", "bank_code", "bank_name", "bank_book", "english_name", "id_card_back", "id_card_front", "individual.id_card_no", "payout_contact_email", "real_name"}
-	slices.Sort(want)
+	want := []string{"payout_contact_email"}
 	wantStore := []string{"store.contact_mobile", "store.contact_name", "store.support_email"}
 	if got := badRequestFields(t, err); !slices.Equal(got, want) {
 		t.Fatalf("個人賣家缺少的欄位（只有申請自己的欄位，店家的缺項不是欄位違規）：got=%v want=%v", got, want)
@@ -761,15 +760,8 @@ func TestSubmitKYCReportsEveryMissingItemAsAFieldViolation(t *testing.T) {
 	}
 	// 申請本身齊全、店家資料還缺：failed_precondition（不是欄位違規），缺哪些看 missing_store_fields；補齊之後才能送出。
 	full := saveDraft(t, f.app, &pb.SaveKYCDraftRequest{
-		Application: &pb.KYCApplication{
-			Etag: individual.GetEtag(), Subject: &pb.KYCApplication_Individual{Individual: &pb.IndividualKYC{IdCardNo: testID}},
-			RealName: "王小明", BirthDate: &date.Date{Year: 1990, Month: 5, Day: 6}, EnglishName: "Wang Farm", BankName: "臺灣銀行", BankCode: "004",
-			BankAccount: "012345678901", PayoutContactEmail: "seller@example.com", IdCardFront: &pb.KYCDocument{StagedToken: "front"}, IdCardBack: &pb.KYCDocument{StagedToken: "back"},
-			BankBook: &pb.KYCDocument{StagedToken: "book"},
-		},
-		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{
-			"individual.id_card_no", "real_name", "birth_date", "english_name", "bank_name", "bank_code", "bank_account", "payout_contact_email", "id_card_front", "id_card_back", "bank_book",
-		}},
+		Application: &pb.KYCApplication{Etag: individual.GetEtag(), PayoutContactEmail: "seller@example.com"},
+		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"payout_contact_email"}},
 	})
 	_, err = f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: full.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
 	wantCode(t, err, connect.CodeFailedPrecondition, "")
@@ -792,13 +784,15 @@ func TestSubmitKYCReportsEveryMissingItemAsAFieldViolation(t *testing.T) {
 	_, err = f.other.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: company.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
 	wantCode(t, err, connect.CodeInvalidArgument, "")
 	got := badRequestFields(t, err)
-	for _, field := range []string{"business.company_name", "business.tax_id", "business.rep_id_card_no", "id_card_front"} {
+	for _, field := range []string{"business.company_name", "business.tax_id", "payout_contact_email"} {
 		if !slices.Contains(got, field) {
 			t.Fatalf("企業賣家缺少的欄位沒有 %s：%v", field, got)
 		}
 	}
-	if slices.Contains(got, "individual.id_card_no") {
-		t.Fatalf("企業賣家不需要個人的身分證號：%v", got)
+	for _, absent := range []string{"individual.id_card_no", "business.rep_id_card_no", "real_name", "bank_account", "id_card_front"} {
+		if slices.Contains(got, absent) {
+			t.Fatalf("送出不再要求 %s：%v", absent, got)
+		}
 	}
 	if !slices.Equal(missingPaths(company), got) {
 		t.Fatalf("企業賣家的 missing_fields 與送出的違規不一致：%v / %v", missingPaths(company), got)

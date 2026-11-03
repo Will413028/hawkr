@@ -330,7 +330,7 @@ func fullKYC(t model.KYCSellerType) model.KYCApplication {
 			{Slot: model.SlotIDCardFront, Position: 0, AssetID: "asset front", ObjectKey: "certification/secret-key"},
 			{Slot: model.SlotCompanyDocument, Position: 0, AssetID: "co-1"}, {Slot: model.SlotCompanyDocument, Position: 1, AssetID: "co-2"},
 		},
-		MissingFields: []string{"business.tax_id", "individual.id_card_no", "real_name"},
+		MissingFields: []string{"business.company_name", "business.tax_id", "payout_contact_email"},
 		Flow:          &flow,
 		LastRejection: &model.KYCRejection{Reason: "模糊", DecidedAt: now, Issues: []model.KYCIssue{
 			{Field: "real_name", Code: model.IssueMismatch, Message: "與證件上的姓名不同"},
@@ -405,7 +405,7 @@ func TestKYCResponseCarriesOnlyMaskedValuesAndNoDocumentImages(t *testing.T) {
 	if got := out.GetOutstandingIssues(); len(got) != 1 || !proto.Equal(got[0], wantIssues[1]) {
 		t.Fatalf("outstanding_issues=%v", got)
 	}
-	if want := []pb.KYCField{pb.KYCField_KYC_FIELD_REAL_NAME, pb.KYCField_KYC_FIELD_INDIVIDUAL_ID_CARD_NO, pb.KYCField_KYC_FIELD_BUSINESS_TAX_ID}; !slices.Equal(out.GetMissingFields(), want) {
+	if want := []pb.KYCField{pb.KYCField_KYC_FIELD_BUSINESS_COMPANY_NAME, pb.KYCField_KYC_FIELD_BUSINESS_TAX_ID, pb.KYCField_KYC_FIELD_PAYOUT_CONTACT_EMAIL}; !slices.Equal(out.GetMissingFields(), want) {
 		t.Fatalf("missing_fields=%v", out.GetMissingFields())
 	}
 	flow := out.GetFlow()
@@ -421,7 +421,6 @@ func TestSubmitKYCPassesTheGenericIdentityErrorThroughUnchanged(t *testing.T) {
 	h := mustApp(t, m, nil, rpc.Images{}, Dashboard{}, testStats(fakeFollowerCounts{}, fakeRatings{}))
 	req := connect.NewRequest(&pb.SubmitKYCRequest{Etag: "2", AcceptedAgreements: []*pb.AgreementAcceptance{
 		{Kind: pb.AgreementKind_AGREEMENT_KIND_KYC_PRIVACY_NOTICE, Version: "2026-10-07"},
-		{Kind: pb.AgreementKind_AGREEMENT_KIND_PAYUNI_TERMS, Version: "2026-10-07"},
 	}})
 	req.Header().Set("User-Agent", "hk-test/1.0")
 	_, err := h.SubmitKYC(rpc.WithClientIP(ctxWithStore(currentStore()), "203.0.113.9"), req)
@@ -432,7 +431,6 @@ func TestSubmitKYCPassesTheGenericIdentityErrorThroughUnchanged(t *testing.T) {
 		AccountID: 7, ExpectedVersion: 2, ClientIP: "203.0.113.9", UserAgent: "hk-test/1.0",
 		AcceptedAgreements: []model.AgreementAcceptance{
 			{Kind: model.AgreementKYCPrivacyNotice, Version: "2026-10-07"},
-			{Kind: model.AgreementPayUniTerms, Version: "2026-10-07"},
 		},
 	}
 	if !reflect.DeepEqual(m.submit, wantSubmit) {
