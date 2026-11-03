@@ -160,15 +160,16 @@
     - 修改 `website/lib/security/csp.ts` 與它的測試：依 Stripe Connect 內嵌元件文件放行 `script-src`、`frame-src`、`connect-src`，附文件 URL。
     - 新增給 seller-app 回跳的免登入頁 `website/app/[locale]/(public)/seller-app/payment-return/page.tsx`：`?state=done|expired`，內容是「請回到 hawkr 賣家 App」。加一條測試，證明未登入也不會被導去登入頁。
     - 開通任務卡（`dashboard/onboardingTasks.ts`）拆成兩項，標題是 client 自己的文字；錢包與儀表板的 PayUni 狀態改看收款帳戶。
+    - 後端（D25）：`internal/platform/stripe` 的 `CreateAccountSession` 帶 `disable_stripe_user_authentication=true`，contract 測試斷言請求本文。
   - 消費端：`rg -n "kycFlow|KYCFlowStatus|PayuniStatusBody|payuniStateTitle|kycInPayuniStage" website --glob '!**/gen/**' --glob '!node_modules'`。
   - 不能動：退回提示與逐項問題的行為；`.seller-cert__status` 的 tone 樣式；不寫 `PaymentAccountStatus` 或 `KYCStatus` 的本地對照表（文案只讀目錄）。
   - 驗收：
     - `test:unit`、`pnpm test`、lint、`tsc`、build（帶 `API_BASE_URL` 覆寫）。
     - e2e 與 Storybook 只在 CI 跑，與基線比對。
-    - mutation：EMBEDDED 時改走導頁、return 時不重讀狀態、CSP 拿掉 Stripe 來源，各自讓測試失敗。
+    - mutation：EMBEDDED 時改走導頁、return 時不重讀狀態、CSP 拿掉 Stripe 來源，Account Session 不帶 `disable_stripe_user_authentication`，各自讓測試失敗。
     - 本機 sandbox 手動驗收：單體設 `STRIPE_REQUIREMENT_COLLECTION=platform`，建一家新店，送出並核准，然後在 website 用內嵌元件完成開通。判定同步驟 5：`transfers_active = true`、`ENABLED`、可曝光。店 1009 是金流商收件，不能用。
-  - 停止條件：內嵌元件不能用 v2 帳戶與 `2026-09-30.preview` 初始化時（5b 只驗過 v1 的 `account_sessions`），停下回報，不改 API 版本或 SDK 版本。
-  - 需要人做的事：Will 在本機環境放 sandbox 的公開金鑰。
+  - 停止條件：內嵌元件不能用 v2 帳戶與 `2026-09-30.preview` 初始化時（5b 只驗過 v1 的 `account_sessions`），停下回報，不改 API 版本或 SDK 版本。2026-11-03 實測可以初始化並進入表單（`spike/README.md` Q15），走完開通仍是本步驟的手動驗收。
+  - 需要人做的事：Will 在本機環境放 sandbox 的公開金鑰（2026-11-03 完成，`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` 放在本機個人脈絡檔記錄的位置）。
 - [ ] **7c. seller-app**（被擋於：7a、7b 的回跳頁）
   - 範圍：
     - 修改 `data/kyc_fields.dart`、`data/kyc_form.dart`、`presentation/kyc_wizard_steps.dart`：精靈刪減（個人兩步），營運資訊步驟加收款聯絡信箱（預設登入信箱、可改）。
@@ -244,6 +245,7 @@
 - **D22 平台自建 KYC 個資管線**（已決 2026-11-02，Will；擋住：6–8）：退場並在本波刪除。平台不再收身分證號、銀行帳號與證件；統編是市集登記資料，仍由平台收並算雜湊（2026-11-02 Will 確認）；防詐改用 fingerprint（D12）。觸發重建：決定接台灣金流商。
 - **D23 收款聯絡信箱**（已決 2026-11-03，Will）：Stripe v2 有 `configuration.recipient` 的帳戶必須帶 `contact_email`（sandbox 實測，`spike/outputs/q13_contact_email.txt`，兩種 dashboard 都是 400）。賣家在送出 KYC 申請時確認（預設帶入登入信箱、可改，送出時必填），核准時複製到收款帳戶列並用於建立外部帳戶；D16「核准時建立」不變。未採：直接用登入信箱（LINE 可能沒有信箱，且賣家無法改）；延到賣家第一次開始收款才建立（要改 D16 與步驟 4 的建立 job、輪詢、後台重試）。延後：建立後修改信箱並同步到 Stripe（觸發：賣家要求改信箱，或上線前的設定頁需求）。
 - **D24 步驟 7 的畫面與流程**（已決 2026-11-03，Will，全部採建議；擋住：7）：附件 `step7-screen-drafts.md` 第 5 節。Q1 送出規則的身分、銀行、證件與 `PAYUNI_TERMS` 在 7a 先拿掉，欄位與 enum 照舊在步驟 8 刪（原計畫把規則也排在 8，表單刪減後送出會一律失敗）。Q2 公司的補充文件保留（市集審核用的公司證明，不是 D22 的證件）。Q3 seller-app 回跳到 website 的靜態頁、回到前景時重讀，不加 deep link。Q4 website 做內嵌元件，新增 `@stripe/connect-js@3.4.6`、`@stripe/react-connect-js@3.4.4`（Will 2026-11-03 同意；兩者 2026-06-23 發佈，3.5.0 未滿兩週；3.4 能否開通 v2 帳戶由 7b 的 sandbox 驗收確認）。Q5 啟用後的「管理收款帳戶」入口不做（要改 proto 加 `account_update` 連結；觸發：賣家要求改資料，或上線前的設定頁需求）。Q6 admin 徽章與賣家共用目錄文字，另顯示原始 `status_reason`。
+- **D25 內嵌元件的 Stripe 使用者驗證**（已決 2026-11-03，Will，選 A；擋住：7b）：平台收件的 Account Session 帶 `components[account_onboarding][features][disable_stripe_user_authentication]=true`。依據：預設會先彈出 Stripe 登入視窗，平台負責補件的帳戶可以用這個參數關掉，代價是平台承擔負餘額（https://docs.stripe.com/connect/get-started-connect-embedded-components?platform=web 「User authentication」）；本平台的帳戶本來就是 `losses_collector=application`，賣家已以 Google／LINE 登入，平台收件的目的就是賣家留在平台頁面完成（`spike/README.md` Q15）。未採 B：維持預設，賣家每次開通都要另外登入或註冊 Stripe。Stripe 收件（託管頁面）不受影響。
 - **E1 Stripe API 版本**（已決 2026-11-02，Will）：Accounts v2（https://docs.stripe.com/connect/accounts-v2）；只有台灣只收轉帳的帳號需要 v1，D8 用 US 碰不到。webhook 用 thin events，收到後一律重讀帳戶（https://docs.stripe.com/webhooks）。（2026-11-03 修訂，Will：釘 `Stripe-Version: 2026-09-30.preview`，capability 有 `rejected` 狀態，D13 的 DISABLED 直接用它；這一版在一般測試模式不能建 v2 Account Link（`spike/README.md` Q11、Q12），測試與錄製改在 Stripe sandbox。未採：`2026-04-22.preview` 沿用測試模式，DISABLED 要從 status_details 推斷、升級時重做）
 
 拍板順序：D1–D22、E1 全部已決（2026-11-02）。
