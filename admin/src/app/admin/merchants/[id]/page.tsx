@@ -93,6 +93,7 @@ import {
 	terminationAvailability,
 	terminationCreatedText,
 } from "./measure";
+import { PaymentAccountSection } from "./PaymentAccountCard";
 import { PayUniContactCard, PayUniStatusCard } from "./PayUniCards";
 import ProductForceUnpublishDialog from "./ProductForceUnpublishDialog";
 import RejectKycDialog from "./RejectKycDialog";
@@ -1186,6 +1187,11 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 			)}
 			{(!isApproved || activeTab === "basic") && isRejected && application && (
 				<KycRejectionNotice application={application} />
+			)}
+
+			{/* 收款帳戶卡（GetPaymentAccount）— 獨立於平台審核狀態，核准後仍顯示；錨點 #payment-account。PayUni 的兩張卡在步驟 8 刪除。 */}
+			{(!isApproved || activeTab === "basic") && (
+				<PaymentAccountSection storeId={store.id} />
 			)}
 
 			{/* PayUni 狀態卡 — 獨立於 Hawkr KYC 核准狀態，approved 後仍顯示；比照本區其他區塊只在 basic tab 顯示。 */}

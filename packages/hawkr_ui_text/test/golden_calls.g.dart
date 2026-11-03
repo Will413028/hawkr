@@ -115,6 +115,9 @@ const _enumNumber = <String, int>{
 	'POLICY_CATEGORY_SPAM': 14,
 	'POLICY_CATEGORY_UNLICENSED_SALE': 3,
 	'POLICY_CATEGORY_UNSPECIFIED': 0,
+	'REQUIREMENT_COLLECTION_PLATFORM': 2,
+	'REQUIREMENT_COLLECTION_PROVIDER': 1,
+	'REQUIREMENT_COLLECTION_UNSPECIFIED': 0,
 	'REVOKE_REASON_ADMIN_CORRECTION': 2,
 	'REVOKE_REASON_APPEAL_ACCEPTED': 1,
 	'REVOKE_REASON_EXTERNAL_DECISION': 3,
@@ -277,6 +280,8 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_seller_v1alpha1_seller.PaymentAccountStatus.valueOf(_n(value))!.action(l);
     case 'seller.PaymentAccountStatus.description':
       return hawkr_seller_v1alpha1_seller.PaymentAccountStatus.valueOf(_n(value))!.description(l);
+    case 'seller.RequirementCollection':
+      return hawkr_seller_v1alpha1_seller.RequirementCollection.valueOf(_n(value))!.uiText(l);
     case 'seller.RevokeReason':
       return hawkr_seller_v1alpha1_seller.RevokeReason.valueOf(_n(value))!.uiText(l);
     case 'seller.RiskGround':

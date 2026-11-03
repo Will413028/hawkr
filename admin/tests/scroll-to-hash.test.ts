@@ -44,6 +44,9 @@ const CasePage = requireFromTest(
 ).default as unknown;
 const OrderPage = requireFromTest("../src/app/admin/authority-orders/[id]/page")
 	.default as unknown;
+const { ToastProvider } = requireFromTest("../src/components/UI/Toast") as {
+	ToastProvider: unknown;
+};
 const MerchantPage = requireFromTest("../src/app/admin/merchants/[id]/page")
 	.default as unknown;
 const { useState } = requireFromTest("react") as typeof import("react");
@@ -145,7 +148,7 @@ test("商家詳情：預設狀態下有 #kyc，資料就緒後捲到它", async 
 	dom.window.location.hash = "#kyc";
 	navigation.params = { id: "9" };
 	const m = mount(
-		h(MerchantPage),
+		h(ToastProvider, null, h(MerchantPage)),
 		createRouterTransport(({ service }) => {
 			service(SellerAdminService, {
 				getStore: () => ({

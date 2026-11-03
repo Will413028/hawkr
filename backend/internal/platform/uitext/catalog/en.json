@@ -102,6 +102,12 @@
     "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
       "message": "The payment provider is reviewing your information. No action is needed."
     },
+    "seller.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM": {
+      "message": "Embedded on platform"
+    },
+    "seller.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": {
+      "message": "Provider-hosted"
+    },
     "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE": {
       "message": "Platform review and payout account both completed"
     }

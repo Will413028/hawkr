@@ -195,7 +195,7 @@ test("itemHref：12 種逐種（含錨點）", () => {
 				kind: ReviewQueueItemKind.PAYMENT_ACCOUNT_CREATE_FAILED,
 				subject: { case: "paymentAccount", value: { storeId: "57" } },
 			},
-			"/admin/merchants/57",
+			"/admin/merchants/57#payment-account",
 		],
 	];
 	assert.equal(cases.length, ALL_KIND_VALUES.length, "每種都有一筆");

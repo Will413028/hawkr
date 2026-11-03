@@ -792,6 +792,14 @@
       "message": "金流商正在審核你的資料，不需要額外操作。",
       "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW）"
     },
+    "seller.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM": {
+      "message": "平台收件（內嵌元件）",
+      "description": "平台收件（金流商的內嵌元件）：資料在網頁上由元件直接送給金流商。"
+    },
+    "seller.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": {
+      "message": "金流商收件（託管頁面）",
+      "description": "金流商收件（託管頁面為預設）：平台不經手身分與銀行資料。"
+    },
     "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION": {
       "message": "平台更正",
       "description": "平台更正誤判。"

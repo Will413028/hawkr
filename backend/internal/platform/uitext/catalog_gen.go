@@ -860,6 +860,26 @@ func (t Text) SellerPaymentAccountStatusDescription(v string) (string, bool) {
 	return "", false
 }
 
+// SellerRequirementCollection 是 seller.RequirementCollection 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerRequirementCollection(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PROVIDER":
+			return "Provider-hosted", true
+		case "PLATFORM":
+			return "Embedded on platform", true
+		}
+	}
+	switch v {
+	case "PROVIDER":
+		return "金流商收件（託管頁面）", true
+	case "PLATFORM":
+		return "平台收件（內嵌元件）", true
+	}
+	return "", false
+}
+
 // SellerRevokeReason 是 seller.RevokeReason 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerRevokeReason(v string) (string, bool) {

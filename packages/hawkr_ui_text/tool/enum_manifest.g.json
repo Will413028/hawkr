@@ -228,7 +228,7 @@
       "name": "hawkr.seller.v1alpha1.RequirementCollection",
       "dartClass": "RequirementCollection",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

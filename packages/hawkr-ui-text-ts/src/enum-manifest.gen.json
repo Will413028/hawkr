@@ -466,7 +466,7 @@
       "name": "hawkr.seller.v1alpha1.RequirementCollection",
       "tsName": "RequirementCollection",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

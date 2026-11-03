@@ -215,6 +215,8 @@ return "生效中";
 	"seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": () => "提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。",
 	"seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED": () => "收款已啟用。",
 	"seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_DISABLED": () => "金流商目前無法啟用你的收款帳戶，請聯絡客服。",
+	"seller.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": () => "金流商收件（託管頁面）",
+	"seller.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM": () => "平台收件（內嵌元件）",
 	"seller.RevokeReason.REVOKE_REASON_APPEAL_ACCEPTED": () => "申覆成立",
 	"seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION": () => "平台更正",
 	"seller.RevokeReason.REVOKE_REASON_EXTERNAL_DECISION": () => "主管機關或法院的決定",

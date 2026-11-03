@@ -412,6 +412,21 @@ extension SellerPaymentAccountStatusUiText on hawkr_seller_v1alpha1_seller.Payme
   String? description(UiLocale l) => _sellerPaymentAccountStatusDescription(l, value);
 }
 
+String? _sellerRequirementCollection(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '金流商收件（託管頁面）',
+(UiLocale.en, 1) => 'Provider-hosted',
+(UiLocale.zhTW, 2) => '平台收件（內嵌元件）',
+(UiLocale.en, 2) => 'Embedded on platform',
+_ => null,
+};
+}
+
+extension SellerRequirementCollectionUiText on hawkr_seller_v1alpha1_seller.RequirementCollection {
+  /// seller.RequirementCollection 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _sellerRequirementCollection(l, value);
+}
+
 String? _sellerRevokeReason(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '申覆成立',

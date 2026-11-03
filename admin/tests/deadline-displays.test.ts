@@ -79,6 +79,9 @@ const { PendingRequestSection } = requireFromTest(
 ) as { PendingRequestSection: unknown };
 const MeasureInbox = requireFromTest("../src/app/admin/measures/page")
 	.default as unknown;
+const { ToastProvider } = requireFromTest("../src/components/UI/Toast") as {
+	ToastProvider: unknown;
+};
 const MerchantDetail = requireFromTest("../src/app/admin/merchants/[id]/page")
 	.default as unknown;
 
@@ -248,7 +251,7 @@ test("#126 商家詳情的 KYC：審核期限；沒有期限是「-」；沒有�
 		] as const) {
 			navigation.params = { id: "9" };
 			const m = mount(
-				h(MerchantDetail),
+				h(ToastProvider, null, h(MerchantDetail)),
 				createRouterTransport(({ service }) => {
 					service(SellerAdminService, {
 						getStore: () => storeWith(kyc),

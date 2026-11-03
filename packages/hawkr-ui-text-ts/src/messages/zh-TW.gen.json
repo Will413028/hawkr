@@ -234,6 +234,10 @@
         "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "金流商正在審核你的資料，不需要額外操作。"
       }
     },
+    "RequirementCollection": {
+      "REQUIREMENT_COLLECTION_PLATFORM": "平台收件（內嵌元件）",
+      "REQUIREMENT_COLLECTION_PROVIDER": "金流商收件（託管頁面）"
+    },
     "RevokeReason": {
       "REVOKE_REASON_ADMIN_CORRECTION": "平台更正",
       "REVOKE_REASON_APPEAL_ACCEPTED": "申覆成立",

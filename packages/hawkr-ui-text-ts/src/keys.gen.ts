@@ -3,7 +3,7 @@ import { Code } from "@connectrpc/connect";
 import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
-import type { ContentKind, KYCField, KYCFlowStatus, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, PayUniState, PaymentAccountStatus, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import type { ContentKind, KYCField, KYCFlowStatus, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, PayUniState, PaymentAccountStatus, RequirementCollection, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { UiMessage } from "./message";
 
 export type { DefaultErrorText, UiMessage } from "./message";
@@ -182,6 +182,8 @@ export type UiTextKey =
 	| "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED"
 	| "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_NOT_CREATED"
 	| "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
+	| "seller.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM"
+	| "seller.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER"
 	| "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION"
 	| "seller.RevokeReason.REVOKE_REASON_APPEAL_ACCEPTED"
 	| "seller.RevokeReason.REVOKE_REASON_EXTERNAL_DECISION"
@@ -732,6 +734,18 @@ const SELLER_PAYMENT_ACCOUNT_STATUS_DESCRIPTION: Readonly<Partial<Record<number,
 /** seller.PaymentAccountStatus.description；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
 export function sellerPaymentAccountStatusDescription(v: PaymentAccountStatus): UiMessage | undefined {
 	const key = SELLER_PAYMENT_ACCOUNT_STATUS_DESCRIPTION[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SELLER_REQUIREMENT_COLLECTION: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER",
+	2: "seller.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM",
+};
+
+/** seller.RequirementCollection 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function sellerRequirementCollection(v: RequirementCollection): UiMessage | undefined {
+	const key = SELLER_REQUIREMENT_COLLECTION[v];
 	if (key === undefined) return undefined;
 	return { key };
 }

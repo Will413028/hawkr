@@ -66,7 +66,7 @@ export function itemHref(item: ReviewQueueItem): string | undefined {
 		case "kycApplication":
 			return `/admin/merchants/${subject.value.storeId}#kyc`;
 		case "paymentAccount":
-			return `/admin/merchants/${subject.value.storeId}`;
+			return `/admin/merchants/${subject.value.storeId}#payment-account`;
 		default:
 			return undefined;
 	}
