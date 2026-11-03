@@ -93,6 +93,10 @@ Output: `outputs/q10_thin.txt` (`@accounts`), `outputs/q10b_thin_self.txt` (plat
 
 Output: `outputs/q11_record.txt`, `outputs/q12_link_version.txt`, `outputs/fixtures/`.
 
+## Q14 Bank fingerprint after Stripe-hosted onboarding (step 6, measured 2026-11-03)
+Answer [measured]: in the sandbox, `GET /v1/accounts/{id}/external_accounts?object=bank_account&limit=100` on `2026-09-30.endive` for the v2 account onboarded through the hosted page in step 5b (`acct_1UXVfaID6WkY4CJw`, bank entered by the seller inside Stripe) returns 200 with one `bank_account` that has a 16-character `fingerprint`, under the platform key. This closes the Q9 gap ("a bank entered by the seller inside Stripe-hosted onboarding"). Limit: one account, Stripe's test bank; live-mode scope stays deferred (plan scope).
+Output: `outputs/fixtures/external_accounts_bank.json` (also the adapter's contract fixture), script `q14_external_accounts.py` (run with the sandbox env like `q11_run.sh`).
+
 ## Cleanup
 All connected accounts were deleted with `DELETE /v1/accounts/{id}` (`cleanup.py`, `outputs/cleanup_final.txt`: 0 remaining). Webhook listener and receiver were stopped by `q05_webhook.sh`.
 
