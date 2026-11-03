@@ -106,3 +106,11 @@ website 從 Cloudflare Workers（OpenNext）搬到 Vercel（函式區域 `hnd1`�
 - **身分改變之後**（登出、已登入頁面收到 401、session 失效、開店完成取得賣家角色）：client 清本機私有資料後整頁導向，伺服器只會讀到改變後的 cookie；其他分頁經 BroadcastChannel `hk-auth-session` 得知帳號不同或失去身分時重新載入，訪客分頁得知登入時 `router.refresh()`。同一帳號的資料更新（暱稱、頭像）以 `router.refresh()` 重取。
 - **顯示資料**：GetSession 帶 `display_name` 與 `avatar`，由單體 httpapi 從 buyer 模組組裝，client 不另外取 profile。
 - **反代需求不變**：website 經同源反代把 `/api/auth/*`、`/api/connect/*`、`/api/v1/*` 轉給單體，需原樣傳 3xx 與多個 `Set-Cookie`；部署平台換成 Vercel 後的驗證由 hosting ADR 的步驟負責。
+
+## 修訂：賣家送審要有聯絡信箱（2026-11-03）
+
+D4 不變：`accounts.email` 仍是 provider 回報、已驗證的 email，登入時更新，是通知的寄件地址；自動連結仍只看符合資格的 Google 身分。補充如下（Stripe 收款計畫 D23 的 2026-11-03 修訂，步驟 7a′）：
+
+- **賣家送審前帳號要有聯絡信箱**：Stripe 的收款帳戶必須帶聯絡信箱，而 LINE 使用者可以不給 email。帳號沒有已驗證的 email 時，賣家在送出 KYC 申請前自己填一個（`IdentityAppService.SetContactEmail`），存在 `accounts.self_entered_email`；`SubmitKYC` 要求帳號有其中之一，沒有回 `failed_precondition` 與 `CONTACT_EMAIL_REQUIRED`。核准時把聯絡信箱（已驗證的優先）快照到 `payment_accounts.contact_email`。
+- **買家不變**：買家沒有這個要求，不必填聯絡信箱。
+- **自填的信箱未驗證，也不是寄件地址**：它不寫進 `account_identities`，不成為自動連結的依據；有已驗證 email 的帳號不能設定自填信箱。通知 A8 只寄已驗證的信箱（通知 ADR `2026-10-05-notification-module.md` 決策 8 不變）；自填信箱以驗證碼驗證延後到 A8 的 email 管道上線。
