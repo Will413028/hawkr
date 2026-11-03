@@ -1,6 +1,6 @@
 "use client";
 
-import type { KYCApplication } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import type { PaymentAccount } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { QueryClientContext } from "@tanstack/react-query";
 import * as React from "react";
 import { Link as ViewTransitionLink } from "@/components/shared/view-transitions";
@@ -218,26 +218,28 @@ export default function Link(props: LinkProps) {
 
 	const ensureSellerWallet = React.useCallback(async () => {
 		if (!queryClient) return;
-		const [sellerRepo, kycRepo, ordersRepo, walletRule] = await Promise.all([
-			import("@/lib/seller/repo"),
-			import("@/lib/seller/kyc"),
-			import("@/lib/orders/repo"),
-			import("@/lib/seller/wallet-transactions"),
-		]);
+		const [sellerRepo, paymentRepo, ordersRepo, walletRule] = await Promise.all(
+			[
+				import("@/lib/seller/repo"),
+				import("@/lib/seller/payment-account"),
+				import("@/lib/orders/repo"),
+				import("@/lib/seller/wallet-transactions"),
+			],
+		);
 		walletTransactionRule = walletRule.walletShowsTransactions;
-		const [seller, kyc] = await Promise.all([
+		const [seller, account] = await Promise.all([
 			queryClient.ensureQueryData({
 				queryKey: queryKeys.seller.self(identity),
 				queryFn: sellerRepo.fetchMyStore,
 				staleTime: 30_000,
 			}),
 			queryClient.ensureQueryData({
-				queryKey: queryKeys.seller.kyc(identity),
-				queryFn: () => kycRepo.fetchMyKyc(),
+				queryKey: queryKeys.seller.paymentAccount(identity),
+				queryFn: () => paymentRepo.fetchMyPaymentAccount(),
 				staleTime: 30_000,
 			}),
 		]);
-		if (!walletRule.walletShowsTransactions(seller, kyc?.flow)) return;
+		if (!walletRule.walletShowsTransactions(seller, account)) return;
 		await Promise.all([
 			queryClient.ensureQueryData({
 				queryKey: queryKeys.seller.orders(identity, SELLER_WALLET_ORDER_PARAMS),
@@ -289,17 +291,17 @@ export default function Link(props: LinkProps) {
 			const seller = queryClient.getQueryData<MyStore | null>(
 				queryKeys.seller.self(identity),
 			);
-			const kyc = queryClient.getQueryData<KYCApplication | null>(
-				queryKeys.seller.kyc(identity),
+			const account = queryClient.getQueryData<PaymentAccount | null>(
+				queryKeys.seller.paymentAccount(identity),
 			);
 			if (
 				seller === undefined ||
-				kyc === undefined ||
+				account === undefined ||
 				walletTransactionRule === undefined
 			) {
 				return true;
 			}
-			if (!walletTransactionRule(seller, kyc?.flow)) {
+			if (!walletTransactionRule(seller, account)) {
 				return false;
 			}
 			return (

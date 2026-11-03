@@ -1,5 +1,6 @@
 "use client";
 
+import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import EmptyStatePanel from "@/components/shared/EmptyStatePanel";
@@ -35,13 +36,13 @@ import {
 	type AfterSaleCase,
 	afterSaleNeedsSeller,
 } from "@/lib/seller/after-sales";
-import { useCertGate } from "@/lib/seller/cert-gate";
+import { CERT_PAGE_HREF, useCertGate } from "@/lib/seller/cert-gate";
 import {
 	periodGrowthPercent,
 	periodLabel,
 	type SellerDashboard,
 } from "@/lib/seller/dashboard";
-import { payuniHasState, payuniStateTitle } from "@/lib/seller/payuni";
+import { paymentAccountCopy } from "@/lib/seller/payment-account";
 import { isTcatCalled } from "@/lib/seller/shipment";
 import type { ShipmentAnomalyItem } from "@/lib/shipping/anomalies";
 import { SellerTableSkeletonRows } from "../components/SellerSkeletons";
@@ -73,8 +74,11 @@ export default function DashboardPage() {
 
 	const { data: self } = useSellerSelf();
 	const ut = useUiText();
-	const payuni = certGate.flow?.payuni;
-	const payuniBanner = payuniHasState(payuni) ? payuni : null;
+	const paymentAccount = certGate.paymentAccount;
+	const paymentBanner =
+		paymentAccount && paymentAccount.status !== PaymentAccountStatus.ENABLED
+			? paymentAccountCopy(ut, paymentAccount)
+			: null;
 	const {
 		data: dash,
 		loadFailed: dashLoadFailed,
@@ -180,18 +184,18 @@ export default function DashboardPage() {
 				</Button>
 			</header>
 
-			{/* Payuni banner is sticky between the head and main content.
+			{/* 收款帳戶 banner is sticky between the head and main content.
 			    （商家認證 banner 已移除 — 認證狀態由 OnboardingProgressCard 與
 			    待辦清單導流，dashboard 不再置頂提示。） */}
 
-			{payuniBanner && (
+			{paymentBanner?.badge && (
 				<div className="seller-banner">
 					<div className="seller-banner__text">
-						<strong>{payuniStateTitle(ut, payuniBanner.state)}</strong>
-						<span>{payuniBanner.explanation?.message}</span>
+						<strong>{paymentBanner.badge}</strong>
+						<span>{paymentBanner.description}</span>
 					</div>
 					<Button
-						href="/seller-center/wallet"
+						href={CERT_PAGE_HREF}
 						color="warning"
 						size="sm"
 						className="flex-none"
@@ -219,7 +223,8 @@ export default function DashboardPage() {
 
 			<OnboardingProgressCard
 				self={self}
-				flowStatus={certGate.flowStatus}
+				kycStatus={certGate.application?.status}
+				paymentAccount={certGate.paymentAccount}
 				shippingRows={shippingRows}
 				// GetMyStore 沒有商品數：商品清單的 total 是唯一來源。
 				productCount={productCount}

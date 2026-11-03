@@ -243,8 +243,11 @@ export const queryKeys = {
 	},
 	seller: {
 		self: (id: QueryIdentity) => ["seller", ...idPrefix(id), "self"] as const,
-		// `GetMyKYC` 的申請（沒有申請是 null）；流程狀態由它推導（`useMyKycFlow`）。
+		// `GetMyKYC` 的申請（沒有申請是 null）。
 		kyc: (id: QueryIdentity) => ["seller", ...idPrefix(id), "kyc"] as const,
+		// `GetMyPaymentAccount` 的收款帳戶（還沒有是 null）。
+		paymentAccount: (id: QueryIdentity) =>
+			["seller", ...idPrefix(id), "payment-account"] as const,
 		dashboard: (id: QueryIdentity) =>
 			["seller", ...idPrefix(id), "dashboard"] as const,
 		orders: (id: QueryIdentity, params?: Record<string, unknown>) =>

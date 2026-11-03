@@ -123,7 +123,11 @@ export default function ShippingClient() {
 			subtitle="設定要開通的配送方式。每張訂單實際出貨流程在「訂單管理」內處理。"
 		>
 			{gate === "certification" ? (
-				<SellerCertGate flow={certGate.flow} subject="設定物流與退貨" />
+				<SellerCertGate
+					application={certGate.application}
+					paymentAccount={certGate.paymentAccount}
+					subject="設定物流與退貨"
+				/>
 			) : gate !== "open" ? (
 				<p role="status">
 					{gate === "pending_deletion"

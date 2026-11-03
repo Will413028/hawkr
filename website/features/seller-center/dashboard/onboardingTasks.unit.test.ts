@@ -2,7 +2,9 @@ import { create } from "@bufbuild/protobuf";
 import {
 	CapabilityStatusSchema,
 	GetMyStoreResponseSchema,
-	KYCFlowStatus,
+	KYCStatus,
+	PaymentAccountSchema,
+	PaymentAccountStatus,
 	SellerCapability,
 	SellerRequirement,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -14,7 +16,6 @@ import { buildOnboardingTasks, type OnboardingTask } from "./onboardingTasks";
 
 const ut = uiTextFor("zh-TW");
 const R = SellerRequirement;
-const F = KYCFlowStatus;
 
 function shippingStatus(
 	publicMissing: SellerRequirement[],
@@ -35,7 +36,9 @@ function shippingStatus(
 function build(
 	missing: SellerRequirement[] | undefined,
 	extra: {
-		flowStatus?: KYCFlowStatus;
+		kycStatus?: KYCStatus;
+		paymentStatus?: PaymentAccountStatus;
+		payoutsActive?: boolean;
 		description?: string;
 		shippingRows?: ShippingOnboarding[];
 		productCount?: number | null;
@@ -56,7 +59,14 @@ function build(
 	return buildOnboardingTasks({
 		ut,
 		my,
-		flowStatus: extra.flowStatus,
+		kycStatus: extra.kycStatus,
+		paymentAccount:
+			extra.paymentStatus === undefined
+				? null
+				: create(PaymentAccountSchema, {
+						status: extra.paymentStatus,
+						payoutsActive: extra.payoutsActive ?? false,
+					}),
 		shippingRows: extra.shippingRows ?? [],
 		productCount: extra.productCount ?? 0,
 	});
@@ -76,7 +86,11 @@ const recommended = (tasks: OnboardingTask[]) =>
 describe("公開前必須 follows the PUBLIC_LISTING missing requirements", () => {
 	it("nothing missing: every required task is complete", () => {
 		const tasks = build([]);
-		expect(required(tasks).map((t) => t.id)).toEqual(["profile", "cert"]);
+		expect(required(tasks).map((t) => t.id)).toEqual([
+			"profile",
+			"platform_review",
+			"payment_account",
+		]);
 		expect(required(tasks).every((t) => t.completed)).toBe(true);
 	});
 
@@ -96,41 +110,79 @@ describe("公開前必須 follows the PUBLIC_LISTING missing requirements", () =
 	it("profile is complete only when none of name, logo and town are missing", () => {
 		const tasks = build([R.ONBOARDING_COMPLETE]);
 		expect(task(tasks, "profile").completed).toBe(true);
-		expect(task(tasks, "cert").completed).toBe(false);
+		expect(task(tasks, "platform_review").completed).toBe(false);
+		expect(task(tasks, "payment_account").completed).toBe(false);
 	});
 
-	it("ONBOARDING_COMPLETE keeps the cert task open and shows the flow status as its text", () => {
-		const cert = task(
-			build([R.ONBOARDING_COMPLETE], {
-				flowStatus: F.KYC_FLOW_STATUS_UNDER_REVIEW,
-			}),
-			"cert",
-		);
-		expect(cert.completed).toBe(false);
-		expect(cert.statusLabel).toBe("PayUni 審核中");
-		expect(cert.href).toBe("/seller-center/me/certifications");
-	});
-
-	it("the cert task is decided by the missing requirements, not by the flow status", () => {
-		// 伺服器說沒有缺 ONBOARDING_COMPLETE：就算流程狀態還顯示審核中，這一列也是完成。
+	it("before the review is approved: 平台審核 shows the KYC status and 收款帳戶 is greyed", () => {
+		const submitted = build([R.ONBOARDING_COMPLETE], {
+			kycStatus: KYCStatus.KYC_STATUS_SUBMITTED,
+		});
+		const review = task(submitted, "platform_review");
+		expect(review.completed).toBe(false);
+		expect(review.statusLabel).toBe("審核中");
+		expect(review.href).toBe("/seller-center/me/certifications");
+		const payment = task(submitted, "payment_account");
+		expect(payment.locked).toBe(true);
+		expect(payment.statusLabel).toBe("平台審核通過後開放設定");
+		expect(payment.cta).toBeUndefined();
+		// 沒有申請：未送出。
 		expect(
-			task(build([], { flowStatus: F.KYC_FLOW_STATUS_UNDER_REVIEW }), "cert")
-				.completed,
-		).toBe(true);
-		// 伺服器說還缺 ONBOARDING_COMPLETE：就算流程狀態是 APPROVED，這一列也還沒完成。
+			task(build([R.ONBOARDING_COMPLETE]), "platform_review").statusLabel,
+		).toBe("未送出");
+	});
+
+	it("approved review, payment not enabled: 收款帳戶 shows the catalog badge and action", () => {
+		const tasks = build([R.ONBOARDING_COMPLETE], {
+			kycStatus: KYCStatus.KYC_STATUS_APPROVED,
+			paymentStatus: PaymentAccountStatus.ACTION_REQUIRED,
+		});
+		expect(task(tasks, "platform_review").completed).toBe(true);
+		const payment = task(tasks, "payment_account");
+		expect(payment.completed).toBe(false);
+		expect(payment.locked).toBe(false);
+		expect(payment.statusLabel).toBe("待設定");
+		expect(payment.cta).toBe("前往設定收款帳戶");
+		expect(payment.statusLabel).not.toMatch(/逾期|停用/);
+	});
+
+	it("approved review without an account yet reads as 準備中", () => {
+		const payment = task(
+			build([R.ONBOARDING_COMPLETE], {
+				kycStatus: KYCStatus.KYC_STATUS_APPROVED,
+			}),
+			"payment_account",
+		);
+		expect(payment.statusLabel).toBe("準備中");
+	});
+
+	it("both rows are decided by the missing requirements, not by the statuses", () => {
+		// 伺服器說沒有缺 ONBOARDING_COMPLETE：就算狀態還顯示審核中，兩列都是完成。
+		const done = build([], {
+			kycStatus: KYCStatus.KYC_STATUS_SUBMITTED,
+			paymentStatus: PaymentAccountStatus.UNDER_REVIEW,
+		});
+		expect(task(done, "platform_review").completed).toBe(true);
+		expect(task(done, "payment_account").completed).toBe(true);
+		expect(task(done, "platform_review").cta).toBeUndefined();
+		expect(task(done, "payment_account").cta).toBeUndefined();
+		// 伺服器說還缺 ONBOARDING_COMPLETE：就算收款帳戶 ENABLED，收款那一列也還沒完成。
 		expect(
 			task(
 				build([R.ONBOARDING_COMPLETE], {
-					flowStatus: F.KYC_FLOW_STATUS_APPROVED,
+					kycStatus: KYCStatus.KYC_STATUS_APPROVED,
+					paymentStatus: PaymentAccountStatus.ENABLED,
 				}),
-				"cert",
+				"payment_account",
 			).completed,
 		).toBe(false);
 	});
 
-	it("PayUni is folded into the KYC row: there is no separate payment task", () => {
-		const ids = build([R.ONBOARDING_COMPLETE]).map((t) => t.id);
-		expect(ids).not.toContain("payuni");
+	it("both titles are client text and the PayUni row stays folded away", () => {
+		const tasks = build([R.ONBOARDING_COMPLETE]);
+		expect(task(tasks, "platform_review").title).toBe("平台審核");
+		expect(task(tasks, "payment_account").title).toBe("收款帳戶");
+		expect(tasks.map((t) => t.id)).not.toContain("payuni");
 	});
 
 	it("requirements the notice page handles have no row and do not fall into the fallback row", () => {
@@ -185,20 +237,13 @@ describe("建議完成", () => {
 		]);
 	});
 
-	it("shipping opens only when the store is certified, whatever the flow says", () => {
+	it("shipping opens only when the store is certified, whatever the statuses say", () => {
 		expect(task(build([]), "shipping").locked).toBe(false);
 		expect(
 			task(
 				build([R.ONBOARDING_COMPLETE], {
-					flowStatus: F.KYC_FLOW_STATUS_APPROVED,
-				}),
-				"shipping",
-			).locked,
-		).toBe(true);
-		expect(
-			task(
-				build([R.ONBOARDING_COMPLETE], {
-					flowStatus: F.KYC_FLOW_STATUS_FORWARDED,
+					kycStatus: KYCStatus.KYC_STATUS_APPROVED,
+					paymentStatus: PaymentAccountStatus.UNDER_REVIEW,
 				}),
 				"shipping",
 			).locked,

@@ -2,22 +2,27 @@
  * Seller certification gate.
  *
  * 「已認證」是店家的公開曝光條件之一：`GetMyStore.capabilities` 中 `PUBLIC_LISTING` 缺的條件不含
- * `ONBOARDING_COMPLETE`（平台審核核准且收款帳戶啟用）。細分的狀態（審核中、補件、PayUni 審核…）來自
- * `GetMyKYC.application.flow.status`。這兩個來源只有這裡讀，頁面不自己拼。
+ * `ONBOARDING_COMPLETE`（平台審核核准且收款帳戶啟用）。細分的狀態來自兩條：平台審核
+ * `GetMyKYC.application.status`，與平台審核核准之後的收款帳戶 `GetMyPaymentAccount.account.status`。這些來源只有這裡讀，頁面不自己拼。
  *
  * 認證不再是上架商品、建立優惠券與發票的前置條件（它們只看 `capabilities`）；它是公開曝光、收款的條件
  * （`approved`，「已認證」只有 `isStoreCertified` 一個來源）。物流設定的閘門另看 `SHIPPING_SETUP`
  * 能力（`shippingGate`），伺服器依能力的缺項告訴 client 是缺認證還是停權、等待刪除，client 不自己推前置條件。
  *
- * Caching note: `useSellerSelf` 與 `useMyKycFlow` 各是一條 identity-scoped server-state，
+ * Caching note: `useSellerSelf`、`useMyKyc` 與 `useMyPaymentAccount` 各是一條 identity-scoped server-state，
  * 所有消費者共用一次請求。`refresh()` 重新讀店家（例如補件之後）。
  */
 
-import type {
-	KYCFlow,
-	KYCFlowStatus,
+import {
+	type KYCApplication,
+	KYCStatus,
+	type PaymentAccount,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
-import { useMyKycFlow, useSellerSelf } from "@/lib/hooks/useSellerSelf";
+import {
+	useMyKyc,
+	useMyPaymentAccount,
+	useSellerSelf,
+} from "@/lib/hooks/useSellerSelf";
 import {
 	isStoreCertified,
 	type MyStore,
@@ -31,12 +36,10 @@ export interface CertGate {
 	approved: boolean;
 	/** 物流設定的閘門（`SHIPPING_SETUP` 的啟用與缺項）。 */
 	shippingGate: ShippingGate;
-	/** 流程狀態（來自 GetMyKYC）；沒讀到時是 undefined。 */
-	flowStatus: KYCFlowStatus | undefined;
-	/** 流程（來自 GetMyKYC，含 `payuni` 與 `resubmitUnavailabilities`）；沒讀到時是 null。 */
-	flow: KYCFlow | null;
-	/** 賣家可以把申請改回草稿重新送出（`flow.can_resubmit`）。 */
-	canResubmit: boolean;
+	/** 申請（GetMyKYC）；沒有申請或沒讀到時是 null。 */
+	application: KYCApplication | null;
+	/** 收款帳戶（GetMyPaymentAccount，平台審核核准後才讀）；還沒有或沒讀到時是 null。 */
+	paymentAccount: PaymentAccount | null;
 	/** 店家（GetMyStore 的回應），沒讀到時是 null。 */
 	seller: MyStore | null;
 	error: string | null;
@@ -45,19 +48,21 @@ export interface CertGate {
 
 export function useCertGate(): CertGate {
 	const { data: seller, loading, error, refresh } = useSellerSelf();
-	const { flow, loading: flowLoading } = useMyKycFlow();
+	const { application, loading: kycLoading } = useMyKyc();
+	const kycApproved = application?.status === KYCStatus.KYC_STATUS_APPROVED;
+	const { account: paymentAccount, loading: paymentLoading } =
+		useMyPaymentAccount({ enabled: kycApproved });
 	const reload = () => {
 		void refresh();
 	};
 
-	if (loading || flowLoading) {
+	if (loading || kycLoading || paymentLoading) {
 		return {
 			loading: true,
 			approved: false,
 			shippingGate: "unknown",
-			flowStatus: undefined,
-			flow: null,
-			canResubmit: false,
+			application: null,
+			paymentAccount: null,
 			seller: null,
 			error: null,
 			refresh: reload,
@@ -75,9 +80,8 @@ export function useCertGate(): CertGate {
 			loading: false,
 			approved: false,
 			shippingGate: "unknown",
-			flowStatus: undefined,
-			flow: null,
-			canResubmit: false,
+			application: null,
+			paymentAccount: null,
 			seller: null,
 			error: error ? error.message : null,
 			refresh: reload,
@@ -85,14 +89,12 @@ export function useCertGate(): CertGate {
 	}
 
 	const approved = isStoreCertified(seller);
-	const flowStatus = flow?.status;
 	return {
 		loading: false,
 		approved,
 		shippingGate: shippingGateOf(seller),
-		flowStatus,
-		flow,
-		canResubmit: flow?.canResubmit ?? false,
+		application,
+		paymentAccount,
 		seller,
 		error: null,
 		refresh: reload,

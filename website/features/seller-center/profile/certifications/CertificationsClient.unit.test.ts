@@ -13,11 +13,8 @@ import {
 	AgreementKind,
 	KYCApplicationSchema,
 	KYCField,
-	KYCFlowStatus,
 	KYCIssueCode,
 	KYCStatus,
-	PayUniState,
-	SellerPayUniSchema,
 	StoreField,
 	StoreSchema,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -55,6 +52,7 @@ const SERVED = vi.hoisted(() => ({
 
 const mocks = vi.hoisted(() => ({
 	type: null as string | null,
+	loginEmail: undefined as string | undefined,
 	store: { etag: "s1" } as Record<string, unknown>,
 	saveKycDraft: vi.fn(),
 	fetchMyKyc: vi.fn(),
@@ -95,9 +93,29 @@ vi.mock("@/lib/hooks/useSellerSelf", async () => {
 			error: null,
 		}),
 		useSetMyKyc: () => kycStore.set,
+		useMyPaymentAccount: () => ({
+			account: null,
+			loading: false,
+			error: null,
+			refetch: async () => {},
+		}),
 		useInvalidateSellerSelf: () => async () => {},
 	};
 });
+vi.mock("@/lib/hooks/useLoginEmail", () => ({
+	useLoginEmail: () => ({ email: mocks.loginEmail, loading: false }),
+}));
+vi.mock("./PaymentAccountSection", () => ({
+	PaymentAccountSection: ({
+		platformApproved,
+	}: {
+		platformApproved: boolean;
+	}) =>
+		React.createElement("div", {
+			"data-testid": "payment-section",
+			"data-approved": platformApproved ? "true" : "false",
+		}),
+}));
 vi.mock("@/lib/navigation/use-observed-router", () => ({
 	useObservedRouter: () => ({ replace: mocks.replace }),
 }));
@@ -223,7 +241,6 @@ function app(init: AppInit = {}) {
 	const base: AppInit = {
 		etag: "e1",
 		status: KYCStatus.KYC_STATUS_DRAFT,
-		flow: { status: KYCFlowStatus.KYC_FLOW_STATUS_DRAFT, canResubmit: true },
 		subject: { case: "individual", value: {} },
 	};
 	return create(KYCApplicationSchema, { ...base, ...init } as AppInit);
@@ -292,6 +309,7 @@ function outdated() {
 beforeEach(() => {
 	vi.useFakeTimers();
 	mocks.type = null;
+	mocks.loginEmail = undefined;
 	Element.prototype.scrollIntoView = mocks.scrollIntoView;
 	window.confirm = () => true;
 	kycStore.set(null);
@@ -325,25 +343,31 @@ describe("續填：由 GetMyKYC 還原", () => {
 	it("既有草稿直接進表單（不是選型態），並捲到 missing_fields 的第一個區塊", async () => {
 		kycStore.set(
 			app({
-				realName: "王小明",
+				payoutContactEmail: "pay@example.com",
+				subject: { case: "business", value: {} },
 				missingFields: [
-					KYCField.KYC_FIELD_BANK_ACCOUNT,
-					KYCField.KYC_FIELD_ENGLISH_NAME,
+					KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL,
+					KYCField.KYC_FIELD_BUSINESS_TAX_ID,
 				],
 			}),
 		);
 		await mount();
-		expect(screen.getByLabelText("真實姓名")).toHaveProperty("value", "王小明");
+		expect(screen.getByLabelText("收款聯絡信箱")).toHaveProperty(
+			"value",
+			"pay@example.com",
+		);
 		expect(screen.queryByText("選擇商家類型")).toBeNull();
 		await act(async () => {});
 		const scrolled = mocks.scrollIntoView.mock.instances.map(
 			(el) => (el as HTMLElement).id,
 		);
-		expect(scrolled).toEqual(["cert-bank"]);
+		expect(scrolled).toEqual(["cert-company"]);
 	});
 
 	it("缺項換了，續填位置跟著換", async () => {
-		kycStore.set(app({ missingFields: [KYCField.KYC_FIELD_ENGLISH_NAME] }));
+		kycStore.set(
+			app({ missingFields: [KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL] }),
+		);
 		await mount();
 		const scrolled = mocks.scrollIntoView.mock.instances.map(
 			(el) => (el as HTMLElement).id,
@@ -355,10 +379,27 @@ describe("續填：由 GetMyKYC 還原", () => {
 		kycStore.set(
 			app({
 				status: KYCStatus.KYC_STATUS_REJECTED,
-				flow: {
-					status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
-					canResubmit: true,
-				},
+				lastRejection: { reason: "公司資料不符" },
+				outstandingIssues: [
+					{
+						field: KYCField.KYC_FIELD_BUSINESS_TAX_ID,
+						code: KYCIssueCode.KYC_ISSUE_CODE_MISMATCH,
+						message: "與登記不符",
+					},
+				],
+				subject: { case: "business", value: {} },
+			}),
+		);
+		await mount();
+		expect(screen.getByText("需修改")).toBeTruthy();
+		expect(screen.getByText("公司資料不符")).toBeTruthy();
+		expect(screen.getByText("統一編號：與登記不符")).toBeTruthy();
+	});
+
+	it("退回指到表單已經沒有的欄位（舊申請）：總理由與逐項說明照樣顯示欄位名稱", async () => {
+		kycStore.set(
+			app({
+				status: KYCStatus.KYC_STATUS_REJECTED,
 				lastRejection: { reason: "存摺照片模糊" },
 				outstandingIssues: [
 					{
@@ -380,47 +421,39 @@ describe("續填：由 GetMyKYC 還原", () => {
 		) =>
 			app({
 				status: KYCStatus.KYC_STATUS_DRAFT,
-				flow: {
-					status: KYCFlowStatus.KYC_FLOW_STATUS_DRAFT,
-					canResubmit: true,
-				},
-				lastRejection: { reason: "英文姓名不符" },
+				lastRejection: { reason: "統編不符" },
 				outstandingIssues,
+				subject: { case: "business", value: {} },
 			});
 		kycStore.set(
 			draft([
 				{
-					field: KYCField.KYC_FIELD_ENGLISH_NAME,
+					field: KYCField.KYC_FIELD_BUSINESS_TAX_ID,
 					code: KYCIssueCode.KYC_ISSUE_CODE_MISMATCH,
-					message: "請與護照一致",
+					message: "請與登記一致",
 				},
 			]),
 		);
 		await mount();
-		expect(screen.getByText("英文姓名不符")).toBeTruthy();
-		expect(screen.getAllByText("請與護照一致").length).toBeGreaterThan(0);
+		expect(screen.getByText("統編不符")).toBeTruthy();
+		expect(screen.getAllByText("請與登記一致").length).toBeGreaterThan(0);
 		cleanup();
 		kycStore.set(draft([]));
 		await mount();
-		expect(screen.getByText("英文姓名不符")).toBeTruthy();
-		expect(screen.queryByText("請與護照一致")).toBeNull();
+		expect(screen.getByText("統編不符")).toBeTruthy();
+		expect(screen.queryByText("請與登記一致")).toBeNull();
 	});
 
 	it("審核中是只讀的狀態頁，不是表單", async () => {
-		kycStore.set(
-			app({
-				status: KYCStatus.KYC_STATUS_SUBMITTED,
-				flow: { status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED },
-			}),
-		);
+		kycStore.set(app({ status: KYCStatus.KYC_STATUS_SUBMITTED }));
 		await mount();
-		expect(screen.queryByLabelText("真實姓名")).toBeNull();
-		expect(screen.getByText("平台審核中")).toBeTruthy();
+		expect(screen.queryByLabelText("收款聯絡信箱")).toBeNull();
+		expect(screen.getByText("審核中")).toBeTruthy();
 	});
 });
 
 describe("表單欄位", () => {
-	it("企業：沒有組織型態、沒有營運說明；有聯絡人姓名、手機與客服電子信箱、統編與公司電話", async () => {
+	it("企業：沒有組織型態、營運說明、身分與銀行；有聯絡人姓名、手機與客服電子信箱、統編、公司電話與收款聯絡信箱", async () => {
 		kycStore.set(app({ subject: { case: "business", value: {} } }));
 		await mount();
 		expect(screen.queryByLabelText("組織型態")).toBeNull();
@@ -433,22 +466,106 @@ describe("表單欄位", () => {
 			"聯絡人姓名",
 			"聯絡人手機",
 			"客服電子信箱",
-			"負責人身分證字號",
+			"收款聯絡信箱",
 			"主要商品類型",
 			"公司地址",
+		]) {
+			expect(screen.getByLabelText(label), label).toBeTruthy();
+		}
+		for (const label of [
+			"負責人身分證字號",
 			"銀行名稱",
 			"銀行帳號",
+			"英文姓名",
 		]) {
-			expect(screen.getByLabelText(label)).toBeTruthy();
+			expect(screen.queryByLabelText(label), label).toBeNull();
 		}
 	});
 
-	it("個人：沒有公司區塊與補充文件", async () => {
+	it("個人：沒有公司區塊與補充文件，有確認送出區與金流商收集身分的說明", async () => {
 		kycStore.set(app());
 		await mount();
 		expect(screen.queryByLabelText("統一編號")).toBeNull();
 		expect(screen.queryByText("補充文件（選填）")).toBeNull();
 		expect(screen.getByLabelText("客服電子信箱")).toBeTruthy();
+		expect(screen.getByLabelText("收款聯絡信箱")).toBeTruthy();
+		expect(
+			screen.getByText(
+				"身分與銀行帳號會在審核通過後，由金流商收集，平台不經手。",
+			),
+		).toBeTruthy();
+	});
+});
+
+describe("收款聯絡信箱預設帶入登入信箱（D23）", () => {
+	it("既有草稿還沒有值：帶入登入信箱並自動存檔寫進申請；可以改", async () => {
+		mocks.loginEmail = "login@example.com";
+		kycStore.set(app({ etag: "e1" }));
+		mocks.saveKycDraft.mockResolvedValue(
+			app({ etag: "e2", payoutContactEmail: "login@example.com" }),
+		);
+		await mount();
+		expect(screen.getByLabelText("收款聯絡信箱")).toHaveProperty(
+			"value",
+			"login@example.com",
+		);
+		await autosave();
+		expect(mocks.saveKycDraft.mock.calls[0]?.[0].updateMask.paths).toEqual([
+			"payout_contact_email",
+		]);
+		expect(
+			mocks.saveKycDraft.mock.calls[0]?.[0].application.payoutContactEmail,
+		).toBe("login@example.com");
+		await typeInto("收款聯絡信箱", "pay@example.com");
+		expect(screen.getByLabelText("收款聯絡信箱")).toHaveProperty(
+			"value",
+			"pay@example.com",
+		);
+	});
+
+	it("草稿已經有值：不覆蓋成登入信箱", async () => {
+		mocks.loginEmail = "login@example.com";
+		kycStore.set(app({ payoutContactEmail: "pay@example.com" }));
+		await mount();
+		expect(screen.getByLabelText("收款聯絡信箱")).toHaveProperty(
+			"value",
+			"pay@example.com",
+		);
+		await autosave();
+		expect(mocks.saveKycDraft).not.toHaveBeenCalled();
+	});
+
+	it("新申請：建立時就帶著登入信箱", async () => {
+		mocks.loginEmail = "login@example.com";
+		mocks.saveKycDraft.mockResolvedValue(
+			app({ etag: "e1", payoutContactEmail: "login@example.com" }),
+		);
+		await mount();
+		await act(async () => {
+			fireEvent.click(screen.getByText("開始填寫"));
+		});
+		expect(
+			mocks.saveKycDraft.mock.calls[0]?.[0].application.payoutContactEmail,
+		).toBe("login@example.com");
+	});
+
+	it("登入沒有信箱：欄位是空的，開頁不寫入", async () => {
+		kycStore.set(app());
+		await mount();
+		expect(screen.getByLabelText("收款聯絡信箱")).toHaveProperty("value", "");
+		await autosave();
+		expect(mocks.saveKycDraft).not.toHaveBeenCalled();
+	});
+
+	it("格式不正確：顯示錯誤、不寫入、不能送出", async () => {
+		kycStore.set(app({ missingFields: [] }));
+		await mount();
+		await typeInto("收款聯絡信箱", "not-an-email");
+		await autosave();
+		expect(mocks.saveKycDraft).not.toHaveBeenCalled();
+		expect(
+			document.querySelector('[data-field-error="收款聯絡信箱"]')?.textContent,
+		).toBe("Email 格式不正確");
 	});
 });
 
@@ -468,16 +585,16 @@ describe("SaveKYCDraft", () => {
 	it("已經有申請：存檔帶 etag，並用回應的新 etag 接著寫", async () => {
 		kycStore.set(app({ etag: "e1" }));
 		mocks.saveKycDraft
-			.mockResolvedValueOnce(app({ etag: "e2", realName: "王小明" }))
-			.mockResolvedValueOnce(app({ etag: "e3", englishName: "Wang" }));
+			.mockResolvedValueOnce(app({ etag: "e2", payoutContactEmail: "a@x.co" }))
+			.mockResolvedValueOnce(app({ etag: "e3", payoutContactEmail: "b@x.co" }));
 		await mount();
-		await typeInto("真實姓名", "王小明");
+		await typeInto("收款聯絡信箱", "a@x.co");
 		await autosave();
 		expect(mocks.saveKycDraft.mock.calls[0]?.[0].application.etag).toBe("e1");
 		expect(mocks.saveKycDraft.mock.calls[0]?.[0].updateMask.paths).toEqual([
-			"real_name",
+			"payout_contact_email",
 		]);
-		await typeInto("英文姓名", "Wang");
+		await typeInto("收款聯絡信箱", "b@x.co");
 		await autosave();
 		expect(mocks.saveKycDraft.mock.calls[1]?.[0].application.etag).toBe("e2");
 	});
@@ -491,21 +608,28 @@ describe("SaveKYCDraft", () => {
 	});
 
 	it("版本衝突：保留使用者輸入、載入最新版本，下一次存檔用新的 etag", async () => {
-		kycStore.set(app({ etag: "e1" }));
+		kycStore.set(app({ etag: "e1", subject: { case: "business", value: {} } }));
 		mocks.saveKycDraft
 			.mockRejectedValueOnce(conflict())
 			.mockResolvedValueOnce(app({ etag: "e10" }));
 		mocks.fetchMyKyc.mockResolvedValue(
-			app({ etag: "e9", englishName: "Latest" }),
+			app({
+				etag: "e9",
+				productType: "Latest",
+				subject: { case: "business", value: {} },
+			}),
 		);
 		await mount();
-		await typeInto("真實姓名", "我輸入的");
+		await typeInto("收款聯絡信箱", "mine@example.com");
 		await autosave();
-		expect(screen.getByLabelText("真實姓名")).toHaveProperty(
+		expect(screen.getByLabelText("收款聯絡信箱")).toHaveProperty(
 			"value",
-			"我輸入的",
+			"mine@example.com",
 		);
-		expect(screen.getByLabelText("英文姓名")).toHaveProperty("value", "Latest");
+		expect(screen.getByLabelText("主要商品類型")).toHaveProperty(
+			"value",
+			"Latest",
+		);
 		expect(screen.getByRole("alert").textContent).toContain(
 			"你輸入的內容仍保留",
 		);
@@ -513,7 +637,7 @@ describe("SaveKYCDraft", () => {
 		expect(mocks.saveKycDraft).toHaveBeenCalledTimes(2);
 		const retry = mocks.saveKycDraft.mock.calls[1]?.[0];
 		expect(retry.application.etag).toBe("e9");
-		expect(retry.application.realName).toBe("我輸入的");
+		expect(retry.application.payoutContactEmail).toBe("mine@example.com");
 	});
 });
 
@@ -521,16 +645,20 @@ describe("SubmitKYC", () => {
 	it("先把暫存存完，再以最新的 etag 送出", async () => {
 		kycStore.set(app({ etag: "e1", missingFields: [] }));
 		mocks.saveKycDraft.mockResolvedValue(
-			app({ etag: "e2", englishName: "Wang", missingFields: [] }),
+			app({
+				etag: "e2",
+				payoutContactEmail: "wang@example.com",
+				missingFields: [],
+			}),
 		);
 		mocks.submitKyc.mockResolvedValue(
 			app({
 				etag: "e3",
-				flow: { status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED },
+				status: KYCStatus.KYC_STATUS_SUBMITTED,
 			}),
 		);
 		await mount();
-		await typeInto("英文姓名", "Wang");
+		await typeInto("收款聯絡信箱", "wang@example.com");
 		await autosave();
 		await acceptAgreements();
 		await act(async () => {
@@ -542,7 +670,9 @@ describe("SubmitKYC", () => {
 	});
 
 	it("缺項由伺服器的 missing_fields 決定：還有缺項不能送出", async () => {
-		kycStore.set(app({ missingFields: [KYCField.KYC_FIELD_ENGLISH_NAME] }));
+		kycStore.set(
+			app({ missingFields: [KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL] }),
+		);
 		await mount();
 		expect(screen.getByText("尚需 1 項必填")).toBeTruthy();
 		expect((screen.getByText("送出認證") as HTMLButtonElement).disabled).toBe(
@@ -555,7 +685,6 @@ describe("SubmitKYC", () => {
 function rejectedApp(init: AppInit = {}) {
 	return app({
 		status: KYCStatus.KYC_STATUS_REJECTED,
-		flow: { status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED, canResubmit: true },
 		submitTime: timestampFromMs(1000),
 		lastRejection: {
 			reason: "存摺照片模糊",
@@ -568,33 +697,6 @@ function rejectedApp(init: AppInit = {}) {
 				message: "封面反光看不清楚",
 			},
 		],
-		missingFields: [],
-		...init,
-	} as AppInit);
-}
-
-const PAYUNI_EXPLANATION = "伺服器獨特說明-請修正資料";
-
-function fixablePayuni() {
-	return create(SellerPayUniSchema, {
-		state: PayUniState.FIXABLE,
-		explanation: create(LocalizedMessageSchema, {
-			locale: "zh-TW",
-			message: PAYUNI_EXPLANATION,
-		}),
-		reason: "PayUni：店家地址不完整",
-	});
-}
-
-function payuniRejectedApp(init: AppInit = {}) {
-	return app({
-		status: KYCStatus.KYC_STATUS_APPROVED,
-		flow: {
-			status: KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED,
-			canResubmit: true,
-			payuni: fixablePayuni(),
-		},
-		submitTime: timestampFromMs(3000),
 		missingFields: [],
 		...init,
 	} as AppInit);
@@ -626,29 +728,33 @@ describe("D1：自動存檔的失敗不會無限重試", () => {
 		kycStore.set(app());
 		mocks.saveKycDraft
 			.mockRejectedValueOnce(
-				invalidField("application.english_name", "商店英文名稱僅容許英數"),
+				invalidField("application.payout_contact_email", "此信箱無法收信"),
 			)
-			.mockResolvedValueOnce(app({ etag: "e2", englishName: "Wang" }));
+			.mockResolvedValueOnce(
+				app({ etag: "e2", payoutContactEmail: "wang@example.com" }),
+			);
 		await mount();
-		await typeInto("英文姓名", "王");
+		await typeInto("收款聯絡信箱", "bad@example.com");
 		await autosave();
 		expect(mocks.saveKycDraft).toHaveBeenCalledTimes(1);
 		expect(
-			document.querySelector('[data-field-error="英文姓名"]')?.textContent,
-		).toBe("商店英文名稱僅容許英數");
-		expect(screen.getByRole("alert").textContent).toContain("英文姓名");
+			document.querySelector('[data-field-error="收款聯絡信箱"]')?.textContent,
+		).toBe("此信箱無法收信");
+		expect(screen.getByRole("alert").textContent).toContain("收款聯絡信箱");
 		await act(async () => {
 			await vi.advanceTimersByTimeAsync(60_000);
 		});
 		expect(mocks.saveKycDraft).toHaveBeenCalledTimes(1);
-		await typeInto("英文姓名", "Wang");
+		await typeInto("收款聯絡信箱", "wang@example.com");
 		await autosave();
 		expect(mocks.saveKycDraft).toHaveBeenCalledTimes(2);
-		expect(document.querySelector('[data-field-error="英文姓名"]')).toBeNull();
+		expect(
+			document.querySelector('[data-field-error="收款聯絡信箱"]'),
+		).toBeNull();
 	});
 
-	it("伺服器拒絕證件：提示顯示伺服器對那一張的訊息，不說格式不正確", async () => {
-		kycStore.set(app());
+	it("伺服器拒絕補充文件：提示顯示伺服器對那一張的訊息，不說格式不正確", async () => {
+		kycStore.set(app({ subject: { case: "business", value: {} } }));
 		mocks.saveKycDraft.mockRejectedValueOnce(
 			new ConnectError("bad", Code.InvalidArgument, undefined, [
 				{
@@ -656,19 +762,11 @@ describe("D1：自動存檔的失敗不會無限重試", () => {
 					value: {
 						fieldViolations: [
 							{
-								field: "application.english_name",
-								description: "商店英文名稱僅容許英數",
+								field: "application.payout_contact_email",
+								description: "此信箱無法收信",
 								localizedMessage: {
 									locale: "zh-TW",
-									message: "商店英文名稱僅容許英數",
-								},
-							},
-							{
-								field: "application.id_card_front",
-								description: "圖片無法使用，請重新上傳",
-								localizedMessage: {
-									locale: "zh-TW",
-									message: "圖片無法使用，請重新上傳",
+									message: "此信箱無法收信",
 								},
 							},
 							{
@@ -685,10 +783,10 @@ describe("D1：自動存檔的失敗不會無限重試", () => {
 			]),
 		);
 		await mount();
-		await typeInto("英文姓名", "王");
+		await typeInto("收款聯絡信箱", "bad@example.com");
 		await autosave();
 		expect(screen.getByRole("alert").textContent).toBe(
-			"下列欄位格式不正確：英文姓名；身分證正面照：圖片無法使用，請重新上傳；補充文件（第 2 張）：圖片無法使用，請重新上傳",
+			"下列欄位格式不正確：收款聯絡信箱；補充文件（第 2 張）：圖片無法使用，請重新上傳",
 		);
 	});
 
@@ -696,7 +794,7 @@ describe("D1：自動存檔的失敗不會無限重試", () => {
 		kycStore.set(app());
 		mocks.saveKycDraft.mockRejectedValue(unavailable());
 		await mount();
-		await typeInto("英文姓名", "Wang");
+		await typeInto("收款聯絡信箱", "wang@example.com");
 		await autosave();
 		await act(async () => {
 			await vi.advanceTimersByTimeAsync(120_000);
@@ -704,7 +802,7 @@ describe("D1：自動存檔的失敗不會無限重試", () => {
 		expect(mocks.saveKycDraft).toHaveBeenCalledTimes(1);
 		expect(screen.getByRole("alert").textContent).toBeTruthy();
 		mocks.saveKycDraft.mockResolvedValue(app({ etag: "e2" }));
-		await typeInto("真實姓名", "王小明");
+		await typeInto("收款聯絡信箱", "other@example.com");
 		await autosave();
 		expect(mocks.saveKycDraft).toHaveBeenCalledTimes(2);
 	});
@@ -714,16 +812,20 @@ describe("D1：自動存檔的失敗不會無限重試", () => {
 		mocks.saveKycDraft
 			.mockRejectedValueOnce(unavailable())
 			.mockResolvedValueOnce(
-				app({ etag: "e2", englishName: "Wang", missingFields: [] }),
+				app({
+					etag: "e2",
+					payoutContactEmail: "wang@example.com",
+					missingFields: [],
+				}),
 			);
 		mocks.submitKyc.mockResolvedValue(
 			app({
 				etag: "e3",
-				flow: { status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED },
+				status: KYCStatus.KYC_STATUS_SUBMITTED,
 			}),
 		);
 		await mount();
-		await typeInto("英文姓名", "Wang");
+		await typeInto("收款聯絡信箱", "wang@example.com");
 		await autosave();
 		expect(mocks.saveKycDraft).toHaveBeenCalledTimes(1);
 		await acceptAgreements();
@@ -738,11 +840,11 @@ describe("D1：自動存檔的失敗不會無限重試", () => {
 		kycStore.set(app());
 		mocks.saveKycDraft.mockRejectedValue(unavailable());
 		await mount();
-		await typeInto("英文姓名", "W");
+		await typeInto("收款聯絡信箱", "a@x.co");
 		await autosave();
-		await typeInto("英文姓名", "Wa");
+		await typeInto("收款聯絡信箱", "ab@x.co");
 		await autosave();
-		await typeInto("英文姓名", "Wan");
+		await typeInto("收款聯絡信箱", "abc@x.co");
 		await autosave();
 		await act(async () => {
 			await vi.advanceTimersByTimeAsync(120_000);
@@ -751,21 +853,18 @@ describe("D1：自動存檔的失敗不會無限重試", () => {
 	});
 });
 
-describe("綁定失敗而且賣家能修正（F17）", () => {
-	it("flow 是 BIND_FAILED、canResubmit 為真：表單可編輯，不是鎖住畫面", async () => {
+describe("審核中與已通過不能編輯", () => {
+	it("已通過：即使伺服器的 flow 說能重送，也是狀態頁而不是表單", async () => {
 		kycStore.set(
 			app({
 				status: KYCStatus.KYC_STATUS_APPROVED,
-				flow: {
-					status: KYCFlowStatus.KYC_FLOW_STATUS_BIND_FAILED,
-					canResubmit: true,
-					payuni: { state: PayUniState.FIXABLE },
-				},
+				flow: { canResubmit: true },
 				missingFields: [],
 			} as AppInit),
 		);
 		await mount();
-		expect(screen.getByLabelText("英文姓名")).toBeTruthy();
+		expect(screen.queryByLabelText("收款聯絡信箱")).toBeNull();
+		expect(screen.getByText("平台審核")).toBeTruthy();
 	});
 });
 
@@ -775,17 +874,13 @@ describe("D2：退回原因在存檔之後還在", () => {
 		mocks.saveKycDraft.mockResolvedValue(
 			rejectedApp({
 				etag: "e2",
-				englishName: "Wang",
+				payoutContactEmail: "wang@example.com",
 				status: KYCStatus.KYC_STATUS_DRAFT,
-				flow: {
-					status: KYCFlowStatus.KYC_FLOW_STATUS_DRAFT,
-					canResubmit: true,
-				},
 			}),
 		);
 		await mount();
 		expect(screen.getByText("存摺照片模糊")).toBeTruthy();
-		await typeInto("英文姓名", "Wang");
+		await typeInto("收款聯絡信箱", "wang@example.com");
 		await autosave();
 		expect(mocks.saveKycDraft).toHaveBeenCalledTimes(1);
 		expect(screen.getByText("存摺照片模糊")).toBeTruthy();
@@ -796,10 +891,6 @@ describe("D2：退回原因在存檔之後還在", () => {
 		kycStore.set(
 			rejectedApp({
 				status: KYCStatus.KYC_STATUS_DRAFT,
-				flow: {
-					status: KYCFlowStatus.KYC_FLOW_STATUS_DRAFT,
-					canResubmit: true,
-				},
 			}),
 		);
 		await mount();
@@ -810,10 +901,6 @@ describe("D2：退回原因在存檔之後還在", () => {
 		kycStore.set(
 			rejectedApp({
 				status: KYCStatus.KYC_STATUS_DRAFT,
-				flow: {
-					status: KYCFlowStatus.KYC_FLOW_STATUS_DRAFT,
-					canResubmit: true,
-				},
 				lastRejection: undefined,
 				outstandingIssues: [],
 			}),
@@ -824,13 +911,13 @@ describe("D2：退回原因在存檔之後還在", () => {
 	});
 });
 
-describe("D3：被退回或 PayUni 拒絕的申請送出", () => {
+describe("D3：被退回的申請送出", () => {
 	it("被退回、沒有改任何欄位：直接送出，不先存檔", async () => {
 		kycStore.set(rejectedApp({ etag: "e1" }));
 		mocks.submitKyc.mockResolvedValue(
 			app({
 				etag: "e3",
-				flow: { status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED },
+				status: KYCStatus.KYC_STATUS_SUBMITTED,
 			}),
 		);
 		await mount();
@@ -844,36 +931,23 @@ describe("D3：被退回或 PayUni 拒絕的申請送出", () => {
 		expect(mocks.replace).toHaveBeenCalledWith("/seller-center/dashboard");
 	});
 
-	it("PayUni 拒絕、沒有改欄位：同樣直接送出，不先存檔", async () => {
-		kycStore.set(payuniRejectedApp({ etag: "e1" }));
-		mocks.submitKyc.mockResolvedValue(
-			app({
-				etag: "e3",
-				flow: { status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED },
-			}),
-		);
-		await mount();
-		await acceptAgreements();
-		await act(async () => {
-			fireEvent.click(screen.getByText("送出認證"));
-		});
-		expect(mocks.saveKycDraft).not.toHaveBeenCalled();
-		expect(mocks.submitKyc).toHaveBeenCalledWith("e1", ACCEPTED_KYC);
-	});
-
 	it("被退回、有改欄位：存檔本身就回到草稿，不多送一次", async () => {
 		kycStore.set(rejectedApp({ etag: "e1" }));
 		mocks.saveKycDraft.mockResolvedValue(
-			app({ etag: "e2", englishName: "Wang", missingFields: [] }),
+			app({
+				etag: "e2",
+				payoutContactEmail: "wang@example.com",
+				missingFields: [],
+			}),
 		);
 		mocks.submitKyc.mockResolvedValue(
 			app({
 				etag: "e3",
-				flow: { status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED },
+				status: KYCStatus.KYC_STATUS_SUBMITTED,
 			}),
 		);
 		await mount();
-		await typeInto("英文姓名", "Wang");
+		await typeInto("收款聯絡信箱", "wang@example.com");
 		await autosave();
 		await acceptAgreements();
 		await act(async () => {
@@ -881,7 +955,7 @@ describe("D3：被退回或 PayUni 拒絕的申請送出", () => {
 		});
 		expect(mocks.saveKycDraft).toHaveBeenCalledTimes(1);
 		expect(mocks.saveKycDraft.mock.calls[0]?.[0].updateMask.paths).toEqual([
-			"english_name",
+			"payout_contact_email",
 		]);
 		expect(mocks.submitKyc).toHaveBeenCalledWith("e2", ACCEPTED_KYC);
 	});
@@ -900,115 +974,77 @@ describe("D4：開頁不寫入", () => {
 	});
 });
 
-describe("D5、D7：PayUni 問題的顯示（flow.payuni）", () => {
-	it("PayUni 拒絕但能重送：表單上方有 PayUni 問題框，標題是目錄名詞、說明是伺服器句子、審核意見標 zh-TW", async () => {
-		kycStore.set(payuniRejectedApp());
-		await mount();
-		expect(screen.getByText("PayUni 需要補件")).toBeTruthy();
-		expect(screen.getByText(PAYUNI_EXPLANATION)).toBeTruthy();
-		const reason = screen.getByText(/PayUni：店家地址不完整/);
-		expect(reason.closest("[lang]")?.getAttribute("lang")).toBe("zh-TW");
-	});
-
-	it("PayUni 拒絕時沒有 last_rejection，不顯示平台的退回橫幅", async () => {
-		kycStore.set(payuniRejectedApp());
-		await mount();
-		expect(screen.queryByText("認證未通過")).toBeNull();
-	});
-
-	it("PayUni 拒絕、第一次存檔回到草稿之後，伺服器仍帶 payuni，問題框還在（R3）", async () => {
-		kycStore.set(payuniRejectedApp());
-		mocks.saveKycDraft.mockResolvedValue(
-			app({
-				etag: "e2",
-				englishName: "Wang",
-				missingFields: [],
-				flow: {
-					status: KYCFlowStatus.KYC_FLOW_STATUS_DRAFT,
-					canResubmit: true,
-					payuni: fixablePayuni(),
-				},
-			}),
-		);
-		await mount();
-		await typeInto("英文姓名", "Wang");
-		await autosave();
-		expect(mocks.saveKycDraft).toHaveBeenCalledTimes(1);
-		expect(screen.getByText(PAYUNI_EXPLANATION)).toBeTruthy();
-	});
-
-	it("伺服器沒帶 payuni（例如送出後回到平台審核）：沒有 PayUni 問題框", async () => {
+describe("兩區狀態頁（D15）", () => {
+	it("審核中：平台審核區顯示目錄的徽章與送出時間，可以取消；收款帳戶區是灰色的", async () => {
 		kycStore.set(
 			app({
-				flow: {
-					status: KYCFlowStatus.KYC_FLOW_STATUS_DRAFT,
-					canResubmit: true,
-				},
+				status: KYCStatus.KYC_STATUS_SUBMITTED,
+				submitTime: timestampFromMs(Date.UTC(2026, 10, 3, 6, 20)),
 			}),
 		);
 		await mount();
-		expect(screen.queryByText("PayUni 需要補件")).toBeNull();
+		expect(screen.getByText("審核中")).toBeTruthy();
+		expect(screen.getByText(/送出時間：2026\/11\/03 14:20/)).toBeTruthy();
+		expect(screen.getByText("取消申請")).toBeTruthy();
+		expect(screen.getByTestId("payment-section").dataset.approved).toBe(
+			"false",
+		);
 	});
 
-	it("鎖住畫面：有 PayUni 狀態時顯示 PayUni 的標題與說明；送審中是流程橫幅", async () => {
+	it("已通過（平台審核核准）：徽章是已通過、有核准時間，收款帳戶區開放", async () => {
 		kycStore.set(
 			app({
 				status: KYCStatus.KYC_STATUS_APPROVED,
-				flow: {
-					status: KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED,
-					canResubmit: false,
-					payuni: create(SellerPayUniSchema, {
-						state: PayUniState.CONTACT_SUPPORT,
-						explanation: create(LocalizedMessageSchema, {
-							locale: "zh-TW",
-							message: "伺服器獨特說明-客服",
-						}),
-					}),
-				},
+				decideTime: timestampFromMs(Date.UTC(2026, 10, 3, 6, 20)),
 			}),
 		);
 		await mount();
-		expect(screen.getByText("PayUni 申請未通過")).toBeTruthy();
-		expect(screen.getByText("伺服器獨特說明-客服")).toBeTruthy();
-		expect(screen.queryByLabelText("真實姓名")).toBeNull();
+		expect(screen.getByText("已通過")).toBeTruthy();
+		expect(screen.getByText(/核准時間：2026\/11\/03 14:20/)).toBeTruthy();
+		expect(screen.queryByText("取消申請")).toBeNull();
+		expect(screen.getByTestId("payment-section").dataset.approved).toBe("true");
 	});
 
-	it("送出被拒（failed_precondition）：顯示伺服器的句子", async () => {
-		const sentence =
-			"PayUni 正在審查你的資料，審查期間不能修改或重新送出商家認證。";
-		kycStore.set(payuniRejectedApp());
-		mocks.submitKyc.mockRejectedValue(
-			new ConnectError(sentence, Code.FailedPrecondition, undefined, [
-				{
-					desc: LocalizedMessageSchema,
-					value: { locale: "zh-TW", message: sentence },
-				},
-			]),
-		);
+	it("取消申請：確認之後呼叫 CancelKYC，回到選型態", async () => {
+		kycStore.set(app({ etag: "e5", status: KYCStatus.KYC_STATUS_SUBMITTED }));
+		mocks.cancelKyc.mockResolvedValue({});
 		await mount();
-		await acceptAgreements();
 		await act(async () => {
-			fireEvent.click(screen.getByText("送出認證"));
+			fireEvent.click(screen.getByText("取消申請"));
 		});
-		expect(screen.getAllByText(sentence).length).toBeGreaterThan(0);
+		expect(mocks.cancelKyc).toHaveBeenCalledWith("e5");
+		expect(screen.getByText("選擇商家類型")).toBeTruthy();
+	});
+
+	it("畫面不寫死 PayUni 與逾期、停用的字眼", async () => {
+		kycStore.set(app({ status: KYCStatus.KYC_STATUS_APPROVED }));
+		await mount();
+		expect(document.body.textContent).not.toMatch(/PayUni|逾期|停用/);
 	});
 });
 
 describe("D8：必填標記與伺服器一致", () => {
-	it("出生日期、發證日期、發證地點不是必填；三張證件是必填", async () => {
-		kycStore.set(app());
+	it("表單沒有身分、銀行、證件與英文名稱；收款聯絡信箱是必填", async () => {
+		kycStore.set(app({ subject: { case: "business", value: {} } }));
 		await mount();
-		for (const label of ["出生日期", "發證日期", "發證地點"]) {
-			expect(screen.getByLabelText(label).getAttribute("aria-required")).toBe(
-				null,
-			);
+		for (const label of [
+			"真實姓名",
+			"英文姓名",
+			"身分證字號",
+			"負責人身分證字號",
+			"出生日期",
+			"銀行名稱",
+			"銀行帳號",
+		]) {
+			expect(screen.queryByLabelText(label), label).toBeNull();
 		}
-		const required = [
-			...document.querySelectorAll<HTMLElement>("[data-uploader]"),
-		]
-			.filter((el) => el.dataset.required === "true")
-			.map((el) => el.dataset.uploader);
-		expect(required).toEqual(["身分證正面照", "身分證反面照", "存摺封面"]);
+		expect(document.querySelectorAll("[data-uploader]")).toHaveLength(1);
+		expect(
+			[...document.querySelectorAll<HTMLElement>("[data-uploader]")].map(
+				(el) => el.dataset.required,
+			),
+		).toEqual([undefined]);
+		expect(document.body.textContent).not.toMatch(/PayUni|身分證正面|存摺/);
 	});
 });
 
@@ -1259,7 +1295,7 @@ describe("店家聯絡資料：自動儲存與缺項", () => {
 		mocks.submitKyc.mockResolvedValue(
 			app({
 				etag: "e3",
-				flow: { status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED },
+				status: KYCStatus.KYC_STATUS_SUBMITTED,
 			}),
 		);
 		await mount();
@@ -1361,7 +1397,7 @@ describe("店家地址：以鄉鎮市區代碼寫到店家", () => {
 		mocks.submitKyc.mockResolvedValue(
 			app({
 				etag: "e3",
-				flow: { status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED },
+				status: KYCStatus.KYC_STATUS_SUBMITTED,
 			}),
 		);
 		await mount();
@@ -1378,7 +1414,7 @@ describe("店家地址：以鄉鎮市區代碼寫到店家", () => {
 		mocks.submitKyc.mockResolvedValue(
 			app({
 				etag: "e3",
-				flow: { status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED },
+				status: KYCStatus.KYC_STATUS_SUBMITTED,
 			}),
 		);
 		await mount();
@@ -1424,7 +1460,7 @@ describe("入駐同意：送出 KYC 只要確認已閱讀告知事項", () => {
 		mocks.submitKyc.mockResolvedValue(
 			app({
 				etag: "e3",
-				flow: { status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED },
+				status: KYCStatus.KYC_STATUS_SUBMITTED,
 			}),
 		);
 		await mount();

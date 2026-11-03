@@ -25,7 +25,7 @@ const BASE_STORE: MockStore = {
 	logoUriTemplate: "https://example.com/{preset}/logo.png",
 };
 
-/** 認證通過（含 PayUni）：公開條件齊全。 */
+/** 平台審核通過且收款帳戶啟用：公開條件齊全。 */
 const APPROVED_STORE: MockStore = { ...BASE_STORE };
 
 /** 還沒認證：伺服器的公開條件缺 ONBOARDING_COMPLETE。 */
@@ -38,16 +38,6 @@ interface SellerFixture {
 	store: MockStore;
 	flow: MockKycFlowStatus;
 }
-
-/** 申請已核准、在 PayUni 階段的流程狀態：伺服器一定帶 `flow.payuni`。 */
-const PAYUNI_STAGE: MockKycFlowStatus[] = [
-	"BINDING",
-	"BIND_FAILED",
-	"FORWARDED",
-	"UNDER_REVIEW",
-	"PENDING_INFO",
-	"PAYUNI_REJECTED",
-];
 
 const APPROVED: SellerFixture = { store: APPROVED_STORE, flow: "APPROVED" };
 const NOT_STARTED: SellerFixture = {
@@ -90,17 +80,7 @@ async function prepareSellerPage(
 	});
 
 	await mockMyStore(page, fixture.store);
-	await mockMyKyc(page, {
-		status: fixture.flow,
-		payuni: PAYUNI_STAGE.includes(fixture.flow)
-			? {
-					state: "REVIEWING",
-					explanation: "伺服器獨特說明-PayUni 審核中",
-				}
-			: fixture.flow === "APPROVED"
-				? { state: "APPROVED" }
-				: undefined,
-	});
+	await mockMyKyc(page, { status: fixture.flow });
 
 	await page.route("**/api/v1/app/shipping_onboardings", (route) => {
 		void route.fulfill({
@@ -373,12 +353,15 @@ test.describe("seller dashboard onboarding task actions", {
 		await expect(aside.getByText("建議完成", { exact: true })).toBeVisible();
 		const groups = aside.locator(".seller-onboarding-progress__steps");
 		await expect(groups).toHaveCount(2);
-		await expect(groups.nth(0).locator("li")).toHaveCount(2);
+		await expect(groups.nth(0).locator("li")).toHaveCount(3);
 		await expect(
 			groups.nth(0).getByRole("button", { name: /^商店資料，/ }),
 		).toBeVisible();
 		await expect(
-			groups.nth(0).getByRole("button", { name: /^商家認證，/ }),
+			groups.nth(0).getByRole("button", { name: /^平台審核，/ }),
+		).toBeVisible();
+		await expect(
+			groups.nth(0).getByRole("button", { name: /^收款帳戶，/ }),
 		).toBeVisible();
 		await expect(groups.nth(1).locator("li")).toHaveCount(3);
 		for (const title of ["物流設定", "上架商品", "商店介紹"]) {
@@ -401,7 +384,7 @@ test.describe("seller dashboard onboarding task actions", {
 		const missing: MockSellerRequirement[] = ["LOGO", "ONBOARDING_COMPLETE"];
 		await prepareSellerPage(page, baseURL as string, {
 			store: { ...BASE_STORE, missingRequirements: missing },
-			flow: "UNDER_REVIEW",
+			flow: "SUBMITTED",
 		});
 		const card = await openDashboardTasks(page);
 		const required = card.locator(".seller-onboarding-progress__steps").first();
@@ -409,16 +392,18 @@ test.describe("seller dashboard onboarding task actions", {
 		await expect(
 			required.getByRole("button", { name: /^商店資料，缺少：logo/ }),
 		).toBeVisible();
-		// KYC 那一列以流程狀態當狀態文字；PayUni 併在這一列，沒有獨立的收款列。
+		// 平台審核那一列以申請狀態當狀態文字；平台審核通過之前，收款帳戶那一列是灰色的提示。
 		await expect(
-			required.getByRole("button", { name: /^商家認證，PayUni 審核中/ }),
+			required.getByRole("button", { name: /^平台審核，審核中/ }),
 		).toBeVisible();
-		await expect(card.getByRole("button", { name: /^收款狀態，/ })).toHaveCount(
-			0,
-		);
+		await expect(
+			required.getByRole("button", {
+				name: /^收款帳戶，平台審核通過後開放設定/,
+			}),
+		).toBeVisible();
 	});
 
-	test("shipping stays locked until the KYC flow is APPROVED", async ({
+	test("shipping stays locked until the onboarding is complete", async ({
 		page,
 		baseURL,
 	}) => {
@@ -426,7 +411,7 @@ test.describe("seller dashboard onboarding task actions", {
 
 		await prepareSellerPage(page, baseURL as string, {
 			store: NOT_STARTED_STORE,
-			flow: "FORWARDED",
+			flow: "SUBMITTED",
 		});
 		const card = await openDashboardTasks(page);
 		const shipping = card.getByRole("button", { name: /^物流設定，/ });
@@ -462,9 +447,9 @@ test.describe("seller dashboard onboarding task actions", {
 
 		await prepareSellerPage(page, baseURL as string, NOT_STARTED);
 		await clickTaskAction(page, {
-			taskTitle: "商家認證",
-			panelTitle: "完成商家認證",
-			cta: "開始認證",
+			taskTitle: "平台審核",
+			panelTitle: "完成平台審核",
+			cta: "前往商家認證",
 		});
 
 		await expectLocation(page, "/seller-center/me/certifications");

@@ -90,6 +90,7 @@ function sellerMethod(method: string): RegExp {
 }
 export const GET_MY_STORE_URL = sellerMethod("GetMyStore");
 export const GET_MY_KYC_URL = sellerMethod("GetMyKYC");
+export const GET_MY_PAYMENT_ACCOUNT_URL = sellerMethod("GetMyPaymentAccount");
 export const UPDATE_MY_STORE_URL = sellerMethod("UpdateMyStore");
 export const GET_MY_DASHBOARD_URL = sellerMethod("GetMyDashboard");
 export const LIST_MY_MEASURES_URL = sellerMethod("ListMyMeasures");
@@ -458,43 +459,34 @@ export type MockKycFlowStatus =
 	| "DRAFT"
 	| "SUBMITTED"
 	| "REJECTED"
-	| "BINDING"
-	| "BIND_FAILED"
-	| "FORWARDED"
+	| "APPROVED";
+
+export type MockPaymentAccountStatus =
+	| "NOT_CREATED"
 	| "UNDER_REVIEW"
-	| "PENDING_INFO"
-	| "APPROVED"
-	| "PAYUNI_REJECTED";
+	| "ACTION_REQUIRED"
+	| "ENABLED"
+	| "DISABLED";
 
 /**
- * proto3 JSON 的 GetMyKYCResponse：只放流程狀態（`application.flow`）。NOT_STARTED 在真實契約上是
- * not_found，這裡用同樣的錯誤回應（client 把它讀成「還沒開始」）。
+ * proto3 JSON 的 GetMyKYCResponse：申請的 `status`（平台審核）與流程旗標（`application.flow`）。NOT_STARTED 在真實
+ * 契約上是 not_found，這裡用同樣的錯誤回應（client 把它讀成「還沒開始」）。
+ *
+ * 收款帳戶（GetMyPaymentAccount）：申請 APPROVED 時預設是 ENABLED，其餘是 not_found（平台審核還沒核准）；
+ * `paymentAccount` 可以指定狀態。
  */
-export interface MockSellerPayUni {
-	state:
-		| "REVIEWING"
-		| "PENDING_INFO"
-		| "FIXABLE"
-		| "FIX_VIA_SUPPORT"
-		| "CONTACT_SUPPORT"
-		| "RETRY_LATER"
-		| "TERMINATED"
-		| "APPROVED";
-	/** 伺服器的狀態說明（APPROVED 沒有）。 */
-	explanation?: string;
-	reason?: string;
-	fixFields?: string[];
-	fixStoreFields?: string[];
-}
-
 export async function mockMyKyc(
 	page: Page,
 	flow: {
 		status: MockKycFlowStatus;
 		identityLocked?: boolean;
 		canResubmit?: boolean;
-		payuni?: MockSellerPayUni;
 		resubmitUnavailabilities?: { reason: string; message: string }[];
+		paymentAccount?: {
+			status: MockPaymentAccountStatus;
+			payoutsActive?: boolean;
+			surface?: "HOSTED" | "EMBEDDED";
+		};
 	},
 ): Promise<void> {
 	await page.route(GET_MY_KYC_URL, (route) => {
@@ -505,31 +497,13 @@ export async function mockMyKyc(
 		void fulfillConnect(route, {
 			application: {
 				id: "1",
+				status: `KYC_STATUS_${flow.status}`,
 				flow: {
-					status: `KYC_FLOW_STATUS_${flow.status}`,
 					identityLocked: flow.identityLocked ?? false,
 					// 伺服器的值：草稿與被退回一律能重送。
 					canResubmit:
 						flow.canResubmit ??
 						(flow.status === "DRAFT" || flow.status === "REJECTED"),
-					...(flow.payuni
-						? {
-								payuni: {
-									state: `PAY_UNI_STATE_${flow.payuni.state}`,
-									...(flow.payuni.explanation
-										? {
-												explanation: {
-													locale: "zh-TW",
-													message: flow.payuni.explanation,
-												},
-											}
-										: {}),
-									reason: flow.payuni.reason ?? "",
-									fixFields: flow.payuni.fixFields ?? [],
-									fixStoreFields: flow.payuni.fixStoreFields ?? [],
-								},
-							}
-						: {}),
 					resubmitUnavailabilities: (flow.resubmitUnavailabilities ?? []).map(
 						(u) => ({
 							reason: `KYC_RESUBMIT_UNAVAILABLE_REASON_${u.reason}`,
@@ -537,6 +511,24 @@ export async function mockMyKyc(
 						}),
 					),
 				},
+			},
+		});
+	});
+	await page.route(GET_MY_PAYMENT_ACCOUNT_URL, (route) => {
+		const account =
+			flow.paymentAccount ??
+			(flow.status === "APPROVED" ? { status: "ENABLED" as const } : null);
+		if (!account) {
+			void fulfillConnectError(route, "not_found", "尚無收款帳戶");
+			return;
+		}
+		void fulfillConnect(route, {
+			account: {
+				status: `PAYMENT_ACCOUNT_STATUS_${account.status}`,
+				requirementCollection: "REQUIREMENT_COLLECTION_PROVIDER",
+				onboardingSurface: `ONBOARDING_SURFACE_${account.surface ?? "HOSTED"}`,
+				transfersActive: account.status === "ENABLED",
+				payoutsActive: account.payoutsActive ?? account.status === "ENABLED",
 			},
 		});
 	});

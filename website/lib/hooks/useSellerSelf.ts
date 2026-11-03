@@ -3,13 +3,14 @@
 import type {
 	KYCApplication,
 	KYCFlow,
+	PaymentAccount,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { accountQueryPending } from "@/lib/auth/account-query";
 import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import { fetchMyKyc } from "@/lib/seller/kyc";
-import { flowOf } from "@/lib/seller/kyc-flow";
+import { fetchMyPaymentAccount } from "@/lib/seller/payment-account";
 import { isStoreMissing, type MyStore } from "@/lib/seller/store";
 import { useSellerDataScope } from "@/lib/seller-data/scope";
 import { useQueryIdentity } from "./useQueryIdentity";
@@ -123,11 +124,11 @@ interface UseMyKycFlowResult {
 	error: Error | null;
 }
 
-/** 申請的流程狀態；沒有申請是 NOT_STARTED。與 `useMyKyc` 共用同一份快取。 */
+/** 申請的流程（`flow`）；沒有申請是 null。與 `useMyKyc` 共用同一份快取。 */
 export function useMyKycFlow(options?: {
 	enabled?: boolean;
 }): UseMyKycFlowResult {
-	const query = useMyKycQuery(flowOf, options?.enabled);
+	const query = useMyKycQuery((app) => app?.flow ?? null, options?.enabled);
 	return {
 		flow: query.data ?? null,
 		loading: query.isLoading,
@@ -141,5 +142,35 @@ export function useSetMyKyc(): (application: KYCApplication | null) => void {
 	const identity = useQueryIdentity();
 	return (application) => {
 		queryClient.setQueryData(queryKeys.seller.kyc(identity), application);
+	};
+}
+
+interface UseMyPaymentAccountResult {
+	/** 還沒有收款帳戶（平台審核還沒核准）是 null。 */
+	account: PaymentAccount | null;
+	loading: boolean;
+	error: Error | null;
+	refetch: () => Promise<unknown>;
+}
+
+/** 收款帳戶（`GetMyPaymentAccount`）。代行工作區沒有這個資料來源，不發查詢。 */
+export function useMyPaymentAccount(options?: {
+	enabled?: boolean;
+}): UseMyPaymentAccountResult {
+	const { hasSeller } = useAuth();
+	const scope = useSellerDataScope();
+	const identity = useQueryIdentity();
+	const query = useQuery({
+		queryKey: queryKeys.seller.paymentAccount(identity),
+		queryFn: () => fetchMyPaymentAccount(),
+		enabled: scope.mode === "seller" && hasSeller && (options?.enabled ?? true),
+		staleTime: 30_000,
+		refetchOnWindowFocus: true,
+	});
+	return {
+		account: query.data ?? null,
+		loading: query.isLoading,
+		error: query.error,
+		refetch: query.refetch,
 	};
 }

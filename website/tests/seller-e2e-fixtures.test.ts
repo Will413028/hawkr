@@ -13,7 +13,7 @@ import {
 	AppealUnavailableReason,
 	GetMyKYCResponseSchema,
 	GetMyStoreResponseSchema,
-	KYCFlowStatus,
+	KYCStatus,
 	MeasureBasis,
 	MeasureKind,
 	MeasureRequestCloseCause,
@@ -135,17 +135,15 @@ test("every capability the fixture names exists in the contract", () => {
 	);
 });
 
-test("the KYC flow fixture shape parses as a GetMyKYCResponse", () => {
+test("the KYC fixture shape parses as a GetMyKYCResponse", () => {
 	const message = fromJson(GetMyKYCResponseSchema, {
 		application: {
 			id: "1",
-			flow: { status: "KYC_FLOW_STATUS_APPROVED", identityLocked: true },
+			status: "KYC_STATUS_APPROVED",
+			flow: { identityLocked: true },
 		},
 	});
-	assert.equal(
-		message.application?.flow?.status,
-		KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
-	);
+	assert.equal(message.application?.status, KYCStatus.KYC_STATUS_APPROVED);
 	assert.equal(message.application?.flow?.identityLocked, true);
 });
 

@@ -4,7 +4,8 @@ import { createLocalPrivateStore } from "@/lib/state/createLocalPrivateStore";
 
 export type SellerOnboardingTaskId =
 	| "profile"
-	| "cert"
+	| "platform_review"
+	| "payment_account"
 	| "other_requirement"
 	| "shipping"
 	| "product"

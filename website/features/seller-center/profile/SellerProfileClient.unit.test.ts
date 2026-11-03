@@ -11,7 +11,6 @@ import { ErrorReason } from "@hawkr/api/gen/hawkr/common/v1alpha1/error_reason_p
 import {
 	GetMyStoreResponseSchema,
 	KYCFlowSchema,
-	KYCFlowStatus,
 	SellerCapability,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -483,7 +482,6 @@ describe("SellerProfileClient writes", () => {
 
 	it("locks the store name and description once PayUni holds the identity", async () => {
 		mocks.flow = create(KYCFlowSchema, {
-			status: KYCFlowStatus.KYC_FLOW_STATUS_FORWARDED,
 			identityLocked: true,
 		});
 		mount();
