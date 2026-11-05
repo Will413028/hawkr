@@ -47,4 +47,36 @@ void main() {
       }
     });
   });
+
+  group('resolveWebOrigin', () {
+    test('a provided define wins for every flavor', () {
+      for (final flavor in Flavor.values) {
+        expect(
+          resolveWebOrigin(flavor, 'https://web.example.test'),
+          'https://web.example.test',
+          reason: flavor.name,
+        );
+      }
+    });
+
+    test('dev falls back to the local website', () {
+      expect(resolveWebOrigin(Flavor.dev, ''), 'http://localhost:3000');
+    });
+
+    test('stage and prod fail fast naming HAWKR_WEB_ORIGIN', () {
+      for (final flavor in [Flavor.stage, Flavor.prod]) {
+        expect(
+          () => resolveWebOrigin(flavor, ''),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              contains('HAWKR_WEB_ORIGIN'),
+            ),
+          ),
+          reason: flavor.name,
+        );
+      }
+    });
+  });
 }

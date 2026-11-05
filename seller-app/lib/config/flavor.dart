@@ -3,11 +3,15 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'firebase_config.dart';
 
 const String _gatewayHostDefine = String.fromEnvironment('GATEWAY_HOST');
+const String _webOriginDefine = String.fromEnvironment('HAWKR_WEB_ORIGIN');
 const String _mediaBaseHostDefine = String.fromEnvironment('MEDIA_BASE_HOST');
 const String _sentryDsnDefine = String.fromEnvironment('SENTRY_DSN');
 
 /// dev flavor 沒有提供 define 時連本機單體。
 const String _localGatewayHost = 'http://localhost:8080';
+
+/// dev flavor 沒有提供 define 時指向本機的 website。
+const String _localWebOrigin = 'http://localhost:3000';
 
 enum Flavor {
   /// 開發環境
@@ -28,6 +32,17 @@ String resolveGatewayHost(Flavor flavor, String define) {
   throw StateError(
     '缺少必要設定 GATEWAY_HOST：${flavor.name} 建置必須帶 '
     '--dart-define=GATEWAY_HOST=<API 主機>（見 config/dart-defines.example.json）',
+  );
+}
+
+/// 解析 website 的 origin（收款開通的回跳頁用）：[define] 非空就用它；dev 沒有提供時指向本機 website；
+/// stage 與 prod 沒有提供時拋出 [StateError]，不組出相對路徑的回跳網址。
+String resolveWebOrigin(Flavor flavor, String define) {
+  if (define.isNotEmpty) return define;
+  if (flavor == Flavor.dev) return _localWebOrigin;
+  throw StateError(
+    '缺少必要設定 HAWKR_WEB_ORIGIN：${flavor.name} 建置必須帶 '
+    '--dart-define=HAWKR_WEB_ORIGIN=<website origin>（見 config/dart-defines.example.json）',
   );
 }
 
@@ -77,8 +92,15 @@ extension FlavorExtension on Flavor {
   /// stage 與 prod 是必要設定，沒有提供時拋出 [StateError]（見 [resolveGatewayHost]）。
   String get gatewayHost => resolveGatewayHost(this, _gatewayHostDefine);
 
+  /// website 的 origin：`--dart-define=HAWKR_WEB_ORIGIN=...`；dev 沒有提供時指向本機 website。
+  /// stage 與 prod 是必要設定，沒有提供時拋出 [StateError]（見 [resolveWebOrigin]）。
+  String get webOrigin => resolveWebOrigin(this, _webOriginDefine);
+
   /// 啟動前檢查必要設定；缺少時拋出 [StateError]，訊息指出缺的 define。
-  void requireCoreConfig() => resolveGatewayHost(this, _gatewayHostDefine);
+  void requireCoreConfig() {
+    resolveGatewayHost(this, _gatewayHostDefine);
+    resolveWebOrigin(this, _webOriginDefine);
+  }
 
   /// API Base URL (帶 /api/v1 前綴)
   String get apiBaseUrl => '$gatewayHost/api/v1';
