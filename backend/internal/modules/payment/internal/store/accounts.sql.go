@@ -88,18 +88,37 @@ func (q *Queries) ClearPaymentAccountCreateFailed(ctx context.Context, arg Clear
 	return result.RowsAffected(), nil
 }
 
-const deletePaymentAccounts = `-- name: DeletePaymentAccounts :execrows
+const deletePaymentAccounts = `-- name: DeletePaymentAccounts :many
 DELETE FROM payment.accounts
 WHERE store_id = ANY($1::bigint[])
+RETURNING provider, external_account_id
 `
 
-// 擁有者的個資清理：刪除這些擁有者的帳戶列（含聯絡信箱）。外部帳戶不在這裡處理。
-func (q *Queries) DeletePaymentAccounts(ctx context.Context, storeIds []int64) (int64, error) {
-	result, err := q.db.Exec(ctx, deletePaymentAccounts, storeIds)
+type DeletePaymentAccountsRow struct {
+	Provider          string
+	ExternalAccountID *string
+}
+
+// 擁有者的個資清理：刪除這些擁有者的帳戶列（含聯絡信箱），回傳有外部帳戶的列的 provider 與外部 ID（呼叫方把它們在 inbox 的未處理事件標為已處理）。
+// 外部帳戶本身不在這裡處理。
+func (q *Queries) DeletePaymentAccounts(ctx context.Context, storeIds []int64) ([]DeletePaymentAccountsRow, error) {
+	rows, err := q.db.Query(ctx, deletePaymentAccounts, storeIds)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	items := []DeletePaymentAccountsRow{}
+	for rows.Next() {
+		var i DeletePaymentAccountsRow
+		if err := rows.Scan(&i.Provider, &i.ExternalAccountID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const insertPaymentAccount = `-- name: InsertPaymentAccount :execrows

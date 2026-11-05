@@ -12,6 +12,8 @@
 | 建立 job 讀店家狀態、輪詢 SQL join 店家表 | 帳戶與店家在同一個 schema | 不成立：payment 不讀 seller | 由組裝點注入擁有者查詢（依賴反轉） | `Owners.OwnerActive`；輪詢先選候選再問 |
 | 擁有者鍵 `store_id` | 擁有者只有店家 | 成立（D28） | 單一擁有者時用業務鍵，第二種擁有者出現再通用化 | 沿用；不建跨 schema FK |
 | 一店一個建立、一個同步 job（River 唯一鍵）、15 分鐘輪詢、冪等鍵 UUID 存在列上 | 外部呼叫在 transaction 外、事件可能遺失或合併 | 成立 | 同（Stripe 的冪等鍵與 webhook 重送建議） | 沿用；job kind 改成 `payment.*` |
+| 收到事件後經 platform 的派送 job 再呼叫模組的 handler（多一跳） | 入口不能在請求內呼叫模組的處理（規則 5：commit 後才回 2xx）、platform 不認得模組的 handler | 成立：platform 只依 provider 查登記的 handler（D29），派送 job 讓 handler 失敗時由 River 重試、用完由補掃重派 | transactional inbox 由背景 worker 消化，入口只持久化 | 採用；派送 job 以 (provider, event_id) 為唯一鍵 |
+| 收款事件 payload 保存 30 天（`EventRetention`） | 需要涵蓋 provider 的重送期與事後查核 | 部分成立：Stripe 重送最多 3 天；30 天是查核用的預設值，沒有法規或合約要求 | 保存期依用途訂，到期刪除 | 先用 30 天預設；觸發重新評估：需要更長的爭議／稽核追溯、或隱私政策訂出 webhook 資料的保存期時 |
 | 後台待辦的成員函式在 seller（`review_payment_account_create_failed`） | 帳戶列在 seller | 不成立 | 擁有者發布 `pub_*_review_items`，reviewqueue 排序分頁 | 改由 `payment.pub_review_items` 發布；店名由後台入口組裝 |
 
 ## 傳輸層的沿用盤點

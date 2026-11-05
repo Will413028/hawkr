@@ -779,3 +779,27 @@ func TestForgetOwnersDeletesTheirAccountsInItsOwnJob(t *testing.T) {
 		t.Fatal("清理刪錯了列")
 	}
 }
+
+// 擁有者被清理後，它外部帳戶在 inbox 裡還沒處理的事件在刪除帳戶列的同一個 transaction 標為已處理，過了保存期由 platform 的清理刪除（原始 payload 不會一直留著）。
+// mutation：Purge 不呼叫 MarkRouteProcessed → 事件仍未處理，清理之後列還在，失敗。
+func TestForgottenOwnersEventsArePurgedAfterRetention(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	external := f.ensure(t, s)
+	f.receive(t, "evt_forgotten", external)
+	if f.processed(t, "evt_forgotten") {
+		t.Fatal("事件在清理前就已處理")
+	}
+	must(t, f.module.PurgeAccounts(ctx, []int64{s}))
+	if !f.processed(t, "evt_forgotten") {
+		t.Fatal("清理沒有把事件標為已處理")
+	}
+	f.now = f.now.Add(EventRetention + time.Hour)
+	_, err := f.inbox.Purge(ctx)
+	must(t, err)
+	if n := f.count(t, "SELECT count(*) FROM inbox.events WHERE event_id = 'evt_forgotten'"); n != 0 {
+		t.Fatalf("過了保存期仍留著 %d 列", n)
+	}
+}

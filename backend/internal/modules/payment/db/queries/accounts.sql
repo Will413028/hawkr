@@ -90,7 +90,9 @@ WHERE external_account_id IS NULL AND create_failed_at IS NULL
 ORDER BY store_id
 LIMIT sqlc.arg(batch);
 
--- name: DeletePaymentAccounts :execrows
--- 擁有者的個資清理：刪除這些擁有者的帳戶列（含聯絡信箱）。外部帳戶不在這裡處理。
+-- name: DeletePaymentAccounts :many
+-- 擁有者的個資清理：刪除這些擁有者的帳戶列（含聯絡信箱），回傳有外部帳戶的列的 provider 與外部 ID（呼叫方把它們在 inbox 的未處理事件標為已處理）。
+-- 外部帳戶本身不在這裡處理。
 DELETE FROM payment.accounts
-WHERE store_id = ANY(sqlc.arg(store_ids)::bigint[]);
+WHERE store_id = ANY(sqlc.arg(store_ids)::bigint[])
+RETURNING provider, external_account_id;

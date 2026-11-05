@@ -1,5 +1,5 @@
 // Package stripe 是 Stripe API 的 client：只含收款開通需要的呼叫（Accounts v2、Account Link、Account Session）與 webhook 簽章驗證。
-// 它不認得賣家模組的型別；對應成中立快照的 adapter 在 seller/internal/payment。
+// 它不認得賣家模組的型別；對應成中立快照的 adapter 在 payment 模組的 internal/account。
 package stripe
 
 import (

@@ -34,9 +34,10 @@ const (
 	createIdle = 10 * time.Minute
 	// EventRetention 是收款事件原始 payload 在 inbox 的保存期（D29）：涵蓋 Stripe 重送事件的 3 天與事後查核的時間。
 	EventRetention = 30 * 24 * time.Hour
-	// syncProcessor 與 eventProcessor 是 inbox 的處理者名稱。
+	// syncProcessor、eventProcessor 與 purgeProcessor 是 inbox 的處理者名稱。
 	syncProcessor  = "payment.account_sync"
 	eventProcessor = "payment.account_event"
+	purgeProcessor = "payment.account_purge"
 )
 
 // Owners 是擁有者（店家）是否營運中的查詢，由組裝點以 seller 的公開 API 實作（payment 是葉節點，不讀 seller）。建立 job 與補排建立只為營運中的擁有者
@@ -216,10 +217,23 @@ func (s *Service) ForgetOwners(ctx context.Context, storeIDs []int64) error {
 	return s.d.Jobs.Enqueue(ctx, args, &opts)
 }
 
-// Purge 是刪除 job 的內容：刪掉這些擁有者的帳戶列（含聯絡信箱）。收款事件的 inbox 列由 platform 的清理依保存期刪除。
+// Purge 是刪除 job 的內容：同一個 transaction 刪掉這些擁有者的帳戶列（含聯絡信箱），並把它們外部帳戶在 inbox 裡到現在為止的未處理事件標為已處理
+// （帳戶不在了，不會再有同步涵蓋它們；不標記的話 platform 的清理永遠不刪，原始 payload 一直留著）。inbox 列之後由 platform 的清理依保存期刪除。
 func (s *Service) Purge(ctx context.Context, storeIDs []int64) error {
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		_, err := store.New(s.d.DB.Conn(ctx)).DeletePaymentAccounts(ctx, storeIDs)
-		return err
+		rows, err := store.New(s.d.DB.Conn(ctx)).DeletePaymentAccounts(ctx, storeIDs)
+		if err != nil || s.d.Inbox == nil {
+			return err
+		}
+		now := s.d.Now().UTC()
+		for _, r := range rows {
+			if r.ExternalAccountID == nil {
+				continue
+			}
+			if _, err := s.d.Inbox.MarkRouteProcessed(ctx, r.Provider, *r.ExternalAccountID, now, purgeProcessor); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
