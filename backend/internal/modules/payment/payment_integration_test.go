@@ -50,11 +50,19 @@ type queue struct {
 	mu   sync.Mutex
 	args []river.JobArgs
 	out  []bool
+	// fail 不是 nil 時，排入這個種類的 job 回 fail（只有一次）：模擬 handler 在 Go 端失敗而 transaction 本身沒有壞。
+	failKind string
+	fail     error
 }
 
 func (q *queue) Enqueue(ctx context.Context, args river.JobArgs, _ *river.InsertOpts) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	if q.fail != nil && args.Kind() == q.failKind {
+		err := q.fail
+		q.fail = nil
+		return err
+	}
 	_, inTx := db.TxFrom(ctx)
 	q.args = append(q.args, args)
 	q.out = append(q.out, !inTx)
@@ -528,7 +536,9 @@ func TestAnEventArrivingWhileTheAccountIsBeingReadIsNotLostWhenItsSyncIsCoalesce
 }
 
 // 派送失敗（handler 回錯誤）時派送的 transaction rollback、不記派送成功，River 重試；重試成功後才排同步。用完重試的事件由 platform 的補掃重派。
-// mutation：Dispatch 在 handler 失敗時仍記下 dispatched_at → 補掃不重派，失敗。
+// handler 的失敗是排入同步 job 失敗（Go 端的錯誤，transaction 本身沒有因 SQL 錯誤而中止）：這樣 Dispatch 若忽略 handler 的錯誤仍能 commit
+// dispatched_at，測試才分辨得出來（SQL 錯誤會讓 transaction 中止，之後的寫入本來就失敗，看不到差別）。
+// mutation：Dispatch 在 handler 失敗時仍記下 dispatched_at → 第一次派送回 nil、補掃不重派，失敗。
 func TestAFailedDispatchIsRetriedAndSweptAgain(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -537,16 +547,16 @@ func TestAFailedDispatchIsRetriedAndSweptAgain(t *testing.T) {
 	external := f.ensure(t, s)
 	h, body := event("evt_1", external)
 	must(t, f.module.ReceiveEvent(ctx, h, body))
-	_, err := f.db.Conn(ctx).Exec(ctx, "ALTER TABLE payment.accounts RENAME TO accounts_gone")
-	must(t, err)
-	if err := f.inbox.Dispatch(ctx, FakeName, "evt_1"); err == nil {
-		t.Fatal("handler 失敗時派送沒有回錯誤")
+	boom := errors.New("排入同步失敗")
+	f.jobs.mu.Lock()
+	f.jobs.failKind, f.jobs.fail = kindSync, boom
+	f.jobs.mu.Unlock()
+	if err := f.inbox.Dispatch(ctx, FakeName, "evt_1"); !errors.Is(err, boom) {
+		t.Fatalf("handler 失敗時派送 err=%v", err)
 	}
 	if n := f.count(t, "SELECT count(*) FROM inbox.events WHERE event_id = 'evt_1' AND dispatched_at IS NULL"); n != 1 {
 		t.Fatal("失敗的派送記成了派送成功")
 	}
-	_, err = f.db.Conn(ctx).Exec(ctx, "ALTER TABLE payment.accounts_gone RENAME TO accounts")
-	must(t, err)
 	dispatches := f.jobs.count(kindDispatch)
 	f.now = f.now.Add(10 * time.Minute)
 	n, err := f.inbox.Sweep(ctx)
