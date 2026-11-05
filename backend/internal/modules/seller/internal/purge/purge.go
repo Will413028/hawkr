@@ -180,6 +180,7 @@ func (s *Service) retireBatch(ctx context.Context, after *int64) (int, int, *int
 func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int64, error) {
 	purgedCount, candidateCount := 0, 0
 	var last *int64
+	s.hooks.beforePurgeBatch()
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
 		now := s.d.Now().UTC()

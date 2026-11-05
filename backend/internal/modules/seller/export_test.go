@@ -12,3 +12,6 @@ func (m *Module) SetPurgeAfterPurgeCandidates(fn func()) { m.purge.SetAfterPurge
 func (m *Module) SetRequestHooks(afterPreRead, afterLock func()) {
 	m.measure.SetRequestHooks(afterPreRead, afterLock)
 }
+
+// SetPurgeBeforePurgeBatch 讓測試擋住第二段清理選候選之前，等寫入 legal hold 的一方 commit（purge.Service.SetBeforePurgeBatch）。
+func (m *Module) SetPurgeBeforePurgeBatch(fn func()) { m.purge.SetBeforePurgeBatch(fn) }
