@@ -30,6 +30,8 @@ type Config struct {
 	// ConnectRetryBudget 是啟動時等待資料庫可連線的總時間。
 	// 部署時 pod 可能比資料庫先起來，所以不在第一次連線失敗就放棄。
 	ConnectRetryBudget time.Duration
+	// Tracer 看到經這個連線池送出的每一句 SQL；nil 表示不追蹤。測試用它檢查跨模組的鎖順序（platform/lockorder）。
+	Tracer pgx.QueryTracer
 }
 
 // DB 是連線池加上 transaction 邊界。
@@ -48,6 +50,9 @@ func Open(ctx context.Context, cfg Config) (*DB, error) {
 	}
 	if cfg.MaxConns > 0 {
 		pc.MaxConns = cfg.MaxConns
+	}
+	if cfg.Tracer != nil {
+		pc.ConnConfig.Tracer = cfg.Tracer
 	}
 	pool, err := pgxpool.NewWithConfig(ctx, pc)
 	if err != nil {
