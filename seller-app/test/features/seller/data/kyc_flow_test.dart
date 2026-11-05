@@ -46,7 +46,13 @@ void main() {
       (s) => s != KYCFlowStatus.KYC_FLOW_STATUS_UNSPECIFIED,
     );
     expect(valid.toSet(), _expected.keys.toSet());
-    expect(validKycFlowStatuses.toSet(), _expected.keys.toSet());
+    for (final status in KYCFlowStatus.values) {
+      expect(
+        isValidKycFlowStatus(status),
+        valid.contains(status),
+        reason: '$status',
+      );
+    }
     for (final entry in _expected.entries) {
       final copy = kycFlowCopy(entry.key, UiLocale.zhTW);
       expect(copy.label, entry.value.label, reason: '${entry.key}');
@@ -134,7 +140,7 @@ void main() {
   });
 
   test('每個有效的流程狀態都有橫幅標題與說明（和 website 的 kyc-flow.ts 同一份）', () {
-    for (final status in validKycFlowStatuses) {
+    for (final status in _expected.keys) {
       final copy = kycFlowCopy(status, UiLocale.zhTW);
       if (_payuniPhase.contains(status)) {
         expect(copy.bannerTitle, isNull, reason: '$status');

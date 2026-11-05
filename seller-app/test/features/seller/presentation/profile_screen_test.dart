@@ -170,7 +170,7 @@ void main() {
 
     expect(find.text('賣家開店任務'), findsOneWidget);
     expect(find.text('缺少：logo'), findsOneWidget);
-    expect(find.text('待認證'), findsOneWidget);
+    expect(find.text('未送出'), findsOneWidget);
     expect(find.text('店舖資料完整度'), findsNothing);
     expect(find.text('實名與收款認證'), findsNothing);
     expect(find.text('通過商家認證後才可設定配送'), findsOneWidget);

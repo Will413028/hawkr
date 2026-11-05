@@ -2,6 +2,7 @@ import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/testing.dart';
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_seller/core/networking/connect_provider.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
@@ -17,6 +18,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../support/fake_my_store.dart';
+import '../../support/kyc_fixtures.dart';
 import '../../support/my_store_fixtures.dart';
 
 class _LoggedIn extends Session {
@@ -41,25 +43,31 @@ class _NoProducts implements ShopTabRepository {
 class _Case {
   const _Case({
     required this.missing,
-    required this.status,
+    required this.review,
     required this.expectedText,
+    this.payment,
   });
 
   final List<SellerRequirement> missing;
-  final KYCFlowStatus status;
+
+  /// 平台審核的狀態（`GetMyKYC`）；null 是沒有申請（not_found）。
+  final KYCStatus? review;
+
+  /// `GetMyPaymentAccount` 的收款帳戶；null 是 not_found。
+  final PaymentAccount? payment;
   final String expectedText;
 }
 
-const _cases = <String, _Case>{
-  '尚未認證': _Case(
+final _cases = <String, _Case>{
+  '尚未認證': const _Case(
     missing: [SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE],
-    status: KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
-    expectedText: '待認證',
+    review: null,
+    expectedText: '未送出',
   ),
-  '認證審核中': _Case(
+  '認證審核中': const _Case(
     missing: [SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE],
-    status: KYCFlowStatus.KYC_FLOW_STATUS_UNDER_REVIEW,
-    expectedText: 'PayUni 審核中',
+    review: KYCStatus.KYC_STATUS_SUBMITTED,
+    expectedText: '審核中',
   ),
   '缺商店資料與停權': _Case(
     missing: [
@@ -69,8 +77,11 @@ const _cases = <String, _Case>{
       SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED,
       SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
     ],
-    status: KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED,
-    expectedText: 'PayUni 審核未通過',
+    review: KYCStatus.KYC_STATUS_APPROVED,
+    payment: PaymentAccount(
+      status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED,
+    ),
+    expectedText: '無法啟用',
   ),
 };
 
@@ -95,11 +106,24 @@ Future<void> _pump(
       ),
       sellerClientProvider.overrideWithValue(
         SellerAppServiceClient(
-          FakeTransportBuilder().unary(SellerAppService.getMyKYC, (_, _) {
-            return GetMyKYCResponse(
-              application: KYCApplication(flow: KYCFlow(status: entry.status)),
-            );
-          }).build(),
+          FakeTransportBuilder()
+              .unary(SellerAppService.getMyKYC, (_, _) {
+                final review = entry.review;
+                if (review == null) {
+                  throw ConnectException(Code.notFound, 'none');
+                }
+                return GetMyKYCResponse(
+                  application: individualApplication(kycStatus: review),
+                );
+              })
+              .unary(SellerAppService.getMyPaymentAccount, (_, _) {
+                final payment = entry.payment;
+                if (payment == null) {
+                  throw ConnectException(Code.notFound, 'none');
+                }
+                return GetMyPaymentAccountResponse(account: payment);
+              })
+              .build(),
         ),
       ),
     ],

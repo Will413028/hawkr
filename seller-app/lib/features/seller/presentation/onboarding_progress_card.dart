@@ -16,6 +16,7 @@ import '../../../shared/widgets/hk_content_card.dart';
 import '../../../shared/widgets/hk_icon.dart';
 import '../../../shared/widgets/hk_status_badge.dart';
 import '../data/current_kyc.dart';
+import '../data/payment_account.dart';
 import '../data/current_store.dart';
 import '../data/onboarding_tasks.dart';
 import '../data/seller_status_refresh.dart';
@@ -38,7 +39,9 @@ class OnboardingProgressCard extends HookConsumerWidget {
     final tasks = buildOnboardingTasks(
       l: context.uiLocale,
       my: my,
-      flowStatus: kyc?.status,
+      reviewStatus: kyc?.reviewStatus,
+      reviewReadable: kyc != null,
+      paymentAccount: ref.watch(currentPaymentAccountProvider)?.value,
       shipping: inputs.shipping,
       productCount: inputs.productCount,
     );
@@ -67,7 +70,8 @@ class OnboardingProgressCard extends HookConsumerWidget {
         case OnboardingTaskId.profile:
         case OnboardingTaskId.description:
           _openProfile(context);
-        case OnboardingTaskId.cert:
+        case OnboardingTaskId.platformReview:
+        case OnboardingTaskId.paymentAccount:
           context.go(MainRoutes.wallet);
         case OnboardingTaskId.notSuspended:
           unawaited(context.push<void>(SellerRoutes.suspensionNotice));

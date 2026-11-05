@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../support/fake_my_store.dart';
+import '../../../support/kyc_fixtures.dart';
 import '../../../support/my_store_fixtures.dart';
 
 const _name = SellerRequirement.SELLER_REQUIREMENT_STORE_NAME;
@@ -34,6 +35,7 @@ Future<GoRouter> _pump(
   required List<SellerRequirement> missing,
   List<SellerRequirement> shippingMissing = const [],
   Object? kyc,
+  Object? payment,
   OnboardingInputs inputs = const OnboardingInputs(),
   String description = '',
 }) async {
@@ -51,11 +53,23 @@ Future<GoRouter> _pump(
       onboardingInputsProvider.overrideWith((ref) async => inputs),
       sellerClientProvider.overrideWithValue(
         SellerAppServiceClient(
-          FakeTransportBuilder().unary(SellerAppService.getMyKYC, (_, _) {
-            final answer = kyc;
-            if (answer is ConnectException) throw answer;
-            return answer as GetMyKYCResponse;
-          }).build(),
+          FakeTransportBuilder()
+              .unary(SellerAppService.getMyKYC, (_, _) {
+                final answer = kyc;
+                if (answer is ConnectException) throw answer;
+                return answer as GetMyKYCResponse;
+              })
+              .unary(SellerAppService.getMyPaymentAccount, (_, _) {
+                final answer = payment;
+                if (answer is ConnectException) throw answer;
+                if (answer == null) {
+                  throw ConnectException(Code.notFound, 'none');
+                }
+                return GetMyPaymentAccountResponse(
+                  account: answer as PaymentAccount,
+                );
+              })
+              .build(),
         ),
       ),
     ],
@@ -103,9 +117,11 @@ Future<GoRouter> _pump(
   return router;
 }
 
-GetMyKYCResponse _flow(KYCFlowStatus status) => GetMyKYCResponse(
-  application: KYCApplication(flow: KYCFlow(status: status)),
-);
+GetMyKYCResponse _review(KYCStatus status) =>
+    GetMyKYCResponse(application: individualApplication(kycStatus: status));
+
+PaymentAccount _account(PaymentAccountStatus status) =>
+    PaymentAccount(status: status);
 
 void main() {
   testWidgets('兩組任務：公開前必須與建議完成，文字照 website', (tester) async {
@@ -113,17 +129,20 @@ void main() {
       tester,
       missing: [_logo, _kyc],
       shippingMissing: [_kyc],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED),
+      kyc: _review(KYCStatus.KYC_STATUS_SUBMITTED),
     );
 
     expect(find.text('賣家開店任務'), findsOneWidget);
     expect(find.text('開店進度'), findsOneWidget);
-    expect(find.text('0/2'), findsOneWidget);
+    expect(find.text('0/3'), findsOneWidget);
     expect(find.text('公開前必須'), findsOneWidget);
     expect(find.text('建議完成'), findsOneWidget);
     expect(find.text('缺少：logo'), findsOneWidget);
-    expect(find.text('平台審核中'), findsOneWidget);
-    expect(find.text('查看進度'), findsOneWidget);
+    expect(find.text('平台審核'), findsOneWidget);
+    expect(find.text('審核中'), findsOneWidget);
+    expect(find.text('前往商家認證'), findsOneWidget);
+    expect(find.text('收款帳戶'), findsOneWidget);
+    expect(find.text('平台審核通過後開放設定'), findsOneWidget);
     expect(find.text('需先通過認證'), findsOneWidget);
     expect(find.text('停權處分'), findsNothing);
     expect(find.text('收合'), findsOneWidget);
@@ -133,7 +152,7 @@ void main() {
     await _pump(
       tester,
       missing: [_notSuspended],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_APPROVED),
+      kyc: _review(KYCStatus.KYC_STATUS_APPROVED),
     );
 
     expect(find.text('停權處分'), findsOneWidget);
@@ -147,7 +166,7 @@ void main() {
     await _pump(
       tester,
       missing: const [],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_APPROVED),
+      kyc: _review(KYCStatus.KYC_STATUS_APPROVED),
     );
 
     expect(find.text('任務完成'), findsOneWidget);
@@ -166,7 +185,7 @@ void main() {
       tester,
       missing: [_kyc],
       shippingMissing: [_kyc],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_DRAFT),
+      kyc: _review(KYCStatus.KYC_STATUS_DRAFT),
     );
 
     final button = tester.widget<TextButton>(
@@ -181,7 +200,7 @@ void main() {
     await _pump(
       tester,
       missing: [_kyc],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_DRAFT),
+      kyc: _review(KYCStatus.KYC_STATUS_DRAFT),
     );
     final button = tester.widget<TextButton>(
       find.widgetWithText(TextButton, '設定物流'),
@@ -193,11 +212,12 @@ void main() {
     await _pump(
       tester,
       missing: const [],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_APPROVED),
+      kyc: _review(KYCStatus.KYC_STATUS_APPROVED),
     );
     await tester.tap(find.text('展開任務'));
     await tester.pumpAndSettle();
 
+    expect(find.text('已啟用'), findsOneWidget);
     expect(find.text('待設定'), findsOneWidget);
     await tester.tap(find.text('設定物流'));
     await tester.pumpAndSettle();
@@ -211,44 +231,76 @@ void main() {
       kyc: ConnectException(Code.notFound, 'none'),
     );
 
-    expect(find.text('待認證'), findsOneWidget);
+    expect(find.text('未送出'), findsOneWidget);
     await tester.tap(find.text('新增商品'));
     await tester.pumpAndSettle();
     expect(find.text('商品選擇頁'), findsOneWidget);
     expect(find.text('認證頁'), findsNothing);
   });
 
-  testWidgets('認證列的按鈕依流程狀態，進入認證頁', (tester) async {
+  testWidgets('平台審核列：被退回顯示「需修改」，按鈕進入認證頁；收款帳戶列鎖定、沒有按鈕', (tester) async {
     await _pump(
       tester,
       missing: [_name, _kyc],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO),
+      kyc: _review(KYCStatus.KYC_STATUS_REJECTED),
     );
 
-    expect(find.text('需補件'), findsOneWidget);
-    expect(find.text('前往補件'), findsOneWidget);
-    await tester.tap(find.text('前往補件').first);
+    expect(find.text('需修改'), findsOneWidget);
+    expect(find.text('平台審核通過後開放設定'), findsOneWidget);
+    expect(find.text('前往設定收款帳戶'), findsNothing);
+    await tester.tap(find.text('前往商家認證'));
     await tester.pumpAndSettle();
     expect(find.text('認證頁'), findsOneWidget);
   });
 
-  testWidgets('讀不到認證狀態時顯示「未知」，不顯示成待認證', (tester) async {
+  testWidgets('收款帳戶列：新帳戶是「待設定」，按鈕進入認證頁；平台審核列已通過、沒有按鈕', (tester) async {
+    await _pump(
+      tester,
+      missing: [_kyc],
+      kyc: _review(KYCStatus.KYC_STATUS_APPROVED),
+      payment: _account(
+        PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED,
+      ),
+    );
+
+    expect(find.text('已通過'), findsOneWidget);
+    expect(find.text('前往商家認證'), findsNothing);
+    expect(find.text('待設定'), findsWidgets);
+    expect(find.textContaining('逾期'), findsNothing);
+    expect(find.textContaining('停用'), findsNothing);
+    await tester.tap(find.text('前往設定收款帳戶'));
+    await tester.pumpAndSettle();
+    expect(find.text('認證頁'), findsOneWidget);
+  });
+
+  testWidgets('平台審核通過、收款帳戶還沒有：「準備中」，動作是重新整理', (tester) async {
+    await _pump(
+      tester,
+      missing: [_kyc],
+      kyc: _review(KYCStatus.KYC_STATUS_APPROVED),
+    );
+
+    expect(find.text('準備中'), findsOneWidget);
+    expect(find.text('重新整理'), findsOneWidget);
+  });
+
+  testWidgets('讀不到認證狀態時平台審核列顯示「未知」，不顯示成未送出', (tester) async {
     await _pump(
       tester,
       missing: [_kyc],
       kyc: ConnectException(Code.unavailable, 'later'),
     );
 
-    expect(find.text('待認證'), findsNothing);
+    expect(find.text('未送出'), findsNothing);
     expect(find.text('未知'), findsOneWidget);
-    expect(find.text('開始認證'), findsWidgets);
+    expect(find.text('前往商家認證'), findsOneWidget);
   });
 
   testWidgets('商品數與商店介紹讓建議項目完成', (tester) async {
     await _pump(
       tester,
       missing: const [],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_APPROVED),
+      kyc: _review(KYCStatus.KYC_STATUS_APPROVED),
       inputs: const OnboardingInputs(productCount: 2),
       description: '產地直送',
     );
@@ -280,9 +332,14 @@ void main() {
         }),
         sellerClientProvider.overrideWithValue(
           SellerAppServiceClient(
-            FakeTransportBuilder().unary(SellerAppService.getMyKYC, (_, _) {
-              return _flow(KYCFlowStatus.KYC_FLOW_STATUS_DRAFT);
-            }).build(),
+            FakeTransportBuilder()
+                .unary(SellerAppService.getMyKYC, (_, _) {
+                  return _review(KYCStatus.KYC_STATUS_DRAFT);
+                })
+                .unary(SellerAppService.getMyPaymentAccount, (_, _) {
+                  throw ConnectException(Code.notFound, 'none');
+                })
+                .build(),
           ),
         ),
       ],
@@ -336,7 +393,7 @@ void main() {
     final storeBefore = server.calls;
     final inputsBefore = inputsBuilds;
 
-    await tester.tap(find.text('開始認證').first);
+    await tester.tap(find.text('前往商家認證').first);
     await tester.pumpAndSettle();
     expect(find.text('錢包頁'), findsOneWidget);
     expect(server.calls, storeBefore, reason: '離開時不重讀');
@@ -347,7 +404,7 @@ void main() {
     expect(server.calls, storeBefore + 1, reason: '回來重讀一次');
     expect(inputsBuilds, inputsBefore + 1);
 
-    await tester.tap(find.text('開始認證').first);
+    await tester.tap(find.text('前往商家認證').first);
     await tester.pumpAndSettle();
     now = now.add(const Duration(seconds: 29));
     router.go('/main/dashboard');
@@ -355,7 +412,7 @@ void main() {
     expect(server.calls, storeBefore + 1, reason: '店家與認證 30 秒內讀過，不再讀');
     expect(inputsBuilds, inputsBefore + 2, reason: '物流與商品數每次回來都重讀');
 
-    await tester.tap(find.text('開始認證').first);
+    await tester.tap(find.text('前往商家認證').first);
     await tester.pumpAndSettle();
     now = now.add(const Duration(seconds: 2));
     router.go('/main/dashboard');

@@ -4,8 +4,6 @@ import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 /// 認證表單的區塊，和 website 的 `CertificationSectionId` 同一組。
 enum KycSection {
   company('公司資訊'),
-  identity('身分證明'),
-  bank('銀行帳戶'),
   other('其他資訊'),
   documents('補充文件');
 
@@ -17,11 +15,6 @@ enum KycSection {
 /// 認證表單的一步。每一步負責的欄位由 [kycStepOfField] 決定，續填的位置由伺服器的 `missing_fields` 推導。
 enum KycStep {
   company(KycSection.company),
-  idUpload(KycSection.identity),
-  idFront(KycSection.identity),
-  idBack(KycSection.identity),
-  bankUpload(KycSection.bank),
-  bankInfo(KycSection.bank),
   other(KycSection.other),
   documents(KycSection.documents),
   confirm(null);
@@ -32,8 +25,8 @@ enum KycStep {
 
   /// 認證旅程列（`CertificationJourneyStepper`）上這一步屬於哪一格。
   int get journeyStep => switch (this) {
-    company || idUpload || idFront || idBack => 1,
-    _ => 2,
+    confirm => 2,
+    _ => 1,
   };
 }
 
@@ -44,22 +37,9 @@ enum KycSubject {
 
   /// 這種身分的步驟順序，最後一步一定是 [KycStep.confirm]。
   List<KycStep> get steps => switch (this) {
-    individual => const [
-      KycStep.idUpload,
-      KycStep.idFront,
-      KycStep.idBack,
-      KycStep.bankUpload,
-      KycStep.bankInfo,
-      KycStep.other,
-      KycStep.confirm,
-    ],
+    individual => const [KycStep.other, KycStep.confirm],
     business => const [
       KycStep.company,
-      KycStep.idUpload,
-      KycStep.idFront,
-      KycStep.idBack,
-      KycStep.bankUpload,
-      KycStep.bankInfo,
       KycStep.other,
       KycStep.documents,
       KycStep.confirm,
@@ -67,55 +47,17 @@ enum KycSubject {
   };
 }
 
-/// 欄位所在的一步，與它在表單裡的控制項：同一個控制項的欄位在缺項清單與 PayUni 問題只列一次（見 [fieldsByControl]）。
+/// 欄位所在的一步，與它在表單裡的控制項：同一個控制項的欄位在缺項清單只列一次（見 [fieldsByControl]）。
 typedef _FieldMeta = ({KycStep step, String control});
 
-/// 伺服器的欄位（缺項、退回要補的欄位、PayUni 問題的欄位）所在的一步與表單控制項，和 website 的 `KYC_FIELDS` 同一張表；
-/// 名稱取自共用文案目錄（[kycFieldLabel]）。銀行名稱與銀行代碼在這支 App 是兩個輸入框，各自一個控制項；個人與公司負責人的
-/// 身分證字號是同一個輸入框。
+/// 伺服器的欄位（缺項、退回要補的欄位）所在的一步與表單控制項；名稱取自共用文案目錄（[kycFieldLabel]）。平台不再收身分、
+/// 銀行與證件（D22），那些欄位不在表裡：不認得的欄位沒有一步，缺項與續填都略過。
 const Map<KYCField, _FieldMeta> _kycFields = {
-  KYCField.KYC_FIELD_REAL_NAME: (step: KycStep.idFront, control: 'realName'),
-  KYCField.KYC_FIELD_BIRTH_DATE: (step: KycStep.idFront, control: 'birthDate'),
-  KYCField.KYC_FIELD_ID_CARD_ISSUE_DATE: (
-    step: KycStep.idBack,
-    control: 'idCardIssueDate',
-  ),
-  KYCField.KYC_FIELD_ID_CARD_ISSUE_TYPE: (
-    step: KycStep.idBack,
-    control: 'idCardIssueType',
-  ),
-  KYCField.KYC_FIELD_ID_CARD_ISSUE_LOCATION: (
-    step: KycStep.idBack,
-    control: 'idCardIssueLocation',
-  ),
-  KYCField.KYC_FIELD_ENGLISH_NAME: (
-    step: KycStep.other,
-    control: 'englishName',
-  ),
-  KYCField.KYC_FIELD_BANK_NAME: (step: KycStep.bankInfo, control: 'bankName'),
-  KYCField.KYC_FIELD_BANK_CODE: (step: KycStep.bankInfo, control: 'bankCode'),
-  KYCField.KYC_FIELD_BANK_ACCOUNT: (
-    step: KycStep.bankInfo,
-    control: 'bankAccount',
-  ),
   KYCField.KYC_FIELD_PRODUCT_TYPE: (
     step: KycStep.company,
     control: 'productType',
   ),
   KYCField.KYC_FIELD_WEBSITE_URL: (step: KycStep.other, control: 'websiteUrl'),
-  KYCField.KYC_FIELD_ID_CARD_FRONT: (
-    step: KycStep.idUpload,
-    control: 'idCardFront',
-  ),
-  KYCField.KYC_FIELD_ID_CARD_BACK: (
-    step: KycStep.idUpload,
-    control: 'idCardBack',
-  ),
-  KYCField.KYC_FIELD_BANK_BOOK: (step: KycStep.bankUpload, control: 'bankBook'),
-  KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO: (
-    step: KycStep.idFront,
-    control: 'idCardNo',
-  ),
   KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME: (
     step: KycStep.company,
     control: 'companyName',
@@ -128,10 +70,6 @@ const Map<KYCField, _FieldMeta> _kycFields = {
   KYCField.KYC_FIELD_BUSINESS_COMPANY_PHONE: (
     step: KycStep.company,
     control: 'companyPhone',
-  ),
-  KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO: (
-    step: KycStep.idFront,
-    control: 'idCardNo',
   ),
   KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS: (
     step: KycStep.documents,
@@ -154,8 +92,8 @@ KycStep? kycStepOfField(KYCField field) => _kycFields[field]?.step;
 KycSection? kycSectionOfField(KYCField field) =>
     _kycFields[field]?.step.section;
 
-/// 同一個表單控制項只留一個欄位：留 proto 順序（欄位號）最前面的那個，位置依該控制項第一次出現的順序。缺項清單與 PayUni
-/// 問題的欄位都用這條規則，同一個控制項（個人與負責人共用的身分證字號輸入框）只列一次。不認得的欄位略過。
+/// 同一個表單控制項只留一個欄位：留 proto 順序（欄位號）最前面的那個，位置依該控制項第一次出現的順序。缺項清單用這條規則，
+/// 同一個控制項只列一次。不認得的欄位略過。
 List<KYCField> fieldsByControl(Iterable<KYCField> fields) {
   final byControl = <String, KYCField>{};
   for (final field in fields) {
@@ -242,16 +180,11 @@ KYCField? kycFieldOfPath(String path) {
   return null;
 }
 
-/// 證件欄位：值是上傳的圖片，不在表單的文字欄位裡（`_valueIn` 沒有它們），沒有行內的提示位置。
-bool isKycDocumentField(KYCField field) => switch (field) {
-  KYCField.KYC_FIELD_ID_CARD_FRONT ||
-  KYCField.KYC_FIELD_ID_CARD_BACK ||
-  KYCField.KYC_FIELD_BANK_BOOK ||
-  KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS => true,
-  _ => false,
-};
+/// 證件欄位：值是上傳的圖片，不在表單的文字欄位裡（`_valueIn` 沒有它），沒有行內的提示位置。
+bool isKycDocumentField(KYCField field) =>
+    field == KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS;
 
-/// 證件欄位的錯誤在提示裡的文字：證件的名稱加上伺服器的訊息（例如「身分證正面照：圖片無法使用，請重新上傳」）；補充文件的單一元素
+/// 證件欄位的錯誤在提示裡的文字：證件的名稱加上伺服器的訊息；補充文件的單一元素
 /// （`business.company_documents[2]`）註明第幾張。不是證件欄位回 null。
 String? kycDocumentNotice(
   String path,

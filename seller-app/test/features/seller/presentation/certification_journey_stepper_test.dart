@@ -15,7 +15,7 @@ void main() {
           body: Center(
             child: SizedBox(
               width: 390,
-              child: CertificationJourneyStepper(currentStep: 2),
+              child: CertificationJourneyStepper(currentStep: 1),
             ),
           ),
         ),
@@ -24,10 +24,11 @@ void main() {
 
     expect(find.byType(HkFrostedCardSurface), findsOneWidget);
     expect(find.text('賣家類型'), findsOneWidget);
-    expect(find.text('身分資料'), findsOneWidget);
-    expect(find.text('收款資料'), findsOneWidget);
+    expect(find.text('商家資料'), findsOneWidget);
+    expect(find.text('身分資料'), findsNothing);
+    expect(find.text('收款資料'), findsNothing);
     expect(find.text('送審開通'), findsOneWidget);
-    expect(find.bySemanticsLabel('認證進度，第 3 步，共 4 步，收款資料'), findsOneWidget);
+    expect(find.bySemanticsLabel('認證進度，第 2 步，共 3 步，商家資料'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     semantics.dispose();

@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/postal_address.pb.dart';
+import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.spec.dart';
+import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pb.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
@@ -11,6 +14,7 @@ import 'package:hawkr_api/transport.dart';
 import 'package:hawkr_seller/core/networking/connect_provider.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
 import 'package:hawkr_seller/features/media/data/private_document_uploader.dart';
+import 'package:hawkr_seller/features/seller/data/contact_email.dart';
 import 'package:hawkr_seller/features/seller/data/current_kyc.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
 import 'package:hawkr_seller/features/seller/data/my_store_repository.dart';
@@ -104,6 +108,15 @@ class KycFakeServer {
   Object? storeFailure;
   bool storeWrittenAtSubmit = false;
   Object? cancelFailure;
+
+  /// 帳號的聯絡信箱（identity 的 GetContactEmail）：預設是 provider 驗證過的信箱；null 是沒有任何信箱。
+  ContactEmail? contact = ContactEmail(
+    email: 'login@example.com',
+    source: ContactEmailSource.CONTACT_EMAIL_SOURCE_VERIFIED,
+  );
+  Object? setContactFailure;
+  Object? contactReadFailure;
+  final contactSets = <String>[];
   Object? uploadFailure;
   final agreements = _Agreements();
   final uploads = <String>[];
@@ -171,11 +184,35 @@ class KycFakeServer {
         .build(),
   );
 
+  IdentityAppServiceClient get identity => IdentityAppServiceClient(
+    FakeTransportBuilder()
+        .unary(IdentityAppService.getContactEmail, (_, _) {
+          calls.add('GetContactEmail');
+          final failure = contactReadFailure;
+          if (failure != null) throw failure;
+          final current = contact;
+          return GetContactEmailResponse(contactEmail: current);
+        })
+        .unary(IdentityAppService.setContactEmail, (req, _) {
+          calls.add('SetContactEmail');
+          final failure = setContactFailure;
+          if (failure != null) throw failure;
+          contactSets.add(req.email);
+          contact = ContactEmail(
+            email: req.email,
+            source: ContactEmailSource.CONTACT_EMAIL_SOURCE_SELF_ENTERED,
+          );
+          return SetContactEmailResponse(contactEmail: contact);
+        })
+        .build(),
+  );
+
   ProviderContainer build() {
     container = ProviderContainer(
       overrides: [
         sessionProvider.overrideWith(_LoggedIn.new),
         sellerClientProvider.overrideWithValue(client),
+        identityClientProvider.overrideWithValue(identity),
         myStoreRepositoryProvider.overrideWithValue(storeServer.repository),
         sellerAgreementsRepositoryProvider.overrideWithValue(agreements),
         privateDocumentUploaderProvider.overrideWithValue((
@@ -200,6 +237,10 @@ class KycFakeServer {
     container.invalidate(currentStoreProvider);
     await container.read(accountKycProvider('acc-1').future);
     await container.read(currentStoreProvider.future);
+    container.invalidate(accountContactEmailProvider('acc-1'));
+    await container
+        .read(accountContactEmailProvider('acc-1').future)
+        .then((_) {}, onError: (_) {});
     container.read(kycWizardProvider.notifier).hydrate(requested: requested);
     calls.clear();
   }
@@ -260,7 +301,7 @@ void main() {
           businessApplication(
             companyName: '範例果園',
             taxId: '22223223',
-            missing: [KYCField.KYC_FIELD_BANK_ACCOUNT],
+            missing: [KYCField.KYC_FIELD_BUSINESS_COMPANY_PHONE],
           ),
         ),
         requested: KycSubject.individual,
@@ -271,21 +312,21 @@ void main() {
       expect(wizard.form.companyRegisterDate, '2020-01-02');
       expect(wizard.form.companyTownCode, '63000010');
       expect(wizard.form.companyPhone, isEmpty, reason: '新申請以外不套用店家預設值');
-      expect(wizard.resumeStep, KycStep.bankInfo);
+      expect(wizard.resumeStep, KycStep.company);
     });
 
     test('續填的位置是第一個還有缺項的一步；缺店家欄位停在其他資訊；沒有缺項停在確認', () async {
       await server.boot(
         kyc: myKycOf(
-          individualApplication(
+          businessApplication(
             missing: [
-              KYCField.KYC_FIELD_BANK_BOOK,
-              KYCField.KYC_FIELD_ID_CARD_FRONT,
+              KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
+              KYCField.KYC_FIELD_BUSINESS_TAX_ID,
             ],
           ),
         ),
       );
-      expect(wizard.resumeStep, KycStep.idUpload);
+      expect(wizard.resumeStep, KycStep.company);
 
       await server.boot(
         kyc: myKycOf(
@@ -301,21 +342,21 @@ void main() {
     test('被退回：退回的總理由與伺服器算的待處理問題（欄位用 KYCField）', () async {
       await server.boot(
         kyc: myKycOf(
-          individualApplication(
+          businessApplication(
             status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
             kycStatus: KYCStatus.KYC_STATUS_REJECTED,
-            rejection: KYCRejection(reason: '證件模糊'),
+            rejection: KYCRejection(reason: '資料不符'),
             outstanding: [
               KYCIssue(
-                field_1: KYCField.KYC_FIELD_ID_CARD_FRONT,
-                documentAssetId: 'asset-front',
+                field_1: KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
+                documentAssetId: 'asset-doc',
                 code: KYCIssueCode.KYC_ISSUE_CODE_UNREADABLE,
                 message: '反光看不清楚',
               ),
               KYCIssue(
-                field_1: KYCField.KYC_FIELD_BANK_ACCOUNT,
+                field_1: KYCField.KYC_FIELD_BUSINESS_TAX_ID,
                 code: KYCIssueCode.KYC_ISSUE_CODE_MISMATCH,
-                message: '與存摺不符',
+                message: '與登記不符',
               ),
             ],
           ),
@@ -323,22 +364,22 @@ void main() {
       );
 
       expect(wizard.editable, isTrue);
-      expect(wizard.rejection?.reason, '證件模糊');
+      expect(wizard.rejection?.reason, '資料不符');
       expect(
         [
           for (final i in wizard.outstandingIssues)
             '${kycFieldLabel(i.field_1, UiLocale.zhTW)}：${i.message}',
         ],
-        ['身分證正面照：反光看不清楚', '銀行帳號：與存摺不符'],
+        ['補充文件：反光看不清楚', '統一編號：與登記不符'],
       );
     });
 
     test('退回的總理由看伺服器有沒有回 last_rejection：處理完每一項、還沒重送時仍在', () async {
       final rejection = KYCRejection(reason: '舊的退回');
       final issue = KYCIssue(
-        field_1: KYCField.KYC_FIELD_REAL_NAME,
+        field_1: KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME,
         code: KYCIssueCode.KYC_ISSUE_CODE_OTHER,
-        message: '姓名不符',
+        message: '名稱不符',
       );
 
       await server.boot(
@@ -384,7 +425,6 @@ void main() {
             ..outstandingIssues.addAll([
               issue(KYCField.KYC_FIELD_BUSINESS_TAX_ID, '與登記不符'),
               issue(KYCField.KYC_FIELD_BUSINESS_TAX_ID, '請重新確認'),
-              issue(KYCField.KYC_FIELD_ID_CARD_BACK, '反面缺少'),
               issue(
                 KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
                 '已過期',
@@ -403,25 +443,10 @@ void main() {
         wizard.fieldError(KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME),
         isNull,
       );
-      expect(wizard.documentIssue(KycDocSlot.idCardBack), '反面缺少');
-      expect(wizard.documentIssue(KycDocSlot.idCardFront), isNull);
       final docs = wizard.docs.companyDocuments;
       expect(wizard.companyDocumentIssue(docs[0]), isNull);
       expect(wizard.companyDocumentIssue(docs[1]), '已過期');
       expect(wizard.companyDocumentsIssue, '請補登記文件');
-    });
-
-    test('證號與帳號只有遮蔽值：沒有重新輸入就不送', () async {
-      await server.boot(
-        kyc: myKycOf(
-          individualApplication(realName: '王小明', idMasked: 'A12****789'),
-        ),
-      );
-
-      expect(wizard.maskedId, 'A12****789');
-      expect(wizard.form.idCardNo, isEmpty);
-      expect(await wizard.save(), isTrue);
-      expect(server.saves, isEmpty);
     });
   });
 
@@ -444,58 +469,29 @@ void main() {
       expect(wizard.application?.etag, 'v1');
     });
 
-    test('存檔只送改過的欄位，帶讀到的 etag，格式不合的證號與帳號不送', () async {
+    test('存檔只送改過的欄位，帶讀到的 etag', () async {
       await server.boot(kyc: myKycOf(individualApplication(etag: 'v1')));
-      wizard.updateForm(
-        (f) => f.copyWith(
-          realName: '王小明',
-          birthDate: '1988-06-10',
-          idCardNo: 'A12',
-          bankAccount: '123',
-          bankCode: '004',
-        ),
-      );
+      wizard.updateForm((f) => f.copyWith(productType: '水果'));
 
       expect(await wizard.save(), isTrue);
 
       final request = server.saves.single;
       expect(request.application.etag, 'v1');
-      expect(request.updateMask.paths, [
-        'real_name',
-        'bank_code',
-        'birth_date',
-      ]);
-      expect(request.application.realName, '王小明');
-      expect(
-        request.application.birthDate,
-        Date(year: 1988, month: 6, day: 10),
-      );
+      expect(request.updateMask.paths, ['product_type']);
+      expect(request.application.productType, '水果');
       expect(request.application.hasIndividual(), isFalse);
     });
 
-    test('有效的身分證號寫進個人那一支；企業寫負責人身分證號', () async {
-      await server.boot(kyc: myKycOf(individualApplication()));
-      wizard.updateForm((f) => f.copyWith(idCardNo: 'A123456789'));
-      await wizard.save();
-      expect(server.saves.last.updateMask.paths, ['individual.id_card_no']);
-      expect(server.saves.last.application.individual.idCardNo, 'A123456789');
-
-      await server.boot(kyc: myKycOf(businessApplication()));
-      wizard.updateForm((f) => f.copyWith(idCardNo: 'A123456789'));
-      await wizard.save();
-      expect(server.saves.last.updateMask.paths, ['business.rep_id_card_no']);
-    });
-
-    test('存檔成功後 etag 換新、證號不再重送', () async {
+    test('存檔成功後 etag 換新、已存的欄位不再重送', () async {
       await server.boot(kyc: myKycOf(individualApplication(etag: 'v1')));
-      wizard.updateForm((f) => f.copyWith(idCardNo: 'A123456789'));
+      wizard.updateForm((f) => f.copyWith(productType: '水果'));
       await wizard.save();
       server.onSave = (_) => individualApplication(etag: 'v3');
-      wizard.updateForm((f) => f.copyWith(realName: '王小明'));
+      wizard.updateForm((f) => f.copyWith(productType: '蔬菜'));
       await wizard.save();
 
       expect(server.saves.last.application.etag, 'v2');
-      expect(server.saves.last.updateMask.paths, ['real_name']);
+      expect(server.saves.last.updateMask.paths, ['product_type']);
       expect(wizard.application?.etag, 'v3');
     });
 
@@ -503,7 +499,7 @@ void main() {
       await server.boot(kyc: myKycOf(businessApplication(etag: 'v1')));
       server.onSave = (request) {
         final saved = server.echo(request);
-        saved.englishName = saved.englishName.trim();
+        saved.productType = saved.productType.trim();
         if (saved.hasBusiness()) {
           saved.business.companyPhone = saved.business.companyPhone.replaceAll(
             '-',
@@ -514,13 +510,13 @@ void main() {
       };
       wizard.updateForm(
         (f) =>
-            f.copyWith(companyPhone: '02-12345678', englishName: 'Wang Farm '),
+            f.copyWith(companyPhone: '02-12345678', productType: 'Wang Farm '),
       );
 
       expect(await wizard.save(), isTrue);
 
       expect(wizard.form.companyPhone, '02-12345678');
-      expect(wizard.form.englishName, 'Wang Farm ', reason: '打字中的尾端空白不能被換掉');
+      expect(wizard.form.productType, 'Wang Farm ', reason: '打字中的尾端空白不能被換掉');
       expect(wizard.hasUnsavedDraft, isFalse);
       final saves = server.saves.length;
       expect(await wizard.save(), isTrue);
@@ -528,64 +524,56 @@ void main() {
     });
 
     test('正規化之後送出不會被「未存」擋住', () async {
-      await server.boot(
-        kyc: myKycOf(individualApplication(etag: 'v1', realName: '王小明')),
-      );
+      await server.boot(kyc: myKycOf(individualApplication(etag: 'v1')));
       server.onSave = (request) {
         final saved = server.echo(request);
-        saved.englishName = saved.englishName.trim();
+        saved.productType = saved.productType.trim();
         return saved;
       };
-      wizard.updateForm((f) => f.copyWith(englishName: 'Wang Farm '));
+      wizard.updateForm((f) => f.copyWith(productType: 'Wang Farm '));
 
       expect(await wizard.submit(_acceptances), KycSubmitOutcome.submitted);
     });
 
-    test('沒送出的欄位原樣保留且仍算未存：打到一半的日期、不合格式的帳號，存別的欄位之後', () async {
-      await server.boot(kyc: myKycOf(individualApplication(etag: 'v1')));
+    test('沒送出的欄位原樣保留且仍算未存：打到一半的日期，存別的欄位之後', () async {
+      await server.boot(kyc: myKycOf(businessApplication(etag: 'v1')));
       wizard.updateForm(
-        (f) => f.copyWith(
-          englishName: 'Wang ',
-          birthDate: '1988-02-3',
-          bankAccount: '123',
-        ),
+        (f) =>
+            f.copyWith(productType: 'Wang ', companyRegisterDate: '2020-01-3'),
       );
 
       expect(await wizard.save(), isTrue);
 
-      expect(server.saves.last.updateMask.paths, ['english_name']);
+      expect(server.saves.last.updateMask.paths, ['product_type']);
       final state = server.container.read(kycWizardProvider);
-      expect(state.form.birthDate, '1988-02-3');
-      expect(state.form.bankAccount, '123');
+      expect(state.form.companyRegisterDate, '2020-01-3');
       expect(
-        state.baseline.birthDate,
-        isEmpty,
+        state.baseline.companyRegisterDate,
+        '2020-01-02',
         reason: '沒送出，baseline 不變，仍與輸入不同',
       );
-      expect(state.baseline.bankAccount, isEmpty);
-      expect(wizard.inputErrors.accountError, isNotNull);
     });
 
     test('存檔期間又被使用者改過的欄位保留輸入，之後的存檔會送出它', () async {
-      await server.boot(kyc: myKycOf(individualApplication(etag: 'v1')));
+      await server.boot(kyc: myKycOf(businessApplication(etag: 'v1')));
       final gate = Completer<void>();
       server.saveGate = gate;
       wizard.updateForm(
-        (f) => f.copyWith(realName: '王小明 ', englishName: 'Wang '),
+        (f) => f.copyWith(companyName: '範例果園 ', productType: 'Wang '),
       );
 
       final saving = wizard.save();
       await Future<void>.delayed(Duration.zero);
-      wizard.updateForm((f) => f.copyWith(englishName: 'Wang Farm'));
+      wizard.updateForm((f) => f.copyWith(productType: 'Wang Farm'));
       gate.complete();
       expect(await saving, isTrue);
 
-      expect(wizard.form.englishName, 'Wang Farm');
-      expect(wizard.form.realName, '王小明 ');
+      expect(wizard.form.productType, 'Wang Farm');
+      expect(wizard.form.companyName, '範例果園 ');
       expect(wizard.hasUnsavedDraft, isTrue, reason: '期間改的欄位還沒存');
       server.saveGate = null;
       expect(await wizard.save(), isTrue);
-      expect(server.saves.last.updateMask.paths, ['english_name']);
+      expect(server.saves.last.updateMask.paths, ['product_type']);
     });
 
     test('草稿的欄位違規在訊息欄位底下（company_address.town_code）也對到地址欄位', () async {
@@ -607,43 +595,43 @@ void main() {
 
     test('寫入的回應直接成為共用的申請（進度卡與閘門不必再讀一次）', () async {
       await server.boot(kyc: myKycOf(individualApplication(etag: 'v1')));
-      wizard.updateForm((f) => f.copyWith(realName: '王小明'));
+      wizard.updateForm((f) => f.copyWith(productType: '水果'));
 
       expect(await wizard.save(), isTrue);
 
       expect(server.calls, ['SaveKYCDraft']);
       final shared = server.container.read(currentKycProvider)?.value;
       expect(shared?.application?.etag, 'v2');
-      expect(shared?.application?.realName, '王小明');
+      expect(shared?.application?.productType, '水果');
     });
 
     test('版本衝突：重讀最新版本、換上新的 etag，保留使用者的輸入', () async {
       await server.boot(
-        kyc: myKycOf(individualApplication(etag: 'v1', realName: '舊名')),
+        kyc: myKycOf(businessApplication(etag: 'v1', companyName: '舊名')),
       );
-      wizard.updateForm((f) => f.copyWith(realName: '王小明'));
+      wizard.updateForm((f) => f.copyWith(companyName: '新名'));
       server.onSave = (_) =>
           throw reasonError(Code.aborted, 'VERSION_CONFLICT');
-      final elsewhere = individualApplication(etag: 'v9', realName: '舊名')
-        ..englishName = 'John';
+      final elsewhere = businessApplication(etag: 'v9', companyName: '舊名')
+        ..productType = 'Fruit';
       server.latest = myKycOf(elsewhere);
 
       expect(await wizard.save(), isFalse);
 
-      expect(wizard.form.realName, '王小明', reason: '使用者改過的欄位保留');
-      expect(wizard.form.englishName, 'John', reason: '別處改過、使用者沒動的欄位換成最新');
+      expect(wizard.form.companyName, '新名', reason: '使用者改過的欄位保留');
+      expect(wizard.form.productType, 'Fruit', reason: '別處改過、使用者沒動的欄位換成最新');
       expect(wizard.error, versionConflictNotice('申請資料'));
       expect(wizard.application?.etag, 'v9');
 
-      server.onSave = (_) => individualApplication(etag: 'v10');
+      server.onSave = (_) => businessApplication(etag: 'v10');
       expect(await wizard.save(), isTrue);
       expect(server.saves.last.application.etag, 'v9');
-      expect(server.saves.last.updateMask.paths, ['real_name']);
+      expect(server.saves.last.updateMask.paths, ['business.company_name']);
     });
 
     test('版本衝突後重讀失敗：顯示無法載入最新版本，輸入保留', () async {
       await server.boot(kyc: myKycOf(individualApplication()));
-      wizard.updateForm((f) => f.copyWith(realName: '王小明'));
+      wizard.updateForm((f) => f.copyWith(productType: '水果'));
       server.onSave = (_) =>
           throw reasonError(Code.aborted, 'VERSION_CONFLICT');
       server.reloadFailure = ConnectException(Code.unavailable, 'down');
@@ -651,14 +639,17 @@ void main() {
       expect(await wizard.save(), isFalse);
 
       expect(wizard.error, versionReloadFailedNotice);
-      expect(wizard.form.realName, '王小明');
+      expect(wizard.form.productType, '水果');
     });
 
-    test('衝突時申請已被取消：回到沒有申請並重設表單與證件（和捨棄草稿相同），之後重建不會帶舊證件', () async {
+    test('衝突時申請已被取消：回到沒有申請並重設表單與文件（和捨棄草稿相同），之後重建不會帶舊文件', () async {
       await server.boot(
-        kyc: myKycOf(individualApplication(etag: 'v1', frontAssetId: 'old')),
+        kyc: myKycOf(
+          businessApplication(etag: 'v1')
+            ..business.companyDocuments.add(KYCDocument(assetId: 'old')),
+        ),
       );
-      wizard.updateForm((f) => f.copyWith(realName: '王小明'));
+      wizard.updateForm((f) => f.copyWith(productType: '水果'));
       server.onSave = (_) =>
           throw reasonError(Code.aborted, 'VERSION_CONFLICT');
       server.application = null;
@@ -668,18 +659,18 @@ void main() {
       expect(wizard.application, isNull);
       expect(wizard.subject, isNull);
       expect(wizard.error, kycCancelledNotice);
-      expect(wizard.form.realName, isEmpty);
-      expect(wizard.docs.idCardFront, isNull);
+      expect(wizard.form.productType, isEmpty);
+      expect(wizard.docs.companyDocuments, isEmpty);
 
       server.onSave = server.echo;
-      expect(await wizard.startDraft(KycSubject.individual), isTrue);
-      wizard.updateForm((f) => f.copyWith(englishName: 'Wang'));
+      expect(await wizard.startDraft(KycSubject.business), isTrue);
+      wizard.updateForm((f) => f.copyWith(productType: 'Wang'));
       expect(await wizard.save(), isTrue);
       expect(
         server.saves.last.updateMask.paths,
-        isNot(contains('id_card_front')),
+        isNot(contains('business.company_documents')),
       );
-      expect(server.saves.last.updateMask.paths, ['english_name']);
+      expect(server.saves.last.updateMask.paths, ['product_type']);
     });
 
     test('建立時別處已經建立（already_exists）：原樣採用那一份，店家預設值不蓋掉它，回到續填位置', () async {
@@ -694,7 +685,7 @@ void main() {
       server.latest = myKycOf(
         businessApplication(
           etag: 'v5',
-          missing: [KYCField.KYC_FIELD_BANK_ACCOUNT],
+          missing: [KYCField.KYC_FIELD_BUSINESS_TAX_ID],
         ),
       );
 
@@ -703,43 +694,28 @@ void main() {
       expect(wizard.application?.etag, 'v5');
       expect(wizard.form.companyPhone, isEmpty, reason: '既有申請沒填電話，不被店家預設值蓋掉');
       expect(wizard.form.companyName, '');
-      expect(wizard.resumeStep, KycStep.bankInfo);
+      expect(wizard.resumeStep, KycStep.company);
       expect(wizard.hasUnsavedDraft, isFalse, reason: '店家預設值沒有被當成待存的修改');
     });
 
     test('欄位錯誤：列出欄位名稱，欄位的值改過就不再顯示錯誤', () async {
       await server.boot(kyc: myKycOf(individualApplication()));
-      wizard.updateForm((f) => f.copyWith(bankCode: '99'));
+      wizard.updateForm((f) => f.copyWith(productType: '99'));
       server.onSave = (_) =>
-          throw fieldError('application.bank_code', '銀行代碼格式不符');
+          throw fieldError('application.product_type', '商品類型格式不符');
 
       expect(await wizard.save(), isFalse);
 
-      expect(wizard.error, '下列欄位格式不正確：銀行代碼');
-      expect(wizard.fieldError(KYCField.KYC_FIELD_BANK_CODE), '銀行代碼格式不符');
-      wizard.updateForm((f) => f.copyWith(bankCode: '004'));
-      expect(wizard.fieldError(KYCField.KYC_FIELD_BANK_CODE), isNull);
+      expect(wizard.error, '下列欄位格式不正確：主要商品類型');
+      expect(wizard.fieldError(KYCField.KYC_FIELD_PRODUCT_TYPE), '商品類型格式不符');
+      wizard.updateForm((f) => f.copyWith(productType: '水果'));
+      expect(wizard.fieldError(KYCField.KYC_FIELD_PRODUCT_TYPE), isNull);
     });
   });
 
-  group('證件', () {
-    test('上傳後以 staged token 存進申請；公司文件最多 10 張', () async {
+  group('企業文件', () {
+    test('公司文件以 staged token 存進申請，最多 10 張', () async {
       await server.boot(kyc: myKycOf(businessApplication()));
-
-      expect(
-        await wizard.uploadDocument(
-          KycDocSlot.idCardFront,
-          Uint8List.fromList([1, 2, 3]),
-          docType: 'id_card',
-          filename: 'f.jpg',
-        ),
-        isTrue,
-      );
-      expect(server.saves.single.updateMask.paths, ['id_card_front']);
-      expect(
-        server.saves.single.application.idCardFront.stagedToken,
-        'token-1',
-      );
 
       for (var i = 0; i < 12; i++) {
         await wizard.addCompanyDocument(
@@ -752,75 +728,65 @@ void main() {
         lessThanOrEqualTo(KycDocs.maxCompanyDocuments),
       );
       expect(server.uploads.where((u) => u.startsWith('document')).length, 10);
+      expect(server.saves.first.updateMask.paths, [
+        'business.company_documents',
+      ]);
+      expect(
+        server
+            .saves
+            .first
+            .application
+            .business
+            .companyDocuments
+            .single
+            .stagedToken,
+        'token-1',
+      );
     });
 
-    test(
-      '伺服器拒絕證件（staged token 過期）：提示顯示伺服器的訊息與是哪一張，不說格式不正確，刪除後可以重新上傳',
-      () async {
-        await server.boot(kyc: myKycOf(businessApplication()));
-        server.onSave = (_) => throw fieldErrors({
-          'application.id_card_front': '圖片無法使用，請重新上傳',
-          'application.business.company_documents[1]': '圖片無法使用，請重新上傳',
-          'application.business.tax_id': '統編不合法',
-        });
-
-        expect(
-          await wizard.uploadDocument(
-            KycDocSlot.idCardFront,
-            Uint8List.fromList([1]),
-            docType: 'id_card',
-            filename: 'f.jpg',
-          ),
-          isFalse,
-        );
-
-        expect(
-          wizard.error,
-          '下列欄位格式不正確：統一編號；'
-          '身分證正面照：圖片無法使用，請重新上傳；'
-          '補充文件（第 2 張）：圖片無法使用，請重新上傳',
-        );
-        server.onSave = server.echo;
-        wizard.clearDocument(KycDocSlot.idCardFront);
-        expect(
-          await wizard.uploadDocument(
-            KycDocSlot.idCardFront,
-            Uint8List.fromList([2]),
-            docType: 'id_card',
-            filename: 'f2.jpg',
-          ),
-          isTrue,
-        );
-        expect(wizard.error, isNull);
-      },
-    );
-
-    test('只有證件被拒絕時，提示只有伺服器的訊息', () async {
+    test('伺服器拒絕文件（staged token 過期）：提示顯示伺服器的訊息與是哪一張，不說格式不正確', () async {
       await server.boot(kyc: myKycOf(businessApplication()));
-      server.onSave = (_) =>
-          throw fieldError('application.bank_book', '圖片無法使用，請重新上傳');
+      server.onSave = (_) => throw fieldErrors({
+        'application.business.company_documents[1]': '圖片無法使用，請重新上傳',
+        'application.business.tax_id': '統編不合法',
+      });
 
-      await wizard.uploadDocument(
-        KycDocSlot.bankBook,
+      expect(
+        await wizard.addCompanyDocument(
+          Uint8List.fromList([1]),
+          filename: 'f.jpg',
+        ),
+        isFalse,
+      );
+
+      expect(
+        wizard.error,
+        '下列欄位格式不正確：統一編號；'
+        '補充文件（第 2 張）：圖片無法使用，請重新上傳',
+      );
+    });
+
+    test('只有文件被拒絕時，提示只有伺服器的訊息', () async {
+      await server.boot(kyc: myKycOf(businessApplication()));
+      server.onSave = (_) => throw fieldError(
+        'application.business.company_documents',
+        '圖片無法使用，請重新上傳',
+      );
+
+      await wizard.addCompanyDocument(
         Uint8List.fromList([1]),
-        docType: 'bank_account',
         filename: 'b.jpg',
       );
 
-      expect(wizard.error, '存摺封面：圖片無法使用，請重新上傳');
+      expect(wizard.error, '補充文件：圖片無法使用，請重新上傳');
     });
 
     test('上傳失敗不存檔，錯誤保留在 error', () async {
-      await server.boot(kyc: myKycOf(individualApplication()));
+      await server.boot(kyc: myKycOf(businessApplication()));
       server.uploadFailure = StateError('offline');
 
       expect(
-        await wizard.uploadDocument(
-          KycDocSlot.bankBook,
-          Uint8List(1),
-          docType: 'bank_account',
-          filename: 'b.jpg',
-        ),
+        await wizard.addCompanyDocument(Uint8List(1), filename: 'b.jpg'),
         isFalse,
       );
       expect(wizard.error, kycUploadFailedNotice);
@@ -914,7 +880,6 @@ void main() {
         kyc: myKycOf(
           individualApplication(
             etag: 'v1',
-            realName: '王小明',
             missing: missing,
             missingStore: missingStore,
           ),
@@ -986,11 +951,11 @@ void main() {
     });
 
     test('伺服器回報還有缺項：不送出，列出缺項', () async {
-      await ready(missing: [KYCField.KYC_FIELD_BANK_BOOK]);
+      await ready(missing: [KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS]);
 
       expect(await wizard.submit(_acceptances), KycSubmitOutcome.failed);
 
-      expect(wizard.error, '下列欄位尚未填寫：存摺封面');
+      expect(wizard.error, '下列欄位尚未填寫：補充文件');
       expect(server.submits, isEmpty);
     });
 
@@ -1094,17 +1059,114 @@ void main() {
       expect(wizard.error, isNot(startsWith('下列欄位')));
     });
 
-    test('欄位違規：欄位下顯示錯誤，並列出欄位名稱', () async {
+    test('帳號有驗證過的信箱：不呼叫 SetContactEmail，也不需要輸入', () async {
       await ready();
-      wizard.updateForm((f) => f.copyWith(englishName: 'x'));
-      server.onSave = (_) =>
-          individualApplication(etag: 'v2', realName: '王小明')..englishName = 'x';
-      server.onSubmit = (_) => throw fieldError('english_name', '請填寫商店英文名稱');
+      expect(wizard.contactEmailBlocker, isNull);
+
+      expect(await wizard.submit(_acceptances), KycSubmitOutcome.submitted);
+
+      expect(server.contactSets, isEmpty);
+      expect(server.calls, isNot(contains('SetContactEmail')));
+    });
+
+    test('帳號沒有任何信箱：沒填不送出；填了先 SetContactEmail（去空白、轉小寫）再 SubmitKYC', () async {
+      server.contact = null;
+      await ready();
+
+      expect(wizard.contactEmailBlocker, '請輸入金流商聯絡信箱');
+      expect(await wizard.submit(_acceptances), KycSubmitOutcome.failed);
+      expect(wizard.error, '請輸入金流商聯絡信箱');
+      expect(server.submits, isEmpty);
+
+      wizard.updateContactEmail('  Shop@Example.COM ');
+      expect(wizard.contactEmailBlocker, isNull);
+      expect(await wizard.submit(_acceptances), KycSubmitOutcome.submitted);
+
+      expect(server.contactSets, ['shop@example.com']);
+      expect(
+        server.calls.indexOf('SetContactEmail'),
+        lessThan(server.calls.indexOf('SubmitKYC')),
+        reason: '信箱要在送出申請之前寫進帳號',
+      );
+    });
+
+    test('格式不合的信箱不送出、不呼叫 SetContactEmail', () async {
+      server.contact = null;
+      await ready();
+      wizard.updateContactEmail('not-an-email');
+
+      expect(wizard.contactEmailError, 'Email 格式不正確');
+      expect(await wizard.submit(_acceptances), KycSubmitOutcome.failed);
+
+      expect(wizard.error, 'Email 格式不正確');
+      expect(server.contactSets, isEmpty);
+      expect(server.submits, isEmpty);
+    });
+
+    test('自填的信箱沒有改：不重複寫入', () async {
+      server.contact = ContactEmail(
+        email: 'mine@example.com',
+        source: ContactEmailSource.CONTACT_EMAIL_SOURCE_SELF_ENTERED,
+      );
+      await ready();
+      expect(wizard.contactEmailValue, 'mine@example.com');
+
+      expect(await wizard.submit(_acceptances), KycSubmitOutcome.submitted);
+
+      expect(server.contactSets, isEmpty);
+    });
+
+    test('SetContactEmail 失敗：顯示伺服器的訊息，不送出申請', () async {
+      server.contact = null;
+      await ready();
+      wizard.updateContactEmail('shop@example.com');
+      server.setContactFailure = reasonError(
+        Code.failedPrecondition,
+        'CONTACT_EMAIL_NOT_SETTABLE',
+        message: '帳號已有驗證過的信箱',
+      );
 
       expect(await wizard.submit(_acceptances), KycSubmitOutcome.failed);
 
-      expect(wizard.error, '下列欄位尚未填寫：英文姓名');
-      expect(wizard.fieldError(KYCField.KYC_FIELD_ENGLISH_NAME), '請填寫商店英文名稱');
+      expect(wizard.error, '帳號已有驗證過的信箱');
+      expect(server.submits, isEmpty);
+    });
+
+    test('信箱還沒讀到（讀取失敗）：不能送出', () async {
+      server.contactReadFailure = ConnectException(Code.unavailable, 'down');
+      await ready();
+
+      expect(wizard.contactEmailBlocker, '載入中');
+      expect(await wizard.submit(_acceptances), KycSubmitOutcome.failed);
+      expect(server.submits, isEmpty);
+    });
+
+    test('SubmitKYC 回 CONTACT_EMAIL_REQUIRED：重讀帳號的信箱，顯示伺服器的訊息', () async {
+      await ready();
+      server.onSubmit = (_) => throw reasonError(
+        Code.failedPrecondition,
+        'CONTACT_EMAIL_REQUIRED',
+        message: '請先填寫聯絡信箱',
+      );
+      server.calls.clear();
+
+      expect(await wizard.submit(_acceptances), KycSubmitOutcome.failed);
+
+      expect(wizard.error, '請先填寫聯絡信箱');
+      expect(server.calls, contains('GetContactEmail'));
+    });
+
+    test('欄位違規：欄位下顯示錯誤，並列出欄位名稱', () async {
+      await ready();
+      wizard.updateForm((f) => f.copyWith(productType: 'x'));
+      server.onSave = (_) =>
+          individualApplication(etag: 'v2')..productType = 'x';
+      server.onSubmit = (_) => throw fieldError('product_type', '請填寫主要商品類型');
+
+      expect(await wizard.submit(_acceptances), KycSubmitOutcome.failed);
+
+      expect(wizard.error, '下列欄位尚未填寫：主要商品類型');
+      expect(wizard.fieldError(KYCField.KYC_FIELD_PRODUCT_TYPE), '請填寫主要商品類型');
     });
 
     test('版本衝突：重讀最新版本，輸入保留，提示重新送出', () async {
@@ -1147,14 +1209,14 @@ void main() {
     test('CancelKYC 帶 etag，成功後回到沒有申請、可重新選身分', () async {
       server.store = myStore(contactPhone: '02-1234-5678').store!;
       await server.boot(kyc: myKycOf(individualApplication(etag: 'v4')));
-      wizard.updateForm((f) => f.copyWith(realName: '王小明'));
+      wizard.updateForm((f) => f.copyWith(productType: '水果'));
 
       expect(await wizard.discard(), isTrue);
 
       expect(server.cancels.single.etag, 'v4');
       expect(wizard.application, isNull);
       expect(wizard.subject, isNull);
-      expect(wizard.form.realName, isEmpty);
+      expect(wizard.form.productType, isEmpty);
       expect(wizard.form.companyPhone, '02-1234-5678');
     });
 
