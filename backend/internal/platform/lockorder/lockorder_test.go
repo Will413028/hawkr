@@ -303,7 +303,7 @@ func TestClassifyOrderIsDeterministicAcrossSiblingClauses(t *testing.T) {
 	}
 }
 
-func TestClassifyLocksOnlyTheBaseRelationsOfFrom(t *testing.T) {
+func TestClassifyLocksOnlyTheRelationsOfFromItems(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name string
