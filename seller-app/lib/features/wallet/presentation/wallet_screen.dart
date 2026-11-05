@@ -261,6 +261,8 @@ class _PaymentAccountPanel extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // hook 要在任何提早 return 之前呼叫，狀態在認得與不認得之間變動時進行中的動作才不會被重置。
+    final actions = usePaymentAccountActions(context, ref);
     final l = context.uiLocale;
     final tone = paymentAccountTone(account.status);
     final title = account.status.uiText(l);
@@ -276,7 +278,6 @@ class _PaymentAccountPanel extends HookConsumerWidget {
     final alert = tone == HkStatusTone.warning || tone == HkStatusTone.danger;
     final description = account.status.description(l);
     final action = account.status.action(l);
-    final actions = usePaymentAccountActions(context, ref);
     final kind = action == null
         ? PaymentAccountActionKind.none
         : paymentAccountActionKind(account);

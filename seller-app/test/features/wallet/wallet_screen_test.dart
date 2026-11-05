@@ -69,6 +69,7 @@ class _Server {
   bool marketing;
   late final FakeMyStoreServer store;
   Completer<void>? kycGate;
+  Completer<void>? launchGate;
   var now = DateTime(2026, 10, 9, 12);
   void advance(Duration d) => now = now.add(d);
   int kycCalls = 0;
@@ -134,6 +135,8 @@ List<Override> _overrides(_Server server) => [
   webOriginProvider.overrideWithValue('https://web.example.test'),
   externalBrowserLauncherProvider.overrideWithValue((uri) async {
     server.launched.add(uri);
+    final gate = server.launchGate;
+    if (gate != null) await gate.future;
     return true;
   }),
 ];
@@ -589,6 +592,37 @@ void main() {
       await _pump(tester, server);
       expect(find.text('無法載入認證狀態'), findsOneWidget);
       expect(find.byKey(const ValueKey('wallet-payment-panel')), findsNothing);
+    });
+
+    testWidgets('同一個面板經過不認得的狀態再回到認得的狀態：不丟例外，進行中的動作仍停用按鈕', (tester) async {
+      final recognised = PaymentAccount(
+        status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED,
+        onboardingSurface: OnboardingSurface.ONBOARDING_SURFACE_HOSTED,
+      );
+      final server = _Server(payment: recognised, certified: false)
+        ..launchGate = Completer<void>();
+      await _pump(tester, server);
+      final button = find.widgetWithText(OutlinedButton, '前往設定收款帳戶');
+      await tester.tap(button);
+      await _settle(tester);
+      expect(tester.widget<OutlinedButton>(button).onPressed, isNull);
+
+      Future<void> resumeWith(PaymentAccount next) async {
+        server.payment = next;
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await _settle(tester);
+      }
+
+      await resumeWith(PaymentAccount());
+      expect(find.text('無法載入認證狀態'), findsOneWidget);
+      await resumeWith(recognised);
+      expect(tester.takeException(), isNull);
+      expect(tester.widget<OutlinedButton>(button).onPressed, isNull);
+      server.launchGate!.complete();
+      await _settle(tester);
+      expect(tester.widget<OutlinedButton>(button).onPressed, isNotNull);
     });
 
     testWidgets('已啟用：沒有面板，也沒有 PayUni 的前往提領', (tester) async {
