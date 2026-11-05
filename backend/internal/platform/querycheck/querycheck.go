@@ -2,12 +2,11 @@
 package querycheck
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
 
-	pg_query "github.com/pganalyze/pg_query_go/v6"
+	"github.com/Will413028/hawkr/backend/internal/platform/pgtree"
 )
 
 // 模組單體規則 2 對「不是 sqlc 寫的 query」的機械檢查。sqlc 只讀自己的 schema.sql 與依賴表允許的 pub.sql，所以參照別的模組的內部表在生成時就
@@ -29,68 +28,44 @@ var timeFuncs = []string{"now", "clock_timestamp", "statement_timestamp", "trans
 // Check 回傳 sql 違反邊界的地方；own 是模組自己的 schema，allowedOwners 是它可以呼叫 pub_* 的擁有者（依賴表允許且發布了 pub 的模組；
 // cmd/jetgen 只為依賴表（internal/arch 的 Dependencies）允許的擁有者生成 pub 包裝，模組的 pubsql 目錄就是這份清單）。
 func Check(sql, own string, allowedOwners []string) ([]string, error) {
-	js, err := pg_query.ParseToJSON(sql)
+	tree, err := pgtree.Parse(sql)
 	if err != nil {
-		return nil, fmt.Errorf("無法解析 SQL：%w", err)
-	}
-	var tree any
-	if err := json.Unmarshal([]byte(js), &tree); err != nil {
 		return nil, err
 	}
 	ctes := map[string]bool{}
 	collectCTEs(tree, ctes)
 	var bad []string
-	var walk func(any)
-	walk = func(n any) {
-		switch v := n.(type) {
-		case map[string]any:
-			// 表的參照：FROM 裡是 RangeVar 節點，INSERT／UPDATE／DELETE 的目標直接是帶 relname 的節點。
-			if rel, ok := v["relname"].(string); ok {
-				schema, _ := v["schemaname"].(string)
-				switch {
-				case schema == "" && ctes[rel]:
-				case schema != own:
-					bad = append(bad, fmt.Sprintf("表 %s.%s 不在模組的 schema %s", schema, rel, own))
-				}
-			}
-			if _, ok := v["SQLValueFunction"].(map[string]any); ok {
-				bad = append(bad, "CURRENT_TIMESTAMP、CURRENT_DATE 等取得現在時間的寫法不允許：時間要是請求的 clock 參數")
-			}
-			if fc, ok := v["FuncCall"].(map[string]any); ok {
-				if msg := checkFunc(fc, own, allowedOwners); msg != "" {
-					bad = append(bad, msg)
-				}
-			}
-			for _, c := range v {
-				walk(c)
-			}
-		case []any:
-			for _, c := range v {
-				walk(c)
+	pgtree.Walk(tree, func(v map[string]any) {
+		// 表的參照：FROM 裡是 RangeVar 節點，INSERT／UPDATE／DELETE 的目標直接是帶 relname 的節點。
+		if rel, ok := v["relname"].(string); ok {
+			schema, _ := v["schemaname"].(string)
+			switch {
+			case schema == "" && ctes[rel]:
+			case schema != own:
+				bad = append(bad, fmt.Sprintf("表 %s.%s 不在模組的 schema %s", schema, rel, own))
 			}
 		}
-	}
-	walk(tree)
+		if _, ok := v["SQLValueFunction"].(map[string]any); ok {
+			bad = append(bad, "CURRENT_TIMESTAMP、CURRENT_DATE 等取得現在時間的寫法不允許：時間要是請求的 clock 參數")
+		}
+		if fc, ok := v["FuncCall"].(map[string]any); ok {
+			if msg := checkFunc(fc, own, allowedOwners); msg != "" {
+				bad = append(bad, msg)
+			}
+		}
+	})
 	slices.Sort(bad)
 	return slices.Compact(bad), nil
 }
 
 func collectCTEs(n any, out map[string]bool) {
-	switch v := n.(type) {
-	case map[string]any:
+	pgtree.Walk(n, func(v map[string]any) {
 		if cte, ok := v["CommonTableExpr"].(map[string]any); ok {
 			if name, _ := cte["ctename"].(string); name != "" {
 				out[name] = true
 			}
 		}
-		for _, c := range v {
-			collectCTEs(c, out)
-		}
-	case []any:
-		for _, c := range v {
-			collectCTEs(c, out)
-		}
-	}
+	})
 }
 
 func checkFunc(fc map[string]any, own string, allowedOwners []string) string {

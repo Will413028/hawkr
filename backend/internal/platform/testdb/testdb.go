@@ -48,6 +48,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
+	"github.com/Will413028/hawkr/backend/internal/platform/lockorder"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 )
 
@@ -269,9 +270,28 @@ func (s *Server) NewURL(t *testing.T, steps ...Step) string {
 }
 
 // NewDB 建一個這支測試專用、套用好 steps 的 database 並連上它，測試結束時關閉連線並刪除 database。
+//
+// 連線池掛著 lockorder.Checker：單體程式開的 transaction 第一次鎖某個模組的列時，已經持有排在它後面的模組的鎖
+// （單體規則 4），或送出無法解析的 SQL，測試失敗並列出兩句 SQL 與呼叫處。測試檔自己開的 transaction 不檢查。
 func (s *Server) NewDB(t *testing.T, steps ...Step) *db.DB {
 	t.Helper()
-	d, err := db.Open(context.Background(), db.Config{URL: s.NewURL(t, steps...), MaxConns: testPoolConns, ConnectRetryBudget: 10 * time.Second})
+	return s.newDB(t, t.Error, steps...)
+}
+
+// newDB 是 NewDB 的本體；report 收到每個鎖順序的倒退與無法解析的 SQL。
+func (s *Server) newDB(t *testing.T, report func(...any), steps ...Step) *db.DB {
+	t.Helper()
+	chk := lockorder.NewChecker()
+	// 先登記的 cleanup 後執行：等連線池關掉、所有 query 都結束之後才讀結果。
+	t.Cleanup(func() {
+		for _, err := range chk.Errors() {
+			report(err)
+		}
+		for _, v := range chk.Violations() {
+			report(v)
+		}
+	})
+	d, err := db.Open(context.Background(), db.Config{URL: s.NewURL(t, steps...), MaxConns: testPoolConns, ConnectRetryBudget: 10 * time.Second, Tracer: chk})
 	if err != nil {
 		t.Fatalf("testdb：連到測試 database：%v", err)
 	}

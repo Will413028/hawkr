@@ -26,6 +26,7 @@ schema `accountdeletion`（`db/schema.sql`）：`deletion_requests`（流程狀�
 - `CompletePending` 沒有待辦申請時不發任何訂單 RPC；買家側結清後才查店家側。守門：`TestCompletePendingWithoutARequestDoesNotQueryOrders`、`TestCompletePendingChecksTheStoreAfterTheBuyerSideClears`。規格：§6。
 - 有店家沒有 SELLER、有 SELLER 沒有店家、帳號沒有現任買家，都回 internal 且不寫入。守門：`TestStoreWithoutSellerRoleIsInternalError`、`TestSellerRoleWithoutStoreIsInternalError`、`TestAccountWithoutBuyerIsInternalError`。規格：§3、§5。
 - 申請進入等待時帳號同交易進入 PENDING_DELETION，等待期間不能開店，等待中的店家不能自己關店。守門：`TestStoreCannotOpenWhileAccountPendingDeletion`、`TestPendingStoreCannotBeClosedOrReplacedByOwner`、`TestAdminPendingIncludesStoreAndCompletesIt`。規格：§3、§5。
+- 申請列的讀取不鎖列（單體規則 4：自己的列排在買家、店家之後）；已刪除帳號沒有帳號列可鎖，並行完成同一筆待辦時 `completeRequest` 把 0 列當成已完成。守門：`TestCompletePendingOnDeletedAccountToleratesConcurrentCompletion`。
 - 同帳號只有一筆 PENDING_ORDERS（DB partial UNIQUE，交易內先 `identity.LockAccount` 序列化），每次受理追加 attempt。守門：`TestPendingRequestUniqueAndRepeatedRequest`、`TestConcurrentRequestsReuseOneProcessRow`、`TestAdminAttemptAfterOwnerPendingIsRecorded`、`TestRequestConstraints`（DB CHECK）。規格：§2、§3、§7。
 - 遠端訂單只在 transaction 外查；店家或 SELLER 在遠端查詢後才出現也不寫入。守門：`TestStoreOpenedBetweenOrdersReadAndTransactionWritesNothing`、`TestSellerGrantedBeforeTransactionLockIsNotDeleted`。規格：§7。
 - 關閉買家只有本模組一條路徑，鎖順序帳號列、買家列、店家列、上層模組；刪帳同時檢查帳號已刪與買家已關。守門：`TestDeletionLocksBuyerAndSellerBeforeSocialRows`、`TestRequestClosedDeletesAccountAndCompletes`、`TestCompletePendingChecksOrdersAgain`。規格：§7。
