@@ -71,11 +71,11 @@ export default function InvoiceAuditDetailDialog({
 				</p>
 				<details className="invoice-details">
 					<summary>展開變更前內容</summary>
-					<pre className="invoice-pre">{entry.beforeJson || "（無）"}</pre>
+					<pre className="adm-json-pre">{entry.beforeJson || "（無）"}</pre>
 				</details>
 				<details className="invoice-details">
 					<summary>展開變更後內容</summary>
-					<pre className="invoice-pre">{entry.afterJson || "（無）"}</pre>
+					<pre className="adm-json-pre">{entry.afterJson || "（無）"}</pre>
 				</details>
 			</div>
 

@@ -15,6 +15,7 @@ import {
 	ratingText,
 	registrationPollInterval,
 } from "./kyc-application";
+import { paymentAccountOf } from "./payment-account";
 import { accountEmailOf } from "./store-detail";
 
 // 商家詳情頁的資料來源（SellerAdminService.GetStore、GetKYCApplication、GetPayUniRegistration；IdentityAdminService.GetAccount；
@@ -76,6 +77,18 @@ export function usePayUniRegistration(storeId: string | undefined) {
 		},
 	);
 	return { query, value: payUniOf(query) };
+}
+
+/**
+ * 收款帳戶（GetPaymentAccount）。核准前還沒建立時是 not_found（尚未建立）。店家 ID 為空時不發請求。
+ * 重新整理後的重讀由 PaymentAccountSection 依 fetch_time 排程，這裡不輪詢。狀態的判斷在 paymentAccountOf。
+ */
+export function usePaymentAccount(storeId: string | undefined) {
+	const query = useConnectQuery(
+		SellerAdminService.method.getPaymentAccount,
+		storeId ? { storeId } : skipToken,
+	);
+	return { query, value: paymentAccountOf(query) };
 }
 
 /**

@@ -30,6 +30,10 @@ const cardModule = requireFromTest(
 	"../src/app/admin/merchants/[id]/PaymentAccountCard",
 ) as typeof import("../src/app/admin/merchants/[id]/PaymentAccountCard");
 
+const accountModule = requireFromTest(
+	"../src/app/admin/merchants/[id]/payment-account",
+) as typeof import("../src/app/admin/merchants/[id]/payment-account");
+
 type State = Parameters<typeof cardModule.PaymentAccountCard>[0]["state"];
 
 function render(state: State): string {
@@ -107,7 +111,7 @@ test("待補條件原文放在折疊的 pre；空物件不畫", () => {
 	});
 	assert.match(
 		withReq,
-		/<details[^>]*>[\s\S]*待補條件（原始內容）[\s\S]*<pre>/,
+		/<details[^>]*>[\s\S]*待補條件（原始內容）[\s\S]*<pre[^>]*>/,
 	);
 	assert.match(withReq, /&quot;entries&quot;/);
 	const empty = render({
@@ -118,7 +122,7 @@ test("待補條件原文放在折疊的 pre；空物件不畫", () => {
 });
 
 test("paymentAccountOf：not_found 是尚未建立，其他錯誤是讀取失敗", () => {
-	const notFound = cardModule.paymentAccountOf({
+	const notFound = accountModule.paymentAccountOf({
 		error: new ConnectError("no", Code.NotFound),
 		data: undefined,
 	});
@@ -126,29 +130,67 @@ test("paymentAccountOf：not_found 是尚未建立，其他錯誤是讀取失敗
 	assert.match(render(notFound), /尚未建立（平台審核核准後自動建立）/);
 	assert.doesNotMatch(render(notFound), /讀取失敗/);
 
-	const failed = cardModule.paymentAccountOf({
+	const failed = accountModule.paymentAccountOf({
 		error: new ConnectError("boom", Code.Unavailable),
 		data: undefined,
 	});
 	assert.equal(failed.state, "error");
 	assert.match(render(failed), /收款帳戶讀取失敗/);
 	assert.deepEqual(
-		cardModule.paymentAccountOf({ error: null, data: undefined }),
+		accountModule.paymentAccountOf({ error: null, data: undefined }),
 		{ state: "loading" },
 	);
 });
 
-test("paymentAccountOf：背景重讀失敗但有舊資料時照舊顯示；錯誤畫面帶伺服器的錯誤文字", () => {
-	const stale = cardModule.paymentAccountOf({
-		error: new ConnectError("boom", Code.Unavailable),
-		data: { account: account() },
+test("paymentAccountOf：規則同 payUniOf（有錯誤就是錯誤，成功卻沒有帳戶是讀取錯誤）；錯誤畫面帶伺服器的錯誤文字", () => {
+	assert.equal(
+		accountModule.paymentAccountOf({
+			error: new ConnectError("boom", Code.Unavailable),
+			data: { account: account() },
+		}).state,
+		"error",
+	);
+	assert.deepEqual(accountModule.paymentAccountOf({ error: null, data: {} }), {
+		state: "error",
 	});
-	assert.equal(stale.state, "ready");
 	const denied = render(
-		cardModule.paymentAccountOf({
+		accountModule.paymentAccountOf({
 			error: new ConnectError("no", Code.PermissionDenied),
 			data: undefined,
 		}),
 	);
 	assert.match(denied, /收款帳戶讀取失敗：/);
+});
+
+test("rereadFinished：fetch_time 與按下時不同才算完成", () => {
+	const t0 = timestampFromDate(new Date("2026-11-03T06:20:00Z"));
+	const t1 = timestampFromDate(new Date("2026-11-03T06:21:00Z"));
+	const base = accountModule.fetchTimeMs(account({ fetchTime: t0 }));
+	assert.equal(
+		accountModule.rereadFinished(base, account({ fetchTime: t0 })),
+		false,
+	);
+	assert.equal(
+		accountModule.rereadFinished(base, account({ fetchTime: t1 })),
+		true,
+	);
+	assert.equal(accountModule.rereadFinished(base, undefined), false);
+	assert.equal(
+		accountModule.rereadFinished(undefined, account({ fetchTime: t1 })),
+		true,
+	);
+});
+
+test("接線：頁面的 invalidateKyc 一併重讀收款帳戶；收款帳戶的資料來自 use-store-detail 的 hook", async () => {
+	const { readFile } = await import("node:fs/promises");
+	const page = await readFile("src/app/admin/merchants/[id]/page.tsx", "utf8");
+	const body = page.slice(page.indexOf("const invalidateKyc"));
+	const fn = body.slice(0, body.indexOf("const approveMutation"));
+	assert.match(fn, /SellerAdminService\.method\.getPaymentAccount/u);
+	assert.match(page, /usePaymentAccount\(/u);
+	const card = await readFile(
+		"src/app/admin/merchants/[id]/PaymentAccountCard.tsx",
+		"utf8",
+	);
+	assert.doesNotMatch(card, /useConnectQuery|useToast/u);
 });

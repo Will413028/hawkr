@@ -121,6 +121,7 @@ import {
 	useAccountEmail,
 	useKycApplication,
 	useNowUntil,
+	usePaymentAccount,
 	usePayUniRegistration,
 	useStoreDetail,
 	useStoreRating,
@@ -262,6 +263,8 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		kycQuery.value.state === "ready" ? kycQuery.value.application : undefined;
 	// PayUni 子商店註冊（GetPayUniRegistration）：第一次核准前是 not_found（尚未註冊）。
 	const payUni = usePayUniRegistration(store?.id);
+	// 收款帳戶（GetPaymentAccount）：核准前是 not_found（尚未建立）；核准、退回、重新綁定後與待辦一起重讀。
+	const paymentAccount = usePaymentAccount(store?.id);
 	const payUniRegistration =
 		payUni.value.state === "ready" ? payUni.value.registration : undefined;
 	// 核准、退回與重新查詢的可用性只讀伺服器（申請的 can_approve、can_reject、can_requery_registration；前提 2026-10-15）。
@@ -436,6 +439,12 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 	// 商家認證（K1、K3、K7）：核准與退回帶讀到的 etag；成功後店家（KYC 摘要）、申請、PayUni 註冊與列表一起重讀。
 	const invalidateKyc = () => {
 		invalidateStore();
+		queryClient.invalidateQueries({
+			queryKey: createConnectQueryKey({
+				schema: SellerAdminService.method.getPaymentAccount,
+				cardinality: undefined,
+			}),
+		});
 		queryClient.invalidateQueries({
 			queryKey: createConnectQueryKey({
 				schema: SellerAdminService.method.getKYCApplication,
@@ -1191,7 +1200,11 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 
 			{/* 收款帳戶卡（GetPaymentAccount）— 獨立於平台審核狀態，核准後仍顯示；錨點 #payment-account。PayUni 的兩張卡在步驟 8 刪除。 */}
 			{(!isApproved || activeTab === "basic") && (
-				<PaymentAccountSection storeId={store.id} />
+				<PaymentAccountSection
+					storeId={store.id}
+					payment={paymentAccount}
+					onNotice={setNotice}
+				/>
 			)}
 
 			{/* PayUni 狀態卡 — 獨立於 Hawkr KYC 核准狀態，approved 後仍顯示；比照本區其他區塊只在 basic tab 顯示。 */}
