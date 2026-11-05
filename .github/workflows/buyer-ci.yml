@@ -13,7 +13,7 @@ on:
       - '.github/workflows/buyer-ci.yml'
       - '.github/workflows/_flutter-quality.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths:
       - 'buyer-app/**'
       - 'packages/hawkr_api/**'

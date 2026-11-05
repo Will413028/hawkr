@@ -3,12 +3,12 @@ name: commit messages
 # commit message 的 Conventional Commits 檢查。本機由 pre-commit 在 commit 時擋下
 # （.pre-commit-config.yaml）；這支是後備：沒裝 hook 的 clone、GitHub 網頁上的編輯，
 # 都在這裡被發現。規則與本機相同，都在 scripts/check-commit-msg.py。
-# 直接 push 到 main 時，這裡只能事後回報，擋不住已經推上去的 commit。
+# 直接 push 到 dev 時，這裡只能事後回報，擋不住已經推上去的 commit。
 
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
 
 concurrency:
@@ -48,3 +48,20 @@ jobs:
             range="$SHA^!"
           fi
           python3 scripts/check-commit-msg.py --range "$range"
+
+  gate:
+    # The only required check on main: it passes when every other job in this workflow succeeded or was skipped.
+    name: gate (commit-messages)
+    if: always()
+    needs: [check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Every job succeeded or was skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) echo "a needed job ended with: $r"; exit 1 ;; esac
+          done

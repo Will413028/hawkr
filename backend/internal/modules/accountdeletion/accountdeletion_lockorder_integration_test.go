@@ -137,3 +137,150 @@ func TestDeletionLocksBuyerAndSellerBeforeSocialRows(t *testing.T) {
 		})
 	}
 }
+
+// 已刪除帳號沒有帳號列可鎖（LockLiveAccount 對已刪除帳號不鎖），並行完成同一筆待辦申請時，CompleteRequest 的 UPDATE 會等到對方 commit，
+// 重新判斷後 0 列。0 列要當成「已完成」回傳該筆申請（不是帳號最新的一筆；後者見下一個測試），不能把 pgx.ErrNoRows 傳出去。拿掉 completeRequest 的 ErrNoRows 處理，這個測試失敗。
+func TestCompletePendingOnDeletedAccountToleratesConcurrentCompletion(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	id, _ := f.account(t)
+	f.orders.mu.Lock()
+	f.orders.open = true
+	f.orders.mu.Unlock()
+	if state, err := f.module.Request(ctx, adminRequest(id)); err != nil || state != PendingOrders {
+		t.Fatalf("state=%s err=%v", state, err)
+	}
+	// 帳號被另一條路徑刪除了，待辦申請還在 PENDING_ORDERS。
+	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE identity.accounts SET deleted_at = now(), deletion_pending_at = NULL, email = NULL, suspended_at = NULL WHERE id = $1", id); err != nil {
+		t.Fatal(err)
+	}
+
+	// 另一個 transaction 先鎖住待辦申請列；CompletePending 的一般讀取仍讀得到它，之後的 UPDATE 停在這一列上。
+	held, release, holdDone := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	go func() {
+		holdDone <- f.db.InTx(ctx, func(ctx context.Context) error {
+			var rid uuid.UUID
+			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT id FROM accountdeletion.deletion_requests WHERE account_id = $1 AND status = 'PENDING_ORDERS' FOR UPDATE", id).Scan(&rid); err != nil {
+				return err
+			}
+			close(held)
+			<-release
+			_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE accountdeletion.deletion_requests SET status = 'COMPLETED', completed_at = now() WHERE id = $1", rid)
+			return err
+		})
+	}()
+	<-held
+	type result struct {
+		state State
+		err   error
+	}
+	done := make(chan result, 1)
+	go func() { s, err := f.module.CompletePending(ctx, id); done <- result{s, err} }()
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		var waiting int64
+		if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'").Scan(&waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting > 0 {
+			break
+		}
+		select {
+		case r := <-done:
+			t.Fatalf("CompletePending 沒有停在申請列上就結束了：%s %v", r.state, r.err)
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("CompletePending 沒有卡在鎖上")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	close(release)
+	if err := <-holdDone; err != nil {
+		t.Fatal(err)
+	}
+	r := <-done
+	if r.err != nil || r.state != Completed {
+		t.Fatalf("對方已完成同一筆申請：state=%s err=%v，預期 Completed 且沒有錯誤", r.state, r.err)
+	}
+	if f.count(t, id) != 1 {
+		t.Fatal("申請列數量不是 1")
+	}
+}
+
+// 並行完成同一筆待辦申請之後，Request 要把這次的 attempt 記在「它要完成的那一筆」上，不是帳號最新的一筆：
+// 帳號另有一筆更晚的已完成申請時，completeRequest 的 0 列路徑若回傳 LatestRequest，attempt 會掛到別的申請上。
+func TestRequestOnDeletedAccountRecordsAttemptOnTheConcurrentlyCompletedRequest(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	id, _ := f.account(t)
+	f.orders.mu.Lock()
+	f.orders.open = true
+	f.orders.mu.Unlock()
+	if state, err := f.module.Request(ctx, adminRequest(id)); err != nil || state != PendingOrders {
+		t.Fatalf("state=%s err=%v", state, err)
+	}
+	var pendingID uuid.UUID
+	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT id FROM accountdeletion.deletion_requests WHERE account_id = $1 AND status = 'PENDING_ORDERS'", id).Scan(&pendingID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE identity.accounts SET deleted_at = now(), deletion_pending_at = NULL, email = NULL, suspended_at = NULL WHERE id = $1", id); err != nil {
+		t.Fatal(err)
+	}
+	// 一筆更晚的已完成申請：LatestRequest 會回它，不是待辦的那一筆。
+	if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO accountdeletion.deletion_requests (id, account_id, status, requested_at, completed_at) VALUES ($1, $2, 'COMPLETED', now() + interval '1 hour', now() + interval '1 hour')", uuid.NewV7(), id); err != nil {
+		t.Fatal(err)
+	}
+
+	held, release, holdDone := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	go func() {
+		holdDone <- f.db.InTx(ctx, func(ctx context.Context) error {
+			if _, err := f.db.Conn(ctx).Exec(ctx, "SELECT 1 FROM accountdeletion.deletion_requests WHERE id = $1 FOR UPDATE", pendingID); err != nil {
+				return err
+			}
+			close(held)
+			<-release
+			_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE accountdeletion.deletion_requests SET status = 'COMPLETED', completed_at = now() WHERE id = $1", pendingID)
+			return err
+		})
+	}()
+	<-held
+	done := make(chan error, 1)
+	go func() { _, err := f.module.Request(ctx, adminRequest(id)); done <- err }()
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		var waiting int64
+		if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'").Scan(&waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting > 0 {
+			break
+		}
+		select {
+		case err := <-done:
+			t.Fatalf("Request 沒有停在申請列上就結束了：%v", err)
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("Request 沒有卡在鎖上")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	close(release)
+	if err := <-holdDone; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("Request：%v", err)
+	}
+	var n int64
+	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM accountdeletion.request_attempts WHERE request_id = $1", pendingID).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	// 第一次 Request 的 attempt 也在這一筆上，所以是 2；掛到最新那一筆的話只有 1。
+	if n != 2 {
+		t.Fatalf("待辦申請上的 attempt = %d，預期 2（第一次與並行完成後的這一次）", n)
+	}
+}

@@ -22,7 +22,7 @@ on:
       - 'backend/Makefile'
       - '.github/workflows/ui-text-generated-diff.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: *ui_text_paths
   workflow_dispatch:
 

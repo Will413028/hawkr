@@ -340,7 +340,7 @@ func (s *Service) CompletePending(ctx context.Context, accountID int64) (model.S
 		}
 		if current.deleted {
 			now := s.d.Now().UTC()
-			_, err = q.CompleteRequest(ctx, store.CompleteRequestParams{ID: pending.ID, CompletedAt: &now})
+			_, err = s.completeRequest(ctx, q, pending, now)
 			state = model.Completed
 			return err
 		}
@@ -395,7 +395,7 @@ func (s *Service) closeParticipants(ctx context.Context, snap snapshot) error {
 func (s *Service) recordCompleted(ctx context.Context, q *store.Queries, accountID int64, now time.Time) (store.AccountdeletionDeletionRequest, error) {
 	pending, err := q.PendingRequest(ctx, accountID)
 	if err == nil {
-		return q.CompleteRequest(ctx, store.CompleteRequestParams{ID: pending.ID, CompletedAt: &now})
+		return s.completeRequest(ctx, q, pending, now)
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return store.AccountdeletionDeletionRequest{}, err
@@ -409,6 +409,17 @@ func (s *Service) recordCompleted(ctx context.Context, q *store.Queries, account
 	}
 	return q.InsertCompletedRequest(ctx, store.InsertCompletedRequestParams{ID: s.d.NewID(), AccountID: accountID, RequestedAt: now})
 }
+
+// completeRequest 把待辦申請標成完成，且冪等：0 列（申請已不是 PENDING_ORDERS）代表並行的另一個 transaction 已完成它，回傳那一筆申請（以 pending.ID 重讀，不是帳號的最新一筆）。
+// 活帳號的路徑被帳號列鎖序列化，不會走到 0 列；已刪除的帳號沒有列可鎖（LockLiveAccount 對已刪除帳號不鎖），並行完成才會。
+func (s *Service) completeRequest(ctx context.Context, q *store.Queries, pending store.AccountdeletionDeletionRequest, now time.Time) (store.AccountdeletionDeletionRequest, error) {
+	row, err := q.CompleteRequest(ctx, store.CompleteRequestParams{ID: pending.ID, CompletedAt: &now})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return q.RequestByID(ctx, pending.ID)
+	}
+	return row, err
+}
+
 func (s *Service) attempt(ctx context.Context, q *store.Queries, requestID uuid.UUID, in model.RequestInput, now time.Time) error {
 	return q.InsertRequestAttempt(ctx, store.InsertRequestAttemptParams{ID: s.d.NewID(), RequestID: requestID, Requester: string(in.Requester), OperatorAdminID: in.OperatorAdminID, Reason: in.Reason, AttemptedAt: now})
 }

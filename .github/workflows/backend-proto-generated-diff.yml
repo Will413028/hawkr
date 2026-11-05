@@ -18,7 +18,7 @@ on:
       - 'backend/scripts/proto/**'
       - '.github/workflows/backend-proto-generated-diff.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: *proto_paths
   workflow_dispatch:
 

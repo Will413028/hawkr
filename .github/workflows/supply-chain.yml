@@ -14,7 +14,7 @@ name: supply chain
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, dev]
   schedule:
     - cron: '17 3 * * 1'
   workflow_dispatch:
@@ -140,3 +140,20 @@ jobs:
           python3 -m pip install --require-hashes --only-binary :all: -r scripts/ci/zizmor-requirements.txt
       - name: zizmor（auditor：不隱藏低信心的發現）
         run: zizmor --no-progress --persona=auditor --min-severity=informational .
+
+  gate:
+    # The only required check on main: it passes when every other job in this workflow succeeded or was skipped.
+    name: gate (supply-chain)
+    if: always()
+    needs: [go-modules, govulncheck, osv-scanner, gitleaks, zizmor]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Every job succeeded or was skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) echo "a needed job ended with: $r"; exit 1 ;; esac
+          done

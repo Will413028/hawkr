@@ -223,3 +223,47 @@ func TestStartRetriesOnceWhenTheSharedContainerVanishes(t *testing.T) {
 		t.Fatalf("兩次都失敗應該回錯誤且只試兩次：calls=%d err=%v", calls, err)
 	}
 }
+
+// NewDB 的連線池掛著鎖順序檢查：同一個 transaction 先鎖 seller 的列、再等 identity 的列要回報，由下往上不回報。
+// 用 schema 名稱就是模組名稱的兩張表模擬，不套任何模組的 migration。
+func TestNewDBReportsATransactionThatLocksALowerModuleAfterAHigherOne(t *testing.T) {
+	t.Parallel()
+	var got []string
+	t.Run("transactions", func(t *testing.T) {
+		d := pg.NewDBReporting(t, func(args ...any) { got = append(got, fmt.Sprint(args...)) })
+		ctx := context.Background()
+		for _, sql := range []string{
+			"CREATE SCHEMA identity",
+			"CREATE SCHEMA seller",
+			"CREATE TABLE identity.accounts (id int PRIMARY KEY, n int NOT NULL DEFAULT 0)",
+			"CREATE TABLE seller.stores (id int PRIMARY KEY, n int NOT NULL DEFAULT 0)",
+			"INSERT INTO identity.accounts (id) VALUES (1)",
+			"INSERT INTO seller.stores (id) VALUES (1)",
+		} {
+			if _, err := d.Conn(ctx).Exec(ctx, sql); err != nil {
+				t.Fatal(err)
+			}
+		}
+		run := func(first, second string) {
+			t.Helper()
+			err := d.InTx(ctx, func(ctx context.Context) error {
+				if _, err := d.Conn(ctx).Exec(ctx, first); err != nil {
+					return err
+				}
+				_, err := d.Conn(ctx).Exec(ctx, second)
+				return err
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		run("SELECT 1 FROM identity.accounts WHERE id = 1 FOR UPDATE", "UPDATE seller.stores SET n = n + 1 WHERE id = 1")
+		run("SELECT 1 FROM seller.stores WHERE id = 1 FOR UPDATE", "UPDATE identity.accounts SET n = n + 1 WHERE id = 1")
+	})
+	if len(got) != 1 {
+		t.Fatalf("reports = %q，預期只有倒序的那一個 transaction", got)
+	}
+	if !strings.Contains(got[0], "先鎖 seller.stores（FOR UPDATE") || !strings.Contains(got[0], "再等 identity.accounts（UPDATE") {
+		t.Fatalf("report = %q", got[0])
+	}
+}

@@ -29,7 +29,7 @@ on:
       - '.github/actions/pnpm-install/**'
       - '.github/workflows/ui-text-guard.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: *guard_paths
   workflow_dispatch:
 

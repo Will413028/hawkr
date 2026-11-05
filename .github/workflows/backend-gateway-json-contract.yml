@@ -16,7 +16,7 @@ on:
       - 'backend/api/openapi/openapi.yaml'
       - '.github/workflows/backend-gateway-json-contract.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: *gw_paths
   workflow_dispatch:
 

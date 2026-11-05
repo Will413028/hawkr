@@ -349,6 +349,8 @@
 
 這和 accountdeletion 現有的順序一致（identity → buyer → seller →自己的列）。D4 對「由上往下、不變量跨模組」寫入的理由（四個實際缺口）不變。
 
+**2026-11-06 修訂（Will）**：(c) 的順序適用每一次鎖列，不限於「可能被兩個以上模組的路徑鎖到的列」，與 `platform/lockorder` 的檢查器實際強制的一致。理由：「只有單一模組鎖得到」無法機械判定（檢查器看不出哪些表只有一個模組會鎖），要分兩類就得維護豁免清單；全部套用則違反可由測試直接抓到，也不需要任何豁免。全域順序只留在 `lockorder.Modules` 一份。依此，accountdeletion 的申請列讀取不再 `FOR UPDATE`（活帳號路徑已由帳號列鎖序列化；已刪除帳號路徑沒有帳號列可鎖，改由 `CompleteRequest` 冪等處理並行完成）。
+
 **曝光規則**：`seller.store_exposures` 存的是最後公告的值，不是現在可不可以曝光，所以不能直接包成 `pub_*`。規則的每個述詞搬進 seller 擁有的 SQL（`seller.pub_exposable_stores(at)`），Go 的 `Classify`、`CapabilitiesOf` 讀同一份。`store_exposures`、`StoreExposureChanged` 與 15 分鐘對帳，只在還有行程外的 legacy 消費者時保留，B4 把 product 搬進單體後一併刪除。
 
 **後果**：A7 計畫少 social 的曝光與封鎖兩份投影；遷移計畫 B4 不建 `store_state`；A7-1c、1d 少兩個同步訂閱者。單體規則 2、3、4、6 已更新（`backend/AGENTS.md`）。

@@ -15,7 +15,7 @@ on:
       - 'backend/scripts/check-surefire-it-includes.py'
       - '.github/workflows/backend-java-tests.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: *java_paths
   workflow_dispatch:
 

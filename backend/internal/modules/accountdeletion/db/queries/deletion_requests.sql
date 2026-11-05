@@ -1,13 +1,18 @@
 -- name: PendingRequest :one
+-- 一般讀取，不鎖列：活帳號的路徑已先鎖 identity 帳號列，同帳號的申請都被它序列化；已刪除帳號的路徑沒有帳號列可鎖，
+-- 並行完成同一筆申請由 CompleteRequest 的 Go 呼叫端以「0 列＝已完成」處理（單體規則 4：不在買家、店家之前鎖自己的申請列）。
 SELECT * FROM accountdeletion.deletion_requests
-WHERE account_id = $1 AND status = 'PENDING_ORDERS'
-FOR UPDATE;
+WHERE account_id = $1 AND status = 'PENDING_ORDERS';
 
 -- name: LatestRequest :one
 SELECT * FROM accountdeletion.deletion_requests
 WHERE account_id = $1
 ORDER BY requested_at DESC, id DESC
 LIMIT 1;
+
+-- name: RequestByID :one
+SELECT * FROM accountdeletion.deletion_requests
+WHERE id = $1;
 
 -- name: PendingBatch :many
 SELECT account_id FROM accountdeletion.deletion_requests

@@ -21,7 +21,7 @@ on:
       - 'backend/services/invoice-service/**'
       - '.github/workflows/backend-integration-tests.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: *integration_paths
   workflow_dispatch:
 
