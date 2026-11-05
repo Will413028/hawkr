@@ -121,14 +121,14 @@ func TestApprovalSnapshotsTheAccountContactEmailVerifiedFirst(t *testing.T) {
 	}
 }
 
-// 沒有已驗證的 email 時用自填的，同樣正規化。
+// 沒有已驗證的 email 時用自填的（identity 只存小寫的自填信箱，accounts_self_entered_email_check）。
 // mutation：核准只讀已驗證的 email → 核准因沒有聯絡信箱被拒，失敗。
 func TestApprovalSnapshotsTheSelfEnteredEmailWhenThereIsNoVerifiedOne(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
 	accountID, s := f.open(t)
-	f.setContactEmails(t, accountID, nil, ptr("Self@example.com"))
+	f.setContactEmails(t, accountID, nil, ptr("self@example.com"))
 	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
 	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
