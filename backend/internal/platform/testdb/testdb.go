@@ -272,8 +272,7 @@ func (s *Server) NewURL(t *testing.T, steps ...Step) string {
 // NewDB 建一個這支測試專用、套用好 steps 的 database 並連上它，測試結束時關閉連線並刪除 database。
 //
 // 連線池掛著 lockorder.Checker：單體程式開的 transaction 第一次鎖某個模組的列時，已經持有排在它後面的模組的鎖
-// （單體規則 4），或送出無法解析的 SQL，測試失敗並列出兩句 SQL 與呼叫處。測試檔自己開的 transaction 與
-// lockorder.Exemptions 裡的組合不檢查。
+// （單體規則 4），或送出無法解析的 SQL，測試失敗並列出兩句 SQL 與呼叫處。測試檔自己開的 transaction 不檢查。
 func (s *Server) NewDB(t *testing.T, steps ...Step) *db.DB {
 	t.Helper()
 	return s.newDB(t, t.Error, steps...)

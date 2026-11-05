@@ -410,12 +410,12 @@ func (s *Service) recordCompleted(ctx context.Context, q *store.Queries, account
 	return q.InsertCompletedRequest(ctx, store.InsertCompletedRequestParams{ID: s.d.NewID(), AccountID: accountID, RequestedAt: now})
 }
 
-// completeRequest 把待辦申請標成完成，且冪等：0 列（申請已不是 PENDING_ORDERS）代表並行的另一個 transaction 已完成它，回傳最新的申請。
+// completeRequest 把待辦申請標成完成，且冪等：0 列（申請已不是 PENDING_ORDERS）代表並行的另一個 transaction 已完成它，回傳那一筆申請（以 pending.ID 重讀，不是帳號的最新一筆）。
 // 活帳號的路徑被帳號列鎖序列化，不會走到 0 列；已刪除的帳號沒有列可鎖（LockLiveAccount 對已刪除帳號不鎖），並行完成才會。
 func (s *Service) completeRequest(ctx context.Context, q *store.Queries, pending store.AccountdeletionDeletionRequest, now time.Time) (store.AccountdeletionDeletionRequest, error) {
 	row, err := q.CompleteRequest(ctx, store.CompleteRequestParams{ID: pending.ID, CompletedAt: &now})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return q.LatestRequest(ctx, pending.AccountID)
+		return q.RequestByID(ctx, pending.ID)
 	}
 	return row, err
 }

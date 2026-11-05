@@ -35,6 +35,9 @@ func qualified(l Lock) string { return l.Schema + "." + l.Table }
 //
 // transaction 的邊界看 pgx 送出的 begin、commit、rollback（db.InTx 與 InReadSnapshot 都經 pgx 的 BeginTx）；
 // 不在 transaction 裡的單句 SQL 沒有順序可言，不檢查。
+//
+// COPY FROM 不追蹤（沒有實作 pgx.CopyFromTracer）：它只新增列，表上是 RowExclusiveLock，不鎖既有的列，也沒有
+// ON CONFLICT，依本套件的規則和單純的 INSERT 一樣不算列鎖。
 type Checker struct {
 	mu         sync.Mutex
 	txs        map[any]*txState
@@ -93,16 +96,6 @@ func (c *Checker) TraceBatchQuery(context.Context, *pgx.Conn, pgx.TraceBatchQuer
 // TraceBatchEnd 實作 pgx.BatchTracer。
 func (c *Checker) TraceBatchEnd(context.Context, *pgx.Conn, pgx.TraceBatchEndData) {}
 
-// TraceCopyFromStart 實作 pgx.CopyFromTracer。COPY FROM 只新增列、沒有 ON CONFLICT，鎖的情形等同單純的
-// INSERT（見 CopyFromLocks），所以沒有要記的加鎖；實作出來是為了讓「COPY 不算」是明確的決定，而不是漏掉。
-func (c *Checker) TraceCopyFromStart(ctx context.Context, _ *pgx.Conn, data pgx.TraceCopyFromStartData) context.Context {
-	_ = CopyFromLocks(data.TableName)
-	return ctx
-}
-
-// TraceCopyFromEnd 實作 pgx.CopyFromTracer。
-func (c *Checker) TraceCopyFromEnd(context.Context, *pgx.Conn, pgx.TraceCopyFromEndData) {}
-
 // Violations 回傳到目前為止的倒退，同一組（先鎖的語句與呼叫處、後鎖的語句與呼叫處）只記一次。
 func (c *Checker) Violations() []Violation {
 	c.mu.Lock()
@@ -159,7 +152,11 @@ func (c *Checker) observe(key any, sql string) {
 		if st.held && rank < st.topRank && l.Waits && !st.locked[rank] {
 			c.record(Violation{Held: st.top, Then: acq})
 		}
-		st.locked[rank] = true
+		// 只有會等的鎖算「這個模組已經鎖過」：SKIP LOCKED、NOWAIT 可能一列都沒鎖到，也不是等待的那一邊，
+		// 不能讓同一個模組之後真正會等的鎖逃過檢查。
+		if l.Waits {
+			st.locked[rank] = true
+		}
 		if !st.held || rank > st.topRank {
 			st.top, st.topRank, st.held = acq, rank, true
 		}

@@ -1,12 +1,10 @@
 package lockorder
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 
-	"github.com/jackc/pgx/v5"
-	pg_query "github.com/pganalyze/pg_query_go/v6"
+	"github.com/Will413028/hawkr/backend/internal/platform/pgtree"
 )
 
 // Lock 是一句 SQL 對一個表的列鎖。
@@ -35,42 +33,32 @@ func Classify(sql string) ([]Lock, error) {
 	if v, ok := classified.Load(sql); ok {
 		return v.([]Lock), nil
 	}
-	js, err := pg_query.ParseToJSON(sql)
+	tree, err := pgtree.Parse(sql)
 	if err != nil {
-		return nil, fmt.Errorf("lockorder：無法解析 SQL：%w", err)
-	}
-	var tree any
-	if err := json.Unmarshal([]byte(js), &tree); err != nil {
-		return nil, fmt.Errorf("lockorder：解析樹：%w", err)
+		return nil, fmt.Errorf("lockorder：%w", err)
 	}
 	var locks []Lock
-	walk(tree, &locks)
+	pgtree.Walk(tree, func(v map[string]any) { nodeLocks(v, &locks) })
 	classified.Store(sql, locks)
 	return locks, nil
 }
 
-func walk(n any, out *[]Lock) {
-	switch v := n.(type) {
-	case map[string]any:
-		if s, ok := v["SelectStmt"].(map[string]any); ok {
-			selectLocks(s, out)
+// dmlKinds 是目標表整個被鎖的語句；用 slice 讓同一個節點的處理順序固定。
+var dmlKinds = []struct{ node, kind string }{{"DeleteStmt", "DELETE"}, {"MergeStmt", "MERGE"}, {"UpdateStmt", "UPDATE"}}
+
+// nodeLocks 處理解析樹的一個節點；pgtree.Walk 以固定順序走過每個節點，所以同一句 SQL 的鎖順序每次相同。
+func nodeLocks(v map[string]any, out *[]Lock) {
+	if s, ok := v["SelectStmt"].(map[string]any); ok {
+		selectLocks(s, out)
+	}
+	for _, d := range dmlKinds {
+		if s, ok := v[d.node].(map[string]any); ok {
+			addRelation(s["relation"], d.kind, true, out)
 		}
-		for key, kind := range map[string]string{"UpdateStmt": "UPDATE", "DeleteStmt": "DELETE", "MergeStmt": "MERGE"} {
-			if s, ok := v[key].(map[string]any); ok {
-				addRelation(s["relation"], kind, true, out)
-			}
-		}
-		if s, ok := v["InsertStmt"].(map[string]any); ok {
-			if oc, ok := s["onConflictClause"].(map[string]any); ok && oc["action"] == "ONCONFLICT_UPDATE" {
-				addRelation(s["relation"], "INSERT ON CONFLICT DO UPDATE", true, out)
-			}
-		}
-		for _, c := range v {
-			walk(c, out)
-		}
-	case []any:
-		for _, c := range v {
-			walk(c, out)
+	}
+	if s, ok := v["InsertStmt"].(map[string]any); ok {
+		if oc, ok := s["onConflictClause"].(map[string]any); ok && oc["action"] == "ONCONFLICT_UPDATE" {
+			addRelation(s["relation"], "INSERT ON CONFLICT DO UPDATE", true, out)
 		}
 	}
 }
@@ -82,11 +70,12 @@ var strengths = map[string]string{
 	"LCS_FORKEYSHARE":    "FOR KEY SHARE",
 }
 
-// selectLocks 處理一層 SELECT 的鎖定子句：有 OF 就只鎖列出的表，沒有就鎖 FROM 裡的每個表（含 join 與子查詢）。
-// OF 後面寫的是 FROM 裡的別名或不帶 schema 的表名，所以對回 FROM 的表才知道 schema。
+// selectLocks 處理一層 SELECT 的鎖定子句：有 OF 就只鎖列出的表，沒有就鎖 FROM 裡的每個基底表。
+// 基底表是 FROM 清單直接寫的表與 JOIN 兩邊（遞迴）的表；JOIN ON 的條件、LATERAL、函式參數與子查詢裡出現的表
+// 不算（不當成被這個子句鎖住）。OF 後面寫的是 FROM 裡的別名或不帶 schema 的表名，所以對回基底表才知道 schema。
 func selectLocks(s map[string]any, out *[]Lock) {
 	clauses, _ := s["lockingClause"].([]any)
-	from := rangeVars(s["fromClause"])
+	from := baseRelations(s["fromClause"])
 	for _, c := range clauses {
 		lc, _ := c.(map[string]any)["LockingClause"].(map[string]any)
 		if lc == nil {
@@ -129,27 +118,25 @@ func refName(rv any) string {
 	return name
 }
 
-// rangeVars 收集 n 底下所有帶 relname 的節點（FROM 裡的表、join 的兩邊、子查詢裡的表）。
-func rangeVars(n any) []any {
-	var out []any
-	var visit func(any)
-	visit = func(x any) {
-		switch v := x.(type) {
-		case map[string]any:
-			if _, ok := v["relname"].(string); ok {
-				out = append(out, v)
-			}
-			for _, c := range v {
-				visit(c)
-			}
-		case []any:
-			for _, c := range v {
-				visit(c)
-			}
+// baseRelations 收集 FROM 的基底表：RangeVar 本身，以及 JoinExpr 左右兩邊（遞迴）的 RangeVar。
+// 不進 JOIN 的 quals、RangeSubselect、RangeFunction 等其他節點。
+func baseRelations(n any) []any {
+	switch v := n.(type) {
+	case []any:
+		var out []any
+		for _, c := range v {
+			out = append(out, baseRelations(c)...)
+		}
+		return out
+	case map[string]any:
+		if rv, ok := v["RangeVar"].(map[string]any); ok {
+			return []any{rv}
+		}
+		if j, ok := v["JoinExpr"].(map[string]any); ok {
+			return append(baseRelations(j["larg"]), baseRelations(j["rarg"])...)
 		}
 	}
-	visit(n)
-	return out
+	return nil
 }
 
 func addRelation(rel any, kind string, waits bool, out *[]Lock) {
@@ -164,6 +151,3 @@ func addRelation(rel any, kind string, waits bool, out *[]Lock) {
 	}
 	*out = append(*out, Lock{Schema: schema, Table: table, Kind: kind, Waits: waits})
 }
-
-// CopyFromLocks 回傳 COPY FROM table 會加的列鎖：永遠沒有（理由見上面的分類說明）。
-func CopyFromLocks(table pgx.Identifier) []Lock { return nil }

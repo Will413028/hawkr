@@ -28,7 +28,8 @@ package lockorder
 // 每個模組都排在它依賴的模組之後（internal/arch 的 TestLockOrderIsBottomUpOverTheDependencyTable 檢查），
 // 所以上層呼叫下層的 API 時，要在鎖自己的列之前呼叫；下層通知上層（同 transaction 的事件）天然符合。
 // 同一層的模組之間的先後是這張表決定的：identity → buyer → seller；編排者
-// （accountsuspension、accountdeletion）自己的列排在它們會碰到的模組之後。
+// （accountsuspension、accountdeletion）自己的列排在它們會碰到的模組之後；最後是 notification：它只訂閱別人的
+// 事件、寫通知列，不被任何模組依賴，通知列是同一個 transaction 裡最後才寫的副作用，所以排在編排者之後。
 //
 // 不在表裡的 schema（river、pg_catalog 等）不檢查。新模組加進 internal/arch 的依賴表時，同一次變更加進這裡。
 var Modules = []string{

@@ -210,10 +210,7 @@ func sorted(ls []Lock) []Lock {
 	return out
 }
 
-var (
-	_ pgx.BatchTracer    = (*Checker)(nil)
-	_ pgx.CopyFromTracer = (*Checker)(nil)
-)
+var _ pgx.BatchTracer = (*Checker)(nil)
 
 func TestCheckerClassifiesEveryStatementOfABatch(t *testing.T) {
 	t.Parallel()
@@ -267,24 +264,73 @@ func TestCheckerBatchReportsUnparsableSQL(t *testing.T) {
 	}
 }
 
-// COPY FROM 只新增列、沒有 ON CONFLICT，鎖的情形和單純的 INSERT 一樣：不鎖既有的列，所以不算加鎖，
-// 也不會讓先前鎖過的順序倒退。
-func TestCheckerCopyFromCountsAsAPlainInsert(t *testing.T) {
+// COPY FROM 只新增列、沒有 ON CONFLICT，不鎖既有的列，所以 Checker 不追蹤它（沒有實作 pgx.CopyFromTracer）。
+func TestCheckerDoesNotTraceCopyFrom(t *testing.T) {
+	t.Parallel()
+	var tracer any = NewChecker()
+	if _, ok := tracer.(pgx.CopyFromTracer); ok {
+		t.Fatal("Checker 不該實作 pgx.CopyFromTracer：COPY 只新增列，不是列鎖")
+	}
+}
+
+func TestCheckerSkipLockedOnALowerModuleDoesNotHideALaterWaitingLock(t *testing.T) {
 	t.Parallel()
 	c := NewChecker()
-	conn := new(pgx.Conn)
-	ctx := context.Background()
-	c.TraceQueryStart(ctx, conn, pgx.TraceQueryStartData{SQL: "begin"})
-	c.TraceQueryStart(ctx, conn, pgx.TraceQueryStartData{SQL: "SELECT 1 FROM seller.stores FOR UPDATE"})
-	ctx = c.TraceCopyFromStart(ctx, conn, pgx.TraceCopyFromStartData{TableName: pgx.Identifier{"identity", "accounts"}, ColumnNames: []string{"account_id"}})
-	c.TraceCopyFromEnd(ctx, conn, pgx.TraceCopyFromEndData{})
-	if vs := c.Violations(); len(vs) != 0 {
-		t.Fatalf("violations = %v", vs)
+	conn := new(int)
+	c.observe(conn, "begin")
+	c.observe(conn, "UPDATE social.posts SET x = 1")
+	c.observe(conn, "SELECT 1 FROM identity.accounts FOR UPDATE SKIP LOCKED")
+	c.observe(conn, "SELECT 1 FROM identity.accounts FOR UPDATE")
+	c.observe(conn, "commit")
+	if vs := c.Violations(); len(vs) != 1 {
+		t.Fatalf("violations = %+v，預期等待的那一句報一筆", vs)
 	}
-	if len(c.Errors()) != 0 {
-		t.Fatalf("errors = %v", c.Errors())
+}
+
+func TestClassifyOrderIsDeterministicAcrossSiblingClauses(t *testing.T) {
+	t.Parallel()
+	const base = "WITH d AS (DELETE FROM buyer.buyers WHERE id = $1 RETURNING id) " +
+		"SELECT 1 FROM (SELECT 1 FROM identity.accounts FOR UPDATE) a WHERE EXISTS (SELECT 1 FROM seller.stores FOR UPDATE)"
+	want := []Lock{{"identity", "accounts", "FOR UPDATE", true}, {"seller", "stores", "FOR UPDATE", true}, {"buyer", "buyers", "DELETE", true}}
+	for i := range 200 {
+		got, err := Classify(base + strings.Repeat(" ", i+1)) // 不同的文字，避開快取
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(got, want) {
+			t.Fatalf("第 %d 次 Classify = %+v，預期固定順序 %+v", i, got, want)
+		}
 	}
-	if locks := CopyFromLocks(pgx.Identifier{"identity", "accounts"}); len(locks) != 0 {
-		t.Fatalf("CopyFromLocks = %v", locks)
+}
+
+func TestClassifyLocksOnlyTheBaseRelationsOfFrom(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		sql  string
+		want []Lock
+	}{
+		{"sublink in join on", "SELECT 1 FROM seller.stores s JOIN seller.measures m ON m.id IN (SELECT id FROM buyer.buyers) FOR UPDATE",
+			[]Lock{{"seller", "stores", "FOR UPDATE", true}, {"seller", "measures", "FOR UPDATE", true}}},
+		{"function argument sublink", "SELECT 1 FROM seller.stores s, generate_series(1, (SELECT count(*) FROM buyer.buyers)) g FOR UPDATE",
+			[]Lock{{"seller", "stores", "FOR UPDATE", true}}},
+		{"lateral subselect is not a base relation", "SELECT 1 FROM seller.stores s, LATERAL (SELECT 1 FROM buyer.buyers b WHERE b.id = s.id) x FOR UPDATE",
+			[]Lock{{"seller", "stores", "FOR UPDATE", true}}},
+		{"nested join", "SELECT 1 FROM seller.stores s JOIN (seller.measures m JOIN seller.reports r ON r.id = m.id) ON m.id = s.id FOR SHARE",
+			[]Lock{{"seller", "stores", "FOR SHARE", true}, {"seller", "measures", "FOR SHARE", true}, {"seller", "reports", "FOR SHARE", true}}},
+		{"of does not match a name inside a subselect", "SELECT 1 FROM seller.stores JOIN LATERAL (SELECT 1 FROM buyer.stores) x ON true FOR UPDATE OF stores",
+			[]Lock{{"seller", "stores", "FOR UPDATE", true}}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := Classify(c.sql)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(sorted(got), sorted(c.want)) {
+				t.Fatalf("Classify = %+v，預期 %+v", got, c.want)
+			}
+		})
 	}
 }

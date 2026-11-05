@@ -189,6 +189,24 @@ func (q *Queries) PendingRequest(ctx context.Context, accountID int64) (Accountd
 	return i, err
 }
 
+const requestByID = `-- name: RequestByID :one
+SELECT id, account_id, status, requested_at, completed_at FROM accountdeletion.deletion_requests
+WHERE id = $1
+`
+
+func (q *Queries) RequestByID(ctx context.Context, id uuid.UUID) (AccountdeletionDeletionRequest, error) {
+	row := q.db.QueryRow(ctx, requestByID, id)
+	var i AccountdeletionDeletionRequest
+	err := row.Scan(
+		&i.ID,
+		&i.AccountID,
+		&i.Status,
+		&i.RequestedAt,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
 const upsertPendingRequest = `-- name: UpsertPendingRequest :one
 INSERT INTO accountdeletion.deletion_requests
     (id, account_id, status, requested_at)

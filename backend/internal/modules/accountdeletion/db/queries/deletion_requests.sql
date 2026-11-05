@@ -10,6 +10,10 @@ WHERE account_id = $1
 ORDER BY requested_at DESC, id DESC
 LIMIT 1;
 
+-- name: RequestByID :one
+SELECT * FROM accountdeletion.deletion_requests
+WHERE id = $1;
+
 -- name: PendingBatch :many
 SELECT account_id FROM accountdeletion.deletion_requests
 WHERE status = 'PENDING_ORDERS' AND account_id > $1
