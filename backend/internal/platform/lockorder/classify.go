@@ -70,12 +70,14 @@ var strengths = map[string]string{
 	"LCS_FORKEYSHARE":    "FOR KEY SHARE",
 }
 
-// selectLocks 處理一層 SELECT 的鎖定子句：有 OF 就只鎖列出的表，沒有就鎖 FROM 裡的每個基底表。
-// 基底表是 FROM 清單直接寫的表與 JOIN 兩邊（遞迴）的表；JOIN ON 的條件、LATERAL、函式參數與子查詢裡出現的表
-// 不算（不當成被這個子句鎖住）。OF 後面寫的是 FROM 裡的別名或不帶 schema 的表名，所以對回基底表才知道 schema。
+// selectLocks 處理一層 SELECT 的鎖定子句：有 OF 就只鎖列出的 FROM 項目，沒有就鎖 FROM 裡的每個項目。
+// 依 PostgreSQL 文件（SELECT, The Locking Clause）：鎖定子句套在 view 或子查詢上時，會影響其中用到的所有表。
+// 所以 FROM 項目是基底表（RangeVar）、JOIN 兩邊（遞迴）、或 FROM 清單裡的子查詢（RangeSubselect，含 LATERAL；
+// 子查詢內的表依它自己的 FROM 規則遞迴收集）。只出現在 WHERE 或 JOIN ON 的條件、運算式裡的子查詢（sublink）、
+// 目標列與函式參數裡的表不算。OF 後面寫的是 FROM 裡的別名或不帶 schema 的表名；指名子查詢別名就鎖它的全部表。
 func selectLocks(s map[string]any, out *[]Lock) {
 	clauses, _ := s["lockingClause"].([]any)
-	from := baseRelations(s["fromClause"])
+	from := fromItems(s["fromClause"])
 	for _, c := range clauses {
 		lc, _ := c.(map[string]any)["LockingClause"].(map[string]any)
 		if lc == nil {
@@ -90,53 +92,86 @@ func selectLocks(s map[string]any, out *[]Lock) {
 		waits := policy != "LockWaitSkip" && policy != "LockWaitError"
 		rels, _ := lc["lockedRels"].([]any)
 		if len(rels) == 0 {
-			for _, rv := range from {
-				addRelation(rv, kind, waits, out)
+			for _, it := range from {
+				for _, rv := range it.tables {
+					addRelation(rv, kind, waits, out)
+				}
 			}
 			continue
 		}
 		for _, r := range rels {
 			name, _ := r.(map[string]any)["RangeVar"].(map[string]any)["relname"].(string)
-			for _, rv := range from {
-				if refName(rv) == name {
-					addRelation(rv, kind, waits, out)
+			for _, it := range from {
+				if it.name == name {
+					for _, rv := range it.tables {
+						addRelation(rv, kind, waits, out)
+					}
 				}
 			}
 		}
 	}
 }
 
-// refName 是 FROM 裡的表在同一句 SQL 裡被引用的名字：有別名用別名，沒有就是表名。
-func refName(rv any) string {
-	r, _ := rv.(map[string]any)
-	if alias, ok := r["alias"].(map[string]any); ok {
-		if name, _ := alias["aliasname"].(string); name != "" {
-			return name
-		}
-	}
-	name, _ := r["relname"].(string)
-	return name
+// fromItem 是 FROM 清單裡一個可被 OF 指名的項目：name 是它在同一句 SQL 裡被引用的名字，tables 是它鎖住的表。
+type fromItem struct {
+	name   string
+	tables []any
 }
 
-// baseRelations 收集 FROM 的基底表：RangeVar 本身，以及 JoinExpr 左右兩邊（遞迴）的 RangeVar。
-// 不進 JOIN 的 quals、RangeSubselect、RangeFunction 等其他節點。
-func baseRelations(n any) []any {
+// aliasOf 回傳節點的別名；沒有別名回傳空字串。
+func aliasOf(r map[string]any) string {
+	if alias, ok := r["alias"].(map[string]any); ok {
+		name, _ := alias["aliasname"].(string)
+		return name
+	}
+	return ""
+}
+
+// fromItems 收集 FROM 的項目：RangeVar（名字是別名，沒有就是表名）、JoinExpr 左右兩邊（遞迴）、
+// RangeSubselect（名字是別名，表是子查詢自己的 FROM 項目的全部表）。不進 JOIN 的 quals、RangeFunction 等其他節點。
+func fromItems(n any) []fromItem {
 	switch v := n.(type) {
 	case []any:
-		var out []any
+		var out []fromItem
 		for _, c := range v {
-			out = append(out, baseRelations(c)...)
+			out = append(out, fromItems(c)...)
 		}
 		return out
 	case map[string]any:
 		if rv, ok := v["RangeVar"].(map[string]any); ok {
-			return []any{rv}
+			name := aliasOf(rv)
+			if name == "" {
+				name, _ = rv["relname"].(string)
+			}
+			return []fromItem{{name: name, tables: []any{rv}}}
 		}
 		if j, ok := v["JoinExpr"].(map[string]any); ok {
-			return append(baseRelations(j["larg"]), baseRelations(j["rarg"])...)
+			return append(fromItems(j["larg"]), fromItems(j["rarg"])...)
+		}
+		if rs, ok := v["RangeSubselect"].(map[string]any); ok {
+			sub, _ := rs["subquery"].(map[string]any)
+			return []fromItem{{name: aliasOf(rs), tables: subqueryTables(sub)}}
 		}
 	}
 	return nil
+}
+
+// subqueryTables 收集子查詢被鎖住的表：它自己的 FROM 項目（遞迴），UNION 等集合運算則兩邊都收。
+func subqueryTables(n map[string]any) []any {
+	sel, _ := n["SelectStmt"].(map[string]any)
+	if sel == nil {
+		return nil
+	}
+	var out []any
+	for _, it := range fromItems(sel["fromClause"]) {
+		out = append(out, it.tables...)
+	}
+	for _, side := range []string{"larg", "rarg"} {
+		if l, ok := sel[side].(map[string]any); ok {
+			out = append(out, subqueryTables(l)...)
+		}
+	}
+	return out
 }
 
 func addRelation(rel any, kind string, waits bool, out *[]Lock) {
