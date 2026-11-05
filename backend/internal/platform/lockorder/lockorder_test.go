@@ -1,9 +1,12 @@
 package lockorder
 
 import (
+	"context"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func TestClassifyFindsRowLocksOnExistingRows(t *testing.T) {
@@ -206,4 +209,83 @@ func sorted(ls []Lock) []Lock {
 		return strings.Compare(a.Schema+"."+a.Table+" "+a.Kind, b.Schema+"."+b.Table+" "+b.Kind)
 	})
 	return out
+}
+
+var (
+	_ pgx.BatchTracer    = (*Checker)(nil)
+	_ pgx.CopyFromTracer = (*Checker)(nil)
+)
+
+func TestCheckerClassifiesEveryStatementOfABatch(t *testing.T) {
+	t.Parallel()
+	c := NewChecker()
+	conn := new(pgx.Conn)
+	ctx := context.Background()
+	c.TraceQueryStart(ctx, conn, pgx.TraceQueryStartData{SQL: "begin"})
+
+	b := &pgx.Batch{}
+	b.Queue("-- name: LockStore :one\nSELECT 1 FROM seller.stores WHERE store_id = $1 FOR UPDATE", 1)
+	b.Queue("-- name: SuspendAccount :exec\nUPDATE identity.accounts SET suspended_at = $2 WHERE account_id = $1", 1, 2)
+	c.TraceBatchStart(ctx, conn, pgx.TraceBatchStartData{Batch: b})
+	for _, q := range b.QueuedQueries {
+		c.TraceBatchQuery(ctx, conn, pgx.TraceBatchQueryData{SQL: q.SQL})
+	}
+	c.TraceBatchEnd(ctx, conn, pgx.TraceBatchEndData{})
+	c.TraceQueryStart(ctx, conn, pgx.TraceQueryStartData{SQL: "commit"})
+
+	vs := c.Violations()
+	if len(vs) != 1 {
+		t.Fatalf("violations = %v，預期一筆（batch 裡的語句要和單句一樣分類，而且每句只算一次）", vs)
+	}
+	if vs[0].Held.Statement != "LockStore" || vs[0].Then.Statement != "SuspendAccount" {
+		t.Fatalf("violation = %v", vs[0])
+	}
+}
+
+func TestCheckerBatchOutsideATransactionIsNotChecked(t *testing.T) {
+	t.Parallel()
+	c := NewChecker()
+	b := &pgx.Batch{}
+	b.Queue("SELECT 1 FROM seller.stores FOR UPDATE")
+	b.Queue("SELECT 1 FROM identity.accounts FOR UPDATE")
+	c.TraceBatchStart(context.Background(), new(pgx.Conn), pgx.TraceBatchStartData{Batch: b})
+	if vs := c.Violations(); len(vs) != 0 {
+		t.Fatalf("violations = %v", vs)
+	}
+}
+
+func TestCheckerBatchReportsUnparsableSQL(t *testing.T) {
+	t.Parallel()
+	c := NewChecker()
+	conn := new(pgx.Conn)
+	ctx := context.Background()
+	c.TraceQueryStart(ctx, conn, pgx.TraceQueryStartData{SQL: "begin"})
+	b := &pgx.Batch{}
+	b.Queue("SELEKT nonsense")
+	c.TraceBatchStart(ctx, conn, pgx.TraceBatchStartData{Batch: b})
+	if len(c.Errors()) != 1 {
+		t.Fatalf("errors = %v，預期一筆", c.Errors())
+	}
+}
+
+// COPY FROM 只新增列、沒有 ON CONFLICT，鎖的情形和單純的 INSERT 一樣：不鎖既有的列，所以不算加鎖，
+// 也不會讓先前鎖過的順序倒退。
+func TestCheckerCopyFromCountsAsAPlainInsert(t *testing.T) {
+	t.Parallel()
+	c := NewChecker()
+	conn := new(pgx.Conn)
+	ctx := context.Background()
+	c.TraceQueryStart(ctx, conn, pgx.TraceQueryStartData{SQL: "begin"})
+	c.TraceQueryStart(ctx, conn, pgx.TraceQueryStartData{SQL: "SELECT 1 FROM seller.stores FOR UPDATE"})
+	ctx = c.TraceCopyFromStart(ctx, conn, pgx.TraceCopyFromStartData{TableName: pgx.Identifier{"identity", "accounts"}, ColumnNames: []string{"account_id"}})
+	c.TraceCopyFromEnd(ctx, conn, pgx.TraceCopyFromEndData{})
+	if vs := c.Violations(); len(vs) != 0 {
+		t.Fatalf("violations = %v", vs)
+	}
+	if len(c.Errors()) != 0 {
+		t.Fatalf("errors = %v", c.Errors())
+	}
+	if locks := CopyFromLocks(pgx.Identifier{"identity", "accounts"}); len(locks) != 0 {
+		t.Fatalf("CopyFromLocks = %v", locks)
+	}
 }

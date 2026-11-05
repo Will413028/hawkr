@@ -75,6 +75,34 @@ func (c *Checker) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.
 // TraceQueryEnd 實作 pgx.QueryTracer；鎖在語句開始時就算數（等待發生在執行中），結束時不用做事。
 func (c *Checker) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
 
+// TraceBatchStart 實作 pgx.BatchTracer：SendBatch 不經 TraceQueryStart，這裡把 batch 裡排好的每一句 SQL 依序
+// 當成單句處理（batch 在同一條連線上按順序執行，鎖在語句執行時加）。
+func (c *Checker) TraceBatchStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceBatchStartData) context.Context {
+	if data.Batch == nil {
+		return ctx
+	}
+	for _, q := range data.Batch.QueuedQueries {
+		c.observe(conn, q.SQL)
+	}
+	return ctx
+}
+
+// TraceBatchQuery 實作 pgx.BatchTracer；語句已在 TraceBatchStart 處理過，這裡不重複算。
+func (c *Checker) TraceBatchQuery(context.Context, *pgx.Conn, pgx.TraceBatchQueryData) {}
+
+// TraceBatchEnd 實作 pgx.BatchTracer。
+func (c *Checker) TraceBatchEnd(context.Context, *pgx.Conn, pgx.TraceBatchEndData) {}
+
+// TraceCopyFromStart 實作 pgx.CopyFromTracer。COPY FROM 只新增列、沒有 ON CONFLICT，鎖的情形等同單純的
+// INSERT（見 CopyFromLocks），所以沒有要記的加鎖；實作出來是為了讓「COPY 不算」是明確的決定，而不是漏掉。
+func (c *Checker) TraceCopyFromStart(ctx context.Context, _ *pgx.Conn, data pgx.TraceCopyFromStartData) context.Context {
+	_ = CopyFromLocks(data.TableName)
+	return ctx
+}
+
+// TraceCopyFromEnd 實作 pgx.CopyFromTracer。
+func (c *Checker) TraceCopyFromEnd(context.Context, *pgx.Conn, pgx.TraceCopyFromEndData) {}
+
 // Violations 回傳到目前為止的倒退，同一組（先鎖的語句與呼叫處、後鎖的語句與呼叫處）只記一次。
 func (c *Checker) Violations() []Violation {
 	c.mu.Lock()

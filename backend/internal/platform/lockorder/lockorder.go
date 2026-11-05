@@ -6,6 +6,20 @@
 //
 // 檢查的單位是模組（schema），不是表：模組內的順序（seller §18、social §6）不在這裡。一句 SQL 只碰自己模組的
 // schema（規則 2），所以它鎖到的列屬於哪個模組，看它的表寫在哪個 schema 就知道。
+//
+// # 不在檢查範圍
+//
+// 這是測試期的啟發式檢查，不是死鎖的證明。下面這些不看，通過不代表沒有這類順序問題：
+//   - 外鍵檢查隱含的鎖（被參照列上的 FOR KEY SHARE）：不出現在 SQL 文字裡；規則 3 不建跨 schema FK，
+//     所以只可能在同一模組內。
+//   - trigger 與函式（含 PL/pgSQL）內部的 SQL：tracer 只看到呼叫它們的那一句。
+//   - advisory lock：沒有表，看不出屬於哪個模組。
+//   - 單純 INSERT（含 COPY FROM）撞到另一個未 commit 的 INSERT 的唯一鍵而等待：不鎖既有列，不分類。
+//   - 同一模組裡不同根的列（例如兩個帳號）：判定單位是模組，模組內的順序靠各模組自己的規定與個案死鎖測試。
+//   - 測試檔（_test.go）自己開的 transaction：以開 transaction 的呼叫處是否在 _test.go 判斷，整個 transaction
+//     跳過。這個判斷是看呼叫堆疊的啟發式，helper 或 closure 讓呼叫處落在非測試檔時會被當成單體程式檢查，反之亦然。
+//
+// 有涵蓋的送出路徑：Query、Exec、QueryRow、SendBatch（batch 內每句）；CopyFrom 視同單純 INSERT，不加鎖。
 package lockorder
 
 import "slices"

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/jackc/pgx/v5"
 	pg_query "github.com/pganalyze/pg_query_go/v6"
 )
 
@@ -23,6 +24,9 @@ type Lock struct {
 // 單純的 INSERT（含 ON CONFLICT DO NOTHING）只會在唯一鍵和另一個還沒 commit 的 INSERT 撞到時等待，這裡不算；
 // 外鍵檢查加的 FOR KEY SHARE 只在同一個 schema 內（規則 3 不建跨 schema FK），不影響跨模組的順序。
 // advisory lock 沒有表，看不出屬於哪個模組，也不算。
+
+// COPY FROM 同理：只新增列（表上是 RowExclusiveLock，不鎖既有的列），沒有 ON CONFLICT，和單純的 INSERT 一樣不算。
+// 若把它算成列寫入，COPY 進上層模組的表會被誤報成「持有高位鎖」，但它不會讓任何 transaction 等待既有列的鎖。
 
 var classified sync.Map // SQL 文字 → []Lock；測試裡同一句 sqlc query 會跑很多次
 
@@ -160,3 +164,6 @@ func addRelation(rel any, kind string, waits bool, out *[]Lock) {
 	}
 	*out = append(*out, Lock{Schema: schema, Table: table, Kind: kind, Waits: waits})
 }
+
+// CopyFromLocks 回傳 COPY FROM table 會加的列鎖：永遠沒有（理由見上面的分類說明）。
+func CopyFromLocks(table pgx.Identifier) []Lock { return nil }
