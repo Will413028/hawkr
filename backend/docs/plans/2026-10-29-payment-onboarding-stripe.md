@@ -207,12 +207,17 @@
     - `pnpm test`、lint、`tsc`。
     - mutation：沒有 `create_failed_time` 時仍顯示重試按鈕、not_found 當成錯誤，各自讓測試失敗。
 
-- [ ] **7d′. 收款帳戶搬到 payment 模組，webhook inbox 移到 platform（D28、D29）**（被擋於：D28、D29 已決；7d）
-  - 範圍：附件 `payment-ownership-brief.md` 第 2 節「要改的地方」全部：新模組與 migration、`seller/internal/payment` 與 `seller/payment.go`、`model/payment.go`、`queries/payment.sql`、`httpapi/seller/payment*.go` 搬到 payment；`PayoutAccountChanged` 事件與 seller 的同 transaction 訂閱者；`PAYMENT_ACCOUNT_CREATE_FAILED` 由 payment 發布、`reviewqueue` 依賴加 payment；platform 的 inbox（schema、寫入、派送、補掃、清理）並把 Stripe 入口改用它；`internal/arch/modules.go`、`cmd/hawkr/modules.go`、`backend/AGENTS.md` 規則 4 的順序、兩份 ADR 的修訂段、`docs/modules/payment.md`、`dev_seed.go`。對外 RPC 契約有 seller 與 admin 的收款帳戶 RPC 時，依「契約先於實作」決定是否移到 payment 的 service，同一次改完消費端。
+- [ ] **7d′. 收款帳戶搬到 payment 模組，webhook inbox 移到 platform（D28、D29）**（被擋於：D28、D29、D30 已決；7d）
+  - 範圍：附件 `payment-ownership-brief.md` 第 2 節「要改的地方」全部：新模組與 migration、`seller/internal/payment` 與 `seller/payment.go`、`model/payment.go`、`queries/payment.sql`、`httpapi/seller/payment*.go` 搬到 payment；`PayoutAccountChanged` 事件與 seller 的同 transaction 訂閱者；`PAYMENT_ACCOUNT_CREATE_FAILED` 由 payment 發布、`reviewqueue` 依賴加 payment；platform 的 inbox（schema、寫入、派送、補掃、清理）並把 Stripe 入口改用它；`internal/arch/modules.go`、`cmd/hawkr/modules.go`、兩份 ADR 的修訂段、`docs/modules/payment.md`、`dev_seed.go`。全域鎖順序只在 `platform/lockorder` 的 `Modules`（payment 已排在 seller 之前），確認不用改，不在 `backend/AGENTS.md` 規則 4 另寫一份。對外 RPC 照 D30。
+    - inbox 的「已處理」：收款事件只是「重讀帳戶」的訊號。收款的 handler 只排同步 job，不標記已處理；同步 job 在寫快取的 transaction 內，經 platform API 把「這個外部帳戶、讀取開始前收到的事件」整批標記已處理，保留現行「執行中的 job 合併後來的 job 也不漏」的保證。platform 的標記 API 因此要支援依路由鍵與時間上限整批標記。
+    - 補掃分工：platform 補掃只重派「派送 job 被丟棄或用完重試、事件仍未處理」的 inbox 列；payment 的 15 分鐘輪詢保留 DISABLED 可解除、`stale` 建立兩種掃描，以及「有超過 1 分鐘未處理事件的帳戶補排同步」。
+    - 鎖順序：核准的 transaction 對 payment 只 INSERT 帳戶列（`ON CONFLICT DO NOTHING`）並排唯一的建立 job，不 upsert 既有列；既有列只由 payment 自己的 job 寫。
+    - 擁有者鍵沿用 `store_id`（D28 現階段只有店家；出現第二種擁有者時再通用化）。
+    - payload：照 D29 存原始 payload 與依 provider 的保存期，清理由 platform 週期 job 做；payload 與 `PayoutAccountChanged` 的明文 fingerprint 不寫 log。
   - 消費端：`git grep -n -E "seller/internal/payment|payment_accounts|payment_provider_events|PaymentAccount" -- backend api/hawkr admin/src website seller-app/lib packages ':!**/gen/**'`。
   - 不能動：D5（外部呼叫不在 transaction 內）、D12（fingerprint 同 transaction 寫成 hash）、D19（一個擁有者一個外部帳戶）、D23（聯絡信箱由 seller 傳入）。
-  - 驗收：monolith 全套（gofmt、vet 含 integration tag、unit、`make lint-monolith`、`atlas migrate validate`、arch test）；integration（CI，含 `lockorder` 檢查若已進 `dev`）；mutation：訂閱者不更新閘門副本、inbox 不去重、派送失敗不重試，各自讓測試失敗；sandbox 重跑一次 webhook 驅動的 `ENABLED`。
-  - 停止條件：鎖順序檢查報出核准與同步方向相反且無法照附件的兩種改法消除時，停下交 Will。
+  - 驗收：monolith 全套（gofmt、vet 含 integration tag、unit、`make lint-monolith`、`atlas migrate validate`、arch test）；integration（CI，含 `lockorder` 檢查，分支已在 `d9c4bc82` 併入）；mutation：訂閱者不更新閘門副本、inbox 不去重、派送失敗不重試、收款 handler 一收到就標記已處理（同步被合併時事件漏掉），各自讓測試失敗；sandbox 重跑一次 webhook 驅動的 `ENABLED`。
+  - 停止條件：照上面的鎖順序寫法後，`lockorder` 仍報核准與同步方向相反時，停下交 Will。
 
 - [ ] **7e. 伺服器推導的開通狀態（D26、D27）**（被擋於：D26、D27 已決；7d′；7a′、7b、7c、7d 的程式）
   - 範圍：
@@ -280,6 +285,7 @@
 - **D24 補充**（2026-11-05，Will）：App 內的 Stripe 內嵌開通（Stripe 的 iOS、Android SDK 有 account onboarding 元件，https://docs.stripe.com/connect/supported-embedded-components）不做，維持「到網頁完成」；這是 D24「不新增依賴」的選擇，不是 Stripe 的限制。延後，觸發條件：App 的開通完成率偏低，或平台收件成為主要模式。D26 的 `action` 能表達「到網頁完成」，之後改不動契約。
 
 - **D28 收款帳戶的擁有者**（已決 2026-11-06，Will，採附件 `payment-ownership-brief.md` 的 P1-A；擋住：7d′、7e、8）：新建 `payment` 模組，現階段只擁有收款帳戶（帳戶列、建立與同步 job、輪詢、port 與 Stripe／fake adapter、後台的讀取、重新整理、重試建立）；seller 依賴 payment，留下平台審核、開通閘門（讀 seller 自存的 `transfers_active` 副本）、曝光公告與 fingerprint 防詐 hash。seller 核准時呼叫 payment；payment 在寫快取的 transaction 內發 `PayoutAccountChanged`，seller 以同 transaction 的訂閱者更新副本與防詐 hash。依據：ADR `2026-09-24-go-modular-monolith.md` D2 的分開判準（跟著 provider 改的不放 seller）、`internal/arch/modules.go` 的 `payment` 葉節點，以及 B2、B10 都要讀收款帳戶而規則 1 不准 import `seller/internal/payment`。未採：維持在 seller、B2 另建（provider 包裝與 inbox 兩份）；到 B2 再搬（已進 main，引用更多）。鎖順序以 `lockorder` 檢查驗證（核准的 upsert 與同步 job 的方向）。
+- **D30 收款帳戶 RPC 的去向**（已決 2026-11-06，Will；擋住：7d′）：賣家端的 `GetMyPaymentAccount`、`CreatePaymentOnboardingSession` 留在 seller 的 service，seller 確認店家擁有者後呼叫 payment 的公開 API；後台的 3 支收款帳戶 RPC 搬到 payment 的 admin service，同一次改完 admin。依據：payment 是葉節點，不能向上讀 seller 驗證擁有者。未採：全部搬到 payment（要讓 payment 收已驗證的擁有者參照，網站與 App 也要改）；全部留 seller（後台讀收款帳戶仍掛在 seller）。
 - **D29 webhook inbox 由 platform 提供**（已決 2026-11-06，Will，採附件的 P2-A；擋住：7d′）：platform 擁有 `inbox` schema（`(provider, event_id)` 唯一、收到與處理時間、處理者、原始 payload 與保存期）；入口驗簽後同 transaction 寫 inbox 並排派送 job，commit 後才回 2xx；模組 handler 在自己的 transaction 寫業務列並經 platform API 標記已處理；補掃與清理是 platform 的週期 job。分支的 `seller.payment_provider_events` 換成它。ADR D5 修訂：platform 提供 inbox；intent 列是模組的業務列。未採：各模組自建同形狀的表（platform 要對模組的表下 SQL）、現況（違反 D5）。
 
 - **E1 Stripe API 版本**（已決 2026-11-02，Will）：Accounts v2（https://docs.stripe.com/connect/accounts-v2）；只有台灣只收轉帳的帳號需要 v1，D8 用 US 碰不到。webhook 用 thin events，收到後一律重讀帳戶（https://docs.stripe.com/webhooks）。（2026-11-03 修訂，Will：釘 `Stripe-Version: 2026-09-30.preview`，capability 有 `rejected` 狀態，D13 的 DISABLED 直接用它；這一版在一般測試模式不能建 v2 Account Link（`spike/README.md` Q11、Q12），測試與錄製改在 Stripe sandbox。未採：`2026-04-22.preview` 沿用測試模式，DISABLED 要從 status_details 推斷、升級時重做）
