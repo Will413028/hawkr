@@ -49,7 +49,7 @@ var dmlKinds = []struct{ node, kind string }{{"DeleteStmt", "DELETE"}, {"MergeSt
 // nodeLocks 處理解析樹的一個節點；pgtree.Walk 以固定順序走過每個節點，所以同一句 SQL 的鎖順序每次相同。
 func nodeLocks(v map[string]any, out *[]Lock) {
 	if s, ok := v["SelectStmt"].(map[string]any); ok {
-		selectLocks(s, out)
+		setOpLocks(s, out)
 	}
 	for _, d := range dmlKinds {
 		if s, ok := v[d.node].(map[string]any); ok {
@@ -59,6 +59,18 @@ func nodeLocks(v map[string]any, out *[]Lock) {
 	if s, ok := v["InsertStmt"].(map[string]any); ok {
 		if oc, ok := s["onConflictClause"].(map[string]any); ok && oc["action"] == "ONCONFLICT_UPDATE" {
 			addRelation(s["relation"], "INSERT ON CONFLICT DO UPDATE", true, out)
+		}
+	}
+}
+
+// setOpLocks 對一個 SelectStmt 與它集合運算（UNION 等）的各分支各跑一次 selectLocks。
+// 集合運算的 larg、rarg 是沒有 "SelectStmt" 外層 key 的 SelectStmt 本體，pgtree.Walk 不會當成 SelectStmt 節點，
+// 所以帶鎖定子句的括號分支要在這裡遞迴處理。
+func setOpLocks(s map[string]any, out *[]Lock) {
+	selectLocks(s, out)
+	for _, side := range []string{"larg", "rarg"} {
+		if b, ok := s[side].(map[string]any); ok {
+			setOpLocks(b, out)
 		}
 	}
 }
@@ -149,7 +161,8 @@ func fromItems(n any) []fromItem {
 			return append(fromItems(j["larg"]), fromItems(j["rarg"])...)
 		}
 		if rs, ok := v["RangeSubselect"].(map[string]any); ok {
-			sub, _ := rs["subquery"].(map[string]any)
+			wrapper, _ := rs["subquery"].(map[string]any)
+			sub, _ := wrapper["SelectStmt"].(map[string]any)
 			return []fromItem{{name: aliasOf(rs), tables: subqueryTables(sub)}}
 		}
 	}
@@ -157,8 +170,8 @@ func fromItems(n any) []fromItem {
 }
 
 // subqueryTables 收集子查詢被鎖住的表：它自己的 FROM 項目（遞迴），UNION 等集合運算則兩邊都收。
-func subqueryTables(n map[string]any) []any {
-	sel, _ := n["SelectStmt"].(map[string]any)
+// 參數是 SelectStmt 本體（RangeSubselect 的外層 key 由呼叫端拆掉；larg、rarg 本來就沒有外層）。
+func subqueryTables(sel map[string]any) []any {
 	if sel == nil {
 		return nil
 	}
