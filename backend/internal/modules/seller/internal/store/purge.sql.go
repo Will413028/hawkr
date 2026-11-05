@@ -222,37 +222,6 @@ func (q *Queries) PurgePayUniRegistrations(ctx context.Context, arg PurgePayUniR
 	return result.RowsAffected(), nil
 }
 
-const purgePaymentAccounts = `-- name: PurgePaymentAccounts :execrows
-DELETE FROM seller.payment_accounts a
-USING seller.stores s
-WHERE a.store_id = ANY($1::bigint[]) AND s.store_id = a.store_id AND s.pii_purged_at IS NOT NULL
-`
-
-// 刪掉這些店家的收款帳戶列（外部帳戶 ID、requirements、status_reason）。只作用於店家列已清理的店家：保留期限的判斷只有 PurgeStores 一處。
-func (q *Queries) PurgePaymentAccounts(ctx context.Context, storeIds []int64) (int64, error) {
-	result, err := q.db.Exec(ctx, purgePaymentAccounts, storeIds)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const purgePaymentProviderEvents = `-- name: PurgePaymentProviderEvents :execrows
-DELETE FROM seller.payment_provider_events e
-USING seller.payment_accounts a, seller.stores s
-WHERE a.store_id = ANY($1::bigint[]) AND s.store_id = a.store_id AND s.pii_purged_at IS NOT NULL
-  AND e.provider = a.provider AND e.external_account_id = a.external_account_id
-`
-
-// 刪掉這些店家的收款帳戶的 webhook inbox 列（inbox 以外部帳戶 ID 為鍵，不帶 store_id，所以經由帳戶列找；要在 PurgePaymentAccounts 之前）。只作用於店家列已清理的店家。
-func (q *Queries) PurgePaymentProviderEvents(ctx context.Context, storeIds []int64) (int64, error) {
-	result, err := q.db.Exec(ctx, purgePaymentProviderEvents, storeIds)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const purgeStores = `-- name: PurgeStores :many
 UPDATE seller.stores
 SET store_name = NULL,

@@ -4,11 +4,11 @@ import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError, createRouterTransport } from "@connectrpc/connect";
 import { createConnectQueryKey } from "@connectrpc/connect-query";
-import { ReviewQueueAdminService } from "@hawkr/api/gen/hawkr/admin/reviewqueue/v1alpha1/review_queue_pb";
 import {
 	PaymentAccountSchema,
-	SellerAdminService,
-} from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
+	PaymentAdminService,
+} from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1/payment_pb";
+import { ReviewQueueAdminService } from "@hawkr/api/gen/hawkr/admin/reviewqueue/v1alpha1/review_queue_pb";
 import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import {
 	bodyText,
@@ -78,7 +78,7 @@ function setup(
 ) {
 	const calls = { get: 0, refresh: 0, retry: 0 };
 	const transport = createRouterTransport(({ service }) => {
-		service(SellerAdminService, {
+		service(PaymentAdminService, {
 			getPaymentAccount: () => {
 				calls.get += 1;
 				const r = handlers.get(calls.get);

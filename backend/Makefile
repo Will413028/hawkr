@@ -166,7 +166,7 @@ lint-fix-all:
 # Catches: a migration .sql file added/edited without re-running `atlas migrate hash`
 # — passes `go build`/`go test` silently but fails when `hawkr migrate` applies it.
 atlas-validate-all:
-	@for hcl in internal/modules/*/db/atlas.hcl $(addsuffix /db/atlas.hcl,$(ATLAS_SERVICES)); do \
+	@for hcl in internal/modules/*/db/atlas.hcl internal/platform/*/db/atlas.hcl $(addsuffix /db/atlas.hcl,$(ATLAS_SERVICES)); do \
 		dir=$$(dirname $$hcl); \
 		echo "=== Validating $$dir migrations ==="; \
 		(cd $$dir && atlas migrate validate --dir "file://migrations") || exit 1; \

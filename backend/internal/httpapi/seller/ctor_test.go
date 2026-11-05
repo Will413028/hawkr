@@ -1,6 +1,7 @@
 package seller
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 	"testing"
@@ -31,7 +32,7 @@ func mustAgreementURL(t testing.TB, ref string) string {
 // mustApp 與 mustPublic 是測試的建構：StatsSource 是必要的（零值被建構子擋下），其餘照 NewApp、NewPublic。
 func mustApp(t testing.TB, m Module, followers Followers, images rpc.Images, dash Dashboard, stats *StatsSource) *App {
 	t.Helper()
-	h, err := NewApp(m, followers, images, dash, stats)
+	h, err := NewApp(m, &paymentModule{}, followers, images, dash, stats)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,8 +50,11 @@ func mustPublic(t testing.TB, m PublicModule, stats *StatsSource, images rpc.Ima
 
 // StatsSource 只能由 NewStatsSource 取得（指標，nil 不可用）：建構子收到 nil 回錯誤，不是等到 RateCards 對 nil 介面 panic。
 func TestConstructorsRejectANilStatsSource(t *testing.T) {
-	if _, err := NewApp(&fakeModule{}, nil, rpc.Images{}, Dashboard{}, nil); err == nil {
+	if _, err := NewApp(&fakeModule{}, &paymentModule{}, nil, rpc.Images{}, Dashboard{}, nil); err == nil {
 		t.Error("NewApp 收下了 nil 的 StatsSource")
+	}
+	if _, err := NewApp(&fakeModule{}, nil, nil, rpc.Images{}, Dashboard{}, testStats(fakeFollowerCounts{}, fakeRatings{})); !errors.Is(err, ErrPaymentsRequired) {
+		t.Errorf("NewApp 收下了 nil 的收款帳戶來源：%v", err)
 	}
 	if _, err := NewPublic(&fakePublic{}, nil, rpc.Images{}, mustWebOrigin(t)); err == nil {
 		t.Error("NewPublic 收下了 nil 的 StatsSource")

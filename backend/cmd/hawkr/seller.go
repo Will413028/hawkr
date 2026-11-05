@@ -11,6 +11,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerserver"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -19,7 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/payuni"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
-	"github.com/Will413028/hawkr/backend/internal/platform/stripe"
 )
 
 // kycKeys 是 KYC 個資的金鑰：加密金鑰環與比對用的 HMAC 金鑰環。
@@ -109,61 +109,6 @@ func readPayUni(e *config.Env, log *slog.Logger) *payuniSetup {
 	return setup
 }
 
-// readPayment 讀收款開通的 provider：PAYMENT_PROVIDER 為空表示沒有設定（核准不建立收款帳戶，開通相關的方法回 failed_precondition），
-// fake 是記憶體內的 provider（所有帳戶都回轉帳能力已啟用，只給本機開發），stripe 是 Stripe Connect（Accounts v2）；其他值讓啟動失敗。
-// stripe 讀 STRIPE_SECRET_KEY（沒有設定時等於沒有 provider，serve 照常啟動）、STRIPE_WEBHOOK_SECRET（有金鑰卻沒有它，啟動失敗）與
-// STRIPE_REQUIREMENT_COLLECTION（provider 是 Stripe 收件、託管頁面，預設；platform 是平台收件、內嵌元件；其他值啟動失敗）。
-func readPayment(e *config.Env, log *slog.Logger) seller.PaymentProvider {
-	switch name := e.StringOr("PAYMENT_PROVIDER", ""); name {
-	case "":
-		log.Warn("收款開通沒有設定：核准後不會建立收款帳戶，店家不會通過開通閘門")
-		return nil
-	case "fake":
-		fake := seller.NewPaymentFake()
-		fake.AutoActive = true
-		return fake
-	case "stripe":
-		return readStripe(e, log)
-	default:
-		e.Fail("PAYMENT_PROVIDER：不認得的值 %q（可用：fake、stripe）", name)
-		return nil
-	}
-}
-
-func readStripe(e *config.Env, log *slog.Logger) seller.PaymentProvider {
-	var collection seller.RequirementCollection
-	switch v := e.StringOr("STRIPE_REQUIREMENT_COLLECTION", "provider"); v {
-	case "provider":
-		collection = seller.CollectionProvider
-	case "platform":
-		collection = seller.CollectionPlatform
-	default:
-		e.Fail("STRIPE_REQUIREMENT_COLLECTION：不認得的值 %q（可用：provider、platform）", v)
-		return nil
-	}
-	key := e.StringOr("STRIPE_SECRET_KEY", "")
-	if key == "" {
-		log.Warn("PAYMENT_PROVIDER=stripe 但沒有 STRIPE_SECRET_KEY：核准後不會建立收款帳戶，店家不會通過開通閘門")
-		return nil
-	}
-	whsecret := e.StringOr("STRIPE_WEBHOOK_SECRET", "")
-	if whsecret == "" {
-		e.Fail("STRIPE_WEBHOOK_SECRET：設了 STRIPE_SECRET_KEY 就必填")
-		return nil
-	}
-	client, err := stripe.New(stripe.Config{SecretKey: key, WebhookSecret: whsecret})
-	if err != nil {
-		e.Fail("Stripe：%v", err)
-		return nil
-	}
-	provider, err := seller.NewStripePayment(client, collection)
-	if err != nil {
-		e.Fail("Stripe：%v", err)
-		return nil
-	}
-	return provider
-}
-
 // readGCIS 讀統一編號查詢（經濟部商業司的公開資料，不是舊公司的服務）的設定：GCIS_BASE_URL（預設是公開資料平台
 // https://data.gcis.nat.gov.tw）、GCIS_TIMEOUT（一次查詢的總上限，預設 5 秒；公司與商業登記兩個資料集的請求共用）。
 // serve（統編查詢的 Connect 方法、送件時排入登記資料的查詢）、worker（執行查詢的 job）與建構 seller 模組的子命令都需要它。
@@ -181,10 +126,10 @@ func readGCIS(e *config.Env) *gcis.Client {
 // 的綁定與同步、通知的套用、輪詢、商家名單圖片的引用收斂、商品瀏覽事件的彙總與清理；排程的是 PeriodicJobs）。orders 是店家未結訂單的 port（自己關店用；刪帳號的
 // accountdeletion 用同一個實作），products 是商品所屬店家的 port（彙總瀏覽事件用，見 sellerProducts）。
 // 它的事件由 subscribeSellerRelay 轉成給舊服務的 RabbitMQ 訊息（sellerrelay），治理事件的通知在 A8。
-func newSeller(d *db.DB, bus *events.Bus, jc jobs.ReportingEnqueuer, id *identity.Module, med media.Media, orders seller.Orders, products seller.ProductStores, kyc *kycKeys, pay *payuniSetup, payment seller.PaymentProvider, registry *gcis.Client, log *slog.Logger) *seller.Module {
+func newSeller(d *db.DB, bus *events.Bus, jc jobs.ReportingEnqueuer, id *identity.Module, med media.Media, orders seller.Orders, products seller.ProductStores, kyc *kycKeys, pay *payuniSetup, payments *payment.Module, registry *gcis.Client, log *slog.Logger) *seller.Module {
 	return seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: jc, Identity: id, Media: med, Orders: orders, KYCKeys: kyc.enc, KYCMAC: kyc.mac,
-		ProductStores: products, PayUni: pay.client, Payment: payment, Registry: registry, StorefrontBaseURL: pay.storefront, Now: time.Now, Logger: log,
+		ProductStores: products, PayUni: pay.client, Payment: payments, Registry: registry, StorefrontBaseURL: pay.storefront, Now: time.Now, Logger: log,
 	})
 }
 

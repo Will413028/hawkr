@@ -1,4 +1,4 @@
-package payment
+package account
 
 import (
 	"context"
@@ -11,10 +11,10 @@ import (
 
 	"github.com/riverqueue/river"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 )
 
 func details(ds ...StatusDetail) []StatusDetail { return ds }
@@ -131,24 +131,34 @@ type noopJobs struct{}
 
 func (noopJobs) Enqueue(context.Context, river.JobArgs, *river.InsertOpts) error { return nil }
 
-type noIdentities struct{}
+type activeOwners struct{}
 
-func (noIdentities) RecordBankFingerprints(context.Context, *store.Queries, int64, string, []string, time.Time) error {
-	return nil
-}
+func (activeOwners) OwnerActive(context.Context, int64) (bool, error) { return true, nil }
 
-// 組裝時缺 Identities 要在啟動就失敗，不能讓同步默默不寫 fingerprint。
-// mutation：New 不檢查 Identities → 第一段沒有 panic。
-func TestNewRequiresIdentities(t *testing.T) {
-	d := Deps{DB: &db.DB{}, Jobs: noopJobs{}, Exposure: &exposure.Service{}, Now: time.Now, Logger: slog.Default()}
+// 設定了 provider 時，組裝缺 Owners 要在啟動就失敗，不能讓建立 job 不檢查擁有者是否營運中；沒有 provider（沒有設定收款開通）時不需要。設定了 provider 時
+// 把事件處理登記到 inbox（同一個 provider 登記兩次是組裝錯誤）。
+// mutation：New 不檢查 Owners → 第一段沒有 panic；New 不登記 inbox → 第二次 New 沒有 panic。
+func TestNewRequiresOwnersAndRegistersTheProviderWithTheInbox(t *testing.T) {
+	d := Deps{DB: &db.DB{}, Events: events.NewBus(), Jobs: noopJobs{}, Now: time.Now, Logger: slog.Default()}
+	New(d)
+	d.Inbox = inbox.New(inbox.Deps{DB: d.DB, Jobs: d.Jobs, Now: d.Now, Logger: d.Logger})
+	d.Provider = NewFake()
 	func() {
 		defer func() {
 			if recover() == nil {
-				t.Fatal("缺 Identities 沒有 panic")
+				t.Fatal("缺 Owners 沒有 panic")
 			}
 		}()
 		New(d)
 	}()
-	d.Identities = noIdentities{}
+	d.Owners = activeOwners{}
 	New(d)
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("同一個 inbox 登記兩次 fake 沒有 panic")
+			}
+		}()
+		New(d)
+	}()
 }

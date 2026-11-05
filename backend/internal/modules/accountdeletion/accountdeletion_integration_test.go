@@ -21,6 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -124,7 +125,7 @@ func setupWith(t *testing.T, extra ...migrate.Module) *fixture {
 	b := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
 	kycKeys, kycMAC := sealtest.Keys(t)
 	orders := &testOrders{}
-	sl := seller.New(seller.Deps{KYCKeys: kycKeys, KYCMAC: kycMAC, DB: d, Events: bus, Jobs: queue, Identity: id, Media: testMedia{}, Orders: orders, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log})
+	sl := seller.New(seller.Deps{KYCKeys: kycKeys, KYCMAC: kycMAC, DB: d, Events: bus, Jobs: queue, Identity: id, Media: testMedia{}, Orders: orders, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})})
 	m := New(Deps{DB: d, Identity: id, Buyer: b, Seller: sl, Orders: orders, Now: time.Now})
 	return &fixture{db: d, identity: id, buyer: b, seller: sl, orders: orders, module: m, queue: queue, bus: bus}
 }

@@ -73,7 +73,7 @@ func count(t *testing.T, d *db.DB, query string, args ...any) int {
 }
 
 // 種子的店家全部在 seller 模組的可曝光集合裡（模組自己的規則判斷，不是 SQL 重寫一份），後台揭露回的是 fixture 的明文，資料庫參照的金鑰
-// 都在執行中的金鑰環裡；全量重新公告之後每家店的公告是 version 1、可曝光。
+// 都在執行中的金鑰環裡。種子以 payment 的 fake 同步收款帳戶時，seller 的訂閱者在轉帳能力啟用時公告一次（version 1），全量重新公告之後是 version 2、可曝光。
 func TestDevSeedWritesStoresThatTheModuleServesAsExposable(t *testing.T) {
 	ctx := context.Background()
 	d := devSeedEnv(t)
@@ -122,8 +122,8 @@ func TestDevSeedWritesStoresThatTheModuleServesAsExposable(t *testing.T) {
 		if err := d.Pool().QueryRow(ctx, `SELECT version, exposable FROM seller.store_exposures WHERE store_id = $1`, s.StoreID).Scan(&version, &announced); err != nil {
 			t.Fatal(err)
 		}
-		if version != 1 || !announced {
-			t.Errorf("店 %d 的公告列 = (version %d, exposable %v)，want (1, true)", s.StoreID, version, announced)
+		if version != 2 || !announced {
+			t.Errorf("店 %d 的公告列 = (version %d, exposable %v)，want (2, true)", s.StoreID, version, announced)
 		}
 		var code string
 		if err := d.Pool().QueryRow(ctx, `SELECT mer_id FROM seller.payuni_registrations WHERE store_id = $1`, s.StoreID).Scan(&code); err != nil {
@@ -133,12 +133,16 @@ func TestDevSeedWritesStoresThatTheModuleServesAsExposable(t *testing.T) {
 			t.Errorf("店 %d 的 mer_id = %s，want %s", s.StoreID, code, want)
 		}
 		var provider, paymentStatus string
-		var transfers bool
-		if err := d.Pool().QueryRow(ctx, `SELECT provider, status, transfers_active FROM seller.payment_accounts WHERE store_id = $1`, s.StoreID).Scan(&provider, &paymentStatus, &transfers); err != nil {
+		var transfers, copied bool
+		if err := d.Pool().QueryRow(ctx, `SELECT provider, status, transfers_active FROM payment.accounts WHERE store_id = $1`, s.StoreID).Scan(&provider, &paymentStatus, &transfers); err != nil {
 			t.Fatal(err)
 		}
 		if provider != "fake" || paymentStatus != "ENABLED" || !transfers {
 			t.Errorf("店 %d 的收款帳戶 = (%s, %s, transfers_active %v)，want (fake, ENABLED, true)", s.StoreID, provider, paymentStatus, transfers)
+		}
+		// 開通閘門的副本由 PayoutAccountChanged 的訂閱者寫入（種子不直接寫 seller 的表）。
+		if err := d.Pool().QueryRow(ctx, `SELECT transfers_active FROM seller.payout_capabilities WHERE store_id = $1`, s.StoreID).Scan(&copied); err != nil || !copied {
+			t.Errorf("店 %d 的閘門副本 = %v（%v），want true", s.StoreID, copied, err)
 		}
 	}
 	if err := module.CheckKYCKeys(ctx); err != nil {

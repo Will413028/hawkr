@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+// payment 模組給後台的 API（Stripe 計畫 D28、D30）：收款帳戶的讀取、重新整理與重試建立。收款帳戶由 payment 模組擁有，擁有者現階段是店家
+// （store_id）；賣家自己的收款帳戶讀取與開通 session 留在 SellerAppService（seller 確認店家擁有者之後呼叫 payment）。狀態與收件方式的列舉沿用
+// hawkr.seller.v1alpha1 的定義（賣家與後台看到同一組值）。
+package hawkr.admin.payment.v1alpha1;
+
+import "hawkr/seller/v1alpha1/seller.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// PaymentAdminService 只有管理員能呼叫。
+service PaymentAdminService {
+  // GetPaymentAccount 讀店家的收款帳戶（外部帳戶的本地快取：狀態、轉帳與撥款能力、待補條件的原始內容、停用原因）。店家還沒有收款帳戶
+  // （平台審核還沒核准，或沒有設定收款開通）時回 not_found。
+  rpc GetPaymentAccount(GetPaymentAccountRequest) returns (GetPaymentAccountResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // RefreshPaymentAccount 排入一次重讀外部帳戶的背景工作（營運工具；同一家店已有排隊的就合併，回應不等結果，結果從 GetPaymentAccount 看）。
+  // 沒有設定收款開通、外部帳戶還沒有建立時回 failed_precondition，店家沒有收款帳戶回 not_found。
+  rpc RefreshPaymentAccount(RefreshPaymentAccountRequest) returns (RefreshPaymentAccountResponse);
+
+  // RetryPaymentAccountCreate 對建立失敗（重試用完，後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED）的收款帳戶重新排入建立。沒有 etag，由狀態檢查保護：
+  // 帳戶不是建立失敗的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。
+  rpc RetryPaymentAccountCreate(RetryPaymentAccountCreateRequest) returns (RetryPaymentAccountCreateResponse);
+}
+
+// PaymentAccount 是後台看到的店家收款帳戶（payment 模組擁有，擁有者是店家）。
+message PaymentAccount {
+  string store_id = 1;
+  // provider 的代碼（例如 stripe）。
+  string provider = 2;
+  // 外部帳戶 ID；還沒有建立時是空字串。
+  string external_account_id = 3;
+  hawkr.seller.v1alpha1.PaymentAccountStatus status = 4;
+  hawkr.seller.v1alpha1.RequirementCollection requirement_collection = 5;
+  bool transfers_active = 6;
+  bool payouts_active = 7;
+  // 金流商回報的待補條件原始內容（物件）。
+  google.protobuf.Struct requirements = 8;
+  // 導出目前狀態的金流商原因碼（只給後台）；沒有時是空字串。
+  string status_reason = 9;
+  // 最近一次向金流商讀取帳戶的時間；還沒讀過時不設。
+  google.protobuf.Timestamp fetch_time = 10;
+  // 建立重試用完的時間；只有還沒有外部帳戶而且建立失敗的帳戶才有。
+  google.protobuf.Timestamp create_failed_time = 11;
+  google.protobuf.Timestamp create_time = 12;
+  google.protobuf.Timestamp update_time = 13;
+}
+
+message GetPaymentAccountRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetPaymentAccountResponse {
+  PaymentAccount account = 1;
+}
+
+message RefreshPaymentAccountRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message RefreshPaymentAccountResponse {}
+
+message RetryPaymentAccountCreateRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message RetryPaymentAccountCreateResponse {
+  PaymentAccount account = 1;
+}

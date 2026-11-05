@@ -4,7 +4,7 @@ import test from "node:test";
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
-import { PaymentAccountSchema } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
+import { PaymentAccountSchema } from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1/payment_pb";
 import {
 	PaymentAccountStatus,
 	RequirementCollection,
@@ -186,7 +186,7 @@ test("接線：頁面的 invalidateKyc 一併重讀收款帳戶；收款帳戶�
 	const page = await readFile("src/app/admin/merchants/[id]/page.tsx", "utf8");
 	const body = page.slice(page.indexOf("const invalidateKyc"));
 	const fn = body.slice(0, body.indexOf("const approveMutation"));
-	assert.match(fn, /SellerAdminService\.method\.getPaymentAccount/u);
+	assert.match(fn, /PaymentAdminService\.method\.getPaymentAccount/u);
 	assert.match(page, /usePaymentAccount\(/u);
 	const card = await readFile(
 		"src/app/admin/merchants/[id]/PaymentAccountCard.tsx",

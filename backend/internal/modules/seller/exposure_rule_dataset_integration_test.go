@@ -66,9 +66,6 @@ func TestExposureRuleAgreesBetweenSQLAndGoOnADataset(t *testing.T) {
 	payuni := func(storeID int64, sql string, args ...any) {
 		exec("UPDATE seller.payuni_registrations SET "+sql+" WHERE store_id = $1", append([]any{storeID}, args...)...)
 	}
-	payment := func(storeID int64, sql string) {
-		exec("UPDATE seller.payment_accounts SET "+sql+" WHERE store_id = $1", storeID)
-	}
 	kyc := func(storeID int64, sql string) {
 		exec("UPDATE seller.kyc_applications SET "+sql+" WHERE store_id = $1 AND status <> 'CANCELLED'", storeID)
 	}
@@ -117,18 +114,12 @@ func TestExposureRuleAgreesBetweenSQLAndGoOnADataset(t *testing.T) {
 	add("沒有 KYC 申請", s.StoreID, []Requirement{RequirementOnboardingComplete}, nil)
 
 	_, id = exposable()
-	exec("DELETE FROM seller.payment_accounts WHERE store_id = $1", id)
-	add("KYC 已核准但沒有收款帳戶", id, []Requirement{RequirementOnboardingComplete}, nil)
+	exec("DELETE FROM seller.payout_capabilities WHERE store_id = $1", id)
+	add("KYC 已核准但沒有收款帳戶的閘門副本", id, []Requirement{RequirementOnboardingComplete}, nil)
 
 	_, id = exposable()
-	payment(id, "status = 'NOT_CREATED', external_account_id = NULL, transfers_active = false, payouts_active = false, fetched_at = NULL")
-	add("收款帳戶還沒有建立", id, []Requirement{RequirementOnboardingComplete}, nil)
-
-	for _, st := range []string{"UNDER_REVIEW", "ACTION_REQUIRED", "DISABLED"} {
-		_, id = exposable()
-		payment(id, "status = '"+st+"', transfers_active = false, payouts_active = false")
-		add("收款帳戶 "+st, id, []Requirement{RequirementOnboardingComplete}, nil)
-	}
+	exec("UPDATE seller.payout_capabilities SET transfers_active = false WHERE store_id = $1", id)
+	add("收款帳戶的轉帳能力未啟用", id, []Requirement{RequirementOnboardingComplete}, nil)
 
 	// PayUni 不再是開通閘門的輸入：綁定失敗、審核被拒絕的店家，只要收款帳戶啟用就可以曝光。
 	_, id = exposable()
@@ -211,19 +202,24 @@ func TestExposureRuleAgreesBetweenSQLAndGoOnADataset(t *testing.T) {
 		}
 	}
 
-	// 開通條件（SQL）等於「目前那一筆申請已核准而且收款帳戶的轉帳能力啟用」：Go 以申請狀態與帳戶列各自重算一次。
+	// 開通條件（SQL）等於「目前那一筆申請已核准而且收款帳戶的轉帳能力啟用」：Go 以申請狀態與閘門副本（payout_capabilities）各自重算一次。
 	applications, err := q.CurrentKYCStatuses(ctx, ids)
 	must(t, err)
 	approvedApplication := map[int64]bool{}
 	for _, a := range applications {
 		approvedApplication[a.StoreID] = model.KYCStatus(a.Status) == model.KYCStatusApproved
 	}
-	accounts, err := q.PaymentAccountsByStores(ctx, ids)
-	must(t, err)
 	transfers := map[int64]bool{}
-	for _, a := range accounts {
-		transfers[a.StoreID] = a.TransfersActive
+	rows, err := f.db.Conn(ctx).Query(ctx, "SELECT store_id, transfers_active FROM seller.payout_capabilities WHERE store_id = ANY($1)", ids)
+	must(t, err)
+	for rows.Next() {
+		var id int64
+		var active bool
+		must(t, rows.Scan(&id, &active))
+		transfers[id] = active
 	}
+	must(t, rows.Err())
+	rows.Close()
 	flags, err := q.StoreRequirementFlags(ctx, ids)
 	must(t, err)
 	if len(flags) != len(ids) {

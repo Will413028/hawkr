@@ -3,6 +3,8 @@ package model
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 // PaymentAccountStatus 是收款帳戶的中立狀態（Stripe 計畫 D13），由外部帳戶的快照推導。
@@ -22,7 +24,7 @@ const (
 	PaymentDisabled PaymentAccountStatus = "DISABLED"
 )
 
-// PaymentAccountStatusValues 回傳全部狀態，與 payment_accounts_status_check 相同。
+// PaymentAccountStatusValues 回傳全部狀態，與 accounts_status_check 相同。
 func PaymentAccountStatusValues() []PaymentAccountStatus {
 	return []PaymentAccountStatus{PaymentNotCreated, PaymentUnderReview, PaymentActionRequired, PaymentEnabled, PaymentDisabled}
 }
@@ -38,7 +40,7 @@ const (
 	CollectionPlatform RequirementCollection = "PLATFORM"
 )
 
-// RequirementCollectionValues 回傳全部收件方式，與 payment_accounts_collection_check 相同。
+// RequirementCollectionValues 回傳全部收件方式，與 accounts_collection_check 相同。
 func RequirementCollectionValues() []RequirementCollection {
 	return []RequirementCollection{CollectionProvider, CollectionPlatform}
 }
@@ -54,7 +56,7 @@ const (
 	SurfaceEmbedded OnboardingSurface = "EMBEDDED"
 )
 
-// PaymentAccount 是店家的收款帳戶：外部帳戶的本地快取，不含個資。
+// PaymentAccount 是擁有者（店家）的收款帳戶：外部帳戶的本地快取（聯絡信箱不對外）。
 type PaymentAccount struct {
 	StoreID               int64
 	Provider              string
@@ -82,9 +84,23 @@ type OnboardingSession struct {
 	ExpiresAt    *time.Time
 }
 
-// CreatePaymentOnboardingSessionInput 是賣家取得開通 session 的輸入；ReturnURL 與 RefreshURL 由呼叫方（handler）組出。
-type CreatePaymentOnboardingSessionInput struct {
-	AccountID  int64
-	ReturnURL  string
-	RefreshURL string
+// PayoutAccountChanged 是同步 job 寫入帳戶快照的 transaction 內發布的事件（Stripe 計畫 D28）：seller 以同 transaction 的訂閱者更新開通閘門讀的
+// transfers_active 副本，並把 BankFingerprints 寫成防詐比對 hash（D12）。每次同步都發布（fingerprint 可能在轉帳能力不變時改變）。
+// BankFingerprints 是 provider 的外部銀行帳號識別碼明文：發布方與訂閱者都不保存、不寫 log。
+type PayoutAccountChanged struct {
+	OccurredAt       time.Time
+	StoreID          int64
+	Provider         string
+	TransfersActive  bool
+	BankFingerprints []string
+}
+
+// Positive 檢查 ID 都是正數。
+func Positive(ids ...int64) error {
+	for _, id := range ids {
+		if id <= 0 {
+			return apperr.InvalidInput("ID 必須為正數")
+		}
+	}
+	return nil
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -46,6 +47,7 @@ func newSellerRelayFixture(t *testing.T) *sellerRelayFixture {
 	sellers := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: accounts, Media: noMedia{}, Orders: noOrders{}, ProductStores: &productStoresStub{}, Registry: noRegistry{},
 		KYCKeys: kycKeys, KYCMAC: kycMAC, Now: clock, Logger: logger,
+		Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger}),
 	})
 	subscribeSellerRelay(bus, queue)
 	var account int64

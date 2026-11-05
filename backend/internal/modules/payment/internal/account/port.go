@@ -1,12 +1,12 @@
-// Package payment 是賣家收款開通：provider 中立的 port（建立外部帳戶、開通 session、讀帳戶快照、驗事件）、帳戶的本地快取、
-// 同步與建立的 River job，以及 webhook inbox。
+// Package account 是收款帳戶：provider 中立的 port（建立外部帳戶、開通 session、讀帳戶快照、驗事件）、帳戶的本地快取、
+// 同步與建立的 River job，以及 platform inbox 的收款事件處理（Stripe 計畫 D28、D29）。
 //
 // 結構（backend AGENTS.md 規則 4、5）：
-//   - 平台審核核准的 transaction 內先寫「建立中」的列（沒有外部 ID）並排入以 store_id 為唯一鍵的建立 job；job 在 transaction 外呼叫
-//     provider，再於自己的 transaction 填上外部 ID 並排入同步 job。
-//   - 同步 job 在 transaction 外重讀外部帳戶，在 transaction 內整列覆寫快取；webhook、輪詢與管理員的重新整理都只排這個 job。
-//   - 開通閘門只看快取的 transfers_active（db/objects.sql 的 store_requirement_flags）。
-package payment
+//   - seller 核准的 transaction 內只 INSERT「建立中」的列（沒有外部 ID；既有的列不改）並排入以 store_id 為唯一鍵的建立 job；job 在
+//     transaction 外呼叫 provider，再於自己的 transaction 填上外部 ID 並排入同步 job。
+//   - 同步 job 在 transaction 外重讀外部帳戶，在 transaction 內整列覆寫快取、發 PayoutAccountChanged（seller 的同 transaction 訂閱者更新開通閘門的
+//     副本與防詐 hash），並把讀取開始前收到的收款事件標為已處理；webhook、輪詢與管理員的重新整理都只排這個 job。
+package account
 
 import (
 	"cmp"
@@ -17,7 +17,7 @@ import (
 	"slices"
 	"unicode/utf8"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 )
 
 // Capabilities 是 provider 的能力描述：誰收身分與銀行資料、用什麼介面開通。兩軸互相獨立。
@@ -138,7 +138,7 @@ var (
 	ErrIgnoredEvent = errors.New("payment: ignored event")
 )
 
-// maxReasonLen 是 status_reason 的字數上限（payment_accounts_status_reason_check）。
+// maxReasonLen 是 status_reason 的字數上限（accounts_status_reason_check）。
 const maxReasonLen = 200
 
 // StatusNote 標示 StatusOf 遇到不認得或不完整的快照：狀態仍會推導（視為審核中），呼叫方要記警示（帶店家與外部帳戶 ID）。

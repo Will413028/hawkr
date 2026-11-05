@@ -32,9 +32,8 @@ func (f *fixture) makeSeededStoresExposable(t *testing.T) {
 					created_at, updated_at)
 				SELECT store_id, 'HAWK' || store_id, md5('kyc' || store_id)::uuid, 'BOUND', $1, 'APPROVED', $1, $1, $1
 				FROM seller.stores WHERE store_code > 2900000000`,
-			`INSERT INTO seller.payment_accounts (store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active,
-					fetched_at, created_at, updated_at)
-				SELECT store_id, 'fake', 'acct_' || store_id, 'seller@example.com', 'PROVIDER', 'ENABLED', true, true, $1, $1, $1
+			`INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at)
+				SELECT store_id, 'fake', true, $1
 				FROM seller.stores WHERE store_code > 2900000000`,
 		} {
 			var args []any

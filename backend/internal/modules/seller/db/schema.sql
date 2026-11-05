@@ -915,7 +915,7 @@ CREATE INDEX measure_identities_hash ON seller.measure_identities (hash);
 -- 個資：id_card_no、rep_id_card_no（企業負責人）與 bank_account 是 AES-256-GCM 的密文（platform/seal，AAD 是申請 ID
 -- 加欄位名），real_name 與 birth_date 明文（後台以姓名模糊搜尋，ADR 2026-07-20）。每個識別欄位另有一個 blind index
 -- （HMAC，輸入帶欄位標籤；*_hash_key 是算出它的金鑰 ID），給處分的身分快照用。送給 PayUni 的聯絡資料（聯絡人、聯絡手機、
--- 客服信箱）是店家的欄位（stores），不在申請上。收款聯絡信箱不在申請上：它是帳號的聯絡信箱（identity，D23 2026-11-03 修訂），送出時要求帳號有，核准時快照到 payment_accounts.contact_email。公司地址以內政部的鄉鎮市區代碼表示（同 stores）。
+-- 客服信箱）是店家的欄位（stores），不在申請上。收款聯絡信箱不在申請上：它是帳號的聯絡信箱（identity，D23 2026-11-03 修訂），送出時要求帳號有，核准時傳給 payment 模組快照到收款帳戶列（payment.accounts.contact_email）。公司地址以內政部的鄉鎮市區代碼表示（同 stores）。
 -- version 是樂觀鎖（etag 的來源）：所有寫入者必帶讀到的版本。
 -- 個資清理：店家關閉滿保留期後 purge 套件清掉全部個人欄位（密文、blind index、姓名、生日、證件資訊、聯絡方式、公司與
 -- 地址），記下 pii_purged_at；審核的事實（狀態、時間、審核紀錄）與不具名的欄位（seller_type、product_type）保留。kyc_applications_purged_check 列出被清掉的欄位：清理過的列這些一定是 NULL。處分的身分快照不在這裡
@@ -1624,59 +1624,13 @@ CREATE TABLE seller.store_blocks (
 );
 CREATE INDEX store_blocks_buyer ON seller.store_blocks (buyer_id, store_id);
 
--- 收款帳戶：店家在金流商那邊的外部帳戶的本地快取（Stripe 計畫 D13、D19）。一店一列，關店再開沿用；只存狀態與建立外部帳戶要用的聯絡信箱（D23）。
--- 核准的 transaction 先寫「建立中」的列（external_account_id 是 NULL、status 是 NOT_CREATED），EnsureAccount job 在 transaction 外
--- 建立外部帳戶後填上外部 ID；之後的狀態由 sync job 重讀外部帳戶後整列覆寫（沒有觀測歷史，重讀即最新）。
--- status 是中立的五個狀態，由轉帳能力的狀態與 status_details 推導；transfers_active 與 payouts_active 是外部帳戶的能力是否啟用（開通閘門看 transfers_active，
--- ENABLED 等於 transfers_active）。requirements 是快照的原始內容，status_reason 是導出目前狀態的金流商原因碼（只給後台）。create_failed_at 是建立重試用完的時刻
--- （只有還沒有外部 ID 的列才有；後台待辦 review_payment_account_create_failed 的開始時間，重試建立時清空）。
--- contact_email 是核准時從 identity 的帳號聯絡信箱（已驗證的優先，否則自填的）快照來的聯絡信箱，建立外部帳戶時送給金流商，之後不自動同步；外部帳戶建立前每次核准以當時的信箱覆寫，建立後保留原值（改信箱 D23 延後）；列隨店家個資清理一起刪除，所以不另設清除欄位。
--- create_idempotency_key 是寫入「建立中」的列時產生的隨機 UUID（v4），建立外部帳戶的每次重試都用它當冪等鍵（Stripe 建議每個邏輯請求用隨機 UUID；
--- 不用 store_id，兩個資料庫共用同一個 Stripe 帳號時才不會撞到別人的帳戶）。
-CREATE TABLE seller.payment_accounts (
-    store_id               BIGINT      PRIMARY KEY REFERENCES seller.stores (store_id),
-    provider               TEXT        NOT NULL,
-    external_account_id    TEXT,
-    contact_email          TEXT        NOT NULL,
-    requirement_collection TEXT        NOT NULL,
-    status                 TEXT        NOT NULL DEFAULT 'NOT_CREATED',
-    transfers_active       BOOLEAN     NOT NULL DEFAULT false,
-    payouts_active         BOOLEAN     NOT NULL DEFAULT false,
-    requirements           JSONB       NOT NULL DEFAULT '{}',
-    status_reason          TEXT,
-    fetched_at             TIMESTAMPTZ,
-    create_failed_at       TIMESTAMPTZ,
-    create_idempotency_key UUID        NOT NULL DEFAULT gen_random_uuid(),
-    created_at             TIMESTAMPTZ NOT NULL,
-    updated_at             TIMESTAMPTZ NOT NULL,
-    CONSTRAINT payment_accounts_provider_check CHECK (provider ~ '^[a-z][a-z0-9_]{0,39}$'),
-    CONSTRAINT payment_accounts_contact_email_check CHECK (
-        contact_email = lower(contact_email) AND char_length(contact_email) <= 254 AND contact_email ~ '^[^@[:space:]]+@[^@[:space:]]+$'
-    ),
-    CONSTRAINT payment_accounts_external_id_check CHECK (external_account_id IS NULL OR char_length(external_account_id) BETWEEN 1 AND 255),
-    CONSTRAINT payment_accounts_collection_check CHECK (requirement_collection IN ('PROVIDER', 'PLATFORM')),
-    CONSTRAINT payment_accounts_status_check CHECK (status IN ('NOT_CREATED', 'UNDER_REVIEW', 'ACTION_REQUIRED', 'ENABLED', 'DISABLED')),
-    CONSTRAINT payment_accounts_created_check CHECK ((status = 'NOT_CREATED') = (external_account_id IS NULL)),
-    CONSTRAINT payment_accounts_enabled_check CHECK ((status = 'ENABLED') = transfers_active),
-    CONSTRAINT payment_accounts_snapshot_check CHECK (external_account_id IS NOT NULL OR (fetched_at IS NULL AND NOT payouts_active AND status_reason IS NULL)),
-    CONSTRAINT payment_accounts_requirements_check CHECK (jsonb_typeof(requirements) = 'object'),
-    CONSTRAINT payment_accounts_status_reason_check CHECK (status_reason IS NULL OR char_length(status_reason) BETWEEN 1 AND 200),
-    CONSTRAINT payment_accounts_create_failed_check CHECK (create_failed_at IS NULL OR external_account_id IS NULL)
+-- 收款帳戶的開通閘門副本（Stripe 計畫 D28）：收款帳戶由 payment 模組擁有，同步 job 在寫快取的 transaction 內發 PayoutAccountChanged，
+-- seller 以同 transaction 的訂閱者把轉帳能力是否啟用複製到這裡（開通閘門 store_requirement_flags.onboarding_complete 只讀這一欄，不讀 payment）。
+-- 沒有列等於轉帳能力未啟用。provider 是發布事件的 provider 代碼。列隨店家保留（不含個資）。
+CREATE TABLE seller.payout_capabilities (
+    store_id         BIGINT      PRIMARY KEY REFERENCES seller.stores (store_id),
+    provider         TEXT        NOT NULL,
+    transfers_active BOOLEAN     NOT NULL,
+    updated_at       TIMESTAMPTZ NOT NULL,
+    CONSTRAINT payout_capabilities_provider_check CHECK (provider ~ '^[a-z][a-z0-9_]{0,39}$')
 );
-CREATE UNIQUE INDEX payment_accounts_external ON seller.payment_accounts (provider, external_account_id) WHERE external_account_id IS NOT NULL;
-CREATE INDEX payment_accounts_poll ON seller.payment_accounts (fetched_at NULLS FIRST, store_id) WHERE status IN ('UNDER_REVIEW', 'ACTION_REQUIRED', 'DISABLED');
-
--- 收款開通的 webhook inbox（單體規則 5）：金流商的事件先寫這裡再處理。(provider, event_id) 唯一，重送的事件不再排 job。
--- processed_at 是同步 job 讀過外部帳戶、涵蓋這個事件之後記下的時間；外部帳戶 ID 對不到本地帳戶的事件只留紀錄。
-CREATE TABLE seller.payment_provider_events (
-    provider            TEXT        NOT NULL,
-    event_id            TEXT        NOT NULL,
-    external_account_id TEXT        NOT NULL,
-    received_at         TIMESTAMPTZ NOT NULL,
-    processed_at        TIMESTAMPTZ,
-    PRIMARY KEY (provider, event_id),
-    CONSTRAINT payment_provider_events_provider_check CHECK (provider ~ '^[a-z][a-z0-9_]{0,39}$'),
-    CONSTRAINT payment_provider_events_event_id_check CHECK (char_length(event_id) BETWEEN 1 AND 255),
-    CONSTRAINT payment_provider_events_account_check CHECK (char_length(external_account_id) BETWEEN 1 AND 255)
-);
-CREATE INDEX payment_provider_events_pending ON seller.payment_provider_events (provider, external_account_id) WHERE processed_at IS NULL;

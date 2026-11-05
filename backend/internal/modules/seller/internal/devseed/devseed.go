@@ -107,7 +107,7 @@ var clearChildrenSQL = []string{
 	`DELETE FROM seller.case_inquiry_reply_evidence WHERE inquiry_id IN (SELECT id FROM seller.case_inquiries WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.case_inquiries WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.cases WHERE store_id = ANY($1)`,
-	`DELETE FROM seller.payment_accounts WHERE store_id = ANY($1)`,
+	`DELETE FROM seller.payout_capabilities WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.payuni_observations WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.payuni_registrations WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.agreement_acceptances WHERE store_id = ANY($1)`,
@@ -138,10 +138,7 @@ const profileSnapshotSQL = `SELECT s.store_id, ` + profileExpr + ` FROM seller.s
 
 // 申請列、註冊列接著鎖（店家、申請、註冊的順序，同模組的寫入者）；註冊列的 intent_seq 是重寫之後要延續的底。
 const (
-	lockApplicationsSQL = `SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1) ORDER BY store_id, application_id FOR UPDATE`
-	// 種子店家的收款帳戶：fake provider 的外部帳戶，轉帳能力已啟用（開通閘門看 transfers_active），店家仍可曝光。
-	insertPaymentAccountSQL = `INSERT INTO seller.payment_accounts (store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, fetched_at, created_at, updated_at)
-		VALUES ($1, 'fake', 'fake_acct_seed_' || $1::bigint::text, 'seed-' || $1::bigint::text || '@example.com', 'PROVIDER', 'ENABLED', true, true, '{}', $2, $2, $2)`
+	lockApplicationsSQL  = `SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1) ORDER BY store_id, application_id FOR UPDATE`
 	lockRegistrationsSQL = `SELECT store_id, intent_seq FROM seller.payuni_registrations WHERE store_id = ANY($1) ORDER BY store_id FOR UPDATE`
 	setIntentSeqSQL      = `UPDATE seller.payuni_registrations SET intent_seq = $2 WHERE store_id = $1 RETURNING intent_seq`
 )
@@ -639,10 +636,6 @@ func (s *Service) seedOne(ctx context.Context, q *store.Queries, st Store, now t
 		StoreID: st.StoreID, MerStatus: &st.PayUniMerStatus, MemberStatus: &st.PayUniMemberStatus,
 		Outcome: string(model.PayUniOutcomeOf(st.PayUniMerStatus, st.PayUniMemberStatus)), ExecutedAt: &now, Now: now,
 	})
-	if err != nil {
-		return err
-	}
-	_, err = conn.Exec(ctx, insertPaymentAccountSQL, st.StoreID, now)
 	return err
 }
 

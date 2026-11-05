@@ -71,7 +71,42 @@ func reportItem(id string, due time.Time) rq.Item {
 	return rq.Item{Kind: rq.ReportTriage, ItemID: id, ReportID: &r, Start: due.Add(-72 * time.Hour), Due: due}
 }
 
-func newAdmin(f *fakeLister) *Admin { return NewAdmin(f, func() time.Time { return now }) }
+// fakeNames 回店名並記下每次查詢的店家。
+type fakeNames struct {
+	names map[int64]string
+	calls [][]int64
+}
+
+func (f *fakeNames) StoreNames(_ context.Context, ids []int64) (map[int64]string, error) {
+	f.calls = append(f.calls, slices.Clone(ids))
+	return f.names, nil
+}
+
+func newAdmin(f *fakeLister) *Admin {
+	return NewAdmin(f, &fakeNames{}, func() time.Time { return now })
+}
+
+// payment 的待辦只有店家 ID（店名在模組的查詢是空字串）：handler 一頁批次讀一次店名補上；來源已經給店名的項目不查、不覆寫。
+// mutation：拿掉 fillStoreNames → 收款帳戶待辦的 store_name 是空的；補名字時不跳過已有店名的項目 → 呼叫的店家多了 2。
+func TestStoreNamesAreFilledForItemsWithoutOne(t *testing.T) {
+	s1, s2 := int64(1), int64(2)
+	f := &fakeLister{items: []rq.Item{
+		{Kind: rq.PaymentAccountCreateFailed, ItemID: "1", StoreID: &s1, Start: now, Due: now.Add(24 * time.Hour)},
+		{Kind: rq.PaymentAccountCreateFailed, ItemID: "2", StoreID: &s2, StoreName: "已有店名", Start: now, Due: now.Add(25 * time.Hour)},
+	}}
+	names := &fakeNames{names: map[int64]string{1: "收款店", 2: "不該用到"}}
+	h := NewAdmin(f, names, func() time.Time { return now })
+	resp, err := list(t, h, asOwner, &adminpb.ListReviewQueueRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Items) != 2 || resp.Items[0].GetStoreName() != "收款店" || resp.Items[1].GetStoreName() != "已有店名" {
+		t.Fatalf("items=%v", resp.Items)
+	}
+	if len(names.calls) != 1 || !slices.Equal(names.calls[0], []int64{1}) {
+		t.Fatalf("店名查詢=%v", names.calls)
+	}
+}
 
 // 呼叫者：以 header 選擇放進 ctx 的 principal（真實的入口是 withSession），其餘走真正的 interceptor 與 Connect 的 wire，錯誤碼因此是 client 看到的。
 const (
@@ -151,7 +186,7 @@ func TestKindsAreOneToOneWithTheContract(t *testing.T) {
 		// PayUni 註冊只有 get 讀取權（沒有 list RPC）。
 		rq.PayUniBindRetry: adminperm.SellerPayUniRegistrationsGet,
 		// 收款帳戶的讀取權（沒有 list RPC）。
-		rq.PaymentAccountCreateFailed: adminperm.SellerPaymentAccountsGet,
+		rq.PaymentAccountCreateFailed: adminperm.PaymentAccountsGet,
 	}
 	for _, k := range rq.Kinds() {
 		perm, ok := kindPermissions[k]

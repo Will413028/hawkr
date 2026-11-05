@@ -480,7 +480,7 @@ func (s *Service) Approve(ctx context.Context, in model.ApproveKYCInput) (model.
 			}
 			contact = &email
 		}
-		if err := s.d.Payment.RequestAccount(ctx, q, row.StoreID, contact, now); err != nil {
+		if err := s.d.Payment.RequestAccount(ctx, row.StoreID, contact, now); err != nil {
 			return err
 		}
 		if err := s.d.Exposure.Announce(ctx, q, now, row.StoreID); err != nil {

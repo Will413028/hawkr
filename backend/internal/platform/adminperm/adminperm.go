@@ -38,6 +38,9 @@ const (
 	IdentityAccountsGet               Permission = "identity.accounts.get"
 	IdentityAccountsDelete            Permission = "identity.accounts.delete"
 	LegacyGatewayForward              Permission = "legacy.gateway.forward"
+	PaymentAccountsGet                Permission = "payment.accounts.get"
+	PaymentAccountsRefresh            Permission = "payment.accounts.refresh"
+	PaymentAccountsRetryCreate        Permission = "payment.accounts.retry_create"
 	ReviewQueueItemsList              Permission = "reviewqueue.items.list"
 	SellerStoresList                  Permission = "seller.stores.list"
 	SellerStoresGet                   Permission = "seller.stores.get"
@@ -55,9 +58,6 @@ const (
 	SellerPayUniRegistrationsRebind   Permission = "seller.payuni_registrations.rebind"
 	SellerPayUniRegistrationsRefresh  Permission = "seller.payuni_registrations.refresh"
 	SellerPayUniObservationsList      Permission = "seller.payuni_observations.list"
-	SellerPaymentAccountsGet          Permission = "seller.payment_accounts.get"
-	SellerPaymentAccountsRefresh      Permission = "seller.payment_accounts.refresh"
-	SellerPaymentAccountsRetryCreate  Permission = "seller.payment_accounts.retry_create"
 	SellerReportsList                 Permission = "seller.reports.list"
 	SellerReportsGet                  Permission = "seller.reports.get"
 	SellerReportsMarkSupplementsSeen  Permission = "seller.reports.mark_supplements_seen"
@@ -120,6 +120,7 @@ func Catalog() []Permission {
 		DelegationSessionsCreate,
 		IdentityAccountsList, IdentityAccountsGet, IdentityAccountsDelete,
 		LegacyGatewayForward,
+		PaymentAccountsGet, PaymentAccountsRefresh, PaymentAccountsRetryCreate,
 		ReviewQueueItemsList,
 		SellerStoresList, SellerStoresGet,
 		SellerStoreStatsGet,
@@ -127,7 +128,6 @@ func Catalog() []Permission {
 		SellerKYCApplicationsRequery,
 		SellerKYCRevealsList, SellerKYCRevealsCreate, SellerKYCDocumentAccessesList, SellerKYCDocumentsGet,
 		SellerPayUniRegistrationsGet, SellerPayUniRegistrationsRebind, SellerPayUniRegistrationsRefresh, SellerPayUniObservationsList,
-		SellerPaymentAccountsGet, SellerPaymentAccountsRefresh, SellerPaymentAccountsRetryCreate,
 		SellerReportsList, SellerReportsGet, SellerReportsMarkSupplementsSeen, SellerReportsTriage, SellerReportsResolve, SellerReportsMove,
 		SellerCasesList, SellerCasesGet, SellerCasesDecide, SellerCasesChangeSeverity,
 		SellerCaseNotesCreate, SellerCaseNotesList, SellerReportEvidenceGet,

@@ -41,6 +41,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -113,7 +114,7 @@ func setup(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := httpapi.NewHandler(httpapi.Deps{Buyer: &buyer.Module{}, Social: &social.Module{}, Ready: d.Ping, Content: m, Identity: id, Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{}, Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: &seller.Module{}, Now: time.Now, Logger: log}), Images: images, Logger: log})
+	h, err := httpapi.NewHandler(httpapi.Deps{Buyer: &buyer.Module{}, Social: &social.Module{}, Ready: d.Ping, Content: m, Identity: id, Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: &seller.Module{}, Now: time.Now, Logger: log}), Images: images, Logger: log})
 	if err != nil {
 		t.Fatal(err)
 	}

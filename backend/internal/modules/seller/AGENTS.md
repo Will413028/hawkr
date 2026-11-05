@@ -2,11 +2,11 @@
 
 ## 職責
 
-店家業務身分與 profile 的擁有者：開店、KYC 與 PayUni、收款開通（`internal/payment`）、措施與停權、治理（通報、案件、申訴）、關店與清理、商家名單、商品瀏覽數、刪帳參與者。行為規格的唯一來源是 `docs/modules/seller.md`。
+店家業務身分與 profile 的擁有者：開店、KYC 與 PayUni、開通閘門（收款帳戶本身由 payment 模組擁有，seller 存轉帳能力的副本，`internal/payout`）、措施與停權、治理（通報、案件、申訴）、關店與清理、商家名單、商品瀏覽數、刪帳參與者。行為規格的唯一來源是 `docs/modules/seller.md`。
 
 ## 擁有的資料
 
-schema `seller`（`db/schema.sql`；view 與函式在 `db/objects.sql`），依子領域：店家、措施與停權、治理（通報、案件、申訴）、KYC 與 PayUni、收款帳戶、商家名單、瀏覽、媒體同步與清理。表單見規格 §1。讀取模型：無。
+schema `seller`（`db/schema.sql`；view 與函式在 `db/objects.sql`），依子領域：店家、措施與停權、治理（通報、案件、申訴）、KYC 與 PayUni、收款帳戶的閘門副本、商家名單、瀏覽、媒體同步與清理。表單見規格 §1。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -24,7 +24,7 @@ schema `seller`（`db/schema.sql`；view 與函式在 `db/objects.sql`），依�
 - 鎖順序：全域順序見 `backend/AGENTS.md` 單體規則 4；本模組內：帳號全部 stint、通報／案件／詢問／措施列（依 id 升序）、公告列。守門：`TestConcurrentSourceRevokeAndLinkedCreateNeverDeadlock`。規格：§18。
 - 動作可用性各只有一處來源（`Can*`、`*UnavailableReasons`、`BlockFor`），API 的 `can_*` 共用。守門：`TestCanFlagsMatchWhetherTheActionSucceeds`。規格：§5–§8。
 - 能力只由 `model.CapabilitiesOf` 推導；停權不擋關店與刪帳。守門：`TestActingStoreFailsClosed`。規格：§10。
-- 開通閘門只看 `payment_accounts.transfers_active`（view `store_requirement_flags.onboarding_complete`）；外部呼叫不在 transaction 內，建立與同步各一店一個 job。收款帳戶狀態只由 `payment.StatusOf` 從轉帳能力快照推導（5 值，規格：§13.1），不另存 capability 的 status 或行動方。守門：`TestExposureRequiresTheTransfersCapabilityOfThePaymentAccount`、`TestPaymentJobsAreUniquePerStoreInRiver`。規格：§10。
+- 開通閘門只看 seller 自存的副本 `payout_capabilities.transfers_active`（view `store_requirement_flags.onboarding_complete`），由 payment 的 `PayoutAccountChanged` 經同 transaction 的訂閱者（`internal/payout`）寫入，seller 不讀 payment 的表；核准與個資清理對 payment 只呼叫 `RequestAccount`（只 INSERT）與 `ForgetOwners`（只排 job），不等 payment 的既有列。守門：`TestExposureRequiresTheTransfersCapabilityOfThePaymentAccount`、`TestReapprovalKeepsTheFirstContactEmailSnapshot`、`TestPurgeAsksPaymentToForgetThePurgedStoreOnly`。規格：§13.1、`docs/modules/payment.md`。
 - 事件與快取失效在寫入的 transaction 內；儲存代碼 UPPER_SNAKE 加 CHECK 等於 `Values()`。守門：`TestEventFailuresRollBackTheWholeCommand`、`TestChecksMatchGo`。規格：§18、§20。
 - 單一子領域的不變量在 `internal/<子領域>/AGENTS.md`（碰該目錄時才載入）；跨子領域的才放這裡。
 

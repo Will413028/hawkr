@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -86,7 +87,7 @@ func TestBankFingerprintRowsAreIdempotentKeptAndNeverPlaintext(t *testing.T) {
 	if n := f.fingerprintRows(t, s.StoreID); n != keys*2 {
 		t.Fatalf("2 個 fingerprint × %d 把金鑰：%d", keys, n)
 	}
-	f.setPayment(t, s.StoreID, PaymentSnapshot{Transfers: PaymentCapabilityActive, PayoutsActive: true, BankFingerprints: []string{fpShared, fpOther}})
+	f.setPayment(t, s.StoreID, payment.Snapshot{Transfers: payment.CapabilityActive, PayoutsActive: true, BankFingerprints: []string{fpShared, fpOther}})
 	if n := f.fingerprintRows(t, s.StoreID); n != keys*2 {
 		t.Fatalf("重複同步不增加列：%d", n)
 	}
@@ -94,7 +95,7 @@ func TestBankFingerprintRowsAreIdempotentKeptAndNeverPlaintext(t *testing.T) {
 	if n := f.fingerprintRows(t, s.StoreID); n != keys*2 {
 		t.Fatalf("fingerprint 從快照消失，列仍保留：%d", n)
 	}
-	f.setPayment(t, s.StoreID, PaymentSnapshot{Transfers: PaymentCapabilityActive, PayoutsActive: true, BankFingerprints: []string{"fp_third_bank_0003"}})
+	f.setPayment(t, s.StoreID, payment.Snapshot{Transfers: payment.CapabilityActive, PayoutsActive: true, BankFingerprints: []string{"fp_third_bank_0003"}})
 	if n := f.fingerprintRows(t, s.StoreID); n != keys*3 {
 		t.Fatalf("新的 fingerprint 另外加列：%d", n)
 	}

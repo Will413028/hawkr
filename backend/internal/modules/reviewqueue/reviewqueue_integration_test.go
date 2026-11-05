@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
@@ -29,7 +30,7 @@ func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 // setup 給這支測試一個套用了 seller migration 的 database（本模組沒有自己的 schema，讀 seller 發布的 pub_review_items，函式建在 seller 的表上）。
 func setup(t *testing.T) (*db.DB, *reviewqueue.Module) {
 	t.Helper()
-	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "seller", Dir: seller.Migrations()}))
+	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "seller", Dir: seller.Migrations()}, migrate.Module{Name: "payment", Dir: payment.Migrations()}))
 	return d, reviewqueue.New(reviewqueue.Deps{DB: d})
 }
 
@@ -298,22 +299,23 @@ func TestListRejectsInvalidInput(t *testing.T) {
 	}
 }
 
-// 模組認得的種類與來源一致：seller 的 11 支函式各自的 kind 字面值，集合等於模組的 Kinds（加來源的種類時沒有同步 model.Kinds，這裡失敗）。
+// 模組認得的種類與來源一致：seller 的 10 支函式與 payment 的 pub_review_items 各自的 kind 字面值，集合等於模組的 Kinds（加來源的種類時沒有同步
+// model.Kinds，這裡失敗）。
 // 查詢以 kinds 篩選，所以來源多出模組不認得的種類時，那些列在執行期不會出現在結果裡、也不報錯，只有這個測試（測試期）看得到。
 func TestKindsMatchTheSource(t *testing.T) {
 	t.Parallel()
 	d, _ := setup(t)
 	ctx := context.Background()
 	fns := []string{
-		"review_report_triage", "review_case_decision", "review_case_inquiry_overdue", "review_authority_order",
-		"review_authority_target_notice", "review_measure_appeal", "review_measure_lift_request", "review_measure_review",
-		"review_kyc_application", "review_payuni_bind_retry", "review_payment_account_create_failed",
+		"seller.review_report_triage", "seller.review_case_decision", "seller.review_case_inquiry_overdue", "seller.review_authority_order",
+		"seller.review_authority_target_notice", "seller.review_measure_appeal", "seller.review_measure_lift_request", "seller.review_measure_review",
+		"seller.review_kyc_application", "seller.review_payuni_bind_retry", "payment.pub_review_items",
 	}
 	var sourceKinds []string
 	// 每支函式的 kind 字面值：從函式定義裡讀（pg_get_functiondef 的第一個 SELECT 字面值）。
 	for _, fn := range fns {
 		var def string
-		must(t, d.Conn(ctx).QueryRow(ctx, `SELECT pg_get_functiondef(('seller.'||$1||'(timestamptz)')::regprocedure)`, fn).Scan(&def))
+		must(t, d.Conn(ctx).QueryRow(ctx, `SELECT pg_get_functiondef(($1||'(timestamptz)')::regprocedure)`, fn).Scan(&def))
 		i := strings.Index(def, "SELECT '")
 		j := strings.Index(def[i+8:], "'")
 		if i < 0 || j < 0 {
@@ -354,7 +356,7 @@ func setupICU(t *testing.T) (*db.DB, *reviewqueue.Module) {
 	d, err := db.Open(ctx, db.Config{URL: u.String(), MaxConns: 5, ConnectRetryBudget: 10 * time.Second})
 	must(t, err)
 	t.Cleanup(d.Close)
-	must(t, migrate.Apply(ctx, d, []migrate.Module{{Name: "seller", Dir: seller.Migrations()}}))
+	must(t, migrate.Apply(ctx, d, []migrate.Module{{Name: "seller", Dir: seller.Migrations()}, {Name: "payment", Dir: payment.Migrations()}}))
 	return d, reviewqueue.New(reviewqueue.Deps{DB: d})
 }
 
@@ -408,5 +410,22 @@ func TestOrderingIsBytewiseNotLocale(t *testing.T) {
 		if !slices.Equal(ids, want) {
 			t.Errorf("每頁 %d：逐頁讀完 %v，位元組順序 %v", size, ids, want)
 		}
+	}
+}
+
+// payment 的待辦和 seller 的一起排序分頁：建立失敗的收款帳戶出現在結果裡，帶店家 ID、店名是空字串（由後台入口補），期限是失敗後 24 小時。
+// mutation：items.sql 拿掉 payment.pub_review_items 的 UNION ALL 分支 → 沒有這一列，失敗。
+func TestPaymentItemsAreMergedIntoTheQueue(t *testing.T) {
+	t.Parallel()
+	d, m := setup(t)
+	ctx := context.Background()
+	_, err := d.Conn(ctx).Exec(ctx, `INSERT INTO payment.accounts (store_id, provider, contact_email, requirement_collection, create_failed_at, created_at, updated_at)
+		VALUES (42, 'fake', 'a@example.com', 'PROVIDER', $1, $1, $1)`, base)
+	must(t, err)
+	items, err := m.List(ctx, base.Add(time.Hour), reviewqueue.Kinds(), nil, 10)
+	must(t, err)
+	if len(items) != 1 || items[0].Kind != reviewqueue.PaymentAccountCreateFailed || items[0].ItemID != "42" || items[0].StoreID == nil || *items[0].StoreID != 42 ||
+		items[0].StoreName != "" || !items[0].Due.Equal(base.Add(24*time.Hour)) {
+		t.Fatalf("items=%+v", items)
 	}
 }

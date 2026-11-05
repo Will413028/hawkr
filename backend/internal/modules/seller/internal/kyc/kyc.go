@@ -20,7 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payuni"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
@@ -45,8 +44,8 @@ type Deps struct {
 	Media  media.Media
 	// Exposure 是可曝光的公告：申請的狀態是 KYC 流程的輸入，每個改變它的寫入在 transaction 的最後呼叫。
 	Exposure *exposure.Service
-	// Payment 是收款帳戶：核准的 transaction 內寫「建立中」的列並排入建立 job（Stripe 計畫 D16）。
-	Payment  *payment.Service
+	// Payment 是收款帳戶的擁有者（payment 模組）：核准的 transaction 內寫「建立中」的列並排入建立 job（Stripe 計畫 D16、D28）。
+	Payment  Payment
 	Identity Identity
 	Keys     *seal.Keyring
 	MAC      *seal.MAC
@@ -54,6 +53,13 @@ type Deps struct {
 	Registry Registry
 	Now      func() time.Time
 	Logger   *slog.Logger
+}
+
+// Payment 是 payment 模組的公開 API 中核准用到的部分。RequestAccount 在呼叫方的 transaction 內只 INSERT 帳戶列（既有的列不改）並排入建立 job，
+// 不鎖 payment 的既有列（全域鎖順序 payment 先於 seller，核准已鎖住店家與申請列）。
+type Payment interface {
+	Configured() bool
+	RequestAccount(ctx context.Context, storeID int64, contactEmail *string, now time.Time) error
 }
 
 // Service 是 KYC 的 use case。

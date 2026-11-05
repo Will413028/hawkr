@@ -3,8 +3,8 @@ import { Code, ConnectError, type Transport } from "@connectrpc/connect";
 import { createQueryOptions } from "@connectrpc/connect-query";
 import {
 	type PaymentAccount,
-	SellerAdminService,
-} from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
+	PaymentAdminService,
+} from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1/payment_pb";
 import { skipToken } from "@tanstack/react-query";
 
 // 商家詳情收款帳戶卡的純邏輯（讀取狀態、快取 key、重新整理後的重讀判斷）；元件在 PaymentAccountCard.tsx，查詢 hook 在 use-store-detail.ts。
@@ -37,7 +37,7 @@ export function paymentAccountQueryOptions(
 	storeId: string | undefined,
 ) {
 	return createQueryOptions(
-		SellerAdminService.method.getPaymentAccount,
+		PaymentAdminService.method.getPaymentAccount,
 		storeId ? { storeId } : skipToken,
 		{ transport },
 	);

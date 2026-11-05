@@ -9,17 +9,15 @@ import (
 
 	"connectrpc.com/connect"
 
-	adminpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
-	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 type paymentModule struct {
-	Module
-	account    model.PaymentAccount
-	caps       model.PaymentCapabilities
+	account    payment.Account
+	caps       payment.Capabilities
 	configured bool
 	sessionFor int64
 	returnURL  string
@@ -27,47 +25,25 @@ type paymentModule struct {
 	err        error
 }
 
-func (m *paymentModule) PaymentAccountOf(_ context.Context, storeID int64) (model.PaymentAccount, error) {
+func (m *paymentModule) Account(_ context.Context, storeID int64) (payment.Account, error) {
 	return m.account, m.err
 }
 
-func (m *paymentModule) PaymentCapabilities() (model.PaymentCapabilities, bool) {
+func (m *paymentModule) Capabilities() (payment.Capabilities, bool) {
 	return m.caps, m.configured
 }
 
-func (m *paymentModule) CreatePaymentOnboardingSession(_ context.Context, storeID int64, returnURL, refreshURL string) (model.OnboardingSession, error) {
+func (m *paymentModule) CreateOnboardingSession(_ context.Context, storeID int64, returnURL, refreshURL string) (payment.OnboardingSession, error) {
 	m.sessionFor, m.returnURL, m.refreshURL = storeID, returnURL, refreshURL
 	exp := time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)
-	return model.OnboardingSession{Surface: model.SurfaceHosted, URL: "https://onboarding.example.test/x", ExpiresAt: &exp}, m.err
-}
-
-type paymentAdminModule struct {
-	AdminModule
-	account   model.PaymentAccount
-	refreshed int64
-	retried   int64
-	err       error
-}
-
-func (m *paymentAdminModule) PaymentAccountOf(context.Context, int64) (model.PaymentAccount, error) {
-	return m.account, m.err
-}
-
-func (m *paymentAdminModule) RefreshPaymentAccount(_ context.Context, id int64) error {
-	m.refreshed = id
-	return m.err
-}
-
-func (m *paymentAdminModule) RetryPaymentAccountCreate(_ context.Context, id int64) (model.PaymentAccount, error) {
-	m.retried = id
-	return m.account, m.err
+	return payment.OnboardingSession{Surface: payment.SurfaceHosted, URL: "https://onboarding.example.test/x", ExpiresAt: &exp}, m.err
 }
 
 func TestPaymentEnumsMatchTheModule(t *testing.T) {
 	for name, got := range map[string][]string{
-		"PaymentAccountStatus":  rpc.EnumMismatches[pb.PaymentAccountStatus](model.PaymentAccountStatusValues()),
-		"RequirementCollection": rpc.EnumMismatches[pb.RequirementCollection]([]model.RequirementCollection{model.CollectionProvider, model.CollectionPlatform}),
-		"OnboardingSurface":     rpc.EnumMismatches[pb.OnboardingSurface]([]model.OnboardingSurface{model.SurfaceHosted, model.SurfaceEmbedded}),
+		"PaymentAccountStatus":  rpc.EnumMismatches[pb.PaymentAccountStatus](payment.AccountStatusValues()),
+		"RequirementCollection": rpc.EnumMismatches[pb.RequirementCollection](payment.RequirementCollectionValues()),
+		"OnboardingSurface":     rpc.EnumMismatches[pb.OnboardingSurface]([]payment.OnboardingSurface{payment.SurfaceHosted, payment.SurfaceEmbedded}),
 	} {
 		if len(got) != 0 {
 			t.Errorf("%s：%v", name, got)
@@ -103,13 +79,13 @@ func TestCheckReturnURLAcceptsOnlyAbsoluteHTTPSOrLocalHTTP(t *testing.T) {
 func TestGetMyPaymentAccountReturnsTheNeutralStatusAndTheProviderSurface(t *testing.T) {
 	fetched := time.Date(2026, 11, 2, 3, 0, 0, 0, time.UTC)
 	m := &paymentModule{
-		configured: true, caps: model.PaymentCapabilities{RequirementCollection: model.CollectionPlatform, OnboardingSurface: model.SurfaceEmbedded},
-		account: model.PaymentAccount{
-			StoreID: 11, Status: model.PaymentActionRequired, RequirementCollection: model.CollectionPlatform, TransfersActive: false, PayoutsActive: false,
+		configured: true, caps: payment.Capabilities{RequirementCollection: payment.CollectionPlatform, OnboardingSurface: payment.SurfaceEmbedded},
+		account: payment.Account{
+			StoreID: 11, Status: payment.StatusActionRequired, RequirementCollection: payment.CollectionPlatform, TransfersActive: false, PayoutsActive: false,
 			Requirements: json.RawMessage(`{"currently_due":["individual.id_number"]}`), FetchedAt: &fetched,
 		},
 	}
-	app := &App{m: m}
+	app := &App{payments: m}
 	got, err := app.GetMyPaymentAccount(ctxWithStore(currentStore()), connect.NewRequest(&pb.GetMyPaymentAccountRequest{}))
 	if err != nil {
 		t.Fatal(err)
@@ -131,7 +107,7 @@ func TestGetMyPaymentAccountReturnsTheNeutralStatusAndTheProviderSurface(t *test
 
 func TestCreatePaymentOnboardingSessionValidatesTheUrlsBeforeCallingTheModule(t *testing.T) {
 	m := &paymentModule{}
-	app := &App{m: m}
+	app := &App{payments: m}
 	for name, req := range map[string]*pb.CreatePaymentOnboardingSessionRequest{
 		"沒有 return_url":  {RefreshUrl: "https://web.example.test/again"},
 		"沒有 refresh_url": {ReturnUrl: "https://web.example.test/ok"},
@@ -155,49 +131,5 @@ func TestCreatePaymentOnboardingSessionValidatesTheUrlsBeforeCallingTheModule(t 
 	}
 	if got.Msg.GetSurface() != pb.OnboardingSurface_ONBOARDING_SURFACE_HOSTED || got.Msg.GetUrl() == "" || got.Msg.GetClientSecret() != "" || got.Msg.GetExpireTime() == nil {
 		t.Fatalf("response=%v", got.Msg)
-	}
-}
-
-func TestAdminPaymentAccountHandlersMapTheAccountAndPassTheStore(t *testing.T) {
-	ext := "acct_1"
-	reason := "rejected.fraud"
-	failed := time.Date(2026, 11, 2, 1, 0, 0, 0, time.UTC)
-	m := &paymentAdminModule{account: model.PaymentAccount{
-		StoreID: 11, Provider: "stripe", ExternalAccountID: &ext, Status: model.PaymentDisabled, RequirementCollection: model.CollectionProvider,
-		StatusReason: &reason, CreateFailedAt: &failed, CreatedAt: failed, UpdatedAt: failed,
-	}}
-	h := NewAdmin(m, rpc.Images{})
-	got, err := h.GetPaymentAccount(adminCtx(1), connect.NewRequest(&adminpb.GetPaymentAccountRequest{StoreId: "11"}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	a := got.Msg.GetAccount()
-	if a.GetStoreId() != "11" || a.GetProvider() != "stripe" || a.GetExternalAccountId() != "acct_1" || a.GetStatus() != pb.PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_DISABLED ||
-		a.GetStatusReason() != reason || a.GetCreateFailedTime() == nil || a.GetFetchTime() != nil {
-		t.Fatalf("account=%v", a)
-	}
-	if _, err := h.RefreshPaymentAccount(adminCtx(1), connect.NewRequest(&adminpb.RefreshPaymentAccountRequest{StoreId: "11"})); err != nil || m.refreshed != 11 {
-		t.Fatalf("refresh: %v %d", err, m.refreshed)
-	}
-	if _, err := h.RetryPaymentAccountCreate(adminCtx(1), connect.NewRequest(&adminpb.RetryPaymentAccountCreateRequest{StoreId: "11"})); err != nil || m.retried != 11 {
-		t.Fatalf("retry: %v %d", err, m.retried)
-	}
-	for name, call := range map[string]func() error{
-		"Get": func() error {
-			_, err := h.GetPaymentAccount(adminCtx(1), connect.NewRequest(&adminpb.GetPaymentAccountRequest{StoreId: "x"}))
-			return err
-		},
-		"Refresh": func() error {
-			_, err := h.RefreshPaymentAccount(adminCtx(1), connect.NewRequest(&adminpb.RefreshPaymentAccountRequest{}))
-			return err
-		},
-		"Retry": func() error {
-			_, err := h.RetryPaymentAccountCreate(adminCtx(1), connect.NewRequest(&adminpb.RetryPaymentAccountCreateRequest{StoreId: "0"}))
-			return err
-		},
-	} {
-		if apperr.KindOf(call()) != apperr.KindInvalidInput {
-			t.Errorf("%s：壞的 store_id 不是 invalid argument", name)
-		}
 	}
 }

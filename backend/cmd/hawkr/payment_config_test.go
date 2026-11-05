@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 )
 
-func readPaymentWith(env map[string]string) (seller.PaymentProvider, error) {
+func readPaymentWith(env map[string]string) (payment.Provider, error) {
 	e := config.FromMap(env)
 	p := readPayment(e, slog.New(slog.DiscardHandler))
 	return p, e.Err()
@@ -44,14 +44,14 @@ func TestStripePaymentConfig(t *testing.T) {
 	if err != nil || p == nil || p.Name() != "stripe" {
 		t.Fatalf("預設：%v %v", p, err)
 	}
-	if c := p.Capabilities(); c.RequirementCollection != seller.CollectionProvider || c.OnboardingSurface != seller.SurfaceHosted {
+	if c := p.Capabilities(); c.RequirementCollection != payment.CollectionProvider || c.OnboardingSurface != payment.SurfaceHosted {
 		t.Errorf("預設要是 Stripe 收件加託管頁面：%+v", c)
 	}
 	p, err = readPaymentWith(with("STRIPE_REQUIREMENT_COLLECTION", "platform"))
 	if err != nil || p == nil {
 		t.Fatalf("platform：%v %v", p, err)
 	}
-	if c := p.Capabilities(); c.RequirementCollection != seller.CollectionPlatform || c.OnboardingSurface != seller.SurfaceEmbedded {
+	if c := p.Capabilities(); c.RequirementCollection != payment.CollectionPlatform || c.OnboardingSurface != payment.SurfaceEmbedded {
 		t.Errorf("platform 要是平台收件加內嵌元件：%+v", c)
 	}
 	if _, err := readPaymentWith(with("STRIPE_REQUIREMENT_COLLECTION", "both")); err == nil || !strings.Contains(err.Error(), "STRIPE_REQUIREMENT_COLLECTION") {

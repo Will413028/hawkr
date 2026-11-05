@@ -1,4 +1,4 @@
-package payment
+package account
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/stripe"
 )
 

@@ -390,30 +390,11 @@ type SellerMediaRefSync struct {
 	UpdatedAt time.Time
 }
 
-type SellerPaymentAccount struct {
-	StoreID               int64
-	Provider              string
-	ExternalAccountID     *string
-	ContactEmail          string
-	RequirementCollection string
-	Status                string
-	TransfersActive       bool
-	PayoutsActive         bool
-	Requirements          []byte
-	StatusReason          *string
-	FetchedAt             *time.Time
-	CreateFailedAt        *time.Time
-	CreateIdempotencyKey  uuid.UUID
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
-}
-
-type SellerPaymentProviderEvent struct {
-	Provider          string
-	EventID           string
-	ExternalAccountID string
-	ReceivedAt        time.Time
-	ProcessedAt       *time.Time
+type SellerPayoutCapability struct {
+	StoreID         int64
+	Provider        string
+	TransfersActive bool
+	UpdatedAt       time.Time
 }
 
 type SellerPayuniObservation struct {

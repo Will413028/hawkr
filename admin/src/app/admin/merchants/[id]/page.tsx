@@ -9,6 +9,7 @@ import {
 	useTransport,
 } from "@connectrpc/connect-query";
 import { IdentityAdminService } from "@hawkr/api/gen/hawkr/admin/identity/v1alpha1/identity_pb";
+import { PaymentAdminService } from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1/payment_pb";
 import {
 	type CreateMeasureRequestSchema,
 	SellerGovernanceAdminService,
@@ -441,7 +442,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		invalidateStore();
 		queryClient.invalidateQueries({
 			queryKey: createConnectQueryKey({
-				schema: SellerAdminService.method.getPaymentAccount,
+				schema: PaymentAdminService.method.getPaymentAccount,
 				cardinality: undefined,
 			}),
 		});

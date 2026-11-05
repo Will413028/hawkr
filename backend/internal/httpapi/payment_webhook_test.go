@@ -18,7 +18,7 @@ type recordingEvents struct {
 	body  string
 }
 
-func (r *recordingEvents) ReceivePaymentEvent(_ context.Context, _ http.Header, body []byte) error {
+func (r *recordingEvents) ReceiveEvent(_ context.Context, _ http.Header, body []byte) error {
 	r.calls++
 	r.body = string(body)
 	return r.err

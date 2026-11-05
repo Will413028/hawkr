@@ -204,8 +204,7 @@ func (f *fixture) exposableStore(t *testing.T) (storeID, accountID int64) {
 	storeID = f.scalar(t, "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID)
 	f.exec(t, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
 		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, f.clock(), uuid.NewV7())
-	f.exec(t, `INSERT INTO seller.payment_accounts (store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, created_at, updated_at)
-		VALUES ($1, 'fake', 'acct_' || $1::bigint::text, 'seller@example.com', 'PROVIDER', 'ENABLED', true, true, $2, $2)`, storeID, f.clock())
+	f.exec(t, `INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, f.clock())
 	return storeID, accountID
 }
 

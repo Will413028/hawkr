@@ -43,7 +43,14 @@ type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
 	Jobs   jobs.Enqueuer
-	Now    func() time.Time
+	// Payment 是收款帳戶的擁有者（payment 模組）：清理的 transaction 內排入刪除店家收款帳戶列的 job。
+	Payment Payment
+	Now     func() time.Time
+}
+
+// Payment 是 payment 模組的公開 API 中清理用到的部分。
+type Payment interface {
+	ForgetOwners(ctx context.Context, storeIDs []int64) error
 }
 
 // Service 執行個資清理。
@@ -274,12 +281,9 @@ func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int6
 		if _, err := q.PurgePayUniObservations(ctx, purged); err != nil {
 			return err
 		}
-		// 收款帳戶的快照帶外部帳戶 ID 與 requirements；webhook inbox 以外部帳戶 ID 為鍵，先刪 inbox 再刪帳戶列。
-		if _, err := q.PurgePaymentProviderEvents(ctx, purged); err != nil {
-			return err
-		}
-		_, err = q.PurgePaymentAccounts(ctx, purged)
-		return err
+		// 收款帳戶（聯絡信箱、外部帳戶 ID、requirements）由 payment 擁有：同一個 transaction 只排入它的刪除 job，不在鎖住店家列之後等下層的列
+		// （platform/lockorder）。收款事件的 inbox 列由 platform 依保存期清理。
+		return s.d.Payment.ForgetOwners(ctx, purged)
 	})
 	return purgedCount, candidateCount, last, err
 }

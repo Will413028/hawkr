@@ -14,6 +14,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 // 清理之後可以留下值的欄位（其餘一律必須是 NULL）。新增欄位時這份清單逼人決定：留下的要有理由（事實、狀態碼、時間），不是個資。
@@ -388,19 +389,17 @@ func TestPurgeIsNotCappedAtOneBatch(t *testing.T) {
 	}
 }
 
-// 關店滿保留期的最終清理一併刪掉店家的收款帳戶列與那個外部帳戶的 webhook inbox；別的店家的帳戶與事件不動。
-// mutation：purge.go 拿掉 PurgePaymentAccounts（或 PurgePaymentProviderEvents）的呼叫 → 帳戶列（或事件）還在，失敗。
-func TestPurgeDeletesThePaymentAccountAndItsEventsOfThePurgedStoreOnly(t *testing.T) {
+// 關店滿保留期的最終清理請 payment 刪掉店家的收款帳戶列：清理的 transaction 只排入 payment 的刪除 job（不鎖下層 payment 的列，platform/lockorder），
+// job 只刪被清理的店家；別的店家的帳戶不動。
+// mutation：purge.go 拿掉 ForgetOwners 的呼叫 → 沒有刪除 job，失敗。
+func TestPurgeAsksPaymentToForgetThePurgedStoreOnly(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
 	gone, goneStore := f.approvedStore(t)
 	_, keptStore := f.approvedStore(t)
 	for _, s := range []Store{goneStore, keptStore} {
-		external := f.ensureAccount(t, s.StoreID)
 		f.setPayment(t, s.StoreID, enabledSnapshot)
-		h, body := f.paymentEvent(fmt.Sprintf("evt_%d", s.StoreID), external)
-		must(t, f.module.ReceivePaymentEvent(ctx, h, body))
 	}
 	_, err := f.module.CloseCurrent(ctx, gone)
 	must(t, err)
@@ -410,16 +409,27 @@ func TestPurgeDeletesThePaymentAccountAndItsEventsOfThePurgedStoreOnly(t *testin
 	if n != 1 {
 		t.Fatalf("purged=%d", n)
 	}
-	if c := f.count(t, fmt.Sprintf("SELECT count(*) FROM seller.payment_accounts WHERE store_id = %d", goneStore.StoreID)); c != 0 {
-		t.Fatalf("清理之後帳戶列還在：%d", c)
+	var forgotten []int64
+	f.jobs.mu.Lock()
+	for _, a := range f.jobs.args {
+		if a.Kind() != "payment.account_purge" {
+			continue
+		}
+		raw, err := json.Marshal(a)
+		must(t, err)
+		var v struct {
+			StoreIDs []int64 `json:"store_ids"`
+		}
+		must(t, json.Unmarshal(raw, &v))
+		forgotten = append(forgotten, v.StoreIDs...)
 	}
-	if c := f.count(t, fmt.Sprintf("SELECT count(*) FROM seller.payment_provider_events WHERE event_id = 'evt_%d'", goneStore.StoreID)); c != 0 {
-		t.Fatalf("清理之後 inbox 事件還在：%d", c)
+	f.jobs.mu.Unlock()
+	if !slices.Equal(forgotten, []int64{goneStore.StoreID}) {
+		t.Fatalf("排入刪除的店家=%v", forgotten)
 	}
-	if c := f.count(t, fmt.Sprintf("SELECT count(*) FROM seller.payment_accounts WHERE store_id = %d", keptStore.StoreID)); c != 1 {
-		t.Fatalf("別的店家的帳戶列被刪：%d", c)
+	must(t, f.payments.PurgeAccounts(ctx, forgotten))
+	if _, err := f.payments.Account(ctx, goneStore.StoreID); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("清理之後帳戶列還在：%v", err)
 	}
-	if c := f.count(t, fmt.Sprintf("SELECT count(*) FROM seller.payment_provider_events WHERE event_id = 'evt_%d'", keptStore.StoreID)); c != 1 {
-		t.Fatalf("別的店家的事件被刪：%d", c)
-	}
+	f.paymentAccount(t, keptStore.StoreID)
 }

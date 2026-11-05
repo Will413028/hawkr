@@ -1,4 +1,4 @@
-package payment
+package account
 
 import (
 	"context"
@@ -20,13 +20,13 @@ func openStates() []rivertype.JobState {
 	}
 }
 
-// EnsureArgs 是建立外部帳戶的 job，以 store_id 為唯一鍵：同一個店家同時最多一個排隊中的建立。
+// EnsureArgs 是建立外部帳戶的 job，以 store_id 為唯一鍵：同一個擁有者同時最多一個排隊中的建立。
 type EnsureArgs struct {
 	StoreID int64 `json:"store_id" river:"unique"`
 }
 
 // Kind 是 River 的 job 種類。
-func (EnsureArgs) Kind() string { return "seller.payment_ensure" }
+func (EnsureArgs) Kind() string { return "payment.account_ensure" }
 
 // InsertOpts 是建立 job 的排入選項：以 store_id 去重（不含已完成的），暫時性的失敗最多重試 maxAttempts 次。
 func (EnsureArgs) InsertOpts() river.InsertOpts {
@@ -45,7 +45,7 @@ type SyncArgs struct {
 }
 
 // Kind 是 River 的 job 種類。
-func (SyncArgs) Kind() string { return "seller.payment_sync" }
+func (SyncArgs) Kind() string { return "payment.account_sync" }
 
 // InsertOpts 是同步 job 的排入選項。
 func (SyncArgs) InsertOpts() river.InsertOpts {
@@ -62,7 +62,7 @@ func enqueueSync(ctx context.Context, jc jobs.Enqueuer, storeID int64) error {
 type SweepArgs struct{}
 
 // Kind 是 River 的 job 種類。
-func (SweepArgs) Kind() string { return "seller.payment_sweep" }
+func (SweepArgs) Kind() string { return "payment.account_sweep" }
 
 // InsertOpts 把同一段時間內的排程與重啟合併。
 func (SweepArgs) InsertOpts() river.InsertOpts {
@@ -134,6 +134,7 @@ func (s *Service) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &ensureWorker{service: s})
 	river.AddWorker(workers, &syncWorker{service: s})
 	river.AddWorker(workers, &sweepWorker{service: s})
+	river.AddWorker(workers, &purgeWorker{service: s})
 }
 
 // PeriodicJobs 回傳啟動即執行、每 15 分鐘的掃描。
@@ -141,15 +142,44 @@ func (s *Service) PeriodicJobs() []*river.PeriodicJob {
 	return []*river.PeriodicJob{river.NewPeriodicJob(
 		river.PeriodicInterval(pollInterval),
 		func() (river.JobArgs, *river.InsertOpts) { return SweepArgs{}, nil },
-		&river.PeriodicJobOpts{ID: "seller.payment_sweep", RunOnStart: true},
+		&river.PeriodicJobOpts{ID: "payment.account_sweep", RunOnStart: true},
 	)}
 }
 
-// Sweep 排入輪詢補漏的同步（UNDER_REVIEW、ACTION_REQUIRED、原因碼不是 rejected*／unsupported* 的 DISABLED 帳戶，以及任何狀態中 inbox 有超過 eventGrace 還沒處理的事件的帳戶）與閒置建立列的建立 job，各自分批、各批一個 transaction。
-// 回傳排入同步與建立的帳戶數（唯一鍵合併掉的也算）。沒有設定 provider 時什麼都不做。
+// PurgeArgs 是擁有者個資清理後刪除帳戶列的 job（ForgetOwners 在清理的 transaction 內排入）。
+type PurgeArgs struct {
+	StoreIDs []int64 `json:"store_ids"`
+}
+
+// Kind 是 River 的 job 種類。
+func (PurgeArgs) Kind() string { return "payment.account_purge" }
+
+// InsertOpts 是刪除 job 的排入選項。
+func (PurgeArgs) InsertOpts() river.InsertOpts { return river.InsertOpts{MaxAttempts: maxAttempts} }
+
+type purgeWorker struct {
+	river.WorkerDefaults[PurgeArgs]
+	service *Service
+}
+
+// Work 刪除帳戶列。
+func (w *purgeWorker) Work(ctx context.Context, job *river.Job[PurgeArgs]) error {
+	return w.service.Purge(ctx, job.Args.StoreIDs)
+}
+
+// Sweep 是 payment 自己的輪詢補漏（D29 的補掃分工：platform 只重派沒有派送成功的 inbox 列），各自分批、各批一個 transaction：
+//   - 狀態：UNDER_REVIEW、ACTION_REQUIRED、原因碼不是 rejected*／unsupported* 的 DISABLED 帳戶排同步（掉了 webhook 時的保底，DISABLED 可能被解除）；
+//   - 事件：inbox 有超過 eventGrace 還沒處理的事件的帳戶排同步（任何狀態）；
+//   - 建立：閒置的建立列，擁有者營運中時排建立 job。
+//
+// 回傳排入同步與建立的帳戶數（唯一鍵合併掉的也算；兩種同步的帳戶重複時算兩次）。沒有設定 provider 時什麼都不做。
 func (s *Service) Sweep(ctx context.Context) (synced, ensured int, err error) {
-	if s.d.Provider == nil {
+	p := s.d.Provider
+	if p == nil {
 		return 0, 0, nil
+	}
+	queueSync := func(id int64) error {
+		return s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueueSync(ctx, s.d.Jobs, id) })
 	}
 	var after int64
 	for {
@@ -158,7 +188,7 @@ func (s *Service) Sweep(ctx context.Context) (synced, ensured int, err error) {
 			return synced, ensured, err
 		}
 		for _, id := range ids {
-			if err := s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueueSync(ctx, s.d.Jobs, id) }); err != nil {
+			if err := queueSync(id); err != nil {
 				return synced, ensured, err
 			}
 			synced++
@@ -168,6 +198,23 @@ func (s *Service) Sweep(ctx context.Context) (synced, ensured int, err error) {
 			break
 		}
 	}
+	route := ""
+	for {
+		ids, next, err := s.staleEventStores(ctx, p.Name(), route)
+		if err != nil {
+			return synced, ensured, err
+		}
+		for _, id := range ids {
+			if err := queueSync(id); err != nil {
+				return synced, ensured, err
+			}
+			synced++
+		}
+		if next == "" {
+			break
+		}
+		route = next
+	}
 	after = 0
 	for {
 		ids, err := s.stale(ctx, after)
@@ -175,11 +222,18 @@ func (s *Service) Sweep(ctx context.Context) (synced, ensured int, err error) {
 			return synced, ensured, err
 		}
 		for _, id := range ids {
+			after = id
+			active, err := s.d.Owners.OwnerActive(ctx, id)
+			if err != nil {
+				return synced, ensured, err
+			}
+			if !active {
+				continue
+			}
 			if err := s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueueEnsure(ctx, s.d.Jobs, id) }); err != nil {
 				return synced, ensured, err
 			}
 			ensured++
-			after = id
 		}
 		if len(ids) < sweepBatch {
 			return synced, ensured, nil

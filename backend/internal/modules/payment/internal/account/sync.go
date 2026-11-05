@@ -1,4 +1,4 @@
-package payment
+package account
 
 import (
 	"context"
@@ -7,15 +7,17 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// Sync 是同步 job 的內容：在 transaction 外重讀外部帳戶，在 transaction 內整列覆寫快取、記下涵蓋的事件、閘門的輸入有變時重新公告可曝光
-// （transaction 裡最後一個鎖：帳戶列之後是公告列）。沒有帳戶列、還沒有外部 ID 的什麼都不做。again 為 true 表示讀取期間又收到事件
-// （唯一鍵排除了新 job）：呼叫方稍後再跑一輪。重讀失敗回傳錯誤，由 River 重試；外部帳戶不存在是永久失敗（ErrPermanent），回傳給 job 取消。
+// Sync 是同步 job 的內容：在 transaction 外重讀外部帳戶，在 transaction 內整列覆寫快取、發布 PayoutAccountChanged（seller 的同 transaction 訂閱者
+// 更新開通閘門的副本、把 fingerprint 寫成防詐 hash、閘門的輸入有變時重新公告；全域鎖順序 payment 先於 seller），並經 platform inbox 把這個外部帳戶在
+// 讀取開始前收到的事件整批標為已處理（D29：收款事件只是「重讀帳戶」的訊號，handler 不標記，由涵蓋它的同步標記）。沒有帳戶列、還沒有外部 ID 的
+// 什麼都不做。again 為 true 表示讀取期間又收到事件（唯一鍵排除了新 job）：呼叫方稍後再跑一輪。重讀失敗回傳錯誤，由 River 重試；外部帳戶不存在是
+// 永久失敗（ErrPermanent），回傳給 job 取消。
 func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err error) {
 	p := s.d.Provider
 	if p == nil {
@@ -44,6 +46,9 @@ func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err erro
 	err = s.d.DB.InTx(wctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
 		before, err := q.LockPaymentAccount(ctx, storeID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
 		if err != nil {
 			return err
 		}
@@ -53,7 +58,7 @@ func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err erro
 		now := s.d.Now().UTC()
 		status, reasonCode, note := StatusOf(snap)
 		if note != NoteNone {
-			s.d.Logger.WarnContext(ctx, "seller：收款帳戶的快照不認得或不完整，視為審核中", "store_id", storeID, "external_account_id", external, "note", string(note), "transfers", string(snap.Transfers), "details", len(snap.Details))
+			s.d.Logger.WarnContext(ctx, "payment：收款帳戶的快照不認得或不完整，視為審核中", "store_id", storeID, "external_account_id", external, "note", string(note), "transfers", string(snap.Transfers), "details", len(snap.Details))
 		}
 		raw := snap.Requirements
 		if len(raw) == 0 || !json.Valid(raw) {
@@ -63,30 +68,24 @@ func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err erro
 		if reasonCode != "" {
 			reason = &reasonCode
 		}
+		enabled := status == model.PaymentEnabled
 		if _, err := q.ApplyPaymentSnapshot(ctx, store.ApplyPaymentSnapshotParams{
-			StoreID: storeID, Status: string(status), TransfersActive: status == model.PaymentEnabled, PayoutsActive: snap.PayoutsActive && status == model.PaymentEnabled,
+			StoreID: storeID, Status: string(status), TransfersActive: enabled, PayoutsActive: snap.PayoutsActive && enabled,
 			Requirements: raw, StatusReason: reason, FetchedAt: &startedAt, Now: now,
 		}); err != nil {
 			return err
 		}
-		if err := s.d.Identities.RecordBankFingerprints(ctx, q, storeID, before.Provider, snap.BankFingerprints, now); err != nil {
+		err = events.Publish(ctx, s.d.Events, model.PayoutAccountChanged{
+			OccurredAt: now, StoreID: storeID, Provider: before.Provider, TransfersActive: enabled, BankFingerprints: snap.BankFingerprints,
+		})
+		if err != nil {
 			return err
 		}
-		if _, err := q.MarkPaymentEventsProcessed(ctx, store.MarkPaymentEventsProcessedParams{
-			Provider: before.Provider, ExternalAccountID: external, ReceivedBefore: startedAt, Now: &now,
-		}); err != nil {
+		if _, err := s.d.Inbox.MarkRouteProcessed(ctx, before.Provider, external, startedAt, syncProcessor); err != nil {
 			return err
 		}
-		if again, err = q.PaymentEventsPending(ctx, store.PaymentEventsPendingParams{Provider: before.Provider, ExternalAccountID: external}); err != nil {
-			return err
-		}
-		if before.TransfersActive == (status == model.PaymentEnabled) {
-			return nil
-		}
-		if err := s.d.Exposure.Announce(ctx, q, now, storeID); err != nil {
-			return err
-		}
-		return stint.InvalidateByID(ctx, q, s.d.Jobs, storeID)
+		again, err = s.d.Inbox.RoutePending(ctx, before.Provider, external)
+		return err
 	})
 	return again, err
 }
@@ -115,7 +114,7 @@ func (s *Service) RetryCreate(ctx context.Context, storeID int64) (model.Payment
 	if err := model.Positive(storeID); err != nil {
 		return model.PaymentAccount{}, err
 	}
-	var out store.SellerPaymentAccount
+	var out store.PaymentAccount
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
 		locked, err := q.LockPaymentAccount(ctx, storeID)

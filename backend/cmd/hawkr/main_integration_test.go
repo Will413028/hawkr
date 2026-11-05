@@ -14,6 +14,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
@@ -38,7 +39,7 @@ func TestMigrateIsRepeatableAgainstARealDatabase(t *testing.T) {
 // 每個模組單獨套用在空的 database 上：參照別的模組會套用失敗，
 // 把物件建到自己的 schema 以外會被 ForeignObjects 列出來（ADR D3）。
 func TestEveryModuleStaysInsideItsOwnSchema(t *testing.T) {
-	for _, m := range modules() {
+	for _, m := range migrations() {
 		t.Run(m.Name, func(t *testing.T) {
 			d := pg.NewDB(t)
 			if err := migrate.Apply(context.Background(), d, []migrate.Module{m}); err != nil {
@@ -63,7 +64,7 @@ func TestEveryModuleStaysInsideItsOwnSchema(t *testing.T) {
 // 這裡把兩者各自套用在空的 database 上（schema.sql 先、objects.sql 後），比對結果；也檢查 migration 套用後的每個函式符合單體規則 6（FunctionsBreakingRule6）。
 func TestSchemaFileMatchesMigrations(t *testing.T) {
 	ctx := context.Background()
-	for _, m := range modules() {
+	for _, m := range migrations() {
 		t.Run(m.Name, func(t *testing.T) {
 			fromMigrations := pg.NewDB(t)
 			if err := migrate.Apply(ctx, fromMigrations, []migrate.Module{m}); err != nil {
@@ -71,7 +72,7 @@ func TestSchemaFileMatchesMigrations(t *testing.T) {
 			}
 			fromSchema := pg.NewDB(t)
 			for _, name := range []string{"schema.sql", "objects.sql"} {
-				sql, err := os.ReadFile(filepath.Join("..", "..", "internal", "modules", m.Name, "db", name))
+				sql, err := os.ReadFile(filepath.Join("..", "..", sourceDir(m.Name), "db", name))
 				if name == "objects.sql" && os.IsNotExist(err) {
 					continue
 				}
@@ -123,8 +124,8 @@ func TestSchemaFileMatchesMigrations(t *testing.T) {
 func TestPubContractsMatchMigrations(t *testing.T) {
 	ctx := context.Background()
 	checked := 0
-	for _, m := range modules() {
-		path := filepath.Join("..", "..", "internal", "modules", m.Name, "db", "pub.sql")
+	for _, m := range migrations() {
+		path := filepath.Join("..", "..", sourceDir(m.Name), "db", "pub.sql")
 		contract, err := os.ReadFile(path)
 		if os.IsNotExist(err) {
 			continue
@@ -224,4 +225,15 @@ func TestWorkerRunsQueuedJobs(t *testing.T) {
 	if err := <-done; err != nil {
 		t.Fatalf("worker 停止時回傳 %v", err)
 	}
+}
+
+// platformDirs 是 platformData 每個 schema 的套件目錄（相對於 backend/）。
+var platformDirs = map[string]string{inbox.Schema: "internal/platform/inbox"}
+
+// sourceDir 是 schema 的原始碼目錄（相對於 backend/）：platform 的在 platformDirs，模組的是 internal/modules/<名稱>。
+func sourceDir(name string) string {
+	if dir, ok := platformDirs[name]; ok {
+		return dir
+	}
+	return "internal/modules/" + name
 }

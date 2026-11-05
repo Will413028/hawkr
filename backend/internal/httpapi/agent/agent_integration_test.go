@@ -32,6 +32,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -179,7 +180,7 @@ func TestVendorPortalFromInviteToTheGateway(t *testing.T) {
 	}
 	h, err := httpapi.NewHandler(httpapi.Deps{Buyer: &buyer.Module{}, Social: &social.Module{},
 		Ready: d.Ping, Identity: id, Agent: agents, Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
-		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{},
+		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{},
 		Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: &seller.Module{}, Now: now, Logger: log}),
 		Legacy:     proxy, LegacyPrefixes: gatewayproxy.Prefixes, Now: now, Logger: log,
 	})

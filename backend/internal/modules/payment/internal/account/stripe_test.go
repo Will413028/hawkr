@@ -1,4 +1,4 @@
-package payment
+package account
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/stripe"
 )
 

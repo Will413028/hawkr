@@ -6,8 +6,8 @@ import {
 	useMutation as useConnectMutation,
 	useTransport,
 } from "@connectrpc/connect-query";
+import { PaymentAdminService } from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1/payment_pb";
 import { ReviewQueueAdminService } from "@hawkr/api/gen/hawkr/admin/reviewqueue/v1alpha1/review_queue_pb";
-import { SellerAdminService } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
 import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 import {
@@ -32,7 +32,7 @@ import {
 } from "./payment-account";
 import type { usePaymentAccount } from "./use-store-detail";
 
-// 商家詳情的收款帳戶卡（GetPaymentAccount、RefreshPaymentAccount、RetryPaymentAccountCreate；附件 step7-screen-drafts.md 第 3 節）。
+// 商家詳情的收款帳戶卡（PaymentAdminService 的 GetPaymentAccount、RefreshPaymentAccount、RetryPaymentAccountCreate；附件 step7-screen-drafts.md 第 3 節）。
 // 徽章文字與賣家共用目錄（D24 Q6），細節看原始的 status_reason 與待補條件。
 
 /** 錨點：審核待辦 PAYMENT_ACCOUNT_CREATE_FAILED 的連結帶這個 hash（queue-item.ts）。 */
@@ -240,10 +240,10 @@ export function PaymentAccountSection({
 	const queryClient = useQueryClient();
 	const transport = useTransport();
 	const refreshMutation = useConnectMutation(
-		SellerAdminService.method.refreshPaymentAccount,
+		PaymentAdminService.method.refreshPaymentAccount,
 	);
 	const retryMutation = useConnectMutation(
-		SellerAdminService.method.retryPaymentAccountCreate,
+		PaymentAdminService.method.retryPaymentAccountCreate,
 	);
 	const rereadTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
 		undefined,
