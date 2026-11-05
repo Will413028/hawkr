@@ -269,7 +269,6 @@ lib/
 | OSS 服務 | `oss_service.dart` | 圖片讀取 URL 產生 (presigned URL) |
 | 圖片處理 | `image_processing_service.dart` | 壓縮、格式轉換 |
 | AI 圖片 | `ai_image_service.dart` | Gemini AI 圖片處理 |
-| OCR | `apple_vision_ocr_service.dart`, `id_card_ocr_service.dart`, `bank_book_ocr_service.dart` | 證件辨識 |
 | 推播 | `push_notification_manager.dart`, `push_notifications.dart` | FCM 推播通知 |
 | 商家頭像 | `merchant_avatar_helper.dart` | 頭像載入 (含 presigned URL) |
 | 訂單狀態 | `order_status_notifier.dart` | 訂單即時狀態更新 |

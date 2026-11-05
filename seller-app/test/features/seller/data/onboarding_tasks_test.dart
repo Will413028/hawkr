@@ -1,5 +1,6 @@
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_seller/features/seller/data/onboarding_tasks.dart';
+import 'package:hawkr_seller/features/seller/data/payment_account.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hawkr_seller/shared/widgets/hk_status_badge.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -98,14 +99,63 @@ void main() {
       expect(review.cta, '前往商家認證');
     });
 
-    test('伺服器說開通閘門已通過、收款帳戶還沒讀到：收款帳戶列是「已啟用」', () {
+    test('收款帳戶已啟用：列是「已啟用」，完成而且沒有按鈕（不管店家的開通閘門讀到什麼）', () {
       final tasks = buildOnboardingTasks(
         l: UiLocale.zhTW,
-        my: myStore(publicListing: publicListingMissing()),
-        reviewStatus: null,
-        paymentAccount: null,
+        my: myStore(publicListing: publicListingMissing([_kyc])),
+        reviewStatus: KYCStatus.KYC_STATUS_APPROVED,
+        paymentAccount: PaymentAccount(
+          status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED,
+        ),
       );
-      expect(_task(tasks, OnboardingTaskId.paymentAccount).statusLabel, '已啟用');
+      final payment = _task(tasks, OnboardingTaskId.paymentAccount);
+      expect(payment.statusLabel, '已啟用');
+      expect(payment.completed, isTrue);
+      expect(payment.cta, isNull);
+    });
+
+    test('平台審核還沒通過：就算讀到收款帳戶也不顯示它（effectivePaymentAccount 與文件一致，回 null）', () {
+      final account = PaymentAccount(
+        status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED,
+      );
+      expect(effectivePaymentAccount(account, approved: false), isNull);
+      final tasks = buildOnboardingTasks(
+        l: UiLocale.zhTW,
+        my: myStore(publicListing: publicListingMissing([_kyc])),
+        reviewStatus: KYCStatus.KYC_STATUS_SUBMITTED,
+        paymentAccount: account,
+      );
+      final payment = _task(tasks, OnboardingTaskId.paymentAccount);
+      expect(payment.completed, isFalse);
+      expect(payment.locked, isTrue);
+      expect(payment.statusLabel, '平台審核通過後開放設定');
+    });
+
+    test('收款帳戶讀取失敗（平台審核已通過）：不當成「準備中」，狀態是目錄的「未知」，按鈕去商家認證重讀', () {
+      final tasks = buildOnboardingTasks(
+        l: UiLocale.zhTW,
+        my: myStore(publicListing: publicListingMissing([_kyc])),
+        reviewStatus: KYCStatus.KYC_STATUS_APPROVED,
+        paymentAccount: null,
+        paymentReadable: false,
+      );
+      final payment = _task(tasks, OnboardingTaskId.paymentAccount);
+      expect(payment.statusLabel, '未知');
+      expect(payment.completed, isFalse);
+      expect(payment.cta, '前往商家認證');
+    });
+
+    test('收款帳戶讀取失敗但平台審核還沒通過：仍是「平台審核通過後開放設定」（讀取失敗只在核准之後才有意義）', () {
+      final tasks = buildOnboardingTasks(
+        l: UiLocale.zhTW,
+        my: myStore(publicListing: publicListingMissing([_kyc])),
+        reviewStatus: KYCStatus.KYC_STATUS_SUBMITTED,
+        paymentAccount: null,
+        paymentReadable: false,
+      );
+      final payment = _task(tasks, OnboardingTaskId.paymentAccount);
+      expect(payment.statusLabel, '平台審核通過後開放設定');
+      expect(payment.locked, isTrue);
     });
 
     test('申請狀態是 UNSPECIFIED：狀態是目錄的「未知」', () {
@@ -178,15 +228,17 @@ void main() {
       expect(payment.cta, isNull);
     });
 
-    test('exposure 說已通過、流程狀態卻還沒讀到：以 exposure 為準', () {
+    test('平台審核只讀申請狀態：流程狀態還沒讀到時，開通閘門已通過也不算平台審核完成', () {
       final tasks = buildOnboardingTasks(
         l: UiLocale.zhTW,
         my: myStore(publicListing: publicListingMissing()),
         reviewStatus: null,
+        reviewReadable: false,
         paymentAccount: null,
       );
-      expect(_task(tasks, OnboardingTaskId.platformReview).completed, isTrue);
-      expect(_task(tasks, OnboardingTaskId.paymentAccount).completed, isTrue);
+      expect(_task(tasks, OnboardingTaskId.platformReview).completed, isFalse);
+      expect(_task(tasks, OnboardingTaskId.platformReview).statusLabel, '未知');
+      expect(_task(tasks, OnboardingTaskId.paymentAccount).completed, isFalse);
     });
 
     test('停權與商店狀態列只在缺那個條件時出現', () {
@@ -312,7 +364,9 @@ void main() {
         l: UiLocale.zhTW,
         my: myStore(publicListing: publicListingMissing()),
         reviewStatus: KYCStatus.KYC_STATUS_APPROVED,
-        paymentAccount: null,
+        paymentAccount: PaymentAccount(
+          status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED,
+        ),
       );
       final required = tasks.where(
         (t) => t.group == OnboardingTaskGroup.beforePublish,
@@ -410,16 +464,14 @@ void main() {
       expect(pending.statusLabel, '未營業');
     });
 
-    test('exposure 已認證、GetMyKYC 讀不到：認證列已通過、物流解鎖，沒有矛盾', () {
+    test('物流解鎖只看伺服器的 SHIPPING_SETUP，與認證列各讀各的', () {
       final tasks = buildOnboardingTasks(
         l: UiLocale.zhTW,
         my: myStore(publicListing: publicListingMissing()),
         reviewStatus: null,
+        reviewReadable: false,
         paymentAccount: null,
       );
-      expect(_task(tasks, OnboardingTaskId.platformReview).completed, isTrue);
-      expect(_task(tasks, OnboardingTaskId.platformReview).statusLabel, '已通過');
-      expect(_task(tasks, OnboardingTaskId.paymentAccount).completed, isTrue);
       expect(_task(tasks, OnboardingTaskId.shipping).locked, isFalse);
     });
 

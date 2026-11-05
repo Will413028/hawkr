@@ -37,13 +37,24 @@ bool paymentAccountCanOnboard(PaymentAccount account) =>
 bool paymentAccountEnabled(PaymentAccount? account) =>
     account?.status == PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED;
 
-/// 畫面要顯示的收款帳戶：平台審核已核准（[platformApproved]）而 `GetMyPaymentAccount` 還沒有帳戶（外部帳戶在建立）與
+/// 平台審核通過：`GetMyKYC` 的 `KYCApplication.status` 是 APPROVED（沒有申請是 null，不算）。錢包、認證狀態畫面與開通任務卡
+/// 都用這一個定義（計畫步驟 7：平台審核讀 `KYCApplication.status`）。
+bool platformApproved(KYCStatus? reviewStatus) =>
+    reviewStatus == KYCStatus.KYC_STATUS_APPROVED;
+
+/// 平台審核還沒通過時，收款帳戶區的提示（沒有收款帳戶可看）。
+const paymentAccountNotYetOpenNotice = '平台審核通過後開放設定';
+
+/// 伺服器說這個帳戶用內嵌元件開通（平台收件）時 App 的提示：App 沒有內嵌元件。
+const paymentAccountEmbeddedNotice = '請到網頁版完成收款設定';
+
+/// 畫面要顯示的收款帳戶：平台審核已核准（[approved]）而 `GetMyPaymentAccount` 還沒有帳戶（外部帳戶在建立）與
 /// 「準備中」同義；平台審核還沒核准時沒有收款帳戶（null）。
 PaymentAccount? effectivePaymentAccount(
   PaymentAccount? account, {
-  required bool platformApproved,
+  required bool approved,
 }) {
-  if (!platformApproved) return account;
+  if (!approved) return null;
   return account ??
       PaymentAccount(
         status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED,
@@ -77,11 +88,12 @@ final class PaymentAccountRepository {
     }
   }
 
-  /// 託管頁面的開通連結（一次性、短效）。回應的介面不是 HOSTED 或沒有連結是契約被違反，丟 [FormatException]：
+  /// 託管頁面的開通連結（一次性、短效）；只收 https，[allowInsecureUrl]（只有 dev 的本機測試）才收 http。回應的介面不是 HOSTED 或沒有連結是契約被違反，丟 [FormatException]：
   /// 不猜一個預設介面。
   Future<HostedSession> createHostedSession({
     required Uri returnUrl,
     required Uri refreshUrl,
+    bool allowInsecureUrl = false,
   }) async {
     final response = await _client.createPaymentOnboardingSession(
       CreatePaymentOnboardingSessionRequest(
@@ -93,7 +105,8 @@ final class PaymentAccountRepository {
       throw FormatException('開通介面不是託管頁面：${response.surface}');
     }
     final url = Uri.tryParse(response.url);
-    if (url == null || !url.isScheme('https') && !url.isScheme('http')) {
+    if (url == null ||
+        !url.isScheme('https') && !(allowInsecureUrl && url.isScheme('http'))) {
       throw FormatException('開通連結無效：${response.url}');
     }
     return HostedSession(url);

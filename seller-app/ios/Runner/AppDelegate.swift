@@ -29,10 +29,6 @@ private func HKLog(_ message: String, file: String = #file, function: String = #
     GeneratedPluginRegistrant.register(with: self)
     HKLog("[AppDelegate] Plugin registration complete")
 
-    // Register Apple Vision OCR Plugin
-    AppleVisionOcrPlugin.register(with: self.registrar(forPlugin: "AppleVisionOcrPlugin")!)
-    HKLog("[AppDelegate] AppleVisionOcrPlugin registered")
-
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 

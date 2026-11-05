@@ -10,6 +10,7 @@ import 'package:hawkr_seller/features/notification/data/notification_repository.
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
 import 'package:hawkr_seller/features/seller/data/current_kyc.dart';
 import 'package:hawkr_seller/features/seller/data/onboarding_tasks.dart';
+import 'package:hawkr_seller/features/seller/data/payment_account.dart';
 import 'package:hawkr_seller/features/seller/data/my_store_repository.dart';
 import 'package:hawkr_seller/features/seller/data/store_closing.dart';
 import 'package:hawkr_seller/features/seller/data/store_editor.dart';
@@ -22,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../support/connect_errors.dart';
+import '../../../support/kyc_fixtures.dart';
 import '../../../support/fake_my_store.dart';
 import '../../../support/my_store_fixtures.dart';
 import '../../../support/default_error_text.dart';
@@ -58,6 +60,7 @@ void main() {
   Future<ProviderContainer> pump(
     WidgetTester tester, {
     bool identityLocked = false,
+    bool certified = false,
     KYCFlowStatus kycStatus = KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
     GetMyStoreResponse? response,
     GoRouter? router,
@@ -74,8 +77,23 @@ void main() {
         myStoreRepositoryProvider.overrideWithValue(server.repository),
         accountKycProvider('acc-1').overrideWith(
           () => _FakeKyc(
-            MyKyc(status: kycStatus, identityLocked: identityLocked),
+            MyKyc(
+              status: kycStatus,
+              identityLocked: identityLocked,
+              application: certified
+                  ? individualApplication(
+                      kycStatus: KYCStatus.KYC_STATUS_APPROVED,
+                    )
+                  : null,
+            ),
           ),
+        ),
+        accountPaymentAccountProvider('acc-1').overrideWith(
+          (ref) async => certified
+              ? PaymentAccount(
+                  status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED,
+                )
+              : null,
         ),
         onboardingInputsProvider.overrideWith((ref) async {
           onInputsBuilt?.call();
@@ -191,7 +209,7 @@ void main() {
     addTearDown(router.dispose);
     await pump(
       tester,
-      kycStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
+      certified: true,
       response: myStoreResponse(publicListing: publicListingMissing()),
       router: router,
       onInputsBuilt: () => inputsBuilds++,
@@ -214,7 +232,7 @@ void main() {
   testWidgets('SHIPPING_SETUP 啟用才開放營運設定的物流入口', (tester) async {
     await pump(
       tester,
-      kycStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
+      certified: true,
       response: myStoreResponse(publicListing: publicListingMissing()),
     );
 

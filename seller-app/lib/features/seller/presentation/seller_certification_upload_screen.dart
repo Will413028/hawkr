@@ -26,7 +26,6 @@ import '../../../shared/widgets/hk_glass_app_bar.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
 import '../data/contact_email.dart';
 import '../data/current_kyc.dart';
-import "../data/current_store.dart";
 import '../data/kyc_fields.dart';
 import '../data/kyc_flow.dart';
 import '../data/kyc_wizard.dart';
@@ -364,10 +363,7 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
         );
       }
       if (locked) {
-        return CertificationStatusView(
-          application: application,
-          certified: ref.watch(myStoreSnapshotProvider)?.isCertified ?? false,
-        );
+        return CertificationStatusView(application: application);
       }
       return Stack(
         children: [

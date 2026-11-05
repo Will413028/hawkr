@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart' show AppLifecycleState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
@@ -67,9 +68,13 @@ class _Server {
         .build(),
   );
 
-  ProviderContainer container({String origin = 'https://web.example.test'}) {
+  ProviderContainer container({
+    String origin = 'https://web.example.test',
+    bool allowInsecureUrl = false,
+  }) {
     final container = ProviderContainer(
       overrides: [
+        allowInsecureOnboardingUrlProvider.overrideWithValue(allowInsecureUrl),
         sessionProvider.overrideWith(_LoggedIn.new),
         sellerClientProvider.overrideWithValue(client),
         myStoreRepositoryProvider.overrideWithValue(store.repository),
@@ -94,6 +99,14 @@ class _Server {
 }
 
 void main() {
+  final binding = TestWidgetsFlutterBinding.ensureInitialized();
+
+  /// 把 App 切到背景再回前景（不經過任何畫面）。
+  void backgroundAndResume() {
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+  }
+
   group('paymentReturnUri：website 的回跳頁', () {
     test(
       '<origin>/seller-app/payment-return?state=done|expired，預設語系沒有路徑前綴',
@@ -113,6 +126,48 @@ void main() {
         );
       },
     );
+  });
+
+  group('paymentReturnUri 的 origin 結尾斜線', () {
+    test('結尾有斜線也不會出現 //', () {
+      expect(
+        paymentReturnUri(
+          'https://web.example.test/',
+          PaymentReturnState.done,
+        ).toString(),
+        'https://web.example.test/seller-app/payment-return?state=done',
+      );
+    });
+  });
+
+  group('開通連結只收 https（dev 才收 http）', () {
+    test('stage 與 prod：http 連結失敗，不開瀏覽器', () async {
+      final server = _Server()
+        ..sessionResponse = CreatePaymentOnboardingSessionResponse(
+          surface: _hosted,
+          url: 'http://connect.example.test/setup',
+        );
+      final container = server.container();
+      expect(
+        await container.read(paymentOnboardingProvider.notifier).start(_hosted),
+        PaymentOnboardingOutcome.failed,
+      );
+      expect(server.launched, isEmpty);
+    });
+
+    test('dev：http 連結可以開（本機測試）', () async {
+      final server = _Server()
+        ..sessionResponse = CreatePaymentOnboardingSessionResponse(
+          surface: _hosted,
+          url: 'http://localhost:4242/setup',
+        );
+      final container = server.container(allowInsecureUrl: true);
+      expect(
+        await container.read(paymentOnboardingProvider.notifier).start(_hosted),
+        PaymentOnboardingOutcome.launched,
+      );
+      expect(server.launched.single.toString(), 'http://localhost:4242/setup');
+    });
   });
 
   group('start', () {
@@ -291,6 +346,40 @@ void main() {
       await Future.wait([inFlight, resumed]);
 
       expect(server.paymentCalls, callsDuringRound);
+    });
+
+    test('沒有任何畫面在監看時，從瀏覽器回來的那次回前景也帶 fresh: true，而且只一次', () async {
+      final server = _Server();
+      final container = server.container();
+      await container.read(accountPaymentAccountProvider('acc-1').future);
+      final notifier = container.read(paymentOnboardingProvider.notifier);
+      expect(await notifier.start(_hosted), PaymentOnboardingOutcome.launched);
+
+      Future<int> callsAfterResumeDuringRound() async {
+        final gate = Completer<void>();
+        server.gates[server.paymentCalls + 1] = gate;
+        final inFlight = container
+            .read(sellerStatusRefreshProvider.notifier)
+            .refresh();
+        await Future<void>.delayed(Duration.zero);
+        final duringRound = server.paymentCalls;
+        backgroundAndResume();
+        gate.complete();
+        await inFlight;
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        return server.paymentCalls - duringRound;
+      }
+
+      expect(
+        await callsAfterResumeDuringRound(),
+        1,
+        reason: '從瀏覽器回來：進行中那輪結束後另起一輪',
+      );
+      expect(
+        await callsAfterResumeDuringRound(),
+        0,
+        reason: '記號已消耗：第二次回前景不再帶 fresh（也不自己重讀）',
+      );
     });
   });
 }

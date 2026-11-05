@@ -28,6 +28,12 @@ import '../../seller/data/current_kyc.dart';
 import '../../seller/data/current_store.dart';
 import '../../seller/data/payment_account.dart';
 import '../../seller/data/seller_status_refresh.dart';
+import '../../seller/presentation/payment_account_action.dart';
+import '../../seller/presentation/seller_certification_gate.dart'
+    show
+        certificationGateConfirmText,
+        certificationGateMessage,
+        certificationGateTitle;
 import 'wallet_account_section.dart';
 import 'wallet_coupon_section.dart';
 
@@ -88,8 +94,11 @@ class WalletScreen extends HookConsumerWidget {
     }
     final marketing =
         my?.can(SellerCapability.SELLER_CAPABILITY_MARKETING) ?? false;
+    // 收款帳戶的讀取失敗只在平台審核通過之後才有意義（之前沒有收款帳戶，畫面是認證閘門）。
+    final reviewStatus = kyc.value?.reviewStatus;
+    final approved = platformApproved(reviewStatus);
     if (_isFailed(kyc) ||
-        _isFailed(payment) ||
+        (approved && _isFailed(payment)) ||
         ref.watch(storeUnavailableProvider)) {
       return _WalletPage(
         showCoupons: marketing,
@@ -105,11 +114,7 @@ class WalletScreen extends HookConsumerWidget {
       );
     }
 
-    final reviewStatus = kyc.requireValue.reviewStatus;
-    final account = effectivePaymentAccount(
-      payment.requireValue,
-      platformApproved: reviewStatus == KYCStatus.KYC_STATUS_APPROVED,
-    );
+    final account = effectivePaymentAccount(payment.value, approved: approved);
     final certified = my?.isCertified ?? false;
     return _WalletPage(
       showCoupons: marketing,
@@ -223,10 +228,10 @@ class _CertificationGate extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('尚未通過商家認證', style: AppTypography.bodyBold),
+          Text(certificationGateTitle, style: AppTypography.bodyBold),
           const SizedBox(height: HkSpace.sm),
           Text(
-            '通過平台審核並啟用收款帳戶後，就能啟用錢包與收款。',
+            certificationGateMessage('啟用錢包與收款'),
             style: AppTypography.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: HkSpace.xs),
@@ -238,7 +243,7 @@ class _CertificationGate extends ConsumerWidget {
           const SizedBox(height: HkSpace.lg),
           FilledButton(
             onPressed: () => _openKycWizard(context, ref),
-            child: const HkButtonLabel('前往商家認證'),
+            child: const HkButtonLabel(certificationGateConfirmText),
           ),
         ],
       ),
@@ -247,8 +252,9 @@ class _CertificationGate extends ConsumerWidget {
 }
 
 /// 收款帳戶的狀態面板（唯讀）：標題、說明與動作文字都是共用文案目錄（`seller.PaymentAccountStatus`）的文字；不顯示金流商的
-/// 待補條件細項（金流商自己的頁面會列出要補什麼）。動作：無法啟用的狀態去聯絡客服，其他去商家認證頁（開通與重新整理都在那裡）。
-class _PaymentAccountPanel extends ConsumerWidget {
+/// 待補條件細項（金流商自己的頁面會列出要補什麼）。動作與認證狀態畫面共用 [paymentAccountActionKind]：無法啟用去聯絡客服，
+/// 需要開通開始開通，其他重新讀取。
+class _PaymentAccountPanel extends HookConsumerWidget {
   const _PaymentAccountPanel({required this.account});
 
   final PaymentAccount account;
@@ -270,8 +276,14 @@ class _PaymentAccountPanel extends ConsumerWidget {
     final alert = tone == HkStatusTone.warning || tone == HkStatusTone.danger;
     final description = account.status.description(l);
     final action = account.status.action(l);
-    final disabled =
-        account.status == PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED;
+    final actions = usePaymentAccountActions(context, ref);
+    final kind = action == null
+        ? PaymentAccountActionKind.none
+        : paymentAccountActionKind(account);
+    final embedded =
+        paymentAccountCanOnboard(account) &&
+        account.onboardingSurface ==
+            OnboardingSurface.ONBOARDING_SURFACE_EMBEDDED;
     return HkContentCard(
       key: const ValueKey('wallet-payment-panel'),
       elevated: true,
@@ -296,12 +308,19 @@ class _PaymentAccountPanel extends ConsumerWidget {
               ),
             ),
           ],
-          if (action != null) ...[
+          if (embedded) ...[
+            const SizedBox(height: HkSpace.xs),
+            Text(
+              paymentAccountEmbeddedNotice,
+              style: AppTypography.body.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+          if (action != null && kind != PaymentAccountActionKind.none) ...[
             const SizedBox(height: HkSpace.md),
             OutlinedButton(
-              onPressed: () => disabled
-                  ? context.push(SettingsRoutes.help)
-                  : _openKycWizard(context, ref),
+              onPressed: actions.busy ? null : () => actions.run(account, kind),
               child: HkButtonLabel(action),
             ),
           ],

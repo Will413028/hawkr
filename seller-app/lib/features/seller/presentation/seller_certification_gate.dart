@@ -17,6 +17,11 @@ typedef StoreLoader = Future<MyStore?> Function();
 
 const _shippingSubject = '設定物流與退貨';
 
+/// 認證閘門（物流對話框與錢包卡）共用的文字；錢包與物流只差「通過之後能做什麼」。
+const certificationGateTitle = '尚未通過商家認證';
+const certificationGateConfirmText = '前往商家認證';
+String certificationGateMessage(String subject) => '通過平台審核並啟用收款帳戶後，就能$subject。';
+
 /// 目前帳號重讀後的店家，交給 [openShippingSettingsWithCertificationGate]。
 Future<void> openShippingSettings(BuildContext context, WidgetRef ref) =>
     openShippingSettingsWithCertificationGate(
@@ -92,10 +97,10 @@ Future<void> openShippingSettingsWithCertificationGate(
 /// 認證閘門對話框的文字：website 的認證閘門同一句（通過平台審核並啟用收款帳戶後才能設定物流）。
 @visibleForTesting
 ShippingCertificationGateCopy shippingCertificationGateCopy() =>
-    const ShippingCertificationGateCopy(
-      title: '尚未通過商家認證',
-      message: '通過平台審核並啟用收款帳戶後，就能$_shippingSubject。',
-      confirmText: '前往商家認證',
+    ShippingCertificationGateCopy(
+      title: certificationGateTitle,
+      message: certificationGateMessage(_shippingSubject),
+      confirmText: certificationGateConfirmText,
     );
 
 @visibleForTesting

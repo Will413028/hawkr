@@ -48,12 +48,6 @@ final class MyKyc {
   /// 平台審核的狀態（`KYCApplication.status`）；沒有申請是 null。
   KYCStatus? get reviewStatus => application?.status;
 
-  /// 賣家能不能自己修正後重新送出（`flow.can_resubmit`）；沒有申請時是 false。
-  bool get canResubmit =>
-      application != null &&
-      application!.hasFlow() &&
-      application!.flow.canResubmit;
-
   @override
   bool operator ==(Object other) =>
       other is MyKyc &&

@@ -8,7 +8,9 @@ DART = $(shell which fvm > /dev/null 2>&1 && echo "fvm dart" || echo "dart")
 DEFINES_FILE ?= config/dart-defines.json
 # GATEWAY_HOST 也可以直接帶：`make stage-debug GATEWAY_HOST=https://api.example.test`。
 GATEWAY_HOST ?=
-DEFINES_FLAG = $(if $(wildcard $(DEFINES_FILE)),--dart-define-from-file=$(DEFINES_FILE)) $(if $(GATEWAY_HOST),--dart-define=GATEWAY_HOST=$(GATEWAY_HOST))
+# HAWKR_WEB_ORIGIN（website 的 origin，付款回跳頁用）同樣可以直接帶。
+HAWKR_WEB_ORIGIN ?=
+DEFINES_FLAG = $(if $(wildcard $(DEFINES_FILE)),--dart-define-from-file=$(DEFINES_FILE)) $(if $(GATEWAY_HOST),--dart-define=GATEWAY_HOST=$(GATEWAY_HOST)) $(if $(HAWKR_WEB_ORIGIN),--dart-define=HAWKR_WEB_ORIGIN=$(HAWKR_WEB_ORIGIN))
 
 .PHONY: require-gateway help dev-debug dev-profile dev-release stage-debug stage-profile stage-release prod-debug prod-profile prod-release clean clean-ios clean-reinstall analyze format test check-updates deadcode enum-text
 
@@ -89,11 +91,15 @@ build-ios-ipa-prod: require-gateway
 	@echo "Building iOS IPA (prod)..."
 	$(FLUTTER) build ipa --flavor prod -t lib/main.dart --dart-define=FLUTTER_FLAVOR=prod $(DEFINES_FLAG)
 
-# stage 與 prod 必須有 GATEWAY_HOST（API 主機是必要設定，沒有預設值）；缺少時拒絕建置。
-# 檔案裡只看 GATEWAY_HOST 一行是否有非空值。
+# stage 與 prod 必須有 GATEWAY_HOST 與 HAWKR_WEB_ORIGIN（API 主機與 website origin 是必要設定，沒有預設值，
+# 缺少時 App 啟動即丟 StateError）；缺少時拒絕建置。檔案裡只看各自一行是否有非空值。
 require-gateway:
 	@if [ -z "$(GATEWAY_HOST)" ] && ! grep -Eq '"GATEWAY_HOST"[[:space:]]*:[[:space:]]*"[^"]+"' "$(DEFINES_FILE)" 2>/dev/null; then \
 		echo "error: stage 與 prod 必須提供 GATEWAY_HOST：在 $(DEFINES_FILE) 填入，或 make <target> GATEWAY_HOST=<API 主機>" >&2; \
+		exit 1; \
+	fi
+	@if [ -z "$(HAWKR_WEB_ORIGIN)" ] && ! grep -Eq '"HAWKR_WEB_ORIGIN"[[:space:]]*:[[:space:]]*"[^"]+"' "$(DEFINES_FILE)" 2>/dev/null; then \
+		echo "error: stage 與 prod 必須提供 HAWKR_WEB_ORIGIN：在 $(DEFINES_FILE) 填入，或 make <target> HAWKR_WEB_ORIGIN=<website origin>" >&2; \
 		exit 1; \
 	fi
 

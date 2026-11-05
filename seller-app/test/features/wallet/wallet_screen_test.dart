@@ -15,6 +15,7 @@ import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/coupon/data/coupon_model.dart';
 import 'package:hawkr_seller/features/coupon/presentation/coupon_controller.dart';
 import 'package:hawkr_seller/features/seller/data/my_store_repository.dart';
+import 'package:hawkr_seller/features/seller/data/payment_onboarding.dart';
 import 'package:hawkr_seller/features/wallet/presentation/wallet_screen.dart';
 import 'package:hawkr_seller/shared/widgets/truck_loading_overlay.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
@@ -72,6 +73,7 @@ class _Server {
   void advance(Duration d) => now = now.add(d);
   int kycCalls = 0;
   int paymentCalls = 0;
+  final launched = <Uri>[];
 
   GetMyStoreResponse _storeResponse() => myStoreResponse(
     capabilities: marketing
@@ -101,6 +103,13 @@ class _Server {
           if (answer == null) throw ConnectException(Code.notFound, 'none');
           return GetMyPaymentAccountResponse(account: answer as PaymentAccount);
         })
+        .unary(
+          SellerAppService.createPaymentOnboardingSession,
+          (_, _) => CreatePaymentOnboardingSessionResponse(
+            surface: OnboardingSurface.ONBOARDING_SURFACE_HOSTED,
+            url: 'https://connect.example.test/setup',
+          ),
+        )
         .build(),
   );
 }
@@ -122,6 +131,11 @@ List<Override> _overrides(_Server server) => [
   sellerClientProvider.overrideWithValue(server.client),
   myStoreRepositoryProvider.overrideWithValue(server.store.repository),
   couponListControllerProvider.overrideWith(_CouponFixture.new),
+  webOriginProvider.overrideWithValue('https://web.example.test'),
+  externalBrowserLauncherProvider.overrideWithValue((uri) async {
+    server.launched.add(uri);
+    return true;
+  }),
 ];
 
 Future<GoRouter> _pump(
@@ -429,6 +443,19 @@ void main() {
       expect(find.text('優惠券'), findsOneWidget);
     });
 
+    testWidgets('GetMyPaymentAccount 失敗但平台審核還沒核准：仍是認證閘門（讀取失敗只在核准之後才有意義）', (
+      tester,
+    ) async {
+      final server = _Server(
+        review: KYCStatus.KYC_STATUS_SUBMITTED,
+        payment: ConnectException(Code.unavailable, 'later'),
+        certified: false,
+      );
+      await _pump(tester, server);
+      expect(find.text('無法載入認證狀態'), findsNothing);
+      expect(find.text('尚未通過商家認證'), findsOneWidget);
+    });
+
     testWidgets('第一次顯示等 GetMyKYC 與 GetMyPaymentAccount，不會先閃出閘門', (
       tester,
     ) async {
@@ -490,14 +517,17 @@ void main() {
   });
 
   group('收款帳戶狀態面板', () {
-    testWidgets('待設定：目錄的標題、說明與動作；新帳戶不說逾期或停用，按鈕進認證流程', (tester) async {
+    testWidgets('待設定：目錄的標題、說明與動作；新帳戶不說逾期或停用，按鈕開始開通（與認證狀態畫面同一個動作）', (
+      tester,
+    ) async {
       final server = _Server(
-        payment: _account(
-          PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED,
+        payment: PaymentAccount(
+          status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED,
+          onboardingSurface: OnboardingSurface.ONBOARDING_SURFACE_HOSTED,
         ),
         certified: false,
       );
-      final router = await _pump(tester, server);
+      await _pump(tester, server);
       expect(
         find.byKey(const ValueKey('wallet-payment-panel')),
         findsOneWidget,
@@ -509,9 +539,11 @@ void main() {
       expect(find.text('尚未通過商家認證'), findsNothing);
 
       await _tap(tester, find.text('前往設定收款帳戶'));
-      expect(find.text('wizard:null'), findsOneWidget);
-      router.pop(true);
-      await _settle(tester);
+      expect(find.text('wizard:null'), findsNothing);
+      expect(
+        server.launched.single.toString(),
+        'https://connect.example.test/setup',
+      );
     });
 
     testWidgets('平台審核核准、收款帳戶還沒有（not_found）：與「準備中」同義', (tester) async {
@@ -521,6 +553,12 @@ void main() {
       expect(find.text('正在建立收款帳戶，通常幾分鐘內完成。'), findsOneWidget);
       expect(find.text('重新整理'), findsOneWidget);
       expect(find.text('尚未通過商家認證'), findsNothing);
+
+      // 目錄的動作是「重新整理」：重讀收款帳戶，不進認證流程。
+      final before = server.paymentCalls;
+      await _tap(tester, find.text('重新整理'));
+      expect(find.text('wizard:null'), findsNothing);
+      expect(server.paymentCalls, greaterThan(before));
     });
 
     testWidgets('審核中：沒有額外操作的說明', (tester) async {

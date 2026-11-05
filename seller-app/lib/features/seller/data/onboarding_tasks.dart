@@ -113,13 +113,15 @@ const _profileRequirements = [
 ///
 /// [reviewStatus] 是平台審核的狀態（`GetMyKYC` 的 `KYCApplication.status`），沒有申請時是 null；[reviewReadable] 為 false 表示
 /// `GetMyKYC` 還沒讀到或讀取失敗，此時 null 不是「未送出」，狀態文字是目錄的「未知」。[paymentAccount] 是 `GetMyPaymentAccount`
-/// （平台審核核准之前沒有）。[l] 是 UI 語系（名詞與狀態文字取自共用文案目錄）。
+/// （平台審核核准之前沒有）；[paymentReadable] 為 false 表示它讀取失敗（平台審核核准之後才有意義），此時 null 不是「準備中」，
+/// 狀態文字是目錄的「未知」。[l] 是 UI 語系（名詞與狀態文字取自共用文案目錄）。
 List<OnboardingTask> buildOnboardingTasks({
   required UiLocale l,
   required MyStore? my,
   required KYCStatus? reviewStatus,
   required PaymentAccount? paymentAccount,
   bool reviewReadable = true,
+  bool paymentReadable = true,
   ShippingProgress shipping = const ShippingProgress(),
   int? productCount,
 }) {
@@ -134,21 +136,13 @@ List<OnboardingTask> buildOnboardingTasks({
       if (lacks(requirement)) requirement.uiText(l) ?? commonUnknown(l),
   ];
   final profileDone = missingProfile.isEmpty;
-  // 收款帳戶啟用而且平台審核核准才通過開通閘門（`ONBOARDING_COMPLETE`），這是伺服器的判斷；平台審核另看申請狀態。
-  final paymentDone = !lacks(
-    SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
-  );
-  final reviewDone =
-      paymentDone || reviewStatus == KYCStatus.KYC_STATUS_APPROVED;
-  // 伺服器說開通閘門已通過、收款帳戶卻還沒讀到：狀態文字用「已啟用」，不顯示成「準備中」。
-  final account = paymentDone && paymentAccount == null
-      ? PaymentAccount(
-          status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED,
-        )
-      : effectivePaymentAccount(paymentAccount, platformApproved: reviewDone);
-  final reviewLabel = reviewDone
-      ? KYCStatus.KYC_STATUS_APPROVED.uiText(l)
-      : reviewStatus?.uiText(l);
+  // 平台審核與收款帳戶各自讀自己的來源（`KYCApplication.status`、`GetMyPaymentAccount`），判斷共用 [platformApproved] 與
+  // [effectivePaymentAccount]；收款帳戶啟用算完成。
+  final reviewDone = platformApproved(reviewStatus);
+  final account = effectivePaymentAccount(paymentAccount, approved: reviewDone);
+  final paymentDone = paymentAccountEnabled(account);
+  final paymentUnreadable = reviewDone && !paymentReadable && !paymentDone;
+  final reviewLabel = reviewStatus?.uiText(l);
 
   final tasks = <OnboardingTask>[
     OnboardingTask(
@@ -168,7 +162,7 @@ List<OnboardingTask> buildOnboardingTasks({
       // 已通過就沒有要辦的審核了，不再給按鈕。
       cta: reviewDone ? null : '前往商家認證',
       completed: reviewDone,
-      statusLabel: reviewStatus == null && !reviewDone && reviewReadable
+      statusLabel: reviewStatus == null && reviewReadable
           ? '未送出'
           : reviewLabel ?? commonUnknown(l),
     ),
@@ -177,12 +171,18 @@ List<OnboardingTask> buildOnboardingTasks({
       group: OnboardingTaskGroup.beforePublish,
       title: '收款帳戶',
       description: '向金流商設定身分與銀行資料。',
-      // 已啟用就沒有要辦的了；平台審核還沒通過時只有灰色的提示。
-      cta: paymentDone || account == null ? null : account.status.action(l),
+      // 已啟用就沒有要辦的了；平台審核還沒通過時只有灰色的提示；讀不到時去商家認證頁重讀。
+      cta: paymentDone || account == null
+          ? null
+          : paymentUnreadable
+          ? '前往商家認證'
+          : account.status.action(l),
       completed: paymentDone,
       locked: account == null,
       statusLabel: account == null
-          ? '平台審核通過後開放設定'
+          ? paymentAccountNotYetOpenNotice
+          : paymentUnreadable
+          ? commonUnknown(l)
           : account.status.uiText(l) ?? commonUnknown(l),
     ),
   ];

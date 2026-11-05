@@ -68,7 +68,6 @@ Future<void> _pump(
   WidgetTester tester,
   _Server server, {
   KYCStatus review = KYCStatus.KYC_STATUS_APPROVED,
-  bool certified = false,
   Timestamp? decideTime,
 }) async {
   final store = FakeMyStoreServer();
@@ -98,12 +97,8 @@ Future<void> _pump(
     routes: [
       GoRoute(
         path: '/',
-        builder: (_, _) => Scaffold(
-          body: CertificationStatusView(
-            application: application,
-            certified: certified,
-          ),
-        ),
+        builder: (_, _) =>
+            Scaffold(body: CertificationStatusView(application: application)),
       ),
       GoRoute(
         path: SettingsRoutes.help,
@@ -157,20 +152,17 @@ void main() {
       expect(find.textContaining('核准時間：'), findsOneWidget);
     });
 
-    testWidgets('店家已通過開通閘門（certified）：平台審核一律是已通過，不管申請狀態', (tester) async {
+    testWidgets('平台審核只讀申請狀態（沒有「開通閘門已過就一律已通過」的例外）：審核中就不讀收款帳戶', (tester) async {
       final server = _Server()
         ..payment = PaymentAccount(
           status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED,
           payoutsActive: true,
         );
-      await _pump(
-        tester,
-        server,
-        review: KYCStatus.KYC_STATUS_SUBMITTED,
-        certified: true,
-      );
+      await _pump(tester, server, review: KYCStatus.KYC_STATUS_SUBMITTED);
 
-      expect(_in('kyc_platform_review', '已通過'), findsOneWidget);
+      expect(_in('kyc_platform_review', '審核中'), findsOneWidget);
+      expect(_in('kyc_payment_account', '平台審核通過後開放設定'), findsOneWidget);
+      expect(server.paymentCalls, 0);
     });
 
     testWidgets('不認得的申請狀態（UNSPECIFIED）：徽章是目錄的「未知」', (tester) async {

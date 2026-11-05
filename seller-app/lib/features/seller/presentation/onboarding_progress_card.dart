@@ -34,6 +34,7 @@ class OnboardingProgressCard extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final my = ref.watch(myStoreSnapshotProvider);
     final kyc = ref.watch(currentKycProvider)?.value;
+    final payment = ref.watch(currentPaymentAccountProvider);
     final inputs =
         ref.watch(onboardingInputsProvider).value ?? const OnboardingInputs();
     final tasks = buildOnboardingTasks(
@@ -41,7 +42,8 @@ class OnboardingProgressCard extends HookConsumerWidget {
       my: my,
       reviewStatus: kyc?.reviewStatus,
       reviewReadable: kyc != null,
-      paymentAccount: ref.watch(currentPaymentAccountProvider)?.value,
+      paymentAccount: payment?.value,
+      paymentReadable: payment?.hasValue ?? false,
       shipping: inputs.shipping,
       productCount: inputs.productCount,
     );

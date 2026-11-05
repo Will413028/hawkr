@@ -167,6 +167,7 @@ void main() {
       tester,
       missing: const [],
       kyc: _review(KYCStatus.KYC_STATUS_APPROVED),
+      payment: _account(PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED),
     );
 
     expect(find.text('任務完成'), findsOneWidget);
@@ -213,6 +214,7 @@ void main() {
       tester,
       missing: const [],
       kyc: _review(KYCStatus.KYC_STATUS_APPROVED),
+      payment: _account(PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED),
     );
     await tester.tap(find.text('展開任務'));
     await tester.pumpAndSettle();
@@ -284,6 +286,18 @@ void main() {
     expect(find.text('重新整理'), findsOneWidget);
   });
 
+  testWidgets('平台審核通過、收款帳戶讀取失敗：「未知」，不顯示成「準備中」', (tester) async {
+    await _pump(
+      tester,
+      missing: [_kyc],
+      kyc: _review(KYCStatus.KYC_STATUS_APPROVED),
+      payment: ConnectException(Code.unavailable, 'later'),
+    );
+
+    expect(find.text('準備中'), findsNothing);
+    expect(find.text('未知'), findsOneWidget);
+  });
+
   testWidgets('讀不到認證狀態時平台審核列顯示「未知」，不顯示成未送出', (tester) async {
     await _pump(
       tester,
@@ -301,6 +315,7 @@ void main() {
       tester,
       missing: const [],
       kyc: _review(KYCStatus.KYC_STATUS_APPROVED),
+      payment: _account(PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED),
       inputs: const OnboardingInputs(productCount: 2),
       description: '產地直送',
     );
