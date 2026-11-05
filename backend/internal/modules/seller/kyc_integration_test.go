@@ -1200,7 +1200,7 @@ func TestStartupChecksThatEveryKeyReferencedByTheDatabaseIsConfigured(t *testing
 		must(t, err)
 		mac, err := seal.ParseMAC(macSpec)
 		must(t, err)
-		return New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Identity: f.identity, Media: f.media, Orders: f.orders, KYCKeys: enc, KYCMAC: mac, ProductStores: f.products, Registry: f.registry,
+		return New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Identity: f.identity, Media: f.media, Orders: f.orders, KYCKeys: enc, KYCMAC: mac, ProductStores: f.products, Registry: f.registry, Payment: f.payments,
 			Now: func() time.Time { return f.now }, StoreCode: func(time.Time) (int64, error) { return 0, errors.New("unused") }})
 	}
 	oldEnc, oldMAC := "test1:"+b64("test-kyc-encryption-key-00000001"), "test1:"+b64("test-kyc-hash-hmac-key-000000001")

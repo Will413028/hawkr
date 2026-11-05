@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -163,7 +164,8 @@ func (f *fixture) count(t *testing.T, sql string, args ...any) int64 {
 	return n
 }
 
-var nextStore int64 = 100
+// nextStore 是平行測試共用的擁有者 ID 來源（atomic：每次取到不同的值）。
+var nextStore atomic.Int64
 
 // request 模擬擁有者核准的 transaction：寫「建立中」的帳戶列並排入建立 job。
 func (f *fixture) request(t *testing.T, storeID int64, email string) {
@@ -173,9 +175,9 @@ func (f *fixture) request(t *testing.T, storeID int64, email string) {
 
 func (f *fixture) newStore(t *testing.T) int64 {
 	t.Helper()
-	nextStore++
-	f.request(t, nextStore, "seller@example.com")
-	return nextStore
+	id := nextStore.Add(1) + 100
+	f.request(t, id, "seller@example.com")
+	return id
 }
 
 func (f *fixture) account(t *testing.T, storeID int64) Account {
