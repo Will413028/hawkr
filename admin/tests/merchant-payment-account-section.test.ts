@@ -70,6 +70,8 @@ function setup(
 	handlers: {
 		get: (call: number) => ReturnType<typeof account> | ConnectError;
 		refresh?: () => undefined | ConnectError;
+		/** 讓 RefreshPaymentAccount 卡住直到這個 promise 完成。 */
+		refreshGate?: Promise<void>;
 		retry?: () => ReturnType<typeof account>;
 	},
 	rereadMs = 5,
@@ -83,8 +85,9 @@ function setup(
 				if (r instanceof ConnectError) throw r;
 				return { account: r };
 			},
-			refreshPaymentAccount: () => {
+			refreshPaymentAccount: async () => {
 				calls.refresh += 1;
+				await handlers.refreshGate;
 				const r = handlers.refresh?.();
 				if (r instanceof ConnectError) throw r;
 				return {};
@@ -139,12 +142,28 @@ test("重新整理：fetch_time 一直沒變時重讀有次數上限", async () 
 });
 
 test("重新整理：卸載後計時器停止，不再重讀", async () => {
-	// 間隔拉長，確保卸載發生在第一次重讀之前。
-	const { calls, view } = setup({ get: () => account({}) }, 60);
+	// 間隔遠大於測試時長：計時器不可能自己觸發，只有卸載清掉它才不會漏出去，不靠牆鐘競速。
+	const { calls, view } = setup({ get: () => account({}) }, 60_000);
 	await view.render();
 	await click("重新整理");
+	await until(() => calls.refresh === 1, "重新整理已送出");
 	await view.unmount();
-	await sleep(150);
+	await sleep(50);
+	assert.equal(calls.get, 1);
+});
+
+test("重新整理：RPC 還在等時卸載，回應到了也不啟動重讀", async () => {
+	let release: () => void = () => {};
+	const refreshGate = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const { calls, view } = setup({ get: () => account({}), refreshGate }, 5);
+	await view.render();
+	await click("重新整理");
+	await until(() => calls.refresh === 1, "重新整理已送出");
+	await view.unmount();
+	release();
+	await sleep(80);
 	assert.equal(calls.get, 1);
 });
 

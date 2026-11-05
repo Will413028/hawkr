@@ -254,7 +254,15 @@ export function PaymentAccountSection({
 		generation.current += 1;
 		clearTimeout(rereadTimer.current);
 	};
-	useEffect(() => stopReread, []);
+	// 卸載後才回來的重新整理回應不可再排計時器（cleanup 的 stopReread 已經跑過了）。
+	const mounted = useRef(false);
+	useEffect(() => {
+		mounted.current = true;
+		return () => {
+			mounted.current = false;
+			stopReread();
+		};
+	}, []);
 
 	// 處理過的待辦（建立失敗）依帳戶狀態出入佇列：結果一變就讓待辦列表重讀。
 	const invalidateQueue = () => {
@@ -292,7 +300,7 @@ export function PaymentAccountSection({
 			await refreshMutation.mutateAsync({ storeId });
 			onNotice({ tone: "success", text: REFRESH_QUEUED_TEXT });
 			invalidateQueue();
-			startReread(baselineMs);
+			if (mounted.current) startReread(baselineMs);
 		} catch (caught) {
 			onNotice({
 				tone: "error",
