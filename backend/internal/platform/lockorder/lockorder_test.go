@@ -134,21 +134,20 @@ func TestCheckerAllowsReturningToAModuleLockedEarlierInTheSameTransaction(t *tes
 	}
 }
 
-func TestCheckerSkipsExemptedPairsOnly(t *testing.T) {
+func TestCheckerFlagsOrchestratorRowLockedBeforeBuyerAndSeller(t *testing.T) {
 	t.Parallel()
 	c := NewChecker()
 	conn := new(int)
 	c.observe(conn, "begin")
 	c.observe(conn, "-- name: LockLiveAccount :one\nSELECT 1 FROM identity.accounts WHERE account_id = $1 FOR UPDATE")
 	c.observe(conn, "-- name: PendingRequest :one\nSELECT * FROM accountdeletion.deletion_requests WHERE account_id = $1 FOR UPDATE")
-	c.observe(conn, "-- name: LockBuyer :one\nSELECT 1 FROM buyer.buyers WHERE buyer_id = $1 FOR UPDATE")             // 豁免
-	c.observe(conn, "-- name: LockAccountStores :many\nSELECT 1 FROM seller.stores WHERE account_id = $1 FOR UPDATE") // 豁免
-	c.observe(conn, "-- name: HidePost :exec\nUPDATE social.posts SET hidden = true WHERE id = $1")                   // 不在 Then：倒退
+	c.observe(conn, "-- name: LockBuyer :one\nSELECT 1 FROM buyer.buyers WHERE buyer_id = $1 FOR UPDATE")             // 倒退，沒有豁免
+	c.observe(conn, "-- name: LockAccountStores :many\nSELECT 1 FROM seller.stores WHERE account_id = $1 FOR UPDATE") // 倒退，沒有豁免
 	c.observe(conn, "commit")
 
 	vs := c.Violations()
-	if len(vs) != 1 || vs[0].Then.Lock.Schema != "social" {
-		t.Fatalf("violations = %+v，預期只有不在豁免裡的 social", vs)
+	if len(vs) != 2 || vs[0].Then.Lock.Schema != "buyer" || vs[1].Then.Lock.Schema != "seller" {
+		t.Fatalf("violations = %+v，預期 buyer 與 seller 各一筆", vs)
 	}
 }
 

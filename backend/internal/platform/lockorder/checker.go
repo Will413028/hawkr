@@ -156,7 +156,7 @@ func (c *Checker) observe(key any, sql string) {
 		}
 		acq := Acquisition{Lock: l, Statement: statementName(sql), Site: site}
 		c.mu.Lock()
-		if st.held && rank < st.topRank && l.Waits && !st.locked[rank] && !exempt(st.top, acq) {
+		if st.held && rank < st.topRank && l.Waits && !st.locked[rank] {
 			c.record(Violation{Held: st.top, Then: acq})
 		}
 		st.locked[rank] = true

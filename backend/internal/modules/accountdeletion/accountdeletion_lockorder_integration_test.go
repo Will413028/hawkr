@@ -137,3 +137,74 @@ func TestDeletionLocksBuyerAndSellerBeforeSocialRows(t *testing.T) {
 		})
 	}
 }
+
+// 已刪除帳號沒有帳號列可鎖（LockLiveAccount 對已刪除帳號不鎖），並行完成同一筆待辦申請時，CompleteRequest 的 UPDATE 會等到對方 commit，
+// 重新判斷後 0 列。0 列要當成「已完成」回傳最新申請，不能把 pgx.ErrNoRows 傳出去。拿掉 completeRequest 的 ErrNoRows 處理，這個測試失敗。
+func TestCompletePendingOnDeletedAccountToleratesConcurrentCompletion(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	id, _ := f.account(t)
+	f.orders.mu.Lock()
+	f.orders.open = true
+	f.orders.mu.Unlock()
+	if state, err := f.module.Request(ctx, adminRequest(id)); err != nil || state != PendingOrders {
+		t.Fatalf("state=%s err=%v", state, err)
+	}
+	// 帳號被另一條路徑刪除了，待辦申請還在 PENDING_ORDERS。
+	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE identity.accounts SET deleted_at = now(), deletion_pending_at = NULL, email = NULL, suspended_at = NULL WHERE id = $1", id); err != nil {
+		t.Fatal(err)
+	}
+
+	// 另一個 transaction 先鎖住待辦申請列；CompletePending 的一般讀取仍讀得到它，之後的 UPDATE 停在這一列上。
+	held, release, holdDone := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	go func() {
+		holdDone <- f.db.InTx(ctx, func(ctx context.Context) error {
+			var rid uuid.UUID
+			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT id FROM accountdeletion.deletion_requests WHERE account_id = $1 AND status = 'PENDING_ORDERS' FOR UPDATE", id).Scan(&rid); err != nil {
+				return err
+			}
+			close(held)
+			<-release
+			_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE accountdeletion.deletion_requests SET status = 'COMPLETED', completed_at = now() WHERE id = $1", rid)
+			return err
+		})
+	}()
+	<-held
+	type result struct {
+		state State
+		err   error
+	}
+	done := make(chan result, 1)
+	go func() { s, err := f.module.CompletePending(ctx, id); done <- result{s, err} }()
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		var waiting int64
+		if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'").Scan(&waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting > 0 {
+			break
+		}
+		select {
+		case r := <-done:
+			t.Fatalf("CompletePending 沒有停在申請列上就結束了：%s %v", r.state, r.err)
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("CompletePending 沒有卡在鎖上")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	close(release)
+	if err := <-holdDone; err != nil {
+		t.Fatal(err)
+	}
+	r := <-done
+	if r.err != nil || r.state != Completed {
+		t.Fatalf("對方已完成同一筆申請：state=%s err=%v，預期 Completed 且沒有錯誤", r.state, r.err)
+	}
+	if f.count(t, id) != 1 {
+		t.Fatal("申請列數量不是 1")
+	}
+}
