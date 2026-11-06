@@ -27,23 +27,23 @@ auditConfig:
 # 兩個 app 共用的依賴版本（取 website 原有版本）。
 # typescript-compiler-api 是 npm:@typescript/typescript6 的別名（TypeScript 7 沒有穩定的 JS compiler API，website、admin 與 @hawkr/ui-text 的測試／檢查工具用）。
 catalog:
-  "@biomejs/biome": ^2.4.13
-  "@bufbuild/protobuf": 2.15.0
-  "@bufbuild/protoc-gen-es": 2.15.0
-  "@connectrpc/connect": 2.2.0
+  "@biomejs/biome": ^2.6.4
+  "@bufbuild/protobuf": 2.16.0
+  "@bufbuild/protoc-gen-es": 2.16.0
+  "@connectrpc/connect": 2.3.0
   "@connectrpc/connect-query": 2.3.1
-  "@connectrpc/connect-web": 2.2.0
-  "@types/node": ^26.0.0
-  "@types/react": 19.2.18
-  "@types/react-dom": 19.2.4
-  next: 16.4.1
-  next-intl: 4.13.0
-  react: 19.2.8
-  react-dom: 19.2.8
-  tsx: ^4.22.4
+  "@connectrpc/connect-web": 2.3.0
+  "@types/node": ^26.6.6
+  "@types/react": 19.3.0
+  "@types/react-dom": 19.3.0
+  next: 16.4.3
+  next-intl: 4.14.9
+  react: 19.3.1
+  react-dom: 19.3.1
+  tsx: ^4.23.15
   typescript: 7.0.2
   typescript-compiler-api: npm:@typescript/typescript6@6.0.2
-  use-intl: 4.13.0
+  use-intl: 4.14.9
   vitest: 4.1.10
 
 # minimumReleaseAge (pnpm 11 default: 24h) needs a live round-trip to
