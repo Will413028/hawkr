@@ -34,16 +34,17 @@ const (
 // 商家認證各自頁面的 list 權限；重新綁定 PayUni 的來源是 PayUni 註冊，它唯一的讀取權限是 get（沒有 list RPC，不新增沒有 RPC 的 list 權限）。
 // 新種類沒有列在這裡，TestKindsAreOneToOneWithTheContract 失敗（它逐種類寫死期望的權限）。
 var kindPermissions = map[rq.Kind]adminperm.Permission{
-	rq.ReportTriage:          adminperm.SellerReportsList,
-	rq.CaseDecision:          adminperm.SellerCasesList,
-	rq.CaseInquiryOverdue:    adminperm.SellerCaseInquiriesList,
-	rq.AuthorityOrder:        adminperm.SellerAuthorityOrdersList,
-	rq.AuthorityTargetNotice: adminperm.SellerAuthorityOrdersList,
-	rq.MeasureAppeal:         adminperm.SellerMeasuresList,
-	rq.MeasureLiftRequest:    adminperm.SellerMeasuresList,
-	rq.MeasureReview:         adminperm.SellerMeasuresList,
-	rq.KYCApplication:        adminperm.SellerKYCApplicationsList,
-	rq.PayUniBindRetry:       adminperm.SellerPayUniRegistrationsGet,
+	rq.ReportTriage:               adminperm.SellerReportsList,
+	rq.CaseDecision:               adminperm.SellerCasesList,
+	rq.CaseInquiryOverdue:         adminperm.SellerCaseInquiriesList,
+	rq.AuthorityOrder:             adminperm.SellerAuthorityOrdersList,
+	rq.AuthorityTargetNotice:      adminperm.SellerAuthorityOrdersList,
+	rq.MeasureAppeal:              adminperm.SellerMeasuresList,
+	rq.MeasureLiftRequest:         adminperm.SellerMeasuresList,
+	rq.MeasureReview:              adminperm.SellerMeasuresList,
+	rq.KYCApplication:             adminperm.SellerKYCApplicationsList,
+	rq.PayUniBindRetry:            adminperm.SellerPayUniRegistrationsGet,
+	rq.PaymentAccountCreateFailed: adminperm.PaymentAccountsGet,
 }
 
 // Lister 是 handler 需要的模組方法（*reviewqueue.Module 實作它）。
@@ -51,10 +52,16 @@ type Lister interface {
 	List(ctx context.Context, now time.Time, kinds []rq.Kind, after *rq.Cursor, limit int32) ([]rq.Item, error)
 }
 
+// StoreNames 是店名的來源（seller 的公開 API）：沒有店名的來源（payment 的收款帳戶待辦只有店家 ID）在這裡補上，店名已清理或店家不存在時是空字串。
+type StoreNames interface {
+	StoreNames(ctx context.Context, storeIDs []int64) (map[int64]string, error)
+}
+
 // Admin 實作 ReviewQueueAdminService。授權（reviewqueue.items.list）由 adminauth 的 interceptor 檢查；種類的權限在這裡與請求的 kinds 取交集。
 type Admin struct {
-	m   Lister
-	now func() time.Time
+	m     Lister
+	names StoreNames
+	now   func() time.Time
 	// allows 回答呼叫者有沒有某個讀取權限；預設是 Principal.AdminAllows（interceptor 與 adminauth.GuardFile 用的同一組）。
 	// 現在只有 OWNER 一個角色（擁有全部權限），測試換掉它才能表達「只有某些來源的讀取權」。
 	allows func(identity.Principal, adminperm.Permission) bool
@@ -62,12 +69,35 @@ type Admin struct {
 
 var _ reviewqueuev1alpha1connect.ReviewQueueAdminServiceHandler = (*Admin)(nil)
 
-// NewAdmin 建立後台的 handler；now 是整個請求用的時鐘（nil 時用 time.Now）。
-func NewAdmin(m Lister, now func() time.Time) *Admin {
+// NewAdmin 建立後台的 handler；names 是店名的來源，now 是整個請求用的時鐘（nil 時用 time.Now）。
+func NewAdmin(m Lister, names StoreNames, now func() time.Time) *Admin {
 	if now == nil {
 		now = time.Now
 	}
-	return &Admin{m: m, now: now, allows: identity.Principal.AdminAllows}
+	return &Admin{m: m, names: names, now: now, allows: identity.Principal.AdminAllows}
+}
+
+// fillStoreNames 補上來源沒有給店名的項目（payment 的待辦）：一頁一次批次讀取。
+func (h *Admin) fillStoreNames(ctx context.Context, items []rq.Item) error {
+	var ids []int64
+	for _, item := range items {
+		if item.StoreID != nil && item.StoreName == "" && !slices.Contains(ids, *item.StoreID) {
+			ids = append(ids, *item.StoreID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	names, err := h.names.StoreNames(ctx, ids)
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		if items[i].StoreID != nil && items[i].StoreName == "" {
+			items[i].StoreName = names[*items[i].StoreID]
+		}
+	}
+	return nil
 }
 
 func (h *Admin) ListReviewQueue(ctx context.Context, req *connect.Request[adminpb.ListReviewQueueRequest]) (*connect.Response[adminpb.ListReviewQueueResponse], error) {
@@ -104,6 +134,9 @@ func (h *Admin) ListReviewQueue(ctx context.Context, req *connect.Request[adminp
 	if len(items) > int(size) {
 		items = items[:size]
 		out.NextPageToken = rpc.TokenFor(scope, rq.CursorOf(items[size-1]))
+	}
+	if err := h.fillStoreNames(ctx, items); err != nil {
+		return nil, err
 	}
 	for _, item := range items {
 		pb, err := toProto(item)
@@ -217,6 +250,11 @@ func toProto(item rq.Item) (*adminpb.ReviewQueueItem, error) {
 			return nil, missing("kyc_application_id 或 store_id")
 		}
 		out.Subject = &adminpb.ReviewQueueItem_KycApplication{KycApplication: &adminpb.KYCApplicationRef{StoreId: rpc.FormatID(*item.StoreID), ApplicationId: item.KYCApplicationID.String()}}
+	case rq.PaymentAccountCreateFailed:
+		if item.StoreID == nil {
+			return nil, missing("store_id")
+		}
+		out.Subject = &adminpb.ReviewQueueItem_PaymentAccount{PaymentAccount: &adminpb.PaymentAccountRef{StoreId: rpc.FormatID(*item.StoreID)}}
 	default:
 		return nil, fmt.Errorf("httpapi/reviewqueue：不認得的種類 %q", item.Kind)
 	}

@@ -8,15 +8,15 @@ part of 'seller_status_refresh.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// 重讀賣家的伺服器狀態：店家（`GetMyStore`）與認證流程（`GetMyKYC`）一起，兩者不會一個新一個舊（PayUni 狀態是認證流程的一部分，隨 `GetMyKYC` 一起讀）。
+/// 重讀賣家的伺服器狀態：店家（`GetMyStore`）、認證流程（`GetMyKYC`）與收款帳戶（`GetMyPaymentAccount`）一起，三者不會一個新一個舊。
 
 @ProviderFor(SellerStatusRefresh)
 final sellerStatusRefreshProvider = SellerStatusRefreshProvider._();
 
-/// 重讀賣家的伺服器狀態：店家（`GetMyStore`）與認證流程（`GetMyKYC`）一起，兩者不會一個新一個舊（PayUni 狀態是認證流程的一部分，隨 `GetMyKYC` 一起讀）。
+/// 重讀賣家的伺服器狀態：店家（`GetMyStore`）、認證流程（`GetMyKYC`）與收款帳戶（`GetMyPaymentAccount`）一起，三者不會一個新一個舊。
 final class SellerStatusRefreshProvider
     extends $NotifierProvider<SellerStatusRefresh, void> {
-  /// 重讀賣家的伺服器狀態：店家（`GetMyStore`）與認證流程（`GetMyKYC`）一起，兩者不會一個新一個舊（PayUni 狀態是認證流程的一部分，隨 `GetMyKYC` 一起讀）。
+  /// 重讀賣家的伺服器狀態：店家（`GetMyStore`）、認證流程（`GetMyKYC`）與收款帳戶（`GetMyPaymentAccount`）一起，三者不會一個新一個舊。
   SellerStatusRefreshProvider._()
     : super(
         from: null,
@@ -45,9 +45,9 @@ final class SellerStatusRefreshProvider
 }
 
 String _$sellerStatusRefreshHash() =>
-    r'42a6450f098bec3268f468a4b4e148ce39861b9f';
+    r'd47b73e839bb5b2cb39aa0a188cd6066bbddd0c5';
 
-/// 重讀賣家的伺服器狀態：店家（`GetMyStore`）與認證流程（`GetMyKYC`）一起，兩者不會一個新一個舊（PayUni 狀態是認證流程的一部分，隨 `GetMyKYC` 一起讀）。
+/// 重讀賣家的伺服器狀態：店家（`GetMyStore`）、認證流程（`GetMyKYC`）與收款帳戶（`GetMyPaymentAccount`）一起，三者不會一個新一個舊。
 
 abstract class _$SellerStatusRefresh extends $Notifier<void> {
   void build();

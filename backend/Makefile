@@ -166,7 +166,7 @@ lint-fix-all:
 # Catches: a migration .sql file added/edited without re-running `atlas migrate hash`
 # — passes `go build`/`go test` silently but fails when `hawkr migrate` applies it.
 atlas-validate-all:
-	@for hcl in internal/modules/*/db/atlas.hcl $(addsuffix /db/atlas.hcl,$(ATLAS_SERVICES)); do \
+	@for hcl in internal/modules/*/db/atlas.hcl internal/platform/*/db/atlas.hcl $(addsuffix /db/atlas.hcl,$(ATLAS_SERVICES)); do \
 		dir=$$(dirname $$hcl); \
 		echo "=== Validating $$dir migrations ==="; \
 		(cd $$dir && atlas migrate validate --dir "file://migrations") || exit 1; \
@@ -252,6 +252,8 @@ PAYUNI_AGENT_ID ?=
 PAYUNI_HASH_KEY ?=
 PAYUNI_HASH_IV ?=
 PAYUNI_STOREFRONT_BASE_URL ?=
+# 收款開通的 provider（詳見 cmd/hawkr/seller.go 的 readPayment）：本機用 fake（記憶體內，所有帳戶都回轉帳能力已啟用），空字串表示沒有設定。
+PAYMENT_PROVIDER ?= fake
 # 本機開發的 dev token 的金鑰（make dev-key 產生，不進版控）。與 Access 正式設定互斥。
 DEV_AUTH_KEY_FILE ?= $(CURDIR)/.dev/dev-auth.pem
 MONOLITH_ENV = GOWORK=off DATABASE_URL='$(DATABASE_URL)' MEDIA_SERVICE_ADDR='$(MEDIA_SERVICE_ADDR)' MEDIA_ORIGIN='$(MEDIA_ORIGIN)' PUBLIC_WEB_ORIGIN='$(PUBLIC_WEB_ORIGIN)' \
@@ -260,7 +262,7 @@ MONOLITH_ENV = GOWORK=off DATABASE_URL='$(DATABASE_URL)' MEDIA_SERVICE_ADDR='$(M
 	DEV_AUTH_KEY_FILE='$(DEV_AUTH_KEY_FILE)' LEGACY_GRPC_ADDR='$(LEGACY_GRPC_ADDR)' \
 	KYC_ENCRYPTION_KEYS='$(KYC_ENCRYPTION_KEYS)' KYC_HASH_KEYS='$(KYC_HASH_KEYS)' \
 	PAYUNI_BASE_URL='$(PAYUNI_BASE_URL)' PAYUNI_AGENT_ID='$(PAYUNI_AGENT_ID)' PAYUNI_HASH_KEY='$(PAYUNI_HASH_KEY)' \
-	PAYUNI_HASH_IV='$(PAYUNI_HASH_IV)' PAYUNI_STOREFRONT_BASE_URL='$(PAYUNI_STOREFRONT_BASE_URL)' \
+	PAYUNI_HASH_IV='$(PAYUNI_HASH_IV)' PAYUNI_STOREFRONT_BASE_URL='$(PAYUNI_STOREFRONT_BASE_URL)' PAYMENT_PROVIDER='$(PAYMENT_PROVIDER)' \
 	RABBITMQ_URL='$(RABBITMQ_URL)' \
 	PRODUCT_SERVICE_ADDR='$(PRODUCT_SERVICE_ADDR)' ORDER_SERVICE_ADDR='$(ORDER_SERVICE_ADDR)' CRM_SERVICE_ADDR='$(CRM_SERVICE_ADDR)' \
 	REVIEW_SERVICE_ADDR='$(REVIEW_SERVICE_ADDR)'

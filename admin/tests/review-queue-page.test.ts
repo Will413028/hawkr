@@ -190,6 +190,13 @@ test("itemHref：12 種逐種（含錨點）", () => {
 			},
 			"/admin/merchants/56#kyc",
 		],
+		[
+			{
+				kind: ReviewQueueItemKind.PAYMENT_ACCOUNT_CREATE_FAILED,
+				subject: { case: "paymentAccount", value: { storeId: "57" } },
+			},
+			"/admin/merchants/57#payment-account",
+		],
 	];
 	assert.equal(cases.length, ALL_KIND_VALUES.length, "每種都有一筆");
 	for (const [patch, want] of cases) assert.equal(itemHref(item(patch)), want);
@@ -217,6 +224,7 @@ test("種類標籤：涵蓋 enum 的每個非 UNSPECIFIED 值；UNSPECIFIED 不�
 		[ReviewQueueItemKind.MEASURE_REVIEW, "複審停權"],
 		[ReviewQueueItemKind.KYC_APPLICATION, "審核商家認證"],
 		[ReviewQueueItemKind.PAYUNI_BIND_RETRY, "重新綁定 PayUni"],
+		[ReviewQueueItemKind.PAYMENT_ACCOUNT_CREATE_FAILED, "重試建立收款帳戶"],
 	];
 	assert.equal(expected.length, ALL_KIND_VALUES.length);
 	for (const [kind, text] of expected) {

@@ -1,12 +1,23 @@
+import { create } from "@bufbuild/protobuf";
 import {
-	KYCFlowStatus,
+	KYCStatus,
+	type PaymentAccount,
+	PaymentAccountSchema,
+	PaymentAccountStatus,
 	SellerRequirement,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
-import { commonUnknown, sellerSellerRequirement } from "@hawkr/ui-text/keys";
+import {
+	commonUnknown,
+	sellerKYCStatus,
+	sellerSellerRequirement,
+} from "@hawkr/ui-text/keys";
 import type { AppIconName } from "@/components/shared/AppIcon";
 import type { UiText } from "@/lib/i18n/ui-text";
 import { CERT_PAGE_HREF } from "@/lib/seller/cert-gate";
-import { kycFlowActionLabel, kycFlowStatusLabel } from "@/lib/seller/kyc-flow";
+import {
+	paymentAccountCopy,
+	paymentAccountLink,
+} from "@/lib/seller/payment-account";
 import {
 	isApproved,
 	isProcessing,
@@ -63,7 +74,7 @@ const HANDLED_BY_NOTICE_PAGE: readonly SellerRequirement[] = [
 
 const KNOWN_REQUIREMENTS: ReadonlySet<SellerRequirement> = new Set([
 	...HANDLED_BY_NOTICE_PAGE,
-	SellerRequirement.KYC_APPROVED,
+	SellerRequirement.ONBOARDING_COMPLETE,
 	...PROFILE_REQUIREMENTS,
 ]);
 
@@ -75,7 +86,8 @@ const KNOWN_REQUIREMENTS: ReadonlySet<SellerRequirement> = new Set([
 function buildRequiredTasks(
 	ut: UiText,
 	my: MyStore | null,
-	flowStatus: KYCFlowStatus | undefined,
+	kycStatus: KYCStatus | undefined,
+	paymentAccount: PaymentAccount | null,
 ): OnboardingTask[] {
 	const missing = missingRequirements(my);
 	const lacks = (requirement: SellerRequirement) =>
@@ -85,7 +97,22 @@ function buildRequiredTasks(
 		ut(sellerSellerRequirement(requirement) ?? commonUnknown()),
 	);
 	const profileDone = missingProfile.length === 0;
-	const certDone = !lacks(SellerRequirement.KYC_APPROVED);
+	const paymentDone = !lacks(SellerRequirement.ONBOARDING_COMPLETE);
+	const reviewDone = paymentDone || kycStatus === KYCStatus.KYC_STATUS_APPROVED;
+	// 平台審核核准而收款帳戶還沒有（外部帳戶在建立）與「準備中」同義。
+	const effectiveAccount = reviewDone
+		? (paymentAccount ??
+			create(PaymentAccountSchema, {
+				status: PaymentAccountStatus.NOT_CREATED,
+			}))
+		: undefined;
+	const payment = effectiveAccount
+		? paymentAccountCopy(ut, effectiveAccount)
+		: undefined;
+	const paymentLink =
+		effectiveAccount && payment
+			? paymentAccountLink(effectiveAccount.status, payment)
+			: undefined;
 
 	const tasks: OnboardingTask[] = [
 		{
@@ -104,22 +131,40 @@ function buildRequiredTasks(
 				: `缺少：${missingProfile.join("、")}`,
 		},
 		{
-			id: "cert",
+			id: "platform_review",
 			group: "required",
-			title: "商家認證",
-			description: "身分認證與 PayUni 收款審核。",
-			panelTitle: "完成商家認證",
-			panelDescription:
-				"通過商家認證（含 PayUni 收款審核）後，店面才會公開，也才能正式收款。",
+			title: "平台審核",
+			description: "商家資料與統編的平台審核。",
+			panelTitle: "完成平台審核",
+			panelDescription: "平台審核通過後，店面才能公開，並開放設定收款帳戶。",
 			href: CERT_PAGE_HREF,
-			// 已通過就沒有要辦的認證了 — 不再給按鈕。
-			cta: certDone ? undefined : kycFlowActionLabel(ut, flowStatus),
+			// 已通過就沒有要辦的審核了 — 不再給按鈕。
+			cta: reviewDone ? undefined : "前往商家認證",
 			icon: "shield",
-			completed: certDone,
-			statusLabel: kycFlowStatusLabel(
-				ut,
-				certDone ? KYCFlowStatus.KYC_FLOW_STATUS_APPROVED : flowStatus,
-			),
+			completed: reviewDone,
+			statusLabel: reviewDone
+				? ut(sellerKYCStatus(KYCStatus.KYC_STATUS_APPROVED) ?? commonUnknown())
+				: kycStatus === undefined
+					? "未送出"
+					: ut(sellerKYCStatus(kycStatus) ?? commonUnknown()),
+		},
+		{
+			id: "payment_account",
+			group: "required",
+			title: "收款帳戶",
+			description: "向金流商設定身分與銀行資料。",
+			panelTitle: "設定收款帳戶",
+			panelDescription:
+				"身分與銀行資料由金流商收集，平台不經手；收款帳戶啟用後才能正式收款。",
+			href: paymentLink?.href ?? CERT_PAGE_HREF,
+			// 已啟用就沒有要辦的了；平台審核還沒通過時只有灰色的提示。
+			cta: paymentDone || !reviewDone ? undefined : paymentLink?.label,
+			icon: "wallet",
+			completed: paymentDone,
+			locked: !reviewDone,
+			statusLabel: !reviewDone
+				? "平台審核通過後開放設定"
+				: (payment?.badge ?? ut(commonUnknown())),
 		},
 	];
 
@@ -147,12 +192,10 @@ function buildRequiredTasks(
 
 function buildRecommendedTasks({
 	my,
-	flowStatus,
 	shippingRows,
 	productCount,
 }: {
 	my: MyStore | null;
-	flowStatus: KYCFlowStatus | undefined;
 	shippingRows: ShippingOnboarding[];
 	productCount: number | null;
 }): OnboardingTask[] {
@@ -225,18 +268,21 @@ function buildRecommendedTasks({
 export function buildOnboardingTasks({
 	ut,
 	my,
-	flowStatus,
+	kycStatus,
+	paymentAccount,
 	shippingRows,
 	productCount,
 }: {
 	ut: UiText;
 	my: MyStore | null;
-	flowStatus: KYCFlowStatus | undefined;
+	/** 申請的狀態；沒有申請（或已取消）是 undefined。 */
+	kycStatus: KYCStatus | undefined;
+	paymentAccount: PaymentAccount | null;
 	shippingRows: ShippingOnboarding[];
 	productCount: number | null;
 }): OnboardingTask[] {
 	return [
-		...buildRequiredTasks(ut, my, flowStatus),
-		...buildRecommendedTasks({ my, flowStatus, shippingRows, productCount }),
+		...buildRequiredTasks(ut, my, kycStatus, paymentAccount),
+		...buildRecommendedTasks({ my, shippingRows, productCount }),
 	];
 }

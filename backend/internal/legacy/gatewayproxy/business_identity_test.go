@@ -107,7 +107,7 @@ func storeIn(status seller.Status, effective ...seller.EffectiveMeasure) seller.
 	var st seller.Store
 	st.StoreID, st.Status, st.Sanctions = 82, status, seller.SanctionedBy(effective...)
 	st.Conditions = seller.Conditions{
-		Derived: true, Active: status != seller.Closed, NotPendingDeletion: status != seller.PendingDeletion, KYCApproved: true,
+		Derived: true, Active: status != seller.Closed, NotPendingDeletion: status != seller.PendingDeletion, OnboardingComplete: true,
 		StoreName: true, Logo: true, TownCode: true,
 	}
 	return st
@@ -233,7 +233,7 @@ func TestPendingDeletionKeepsFulfilmentAndDropsBusinessCapabilities(t *testing.T
 	}
 }
 
-// 經 ServeHTTP：header 的 CAP_SHIPPING_SETUP 跟著 seller 讀出的 KYC 條件（Store.Conditions.KYCApproved）。
+// 經 ServeHTTP：header 的 CAP_SHIPPING_SETUP 跟著 seller 讀出的 KYC 條件（Store.Conditions.OnboardingComplete）。
 func TestForwardedHeaderFollowsTheKYCCondition(t *testing.T) {
 	do := func(st seller.Store) (status int, tokens []string, upstream int) {
 		l := sellerLookupFunc(func(context.Context, int64) (seller.Store, error) { return st, nil })
@@ -254,7 +254,7 @@ func TestForwardedHeaderFollowsTheKYCCondition(t *testing.T) {
 	}
 	for _, kyc := range []bool{false, true} {
 		state := storeIn(seller.Active)
-		state.Conditions.KYCApproved = kyc
+		state.Conditions.OnboardingComplete = kyc
 		status, tokens, upstream := do(state)
 		if status != 200 || upstream != 1 || !slices.Contains(tokens, "CAP_PRODUCT_MANAGE") {
 			t.Fatalf("kyc %v: status=%d upstream=%d tokens=%v", kyc, status, upstream, tokens)
@@ -269,7 +269,7 @@ func TestForwardedHeaderFollowsTheKYCCondition(t *testing.T) {
 func TestHeaderCarriesOnlyActiveActionCapabilities(t *testing.T) {
 	for _, kyc := range []bool{false, true} {
 		state := storeIn(seller.Active)
-		state.Conditions.KYCApproved = kyc
+		state.Conditions.OnboardingComplete = kyc
 		var c Caller
 		statuses := seller.CapabilitiesOf(state)
 		if err := currentStoreOf(state, statuses, &c); err != nil {

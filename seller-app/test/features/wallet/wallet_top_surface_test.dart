@@ -3,14 +3,13 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
-import 'package:hawkr_api/gen/google/rpc/error_details.pb.dart'
-    show LocalizedMessage;
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/coupon/data/coupon_model.dart';
 import 'package:hawkr_seller/features/coupon/presentation/coupon_controller.dart';
 import 'package:hawkr_seller/features/seller/data/current_kyc.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
+import 'package:hawkr_seller/features/seller/data/payment_account.dart';
 import 'package:hawkr_seller/features/wallet/presentation/wallet_screen.dart';
 import 'package:hawkr_seller/shared/widgets/green_header_bar.dart';
 import 'package:hawkr_seller/shared/widgets/truck_loading_overlay.dart';
@@ -26,42 +25,38 @@ import '../../support/my_store_fixtures.dart';
 
 typedef _Scenario = ({
   String name,
-  KYCFlowStatus status,
-  SellerPayUni? payuni,
+  KYCStatus? review,
+  PaymentAccount? payment,
   bool certified,
 });
 
 final _scenarios = <_Scenario>[
   (
     name: 'approved',
-    status: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
-    payuni: SellerPayUni(state: PayUniState.PAY_UNI_STATE_APPROVED),
+    review: KYCStatus.KYC_STATUS_APPROVED,
+    payment: PaymentAccount(
+      status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED,
+    ),
     certified: true,
   ),
-  (
-    name: 'not started',
-    status: KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
-    payuni: null,
-    certified: false,
-  ),
+  (name: 'not started', review: null, payment: null, certified: false),
   (
     name: 'submitted',
-    status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED,
-    payuni: null,
+    review: KYCStatus.KYC_STATUS_SUBMITTED,
+    payment: null,
     certified: false,
   ),
   (
     name: 'rejected',
-    status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
-    payuni: null,
+    review: KYCStatus.KYC_STATUS_REJECTED,
+    payment: null,
     certified: false,
   ),
   (
-    name: 'payuni pending info',
-    status: KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO,
-    payuni: SellerPayUni(
-      state: PayUniState.PAY_UNI_STATE_PENDING_INFO,
-      explanation: LocalizedMessage(locale: 'zh-TW', message: '請至信箱查看補件通知。'),
+    name: 'payment account action required',
+    review: KYCStatus.KYC_STATUS_APPROVED,
+    payment: PaymentAccount(
+      status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED,
     ),
     certified: false,
   ),
@@ -174,19 +169,21 @@ Future<void> _pumpWallet(
   final kyc = scenario == null
       ? const AsyncLoading<MyKyc>()
       : AsyncData(
-          MyKyc.fromApplication(
-            individualApplication(
-              status: scenario.status,
-              payuni: scenario.payuni,
-            ),
-          ),
+          scenario.review == null
+              ? const MyKyc.notStarted()
+              : MyKyc.fromApplication(
+                  individualApplication(kycStatus: scenario.review!),
+                ),
         );
+  final payment = scenario == null
+      ? const AsyncLoading<PaymentAccount?>()
+      : AsyncData<PaymentAccount?>(scenario.payment);
   final store = scenario == null
       ? null
       : myStore(
           publicListing: publicListingMissing([
             if (!scenario.certified)
-              SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+              SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
           ]),
         );
 
@@ -194,6 +191,7 @@ Future<void> _pumpWallet(
     ProviderScope(
       overrides: [
         currentKycProvider.overrideWithValue(kyc),
+        currentPaymentAccountProvider.overrideWithValue(payment),
         myStoreSnapshotProvider.overrideWithValue(store),
         couponListControllerProvider.overrideWith(_CouponFixture.new),
       ],

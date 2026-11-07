@@ -54,13 +54,16 @@ KYCApplication individualApplication({
 KYCApplication businessApplication({
   String etag = 'v1',
   KYCFlowStatus status = KYCFlowStatus.KYC_FLOW_STATUS_DRAFT,
+  KYCStatus kycStatus = KYCStatus.KYC_STATUS_DRAFT,
   String companyName = '',
   String taxId = '',
   List<KYCField> missing = const [],
   List<StoreField> missingStore = const [],
+  KYCRejection? rejection,
+  List<KYCIssue> outstanding = const [],
 }) => KYCApplication(
   etag: etag,
-  status: KYCStatus.KYC_STATUS_DRAFT,
+  status: kycStatus,
   business: BusinessKYC(
     companyName: companyName,
     taxId: taxId,
@@ -75,6 +78,8 @@ KYCApplication businessApplication({
   ),
   missingFields: missing,
   missingStoreFields: missingStore,
+  lastRejection: rejection,
+  outstandingIssues: outstanding,
 );
 
 MyKyc myKycOf(KYCApplication? app) =>

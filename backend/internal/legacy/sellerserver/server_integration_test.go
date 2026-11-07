@@ -23,8 +23,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/agent"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	pu "github.com/Will413028/hawkr/backend/internal/platform/payuni"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
@@ -133,7 +135,8 @@ func (c *ratingCall) check(t *testing.T, what string) {
 func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "identity", Dir: identity.Migrations()}, migrate.Module{Name: "seller", Dir: seller.Migrations()}))
+	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: inbox.Schema, Dir: inbox.Migrations()}, migrate.Module{Name: "identity", Dir: identity.Migrations()},
+		migrate.Module{Name: "payment", Dir: payment.Migrations()}, migrate.Module{Name: "seller", Dir: seller.Migrations()}))
 	now := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
@@ -141,15 +144,27 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	fake := media.NewFake()
 	fake.Key = func(refType, token string) string { return refType + "/" + token }
 	keys, mac := sealtest.Keys(t)
-	m := seller.New(seller.Deps{
+	provider := payment.NewFake()
+	provider.AutoActive = true
+	var m *seller.Module
+	clock := func() time.Time { return now }
+	payments := payment.New(payment.Deps{
+		DB: d, Events: bus, Jobs: noJobs{}, Inbox: inbox.New(inbox.Deps{DB: d, Jobs: noJobs{}, Now: clock, Logger: log}), Provider: provider,
+		Owners: ownerFunc(func(ctx context.Context, storeID int64) (bool, error) {
+			s, err := m.Store(ctx, storeID)
+			return err == nil && s.Status != seller.Closed, err
+		}), Now: clock, Logger: log,
+	})
+	m = seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: noJobs{}, Identity: id, Media: fake, Orders: noOrders{}, KYCKeys: keys, KYCMAC: mac,
-		PayUni: approvingPayUni{}, ProductStores: noProducts{}, Registry: noRegistry{}, StorefrontBaseURL: "https://store.example.invalid",
+		PayUni: approvingPayUni{}, Payment: payments, ProductStores: noProducts{}, Registry: noRegistry{}, StorefrontBaseURL: "https://store.example.invalid",
 		Now: func() time.Time { return now }, Logger: log,
 	})
+	events.Subscribe(bus, m.OnPayoutAccountChanged)
 	account := func() int64 {
 		var accountID int64
 		for range 3 { // account_id 與 store_id 不同值，互換 ID 的缺陷才藏不住
-			if err := d.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&accountID); err != nil {
+			if err := d.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts (self_entered_email) VALUES ('seller@example.com') RETURNING id").Scan(&accountID); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -191,6 +206,9 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		_, err = m.SyncPayUni(ctx, s.StoreID, false)
 		must(err)
 		must(m.PollPayUni(ctx, s.StoreID, seller.PayUniSourcePoll))
+		must(payments.EnsureAccount(ctx, s.StoreID, false))
+		_, err = payments.SyncAccount(ctx, s.StoreID)
+		must(err)
 		cur, err := m.Store(ctx, s.StoreID)
 		must(err)
 		s, err = m.UpdateProfile(ctx, seller.UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: "logo", UploaderID: accountID})
@@ -517,4 +535,11 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 			}
 		}
 	})
+}
+
+// ownerFunc 是 payment 的擁有者查詢的函式版本。
+type ownerFunc func(ctx context.Context, storeID int64) (bool, error)
+
+func (f ownerFunc) OwnerActive(ctx context.Context, storeID int64) (bool, error) {
+	return f(ctx, storeID)
 }

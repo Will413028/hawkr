@@ -57,6 +57,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.identity.v1alpha1.ContactEmailSource",
+      "dartClass": "ContactEmailSource",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState",
       "dartClass": "DeleteAccountResponse_DeletionState",
       "dartLibrary": "package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pbenum.dart",
@@ -130,7 +137,7 @@
       "name": "hawkr.seller.v1alpha1.KYCStatus",
       "dartClass": "KYCStatus",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
@@ -176,6 +183,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.seller.v1alpha1.OnboardingSurface",
+      "dartClass": "OnboardingSurface",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.seller.v1alpha1.PayUniBindStatus",
       "dartClass": "PayUniBindStatus",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
@@ -185,6 +199,13 @@
     {
       "name": "hawkr.seller.v1alpha1.PayUniState",
       "dartClass": "PayUniState",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.PaymentAccountStatus",
+      "dartClass": "PaymentAccountStatus",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
       "inCatalog": true,
       "serverOwned": false
@@ -201,6 +222,13 @@
       "dartClass": "ReportOutcome",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pbenum.dart",
       "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.RequirementCollection",
+      "dartClass": "RequirementCollection",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
       "serverOwned": false
     },
     {

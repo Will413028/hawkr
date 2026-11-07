@@ -324,7 +324,7 @@ func TestDashboardNeedsMarketingWhichSuspendedAndPendingDeletionStoresLack(t *te
 		"已關閉":  {model.Closed, false, false},
 	} {
 		store := model.Store{Status: tc.status, Sanctions: sanctionsOf(tc.suspended), Conditions: model.Conditions{
-			Derived: true, Active: tc.status != model.Closed, NotPendingDeletion: tc.status != model.PendingDeletion, KYCApproved: true,
+			Derived: true, Active: tc.status != model.Closed, NotPendingDeletion: tc.status != model.PendingDeletion, OnboardingComplete: true,
 			StoreName: true, Logo: true, TownCode: true,
 		}}
 		if got := slices.Contains(model.ActiveCapabilities(model.CapabilitiesOf(store)), d.capability); got != tc.want {

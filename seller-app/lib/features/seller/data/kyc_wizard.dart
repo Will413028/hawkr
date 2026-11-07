@@ -15,6 +15,7 @@ import '../../../core/networking/connect_provider.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../media/data/private_document_uploader.dart';
 import 'current_kyc.dart';
+import 'contact_email.dart';
 import 'current_store.dart';
 import 'kyc_fields.dart';
 import 'kyc_form.dart';
@@ -107,6 +108,9 @@ abstract class KycWizardState with _$KycWizardState {
     @Default(StoreContactErrors()) StoreContactErrors storeServerErrors,
     StoreContactDraft? storeServerErrorsFor,
 
+    /// 賣家在確認步驟輸入的聯絡信箱；還沒輸入過是 null（顯示帳號目前的信箱）。
+    String? contactEmailDraft,
+
     /// 最近一次動作失敗或提醒的文字。
     String? error,
 
@@ -181,6 +185,84 @@ class KycWizard extends _$KycWizard {
 
   bool get canDiscard => kycCanDiscard(application);
 
+  /* ===== 收款聯絡信箱（帳號層級，D23 修訂） ===== */
+
+  AsyncValue<AccountContactEmail?>? get _contactRead =>
+      ref.read(currentContactEmailProvider);
+
+  /// 帳號的聯絡信箱讀取結果（確認步驟的欄位依它決定顯示）；沒有登入是 null。
+  AsyncValue<AccountContactEmail?>? get contactEmailRead => _contactRead;
+
+  /// 重讀帳號的聯絡信箱（讀取失敗時的重試）。
+  Future<void> reloadContactEmail() async {
+    await ref.read(contactEmailReaderProvider.notifier).refresh();
+  }
+
+  /// 確認步驟欄位的值：賣家輸入的，沒輸入過是帳號目前的信箱。
+  String get contactEmailValue =>
+      state.contactEmailDraft ?? _contactRead?.value?.email ?? '';
+
+  /// 聯絡信箱還不能送出的原因；可以送出是 null。帳號的信箱還沒讀到（讀取中或失敗）不能送出；有 provider 驗證過的信箱時
+  /// 不需要輸入；其他情況檢查輸入的格式。
+  String? get contactEmailBlocker {
+    final read = _contactRead;
+    if (read == null || !read.hasValue) return '載入中';
+    if (!contactEmailEditable(read.value)) return null;
+    return validateContactEmail(contactEmailValue);
+  }
+
+  /// 欄位下方顯示的錯誤：賣家輸入過之後才顯示格式錯誤。
+  String? get contactEmailError =>
+      state.contactEmailDraft == null ||
+          !contactEmailEditable(_contactRead?.value)
+      ? null
+      : validateContactEmail(state.contactEmailDraft!);
+
+  void updateContactEmail(String value) {
+    _set((s) => s.copyWith(contactEmailDraft: value));
+  }
+
+  /// 送出之前把自填的聯絡信箱寫進帳號（`SetContactEmail`）。有 provider 驗證過的信箱、或輸入和帳號目前的自填信箱相同時
+  /// 不呼叫。格式不合或失敗回 false，原因在 [error]。
+  Future<bool> _saveContactEmail() async {
+    final contact = _contactRead?.value;
+    if (!contactEmailEditable(contact)) return true;
+    final blocker = contactEmailBlocker;
+    if (blocker != null) {
+      _set((s) => s.copyWith(error: blocker));
+      return false;
+    }
+    final email = normalizeContactEmail(contactEmailValue);
+    if (contact != null && contact.email == email) return true;
+    try {
+      await ref.read(contactEmailRepositoryProvider).set(email);
+      if (!ref.mounted) return false;
+      await ref.read(contactEmailReaderProvider.notifier).refresh();
+      return true;
+    } catch (error) {
+      HKLog.logW('[KycWizard] SetContactEmail failed: $error');
+      if (!ref.mounted) return false;
+      final failure = submitError(
+        error,
+        defaults: ref.read(defaultErrorTextProvider),
+      );
+      _set(
+        (s) => s.copyWith(
+          error: switch (failure) {
+            SubmitMessage(:final message) => message,
+            SubmitFields(:final fields, :final message) =>
+              message ?? fields.values.first,
+            SubmitConflict() => ref.read(defaultErrorTextProvider)(
+              Code.aborted,
+            ),
+          },
+        ),
+      );
+      await ref.read(contactEmailReaderProvider.notifier).refresh();
+      return false;
+    }
+  }
+
   /// 伺服器算的、賣家還沒處理的退回問題（欄位的值改過、指到的文件移除或替換就算處理，client 不推導）。
   List<KYCIssue> get outstandingIssues =>
       application?.outstandingIssues ?? const <KYCIssue>[];
@@ -192,9 +274,6 @@ class KycWizard extends _$KycWizard {
     return app != null && app.hasLastRejection() ? app.lastRejection : null;
   }
 
-  String get maskedId => maskedIdOf(application);
-  String get maskedBankAccount => application?.bankAccountMasked ?? '';
-
   /// 伺服器的缺項（申請欄位加店家欄位）。
   List<KycMissingItem> get missingItems => [
     ...missingItemsOf(application?.missingFields ?? const [], _l),
@@ -202,9 +281,6 @@ class KycWizard extends _$KycWizard {
   ];
 
   UiLocale get _l => ref.read(uiLocaleProvider);
-
-  ({String? idError, String? accountError}) get inputErrors =>
-      kycInputErrors(state.form);
 
   StoreContactErrors get contactErrors {
     final local = storeContactErrors(state.store);
@@ -223,23 +299,10 @@ class KycWizard extends _$KycWizard {
   /// 伺服器對 [field] 的欄位錯誤；欄位的值改過就不再顯示。
   /// 沒有（或已改過）伺服器的欄位錯誤時，顯示待處理的退回問題對這個欄位的說明。
   String? fieldError(KYCField field) {
-    final entry = state.fieldErrors[_canonical(field)];
+    final entry = state.fieldErrors[field];
     if (entry != null && _valueIn(state.form, field) == entry.value) {
       return entry.message;
     }
-    return _joined([
-      for (final issue in outstandingIssues)
-        if (_canonical(issue.field_1) == _canonical(field)) issue.message,
-    ]);
-  }
-
-  /// 單張證件（身分證正反面、存摺封面）的待處理退回問題；單張的位置只有一張，所以不論問題有沒有指到那一張都算。
-  String? documentIssue(KycDocSlot slot) {
-    final field = switch (slot) {
-      KycDocSlot.idCardFront => KYCField.KYC_FIELD_ID_CARD_FRONT,
-      KycDocSlot.idCardBack => KYCField.KYC_FIELD_ID_CARD_BACK,
-      KycDocSlot.bankBook => KYCField.KYC_FIELD_BANK_BOOK,
-    };
     return _joined([
       for (final issue in outstandingIssues)
         if (issue.field_1 == field) issue.message,
@@ -268,25 +331,8 @@ class KycWizard extends _$KycWizard {
   static String? _joined(List<String> messages) =>
       messages.isEmpty ? null : messages.join('；');
 
-  static KYCField _canonical(KYCField field) =>
-      field == KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO
-      ? KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO
-      : field;
-
-  static String? _valueIn(KycForm form, KYCField field) => switch (_canonical(
-    field,
-  )) {
-    KYCField.KYC_FIELD_REAL_NAME => form.realName,
-    KYCField.KYC_FIELD_BIRTH_DATE => form.birthDate,
-    KYCField.KYC_FIELD_ID_CARD_ISSUE_DATE => form.idCardIssueDate,
-    KYCField.KYC_FIELD_ID_CARD_ISSUE_TYPE => form.idCardIssueType,
-    KYCField.KYC_FIELD_ID_CARD_ISSUE_LOCATION => form.idCardIssueLocation,
-    KYCField.KYC_FIELD_ENGLISH_NAME => form.englishName,
-    KYCField.KYC_FIELD_BANK_NAME => form.bankName,
-    KYCField.KYC_FIELD_BANK_CODE => form.bankCode,
-    KYCField.KYC_FIELD_BANK_ACCOUNT => form.bankAccount,
+  static String? _valueIn(KycForm form, KYCField field) => switch (field) {
     KYCField.KYC_FIELD_PRODUCT_TYPE => form.productType,
-    KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO => form.idCardNo,
     KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME => form.companyName,
     KYCField.KYC_FIELD_BUSINESS_TAX_ID => form.taxId,
     KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE =>
@@ -552,10 +598,7 @@ class KycWizard extends _$KycWizard {
       }
       final value = _valueIn(sent, field);
       if (value != null) {
-        errors[_canonical(field)] = KycFieldError(
-          message: message,
-          value: value,
-        );
+        errors[field] = KycFieldError(message: message, value: value);
       }
       final label = kycFieldLabel(field, _l);
       if (label != null && !labels.contains(label)) labels.add(label);
@@ -601,10 +644,7 @@ class KycWizard extends _$KycWizard {
     _set(
       (s) => s.copyWith(
         subject: kycSubjectOf(app) ?? s.subject,
-        baseline: latestForm.copyWith(
-          idCardNo: s.baseline.idCardNo,
-          bankAccount: s.baseline.bankAccount,
-        ),
+        baseline: latestForm,
         baselineDocs: kycDocsOf(app),
         form: mergeLatestForm(s.form, s.baseline, latestForm),
         docs: mergeLatestDocs(s.docs, s.baselineDocs, kycDocsOf(app)),
@@ -625,44 +665,7 @@ class KycWizard extends _$KycWizard {
     );
   }
 
-  /* ===== 證件 ===== */
-
-  /// 上傳一張單張位置的證件，上傳完成後存進申請。
-  Future<bool> uploadDocument(
-    KycDocSlot slot,
-    Uint8List bytes, {
-    required String docType,
-    required String filename,
-  }) async {
-    final key = slot.path;
-    _set((s) => s.copyWith(uploading: {...s.uploading, key}, error: null));
-    try {
-      final token = await ref.read(privateDocumentUploaderProvider)(
-        bytes,
-        docType,
-        filename,
-      );
-      _set(
-        (s) => s.copyWith(
-          docs: s.docs.withSlot(
-            slot,
-            KycDoc(stagedToken: token, preview: bytes),
-          ),
-        ),
-      );
-    } catch (error) {
-      HKLog.logW('[KycWizard] upload $key failed: $error');
-      _set((s) => s.copyWith(error: kycUploadFailedNotice));
-      return false;
-    } finally {
-      _set((s) => s.copyWith(uploading: {...s.uploading}..remove(key)));
-    }
-    return save();
-  }
-
-  void clearDocument(KycDocSlot slot) {
-    _set((s) => s.copyWith(docs: s.docs.withSlot(slot, null)));
-  }
+  /* ===== 企業文件 ===== */
 
   /// 新增一張企業文件（最多 [KycDocs.maxCompanyDocuments] 張），上傳完成後存進申請。
   Future<bool> addCompanyDocument(
@@ -854,7 +857,7 @@ class KycWizard extends _$KycWizard {
 
   /* ===== 送出與捨棄 ===== */
 
-  /// 送出認證：先把店家資料寫進店家、存好草稿，再以 [acceptances]（個資告知與 PayUni 條款的現行版本）直接送出 `SubmitKYC`。
+  /// 送出認證：先把店家資料寫進店家、存好草稿，再以 [acceptances]（個資告知的現行版本）直接送出 `SubmitKYC`。
   Future<KycSubmitOutcome> submit(List<AgreementAcceptance> acceptances) async {
     if (application == null || !editable || state.submitting) {
       return KycSubmitOutcome.failed;
@@ -876,6 +879,8 @@ class KycWizard extends _$KycWizard {
         }
         return KycSubmitOutcome.failed;
       }
+      if (!await _saveContactEmail()) return KycSubmitOutcome.failed;
+      if (!ref.mounted) return KycSubmitOutcome.failed;
       // 店家欄位的缺項以伺服器為準（快取可能過期）：送出後回 failed_precondition 再重讀並列出缺哪些。
       final stillMissing = missingItemsOf(
         application?.missingFields ?? const [],
@@ -916,6 +921,22 @@ class KycWizard extends _$KycWizard {
       );
       return KycSubmitOutcome.agreementOutdated;
     }
+    if (hasErrorReason(error, ErrorReason.CONTACT_EMAIL_REQUIRED)) {
+      await ref.read(contactEmailReaderProvider.notifier).refresh();
+      if (!ref.mounted) return KycSubmitOutcome.failed;
+      _set(
+        (s) => s.copyWith(
+          error: switch (submitError(
+            error,
+            defaults: ref.read(defaultErrorTextProvider),
+          )) {
+            SubmitMessage(:final message) => message,
+            _ => ref.read(defaultErrorTextProvider)(Code.failedPrecondition),
+          },
+        ),
+      );
+      return KycSubmitOutcome.failed;
+    }
     final failure = submitError(
       error,
       defaults: ref.read(defaultErrorTextProvider),
@@ -931,10 +952,7 @@ class KycWizard extends _$KycWizard {
           if (field == null) continue;
           final value = _valueIn(state.form, field);
           if (value != null) {
-            errors[_canonical(field)] = KycFieldError(
-              message: text,
-              value: value,
-            );
+            errors[field] = KycFieldError(message: text, value: value);
           }
           final label = kycFieldLabel(field, _l);
           if (label != null && !labels.contains(label)) labels.add(label);

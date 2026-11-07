@@ -2,10 +2,9 @@
  * N6｜`SellerTaxReviewStatus`（10 個 DB 值 ＋ 1 個合成的 `NOT_STARTED`）→ 稅務身分
  * 狀態卡的呈現決策（58A §B-2.3 (8)）。
  *
- * 🔴 **不要複製 `lib/seller/kyc-flow.ts` 的 `kycFlowBanner()` 再改**：那一支
- * 是商家認證流程狀態的文案表，狀態機與本表不同（沒有期限倒數、沒有「已延長一次」旗標、
- * 沒有接單能力這第二維度）。複製之後會有人以為兩者同源而一起改，然後在其中一邊改出
- * 一個對另一邊錯的文案。這裡只沿用它的 `StatusBannerTone` 型別。
+ * 🔴 **不要拿商家認證或收款帳戶的狀態文案來改**：那些是共用文案目錄的文字，狀態機與本表不同
+ * （沒有期限倒數、沒有「已延長一次」旗標、沒有接單能力這第二維度）。複製之後會有人以為兩者
+ * 同源而一起改，然後在其中一邊改出一個對另一邊錯的文案。這裡只沿用 `StatusBannerTone` 型別。
  *
  * 🔴 **必須有 default 分支**（§B-2.0 T13）：11 個值逐一有歸屬，值域外落
  * `狀態更新中` 而不是白畫面。default **不得**寫成把已知值一併吃掉的萬用分支
@@ -16,7 +15,7 @@
  */
 
 import { SellerTaxReviewStatus } from "@/lib/codemeta/enums";
-import type { StatusBannerTone } from "@/lib/seller/kyc-flow";
+import type { StatusBannerTone } from "@/lib/seller/status-tone";
 
 export interface InvoiceTaxStatusBanner {
 	tone: StatusBannerTone;

@@ -51,7 +51,7 @@ func newStore(id int64, status seller.Status, suspended bool) seller.Store {
 	s.StoreID, s.AccountID, s.StoreName, s.Status, s.Sanctions = id, id+7, "梨山盛花園", status, sanctionsOf(suspended)
 	// seller 讀店家時由 SQL 帶上的條件（Store.Conditions）：生命週期照 status，其餘都滿足。
 	s.Conditions = seller.Conditions{
-		Derived: true, Active: status != seller.Closed, NotPendingDeletion: status != seller.PendingDeletion, KYCApproved: true,
+		Derived: true, Active: status != seller.Closed, NotPendingDeletion: status != seller.PendingDeletion, OnboardingComplete: true,
 		StoreName: true, Logo: true, TownCode: true,
 	}
 	return s

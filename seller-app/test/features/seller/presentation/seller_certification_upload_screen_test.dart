@@ -1,11 +1,12 @@
 import 'dart:async';
 
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/postal_address.pb.dart';
+import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.spec.dart';
+import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pb.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
-import 'package:hawkr_api/gen/google/rpc/error_details.pb.dart'
-    show LocalizedMessage;
 import 'package:hawkr_api/gen/google/type/date.pb.dart';
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart';
@@ -21,8 +22,6 @@ import 'package:hawkr_seller/features/seller/data/version_conflict.dart';
 import 'package:hawkr_seller/features/seller/presentation/kyc_wizard_widgets.dart';
 import 'package:hawkr_seller/features/seller/presentation/profile_form_widgets.dart';
 import 'package:hawkr_seller/features/seller/presentation/seller_certification_upload_screen.dart';
-import 'package:hawkr_seller/features/seller/presentation/widgets/payuni_status_body.dart'
-    show payuniReasonLocale;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -79,6 +78,32 @@ class _Server {
   Completer<void>? submitGate;
   Object? kycFailure;
 
+  /// GetMyPaymentAccount 的回應：[PaymentAccount]，或 null（not_found）。
+  PaymentAccount? payment;
+
+  /// GetContactEmail 的回應：預設是 provider 驗證過的信箱；null 是沒有任何信箱。
+  ContactEmail? contact = ContactEmail(
+    email: 'login@example.com',
+    source: ContactEmailSource.CONTACT_EMAIL_SOURCE_VERIFIED,
+  );
+  final contactSets = <String>[];
+
+  IdentityAppServiceClient get identity => IdentityAppServiceClient(
+    FakeTransportBuilder()
+        .unary(IdentityAppService.getContactEmail, (_, _) {
+          return GetContactEmailResponse(contactEmail: contact);
+        })
+        .unary(IdentityAppService.setContactEmail, (req, _) {
+          contactSets.add(req.email);
+          contact = ContactEmail(
+            email: req.email,
+            source: ContactEmailSource.CONTACT_EMAIL_SOURCE_SELF_ENTERED,
+          );
+          return SetContactEmailResponse(contactEmail: contact);
+        })
+        .build(),
+  );
+
   SellerAppServiceClient get client => SellerAppServiceClient(
     FakeTransportBuilder()
         .unary(SellerAppService.getMyKYC, (_, _) {
@@ -116,6 +141,11 @@ class _Server {
           application = null;
           return CancelKYCResponse(application: KYCApplication());
         })
+        .unary(SellerAppService.getMyPaymentAccount, (_, _) {
+          final account = payment;
+          if (account == null) throw ConnectException(Code.notFound, 'none');
+          return GetMyPaymentAccountResponse(account: account);
+        })
         .unary(SellerAppService.lookupBusinessRegistration, (req, _) {
           lookups.add(req.taxId);
           return onLookup?.call(req.taxId) ??
@@ -146,6 +176,7 @@ void main() {
       overrides: [
         sessionProvider.overrideWith(_LoggedIn.new),
         sellerClientProvider.overrideWithValue(server.client),
+        identityClientProvider.overrideWithValue(server.identity),
         myStoreRepositoryProvider.overrideWithValue(store.repository),
         sellerAgreementsRepositoryProvider.overrideWithValue(agreements),
       ],
@@ -228,7 +259,7 @@ void main() {
       expect(server.saves.single.application.etag, isEmpty);
       expect(server.saves.single.application.hasBusiness(), isTrue);
       expect(find.text('公司資訊'), findsWidgets);
-      expect(find.text('資料步驟 1 / 9'), findsOneWidget);
+      expect(find.text('資料步驟 1 / 4'), findsOneWidget);
     });
 
     testWidgets('已有申請：身分以申請為準，不理錢包選的身分，也不再建立', (tester) async {
@@ -247,62 +278,57 @@ void main() {
     testWidgets('被退回：顯示退回原因與要修正的欄位，停在第一個缺項的一步', (tester) async {
       await pumpScreen(
         tester,
-        application: individualApplication(
+        application: businessApplication(
           status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
           kycStatus: KYCStatus.KYC_STATUS_REJECTED,
-          missing: [KYCField.KYC_FIELD_BANK_ACCOUNT],
-          rejection: KYCRejection(reason: '證件模糊'),
+          missing: [KYCField.KYC_FIELD_BUSINESS_TAX_ID],
+          rejection: KYCRejection(reason: '資料不符'),
           outstanding: [
             KYCIssue(
-              field_1: KYCField.KYC_FIELD_ID_CARD_FRONT,
-              code: KYCIssueCode.KYC_ISSUE_CODE_UNREADABLE,
-              message: '反光看不清楚',
-            ),
-            KYCIssue(
-              field_1: KYCField.KYC_FIELD_BANK_ACCOUNT,
+              field_1: KYCField.KYC_FIELD_BUSINESS_TAX_ID,
               code: KYCIssueCode.KYC_ISSUE_CODE_MISMATCH,
-              message: '與存摺不符',
+              message: '與登記不符',
             ),
           ],
         ),
       );
 
       expect(find.text('認證未通過'), findsOneWidget);
-      expect(find.text('證件模糊'), findsOneWidget);
-      expect(find.text('身分證正面照：反光看不清楚'), findsOneWidget);
-      expect(find.text('銀行帳號：與存摺不符'), findsOneWidget);
-      expect(find.text('收款帳戶'), findsOneWidget);
+      expect(find.text('資料不符'), findsOneWidget);
+      expect(find.text('統一編號：與登記不符'), findsOneWidget);
+      expect(find.text('公司資訊'), findsWidgets);
     });
 
-    testWidgets('退回指出的證件問題顯示在那張證件旁，說明來自伺服器', (tester) async {
+    testWidgets('退回指出的補充文件問題顯示在那張文件旁，說明來自伺服器', (tester) async {
       await pumpScreen(
         tester,
-        application: individualApplication(
+        application: businessApplication(
           status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
           kycStatus: KYCStatus.KYC_STATUS_REJECTED,
-          missing: [KYCField.KYC_FIELD_ID_CARD_FRONT],
-          rejection: KYCRejection(reason: '證件模糊'),
+          missing: [KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS],
+          rejection: KYCRejection(reason: '文件過期'),
           outstanding: [
             KYCIssue(
-              field_1: KYCField.KYC_FIELD_ID_CARD_FRONT,
-              code: KYCIssueCode.KYC_ISSUE_CODE_UNREADABLE,
-              message: '正面反光看不清楚',
+              field_1: KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
+              documentAssetId: 'co-1',
+              code: KYCIssueCode.KYC_ISSUE_CODE_OTHER,
+              message: '已過期',
             ),
           ],
-        ),
+        )..business.companyDocuments.add(KYCDocument(assetId: 'co-1')),
       );
 
       expect(
         find.descendant(
-          of: find.byKey(const Key('kyc_id_front')),
-          matching: find.text('正面反光看不清楚'),
+          of: find.byKey(const Key('kyc_company_document_0')),
+          matching: find.text('已過期'),
         ),
         findsOneWidget,
       );
-      expect(find.text('身分證正面照：正面反光看不清楚'), findsOneWidget);
+      expect(find.text('補充文件：已過期'), findsOneWidget);
     });
 
-    testWidgets('審核中的申請是只讀的狀態頁，沒有任何欄位', (tester) async {
+    testWidgets('審核中的申請是只讀的兩區狀態頁：平台審核讀申請狀態，收款帳戶還沒開放', (tester) async {
       await pumpScreen(
         tester,
         application: individualApplication(
@@ -312,135 +338,34 @@ void main() {
       );
 
       expect(find.byKey(const Key('kyc_locked')), findsOneWidget);
-      expect(find.text('平台審核中'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('kyc_platform_review')),
+          matching: find.text('審核中'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('kyc_payment_account')),
+          matching: find.text('平台審核通過後開放設定'),
+        ),
+        findsOneWidget,
+      );
       expect(find.byType(TextField), findsNothing);
     });
 
-    testWidgets('綁定失敗、賣家能修正（can_resubmit）：表單可編輯，有 PayUni 問題框，沒有鎖住畫面', (
-      tester,
-    ) async {
-      await pumpScreen(
-        tester,
-        application: individualApplication(
-          status: KYCFlowStatus.KYC_FLOW_STATUS_BIND_FAILED,
-          kycStatus: KYCStatus.KYC_STATUS_APPROVED,
-          canResubmit: true,
-          missing: [KYCField.KYC_FIELD_ID_CARD_FRONT],
-          payuni: SellerPayUni(
-            state: PayUniState.PAY_UNI_STATE_FIXABLE,
-            explanation: LocalizedMessage(
-              locale: 'zh-TW',
-              message: '伺服器說明-綁定失敗',
-            ),
-            fixFields: [KYCField.KYC_FIELD_REAL_NAME],
-          ),
-        ),
-      );
-
-      expect(find.byKey(const Key('kyc_locked')), findsNothing);
-      expect(find.byKey(const Key('kyc_payuni_problem')), findsOneWidget);
-      expect(find.byKey(const Key('kyc_id_front')), findsOneWidget);
-    });
-
-    testWidgets('PayUni 拒絕、可修正：表單上方有 PayUni 問題框，沒有退回框', (tester) async {
-      await pumpScreen(
-        tester,
-        application: individualApplication(
-          status: KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED,
-          kycStatus: KYCStatus.KYC_STATUS_DRAFT,
-          canResubmit: true,
-          payuni: SellerPayUni(
-            state: PayUniState.PAY_UNI_STATE_FIXABLE,
-            explanation: LocalizedMessage(
-              locale: 'zh-TW',
-              message: '伺服器說明-FIXABLE',
-            ),
-            reason: '資料不符',
-            fixFields: [KYCField.KYC_FIELD_REAL_NAME],
-          ),
-        ),
-      );
-
-      final box = find.byKey(const Key('kyc_payuni_problem'));
-      expect(box, findsOneWidget);
-      expect(
-        find.descendant(of: box, matching: find.text('PayUni 需要補件')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: box, matching: find.text('伺服器說明-FIXABLE')),
-        findsOneWidget,
-      );
-      expect(tester.widget<Text>(find.text('資料不符')).locale, payuniReasonLocale);
-      expect(find.text('認證未通過'), findsNothing);
-    });
-
-    testWidgets('草稿且有 payuni（賣家正在修正）：問題框仍在', (tester) async {
-      await pumpScreen(
-        tester,
-        application: individualApplication(
-          status: KYCFlowStatus.KYC_FLOW_STATUS_DRAFT,
-          kycStatus: KYCStatus.KYC_STATUS_DRAFT,
-          canResubmit: true,
-          payuni: SellerPayUni(state: PayUniState.PAY_UNI_STATE_FIXABLE),
-        ),
-      );
-      expect(find.byKey(const Key('kyc_payuni_problem')), findsOneWidget);
-    });
-
-    testWidgets('被退回：只有退回框，沒有 PayUni 問題框', (tester) async {
+    testWidgets('被退回：顯示退回框', (tester) async {
       await pumpScreen(
         tester,
         application: individualApplication(
           status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
           kycStatus: KYCStatus.KYC_STATUS_REJECTED,
-          rejection: KYCRejection(reason: '證件模糊'),
+          rejection: KYCRejection(reason: '資料不符'),
         ),
       );
-      expect(find.text('證件模糊'), findsOneWidget);
-      expect(find.byKey(const Key('kyc_payuni_problem')), findsNothing);
-    });
-
-    testWidgets('鎖住畫面：有 PayUni 狀態時顯示 PayUni 標題、說明與審核意見；送審中是流程橫幅', (
-      tester,
-    ) async {
-      await pumpScreen(
-        tester,
-        application: individualApplication(
-          status: KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED,
-          kycStatus: KYCStatus.KYC_STATUS_APPROVED,
-          payuni: SellerPayUni(
-            state: PayUniState.PAY_UNI_STATE_CONTACT_SUPPORT,
-            explanation: LocalizedMessage(
-              locale: 'zh-TW',
-              message: '伺服器說明-CONTACT',
-            ),
-            reason: '會員已停權',
-          ),
-        ),
-      );
-      expect(find.byKey(const Key('kyc_locked')), findsOneWidget);
-      expect(find.text('PayUni 申請未通過'), findsOneWidget);
-      expect(find.text('伺服器說明-CONTACT'), findsOneWidget);
-      expect(
-        tester.widget<Text>(find.text('會員已停權')).locale,
-        payuniReasonLocale,
-      );
-      expect(find.byType(TextField), findsNothing);
-    });
-
-    testWidgets('證號只有遮蔽值：顯示遮蔽值，沒有重新輸入就不送', (tester) async {
-      await pumpScreen(
-        tester,
-        application: individualApplication(
-          realName: '王小明',
-          idMasked: 'A12****789',
-          missing: [KYCField.KYC_FIELD_REAL_NAME],
-        ),
-      );
-      expect(find.text('已填寫（A12****789），如需修改請重新輸入'), findsOneWidget);
-      expect(fieldText(tester, 'kyc_id_card_no'), isEmpty);
-      expect(server.saves, isEmpty);
+      expect(find.text('資料不符'), findsOneWidget);
+      expect(find.byKey(const Key('kyc_locked')), findsNothing);
     });
   });
 
@@ -448,41 +373,39 @@ void main() {
     testWidgets('下一步存進伺服器（只送改過的欄位、帶 etag），再前進', (tester) async {
       await pumpScreen(
         tester,
-        application: individualApplication(
+        application: businessApplication(
           etag: 'v1',
-          missing: [KYCField.KYC_FIELD_BANK_ACCOUNT],
+          missing: [KYCField.KYC_FIELD_BUSINESS_COMPANY_PHONE],
         ),
       );
-      server.onSave = (req) =>
-          individualApplication(etag: 'v2')
-            ..bankName = req.application.bankName;
+      server.onSave = (req) => businessApplication(etag: 'v2');
 
-      await tester.enterText(field('kyc_bank_name'), '台北富邦銀行');
+      await tester.enterText(field('kyc_company_name'), '範例果園');
       await tapText(tester, '下一步');
 
       expect(server.saves.single.application.etag, 'v1');
-      expect(server.saves.single.updateMask.paths, ['bank_name']);
+      expect(server.saves.single.updateMask.paths, ['business.company_name']);
       expect(find.text('商家營運資訊'), findsOneWidget);
     });
 
     testWidgets('版本衝突：停在原地、顯示更新提示，輸入保留', (tester) async {
       await pumpScreen(
         tester,
-        application: individualApplication(
+        application: businessApplication(
           etag: 'v1',
-          missing: [KYCField.KYC_FIELD_BANK_ACCOUNT],
+          missing: [KYCField.KYC_FIELD_BUSINESS_COMPANY_PHONE],
         ),
       );
       server.onSave = (_) =>
           throw reasonError(Code.aborted, 'VERSION_CONFLICT');
-      server.application = individualApplication(etag: 'v9');
+      server.application = businessApplication(etag: 'v9');
 
-      await tester.enterText(field('kyc_bank_name'), '台北富邦銀行');
+      await tester.enterText(field('kyc_company_name'), '範例果園');
       await tapText(tester, '下一步');
 
       expect(find.text(versionConflictNotice('申請資料')), findsOneWidget);
-      expect(fieldText(tester, 'kyc_bank_name'), '台北富邦銀行');
-      expect(find.text('收款帳戶'), findsOneWidget);
+      expect(fieldText(tester, 'kyc_company_name'), '範例果園');
+      expect(find.text('公司資訊'), findsWidgets);
     });
   });
 
@@ -552,12 +475,13 @@ void main() {
   group('確認送出', () {
     KYCApplication complete() => individualApplication(etag: 'v1');
 
-    Future<void> checkBoth(WidgetTester tester) async {
+    Future<void> checkNotice(WidgetTester tester) async {
       await tapKey(tester, 'kyc_privacy_checkbox');
-      await tapKey(tester, 'kyc_payuni_checkbox');
     }
 
-    testWidgets('沒有缺項時停在確認；兩個勾選都勾了才能送出，送出帶 etag 與兩份現行版本', (tester) async {
+    testWidgets('沒有缺項時停在確認；告知事項勾了才能送出，送出帶 etag 與現行版本，不帶 PAYUNI_TERMS', (
+      tester,
+    ) async {
       await pumpScreen(tester, application: complete());
 
       expect(find.text('確認送出'), findsWidgets);
@@ -566,21 +490,61 @@ void main() {
       );
       expect(submitButton().onTap, isNull);
 
-      await checkBoth(tester);
+      await checkNotice(tester);
       await tapText(tester, '送出認證');
 
       final request = server.submits.single;
       expect(request.etag, 'v1');
       expect(request.acceptedAgreements.map((a) => a.kind), [
         AgreementKind.AGREEMENT_KIND_KYC_PRIVACY_NOTICE,
-        AgreementKind.AGREEMENT_KIND_PAYUNI_TERMS,
       ]);
-      expect(request.acceptedAgreements.map((a) => a.version), ['p1', 'u1']);
+      expect(request.acceptedAgreements.map((a) => a.version), ['p1']);
+      expect(find.byKey(const Key('kyc_payuni_checkbox')), findsNothing);
       expect(find.text('已送出申請'), findsOneWidget);
-      expect(find.text('送出後 PayUni 預設密碼為你的身分證字號'), findsOneWidget);
+      expect(find.textContaining('PayUni'), findsNothing);
       await tester.tap(find.text('我知道了'));
       await tester.pumpAndSettle();
       expect(find.text('WALLET'), findsOneWidget);
+    });
+
+    testWidgets('帳號有驗證過的信箱：確認頁顯示信箱，沒有輸入框，送出不呼叫 SetContactEmail', (
+      tester,
+    ) async {
+      await pumpScreen(tester, application: complete());
+
+      expect(
+        find.byKey(const Key('kyc_contact_email_verified')),
+        findsOneWidget,
+      );
+      expect(find.text('login@example.com'), findsOneWidget);
+      expect(find.byKey(const Key('kyc_contact_email')), findsNothing);
+
+      await checkNotice(tester);
+      await tapText(tester, '送出認證');
+
+      expect(server.contactSets, isEmpty);
+      expect(server.submits, hasLength(1));
+    });
+
+    testWidgets('帳號沒有任何信箱：確認頁有輸入框，填了才能送出，送出前先寫進帳號', (tester) async {
+      server.contact = null;
+      await pumpScreen(tester, application: complete());
+
+      expect(find.byKey(const Key('kyc_contact_email_verified')), findsNothing);
+      expect(field('kyc_contact_email'), findsOneWidget);
+      await checkNotice(tester);
+      KycPrimaryButton submitButton() => tester.widget<KycPrimaryButton>(
+        find.widgetWithText(KycPrimaryButton, '送出認證'),
+      );
+      expect(submitButton().onTap, isNull, reason: '信箱還沒填');
+
+      await tester.enterText(field('kyc_contact_email'), 'Shop@Example.com');
+      await tester.pumpAndSettle();
+      expect(submitButton().onTap, isNotNull);
+      await tapText(tester, '送出認證');
+
+      expect(server.contactSets, ['shop@example.com']);
+      expect(server.submits, hasLength(1));
     });
 
     testWidgets('AGREEMENT_OUTDATED：重讀條款、取消勾選，提示重新勾選', (tester) async {
@@ -588,12 +552,12 @@ void main() {
       server.onSubmit = (_) =>
           throw reasonError(Code.failedPrecondition, 'AGREEMENT_OUTDATED');
 
-      await checkBoth(tester);
+      await checkNotice(tester);
       await tapText(tester, '送出認證');
 
       expect(find.text(agreementOutdatedMessage), findsOneWidget);
       expect(agreements.reads, 2);
-      for (final key in const ['kyc_privacy_checkbox', 'kyc_payuni_checkbox']) {
+      for (final key in const ['kyc_privacy_checkbox']) {
         expect(
           tester.widget<Checkbox>(find.byKey(Key(key))).value,
           isFalse,
@@ -609,7 +573,7 @@ void main() {
         throw reasonError(Code.failedPrecondition, 'AGREEMENT_OUTDATED');
       };
 
-      await checkBoth(tester);
+      await checkNotice(tester);
       await tapText(tester, '送出認證');
 
       expect(find.text(versionReloadFailedNotice), findsOneWidget);
@@ -630,7 +594,7 @@ void main() {
         throw ConnectException(Code.failedPrecondition, '請先到店家設定補齊');
       };
 
-      await checkBoth(tester);
+      await checkNotice(tester);
       await tapText(tester, '送出認證');
 
       expect(find.text('下列欄位尚未填寫：店家地址、聯絡人姓名'), findsWidgets);
@@ -639,12 +603,12 @@ void main() {
 
     testWidgets('欄位違規：顯示欄位名稱', (tester) async {
       await pumpScreen(tester, application: complete());
-      server.onSubmit = (_) => throw fieldError('english_name', '請填寫商店英文名稱');
+      server.onSubmit = (_) => throw fieldError('product_type', '請填寫主要商品類型');
 
-      await checkBoth(tester);
+      await checkNotice(tester);
       await tapText(tester, '送出認證');
 
-      expect(find.text('下列欄位尚未填寫：英文姓名'), findsOneWidget);
+      expect(find.text('下列欄位尚未填寫：主要商品類型'), findsOneWidget);
       expect(server.submits, hasLength(1));
     });
   });
@@ -655,7 +619,7 @@ void main() {
         tester,
         application: individualApplication(
           etag: 'v4',
-          missing: [KYCField.KYC_FIELD_ID_CARD_FRONT],
+          missingStore: [StoreField.STORE_FIELD_ADDRESS],
         ),
       );
 
@@ -679,7 +643,7 @@ void main() {
       await pumpScreen(
         tester,
         application: individualApplication(
-          missing: [KYCField.KYC_FIELD_ID_CARD_FRONT],
+          missingStore: [StoreField.STORE_FIELD_ADDRESS],
         ),
       );
 
@@ -697,7 +661,7 @@ void main() {
           status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
           kycStatus: KYCStatus.KYC_STATUS_REJECTED,
           identityLocked: true,
-          missing: [KYCField.KYC_FIELD_ID_CARD_FRONT],
+          missingStore: [StoreField.STORE_FIELD_ADDRESS],
         ),
       );
 
@@ -749,34 +713,15 @@ void main() {
       expect(find.text('商家營運資訊'), findsOneWidget);
       expect(find.byKey(const Key('kyc_product_type')), findsNothing);
     });
-
-    testWidgets('發證地點是縣市選單（選項同 website 的縣市清單），可選', (tester) async {
-      await pumpScreen(
-        tester,
-        application: individualApplication(
-          missing: [KYCField.KYC_FIELD_ID_CARD_ISSUE_LOCATION],
-        ),
-      );
-      expect(find.byKey(const Key('kyc_issue_location')), findsOneWidget);
-      expect(field('kyc_issue_location'), findsNothing);
-
-      await tapKey(tester, 'kyc_issue_location');
-      expect(find.text('台北市'), findsOneWidget);
-      expect(find.text('新北市'), findsOneWidget);
-      await tester.tap(find.text('台北市'));
-      await tester.pumpAndSettle();
-      await tapText(tester, '下一步');
-
-      expect(server.saves.single.application.idCardIssueLocation, '台北市');
-    });
   });
 
   group('送出前提醒與離開', () {
-    testWidgets('確認頁在「PayUni 預設密碼」旁顯示鎖定提醒；身分欄位已鎖住後不顯示', (tester) async {
+    testWidgets('確認頁顯示鎖定提醒與「身分與銀行由金流商收集」；身分欄位已鎖住後不顯示鎖定提醒', (tester) async {
       await pumpScreen(tester, application: individualApplication(etag: 'v1'));
       expect(find.text(kPayuniLockOnSubmitNotice), findsOneWidget);
       expect(kPayuniLockOnSubmitNotice, '送出後商店名稱與商店介紹將無法修改，請先確認無誤');
-      expect(find.text('送出後 PayUni 預設密碼為你的身分證字號'), findsOneWidget);
+      expect(find.text('身分與銀行帳號會在審核通過後，由金流商收集，平台不經手。'), findsOneWidget);
+      expect(find.textContaining('PayUni'), findsNothing);
     });
 
     testWidgets('identity_locked 時不顯示鎖定提醒', (tester) async {
@@ -790,14 +735,12 @@ void main() {
         ),
       );
 
-      expect(find.text('送出後 PayUni 預設密碼為你的身分證字號'), findsOneWidget);
       expect(find.text(kPayuniLockOnSubmitNotice), findsNothing);
     });
 
     testWidgets('送出進行中不能返回；完成後才離開', (tester) async {
       await pumpScreen(tester, application: individualApplication(etag: 'v1'));
       await tapKey(tester, 'kyc_privacy_checkbox');
-      await tapKey(tester, 'kyc_payuni_checkbox');
       server.submitGate = Completer<void>();
 
       await tester.ensureVisible(find.text('送出認證'));
@@ -838,14 +781,14 @@ void main() {
         tester,
         staleCache: individualApplication(
           etag: 'stale',
-          missing: [KYCField.KYC_FIELD_BANK_ACCOUNT],
+          missingStore: [StoreField.STORE_FIELD_ADDRESS],
         ),
         application: individualApplication(etag: 'fresh'),
         rereadFailure: ConnectException(Code.unavailable, 'down'),
       );
 
       expect(find.text('無法載入認證資料'), findsOneWidget);
-      expect(find.text('收款帳戶'), findsNothing);
+      expect(find.text('商家營運資訊'), findsNothing);
       expect(find.text('確認送出'), findsNothing);
 
       server.kycFailure = null;
@@ -858,7 +801,6 @@ void main() {
     testWidgets('送出時衝突發現申請已取消：回到選擇身分，重建後從第一步開始、勾選取消', (tester) async {
       await pumpScreen(tester, application: individualApplication(etag: 'v1'));
       await tapKey(tester, 'kyc_privacy_checkbox');
-      await tapKey(tester, 'kyc_payuni_checkbox');
       server.onSubmit = (_) {
         server.application = null;
         throw reasonError(Code.aborted, 'VERSION_CONFLICT');
@@ -873,14 +815,13 @@ void main() {
       await tapKey(tester, 'kyc_subject_individual');
       await tapText(tester, '開始填寫');
 
-      expect(find.text('上傳身分證'), findsOneWidget);
+      expect(find.text('商家營運資訊'), findsOneWidget);
       expect(find.text('確認送出'), findsNothing);
     });
 
-    testWidgets('取消之後再回到確認頁，兩個勾選是取消的', (tester) async {
+    testWidgets('取消之後再回到確認頁，勾選是取消的', (tester) async {
       await pumpScreen(tester, application: individualApplication(etag: 'v1'));
       await tapKey(tester, 'kyc_privacy_checkbox');
-      await tapKey(tester, 'kyc_payuni_checkbox');
       server.onSubmit = (_) {
         server.application = null;
         throw reasonError(Code.aborted, 'VERSION_CONFLICT');
@@ -895,18 +836,15 @@ void main() {
       await tapText(tester, '開始填寫');
 
       expect(find.text('確認送出'), findsWidgets);
-      for (final key in const ['kyc_privacy_checkbox', 'kyc_payuni_checkbox']) {
+      for (final key in const ['kyc_privacy_checkbox']) {
         expect(tester.widget<Checkbox>(find.byKey(Key(key))).value, isFalse);
       }
     });
   });
 
   group('日期', () {
-    test('民國年與 ISO 日期互轉；不是有效日期回空字串', () {
+    test('民國年顯示；不是有效日期回空字串', () {
       expect(rocDateOfIso('2026-06-29'), '115/06/29');
-      expect(isoOfRocDate('077/06/10'), '1988-06-10');
-      expect(isoOfRocDate('115/02/30'), isEmpty);
-      expect(isoOfRocDate('not-a-date'), isEmpty);
       expect(rocDateOfIso(''), isEmpty);
     });
   });

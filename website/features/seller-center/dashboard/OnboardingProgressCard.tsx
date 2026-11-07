@@ -1,6 +1,9 @@
 "use client";
 
-import type { KYCFlowStatus } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import type {
+	KYCStatus,
+	PaymentAccount,
+} from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Button from "@/components/ui/Button";
@@ -59,12 +62,14 @@ function OnboardingStep({
 
 export default function OnboardingProgressCard({
 	self,
-	flowStatus,
+	kycStatus,
+	paymentAccount,
 	shippingRows,
 	productCount,
 }: {
 	self: MyStore | null;
-	flowStatus: KYCFlowStatus | undefined;
+	kycStatus: KYCStatus | undefined;
+	paymentAccount: PaymentAccount | null;
 	shippingRows: ShippingOnboarding[];
 	productCount: number | null;
 }) {
@@ -74,11 +79,12 @@ export default function OnboardingProgressCard({
 			buildOnboardingTasks({
 				ut,
 				my: self,
-				flowStatus,
+				kycStatus,
+				paymentAccount,
 				shippingRows,
 				productCount,
 			}),
-		[ut, self, flowStatus, shippingRows, productCount],
+		[ut, self, kycStatus, paymentAccount, shippingRows, productCount],
 	);
 	const requiredTasks = tasks.filter((task) => task.group === "required");
 	const completedRequired = requiredTasks.filter(

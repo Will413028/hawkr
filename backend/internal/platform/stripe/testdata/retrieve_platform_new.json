@@ -1,0 +1,386 @@
+{
+  "status": 200,
+  "body": {
+    "id": "acct_1UXUVeEfy6as5ms7",
+    "object": "v2.core.account",
+    "applied_configurations": [
+      "recipient"
+    ],
+    "closed": false,
+    "configuration": {
+      "customer": null,
+      "merchant": null,
+      "recipient": {
+        "applied": true,
+        "capabilities": {
+          "bank_accounts": {
+            "local": null,
+            "wire": null
+          },
+          "cards": null,
+          "crypto_wallets": null,
+          "stripe_balance": {
+            "payouts": {
+              "status": "restricted",
+              "status_details": [
+                {
+                  "code": "requirements_past_due",
+                  "resolution": "provide_info"
+                }
+              ]
+            },
+            "stripe_transfers": {
+              "status": "restricted",
+              "status_details": [
+                {
+                  "code": "requirements_past_due",
+                  "resolution": "provide_info"
+                }
+              ]
+            }
+          }
+        },
+        "default_outbound_destination": null
+      }
+    },
+    "contact_email": "<EMAIL-MASKED>",
+    "contact_phone": null,
+    "created": "2026-11-02T23:19:29.000Z",
+    "dashboard": "none",
+    "identity": {
+      "attestations": {
+        "directorship_declaration": null,
+        "ownership_declaration": null,
+        "persons_provided": {
+          "directors": null,
+          "executives": null,
+          "owners": null,
+          "ownership_exemption_reason": null
+        },
+        "representative_declaration": null,
+        "terms_of_service": {
+          "account": null
+        }
+      },
+      "business_details": null,
+      "country": "US",
+      "entity_type": "individual",
+      "individual": null
+    },
+    "defaults": {
+      "currency": "usd",
+      "locales": [],
+      "payout_methods": null,
+      "profile": {
+        "business_url": null,
+        "doing_business_as": null,
+        "product_description": null
+      },
+      "responsibilities": {
+        "fees_collector": "application",
+        "losses_collector": "application",
+        "requirements_collector": "application"
+      },
+      "timezone": null
+    },
+    "display_name": "Spike Store",
+    "future_requirements": null,
+    "metadata": {},
+    "requirements": {
+      "entries": [
+        {
+          "awaiting_action_from": "user",
+          "description": "defaults.profile.business_url",
+          "errors": [],
+          "impact": {
+            "restricts_capabilities": [
+              {
+                "capability": "stripe_balance.payouts",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "past_due"
+                }
+              },
+              {
+                "capability": "stripe_balance.stripe_transfers",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "past_due"
+                }
+              }
+            ]
+          },
+          "minimum_deadline": {
+            "status": "past_due"
+          },
+          "reference": null,
+          "requested_reasons": [
+            {
+              "code": "routine_onboarding"
+            }
+          ]
+        },
+        {
+          "awaiting_action_from": "user",
+          "description": "external_account",
+          "errors": [],
+          "impact": {
+            "restricts_capabilities": [
+              {
+                "capability": "stripe_balance.payouts",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "past_due"
+                }
+              }
+            ]
+          },
+          "minimum_deadline": {
+            "status": "past_due"
+          },
+          "reference": null,
+          "requested_reasons": [
+            {
+              "code": "routine_onboarding"
+            }
+          ]
+        },
+        {
+          "awaiting_action_from": "user",
+          "description": "identity.attestations.terms_of_service.account.date",
+          "errors": [],
+          "impact": {
+            "restricts_capabilities": [
+              {
+                "capability": "stripe_balance.payouts",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "past_due"
+                }
+              },
+              {
+                "capability": "stripe_balance.stripe_transfers",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "past_due"
+                }
+              }
+            ]
+          },
+          "minimum_deadline": {
+            "status": "past_due"
+          },
+          "reference": null,
+          "requested_reasons": [
+            {
+              "code": "routine_onboarding"
+            }
+          ]
+        },
+        {
+          "awaiting_action_from": "user",
+          "description": "identity.attestations.terms_of_service.account.ip",
+          "errors": [],
+          "impact": {
+            "restricts_capabilities": [
+              {
+                "capability": "stripe_balance.payouts",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "past_due"
+                }
+              },
+              {
+                "capability": "stripe_balance.stripe_transfers",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "past_due"
+                }
+              }
+            ]
+          },
+          "minimum_deadline": {
+            "status": "past_due"
+          },
+          "reference": null,
+          "requested_reasons": [
+            {
+              "code": "routine_onboarding"
+            }
+          ]
+        },
+        {
+          "awaiting_action_from": "user",
+          "description": "identity.individual.date_of_birth.day",
+          "errors": [],
+          "impact": {
+            "restricts_capabilities": [
+              {
+                "capability": "stripe_balance.payouts",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "eventually_due"
+                }
+              }
+            ]
+          },
+          "minimum_deadline": {
+            "status": "eventually_due"
+          },
+          "reference": null,
+          "requested_reasons": [
+            {
+              "code": "routine_onboarding"
+            }
+          ]
+        },
+        {
+          "awaiting_action_from": "user",
+          "description": "identity.individual.date_of_birth.month",
+          "errors": [],
+          "impact": {
+            "restricts_capabilities": [
+              {
+                "capability": "stripe_balance.payouts",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "eventually_due"
+                }
+              }
+            ]
+          },
+          "minimum_deadline": {
+            "status": "eventually_due"
+          },
+          "reference": null,
+          "requested_reasons": [
+            {
+              "code": "routine_onboarding"
+            }
+          ]
+        },
+        {
+          "awaiting_action_from": "user",
+          "description": "identity.individual.date_of_birth.year",
+          "errors": [],
+          "impact": {
+            "restricts_capabilities": [
+              {
+                "capability": "stripe_balance.payouts",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "eventually_due"
+                }
+              }
+            ]
+          },
+          "minimum_deadline": {
+            "status": "eventually_due"
+          },
+          "reference": null,
+          "requested_reasons": [
+            {
+              "code": "routine_onboarding"
+            }
+          ]
+        },
+        {
+          "awaiting_action_from": "user",
+          "description": "identity.individual.given_name",
+          "errors": [],
+          "impact": {
+            "restricts_capabilities": [
+              {
+                "capability": "stripe_balance.payouts",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "past_due"
+                }
+              },
+              {
+                "capability": "stripe_balance.stripe_transfers",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "past_due"
+                }
+              }
+            ]
+          },
+          "minimum_deadline": {
+            "status": "past_due"
+          },
+          "reference": null,
+          "requested_reasons": [
+            {
+              "code": "routine_onboarding"
+            }
+          ]
+        },
+        {
+          "awaiting_action_from": "user",
+          "description": "identity.individual.id_numbers.us_ssn_last_4",
+          "errors": [],
+          "impact": {
+            "restricts_capabilities": [
+              {
+                "capability": "stripe_balance.payouts",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "eventually_due"
+                }
+              }
+            ]
+          },
+          "minimum_deadline": {
+            "status": "eventually_due"
+          },
+          "reference": null,
+          "requested_reasons": [
+            {
+              "code": "routine_onboarding"
+            }
+          ]
+        },
+        {
+          "awaiting_action_from": "user",
+          "description": "identity.individual.surname",
+          "errors": [],
+          "impact": {
+            "restricts_capabilities": [
+              {
+                "capability": "stripe_balance.payouts",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "past_due"
+                }
+              },
+              {
+                "capability": "stripe_balance.stripe_transfers",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "past_due"
+                }
+              }
+            ]
+          },
+          "minimum_deadline": {
+            "status": "past_due"
+          },
+          "reference": null,
+          "requested_reasons": [
+            {
+              "code": "routine_onboarding"
+            }
+          ]
+        }
+      ],
+      "summary": {
+        "minimum_deadline": {
+          "status": "past_due",
+          "time": null
+        }
+      }
+    },
+    "livemode": false
+  }
+}

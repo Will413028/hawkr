@@ -10,8 +10,8 @@
 
 -- 店家與時間無關的條件，一欄一個布林（Go 的 model.Requirement 一項對一欄，Go 只讀這裡、不重算；停權與時間有關，在 effective_measures）：
 --   - active：沒有關閉；not_pending_deletion：沒有正在隨帳號刪除；
---   - kyc_approved：目前那一筆還沒取消的 KYC 申請已核准，而且 PayUni 註冊已綁定、審核結果是核准（model.DeriveKYCFlow 的 APPROVED，
---     資料集測試鎖住兩者一致；DeriveKYCFlow 只負責給賣家與後台看的流程狀態）；
+--   - onboarding_complete：平台審核已核准（目前那一筆還沒取消的 KYC 申請是 APPROVED），而且收款帳戶的轉帳能力啟用
+--     （payout_capabilities.transfers_active：payment 模組經 PayoutAccountChanged 複製過來的副本，Stripe 計畫 D10、D20、D28）；DeriveKYCFlow 只負責給賣家與後台看的流程狀態；
 --   - has_store_name、has_logo、has_town_code：有值。文字欄位不存空字串（stores_store_name_check、stores_images_check、stores_town_code_check），
 --     店名也不存頭尾是 Unicode 空白的值（stores_store_name_check，platform/trimtext.Check，與寫入端的 trimtext.Trim 同一個集合），所以有值就是 NOT NULL；店名只有個資清理過的列是 NULL。
 CREATE VIEW seller.store_requirement_flags AS
@@ -22,9 +22,9 @@ SELECT s.store_id,
        EXISTS (
            SELECT 1
            FROM seller.kyc_applications a
-           JOIN seller.payuni_registrations r ON r.store_id = a.store_id
-           WHERE a.store_id = s.store_id AND a.status = 'APPROVED' AND r.bind_status = 'BOUND' AND r.outcome = 'APPROVED'
-       ) AS kyc_approved,
+           JOIN seller.payout_capabilities p ON p.store_id = a.store_id
+           WHERE a.store_id = s.store_id AND a.status = 'APPROVED' AND p.transfers_active
+       ) AS onboarding_complete,
        (s.store_name IS NOT NULL)::boolean AS has_store_name,
        (s.logo_key IS NOT NULL)::boolean AS has_logo,
        (s.town_code IS NOT NULL)::boolean AS has_town_code
@@ -60,7 +60,7 @@ LANGUAGE sql STABLE
 BEGIN ATOMIC
     SELECT f.store_id
     FROM seller.store_requirement_flags f
-    WHERE f.active AND f.not_pending_deletion AND f.kyc_approved AND f.has_store_name AND f.has_logo AND f.has_town_code
+    WHERE f.active AND f.not_pending_deletion AND f.onboarding_complete AND f.has_store_name AND f.has_logo AND f.has_town_code
       AND NOT EXISTS (SELECT 1 FROM seller.effective_measures(at) e WHERE e.account_id = f.account_id);
 END;
 

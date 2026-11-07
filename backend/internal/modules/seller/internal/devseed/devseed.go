@@ -107,6 +107,7 @@ var clearChildrenSQL = []string{
 	`DELETE FROM seller.case_inquiry_reply_evidence WHERE inquiry_id IN (SELECT id FROM seller.case_inquiries WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.case_inquiries WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.cases WHERE store_id = ANY($1)`,
+	`DELETE FROM seller.payout_capabilities WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.payuni_observations WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.payuni_registrations WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.agreement_acceptances WHERE store_id = ANY($1)`,

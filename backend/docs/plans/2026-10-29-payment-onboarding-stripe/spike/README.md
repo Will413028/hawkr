@@ -60,6 +60,46 @@ Answer [measured]: `POST https://files.stripe.com/v1/files` multipart, `purpose=
 Docs: https://docs.stripe.com/api/files/create , https://docs.stripe.com/connect/handling-api-verification#upload-a-verification-document
 Output: `outputs/q08_files.txt`.
 
+## Q9 Accounts v2 recipient, both collection modes (step 5, measured 2026-11-03)
+
+`Stripe-Version: 2026-04-22.preview`, US, `identity.entity_type=individual`, `configuration.recipient.capabilities.stripe_balance.stripe_transfers.requested=true`, `defaults.responsibilities.fees_collector=losses_collector=application`.
+
+- Collection mode is chosen by `dashboard`: `none` gives `defaults.responsibilities.requirements_collector=application`; `express` gives `stripe` (https://docs.stripe.com/connect/accounts-v2/connected-account-configuration). `fees_collector`/`losses_collector=stripe` is rejected for a recipient-only account (`invalid_fields`: "can only be application").
+- Idempotency: same `Idempotency-Key` and body returns 200 with the same account id; same key with a different body returns 409 `idempotency_error`.
+- Bank fingerprint: an external bank account attached via `POST /v1/accounts/{id}/external_accounts` is listed with `fingerprint` under the platform key in both modes; same tag as Q6 (fingerprint stable). Not measured: a bank entered by the seller inside Stripe-hosted onboarding (step 5 manual run).
+- Rename: `POST /v2/core/accounts/{id}` with `display_name` returns 200 in both modes (D17: Stripe does not block; we do not sync).
+- `POST /v2/core/account_links` (`use_case.type=account_onboarding`, `configurations=[recipient]`) returns a URL in both modes; `POST /v1/account_sessions` with `account_onboarding` returns a client secret in both modes.
+- Cleanup: `POST /v2/core/accounts/{id}/close` returns 400 `configs_must_match_to_close` without a body naming the configurations; `DELETE /v1/accounts/{id}` deletes test accounts.
+
+Output: `outputs/q09_v2_recipient.txt`.
+
+## Q10 Thin events for v2 accounts (step 5, measured 2026-11-03)
+
+`stripe listen --all-thin` forwarding to `webhook_receiver.py`.
+
+- v2 account events are delivered to the platform's own destination (`context` null): `v2.core.account.created`, `v2.core.account[defaults].updated`, `v2.core.account[identity].updated`, `v2.core.account[configuration.recipient].updated`, `v2.core.account[configuration.recipient].capability_status_updated`, `v2.core.account_person.created`. `related_object = {id: acct_…, type: v2.core.account}`. Payload top-level keys: `context, created, id, livemode, object, reason, related_object, type`.
+- With `--events-from @accounts` the connected account's v1 events arrive thin as `v1.account.updated`, `v1.capability.updated`, `v1.person.created` with `context = acct_…`; retrieving one with `GET /v2/core/events/{id}` without `Stripe-Context` returns 404. The adapter subscribes only to the platform's `v2.core.account*` events.
+- `GET /v2/core/events/{id}` returns `changes.before/after` (not needed: the sync job re-reads the account).
+- Signature: `Stripe-Signature: t=…,v1=…`, HMAC-SHA256 of `{t}.{raw body}`; altered body and a timestamp 1000 s off both fail verification.
+
+Output: `outputs/q10_thin.txt` (`@accounts`), `outputs/q10b_thin_self.txt` (platform).
+
+## Q11–Q12 API version 2026-09-30.preview in test mode (step 5, measured 2026-11-03)
+
+- `2026-09-30.preview` removes `use_case.account_onboarding.configurations` from `POST /v2/core/account_links` (https://docs.stripe.com/changelog/endive/2026-09-30/removes-configurations-parameter-from-v2-core-account-links-api) and adds capability status `rejected` with `rejected_*` codes (https://docs.stripe.com/changelog/endive/2026-09-30/rejected-accounts-v2-capabilities).
+- In plain test mode (not a sandbox) the Account Link is refused: "Cannot create a v2 account link … with recipient config capabilities other than stripe_balance.stripe_transfers requested in testmode. Please switch to an account created in a sandbox". `stripe_balance.payouts` is added automatically and cannot be set (`Unknown field`). The same call worked on `2026-04-22.preview` (Q9).
+- `defaults.profile.business_url = https://example.com` is rejected as `Invalid URL`.
+- Decision: E1 revised (Will 2026-11-03), pin `2026-09-30.preview` and record in a sandbox. Fixtures in `outputs/fixtures/` are from plain test mode and are re-recorded there.
+
+Output: `outputs/q11_record.txt`, `outputs/q12_link_version.txt`, `outputs/fixtures/`.
+
+## Q14 Bank fingerprint after Stripe-hosted onboarding (step 6, measured 2026-11-03)
+Answer [measured]: in the sandbox, `GET /v1/accounts/{id}/external_accounts?object=bank_account&limit=100` on `2026-09-30.endive` for the v2 account onboarded through the hosted page in step 5b (`acct_1UXVfaID6WkY4CJw`, bank entered by the seller inside Stripe) returns 200 with one `bank_account` that has a 16-character `fingerprint`, under the platform key. This closes the Q9 gap ("a bank entered by the seller inside Stripe-hosted onboarding"). Limit: one account, Stripe's test bank; live-mode scope stays deferred (plan scope).
+Output: `outputs/fixtures/external_accounts_bank.json` (also the adapter's contract fixture), script `q14_external_accounts.py` (run with the sandbox env like `q11_run.sh`).
+
+## Q15 Embedded onboarding for a v2 account with connect-js 3.4 (step 7b, measured 2026-11-03)
+Answer [measured]: in the sandbox, a v2 account created with the adapter's body (`dashboard=none`, recipient `stripe_transfers`, `2026-09-30.preview`; `acct_1UXdGKRRzdP06vGA`) accepts a v1 `POST /v1/account_sessions` on `2026-09-30.endive` (200, client secret). A local page loading `@stripe/connect-js@3.4.6` initialises `account-onboarding` without a load error and shows the intro screen. With the default session, clicking the start button spins indefinitely with no console error and no overlay iframe: the component waits on the Stripe user-authentication popup, which the doc says is on by default and always a popup (https://docs.stripe.com/connect/get-started-connect-embedded-components?platform=web, "User authentication in Connect embedded components"). With `components[account_onboarding][features][disable_stripe_user_authentication]=true` the form renders directly (`onStepChange`: `networked_onboarding_with_link` then `representative_details`, "Your details"). Decision D25. The website sets no `Cross-Origin-Opener-Policy` header (a value other than `unsafe-none` would break that popup). Limit: the onboarding was not completed in this spike; completion is 7b's manual acceptance. No script or output was kept (the page held a client secret and was deleted); the account was left in the sandbox.
+
 ## Cleanup
 All connected accounts were deleted with `DELETE /v1/accounts/{id}` (`cleanup.py`, `outputs/cleanup_final.txt`: 0 remaining). Webhook listener and receiver were stopped by `q05_webhook.sh`.
 

@@ -19,6 +19,10 @@ const (
 	fieldBank      = "BANK_ACCOUNT"
 )
 
+// fieldBankFingerprint 是 provider 回報的外部銀行帳號 fingerprint 的 blind index（只在 account_identity_hashes，來源是 provider 不是申請）。
+// 它不在 hashFields：申請的草稿同步、修剪與補算都只處理申請持有的欄位，不能動到它。
+const fieldBankFingerprint = "BANK_FINGERPRINT"
+
 var hashFields = []string{fieldIDCard, fieldRepIDCard, fieldTaxID, fieldBank}
 
 // LinkedField 把比對 hash 的欄位對到關聯帳號命中的身分種類。
@@ -30,7 +34,7 @@ func linkedIdentityOf(field string) (model.LinkedIdentity, bool) {
 		return model.LinkedResponsiblePersonID, true
 	case fieldTaxID:
 		return model.LinkedUBN, true
-	case fieldBank:
+	case fieldBank, fieldBankFingerprint:
 		return model.LinkedBankAccount, true
 	}
 	return "", false

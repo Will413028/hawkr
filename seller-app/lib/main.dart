@@ -50,7 +50,7 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   final flavor = _resolveFlavorFromEnv();
-  // API 主機是必要設定：stage 與 prod 缺少 GATEWAY_HOST 時在 runApp 前直接失敗。
+  // API 主機與 website origin 是必要設定：stage 與 prod 缺少 GATEWAY_HOST 或 HAWKR_WEB_ORIGIN 時在 runApp 前直接失敗。
   flavor.requireCoreConfig();
 
   SentryFlutter.init(

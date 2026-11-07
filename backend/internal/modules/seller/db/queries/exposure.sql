@@ -57,7 +57,7 @@ ORDER BY s.store_id;
 -- name: StoreRequirementFlags :many
 -- 這些店家與時間無關的條件（seller.store_requirement_flags：曝光與能力的條件唯一的家，Go 只把布林對應到 model.Requirement，不重算）；
 -- 不存在的 ID 沒有列。stint.WithConditions 讀店家時帶上。
-SELECT f.store_id, f.active, f.not_pending_deletion, f.kyc_approved, f.has_store_name, f.has_logo, f.has_town_code
+SELECT f.store_id, f.active, f.not_pending_deletion, f.onboarding_complete, f.has_store_name, f.has_logo, f.has_town_code
 FROM seller.store_requirement_flags f
 WHERE f.store_id = ANY(sqlc.arg(store_ids)::bigint[]);
 

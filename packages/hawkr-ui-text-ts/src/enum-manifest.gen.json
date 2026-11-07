@@ -295,6 +295,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.identity.v1alpha1.ContactEmailSource",
+      "tsName": "ContactEmailSource",
+      "tsModule": "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState",
       "tsName": "DeleteAccountResponse_DeletionState",
       "tsModule": "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb",
@@ -368,7 +375,7 @@
       "name": "hawkr.seller.v1alpha1.KYCStatus",
       "tsName": "KYCStatus",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
@@ -414,6 +421,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.seller.v1alpha1.OnboardingSurface",
+      "tsName": "OnboardingSurface",
+      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.seller.v1alpha1.PayUniBindStatus",
       "tsName": "PayUniBindStatus",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
@@ -423,6 +437,13 @@
     {
       "name": "hawkr.seller.v1alpha1.PayUniState",
       "tsName": "PayUniState",
+      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.PaymentAccountStatus",
+      "tsName": "PaymentAccountStatus",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
       "inCatalog": true,
       "serverOwned": false
@@ -439,6 +460,13 @@
       "tsName": "ReportOutcome",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb",
       "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.RequirementCollection",
+      "tsName": "RequirementCollection",
+      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
+      "inCatalog": true,
       "serverOwned": false
     },
     {

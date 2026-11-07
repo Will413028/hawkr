@@ -14,6 +14,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 // 清理之後可以留下值的欄位（其餘一律必須是 NULL）。新增欄位時這份清單逼人決定：留下的要有理由（事實、狀態碼、時間），不是個資。
@@ -386,4 +387,49 @@ func TestPurgeIsNotCappedAtOneBatch(t *testing.T) {
 	if left := f.count(t, "SELECT count(*) FROM seller.stores WHERE status='CLOSED' AND pii_purged_at IS NULL"); left != 3 {
 		t.Fatalf("沒清的=%d（應該只剩關閉 10 天的 3 間）", left)
 	}
+}
+
+// 關店滿保留期的最終清理請 payment 刪掉店家的收款帳戶列：清理的 transaction 只排入 payment 的刪除 job（不鎖下層 payment 的列，platform/lockorder），
+// job 只刪被清理的店家；別的店家的帳戶不動。
+// mutation：purge.go 拿掉 ForgetOwners 的呼叫 → 沒有刪除 job，失敗。
+func TestPurgeAsksPaymentToForgetThePurgedStoreOnly(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	gone, goneStore := f.approvedStore(t)
+	_, keptStore := f.approvedStore(t)
+	for _, s := range []Store{goneStore, keptStore} {
+		f.setPayment(t, s.StoreID, enabledSnapshot)
+	}
+	_, err := f.module.CloseCurrent(ctx, gone)
+	must(t, err)
+	f.now = f.now.Add(StoreRetention + time.Second)
+	n, err := f.module.PurgePII(ctx)
+	must(t, err)
+	if n != 1 {
+		t.Fatalf("purged=%d", n)
+	}
+	var forgotten []int64
+	f.jobs.mu.Lock()
+	for _, a := range f.jobs.args {
+		if a.Kind() != "payment.account_purge" {
+			continue
+		}
+		raw, err := json.Marshal(a)
+		must(t, err)
+		var v struct {
+			StoreIDs []int64 `json:"store_ids"`
+		}
+		must(t, json.Unmarshal(raw, &v))
+		forgotten = append(forgotten, v.StoreIDs...)
+	}
+	f.jobs.mu.Unlock()
+	if !slices.Equal(forgotten, []int64{goneStore.StoreID}) {
+		t.Fatalf("排入刪除的店家=%v", forgotten)
+	}
+	must(t, f.payments.PurgeAccounts(ctx, forgotten))
+	if _, err := f.payments.Account(ctx, goneStore.StoreID); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("清理之後帳戶列還在：%v", err)
+	}
+	f.paymentAccount(t, keptStore.StoreID)
 }

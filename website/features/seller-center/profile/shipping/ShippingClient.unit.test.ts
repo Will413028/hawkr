@@ -1,14 +1,13 @@
 /** @vitest-environment jsdom */
 
 import { create } from "@bufbuild/protobuf";
-import { LocalizedMessageSchema } from "@hawkr/api/gen/google/rpc/error_details_pb";
 import { PostalAddressSchema } from "@hawkr/api/gen/hawkr/common/v1alpha1/postal_address_pb";
 import {
 	GetMyStoreResponseSchema,
-	KYCFlowSchema,
-	KYCFlowStatus,
-	PayUniState,
-	SellerPayUniSchema,
+	KYCApplicationSchema,
+	KYCStatus,
+	PaymentAccountSchema,
+	PaymentAccountStatus,
 	StoreSchema,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import {
@@ -40,22 +39,29 @@ vi.mock("@/lib/seller/shipping", async (importOriginal) => ({
 	submitHomeDeliveryOnboarding: h.submitHome,
 	submitCvsOnboarding: h.submitCvs,
 }));
-// 閘門：用真的 kycFlowGate 算文字（SellerCertGate 本身只負責版面），讓測試看得到 ShippingClient 傳給它的 flow 與 subject。
-vi.mock("@/features/seller-center", async () => {
-	const { kycFlowGate } = await import("@/lib/seller/kyc-flow");
-	const { uiTextFor } = await import("@/lib/i18n/ui-text");
-	return {
-		SellerCertGate: (p: { flow?: never; subject?: string }) => {
-			const { copy } = kycFlowGate(uiTextFor("zh-TW"), p.flow);
-			return React.createElement(
-				"div",
-				{ "data-testid": "cert-gate" },
-				React.createElement("strong", null, copy.heading),
-				React.createElement("p", null, copy.message(p.subject ?? "繼續")),
-			);
-		},
-	};
-});
+// 閘門：SellerCertGate 本身只負責版面；這裡只讓測試看得到 ShippingClient 傳給它的申請、收款帳戶與 subject。
+vi.mock("@/features/seller-center", () => ({
+	SellerCertGate: (p: {
+		application?: { status: number } | null;
+		paymentAccount?: { status: number } | null;
+		subject?: string;
+	}) =>
+		React.createElement(
+			"div",
+			{ "data-testid": "cert-gate" },
+			React.createElement("p", null, p.subject ?? "繼續"),
+			React.createElement(
+				"span",
+				{ "data-testid": "gate-kyc" },
+				String(p.application?.status ?? "none"),
+			),
+			React.createElement(
+				"span",
+				{ "data-testid": "gate-payment" },
+				String(p.paymentAccount?.status ?? "none"),
+			),
+		),
+}));
 vi.mock("@/components/shared/SellerPageShell", () => ({
 	SellerPageShell: ({ children }: { children: React.ReactNode }) =>
 		React.createElement("div", null, children),
@@ -133,7 +139,8 @@ function setData(opts: {
 	h.certGate = {
 		loading: false,
 		shippingGate: "open",
-		flowStatus: undefined,
+		application: null,
+		paymentAccount: null,
 		seller: storeOf(opts.townCode ?? "63000050", opts.contactName),
 	};
 	h.onboardings = {
@@ -144,8 +151,16 @@ function setData(opts: {
 	};
 }
 
-function setGate(flow: ReturnType<typeof create<typeof KYCFlowSchema>>) {
-	h.certGate = { loading: false, shippingGate: "certification", flow };
+function setGate(
+	application: ReturnType<typeof create<typeof KYCApplicationSchema>> | null,
+	paymentAccount: ReturnType<typeof create<typeof PaymentAccountSchema>> | null,
+) {
+	h.certGate = {
+		loading: false,
+		shippingGate: "certification",
+		application,
+		paymentAccount,
+	};
 	h.onboardings = { rows: [], loaded: true, error: null, refresh: vi.fn() };
 }
 
@@ -359,45 +374,28 @@ describe("ShippingClient 7-11 prefill", () => {
 });
 
 describe("ShippingClient 的認證閘門", () => {
-	it("有 PayUni 狀態：標題是 PayUni 的標題、內容是伺服器的說明，不帶 subject", () => {
+	it("把申請、收款帳戶與 subject 交給閘門", () => {
 		setGate(
-			create(KYCFlowSchema, {
-				status: KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED,
-				payuni: create(SellerPayUniSchema, {
-					state: PayUniState.FIXABLE,
-					explanation: create(LocalizedMessageSchema, {
-						locale: "zh-TW",
-						message: "伺服器獨特說明-閘門",
-					}),
-				}),
+			create(KYCApplicationSchema, { status: KYCStatus.KYC_STATUS_APPROVED }),
+			create(PaymentAccountSchema, {
+				status: PaymentAccountStatus.ACTION_REQUIRED,
 			}),
 		);
 		render(React.createElement(ShippingClient));
 		const gate = screen.getByTestId("cert-gate");
-		expect(gate.textContent).toContain("PayUni 需要補件");
-		expect(gate.textContent).toContain("伺服器獨特說明-閘門");
-		expect(gate.textContent).not.toContain("設定物流與退貨");
-	});
-
-	it("沒有 PayUni 狀態：照目錄的文字，內容帶 subject", () => {
-		setGate(
-			create(KYCFlowSchema, {
-				status: KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
-			}),
-		);
-		render(React.createElement(ShippingClient));
-		const gate = screen.getByTestId("cert-gate");
-		expect(gate.textContent).toContain("尚未通過商家認證");
 		expect(gate.textContent).toContain("設定物流與退貨");
+		expect(screen.getByTestId("gate-kyc").textContent).toBe(
+			String(KYCStatus.KYC_STATUS_APPROVED),
+		);
+		expect(screen.getByTestId("gate-payment").textContent).toBe(
+			String(PaymentAccountStatus.ACTION_REQUIRED),
+		);
 	});
 
-	it("PayUni 階段卻沒有 payuni（契約被違反）：閘門是「未知」，不是空白", () => {
-		setGate(
-			create(KYCFlowSchema, {
-				status: KYCFlowStatus.KYC_FLOW_STATUS_BIND_FAILED,
-			}),
-		);
+	it("沒有申請也沒有收款帳戶：閘門照樣出現", () => {
+		setGate(null, null);
 		render(React.createElement(ShippingClient));
-		expect(screen.getByTestId("cert-gate").textContent).toContain("未知");
+		expect(screen.getByTestId("gate-kyc").textContent).toBe("none");
+		expect(screen.getByTestId("gate-payment").textContent).toBe("none");
 	});
 });

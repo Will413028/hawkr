@@ -57,6 +57,29 @@ func TestPayUniStatusAndBindChangesInvalidateTheStorePage(t *testing.T) {
 	}
 }
 
+// 收款帳戶的轉帳能力是開通閘門的輸入：同步 job 在結果寫入的 transaction 內重新公告並排入快取失效；能力沒有變的同步不排。
+// mutation：Sync 拿掉 stint.InvalidateByID → 啟用與停用都沒有排入快取失效，失敗。
+func TestPaymentAccountCapabilityChangesInvalidateTheStorePage(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	_, s := f.approvedStore(t)
+	f.ensureAccount(t, s.StoreID)
+	before := f.revalidations(s)
+	f.setPayment(t, s.StoreID, enabledSnapshot)
+	if got := f.revalidations(s); got != before+1 {
+		t.Fatalf("轉帳能力啟用沒有排入快取失效：%d → %d", before, got)
+	}
+	before = f.revalidations(s)
+	f.setPayment(t, s.StoreID, enabledSnapshot)
+	if got := f.revalidations(s); got != before {
+		t.Fatalf("能力沒有變的同步排入了快取失效：%d → %d", before, got)
+	}
+	f.setPayment(t, s.StoreID, rejectedSnapshot)
+	if got := f.revalidations(s); got != before+1 {
+		t.Fatalf("轉帳能力停用沒有排入快取失效：%d → %d", before, got)
+	}
+}
+
 // KYC 申請的狀態是曝光的輸入：送出、取消、核准、退回各排入一次。
 func TestKYCStatusChangesInvalidateTheStorePage(t *testing.T) {
 	t.Parallel()

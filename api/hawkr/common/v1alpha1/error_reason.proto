@@ -33,7 +33,7 @@ enum ErrorReason {
   AGREEMENT_OUTDATED = 6;
   // 賣家做這個操作需要的前置條件沒有滿足（搭配 failed_precondition）：身分認證未核准，或店家正在隨帳號刪除。停權不用它，
   // 停權是 SELLER_SUSPENDED。ErrorInfo.metadata 的 missingRequirements 是缺的條件，值是
-  // seller.v1alpha1.SellerRequirement 的值名（不加 SELLER_REQUIREMENT_ 前綴，例如 KYC_APPROVED），依列舉的數字由小到大以逗號連接。client 先看 GetMyStore 的能力狀態，這個 reason 只是
+  // seller.v1alpha1.SellerRequirement 的值名（不加 SELLER_REQUIREMENT_ 前綴，例如 ONBOARDING_COMPLETE），依列舉的數字由小到大以逗號連接。client 先看 GetMyStore 的能力狀態，這個 reason 只是
   // 伺服器逐方法檢查的後備：重讀 GetMyStore，依缺的條件顯示。
   SELLER_REQUIREMENT_MISSING = 7;
   // 帳號停權中，不能申請開店（搭配 failed_precondition）；解除停權後可以再申請。client 顯示 LocalizedMessage，並導向措施與申覆。帳號同時有生效中的終止合作時是
@@ -57,6 +57,9 @@ enum ErrorReason {
   // 在 15 分鐘內以 provider 驗證過。client 引導使用者重新走一次登入（web 的 /api/auth/{provider}/start、App 的 ExchangeIdToken，
   // 登入會換發新 session），再重送。
   REAUTHENTICATION_REQUIRED = 14;
+  // 帳號沒有聯絡信箱（沒有 provider 驗證過的 email，也沒有自填的），不能送出 KYC 申請（搭配 failed_precondition）：SellerAppService.SubmitKYC。
+  // client 引導使用者在 IdentityAppService.SetContactEmail 填一個，再重送。
+  CONTACT_EMAIL_REQUIRED = 15;
   // 2 是刪掉的 PHONE_CODE_EXPIRED（新帳號不驗證手機，ADR 2026-09-27-identity-clerk）。
   reserved 2;
   reserved "PHONE_CODE_EXPIRED";

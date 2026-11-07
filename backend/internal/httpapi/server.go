@@ -30,6 +30,7 @@ import (
 	adminbuyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
 	admincontentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
 	adminidentityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
+	adminpaymentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
 	adminreviewqueueconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/reviewqueue/v1alpha1/reviewqueuev1alpha1connect"
 	adminsellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/agent/v1alpha1/agentv1alpha1connect"
@@ -39,6 +40,7 @@ import (
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	httpidentity "github.com/Will413028/hawkr/backend/internal/httpapi/identity"
+	httppayment "github.com/Will413028/hawkr/backend/internal/httpapi/payment"
 	httpreviewqueue "github.com/Will413028/hawkr/backend/internal/httpapi/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
@@ -49,6 +51,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -74,6 +77,8 @@ type Deps struct {
 	// provider，這兩個方法回 unavailable。
 	AppLogin *httpidentity.AppLogin
 	Seller   *seller.Module
+	// Payment 是收款帳戶（payment 模組）：賣家的收款帳戶 RPC（seller 確認擁有者之後呼叫）、PaymentAdminService 與收款 webhook。
+	Payment *payment.Module
 	// Social 給後台建立內容下架措施前核對內容歸屬（SellerGovernanceAdminService.CreateMeasure）。
 	Social *social.Module
 	// Agent 是 vendor portal 的邀請與 session（VendorPortalPublicService、VendorPortalInviteeService）；Google 的 step-up 經 Identity。
@@ -142,6 +147,9 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	if deps.ReviewQueue == nil {
 		return nil, fmt.Errorf("httpapi：ReviewQueueAdminService 需要 ReviewQueue")
 	}
+	if deps.Payment == nil {
+		return nil, fmt.Errorf("httpapi：PaymentAdminService 與收款 webhook 需要 Payment")
+	}
 	if deps.Social == nil {
 		return nil, fmt.Errorf("httpapi：SellerGovernanceAdminService 需要 Social")
 	}
@@ -201,7 +209,7 @@ func fileRoutes(deps Deps) []fileRoute {
 }
 
 // assemble 把 service 掛上入口的中介層：tracing、CSRF、session、限流的身分，以及 Connect 的限流、快取規則
-// 與 interceptor 之前的錯誤 log。測試以它掛上假的 service，驗證中介層本身的性質（例如串流不被緩衝），不必依賴
+// 與 interceptor 之前的錯誤 log。Stripe webhook（簽章就是驗證）在 CSRF、session 與限流的身分之外，只經 tracing。測試以它掛上假的 service，驗證中介層本身的性質（例如串流不被緩衝），不必依賴
 // 某個正式的 service。
 func assemble(deps Deps, services []service, files ...fileRoute) (http.Handler, error) {
 	if deps.Now == nil {
@@ -253,7 +261,16 @@ func assemble(deps Deps, services []service, files ...fileRoute) (http.Handler, 
 	h = withSession(deps.Identity, deps.Logger, h)
 	h = withCookieCSRF(cookieCSRFOrigins(deps.WebOrigin, deps.Origins), h)
 	h = csrf.Handler(h)
+	h = withPaymentWebhook(deps.Payment, deps.Logger, h)
 	return withTracing(deps.Tracer, h), nil
+}
+
+// withPaymentWebhook 在 next（CSRF、session、限流身分都在裡面）之外掛上 Stripe webhook：簽章就是驗證，沒有 cookie、Origin 與 Bearer。
+func withPaymentWebhook(events httppayment.Events, log *slog.Logger, next http.Handler) http.Handler {
+	root := http.NewServeMux()
+	root.Handle(httppayment.WebhookRoute, httppayment.NewWebhook(events, log))
+	root.Handle("/", next)
+	return root
 }
 
 type service struct {
@@ -310,7 +327,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	if err != nil {
 		return nil, err
 	}
-	sellerApp, err := httpseller.NewApp(deps.Seller, deps.Buyer, deps.Images, dashboard, stats)
+	sellerApp, err := httpseller.NewApp(deps.Seller, deps.Payment, deps.Buyer, deps.Images, dashboard, stats)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +343,8 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(sellerconnect.NewSellerReportAppServiceHandler(reports, opts...))
 	add(sellerconnect.NewSellerReportPublicServiceHandler(reports, opts...))
 	add(adminsellerconnect.NewSellerProspectAdminServiceHandler(httpseller.NewProspects(deps.Seller, deps.Images), opts...))
-	add(adminreviewqueueconnect.NewReviewQueueAdminServiceHandler(httpreviewqueue.NewAdmin(deps.ReviewQueue, deps.Now), opts...))
+	add(adminpaymentconnect.NewPaymentAdminServiceHandler(httppayment.NewAdmin(deps.Payment), opts...))
+	add(adminreviewqueueconnect.NewReviewQueueAdminServiceHandler(httpreviewqueue.NewAdmin(deps.ReviewQueue, sellerStoreNames{deps.Seller}, deps.Now), opts...))
 	// 受邀供應商的 service 以請求的 rfq_recipient_id 選 cookie 並驗證 session，由這支 interceptor 執行；只掛在
 	// VendorPortalInviteeService、在 rpc.NewInterceptor 之內。
 	invitee, err := httpagent.NewInterceptor(deps.Agent)
@@ -418,4 +436,21 @@ func spanName(_ string, r *http.Request) string {
 		return r.URL.Path
 	}
 	return r.Method
+}
+
+// sellerStoreNames 以 seller 的店家卡片實作後台待辦的店名來源（payment 的待辦只有店家 ID）。
+type sellerStoreNames struct{ m *seller.Module }
+
+func (s sellerStoreNames) StoreNames(ctx context.Context, storeIDs []int64) (map[int64]string, error) {
+	cards, err := s.m.StoreCards(ctx, storeIDs)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int64]string, len(cards))
+	for _, c := range cards {
+		if c.Name != nil {
+			out[c.StoreID] = *c.Name
+		}
+	}
+	return out, nil
 }

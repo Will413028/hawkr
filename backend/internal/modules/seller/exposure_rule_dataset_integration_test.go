@@ -13,7 +13,6 @@ import (
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 )
 
@@ -29,8 +28,8 @@ type exposureCase struct {
 // 曝光規則只寫在 seller 的 SQL（seller.pub_exposable_stores(at)，條件在 store_requirement_flags 與 effective_measures）。Go 只把讀出來的
 // 條件對應到 Requirement，「全部條件的 AND」在 Go（needs 表的 CapPublicListing）與 SQL 各寫一次。這個資料集鎖住四條路徑在每家店、
 // 每個評估時刻都相等：SQL 函式直接查、Module.ExposableStores（exposure.Classify 讀同一個函式）、CapabilitiesOf 的 PUBLIC_LISTING（Go 的
-// AND）與人工標註；缺項與人工標註相等（每個條件只缺它自己）；KYC 條件與顯示用的 model.DeriveKYCFlow 的 APPROVED 相等。
-// 資料集含每個生命週期、個資清理、缺 logo 與鄉鎮市區、KYC 申請的每個狀態、沒有申請、沒有 PayUni 註冊、PayUni 的每個綁定狀態與審核結果，
+// AND）與人工標註；缺項與人工標註相等（每個條件只缺它自己）；開通條件等於申請核准且收款帳戶的轉帳能力啟用。
+// 資料集含每個生命週期、個資清理、缺 logo 與鄉鎮市區、KYC 申請的每個狀態、沒有申請、沒有收款帳戶、收款帳戶的每個狀態、PayUni 的綁定失敗與審核被拒絕（不影響閘門），
 // 以及有固定期間的停權（剛好結束、早 1µs）、開放式 RISK、解除的 RISK（結束在下一刻）、警告、預告終止（剛好生效、早 1µs）。
 func TestExposureRuleAgreesBetweenSQLAndGoOnADataset(t *testing.T) {
 	t.Parallel()
@@ -107,34 +106,29 @@ func TestExposureRuleAgreesBetweenSQLAndGoOnADataset(t *testing.T) {
 	} {
 		_, id = exposable()
 		kyc(id, st.set)
-		add(st.name, id, []Requirement{RequirementKYCApproved}, nil)
+		add(st.name, id, []Requirement{RequirementOnboardingComplete}, nil)
 	}
 
 	accountID, s := f.open(t)
 	f.logoed(t, accountID, s)
-	add("沒有 KYC 申請", s.StoreID, []Requirement{RequirementKYCApproved}, nil)
+	add("沒有 KYC 申請", s.StoreID, []Requirement{RequirementOnboardingComplete}, nil)
 
 	_, id = exposable()
-	exec("DELETE FROM seller.payuni_registrations WHERE store_id = $1", id)
-	add("KYC 已核准但沒有 PayUni 註冊", id, []Requirement{RequirementKYCApproved}, nil)
+	exec("DELETE FROM seller.payout_capabilities WHERE store_id = $1", id)
+	add("KYC 已核准但沒有收款帳戶的閘門副本", id, []Requirement{RequirementOnboardingComplete}, nil)
 
 	_, id = exposable()
-	payuni(id, "bind_status = 'PENDING', bound_at = NULL")
-	add("PayUni 綁定中（審核結果仍是核准）", id, []Requirement{RequirementKYCApproved}, nil)
+	exec("UPDATE seller.payout_capabilities SET transfers_active = false WHERE store_id = $1", id)
+	add("收款帳戶的轉帳能力未啟用", id, []Requirement{RequirementOnboardingComplete}, nil)
 
+	// PayUni 不再是開通閘門的輸入：綁定失敗、審核被拒絕的店家，只要收款帳戶啟用就可以曝光。
 	_, id = exposable()
 	payuni(id, "bind_status = 'FAILED', bound_at = NULL, bind_error_code = 'AGENT04017', bind_failed_at = updated_at")
-	add("PayUni 綁定失敗", id, []Requirement{RequirementKYCApproved}, nil)
+	add("PayUni 綁定失敗但收款帳戶已啟用", id, nil, nil)
 
 	_, id = exposable()
-	payuni(id, "outcome = 'NONE', status_observed_at = NULL")
-	add("PayUni 還沒有審核結果", id, []Requirement{RequirementKYCApproved}, nil)
-
-	for _, outcome := range []string{"UNDER_REVIEW", "PENDING_INFO", "REJECTED", "UNRECOGNIZED"} {
-		_, id = exposable()
-		payuni(id, "outcome = $2", outcome)
-		add("PayUni 審核結果 "+outcome, id, []Requirement{RequirementKYCApproved}, nil)
-	}
+	payuni(id, "outcome = 'REJECTED'")
+	add("PayUni 審核被拒絕但收款帳戶已啟用", id, nil, nil)
 
 	// 措施會記下帳號的身分快照，之後同一個身分就不能再通過 KYC：先建好所有要套措施的店，再建立措施。
 	measured := make([]int64, 5)
@@ -208,33 +202,41 @@ func TestExposureRuleAgreesBetweenSQLAndGoOnADataset(t *testing.T) {
 		}
 	}
 
-	// KYC 條件（SQL）與顯示用的流程狀態（Go 的 DeriveKYCFlow）對「已核准」的定義相同。
+	// 開通條件（SQL）等於「目前那一筆申請已核准而且收款帳戶的轉帳能力啟用」：Go 以申請狀態與閘門副本（payout_capabilities）各自重算一次。
 	applications, err := q.CurrentKYCStatuses(ctx, ids)
 	must(t, err)
-	statuses := map[int64]model.KYCStatus{}
+	approvedApplication := map[int64]bool{}
 	for _, a := range applications {
-		statuses[a.StoreID] = model.KYCStatus(a.Status)
+		approvedApplication[a.StoreID] = model.KYCStatus(a.Status) == model.KYCStatusApproved
 	}
-	flows, err := stint.FlowStatusesOf(ctx, q, statuses)
+	transfers := map[int64]bool{}
+	rows, err := f.db.Conn(ctx).Query(ctx, "SELECT store_id, transfers_active FROM seller.payout_capabilities WHERE store_id = ANY($1)", ids)
 	must(t, err)
+	for rows.Next() {
+		var id int64
+		var active bool
+		must(t, rows.Scan(&id, &active))
+		transfers[id] = active
+	}
+	must(t, rows.Err())
+	rows.Close()
 	flags, err := q.StoreRequirementFlags(ctx, ids)
 	must(t, err)
 	if len(flags) != len(ids) {
 		t.Fatalf("條件列 %d 筆，店家 %d 家", len(flags), len(ids))
 	}
-	approved := 0
+	complete := 0
 	for _, fl := range flags {
-		status, ok := flows[fl.StoreID]
-		goApproved := ok && status == model.FlowApproved
-		if fl.KycApproved != goApproved {
-			t.Errorf("店家 %d：kyc_approved=%v，DeriveKYCFlow=%v", fl.StoreID, fl.KycApproved, status)
+		want := approvedApplication[fl.StoreID] && transfers[fl.StoreID]
+		if fl.OnboardingComplete != want {
+			t.Errorf("店家 %d：onboarding_complete=%v，申請核准=%v、轉帳能力=%v", fl.StoreID, fl.OnboardingComplete, approvedApplication[fl.StoreID], transfers[fl.StoreID])
 		}
-		if goApproved {
-			approved++
+		if want {
+			complete++
 		}
 	}
-	if approved == 0 || approved == len(flags) {
-		t.Fatalf("資料集要同時有核准與沒有核准的店家：核准 %d／%d", approved, len(flags))
+	if complete == 0 || complete == len(flags) {
+		t.Fatalf("資料集要同時有完成與沒有完成開通的店家：完成 %d／%d", complete, len(flags))
 	}
 }
 

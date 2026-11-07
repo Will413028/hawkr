@@ -43,6 +43,8 @@ enum ReviewQueueItemKind {
   REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION = 11;
   // 重試用完的 PayUni 綁定失敗，等管理員重新綁定（subject 是 kyc_application）。
   REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY = 12;
+  // 建立重試用完的收款帳戶，等管理員重試建立（subject 是 payment_account）。
+  REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED = 13;
 
   reserved 4, 10;
   reserved "REVIEW_QUEUE_ITEM_KIND_CASE_FDA_REFERRAL", "REVIEW_QUEUE_ITEM_KIND_FOOD_REGISTRATION";
@@ -77,6 +79,7 @@ message ReviewQueueItem {
     MeasureRequestRef measure_request = 7;
     string measure_id = 8;
     KYCApplicationRef kyc_application = 10;
+    PaymentAccountRef payment_account = 11;
   }
 
   reserved 9;
@@ -109,6 +112,11 @@ message AuthorityTargetRef {
 message MeasureRequestRef {
   string measure_id = 1;
   string request_id = 2;
+}
+
+// PaymentAccountRef 指到店家的收款帳戶（一店一個）。
+message PaymentAccountRef {
+  string store_id = 1;
 }
 
 // KYCApplicationRef 指到店家的一筆商家認證申請。

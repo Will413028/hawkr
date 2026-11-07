@@ -1,4 +1,4 @@
-import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -9,7 +9,7 @@ import '../../../shared/widgets/hk_status_badge.dart';
 import '../../product/data/product_repository.dart';
 import '../../settings/data/shipping_settings_remote_service.dart';
 import 'current_store.dart';
-import 'kyc_flow.dart';
+import 'payment_account.dart';
 
 part 'onboarding_tasks.g.dart';
 
@@ -24,7 +24,8 @@ enum OnboardingTaskGroup {
 
 enum OnboardingTaskId {
   profile,
-  cert,
+  platformReview,
+  paymentAccount,
   notSuspended,
   storeActive,
   otherRequirement,
@@ -94,7 +95,7 @@ const _knownRequirements = {
   SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE,
   SellerRequirement.SELLER_REQUIREMENT_NOT_PENDING_DELETION,
   SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED,
-  SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+  SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
   SellerRequirement.SELLER_REQUIREMENT_STORE_NAME,
   SellerRequirement.SELLER_REQUIREMENT_LOGO,
   SellerRequirement.SELLER_REQUIREMENT_TOWN_CODE,
@@ -110,11 +111,17 @@ const _profileRequirements = [
 /// 「公開前必須」只由伺服器的 `PUBLIC_LISTING` 缺的條件（`missing`）推導，client 不自己判斷：伺服器新增條件時，沒有專屬列的
 /// 條件以「其他公開條件」出現。沒有 `PUBLIC_LISTING`（還沒讀到）時每個條件都當成還缺。
 ///
-/// [flowStatus] 是 `GetMyKYC` 的流程狀態；讀不到時是 null。[l] 是 UI 語系（名詞與狀態文字取自共用文案目錄）。
+/// [reviewStatus] 是平台審核的狀態（`GetMyKYC` 的 `KYCApplication.status`），沒有申請時是 null；[reviewReadable] 為 false 表示
+/// `GetMyKYC` 還沒讀到或讀取失敗，此時 null 不是「未送出」，狀態文字是目錄的「未知」。[paymentAccount] 是 `GetMyPaymentAccount`
+/// （平台審核核准之前沒有）；[paymentReadable] 為 false 表示它讀取失敗（平台審核核准之後才有意義），此時 null 不是「準備中」，
+/// 狀態文字是目錄的「未知」。[l] 是 UI 語系（名詞與狀態文字取自共用文案目錄）。
 List<OnboardingTask> buildOnboardingTasks({
   required UiLocale l,
   required MyStore? my,
-  required KYCFlowStatus? flowStatus,
+  required KYCStatus? reviewStatus,
+  required PaymentAccount? paymentAccount,
+  bool reviewReadable = true,
+  bool paymentReadable = true,
   ShippingProgress shipping = const ShippingProgress(),
   int? productCount,
 }) {
@@ -129,17 +136,13 @@ List<OnboardingTask> buildOnboardingTasks({
       if (lacks(requirement)) requirement.uiText(l) ?? commonUnknown(l),
   ];
   final profileDone = missingProfile.isEmpty;
-  final certDone = my?.isCertified ?? false;
-  // 讀不到流程狀態時和「尚未開始」一樣引導開始認證（website `kycFlowActionLabel`）。
-  final action = kycFlowCopy(
-    flowStatus ?? KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
-    l,
-  ).action;
-  final statusLabel =
-      (certDone ? KYCFlowStatus.KYC_FLOW_STATUS_APPROVED : flowStatus)?.uiText(
-        l,
-      ) ??
-      commonUnknown(l);
+  // 平台審核與收款帳戶各自讀自己的來源（`KYCApplication.status`、`GetMyPaymentAccount`），判斷共用 [platformApproved] 與
+  // [effectivePaymentAccount]；收款帳戶啟用算完成。
+  final reviewDone = platformApproved(reviewStatus);
+  final account = effectivePaymentAccount(paymentAccount, approved: reviewDone);
+  final paymentDone = paymentAccountEnabled(account);
+  final paymentUnreadable = reviewDone && !paymentReadable && !paymentDone;
+  final reviewLabel = reviewStatus?.uiText(l);
 
   final tasks = <OnboardingTask>[
     OnboardingTask(
@@ -152,13 +155,35 @@ List<OnboardingTask> buildOnboardingTasks({
       statusLabel: profileDone ? '已完成' : '缺少：${missingProfile.join('、')}',
     ),
     OnboardingTask(
-      id: OnboardingTaskId.cert,
+      id: OnboardingTaskId.platformReview,
       group: OnboardingTaskGroup.beforePublish,
-      title: '商家認證',
-      description: '身分認證與 PayUni 收款審核。',
-      cta: certDone ? null : action,
-      completed: certDone,
-      statusLabel: statusLabel,
+      title: '平台審核',
+      description: '商家資料與統編的平台審核。',
+      // 已通過就沒有要辦的審核了，不再給按鈕。
+      cta: reviewDone ? null : '前往商家認證',
+      completed: reviewDone,
+      statusLabel: reviewStatus == null && reviewReadable
+          ? '未送出'
+          : reviewLabel ?? commonUnknown(l),
+    ),
+    OnboardingTask(
+      id: OnboardingTaskId.paymentAccount,
+      group: OnboardingTaskGroup.beforePublish,
+      title: '收款帳戶',
+      description: '向金流商設定身分與銀行資料。',
+      // 已啟用就沒有要辦的了；平台審核還沒通過時只有灰色的提示；讀不到時去商家認證頁重讀。
+      cta: paymentDone || account == null
+          ? null
+          : paymentUnreadable
+          ? '前往商家認證'
+          : account.status.action(l),
+      completed: paymentDone,
+      locked: account == null,
+      statusLabel: account == null
+          ? paymentAccountNotYetOpenNotice
+          : paymentUnreadable
+          ? commonUnknown(l)
+          : account.status.uiText(l) ?? commonUnknown(l),
     ),
   ];
 

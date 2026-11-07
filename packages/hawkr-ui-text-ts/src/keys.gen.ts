@@ -3,7 +3,7 @@ import { Code } from "@connectrpc/connect";
 import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
-import type { ContentKind, KYCField, KYCFlowStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, PayUniState, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import type { ContentKind, KYCField, KYCFlowStatus, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, PayUniState, PaymentAccountStatus, RequirementCollection, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { UiMessage } from "./message";
 
 export type { DefaultErrorText, UiMessage } from "./message";
@@ -115,6 +115,11 @@ export type UiTextKey =
 	| "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_NOT_STARTED"
 	| "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_REJECTED"
 	| "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_SUBMITTED"
+	| "seller.KYCStatus.KYC_STATUS_APPROVED"
+	| "seller.KYCStatus.KYC_STATUS_CANCELLED"
+	| "seller.KYCStatus.KYC_STATUS_DRAFT"
+	| "seller.KYCStatus.KYC_STATUS_REJECTED"
+	| "seller.KYCStatus.KYC_STATUS_SUBMITTED"
 	| "seller.Measure.appeal_deadline"
 	| "seller.Measure.meta_kind"
 	| "seller.Measure.meta_severity"
@@ -162,6 +167,23 @@ export type UiTextKey =
 	| "seller.PayUniState.PAY_UNI_STATE_RETRY_LATER"
 	| "seller.PayUniState.PAY_UNI_STATE_REVIEWING"
 	| "seller.PayUniState.PAY_UNI_STATE_TERMINATED"
+	| "seller.PaymentAccount.payouts_inactive_note"
+	| "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
+	| "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED"
+	| "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED"
+	| "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED"
+	| "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
+	| "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
+	| "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED"
+	| "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_NOT_CREATED"
+	| "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
+	| "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
+	| "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_DISABLED"
+	| "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED"
+	| "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_NOT_CREATED"
+	| "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
+	| "seller.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM"
+	| "seller.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER"
 	| "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION"
 	| "seller.RevokeReason.REVOKE_REASON_APPEAL_ACCEPTED"
 	| "seller.RevokeReason.REVOKE_REASON_EXTERNAL_DECISION"
@@ -178,10 +200,10 @@ export type UiTextKey =
 	| "seller.RiskGround.RISK_GROUND_TRANSACTION"
 	| "seller.SellerPayUni.fix_fields_heading"
 	| "seller.SellerPayUni.reason_heading"
-	| "seller.SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_LOGO"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_NOT_PENDING_DELETION"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED"
+	| "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_NAME"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_TOWN_CODE"
@@ -458,6 +480,21 @@ export function sellerKYCFlowStatusGateMessage(v: KYCFlowStatus, a: { subject: s
 	return { key, values: { subject: a.subject } };
 }
 
+const SELLER_KYCSTATUS: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.KYCStatus.KYC_STATUS_DRAFT",
+	2: "seller.KYCStatus.KYC_STATUS_SUBMITTED",
+	3: "seller.KYCStatus.KYC_STATUS_APPROVED",
+	4: "seller.KYCStatus.KYC_STATUS_REJECTED",
+	5: "seller.KYCStatus.KYC_STATUS_CANCELLED",
+};
+
+/** seller.KYCStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function sellerKYCStatus(v: KYCStatus): UiMessage | undefined {
+	const key = SELLER_KYCSTATUS[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
 /** seller.Measure.appeal_deadline */
 export function sellerMeasureAppealDeadline(a: { deadline: string }): UiMessage {
 	return { key: "seller.Measure.appeal_deadline", values: { deadline: a.deadline } };
@@ -652,6 +689,67 @@ export function sellerPayUniState(v: PayUniState): UiMessage | undefined {
 	return { key };
 }
 
+/** seller.PaymentAccount.payouts_inactive_note */
+export function sellerPaymentAccountPayoutsInactiveNote(): UiMessage {
+	return { key: "seller.PaymentAccount.payouts_inactive_note" };
+}
+
+const SELLER_PAYMENT_ACCOUNT_STATUS: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED",
+	2: "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW",
+	3: "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED",
+	4: "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED",
+	5: "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED",
+};
+
+/** seller.PaymentAccountStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function sellerPaymentAccountStatus(v: PaymentAccountStatus): UiMessage | undefined {
+	const key = SELLER_PAYMENT_ACCOUNT_STATUS[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SELLER_PAYMENT_ACCOUNT_STATUS_ACTION: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_NOT_CREATED",
+	2: "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW",
+	3: "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED",
+	5: "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED",
+};
+
+/** seller.PaymentAccountStatus.action；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
+export function sellerPaymentAccountStatusAction(v: PaymentAccountStatus): UiMessage | undefined {
+	const key = SELLER_PAYMENT_ACCOUNT_STATUS_ACTION[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SELLER_PAYMENT_ACCOUNT_STATUS_DESCRIPTION: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_NOT_CREATED",
+	2: "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW",
+	3: "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED",
+	4: "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED",
+	5: "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_DISABLED",
+};
+
+/** seller.PaymentAccountStatus.description；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
+export function sellerPaymentAccountStatusDescription(v: PaymentAccountStatus): UiMessage | undefined {
+	const key = SELLER_PAYMENT_ACCOUNT_STATUS_DESCRIPTION[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SELLER_REQUIREMENT_COLLECTION: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER",
+	2: "seller.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM",
+};
+
+/** seller.RequirementCollection 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function sellerRequirementCollection(v: RequirementCollection): UiMessage | undefined {
+	const key = SELLER_REQUIREMENT_COLLECTION[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
 const SELLER_REVOKE_REASON: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "seller.RevokeReason.REVOKE_REASON_APPEAL_ACCEPTED",
 	2: "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION",
@@ -699,7 +797,7 @@ export function sellerSellerPayUniReasonHeading(): UiMessage {
 const SELLER_SELLER_REQUIREMENT: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE",
 	2: "seller.SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED",
-	3: "seller.SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED",
+	3: "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE",
 	4: "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_NAME",
 	5: "seller.SellerRequirement.SELLER_REQUIREMENT_LOGO",
 	6: "seller.SellerRequirement.SELLER_REQUIREMENT_TOWN_CODE",

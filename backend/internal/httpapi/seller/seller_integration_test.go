@@ -34,6 +34,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -127,13 +128,18 @@ func setup(t *testing.T) *fixture {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()}, Now: time.Now, Logger: log})
-	_, sellerToken, err := id.DevNewSession(ctx)
+	sellerAccount, sellerToken, err := id.DevNewSession(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, otherToken, err := id.DevNewSession(ctx)
+	otherAccount, otherToken, err := id.DevNewSession(ctx)
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, account := range []int64{sellerAccount, otherAccount} {
+		if _, err := id.SetSelfEnteredEmail(ctx, account, "seller@example.com"); err != nil {
+			t.Fatal(err)
+		}
 	}
 	adminToken, err := dev.AdminToken("dev_admin_connect")
 	if err != nil {
@@ -153,6 +159,7 @@ func setup(t *testing.T) *fixture {
 	m := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: id, Media: stagedMedia{}, Orders: o, KYCKeys: kycKeys, KYCMAC: kycMAC,
 		ProductStores: noProducts{}, Registry: registry, Now: time.Now, Logger: log,
+		Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log}),
 	})
 	images, err := rpc.NewImages("https://media.example.test")
 	if err != nil {
@@ -161,7 +168,7 @@ func setup(t *testing.T) *fixture {
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
 	h, err := httpapi.NewHandler(httpapi.Deps{Social: &social.Module{},
 		Ready: d.Ping, Identity: id, Seller: m, Buyer: buyers, Images: images, Logger: log,
-		Deletion: &accountdeletion.Module{}, Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}}), Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, DashboardBudget: time.Minute, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{},
+		Deletion: &accountdeletion.Module{}, Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}}), Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, DashboardBudget: time.Minute, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -356,7 +363,7 @@ func TestApplyStoreThenGetMyStoreListsMissingExposure(t *testing.T) {
 	if got.GetStore().GetId() != created.GetId() || got.GetSuspended() {
 		t.Fatalf("got=%v", got)
 	}
-	want := []pb.SellerRequirement{pb.SellerRequirement_SELLER_REQUIREMENT_KYC_APPROVED, pb.SellerRequirement_SELLER_REQUIREMENT_LOGO}
+	want := []pb.SellerRequirement{pb.SellerRequirement_SELLER_REQUIREMENT_ONBOARDING_COMPLETE, pb.SellerRequirement_SELLER_REQUIREMENT_LOGO}
 	if listing := capabilityStatus(t, got, pb.SellerCapability_SELLER_CAPABILITY_PUBLIC_LISTING); listing.GetActive() || !slices.Equal(listing.GetMissing(), want) {
 		t.Fatalf("public listing=%v", listing)
 	}
@@ -576,7 +583,7 @@ func TestLogoAndCoverChangeThroughUpdateMyStoreTokens(t *testing.T) {
 		t.Fatalf("store=%v", cover.Msg.GetStore())
 	}
 	got := f.get(t)
-	if listing := capabilityStatus(t, got, pb.SellerCapability_SELLER_CAPABILITY_PUBLIC_LISTING); !slices.Equal(listing.GetMissing(), []pb.SellerRequirement{pb.SellerRequirement_SELLER_REQUIREMENT_KYC_APPROVED}) {
+	if listing := capabilityStatus(t, got, pb.SellerCapability_SELLER_CAPABILITY_PUBLIC_LISTING); !slices.Equal(listing.GetMissing(), []pb.SellerRequirement{pb.SellerRequirement_SELLER_REQUIREMENT_ONBOARDING_COMPLETE}) {
 		t.Fatalf("missing=%v", listing.GetMissing())
 	}
 	_, err = f.app.UpdateMyStore(ctx, connect.NewRequest(&pb.UpdateMyStoreRequest{

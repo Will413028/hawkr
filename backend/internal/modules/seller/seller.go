@@ -15,6 +15,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/block"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/closing"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/devseed"
@@ -25,6 +26,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/onboarding"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payout"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payuni"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/profile"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/prospect"
@@ -69,6 +71,9 @@ type Deps struct {
 	KYCKeys  *seal.Keyring
 	KYCMAC   *seal.MAC
 	PayUni   PayUniClient
+	// Payment 是收款帳戶的擁有者（payment 模組，Stripe 計畫 D28），必填：核准的 transaction 內請它寫「建立中」的帳戶列並排入建立 job，個資清理時請它
+	// 刪除帳戶列。沒有設定 provider 的 payment 模組讓核准不建立收款帳戶。
+	Payment *payment.Module
 	// Registry 是登記資料來源（公司型申請送件時查詢並存快照；serve 與 worker 都需要，serve 排入、worker 執行），必填。
 	Registry Registry
 	// ProductStores 是商品所屬店家的 port，彙總瀏覽事件的 job 用；必填。
@@ -91,6 +96,7 @@ type Module struct {
 	measure    *measure.Service
 	kyc        *kyc.Service
 	payuni     *payuni.Service
+	payout     *payout.Service
 	purge      *purge.Service
 	prospect   *prospect.Service
 	views      *views.Service
@@ -100,7 +106,7 @@ type Module struct {
 
 // New 建立模組。
 func New(d Deps) *Module {
-	if d.DB == nil || d.Events == nil || d.Jobs == nil || d.Identity == nil || d.Media == nil || d.Orders == nil || d.KYCKeys == nil || d.KYCMAC == nil || d.ProductStores == nil || d.Registry == nil {
+	if d.DB == nil || d.Events == nil || d.Jobs == nil || d.Identity == nil || d.Media == nil || d.Orders == nil || d.KYCKeys == nil || d.KYCMAC == nil || d.ProductStores == nil || d.Registry == nil || d.Payment == nil {
 		panic("seller: missing dependency")
 	}
 	if d.Now == nil {
@@ -118,7 +124,7 @@ func New(d Deps) *Module {
 		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Identity: d.Identity, Orders: d.Orders, Exposure: exposures, Now: d.Now,
 	})
 	kycService := kyc.New(kyc.Deps{
-		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Exposure: exposures, Keys: d.KYCKeys, MAC: d.KYCMAC, Registry: d.Registry, Now: d.Now, Logger: d.Logger,
+		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Exposure: exposures, Payment: d.Payment, Identity: d.Identity, Keys: d.KYCKeys, MAC: d.KYCMAC, Registry: d.Registry, Now: d.Now, Logger: d.Logger,
 	})
 	return &Module{
 		onboarding: onboarding.New(onboarding.Deps{
@@ -142,7 +148,8 @@ func New(d Deps) *Module {
 			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Client: d.PayUni, KYC: kycService, Exposure: exposures,
 			StorefrontBaseURL: d.StorefrontBaseURL, Now: d.Now, Logger: d.Logger,
 		}),
-		purge: purge.New(purge.Deps{DB: d.DB, Events: d.Events, Jobs: d.Jobs, Now: d.Now}),
+		payout: payout.New(payout.Deps{DB: d.DB, Jobs: d.Jobs, Exposure: exposures, Identities: kyc.NewFingerprints(d.KYCMAC)}),
+		purge:  purge.New(purge.Deps{DB: d.DB, Events: d.Events, Jobs: d.Jobs, Payment: d.Payment, Now: d.Now}),
 		prospect: prospect.New(prospect.Deps{
 			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Now: d.Now,
 		}),
@@ -229,8 +236,8 @@ const (
 	RequirementActive = model.RequirementActive
 	// RequirementNotSuspended 帳號沒有生效中的停權。
 	RequirementNotSuspended = model.RequirementNotSuspended
-	// RequirementKYCApproved KYC 流程已核准（含 PayUni 核准）。
-	RequirementKYCApproved = model.RequirementKYCApproved
+	// RequirementOnboardingComplete 平台審核已核准，而且收款帳戶的轉帳能力已啟用。
+	RequirementOnboardingComplete = model.RequirementOnboardingComplete
 	// RequirementStoreName 有店名。
 	RequirementStoreName = model.RequirementStoreName
 	// RequirementLogo 有 logo。
@@ -282,7 +289,7 @@ func CurrentAgreement(k AgreementKind) (Agreement, bool) {
 func AgreementKinds() []AgreementKind { return model.AgreementKinds() }
 
 // CurrentApplyAcceptances 是 Apply 要求的同意（SELLER_TERMS 的現行版本），CurrentKYCAcceptances 是 SubmitKYC 要求的同意
-// （KYC_PRIVACY_NOTICE 與 PAYUNI_TERMS 的現行版本）：給測試組出合法的輸入，不是 client 版本的來源（client 讀 GetSellerAgreements）。
+// （KYC_PRIVACY_NOTICE 的現行版本）：給測試組出合法的輸入，不是 client 版本的來源（client 讀 GetSellerAgreements）。
 func CurrentApplyAcceptances() []AgreementAcceptance {
 	return currentAcceptances(model.ApplyAgreements)
 }

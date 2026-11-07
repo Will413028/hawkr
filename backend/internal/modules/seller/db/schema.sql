@@ -915,7 +915,7 @@ CREATE INDEX measure_identities_hash ON seller.measure_identities (hash);
 -- 個資：id_card_no、rep_id_card_no（企業負責人）與 bank_account 是 AES-256-GCM 的密文（platform/seal，AAD 是申請 ID
 -- 加欄位名），real_name 與 birth_date 明文（後台以姓名模糊搜尋，ADR 2026-07-20）。每個識別欄位另有一個 blind index
 -- （HMAC，輸入帶欄位標籤；*_hash_key 是算出它的金鑰 ID），給處分的身分快照用。送給 PayUni 的聯絡資料（聯絡人、聯絡手機、
--- 客服信箱）是店家的欄位（stores），不在申請上。公司地址以內政部的鄉鎮市區代碼表示（同 stores）。
+-- 客服信箱）是店家的欄位（stores），不在申請上。收款聯絡信箱不在申請上：它是帳號的聯絡信箱（identity，D23 2026-11-03 修訂），送出時要求帳號有，核准時傳給 payment 模組快照到收款帳戶列（payment.accounts.contact_email）。公司地址以內政部的鄉鎮市區代碼表示（同 stores）。
 -- version 是樂觀鎖（etag 的來源）：所有寫入者必帶讀到的版本。
 -- 個資清理：店家關閉滿保留期後 purge 套件清掉全部個人欄位（密文、blind index、姓名、生日、證件資訊、聯絡方式、公司與
 -- 地址），記下 pii_purged_at；審核的事實（狀態、時間、審核紀錄）與不具名的欄位（seller_type、product_type）保留。kyc_applications_purged_check 列出被清掉的欄位：清理過的列這些一定是 NULL。處分的身分快照不在這裡
@@ -1007,10 +1007,8 @@ CREATE TABLE seller.kyc_applications (
     CONSTRAINT kyc_applications_complete_check CHECK (
         status NOT IN ('SUBMITTED', 'APPROVED', 'REJECTED') OR (
             submitted_at IS NOT NULL AND (pii_purged_at IS NOT NULL OR (
-                real_name IS NOT NULL AND english_name IS NOT NULL AND bank_name IS NOT NULL AND
-                bank_code IS NOT NULL AND bank_account_enc IS NOT NULL AND
-                ((seller_type = 'INDIVIDUAL' AND id_card_no_enc IS NOT NULL) OR
-                 (seller_type = 'COMPANY' AND company_name IS NOT NULL AND tax_id IS NOT NULL AND rep_id_card_no_enc IS NOT NULL))
+                (seller_type = 'INDIVIDUAL' OR
+                 (seller_type = 'COMPANY' AND company_name IS NOT NULL AND tax_id IS NOT NULL))
             ))
         )
     ),
@@ -1054,11 +1052,13 @@ CREATE TABLE seller.kyc_identity_hashes (
 CREATE INDEX kyc_identity_hashes_hash ON seller.kyc_identity_hashes (hash, key_id);
 
 -- 防詐用的身分比對索引（ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-30 修訂，Stripe 計畫 D3）：與 KYC 個資分開保存，只有 blind index、沒有明文。
--- 寫入時機與 kyc_identity_hashes 相同（同一個 transaction、同一支 writeHashes；欄位被改掉時同步修剪），但不隨 184 天的個資清理刪除：
+-- 來源有兩種：申請的識別欄位（與 kyc_identity_hashes 同一個 transaction、同一支 writeHashes 寫入；欄位被改掉時同步修剪），以及 provider 回報的外部銀行帳號
+-- fingerprint（BANK_FINGERPRINT，收款帳戶同步在寫快取的同一個 transaction 寫入，kyc.Fingerprints；不是草稿的值，不修剪，只由過期刪除）。兩種都不隨 184 天的個資清理刪除：
 -- 停權措施建立時 SnapshotMeasureIdentities 從這裡取，所以舊 stint 的 KYC 清掉之後，之後才建立的處分仍取得到它的身分。
--- 一列是（來源 stint，種類，金鑰，hash）：field 與 kyc_identity_hashes.field 同一組值（本人與負責人的身分證號分開，進措施快照時才合成 ID_CARD）；
+-- 一列是（來源 stint，種類，金鑰，hash）：field 是 kyc_identity_hashes.field 的值加上 BANK_FINGERPRINT（本人與負責人的身分證號分開，進措施快照時才合成 ID_CARD；
+-- BANK_FINGERPRINT 進快照時是 BANK_ACCOUNT，但 hash 輸入的標籤不同，不會等於申請的銀行帳號 hash）；
 -- source_store_id 是 stint（stores 一列一個 stint）；account_id 是該 stint 所屬的帳號（stores.account_id 不會變，這裡複製是為了快照不必 join）。
--- 刪除只有兩條路：欄位被改掉的修剪（只刪已沒有任何申請持有的值），以及來源 stint 的目前這次關店滿 model.IdentityHashRetention（5 年）後由 seller 的清理 job 刪
+-- 刪除只有兩條路：欄位被改掉的修剪（只刪已沒有任何申請持有的值；不處理 BANK_FINGERPRINT），以及來源 stint 的目前這次關店滿 model.IdentityHashRetention（5 年）後由 seller 的清理 job 刪
 -- （被調取資料的保存擋下的不刪；stint 恢復營業就不算關閉）。金鑰環的舊金鑰要留到這些列被刪，CheckKYCKeys 涵蓋這張表。
 CREATE TABLE seller.account_identity_hashes (
     source_store_id BIGINT NOT NULL REFERENCES seller.stores (store_id),
@@ -1068,11 +1068,12 @@ CREATE TABLE seller.account_identity_hashes (
     account_id      BIGINT NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (source_store_id, field, key_id, hash),
-    CONSTRAINT account_identity_hashes_field_check CHECK (field IN ('ID_CARD_NO', 'REP_ID_CARD_NO', 'TAX_ID', 'BANK_ACCOUNT')),
+    CONSTRAINT account_identity_hashes_field_check CHECK (field IN ('ID_CARD_NO', 'REP_ID_CARD_NO', 'TAX_ID', 'BANK_ACCOUNT', 'BANK_FINGERPRINT')),
     CONSTRAINT account_identity_hashes_key_check CHECK (key_id <> ''),
     CONSTRAINT account_identity_hashes_hash_check CHECK (octet_length(hash) = 32)
 );
 CREATE INDEX account_identity_hashes_account ON seller.account_identity_hashes (account_id);
+CREATE INDEX account_identity_hashes_hash ON seller.account_identity_hashes (hash, key_id);
 
 -- 證件與文件圖片：身分證正反面、存摺封面各一張（position 0），公司文件最多 10 張。media 的引用以
 -- ref_id = application_id 登記（CERTIFICATION），存 asset ID 是同步 job 登記引用時業務列目前指著的資產。
@@ -1622,3 +1623,14 @@ CREATE TABLE seller.store_blocks (
     CONSTRAINT store_blocks_buyer_id_check CHECK (buyer_id > 0)
 );
 CREATE INDEX store_blocks_buyer ON seller.store_blocks (buyer_id, store_id);
+
+-- 收款帳戶的開通閘門副本（Stripe 計畫 D28）：收款帳戶由 payment 模組擁有，同步 job 在寫快取的 transaction 內發 PayoutAccountChanged，
+-- seller 以同 transaction 的訂閱者把轉帳能力是否啟用複製到這裡（開通閘門 store_requirement_flags.onboarding_complete 只讀這一欄，不讀 payment）。
+-- 沒有列等於轉帳能力未啟用。provider 是發布事件的 provider 代碼。列隨店家保留（不含個資）。
+CREATE TABLE seller.payout_capabilities (
+    store_id         BIGINT      PRIMARY KEY REFERENCES seller.stores (store_id),
+    provider         TEXT        NOT NULL,
+    transfers_active BOOLEAN     NOT NULL,
+    updated_at       TIMESTAMPTZ NOT NULL,
+    CONSTRAINT payout_capabilities_provider_check CHECK (provider ~ '^[a-z][a-z0-9_]{0,39}$')
+);

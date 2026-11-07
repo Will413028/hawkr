@@ -25,7 +25,7 @@ class WalletAccountSection extends HookWidget {
         _AccountRow(
           key: const ValueKey('wallet-cert-row'),
           title: '商家認證',
-          subtitle: '身分、銀行帳戶、PayUni 資料',
+          subtitle: '平台審核與收款帳戶',
           trailing: const HkStatusBadge(
             label: '已通過',
             tone: HkStatusTone.success,
@@ -41,9 +41,7 @@ class WalletAccountSection extends HookWidget {
               children: [
                 Text('商家認證已通過', style: AppTypography.bodyBold),
                 const SizedBox(height: HkSpace.xs),
-                const Text(
-                  '身分、銀行帳戶與 PayUni 收款皆已完成驗證，可正常收款與出貨。撥款週期為訂單完成 + 7 天。',
-                ),
+                const Text('平台審核與收款帳戶皆已完成，可正常收款與出貨。撥款週期為訂單完成 + 7 天。'),
               ],
             ),
           ),

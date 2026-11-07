@@ -45,19 +45,8 @@ final class MyKyc {
   /// 伺服器回的整份申請（etag、欄位、缺項、退回、證件）；沒有申請時是 null。
   final KYCApplication? application;
 
-  /// 賣家看到的 PayUni 狀態（`flow.payuni`）；申請不在 PayUni 階段時是 null。
-  SellerPayUni? get payuni =>
-      application != null &&
-          application!.hasFlow() &&
-          application!.flow.hasPayuni()
-      ? application!.flow.payuni
-      : null;
-
-  /// 賣家能不能自己修正後重新送出（`flow.can_resubmit`）；沒有申請時是 false。
-  bool get canResubmit =>
-      application != null &&
-      application!.hasFlow() &&
-      application!.flow.canResubmit;
+  /// 平台審核的狀態（`KYCApplication.status`）；沒有申請是 null。
+  KYCStatus? get reviewStatus => application?.status;
 
   @override
   bool operator ==(Object other) =>

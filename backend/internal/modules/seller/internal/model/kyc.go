@@ -2,7 +2,6 @@ package model
 
 import (
 	"errors"
-	"net/mail"
 	"regexp"
 	"strings"
 	"time"
@@ -613,6 +612,12 @@ func IdentityInput(kind SanctionIdentityKind, value string) []byte {
 	panic("seller: unknown identity kind " + string(kind))
 }
 
+// BankFingerprintInput 是 provider 回報的外部銀行帳號 fingerprint 的 blind index 輸入：標籤與 IdentityInput 的任何一種都不同（兩者是不同的 hash 空間，
+// 不會互相命中），值帶 provider 代碼，不同 provider 的 fingerprint 不會撞。
+func BankFingerprintInput(provider, fingerprint string) []byte {
+	return []byte("provider:bankfp:v1|" + provider + ":" + fingerprint)
+}
+
 // BankIdentityValue 是銀行帳號 blind index 的值：銀行代碼加正規化後的帳號。
 func BankIdentityValue(bankCode, account string) string { return bankCode + "|" + account }
 
@@ -653,18 +658,6 @@ func FormatDate(d time.Time) string { return d.Format(time.DateOnly) }
 func NormalizeMobile(raw string) (string, bool) {
 	p := phone.NormalizeToLocal(raw)
 	return p, mobileRe.MatchString(p)
-}
-
-// NormalizeEmail 去掉前後空白、轉小寫，要求有網域且網域有點（user@localhost 不算）。
-func NormalizeEmail(raw string) (string, bool) {
-	addr, err := mail.ParseAddress(strings.TrimSpace(raw))
-	if err != nil || addr.Name != "" {
-		return "", false
-	}
-	email := strings.ToLower(addr.Address)
-	at := strings.LastIndex(email, "@")
-	ok := at > 0 && strings.Contains(email[at+1:], ".") && len(email) <= 254 && !strings.ContainsAny(email, " \t")
-	return email, ok
 }
 
 // ValidEnglishName 檢查 PayUni 商店英文名稱的字元集與長度（至多 50 字）。

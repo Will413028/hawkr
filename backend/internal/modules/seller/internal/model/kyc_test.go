@@ -70,15 +70,7 @@ func TestParseDate(t *testing.T) {
 	}
 }
 
-func TestNormalizeEmailAndMobile(t *testing.T) {
-	if got, ok := NormalizeEmail(" Owner@Example.COM "); !ok || got != "owner@example.com" {
-		t.Errorf("email = %q, %v", got, ok)
-	}
-	for _, raw := range []string{"", "user@localhost", "no-at.example.com", "Name <a@b.co>"} {
-		if _, ok := NormalizeEmail(raw); ok {
-			t.Errorf("NormalizeEmail(%q) 應該被拒絕", raw)
-		}
-	}
+func TestNormalizeMobile(t *testing.T) {
 	if got, ok := NormalizeMobile("+886 912-345-678"); !ok || got != "0912345678" {
 		t.Errorf("mobile = %q, %v", got, ok)
 	}

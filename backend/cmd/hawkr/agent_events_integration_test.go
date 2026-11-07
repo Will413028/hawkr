@@ -13,6 +13,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/agent"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
@@ -42,6 +43,7 @@ func TestProspectArchiveAndMergeRevokeVendorPortalAccess(t *testing.T) {
 	sellers := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: accounts, Media: noMedia{}, Orders: noOrders{}, ProductStores: &productStoresStub{}, Registry: noRegistry{},
 		KYCKeys: kycKeys, KYCMAC: kycMAC, Now: clock, Logger: logger,
+		Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger}),
 	})
 	agents := agent.New(agent.Deps{DB: d, Prospects: sellers, Now: clock})
 	subscribeAgent(bus, agents)

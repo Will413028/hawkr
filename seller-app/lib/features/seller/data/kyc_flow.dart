@@ -51,9 +51,6 @@ const _kycFlowTone = <KYCFlowStatus, HkStatusTone>{
   KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED: HkStatusTone.danger,
 };
 
-/// 所有有效的流程狀態（不含 `KYC_FLOW_STATUS_UNSPECIFIED`）。
-Iterable<KYCFlowStatus> get validKycFlowStatuses => _kycFlowTone.keys;
-
 /// [status] 是不是一個有效的流程狀態：`UNSPECIFIED` 與不認得的值都不是。
 bool isValidKycFlowStatus(KYCFlowStatus status) =>
     _kycFlowTone.containsKey(status);

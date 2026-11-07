@@ -1,0 +1,4 @@
+transfers only create 200 caps: {'payouts': 'restricted', 'stripe_transfers': 'restricted'}
+transfers only link 400 Some fields in the request were invalid: 'account: Cannot create a v2 account link for acct_1UXO7eEWUjtC6eQa with recipient config capabilities other than stripe_balance.stripe_transfers requested in testmode. Please switch to an account created in a sandbox to test.'
+delete 200
+payouts false create 400 {'code': 'invalid_fields', 'message': "Some fields in the request were invalid: 'configuration.recipient.capabilities.stripe_balance.payouts: Unknown field.'", 'request_log_url': 'https://dashboard.stripe.com/logs/req_<MASKED:c192>', 'invalid_fields': [{'field': 'configuration.recipient.capabilities.stripe_balance.payouts', 'message': 'Unknown field.'}]}

@@ -10,10 +10,14 @@ import {
 } from "@hawkr/api/connect/errors";
 import { ErrorReason } from "@hawkr/api/gen/hawkr/common/v1alpha1/error_reason_pb";
 import {
+	ContactEmailSource,
+	GetContactEmailResponseSchema,
+} from "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb";
+import {
 	AppealUnavailableReason,
 	GetMyKYCResponseSchema,
 	GetMyStoreResponseSchema,
-	KYCFlowStatus,
+	KYCStatus,
 	MeasureBasis,
 	MeasureKind,
 	MeasureRequestCloseCause,
@@ -57,7 +61,7 @@ test("myStoreJson parses as a GetMyStoreResponse with every field mapped", () =>
 			address: { townCode: "66000290", addressDetail: "東關路一段 100 號" },
 			logoUriTemplate: "https://img.test/{preset}/logo.png",
 			etag: "e7",
-			missingRequirements: ["KYC_APPROVED", "LOGO"],
+			missingRequirements: ["ONBOARDING_COMPLETE", "LOGO"],
 		}),
 	);
 
@@ -75,7 +79,7 @@ test("myStoreJson parses as a GetMyStoreResponse with every field mapped", () =>
 		(status) => status.capability === SellerCapability.PUBLIC_LISTING,
 	);
 	assert.deepEqual(listing?.missing, [
-		SellerRequirement.KYC_APPROVED,
+		SellerRequirement.ONBOARDING_COMPLETE,
 		SellerRequirement.LOGO,
 	]);
 	assert.equal(listing?.active, false);
@@ -83,7 +87,7 @@ test("myStoreJson parses as a GetMyStoreResponse with every field mapped", () =>
 		(status) => status.capability === SellerCapability.SHIPPING_SETUP,
 	);
 	assert.equal(shipping?.active, false);
-	assert.deepEqual(shipping?.missing, [SellerRequirement.KYC_APPROVED]);
+	assert.deepEqual(shipping?.missing, [SellerRequirement.ONBOARDING_COMPLETE]);
 	assert.equal(message.suspended, false);
 });
 
@@ -135,18 +139,30 @@ test("every capability the fixture names exists in the contract", () => {
 	);
 });
 
-test("the KYC flow fixture shape parses as a GetMyKYCResponse", () => {
+test("the KYC fixture shape parses as a GetMyKYCResponse", () => {
 	const message = fromJson(GetMyKYCResponseSchema, {
 		application: {
 			id: "1",
-			flow: { status: "KYC_FLOW_STATUS_APPROVED", identityLocked: true },
+			status: "KYC_STATUS_APPROVED",
+			flow: { identityLocked: true },
 		},
 	});
-	assert.equal(
-		message.application?.flow?.status,
-		KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
-	);
+	assert.equal(message.application?.status, KYCStatus.KYC_STATUS_APPROVED);
 	assert.equal(message.application?.flow?.identityLocked, true);
+});
+
+test("the contact email fixture shape parses as a GetContactEmailResponse", () => {
+	const verified = fromJson(GetContactEmailResponseSchema, {
+		contactEmail: {
+			email: "seller@example.com",
+			source: "CONTACT_EMAIL_SOURCE_VERIFIED",
+		},
+	});
+	assert.equal(verified.contactEmail?.source, ContactEmailSource.VERIFIED);
+	assert.equal(
+		fromJson(GetContactEmailResponseSchema, {}).contactEmail,
+		undefined,
+	);
 });
 
 test("the version-conflict error fixture is classified as VERSION_CONFLICT", () => {

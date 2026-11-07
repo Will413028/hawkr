@@ -21,8 +21,7 @@ func TestCheckAgreementsAcceptsExactlyTheRequiredKindsAtTheCurrentVersion(t *tes
 	if err := CheckAgreements(ApplyAgreements, acceptances(AgreementSellerTerms)); err != nil {
 		t.Fatal(err)
 	}
-	// 順序不拘。
-	if err := CheckAgreements(SubmitKYCAgreements, acceptances(AgreementPayUniTerms, AgreementKYCPrivacyNotice)); err != nil {
+	if err := CheckAgreements(SubmitKYCAgreements, acceptances(AgreementKYCPrivacyNotice)); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -33,14 +32,15 @@ func TestCheckAgreementsRejectsWrongKindsAsInvalidInputOnTheAgreementsField(t *t
 		required []AgreementKind
 		got      []AgreementAcceptance
 	}{
-		"沒有任何同意":           {ApplyAgreements, nil},
-		"缺一種":              {SubmitKYCAgreements, acceptances(AgreementKYCPrivacyNotice)},
-		"多出不屬於操作的種類":       {ApplyAgreements, acceptances(AgreementSellerTerms, AgreementPayUniTerms)},
-		"整組是別的操作的種類":       {ApplyAgreements, acceptances(AgreementKYCPrivacyNotice, AgreementPayUniTerms)},
-		"同一種兩次":            {SubmitKYCAgreements, []AgreementAcceptance{cur(AgreementKYCPrivacyNotice), cur(AgreementKYCPrivacyNotice), cur(AgreementPayUniTerms)}},
-		"UNSPECIFIED（空字串）": {ApplyAgreements, []AgreementAcceptance{cur(AgreementSellerTerms), {Kind: "", Version: "2026-10-07"}}},
-		"不認得的種類":           {ApplyAgreements, []AgreementAcceptance{{Kind: "99", Version: "2026-10-07"}}},
-		"空的種類取代必要的種類":      {ApplyAgreements, []AgreementAcceptance{{Kind: "", Version: CurrentAgreements[AgreementSellerTerms].Version}}},
+		"沒有任何同意":                 {ApplyAgreements, nil},
+		"缺一種":                    {SubmitKYCAgreements, nil},
+		"送出 KYC 多出 PAYUNI_TERMS": {SubmitKYCAgreements, acceptances(AgreementKYCPrivacyNotice, AgreementPayUniTerms)},
+		"多出不屬於操作的種類":             {ApplyAgreements, acceptances(AgreementSellerTerms, AgreementPayUniTerms)},
+		"整組是別的操作的種類":             {ApplyAgreements, acceptances(AgreementKYCPrivacyNotice, AgreementPayUniTerms)},
+		"同一種兩次":                  {SubmitKYCAgreements, []AgreementAcceptance{cur(AgreementKYCPrivacyNotice), cur(AgreementKYCPrivacyNotice)}},
+		"UNSPECIFIED（空字串）":       {ApplyAgreements, []AgreementAcceptance{cur(AgreementSellerTerms), {Kind: "", Version: "2026-10-07"}}},
+		"不認得的種類":                 {ApplyAgreements, []AgreementAcceptance{{Kind: "99", Version: "2026-10-07"}}},
+		"空的種類取代必要的種類":            {ApplyAgreements, []AgreementAcceptance{{Kind: "", Version: CurrentAgreements[AgreementSellerTerms].Version}}},
 	} {
 		err := CheckAgreements(c.required, c.got)
 		var ae *apperr.Error

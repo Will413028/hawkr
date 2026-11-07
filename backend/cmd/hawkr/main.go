@@ -157,6 +157,7 @@ func runServe(ctx context.Context) error {
 	idc := readIdentityConfig(verifierCtx, e)
 	kyc := readKYCKeys(e)
 	pay := readPayUni(e, log)
+	paymentProvider := readPayment(e, log)
 	registry := readGCIS(e)
 	if err := e.Err(); err != nil {
 		return err
@@ -221,7 +222,11 @@ func runServe(ctx context.Context) error {
 		Media: med, Now: time.Now, Logger: log,
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
-	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kyc, pay, registry, log)
+	box := newInbox(d, jc, log)
+	payments, owners := newPayment(d, bus, jc, box, paymentProvider, log)
+	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kyc, pay, payments, registry, log)
+	owners.bind(sellerModule)
+	subscribeSellerPayout(bus, sellerModule)
 	// 資料庫參照的金鑰（KYC 的密文、blind index、處分的身分快照）都要在設定的金鑰環裡，缺了就不啟動。
 	if err := sellerModule.CheckKYCKeys(ctx); err != nil {
 		return err
@@ -272,6 +277,7 @@ func runServe(ctx context.Context) error {
 		AppLogin:        appLogin,
 		Buyer:           buyerModule,
 		Seller:          sellerModule,
+		Payment:         payments,
 		Agent:           agentModule,
 		Discovery:       discoveryModule,
 		ReviewQueue:     reviewqueue.New(reviewqueue.Deps{DB: d}),
@@ -333,6 +339,7 @@ func runWorker(ctx context.Context) error {
 	idc := readIdentityConfig(verifierCtx, e)
 	kyc := readKYCKeys(e)
 	pay := readPayUni(e, log)
+	paymentProvider := readPayment(e, log)
 	registry := readGCIS(e)
 	if err := e.Err(); err != nil {
 		return err
@@ -380,7 +387,11 @@ func runWorker(ctx context.Context) error {
 		Media: med, Now: time.Now, Logger: log,
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
-	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kyc, pay, registry, log)
+	box := newInbox(d, jc, log)
+	payments, owners := newPayment(d, bus, jc, box, paymentProvider, log)
+	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kyc, pay, payments, registry, log)
+	owners.bind(sellerModule)
+	subscribeSellerPayout(bus, sellerModule)
 	// 資料庫參照的金鑰（KYC 的密文、blind index、處分的身分快照）都要在設定的金鑰環裡，缺了就不啟動。
 	if err := sellerModule.CheckKYCKeys(ctx); err != nil {
 		return err
@@ -416,6 +427,8 @@ func runWorker(ctx context.Context) error {
 	contentModule.AddWorkers(workers)
 	buyerModule.AddWorkers(workers)
 	sellerModule.AddWorkers(workers)
+	payments.AddWorkers(workers)
+	box.AddWorkers(workers)
 	socialModule.AddWorkers(workers)
 	discoveryModule.AddWorkers(workers)
 	agentModule.AddWorkers(workers)
@@ -427,6 +440,8 @@ func runWorker(ctx context.Context) error {
 	periodic := append(id.PeriodicJobs(), buyerModule.PeriodicJobs()...)
 	periodic = append(periodic, deletion.PeriodicJobs()...)
 	periodic = append(periodic, sellerModule.PeriodicJobs()...)
+	periodic = append(periodic, payments.PeriodicJobs()...)
+	periodic = append(periodic, box.PeriodicJobs()...)
 	periodic = append(periodic, socialModule.PeriodicJobs()...)
 	periodic = append(periodic, discoveryModule.PeriodicJobs()...)
 	periodic = append(periodic, agentModule.PeriodicJobs()...)
@@ -474,7 +489,7 @@ func runMigrate(ctx context.Context) error {
 	if err := jobs.Migrate(ctx, d); err != nil {
 		return err
 	}
-	return migrate.Apply(ctx, d, modules())
+	return migrate.Apply(ctx, d, migrations())
 }
 
 // serve 在 ctx 結束前持續服務；ctx 結束後停止接新連線，並等進行中的請求收尾。

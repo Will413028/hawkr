@@ -48,6 +48,7 @@ type Followers interface {
 // App 是 SellerAppService 的 handler。
 type App struct {
 	m         Module
+	payments  Payments
 	followers Followers
 	images    rpc.Images
 	dash      Dashboard
@@ -56,13 +57,20 @@ type App struct {
 
 var _ sellerv1alpha1connect.SellerAppServiceHandler = (*App)(nil)
 
+// ErrPaymentsRequired 是 NewApp 沒有收款帳戶來源時的錯誤。
+var ErrPaymentsRequired = errors.New("httpapi/seller：需要收款帳戶的來源（payment 模組）")
+
 // NewApp 建立賣家 handler。dash 是儀表板的來源與時鐘，GetMyDashboard 用，三個來源由組裝點提供。stats 是 GetMyStore 的統計來源（粉絲與評價），
 // 與前台店面頁（NewPublic）是同一份 *StatsSource（NewStatsSource 建立，nil 回錯誤）。統編的登記資料經模組（Module.LookupBusinessRegistration）。
-func NewApp(m Module, followers Followers, images rpc.Images, dash Dashboard, stats *StatsSource) (*App, error) {
+// payments 是收款帳戶的來源（payment 模組），nil 回錯誤。
+func NewApp(m Module, payments Payments, followers Followers, images rpc.Images, dash Dashboard, stats *StatsSource) (*App, error) {
 	if stats == nil {
 		return nil, ErrStatsSourceRequired
 	}
-	return &App{m: m, followers: followers, images: images, dash: dash, stats: stats}, nil
+	if payments == nil {
+		return nil, ErrPaymentsRequired
+	}
+	return &App{m: m, payments: payments, followers: followers, images: images, dash: dash, stats: stats}, nil
 }
 
 // deref 是可選文字的值：沒有值是空字串（契約以空字串表示沒有填）。

@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, sellerContentKind, sellerKYCField, sellerKYCFlowStatus, sellerKYCFlowStatusAction, sellerKYCFlowStatusBannerDescription, sellerKYCFlowStatusBannerTitle, sellerKYCFlowStatusGateHeading, sellerKYCFlowStatusGateMessage, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerPayUniState, sellerRevokeReason, sellerRiskGround, sellerSellerPayUniFixFieldsHeading, sellerSellerPayUniReasonHeading, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
+import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, sellerContentKind, sellerKYCField, sellerKYCFlowStatus, sellerKYCFlowStatusAction, sellerKYCFlowStatusBannerDescription, sellerKYCFlowStatusBannerTitle, sellerKYCFlowStatusGateHeading, sellerKYCFlowStatusGateMessage, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerPayUniState, sellerPaymentAccountPayoutsInactiveNote, sellerPaymentAccountStatus, sellerPaymentAccountStatusAction, sellerPaymentAccountStatusDescription, sellerRequirementCollection, sellerRevokeReason, sellerRiskGround, sellerSellerPayUniFixFieldsHeading, sellerSellerPayUniReasonHeading, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -58,6 +58,12 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"KYC_FLOW_STATUS_SUBMITTED": 3,
 	"KYC_FLOW_STATUS_UNDER_REVIEW": 8,
 	"KYC_FLOW_STATUS_UNSPECIFIED": 0,
+	"KYC_STATUS_APPROVED": 3,
+	"KYC_STATUS_CANCELLED": 5,
+	"KYC_STATUS_DRAFT": 1,
+	"KYC_STATUS_REJECTED": 4,
+	"KYC_STATUS_SUBMITTED": 2,
+	"KYC_STATUS_UNSPECIFIED": 0,
 	"MEASURE_BASIS_CONTRACT": 3,
 	"MEASURE_BASIS_RISK": 2,
 	"MEASURE_BASIS_UNSPECIFIED": 0,
@@ -81,6 +87,12 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"MEASURE_STATE_REVOKED": 4,
 	"MEASURE_STATE_SCHEDULED": 5,
 	"MEASURE_STATE_UNSPECIFIED": 0,
+	"PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": 3,
+	"PAYMENT_ACCOUNT_STATUS_DISABLED": 5,
+	"PAYMENT_ACCOUNT_STATUS_ENABLED": 4,
+	"PAYMENT_ACCOUNT_STATUS_NOT_CREATED": 1,
+	"PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": 2,
+	"PAYMENT_ACCOUNT_STATUS_UNSPECIFIED": 0,
 	"PAY_UNI_STATE_APPROVED": 8,
 	"PAY_UNI_STATE_CONTACT_SUPPORT": 5,
 	"PAY_UNI_STATE_FIXABLE": 3,
@@ -107,6 +119,9 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"POLICY_CATEGORY_SPAM": 14,
 	"POLICY_CATEGORY_UNLICENSED_SALE": 3,
 	"POLICY_CATEGORY_UNSPECIFIED": 0,
+	"REQUIREMENT_COLLECTION_PLATFORM": 2,
+	"REQUIREMENT_COLLECTION_PROVIDER": 1,
+	"REQUIREMENT_COLLECTION_UNSPECIFIED": 0,
 	"REVOKE_REASON_ADMIN_CORRECTION": 2,
 	"REVOKE_REASON_APPEAL_ACCEPTED": 1,
 	"REVOKE_REASON_EXTERNAL_DECISION": 3,
@@ -123,10 +138,10 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"RISK_GROUND_SECURITY": 6,
 	"RISK_GROUND_TRANSACTION": 1,
 	"RISK_GROUND_UNSPECIFIED": 0,
-	"SELLER_REQUIREMENT_KYC_APPROVED": 3,
 	"SELLER_REQUIREMENT_LOGO": 5,
 	"SELLER_REQUIREMENT_NOT_PENDING_DELETION": 7,
 	"SELLER_REQUIREMENT_NOT_SUSPENDED": 2,
+	"SELLER_REQUIREMENT_ONBOARDING_COMPLETE": 3,
 	"SELLER_REQUIREMENT_STORE_ACTIVE": 1,
 	"SELLER_REQUIREMENT_STORE_NAME": 4,
 	"SELLER_REQUIREMENT_TOWN_CODE": 6,
@@ -233,6 +248,9 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	case "seller.KYCFlowStatus.gate_message": {
 		return sellerKYCFlowStatusGateMessage(num(c.value), { subject: p.subject as string });
 	}
+	case "seller.KYCStatus": {
+		return sellerKYCStatus(num(c.value));
+	}
 	case "seller.Measure.appeal_deadline": {
 		return sellerMeasureAppealDeadline({ deadline: p.deadline as string });
 	}
@@ -302,6 +320,21 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "seller.PayUniState": {
 		return sellerPayUniState(num(c.value));
+	}
+	case "seller.PaymentAccount.payouts_inactive_note": {
+		return sellerPaymentAccountPayoutsInactiveNote();
+	}
+	case "seller.PaymentAccountStatus": {
+		return sellerPaymentAccountStatus(num(c.value));
+	}
+	case "seller.PaymentAccountStatus.action": {
+		return sellerPaymentAccountStatusAction(num(c.value));
+	}
+	case "seller.PaymentAccountStatus.description": {
+		return sellerPaymentAccountStatusDescription(num(c.value));
+	}
+	case "seller.RequirementCollection": {
+		return sellerRequirementCollection(num(c.value));
 	}
 	case "seller.RevokeReason": {
 		return sellerRevokeReason(num(c.value));

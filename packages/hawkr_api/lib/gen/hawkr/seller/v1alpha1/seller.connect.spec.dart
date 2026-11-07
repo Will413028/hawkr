@@ -124,7 +124,8 @@ abstract final class SellerAppService {
   /// 不必先儲存；can_resubmit 為 false 的狀態回 failed_precondition，訊息是 KYCFlow.resubmit_unavailabilities 的第一句。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
   /// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（real_name、id_card_front、business.tax_id……，與 KYCField 一對一）。申請本身齊全之後，
   /// PayUni 綁定需要的店家資料（地址、聯絡人姓名與手機、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
-  /// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。 身分比對沒有通過時回
+  /// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。帳號沒有聯絡信箱（IdentityAppService.GetContactEmail 沒有回信箱）時回
+  /// failed_precondition 與 ErrorReason CONTACT_EMAIL_REQUIRED，client 引導在 IdentityAppService.SetContactEmail 填一個再重送。 身分比對沒有通過時回
   /// failed_precondition，訊息固定，不透露是哪個欄位或哪個帳號。每個帳號每小時最多送出 5 次，超過回
   /// resource_exhausted（帶 RetryInfo）。
   static const submitKYC = connect.Spec(
@@ -140,6 +141,26 @@ abstract final class SellerAppService {
     connect.StreamType.unary,
     hawkrsellerv1alpha1seller.CancelKYCRequest.new,
     hawkrsellerv1alpha1seller.CancelKYCResponse.new,
+  );
+
+  /// GetMyPaymentAccount 回傳呼叫者店家的收款帳戶：中立的狀態（PaymentAccountStatus）、誰收身分與銀行資料、開通用的介面。
+  /// 店家還沒有收款帳戶（平台審核還沒核准，或沒有設定收款開通）時回 not_found。
+  static const getMyPaymentAccount = connect.Spec(
+    '/$name/GetMyPaymentAccount',
+    connect.StreamType.unary,
+    hawkrsellerv1alpha1seller.GetMyPaymentAccountRequest.new,
+    hawkrsellerv1alpha1seller.GetMyPaymentAccountResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
+  /// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session：onboarding_surface 是 HOSTED 時回連結（賣家開外部瀏覽器完成後回到
+  /// return_url；連結過期時回到 refresh_url 重新取得），是 EMBEDDED 時回內嵌元件的 client_secret。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
+  /// 停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
+  static const createPaymentOnboardingSession = connect.Spec(
+    '/$name/CreatePaymentOnboardingSession',
+    connect.StreamType.unary,
+    hawkrsellerv1alpha1seller.CreatePaymentOnboardingSessionRequest.new,
+    hawkrsellerv1alpha1seller.CreatePaymentOnboardingSessionResponse.new,
   );
 
   /// LookupBusinessRegistration 以統一編號查經濟部商業司的公開登記資料，給 KYC 表單帶入公司資料。查無這個統編不是錯誤：

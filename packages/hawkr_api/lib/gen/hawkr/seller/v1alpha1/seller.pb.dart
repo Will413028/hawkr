@@ -16,18 +16,19 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 import 'package:protobuf/well_known_types/google/protobuf/duration.pb.dart'
-    as $6;
+    as $7;
 import 'package:protobuf/well_known_types/google/protobuf/field_mask.pb.dart'
     as $4;
+import 'package:protobuf/well_known_types/google/protobuf/struct.pb.dart' as $6;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
     as $1;
 
 import '../../../google/rpc/error_details.pb.dart' as $3;
 import '../../../google/type/date.pb.dart' as $5;
 import '../../common/v1alpha1/image.pb.dart' as $0;
-import '../../common/v1alpha1/policy_category.pbenum.dart' as $8;
+import '../../common/v1alpha1/policy_category.pbenum.dart' as $9;
 import '../../common/v1alpha1/postal_address.pb.dart' as $2;
-import '../../common/v1alpha1/store_card.pb.dart' as $7;
+import '../../common/v1alpha1/store_card.pb.dart' as $8;
 import 'seller.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -4065,6 +4066,459 @@ class SaveKYCDraftResponse extends $pb.GeneratedMessage {
   KYCApplication ensureApplication() => $_ensure(0);
 }
 
+/// PaymentAccount 是賣家看到的收款帳戶。
+class PaymentAccount extends $pb.GeneratedMessage {
+  factory PaymentAccount({
+    PaymentAccountStatus? status,
+    RequirementCollection? requirementCollection,
+    OnboardingSurface? onboardingSurface,
+    $core.bool? transfersActive,
+    $core.bool? payoutsActive,
+    $6.Struct? requirements,
+    $1.Timestamp? fetchTime,
+  }) {
+    final result = PaymentAccount._();
+    if (status != null) result.status = status;
+    if (requirementCollection != null)
+      result.requirementCollection = requirementCollection;
+    if (onboardingSurface != null) result.onboardingSurface = onboardingSurface;
+    if (transfersActive != null) result.transfersActive = transfersActive;
+    if (payoutsActive != null) result.payoutsActive = payoutsActive;
+    if (requirements != null) result.requirements = requirements;
+    if (fetchTime != null) result.fetchTime = fetchTime;
+    return result;
+  }
+
+  PaymentAccount._();
+
+  factory PaymentAccount.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PaymentAccount()..mergeFromBuffer(data, registry);
+  factory PaymentAccount.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PaymentAccount()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PaymentAccount',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: PaymentAccount.$_createMessage)
+    ..aE<PaymentAccountStatus>(1, _omitFieldNames ? '' : 'status',
+        enumValues: PaymentAccountStatus.values)
+    ..aE<RequirementCollection>(
+        2, _omitFieldNames ? '' : 'requirementCollection',
+        enumValues: RequirementCollection.values)
+    ..aE<OnboardingSurface>(3, _omitFieldNames ? '' : 'onboardingSurface',
+        enumValues: OnboardingSurface.values)
+    ..aOB(4, _omitFieldNames ? '' : 'transfersActive')
+    ..aOB(5, _omitFieldNames ? '' : 'payoutsActive')
+    ..aOM<$6.Struct>(6, _omitFieldNames ? '' : 'requirements',
+        subBuilder: $6.Struct.$_createMessage)
+    ..aOM<$1.Timestamp>(7, _omitFieldNames ? '' : 'fetchTime',
+        subBuilder: $1.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PaymentAccount clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PaymentAccount copyWith(void Function(PaymentAccount) updates) =>
+      super.copyWith((message) => updates(message as PaymentAccount))
+          as PaymentAccount;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PaymentAccount() / PaymentAccount.new instead')
+  static PaymentAccount create() => PaymentAccount._();
+  static $pb.GeneratedMessage $_createMessage() => PaymentAccount._();
+  @$core.override
+  PaymentAccount createEmptyInstance() => PaymentAccount._();
+  @$core.pragma('dart2js:noInline')
+  static PaymentAccount getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PaymentAccount>(
+          PaymentAccount.$_createMessage);
+  static PaymentAccount? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  PaymentAccountStatus get status => $_getN(0);
+  @$pb.TagNumber(1)
+  set status(PaymentAccountStatus value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStatus() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStatus() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  RequirementCollection get requirementCollection => $_getN(1);
+  @$pb.TagNumber(2)
+  set requirementCollection(RequirementCollection value) =>
+      $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRequirementCollection() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRequirementCollection() => $_clearField(2);
+
+  /// 目前設定的 provider 用哪種介面開通；沒有設定收款開通時是 UNSPECIFIED。
+  @$pb.TagNumber(3)
+  OnboardingSurface get onboardingSurface => $_getN(2);
+  @$pb.TagNumber(3)
+  set onboardingSurface(OnboardingSurface value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasOnboardingSurface() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOnboardingSurface() => $_clearField(3);
+
+  /// 轉帳能力是否啟用（開通閘門的輸入）。
+  @$pb.TagNumber(4)
+  $core.bool get transfersActive => $_getBF(3);
+  @$pb.TagNumber(4)
+  set transfersActive($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTransfersActive() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTransfersActive() => $_clearField(4);
+
+  /// 撥款能力是否啟用。
+  @$pb.TagNumber(5)
+  $core.bool get payoutsActive => $_getBF(4);
+  @$pb.TagNumber(5)
+  set payoutsActive($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPayoutsActive() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPayoutsActive() => $_clearField(5);
+
+  /// 金流商回報的待補條件原始內容（物件，內容由金流商定義）；沒有時是空物件。
+  @$pb.TagNumber(6)
+  $6.Struct get requirements => $_getN(5);
+  @$pb.TagNumber(6)
+  set requirements($6.Struct value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasRequirements() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearRequirements() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $6.Struct ensureRequirements() => $_ensure(5);
+
+  /// 最近一次向金流商讀取帳戶的時間；還沒讀過時不設。
+  @$pb.TagNumber(7)
+  $1.Timestamp get fetchTime => $_getN(6);
+  @$pb.TagNumber(7)
+  set fetchTime($1.Timestamp value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasFetchTime() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearFetchTime() => $_clearField(7);
+  @$pb.TagNumber(7)
+  $1.Timestamp ensureFetchTime() => $_ensure(6);
+}
+
+class GetMyPaymentAccountRequest extends $pb.GeneratedMessage {
+  factory GetMyPaymentAccountRequest() => GetMyPaymentAccountRequest._();
+
+  GetMyPaymentAccountRequest._();
+
+  factory GetMyPaymentAccountRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyPaymentAccountRequest()..mergeFromBuffer(data, registry);
+  factory GetMyPaymentAccountRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyPaymentAccountRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetMyPaymentAccountRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: GetMyPaymentAccountRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyPaymentAccountRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyPaymentAccountRequest copyWith(
+          void Function(GetMyPaymentAccountRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as GetMyPaymentAccountRequest))
+          as GetMyPaymentAccountRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetMyPaymentAccountRequest() / GetMyPaymentAccountRequest.new instead')
+  static GetMyPaymentAccountRequest create() => GetMyPaymentAccountRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      GetMyPaymentAccountRequest._();
+  @$core.override
+  GetMyPaymentAccountRequest createEmptyInstance() =>
+      GetMyPaymentAccountRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GetMyPaymentAccountRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetMyPaymentAccountRequest>(
+          GetMyPaymentAccountRequest.$_createMessage);
+  static GetMyPaymentAccountRequest? _defaultInstance;
+}
+
+class GetMyPaymentAccountResponse extends $pb.GeneratedMessage {
+  factory GetMyPaymentAccountResponse({
+    PaymentAccount? account,
+  }) {
+    final result = GetMyPaymentAccountResponse._();
+    if (account != null) result.account = account;
+    return result;
+  }
+
+  GetMyPaymentAccountResponse._();
+
+  factory GetMyPaymentAccountResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyPaymentAccountResponse()..mergeFromBuffer(data, registry);
+  factory GetMyPaymentAccountResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyPaymentAccountResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetMyPaymentAccountResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: GetMyPaymentAccountResponse.$_createMessage)
+    ..aOM<PaymentAccount>(1, _omitFieldNames ? '' : 'account',
+        subBuilder: PaymentAccount.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyPaymentAccountResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyPaymentAccountResponse copyWith(
+          void Function(GetMyPaymentAccountResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as GetMyPaymentAccountResponse))
+          as GetMyPaymentAccountResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetMyPaymentAccountResponse() / GetMyPaymentAccountResponse.new instead')
+  static GetMyPaymentAccountResponse create() =>
+      GetMyPaymentAccountResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      GetMyPaymentAccountResponse._();
+  @$core.override
+  GetMyPaymentAccountResponse createEmptyInstance() =>
+      GetMyPaymentAccountResponse._();
+  @$core.pragma('dart2js:noInline')
+  static GetMyPaymentAccountResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetMyPaymentAccountResponse>(
+          GetMyPaymentAccountResponse.$_createMessage);
+  static GetMyPaymentAccountResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  PaymentAccount get account => $_getN(0);
+  @$pb.TagNumber(1)
+  set account(PaymentAccount value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasAccount() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAccount() => $_clearField(1);
+  @$pb.TagNumber(1)
+  PaymentAccount ensureAccount() => $_ensure(0);
+}
+
+class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
+  factory CreatePaymentOnboardingSessionRequest({
+    $core.String? returnUrl,
+    $core.String? refreshUrl,
+  }) {
+    final result = CreatePaymentOnboardingSessionRequest._();
+    if (returnUrl != null) result.returnUrl = returnUrl;
+    if (refreshUrl != null) result.refreshUrl = refreshUrl;
+    return result;
+  }
+
+  CreatePaymentOnboardingSessionRequest._();
+
+  factory CreatePaymentOnboardingSessionRequest.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreatePaymentOnboardingSessionRequest()..mergeFromBuffer(data, registry);
+  factory CreatePaymentOnboardingSessionRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreatePaymentOnboardingSessionRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreatePaymentOnboardingSessionRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance:
+          CreatePaymentOnboardingSessionRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'returnUrl')
+    ..aOS(2, _omitFieldNames ? '' : 'refreshUrl')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreatePaymentOnboardingSessionRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreatePaymentOnboardingSessionRequest copyWith(
+          void Function(CreatePaymentOnboardingSessionRequest) updates) =>
+      super.copyWith((message) =>
+              updates(message as CreatePaymentOnboardingSessionRequest))
+          as CreatePaymentOnboardingSessionRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CreatePaymentOnboardingSessionRequest() / CreatePaymentOnboardingSessionRequest.new instead')
+  static CreatePaymentOnboardingSessionRequest create() =>
+      CreatePaymentOnboardingSessionRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      CreatePaymentOnboardingSessionRequest._();
+  @$core.override
+  CreatePaymentOnboardingSessionRequest createEmptyInstance() =>
+      CreatePaymentOnboardingSessionRequest._();
+  @$core.pragma('dart2js:noInline')
+  static CreatePaymentOnboardingSessionRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              CreatePaymentOnboardingSessionRequest>(
+          CreatePaymentOnboardingSessionRequest.$_createMessage);
+  static CreatePaymentOnboardingSessionRequest? _defaultInstance;
+
+  /// 賣家完成或離開開通流程後回到的網址：https，或本機開發的 http://localhost。
+  @$pb.TagNumber(1)
+  $core.String get returnUrl => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set returnUrl($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasReturnUrl() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearReturnUrl() => $_clearField(1);
+
+  /// 連結過期或已使用時，金流商把賣家送回的網址，client 在那裡重新呼叫本方法；規則同 return_url。
+  @$pb.TagNumber(2)
+  $core.String get refreshUrl => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set refreshUrl($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRefreshUrl() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRefreshUrl() => $_clearField(2);
+}
+
+class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
+  factory CreatePaymentOnboardingSessionResponse({
+    OnboardingSurface? surface,
+    $core.String? url,
+    $core.String? clientSecret,
+    $1.Timestamp? expireTime,
+  }) {
+    final result = CreatePaymentOnboardingSessionResponse._();
+    if (surface != null) result.surface = surface;
+    if (url != null) result.url = url;
+    if (clientSecret != null) result.clientSecret = clientSecret;
+    if (expireTime != null) result.expireTime = expireTime;
+    return result;
+  }
+
+  CreatePaymentOnboardingSessionResponse._();
+
+  factory CreatePaymentOnboardingSessionResponse.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreatePaymentOnboardingSessionResponse()..mergeFromBuffer(data, registry);
+  factory CreatePaymentOnboardingSessionResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreatePaymentOnboardingSessionResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreatePaymentOnboardingSessionResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance:
+          CreatePaymentOnboardingSessionResponse.$_createMessage)
+    ..aE<OnboardingSurface>(1, _omitFieldNames ? '' : 'surface',
+        enumValues: OnboardingSurface.values)
+    ..aOS(2, _omitFieldNames ? '' : 'url')
+    ..aOS(3, _omitFieldNames ? '' : 'clientSecret')
+    ..aOM<$1.Timestamp>(4, _omitFieldNames ? '' : 'expireTime',
+        subBuilder: $1.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreatePaymentOnboardingSessionResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreatePaymentOnboardingSessionResponse copyWith(
+          void Function(CreatePaymentOnboardingSessionResponse) updates) =>
+      super.copyWith((message) =>
+              updates(message as CreatePaymentOnboardingSessionResponse))
+          as CreatePaymentOnboardingSessionResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CreatePaymentOnboardingSessionResponse() / CreatePaymentOnboardingSessionResponse.new instead')
+  static CreatePaymentOnboardingSessionResponse create() =>
+      CreatePaymentOnboardingSessionResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      CreatePaymentOnboardingSessionResponse._();
+  @$core.override
+  CreatePaymentOnboardingSessionResponse createEmptyInstance() =>
+      CreatePaymentOnboardingSessionResponse._();
+  @$core.pragma('dart2js:noInline')
+  static CreatePaymentOnboardingSessionResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              CreatePaymentOnboardingSessionResponse>(
+          CreatePaymentOnboardingSessionResponse.$_createMessage);
+  static CreatePaymentOnboardingSessionResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  OnboardingSurface get surface => $_getN(0);
+  @$pb.TagNumber(1)
+  set surface(OnboardingSurface value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSurface() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSurface() => $_clearField(1);
+
+  /// surface 是 HOSTED 時的開通連結（一次性、短效）。
+  @$pb.TagNumber(2)
+  $core.String get url => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set url($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasUrl() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearUrl() => $_clearField(2);
+
+  /// surface 是 EMBEDDED 時，初始化內嵌元件用的 client secret；只給這個賣家的瀏覽器，不記錄。
+  @$pb.TagNumber(3)
+  $core.String get clientSecret => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set clientSecret($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasClientSecret() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearClientSecret() => $_clearField(3);
+
+  /// session 的到期時間；金流商沒有給時不設。
+  @$pb.TagNumber(4)
+  $1.Timestamp get expireTime => $_getN(3);
+  @$pb.TagNumber(4)
+  set expireTime($1.Timestamp value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasExpireTime() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearExpireTime() => $_clearField(4);
+  @$pb.TagNumber(4)
+  $1.Timestamp ensureExpireTime() => $_ensure(3);
+}
+
 class GetMyKYCRequest extends $pb.GeneratedMessage {
   factory GetMyKYCRequest() => GetMyKYCRequest._();
 
@@ -4933,7 +5387,7 @@ class AppealUnavailability extends $pb.GeneratedMessage {
 class MeasureFinding extends $pb.GeneratedMessage {
   factory MeasureFinding({
     $core.String? id,
-    $8.PolicyCategory? category,
+    $9.PolicyCategory? category,
     ViolationSeverity? severity,
     $1.Timestamp? createTime,
   }) {
@@ -4960,8 +5414,8 @@ class MeasureFinding extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: MeasureFinding.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'id')
-    ..aE<$8.PolicyCategory>(2, _omitFieldNames ? '' : 'category',
-        enumValues: $8.PolicyCategory.values)
+    ..aE<$9.PolicyCategory>(2, _omitFieldNames ? '' : 'category',
+        enumValues: $9.PolicyCategory.values)
     ..aE<ViolationSeverity>(3, _omitFieldNames ? '' : 'severity',
         enumValues: ViolationSeverity.values)
     ..aOM<$1.Timestamp>(4, _omitFieldNames ? '' : 'createTime',
@@ -5001,9 +5455,9 @@ class MeasureFinding extends $pb.GeneratedMessage {
 
   /// 認定的類別：政策分類中平台判定與認定可用的值（不含 OTHER）。
   @$pb.TagNumber(2)
-  $8.PolicyCategory get category => $_getN(1);
+  $9.PolicyCategory get category => $_getN(1);
   @$pb.TagNumber(2)
-  set category($8.PolicyCategory value) => $_setField(2, value);
+  set category($9.PolicyCategory value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasCategory() => $_has(1);
   @$pb.TagNumber(2)
@@ -5283,7 +5737,7 @@ class Measure extends $pb.GeneratedMessage {
     RevokeReason? revokeReason,
     $core.bool? canRequestRemediation,
     $1.Timestamp? nextRemediationTime,
-    $6.Duration? rejectionCooldown,
+    $7.Duration? rejectionCooldown,
     $core.Iterable<MeasureRequest>? requests,
     TerminationGround? terminationGround,
     $1.Timestamp? appealDeadlineTime,
@@ -5358,8 +5812,8 @@ class Measure extends $pb.GeneratedMessage {
     ..aOB(15, _omitFieldNames ? '' : 'canRequestRemediation')
     ..aOM<$1.Timestamp>(16, _omitFieldNames ? '' : 'nextRemediationTime',
         subBuilder: $1.Timestamp.$_createMessage)
-    ..aOM<$6.Duration>(17, _omitFieldNames ? '' : 'rejectionCooldown',
-        subBuilder: $6.Duration.$_createMessage)
+    ..aOM<$7.Duration>(17, _omitFieldNames ? '' : 'rejectionCooldown',
+        subBuilder: $7.Duration.$_createMessage)
     ..pPM<MeasureRequest>(18, _omitFieldNames ? '' : 'requests',
         subBuilder: MeasureRequest.$_createMessage)
     ..aE<TerminationGround>(20, _omitFieldNames ? '' : 'terminationGround',
@@ -5539,15 +5993,15 @@ class Measure extends $pb.GeneratedMessage {
   /// 這筆措施的下一個請求若被駁回，會開始的冷卻期長度；只在 RISK 依據、措施生效中時才可能設，不設表示不會有冷卻。給送出前的警告用（「若本次經駁回，將於這段期間內不得
   /// 再提出」），client 不用自己從駁回次數推導。冷卻規則由伺服器決定（條款第 17.4 條）。
   @$pb.TagNumber(17)
-  $6.Duration get rejectionCooldown => $_getN(14);
+  $7.Duration get rejectionCooldown => $_getN(14);
   @$pb.TagNumber(17)
-  set rejectionCooldown($6.Duration value) => $_setField(17, value);
+  set rejectionCooldown($7.Duration value) => $_setField(17, value);
   @$pb.TagNumber(17)
   $core.bool hasRejectionCooldown() => $_has(14);
   @$pb.TagNumber(17)
   void clearRejectionCooldown() => $_clearField(17);
   @$pb.TagNumber(17)
-  $6.Duration ensureRejectionCooldown() => $_ensure(14);
+  $7.Duration ensureRejectionCooldown() => $_ensure(14);
 
   /// 措施上賣家的請求（申覆與解除請求，看 MeasureRequest.kind），新到舊；沒有請求過時是空的。每一筆的 state 由伺服器推導（見
   /// MeasureRequest）；同時至多一筆 PENDING，所以「目前的請求」是第一筆不是 CLOSED 的。
@@ -6785,7 +7239,7 @@ class BatchGetStoresRequest extends $pb.GeneratedMessage {
 
 class BatchGetStoresResponse extends $pb.GeneratedMessage {
   factory BatchGetStoresResponse({
-    $core.Iterable<$7.StoreCard>? stores,
+    $core.Iterable<$8.StoreCard>? stores,
   }) {
     final result = BatchGetStoresResponse._();
     if (stores != null) result.stores.addAll(stores);
@@ -6806,8 +7260,8 @@ class BatchGetStoresResponse extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: BatchGetStoresResponse.$_createMessage)
-    ..pPM<$7.StoreCard>(1, _omitFieldNames ? '' : 'stores',
-        subBuilder: $7.StoreCard.$_createMessage)
+    ..pPM<$8.StoreCard>(1, _omitFieldNames ? '' : 'stores',
+        subBuilder: $8.StoreCard.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6835,7 +7289,7 @@ class BatchGetStoresResponse extends $pb.GeneratedMessage {
   static BatchGetStoresResponse? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $pb.PbList<$7.StoreCard> get stores => $_getList(0);
+  $pb.PbList<$8.StoreCard> get stores => $_getList(0);
 }
 
 class GetSellerAgreementsRequest extends $pb.GeneratedMessage {
@@ -7150,7 +7604,8 @@ class SellerAppServiceApi {
   /// 不必先儲存；can_resubmit 為 false 的狀態回 failed_precondition，訊息是 KYCFlow.resubmit_unavailabilities 的第一句。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
   /// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（real_name、id_card_front、business.tax_id……，與 KYCField 一對一）。申請本身齊全之後，
   /// PayUni 綁定需要的店家資料（地址、聯絡人姓名與手機、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
-  /// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。 身分比對沒有通過時回
+  /// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。帳號沒有聯絡信箱（IdentityAppService.GetContactEmail 沒有回信箱）時回
+  /// failed_precondition 與 ErrorReason CONTACT_EMAIL_REQUIRED，client 引導在 IdentityAppService.SetContactEmail 填一個再重送。 身分比對沒有通過時回
   /// failed_precondition，訊息固定，不透露是哪個欄位或哪個帳號。每個帳號每小時最多送出 5 次，超過回
   /// resource_exhausted（帶 RetryInfo）。
   $async.Future<SubmitKYCResponse> submitKYC(
@@ -7163,6 +7618,26 @@ class SellerAppServiceApi {
           $pb.ClientContext? ctx, CancelKYCRequest request) =>
       _client.invoke<CancelKYCResponse>(
           ctx, 'SellerAppService', 'CancelKYC', request, CancelKYCResponse());
+
+  /// GetMyPaymentAccount 回傳呼叫者店家的收款帳戶：中立的狀態（PaymentAccountStatus）、誰收身分與銀行資料、開通用的介面。
+  /// 店家還沒有收款帳戶（平台審核還沒核准，或沒有設定收款開通）時回 not_found。
+  $async.Future<GetMyPaymentAccountResponse> getMyPaymentAccount(
+          $pb.ClientContext? ctx, GetMyPaymentAccountRequest request) =>
+      _client.invoke<GetMyPaymentAccountResponse>(ctx, 'SellerAppService',
+          'GetMyPaymentAccount', request, GetMyPaymentAccountResponse());
+
+  /// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session：onboarding_surface 是 HOSTED 時回連結（賣家開外部瀏覽器完成後回到
+  /// return_url；連結過期時回到 refresh_url 重新取得），是 EMBEDDED 時回內嵌元件的 client_secret。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
+  /// 停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
+  $async.Future<CreatePaymentOnboardingSessionResponse>
+      createPaymentOnboardingSession($pb.ClientContext? ctx,
+              CreatePaymentOnboardingSessionRequest request) =>
+          _client.invoke<CreatePaymentOnboardingSessionResponse>(
+              ctx,
+              'SellerAppService',
+              'CreatePaymentOnboardingSession',
+              request,
+              CreatePaymentOnboardingSessionResponse());
 
   /// LookupBusinessRegistration 以統一編號查經濟部商業司的公開登記資料，給 KYC 表單帶入公司資料。查無這個統編不是錯誤：
   /// 回應沒有 registration；資料來源暫時無法使用回 unavailable，畫面退回手動填寫。每個帳號每分鐘最多查 10 次，超過回

@@ -1,0 +1,58 @@
+[application] create 200; replay 200 same id: True
+[application] replay with different body: 409 idempotency_error
+--- [application] account (HTTP 200)
+{
+  "object": "v2.core.account",
+  "dashboard": "none",
+  "defaults": {
+    "currency": "usd",
+    "locales": [],
+    "profile": {
+      "business_url": null,
+      "doing_business_as": null,
+      "product_description": null
+    },
+    "responsibilities": {
+      "fees_collector": "application",
+      "losses_collector": "application",
+      "requirements_collector": "application"
+    },
+    "timezone": null
+  }
+}
+[application] attach bank via v1: 200 None
+[application] list external_accounts: 200 fingerprint present: True tag=fp_11e7 err=None
+[application] rename: 200 display_name=Renamed Store err=None
+[application] account_link: 200 has url: True expires_at=2026-11-02T16:20:24.000Z err=None
+[application] account_session: 200 has secret: True err=None
+[stripe] create 200; replay 200 same id: True
+[stripe] replay with different body: 409 idempotency_error
+--- [stripe] account (HTTP 200)
+{
+  "object": "v2.core.account",
+  "dashboard": "express",
+  "defaults": {
+    "currency": "usd",
+    "locales": [],
+    "profile": {
+      "business_url": null,
+      "doing_business_as": null,
+      "product_description": null
+    },
+    "responsibilities": {
+      "fees_collector": "application",
+      "losses_collector": "application",
+      "requirements_collector": "stripe"
+    },
+    "timezone": null
+  }
+}
+[stripe] attach bank via v1: 200 None
+[stripe] list external_accounts: 200 fingerprint present: True tag=fp_11e7 err=None
+[stripe] rename: 200 display_name=Renamed Store err=None
+[stripe] account_link: 200 has url: True expires_at=2026-11-02T16:20:39.000Z err=None
+[stripe] account_session: 200 has secret: True err=None
+close 400 configs_must_match_to_close
+v1 delete 200
+close 400 configs_must_match_to_close
+v1 delete 200

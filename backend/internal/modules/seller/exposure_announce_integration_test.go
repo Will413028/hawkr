@@ -58,6 +58,7 @@ func TestExposureFlipsAreAnnouncedByEveryKindOfWrite(t *testing.T) {
 	accountID, s := f.boundStore(t)
 	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "1"}
 	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourcePoll))
+	f.setPayment(t, s.StoreID, enabledSnapshot)
 	if got := announcements.all(); len(got) != 0 {
 		t.Fatalf("PayUni 核准但還沒有 logo，不可曝光：%+v", got)
 	}
@@ -80,11 +81,13 @@ func TestExposureFlipsAreAnnouncedByEveryKindOfWrite(t *testing.T) {
 	f.now = f.now.Add(time.Hour)
 	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "8"}
 	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourceRefresh))
+	f.setPayment(t, s.StoreID, rejectedSnapshot)
 	f.wantAnnouncements(t, announcements, n, s.StoreID, false)
 	n = len(announcements.all())
 	f.now = f.now.Add(time.Hour)
 	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "1"}
 	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourceRefresh))
+	f.setPayment(t, s.StoreID, enabledSnapshot)
 	f.wantAnnouncements(t, announcements, n, s.StoreID, true)
 
 	n = len(announcements.all())
@@ -190,6 +193,7 @@ func TestAnExposureEventFailureRollsBackTheWriteAndTheAnnouncement(t *testing.T)
 	accountID, s := f.boundStore(t)
 	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "1"}
 	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourcePoll))
+	f.setPayment(t, s.StoreID, enabledSnapshot)
 	boom := errors.New("subscriber failed")
 	events.Subscribe(f.bus, func(context.Context, StoreExposureChanged) error { return boom })
 	cur, err := f.module.Store(ctx, s.StoreID)

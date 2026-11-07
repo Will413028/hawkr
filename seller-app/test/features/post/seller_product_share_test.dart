@@ -71,7 +71,7 @@ MyStore _store({required bool listed}) => MyStore(
   myStoreResponse(
     storeCode: 'FRESH88',
     publicListing: publicListingMissing([
-      if (!listed) SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+      if (!listed) SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
     ]),
   ),
 );

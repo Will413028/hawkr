@@ -79,7 +79,7 @@ var trimmedColumns = []trimmedColumn{
 func TestTrimmedTextChecksUseTheCanonicalPattern(t *testing.T) {
 	ctx := context.Background()
 	d := pg.NewDB(t)
-	mods := modules()
+	mods := migrations()
 	if err := migrate.Apply(ctx, d, mods); err != nil {
 		t.Fatal(err)
 	}

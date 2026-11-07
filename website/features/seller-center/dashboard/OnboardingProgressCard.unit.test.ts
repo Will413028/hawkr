@@ -4,7 +4,9 @@ import { create } from "@bufbuild/protobuf";
 import {
 	CapabilityStatusSchema,
 	GetMyStoreResponseSchema,
-	KYCFlowStatus,
+	KYCStatus,
+	PaymentAccountSchema,
+	PaymentAccountStatus,
 	SellerCapability,
 	SellerRequirement,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -75,24 +77,31 @@ const R = SellerRequirement;
 
 function renderCard(
 	missing: SellerRequirement[],
-	flowStatus = KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
+	kycStatus?: KYCStatus,
+	paymentStatus?: PaymentAccountStatus,
 ) {
 	const my = create(GetMyStoreResponseSchema, {
 		store: { id: "1", description: "介紹" },
 		capabilities: [
 			publicListingStatus(missing),
-			// 照伺服器：物流建店缺認證時才缺 KYC_APPROVED。
+			// 照伺服器：物流建店缺認證時才缺 ONBOARDING_COMPLETE。
 			create(CapabilityStatusSchema, {
 				capability: SellerCapability.SHIPPING_SETUP,
-				active: !missing.includes(R.KYC_APPROVED),
-				missing: missing.includes(R.KYC_APPROVED) ? [R.KYC_APPROVED] : [],
+				active: !missing.includes(R.ONBOARDING_COMPLETE),
+				missing: missing.includes(R.ONBOARDING_COMPLETE)
+					? [R.ONBOARDING_COMPLETE]
+					: [],
 			}),
 		],
 	});
 	render(
 		React.createElement(OnboardingProgressCard, {
 			self: my,
-			flowStatus,
+			kycStatus,
+			paymentAccount:
+				paymentStatus === undefined
+					? null
+					: create(PaymentAccountSchema, { status: paymentStatus }),
 			shippingRows: [],
 			productCount: 0,
 		}),
@@ -110,7 +119,7 @@ afterEach(() => {
 
 describe("OnboardingProgressCard", () => {
 	it("splits the steps into 公開前必須 and 建議完成", () => {
-		renderCard([R.KYC_APPROVED]);
+		renderCard([R.ONBOARDING_COMPLETE]);
 		expand();
 
 		const lists = screen.getAllByRole("list");
@@ -118,7 +127,8 @@ describe("OnboardingProgressCard", () => {
 		const required = within(lists[0] as HTMLElement);
 		const recommended = within(lists[1] as HTMLElement);
 		expect(required.getByRole("button", { name: /^商店資料，/ })).toBeTruthy();
-		expect(required.getByRole("button", { name: /^商家認證，/ })).toBeTruthy();
+		expect(required.getByRole("button", { name: /^平台審核，/ })).toBeTruthy();
+		expect(required.getByRole("button", { name: /^收款帳戶，/ })).toBeTruthy();
 		for (const title of ["物流設定", "上架商品", "商店介紹"]) {
 			expect(
 				recommended.getByRole("button", { name: new RegExp(`^${title}，`) }),
@@ -129,9 +139,9 @@ describe("OnboardingProgressCard", () => {
 	});
 
 	it("progress only counts the required group", () => {
-		renderCard([R.KYC_APPROVED]);
-		// 兩個必須項目完成一個；建議完成的四項不進分母。
-		expect(screen.getByText("1/2")).toBeTruthy();
+		renderCard([R.ONBOARDING_COMPLETE]);
+		// 三個必須項目完成一個；建議完成的項目不進分母。
+		expect(screen.getByText("1/3")).toBeTruthy();
 	});
 
 	it("is collapsed with the completion mark once nothing is missing", () => {
@@ -140,14 +150,30 @@ describe("OnboardingProgressCard", () => {
 		expect(screen.queryByRole("list")).toBeNull();
 	});
 
-	it("selecting a required step shows its status and action", () => {
-		renderCard([R.KYC_APPROVED], KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO);
+	it("selecting 收款帳戶 after approval shows its catalog status and action", () => {
+		renderCard(
+			[R.ONBOARDING_COMPLETE],
+			KYCStatus.KYC_STATUS_APPROVED,
+			PaymentAccountStatus.ACTION_REQUIRED,
+		);
 		expand();
 
-		fireEvent.click(screen.getByRole("button", { name: /^商家認證，/ }));
-		expect(screen.getAllByText("需補件").length).toBeGreaterThan(0);
+		fireEvent.click(screen.getByRole("button", { name: /^收款帳戶，/ }));
+		expect(screen.getAllByText("待設定").length).toBeGreaterThan(0);
 		expect(
-			screen.getByRole("link", { name: "前往補件" }).getAttribute("href"),
+			screen
+				.getByRole("link", { name: "前往設定收款帳戶" })
+				.getAttribute("href"),
+		).toBe("/seller-center/me/certifications");
+	});
+
+	it("selecting 平台審核 before submit offers the certification page", () => {
+		renderCard([R.ONBOARDING_COMPLETE]);
+		expand();
+
+		fireEvent.click(screen.getByRole("button", { name: /^平台審核，/ }));
+		expect(
+			screen.getByRole("link", { name: "前往商家認證" }).getAttribute("href"),
 		).toBe("/seller-center/me/certifications");
 	});
 

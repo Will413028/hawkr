@@ -16,9 +16,11 @@ import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
 import 'package:protobuf/well_known_types/google/protobuf/duration.pbjson.dart'
-    as $6;
+    as $7;
 import 'package:protobuf/well_known_types/google/protobuf/field_mask.pbjson.dart'
     as $4;
+import 'package:protobuf/well_known_types/google/protobuf/struct.pbjson.dart'
+    as $6;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
     as $1;
 
@@ -26,7 +28,7 @@ import '../../../google/rpc/error_details.pbjson.dart' as $3;
 import '../../../google/type/date.pbjson.dart' as $5;
 import '../../common/v1alpha1/image.pbjson.dart' as $0;
 import '../../common/v1alpha1/postal_address.pbjson.dart' as $2;
-import '../../common/v1alpha1/store_card.pbjson.dart' as $7;
+import '../../common/v1alpha1/store_card.pbjson.dart' as $8;
 
 @$core.Deprecated('Use agreementKindDescriptor instead')
 const AgreementKind$json = {
@@ -116,7 +118,7 @@ const SellerRequirement$json = {
     {'1': 'SELLER_REQUIREMENT_UNSPECIFIED', '2': 0},
     {'1': 'SELLER_REQUIREMENT_STORE_ACTIVE', '2': 1},
     {'1': 'SELLER_REQUIREMENT_NOT_SUSPENDED', '2': 2},
-    {'1': 'SELLER_REQUIREMENT_KYC_APPROVED', '2': 3},
+    {'1': 'SELLER_REQUIREMENT_ONBOARDING_COMPLETE', '2': 3},
     {'1': 'SELLER_REQUIREMENT_STORE_NAME', '2': 4},
     {'1': 'SELLER_REQUIREMENT_LOGO', '2': 5},
     {'1': 'SELLER_REQUIREMENT_TOWN_CODE', '2': 6},
@@ -128,10 +130,10 @@ const SellerRequirement$json = {
 final $typed_data.Uint8List sellerRequirementDescriptor = $convert.base64Decode(
     'ChFTZWxsZXJSZXF1aXJlbWVudBIiCh5TRUxMRVJfUkVRVUlSRU1FTlRfVU5TUEVDSUZJRUQQAB'
     'IjCh9TRUxMRVJfUkVRVUlSRU1FTlRfU1RPUkVfQUNUSVZFEAESJAogU0VMTEVSX1JFUVVJUkVN'
-    'RU5UX05PVF9TVVNQRU5ERUQQAhIjCh9TRUxMRVJfUkVRVUlSRU1FTlRfS1lDX0FQUFJPVkVEEA'
-    'MSIQodU0VMTEVSX1JFUVVJUkVNRU5UX1NUT1JFX05BTUUQBBIbChdTRUxMRVJfUkVRVUlSRU1F'
-    'TlRfTE9HTxAFEiAKHFNFTExFUl9SRVFVSVJFTUVOVF9UT1dOX0NPREUQBhIrCidTRUxMRVJfUk'
-    'VRVUlSRU1FTlRfTk9UX1BFTkRJTkdfREVMRVRJT04QBw==');
+    'RU5UX05PVF9TVVNQRU5ERUQQAhIqCiZTRUxMRVJfUkVRVUlSRU1FTlRfT05CT0FSRElOR19DT0'
+    '1QTEVURRADEiEKHVNFTExFUl9SRVFVSVJFTUVOVF9TVE9SRV9OQU1FEAQSGwoXU0VMTEVSX1JF'
+    'UVVJUkVNRU5UX0xPR08QBRIgChxTRUxMRVJfUkVRVUlSRU1FTlRfVE9XTl9DT0RFEAYSKwonU0'
+    'VMTEVSX1JFUVVJUkVNRU5UX05PVF9QRU5ESU5HX0RFTEVUSU9OEAc=');
 
 @$core.Deprecated('Use storeFieldDescriptor instead')
 const StoreField$json = {
@@ -228,6 +230,7 @@ const KYCField$json = {
     {'1': 19, '2': 19},
     {'1': 23, '2': 23},
     {'1': 24, '2': 24},
+    {'1': 29, '2': 29},
   ],
   '5': [
     'KYC_FIELD_FOOD_BUSINESS',
@@ -235,7 +238,8 @@ const KYCField$json = {
     'KYC_FIELD_CONTACT_PHONE',
     'KYC_FIELD_BUSINESS_COMPANY_TYPE',
     'KYC_FIELD_BUSINESS_COMPANY_TOWN_CODE',
-    'KYC_FIELD_BUSINESS_COMPANY_ADDRESS_DETAIL'
+    'KYC_FIELD_BUSINESS_COMPANY_ADDRESS_DETAIL',
+    'KYC_FIELD_PAYOUT_CONTACT_EMAIL'
   ],
 };
 
@@ -255,10 +259,11 @@ final $typed_data.Uint8List kYCFieldDescriptor = $convert.base64Decode(
     '9DT01QQU5ZX1BIT05FEBkSJQohS1lDX0ZJRUxEX0JVU0lORVNTX1JFUF9JRF9DQVJEX05PEBoS'
     'KAokS1lDX0ZJRUxEX0JVU0lORVNTX0NPTVBBTllfRE9DVU1FTlRTEBsSJgoiS1lDX0ZJRUxEX0'
     'JVU0lORVNTX0NPTVBBTllfQUREUkVTUxAcIgQICxALIgQIDRANIgQIDhAOIgQIExATIgQIFxAX'
-    'IgQIGBAYKhdLWUNfRklFTERfRk9PRF9CVVNJTkVTUyoXS1lDX0ZJRUxEX0NPTlRBQ1RfRU1BSU'
-    'wqF0tZQ19GSUVMRF9DT05UQUNUX1BIT05FKh9LWUNfRklFTERfQlVTSU5FU1NfQ09NUEFOWV9U'
-    'WVBFKiRLWUNfRklFTERfQlVTSU5FU1NfQ09NUEFOWV9UT1dOX0NPREUqKUtZQ19GSUVMRF9CVV'
-    'NJTkVTU19DT01QQU5ZX0FERFJFU1NfREVUQUlM');
+    'IgQIGBAYIgQIHRAdKhdLWUNfRklFTERfRk9PRF9CVVNJTkVTUyoXS1lDX0ZJRUxEX0NPTlRBQ1'
+    'RfRU1BSUwqF0tZQ19GSUVMRF9DT05UQUNUX1BIT05FKh9LWUNfRklFTERfQlVTSU5FU1NfQ09N'
+    'UEFOWV9UWVBFKiRLWUNfRklFTERfQlVTSU5FU1NfQ09NUEFOWV9UT1dOX0NPREUqKUtZQ19GSU'
+    'VMRF9CVVNJTkVTU19DT01QQU5ZX0FERFJFU1NfREVUQUlMKh5LWUNfRklFTERfUEFZT1VUX0NP'
+    'TlRBQ1RfRU1BSUw=');
 
 @$core.Deprecated('Use kYCIssueCodeDescriptor instead')
 const KYCIssueCode$json = {
@@ -383,6 +388,59 @@ final $typed_data.Uint8List kYCResubmitUnavailableReasonDescriptor = $convert.ba
     'TEFCTEVfUkVBU09OX1BBWVVOSV9SRVRSWV9MQVRFUhAHEjUKMUtZQ19SRVNVQk1JVF9VTkFWQU'
     'lMQUJMRV9SRUFTT05fUEFZVU5JX1RFUk1JTkFURUQQCBIzCi9LWUNfUkVTVUJNSVRfVU5BVkFJ'
     'TEFCTEVfUkVBU09OX1BBWVVOSV9BUFBST1ZFRBAJ');
+
+@$core.Deprecated('Use paymentAccountStatusDescriptor instead')
+const PaymentAccountStatus$json = {
+  '1': 'PaymentAccountStatus',
+  '2': [
+    {'1': 'PAYMENT_ACCOUNT_STATUS_UNSPECIFIED', '2': 0},
+    {'1': 'PAYMENT_ACCOUNT_STATUS_NOT_CREATED', '2': 1},
+    {'1': 'PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW', '2': 2},
+    {'1': 'PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED', '2': 3},
+    {'1': 'PAYMENT_ACCOUNT_STATUS_ENABLED', '2': 4},
+    {'1': 'PAYMENT_ACCOUNT_STATUS_DISABLED', '2': 5},
+  ],
+};
+
+/// Descriptor for `PaymentAccountStatus`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List paymentAccountStatusDescriptor = $convert.base64Decode(
+    'ChRQYXltZW50QWNjb3VudFN0YXR1cxImCiJQQVlNRU5UX0FDQ09VTlRfU1RBVFVTX1VOU1BFQ0'
+    'lGSUVEEAASJgoiUEFZTUVOVF9BQ0NPVU5UX1NUQVRVU19OT1RfQ1JFQVRFRBABEicKI1BBWU1F'
+    'TlRfQUNDT1VOVF9TVEFUVVNfVU5ERVJfUkVWSUVXEAISKgomUEFZTUVOVF9BQ0NPVU5UX1NUQV'
+    'RVU19BQ1RJT05fUkVRVUlSRUQQAxIiCh5QQVlNRU5UX0FDQ09VTlRfU1RBVFVTX0VOQUJMRUQQ'
+    'BBIjCh9QQVlNRU5UX0FDQ09VTlRfU1RBVFVTX0RJU0FCTEVEEAU=');
+
+@$core.Deprecated('Use requirementCollectionDescriptor instead')
+const RequirementCollection$json = {
+  '1': 'RequirementCollection',
+  '2': [
+    {'1': 'REQUIREMENT_COLLECTION_UNSPECIFIED', '2': 0},
+    {'1': 'REQUIREMENT_COLLECTION_PROVIDER', '2': 1},
+    {'1': 'REQUIREMENT_COLLECTION_PLATFORM', '2': 2},
+  ],
+};
+
+/// Descriptor for `RequirementCollection`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List requirementCollectionDescriptor = $convert.base64Decode(
+    'ChVSZXF1aXJlbWVudENvbGxlY3Rpb24SJgoiUkVRVUlSRU1FTlRfQ09MTEVDVElPTl9VTlNQRU'
+    'NJRklFRBAAEiMKH1JFUVVJUkVNRU5UX0NPTExFQ1RJT05fUFJPVklERVIQARIjCh9SRVFVSVJF'
+    'TUVOVF9DT0xMRUNUSU9OX1BMQVRGT1JNEAI=');
+
+@$core.Deprecated('Use onboardingSurfaceDescriptor instead')
+const OnboardingSurface$json = {
+  '1': 'OnboardingSurface',
+  '2': [
+    {'1': 'ONBOARDING_SURFACE_UNSPECIFIED', '2': 0},
+    {'1': 'ONBOARDING_SURFACE_HOSTED', '2': 1},
+    {'1': 'ONBOARDING_SURFACE_EMBEDDED', '2': 2},
+  ],
+};
+
+/// Descriptor for `OnboardingSurface`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List onboardingSurfaceDescriptor = $convert.base64Decode(
+    'ChFPbmJvYXJkaW5nU3VyZmFjZRIiCh5PTkJPQVJESU5HX1NVUkZBQ0VfVU5TUEVDSUZJRUQQAB'
+    'IdChlPTkJPQVJESU5HX1NVUkZBQ0VfSE9TVEVEEAESHwobT05CT0FSRElOR19TVVJGQUNFX0VN'
+    'QkVEREVEEAI=');
 
 @$core.Deprecated('Use violationSeverityDescriptor instead')
 const ViolationSeverity$json = {
@@ -2048,8 +2106,14 @@ const KYCApplication$json = {
     {'1': 15, '2': 16},
     {'1': 17, '2': 18},
     {'1': 18, '2': 19},
+    {'1': 33, '2': 34},
   ],
-  '10': ['contact_email', 'contact_phone', 'food_business'],
+  '10': [
+    'contact_email',
+    'contact_phone',
+    'food_business',
+    'payout_contact_email'
+  ],
 };
 
 /// Descriptor for `KYCApplication`. Decode as a `google.protobuf.DescriptorProto`.
@@ -2083,8 +2147,8 @@ final $typed_data.Uint8List kYCApplicationDescriptor = $convert.base64Decode(
     'Z2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgpkZWNpZGVUaW1lEkAKC2NyZWF0ZV90aW1lGB'
     '0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgpjcmVhdGVUaW1lEkAKC3Vw'
     'ZGF0ZV90aW1lGB4gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgp1cGRhdG'
-    'VUaW1lQgkKB3N1YmplY3RKBAgPEBBKBAgREBJKBAgSEBNSDWNvbnRhY3RfZW1haWxSDWNvbnRh'
-    'Y3RfcGhvbmVSDWZvb2RfYnVzaW5lc3M=');
+    'VUaW1lQgkKB3N1YmplY3RKBAgPEBBKBAgREBJKBAgSEBNKBAghECJSDWNvbnRhY3RfZW1haWxS'
+    'DWNvbnRhY3RfcGhvbmVSDWZvb2RfYnVzaW5lc3NSFHBheW91dF9jb250YWN0X2VtYWls');
 
 @$core.Deprecated('Use saveKYCDraftRequestDescriptor instead')
 const SaveKYCDraftRequest$json = {
@@ -2135,6 +2199,148 @@ const SaveKYCDraftResponse$json = {
 final $typed_data.Uint8List saveKYCDraftResponseDescriptor = $convert.base64Decode(
     'ChRTYXZlS1lDRHJhZnRSZXNwb25zZRJHCgthcHBsaWNhdGlvbhgBIAEoCzIlLmhhd2tyLnNlbG'
     'xlci52MWFscGhhMS5LWUNBcHBsaWNhdGlvblILYXBwbGljYXRpb24=');
+
+@$core.Deprecated('Use paymentAccountDescriptor instead')
+const PaymentAccount$json = {
+  '1': 'PaymentAccount',
+  '2': [
+    {
+      '1': 'status',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.PaymentAccountStatus',
+      '10': 'status'
+    },
+    {
+      '1': 'requirement_collection',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.RequirementCollection',
+      '10': 'requirementCollection'
+    },
+    {
+      '1': 'onboarding_surface',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.OnboardingSurface',
+      '10': 'onboardingSurface'
+    },
+    {'1': 'transfers_active', '3': 4, '4': 1, '5': 8, '10': 'transfersActive'},
+    {'1': 'payouts_active', '3': 5, '4': 1, '5': 8, '10': 'payoutsActive'},
+    {
+      '1': 'requirements',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Struct',
+      '10': 'requirements'
+    },
+    {
+      '1': 'fetch_time',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'fetchTime'
+    },
+  ],
+};
+
+/// Descriptor for `PaymentAccount`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List paymentAccountDescriptor = $convert.base64Decode(
+    'Cg5QYXltZW50QWNjb3VudBJDCgZzdGF0dXMYASABKA4yKy5oYXdrci5zZWxsZXIudjFhbHBoYT'
+    'EuUGF5bWVudEFjY291bnRTdGF0dXNSBnN0YXR1cxJjChZyZXF1aXJlbWVudF9jb2xsZWN0aW9u'
+    'GAIgASgOMiwuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcXVpcmVtZW50Q29sbGVjdGlvblIVcm'
+    'VxdWlyZW1lbnRDb2xsZWN0aW9uElcKEm9uYm9hcmRpbmdfc3VyZmFjZRgDIAEoDjIoLmhhd2ty'
+    'LnNlbGxlci52MWFscGhhMS5PbmJvYXJkaW5nU3VyZmFjZVIRb25ib2FyZGluZ1N1cmZhY2USKQ'
+    'oQdHJhbnNmZXJzX2FjdGl2ZRgEIAEoCFIPdHJhbnNmZXJzQWN0aXZlEiUKDnBheW91dHNfYWN0'
+    'aXZlGAUgASgIUg1wYXlvdXRzQWN0aXZlEjsKDHJlcXVpcmVtZW50cxgGIAEoCzIXLmdvb2dsZS'
+    '5wcm90b2J1Zi5TdHJ1Y3RSDHJlcXVpcmVtZW50cxI5CgpmZXRjaF90aW1lGAcgASgLMhouZ29v'
+    'Z2xlLnByb3RvYnVmLlRpbWVzdGFtcFIJZmV0Y2hUaW1l');
+
+@$core.Deprecated('Use getMyPaymentAccountRequestDescriptor instead')
+const GetMyPaymentAccountRequest$json = {
+  '1': 'GetMyPaymentAccountRequest',
+};
+
+/// Descriptor for `GetMyPaymentAccountRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getMyPaymentAccountRequestDescriptor =
+    $convert.base64Decode('ChpHZXRNeVBheW1lbnRBY2NvdW50UmVxdWVzdA==');
+
+@$core.Deprecated('Use getMyPaymentAccountResponseDescriptor instead')
+const GetMyPaymentAccountResponse$json = {
+  '1': 'GetMyPaymentAccountResponse',
+  '2': [
+    {
+      '1': 'account',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.PaymentAccount',
+      '10': 'account'
+    },
+  ],
+};
+
+/// Descriptor for `GetMyPaymentAccountResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getMyPaymentAccountResponseDescriptor =
+    $convert.base64Decode(
+        'ChtHZXRNeVBheW1lbnRBY2NvdW50UmVzcG9uc2USPwoHYWNjb3VudBgBIAEoCzIlLmhhd2tyLn'
+        'NlbGxlci52MWFscGhhMS5QYXltZW50QWNjb3VudFIHYWNjb3VudA==');
+
+@$core.Deprecated('Use createPaymentOnboardingSessionRequestDescriptor instead')
+const CreatePaymentOnboardingSessionRequest$json = {
+  '1': 'CreatePaymentOnboardingSessionRequest',
+  '2': [
+    {'1': 'return_url', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'returnUrl'},
+    {'1': 'refresh_url', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'refreshUrl'},
+  ],
+};
+
+/// Descriptor for `CreatePaymentOnboardingSessionRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createPaymentOnboardingSessionRequestDescriptor =
+    $convert.base64Decode(
+        'CiVDcmVhdGVQYXltZW50T25ib2FyZGluZ1Nlc3Npb25SZXF1ZXN0EiIKCnJldHVybl91cmwYAS'
+        'ABKAlCA+BBAlIJcmV0dXJuVXJsEiQKC3JlZnJlc2hfdXJsGAIgASgJQgPgQQJSCnJlZnJlc2hV'
+        'cmw=');
+
+@$core
+    .Deprecated('Use createPaymentOnboardingSessionResponseDescriptor instead')
+const CreatePaymentOnboardingSessionResponse$json = {
+  '1': 'CreatePaymentOnboardingSessionResponse',
+  '2': [
+    {
+      '1': 'surface',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.OnboardingSurface',
+      '10': 'surface'
+    },
+    {'1': 'url', '3': 2, '4': 1, '5': 9, '10': 'url'},
+    {'1': 'client_secret', '3': 3, '4': 1, '5': 9, '10': 'clientSecret'},
+    {
+      '1': 'expire_time',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'expireTime'
+    },
+  ],
+};
+
+/// Descriptor for `CreatePaymentOnboardingSessionResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createPaymentOnboardingSessionResponseDescriptor =
+    $convert.base64Decode(
+        'CiZDcmVhdGVQYXltZW50T25ib2FyZGluZ1Nlc3Npb25SZXNwb25zZRJCCgdzdXJmYWNlGAEgAS'
+        'gOMiguaGF3a3Iuc2VsbGVyLnYxYWxwaGExLk9uYm9hcmRpbmdTdXJmYWNlUgdzdXJmYWNlEhAK'
+        'A3VybBgCIAEoCVIDdXJsEiMKDWNsaWVudF9zZWNyZXQYAyABKAlSDGNsaWVudFNlY3JldBI7Cg'
+        'tleHBpcmVfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBSCmV4cGlyZVRp'
+        'bWU=');
 
 @$core.Deprecated('Use getMyKYCRequestDescriptor instead')
 const GetMyKYCRequest$json = {
@@ -3265,6 +3471,17 @@ const $core.Map<$core.String, $core.dynamic> SellerAppServiceBase$json = {
       '3': '.hawkr.seller.v1alpha1.CancelKYCResponse'
     },
     {
+      '1': 'GetMyPaymentAccount',
+      '2': '.hawkr.seller.v1alpha1.GetMyPaymentAccountRequest',
+      '3': '.hawkr.seller.v1alpha1.GetMyPaymentAccountResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'CreatePaymentOnboardingSession',
+      '2': '.hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionRequest',
+      '3': '.hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse'
+    },
+    {
       '1': 'LookupBusinessRegistration',
       '2': '.hawkr.seller.v1alpha1.LookupBusinessRegistrationRequest',
       '3': '.hawkr.seller.v1alpha1.LookupBusinessRegistrationResponse'
@@ -3357,6 +3574,19 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.SubmitKYCResponse': SubmitKYCResponse$json,
   '.hawkr.seller.v1alpha1.CancelKYCRequest': CancelKYCRequest$json,
   '.hawkr.seller.v1alpha1.CancelKYCResponse': CancelKYCResponse$json,
+  '.hawkr.seller.v1alpha1.GetMyPaymentAccountRequest':
+      GetMyPaymentAccountRequest$json,
+  '.hawkr.seller.v1alpha1.GetMyPaymentAccountResponse':
+      GetMyPaymentAccountResponse$json,
+  '.hawkr.seller.v1alpha1.PaymentAccount': PaymentAccount$json,
+  '.google.protobuf.Struct': $6.Struct$json,
+  '.google.protobuf.Struct.FieldsEntry': $6.Struct_FieldsEntry$json,
+  '.google.protobuf.Value': $6.Value$json,
+  '.google.protobuf.ListValue': $6.ListValue$json,
+  '.hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionRequest':
+      CreatePaymentOnboardingSessionRequest$json,
+  '.hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse':
+      CreatePaymentOnboardingSessionResponse$json,
   '.hawkr.seller.v1alpha1.LookupBusinessRegistrationRequest':
       LookupBusinessRegistrationRequest$json,
   '.hawkr.seller.v1alpha1.LookupBusinessRegistrationResponse':
@@ -3367,7 +3597,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.Measure': Measure$json,
   '.hawkr.seller.v1alpha1.MeasureFinding': MeasureFinding$json,
   '.hawkr.seller.v1alpha1.MeasurePeriod': MeasurePeriod$json,
-  '.google.protobuf.Duration': $6.Duration$json,
+  '.google.protobuf.Duration': $7.Duration$json,
   '.hawkr.seller.v1alpha1.MeasureRequest': MeasureRequest$json,
   '.hawkr.seller.v1alpha1.RemediationUnavailability':
       RemediationUnavailability$json,
@@ -3409,17 +3639,23 @@ final $typed_data.Uint8List sellerAppServiceDescriptor = $convert.base64Decode(
     'drci5zZWxsZXIudjFhbHBoYTEuU3VibWl0S1lDUmVxdWVzdBooLmhhd2tyLnNlbGxlci52MWFs'
     'cGhhMS5TdWJtaXRLWUNSZXNwb25zZRJeCglDYW5jZWxLWUMSJy5oYXdrci5zZWxsZXIudjFhbH'
     'BoYTEuQ2FuY2VsS1lDUmVxdWVzdBooLmhhd2tyLnNlbGxlci52MWFscGhhMS5DYW5jZWxLWUNS'
-    'ZXNwb25zZRKRAQoaTG9va3VwQnVzaW5lc3NSZWdpc3RyYXRpb24SOC5oYXdrci5zZWxsZXIudj'
-    'FhbHBoYTEuTG9va3VwQnVzaW5lc3NSZWdpc3RyYXRpb25SZXF1ZXN0GjkuaGF3a3Iuc2VsbGVy'
-    'LnYxYWxwaGExLkxvb2t1cEJ1c2luZXNzUmVnaXN0cmF0aW9uUmVzcG9uc2UScgoOTGlzdE15TW'
-    'Vhc3VyZXMSLC5oYXdrci5zZWxsZXIudjFhbHBoYTEuTGlzdE15TWVhc3VyZXNSZXF1ZXN0Gi0u'
-    'aGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxpc3RNeU1lYXN1cmVzUmVzcG9uc2UiA5ACARJsCgxHZX'
-    'RNeU1lYXN1cmUSKi5oYXdrci5zZWxsZXIudjFhbHBoYTEuR2V0TXlNZWFzdXJlUmVxdWVzdBor'
-    'Lmhhd2tyLnNlbGxlci52MWFscGhhMS5HZXRNeU1lYXN1cmVSZXNwb25zZSIDkAIBEmcKDFN1Ym'
-    '1pdEFwcGVhbBIqLmhhd2tyLnNlbGxlci52MWFscGhhMS5TdWJtaXRBcHBlYWxSZXF1ZXN0Gisu'
-    'aGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN1Ym1pdEFwcGVhbFJlc3BvbnNlEnkKElJlcXVlc3RSZW'
-    '1lZGlhdGlvbhIwLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXF1ZXN0UmVtZWRpYXRpb25SZXF1'
-    'ZXN0GjEuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcXVlc3RSZW1lZGlhdGlvblJlc3BvbnNl');
+    'ZXNwb25zZRKBAQoTR2V0TXlQYXltZW50QWNjb3VudBIxLmhhd2tyLnNlbGxlci52MWFscGhhMS'
+    '5HZXRNeVBheW1lbnRBY2NvdW50UmVxdWVzdBoyLmhhd2tyLnNlbGxlci52MWFscGhhMS5HZXRN'
+    'eVBheW1lbnRBY2NvdW50UmVzcG9uc2UiA5ACARKdAQoeQ3JlYXRlUGF5bWVudE9uYm9hcmRpbm'
+    'dTZXNzaW9uEjwuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkNyZWF0ZVBheW1lbnRPbmJvYXJkaW5n'
+    'U2Vzc2lvblJlcXVlc3QaPS5oYXdrci5zZWxsZXIudjFhbHBoYTEuQ3JlYXRlUGF5bWVudE9uYm'
+    '9hcmRpbmdTZXNzaW9uUmVzcG9uc2USkQEKGkxvb2t1cEJ1c2luZXNzUmVnaXN0cmF0aW9uEjgu'
+    'aGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxvb2t1cEJ1c2luZXNzUmVnaXN0cmF0aW9uUmVxdWVzdB'
+    'o5Lmhhd2tyLnNlbGxlci52MWFscGhhMS5Mb29rdXBCdXNpbmVzc1JlZ2lzdHJhdGlvblJlc3Bv'
+    'bnNlEnIKDkxpc3RNeU1lYXN1cmVzEiwuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxpc3RNeU1lYX'
+    'N1cmVzUmVxdWVzdBotLmhhd2tyLnNlbGxlci52MWFscGhhMS5MaXN0TXlNZWFzdXJlc1Jlc3Bv'
+    'bnNlIgOQAgESbAoMR2V0TXlNZWFzdXJlEiouaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkdldE15TW'
+    'Vhc3VyZVJlcXVlc3QaKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuR2V0TXlNZWFzdXJlUmVzcG9u'
+    'c2UiA5ACARJnCgxTdWJtaXRBcHBlYWwSKi5oYXdrci5zZWxsZXIudjFhbHBoYTEuU3VibWl0QX'
+    'BwZWFsUmVxdWVzdBorLmhhd2tyLnNlbGxlci52MWFscGhhMS5TdWJtaXRBcHBlYWxSZXNwb25z'
+    'ZRJ5ChJSZXF1ZXN0UmVtZWRpYXRpb24SMC5oYXdrci5zZWxsZXIudjFhbHBoYTEuUmVxdWVzdF'
+    'JlbWVkaWF0aW9uUmVxdWVzdBoxLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXF1ZXN0UmVtZWRp'
+    'YXRpb25SZXNwb25zZQ==');
 
 const $core.Map<$core.String, $core.dynamic> SellerPublicServiceBase$json = {
   '1': 'SellerPublicService',
@@ -3469,7 +3705,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.ListStoresResponse': ListStoresResponse$json,
   '.hawkr.seller.v1alpha1.BatchGetStoresRequest': BatchGetStoresRequest$json,
   '.hawkr.seller.v1alpha1.BatchGetStoresResponse': BatchGetStoresResponse$json,
-  '.hawkr.common.v1alpha1.StoreCard': $7.StoreCard$json,
+  '.hawkr.common.v1alpha1.StoreCard': $8.StoreCard$json,
   '.hawkr.seller.v1alpha1.GetSellerAgreementsRequest':
       GetSellerAgreementsRequest$json,
   '.hawkr.seller.v1alpha1.GetSellerAgreementsResponse':

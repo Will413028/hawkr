@@ -54,7 +54,7 @@ const (
 	ErrorReason_AGREEMENT_OUTDATED ErrorReason = 6
 	// 賣家做這個操作需要的前置條件沒有滿足（搭配 failed_precondition）：身分認證未核准，或店家正在隨帳號刪除。停權不用它，
 	// 停權是 SELLER_SUSPENDED。ErrorInfo.metadata 的 missingRequirements 是缺的條件，值是
-	// seller.v1alpha1.SellerRequirement 的值名（不加 SELLER_REQUIREMENT_ 前綴，例如 KYC_APPROVED），依列舉的數字由小到大以逗號連接。client 先看 GetMyStore 的能力狀態，這個 reason 只是
+	// seller.v1alpha1.SellerRequirement 的值名（不加 SELLER_REQUIREMENT_ 前綴，例如 ONBOARDING_COMPLETE），依列舉的數字由小到大以逗號連接。client 先看 GetMyStore 的能力狀態，這個 reason 只是
 	// 伺服器逐方法檢查的後備：重讀 GetMyStore，依缺的條件顯示。
 	ErrorReason_SELLER_REQUIREMENT_MISSING ErrorReason = 7
 	// 帳號停權中，不能申請開店（搭配 failed_precondition）；解除停權後可以再申請。client 顯示 LocalizedMessage，並導向措施與申覆。帳號同時有生效中的終止合作時是
@@ -78,6 +78,9 @@ const (
 	// 在 15 分鐘內以 provider 驗證過。client 引導使用者重新走一次登入（web 的 /api/auth/{provider}/start、App 的 ExchangeIdToken，
 	// 登入會換發新 session），再重送。
 	ErrorReason_REAUTHENTICATION_REQUIRED ErrorReason = 14
+	// 帳號沒有聯絡信箱（沒有 provider 驗證過的 email，也沒有自填的），不能送出 KYC 申請（搭配 failed_precondition）：SellerAppService.SubmitKYC。
+	// client 引導使用者在 IdentityAppService.SetContactEmail 填一個，再重送。
+	ErrorReason_CONTACT_EMAIL_REQUIRED ErrorReason = 15
 )
 
 // Enum value maps for ErrorReason.
@@ -96,6 +99,7 @@ var (
 		12: "ACCOUNT_SUSPENDED",
 		13: "IDENTITY_ALREADY_LINKED",
 		14: "REAUTHENTICATION_REQUIRED",
+		15: "CONTACT_EMAIL_REQUIRED",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":   0,
@@ -111,6 +115,7 @@ var (
 		"ACCOUNT_SUSPENDED":          12,
 		"IDENTITY_ALREADY_LINKED":    13,
 		"REAUTHENTICATION_REQUIRED":  14,
+		"CONTACT_EMAIL_REQUIRED":     15,
 	}
 )
 
@@ -145,7 +150,7 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xa0\x03\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xbc\x03\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10VERSION_CONFLICT\x10\x01\x12\x14\n" +
@@ -160,7 +165,8 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\x11ACCOUNT_HAS_STORE\x10\v\x12\x15\n" +
 	"\x11ACCOUNT_SUSPENDED\x10\f\x12\x1b\n" +
 	"\x17IDENTITY_ALREADY_LINKED\x10\r\x12\x1d\n" +
-	"\x19REAUTHENTICATION_REQUIRED\x10\x0e\"\x04\b\x02\x10\x02\"\x04\b\x05\x10\x05*\x12PHONE_CODE_EXPIRED*\x16ACCOUNT_HAS_OPEN_STOREB\x82\x02\n" +
+	"\x19REAUTHENTICATION_REQUIRED\x10\x0e\x12\x1a\n" +
+	"\x16CONTACT_EMAIL_REQUIRED\x10\x0f\"\x04\b\x02\x10\x02\"\x04\b\x05\x10\x05*\x12PHONE_CODE_EXPIRED*\x16ACCOUNT_HAS_OPEN_STOREB\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (

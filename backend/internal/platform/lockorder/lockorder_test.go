@@ -30,8 +30,8 @@ func TestClassifyFindsRowLocksOnExistingRows(t *testing.T) {
 			[]Lock{{"buyer", "buyers", "UPDATE", true}}},
 		{"delete inside a cte", "WITH d AS (DELETE FROM social.posts WHERE id = $1 RETURNING id) SELECT count(*) FROM d",
 			[]Lock{{"social", "posts", "DELETE", true}}},
-		{"upsert", "INSERT INTO seller.payment_accounts (store_id) VALUES ($1) ON CONFLICT (store_id) DO UPDATE SET updated_at = $2",
-			[]Lock{{"seller", "payment_accounts", "INSERT ON CONFLICT DO UPDATE", true}}},
+		{"upsert", "INSERT INTO seller.payout_capabilities (store_id) VALUES ($1) ON CONFLICT (store_id) DO UPDATE SET updated_at = $2",
+			[]Lock{{"seller", "payout_capabilities", "INSERT ON CONFLICT DO UPDATE", true}}},
 		{"locking subselect", "UPDATE social.posts SET hidden = true WHERE id IN (SELECT id FROM social.posts WHERE author = $1 FOR UPDATE)",
 			[]Lock{{"social", "posts", "UPDATE", true}, {"social", "posts", "FOR UPDATE", true}}},
 	}

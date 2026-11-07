@@ -95,6 +95,19 @@ type RemoveRoleInput = model.RemoveRoleInput
 // Lifecycle 是帳號的生命週期。
 type Lifecycle = model.Lifecycle
 
+// ContactEmail 是帳號的聯絡信箱與來源。
+type ContactEmail = model.ContactEmail
+
+// ContactEmailSource 是聯絡信箱的來源。
+type ContactEmailSource = model.ContactEmailSource
+
+const (
+	// ContactEmailVerified 是 provider 驗證過的 email（寄件地址）。
+	ContactEmailVerified = model.ContactEmailVerified
+	// ContactEmailSelfEntered 是帳號自填、未驗證的信箱。
+	ContactEmailSelfEntered = model.ContactEmailSelfEntered
+)
+
 // Admin 是管理員。
 type Admin = model.Admin
 
@@ -242,6 +255,18 @@ func (m *Module) Account(ctx context.Context, id int64) (Account, error) {
 // Accounts 回傳存在的帳號，依 ID 排序；不存在的 ID 略過。
 func (m *Module) Accounts(ctx context.Context, ids []int64) ([]Account, error) {
 	return m.account.Accounts(ctx, ids)
+}
+
+// ContactEmail 回傳帳號的聯絡信箱與來源：已驗證的 email 優先，沒有才用自填的，兩者都沒有（含已刪除的帳號）時 ok 是 false。
+// 自填的信箱未驗證，不是寄件地址（通知只寄 Source 是 ContactEmailVerified 的）。帳號不存在回 NotFound。在呼叫方的 transaction 內呼叫時讀它的狀態。
+func (m *Module) ContactEmail(ctx context.Context, accountID int64) (ContactEmail, bool, error) {
+	return m.account.ContactEmail(ctx, accountID)
+}
+
+// SetSelfEnteredEmail 設定帳號自填的聯絡信箱（trim、小寫、格式與長度同 emailaddr.Normalize）。只在帳號沒有已驗證的 email 時可設，
+// 有的話回 FailedPrecondition；格式不合回 InvalidInput（欄位 Email）；帳號不存在或已刪除回 NotFound。回傳設定之後的聯絡信箱。
+func (m *Module) SetSelfEnteredEmail(ctx context.Context, accountID int64, email string) (ContactEmail, error) {
+	return m.account.SetSelfEnteredEmail(ctx, accountID, email)
 }
 
 // GrantRole 授予角色（SELLER）；已有同角色時更新來源。帳號不存在或已刪除時回 NotFound，等待刪除時回 FailedPrecondition，

@@ -1,0 +1,10 @@
+{
+  "status": 409,
+  "body": {
+    "error": {
+      "code": "idempotency_error",
+      "message": "Idempotency keys can only be reused with the same parameters they were first used with. Try using a different key than spike-6b2e63ce0ef04670962d99e9f7e5ea0c if you want to execute a new request.",
+      "request_log_url": "https://dashboard.stripe.com/acct_1UXPj9RPCx5baPmE/test/logs/req_<MASKED:da77>"
+    }
+  }
+}

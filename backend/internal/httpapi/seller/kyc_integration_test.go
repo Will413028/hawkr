@@ -262,10 +262,10 @@ func TestSubmitKYCAgreementErrorsReachTheClient(t *testing.T) {
 	f.applyComplete(t, f.app)
 	draft := saveDraft(t, f.app, completeDraft(testID))
 	outdated := kycAgreementsPB()
-	outdated[1].Version = "2026-01-01"
+	outdated[0].Version = "2026-01-01"
 	_, err := f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: draft.GetEtag(), AcceptedAgreements: outdated}))
 	wantCode(t, err, connect.CodeFailedPrecondition, "AGREEMENT_OUTDATED")
-	for name, in := range map[string][]*pb.AgreementAcceptance{"沒有": nil, "缺一種": kycAgreementsPB()[:1], "開店的種類": pbAcceptances(seller.CurrentApplyAcceptances())} {
+	for name, in := range map[string][]*pb.AgreementAcceptance{"沒有": nil, "開店的種類": pbAcceptances(seller.CurrentApplyAcceptances())} {
 		_, err = f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: draft.GetEtag(), AcceptedAgreements: in}))
 		if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "accepted_agreements" {
 			t.Fatalf("%s：field=%q", name, field)
@@ -741,45 +741,26 @@ func TestSubmitKYCReportsEveryMissingItemAsAFieldViolation(t *testing.T) {
 		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"individual"}},
 	})
 	_, err := f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: individual.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
-	wantCode(t, err, connect.CodeInvalidArgument, "")
-	want := []string{"bank_account", "bank_code", "bank_name", "bank_book", "english_name", "id_card_back", "id_card_front", "individual.id_card_no", "real_name"}
-	slices.Sort(want)
 	wantStore := []string{"store.contact_mobile", "store.contact_name", "store.support_email"}
-	if got := badRequestFields(t, err); !slices.Equal(got, want) {
-		t.Fatalf("個人賣家缺少的欄位（只有申請自己的欄位，店家的缺項不是欄位違規）：got=%v want=%v", got, want)
-	}
-	// 申請的檢視帶同一份清單（missing_fields 與 missing_store_fields），送出只在真的送審時才需要用到額度。
-	if got := missingPaths(individual); !slices.Equal(got, want) {
-		t.Fatalf("missing_fields 與送出的違規不一致：got=%v want=%v", got, want)
-	}
-	if got := missingStorePaths(individual); !slices.Equal(got, wantStore) {
-		t.Fatalf("missing_store_fields 與送出的違規不一致：got=%v want=%v", got, wantStore)
-	}
-	if mine, err := f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{})); err != nil || !slices.Equal(missingPaths(mine.Msg.GetApplication()), want) ||
-		!slices.Equal(missingStorePaths(mine.Msg.GetApplication()), wantStore) {
-		t.Fatalf("GetMyKYC：err=%v mine=%v", err, mine)
-	}
-	// 申請本身齊全、店家資料還缺：failed_precondition（不是欄位違規），缺哪些看 missing_store_fields；補齊之後才能送出。
-	full := saveDraft(t, f.app, &pb.SaveKYCDraftRequest{
-		Application: &pb.KYCApplication{
-			Etag: individual.GetEtag(), Subject: &pb.KYCApplication_Individual{Individual: &pb.IndividualKYC{IdCardNo: testID}},
-			RealName: "王小明", BirthDate: &date.Date{Year: 1990, Month: 5, Day: 6}, EnglishName: "Wang Farm", BankName: "臺灣銀行", BankCode: "004",
-			BankAccount: "012345678901", IdCardFront: &pb.KYCDocument{StagedToken: "front"}, IdCardBack: &pb.KYCDocument{StagedToken: "back"},
-			BankBook: &pb.KYCDocument{StagedToken: "book"},
-		},
-		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{
-			"individual.id_card_no", "real_name", "birth_date", "english_name", "bank_name", "bank_code", "bank_account", "id_card_front", "id_card_back", "bank_book",
-		}},
-	})
-	_, err = f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: full.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
+	// 個人賣家的申請沒有必填欄位；店家資料還缺：failed_precondition（不是欄位違規），缺哪些看 missing_store_fields；補齊之後才能送出。
 	wantCode(t, err, connect.CodeFailedPrecondition, "")
 	if got := badRequestFields(t, err); len(got) != 0 {
 		t.Fatalf("店家資料缺項不該帶欄位違規：%v", got)
 	}
+	if got := missingPaths(individual); len(got) != 0 {
+		t.Fatalf("個人賣家的 missing_fields=%v，預期空", got)
+	}
+	if got := missingStorePaths(individual); !slices.Equal(got, wantStore) {
+		t.Fatalf("missing_store_fields 與送出的結果不一致：got=%v want=%v", got, wantStore)
+	}
+	if mine, err := f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{})); err != nil || len(missingPaths(mine.Msg.GetApplication())) != 0 ||
+		!slices.Equal(missingStorePaths(mine.Msg.GetApplication()), wantStore) {
+		t.Fatalf("GetMyKYC：err=%v mine=%v", err, mine)
+	}
 	// 店家資料補齊之後，缺項只剩申請自己的欄位。
 	filled := f.fillContact(t, f.app)
 	if got := missingStorePaths(saveDraft(t, f.app, &pb.SaveKYCDraftRequest{
-		Application: &pb.KYCApplication{Etag: full.GetEtag()}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"product_type"}},
+		Application: &pb.KYCApplication{Etag: individual.GetEtag()}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"product_type"}},
 	})); len(got) != 0 || filled.GetContactName() == "" {
 		t.Fatalf("補齊聯絡資料之後 missing_store_fields=%v store=%v", got, filled)
 	}
@@ -792,13 +773,15 @@ func TestSubmitKYCReportsEveryMissingItemAsAFieldViolation(t *testing.T) {
 	_, err = f.other.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: company.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
 	wantCode(t, err, connect.CodeInvalidArgument, "")
 	got := badRequestFields(t, err)
-	for _, field := range []string{"business.company_name", "business.tax_id", "business.rep_id_card_no", "id_card_front"} {
+	for _, field := range []string{"business.company_name", "business.tax_id"} {
 		if !slices.Contains(got, field) {
 			t.Fatalf("企業賣家缺少的欄位沒有 %s：%v", field, got)
 		}
 	}
-	if slices.Contains(got, "individual.id_card_no") {
-		t.Fatalf("企業賣家不需要個人的身分證號：%v", got)
+	for _, absent := range []string{"individual.id_card_no", "business.rep_id_card_no", "real_name", "bank_account", "id_card_front"} {
+		if slices.Contains(got, absent) {
+			t.Fatalf("送出不再要求 %s：%v", absent, got)
+		}
 	}
 	if !slices.Equal(missingPaths(company), got) {
 		t.Fatalf("企業賣家的 missing_fields 與送出的違規不一致：%v / %v", missingPaths(company), got)
@@ -971,7 +954,7 @@ func TestSaveKYCDraftSwitchesTheSellerTypeAndValidatesTheTaxID(t *testing.T) {
 		t.Fatalf("switched=%v", switched)
 	}
 	// 個人專屬的身分證號隨型態切換清掉；共用的欄位保留。
-	if switched.GetRealName() != "王小明" || slices.Contains(missingPaths(switched), "real_name") || !slices.Contains(missingPaths(switched), "business.rep_id_card_no") {
+	if switched.GetRealName() != "王小明" || switched.GetBusiness().GetRepIdCardNoMasked() != "" || len(missingPaths(switched)) != 0 {
 		t.Fatalf("switched=%v missing=%v", switched, missingPaths(switched))
 	}
 }

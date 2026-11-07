@@ -675,27 +675,44 @@ func TestKYCSchemaConstraints(t *testing.T) {
 	accountID, _ := f.open(t)
 	f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
 	for name, query := range map[string]string{
-		"submitted without required fields":  "UPDATE seller.kyc_applications SET status='SUBMITTED', submitted_at=now(), submission_seq=1, real_name=NULL",
-		"submitted without a submission seq": "UPDATE seller.kyc_applications SET status='SUBMITTED', submitted_at=now()",
-		"a negative submission seq":          "UPDATE seller.kyc_applications SET submission_seq=-1",
-		"individual with company fields":     "UPDATE seller.kyc_applications SET company_name='x'",
-		"company with an individual id":      "UPDATE seller.kyc_applications SET seller_type='COMPANY'",
-		"ciphertext without hash":            "UPDATE seller.kyc_applications SET id_card_hash=NULL",
-		"short hash":                         "UPDATE seller.kyc_applications SET id_card_hash='\\x00'",
-		"bad bank code":                      "UPDATE seller.kyc_applications SET bank_code='12'",
-		"approved without a decision time":   "UPDATE seller.kyc_applications SET status='APPROVED', submission_seq=1",
-		"landline as mobile":                 "UPDATE seller.kyc_applications SET contact_phone='0229010572'",
-		"unknown status":                     "UPDATE seller.kyc_applications SET status='FORWARDED'",
-		"unknown slot":                       "INSERT INTO seller.kyc_documents (application_id, slot, asset_id, object_key) SELECT application_id, 'SELFIE', 'a', 'k' FROM seller.kyc_applications",
-		"review without a reviewer":          "INSERT INTO seller.kyc_reviews (review_id, application_id, action, decided_at) SELECT uuidv7(), application_id, 'APPROVE', now() FROM seller.kyc_applications",
-		"reject without a reason":            "INSERT INTO seller.kyc_reviews (review_id, application_id, action, reviewer_admin_id, decided_at) SELECT uuidv7(), application_id, 'REJECT', 1, now() FROM seller.kyc_applications",
-		"rebind without a reviewer":          "INSERT INTO seller.kyc_reviews (review_id, application_id, action, decided_at) SELECT uuidv7(), application_id, 'REBIND', now() FROM seller.kyc_applications",
-		"approve by a non positive admin":    "INSERT INTO seller.kyc_reviews (review_id, application_id, action, reviewer_admin_id, decided_at) SELECT uuidv7(), application_id, 'APPROVE', 0, now() FROM seller.kyc_applications",
-		"seller action with a reviewer":      "INSERT INTO seller.kyc_reviews (review_id, application_id, action, reviewer_admin_id, decided_at) SELECT uuidv7(), application_id, 'SUBMIT', 1, now() FROM seller.kyc_applications",
+		"submitted company without its registration data": "UPDATE seller.kyc_applications SET status='SUBMITTED', submitted_at=now(), submission_seq=1, seller_type='COMPANY', id_card_no_enc=NULL, id_card_hash=NULL, id_card_hash_key=NULL, company_name=NULL",
+		"submitted without a submission seq":              "UPDATE seller.kyc_applications SET status='SUBMITTED', submitted_at=now()",
+		"a negative submission seq":                       "UPDATE seller.kyc_applications SET submission_seq=-1",
+		"individual with company fields":                  "UPDATE seller.kyc_applications SET company_name='x'",
+		"company with an individual id":                   "UPDATE seller.kyc_applications SET seller_type='COMPANY'",
+		"ciphertext without hash":                         "UPDATE seller.kyc_applications SET id_card_hash=NULL",
+		"short hash":                                      "UPDATE seller.kyc_applications SET id_card_hash='\\x00'",
+		"bad bank code":                                   "UPDATE seller.kyc_applications SET bank_code='12'",
+		"approved without a decision time":                "UPDATE seller.kyc_applications SET status='APPROVED', submission_seq=1",
+		"landline as mobile":                              "UPDATE seller.kyc_applications SET contact_phone='0229010572'",
+		"unknown status":                                  "UPDATE seller.kyc_applications SET status='FORWARDED'",
+		"unknown slot":                                    "INSERT INTO seller.kyc_documents (application_id, slot, asset_id, object_key) SELECT application_id, 'SELFIE', 'a', 'k' FROM seller.kyc_applications",
+		"review without a reviewer":                       "INSERT INTO seller.kyc_reviews (review_id, application_id, action, decided_at) SELECT uuidv7(), application_id, 'APPROVE', now() FROM seller.kyc_applications",
+		"reject without a reason":                         "INSERT INTO seller.kyc_reviews (review_id, application_id, action, reviewer_admin_id, decided_at) SELECT uuidv7(), application_id, 'REJECT', 1, now() FROM seller.kyc_applications",
+		"rebind without a reviewer":                       "INSERT INTO seller.kyc_reviews (review_id, application_id, action, decided_at) SELECT uuidv7(), application_id, 'REBIND', now() FROM seller.kyc_applications",
+		"approve by a non positive admin":                 "INSERT INTO seller.kyc_reviews (review_id, application_id, action, reviewer_admin_id, decided_at) SELECT uuidv7(), application_id, 'APPROVE', 0, now() FROM seller.kyc_applications",
+		"seller action with a reviewer":                   "INSERT INTO seller.kyc_reviews (review_id, application_id, action, reviewer_admin_id, decided_at) SELECT uuidv7(), application_id, 'SUBMIT', 1, now() FROM seller.kyc_applications",
 	} {
 		if _, err := f.db.Conn(ctx).Exec(ctx, query); err == nil {
 			t.Errorf("%s 應該被 CHECK 擋下", name)
 		}
+	}
+	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.kyc_applications SET real_name=NULL"); err != nil {
+		t.Errorf("草稿不受送出時的必填限制：%v", err)
+	}
+	companyAccount, companyStore := f.open(t)
+	f.savedDraft(t, companyDraft(companyAccount, idRep, taxIDOne, bankAcct))
+	const submit = "UPDATE seller.kyc_applications SET status='SUBMITTED', submitted_at=now(), submission_seq=1%s WHERE store_id=$1"
+	for name, extra := range map[string]string{
+		"company submitted without a tax id":       ", tax_id=NULL, tax_id_hash=NULL, tax_id_hash_key=NULL",
+		"company submitted without a company name": ", company_name=NULL",
+	} {
+		if _, err := f.db.Conn(ctx).Exec(ctx, fmt.Sprintf(submit, extra), companyStore.StoreID); err == nil {
+			t.Errorf("%s 應該被 CHECK 擋下", name)
+		}
+	}
+	if _, err := f.db.Conn(ctx).Exec(ctx, fmt.Sprintf(submit, ""), companyStore.StoreID); err != nil {
+		t.Errorf("公司賣家有公司名稱、統編與收款聯絡信箱就能送出：%v", err)
 	}
 }
 
@@ -922,10 +939,10 @@ func TestKYCInputValidation(t *testing.T) {
 	}
 	// 送出時一次列出全部缺的欄位。
 	blank, _ := f.open(t)
-	minimal := f.savedDraft(t, KYCDraftInput{AccountID: blank, SellerType: individual()})
+	minimal := f.savedDraft(t, KYCDraftInput{AccountID: blank, SellerType: ptr(KYCCompany)})
 	_, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: blank, ExpectedVersion: minimal.Version})
 	var ae *apperr.Error
-	if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) < 8 {
+	if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) != 2 {
 		t.Fatalf("submit an empty draft: %v", err)
 	}
 }
@@ -1183,7 +1200,7 @@ func TestStartupChecksThatEveryKeyReferencedByTheDatabaseIsConfigured(t *testing
 		must(t, err)
 		mac, err := seal.ParseMAC(macSpec)
 		must(t, err)
-		return New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Identity: f.identity, Media: f.media, Orders: f.orders, KYCKeys: enc, KYCMAC: mac, ProductStores: f.products, Registry: f.registry,
+		return New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Identity: f.identity, Media: f.media, Orders: f.orders, KYCKeys: enc, KYCMAC: mac, ProductStores: f.products, Registry: f.registry, Payment: f.payments,
 			Now: func() time.Time { return f.now }, StoreCode: func(time.Time) (int64, error) { return 0, errors.New("unused") }})
 	}
 	oldEnc, oldMAC := "test1:"+b64("test-kyc-encryption-key-00000001"), "test1:"+b64("test-kyc-hash-hmac-key-000000001")
@@ -1298,19 +1315,24 @@ func TestKYCSameStagedTokenCannotFillTwoDocumentSlots(t *testing.T) {
 	}
 }
 
-// missing_fields 與送出檢查同一份規則：缺的欄位依 KYCFieldNames 的順序，個人與企業各自專屬的項目依型態，補齊之後是空的，
-// 而且送出缺項時回的違規正好是這份清單。
+// missing_fields 與送出檢查同一份規則：缺的欄位依 KYCFieldNames 的順序，企業專屬的項目依型態，補齊之後是空的，
+// 而且送出缺項時回的違規正好是這份清單。身分、銀行與證件不在必填之內。
 func TestKYCMissingFieldsFollowTheSubmissionRule(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, _ := f.open(t)
 	empty := f.savedDraft(t, KYCDraftInput{AccountID: accountID, SellerType: individual()})
-	wantIndividual := []string{"real_name", "english_name", "bank_name", "bank_code", "bank_account", "id_card_front", "id_card_back", "bank_book", "individual.id_card_no"}
-	if !slices.Equal(empty.MissingFields, wantIndividual) {
+	if len(empty.MissingFields) != 0 {
 		t.Fatalf("個人賣家缺：%v", empty.MissingFields)
 	}
-	_, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: empty.Version})
+	switched, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: empty.Version, SellerType: ptr(KYCCompany)})
+	must(t, err)
+	wantCompany := []string{"business.company_name", "business.tax_id"}
+	if !slices.Equal(switched.MissingFields, wantCompany) {
+		t.Fatalf("企業賣家缺：%v", switched.MissingFields)
+	}
+	_, err = f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: switched.Version})
 	var ae *apperr.Error
 	if !errors.As(err, &ae) {
 		t.Fatalf("err=%v", err)
@@ -1319,22 +1341,67 @@ func TestKYCMissingFieldsFollowTheSubmissionRule(t *testing.T) {
 	for _, v := range ae.FieldViolations() {
 		violations = append(violations, v.Field)
 	}
-	if !slices.Equal(violations, wantIndividual) {
+	if !slices.Equal(violations, wantCompany) {
 		t.Fatalf("送出的違規與 missing_fields 不一致：%v", violations)
-	}
-	switched, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: empty.Version, SellerType: ptr(KYCCompany)})
-	must(t, err)
-	for _, want := range []string{"business.company_name", "business.tax_id", "business.rep_id_card_no"} {
-		if !slices.Contains(switched.MissingFields, want) {
-			t.Fatalf("企業賣家缺：%v", switched.MissingFields)
-		}
-	}
-	if slices.Contains(switched.MissingFields, "individual.id_card_no") {
-		t.Fatalf("企業賣家不缺個人的身分證號：%v", switched.MissingFields)
 	}
 	other, _ := f.open(t)
 	if full := f.savedDraft(t, kycDraft(other, idB, bankAcct)); len(full.MissingFields) != 0 {
 		t.Fatalf("齊全時應該是空的：%v", full.MissingFields)
+	}
+}
+
+// 送出只要求市集登記資料與收款聯絡信箱：不帶身分、銀行、證件的個人與企業申請都能送出並核准。
+// mutation：把 real_name 加回 requirements → 本測試與 TestRequirementsAreMarketplaceDataOnly 失敗；
+// kyc_applications_complete_check 改回含身分與銀行欄位 → 送出被資料庫的約束擋下，本測試失敗（只在 CI 的 integration 驗證）。
+func TestSubmitAndApproveWithoutIdentityBankOrDocuments(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	for name, draft := range map[string]func(accountID int64) KYCDraftInput{
+		"個人": func(accountID int64) KYCDraftInput {
+			return KYCDraftInput{AccountID: accountID, SellerType: individual(), ProductType: ptr("蔬果")}
+		},
+		"企業": func(accountID int64) KYCDraftInput {
+			return KYCDraftInput{
+				AccountID: accountID, SellerType: ptr(KYCCompany), ProductType: ptr("蔬果"),
+				CompanyName: ptr("範例小農有限公司"), TaxID: ptr(taxIDOne),
+			}
+		},
+	} {
+		accountID, _ := f.open(t)
+		d := f.savedDraft(t, draft(accountID))
+		if len(d.MissingFields) != 0 {
+			t.Fatalf("%s：missing_fields=%v", name, d.MissingFields)
+		}
+		sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
+		if err != nil || sub.Status != KYCStatusSubmitted {
+			t.Fatalf("%s：送出 err=%v status=%v", name, err, sub.Status)
+		}
+		must(t, approve(f, sub))
+		mine, err := f.module.MyKYC(ctx, accountID)
+		must(t, err)
+		if mine.Status != KYCStatusApproved {
+			t.Fatalf("%s：核准後 status=%v", name, mine.Status)
+		}
+	}
+}
+
+// 送出帶了 PAYUNI_TERMS 被拒：種類不屬於 SubmitKYC，申請維持草稿。
+// mutation：把 PAYUNI_TERMS 加回 SubmitKYCAgreements → 本測試失敗。
+func TestSubmitKYCRejectsPayUniTerms(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	accountID, _ := f.open(t)
+	d := f.savedDraft(t, KYCDraftInput{AccountID: accountID, SellerType: individual()})
+	withPayUni := append(CurrentKYCAcceptances(), AgreementAcceptance{Kind: AgreementPayUniTerms, Version: CurrentAgreementsOrFail(t, AgreementPayUniTerms).Version})
+	_, err := f.module.SubmitKYC(context.Background(), SubmitKYCInput{AcceptedAgreements: withPayUni, AccountID: accountID, ExpectedVersion: d.Version})
+	if apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("err=%v", err)
+	}
+	mine, err := f.module.MyKYC(context.Background(), accountID)
+	must(t, err)
+	if mine.Status != KYCStatusDraft {
+		t.Fatalf("申請被送出：%v", mine.Status)
 	}
 }
 
@@ -1371,7 +1438,7 @@ func TestSubmitKYCRequiresTheStoreContactData(t *testing.T) {
 	}
 	// 申請自己的缺項先檢查：回 invalid_argument 與欄位違規，不是店家的 failed_precondition。
 	other, _ := f.open(t)
-	blank := f.savedDraft(t, KYCDraftInput{AccountID: other, SellerType: individual()})
+	blank := f.savedDraft(t, KYCDraftInput{AccountID: other, SellerType: ptr(KYCCompany)})
 	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET contact_name = NULL WHERE account_id = $1", other); err != nil {
 		t.Fatal(err)
 	}

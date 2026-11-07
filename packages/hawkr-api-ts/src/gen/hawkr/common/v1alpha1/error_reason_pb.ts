@@ -9,7 +9,7 @@ import { enumDesc, fileDesc } from "@bufbuild/protobuf/codegenv2";
  * Describes the file hawkr/common/v1alpha1/error_reason.proto.
  */
 export const file_hawkr_common_v1alpha1_error_reason: GenFile = /*@__PURE__*/
-  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqoAMKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAMSGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQBBIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAKEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAGEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAcSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQCBIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCRIVChFBQ0NPVU5UX0hBU19TVE9SRRALEhUKEUFDQ09VTlRfU1VTUEVOREVEEAwSGwoXSURFTlRJVFlfQUxSRUFEWV9MSU5LRUQQDRIdChlSRUFVVEhFTlRJQ0FUSU9OX1JFUVVJUkVEEA4iBAgCEAIiBAgFEAUqElBIT05FX0NPREVfRVhQSVJFRCoWQUNDT1VOVF9IQVNfT1BFTl9TVE9SRWIGcHJvdG8z");
+  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqvAMKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAMSGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQBBIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAKEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAGEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAcSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQCBIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCRIVChFBQ0NPVU5UX0hBU19TVE9SRRALEhUKEUFDQ09VTlRfU1VTUEVOREVEEAwSGwoXSURFTlRJVFlfQUxSRUFEWV9MSU5LRUQQDRIdChlSRUFVVEhFTlRJQ0FUSU9OX1JFUVVJUkVEEA4SGgoWQ09OVEFDVF9FTUFJTF9SRVFVSVJFRBAPIgQIAhACIgQIBRAFKhJQSE9ORV9DT0RFX0VYUElSRUQqFkFDQ09VTlRfSEFTX09QRU5fU1RPUkViBnByb3RvMw");
 
 /**
  * ErrorReason 是錯誤 details 裡 google.rpc.ErrorInfo.reason 可以用的值，domain 是 hawkr
@@ -76,7 +76,7 @@ export enum ErrorReason {
   /**
    * 賣家做這個操作需要的前置條件沒有滿足（搭配 failed_precondition）：身分認證未核准，或店家正在隨帳號刪除。停權不用它，
    * 停權是 SELLER_SUSPENDED。ErrorInfo.metadata 的 missingRequirements 是缺的條件，值是
-   * seller.v1alpha1.SellerRequirement 的值名（不加 SELLER_REQUIREMENT_ 前綴，例如 KYC_APPROVED），依列舉的數字由小到大以逗號連接。client 先看 GetMyStore 的能力狀態，這個 reason 只是
+   * seller.v1alpha1.SellerRequirement 的值名（不加 SELLER_REQUIREMENT_ 前綴，例如 ONBOARDING_COMPLETE），依列舉的數字由小到大以逗號連接。client 先看 GetMyStore 的能力狀態，這個 reason 只是
    * 伺服器逐方法檢查的後備：重讀 GetMyStore，依缺的條件顯示。
    *
    * @generated from enum value: SELLER_REQUIREMENT_MISSING = 7;
@@ -133,6 +133,14 @@ export enum ErrorReason {
    * @generated from enum value: REAUTHENTICATION_REQUIRED = 14;
    */
   REAUTHENTICATION_REQUIRED = 14,
+
+  /**
+   * 帳號沒有聯絡信箱（沒有 provider 驗證過的 email，也沒有自填的），不能送出 KYC 申請（搭配 failed_precondition）：SellerAppService.SubmitKYC。
+   * client 引導使用者在 IdentityAppService.SetContactEmail 填一個，再重送。
+   *
+   * @generated from enum value: CONTACT_EMAIL_REQUIRED = 15;
+   */
+  CONTACT_EMAIL_REQUIRED = 15,
 }
 
 /**

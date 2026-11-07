@@ -138,6 +138,13 @@
         "KYC_FLOW_STATUS_SUBMITTED": "你的商家認證平台審核中，通過後將自動送出至 PayUni 進行金流審核，完成後就能{subject}。"
       }
     },
+    "KYCStatus": {
+      "KYC_STATUS_APPROVED": "Approved",
+      "KYC_STATUS_CANCELLED": "Cancelled",
+      "KYC_STATUS_DRAFT": "Draft",
+      "KYC_STATUS_REJECTED": "Needs changes",
+      "KYC_STATUS_SUBMITTED": "Under review"
+    },
     "Measure": {
       "appeal_deadline": "申覆期限：{deadline}",
       "meta_kind": "措施：{kind}",
@@ -204,6 +211,33 @@
       "PAY_UNI_STATE_REVIEWING": "PayUni 審核中",
       "PAY_UNI_STATE_TERMINATED": "PayUni 收款帳戶已終止"
     },
+    "PaymentAccount": {
+      "payouts_inactive_note": "Payouts to your bank account are not enabled yet. The payment provider may ask you for more information."
+    },
+    "PaymentAccountStatus": {
+      "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "Setup needed",
+      "PAYMENT_ACCOUNT_STATUS_DISABLED": "Unavailable",
+      "PAYMENT_ACCOUNT_STATUS_ENABLED": "Active",
+      "PAYMENT_ACCOUNT_STATUS_NOT_CREATED": "Preparing",
+      "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "Under review",
+      "action": {
+        "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "Go to payout account setup",
+        "PAYMENT_ACCOUNT_STATUS_DISABLED": "Contact support",
+        "PAYMENT_ACCOUNT_STATUS_NOT_CREATED": "Refresh",
+        "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "Refresh"
+      },
+      "description": {
+        "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it.",
+        "PAYMENT_ACCOUNT_STATUS_DISABLED": "The payment provider cannot enable your payout account right now. Please contact support.",
+        "PAYMENT_ACCOUNT_STATUS_ENABLED": "Payments are enabled.",
+        "PAYMENT_ACCOUNT_STATUS_NOT_CREATED": "We are setting up your payout account. This usually takes a few minutes.",
+        "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "The payment provider is reviewing your information. No action is needed."
+      }
+    },
+    "RequirementCollection": {
+      "REQUIREMENT_COLLECTION_PLATFORM": "Embedded on platform",
+      "REQUIREMENT_COLLECTION_PROVIDER": "Provider-hosted"
+    },
     "RevokeReason": {
       "REVOKE_REASON_ADMIN_CORRECTION": "平台更正",
       "REVOKE_REASON_APPEAL_ACCEPTED": "申覆成立",
@@ -227,10 +261,10 @@
       "reason_heading": "PayUni 的審核意見"
     },
     "SellerRequirement": {
-      "SELLER_REQUIREMENT_KYC_APPROVED": "商家認證已通過",
       "SELLER_REQUIREMENT_LOGO": "logo",
       "SELLER_REQUIREMENT_NOT_PENDING_DELETION": "店家未在刪除中",
       "SELLER_REQUIREMENT_NOT_SUSPENDED": "帳號未停權",
+      "SELLER_REQUIREMENT_ONBOARDING_COMPLETE": "Platform review and payout account both completed",
       "SELLER_REQUIREMENT_STORE_ACTIVE": "店家未關閉",
       "SELLER_REQUIREMENT_STORE_NAME": "店名",
       "SELLER_REQUIREMENT_TOWN_CODE": "所在地"

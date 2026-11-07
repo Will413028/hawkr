@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
 
@@ -149,6 +150,7 @@ func setupAdmin(t *testing.T) *adminFixture {
 	m := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: id, Media: mediaFake, Orders: orders, KYCKeys: kycKeys, KYCMAC: kycMAC,
 		ProductStores: noProducts{}, Registry: f.registry, Now: f.now, Logger: log,
+		Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: f.now, Logger: log}),
 	})
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: m, Orders: orders, Now: time.Now, Logger: log})
 	socialModule := social.New(social.Deps{
@@ -162,7 +164,7 @@ func setupAdmin(t *testing.T) *adminFixture {
 	}
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Ready: d.Ping, Identity: id, Seller: m, Social: socialModule, Buyer: buyers, Images: images, Logger: log, Deletion: deletion,
-		Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: m, Now: time.Now, Logger: log}), Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{},
+		Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: m, Now: time.Now, Logger: log}), Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -217,6 +219,9 @@ func (f *adminFixture) newSeller(t *testing.T, name string) (int64, seller.Store
 	}
 	authenticated, err := f.id.Authenticate(context.Background(), token)
 	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.id.SetSelfEnteredEmail(context.Background(), authenticated.Principal.ID, "seller@example.com"); err != nil {
 		t.Fatal(err)
 	}
 	s, err := f.module.Apply(context.Background(), seller.ApplyInput{AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: authenticated.Principal.ID, StoreName: name, TownCode: "63000050", AddressDetail: "測試路一號"})

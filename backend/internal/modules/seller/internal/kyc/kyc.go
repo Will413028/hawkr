@@ -14,6 +14,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/agreement"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
@@ -30,6 +31,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
 )
 
+// Identity 是 KYC 需要的 identity 公開 API：帳號的聯絡信箱（送出時要有，核准時快照到收款帳戶）。
+type Identity interface {
+	ContactEmail(ctx context.Context, accountID int64) (identity.ContactEmail, bool, error)
+}
+
 // Deps 外部依賴；clock 由組裝點注入。Keys 與 MAC 必填（seller.New 檢查）：個資不能在沒有加密的情況下寫入。
 type Deps struct {
 	DB     *db.DB
@@ -38,12 +44,22 @@ type Deps struct {
 	Media  media.Media
 	// Exposure 是可曝光的公告：申請的狀態是 KYC 流程的輸入，每個改變它的寫入在 transaction 的最後呼叫。
 	Exposure *exposure.Service
+	// Payment 是收款帳戶的擁有者（payment 模組）：核准的 transaction 內寫「建立中」的列並排入建立 job（Stripe 計畫 D16、D28）。
+	Payment  Payment
+	Identity Identity
 	Keys     *seal.Keyring
 	MAC      *seal.MAC
 	// Registry 是登記資料來源（公司型申請送件時的查詢快照）；必填：公開資料，沒有「沒有設定」的情形。
 	Registry Registry
 	Now      func() time.Time
 	Logger   *slog.Logger
+}
+
+// Payment 是 payment 模組的公開 API 中核准用到的部分。RequestAccount 在呼叫方的 transaction 內只 INSERT 帳戶列（既有的列不改）並排入建立 job，
+// 不鎖 payment 的既有列（全域鎖順序 payment 先於 seller，核准已鎖住店家與申請列）。
+type Payment interface {
+	Configured() bool
+	RequestAccount(ctx context.Context, storeID int64, contactEmail *string, now time.Time) error
 }
 
 // Service 是 KYC 的 use case。
@@ -54,10 +70,31 @@ type Service struct {
 
 // New 建立服務。
 func New(d Deps) *Service {
-	if d.Registry == nil {
-		panic("kyc: Registry is required")
+	if d.Registry == nil || d.Payment == nil || d.Identity == nil {
+		panic("kyc: Registry, Payment and Identity are required")
 	}
 	return &Service{d: d, p: protector{keys: d.Keys, mac: d.MAC}}
+}
+
+// contactEmail 回傳帳號的聯絡信箱，identity 已依它的規則正規化並略過格式不合的值；帳號沒有可用的信箱時 ok 是 false。在呼叫方的 transaction 內讀取。
+func (s *Service) contactEmail(ctx context.Context, accountID int64) (string, bool, error) {
+	c, ok, err := s.d.Identity.ContactEmail(ctx, accountID)
+	if err != nil || !ok {
+		return "", false, err
+	}
+	return c.Address, true, nil
+}
+
+// requireContactEmail 是送審的檢查：帳號沒有聯絡信箱回 failed_precondition 與 CONTACT_EMAIL_REQUIRED。
+func (s *Service) requireContactEmail(ctx context.Context, accountID int64) (string, error) {
+	email, ok, err := s.contactEmail(ctx, accountID)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", apperr.FailedPrecondition("請先填寫聯絡信箱").WithReason(apperr.ReasonContactEmailRequired)
+	}
+	return email, nil
 }
 
 func errVersionConflict() error { return apperr.VersionConflict("申請資料已被修改") }
@@ -332,7 +369,7 @@ func (s *Service) viewWith(ctx context.Context, q *store.Queries, row store.Sell
 	flow := pv.Flow
 	out.Documents, out.LastRejection, out.Flow = toDocuments(docs), lastRejection(reviews, issues), &flow
 	out.OutstandingIssues = outstandingIssues(reviews, issueRows)
-	out.MissingFields = missingFields(row, docs)
+	out.MissingFields = missingFields(row)
 	if out.MissingStoreFields, err = s.missingStoreFields(ctx, q, row.StoreID); err != nil {
 		return out, nil, err
 	}
@@ -344,7 +381,7 @@ func (s *Service) viewWith(ctx context.Context, q *store.Queries, row store.Sell
 }
 
 // Submit 送出申請：草稿，以及流程允許重新送出（CanResubmit）的申請——被退回的、已核准但 PayUni 拒絕而且還能重新綁定的——
-// 都能直接送出，不必先回到草稿。必填欄位與三張證件齊全才能送出，並先比對身分（命中別的帳號生效中的處分時失敗，回泛用錯誤；權威的
+// 都能直接送出，不必先回到草稿。必填欄位齊全才能送出，並先比對身分（命中別的帳號生效中的處分時失敗，回泛用錯誤；權威的
 // 比對在核准時）。同意的文件（AcceptedAgreements）先於一切業務檢查驗證（種類不對回 InvalidInput，版本不是現行版本回
 // FailedPrecondition 的 AGREEMENT_OUTDATED）。寫入、同意紀錄、審核紀錄（SUBMIT）與 KYCSubmitted 在同一個 transaction。
 func (s *Service) Submit(ctx context.Context, in model.SubmitKYCInput) (model.KYCApplication, error) {
@@ -379,11 +416,10 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitKYCInput) (model.KY
 		if err := payuni.CheckResubmit(ctx, q, row); err != nil {
 			return err
 		}
-		docs, err := q.KYCDocuments(ctx, row.ApplicationID)
-		if err != nil {
+		if err := complete(row); err != nil {
 			return err
 		}
-		if err := complete(row, docs); err != nil {
+		if _, err := s.requireContactEmail(ctx, locked.AccountID); err != nil {
 			return err
 		}
 		missingStore, err := s.missingStoreFields(ctx, q, row.StoreID)
@@ -544,53 +580,33 @@ func (s *Service) transition(ctx context.Context, q *store.Queries, row store.Se
 	return updated, stint.InvalidateByID(ctx, q, s.d.Jobs, row.StoreID)
 }
 
-// complete 檢查送出必填的欄位與三張證件（DB 的 kyc_applications_complete_check 是保底）；一次列出全部缺的欄位。
+// complete 檢查送出必填的欄位（DB 的 kyc_applications_complete_check 是保底）；一次列出全部缺的欄位。
 type requirement struct {
 	field, message string
-	absent         func(row store.SellerKycApplication, have map[string]bool) bool
+	absent         func(row store.SellerKycApplication) bool
 }
 
 // requirements 是送出之前必填的項目（欄位路徑與缺少時的說明）；完整性的規則只有這一份：送出（complete）與申請檢視的
-// missing_fields（missingFields）都由它推導。個人與企業各自專屬的項目依 model.FieldAppliesTo 過濾。
+// missing_fields（missingFields）都由它推導。企業專屬的項目依 model.FieldAppliesTo 過濾。
 var requirements = []requirement{
-	{"real_name", "請填寫姓名", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.RealName == nil }},
-	{"english_name", "請填寫商店英文名稱", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.EnglishName == nil }},
-	{"bank_name", "請填寫銀行名稱", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.BankName == nil }},
-	{"bank_code", "請填寫銀行代碼", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.BankCode == nil }},
-	{"bank_account", "請填寫銀行帳號", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.BankAccountEnc == nil }},
-	{"id_card_front", "請上傳身分證正面照片", func(_ store.SellerKycApplication, have map[string]bool) bool {
-		return !have[string(model.SlotIDCardFront)]
-	}},
-	{"id_card_back", "請上傳身分證反面照片", func(_ store.SellerKycApplication, have map[string]bool) bool {
-		return !have[string(model.SlotIDCardBack)]
-	}},
-	{"bank_book", "請上傳存摺封面照片", func(_ store.SellerKycApplication, have map[string]bool) bool {
-		return !have[string(model.SlotBankBook)]
-	}},
-	{"individual.id_card_no", "請填寫身分證字號", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.IDCardNoEnc == nil }},
-	{"business.company_name", "請填寫公司名稱", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.CompanyName == nil }},
-	{"business.tax_id", "請填寫統一編號", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.TaxID == nil }},
-	{"business.rep_id_card_no", "請填寫負責人身分證字號", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.RepIDCardNoEnc == nil }},
+	{"business.company_name", "請填寫公司名稱", func(r store.SellerKycApplication) bool { return r.CompanyName == nil }},
+	{"business.tax_id", "請填寫統一編號", func(r store.SellerKycApplication) bool { return r.TaxID == nil }},
 }
 
 // missingFields 回傳還缺的欄位路徑（依 requirements 的順序）。
-func missingFields(row store.SellerKycApplication, docs []store.SellerKycDocument) []string {
-	have := map[string]bool{}
-	for _, d := range docs {
-		have[d.Slot] = true
-	}
+func missingFields(row store.SellerKycApplication) []string {
 	out := []string{}
 	for _, r := range requirements {
-		if model.FieldAppliesTo(r.field, model.KYCSellerType(row.SellerType)) && r.absent(row, have) {
+		if model.FieldAppliesTo(r.field, model.KYCSellerType(row.SellerType)) && r.absent(row) {
 			out = append(out, r.field)
 		}
 	}
 	return out
 }
 
-// complete 在送出時確認必填的項目與證件齊全：缺的每一項都是一個欄位違規（欄位是 KYCFieldNames 的路徑）。
-func complete(row store.SellerKycApplication, docs []store.SellerKycDocument) error {
-	missing := missingFields(row, docs)
+// complete 在送出時確認必填的項目齊全：缺的每一項都是一個欄位違規（欄位是 KYCFieldNames 的路徑）。
+func complete(row store.SellerKycApplication) error {
+	missing := missingFields(row)
 	if len(missing) == 0 {
 		return nil
 	}

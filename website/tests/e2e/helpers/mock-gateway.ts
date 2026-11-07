@@ -69,6 +69,11 @@ export const GET_SESSION_URL = identityMethod(
 	"GetSession",
 );
 
+export const GET_CONTACT_EMAIL_URL = identityMethod(
+	"IdentityAppService",
+	"GetContactEmail",
+);
+
 export const LIST_LINKED_IDENTITIES_URL = identityMethod(
 	"IdentityAppService",
 	"ListLinkedIdentities",
@@ -90,6 +95,7 @@ function sellerMethod(method: string): RegExp {
 }
 export const GET_MY_STORE_URL = sellerMethod("GetMyStore");
 export const GET_MY_KYC_URL = sellerMethod("GetMyKYC");
+export const GET_MY_PAYMENT_ACCOUNT_URL = sellerMethod("GetMyPaymentAccount");
 export const UPDATE_MY_STORE_URL = sellerMethod("UpdateMyStore");
 export const GET_MY_DASHBOARD_URL = sellerMethod("GetMyDashboard");
 export const LIST_MY_MEASURES_URL = sellerMethod("ListMyMeasures");
@@ -143,7 +149,7 @@ export const PENDING_DELETION_SELLER_CAPABILITIES: readonly MockSellerCapability
 export type MockSellerRequirement =
 	| "STORE_ACTIVE"
 	| "NOT_SUSPENDED"
-	| "KYC_APPROVED"
+	| "ONBOARDING_COMPLETE"
 	| "STORE_NAME"
 	| "LOGO"
 	| "TOWN_CODE"
@@ -153,7 +159,7 @@ export type MockSellerRequirement =
 const SELLER_REQUIREMENT_ORDER: readonly MockSellerRequirement[] = [
 	"STORE_ACTIVE",
 	"NOT_SUSPENDED",
-	"KYC_APPROVED",
+	"ONBOARDING_COMPLETE",
 	"STORE_NAME",
 	"LOGO",
 	"TOWN_CODE",
@@ -189,7 +195,7 @@ export interface MockStore {
 	logoUriTemplate?: string;
 	/** 有生效中的停權措施（`GetMyStoreResponse.suspended`）；原因與期間看 `ListMyMeasures`。 */
 	suspended?: boolean;
-	/** 啟用的能力；預設是全部（物流建店在缺 KYC_APPROVED 時不啟用）。 */
+	/** 啟用的能力；預設是全部（物流建店在缺 ONBOARDING_COMPLETE 時不啟用）。 */
 	capabilities?: readonly MockSellerCapability[];
 	/** 店家狀態 PUBLIC_LISTING 還沒滿足的條件；預設沒有缺。 */
 	missingRequirements?: readonly MockSellerRequirement[];
@@ -197,7 +203,7 @@ export interface MockStore {
 
 /**
  * 沒有啟用的能力缺的條件，照伺服器的規則（backend `model.CapabilitiesOf`）：停權缺 NOT_SUSPENDED，物流建店
- * 缺 KYC_APPROVED，等待刪除缺 NOT_PENDING_DELETION；測試單獨拿掉某個能力、其他狀態都正常時，缺 NOT_SUSPENDED
+ * 缺 ONBOARDING_COMPLETE，等待刪除缺 NOT_PENDING_DELETION；測試單獨拿掉某個能力、其他狀態都正常時，缺 NOT_SUSPENDED
  * 當作代表（契約要求沒有啟用的能力至少缺一項）。
  */
 function missingOfInactive(
@@ -209,9 +215,9 @@ function missingOfInactive(
 	if (store.suspended) missing.push("NOT_SUSPENDED");
 	if (
 		capability === "SHIPPING_SETUP" &&
-		publicListingMissing.includes("KYC_APPROVED")
+		publicListingMissing.includes("ONBOARDING_COMPLETE")
 	) {
-		missing.push("KYC_APPROVED");
+		missing.push("ONBOARDING_COMPLETE");
 	}
 	if (store.status === "PENDING_DELETION") missing.push("NOT_PENDING_DELETION");
 	return inRequirementOrder(missing.length > 0 ? missing : ["NOT_SUSPENDED"]);
@@ -221,7 +227,7 @@ function missingOfInactive(
 export function myStoreJson(store: MockStore) {
 	const missing = inRequirementOrder(store.missingRequirements ?? []);
 	const granted = new Set(store.capabilities ?? ALL_SELLER_CAPABILITIES);
-	if (missing.includes("KYC_APPROVED")) granted.delete("SHIPPING_SETUP");
+	if (missing.includes("ONBOARDING_COMPLETE")) granted.delete("SHIPPING_SETUP");
 	return {
 		store: {
 			id: store.id,
@@ -458,45 +464,60 @@ export type MockKycFlowStatus =
 	| "DRAFT"
 	| "SUBMITTED"
 	| "REJECTED"
-	| "BINDING"
-	| "BIND_FAILED"
-	| "FORWARDED"
+	| "APPROVED";
+
+export type MockPaymentAccountStatus =
+	| "NOT_CREATED"
 	| "UNDER_REVIEW"
-	| "PENDING_INFO"
-	| "APPROVED"
-	| "PAYUNI_REJECTED";
+	| "ACTION_REQUIRED"
+	| "ENABLED"
+	| "DISABLED";
 
 /**
- * proto3 JSON 的 GetMyKYCResponse：只放流程狀態（`application.flow`）。NOT_STARTED 在真實契約上是
- * not_found，這裡用同樣的錯誤回應（client 把它讀成「還沒開始」）。
+ * proto3 JSON 的 GetMyKYCResponse：申請的 `status`（平台審核）與流程旗標（`application.flow`）。NOT_STARTED 在真實
+ * 契約上是 not_found，這裡用同樣的錯誤回應（client 把它讀成「還沒開始」）。
+ *
+ * 收款帳戶（GetMyPaymentAccount）：申請 APPROVED 時預設是 ENABLED，其餘是 not_found（平台審核還沒核准）；
+ * `paymentAccount` 可以指定狀態。
+ *
+ * 帳號的聯絡信箱（identity 的 GetContactEmail，認證頁的收款區與送審前的檢查讀它）：預設是 provider 驗證過的信箱；
+ * `contactEmail: null` 是帳號還沒有聯絡信箱（回應沒有 `contactEmail`）。
  */
-export interface MockSellerPayUni {
-	state:
-		| "REVIEWING"
-		| "PENDING_INFO"
-		| "FIXABLE"
-		| "FIX_VIA_SUPPORT"
-		| "CONTACT_SUPPORT"
-		| "RETRY_LATER"
-		| "TERMINATED"
-		| "APPROVED";
-	/** 伺服器的狀態說明（APPROVED 沒有）。 */
-	explanation?: string;
-	reason?: string;
-	fixFields?: string[];
-	fixStoreFields?: string[];
-}
-
 export async function mockMyKyc(
 	page: Page,
 	flow: {
 		status: MockKycFlowStatus;
 		identityLocked?: boolean;
 		canResubmit?: boolean;
-		payuni?: MockSellerPayUni;
 		resubmitUnavailabilities?: { reason: string; message: string }[];
+		paymentAccount?: {
+			status: MockPaymentAccountStatus;
+			payoutsActive?: boolean;
+			surface?: "HOSTED" | "EMBEDDED";
+		};
+		contactEmail?: {
+			email: string;
+			source: "VERIFIED" | "SELF_ENTERED";
+		} | null;
 	},
 ): Promise<void> {
+	await page.route(GET_CONTACT_EMAIL_URL, (route) => {
+		const contact =
+			flow.contactEmail === undefined
+				? { email: "seller@example.com", source: "VERIFIED" as const }
+				: flow.contactEmail;
+		void fulfillConnect(
+			route,
+			contact
+				? {
+						contactEmail: {
+							email: contact.email,
+							source: `CONTACT_EMAIL_SOURCE_${contact.source}`,
+						},
+					}
+				: {},
+		);
+	});
 	await page.route(GET_MY_KYC_URL, (route) => {
 		if (flow.status === "NOT_STARTED") {
 			void fulfillConnectError(route, "not_found", "尚未申請");
@@ -505,31 +526,13 @@ export async function mockMyKyc(
 		void fulfillConnect(route, {
 			application: {
 				id: "1",
+				status: `KYC_STATUS_${flow.status}`,
 				flow: {
-					status: `KYC_FLOW_STATUS_${flow.status}`,
 					identityLocked: flow.identityLocked ?? false,
 					// 伺服器的值：草稿與被退回一律能重送。
 					canResubmit:
 						flow.canResubmit ??
 						(flow.status === "DRAFT" || flow.status === "REJECTED"),
-					...(flow.payuni
-						? {
-								payuni: {
-									state: `PAY_UNI_STATE_${flow.payuni.state}`,
-									...(flow.payuni.explanation
-										? {
-												explanation: {
-													locale: "zh-TW",
-													message: flow.payuni.explanation,
-												},
-											}
-										: {}),
-									reason: flow.payuni.reason ?? "",
-									fixFields: flow.payuni.fixFields ?? [],
-									fixStoreFields: flow.payuni.fixStoreFields ?? [],
-								},
-							}
-						: {}),
 					resubmitUnavailabilities: (flow.resubmitUnavailabilities ?? []).map(
 						(u) => ({
 							reason: `KYC_RESUBMIT_UNAVAILABLE_REASON_${u.reason}`,
@@ -537,6 +540,24 @@ export async function mockMyKyc(
 						}),
 					),
 				},
+			},
+		});
+	});
+	await page.route(GET_MY_PAYMENT_ACCOUNT_URL, (route) => {
+		const account =
+			flow.paymentAccount ??
+			(flow.status === "APPROVED" ? { status: "ENABLED" as const } : null);
+		if (!account) {
+			void fulfillConnectError(route, "not_found", "尚無收款帳戶");
+			return;
+		}
+		void fulfillConnect(route, {
+			account: {
+				status: `PAYMENT_ACCOUNT_STATUS_${account.status}`,
+				requirementCollection: "REQUIREMENT_COLLECTION_PROVIDER",
+				onboardingSurface: `ONBOARDING_SURFACE_${account.surface ?? "HOSTED"}`,
+				transfersActive: account.status === "ENABLED",
+				payoutsActive: account.payoutsActive ?? account.status === "ENABLED",
 			},
 		});
 	});

@@ -63,6 +63,9 @@ var declarations = map[string]declaration{
 	sellerv1alpha1connect.SellerAppServiceSaveKYCDraftProcedure: requires(model.CapStorefrontWrite),
 	sellerv1alpha1connect.SellerAppServiceGetMyKYCProcedure:     requires(model.CapAccountSelfRead),
 	sellerv1alpha1connect.SellerAppServiceCancelKYCProcedure:    requires(model.CapStorefrontWrite),
+	// 收款帳戶：讀取自己的帳戶停權時仍可以；取得開通 session 會呼叫金流商，是店面設定的一部分，停權與等待刪除時不能做。
+	sellerv1alpha1connect.SellerAppServiceGetMyPaymentAccountProcedure:            requires(model.CapAccountSelfRead),
+	sellerv1alpha1connect.SellerAppServiceCreatePaymentOnboardingSessionProcedure: requires(model.CapStorefrontWrite),
 	// 身分比對是身分證號與統編存在與否的探測面（ADR 2026-10-19-seller-kyc-payuni-consolidated）：每個帳號每小時最多 5 次。
 	// 一次正常的申請是填完才送出，被退回後修改重送，一個小時內不會超過；額度以帳號計，計數在這個程序的記憶體內：多個
 	// instance 各自計數，monolith 跑超過一個 instance 之前要換成共用的計數（docs/modules/seller.md §23；入口的 IP 限流不是它的補償）。

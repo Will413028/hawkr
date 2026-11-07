@@ -16,7 +16,7 @@ var Dependencies = map[string][]string{
 	"media":             {},
 	"payment":           {},
 	"buyer":             {"identity", "media"},
-	"seller":            {"identity", "media"},
+	"seller":            {"identity", "media", "payment"},
 	"content":           {"media"},
 	"fulfillment":       {"buyer", "seller", "media"},
 	"catalog":           {"seller", "buyer", "media", "fulfillment"},
@@ -35,7 +35,7 @@ var Dependencies = map[string][]string{
 	"delegation":        {"identity", "seller", "ordering", "catalog", "social", "media"}, // 授權、session、稽核與編排全由 delegation 擁有。
 	"accountdeletion":   {"identity", "buyer", "seller"},                                  // 刪除帳號的流程管理者。
 	"accountsuspension": {"identity", "seller"},                                           // 停權與解除的唯一入口：鎖帳號、確認沒有店家、再呼叫 identity。
-	"reviewqueue":       {"seller"},                                                       // 後台待辦：讀各來源發布的 pub_*_review_items 排序分頁。
+	"reviewqueue":       {"seller", "payment"},                                            // 後台待辦：讀各來源發布的 pub_*_review_items 排序分頁。
 	"agent":             {"ordering", "catalog", "buyer", "seller", "media"},
 	"notification": {
 		"identity", "buyer", "seller", "catalog", "ordering", "fulfillment", "payment", "invoice",
@@ -50,6 +50,7 @@ type InternalGraph struct {
 
 // InternalDependencies 是已建立模組的內部 package 依賴圖。
 var InternalDependencies = map[string]InternalGraph{
+	"payment": {Packages: map[string][]string{"account": {"model", "store"}, "model": {}, "store": {}}},
 	"social": {Packages: map[string][]string{
 		"actor":      {"model", "text", "visibility"},
 		"comment":    {"actor", "model", "reads", "store", "text", "textcheck", "visibility"},
@@ -112,6 +113,7 @@ var InternalDependencies = map[string]InternalGraph{
 		"mediaref":   {"model", "store"},
 		"kyc":        {"agreement", "exposure", "mediaref", "model", "payuni", "store", "stint"},
 		"payuni":     {"exposure", "model", "store", "stint"},
+		"payout":     {"exposure", "store", "stint"},
 		"exposure":   {"model", "store", "stint"},
 		"purge":      {"mediaref", "model", "store"},
 		"prospect":   {"mediaref", "model", "store"},

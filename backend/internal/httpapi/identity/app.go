@@ -30,6 +30,8 @@ type appIdentity interface {
 	ListSessions(ctx context.Context, accountID int64) ([]identity.SessionInfo, error)
 	ListLinkedIdentities(ctx context.Context, accountID int64) ([]identity.LinkedIdentity, error)
 	RevokeSession(ctx context.Context, accountID int64, sessionID identity.SessionID) error
+	ContactEmail(ctx context.Context, accountID int64) (identity.ContactEmail, bool, error)
+	SetSelfEnteredEmail(ctx context.Context, accountID int64, email string) (identity.ContactEmail, error)
 }
 
 // buyerProfiles 是頁首顯示資料的來源：買家模組的公開讀取。
@@ -257,6 +259,53 @@ func (h *App) RevokeSession(ctx context.Context, req *connect.Request[pb.RevokeS
 		return nil, err
 	}
 	return connect.NewResponse(&pb.RevokeSessionResponse{}), nil
+}
+
+// GetContactEmail 回傳呼叫者的帳號聯絡信箱與來源；沒有任何信箱時不帶 contact_email。
+func (h *App) GetContactEmail(ctx context.Context, _ *connect.Request[pb.GetContactEmailRequest]) (*connect.Response[pb.GetContactEmailResponse], error) {
+	p, _, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	c, ok, err := h.m.ContactEmail(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	resp := &pb.GetContactEmailResponse{}
+	if ok {
+		if resp.ContactEmail, err = contactEmail(c); err != nil {
+			return nil, err
+		}
+	}
+	return connect.NewResponse(resp), nil
+}
+
+// setContactEmailPaths 把模組回報的欄位對應到 SetContactEmailRequest 的路徑。
+var setContactEmailPaths = rpc.FieldPaths{"Email": "email"}
+
+// SetContactEmail 設定呼叫者自填的聯絡信箱；帳號已有 provider 驗證過的 email 時回 failed_precondition。
+func (h *App) SetContactEmail(ctx context.Context, req *connect.Request[pb.SetContactEmailRequest]) (*connect.Response[pb.SetContactEmailResponse], error) {
+	p, _, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	c, err := h.m.SetSelfEnteredEmail(ctx, p.ID, req.Msg.GetEmail())
+	if err != nil {
+		return nil, rpc.WithFieldPaths(err, setContactEmailPaths)
+	}
+	out, err := contactEmail(c)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.SetContactEmailResponse{ContactEmail: out}), nil
+}
+
+func contactEmail(c identity.ContactEmail) (*pb.ContactEmail, error) {
+	source := rpc.EnumToProto[pb.ContactEmailSource](string(c.Source))
+	if source == pb.ContactEmailSource_CONTACT_EMAIL_SOURCE_UNSPECIFIED {
+		return nil, fmt.Errorf("httpapi/identity：聯絡信箱有不認得的來源 %q", c.Source)
+	}
+	return &pb.ContactEmail{Email: c.Address, Source: source}, nil
 }
 
 // requireRecentAuthentication 要求最近一次以 provider 驗證的時間 authTime 不早於 now 之前的 ReauthWindow（ASVS；計畫 2026-10-30-self-hosted-auth
