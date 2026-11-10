@@ -47,17 +47,28 @@ abstract final class SellerAppService {
     idempotency: connect.Idempotency.noSideEffects,
   );
 
-  /// GetMyOnboarding 回傳呼叫者店家的開通任務：依序的必要任務（商店資料、平台審核、收款帳戶，以及公開條件還缺其他項目時的「其他公開條件」），
-  /// 與開通閘門 complete。任務的狀態、下一步與文字都由伺服器推導（client 只呈現，不組合 GetMyKYC、GetMyPaymentAccount、GetMyStore 推導）。
-  /// 平台審核與收款帳戶各自讀取自己的來源：單一來源讀不到只讓該項是 UNKNOWN，方法本身不因此失敗。refresh 為 true 時先同步向金流商重讀收款帳戶
-  /// 再回傳（賣家從金流商的頁面回來時用）；同步失敗只記錄、不讓方法失敗，這時以快取的狀態回傳。refresh 可能寫入收款帳戶的快取，所以不是
-  /// NO_SIDE_EFFECTS（IDEMPOTENT，以 POST 呼叫，仍可自動重送），也像其他會改變狀態的方法一樣，停權的帳號呼叫時回 permission_denied
-  /// （ACCOUNT_SUSPENDED）：client 以 GetMyStore 的停權狀態導向公告頁，不靠這個方法。需要賣家能力 CAP_ACCOUNT_SELF_READ，所以已關閉的店家回 not_found。
+  /// GetMyOnboarding 回傳呼叫者店家的開通任務：依序的必要任務（商店資料、平台審核、收款帳戶）與開通閘門 complete。任務的狀態、下一步與文字
+  /// 都由伺服器推導（client 只呈現，不組合 GetMyKYC、GetMyPaymentAccount、GetMyStore 推導）。平台審核與收款帳戶各自讀取自己的來源：單一來源讀不到
+  /// 只讓該項是 UNKNOWN，方法本身不因此失敗。只讀本地的狀態，不呼叫金流商；要最新的收款帳戶狀態先呼叫 RefreshMyPaymentAccount 再讀。
+  /// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀（client 以 GetMyStore 的停權狀態導向公告頁），已關閉的店家回 not_found。
   static const getMyOnboarding = connect.Spec(
     '/$name/GetMyOnboarding',
     connect.StreamType.unary,
     hawkrsellerv1alpha1seller.GetMyOnboardingRequest.new,
     hawkrsellerv1alpha1seller.GetMyOnboardingResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
+  /// RefreshMyPaymentAccount 同步向金流商重讀呼叫者店家的收款帳戶並更新快取（賣家從金流商的開通頁面回來時用，之後讀 GetMyOnboarding）。
+  /// 同一帳戶上次讀取在 10 秒內就不呼叫金流商、直接成功（快取就是結果）。還沒有外部帳戶或沒有設定收款開通時什麼都不做、回成功。
+  /// 金流商暫時讀不到回 unavailable（client 可以重試）；金流商沒有這個帳戶回 failed_precondition。需要賣家能力 CAP_STOREFRONT_WRITE
+  /// （會呼叫金流商，是店面設定的一部分）：停權與等待刪除的店家回 permission_denied（SELLER_SUSPENDED）與 failed_precondition。
+  /// 重複呼叫與一次的結果相同，所以是 IDEMPOTENT，可以自動重試。
+  static const refreshMyPaymentAccount = connect.Spec(
+    '/$name/RefreshMyPaymentAccount',
+    connect.StreamType.unary,
+    hawkrsellerv1alpha1seller.RefreshMyPaymentAccountRequest.new,
+    hawkrsellerv1alpha1seller.RefreshMyPaymentAccountResponse.new,
     idempotency: connect.Idempotency.idempotent,
   );
 

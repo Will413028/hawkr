@@ -56,10 +56,6 @@
       "message": "措施剛剛有變動，請重試。",
       "description": "撤銷（後台）或申覆、解除請求（賣家）要鎖的帳號範圍在預讀與鎖住之間反覆變動（剛好有新的關聯終止或引用），重跑次數用完（Unavailable，可重送）。沿用撤銷原本寫死的句子。"
     },
-    "onboarding.other_requirement.missing": {
-      "message": "還有公開條件尚未滿足，請聯絡客服。",
-      "description": "開通任務其他公開條件的狀態句：有上面各項與停權、關店、等待刪除以外的條件缺少（ACTION_REQUIRED）。"
-    },
     "onboarding.payment_account.action_required": {
       "message": "提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。",
       "description": "開通任務收款帳戶的狀態句：賣家要補資料（ACTION_REQUIRED，可以開通 session）。"
@@ -140,10 +136,6 @@
         }
       },
       "description": "開通任務商店資料的狀態句：缺少的項目（ACTION_REQUIRED）；items 是目錄名詞（SellerRequirement 的店名、logo、所在地）以語系的分隔詞連接。"
-    },
-    "onboarding.title.other_requirement": {
-      "message": "其他公開條件",
-      "description": "開通任務標題：其他公開條件（OTHER_REQUIREMENT）。"
     },
     "onboarding.title.payment_account": {
       "message": "收款帳戶",

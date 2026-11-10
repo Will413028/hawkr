@@ -359,8 +359,6 @@ const (
 	OnboardingPlatformReview = model.OnboardingPlatformReview
 	// OnboardingPaymentAccount 收款帳戶。
 	OnboardingPaymentAccount = model.OnboardingPaymentAccount
-	// OnboardingOtherRequirement 其他公開條件。
-	OnboardingOtherRequirement = model.OnboardingOtherRequirement
 	// OnboardingCompleted 是任務狀態：已完成。
 	OnboardingCompleted = model.OnboardingCompleted
 )

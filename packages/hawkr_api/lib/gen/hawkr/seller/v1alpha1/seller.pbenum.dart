@@ -362,21 +362,15 @@ class OnboardingTaskId extends $pb.ProtobufEnum {
       OnboardingTaskId._(
           3, _omitEnumNames ? '' : 'ONBOARDING_TASK_ID_PAYMENT_ACCOUNT');
 
-  /// 其他公開條件：公開曝光還缺上面三項與停權、關店、等待刪除（由公告頁處理）以外的條件，賣家只能聯絡客服。
-  static const OnboardingTaskId ONBOARDING_TASK_ID_OTHER_REQUIREMENT =
-      OnboardingTaskId._(
-          4, _omitEnumNames ? '' : 'ONBOARDING_TASK_ID_OTHER_REQUIREMENT');
-
   static const $core.List<OnboardingTaskId> values = <OnboardingTaskId>[
     ONBOARDING_TASK_ID_UNSPECIFIED,
     ONBOARDING_TASK_ID_PROFILE,
     ONBOARDING_TASK_ID_PLATFORM_REVIEW,
     ONBOARDING_TASK_ID_PAYMENT_ACCOUNT,
-    ONBOARDING_TASK_ID_OTHER_REQUIREMENT,
   ];
 
   static final $core.List<OnboardingTaskId?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
   static OnboardingTaskId? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -456,7 +450,7 @@ class OnboardingAction extends $pb.ProtobufEnum {
       OnboardingAction._(4,
           _omitEnumNames ? '' : 'ONBOARDING_ACTION_START_PAYMENT_ONBOARDING');
 
-  /// 重新整理收款帳戶的狀態：再呼叫 GetMyOnboarding 並帶 refresh。
+  /// 重新整理收款帳戶的狀態：呼叫 RefreshMyPaymentAccount，再呼叫 GetMyOnboarding。
   static const OnboardingAction ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT =
       OnboardingAction._(
           5, _omitEnumNames ? '' : 'ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT');

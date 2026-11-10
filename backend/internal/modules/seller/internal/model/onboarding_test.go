@@ -39,51 +39,50 @@ func TestOnboardingTaskStatesAndActions(t *testing.T) {
 	t.Parallel()
 	enabled := OnboardingPaymentRead{Found: true, Status: "ENABLED", CanStartOnboarding: true}
 	cases := []struct {
-		name       string
-		c          Conditions
-		kyc        OnboardingKYCRead
-		pay        OnboardingPaymentRead
-		profile    [2]any
-		review     [2]any
-		payment    [2]any
-		wantOthers bool
+		name    string
+		c       Conditions
+		kyc     OnboardingKYCRead
+		pay     OnboardingPaymentRead
+		profile [2]any
+		review  [2]any
+		payment [2]any
 	}{
 		{"全部完成", conds(true, true, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, enabled,
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}},
 		{"全部完成但兩個來源都讀不到：完成的任務不需要讀取結果", conds(true, true, true), OnboardingKYCRead{Err: errRead}, OnboardingPaymentRead{Err: errRead},
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}},
 		{"商店資料缺項", conds(true, true, false), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, enabled,
-			[2]any{OnboardingActionRequired, OnboardingActionEditProfile}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, false},
+			[2]any{OnboardingActionRequired, OnboardingActionEditProfile}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}},
 		{"沒有 KYC 申請", conds(false, false, true), OnboardingKYCRead{}, OnboardingPaymentRead{},
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionSubmitCertification}, [2]any{OnboardingLocked, OnboardingActionNone}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionSubmitCertification}, [2]any{OnboardingLocked, OnboardingActionNone}},
 		{"KYC 草稿", conds(false, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusDraft}, OnboardingPaymentRead{},
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionSubmitCertification}, [2]any{OnboardingLocked, OnboardingActionNone}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionSubmitCertification}, [2]any{OnboardingLocked, OnboardingActionNone}},
 		{"KYC 審核中", conds(false, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusSubmitted}, OnboardingPaymentRead{},
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionNone}, [2]any{OnboardingLocked, OnboardingActionNone}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionNone}, [2]any{OnboardingLocked, OnboardingActionNone}},
 		{"KYC 被退回", conds(false, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusRejected}, OnboardingPaymentRead{},
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionSubmitCertification}, [2]any{OnboardingLocked, OnboardingActionNone}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionSubmitCertification}, [2]any{OnboardingLocked, OnboardingActionNone}},
 		{"KYC 已取消", conds(false, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusCancelled}, OnboardingPaymentRead{},
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionSubmitCertification}, [2]any{OnboardingLocked, OnboardingActionNone}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionSubmitCertification}, [2]any{OnboardingLocked, OnboardingActionNone}},
 		{"KYC 讀取失敗：只有平台審核是 UNKNOWN，收款帳戶仍是 LOCKED", conds(false, false, true), OnboardingKYCRead{Err: errRead}, OnboardingPaymentRead{},
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingUnknown, OnboardingActionNone}, [2]any{OnboardingLocked, OnboardingActionNone}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingUnknown, OnboardingActionNone}, [2]any{OnboardingLocked, OnboardingActionNone}},
 		{"KYC 核准、還沒有收款帳戶列", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{},
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionRefreshPaymentAccount}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionRefreshPaymentAccount}},
 		{"收款帳戶建立中", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "NOT_CREATED"},
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionRefreshPaymentAccount}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionRefreshPaymentAccount}},
 		{"收款帳戶審核中", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "UNDER_REVIEW"},
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionRefreshPaymentAccount}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionRefreshPaymentAccount}},
 		{"收款帳戶待設定、可以開通", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED", CanStartOnboarding: true},
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionStartPaymentOnboarding}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionStartPaymentOnboarding}},
 		{"收款帳戶待設定、沒有設定收款開通", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED"},
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionNone}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionNone}},
 		{"收款帳戶被停用", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "DISABLED"},
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionContactSupport}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionContactSupport}},
 		{"帳戶 ENABLED 但副本還沒跟上：不算完成", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, enabled,
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionRefreshPaymentAccount}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionRefreshPaymentAccount}},
 		{"收款帳戶讀取失敗：只有收款帳戶是 UNKNOWN", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Err: errRead},
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingUnknown, OnboardingActionNone}, false},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingUnknown, OnboardingActionNone}},
 		{"沒有讀過條件：fail-closed", Conditions{}, OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, enabled,
-			[2]any{OnboardingActionRequired, OnboardingActionEditProfile}, [2]any{OnboardingInProgress, OnboardingActionNone}, [2]any{OnboardingLocked, OnboardingActionNone}, false},
+			[2]any{OnboardingActionRequired, OnboardingActionEditProfile}, [2]any{OnboardingInProgress, OnboardingActionNone}, [2]any{OnboardingLocked, OnboardingActionNone}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -144,25 +143,53 @@ func TestOnboardingUnknownOnlyOnReadFailure(t *testing.T) {
 	}
 }
 
-// 沒有任務處理的公開條件才出現 OTHER_REQUIREMENT；任務與公告頁處理的條件（含停權、關店、等待刪除）都不出現。
-// mutation：已處理的清單拿掉 NOT_SUSPENDED → 停權時出現「其他公開條件」，失敗。
-func TestOnboardingOtherRequirementOnlyForUnhandledRequirements(t *testing.T) {
+// 公開曝光的每個條件都對應到恰好一種處理者：一個以上的開通任務，或公告頁（STORE_ACTIVE、NOT_SUSPENDED、NOT_PENDING_DELETION）；兩者不並存。
+// 對照表 requirementCovers 就是商店資料任務挑條件用的表（profileTask 經 requirementsOf 讀它），不是平行的副本。
+// mutation：CapPublicListing 的 needs 加一個沒有在 requirementCovers 的新條件（並列入 Requirements()）→ 這個測試失敗。
+func TestEveryPublicListingRequirementIsCoveredByATaskOrTheNoticePage(t *testing.T) {
 	t.Parallel()
-	in := OnboardingInput{Store: storeWith(conds(true, true, true)), KYC: OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, Payment: OnboardingPaymentRead{Found: true, Status: "ENABLED"}}
-	if o := onboardingTasks(uitext.ZhTW, in, Requirements()); len(o.Tasks) != 3 {
-		t.Fatalf("已處理的條件全缺時任務是 %d 項，要 3 項（沒有其他公開條件）", len(o.Tasks))
+	var notice []Requirement
+	for _, r := range Needs(CapPublicListing) {
+		cover, ok := requirementCovers[r]
+		if !ok {
+			t.Errorf("公開條件 %s 沒有對應到任務或公告頁", r)
+			continue
+		}
+		if (len(cover.tasks) > 0) == cover.notice {
+			t.Errorf("公開條件 %s 的處理者要是任務或公告頁其中之一：%+v", r, cover)
+		}
+		for _, id := range cover.tasks {
+			if !slices.Contains(OnboardingTaskIDValues(), id) {
+				t.Errorf("公開條件 %s 對應到不存在的任務 %s", r, id)
+			}
+		}
+		if cover.notice {
+			notice = append(notice, r)
+		}
 	}
-	o := onboardingTasks(uitext.ZhTW, in, []Requirement{RequirementNotSuspended, "SOMETHING_NEW"})
-	if len(o.Tasks) != 4 {
-		t.Fatalf("有沒處理的條件時任務是 %d 項，要 4 項", len(o.Tasks))
+	if want := []Requirement{RequirementActive, RequirementNotSuspended, RequirementNotPendingDeletion}; !slices.Equal(notice, want) {
+		t.Errorf("公告頁處理的條件=%v，要 %v", notice, want)
 	}
-	other := taskOf(t, o, OnboardingOtherRequirement)
-	if other.State != OnboardingActionRequired || other.Action != OnboardingActionContactSupport || o.Tasks[3].ID != OnboardingOtherRequirement {
-		t.Fatalf("其他公開條件：%+v，要 ACTION_REQUIRED、CONTACT_SUPPORT、排在最後", other)
+	for r := range requirementCovers {
+		if !slices.Contains(Requirements(), r) {
+			t.Errorf("對照表有不是公開條件的 %s", r)
+		}
 	}
-	suspended := Store{Status: Active, Sanctions: sanctionsOf(true), Conditions: conds(true, true, true)}
-	if o := OnboardingTasksOf(uitext.ZhTW, OnboardingInput{Store: suspended}); len(o.Tasks) != 3 {
-		t.Fatalf("停權的店家出現了其他公開條件：%d 項", len(o.Tasks))
+	// 商店資料任務缺哪些條件就是表裡歸它的條件：缺任何一項都不能是 COMPLETED。
+	for _, r := range requirementsOf(OnboardingProfile) {
+		c := conds(true, true, true)
+		clear, ok := map[Requirement]func(*Conditions){
+			RequirementStoreName: func(c *Conditions) { c.StoreName = false },
+			RequirementLogo:      func(c *Conditions) { c.Logo = false },
+			RequirementTownCode:  func(c *Conditions) { c.TownCode = false },
+		}[r]
+		if !ok {
+			t.Fatalf("商店資料任務的條件 %s 沒有對應的測試輸入", r)
+		}
+		clear(&c)
+		if got := taskOf(t, OnboardingTasksOf(uitext.ZhTW, OnboardingInput{Store: storeWith(c)}), OnboardingProfile); got.State != OnboardingActionRequired {
+			t.Errorf("缺 %s 時商店資料是 %s，要 ACTION_REQUIRED", r, got.State)
+		}
 	}
 }
 

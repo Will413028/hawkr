@@ -64,20 +64,12 @@ func toOnboardingTasks(o model.Onboarding) []*pb.OnboardingTask {
 	return out
 }
 
-// GetMyOnboarding 回傳呼叫者店家的開通任務。refresh 為 true 時先同步重讀金流商的收款帳戶；同步失敗只記錄，以快取的狀態繼續（不讓方法失敗）。
-// 同步之後才由 payment 讀快取、由店家的條件讀 seller 自存的副本：同步在 payment 的 transaction 內發布 PayoutAccountChanged，seller 的副本在同一個
-// transaction 更新，所以這裡讀到的條件已經是同步之後的；但 interceptor 在同步之前就讀了店家，所以條件要在同步之後重讀。
-func (h *App) GetMyOnboarding(ctx context.Context, req *connect.Request[pb.GetMyOnboardingRequest]) (*connect.Response[pb.GetMyOnboardingResponse], error) {
+// GetMyOnboarding 回傳呼叫者店家的開通任務。唯讀：不呼叫金流商，收款帳戶讀的是 payment 的快取，完成與否看讀店家時帶上的條件（seller 自存的副本）；
+// 要最新的收款帳戶狀態先呼叫 RefreshMyPaymentAccount（D33）。停權的店家也可以讀（能力 CAP_ACCOUNT_SELF_READ）。
+func (h *App) GetMyOnboarding(ctx context.Context, _ *connect.Request[pb.GetMyOnboardingRequest]) (*connect.Response[pb.GetMyOnboardingResponse], error) {
 	current, err := storeFrom(ctx)
 	if err != nil {
 		return nil, err
-	}
-	if req.Msg.GetRefresh() {
-		if _, err := h.payments.SyncAccount(ctx, current.StoreID); err != nil {
-			h.dashboardLog().WarnContext(ctx, "httpapi/seller：開通任務同步重讀收款帳戶失敗，以快取的狀態回傳", "store_id", current.StoreID, "error", err)
-		} else if current, err = h.m.Store(ctx, current.StoreID); err != nil {
-			return nil, err
-		}
 	}
 	kyc := func(ctx context.Context) (model.KYCApplication, bool, error) {
 		app, err := h.m.MyKYC(ctx, current.AccountID)
@@ -90,7 +82,7 @@ func (h *App) GetMyOnboarding(ctx context.Context, req *connect.Request[pb.GetMy
 	return connect.NewResponse(&pb.GetMyOnboardingResponse{Tasks: toOnboardingTasks(onboarding), Complete: onboarding.Complete}), nil
 }
 
-// GetStoreOnboarding 回傳一家店的開通任務（後台只讀，沒有 refresh）；與賣家端是同一個函式，後台讀不到草稿。
+// GetStoreOnboarding 回傳一家店的開通任務（後台只讀，不重讀金流商）；與賣家端是同一個函式，後台讀不到草稿。
 func (h *Admin) GetStoreOnboarding(ctx context.Context, req *connect.Request[adminpb.GetStoreOnboardingRequest]) (*connect.Response[adminpb.GetStoreOnboardingResponse], error) {
 	id, err := rpc.ParseID("store_id", req.Msg.GetStoreId())
 	if err != nil {

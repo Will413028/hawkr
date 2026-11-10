@@ -18,13 +18,11 @@ const (
 	OnboardingPlatformReview OnboardingTaskID = "PLATFORM_REVIEW"
 	// OnboardingPaymentAccount 收款帳戶：轉帳能力啟用（seller 自存的副本）。
 	OnboardingPaymentAccount OnboardingTaskID = "PAYMENT_ACCOUNT"
-	// OnboardingOtherRequirement 其他公開條件：公開曝光還缺其他任務與公告頁都沒有涵蓋的條件。
-	OnboardingOtherRequirement OnboardingTaskID = "OTHER_REQUIREMENT"
 )
 
 // OnboardingTaskIDValues 回傳全部任務種類，依顯示順序。
 func OnboardingTaskIDValues() []OnboardingTaskID {
-	return []OnboardingTaskID{OnboardingProfile, OnboardingPlatformReview, OnboardingPaymentAccount, OnboardingOtherRequirement}
+	return []OnboardingTaskID{OnboardingProfile, OnboardingPlatformReview, OnboardingPaymentAccount}
 }
 
 // OnboardingTaskState 是開通任務的狀態（只供 client 分支），值＝proto OnboardingTaskState 的值名去掉型別前綴。
@@ -109,7 +107,7 @@ type OnboardingTask struct {
 
 // Onboarding 是開通任務清單與開通閘門。
 type Onboarding struct {
-	// Tasks 是必要任務，依 OnboardingTaskIDValues 的順序；OTHER_REQUIREMENT 只在需要時出現。
+	// Tasks 是必要任務，依 OnboardingTaskIDValues 的順序。
 	Tasks []OnboardingTask
 	// Complete 是開通閘門 ONBOARDING_COMPLETE（與 CapabilitiesOf 的 CapPublicListing 與 CapShippingSetup 缺不缺這一項同一個值）。
 	Complete bool
@@ -120,52 +118,60 @@ type Onboarding struct {
 // 停權、關店與等待刪除不是任務（由公告頁處理）。讀取失敗（in.KYC.Err、in.Payment.Err）只讓需要那個讀取來決定狀態句與下一步的任務是 UNKNOWN：
 // 已經完成的任務不需要讀取結果，仍是 COMPLETED。
 func OnboardingTasksOf(l uitext.Locale, in OnboardingInput) Onboarding {
-	return onboardingTasks(l, in, MissingExposure(in.Store))
-}
-
-// onboardingHandled 是公開曝光的條件裡，開通任務或公告頁已經處理的：其餘缺的條件才出現在 OTHER_REQUIREMENT。
-var onboardingHandled = []Requirement{
-	RequirementStoreName, RequirementLogo, RequirementTownCode, RequirementOnboardingComplete,
-	RequirementActive, RequirementNotPendingDeletion, RequirementNotSuspended,
-}
-
-// onboardingTasks 以已算好的公開曝光缺項 missing 組清單（測試以人工的缺項涵蓋「沒有任務處理的條件」）。
-func onboardingTasks(l uitext.Locale, in OnboardingInput, missing []Requirement) Onboarding {
-	c := in.Store.Conditions
-	tasks := []OnboardingTask{
-		profileTask(l, c),
-		platformReviewTask(l, c, in.KYC),
-		paymentAccountTask(l, c, in.Payment),
+	return Onboarding{
+		Tasks: []OnboardingTask{
+			profileTask(l, in.Store),
+			platformReviewTask(l, in.Store.Conditions, in.KYC),
+			paymentAccountTask(l, in.Store.Conditions, in.Payment),
+		},
+		Complete: in.Store.Conditions.OnboardingComplete(),
 	}
-	for _, r := range missing {
-		if !slices.Contains(onboardingHandled, r) {
-			tasks = append(tasks, OnboardingTask{
-				ID: OnboardingOtherRequirement, State: OnboardingActionRequired, Action: OnboardingActionContactSupport,
-				Title: text.OnboardingTitleOtherRequirement(l), Status: text.OnboardingOtherRequirementMissing(l),
-			})
-			break
+}
+
+// onboardingCover 是一個公開條件由誰處理：tasks 是處理它的開通任務，notice 為 true 表示由公告頁處理（不是任務）；兩者恰好有一個。
+type onboardingCover struct {
+	tasks  []OnboardingTaskID
+	notice bool
+}
+
+// requirementCovers 是每個公開條件（Requirements()）的處理者，也是任務函式的輸入：商店資料任務缺什麼由這張表挑出歸它的條件。
+// 平台審核與收款帳戶一起處理 ONBOARDING_COMPLETE（兩者的 AND）。新增公開條件時必須在這裡有一列，測試
+// TestEveryPublicListingRequirementIsCoveredByATaskOrTheNoticePage 守住。
+var requirementCovers = map[Requirement]onboardingCover{
+	RequirementStoreName:          {tasks: []OnboardingTaskID{OnboardingProfile}},
+	RequirementLogo:               {tasks: []OnboardingTaskID{OnboardingProfile}},
+	RequirementTownCode:           {tasks: []OnboardingTaskID{OnboardingProfile}},
+	RequirementOnboardingComplete: {tasks: []OnboardingTaskID{OnboardingPlatformReview, OnboardingPaymentAccount}},
+	RequirementActive:             {notice: true},
+	RequirementNotSuspended:       {notice: true},
+	RequirementNotPendingDeletion: {notice: true},
+}
+
+// requirementsOf 回傳歸任務 id 處理的公開條件，依 Requirements() 的順序。
+func requirementsOf(id OnboardingTaskID) []Requirement {
+	var out []Requirement
+	for _, r := range Requirements() {
+		if slices.Contains(requirementCovers[r].tasks, id) {
+			out = append(out, r)
 		}
 	}
-	return Onboarding{Tasks: tasks, Complete: c.OnboardingComplete()}
+	return out
 }
 
-func profileTask(l uitext.Locale, c Conditions) OnboardingTask {
+// profileTask：歸商店資料處理的條件（requirementCovers）全部滿足才完成；沒有讀過條件時 met 一律不滿足（fail-closed）。
+func profileTask(l uitext.Locale, s Store) OnboardingTask {
 	t := OnboardingTask{ID: OnboardingProfile, Title: text.OnboardingTitleProfile(l)}
-	if c.Derived && c.StoreName && c.Logo && c.TownCode {
-		t.State, t.Action, t.Status = OnboardingCompleted, OnboardingActionNone, text.OnboardingProfileCompleted(l)
-		return t
-	}
-	// 沒有讀過條件（Derived 為 false）時三項都算缺（fail-closed）。
 	var missing []string
-	for _, m := range []struct {
-		ok bool
-		r  Requirement
-	}{{c.StoreName, RequirementStoreName}, {c.Logo, RequirementLogo}, {c.TownCode, RequirementTownCode}} {
-		if m.ok && c.Derived {
+	for _, r := range requirementsOf(OnboardingProfile) {
+		if met(r, s) {
 			continue
 		}
-		noun, _ := uitext.For(l).SellerSellerRequirement(string(m.r))
+		noun, _ := uitext.For(l).SellerSellerRequirement(string(r))
 		missing = append(missing, noun)
+	}
+	if len(missing) == 0 {
+		t.State, t.Action, t.Status = OnboardingCompleted, OnboardingActionNone, text.OnboardingProfileCompleted(l)
+		return t
 	}
 	t.State, t.Action = OnboardingActionRequired, OnboardingActionEditProfile
 	t.Status = text.OnboardingProfileMissing(l, text.OnboardingProfileMissingArgs{Items: strings.Join(missing, text.OnboardingProfileListSeparator(l).Text)})

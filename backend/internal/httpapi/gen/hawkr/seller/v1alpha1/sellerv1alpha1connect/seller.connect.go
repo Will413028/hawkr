@@ -54,6 +54,9 @@ const (
 	// SellerAppServiceGetMyOnboardingProcedure is the fully-qualified name of the SellerAppService's
 	// GetMyOnboarding RPC.
 	SellerAppServiceGetMyOnboardingProcedure = "/hawkr.seller.v1alpha1.SellerAppService/GetMyOnboarding"
+	// SellerAppServiceRefreshMyPaymentAccountProcedure is the fully-qualified name of the
+	// SellerAppService's RefreshMyPaymentAccount RPC.
+	SellerAppServiceRefreshMyPaymentAccountProcedure = "/hawkr.seller.v1alpha1.SellerAppService/RefreshMyPaymentAccount"
 	// SellerAppServiceUpdateMyStoreProcedure is the fully-qualified name of the SellerAppService's
 	// UpdateMyStore RPC.
 	SellerAppServiceUpdateMyStoreProcedure = "/hawkr.seller.v1alpha1.SellerAppService/UpdateMyStore"
@@ -132,13 +135,17 @@ type SellerAppServiceClient interface {
 	GetMyStoreOpening(context.Context, *connect.Request[v1alpha1.GetMyStoreOpeningRequest]) (*connect.Response[v1alpha1.GetMyStoreOpeningResponse], error)
 	// GetMyStore 回傳呼叫者的店家，連同停權與每個能力的狀態（含缺的條件）。停權與等待刪除的店家照樣回傳。
 	GetMyStore(context.Context, *connect.Request[v1alpha1.GetMyStoreRequest]) (*connect.Response[v1alpha1.GetMyStoreResponse], error)
-	// GetMyOnboarding 回傳呼叫者店家的開通任務：依序的必要任務（商店資料、平台審核、收款帳戶，以及公開條件還缺其他項目時的「其他公開條件」），
-	// 與開通閘門 complete。任務的狀態、下一步與文字都由伺服器推導（client 只呈現，不組合 GetMyKYC、GetMyPaymentAccount、GetMyStore 推導）。
-	// 平台審核與收款帳戶各自讀取自己的來源：單一來源讀不到只讓該項是 UNKNOWN，方法本身不因此失敗。refresh 為 true 時先同步向金流商重讀收款帳戶
-	// 再回傳（賣家從金流商的頁面回來時用）；同步失敗只記錄、不讓方法失敗，這時以快取的狀態回傳。refresh 可能寫入收款帳戶的快取，所以不是
-	// NO_SIDE_EFFECTS（IDEMPOTENT，以 POST 呼叫，仍可自動重送），也像其他會改變狀態的方法一樣，停權的帳號呼叫時回 permission_denied
-	// （ACCOUNT_SUSPENDED）：client 以 GetMyStore 的停權狀態導向公告頁，不靠這個方法。需要賣家能力 CAP_ACCOUNT_SELF_READ，所以已關閉的店家回 not_found。
+	// GetMyOnboarding 回傳呼叫者店家的開通任務：依序的必要任務（商店資料、平台審核、收款帳戶）與開通閘門 complete。任務的狀態、下一步與文字
+	// 都由伺服器推導（client 只呈現，不組合 GetMyKYC、GetMyPaymentAccount、GetMyStore 推導）。平台審核與收款帳戶各自讀取自己的來源：單一來源讀不到
+	// 只讓該項是 UNKNOWN，方法本身不因此失敗。只讀本地的狀態，不呼叫金流商；要最新的收款帳戶狀態先呼叫 RefreshMyPaymentAccount 再讀。
+	// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀（client 以 GetMyStore 的停權狀態導向公告頁），已關閉的店家回 not_found。
 	GetMyOnboarding(context.Context, *connect.Request[v1alpha1.GetMyOnboardingRequest]) (*connect.Response[v1alpha1.GetMyOnboardingResponse], error)
+	// RefreshMyPaymentAccount 同步向金流商重讀呼叫者店家的收款帳戶並更新快取（賣家從金流商的開通頁面回來時用，之後讀 GetMyOnboarding）。
+	// 同一帳戶上次讀取在 10 秒內就不呼叫金流商、直接成功（快取就是結果）。還沒有外部帳戶或沒有設定收款開通時什麼都不做、回成功。
+	// 金流商暫時讀不到回 unavailable（client 可以重試）；金流商沒有這個帳戶回 failed_precondition。需要賣家能力 CAP_STOREFRONT_WRITE
+	// （會呼叫金流商，是店面設定的一部分）：停權與等待刪除的店家回 permission_denied（SELLER_SUSPENDED）與 failed_precondition。
+	// 重複呼叫與一次的結果相同，所以是 IDEMPOTENT，可以自動重試。
+	RefreshMyPaymentAccount(context.Context, *connect.Request[v1alpha1.RefreshMyPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshMyPaymentAccountResponse], error)
 	// UpdateMyStore 修改店家資料的欄位（update_mask），含 logo 與封面（logo_staged_token、
 	// cover_staged_token）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
 	// 不寫入，etag 不變。
@@ -243,6 +250,13 @@ func NewSellerAppServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			httpClient,
 			baseURL+SellerAppServiceGetMyOnboardingProcedure,
 			connect.WithSchema(sellerAppServiceMethods.ByName("GetMyOnboarding")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		refreshMyPaymentAccount: connect.NewClient[v1alpha1.RefreshMyPaymentAccountRequest, v1alpha1.RefreshMyPaymentAccountResponse](
+			httpClient,
+			baseURL+SellerAppServiceRefreshMyPaymentAccountProcedure,
+			connect.WithSchema(sellerAppServiceMethods.ByName("RefreshMyPaymentAccount")),
 			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
@@ -358,6 +372,7 @@ type sellerAppServiceClient struct {
 	getMyStoreOpening              *connect.Client[v1alpha1.GetMyStoreOpeningRequest, v1alpha1.GetMyStoreOpeningResponse]
 	getMyStore                     *connect.Client[v1alpha1.GetMyStoreRequest, v1alpha1.GetMyStoreResponse]
 	getMyOnboarding                *connect.Client[v1alpha1.GetMyOnboardingRequest, v1alpha1.GetMyOnboardingResponse]
+	refreshMyPaymentAccount        *connect.Client[v1alpha1.RefreshMyPaymentAccountRequest, v1alpha1.RefreshMyPaymentAccountResponse]
 	updateMyStore                  *connect.Client[v1alpha1.UpdateMyStoreRequest, v1alpha1.UpdateMyStoreResponse]
 	completeMyStoreOnboarding      *connect.Client[v1alpha1.CompleteMyStoreOnboardingRequest, v1alpha1.CompleteMyStoreOnboardingResponse]
 	listMyFollowers                *connect.Client[v1alpha1.ListMyFollowersRequest, v1alpha1.ListMyFollowersResponse]
@@ -394,6 +409,11 @@ func (c *sellerAppServiceClient) GetMyStore(ctx context.Context, req *connect.Re
 // GetMyOnboarding calls hawkr.seller.v1alpha1.SellerAppService.GetMyOnboarding.
 func (c *sellerAppServiceClient) GetMyOnboarding(ctx context.Context, req *connect.Request[v1alpha1.GetMyOnboardingRequest]) (*connect.Response[v1alpha1.GetMyOnboardingResponse], error) {
 	return c.getMyOnboarding.CallUnary(ctx, req)
+}
+
+// RefreshMyPaymentAccount calls hawkr.seller.v1alpha1.SellerAppService.RefreshMyPaymentAccount.
+func (c *sellerAppServiceClient) RefreshMyPaymentAccount(ctx context.Context, req *connect.Request[v1alpha1.RefreshMyPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshMyPaymentAccountResponse], error) {
+	return c.refreshMyPaymentAccount.CallUnary(ctx, req)
 }
 
 // UpdateMyStore calls hawkr.seller.v1alpha1.SellerAppService.UpdateMyStore.
@@ -492,13 +512,17 @@ type SellerAppServiceHandler interface {
 	GetMyStoreOpening(context.Context, *connect.Request[v1alpha1.GetMyStoreOpeningRequest]) (*connect.Response[v1alpha1.GetMyStoreOpeningResponse], error)
 	// GetMyStore 回傳呼叫者的店家，連同停權與每個能力的狀態（含缺的條件）。停權與等待刪除的店家照樣回傳。
 	GetMyStore(context.Context, *connect.Request[v1alpha1.GetMyStoreRequest]) (*connect.Response[v1alpha1.GetMyStoreResponse], error)
-	// GetMyOnboarding 回傳呼叫者店家的開通任務：依序的必要任務（商店資料、平台審核、收款帳戶，以及公開條件還缺其他項目時的「其他公開條件」），
-	// 與開通閘門 complete。任務的狀態、下一步與文字都由伺服器推導（client 只呈現，不組合 GetMyKYC、GetMyPaymentAccount、GetMyStore 推導）。
-	// 平台審核與收款帳戶各自讀取自己的來源：單一來源讀不到只讓該項是 UNKNOWN，方法本身不因此失敗。refresh 為 true 時先同步向金流商重讀收款帳戶
-	// 再回傳（賣家從金流商的頁面回來時用）；同步失敗只記錄、不讓方法失敗，這時以快取的狀態回傳。refresh 可能寫入收款帳戶的快取，所以不是
-	// NO_SIDE_EFFECTS（IDEMPOTENT，以 POST 呼叫，仍可自動重送），也像其他會改變狀態的方法一樣，停權的帳號呼叫時回 permission_denied
-	// （ACCOUNT_SUSPENDED）：client 以 GetMyStore 的停權狀態導向公告頁，不靠這個方法。需要賣家能力 CAP_ACCOUNT_SELF_READ，所以已關閉的店家回 not_found。
+	// GetMyOnboarding 回傳呼叫者店家的開通任務：依序的必要任務（商店資料、平台審核、收款帳戶）與開通閘門 complete。任務的狀態、下一步與文字
+	// 都由伺服器推導（client 只呈現，不組合 GetMyKYC、GetMyPaymentAccount、GetMyStore 推導）。平台審核與收款帳戶各自讀取自己的來源：單一來源讀不到
+	// 只讓該項是 UNKNOWN，方法本身不因此失敗。只讀本地的狀態，不呼叫金流商；要最新的收款帳戶狀態先呼叫 RefreshMyPaymentAccount 再讀。
+	// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀（client 以 GetMyStore 的停權狀態導向公告頁），已關閉的店家回 not_found。
 	GetMyOnboarding(context.Context, *connect.Request[v1alpha1.GetMyOnboardingRequest]) (*connect.Response[v1alpha1.GetMyOnboardingResponse], error)
+	// RefreshMyPaymentAccount 同步向金流商重讀呼叫者店家的收款帳戶並更新快取（賣家從金流商的開通頁面回來時用，之後讀 GetMyOnboarding）。
+	// 同一帳戶上次讀取在 10 秒內就不呼叫金流商、直接成功（快取就是結果）。還沒有外部帳戶或沒有設定收款開通時什麼都不做、回成功。
+	// 金流商暫時讀不到回 unavailable（client 可以重試）；金流商沒有這個帳戶回 failed_precondition。需要賣家能力 CAP_STOREFRONT_WRITE
+	// （會呼叫金流商，是店面設定的一部分）：停權與等待刪除的店家回 permission_denied（SELLER_SUSPENDED）與 failed_precondition。
+	// 重複呼叫與一次的結果相同，所以是 IDEMPOTENT，可以自動重試。
+	RefreshMyPaymentAccount(context.Context, *connect.Request[v1alpha1.RefreshMyPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshMyPaymentAccountResponse], error)
 	// UpdateMyStore 修改店家資料的欄位（update_mask），含 logo 與封面（logo_staged_token、
 	// cover_staged_token）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
 	// 不寫入，etag 不變。
@@ -599,6 +623,13 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 		SellerAppServiceGetMyOnboardingProcedure,
 		svc.GetMyOnboarding,
 		connect.WithSchema(sellerAppServiceMethods.ByName("GetMyOnboarding")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	sellerAppServiceRefreshMyPaymentAccountHandler := connect.NewUnaryHandler(
+		SellerAppServiceRefreshMyPaymentAccountProcedure,
+		svc.RefreshMyPaymentAccount,
+		connect.WithSchema(sellerAppServiceMethods.ByName("RefreshMyPaymentAccount")),
 		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
@@ -715,6 +746,8 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 			sellerAppServiceGetMyStoreHandler.ServeHTTP(w, r)
 		case SellerAppServiceGetMyOnboardingProcedure:
 			sellerAppServiceGetMyOnboardingHandler.ServeHTTP(w, r)
+		case SellerAppServiceRefreshMyPaymentAccountProcedure:
+			sellerAppServiceRefreshMyPaymentAccountHandler.ServeHTTP(w, r)
 		case SellerAppServiceUpdateMyStoreProcedure:
 			sellerAppServiceUpdateMyStoreHandler.ServeHTTP(w, r)
 		case SellerAppServiceCompleteMyStoreOnboardingProcedure:
@@ -770,6 +803,10 @@ func (UnimplementedSellerAppServiceHandler) GetMyStore(context.Context, *connect
 
 func (UnimplementedSellerAppServiceHandler) GetMyOnboarding(context.Context, *connect.Request[v1alpha1.GetMyOnboardingRequest]) (*connect.Response[v1alpha1.GetMyOnboardingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.GetMyOnboarding is not implemented"))
+}
+
+func (UnimplementedSellerAppServiceHandler) RefreshMyPaymentAccount(context.Context, *connect.Request[v1alpha1.RefreshMyPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshMyPaymentAccountResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.RefreshMyPaymentAccount is not implemented"))
 }
 
 func (UnimplementedSellerAppServiceHandler) UpdateMyStore(context.Context, *connect.Request[v1alpha1.UpdateMyStoreRequest]) (*connect.Response[v1alpha1.UpdateMyStoreResponse], error) {

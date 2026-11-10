@@ -1132,13 +1132,7 @@ class GetMyStoreResponse extends $pb.GeneratedMessage {
 }
 
 class GetMyOnboardingRequest extends $pb.GeneratedMessage {
-  factory GetMyOnboardingRequest({
-    $core.bool? refresh,
-  }) {
-    final result = GetMyOnboardingRequest._();
-    if (refresh != null) result.refresh = refresh;
-    return result;
-  }
+  factory GetMyOnboardingRequest() => GetMyOnboardingRequest._();
 
   GetMyOnboardingRequest._();
 
@@ -1154,7 +1148,6 @@ class GetMyOnboardingRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: GetMyOnboardingRequest.$_createMessage)
-    ..aOB(1, _omitFieldNames ? '' : 'refresh')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1180,17 +1173,6 @@ class GetMyOnboardingRequest extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<GetMyOnboardingRequest>(
           GetMyOnboardingRequest.$_createMessage);
   static GetMyOnboardingRequest? _defaultInstance;
-
-  /// 為 true 時，先同步重讀金流商的收款帳戶再回傳（從金流商的開通頁面回到平台時使用）。同步失敗不讓方法失敗：記錄之後以目前快取的狀態回傳。
-  /// 為 false 時只讀本地的狀態。
-  @$pb.TagNumber(1)
-  $core.bool get refresh => $_getBF(0);
-  @$pb.TagNumber(1)
-  set refresh($core.bool value) => $_setBool(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasRefresh() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearRefresh() => $_clearField(1);
 }
 
 class GetMyOnboardingResponse extends $pb.GeneratedMessage {
@@ -1247,7 +1229,7 @@ class GetMyOnboardingResponse extends $pb.GeneratedMessage {
           GetMyOnboardingResponse.$_createMessage);
   static GetMyOnboardingResponse? _defaultInstance;
 
-  /// 必要任務，依顯示順序（OnboardingTaskId 的順序：PROFILE、PLATFORM_REVIEW、PAYMENT_ACCOUNT，OTHER_REQUIREMENT 只在需要時出現在最後）。
+  /// 必要任務，依顯示順序（OnboardingTaskId 的順序：PROFILE、PLATFORM_REVIEW、PAYMENT_ACCOUNT）。
   /// 順序與分組三端相同，client 照順序呈現。建議任務（物流、商品、簡介）不在這裡。
   @$pb.TagNumber(1)
   $pb.PbList<OnboardingTask> get tasks => $_getList(0);
@@ -1525,6 +1507,104 @@ class UpdateMyStoreResponse extends $pb.GeneratedMessage {
   void clearStore() => $_clearField(1);
   @$pb.TagNumber(1)
   Store ensureStore() => $_ensure(0);
+}
+
+class RefreshMyPaymentAccountRequest extends $pb.GeneratedMessage {
+  factory RefreshMyPaymentAccountRequest() =>
+      RefreshMyPaymentAccountRequest._();
+
+  RefreshMyPaymentAccountRequest._();
+
+  factory RefreshMyPaymentAccountRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RefreshMyPaymentAccountRequest()..mergeFromBuffer(data, registry);
+  factory RefreshMyPaymentAccountRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RefreshMyPaymentAccountRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RefreshMyPaymentAccountRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: RefreshMyPaymentAccountRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshMyPaymentAccountRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshMyPaymentAccountRequest copyWith(
+          void Function(RefreshMyPaymentAccountRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as RefreshMyPaymentAccountRequest))
+          as RefreshMyPaymentAccountRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use RefreshMyPaymentAccountRequest() / RefreshMyPaymentAccountRequest.new instead')
+  static RefreshMyPaymentAccountRequest create() =>
+      RefreshMyPaymentAccountRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      RefreshMyPaymentAccountRequest._();
+  @$core.override
+  RefreshMyPaymentAccountRequest createEmptyInstance() =>
+      RefreshMyPaymentAccountRequest._();
+  @$core.pragma('dart2js:noInline')
+  static RefreshMyPaymentAccountRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RefreshMyPaymentAccountRequest>(
+          RefreshMyPaymentAccountRequest.$_createMessage);
+  static RefreshMyPaymentAccountRequest? _defaultInstance;
+}
+
+class RefreshMyPaymentAccountResponse extends $pb.GeneratedMessage {
+  factory RefreshMyPaymentAccountResponse() =>
+      RefreshMyPaymentAccountResponse._();
+
+  RefreshMyPaymentAccountResponse._();
+
+  factory RefreshMyPaymentAccountResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RefreshMyPaymentAccountResponse()..mergeFromBuffer(data, registry);
+  factory RefreshMyPaymentAccountResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RefreshMyPaymentAccountResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RefreshMyPaymentAccountResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: RefreshMyPaymentAccountResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshMyPaymentAccountResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshMyPaymentAccountResponse copyWith(
+          void Function(RefreshMyPaymentAccountResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as RefreshMyPaymentAccountResponse))
+          as RefreshMyPaymentAccountResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use RefreshMyPaymentAccountResponse() / RefreshMyPaymentAccountResponse.new instead')
+  static RefreshMyPaymentAccountResponse create() =>
+      RefreshMyPaymentAccountResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      RefreshMyPaymentAccountResponse._();
+  @$core.override
+  RefreshMyPaymentAccountResponse createEmptyInstance() =>
+      RefreshMyPaymentAccountResponse._();
+  @$core.pragma('dart2js:noInline')
+  static RefreshMyPaymentAccountResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RefreshMyPaymentAccountResponse>(
+          RefreshMyPaymentAccountResponse.$_createMessage);
+  static RefreshMyPaymentAccountResponse? _defaultInstance;
 }
 
 class CompleteMyStoreOnboardingRequest extends $pb.GeneratedMessage {
@@ -7796,16 +7876,28 @@ class SellerAppServiceApi {
       _client.invoke<GetMyStoreResponse>(
           ctx, 'SellerAppService', 'GetMyStore', request, GetMyStoreResponse());
 
-  /// GetMyOnboarding 回傳呼叫者店家的開通任務：依序的必要任務（商店資料、平台審核、收款帳戶，以及公開條件還缺其他項目時的「其他公開條件」），
-  /// 與開通閘門 complete。任務的狀態、下一步與文字都由伺服器推導（client 只呈現，不組合 GetMyKYC、GetMyPaymentAccount、GetMyStore 推導）。
-  /// 平台審核與收款帳戶各自讀取自己的來源：單一來源讀不到只讓該項是 UNKNOWN，方法本身不因此失敗。refresh 為 true 時先同步向金流商重讀收款帳戶
-  /// 再回傳（賣家從金流商的頁面回來時用）；同步失敗只記錄、不讓方法失敗，這時以快取的狀態回傳。refresh 可能寫入收款帳戶的快取，所以不是
-  /// NO_SIDE_EFFECTS（IDEMPOTENT，以 POST 呼叫，仍可自動重送），也像其他會改變狀態的方法一樣，停權的帳號呼叫時回 permission_denied
-  /// （ACCOUNT_SUSPENDED）：client 以 GetMyStore 的停權狀態導向公告頁，不靠這個方法。需要賣家能力 CAP_ACCOUNT_SELF_READ，所以已關閉的店家回 not_found。
+  /// GetMyOnboarding 回傳呼叫者店家的開通任務：依序的必要任務（商店資料、平台審核、收款帳戶）與開通閘門 complete。任務的狀態、下一步與文字
+  /// 都由伺服器推導（client 只呈現，不組合 GetMyKYC、GetMyPaymentAccount、GetMyStore 推導）。平台審核與收款帳戶各自讀取自己的來源：單一來源讀不到
+  /// 只讓該項是 UNKNOWN，方法本身不因此失敗。只讀本地的狀態，不呼叫金流商；要最新的收款帳戶狀態先呼叫 RefreshMyPaymentAccount 再讀。
+  /// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀（client 以 GetMyStore 的停權狀態導向公告頁），已關閉的店家回 not_found。
   $async.Future<GetMyOnboardingResponse> getMyOnboarding(
           $pb.ClientContext? ctx, GetMyOnboardingRequest request) =>
       _client.invoke<GetMyOnboardingResponse>(ctx, 'SellerAppService',
           'GetMyOnboarding', request, GetMyOnboardingResponse());
+
+  /// RefreshMyPaymentAccount 同步向金流商重讀呼叫者店家的收款帳戶並更新快取（賣家從金流商的開通頁面回來時用，之後讀 GetMyOnboarding）。
+  /// 同一帳戶上次讀取在 10 秒內就不呼叫金流商、直接成功（快取就是結果）。還沒有外部帳戶或沒有設定收款開通時什麼都不做、回成功。
+  /// 金流商暫時讀不到回 unavailable（client 可以重試）；金流商沒有這個帳戶回 failed_precondition。需要賣家能力 CAP_STOREFRONT_WRITE
+  /// （會呼叫金流商，是店面設定的一部分）：停權與等待刪除的店家回 permission_denied（SELLER_SUSPENDED）與 failed_precondition。
+  /// 重複呼叫與一次的結果相同，所以是 IDEMPOTENT，可以自動重試。
+  $async.Future<RefreshMyPaymentAccountResponse> refreshMyPaymentAccount(
+          $pb.ClientContext? ctx, RefreshMyPaymentAccountRequest request) =>
+      _client.invoke<RefreshMyPaymentAccountResponse>(
+          ctx,
+          'SellerAppService',
+          'RefreshMyPaymentAccount',
+          request,
+          RefreshMyPaymentAccountResponse());
 
   /// UpdateMyStore 修改店家資料的欄位（update_mask），含 logo 與封面（logo_staged_token、
   /// cover_staged_token）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時

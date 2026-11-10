@@ -10,28 +10,23 @@ import (
 
 	adminpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// onboardingModule 是 GetMyOnboarding 的來源：MyKYC 回 kyc（或 kycErr），Store 回 reread（refresh 同步之後重讀店家，條件已經是同步之後的）。
+// onboardingModule 是 GetMyOnboarding 的來源：MyKYC 回 kyc（或 kycErr）。沒有實作 Store：GetMyOnboarding 只讀 interceptor 放進 ctx 的店家，
+// 呼叫 Store 會因為嵌入的 Module 是 nil 而 panic。
 type onboardingModule struct {
 	Module
-	kyc     model.KYCApplication
-	kycErr  error
-	reread  model.Store
-	rereads int
+	kyc    model.KYCApplication
+	kycErr error
 }
 
 func (m *onboardingModule) MyKYC(context.Context, int64) (model.KYCApplication, error) {
 	return m.kyc, m.kycErr
-}
-
-func (m *onboardingModule) Store(context.Context, int64) (model.Store, error) {
-	m.rereads++
-	return m.reread, nil
 }
 
 type onboardingAdminModule struct {
@@ -102,8 +97,8 @@ func TestGetMyOnboardingReturnsOrderedTasksAndTheGate(t *testing.T) {
 		states[pb.OnboardingTaskId_ONBOARDING_TASK_ID_PAYMENT_ACCOUNT] != pb.OnboardingTaskState_ONBOARDING_TASK_STATE_LOCKED {
 		t.Fatalf("states=%v", states)
 	}
-	if len(pay.syncedFor) != 0 || m.rereads != 0 {
-		t.Fatalf("refresh 沒設卻同步了：%v、重讀店家 %d 次", pay.syncedFor, m.rereads)
+	if len(pay.syncedFor) != 0 {
+		t.Fatalf("唯讀的方法同步了金流商：%v", pay.syncedFor)
 	}
 }
 
@@ -152,36 +147,42 @@ func TestGetMyOnboardingMarksOnlyTheFailedSourceUnknown(t *testing.T) {
 	}
 }
 
-// refresh 為 true 時先同步重讀收款帳戶，再以同步之後的店家條件組清單；同步失敗只記錄，以原本的條件回傳，不讓方法失敗；refresh 為 false 不同步。
-// mutation：refresh 不呼叫 SyncAccount → syncedFor 是空的，失敗。
-func TestGetMyOnboardingRefreshSyncsThePaymentAccountFirst(t *testing.T) {
-	before, after := storeWithGate(true, false), storeWithGate(true, true)
-	m := &onboardingModule{kyc: model.KYCApplication{Status: model.KYCStatusApproved}, reread: after}
-	pay := &paymentModule{account: payment.Account{Status: payment.StatusEnabled}}
-	h := &App{m: m, payments: pay}
-	got, err := h.GetMyOnboarding(ctxWithStore(before), connect.NewRequest(&pb.GetMyOnboardingRequest{Refresh: true}))
-	if err != nil {
+// RefreshMyPaymentAccount 以呼叫者的店家同步重讀收款帳戶（D33），成功回空回應；重讀失敗原樣回錯誤（unavailable），不吞掉。
+// mutation：不呼叫 SyncAccountUnlessFresh → syncedFor 是空的，失敗；失敗時回 nil → 第二段的 err 是 nil，失敗。
+func TestRefreshMyPaymentAccountSyncsTheCallersStore(t *testing.T) {
+	pay := &paymentModule{}
+	h := &App{m: &onboardingModule{}, payments: pay}
+	if _, err := h.RefreshMyPaymentAccount(ctxWithStore(storeWithGate(true, false)), connect.NewRequest(&pb.RefreshMyPaymentAccountRequest{})); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(pay.syncedFor, []int64{11}) || m.rereads != 1 {
-		t.Fatalf("同步的店家=%v、重讀店家 %d 次", pay.syncedFor, m.rereads)
-	}
-	if !got.Msg.GetComplete() || taskStates(got.Msg)[pb.OnboardingTaskId_ONBOARDING_TASK_ID_PAYMENT_ACCOUNT] != pb.OnboardingTaskState_ONBOARDING_TASK_STATE_COMPLETED {
-		t.Fatalf("同步之後的條件沒有反映：complete=%v tasks=%v", got.Msg.GetComplete(), got.Msg.GetTasks())
+	if !slices.Equal(pay.syncedFor, []int64{11}) {
+		t.Fatalf("同步的店家=%v，要 [11]", pay.syncedFor)
 	}
 
-	pay = &paymentModule{account: payment.Account{Status: payment.StatusUnderReview}, syncErr: errors.New("金流商沒有回應")}
-	m = &onboardingModule{kyc: model.KYCApplication{Status: model.KYCStatusApproved}, reread: after}
-	h = &App{m: m, payments: pay}
-	got, err = h.GetMyOnboarding(ctxWithStore(before), connect.NewRequest(&pb.GetMyOnboardingRequest{Refresh: true}))
-	if err != nil {
-		t.Fatalf("同步失敗讓方法失敗：%v", err)
+	pay = &paymentModule{syncErr: apperr.Unavailable("暫時無法向金流商讀取收款帳戶")}
+	h = &App{m: &onboardingModule{}, payments: pay}
+	_, err := h.RefreshMyPaymentAccount(ctxWithStore(storeWithGate(true, false)), connect.NewRequest(&pb.RefreshMyPaymentAccountRequest{}))
+	if apperr.KindOf(err) != apperr.KindUnavailable || len(pay.syncedFor) != 1 {
+		t.Fatalf("重讀失敗要回 unavailable：err=%v，同步 %v", err, pay.syncedFor)
 	}
-	if len(pay.syncedFor) != 1 || m.rereads != 0 || got.Msg.GetComplete() {
-		t.Fatalf("同步失敗時要以原本快取的狀態回傳：同步 %v、重讀 %d 次、complete=%v", pay.syncedFor, m.rereads, got.Msg.GetComplete())
+}
+
+// 兩個方法的契約屬性：GetMyOnboarding 唯讀（NO_SIDE_EFFECTS、effect Read、停權也能讀：宣告的能力不要求未停權），
+// RefreshMyPaymentAccount 是寫入（IDEMPOTENT、effect Write、停權時不能做）。
+func TestOnboardingMethodsDeclareReadAndWriteCapabilities(t *testing.T) {
+	read := declarations[sellerv1alpha1connect.SellerAppServiceGetMyOnboardingProcedure]
+	write := declarations[sellerv1alpha1connect.SellerAppServiceRefreshMyPaymentAccountProcedure]
+	if read.capability != model.CapAccountSelfRead || write.capability != model.CapStorefrontWrite {
+		t.Fatalf("能力：GetMyOnboarding=%s、RefreshMyPaymentAccount=%s", read.capability, write.capability)
 	}
-	if taskStates(got.Msg)[pb.OnboardingTaskId_ONBOARDING_TASK_ID_PAYMENT_ACCOUNT] != pb.OnboardingTaskState_ONBOARDING_TASK_STATE_IN_PROGRESS {
-		t.Fatalf("tasks=%v", got.Msg.GetTasks())
+	suspended := storeWithGate(true, true)
+	suspended.Sanctions = sanctionsOf(true)
+	active := map[model.Capability]bool{}
+	for _, c := range model.ActiveCapabilities(model.CapabilitiesOf(suspended)) {
+		active[c] = true
+	}
+	if active[write.capability] || !active[read.capability] {
+		t.Fatalf("停權時要能讀開通任務、不能重讀收款帳戶：啟用的能力 %v", active)
 	}
 }
 

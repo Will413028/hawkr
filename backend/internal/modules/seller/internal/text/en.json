@@ -1,8 +1,5 @@
 {
   "default": {
-    "onboarding.other_requirement.missing": {
-      "message": "Some requirements for listing your store are not met yet. Please contact support."
-    },
     "onboarding.payment_account.action_required": {
       "message": "Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it."
     },
@@ -59,9 +56,6 @@
     },
     "onboarding.profile.missing": {
       "message": "Still missing: {items}."
-    },
-    "onboarding.title.other_requirement": {
-      "message": "Other listing requirements"
     },
     "onboarding.title.payment_account": {
       "message": "Payout account"

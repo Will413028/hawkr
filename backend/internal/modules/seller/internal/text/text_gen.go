@@ -424,15 +424,6 @@ func NoteBodyLength() uitext.Message {
 	return uitext.Message{Text: "內部註記必須是 1 到 2000 字。", Locale: uitext.ZhTW}
 }
 
-// OnboardingOtherRequirementMissing 是模組句子 onboarding.other_requirement.missing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func OnboardingOtherRequirementMissing(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "Some requirements for listing your store are not met yet. Please contact support.", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "還有公開條件尚未滿足，請聯絡客服。", Locale: uitext.ZhTW}
-}
-
 // OnboardingPaymentAccountActionRequired 是模組句子 onboarding.payment_account.action_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func OnboardingPaymentAccountActionRequired(l uitext.Locale) uitext.Message {
 	switch l {
@@ -607,15 +598,6 @@ func OnboardingProfileMissing(l uitext.Locale, a OnboardingProfileMissingArgs) u
 		return uitext.Message{Text: "Still missing: " + a.Items + ".", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "還缺少：" + a.Items + "。", Locale: uitext.ZhTW}
-}
-
-// OnboardingTitleOtherRequirement 是模組句子 onboarding.title.other_requirement；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func OnboardingTitleOtherRequirement(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "Other listing requirements", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "其他公開條件", Locale: uitext.ZhTW}
 }
 
 // OnboardingTitlePaymentAccount 是模組句子 onboarding.title.payment_account；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
