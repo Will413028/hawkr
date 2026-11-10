@@ -223,20 +223,20 @@
 
 - [ ] **7e. 伺服器推導的開通狀態（D26、D27、D31）**：拆成 7e1–7e4，各自有驗收；7e2–7e4 都只依賴 7e1，彼此獨立。盤點見附件 `step7e-inventory.md`（快照 `7269bdf3`）。共同的停止條件：必要任務的分組或順序在三端需要不同時，停下交 Will（D26 的推翻條件）。
 
-- [ ] **7e1. 契約與後端**（被擋於：D26、D27、D31、D32 已決；7d′）
+- [ ] **7e1. 契約與後端**（被擋於：D26、D27、D31、D32、D33 已決；7d′）
   - 範圍：
     - view：新 migration 讓 `seller.store_requirement_flags` 另外輸出 `kyc_approved` 與 `transfers_active` 兩欄，`onboarding_complete` 定義成兩者的 AND（語意不變）；依賴它的 view 照 Atlas 的需要重建；`db/objects.sql` 跟上；`model.Conditions` 讀這兩欄（D31 Q3）。`model/exposure.go` 說「含 PayUni 核准」的過時註解改正。
-    - 契約：`api/hawkr/seller/v1alpha1/seller.proto` 新增 `GetMyOnboarding`（request 帶 `bool refresh`）。回應是依序的必要任務 `repeated OnboardingTask`，加上 `bool complete`（等於閘門 `ONBOARDING_COMPLETE`）。每項任務有：`OnboardingTaskId`（PROFILE、PLATFORM_REVIEW、PAYMENT_ACCOUNT、OTHER_REQUIREMENT）、`OnboardingTaskState`（只供分支：COMPLETED、ACTION_REQUIRED、IN_PROGRESS、LOCKED、UNKNOWN）、`OnboardingAction`（下一步，client 對到自己的路由；例如 NONE、EDIT_PROFILE、SUBMIT_CERTIFICATION、START_PAYMENT_ONBOARDING、REFRESH_PAYMENT_ACCOUNT、CONTACT_SUPPORT，最後的值以盤點的 CTA 為準），以及伺服器產生的標題與狀態句（`LocalizedMessage`）。admin 的 seller service 新增 `GetStoreOnboarding(store_id)`，回同一個 message。三端生成。
-    - 後端：seller 一個純函式，輸入讀店家時的條件（含上面兩欄）、KYC 與收款帳戶的讀取結果，產生任務清單；`complete` 與 `CapabilitiesOf` 的 ONBOARDING_COMPLETE 都由同一組欄位得出。定義照 D31 Q2：平台審核完成看 KYC 核准，收款完成看 seller 自存的 `transfers_active` 副本，停權與關店不列為任務（由公告頁處理）。`refresh` 為真時，先經 payment 的公開 API 同步重讀帳戶再讀；同步可能和 job 並行，依 D32 寫入時比讀取開始時間。單一來源讀取失敗只讓該項為 UNKNOWN（D26）。句子放在 seller 的 `internal/text`（D27）。action 的按鈕文字只由 enum 決定，放共用文案目錄，最後 `make uitext`。
+    - 契約：`api/hawkr/seller/v1alpha1/seller.proto` 新增唯讀的 `GetMyOnboarding` 與寫入類的 `RefreshMyPaymentAccount`（D33）。回應是依序的必要任務 `repeated OnboardingTask`，加上 `bool complete`（等於閘門 `ONBOARDING_COMPLETE`）。每項任務有：`OnboardingTaskId`（PROFILE、PLATFORM_REVIEW、PAYMENT_ACCOUNT；D33 拿掉 OTHER_REQUIREMENT）、`OnboardingTaskState`（只供分支：COMPLETED、ACTION_REQUIRED、IN_PROGRESS、LOCKED、UNKNOWN）、`OnboardingAction`（下一步，client 對到自己的路由；例如 NONE、EDIT_PROFILE、SUBMIT_CERTIFICATION、START_PAYMENT_ONBOARDING、REFRESH_PAYMENT_ACCOUNT、CONTACT_SUPPORT，最後的值以盤點的 CTA 為準），以及伺服器產生的標題與狀態句（`LocalizedMessage`）。admin 的 seller service 新增 `GetStoreOnboarding(store_id)`，回同一個 message。三端生成。
+    - 後端：seller 一個純函式，輸入讀店家時的條件（含上面兩欄）、KYC 與收款帳戶的讀取結果，產生任務清單；`complete` 與 `CapabilitiesOf` 的 ONBOARDING_COMPLETE 都由同一組欄位得出。定義照 D31 Q2：平台審核完成看 KYC 核准，收款完成看 seller 自存的 `transfers_active` 副本，停權與關店不列為任務（由公告頁處理）。`RefreshMyPaymentAccount` 經 payment 的公開 API 同步重讀帳戶（同一帳戶上次讀取在 10 秒內就不讀，D33）；同步可能和 job 並行，依 D32 寫入時比讀取開始時間。單一來源讀取失敗只讓該項為 UNKNOWN（D26）。句子放在 seller 的 `internal/text`（D27）。action 的按鈕文字只由 enum 決定，放共用文案目錄，最後 `make uitext`。
   - 消費端：`rg -n "store_requirement_flags|onboarding_complete|OnboardingComplete" backend --glob '!**/gen/**'`；新 RPC 沒有既有消費端。
   - 不動：`GetMyKYC`、`GetMyPaymentAccount`、`GetMyStore` 的契約與行為；`pub_exposable_stores` 與 social SQL 的結果。
   - 驗收：
-    - unit 以表驅動覆蓋每個任務的每個狀態與 action；integration 表驅動確認「必要任務全部 COMPLETED ⇔ view 的 `onboarding_complete` ⇔ `CapabilitiesOf` 沒有缺 ONBOARDING_COMPLETE」（CI）。
-    - mutation：閘門改回獨立判斷（例如 `onboarding_complete` 只看 KYC）、讀取失敗讓 RPC 失敗、`refresh` 不重讀、拿掉 D32 的讀取時間條件（integration 的並行測試：較晚開始的讀取先寫入後，較早的不能覆蓋），各自讓測試失敗。
+    - unit 以表驅動覆蓋每個任務的每個狀態與 action；每個公開條件都對應到一個任務或公告頁（D33；mutation：新增一個沒有對應的條件，測試要失敗）；integration 表驅動確認「PLATFORM_REVIEW 與 PAYMENT_ACCOUNT 都 COMPLETED ⇔ view 的 `onboarding_complete` ⇔ `CapabilitiesOf` 沒有缺 ONBOARDING_COMPLETE」（CI）。
+    - mutation：閘門改回獨立判斷（例如 `onboarding_complete` 只看 KYC）、讀取失敗讓 RPC 失敗、`RefreshMyPaymentAccount` 不重讀或不擋 10 秒內的重複、拿掉 D32 的讀取時間條件（integration 的並行測試：較晚開始的讀取先寫入後，較早的不能覆蓋），各自讓測試失敗。
     - `make lint-monolith`、`atlas migrate validate`、`make sqlc` 無 drift、`buf lint`、三端生成物與 `make uitext` 無 drift、`check-enum-text`。
 
 - [ ] **7e2. website 只呈現**（被擋於：7e1）
-  - 範圍：開店進度卡的必要任務改用 `GetMyOnboarding`，刪除 `onboardingTasks.ts` 裡的必要任務推導；建議任務（物流、商品、簡介）照舊由 client 組（D31 Q1）。`PaymentAccountSection`、`CertificationsClient`、`cert-gate.ts`、`pageCapabilities.ts` 裡和必要任務重疊的推導改讀摘要或閘門；從 Stripe 回來時帶 `refresh`。欄位標籤進共用文案目錄。
+  - 範圍：開店進度卡的必要任務改用 `GetMyOnboarding`，刪除 `onboardingTasks.ts` 裡的必要任務推導；建議任務（物流、商品、簡介）照舊由 client 組（D31 Q1）。`PaymentAccountSection`、`CertificationsClient`、`cert-gate.ts`、`pageCapabilities.ts` 裡和必要任務重疊的推導改讀摘要或閘門；從 Stripe 回來時先呼叫 `RefreshMyPaymentAccount` 再讀摘要（D33）。欄位標籤進共用文案目錄。
   - 消費端：`rg -n "buildOnboardingTasks|onboardingTasks|paymentDone|reviewDone|isStoreCertified" website --glob '!**/gen/**'`。
   - 驗收：`test:unit`、`pnpm test`、lint、`tsc`、`check-enum-text`；mutation：改回本地推導（例如以 `KYCApplication.status` 判斷完成）測試要失敗；e2e 的 mock 跟上（CI）。
 
@@ -313,9 +313,11 @@
 
 - **D32 收款帳戶的同步重讀與 job 並行**（已決 2026-11-11，Will，採建議；擋住：7e1）：D26 的同步重讀會和同步 job 並行；現行 `ApplyPaymentSnapshot` 整列覆寫、不比時間，「一個帳戶同一時間只有一個同步」只靠 River 唯一鍵保證，所以較早開始的讀取可能蓋掉較新的快取與 seller 副本。做法：寫入時只有讀取開始時間不早於已存的 `fetched_at` 才寫；被擋下的那次不標記 inbox 事件已處理、不發 `PayoutAccountChanged`。這個條件只在有 job 以外的同步呼叫時才需要；那個呼叫拿掉時，條件也一起拿掉。未採：RPC 排 job 並等結果（handler 要多一套等待與逾時機制）；不同步重讀（偏離 D26，賣家回來的第一眼可能還是舊狀態）。
 
+- **D33 重讀拆成獨立方法、拿掉「其他公開條件」、重讀頻率**（已決 2026-11-11，Will，三題都採建議；擋住：7e1；修訂 D26「從 Stripe 回來時先重讀再回傳」的形狀與 D31 Q1 的任務數）：7e1 第一版把重讀做成 `GetMyOnboarding` 的 `refresh`，讀取方法因此帶寫入、停權帳號連讀都被拒。改成：`GetMyOnboarding` 唯讀（NO_SIDE_EFFECTS），另加寫入類的 `RefreshMyPaymentAccount`；從 Stripe 回來時 client 先重讀再讀摘要（依據：讀取方法無副作用，Google AIP-131）。`OTHER_REQUIREMENT` 拿掉：7 個公開條件都已有任務或由公告頁處理，這個值不會出現；改用 unit 測試守住「每個公開條件都對應到任務或公告頁」。同一帳戶上次讀取在 10 秒內就不向 Stripe 讀、直接回快取：重讀由賣家觸發外部呼叫，這是它的成立條件。未採：維持 `refresh` 在讀取方法上；保留 OTHER_REQUIREMENT 當保險；不限制頻率。
+
 - **E1 Stripe API 版本**（已決 2026-11-02，Will）：Accounts v2（https://docs.stripe.com/connect/accounts-v2）；只有台灣只收轉帳的帳號需要 v1，D8 用 US 碰不到。webhook 用 thin events，收到後一律重讀帳戶（https://docs.stripe.com/webhooks）。（2026-11-03 修訂，Will：釘 `Stripe-Version: 2026-09-30.preview`，capability 有 `rejected` 狀態，D13 的 DISABLED 直接用它；這一版在一般測試模式不能建 v2 Account Link（`spike/README.md` Q11、Q12），測試與錄製改在 Stripe sandbox。未採：`2026-04-22.preview` 沿用測試模式，DISABLED 要從 status_details 推斷、升級時重做）
 
-拍板順序：D1–D22、E1 全部已決（2026-11-02）；D23–D30 已決（2026-11-03～06）；D31 已決（2026-11-10）；D32 已決（2026-11-11）。
+拍板順序：D1–D22、E1 全部已決（2026-11-02）；D23–D30 已決（2026-11-03～06）；D31 已決（2026-11-10）；D32、D33 已決（2026-11-11）。
 
 ## 進度
 
