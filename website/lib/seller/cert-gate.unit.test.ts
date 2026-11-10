@@ -112,4 +112,17 @@ describe("useCertGate：收款帳戶只在摘要說平台審核完成之後讀",
 		const { result } = renderHook(() => useCertGate());
 		expect(result.current.approved).toBe(true);
 	});
+
+	it("platformReviewCompleted 是摘要的答案，不看申請狀態", () => {
+		mocks.application = application(KYCStatus.KYC_STATUS_APPROVED);
+		mocks.onboarding = review(OnboardingTaskState.ACTION_REQUIRED);
+		expect(
+			renderHook(() => useCertGate()).result.current.platformReviewCompleted,
+		).toBe(false);
+		mocks.application = application(KYCStatus.KYC_STATUS_SUBMITTED);
+		mocks.onboarding = review(OnboardingTaskState.COMPLETED);
+		expect(
+			renderHook(() => useCertGate()).result.current.platformReviewCompleted,
+		).toBe(true);
+	});
 });

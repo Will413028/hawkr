@@ -21,12 +21,14 @@ test("Link 的錢包預取不重寫已認證判斷", () => {
 	);
 });
 
-test("Link 的錢包預取只在平台審核核准後讀收款帳戶", () => {
+test("Link 的錢包預取只在開通摘要的平台審核完成後讀收款帳戶", () => {
 	const source = readFileSync(
 		new URL("../components/shared/Link.tsx", import.meta.url),
 		"utf8",
 	);
-	const approved = source.indexOf("platformReviewApproved(application)");
+	assert.doesNotMatch(source, /platformReviewApproved|KYC_STATUS_APPROVED/);
+	assert.match(source, /fetchMyOnboarding\(\)/);
+	const approved = source.indexOf("platformReviewCompleted(onboarding)");
 	const payment = source.indexOf("paymentRepo.fetchMyPaymentAccount");
 	assert.ok(approved > 0 && payment > approved);
 });

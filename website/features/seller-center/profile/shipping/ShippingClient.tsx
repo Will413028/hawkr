@@ -125,6 +125,7 @@ export default function ShippingClient() {
 			{gate === "certification" ? (
 				<SellerCertGate
 					application={certGate.application}
+					platformReviewCompleted={certGate.platformReviewCompleted}
 					paymentAccount={certGate.paymentAccount}
 					subject="設定物流與退貨"
 				/>

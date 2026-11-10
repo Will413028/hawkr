@@ -158,6 +158,7 @@ function setGate(
 	h.certGate = {
 		loading: false,
 		shippingGate: "certification",
+		platformReviewCompleted: false,
 		application,
 		paymentAccount,
 	};

@@ -1,9 +1,8 @@
 "use client";
 
-import {
-	type KYCApplication,
-	KYCStatus,
-	type PaymentAccount,
+import type {
+	KYCApplication,
+	PaymentAccount,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { sellerKYCStatus } from "@hawkr/ui-text/keys";
 import AppIcon from "@/components/shared/AppIcon";
@@ -18,6 +17,8 @@ import {
 interface Props {
 	/** 申請（`useCertGate().application`）；沒有申請是 null。 */
 	application?: KYCApplication | null;
+	/** 平台審核已完成（`useCertGate().platformReviewCompleted`，開通摘要的答案）；省略視為還沒完成。 */
+	platformReviewCompleted?: boolean;
 	/** 收款帳戶（`useCertGate().paymentAccount`）；平台審核核准之前沒有。 */
 	paymentAccount?: PaymentAccount | null;
 	/** Subject the seller is being blocked from doing — used to template
@@ -38,6 +39,7 @@ interface Props {
  */
 export function SellerCertGate({
 	application,
+	platformReviewCompleted = false,
 	paymentAccount,
 	subject = "繼續",
 	title,
@@ -45,9 +47,10 @@ export function SellerCertGate({
 	detail,
 }: Props) {
 	const ut = useUiText();
-	const approved = application?.status === KYCStatus.KYC_STATUS_APPROVED;
 	const payment =
-		approved && paymentAccount ? paymentAccountCopy(ut, paymentAccount) : null;
+		platformReviewCompleted && paymentAccount
+			? paymentAccountCopy(ut, paymentAccount)
+			: null;
 	const reviewStatus = application
 		? optionalText(ut, sellerKYCStatus(application.status))
 		: undefined;

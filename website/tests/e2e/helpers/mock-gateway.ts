@@ -644,7 +644,7 @@ export function onboardingOf(flow: {
 	}
 }
 
-/** proto3 JSON 的 GetMyOnboardingResponse；`complete` 是三項都完成（閘門 ONBOARDING_COMPLETE 與 PROFILE 無關，這裡只看後兩項）。 */
+/** proto3 JSON 的 GetMyOnboardingResponse；`complete` 只看 PLATFORM_REVIEW 與 PAYMENT_ACCOUNT 兩項（契約上 `complete` 不含 PROFILE，與閘門 ONBOARDING_COMPLETE 同義）。 */
 export async function mockMyOnboarding(
 	page: Page,
 	tasks: MockOnboardingTask[] | "error",

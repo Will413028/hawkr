@@ -80,6 +80,7 @@ export default function WalletClient() {
 					) : paymentAccount ? null : (
 						<SellerCertGate
 							application={cert.application}
+							platformReviewCompleted={cert.platformReviewCompleted}
 							paymentAccount={paymentAccount}
 							subject="啟用錢包與收款"
 						/>

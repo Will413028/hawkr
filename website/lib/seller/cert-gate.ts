@@ -37,6 +37,8 @@ export interface CertGate {
 	approved: boolean;
 	/** 物流設定的閘門（`SHIPPING_SETUP` 的啟用與缺項）。 */
 	shippingGate: ShippingGate;
+	/** 平台審核已完成（開通摘要 PLATFORM_REVIEW 是 COMPLETED）；沒讀到摘要時是 false。 */
+	platformReviewCompleted: boolean;
 	/** 申請（GetMyKYC）；沒有申請或沒讀到時是 null。 */
 	application: KYCApplication | null;
 	/** 收款帳戶（GetMyPaymentAccount，平台審核核准後才讀）；還沒有或沒讀到時是 null。 */
@@ -62,6 +64,7 @@ export function useCertGate(): CertGate {
 		return {
 			loading: true,
 			approved: false,
+			platformReviewCompleted: false,
 			shippingGate: "unknown",
 			application: null,
 			paymentAccount: null,
@@ -81,6 +84,7 @@ export function useCertGate(): CertGate {
 		return {
 			loading: false,
 			approved: false,
+			platformReviewCompleted: false,
 			shippingGate: "unknown",
 			application: null,
 			paymentAccount: null,
@@ -94,6 +98,7 @@ export function useCertGate(): CertGate {
 	return {
 		loading: false,
 		approved,
+		platformReviewCompleted: platformReviewCompleted(onboarding),
 		shippingGate: shippingGateOf(seller),
 		application,
 		paymentAccount,

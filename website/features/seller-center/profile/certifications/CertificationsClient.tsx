@@ -230,7 +230,12 @@ export default function CertificationsClient() {
 	const { status: authStatus } = useAuth();
 	const { data: seller, loading: sellerLoading } = useSellerSelf();
 	const { application, loading: kycLoading, error: kycLoadError } = useMyKyc();
-	const { onboarding, loading: onboardingLoading } = useMyOnboarding();
+	const {
+		onboarding,
+		loading: onboardingLoading,
+		error: onboardingError,
+		refetch: refetchOnboarding,
+	} = useMyOnboarding();
 	const [hydrated, setHydrated] = React.useState(false);
 	const [error, setError] = useResettableError();
 	const {
@@ -1046,7 +1051,7 @@ export default function CertificationsClient() {
 	 *                       Render branches
 	 * ============================================================ */
 
-	if (!hydrated || onboardingLoading) {
+	if (!hydrated) {
 		return (
 			<div className="seller-cert">
 				<p className="seller-cert__loading">載入中…</p>
@@ -1077,7 +1082,14 @@ export default function CertificationsClient() {
 					cancelling={discardInitiator === "withdraw"}
 					onCancel={() => void handleCancel("withdraw")}
 				/>
-				<PaymentAccountSection platformApproved={platformApproved} />
+				<PaymentAccountSection
+					platformApproved={platformApproved}
+					summary={{
+						loading: onboardingLoading,
+						error: onboarding ? null : onboardingError,
+						refetch: refetchOnboarding,
+					}}
+				/>
 				{certified && (
 					<section className="seller-card">
 						<header className="seller-card__head">

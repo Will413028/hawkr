@@ -98,6 +98,7 @@ function setCert(
 					}),
 		seller: { capabilities: [{ capability: 2, active: true, missing: [] }] },
 		approved: kycStatus === KYCStatus.KYC_STATUS_APPROVED,
+		platformReviewCompleted: kycStatus === KYCStatus.KYC_STATUS_APPROVED,
 		refresh: () => {},
 	};
 }

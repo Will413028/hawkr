@@ -1,6 +1,7 @@
 "use client";
 
 import { Code } from "@connectrpc/connect";
+import { errorText } from "@hawkr/api/connect/errors";
 import type { GetMyOnboardingResponse } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
@@ -77,18 +78,25 @@ export default function OnboardingProgressCard({
 	const defaults = useDefaultErrorText();
 	const refreshPaymentAccount = useRefreshPaymentAccount();
 	const [refreshing, setRefreshing] = React.useState(false);
-	const [refreshFailed, setRefreshFailed] = React.useState(false);
-	const refresh = React.useCallback(async () => {
-		setRefreshing(true);
-		setRefreshFailed(false);
-		try {
-			await refreshPaymentAccount();
-		} catch {
-			setRefreshFailed(true);
-		} finally {
-			setRefreshing(false);
-		}
-	}, [refreshPaymentAccount]);
+	// 錯誤屬於按下「重新整理」時的那個任務：換任務就不再顯示。
+	const [refreshFailure, setRefreshFailure] = React.useState<{
+		taskId: string;
+		error: unknown;
+	} | null>(null);
+	const refresh = React.useCallback(
+		async (taskId: string) => {
+			setRefreshing(true);
+			setRefreshFailure(null);
+			try {
+				await refreshPaymentAccount();
+			} catch (error) {
+				setRefreshFailure({ taskId, error });
+			} finally {
+				setRefreshing(false);
+			}
+		},
+		[refreshPaymentAccount],
+	);
 	const requiredFailed = onboarding === null && !onboardingLoading;
 	const tasks = React.useMemo(
 		() =>
@@ -275,14 +283,14 @@ export default function OnboardingProgressCard({
 									disabled={activeTask.locked || refreshing}
 									isLoading={refreshing}
 									loadingLabel="正在確認資料…"
-									onClick={() => void refresh()}
+									onClick={() => void refresh(activeTask.id)}
 									className="seller-onboarding-progress__cta"
 								>
 									{activeTask.next.label}
 								</Button>
 							) : null}
-							{refreshFailed ? (
-								<p role="alert">{defaults(Code.Internal)}</p>
+							{refreshFailure && refreshFailure.taskId === activeTask.id ? (
+								<p role="alert">{errorText(refreshFailure.error, defaults)}</p>
 							) : null}
 						</div>
 						<div

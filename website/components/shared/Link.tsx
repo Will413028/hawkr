@@ -1,7 +1,7 @@
 "use client";
 
 import type {
-	KYCApplication,
+	GetMyOnboardingResponse,
 	PaymentAccount,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { QueryClientContext } from "@tanstack/react-query";
@@ -124,7 +124,7 @@ let walletTransactionRule:
 	| typeof import("@/lib/seller/wallet-transactions").walletShowsTransactions
 	| undefined;
 let platformApprovedRule:
-	| typeof import("@/lib/seller/wallet-transactions").platformReviewApproved
+	| typeof import("@/lib/seller/onboarding-summary").platformReviewCompleted
 	| undefined;
 
 // One user intent owns delayed atomic navigation across every Link instance.
@@ -224,29 +224,29 @@ export default function Link(props: LinkProps) {
 
 	const ensureSellerWallet = React.useCallback(async () => {
 		if (!queryClient) return;
-		const [sellerRepo, kycRepo, paymentRepo, ordersRepo, walletRule] =
+		const [sellerRepo, summaryRepo, paymentRepo, ordersRepo, walletRule] =
 			await Promise.all([
 				import("@/lib/seller/repo"),
-				import("@/lib/seller/kyc"),
+				import("@/lib/seller/onboarding-summary"),
 				import("@/lib/seller/payment-account"),
 				import("@/lib/orders/repo"),
 				import("@/lib/seller/wallet-transactions"),
 			]);
 		walletTransactionRule = walletRule.walletShowsTransactions;
-		platformApprovedRule = walletRule.platformReviewApproved;
-		const [seller, application] = await Promise.all([
+		platformApprovedRule = summaryRepo.platformReviewCompleted;
+		const [seller, onboarding] = await Promise.all([
 			queryClient.ensureQueryData({
 				queryKey: queryKeys.seller.self(identity),
 				queryFn: sellerRepo.fetchMyStore,
 				staleTime: 30_000,
 			}),
 			queryClient.ensureQueryData({
-				queryKey: queryKeys.seller.kyc(identity),
-				queryFn: () => kycRepo.fetchMyKyc(),
+				queryKey: queryKeys.seller.onboarding(identity),
+				queryFn: () => summaryRepo.fetchMyOnboarding(),
 				staleTime: 30_000,
 			}),
 		]);
-		const account = walletRule.platformReviewApproved(application)
+		const account = summaryRepo.platformReviewCompleted(onboarding)
 			? await queryClient.ensureQueryData({
 					queryKey: queryKeys.seller.paymentAccount(identity),
 					queryFn: () => paymentRepo.fetchMyPaymentAccount(),
@@ -305,21 +305,21 @@ export default function Link(props: LinkProps) {
 			const seller = queryClient.getQueryData<MyStore | null>(
 				queryKeys.seller.self(identity),
 			);
-			const application = queryClient.getQueryData<KYCApplication | null>(
-				queryKeys.seller.kyc(identity),
+			const onboarding = queryClient.getQueryData<GetMyOnboardingResponse>(
+				queryKeys.seller.onboarding(identity),
 			);
 			const account = queryClient.getQueryData<PaymentAccount | null>(
 				queryKeys.seller.paymentAccount(identity),
 			);
 			if (
 				seller === undefined ||
-				application === undefined ||
+				onboarding === undefined ||
 				walletTransactionRule === undefined ||
 				platformApprovedRule === undefined
 			) {
 				return true;
 			}
-			if (!platformApprovedRule(application)) return false;
+			if (!platformApprovedRule(onboarding)) return false;
 			if (account === undefined) return true;
 			if (!walletTransactionRule(seller, account)) {
 				return false;

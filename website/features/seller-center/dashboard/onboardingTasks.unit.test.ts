@@ -255,14 +255,26 @@ describe("公開前必須 comes from the server's GetMyOnboarding", () => {
 		]);
 	});
 
-	it("a task id the web has no presentation for is not rendered with invented text", () => {
+	it("UNSPECIFIED id is skipped; an id the web has no presentation for still renders with the server's title, status and action", () => {
 		const onboarding = onboardingFixture([
 			{ id: ID.UNSPECIFIED, state: S.ACTION_REQUIRED },
 			{ id: ID.PROFILE, state: S.COMPLETED },
+			{
+				id: 77 as OnboardingTaskId,
+				state: S.ACTION_REQUIRED,
+				action: A.CONTACT_SUPPORT,
+				title: "未來任務標題",
+				status: "未來任務狀態",
+			},
 		]);
-		expect(required(build([], { onboarding })).map((t) => t.id)).toEqual([
-			"profile",
-		]);
+		const tasks = required(build([], { onboarding }));
+		expect(tasks.map((t) => t.id)).toEqual(["profile", "required_77"]);
+		const future = task(tasks, "required_77");
+		expect(future.title).toBe("未來任務標題");
+		expect(future.statusLabel).toBe("未來任務狀態");
+		expect(future.completed).toBe(false);
+		expect(future.icon).toBe("activity");
+		expect(future.next).toMatchObject({ kind: "link", href: "/contact" });
 	});
 
 	it("the required group does not depend on shipping, products or the store description", () => {

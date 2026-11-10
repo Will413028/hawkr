@@ -57,6 +57,7 @@ describe("SellerCertGate", () => {
 				application: create(KYCApplicationSchema, {
 					status: KYCStatus.KYC_STATUS_APPROVED,
 				}),
+				platformReviewCompleted: true,
 				paymentAccount: create(PaymentAccountSchema, {
 					status: PaymentAccountStatus.ACTION_REQUIRED,
 				}),
@@ -78,6 +79,7 @@ describe("SellerCertGate", () => {
 				application: create(KYCApplicationSchema, {
 					status: KYCStatus.KYC_STATUS_APPROVED,
 				}),
+				platformReviewCompleted: true,
 				paymentAccount: create(PaymentAccountSchema, {
 					status: PaymentAccountStatus.DISABLED,
 				}),
@@ -94,6 +96,7 @@ describe("SellerCertGate", () => {
 				application: create(KYCApplicationSchema, {
 					status: KYCStatus.KYC_STATUS_APPROVED,
 				}),
+				platformReviewCompleted: true,
 				paymentAccount: create(PaymentAccountSchema, {
 					status: PaymentAccountStatus.NOT_CREATED,
 				}),
@@ -103,5 +106,36 @@ describe("SellerCertGate", () => {
 		expect(
 			screen.getByText("前往商家認證").closest("a")?.getAttribute("href"),
 		).toBe("/seller-center/me/certifications");
+	});
+
+	it("申請是 APPROVED 但開通摘要的平台審核還沒完成：走核准前的分支，名詞仍來自申請", () => {
+		render(
+			React.createElement(SellerCertGate, {
+				application: create(KYCApplicationSchema, {
+					status: KYCStatus.KYC_STATUS_APPROVED,
+				}),
+				platformReviewCompleted: false,
+				paymentAccount: create(PaymentAccountSchema, {
+					status: PaymentAccountStatus.ACTION_REQUIRED,
+				}),
+			}),
+		);
+		expect(screen.queryByText("前往設定收款帳戶")).toBeNull();
+		expect(screen.getByText("前往商家認證")).toBeTruthy();
+	});
+
+	it("開通摘要的平台審核已完成但申請不是 APPROVED：走收款帳戶分支", () => {
+		render(
+			React.createElement(SellerCertGate, {
+				application: create(KYCApplicationSchema, {
+					status: KYCStatus.KYC_STATUS_SUBMITTED,
+				}),
+				platformReviewCompleted: true,
+				paymentAccount: create(PaymentAccountSchema, {
+					status: PaymentAccountStatus.ACTION_REQUIRED,
+				}),
+			}),
+		);
+		expect(screen.getByText("前往設定收款帳戶")).toBeTruthy();
 	});
 });

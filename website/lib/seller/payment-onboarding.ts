@@ -2,15 +2,12 @@
  * 收款帳戶開通的流程（純邏輯，元件只負責接線）。
  *
  * - HOSTED：呼叫 `CreatePaymentOnboardingSession`，整頁導到金流商的連結；回到 `?payment=return` 時先呼叫
- *   `RefreshMyPaymentAccount`（伺服器同步向金流商重讀，D33）再讀帳戶與開通摘要，不輪詢；`resource_exhausted`
+ *   `RefreshMyPaymentAccount`（伺服器同步向金流商重讀，D33）再讀帳戶與開通摘要（`confirmPaymentReturn`），不輪詢；`resource_exhausted`
  *   帶 RetryInfo 由 transport 的 retryInterceptor 重試；回到 `?payment=refresh`（連結過期）時重新取得連結再導。
  * - EMBEDDED：不在這裡建立 session；內嵌元件自己呼叫 `fetchClientSecret`（每次都是新的 session）。
  */
 
-import {
-	OnboardingSurface,
-	type PaymentAccount,
-} from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import { OnboardingSurface } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { OnboardingSession } from "./payment-account";
 
 /** 開通完成與離開都回到認證頁，用 query 區分。 */
@@ -78,35 +75,23 @@ export async function embeddedClientSecret(
 }
 
 interface ConfirmDeps {
-	/** 呼叫 `RefreshMyPaymentAccount`：伺服器同步重讀帳戶；失敗丟錯，不讀。 */
+	/** 呼叫 `RefreshMyPaymentAccount`：伺服器同步重讀帳戶。 */
 	refreshAccount: () => Promise<void>;
-	/** 重讀帳戶與開通摘要並把結果交給畫面（寫進快取）。 */
-	readAccount: () => Promise<PaymentAccount | null>;
+	/** 重新讀帳戶與開通摘要（讓快取與畫面更新）。 */
+	readAccount: () => Promise<unknown>;
 }
-
-/** 回到網頁後先重讀（一次）再讀；回傳讀到的帳戶。 */
-export async function confirmPaymentReturn(
-	deps: ConfirmDeps,
-): Promise<PaymentAccount | null> {
-	await deps.refreshAccount();
-	return deps.readAccount();
-}
-
-export type ParamOutcome =
-	| { kind: "confirmed"; account: PaymentAccount | null }
-	| { kind: "redirect"; url: string }
-	| { kind: "embedded" };
 
 /**
- * 網址上的 `?payment=`：`return` 先重讀再讀帳戶，`refresh` 重新開始開通（連結過期，HOSTED 取得新連結）。
- * `refresh` 需要伺服器告知的介面；沒有介面（帳戶還沒讀到或沒有設定）丟錯。
+ * 回到網頁後與狀態按鈕共用的一條路徑：先重讀（一次）再讀。重讀失敗也照樣讀（快取不能留在舊的），讀完再把重讀的
+ * 錯誤丟出去，讓畫面顯示伺服器的句子。
  */
-export async function handlePaymentParam(
-	param: PaymentParam,
-	deps: ConfirmDeps & StartDeps & { surface: OnboardingSurface | undefined },
-): Promise<ParamOutcome> {
-	if (param === "return") {
-		return { kind: "confirmed", account: await confirmPaymentReturn(deps) };
+export async function confirmPaymentReturn(deps: ConfirmDeps): Promise<void> {
+	let refreshFailure: { error: unknown } | null = null;
+	try {
+		await deps.refreshAccount();
+	} catch (error) {
+		refreshFailure = { error };
 	}
-	return startOnboarding(deps.surface ?? OnboardingSurface.UNSPECIFIED, deps);
+	await deps.readAccount();
+	if (refreshFailure) throw refreshFailure.error;
 }

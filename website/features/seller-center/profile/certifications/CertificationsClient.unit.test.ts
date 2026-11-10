@@ -72,6 +72,7 @@ const mocks = vi.hoisted(() => ({
 	/** GetMyOnboarding 的回應；null 是還沒讀到或讀取失敗。 */
 	onboarding: null as unknown,
 	onboardingLoading: false,
+	onboardingError: null as Error | null,
 }));
 
 vi.mock("next/navigation", async (importOriginal) => ({
@@ -105,7 +106,7 @@ vi.mock("@/lib/hooks/useSellerSelf", async () => {
 		useMyOnboarding: () => ({
 			onboarding: mocks.onboarding,
 			loading: mocks.onboardingLoading,
-			error: null,
+			error: mocks.onboardingError,
 			refetch: async () => {},
 		}),
 		useSetMyKyc: () => kycStore.set,
@@ -133,12 +134,16 @@ vi.mock("@/lib/seller/contact-email", async (importActual) => ({
 vi.mock("./PaymentAccountSection", () => ({
 	PaymentAccountSection: ({
 		platformApproved,
+		summary,
 	}: {
 		platformApproved: boolean;
+		summary: { loading: boolean; error: Error | null };
 	}) =>
 		React.createElement("div", {
 			"data-testid": "payment-section",
 			"data-approved": platformApproved ? "true" : "false",
+			"data-summary-loading": summary.loading ? "true" : "false",
+			"data-summary-error": summary.error?.message ?? "",
 		}),
 }));
 vi.mock("@/lib/navigation/use-observed-router", () => ({
@@ -340,6 +345,7 @@ beforeEach(() => {
 	mocks.type = null;
 	mocks.onboarding = null;
 	mocks.onboardingLoading = false;
+	mocks.onboardingError = null;
 	Element.prototype.scrollIntoView = mocks.scrollIntoView;
 	window.confirm = () => true;
 	kycStore.set(null);
@@ -1010,12 +1016,34 @@ describe("兩區狀態頁（D15）", () => {
 		);
 	});
 
-	it("摘要還在載入：等它，不先畫出灰色的收款帳戶區", async () => {
+	it("摘要還在載入：只有收款帳戶區等它，頁面其餘部分照常畫出", async () => {
 		kycStore.set(app({ status: KYCStatus.KYC_STATUS_APPROVED }));
 		mocks.onboardingLoading = true;
 		await mount();
-		expect(screen.queryByTestId("payment-section")).toBeNull();
-		expect(screen.getByText("載入中…")).toBeTruthy();
+		expect(screen.getByTestId("payment-section").dataset.summaryLoading).toBe(
+			"true",
+		);
+		expect(screen.getByText("已通過")).toBeTruthy();
+	});
+
+	it("摘要讀取失敗：把錯誤交給收款帳戶區，不由頁面推導平台審核", async () => {
+		kycStore.set(app({ status: KYCStatus.KYC_STATUS_APPROVED }));
+		mocks.onboarding = null;
+		mocks.onboardingError = new Error("summary down");
+		await mount();
+		const section = screen.getByTestId("payment-section");
+		expect(section.dataset.summaryError).toBe("summary down");
+		expect(section.dataset.approved).toBe("false");
+	});
+
+	it("摘要有舊資料而背景重讀失敗：不當成讀取失敗", async () => {
+		kycStore.set(app({ status: KYCStatus.KYC_STATUS_APPROVED }));
+		summary(OnboardingTaskState.COMPLETED);
+		mocks.onboardingError = new Error("blip");
+		await mount();
+		const section = screen.getByTestId("payment-section");
+		expect(section.dataset.summaryError).toBe("");
+		expect(section.dataset.approved).toBe("true");
 	});
 
 	it("取消申請：確認之後呼叫 CancelKYC，回到選型態", async () => {

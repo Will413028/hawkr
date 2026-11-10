@@ -1,19 +1,18 @@
 "use client";
 
 import { timestampDate } from "@bufbuild/protobuf/wkt";
-import { Code } from "@connectrpc/connect";
+import { Code, ConnectError } from "@connectrpc/connect";
+import { errorText } from "@hawkr/api/connect/errors";
 import {
 	OnboardingSurface,
 	type PaymentAccount,
 	PaymentAccountStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
-import { useQueryClient } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import * as React from "react";
 import Button from "@/components/ui/Button";
 import { formatTaipeiMonthDayTime } from "@/lib/date/taipei";
-import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
 import {
 	useMyPaymentAccount,
 	useRefreshPaymentAccount,
@@ -21,19 +20,15 @@ import {
 import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
 import { useLocalizedHref } from "@/lib/intl/use-router";
 import { commitDocumentNavigation } from "@/lib/navigation/document-location";
-import { queryKeys } from "@/lib/query/keys";
-import { refreshMyPaymentAccount } from "@/lib/seller/onboarding-summary";
 import {
 	CONTACT_HREF,
 	createPaymentOnboardingSession,
-	fetchMyPaymentAccount,
 	paymentAccountCanOnboard,
 	paymentAccountCopy,
 	paymentAccountTone,
 } from "@/lib/seller/payment-account";
 import {
 	embeddedClientSecret,
-	handlePaymentParam,
 	onboardingUrls,
 	PAYMENT_PARAM,
 	paymentParamOf,
@@ -59,14 +54,19 @@ function formatUpdated(account: PaymentAccount): string | null {
  */
 export function PaymentAccountSection({
 	platformApproved,
+	summary,
 }: {
 	platformApproved: boolean;
+	/** 開通摘要（`useMyOnboarding`）的載入與錯誤狀態：讀失敗時不能判斷平台審核，顯示錯誤而不是「尚未開放」。 */
+	summary: {
+		loading: boolean;
+		error: Error | null;
+		refetch: () => unknown;
+	};
 }) {
 	const ut = useUiText();
 	const defaults = useDefaultErrorText();
 	const searchParams = useSearchParams();
-	const queryClient = useQueryClient();
-	const identity = useQueryIdentity();
 	const {
 		account,
 		loading,
@@ -79,7 +79,7 @@ export function PaymentAccountSection({
 	const [busy, setBusy] = React.useState(false);
 	const [confirming, setConfirming] = React.useState(false);
 	const [embeddedOpen, setEmbeddedOpen] = React.useState(false);
-	const [failed, setFailed] = React.useState(false);
+	const [failure, setFailure] = React.useState<{ error: unknown } | null>(null);
 	const accountRef = React.useRef(account);
 	accountRef.current = account;
 	const handledRef = React.useRef(false);
@@ -93,22 +93,11 @@ export function PaymentAccountSection({
 		[urls],
 	);
 	const refreshPaymentAccount = useRefreshPaymentAccount();
-	// 從金流商回來：先同步重讀（refreshMyPaymentAccount），再讀帳戶與開通摘要。
-	const readAccount = React.useCallback(async () => {
-		const [fresh] = await Promise.all([
-			fetchMyPaymentAccount(),
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.seller.onboarding(identity),
-			}),
-		]);
-		queryClient.setQueryData(queryKeys.seller.paymentAccount(identity), fresh);
-		return fresh;
-	}, [queryClient, identity]);
 
 	const begin = React.useCallback(
 		async (surface: OnboardingSurface) => {
 			setBusy(true);
-			setFailed(false);
+			setFailure(null);
 			try {
 				const started = await startOnboarding(surface, { createSession });
 				if (started.kind === "redirect") {
@@ -116,8 +105,8 @@ export function PaymentAccountSection({
 					return;
 				}
 				setEmbeddedOpen(true);
-			} catch {
-				setFailed(true);
+			} catch (error) {
+				setFailure({ error });
 			} finally {
 				setBusy(false);
 			}
@@ -125,30 +114,14 @@ export function PaymentAccountSection({
 		[createSession],
 	);
 
+	// 從金流商回來與狀態按鈕是同一條路徑：先同步重讀，再重新讀開通摘要與帳戶。
 	const confirm = React.useCallback(async () => {
 		setConfirming(true);
-		setFailed(false);
-		try {
-			await handlePaymentParam("return", {
-				refreshAccount: refreshMyPaymentAccount,
-				readAccount,
-				createSession,
-				surface: accountRef.current?.onboardingSurface,
-			});
-		} catch {
-			setFailed(true);
-		} finally {
-			setConfirming(false);
-		}
-	}, [readAccount, createSession]);
-
-	const refreshStatus = React.useCallback(async () => {
-		setConfirming(true);
-		setFailed(false);
+		setFailure(null);
 		try {
 			await refreshPaymentAccount();
-		} catch {
-			setFailed(true);
+		} catch (error) {
+			setFailure({ error });
 		} finally {
 			setConfirming(false);
 		}
@@ -171,6 +144,37 @@ export function PaymentAccountSection({
 	const copy = account ? paymentAccountCopy(ut, account) : null;
 	const tone = account ? paymentAccountTone(account.status) : undefined;
 	const genericError = defaults(Code.Internal);
+
+	if (summary.loading) {
+		return (
+			<section className="seller-card" aria-label="收款帳戶">
+				<header className="seller-card__head">
+					<h2>收款帳戶</h2>
+				</header>
+				<p>載入中…</p>
+			</section>
+		);
+	}
+
+	if (summary.error && !platformApproved) {
+		return (
+			<section className="seller-card" aria-label="收款帳戶">
+				<header className="seller-card__head">
+					<h2>收款帳戶</h2>
+				</header>
+				<div className="seller-cert__status is-warning" role="alert">
+					<p>{errorText(summary.error, defaults)}</p>
+					<Button
+						variant="bordered"
+						size="sm"
+						onClick={() => void summary.refetch()}
+					>
+						重新整理
+					</Button>
+				</div>
+			</section>
+		);
+	}
 
 	if (!platformApproved) {
 		return (
@@ -246,7 +250,7 @@ export function PaymentAccountSection({
 								variant="bordered"
 								size="sm"
 								disabled={confirming}
-								onClick={() => void refreshStatus()}
+								onClick={() => void confirm()}
 							>
 								{copy.action}
 							</Button>
@@ -257,9 +261,9 @@ export function PaymentAccountSection({
 					) : null}
 				</>
 			)}
-			{failed || missingKey ? (
+			{failure || missingKey ? (
 				<p className="seller-cert__error" role="alert">
-					{genericError}
+					{failure ? errorText(failure.error, defaults) : genericError}
 				</p>
 			) : null}
 			{embeddedOpen && !missingKey && publishableKey !== "" ? (
@@ -270,7 +274,11 @@ export function PaymentAccountSection({
 						setEmbeddedOpen(false);
 						void confirm();
 					}}
-					onLoadError={() => setFailed(true)}
+					onLoadError={() =>
+						setFailure({
+							error: new ConnectError("embedded load", Code.Internal),
+						})
+					}
 				/>
 			) : null}
 		</section>

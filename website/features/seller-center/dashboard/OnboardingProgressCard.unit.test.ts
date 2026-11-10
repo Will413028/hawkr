@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import { create } from "@bufbuild/protobuf";
+import { Code, ConnectError } from "@connectrpc/connect";
+import { LocalizedMessageSchema } from "@hawkr/api/gen/google/rpc/error_details_pb";
 import {
 	CapabilityStatusSchema,
 	type GetMyOnboardingResponse,
@@ -271,6 +273,53 @@ describe("OnboardingProgressCard", () => {
 		fireEvent.click(screen.getByRole("button", { name: /^伺服器標題3，/ }));
 		fireEvent.click(screen.getByRole("button", { name: "重新整理" }));
 		expect((await screen.findByRole("alert")).textContent).toBe("系統錯誤");
+	});
+
+	it("a failed refresh shows the server's sentence", async () => {
+		const err = new ConnectError("blocked", Code.FailedPrecondition);
+		err.details.push({
+			desc: LocalizedMessageSchema,
+			value: create(LocalizedMessageSchema, {
+				locale: "zh-TW",
+				message: "商店已暫停營業",
+			}),
+		});
+		refreshPaymentAccount.mockRejectedValueOnce(err);
+		renderCard({
+			onboarding: onboardingFixture([
+				{
+					id: ID.PAYMENT_ACCOUNT,
+					state: S.IN_PROGRESS,
+					action: A.REFRESH_PAYMENT_ACCOUNT,
+				},
+			]),
+		});
+		expand();
+		fireEvent.click(screen.getByRole("button", { name: /^伺服器標題3，/ }));
+		fireEvent.click(screen.getByRole("button", { name: "重新整理" }));
+		expect((await screen.findByRole("alert")).textContent).toBe(
+			"商店已暫停營業",
+		);
+	});
+
+	it("a refresh error is cleared when the active task changes", async () => {
+		refreshPaymentAccount.mockRejectedValueOnce(new Error("boom"));
+		renderCard({
+			onboarding: onboardingFixture([
+				{ id: ID.PROFILE, state: S.COMPLETED },
+				{
+					id: ID.PAYMENT_ACCOUNT,
+					state: S.IN_PROGRESS,
+					action: A.REFRESH_PAYMENT_ACCOUNT,
+				},
+			]),
+		});
+		expand();
+		fireEvent.click(screen.getByRole("button", { name: /^伺服器標題3，/ }));
+		fireEvent.click(screen.getByRole("button", { name: "重新整理" }));
+		await screen.findByRole("alert");
+		fireEvent.click(screen.getByRole("button", { name: /^伺服器標題1，/ }));
+		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
 	it("GetMyOnboarding failed: the required group is one load-failure state, recommended stay", () => {

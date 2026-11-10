@@ -17,6 +17,7 @@ import {
 	refreshMyPaymentAccount,
 } from "@/lib/seller/onboarding-summary";
 import { fetchMyPaymentAccount } from "@/lib/seller/payment-account";
+import { confirmPaymentReturn } from "@/lib/seller/payment-onboarding";
 import { isStoreMissing, type MyStore } from "@/lib/seller/store";
 import { useSellerDataScope } from "@/lib/seller-data/scope";
 import { useQueryIdentity } from "./useQueryIdentity";
@@ -82,6 +83,9 @@ export function useInvalidateSellerSelf(): () => Promise<void> {
 			queryClient.invalidateQueries({
 				queryKey: queryKeys.seller.kyc(identity),
 			}),
+			queryClient.invalidateQueries({
+				queryKey: queryKeys.seller.onboarding(identity),
+			}),
 		]);
 	};
 }
@@ -142,12 +146,18 @@ export function useMyKycFlow(options?: {
 	};
 }
 
-/** 把伺服器剛回的申請寫進快取（存檔、送出、取消的回應就是最新的申請）。 */
+/**
+ * 把伺服器剛回的申請寫進快取（存檔、送出、取消的回應就是最新的申請），並讓開通摘要重讀
+ * （平台審核任務的狀態由申請推導，摘要由伺服器算）。
+ */
 export function useSetMyKyc(): (application: KYCApplication | null) => void {
 	const queryClient = useQueryClient();
 	const identity = useQueryIdentity();
 	return (application) => {
 		queryClient.setQueryData(queryKeys.seller.kyc(identity), application);
+		void queryClient.invalidateQueries({
+			queryKey: queryKeys.seller.onboarding(identity),
+		});
 	};
 }
 
@@ -215,20 +225,26 @@ export function useMyOnboarding(options?: {
 }
 
 /**
- * 同步重讀收款帳戶（`RefreshMyPaymentAccount`），成功後重新讀開通摘要與收款帳戶。重讀失敗丟錯（不讀）。
+ * 同步重讀收款帳戶（`RefreshMyPaymentAccount`）再重新讀開通摘要與收款帳戶（`confirmPaymentReturn`）：
+ * 回跳與狀態按鈕共用的一條路徑。重讀失敗時仍會讀，之後丟出重讀的錯誤。
  */
 export function useRefreshPaymentAccount(): () => Promise<void> {
 	const queryClient = useQueryClient();
 	const identity = useQueryIdentity();
-	return React.useCallback(async () => {
-		await refreshMyPaymentAccount();
-		await Promise.all([
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.seller.onboarding(identity),
+	return React.useCallback(
+		() =>
+			confirmPaymentReturn({
+				refreshAccount: () => refreshMyPaymentAccount(),
+				readAccount: () =>
+					Promise.all([
+						queryClient.invalidateQueries({
+							queryKey: queryKeys.seller.onboarding(identity),
+						}),
+						queryClient.invalidateQueries({
+							queryKey: queryKeys.seller.paymentAccount(identity),
+						}),
+					]),
 			}),
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.seller.paymentAccount(identity),
-			}),
-		]);
-	}, [queryClient, identity]);
+		[queryClient, identity],
+	);
 }

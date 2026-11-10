@@ -107,12 +107,29 @@ function nextOf(
 	}
 }
 
+/** 沒有專屬呈現的必要任務（伺服器新增的 id）：標題、狀態與下一步照伺服器，圖示是中性的預設，不寫 id 專屬的文字。 */
+function genericRequiredPresentation(
+	task: ServerOnboardingTask,
+): Pick<
+	OnboardingTask,
+	"id" | "description" | "panelTitle" | "panelDescription" | "icon"
+> {
+	return {
+		id: `required_${task.id}`,
+		description: "",
+		panelTitle: task.title?.message ?? "",
+		panelDescription: task.status?.message ?? "",
+		icon: "activity",
+	};
+}
+
 function requiredTaskOf(
 	ut: UiText,
 	task: ServerOnboardingTask,
 ): OnboardingTask | undefined {
-	const presentation = REQUIRED_PRESENTATION[task.id];
-	if (!presentation) return undefined;
+	if (task.id === OnboardingTaskId.UNSPECIFIED) return undefined;
+	const presentation =
+		REQUIRED_PRESENTATION[task.id] ?? genericRequiredPresentation(task);
 	return {
 		...presentation,
 		group: "required",
