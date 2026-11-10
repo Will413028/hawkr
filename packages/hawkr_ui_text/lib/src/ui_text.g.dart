@@ -597,6 +597,22 @@ String commonUnknown(UiLocale l) => switch (l) {
 UiLocale.zhTW || UiLocale.en => '未知',
 };
 
+/// seller.KYCApplication.decide_time
+String sellerKYCApplicationDecideTime(UiLocale l, {required String time}) {
+return switch (l) {
+UiLocale.zhTW => '核准時間：' + time,
+UiLocale.en => 'Approved at: ' + time,
+};
+}
+
+/// seller.KYCApplication.submit_time
+String sellerKYCApplicationSubmitTime(UiLocale l, {required String time}) {
+return switch (l) {
+UiLocale.zhTW => '送出時間：' + time,
+UiLocale.en => 'Submitted at: ' + time,
+};
+}
+
 /// seller.Measure.appeal_deadline
 String sellerMeasureAppealDeadline(UiLocale l, {required String deadline}) {
 return switch (l) {

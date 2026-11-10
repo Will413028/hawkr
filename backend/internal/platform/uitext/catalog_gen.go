@@ -176,6 +176,22 @@ func (t Text) SellerContentKind(v string) (string, bool) {
 	return "", false
 }
 
+// SellerKYCApplicationDecideTime 是 seller.KYCApplication.decide_time 的文案。
+func (t Text) SellerKYCApplicationDecideTime(time string) string {
+	if t.Locale() == EN {
+		return "Approved at: " + time
+	}
+	return "核准時間：" + time
+}
+
+// SellerKYCApplicationSubmitTime 是 seller.KYCApplication.submit_time 的文案。
+func (t Text) SellerKYCApplicationSubmitTime(time string) string {
+	if t.Locale() == EN {
+		return "Submitted at: " + time
+	}
+	return "送出時間：" + time
+}
+
 // SellerKYCField 是 seller.KYCField 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerKYCField(v string) (string, bool) {

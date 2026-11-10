@@ -61,6 +61,10 @@
       "CONTENT_KIND_FORUM_ENTRY": "討論區留言",
       "CONTENT_KIND_POST": "貼文"
     },
+    "KYCApplication": {
+      "decide_time": "Approved at: {time}",
+      "submit_time": "Submitted at: {time}"
+    },
     "KYCField": {
       "KYC_FIELD_BANK_ACCOUNT": "銀行帳號",
       "KYC_FIELD_BANK_BOOK": "存摺封面",

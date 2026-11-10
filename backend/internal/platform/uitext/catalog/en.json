@@ -33,6 +33,12 @@
     "common.StoreCardStatus.STORE_CARD_STATUS_PAUSED": {
       "message": "Temporarily closed"
     },
+    "seller.KYCApplication.decide_time": {
+      "message": "Approved at: {time}"
+    },
+    "seller.KYCApplication.submit_time": {
+      "message": "Submitted at: {time}"
+    },
     "seller.KYCStatus.KYC_STATUS_APPROVED": {
       "message": "Approved"
     },

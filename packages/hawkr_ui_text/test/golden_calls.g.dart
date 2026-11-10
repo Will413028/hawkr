@@ -217,6 +217,10 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return commonUnknown(l);
     case 'seller.ContentKind':
       return hawkr_seller_v1alpha1_seller.ContentKind.valueOf(_n(value))!.uiText(l);
+    case 'seller.KYCApplication.decide_time':
+      return sellerKYCApplicationDecideTime(l, time: params['time']! as String);
+    case 'seller.KYCApplication.submit_time':
+      return sellerKYCApplicationSubmitTime(l, time: params['time']! as String);
     case 'seller.KYCField':
       return hawkr_seller_v1alpha1_seller.KYCField.valueOf(_n(value))!.uiText(l);
     case 'seller.KYCFlowStatus':

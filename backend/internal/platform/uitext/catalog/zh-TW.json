@@ -172,6 +172,24 @@
       "message": "貼文",
       "description": "店家貼文。"
     },
+    "seller.KYCApplication.decide_time": {
+      "message": "核准時間：{time}",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "商家認證已通過時，平台審核區顯示核准時間的標籤。time 是台北時間（YYYY/MM/DD HH:mm）。"
+    },
+    "seller.KYCApplication.submit_time": {
+      "message": "送出時間：{time}",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "商家認證審核中時，平台審核區顯示送出時間的標籤。time 是台北時間（YYYY/MM/DD HH:mm）。"
+    },
     "seller.KYCField.KYC_FIELD_BANK_ACCOUNT": {
       "message": "銀行帳號",
       "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BANK_ACCOUNT）"

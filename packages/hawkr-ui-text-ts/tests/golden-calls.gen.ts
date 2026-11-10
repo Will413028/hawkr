@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, sellerContentKind, sellerKYCField, sellerKYCFlowStatus, sellerKYCFlowStatusAction, sellerKYCFlowStatusBannerDescription, sellerKYCFlowStatusBannerTitle, sellerKYCFlowStatusGateHeading, sellerKYCFlowStatusGateMessage, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerOnboardingActionButton, sellerPayUniState, sellerPaymentAccountPayoutsInactiveNote, sellerPaymentAccountStatus, sellerPaymentAccountStatusAction, sellerPaymentAccountStatusDescription, sellerRequirementCollection, sellerRevokeReason, sellerRiskGround, sellerSellerPayUniFixFieldsHeading, sellerSellerPayUniReasonHeading, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
+import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCFlowStatus, sellerKYCFlowStatusAction, sellerKYCFlowStatusBannerDescription, sellerKYCFlowStatusBannerTitle, sellerKYCFlowStatusGateHeading, sellerKYCFlowStatusGateMessage, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerOnboardingActionButton, sellerPayUniState, sellerPaymentAccountPayoutsInactiveNote, sellerPaymentAccountStatus, sellerPaymentAccountStatusAction, sellerPaymentAccountStatusDescription, sellerRequirementCollection, sellerRevokeReason, sellerRiskGround, sellerSellerPayUniFixFieldsHeading, sellerSellerPayUniReasonHeading, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -233,6 +233,12 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "seller.ContentKind": {
 		return sellerContentKind(num(c.value));
+	}
+	case "seller.KYCApplication.decide_time": {
+		return sellerKYCApplicationDecideTime({ time: p.time as string });
+	}
+	case "seller.KYCApplication.submit_time": {
+		return sellerKYCApplicationSubmitTime({ time: p.time as string });
 	}
 	case "seller.KYCField": {
 		return sellerKYCField(num(c.value));

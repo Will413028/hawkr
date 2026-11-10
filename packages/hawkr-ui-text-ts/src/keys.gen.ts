@@ -52,6 +52,8 @@ export type UiTextKey =
 	| "seller.ContentKind.CONTENT_KIND_COMMENT"
 	| "seller.ContentKind.CONTENT_KIND_FORUM_ENTRY"
 	| "seller.ContentKind.CONTENT_KIND_POST"
+	| "seller.KYCApplication.decide_time"
+	| "seller.KYCApplication.submit_time"
 	| "seller.KYCField.KYC_FIELD_BANK_ACCOUNT"
 	| "seller.KYCField.KYC_FIELD_BANK_BOOK"
 	| "seller.KYCField.KYC_FIELD_BANK_CODE"
@@ -350,6 +352,16 @@ export function sellerContentKind(v: ContentKind): UiMessage | undefined {
 	const key = SELLER_CONTENT_KIND[v];
 	if (key === undefined) return undefined;
 	return { key };
+}
+
+/** seller.KYCApplication.decide_time */
+export function sellerKYCApplicationDecideTime(a: { time: string }): UiMessage {
+	return { key: "seller.KYCApplication.decide_time", values: { time: a.time } };
+}
+
+/** seller.KYCApplication.submit_time */
+export function sellerKYCApplicationSubmitTime(a: { time: string }): UiMessage {
+	return { key: "seller.KYCApplication.submit_time", values: { time: a.time } };
 }
 
 const SELLER_KYCFIELD: Readonly<Partial<Record<number, UiTextKey>>> = {
