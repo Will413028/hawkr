@@ -17,12 +17,12 @@ import (
 // Sync 是同步 job 的內容：在 transaction 外重讀外部帳戶，在 transaction 內整列覆寫快取、發布 PayoutAccountChanged（seller 的同 transaction 訂閱者
 // 更新開通閘門的副本、把 fingerprint 寫成防詐 hash、閘門的輸入有變時重新公告；全域鎖順序 payment 先於 seller），並經 platform inbox 把這個外部帳戶在
 // 讀取開始前收到的事件整批標為已處理（D29：收款事件只是「重讀帳戶」的訊號，handler 不標記，由涵蓋它的同步標記）。同步可能和別的同步並行（job 與
-// seller 的同步重讀）：寫入只在這次的讀取開始時間不早於已存的 fetched_at 時進行（D32），被擋下的這次整個什麼都不做（不寫、不標記、不發布，again 為
-// false：較晚開始的那次涵蓋了在這次開始之前收到的事件）。沒有帳戶列、還沒有外部 ID 的什麼都不做。again 為 true 表示讀取期間又收到事件（唯一鍵排除了新 job）：呼叫方稍後再跑一輪。重讀失敗回傳錯誤，由 River 重試；外部帳戶不存在是
+// seller 的同步重讀）：寫入只在這次的讀取開始時間不早於已存的 fetched_at 時進行（D32），被擋下的這次不寫、不標記、不發布，但仍以唯讀的 RoutePending
+// 回答 again（較晚開始的那次標記了在它開始之前收到的事件，之後收到的還在，由這個 again 讓呼叫方再跑一輪）。沒有帳戶列、還沒有外部 ID 的什麼都不做。
+// again 為 true 表示還有未處理的事件（唯一鍵排除了新 job）：呼叫方稍後再跑一輪。重讀失敗回傳錯誤，由 River 重試；外部帳戶不存在是
 // 永久失敗（ErrPermanent），回傳給 job 取消。
 func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err error) {
-	p := s.d.Provider
-	if p == nil {
+	if s.d.Provider == nil {
 		return false, nil
 	}
 	row, err := store.New(s.d.DB.Conn(ctx)).PaymentAccountByStore(ctx, storeID)
@@ -32,9 +32,16 @@ func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err erro
 	if err != nil {
 		return false, err
 	}
+	return s.syncRow(ctx, row)
+}
+
+// syncRow 是 Sync 的本體，row 是呼叫方剛讀到的帳戶列（只用它的外部 ID 與 provider，寫入在 transaction 內重新鎖列）。
+func (s *Service) syncRow(ctx context.Context, row store.PaymentAccount) (again bool, err error) {
+	p := s.d.Provider
 	if row.ExternalAccountID == nil || row.Provider != p.Name() {
 		return false, nil
 	}
+	storeID := row.StoreID
 	external := *row.ExternalAccountID
 	startedAt := s.d.Now().UTC()
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
@@ -75,8 +82,9 @@ func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err erro
 			StoreID: storeID, Status: string(status), TransfersActive: enabled, PayoutsActive: snap.PayoutsActive && enabled,
 			Requirements: raw, StatusReason: reason, FetchedAt: &startedAt, Now: now,
 		}); errors.Is(err, pgx.ErrNoRows) {
-			// 較晚開始的讀取已經寫入：這次的快照較舊，不寫、不發布、不標記；涵蓋的事件與 again 都由那一次處理。
-			return nil
+			// 較晚開始的讀取已經寫入：這次的快照較舊，不寫、不發布、不標記；只唯讀地回答還有沒有未處理的事件。
+			again, err = s.d.Inbox.RoutePending(ctx, before.Provider, external)
+			return err
 		} else if err != nil {
 			return err
 		}
@@ -95,33 +103,35 @@ func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err erro
 	return again, err
 }
 
-// ReadDebounce 是賣家觸發的重讀的間隔：同一帳戶上次讀取（fetched_at，讀取開始時間）距現在不到這麼久就不向 provider 讀，直接用快取（D33）。
+// ReadDebounce 是賣家觸發的重讀的最短間隔（D33）：同一帳戶上次賣家觸發的讀取被受理（seller_read_claimed_at，含失敗與並行的）或上次寫入的讀取
+// （fetched_at，讀取開始時間）距現在不到這麼久，就不向 provider 讀、直接用快取。
 const ReadDebounce = 10 * time.Second
 
-// readIsFresh 回答快取是否新到不必再讀：沒有讀過（fetchedAt 為 nil）一定要讀；剛好滿 ReadDebounce 就要讀。
-func readIsFresh(fetchedAt *time.Time, now time.Time) bool {
-	return fetchedAt != nil && now.Sub(*fetchedAt) < ReadDebounce
-}
+// staleBefore 是搶名額的門檻：seller_read_claimed_at 與 fetched_at 不晚於它才搶得到（剛好滿 ReadDebounce 搶得到）。
+func staleBefore(now time.Time) time.Time { return now.Add(-ReadDebounce) }
 
-// SyncUnlessFresh 是賣家觸發的同步重讀（RefreshMyPaymentAccount）：上次讀取在 ReadDebounce 內就不呼叫 provider、直接成功（快取就是結果）；
-// 否則走 Sync。這個限制的成立條件是外部讀取由賣家觸發、頻率不受 job 的唯一鍵約束，拿掉賣家觸發的呼叫時一起拿掉。沒有 provider、沒有帳戶列或還沒有
-// 外部 ID 時什麼都不做（與 Sync 相同，快取就是現況）。重讀失敗是明確動作的失敗：暫時性的回 Unavailable（重試可能成功），外部帳戶不存在這類永久
-// 失敗回 FailedPrecondition；呼叫者自己取消的原樣回傳。
+// SyncUnlessFresh 是賣家觸發的同步重讀（RefreshMyPaymentAccount）：先以單一條件式 UPDATE 搶讀取名額（ClaimPaymentAccountSellerRead），搶不到
+// （間隔內已有讀取，含失敗與並行的）就不呼叫 provider、直接成功（快取就是結果）；搶到才讀（同一列沿用，不重讀）。這個限制的成立條件是外部讀取由
+// 賣家觸發、頻率不受 job 的唯一鍵約束，拿掉賣家觸發的呼叫時一起拿掉。沒有 provider、沒有帳戶列或還沒有外部 ID 時什麼都不做（與 Sync 相同，快取就是現況）。
+// 讀完仍有未處理的事件（again，例如被 D32 擋下而事件是在較晚的讀取之後到的）就在自己的 transaction 內排同步 job（唯一鍵合併）。重讀失敗是明確動作的
+// 失敗：暫時性的回 Unavailable（重試可能成功），外部帳戶不存在這類永久失敗回 FailedPrecondition；呼叫者自己取消的原樣回傳。
 func (s *Service) SyncUnlessFresh(ctx context.Context, storeID int64) error {
 	if s.d.Provider == nil {
 		return nil
 	}
-	row, err := store.New(s.d.DB.Conn(ctx)).PaymentAccountByStore(ctx, storeID)
+	now := s.d.Now().UTC()
+	cutoff := staleBefore(now)
+	row, err := store.New(s.d.DB.Conn(ctx)).ClaimPaymentAccountSellerRead(ctx, store.ClaimPaymentAccountSellerReadParams{
+		StoreID: storeID, Now: &now, StaleBefore: &cutoff,
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	if readIsFresh(row.FetchedAt, s.d.Now()) {
-		return nil
-	}
-	if _, err := s.Sync(ctx, storeID); err != nil {
+	again, err := s.syncRow(ctx, row)
+	if err != nil {
 		switch {
 		case ctx.Err() != nil:
 			return err
@@ -130,6 +140,9 @@ func (s *Service) SyncUnlessFresh(ctx context.Context, storeID int64) error {
 		default:
 			return apperr.WithCause(apperr.Unavailable("暫時無法向金流商讀取收款帳戶，請稍後再試"), err)
 		}
+	}
+	if again {
+		return s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueueSync(ctx, s.d.Jobs, storeID) })
 	}
 	return nil
 }

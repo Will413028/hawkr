@@ -19,6 +19,7 @@ import (
 	"github.com/riverqueue/river"
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/payment"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/account"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -864,6 +865,7 @@ func TestAnOlderReadNeverOverwritesANewerCommittedRead(t *testing.T) {
 // mutation 1：被擋下之後仍呼叫 MarkRouteProcessed → 事件被標為已處理，失敗。
 // mutation 2：被擋下之後仍發布 PayoutAccountChanged → 多一次事件，失敗。
 // mutation 3：條件改成 fetched_at < 讀取開始時間 → 相等時不寫，失敗。
+// mutation 4：被擋下的分支回 again=false（不問 RoutePending）→ 還有未處理事件卻不要求再跑，失敗。
 func TestARejectedSyncDoesNotMarkEventsOrPublish(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -880,8 +882,8 @@ func TestARejectedSyncDoesNotMarkEventsOrPublish(t *testing.T) {
 	f.fake.Set(external, needsSellerSnapshot)
 	again, err := f.module.SyncAccount(ctx, s)
 	must(t, err)
-	if again {
-		t.Fatal("被擋下的同步要求再跑一輪")
+	if !again {
+		t.Fatal("被擋下的同步沒有回報還有未處理的事件（唯讀的 RoutePending），較晚才到的事件要等輪詢")
 	}
 	got := f.account(t, s)
 	if got.Status != StatusEnabled || got.FetchedAt == nil || !got.FetchedAt.Equal(stored) {
@@ -903,9 +905,9 @@ func TestARejectedSyncDoesNotMarkEventsOrPublish(t *testing.T) {
 	}
 }
 
-// 賣家觸發的重讀（D33）：上次讀取在 ReadDebounce 內不呼叫 provider、快取不變；滿 ReadDebounce 才讀；重讀失敗回 Unavailable，永久失敗回 FailedPrecondition。
-// 時間用注入的 f.now，不睡眠。待 CI（integration）。
-// mutation：SyncUnlessFresh 不檢查 readIsFresh → 窗內多一次 fetch，失敗；不呼叫 Sync → 滿窗後 fetch 次數不變，失敗。
+// 賣家觸發的重讀（D33）：窗內（上次寫入的讀取或上次被受理的賣家重讀，含失敗的）不呼叫 provider、快取不變；滿 ReadDebounce 才讀；重讀失敗回 Unavailable，
+// 永久失敗回 FailedPrecondition，而且失敗的那次也占了名額（同一時刻再呼叫不再讀）。時間用注入的 f.now，不睡眠。待 CI（integration）。
+// mutation：SyncUnlessFresh 不搶名額 → 窗內多一次 fetch，失敗；搶到卻不讀 → 滿窗後 fetch 次數不變，失敗；失敗時把名額還回去 → 失敗後同一時刻又讀一次，失敗。
 func TestSellerTriggeredRereadIsDebouncedAndFailsLoudly(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -914,12 +916,13 @@ func TestSellerTriggeredRereadIsDebouncedAndFailsLoudly(t *testing.T) {
 	f.set(t, s, needsSellerSnapshot)
 	_, base, _ := f.fake.Calls()
 	external := *f.account(t, s).ExternalAccountID
+	fetches := func() int { _, n, _ := f.fake.Calls(); return n - base }
 
-	f.now = f.now.Add(ReadDebounce - time.Second)
+	f.now = f.now.Add(account.ReadDebounce - time.Second)
 	f.fake.Set(external, enabledSnapshot)
 	must(t, f.module.SyncAccountUnlessFresh(ctx, s))
-	if _, n, _ := f.fake.Calls(); n != base {
-		t.Fatalf("窗內向 provider 讀了 %d 次，要 0 次", n-base)
+	if n := fetches(); n != 0 {
+		t.Fatalf("窗內向 provider 讀了 %d 次，要 0 次", n)
 	}
 	if got := f.account(t, s); got.Status == StatusEnabled {
 		t.Fatal("窗內的重讀改了快取")
@@ -927,18 +930,27 @@ func TestSellerTriggeredRereadIsDebouncedAndFailsLoudly(t *testing.T) {
 
 	f.now = f.now.Add(time.Second)
 	must(t, f.module.SyncAccountUnlessFresh(ctx, s))
-	if _, n, _ := f.fake.Calls(); n != base+1 {
-		t.Fatalf("滿窗後向 provider 讀了 %d 次，要 1 次", n-base)
+	if n := fetches(); n != 1 {
+		t.Fatalf("滿窗後向 provider 讀了 %d 次，要 1 次", n)
 	}
 	if got := f.account(t, s); got.Status != StatusEnabled {
 		t.Fatalf("滿窗後的重讀沒有寫入快取：%s", got.Status)
 	}
 
-	f.now = f.now.Add(ReadDebounce)
+	f.now = f.now.Add(account.ReadDebounce)
 	f.fake.FailFetch(errors.New("provider 逾時"))
 	if err := f.module.SyncAccountUnlessFresh(ctx, s); apperr.KindOf(err) != apperr.KindUnavailable {
 		t.Fatalf("暫時性失敗是 %v，要 Unavailable", err)
 	}
+	if n := fetches(); n != 2 {
+		t.Fatalf("失敗的重讀共讀了 %d 次，要 2 次", n)
+	}
+	must(t, f.module.SyncAccountUnlessFresh(ctx, s))
+	if n := fetches(); n != 2 {
+		t.Fatalf("失敗的那次沒有占名額：同一時刻又讀了，共 %d 次", n)
+	}
+
+	f.now = f.now.Add(account.ReadDebounce)
 	f.fake.FailFetch(fmt.Errorf("%w：外部帳戶不存在", ErrPermanent))
 	if err := f.module.SyncAccountUnlessFresh(ctx, s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("永久失敗是 %v，要 FailedPrecondition", err)
@@ -946,4 +958,64 @@ func TestSellerTriggeredRereadIsDebouncedAndFailsLoudly(t *testing.T) {
 
 	// 還沒有外部帳戶的列：什麼都不做、不算失敗。
 	must(t, f.module.SyncAccountUnlessFresh(ctx, f.newStore(t)))
+}
+
+// 並行的賣家重讀只有一個讀 provider（D33，搶名額）：第一個讀取進行中、同一時刻（注入的時鐘）又來一個，第二個搶不到、不呼叫 provider、直接成功。
+// 交錯由 OnFetch 排好，沒有 sleep。待 CI（integration）。
+// mutation：搶名額改回「先查 fetched_at 再讀」（名額只在讀取成功寫入後才占）→ 第二個也讀，fetch 共 2 次，失敗。
+func TestConcurrentSellerRefreshesReadTheProviderOnce(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	external := f.ensure(t, s)
+	f.fake.Set(external, needsSellerSnapshot)
+	_, base, _ := f.fake.Calls()
+	var inner error
+	f.fake.OnFetch = func() { inner = f.module.SyncAccountUnlessFresh(ctx, s) }
+	must(t, f.module.SyncAccountUnlessFresh(ctx, s))
+	must(t, inner)
+	if _, n, _ := f.fake.Calls(); n-base != 1 {
+		t.Fatalf("並行的兩個賣家重讀共讀了 %d 次，要 1 次", n-base)
+	}
+	if got := f.account(t, s); got.Status != StatusActionRequired {
+		t.Fatalf("搶到名額的那次沒有寫入快取：%s", got.Status)
+	}
+}
+
+// 賣家重讀被 D32 擋下、而擋下它的讀取之後又收到事件時，賣家路徑自己排一個同步 job（唯一鍵合併），不留給輪詢。待 CI（integration）。
+// mutation：SyncUnlessFresh 丟掉 again → 沒有新的同步 job，失敗；被擋下的分支不回報 again → 同上。
+func TestASellerRefreshRejectedByTheGuardQueuesASyncForLaterEvents(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	external := f.ensure(t, s)
+	f.fake.Set(external, needsSellerSnapshot)
+	f.now = f.now.Add(time.Second)
+	newer := f.now.Add(time.Minute)
+	f.fake.OnFetch = func() {
+		f.now = newer
+		f.fake.Set(external, enabledSnapshot)
+		_, err := f.module.SyncAccount(ctx, s)
+		must(t, err)
+		f.fake.Set(external, needsSellerSnapshot)
+		f.now = newer.Add(time.Second)
+		f.receive(t, "evt_after_newer_read", external)
+	}
+	syncs := len(f.jobs.storeIDs(t, kindSync))
+	must(t, f.module.SyncAccountUnlessFresh(ctx, s))
+	if got := f.account(t, s); got.Status != StatusEnabled || got.FetchedAt == nil || !got.FetchedAt.Equal(newer) {
+		t.Fatalf("被擋下的賣家重讀改了快取：status=%s fetched=%v", got.Status, got.FetchedAt)
+	}
+	if f.processed(t, "evt_after_newer_read") {
+		t.Fatal("被擋下的重讀把較晚到的事件標為已處理")
+	}
+	// receive 的 handler 排了一個同步 job；賣家路徑要再排一個（唯一鍵在 River 合併），共 +2。
+	if got := len(f.jobs.storeIDs(t, kindSync)) - syncs; got != 2 {
+		t.Fatalf("排入 %d 個同步 job，要 2 個（事件 handler 一個、賣家路徑的 again 一個）", got)
+	}
+	if f.jobs.outsideTx() {
+		t.Fatal("有 job 在 transaction 外排入")
+	}
 }

@@ -17,6 +17,7 @@ CREATE SCHEMA payment;
 -- status 是中立的五個狀態，由轉帳能力的狀態與 status_details 推導；transfers_active 與 payouts_active 是外部帳戶的能力是否啟用（seller 的開通閘門讀
 -- 經 PayoutAccountChanged 複製的 transfers_active；ENABLED 等於 transfers_active）。requirements 是快照的原始內容，status_reason 是導出目前狀態的金流商原因碼（只給後台）。
 -- create_failed_at 是建立重試用完的時刻（只有還沒有外部 ID 的列才有；後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED 的開始時間，重試建立時清空）。
+-- seller_read_claimed_at 是上次賣家觸發的讀取被受理的時刻（含失敗與並行的；條件式 UPDATE 搶名額，D33），同步 job 不讀寫；它是後加的欄，接在最後。
 -- contact_email 是 seller 核准時傳入的聯絡信箱快照，建立外部帳戶時送給金流商，之後不自動同步（改信箱 D23 延後）；擁有者的個資清理時由清除 job 刪除整列。
 -- create_idempotency_key 是寫入「建立中」的列時產生的隨機 UUID（v4），建立外部帳戶的每次重試都用它當冪等鍵（Stripe 建議每個邏輯請求用隨機 UUID；
 -- 不用 store_id，兩個資料庫共用同一個 Stripe 帳號時才不會撞到別人的帳戶）。
@@ -36,6 +37,7 @@ CREATE TABLE payment.accounts (
     create_idempotency_key UUID        NOT NULL DEFAULT gen_random_uuid(),
     created_at             TIMESTAMPTZ NOT NULL,
     updated_at             TIMESTAMPTZ NOT NULL,
+    seller_read_claimed_at TIMESTAMPTZ,
     CONSTRAINT accounts_store_id_check CHECK (store_id > 0),
     CONSTRAINT accounts_provider_check CHECK (provider ~ '^[a-z][a-z0-9_]{0,39}$'),
     CONSTRAINT accounts_contact_email_check CHECK (

@@ -62,6 +62,17 @@ WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NOT NULL
   AND (fetched_at IS NULL OR fetched_at <= sqlc.arg(fetched_at))
 RETURNING *;
 
+-- name: ClaimPaymentAccountSellerRead :one
+-- 賣家觸發的重讀先搶讀取名額再呼叫 provider（D33）：已經有外部 ID、上次賣家觸發的讀取（seller_read_claimed_at，含失敗的與並行的）和上次寫入的讀取
+-- （fetched_at）都早於 stale_before 才寫入 seller_read_claimed_at 並回傳列；沒有回傳列就是名額被占走（呼叫方不讀 provider、直接成功）。單一條件式 UPDATE，
+-- 並行的呼叫由列鎖序列化，後到的重新檢查條件而拿不到。同步 job 不經過這裡。
+UPDATE payment.accounts
+SET seller_read_claimed_at = sqlc.arg(now)
+WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NOT NULL
+  AND (seller_read_claimed_at IS NULL OR seller_read_claimed_at <= sqlc.arg(stale_before))
+  AND (fetched_at IS NULL OR fetched_at <= sqlc.arg(stale_before))
+RETURNING *;
+
 -- name: PollablePaymentAccountStoreIDs :many
 -- 輪詢補漏：UNDER_REVIEW、ACTION_REQUIRED 的帳戶，DISABLED 但原因碼不是終局（rejected*、unsupported*）的帳戶（restricted 加 contact_stripe 或 no_resolution
 -- 可以被 Stripe 解除，掉了 webhook 時只有輪詢補得到；rejected 與 unsupported 不會再啟用，不輪詢），依 store_id 分批。inbox 有舊的未處理事件的帳戶由

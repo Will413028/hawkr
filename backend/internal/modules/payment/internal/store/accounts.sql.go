@@ -21,7 +21,7 @@ SET status = $1,
     updated_at = $7
 WHERE store_id = $8 AND external_account_id IS NOT NULL
   AND (fetched_at IS NULL OR fetched_at <= $6)
-RETURNING store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
+RETURNING store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at
 `
 
 type ApplyPaymentSnapshotParams struct {
@@ -65,6 +65,49 @@ func (q *Queries) ApplyPaymentSnapshot(ctx context.Context, arg ApplyPaymentSnap
 		&i.CreateIdempotencyKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SellerReadClaimedAt,
+	)
+	return i, err
+}
+
+const claimPaymentAccountSellerRead = `-- name: ClaimPaymentAccountSellerRead :one
+UPDATE payment.accounts
+SET seller_read_claimed_at = $1
+WHERE store_id = $2 AND external_account_id IS NOT NULL
+  AND (seller_read_claimed_at IS NULL OR seller_read_claimed_at <= $3)
+  AND (fetched_at IS NULL OR fetched_at <= $3)
+RETURNING store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at
+`
+
+type ClaimPaymentAccountSellerReadParams struct {
+	Now         *time.Time
+	StoreID     int64
+	StaleBefore *time.Time
+}
+
+// 賣家觸發的重讀先搶讀取名額再呼叫 provider（D33）：已經有外部 ID、上次賣家觸發的讀取（seller_read_claimed_at，含失敗的與並行的）和上次寫入的讀取
+// （fetched_at）都早於 stale_before 才寫入 seller_read_claimed_at 並回傳列；沒有回傳列就是名額被占走（呼叫方不讀 provider、直接成功）。單一條件式 UPDATE，
+// 並行的呼叫由列鎖序列化，後到的重新檢查條件而拿不到。同步 job 不經過這裡。
+func (q *Queries) ClaimPaymentAccountSellerRead(ctx context.Context, arg ClaimPaymentAccountSellerReadParams) (PaymentAccount, error) {
+	row := q.db.QueryRow(ctx, claimPaymentAccountSellerRead, arg.Now, arg.StoreID, arg.StaleBefore)
+	var i PaymentAccount
+	err := row.Scan(
+		&i.StoreID,
+		&i.Provider,
+		&i.ExternalAccountID,
+		&i.ContactEmail,
+		&i.RequirementCollection,
+		&i.Status,
+		&i.TransfersActive,
+		&i.PayoutsActive,
+		&i.Requirements,
+		&i.StatusReason,
+		&i.FetchedAt,
+		&i.CreateFailedAt,
+		&i.CreateIdempotencyKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SellerReadClaimedAt,
 	)
 	return i, err
 }
@@ -155,7 +198,7 @@ func (q *Queries) InsertPaymentAccount(ctx context.Context, arg InsertPaymentAcc
 }
 
 const lockPaymentAccount = `-- name: LockPaymentAccount :one
-SELECT store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
+SELECT store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at
 FROM payment.accounts
 WHERE store_id = $1
 FOR UPDATE
@@ -181,6 +224,7 @@ func (q *Queries) LockPaymentAccount(ctx context.Context, storeID int64) (Paymen
 		&i.CreateIdempotencyKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SellerReadClaimedAt,
 	)
 	return i, err
 }
@@ -207,7 +251,7 @@ func (q *Queries) MarkPaymentAccountCreateFailed(ctx context.Context, arg MarkPa
 }
 
 const paymentAccountByExternal = `-- name: PaymentAccountByExternal :one
-SELECT store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
+SELECT store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at
 FROM payment.accounts
 WHERE provider = $1 AND external_account_id = $2
 `
@@ -236,12 +280,13 @@ func (q *Queries) PaymentAccountByExternal(ctx context.Context, arg PaymentAccou
 		&i.CreateIdempotencyKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SellerReadClaimedAt,
 	)
 	return i, err
 }
 
 const paymentAccountByStore = `-- name: PaymentAccountByStore :one
-SELECT store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
+SELECT store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at
 FROM payment.accounts
 WHERE store_id = $1
 `
@@ -265,6 +310,7 @@ func (q *Queries) PaymentAccountByStore(ctx context.Context, storeID int64) (Pay
 		&i.CreateIdempotencyKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SellerReadClaimedAt,
 	)
 	return i, err
 }
@@ -349,7 +395,7 @@ SET external_account_id = $1,
     create_failed_at = NULL,
     updated_at = $2
 WHERE store_id = $3 AND external_account_id IS NULL
-RETURNING store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
+RETURNING store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at
 `
 
 type SetPaymentAccountExternalParams struct {
@@ -378,6 +424,7 @@ func (q *Queries) SetPaymentAccountExternal(ctx context.Context, arg SetPaymentA
 		&i.CreateIdempotencyKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SellerReadClaimedAt,
 	)
 	return i, err
 }

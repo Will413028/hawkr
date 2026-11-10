@@ -237,14 +237,11 @@ func (m *Module) SyncAccount(ctx context.Context, storeID int64) (again bool, er
 	return m.accounts.Sync(ctx, storeID)
 }
 
-// SyncAccountUnlessFresh 是賣家觸發的同步重讀（seller 的 RefreshMyPaymentAccount）：上次讀取在 ReadDebounce 內就不向金流商讀、直接成功（D33）；
-// 否則同步重讀並寫入快取。重讀失敗回 Unavailable（暫時性）或 FailedPrecondition（金流商沒有這個帳戶）。呼叫方先確認呼叫者是擁有者，且不能在 transaction 內呼叫。
+// SyncAccountUnlessFresh 是賣家觸發的同步重讀（seller 的 RefreshMyPaymentAccount）：間隔（10 秒）內已有讀取（含失敗的與並行的，以條件式 UPDATE 搶名額）就不向金流商讀、直接成功（D33）；
+// 搶到才同步重讀並寫入快取，讀完仍有未處理事件時排同步 job。重讀失敗回 Unavailable（暫時性）或 FailedPrecondition（金流商沒有這個帳戶）。呼叫方先確認呼叫者是擁有者，且不能在 transaction 內呼叫。
 func (m *Module) SyncAccountUnlessFresh(ctx context.Context, storeID int64) error {
 	return m.accounts.SyncUnlessFresh(ctx, storeID)
 }
-
-// ReadDebounce 是賣家觸發的重讀的最短間隔（D33）。
-const ReadDebounce = account.ReadDebounce
 
 // SweepAccounts 是定期掃描（payment.account_sweep）的內容，給 worker 與測試呼叫；回傳排入同步與建立的帳戶數。
 func (m *Module) SweepAccounts(ctx context.Context) (synced, ensured int, err error) {

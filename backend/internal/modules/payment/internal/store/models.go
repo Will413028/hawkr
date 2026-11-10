@@ -26,4 +26,5 @@ type PaymentAccount struct {
 	CreateIdempotencyKey  uuid.UUID
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
+	SellerReadClaimedAt   *time.Time
 }
