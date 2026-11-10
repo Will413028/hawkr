@@ -902,3 +902,48 @@ func TestARejectedSyncDoesNotMarkEventsOrPublish(t *testing.T) {
 		t.Fatalf("讀取開始時間等於 fetched_at 時沒有寫入：status=%s changes=%d processed=%v", got.Status, len(f.changes), f.processed(t, "evt_older_read"))
 	}
 }
+
+// 賣家觸發的重讀（D33）：上次讀取在 ReadDebounce 內不呼叫 provider、快取不變；滿 ReadDebounce 才讀；重讀失敗回 Unavailable，永久失敗回 FailedPrecondition。
+// 時間用注入的 f.now，不睡眠。待 CI（integration）。
+// mutation：SyncUnlessFresh 不檢查 readIsFresh → 窗內多一次 fetch，失敗；不呼叫 Sync → 滿窗後 fetch 次數不變，失敗。
+func TestSellerTriggeredRereadIsDebouncedAndFailsLoudly(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	f.set(t, s, needsSellerSnapshot)
+	_, base, _ := f.fake.Calls()
+	external := *f.account(t, s).ExternalAccountID
+
+	f.now = f.now.Add(ReadDebounce - time.Second)
+	f.fake.Set(external, enabledSnapshot)
+	must(t, f.module.SyncAccountUnlessFresh(ctx, s))
+	if _, n, _ := f.fake.Calls(); n != base {
+		t.Fatalf("窗內向 provider 讀了 %d 次，要 0 次", n-base)
+	}
+	if got := f.account(t, s); got.Status == StatusEnabled {
+		t.Fatal("窗內的重讀改了快取")
+	}
+
+	f.now = f.now.Add(time.Second)
+	must(t, f.module.SyncAccountUnlessFresh(ctx, s))
+	if _, n, _ := f.fake.Calls(); n != base+1 {
+		t.Fatalf("滿窗後向 provider 讀了 %d 次，要 1 次", n-base)
+	}
+	if got := f.account(t, s); got.Status != StatusEnabled {
+		t.Fatalf("滿窗後的重讀沒有寫入快取：%s", got.Status)
+	}
+
+	f.now = f.now.Add(ReadDebounce)
+	f.fake.FailFetch(errors.New("provider 逾時"))
+	if err := f.module.SyncAccountUnlessFresh(ctx, s); apperr.KindOf(err) != apperr.KindUnavailable {
+		t.Fatalf("暫時性失敗是 %v，要 Unavailable", err)
+	}
+	f.fake.FailFetch(fmt.Errorf("%w：外部帳戶不存在", ErrPermanent))
+	if err := f.module.SyncAccountUnlessFresh(ctx, s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("永久失敗是 %v，要 FailedPrecondition", err)
+	}
+
+	// 還沒有外部帳戶的列：什麼都不做、不算失敗。
+	must(t, f.module.SyncAccountUnlessFresh(ctx, f.newStore(t)))
+}

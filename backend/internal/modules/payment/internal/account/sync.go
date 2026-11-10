@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -92,6 +93,45 @@ func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err erro
 		return err
 	})
 	return again, err
+}
+
+// ReadDebounce 是賣家觸發的重讀的間隔：同一帳戶上次讀取（fetched_at，讀取開始時間）距現在不到這麼久就不向 provider 讀，直接用快取（D33）。
+const ReadDebounce = 10 * time.Second
+
+// readIsFresh 回答快取是否新到不必再讀：沒有讀過（fetchedAt 為 nil）一定要讀；剛好滿 ReadDebounce 就要讀。
+func readIsFresh(fetchedAt *time.Time, now time.Time) bool {
+	return fetchedAt != nil && now.Sub(*fetchedAt) < ReadDebounce
+}
+
+// SyncUnlessFresh 是賣家觸發的同步重讀（RefreshMyPaymentAccount）：上次讀取在 ReadDebounce 內就不呼叫 provider、直接成功（快取就是結果）；
+// 否則走 Sync。這個限制的成立條件是外部讀取由賣家觸發、頻率不受 job 的唯一鍵約束，拿掉賣家觸發的呼叫時一起拿掉。沒有 provider、沒有帳戶列或還沒有
+// 外部 ID 時什麼都不做（與 Sync 相同，快取就是現況）。重讀失敗是明確動作的失敗：暫時性的回 Unavailable（重試可能成功），外部帳戶不存在這類永久
+// 失敗回 FailedPrecondition；呼叫者自己取消的原樣回傳。
+func (s *Service) SyncUnlessFresh(ctx context.Context, storeID int64) error {
+	if s.d.Provider == nil {
+		return nil
+	}
+	row, err := store.New(s.d.DB.Conn(ctx)).PaymentAccountByStore(ctx, storeID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if readIsFresh(row.FetchedAt, s.d.Now()) {
+		return nil
+	}
+	if _, err := s.Sync(ctx, storeID); err != nil {
+		switch {
+		case ctx.Err() != nil:
+			return err
+		case errors.Is(err, ErrPermanent):
+			return apperr.WithCause(apperr.FailedPrecondition("金流商沒有這個收款帳戶"), err)
+		default:
+			return apperr.WithCause(apperr.Unavailable("暫時無法向金流商讀取收款帳戶，請稍後再試"), err)
+		}
+	}
+	return nil
 }
 
 // Refresh 是管理員的「重新整理狀態」：只排同步 job（以 store_id 為唯一鍵，已經有排隊的就合併）。沒有設定 provider、店家還沒有外部帳戶時回
