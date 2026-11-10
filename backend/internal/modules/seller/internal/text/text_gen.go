@@ -424,6 +424,227 @@ func NoteBodyLength() uitext.Message {
 	return uitext.Message{Text: "內部註記必須是 1 到 2000 字。", Locale: uitext.ZhTW}
 }
 
+// OnboardingOtherRequirementMissing 是模組句子 onboarding.other_requirement.missing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingOtherRequirementMissing(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Some requirements for listing your store are not met yet. Please contact support.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "還有公開條件尚未滿足，請聯絡客服。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountActionRequired 是模組句子 onboarding.payment_account.action_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountActionRequired(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountActionRequiredUnavailable 是模組句子 onboarding.payment_account.action_required_unavailable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountActionRequiredUnavailable(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your payout account needs more information, but setup is not available right now. Please try again later or contact support.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收款帳戶還需要補資料，但目前無法開始設定，請稍後再試或聯絡客服。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountCompleted 是模組句子 onboarding.payment_account.completed；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountCompleted(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your payout account is active.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收款帳戶已啟用。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountDisabled 是模組句子 onboarding.payment_account.disabled；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountDisabled(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The payment provider cannot activate your payout account right now. Please contact support.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "金流商目前無法啟用你的收款帳戶，請聯絡客服。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountLocked 是模組句子 onboarding.payment_account.locked；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountLocked(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "You can set up your payout account after the platform review is approved.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "平台審核通過後才能設定收款帳戶。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountPreparing 是模組句子 onboarding.payment_account.preparing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountPreparing(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "We are creating your payout account. This usually takes a few minutes.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "正在建立收款帳戶，通常幾分鐘內完成。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountSyncing 是模組句子 onboarding.payment_account.syncing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountSyncing(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your payout account status is being updated. Please refresh in a moment.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收款帳戶的狀態正在更新，請稍後重新整理。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountUnderReview 是模組句子 onboarding.payment_account.under_review；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountUnderReview(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The payment provider is reviewing your account. You do not need to do anything.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "金流商審核中，你不需要做任何事。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountUnknown 是模組句子 onboarding.payment_account.unknown；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountUnknown(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "We cannot read your payout account status right now. Please try again later.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "目前讀不到收款帳戶的狀態，請稍後再試。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPlatformReviewCancelled 是模組句子 onboarding.platform_review.cancelled；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPlatformReviewCancelled(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your seller verification was cancelled. You can submit it again.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "商家認證申請已取消，可以重新送出。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPlatformReviewCompleted 是模組句子 onboarding.platform_review.completed；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPlatformReviewCompleted(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your seller verification is approved.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "商家認證已通過。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPlatformReviewDraft 是模組句子 onboarding.platform_review.draft；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPlatformReviewDraft(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your seller verification is still a draft and has not been submitted.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "商家認證申請還是草稿，尚未送出。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPlatformReviewNotSubmitted 是模組句子 onboarding.platform_review.not_submitted；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPlatformReviewNotSubmitted(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "You have not submitted a seller verification yet.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "還沒有送出商家認證申請。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPlatformReviewRejected 是模組句子 onboarding.platform_review.rejected；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPlatformReviewRejected(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your seller verification needs changes. Update it and submit again.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "商家認證申請需要修改，修改後請重新送出。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPlatformReviewSubmitted 是模組句子 onboarding.platform_review.submitted；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPlatformReviewSubmitted(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your seller verification is under review. You do not need to do anything.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "商家認證申請審核中，你不需要做任何事。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPlatformReviewUnknown 是模組句子 onboarding.platform_review.unknown；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPlatformReviewUnknown(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "We cannot read your seller verification status right now. Please try again later.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "目前讀不到商家認證的狀態，請稍後再試。", Locale: uitext.ZhTW}
+}
+
+// OnboardingProfileCompleted 是模組句子 onboarding.profile.completed；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingProfileCompleted(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your store name, logo and location are all set.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店名、logo 與所在地都已填寫。", Locale: uitext.ZhTW}
+}
+
+// OnboardingProfileListSeparator 是模組句子 onboarding.profile.list_separator；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingProfileListSeparator(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: ", ", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "、", Locale: uitext.ZhTW}
+}
+
+// OnboardingProfileMissingArgs 是 OnboardingProfileMissing 的參數。
+type OnboardingProfileMissingArgs struct {
+	Items string
+}
+
+// OnboardingProfileMissing 是模組句子 onboarding.profile.missing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingProfileMissing(l uitext.Locale, a OnboardingProfileMissingArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Still missing: " + a.Items + ".", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "還缺少：" + a.Items + "。", Locale: uitext.ZhTW}
+}
+
+// OnboardingTitleOtherRequirement 是模組句子 onboarding.title.other_requirement；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingTitleOtherRequirement(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Other listing requirements", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "其他公開條件", Locale: uitext.ZhTW}
+}
+
+// OnboardingTitlePaymentAccount 是模組句子 onboarding.title.payment_account；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingTitlePaymentAccount(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Payout account", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收款帳戶", Locale: uitext.ZhTW}
+}
+
+// OnboardingTitlePlatformReview 是模組句子 onboarding.title.platform_review；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingTitlePlatformReview(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Platform review", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "平台審核", Locale: uitext.ZhTW}
+}
+
+// OnboardingTitleProfile 是模組句子 onboarding.title.profile；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingTitleProfile(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Store profile", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "商店資料", Locale: uitext.ZhTW}
+}
+
 // OpeningUnavailableAccountDeleting 是模組句子 opening.unavailable.account_deleting；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func OpeningUnavailableAccountDeleting(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "帳號正在刪除，不能申請開店", Locale: uitext.ZhTW}

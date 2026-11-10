@@ -1,1 +1,76 @@
-{}
+{
+  "default": {
+    "onboarding.other_requirement.missing": {
+      "message": "Some requirements for listing your store are not met yet. Please contact support."
+    },
+    "onboarding.payment_account.action_required": {
+      "message": "Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it."
+    },
+    "onboarding.payment_account.action_required_unavailable": {
+      "message": "Your payout account needs more information, but setup is not available right now. Please try again later or contact support."
+    },
+    "onboarding.payment_account.completed": {
+      "message": "Your payout account is active."
+    },
+    "onboarding.payment_account.disabled": {
+      "message": "The payment provider cannot activate your payout account right now. Please contact support."
+    },
+    "onboarding.payment_account.locked": {
+      "message": "You can set up your payout account after the platform review is approved."
+    },
+    "onboarding.payment_account.preparing": {
+      "message": "We are creating your payout account. This usually takes a few minutes."
+    },
+    "onboarding.payment_account.syncing": {
+      "message": "Your payout account status is being updated. Please refresh in a moment."
+    },
+    "onboarding.payment_account.under_review": {
+      "message": "The payment provider is reviewing your account. You do not need to do anything."
+    },
+    "onboarding.payment_account.unknown": {
+      "message": "We cannot read your payout account status right now. Please try again later."
+    },
+    "onboarding.platform_review.cancelled": {
+      "message": "Your seller verification was cancelled. You can submit it again."
+    },
+    "onboarding.platform_review.completed": {
+      "message": "Your seller verification is approved."
+    },
+    "onboarding.platform_review.draft": {
+      "message": "Your seller verification is still a draft and has not been submitted."
+    },
+    "onboarding.platform_review.not_submitted": {
+      "message": "You have not submitted a seller verification yet."
+    },
+    "onboarding.platform_review.rejected": {
+      "message": "Your seller verification needs changes. Update it and submit again."
+    },
+    "onboarding.platform_review.submitted": {
+      "message": "Your seller verification is under review. You do not need to do anything."
+    },
+    "onboarding.platform_review.unknown": {
+      "message": "We cannot read your seller verification status right now. Please try again later."
+    },
+    "onboarding.profile.completed": {
+      "message": "Your store name, logo and location are all set."
+    },
+    "onboarding.profile.list_separator": {
+      "message": ", "
+    },
+    "onboarding.profile.missing": {
+      "message": "Still missing: {items}."
+    },
+    "onboarding.title.other_requirement": {
+      "message": "Other listing requirements"
+    },
+    "onboarding.title.payment_account": {
+      "message": "Payout account"
+    },
+    "onboarding.title.platform_review": {
+      "message": "Platform review"
+    },
+    "onboarding.title.profile": {
+      "message": "Store profile"
+    }
+  }
+}

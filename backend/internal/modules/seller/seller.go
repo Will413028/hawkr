@@ -37,6 +37,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -338,6 +339,46 @@ const (
 
 // OpeningBlockerValues 回傳全部原因，依優先序。
 func OpeningBlockerValues() []OpeningBlocker { return model.OpeningBlockerValues() }
+
+// Onboarding 是店家的開通任務清單與開通閘門；OnboardingTask 是其中一個任務。
+type (
+	Onboarding            = model.Onboarding
+	OnboardingTask        = model.OnboardingTask
+	OnboardingInput       = model.OnboardingInput
+	OnboardingKYCRead     = model.OnboardingKYCRead
+	OnboardingPaymentRead = model.OnboardingPaymentRead
+	OnboardingTaskID      = model.OnboardingTaskID
+	OnboardingTaskState   = model.OnboardingTaskState
+	OnboardingAction      = model.OnboardingAction
+)
+
+const (
+	// OnboardingProfile 商店資料。
+	OnboardingProfile = model.OnboardingProfile
+	// OnboardingPlatformReview 平台審核。
+	OnboardingPlatformReview = model.OnboardingPlatformReview
+	// OnboardingPaymentAccount 收款帳戶。
+	OnboardingPaymentAccount = model.OnboardingPaymentAccount
+	// OnboardingOtherRequirement 其他公開條件。
+	OnboardingOtherRequirement = model.OnboardingOtherRequirement
+	// OnboardingCompleted 是任務狀態：已完成。
+	OnboardingCompleted = model.OnboardingCompleted
+)
+
+// OnboardingTasksOf 回報店家 s 的開通任務清單與開通閘門（語系 l，唯一的產生點）：完成與否由讀店家時帶上的條件決定（與 CapabilitiesOf 同一組欄位），
+// KYC 與收款帳戶的讀取結果只決定狀態句與下一步，讀取失敗只讓需要它的任務是 UNKNOWN。
+func OnboardingTasksOf(l uitext.Locale, in OnboardingInput) Onboarding {
+	return model.OnboardingTasksOf(l, in)
+}
+
+// OnboardingTaskIDValues、OnboardingTaskStateValues、OnboardingActionValues 回傳各值域（依顯示順序），給契約對照的測試用。
+func OnboardingTaskIDValues() []OnboardingTaskID { return model.OnboardingTaskIDValues() }
+
+// OnboardingTaskStateValues 回傳開通任務的全部狀態。
+func OnboardingTaskStateValues() []OnboardingTaskState { return model.OnboardingTaskStateValues() }
+
+// OnboardingActionValues 回傳開通任務的全部下一步。
+func OnboardingActionValues() []OnboardingAction { return model.OnboardingActionValues() }
 
 // StoreCursor 是後台店家清單的 keyset 位置。
 type StoreCursor = model.StoreCursor
