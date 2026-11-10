@@ -96,6 +96,10 @@ function sellerMethod(method: string): RegExp {
 export const GET_MY_STORE_URL = sellerMethod("GetMyStore");
 export const GET_MY_KYC_URL = sellerMethod("GetMyKYC");
 export const GET_MY_PAYMENT_ACCOUNT_URL = sellerMethod("GetMyPaymentAccount");
+export const GET_MY_ONBOARDING_URL = sellerMethod("GetMyOnboarding");
+export const REFRESH_MY_PAYMENT_ACCOUNT_URL = sellerMethod(
+	"RefreshMyPaymentAccount",
+);
 export const UPDATE_MY_STORE_URL = sellerMethod("UpdateMyStore");
 export const GET_MY_DASHBOARD_URL = sellerMethod("GetMyDashboard");
 export const LIST_MY_MEASURES_URL = sellerMethod("ListMyMeasures");
@@ -466,12 +470,204 @@ export type MockKycFlowStatus =
 	| "REJECTED"
 	| "APPROVED";
 
+export type MockOnboardingState =
+	| "COMPLETED"
+	| "ACTION_REQUIRED"
+	| "IN_PROGRESS"
+	| "LOCKED"
+	| "UNKNOWN";
+
+export type MockOnboardingAction =
+	| "NONE"
+	| "EDIT_PROFILE"
+	| "SUBMIT_CERTIFICATION"
+	| "START_PAYMENT_ONBOARDING"
+	| "REFRESH_PAYMENT_ACCOUNT"
+	| "CONTACT_SUPPORT";
+
+/** 伺服器回的一個必要任務（`OnboardingTask`）：標題與狀態句是伺服器的 `LocalizedMessage`。 */
+export interface MockOnboardingTask {
+	id: "PROFILE" | "PLATFORM_REVIEW" | "PAYMENT_ACCOUNT";
+	state: MockOnboardingState;
+	action: MockOnboardingAction;
+	title: string;
+	status: string;
+}
+
 export type MockPaymentAccountStatus =
 	| "NOT_CREATED"
 	| "UNDER_REVIEW"
 	| "ACTION_REQUIRED"
 	| "ENABLED"
 	| "DISABLED";
+
+const ONBOARDING_TITLE = {
+	PROFILE: "商店資料",
+	PLATFORM_REVIEW: "平台審核",
+	PAYMENT_ACCOUNT: "收款帳戶",
+} as const;
+
+function task(
+	id: MockOnboardingTask["id"],
+	state: MockOnboardingState,
+	action: MockOnboardingAction,
+	status: string,
+): MockOnboardingTask {
+	return { id, state, action, title: ONBOARDING_TITLE[id], status };
+}
+
+/**
+ * 預設的 GetMyOnboarding：伺服器的任務推導（onboarding.go）在 mock 這一側的對照，只供沒有特別指定摘要的 spec。
+ * 商店資料一律已完成（要缺項的 spec 指定 `onboarding`）。
+ */
+export function onboardingOf(flow: {
+	status: MockKycFlowStatus;
+	paymentAccount?: { status: MockPaymentAccountStatus };
+}): MockOnboardingTask[] {
+	const profile = task(
+		"PROFILE",
+		"COMPLETED",
+		"NONE",
+		"店名、logo 與所在地都已填寫。",
+	);
+	const locked = task(
+		"PAYMENT_ACCOUNT",
+		"LOCKED",
+		"NONE",
+		"平台審核通過後才能設定收款帳戶。",
+	);
+	switch (flow.status) {
+		case "NOT_STARTED":
+			return [
+				profile,
+				task(
+					"PLATFORM_REVIEW",
+					"ACTION_REQUIRED",
+					"SUBMIT_CERTIFICATION",
+					"還沒有送出商家認證申請。",
+				),
+				locked,
+			];
+		case "DRAFT":
+			return [
+				profile,
+				task(
+					"PLATFORM_REVIEW",
+					"ACTION_REQUIRED",
+					"SUBMIT_CERTIFICATION",
+					"商家認證申請還是草稿，尚未送出。",
+				),
+				locked,
+			];
+		case "REJECTED":
+			return [
+				profile,
+				task(
+					"PLATFORM_REVIEW",
+					"ACTION_REQUIRED",
+					"SUBMIT_CERTIFICATION",
+					"商家認證申請需要修改，修改後請重新送出。",
+				),
+				locked,
+			];
+		case "SUBMITTED":
+			return [
+				profile,
+				task(
+					"PLATFORM_REVIEW",
+					"IN_PROGRESS",
+					"NONE",
+					"商家認證申請審核中，你不需要做任何事。",
+				),
+				locked,
+			];
+		case "APPROVED": {
+			const review = task(
+				"PLATFORM_REVIEW",
+				"COMPLETED",
+				"NONE",
+				"商家認證已通過。",
+			);
+			switch (flow.paymentAccount?.status ?? "ENABLED") {
+				case "ENABLED":
+					return [
+						profile,
+						review,
+						task("PAYMENT_ACCOUNT", "COMPLETED", "NONE", "收款帳戶已啟用。"),
+					];
+				case "ACTION_REQUIRED":
+					return [
+						profile,
+						review,
+						task(
+							"PAYMENT_ACCOUNT",
+							"ACTION_REQUIRED",
+							"START_PAYMENT_ONBOARDING",
+							"提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。",
+						),
+					];
+				case "UNDER_REVIEW":
+					return [
+						profile,
+						review,
+						task(
+							"PAYMENT_ACCOUNT",
+							"IN_PROGRESS",
+							"REFRESH_PAYMENT_ACCOUNT",
+							"金流商審核中，你不需要做任何事。",
+						),
+					];
+				case "DISABLED":
+					return [
+						profile,
+						review,
+						task(
+							"PAYMENT_ACCOUNT",
+							"ACTION_REQUIRED",
+							"CONTACT_SUPPORT",
+							"金流商目前無法啟用你的收款帳戶，請聯絡客服。",
+						),
+					];
+				default:
+					return [
+						profile,
+						review,
+						task(
+							"PAYMENT_ACCOUNT",
+							"IN_PROGRESS",
+							"REFRESH_PAYMENT_ACCOUNT",
+							"正在建立收款帳戶，通常幾分鐘內完成。",
+						),
+					];
+			}
+		}
+	}
+}
+
+/** proto3 JSON 的 GetMyOnboardingResponse；`complete` 是三項都完成（閘門 ONBOARDING_COMPLETE 與 PROFILE 無關，這裡只看後兩項）。 */
+export async function mockMyOnboarding(
+	page: Page,
+	tasks: MockOnboardingTask[] | "error",
+): Promise<void> {
+	await page.route(GET_MY_ONBOARDING_URL, (route) => {
+		if (tasks === "error") {
+			void fulfillConnectError(route, "internal", "mock onboarding failure");
+			return;
+		}
+		void fulfillConnect(route, {
+			tasks: tasks.map((t) => ({
+				id: `ONBOARDING_TASK_ID_${t.id}`,
+				state: `ONBOARDING_TASK_STATE_${t.state}`,
+				action: `ONBOARDING_ACTION_${t.action}`,
+				title: { locale: "zh-TW", message: t.title },
+				status: { locale: "zh-TW", message: t.status },
+			})),
+			complete: tasks
+				.filter((t) => t.id !== "PROFILE")
+				.every((t) => t.state === "COMPLETED"),
+		});
+	});
+}
 
 /**
  * proto3 JSON 的 GetMyKYCResponse：申請的 `status`（平台審核）與流程旗標（`application.flow`）。NOT_STARTED 在真實
@@ -499,6 +695,12 @@ export async function mockMyKyc(
 			email: string;
 			source: "VERIFIED" | "SELF_ENTERED";
 		} | null;
+		/**
+		 * GetMyOnboarding 的回應（必要任務依序）。沒給時由 `onboardingOf` 依申請與收款帳戶狀態產生，
+		 * 句子與狀態取自伺服器的對照（`backend/internal/modules/seller/internal/model/onboarding.go`）；
+		 * 要驗證「畫面跟摘要、不跟申請」的 spec 自己給。`"error"` 是 GetMyOnboarding 失敗。
+		 */
+		onboarding?: MockOnboardingTask[] | "error";
 	},
 ): Promise<void> {
 	await page.route(GET_CONTACT_EMAIL_URL, (route) => {
@@ -542,6 +744,10 @@ export async function mockMyKyc(
 				},
 			},
 		});
+	});
+	await mockMyOnboarding(page, flow.onboarding ?? onboardingOf(flow));
+	await page.route(REFRESH_MY_PAYMENT_ACCOUNT_URL, (route) => {
+		void fulfillConnect(route, {});
 	});
 	await page.route(GET_MY_PAYMENT_ACCOUNT_URL, (route) => {
 		const account =

@@ -2,20 +2,27 @@ import { create } from "@bufbuild/protobuf";
 import {
 	CapabilityStatusSchema,
 	GetMyStoreResponseSchema,
-	KYCStatus,
-	PaymentAccountSchema,
-	PaymentAccountStatus,
+	OnboardingAction,
+	OnboardingTaskId,
+	OnboardingTaskState,
 	SellerCapability,
 	SellerRequirement,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { describe, expect, it } from "vitest";
 import { uiTextFor } from "@/lib/i18n/ui-text";
 import { publicListingStatus } from "@/lib/seller/capability-fixtures";
+import {
+	onboardingFixture,
+	requiredFixture,
+} from "@/lib/seller/onboarding-fixtures";
 import type { ShippingOnboarding } from "@/lib/seller/shipping";
 import { buildOnboardingTasks, type OnboardingTask } from "./onboardingTasks";
 
 const ut = uiTextFor("zh-TW");
 const R = SellerRequirement;
+const S = OnboardingTaskState;
+const A = OnboardingAction;
+const ID = OnboardingTaskId;
 
 function shippingStatus(
 	publicMissing: SellerRequirement[],
@@ -33,12 +40,13 @@ function shippingStatus(
 	});
 }
 
+const NOT_DONE = { state: S.ACTION_REQUIRED, action: A.NONE } as const;
+
+/** 建議任務由 client 組，只看店家的能力與資料；必要任務由伺服器的摘要給（預設三項都還沒完成）。 */
 function build(
 	missing: SellerRequirement[] | undefined,
 	extra: {
-		kycStatus?: KYCStatus;
-		paymentStatus?: PaymentAccountStatus;
-		payoutsActive?: boolean;
+		onboarding?: Parameters<typeof buildOnboardingTasks>[0]["onboarding"];
 		description?: string;
 		shippingRows?: ShippingOnboarding[];
 		productCount?: number | null;
@@ -59,14 +67,10 @@ function build(
 	return buildOnboardingTasks({
 		ut,
 		my,
-		kycStatus: extra.kycStatus,
-		paymentAccount:
-			extra.paymentStatus === undefined
-				? null
-				: create(PaymentAccountSchema, {
-						status: extra.paymentStatus,
-						payoutsActive: extra.payoutsActive ?? false,
-					}),
+		onboarding:
+			extra.onboarding === undefined
+				? requiredFixture(NOT_DONE, NOT_DONE, NOT_DONE)
+				: extra.onboarding,
 		shippingRows: extra.shippingRows ?? [],
 		productCount: extra.productCount ?? 0,
 	});
@@ -83,173 +87,194 @@ const required = (tasks: OnboardingTask[]) =>
 const recommended = (tasks: OnboardingTask[]) =>
 	tasks.filter((t) => t.group === "recommended");
 
-describe("公開前必須 follows the PUBLIC_LISTING missing requirements", () => {
-	it("nothing missing: every required task is complete", () => {
-		const tasks = build([]);
-		expect(required(tasks).map((t) => t.id)).toEqual([
-			"profile",
-			"platform_review",
-			"payment_account",
+describe("公開前必須 comes from the server's GetMyOnboarding", () => {
+	it("keeps the server order and shows its title and status sentence verbatim", () => {
+		const onboarding = onboardingFixture([
+			{
+				id: ID.PROFILE,
+				state: S.ACTION_REQUIRED,
+				title: "伺服器標題X",
+				status: "伺服器狀態X",
+			},
+			{
+				id: ID.PLATFORM_REVIEW,
+				state: S.IN_PROGRESS,
+				title: "伺服器標題Y",
+				status: "伺服器狀態Y",
+			},
+			{
+				id: ID.PAYMENT_ACCOUNT,
+				state: S.LOCKED,
+				title: "伺服器標題Z",
+				status: "伺服器狀態Z",
+			},
 		]);
-		expect(required(tasks).every((t) => t.completed)).toBe(true);
+		const tasks = required(build([], { onboarding }));
+		expect(tasks.map((t) => [t.id, t.title, t.statusLabel])).toEqual([
+			["profile", "伺服器標題X", "伺服器狀態X"],
+			["platform_review", "伺服器標題Y", "伺服器狀態Y"],
+			["payment_account", "伺服器標題Z", "伺服器狀態Z"],
+		]);
 	});
 
-	it("each store-info requirement keeps the profile task open and names itself", () => {
-		for (const [requirement, label] of [
-			[R.STORE_NAME, "店名"],
-			[R.LOGO, "logo"],
-			[R.TOWN_CODE, "所在地"],
+	it("completed is state COMPLETED and locked is state LOCKED; nothing else", () => {
+		for (const [state, completed, locked] of [
+			[S.COMPLETED, true, false],
+			[S.LOCKED, false, true],
+			[S.ACTION_REQUIRED, false, false],
+			[S.IN_PROGRESS, false, false],
+			[S.UNKNOWN, false, false],
+			[S.UNSPECIFIED, false, false],
+			[99 as OnboardingTaskState, false, false],
 		] as const) {
-			const profile = task(build([requirement]), "profile");
-			expect(profile.completed, label).toBe(false);
-			expect(profile.statusLabel, label).toContain(label);
-			expect(profile.href).toBe("/seller-center/me");
+			const onboarding = onboardingFixture([{ id: ID.PLATFORM_REVIEW, state }]);
+			const t = task(build([], { onboarding }), "platform_review");
+			expect([t.completed, t.locked], String(state)).toEqual([
+				completed,
+				locked,
+			]);
 		}
 	});
 
-	it("profile is complete only when none of name, logo and town are missing", () => {
-		const tasks = build([R.ONBOARDING_COMPLETE]);
-		expect(task(tasks, "profile").completed).toBe(true);
-		expect(task(tasks, "platform_review").completed).toBe(false);
-		expect(task(tasks, "payment_account").completed).toBe(false);
+	it("UNKNOWN shows the server's status sentence and offers no button", () => {
+		const onboarding = onboardingFixture([
+			{
+				id: ID.PAYMENT_ACCOUNT,
+				state: S.UNKNOWN,
+				action: A.NONE,
+				status: "伺服器說讀不到",
+			},
+		]);
+		const t = task(build([], { onboarding }), "payment_account");
+		expect(t.statusLabel).toBe("伺服器說讀不到");
+		expect(t.completed).toBe(false);
+		expect(t.locked).toBe(false);
+		expect(t.next).toBeUndefined();
 	});
 
-	it("before the review is approved: 平台審核 shows the KYC status and 收款帳戶 is greyed", () => {
-		const submitted = build([R.ONBOARDING_COMPLETE], {
-			kycStatus: KYCStatus.KYC_STATUS_SUBMITTED,
+	it("state comes from the server, not from the store's capabilities or KYC", () => {
+		// 店家的能力說 ONBOARDING_COMPLETE 沒缺，摘要說兩項都還沒完成：跟摘要。
+		const stillOpen = build([], {
+			onboarding: requiredFixture(
+				{ state: S.COMPLETED, action: A.NONE },
+				{ state: S.ACTION_REQUIRED, action: A.SUBMIT_CERTIFICATION },
+				{ state: S.LOCKED, action: A.NONE },
+			),
 		});
-		const review = task(submitted, "platform_review");
-		expect(review.completed).toBe(false);
-		expect(review.statusLabel).toBe("審核中");
-		expect(review.href).toBe("/seller-center/me/certifications");
-		const payment = task(submitted, "payment_account");
-		expect(payment.locked).toBe(true);
-		expect(payment.statusLabel).toBe("平台審核通過後開放設定");
-		expect(payment.cta).toBeUndefined();
-		// 沒有申請：未送出。
-		expect(
-			task(build([R.ONBOARDING_COMPLETE]), "platform_review").statusLabel,
-		).toBe("未送出");
-	});
-
-	it("approved review, payment not enabled: 收款帳戶 shows the catalog badge and action", () => {
-		const tasks = build([R.ONBOARDING_COMPLETE], {
-			kycStatus: KYCStatus.KYC_STATUS_APPROVED,
-			paymentStatus: PaymentAccountStatus.ACTION_REQUIRED,
+		expect(task(stillOpen, "platform_review").completed).toBe(false);
+		expect(task(stillOpen, "payment_account").completed).toBe(false);
+		// 店家的能力說還缺 ONBOARDING_COMPLETE，缺店名，摘要說都完成：跟摘要。
+		const done = build([R.ONBOARDING_COMPLETE, R.STORE_NAME], {
+			onboarding: requiredFixture(
+				{ state: S.COMPLETED, action: A.NONE },
+				{ state: S.COMPLETED, action: A.NONE },
+				{ state: S.COMPLETED, action: A.NONE },
+			),
 		});
-		expect(task(tasks, "platform_review").completed).toBe(true);
-		const payment = task(tasks, "payment_account");
-		expect(payment.completed).toBe(false);
-		expect(payment.locked).toBe(false);
-		expect(payment.statusLabel).toBe("待設定");
-		expect(payment.cta).toBe("前往設定收款帳戶");
-		expect(payment.statusLabel).not.toMatch(/逾期|停用/);
+		expect(required(done).every((t) => t.completed)).toBe(true);
 	});
 
-	it("the 收款帳戶 action label matches its link for every status", () => {
-		const approved = KYCStatus.KYC_STATUS_APPROVED;
-		const disabled = task(
-			build([R.ONBOARDING_COMPLETE], {
-				kycStatus: approved,
-				paymentStatus: PaymentAccountStatus.DISABLED,
-			}),
-			"payment_account",
-		);
-		expect(disabled.cta).toBe("聯絡客服");
-		expect(disabled.href).toBe("/contact");
-		for (const status of [
-			PaymentAccountStatus.NOT_CREATED,
-			PaymentAccountStatus.UNDER_REVIEW,
-			PaymentAccountStatus.ENABLED,
-		]) {
-			const t = task(
-				build([R.ONBOARDING_COMPLETE], {
-					kycStatus: approved,
-					paymentStatus: status,
-				}),
-				"payment_account",
-			);
-			expect(t.cta, String(status)).toBe("前往商家認證");
-			expect(t.href, String(status)).toBe("/seller-center/me/certifications");
-		}
-		const notCreated = task(
-			build([R.ONBOARDING_COMPLETE], { kycStatus: approved }),
-			"payment_account",
-		);
-		expect(notCreated.cta).toBe("前往商家認證");
-	});
-
-	it("approved review without an account yet reads as 準備中", () => {
-		const payment = task(
-			build([R.ONBOARDING_COMPLETE], {
-				kycStatus: KYCStatus.KYC_STATUS_APPROVED,
-			}),
-			"payment_account",
-		);
-		expect(payment.statusLabel).toBe("準備中");
-	});
-
-	it("both rows are decided by the missing requirements, not by the statuses", () => {
-		// 伺服器說沒有缺 ONBOARDING_COMPLETE：就算狀態還顯示審核中，兩列都是完成。
-		const done = build([], {
-			kycStatus: KYCStatus.KYC_STATUS_SUBMITTED,
-			paymentStatus: PaymentAccountStatus.UNDER_REVIEW,
-		});
-		expect(task(done, "platform_review").completed).toBe(true);
-		expect(task(done, "payment_account").completed).toBe(true);
-		expect(task(done, "platform_review").cta).toBeUndefined();
-		expect(task(done, "payment_account").cta).toBeUndefined();
-		// 伺服器說還缺 ONBOARDING_COMPLETE：就算收款帳戶 ENABLED，收款那一列也還沒完成。
-		expect(
-			task(
-				build([R.ONBOARDING_COMPLETE], {
-					kycStatus: KYCStatus.KYC_STATUS_APPROVED,
-					paymentStatus: PaymentAccountStatus.ENABLED,
-				}),
-				"payment_account",
-			).completed,
-		).toBe(false);
-	});
-
-	it("both titles are client text and the PayUni row stays folded away", () => {
-		const tasks = build([R.ONBOARDING_COMPLETE]);
-		expect(task(tasks, "platform_review").title).toBe("平台審核");
-		expect(task(tasks, "payment_account").title).toBe("收款帳戶");
-		expect(tasks.map((t) => t.id)).not.toContain("payuni");
-	});
-
-	it("requirements the notice page handles have no row and do not fall into the fallback row", () => {
-		for (const requirement of [
-			R.NOT_SUSPENDED,
-			R.STORE_ACTIVE,
-			R.NOT_PENDING_DELETION,
-		]) {
+	it("button label comes from the catalog per action; NONE has no button", () => {
+		const labels = new Map<OnboardingAction, string>([
+			[A.EDIT_PROFILE, "去設定"],
+			[A.SUBMIT_CERTIFICATION, "前往商家認證"],
+			[A.START_PAYMENT_ONBOARDING, "前往設定收款帳戶"],
+			[A.REFRESH_PAYMENT_ACCOUNT, "重新整理"],
+			[A.CONTACT_SUPPORT, "聯絡客服"],
+		]);
+		for (const [action, label] of labels) {
+			const onboarding = onboardingFixture([
+				{ id: ID.PROFILE, state: S.ACTION_REQUIRED, action },
+			]);
 			expect(
-				build([requirement]).map((t) => t.id),
-				String(requirement),
-			).toEqual(build([]).map((t) => t.id));
+				task(build([], { onboarding }), "profile").next?.label,
+				String(action),
+			).toBe(label);
+		}
+		for (const action of [A.NONE, A.UNSPECIFIED, 99 as OnboardingAction]) {
+			const onboarding = onboardingFixture([
+				{ id: ID.PROFILE, state: S.ACTION_REQUIRED, action },
+			]);
+			expect(
+				task(build([], { onboarding }), "profile").next,
+				String(action),
+			).toBeUndefined();
 		}
 	});
 
-	it("a requirement the client does not know still shows up", () => {
-		const tasks = build([99 as SellerRequirement]);
-		expect(task(tasks, "other_requirement").completed).toBe(false);
+	it("action maps to the web destination; refresh stays in place", () => {
+		const next = (action: OnboardingAction) =>
+			task(
+				build([], {
+					onboarding: onboardingFixture([
+						{ id: ID.PAYMENT_ACCOUNT, state: S.ACTION_REQUIRED, action },
+					]),
+				}),
+				"payment_account",
+			).next;
+		expect(next(A.EDIT_PROFILE)).toMatchObject({
+			kind: "link",
+			href: "/seller-center/me",
+		});
+		expect(next(A.SUBMIT_CERTIFICATION)).toMatchObject({
+			kind: "link",
+			href: "/seller-center/me/certifications",
+		});
+		expect(next(A.START_PAYMENT_ONBOARDING)).toMatchObject({
+			kind: "link",
+			href: "/seller-center/me/certifications",
+		});
+		expect(next(A.CONTACT_SUPPORT)).toMatchObject({
+			kind: "link",
+			href: "/contact",
+		});
+		expect(next(A.REFRESH_PAYMENT_ACCOUNT)?.kind).toBe("refresh");
 	});
 
-	it("an unspecified requirement is not a task", () => {
-		const tasks = build([R.UNSPECIFIED]);
-		expect(tasks.some((t) => t.id === "other_requirement")).toBe(false);
+	it("presentation fields depend on the task id only, not on the state", () => {
+		const present = (state: OnboardingTaskState) => {
+			const t = task(
+				build([], {
+					onboarding: onboardingFixture([{ id: ID.PLATFORM_REVIEW, state }]),
+				}),
+				"platform_review",
+			);
+			return [t.icon, t.panelTitle, t.panelDescription, t.description];
+		};
+		expect(present(S.COMPLETED)).toEqual(present(S.LOCKED));
+		expect(present(S.COMPLETED)).toEqual(present(S.UNKNOWN));
 	});
 
-	it("without a PUBLIC_LISTING status nothing is treated as satisfied", () => {
-		const tasks = build(undefined);
-		expect(required(tasks).every((t) => !t.completed)).toBe(true);
+	it("no summary (not loaded or failed): no required tasks, recommended stay", () => {
+		const tasks = build([], { onboarding: null });
+		expect(required(tasks)).toEqual([]);
+		expect(recommended(tasks).map((t) => t.id)).toEqual([
+			"shipping",
+			"product",
+			"description",
+		]);
+	});
+
+	it("a task id the web has no presentation for is not rendered with invented text", () => {
+		const onboarding = onboardingFixture([
+			{ id: ID.UNSPECIFIED, state: S.ACTION_REQUIRED },
+			{ id: ID.PROFILE, state: S.COMPLETED },
+		]);
+		expect(required(build([], { onboarding })).map((t) => t.id)).toEqual([
+			"profile",
+		]);
 	});
 
 	it("the required group does not depend on shipping, products or the store description", () => {
-		const bare = required(build([R.LOGO]));
+		const onboarding = requiredFixture(
+			{ state: S.COMPLETED, action: A.NONE },
+			{ state: S.ACTION_REQUIRED, action: A.SUBMIT_CERTIFICATION },
+			{ state: S.LOCKED, action: A.NONE },
+		);
+		const bare = required(build([R.LOGO], { onboarding }));
 		const busy = required(
 			build([R.LOGO], {
+				onboarding,
 				description: "產地直送",
 				productCount: 5,
 				shippingRows: [{ payuniSubmitStatus: "SUCCEEDED" }],
@@ -272,15 +297,9 @@ describe("建議完成", () => {
 
 	it("shipping opens only when the store is certified, whatever the statuses say", () => {
 		expect(task(build([]), "shipping").locked).toBe(false);
-		expect(
-			task(
-				build([R.ONBOARDING_COMPLETE], {
-					kycStatus: KYCStatus.KYC_STATUS_APPROVED,
-					paymentStatus: PaymentAccountStatus.UNDER_REVIEW,
-				}),
-				"shipping",
-			).locked,
-		).toBe(true);
+		expect(task(build([R.ONBOARDING_COMPLETE], {}), "shipping").locked).toBe(
+			true,
+		);
 	});
 
 	it("shipping is gated by SHIPPING_SETUP, not by the PUBLIC_LISTING list", () => {

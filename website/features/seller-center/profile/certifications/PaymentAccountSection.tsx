@@ -14,12 +14,17 @@ import * as React from "react";
 import Button from "@/components/ui/Button";
 import { formatTaipeiMonthDayTime } from "@/lib/date/taipei";
 import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
-import { useMyPaymentAccount } from "@/lib/hooks/useSellerSelf";
+import {
+	useMyPaymentAccount,
+	useRefreshPaymentAccount,
+} from "@/lib/hooks/useSellerSelf";
 import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
 import { useLocalizedHref } from "@/lib/intl/use-router";
 import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 import { queryKeys } from "@/lib/query/keys";
+import { refreshMyPaymentAccount } from "@/lib/seller/onboarding-summary";
 import {
+	CONTACT_HREF,
 	createPaymentOnboardingSession,
 	fetchMyPaymentAccount,
 	paymentAccountCanOnboard,
@@ -41,9 +46,6 @@ const EmbeddedPaymentOnboarding = dynamic(
 );
 
 const CERT_PATH = "/seller-center/me/certifications";
-const CONTACT_HREF = "/contact";
-const sleep = (ms: number) =>
-	new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
 function formatUpdated(account: PaymentAccount): string | null {
 	if (!account.fetchTime) return null;
@@ -90,8 +92,15 @@ export function PaymentAccountSection({
 		() => createPaymentOnboardingSession(urls()),
 		[urls],
 	);
+	const refreshPaymentAccount = useRefreshPaymentAccount();
+	// 從金流商回來：先同步重讀（refreshMyPaymentAccount），再讀帳戶與開通摘要。
 	const readAccount = React.useCallback(async () => {
-		const fresh = await fetchMyPaymentAccount();
+		const [fresh] = await Promise.all([
+			fetchMyPaymentAccount(),
+			queryClient.invalidateQueries({
+				queryKey: queryKeys.seller.onboarding(identity),
+			}),
+		]);
 		queryClient.setQueryData(queryKeys.seller.paymentAccount(identity), fresh);
 		return fresh;
 	}, [queryClient, identity]);
@@ -121,8 +130,8 @@ export function PaymentAccountSection({
 		setFailed(false);
 		try {
 			await handlePaymentParam("return", {
+				refreshAccount: refreshMyPaymentAccount,
 				readAccount,
-				sleep,
 				createSession,
 				surface: accountRef.current?.onboardingSurface,
 			});
@@ -132,6 +141,18 @@ export function PaymentAccountSection({
 			setConfirming(false);
 		}
 	}, [readAccount, createSession]);
+
+	const refreshStatus = React.useCallback(async () => {
+		setConfirming(true);
+		setFailed(false);
+		try {
+			await refreshPaymentAccount();
+		} catch {
+			setFailed(true);
+		} finally {
+			setConfirming(false);
+		}
+	}, [refreshPaymentAccount]);
 
 	const param = paymentParamOf(searchParams?.get(PAYMENT_PARAM) ?? null);
 	React.useEffect(() => {
@@ -225,7 +246,7 @@ export function PaymentAccountSection({
 								variant="bordered"
 								size="sm"
 								disabled={confirming}
-								onClick={() => void refetch()}
+								onClick={() => void refreshStatus()}
 							>
 								{copy.action}
 							</Button>

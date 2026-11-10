@@ -2,7 +2,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import {
 	fulfillConnect,
 	type MockKycFlowStatus,
-	type MockSellerRequirement,
+	type MockOnboardingTask,
 	type MockStore,
 	mockMyKyc,
 	mockMyStore,
@@ -37,9 +37,39 @@ const NOT_STARTED_STORE: MockStore = {
 interface SellerFixture {
 	store: MockStore;
 	flow: MockKycFlowStatus;
+	/** GetMyOnboarding 的回應；沒給時由申請狀態產生（見 mock-gateway 的 `onboardingOf`）。 */
+	onboarding?: MockOnboardingTask[] | "error";
 }
 
 const APPROVED: SellerFixture = { store: APPROVED_STORE, flow: "APPROVED" };
+/** 商店資料還缺項：伺服器的任務是 ACTION_REQUIRED、下一步 EDIT_PROFILE。 */
+const PROFILE_MISSING: SellerFixture = {
+	store: { ...BASE_STORE, missingRequirements: ["LOGO"] },
+	flow: "APPROVED",
+	onboarding: [
+		{
+			id: "PROFILE",
+			state: "ACTION_REQUIRED",
+			action: "EDIT_PROFILE",
+			title: "商店資料",
+			status: "還缺少：logo。",
+		},
+		{
+			id: "PLATFORM_REVIEW",
+			state: "COMPLETED",
+			action: "NONE",
+			title: "平台審核",
+			status: "商家認證已通過。",
+		},
+		{
+			id: "PAYMENT_ACCOUNT",
+			state: "COMPLETED",
+			action: "NONE",
+			title: "收款帳戶",
+			status: "收款帳戶已啟用。",
+		},
+	],
+};
 const NOT_STARTED: SellerFixture = {
 	store: NOT_STARTED_STORE,
 	flow: "NOT_STARTED",
@@ -80,7 +110,10 @@ async function prepareSellerPage(
 	});
 
 	await mockMyStore(page, fixture.store);
-	await mockMyKyc(page, { status: fixture.flow });
+	await mockMyKyc(page, {
+		status: fixture.flow,
+		onboarding: fixture.onboarding,
+	});
 
 	await page.route("**/api/v1/app/shipping_onboardings", (route) => {
 		void route.fulfill({
@@ -219,6 +252,8 @@ interface TaskActionCase {
 	location: string;
 	/** 落地後該頁必須成立的內容。 */
 	verify: (page: Page) => Promise<void>;
+	/** 預設是 APPROVED（必要任務都完成）。 */
+	fixture?: SellerFixture;
 }
 
 /**
@@ -237,6 +272,7 @@ interface TaskActionCase {
 const APPROVED_TASK_ACTIONS: TaskActionCase[] = [
 	{
 		name: "store profile action",
+		fixture: PROFILE_MISSING,
 		taskTitle: "商店資料",
 		panelTitle: "完成商店資料",
 		cta: "去設定",
@@ -327,7 +363,11 @@ test.describe("seller dashboard onboarding task actions", {
 		test(`approved seller: ${taskAction.name}`, async ({ page, baseURL }) => {
 			test.skip(!baseURL, "Playwright baseURL is required");
 
-			await prepareSellerPage(page, baseURL as string, APPROVED);
+			await prepareSellerPage(
+				page,
+				baseURL as string,
+				taskAction.fixture ?? APPROVED,
+			);
 
 			await clickTaskAction(page, {
 				taskTitle: taskAction.taskTitle,
@@ -375,32 +415,122 @@ test.describe("seller dashboard onboarding task actions", {
 		);
 	});
 
-	test("公開前必須 follows the server's missing requirements", async ({
+	test("公開前必須 shows the server's task sentences", async ({
 		page,
 		baseURL,
 	}) => {
 		test.skip(!baseURL, "Playwright baseURL is required");
 
-		const missing: MockSellerRequirement[] = ["LOGO", "ONBOARDING_COMPLETE"];
 		await prepareSellerPage(page, baseURL as string, {
-			store: { ...BASE_STORE, missingRequirements: missing },
+			store: { ...BASE_STORE, missingRequirements: ["ONBOARDING_COMPLETE"] },
 			flow: "SUBMITTED",
+			onboarding: [
+				{
+					id: "PROFILE",
+					state: "ACTION_REQUIRED",
+					action: "EDIT_PROFILE",
+					title: "伺服器標題一",
+					status: "伺服器句子一：缺 logo",
+				},
+				{
+					id: "PLATFORM_REVIEW",
+					state: "IN_PROGRESS",
+					action: "NONE",
+					title: "伺服器標題二",
+					status: "伺服器句子二：審核中",
+				},
+				{
+					id: "PAYMENT_ACCOUNT",
+					state: "LOCKED",
+					action: "NONE",
+					title: "伺服器標題三",
+					status: "伺服器句子三：尚未開放",
+				},
+			],
 		});
 		const card = await openDashboardTasks(page);
 		const required = card.locator(".seller-onboarding-progress__steps").first();
 
 		await expect(
-			required.getByRole("button", { name: /^商店資料，缺少：logo/ }),
-		).toBeVisible();
-		// 平台審核那一列以申請狀態當狀態文字；平台審核通過之前，收款帳戶那一列是灰色的提示。
-		await expect(
-			required.getByRole("button", { name: /^平台審核，審核中/ }),
+			required.getByRole("button", {
+				name: "伺服器標題一，伺服器句子一：缺 logo",
+			}),
 		).toBeVisible();
 		await expect(
 			required.getByRole("button", {
-				name: /^收款帳戶，平台審核通過後開放設定/,
+				name: "伺服器標題二，伺服器句子二：審核中",
 			}),
 		).toBeVisible();
+		await expect(
+			required.getByRole("button", {
+				name: "伺服器標題三，伺服器句子三：尚未開放",
+			}),
+		).toBeVisible();
+	});
+
+	test("公開前必須 follows the summary, not the KYC application", async ({
+		page,
+		baseURL,
+	}) => {
+		test.skip(!baseURL, "Playwright baseURL is required");
+
+		// GetMyKYC 說已核准，摘要說平台審核還要送件：畫面跟摘要。
+		await prepareSellerPage(page, baseURL as string, {
+			store: NOT_STARTED_STORE,
+			flow: "APPROVED",
+			onboarding: [
+				{
+					id: "PROFILE",
+					state: "COMPLETED",
+					action: "NONE",
+					title: "商店資料",
+					status: "店名、logo 與所在地都已填寫。",
+				},
+				{
+					id: "PLATFORM_REVIEW",
+					state: "ACTION_REQUIRED",
+					action: "SUBMIT_CERTIFICATION",
+					title: "平台審核",
+					status: "伺服器說：還沒送件",
+				},
+				{
+					id: "PAYMENT_ACCOUNT",
+					state: "LOCKED",
+					action: "NONE",
+					title: "收款帳戶",
+					status: "平台審核通過後才能設定收款帳戶。",
+				},
+			],
+		});
+		const card = await openDashboardTasks(page);
+		await expect(
+			card.getByRole("button", { name: "平台審核，伺服器說：還沒送件" }),
+		).toBeVisible();
+		await expect(card.getByText("1/3")).toBeVisible();
+	});
+
+	test("GetMyOnboarding failing leaves one load-failure state and keeps the recommended tasks", async ({
+		page,
+		baseURL,
+	}) => {
+		test.skip(!baseURL, "Playwright baseURL is required");
+
+		await prepareSellerPage(page, baseURL as string, {
+			store: NOT_STARTED_STORE,
+			flow: "SUBMITTED",
+			onboarding: "error",
+		});
+		const card = await openDashboardTasks(page);
+		const aside = card.locator(".seller-onboarding-progress__aside");
+		await expect(aside.getByRole("alert")).toHaveText("系統錯誤");
+		await expect(
+			aside.locator(".seller-onboarding-progress__steps"),
+		).toHaveCount(1);
+		for (const title of ["物流設定", "上架商品", "商店介紹"]) {
+			await expect(
+				aside.getByRole("button", { name: new RegExp(`^${title}，`) }),
+			).toBeVisible();
+		}
 	});
 
 	test("shipping stays locked until the onboarding is complete", async ({

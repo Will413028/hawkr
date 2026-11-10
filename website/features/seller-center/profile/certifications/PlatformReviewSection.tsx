@@ -5,7 +5,12 @@ import {
 	type KYCApplication,
 	KYCStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
-import { commonUnknown, sellerKYCStatus } from "@hawkr/ui-text/keys";
+import {
+	commonUnknown,
+	sellerKYCApplicationDecideTime,
+	sellerKYCApplicationSubmitTime,
+	sellerKYCStatus,
+} from "@hawkr/ui-text/keys";
 import Button from "@/components/ui/Button";
 import { formatTaipeiDateTime } from "@/lib/date/taipei";
 import { optionalText, useUiText } from "@/lib/i18n/ui-text";
@@ -62,10 +67,22 @@ export function PlatformReviewSection({
 			<div className={`seller-cert__status is-${tone}`}>
 				<strong>{badge}</strong>
 				{stamp?.kind === "decide" && (
-					<p>核准時間：{formatTaipeiDateTime(timestampDate(stamp.at))}</p>
+					<p>
+						{ut(
+							sellerKYCApplicationDecideTime({
+								time: formatTaipeiDateTime(timestampDate(stamp.at)),
+							}),
+						)}
+					</p>
 				)}
 				{stamp?.kind === "submit" && (
-					<p>送出時間：{formatTaipeiDateTime(timestampDate(stamp.at))}</p>
+					<p>
+						{ut(
+							sellerKYCApplicationSubmitTime({
+								time: formatTaipeiDateTime(timestampDate(stamp.at)),
+							}),
+						)}
+					</p>
 				)}
 				{submitted ? <p>審核完成後會以通知告知你結果。</p> : null}
 			</div>

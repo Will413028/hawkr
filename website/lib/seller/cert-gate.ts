@@ -2,27 +2,28 @@
  * Seller certification gate.
  *
  * 「已認證」是店家的公開曝光條件之一：`GetMyStore.capabilities` 中 `PUBLIC_LISTING` 缺的條件不含
- * `ONBOARDING_COMPLETE`（平台審核核准且收款帳戶啟用）。細分的狀態來自兩條：平台審核
- * `GetMyKYC.application.status`，與平台審核核准之後的收款帳戶 `GetMyPaymentAccount.account.status`。這些來源只有這裡讀，頁面不自己拼。
+ * `ONBOARDING_COMPLETE`（平台審核核准且收款帳戶啟用）。細分的狀態來自三條：申請 `GetMyKYC.application`（只作申請本身的資料）、
+ * 開通摘要 `GetMyOnboarding`（平台審核是否完成由它決定，收款帳戶在那之後才讀），與收款帳戶 `GetMyPaymentAccount.account.status`。這些來源只有這裡讀，頁面不自己拼。
  *
  * 認證不再是上架商品、建立優惠券與發票的前置條件（它們只看 `capabilities`）；它是公開曝光、收款的條件
  * （`approved`，「已認證」只有 `isStoreCertified` 一個來源）。物流設定的閘門另看 `SHIPPING_SETUP`
  * 能力（`shippingGate`），伺服器依能力的缺項告訴 client 是缺認證還是停權、等待刪除，client 不自己推前置條件。
  *
- * Caching note: `useSellerSelf`、`useMyKyc` 與 `useMyPaymentAccount` 各是一條 identity-scoped server-state，
+ * Caching note: `useSellerSelf`、`useMyKyc`、`useMyOnboarding` 與 `useMyPaymentAccount` 各是一條 identity-scoped server-state，
  * 所有消費者共用一次請求。`refresh()` 重新讀店家（例如補件之後）。
  */
 
-import {
-	type KYCApplication,
-	KYCStatus,
-	type PaymentAccount,
+import type {
+	KYCApplication,
+	PaymentAccount,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import {
 	useMyKyc,
+	useMyOnboarding,
 	useMyPaymentAccount,
 	useSellerSelf,
 } from "@/lib/hooks/useSellerSelf";
+import { platformReviewCompleted } from "./onboarding-summary";
 import {
 	isStoreCertified,
 	type MyStore,
@@ -49,14 +50,15 @@ export interface CertGate {
 export function useCertGate(): CertGate {
 	const { data: seller, loading, error, refresh } = useSellerSelf();
 	const { application, loading: kycLoading } = useMyKyc();
-	const kycApproved = application?.status === KYCStatus.KYC_STATUS_APPROVED;
+	const { onboarding, loading: onboardingLoading } = useMyOnboarding();
+	// 收款帳戶在平台審核完成之後才讀；「完成」是開通摘要（伺服器）的答案，不從申請狀態推導。
 	const { account: paymentAccount, loading: paymentLoading } =
-		useMyPaymentAccount({ enabled: kycApproved });
+		useMyPaymentAccount({ enabled: platformReviewCompleted(onboarding) });
 	const reload = () => {
 		void refresh();
 	};
 
-	if (loading || kycLoading || paymentLoading) {
+	if (loading || kycLoading || onboardingLoading || paymentLoading) {
 		return {
 			loading: true,
 			approved: false,

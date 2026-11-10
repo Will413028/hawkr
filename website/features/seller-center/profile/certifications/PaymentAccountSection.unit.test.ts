@@ -26,6 +26,12 @@ const mocks = vi.hoisted(() => ({
 	navigate: vi.fn(),
 	refetch: vi.fn(),
 	setQueryData: vi.fn(),
+	invalidateQueries: vi.fn(),
+	/** RefreshMyPaymentAccount（回跳時直接呼叫的那一支）。 */
+	refreshRpc: vi.fn(),
+	/** useRefreshPaymentAccount 回的函式（狀態按鈕：重讀並重新讀摘要與帳戶）。 */
+	refreshAndReload: vi.fn(),
+	calls: [] as string[],
 }));
 
 vi.mock("next/navigation", async (importOriginal) => ({
@@ -34,12 +40,19 @@ vi.mock("next/navigation", async (importOriginal) => ({
 }));
 vi.mock("@tanstack/react-query", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@tanstack/react-query")>()),
-	useQueryClient: () => ({ setQueryData: mocks.setQueryData }),
+	useQueryClient: () => ({
+		setQueryData: mocks.setQueryData,
+		invalidateQueries: mocks.invalidateQueries,
+	}),
 }));
 vi.mock("@/lib/hooks/useQueryIdentity", () => ({
 	useQueryIdentity: () => ({ accountId: "1", activeRole: "seller" }),
 }));
+vi.mock("@/lib/seller/onboarding-summary", () => ({
+	refreshMyPaymentAccount: mocks.refreshRpc,
+}));
 vi.mock("@/lib/hooks/useSellerSelf", () => ({
+	useRefreshPaymentAccount: () => mocks.refreshAndReload,
 	useMyPaymentAccount: (options?: { enabled?: boolean }) => {
 		mocks.hookEnabled.push(options?.enabled ?? true);
 		return {
@@ -136,6 +149,18 @@ beforeEach(() => {
 	mocks.navigate.mockReset();
 	mocks.refetch.mockReset();
 	mocks.setQueryData.mockReset();
+	mocks.invalidateQueries.mockReset();
+	mocks.refreshRpc.mockReset();
+	mocks.refreshRpc.mockImplementation(async () => {
+		mocks.calls.push("refresh");
+	});
+	mocks.refreshAndReload.mockReset();
+	mocks.refreshAndReload.mockResolvedValue(undefined);
+	mocks.calls = [];
+	mocks.fetchAccount.mockImplementation(async () => {
+		mocks.calls.push("read");
+		return null;
+	});
 	vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "pk_test_dummy");
 	window.history.replaceState(null, "", "/seller-center/me/certifications");
 });
@@ -170,21 +195,45 @@ describe("狀態文字來自目錄", () => {
 		expect(document.body.textContent).not.toMatch(/逾期|停用|過期/);
 	});
 
-	it("NOT_CREATED 與 UNDER_REVIEW：重新整理只重讀，不開通", async () => {
+	it("NOT_CREATED 與 UNDER_REVIEW：重新整理呼叫 RefreshMyPaymentAccount 再重讀，不開通", async () => {
 		for (const status of [
 			PaymentAccountStatus.NOT_CREATED,
 			PaymentAccountStatus.UNDER_REVIEW,
 		]) {
 			mocks.account = account(status);
 			mocks.refetch.mockReset();
+			mocks.refreshAndReload.mockClear();
 			const view = await mount();
 			await act(async () => {
 				fireEvent.click(screen.getByText("重新整理"));
 			});
-			expect(mocks.refetch).toHaveBeenCalledTimes(1);
+			expect(mocks.refreshAndReload).toHaveBeenCalledTimes(1);
+			// 只重讀帳戶（refetch）不夠：伺服器的快取沒更新，讀到的還是舊的。
+			expect(mocks.refetch).not.toHaveBeenCalled();
 			expect(mocks.createSession).not.toHaveBeenCalled();
 			view.unmount();
 		}
+	});
+
+	it("重新整理的重讀失敗：一般的錯誤，畫面留在原狀態", async () => {
+		mocks.account = account(PaymentAccountStatus.UNDER_REVIEW);
+		mocks.refreshAndReload.mockRejectedValue(new Error("boom"));
+		await mount();
+		await act(async () => {
+			fireEvent.click(screen.getByText("重新整理"));
+		});
+		expect(screen.getByRole("alert").textContent).toBe("系統錯誤");
+		expect(screen.getByText("審核中")).toBeTruthy();
+	});
+
+	it("載入失敗的「重新整理」只是重讀 GetMyPaymentAccount", async () => {
+		mocks.account = account(PaymentAccountStatus.UNSPECIFIED);
+		await mount();
+		await act(async () => {
+			fireEvent.click(screen.getByText("重新整理"));
+		});
+		expect(mocks.refetch).toHaveBeenCalledTimes(1);
+		expect(mocks.refreshAndReload).not.toHaveBeenCalled();
 	});
 
 	it("ACTION_REQUIRED 但沒有告知開通介面：沒有按鈕", async () => {
@@ -281,13 +330,14 @@ describe("EMBEDDED：內嵌元件", () => {
 		expect(mocks.createSession).not.toHaveBeenCalled();
 	});
 
-	it("元件的 onExit：收起元件並重讀 GetMyPaymentAccount", async () => {
+	it("元件的 onExit：收起元件，先重讀（RefreshMyPaymentAccount）再讀 GetMyPaymentAccount", async () => {
 		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED, {
 			surface: OnboardingSurface.EMBEDDED,
 		});
-		mocks.fetchAccount.mockResolvedValue(
-			account(PaymentAccountStatus.UNDER_REVIEW),
-		);
+		mocks.fetchAccount.mockImplementation(async () => {
+			mocks.calls.push("read");
+			return account(PaymentAccountStatus.UNDER_REVIEW);
+		});
 		await mount();
 		await act(async () => {
 			fireEvent.click(screen.getByText("前往設定收款帳戶"));
@@ -296,7 +346,7 @@ describe("EMBEDDED：內嵌元件", () => {
 		await act(async () => {
 			fireEvent.click(screen.getByText("exit-embedded"));
 		});
-		expect(mocks.fetchAccount).toHaveBeenCalledTimes(1);
+		expect(mocks.calls).toEqual(["refresh", "read"]);
 		expect(mocks.setQueryData).toHaveBeenCalled();
 		expect(screen.queryByTestId("embedded")).toBeNull();
 	});
@@ -317,16 +367,19 @@ describe("EMBEDDED：內嵌元件", () => {
 });
 
 describe("回跳的 ?payment=", () => {
-	it("return：重讀 GetMyPaymentAccount，等待時顯示「正在確認資料…」，並寫進快取", async () => {
+	it("return：先重讀一次再讀，等待時顯示「正在確認資料…」，寫進快取並重新讀開通摘要", async () => {
 		mocks.param = "return";
 		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED);
 		let resolve: (value: PaymentAccount) => void = () => {};
-		mocks.fetchAccount.mockReturnValue(
-			new Promise<PaymentAccount>((r) => {
+		mocks.fetchAccount.mockImplementation(() => {
+			mocks.calls.push("read");
+			return new Promise<PaymentAccount>((r) => {
 				resolve = r;
-			}),
-		);
+			});
+		});
 		await mount();
+		expect(mocks.calls).toEqual(["refresh", "read"]);
+		expect(mocks.refreshRpc).toHaveBeenCalledTimes(1);
 		expect(mocks.fetchAccount).toHaveBeenCalledTimes(1);
 		expect(screen.getByText("正在確認資料…")).toBeTruthy();
 		await act(async () => {
@@ -334,8 +387,38 @@ describe("回跳的 ?payment=", () => {
 		});
 		expect(screen.queryByText("正在確認資料…")).toBeNull();
 		expect(mocks.setQueryData).toHaveBeenCalled();
+		expect(mocks.invalidateQueries).toHaveBeenCalledTimes(1);
 		expect(mocks.createSession).not.toHaveBeenCalled();
 		expect(window.location.search).toBe("");
+	});
+
+	it("return：讀到還是待設定也不輪詢，之後不再讀", async () => {
+		vi.useFakeTimers();
+		try {
+			mocks.param = "return";
+			mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED);
+			mocks.fetchAccount.mockImplementation(async () => {
+				mocks.calls.push("read");
+				return account(PaymentAccountStatus.ACTION_REQUIRED);
+			});
+			await mount();
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(60_000);
+			});
+			expect(mocks.refreshRpc).toHaveBeenCalledTimes(1);
+			expect(mocks.fetchAccount).toHaveBeenCalledTimes(1);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("return：重讀失敗顯示一般的錯誤，不讀帳戶", async () => {
+		mocks.param = "return";
+		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED);
+		mocks.refreshRpc.mockRejectedValue(new Error("failed_precondition"));
+		await mount();
+		expect(mocks.fetchAccount).not.toHaveBeenCalled();
+		expect(screen.getByRole("alert").textContent).toBe("系統錯誤");
 	});
 
 	it("refresh：重新取得連結再導過去", async () => {
@@ -351,11 +434,13 @@ describe("回跳的 ?payment=", () => {
 			"https://connect.stripe.test/setup/new",
 		);
 		expect(mocks.fetchAccount).not.toHaveBeenCalled();
+		expect(mocks.refreshRpc).not.toHaveBeenCalled();
 	});
 
 	it("平台審核還沒通過時忽略 ?payment=", async () => {
 		mocks.param = "return";
 		await mount(false);
 		expect(mocks.fetchAccount).not.toHaveBeenCalled();
+		expect(mocks.refreshRpc).not.toHaveBeenCalled();
 	});
 });

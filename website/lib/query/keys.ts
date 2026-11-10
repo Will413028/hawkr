@@ -245,6 +245,9 @@ export const queryKeys = {
 		self: (id: QueryIdentity) => ["seller", ...idPrefix(id), "self"] as const,
 		// `GetMyKYC` 的申請（沒有申請是 null）。
 		kyc: (id: QueryIdentity) => ["seller", ...idPrefix(id), "kyc"] as const,
+		// `GetMyOnboarding` 的開通任務摘要（必要任務與閘門 complete）。
+		onboarding: (id: QueryIdentity) =>
+			["seller", ...idPrefix(id), "onboarding"] as const,
 		// `GetMyPaymentAccount` 的收款帳戶（還沒有是 null）。
 		paymentAccount: (id: QueryIdentity) =>
 			["seller", ...idPrefix(id), "payment-account"] as const,

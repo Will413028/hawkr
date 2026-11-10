@@ -8,13 +8,11 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import type { OnboardingSession } from "./payment-account";
 import {
-	CONFIRM_ATTEMPTS,
 	confirmPaymentReturn,
 	embeddedClientSecret,
 	handlePaymentParam,
 	onboardingUrls,
 	paymentParamOf,
-	paymentStatusSettled,
 	startOnboarding,
 } from "./payment-onboarding";
 
@@ -113,78 +111,58 @@ describe("embeddedClientSecret", () => {
 	});
 });
 
-describe("paymentStatusSettled", () => {
-	it("審核中、已啟用、無法啟用已經同步；待設定、準備中、沒有帳戶、未知值還沒", () => {
-		for (const status of [
-			PaymentAccountStatus.UNDER_REVIEW,
-			PaymentAccountStatus.ENABLED,
-			PaymentAccountStatus.DISABLED,
-		]) {
-			expect(paymentStatusSettled(account(status))).toBe(true);
-		}
-		for (const status of [
-			PaymentAccountStatus.ACTION_REQUIRED,
-			PaymentAccountStatus.NOT_CREATED,
-			PaymentAccountStatus.UNSPECIFIED,
-			99 as PaymentAccountStatus,
-		]) {
-			expect(paymentStatusSettled(account(status))).toBe(false);
-		}
-		expect(paymentStatusSettled(null)).toBe(false);
-	});
-});
-
 describe("confirmPaymentReturn", () => {
-	it("狀態一離開待設定就停，不多讀", async () => {
-		const reads = [
-			account(PaymentAccountStatus.ACTION_REQUIRED),
-			account(PaymentAccountStatus.UNDER_REVIEW),
-			account(PaymentAccountStatus.ENABLED),
-		];
-		const readAccount = vi.fn(async () => reads.shift() ?? null);
-		const sleep = vi.fn(async () => {});
-		const result = await confirmPaymentReturn({ readAccount, sleep });
-		expect(result?.status).toBe(PaymentAccountStatus.UNDER_REVIEW);
-		expect(readAccount).toHaveBeenCalledTimes(2);
-		expect(sleep).toHaveBeenCalledTimes(1);
-	});
-
-	it("一直沒同步：讀滿有限次數就停，回最後讀到的帳戶", async () => {
-		const readAccount = vi.fn(async () =>
-			account(PaymentAccountStatus.ACTION_REQUIRED),
-		);
-		const sleep = vi.fn(async () => {});
-		const result = await confirmPaymentReturn({
-			readAccount,
-			sleep,
-			intervalMs: 1234,
+	it("先重讀一次再讀：順序是 refresh、read，各只有一次，不輪詢", async () => {
+		const calls: string[] = [];
+		const refreshAccount = vi.fn(async () => {
+			calls.push("refresh");
 		});
-		expect(readAccount).toHaveBeenCalledTimes(CONFIRM_ATTEMPTS);
-		expect(sleep).toHaveBeenCalledTimes(CONFIRM_ATTEMPTS - 1);
-		expect(sleep).toHaveBeenCalledWith(1234);
+		// 讀到的還是待設定：舊的輪詢會因為「還沒同步」再讀，這裡必須只讀一次。
+		const readAccount = vi.fn(async () => {
+			calls.push("read");
+			return account(PaymentAccountStatus.ACTION_REQUIRED);
+		});
+		const result = await confirmPaymentReturn({ refreshAccount, readAccount });
+		expect(calls).toEqual(["refresh", "read"]);
+		expect(refreshAccount).toHaveBeenCalledTimes(1);
+		expect(readAccount).toHaveBeenCalledTimes(1);
 		expect(result?.status).toBe(PaymentAccountStatus.ACTION_REQUIRED);
 	});
 
+	it("重讀失敗：錯誤往上丟，不讀帳戶", async () => {
+		const refreshAccount = vi.fn().mockRejectedValue(new Error("refresh boom"));
+		const readAccount = vi.fn(async () => null);
+		await expect(
+			confirmPaymentReturn({ refreshAccount, readAccount }),
+		).rejects.toThrow("refresh boom");
+		expect(readAccount).not.toHaveBeenCalled();
+	});
+
 	it("讀取失敗：錯誤往上丟，由畫面顯示一般的錯誤", async () => {
+		const refreshAccount = vi.fn(async () => {});
 		const readAccount = vi.fn().mockRejectedValue(new Error("boom"));
 		await expect(
-			confirmPaymentReturn({ readAccount, sleep: async () => {} }),
+			confirmPaymentReturn({ refreshAccount, readAccount }),
 		).rejects.toThrow("boom");
 	});
 });
 
 describe("handlePaymentParam", () => {
 	const deps = () => ({
+		refreshAccount: vi.fn(async () => {}),
 		readAccount: vi.fn(async () => account(PaymentAccountStatus.UNDER_REVIEW)),
-		sleep: async () => {},
 		createSession: vi.fn().mockResolvedValue(hosted),
 		surface: OnboardingSurface.HOSTED as OnboardingSurface | undefined,
 	});
 
-	it("?payment=return：重讀 GetMyPaymentAccount，不建立新的 session", async () => {
+	it("?payment=return：先重讀再讀 GetMyPaymentAccount，不建立新的 session", async () => {
 		const d = deps();
 		const outcome = await handlePaymentParam("return", d);
-		expect(d.readAccount).toHaveBeenCalled();
+		expect(d.refreshAccount).toHaveBeenCalledTimes(1);
+		expect(d.readAccount).toHaveBeenCalledTimes(1);
+		expect(d.refreshAccount.mock.invocationCallOrder[0]).toBeLessThan(
+			d.readAccount.mock.invocationCallOrder[0] as number,
+		);
 		expect(d.createSession).not.toHaveBeenCalled();
 		expect(outcome).toMatchObject({ kind: "confirmed" });
 	});
@@ -193,6 +171,7 @@ describe("handlePaymentParam", () => {
 		const d = deps();
 		const outcome = await handlePaymentParam("refresh", d);
 		expect(d.createSession).toHaveBeenCalledTimes(1);
+		expect(d.refreshAccount).not.toHaveBeenCalled();
 		expect(d.readAccount).not.toHaveBeenCalled();
 		expect(outcome).toEqual({ kind: "redirect", url: hosted.url });
 	});

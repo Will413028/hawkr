@@ -118,7 +118,8 @@ export function paymentAccountCopy(
 	};
 }
 
-const CONTACT_HREF = "/contact";
+/** 客服頁。 */
+export const CONTACT_HREF = "/contact";
 const CERT_ACTION_LABEL = "前往商家認證";
 
 /**

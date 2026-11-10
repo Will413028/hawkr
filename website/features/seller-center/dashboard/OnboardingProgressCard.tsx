@@ -1,13 +1,12 @@
 "use client";
 
-import type {
-	KYCStatus,
-	PaymentAccount,
-} from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import { Code } from "@connectrpc/connect";
+import type { GetMyOnboardingResponse } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Button from "@/components/ui/Button";
-import { useUiText } from "@/lib/i18n/ui-text";
+import { useRefreshPaymentAccount } from "@/lib/hooks/useSellerSelf";
+import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
 import type { ShippingOnboarding } from "@/lib/seller/shipping";
 import type { MyStore } from "@/lib/seller/store";
 import { useSellerDashboardUiStore } from "./dashboardUiStore";
@@ -62,29 +61,45 @@ function OnboardingStep({
 
 export default function OnboardingProgressCard({
 	self,
-	kycStatus,
-	paymentAccount,
+	onboarding,
+	onboardingLoading,
 	shippingRows,
 	productCount,
 }: {
 	self: MyStore | null;
-	kycStatus: KYCStatus | undefined;
-	paymentAccount: PaymentAccount | null;
+	/** 伺服器的開通摘要（必要任務）；還沒讀到或讀取失敗是 null。 */
+	onboarding: GetMyOnboardingResponse | null;
+	onboardingLoading: boolean;
 	shippingRows: ShippingOnboarding[];
 	productCount: number | null;
 }) {
 	const ut = useUiText();
+	const defaults = useDefaultErrorText();
+	const refreshPaymentAccount = useRefreshPaymentAccount();
+	const [refreshing, setRefreshing] = React.useState(false);
+	const [refreshFailed, setRefreshFailed] = React.useState(false);
+	const refresh = React.useCallback(async () => {
+		setRefreshing(true);
+		setRefreshFailed(false);
+		try {
+			await refreshPaymentAccount();
+		} catch {
+			setRefreshFailed(true);
+		} finally {
+			setRefreshing(false);
+		}
+	}, [refreshPaymentAccount]);
+	const requiredFailed = onboarding === null && !onboardingLoading;
 	const tasks = React.useMemo(
 		() =>
 			buildOnboardingTasks({
 				ut,
 				my: self,
-				kycStatus,
-				paymentAccount,
+				onboarding,
 				shippingRows,
 				productCount,
 			}),
-		[ut, self, kycStatus, paymentAccount, shippingRows, productCount],
+		[ut, self, onboarding, shippingRows, productCount],
 	);
 	const requiredTasks = tasks.filter((task) => task.group === "required");
 	const completedRequired = requiredTasks.filter(
@@ -94,6 +109,7 @@ export default function OnboardingProgressCard({
 	const progress = totalRequired
 		? Math.round((completedRequired / totalRequired) * 100)
 		: 0;
+	const requiredReady = totalRequired > 0;
 	const allRequiredComplete =
 		totalRequired > 0 && completedRequired === totalRequired;
 	const suggestedTask =
@@ -139,13 +155,13 @@ export default function OnboardingProgressCard({
 							)}
 						</span>
 					</div>
-					{!allRequiredComplete && (
+					{requiredReady && !allRequiredComplete && (
 						<span className="seller-onboarding-progress__count">
 							{completedRequired}/{totalRequired}
 						</span>
 					)}
 				</div>
-				{!allRequiredComplete && (
+				{requiredReady && !allRequiredComplete && (
 					<div className="seller-onboarding-progress__meter">
 						<div
 							className="seller-onboarding-progress__bar"
@@ -186,22 +202,38 @@ export default function OnboardingProgressCard({
 					<div className="seller-onboarding-progress__aside">
 						{(["required", "recommended"] as const).map((group) => {
 							const groupTasks = tasks.filter((task) => task.group === group);
-							if (groupTasks.length === 0) return null;
+							const requiredPlaceholder =
+								group === "required" && groupTasks.length === 0
+									? onboardingLoading
+										? "載入中…"
+										: requiredFailed
+											? defaults(Code.Internal)
+											: null
+									: null;
+							if (groupTasks.length === 0 && requiredPlaceholder === null)
+								return null;
 							return (
 								<React.Fragment key={group}>
 									<span className="seller-onboarding-progress__eyebrow">
 										{ONBOARDING_GROUP_LABEL[group]}
 									</span>
-									<ul className="seller-onboarding-progress__steps">
-										{groupTasks.map((task) => (
-											<OnboardingStep
-												key={task.id}
-												task={task}
-												active={task.id === activeTask.id}
-												onSelect={() => setActiveTaskId(task.id)}
-											/>
-										))}
-									</ul>
+									{requiredPlaceholder !== null ? (
+										<p role={requiredFailed ? "alert" : "status"}>
+											{requiredPlaceholder}
+										</p>
+									) : null}
+									{groupTasks.length > 0 ? (
+										<ul className="seller-onboarding-progress__steps">
+											{groupTasks.map((task) => (
+												<OnboardingStep
+													key={task.id}
+													task={task}
+													active={task.id === activeTask.id}
+													onSelect={() => setActiveTaskId(task.id)}
+												/>
+											))}
+										</ul>
+									) : null}
 								</React.Fragment>
 							);
 						})}
@@ -228,15 +260,29 @@ export default function OnboardingProgressCard({
 							<p className="seller-onboarding-progress__description">
 								{activeTask.panelDescription}
 							</p>
-							{activeTask.cta ? (
+							{activeTask.next?.kind === "link" ? (
 								<Button
-									href={activeTask.href}
+									href={activeTask.next.href}
 									size="lg"
 									disabled={activeTask.locked}
 									className="seller-onboarding-progress__cta"
 								>
-									{activeTask.cta}
+									{activeTask.next.label}
 								</Button>
+							) : activeTask.next?.kind === "refresh" ? (
+								<Button
+									size="lg"
+									disabled={activeTask.locked || refreshing}
+									isLoading={refreshing}
+									loadingLabel="正在確認資料…"
+									onClick={() => void refresh()}
+									className="seller-onboarding-progress__cta"
+								>
+									{activeTask.next.label}
+								</Button>
+							) : null}
+							{refreshFailed ? (
+								<p role="alert">{defaults(Code.Internal)}</p>
 							) : null}
 						</div>
 						<div

@@ -23,7 +23,7 @@ import { useOrderList } from "@/lib/hooks/useOrders";
 import { useSellerAfterSales } from "@/lib/hooks/useSellerAfterSales";
 import { useSellerDashboard } from "@/lib/hooks/useSellerDashboard";
 import { useSellerProducts } from "@/lib/hooks/useSellerProducts";
-import { useSellerSelf } from "@/lib/hooks/useSellerSelf";
+import { useMyOnboarding, useSellerSelf } from "@/lib/hooks/useSellerSelf";
 import {
 	useSellerShipmentAnomalies,
 	useSellerShipmentAnomalyStats,
@@ -73,6 +73,7 @@ export default function DashboardPage() {
 	const certGate = useCertGate();
 
 	const { data: self } = useSellerSelf();
+	const { onboarding, loading: onboardingLoading } = useMyOnboarding();
 	const ut = useUiText();
 	const paymentAccount = certGate.paymentAccount;
 	const paymentBanner =
@@ -223,8 +224,8 @@ export default function DashboardPage() {
 
 			<OnboardingProgressCard
 				self={self}
-				kycStatus={certGate.application?.status}
-				paymentAccount={certGate.paymentAccount}
+				onboarding={onboarding}
+				onboardingLoading={onboardingLoading}
 				shippingRows={shippingRows}
 				// GetMyStore 沒有商品數：商品清單的 total 是唯一來源。
 				productCount={productCount}

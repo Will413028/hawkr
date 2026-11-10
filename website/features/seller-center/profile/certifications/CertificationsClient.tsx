@@ -56,6 +56,7 @@ import { useResettableError } from "@/lib/hooks/useResettableError";
 import {
 	useInvalidateSellerSelf,
 	useMyKyc,
+	useMyOnboarding,
 	useSellerSelf,
 	useSetMyKyc,
 } from "@/lib/hooks/useSellerSelf";
@@ -117,6 +118,7 @@ import {
 	saveKycDraft,
 	submitKyc,
 } from "@/lib/seller/kyc";
+import { platformReviewCompleted } from "@/lib/seller/onboarding-summary";
 import { PAYUNI_LOCK_ON_SUBMIT_NOTICE } from "@/lib/seller/payuni-locked-fields";
 import { fetchMyStore, updateMyStore } from "@/lib/seller/repo";
 import { isStoreCertified, type MyStore } from "@/lib/seller/store";
@@ -228,6 +230,7 @@ export default function CertificationsClient() {
 	const { status: authStatus } = useAuth();
 	const { data: seller, loading: sellerLoading } = useSellerSelf();
 	const { application, loading: kycLoading, error: kycLoadError } = useMyKyc();
+	const { onboarding, loading: onboardingLoading } = useMyOnboarding();
 	const [hydrated, setHydrated] = React.useState(false);
 	const [error, setError] = useResettableError();
 	const {
@@ -990,6 +993,7 @@ export default function CertificationsClient() {
 		setError(null);
 		try {
 			await cancelKyc(etagRef.current);
+			void invalidateSelf();
 			latestAppRef.current = null;
 			setServerFieldErrors([]);
 			setMyKyc(null);
@@ -1042,7 +1046,7 @@ export default function CertificationsClient() {
 	 *                       Render branches
 	 * ============================================================ */
 
-	if (!hydrated) {
+	if (!hydrated || onboardingLoading) {
 		return (
 			<div className="seller-cert">
 				<p className="seller-cert__loading">載入中…</p>
@@ -1050,7 +1054,8 @@ export default function CertificationsClient() {
 		);
 	}
 
-	const platformApproved = shownStatus === KYCStatus.KYC_STATUS_APPROVED;
+	// 平台審核是否完成是開通摘要（伺服器）的答案；`shownStatus` 只用來顯示申請本身。
+	const platformApproved = platformReviewCompleted(onboarding);
 
 	if (certified || (application !== null && !editable) || submitOk) {
 		return (

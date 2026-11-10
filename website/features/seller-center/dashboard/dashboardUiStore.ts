@@ -6,7 +6,6 @@ export type SellerOnboardingTaskId =
 	| "profile"
 	| "platform_review"
 	| "payment_account"
-	| "other_requirement"
 	| "shipping"
 	| "product"
 	| "description";

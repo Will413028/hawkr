@@ -15,6 +15,9 @@ import {
 	KYCField,
 	KYCIssueCode,
 	KYCStatus,
+	OnboardingAction,
+	OnboardingTaskId,
+	OnboardingTaskState,
 	StoreField,
 	StoreSchema,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -27,6 +30,7 @@ import {
 } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { onboardingFixture } from "@/lib/seller/onboarding-fixtures";
 
 type AppInit = Parameters<typeof create<typeof KYCApplicationSchema>>[1];
 
@@ -65,6 +69,9 @@ const mocks = vi.hoisted(() => ({
 	contactLoadError: null as Error | null,
 	setContactEmail: vi.fn(),
 	refetchContact: vi.fn(),
+	/** GetMyOnboarding 的回應；null 是還沒讀到或讀取失敗。 */
+	onboarding: null as unknown,
+	onboardingLoading: false,
 }));
 
 vi.mock("next/navigation", async (importOriginal) => ({
@@ -94,6 +101,12 @@ vi.mock("@/lib/hooks/useSellerSelf", async () => {
 			),
 			loading: false,
 			error: null,
+		}),
+		useMyOnboarding: () => ({
+			onboarding: mocks.onboarding,
+			loading: mocks.onboardingLoading,
+			error: null,
+			refetch: async () => {},
 		}),
 		useSetMyKyc: () => kycStore.set,
 		useMyPaymentAccount: () => ({
@@ -325,6 +338,8 @@ function outdated() {
 beforeEach(() => {
 	vi.useFakeTimers();
 	mocks.type = null;
+	mocks.onboarding = null;
+	mocks.onboardingLoading = false;
 	Element.prototype.scrollIntoView = mocks.scrollIntoView;
 	window.confirm = () => true;
 	kycStore.set(null);
@@ -917,6 +932,20 @@ describe("D4：開頁不寫入", () => {
 	});
 });
 
+/** 摘要（伺服器）裡平台審核的狀態。 */
+function summary(state: OnboardingTaskState) {
+	mocks.onboarding = onboardingFixture([
+		{
+			id: OnboardingTaskId.PLATFORM_REVIEW,
+			state,
+			action:
+				state === OnboardingTaskState.COMPLETED
+					? OnboardingAction.NONE
+					: OnboardingAction.SUBMIT_CERTIFICATION,
+		},
+	]);
+}
+
 describe("兩區狀態頁（D15）", () => {
 	it("審核中：平台審核區顯示目錄的徽章與送出時間，可以取消；收款帳戶區是灰色的", async () => {
 		kycStore.set(
@@ -925,6 +954,7 @@ describe("兩區狀態頁（D15）", () => {
 				submitTime: timestampFromMs(Date.UTC(2026, 10, 3, 6, 20)),
 			}),
 		);
+		summary(OnboardingTaskState.IN_PROGRESS);
 		await mount();
 		expect(screen.getByText("審核中")).toBeTruthy();
 		expect(screen.getByText(/送出時間：2026\/11\/03 14:20/)).toBeTruthy();
@@ -941,11 +971,51 @@ describe("兩區狀態頁（D15）", () => {
 				decideTime: timestampFromMs(Date.UTC(2026, 10, 3, 6, 20)),
 			}),
 		);
+		summary(OnboardingTaskState.COMPLETED);
 		await mount();
 		expect(screen.getByText("已通過")).toBeTruthy();
 		expect(screen.getByText(/核准時間：2026\/11\/03 14:20/)).toBeTruthy();
 		expect(screen.queryByText("取消申請")).toBeNull();
 		expect(screen.getByTestId("payment-section").dataset.approved).toBe("true");
+	});
+
+	it("收款帳戶區是否開放只看摘要：申請已核准而摘要說平台審核還沒完成，區塊仍是灰的", async () => {
+		kycStore.set(app({ status: KYCStatus.KYC_STATUS_APPROVED }));
+		summary(OnboardingTaskState.ACTION_REQUIRED);
+		await mount();
+		expect(screen.getByTestId("payment-section").dataset.approved).toBe(
+			"false",
+		);
+	});
+
+	it("收款帳戶區是否開放只看摘要：申請還在審核而摘要說平台審核已完成，區塊開放", async () => {
+		kycStore.set(app({ status: KYCStatus.KYC_STATUS_SUBMITTED }));
+		summary(OnboardingTaskState.COMPLETED);
+		await mount();
+		expect(screen.getByTestId("payment-section").dataset.approved).toBe("true");
+	});
+
+	it("摘要沒讀到或平台審核是 UNKNOWN：不當成已完成", async () => {
+		kycStore.set(app({ status: KYCStatus.KYC_STATUS_APPROVED }));
+		summary(OnboardingTaskState.UNKNOWN);
+		const view = await mount();
+		expect(screen.getByTestId("payment-section").dataset.approved).toBe(
+			"false",
+		);
+		view.unmount();
+		mocks.onboarding = null;
+		await mount();
+		expect(screen.getByTestId("payment-section").dataset.approved).toBe(
+			"false",
+		);
+	});
+
+	it("摘要還在載入：等它，不先畫出灰色的收款帳戶區", async () => {
+		kycStore.set(app({ status: KYCStatus.KYC_STATUS_APPROVED }));
+		mocks.onboardingLoading = true;
+		await mount();
+		expect(screen.queryByTestId("payment-section")).toBeNull();
+		expect(screen.getByText("載入中…")).toBeTruthy();
 	});
 
 	it("取消申請：確認之後呼叫 CancelKYC，回到選型態", async () => {

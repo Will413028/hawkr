@@ -1,15 +1,15 @@
 /**
  * 收款帳戶開通的流程（純邏輯，元件只負責接線）。
  *
- * - HOSTED：呼叫 `CreatePaymentOnboardingSession`，整頁導到金流商的連結；回到 `?payment=return` 時重讀帳戶並輪詢幾次
- *   （狀態由金流商的事件非同步同步，剛回來時可能還是舊的）；回到 `?payment=refresh`（連結過期）時重新取得連結再導。
+ * - HOSTED：呼叫 `CreatePaymentOnboardingSession`，整頁導到金流商的連結；回到 `?payment=return` 時先呼叫
+ *   `RefreshMyPaymentAccount`（伺服器同步向金流商重讀，D33）再讀帳戶與開通摘要，不輪詢；`resource_exhausted`
+ *   帶 RetryInfo 由 transport 的 retryInterceptor 重試；回到 `?payment=refresh`（連結過期）時重新取得連結再導。
  * - EMBEDDED：不在這裡建立 session；內嵌元件自己呼叫 `fetchClientSecret`（每次都是新的 session）。
  */
 
 import {
 	OnboardingSurface,
 	type PaymentAccount,
-	PaymentAccountStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { OnboardingSession } from "./payment-account";
 
@@ -77,42 +77,19 @@ export async function embeddedClientSecret(
 	return session.clientSecret;
 }
 
-/** 回到網頁之後狀態已經離開「待設定」與「準備中」：不必再等同步。 */
-export function paymentStatusSettled(account: PaymentAccount | null): boolean {
-	switch (account?.status) {
-		case PaymentAccountStatus.UNDER_REVIEW:
-		case PaymentAccountStatus.ENABLED:
-		case PaymentAccountStatus.DISABLED:
-			return true;
-		default:
-			return false;
-	}
-}
-
-export const CONFIRM_ATTEMPTS = 5;
-export const CONFIRM_INTERVAL_MS = 3_000;
-
 interface ConfirmDeps {
-	/** 重讀帳戶並把結果交給畫面（寫進快取）。 */
+	/** 呼叫 `RefreshMyPaymentAccount`：伺服器同步重讀帳戶；失敗丟錯，不讀。 */
+	refreshAccount: () => Promise<void>;
+	/** 重讀帳戶與開通摘要並把結果交給畫面（寫進快取）。 */
 	readAccount: () => Promise<PaymentAccount | null>;
-	sleep: (ms: number) => Promise<void>;
-	attempts?: number;
-	intervalMs?: number;
 }
 
-/** 回到網頁後重讀帳戶，最多 `attempts` 次，狀態離開「待設定」就停；回傳最後讀到的帳戶。 */
+/** 回到網頁後先重讀（一次）再讀；回傳讀到的帳戶。 */
 export async function confirmPaymentReturn(
 	deps: ConfirmDeps,
 ): Promise<PaymentAccount | null> {
-	const attempts = deps.attempts ?? CONFIRM_ATTEMPTS;
-	const interval = deps.intervalMs ?? CONFIRM_INTERVAL_MS;
-	let last: PaymentAccount | null = null;
-	for (let i = 0; i < attempts; i++) {
-		if (i > 0) await deps.sleep(interval);
-		last = await deps.readAccount();
-		if (paymentStatusSettled(last)) break;
-	}
-	return last;
+	await deps.refreshAccount();
+	return deps.readAccount();
 }
 
 export type ParamOutcome =
@@ -121,7 +98,7 @@ export type ParamOutcome =
 	| { kind: "embedded" };
 
 /**
- * 網址上的 `?payment=`：`return` 重讀帳戶，`refresh` 重新開始開通（連結過期，HOSTED 取得新連結）。
+ * 網址上的 `?payment=`：`return` 先重讀再讀帳戶，`refresh` 重新開始開通（連結過期，HOSTED 取得新連結）。
  * `refresh` 需要伺服器告知的介面；沒有介面（帳戶還沒讀到或沒有設定）丟錯。
  */
 export async function handlePaymentParam(

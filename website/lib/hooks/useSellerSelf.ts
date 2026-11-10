@@ -1,15 +1,21 @@
 "use client";
 
 import type {
+	GetMyOnboardingResponse,
 	KYCApplication,
 	KYCFlow,
 	PaymentAccount,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import * as React from "react";
 import { accountQueryPending } from "@/lib/auth/account-query";
 import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import { fetchMyKyc } from "@/lib/seller/kyc";
+import {
+	fetchMyOnboarding,
+	refreshMyPaymentAccount,
+} from "@/lib/seller/onboarding-summary";
 import { fetchMyPaymentAccount } from "@/lib/seller/payment-account";
 import { isStoreMissing, type MyStore } from "@/lib/seller/store";
 import { useSellerDataScope } from "@/lib/seller-data/scope";
@@ -63,7 +69,7 @@ export function useSellerSelf(): UseSellerSelfResult {
 }
 
 /**
- * Returns a callback that invalidates the store and KYC-flow queries so all
+ * Returns a callback that invalidates the store, KYC-flow and onboarding-summary queries so all
  * consumers refetch — call it after a profile / cert / logo / cover mutation.
  */
 export function useInvalidateSellerSelf(): () => Promise<void> {
@@ -173,4 +179,56 @@ export function useMyPaymentAccount(options?: {
 		error: query.error,
 		refetch: query.refetch,
 	};
+}
+
+interface UseMyOnboardingResult {
+	/** 開通任務摘要；還沒讀到或讀取失敗是 null。 */
+	onboarding: GetMyOnboardingResponse | null;
+	loading: boolean;
+	error: Error | null;
+	refetch: () => Promise<unknown>;
+}
+
+/**
+ * 開通任務摘要（`GetMyOnboarding`）：必要任務的狀態、下一步與句子都是伺服器的答案。停權與等待刪除的店家照樣
+ * 讀得到；代行工作區沒有這個資料來源，不發查詢。
+ */
+export function useMyOnboarding(options?: {
+	enabled?: boolean;
+}): UseMyOnboardingResult {
+	const { hasSeller } = useAuth();
+	const scope = useSellerDataScope();
+	const identity = useQueryIdentity();
+	const query = useQuery({
+		queryKey: queryKeys.seller.onboarding(identity),
+		queryFn: () => fetchMyOnboarding(),
+		enabled: scope.mode === "seller" && hasSeller && (options?.enabled ?? true),
+		staleTime: 30_000,
+		refetchOnWindowFocus: true,
+	});
+	return {
+		onboarding: query.data ?? null,
+		loading: query.isLoading,
+		error: query.error,
+		refetch: query.refetch,
+	};
+}
+
+/**
+ * 同步重讀收款帳戶（`RefreshMyPaymentAccount`），成功後重新讀開通摘要與收款帳戶。重讀失敗丟錯（不讀）。
+ */
+export function useRefreshPaymentAccount(): () => Promise<void> {
+	const queryClient = useQueryClient();
+	const identity = useQueryIdentity();
+	return React.useCallback(async () => {
+		await refreshMyPaymentAccount();
+		await Promise.all([
+			queryClient.invalidateQueries({
+				queryKey: queryKeys.seller.onboarding(identity),
+			}),
+			queryClient.invalidateQueries({
+				queryKey: queryKeys.seller.paymentAccount(identity),
+			}),
+		]);
+	}, [queryClient, identity]);
 }
