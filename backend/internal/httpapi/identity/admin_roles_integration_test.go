@@ -77,8 +77,8 @@ func TestAdminWithoutRolesIsDeniedEverywhereExceptTheExemptions(t *testing.T) {
 		"/hawkr.admin.identity.v1alpha1.IdentityAdminService/SignOut":    true,
 	}
 	procedures := adminauth.Procedures()
-	if len(procedures) != 83 {
-		t.Fatalf("admin 方法 %d 支，預期 83", len(procedures))
+	if len(procedures) != 84 {
+		t.Fatalf("admin 方法 %d 支，預期 84", len(procedures))
 	}
 	for _, procedure := range procedures {
 		status, code := f.post(t, procedure, tok)
