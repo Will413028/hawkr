@@ -15,8 +15,9 @@ import (
 
 // Sync 是同步 job 的內容：在 transaction 外重讀外部帳戶，在 transaction 內整列覆寫快取、發布 PayoutAccountChanged（seller 的同 transaction 訂閱者
 // 更新開通閘門的副本、把 fingerprint 寫成防詐 hash、閘門的輸入有變時重新公告；全域鎖順序 payment 先於 seller），並經 platform inbox 把這個外部帳戶在
-// 讀取開始前收到的事件整批標為已處理（D29：收款事件只是「重讀帳戶」的訊號，handler 不標記，由涵蓋它的同步標記）。沒有帳戶列、還沒有外部 ID 的
-// 什麼都不做。again 為 true 表示讀取期間又收到事件（唯一鍵排除了新 job）：呼叫方稍後再跑一輪。重讀失敗回傳錯誤，由 River 重試；外部帳戶不存在是
+// 讀取開始前收到的事件整批標為已處理（D29：收款事件只是「重讀帳戶」的訊號，handler 不標記，由涵蓋它的同步標記）。同步可能和別的同步並行（job 與
+// seller 的同步重讀）：寫入只在這次的讀取開始時間不早於已存的 fetched_at 時進行（D32），被擋下的這次整個什麼都不做（不寫、不標記、不發布，again 為
+// false：較晚開始的那次涵蓋了在這次開始之前收到的事件）。沒有帳戶列、還沒有外部 ID 的什麼都不做。again 為 true 表示讀取期間又收到事件（唯一鍵排除了新 job）：呼叫方稍後再跑一輪。重讀失敗回傳錯誤，由 River 重試；外部帳戶不存在是
 // 永久失敗（ErrPermanent），回傳給 job 取消。
 func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err error) {
 	p := s.d.Provider
@@ -72,7 +73,10 @@ func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err erro
 		if _, err := q.ApplyPaymentSnapshot(ctx, store.ApplyPaymentSnapshotParams{
 			StoreID: storeID, Status: string(status), TransfersActive: enabled, PayoutsActive: snap.PayoutsActive && enabled,
 			Requirements: raw, StatusReason: reason, FetchedAt: &startedAt, Now: now,
-		}); err != nil {
+		}); errors.Is(err, pgx.ErrNoRows) {
+			// 較晚開始的讀取已經寫入：這次的快照較舊，不寫、不發布、不標記；涵蓋的事件與 again 都由那一次處理。
+			return nil
+		} else if err != nil {
 			return err
 		}
 		err = events.Publish(ctx, s.d.Events, model.PayoutAccountChanged{

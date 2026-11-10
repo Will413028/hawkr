@@ -815,3 +815,90 @@ func TestForgottenOwnersEventsArePurgedAfterRetention(t *testing.T) {
 		t.Fatalf("過了保存期仍留著 %d 列", n)
 	}
 }
+
+// 同步可以與別的同步並行（job 與 seller 的同步重讀，D32）：較晚開始的讀取先寫入之後，較早開始的那次讀到的是較舊的快照，不能覆蓋它，
+// 也不能再發布 PayoutAccountChanged。讀取開始時間由注入的時鐘決定，交錯由 OnFetch 排好，沒有 sleep。
+// mutation：ApplyPaymentSnapshot 拿掉 fetched_at 條件 → 較舊的快照覆蓋 ENABLED、再發一次 PayoutAccountChanged，失敗。
+func TestAnOlderReadNeverOverwritesANewerCommittedRead(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	external := f.ensure(t, s)
+	f.fake.Set(external, needsSellerSnapshot)
+	f.receive(t, "evt_before_both_reads", external)
+	f.now = f.now.Add(time.Second)
+	older, newer := f.now, f.now.Add(time.Minute)
+	f.fake.OnFetch = func() {
+		f.now = newer
+		f.fake.Set(external, enabledSnapshot)
+		again, err := f.module.SyncAccount(ctx, s)
+		must(t, err)
+		if again {
+			t.Error("較晚開始的讀取沒有事件卻要求再跑一輪")
+		}
+		f.fake.Set(external, needsSellerSnapshot)
+	}
+	again, err := f.module.SyncAccount(ctx, s)
+	must(t, err)
+	if again {
+		t.Fatal("被擋下的讀取要求再跑一輪")
+	}
+	got := f.account(t, s)
+	if got.Status != StatusEnabled || !got.TransfersActive || got.FetchedAt == nil || !got.FetchedAt.Equal(newer) {
+		t.Fatalf("較舊的快照覆蓋了較新的：status=%s transfers=%v fetched=%v，要 ENABLED 與 %v", got.Status, got.TransfersActive, got.FetchedAt, newer)
+	}
+	if len(f.changes) != 1 || !f.changes[0].TransfersActive {
+		t.Fatalf("PayoutAccountChanged 共 %d 次：%+v，要只有較晚開始的那一次", len(f.changes), f.changes)
+	}
+	if !f.processed(t, "evt_before_both_reads") {
+		t.Fatal("較晚開始的讀取沒有標記讀取之前收到的事件")
+	}
+	if older.After(newer) || older.Equal(newer) {
+		t.Fatal("測試的兩個讀取開始時間沒有先後")
+	}
+}
+
+// 被擋下的同步（讀取開始時間早於已存的 fetched_at）整個什麼都不做：不寫快取、不發布 PayoutAccountChanged、不把它之前收到的事件標為已處理；
+// 讀取開始時間等於 fetched_at 時照常寫入（「不早於」）。fetched_at 是 NULL（還沒同步過）一律寫入由 set 的第一次同步涵蓋。
+// mutation 1：被擋下之後仍呼叫 MarkRouteProcessed → 事件被標為已處理，失敗。
+// mutation 2：被擋下之後仍發布 PayoutAccountChanged → 多一次事件，失敗。
+// mutation 3：條件改成 fetched_at < 讀取開始時間 → 相等時不寫，失敗。
+func TestARejectedSyncDoesNotMarkEventsOrPublish(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	external := f.ensure(t, s)
+	f.set(t, s, enabledSnapshot)
+	stored := *f.account(t, s).FetchedAt
+	published := len(f.changes)
+
+	f.now = stored.Add(-time.Minute)
+	f.receive(t, "evt_older_read", external)
+	f.now = stored.Add(-time.Second)
+	f.fake.Set(external, needsSellerSnapshot)
+	again, err := f.module.SyncAccount(ctx, s)
+	must(t, err)
+	if again {
+		t.Fatal("被擋下的同步要求再跑一輪")
+	}
+	got := f.account(t, s)
+	if got.Status != StatusEnabled || got.FetchedAt == nil || !got.FetchedAt.Equal(stored) {
+		t.Fatalf("被擋下的同步改了快取：status=%s fetched=%v", got.Status, got.FetchedAt)
+	}
+	if len(f.changes) != published {
+		t.Fatalf("被擋下的同步發布了 PayoutAccountChanged：%d → %d", published, len(f.changes))
+	}
+	if f.processed(t, "evt_older_read") {
+		t.Fatal("被擋下的同步把事件標為已處理")
+	}
+
+	f.now = stored
+	_, err = f.module.SyncAccount(ctx, s)
+	must(t, err)
+	got = f.account(t, s)
+	if got.Status != StatusActionRequired || len(f.changes) != published+1 || !f.processed(t, "evt_older_read") {
+		t.Fatalf("讀取開始時間等於 fetched_at 時沒有寫入：status=%s changes=%d processed=%v", got.Status, len(f.changes), f.processed(t, "evt_older_read"))
+	}
+}

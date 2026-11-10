@@ -48,7 +48,8 @@ SET create_failed_at = NULL,
 WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NULL AND create_failed_at IS NOT NULL;
 
 -- name: ApplyPaymentSnapshot :one
--- 同步 job 重讀外部帳戶之後整列覆寫快取（沒有事件時間排序，重讀即最新）；沒有外部 ID 的列不寫。
+-- 同步重讀外部帳戶之後整列覆寫快取；沒有外部 ID 的列不寫。讀取開始時間早於已存的 fetched_at 的不寫（較晚開始的讀取已經先寫入，較早開始的不能蓋掉
+-- 較新的快取，D32）：沒有回傳列時呼叫方不標記 inbox 事件、不發布 PayoutAccountChanged。fetched_at 是 NULL（還沒有同步過）一律寫。
 UPDATE payment.accounts
 SET status = sqlc.arg(status),
     transfers_active = sqlc.arg(transfers_active),
@@ -58,6 +59,7 @@ SET status = sqlc.arg(status),
     fetched_at = sqlc.arg(fetched_at),
     updated_at = sqlc.arg(now)
 WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NOT NULL
+  AND (fetched_at IS NULL OR fetched_at <= sqlc.arg(fetched_at))
 RETURNING *;
 
 -- name: PollablePaymentAccountStoreIDs :many

@@ -230,7 +230,9 @@ func (m *Module) EnsureAccount(ctx context.Context, storeID int64, finalAttempt 
 	return m.accounts.Ensure(ctx, storeID, finalAttempt)
 }
 
-// SyncAccount 是同步 job（payment.account_sync）的內容，給 worker 與測試呼叫；again 為 true 表示讀取期間又收到事件。
+// SyncAccount 重讀外部帳戶並寫入快取：同步 job（payment.account_sync）的內容，也給 seller 的 GetMyOnboarding 在 refresh 時同步呼叫；可以與 job 並行，
+// 較早開始的讀取不覆蓋較晚開始的（D32）。again 為 true 表示讀取期間又收到事件（job 會稍後再跑一輪；同步呼叫方可以忽略，快取最遲在 job 之後更新）。
+// 外部呼叫在 transaction 外，呼叫方不能在 transaction 內呼叫。
 func (m *Module) SyncAccount(ctx context.Context, storeID int64) (again bool, err error) {
 	return m.accounts.Sync(ctx, storeID)
 }

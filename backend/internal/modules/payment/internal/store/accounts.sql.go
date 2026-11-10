@@ -20,6 +20,7 @@ SET status = $1,
     fetched_at = $6,
     updated_at = $7
 WHERE store_id = $8 AND external_account_id IS NOT NULL
+  AND (fetched_at IS NULL OR fetched_at <= $6)
 RETURNING store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
 `
 
@@ -34,7 +35,8 @@ type ApplyPaymentSnapshotParams struct {
 	StoreID         int64
 }
 
-// 同步 job 重讀外部帳戶之後整列覆寫快取（沒有事件時間排序，重讀即最新）；沒有外部 ID 的列不寫。
+// 同步重讀外部帳戶之後整列覆寫快取；沒有外部 ID 的列不寫。讀取開始時間早於已存的 fetched_at 的不寫（較晚開始的讀取已經先寫入，較早開始的不能蓋掉
+// 較新的快取，D32）：沒有回傳列時呼叫方不標記 inbox 事件、不發布 PayoutAccountChanged。fetched_at 是 NULL（還沒有同步過）一律寫。
 func (q *Queries) ApplyPaymentSnapshot(ctx context.Context, arg ApplyPaymentSnapshotParams) (PaymentAccount, error) {
 	row := q.db.QueryRow(ctx, applyPaymentSnapshot,
 		arg.Status,
