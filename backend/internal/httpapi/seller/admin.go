@@ -2,6 +2,7 @@ package seller
 
 import (
 	"context"
+	"log/slog"
 	"strconv"
 	"uuid"
 
@@ -40,15 +41,21 @@ type AdminModule interface {
 
 // Admin 是 SellerAdminService 的 handler。授權（只有管理員）由 rpc 的 interceptor 依 service 名稱檢查。
 type Admin struct {
-	m      AdminModule
-	images rpc.Images
+	m        AdminModule
+	images   rpc.Images
+	payments PaymentReader
+	log      *slog.Logger
 }
 
 var _ sellerv1alpha1connect.SellerAdminServiceHandler = (*Admin)(nil)
 
 // NewAdmin 建立後台的 handler。措施此刻的狀態由模組算好（Measure.State），handler 沒有時鐘。
-func NewAdmin(m AdminModule, images rpc.Images) *Admin {
-	return &Admin{m: m, images: images}
+// payments 是開通任務讀收款帳戶的來源（GetStoreOnboarding），log 記錄讀不到的來源（nil 時不記錄）。
+func NewAdmin(m AdminModule, images rpc.Images, payments PaymentReader, log *slog.Logger) *Admin {
+	if log == nil {
+		log = slog.New(slog.DiscardHandler)
+	}
+	return &Admin{m: m, images: images, payments: payments, log: log}
 }
 
 // 模組輸入的欄位對應到請求的路徑。

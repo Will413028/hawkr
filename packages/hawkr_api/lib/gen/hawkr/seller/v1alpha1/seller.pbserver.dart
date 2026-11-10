@@ -27,6 +27,8 @@ abstract class SellerAppServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $10.GetMyStoreOpeningRequest request);
   $async.Future<$10.GetMyStoreResponse> getMyStore(
       $pb.ServerContext ctx, $10.GetMyStoreRequest request);
+  $async.Future<$10.GetMyOnboardingResponse> getMyOnboarding(
+      $pb.ServerContext ctx, $10.GetMyOnboardingRequest request);
   $async.Future<$10.UpdateMyStoreResponse> updateMyStore(
       $pb.ServerContext ctx, $10.UpdateMyStoreRequest request);
   $async.Future<$10.CompleteMyStoreOnboardingResponse>
@@ -71,6 +73,8 @@ abstract class SellerAppServiceBase extends $pb.GeneratedService {
         return $10.GetMyStoreOpeningRequest();
       case 'GetMyStore':
         return $10.GetMyStoreRequest();
+      case 'GetMyOnboarding':
+        return $10.GetMyOnboardingRequest();
       case 'UpdateMyStore':
         return $10.UpdateMyStoreRequest();
       case 'CompleteMyStoreOnboarding':
@@ -117,6 +121,8 @@ abstract class SellerAppServiceBase extends $pb.GeneratedService {
         return getMyStoreOpening(ctx, request as $10.GetMyStoreOpeningRequest);
       case 'GetMyStore':
         return getMyStore(ctx, request as $10.GetMyStoreRequest);
+      case 'GetMyOnboarding':
+        return getMyOnboarding(ctx, request as $10.GetMyOnboardingRequest);
       case 'UpdateMyStore':
         return updateMyStore(ctx, request as $10.UpdateMyStoreRequest);
       case 'CompleteMyStoreOnboarding':

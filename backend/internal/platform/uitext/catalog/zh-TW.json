@@ -700,6 +700,26 @@
       "message": "預定生效",
       "description": "已建立、還沒到開始時間（period.start_time 在未來）；目前只有預告終止（TerminationGround.NOTICE）。此時帳號不受限制。\n預告期內店家關閉，措施直接變 ENDED，不會變 ACTIVE。"
     },
+    "seller.OnboardingAction.button.ONBOARDING_ACTION_CONTACT_SUPPORT": {
+      "message": "聯絡客服",
+      "description": "開通任務的按鈕文字，只由下一步（OnboardingAction）決定；沒有下一步（NONE）沒有按鈕。（值 ONBOARDING_ACTION_CONTACT_SUPPORT）"
+    },
+    "seller.OnboardingAction.button.ONBOARDING_ACTION_EDIT_PROFILE": {
+      "message": "去設定",
+      "description": "開通任務的按鈕文字，只由下一步（OnboardingAction）決定；沒有下一步（NONE）沒有按鈕。（值 ONBOARDING_ACTION_EDIT_PROFILE）"
+    },
+    "seller.OnboardingAction.button.ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT": {
+      "message": "重新整理",
+      "description": "開通任務的按鈕文字，只由下一步（OnboardingAction）決定；沒有下一步（NONE）沒有按鈕。（值 ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT）"
+    },
+    "seller.OnboardingAction.button.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING": {
+      "message": "前往設定收款帳戶",
+      "description": "開通任務的按鈕文字，只由下一步（OnboardingAction）決定；沒有下一步（NONE）沒有按鈕。（值 ONBOARDING_ACTION_START_PAYMENT_ONBOARDING）"
+    },
+    "seller.OnboardingAction.button.ONBOARDING_ACTION_SUBMIT_CERTIFICATION": {
+      "message": "前往商家認證",
+      "description": "開通任務的按鈕文字，只由下一步（OnboardingAction）決定；沒有下一步（NONE）沒有按鈕。（值 ONBOARDING_ACTION_SUBMIT_CERTIFICATION）"
+    },
     "seller.PayUniState.PAY_UNI_STATE_APPROVED": {
       "message": "PayUni 收款已啟用",
       "description": "可以收款。"
@@ -1148,6 +1168,14 @@
         "staff": []
       },
       "description": "請求的種類與狀態合成的狀態標籤。"
+    },
+    "seller.OnboardingAction.button": {
+      "omit": {
+        "default": [
+          "ONBOARDING_ACTION_NONE"
+        ]
+      },
+      "description": "開通任務的按鈕文字，只由下一步（OnboardingAction）決定；沒有下一步（NONE）沒有按鈕。"
     },
     "seller.PaymentAccountStatus.action": {
       "omit": {

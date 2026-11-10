@@ -67,6 +67,7 @@ var declarations = map[string]declaration{
 	sellerv1alpha1connect.SellerAdminServiceListStoresProcedure:              requires(adminperm.SellerStoresList),
 	sellerv1alpha1connect.SellerAdminServiceGetStoreStatsProcedure:           requires(adminperm.SellerStoreStatsGet),
 	sellerv1alpha1connect.SellerAdminServiceGetStoreProcedure:                requires(adminperm.SellerStoresGet),
+	sellerv1alpha1connect.SellerAdminServiceGetStoreOnboardingProcedure:      requires(adminperm.SellerStoreOnboardingGet),
 	sellerv1alpha1connect.SellerAdminServiceListKYCApplicationsProcedure:     requires(adminperm.SellerKYCApplicationsList),
 	sellerv1alpha1connect.SellerAdminServiceGetKYCApplicationProcedure:       requires(adminperm.SellerKYCApplicationsGet),
 	sellerv1alpha1connect.SellerAdminServiceListKYCRevealsProcedure:          requires(adminperm.SellerKYCRevealsList),

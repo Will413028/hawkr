@@ -331,7 +331,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	if err != nil {
 		return nil, err
 	}
-	add(adminsellerconnect.NewSellerAdminServiceHandler(httpseller.NewAdmin(deps.Seller, deps.Images), opts...))
+	add(adminsellerconnect.NewSellerAdminServiceHandler(httpseller.NewAdmin(deps.Seller, deps.Images, deps.Payment, deps.Logger), opts...))
 	add(sellerconnect.NewSellerPublicServiceHandler(sellerPublic, opts...))
 	add(sellerconnect.NewSellerAppServiceHandler(sellerApp, append(slices.Clone(opts), connect.WithInterceptors(acting))...))
 	add(adminsellerconnect.NewSellerGovernanceAdminServiceHandler(httpseller.NewGovernance(deps.Seller, deps.Images), opts...))

@@ -34,7 +34,7 @@ func adminCtx(id int64) context.Context {
 	return rpc.WithPrincipal(context.Background(), identity.Principal{Kind: identity.PrincipalAdmin, ID: id})
 }
 
-func newTestAdmin(m AdminModule) *Admin { return NewAdmin(m, rpc.Images{}) }
+func newTestAdmin(m AdminModule) *Admin { return NewAdmin(m, rpc.Images{}, nil, nil) }
 
 // wantInvalidArgument 確認請求被當成 client 的錯拒絕：handler 回的是模組的 invalid_input，或傳輸層的 invalid_argument（interceptor
 // 之後都是 invalid_argument）；沒帶或讀不懂的 etag 是 etag 的規則（API 設計規範（Connect）§七），傳輸層以 version_conflict 回。

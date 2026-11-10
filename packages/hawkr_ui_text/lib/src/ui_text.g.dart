@@ -336,6 +336,27 @@ extension SellerMeasureStateUiText on hawkr_seller_v1alpha1_seller.MeasureState 
   String? uiText(UiLocale l, {required hawkr_seller_v1alpha1_seller.MeasureKind kind}) => _sellerMeasureState(l, value, kind);
 }
 
+String? _sellerOnboardingActionButton(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 2) => '去設定',
+(UiLocale.en, 2) => 'Go to settings',
+(UiLocale.zhTW, 3) => '前往商家認證',
+(UiLocale.en, 3) => 'Go to seller verification',
+(UiLocale.zhTW, 4) => '前往設定收款帳戶',
+(UiLocale.en, 4) => 'Go to payout account setup',
+(UiLocale.zhTW, 5) => '重新整理',
+(UiLocale.en, 5) => 'Refresh',
+(UiLocale.zhTW, 6) => '聯絡客服',
+(UiLocale.en, 6) => 'Contact support',
+_ => null,
+};
+}
+
+extension SellerOnboardingActionUiText on hawkr_seller_v1alpha1_seller.OnboardingAction {
+  /// seller.OnboardingAction.button；沒有文字的值回 null。
+  String? button(UiLocale l) => _sellerOnboardingActionButton(l, value);
+}
+
 String? _sellerPayUniState(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => 'PayUni 審核中',

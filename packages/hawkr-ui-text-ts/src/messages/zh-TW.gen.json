@@ -201,6 +201,15 @@
       "MEASURE_STATE_REVOKED": "已撤銷",
       "MEASURE_STATE_SCHEDULED": "預定生效"
     },
+    "OnboardingAction": {
+      "button": {
+        "ONBOARDING_ACTION_CONTACT_SUPPORT": "聯絡客服",
+        "ONBOARDING_ACTION_EDIT_PROFILE": "去設定",
+        "ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT": "重新整理",
+        "ONBOARDING_ACTION_START_PAYMENT_ONBOARDING": "前往設定收款帳戶",
+        "ONBOARDING_ACTION_SUBMIT_CERTIFICATION": "前往商家認證"
+      }
+    },
     "PayUniState": {
       "PAY_UNI_STATE_APPROVED": "PayUni 收款已啟用",
       "PAY_UNI_STATE_CONTACT_SUPPORT": "PayUni 申請未通過",

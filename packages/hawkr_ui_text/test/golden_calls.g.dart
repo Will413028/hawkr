@@ -83,6 +83,13 @@ const _enumNumber = <String, int>{
 	'MEASURE_STATE_REVOKED': 4,
 	'MEASURE_STATE_SCHEDULED': 5,
 	'MEASURE_STATE_UNSPECIFIED': 0,
+	'ONBOARDING_ACTION_CONTACT_SUPPORT': 6,
+	'ONBOARDING_ACTION_EDIT_PROFILE': 2,
+	'ONBOARDING_ACTION_NONE': 1,
+	'ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT': 5,
+	'ONBOARDING_ACTION_START_PAYMENT_ONBOARDING': 4,
+	'ONBOARDING_ACTION_SUBMIT_CERTIFICATION': 3,
+	'ONBOARDING_ACTION_UNSPECIFIED': 0,
 	'PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED': 3,
 	'PAYMENT_ACCOUNT_STATUS_DISABLED': 5,
 	'PAYMENT_ACCOUNT_STATUS_ENABLED': 4,
@@ -270,6 +277,8 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_seller_v1alpha1_seller.MeasureRequestState.valueOf(_n(value))!.withKind(l, kind: hawkr_seller_v1alpha1_seller.MeasureRequestKind.valueOf(_n(params['kind']))!);
     case 'seller.MeasureState':
       return hawkr_seller_v1alpha1_seller.MeasureState.valueOf(_n(value))!.uiText(l, kind: hawkr_seller_v1alpha1_seller.MeasureKind.valueOf(_n(params['kind']))!);
+    case 'seller.OnboardingAction.button':
+      return hawkr_seller_v1alpha1_seller.OnboardingAction.valueOf(_n(value))!.button(l);
     case 'seller.PayUniState':
       return hawkr_seller_v1alpha1_seller.PayUniState.valueOf(_n(value))!.uiText(l);
     case 'seller.PaymentAccount.payouts_inactive_note':

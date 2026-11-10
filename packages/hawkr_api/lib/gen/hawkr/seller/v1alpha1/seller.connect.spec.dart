@@ -47,6 +47,20 @@ abstract final class SellerAppService {
     idempotency: connect.Idempotency.noSideEffects,
   );
 
+  /// GetMyOnboarding 回傳呼叫者店家的開通任務：依序的必要任務（商店資料、平台審核、收款帳戶，以及公開條件還缺其他項目時的「其他公開條件」），
+  /// 與開通閘門 complete。任務的狀態、下一步與文字都由伺服器推導（client 只呈現，不組合 GetMyKYC、GetMyPaymentAccount、GetMyStore 推導）。
+  /// 平台審核與收款帳戶各自讀取自己的來源：單一來源讀不到只讓該項是 UNKNOWN，方法本身不因此失敗。refresh 為 true 時先同步向金流商重讀收款帳戶
+  /// 再回傳（賣家從金流商的頁面回來時用）；同步失敗只記錄、不讓方法失敗，這時以快取的狀態回傳。refresh 可能寫入收款帳戶的快取，所以不是
+  /// NO_SIDE_EFFECTS（IDEMPOTENT，以 POST 呼叫，仍可自動重送），也像其他會改變狀態的方法一樣，停權的帳號呼叫時回 permission_denied
+  /// （ACCOUNT_SUSPENDED）：client 以 GetMyStore 的停權狀態導向公告頁，不靠這個方法。需要賣家能力 CAP_ACCOUNT_SELF_READ，所以已關閉的店家回 not_found。
+  static const getMyOnboarding = connect.Spec(
+    '/$name/GetMyOnboarding',
+    connect.StreamType.unary,
+    hawkrsellerv1alpha1seller.GetMyOnboardingRequest.new,
+    hawkrsellerv1alpha1seller.GetMyOnboardingResponse.new,
+    idempotency: connect.Idempotency.idempotent,
+  );
+
   /// UpdateMyStore 修改店家資料的欄位（update_mask），含 logo 與封面（logo_staged_token、
   /// cover_staged_token）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
   /// 不寫入，etag 不變。

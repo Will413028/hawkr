@@ -736,6 +736,38 @@ func (t Text) SellerMeasureState(v string, kind string) (string, bool) {
 	return "", false
 }
 
+// SellerOnboardingActionButton 是 seller.OnboardingAction.button 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerOnboardingActionButton(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "EDIT_PROFILE":
+			return "Go to settings", true
+		case "SUBMIT_CERTIFICATION":
+			return "Go to seller verification", true
+		case "START_PAYMENT_ONBOARDING":
+			return "Go to payout account setup", true
+		case "REFRESH_PAYMENT_ACCOUNT":
+			return "Refresh", true
+		case "CONTACT_SUPPORT":
+			return "Contact support", true
+		}
+	}
+	switch v {
+	case "EDIT_PROFILE":
+		return "去設定", true
+	case "SUBMIT_CERTIFICATION":
+		return "前往商家認證", true
+	case "START_PAYMENT_ONBOARDING":
+		return "前往設定收款帳戶", true
+	case "REFRESH_PAYMENT_ACCOUNT":
+		return "重新整理", true
+	case "CONTACT_SUPPORT":
+		return "聯絡客服", true
+	}
+	return "", false
+}
+
 // SellerPayUniState 是 seller.PayUniState 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerPayUniState(v string) (string, bool) {

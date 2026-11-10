@@ -3,7 +3,7 @@ import { Code } from "@connectrpc/connect";
 import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
-import type { ContentKind, KYCField, KYCFlowStatus, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, PayUniState, PaymentAccountStatus, RequirementCollection, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import type { ContentKind, KYCField, KYCFlowStatus, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, PayUniState, PaymentAccountStatus, RequirementCollection, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { UiMessage } from "./message";
 
 export type { DefaultErrorText, UiMessage } from "./message";
@@ -159,6 +159,11 @@ export type UiTextKey =
 	| "seller.MeasureState.MEASURE_STATE_ISSUED"
 	| "seller.MeasureState.MEASURE_STATE_REVOKED"
 	| "seller.MeasureState.MEASURE_STATE_SCHEDULED"
+	| "seller.OnboardingAction.button.ONBOARDING_ACTION_CONTACT_SUPPORT"
+	| "seller.OnboardingAction.button.ONBOARDING_ACTION_EDIT_PROFILE"
+	| "seller.OnboardingAction.button.ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT"
+	| "seller.OnboardingAction.button.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING"
+	| "seller.OnboardingAction.button.ONBOARDING_ACTION_SUBMIT_CERTIFICATION"
 	| "seller.PayUniState.PAY_UNI_STATE_APPROVED"
 	| "seller.PayUniState.PAY_UNI_STATE_CONTACT_SUPPORT"
 	| "seller.PayUniState.PAY_UNI_STATE_FIXABLE"
@@ -669,6 +674,21 @@ export function sellerMeasureState(v: MeasureState, a: { kind: MeasureKind }): U
 	const key = SELLER_MEASURE_STATE[v];
 	if (key === undefined) return undefined;
 	return { key, values: { kind: SELLER_MEASURE_KIND_NAME[a.kind] ?? "" } };
+}
+
+const SELLER_ONBOARDING_ACTION_BUTTON: Readonly<Partial<Record<number, UiTextKey>>> = {
+	2: "seller.OnboardingAction.button.ONBOARDING_ACTION_EDIT_PROFILE",
+	3: "seller.OnboardingAction.button.ONBOARDING_ACTION_SUBMIT_CERTIFICATION",
+	4: "seller.OnboardingAction.button.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING",
+	5: "seller.OnboardingAction.button.ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT",
+	6: "seller.OnboardingAction.button.ONBOARDING_ACTION_CONTACT_SUPPORT",
+};
+
+/** seller.OnboardingAction.button；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
+export function sellerOnboardingActionButton(v: OnboardingAction): UiMessage | undefined {
+	const key = SELLER_ONBOARDING_ACTION_BUTTON[v];
+	if (key === undefined) return undefined;
+	return { key };
 }
 
 const SELLER_PAY_UNI_STATE: Readonly<Partial<Record<number, UiTextKey>>> = {

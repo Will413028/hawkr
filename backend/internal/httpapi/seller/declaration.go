@@ -52,6 +52,7 @@ var declarations = map[string]declaration{
 	sellerv1alpha1connect.SellerAppServiceApplyStoreProcedure:                exempt("申請開店時帳號還沒有店家，也還不是賣家"),
 	sellerv1alpha1connect.SellerAppServiceGetMyStoreOpeningProcedure:         exempt("開店入口在送出之前讀取，帳號還沒有店家，也還不是賣家；帳號的措施與生命週期由模組以 account ID 判斷"),
 	sellerv1alpha1connect.SellerAppServiceGetMyStoreProcedure:                requires(model.CapAccountSelfRead),
+	sellerv1alpha1connect.SellerAppServiceGetMyOnboardingProcedure:           requires(model.CapAccountSelfRead),
 	sellerv1alpha1connect.SellerAppServiceUpdateMyStoreProcedure:             requires(model.CapStorefrontWrite),
 	sellerv1alpha1connect.SellerAppServiceCompleteMyStoreOnboardingProcedure: requires(model.CapStorefrontWrite),
 	sellerv1alpha1connect.SellerAppServiceListMyFollowersProcedure:           requires(model.CapMarketing),

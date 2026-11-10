@@ -1272,6 +1272,104 @@ func (x *GetStoreRequest) GetId() string {
 	return ""
 }
 
+type GetStoreOnboardingRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StoreId       string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetStoreOnboardingRequest) Reset() {
+	*x = GetStoreOnboardingRequest{}
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetStoreOnboardingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetStoreOnboardingRequest) ProtoMessage() {}
+
+func (x *GetStoreOnboardingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetStoreOnboardingRequest.ProtoReflect.Descriptor instead.
+func (*GetStoreOnboardingRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetStoreOnboardingRequest) GetStoreId() string {
+	if x != nil {
+		return x.StoreId
+	}
+	return ""
+}
+
+type GetStoreOnboardingResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 必要任務，依顯示順序，與 hawkr.seller.v1alpha1.GetMyOnboardingResponse.tasks 相同。
+	Tasks []*v1alpha11.OnboardingTask `protobuf:"bytes,1,rep,name=tasks,proto3" json:"tasks,omitempty"`
+	// 開通閘門是否通過，與 hawkr.seller.v1alpha1.GetMyOnboardingResponse.complete 相同。
+	Complete      bool `protobuf:"varint,2,opt,name=complete,proto3" json:"complete,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetStoreOnboardingResponse) Reset() {
+	*x = GetStoreOnboardingResponse{}
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetStoreOnboardingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetStoreOnboardingResponse) ProtoMessage() {}
+
+func (x *GetStoreOnboardingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetStoreOnboardingResponse.ProtoReflect.Descriptor instead.
+func (*GetStoreOnboardingResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetStoreOnboardingResponse) GetTasks() []*v1alpha11.OnboardingTask {
+	if x != nil {
+		return x.Tasks
+	}
+	return nil
+}
+
+func (x *GetStoreOnboardingResponse) GetComplete() bool {
+	if x != nil {
+		return x.Complete
+	}
+	return false
+}
+
 type GetStoreResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Store *Store                 `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
@@ -1300,7 +1398,7 @@ type GetStoreResponse struct {
 
 func (x *GetStoreResponse) Reset() {
 	*x = GetStoreResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[10]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1312,7 +1410,7 @@ func (x *GetStoreResponse) String() string {
 func (*GetStoreResponse) ProtoMessage() {}
 
 func (x *GetStoreResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[10]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1325,7 +1423,7 @@ func (x *GetStoreResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStoreResponse.ProtoReflect.Descriptor instead.
 func (*GetStoreResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{10}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetStoreResponse) GetStore() *Store {
@@ -1391,7 +1489,7 @@ type KYCDocument struct {
 
 func (x *KYCDocument) Reset() {
 	*x = KYCDocument{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[11]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1403,7 +1501,7 @@ func (x *KYCDocument) String() string {
 func (*KYCDocument) ProtoMessage() {}
 
 func (x *KYCDocument) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[11]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1416,7 +1514,7 @@ func (x *KYCDocument) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KYCDocument.ProtoReflect.Descriptor instead.
 func (*KYCDocument) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{11}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *KYCDocument) GetField() v1alpha11.KYCField {
@@ -1452,7 +1550,7 @@ type KYCDocumentView struct {
 
 func (x *KYCDocumentView) Reset() {
 	*x = KYCDocumentView{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[12]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1464,7 +1562,7 @@ func (x *KYCDocumentView) String() string {
 func (*KYCDocumentView) ProtoMessage() {}
 
 func (x *KYCDocumentView) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[12]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1477,7 +1575,7 @@ func (x *KYCDocumentView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KYCDocumentView.ProtoReflect.Descriptor instead.
 func (*KYCDocumentView) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{12}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *KYCDocumentView) GetField() v1alpha11.KYCField {
@@ -1525,7 +1623,7 @@ type KYCDocumentAccess struct {
 
 func (x *KYCDocumentAccess) Reset() {
 	*x = KYCDocumentAccess{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[13]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1537,7 +1635,7 @@ func (x *KYCDocumentAccess) String() string {
 func (*KYCDocumentAccess) ProtoMessage() {}
 
 func (x *KYCDocumentAccess) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[13]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1550,7 +1648,7 @@ func (x *KYCDocumentAccess) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KYCDocumentAccess.ProtoReflect.Descriptor instead.
 func (*KYCDocumentAccess) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{13}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *KYCDocumentAccess) GetId() string {
@@ -1605,7 +1703,7 @@ type IndividualKYC struct {
 
 func (x *IndividualKYC) Reset() {
 	*x = IndividualKYC{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[14]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1617,7 +1715,7 @@ func (x *IndividualKYC) String() string {
 func (*IndividualKYC) ProtoMessage() {}
 
 func (x *IndividualKYC) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[14]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1630,7 +1728,7 @@ func (x *IndividualKYC) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IndividualKYC.ProtoReflect.Descriptor instead.
 func (*IndividualKYC) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{14}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *IndividualKYC) GetIdCardNoMasked() string {
@@ -1656,7 +1754,7 @@ type BusinessKYC struct {
 
 func (x *BusinessKYC) Reset() {
 	*x = BusinessKYC{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[15]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1668,7 +1766,7 @@ func (x *BusinessKYC) String() string {
 func (*BusinessKYC) ProtoMessage() {}
 
 func (x *BusinessKYC) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[15]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1681,7 +1779,7 @@ func (x *BusinessKYC) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BusinessKYC.ProtoReflect.Descriptor instead.
 func (*BusinessKYC) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{15}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *BusinessKYC) GetCompanyName() string {
@@ -1751,7 +1849,7 @@ type KYCReview struct {
 
 func (x *KYCReview) Reset() {
 	*x = KYCReview{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[16]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1763,7 +1861,7 @@ func (x *KYCReview) String() string {
 func (*KYCReview) ProtoMessage() {}
 
 func (x *KYCReview) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[16]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1776,7 +1874,7 @@ func (x *KYCReview) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KYCReview.ProtoReflect.Descriptor instead.
 func (*KYCReview) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{16}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *KYCReview) GetId() string {
@@ -1869,7 +1967,7 @@ type KYCRegistration struct {
 
 func (x *KYCRegistration) Reset() {
 	*x = KYCRegistration{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[17]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1881,7 +1979,7 @@ func (x *KYCRegistration) String() string {
 func (*KYCRegistration) ProtoMessage() {}
 
 func (x *KYCRegistration) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[17]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1894,7 +1992,7 @@ func (x *KYCRegistration) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KYCRegistration.ProtoReflect.Descriptor instead.
 func (*KYCRegistration) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{17}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *KYCRegistration) GetTaxId() string {
@@ -2002,7 +2100,7 @@ type KYCRegistrationCheck struct {
 
 func (x *KYCRegistrationCheck) Reset() {
 	*x = KYCRegistrationCheck{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[18]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2014,7 +2112,7 @@ func (x *KYCRegistrationCheck) String() string {
 func (*KYCRegistrationCheck) ProtoMessage() {}
 
 func (x *KYCRegistrationCheck) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[18]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2027,7 +2125,7 @@ func (x *KYCRegistrationCheck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KYCRegistrationCheck.ProtoReflect.Descriptor instead.
 func (*KYCRegistrationCheck) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{18}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *KYCRegistrationCheck) GetSeq() int64 {
@@ -2101,7 +2199,7 @@ type KYCReveal struct {
 
 func (x *KYCReveal) Reset() {
 	*x = KYCReveal{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[19]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2113,7 +2211,7 @@ func (x *KYCReveal) String() string {
 func (*KYCReveal) ProtoMessage() {}
 
 func (x *KYCReveal) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[19]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2126,7 +2224,7 @@ func (x *KYCReveal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KYCReveal.ProtoReflect.Descriptor instead.
 func (*KYCReveal) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{19}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *KYCReveal) GetId() string {
@@ -2233,7 +2331,7 @@ type KYCApplication struct {
 
 func (x *KYCApplication) Reset() {
 	*x = KYCApplication{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[20]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2245,7 +2343,7 @@ func (x *KYCApplication) String() string {
 func (*KYCApplication) ProtoMessage() {}
 
 func (x *KYCApplication) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[20]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2258,7 +2356,7 @@ func (x *KYCApplication) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KYCApplication.ProtoReflect.Descriptor instead.
 func (*KYCApplication) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{20}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *KYCApplication) GetId() string {
@@ -2561,7 +2659,7 @@ type KYCApplicationSummary struct {
 
 func (x *KYCApplicationSummary) Reset() {
 	*x = KYCApplicationSummary{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[21]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2573,7 +2671,7 @@ func (x *KYCApplicationSummary) String() string {
 func (*KYCApplicationSummary) ProtoMessage() {}
 
 func (x *KYCApplicationSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[21]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2586,7 +2684,7 @@ func (x *KYCApplicationSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KYCApplicationSummary.ProtoReflect.Descriptor instead.
 func (*KYCApplicationSummary) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{21}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *KYCApplicationSummary) GetId() string {
@@ -2674,7 +2772,7 @@ type ListKYCApplicationsRequest struct {
 
 func (x *ListKYCApplicationsRequest) Reset() {
 	*x = ListKYCApplicationsRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[22]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2686,7 +2784,7 @@ func (x *ListKYCApplicationsRequest) String() string {
 func (*ListKYCApplicationsRequest) ProtoMessage() {}
 
 func (x *ListKYCApplicationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[22]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2699,7 +2797,7 @@ func (x *ListKYCApplicationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListKYCApplicationsRequest.ProtoReflect.Descriptor instead.
 func (*ListKYCApplicationsRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{22}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ListKYCApplicationsRequest) GetPageSize() int32 {
@@ -2740,7 +2838,7 @@ type ListKYCApplicationsResponse struct {
 
 func (x *ListKYCApplicationsResponse) Reset() {
 	*x = ListKYCApplicationsResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[23]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2752,7 +2850,7 @@ func (x *ListKYCApplicationsResponse) String() string {
 func (*ListKYCApplicationsResponse) ProtoMessage() {}
 
 func (x *ListKYCApplicationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[23]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2765,7 +2863,7 @@ func (x *ListKYCApplicationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListKYCApplicationsResponse.ProtoReflect.Descriptor instead.
 func (*ListKYCApplicationsResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{23}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ListKYCApplicationsResponse) GetApplications() []*KYCApplicationSummary {
@@ -2791,7 +2889,7 @@ type GetKYCApplicationRequest struct {
 
 func (x *GetKYCApplicationRequest) Reset() {
 	*x = GetKYCApplicationRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[24]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2803,7 +2901,7 @@ func (x *GetKYCApplicationRequest) String() string {
 func (*GetKYCApplicationRequest) ProtoMessage() {}
 
 func (x *GetKYCApplicationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[24]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2816,7 +2914,7 @@ func (x *GetKYCApplicationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetKYCApplicationRequest.ProtoReflect.Descriptor instead.
 func (*GetKYCApplicationRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{24}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *GetKYCApplicationRequest) GetId() string {
@@ -2835,7 +2933,7 @@ type GetKYCApplicationResponse struct {
 
 func (x *GetKYCApplicationResponse) Reset() {
 	*x = GetKYCApplicationResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[25]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2847,7 +2945,7 @@ func (x *GetKYCApplicationResponse) String() string {
 func (*GetKYCApplicationResponse) ProtoMessage() {}
 
 func (x *GetKYCApplicationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[25]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2860,7 +2958,7 @@ func (x *GetKYCApplicationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetKYCApplicationResponse.ProtoReflect.Descriptor instead.
 func (*GetKYCApplicationResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{25}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *GetKYCApplicationResponse) GetApplication() *KYCApplication {
@@ -2882,7 +2980,7 @@ type ListKYCRevealsRequest struct {
 
 func (x *ListKYCRevealsRequest) Reset() {
 	*x = ListKYCRevealsRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[26]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2894,7 +2992,7 @@ func (x *ListKYCRevealsRequest) String() string {
 func (*ListKYCRevealsRequest) ProtoMessage() {}
 
 func (x *ListKYCRevealsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[26]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2907,7 +3005,7 @@ func (x *ListKYCRevealsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListKYCRevealsRequest.ProtoReflect.Descriptor instead.
 func (*ListKYCRevealsRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{26}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ListKYCRevealsRequest) GetId() string {
@@ -2941,7 +3039,7 @@ type ListKYCRevealsResponse struct {
 
 func (x *ListKYCRevealsResponse) Reset() {
 	*x = ListKYCRevealsResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[27]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2953,7 +3051,7 @@ func (x *ListKYCRevealsResponse) String() string {
 func (*ListKYCRevealsResponse) ProtoMessage() {}
 
 func (x *ListKYCRevealsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[27]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2966,7 +3064,7 @@ func (x *ListKYCRevealsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListKYCRevealsResponse.ProtoReflect.Descriptor instead.
 func (*ListKYCRevealsResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{27}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ListKYCRevealsResponse) GetReveals() []*KYCReveal {
@@ -2995,7 +3093,7 @@ type ListKYCDocumentAccessesRequest struct {
 
 func (x *ListKYCDocumentAccessesRequest) Reset() {
 	*x = ListKYCDocumentAccessesRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[28]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3007,7 +3105,7 @@ func (x *ListKYCDocumentAccessesRequest) String() string {
 func (*ListKYCDocumentAccessesRequest) ProtoMessage() {}
 
 func (x *ListKYCDocumentAccessesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[28]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3020,7 +3118,7 @@ func (x *ListKYCDocumentAccessesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListKYCDocumentAccessesRequest.ProtoReflect.Descriptor instead.
 func (*ListKYCDocumentAccessesRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{28}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ListKYCDocumentAccessesRequest) GetId() string {
@@ -3054,7 +3152,7 @@ type ListKYCDocumentAccessesResponse struct {
 
 func (x *ListKYCDocumentAccessesResponse) Reset() {
 	*x = ListKYCDocumentAccessesResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[29]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3066,7 +3164,7 @@ func (x *ListKYCDocumentAccessesResponse) String() string {
 func (*ListKYCDocumentAccessesResponse) ProtoMessage() {}
 
 func (x *ListKYCDocumentAccessesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[29]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3079,7 +3177,7 @@ func (x *ListKYCDocumentAccessesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListKYCDocumentAccessesResponse.ProtoReflect.Descriptor instead.
 func (*ListKYCDocumentAccessesResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{29}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ListKYCDocumentAccessesResponse) GetDocumentAccesses() []*KYCDocumentAccess {
@@ -3109,7 +3207,7 @@ type ApproveKYCRequest struct {
 
 func (x *ApproveKYCRequest) Reset() {
 	*x = ApproveKYCRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[30]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3121,7 +3219,7 @@ func (x *ApproveKYCRequest) String() string {
 func (*ApproveKYCRequest) ProtoMessage() {}
 
 func (x *ApproveKYCRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[30]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3134,7 +3232,7 @@ func (x *ApproveKYCRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApproveKYCRequest.ProtoReflect.Descriptor instead.
 func (*ApproveKYCRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{30}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ApproveKYCRequest) GetId() string {
@@ -3167,7 +3265,7 @@ type ApproveKYCResponse struct {
 
 func (x *ApproveKYCResponse) Reset() {
 	*x = ApproveKYCResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[31]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3179,7 +3277,7 @@ func (x *ApproveKYCResponse) String() string {
 func (*ApproveKYCResponse) ProtoMessage() {}
 
 func (x *ApproveKYCResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[31]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3192,7 +3290,7 @@ func (x *ApproveKYCResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApproveKYCResponse.ProtoReflect.Descriptor instead.
 func (*ApproveKYCResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{31}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *ApproveKYCResponse) GetApplication() *KYCApplication {
@@ -3222,7 +3320,7 @@ type RejectKYCRequest struct {
 
 func (x *RejectKYCRequest) Reset() {
 	*x = RejectKYCRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[32]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3234,7 +3332,7 @@ func (x *RejectKYCRequest) String() string {
 func (*RejectKYCRequest) ProtoMessage() {}
 
 func (x *RejectKYCRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[32]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3247,7 +3345,7 @@ func (x *RejectKYCRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RejectKYCRequest.ProtoReflect.Descriptor instead.
 func (*RejectKYCRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{32}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *RejectKYCRequest) GetId() string {
@@ -3294,7 +3392,7 @@ type RejectKYCResponse struct {
 
 func (x *RejectKYCResponse) Reset() {
 	*x = RejectKYCResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[33]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3306,7 +3404,7 @@ func (x *RejectKYCResponse) String() string {
 func (*RejectKYCResponse) ProtoMessage() {}
 
 func (x *RejectKYCResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[33]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3319,7 +3417,7 @@ func (x *RejectKYCResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RejectKYCResponse.ProtoReflect.Descriptor instead.
 func (*RejectKYCResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{33}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *RejectKYCResponse) GetApplication() *KYCApplication {
@@ -3340,7 +3438,7 @@ type RevealKYCSensitiveRequest struct {
 
 func (x *RevealKYCSensitiveRequest) Reset() {
 	*x = RevealKYCSensitiveRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[34]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3352,7 +3450,7 @@ func (x *RevealKYCSensitiveRequest) String() string {
 func (*RevealKYCSensitiveRequest) ProtoMessage() {}
 
 func (x *RevealKYCSensitiveRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[34]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3365,7 +3463,7 @@ func (x *RevealKYCSensitiveRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevealKYCSensitiveRequest.ProtoReflect.Descriptor instead.
 func (*RevealKYCSensitiveRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{34}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *RevealKYCSensitiveRequest) GetId() string {
@@ -3397,7 +3495,7 @@ type RevealKYCSensitiveResponse struct {
 
 func (x *RevealKYCSensitiveResponse) Reset() {
 	*x = RevealKYCSensitiveResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[35]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3409,7 +3507,7 @@ func (x *RevealKYCSensitiveResponse) String() string {
 func (*RevealKYCSensitiveResponse) ProtoMessage() {}
 
 func (x *RevealKYCSensitiveResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[35]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3422,7 +3520,7 @@ func (x *RevealKYCSensitiveResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevealKYCSensitiveResponse.ProtoReflect.Descriptor instead.
 func (*RevealKYCSensitiveResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{35}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *RevealKYCSensitiveResponse) GetIdCardNo() string {
@@ -3477,7 +3575,7 @@ type PayUniStatusCodes struct {
 
 func (x *PayUniStatusCodes) Reset() {
 	*x = PayUniStatusCodes{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[36]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3489,7 +3587,7 @@ func (x *PayUniStatusCodes) String() string {
 func (*PayUniStatusCodes) ProtoMessage() {}
 
 func (x *PayUniStatusCodes) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[36]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3502,7 +3600,7 @@ func (x *PayUniStatusCodes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PayUniStatusCodes.ProtoReflect.Descriptor instead.
 func (*PayUniStatusCodes) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{36}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *PayUniStatusCodes) GetMerStatus() string {
@@ -3592,7 +3690,7 @@ type PayUniRegistration struct {
 
 func (x *PayUniRegistration) Reset() {
 	*x = PayUniRegistration{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[37]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3604,7 +3702,7 @@ func (x *PayUniRegistration) String() string {
 func (*PayUniRegistration) ProtoMessage() {}
 
 func (x *PayUniRegistration) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[37]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3617,7 +3715,7 @@ func (x *PayUniRegistration) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PayUniRegistration.ProtoReflect.Descriptor instead.
 func (*PayUniRegistration) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{37}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *PayUniRegistration) GetStoreId() string {
@@ -3755,7 +3853,7 @@ type GetPayUniRegistrationRequest struct {
 
 func (x *GetPayUniRegistrationRequest) Reset() {
 	*x = GetPayUniRegistrationRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[38]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3767,7 +3865,7 @@ func (x *GetPayUniRegistrationRequest) String() string {
 func (*GetPayUniRegistrationRequest) ProtoMessage() {}
 
 func (x *GetPayUniRegistrationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[38]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3780,7 +3878,7 @@ func (x *GetPayUniRegistrationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPayUniRegistrationRequest.ProtoReflect.Descriptor instead.
 func (*GetPayUniRegistrationRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{38}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *GetPayUniRegistrationRequest) GetStoreId() string {
@@ -3799,7 +3897,7 @@ type GetPayUniRegistrationResponse struct {
 
 func (x *GetPayUniRegistrationResponse) Reset() {
 	*x = GetPayUniRegistrationResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[39]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3811,7 +3909,7 @@ func (x *GetPayUniRegistrationResponse) String() string {
 func (*GetPayUniRegistrationResponse) ProtoMessage() {}
 
 func (x *GetPayUniRegistrationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[39]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3824,7 +3922,7 @@ func (x *GetPayUniRegistrationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPayUniRegistrationResponse.ProtoReflect.Descriptor instead.
 func (*GetPayUniRegistrationResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{39}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *GetPayUniRegistrationResponse) GetRegistration() *PayUniRegistration {
@@ -3843,7 +3941,7 @@ type RebindPayUniRequest struct {
 
 func (x *RebindPayUniRequest) Reset() {
 	*x = RebindPayUniRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[40]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3855,7 +3953,7 @@ func (x *RebindPayUniRequest) String() string {
 func (*RebindPayUniRequest) ProtoMessage() {}
 
 func (x *RebindPayUniRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[40]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3868,7 +3966,7 @@ func (x *RebindPayUniRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RebindPayUniRequest.ProtoReflect.Descriptor instead.
 func (*RebindPayUniRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{40}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *RebindPayUniRequest) GetStoreId() string {
@@ -3887,7 +3985,7 @@ type RebindPayUniResponse struct {
 
 func (x *RebindPayUniResponse) Reset() {
 	*x = RebindPayUniResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[41]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3899,7 +3997,7 @@ func (x *RebindPayUniResponse) String() string {
 func (*RebindPayUniResponse) ProtoMessage() {}
 
 func (x *RebindPayUniResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[41]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3912,7 +4010,7 @@ func (x *RebindPayUniResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RebindPayUniResponse.ProtoReflect.Descriptor instead.
 func (*RebindPayUniResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{41}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *RebindPayUniResponse) GetRegistration() *PayUniRegistration {
@@ -3939,7 +4037,7 @@ type PayUniObservation struct {
 
 func (x *PayUniObservation) Reset() {
 	*x = PayUniObservation{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[42]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3951,7 +4049,7 @@ func (x *PayUniObservation) String() string {
 func (*PayUniObservation) ProtoMessage() {}
 
 func (x *PayUniObservation) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[42]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3964,7 +4062,7 @@ func (x *PayUniObservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PayUniObservation.ProtoReflect.Descriptor instead.
 func (*PayUniObservation) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{42}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *PayUniObservation) GetId() string {
@@ -4021,7 +4119,7 @@ type ListPayUniObservationsRequest struct {
 
 func (x *ListPayUniObservationsRequest) Reset() {
 	*x = ListPayUniObservationsRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[43]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4033,7 +4131,7 @@ func (x *ListPayUniObservationsRequest) String() string {
 func (*ListPayUniObservationsRequest) ProtoMessage() {}
 
 func (x *ListPayUniObservationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[43]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4046,7 +4144,7 @@ func (x *ListPayUniObservationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPayUniObservationsRequest.ProtoReflect.Descriptor instead.
 func (*ListPayUniObservationsRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{43}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *ListPayUniObservationsRequest) GetStoreId() string {
@@ -4080,7 +4178,7 @@ type ListPayUniObservationsResponse struct {
 
 func (x *ListPayUniObservationsResponse) Reset() {
 	*x = ListPayUniObservationsResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[44]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4092,7 +4190,7 @@ func (x *ListPayUniObservationsResponse) String() string {
 func (*ListPayUniObservationsResponse) ProtoMessage() {}
 
 func (x *ListPayUniObservationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[44]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4105,7 +4203,7 @@ func (x *ListPayUniObservationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPayUniObservationsResponse.ProtoReflect.Descriptor instead.
 func (*ListPayUniObservationsResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{44}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *ListPayUniObservationsResponse) GetObservations() []*PayUniObservation {
@@ -4131,7 +4229,7 @@ type RefreshPayUniStatusRequest struct {
 
 func (x *RefreshPayUniStatusRequest) Reset() {
 	*x = RefreshPayUniStatusRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[45]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4143,7 +4241,7 @@ func (x *RefreshPayUniStatusRequest) String() string {
 func (*RefreshPayUniStatusRequest) ProtoMessage() {}
 
 func (x *RefreshPayUniStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[45]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4156,7 +4254,7 @@ func (x *RefreshPayUniStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshPayUniStatusRequest.ProtoReflect.Descriptor instead.
 func (*RefreshPayUniStatusRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{45}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *RefreshPayUniStatusRequest) GetStoreId() string {
@@ -4174,7 +4272,7 @@ type RefreshPayUniStatusResponse struct {
 
 func (x *RefreshPayUniStatusResponse) Reset() {
 	*x = RefreshPayUniStatusResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[46]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4186,7 +4284,7 @@ func (x *RefreshPayUniStatusResponse) String() string {
 func (*RefreshPayUniStatusResponse) ProtoMessage() {}
 
 func (x *RefreshPayUniStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[46]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4199,7 +4297,7 @@ func (x *RefreshPayUniStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshPayUniStatusResponse.ProtoReflect.Descriptor instead.
 func (*RefreshPayUniStatusResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{46}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{48}
 }
 
 type RequeryKYCRegistrationRequest struct {
@@ -4211,7 +4309,7 @@ type RequeryKYCRegistrationRequest struct {
 
 func (x *RequeryKYCRegistrationRequest) Reset() {
 	*x = RequeryKYCRegistrationRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[47]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4223,7 +4321,7 @@ func (x *RequeryKYCRegistrationRequest) String() string {
 func (*RequeryKYCRegistrationRequest) ProtoMessage() {}
 
 func (x *RequeryKYCRegistrationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[47]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4236,7 +4334,7 @@ func (x *RequeryKYCRegistrationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequeryKYCRegistrationRequest.ProtoReflect.Descriptor instead.
 func (*RequeryKYCRegistrationRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{47}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *RequeryKYCRegistrationRequest) GetId() string {
@@ -4256,7 +4354,7 @@ type RequeryKYCRegistrationResponse struct {
 
 func (x *RequeryKYCRegistrationResponse) Reset() {
 	*x = RequeryKYCRegistrationResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[48]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4268,7 +4366,7 @@ func (x *RequeryKYCRegistrationResponse) String() string {
 func (*RequeryKYCRegistrationResponse) ProtoMessage() {}
 
 func (x *RequeryKYCRegistrationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[48]
+	mi := &file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4281,7 +4379,7 @@ func (x *RequeryKYCRegistrationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequeryKYCRegistrationResponse.ProtoReflect.Descriptor instead.
 func (*RequeryKYCRegistrationResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{48}
+	return file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *RequeryKYCRegistrationResponse) GetRegistrationCheck() *KYCRegistrationCheck {
@@ -4375,7 +4473,12 @@ const file_hawkr_admin_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x15new_stores_this_month\x18\x05 \x01(\x05R\x12newStoresThisMonth\x12;\n" +
 	"\x1akyc_awaiting_review_stores\x18\x06 \x01(\x05R\x17kycAwaitingReviewStoresJ\x04\b\x02\x10\x03R\x14kyc_submitted_stores\"&\n" +
 	"\x0fGetStoreRequest\x12\x13\n" +
-	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\"\xa6\x05\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\";\n" +
+	"\x19GetStoreOnboardingRequest\x12\x1e\n" +
+	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\"\x7f\n" +
+	"\x1aGetStoreOnboardingResponse\x12@\n" +
+	"\x05tasks\x18\x01 \x03(\v2%.hawkr.seller.v1alpha1.OnboardingTaskB\x03\xe0A\x03R\x05tasks\x12\x1f\n" +
+	"\bcomplete\x18\x02 \x01(\bB\x03\xe0A\x03R\bcomplete\"\xa6\x05\n" +
 	"\x10GetStoreResponse\x128\n" +
 	"\x05store\x18\x01 \x01(\v2\".hawkr.admin.seller.v1alpha1.StoreR\x05store\x129\n" +
 	"\x03kyc\x18\x04 \x01(\v2'.hawkr.admin.seller.v1alpha1.KYCSummaryR\x03kyc\x12M\n" +
@@ -4687,12 +4790,13 @@ const file_hawkr_admin_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x1eKYC_REGISTRATION_STATUS_ACTIVE\x10\x01\x12/\n" +
 	"+KYC_REGISTRATION_STATUS_ORDERED_TO_DISSOLVE\x10\x02\x12&\n" +
 	"\"KYC_REGISTRATION_STATUS_TERMINATED\x10\x03\x12#\n" +
-	"\x1fKYC_REGISTRATION_STATUS_UNKNOWN\x10\x042\xcf\x0f\n" +
+	"\x1fKYC_REGISTRATION_STATUS_UNKNOWN\x10\x042\xdc\x10\n" +
 	"\x12SellerAdminService\x12r\n" +
 	"\n" +
 	"ListStores\x12..hawkr.admin.seller.v1alpha1.ListStoresRequest\x1a/.hawkr.admin.seller.v1alpha1.ListStoresResponse\"\x03\x90\x02\x01\x12{\n" +
 	"\rGetStoreStats\x121.hawkr.admin.seller.v1alpha1.GetStoreStatsRequest\x1a2.hawkr.admin.seller.v1alpha1.GetStoreStatsResponse\"\x03\x90\x02\x01\x12l\n" +
-	"\bGetStore\x12,.hawkr.admin.seller.v1alpha1.GetStoreRequest\x1a-.hawkr.admin.seller.v1alpha1.GetStoreResponse\"\x03\x90\x02\x01\x12\x8d\x01\n" +
+	"\bGetStore\x12,.hawkr.admin.seller.v1alpha1.GetStoreRequest\x1a-.hawkr.admin.seller.v1alpha1.GetStoreResponse\"\x03\x90\x02\x01\x12\x8a\x01\n" +
+	"\x12GetStoreOnboarding\x126.hawkr.admin.seller.v1alpha1.GetStoreOnboardingRequest\x1a7.hawkr.admin.seller.v1alpha1.GetStoreOnboardingResponse\"\x03\x90\x02\x01\x12\x8d\x01\n" +
 	"\x13ListKYCApplications\x127.hawkr.admin.seller.v1alpha1.ListKYCApplicationsRequest\x1a8.hawkr.admin.seller.v1alpha1.ListKYCApplicationsResponse\"\x03\x90\x02\x01\x12\x87\x01\n" +
 	"\x11GetKYCApplication\x125.hawkr.admin.seller.v1alpha1.GetKYCApplicationRequest\x1a6.hawkr.admin.seller.v1alpha1.GetKYCApplicationResponse\"\x03\x90\x02\x01\x12~\n" +
 	"\x0eListKYCReveals\x122.hawkr.admin.seller.v1alpha1.ListKYCRevealsRequest\x1a3.hawkr.admin.seller.v1alpha1.ListKYCRevealsResponse\"\x03\x90\x02\x01\x12\x99\x01\n" +
@@ -4721,7 +4825,7 @@ func file_hawkr_admin_seller_v1alpha1_seller_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_admin_seller_v1alpha1_seller_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
+var file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes = make([]protoimpl.MessageInfo, 51)
 var file_hawkr_admin_seller_v1alpha1_seller_proto_goTypes = []any{
 	(StoreActionUnavailableReason)(0),       // 0: hawkr.admin.seller.v1alpha1.StoreActionUnavailableReason
 	(StoreCloser)(0),                        // 1: hawkr.admin.seller.v1alpha1.StoreCloser
@@ -4740,201 +4844,207 @@ var file_hawkr_admin_seller_v1alpha1_seller_proto_goTypes = []any{
 	(*GetStoreStatsRequest)(nil),            // 14: hawkr.admin.seller.v1alpha1.GetStoreStatsRequest
 	(*GetStoreStatsResponse)(nil),           // 15: hawkr.admin.seller.v1alpha1.GetStoreStatsResponse
 	(*GetStoreRequest)(nil),                 // 16: hawkr.admin.seller.v1alpha1.GetStoreRequest
-	(*GetStoreResponse)(nil),                // 17: hawkr.admin.seller.v1alpha1.GetStoreResponse
-	(*KYCDocument)(nil),                     // 18: hawkr.admin.seller.v1alpha1.KYCDocument
-	(*KYCDocumentView)(nil),                 // 19: hawkr.admin.seller.v1alpha1.KYCDocumentView
-	(*KYCDocumentAccess)(nil),               // 20: hawkr.admin.seller.v1alpha1.KYCDocumentAccess
-	(*IndividualKYC)(nil),                   // 21: hawkr.admin.seller.v1alpha1.IndividualKYC
-	(*BusinessKYC)(nil),                     // 22: hawkr.admin.seller.v1alpha1.BusinessKYC
-	(*KYCReview)(nil),                       // 23: hawkr.admin.seller.v1alpha1.KYCReview
-	(*KYCRegistration)(nil),                 // 24: hawkr.admin.seller.v1alpha1.KYCRegistration
-	(*KYCRegistrationCheck)(nil),            // 25: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck
-	(*KYCReveal)(nil),                       // 26: hawkr.admin.seller.v1alpha1.KYCReveal
-	(*KYCApplication)(nil),                  // 27: hawkr.admin.seller.v1alpha1.KYCApplication
-	(*KYCApplicationSummary)(nil),           // 28: hawkr.admin.seller.v1alpha1.KYCApplicationSummary
-	(*ListKYCApplicationsRequest)(nil),      // 29: hawkr.admin.seller.v1alpha1.ListKYCApplicationsRequest
-	(*ListKYCApplicationsResponse)(nil),     // 30: hawkr.admin.seller.v1alpha1.ListKYCApplicationsResponse
-	(*GetKYCApplicationRequest)(nil),        // 31: hawkr.admin.seller.v1alpha1.GetKYCApplicationRequest
-	(*GetKYCApplicationResponse)(nil),       // 32: hawkr.admin.seller.v1alpha1.GetKYCApplicationResponse
-	(*ListKYCRevealsRequest)(nil),           // 33: hawkr.admin.seller.v1alpha1.ListKYCRevealsRequest
-	(*ListKYCRevealsResponse)(nil),          // 34: hawkr.admin.seller.v1alpha1.ListKYCRevealsResponse
-	(*ListKYCDocumentAccessesRequest)(nil),  // 35: hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesRequest
-	(*ListKYCDocumentAccessesResponse)(nil), // 36: hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesResponse
-	(*ApproveKYCRequest)(nil),               // 37: hawkr.admin.seller.v1alpha1.ApproveKYCRequest
-	(*ApproveKYCResponse)(nil),              // 38: hawkr.admin.seller.v1alpha1.ApproveKYCResponse
-	(*RejectKYCRequest)(nil),                // 39: hawkr.admin.seller.v1alpha1.RejectKYCRequest
-	(*RejectKYCResponse)(nil),               // 40: hawkr.admin.seller.v1alpha1.RejectKYCResponse
-	(*RevealKYCSensitiveRequest)(nil),       // 41: hawkr.admin.seller.v1alpha1.RevealKYCSensitiveRequest
-	(*RevealKYCSensitiveResponse)(nil),      // 42: hawkr.admin.seller.v1alpha1.RevealKYCSensitiveResponse
-	(*PayUniStatusCodes)(nil),               // 43: hawkr.admin.seller.v1alpha1.PayUniStatusCodes
-	(*PayUniRegistration)(nil),              // 44: hawkr.admin.seller.v1alpha1.PayUniRegistration
-	(*GetPayUniRegistrationRequest)(nil),    // 45: hawkr.admin.seller.v1alpha1.GetPayUniRegistrationRequest
-	(*GetPayUniRegistrationResponse)(nil),   // 46: hawkr.admin.seller.v1alpha1.GetPayUniRegistrationResponse
-	(*RebindPayUniRequest)(nil),             // 47: hawkr.admin.seller.v1alpha1.RebindPayUniRequest
-	(*RebindPayUniResponse)(nil),            // 48: hawkr.admin.seller.v1alpha1.RebindPayUniResponse
-	(*PayUniObservation)(nil),               // 49: hawkr.admin.seller.v1alpha1.PayUniObservation
-	(*ListPayUniObservationsRequest)(nil),   // 50: hawkr.admin.seller.v1alpha1.ListPayUniObservationsRequest
-	(*ListPayUniObservationsResponse)(nil),  // 51: hawkr.admin.seller.v1alpha1.ListPayUniObservationsResponse
-	(*RefreshPayUniStatusRequest)(nil),      // 52: hawkr.admin.seller.v1alpha1.RefreshPayUniStatusRequest
-	(*RefreshPayUniStatusResponse)(nil),     // 53: hawkr.admin.seller.v1alpha1.RefreshPayUniStatusResponse
-	(*RequeryKYCRegistrationRequest)(nil),   // 54: hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationRequest
-	(*RequeryKYCRegistrationResponse)(nil),  // 55: hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationResponse
-	(*errdetails.LocalizedMessage)(nil),     // 56: google.rpc.LocalizedMessage
-	(*v1alpha1.Image)(nil),                  // 57: hawkr.common.v1alpha1.Image
-	(v1alpha11.StoreStatus)(0),              // 58: hawkr.seller.v1alpha1.StoreStatus
-	(*timestamppb.Timestamp)(nil),           // 59: google.protobuf.Timestamp
-	(*v1alpha1.PostalAddress)(nil),          // 60: hawkr.common.v1alpha1.PostalAddress
-	(v1alpha11.KYCFlowStatus)(0),            // 61: hawkr.seller.v1alpha1.KYCFlowStatus
-	(v1alpha11.KYCStatus)(0),                // 62: hawkr.seller.v1alpha1.KYCStatus
-	(*v1alpha1.Deadline)(nil),               // 63: hawkr.common.v1alpha1.Deadline
-	(v1alpha11.PayUniBindStatus)(0),         // 64: hawkr.seller.v1alpha1.PayUniBindStatus
-	(*Measure)(nil),                         // 65: hawkr.admin.seller.v1alpha1.Measure
-	(*TerminationOption)(nil),               // 66: hawkr.admin.seller.v1alpha1.TerminationOption
-	(v1alpha11.KYCField)(0),                 // 67: hawkr.seller.v1alpha1.KYCField
-	(*date.Date)(nil),                       // 68: google.type.Date
-	(*v1alpha11.KYCIssue)(nil),              // 69: hawkr.seller.v1alpha1.KYCIssue
-	(*v1alpha11.KYCFlow)(nil),               // 70: hawkr.seller.v1alpha1.KYCFlow
-	(*v1alpha11.PayUniProblem)(nil),         // 71: hawkr.seller.v1alpha1.PayUniProblem
+	(*GetStoreOnboardingRequest)(nil),       // 17: hawkr.admin.seller.v1alpha1.GetStoreOnboardingRequest
+	(*GetStoreOnboardingResponse)(nil),      // 18: hawkr.admin.seller.v1alpha1.GetStoreOnboardingResponse
+	(*GetStoreResponse)(nil),                // 19: hawkr.admin.seller.v1alpha1.GetStoreResponse
+	(*KYCDocument)(nil),                     // 20: hawkr.admin.seller.v1alpha1.KYCDocument
+	(*KYCDocumentView)(nil),                 // 21: hawkr.admin.seller.v1alpha1.KYCDocumentView
+	(*KYCDocumentAccess)(nil),               // 22: hawkr.admin.seller.v1alpha1.KYCDocumentAccess
+	(*IndividualKYC)(nil),                   // 23: hawkr.admin.seller.v1alpha1.IndividualKYC
+	(*BusinessKYC)(nil),                     // 24: hawkr.admin.seller.v1alpha1.BusinessKYC
+	(*KYCReview)(nil),                       // 25: hawkr.admin.seller.v1alpha1.KYCReview
+	(*KYCRegistration)(nil),                 // 26: hawkr.admin.seller.v1alpha1.KYCRegistration
+	(*KYCRegistrationCheck)(nil),            // 27: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck
+	(*KYCReveal)(nil),                       // 28: hawkr.admin.seller.v1alpha1.KYCReveal
+	(*KYCApplication)(nil),                  // 29: hawkr.admin.seller.v1alpha1.KYCApplication
+	(*KYCApplicationSummary)(nil),           // 30: hawkr.admin.seller.v1alpha1.KYCApplicationSummary
+	(*ListKYCApplicationsRequest)(nil),      // 31: hawkr.admin.seller.v1alpha1.ListKYCApplicationsRequest
+	(*ListKYCApplicationsResponse)(nil),     // 32: hawkr.admin.seller.v1alpha1.ListKYCApplicationsResponse
+	(*GetKYCApplicationRequest)(nil),        // 33: hawkr.admin.seller.v1alpha1.GetKYCApplicationRequest
+	(*GetKYCApplicationResponse)(nil),       // 34: hawkr.admin.seller.v1alpha1.GetKYCApplicationResponse
+	(*ListKYCRevealsRequest)(nil),           // 35: hawkr.admin.seller.v1alpha1.ListKYCRevealsRequest
+	(*ListKYCRevealsResponse)(nil),          // 36: hawkr.admin.seller.v1alpha1.ListKYCRevealsResponse
+	(*ListKYCDocumentAccessesRequest)(nil),  // 37: hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesRequest
+	(*ListKYCDocumentAccessesResponse)(nil), // 38: hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesResponse
+	(*ApproveKYCRequest)(nil),               // 39: hawkr.admin.seller.v1alpha1.ApproveKYCRequest
+	(*ApproveKYCResponse)(nil),              // 40: hawkr.admin.seller.v1alpha1.ApproveKYCResponse
+	(*RejectKYCRequest)(nil),                // 41: hawkr.admin.seller.v1alpha1.RejectKYCRequest
+	(*RejectKYCResponse)(nil),               // 42: hawkr.admin.seller.v1alpha1.RejectKYCResponse
+	(*RevealKYCSensitiveRequest)(nil),       // 43: hawkr.admin.seller.v1alpha1.RevealKYCSensitiveRequest
+	(*RevealKYCSensitiveResponse)(nil),      // 44: hawkr.admin.seller.v1alpha1.RevealKYCSensitiveResponse
+	(*PayUniStatusCodes)(nil),               // 45: hawkr.admin.seller.v1alpha1.PayUniStatusCodes
+	(*PayUniRegistration)(nil),              // 46: hawkr.admin.seller.v1alpha1.PayUniRegistration
+	(*GetPayUniRegistrationRequest)(nil),    // 47: hawkr.admin.seller.v1alpha1.GetPayUniRegistrationRequest
+	(*GetPayUniRegistrationResponse)(nil),   // 48: hawkr.admin.seller.v1alpha1.GetPayUniRegistrationResponse
+	(*RebindPayUniRequest)(nil),             // 49: hawkr.admin.seller.v1alpha1.RebindPayUniRequest
+	(*RebindPayUniResponse)(nil),            // 50: hawkr.admin.seller.v1alpha1.RebindPayUniResponse
+	(*PayUniObservation)(nil),               // 51: hawkr.admin.seller.v1alpha1.PayUniObservation
+	(*ListPayUniObservationsRequest)(nil),   // 52: hawkr.admin.seller.v1alpha1.ListPayUniObservationsRequest
+	(*ListPayUniObservationsResponse)(nil),  // 53: hawkr.admin.seller.v1alpha1.ListPayUniObservationsResponse
+	(*RefreshPayUniStatusRequest)(nil),      // 54: hawkr.admin.seller.v1alpha1.RefreshPayUniStatusRequest
+	(*RefreshPayUniStatusResponse)(nil),     // 55: hawkr.admin.seller.v1alpha1.RefreshPayUniStatusResponse
+	(*RequeryKYCRegistrationRequest)(nil),   // 56: hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationRequest
+	(*RequeryKYCRegistrationResponse)(nil),  // 57: hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationResponse
+	(*errdetails.LocalizedMessage)(nil),     // 58: google.rpc.LocalizedMessage
+	(*v1alpha1.Image)(nil),                  // 59: hawkr.common.v1alpha1.Image
+	(v1alpha11.StoreStatus)(0),              // 60: hawkr.seller.v1alpha1.StoreStatus
+	(*timestamppb.Timestamp)(nil),           // 61: google.protobuf.Timestamp
+	(*v1alpha1.PostalAddress)(nil),          // 62: hawkr.common.v1alpha1.PostalAddress
+	(v1alpha11.KYCFlowStatus)(0),            // 63: hawkr.seller.v1alpha1.KYCFlowStatus
+	(v1alpha11.KYCStatus)(0),                // 64: hawkr.seller.v1alpha1.KYCStatus
+	(*v1alpha1.Deadline)(nil),               // 65: hawkr.common.v1alpha1.Deadline
+	(v1alpha11.PayUniBindStatus)(0),         // 66: hawkr.seller.v1alpha1.PayUniBindStatus
+	(*v1alpha11.OnboardingTask)(nil),        // 67: hawkr.seller.v1alpha1.OnboardingTask
+	(*Measure)(nil),                         // 68: hawkr.admin.seller.v1alpha1.Measure
+	(*TerminationOption)(nil),               // 69: hawkr.admin.seller.v1alpha1.TerminationOption
+	(v1alpha11.KYCField)(0),                 // 70: hawkr.seller.v1alpha1.KYCField
+	(*date.Date)(nil),                       // 71: google.type.Date
+	(*v1alpha11.KYCIssue)(nil),              // 72: hawkr.seller.v1alpha1.KYCIssue
+	(*v1alpha11.KYCFlow)(nil),               // 73: hawkr.seller.v1alpha1.KYCFlow
+	(*v1alpha11.PayUniProblem)(nil),         // 74: hawkr.seller.v1alpha1.PayUniProblem
 }
 var file_hawkr_admin_seller_v1alpha1_seller_proto_depIdxs = []int32{
 	0,   // 0: hawkr.admin.seller.v1alpha1.StoreActionUnavailability.reason:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailableReason
-	56,  // 1: hawkr.admin.seller.v1alpha1.StoreActionUnavailability.message:type_name -> google.rpc.LocalizedMessage
+	58,  // 1: hawkr.admin.seller.v1alpha1.StoreActionUnavailability.message:type_name -> google.rpc.LocalizedMessage
 	1,   // 2: hawkr.admin.seller.v1alpha1.Closure.closer:type_name -> hawkr.admin.seller.v1alpha1.StoreCloser
-	57,  // 3: hawkr.admin.seller.v1alpha1.Store.logo:type_name -> hawkr.common.v1alpha1.Image
-	57,  // 4: hawkr.admin.seller.v1alpha1.Store.cover_image:type_name -> hawkr.common.v1alpha1.Image
-	58,  // 5: hawkr.admin.seller.v1alpha1.Store.status:type_name -> hawkr.seller.v1alpha1.StoreStatus
-	59,  // 6: hawkr.admin.seller.v1alpha1.Store.create_time:type_name -> google.protobuf.Timestamp
-	59,  // 7: hawkr.admin.seller.v1alpha1.Store.update_time:type_name -> google.protobuf.Timestamp
-	59,  // 8: hawkr.admin.seller.v1alpha1.Store.close_time:type_name -> google.protobuf.Timestamp
+	59,  // 3: hawkr.admin.seller.v1alpha1.Store.logo:type_name -> hawkr.common.v1alpha1.Image
+	59,  // 4: hawkr.admin.seller.v1alpha1.Store.cover_image:type_name -> hawkr.common.v1alpha1.Image
+	60,  // 5: hawkr.admin.seller.v1alpha1.Store.status:type_name -> hawkr.seller.v1alpha1.StoreStatus
+	61,  // 6: hawkr.admin.seller.v1alpha1.Store.create_time:type_name -> google.protobuf.Timestamp
+	61,  // 7: hawkr.admin.seller.v1alpha1.Store.update_time:type_name -> google.protobuf.Timestamp
+	61,  // 8: hawkr.admin.seller.v1alpha1.Store.close_time:type_name -> google.protobuf.Timestamp
 	8,   // 9: hawkr.admin.seller.v1alpha1.Store.closure:type_name -> hawkr.admin.seller.v1alpha1.Closure
-	60,  // 10: hawkr.admin.seller.v1alpha1.Store.address:type_name -> hawkr.common.v1alpha1.PostalAddress
+	62,  // 10: hawkr.admin.seller.v1alpha1.Store.address:type_name -> hawkr.common.v1alpha1.PostalAddress
 	9,   // 11: hawkr.admin.seller.v1alpha1.StoreListItem.store:type_name -> hawkr.admin.seller.v1alpha1.Store
-	61,  // 12: hawkr.admin.seller.v1alpha1.StoreListItem.kyc_flow_status:type_name -> hawkr.seller.v1alpha1.KYCFlowStatus
+	63,  // 12: hawkr.admin.seller.v1alpha1.StoreListItem.kyc_flow_status:type_name -> hawkr.seller.v1alpha1.KYCFlowStatus
 	7,   // 13: hawkr.admin.seller.v1alpha1.StoreListItem.delegation_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
-	62,  // 14: hawkr.admin.seller.v1alpha1.KYCSummary.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
-	61,  // 15: hawkr.admin.seller.v1alpha1.KYCSummary.flow_status:type_name -> hawkr.seller.v1alpha1.KYCFlowStatus
-	59,  // 16: hawkr.admin.seller.v1alpha1.KYCSummary.submit_time:type_name -> google.protobuf.Timestamp
-	59,  // 17: hawkr.admin.seller.v1alpha1.KYCSummary.decide_time:type_name -> google.protobuf.Timestamp
-	63,  // 18: hawkr.admin.seller.v1alpha1.KYCSummary.decide_deadline:type_name -> hawkr.common.v1alpha1.Deadline
-	58,  // 19: hawkr.admin.seller.v1alpha1.ListStoresRequest.status:type_name -> hawkr.seller.v1alpha1.StoreStatus
-	62,  // 20: hawkr.admin.seller.v1alpha1.ListStoresRequest.kyc_status:type_name -> hawkr.seller.v1alpha1.KYCStatus
-	64,  // 21: hawkr.admin.seller.v1alpha1.ListStoresRequest.payuni_bind_status:type_name -> hawkr.seller.v1alpha1.PayUniBindStatus
+	64,  // 14: hawkr.admin.seller.v1alpha1.KYCSummary.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
+	63,  // 15: hawkr.admin.seller.v1alpha1.KYCSummary.flow_status:type_name -> hawkr.seller.v1alpha1.KYCFlowStatus
+	61,  // 16: hawkr.admin.seller.v1alpha1.KYCSummary.submit_time:type_name -> google.protobuf.Timestamp
+	61,  // 17: hawkr.admin.seller.v1alpha1.KYCSummary.decide_time:type_name -> google.protobuf.Timestamp
+	65,  // 18: hawkr.admin.seller.v1alpha1.KYCSummary.decide_deadline:type_name -> hawkr.common.v1alpha1.Deadline
+	60,  // 19: hawkr.admin.seller.v1alpha1.ListStoresRequest.status:type_name -> hawkr.seller.v1alpha1.StoreStatus
+	64,  // 20: hawkr.admin.seller.v1alpha1.ListStoresRequest.kyc_status:type_name -> hawkr.seller.v1alpha1.KYCStatus
+	66,  // 21: hawkr.admin.seller.v1alpha1.ListStoresRequest.payuni_bind_status:type_name -> hawkr.seller.v1alpha1.PayUniBindStatus
 	10,  // 22: hawkr.admin.seller.v1alpha1.ListStoresResponse.stores:type_name -> hawkr.admin.seller.v1alpha1.StoreListItem
-	9,   // 23: hawkr.admin.seller.v1alpha1.GetStoreResponse.store:type_name -> hawkr.admin.seller.v1alpha1.Store
-	11,  // 24: hawkr.admin.seller.v1alpha1.GetStoreResponse.kyc:type_name -> hawkr.admin.seller.v1alpha1.KYCSummary
-	65,  // 25: hawkr.admin.seller.v1alpha1.GetStoreResponse.active_measures:type_name -> hawkr.admin.seller.v1alpha1.Measure
-	66,  // 26: hawkr.admin.seller.v1alpha1.GetStoreResponse.available_terminations:type_name -> hawkr.admin.seller.v1alpha1.TerminationOption
-	7,   // 27: hawkr.admin.seller.v1alpha1.GetStoreResponse.create_measure_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
-	67,  // 28: hawkr.admin.seller.v1alpha1.KYCDocument.field:type_name -> hawkr.seller.v1alpha1.KYCField
-	67,  // 29: hawkr.admin.seller.v1alpha1.KYCDocumentView.field:type_name -> hawkr.seller.v1alpha1.KYCField
-	67,  // 30: hawkr.admin.seller.v1alpha1.KYCDocumentAccess.field:type_name -> hawkr.seller.v1alpha1.KYCField
-	59,  // 31: hawkr.admin.seller.v1alpha1.KYCDocumentAccess.access_time:type_name -> google.protobuf.Timestamp
-	68,  // 32: hawkr.admin.seller.v1alpha1.BusinessKYC.company_register_date:type_name -> google.type.Date
-	60,  // 33: hawkr.admin.seller.v1alpha1.BusinessKYC.company_address:type_name -> hawkr.common.v1alpha1.PostalAddress
-	3,   // 34: hawkr.admin.seller.v1alpha1.KYCReview.action:type_name -> hawkr.admin.seller.v1alpha1.KYCReviewAction
-	59,  // 35: hawkr.admin.seller.v1alpha1.KYCReview.decide_time:type_name -> google.protobuf.Timestamp
-	59,  // 36: hawkr.admin.seller.v1alpha1.KYCReview.registration_check_query_time:type_name -> google.protobuf.Timestamp
-	69,  // 37: hawkr.admin.seller.v1alpha1.KYCReview.issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
-	60,  // 38: hawkr.admin.seller.v1alpha1.KYCRegistration.postal_address:type_name -> hawkr.common.v1alpha1.PostalAddress
-	68,  // 39: hawkr.admin.seller.v1alpha1.KYCRegistration.setup_date:type_name -> google.type.Date
-	6,   // 40: hawkr.admin.seller.v1alpha1.KYCRegistration.status:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationStatus
-	68,  // 41: hawkr.admin.seller.v1alpha1.KYCRegistration.suspend_start_date:type_name -> google.type.Date
-	68,  // 42: hawkr.admin.seller.v1alpha1.KYCRegistration.suspend_end_date:type_name -> google.type.Date
-	5,   // 43: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.outcome:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationOutcome
-	59,  // 44: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.query_time:type_name -> google.protobuf.Timestamp
-	24,  // 45: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.registration:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistration
-	67,  // 46: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.mismatched_fields:type_name -> hawkr.seller.v1alpha1.KYCField
-	67,  // 47: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.unverifiable_fields:type_name -> hawkr.seller.v1alpha1.KYCField
-	59,  // 48: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.request_time:type_name -> google.protobuf.Timestamp
-	59,  // 49: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.deadline_time:type_name -> google.protobuf.Timestamp
-	59,  // 50: hawkr.admin.seller.v1alpha1.KYCReveal.reveal_time:type_name -> google.protobuf.Timestamp
-	59,  // 51: hawkr.admin.seller.v1alpha1.KYCReveal.expire_time:type_name -> google.protobuf.Timestamp
-	62,  // 52: hawkr.admin.seller.v1alpha1.KYCApplication.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
-	68,  // 53: hawkr.admin.seller.v1alpha1.KYCApplication.birth_date:type_name -> google.type.Date
-	68,  // 54: hawkr.admin.seller.v1alpha1.KYCApplication.id_card_issue_date:type_name -> google.type.Date
-	21,  // 55: hawkr.admin.seller.v1alpha1.KYCApplication.individual:type_name -> hawkr.admin.seller.v1alpha1.IndividualKYC
-	22,  // 56: hawkr.admin.seller.v1alpha1.KYCApplication.business:type_name -> hawkr.admin.seller.v1alpha1.BusinessKYC
-	18,  // 57: hawkr.admin.seller.v1alpha1.KYCApplication.documents:type_name -> hawkr.admin.seller.v1alpha1.KYCDocument
-	70,  // 58: hawkr.admin.seller.v1alpha1.KYCApplication.flow:type_name -> hawkr.seller.v1alpha1.KYCFlow
-	23,  // 59: hawkr.admin.seller.v1alpha1.KYCApplication.reviews:type_name -> hawkr.admin.seller.v1alpha1.KYCReview
-	59,  // 60: hawkr.admin.seller.v1alpha1.KYCApplication.submit_time:type_name -> google.protobuf.Timestamp
-	59,  // 61: hawkr.admin.seller.v1alpha1.KYCApplication.decide_time:type_name -> google.protobuf.Timestamp
-	59,  // 62: hawkr.admin.seller.v1alpha1.KYCApplication.create_time:type_name -> google.protobuf.Timestamp
-	59,  // 63: hawkr.admin.seller.v1alpha1.KYCApplication.update_time:type_name -> google.protobuf.Timestamp
-	25,  // 64: hawkr.admin.seller.v1alpha1.KYCApplication.registration_check:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationCheck
-	25,  // 65: hawkr.admin.seller.v1alpha1.KYCApplication.pending_registration_check:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationCheck
-	69,  // 66: hawkr.admin.seller.v1alpha1.KYCApplication.outstanding_issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
-	67,  // 67: hawkr.admin.seller.v1alpha1.KYCApplication.issuable_fields:type_name -> hawkr.seller.v1alpha1.KYCField
-	7,   // 68: hawkr.admin.seller.v1alpha1.KYCApplication.approve_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
-	7,   // 69: hawkr.admin.seller.v1alpha1.KYCApplication.reject_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
-	7,   // 70: hawkr.admin.seller.v1alpha1.KYCApplication.requery_registration_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
-	62,  // 71: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
-	2,   // 72: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.seller_type:type_name -> hawkr.admin.seller.v1alpha1.KYCSellerType
-	59,  // 73: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.submit_time:type_name -> google.protobuf.Timestamp
-	59,  // 74: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.decide_time:type_name -> google.protobuf.Timestamp
-	62,  // 75: hawkr.admin.seller.v1alpha1.ListKYCApplicationsRequest.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
-	28,  // 76: hawkr.admin.seller.v1alpha1.ListKYCApplicationsResponse.applications:type_name -> hawkr.admin.seller.v1alpha1.KYCApplicationSummary
-	27,  // 77: hawkr.admin.seller.v1alpha1.GetKYCApplicationResponse.application:type_name -> hawkr.admin.seller.v1alpha1.KYCApplication
-	26,  // 78: hawkr.admin.seller.v1alpha1.ListKYCRevealsResponse.reveals:type_name -> hawkr.admin.seller.v1alpha1.KYCReveal
-	20,  // 79: hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesResponse.document_accesses:type_name -> hawkr.admin.seller.v1alpha1.KYCDocumentAccess
-	27,  // 80: hawkr.admin.seller.v1alpha1.ApproveKYCResponse.application:type_name -> hawkr.admin.seller.v1alpha1.KYCApplication
-	69,  // 81: hawkr.admin.seller.v1alpha1.RejectKYCRequest.issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
-	27,  // 82: hawkr.admin.seller.v1alpha1.RejectKYCResponse.application:type_name -> hawkr.admin.seller.v1alpha1.KYCApplication
-	59,  // 83: hawkr.admin.seller.v1alpha1.RevealKYCSensitiveResponse.expire_time:type_name -> google.protobuf.Timestamp
-	19,  // 84: hawkr.admin.seller.v1alpha1.RevealKYCSensitiveResponse.documents:type_name -> hawkr.admin.seller.v1alpha1.KYCDocumentView
-	64,  // 85: hawkr.admin.seller.v1alpha1.PayUniRegistration.bind_status:type_name -> hawkr.seller.v1alpha1.PayUniBindStatus
-	59,  // 86: hawkr.admin.seller.v1alpha1.PayUniRegistration.bind_time:type_name -> google.protobuf.Timestamp
-	43,  // 87: hawkr.admin.seller.v1alpha1.PayUniRegistration.status_codes:type_name -> hawkr.admin.seller.v1alpha1.PayUniStatusCodes
-	59,  // 88: hawkr.admin.seller.v1alpha1.PayUniRegistration.status_time:type_name -> google.protobuf.Timestamp
-	59,  // 89: hawkr.admin.seller.v1alpha1.PayUniRegistration.check_time:type_name -> google.protobuf.Timestamp
-	71,  // 90: hawkr.admin.seller.v1alpha1.PayUniRegistration.problem:type_name -> hawkr.seller.v1alpha1.PayUniProblem
-	59,  // 91: hawkr.admin.seller.v1alpha1.PayUniRegistration.create_time:type_name -> google.protobuf.Timestamp
-	59,  // 92: hawkr.admin.seller.v1alpha1.PayUniRegistration.update_time:type_name -> google.protobuf.Timestamp
-	7,   // 93: hawkr.admin.seller.v1alpha1.PayUniRegistration.rebind_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
-	61,  // 94: hawkr.admin.seller.v1alpha1.PayUniRegistration.flow_status:type_name -> hawkr.seller.v1alpha1.KYCFlowStatus
-	44,  // 95: hawkr.admin.seller.v1alpha1.GetPayUniRegistrationResponse.registration:type_name -> hawkr.admin.seller.v1alpha1.PayUniRegistration
-	44,  // 96: hawkr.admin.seller.v1alpha1.RebindPayUniResponse.registration:type_name -> hawkr.admin.seller.v1alpha1.PayUniRegistration
-	4,   // 97: hawkr.admin.seller.v1alpha1.PayUniObservation.source:type_name -> hawkr.admin.seller.v1alpha1.PayUniObservationSource
-	43,  // 98: hawkr.admin.seller.v1alpha1.PayUniObservation.status_codes:type_name -> hawkr.admin.seller.v1alpha1.PayUniStatusCodes
-	59,  // 99: hawkr.admin.seller.v1alpha1.PayUniObservation.execute_time:type_name -> google.protobuf.Timestamp
-	59,  // 100: hawkr.admin.seller.v1alpha1.PayUniObservation.receive_time:type_name -> google.protobuf.Timestamp
-	49,  // 101: hawkr.admin.seller.v1alpha1.ListPayUniObservationsResponse.observations:type_name -> hawkr.admin.seller.v1alpha1.PayUniObservation
-	25,  // 102: hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationResponse.registration_check:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationCheck
-	12,  // 103: hawkr.admin.seller.v1alpha1.SellerAdminService.ListStores:input_type -> hawkr.admin.seller.v1alpha1.ListStoresRequest
-	14,  // 104: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreStats:input_type -> hawkr.admin.seller.v1alpha1.GetStoreStatsRequest
-	16,  // 105: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStore:input_type -> hawkr.admin.seller.v1alpha1.GetStoreRequest
-	29,  // 106: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCApplications:input_type -> hawkr.admin.seller.v1alpha1.ListKYCApplicationsRequest
-	31,  // 107: hawkr.admin.seller.v1alpha1.SellerAdminService.GetKYCApplication:input_type -> hawkr.admin.seller.v1alpha1.GetKYCApplicationRequest
-	33,  // 108: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCReveals:input_type -> hawkr.admin.seller.v1alpha1.ListKYCRevealsRequest
-	35,  // 109: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCDocumentAccesses:input_type -> hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesRequest
-	37,  // 110: hawkr.admin.seller.v1alpha1.SellerAdminService.ApproveKYC:input_type -> hawkr.admin.seller.v1alpha1.ApproveKYCRequest
-	39,  // 111: hawkr.admin.seller.v1alpha1.SellerAdminService.RejectKYC:input_type -> hawkr.admin.seller.v1alpha1.RejectKYCRequest
-	41,  // 112: hawkr.admin.seller.v1alpha1.SellerAdminService.RevealKYCSensitive:input_type -> hawkr.admin.seller.v1alpha1.RevealKYCSensitiveRequest
-	45,  // 113: hawkr.admin.seller.v1alpha1.SellerAdminService.GetPayUniRegistration:input_type -> hawkr.admin.seller.v1alpha1.GetPayUniRegistrationRequest
-	47,  // 114: hawkr.admin.seller.v1alpha1.SellerAdminService.RebindPayUni:input_type -> hawkr.admin.seller.v1alpha1.RebindPayUniRequest
-	50,  // 115: hawkr.admin.seller.v1alpha1.SellerAdminService.ListPayUniObservations:input_type -> hawkr.admin.seller.v1alpha1.ListPayUniObservationsRequest
-	52,  // 116: hawkr.admin.seller.v1alpha1.SellerAdminService.RefreshPayUniStatus:input_type -> hawkr.admin.seller.v1alpha1.RefreshPayUniStatusRequest
-	54,  // 117: hawkr.admin.seller.v1alpha1.SellerAdminService.RequeryKYCRegistration:input_type -> hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationRequest
-	13,  // 118: hawkr.admin.seller.v1alpha1.SellerAdminService.ListStores:output_type -> hawkr.admin.seller.v1alpha1.ListStoresResponse
-	15,  // 119: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreStats:output_type -> hawkr.admin.seller.v1alpha1.GetStoreStatsResponse
-	17,  // 120: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStore:output_type -> hawkr.admin.seller.v1alpha1.GetStoreResponse
-	30,  // 121: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCApplications:output_type -> hawkr.admin.seller.v1alpha1.ListKYCApplicationsResponse
-	32,  // 122: hawkr.admin.seller.v1alpha1.SellerAdminService.GetKYCApplication:output_type -> hawkr.admin.seller.v1alpha1.GetKYCApplicationResponse
-	34,  // 123: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCReveals:output_type -> hawkr.admin.seller.v1alpha1.ListKYCRevealsResponse
-	36,  // 124: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCDocumentAccesses:output_type -> hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesResponse
-	38,  // 125: hawkr.admin.seller.v1alpha1.SellerAdminService.ApproveKYC:output_type -> hawkr.admin.seller.v1alpha1.ApproveKYCResponse
-	40,  // 126: hawkr.admin.seller.v1alpha1.SellerAdminService.RejectKYC:output_type -> hawkr.admin.seller.v1alpha1.RejectKYCResponse
-	42,  // 127: hawkr.admin.seller.v1alpha1.SellerAdminService.RevealKYCSensitive:output_type -> hawkr.admin.seller.v1alpha1.RevealKYCSensitiveResponse
-	46,  // 128: hawkr.admin.seller.v1alpha1.SellerAdminService.GetPayUniRegistration:output_type -> hawkr.admin.seller.v1alpha1.GetPayUniRegistrationResponse
-	48,  // 129: hawkr.admin.seller.v1alpha1.SellerAdminService.RebindPayUni:output_type -> hawkr.admin.seller.v1alpha1.RebindPayUniResponse
-	51,  // 130: hawkr.admin.seller.v1alpha1.SellerAdminService.ListPayUniObservations:output_type -> hawkr.admin.seller.v1alpha1.ListPayUniObservationsResponse
-	53,  // 131: hawkr.admin.seller.v1alpha1.SellerAdminService.RefreshPayUniStatus:output_type -> hawkr.admin.seller.v1alpha1.RefreshPayUniStatusResponse
-	55,  // 132: hawkr.admin.seller.v1alpha1.SellerAdminService.RequeryKYCRegistration:output_type -> hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationResponse
-	118, // [118:133] is the sub-list for method output_type
-	103, // [103:118] is the sub-list for method input_type
-	103, // [103:103] is the sub-list for extension type_name
-	103, // [103:103] is the sub-list for extension extendee
-	0,   // [0:103] is the sub-list for field type_name
+	67,  // 23: hawkr.admin.seller.v1alpha1.GetStoreOnboardingResponse.tasks:type_name -> hawkr.seller.v1alpha1.OnboardingTask
+	9,   // 24: hawkr.admin.seller.v1alpha1.GetStoreResponse.store:type_name -> hawkr.admin.seller.v1alpha1.Store
+	11,  // 25: hawkr.admin.seller.v1alpha1.GetStoreResponse.kyc:type_name -> hawkr.admin.seller.v1alpha1.KYCSummary
+	68,  // 26: hawkr.admin.seller.v1alpha1.GetStoreResponse.active_measures:type_name -> hawkr.admin.seller.v1alpha1.Measure
+	69,  // 27: hawkr.admin.seller.v1alpha1.GetStoreResponse.available_terminations:type_name -> hawkr.admin.seller.v1alpha1.TerminationOption
+	7,   // 28: hawkr.admin.seller.v1alpha1.GetStoreResponse.create_measure_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
+	70,  // 29: hawkr.admin.seller.v1alpha1.KYCDocument.field:type_name -> hawkr.seller.v1alpha1.KYCField
+	70,  // 30: hawkr.admin.seller.v1alpha1.KYCDocumentView.field:type_name -> hawkr.seller.v1alpha1.KYCField
+	70,  // 31: hawkr.admin.seller.v1alpha1.KYCDocumentAccess.field:type_name -> hawkr.seller.v1alpha1.KYCField
+	61,  // 32: hawkr.admin.seller.v1alpha1.KYCDocumentAccess.access_time:type_name -> google.protobuf.Timestamp
+	71,  // 33: hawkr.admin.seller.v1alpha1.BusinessKYC.company_register_date:type_name -> google.type.Date
+	62,  // 34: hawkr.admin.seller.v1alpha1.BusinessKYC.company_address:type_name -> hawkr.common.v1alpha1.PostalAddress
+	3,   // 35: hawkr.admin.seller.v1alpha1.KYCReview.action:type_name -> hawkr.admin.seller.v1alpha1.KYCReviewAction
+	61,  // 36: hawkr.admin.seller.v1alpha1.KYCReview.decide_time:type_name -> google.protobuf.Timestamp
+	61,  // 37: hawkr.admin.seller.v1alpha1.KYCReview.registration_check_query_time:type_name -> google.protobuf.Timestamp
+	72,  // 38: hawkr.admin.seller.v1alpha1.KYCReview.issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
+	62,  // 39: hawkr.admin.seller.v1alpha1.KYCRegistration.postal_address:type_name -> hawkr.common.v1alpha1.PostalAddress
+	71,  // 40: hawkr.admin.seller.v1alpha1.KYCRegistration.setup_date:type_name -> google.type.Date
+	6,   // 41: hawkr.admin.seller.v1alpha1.KYCRegistration.status:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationStatus
+	71,  // 42: hawkr.admin.seller.v1alpha1.KYCRegistration.suspend_start_date:type_name -> google.type.Date
+	71,  // 43: hawkr.admin.seller.v1alpha1.KYCRegistration.suspend_end_date:type_name -> google.type.Date
+	5,   // 44: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.outcome:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationOutcome
+	61,  // 45: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.query_time:type_name -> google.protobuf.Timestamp
+	26,  // 46: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.registration:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistration
+	70,  // 47: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.mismatched_fields:type_name -> hawkr.seller.v1alpha1.KYCField
+	70,  // 48: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.unverifiable_fields:type_name -> hawkr.seller.v1alpha1.KYCField
+	61,  // 49: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.request_time:type_name -> google.protobuf.Timestamp
+	61,  // 50: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.deadline_time:type_name -> google.protobuf.Timestamp
+	61,  // 51: hawkr.admin.seller.v1alpha1.KYCReveal.reveal_time:type_name -> google.protobuf.Timestamp
+	61,  // 52: hawkr.admin.seller.v1alpha1.KYCReveal.expire_time:type_name -> google.protobuf.Timestamp
+	64,  // 53: hawkr.admin.seller.v1alpha1.KYCApplication.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
+	71,  // 54: hawkr.admin.seller.v1alpha1.KYCApplication.birth_date:type_name -> google.type.Date
+	71,  // 55: hawkr.admin.seller.v1alpha1.KYCApplication.id_card_issue_date:type_name -> google.type.Date
+	23,  // 56: hawkr.admin.seller.v1alpha1.KYCApplication.individual:type_name -> hawkr.admin.seller.v1alpha1.IndividualKYC
+	24,  // 57: hawkr.admin.seller.v1alpha1.KYCApplication.business:type_name -> hawkr.admin.seller.v1alpha1.BusinessKYC
+	20,  // 58: hawkr.admin.seller.v1alpha1.KYCApplication.documents:type_name -> hawkr.admin.seller.v1alpha1.KYCDocument
+	73,  // 59: hawkr.admin.seller.v1alpha1.KYCApplication.flow:type_name -> hawkr.seller.v1alpha1.KYCFlow
+	25,  // 60: hawkr.admin.seller.v1alpha1.KYCApplication.reviews:type_name -> hawkr.admin.seller.v1alpha1.KYCReview
+	61,  // 61: hawkr.admin.seller.v1alpha1.KYCApplication.submit_time:type_name -> google.protobuf.Timestamp
+	61,  // 62: hawkr.admin.seller.v1alpha1.KYCApplication.decide_time:type_name -> google.protobuf.Timestamp
+	61,  // 63: hawkr.admin.seller.v1alpha1.KYCApplication.create_time:type_name -> google.protobuf.Timestamp
+	61,  // 64: hawkr.admin.seller.v1alpha1.KYCApplication.update_time:type_name -> google.protobuf.Timestamp
+	27,  // 65: hawkr.admin.seller.v1alpha1.KYCApplication.registration_check:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationCheck
+	27,  // 66: hawkr.admin.seller.v1alpha1.KYCApplication.pending_registration_check:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationCheck
+	72,  // 67: hawkr.admin.seller.v1alpha1.KYCApplication.outstanding_issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
+	70,  // 68: hawkr.admin.seller.v1alpha1.KYCApplication.issuable_fields:type_name -> hawkr.seller.v1alpha1.KYCField
+	7,   // 69: hawkr.admin.seller.v1alpha1.KYCApplication.approve_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
+	7,   // 70: hawkr.admin.seller.v1alpha1.KYCApplication.reject_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
+	7,   // 71: hawkr.admin.seller.v1alpha1.KYCApplication.requery_registration_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
+	64,  // 72: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
+	2,   // 73: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.seller_type:type_name -> hawkr.admin.seller.v1alpha1.KYCSellerType
+	61,  // 74: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.submit_time:type_name -> google.protobuf.Timestamp
+	61,  // 75: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.decide_time:type_name -> google.protobuf.Timestamp
+	64,  // 76: hawkr.admin.seller.v1alpha1.ListKYCApplicationsRequest.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
+	30,  // 77: hawkr.admin.seller.v1alpha1.ListKYCApplicationsResponse.applications:type_name -> hawkr.admin.seller.v1alpha1.KYCApplicationSummary
+	29,  // 78: hawkr.admin.seller.v1alpha1.GetKYCApplicationResponse.application:type_name -> hawkr.admin.seller.v1alpha1.KYCApplication
+	28,  // 79: hawkr.admin.seller.v1alpha1.ListKYCRevealsResponse.reveals:type_name -> hawkr.admin.seller.v1alpha1.KYCReveal
+	22,  // 80: hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesResponse.document_accesses:type_name -> hawkr.admin.seller.v1alpha1.KYCDocumentAccess
+	29,  // 81: hawkr.admin.seller.v1alpha1.ApproveKYCResponse.application:type_name -> hawkr.admin.seller.v1alpha1.KYCApplication
+	72,  // 82: hawkr.admin.seller.v1alpha1.RejectKYCRequest.issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
+	29,  // 83: hawkr.admin.seller.v1alpha1.RejectKYCResponse.application:type_name -> hawkr.admin.seller.v1alpha1.KYCApplication
+	61,  // 84: hawkr.admin.seller.v1alpha1.RevealKYCSensitiveResponse.expire_time:type_name -> google.protobuf.Timestamp
+	21,  // 85: hawkr.admin.seller.v1alpha1.RevealKYCSensitiveResponse.documents:type_name -> hawkr.admin.seller.v1alpha1.KYCDocumentView
+	66,  // 86: hawkr.admin.seller.v1alpha1.PayUniRegistration.bind_status:type_name -> hawkr.seller.v1alpha1.PayUniBindStatus
+	61,  // 87: hawkr.admin.seller.v1alpha1.PayUniRegistration.bind_time:type_name -> google.protobuf.Timestamp
+	45,  // 88: hawkr.admin.seller.v1alpha1.PayUniRegistration.status_codes:type_name -> hawkr.admin.seller.v1alpha1.PayUniStatusCodes
+	61,  // 89: hawkr.admin.seller.v1alpha1.PayUniRegistration.status_time:type_name -> google.protobuf.Timestamp
+	61,  // 90: hawkr.admin.seller.v1alpha1.PayUniRegistration.check_time:type_name -> google.protobuf.Timestamp
+	74,  // 91: hawkr.admin.seller.v1alpha1.PayUniRegistration.problem:type_name -> hawkr.seller.v1alpha1.PayUniProblem
+	61,  // 92: hawkr.admin.seller.v1alpha1.PayUniRegistration.create_time:type_name -> google.protobuf.Timestamp
+	61,  // 93: hawkr.admin.seller.v1alpha1.PayUniRegistration.update_time:type_name -> google.protobuf.Timestamp
+	7,   // 94: hawkr.admin.seller.v1alpha1.PayUniRegistration.rebind_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
+	63,  // 95: hawkr.admin.seller.v1alpha1.PayUniRegistration.flow_status:type_name -> hawkr.seller.v1alpha1.KYCFlowStatus
+	46,  // 96: hawkr.admin.seller.v1alpha1.GetPayUniRegistrationResponse.registration:type_name -> hawkr.admin.seller.v1alpha1.PayUniRegistration
+	46,  // 97: hawkr.admin.seller.v1alpha1.RebindPayUniResponse.registration:type_name -> hawkr.admin.seller.v1alpha1.PayUniRegistration
+	4,   // 98: hawkr.admin.seller.v1alpha1.PayUniObservation.source:type_name -> hawkr.admin.seller.v1alpha1.PayUniObservationSource
+	45,  // 99: hawkr.admin.seller.v1alpha1.PayUniObservation.status_codes:type_name -> hawkr.admin.seller.v1alpha1.PayUniStatusCodes
+	61,  // 100: hawkr.admin.seller.v1alpha1.PayUniObservation.execute_time:type_name -> google.protobuf.Timestamp
+	61,  // 101: hawkr.admin.seller.v1alpha1.PayUniObservation.receive_time:type_name -> google.protobuf.Timestamp
+	51,  // 102: hawkr.admin.seller.v1alpha1.ListPayUniObservationsResponse.observations:type_name -> hawkr.admin.seller.v1alpha1.PayUniObservation
+	27,  // 103: hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationResponse.registration_check:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationCheck
+	12,  // 104: hawkr.admin.seller.v1alpha1.SellerAdminService.ListStores:input_type -> hawkr.admin.seller.v1alpha1.ListStoresRequest
+	14,  // 105: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreStats:input_type -> hawkr.admin.seller.v1alpha1.GetStoreStatsRequest
+	16,  // 106: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStore:input_type -> hawkr.admin.seller.v1alpha1.GetStoreRequest
+	17,  // 107: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreOnboarding:input_type -> hawkr.admin.seller.v1alpha1.GetStoreOnboardingRequest
+	31,  // 108: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCApplications:input_type -> hawkr.admin.seller.v1alpha1.ListKYCApplicationsRequest
+	33,  // 109: hawkr.admin.seller.v1alpha1.SellerAdminService.GetKYCApplication:input_type -> hawkr.admin.seller.v1alpha1.GetKYCApplicationRequest
+	35,  // 110: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCReveals:input_type -> hawkr.admin.seller.v1alpha1.ListKYCRevealsRequest
+	37,  // 111: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCDocumentAccesses:input_type -> hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesRequest
+	39,  // 112: hawkr.admin.seller.v1alpha1.SellerAdminService.ApproveKYC:input_type -> hawkr.admin.seller.v1alpha1.ApproveKYCRequest
+	41,  // 113: hawkr.admin.seller.v1alpha1.SellerAdminService.RejectKYC:input_type -> hawkr.admin.seller.v1alpha1.RejectKYCRequest
+	43,  // 114: hawkr.admin.seller.v1alpha1.SellerAdminService.RevealKYCSensitive:input_type -> hawkr.admin.seller.v1alpha1.RevealKYCSensitiveRequest
+	47,  // 115: hawkr.admin.seller.v1alpha1.SellerAdminService.GetPayUniRegistration:input_type -> hawkr.admin.seller.v1alpha1.GetPayUniRegistrationRequest
+	49,  // 116: hawkr.admin.seller.v1alpha1.SellerAdminService.RebindPayUni:input_type -> hawkr.admin.seller.v1alpha1.RebindPayUniRequest
+	52,  // 117: hawkr.admin.seller.v1alpha1.SellerAdminService.ListPayUniObservations:input_type -> hawkr.admin.seller.v1alpha1.ListPayUniObservationsRequest
+	54,  // 118: hawkr.admin.seller.v1alpha1.SellerAdminService.RefreshPayUniStatus:input_type -> hawkr.admin.seller.v1alpha1.RefreshPayUniStatusRequest
+	56,  // 119: hawkr.admin.seller.v1alpha1.SellerAdminService.RequeryKYCRegistration:input_type -> hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationRequest
+	13,  // 120: hawkr.admin.seller.v1alpha1.SellerAdminService.ListStores:output_type -> hawkr.admin.seller.v1alpha1.ListStoresResponse
+	15,  // 121: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreStats:output_type -> hawkr.admin.seller.v1alpha1.GetStoreStatsResponse
+	19,  // 122: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStore:output_type -> hawkr.admin.seller.v1alpha1.GetStoreResponse
+	18,  // 123: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreOnboarding:output_type -> hawkr.admin.seller.v1alpha1.GetStoreOnboardingResponse
+	32,  // 124: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCApplications:output_type -> hawkr.admin.seller.v1alpha1.ListKYCApplicationsResponse
+	34,  // 125: hawkr.admin.seller.v1alpha1.SellerAdminService.GetKYCApplication:output_type -> hawkr.admin.seller.v1alpha1.GetKYCApplicationResponse
+	36,  // 126: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCReveals:output_type -> hawkr.admin.seller.v1alpha1.ListKYCRevealsResponse
+	38,  // 127: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCDocumentAccesses:output_type -> hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesResponse
+	40,  // 128: hawkr.admin.seller.v1alpha1.SellerAdminService.ApproveKYC:output_type -> hawkr.admin.seller.v1alpha1.ApproveKYCResponse
+	42,  // 129: hawkr.admin.seller.v1alpha1.SellerAdminService.RejectKYC:output_type -> hawkr.admin.seller.v1alpha1.RejectKYCResponse
+	44,  // 130: hawkr.admin.seller.v1alpha1.SellerAdminService.RevealKYCSensitive:output_type -> hawkr.admin.seller.v1alpha1.RevealKYCSensitiveResponse
+	48,  // 131: hawkr.admin.seller.v1alpha1.SellerAdminService.GetPayUniRegistration:output_type -> hawkr.admin.seller.v1alpha1.GetPayUniRegistrationResponse
+	50,  // 132: hawkr.admin.seller.v1alpha1.SellerAdminService.RebindPayUni:output_type -> hawkr.admin.seller.v1alpha1.RebindPayUniResponse
+	53,  // 133: hawkr.admin.seller.v1alpha1.SellerAdminService.ListPayUniObservations:output_type -> hawkr.admin.seller.v1alpha1.ListPayUniObservationsResponse
+	55,  // 134: hawkr.admin.seller.v1alpha1.SellerAdminService.RefreshPayUniStatus:output_type -> hawkr.admin.seller.v1alpha1.RefreshPayUniStatusResponse
+	57,  // 135: hawkr.admin.seller.v1alpha1.SellerAdminService.RequeryKYCRegistration:output_type -> hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationResponse
+	120, // [120:136] is the sub-list for method output_type
+	104, // [104:120] is the sub-list for method input_type
+	104, // [104:104] is the sub-list for extension type_name
+	104, // [104:104] is the sub-list for extension extendee
+	0,   // [0:104] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_admin_seller_v1alpha1_seller_proto_init() }
@@ -4944,7 +5054,7 @@ func file_hawkr_admin_seller_v1alpha1_seller_proto_init() {
 	}
 	file_hawkr_admin_seller_v1alpha1_measure_proto_init()
 	file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[5].OneofWrappers = []any{}
-	file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[20].OneofWrappers = []any{
+	file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[22].OneofWrappers = []any{
 		(*KYCApplication_Individual)(nil),
 		(*KYCApplication_Business)(nil),
 	}
@@ -4954,7 +5064,7 @@ func file_hawkr_admin_seller_v1alpha1_seller_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_admin_seller_v1alpha1_seller_proto_rawDesc), len(file_hawkr_admin_seller_v1alpha1_seller_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   49,
+			NumMessages:   51,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -51,6 +51,9 @@ const (
 	// SellerAdminServiceGetStoreProcedure is the fully-qualified name of the SellerAdminService's
 	// GetStore RPC.
 	SellerAdminServiceGetStoreProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/GetStore"
+	// SellerAdminServiceGetStoreOnboardingProcedure is the fully-qualified name of the
+	// SellerAdminService's GetStoreOnboarding RPC.
+	SellerAdminServiceGetStoreOnboardingProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/GetStoreOnboarding"
 	// SellerAdminServiceListKYCApplicationsProcedure is the fully-qualified name of the
 	// SellerAdminService's ListKYCApplications RPC.
 	SellerAdminServiceListKYCApplicationsProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/ListKYCApplications"
@@ -98,6 +101,9 @@ type SellerAdminServiceClient interface {
 	GetStoreStats(context.Context, *connect.Request[v1alpha1.GetStoreStatsRequest]) (*connect.Response[v1alpha1.GetStoreStatsResponse], error)
 	// GetStore 回傳一家店，連同帳號此刻生效中的措施（active_measures）與身分認證（KYC）的摘要。已關閉的店照樣回傳。
 	GetStore(context.Context, *connect.Request[v1alpha1.GetStoreRequest]) (*connect.Response[v1alpha1.GetStoreResponse], error)
+	// GetStoreOnboarding 回傳一家店的開通任務（與賣家自己看到的 GetMyOnboarding 同一份推導：同一個函式、同一組來源欄位），後台只讀取，沒有 refresh。
+	// 平台審核與收款帳戶各自讀取：單一來源讀不到只讓該項是 UNKNOWN。文字是賣家受眾的句子（後台看賣家看到的），語系依請求。已關閉的店照樣回傳。
+	GetStoreOnboarding(context.Context, *connect.Request[v1alpha1.GetStoreOnboardingRequest]) (*connect.Response[v1alpha1.GetStoreOnboardingResponse], error)
 	// ListKYCApplications 是身分認證的審核佇列：只列送出過的申請（不含賣家的草稿，也不含沒送出就取消的）。依送出時間排序：
 	// status 是 SUBMITTED（待審核）時舊到新，等最久的在最前面；其他（含沒有指定）新到舊。DRAFT 回 invalid_argument。
 	ListKYCApplications(context.Context, *connect.Request[v1alpha1.ListKYCApplicationsRequest]) (*connect.Response[v1alpha1.ListKYCApplicationsResponse], error)
@@ -179,6 +185,13 @@ func NewSellerAdminServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			httpClient,
 			baseURL+SellerAdminServiceGetStoreProcedure,
 			connect.WithSchema(sellerAdminServiceMethods.ByName("GetStore")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		getStoreOnboarding: connect.NewClient[v1alpha1.GetStoreOnboardingRequest, v1alpha1.GetStoreOnboardingResponse](
+			httpClient,
+			baseURL+SellerAdminServiceGetStoreOnboardingProcedure,
+			connect.WithSchema(sellerAdminServiceMethods.ByName("GetStoreOnboarding")),
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
@@ -268,6 +281,7 @@ type sellerAdminServiceClient struct {
 	listStores              *connect.Client[v1alpha1.ListStoresRequest, v1alpha1.ListStoresResponse]
 	getStoreStats           *connect.Client[v1alpha1.GetStoreStatsRequest, v1alpha1.GetStoreStatsResponse]
 	getStore                *connect.Client[v1alpha1.GetStoreRequest, v1alpha1.GetStoreResponse]
+	getStoreOnboarding      *connect.Client[v1alpha1.GetStoreOnboardingRequest, v1alpha1.GetStoreOnboardingResponse]
 	listKYCApplications     *connect.Client[v1alpha1.ListKYCApplicationsRequest, v1alpha1.ListKYCApplicationsResponse]
 	getKYCApplication       *connect.Client[v1alpha1.GetKYCApplicationRequest, v1alpha1.GetKYCApplicationResponse]
 	listKYCReveals          *connect.Client[v1alpha1.ListKYCRevealsRequest, v1alpha1.ListKYCRevealsResponse]
@@ -295,6 +309,11 @@ func (c *sellerAdminServiceClient) GetStoreStats(ctx context.Context, req *conne
 // GetStore calls hawkr.admin.seller.v1alpha1.SellerAdminService.GetStore.
 func (c *sellerAdminServiceClient) GetStore(ctx context.Context, req *connect.Request[v1alpha1.GetStoreRequest]) (*connect.Response[v1alpha1.GetStoreResponse], error) {
 	return c.getStore.CallUnary(ctx, req)
+}
+
+// GetStoreOnboarding calls hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreOnboarding.
+func (c *sellerAdminServiceClient) GetStoreOnboarding(ctx context.Context, req *connect.Request[v1alpha1.GetStoreOnboardingRequest]) (*connect.Response[v1alpha1.GetStoreOnboardingResponse], error) {
+	return c.getStoreOnboarding.CallUnary(ctx, req)
 }
 
 // ListKYCApplications calls hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCApplications.
@@ -369,6 +388,9 @@ type SellerAdminServiceHandler interface {
 	GetStoreStats(context.Context, *connect.Request[v1alpha1.GetStoreStatsRequest]) (*connect.Response[v1alpha1.GetStoreStatsResponse], error)
 	// GetStore 回傳一家店，連同帳號此刻生效中的措施（active_measures）與身分認證（KYC）的摘要。已關閉的店照樣回傳。
 	GetStore(context.Context, *connect.Request[v1alpha1.GetStoreRequest]) (*connect.Response[v1alpha1.GetStoreResponse], error)
+	// GetStoreOnboarding 回傳一家店的開通任務（與賣家自己看到的 GetMyOnboarding 同一份推導：同一個函式、同一組來源欄位），後台只讀取，沒有 refresh。
+	// 平台審核與收款帳戶各自讀取：單一來源讀不到只讓該項是 UNKNOWN。文字是賣家受眾的句子（後台看賣家看到的），語系依請求。已關閉的店照樣回傳。
+	GetStoreOnboarding(context.Context, *connect.Request[v1alpha1.GetStoreOnboardingRequest]) (*connect.Response[v1alpha1.GetStoreOnboardingResponse], error)
 	// ListKYCApplications 是身分認證的審核佇列：只列送出過的申請（不含賣家的草稿，也不含沒送出就取消的）。依送出時間排序：
 	// status 是 SUBMITTED（待審核）時舊到新，等最久的在最前面；其他（含沒有指定）新到舊。DRAFT 回 invalid_argument。
 	ListKYCApplications(context.Context, *connect.Request[v1alpha1.ListKYCApplicationsRequest]) (*connect.Response[v1alpha1.ListKYCApplicationsResponse], error)
@@ -445,6 +467,13 @@ func NewSellerAdminServiceHandler(svc SellerAdminServiceHandler, opts ...connect
 		SellerAdminServiceGetStoreProcedure,
 		svc.GetStore,
 		connect.WithSchema(sellerAdminServiceMethods.ByName("GetStore")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	sellerAdminServiceGetStoreOnboardingHandler := connect.NewUnaryHandler(
+		SellerAdminServiceGetStoreOnboardingProcedure,
+		svc.GetStoreOnboarding,
+		connect.WithSchema(sellerAdminServiceMethods.ByName("GetStoreOnboarding")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
@@ -534,6 +563,8 @@ func NewSellerAdminServiceHandler(svc SellerAdminServiceHandler, opts ...connect
 			sellerAdminServiceGetStoreStatsHandler.ServeHTTP(w, r)
 		case SellerAdminServiceGetStoreProcedure:
 			sellerAdminServiceGetStoreHandler.ServeHTTP(w, r)
+		case SellerAdminServiceGetStoreOnboardingProcedure:
+			sellerAdminServiceGetStoreOnboardingHandler.ServeHTTP(w, r)
 		case SellerAdminServiceListKYCApplicationsProcedure:
 			sellerAdminServiceListKYCApplicationsHandler.ServeHTTP(w, r)
 		case SellerAdminServiceGetKYCApplicationProcedure:
@@ -577,6 +608,10 @@ func (UnimplementedSellerAdminServiceHandler) GetStoreStats(context.Context, *co
 
 func (UnimplementedSellerAdminServiceHandler) GetStore(context.Context, *connect.Request[v1alpha1.GetStoreRequest]) (*connect.Response[v1alpha1.GetStoreResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.GetStore is not implemented"))
+}
+
+func (UnimplementedSellerAdminServiceHandler) GetStoreOnboarding(context.Context, *connect.Request[v1alpha1.GetStoreOnboardingRequest]) (*connect.Response[v1alpha1.GetStoreOnboardingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreOnboarding is not implemented"))
 }
 
 func (UnimplementedSellerAdminServiceHandler) ListKYCApplications(context.Context, *connect.Request[v1alpha1.ListKYCApplicationsRequest]) (*connect.Response[v1alpha1.ListKYCApplicationsResponse], error) {

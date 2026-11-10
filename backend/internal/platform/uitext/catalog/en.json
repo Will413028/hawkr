@@ -57,6 +57,21 @@
     "seller.Measure.suspension_ended": {
       "message": "Ended on {end}"
     },
+    "seller.OnboardingAction.button.ONBOARDING_ACTION_CONTACT_SUPPORT": {
+      "message": "Contact support"
+    },
+    "seller.OnboardingAction.button.ONBOARDING_ACTION_EDIT_PROFILE": {
+      "message": "Go to settings"
+    },
+    "seller.OnboardingAction.button.ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT": {
+      "message": "Refresh"
+    },
+    "seller.OnboardingAction.button.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING": {
+      "message": "Go to payout account setup"
+    },
+    "seller.OnboardingAction.button.ONBOARDING_ACTION_SUBMIT_CERTIFICATION": {
+      "message": "Go to seller verification"
+    },
     "seller.PaymentAccount.payouts_inactive_note": {
       "message": "Payouts to your bank account are not enabled yet. The payment provider may ask you for more information."
     },

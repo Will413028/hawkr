@@ -45,6 +45,7 @@ const (
 	SellerStoresList                  Permission = "seller.stores.list"
 	SellerStoresGet                   Permission = "seller.stores.get"
 	SellerStoreStatsGet               Permission = "seller.store_stats.get"
+	SellerStoreOnboardingGet          Permission = "seller.store_onboarding.get"
 	SellerKYCApplicationsList         Permission = "seller.kyc_applications.list"
 	SellerKYCApplicationsGet          Permission = "seller.kyc_applications.get"
 	SellerKYCApplicationsApprove      Permission = "seller.kyc_applications.approve"
@@ -123,7 +124,7 @@ func Catalog() []Permission {
 		PaymentAccountsGet, PaymentAccountsRefresh, PaymentAccountsRetryCreate,
 		ReviewQueueItemsList,
 		SellerStoresList, SellerStoresGet,
-		SellerStoreStatsGet,
+		SellerStoreStatsGet, SellerStoreOnboardingGet,
 		SellerKYCApplicationsList, SellerKYCApplicationsGet, SellerKYCApplicationsApprove, SellerKYCApplicationsReject,
 		SellerKYCApplicationsRequery,
 		SellerKYCRevealsList, SellerKYCRevealsCreate, SellerKYCDocumentAccessesList, SellerKYCDocumentsGet,

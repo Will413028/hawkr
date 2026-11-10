@@ -114,6 +114,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerMeasureRequestStateWithKind(goldenEnum(c.Value, "MEASURE_REQUEST_STATE_"), goldenEnum(goldenString(c, "kind"), "MEASURE_REQUEST_KIND_"))
 	case "seller.MeasureState":
 		return t.SellerMeasureState(goldenEnum(c.Value, "MEASURE_STATE_"), goldenEnum(goldenString(c, "kind"), "MEASURE_KIND_"))
+	case "seller.OnboardingAction.button":
+		return t.SellerOnboardingActionButton(goldenEnum(c.Value, "ONBOARDING_ACTION_"))
 	case "seller.PayUniState":
 		return t.SellerPayUniState(goldenEnum(c.Value, "PAY_UNI_STATE_"))
 	case "seller.PaymentAccount.payouts_inactive_note":

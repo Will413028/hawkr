@@ -51,6 +51,9 @@ const (
 	// SellerAppServiceGetMyStoreProcedure is the fully-qualified name of the SellerAppService's
 	// GetMyStore RPC.
 	SellerAppServiceGetMyStoreProcedure = "/hawkr.seller.v1alpha1.SellerAppService/GetMyStore"
+	// SellerAppServiceGetMyOnboardingProcedure is the fully-qualified name of the SellerAppService's
+	// GetMyOnboarding RPC.
+	SellerAppServiceGetMyOnboardingProcedure = "/hawkr.seller.v1alpha1.SellerAppService/GetMyOnboarding"
 	// SellerAppServiceUpdateMyStoreProcedure is the fully-qualified name of the SellerAppService's
 	// UpdateMyStore RPC.
 	SellerAppServiceUpdateMyStoreProcedure = "/hawkr.seller.v1alpha1.SellerAppService/UpdateMyStore"
@@ -129,6 +132,13 @@ type SellerAppServiceClient interface {
 	GetMyStoreOpening(context.Context, *connect.Request[v1alpha1.GetMyStoreOpeningRequest]) (*connect.Response[v1alpha1.GetMyStoreOpeningResponse], error)
 	// GetMyStore 回傳呼叫者的店家，連同停權與每個能力的狀態（含缺的條件）。停權與等待刪除的店家照樣回傳。
 	GetMyStore(context.Context, *connect.Request[v1alpha1.GetMyStoreRequest]) (*connect.Response[v1alpha1.GetMyStoreResponse], error)
+	// GetMyOnboarding 回傳呼叫者店家的開通任務：依序的必要任務（商店資料、平台審核、收款帳戶，以及公開條件還缺其他項目時的「其他公開條件」），
+	// 與開通閘門 complete。任務的狀態、下一步與文字都由伺服器推導（client 只呈現，不組合 GetMyKYC、GetMyPaymentAccount、GetMyStore 推導）。
+	// 平台審核與收款帳戶各自讀取自己的來源：單一來源讀不到只讓該項是 UNKNOWN，方法本身不因此失敗。refresh 為 true 時先同步向金流商重讀收款帳戶
+	// 再回傳（賣家從金流商的頁面回來時用）；同步失敗只記錄、不讓方法失敗，這時以快取的狀態回傳。refresh 可能寫入收款帳戶的快取，所以不是
+	// NO_SIDE_EFFECTS（IDEMPOTENT，以 POST 呼叫，仍可自動重送），也像其他會改變狀態的方法一樣，停權的帳號呼叫時回 permission_denied
+	// （ACCOUNT_SUSPENDED）：client 以 GetMyStore 的停權狀態導向公告頁，不靠這個方法。需要賣家能力 CAP_ACCOUNT_SELF_READ，所以已關閉的店家回 not_found。
+	GetMyOnboarding(context.Context, *connect.Request[v1alpha1.GetMyOnboardingRequest]) (*connect.Response[v1alpha1.GetMyOnboardingResponse], error)
 	// UpdateMyStore 修改店家資料的欄位（update_mask），含 logo 與封面（logo_staged_token、
 	// cover_staged_token）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
 	// 不寫入，etag 不變。
@@ -227,6 +237,13 @@ func NewSellerAppServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			baseURL+SellerAppServiceGetMyStoreProcedure,
 			connect.WithSchema(sellerAppServiceMethods.ByName("GetMyStore")),
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		getMyOnboarding: connect.NewClient[v1alpha1.GetMyOnboardingRequest, v1alpha1.GetMyOnboardingResponse](
+			httpClient,
+			baseURL+SellerAppServiceGetMyOnboardingProcedure,
+			connect.WithSchema(sellerAppServiceMethods.ByName("GetMyOnboarding")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
 		updateMyStore: connect.NewClient[v1alpha1.UpdateMyStoreRequest, v1alpha1.UpdateMyStoreResponse](
@@ -340,6 +357,7 @@ type sellerAppServiceClient struct {
 	applyStore                     *connect.Client[v1alpha1.ApplyStoreRequest, v1alpha1.ApplyStoreResponse]
 	getMyStoreOpening              *connect.Client[v1alpha1.GetMyStoreOpeningRequest, v1alpha1.GetMyStoreOpeningResponse]
 	getMyStore                     *connect.Client[v1alpha1.GetMyStoreRequest, v1alpha1.GetMyStoreResponse]
+	getMyOnboarding                *connect.Client[v1alpha1.GetMyOnboardingRequest, v1alpha1.GetMyOnboardingResponse]
 	updateMyStore                  *connect.Client[v1alpha1.UpdateMyStoreRequest, v1alpha1.UpdateMyStoreResponse]
 	completeMyStoreOnboarding      *connect.Client[v1alpha1.CompleteMyStoreOnboardingRequest, v1alpha1.CompleteMyStoreOnboardingResponse]
 	listMyFollowers                *connect.Client[v1alpha1.ListMyFollowersRequest, v1alpha1.ListMyFollowersResponse]
@@ -371,6 +389,11 @@ func (c *sellerAppServiceClient) GetMyStoreOpening(ctx context.Context, req *con
 // GetMyStore calls hawkr.seller.v1alpha1.SellerAppService.GetMyStore.
 func (c *sellerAppServiceClient) GetMyStore(ctx context.Context, req *connect.Request[v1alpha1.GetMyStoreRequest]) (*connect.Response[v1alpha1.GetMyStoreResponse], error) {
 	return c.getMyStore.CallUnary(ctx, req)
+}
+
+// GetMyOnboarding calls hawkr.seller.v1alpha1.SellerAppService.GetMyOnboarding.
+func (c *sellerAppServiceClient) GetMyOnboarding(ctx context.Context, req *connect.Request[v1alpha1.GetMyOnboardingRequest]) (*connect.Response[v1alpha1.GetMyOnboardingResponse], error) {
+	return c.getMyOnboarding.CallUnary(ctx, req)
 }
 
 // UpdateMyStore calls hawkr.seller.v1alpha1.SellerAppService.UpdateMyStore.
@@ -469,6 +492,13 @@ type SellerAppServiceHandler interface {
 	GetMyStoreOpening(context.Context, *connect.Request[v1alpha1.GetMyStoreOpeningRequest]) (*connect.Response[v1alpha1.GetMyStoreOpeningResponse], error)
 	// GetMyStore 回傳呼叫者的店家，連同停權與每個能力的狀態（含缺的條件）。停權與等待刪除的店家照樣回傳。
 	GetMyStore(context.Context, *connect.Request[v1alpha1.GetMyStoreRequest]) (*connect.Response[v1alpha1.GetMyStoreResponse], error)
+	// GetMyOnboarding 回傳呼叫者店家的開通任務：依序的必要任務（商店資料、平台審核、收款帳戶，以及公開條件還缺其他項目時的「其他公開條件」），
+	// 與開通閘門 complete。任務的狀態、下一步與文字都由伺服器推導（client 只呈現，不組合 GetMyKYC、GetMyPaymentAccount、GetMyStore 推導）。
+	// 平台審核與收款帳戶各自讀取自己的來源：單一來源讀不到只讓該項是 UNKNOWN，方法本身不因此失敗。refresh 為 true 時先同步向金流商重讀收款帳戶
+	// 再回傳（賣家從金流商的頁面回來時用）；同步失敗只記錄、不讓方法失敗，這時以快取的狀態回傳。refresh 可能寫入收款帳戶的快取，所以不是
+	// NO_SIDE_EFFECTS（IDEMPOTENT，以 POST 呼叫，仍可自動重送），也像其他會改變狀態的方法一樣，停權的帳號呼叫時回 permission_denied
+	// （ACCOUNT_SUSPENDED）：client 以 GetMyStore 的停權狀態導向公告頁，不靠這個方法。需要賣家能力 CAP_ACCOUNT_SELF_READ，所以已關閉的店家回 not_found。
+	GetMyOnboarding(context.Context, *connect.Request[v1alpha1.GetMyOnboardingRequest]) (*connect.Response[v1alpha1.GetMyOnboardingResponse], error)
 	// UpdateMyStore 修改店家資料的欄位（update_mask），含 logo 與封面（logo_staged_token、
 	// cover_staged_token）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
 	// 不寫入，etag 不變。
@@ -563,6 +593,13 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 		svc.GetMyStore,
 		connect.WithSchema(sellerAppServiceMethods.ByName("GetMyStore")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	sellerAppServiceGetMyOnboardingHandler := connect.NewUnaryHandler(
+		SellerAppServiceGetMyOnboardingProcedure,
+		svc.GetMyOnboarding,
+		connect.WithSchema(sellerAppServiceMethods.ByName("GetMyOnboarding")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
 	sellerAppServiceUpdateMyStoreHandler := connect.NewUnaryHandler(
@@ -676,6 +713,8 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 			sellerAppServiceGetMyStoreOpeningHandler.ServeHTTP(w, r)
 		case SellerAppServiceGetMyStoreProcedure:
 			sellerAppServiceGetMyStoreHandler.ServeHTTP(w, r)
+		case SellerAppServiceGetMyOnboardingProcedure:
+			sellerAppServiceGetMyOnboardingHandler.ServeHTTP(w, r)
 		case SellerAppServiceUpdateMyStoreProcedure:
 			sellerAppServiceUpdateMyStoreHandler.ServeHTTP(w, r)
 		case SellerAppServiceCompleteMyStoreOnboardingProcedure:
@@ -727,6 +766,10 @@ func (UnimplementedSellerAppServiceHandler) GetMyStoreOpening(context.Context, *
 
 func (UnimplementedSellerAppServiceHandler) GetMyStore(context.Context, *connect.Request[v1alpha1.GetMyStoreRequest]) (*connect.Response[v1alpha1.GetMyStoreResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.GetMyStore is not implemented"))
+}
+
+func (UnimplementedSellerAppServiceHandler) GetMyOnboarding(context.Context, *connect.Request[v1alpha1.GetMyOnboardingRequest]) (*connect.Response[v1alpha1.GetMyOnboardingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.GetMyOnboarding is not implemented"))
 }
 
 func (UnimplementedSellerAppServiceHandler) UpdateMyStore(context.Context, *connect.Request[v1alpha1.UpdateMyStoreRequest]) (*connect.Response[v1alpha1.UpdateMyStoreResponse], error) {

@@ -23,6 +23,9 @@ type paymentModule struct {
 	returnURL  string
 	refreshURL string
 	err        error
+	// syncedFor 記下 SyncAccount 被呼叫的店家；syncErr 非 nil 時同步失敗。
+	syncedFor []int64
+	syncErr   error
 }
 
 func (m *paymentModule) Account(_ context.Context, storeID int64) (payment.Account, error) {
@@ -31,6 +34,11 @@ func (m *paymentModule) Account(_ context.Context, storeID int64) (payment.Accou
 
 func (m *paymentModule) Capabilities() (payment.Capabilities, bool) {
 	return m.caps, m.configured
+}
+
+func (m *paymentModule) SyncAccount(_ context.Context, storeID int64) (bool, error) {
+	m.syncedFor = append(m.syncedFor, storeID)
+	return false, m.syncErr
 }
 
 func (m *paymentModule) CreateOnboardingSession(_ context.Context, storeID int64, returnURL, refreshURL string) (payment.OnboardingSession, error) {

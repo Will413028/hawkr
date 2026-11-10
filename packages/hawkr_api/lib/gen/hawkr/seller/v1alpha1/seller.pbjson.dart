@@ -176,6 +176,69 @@ final $typed_data.Uint8List storeOpeningUnavailableReasonDescriptor = $convert.b
     'X0RFTEVUSU5HEAMSMQotU1RPUkVfT1BFTklOR19VTkFWQUlMQUJMRV9SRUFTT05fU1RPUkVfRV'
     'hJU1RTEAQ=');
 
+@$core.Deprecated('Use onboardingTaskIdDescriptor instead')
+const OnboardingTaskId$json = {
+  '1': 'OnboardingTaskId',
+  '2': [
+    {'1': 'ONBOARDING_TASK_ID_UNSPECIFIED', '2': 0},
+    {'1': 'ONBOARDING_TASK_ID_PROFILE', '2': 1},
+    {'1': 'ONBOARDING_TASK_ID_PLATFORM_REVIEW', '2': 2},
+    {'1': 'ONBOARDING_TASK_ID_PAYMENT_ACCOUNT', '2': 3},
+    {'1': 'ONBOARDING_TASK_ID_OTHER_REQUIREMENT', '2': 4},
+  ],
+};
+
+/// Descriptor for `OnboardingTaskId`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List onboardingTaskIdDescriptor = $convert.base64Decode(
+    'ChBPbmJvYXJkaW5nVGFza0lkEiIKHk9OQk9BUkRJTkdfVEFTS19JRF9VTlNQRUNJRklFRBAAEh'
+    '4KGk9OQk9BUkRJTkdfVEFTS19JRF9QUk9GSUxFEAESJgoiT05CT0FSRElOR19UQVNLX0lEX1BM'
+    'QVRGT1JNX1JFVklFVxACEiYKIk9OQk9BUkRJTkdfVEFTS19JRF9QQVlNRU5UX0FDQ09VTlQQAx'
+    'IoCiRPTkJPQVJESU5HX1RBU0tfSURfT1RIRVJfUkVRVUlSRU1FTlQQBA==');
+
+@$core.Deprecated('Use onboardingTaskStateDescriptor instead')
+const OnboardingTaskState$json = {
+  '1': 'OnboardingTaskState',
+  '2': [
+    {'1': 'ONBOARDING_TASK_STATE_UNSPECIFIED', '2': 0},
+    {'1': 'ONBOARDING_TASK_STATE_COMPLETED', '2': 1},
+    {'1': 'ONBOARDING_TASK_STATE_ACTION_REQUIRED', '2': 2},
+    {'1': 'ONBOARDING_TASK_STATE_IN_PROGRESS', '2': 3},
+    {'1': 'ONBOARDING_TASK_STATE_LOCKED', '2': 4},
+    {'1': 'ONBOARDING_TASK_STATE_UNKNOWN', '2': 5},
+  ],
+};
+
+/// Descriptor for `OnboardingTaskState`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List onboardingTaskStateDescriptor = $convert.base64Decode(
+    'ChNPbmJvYXJkaW5nVGFza1N0YXRlEiUKIU9OQk9BUkRJTkdfVEFTS19TVEFURV9VTlNQRUNJRk'
+    'lFRBAAEiMKH09OQk9BUkRJTkdfVEFTS19TVEFURV9DT01QTEVURUQQARIpCiVPTkJPQVJESU5H'
+    'X1RBU0tfU1RBVEVfQUNUSU9OX1JFUVVJUkVEEAISJQohT05CT0FSRElOR19UQVNLX1NUQVRFX0'
+    'lOX1BST0dSRVNTEAMSIAocT05CT0FSRElOR19UQVNLX1NUQVRFX0xPQ0tFRBAEEiEKHU9OQk9B'
+    'UkRJTkdfVEFTS19TVEFURV9VTktOT1dOEAU=');
+
+@$core.Deprecated('Use onboardingActionDescriptor instead')
+const OnboardingAction$json = {
+  '1': 'OnboardingAction',
+  '2': [
+    {'1': 'ONBOARDING_ACTION_UNSPECIFIED', '2': 0},
+    {'1': 'ONBOARDING_ACTION_NONE', '2': 1},
+    {'1': 'ONBOARDING_ACTION_EDIT_PROFILE', '2': 2},
+    {'1': 'ONBOARDING_ACTION_SUBMIT_CERTIFICATION', '2': 3},
+    {'1': 'ONBOARDING_ACTION_START_PAYMENT_ONBOARDING', '2': 4},
+    {'1': 'ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT', '2': 5},
+    {'1': 'ONBOARDING_ACTION_CONTACT_SUPPORT', '2': 6},
+  ],
+};
+
+/// Descriptor for `OnboardingAction`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List onboardingActionDescriptor = $convert.base64Decode(
+    'ChBPbmJvYXJkaW5nQWN0aW9uEiEKHU9OQk9BUkRJTkdfQUNUSU9OX1VOU1BFQ0lGSUVEEAASGg'
+    'oWT05CT0FSRElOR19BQ1RJT05fTk9ORRABEiIKHk9OQk9BUkRJTkdfQUNUSU9OX0VESVRfUFJP'
+    'RklMRRACEioKJk9OQk9BUkRJTkdfQUNUSU9OX1NVQk1JVF9DRVJUSUZJQ0FUSU9OEAMSLgoqT0'
+    '5CT0FSRElOR19BQ1RJT05fU1RBUlRfUEFZTUVOVF9PTkJPQVJESU5HEAQSLQopT05CT0FSRElO'
+    'R19BQ1RJT05fUkVGUkVTSF9QQVlNRU5UX0FDQ09VTlQQBRIlCiFPTkJPQVJESU5HX0FDVElPTl'
+    '9DT05UQUNUX1NVUFBPUlQQBg==');
+
 @$core.Deprecated('Use kYCStatusDescriptor instead')
 const KYCStatus$json = {
   '1': 'KYCStatus',
@@ -1127,6 +1190,104 @@ final $typed_data.Uint8List getMyStoreResponseDescriptor = $convert.base64Decode
     'MWFscGhhMS5DYXBhYmlsaXR5U3RhdHVzUgxjYXBhYmlsaXRpZXMSNwoFc3RhdHMYBSABKAsyIS'
     '5oYXdrci5zZWxsZXIudjFhbHBoYTEuU3RvcmVTdGF0c1IFc3RhdHMSIQoJc3VzcGVuZGVkGAYg'
     'ASgIQgPgQQNSCXN1c3BlbmRlZEoECAIQA0oECAQQBVIKc3VzcGVuc2lvblIIZXhwb3N1cmU=');
+
+@$core.Deprecated('Use getMyOnboardingRequestDescriptor instead')
+const GetMyOnboardingRequest$json = {
+  '1': 'GetMyOnboardingRequest',
+  '2': [
+    {'1': 'refresh', '3': 1, '4': 1, '5': 8, '10': 'refresh'},
+  ],
+};
+
+/// Descriptor for `GetMyOnboardingRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getMyOnboardingRequestDescriptor =
+    $convert.base64Decode(
+        'ChZHZXRNeU9uYm9hcmRpbmdSZXF1ZXN0EhgKB3JlZnJlc2gYASABKAhSB3JlZnJlc2g=');
+
+@$core.Deprecated('Use getMyOnboardingResponseDescriptor instead')
+const GetMyOnboardingResponse$json = {
+  '1': 'GetMyOnboardingResponse',
+  '2': [
+    {
+      '1': 'tasks',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.OnboardingTask',
+      '8': {},
+      '10': 'tasks'
+    },
+    {'1': 'complete', '3': 2, '4': 1, '5': 8, '8': {}, '10': 'complete'},
+  ],
+};
+
+/// Descriptor for `GetMyOnboardingResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getMyOnboardingResponseDescriptor = $convert.base64Decode(
+    'ChdHZXRNeU9uYm9hcmRpbmdSZXNwb25zZRJACgV0YXNrcxgBIAMoCzIlLmhhd2tyLnNlbGxlci'
+    '52MWFscGhhMS5PbmJvYXJkaW5nVGFza0ID4EEDUgV0YXNrcxIfCghjb21wbGV0ZRgCIAEoCEID'
+    '4EEDUghjb21wbGV0ZQ==');
+
+@$core.Deprecated('Use onboardingTaskDescriptor instead')
+const OnboardingTask$json = {
+  '1': 'OnboardingTask',
+  '2': [
+    {
+      '1': 'id',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.OnboardingTaskId',
+      '8': {},
+      '10': 'id'
+    },
+    {
+      '1': 'state',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.OnboardingTaskState',
+      '8': {},
+      '10': 'state'
+    },
+    {
+      '1': 'action',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.OnboardingAction',
+      '8': {},
+      '10': 'action'
+    },
+    {
+      '1': 'title',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.rpc.LocalizedMessage',
+      '8': {},
+      '10': 'title'
+    },
+    {
+      '1': 'status',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.rpc.LocalizedMessage',
+      '8': {},
+      '10': 'status'
+    },
+  ],
+};
+
+/// Descriptor for `OnboardingTask`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List onboardingTaskDescriptor = $convert.base64Decode(
+    'Cg5PbmJvYXJkaW5nVGFzaxI8CgJpZBgBIAEoDjInLmhhd2tyLnNlbGxlci52MWFscGhhMS5Pbm'
+    'JvYXJkaW5nVGFza0lkQgPgQQNSAmlkEkUKBXN0YXRlGAIgASgOMiouaGF3a3Iuc2VsbGVyLnYx'
+    'YWxwaGExLk9uYm9hcmRpbmdUYXNrU3RhdGVCA+BBA1IFc3RhdGUSRAoGYWN0aW9uGAMgASgOMi'
+    'cuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLk9uYm9hcmRpbmdBY3Rpb25CA+BBA1IGYWN0aW9uEjcK'
+    'BXRpdGxlGAQgASgLMhwuZ29vZ2xlLnJwYy5Mb2NhbGl6ZWRNZXNzYWdlQgPgQQNSBXRpdGxlEj'
+    'kKBnN0YXR1cxgFIAEoCzIcLmdvb2dsZS5ycGMuTG9jYWxpemVkTWVzc2FnZUID4EEDUgZzdGF0'
+    'dXM=');
 
 @$core.Deprecated('Use updateMyStoreRequestDescriptor instead')
 const UpdateMyStoreRequest$json = {
@@ -3422,6 +3583,12 @@ const $core.Map<$core.String, $core.dynamic> SellerAppServiceBase$json = {
       '4': {'34': 1},
     },
     {
+      '1': 'GetMyOnboarding',
+      '2': '.hawkr.seller.v1alpha1.GetMyOnboardingRequest',
+      '3': '.hawkr.seller.v1alpha1.GetMyOnboardingResponse',
+      '4': {'34': 2},
+    },
+    {
       '1': 'UpdateMyStore',
       '2': '.hawkr.seller.v1alpha1.UpdateMyStoreRequest',
       '3': '.hawkr.seller.v1alpha1.UpdateMyStoreResponse'
@@ -3532,6 +3699,10 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.GetMyStoreResponse': GetMyStoreResponse$json,
   '.hawkr.seller.v1alpha1.CapabilityStatus': CapabilityStatus$json,
   '.hawkr.seller.v1alpha1.StoreStats': StoreStats$json,
+  '.hawkr.seller.v1alpha1.GetMyOnboardingRequest': GetMyOnboardingRequest$json,
+  '.hawkr.seller.v1alpha1.GetMyOnboardingResponse':
+      GetMyOnboardingResponse$json,
+  '.hawkr.seller.v1alpha1.OnboardingTask': OnboardingTask$json,
   '.hawkr.seller.v1alpha1.UpdateMyStoreRequest': UpdateMyStoreRequest$json,
   '.google.protobuf.FieldMask': $4.FieldMask$json,
   '.hawkr.seller.v1alpha1.UpdateMyStoreResponse': UpdateMyStoreResponse$json,
@@ -3621,41 +3792,43 @@ final $typed_data.Uint8List sellerAppServiceDescriptor = $convert.base64Decode(
     '15U3RvcmVPcGVuaW5nUmVxdWVzdBowLmhhd2tyLnNlbGxlci52MWFscGhhMS5HZXRNeVN0b3Jl'
     'T3BlbmluZ1Jlc3BvbnNlIgOQAgESZgoKR2V0TXlTdG9yZRIoLmhhd2tyLnNlbGxlci52MWFscG'
     'hhMS5HZXRNeVN0b3JlUmVxdWVzdBopLmhhd2tyLnNlbGxlci52MWFscGhhMS5HZXRNeVN0b3Jl'
-    'UmVzcG9uc2UiA5ACARJqCg1VcGRhdGVNeVN0b3JlEisuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLl'
-    'VwZGF0ZU15U3RvcmVSZXF1ZXN0GiwuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlVwZGF0ZU15U3Rv'
-    'cmVSZXNwb25zZRKTAQoZQ29tcGxldGVNeVN0b3JlT25ib2FyZGluZxI3Lmhhd2tyLnNlbGxlci'
-    '52MWFscGhhMS5Db21wbGV0ZU15U3RvcmVPbmJvYXJkaW5nUmVxdWVzdBo4Lmhhd2tyLnNlbGxl'
-    'ci52MWFscGhhMS5Db21wbGV0ZU15U3RvcmVPbmJvYXJkaW5nUmVzcG9uc2UiA5ACAhJ1Cg9MaX'
-    'N0TXlGb2xsb3dlcnMSLS5oYXdrci5zZWxsZXIudjFhbHBoYTEuTGlzdE15Rm9sbG93ZXJzUmVx'
-    'dWVzdBouLmhhd2tyLnNlbGxlci52MWFscGhhMS5MaXN0TXlGb2xsb3dlcnNSZXNwb25zZSIDkA'
-    'IBEnIKDkdldE15RGFzaGJvYXJkEiwuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkdldE15RGFzaGJv'
-    'YXJkUmVxdWVzdBotLmhhd2tyLnNlbGxlci52MWFscGhhMS5HZXRNeURhc2hib2FyZFJlc3Bvbn'
-    'NlIgOQAgESZwoMQ2xvc2VNeVN0b3JlEiouaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkNsb3NlTXlT'
-    'dG9yZVJlcXVlc3QaKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuQ2xvc2VNeVN0b3JlUmVzcG9uc2'
-    'USZwoMU2F2ZUtZQ0RyYWZ0EiouaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlNhdmVLWUNEcmFmdFJl'
-    'cXVlc3QaKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuU2F2ZUtZQ0RyYWZ0UmVzcG9uc2USYAoIR2'
-    'V0TXlLWUMSJi5oYXdrci5zZWxsZXIudjFhbHBoYTEuR2V0TXlLWUNSZXF1ZXN0GicuaGF3a3Iu'
-    'c2VsbGVyLnYxYWxwaGExLkdldE15S1lDUmVzcG9uc2UiA5ACARJeCglTdWJtaXRLWUMSJy5oYX'
-    'drci5zZWxsZXIudjFhbHBoYTEuU3VibWl0S1lDUmVxdWVzdBooLmhhd2tyLnNlbGxlci52MWFs'
-    'cGhhMS5TdWJtaXRLWUNSZXNwb25zZRJeCglDYW5jZWxLWUMSJy5oYXdrci5zZWxsZXIudjFhbH'
-    'BoYTEuQ2FuY2VsS1lDUmVxdWVzdBooLmhhd2tyLnNlbGxlci52MWFscGhhMS5DYW5jZWxLWUNS'
-    'ZXNwb25zZRKBAQoTR2V0TXlQYXltZW50QWNjb3VudBIxLmhhd2tyLnNlbGxlci52MWFscGhhMS'
-    '5HZXRNeVBheW1lbnRBY2NvdW50UmVxdWVzdBoyLmhhd2tyLnNlbGxlci52MWFscGhhMS5HZXRN'
-    'eVBheW1lbnRBY2NvdW50UmVzcG9uc2UiA5ACARKdAQoeQ3JlYXRlUGF5bWVudE9uYm9hcmRpbm'
-    'dTZXNzaW9uEjwuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkNyZWF0ZVBheW1lbnRPbmJvYXJkaW5n'
-    'U2Vzc2lvblJlcXVlc3QaPS5oYXdrci5zZWxsZXIudjFhbHBoYTEuQ3JlYXRlUGF5bWVudE9uYm'
-    '9hcmRpbmdTZXNzaW9uUmVzcG9uc2USkQEKGkxvb2t1cEJ1c2luZXNzUmVnaXN0cmF0aW9uEjgu'
-    'aGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxvb2t1cEJ1c2luZXNzUmVnaXN0cmF0aW9uUmVxdWVzdB'
-    'o5Lmhhd2tyLnNlbGxlci52MWFscGhhMS5Mb29rdXBCdXNpbmVzc1JlZ2lzdHJhdGlvblJlc3Bv'
-    'bnNlEnIKDkxpc3RNeU1lYXN1cmVzEiwuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxpc3RNeU1lYX'
-    'N1cmVzUmVxdWVzdBotLmhhd2tyLnNlbGxlci52MWFscGhhMS5MaXN0TXlNZWFzdXJlc1Jlc3Bv'
-    'bnNlIgOQAgESbAoMR2V0TXlNZWFzdXJlEiouaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkdldE15TW'
-    'Vhc3VyZVJlcXVlc3QaKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuR2V0TXlNZWFzdXJlUmVzcG9u'
-    'c2UiA5ACARJnCgxTdWJtaXRBcHBlYWwSKi5oYXdrci5zZWxsZXIudjFhbHBoYTEuU3VibWl0QX'
-    'BwZWFsUmVxdWVzdBorLmhhd2tyLnNlbGxlci52MWFscGhhMS5TdWJtaXRBcHBlYWxSZXNwb25z'
-    'ZRJ5ChJSZXF1ZXN0UmVtZWRpYXRpb24SMC5oYXdrci5zZWxsZXIudjFhbHBoYTEuUmVxdWVzdF'
-    'JlbWVkaWF0aW9uUmVxdWVzdBoxLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXF1ZXN0UmVtZWRp'
-    'YXRpb25SZXNwb25zZQ==');
+    'UmVzcG9uc2UiA5ACARJ1Cg9HZXRNeU9uYm9hcmRpbmcSLS5oYXdrci5zZWxsZXIudjFhbHBoYT'
+    'EuR2V0TXlPbmJvYXJkaW5nUmVxdWVzdBouLmhhd2tyLnNlbGxlci52MWFscGhhMS5HZXRNeU9u'
+    'Ym9hcmRpbmdSZXNwb25zZSIDkAICEmoKDVVwZGF0ZU15U3RvcmUSKy5oYXdrci5zZWxsZXIudj'
+    'FhbHBoYTEuVXBkYXRlTXlTdG9yZVJlcXVlc3QaLC5oYXdrci5zZWxsZXIudjFhbHBoYTEuVXBk'
+    'YXRlTXlTdG9yZVJlc3BvbnNlEpMBChlDb21wbGV0ZU15U3RvcmVPbmJvYXJkaW5nEjcuaGF3a3'
+    'Iuc2VsbGVyLnYxYWxwaGExLkNvbXBsZXRlTXlTdG9yZU9uYm9hcmRpbmdSZXF1ZXN0GjguaGF3'
+    'a3Iuc2VsbGVyLnYxYWxwaGExLkNvbXBsZXRlTXlTdG9yZU9uYm9hcmRpbmdSZXNwb25zZSIDkA'
+    'ICEnUKD0xpc3RNeUZvbGxvd2VycxItLmhhd2tyLnNlbGxlci52MWFscGhhMS5MaXN0TXlGb2xs'
+    'b3dlcnNSZXF1ZXN0Gi4uaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxpc3RNeUZvbGxvd2Vyc1Jlc3'
+    'BvbnNlIgOQAgEScgoOR2V0TXlEYXNoYm9hcmQSLC5oYXdrci5zZWxsZXIudjFhbHBoYTEuR2V0'
+    'TXlEYXNoYm9hcmRSZXF1ZXN0Gi0uaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkdldE15RGFzaGJvYX'
+    'JkUmVzcG9uc2UiA5ACARJnCgxDbG9zZU15U3RvcmUSKi5oYXdrci5zZWxsZXIudjFhbHBoYTEu'
+    'Q2xvc2VNeVN0b3JlUmVxdWVzdBorLmhhd2tyLnNlbGxlci52MWFscGhhMS5DbG9zZU15U3Rvcm'
+    'VSZXNwb25zZRJnCgxTYXZlS1lDRHJhZnQSKi5oYXdrci5zZWxsZXIudjFhbHBoYTEuU2F2ZUtZ'
+    'Q0RyYWZ0UmVxdWVzdBorLmhhd2tyLnNlbGxlci52MWFscGhhMS5TYXZlS1lDRHJhZnRSZXNwb2'
+    '5zZRJgCghHZXRNeUtZQxImLmhhd2tyLnNlbGxlci52MWFscGhhMS5HZXRNeUtZQ1JlcXVlc3Qa'
+    'Jy5oYXdrci5zZWxsZXIudjFhbHBoYTEuR2V0TXlLWUNSZXNwb25zZSIDkAIBEl4KCVN1Ym1pdE'
+    'tZQxInLmhhd2tyLnNlbGxlci52MWFscGhhMS5TdWJtaXRLWUNSZXF1ZXN0GiguaGF3a3Iuc2Vs'
+    'bGVyLnYxYWxwaGExLlN1Ym1pdEtZQ1Jlc3BvbnNlEl4KCUNhbmNlbEtZQxInLmhhd2tyLnNlbG'
+    'xlci52MWFscGhhMS5DYW5jZWxLWUNSZXF1ZXN0GiguaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkNh'
+    'bmNlbEtZQ1Jlc3BvbnNlEoEBChNHZXRNeVBheW1lbnRBY2NvdW50EjEuaGF3a3Iuc2VsbGVyLn'
+    'YxYWxwaGExLkdldE15UGF5bWVudEFjY291bnRSZXF1ZXN0GjIuaGF3a3Iuc2VsbGVyLnYxYWxw'
+    'aGExLkdldE15UGF5bWVudEFjY291bnRSZXNwb25zZSIDkAIBEp0BCh5DcmVhdGVQYXltZW50T2'
+    '5ib2FyZGluZ1Nlc3Npb24SPC5oYXdrci5zZWxsZXIudjFhbHBoYTEuQ3JlYXRlUGF5bWVudE9u'
+    'Ym9hcmRpbmdTZXNzaW9uUmVxdWVzdBo9Lmhhd2tyLnNlbGxlci52MWFscGhhMS5DcmVhdGVQYX'
+    'ltZW50T25ib2FyZGluZ1Nlc3Npb25SZXNwb25zZRKRAQoaTG9va3VwQnVzaW5lc3NSZWdpc3Ry'
+    'YXRpb24SOC5oYXdrci5zZWxsZXIudjFhbHBoYTEuTG9va3VwQnVzaW5lc3NSZWdpc3RyYXRpb2'
+    '5SZXF1ZXN0GjkuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxvb2t1cEJ1c2luZXNzUmVnaXN0cmF0'
+    'aW9uUmVzcG9uc2UScgoOTGlzdE15TWVhc3VyZXMSLC5oYXdrci5zZWxsZXIudjFhbHBoYTEuTG'
+    'lzdE15TWVhc3VyZXNSZXF1ZXN0Gi0uaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxpc3RNeU1lYXN1'
+    'cmVzUmVzcG9uc2UiA5ACARJsCgxHZXRNeU1lYXN1cmUSKi5oYXdrci5zZWxsZXIudjFhbHBoYT'
+    'EuR2V0TXlNZWFzdXJlUmVxdWVzdBorLmhhd2tyLnNlbGxlci52MWFscGhhMS5HZXRNeU1lYXN1'
+    'cmVSZXNwb25zZSIDkAIBEmcKDFN1Ym1pdEFwcGVhbBIqLmhhd2tyLnNlbGxlci52MWFscGhhMS'
+    '5TdWJtaXRBcHBlYWxSZXF1ZXN0GisuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN1Ym1pdEFwcGVh'
+    'bFJlc3BvbnNlEnkKElJlcXVlc3RSZW1lZGlhdGlvbhIwLmhhd2tyLnNlbGxlci52MWFscGhhMS'
+    '5SZXF1ZXN0UmVtZWRpYXRpb25SZXF1ZXN0GjEuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcXVl'
+    'c3RSZW1lZGlhdGlvblJlc3BvbnNl');
 
 const $core.Map<$core.String, $core.dynamic> SellerPublicServiceBase$json = {
   '1': 'SellerPublicService',

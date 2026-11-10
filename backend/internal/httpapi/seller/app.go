@@ -26,6 +26,7 @@ type Module interface {
 	LookupBusinessRegistration(ctx context.Context, taxID string) (model.Registration, bool, error)
 	Apply(context.Context, model.ApplyInput) (model.Store, error)
 	StoreOpening(ctx context.Context, accountID int64) (model.StoreOpening, error)
+	Store(ctx context.Context, storeID int64) (model.Store, error)
 	UpdateProfile(context.Context, model.UpdateProfileInput) (model.Store, error)
 	CompleteOnboarding(ctx context.Context, storeID, expectedVersion int64) (model.Store, error)
 	CloseCurrent(context.Context, int64) (model.Store, error)

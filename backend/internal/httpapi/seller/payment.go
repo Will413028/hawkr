@@ -36,11 +36,18 @@ func checkReturnURL(path, raw string) error {
 	return nil
 }
 
-// Payments 是賣家收款帳戶的來源（payment 模組，Stripe 計畫 D30）：handler 先由能力檢查取得呼叫者的店家（擁有者），再以店家呼叫。
-type Payments interface {
+// PaymentReader 是收款帳戶的讀取來源（賣家端與後台的開通任務共用）。
+type PaymentReader interface {
 	Account(ctx context.Context, storeID int64) (payment.Account, error)
 	Capabilities() (payment.Capabilities, bool)
+}
+
+// Payments 是賣家收款帳戶的來源（payment 模組，Stripe 計畫 D30）：handler 先由能力檢查取得呼叫者的店家（擁有者），再以店家呼叫。
+// SyncAccount 是 GetMyOnboarding 在 refresh 時的同步重讀（transaction 外的外部呼叫，可以與同步 job 並行，D32）；again 不需要處理。
+type Payments interface {
+	PaymentReader
 	CreateOnboardingSession(ctx context.Context, storeID int64, returnURL, refreshURL string) (payment.OnboardingSession, error)
+	SyncAccount(ctx context.Context, storeID int64) (again bool, err error)
 }
 
 func optTimestamp(t *time.Time) *timestamppb.Timestamp {

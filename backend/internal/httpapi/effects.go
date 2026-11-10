@@ -95,6 +95,7 @@ var customerEffects = map[string]Effect{
 	"/hawkr.seller.v1alpha1.SellerAppService/ApplyStore":                     EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerAppService/GetMyStoreOpening":              EffectRead,
 	"/hawkr.seller.v1alpha1.SellerAppService/GetMyStore":                     EffectRead,
+	"/hawkr.seller.v1alpha1.SellerAppService/GetMyOnboarding":                EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerAppService/UpdateMyStore":                  EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerAppService/CompleteMyStoreOnboarding":      EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerAppService/ListMyFollowers":                EffectRead,

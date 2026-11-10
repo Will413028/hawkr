@@ -342,6 +342,148 @@ class StoreOpeningUnavailableReason extends $pb.ProtobufEnum {
   const StoreOpeningUnavailableReason._(super.value, super.name);
 }
 
+/// OnboardingTaskId 是開通任務的種類。client 用它分支（圖示、路由），不用它組顯示文字。
+class OnboardingTaskId extends $pb.ProtobufEnum {
+  static const OnboardingTaskId ONBOARDING_TASK_ID_UNSPECIFIED =
+      OnboardingTaskId._(
+          0, _omitEnumNames ? '' : 'ONBOARDING_TASK_ID_UNSPECIFIED');
+
+  /// 商店資料：店名、logo 與所在地都有值（公開曝光的條件）。
+  static const OnboardingTaskId ONBOARDING_TASK_ID_PROFILE =
+      OnboardingTaskId._(1, _omitEnumNames ? '' : 'ONBOARDING_TASK_ID_PROFILE');
+
+  /// 平台審核：商家認證（KYC）核准。
+  static const OnboardingTaskId ONBOARDING_TASK_ID_PLATFORM_REVIEW =
+      OnboardingTaskId._(
+          2, _omitEnumNames ? '' : 'ONBOARDING_TASK_ID_PLATFORM_REVIEW');
+
+  /// 收款帳戶：金流商的收款帳戶轉帳能力啟用；平台審核完成之前是 LOCKED。
+  static const OnboardingTaskId ONBOARDING_TASK_ID_PAYMENT_ACCOUNT =
+      OnboardingTaskId._(
+          3, _omitEnumNames ? '' : 'ONBOARDING_TASK_ID_PAYMENT_ACCOUNT');
+
+  /// 其他公開條件：公開曝光還缺上面三項與停權、關店、等待刪除（由公告頁處理）以外的條件，賣家只能聯絡客服。
+  static const OnboardingTaskId ONBOARDING_TASK_ID_OTHER_REQUIREMENT =
+      OnboardingTaskId._(
+          4, _omitEnumNames ? '' : 'ONBOARDING_TASK_ID_OTHER_REQUIREMENT');
+
+  static const $core.List<OnboardingTaskId> values = <OnboardingTaskId>[
+    ONBOARDING_TASK_ID_UNSPECIFIED,
+    ONBOARDING_TASK_ID_PROFILE,
+    ONBOARDING_TASK_ID_PLATFORM_REVIEW,
+    ONBOARDING_TASK_ID_PAYMENT_ACCOUNT,
+    ONBOARDING_TASK_ID_OTHER_REQUIREMENT,
+  ];
+
+  static final $core.List<OnboardingTaskId?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static OnboardingTaskId? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const OnboardingTaskId._(super.value, super.name);
+}
+
+/// OnboardingTaskState 是開通任務的狀態，只供 client 分支。
+class OnboardingTaskState extends $pb.ProtobufEnum {
+  static const OnboardingTaskState ONBOARDING_TASK_STATE_UNSPECIFIED =
+      OnboardingTaskState._(
+          0, _omitEnumNames ? '' : 'ONBOARDING_TASK_STATE_UNSPECIFIED');
+
+  /// 已完成。
+  static const OnboardingTaskState ONBOARDING_TASK_STATE_COMPLETED =
+      OnboardingTaskState._(
+          1, _omitEnumNames ? '' : 'ONBOARDING_TASK_STATE_COMPLETED');
+
+  /// 需要賣家動作；action 說明下一步。
+  static const OnboardingTaskState ONBOARDING_TASK_STATE_ACTION_REQUIRED =
+      OnboardingTaskState._(
+          2, _omitEnumNames ? '' : 'ONBOARDING_TASK_STATE_ACTION_REQUIRED');
+
+  /// 進行中，賣家沒有要做的事（等平台或金流商）；action 可能是重新整理。
+  static const OnboardingTaskState ONBOARDING_TASK_STATE_IN_PROGRESS =
+      OnboardingTaskState._(
+          3, _omitEnumNames ? '' : 'ONBOARDING_TASK_STATE_IN_PROGRESS');
+
+  /// 前一項還沒完成，這一項尚未開放。
+  static const OnboardingTaskState ONBOARDING_TASK_STATE_LOCKED =
+      OnboardingTaskState._(
+          4, _omitEnumNames ? '' : 'ONBOARDING_TASK_STATE_LOCKED');
+
+  /// 這一項的來源暫時讀不到，狀態不明。
+  static const OnboardingTaskState ONBOARDING_TASK_STATE_UNKNOWN =
+      OnboardingTaskState._(
+          5, _omitEnumNames ? '' : 'ONBOARDING_TASK_STATE_UNKNOWN');
+
+  static const $core.List<OnboardingTaskState> values = <OnboardingTaskState>[
+    ONBOARDING_TASK_STATE_UNSPECIFIED,
+    ONBOARDING_TASK_STATE_COMPLETED,
+    ONBOARDING_TASK_STATE_ACTION_REQUIRED,
+    ONBOARDING_TASK_STATE_IN_PROGRESS,
+    ONBOARDING_TASK_STATE_LOCKED,
+    ONBOARDING_TASK_STATE_UNKNOWN,
+  ];
+
+  static final $core.List<OnboardingTaskState?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
+  static OnboardingTaskState? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const OnboardingTaskState._(super.value, super.name);
+}
+
+/// OnboardingAction 是開通任務的下一步。client 對到自己的路由（網頁與 App 的位置不同）；按鈕文字由共用文案目錄依值決定。
+class OnboardingAction extends $pb.ProtobufEnum {
+  static const OnboardingAction ONBOARDING_ACTION_UNSPECIFIED =
+      OnboardingAction._(
+          0, _omitEnumNames ? '' : 'ONBOARDING_ACTION_UNSPECIFIED');
+
+  /// 沒有賣家能做的事。
+  static const OnboardingAction ONBOARDING_ACTION_NONE =
+      OnboardingAction._(1, _omitEnumNames ? '' : 'ONBOARDING_ACTION_NONE');
+
+  /// 到店家資料補齊店名、logo 或所在地。
+  static const OnboardingAction ONBOARDING_ACTION_EDIT_PROFILE =
+      OnboardingAction._(
+          2, _omitEnumNames ? '' : 'ONBOARDING_ACTION_EDIT_PROFILE');
+
+  /// 到商家認證送出或重新送出申請（尚未送出、草稿、被退回、已取消）。
+  static const OnboardingAction ONBOARDING_ACTION_SUBMIT_CERTIFICATION =
+      OnboardingAction._(
+          3, _omitEnumNames ? '' : 'ONBOARDING_ACTION_SUBMIT_CERTIFICATION');
+
+  /// 開始（或繼續）金流商的收款帳戶設定：呼叫 CreatePaymentOnboardingSession。
+  static const OnboardingAction ONBOARDING_ACTION_START_PAYMENT_ONBOARDING =
+      OnboardingAction._(4,
+          _omitEnumNames ? '' : 'ONBOARDING_ACTION_START_PAYMENT_ONBOARDING');
+
+  /// 重新整理收款帳戶的狀態：再呼叫 GetMyOnboarding 並帶 refresh。
+  static const OnboardingAction ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT =
+      OnboardingAction._(
+          5, _omitEnumNames ? '' : 'ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT');
+
+  /// 聯絡客服：問題無法由賣家自行解決。
+  static const OnboardingAction ONBOARDING_ACTION_CONTACT_SUPPORT =
+      OnboardingAction._(
+          6, _omitEnumNames ? '' : 'ONBOARDING_ACTION_CONTACT_SUPPORT');
+
+  static const $core.List<OnboardingAction> values = <OnboardingAction>[
+    ONBOARDING_ACTION_UNSPECIFIED,
+    ONBOARDING_ACTION_NONE,
+    ONBOARDING_ACTION_EDIT_PROFILE,
+    ONBOARDING_ACTION_SUBMIT_CERTIFICATION,
+    ONBOARDING_ACTION_START_PAYMENT_ONBOARDING,
+    ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT,
+    ONBOARDING_ACTION_CONTACT_SUPPORT,
+  ];
+
+  static final $core.List<OnboardingAction?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 6);
+  static OnboardingAction? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const OnboardingAction._(super.value, super.name);
+}
+
 /// KYCStatus 是申請的人工決定；PayUni 的綁定結果不在這條軸上（見 KYCFlow）。
 class KYCStatus extends $pb.ProtobufEnum {
   static const KYCStatus KYC_STATUS_UNSPECIFIED =

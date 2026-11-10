@@ -1131,6 +1131,261 @@ class GetMyStoreResponse extends $pb.GeneratedMessage {
   void clearSuspended() => $_clearField(6);
 }
 
+class GetMyOnboardingRequest extends $pb.GeneratedMessage {
+  factory GetMyOnboardingRequest({
+    $core.bool? refresh,
+  }) {
+    final result = GetMyOnboardingRequest._();
+    if (refresh != null) result.refresh = refresh;
+    return result;
+  }
+
+  GetMyOnboardingRequest._();
+
+  factory GetMyOnboardingRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyOnboardingRequest()..mergeFromBuffer(data, registry);
+  factory GetMyOnboardingRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyOnboardingRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetMyOnboardingRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: GetMyOnboardingRequest.$_createMessage)
+    ..aOB(1, _omitFieldNames ? '' : 'refresh')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyOnboardingRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyOnboardingRequest copyWith(
+          void Function(GetMyOnboardingRequest) updates) =>
+      super.copyWith((message) => updates(message as GetMyOnboardingRequest))
+          as GetMyOnboardingRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetMyOnboardingRequest() / GetMyOnboardingRequest.new instead')
+  static GetMyOnboardingRequest create() => GetMyOnboardingRequest._();
+  static $pb.GeneratedMessage $_createMessage() => GetMyOnboardingRequest._();
+  @$core.override
+  GetMyOnboardingRequest createEmptyInstance() => GetMyOnboardingRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GetMyOnboardingRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetMyOnboardingRequest>(
+          GetMyOnboardingRequest.$_createMessage);
+  static GetMyOnboardingRequest? _defaultInstance;
+
+  /// 為 true 時，先同步重讀金流商的收款帳戶再回傳（從金流商的開通頁面回到平台時使用）。同步失敗不讓方法失敗：記錄之後以目前快取的狀態回傳。
+  /// 為 false 時只讀本地的狀態。
+  @$pb.TagNumber(1)
+  $core.bool get refresh => $_getBF(0);
+  @$pb.TagNumber(1)
+  set refresh($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRefresh() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRefresh() => $_clearField(1);
+}
+
+class GetMyOnboardingResponse extends $pb.GeneratedMessage {
+  factory GetMyOnboardingResponse({
+    $core.Iterable<OnboardingTask>? tasks,
+    $core.bool? complete,
+  }) {
+    final result = GetMyOnboardingResponse._();
+    if (tasks != null) result.tasks.addAll(tasks);
+    if (complete != null) result.complete = complete;
+    return result;
+  }
+
+  GetMyOnboardingResponse._();
+
+  factory GetMyOnboardingResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyOnboardingResponse()..mergeFromBuffer(data, registry);
+  factory GetMyOnboardingResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyOnboardingResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetMyOnboardingResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: GetMyOnboardingResponse.$_createMessage)
+    ..pPM<OnboardingTask>(1, _omitFieldNames ? '' : 'tasks',
+        subBuilder: OnboardingTask.$_createMessage)
+    ..aOB(2, _omitFieldNames ? '' : 'complete')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyOnboardingResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyOnboardingResponse copyWith(
+          void Function(GetMyOnboardingResponse) updates) =>
+      super.copyWith((message) => updates(message as GetMyOnboardingResponse))
+          as GetMyOnboardingResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetMyOnboardingResponse() / GetMyOnboardingResponse.new instead')
+  static GetMyOnboardingResponse create() => GetMyOnboardingResponse._();
+  static $pb.GeneratedMessage $_createMessage() => GetMyOnboardingResponse._();
+  @$core.override
+  GetMyOnboardingResponse createEmptyInstance() => GetMyOnboardingResponse._();
+  @$core.pragma('dart2js:noInline')
+  static GetMyOnboardingResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetMyOnboardingResponse>(
+          GetMyOnboardingResponse.$_createMessage);
+  static GetMyOnboardingResponse? _defaultInstance;
+
+  /// 必要任務，依顯示順序（OnboardingTaskId 的順序：PROFILE、PLATFORM_REVIEW、PAYMENT_ACCOUNT，OTHER_REQUIREMENT 只在需要時出現在最後）。
+  /// 順序與分組三端相同，client 照順序呈現。建議任務（物流、商品、簡介）不在這裡。
+  @$pb.TagNumber(1)
+  $pb.PbList<OnboardingTask> get tasks => $_getList(0);
+
+  /// 開通閘門是否通過，等於 GetMyStore 的 capabilities 裡 SELLER_REQUIREMENT_ONBOARDING_COMPLETE 沒有缺（平台審核核准且收款帳戶的轉帳能力啟用，
+  /// 與 PLATFORM_REVIEW、PAYMENT_ACCOUNT 兩項都是 COMPLETED 同義，同一組來源欄位）。不含 PROFILE：商店資料齊全是公開曝光的條件、不是開通閘門。
+  @$pb.TagNumber(2)
+  $core.bool get complete => $_getBF(1);
+  @$pb.TagNumber(2)
+  set complete($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasComplete() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearComplete() => $_clearField(2);
+}
+
+/// OnboardingTask 是一個開通任務。client 用 state 與 action 分支，title 與 status 直接顯示；不從其他方法推導任務狀態，也不另建對照表。
+class OnboardingTask extends $pb.GeneratedMessage {
+  factory OnboardingTask({
+    OnboardingTaskId? id,
+    OnboardingTaskState? state,
+    OnboardingAction? action,
+    $3.LocalizedMessage? title,
+    $3.LocalizedMessage? status,
+  }) {
+    final result = OnboardingTask._();
+    if (id != null) result.id = id;
+    if (state != null) result.state = state;
+    if (action != null) result.action = action;
+    if (title != null) result.title = title;
+    if (status != null) result.status = status;
+    return result;
+  }
+
+  OnboardingTask._();
+
+  factory OnboardingTask.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      OnboardingTask()..mergeFromBuffer(data, registry);
+  factory OnboardingTask.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      OnboardingTask()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'OnboardingTask',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: OnboardingTask.$_createMessage)
+    ..aE<OnboardingTaskId>(1, _omitFieldNames ? '' : 'id',
+        enumValues: OnboardingTaskId.values)
+    ..aE<OnboardingTaskState>(2, _omitFieldNames ? '' : 'state',
+        enumValues: OnboardingTaskState.values)
+    ..aE<OnboardingAction>(3, _omitFieldNames ? '' : 'action',
+        enumValues: OnboardingAction.values)
+    ..aOM<$3.LocalizedMessage>(4, _omitFieldNames ? '' : 'title',
+        subBuilder: $3.LocalizedMessage.$_createMessage)
+    ..aOM<$3.LocalizedMessage>(5, _omitFieldNames ? '' : 'status',
+        subBuilder: $3.LocalizedMessage.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  OnboardingTask clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  OnboardingTask copyWith(void Function(OnboardingTask) updates) =>
+      super.copyWith((message) => updates(message as OnboardingTask))
+          as OnboardingTask;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use OnboardingTask() / OnboardingTask.new instead')
+  static OnboardingTask create() => OnboardingTask._();
+  static $pb.GeneratedMessage $_createMessage() => OnboardingTask._();
+  @$core.override
+  OnboardingTask createEmptyInstance() => OnboardingTask._();
+  @$core.pragma('dart2js:noInline')
+  static OnboardingTask getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<OnboardingTask>(
+          OnboardingTask.$_createMessage);
+  static OnboardingTask? _defaultInstance;
+
+  /// 任務。伺服器一律設，不會是 UNSPECIFIED。
+  @$pb.TagNumber(1)
+  OnboardingTaskId get id => $_getN(0);
+  @$pb.TagNumber(1)
+  set id(OnboardingTaskId value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  /// 任務的狀態，只供 client 分支（圖示、鎖頭、按鈕是否可按），不用它組顯示文字。伺服器一律設，不會是 UNSPECIFIED；UNKNOWN 只表示這一項的來源讀取失敗。
+  @$pb.TagNumber(2)
+  OnboardingTaskState get state => $_getN(1);
+  @$pb.TagNumber(2)
+  set state(OnboardingTaskState value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasState() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearState() => $_clearField(2);
+
+  /// 賣家下一步要做什麼；client 對到自己的路由與按鈕文字（按鈕文字由共用文案目錄依這個值決定）。COMPLETED、LOCKED、UNKNOWN 與沒有賣家能做的事時是 NONE。
+  /// 伺服器一律設，不會是 UNSPECIFIED。
+  @$pb.TagNumber(3)
+  OnboardingAction get action => $_getN(2);
+  @$pb.TagNumber(3)
+  set action(OnboardingAction value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAction() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAction() => $_clearField(3);
+
+  /// 任務標題（locale 是實際用的語系）。client 直接顯示。
+  @$pb.TagNumber(4)
+  $3.LocalizedMessage get title => $_getN(3);
+  @$pb.TagNumber(4)
+  set title($3.LocalizedMessage value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTitle() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTitle() => $_clearField(4);
+  @$pb.TagNumber(4)
+  $3.LocalizedMessage ensureTitle() => $_ensure(3);
+
+  /// 任務目前狀態的一句話（locale 是實際用的語系），有主詞、不含 client 的畫面或選單名稱。client 直接顯示。
+  @$pb.TagNumber(5)
+  $3.LocalizedMessage get status => $_getN(4);
+  @$pb.TagNumber(5)
+  set status($3.LocalizedMessage value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasStatus() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearStatus() => $_clearField(5);
+  @$pb.TagNumber(5)
+  $3.LocalizedMessage ensureStatus() => $_ensure(4);
+}
+
 class UpdateMyStoreRequest extends $pb.GeneratedMessage {
   factory UpdateMyStoreRequest({
     Store? store,
@@ -7540,6 +7795,17 @@ class SellerAppServiceApi {
           $pb.ClientContext? ctx, GetMyStoreRequest request) =>
       _client.invoke<GetMyStoreResponse>(
           ctx, 'SellerAppService', 'GetMyStore', request, GetMyStoreResponse());
+
+  /// GetMyOnboarding 回傳呼叫者店家的開通任務：依序的必要任務（商店資料、平台審核、收款帳戶，以及公開條件還缺其他項目時的「其他公開條件」），
+  /// 與開通閘門 complete。任務的狀態、下一步與文字都由伺服器推導（client 只呈現，不組合 GetMyKYC、GetMyPaymentAccount、GetMyStore 推導）。
+  /// 平台審核與收款帳戶各自讀取自己的來源：單一來源讀不到只讓該項是 UNKNOWN，方法本身不因此失敗。refresh 為 true 時先同步向金流商重讀收款帳戶
+  /// 再回傳（賣家從金流商的頁面回來時用）；同步失敗只記錄、不讓方法失敗，這時以快取的狀態回傳。refresh 可能寫入收款帳戶的快取，所以不是
+  /// NO_SIDE_EFFECTS（IDEMPOTENT，以 POST 呼叫，仍可自動重送），也像其他會改變狀態的方法一樣，停權的帳號呼叫時回 permission_denied
+  /// （ACCOUNT_SUSPENDED）：client 以 GetMyStore 的停權狀態導向公告頁，不靠這個方法。需要賣家能力 CAP_ACCOUNT_SELF_READ，所以已關閉的店家回 not_found。
+  $async.Future<GetMyOnboardingResponse> getMyOnboarding(
+          $pb.ClientContext? ctx, GetMyOnboardingRequest request) =>
+      _client.invoke<GetMyOnboardingResponse>(ctx, 'SellerAppService',
+          'GetMyOnboarding', request, GetMyOnboardingResponse());
 
   /// UpdateMyStore 修改店家資料的欄位（update_mask），含 logo 與封面（logo_staged_token、
   /// cover_staged_token）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
