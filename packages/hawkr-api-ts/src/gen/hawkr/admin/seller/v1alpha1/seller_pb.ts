@@ -2504,7 +2504,7 @@ export const SellerAdminService: GenService<{
   },
   /**
    * GetStoreOnboarding 回傳一家店的開通任務（與賣家自己看到的 GetMyOnboarding 同一份推導：同一個函式、同一組來源欄位），後台只讀取，不重讀金流商。
-   * 平台審核與收款帳戶各自讀取：單一來源讀不到只讓該項是 UNKNOWN。文字是賣家受眾的句子（後台看賣家看到的），語系依請求。已關閉的店照樣回傳。
+   * 平台審核與收款帳戶各自讀取：單一來源讀不到只讓該項是 UNKNOWN。文字是賣家受眾的句子，語系依請求。賣家的草稿與沒送出就取消的申請對後台不可見（草稿是賣家私有的），所以後台的平台審核項把它們當成還沒送出，句子與賣家看到的不同。已關閉的店照樣回傳。
    *
    * @generated from rpc hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreOnboarding
    */

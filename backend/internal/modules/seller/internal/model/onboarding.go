@@ -86,7 +86,7 @@ type OnboardingPaymentRead struct {
 	Found              bool
 	Status             string
 	CanStartOnboarding bool
-	// Configured 是這個環境有沒有設定收款開通：沒有時帳戶列不會被建立，「建立中」與重新整理都不會有結果。
+	// Configured 是這個環境有沒有設定收款開通：沒有時帳戶列不會被建立或更新，重新整理不會有結果，所以不論帳戶列是什麼狀態都沒有動作可做。
 	Configured bool
 	// CreateFailed 是帳戶列的建立重試用完（沒有外部帳戶、有 create_failed_at），等營運重試建立。
 	CreateFailed bool
@@ -238,7 +238,7 @@ func paymentAccountTask(l uitext.Locale, c Conditions, p OnboardingPaymentRead) 
 		return set(OnboardingUnknown, OnboardingActionNone, text.OnboardingPaymentAccountUnknown(l))
 	case p.Found && p.CreateFailed:
 		return set(OnboardingActionRequired, OnboardingActionContactSupport, text.OnboardingPaymentAccountCreateFailed(l))
-	case !p.Configured && (!p.Found || p.Status == "NOT_CREATED"):
+	case !p.Configured:
 		return set(OnboardingInProgress, OnboardingActionNone, text.OnboardingPaymentAccountNotAvailable(l))
 	case !p.Found:
 		return set(OnboardingInProgress, OnboardingActionRefreshPaymentAccount, text.OnboardingPaymentAccountPreparing(l))

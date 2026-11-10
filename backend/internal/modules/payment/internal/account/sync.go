@@ -104,31 +104,64 @@ func (s *Service) syncRow(ctx context.Context, row store.PaymentAccount) (again 
 }
 
 // ReadDebounce 是賣家觸發的重讀的最短間隔（D33）：同一帳戶上次賣家觸發的讀取被受理（seller_read_claimed_at，含失敗與並行的）或上次寫入的讀取
-// （fetched_at，讀取開始時間）距現在不到這麼久，就不向 provider 讀、直接用快取。
+// （fetched_at，讀取開始時間）距現在不到這麼久，就不向 provider 讀（回答依 busyRetryAfter）。
 const ReadDebounce = 10 * time.Second
 
 // staleBefore 是搶名額的門檻：seller_read_claimed_at 與 fetched_at 不晚於它才搶得到（剛好滿 ReadDebounce 搶得到）。
 func staleBefore(now time.Time) time.Time { return now.Add(-ReadDebounce) }
 
-// SyncUnlessFresh 是賣家觸發的同步重讀（RefreshMyPaymentAccount）：先以單一條件式 UPDATE 搶讀取名額（ClaimPaymentAccountSellerRead），搶不到
-// （間隔內已有讀取，含失敗與並行的）就不呼叫 provider、直接成功（快取就是結果）；搶到才讀（同一列沿用，不重讀）。這個限制的成立條件是外部讀取由
-// 賣家觸發、頻率不受 job 的唯一鍵約束，拿掉賣家觸發的呼叫時一起拿掉。沒有 provider、沒有帳戶列或還沒有外部 ID 時什麼都不做（與 Sync 相同，快取就是現況）。
-// 讀完仍有未處理的事件（again，例如被 D32 擋下而事件是在較晚的讀取之後到的）就在自己的 transaction 內排同步 job（唯一鍵合併）。重讀失敗是明確動作的
-// 失敗：暫時性的回 Unavailable（重試可能成功），外部帳戶不存在這類永久失敗回 FailedPrecondition；呼叫者自己取消的原樣回傳。
+// busyRetryAfter 決定搶不到名額時的回答：回 0 是成功（快取已經涵蓋這個名額：fetched_at 不早於 seller_read_claimed_at，即占名額的那次讀取已寫入，
+// 或名額是別的同步寫入的），回大於 0 是 resource_exhausted 的重試等待（占名額的讀取失敗或還在進行中，快取沒有涵蓋它）：窗的剩餘時間，至少一秒。
+// 兩個時間都是列上的值，now 是注入的時鐘。
+func busyRetryAfter(claimedAt, fetchedAt *time.Time, now time.Time) time.Duration {
+	if claimedAt == nil || (fetchedAt != nil && !fetchedAt.Before(*claimedAt)) {
+		return 0
+	}
+	return max(claimedAt.Add(ReadDebounce).Sub(now), time.Second)
+}
+
+// busyOutcome 把 busyRetryAfter 轉成回給呼叫方的結果：成功是 nil，否則是帶重試等待（傳輸層放進 RetryInfo）的 ResourceExhausted。
+func busyOutcome(claimedAt, fetchedAt *time.Time, now time.Time) error {
+	if wait := busyRetryAfter(claimedAt, fetchedAt, now); wait > 0 {
+		return apperr.ResourceExhausted(wait, "收款帳戶正在重新整理，請稍後再試")
+	}
+	return nil
+}
+
+// SyncUnlessFresh 是賣家觸發的同步重讀（RefreshMyPaymentAccount）：先以單一條件式 UPDATE 搶讀取名額（ClaimPaymentAccountSellerRead）；搶到才讀
+// （同一列沿用，不重讀）。搶不到時不呼叫 provider，依列上的時間回答（busyRetryAfter）：快取已涵蓋占名額的讀取就成功，否則（那次讀取失敗或還在進行中）
+// 回 ResourceExhausted 並帶窗的剩餘秒數，client 照它重試，失敗不會被快取蓋掉。這個限制的成立條件是外部讀取由賣家觸發、頻率不受 job 的唯一鍵約束，
+// 拿掉賣家觸發的呼叫時一起拿掉。沒有設定 provider 回 FailedPrecondition；沒有帳戶列或還沒有外部 ID 時什麼都不做（快取就是現況）。
+// 讀完仍有未處理的事件（again，例如被 D32 擋下而事件是在較晚的讀取之後到的）就在自己的 transaction 內排同步 job（唯一鍵合併），
+// 這個寫入不隨呼叫者取消。重讀失敗是明確動作的失敗：暫時性的回 Unavailable，外部帳戶不存在這類永久失敗回 FailedPrecondition；呼叫者自己取消的原樣回傳。
 func (s *Service) SyncUnlessFresh(ctx context.Context, storeID int64) error {
 	if s.d.Provider == nil {
-		return nil
+		return apperr.FailedPrecondition("尚未設定收款開通")
 	}
 	now := s.d.Now().UTC()
 	cutoff := staleBefore(now)
-	row, err := store.New(s.d.DB.Conn(ctx)).ClaimPaymentAccountSellerRead(ctx, store.ClaimPaymentAccountSellerReadParams{
+	q := store.New(s.d.DB.Conn(ctx))
+	row, err := q.ClaimPaymentAccountSellerRead(ctx, store.ClaimPaymentAccountSellerReadParams{
 		StoreID: storeID, Now: &now, StaleBefore: &cutoff,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil
+		cur, err := q.PaymentAccountByStore(ctx, storeID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if cur.ExternalAccountID == nil {
+			return nil
+		}
+		return busyOutcome(cur.SellerReadClaimedAt, cur.FetchedAt, now)
 	}
 	if err != nil {
 		return err
+	}
+	if row.Provider != s.d.Provider.Name() {
+		return apperr.FailedPrecondition("收款帳戶不是由目前的金流商建立")
 	}
 	again, err := s.syncRow(ctx, row)
 	if err != nil {
@@ -142,7 +175,7 @@ func (s *Service) SyncUnlessFresh(ctx context.Context, storeID int64) error {
 		}
 	}
 	if again {
-		return s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueueSync(ctx, s.d.Jobs, storeID) })
+		return s.d.DB.InTx(context.WithoutCancel(ctx), func(ctx context.Context) error { return enqueueSync(ctx, s.d.Jobs, storeID) })
 	}
 	return nil
 }

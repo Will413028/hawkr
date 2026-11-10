@@ -37,7 +37,7 @@ func taskOf(t *testing.T, o Onboarding, id OnboardingTaskID) OnboardingTask {
 // mutation 3：KYC 讀取失敗時整個函式回空清單（模擬讓 RPC 失敗）→ 其他任務消失，失敗。
 func TestOnboardingTaskStatesAndActions(t *testing.T) {
 	t.Parallel()
-	enabled := OnboardingPaymentRead{Found: true, Status: "ENABLED", CanStartOnboarding: true}
+	enabled := OnboardingPaymentRead{Found: true, Status: "ENABLED", CanStartOnboarding: true, Configured: true}
 	cases := []struct {
 		name    string
 		c       Conditions
@@ -75,13 +75,17 @@ func TestOnboardingTaskStatesAndActions(t *testing.T) {
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionNone}},
 		{"沒有設定收款開通、帳戶列停在建立中", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "NOT_CREATED"},
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionNone}},
-		{"收款帳戶審核中", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "UNDER_REVIEW"},
+		{"收款帳戶審核中", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "UNDER_REVIEW", Configured: true},
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionRefreshPaymentAccount}},
-		{"收款帳戶待設定、可以開通", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED", CanStartOnboarding: true},
+		{"收款帳戶待設定、可以開通", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED", CanStartOnboarding: true, Configured: true},
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionStartPaymentOnboarding}},
-		{"收款帳戶待設定、沒有設定收款開通", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED"},
+		{"收款帳戶待設定、已設定但沒有可用的開通介面", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED", Configured: true},
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionNone}},
-		{"收款帳戶被停用", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "DISABLED"},
+		{"沒有設定收款開通、帳戶列已有外部帳戶：不論狀態都沒有動作", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "UNDER_REVIEW"},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionNone}},
+		{"沒有設定收款開通、帳戶 ACTION_REQUIRED", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED"},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionNone}},
+		{"收款帳戶被停用", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "DISABLED", Configured: true},
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionContactSupport}},
 		{"帳戶 ENABLED 但副本還沒跟上：不算完成", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, enabled,
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionRefreshPaymentAccount}},

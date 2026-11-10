@@ -86,7 +86,7 @@ type ClaimPaymentAccountSellerReadParams struct {
 }
 
 // 賣家觸發的重讀先搶讀取名額再呼叫 provider（D33）：已經有外部 ID、上次賣家觸發的讀取（seller_read_claimed_at，含失敗的與並行的）和上次寫入的讀取
-// （fetched_at）都早於 stale_before 才寫入 seller_read_claimed_at 並回傳列；沒有回傳列就是名額被占走（呼叫方不讀 provider、直接成功）。單一條件式 UPDATE，
+// （fetched_at）都早於 stale_before 才寫入 seller_read_claimed_at 並回傳列；沒有回傳列就是名額被占走（呼叫方不讀 provider，依 seller_read_claimed_at 與 fetched_at 回答成功或 resource_exhausted）。單一條件式 UPDATE，
 // 並行的呼叫由列鎖序列化，後到的重新檢查條件而拿不到。同步 job 不經過這裡。
 func (q *Queries) ClaimPaymentAccountSellerRead(ctx context.Context, arg ClaimPaymentAccountSellerReadParams) (PaymentAccount, error) {
 	row := q.db.QueryRow(ctx, claimPaymentAccountSellerRead, arg.Now, arg.StoreID, arg.StaleBefore)

@@ -906,8 +906,10 @@ func TestARejectedSyncDoesNotMarkEventsOrPublish(t *testing.T) {
 }
 
 // 賣家觸發的重讀（D33）：窗內（上次寫入的讀取或上次被受理的賣家重讀，含失敗的）不呼叫 provider、快取不變；滿 ReadDebounce 才讀；重讀失敗回 Unavailable，
-// 永久失敗回 FailedPrecondition，而且失敗的那次也占了名額（同一時刻再呼叫不再讀）。時間用注入的 f.now，不睡眠。待 CI（integration）。
-// mutation：SyncUnlessFresh 不搶名額 → 窗內多一次 fetch，失敗；搶到卻不讀 → 滿窗後 fetch 次數不變，失敗；失敗時把名額還回去 → 失敗後同一時刻又讀一次，失敗。
+// 永久失敗回 FailedPrecondition，失敗的那次也占了名額：窗內立刻重試不讀 provider，回 ResourceExhausted 並帶窗的剩餘秒數（不被舊快取蓋成成功）；成功的那次
+// 之後立刻重試是成功。時間用注入的 f.now，不睡眠。待 CI（integration）。
+// mutation：SyncUnlessFresh 不搶名額 → 窗內多一次 fetch，失敗；搶到卻不讀 → 滿窗後 fetch 次數不變，失敗；失敗時把名額還回去 → 失敗後同一時刻又讀一次，失敗；
+// 搶不到時一律回成功 → 失敗後的重試不是 ResourceExhausted，失敗。
 func TestSellerTriggeredRereadIsDebouncedAndFailsLoudly(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -936,6 +938,10 @@ func TestSellerTriggeredRereadIsDebouncedAndFailsLoudly(t *testing.T) {
 	if got := f.account(t, s); got.Status != StatusEnabled {
 		t.Fatalf("滿窗後的重讀沒有寫入快取：%s", got.Status)
 	}
+	must(t, f.module.SyncAccountUnlessFresh(ctx, s))
+	if n := fetches(); n != 1 {
+		t.Fatalf("成功之後立刻重試又讀了 provider，共 %d 次", n)
+	}
 
 	f.now = f.now.Add(account.ReadDebounce)
 	f.fake.FailFetch(errors.New("provider 逾時"))
@@ -945,9 +951,14 @@ func TestSellerTriggeredRereadIsDebouncedAndFailsLoudly(t *testing.T) {
 	if n := fetches(); n != 2 {
 		t.Fatalf("失敗的重讀共讀了 %d 次，要 2 次", n)
 	}
-	must(t, f.module.SyncAccountUnlessFresh(ctx, s))
+	f.now = f.now.Add(4 * time.Second)
+	err := f.module.SyncAccountUnlessFresh(ctx, s)
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Kind() != apperr.KindResourceExhausted || ae.RetryAfter != account.ReadDebounce-4*time.Second {
+		t.Fatalf("失敗後窗內的重試是 %v，要帶剩餘 %v 的 ResourceExhausted", err, account.ReadDebounce-4*time.Second)
+	}
 	if n := fetches(); n != 2 {
-		t.Fatalf("失敗的那次沒有占名額：同一時刻又讀了，共 %d 次", n)
+		t.Fatalf("失敗的那次沒有占名額：窗內又讀了，共 %d 次", n)
 	}
 
 	f.now = f.now.Add(account.ReadDebounce)
@@ -960,7 +971,8 @@ func TestSellerTriggeredRereadIsDebouncedAndFailsLoudly(t *testing.T) {
 	must(t, f.module.SyncAccountUnlessFresh(ctx, f.newStore(t)))
 }
 
-// 並行的賣家重讀只有一個讀 provider（D33，搶名額）：第一個讀取進行中、同一時刻（注入的時鐘）又來一個，第二個搶不到、不呼叫 provider、直接成功。
+// 並行的賣家重讀只有一個讀 provider（D33，搶名額）：第一個讀取進行中、同一時刻（注入的時鐘）又來一個，第二個搶不到、不呼叫 provider，
+// 因為快取還沒有涵蓋進行中的讀取，回 ResourceExhausted 並帶整個窗。
 // 交錯由 OnFetch 排好，沒有 sleep。待 CI（integration）。
 // mutation：搶名額改回「先查 fetched_at 再讀」（名額只在讀取成功寫入後才占）→ 第二個也讀，fetch 共 2 次，失敗。
 func TestConcurrentSellerRefreshesReadTheProviderOnce(t *testing.T) {
@@ -974,7 +986,10 @@ func TestConcurrentSellerRefreshesReadTheProviderOnce(t *testing.T) {
 	var inner error
 	f.fake.OnFetch = func() { inner = f.module.SyncAccountUnlessFresh(ctx, s) }
 	must(t, f.module.SyncAccountUnlessFresh(ctx, s))
-	must(t, inner)
+	var ae *apperr.Error
+	if !errors.As(inner, &ae) || ae.Kind() != apperr.KindResourceExhausted || ae.RetryAfter != account.ReadDebounce {
+		t.Fatalf("進行中的讀取旁的第二個重讀是 %v，要帶 %v 的 ResourceExhausted", inner, account.ReadDebounce)
+	}
 	if _, n, _ := f.fake.Calls(); n-base != 1 {
 		t.Fatalf("並行的兩個賣家重讀共讀了 %d 次，要 1 次", n-base)
 	}

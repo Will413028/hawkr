@@ -60,9 +60,10 @@ abstract final class SellerAppService {
   );
 
   /// RefreshMyPaymentAccount 同步向金流商重讀呼叫者店家的收款帳戶並更新快取（賣家從金流商的開通頁面回來時用，之後讀 GetMyOnboarding）。
-  /// 同一帳戶上次讀取在 10 秒內就不呼叫金流商、直接成功（快取就是結果）。還沒有外部帳戶或沒有設定收款開通時什麼都不做、回成功。
-  /// 金流商暫時讀不到回 unavailable（client 可以重試）；金流商沒有這個帳戶回 failed_precondition。需要賣家能力 CAP_STOREFRONT_WRITE
-  /// （會呼叫金流商，是店面設定的一部分）：停權與等待刪除的店家回 permission_denied（SELLER_SUSPENDED）與 failed_precondition。
+  /// 同一帳戶上次讀取在 10 秒內就不呼叫金流商：快取已經涵蓋那次讀取就直接成功；那次讀取失敗或還在進行中就回 resource_exhausted，
+  /// 帶 google.rpc.RetryInfo（窗的剩餘時間，至少 1 秒），client 照它重試，不會把失敗當成成功。還沒有外部帳戶時什麼都不做、回成功；
+  /// 沒有設定收款開通回 failed_precondition。金流商暫時讀不到回 unavailable（client 可以重試）；金流商沒有這個帳戶回 failed_precondition。
+  /// 需要賣家能力 CAP_STOREFRONT_WRITE（會呼叫金流商，是店面設定的一部分）：停權與等待刪除的店家回 permission_denied（SELLER_SUSPENDED）與 failed_precondition。
   /// 重複呼叫與一次的結果相同，所以是 IDEMPOTENT，可以自動重試。
   static const refreshMyPaymentAccount = connect.Spec(
     '/$name/RefreshMyPaymentAccount',
