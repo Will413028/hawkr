@@ -68,6 +68,10 @@
       "message": "收款帳戶已啟用。",
       "description": "開通任務收款帳戶的狀態句：已啟用（COMPLETED，依 seller 自存的轉帳能力副本）。"
     },
+    "onboarding.payment_account.create_failed": {
+      "message": "收款帳戶建立失敗，請聯絡客服。",
+      "description": "開通任務收款帳戶的狀態句：建立收款帳戶的重試用完、進入後台待辦等營運重試（有帳戶列、沒有外部帳戶、有 create_failed_at；ACTION_REQUIRED，下一步聯絡客服）。"
+    },
     "onboarding.payment_account.disabled": {
       "message": "金流商目前無法啟用你的收款帳戶，請聯絡客服。",
       "description": "開通任務收款帳戶的狀態句：被金流商拒絕、不支援或限制（DISABLED，ACTION_REQUIRED）。"
@@ -75,6 +79,10 @@
     "onboarding.payment_account.locked": {
       "message": "平台審核通過後才能設定收款帳戶。",
       "description": "開通任務收款帳戶的狀態句：平台審核還沒完成（LOCKED）。"
+    },
+    "onboarding.payment_account.not_available": {
+      "message": "目前還沒有開放收款設定，開放後你就能繼續。",
+      "description": "開通任務收款帳戶的狀態句：這個環境沒有設定收款開通，帳戶不會被建立（IN_PROGRESS，沒有下一步）。"
     },
     "onboarding.payment_account.preparing": {
       "message": "正在建立收款帳戶，通常幾分鐘內完成。",

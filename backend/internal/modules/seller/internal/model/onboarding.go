@@ -86,6 +86,10 @@ type OnboardingPaymentRead struct {
 	Found              bool
 	Status             string
 	CanStartOnboarding bool
+	// Configured 是這個環境有沒有設定收款開通：沒有時帳戶列不會被建立，「建立中」與重新整理都不會有結果。
+	Configured bool
+	// CreateFailed 是帳戶列的建立重試用完（沒有外部帳戶、有 create_failed_at），等營運重試建立。
+	CreateFailed bool
 }
 
 // OnboardingInput 是開通任務清單的輸入：讀店家時的條件（Store.Conditions，閘門的兩個來源欄在其中）、停權（Store.Sanctions）、KYC 與收款帳戶的讀取結果。
@@ -115,17 +119,28 @@ type Onboarding struct {
 
 // OnboardingTasksOf 是開通任務清單的唯一產生點（語系 l）：任務的完成由 in.Store.Conditions 決定（與能力推導讀同一組欄位，D31 Q2、Q3）：
 // PROFILE 看店名、logo 與鄉鎮市區代碼；PLATFORM_REVIEW 看 KYCApproved；PAYMENT_ACCOUNT 看 TransfersActive 副本（收款帳戶本身的讀取只決定狀態句與下一步），還沒完成而且平台審核也沒完成時是 LOCKED。
-// 停權、關店與等待刪除不是任務（由公告頁處理）。讀取失敗（in.KYC.Err、in.Payment.Err）只讓需要那個讀取來決定狀態句與下一步的任務是 UNKNOWN：
+// 停權、關店與等待刪除不是任務（由公告頁處理）；店家沒有 CapStorefrontWrite 時（停權、等待刪除，與能力推導同一個 Store.Can），後續 RPC 會被擋下的下一步改為 NONE，狀態與句子不變，聯絡客服照舊。讀取失敗（in.KYC.Err、in.Payment.Err）只讓需要那個讀取來決定狀態句與下一步的任務是 UNKNOWN：
 // 已經完成的任務不需要讀取結果，仍是 COMPLETED。
 func OnboardingTasksOf(l uitext.Locale, in OnboardingInput) Onboarding {
-	return Onboarding{
-		Tasks: []OnboardingTask{
-			profileTask(l, in.Store),
-			platformReviewTask(l, in.Store.Conditions, in.KYC),
-			paymentAccountTask(l, in.Store.Conditions, in.Payment),
-		},
-		Complete: in.Store.Conditions.OnboardingComplete(),
+	tasks := []OnboardingTask{
+		profileTask(l, in.Store),
+		platformReviewTask(l, in.Store.Conditions, in.KYC),
+		paymentAccountTask(l, in.Store.Conditions, in.Payment),
 	}
+	if !in.Store.Can(CapStorefrontWrite) {
+		for i := range tasks {
+			if actionNeedsStorefrontWrite(tasks[i].Action) {
+				tasks[i].Action = OnboardingActionNone
+			}
+		}
+	}
+	return Onboarding{Tasks: tasks, Complete: in.Store.Conditions.OnboardingComplete()}
+}
+
+// actionNeedsStorefrontWrite 回報下一步的後續 RPC 是不是需要 CapStorefrontWrite（編輯商店資料、儲存與送出認證、開通 session 與重新整理收款帳戶都是）。
+// 聯絡客服不需要任何賣家能力，沒有下一步更不需要。
+func actionNeedsStorefrontWrite(a OnboardingAction) bool {
+	return a != OnboardingActionNone && a != OnboardingActionContactSupport
 }
 
 // onboardingCover 是一個公開條件由誰處理：tasks 是處理它的開通任務，notice 為 true 表示由公告頁處理（不是任務）；兩者恰好有一個。
@@ -221,6 +236,10 @@ func paymentAccountTask(l uitext.Locale, c Conditions, p OnboardingPaymentRead) 
 		return set(OnboardingLocked, OnboardingActionNone, text.OnboardingPaymentAccountLocked(l))
 	case p.Err != nil:
 		return set(OnboardingUnknown, OnboardingActionNone, text.OnboardingPaymentAccountUnknown(l))
+	case p.Found && p.CreateFailed:
+		return set(OnboardingActionRequired, OnboardingActionContactSupport, text.OnboardingPaymentAccountCreateFailed(l))
+	case !p.Configured && (!p.Found || p.Status == "NOT_CREATED"):
+		return set(OnboardingInProgress, OnboardingActionNone, text.OnboardingPaymentAccountNotAvailable(l))
 	case !p.Found:
 		return set(OnboardingInProgress, OnboardingActionRefreshPaymentAccount, text.OnboardingPaymentAccountPreparing(l))
 	}

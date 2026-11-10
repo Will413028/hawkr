@@ -451,6 +451,15 @@ func OnboardingPaymentAccountCompleted(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "收款帳戶已啟用。", Locale: uitext.ZhTW}
 }
 
+// OnboardingPaymentAccountCreateFailed 是模組句子 onboarding.payment_account.create_failed；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountCreateFailed(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "We could not create your payout account. Please contact support.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收款帳戶建立失敗，請聯絡客服。", Locale: uitext.ZhTW}
+}
+
 // OnboardingPaymentAccountDisabled 是模組句子 onboarding.payment_account.disabled；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func OnboardingPaymentAccountDisabled(l uitext.Locale) uitext.Message {
 	switch l {
@@ -467,6 +476,15 @@ func OnboardingPaymentAccountLocked(l uitext.Locale) uitext.Message {
 		return uitext.Message{Text: "You can set up your payout account after the platform review is approved.", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "平台審核通過後才能設定收款帳戶。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountNotAvailable 是模組句子 onboarding.payment_account.not_available；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountNotAvailable(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Payout setup is not open yet. You can continue once it opens.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "目前還沒有開放收款設定，開放後你就能繼續。", Locale: uitext.ZhTW}
 }
 
 // OnboardingPaymentAccountPreparing 是模組句子 onboarding.payment_account.preparing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。

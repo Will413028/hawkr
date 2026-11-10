@@ -44,9 +44,9 @@ func readPaymentAccount(ctx context.Context, log *slog.Logger, storeID int64, pa
 		return model.OnboardingPaymentRead{Err: err}
 	}
 	caps, configured := payments.Capabilities()
-	read := model.OnboardingPaymentRead{CanStartOnboarding: configured && caps.OnboardingSurface != ""}
+	read := model.OnboardingPaymentRead{CanStartOnboarding: configured && caps.OnboardingSurface != "", Configured: configured}
 	if err == nil {
-		read.Found, read.Status = true, string(acct.Status)
+		read.Found, read.Status, read.CreateFailed = true, string(acct.Status), acct.CreateFailedAt != nil
 	}
 	return read
 }
@@ -78,7 +78,7 @@ func (h *App) GetMyOnboarding(ctx context.Context, _ *connect.Request[pb.GetMyOn
 		}
 		return app, err == nil, err
 	}
-	onboarding := readOnboarding(ctx, h.dashboardLog(), current, kyc, h.payments)
+	onboarding := readOnboarding(ctx, h.log, current, kyc, h.payments)
 	return connect.NewResponse(&pb.GetMyOnboardingResponse{Tasks: toOnboardingTasks(onboarding), Complete: onboarding.Complete}), nil
 }
 

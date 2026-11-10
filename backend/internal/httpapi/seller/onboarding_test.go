@@ -1,10 +1,14 @@
 package seller
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -45,6 +49,8 @@ func (m *onboardingAdminModule) StoreKYC(context.Context, int64) (model.KYCAppli
 	return m.kyc, m.found, m.kycErr
 }
 
+var quietLog = slog.New(slog.DiscardHandler)
+
 func storeWithGate(kyc, transfers bool) model.Store {
 	s := currentStore()
 	s.Conditions.KYCApproved, s.Conditions.TransfersActive = kyc, transfers
@@ -75,7 +81,7 @@ func TestOnboardingEnumsMatchTheModule(t *testing.T) {
 func TestGetMyOnboardingReturnsOrderedTasksAndTheGate(t *testing.T) {
 	m := &onboardingModule{kyc: model.KYCApplication{Status: model.KYCStatusSubmitted}}
 	pay := &paymentModule{configured: true}
-	h := &App{m: m, payments: pay}
+	h := &App{m: m, payments: pay, log: quietLog}
 	got, err := h.GetMyOnboarding(ctxWithStore(storeWithGate(false, false)), connect.NewRequest(&pb.GetMyOnboardingRequest{}))
 	if err != nil {
 		t.Fatal(err)
@@ -129,7 +135,7 @@ func TestGetMyOnboardingMarksOnlyTheFailedSourceUnknown(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			m := &onboardingModule{kyc: model.KYCApplication{Status: model.KYCStatusApproved}, kycErr: tc.kycErr}
-			h := &App{m: m, payments: &paymentModule{err: tc.payErr}}
+			h := &App{m: m, payments: &paymentModule{err: tc.payErr}, log: quietLog}
 			got, err := h.GetMyOnboarding(ctxWithStore(tc.store), connect.NewRequest(&pb.GetMyOnboardingRequest{}))
 			if err != nil {
 				t.Fatalf("單一來源讀取失敗讓方法失敗：%v", err)
@@ -151,7 +157,7 @@ func TestGetMyOnboardingMarksOnlyTheFailedSourceUnknown(t *testing.T) {
 // mutation：不呼叫 SyncAccountUnlessFresh → syncedFor 是空的，失敗；失敗時回 nil → 第二段的 err 是 nil，失敗。
 func TestRefreshMyPaymentAccountSyncsTheCallersStore(t *testing.T) {
 	pay := &paymentModule{}
-	h := &App{m: &onboardingModule{}, payments: pay}
+	h := &App{m: &onboardingModule{}, payments: pay, log: quietLog}
 	if _, err := h.RefreshMyPaymentAccount(ctxWithStore(storeWithGate(true, false)), connect.NewRequest(&pb.RefreshMyPaymentAccountRequest{})); err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +166,7 @@ func TestRefreshMyPaymentAccountSyncsTheCallersStore(t *testing.T) {
 	}
 
 	pay = &paymentModule{syncErr: apperr.Unavailable("暫時無法向金流商讀取收款帳戶")}
-	h = &App{m: &onboardingModule{}, payments: pay}
+	h = &App{m: &onboardingModule{}, payments: pay, log: quietLog}
 	_, err := h.RefreshMyPaymentAccount(ctxWithStore(storeWithGate(true, false)), connect.NewRequest(&pb.RefreshMyPaymentAccountRequest{}))
 	if apperr.KindOf(err) != apperr.KindUnavailable || len(pay.syncedFor) != 1 {
 		t.Fatalf("重讀失敗要回 unavailable：err=%v，同步 %v", err, pay.syncedFor)
@@ -191,7 +197,7 @@ func TestGetMyOnboardingStartActionNeedsConfiguredPaymentOnboarding(t *testing.T
 	for _, configured := range []bool{true, false} {
 		h := &App{m: &onboardingModule{kyc: model.KYCApplication{Status: model.KYCStatusApproved}}, payments: &paymentModule{
 			configured: configured, caps: payment.Capabilities{OnboardingSurface: payment.SurfaceHosted}, account: payment.Account{Status: payment.StatusActionRequired},
-		}}
+		}, log: quietLog}
 		got, err := h.GetMyOnboarding(ctxWithStore(storeWithGate(true, false)), connect.NewRequest(&pb.GetMyOnboardingRequest{}))
 		if err != nil {
 			t.Fatal(err)
@@ -242,4 +248,76 @@ func TestGetStoreOnboardingUsesTheSameDerivation(t *testing.T) {
 
 	_, err = h.GetStoreOnboarding(adminCtx(1), connect.NewRequest(&adminpb.GetStoreOnboardingRequest{StoreId: "x"}))
 	wantInvalidArgument(t, err)
+}
+
+func paymentTask(t *testing.T, resp *pb.GetMyOnboardingResponse) *pb.OnboardingTask {
+	t.Helper()
+	for _, task := range resp.GetTasks() {
+		if task.GetId() == pb.OnboardingTaskId_ONBOARDING_TASK_ID_PAYMENT_ACCOUNT {
+			return task
+		}
+	}
+	t.Fatalf("沒有收款帳戶任務：%v", resp.GetTasks())
+	return nil
+}
+
+// 收款帳戶讀取結果的兩個旗標進任務：建立失敗（有帳戶列、沒有外部帳戶、有 create_failed_at）給聯絡客服；沒有設定收款開通且帳戶還沒建立時沒有重新整理。
+// mutation 1：readPaymentAccount 不填 CreateFailed → 建立失敗的列變成「建立中」與重新整理，失敗。
+// mutation 2：不填 Configured → 設定好但還沒有帳戶列的列變成「尚未開放」，失敗。
+func TestGetMyOnboardingReadsCreateFailedAndConfiguredFromPayment(t *testing.T) {
+	failedAt := time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)
+	cases := []struct {
+		name       string
+		pay        *paymentModule
+		wantState  pb.OnboardingTaskState
+		wantAction pb.OnboardingAction
+	}{
+		{"建立失敗", &paymentModule{configured: true, account: payment.Account{Status: payment.StatusNotCreated, CreateFailedAt: &failedAt}},
+			pb.OnboardingTaskState_ONBOARDING_TASK_STATE_ACTION_REQUIRED, pb.OnboardingAction_ONBOARDING_ACTION_CONTACT_SUPPORT},
+		{"設定好、還沒有帳戶列", &paymentModule{configured: true, err: apperr.NotFound("沒有")},
+			pb.OnboardingTaskState_ONBOARDING_TASK_STATE_IN_PROGRESS, pb.OnboardingAction_ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT},
+		{"沒有設定收款開通、沒有帳戶列", &paymentModule{err: apperr.NotFound("沒有")},
+			pb.OnboardingTaskState_ONBOARDING_TASK_STATE_IN_PROGRESS, pb.OnboardingAction_ONBOARDING_ACTION_NONE},
+	}
+	for _, tc := range cases {
+		h := &App{m: &onboardingModule{kyc: model.KYCApplication{Status: model.KYCStatusApproved}}, payments: tc.pay, log: quietLog}
+		got, err := h.GetMyOnboarding(ctxWithStore(storeWithGate(true, false)), connect.NewRequest(&pb.GetMyOnboardingRequest{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		task := paymentTask(t, got.Msg)
+		if task.GetState() != tc.wantState || task.GetAction() != tc.wantAction {
+			t.Errorf("%s：state=%v action=%v，要 %v %v", tc.name, task.GetState(), task.GetAction(), tc.wantState, tc.wantAction)
+		}
+	}
+}
+
+// 停權的店家可以讀開通任務，但需要 CAP_STOREFRONT_WRITE 的下一步不給（NONE）；狀態不變。
+// mutation：OnboardingTasksOf 不看 Store.Can → 停權的列照給 SUBMIT_CERTIFICATION，失敗。
+func TestGetMyOnboardingGivesNoWriteActionsToASuspendedStore(t *testing.T) {
+	store := storeWithGate(false, false)
+	store.Sanctions = sanctionsOf(true)
+	h := &App{m: &onboardingModule{}, payments: &paymentModule{configured: true}, log: quietLog}
+	got, err := h.GetMyOnboarding(ctxWithStore(store), connect.NewRequest(&pb.GetMyOnboardingRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, task := range got.Msg.GetTasks() {
+		if task.GetAction() != pb.OnboardingAction_ONBOARDING_ACTION_NONE {
+			t.Errorf("停權的店家 %v 的下一步是 %v，要 NONE", task.GetId(), task.GetAction())
+		}
+	}
+}
+
+// GetMyOnboarding 的 log 是 App 自己的，不經儀表板的接線（Dashboard.Log 沒設也要記到）。
+// mutation：改回 h.dashboardLog() → 這個測試的 buffer 是空的，失敗。
+func TestGetMyOnboardingLogsToItsOwnLogger(t *testing.T) {
+	var buf bytes.Buffer
+	h := &App{m: &onboardingModule{kycErr: errors.New("壞了")}, payments: &paymentModule{}, log: slog.New(slog.NewTextHandler(&buf, nil))}
+	if _, err := h.GetMyOnboarding(ctxWithStore(storeWithGate(false, false)), connect.NewRequest(&pb.GetMyOnboardingRequest{})); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "KYC") {
+		t.Fatalf("沒有記到 App 的 logger：%q", buf.String())
+	}
 }

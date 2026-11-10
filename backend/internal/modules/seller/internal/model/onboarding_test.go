@@ -65,10 +65,16 @@ func TestOnboardingTaskStatesAndActions(t *testing.T) {
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionSubmitCertification}, [2]any{OnboardingLocked, OnboardingActionNone}},
 		{"KYC 讀取失敗：只有平台審核是 UNKNOWN，收款帳戶仍是 LOCKED", conds(false, false, true), OnboardingKYCRead{Err: errRead}, OnboardingPaymentRead{},
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingUnknown, OnboardingActionNone}, [2]any{OnboardingLocked, OnboardingActionNone}},
-		{"KYC 核准、還沒有收款帳戶列", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{},
+		{"KYC 核准、還沒有收款帳戶列", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Configured: true},
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionRefreshPaymentAccount}},
-		{"收款帳戶建立中", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "NOT_CREATED"},
+		{"收款帳戶建立中", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "NOT_CREATED", Configured: true},
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionRefreshPaymentAccount}},
+		{"收款帳戶建立失敗：等營運重試，賣家聯絡客服", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "NOT_CREATED", Configured: true, CreateFailed: true},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionContactSupport}},
+		{"沒有設定收款開通、沒有帳戶列：沒有重新整理這個動作", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionNone}},
+		{"沒有設定收款開通、帳戶列停在建立中", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "NOT_CREATED"},
+			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionNone}},
 		{"收款帳戶審核中", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "UNDER_REVIEW"},
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionRefreshPaymentAccount}},
 		{"收款帳戶待設定、可以開通", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED", CanStartOnboarding: true},
@@ -82,7 +88,7 @@ func TestOnboardingTaskStatesAndActions(t *testing.T) {
 		{"收款帳戶讀取失敗：只有收款帳戶是 UNKNOWN", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Err: errRead},
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingUnknown, OnboardingActionNone}},
 		{"沒有讀過條件：fail-closed", Conditions{}, OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, enabled,
-			[2]any{OnboardingActionRequired, OnboardingActionEditProfile}, [2]any{OnboardingInProgress, OnboardingActionNone}, [2]any{OnboardingLocked, OnboardingActionNone}},
+			[2]any{OnboardingActionRequired, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionNone}, [2]any{OnboardingLocked, OnboardingActionNone}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -115,12 +121,69 @@ func TestOnboardingTaskStatesAndActions(t *testing.T) {
 	}
 }
 
+// 店家沒有 CapStorefrontWrite（停權、等待刪除）時，後續 RPC 會被擋下的下一步是 NONE，狀態與句子不變；聯絡客服不需要能力，照舊。判斷與能力推導同一個 Store.Can。
+// mutation 1：OnboardingTasksOf 不看 Store.Can（停權時照給下一步）→ 停權與等待刪除的列失敗。
+// mutation 2：聯絡客服也被清成 NONE → 建立失敗與被停用的列失敗。
+// mutation 3：把狀態與句子也改掉（例如清成 LOCKED）→ 與能完成寫入的同一份輸入比對失敗。
+func TestOnboardingActionsAreNoneWhenTheStoreCannotWrite(t *testing.T) {
+	t.Parallel()
+	suspended := Store{Status: Active, Sanctions: SanctionedBy(EffectiveMeasure{}), Conditions: conds(false, false, false)}
+	pending := Store{Status: PendingDeletion, Sanctions: NoSanctions(), Conditions: Conditions{Derived: true, Active: true, NotPendingDeletion: false, StoreName: false}}
+	withKYC := func(s Store) Store { s.Conditions.KYCApproved = true; return s }
+	cases := []struct {
+		name  string
+		store Store
+		kyc   OnboardingKYCRead
+		pay   OnboardingPaymentRead
+	}{
+		{"停權、缺資料、沒有申請", suspended, OnboardingKYCRead{}, OnboardingPaymentRead{}},
+		{"停權、KYC 被退回", suspended, OnboardingKYCRead{Found: true, Status: KYCStatusRejected}, OnboardingPaymentRead{}},
+		{"停權、帳戶待設定", withKYC(suspended), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED", CanStartOnboarding: true, Configured: true}},
+		{"停權、帳戶審核中", withKYC(suspended), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "UNDER_REVIEW", Configured: true}},
+		{"等待刪除、缺資料、沒有申請", pending, OnboardingKYCRead{}, OnboardingPaymentRead{}},
+		{"等待刪除、帳戶待設定", withKYC(pending), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED", CanStartOnboarding: true, Configured: true}},
+	}
+	for _, tc := range cases {
+		if tc.store.Can(CapStorefrontWrite) {
+			t.Fatalf("%s：測試的店家其實有 CapStorefrontWrite", tc.name)
+		}
+		o := OnboardingTasksOf(uitext.ZhTW, OnboardingInput{Store: tc.store, KYC: tc.kyc, Payment: tc.pay})
+		for _, task := range o.Tasks {
+			if task.Action != OnboardingActionNone {
+				t.Errorf("%s：%s 的下一步是 %s，要 NONE", tc.name, task.ID, task.Action)
+			}
+			if task.State == "" || task.Status.Text == "" {
+				t.Errorf("%s：%s 的狀態或句子被清掉：%+v", tc.name, task.ID, task)
+			}
+		}
+		// 狀態與句子與「能寫」的同一份輸入相同。
+		writable := tc.store
+		writable.Sanctions, writable.Status = NoSanctions(), Active
+		writable.Conditions.Active, writable.Conditions.NotPendingDeletion = true, true
+		if !writable.Can(CapStorefrontWrite) {
+			t.Fatalf("%s：對照的店家沒有 CapStorefrontWrite", tc.name)
+		}
+		want := OnboardingTasksOf(uitext.ZhTW, OnboardingInput{Store: writable, KYC: tc.kyc, Payment: tc.pay})
+		for i, task := range o.Tasks {
+			if task.State != want.Tasks[i].State || task.Status != want.Tasks[i].Status {
+				t.Errorf("%s：%s 的狀態或句子與能寫入時不同：%+v vs %+v", tc.name, task.ID, task, want.Tasks[i])
+			}
+		}
+	}
+	// 聯絡客服不需要賣家能力：停權的店家照舊拿得到。
+	dis := OnboardingTasksOf(uitext.ZhTW, OnboardingInput{Store: withKYC(suspended), KYC: OnboardingKYCRead{Found: true, Status: KYCStatusApproved},
+		Payment: OnboardingPaymentRead{Found: true, Status: "DISABLED", Configured: true}})
+	if got := taskOf(t, dis, OnboardingPaymentAccount).Action; got != OnboardingActionContactSupport {
+		t.Errorf("停權、帳戶被停用：下一步 %s，要 CONTACT_SUPPORT", got)
+	}
+}
+
 // UNKNOWN 只表示來源讀取失敗：沒有任何讀取失敗時，任何輸入都不會產生 UNKNOWN，也不會產生沒設的 state 或 action。
 func TestOnboardingUnknownOnlyOnReadFailure(t *testing.T) {
 	t.Parallel()
 	kycs := []OnboardingKYCRead{{}, {Found: true, Status: KYCStatusDraft}, {Found: true, Status: KYCStatusSubmitted}, {Found: true, Status: KYCStatusApproved},
 		{Found: true, Status: KYCStatusRejected}, {Found: true, Status: KYCStatusCancelled}, {Found: true, Status: "SOMETHING_NEW"}}
-	pays := []OnboardingPaymentRead{{}, {Found: true, Status: "NOT_CREATED"}, {Found: true, Status: "UNDER_REVIEW"}, {Found: true, Status: "ACTION_REQUIRED"},
+	pays := []OnboardingPaymentRead{{}, {Configured: true}, {Found: true, Status: "NOT_CREATED", CreateFailed: true, Configured: true}, {Found: true, Status: "NOT_CREATED"}, {Found: true, Status: "UNDER_REVIEW"}, {Found: true, Status: "ACTION_REQUIRED"},
 		{Found: true, Status: "ACTION_REQUIRED", CanStartOnboarding: true}, {Found: true, Status: "ENABLED"}, {Found: true, Status: "DISABLED"}, {Found: true, Status: "SOMETHING_NEW"}}
 	for _, kyc := range []bool{false, true} {
 		for _, transfers := range []bool{false, true} {

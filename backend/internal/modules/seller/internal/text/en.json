@@ -9,11 +9,17 @@
     "onboarding.payment_account.completed": {
       "message": "Your payout account is active."
     },
+    "onboarding.payment_account.create_failed": {
+      "message": "We could not create your payout account. Please contact support."
+    },
     "onboarding.payment_account.disabled": {
       "message": "The payment provider cannot activate your payout account right now. Please contact support."
     },
     "onboarding.payment_account.locked": {
       "message": "You can set up your payout account after the platform review is approved."
+    },
+    "onboarding.payment_account.not_available": {
+      "message": "Payout setup is not open yet. You can continue once it opens."
     },
     "onboarding.payment_account.preparing": {
       "message": "We are creating your payout account. This usually takes a few minutes."
