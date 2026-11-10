@@ -21,7 +21,7 @@ var (
 // status 決定，KYC 由 kyc 決定，店名、logo 與鄉鎮市區都有。
 func conditionsOf(status Status, kyc bool) Conditions {
 	return Conditions{
-		Derived: true, Active: status != Closed, NotPendingDeletion: status != PendingDeletion, OnboardingComplete: kyc,
+		Derived: true, Active: status != Closed, NotPendingDeletion: status != PendingDeletion, KYCApproved: kyc, TransfersActive: kyc,
 		StoreName: true, Logo: true, TownCode: true,
 	}
 }
@@ -33,7 +33,7 @@ func fullStore(status Status, suspended bool) Store {
 
 // withoutKYC 是同一個店家、KYC 流程沒有核准。
 func withoutKYC(s Store) Store {
-	s.Conditions.OnboardingComplete = false
+	s.Conditions.TransfersActive = false
 	return s
 }
 

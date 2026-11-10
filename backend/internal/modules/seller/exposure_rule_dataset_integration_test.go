@@ -225,11 +225,26 @@ func TestExposureRuleAgreesBetweenSQLAndGoOnADataset(t *testing.T) {
 	if len(flags) != len(ids) {
 		t.Fatalf("條件列 %d 筆，店家 %d 家", len(flags), len(ids))
 	}
+	viewComplete := map[int64]bool{}
+	completeRows, err := f.db.Conn(ctx).Query(ctx, "SELECT store_id, onboarding_complete FROM seller.store_requirement_flags WHERE store_id = ANY($1)", ids)
+	must(t, err)
+	for completeRows.Next() {
+		var id int64
+		var complete bool
+		must(t, completeRows.Scan(&id, &complete))
+		viewComplete[id] = complete
+	}
+	must(t, completeRows.Err())
+	completeRows.Close()
 	complete := 0
 	for _, fl := range flags {
-		want := approvedApplication[fl.StoreID] && transfers[fl.StoreID]
-		if fl.OnboardingComplete != want {
-			t.Errorf("店家 %d：onboarding_complete=%v，申請核准=%v、轉帳能力=%v", fl.StoreID, fl.OnboardingComplete, approvedApplication[fl.StoreID], transfers[fl.StoreID])
+		wantKYC, wantTransfers := approvedApplication[fl.StoreID], transfers[fl.StoreID]
+		if fl.KycApproved != wantKYC || fl.TransfersActive != wantTransfers {
+			t.Errorf("店家 %d：kyc_approved=%v、transfers_active=%v，申請核准=%v、轉帳能力=%v", fl.StoreID, fl.KycApproved, fl.TransfersActive, wantKYC, wantTransfers)
+		}
+		want := wantKYC && wantTransfers
+		if viewComplete[fl.StoreID] != want {
+			t.Errorf("店家 %d：onboarding_complete=%v，申請核准=%v、轉帳能力=%v", fl.StoreID, viewComplete[fl.StoreID], wantKYC, wantTransfers)
 		}
 		if want {
 			complete++

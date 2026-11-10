@@ -1,4 +1,4 @@
-h1:cjW/EOFVrXzQUbM9zJjJDress6r3E6him+WsNqZH5iE=
+h1:7YF4eNBIoLuWWyQqlp5tZiGC/TaM9WVnm4Dgm6dGBf8=
 20261001160141_seller_core.sql h1:hVkQ8Wo6S5BLgzr4nFSGS/1EZpRX9mHqRwpxmIP3Yeg=
 20261002120004_seller_governance.sql h1:Dj/zGg4clK5U8YBsKn+TWnE5ZizigjU9/s7EXXHuc+g=
 20261002133159_seller_kyc.sql h1:QiN6KkqvCU/lwdw0B66YQniBEGnAhojvTYHQJ8lOqlc=
@@ -72,3 +72,4 @@ h1:cjW/EOFVrXzQUbM9zJjJDress6r3E6him+WsNqZH5iE=
 20261103040227_kyc_complete_check_marketplace_only.sql h1:XxV+O48qBsSgIk+REVnTE+UJOWeLrapBhk565JGpd68=
 20261103124804_kyc_drop_payout_contact_email.sql h1:PYvGE4jMb0B8vCCQqAPLKCylnPHjeLQ+j5eqOaT2IEE=
 20261106120300_payment_moved_to_payment_module.sql h1:XPdxH54JobnEqlli21B+Bbag4pFX8NHGSHlRyrU6t2w=
+20261110160932_store_requirement_flags_two_sources.sql h1:QqC2m4yPimZjmlRKK6mMKX0U7Ob3SPNKndwZcNMei98=

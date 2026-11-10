@@ -245,7 +245,7 @@ func (q *Queries) StampFirstExposed(ctx context.Context, arg StampFirstExposedPa
 }
 
 const storeRequirementFlags = `-- name: StoreRequirementFlags :many
-SELECT f.store_id, f.active, f.not_pending_deletion, f.onboarding_complete, f.has_store_name, f.has_logo, f.has_town_code
+SELECT f.store_id, f.active, f.not_pending_deletion, f.kyc_approved, f.transfers_active, f.has_store_name, f.has_logo, f.has_town_code
 FROM seller.store_requirement_flags f
 WHERE f.store_id = ANY($1::bigint[])
 `
@@ -254,14 +254,16 @@ type StoreRequirementFlagsRow struct {
 	StoreID            int64
 	Active             bool
 	NotPendingDeletion bool
-	OnboardingComplete bool
+	KycApproved        bool
+	TransfersActive    bool
 	HasStoreName       bool
 	HasLogo            bool
 	HasTownCode        bool
 }
 
 // 這些店家與時間無關的條件（seller.store_requirement_flags：曝光與能力的條件唯一的家，Go 只把布林對應到 model.Requirement，不重算）；
-// 不存在的 ID 沒有列。stint.WithConditions 讀店家時帶上。
+// 不存在的 ID 沒有列。stint.WithConditions 讀店家時帶上。開通閘門讀兩個來源欄 kyc_approved 與 transfers_active（onboarding_complete 是它們的 AND，Go 不讀它，
+// 由 integration 的資料集測試鎖住 SQL 與 Go 一致）。
 func (q *Queries) StoreRequirementFlags(ctx context.Context, storeIds []int64) ([]StoreRequirementFlagsRow, error) {
 	rows, err := q.db.Query(ctx, storeRequirementFlags, storeIds)
 	if err != nil {
@@ -275,7 +277,8 @@ func (q *Queries) StoreRequirementFlags(ctx context.Context, storeIds []int64) (
 			&i.StoreID,
 			&i.Active,
 			&i.NotPendingDeletion,
-			&i.OnboardingComplete,
+			&i.KycApproved,
+			&i.TransfersActive,
 			&i.HasStoreName,
 			&i.HasLogo,
 			&i.HasTownCode,

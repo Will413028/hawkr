@@ -628,10 +628,12 @@ type SellerStoreRequirementFlag struct {
 	AccountID          int64
 	Active             bool
 	NotPendingDeletion bool
-	OnboardingComplete bool
+	OnboardingComplete *bool
 	HasStoreName       bool
 	HasLogo            bool
 	HasTownCode        bool
+	KycApproved        bool
+	TransfersActive    bool
 }
 
 type SellerSuspensionPeriod struct {

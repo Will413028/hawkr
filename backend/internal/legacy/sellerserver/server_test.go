@@ -68,7 +68,7 @@ func TestSellerMetaTruthTable(t *testing.T) {
 	active.StoreName = "範例小農"
 	active.TownCode = text("63000050")
 	// seller 讀出的條件（Store.Conditions）；各列只改測試要的那一項。
-	active.Conditions = seller.Conditions{Derived: true, Active: true, NotPendingDeletion: true, OnboardingComplete: true, StoreName: true, Logo: true, TownCode: true}
+	active.Conditions = seller.Conditions{Derived: true, Active: true, NotPendingDeletion: true, KYCApproved: true, TransfersActive: true, StoreName: true, Logo: true, TownCode: true}
 	ground := seller.RiskFraud
 	with := func(f func(s *seller.Store)) seller.Store { s := active; f(&s); return s }
 	for _, tc := range []struct {
@@ -83,7 +83,7 @@ func TestSellerMetaTruthTable(t *testing.T) {
 		}), false, false, false},
 		{"等待刪除", with(func(s *seller.Store) { s.Status, s.Conditions.NotPendingDeletion = seller.PendingDeletion, false }), false, false, false},
 		{"已關閉", with(func(s *seller.Store) { s.Status, s.Conditions.Active = seller.Closed, false; s.LogoKey = nil }), false, false, false},
-		{"KYC 或 PayUni 未核准：可以先上架、不能結帳", with(func(s *seller.Store) { s.Conditions.OnboardingComplete = false }), false, true, false},
+		{"KYC 或 PayUni 未核准：可以先上架、不能結帳", with(func(s *seller.Store) { s.Conditions.TransfersActive = false }), false, true, false},
 		{"缺 logo：可以先上架、不能結帳", with(func(s *seller.Store) { s.LogoKey, s.Conditions.Logo = nil, false }), false, true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -271,7 +271,7 @@ func WithConditions(ctx context.Context, q *store.Queries, stores []model.Store)
 	byStore := make(map[int64]model.Conditions, len(rows))
 	for _, r := range rows {
 		byStore[r.StoreID] = model.Conditions{
-			Derived: true, Active: r.Active, NotPendingDeletion: r.NotPendingDeletion, OnboardingComplete: r.OnboardingComplete,
+			Derived: true, Active: r.Active, NotPendingDeletion: r.NotPendingDeletion, KYCApproved: r.KycApproved, TransfersActive: r.TransfersActive,
 			StoreName: r.HasStoreName, Logo: r.HasLogo, TownCode: r.HasTownCode,
 		}
 	}

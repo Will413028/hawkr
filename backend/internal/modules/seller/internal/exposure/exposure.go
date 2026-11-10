@@ -36,7 +36,7 @@ func New(d Deps) *Service {
 }
 
 // KYCFlows 讀取店家的 KYC 流程（沒有申請的店家不在結果裡：零值的流程不是 APPROVED），給後台清單顯示流程狀態；曝光與能力的
-// 開通條件不讀它（model.Conditions.OnboardingComplete 讀自 seller.store_requirement_flags：申請已核准且收款帳戶 transfers_active；這裡的流程狀態仍以 PayUni 推導）。
+// 開通條件不讀它（model.Conditions.OnboardingComplete() 是 seller.store_requirement_flags 的 kyc_approved 與 transfers_active 的 AND：申請已核准且收款帳戶 transfers_active；這裡的流程狀態仍以 PayUni 推導）。
 // 固定兩次查詢（KYC 申請、PayUni 註冊），與 ID 數量無關。
 func (s *Service) KYCFlows(ctx context.Context, q *store.Queries, storeIDs []int64) (map[int64]model.KYCFlowStatus, error) {
 	applications, err := q.CurrentKYCStatuses(ctx, storeIDs)

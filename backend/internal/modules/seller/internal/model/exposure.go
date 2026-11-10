@@ -80,7 +80,7 @@ func NewRequirementMissing(missing []Requirement) *apperr.Error {
 // （TestExposureRuleAgreesBetweenSQLAndGoOnADataset）鎖住。條件：
 //   - 店家沒有關閉、沒有正在隨帳號刪除（生命週期是營運中 ACTIVE）；
 //   - 帳號沒有生效中的停權；
-//   - KYC 流程已核准（含 PayUni 核准）；
+//   - 平台審核已核准（KYC 申請 APPROVED）而且收款帳戶的轉帳能力已啟用（seller 自存的副本，開通閘門 ONBOARDING_COMPLETE）；
 //   - 店名、logo 與鄉鎮市區代碼都有值。
 //
 // 「至少一個上架商品」不在這裡：它由曝光端檢查。
@@ -109,7 +109,7 @@ func met(r Requirement, s Store) bool {
 	case RequirementNotPendingDeletion:
 		return c.NotPendingDeletion
 	case RequirementOnboardingComplete:
-		return c.OnboardingComplete
+		return c.OnboardingComplete()
 	case RequirementStoreName:
 		return c.StoreName
 	case RequirementLogo:

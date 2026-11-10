@@ -184,18 +184,24 @@ func (s *Sanctions) IDs() []uuid.UUID {
 }
 
 // Conditions 是店家與時間無關的條件此刻是否滿足（曝光與能力共用，一欄對一個 Requirement）。它不在 Go 推導：讀店家時由
-// seller.store_requirement_flags（db/objects.sql，曝光規則唯一的家）讀出（stint.WithConditions），Go 只把布林對應到 Requirement；
+// seller.store_requirement_flags（db/objects.sql，曝光規則唯一的家）讀出（stint.WithConditions），Go 只把布林對應到 Requirement（開通閘門是兩個來源欄的 AND）；
 // 與時間有關的停權由 Sanctions 表示（同樣讀 SQL 的 seller.effective_measures）。Derived 為 false（沒有讀過）時每一項都不滿足
 // （fail-closed，比照 Sanctions 的 nil）。
 type Conditions struct {
 	Derived            bool
 	Active             bool
 	NotPendingDeletion bool
-	OnboardingComplete bool
-	StoreName          bool
-	Logo               bool
-	TownCode           bool
+	// KYCApproved 與 TransfersActive 是開通閘門的兩個來源（平台審核已核准、seller 自存的轉帳能力副本）；閘門是它們的 AND（OnboardingComplete），
+	// 開通任務清單（OnboardingTasks）與能力推導讀同一組欄位（D31 Q3）。
+	KYCApproved     bool
+	TransfersActive bool
+	StoreName       bool
+	Logo            bool
+	TownCode        bool
 }
+
+// OnboardingComplete 是開通閘門：平台審核已核准，而且收款帳戶的轉帳能力已啟用（seller.store_requirement_flags 的 onboarding_complete 是同一個 AND）。
+func (c Conditions) OnboardingComplete() bool { return c.KYCApproved && c.TransfersActive }
 
 // Store 是一個 stint。Sanctions 是讀取當下由生效中的措施推導的帳號停權狀態（帳號任何一個 stint 的措施都算），不是 stint 的
 // 欄位；用 Suspended 判斷。Conditions 是讀取當下由 SQL 讀出的其他條件；能力與曝光只看這兩者（不看 Status、店名等欄位）。

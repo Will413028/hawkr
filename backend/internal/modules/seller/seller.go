@@ -447,8 +447,7 @@ func (m *Module) Store(ctx context.Context, storeID int64) (Store, error) {
 	return m.profile.Store(ctx, storeID)
 }
 
-// ExposableStores 從 storeIDs（最多 MaxBatchSize 個）挑出可以公開曝光的店家：營運中、沒有生效中的停權、KYC 流程已核准（含
-// PayUni）、店名、logo 與鄉鎮市區代碼齊全（規則只有 seller.pub_exposable_stores）。依輸入順序回傳，不存在或不可曝光的略過；「至少一個上架
+// ExposableStores 從 storeIDs（最多 MaxBatchSize 個）挑出可以公開曝光的店家：營運中、沒有生效中的停權、開通閘門已通過（平台審核核准且轉帳能力啟用）、店名、logo 與鄉鎮市區代碼齊全（規則只有 seller.pub_exposable_stores）。依輸入順序回傳，不存在或不可曝光的略過；「至少一個上架
 // 商品」由曝光端檢查。任何讀取失敗都回錯誤（fail-closed）。
 func (m *Module) ExposableStores(ctx context.Context, storeIDs []int64) ([]ExposableStore, error) {
 	return m.profile.ExposableStores(ctx, storeIDs)

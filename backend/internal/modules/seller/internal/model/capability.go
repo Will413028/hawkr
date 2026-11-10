@@ -38,7 +38,7 @@ const (
 	CapInvoiceManage Capability = "CAP_INVOICE_MANAGE"
 	// CapInvoiceTaxRemedy 稅務身分的申請、補件與延長（救濟管道）。
 	CapInvoiceTaxRemedy Capability = "CAP_INVOICE_TAX_REMEDY"
-	// CapShippingSetup 物流建店、啟用與關閉配送方式；前置條件是 KYC 流程核准（含 PayUni 核准）。
+	// CapShippingSetup 物流建店、啟用與關閉配送方式；前置條件是開通閘門 ONBOARDING_COMPLETE（平台審核核准且收款帳戶的轉帳能力啟用）。
 	CapShippingSetup Capability = "CAP_SHIPPING_SETUP"
 	// CapPublicListing 店家的狀態：買家看得到店面、可以結帳。缺的條件就是 MissingExposure。它是狀態不是動作：只出現在
 	// CapabilitiesOf 的結果，不在 Capabilities()，方法不能宣告它，也不進 gateway 的能力 header。
