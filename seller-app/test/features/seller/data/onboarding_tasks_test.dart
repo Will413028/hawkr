@@ -1,4 +1,5 @@
-import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart'
+    hide OnboardingTask, OnboardingTaskId;
 import 'package:hawkr_seller/features/seller/data/onboarding_tasks.dart';
 import 'package:hawkr_seller/features/seller/data/payment_account.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
