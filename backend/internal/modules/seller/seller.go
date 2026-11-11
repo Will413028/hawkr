@@ -27,7 +27,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/onboarding"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payout"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payuni"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/profile"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/prospect"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/purge"
@@ -60,8 +59,7 @@ type Orders interface {
 
 // Deps 是模組需要的外部依賴；clock 由組裝點注入。StoreCode 是 store_code 的產生器，測試以外不給（預設是
 // 年份加密碼學亂數）。KYCKeys 是 KYC 個資的加密金鑰環，KYCMAC 是比對用的 HMAC 金鑰環（兩者必須是不同的金鑰，
-// seal.Distinct），都是必填。PayUni 是呼叫 PayUni 的 client（platform/payuni 實作），沒有設定時給 nil：綁定記為失敗
-// （PAYUNI_NOT_CONFIGURED），輪詢不排；StorefrontBaseURL 是店家頁的網站根網址（申請沒有填官網時，MerURL 由它組成）。
+// seal.Distinct），都是必填。
 type Deps struct {
 	DB       *db.DB
 	Events   *events.Bus
@@ -71,7 +69,6 @@ type Deps struct {
 	Orders   Orders
 	KYCKeys  *seal.Keyring
 	KYCMAC   *seal.MAC
-	PayUni   PayUniClient
 	// Payment 是收款帳戶的擁有者（payment 模組，Stripe 計畫 D28），必填：核准的 transaction 內請它寫「建立中」的帳戶列並排入建立 job，個資清理時請它
 	// 刪除帳戶列。沒有設定 provider 的 payment 模組讓核准不建立收款帳戶。
 	Payment *payment.Module
@@ -79,11 +76,9 @@ type Deps struct {
 	Registry Registry
 	// ProductStores 是商品所屬店家的 port，彙總瀏覽事件的 job 用；必填。
 	ProductStores ProductStores
-	// StorefrontBaseURL 見上；空字串表示沒有。
-	StorefrontBaseURL string
-	Now               func() time.Time
-	StoreCode         func(now time.Time) (int64, error)
-	Logger            *slog.Logger
+	Now           func() time.Time
+	StoreCode     func(now time.Time) (int64, error)
+	Logger        *slog.Logger
 }
 
 // Module 是 seller 模組。
@@ -96,7 +91,6 @@ type Module struct {
 	governance *governance.Service
 	measure    *measure.Service
 	kyc        *kyc.Service
-	payuni     *payuni.Service
 	payout     *payout.Service
 	purge      *purge.Service
 	prospect   *prospect.Service
@@ -144,11 +138,7 @@ func New(d Deps) *Module {
 		measure: measure.New(measure.Deps{
 			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Identity: d.Identity, Linked: kycService, Closing: closings, Exposure: exposures, Now: d.Now,
 		}),
-		kyc: kycService,
-		payuni: payuni.New(payuni.Deps{
-			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Client: d.PayUni, KYC: kycService, Exposure: exposures,
-			StorefrontBaseURL: d.StorefrontBaseURL, Now: d.Now, Logger: d.Logger,
-		}),
+		kyc:    kycService,
 		payout: payout.New(payout.Deps{DB: d.DB, Jobs: d.Jobs, Exposure: exposures, Identities: kyc.NewFingerprints(d.KYCMAC)}),
 		purge:  purge.New(purge.Deps{DB: d.DB, Events: d.Events, Jobs: d.Jobs, Payment: d.Payment, Now: d.Now}),
 		prospect: prospect.New(prospect.Deps{
@@ -160,7 +150,7 @@ func New(d Deps) *Module {
 	}
 }
 
-// Reader 是只讀店家的 seller：只需要資料庫，不需要事件、job、media、KYC 金鑰或 PayUni。給只讀店家狀態的組裝使用（運維子命令
+// Reader 是只讀店家的 seller：只需要資料庫，不需要事件、job、media 或 KYC 金鑰。給只讀店家狀態的組裝使用（運維子命令
 // admin-role、delegation-eligibility 的 delegation 依賴；characterization 測試的組裝），它們不該為了讀一列店家而備齊 serve 的 seller 設定。
 // 讀取的規則與 Module.Store 是同一份（同一支 profile.Service.Store）。
 type Reader struct{ profile *profile.Service }
@@ -639,7 +629,6 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 	m.closing.AddWorkers(workers)
 	m.measure.AddWorkers(workers)
 	m.governance.AddWorkers(workers)
-	m.payuni.AddWorkers(workers)
 	m.kyc.AddWorkers(workers)
 	m.purge.AddWorkers(workers)
 	m.profile.AddWorkers(workers)
@@ -647,8 +636,7 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 }
 
 // PeriodicJobs 回傳本模組的排程 job：第一次公開的記錄（每 15 分鐘）、措施的對帳、終止合作的對帳（每小時）、措施的結案掃描（每 5 分鐘）、匿名通報人聯絡欄位的清理、關店滿保留期的個資清理（啟動即執行、每小時
-// 補跑）、商品瀏覽事件的彙總（每 5 分鐘）與過期事件的清理（每小時），以及 media 引用的保底掃描（每 15 分鐘）與 PayUni 的掃描（補排遺失的 sync、排輪詢，啟動即執行、每 15
-// 分鐘），以及 KYC 登記資料查詢的掃描（補排遺失的查詢 job、把過期的 PENDING 收成終態，啟動即執行、每 1 分鐘）。
+// 補跑）、商品瀏覽事件的彙總（每 5 分鐘）與過期事件的清理（每小時），以及 media 引用的保底掃描（每 15 分鐘），以及 KYC 登記資料查詢的掃描（補排遺失的查詢 job、把過期的 PENDING 收成終態，啟動即執行、每 1 分鐘）。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	jobs := append(m.suspension.PeriodicJobs(), m.closing.PeriodicJobs()...)
 	jobs = append(jobs, m.measure.PeriodicJobs()...)
@@ -656,7 +644,6 @@ func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	jobs = append(jobs, m.purge.PeriodicJobs()...)
 	jobs = append(jobs, m.profile.PeriodicJobs()...)
 	jobs = append(jobs, m.views.PeriodicJobs()...)
-	jobs = append(jobs, m.payuni.PeriodicJobs()...)
 	jobs = append(jobs, m.kyc.PeriodicJobs()...)
 	return append(jobs, mediaref.PeriodicJobs()...)
 }
@@ -675,7 +662,7 @@ type DevSeedStore = devseed.Store
 type DevSeedAccountRange = devseed.AccountRange
 
 // SeedDevStores 在一個 transaction 內把本機開發的種子店家還原成 fixture（upsert，只動這幾家店與它們的子列，不碰別的店家）：固定的 store_id 與
-// store_code、已核准的 KYC（識別欄位以執行中的金鑰加密）、已綁定而且 PayUni 核准的註冊、logo；公告列保留，version 只增不減。只給本機開發的
+// store_code、已核准的 KYC（識別欄位以執行中的金鑰加密）、logo；公告列保留，version 只增不減。只給本機開發的
 // dev-seed 子命令使用：它直接寫列，繞過開店、送出、審核與綁定的狀態轉移；profile 有變時發 StoreProfileChanged，刪掉的證件與佐證經退場機制釋放
 // media 的引用；停權、關閉、等待刪除這些有下游消費者的生命週期狀態不還原，前提檢查發現就拒絕。寫完之後要 ReannounceExposures 讓下游知道可曝光。
 // rebuilt 是 01-account.sql 重建的帳號區間，區間內有種子以外的未關閉店家時整個拒絕（見 CheckDevSeed）。必須在 transaction 外呼叫。
@@ -698,7 +685,7 @@ func (m *Module) ReannounceExposures(ctx context.Context) (int, error) {
 
 // PurgePII 跑關店之後的兩段清理（ADR 2026-10-19-seller-kyc-payuni-consolidated「關店與個資保留」與 2026-10-20 修訂）：第一段（退場）在一般關店 30 天
 // （StoreRetireAfter；終止合作關店不早於申覆期限）後清公開內容、釋放 logo 與封面並發 StoreRetired；第二段在關店 184 天（StoreRetention）後清註冊、身分與連線資料
-// （店家聯絡、KYC、PayUni 的自由文字、同意紀錄的來源）。申覆的 legal hold 與主管機關來函的保存擋兩段。分批處理到沒有候選為止，回傳第二段清理了個資的店家數（退場看 retired_at）；
+// （店家聯絡、KYC、同意紀錄的來源）。申覆的 legal hold 與主管機關來函的保存擋兩段。分批處理到沒有候選為止，回傳第二段清理了個資的店家數（退場看 retired_at）；
 // 重跑是 no-op。它是 seller.purge_pii job 的內容，給 worker 與測試呼叫。
 func (m *Module) PurgePII(ctx context.Context) (int, error) {
 	return m.purge.Run(ctx)

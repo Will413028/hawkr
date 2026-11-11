@@ -147,7 +147,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	})
 	m = seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: noJobs{}, Identity: id, Media: fake, Orders: noOrders{}, KYCKeys: keys, KYCMAC: mac,
-		Payment: payments, ProductStores: noProducts{}, Registry: noRegistry{}, StorefrontBaseURL: "https://store.example.invalid",
+		Payment: payments, ProductStores: noProducts{}, Registry: noRegistry{},
 		Now: func() time.Time { return now }, Logger: log,
 	})
 	events.Subscribe(bus, m.OnPayoutAccountChanged)

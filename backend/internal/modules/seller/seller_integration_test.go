@@ -243,8 +243,7 @@ func (f *fixture) newModuleClock(t *testing.T, jc jobs.ReportingEnqueuer, kycKey
 	log := slog.New(slog.NewTextHandler(&f.logs, nil))
 	return New(Deps{
 		DB: f.db, Events: f.bus, Jobs: jc, Identity: f.identity, Media: f.media, Orders: f.orders, KYCKeys: kycKeys, KYCMAC: kycMAC, Payment: f.payments, ProductStores: f.products, Registry: f.registry,
-		StorefrontBaseURL: "https://store.example.invalid",
-		Now:               now, Logger: log,
+		Now: now, Logger: log,
 		StoreCode: func(now time.Time) (int64, error) {
 			if len(f.codes) > 0 {
 				code := f.codes[0]

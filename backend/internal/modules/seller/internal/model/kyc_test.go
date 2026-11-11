@@ -120,15 +120,3 @@ func TestKYCCursorValid(t *testing.T) {
 		t.Error("完整的位置要有效")
 	}
 }
-
-func TestPayUniObservationCursorValid(t *testing.T) {
-	now := time.Now()
-	for name, c := range map[string]PayUniObservationCursor{"zero": {}, "no time": {ObservationID: uuid.NewV7()}, "no id": {ExecutedAt: now}} {
-		if c.Valid() {
-			t.Errorf("%s 不是完整的位置", name)
-		}
-	}
-	if !(PayUniObservationCursor{ExecutedAt: now, ObservationID: uuid.NewV7()}).Valid() {
-		t.Error("完整的位置要有效")
-	}
-}
