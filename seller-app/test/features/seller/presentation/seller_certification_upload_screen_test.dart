@@ -395,6 +395,13 @@ void main() {
         ),
       );
       expect(find.text('資料不符'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('kyc_rejection')),
+          matching: find.text('請查看退件原因並編輯後重新送出。'),
+        ),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('kyc_locked')), findsNothing);
     });
   });

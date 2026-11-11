@@ -572,6 +572,9 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
+/// 退回框的說明行；website 的退回框顯示同一句。
+const _rejectionResubmitHint = '請查看退件原因並編輯後重新送出。';
+
 /// 被平台退回的申請：狀態名稱、退回原因與伺服器算的待處理問題（欄位名稱加說明）。只看 [rejection]。
 class _RejectionBanner extends StatelessWidget {
   const _RejectionBanner({required this.rejection, required this.issues});
@@ -604,6 +607,11 @@ class _RejectionBanner extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     color: AppColors.danger,
                   ),
+                ),
+                SizedBox(height: 4.h),
+                Text(
+                  _rejectionResubmitHint,
+                  style: TextStyle(fontSize: 14.sp, color: AppColors.gray1),
                 ),
                 SizedBox(height: 8.h),
                 Text(

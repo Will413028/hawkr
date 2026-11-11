@@ -32,7 +32,7 @@ class NotificationRouter {
   ///       讓已打開的訂單列表/同訂單詳情頁自動 refresh；無 orderSn 時退回 /main/orders
   /// - AFTER_SALE_REQUEST / AFTER_SALE_STATUS / REFUND_REQUESTED
   ///     → /after-sales/detail (帶 caseNo)；無 caseNo 時退回配送中 + 售後處理篩選
-  /// - CERTIFICATION_* / MERCHANT_VERIFICATION / SELLER_REVIEW_STATUS /
+  /// - CERTIFICATION_* / SELLER_REVIEW_STATUS /
   ///   PAYUNI_STATUS → 導向 /main/wallet（重讀由 manager 負責）
   /// - CHAT_MESSAGE → /chat/thread (帶 conversationId)
   /// - NEW_FOLLOWER / NEW_SUBSCRIBER → /subscribers
@@ -57,7 +57,7 @@ class NotificationRouter {
     final context = MyApp.navigatorKey.currentContext;
     final normalized = rawType.toUpperCase();
 
-    // 認證與 PayUni 狀態的推播：到錢包看結果（重讀由 manager 在事件進來時做，這裡只導覽）。
+    // 認證與收款帳戶狀態的推播：到錢包看結果（重讀由 manager 在事件進來時做，這裡只導覽）。
     if (isSellerStatusPushType(normalized)) {
       HKLog.logI('[NotificationRouter] → 錢包 ($normalized)');
       context?.go(MainRoutes.wallet);

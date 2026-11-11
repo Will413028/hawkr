@@ -62,7 +62,6 @@ void main() {
   Future<ProviderContainer> pump(
     WidgetTester tester, {
     bool certified = false,
-    KYCStatus? reviewStatus,
     GetMyStoreResponse? response,
     GoRouter? router,
     ValueGetter<int>? onInputsBuilt,
@@ -84,9 +83,7 @@ void main() {
                   ? individualApplication(
                       kycStatus: KYCStatus.KYC_STATUS_APPROVED,
                     )
-                  : reviewStatus == null
-                  ? null
-                  : individualApplication(kycStatus: reviewStatus),
+                  : null,
             ),
           ),
         ),
@@ -267,29 +264,26 @@ void main() {
     expect(find.text('任務完成'), findsOneWidget);
   });
 
-  for (final review in [
-    null,
-    KYCStatus.KYC_STATUS_DRAFT,
-    KYCStatus.KYC_STATUS_SUBMITTED,
-    KYCStatus.KYC_STATUS_APPROVED,
-  ]) {
-    testWidgets('申請狀態 $review：店名與商店介紹都可編輯，沒有鎖定說明', (tester) async {
-      await pump(tester, reviewStatus: review);
+  testWidgets('店名、商店介紹與得獎紀錄都可編輯，沒有鎖定說明', (tester) async {
+    await pump(tester);
 
-      expect(find.textContaining('PayUni'), findsNothing);
-      await tester.tap(find.text('商店名稱'));
-      await tester.pumpAndSettle();
-      expect(find.text('編輯商店名稱'), findsOneWidget);
-    });
+    expect(find.textContaining('PayUni'), findsNothing);
+    await tester.tap(find.text('商店名稱'));
+    await tester.pumpAndSettle();
+    expect(find.text('編輯商店名稱'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
 
-    testWidgets('申請狀態 $review：商店介紹可編輯', (tester) async {
-      await pump(tester, reviewStatus: review);
+    await tester.tap(find.widgetWithText(ProfileEditableInfoRow, '商店介紹'));
+    await tester.pumpAndSettle();
+    expect(find.text('編輯商店介紹'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(ProfileEditableInfoRow, '商店介紹'));
-      await tester.pumpAndSettle();
-      expect(find.text('編輯商店介紹'), findsOneWidget);
-    });
-  }
+    await tester.tap(find.text('得獎紀錄 / 店鋪亮點'));
+    await tester.pumpAndSettle();
+    expect(find.text('編輯得獎紀錄 / 店鋪亮點'), findsOneWidget);
+  });
 
   testWidgets('欄位與標籤：商店電話、聯絡人姓名、聯絡人手機、客服電子信箱、店家地址；沒有信箱列', (tester) async {
     await pump(tester);

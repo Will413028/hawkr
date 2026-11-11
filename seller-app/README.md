@@ -272,7 +272,7 @@ lib/
 | 推播 | `push_notification_manager.dart`, `push_notifications.dart` | FCM 推播通知 |
 | 商家頭像 | `merchant_avatar_helper.dart` | 頭像載入 (含 presigned URL) |
 | 訂單狀態 | `order_status_notifier.dart` | 訂單即時狀態更新 |
-| PayUNi 狀態 | `payuni.dart`、`seller_status_refresh.dart` | `GetMyKYC` 的狀態（含 `flow.payuni`）；推播只觸發重讀 |
+| 賣家狀態重讀 | `seller_status_refresh.dart` | 店家、認證流程、收款帳戶與開通摘要一起重讀；推播只觸發重讀 |
 
 ## 共用元件
 
