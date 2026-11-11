@@ -416,7 +416,7 @@ func TestApprovedKYCCannotBeResubmittedAndStoreContactUpdate(t *testing.T) {
 	wantCode(t, err, connect.CodeAborted, "VERSION_CONFLICT")
 	for field, in := range map[string]*pb.Store{
 		"store.contact_mobile": {ContactMobile: "123"}, "store.support_email": {SupportEmail: "not-an-email"},
-		"store.contact_name": {ContactName: "這個聯絡人的名字實在是太長了所以超過二十個字的上限"},
+		"store.contact_name": {ContactName: strings.Repeat("字", 51)},
 	} {
 		in.Etag = after.GetEtag()
 		path := strings.TrimPrefix(field, "store.")
@@ -426,12 +426,29 @@ func TestApprovedKYCCannotBeResubmittedAndStoreContactUpdate(t *testing.T) {
 		}
 	}
 
+	// 已核准時客服信箱不能清掉；聯絡人姓名與手機是選填，可以清。
+	_, err = f.app.UpdateMyStore(ctx, connect.NewRequest(&pb.UpdateMyStoreRequest{
+		Store: &pb.Store{Etag: after.GetEtag()}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"support_email"}},
+	}))
+	if got := wantCode(t, err, connect.CodeInvalidArgument, ""); got != "store.support_email" {
+		t.Fatalf("清客服信箱：field=%q", got)
+	}
+	cleared, err := f.app.UpdateMyStore(ctx, connect.NewRequest(&pb.UpdateMyStoreRequest{
+		Store: &pb.Store{Etag: after.GetEtag()}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"contact_name", "contact_mobile"}},
+	}))
+	if err != nil {
+		t.Fatalf("已核准時清聯絡人姓名與手機：%v", err)
+	}
+	if c := cleared.Msg.GetStore(); c.GetContactName() != "" || c.GetContactMobile() != "" || c.GetSupportEmail() != "owner@example.com" {
+		t.Fatalf("cleared=%v", c)
+	}
+
 	f.suspendStore(t, f.storeID(t))
 	if _, err := f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{})); err != nil {
 		t.Fatalf("停權時讀自己的申請：%v", err)
 	}
 	_, err = f.app.UpdateMyStore(ctx, connect.NewRequest(&pb.UpdateMyStoreRequest{
-		Store: &pb.Store{Etag: after.GetEtag(), ContactName: "停權中"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"contact_name"}},
+		Store: &pb.Store{Etag: cleared.Msg.GetStore().GetEtag(), ContactName: "停權中"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"contact_name"}},
 	}))
 	wantCode(t, err, connect.CodePermissionDenied, "SELLER_SUSPENDED")
 }
@@ -715,7 +732,7 @@ func TestSubmitKYCReportsEveryMissingItemAsAFieldViolation(t *testing.T) {
 		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"individual"}},
 	})
 	_, err := f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: individual.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
-	wantStore := []string{"store.contact_mobile", "store.contact_name", "store.support_email"}
+	wantStore := []string{"store.support_email"}
 	// 個人賣家的申請沒有必填欄位；店家資料還缺：failed_precondition（不是欄位違規），缺哪些看 missing_store_fields；補齊之後才能送出。
 	wantCode(t, err, connect.CodeFailedPrecondition, "")
 	if got := badRequestFields(t, err); len(got) != 0 {
