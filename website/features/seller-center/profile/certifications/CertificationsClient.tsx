@@ -1445,7 +1445,6 @@ function TypePicker({
 					<TypePickerIndividualIcon />
 					<strong>個人賣家</strong>
 					<small>以個人名義販售農產品 / 自家產品</small>
-					<small>需身分證 + 存摺</small>
 				</button>
 				<button
 					type="button"
@@ -1455,7 +1454,7 @@ function TypePicker({
 					<TypePickerBusinessIcon />
 					<strong>企業用戶</strong>
 					<small>以行號或公司名義販售（需統一編號）</small>
-					<small>需公司資訊 + 負責人身分證 + 公司帳戶存摺</small>
+					<small>需公司資訊與統一編號</small>
 				</button>
 			</div>
 			<footer>

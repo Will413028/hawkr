@@ -1056,6 +1056,20 @@ describe("兩區狀態頁（D15）", () => {
 		expect(screen.getByText("選擇商家類型")).toBeTruthy();
 	});
 
+	it("類型選擇的副標：個人沒有需求副標，企業只列公司資訊與統一編號", async () => {
+		kycStore.set(null);
+		await mount();
+		const card = (name: string) =>
+			screen.getByText(name).closest("button") as HTMLElement;
+		const subtitles = (name: string) =>
+			[...card(name).querySelectorAll("small")].map((el) => el.textContent);
+		expect(subtitles("個人賣家")).toEqual(["以個人名義販售農產品 / 自家產品"]);
+		expect(subtitles("企業用戶")).toEqual([
+			"以行號或公司名義販售（需統一編號）",
+			"需公司資訊與統一編號",
+		]);
+	});
+
 	it("畫面不寫死 PayUni 與逾期、停用的字眼", async () => {
 		kycStore.set(app({ status: KYCStatus.KYC_STATUS_APPROVED }));
 		await mount();
