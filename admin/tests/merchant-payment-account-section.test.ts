@@ -9,6 +9,7 @@ import {
 	PaymentAdminService,
 } from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1/payment_pb";
 import { ReviewQueueAdminService } from "@hawkr/api/gen/hawkr/admin/reviewqueue/v1alpha1/review_queue_pb";
+import { SellerAdminService } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
 import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import {
 	bodyText,
@@ -25,6 +26,7 @@ import {
  */
 
 const h = React.createElement;
+const { useState } = requireFromTest("react") as typeof import("react");
 const sectionModule = requireFromTest(
 	"../src/app/admin/merchants/[id]/PaymentAccountCard",
 ) as typeof import("../src/app/admin/merchants/[id]/PaymentAccountCard");
@@ -66,22 +68,51 @@ function Host({ notices, rereadMs }: { notices: Notice[]; rereadMs: number }) {
 	});
 }
 
+/** 與商家詳情頁相同的掛法：查詢在頁面層，區塊可以先卸載（切換分頁）而查詢還在。 */
+function PageHost({
+	notices,
+	rereadMs,
+}: {
+	notices: Notice[];
+	rereadMs: number;
+}) {
+	const payment = hooks.usePaymentAccount("57");
+	const [shown, setShown] = useState(true);
+	if (!shown) return null;
+	return h(
+		"div",
+		null,
+		h("button", { type: "button", onClick: () => setShown(false) }, "切換分頁"),
+		h(sectionModule.PaymentAccountSection, {
+			storeId: "57",
+			payment,
+			onNotice: (n: Notice) => notices.push(n),
+			rereadMs,
+		}),
+	);
+}
+
 function setup(
 	handlers: {
 		get: (call: number) => ReturnType<typeof account> | ConnectError;
+		/** 讓第 call 次 GetPaymentAccount 卡住直到回傳的 promise 完成。 */
+		getGate?: (call: number) => Promise<void> | undefined;
 		refresh?: () => undefined | ConnectError;
 		/** 讓 RefreshPaymentAccount 卡住直到這個 promise 完成。 */
 		refreshGate?: Promise<void>;
 		retry?: () => ReturnType<typeof account>;
 	},
 	rereadMs = 5,
+	host: typeof Host = Host,
 ) {
 	const calls = { get: 0, refresh: 0, retry: 0 };
 	const transport = createRouterTransport(({ service }) => {
 		service(PaymentAdminService, {
-			getPaymentAccount: () => {
+			getPaymentAccount: async () => {
 				calls.get += 1;
-				const r = handlers.get(calls.get);
+				const call = calls.get;
+				await handlers.getGate?.(call);
+				const r = handlers.get(call);
 				if (r instanceof ConnectError) throw r;
 				return { account: r };
 			},
@@ -99,7 +130,7 @@ function setup(
 		});
 	});
 	const notices: Notice[] = [];
-	const view = mount(h(Host, { notices, rereadMs }), transport);
+	const view = mount(h(host, { notices, rereadMs }), transport);
 	view.queryClient.setQueryData(queueKey, { items: [] });
 	const queueInvalidated = () =>
 		view.queryClient.getQueryState(queueKey)?.isInvalidated === true;
@@ -227,4 +258,111 @@ test("讀取：not_found 是尚未建立；其他錯誤是讀取失敗，重試�
 	await click("重試");
 	await until(() => bodyText().includes("acct_1"), "重試後顯示帳戶");
 	assert.equal(failing.calls.get, 2);
+});
+
+test("開通任務：重試建立成功與重讀完成都讓開通任務查詢重讀（重新整理剛排入與未完成的重讀不算），重新整理失敗不重讀", async () => {
+	const onboardingKey = createConnectQueryKey({
+		schema: SellerAdminService.method.getStoreOnboarding,
+		cardinality: undefined,
+	});
+	const invalidated = (view: ReturnType<typeof setup>["view"]) =>
+		view.queryClient.getQueryState(onboardingKey)?.isInvalidated === true;
+
+	const retry = setup({
+		get: () =>
+			account({
+				externalAccountId: "",
+				status: PaymentAccountStatus.NOT_CREATED,
+				createFailedTime: at(1),
+			}),
+		retry: () => account({ externalAccountId: "acct_new" }),
+	});
+	retry.view.queryClient.setQueryData(onboardingKey, {
+		tasks: [],
+		complete: false,
+	});
+	await retry.view.render();
+	await click("重試建立");
+	await until(() => bodyText().includes("acct_new"), "快取已寫入");
+	assert.equal(invalidated(retry.view), true);
+	await retry.view.unmount();
+
+	// 第 2 次讀仍是舊 fetch_time（重讀未完成），第 3 次才變；第 3 次卡住，讓「還沒完成」的斷言有可觀察的時間點。
+	let releaseThird: () => void = () => {};
+	const thirdGate = new Promise<void>((resolve) => {
+		releaseThird = resolve;
+	});
+	const reread = setup({
+		get: (n) => account({ fetchTime: n >= 3 ? at(5) : at(0) }),
+		getGate: (n) => (n === 3 ? thirdGate : undefined),
+	});
+	reread.view.queryClient.setQueryData(onboardingKey, {
+		tasks: [],
+		complete: false,
+	});
+	await reread.view.render();
+	await click("重新整理");
+	assert.equal(reread.calls.refresh, 1);
+	await until(() => reread.calls.get >= 3, "第一次重讀已處理、第二次重讀送出");
+	assert.equal(
+		invalidated(reread.view),
+		false,
+		"fetch_time 還沒變：排入重新整理與未完成的重讀都不重讀開通任務",
+	);
+	releaseThird();
+	await until(() => invalidated(reread.view), "重讀完成後開通任務重讀");
+	await reread.view.unmount();
+
+	const failing = setup({
+		get: () => account({}),
+		refresh: () => new ConnectError("down", Code.Unavailable),
+	});
+	failing.view.queryClient.setQueryData(onboardingKey, {
+		tasks: [],
+		complete: false,
+	});
+	await failing.view.render();
+	await click("重新整理");
+	await until(
+		() => failing.notices.some((n) => n?.tone === "error"),
+		"重新整理失敗的結果已顯示",
+	);
+	assert.equal(invalidated(failing.view), false);
+	await failing.view.unmount();
+});
+
+test("開通任務：重讀還在途中區塊就卸載（頁面層的查詢還在），帳戶更新後開通任務仍然重讀，且不再排下一輪", async () => {
+	const onboardingKey = createConnectQueryKey({
+		schema: SellerAdminService.method.getStoreOnboarding,
+		cardinality: undefined,
+	});
+	let release: () => void = () => {};
+	const gate = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const { calls, view } = setup(
+		{
+			get: (n) => account({ fetchTime: n >= 2 ? at(5) : at(0) }),
+			getGate: (n) => (n === 2 ? gate : undefined),
+		},
+		5,
+		PageHost,
+	);
+	view.queryClient.setQueryData(onboardingKey, { tasks: [], complete: false });
+	await view.render();
+	await click("重新整理");
+	await until(() => calls.get === 2, "重讀已送出");
+	await click("切換分頁");
+	assert.equal(
+		view.queryClient.getQueryState(onboardingKey)?.isInvalidated,
+		false,
+	);
+	release();
+	await until(
+		() => view.queryClient.getQueryState(onboardingKey)?.isInvalidated === true,
+		"帳戶更新後開通任務重讀",
+	);
+	await sleep(40);
+	assert.equal(calls.get, 2);
+	await view.unmount();
 });

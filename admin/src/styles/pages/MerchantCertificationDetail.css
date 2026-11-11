@@ -1306,6 +1306,56 @@
 	margin-top: 16px;
 }
 
+.onboarding-summary-card {
+	margin-bottom: 20px;
+}
+
+.onboarding-task-list {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin: 12px 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.onboarding-task {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+}
+
+.onboarding-task-icon {
+	flex-shrink: 0;
+	margin-top: 2px;
+	font-size: 20px;
+}
+
+.onboarding-task-title {
+	font-weight: 600;
+}
+
+.onboarding-task-status {
+	color: var(--admin-muted-aa);
+}
+
+.onboarding-task--success .onboarding-task-icon {
+	color: var(--admin-success);
+}
+
+.onboarding-task--warning .onboarding-task-icon {
+	color: var(--admin-warning);
+}
+
+.onboarding-task--info .onboarding-task-icon {
+	color: var(--admin-info);
+}
+
+.onboarding-task--muted .onboarding-task-icon,
+.onboarding-task--unknown .onboarding-task-icon {
+	color: var(--admin-muted-aa);
+}
+
 .payment-account-failed {
 	color: var(--admin-warning);
 	font-weight: 500;

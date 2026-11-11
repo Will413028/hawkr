@@ -16,11 +16,12 @@ import {
 	ratingText,
 	registrationPollInterval,
 } from "./kyc-application";
+import { onboardingSummaryOf } from "./onboarding-summary";
 import { paymentAccountOf } from "./payment-account";
 import { accountEmailOf } from "./store-detail";
 
-// 商家詳情頁的資料來源（SellerAdminService.GetStore、GetKYCApplication、GetPayUniRegistration；IdentityAdminService.GetAccount；
-// 公開的 SellerPublicService.GetStore 的評分統計）。查詢都經 connect-query
+// 商家詳情頁的資料來源（SellerAdminService.GetStore、GetKYCApplication、GetPayUniRegistration、GetStoreOnboarding；
+// PaymentAdminService.GetPaymentAccount；IdentityAdminService.GetAccount；公開的 SellerPublicService.GetStore 的評分統計）。查詢都經 connect-query
 // 的 transport（K1），頁面只讀結果。
 
 /** 店家詳情（GetStore）。已關閉的店照樣回傳；生效中的措施（active_measures）與店家是同一次讀取。storeId 為空時不發請求。 */
@@ -90,6 +91,18 @@ export function usePaymentAccount(storeId: string | undefined) {
 		storeId ? { storeId } : skipToken,
 	);
 	return { query, value: paymentAccountOf(query) };
+}
+
+/**
+ * 開通任務（SellerAdminService.GetStoreOnboarding）：與賣家自己看到的同一份推導，後台只讀、不重讀金流商。單一來源讀不到只讓該項是 UNKNOWN。
+ * 店家 ID 為空時不發請求。平台審核與收款帳戶變動後由頁面與 PaymentAccountSection 讓它重讀；狀態的判斷在 onboardingSummaryOf。
+ */
+export function useStoreOnboarding(storeId: string | undefined) {
+	const query = useConnectQuery(
+		SellerAdminService.method.getStoreOnboarding,
+		storeId ? { storeId } : skipToken,
+	);
+	return { query, value: onboardingSummaryOf(query) };
 }
 
 /**

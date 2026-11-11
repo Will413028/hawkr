@@ -8,19 +8,20 @@ import {
 } from "@connectrpc/connect-query";
 import { PaymentAdminService } from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1/payment_pb";
 import { ReviewQueueAdminService } from "@hawkr/api/gen/hawkr/admin/reviewqueue/v1alpha1/review_queue_pb";
+import { SellerAdminService } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
 import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
-import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 import {
 	sellerPaymentAccountStatus,
 	sellerRequirementCollection,
 } from "@hawkr/ui-text/keys";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
-import { type BadgeVariant, Button, StatusBadge } from "@/components/UI";
+import { type BadgeVariant, Button } from "@/components/UI";
 import CopyIconButton from "@/features/delegated-operations/components/CopyIconButton";
 import { connectErrorText, errorMessage } from "@/lib/error-text";
 import { formatDateTimeShort } from "@/lib/format";
 import { staffTextOrUnknown } from "@/lib/ui-text";
+import { DetailCardShell } from "./DetailCardShell";
 import type { GovernanceNotice } from "./GovernanceNotice";
 import {
 	fetchTimeMs,
@@ -51,33 +52,16 @@ const STATUS_VARIANT: Readonly<
 	[PaymentAccountStatus.DISABLED]: "danger",
 };
 
+const SHELL = {
+	id: PAYMENT_ACCOUNT_ANCHOR,
+	titleId: "payment-account-title",
+	icon: "account_balance",
+	title: "收款帳戶",
+	className: "payment-account-card",
+} as const;
+
 function capabilityText(active: boolean): string {
 	return active ? "已啟用" : "未啟用";
-}
-
-function Shell({
-	badge,
-	children,
-}: {
-	badge?: { label: string; variant: BadgeVariant };
-	children: React.ReactNode;
-}) {
-	return (
-		<section
-			id={PAYMENT_ACCOUNT_ANCHOR}
-			className="detail-card payment-account-card"
-			aria-labelledby="payment-account-title"
-		>
-			<div className="section-title">
-				<MaterialSymbol name="account_balance" />
-				<span id="payment-account-title">收款帳戶</span>
-				{badge && (
-					<StatusBadge variant={badge.variant}>{badge.label}</StatusBadge>
-				)}
-			</div>
-			<div className="card-body">{children}</div>
-		</section>
-	);
 }
 
 function Field({
@@ -113,16 +97,16 @@ export function PaymentAccountCard({
 }) {
 	if (state.state === "loading") {
 		return (
-			<Shell>
+			<DetailCardShell {...SHELL}>
 				<p className="payment-desc" role="status">
 					收款帳戶載入中…
 				</p>
-			</Shell>
+			</DetailCardShell>
 		);
 	}
 	if (state.state === "error") {
 		return (
-			<Shell>
+			<DetailCardShell {...SHELL}>
 				<p className="payment-desc" role="alert">
 					收款帳戶讀取失敗
 					{state.error !== undefined && `：${errorMessage(state.error)}`}
@@ -132,14 +116,14 @@ export function PaymentAccountCard({
 						重試
 					</Button>
 				</div>
-			</Shell>
+			</DetailCardShell>
 		);
 	}
 	if (state.state === "notFound") {
 		return (
-			<Shell>
+			<DetailCardShell {...SHELL}>
 				<p className="payment-desc">尚未建立（平台審核核准後自動建立）</p>
-			</Shell>
+			</DetailCardShell>
 		);
 	}
 	const account = state.account;
@@ -150,7 +134,7 @@ export function PaymentAccountCard({
 	const failedTime = account.createFailedTime;
 	const requirements = account.requirements;
 	return (
-		<Shell badge={badge}>
+		<DetailCardShell {...SHELL} badge={badge}>
 			<div className="info-grid">
 				<Field label="金流商">{account.provider || "-"}</Field>
 				<Field label="外部帳戶">
@@ -218,7 +202,7 @@ export function PaymentAccountCard({
 					</Button>
 				)}
 			</div>
-		</Shell>
+		</DetailCardShell>
 	);
 }
 
@@ -264,11 +248,20 @@ export function PaymentAccountSection({
 		};
 	}, []);
 
-	// 處理過的待辦（建立失敗）依帳戶狀態出入佇列：結果一變就讓待辦列表重讀。
+	// 處理過的待辦（建立失敗）依帳戶狀態出入佇列：重新整理排入、重讀完成、重試建立成功都重讀。
 	const invalidateQueue = () => {
 		void queryClient.invalidateQueries({
 			queryKey: createConnectQueryKey({
 				schema: ReviewQueueAdminService.method.listReviewQueue,
+				cardinality: undefined,
+			}),
+		});
+	};
+	// 開通任務的收款帳戶項跟著帳戶結果走：只在重讀完成與重試建立成功時重讀（重新整理剛排入時帳戶還沒變）。
+	const invalidateOnboarding = () => {
+		void queryClient.invalidateQueries({
+			queryKey: createConnectQueryKey({
+				schema: SellerAdminService.method.getStoreOnboarding,
 				cardinality: undefined,
 			}),
 		});
@@ -282,11 +275,13 @@ export function PaymentAccountSection({
 			rereadTimer.current = setTimeout(async () => {
 				attempt += 1;
 				const result = await payment.query.refetch();
-				if (generation.current !== mine) return;
+				// 帳戶快取已更新：即使已卸載或被新一輪取代，頁面層的開通任務查詢也要重讀；世代只管要不要排下一輪。
 				if (rereadFinished(baselineMs, result.data?.account)) {
 					invalidateQueue();
+					invalidateOnboarding();
 					return;
 				}
+				if (generation.current !== mine) return;
 				if (attempt < REFRESH_REREAD_MAX_ATTEMPTS) schedule();
 			}, rereadMs);
 		};
@@ -318,6 +313,7 @@ export function PaymentAccountSection({
 			);
 			onNotice({ tone: "success", text: RETRY_QUEUED_TEXT });
 			invalidateQueue();
+			invalidateOnboarding();
 		} catch (caught) {
 			onNotice({
 				tone: "error",

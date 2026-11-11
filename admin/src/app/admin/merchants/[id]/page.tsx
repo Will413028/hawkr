@@ -94,6 +94,7 @@ import {
 	terminationAvailability,
 	terminationCreatedText,
 } from "./measure";
+import { OnboardingSummaryCard } from "./OnboardingSummaryCard";
 import { PaymentAccountSection } from "./PaymentAccountCard";
 import { PayUniContactCard, PayUniStatusCard } from "./PayUniCards";
 import ProductForceUnpublishDialog from "./ProductForceUnpublishDialog";
@@ -125,6 +126,7 @@ import {
 	usePaymentAccount,
 	usePayUniRegistration,
 	useStoreDetail,
+	useStoreOnboarding,
 	useStoreRating,
 } from "./use-store-detail";
 import "@/styles/pages/DelegatedOperations.css";
@@ -266,6 +268,8 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 	const payUni = usePayUniRegistration(store?.id);
 	// 收款帳戶（GetPaymentAccount）：核准前是 not_found（尚未建立）；核准、退回、重新綁定後與待辦一起重讀。
 	const paymentAccount = usePaymentAccount(store?.id);
+	// 開通任務（GetStoreOnboarding）：平台審核與收款帳戶都會改變它，核准、退回與收款帳戶的動作後重讀。
+	const onboarding = useStoreOnboarding(store?.id);
 	const payUniRegistration =
 		payUni.value.state === "ready" ? payUni.value.registration : undefined;
 	// 核准、退回與重新查詢的可用性只讀伺服器（申請的 can_approve、can_reject、can_requery_registration；前提 2026-10-15）。
@@ -443,6 +447,12 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		queryClient.invalidateQueries({
 			queryKey: createConnectQueryKey({
 				schema: PaymentAdminService.method.getPaymentAccount,
+				cardinality: undefined,
+			}),
+		});
+		queryClient.invalidateQueries({
+			queryKey: createConnectQueryKey({
+				schema: SellerAdminService.method.getStoreOnboarding,
 				cardinality: undefined,
 			}),
 		});
@@ -1197,6 +1207,14 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 			)}
 			{(!isApproved || activeTab === "basic") && isRejected && application && (
 				<KycRejectionNotice application={application} />
+			)}
+
+			{/* 開通摘要卡（GetStoreOnboarding）— 只讀，與賣家看到的同一份任務；在收款帳戶卡之上。 */}
+			{(!isApproved || activeTab === "basic") && (
+				<OnboardingSummaryCard
+					state={onboarding.value}
+					onReload={() => void onboarding.query.refetch()}
+				/>
 			)}
 
 			{/* 收款帳戶卡（GetPaymentAccount）— 獨立於平台審核狀態，核准後仍顯示；錨點 #payment-account。PayUni 的兩張卡在步驟 8 刪除。 */}
