@@ -109,7 +109,7 @@ function useMyKycQuery<T>(
 		select,
 		enabled: scope.mode === "seller" && hasSeller && (enabledOption ?? true),
 		staleTime: 30_000,
-		// PayUni 的審核結果由伺服器的背景程序與 PayUni 通知更新，沒有賣家端的刷新動作：回到分頁時重新讀一次。
+		// 審核結果由伺服器更新，沒有賣家端的刷新動作：回到分頁時重新讀一次。
 		refetchOnWindowFocus: true,
 	});
 }

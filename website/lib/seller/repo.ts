@@ -2,7 +2,7 @@
  * Seller-side repos.
  *
  * 店家資料走 Connect（`SellerAppService`）：GetMyStore、UpdateMyStore、CompleteMyStoreOnboarding、
- * ApplyStore、CloseMyStore；認證與 PayUni 在 `kyc.ts`、`payuni.ts`。儀表板在 `dashboard.ts`（`GetMyDashboard`），措施與申覆在 `measures.ts`。其餘端點仍是 REST（全部 authed）：
+ * ApplyStore、CloseMyStore；認證在 `kyc.ts`。儀表板在 `dashboard.ts`（`GetMyDashboard`），措施與申覆在 `measures.ts`。其餘端點仍是 REST（全部 authed）：
  *   GET    /app/sellers/me/customers                customers list (CRM)
  *   GET    /app/coupon_templates                    my coupon templates
  *   POST   /app/coupon_templates                    create

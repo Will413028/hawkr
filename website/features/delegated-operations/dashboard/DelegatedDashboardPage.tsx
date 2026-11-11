@@ -31,8 +31,8 @@ import {
  *   不需要新 capability，**CI 全綠而攻擊面已經擴大**（§6.1.8 禁令）。
  * - 「快速操作」四顆是**匯出訂單／建立優惠券／新增商品／發布動態** —— 前兩顆分別
  *   落在履約與封閉九值之外，代行按下去只會拿到 403 或打到管理員自己的帳號。
- * - 開店進度卡讀 `useSellerSelf`／`usePayuniStatus`／`useShippingOnboardings`，
- *   後兩支是金流與履約禁區。
+ * - 開店進度卡讀 `useSellerSelf`／`useShippingOnboardings`，
+ *   後一支是履約禁區。
  *
  * ⇒ 這一頁只做一件事：把**既有三支唯讀列表端點的 `total`** 排成 KPI（B15 明列的
  * 唯一合法作法，與訂單頁四張卡同一個機制），後端零新增。缺哪一個 read capability
