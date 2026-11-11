@@ -9,6 +9,7 @@ import 'package:hawkr_seller/features/coupon/data/coupon_model.dart';
 import 'package:hawkr_seller/features/coupon/presentation/coupon_controller.dart';
 import 'package:hawkr_seller/features/seller/data/current_kyc.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
+import 'package:hawkr_seller/features/seller/data/onboarding_summary.dart';
 import 'package:hawkr_seller/features/seller/data/payment_account.dart';
 import 'package:hawkr_seller/features/wallet/presentation/wallet_screen.dart';
 import 'package:hawkr_seller/shared/widgets/green_header_bar.dart';
@@ -22,11 +23,13 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../support/kyc_fixtures.dart';
 import '../../support/my_store_fixtures.dart';
+import '../../support/onboarding_fixtures.dart';
 
 typedef _Scenario = ({
   String name,
   KYCStatus? review,
   PaymentAccount? payment,
+  GetMyOnboardingResponse summary,
   bool certified,
 });
 
@@ -37,19 +40,28 @@ final _scenarios = <_Scenario>[
     payment: PaymentAccount(
       status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED,
     ),
+    summary: completedSummary(),
     certified: true,
   ),
-  (name: 'not started', review: null, payment: null, certified: false),
+  (
+    name: 'not started',
+    review: null,
+    payment: null,
+    summary: reviewPendingSummary(),
+    certified: false,
+  ),
   (
     name: 'submitted',
     review: KYCStatus.KYC_STATUS_SUBMITTED,
     payment: null,
+    summary: reviewPendingSummary(),
     certified: false,
   ),
   (
     name: 'rejected',
     review: KYCStatus.KYC_STATUS_REJECTED,
     payment: null,
+    summary: reviewPendingSummary(),
     certified: false,
   ),
   (
@@ -58,6 +70,7 @@ final _scenarios = <_Scenario>[
     payment: PaymentAccount(
       status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED,
     ),
+    summary: paymentPendingSummary(),
     certified: false,
   ),
 ];
@@ -178,6 +191,9 @@ Future<void> _pumpWallet(
   final payment = scenario == null
       ? const AsyncLoading<PaymentAccount?>()
       : AsyncData<PaymentAccount?>(scenario.payment);
+  final summary = scenario == null
+      ? const AsyncLoading<GetMyOnboardingResponse>()
+      : AsyncData(scenario.summary);
   final store = scenario == null
       ? null
       : myStore(
@@ -192,6 +208,7 @@ Future<void> _pumpWallet(
       overrides: [
         currentKycProvider.overrideWithValue(kyc),
         currentPaymentAccountProvider.overrideWithValue(payment),
+        currentOnboardingProvider.overrideWithValue(summary),
         myStoreSnapshotProvider.overrideWithValue(store),
         couponListControllerProvider.overrideWith(_CouponFixture.new),
       ],

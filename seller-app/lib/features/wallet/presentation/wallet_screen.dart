@@ -26,6 +26,7 @@ import '../../../shared/widgets/logo_home_button.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
 import '../../seller/data/current_kyc.dart';
 import '../../seller/data/current_store.dart';
+import '../../seller/data/onboarding_summary.dart';
 import '../../seller/data/payment_account.dart';
 import '../../seller/data/seller_status_refresh.dart';
 import '../../seller/presentation/payment_account_action.dart';
@@ -37,15 +38,17 @@ import '../../seller/presentation/seller_certification_gate.dart'
 import 'wallet_account_section.dart';
 import 'wallet_coupon_section.dart';
 
-/// 錢包頁：依收款帳戶（`GetMyPaymentAccount`）顯示認證閘門或收款帳戶狀態面板（和 website 的 `WalletClient` 同一個判斷）：
-/// 平台審核核准之前沒有收款帳戶，顯示認證閘門；收款帳戶還沒啟用顯示狀態面板；店家通過開通閘門後加上帳戶與認證。
+/// 錢包頁：依伺服器的開通摘要（`GetMyOnboarding`）顯示認證閘門或收款帳戶狀態面板（和 website 的 `WalletClient` 同一個判斷）：
+/// 摘要的平台審核任務還沒完成、或還沒有收款帳戶，顯示認證閘門；收款帳戶任務還沒完成顯示狀態面板（內容讀 `GetMyPaymentAccount`）；
+/// 店家通過開通閘門後加上帳戶與認證。
 /// 優惠券由 `MARKETING` 能力決定，與認證狀態無關。
 ///
 /// 錢包常駐在主導航的 IndexedStack 裡；它是否看得到由 widget 樹決定：被隱藏的分頁，或被不透明頁面（認證流程）蓋住時，
 /// `TickerMode` 是關閉的（flutter_riverpod 在 `TickerMode` 關閉時暫停這個畫面的監看）。
 /// 第一次開啟與從看不到變成看得到時重讀（30 秒內讀過就不讀），回前景只在看得到時重讀。重讀失敗時繼續顯示上一次成功的值
 /// （同 website 的 `useCertGate`），只有完全沒有值才顯示錯誤面板。
-/// 第一次顯示等 `GetMyKYC`、`GetMyPaymentAccount` 與第一次 `GetMyStore`（店家決定帳戶與認證和優惠券）。
+/// 第一次顯示等 `GetMyKYC`、`GetMyPaymentAccount`、`GetMyOnboarding` 與第一次 `GetMyStore`（店家決定帳戶與認證和優惠券）。
+/// 摘要沒有任何值（讀取失敗）時顯示錯誤面板，不當成未通過也不當成通過。
 class WalletScreen extends HookConsumerWidget {
   const WalletScreen({super.key});
 
@@ -53,6 +56,7 @@ class WalletScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final kyc = ref.watch(currentKycProvider);
     final payment = ref.watch(currentPaymentAccountProvider);
+    final onboarding = ref.watch(currentOnboardingProvider);
     final store = ref.watch(currentStoreProvider);
     final my = ref.watch(myStoreSnapshotProvider);
 
@@ -72,7 +76,7 @@ class WalletScreen extends HookConsumerWidget {
       backgroundColor: AppColors.bgPrimary,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: statusBarStyle,
-        child: _body(context, ref, kyc, payment, store, my),
+        child: _body(context, ref, kyc, payment, onboarding, store, my),
       ),
     );
   }
@@ -82,23 +86,29 @@ class WalletScreen extends HookConsumerWidget {
     WidgetRef ref,
     AsyncValue<MyKyc>? kyc,
     AsyncValue<PaymentAccount?>? payment,
+    AsyncValue<GetMyOnboardingResponse>? onboarding,
     AsyncValue<Object?> store,
     MyStore? my,
   ) {
     if (kyc == null ||
         payment == null ||
+        onboarding == null ||
         _isLoading(kyc) ||
         _isLoading(payment) ||
+        _isLoading(onboarding) ||
         _isLoading(store)) {
       return const TruckLoadingOverlay();
     }
     final marketing =
         my?.can(SellerCapability.SELLER_CAPABILITY_MARKETING) ?? false;
-    // 收款帳戶的讀取失敗只在平台審核通過之後才有意義（之前沒有收款帳戶，畫面是認證閘門）。
+    // 收款帳戶的讀取失敗只在平台審核完成而且收款帳戶任務還沒完成時有意義（否則畫面是認證閘門或沒有面板）。
     final reviewStatus = kyc.value?.reviewStatus;
-    final approved = platformApproved(reviewStatus);
+    final summary = onboarding.value;
+    final approved = platformReviewCompleted(summary);
+    final paymentDone = paymentAccountTaskCompleted(summary);
     if (_isFailed(kyc) ||
-        (approved && _isFailed(payment)) ||
+        _isFailed(onboarding) ||
+        (approved && !paymentDone && _isFailed(payment)) ||
         ref.watch(storeUnavailableProvider)) {
       return _WalletPage(
         showCoupons: marketing,
@@ -114,14 +124,14 @@ class WalletScreen extends HookConsumerWidget {
       );
     }
 
-    final account = effectivePaymentAccount(payment.value, approved: approved);
+    final account = approved && !paymentDone ? payment.value : null;
     final certified = my?.isCertified ?? false;
     return _WalletPage(
       showCoupons: marketing,
       children: [
-        if (account == null)
+        if (!approved || (!paymentDone && account == null))
           _CertificationGate(reviewStatus: reviewStatus)
-        else if (!paymentAccountEnabled(account))
+        else if (account != null)
           _PaymentAccountPanel(account: account),
         if (certified) const WalletAccountSection(),
       ],
@@ -209,7 +219,7 @@ class _WalletPage extends StatelessWidget {
   }
 }
 
-/// 認證前的閘門（平台審核還沒核准，沒有收款帳戶）：文字與 website 的 `SellerCertGate` 相同，目前狀態是平台審核的目錄名詞
+/// 認證前的閘門（開通摘要的平台審核任務還沒完成，或還沒有收款帳戶）：文字與 website 的 `SellerCertGate` 相同，目前狀態是平台審核的目錄名詞
 /// （`seller.KYCStatus`），沒有申請是「未送出」。按鈕進認證流程，流程自己選個人或企業；回來後重讀狀態。
 class _CertificationGate extends ConsumerWidget {
   const _CertificationGate({required this.reviewStatus});

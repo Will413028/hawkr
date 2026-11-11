@@ -9,6 +9,7 @@ import 'package:hawkr_seller/features/notification/data/notification_model.dart'
 import 'package:hawkr_seller/features/notification/data/notification_repository.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
 import 'package:hawkr_seller/features/seller/data/current_kyc.dart';
+import 'package:hawkr_seller/features/seller/data/onboarding_summary.dart';
 import 'package:hawkr_seller/features/seller/data/onboarding_tasks.dart';
 import 'package:hawkr_seller/features/seller/data/payment_account.dart';
 import 'package:hawkr_seller/features/seller/data/my_store_repository.dart';
@@ -26,6 +27,7 @@ import '../../../support/connect_errors.dart';
 import '../../../support/kyc_fixtures.dart';
 import '../../../support/fake_my_store.dart';
 import '../../../support/my_store_fixtures.dart';
+import '../../../support/onboarding_fixtures.dart';
 import '../../../support/default_error_text.dart';
 
 class _FakeKyc extends AccountKyc {
@@ -66,6 +68,7 @@ void main() {
     GoRouter? router,
     ValueGetter<int>? onInputsBuilt,
     ValueGetter<DateTime>? clock,
+    GetMyOnboardingResponse? summary,
   }) async {
     updates = [];
     closes = 0;
@@ -94,6 +97,30 @@ void main() {
                   status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED,
                 )
               : null,
+        ),
+        accountOnboardingProvider('acc-1').overrideWith(
+          (ref) async =>
+              summary ??
+              (certified
+                  ? completedSummary()
+                  : onboardingSummary([
+                      serverTask(
+                        OnboardingTaskId.ONBOARDING_TASK_ID_PROFILE,
+                        OnboardingTaskState
+                            .ONBOARDING_TASK_STATE_ACTION_REQUIRED,
+                        status: '缺少：logo',
+                      ),
+                      serverTask(
+                        OnboardingTaskId.ONBOARDING_TASK_ID_PLATFORM_REVIEW,
+                        OnboardingTaskState
+                            .ONBOARDING_TASK_STATE_ACTION_REQUIRED,
+                        status: '未送出',
+                      ),
+                      serverTask(
+                        OnboardingTaskId.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT,
+                        OnboardingTaskState.ONBOARDING_TASK_STATE_LOCKED,
+                      ),
+                    ])),
         ),
         onboardingInputsProvider.overrideWith((ref) async {
           onInputsBuilt?.call();

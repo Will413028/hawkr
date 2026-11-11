@@ -32,6 +32,7 @@ import '../../../support/connect_errors.dart';
 import '../../../support/fake_my_store.dart';
 import '../../../support/kyc_fixtures.dart';
 import '../../../support/my_store_fixtures.dart';
+import '../../../support/onboarding_fixtures.dart';
 
 class _LoggedIn extends Session {
   @override
@@ -113,6 +114,12 @@ class _Server {
           if (app == null) throw ConnectException(Code.notFound, 'none');
           return GetMyKYCResponse(application: app);
         })
+        .unary(
+          SellerAppService.getMyOnboarding,
+          (_, _) => application?.status == KYCStatus.KYC_STATUS_APPROVED
+              ? paymentPendingSummary()
+              : reviewPendingSummary(),
+        )
         .unary(SellerAppService.saveKYCDraft, (req, _) {
           saves.add(req);
           final result =
@@ -328,7 +335,7 @@ void main() {
       expect(find.text('補充文件：已過期'), findsOneWidget);
     });
 
-    testWidgets('審核中的申請是只讀的兩區狀態頁：平台審核讀申請狀態，收款帳戶還沒開放', (tester) async {
+    testWidgets('審核中的申請是只讀的兩區狀態頁：平台審核區顯示申請狀態，收款帳戶區依開通摘要還沒開放', (tester) async {
       await pumpScreen(
         tester,
         application: individualApplication(

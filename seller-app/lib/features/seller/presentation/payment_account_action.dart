@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/transport.dart' show Code;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -47,14 +48,25 @@ PaymentAccountActionKind paymentAccountActionKind(PaymentAccount account) =>
 typedef PaymentAccountActions = ({
   bool busy,
   void Function(PaymentAccount account, PaymentAccountActionKind kind) run,
+  void Function() refresh,
 });
 
-/// 收款帳戶動作的執行與進行中狀態（hook，只在 `HookConsumerWidget` 的 build 裡用）。
+/// 收款帳戶動作的執行與進行中狀態（hook，只在 `HookConsumerWidget` 的 build 裡用）。「重新整理」（[PaymentAccountActions.refresh]，
+/// 與 `reload` 動作同一條路徑）先 `RefreshMyPaymentAccount` 再重讀；那一步的失敗（包含從金流商頁面回來時的那一次）以 toast 顯示
+/// 伺服器的句子。
 PaymentAccountActions usePaymentAccountActions(
   BuildContext context,
   WidgetRef ref,
 ) {
   final busy = useState(false);
+
+  ref.listen(paymentOnboardingProvider, (previous, failure) {
+    if (failure == null || !context.mounted) return;
+    FloatingToast.error(
+      context,
+      errorText(failure.error, defaults: ref.read(defaultErrorTextProvider)),
+    );
+  });
 
   Future<void> guarded(Future<void> Function() body) async {
     busy.value = true;
@@ -79,7 +91,7 @@ PaymentAccountActions usePaymentAccountActions(
   });
 
   Future<void> reload() => guarded(() async {
-    await ref.read(paymentAccountReaderProvider.notifier).refresh();
+    await ref.read(paymentOnboardingProvider.notifier).confirmPaymentAccount();
   });
 
   return (
@@ -96,5 +108,6 @@ PaymentAccountActions usePaymentAccountActions(
           unawaited(reload());
       }
     },
+    refresh: () => unawaited(reload()),
   );
 }

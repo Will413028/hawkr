@@ -10,11 +10,14 @@ import 'package:hawkr_seller/core/session/session_provider.dart';
 import 'package:hawkr_seller/features/seller/data/current_kyc.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
 import 'package:hawkr_seller/features/seller/data/my_store_repository.dart';
+import 'package:hawkr_seller/features/seller/data/onboarding_summary.dart';
+import 'package:hawkr_seller/features/seller/data/payment_account.dart';
 import 'package:hawkr_seller/features/seller/data/seller_status_refresh.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/fake_my_store.dart';
+import '../../../support/onboarding_fixtures.dart';
 
 class _LoggedIn extends Session {
   @override
@@ -411,5 +414,79 @@ void main() {
     await refresh.refresh();
     expect(store.calls, storeBefore + 3);
     expect(kycCalls, kycBefore + 3);
+  });
+
+  group('開通摘要與店家、認證、收款帳戶同一輪', () {
+    ({ProviderContainer container, List<String> calls}) summaryContainer({
+      Object? summaryFailure,
+    }) {
+      final calls = <String>[];
+      final store = FakeMyStoreServer();
+      final container = ProviderContainer(
+        overrides: [
+          sessionProvider.overrideWith(_LoggedIn.new),
+          myStoreRepositoryProvider.overrideWithValue(store.repository),
+          sellerClientProvider.overrideWithValue(
+            SellerAppServiceClient(
+              FakeTransportBuilder()
+                  .unary(SellerAppService.getMyKYC, (_, _) {
+                    calls.add('kyc');
+                    throw ConnectException(Code.notFound, 'none');
+                  })
+                  .unary(SellerAppService.getMyPaymentAccount, (_, _) {
+                    calls.add('payment');
+                    throw ConnectException(Code.notFound, 'none');
+                  })
+                  .unary(SellerAppService.getMyOnboarding, (_, _) {
+                    calls.add('summary');
+                    final failure = summaryFailure;
+                    if (failure != null) throw failure;
+                    return completedSummary();
+                  })
+                  .build(),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final subs = [
+        container.listen(currentStoreProvider, (_, _) {}),
+        container.listen(currentKycProvider, (_, _) {}),
+        container.listen(currentPaymentAccountProvider, (_, _) {}),
+        container.listen(currentOnboardingProvider, (_, _) {}),
+      ];
+      for (final sub in subs) {
+        addTearDown(sub.close);
+      }
+      return (container: container, calls: calls);
+    }
+
+    test('一輪把四項都重讀，四項都成功才算這一輪成功', () async {
+      final (:container, :calls) = summaryContainer();
+      await container.read(accountOnboardingProvider('acc-1').future);
+      await container.read(currentStoreProvider.future);
+      calls.clear();
+
+      final refresh = container.read(sellerStatusRefreshProvider.notifier);
+      await refresh.refresh(fresh: true);
+
+      expect(calls.toSet(), {'kyc', 'payment', 'summary'});
+      expect(calls.where((c) => c == 'summary'), hasLength(1));
+      expect(refresh.isStale(const Duration(minutes: 5)), isFalse);
+    });
+
+    test('摘要讀取失敗：這一輪不算成功（下次可見時照樣重讀），其他三項照讀', () async {
+      final (:container, :calls) = summaryContainer(
+        summaryFailure: ConnectException(Code.unavailable, 'later'),
+      );
+      await container.read(currentStoreProvider.future);
+      calls.clear();
+
+      final refresh = container.read(sellerStatusRefreshProvider.notifier);
+      await refresh.refresh(fresh: true);
+
+      expect(calls.toSet(), {'kyc', 'payment', 'summary'});
+      expect(refresh.isStale(const Duration(minutes: 5)), isTrue);
+    });
   });
 }

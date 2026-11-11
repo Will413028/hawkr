@@ -29,6 +29,7 @@ import 'package:go_router/go_router.dart';
 import '../../support/fake_my_store.dart';
 import '../../support/kyc_fixtures.dart';
 import '../../support/my_store_fixtures.dart';
+import '../../support/onboarding_fixtures.dart';
 
 const _enabled = PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED;
 
@@ -69,7 +70,27 @@ class _Server {
   bool marketing;
   late final FakeMyStoreServer store;
   Completer<void>? kycGate;
+  Completer<void>? summaryGate;
   Completer<void>? launchGate;
+
+  /// `GetMyOnboarding` 的回應：[GetMyOnboardingResponse] 或例外；null 時照目前的申請與收款帳戶推出一份同義的摘要
+  /// （核准且收款帳戶 ENABLED 是全部完成，核准但帳戶還沒啟用是收款帳戶待開通，其餘是平台審核還沒完成）。
+  Object? summary;
+  int summaryCalls = 0;
+  final calls = <String>[];
+
+  GetMyOnboardingResponse _derivedSummary() {
+    final answer = kyc;
+    final approved =
+        answer is GetMyKYCResponse &&
+        answer.application.status == KYCStatus.KYC_STATUS_APPROVED;
+    if (!approved) return reviewPendingSummary();
+    final account = payment;
+    return account is PaymentAccount && account.status == _enabled
+        ? completedSummary()
+        : paymentPendingSummary();
+  }
+
   var now = DateTime(2026, 10, 9, 12);
   void advance(Duration d) => now = now.add(d);
   int kycCalls = 0;
@@ -96,6 +117,19 @@ class _Server {
           final answer = kyc;
           if (answer is ConnectException) throw answer;
           return answer as GetMyKYCResponse;
+        })
+        .unary(SellerAppService.getMyOnboarding, (_, _) async {
+          summaryCalls++;
+          calls.add('getMyOnboarding');
+          final gate = summaryGate;
+          if (gate != null) await gate.future;
+          final answer = summary ?? _derivedSummary();
+          if (answer is ConnectException) throw answer;
+          return answer as GetMyOnboardingResponse;
+        })
+        .unary(SellerAppService.refreshMyPaymentAccount, (_, _) {
+          calls.add('refreshMyPaymentAccount');
+          return RefreshMyPaymentAccountResponse();
         })
         .unary(SellerAppService.getMyPaymentAccount, (_, _) {
           paymentCalls++;
@@ -519,6 +553,78 @@ void main() {
     });
   });
 
+  group('是否顯示閘門由開通摘要決定', () {
+    testWidgets('摘要讀取失敗：錯誤面板與重試，不當成未通過也不當成通過', (tester) async {
+      final server = _Server()
+        ..summary = ConnectException(Code.unavailable, 'later');
+      await _pump(tester, server);
+      expect(find.text('無法載入認證狀態'), findsOneWidget);
+      expect(find.text('尚未通過商家認證'), findsNothing);
+      expect(find.byKey(const Key('wallet-payment-panel')), findsNothing);
+
+      server.summary = null;
+      await _tap(tester, find.text('重試'));
+      expect(find.text('無法載入認證狀態'), findsNothing);
+    });
+
+    testWidgets('申請已核准但摘要說平台審核還沒完成：顯示閘門', (tester) async {
+      final server = _Server(certified: false)
+        ..summary = reviewPendingSummary();
+      await _pump(tester, server);
+      expect(find.text('尚未通過商家認證'), findsOneWidget);
+      expect(find.byKey(const Key('wallet-payment-panel')), findsNothing);
+    });
+
+    testWidgets('申請不是核准但摘要說平台審核與收款帳戶都完成：沒有閘門也沒有面板', (tester) async {
+      final server = _Server(review: KYCStatus.KYC_STATUS_SUBMITTED)
+        ..summary = completedSummary();
+      await _pump(tester, server);
+      expect(find.text('尚未通過商家認證'), findsNothing);
+      expect(find.byKey(const Key('wallet-payment-panel')), findsNothing);
+    });
+
+    testWidgets('收款帳戶任務由摘要決定：帳戶資料說審核中但摘要說完成，沒有面板', (tester) async {
+      final server = _Server(
+        payment: _account(
+          PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW,
+        ),
+      )..summary = completedSummary();
+      await _pump(tester, server);
+      expect(find.byKey(const Key('wallet-payment-panel')), findsNothing);
+    });
+
+    testWidgets('摘要 UNKNOWN 的平台審核不算完成：顯示閘門', (tester) async {
+      final server = _Server(certified: false)
+        ..summary = onboardingSummary([
+          serverTask(
+            OnboardingTaskId.ONBOARDING_TASK_ID_PLATFORM_REVIEW,
+            OnboardingTaskState.ONBOARDING_TASK_STATE_UNKNOWN,
+          ),
+        ]);
+      await _pump(tester, server);
+      expect(find.text('尚未通過商家認證'), findsOneWidget);
+    });
+
+    testWidgets('第一次顯示也等摘要，不會先閃出閘門', (tester) async {
+      final server = _Server(certified: false)..summaryGate = Completer<void>();
+      await _pump(tester, server);
+      expect(find.byType(TruckLoadingOverlay), findsOneWidget);
+      expect(find.text('尚未通過商家認證'), findsNothing);
+      server.summaryGate!.complete();
+      await _settle(tester);
+      expect(find.byType(TruckLoadingOverlay), findsNothing);
+    });
+
+    testWidgets('App 回到前景時也重讀摘要', (tester) async {
+      final server = _Server();
+      await _pump(tester, server);
+      final before = server.summaryCalls;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await _settle(tester);
+      expect(server.summaryCalls, before + 1);
+    });
+  });
+
   group('收款帳戶狀態面板', () {
     testWidgets('待設定：目錄的標題、說明與動作；新帳戶不說逾期或停用，按鈕開始開通（與認證狀態畫面同一個動作）', (
       tester,
@@ -549,19 +655,32 @@ void main() {
       );
     });
 
-    testWidgets('平台審核核准、收款帳戶還沒有（not_found）：與「準備中」同義', (tester) async {
+    testWidgets('平台審核完成、讀不到收款帳戶（not_found）：照 website 顯示認證閘門，不自己當成「準備中」', (
+      tester,
+    ) async {
       final server = _Server(certified: false)..payment = null;
       await _pump(tester, server);
-      expect(find.text('準備中'), findsOneWidget);
-      expect(find.text('正在建立收款帳戶，通常幾分鐘內完成。'), findsOneWidget);
-      expect(find.text('重新整理'), findsOneWidget);
-      expect(find.text('尚未通過商家認證'), findsNothing);
+      expect(find.text('準備中'), findsNothing);
+      expect(find.text('尚未通過商家認證'), findsOneWidget);
+      expect(find.byKey(const Key('wallet-payment-panel')), findsNothing);
+    });
 
-      // 目錄的動作是「重新整理」：重讀收款帳戶，不進認證流程。
-      final before = server.paymentCalls;
+    testWidgets('面板的「重新整理」：先 RefreshMyPaymentAccount 再重讀收款帳戶與摘要', (
+      tester,
+    ) async {
+      final server = _Server(
+        certified: false,
+        payment: _account(
+          PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW,
+        ),
+      );
+      await _pump(tester, server);
+      server.calls.clear();
+
       await _tap(tester, find.text('重新整理'));
-      expect(find.text('wizard:null'), findsNothing);
-      expect(server.paymentCalls, greaterThan(before));
+
+      expect(server.calls.first, 'refreshMyPaymentAccount');
+      expect(server.calls, contains('getMyOnboarding'));
     });
 
     testWidgets('審核中：沒有額外操作的說明', (tester) async {

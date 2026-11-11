@@ -166,7 +166,7 @@ final paymentOnboardingProvider = PaymentOnboardingProvider._();
 /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面
 /// 還在都會以 `fresh: true` 重讀一次（畫面各自的回前景重讀走 [onResumed]，不會重複消耗記號）。
 final class PaymentOnboardingProvider
-    extends $NotifierProvider<PaymentOnboarding, void> {
+    extends $NotifierProvider<PaymentOnboarding, PaymentRefreshFailure?> {
   /// 收款帳戶的開通與回到前景時的重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
   /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面
   /// 還在都會以 `fresh: true` 重讀一次（畫面各自的回前景重讀走 [onResumed]，不會重複消耗記號）。
@@ -189,31 +189,32 @@ final class PaymentOnboardingProvider
   PaymentOnboarding create() => PaymentOnboarding();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(void value) {
+  Override overrideWithValue(PaymentRefreshFailure? value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<void>(value),
+      providerOverride: $SyncValueProvider<PaymentRefreshFailure?>(value),
     );
   }
 }
 
-String _$paymentOnboardingHash() => r'64a976f1975f68bbe49550856b38bc89cbcd13cb';
+String _$paymentOnboardingHash() => r'b318a04fd81e94887463403c25e44d47dcc32de0';
 
 /// 收款帳戶的開通與回到前景時的重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
 /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面
 /// 還在都會以 `fresh: true` 重讀一次（畫面各自的回前景重讀走 [onResumed]，不會重複消耗記號）。
 
-abstract class _$PaymentOnboarding extends $Notifier<void> {
-  void build();
+abstract class _$PaymentOnboarding extends $Notifier<PaymentRefreshFailure?> {
+  PaymentRefreshFailure? build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<void, void>;
+    final ref =
+        this.ref as $Ref<PaymentRefreshFailure?, PaymentRefreshFailure?>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<void, void>,
-              void,
+              AnyNotifier<PaymentRefreshFailure?, PaymentRefreshFailure?>,
+              PaymentRefreshFailure?,
               Object?,
               Object?
             >;

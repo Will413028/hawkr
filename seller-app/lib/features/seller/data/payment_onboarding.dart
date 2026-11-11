@@ -61,6 +61,14 @@ final class _ResumeObserver with WidgetsBindingObserver {
   }
 }
 
+/// 一次「先重讀再讀」裡 `RefreshMyPaymentAccount` 的失敗，交給畫面顯示（[PaymentOnboarding] 的 state）。每次失敗是新的物件，
+/// 連續兩次失敗畫面也都會收到。
+final class PaymentRefreshFailure {
+  PaymentRefreshFailure(this.error);
+
+  final Object error;
+}
+
 /// 收款帳戶的開通與回到前景時的重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
 /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面
 /// 還在都會以 `fresh: true` 重讀一次（畫面各自的回前景重讀走 [onResumed]，不會重複消耗記號）。
@@ -69,13 +77,14 @@ class PaymentOnboarding extends _$PaymentOnboarding {
   bool _awaitingReturn = false;
 
   @override
-  void build() {
+  PaymentRefreshFailure? build() {
     final binding = WidgetsFlutterBinding.ensureInitialized();
     final observer = _ResumeObserver(() {
       if (_awaitingReturn && ref.mounted) unawaited(onResumed());
     });
     binding.addObserver(observer);
     ref.onDispose(() => binding.removeObserver(observer));
+    return null;
   }
 
   /// 依伺服器告知的 [surface] 開始開通。HOSTED：取得連結並在外部瀏覽器開啟；EMBEDDED：不呼叫伺服器，回 [needsWeb]；
@@ -111,13 +120,31 @@ class PaymentOnboarding extends _$PaymentOnboarding {
     }
   }
 
-  /// App 回到前景：重讀店家、認證與收款帳戶。從外部瀏覽器回來時伺服器剛改變了狀態（金流商的事件可能已經到了），
-  /// 帶 `fresh: true`，進行中的那一輪可能在變更之前就開始讀了，不共用它。
+  /// App 回到前景。從外部瀏覽器回來時伺服器剛改變了狀態（金流商的事件可能已經到了），走 [confirmPaymentAccount]：先
+  /// `RefreshMyPaymentAccount` 再 `fresh: true` 重讀（進行中的那一輪可能在變更之前就開始讀了，不共用它）。其他回前景只重讀
+  /// 店家、認證、收款帳戶與開通摘要，不呼叫金流商。回傳重讀有沒有成功。
   Future<bool> onResumed() {
     final returnedFromBrowser = _awaitingReturn;
     _awaitingReturn = false;
-    return ref
+    if (returnedFromBrowser) return confirmPaymentAccount();
+    return ref.read(sellerStatusRefreshProvider.notifier).refresh();
+  }
+
+  /// 從金流商回來與「重新整理」共用的一條路徑：先 `RefreshMyPaymentAccount`（伺服器同步向金流商重讀）再 `fresh: true` 重讀
+  /// 全部狀態（含開通摘要）。重讀失敗也照樣讀（快取不能留在舊的），讀完才把失敗放進 state 交給畫面。回傳讀取有沒有成功。
+  Future<bool> confirmPaymentAccount() async {
+    Object? failure;
+    try {
+      await ref.read(paymentAccountRepositoryProvider).refresh();
+    } catch (error) {
+      HKLog.logW('[PaymentOnboarding] RefreshMyPaymentAccount failed: $error');
+      failure = error;
+    }
+    if (!ref.mounted) return false;
+    final read = await ref
         .read(sellerStatusRefreshProvider.notifier)
-        .refresh(fresh: returnedFromBrowser);
+        .refresh(fresh: true);
+    if (failure != null && ref.mounted) state = PaymentRefreshFailure(failure);
+    return read;
   }
 }

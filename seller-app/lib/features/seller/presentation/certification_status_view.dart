@@ -14,6 +14,7 @@ import '../../../core/theme/hk_tokens.dart';
 import '../../../shared/widgets/hk_button_label.dart';
 import '../../../shared/widgets/hk_frosted_card_surface.dart';
 import '../../../shared/widgets/hk_status_badge.dart';
+import '../data/onboarding_summary.dart';
 import '../data/payment_account.dart';
 import '../data/payment_onboarding.dart';
 import 'payment_account_action.dart';
@@ -52,10 +53,11 @@ enum KycStampKind { decide, submit }
   return null;
 }
 
-/// 已送出審核 / 已完成審核的唯讀狀態畫面（D15）：兩區，平台審核讀 `KYCApplication.status`，收款帳戶讀
-/// `GetMyPaymentAccount`；不看 `KYCFlowStatus`。
+/// 已送出審核 / 已完成審核的唯讀狀態畫面（D15）：兩區，平台審核區顯示申請（`KYCApplication.status`）的狀態與時間，收款帳戶區
+/// 是否開放由開通摘要（`GetMyOnboarding`）的平台審核任務決定，內容讀 `GetMyPaymentAccount`；不看 `KYCFlowStatus`。
 ///
-/// 從外部瀏覽器（金流商的託管頁面）切回 App 時重讀狀態：[PaymentOnboarding.onResumed]，從瀏覽器回來帶 `fresh: true`。
+/// 從外部瀏覽器（金流商的託管頁面）切回 App 時重讀狀態：[PaymentOnboarding.onResumed]，從瀏覽器回來先
+/// `RefreshMyPaymentAccount` 再 `fresh: true` 重讀。
 class CertificationStatusView extends HookConsumerWidget {
   const CertificationStatusView({super.key, required this.application});
 
@@ -86,7 +88,7 @@ class CertificationStatusView extends HookConsumerWidget {
               const SizedBox(height: HkSpace.lg),
               _PlatformReviewSection(application: application, status: status),
               const SizedBox(height: HkSpace.lg),
-              _PaymentAccountSection(approved: platformApproved(status)),
+              const _PaymentAccountSection(),
             ],
           ),
         ),
@@ -174,19 +176,43 @@ class _PlatformReviewSection extends StatelessWidget {
   }
 }
 
-/// 「收款帳戶」區：平台審核核准之前是灰色的提示；核准之後依 `GetMyPaymentAccount` 顯示目錄的狀態、說明與動作。
-/// 不顯示金流商的待補條件細項（金流商自己的頁面會列出要補什麼）。
+/// 「收款帳戶」區：開通摘要說平台審核還沒完成之前是灰色的提示；完成之後依 `GetMyPaymentAccount` 顯示目錄的狀態、說明與動作。
+/// 摘要或收款帳戶讀不到時顯示錯誤與重新整理，不當成「尚未開放」。不顯示金流商的待補條件細項（金流商自己的頁面會列出要補什麼）。
 class _PaymentAccountSection extends HookConsumerWidget {
-  const _PaymentAccountSection({required this.approved});
-
-  final bool approved;
+  const _PaymentAccountSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = context.uiLocale;
     final actions = usePaymentAccountActions(context, ref);
 
-    if (!approved) {
+    Widget loadingCard() => const _SectionCard(
+      cardKey: Key('kyc_payment_account'),
+      title: '收款帳戶',
+      children: [Text('載入中…', style: _bodyStyle)],
+    );
+    Widget errorCard() => _SectionCard(
+      cardKey: const Key('kyc_payment_account'),
+      title: '收款帳戶',
+      children: [
+        Text(
+          ref.watch(defaultErrorTextProvider)(Code.internal),
+          style: _bodyStyle,
+        ),
+        const SizedBox(height: HkSpace.md),
+        OutlinedButton(
+          onPressed: actions.busy ? null : actions.refresh,
+          child: const HkButtonLabel('重新整理'),
+        ),
+      ],
+    );
+
+    final summary = ref.watch(currentOnboardingProvider);
+    if (summary == null || (summary.isLoading && !summary.hasValue)) {
+      return loadingCard();
+    }
+    if (!summary.hasValue) return errorCard();
+    if (!platformReviewCompleted(summary.requireValue)) {
       return const _SectionCard(
         cardKey: Key('kyc_payment_account'),
         title: '收款帳戶',
@@ -196,39 +222,12 @@ class _PaymentAccountSection extends HookConsumerWidget {
 
     final read = ref.watch(currentPaymentAccountProvider);
     if (read == null || (read.isLoading && !read.hasValue)) {
-      return const _SectionCard(
-        cardKey: Key('kyc_payment_account'),
-        title: '收款帳戶',
-        children: [Text('載入中…', style: _bodyStyle)],
-      );
+      return loadingCard();
     }
-    final account = read.hasValue
-        ? effectivePaymentAccount(read.requireValue, approved: true)
-        : null;
+    final account = read.hasValue ? read.requireValue : null;
     final tone = account == null ? null : paymentAccountTone(account.status);
     final badge = account?.status.uiText(l);
-    if (account == null || tone == null || badge == null) {
-      return _SectionCard(
-        cardKey: const Key('kyc_payment_account'),
-        title: '收款帳戶',
-        children: [
-          Text(
-            ref.watch(defaultErrorTextProvider)(Code.internal),
-            style: _bodyStyle,
-          ),
-          const SizedBox(height: HkSpace.md),
-          OutlinedButton(
-            onPressed: actions.busy
-                ? null
-                : () => actions.run(
-                    PaymentAccount(),
-                    PaymentAccountActionKind.reload,
-                  ),
-            child: const HkButtonLabel('重新整理'),
-          ),
-        ],
-      );
-    }
+    if (account == null || tone == null || badge == null) return errorCard();
 
     final description = account.status.description(l);
     final action = account.status.action(l);

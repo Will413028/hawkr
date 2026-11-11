@@ -19,7 +19,9 @@ import 'package:hawkr_seller/features/seller/data/payment_onboarding.dart';
 import 'package:hawkr_seller/features/seller/presentation/certification_status_view.dart';
 
 import '../../../support/fake_my_store.dart';
+import '../../../support/connect_errors.dart';
 import '../../../support/kyc_fixtures.dart';
+import '../../../support/onboarding_fixtures.dart';
 
 const _actionRequired =
     PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED;
@@ -37,6 +39,18 @@ class _Server {
   PaymentAccount? payment;
   Object? paymentFailure;
   int paymentCalls = 0;
+
+  /// GetMyOnboarding 的回應；null 時照申請狀態：核准是平台審核完成，其餘是還沒完成。
+  GetMyOnboardingResponse? summary;
+  Object? summaryFailure;
+  bool approved = true;
+
+  /// RefreshMyPaymentAccount 的失敗；null 是成功。
+  Object? refreshFailure;
+
+  /// 依序記下伺服器收到的呼叫，驗證「先重讀再讀」的順序。
+  final calls = <String>[];
+  int refreshCalls = 0;
   final sessions = <CreatePaymentOnboardingSessionRequest>[];
   final launched = <Uri>[];
 
@@ -45,7 +59,22 @@ class _Server {
         .unary(SellerAppService.getMyKYC, (_, _) {
           return GetMyKYCResponse(application: individualApplication());
         })
+        .unary(SellerAppService.getMyOnboarding, (_, _) {
+          calls.add('getMyOnboarding');
+          final failure = summaryFailure;
+          if (failure != null) throw failure;
+          return summary ??
+              (approved ? paymentPendingSummary() : reviewPendingSummary());
+        })
+        .unary(SellerAppService.refreshMyPaymentAccount, (_, _) {
+          calls.add('refreshMyPaymentAccount');
+          refreshCalls++;
+          final failure = refreshFailure;
+          if (failure != null) throw failure;
+          return RefreshMyPaymentAccountResponse();
+        })
         .unary(SellerAppService.getMyPaymentAccount, (_, _) {
+          calls.add('getMyPaymentAccount');
           paymentCalls++;
           final failure = paymentFailure;
           if (failure != null) throw failure;
@@ -70,6 +99,7 @@ Future<void> _pump(
   KYCStatus review = KYCStatus.KYC_STATUS_APPROVED,
   Timestamp? decideTime,
 }) async {
+  server.approved = review == KYCStatus.KYC_STATUS_APPROVED;
   final store = FakeMyStoreServer();
   final container = ProviderContainer(
     overrides: [
@@ -126,7 +156,7 @@ Finder _in(String key, String text) =>
     find.descendant(of: find.byKey(Key(key)), matching: find.text(text));
 
 void main() {
-  group('平台審核區：讀 KYCApplication.status，文字取自目錄', () {
+  group('平台審核區：顯示 KYCApplication.status，文字取自目錄', () {
     testWidgets('審核中：徽章與送出時間；收款帳戶區是灰色的提示，不讀 GetMyPaymentAccount', (
       tester,
     ) async {
@@ -152,16 +182,39 @@ void main() {
       expect(find.textContaining('核准時間：'), findsOneWidget);
     });
 
-    testWidgets('平台審核只讀申請狀態（沒有「開通閘門已過就一律已通過」的例外）：審核中就不讀收款帳戶', (tester) async {
+    testWidgets('收款帳戶區是否開放讀開通摘要，不看申請狀態：申請已核准但摘要說平台審核還沒完成，仍是灰色提示', (
+      tester,
+    ) async {
       final server = _Server()
+        ..summary = reviewPendingSummary()
         ..payment = PaymentAccount(
           status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED,
           payoutsActive: true,
         );
+      await _pump(tester, server);
+
+      expect(_in('kyc_platform_review', '已通過'), findsOneWidget);
+      expect(_in('kyc_payment_account', '平台審核通過後開放設定'), findsOneWidget);
+      expect(server.paymentCalls, 0);
+    });
+
+    testWidgets('申請還是審核中但摘要說平台審核已完成：照摘要開放收款帳戶區', (tester) async {
+      final server = _Server()
+        ..summary = paymentPendingSummary()
+        ..payment = PaymentAccount(status: _actionRequired);
       await _pump(tester, server, review: KYCStatus.KYC_STATUS_SUBMITTED);
 
       expect(_in('kyc_platform_review', '審核中'), findsOneWidget);
-      expect(_in('kyc_payment_account', '平台審核通過後開放設定'), findsOneWidget);
+      expect(_in('kyc_payment_account', '待設定'), findsOneWidget);
+    });
+
+    testWidgets('摘要讀取失敗：顯示錯誤與重新整理，不當成「尚未開放」也不讀收款帳戶', (tester) async {
+      final server = _Server()
+        ..summaryFailure = ConnectException(Code.unavailable, 'down');
+      await _pump(tester, server);
+
+      expect(_in('kyc_payment_account', '重新整理'), findsOneWidget);
+      expect(find.text('平台審核通過後開放設定'), findsNothing);
       expect(server.paymentCalls, 0);
     });
 
@@ -171,7 +224,7 @@ void main() {
     });
   });
 
-  group('收款帳戶區：讀 GetMyPaymentAccount，文字取自目錄', () {
+  group('收款帳戶區：內容讀 GetMyPaymentAccount，文字取自目錄', () {
     testWidgets('待設定：說明不說逾期或停用；HOSTED 的按鈕在外部瀏覽器開連結，回跳網址指向回跳頁', (tester) async {
       final server = _Server()
         ..payment = PaymentAccount(
@@ -224,16 +277,22 @@ void main() {
       expect(find.text('請到網頁版完成收款設定'), findsNothing);
     });
 
-    testWidgets('平台審核核准、收款帳戶還沒有（not_found）：與「準備中」同義，動作是重新整理', (tester) async {
-      final server = _Server();
-      await _pump(tester, server);
+    testWidgets(
+      '平台審核完成、讀不到收款帳戶（not_found）：顯示錯誤與重新整理，不自己當成「準備中」；重新整理先呼叫 RefreshMyPaymentAccount 再讀',
+      (tester) async {
+        final server = _Server();
+        await _pump(tester, server);
 
-      expect(_in('kyc_payment_account', '準備中'), findsOneWidget);
-      final before = server.paymentCalls;
-      await tester.tap(find.byKey(const Key('payment_account_refresh')));
-      await tester.pumpAndSettle();
-      expect(server.paymentCalls, before + 1);
-    });
+        expect(_in('kyc_payment_account', '準備中'), findsNothing);
+        expect(_in('kyc_payment_account', '重新整理'), findsOneWidget);
+        server.calls.clear();
+        await tester.tap(find.text('重新整理'));
+        await tester.pumpAndSettle();
+        expect(server.calls.first, 'refreshMyPaymentAccount');
+        expect(server.calls, contains('getMyOnboarding'));
+        expect(server.calls, contains('getMyPaymentAccount'));
+      },
+    );
 
     testWidgets('已啟用但撥款還沒啟用：多一行撥款提醒', (tester) async {
       final server = _Server()
@@ -277,8 +336,92 @@ void main() {
     });
   });
 
-  group('回到前景', () {
-    testWidgets('AppLifecycleState.resumed 重讀收款帳戶（GetMyPaymentAccount）', (
+  group('重新整理與回到前景', () {
+    testWidgets('「重新整理」重讀失敗：照樣讀，並顯示伺服器的句子', (tester) async {
+      final server = _Server()
+        ..payment = PaymentAccount(
+          status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW,
+        )
+        ..refreshFailure = reasonError(
+          Code.failedPrecondition,
+          'PAYMENT_NOT_CONFIGURED',
+          message: '尚未設定收款',
+        );
+      await _pump(tester, server);
+      server.calls.clear();
+
+      await tester.tap(find.byKey(const Key('payment_account_refresh')));
+      await tester.pumpAndSettle();
+
+      expect(server.calls.first, 'refreshMyPaymentAccount');
+      expect(server.calls, contains('getMyOnboarding'));
+      expect(find.text('尚未設定收款'), findsOneWidget);
+      await tester.pumpAndSettle(const Duration(seconds: 5));
+    });
+
+    testWidgets('一般回前景不呼叫 RefreshMyPaymentAccount', (tester) async {
+      final server = _Server()
+        ..payment = PaymentAccount(
+          status: _actionRequired,
+          onboardingSurface: _hosted,
+        );
+      await _pump(tester, server);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(server.refreshCalls, 0);
+      expect(server.calls, contains('getMyOnboarding'));
+    });
+
+    testWidgets('從外部瀏覽器回來：先 RefreshMyPaymentAccount 再讀摘要與帳戶', (tester) async {
+      final server = _Server()
+        ..payment = PaymentAccount(
+          status: _actionRequired,
+          onboardingSurface: _hosted,
+        );
+      await _pump(tester, server);
+      await tester.tap(find.byKey(const Key('payment_account_onboard')));
+      await tester.pumpAndSettle();
+      server.calls.clear();
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(server.refreshCalls, 1);
+      expect(server.calls.first, 'refreshMyPaymentAccount');
+      expect(
+        server.calls.skip(1),
+        containsAll(['getMyOnboarding', 'getMyPaymentAccount']),
+      );
+    });
+
+    testWidgets('從外部瀏覽器回來而重讀失敗：照樣讀，並顯示伺服器的句子', (tester) async {
+      final server = _Server()
+        ..payment = PaymentAccount(
+          status: _actionRequired,
+          onboardingSurface: _hosted,
+        )
+        ..refreshFailure = reasonError(
+          Code.failedPrecondition,
+          'PAYMENT_NOT_CONFIGURED',
+          message: '尚未設定收款',
+        );
+      await _pump(tester, server);
+      await tester.tap(find.byKey(const Key('payment_account_onboard')));
+      await tester.pumpAndSettle();
+      server.calls.clear();
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(server.calls.first, 'refreshMyPaymentAccount');
+      expect(server.calls, contains('getMyOnboarding'));
+      expect(find.text('尚未設定收款'), findsOneWidget);
+      await tester.pumpAndSettle(const Duration(seconds: 5));
+    });
+
+    testWidgets('AppLifecycleState.resumed 重讀收款帳戶（GetMyPaymentAccount）與開通摘要', (
       tester,
     ) async {
       final server = _Server()

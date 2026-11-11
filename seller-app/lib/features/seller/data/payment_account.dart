@@ -33,33 +33,11 @@ bool paymentAccountCanOnboard(PaymentAccount account) =>
         account.onboardingSurface ==
             OnboardingSurface.ONBOARDING_SURFACE_EMBEDDED);
 
-/// 收款已啟用（轉帳能力啟用）：錢包閘門與開通任務卡的完成條件。
-bool paymentAccountEnabled(PaymentAccount? account) =>
-    account?.status == PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED;
-
-/// 平台審核通過：`GetMyKYC` 的 `KYCApplication.status` 是 APPROVED（沒有申請是 null，不算）。錢包、認證狀態畫面與開通任務卡
-/// 都用這一個定義（計畫步驟 7：平台審核讀 `KYCApplication.status`）。
-bool platformApproved(KYCStatus? reviewStatus) =>
-    reviewStatus == KYCStatus.KYC_STATUS_APPROVED;
-
 /// 平台審核還沒通過時，收款帳戶區的提示（沒有收款帳戶可看）。
 const paymentAccountNotYetOpenNotice = '平台審核通過後開放設定';
 
 /// 伺服器說這個帳戶用內嵌元件開通（平台收件）時 App 的提示：App 沒有內嵌元件。
 const paymentAccountEmbeddedNotice = '請到網頁版完成收款設定';
-
-/// 畫面要顯示的收款帳戶：平台審核已核准（[approved]）而 `GetMyPaymentAccount` 還沒有帳戶（外部帳戶在建立）與
-/// 「準備中」同義；平台審核還沒核准時沒有收款帳戶（null）。
-PaymentAccount? effectivePaymentAccount(
-  PaymentAccount? account, {
-  required bool approved,
-}) {
-  if (!approved) return null;
-  return account ??
-      PaymentAccount(
-        status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED,
-      );
-}
 
 /// 一次 `CreatePaymentOnboardingSession` 的結果：託管頁面是 [HostedSession.url]；內嵌元件的 client secret 只給網頁
 /// 的瀏覽器，App 不使用，所以 App 不呼叫它（見 `payment_onboarding.dart`）。
@@ -69,7 +47,7 @@ final class HostedSession {
   final Uri url;
 }
 
-/// `GetMyPaymentAccount` 與 `CreatePaymentOnboardingSession`，登入後呼叫。
+/// `GetMyPaymentAccount`、`RefreshMyPaymentAccount` 與 `CreatePaymentOnboardingSession`，登入後呼叫。
 final class PaymentAccountRepository {
   const PaymentAccountRepository(this._client);
 
@@ -86,6 +64,12 @@ final class PaymentAccountRepository {
       if (ConnectException.from(error).code == Code.notFound) return null;
       rethrow;
     }
+  }
+
+  /// 同步向金流商重讀收款帳戶並更新伺服器的快取（從金流商的頁面回來、或賣家按「重新整理」時，先呼叫它再讀開通摘要）。失敗丟出該錯誤。
+  /// 方法是 IDEMPOTENT：`resource_exhausted` 帶 RetryInfo 與 `unavailable` 由 transport 的 `retryInterceptor` 重試，這裡不重試。
+  Future<void> refresh() async {
+    await _client.refreshMyPaymentAccount(RefreshMyPaymentAccountRequest());
   }
 
   /// 託管頁面的開通連結（一次性、短效）；只收 https，[allowInsecureUrl]（只有 dev 的本機測試）才收 http。回應的介面不是 HOSTED 或沒有連結是契約被違反，丟 [FormatException]：

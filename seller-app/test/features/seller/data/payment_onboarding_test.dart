@@ -7,6 +7,7 @@ import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/testing.dart';
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_seller/core/networking/connect_provider.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
 import 'package:hawkr_seller/features/seller/data/current_kyc.dart';
@@ -17,7 +18,9 @@ import 'package:hawkr_seller/features/seller/data/payment_onboarding.dart';
 import 'package:hawkr_seller/features/seller/data/seller_status_refresh.dart';
 
 import '../../../support/fake_my_store.dart';
+import '../../../support/connect_errors.dart';
 import '../../../support/kyc_fixtures.dart';
+import '../../../support/onboarding_fixtures.dart';
 
 const _hosted = OnboardingSurface.ONBOARDING_SURFACE_HOSTED;
 const _embedded = OnboardingSurface.ONBOARDING_SURFACE_EMBEDDED;
@@ -28,9 +31,17 @@ class _LoggedIn extends Session {
       const SessionModel(accountId: 'acc-1', isLoggedIn: true);
 }
 
-/// 假的伺服器：記下 GetMyPaymentAccount 與 CreatePaymentOnboardingSession 的呼叫。
+/// 假的伺服器：記下 GetMyPaymentAccount、GetMyOnboarding、RefreshMyPaymentAccount 與 CreatePaymentOnboardingSession 的呼叫。
 class _Server {
   int paymentCalls = 0;
+  int summaryCalls = 0;
+  int refreshCalls = 0;
+
+  /// 依序記下 RefreshMyPaymentAccount 與讀取的呼叫，驗證「先重讀再讀」的順序。
+  final calls = <String>[];
+
+  /// RefreshMyPaymentAccount 的失敗；null 是成功。
+  Object? refreshFailure;
   final sessions = <CreatePaymentOnboardingSessionRequest>[];
   final launched = <Uri>[];
   bool launchResult = true;
@@ -50,7 +61,20 @@ class _Server {
         .unary(SellerAppService.getMyKYC, (_, _) {
           return GetMyKYCResponse(application: individualApplication());
         })
+        .unary(SellerAppService.getMyOnboarding, (_, _) {
+          summaryCalls++;
+          calls.add('getMyOnboarding');
+          return paymentPendingSummary();
+        })
+        .unary(SellerAppService.refreshMyPaymentAccount, (_, _) {
+          refreshCalls++;
+          calls.add('refreshMyPaymentAccount');
+          final failure = refreshFailure;
+          if (failure != null) throw failure;
+          return RefreshMyPaymentAccountResponse();
+        })
         .unary(SellerAppService.getMyPaymentAccount, (_, _) async {
+          calls.add('getMyPaymentAccount');
           final call = ++paymentCalls;
           await gates[call]?.future;
           return GetMyPaymentAccountResponse(
@@ -267,15 +291,83 @@ void main() {
   });
 
   group('onResumed：回到前景重讀', () {
-    test('重讀店家、認證流程與收款帳戶（GetMyPaymentAccount）', () async {
+    test(
+      '重讀店家、認證流程、收款帳戶（GetMyPaymentAccount）與開通摘要，不呼叫 RefreshMyPaymentAccount',
+      () async {
+        final server = _Server();
+        final container = server.container();
+        await container.read(accountPaymentAccountProvider('acc-1').future);
+        final before = server.paymentCalls;
+        final summaryBefore = server.summaryCalls;
+
+        await container.read(paymentOnboardingProvider.notifier).onResumed();
+
+        expect(server.paymentCalls, before + 1);
+        expect(server.summaryCalls, summaryBefore + 1);
+        expect(server.refreshCalls, 0);
+      },
+    );
+
+    test('從外部瀏覽器回來：先 RefreshMyPaymentAccount，再讀收款帳戶與開通摘要（同一輪）', () async {
       final server = _Server();
       final container = server.container();
       await container.read(accountPaymentAccountProvider('acc-1').future);
-      final before = server.paymentCalls;
+      final notifier = container.read(paymentOnboardingProvider.notifier);
+      await notifier.start(_hosted);
+      server.calls.clear();
 
-      await container.read(paymentOnboardingProvider.notifier).onResumed();
+      await notifier.onResumed();
 
-      expect(server.paymentCalls, before + 1);
+      expect(server.refreshCalls, 1);
+      expect(server.calls.first, 'refreshMyPaymentAccount');
+      expect(
+        server.calls.skip(1),
+        containsAll(['getMyPaymentAccount', 'getMyOnboarding']),
+      );
+      expect(container.read(paymentOnboardingProvider), isNull);
+    });
+
+    test('從外部瀏覽器回來而 RefreshMyPaymentAccount 失敗：照樣讀，讀完把失敗放進 state', () async {
+      final server = _Server()
+        ..refreshFailure = reasonError(
+          Code.resourceExhausted,
+          'RATE_LIMITED',
+          message: '請稍後再試',
+        );
+      final container = server.container();
+      await container.read(accountPaymentAccountProvider('acc-1').future);
+      final notifier = container.read(paymentOnboardingProvider.notifier);
+      await notifier.start(_hosted);
+      server.calls.clear();
+
+      await notifier.onResumed();
+
+      expect(server.calls.first, 'refreshMyPaymentAccount');
+      expect(
+        server.calls,
+        containsAll(['getMyPaymentAccount', 'getMyOnboarding']),
+      );
+      final failure = container.read(paymentOnboardingProvider);
+      expect(failure, isNotNull);
+      expect(
+        ConnectException.from(failure!.error).code,
+        Code.resourceExhausted,
+      );
+    });
+
+    test('confirmPaymentAccount 連續兩次失敗：每次都是新的事件', () async {
+      final server = _Server()
+        ..refreshFailure = reasonError(Code.unavailable, 'DOWN');
+      final container = server.container();
+      final notifier = container.read(paymentOnboardingProvider.notifier);
+      final seen = <PaymentRefreshFailure?>[];
+      container.listen(paymentOnboardingProvider, (_, next) => seen.add(next));
+
+      await notifier.confirmPaymentAccount();
+      await notifier.confirmPaymentAccount();
+
+      expect(seen, hasLength(2));
+      expect(identical(seen.first, seen.last), isFalse);
     });
 
     test('從外部瀏覽器回來帶 fresh: true：進行中那一輪可能在狀態改變之前就開始讀了，之後再讀一輪', () async {

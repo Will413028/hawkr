@@ -15,16 +15,17 @@ import '../../../shared/widgets/hk_button_label.dart';
 import '../../../shared/widgets/hk_content_card.dart';
 import '../../../shared/widgets/hk_icon.dart';
 import '../../../shared/widgets/hk_status_badge.dart';
-import '../data/current_kyc.dart';
-import '../data/payment_account.dart';
 import '../data/current_store.dart';
+import '../data/onboarding_summary.dart';
 import '../data/onboarding_tasks.dart';
 import '../data/seller_status_refresh.dart';
+import 'payment_account_action.dart';
 
-/// 開店進度卡（B8）：項目、分組與文字和 website 的 `OnboardingProgressCard` 同一套，資料來自
-/// `GetMyStore.capabilities` 的 `PUBLIC_LISTING`、`GetMyKYC.flow`、物流開通與商品數。
+/// 開店進度卡（B8）：項目、分組與文字和 website 的 `OnboardingProgressCard` 同一套。「公開前必須」是伺服器開通摘要
+/// （`GetMyOnboarding`）的任務依序呈現；「建議完成」由 `GetMyStore` 的店家資料、物流開通與商品數組成。
 ///
-/// 「公開前必須」全部完成時預設收合。[onOpenProfile] 是「商店資料」「商店介紹」的去處；沒給時回商店設定頁。
+/// 「公開前必須」全部完成時預設收合。按鈕的去處依伺服器的 `OnboardingAction`：重新整理收款帳戶在原地先呼叫
+/// `RefreshMyPaymentAccount` 再重讀，失敗以 toast 顯示伺服器的句子。[onOpenProfile] 是「商店資料」「商店介紹」的去處；沒給時回商店設定頁。
 class OnboardingProgressCard extends HookConsumerWidget {
   const OnboardingProgressCard({super.key, this.onOpenProfile});
 
@@ -33,17 +34,14 @@ class OnboardingProgressCard extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final my = ref.watch(myStoreSnapshotProvider);
-    final kyc = ref.watch(currentKycProvider)?.value;
-    final payment = ref.watch(currentPaymentAccountProvider);
+    final summary = ref.watch(currentOnboardingProvider)?.value;
     final inputs =
         ref.watch(onboardingInputsProvider).value ?? const OnboardingInputs();
-    final tasks = buildOnboardingTasks(
+    final actions = usePaymentAccountActions(context, ref);
+    final tasks = buildOnboardingSteps(
       l: context.uiLocale,
       my: my,
-      reviewStatus: kyc?.reviewStatus,
-      reviewReadable: kyc != null,
-      paymentAccount: payment?.value,
-      paymentReadable: payment?.hasValue ?? false,
+      summary: summary,
       shipping: inputs.shipping,
       productCount: inputs.productCount,
     );
@@ -67,24 +65,22 @@ class OnboardingProgressCard extends HookConsumerWidget {
       );
     });
 
-    void open(OnboardingTask task) {
-      switch (task.id) {
-        case SellerOnboardingTaskKey.profile:
-        case SellerOnboardingTaskKey.description:
-          _openProfile(context);
-        case SellerOnboardingTaskKey.platformReview:
-        case SellerOnboardingTaskKey.paymentAccount:
-          context.go(MainRoutes.wallet);
-        case SellerOnboardingTaskKey.notSuspended:
-          unawaited(context.push<void>(SellerRoutes.suspensionNotice));
-        case SellerOnboardingTaskKey.storeActive:
-          unawaited(context.push<void>(SellerRoutes.suspensionNotice));
-        case SellerOnboardingTaskKey.shipping:
-          unawaited(context.push<void>(SettingsRoutes.shipping));
-        case SellerOnboardingTaskKey.product:
-          unawaited(context.push<void>(ProductRoutes.picker));
-        case SellerOnboardingTaskKey.otherRequirement:
+    void open(OnboardingStep task) {
+      switch (task.target) {
+        case OnboardingStepTarget.none:
           break;
+        case OnboardingStepTarget.editProfile:
+          _openProfile(context);
+        case OnboardingStepTarget.certification:
+          context.go(MainRoutes.wallet);
+        case OnboardingStepTarget.support:
+          unawaited(context.push<void>(SettingsRoutes.help));
+        case OnboardingStepTarget.refreshPayment:
+          actions.refresh();
+        case OnboardingStepTarget.shipping:
+          unawaited(context.push<void>(SettingsRoutes.shipping));
+        case OnboardingStepTarget.product:
+          unawaited(context.push<void>(ProductRoutes.picker));
       }
     }
 
@@ -115,7 +111,11 @@ class OnboardingProgressCard extends HookConsumerWidget {
                   ),
                 ),
                 for (final task in tasks.where((task) => task.group == group))
-                  _TaskRow(task: task, onOpen: () => open(task)),
+                  _TaskRow(
+                    task: task,
+                    busy: actions.busy,
+                    onOpen: () => open(task),
+                  ),
               ],
         ],
       ),
@@ -239,9 +239,14 @@ class _Header extends StatelessWidget {
 }
 
 class _TaskRow extends StatelessWidget {
-  const _TaskRow({required this.task, required this.onOpen});
+  const _TaskRow({
+    required this.task,
+    required this.busy,
+    required this.onOpen,
+  });
 
-  final OnboardingTask task;
+  final OnboardingStep task;
+  final bool busy;
   final VoidCallback onOpen;
 
   @override
@@ -255,6 +260,7 @@ class _TaskRow extends StatelessWidget {
         ? AppIconColors.success
         : AppIconColors.muted;
     final cta = task.cta;
+    final description = task.description;
     return Semantics(
       container: true,
       label: '${task.title}，${task.statusLabel}',
@@ -280,14 +286,16 @@ class _TaskRow extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: HkSpace.xs),
-                  Text(
-                    task.description,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
+                  if (description != null) ...[
+                    const SizedBox(height: HkSpace.xs),
+                    Text(
+                      description,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: HkSpace.sm),
                   HkStatusBadge(label: task.statusLabel, tone: task.tone),
                 ],
@@ -296,7 +304,7 @@ class _TaskRow extends StatelessWidget {
             if (cta != null) ...[
               const SizedBox(width: HkSpace.sm),
               TextButton(
-                onPressed: task.locked ? null : onOpen,
+                onPressed: task.locked || busy ? null : onOpen,
                 style: TextButton.styleFrom(
                   minimumSize: const Size(HkControl.minTap, HkControl.minTap),
                 ),
