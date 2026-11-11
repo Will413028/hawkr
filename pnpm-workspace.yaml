@@ -44,7 +44,7 @@ catalog:
   typescript: 7.0.2
   typescript-compiler-api: npm:@typescript/typescript6@6.0.2
   use-intl: 4.13.0
-  vitest: 4.1.10
+  vitest: 5.0.3
 
 # minimumReleaseAge (pnpm 11 default: 24h) needs a live round-trip to
 # registry.npmjs.org per lockfile entry to read its publish date. That
