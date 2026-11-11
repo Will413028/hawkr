@@ -55,10 +55,6 @@ const (
 	SellerKYCRevealsCreate            Permission = "seller.kyc_reveals.create"
 	SellerKYCDocumentAccessesList     Permission = "seller.kyc_document_accesses.list"
 	SellerKYCDocumentsGet             Permission = "seller.kyc_documents.get"
-	SellerPayUniRegistrationsGet      Permission = "seller.payuni_registrations.get"
-	SellerPayUniRegistrationsRebind   Permission = "seller.payuni_registrations.rebind"
-	SellerPayUniRegistrationsRefresh  Permission = "seller.payuni_registrations.refresh"
-	SellerPayUniObservationsList      Permission = "seller.payuni_observations.list"
 	SellerReportsList                 Permission = "seller.reports.list"
 	SellerReportsGet                  Permission = "seller.reports.get"
 	SellerReportsMarkSupplementsSeen  Permission = "seller.reports.mark_supplements_seen"
@@ -128,7 +124,6 @@ func Catalog() []Permission {
 		SellerKYCApplicationsList, SellerKYCApplicationsGet, SellerKYCApplicationsApprove, SellerKYCApplicationsReject,
 		SellerKYCApplicationsRequery,
 		SellerKYCRevealsList, SellerKYCRevealsCreate, SellerKYCDocumentAccessesList, SellerKYCDocumentsGet,
-		SellerPayUniRegistrationsGet, SellerPayUniRegistrationsRebind, SellerPayUniRegistrationsRefresh, SellerPayUniObservationsList,
 		SellerReportsList, SellerReportsGet, SellerReportsMarkSupplementsSeen, SellerReportsTriage, SellerReportsResolve, SellerReportsMove,
 		SellerCasesList, SellerCasesGet, SellerCasesDecide, SellerCasesChangeSeverity,
 		SellerCaseNotesCreate, SellerCaseNotesList, SellerReportEvidenceGet,

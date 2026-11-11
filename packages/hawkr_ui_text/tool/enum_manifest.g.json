@@ -211,13 +211,6 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.seller.v1alpha1.PayUniBindStatus",
-      "dartClass": "PayUniBindStatus",
-      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
       "name": "hawkr.seller.v1alpha1.PayUniState",
       "dartClass": "PayUniState",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",

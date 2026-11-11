@@ -46,13 +46,6 @@ func (s *Service) AdminList(ctx context.Context, in model.StoreListInput) (model
 		status := string(*in.KYCStatus)
 		params.KycStatus = &status
 	}
-	if in.PayUniBindStatus != nil {
-		if !slices.Contains(model.PayUniBindStatusValues(), *in.PayUniBindStatus) {
-			return model.StorePage{}, apperr.InvalidInputOn([]string{"PayUniBindStatus"}, "綁定狀態不合法")
-		}
-		status := string(*in.PayUniBindStatus)
-		params.BindStatus = &status
-	}
 	if in.AccountID != nil {
 		if err := model.Positive(*in.AccountID); err != nil {
 			return model.StorePage{}, apperr.InvalidInputOn([]string{"AccountID"}, "帳號 ID 不合法")

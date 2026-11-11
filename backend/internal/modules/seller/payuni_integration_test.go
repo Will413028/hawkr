@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -165,7 +164,7 @@ func (f *fixture) registration(t *testing.T, storeID int64) PayUniRegistration {
 	t.Helper()
 	r, err := f.module.PayUniRegistrationOf(context.Background(), storeID)
 	must(t, err)
-	return r.PayUniRegistration
+	return r
 }
 
 func (f *fixture) sync(t *testing.T, storeID int64) bool {
@@ -444,14 +443,6 @@ func TestTransportErrorIsRetriedAndOnlyTheFinalAttemptFails(t *testing.T) {
 	if r.BindStatus != BindStatusFailed || deref(r.BindErrorCode) != PayUniErrUnavailable || len(failed.all()) != 1 || r.BindAttempts != 3 {
 		t.Fatalf("registration=%+v", r)
 	}
-	// 管理員重新綁定之後可以成功。
-	if _, err := f.module.RebindPayUni(context.Background(), RebindPayUniInput{StoreID: s.StoreID, AdminID: 9}); err != nil {
-		t.Fatal(err)
-	}
-	f.sync(t, s.StoreID)
-	if r := f.registration(t, s.StoreID); r.BindStatus != BindStatusBound || r.BindAttempts != 1 {
-		t.Fatalf("registration=%+v", r)
-	}
 }
 
 // 回歸（盤點 D15）：舊 client 在地址空白時送假資料（地址「台灣」、郵遞區號 100）。缺地址就記為資料不完整，不呼叫
@@ -619,50 +610,10 @@ func TestAlreadyBoundTerminalMerchantNeedsReonboarding(t *testing.T) {
 	if ev := rejected.all(); len(ev) != 1 || ev[0].Reason != "文件不符" {
 		t.Fatalf("rejected=%+v", ev)
 	}
-	if _, err := f.module.RebindPayUni(context.Background(), RebindPayUniInput{StoreID: s.StoreID, AdminID: 9}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
-		t.Fatalf("rebind: %v", err)
-	}
 	mine, err := f.module.MyKYC(context.Background(), accountID)
 	must(t, err)
 	if mine.Flow.Status != FlowBindFailed || mine.Flow.CanResubmit || mine.PayUni == nil || mine.PayUni.State != PayUniState("TERMINATED") {
 		t.Fatalf("flow=%+v payuni=%+v", mine.Flow, mine.PayUni)
-	}
-}
-
-func TestRebindOnlyFromFailed(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	_, s := f.approvedStore(t)
-	rebind := func() (AdminPayUniRegistration, error) {
-		return f.module.RebindPayUni(context.Background(), RebindPayUniInput{StoreID: s.StoreID, AdminID: 9})
-	}
-	// PENDING：已經在（重新）綁定，重送安全、不另排 job。
-	jobs := f.jobs.count(kindSync)
-	if r, err := rebind(); err != nil || r.BindStatus != BindStatusPending || f.jobs.count(kindSync) != jobs {
-		t.Fatalf("pending rebind: %+v %v", r, err)
-	} else if len(r.RebindUnavailable) != 1 || r.RebindUnavailable[0] != StoreReasonPayUniBindInProgress {
-		// 綁定中：可用性的第一個原因是 PAYUNI_BIND_IN_PROGRESS（idempotent），與方法回目前註冊的分支是同一個判斷。
-		t.Fatalf("pending reasons: %v", r.RebindUnavailable)
-	}
-	f.payuni.bindErr = []error{apiErr("AGENT04003")}
-	f.sync(t, s.StoreID)
-	if f.registration(t, s.StoreID).BindStatus != BindStatusFailed {
-		t.Fatal("not failed")
-	}
-	if _, err := f.module.RebindPayUni(context.Background(), RebindPayUniInput{StoreID: 0, AdminID: 9}); apperr.KindOf(err) != apperr.KindInvalidInput {
-		t.Fatalf("invalid: %v", err)
-	}
-	r, err := rebind()
-	must(t, err)
-	if r.BindStatus != BindStatusPending || r.BindErrorCode != nil || r.BindAttempts != 0 || f.jobs.count(kindSync) != jobs+1 {
-		t.Fatalf("rebind: %+v jobs=%d", r, f.jobs.count(kindSync))
-	}
-	f.sync(t, s.StoreID)
-	if _, err := rebind(); apperr.KindOf(err) != apperr.KindFailedPrecondition {
-		t.Fatalf("rebind on a bound registration: %v", err)
-	}
-	if _, err := f.module.RebindPayUni(context.Background(), RebindPayUniInput{StoreID: s.StoreID + 100, AdminID: 9}); apperr.KindOf(err) != apperr.KindNotFound {
-		t.Fatalf("unknown store: %v", err)
 	}
 }
 
@@ -682,14 +633,6 @@ func TestNotConfiguredPayUniFailsWithAClearCodeAndDoesNotPoll(t *testing.T) {
 	}
 	if _, polled, err := f.module.SweepPayUni(context.Background()); err != nil || polled != 0 {
 		t.Fatalf("sweep: %d %v", polled, err)
-	}
-	// 設定好之後由管理員重新綁定。
-	f.module = f.newModule(t, f.payuni, f.jobs)
-	_, err := f.module.RebindPayUni(context.Background(), RebindPayUniInput{StoreID: s.StoreID, AdminID: 9})
-	must(t, err)
-	f.sync(t, s.StoreID)
-	if f.registration(t, s.StoreID).BindStatus != BindStatusBound {
-		t.Fatal("not bound")
 	}
 }
 
@@ -1324,19 +1267,22 @@ func TestStoreNameAndDescriptionAreLockedWhilePayUniHoldsThem(t *testing.T) {
 	locked("審核中")
 	must(t, approve(f, sub))
 	locked("綁定中")
-	f.payuni.bindErr = []error{apiErr("AGENT04003")}
-	f.sync(t, s.StoreID)
-	if err := rename("修正後的店名"); err != nil {
-		t.Fatalf("綁定失敗時要能修正店名：%v", err)
-	}
-	_, err := f.module.RebindPayUni(ctx, RebindPayUniInput{StoreID: s.StoreID, AdminID: 9})
-	must(t, err)
 	f.sync(t, s.StoreID)
 	locked("已綁定")
 	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "5"}
 	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourcePoll))
 	locked("PayUni 待補件")
 	_ = accountID
+
+	// 綁定失敗時 PayUni 沒有收下，店名要能修正。
+	_, failed := f.approvedWith(t, idB, "012345678902")
+	f.payuni.bindErr = []error{apiErr("AGENT04003")}
+	f.sync(t, failed.StoreID)
+	cur, err := f.module.Store(ctx, failed.StoreID)
+	must(t, err)
+	if _, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: failed.StoreID, ExpectedVersion: cur.Version, StoreName: ptr("修正後的店名")}); err != nil {
+		t.Fatalf("綁定失敗時要能修正店名：%v", err)
+	}
 }
 
 func TestPayUniStateIsAvailableOnlyForTheOwnStore(t *testing.T) {
@@ -1567,54 +1513,6 @@ func TestIncompleteDataFailureReturnsToPendingOnlyWhenTheDataIsComplete(t *testi
 	}
 	if r := f.registration(t, s.StoreID); r.BindStatus != BindStatusPending || f.jobs.count(kindSync) != jobs+1 {
 		t.Fatalf("registration=%+v jobs=%d", r, f.jobs.count(kindSync)-jobs)
-	}
-}
-
-// 回歸（CR-10）：管理員重新綁定留下 append-only 的紀錄（誰、何時、哪一份申請），而不是丟掉 AdminID。
-func TestAdminRebindIsRecorded(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	_, s := f.approvedStore(t)
-	f.payuni.bindErr = []error{apiErr("AGENT04003")}
-	f.sync(t, s.StoreID)
-	_, err := f.module.RebindPayUni(ctx, RebindPayUniInput{StoreID: s.StoreID, AdminID: 4242})
-	must(t, err)
-	reg := f.registration(t, s.StoreID)
-	var n int64
-	must(t, f.db.Conn(ctx).QueryRow(ctx,
-		"SELECT count(*) FROM seller.kyc_reviews WHERE action='REBIND' AND reviewer_admin_id=4242 AND application_id=$1 AND decided_at=$2",
-		reg.ApplicationID, f.now).Scan(&n))
-	if n != 1 {
-		t.Fatalf("重新綁定的紀錄 = %d", n)
-	}
-	// 重送（已經在重新綁定）不重複記錄。
-	if _, err := f.module.RebindPayUni(ctx, RebindPayUniInput{StoreID: s.StoreID, AdminID: 4242}); err != nil {
-		t.Fatal(err)
-	}
-	if f.count(t, "SELECT count(*) FROM seller.kyc_reviews WHERE action='REBIND'") != 1 {
-		t.Fatal("重送又記了一筆")
-	}
-}
-
-// 回歸：重新綁定回傳的註冊與一般讀取（PayUniRegistrationOf）是同一個形狀，帶申請的賣家型態（問題要補的欄位依它過濾）；
-// 第一次重新綁定與已經在重新綁定時的重送都一樣。
-func TestRebindReturnsTheRegistrationWithTheSellerType(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	_, s := f.approvedStore(t)
-	f.payuni.bindErr = []error{apiErr("AGENT04003")}
-	f.sync(t, s.StoreID)
-	first, err := f.module.RebindPayUni(ctx, RebindPayUniInput{StoreID: s.StoreID, AdminID: 4242})
-	must(t, err)
-	if first.SellerType != KYCIndividual || first.BindStatus != BindStatusPending || !reflect.DeepEqual(first.PayUniRegistration, f.registration(t, s.StoreID)) {
-		t.Fatalf("rebind=%+v read=%+v", first, f.registration(t, s.StoreID))
-	}
-	again, err := f.module.RebindPayUni(ctx, RebindPayUniInput{StoreID: s.StoreID, AdminID: 4242})
-	must(t, err)
-	if !reflect.DeepEqual(again, first) {
-		t.Fatalf("replay=%+v first=%+v", again, first)
 	}
 }
 

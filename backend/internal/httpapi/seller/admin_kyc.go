@@ -20,7 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 後台的身分認證（KYC）審核與 PayUni 方法（遷移計畫 A3b 步驟 8f）。後台的訊息與前台的 KYCApplication 分開：前台的有寫入用的
+// 後台的身分認證（KYC）審核方法。後台的訊息與前台的 KYCApplication 分開：前台的有寫入用的
 // 明文欄位，後台的型別沒有任何欄位能放明文；全文只由 RevealKYCSensitive 回傳。
 
 // 模組輸入的欄位對應到請求的路徑。
@@ -234,60 +234,6 @@ func auditScope(procedure string, applicationID uuid.UUID) string {
 	return procedure + "\x00" + applicationID.String()
 }
 
-func (h *Admin) GetPayUniRegistration(ctx context.Context, req *connect.Request[adminpb.GetPayUniRegistrationRequest]) (*connect.Response[adminpb.GetPayUniRegistrationResponse], error) {
-	storeID, err := rpc.ParseID("store_id", req.Msg.GetStoreId())
-	if err != nil {
-		return nil, err
-	}
-	reg, err := h.m.PayUniRegistrationOf(ctx, storeID)
-	if err != nil {
-		return nil, err
-	}
-	return connect.NewResponse(&adminpb.GetPayUniRegistrationResponse{Registration: toAdminPayUni(reg)}), nil
-}
-
-// RebindPayUni 沒有 etag 也不要理由：「只有綁定失敗才能重綁」的狀態檢查在模組，重送是冪等的。
-func (h *Admin) RebindPayUni(ctx context.Context, req *connect.Request[adminpb.RebindPayUniRequest]) (*connect.Response[adminpb.RebindPayUniResponse], error) {
-	adminID, err := adminFrom(ctx)
-	if err != nil {
-		return nil, err
-	}
-	storeID, err := rpc.ParseID("store_id", req.Msg.GetStoreId())
-	if err != nil {
-		return nil, err
-	}
-	reg, err := h.m.RebindPayUni(ctx, model.RebindPayUniInput{StoreID: storeID, AdminID: adminID})
-	if err != nil {
-		return nil, err
-	}
-	return connect.NewResponse(&adminpb.RebindPayUniResponse{Registration: toAdminPayUni(reg)}), nil
-}
-
-func (h *Admin) ListPayUniObservations(ctx context.Context, req *connect.Request[adminpb.ListPayUniObservationsRequest]) (*connect.Response[adminpb.ListPayUniObservationsResponse], error) {
-	storeID, err := rpc.ParseID("store_id", req.Msg.GetStoreId())
-	if err != nil {
-		return nil, err
-	}
-	// 沒有這家店時模組回 not_found，不是空的清單。
-	scope := rpc.PageScope(sellerv1alpha1connect.SellerAdminServiceListPayUniObservationsProcedure, storeID)
-	after, err := rpc.ValidCursor[model.PayUniObservationCursor](scope, req.Msg.GetPageToken())
-	if err != nil {
-		return nil, err
-	}
-	page, err := h.m.PayUniObservations(ctx, model.PayUniObservationListInput{StoreID: storeID, PageSize: req.Msg.GetPageSize(), After: after})
-	if err != nil {
-		return nil, err
-	}
-	out := &adminpb.ListPayUniObservationsResponse{Observations: make([]*adminpb.PayUniObservation, len(page.Items))}
-	for i, o := range page.Items {
-		out.Observations[i] = toObservation(o)
-	}
-	if page.Next != nil {
-		out.NextPageToken = rpc.TokenFor(scope, page.Next)
-	}
-	return connect.NewResponse(out), nil
-}
-
 // RequeryKYCRegistration 排入一次登記資料查詢（回應不等結果），回傳這筆進行中的查詢（帶期限）；這一輪還沒查完的舊查詢被取代。
 func (h *Admin) RequeryKYCRegistration(ctx context.Context, req *connect.Request[adminpb.RequeryKYCRegistrationRequest]) (*connect.Response[adminpb.RequeryKYCRegistrationResponse], error) {
 	adminID, err := adminFrom(ctx)
@@ -303,17 +249,6 @@ func (h *Admin) RequeryKYCRegistration(ctx context.Context, req *connect.Request
 		return nil, err
 	}
 	return connect.NewResponse(&adminpb.RequeryKYCRegistrationResponse{RegistrationCheck: toRegistrationCheck(check)}), nil
-}
-
-func (h *Admin) RefreshPayUniStatus(ctx context.Context, req *connect.Request[adminpb.RefreshPayUniStatusRequest]) (*connect.Response[adminpb.RefreshPayUniStatusResponse], error) {
-	storeID, err := rpc.ParseID("store_id", req.Msg.GetStoreId())
-	if err != nil {
-		return nil, err
-	}
-	if err := h.m.RefreshPayUniStatus(ctx, storeID); err != nil {
-		return nil, err
-	}
-	return connect.NewResponse(&adminpb.RefreshPayUniStatusResponse{}), nil
 }
 
 func toKYCSummary(a model.KYCApplication) *adminpb.KYCApplicationSummary {
@@ -463,43 +398,4 @@ func toCalendarDate(t time.Time) *date.Date {
 		return nil
 	}
 	return &date.Date{Year: int32(t.Year()), Month: int32(t.Month()), Day: int32(t.Day())} //nolint:gosec // time.Time 的日曆欄位在 Date 的範圍內
-}
-
-func toAdminPayUni(v model.AdminPayUniRegistration) *adminpb.PayUniRegistration {
-	r := v.PayUniRegistration
-	out := &adminpb.PayUniRegistration{
-		StoreId: rpc.FormatID(r.StoreID), MerId: r.MerID, ApplicationId: r.ApplicationID.String(),
-		BindStatus: rpc.EnumToProto[pb.PayUniBindStatus](r.BindStatus), BindErrorCode: deref(r.BindErrorCode),
-		BindAttempts: int32(r.BindAttempts), //nolint:gosec // 嘗試次數遠小於 int32
-		StatusCodes: &adminpb.PayUniStatusCodes{
-			MerStatus: deref(r.Status.MerStatus), MemberStatus: deref(r.Status.MemberStatus), CreditStatus: deref(r.Status.CreditStatus),
-			ApplePayStatus: deref(r.Status.ApplePayStatus), GooglePayStatus: deref(r.Status.GooglePayStatus), AtmStatus: deref(r.Status.ATMStatus),
-			Reason: deref(r.Status.Reason),
-		},
-		Problem: toProblem(model.PayUniProblemOf(r)), FlowStatus: rpc.EnumToProto[pb.KYCFlowStatus](v.FlowStatus),
-		CanRebind: len(v.RebindUnavailable) == 0, RebindUnavailabilities: toStoreActionUnavailabilities(v.RebindUnavailable, model.StoreActionRebindPayUni),
-		SyncPending: r.SyncPending, SyncErrorCode: deref(r.SyncErrorCode),
-		CreateTime: timestamppb.New(r.CreatedAt), UpdateTime: timestamppb.New(r.UpdatedAt),
-	}
-	if r.BoundAt != nil {
-		out.BindTime = timestamppb.New(*r.BoundAt)
-	}
-	if r.Status.ObservedAt != nil {
-		out.StatusTime = timestamppb.New(*r.Status.ObservedAt)
-	}
-	if r.Status.CheckedAt != nil {
-		out.CheckTime = timestamppb.New(*r.Status.CheckedAt)
-	}
-	return out
-}
-
-func toObservation(o model.PayUniObservation) *adminpb.PayUniObservation {
-	return &adminpb.PayUniObservation{
-		Id: o.ID.String(), Source: rpc.EnumToProto[adminpb.PayUniObservationSource](o.Source), EventKey: deref(o.EventKey),
-		StatusCodes: &adminpb.PayUniStatusCodes{
-			MerStatus: deref(o.MerStatus), MemberStatus: deref(o.MemberStatus), CreditStatus: deref(o.CreditStatus),
-			ApplePayStatus: deref(o.ApplePayStatus), GooglePayStatus: deref(o.GooglePayStatus), AtmStatus: deref(o.ATMStatus), Reason: deref(o.Reason),
-		},
-		ExecuteTime: timestamppb.New(o.ExecutedAt), ReceiveTime: timestamppb.New(o.ReceivedAt),
-	}
 }

@@ -761,16 +761,6 @@ enum KYCFlowStatus {
   KYC_FLOW_STATUS_PAYUNI_REJECTED = 11;
 }
 
-// PayUniBindStatus 是 PayUni 子商店的綁定狀態。
-enum PayUniBindStatus {
-  PAY_UNI_BIND_STATUS_UNSPECIFIED = 0;
-  // 意圖已寫入，背景程序還沒有送出或正在重試。
-  PAY_UNI_BIND_STATUS_PENDING = 1;
-  PAY_UNI_BIND_STATUS_BOUND = 2;
-  // 綁定失敗，等管理員重新綁定。
-  PAY_UNI_BIND_STATUS_FAILED = 3;
-}
-
 // KYCDocument 是申請上的一張證件圖片。證件含個資，下載要經有授權的 download_uri（只有申請的擁有者能下載），不是公開的
 // 圖片網址。
 message KYCDocument {
@@ -882,7 +872,7 @@ message KYCFlow {
   // failed_precondition 是第一個的 message。只在賣家的回應設，admin 的 KYCApplication.flow 不設。
   repeated KYCResubmitUnavailability resubmit_unavailabilities = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 申請在 PayUni 階段（已核准），或賣家正在修正 PayUni 拒絕、綁定失敗的那份申請（草稿）時才設。只在賣家的回應設，
-  // admin 的 KYCApplication.flow 不設（後台的 PayUni 呈現在 PayUniRegistration）。
+  // admin 的 KYCApplication.flow 不設。
   SellerPayUni payuni = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 

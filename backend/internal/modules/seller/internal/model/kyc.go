@@ -83,13 +83,11 @@ const (
 	ReviewReject ReviewAction = "REJECT"
 	// ReviewCancel 賣家取消。
 	ReviewCancel ReviewAction = "CANCEL"
-	// ReviewRebind 管理員對這份申請的 PayUni 註冊重新綁定（只記誰與何時）。
-	ReviewRebind ReviewAction = "REBIND"
 )
 
 // ReviewActionValues 回傳全部動作，與 DB 的 kyc_reviews_action_check 一致。
 func ReviewActionValues() []ReviewAction {
-	return []ReviewAction{ReviewSubmit, ReviewApprove, ReviewReject, ReviewCancel, ReviewRebind}
+	return []ReviewAction{ReviewSubmit, ReviewApprove, ReviewReject, ReviewCancel}
 }
 
 // SanctionIdentityKind 是措施身分快照的比對種類，與 DB 的 measure_identities_kind_check 一致。

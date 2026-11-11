@@ -248,23 +248,8 @@ BEGIN ATOMIC
       AND NOT EXISTS (SELECT 1 FROM seller.effective_measures(at) e WHERE e.account_id = s.account_id);
 END;
 
--- PAYUNI_BIND_RETRY 重新綁定 PayUni：綁定重試用完（bind_error_code 是 PAYUNI_UNAVAILABLE）、店家營運中、註冊的申請是已核准的（賣家把它改回草稿時
--- 不列：重新核准之後會自動重新綁定）。其他綁定失敗（資料不完整、被永久拒絕）賣家被告知找客服，由客服接手，不進待辦。開始是綁定失敗的時刻
--- （bind_failed_at；不用 updated_at：失敗期間店家改地址會推後它），期限 24 小時（上線前的起始值）。
-CREATE FUNCTION seller.review_payuni_bind_retry(at TIMESTAMPTZ) RETURNS SETOF seller.review_item
-LANGUAGE sql STABLE
-BEGIN ATOMIC
-    SELECT 'PAYUNI_BIND_RETRY'::text, k.application_id::text, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::smallint, NULL::bigint,
-           NULL::uuid, NULL::uuid, k.application_id, r.store_id, COALESCE(s.store_name, ''),
-           r.bind_failed_at, r.bind_failed_at + INTERVAL '24 hours'
-    FROM seller.payuni_registrations r
-    JOIN seller.stores s ON s.store_id = r.store_id
-    JOIN seller.kyc_applications k ON k.application_id = r.application_id
-    WHERE r.bind_status = 'FAILED' AND r.bind_error_code = 'PAYUNI_UNAVAILABLE' AND s.status = 'ACTIVE' AND k.status = 'APPROVED';
-END;
-
 -- 發布的讀取介面（step10e-3d-design.md §2.1）：at 這一刻營運要處理的事項，後台待辦（reviewqueue 模組）的 seller 部分。每一列是一件待辦：種類、對象的鍵、
--- 店家、開始時間與期限，欄位的意義同 review_item。10 種都有期限，due_at 一律有值（E3）。是 10 支 review_<種類>(at) 的 UNION ALL：成員的條件與時長只寫在那些
+-- 店家、開始時間與期限，欄位的意義同 review_item。9 種都有期限，due_at 一律有值（E3）。是 9 支 review_<種類>(at) 的 UNION ALL：成員的條件與時長只寫在那些
 -- 函式（規則只有一個家，E10），這裡不重寫；成員與指令用的 Go 定義一致由資料集測試鎖住。時間由呼叫方以請求的 clock 傳入，不用 now()。
 -- 消費端排序與分頁（reviewqueue 的 keyset：due_at、start_at、kind COLLATE "C"、item_id COLLATE "C"）；kind 是 UPPER_SNAKE，item_id 的位元組順序穩定。
 CREATE TYPE seller.pub_review_item AS (
@@ -304,9 +289,7 @@ BEGIN ATOMIC
     UNION ALL
     SELECT * FROM seller.review_measure_review(at)
     UNION ALL
-    SELECT * FROM seller.review_kyc_application(at)
-    UNION ALL
-    SELECT * FROM seller.review_payuni_bind_retry(at);
+    SELECT * FROM seller.review_kyc_application(at);
 END;
 
 -- 發布的讀取介面（pub_*，形狀宣告在 db/pub.sql，契約測試比對兩者）：此刻生效中的內容下架措施的對象，一列是一個（措施，內容）。內容下架建立即生效、

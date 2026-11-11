@@ -106,13 +106,10 @@ func issuesByReview(rows []store.SellerKycReviewIssue) map[uuid.UUID][]model.KYC
 	return out
 }
 
-// pendingRejection 是賣家要處理的那次退回：審核紀錄（依時間排序）去掉 REBIND（管理員對已核准申請的動作）之後，最後一筆是 REJECT；
+// pendingRejection 是賣家要處理的那次退回：審核紀錄（依時間排序）的最後一筆是 REJECT；
 // 重新送出、核准、取消都會留下之後的紀錄，所以那之後就沒有了。
 func pendingRejection(reviews []store.SellerKycReview) *store.SellerKycReview {
 	i := len(reviews) - 1
-	for i >= 0 && reviews[i].Action == string(model.ReviewRebind) {
-		i--
-	}
 	if i < 0 || reviews[i].Action != string(model.ReviewReject) {
 		return nil
 	}

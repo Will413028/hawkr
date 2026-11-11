@@ -26,22 +26,15 @@ func reasonsEqual(got []StoreActionUnavailableReason, want ...StoreActionUnavail
 	return slices.Equal(got, want)
 }
 
-// 表上 blocking 的組合都有以「。」結尾的 zh-TW 句子；idempotent 與表外的組合是零值。
+// 表上的組合都有以「。」結尾的 zh-TW 句子；表外的組合是零值。
 func TestStoreActionTextCoversExactlyTheBlockingCombinations(t *testing.T) {
 	for _, a := range StoreActionValues() {
 		listed := map[StoreActionUnavailableReason]bool{}
 		for _, rule := range storeActionRules[a] {
 			listed[rule.Reason] = true
 			got := StoreActionUnavailableText(rule.Reason, a)
-			switch {
-			case rule.Text != nil:
-				if got.Text == "" || !strings.HasSuffix(got.Text, "。") || got.Locale != uitext.ZhTW {
-					t.Errorf("%s/%s 沒有完整的 zh-TW 句子：%+v", a, rule.Reason, got)
-				}
-			default:
-				if got != (uitext.Message{}) {
-					t.Errorf("%s/%s 是 idempotent，不該有句子：%+v", a, rule.Reason, got)
-				}
+			if got.Text == "" || !strings.HasSuffix(got.Text, "。") || got.Locale != uitext.ZhTW {
+				t.Errorf("%s/%s 沒有完整的 zh-TW 句子：%+v", a, rule.Reason, got)
 			}
 		}
 		for _, r := range StoreActionUnavailableReasonValues() {
@@ -52,9 +45,6 @@ func TestStoreActionTextCoversExactlyTheBlockingCombinations(t *testing.T) {
 	}
 	if StoreActionUnavailableText("WEIRD", StoreActionDelegate) != (uitext.Message{}) || StoreActionUnavailableText(StoreReasonStoreClosed, "WEIRD") != (uitext.Message{}) {
 		t.Error("不認得的原因或動作不得有句子")
-	}
-	if !StoreActionIdempotent(StoreActionRebindPayUni, StoreReasonPayUniBindInProgress) || StoreActionIdempotent(StoreActionRebindPayUni, StoreReasonPayUniBound) {
-		t.Error("只有重新綁定的 PAYUNI_BIND_IN_PROGRESS 是 idempotent")
 	}
 }
 
@@ -93,11 +83,6 @@ func TestStoreActionTextIsTheApprovedCopy(t *testing.T) {
 		{StoreReasonKYCNotSubmitted, StoreActionRejectKYC, "只有審核中的申請能核准或退回。"},
 		{StoreReasonKYCNotSubmitted, StoreActionRequeryKYC, "只有審核中的申請能重新查詢登記資料。"},
 		{StoreReasonKYCNotBusiness, StoreActionRequeryKYC, "只有公司型的申請有登記資料可以查詢。"},
-		{StoreReasonPayUniMerchantTerminal, StoreActionRebindPayUni, "PayUni 端的商店已是終止狀態，這家店無法再綁定；賣家要重新入駐才能收款。"},
-		{StoreReasonStoreClosed, StoreActionRebindPayUni, "店家已關閉，不能重新綁定 PayUni。"},
-		{StoreReasonStorePendingDeletion, StoreActionRebindPayUni, "店家等待刪除，不能重新綁定 PayUni。"},
-		{StoreReasonKYCNotApproved, StoreActionRebindPayUni, "賣家正在修改商家認證，重新核准後會自動重新綁定。"},
-		{StoreReasonPayUniBound, StoreActionRebindPayUni, "只有綁定失敗的註冊能重新綁定。"},
 	} {
 		if got := StoreActionUnavailableText(tc.reason, tc.action).Text; got != tc.want {
 			t.Errorf("%s/%s = %q，期望 %q", tc.reason, tc.action, got, tc.want)
@@ -198,47 +183,14 @@ func TestKYCReviewReasonsPerState(t *testing.T) {
 	}
 }
 
-// 重新綁定：第一個原因的順序（結構性的在後、店家狀態在前）、idempotent、申請不是已核准。
-func TestRebindReasonsFirstReasonPerState(t *testing.T) {
-	reg := func(bind PayUniBindStatus, terminal bool) PayUniRegistration {
-		return PayUniRegistration{BindStatus: bind, NeedsReonboarding: terminal}
-	}
-	for _, tc := range []struct {
-		name  string
-		store Store
-		reg   PayUniRegistration
-		app   KYCStatus
-		want  []StoreActionUnavailableReason
-	}{
-		{"FAILED、已核准、營運中：可以", storeIn(Active, false), reg(BindFailed, false), KYCStatusApproved, nil},
-		{"已關閉而且 PENDING：第一個是已關閉，不是 idempotent", storeIn(Closed, false), reg(BindPending, false), KYCStatusApproved, []StoreActionUnavailableReason{StoreReasonStoreClosed, StoreReasonPayUniBindInProgress}},
-		{"PENDING：只有 idempotent 的原因", storeIn(Active, false), reg(BindPending, false), KYCStatusApproved, []StoreActionUnavailableReason{StoreReasonPayUniBindInProgress}},
-		{"終止而且已關閉：第一個是終止", storeIn(Closed, false), reg(BindFailed, true), KYCStatusApproved, []StoreActionUnavailableReason{StoreReasonPayUniMerchantTerminal, StoreReasonStoreClosed}},
-		{"等待刪除", storeIn(PendingDeletion, false), reg(BindFailed, false), KYCStatusApproved, []StoreActionUnavailableReason{StoreReasonStorePendingDeletion}},
-		{"BOUND 而且申請是草稿：第一個是結構性的 PAYUNI_BOUND", storeIn(Active, false), reg(BindBound, false), KYCStatusDraft, []StoreActionUnavailableReason{StoreReasonPayUniBound, StoreReasonKYCNotApproved}},
-		{"FAILED 而且申請是草稿：只有 KYC_NOT_APPROVED", storeIn(Active, false), reg(BindFailed, false), KYCStatusDraft, []StoreActionUnavailableReason{StoreReasonKYCNotApproved}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := RebindUnavailableReasons(tc.store, tc.reg, tc.app); !slices.Equal(got, tc.want) {
-				t.Errorf("got %v 期望 %v", got, tc.want)
-			}
-		})
-	}
-	for _, app := range []KYCStatus{KYCStatusDraft, KYCStatusSubmitted, KYCStatusRejected, KYCStatusCancelled} {
-		if got := RebindUnavailableReasons(storeIn(Active, false), reg(BindFailed, false), app); !reasonsEqual(got, StoreReasonKYCNotApproved) {
-			t.Errorf("申請 %s：%v", app, got)
-		}
-	}
-}
-
-// 錯誤取第一個原因的句子；清單是空或第一個原因沒有句子是內部錯誤（不是 failed_precondition，也沒有通用句）。
+// 錯誤取第一個原因的句子；清單是空或第一個原因在該動作的表上沒有句子是內部錯誤（不是 failed_precondition，也沒有通用句）。
 func TestErrStoreActionUnavailable(t *testing.T) {
 	err := ErrStoreActionUnavailable([]StoreActionUnavailableReason{StoreReasonStoreClosed, StoreReasonStorePendingDeletion}, StoreActionDelegate)
 	if apperr.KindOf(err) != apperr.KindFailedPrecondition || err == nil || !strings.Contains(err.Error(), "店家已關閉，無法代行。") {
 		t.Fatalf("err=%v", err)
 	}
-	for _, bad := range [][]StoreActionUnavailableReason{nil, {StoreReasonPayUniBindInProgress}} {
-		got := ErrStoreActionUnavailable(bad, StoreActionRebindPayUni)
+	for _, bad := range [][]StoreActionUnavailableReason{nil, {StoreReasonKYCNotBusiness}} {
+		got := ErrStoreActionUnavailable(bad, StoreActionDelegate)
 		if got == nil || apperr.KindOf(got) == apperr.KindFailedPrecondition {
 			t.Errorf("%v：%v", bad, got)
 		}

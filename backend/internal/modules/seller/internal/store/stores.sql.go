@@ -77,22 +77,15 @@ WHERE st.status = ANY($1::text[])
     EXISTS (SELECT 1 FROM seller.review_kyc_application($7::timestamptz) r WHERE r.store_id = st.store_id)
   )
   AND (
-    $8::text IS NULL OR
-    EXISTS (
-      SELECT 1 FROM seller.payuni_registrations r
-      WHERE r.store_id = st.store_id AND r.bind_status = $8::text
-    )
+    $8::bool IS NULL OR
+    (st.account_id = ANY($9::bigint[])) = $8::bool
   )
   AND (
-    $9::bool IS NULL OR
-    (st.account_id = ANY($10::bigint[])) = $9::bool
-  )
-  AND (
-    $11::timestamptz IS NULL OR
-    (st.created_at, st.store_id) < ($11::timestamptz, $12::bigint)
+    $10::timestamptz IS NULL OR
+    (st.created_at, st.store_id) < ($10::timestamptz, $11::bigint)
   )
 ORDER BY st.created_at DESC, st.store_id DESC
-LIMIT $13
+LIMIT $12
 `
 
 type AdminStoresParams struct {
@@ -103,7 +96,6 @@ type AdminStoresParams struct {
 	KycStatus         *string
 	KycAwaitingReview bool
 	Now               time.Time
-	BindStatus        *string
 	Suspended         *bool
 	SuspendedAccounts []int64
 	AfterCreatedAt    *time.Time
@@ -124,7 +116,6 @@ func (q *Queries) AdminStores(ctx context.Context, arg AdminStoresParams) ([]Sel
 		arg.KycStatus,
 		arg.KycAwaitingReview,
 		arg.Now,
-		arg.BindStatus,
 		arg.Suspended,
 		arg.SuspendedAccounts,
 		arg.AfterCreatedAt,

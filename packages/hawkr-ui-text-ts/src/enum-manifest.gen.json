@@ -169,13 +169,6 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.admin.seller.v1alpha1.PayUniObservationSource",
-      "tsName": "PayUniObservationSource",
-      "tsModule": "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
       "name": "hawkr.admin.seller.v1alpha1.ProspectMatchReason",
       "tsName": "ProspectMatchReason",
       "tsModule": "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/prospect_pb",
@@ -444,13 +437,6 @@
     {
       "name": "hawkr.seller.v1alpha1.OnboardingTaskState",
       "tsName": "OnboardingTaskState",
-      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
-      "name": "hawkr.seller.v1alpha1.PayUniBindStatus",
-      "tsName": "PayUniBindStatus",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
       "inCatalog": false,
       "serverOwned": false

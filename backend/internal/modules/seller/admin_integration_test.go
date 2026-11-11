@@ -500,32 +500,15 @@ func TestAdminStoresKYCFilterOnlyMatchesTheCurrentApplication(t *testing.T) {
 	}
 }
 
-// 帳號、PayUni 綁定狀態與停權的篩選。停權和能力檢查是同一個定義：結束、到期之後篩選與 CapabilitiesOf 一起變。
-func TestAdminStoresFilterByAccountBindStatusAndSuspension(t *testing.T) {
+// 帳號與停權的篩選。停權和能力檢查是同一個定義：結束、到期之後篩選與 CapabilitiesOf 一起變。
+func TestAdminStoresFilterByAccountAndSuspension(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	boundAccount, bound := f.approvedWith(t, idA, bankAcct)
-	f.sync(t, bound.StoreID)
-	_, failed := f.approvedWith(t, idB, "012345678902")
-	f.payuni.bindErr = []error{apiErr("AGENT03003")}
-	f.sync(t, failed.StoreID)
-	_, pending := f.approvedWith(t, idC, "012345678903")
+	_, second := f.approvedWith(t, idB, "012345678902")
+	_, third := f.approvedWith(t, idC, "012345678903")
 	_, none := f.open(t)
-	all := []int64{bound.StoreID, failed.StoreID, pending.StoreID, none.StoreID}
-	slices.Sort(all)
-
-	for status, want := range map[PayUniBindStatus][]int64{
-		BindStatusBound: {bound.StoreID}, BindStatusFailed: {failed.StoreID}, BindStatusPending: {pending.StoreID},
-	} {
-		if got := listIDs(t, f, StoreListInput{PayUniBindStatus: &status}); !slices.Equal(got, want) {
-			t.Fatalf("bind %s=%v want=%v", status, got, want)
-		}
-	}
-	weird := PayUniBindStatus("WEIRD")
-	if _, err := f.module.AdminStores(ctx, StoreListInput{PayUniBindStatus: &weird}); apperr.KindOf(err) != apperr.KindInvalidInput {
-		t.Fatalf("weird bind: %v", err)
-	}
 
 	// 帳號：完全相符，換過店的帳號有兩個 stint。
 	if got := listIDs(t, f, StoreListInput{AccountID: &boundAccount}); !slices.Equal(got, []int64{bound.StoreID}) {
@@ -573,14 +556,14 @@ func TestAdminStoresFilterByAccountBindStatusAndSuspension(t *testing.T) {
 		}
 	}
 	check("nobody", nil)
-	rec := f.suspend(t, failed.StoreID)
-	check("risk suspension", []int64{failed.StoreID})
+	rec := f.suspend(t, second.StoreID)
+	check("risk suspension", []int64{second.StoreID})
 	_, err = f.lift(ctx, rec)
 	must(t, err)
 	check("ended", nil)
 	ends := f.now.Add(48 * time.Hour)
-	f.violate(t, pending.StoreID, SeverityHigh, MeasureSuspension, &ends)
-	check("violation suspension", []int64{pending.StoreID})
+	f.violate(t, third.StoreID, SeverityHigh, MeasureSuspension, &ends)
+	check("violation suspension", []int64{third.StoreID})
 	f.now = ends.Add(time.Second)
 	check("violation suspension expired", nil)
 	f.suspend(t, none.StoreID)

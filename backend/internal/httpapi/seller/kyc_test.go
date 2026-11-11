@@ -462,7 +462,6 @@ func TestKYCAndGovernanceEnumsMatchTheModule(t *testing.T) {
 		"KYCStatus":                    rpc.EnumMismatches[pb.KYCStatus](model.KYCStatusValues()),
 		"KYCField":                     rpc.EnumMismatches[pb.KYCField](fields),
 		"KYCFlowStatus":                rpc.EnumMismatches[pb.KYCFlowStatus](model.KYCFlowStatusValues()),
-		"PayUniBindStatus":             rpc.EnumMismatches[pb.PayUniBindStatus](model.PayUniBindStatusValues()),
 		"PayUniState":                  rpc.EnumMismatches[pb.PayUniState](model.PayUniStateValues()),
 		"KYCResubmitUnavailableReason": rpc.EnumMismatches[pb.KYCResubmitUnavailableReason](model.KYCResubmitUnavailableReasonValues()),
 		"PolicyCategory":               rpc.EnumMismatches[commonpb.PolicyCategory](policy.Values()),
@@ -500,7 +499,7 @@ func TestToProblemMapsCodeReasonAndFields(t *testing.T) {
 }
 
 // 賣家讀自己的申請：流程帶 PayUni 狀態（標題以外的事實與句子：說明的語系與內容、審核意見、能修正的欄位）與不能重新送出的原因；
-// 後台的 KYCApplication.flow 兩者都不設（後台的 PayUni 呈現在 PayUniRegistration）。
+// 後台的 KYCApplication.flow 兩者都不設。
 func TestSellerFlowCarriesPayUniAndResubmitUnavailabilitiesButAdminFlowDoesNot(t *testing.T) {
 	flow := model.KYCFlow{Status: model.FlowPayUniRejected}
 	app := model.KYCApplication{

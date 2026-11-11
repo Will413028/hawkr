@@ -712,38 +712,6 @@ class KYCFlowStatus extends $pb.ProtobufEnum {
   const KYCFlowStatus._(super.value, super.name);
 }
 
-/// PayUniBindStatus 是 PayUni 子商店的綁定狀態。
-class PayUniBindStatus extends $pb.ProtobufEnum {
-  static const PayUniBindStatus PAY_UNI_BIND_STATUS_UNSPECIFIED =
-      PayUniBindStatus._(
-          0, _omitEnumNames ? '' : 'PAY_UNI_BIND_STATUS_UNSPECIFIED');
-
-  /// 意圖已寫入，背景程序還沒有送出或正在重試。
-  static const PayUniBindStatus PAY_UNI_BIND_STATUS_PENDING =
-      PayUniBindStatus._(
-          1, _omitEnumNames ? '' : 'PAY_UNI_BIND_STATUS_PENDING');
-  static const PayUniBindStatus PAY_UNI_BIND_STATUS_BOUND =
-      PayUniBindStatus._(2, _omitEnumNames ? '' : 'PAY_UNI_BIND_STATUS_BOUND');
-
-  /// 綁定失敗，等管理員重新綁定。
-  static const PayUniBindStatus PAY_UNI_BIND_STATUS_FAILED =
-      PayUniBindStatus._(3, _omitEnumNames ? '' : 'PAY_UNI_BIND_STATUS_FAILED');
-
-  static const $core.List<PayUniBindStatus> values = <PayUniBindStatus>[
-    PAY_UNI_BIND_STATUS_UNSPECIFIED,
-    PAY_UNI_BIND_STATUS_PENDING,
-    PAY_UNI_BIND_STATUS_BOUND,
-    PAY_UNI_BIND_STATUS_FAILED,
-  ];
-
-  static final $core.List<PayUniBindStatus?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
-  static PayUniBindStatus? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const PayUniBindStatus._(super.value, super.name);
-}
-
 /// PayUniState 是賣家看到的 PayUni 收款狀態，一個值對應賣家的一種動作。伺服器由申請與 PayUni 註冊推導。
 class PayUniState extends $pb.ProtobufEnum {
   static const PayUniState PAY_UNI_STATE_UNSPECIFIED =

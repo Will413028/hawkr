@@ -48,7 +48,6 @@ const (
 	MeasureLiftRequest         = model.MeasureLiftRequest
 	MeasureReview              = model.MeasureReview
 	KYCApplication             = model.KYCApplication
-	PayUniBindRetry            = model.PayUniBindRetry
 	PaymentAccountCreateFailed = model.PaymentAccountCreateFailed
 )
 

@@ -22,7 +22,6 @@ const (
 	MeasureLiftRequest    Kind = "MEASURE_LIFT_REQUEST"
 	MeasureReview         Kind = "MEASURE_REVIEW"
 	KYCApplication        Kind = "KYC_APPLICATION"
-	PayUniBindRetry       Kind = "PAYUNI_BIND_RETRY"
 	// PaymentAccountCreateFailed 是建立重試用完的收款帳戶（subject 是店家）。
 	PaymentAccountCreateFailed Kind = "PAYMENT_ACCOUNT_CREATE_FAILED"
 )
@@ -30,7 +29,7 @@ const (
 // Kinds 是全部有效的種類。
 var Kinds = []Kind{
 	ReportTriage, CaseDecision, CaseInquiryOverdue, AuthorityOrder, AuthorityTargetNotice,
-	MeasureAppeal, MeasureLiftRequest, MeasureReview, KYCApplication, PayUniBindRetry, PaymentAccountCreateFailed,
+	MeasureAppeal, MeasureLiftRequest, MeasureReview, KYCApplication, PaymentAccountCreateFailed,
 }
 
 // Valid 回傳 k 是不是有效的種類。

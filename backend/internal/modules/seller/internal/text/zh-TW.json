@@ -597,10 +597,6 @@
       "message": "帳號停權中，無法代行。",
       "description": "admin 不能代行營運：帳號有生效中的停權措施（ACCOUNT_SUSPENDED，動作是代行）。"
     },
-    "store_action.unavailable.kyc_not_approved.rebind_payuni": {
-      "message": "賣家正在修改商家認證，重新核准後會自動重新綁定。",
-      "description": "admin 不能重新綁定 PayUni：註冊所根據的申請已被賣家改回草稿，不是已核准（KYC_NOT_APPROVED，動作是重新綁定）。PayUniRegistration.rebind_unavailabilities 與 RebindPayUni 被擋下時錯誤的訊息是同一句。"
-    },
     "store_action.unavailable.kyc_not_business.requery_kyc": {
       "message": "只有公司型的申請有登記資料可以查詢。",
       "description": "admin 不能重新查詢登記資料：不是公司型的申請（KYC_NOT_BUSINESS，動作是重新查詢）。"
@@ -613,14 +609,6 @@
       "message": "只有審核中的申請能核准或退回。",
       "description": "admin 不能核准或退回商家認證：申請不在審核中（KYC_NOT_SUBMITTED，動作是核准、退回，同一句）。"
     },
-    "store_action.unavailable.payuni_bound.rebind_payuni": {
-      "message": "只有綁定失敗的註冊能重新綁定。",
-      "description": "admin 不能重新綁定 PayUni：註冊已綁定（PAYUNI_BOUND，動作是重新綁定）。"
-    },
-    "store_action.unavailable.payuni_merchant_terminal.rebind_payuni": {
-      "message": "PayUni 端的商店已是終止狀態，這家店無法再綁定；賣家要重新入駐才能收款。",
-      "description": "admin 不能重新綁定 PayUni：PayUni 端的商店已是終止狀態（PAYUNI_MERCHANT_TERMINAL，動作是重新綁定）。不叫賣家關店：已關閉的店家也成立。"
-    },
     "store_action.unavailable.store_closed.create_measure": {
       "message": "店家已關閉，不能建立警告、停權或風險措施。",
       "description": "admin 不能建立警告、停權或風險措施：店家已關閉（STORE_CLOSED，動作是建立措施）。GetStoreResponse.create_measure_unavailabilities、CreateMeasure 被擋下時錯誤的訊息、案件與通報的原因（CaseBlockStoreClosed、ReportBlockStoreClosed）是同一句（StoreActionUnavailableText）。"
@@ -629,10 +617,6 @@
       "message": "店家已關閉，無法代行。",
       "description": "admin 不能代行營運：店家已關閉（STORE_CLOSED，動作是代行）。清單的 delegation_unavailabilities 與代行 preflight 被拒絕時的訊息是同一句。"
     },
-    "store_action.unavailable.store_closed.rebind_payuni": {
-      "message": "店家已關閉，不能重新綁定 PayUni。",
-      "description": "admin 不能重新綁定 PayUni：店家已關閉（STORE_CLOSED，動作是重新綁定）。"
-    },
     "store_action.unavailable.store_closed.review_kyc": {
       "message": "店家已關閉，這份商家認證申請暫停審核，店家恢復營業後才能審核或重新查詢。",
       "description": "admin 不能核准、退回或重新查詢商家認證：店家已關閉（STORE_CLOSED，動作是核准、退回、重新查詢，同一句）；申請維持審核中，不在後台待辦，店家恢復營業後回到待辦。"
@@ -640,10 +624,6 @@
     "store_action.unavailable.store_pending_deletion.delegate": {
       "message": "店家等待刪除，無法代行。",
       "description": "admin 不能代行營運：店家等待刪除（STORE_PENDING_DELETION，動作是代行）。"
-    },
-    "store_action.unavailable.store_pending_deletion.rebind_payuni": {
-      "message": "店家等待刪除，不能重新綁定 PayUni。",
-      "description": "admin 不能重新綁定 PayUni：店家等待刪除（STORE_PENDING_DELETION，動作是重新綁定）。"
     },
     "store_action.unavailable.store_pending_deletion.review_kyc": {
       "message": "店家等待刪除，這份商家認證申請不再審核。",

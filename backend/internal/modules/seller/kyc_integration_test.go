@@ -689,7 +689,7 @@ func TestKYCSchemaConstraints(t *testing.T) {
 		"unknown slot":                                    "INSERT INTO seller.kyc_documents (application_id, slot, asset_id, object_key) SELECT application_id, 'SELFIE', 'a', 'k' FROM seller.kyc_applications",
 		"review without a reviewer":                       "INSERT INTO seller.kyc_reviews (review_id, application_id, action, decided_at) SELECT uuidv7(), application_id, 'APPROVE', now() FROM seller.kyc_applications",
 		"reject without a reason":                         "INSERT INTO seller.kyc_reviews (review_id, application_id, action, reviewer_admin_id, decided_at) SELECT uuidv7(), application_id, 'REJECT', 1, now() FROM seller.kyc_applications",
-		"rebind without a reviewer":                       "INSERT INTO seller.kyc_reviews (review_id, application_id, action, decided_at) SELECT uuidv7(), application_id, 'REBIND', now() FROM seller.kyc_applications",
+		"retired rebind action":                           "INSERT INTO seller.kyc_reviews (review_id, application_id, action, reviewer_admin_id, decided_at) SELECT uuidv7(), application_id, 'REBIND', 1, now() FROM seller.kyc_applications",
 		"approve by a non positive admin":                 "INSERT INTO seller.kyc_reviews (review_id, application_id, action, reviewer_admin_id, decided_at) SELECT uuidv7(), application_id, 'APPROVE', 0, now() FROM seller.kyc_applications",
 		"seller action with a reviewer":                   "INSERT INTO seller.kyc_reviews (review_id, application_id, action, reviewer_admin_id, decided_at) SELECT uuidv7(), application_id, 'SUBMIT', 1, now() FROM seller.kyc_applications",
 	} {

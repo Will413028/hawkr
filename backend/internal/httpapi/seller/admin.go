@@ -32,10 +32,6 @@ type AdminModule interface {
 	ApproveKYC(context.Context, model.ApproveKYCInput) (model.KYCAdminApplication, error)
 	RejectKYC(context.Context, model.RejectKYCInput) (model.KYCAdminApplication, error)
 	RevealKYCSensitive(context.Context, model.RevealKYCInput) (model.KYCSensitive, error)
-	PayUniRegistrationOf(ctx context.Context, storeID int64) (model.AdminPayUniRegistration, error)
-	RebindPayUni(context.Context, model.RebindPayUniInput) (model.AdminPayUniRegistration, error)
-	PayUniObservations(context.Context, model.PayUniObservationListInput) (model.PayUniObservationPage, error)
-	RefreshPayUniStatus(ctx context.Context, storeID int64) error
 	RequeryKYCRegistration(context.Context, model.RequeryKYCRegistrationInput) (model.RegistrationCheck, error)
 }
 
@@ -134,9 +130,6 @@ func (h *Admin) ListStores(ctx context.Context, req *connect.Request[adminpb.Lis
 		}
 		in.AccountID = &accountID
 	}
-	if bind := rpc.EnumFromProto[model.PayUniBindStatus](msg.GetPayuniBindStatus()); bind != "" {
-		in.PayUniBindStatus = &bind
-	}
 	if msg.Suspended != nil {
 		suspended := msg.GetSuspended()
 		in.Suspended = &suspended
@@ -148,7 +141,7 @@ func (h *Admin) ListStores(ctx context.Context, req *connect.Request[adminpb.Lis
 		in.KYCStatus = &kyc
 	}
 	// page token 只能用在同一組篩選：換了篩選就從第一頁開始。
-	scope := rpc.FilterScope(sellerv1alpha1connect.SellerAdminServiceListStoresProcedure, in.Query, string(rpc.EnumFromProto[model.Status](msg.GetStatus())), msg.GetKycStatus().String(), msg.GetAccountId(), msg.GetPayuniBindStatus().String(), suspendedScope(msg.Suspended), strconv.FormatBool(msg.GetKycAwaitingReview()))
+	scope := rpc.FilterScope(sellerv1alpha1connect.SellerAdminServiceListStoresProcedure, in.Query, string(rpc.EnumFromProto[model.Status](msg.GetStatus())), msg.GetKycStatus().String(), msg.GetAccountId(), suspendedScope(msg.Suspended), strconv.FormatBool(msg.GetKycAwaitingReview()))
 	after, err := rpc.ValidCursor[model.StoreCursor](scope, msg.GetPageToken())
 	if err != nil {
 		return nil, err
@@ -233,7 +226,7 @@ func (h *Admin) GetStore(ctx context.Context, req *connect.Request[adminpb.GetSt
 }
 
 // toStoreActionUnavailabilities 轉出 admin 不能對店家做 action 的每個原因與它的文字（model.StoreActionUnavailableText，與方法被拒絕時錯誤的
-// LocalizedMessage 同一個函式）。idempotent 的原因（PAYUNI_BIND_IN_PROGRESS）不是失敗，沒有句子，message 不設。
+// LocalizedMessage 同一個函式）。
 func toStoreActionUnavailabilities(reasons []model.StoreActionUnavailableReason, action model.StoreAction) []*adminpb.StoreActionUnavailability {
 	var out []*adminpb.StoreActionUnavailability
 	for _, r := range reasons {

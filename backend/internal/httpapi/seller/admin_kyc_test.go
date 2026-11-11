@@ -29,7 +29,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// adminKYCModule 是後台 KYC 與 PayUni 方法的模組替身：記下輸入，回預先放好的結果。
+// adminKYCModule 是後台 KYC 方法的模組替身：記下輸入，回預先放好的結果。
 type adminKYCModule struct {
 	AdminModule
 	reads      int
@@ -47,11 +47,6 @@ type adminKYCModule struct {
 	revealed   model.KYCSensitive
 	approveErr error
 	calls      int
-	reg        model.AdminPayUniRegistration
-	rebind     model.RebindPayUniInput
-	obsIn      model.PayUniObservationListInput
-	obsPage    model.PayUniObservationPage
-	refreshed  int64
 }
 
 func (m *adminKYCModule) AdminKYCApplications(_ context.Context, in model.KYCListInput) (model.KYCPage, error) {
@@ -89,28 +84,9 @@ func (m *adminKYCModule) RevealKYCSensitive(_ context.Context, in model.RevealKY
 	return m.revealed, nil
 }
 
-func (m *adminKYCModule) PayUniRegistrationOf(context.Context, int64) (model.AdminPayUniRegistration, error) {
-	return m.reg, nil
-}
-
-func (m *adminKYCModule) RebindPayUni(_ context.Context, in model.RebindPayUniInput) (model.AdminPayUniRegistration, error) {
-	m.rebind, m.calls = in, m.calls+1
-	return m.reg, nil
-}
-
-func (m *adminKYCModule) PayUniObservations(_ context.Context, in model.PayUniObservationListInput) (model.PayUniObservationPage, error) {
-	m.obsIn = in
-	return m.obsPage, nil
-}
-
 func (m *adminKYCModule) RequeryKYCRegistration(_ context.Context, in model.RequeryKYCRegistrationInput) (model.RegistrationCheck, error) {
 	m.requery, m.calls = in, m.calls+1
 	return m.requeried, nil
-}
-
-func (m *adminKYCModule) RefreshPayUniStatus(_ context.Context, id int64) error {
-	m.refreshed, m.calls = id, m.calls+1
-	return nil
 }
 
 const (
@@ -336,9 +312,6 @@ func TestAdminKYCEnumsMatchTheModule(t *testing.T) {
 	if got := rpc.EnumMismatches[pb.KYCIssueCode](model.KYCIssueCodeValues()); len(got) != 0 {
 		t.Fatalf("KYCIssueCode：%v", got)
 	}
-	if got := rpc.EnumMismatches[adminpb.PayUniObservationSource](model.PayUniSourceValues()); len(got) != 0 {
-		t.Fatalf("PayUniObservationSource：%v", got)
-	}
 }
 
 func TestRevealKYCSensitiveUsesTheCallingAdminReturnsViewURIsAndAssetIDs(t *testing.T) {
@@ -429,96 +402,6 @@ func TestListKYCApplicationsMapsFiltersAndBindsThePageTokenToThem(t *testing.T) 
 	}
 	scope := sellerv1alpha1connect.SellerAdminServiceListKYCApplicationsProcedure + "\x00" + pb.KYCStatus_KYC_STATUS_UNSPECIFIED.String() + "\x00"
 	_, err = h.ListKYCApplications(adminCtx(1), connect.NewRequest(&adminpb.ListKYCApplicationsRequest{PageToken: rpc.TokenFor(scope, &model.KYCCursor{})}))
-	wantInvalidArgument(t, err)
-}
-
-func TestPayUniAdminMethodsUseTheStoreAndTheCallingAdmin(t *testing.T) {
-	reg := model.PayUniRegistration{
-		StoreID: 11, MerID: "HAWK2000001", ApplicationID: uuid.NewV7(), BindStatus: model.BindStatusFailed, BindErrorCode: ptr("AGENT04003"), BindAttempts: 2,
-		SellerType: model.KYCIndividual, Status: model.PayUniStatus{MerStatus: ptr("2"), Outcome: model.PayUniOutcomeRejected},
-	}
-	view := model.AdminPayUniRegistration{
-		PayUniRegistration: reg, FlowStatus: model.FlowBindFailed,
-		RebindUnavailable: []model.StoreActionUnavailableReason{model.StoreReasonStoreClosed},
-	}
-	m := &adminKYCModule{reg: view}
-	h := newTestAdmin(m)
-	got, err := h.GetPayUniRegistration(adminCtx(1), connect.NewRequest(&adminpb.GetPayUniRegistrationRequest{StoreId: "11"}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	r := got.Msg.GetRegistration()
-	if r.GetMerId() != "HAWK2000001" || r.GetBindAttempts() != 2 || r.GetApplicationId() != reg.ApplicationID.String() || r.GetStatusCodes().GetMerStatus() != "2" ||
-		r.GetBindErrorCode() != "AGENT04003" || r.GetBindStatus() != pb.PayUniBindStatus_PAY_UNI_BIND_STATUS_FAILED {
-		t.Fatalf("registration=%+v", r)
-	}
-	// 階段與重新綁定的可用性由模組推導、handler 原樣轉出；原因的句子是 StoreActionUnavailableText（與 RebindPayUni 被拒絕時的錯誤同一個函式）。
-	if r.GetFlowStatus() != pb.KYCFlowStatus_KYC_FLOW_STATUS_BIND_FAILED || r.GetCanRebind() || len(r.GetRebindUnavailabilities()) != 1 ||
-		r.GetRebindUnavailabilities()[0].GetReason() != adminpb.StoreActionUnavailableReason_STORE_ACTION_UNAVAILABLE_REASON_STORE_CLOSED ||
-		r.GetRebindUnavailabilities()[0].GetMessage().GetMessage() != "店家已關閉，不能重新綁定 PayUni。" {
-		t.Fatalf("rebind=%v flow=%v", r.GetRebindUnavailabilities(), r.GetFlowStatus())
-	}
-	if _, err := h.RebindPayUni(adminCtx(42), connect.NewRequest(&adminpb.RebindPayUniRequest{StoreId: "11"})); err != nil {
-		t.Fatal(err)
-	}
-	if m.rebind.AdminID != 42 || m.rebind.StoreID != 11 {
-		t.Fatalf("rebind=%+v", m.rebind)
-	}
-	if _, err := h.RefreshPayUniStatus(adminCtx(42), connect.NewRequest(&adminpb.RefreshPayUniStatusRequest{StoreId: "11"})); err != nil || m.refreshed != 11 {
-		t.Fatalf("refreshed=%d err=%v", m.refreshed, err)
-	}
-	m.calls = 0
-	for name, call := range map[string]func() error{
-		"get": func() error {
-			_, err := h.GetPayUniRegistration(adminCtx(1), connect.NewRequest(&adminpb.GetPayUniRegistrationRequest{StoreId: "x"}))
-			return err
-		},
-		"rebind": func() error {
-			_, err := h.RebindPayUni(adminCtx(1), connect.NewRequest(&adminpb.RebindPayUniRequest{StoreId: "0"}))
-			return err
-		},
-		"refresh": func() error {
-			_, err := h.RefreshPayUniStatus(adminCtx(1), connect.NewRequest(&adminpb.RefreshPayUniStatusRequest{}))
-			return err
-		},
-		"list": func() error {
-			_, err := h.ListPayUniObservations(adminCtx(1), connect.NewRequest(&adminpb.ListPayUniObservationsRequest{StoreId: "-1"}))
-			return err
-		},
-	} {
-		wantInvalidArgument(t, call())
-		if m.calls != 0 {
-			t.Fatalf("%s：模組不該被呼叫", name)
-		}
-	}
-	if _, err := h.RebindPayUni(context.Background(), connect.NewRequest(&adminpb.RebindPayUniRequest{StoreId: "11"})); !errors.Is(err, errNoPrincipal) {
-		t.Fatalf("no principal: %v", err)
-	}
-}
-
-func TestListPayUniObservationsPagesWithAStoreBoundToken(t *testing.T) {
-	cursor := &model.PayUniObservationCursor{ExecutedAt: time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), ObservationID: uuid.NewV7()}
-	m := &adminKYCModule{obsPage: model.PayUniObservationPage{Items: []model.PayUniObservation{{ID: uuid.NewV7(), Source: model.PayUniSourceWebhook, EventKey: ptr("k"), MerStatus: ptr("1"), ExecutedAt: time.Now(), ReceivedAt: time.Now()}}, Next: cursor}}
-	h := newTestAdmin(m)
-	first, err := h.ListPayUniObservations(adminCtx(1), connect.NewRequest(&adminpb.ListPayUniObservationsRequest{StoreId: "11", PageSize: 1}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	o := first.Msg.GetObservations()[0]
-	if o.GetSource() != adminpb.PayUniObservationSource_PAY_UNI_OBSERVATION_SOURCE_WEBHOOK || o.GetEventKey() != "k" || o.GetStatusCodes().GetMerStatus() != "1" || m.obsIn.StoreID != 11 || m.obsIn.PageSize != 1 {
-		t.Fatalf("o=%+v in=%+v", o, m.obsIn)
-	}
-	token := first.Msg.GetNextPageToken()
-	if _, err := h.ListPayUniObservations(adminCtx(1), connect.NewRequest(&adminpb.ListPayUniObservationsRequest{StoreId: "11", PageToken: token})); err != nil {
-		t.Fatal(err)
-	}
-	if m.obsIn.After == nil || *m.obsIn.After != *cursor {
-		t.Fatalf("after=%+v", m.obsIn.After)
-	}
-	_, err = h.ListPayUniObservations(adminCtx(1), connect.NewRequest(&adminpb.ListPayUniObservationsRequest{StoreId: "12", PageToken: token}))
-	wantInvalidArgument(t, err)
-	scope := rpc.PageScope(sellerv1alpha1connect.SellerAdminServiceListPayUniObservationsProcedure, 11)
-	_, err = h.ListPayUniObservations(adminCtx(1), connect.NewRequest(&adminpb.ListPayUniObservationsRequest{StoreId: "11", PageToken: rpc.TokenFor(scope, &model.PayUniObservationCursor{})}))
 	wantInvalidArgument(t, err)
 }
 

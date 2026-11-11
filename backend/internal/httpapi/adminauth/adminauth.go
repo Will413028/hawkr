@@ -76,10 +76,6 @@ var declarations = map[string]declaration{
 	sellerv1alpha1connect.SellerAdminServiceRejectKYCProcedure:               requires(adminperm.SellerKYCApplicationsReject),
 	sellerv1alpha1connect.SellerAdminServiceRequeryKYCRegistrationProcedure:  requires(adminperm.SellerKYCApplicationsRequery),
 	sellerv1alpha1connect.SellerAdminServiceRevealKYCSensitiveProcedure:      requires(adminperm.SellerKYCRevealsCreate),
-	sellerv1alpha1connect.SellerAdminServiceGetPayUniRegistrationProcedure:   requires(adminperm.SellerPayUniRegistrationsGet),
-	sellerv1alpha1connect.SellerAdminServiceRebindPayUniProcedure:            requires(adminperm.SellerPayUniRegistrationsRebind),
-	sellerv1alpha1connect.SellerAdminServiceListPayUniObservationsProcedure:  requires(adminperm.SellerPayUniObservationsList),
-	sellerv1alpha1connect.SellerAdminServiceRefreshPayUniStatusProcedure:     requires(adminperm.SellerPayUniRegistrationsRefresh),
 
 	sellerv1alpha1connect.SellerGovernanceAdminServiceListReportsProcedure:                 requires(adminperm.SellerReportsList),
 	sellerv1alpha1connect.SellerGovernanceAdminServiceGetReportProcedure:                   requires(adminperm.SellerReportsGet),

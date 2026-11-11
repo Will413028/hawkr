@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"time"
-	"uuid"
 
 	"github.com/jackc/pgx/v5"
 
@@ -154,120 +153,37 @@ func CheckNameUnlocked(ctx context.Context, q *store.Queries, storeID int64) err
 	return nil
 }
 
-// Rebind 是管理員對 FAILED 的註冊重新綁定：回到 PENDING 並排入新的 job（不是再核准一次）。可用性與方法是同一個函式
-// （model.RebindUnavailableReasons，與讀取時的 can_rebind 相同）：清單空就重新綁定；第一個原因是 PAYUNI_BIND_IN_PROGRESS（表上標成
-// idempotent：已經在重新綁定）時重送安全、回傳目前的列；其餘原因（PayUni 端已終止、店家已關閉或等待刪除、已綁定、註冊的申請不是
-// 已核准：賣家把它改回草稿重新修改，此時送給 PayUni 的會是還沒審核的資料）回 FailedPrecondition，訊息是第一個原因的句子。
-// 回傳的註冊與 Registration 一致（帶申請的賣家型態、階段與重新綁定的原因）。
-func (s *Service) Rebind(ctx context.Context, in model.RebindPayUniInput) (model.AdminPayUniRegistration, error) {
-	if err := model.Positive(in.StoreID, in.AdminID); err != nil {
-		return model.AdminPayUniRegistration{}, err
-	}
-	var out model.AdminPayUniRegistration
-	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		q := store.New(s.d.DB.Conn(ctx))
-		// 鎖店家但不擋已關閉：已關閉的店家是 failed_precondition（STORE_CLOSED），不是找不到。
-		lockedStore, err := q.LockStore(ctx, in.StoreID)
-		if err != nil {
-			return model.Error(err)
-		}
-		reg, err := q.LockPayUniRegistration(ctx, in.StoreID)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return apperr.NotFound("店家還沒有 PayUni 註冊")
-		}
-		if err != nil {
-			return err
-		}
-		now := s.d.Now().UTC()
-		current := stint.ToPayUniRegistration(reg)
-		view, err := adminViewOf(ctx, q, lockedStore, current, now)
-		if err != nil {
-			return err
-		}
-		switch reasons := view.RebindUnavailable; {
-		case len(reasons) == 0:
-		case model.StoreActionIdempotent(model.StoreActionRebindPayUni, reasons[0]):
-			out = view
-			return nil
-		default:
-			return model.ErrStoreActionUnavailable(reasons, model.StoreActionRebindPayUni)
-		}
-		reg, err = q.RebindPayUni(ctx, store.RebindPayUniParams{StoreID: in.StoreID, Now: now})
-		if err != nil {
-			return err
-		}
-		// 管理員的動作留下 append-only 的紀錄（誰、何時、哪一份申請的註冊）：沿用審核紀錄的形狀。
-		admin := in.AdminID
-		_, err = q.InsertKYCReview(ctx, store.InsertKYCReviewParams{
-			ReviewID: uuid.NewV7(), ApplicationID: reg.ApplicationID, Action: string(model.ReviewRebind), ReviewerAdminID: &admin,
-			Now: now,
-		})
-		if err != nil {
-			return err
-		}
-		if err := enqueueSync(ctx, s.d.Jobs, in.StoreID); err != nil {
-			return err
-		}
-		out, err = adminViewOf(ctx, q, lockedStore, stint.ToPayUniRegistration(reg), now)
-		return err
-	})
-	return out, err
-}
-
-// Registration 讀店家的 PayUni 註冊（含 PayUni 的狀態、所在的階段與重新綁定的可用性）；沒有時回 NotFound。
-func (s *Service) Registration(ctx context.Context, storeID int64) (model.AdminPayUniRegistration, error) {
+// Registration 讀店家的 PayUni 註冊（帶申請的賣家型態與店家缺的欄位）；沒有時回 NotFound。
+func (s *Service) Registration(ctx context.Context, storeID int64) (model.PayUniRegistration, error) {
 	if err := model.Positive(storeID); err != nil {
-		return model.AdminPayUniRegistration{}, err
+		return model.PayUniRegistration{}, err
 	}
 	q := store.New(s.d.DB.Conn(ctx))
 	row, err := q.PayUniRegistrationByStore(ctx, storeID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return model.AdminPayUniRegistration{}, apperr.NotFound("店家還沒有 PayUni 註冊")
+		return model.PayUniRegistration{}, apperr.NotFound("店家還沒有 PayUni 註冊")
 	}
 	if err != nil {
-		return model.AdminPayUniRegistration{}, err
+		return model.PayUniRegistration{}, err
 	}
-	owner, err := q.StoreByID(ctx, storeID)
-	if err != nil {
-		return model.AdminPayUniRegistration{}, model.Error(err)
-	}
-	return adminViewOf(ctx, q, owner, stint.ToPayUniRegistration(row), s.d.Now().UTC())
+	return withApplication(ctx, q, stint.ToPayUniRegistration(row))
 }
 
-// adminViewOf 組出後台看到的註冊：註冊帶申請的賣家型態（withApplication）、所在的 PayUni 階段（model.PayUniPhaseOf，與賣家的流程狀態同一個函式），以及
-// 重新綁定的原因（model.RebindUnavailableReasons，店家以 stint.Load 載入）。註冊所根據的申請的狀態與賣家型態來自同一次讀取。
-func adminViewOf(ctx context.Context, q *store.Queries, owner store.SellerStore, current model.PayUniRegistration, now time.Time) (model.AdminPayUniRegistration, error) {
-	reg, appStatus, err := withApplication(ctx, q, current)
-	if err != nil {
-		return model.AdminPayUniRegistration{}, err
-	}
-	st, err := stint.Load(ctx, q, owner, now)
-	if err != nil {
-		return model.AdminPayUniRegistration{}, err
-	}
-	return model.AdminPayUniRegistration{
-		PayUniRegistration: reg,
-		FlowStatus:         model.PayUniPhaseOf(reg),
-		RebindUnavailable:  model.RebindUnavailableReasons(st, reg, appStatus),
-	}, nil
-}
-
-// withApplication 帶上註冊的申請的賣家型態（要補的欄位依它過濾，見 model.ProblemOf），以及綁定因資料不完整而失敗時店家現在實際缺的欄位（問題只指向真的缺的店家欄位），
-// 另回傳註冊所根據的申請的狀態（同一次讀取）。
-func withApplication(ctx context.Context, q *store.Queries, reg model.PayUniRegistration) (model.PayUniRegistration, model.KYCStatus, error) {
+// withApplication 帶上註冊的申請的賣家型態（要補的欄位依它過濾，見 model.ProblemOf），以及綁定因資料不完整而失敗時店家現在實際缺的欄位（問題只指向真的缺的店家欄位）。
+func withApplication(ctx context.Context, q *store.Queries, reg model.PayUniRegistration) (model.PayUniRegistration, error) {
 	app, err := q.KYCApplicationByID(ctx, reg.ApplicationID)
 	if err != nil {
-		return reg, "", err
+		return reg, err
 	}
 	reg.SellerType = model.KYCSellerType(app.SellerType)
 	if reg.BindErrorCode != nil && *reg.BindErrorCode == model.ErrIncompleteData {
 		owner, err := q.StoreByID(ctx, reg.StoreID)
 		if err != nil {
-			return reg, "", model.Error(err)
+			return reg, model.Error(err)
 		}
 		reg.IncompleteStoreFields = StoreDataOf(stint.ToStore(owner).Profile).Missing()
 	}
-	return reg, model.KYCStatus(app.Status), nil
+	return reg, nil
 }
 
 // Observations 回傳店家的觀測紀錄，新到舊的 keyset（事件時間、觀測 ID），預設 20、上限 100。店家不存在回 NotFound（不是空的
@@ -334,7 +250,7 @@ func SellerViewOf(ctx context.Context, q *store.Queries, row store.SellerKycAppl
 	regRow, err := q.PayUniRegistrationByStore(ctx, row.StoreID)
 	switch {
 	case err == nil:
-		r, _, err := withApplication(ctx, q, stint.ToPayUniRegistration(regRow))
+		r, err := withApplication(ctx, q, stint.ToPayUniRegistration(regRow))
 		if err != nil {
 			return SellerView{}, err
 		}

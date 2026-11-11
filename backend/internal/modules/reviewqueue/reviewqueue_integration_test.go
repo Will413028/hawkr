@@ -299,7 +299,7 @@ func TestListRejectsInvalidInput(t *testing.T) {
 	}
 }
 
-// 模組認得的種類與來源一致：seller 的 10 支函式與 payment 的 pub_review_items 各自的 kind 字面值，集合等於模組的 Kinds（加來源的種類時沒有同步
+// 模組認得的種類與來源一致：seller 的 9 支函式與 payment 的 pub_review_items 各自的 kind 字面值，集合等於模組的 Kinds（加來源的種類時沒有同步
 // model.Kinds，這裡失敗）。
 // 查詢以 kinds 篩選，所以來源多出模組不認得的種類時，那些列在執行期不會出現在結果裡、也不報錯，只有這個測試（測試期）看得到。
 func TestKindsMatchTheSource(t *testing.T) {
@@ -309,7 +309,7 @@ func TestKindsMatchTheSource(t *testing.T) {
 	fns := []string{
 		"seller.review_report_triage", "seller.review_case_decision", "seller.review_case_inquiry_overdue", "seller.review_authority_order",
 		"seller.review_authority_target_notice", "seller.review_measure_appeal", "seller.review_measure_lift_request", "seller.review_measure_review",
-		"seller.review_kyc_application", "seller.review_payuni_bind_retry", "payment.pub_review_items",
+		"seller.review_kyc_application", "payment.pub_review_items",
 	}
 	var sourceKinds []string
 	// 每支函式的 kind 字面值：從函式定義裡讀（pg_get_functiondef 的第一個 SELECT 字面值）。

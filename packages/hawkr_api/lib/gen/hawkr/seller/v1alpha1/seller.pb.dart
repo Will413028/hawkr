@@ -3560,7 +3560,7 @@ class KYCFlow extends $pb.GeneratedMessage {
       $_getList(3);
 
   /// 申請在 PayUni 階段（已核准），或賣家正在修正 PayUni 拒絕、綁定失敗的那份申請（草稿）時才設。只在賣家的回應設，
-  /// admin 的 KYCApplication.flow 不設（後台的 PayUni 呈現在 PayUniRegistration）。
+  /// admin 的 KYCApplication.flow 不設。
   @$pb.TagNumber(5)
   SellerPayUni get payuni => $_getN(4);
   @$pb.TagNumber(5)

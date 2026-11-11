@@ -2,7 +2,7 @@
 //
 // Source: hawkr/admin/seller/v1alpha1/seller.proto
 
-// seller 模組給後台的 API：店家的清單與統計、身分認證（KYC）的審核與 PayUni 子商店。停權是措施
+// seller 模組給後台的 API：店家的清單與統計、身分認證（KYC）的審核。停權是措施
 // （警告與停權），建立、結束與撤銷在 hawkr.admin.seller.v1alpha1 的 SellerGovernanceAdminService。
 // 前台的 API 在 hawkr.seller.v1alpha1。
 // 後台刪整個帳號在 hawkr.admin.identity.v1alpha1 的 DeleteAccount。
@@ -75,18 +75,6 @@ const (
 	// SellerAdminServiceRevealKYCSensitiveProcedure is the fully-qualified name of the
 	// SellerAdminService's RevealKYCSensitive RPC.
 	SellerAdminServiceRevealKYCSensitiveProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RevealKYCSensitive"
-	// SellerAdminServiceGetPayUniRegistrationProcedure is the fully-qualified name of the
-	// SellerAdminService's GetPayUniRegistration RPC.
-	SellerAdminServiceGetPayUniRegistrationProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/GetPayUniRegistration"
-	// SellerAdminServiceRebindPayUniProcedure is the fully-qualified name of the SellerAdminService's
-	// RebindPayUni RPC.
-	SellerAdminServiceRebindPayUniProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RebindPayUni"
-	// SellerAdminServiceListPayUniObservationsProcedure is the fully-qualified name of the
-	// SellerAdminService's ListPayUniObservations RPC.
-	SellerAdminServiceListPayUniObservationsProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/ListPayUniObservations"
-	// SellerAdminServiceRefreshPayUniStatusProcedure is the fully-qualified name of the
-	// SellerAdminService's RefreshPayUniStatus RPC.
-	SellerAdminServiceRefreshPayUniStatusProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RefreshPayUniStatus"
 	// SellerAdminServiceRequeryKYCRegistrationProcedure is the fully-qualified name of the
 	// SellerAdminService's RequeryKYCRegistration RPC.
 	SellerAdminServiceRequeryKYCRegistrationProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RequeryKYCRegistration"
@@ -133,19 +121,6 @@ type SellerAdminServiceClient interface {
 	// 理由、授權到期的時間，不含值），所以是 POST，不是讀取；稽核寫入失敗就不回傳明文。回應不可快取。到期之後、或別的
 	// 管理員讀證件圖片都是 403，要再看就再顯示一次（再寫一列稽核）。
 	RevealKYCSensitive(context.Context, *connect.Request[v1alpha1.RevealKYCSensitiveRequest]) (*connect.Response[v1alpha1.RevealKYCSensitiveResponse], error)
-	// GetPayUniRegistration 讀店家的 PayUni 子商店註冊（綁定意圖、PayUni 的審核狀態碼與要處理的問題）。店家還沒有核准過
-	// 申請時 not_found。
-	GetPayUniRegistration(context.Context, *connect.Request[v1alpha1.GetPayUniRegistrationRequest]) (*connect.Response[v1alpha1.GetPayUniRegistrationResponse], error)
-	// RebindPayUni 對綁定失敗的註冊重新綁定（回到 PENDING 並排入新的背景工作），留下一筆審核紀錄。沒有 etag，由狀態檢查保護：
-	// 只有綁定失敗的能重綁。已經在重新綁定（PAYUNI_BIND_IN_PROGRESS）時呼叫不回錯誤、回傳目前的註冊（重送安全）；其餘原因回
-	// failed_precondition，訊息是 PayUniRegistration.rebind_unavailabilities 的第一句：PayUni 端已是終止狀態、店家已關閉或等待刪除、
-	// 已綁定、註冊所根據的申請不是已核准（例如賣家正在修改）。
-	RebindPayUni(context.Context, *connect.Request[v1alpha1.RebindPayUniRequest]) (*connect.Response[v1alpha1.RebindPayUniResponse], error)
-	// ListPayUniObservations 列出店家的 PayUni 狀態觀測紀錄（webhook、輪詢、手動刷新與綁定），依 PayUni 的事件時間新到舊。
-	ListPayUniObservations(context.Context, *connect.Request[v1alpha1.ListPayUniObservationsRequest]) (*connect.Response[v1alpha1.ListPayUniObservationsResponse], error)
-	// RefreshPayUniStatus 排入一次向 PayUni 查詢審核狀態的背景工作（營運工具；回應不等結果，結果從 GetPayUniRegistration
-	// 與 ListPayUniObservations 看）。PayUni 沒有設定、註冊還沒有綁定時回 failed_precondition。
-	RefreshPayUniStatus(context.Context, *connect.Request[v1alpha1.RefreshPayUniStatusRequest]) (*connect.Response[v1alpha1.RefreshPayUniStatusResponse], error)
 	// RequeryKYCRegistration 對審核中（SUBMITTED）的公司型申請重新查一次經濟部商業司的登記資料（送件時已查過一次，這是
 	// 手動補查：例如當時來源不可用或查無）。回應不等結果：排入背景工作，回傳這筆進行中的查詢（含期限），結果從 GetKYCApplication 的
 	// registration_check 看（查詢中時 pending_registration_check 有值）。伺服器保證這筆查詢在 deadline_time 之前到終態（查到、查無或
@@ -241,32 +216,6 @@ func NewSellerAdminServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			connect.WithSchema(sellerAdminServiceMethods.ByName("RevealKYCSensitive")),
 			connect.WithClientOptions(opts...),
 		),
-		getPayUniRegistration: connect.NewClient[v1alpha1.GetPayUniRegistrationRequest, v1alpha1.GetPayUniRegistrationResponse](
-			httpClient,
-			baseURL+SellerAdminServiceGetPayUniRegistrationProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("GetPayUniRegistration")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		rebindPayUni: connect.NewClient[v1alpha1.RebindPayUniRequest, v1alpha1.RebindPayUniResponse](
-			httpClient,
-			baseURL+SellerAdminServiceRebindPayUniProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("RebindPayUni")),
-			connect.WithClientOptions(opts...),
-		),
-		listPayUniObservations: connect.NewClient[v1alpha1.ListPayUniObservationsRequest, v1alpha1.ListPayUniObservationsResponse](
-			httpClient,
-			baseURL+SellerAdminServiceListPayUniObservationsProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("ListPayUniObservations")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		refreshPayUniStatus: connect.NewClient[v1alpha1.RefreshPayUniStatusRequest, v1alpha1.RefreshPayUniStatusResponse](
-			httpClient,
-			baseURL+SellerAdminServiceRefreshPayUniStatusProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("RefreshPayUniStatus")),
-			connect.WithClientOptions(opts...),
-		),
 		requeryKYCRegistration: connect.NewClient[v1alpha1.RequeryKYCRegistrationRequest, v1alpha1.RequeryKYCRegistrationResponse](
 			httpClient,
 			baseURL+SellerAdminServiceRequeryKYCRegistrationProcedure,
@@ -289,10 +238,6 @@ type sellerAdminServiceClient struct {
 	approveKYC              *connect.Client[v1alpha1.ApproveKYCRequest, v1alpha1.ApproveKYCResponse]
 	rejectKYC               *connect.Client[v1alpha1.RejectKYCRequest, v1alpha1.RejectKYCResponse]
 	revealKYCSensitive      *connect.Client[v1alpha1.RevealKYCSensitiveRequest, v1alpha1.RevealKYCSensitiveResponse]
-	getPayUniRegistration   *connect.Client[v1alpha1.GetPayUniRegistrationRequest, v1alpha1.GetPayUniRegistrationResponse]
-	rebindPayUni            *connect.Client[v1alpha1.RebindPayUniRequest, v1alpha1.RebindPayUniResponse]
-	listPayUniObservations  *connect.Client[v1alpha1.ListPayUniObservationsRequest, v1alpha1.ListPayUniObservationsResponse]
-	refreshPayUniStatus     *connect.Client[v1alpha1.RefreshPayUniStatusRequest, v1alpha1.RefreshPayUniStatusResponse]
 	requeryKYCRegistration  *connect.Client[v1alpha1.RequeryKYCRegistrationRequest, v1alpha1.RequeryKYCRegistrationResponse]
 }
 
@@ -352,27 +297,6 @@ func (c *sellerAdminServiceClient) RevealKYCSensitive(ctx context.Context, req *
 	return c.revealKYCSensitive.CallUnary(ctx, req)
 }
 
-// GetPayUniRegistration calls hawkr.admin.seller.v1alpha1.SellerAdminService.GetPayUniRegistration.
-func (c *sellerAdminServiceClient) GetPayUniRegistration(ctx context.Context, req *connect.Request[v1alpha1.GetPayUniRegistrationRequest]) (*connect.Response[v1alpha1.GetPayUniRegistrationResponse], error) {
-	return c.getPayUniRegistration.CallUnary(ctx, req)
-}
-
-// RebindPayUni calls hawkr.admin.seller.v1alpha1.SellerAdminService.RebindPayUni.
-func (c *sellerAdminServiceClient) RebindPayUni(ctx context.Context, req *connect.Request[v1alpha1.RebindPayUniRequest]) (*connect.Response[v1alpha1.RebindPayUniResponse], error) {
-	return c.rebindPayUni.CallUnary(ctx, req)
-}
-
-// ListPayUniObservations calls
-// hawkr.admin.seller.v1alpha1.SellerAdminService.ListPayUniObservations.
-func (c *sellerAdminServiceClient) ListPayUniObservations(ctx context.Context, req *connect.Request[v1alpha1.ListPayUniObservationsRequest]) (*connect.Response[v1alpha1.ListPayUniObservationsResponse], error) {
-	return c.listPayUniObservations.CallUnary(ctx, req)
-}
-
-// RefreshPayUniStatus calls hawkr.admin.seller.v1alpha1.SellerAdminService.RefreshPayUniStatus.
-func (c *sellerAdminServiceClient) RefreshPayUniStatus(ctx context.Context, req *connect.Request[v1alpha1.RefreshPayUniStatusRequest]) (*connect.Response[v1alpha1.RefreshPayUniStatusResponse], error) {
-	return c.refreshPayUniStatus.CallUnary(ctx, req)
-}
-
 // RequeryKYCRegistration calls
 // hawkr.admin.seller.v1alpha1.SellerAdminService.RequeryKYCRegistration.
 func (c *sellerAdminServiceClient) RequeryKYCRegistration(ctx context.Context, req *connect.Request[v1alpha1.RequeryKYCRegistrationRequest]) (*connect.Response[v1alpha1.RequeryKYCRegistrationResponse], error) {
@@ -420,19 +344,6 @@ type SellerAdminServiceHandler interface {
 	// 理由、授權到期的時間，不含值），所以是 POST，不是讀取；稽核寫入失敗就不回傳明文。回應不可快取。到期之後、或別的
 	// 管理員讀證件圖片都是 403，要再看就再顯示一次（再寫一列稽核）。
 	RevealKYCSensitive(context.Context, *connect.Request[v1alpha1.RevealKYCSensitiveRequest]) (*connect.Response[v1alpha1.RevealKYCSensitiveResponse], error)
-	// GetPayUniRegistration 讀店家的 PayUni 子商店註冊（綁定意圖、PayUni 的審核狀態碼與要處理的問題）。店家還沒有核准過
-	// 申請時 not_found。
-	GetPayUniRegistration(context.Context, *connect.Request[v1alpha1.GetPayUniRegistrationRequest]) (*connect.Response[v1alpha1.GetPayUniRegistrationResponse], error)
-	// RebindPayUni 對綁定失敗的註冊重新綁定（回到 PENDING 並排入新的背景工作），留下一筆審核紀錄。沒有 etag，由狀態檢查保護：
-	// 只有綁定失敗的能重綁。已經在重新綁定（PAYUNI_BIND_IN_PROGRESS）時呼叫不回錯誤、回傳目前的註冊（重送安全）；其餘原因回
-	// failed_precondition，訊息是 PayUniRegistration.rebind_unavailabilities 的第一句：PayUni 端已是終止狀態、店家已關閉或等待刪除、
-	// 已綁定、註冊所根據的申請不是已核准（例如賣家正在修改）。
-	RebindPayUni(context.Context, *connect.Request[v1alpha1.RebindPayUniRequest]) (*connect.Response[v1alpha1.RebindPayUniResponse], error)
-	// ListPayUniObservations 列出店家的 PayUni 狀態觀測紀錄（webhook、輪詢、手動刷新與綁定），依 PayUni 的事件時間新到舊。
-	ListPayUniObservations(context.Context, *connect.Request[v1alpha1.ListPayUniObservationsRequest]) (*connect.Response[v1alpha1.ListPayUniObservationsResponse], error)
-	// RefreshPayUniStatus 排入一次向 PayUni 查詢審核狀態的背景工作（營運工具；回應不等結果，結果從 GetPayUniRegistration
-	// 與 ListPayUniObservations 看）。PayUni 沒有設定、註冊還沒有綁定時回 failed_precondition。
-	RefreshPayUniStatus(context.Context, *connect.Request[v1alpha1.RefreshPayUniStatusRequest]) (*connect.Response[v1alpha1.RefreshPayUniStatusResponse], error)
 	// RequeryKYCRegistration 對審核中（SUBMITTED）的公司型申請重新查一次經濟部商業司的登記資料（送件時已查過一次，這是
 	// 手動補查：例如當時來源不可用或查無）。回應不等結果：排入背景工作，回傳這筆進行中的查詢（含期限），結果從 GetKYCApplication 的
 	// registration_check 看（查詢中時 pending_registration_check 有值）。伺服器保證這筆查詢在 deadline_time 之前到終態（查到、查無或
@@ -523,32 +434,6 @@ func NewSellerAdminServiceHandler(svc SellerAdminServiceHandler, opts ...connect
 		connect.WithSchema(sellerAdminServiceMethods.ByName("RevealKYCSensitive")),
 		connect.WithHandlerOptions(opts...),
 	)
-	sellerAdminServiceGetPayUniRegistrationHandler := connect.NewUnaryHandler(
-		SellerAdminServiceGetPayUniRegistrationProcedure,
-		svc.GetPayUniRegistration,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("GetPayUniRegistration")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerAdminServiceRebindPayUniHandler := connect.NewUnaryHandler(
-		SellerAdminServiceRebindPayUniProcedure,
-		svc.RebindPayUni,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("RebindPayUni")),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerAdminServiceListPayUniObservationsHandler := connect.NewUnaryHandler(
-		SellerAdminServiceListPayUniObservationsProcedure,
-		svc.ListPayUniObservations,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("ListPayUniObservations")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerAdminServiceRefreshPayUniStatusHandler := connect.NewUnaryHandler(
-		SellerAdminServiceRefreshPayUniStatusProcedure,
-		svc.RefreshPayUniStatus,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("RefreshPayUniStatus")),
-		connect.WithHandlerOptions(opts...),
-	)
 	sellerAdminServiceRequeryKYCRegistrationHandler := connect.NewUnaryHandler(
 		SellerAdminServiceRequeryKYCRegistrationProcedure,
 		svc.RequeryKYCRegistration,
@@ -579,14 +464,6 @@ func NewSellerAdminServiceHandler(svc SellerAdminServiceHandler, opts ...connect
 			sellerAdminServiceRejectKYCHandler.ServeHTTP(w, r)
 		case SellerAdminServiceRevealKYCSensitiveProcedure:
 			sellerAdminServiceRevealKYCSensitiveHandler.ServeHTTP(w, r)
-		case SellerAdminServiceGetPayUniRegistrationProcedure:
-			sellerAdminServiceGetPayUniRegistrationHandler.ServeHTTP(w, r)
-		case SellerAdminServiceRebindPayUniProcedure:
-			sellerAdminServiceRebindPayUniHandler.ServeHTTP(w, r)
-		case SellerAdminServiceListPayUniObservationsProcedure:
-			sellerAdminServiceListPayUniObservationsHandler.ServeHTTP(w, r)
-		case SellerAdminServiceRefreshPayUniStatusProcedure:
-			sellerAdminServiceRefreshPayUniStatusHandler.ServeHTTP(w, r)
 		case SellerAdminServiceRequeryKYCRegistrationProcedure:
 			sellerAdminServiceRequeryKYCRegistrationHandler.ServeHTTP(w, r)
 		default:
@@ -640,22 +517,6 @@ func (UnimplementedSellerAdminServiceHandler) RejectKYC(context.Context, *connec
 
 func (UnimplementedSellerAdminServiceHandler) RevealKYCSensitive(context.Context, *connect.Request[v1alpha1.RevealKYCSensitiveRequest]) (*connect.Response[v1alpha1.RevealKYCSensitiveResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.RevealKYCSensitive is not implemented"))
-}
-
-func (UnimplementedSellerAdminServiceHandler) GetPayUniRegistration(context.Context, *connect.Request[v1alpha1.GetPayUniRegistrationRequest]) (*connect.Response[v1alpha1.GetPayUniRegistrationResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.GetPayUniRegistration is not implemented"))
-}
-
-func (UnimplementedSellerAdminServiceHandler) RebindPayUni(context.Context, *connect.Request[v1alpha1.RebindPayUniRequest]) (*connect.Response[v1alpha1.RebindPayUniResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.RebindPayUni is not implemented"))
-}
-
-func (UnimplementedSellerAdminServiceHandler) ListPayUniObservations(context.Context, *connect.Request[v1alpha1.ListPayUniObservationsRequest]) (*connect.Response[v1alpha1.ListPayUniObservationsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.ListPayUniObservations is not implemented"))
-}
-
-func (UnimplementedSellerAdminServiceHandler) RefreshPayUniStatus(context.Context, *connect.Request[v1alpha1.RefreshPayUniStatusRequest]) (*connect.Response[v1alpha1.RefreshPayUniStatusResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.RefreshPayUniStatus is not implemented"))
 }
 
 func (UnimplementedSellerAdminServiceHandler) RequeryKYCRegistration(context.Context, *connect.Request[v1alpha1.RequeryKYCRegistrationRequest]) (*connect.Response[v1alpha1.RequeryKYCRegistrationResponse], error) {

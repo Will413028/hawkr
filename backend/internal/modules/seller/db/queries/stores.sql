@@ -210,13 +210,6 @@ WHERE st.status = ANY(sqlc.arg(statuses)::text[])
     EXISTS (SELECT 1 FROM seller.review_kyc_application(sqlc.arg(now)::timestamptz) r WHERE r.store_id = st.store_id)
   )
   AND (
-    sqlc.narg(bind_status)::text IS NULL OR
-    EXISTS (
-      SELECT 1 FROM seller.payuni_registrations r
-      WHERE r.store_id = st.store_id AND r.bind_status = sqlc.narg(bind_status)::text
-    )
-  )
-  AND (
     sqlc.narg(suspended)::bool IS NULL OR
     (st.account_id = ANY(sqlc.arg(suspended_accounts)::bigint[])) = sqlc.narg(suspended)::bool
   )

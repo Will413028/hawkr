@@ -410,11 +410,11 @@ func TestRevealGrantsTimeBoxedDocumentAccess(t *testing.T) {
 }
 
 // 新的後台方法都只有管理員能呼叫：沒登入是 unauthenticated，買家是 permission_denied，什麼都不會被寫入。
-func TestAdminKYCAndPayUniMethodsRejectCustomersAndVisitorsAndWriteNothing(t *testing.T) {
+func TestAdminKYCMethodsRejectCustomersAndVisitorsAndWriteNothing(t *testing.T) {
 	t.Parallel()
 	f := setupAdmin(t)
 	ctx := context.Background()
-	_, s, app := f.submittedKYC(t, "甲店", kycTestID, kycTestBank)
+	_, _, app := f.submittedKYC(t, "甲店", kycTestID, kycTestBank)
 	for name, c := range map[string]adminSellerClient{"customer": f.customer, "visitor": f.anonymous} {
 		want := connect.CodePermissionDenied
 		if name == "visitor" {
@@ -449,22 +449,6 @@ func TestAdminKYCAndPayUniMethodsRejectCustomersAndVisitorsAndWriteNothing(t *te
 				_, err := c.RevealKYCSensitive(ctx, connect.NewRequest(&adminsellerpb.RevealKYCSensitiveRequest{Id: app.ID.String(), Reason: "越權"}))
 				return err
 			},
-			"GetPayUniRegistration": func() error {
-				_, err := c.GetPayUniRegistration(ctx, connect.NewRequest(&adminsellerpb.GetPayUniRegistrationRequest{StoreId: sid(s.StoreID)}))
-				return err
-			},
-			"RebindPayUni": func() error {
-				_, err := c.RebindPayUni(ctx, connect.NewRequest(&adminsellerpb.RebindPayUniRequest{StoreId: sid(s.StoreID)}))
-				return err
-			},
-			"ListPayUniObservations": func() error {
-				_, err := c.ListPayUniObservations(ctx, connect.NewRequest(&adminsellerpb.ListPayUniObservationsRequest{StoreId: sid(s.StoreID)}))
-				return err
-			},
-			"RefreshPayUniStatus": func() error {
-				_, err := c.RefreshPayUniStatus(ctx, connect.NewRequest(&adminsellerpb.RefreshPayUniStatusRequest{StoreId: sid(s.StoreID)}))
-				return err
-			},
 			"RequeryKYCRegistration": func() error {
 				_, err := c.RequeryKYCRegistration(ctx, connect.NewRequest(&adminsellerpb.RequeryKYCRegistrationRequest{Id: app.ID.String()}))
 				return err
@@ -493,112 +477,8 @@ type adminSellerClient interface {
 	ApproveKYC(context.Context, *connect.Request[adminsellerpb.ApproveKYCRequest]) (*connect.Response[adminsellerpb.ApproveKYCResponse], error)
 	RejectKYC(context.Context, *connect.Request[adminsellerpb.RejectKYCRequest]) (*connect.Response[adminsellerpb.RejectKYCResponse], error)
 	RevealKYCSensitive(context.Context, *connect.Request[adminsellerpb.RevealKYCSensitiveRequest]) (*connect.Response[adminsellerpb.RevealKYCSensitiveResponse], error)
-	GetPayUniRegistration(context.Context, *connect.Request[adminsellerpb.GetPayUniRegistrationRequest]) (*connect.Response[adminsellerpb.GetPayUniRegistrationResponse], error)
-	RebindPayUni(context.Context, *connect.Request[adminsellerpb.RebindPayUniRequest]) (*connect.Response[adminsellerpb.RebindPayUniResponse], error)
-	ListPayUniObservations(context.Context, *connect.Request[adminsellerpb.ListPayUniObservationsRequest]) (*connect.Response[adminsellerpb.ListPayUniObservationsResponse], error)
-	RefreshPayUniStatus(context.Context, *connect.Request[adminsellerpb.RefreshPayUniStatusRequest]) (*connect.Response[adminsellerpb.RefreshPayUniStatusResponse], error)
 	RequeryKYCRegistration(context.Context, *connect.Request[adminsellerpb.RequeryKYCRegistrationRequest]) (*connect.Response[adminsellerpb.RequeryKYCRegistrationResponse], error)
 }
-
-// PayUni：沒有核准過的店家沒有註冊；核准之後綁定失敗（這個環境沒有設定 PayUni）才能重新綁定，重送是冪等的，回傳的註冊與
-// 讀取一致（帶賣家型態）；觀測紀錄分頁、先檢查店家存在。
-func TestAdminPayUniMethodsOverConnect(t *testing.T) {
-	t.Parallel()
-	f := setupAdmin(t)
-	ctx := context.Background()
-	_, s, app := f.submittedKYC(t, "甲店", kycTestID, kycTestBank)
-	_, err := f.admin.GetPayUniRegistration(ctx, connect.NewRequest(&adminsellerpb.GetPayUniRegistrationRequest{StoreId: sid(s.StoreID)}))
-	wantCode(t, err, connect.CodeNotFound, "")
-	_, err = f.admin.RebindPayUni(ctx, connect.NewRequest(&adminsellerpb.RebindPayUniRequest{StoreId: sid(s.StoreID)}))
-	wantCode(t, err, connect.CodeNotFound, "")
-	_, err = f.admin.GetPayUniRegistration(ctx, connect.NewRequest(&adminsellerpb.GetPayUniRegistrationRequest{StoreId: "987654"}))
-	wantCode(t, err, connect.CodeNotFound, "")
-	_, err = f.admin.ListPayUniObservations(ctx, connect.NewRequest(&adminsellerpb.ListPayUniObservationsRequest{StoreId: "987654"}))
-	wantCode(t, err, connect.CodeNotFound, "")
-	_, err = f.admin.GetPayUniRegistration(ctx, connect.NewRequest(&adminsellerpb.GetPayUniRegistrationRequest{StoreId: "x"}))
-	wantCode(t, err, connect.CodeInvalidArgument, "")
-
-	if _, err := f.admin.ApproveKYC(ctx, connect.NewRequest(&adminsellerpb.ApproveKYCRequest{Id: app.ID.String(), Etag: rpcEtag(app.Version)})); err != nil {
-		t.Fatal(err)
-	}
-	pending, err := f.admin.GetPayUniRegistration(ctx, connect.NewRequest(&adminsellerpb.GetPayUniRegistrationRequest{StoreId: sid(s.StoreID)}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if reg := pending.Msg.GetRegistration(); reg.GetBindStatus() != pb.PayUniBindStatus_PAY_UNI_BIND_STATUS_PENDING || reg.GetMerId() == "" || reg.GetApplicationId() != app.ID.String() || reg.GetStoreId() != sid(s.StoreID) {
-		t.Fatalf("registration=%+v", reg)
-	}
-	// PENDING 時重新綁定是冪等的（回傳目前的註冊）。
-	same, err := f.admin.RebindPayUni(ctx, connect.NewRequest(&adminsellerpb.RebindPayUniRequest{StoreId: sid(s.StoreID)}))
-	if err != nil || same.Msg.GetRegistration().GetBindStatus() != pb.PayUniBindStatus_PAY_UNI_BIND_STATUS_PENDING {
-		t.Fatalf("same=%+v err=%v", same, err)
-	}
-	// 沒有設定 PayUni：背景工作把綁定記成失敗，這時才能重新綁定；重新綁定留下審核紀錄（誰）。
-	if _, err := f.module.SyncPayUni(ctx, s.StoreID, false); err != nil {
-		t.Fatal(err)
-	}
-	failed, err := f.admin.GetPayUniRegistration(ctx, connect.NewRequest(&adminsellerpb.GetPayUniRegistrationRequest{StoreId: sid(s.StoreID)}))
-	if err != nil || failed.Msg.GetRegistration().GetBindStatus() != pb.PayUniBindStatus_PAY_UNI_BIND_STATUS_FAILED || failed.Msg.GetRegistration().GetBindErrorCode() != seller.PayUniErrNotConfigured ||
-		failed.Msg.GetRegistration().GetBindAttempts() != 1 || failed.Msg.GetRegistration().GetProblem().GetCode() != seller.PayUniErrNotConfigured {
-		t.Fatalf("failed=%+v err=%v", failed, err)
-	}
-	rebound, err := f.admin.RebindPayUni(ctx, connect.NewRequest(&adminsellerpb.RebindPayUniRequest{StoreId: sid(s.StoreID)}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if reg := rebound.Msg.GetRegistration(); reg.GetBindStatus() != pb.PayUniBindStatus_PAY_UNI_BIND_STATUS_PENDING || reg.GetBindErrorCode() != "" {
-		t.Fatalf("rebound=%+v", reg)
-	}
-	view := f.getKYC(t, app.ID.String())
-	last := view.GetReviews()[len(view.GetReviews())-1]
-	if last.GetAction() != adminsellerpb.KYCReviewAction_KYC_REVIEW_ACTION_REBIND || last.GetReviewerAdminId() != sid(f.adminID) {
-		t.Fatalf("reviews=%+v", view.GetReviews())
-	}
-	// 沒有設定 PayUni 的刷新是 failed_precondition。
-	_, err = f.admin.RefreshPayUniStatus(ctx, connect.NewRequest(&adminsellerpb.RefreshPayUniStatusRequest{StoreId: sid(s.StoreID)}))
-	wantCode(t, err, connect.CodeFailedPrecondition, "")
-
-	// 觀測紀錄：新到舊，一頁一筆走完不漏不重，換店的 token 不能用。
-	mer := seller.FormatPayUniMerID(s.StoreCode)
-	base := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
-	for i := range 3 {
-		if err := f.module.ApplyPayUniNotification(ctx, seller.PayUniObserveArgs{EventKey: mer + ":" + string(rune('a'+i)), MerID: mer, MerStatus: "9", ExecutedAt: base.Add(time.Duration(i) * time.Minute)}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	var got []*adminsellerpb.PayUniObservation
-	token := ""
-	for range 10 {
-		resp, err := f.admin.ListPayUniObservations(ctx, connect.NewRequest(&adminsellerpb.ListPayUniObservationsRequest{StoreId: sid(s.StoreID), PageSize: 1, PageToken: token}))
-		if err != nil {
-			t.Fatal(err)
-		}
-		got = append(got, resp.Msg.GetObservations()...)
-		if token = resp.Msg.GetNextPageToken(); token == "" {
-			break
-		}
-	}
-	if len(got) < 3 {
-		t.Fatalf("observations=%d", len(got))
-	}
-	for i := 1; i < len(got); i++ {
-		if got[i-1].GetExecuteTime().AsTime().Before(got[i].GetExecuteTime().AsTime()) {
-			t.Fatalf("不是新到舊：%v", got)
-		}
-	}
-	if got[0].GetSource() != adminsellerpb.PayUniObservationSource_PAY_UNI_OBSERVATION_SOURCE_WEBHOOK || got[0].GetStatusCodes().GetMerStatus() != "9" {
-		t.Fatalf("first=%+v", got[0])
-	}
-	_, s2 := f.newSeller(t, "別家")
-	first, err := f.admin.ListPayUniObservations(ctx, connect.NewRequest(&adminsellerpb.ListPayUniObservationsRequest{StoreId: sid(s.StoreID), PageSize: 1}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = f.admin.ListPayUniObservations(ctx, connect.NewRequest(&adminsellerpb.ListPayUniObservationsRequest{StoreId: sid(s2.StoreID), PageToken: first.Msg.GetNextPageToken()}))
-	wantCode(t, err, connect.CodeInvalidArgument, "")
-}
-
-func rpcEtag(version int64) string { return sid(version) + ".0" }
 
 func protoText(t *testing.T, m proto.Message) string {
 	t.Helper()

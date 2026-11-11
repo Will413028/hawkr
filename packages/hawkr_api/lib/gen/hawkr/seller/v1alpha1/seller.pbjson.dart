@@ -378,23 +378,6 @@ final $typed_data.Uint8List kYCFlowStatusDescriptor = $convert.base64Decode(
     'GEtZQ19GTE9XX1NUQVRVU19BUFBST1ZFRBAKEiMKH0tZQ19GTE9XX1NUQVRVU19QQVlVTklfUk'
     'VKRUNURUQQCw==');
 
-@$core.Deprecated('Use payUniBindStatusDescriptor instead')
-const PayUniBindStatus$json = {
-  '1': 'PayUniBindStatus',
-  '2': [
-    {'1': 'PAY_UNI_BIND_STATUS_UNSPECIFIED', '2': 0},
-    {'1': 'PAY_UNI_BIND_STATUS_PENDING', '2': 1},
-    {'1': 'PAY_UNI_BIND_STATUS_BOUND', '2': 2},
-    {'1': 'PAY_UNI_BIND_STATUS_FAILED', '2': 3},
-  ],
-};
-
-/// Descriptor for `PayUniBindStatus`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List payUniBindStatusDescriptor = $convert.base64Decode(
-    'ChBQYXlVbmlCaW5kU3RhdHVzEiMKH1BBWV9VTklfQklORF9TVEFUVVNfVU5TUEVDSUZJRUQQAB'
-    'IfChtQQVlfVU5JX0JJTkRfU1RBVFVTX1BFTkRJTkcQARIdChlQQVlfVU5JX0JJTkRfU1RBVFVT'
-    'X0JPVU5EEAISHgoaUEFZX1VOSV9CSU5EX1NUQVRVU19GQUlMRUQQAw==');
-
 @$core.Deprecated('Use payUniStateDescriptor instead')
 const PayUniState$json = {
   '1': 'PayUniState',

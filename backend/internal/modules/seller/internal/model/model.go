@@ -275,8 +275,6 @@ type StoreListInput struct {
 	KYCAwaitingReview bool
 	// AccountID 只列這個帳號的店家（完全相符；含已關閉的要在 Statuses 明列）。
 	AccountID *int64
-	// PayUniBindStatus 是 PayUni 註冊的綁定狀態（儲存的事實）。
-	PayUniBindStatus *PayUniBindStatus
 	// Suspended 為 true 只列帳號此刻停權中的店家，false 只列沒有停權的，nil 不篩選；「停權中」就是 stint.Derive 的那個定義。
 	Suspended *bool
 	PageSize  int32

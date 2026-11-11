@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// seller 模組給後台的 API：店家的清單與統計、身分認證（KYC）的審核與 PayUni 子商店。停權是措施
+// seller 模組給後台的 API：店家的清單與統計、身分認證（KYC）的審核。停權是措施
 // （警告與停權），建立、結束與撤銷在 hawkr.admin.seller.v1alpha1 的 SellerGovernanceAdminService。
 // 前台的 API 在 hawkr.seller.v1alpha1。
 // 後台刪整個帳號在 hawkr.admin.identity.v1alpha1 的 DeleteAccount。
@@ -88,27 +88,6 @@ service SellerAdminService {
   // 管理員讀證件圖片都是 403，要再看就再顯示一次（再寫一列稽核）。
   rpc RevealKYCSensitive(RevealKYCSensitiveRequest) returns (RevealKYCSensitiveResponse);
 
-  // GetPayUniRegistration 讀店家的 PayUni 子商店註冊（綁定意圖、PayUni 的審核狀態碼與要處理的問題）。店家還沒有核准過
-  // 申請時 not_found。
-  rpc GetPayUniRegistration(GetPayUniRegistrationRequest) returns (GetPayUniRegistrationResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-
-  // RebindPayUni 對綁定失敗的註冊重新綁定（回到 PENDING 並排入新的背景工作），留下一筆審核紀錄。沒有 etag，由狀態檢查保護：
-  // 只有綁定失敗的能重綁。已經在重新綁定（PAYUNI_BIND_IN_PROGRESS）時呼叫不回錯誤、回傳目前的註冊（重送安全）；其餘原因回
-  // failed_precondition，訊息是 PayUniRegistration.rebind_unavailabilities 的第一句：PayUni 端已是終止狀態、店家已關閉或等待刪除、
-  // 已綁定、註冊所根據的申請不是已核准（例如賣家正在修改）。
-  rpc RebindPayUni(RebindPayUniRequest) returns (RebindPayUniResponse);
-
-  // ListPayUniObservations 列出店家的 PayUni 狀態觀測紀錄（webhook、輪詢、手動刷新與綁定），依 PayUni 的事件時間新到舊。
-  rpc ListPayUniObservations(ListPayUniObservationsRequest) returns (ListPayUniObservationsResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-
-  // RefreshPayUniStatus 排入一次向 PayUni 查詢審核狀態的背景工作（營運工具；回應不等結果，結果從 GetPayUniRegistration
-  // 與 ListPayUniObservations 看）。PayUni 沒有設定、註冊還沒有綁定時回 failed_precondition。
-  rpc RefreshPayUniStatus(RefreshPayUniStatusRequest) returns (RefreshPayUniStatusResponse);
-
   // RequeryKYCRegistration 對審核中（SUBMITTED）的公司型申請重新查一次經濟部商業司的登記資料（送件時已查過一次，這是
   // 手動補查：例如當時來源不可用或查無）。回應不等結果：排入背景工作，回傳這筆進行中的查詢（含期限），結果從 GetKYCApplication 的
   // registration_check 看（查詢中時 pending_registration_check 有值）。伺服器保證這筆查詢在 deadline_time 之前到終態（查到、查無或
@@ -118,10 +97,10 @@ service SellerAdminService {
   rpc RequeryKYCRegistration(RequeryKYCRegistrationRequest) returns (RequeryKYCRegistrationResponse);
 }
 
-// StoreActionUnavailableReason 是 admin 此刻不能對店家（或它的帳號、商家認證申請、PayUni 註冊）做某個動作的原因
+// StoreActionUnavailableReason 是 admin 此刻不能對店家（或它的帳號、商家認證申請）做某個動作的原因
 // （StoreActionUnavailability.reason）。每個動作只會出現它相關的原因，依該動作的先後排列，與對應方法的前置檢查是同一個規則
 // （model/store_action.go 的有效組合表）。client 用它分支，不用它組顯示文字。分支規則：依先後，第一個是下面標明「表示沒有入口」的值
-// （KYC_NOT_SUBMITTED、KYC_NOT_BUSINESS、PAYUNI_BIND_IN_PROGRESS、PAYUNI_BOUND）時，畫面不顯示這個動作的
+// （KYC_NOT_SUBMITTED、KYC_NOT_BUSINESS）時，畫面不顯示這個動作的
 // 入口，也不顯示句子；其餘的值顯示 message。新增值時要在它的註解寫明是否表示沒有入口。
 enum StoreActionUnavailableReason {
   STORE_ACTION_UNAVAILABLE_REASON_UNSPECIFIED = 0;
@@ -129,14 +108,6 @@ enum StoreActionUnavailableReason {
   STORE_ACTION_UNAVAILABLE_REASON_KYC_NOT_SUBMITTED = 1;
   // 不是公司型的申請，沒有登記資料可以查詢。表示沒有入口。
   STORE_ACTION_UNAVAILABLE_REASON_KYC_NOT_BUSINESS = 2;
-  // PayUni 端的商店已是終止狀態（needs_reonboarding）。
-  STORE_ACTION_UNAVAILABLE_REASON_PAYUNI_MERCHANT_TERMINAL = 3;
-  // PayUni 註冊正在綁定（PENDING）。表示沒有入口；不是失敗原因、沒有 message：RebindPayUni 此時不回錯誤，回目前的註冊（重送安全）。
-  STORE_ACTION_UNAVAILABLE_REASON_PAYUNI_BIND_IN_PROGRESS = 4;
-  // PayUni 註冊已綁定（BOUND）。表示沒有入口。
-  STORE_ACTION_UNAVAILABLE_REASON_PAYUNI_BOUND = 5;
-  // 重新綁定 PayUni 時，註冊所根據的申請不是已核准（例如賣家正在修改）。
-  STORE_ACTION_UNAVAILABLE_REASON_KYC_NOT_APPROVED = 7;
   // 店家已關閉。
   STORE_ACTION_UNAVAILABLE_REASON_STORE_CLOSED = 8;
   // 店家等待刪除（帳號刪除在等未完成的訂單）。
@@ -144,15 +115,17 @@ enum StoreActionUnavailableReason {
   // 帳號有生效中的停權措施。
   STORE_ACTION_UNAVAILABLE_REASON_ACCOUNT_SUSPENDED = 10;
 
-  reserved 6;
-  reserved "STORE_ACTION_UNAVAILABLE_REASON_FOOD_REGISTRATION_NOT_PENDING";
+  reserved 3, 4, 5, 6, 7;
+  reserved "STORE_ACTION_UNAVAILABLE_REASON_PAYUNI_MERCHANT_TERMINAL", "STORE_ACTION_UNAVAILABLE_REASON_PAYUNI_BIND_IN_PROGRESS",
+      "STORE_ACTION_UNAVAILABLE_REASON_PAYUNI_BOUND", "STORE_ACTION_UNAVAILABLE_REASON_FOOD_REGISTRATION_NOT_PENDING",
+      "STORE_ACTION_UNAVAILABLE_REASON_KYC_NOT_APPROVED";
 }
 
 // StoreActionUnavailability 是此刻不能做某個動作的一個原因；message 與該方法被拒絕時錯誤的 LocalizedMessage 是同一句（同一個 Go 函式）。
 message StoreActionUnavailability {
   StoreActionUnavailableReason reason = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 給員工看的完整一句話（admin RPC 固定 zh-TW，以「。」結尾），有主詞、不含 client 的畫面名稱；client 直接顯示、不加標點，
-  // 沒有 message 時才顯示通用文字。PAYUNI_BIND_IN_PROGRESS 沒有 message（不是失敗原因）。
+  // 沒有 message 時才顯示通用文字。
   google.rpc.LocalizedMessage message = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
@@ -248,6 +221,9 @@ message KYCSummary {
 }
 
 message ListStoresRequest {
+  reserved 7;
+  reserved "payuni_bind_status";
+
   // 每頁筆數：0 用預設值 20，上限 100。
   int32 page_size = 1;
   string page_token = 2;
@@ -261,8 +237,6 @@ message ListStoresRequest {
   // 只列這個帳號的店家（完全相符，用 IdentityAdminService.ListAccounts 找到帳號之後接過來）；空字串不篩選。已關閉的店
   // 要在 status 明列。
   string account_id = 6;
-  // 只列 PayUni 註冊的綁定狀態是這個值的店家（例如 FAILED 是等管理員重新綁定的）；UNSPECIFIED 不篩選。
-  hawkr.seller.v1alpha1.PayUniBindStatus payuni_bind_status = 7;
   // true 只列帳號此刻停權中的店家（有生效中的措施），false 只列沒有停權的；沒有設定不篩選。
   optional bool suspended = 8;
   // true 只列商家認證申請在後台待辦裡的店家：審核中、店家營運中、帳號沒有停權，與後台待辦、GetStoreStatsResponse.kyc_awaiting_review_stores
@@ -351,17 +325,8 @@ enum KYCReviewAction {
   KYC_REVIEW_ACTION_REJECT = 3;
   // 賣家取消。
   KYC_REVIEW_ACTION_CANCEL = 4;
-  // 管理員對這份申請的 PayUni 註冊重新綁定。
-  KYC_REVIEW_ACTION_REBIND = 5;
-}
-
-// PayUniObservationSource 是一筆 PayUni 狀態觀測的來源。
-enum PayUniObservationSource {
-  PAY_UNI_OBSERVATION_SOURCE_UNSPECIFIED = 0;
-  PAY_UNI_OBSERVATION_SOURCE_WEBHOOK = 1;
-  PAY_UNI_OBSERVATION_SOURCE_POLL = 2;
-  PAY_UNI_OBSERVATION_SOURCE_REFRESH = 3;
-  PAY_UNI_OBSERVATION_SOURCE_BIND = 4;
+  reserved 5;
+  reserved "KYC_REVIEW_ACTION_REBIND";
 }
 
 // KYCDocument 是申請上的一張證件或文件：只有位置，沒有圖片的 ID 與下載網址。後台要看圖片時先 RevealKYCSensitive（理由必填、
@@ -719,100 +684,6 @@ message RevealKYCSensitiveResponse {
   google.protobuf.Timestamp expire_time = 4;
   repeated KYCDocumentView documents = 5;
 }
-
-// PayUniStatusCodes 是 PayUni 回報的狀態原碼。沒有回報的碼是空字串。
-message PayUniStatusCodes {
-  string mer_status = 1;
-  string member_status = 2;
-  string credit_status = 3;
-  string apple_pay_status = 4;
-  string google_pay_status = 5;
-  string atm_status = 6;
-  // PayUni 的審核意見。
-  string reason = 7;
-}
-
-// PayUniRegistration 是後台看到的店家 PayUni 子商店註冊。
-message PayUniRegistration {
-  reserved 9, 13, 14, 17, 18, 19, 20, 21;
-  reserved "outcome", "payment_enabled", "needs_reonboarding", "contact_name", "contact_mobile", "contact_tel", "mer_email", "mer_tel";
-
-  string store_id = 1;
-  // PayUni 的商店代號。
-  string mer_id = 2;
-  // 註冊所根據的申請。
-  string application_id = 3;
-  hawkr.seller.v1alpha1.PayUniBindStatus bind_status = 4;
-  string bind_error_code = 5;
-  int32 bind_attempts = 6;
-  google.protobuf.Timestamp bind_time = 7;
-  // PayUni 目前回報的狀態原碼。
-  PayUniStatusCodes status_codes = 8;
-  // 目前狀態的事件時間；還沒有狀態時不設。
-  google.protobuf.Timestamp status_time = 10;
-  // 最近一次向 PayUni 查詢的時間；沒查過時不設。
-  google.protobuf.Timestamp check_time = 11;
-  // 要處理的問題；沒有時不設。
-  hawkr.seller.v1alpha1.PayUniProblem problem = 12;
-  bool sync_pending = 15;
-  string sync_error_code = 16;
-  google.protobuf.Timestamp create_time = 22;
-  google.protobuf.Timestamp update_time = 23;
-  // 此刻呼叫 RebindPayUni 會開始一次新的綁定。等於 rebind_unavailabilities 是空的。
-  bool can_rebind = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 不能重新綁定的原因，依先後。第一個是 PAYUNI_BIND_IN_PROGRESS 時 RebindPayUni 不回錯誤、回目前的註冊（重送安全）；其餘原因被拒絕時
-  // 訊息是第一句。
-  repeated StoreActionUnavailability rebind_unavailabilities = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 這筆註冊所在的 PayUni 階段：BINDING、BIND_FAILED、FORWARDED、UNDER_REVIEW、PENDING_INFO、APPROVED、PAYUNI_REJECTED 之一，與 KYCFlow 在申請已核准時
-  // 的推導同一個函式；client 用它顯示徽章，不從 bind_status、status_codes 推導。
-  hawkr.seller.v1alpha1.KYCFlowStatus flow_status = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-message GetPayUniRegistrationRequest {
-  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
-}
-
-message GetPayUniRegistrationResponse {
-  PayUniRegistration registration = 1;
-}
-
-message RebindPayUniRequest {
-  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
-}
-
-message RebindPayUniResponse {
-  PayUniRegistration registration = 1;
-}
-
-// PayUniObservation 是一筆 PayUni 狀態的觀測。
-message PayUniObservation {
-  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
-  PayUniObservationSource source = 2;
-  // webhook 的冪等鍵；其他來源是空字串。
-  string event_key = 3;
-  PayUniStatusCodes status_codes = 4;
-  // PayUni 的事件時間（webhook 是 ExecuteTime，其他是收到回應的時間）。
-  google.protobuf.Timestamp execute_time = 5;
-  google.protobuf.Timestamp receive_time = 6;
-}
-
-message ListPayUniObservationsRequest {
-  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
-  // 每頁筆數：0 用預設值 20，上限 100。
-  int32 page_size = 2;
-  string page_token = 3;
-}
-
-message ListPayUniObservationsResponse {
-  repeated PayUniObservation observations = 1;
-  string next_page_token = 2;
-}
-
-message RefreshPayUniStatusRequest {
-  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
-}
-
-message RefreshPayUniStatusResponse {}
 
 message RequeryKYCRegistrationRequest {
   string id = 1 [(google.api.field_behavior) = REQUIRED];

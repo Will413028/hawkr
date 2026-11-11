@@ -351,11 +351,6 @@ type PayUniRegistration struct {
 	CreatedAt, UpdatedAt time.Time
 }
 
-// RebindPayUniInput 是管理員對 FAILED 的註冊重新綁定（新的 job，不是再核准一次）。
-type RebindPayUniInput struct {
-	StoreID, AdminID int64
-}
-
 // PayUniNotification 是 PayUni 的 AGENT_NOTIFY 通知（經 Java payuni-webhook-service 的 envelope）：EventKey 是它的冪等鍵
 // （merId:MerStatus:ExecuteTime），ExecuteTime 是 PayUni 的事件時間（yyyyMMddHHmmss，台北時間）。
 type PayUniNotification struct {

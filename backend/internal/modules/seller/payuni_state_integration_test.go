@@ -92,32 +92,6 @@ func TestBindFailureOnIdentityFieldsLetsTheSellerFixAndResubmit(t *testing.T) {
 	}
 }
 
-// 綁定失敗在申請欄位上（AGENT03001）時賣家能自己改：儲存草稿把已核准的申請改回草稿之後，管理員重新綁定被擋下並說明原因
-// （綁定 job 會以註冊的申請讀資料，送給 PayUni 的會是還沒審核的草稿），註冊不變；全程只走產品的 API，沒有直接改資料。
-// mutation：拿掉 Rebind 的申請檢查，註冊會回到 PENDING。
-func TestRebindIsRefusedWhileTheSellerEditsTheApplicationAfterABindFailure(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	accountID, s := f.approvedStore(t)
-	f.payuni.bindErr = []error{apiErr("AGENT03001")}
-	f.sync(t, s.StoreID)
-	mine, err := f.module.MyKYC(ctx, accountID)
-	must(t, err)
-	edited, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: mine.Version, RealName: ptr("王大明")})
-	must(t, err)
-	if edited.Status != KYCStatusDraft {
-		t.Fatalf("儲存草稿要把申請改回草稿：%+v", edited)
-	}
-	_, err = f.module.RebindPayUni(ctx, RebindPayUniInput{StoreID: s.StoreID, AdminID: 9})
-	if apperr.KindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "賣家正在修改商家認證，重新核准後會自動重新綁定。") {
-		t.Fatalf("賣家正在修改時重新綁定要被擋下並說明原因：%v", err)
-	}
-	if r := f.registration(t, s.StoreID); r.BindStatus != BindStatusFailed || deref(r.BindErrorCode) != "AGENT03001" {
-		t.Fatalf("被擋下之後註冊不該改變：%+v", r)
-	}
-}
-
 // 綁定重試用完：賣家等平台重新送出，不能自己改或重送；原因句是「平台會協助重新送出」。
 func TestRetryExhaustedBindFailureIsRetryLaterAndBlocksResubmit(t *testing.T) {
 	t.Parallel()

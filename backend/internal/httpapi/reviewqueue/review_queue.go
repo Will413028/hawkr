@@ -31,7 +31,7 @@ const (
 
 // kindPermissions 是種類 → 看這一種待辦所需的既有讀取權限（E13）：待辦只列呼叫者對來源有讀取權的種類。
 // 權限是來源的讀取權：通報、案件（待決定）、案件的詢問、來函（來函與告知被指名者）、措施（申覆、解除請求與複審）、
-// 商家認證各自頁面的 list 權限；重新綁定 PayUni 的來源是 PayUni 註冊，它唯一的讀取權限是 get（沒有 list RPC，不新增沒有 RPC 的 list 權限）。
+// 商家認證各自頁面的 list 權限。
 // 新種類沒有列在這裡，TestKindsAreOneToOneWithTheContract 失敗（它逐種類寫死期望的權限）。
 var kindPermissions = map[rq.Kind]adminperm.Permission{
 	rq.ReportTriage:               adminperm.SellerReportsList,
@@ -43,7 +43,6 @@ var kindPermissions = map[rq.Kind]adminperm.Permission{
 	rq.MeasureLiftRequest:         adminperm.SellerMeasuresList,
 	rq.MeasureReview:              adminperm.SellerMeasuresList,
 	rq.KYCApplication:             adminperm.SellerKYCApplicationsList,
-	rq.PayUniBindRetry:            adminperm.SellerPayUniRegistrationsGet,
 	rq.PaymentAccountCreateFailed: adminperm.PaymentAccountsGet,
 }
 
@@ -245,7 +244,7 @@ func toProto(item rq.Item) (*adminpb.ReviewQueueItem, error) {
 			return nil, missing("measure_id")
 		}
 		out.Subject = &adminpb.ReviewQueueItem_MeasureId{MeasureId: item.MeasureID.String()}
-	case rq.KYCApplication, rq.PayUniBindRetry:
+	case rq.KYCApplication:
 		if item.KYCApplicationID == nil || item.StoreID == nil {
 			return nil, missing("kyc_application_id 或 store_id")
 		}

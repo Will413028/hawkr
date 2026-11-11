@@ -51,8 +51,6 @@ const (
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW ReviewQueueItemKind = 9
 	// 待審核的商家認證（subject 是 kyc_application）。
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION ReviewQueueItemKind = 11
-	// 重試用完的 PayUni 綁定失敗，等管理員重新綁定（subject 是 kyc_application）。
-	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY ReviewQueueItemKind = 12
 	// 建立重試用完的收款帳戶，等管理員重試建立（subject 是 payment_account）。
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED ReviewQueueItemKind = 13
 )
@@ -70,7 +68,6 @@ var (
 		8:  "REVIEW_QUEUE_ITEM_KIND_MEASURE_LIFT_REQUEST",
 		9:  "REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW",
 		11: "REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION",
-		12: "REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY",
 		13: "REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED",
 	}
 	ReviewQueueItemKind_value = map[string]int32{
@@ -84,7 +81,6 @@ var (
 		"REVIEW_QUEUE_ITEM_KIND_MEASURE_LIFT_REQUEST":          8,
 		"REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW":                9,
 		"REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION":               11,
-		"REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY":             12,
 		"REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED": 13,
 	}
 )
@@ -781,7 +777,7 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\"U\n" +
 	"\x11KYCApplicationRef\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12%\n" +
-	"\x0eapplication_id\x18\x02 \x01(\tR\rapplicationId*\x9d\x05\n" +
+	"\x0eapplication_id\x18\x02 \x01(\tR\rapplicationId*\x9f\x05\n" +
 	"\x13ReviewQueueItemKind\x12&\n" +
 	"\"REVIEW_QUEUE_ITEM_KIND_UNSPECIFIED\x10\x00\x12(\n" +
 	"$REVIEW_QUEUE_ITEM_KIND_REPORT_TRIAGE\x10\x01\x12(\n" +
@@ -792,11 +788,10 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"%REVIEW_QUEUE_ITEM_KIND_MEASURE_APPEAL\x10\a\x12/\n" +
 	"+REVIEW_QUEUE_ITEM_KIND_MEASURE_LIFT_REQUEST\x10\b\x12)\n" +
 	"%REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW\x10\t\x12*\n" +
-	"&REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION\x10\v\x12,\n" +
-	"(REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY\x10\f\x128\n" +
+	"&REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION\x10\v\x128\n" +
 	"4REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED\x10\r\"\x04\b\x04\x10\x04\"\x04\b\n" +
 	"\x10\n" +
-	"*(REVIEW_QUEUE_ITEM_KIND_CASE_FDA_REFERRAL*(REVIEW_QUEUE_ITEM_KIND_FOOD_REGISTRATION2\xa7\x01\n" +
+	"\"\x04\b\f\x10\f*(REVIEW_QUEUE_ITEM_KIND_CASE_FDA_REFERRAL*(REVIEW_QUEUE_ITEM_KIND_FOOD_REGISTRATION*(REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY2\xa7\x01\n" +
 	"\x17ReviewQueueAdminService\x12\x8b\x01\n" +
 	"\x0fListReviewQueue\x128.hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueRequest\x1a9.hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueResponse\"\x03\x90\x02\x01B\xca\x02\n" +
 	"$com.hawkr.admin.reviewqueue.v1alpha1B\x10ReviewQueueProtoP\x01Zmgithub.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/reviewqueue/v1alpha1;reviewqueuev1alpha1\xa2\x02\x03HAR\xaa\x02 Hawkr.Admin.Reviewqueue.V1alpha1\xca\x02 Hawkr\\Admin\\Reviewqueue\\V1alpha1\xe2\x02,Hawkr\\Admin\\Reviewqueue\\V1alpha1\\GPBMetadata\xea\x02#Hawkr::Admin::Reviewqueue::V1alpha1b\x06proto3"

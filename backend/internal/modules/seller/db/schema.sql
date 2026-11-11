@@ -1168,7 +1168,6 @@ CREATE INDEX kyc_registration_checks_pending ON seller.kyc_registration_checks (
 -- 審核紀錄：append-only（只有 INSERT 的查詢），記人工決定的事實（誰、何時、什麼決定、理由），不含任何欄位值。
 -- review_id 同時是對應模組事件的 event_id，relay 重送時不變。reviewer_admin_id 在賣家自己的動作（送出、取消）是 NULL；
 -- 管理員只記 ID，顯示名稱由 client 經 identity 查（與關店、停權的管理員欄位一致）。
--- REBIND 是管理員對這份申請的 PayUni 註冊重新綁定（誰、何時；沒有事件）。
 -- internal_note 是退回時審核員寫的內部備註（只有 REJECT 有，不給賣家看）。逐項問題在 kyc_review_issues。
 -- registration_check_id 是核准或退回當下後台顯示的登記資料查詢（審核的依據；沒有查詢、查詢還沒完成或不可用時是 NULL）。個資清理
 -- 刪掉查詢列時引用置 NULL（ON DELETE SET NULL）：審核紀錄本身保留，不需要為了它對 append-only 的表另寫 UPDATE；外鍵的動作要
@@ -1182,9 +1181,9 @@ CREATE TABLE seller.kyc_reviews (
     internal_note      TEXT,
     decided_at         TIMESTAMPTZ NOT NULL,
     registration_check_id UUID REFERENCES seller.kyc_registration_checks (check_id) ON DELETE SET NULL,
-    CONSTRAINT kyc_reviews_action_check CHECK (action IN ('SUBMIT', 'APPROVE', 'REJECT', 'CANCEL', 'REBIND')),
+    CONSTRAINT kyc_reviews_action_check CHECK (action IN ('SUBMIT', 'APPROVE', 'REJECT', 'CANCEL')),
     CONSTRAINT kyc_reviews_reviewer_check CHECK (
-        (action IN ('APPROVE', 'REJECT', 'REBIND') AND reviewer_admin_id IS NOT NULL AND reviewer_admin_id > 0) OR
+        (action IN ('APPROVE', 'REJECT') AND reviewer_admin_id IS NOT NULL AND reviewer_admin_id > 0) OR
         (action IN ('SUBMIT', 'CANCEL') AND reviewer_admin_id IS NULL)
     ),
     CONSTRAINT kyc_reviews_reason_check CHECK (char_length(reason) BETWEEN 1 AND 1000),
@@ -1293,8 +1292,7 @@ CREATE INDEX kyc_document_accesses_application ON seller.kyc_document_accesses (
 -- PayUni 目前的狀態是它回報的原碼（外部事實）加上推導的 outcome；outcome 與原碼由同一個條件式 UPDATE 一起寫入（唯一
 -- 的寫入點是 payuni 套件的 apply），只有 executed_at 比 status_observed_at 新的觀測會更新（亂序的舊通知不倒退）。
 -- 付款能力不存：outcome = APPROVED 且 bind_status = BOUND 時才有。
--- bind_failed_at：綁定失敗的時刻（只有 bind_status = FAILED 時有值，回到 PENDING 或 BOUND 時清空）；後台待辦 review_payuni_bind_retry 的開始時間，
--- 不用 updated_at：失敗期間店家改地址（BumpPayUniIntent）會推後 updated_at。
+-- bind_failed_at：綁定失敗的時刻（只有 bind_status = FAILED 時有值，回到 PENDING 或 BOUND 時清空）。
 -- resubmitted_at：已綁定的註冊（PayUni 端已有這個商店）在 PayUni 拒絕之後重新送出、再核准的時間：重新核准不再綁定
 -- （MerID 已存在），改以 update_merchant 送新的聯絡欄位與地址；PayUni 的拒絕是舊的狀態，輪詢在這個時間之後的一段期間內
 -- 繼續問，直到 PayUni 回報新的結果。

@@ -172,7 +172,6 @@ const (
 	ReviewApprove = model.ReviewApprove
 	ReviewReject  = model.ReviewReject
 	ReviewCancel  = model.ReviewCancel
-	ReviewRebind  = model.ReviewRebind
 )
 
 // KYCIssueCodeValues 回傳全部退回問題的原因碼。

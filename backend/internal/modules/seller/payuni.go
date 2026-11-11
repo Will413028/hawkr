@@ -32,9 +32,6 @@ type PayUniProblem = model.PayUniProblem
 // PayUniRegistration 是店家的 PayUni 子商店註冊。
 type PayUniRegistration = model.PayUniRegistration
 
-// AdminPayUniRegistration 是後台看到的註冊：註冊加上它所在的 PayUni 階段與此刻不能重新綁定的原因。
-type AdminPayUniRegistration = model.AdminPayUniRegistration
-
 // PayUniStatus 是 PayUni 目前回報的狀態。
 type PayUniStatus = model.PayUniStatus
 
@@ -52,9 +49,6 @@ type PayUniObservationPage = model.PayUniObservationPage
 
 // PayUniNotification 是 PayUni 的 AGENT_NOTIFY 通知。
 type PayUniNotification = model.PayUniNotification
-
-// RebindPayUniInput 是管理員重新綁定。
-type RebindPayUniInput = model.RebindPayUniInput
 
 // KYCFlowStatus 是 cert 軸與 PayUni 軸合成的流程狀態。
 type KYCFlowStatus = model.KYCFlowStatus
@@ -158,19 +152,14 @@ func ClassifyPayUniCode(code string) (remedy PayUniRemedy, fields, storeFields [
 // 同一個推導。
 func PayUniProblemOf(reg PayUniRegistration) *PayUniProblem { return model.ProblemOf(reg) }
 
-// RebindPayUni 管理員對綁定失敗（FAILED）的註冊重新綁定：回到 PENDING 並排入新的 job，不是再核准一次。
-func (m *Module) RebindPayUni(ctx context.Context, in RebindPayUniInput) (AdminPayUniRegistration, error) {
-	return m.payuni.Rebind(ctx, in)
-}
-
-// PayUniRegistrationOf 回傳店家的 PayUni 註冊（管理員）；沒有時回 NotFound。
-func (m *Module) PayUniRegistrationOf(ctx context.Context, storeID int64) (AdminPayUniRegistration, error) {
-	return m.payuni.Registration(ctx, storeID)
-}
-
 // PayUniObservations 回傳店家的 PayUni 狀態觀測紀錄的一頁，新到舊的 keyset（管理員；預設 20、上限 100）。
 func (m *Module) PayUniObservations(ctx context.Context, in PayUniObservationListInput) (PayUniObservationPage, error) {
 	return m.payuni.Observations(ctx, in)
+}
+
+// PayUniRegistrationOf 回傳店家的 PayUni 註冊；沒有時回 NotFound。
+func (m *Module) PayUniRegistrationOf(ctx context.Context, storeID int64) (PayUniRegistration, error) {
+	return m.payuni.Registration(ctx, storeID)
 }
 
 // RefreshPayUniStatus 管理員手動刷新：排入查詢 PayUni 狀態的 job，套用走和 webhook、輪詢同一個函式。

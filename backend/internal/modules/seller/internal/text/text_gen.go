@@ -845,11 +845,6 @@ func StoreActionUnavailableAccountSuspendedDelegate() uitext.Message {
 	return uitext.Message{Text: "帳號停權中，無法代行。", Locale: uitext.ZhTW}
 }
 
-// StoreActionUnavailableKycNotApprovedRebindPayuni 是後台員工受眾的模組句子 store_action.unavailable.kyc_not_approved.rebind_payuni（只有 zh-TW）。
-func StoreActionUnavailableKycNotApprovedRebindPayuni() uitext.Message {
-	return uitext.Message{Text: "賣家正在修改商家認證，重新核准後會自動重新綁定。", Locale: uitext.ZhTW}
-}
-
 // StoreActionUnavailableKycNotBusinessRequeryKyc 是後台員工受眾的模組句子 store_action.unavailable.kyc_not_business.requery_kyc（只有 zh-TW）。
 func StoreActionUnavailableKycNotBusinessRequeryKyc() uitext.Message {
 	return uitext.Message{Text: "只有公司型的申請有登記資料可以查詢。", Locale: uitext.ZhTW}
@@ -865,16 +860,6 @@ func StoreActionUnavailableKycNotSubmittedReviewKyc() uitext.Message {
 	return uitext.Message{Text: "只有審核中的申請能核准或退回。", Locale: uitext.ZhTW}
 }
 
-// StoreActionUnavailablePayuniBoundRebindPayuni 是後台員工受眾的模組句子 store_action.unavailable.payuni_bound.rebind_payuni（只有 zh-TW）。
-func StoreActionUnavailablePayuniBoundRebindPayuni() uitext.Message {
-	return uitext.Message{Text: "只有綁定失敗的註冊能重新綁定。", Locale: uitext.ZhTW}
-}
-
-// StoreActionUnavailablePayuniMerchantTerminalRebindPayuni 是後台員工受眾的模組句子 store_action.unavailable.payuni_merchant_terminal.rebind_payuni（只有 zh-TW）。
-func StoreActionUnavailablePayuniMerchantTerminalRebindPayuni() uitext.Message {
-	return uitext.Message{Text: "PayUni 端的商店已是終止狀態，這家店無法再綁定；賣家要重新入駐才能收款。", Locale: uitext.ZhTW}
-}
-
 // StoreActionUnavailableStoreClosedCreateMeasure 是後台員工受眾的模組句子 store_action.unavailable.store_closed.create_measure（只有 zh-TW）。
 func StoreActionUnavailableStoreClosedCreateMeasure() uitext.Message {
 	return uitext.Message{Text: "店家已關閉，不能建立警告、停權或風險措施。", Locale: uitext.ZhTW}
@@ -885,11 +870,6 @@ func StoreActionUnavailableStoreClosedDelegate() uitext.Message {
 	return uitext.Message{Text: "店家已關閉，無法代行。", Locale: uitext.ZhTW}
 }
 
-// StoreActionUnavailableStoreClosedRebindPayuni 是後台員工受眾的模組句子 store_action.unavailable.store_closed.rebind_payuni（只有 zh-TW）。
-func StoreActionUnavailableStoreClosedRebindPayuni() uitext.Message {
-	return uitext.Message{Text: "店家已關閉，不能重新綁定 PayUni。", Locale: uitext.ZhTW}
-}
-
 // StoreActionUnavailableStoreClosedReviewKyc 是後台員工受眾的模組句子 store_action.unavailable.store_closed.review_kyc（只有 zh-TW）。
 func StoreActionUnavailableStoreClosedReviewKyc() uitext.Message {
 	return uitext.Message{Text: "店家已關閉，這份商家認證申請暫停審核，店家恢復營業後才能審核或重新查詢。", Locale: uitext.ZhTW}
@@ -898,11 +878,6 @@ func StoreActionUnavailableStoreClosedReviewKyc() uitext.Message {
 // StoreActionUnavailableStorePendingDeletionDelegate 是後台員工受眾的模組句子 store_action.unavailable.store_pending_deletion.delegate（只有 zh-TW）。
 func StoreActionUnavailableStorePendingDeletionDelegate() uitext.Message {
 	return uitext.Message{Text: "店家等待刪除，無法代行。", Locale: uitext.ZhTW}
-}
-
-// StoreActionUnavailableStorePendingDeletionRebindPayuni 是後台員工受眾的模組句子 store_action.unavailable.store_pending_deletion.rebind_payuni（只有 zh-TW）。
-func StoreActionUnavailableStorePendingDeletionRebindPayuni() uitext.Message {
-	return uitext.Message{Text: "店家等待刪除，不能重新綁定 PayUni。", Locale: uitext.ZhTW}
 }
 
 // StoreActionUnavailableStorePendingDeletionReviewKyc 是後台員工受眾的模組句子 store_action.unavailable.store_pending_deletion.review_kyc（只有 zh-TW）。
