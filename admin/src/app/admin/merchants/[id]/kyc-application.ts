@@ -11,7 +11,6 @@ import {
 	KYCRegistrationStatus,
 	type KYCReview,
 	KYCReviewAction,
-	type PayUniRegistration,
 	type RevealKYCSensitiveResponse,
 	SellerAdminService,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
@@ -19,7 +18,6 @@ import {
 	KYCField,
 	type KYCIssue,
 	KYCIssueCode,
-	PayUniBindStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { formatDate as formatCalendarDate } from "@hawkr/api/proto/date";
 import { goTrimmedRuneCount, trimGoSpace } from "@hawkr/api/text/server-text";
@@ -31,8 +29,8 @@ import { staffTextOrUnknown, unknownText } from "@/lib/ui-text";
 import { firstVisibleLabel } from "@/lib/unavailability";
 import { addressText } from "./store-detail";
 
-// 商家詳情的商家認證（KYC）審核與 PayUni 的顯示判斷與文案（SellerAdminService.GetKYCApplication、RevealKYCSensitive、
-// ApproveKYC、RejectKYC、RequeryKYCRegistration、GetPayUniRegistration、RebindPayUni）。畫面只管呈現；哪個狀態
+// 商家詳情的商家認證（KYC）審核的顯示判斷與文案（SellerAdminService.GetKYCApplication、RevealKYCSensitive、
+// ApproveKYC、RejectKYC、RequeryKYCRegistration）。畫面只管呈現；哪個狀態
 // 可以核准、退回的逐項問題怎麼組成與驗證、顯示全文何時收回、GCIS 並列怎麼標記、背景工作怎麼輪詢都在這裡，才能不靠畫面測試
 // （決策簡報 K7、K8、K9、K15、K16、D4 第 4、5、6 點；2b 設計簡報題 1 (b′)、題 2）。
 
@@ -53,14 +51,13 @@ export const GCIS_UNAVAILABLE_TEXT = "查詢失敗";
 /** 實作者補：核准與退回遇到 VERSION_CONFLICT 時的說明（輸入保留，畫面已重讀）。 */
 export const KYC_CONFLICT_TEXT =
 	"申請的內容已經變動（可能別的管理員先處理了，或登記資料有了新的查詢結果）。畫面已重新讀取，你輸入的內容還在，請確認後再送出。";
-/** 實作者補：核准成功後的頁首提示（PayUni 綁定由背景程序完成）。 */
-export const APPROVE_SUCCESS_TEXT =
-	"已通過審核。系統會在背景向 PayUni 註冊，結果會顯示在下方的 PayUni 卡片。";
+/** 核准鈕上方的小字與核准成功後的頁首提示，同一句。 */
+export const APPROVE_HINT_TEXT =
+	"核准後系統會建立收款帳戶，賣家再到金流商完成收款設定";
+export const APPROVE_SUCCESS_TEXT = APPROVE_HINT_TEXT;
 export const REJECT_SUCCESS_TEXT =
 	"已退回申請，賣家可依你指出的問題修改後重新送審。";
-/** 實作者補：重新綁定與重新查詢的成功提示。 */
-export const REBIND_SUCCESS_TEXT =
-	"已重新排入 PayUni 綁定，結果會更新在 PayUni 卡片上。";
+/** 實作者補：重新查詢的成功提示。 */
 export const REQUERY_SUCCESS_TEXT =
 	"已排入重新查詢，結果出來後會更新在商業登記欄。";
 
@@ -98,13 +95,12 @@ export function kycApplicationOf(
 }
 
 // ---------------------------------------------------------------------------
-// 背景工作的輪詢（簡報題 1 (b′)）：進行中的查詢與綁定都是有期限、伺服器保證終態的資源，client 以退避輪詢到終態或期限。
+// 背景工作的輪詢（簡報題 1 (b′)）：進行中的查詢是有期限、伺服器保證終態的資源，client 以退避輪詢到終態或期限。
 // 頁籤隱藏時不輪詢（TanStack 的 refetchIntervalInBackground 預設為 false）。
 
 /** 退避的下限與上限（毫秒）：從要求的時間起，間隔隨已等待的時間成長（已等待時間的 1/4），上限 60 秒。 */
 export const POLL_MIN_MS = 3000;
 export const POLL_MAX_MS = 60_000;
-const PAYUNI_POLL_MIN_MS = 5000;
 
 function backoffMs(elapsedMs: number, minMs: number, maxMs: number): number {
 	return Math.min(maxMs, Math.max(minMs, Math.floor(elapsedMs / 4)));
@@ -141,22 +137,6 @@ export function registrationOverdue(
 	if (!pending) return false;
 	if (!pending.deadlineTime) return true;
 	return now.getTime() >= timestampDate(pending.deadlineTime).getTime();
-}
-
-/**
- * PayUni 綁定（bind_status = PENDING）的輪詢間隔：伺服器的 payuni_sweep 保證會到終態（BOUND 或 FAILED），所以沒有次數上限，
- * 間隔以距離上次更新的時間退避、上限 60 秒；其他綁定狀態不輪詢。
- */
-export function payUniPollInterval(
-	registration: PayUniRegistration | undefined,
-	now: Date,
-): number | false {
-	if (registration?.bindStatus !== PayUniBindStatus.PENDING) return false;
-	const updated = registration.updateTime ?? registration.createTime;
-	const elapsed = updated
-		? Math.max(0, now.getTime() - timestampDate(updated).getTime())
-		: 0;
-	return backoffMs(elapsed, PAYUNI_POLL_MIN_MS, POLL_MAX_MS);
 }
 
 // ---------------------------------------------------------------------------
@@ -509,8 +489,6 @@ export function reviewActionLabel(action: KYCReviewAction): string {
 			return "退回";
 		case KYCReviewAction.KYC_REVIEW_ACTION_CANCEL:
 			return "賣家取消";
-		case KYCReviewAction.KYC_REVIEW_ACTION_REBIND:
-			return "重新綁定 PayUni";
 		default:
 			return "-";
 	}
@@ -900,55 +878,6 @@ export function gcisView(
 
 export function gcisMarkLabel(mark: GcisMark): string {
 	return mark === "mismatch" ? "不一致" : "無法比對";
-}
-
-// ---------------------------------------------------------------------------
-// PayUni 註冊（K9、B18、D4 第 6 點）
-
-/** PayUni 註冊的讀取狀態；notFound 是店家還沒有核准過申請（還沒有註冊）。 */
-export type PayUniState =
-	| { state: "loading" }
-	| { state: "error" }
-	| { state: "notFound" }
-	| { state: "ready"; registration: PayUniRegistration };
-
-export function payUniOf(result: {
-	error: unknown;
-	data: { registration?: PayUniRegistration } | undefined;
-}): PayUniState {
-	if (result.error != null) {
-		return result.error instanceof ConnectError &&
-			result.error.code === Code.NotFound
-			? { state: "notFound" }
-			: { state: "error" };
-	}
-	if (result.data === undefined) return { state: "loading" };
-	if (!result.data.registration) return { state: "error" };
-	return { state: "ready", registration: result.data.registration };
-}
-
-/**
- * PayUni 卡上重新綁定的呈現，只讀伺服器（`can_rebind`、`rebind_unavailabilities`）：能做時顯示「重新綁定」；不能做時第一個原因是結構性的
- * （綁定中、已綁定）就什麼都不說，否則顯示第一個原因的伺服器句子（終止、店家已關閉、等待刪除、申請不是已核准）。
- */
-export function rebindPresentation(registration: PayUniRegistration): {
-	canRebind: boolean;
-	reason: string | undefined;
-} {
-	if (registration.canRebind) return { canRebind: true, reason: undefined };
-	return {
-		canRebind: false,
-		reason: firstVisibleLabel(registration.rebindUnavailabilities),
-	};
-}
-
-/** 問題要補的申請欄位文字（沒有時空陣列）。 */
-export function payUniProblemFields(
-	registration: PayUniRegistration,
-): string[] {
-	return (registration.problem?.fields ?? [])
-		.filter((f) => f !== KYCField.KYC_FIELD_UNSPECIFIED)
-		.map(kycFieldLabel);
 }
 
 // ---------------------------------------------------------------------------

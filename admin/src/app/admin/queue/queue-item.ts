@@ -20,7 +20,6 @@ export const QUEUE_KIND_TEXT: Record<
 	[ReviewQueueItemKind.MEASURE_LIFT_REQUEST]: "裁定解除請求",
 	[ReviewQueueItemKind.MEASURE_REVIEW]: "複審停權",
 	[ReviewQueueItemKind.KYC_APPLICATION]: "審核商家認證",
-	[ReviewQueueItemKind.PAYUNI_BIND_RETRY]: "重新綁定 PayUni",
 	[ReviewQueueItemKind.PAYMENT_ACCOUNT_CREATE_FAILED]: "重試建立收款帳戶",
 };
 

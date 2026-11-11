@@ -15,7 +15,7 @@ export type PaymentAccountState =
 	| { state: "notFound" }
 	| { state: "ready"; account: PaymentAccount };
 
-/** 讀取狀態的規則同 payUniOf、accountEmailOf：有錯誤就是錯誤（not_found 是尚未建立），成功卻沒有帳戶是讀取錯誤。 */
+/** 讀取狀態的規則同 accountEmailOf：有錯誤就是錯誤（not_found 是尚未建立），成功卻沒有帳戶是讀取錯誤。 */
 export function paymentAccountOf(result: {
 	error: unknown;
 	data: { account?: PaymentAccount } | undefined;

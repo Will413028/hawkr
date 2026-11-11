@@ -16,8 +16,6 @@ import {
 	KYCRegistrationCheckSchema,
 	KYCRegistrationOutcome,
 	KYCRegistrationStatus,
-	type PayUniRegistration,
-	PayUniRegistrationSchema,
 	RevealKYCSensitiveResponseSchema,
 	SellerAdminService,
 	StoreActionUnavailabilitySchema,
@@ -29,10 +27,11 @@ import {
 	KYCFlowStatus,
 	KYCIssueCode,
 	KYCStatus,
-	PayUniBindStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { QueryClient } from "@tanstack/react-query";
 import {
+	APPROVE_HINT_TEXT,
+	APPROVE_SUCCESS_TEXT,
 	activeReveal,
 	applyRequeryResult,
 	documentSrc,
@@ -45,11 +44,8 @@ import {
 	kycApplicationOf,
 	kycApplicationQueryKey,
 	kycFieldLabel,
-	payUniOf,
-	payUniPollInterval,
 	type ReviewDraft,
 	ratingText,
-	rebindPresentation,
 	registrationOverdue,
 	registrationPollInterval,
 	registrationWarning,
@@ -64,9 +60,9 @@ import {
 import { runAction } from "../src/lib/connect-action";
 
 /**
- * 商家詳情的商家認證（KYC）審核與 PayUni：顯示判斷（kyc-application.ts）與實際渲染出來的 HTML。
- * 釘的是：核准與退回只在審核中、版本衝突時輸入不丟、顯示全文前後與到期收回、綁定失敗時是「重新綁定」而不是核准、
- * GCIS 並列的不一致與無法比對標記、背景工作（登記資料查詢、PayUni 綁定）的退避輪詢。退回的逐項問題在 merchant-kyc-issues.test.ts，
+ * 商家詳情的商家認證（KYC）審核：顯示判斷（kyc-application.ts）與實際渲染出來的 HTML。
+ * 釘的是：核准與退回只在審核中、版本衝突時輸入不丟、顯示全文前後與到期收回、
+ * GCIS 並列的不一致與無法比對標記、背景工作（登記資料查詢）的退避輪詢。退回的逐項問題在 merchant-kyc-issues.test.ts，
  * 顯示全文的到期與放大圖在 merchant-reveal-state.test.ts。所有時間都是固定的值（不讀系統時鐘）。
  */
 
@@ -86,9 +82,6 @@ const { renderToStaticMarkup } = requireFromTest("react-dom/server") as {
 };
 const cards = requireFromTest(
 	"../src/app/admin/merchants/[id]/KycApplicationCards",
-) as Record<string, unknown>;
-const payuniCards = requireFromTest(
-	"../src/app/admin/merchants/[id]/PayUniCards",
 ) as Record<string, unknown>;
 
 const render = (component: unknown, props: Record<string, unknown>): string =>
@@ -1085,305 +1078,6 @@ test("進行中的查詢依伺服器的期限退避輪詢：間隔隨已等待�
 });
 
 // ---------------------------------------------------------------------------
-// PayUni
-
-// 伺服器真的會送的重新綁定句子（model.StoreActionUnavailableText）。
-const TERMINAL_TEXT =
-	"PayUni 端的商店已是終止狀態，這家店無法再綁定；賣家要重新入駐才能收款。";
-const REBIND_CLOSED_TEXT = "店家已關閉，不能重新綁定 PayUni。";
-const REBIND_PENDING_DELETION_TEXT = "店家等待刪除，不能重新綁定 PayUni。";
-const SELLER_EDITING_TEXT = "賣家正在修改商家認證，重新核准後會自動重新綁定。";
-const BOUND_TEXT = "只有綁定失敗的註冊能重新綁定。";
-
-/** 伺服器對一筆綁定失敗、可以重新綁定的註冊送出的形狀（階段與可用性來自伺服器，client 不推導）。 */
-function registration(
-	patch: MessageInitShape<typeof PayUniRegistrationSchema> = {},
-): PayUniRegistration {
-	return create(PayUniRegistrationSchema, {
-		storeId: "100",
-		merId: "HAWK100",
-		bindStatus: PayUniBindStatus.BOUND,
-		flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_UNDER_REVIEW,
-		canRebind: false,
-		rebindUnavailabilities: [why(U.PAYUNI_BOUND, BOUND_TEXT)],
-		...patch,
-	});
-}
-
-function failedRegistration(
-	patch: MessageInitShape<typeof PayUniRegistrationSchema> = {},
-): PayUniRegistration {
-	return registration({
-		bindStatus: PayUniBindStatus.FAILED,
-		flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_BIND_FAILED,
-		canRebind: true,
-		rebindUnavailabilities: [],
-		...patch,
-	});
-}
-
-const NOT_FOUND_RESULT = {
-	error: new ConnectError("未註冊", Code.NotFound),
-	data: undefined,
-};
-
-function renderPayUni(reg: PayUniRegistration): string {
-	return render(payuniCards.PayUniStatusCard as never, {
-		state: payUniOf({ error: null, data: { registration: reg } }),
-		hasApplication: true,
-		rebinding: false,
-		onRebind: noop,
-		onRetry: noop,
-	});
-}
-
-test("綁定失敗而且伺服器說能重新綁定：卡片顯示「重新綁定」；綁定中、已綁定沒有鍵也沒有句子", () => {
-	const failed = failedRegistration({
-		bindErrorCode: "AGENT01001",
-		bindAttempts: 3,
-	});
-	assert.deepEqual(rebindPresentation(failed), {
-		canRebind: true,
-		reason: undefined,
-	});
-	const html = renderPayUni(failed);
-	assert.match(html, /重新綁定/u);
-	assert.match(html, /待重新綁定/u, "徽章與清單同一組文字");
-	assert.match(html, /AGENT01001/u);
-	assert.match(html, /已嘗試 3 次/u);
-
-	// 已綁定（BOUND）：第一個原因是結構性的，伺服器雖然附了句子也不顯示。
-	const bound = renderPayUni(registration());
-	assert.doesNotMatch(bound, /重新綁定/u);
-	assert.ok(!bound.includes(BOUND_TEXT), "結構性的原因不顯示句子");
-	// 綁定中（PENDING）：PAYUNI_BIND_IN_PROGRESS 沒有 message（不是失敗原因），也沒有任何句子，不顯示通用文字。
-	const pending = registration({
-		bindStatus: PayUniBindStatus.PENDING,
-		flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_BINDING,
-		rebindUnavailabilities: [why(U.PAYUNI_BIND_IN_PROGRESS)],
-	});
-	assert.deepEqual(rebindPresentation(pending), {
-		canRebind: false,
-		reason: undefined,
-	});
-	const pendingHtml = renderPayUni(pending);
-	assert.doesNotMatch(pendingHtml, /重新綁定|目前不能操作/u);
-});
-
-test("不能重新綁定而且不是結構性的原因：不顯示「重新綁定」，顯示伺服器的第一句（終止、已關閉、等待刪除、賣家正在修改）", () => {
-	for (const [reason, text] of [
-		[U.PAYUNI_MERCHANT_TERMINAL, TERMINAL_TEXT],
-		[U.STORE_CLOSED, REBIND_CLOSED_TEXT],
-		[U.STORE_PENDING_DELETION, REBIND_PENDING_DELETION_TEXT],
-		[U.KYC_NOT_APPROVED, SELLER_EDITING_TEXT],
-	] as const) {
-		const reg = failedRegistration({
-			canRebind: false,
-			rebindUnavailabilities: [why(reason, text)],
-		});
-		assert.deepEqual(rebindPresentation(reg), {
-			canRebind: false,
-			reason: text,
-		});
-		const html = renderPayUni(reg);
-		assert.doesNotMatch(html, /hk-btn__text">重新綁定</u, "沒有重新綁定的按鈕");
-		assert.ok(html.includes(text), text);
-	}
-});
-
-test("PayUni 端已終止而且 BOUND 的註冊：第一個原因是終止，仍顯示終止的句子（不被後面的結構性原因吃掉）；只顯示第一句", () => {
-	const reg = registration({
-		rebindUnavailabilities: [
-			why(U.PAYUNI_MERCHANT_TERMINAL, TERMINAL_TEXT),
-			why(U.STORE_CLOSED, REBIND_CLOSED_TEXT),
-			why(U.PAYUNI_BOUND, BOUND_TEXT),
-		],
-	});
-	assert.equal(rebindPresentation(reg).reason, TERMINAL_TEXT);
-	const html = renderPayUni(reg);
-	assert.ok(html.includes(TERMINAL_TEXT));
-	assert.ok(!html.includes(REBIND_CLOSED_TEXT), "只顯示第一個原因");
-});
-
-test("PayUni 綁定中（PENDING）以退避輪詢到終態：間隔隨距離上次更新的時間成長、上限 60 秒、沒有次數上限；BOUND、FAILED 與沒有註冊都不輪詢", () => {
-	const updated = new Date("2026-10-11T04:31:00Z");
-	const pending = registration({
-		bindStatus: PayUniBindStatus.PENDING,
-		updateTime: timestampFromDate(updated),
-	});
-	const at = (seconds: number) =>
-		payUniPollInterval(pending, new Date(updated.getTime() + seconds * 1000));
-	assert.equal(at(0), 5000, "最短 5 秒");
-	assert.equal(at(100), 25_000);
-	assert.equal(at(10_000), 60_000, "上限 60 秒");
-	assert.equal(at(86_400), 60_000, "沒有次數上限：一天之後仍在輪詢");
-	for (const bindStatus of [
-		PayUniBindStatus.BOUND,
-		PayUniBindStatus.FAILED,
-		PayUniBindStatus.UNSPECIFIED,
-	]) {
-		assert.equal(
-			payUniPollInterval(registration({ bindStatus }), updated),
-			false,
-			PayUniBindStatus[bindStatus],
-		);
-	}
-	assert.equal(payUniPollInterval(undefined, updated), false);
-});
-
-test("綁定失敗時卡片沒有「核准」入口：只有重新綁定（核准是申請的事，不在 PayUni 卡）", () => {
-	const html = renderPayUni(failedRegistration());
-	assert.doesNotMatch(html, /通過審核|核准/u);
-	assert.match(html, /重新綁定/u);
-});
-
-test("PayUni 徽章只讀伺服器給的階段（flow_status），與清單同一組文字；不從 bind_status、status_codes 推導", () => {
-	const expected: [KYCFlowStatus, string][] = [
-		[KYCFlowStatus.KYC_FLOW_STATUS_BINDING, "PayUni 綁定中"],
-		[KYCFlowStatus.KYC_FLOW_STATUS_BIND_FAILED, "待重新綁定"],
-		[KYCFlowStatus.KYC_FLOW_STATUS_APPROVED, "已核准"],
-		[KYCFlowStatus.KYC_FLOW_STATUS_UNDER_REVIEW, "PayUni 審核中"],
-		[KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO, "PayUni 待補件"],
-		[KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED, "PayUni 審核未通過"],
-	];
-	for (const [flowStatus, label] of expected) {
-		// bindStatus 故意放一個與階段矛盾的值：徽章不得看它。
-		const html = renderPayUni(
-			registration({ flowStatus, bindStatus: PayUniBindStatus.UNSPECIFIED }),
-		);
-		assert.ok(html.includes(label), `${KYCFlowStatus[flowStatus]} → ${label}`);
-	}
-	// UNSPECIFIED 與不認得的值是「未知」（灰色），不當成核准。
-	for (const flowStatus of [KYCFlowStatus.KYC_FLOW_STATUS_UNSPECIFIED, 99]) {
-		const html = renderPayUni(registration({ flowStatus }));
-		assert.ok(html.includes("未知"), String(flowStatus));
-		assert.doesNotMatch(html, />已核准</u);
-	}
-});
-
-test("PayUni 卡：最後同步是 status_time、審核意見直接顯示 status_codes.reason、要補的欄位、沒有 freshness 與原碼徽章", () => {
-	const html = renderPayUni(
-		registration({
-			flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO,
-			statusTime: timestampFromDate(new Date("2026-10-11T04:30:00Z")),
-			problem: {
-				code: "MER_92",
-				fields: [KYCField.KYC_FIELD_BANK_BOOK, KYCField.KYC_FIELD_UNSPECIFIED],
-				reason: "存摺影像不清楚",
-			},
-			statusCodes: {
-				merStatus: "91",
-				memberStatus: "5",
-				reason: "存摺影像不清楚",
-			},
-		}),
-	);
-	assert.match(html, /最後同步：2026\/10\/11 12:30/u);
-	assert.match(html, /存摺影像不清楚/u);
-	assert.match(html, /需補資料：存摺封面/u, "UNSPECIFIED 不顯示成欄位");
-	assert.doesNotMatch(
-		html,
-		/狀態碼|商店 91|會員 5/u,
-		"K9：原碼不顯示，狀態看流程狀態",
-	);
-	assert.match(html, /HAWK100/u);
-	assert.doesNotMatch(html, /剛同步|資料較舊|資料可能延遲/u);
-	// 沒有審核意見時不畫那一行。
-	assert.doesNotMatch(
-		renderPayUni(registration({ statusCodes: { reason: "" } })),
-		/payuni-reason-text/u,
-	);
-});
-
-test("第一次核准前（not_found）：有申請時顯示尚未註冊，沒有申請時整張卡不畫；讀取失敗可重試", () => {
-	const state = payUniOf(NOT_FOUND_RESULT);
-	assert.deepEqual(state, { state: "notFound" });
-	const props = {
-		state,
-		rebinding: false,
-		onRebind: noop,
-		onRetry: noop,
-	};
-	assert.match(
-		render(payuniCards.PayUniStatusCard as never, {
-			...props,
-			hasApplication: true,
-		}),
-		/尚未向 PayUni 註冊/u,
-	);
-	assert.equal(
-		render(payuniCards.PayUniStatusCard as never, {
-			...props,
-			hasApplication: false,
-		}),
-		"",
-	);
-	const error = payUniOf({
-		error: new ConnectError("壞了", Code.Unavailable),
-		data: undefined,
-	});
-	assert.deepEqual(error, { state: "error" });
-	const html = render(payuniCards.PayUniStatusCard as never, {
-		...props,
-		state: error,
-		hasApplication: true,
-	});
-	assert.match(html, /PayUni 狀態讀取失敗/u);
-	assert.match(html, /重試/u);
-	assert.deepEqual(payUniOf({ error: null, data: undefined }), {
-		state: "loading",
-	});
-	assert.deepEqual(
-		payUniOf({ error: null, data: {} }),
-		{ state: "error" },
-		"成功卻沒有註冊不當成尚未註冊",
-	);
-});
-
-test("聯絡資訊卡標題表明是店家目前的聯絡資料（不是 PayUni 收到的值）；讀店家自己的欄位；沒有註冊或全空時不畫", () => {
-	const store = create(StoreSchema, {
-		id: "100",
-		contactName: "王小明",
-		contactMobile: "0912345678",
-		contactPhone: "02-12345678",
-		supportEmail: "seller@example.com",
-	});
-	const html = render(payuniCards.PayUniContactCard as never, {
-		store,
-		registration: registration(),
-	});
-	for (const text of [
-		"王小明",
-		"0912345678",
-		"02-12345678",
-		"seller@example.com",
-	]) {
-		assert.match(html, new RegExp(text, "u"));
-	}
-	assert.match(html, /店家目前的聯絡資料/u);
-	assert.match(html, /不一定是 PayUni 已經收到的值/u);
-	assert.doesNotMatch(
-		html,
-		/PayUni 聯絡資訊/u,
-		"舊標題暗示這是送給 PayUni 的值",
-	);
-	assert.equal(
-		render(payuniCards.PayUniContactCard as never, {
-			store,
-			registration: undefined,
-		}),
-		"",
-	);
-	assert.equal(
-		render(payuniCards.PayUniContactCard as never, {
-			store: create(StoreSchema, { id: "100" }),
-			registration: registration(),
-		}),
-		"",
-	);
-});
-
-// ---------------------------------------------------------------------------
 // 申請的讀取狀態與評分
 
 test("申請的讀取狀態：沒有摘要不發請求；not_found 是沒有申請；成功卻沒有申請是錯誤", () => {
@@ -1433,9 +1127,61 @@ test("評分卡：只顯示讀到且大於 0 的平均分；讀不到、沒有�
 });
 
 // ---------------------------------------------------------------------------
+// 核准的提示、審核備註與聯絡資料（D40）
+
+test("核准鈕上方的小字與核准成功的提示是同一句新文案，不再提 PayUni", async () => {
+	const copy = "核准後系統會建立收款帳戶，賣家再到金流商完成收款設定";
+	assert.equal(APPROVE_HINT_TEXT, copy);
+	assert.equal(APPROVE_SUCCESS_TEXT, copy);
+	const { readFile } = await import("node:fs/promises");
+	const page = await readFile("src/app/admin/merchants/[id]/page.tsx", "utf8");
+	assert.match(page, /\{APPROVE_HINT_TEXT\}/u, "核准鈕上方顯示這句");
+	assert.match(page, /text: APPROVE_SUCCESS_TEXT/u, "核准成功的提示用這句");
+	assert.doesNotMatch(page, /向 PayUni 註冊/u);
+});
+
+test("審核備註只叫審核員核對營業登記資料與統一編號，不再提身分證與證件有效期", async () => {
+	const { readFile } = await import("node:fs/promises");
+	const page = await readFile("src/app/admin/merchants/[id]/page.tsx", "utf8");
+	const note = page.slice(page.indexOf('className="audit-notice-text"'));
+	const text = note
+		.slice(0, note.indexOf("</div>"))
+		.replace(/<[^>]*>/gu, "")
+		.replace(/\s+/gu, "");
+	assert.match(text, /重點核對營業登記資料與統一編號是否一致$/u);
+	assert.doesNotMatch(note.slice(0, note.indexOf("</div>")), /身分證|有效期/u);
+});
+
+test("聯絡人姓名與手機顯示在基本資料卡；沒有值時照卡片既有的空值顯示 -", () => {
+	const filled = render(cards.KycBasicInfoCard as never, {
+		store: create(StoreSchema, {
+			id: "100",
+			storeName: "範例鮮果",
+			contactName: "王小明",
+			contactMobile: "0912345678",
+		}),
+		application: application(),
+		now: NOW,
+		canRequery: false,
+		requerying: false,
+		onRequery: noop,
+	});
+	assert.match(filled, /聯絡人姓名<\/div><div class="field-value">王小明</u);
+	assert.match(filled, /聯絡手機<\/div><div class="field-value">0912345678</u);
+	const html = renderBasicInfo(application());
+	assert.match(html, /聯絡人姓名<\/div><div class="field-value">-</u);
+	assert.match(html, /聯絡手機<\/div><div class="field-value">-</u);
+	assert.equal(
+		(html.match(/class="detail-card"/gu) ?? []).length,
+		1,
+		"併進基本資料卡，沒有另外的卡片",
+	);
+});
+
+// ---------------------------------------------------------------------------
 // 接線（頁面與 hook 讀的是契約的哪個方法）
 
-test("接線：核准與退回帶 etag；顯示全文、重新查詢、重新綁定各走自己的方法；評分讀公開的 GetStore", async () => {
+test("接線：核准與退回帶 etag；顯示全文、重新查詢各走自己的方法；評分讀公開的 GetStore", async () => {
 	const { readFile } = await import("node:fs/promises");
 	const [page, hooks] = await Promise.all([
 		readFile("src/app/admin/merchants/[id]/page.tsx", "utf8"),
@@ -1461,7 +1207,6 @@ test("接線：核准與退回帶 etag；顯示全文、重新查詢、重新綁
 		"rejectKYC",
 		"revealKYCSensitive",
 		"requeryKYCRegistration",
-		"rebindPayUni",
 	]) {
 		assert.match(
 			page,
@@ -1475,13 +1220,16 @@ test("接線：核准與退回帶 etag；顯示全文、重新查詢、重新綁
 		/registrationPollInterval\(/u,
 		"登記資料查詢依期限退避輪詢",
 	);
-	assert.match(hooks, /payUniPollInterval\(/u, "PayUni 綁定中退避輪詢");
 	assert.doesNotMatch(
 		hooks,
 		/REGISTRATION_POLL_MS|registrationCheckPending/u,
 		"寫死的 5 秒輪詢已刪除",
 	);
-	assert.match(hooks, /SellerAdminService\.method\.getPayUniRegistration/u);
+	assert.doesNotMatch(
+		page + hooks,
+		/PayUni|payUni|rebind/u,
+		"詳情頁沒有 PayUni 註冊、重新綁定的讀取與呼叫",
+	);
 	assert.match(hooks, /SellerPublicService\.method\.getStore/u);
 	assert.match(
 		hooks,

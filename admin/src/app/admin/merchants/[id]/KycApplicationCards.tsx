@@ -130,6 +130,8 @@ export function KycBasicInfoCard({
 					<FieldRow label="用戶類型" value={sellerTypeLabel(application)} />
 					<FieldRow label="店鋪名稱" value={store.storeName || "-"} />
 					<FieldRow label="電子信箱" value={store.supportEmail || "-"} />
+					<FieldRow label="聯絡人姓名" value={store.contactName || "-"} />
+					<FieldRow label="聯絡手機" value={store.contactMobile || "-"} />
 					{/* 聯絡電話：退件後要打電話請賣家補件。「賣家沒留電話」本身就是審核者要知道的事，所以沒有值也顯示 "-"。 */}
 					<FieldRow label="聯絡電話" value={store.contactPhone || "-"} />
 					{/* 公司電話是企業賣家限定且選填；個人賣家沒有這個欄位，整欄不顯示而不是顯示空值。 */}

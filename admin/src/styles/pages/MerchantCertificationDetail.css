@@ -423,80 +423,9 @@
 	color: #e7000b;
 }
 
-/* ========== Payment Status Card ========== */
-.payment-status-card {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	padding: 20px 24px;
-	background: white;
-	border: 1px solid #dadada;
-	border-radius: 15px;
-	margin-bottom: 20px;
-	box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.1);
-}
-
-.payment-left {
-	display: flex;
-	align-items: center;
-	gap: 16px;
-	min-width: 0;
-}
-
-.payuni-logo-text {
-	display: inline-flex;
-	align-items: center;
-	height: 28px;
-	flex-shrink: 0;
-	font-size: 16px;
-	font-weight: 700;
-	color: #374151;
-}
-
-.payment-info {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-	min-width: 0;
-	overflow-wrap: anywhere;
-}
-
-.payment-label {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 10px;
-	font-size: 14px;
-	font-weight: 500;
-	color: #374151;
-}
-
 .payment-desc {
 	font-size: 13px;
 	color: #6b7280;
-}
-
-.payuni-reason-text {
-	color: #b45309;
-	font-weight: 500;
-	white-space: pre-wrap;
-}
-
-.payuni-sync-meta {
-	color: #9ca3af;
-	font-size: 12px;
-}
-
-.payment-merchant-id {
-	font-size: 12px;
-	color: #9ca3af;
-}
-
-@media (max-width: 640px) {
-	.payment-left {
-		flex-direction: column;
-		align-items: flex-start;
-	}
 }
 
 .btn-account-status {
@@ -536,13 +465,6 @@
 	border-radius: 16px;
 	overflow: hidden;
 	box-shadow: 0px 2px 20px rgba(0, 0, 0, 0.04);
-}
-
-/* PayUni 聯絡資訊 card 是 detail-content-grid 之外的獨立區塊（跟 payment-status-card
-   同層），不像其他 .detail-card 靠 .detail-left-column 的 flex gap 取得間距，需要
-   自己的 margin-bottom——沿用本頁其他獨立區塊（.payment-status-card）的同一個值。 */
-.payuni-contact-card {
-	margin-bottom: 20px;
 }
 
 /* Section Title - header bar */
@@ -1287,7 +1209,7 @@
 	color: var(--admin-warning);
 }
 
-/* 收款帳戶卡（PaymentAccountCard）：與聯絡資訊卡同層的獨立區塊，間距同 .payuni-contact-card。 */
+/* 收款帳戶卡（PaymentAccountCard）：detail-content-grid 之外的獨立區塊，不靠 .detail-left-column 的 flex gap 取得間距，需要自己的 margin-bottom。 */
 .payment-account-card {
 	margin-bottom: 20px;
 }

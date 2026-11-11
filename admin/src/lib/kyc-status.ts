@@ -8,7 +8,7 @@ export function kycStatusText(status: KYCStatus | undefined): string {
 	return staffTextOrUnknown(sellerKYCStatus(status));
 }
 
-/** 申請已由平台核准（人工決定；PayUni 的結果另看 PayUni 卡）。 */
+/** 申請已由平台核准（人工決定）。 */
 export function isKycApproved(status: KYCStatus | undefined): boolean {
 	return status === KYCStatus.KYC_STATUS_APPROVED;
 }

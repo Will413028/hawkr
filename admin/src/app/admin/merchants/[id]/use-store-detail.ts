@@ -11,8 +11,6 @@ import { useEffect, useState } from "react";
 import {
 	kycApplicationOf,
 	kycApplicationQueryOptions,
-	payUniOf,
-	payUniPollInterval,
 	ratingText,
 	registrationPollInterval,
 } from "./kyc-application";
@@ -20,7 +18,7 @@ import { onboardingSummaryOf } from "./onboarding-summary";
 import { paymentAccountOf } from "./payment-account";
 import { accountEmailOf } from "./store-detail";
 
-// 商家詳情頁的資料來源（SellerAdminService.GetStore、GetKYCApplication、GetPayUniRegistration、GetStoreOnboarding；
+// 商家詳情頁的資料來源（SellerAdminService.GetStore、GetKYCApplication、GetStoreOnboarding；
 // PaymentAdminService.GetPaymentAccount；IdentityAdminService.GetAccount；公開的 SellerPublicService.GetStore 的評分統計）。查詢都經 connect-query
 // 的 transport（K1），頁面只讀結果。
 
@@ -45,7 +43,7 @@ export function useAccountEmail(accountId: string | undefined) {
 }
 
 // ---------------------------------------------------------------------------
-// 商家認證（KYC）與 PayUni（第 2b 刀）
+// 商家認證（KYC）（第 2b 刀）
 
 /**
  * 商家認證的申請內容（GetKYCApplication）。申請 ID 來自 GetStore.kyc.application_id；沒有送出過的申請時 ID 為空，不發請求。
@@ -63,22 +61,6 @@ export function useKycApplication(applicationId: string | undefined) {
 			),
 	});
 	return { query, value: kycApplicationOf(applicationId, query) };
-}
-
-/**
- * PayUni 子商店註冊（GetPayUniRegistration）。第一次核准前是 not_found（尚未註冊）。店家 ID 為空時不發請求。
- * 綁定中（bind_status = PENDING）時以退避輪詢到終態（伺服器的 payuni_sweep 保證會到 BOUND 或 FAILED，所以沒有次數上限，間隔有上限）。
- */
-export function usePayUniRegistration(storeId: string | undefined) {
-	const query = useConnectQuery(
-		SellerAdminService.method.getPayUniRegistration,
-		storeId ? { storeId } : skipToken,
-		{
-			refetchInterval: (q) =>
-				payUniPollInterval(q.state.data?.registration, new Date()),
-		},
-	);
-	return { query, value: payUniOf(query) };
 }
 
 /**

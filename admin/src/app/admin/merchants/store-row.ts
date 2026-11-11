@@ -61,7 +61,7 @@ const FLOW_VARIANT: Readonly<Partial<Record<KYCFlowStatus, BadgeVariant>>> = {
 
 /**
  * 認證流程狀態的徽章：文字取自共用文案目錄的後台員工受眾（沒有申請是「尚未申請」；UNSPECIFIED 與不認得的值是「未知」），
- * 顏色是 admin 的呈現。清單與商家詳情的 PayUni 卡共用。
+ * 顏色是 admin 的呈現。清單與商家詳情的頁首共用。
  */
 export function flowBadge(flow: KYCFlowStatus): {
 	label: string;
