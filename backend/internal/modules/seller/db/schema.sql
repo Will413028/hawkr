@@ -14,7 +14,7 @@ CREATE SCHEMA seller;
 
 -- 店家：一列是一個 stint（ADR 2026-07-11-identity-store-stint-symmetry）。重新入駐新增一列，帶新的 store_id 與
 -- store_code；目前的 stint 是 status 不是 CLOSED 的那一列，每個帳號最多一列（stores_current_account）。
--- store_code 是 PayUni 看到的外部代碼（MerID 由它組成），所以每個 stint 都要新的。
+-- store_code 是對外的店家代碼，每個 stint 都要新的（stores_store_code 唯一）。
 -- first_exposed_at 是這家店的公開時間：第一次被觀察到可公開曝光的時間（只在公告可曝光時由 profile 的公告函式寫入，寫一次不覆寫，永久保留）。
 -- 新店加分以它起算（discovery）；店家卡片也只給「曾經公開過」的店（store_id 連號可列舉，沒公開過的店名不能被逐號讀出），store_id 換成
 -- uuid 之後只移除卡片的這個過濾，欄位保留。
@@ -910,11 +910,11 @@ CREATE INDEX measure_identities_hash ON seller.measure_identities (hash);
 -- KYC 認證申請（ADR 2026-10-19-seller-kyc-payuni-consolidated）：以 store_id 為鍵，一個店家同時最多一筆還沒取消的申請
 -- （kyc_applications_open；被退回的重送沿用原列，狀態回到 DRAFT）。草稿與送出共用同一組具型別的欄位（沒有自由格式的
 -- JSON），草稿時除了身分以外都可以是 NULL，送出之後必填由 kyc_applications_complete_check 表達。status 只記人工決定
--- （草稿、送出、核准、退回、取消）；PayUni 的綁定狀態在 7c 的後續階段，不混進這條軸。ID 是 UUIDv7（應用層產生）：申請
+-- （草稿、送出、核准、退回、取消）；收款帳戶的狀態由 payment 模組擁有，不混進這條軸。ID 是 UUIDv7（應用層產生）：申請
 -- 是 media 引用、事件與稽核指稱的實體，Java 不存它（row-identity ADR）。
 -- 個資：id_card_no、rep_id_card_no（企業負責人）與 bank_account 是 AES-256-GCM 的密文（platform/seal，AAD 是申請 ID
 -- 加欄位名），real_name 與 birth_date 明文（後台以姓名模糊搜尋，ADR 2026-07-20）。每個識別欄位另有一個 blind index
--- （HMAC，輸入帶欄位標籤；*_hash_key 是算出它的金鑰 ID），給處分的身分快照用。送給 PayUni 的聯絡資料（聯絡人、聯絡手機、
+-- （HMAC，輸入帶欄位標籤；*_hash_key 是算出它的金鑰 ID），給處分的身分快照用。聯絡資料（聯絡人、聯絡手機、
 -- 客服信箱）是店家的欄位（stores），不在申請上。收款聯絡信箱不在申請上：它是帳號的聯絡信箱（identity，D23 2026-11-03 修訂），送出時要求帳號有，核准時傳給 payment 模組快照到收款帳戶列（payment.accounts.contact_email）。公司地址以內政部的鄉鎮市區代碼表示（同 stores）。
 -- version 是樂觀鎖（etag 的來源）：所有寫入者必帶讀到的版本。
 -- 個資清理：店家關閉滿保留期後 purge 套件清掉全部個人欄位（密文、blind index、姓名、生日、證件資訊、聯絡方式、公司與
@@ -1161,8 +1161,7 @@ CREATE TABLE seller.kyc_registration_checks (
         NOT (mismatched_fields && unverifiable_fields)
     )
 );
--- 掃描 job 的兩支查詢（過期的收成終態、閒置的補排）只看還在 PENDING 的列，並以 deadline_at 判斷；PENDING 是少數，部分索引很小
--- （payuni_registrations_unsynced 的先例）。
+-- 掃描 job 的兩支查詢（過期的收成終態、閒置的補排）只看還在 PENDING 的列，並以 deadline_at 判斷；PENDING 是少數，部分索引很小。
 CREATE INDEX kyc_registration_checks_pending ON seller.kyc_registration_checks (deadline_at) WHERE outcome = 'PENDING';
 
 -- 審核紀錄：append-only（只有 INSERT 的查詢），記人工決定的事實（誰、何時、什麼決定、理由），不含任何欄位值。
@@ -1275,119 +1274,6 @@ CREATE TABLE seller.kyc_document_accesses (
     CONSTRAINT kyc_document_accesses_position_check CHECK (position >= 0 AND position < 10 AND (slot = 'COMPANY_DOCUMENT' OR position = 0))
 );
 CREATE INDEX kyc_document_accesses_application ON seller.kyc_document_accesses (application_id, accessed_at DESC, access_id DESC);
-
--- PayUni 子商店註冊（ADR 2026-10-19-seller-kyc-payuni-consolidated「核准與 PayUni 綁定」）：一個店家一列（store_id 是主鍵），這一列
--- 就是綁定的意圖（intent）：核准時在同一個 transaction 寫入（bind_status = PENDING）並排入以 store_id 為唯一鍵的 job，
--- job 在 transaction 外呼叫 PayUni，再於自己的 transaction 寫結果。cert 軸（kyc_applications.status）只記人工決定，綁定與
--- PayUni 的審核結果在這張表。MerID 是 'HAWK' 加 store_code，一個 stint 一次性。
--- 不存請求本體（舊的 raw_request 含明文身分證號）：bind 與同步的內容在 job 執行時由 KYC（解密）、店家與這一列的聯絡欄位
--- 組出來，送出就丟。
--- 同步 intent：intent_seq 在任何需要送給 PayUni 的資料改變時加一（核准、店家改聯絡資料或地址、重新綁定），
--- synced_seq 是 job 上次送出時讀到的 intent_seq；兩者不等表示有東西還沒送。同一店家同時只有一個 job 呼叫 PayUni 由
--- River 的唯一鍵（排隊中、執行中、等重試）保證，這裡沒有另外的租約。sync_error_code 是上一次聯絡欄位或地址同步被 PayUni 永久拒絕的代碼
--- （賣家再改一次才會重送）；bind_error_code 只在 FAILED（綁定被永久拒絕、資料不完整或重試用完），由管理員重新綁定。
--- 送給 PayUni 的聯絡資料是店家的欄位（stores 的 contact_name、contact_mobile、support_email、contact_phone 與地址），這裡不存副本。
--- PayUni 自由文字的 reason 是個資：店家關閉滿保留期後由 purge 套件清成 NULL 並記下 pii_purged_at
--- （payuni_registrations_purged_check 要求清理過的列一定沒有它），PayUni 的狀態碼與 outcome 保留。
--- PayUni 目前的狀態是它回報的原碼（外部事實）加上推導的 outcome；outcome 與原碼由同一個條件式 UPDATE 一起寫入（唯一
--- 的寫入點是 payuni 套件的 apply），只有 executed_at 比 status_observed_at 新的觀測會更新（亂序的舊通知不倒退）。
--- 付款能力不存：outcome = APPROVED 且 bind_status = BOUND 時才有。
--- bind_failed_at：綁定失敗的時刻（只有 bind_status = FAILED 時有值，回到 PENDING 或 BOUND 時清空）。
--- resubmitted_at：已綁定的註冊（PayUni 端已有這個商店）在 PayUni 拒絕之後重新送出、再核准的時間：重新核准不再綁定
--- （MerID 已存在），改以 update_merchant 送新的聯絡欄位與地址；PayUni 的拒絕是舊的狀態，輪詢在這個時間之後的一段期間內
--- 繼續問，直到 PayUni 回報新的結果。
-CREATE TABLE seller.payuni_registrations (
-    store_id           BIGINT PRIMARY KEY REFERENCES seller.stores (store_id),
-    mer_id             TEXT NOT NULL,
-    application_id     UUID NOT NULL REFERENCES seller.kyc_applications (application_id),
-    bind_status        TEXT NOT NULL DEFAULT 'PENDING',
-    bind_error_code    TEXT,
-    bind_failed_at     TIMESTAMPTZ,
-    bind_attempts      INTEGER NOT NULL DEFAULT 0,
-    bound_at           TIMESTAMPTZ,
-    intent_seq         BIGINT NOT NULL DEFAULT 1,
-    synced_seq         BIGINT NOT NULL DEFAULT 0,
-    sync_error_code    TEXT,
-    resubmitted_at     TIMESTAMPTZ,
-    mer_status         TEXT,
-    member_status      TEXT,
-    credit_status      TEXT,
-    applepay_status    TEXT,
-    googlepay_status   TEXT,
-    atm_status         TEXT,
-    reason             TEXT,
-    outcome            TEXT NOT NULL DEFAULT 'NONE',
-    status_observed_at TIMESTAMPTZ,
-    status_checked_at  TIMESTAMPTZ,
-    created_at         TIMESTAMPTZ NOT NULL,
-    updated_at         TIMESTAMPTZ NOT NULL,
-    pii_purged_at      TIMESTAMPTZ,
-    CONSTRAINT payuni_registrations_mer_id_check CHECK (mer_id ~ '^HAWK[0-9]{1,10}$'),
-    CONSTRAINT payuni_registrations_bind_status_check CHECK (bind_status IN ('PENDING', 'BOUND', 'FAILED')),
-    CONSTRAINT payuni_registrations_bind_error_check CHECK (
-        (bind_status = 'FAILED') = (bind_error_code IS NOT NULL) AND bind_error_code ~ '^[A-Z][A-Z0-9_]{0,39}$'
-    ),
-    CONSTRAINT payuni_registrations_bind_failed_check CHECK ((bind_status = 'FAILED') = (bind_failed_at IS NOT NULL)),
-    CONSTRAINT payuni_registrations_sync_error_check CHECK (sync_error_code ~ '^[A-Z][A-Z0-9_]{0,39}$'),
-    CONSTRAINT payuni_registrations_bound_check CHECK ((bind_status = 'BOUND') = (bound_at IS NOT NULL)),
-    CONSTRAINT payuni_registrations_attempts_check CHECK (bind_attempts >= 0),
-    CONSTRAINT payuni_registrations_seq_check CHECK (intent_seq >= 1 AND synced_seq >= 0 AND synced_seq <= intent_seq),
-    CONSTRAINT payuni_registrations_status_codes_check CHECK (
-        char_length(mer_status) >= 1 AND char_length(mer_status) <= 20 AND
-        char_length(member_status) >= 1 AND char_length(member_status) <= 20 AND
-        char_length(credit_status) >= 1 AND char_length(credit_status) <= 20 AND
-        char_length(applepay_status) >= 1 AND char_length(applepay_status) <= 20 AND
-        char_length(googlepay_status) >= 1 AND char_length(googlepay_status) <= 20 AND
-        char_length(atm_status) >= 1 AND char_length(atm_status) <= 20 AND
-        char_length(reason) >= 1 AND char_length(reason) <= 500
-    ),
-    CONSTRAINT payuni_registrations_outcome_check CHECK (outcome IN ('NONE', 'UNDER_REVIEW', 'PENDING_INFO', 'APPROVED', 'REJECTED', 'UNRECOGNIZED')),
-    CONSTRAINT payuni_registrations_observed_check CHECK ((outcome = 'NONE') = (status_observed_at IS NULL)),
-    CONSTRAINT payuni_registrations_purged_check CHECK (pii_purged_at IS NULL OR reason IS NULL)
-);
-CREATE UNIQUE INDEX payuni_registrations_mer_id ON seller.payuni_registrations (mer_id);
--- 輪詢與補送的掃描只看還沒有定論的列。
-CREATE INDEX payuni_registrations_poll ON seller.payuni_registrations (status_checked_at NULLS FIRST, store_id)
-    WHERE bind_status = 'BOUND' AND (outcome IN ('NONE', 'UNDER_REVIEW', 'PENDING_INFO', 'UNRECOGNIZED') OR resubmitted_at IS NOT NULL);
-CREATE INDEX payuni_registrations_unsynced ON seller.payuni_registrations (updated_at, store_id)
-    WHERE bind_status <> 'FAILED' AND synced_seq < intent_seq;
-
--- PayUni 狀態的觀測紀錄：append-only（只有 INSERT 的查詢；唯一的 UPDATE 是個資清理清 reason），每一次從 webhook、輪詢、手動刷新或綁定得到的狀態各一列。
--- executed_at 是 PayUni 的事件時間（webhook 的 ExecuteTime；輪詢、刷新與綁定是我們收到回應的時間），排序與「是否比目前
--- 狀態新」只看它；received_at 是我們寫入的時間。(store_id, event_key) 是 webhook 的冪等鍵（Java 的 event_key 是
--- merId:MerStatus:ExecuteTime），重複的通知只記一次、只套用一次。不存 PayUni 回應的本文（沒有 raw）。狀態碼為空表示
--- 這個來源沒有回報它（webhook 只有 MerStatus；綁定成功的紀錄沒有任何狀態碼）。
--- 保留期限：併入店家個資清理的保留期（ADR 2026-10-19-seller-kyc-payuni-consolidated；舊的 payuni_status_history 的 180 天不另設）：店家關閉滿
--- 保留期後 purge 套件清掉 reason（PayUni 的自由文字，可能帶申請人的資料），狀態碼與時間保留。
-CREATE TABLE seller.payuni_observations (
-    observation_id   UUID PRIMARY KEY,
-    store_id         BIGINT NOT NULL REFERENCES seller.stores (store_id),
-    source           TEXT NOT NULL,
-    event_key        TEXT,
-    mer_status       TEXT,
-    member_status    TEXT,
-    credit_status    TEXT,
-    applepay_status  TEXT,
-    googlepay_status TEXT,
-    atm_status       TEXT,
-    reason           TEXT,
-    executed_at      TIMESTAMPTZ NOT NULL,
-    received_at      TIMESTAMPTZ NOT NULL,
-    CONSTRAINT payuni_observations_source_check CHECK (source IN ('WEBHOOK', 'POLL', 'REFRESH', 'BIND')),
-    CONSTRAINT payuni_observations_event_key_check CHECK (char_length(event_key) BETWEEN 1 AND 200),
-    CONSTRAINT payuni_observations_webhook_key_check CHECK (source <> 'WEBHOOK' OR event_key IS NOT NULL),
-    CONSTRAINT payuni_observations_status_codes_check CHECK (
-        char_length(mer_status) >= 1 AND char_length(mer_status) <= 20 AND
-        char_length(member_status) >= 1 AND char_length(member_status) <= 20 AND
-        char_length(credit_status) >= 1 AND char_length(credit_status) <= 20 AND
-        char_length(applepay_status) >= 1 AND char_length(applepay_status) <= 20 AND
-        char_length(googlepay_status) >= 1 AND char_length(googlepay_status) <= 20 AND
-        char_length(atm_status) >= 1 AND char_length(atm_status) <= 20 AND
-        char_length(reason) >= 1 AND char_length(reason) <= 500
-    ),
-    CONSTRAINT payuni_observations_event_key UNIQUE (store_id, event_key)
-);
-CREATE INDEX payuni_observations_store ON seller.payuni_observations (store_id, executed_at DESC, observation_id DESC);
 
 -- 商家名單（站外業者的 BD 名單，遷移計畫 A3b 步驟 7c 階段 4；ADR 2026-09-25-row-identity-by-data-kind）。ID 沿用 IDENTITY：
 -- ai-service 以 BIGINT 存 procurement_candidates.prospect_id（階段 C 換 UUID）。

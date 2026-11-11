@@ -184,44 +184,6 @@ func (q *Queries) PurgeKYCIdentityHashes(ctx context.Context, applicationIds []u
 	return err
 }
 
-const purgePayUniObservations = `-- name: PurgePayUniObservations :execrows
-UPDATE seller.payuni_observations o
-SET reason = NULL
-FROM seller.stores s
-WHERE o.store_id = ANY($1::bigint[]) AND s.store_id = o.store_id AND s.pii_purged_at IS NOT NULL AND o.reason IS NOT NULL
-`
-
-// 清掉這些店家的觀測紀錄的 reason（自由文字）；狀態碼、事件時間與 event_key 保留。
-func (q *Queries) PurgePayUniObservations(ctx context.Context, storeIds []int64) (int64, error) {
-	result, err := q.db.Exec(ctx, purgePayUniObservations, storeIds)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const purgePayUniRegistrations = `-- name: PurgePayUniRegistrations :execrows
-UPDATE seller.payuni_registrations r
-SET reason = NULL,
-    pii_purged_at = $1
-FROM seller.stores s
-WHERE r.store_id = ANY($2::bigint[]) AND s.store_id = r.store_id AND s.pii_purged_at IS NOT NULL AND r.pii_purged_at IS NULL
-`
-
-type PurgePayUniRegistrationsParams struct {
-	Now      *time.Time
-	StoreIds []int64
-}
-
-// 清掉這些店家的 PayUni 註冊的 reason；狀態碼、outcome 與綁定狀態保留。同樣只作用於店家列已清理的註冊。
-func (q *Queries) PurgePayUniRegistrations(ctx context.Context, arg PurgePayUniRegistrationsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, purgePayUniRegistrations, arg.Now, arg.StoreIds)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const purgeStores = `-- name: PurgeStores :many
 UPDATE seller.stores
 SET store_name = NULL,

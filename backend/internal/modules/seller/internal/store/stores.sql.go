@@ -104,7 +104,7 @@ type AdminStoresParams struct {
 }
 
 // 後台的店家清單：生命週期（呼叫方一定給至少一個）、名稱或電話（ILIKE，呼叫方已跳脫 % _ \）或 store_code 相同、帳號、
-// 目前那一筆還沒取消的 KYC 申請的狀態、PayUni 註冊的綁定狀態（儲存的事實），新到舊的 keyset。停權不在這裡判斷：它的定義
+// 目前那一筆還沒取消的 KYC 申請的狀態，新到舊的 keyset。停權不在這裡判斷：它的定義
 // 只有 EffectiveMeasures 一處，呼叫方先以它取得生效中停權措施的帳號（suspended_accounts），suspended 為 true 只列這些帳號的
 // 店家、false 只列不在其中的。
 func (q *Queries) AdminStores(ctx context.Context, arg AdminStoresParams) ([]SellerStore, error) {

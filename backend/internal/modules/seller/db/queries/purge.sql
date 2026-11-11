@@ -154,18 +154,3 @@ WHERE c.store_id = a.source_store_id AND c.reopened_at IS NULL
 DELETE FROM seller.kyc_documents
 WHERE application_id = ANY(sqlc.arg(application_ids)::uuid[])
 RETURNING application_id, asset_id;
-
--- name: PurgePayUniRegistrations :execrows
--- 清掉這些店家的 PayUni 註冊的 reason；狀態碼、outcome 與綁定狀態保留。同樣只作用於店家列已清理的註冊。
-UPDATE seller.payuni_registrations r
-SET reason = NULL,
-    pii_purged_at = sqlc.arg(now)
-FROM seller.stores s
-WHERE r.store_id = ANY(sqlc.arg(store_ids)::bigint[]) AND s.store_id = r.store_id AND s.pii_purged_at IS NOT NULL AND r.pii_purged_at IS NULL;
-
--- name: PurgePayUniObservations :execrows
--- 清掉這些店家的觀測紀錄的 reason（自由文字）；狀態碼、事件時間與 event_key 保留。
-UPDATE seller.payuni_observations o
-SET reason = NULL
-FROM seller.stores s
-WHERE o.store_id = ANY(sqlc.arg(store_ids)::bigint[]) AND s.store_id = o.store_id AND s.pii_purged_at IS NOT NULL AND o.reason IS NOT NULL;

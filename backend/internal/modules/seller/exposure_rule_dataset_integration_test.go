@@ -29,7 +29,7 @@ type exposureCase struct {
 // 條件對應到 Requirement，「全部條件的 AND」在 Go（needs 表的 CapPublicListing）與 SQL 各寫一次。這個資料集鎖住四條路徑在每家店、
 // 每個評估時刻都相等：SQL 函式直接查、Module.ExposableStores（exposure.Classify 讀同一個函式）、CapabilitiesOf 的 PUBLIC_LISTING（Go 的
 // AND）與人工標註；缺項與人工標註相等（每個條件只缺它自己）；開通條件等於申請核准且收款帳戶的轉帳能力啟用。
-// 資料集含每個生命週期、個資清理、缺 logo 與鄉鎮市區、KYC 申請的每個狀態、沒有申請、沒有收款帳戶、收款帳戶的每個狀態、PayUni 的綁定失敗與審核被拒絕（不影響閘門），
+// 資料集含每個生命週期、個資清理、缺 logo 與鄉鎮市區、KYC 申請的每個狀態、沒有申請、沒有收款帳戶、收款帳戶的每個狀態，
 // 以及有固定期間的停權（剛好結束、早 1µs）、開放式 RISK、解除的 RISK（結束在下一刻）、警告、預告終止（剛好生效、早 1µs）。
 func TestExposureRuleAgreesBetweenSQLAndGoOnADataset(t *testing.T) {
 	t.Parallel()
@@ -62,9 +62,6 @@ func TestExposureRuleAgreesBetweenSQLAndGoOnADataset(t *testing.T) {
 	exposable := func() (int64, int64) {
 		accountID, s := f.exposable(t)
 		return accountID, s.StoreID
-	}
-	payuni := func(storeID int64, sql string, args ...any) {
-		exec("UPDATE seller.payuni_registrations SET "+sql+" WHERE store_id = $1", append([]any{storeID}, args...)...)
 	}
 	kyc := func(storeID int64, sql string) {
 		exec("UPDATE seller.kyc_applications SET "+sql+" WHERE store_id = $1 AND status <> 'CANCELLED'", storeID)
@@ -120,15 +117,6 @@ func TestExposureRuleAgreesBetweenSQLAndGoOnADataset(t *testing.T) {
 	_, id = exposable()
 	exec("UPDATE seller.payout_capabilities SET transfers_active = false WHERE store_id = $1", id)
 	add("收款帳戶的轉帳能力未啟用", id, []Requirement{RequirementOnboardingComplete}, nil)
-
-	// PayUni 不再是開通閘門的輸入：綁定失敗、審核被拒絕的店家，只要收款帳戶啟用就可以曝光。
-	_, id = exposable()
-	payuni(id, "bind_status = 'FAILED', bound_at = NULL, bind_error_code = 'AGENT04017', bind_failed_at = updated_at")
-	add("PayUni 綁定失敗但收款帳戶已啟用", id, nil, nil)
-
-	_, id = exposable()
-	payuni(id, "outcome = 'REJECTED'")
-	add("PayUni 審核被拒絕但收款帳戶已啟用", id, nil, nil)
 
 	// 措施會記下帳號的身分快照，之後同一個身分就不能再通過 KYC：先建好所有要套措施的店，再建立措施。
 	measured := make([]int64, 5)

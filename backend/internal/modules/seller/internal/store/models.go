@@ -397,50 +397,6 @@ type SellerPayoutCapability struct {
 	UpdatedAt       time.Time
 }
 
-type SellerPayuniObservation struct {
-	ObservationID   uuid.UUID
-	StoreID         int64
-	Source          string
-	EventKey        *string
-	MerStatus       *string
-	MemberStatus    *string
-	CreditStatus    *string
-	ApplepayStatus  *string
-	GooglepayStatus *string
-	AtmStatus       *string
-	Reason          *string
-	ExecutedAt      time.Time
-	ReceivedAt      time.Time
-}
-
-type SellerPayuniRegistration struct {
-	StoreID          int64
-	MerID            string
-	ApplicationID    uuid.UUID
-	BindStatus       string
-	BindErrorCode    *string
-	BindFailedAt     *time.Time
-	BindAttempts     int32
-	BoundAt          *time.Time
-	IntentSeq        int64
-	SyncedSeq        int64
-	SyncErrorCode    *string
-	ResubmittedAt    *time.Time
-	MerStatus        *string
-	MemberStatus     *string
-	CreditStatus     *string
-	ApplepayStatus   *string
-	GooglepayStatus  *string
-	AtmStatus        *string
-	Reason           *string
-	Outcome          string
-	StatusObservedAt *time.Time
-	StatusCheckedAt  *time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	PiiPurgedAt      *time.Time
-}
-
 type SellerProductViewEvent struct {
 	EventID     uuid.UUID
 	ProductID   int64

@@ -13,7 +13,7 @@ import (
 )
 
 // makeSeededStoresExposable 讓 seedHistory 的店家（store_code > 2900000000）滿足與時間無關的曝光條件：logo、鄉鎮市區、核准的 KYC 申請、
-// 綁定且核准的 PayUni 註冊、轉帳能力啟用的收款帳戶。是否可曝光只剩帳號有沒有生效中的措施。
+// 轉帳能力啟用的收款帳戶。是否可曝光只剩帳號有沒有生效中的措施。
 func (f *fixture) makeSeededStoresExposable(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
@@ -27,10 +27,6 @@ func (f *fixture) makeSeededStoresExposable(t *testing.T) {
 					submitted_at, submission_seq, decided_at, created_at, updated_at)
 				SELECT md5('kyc' || store_id)::uuid, store_id, 'APPROVED', 'INDIVIDUAL', 'x', 'x', 'x', '004',
 				       '\x01', sha256(('b' || store_id)::bytea), 'k', '\x01', sha256(('i' || store_id)::bytea), 'k', $1, 1, $1, $1, $1
-				FROM seller.stores WHERE store_code > 2900000000`,
-			`INSERT INTO seller.payuni_registrations (store_id, mer_id, application_id, bind_status, bound_at, outcome, status_observed_at,
-					created_at, updated_at)
-				SELECT store_id, 'HAWK' || store_id, md5('kyc' || store_id)::uuid, 'BOUND', $1, 'APPROVED', $1, $1, $1
 				FROM seller.stores WHERE store_code > 2900000000`,
 			`INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at)
 				SELECT store_id, 'fake', true, $1
@@ -46,7 +42,7 @@ func (f *fixture) makeSeededStoresExposable(t *testing.T) {
 		}
 		return nil
 	}))
-	for _, table := range []string{"stores", "kyc_applications", "payuni_registrations"} {
+	for _, table := range []string{"stores", "kyc_applications"} {
 		_, err := f.db.Conn(ctx).Exec(ctx, "ANALYZE seller."+table)
 		must(t, err)
 	}
