@@ -2,8 +2,6 @@
 // Classify 是 seller 的 Go 讀它的唯一一處（讀取路徑與公告共用），Announce 把
 // 現在讀出來的可曝光與最後公告的值比對，不同時更新 store_exposures 並在呼叫方的 transaction 內發 StoreExposureChanged
 // （ADR 2026-10-05-store-exposure-to-legacy 決策 1）。
-//
-// 它在 payuni 之下（payuni 的寫入也要公告）。
 package exposure
 
 import (

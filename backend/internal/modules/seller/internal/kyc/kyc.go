@@ -192,7 +192,7 @@ func (s *Service) SaveDraft(ctx context.Context, in model.KYCDraftInput) (model.
 			return err
 		}
 		if current != nil && current.Status != row.Status {
-			// 已核准的申請回到草稿：KYC 流程不再是 APPROVED，店面頁隨之不公開，可曝光重新公告。
+			// 申請的狀態變了（被退回的申請回到草稿）：重新判斷可曝光並公告，店家頁的快取失效。
 			if err := s.d.Exposure.Announce(ctx, q, now, locked.StoreID); err != nil {
 				return err
 			}
@@ -517,9 +517,8 @@ func (s *Service) transition(ctx context.Context, q *store.Queries, row store.Se
 	if err != nil {
 		return updated, err
 	}
-	// 申請的狀態是「可公開曝光」的輸入（KYC 流程的 APPROVED 由它決定）：送出、取消、核准、退回都在同一個 transaction 內排入
-	// website 店家頁的快取失效；可曝光的公告由各個呼叫方在 transaction 的最後做（Announce 是最後一個鎖，transition 之後
-	// 核准還要鎖 PayUni 註冊列）。
+	// 申請的狀態是「可公開曝光」的輸入（申請核准是開通的條件之一）：送出、取消、核准、退回都在同一個 transaction 內排入
+	// website 店家頁的快取失效；可曝光的公告由各個呼叫方在 transaction 的最後做（Announce 是最後一個鎖）。
 	return updated, stint.InvalidateByID(ctx, q, s.d.Jobs, row.StoreID)
 }
 

@@ -494,7 +494,7 @@ func (s *Service) Approve(ctx context.Context, in model.ApproveKYCInput) (model.
 }
 
 // Reject 退回審核中的申請：Reason 必填，Issues 是逐項指出的問題（至少一項，欄位與文件必須是這份申請實際有的），InternalNote 是只給
-// 後台看的備註。鎖與重新檢查同 Approve；寫審核紀錄與問題、發 KYCRejected（對應舊的 merchant.verification.rejected）。賣家修改後重送沿用同一筆申請。
+// 後台看的備註。鎖與重新檢查同 Approve；寫審核紀錄與問題、發 KYCRejected。賣家修改後重送沿用同一筆申請。
 func (s *Service) Reject(ctx context.Context, in model.RejectKYCInput) (model.KYCAdminApplication, error) {
 	if err := model.Positive(in.AdminID); err != nil {
 		return model.KYCAdminApplication{}, err
@@ -614,7 +614,7 @@ func errNoGrant() error {
 
 // MatchCertHolder 回報 holderName（政府證書查驗回的業者名稱）是否屬於店家目前已核准的 KYC 的姓名或公司名稱（規則在
 // model.MatchCertHolder，名字不出這個函式）。基準只有目前的 stint 上人工核准（KYC APPROVED）的申請（`docs/modules/seller.md` §1.3：「已通過
-// 實名認證」的名稱；PayUni 核准是金流開通，不是身分驗證，所以不是條件）：店家不存在、已關閉、沒有申請、申請不是 APPROVED 都是沒有基準
+// 實名認證」的名稱；收款帳戶啟用是金流開通，不是身分驗證，所以不是條件）：店家不存在、已關閉、沒有申請、申請不是 APPROVED 都是沒有基準
 // （HasReference=false，呼叫方轉人工），不是錯誤；讀取失敗回錯誤，呼叫方必須 fail-closed。
 func (s *Service) MatchCertHolder(ctx context.Context, storeID int64, holderName string) (model.CertHolderMatch, error) {
 	if err := model.Positive(storeID); err != nil {

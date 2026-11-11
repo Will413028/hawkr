@@ -347,7 +347,7 @@ class Store extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearDescription() => $_clearField(4);
 
-  /// 商店電話，台灣的手機或市話（PayUni 的 MerTel）；空字串表示沒有填。
+  /// 商店電話，台灣的手機或市話；空字串表示沒有填。
   @$pb.TagNumber(5)
   $core.String get contactPhone => $_getSZ(4);
   @$pb.TagNumber(5)
@@ -7534,7 +7534,7 @@ class SellerAppServiceApi {
       _client.invoke<SaveKYCDraftResponse>(ctx, 'SellerAppService',
           'SaveKYCDraft', request, SaveKYCDraftResponse());
 
-  /// GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）與流程狀態。還沒有申請（或申請已取消）
+  /// GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）。還沒有申請（或申請已取消）
   /// 時回 not_found。
   $async.Future<GetMyKYCResponse> getMyKYC(
           $pb.ClientContext? ctx, GetMyKYCRequest request) =>

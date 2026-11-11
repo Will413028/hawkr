@@ -18,8 +18,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
 )
 
-// 公司型申請送件時的登記資料查詢快照（ADR 2026-10-19-seller-kyc-payuni-consolidated「登記資料快照」）。流程（與 payuni 的 sync 同一個
-// 三段式，backend AGENTS.md 規則 5）：
+// 公司型申請送件時的登記資料查詢快照（ADR 2026-10-19-seller-kyc-payuni-consolidated「登記資料快照」）。流程（三段式，backend AGENTS.md 規則 5）：
 //
 //  1. 送件（或後台重新查詢）的 transaction 內新增一列 PENDING 的查詢（kyc_registration_checks，綁定這一輪送件的 submission_seq）並
 //     排入 job，args 只有 check_id；

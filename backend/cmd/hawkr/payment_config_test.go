@@ -22,7 +22,7 @@ func TestPaymentProviderConfig(t *testing.T) {
 	if p, err := readPaymentWith(map[string]string{"PAYMENT_PROVIDER": "fake"}); p == nil || err != nil {
 		t.Errorf("fake：%v %v", p, err)
 	}
-	if _, err := readPaymentWith(map[string]string{"PAYMENT_PROVIDER": "payuni"}); err == nil || !strings.Contains(err.Error(), "PAYMENT_PROVIDER") {
+	if _, err := readPaymentWith(map[string]string{"PAYMENT_PROVIDER": "unsupported"}); err == nil || !strings.Contains(err.Error(), "PAYMENT_PROVIDER") {
 		t.Errorf("不認得的 provider：%v", err)
 	}
 }

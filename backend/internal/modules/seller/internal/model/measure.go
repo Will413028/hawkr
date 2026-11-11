@@ -190,7 +190,7 @@ const (
 	// 發 StoreRetired 讓下游刪除（商品、貼文、聊天的個資等），之後不能恢復營業；終止合作關店不早於申覆期限（ADR 2026-10-19-seller-kyc-payuni-consolidated
 	// 的 2026-10-20 修訂，Will 改選 Q2 (b)）。時數只從這一個常數來。
 	StoreRetireAfter = 720 * time.Hour
-	// StoreRetention 是關店後的第二段清理：關店後 184 天清註冊、身分與連線資料（店名、聯絡、地址、KYC、PayUni 的自由文字、食品登錄字號、同意紀錄的
+	// StoreRetention 是關店後的第二段清理：關店後 184 天清註冊、身分與連線資料（店名、聯絡、地址、KYC、食品登錄字號、同意紀錄的
 	// IP 與 User-Agent）。184 天是任何連續六個曆月的最大長度，所以不論關店日都不短於詐欺犯罪危害防制條例第 37 條第 1 項的「六個月」。時數只從這一個常數來。
 	StoreRetention = 4416 * time.Hour
 	// IdentityHashRetention 是防詐保存的身分 blind index（account_identity_hashes）的保存期：來源 stint 目前這次關店滿 5 年才刪（Stripe 計畫 D3，Will 2026-10-29；

@@ -504,9 +504,7 @@ type KYCSubmitted struct {
 	StoreID, AccountID int64
 }
 
-// KYCApproved 在管理員核准的 transaction 內發出：這是人工決定，不是 PayUni 的結果。舊系統的
-// merchant.verification.forwarded（status forwarded_to_payuni）是「核准且綁定成功」，7c 的綁定階段完成後由綁定的結果事件
-// 對應；approved、pending_info、under_review 是 PayUni 的審核結果，同樣在後續階段。
+// KYCApproved 在管理員核准的 transaction 內發出：這是人工決定；收款帳戶的建立由同一個 transaction 內 payment 模組寫入。
 type KYCApproved struct {
 	OccurredAt         time.Time
 	EventID            uuid.UUID
@@ -514,8 +512,7 @@ type KYCApproved struct {
 	StoreID, AccountID int64
 }
 
-// KYCRejected 在管理員退回的 transaction 內發出，對應舊的 merchant.verification.rejected（status rejected、
-// reason 是退回理由、merchant_id 是 AccountID）；EventID 是穩定的 UUIDv7，relay 重送時不變。
+// KYCRejected 在管理員退回的 transaction 內發出；Reason 是退回理由，EventID 是穩定的 UUIDv7，訂閱者重送時不變。目前沒有訂閱者。
 type KYCRejected struct {
 	OccurredAt         time.Time
 	EventID            uuid.UUID
@@ -645,7 +642,7 @@ func ParseDate(raw string, now time.Time) (time.Time, bool) {
 // FormatDate 把日曆日輸出成 YYYY-MM-DD。
 func FormatDate(d time.Time) string { return d.Format(time.DateOnly) }
 
-// NormalizeMobile 正規化台灣手機（09 開頭 10 碼）；PayUni 的聯絡電話要手機。
+// NormalizeMobile 正規化台灣手機（09 開頭 10 碼）。
 func NormalizeMobile(raw string) (string, bool) {
 	p := phone.NormalizeToLocal(raw)
 	return p, mobileRe.MatchString(p)
@@ -657,7 +654,7 @@ func ValidEnglishName(name string) bool {
 }
 
 // KYCFieldNames 回傳申請上可以指出「有問題」的欄位路徑（與對外 KYCApplication 的欄位路徑一對一，個人與企業專屬的欄位在
-// individual.、business. 底下）：退回要補的欄位、PayUni 問題要補的欄位、還缺的欄位都用這一套。
+// individual.、business. 底下）：退回要補的欄位與還缺的欄位都用這一套。
 func KYCFieldNames() []string {
 	return []string{
 		"real_name", "birth_date", "id_card_issue_date", "id_card_issue_type", "id_card_issue_location", "english_name",

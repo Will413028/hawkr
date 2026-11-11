@@ -135,7 +135,7 @@ abstract final class SellerAppService {
     hawkrsellerv1alpha1seller.SaveKYCDraftResponse.new,
   );
 
-  /// GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）與流程狀態。還沒有申請（或申請已取消）
+  /// GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）。還沒有申請（或申請已取消）
   /// 時回 not_found。
   static const getMyKYC = connect.Spec(
     '/$name/GetMyKYC',

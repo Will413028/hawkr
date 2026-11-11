@@ -5,7 +5,7 @@
 // source: hawkr/seller/v1alpha1/seller.proto
 
 // seller 模組給前台的 API：賣家自己的店家（申請開店、店家資料、logo 與封面、新手引導、關店）、店家的粉絲、
-// 身分認證（KYC）與 PayUni 子商店、統一編號的登記資料查詢，以及措施與申覆（SellerAppService）；任何人都能讀的店面與
+// 身分認證（KYC）、統一編號的登記資料查詢，以及措施與申覆（SellerAppService）；任何人都能讀的店面與
 // 店家卡片，以及商品瀏覽的訪客打點（SellerPublicService）。後台的 API 在 hawkr.admin.seller.v1alpha1。
 //
 // ID 是不透明的字串；過渡期店家的 ID 是十進位整數字串，client 不解析、不轉數字
@@ -164,7 +164,7 @@ const (
 	SellerCapability_SELLER_CAPABILITY_STOREFRONT_WRITE SellerCapability = 2
 	// 商品的建立、編輯、上下架、價格。
 	SellerCapability_SELLER_CAPABILITY_PRODUCT_MANAGE SellerCapability = 3
-	// 出貨、售後、訂單查詢、PayUni 狀態。
+	// 出貨、售後、訂單查詢。
 	SellerCapability_SELLER_CAPABILITY_ORDER_FULFILL SellerCapability = 4
 	// 收縮型的訂單動作（取消出貨與退款受理）。
 	SellerCapability_SELLER_CAPABILITY_ORDER_CONTRACT SellerCapability = 5
@@ -184,7 +184,7 @@ const (
 	SellerCapability_SELLER_CAPABILITY_INVOICE_MANAGE SellerCapability = 13
 	// 稅務身分的申請、補件與延長。
 	SellerCapability_SELLER_CAPABILITY_INVOICE_TAX_REMEDY SellerCapability = 14
-	// 物流建店、啟用與關閉配送方式。前置條件是商家認證（含 PayUni 審核）核准：物流商以 PayUni 已成立的子商店建店。
+	// 物流建店、啟用與關閉配送方式。前置條件是開通完成（SELLER_REQUIREMENT_ONBOARDING_COMPLETE：平台審核核准且收款帳戶的轉帳能力啟用）。
 	SellerCapability_SELLER_CAPABILITY_SHIPPING_SETUP SellerCapability = 15
 	// 店家的狀態：買家看得到店面、可以結帳。缺的條件是公開曝光的全部條件（SellerRequirement）。這是狀態而不是
 	// 賣家能做的動作，只出現在 GetMyStore 的 capabilities，沒有任何方法需要它；「至少一個上架商品」由商品的曝光端檢查，不在其中。
@@ -2048,7 +2048,7 @@ type Store struct {
 	StoreName string `protobuf:"bytes,3,opt,name=store_name,json=storeName,proto3" json:"store_name,omitempty"`
 	// 店家介紹，最多 2000 字；空字串表示沒有填。
 	Description string `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	// 商店電話，台灣的手機或市話（PayUni 的 MerTel）；空字串表示沒有填。
+	// 商店電話，台灣的手機或市話；空字串表示沒有填。
 	ContactPhone string `protobuf:"bytes,5,opt,name=contact_phone,json=contactPhone,proto3" json:"contact_phone,omitempty"`
 	// 店家地址；不設表示沒有填。送出 KYC 之前要填，申請審核中或已核准時不能清掉。可以只填鄉鎮市區（address_detail 是空字串），有明細就一定有鄉鎮市區代碼。
 	// update_mask 列 address 時整個換成請求的地址，請求沒有 address 就是清掉。

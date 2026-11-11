@@ -266,8 +266,8 @@ func (s *Service) exposedRows(ctx context.Context, q *store.Queries, rows []stor
 // StoreCards 從 storeIDs 中挑出「曾經公開過」的店家，回傳卡片資料（店名、logo、封面、營運狀態），依輸入順序、重複的 ID
 // 只算一次；不存在與從沒公開過的略過（store_id 在過渡期連號、可列舉，沒公開過的店名不能被逐號讀出）。曾經公開過是
 // first_exposed_at 有值（公告函式寫入），或此刻可以公開曝光（涵蓋 job 還沒追上的空窗）；曝光規則仍只有 exposedRows。
-// 營運狀態由 model.CardStatusOf 推導：OPEN 是此刻可以公開曝光，已關閉是 CLOSED，其餘（停權、等待刪除、PayUni 被拒絕、身分認證
-// 改回草稿、缺店名／logo／所在地）是 PAUSED。任何一次讀取失敗都回錯誤，不回部分結果。
+// 營運狀態由 model.CardStatusOf 推導：OPEN 是此刻可以公開曝光，已關閉是 CLOSED，其餘（停權、等待刪除、申請未核准、收款帳戶未啟用、
+// 缺店名／logo／所在地）是 PAUSED。任何一次讀取失敗都回錯誤，不回部分結果。
 func (s *Service) StoreCards(ctx context.Context, storeIDs []int64) ([]model.StoreCard, error) {
 	if err := model.BatchIDs(storeIDs); err != nil {
 		return nil, err

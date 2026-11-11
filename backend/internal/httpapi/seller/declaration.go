@@ -59,8 +59,8 @@ var declarations = map[string]declaration{
 	sellerv1alpha1connect.SellerAppServiceGetMyDashboardProcedure:            requires(model.CapMarketing),
 	sellerv1alpha1connect.SellerAppServiceCloseMyStoreProcedure:              requires(model.CapAccountClose),
 
-	// KYC 與 PayUni：模組對同一個能力再檢查一次（深度防禦）。草稿、送出與取消是店面設定的一部分，停權與等待刪除時不能做；
-	// 讀取自己的申請（含 PayUni 狀態）停權時仍可以。
+	// KYC：模組對同一個能力再檢查一次（深度防禦）。草稿、送出與取消是店面設定的一部分，停權與等待刪除時不能做；
+	// 讀取自己的申請停權時仍可以。
 	sellerv1alpha1connect.SellerAppServiceSaveKYCDraftProcedure: requires(model.CapStorefrontWrite),
 	sellerv1alpha1connect.SellerAppServiceGetMyKYCProcedure:     requires(model.CapAccountSelfRead),
 	sellerv1alpha1connect.SellerAppServiceCancelKYCProcedure:    requires(model.CapStorefrontWrite),

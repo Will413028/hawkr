@@ -18,7 +18,7 @@ const (
 	CapStorefrontWrite Capability = "CAP_STOREFRONT_WRITE"
 	// CapProductManage 商品的建立、編輯、上下架、價格。
 	CapProductManage Capability = "CAP_PRODUCT_MANAGE"
-	// CapOrderFulfill 出貨、物流、售後、訂單查詢、PayUni 狀態。
+	// CapOrderFulfill 出貨、物流、售後、訂單查詢。
 	CapOrderFulfill Capability = "CAP_ORDER_FULFILL"
 	// CapOrderContract 收縮型的訂單動作（取消出貨與退款受理）。
 	CapOrderContract Capability = "CAP_ORDER_CONTRACT"

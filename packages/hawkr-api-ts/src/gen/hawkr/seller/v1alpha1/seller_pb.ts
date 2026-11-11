@@ -3,7 +3,7 @@
 /* eslint-disable */
 
 // seller 模組給前台的 API：賣家自己的店家（申請開店、店家資料、logo 與封面、新手引導、關店）、店家的粉絲、
-// 身分認證（KYC）與 PayUni 子商店、統一編號的登記資料查詢，以及措施與申覆（SellerAppService）；任何人都能讀的店面與
+// 身分認證（KYC）、統一編號的登記資料查詢，以及措施與申覆（SellerAppService）；任何人都能讀的店面與
 // 店家卡片，以及商品瀏覽的訪客打點（SellerPublicService）。後台的 API 在 hawkr.admin.seller.v1alpha1。
 //
 // ID 是不透明的字串；過渡期店家的 ID 是十進位整數字串，client 不解析、不轉數字
@@ -130,7 +130,7 @@ export type Store = Message<"hawkr.seller.v1alpha1.Store"> & {
   description: string;
 
   /**
-   * 商店電話，台灣的手機或市話（PayUni 的 MerTel）；空字串表示沒有填。
+   * 商店電話，台灣的手機或市話；空字串表示沒有填。
    *
    * @generated from field: string contact_phone = 5;
    */
@@ -2847,7 +2847,7 @@ export enum SellerCapability {
   PRODUCT_MANAGE = 3,
 
   /**
-   * 出貨、售後、訂單查詢、PayUni 狀態。
+   * 出貨、售後、訂單查詢。
    *
    * @generated from enum value: SELLER_CAPABILITY_ORDER_FULFILL = 4;
    */
@@ -2917,7 +2917,7 @@ export enum SellerCapability {
   INVOICE_TAX_REMEDY = 14,
 
   /**
-   * 物流建店、啟用與關閉配送方式。前置條件是商家認證（含 PayUni 審核）核准：物流商以 PayUni 已成立的子商店建店。
+   * 物流建店、啟用與關閉配送方式。前置條件是開通完成（SELLER_REQUIREMENT_ONBOARDING_COMPLETE：平台審核核准且收款帳戶的轉帳能力啟用）。
    *
    * @generated from enum value: SELLER_CAPABILITY_SHIPPING_SETUP = 15;
    */
@@ -4439,7 +4439,7 @@ export const SellerAppService: GenService<{
     output: typeof SaveKYCDraftResponseSchema;
   },
   /**
-   * GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）與流程狀態。還沒有申請（或申請已取消）
+   * GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）。還沒有申請（或申請已取消）
    * 時回 not_found。
    *
    * @generated from rpc hawkr.seller.v1alpha1.SellerAppService.GetMyKYC

@@ -541,8 +541,8 @@ func TestLookupBusinessRegistrationMapsTheRegistrationAndValidatesTheTaxID(t *te
 	}
 }
 
-// KYCField 與 KYCApplication 的欄位路徑一對一：退回、PayUni 問題、缺項與送出的 BadRequest 用同一套語彙。可寫的欄位（"*" 展開，
-// 兩支都算）去掉 etag 就是 KYCFieldNames；每個 KYCField 對到真的存在的路徑；PayUni 的欄位群組都在裡面。
+// KYCField 與 KYCApplication 的欄位路徑一對一：退回、缺項與送出的 BadRequest 用同一套語彙。可寫的欄位（"*" 展開，
+// 兩支都算）去掉 etag 就是 KYCFieldNames；每個 KYCField 對到真的存在的路徑。
 func TestKYCFieldIsOneToOneWithTheWritableApplicationFields(t *testing.T) {
 	var writableLeaves []string
 	for _, subject := range []*pb.KYCApplication{

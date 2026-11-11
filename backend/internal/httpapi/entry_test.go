@@ -282,7 +282,7 @@ func TestCSRF(t *testing.T) {
 		{"只有 Origin、不是自己的", "/api/v1/app/orders", "", "https://evil.example", http.StatusForbidden},
 		{"自己的 web", "/api/v1/app/orders", "cross-site", testOrigin, http.StatusOK},
 		{"App 與伺服器（沒有 Sec-Fetch-Site 與 Origin）", "/api/v1/app/orders", "", "", http.StatusOK},
-		{"金流的瀏覽器回跳", "/payment/return", "cross-site", "https://payuni.example", http.StatusOK},
+		{"金流的瀏覽器回跳", "/payment/return", "cross-site", "https://pay.example", http.StatusOK},
 	}
 	for _, c := range cases {
 		if got := post(c.path, c.site, c.origin); got != c.want {

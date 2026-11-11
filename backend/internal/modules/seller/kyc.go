@@ -196,7 +196,7 @@ func KYCDocumentSlotValues() []KYCDocumentSlot { return model.KYCDocumentSlotVal
 // KYCDocumentFieldNames 回傳文件類的欄位路徑（退回的問題可以指到某一張文件的欄位）。
 func KYCDocumentFieldNames() []string { return model.KYCDocumentFieldNames() }
 
-// KYCFieldNames 回傳申請上可以指出「有問題」的欄位路徑（與對外 KYCApplication 的欄位路徑一對一）：退回的問題、PayUni 問題、缺項共用。
+// KYCFieldNames 回傳申請上可以指出「有問題」的欄位路徑（與對外 KYCApplication 的欄位路徑一對一）：退回的問題與缺項共用。
 func KYCFieldNames() []string { return model.KYCFieldNames() }
 
 // KYCSlotField 回傳證件位置所屬的欄位路徑（後台契約用欄位表示文件）；不認得的位置回 false。
@@ -205,7 +205,7 @@ func KYCSlotField(slot KYCDocumentSlot) (string, bool) { return model.KYCSlotFie
 // IssuableFields 回傳申請可以在退回時指出問題的欄位路徑（RejectKYC 的驗證與後台退回表單共用的同一份規則）。
 func IssuableFields(t KYCSellerType) []string { return model.IssuableFields(t) }
 
-// StoreFieldNames 回傳店家上可以指出「有問題」的欄位路徑（與對外 Store 的欄位一對一）：送出前缺的店家欄位與 PayUni 問題共用。
+// StoreFieldNames 回傳店家上可以指出「有問題」的欄位路徑（與對外 Store 的欄位一對一）：送出前缺的店家欄位用這一套。
 func StoreFieldNames() []string { return model.StoreFieldNames() }
 
 // SaveKYCDraft 部分更新帳號目前店家的 KYC 草稿（還沒有申請時建立，ExpectedVersion 為 0；被退回的申請在這裡回到 DRAFT）。
@@ -245,7 +245,7 @@ type CertHolderMatch = model.CertHolderMatch
 
 // MatchCertificateHolder 只為 legacy 的 SellerService.MatchCertificateHolder 存在（product-service 的有機與產銷履歷證書自動核准，
 // 退場：product 搬進單體、直接呼叫本方法，主計畫 B4）：holderName 是政府證書查驗回的業者名稱，是否屬於店家目前已人工核准的 KYC 的
-// 姓名或公司名稱（只回判定與相符的欄位，名字不出模組；不要求 PayUni 核准）。沒有基準（店家不存在、已關閉、沒有核准的申請、
+// 姓名或公司名稱（只回判定與相符的欄位，名字不出模組；不要求收款帳戶啟用）。沒有基準（店家不存在、已關閉、沒有核准的申請、
 // 名稱都是空的）時 HasReference 為 false；讀取失敗回錯誤。
 func (m *Module) MatchCertificateHolder(ctx context.Context, storeID int64, holderName string) (CertHolderMatch, error) {
 	return m.kyc.MatchCertHolder(ctx, storeID, holderName)

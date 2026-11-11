@@ -32,10 +32,10 @@ func TestWebOriginURLJoinsSitePathsAndPassesAbsoluteURLsThrough(t *testing.T) {
 		t.Fatal(err)
 	}
 	cases := map[string]string{
-		"/seller-terms":               "https://www.example/seller-terms",
-		"/privacy#seller-kyc-notice":  "https://www.example/privacy#seller-kyc-notice",
-		"https://www.payuni.com.tw/t": "https://www.payuni.com.tw/t",
-		"http://localhost:3000/x":     "http://localhost:3000/x",
+		"/seller-terms":              "https://www.example/seller-terms",
+		"/privacy#seller-kyc-notice": "https://www.example/privacy#seller-kyc-notice",
+		"https://pay.example.com/t":  "https://pay.example.com/t",
+		"http://localhost:3000/x":    "http://localhost:3000/x",
 	}
 	for in, want := range cases {
 		got, err := w.URL(in)

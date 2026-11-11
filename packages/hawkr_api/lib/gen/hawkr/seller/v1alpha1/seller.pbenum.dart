@@ -104,7 +104,7 @@ class SellerCapability extends $pb.ProtobufEnum {
       SellerCapability._(
           3, _omitEnumNames ? '' : 'SELLER_CAPABILITY_PRODUCT_MANAGE');
 
-  /// 出貨、售後、訂單查詢、PayUni 狀態。
+  /// 出貨、售後、訂單查詢。
   static const SellerCapability SELLER_CAPABILITY_ORDER_FULFILL =
       SellerCapability._(
           4, _omitEnumNames ? '' : 'SELLER_CAPABILITY_ORDER_FULFILL');
@@ -154,7 +154,7 @@ class SellerCapability extends $pb.ProtobufEnum {
       SellerCapability._(
           14, _omitEnumNames ? '' : 'SELLER_CAPABILITY_INVOICE_TAX_REMEDY');
 
-  /// 物流建店、啟用與關閉配送方式。前置條件是商家認證（含 PayUni 審核）核准：物流商以 PayUni 已成立的子商店建店。
+  /// 物流建店、啟用與關閉配送方式。前置條件是開通完成（SELLER_REQUIREMENT_ONBOARDING_COMPLETE：平台審核核准且收款帳戶的轉帳能力啟用）。
   static const SellerCapability SELLER_CAPABILITY_SHIPPING_SETUP =
       SellerCapability._(
           15, _omitEnumNames ? '' : 'SELLER_CAPABILITY_SHIPPING_SETUP');

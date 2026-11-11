@@ -54,7 +54,7 @@ func New(d Deps) *Service {
 	return &Service{d: d}
 }
 
-// RandomStoreCode 產生 store_code：西元年的後兩碼乘以 10^8，加上 8 位密碼學亂數（PayUni 的 MerID 是「HAWK」加上它）。
+// RandomStoreCode 產生 store_code：西元年的後兩碼乘以 10^8，加上 8 位密碼學亂數。
 func RandomStoreCode(now time.Time) (int64, error) {
 	n, err := rand.Int(rand.Reader, big.NewInt(100_000_000))
 	if err != nil {

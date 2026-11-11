@@ -3,7 +3,7 @@
 // Source: hawkr/seller/v1alpha1/seller.proto
 
 // seller 模組給前台的 API：賣家自己的店家（申請開店、店家資料、logo 與封面、新手引導、關店）、店家的粉絲、
-// 身分認證（KYC）與 PayUni 子商店、統一編號的登記資料查詢，以及措施與申覆（SellerAppService）；任何人都能讀的店面與
+// 身分認證（KYC）、統一編號的登記資料查詢，以及措施與申覆（SellerAppService）；任何人都能讀的店面與
 // 店家卡片，以及商品瀏覽的訪客打點（SellerPublicService）。後台的 API 在 hawkr.admin.seller.v1alpha1。
 //
 // ID 是不透明的字串；過渡期店家的 ID 是十進位整數字串，client 不解析、不轉數字
@@ -170,7 +170,7 @@ type SellerAppServiceClient interface {
 	// 保留輸入、顯示最新版本）。被退回的申請在這裡回到草稿重新編輯。全部欄位先驗證才寫入，任何一欄不合法都不會寫入。
 	// 送出（SubmitKYC）才檢查必填欄位與證件是否齊全。只有草稿與被退回的申請能儲存；審核中與已核准的回 failed_precondition。
 	SaveKYCDraft(context.Context, *connect.Request[v1alpha1.SaveKYCDraftRequest]) (*connect.Response[v1alpha1.SaveKYCDraftResponse], error)
-	// GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）與流程狀態。還沒有申請（或申請已取消）
+	// GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）。還沒有申請（或申請已取消）
 	// 時回 not_found。
 	GetMyKYC(context.Context, *connect.Request[v1alpha1.GetMyKYCRequest]) (*connect.Response[v1alpha1.GetMyKYCResponse], error)
 	// SubmitKYC 送出申請給管理員審核。草稿與被退回的申請都能直接送出，
@@ -547,7 +547,7 @@ type SellerAppServiceHandler interface {
 	// 保留輸入、顯示最新版本）。被退回的申請在這裡回到草稿重新編輯。全部欄位先驗證才寫入，任何一欄不合法都不會寫入。
 	// 送出（SubmitKYC）才檢查必填欄位與證件是否齊全。只有草稿與被退回的申請能儲存；審核中與已核准的回 failed_precondition。
 	SaveKYCDraft(context.Context, *connect.Request[v1alpha1.SaveKYCDraftRequest]) (*connect.Response[v1alpha1.SaveKYCDraftResponse], error)
-	// GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）與流程狀態。還沒有申請（或申請已取消）
+	// GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）。還沒有申請（或申請已取消）
 	// 時回 not_found。
 	GetMyKYC(context.Context, *connect.Request[v1alpha1.GetMyKYCRequest]) (*connect.Response[v1alpha1.GetMyKYCResponse], error)
 	// SubmitKYC 送出申請給管理員審核。草稿與被退回的申請都能直接送出，
