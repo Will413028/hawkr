@@ -2,6 +2,7 @@ package model
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -88,5 +89,34 @@ func TestClearedLockedFieldsDependsOnApplicationStatus(t *testing.T) {
 	}
 	if got := ClearedLockedFields(clearedAll, clearedAll, KYCStatusApproved); len(got) != 0 {
 		t.Errorf("原本就缺的不算：%v", got)
+	}
+}
+
+func TestNormalizeContactFields(t *testing.T) {
+	ok := Profile{StoreName: "店", ContactName: ptrTo(" 王小明 "), ContactMobile: ptrTo("0912-345-678"), SupportEmail: ptrTo(" A@Example.COM ")}
+	if err := Normalize(&ok); err != nil || *ok.ContactName != "王小明" || *ok.ContactMobile != "0912345678" || *ok.SupportEmail != "a@example.com" {
+		t.Fatalf("err=%v %+v", err, ok)
+	}
+	for name, edit := range map[string]func(*Profile){
+		"姓名超過 50 字": func(p *Profile) { p.ContactName = ptrTo(strings.Repeat("字", ContactNameMaxRunes+1)) },
+		"手機是市話":     func(p *Profile) { p.ContactMobile = ptrTo("0229010572") },
+		"信箱沒有網域":    func(p *Profile) { p.SupportEmail = ptrTo("user@localhost") },
+		"信箱超過 254 字": func(p *Profile) {
+			p.SupportEmail = ptrTo(strings.Repeat("a", SupportEmailMaxRunes-len("@example.com")+1) + "@example.com")
+		},
+	} {
+		p := Profile{StoreName: "店"}
+		edit(&p)
+		if err := Normalize(&p); err == nil {
+			t.Errorf("%s 應該被拒絕", name)
+		}
+	}
+	if ContactNameMaxRunes != 50 || SupportEmailMaxRunes != 254 {
+		t.Errorf("上限是姓名 50 字、信箱 254：%d、%d", ContactNameMaxRunes, SupportEmailMaxRunes)
+	}
+	boundary := Profile{StoreName: "店", ContactName: ptrTo(strings.Repeat("字", ContactNameMaxRunes)),
+		SupportEmail: ptrTo(strings.Repeat("a", SupportEmailMaxRunes-len("@example.com")) + "@example.com")}
+	if err := Normalize(&boundary); err != nil {
+		t.Errorf("上限剛好應該通過：%v", err)
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -44,8 +45,10 @@ func newSellerRelayFixture(t *testing.T) *sellerRelayFixture {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	accounts := identity.New(identity.Deps{DB: d, Events: bus, Now: clock, Logger: logger})
 	kycKeys, kycMAC := sealtest.Keys(t)
+	kycImages := media.NewFake()
+	kycImages.Key = func(refType, token string) string { return refType + "/" + token }
 	sellers := seller.New(seller.Deps{
-		DB: d, Events: bus, Jobs: queue, Identity: accounts, Media: noMedia{}, Orders: noOrders{}, ProductStores: &productStoresStub{}, Registry: noRegistry{},
+		DB: d, Events: bus, Jobs: queue, Identity: accounts, Media: kycImages, Orders: noOrders{}, ProductStores: &productStoresStub{}, Registry: noRegistry{},
 		KYCKeys: kycKeys, KYCMAC: kycMAC, Now: clock, Logger: logger,
 		Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger}),
 	})
@@ -160,5 +163,50 @@ func TestReconcileExposureAnnouncementIsRelayed(t *testing.T) {
 	got := f.relayJobs(t, "legacy.seller_store_exposure_changed")
 	if len(got) != 1 || got[0]["store_id"] != float64(f.store.StoreID) || got[0]["exposable"] != false || got[0]["version"] != float64(2) {
 		t.Fatalf("relay jobs=%v, want one not-exposable announcement at version 2", got)
+	}
+}
+
+// 平台審核的結果（管理員退回）不轉成舊的通知：送出申請、管理員退回之後，沒有任何新的 legacy 店家 relay job 排入。
+func TestRejectingAKYCApplicationEnqueuesNoLegacyRelayJob(t *testing.T) {
+	ctx := context.Background()
+	f := newSellerRelayFixture(t)
+	if _, err := f.d.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET contact_name = '王小明', contact_mobile = '0912345678', support_email = 'owner@example.com' WHERE store_id = $1", f.store.StoreID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.d.Conn(ctx).Exec(ctx, "UPDATE identity.accounts SET self_entered_email = 'seller@example.com' WHERE id = $1", f.account); err != nil {
+		t.Fatal(err)
+	}
+	individual := seller.KYCIndividual
+	str := func(s string) *string { return &s }
+	draft, err := f.sellers.SaveKYCDraft(ctx, seller.KYCDraftInput{
+		AccountID: f.account, SellerType: &individual, RealName: str("王小明"), BirthDate: str("1990-05-06"), IDCardNo: str("A123456789"),
+		EnglishName: str("Wang Farm"), BankName: str("臺灣銀行"), BankCode: str("004"), BankAccount: str("012345678901"), ProductType: str("蔬果"),
+		IDCardFront: &seller.KYCDocumentRef{StagedToken: "front"}, IDCardBack: &seller.KYCDocumentRef{StagedToken: "back"}, BankBook: &seller.KYCDocumentRef{StagedToken: "book"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	submitted, err := f.sellers.SubmitKYC(ctx, seller.SubmitKYCInput{AcceptedAgreements: seller.CurrentKYCAcceptances(), AccountID: f.account, ExpectedVersion: draft.Version})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := []string{
+		"legacy.seller_store_retired", "legacy.seller_store_suspended", "legacy.seller_store_unsuspended",
+		"legacy.seller_store_profile_changed", "legacy.seller_store_exposure_changed",
+	}
+	before := map[string]int{}
+	for _, kind := range kinds {
+		before[kind] = len(f.relayJobs(t, kind))
+	}
+	if _, err := f.sellers.RejectKYC(ctx, seller.RejectKYCInput{
+		ApplicationID: submitted.ID, ExpectedVersion: submitted.Version, AdminID: 9, Reason: "請確認姓名",
+		Issues: []seller.KYCIssue{{Field: "real_name", Code: seller.IssueOther, Message: "請確認姓名"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range kinds {
+		if got := len(f.relayJobs(t, kind)); got != before[kind] {
+			t.Errorf("%s 在退回之後從 %d 變成 %d：平台審核的結果不轉成舊的通知", kind, before[kind], got)
+		}
 	}
 }
