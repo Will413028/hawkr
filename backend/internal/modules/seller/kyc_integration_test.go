@@ -1386,25 +1386,6 @@ func TestSubmitAndApproveWithoutIdentityBankOrDocuments(t *testing.T) {
 	}
 }
 
-// 送出帶了 PAYUNI_TERMS 被拒：種類不屬於 SubmitKYC，申請維持草稿。
-// mutation：把 PAYUNI_TERMS 加回 SubmitKYCAgreements → 本測試失敗。
-func TestSubmitKYCRejectsPayUniTerms(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	accountID, _ := f.open(t)
-	d := f.savedDraft(t, KYCDraftInput{AccountID: accountID, SellerType: individual()})
-	withPayUni := append(CurrentKYCAcceptances(), AgreementAcceptance{Kind: AgreementPayUniTerms, Version: CurrentAgreementsOrFail(t, AgreementPayUniTerms).Version})
-	_, err := f.module.SubmitKYC(context.Background(), SubmitKYCInput{AcceptedAgreements: withPayUni, AccountID: accountID, ExpectedVersion: d.Version})
-	if apperr.KindOf(err) != apperr.KindInvalidInput {
-		t.Fatalf("err=%v", err)
-	}
-	mine, err := f.module.MyKYC(context.Background(), accountID)
-	must(t, err)
-	if mine.Status != KYCStatusDraft {
-		t.Fatalf("申請被送出：%v", mine.Status)
-	}
-}
-
 // 回歸：送出 KYC 要店家的必填資料（地址、客服信箱）齊全，聯絡人姓名與手機是選填；店家的狀態不在請求裡，缺的不是欄位違規而是
 // failed_precondition，缺哪些看申請檢視的 missing_store_fields（與送出的檢查同一份規則）；申請自己的缺項先回 invalid_argument；
 // 補齊之後才能送出。

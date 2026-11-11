@@ -52,7 +52,7 @@
 
 - 入口、gateway 與舊服務都讀本模組，店家只有一份資料。有 SELLER 卻沒有現任店家是不變量被破壞：`gatewayproxy` 回 500、`accountdeletion` 回 internal，不當成「沒有店家」。
 
-- 入駐同意（ADR `2026-10-19-seller-kyc-payuni-consolidated`「入駐同意紀錄」）：現行版本與網址（站內路徑，對外由 `internal/httpapi` 以 `PUBLIC_WEB_ORIGIN` 組成絕對網址，PayUni 的本來就是絕對網址）只在 `internal/model/agreement_gen.go` 的 `CurrentAgreements`，它由 `website/scripts/generate-legal.ts` 從 `website/docs/legal/` 的正本與 manifest 產生，不得手改；改版是改正本（版本行）或 manifest 後在 `website` 跑 `pnpm gen:legal`。同意的紀錄與開店、送出 KYC 的寫入在同一個 transaction，每次同意事件一列（KYC 的列綁定那次送出的審核紀錄，由資料表的 CHECK 把關）；關店 184 天的第二段清理（`StoreRetention`，連線紀錄）把來源 IP 與 User-Agent 清成 NULL，其餘保留。
+- 入駐同意（ADR `2026-10-19-seller-kyc-payuni-consolidated`「入駐同意紀錄」）：現行版本與網址（站內路徑，對外由 `internal/httpapi` 以 `PUBLIC_WEB_ORIGIN` 組成絕對網址）只在 `internal/model/agreement_gen.go` 的 `CurrentAgreements`，它由 `website/scripts/generate-legal.ts` 從 `website/docs/legal/` 的正本與 manifest 產生，不得手改；改版是改正本（版本行）或 manifest 後在 `website` 跑 `pnpm gen:legal`。同意的紀錄與開店、送出 KYC 的寫入在同一個 transaction，每次同意事件一列（KYC 的列綁定那次送出的審核紀錄，由資料表的 CHECK 把關）；關店 184 天的第二段清理（`StoreRetention`，連線紀錄）把來源 IP 與 User-Agent 清成 NULL，其餘保留。
 
 ### 2.1 身分鍵與 stint 的生命週期
 

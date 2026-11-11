@@ -163,7 +163,7 @@ func TestApplyWithWrongAgreementKindsIsInvalidInput(t *testing.T) {
 	for name, in := range map[string][]AgreementAcceptance{
 		"沒有":          nil,
 		"KYC 的種類":     CurrentKYCAcceptances(),
-		"多出一種":        append(CurrentApplyAcceptances(), current(AgreementPayUniTerms)),
+		"多出一種":        append(CurrentApplyAcceptances(), current(AgreementKYCPrivacyNotice)),
 		"同一種兩次":       {current(AgreementSellerTerms), current(AgreementSellerTerms)},
 		"UNSPECIFIED": {{Kind: "", Version: CurrentAgreementsOrFail(t, AgreementSellerTerms).Version}},
 	} {
@@ -251,11 +251,11 @@ func TestSubmitKYCWithBadAgreementsDoesNotSubmit(t *testing.T) {
 		t.Fatalf("outdated err=%v", err)
 	}
 	for name, in := range map[string][]AgreementAcceptance{
-		"沒有":              nil,
-		"開店的種類":           CurrentApplyAcceptances(),
-		"同一種兩次":           {CurrentKYCAcceptances()[0], CurrentKYCAcceptances()[0]},
-		"多出開店的種類":         append(CurrentKYCAcceptances(), CurrentApplyAcceptances()...),
-		"多出 PAYUNI_TERMS": append(CurrentKYCAcceptances(), AgreementAcceptance{Kind: AgreementPayUniTerms, Version: CurrentAgreementsOrFail(t, AgreementPayUniTerms).Version}),
+		"沒有":                  nil,
+		"開店的種類":               CurrentApplyAcceptances(),
+		"同一種兩次":               {CurrentKYCAcceptances()[0], CurrentKYCAcceptances()[0]},
+		"多出開店的種類":             append(CurrentKYCAcceptances(), CurrentApplyAcceptances()...),
+		"已下架的種類 PAYUNI_TERMS": append(CurrentKYCAcceptances(), AgreementAcceptance{Kind: "PAYUNI_TERMS", Version: "2026-10-07"}),
 	} {
 		_, err := f.kycSubmit(accountID, d.Version, in, "", "")
 		if ae := apperrOf(t, err); ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != "AcceptedAgreements" {
@@ -329,16 +329,17 @@ func TestAgreementAcceptanceTableConstraints(t *testing.T) {
 	for name, err := range map[string]error{
 		"開店的同意重複":      insert("SELLER_TERMS", "2025-01-01", nil, nil),
 		"開店的同意帶了送出":    insert("SELLER_TERMS", "2025-01-01", &reviews[0], nil),
-		"KYC 的同意沒有帶送出": insert("PAYUNI_TERMS", "2025-01-01", nil, nil),
+		"KYC 的同意沒有帶送出": insert("KYC_PRIVACY_NOTICE", "2025-01-01", nil, nil),
 		"不認得的 kind":    insert("NO_SUCH", "v", &reviews[0], nil),
-		"空版本":          insert("PAYUNI_TERMS", "", &reviews[0], nil),
-		"空的 UA":        insert("PAYUNI_TERMS", "v", &reviews[0], &empty),
+		"已下架的 kind":    insert("PAYUNI_TERMS", "v", &reviews[0], nil),
+		"空版本":          insert("KYC_PRIVACY_NOTICE", "", &reviews[0], nil),
+		"空的 UA":        insert("KYC_PRIVACY_NOTICE", "v", &reviews[0], &empty),
 	} {
 		if err == nil {
 			t.Errorf("%s：CHECK 或索引沒有擋下", name)
 		}
 	}
-	if err := insert("PAYUNI_TERMS", "2025-01-01", &reviews[0], nil); err != nil {
+	if err := insert("KYC_PRIVACY_NOTICE", "2025-01-01", &reviews[0], nil); err != nil {
 		t.Fatalf("同一次送出可以有不同版本的列：%v", err)
 	}
 }
@@ -433,10 +434,10 @@ func TestApplyWithAnEmptyVersionIsInvalidInput(t *testing.T) {
 }
 
 // agreement_acceptances_source_check：每種 kind 只綁定剛好一種來源。開店的同意（SELLER_TERMS）不帶送出，KYC 的同意
-// （KYC_PRIVACY_NOTICE，以及資料表仍接受的 PAYUNI_TERMS）一定帶送出。被拒的語句以 wantViolates 斷言是這一條擋下，而且拿掉它就成功（沒有被別的約束遮住）。
+// （KYC_PRIVACY_NOTICE）一定帶送出。被拒的語句以 wantViolates 斷言是這一條擋下，而且拿掉它就成功（沒有被別的約束遮住）。
 // 開店時已寫下的那列 SELLER_TERMS 先刪掉，否則每店一列的唯一索引會遮住「開店的同意帶了送出」。
 // mutation：在測試資料庫 ALTER TABLE seller.agreement_acceptances DROP CONSTRAINT agreement_acceptances_source_check，
-// 三個被拒的情況都改成寫入成功，本測試失敗。
+// 兩個被拒的情況都改成寫入成功，本測試失敗。
 func TestAgreementAcceptancesBindExactlyOneSourceByKind(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -453,7 +454,6 @@ func TestAgreementAcceptancesBindExactlyOneSourceByKind(t *testing.T) {
 	}{
 		{"開店的同意帶了送出", "SELLER_TERMS", &review},
 		{"KYC 告知沒有送出", "KYC_PRIVACY_NOTICE", nil},
-		{"PayUni 條款沒有送出", "PAYUNI_TERMS", nil},
 	} {
 		f.wantViolates(t, c.name, "agreement_acceptances_source_check", insert, s.StoreID, c.kind, accountID, c.review)
 	}
@@ -463,7 +463,6 @@ func TestAgreementAcceptancesBindExactlyOneSourceByKind(t *testing.T) {
 	}{
 		{"SELLER_TERMS", nil},
 		{"KYC_PRIVACY_NOTICE", &review},
-		{"PAYUNI_TERMS", &review},
 	} {
 		if _, err := f.db.Conn(ctx).Exec(ctx, insert, s.StoreID, c.kind, accountID, c.review); err != nil {
 			t.Errorf("%s 綁正確來源卻寫不進去：%v", c.kind, err)

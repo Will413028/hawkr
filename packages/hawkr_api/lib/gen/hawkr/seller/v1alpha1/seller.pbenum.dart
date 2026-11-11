@@ -15,7 +15,7 @@ import 'dart:core' as $core;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 /// AgreementKind 是賣家入駐時要同意或確認已閱讀的文件種類。每個操作要求的種類固定：ApplyStore 要 SELLER_TERMS；SubmitKYC 要
-/// KYC_PRIVACY_NOTICE 與 PAYUNI_TERMS。
+/// KYC_PRIVACY_NOTICE。
 class AgreementKind extends $pb.ProtobufEnum {
   static const AgreementKind AGREEMENT_KIND_UNSPECIFIED =
       AgreementKind._(0, _omitEnumNames ? '' : 'AGREEMENT_KIND_UNSPECIFIED');
@@ -29,19 +29,14 @@ class AgreementKind extends $pb.ProtobufEnum {
       AgreementKind._(
           2, _omitEnumNames ? '' : 'AGREEMENT_KIND_KYC_PRIVACY_NOTICE');
 
-  /// PayUni 的服務條款，送出 KYC（SubmitKYC）時同意。
-  static const AgreementKind AGREEMENT_KIND_PAYUNI_TERMS =
-      AgreementKind._(3, _omitEnumNames ? '' : 'AGREEMENT_KIND_PAYUNI_TERMS');
-
   static const $core.List<AgreementKind> values = <AgreementKind>[
     AGREEMENT_KIND_UNSPECIFIED,
     AGREEMENT_KIND_SELLER_TERMS,
     AGREEMENT_KIND_KYC_PRIVACY_NOTICE,
-    AGREEMENT_KIND_PAYUNI_TERMS,
   ];
 
   static final $core.List<AgreementKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
   static AgreementKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

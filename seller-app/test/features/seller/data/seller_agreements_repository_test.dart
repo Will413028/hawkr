@@ -15,11 +15,6 @@ final _privacy = _agreement(
   'p1',
   'https://www.example.test/privacy',
 );
-final _payuni = _agreement(
-  AgreementKind.AGREEMENT_KIND_PAYUNI_TERMS,
-  'u1',
-  'https://www.example.test/payuni',
-);
 final _seller = _agreement(
   AgreementKind.AGREEMENT_KIND_SELLER_TERMS,
   's1',
@@ -30,8 +25,8 @@ SellerAgreementSet _set(List<SellerAgreement> agreements) =>
     SellerAgreementSet(agreements);
 
 void main() {
-  test('KYC 的個資告知：版本與網址取自伺服器，同意剛好這一份，伺服器多給的 PayUni 條款不送', () {
-    final agreements = _set([_seller, _privacy, _payuni]).kycAgreements();
+  test('KYC 的個資告知：版本與網址取自伺服器，同意剛好這一份，伺服器多給的賣家契約不送', () {
+    final agreements = _set([_seller, _privacy]).kycAgreements();
 
     expect(agreements.privacyNotice.url, 'https://www.example.test/privacy');
     expect(agreements.acceptances.map((a) => (a.kind, a.version)), [
@@ -75,7 +70,7 @@ void main() {
               (_, _) {
                 calls++;
                 return GetSellerAgreementsResponse(
-                  agreements: [_seller, _privacy, _payuni],
+                  agreements: [_seller, _privacy],
                 );
               },
             ).build(),

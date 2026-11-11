@@ -50,7 +50,6 @@ describe("acceptancesOf / agreementUrl", () => {
 			acceptancesOf([
 				AgreementKind.SELLER_TERMS,
 				AgreementKind.KYC_PRIVACY_NOTICE,
-				AgreementKind.PAYUNI_TERMS,
 			]),
 		).toEqual([
 			{
@@ -61,13 +60,9 @@ describe("acceptancesOf / agreementUrl", () => {
 				kind: AgreementKind.KYC_PRIVACY_NOTICE,
 				version: SELLER_AGREEMENTS.KYC_PRIVACY_NOTICE.version,
 			},
-			{
-				kind: AgreementKind.PAYUNI_TERMS,
-				version: SELLER_AGREEMENTS.PAYUNI_TERMS.version,
-			},
 		]);
-		expect(agreementUrl(AgreementKind.PAYUNI_TERMS)).toBe(
-			SELLER_AGREEMENTS.PAYUNI_TERMS.url,
+		expect(agreementUrl(AgreementKind.KYC_PRIVACY_NOTICE)).toBe(
+			SELLER_AGREEMENTS.KYC_PRIVACY_NOTICE.url,
 		);
 	});
 

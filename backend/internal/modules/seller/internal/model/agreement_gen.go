@@ -12,8 +12,4 @@ var CurrentAgreements = map[AgreementKind]Agreement{
 		Version: "2026-11-03",
 		URL:     "/privacy#seller-kyc-notice",
 	},
-	"PAYUNI_TERMS": {
-		Version: "2026-10-07",
-		URL:     "https://www.payuni.com.tw/terms",
-	},
 }

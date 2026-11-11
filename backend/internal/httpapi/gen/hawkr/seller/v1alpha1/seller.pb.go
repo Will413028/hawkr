@@ -38,7 +38,7 @@ const (
 )
 
 // AgreementKind 是賣家入駐時要同意或確認已閱讀的文件種類。每個操作要求的種類固定：ApplyStore 要 SELLER_TERMS；SubmitKYC 要
-// KYC_PRIVACY_NOTICE 與 PAYUNI_TERMS。
+// KYC_PRIVACY_NOTICE。
 type AgreementKind int32
 
 const (
@@ -47,8 +47,6 @@ const (
 	AgreementKind_AGREEMENT_KIND_SELLER_TERMS AgreementKind = 1
 	// 身分認證的個資蒐集告知，送出 KYC（SubmitKYC）時確認已閱讀（告知不是同意）。
 	AgreementKind_AGREEMENT_KIND_KYC_PRIVACY_NOTICE AgreementKind = 2
-	// PayUni 的服務條款，送出 KYC（SubmitKYC）時同意。
-	AgreementKind_AGREEMENT_KIND_PAYUNI_TERMS AgreementKind = 3
 )
 
 // Enum value maps for AgreementKind.
@@ -57,13 +55,11 @@ var (
 		0: "AGREEMENT_KIND_UNSPECIFIED",
 		1: "AGREEMENT_KIND_SELLER_TERMS",
 		2: "AGREEMENT_KIND_KYC_PRIVACY_NOTICE",
-		3: "AGREEMENT_KIND_PAYUNI_TERMS",
 	}
 	AgreementKind_value = map[string]int32{
 		"AGREEMENT_KIND_UNSPECIFIED":        0,
 		"AGREEMENT_KIND_SELLER_TERMS":       1,
 		"AGREEMENT_KIND_KYC_PRIVACY_NOTICE": 2,
-		"AGREEMENT_KIND_PAYUNI_TERMS":       3,
 	}
 )
 
@@ -5132,7 +5128,7 @@ type SubmitKYCRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 讀到的申請的 etag。
 	Etag string `protobuf:"bytes,1,opt,name=etag,proto3" json:"etag,omitempty"`
-	// 賣家確認已閱讀的 KYC_PRIVACY_NOTICE 與同意的 PAYUNI_TERMS，剛好這兩份。缺種類、多出不屬於這個操作的種類、同一種重複或
+	// 賣家確認已閱讀的 KYC_PRIVACY_NOTICE，剛好這一份。缺種類、多出不屬於這個操作的種類、同一種重複或
 	// UNSPECIFIED 回 invalid_argument（field violation 指向 accepted_agreements）；版本不是現行版本回
 	// failed_precondition，ErrorInfo.reason 是 AGREEMENT_OUTDATED，client 重讀 GetSellerAgreements，請賣家重新勾選。
 	// 同意與送出同一個 transaction；每次送出各記一組同意，綁定那次送出的審核紀錄（被退回後再送出，也各自留下一組）。
@@ -7613,12 +7609,11 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x18RecordProductViewRequest\x12\"\n" +
 	"\n" +
 	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"\x1b\n" +
-	"\x19RecordProductViewResponse*\xc7\x01\n" +
+	"\x19RecordProductViewResponse*\xc9\x01\n" +
 	"\rAgreementKind\x12\x1e\n" +
 	"\x1aAGREEMENT_KIND_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bAGREEMENT_KIND_SELLER_TERMS\x10\x01\x12%\n" +
-	"!AGREEMENT_KIND_KYC_PRIVACY_NOTICE\x10\x02\x12\x1f\n" +
-	"\x1bAGREEMENT_KIND_PAYUNI_TERMS\x10\x03\"\x04\b\x04\x10\x04*'AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE*\x80\x01\n" +
+	"!AGREEMENT_KIND_KYC_PRIVACY_NOTICE\x10\x02\"\x04\b\x03\x10\x03\"\x04\b\x04\x10\x04*\x1bAGREEMENT_KIND_PAYUNI_TERMS*'AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE*\x80\x01\n" +
 	"\vStoreStatus\x12\x1c\n" +
 	"\x18STORE_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13STORE_STATUS_ACTIVE\x10\x01\x12!\n" +

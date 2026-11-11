@@ -1,0 +1,3 @@
+-- Delete "PAYUNI_TERMS" rows and modify "agreement_acceptances" table
+DELETE FROM "seller"."agreement_acceptances" WHERE kind = 'PAYUNI_TERMS';
+ALTER TABLE "seller"."agreement_acceptances" DROP CONSTRAINT "agreement_acceptances_kind_check", ADD CONSTRAINT "agreement_acceptances_kind_check" CHECK (kind = ANY (ARRAY['SELLER_TERMS'::text, 'KYC_PRIVACY_NOTICE'::text])), DROP CONSTRAINT "agreement_acceptances_source_check", ADD CONSTRAINT "agreement_acceptances_source_check" CHECK (((kind = 'SELLER_TERMS'::text) AND (submission_review_id IS NULL)) OR ((kind = 'KYC_PRIVACY_NOTICE'::text) AND (submission_review_id IS NOT NULL)));

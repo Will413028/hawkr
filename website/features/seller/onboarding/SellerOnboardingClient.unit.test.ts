@@ -85,7 +85,6 @@ vi.mock("@/features/legal/documents/sellerAgreements.gen", () => ({
 	SELLER_AGREEMENTS: {
 		SELLER_TERMS: { version: "2031-01-02", url: "/served-seller-terms" },
 		KYC_PRIVACY_NOTICE: { version: "2031-01-03", url: "/served-notice" },
-		PAYUNI_TERMS: { version: "2031-01-04", url: "https://example.com/p" },
 	},
 }));
 vi.mock("@/lib/seller/repo", () => ({

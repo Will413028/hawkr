@@ -56,11 +56,6 @@ class _Agreements implements SellerAgreementsRepository {
         version: 'p$reads',
         url: 'https://www.example.test/privacy',
       ),
-      SellerAgreement(
-        kind: AgreementKind.AGREEMENT_KIND_PAYUNI_TERMS,
-        version: 'u$reads',
-        url: 'https://www.example.test/payuni',
-      ),
     ]);
   }
 }
@@ -516,7 +511,7 @@ void main() {
       await tapKey(tester, 'kyc_privacy_checkbox');
     }
 
-    testWidgets('沒有缺項時停在確認；告知事項勾了才能送出，送出帶 etag 與現行版本，不帶 PAYUNI_TERMS', (
+    testWidgets('沒有缺項時停在確認；告知事項勾了才能送出，送出帶 etag 與現行版本，只帶個資告知', (
       tester,
     ) async {
       await pumpScreen(tester, application: complete());

@@ -267,7 +267,6 @@ type AgreementAcceptance = model.AgreementAcceptance
 const (
 	AgreementSellerTerms      = model.AgreementSellerTerms
 	AgreementKYCPrivacyNotice = model.AgreementKYCPrivacyNotice
-	AgreementPayUniTerms      = model.AgreementPayUniTerms
 )
 
 // CurrentAgreement 回傳一種文件的現行版本與網址；不認得的種類回 false。

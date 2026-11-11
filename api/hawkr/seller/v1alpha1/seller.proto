@@ -203,18 +203,16 @@ service SellerPublicService {
 }
 
 // AgreementKind 是賣家入駐時要同意或確認已閱讀的文件種類。每個操作要求的種類固定：ApplyStore 要 SELLER_TERMS；SubmitKYC 要
-// KYC_PRIVACY_NOTICE 與 PAYUNI_TERMS。
+// KYC_PRIVACY_NOTICE。
 enum AgreementKind {
   AGREEMENT_KIND_UNSPECIFIED = 0;
   // 賣家契約，開店（ApplyStore）時同意。
   AGREEMENT_KIND_SELLER_TERMS = 1;
   // 身分認證的個資蒐集告知，送出 KYC（SubmitKYC）時確認已閱讀（告知不是同意）。
   AGREEMENT_KIND_KYC_PRIVACY_NOTICE = 2;
-  // PayUni 的服務條款，送出 KYC（SubmitKYC）時同意。
-  AGREEMENT_KIND_PAYUNI_TERMS = 3;
 
-  reserved 4;
-  reserved "AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE";
+  reserved 3, 4;
+  reserved "AGREEMENT_KIND_PAYUNI_TERMS", "AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE";
 }
 
 // AgreementAcceptance 是賣家對一份文件的同意：client 送回它顯示給賣家的版本，伺服器核對後記錄。
@@ -938,7 +936,7 @@ message GetMyKYCResponse {
 message SubmitKYCRequest {
   // 讀到的申請的 etag。
   string etag = 1 [(google.api.field_behavior) = REQUIRED];
-  // 賣家確認已閱讀的 KYC_PRIVACY_NOTICE 與同意的 PAYUNI_TERMS，剛好這兩份。缺種類、多出不屬於這個操作的種類、同一種重複或
+  // 賣家確認已閱讀的 KYC_PRIVACY_NOTICE，剛好這一份。缺種類、多出不屬於這個操作的種類、同一種重複或
   // UNSPECIFIED 回 invalid_argument（field violation 指向 accepted_agreements）；版本不是現行版本回
   // failed_precondition，ErrorInfo.reason 是 AGREEMENT_OUTDATED，client 重讀 GetSellerAgreements，請賣家重新勾選。
   // 同意與送出同一個 transaction；每次送出各記一組同意，綁定那次送出的審核紀錄（被退回後再送出，也各自留下一組）。

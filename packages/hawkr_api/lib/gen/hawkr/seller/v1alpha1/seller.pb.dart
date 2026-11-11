@@ -4603,7 +4603,7 @@ class SubmitKYCRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearEtag() => $_clearField(1);
 
-  /// 賣家確認已閱讀的 KYC_PRIVACY_NOTICE 與同意的 PAYUNI_TERMS，剛好這兩份。缺種類、多出不屬於這個操作的種類、同一種重複或
+  /// 賣家確認已閱讀的 KYC_PRIVACY_NOTICE，剛好這一份。缺種類、多出不屬於這個操作的種類、同一種重複或
   /// UNSPECIFIED 回 invalid_argument（field violation 指向 accepted_agreements）；版本不是現行版本回
   /// failed_precondition，ErrorInfo.reason 是 AGREEMENT_OUTDATED，client 重讀 GetSellerAgreements，請賣家重新勾選。
   /// 同意與送出同一個 transaction；每次送出各記一組同意，綁定那次送出的審核紀錄（被退回後再送出，也各自留下一組）。

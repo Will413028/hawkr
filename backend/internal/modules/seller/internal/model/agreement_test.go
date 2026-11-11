@@ -34,9 +34,10 @@ func TestCheckAgreementsRejectsWrongKindsAsInvalidInputOnTheAgreementsField(t *t
 	}{
 		"沒有任何同意":                 {ApplyAgreements, nil},
 		"缺一種":                    {SubmitKYCAgreements, nil},
-		"送出 KYC 多出 PAYUNI_TERMS": {SubmitKYCAgreements, acceptances(AgreementKYCPrivacyNotice, AgreementPayUniTerms)},
-		"多出不屬於操作的種類":             {ApplyAgreements, acceptances(AgreementSellerTerms, AgreementPayUniTerms)},
-		"整組是別的操作的種類":             {ApplyAgreements, acceptances(AgreementKYCPrivacyNotice, AgreementPayUniTerms)},
+		"送出 KYC 多出 SELLER_TERMS": {SubmitKYCAgreements, acceptances(AgreementKYCPrivacyNotice, AgreementSellerTerms)},
+		"多出不屬於操作的種類":             {ApplyAgreements, acceptances(AgreementSellerTerms, AgreementKYCPrivacyNotice)},
+		"整組是別的操作的種類":             {ApplyAgreements, acceptances(AgreementKYCPrivacyNotice)},
+		"已下架的種類 PAYUNI_TERMS":    {SubmitKYCAgreements, []AgreementAcceptance{cur(AgreementKYCPrivacyNotice), {Kind: "PAYUNI_TERMS", Version: "2026-10-07"}}},
 		"同一種兩次":                  {SubmitKYCAgreements, []AgreementAcceptance{cur(AgreementKYCPrivacyNotice), cur(AgreementKYCPrivacyNotice)}},
 		"UNSPECIFIED（空字串）":       {ApplyAgreements, []AgreementAcceptance{cur(AgreementSellerTerms), {Kind: "", Version: "2026-10-07"}}},
 		"不認得的種類":                 {ApplyAgreements, []AgreementAcceptance{{Kind: "99", Version: "2026-10-07"}}},
@@ -59,9 +60,19 @@ func TestCheckAgreementsReportsAnOutdatedVersionAsFailedPrecondition(t *testing.
 		}
 	}
 	// 種類錯誤先於版本：版本也過時的壞請求仍是 invalid_argument。
-	err := CheckAgreements(ApplyAgreements, []AgreementAcceptance{{Kind: AgreementPayUniTerms, Version: "2026-01-01"}})
+	err := CheckAgreements(ApplyAgreements, []AgreementAcceptance{{Kind: AgreementKYCPrivacyNotice, Version: "2026-01-01"}})
 	if apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Errorf("err=%v", err)
+	}
+}
+
+func TestAgreementKindsAreExactlySellerTermsAndKYCPrivacyNotice(t *testing.T) {
+	got := AgreementKinds()
+	if len(got) != 2 || got[0] != AgreementSellerTerms || got[1] != AgreementKYCPrivacyNotice {
+		t.Fatalf("AgreementKinds() = %v", got)
+	}
+	if len(CurrentAgreements) != 2 {
+		t.Fatalf("CurrentAgreements 有 %d 筆", len(CurrentAgreements))
 	}
 }
 

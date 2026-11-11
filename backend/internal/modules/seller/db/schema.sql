@@ -1461,9 +1461,9 @@ CREATE TABLE seller.retired_assets (
 );
 CREATE INDEX retired_assets_retired_at ON seller.retired_assets (retired_at);
 
--- 入駐同意紀錄：賣家在開店（SELLER_TERMS）、送出 KYC（KYC_PRIVACY_NOTICE、PAYUNI_TERMS）時同意或確認已閱讀的文件版本，記事實（哪家
+-- 入駐同意紀錄：賣家在開店（SELLER_TERMS）、送出 KYC（KYC_PRIVACY_NOTICE）時同意或確認已閱讀的文件版本，記事實（哪家
 -- 店、哪份文件的哪個版本、誰、何時、來源 IP 與 User-Agent）。每次同意事件一列：沒有 ON CONFLICT，紀錄是一連串事件；開店的 SELLER_TERMS
--- 每家店一列（部分唯一索引），KYC 的兩份每次送出各一列、以 submission_review_id 綁定那次送出的 SUBMIT 審核紀錄（kyc_reviews；
+-- 每家店一列（部分唯一索引），KYC 的告知每次送出各一列、以 submission_review_id 綁定那次送出的 SUBMIT 審核紀錄（kyc_reviews；
 -- 被退回後換了申請主體再送出，也各自留下一組）。
 -- 依種類恰好綁一個來源（source_check）。version 是文件的生效日（Go 常數表 model.CurrentAgreements），全文以 repo 裡的正本保存。
 -- 只有 INSERT 的查詢，agreement_queries_test.go 檢查；唯一的例外是個資清理把來源欄位清成 NULL（PurgeAgreementSources），以及 dev
@@ -1482,13 +1482,13 @@ CREATE TABLE seller.agreement_acceptances (
     client_ip            INET,
     user_agent           TEXT,
     pii_purged_at        TIMESTAMPTZ,
-    CONSTRAINT agreement_acceptances_kind_check CHECK (kind IN ('SELLER_TERMS', 'KYC_PRIVACY_NOTICE', 'PAYUNI_TERMS')),
+    CONSTRAINT agreement_acceptances_kind_check CHECK (kind IN ('SELLER_TERMS', 'KYC_PRIVACY_NOTICE')),
     CONSTRAINT agreement_acceptances_version_check CHECK (char_length(version) >= 1),
     CONSTRAINT agreement_acceptances_account_check CHECK (account_id > 0),
     CONSTRAINT agreement_acceptances_user_agent_check CHECK (user_agent IS NULL OR char_length(user_agent) BETWEEN 1 AND 512),
     CONSTRAINT agreement_acceptances_source_check CHECK (
         (kind = 'SELLER_TERMS' AND submission_review_id IS NULL) OR
-        (kind IN ('KYC_PRIVACY_NOTICE', 'PAYUNI_TERMS') AND submission_review_id IS NOT NULL)
+        (kind = 'KYC_PRIVACY_NOTICE' AND submission_review_id IS NOT NULL)
     ),
     CONSTRAINT agreement_acceptances_purged_check CHECK (pii_purged_at IS NULL OR (client_ip IS NULL AND user_agent IS NULL))
 );

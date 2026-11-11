@@ -9,8 +9,4 @@ export const SELLER_AGREEMENTS = {
 		version: "2026-11-03",
 		url: "/privacy#seller-kyc-notice",
 	},
-	PAYUNI_TERMS: {
-		version: "2026-10-07",
-		url: "https://www.payuni.com.tw/terms",
-	},
 } as const;

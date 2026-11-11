@@ -37,20 +37,23 @@ const AgreementKind$json = {
     {'1': 'AGREEMENT_KIND_UNSPECIFIED', '2': 0},
     {'1': 'AGREEMENT_KIND_SELLER_TERMS', '2': 1},
     {'1': 'AGREEMENT_KIND_KYC_PRIVACY_NOTICE', '2': 2},
-    {'1': 'AGREEMENT_KIND_PAYUNI_TERMS', '2': 3},
   ],
   '4': [
+    {'1': 3, '2': 3},
     {'1': 4, '2': 4},
   ],
-  '5': ['AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE'],
+  '5': [
+    'AGREEMENT_KIND_PAYUNI_TERMS',
+    'AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE'
+  ],
 };
 
 /// Descriptor for `AgreementKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List agreementKindDescriptor = $convert.base64Decode(
     'Cg1BZ3JlZW1lbnRLaW5kEh4KGkFHUkVFTUVOVF9LSU5EX1VOU1BFQ0lGSUVEEAASHwobQUdSRU'
     'VNRU5UX0tJTkRfU0VMTEVSX1RFUk1TEAESJQohQUdSRUVNRU5UX0tJTkRfS1lDX1BSSVZBQ1lf'
-    'Tk9USUNFEAISHwobQUdSRUVNRU5UX0tJTkRfUEFZVU5JX1RFUk1TEAMiBAgEEAQqJ0FHUkVFTU'
-    'VOVF9LSU5EX0ZPT0RfUkVHSVNUUkFUSU9OX05PVElDRQ==');
+    'Tk9USUNFEAIiBAgDEAMiBAgEEAQqG0FHUkVFTUVOVF9LSU5EX1BBWVVOSV9URVJNUyonQUdSRU'
+    'VNRU5UX0tJTkRfRk9PRF9SRUdJU1RSQVRJT05fTk9USUNF');
 
 @$core.Deprecated('Use storeStatusDescriptor instead')
 const StoreStatus$json = {

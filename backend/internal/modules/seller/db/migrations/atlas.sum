@@ -1,4 +1,4 @@
-h1:0ywe67Vf8GlAC6EHfQhkhHYPwbW91TLfJVuEOcXuagw=
+h1:soZIXl2QVnGzJ8TXNuvO7esjmZIhbh6X5gr10wohWyI=
 20261001160141_seller_core.sql h1:hVkQ8Wo6S5BLgzr4nFSGS/1EZpRX9mHqRwpxmIP3Yeg=
 20261002120004_seller_governance.sql h1:Dj/zGg4clK5U8YBsKn+TWnE5ZizigjU9/s7EXXHuc+g=
 20261002133159_seller_kyc.sql h1:QiN6KkqvCU/lwdw0B66YQniBEGnAhojvTYHQJ8lOqlc=
@@ -76,3 +76,4 @@ h1:0ywe67Vf8GlAC6EHfQhkhHYPwbW91TLfJVuEOcXuagw=
 20261111172911_store_contact_limits.sql h1:/0LlA9Cr4Bhn87C0eSiY2CaQDnWVlCpYnBEOPAKFP/0=
 20261111173954_payuni_rebind_retired.sql h1:YK9HBVsoqm3vlHoPJy2TgKp8MHxCUcPIhFup/BNKlD4=
 20261111191132_seller_drop_payuni_registrations.sql h1:IqNoXxcxlfcGPljmuWkRDTk+Ol1vK2QSy8PCZOELl8Y=
+20261111193347_seller_drop_payuni_terms.sql h1:FemtDpJ9LJPBPYJwmMelwqUUFoVuEMGm1+p/dyyy1M8=
