@@ -42,7 +42,7 @@ type Deps struct {
 	Events *events.Bus
 	Jobs   jobs.ReportingEnqueuer
 	Media  media.Media
-	// Exposure 是可曝光的公告：申請的狀態是 KYC 流程的輸入，每個改變它的寫入在 transaction 的最後呼叫。
+	// Exposure 是可曝光的公告：申請的狀態是開通閘門（平台審核核准）的輸入，每個改變它的寫入在 transaction 的最後呼叫。
 	Exposure *exposure.Service
 	// Payment 是收款帳戶的擁有者（payment 模組）：核准的 transaction 內寫「建立中」的列並排入建立 job（Stripe 計畫 D16、D28）。
 	Payment  Payment

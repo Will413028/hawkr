@@ -242,7 +242,7 @@
 | `CAP_ACCOUNT_CLOSE` | 收縮型：關店 | ✓ | ✓ |
 | `CAP_INVOICE_MANAGE` | 發票與稅務憑證的查詢與設定；擴張型與唯讀查看 | ✓ | ✗ |
 | `CAP_INVOICE_TAX_REMEDY` | 稅務身分申請、補件、延長申請、自行開票責任條款同意與自行開立回報——救濟管道 | ✓ | ✓ |
-| `CAP_SHIPPING_SETUP` | 物流建店、啟用與關閉配送方式；前置條件是 KYC 流程核准 | ✓（KYC 核准後） | ✗ |
+| `CAP_SHIPPING_SETUP` | 物流建店、啟用與關閉配送方式；前置條件是開通閘門（平台審核核准且收款帳戶轉帳能力啟用） | ✓（開通後） | ✗ |
 | `CAP_PUBLIC_LISTING` | 狀態不是動作：買家看得到店面、可以結帳；缺的條件就是 `MissingExposure` | 條件齊全時 | ✗ |
 
 - 唯讀不等於放行：dashboard、CRM 查詢、報表、AI 助理、發票查詢即使純唯讀也不在停權白名單。

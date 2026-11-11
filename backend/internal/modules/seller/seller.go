@@ -428,7 +428,7 @@ func CapabilitiesOf(s Store) []CapabilityStatus {
 }
 
 // Authorize 在店家 s 沒有能力 c 時回錯誤：已關閉回 NotFound；停權造成的回 PermissionDenied（帶 ReasonSellerSuspended）；其他前置條件沒有滿足
-// （等待刪除、KYC 流程未核准）回 FailedPrecondition（帶 ReasonSellerRequirementMissing）。s 要是模組讀出的店家（CurrentStore、Store 或
+// （等待刪除、開通閘門未通過）回 FailedPrecondition（帶 ReasonSellerRequirementMissing）。s 要是模組讀出的店家（CurrentStore、Store 或
 // ActingStore 的結果），沒有推導過條件的一律拒絕。給已經拿到店家、需要依資源決定能力的呼叫方（例如 social 的店家身分寫入）。
 func Authorize(s Store, c Capability) error { return model.Authorize(s, c) }
 
@@ -582,7 +582,7 @@ func (m *Module) ReconcileTerminations(ctx context.Context) (int, error) {
 }
 
 // AdminStores 是後台的店家清單（預設只列目前的店家，店名、電話或 store_code 搜尋，依 KYC 申請狀態篩選，新到舊的 keyset）；
-// 每一列帶推導的停權狀態與 KYC 流程狀態。
+// 每一列帶推導的停權狀態與 KYC 申請狀態。
 func (m *Module) AdminStores(ctx context.Context, in StoreListInput) (StorePage, error) {
 	return m.profile.AdminList(ctx, in)
 }

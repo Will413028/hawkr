@@ -26,12 +26,12 @@ func conditionsOf(status Status, kyc bool) Conditions {
 	}
 }
 
-// fullStore 是公開曝光條件除了生命週期與停權之外都滿足（含 KYC 核准）的店家。
+// fullStore 是公開曝光條件除了生命週期與停權之外都滿足（含開通閘門）的店家。
 func fullStore(status Status, suspended bool) Store {
 	return Store{Status: status, Sanctions: sanctionsOf(suspended), Conditions: conditionsOf(status, true)}
 }
 
-// withoutKYC 是同一個店家、KYC 流程沒有核准。
+// withoutKYC 是同一個店家、收款帳戶的轉帳能力沒有啟用（開通閘門未通過）。
 func withoutKYC(s Store) Store {
 	s.Conditions.TransfersActive = false
 	return s
