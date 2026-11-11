@@ -345,7 +345,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 			}
 		}
 		e1 := r.Msg.GetSellers()[exposed.StoreID]
-		if e1.GetPayuniMerId() != seller.FormatPayUniMerID(exposed.StoreCode) || e1.GetZipCode() != "100" || e1.GetAccountId() != exposedAccount || e1.GetSellerName() != "範例小農" {
+		if e1.GetPayuniMerId() != "" || e1.GetZipCode() != "100" || e1.GetAccountId() != exposedAccount || e1.GetSellerName() != "範例小農" {
 			t.Fatalf("%v", e1)
 		}
 	})
@@ -370,7 +370,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	t.Run("GetSellerShippingProfile", func(t *testing.T) {
 		r, e := s.GetSellerShippingProfile(ctx, connect.NewRequest(&pb.GetSellerShippingProfileRequest{StoreId: exposed.StoreID}))
 		d := r.Msg.GetData()
-		if e != nil || d.GetContactEmail() != "owner@example.com" || d.GetZipCode() != "100" || d.GetMerId() != seller.FormatPayUniMerID(exposed.StoreCode) || d.GetSenderPhone() != "0912345678" {
+		if e != nil || d.GetContactEmail() != "owner@example.com" || d.GetZipCode() != "100" || d.GetMerId() != "" || d.GetSenderPhone() != "0912345678" {
 			t.Fatalf("%v %v", r, e)
 		}
 		// 已關閉的店找不到（舊 server 的 store_id 路徑濾掉 deleted_at）。

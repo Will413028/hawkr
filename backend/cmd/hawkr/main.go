@@ -46,7 +46,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
 	"github.com/Will413028/hawkr/backend/internal/legacy/reviewservice"
-	"github.com/Will413028/hawkr/backend/internal/legacy/sellerconsumer"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerserver"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
@@ -452,19 +451,14 @@ func runWorker(ctx context.Context) error {
 	}
 	consumerCtx, stopConsumer := context.WithCancel(ctx)
 	defer stopConsumer()
-	// 單體自己的 queue（hawkr.monolith 前綴）各一個 consumer：買家的訂單完成與補貨、seller 的 PayUni 審核通知。
-	consumerDone := make(chan struct{}, 2)
+	// 單體自己的 queue（hawkr.monolith 前綴）的 consumer：買家的訂單完成與補貨。
+	consumerDone := make(chan struct{})
 	go func() {
-		defer func() { consumerDone <- struct{}{} }()
+		defer close(consumerDone)
 		consumer.Run(consumerCtx, rabbitURL, log)
-	}()
-	go func() {
-		defer func() { consumerDone <- struct{}{} }()
-		sellerconsumer.Consumer{Seller: sellerModule}.Run(consumerCtx, rabbitURL, log)
 	}()
 	err = c.Run(ctx)
 	stopConsumer()
-	<-consumerDone
 	<-consumerDone
 	return err
 }

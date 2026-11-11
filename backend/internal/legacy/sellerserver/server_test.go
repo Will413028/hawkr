@@ -83,7 +83,7 @@ func TestSellerMetaTruthTable(t *testing.T) {
 		}), false, false, false},
 		{"等待刪除", with(func(s *seller.Store) { s.Status, s.Conditions.NotPendingDeletion = seller.PendingDeletion, false }), false, false, false},
 		{"已關閉", with(func(s *seller.Store) { s.Status, s.Conditions.Active = seller.Closed, false; s.LogoKey = nil }), false, false, false},
-		{"KYC 或 PayUni 未核准：可以先上架、不能結帳", with(func(s *seller.Store) { s.Conditions.TransfersActive = false }), false, true, false},
+		{"收款帳戶未啟用：可以先上架、不能結帳", with(func(s *seller.Store) { s.Conditions.TransfersActive = false }), false, true, false},
 		{"缺 logo：可以先上架、不能結帳", with(func(s *seller.Store) { s.LogoKey, s.Conditions.Logo = nil, false }), false, true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -102,12 +102,24 @@ func TestSellerMetaTruthTable(t *testing.T) {
 	}
 	m := sellerMeta(seller.StoreExposure{Store: active, Exposable: true})
 	want := &pb.SellerMeta{
-		AccountId: 3, SellerName: "範例小農", LogoKey: "logo", ZipCode: "100", PayuniMerId: "HAWK2600000001", CanAcceptOrders: true,
+		AccountId: 3, SellerName: "範例小農", LogoKey: "logo", ZipCode: "100", CanAcceptOrders: true,
 		CanManageProducts: true, City: "台北市", District: "中正區", StoreId: "7", StoreCode: "2600000001",
 	}
 	if m.GetAccountId() != want.AccountId || m.GetSellerName() != want.SellerName || m.GetLogoKey() != want.LogoKey || m.GetZipCode() != want.ZipCode ||
-		m.GetPayuniMerId() != want.PayuniMerId || m.GetCity() != want.City || m.GetDistrict() != want.District || m.GetStoreId() != want.StoreId || m.GetStoreCode() != want.StoreCode {
+		m.GetPayuniMerId() != "" || m.GetCity() != want.City || m.GetDistrict() != want.District || m.GetStoreId() != want.StoreId || m.GetStoreCode() != want.StoreCode {
 		t.Fatalf("%v, want %v", m, want)
+	}
+}
+
+// 舊契約的商店代號欄位（付款的 payuni_mer_id 與物流的 mer_id）一律是空字串，不由 store_code 組出。
+func TestMerchantIDFieldsAreEmpty(t *testing.T) {
+	s := seller.Store{Status: seller.Active, Sanctions: seller.NoSanctions(), StoreID: 7, StoreCode: 2600000001, AccountID: 3, StoreName: "範例小農"}
+	if got := sellerMeta(seller.StoreExposure{Store: s, Exposable: true}).GetPayuniMerId(); got != "" {
+		t.Errorf("SellerMeta.payuni_mer_id=%q", got)
+	}
+	p := shippingProfile(s)
+	if p.GetMerId() != "" || p.GetStoreId() != "7" || p.GetSenderName() != "範例小農" {
+		t.Errorf("shipping profile=%v：mer_id 必須是空字串，其餘欄位照舊", p)
 	}
 }
 
