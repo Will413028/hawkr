@@ -184,16 +184,6 @@ void main() {
       expect(StoreTextField.supportEmail.validate(''), isNull);
     });
 
-    test('店名與介紹受 PayUni 鎖定，其他欄位不受', () {
-      expect(
-        [
-          for (final f in StoreTextField.values)
-            if (f.lockedByPayuni) f,
-        ],
-        [StoreTextField.storeName, StoreTextField.description],
-      );
-    });
-
     test('標籤用兩端一起改的名稱', () {
       expect(StoreTextField.contactPhone.label, '商店電話');
       expect(StoreTextField.supportEmail.hint, isNull);

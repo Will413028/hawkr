@@ -20,7 +20,6 @@ import 'package:hawkr_seller/features/seller/data/seller_agreements_repository.d
 import 'package:hawkr_seller/features/seller/data/seller_onboarding.dart';
 import 'package:hawkr_seller/features/seller/data/version_conflict.dart';
 import 'package:hawkr_seller/features/seller/presentation/kyc_wizard_widgets.dart';
-import 'package:hawkr_seller/features/seller/presentation/profile_form_widgets.dart';
 import 'package:hawkr_seller/features/seller/presentation/seller_certification_upload_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -137,7 +136,6 @@ class _Server {
               onSubmit?.call(req) ??
               individualApplication(
                 etag: 'done',
-                status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED,
                 kycStatus: KYCStatus.KYC_STATUS_SUBMITTED,
               );
           application = result;
@@ -286,7 +284,6 @@ void main() {
       await pumpScreen(
         tester,
         application: businessApplication(
-          status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
           kycStatus: KYCStatus.KYC_STATUS_REJECTED,
           missing: [KYCField.KYC_FIELD_BUSINESS_TAX_ID],
           rejection: KYCRejection(reason: '資料不符'),
@@ -300,7 +297,7 @@ void main() {
         ),
       );
 
-      expect(find.text('認證未通過'), findsOneWidget);
+      expect(find.text('需修改'), findsOneWidget);
       expect(find.text('資料不符'), findsOneWidget);
       expect(find.text('統一編號：與登記不符'), findsOneWidget);
       expect(find.text('公司資訊'), findsWidgets);
@@ -310,7 +307,6 @@ void main() {
       await pumpScreen(
         tester,
         application: businessApplication(
-          status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
           kycStatus: KYCStatus.KYC_STATUS_REJECTED,
           missing: [KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS],
           rejection: KYCRejection(reason: '文件過期'),
@@ -339,7 +335,6 @@ void main() {
       await pumpScreen(
         tester,
         application: individualApplication(
-          status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED,
           kycStatus: KYCStatus.KYC_STATUS_SUBMITTED,
         ),
       );
@@ -362,11 +357,39 @@ void main() {
       expect(find.byType(TextField), findsNothing);
     });
 
+    testWidgets('已核准的申請唯讀：沒有表單欄位，也沒有送出入口', (tester) async {
+      await pumpScreen(
+        tester,
+        application: individualApplication(
+          kycStatus: KYCStatus.KYC_STATUS_APPROVED,
+        ),
+      );
+
+      expect(find.byKey(const Key('kyc_locked')), findsOneWidget);
+      expect(find.byType(TextField), findsNothing);
+      expect(find.text('送出認證'), findsNothing);
+      expect(find.text('下一步'), findsNothing);
+      expect(find.byKey(const Key('kyc_discard')), findsNothing);
+      expect(server.saves, isEmpty);
+      expect(server.submits, isEmpty);
+    });
+
+    testWidgets('審核中沒有送出入口與捨棄草稿', (tester) async {
+      await pumpScreen(
+        tester,
+        application: individualApplication(
+          kycStatus: KYCStatus.KYC_STATUS_SUBMITTED,
+        ),
+      );
+
+      expect(find.text('送出認證'), findsNothing);
+      expect(find.byKey(const Key('kyc_discard')), findsNothing);
+    });
+
     testWidgets('被退回：顯示退回框', (tester) async {
       await pumpScreen(
         tester,
         application: individualApplication(
-          status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
           kycStatus: KYCStatus.KYC_STATUS_REJECTED,
           rejection: KYCRejection(reason: '資料不符'),
         ),
@@ -661,13 +684,11 @@ void main() {
       expect(server.cancels, isEmpty);
     });
 
-    testWidgets('身分已被 PayUni 鎖定時沒有捨棄草稿', (tester) async {
+    testWidgets('被退回的申請沒有捨棄草稿', (tester) async {
       await pumpScreen(
         tester,
         application: individualApplication(
-          status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
           kycStatus: KYCStatus.KYC_STATUS_REJECTED,
-          identityLocked: true,
           missingStore: [StoreField.STORE_FIELD_ADDRESS],
         ),
       );
@@ -723,26 +744,12 @@ void main() {
   });
 
   group('送出前提醒與離開', () {
-    testWidgets('確認頁顯示鎖定提醒與「身分與銀行由金流商收集」；身分欄位已鎖住後不顯示鎖定提醒', (tester) async {
+    testWidgets('確認頁顯示「身分與銀行由金流商收集」，沒有店名鎖定提醒', (tester) async {
       await pumpScreen(tester, application: individualApplication(etag: 'v1'));
-      expect(find.text(kPayuniLockOnSubmitNotice), findsOneWidget);
-      expect(kPayuniLockOnSubmitNotice, '送出後商店名稱與商店介紹將無法修改，請先確認無誤');
       expect(find.text('身分與銀行帳號會在審核通過後，由金流商收集，平台不經手。'), findsOneWidget);
+      expect(find.byKey(const Key('kyc_lock_on_submit_notice')), findsNothing);
+      expect(find.textContaining('無法修改'), findsNothing);
       expect(find.textContaining('PayUni'), findsNothing);
-    });
-
-    testWidgets('identity_locked 時不顯示鎖定提醒', (tester) async {
-      await pumpScreen(
-        tester,
-        application: individualApplication(
-          etag: 'v1',
-          status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
-          kycStatus: KYCStatus.KYC_STATUS_REJECTED,
-          identityLocked: true,
-        ),
-      );
-
-      expect(find.text(kPayuniLockOnSubmitNotice), findsNothing);
     });
 
     testWidgets('送出進行中不能返回；完成後才離開', (tester) async {

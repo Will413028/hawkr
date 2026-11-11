@@ -58,14 +58,8 @@ class _Server {
   /// `GetMyPaymentAccount` 的回應：[PaymentAccount]、例外，或 null（not_found：平台審核還沒核准或外部帳戶在建立）。
   Object? payment;
 
-  GetMyKYCResponse _kycResponse() => GetMyKYCResponse(
-    application: individualApplication(
-      status: _review == KYCStatus.KYC_STATUS_APPROVED
-          ? KYCFlowStatus.KYC_FLOW_STATUS_APPROVED
-          : KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED,
-      kycStatus: _review,
-    ),
-  );
+  GetMyKYCResponse _kycResponse() =>
+      GetMyKYCResponse(application: individualApplication(kycStatus: _review));
   bool certified;
   bool marketing;
   late final FakeMyStoreServer store;
@@ -324,11 +318,11 @@ void main() {
       expect(find.text('帳戶與認證'), findsOneWidget);
     });
 
-    testWidgets('流程狀態是 UNSPECIFIED（無法確認）：顯示重試，不當成任何有效狀態', (tester) async {
+    testWidgets('申請狀態是 UNSPECIFIED（無法確認）：顯示重試，不當成任何有效狀態', (tester) async {
       final server = _Server()
         ..kyc = GetMyKYCResponse(
           application: individualApplication(
-            status: KYCFlowStatus.KYC_FLOW_STATUS_UNSPECIFIED,
+            kycStatus: KYCStatus.KYC_STATUS_UNSPECIFIED,
           ),
         );
       await _pump(tester, server);

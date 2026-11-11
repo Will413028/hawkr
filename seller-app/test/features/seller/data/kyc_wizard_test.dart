@@ -87,7 +87,6 @@ class KycFakeServer {
   KYCApplication Function(SubmitKYCRequest) onSubmit = (_) =>
       individualApplication(
         etag: 'v3',
-        status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED,
         kycStatus: KYCStatus.KYC_STATUS_SUBMITTED,
       );
   LookupBusinessRegistrationResponse Function(LookupBusinessRegistrationRequest)
@@ -343,7 +342,6 @@ void main() {
       await server.boot(
         kyc: myKycOf(
           businessApplication(
-            status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
             kycStatus: KYCStatus.KYC_STATUS_REJECTED,
             rejection: KYCRejection(reason: '資料不符'),
             outstanding: [
@@ -396,14 +394,8 @@ void main() {
       expect(wizard.rejection?.reason, '舊的退回');
       expect(wizard.outstandingIssues, isEmpty);
 
-      // 重送、核准後被 PayUni 拒絕：伺服器不回 last_rejection。
-      await server.boot(
-        kyc: myKycOf(
-          individualApplication(
-            status: KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED,
-          ),
-        ),
-      );
+      // 沒有被退回過：伺服器不回 last_rejection。
+      await server.boot(kyc: myKycOf(individualApplication()));
       expect(wizard.rejection, isNull);
     });
 
@@ -923,10 +915,7 @@ void main() {
       final submit = server.submits.single;
       expect(submit.etag, 'v1');
       expect(submit.acceptedAgreements, _acceptances);
-      expect(
-        wizard.application?.flow.status,
-        KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED,
-      );
+      expect(wizard.application?.status, KYCStatus.KYC_STATUS_SUBMITTED);
     });
 
     test('被退回的申請也直接送出，不必先存檔', () async {
@@ -934,9 +923,7 @@ void main() {
         kyc: myKycOf(
           individualApplication(
             etag: 'v1',
-            status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
             kycStatus: KYCStatus.KYC_STATUS_REJECTED,
-            canResubmit: true,
           ),
         ),
       );
@@ -945,9 +932,28 @@ void main() {
 
       expect(server.calls, ['SubmitKYC'], reason: '回應直接成為共用的申請，不再重讀');
       expect(
-        server.container.read(currentKycProvider)?.value?.status,
-        KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED,
+        server.container.read(currentKycProvider)?.value?.reviewStatus,
+        KYCStatus.KYC_STATUS_SUBMITTED,
       );
+    });
+
+    test('已核准與審核中的申請不能編輯也不能送出，不呼叫伺服器', () async {
+      for (final status in [
+        KYCStatus.KYC_STATUS_APPROVED,
+        KYCStatus.KYC_STATUS_SUBMITTED,
+      ]) {
+        await server.boot(
+          kyc: myKycOf(individualApplication(kycStatus: status)),
+        );
+
+        expect(wizard.editable, isFalse, reason: '$status');
+        expect(
+          await wizard.submit(_acceptances),
+          KycSubmitOutcome.failed,
+          reason: '$status',
+        );
+        expect(server.submits, isEmpty, reason: '$status');
+      }
     });
 
     test('伺服器回報還有缺項：不送出，列出缺項', () async {
@@ -1220,18 +1226,10 @@ void main() {
       expect(wizard.form.companyPhone, '02-1234-5678');
     });
 
-    test('已鎖定身分（PayUni 已建檔）或不是草稿就不能捨棄', () async {
-      await server.boot(
-        kyc: myKycOf(individualApplication(identityLocked: true)),
-      );
-      expect(wizard.canDiscard, isFalse);
-
+    test('不是草稿就不能捨棄', () async {
       await server.boot(
         kyc: myKycOf(
-          individualApplication(
-            status: KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
-            kycStatus: KYCStatus.KYC_STATUS_REJECTED,
-          ),
+          individualApplication(kycStatus: KYCStatus.KYC_STATUS_REJECTED),
         ),
       );
       expect(wizard.canDiscard, isFalse);

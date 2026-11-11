@@ -61,11 +61,9 @@ class _KycServer {
 
   GetMyKYCResponse answer(int call) => GetMyKYCResponse(
     application: KYCApplication(
-      flow: KYCFlow(
-        status: call == 1
-            ? KYCFlowStatus.KYC_FLOW_STATUS_DRAFT
-            : KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED,
-      ),
+      status: call == 1
+          ? KYCStatus.KYC_STATUS_DRAFT
+          : KYCStatus.KYC_STATUS_SUBMITTED,
     ),
   );
 
@@ -126,7 +124,7 @@ void main() {
 
     expect(server.calls, 3);
     final cached = container.read(accountKycProvider('acc-1')).requireValue;
-    expect(cached.status, KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED);
+    expect(cached.reviewStatus, KYCStatus.KYC_STATUS_SUBMITTED);
   });
 
   test('前一輪結束與後續一輪開始之間，非 fresh 呼叫不會另開一輪（同時最多一輪）', () async {
@@ -245,7 +243,7 @@ void main() {
               return GetMyKYCResponse(
                 application: KYCApplication(
                   etag: 'old',
-                  flow: KYCFlow(status: KYCFlowStatus.KYC_FLOW_STATUS_DRAFT),
+                  status: KYCStatus.KYC_STATUS_DRAFT,
                 ),
               );
             }).build(),
@@ -261,10 +259,7 @@ void main() {
     container
         .read(kycReaderProvider.notifier)
         .adopt(
-          KYCApplication(
-            etag: 'new',
-            flow: KYCFlow(status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED),
-          ),
+          KYCApplication(etag: 'new', status: KYCStatus.KYC_STATUS_SUBMITTED),
         );
     stale.complete();
     await Future<void>.delayed(Duration.zero);
@@ -272,10 +267,10 @@ void main() {
 
     final kyc = container.read(accountKycProvider('acc-1')).requireValue;
     expect(kyc.application?.etag, 'new');
-    expect(kyc.status, KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED);
+    expect(kyc.reviewStatus, KYCStatus.KYC_STATUS_SUBMITTED);
   });
 
-  test('讀取回來的流程狀態無效（FormatException）時，仍採用讀取期間 adopt 的結果', () async {
+  test('讀取回來的申請狀態無效（FormatException）時，仍採用讀取期間 adopt 的結果', () async {
     final stale = Completer<void>();
     final container = ProviderContainer(
       overrides: [
@@ -301,10 +296,7 @@ void main() {
     container
         .read(kycReaderProvider.notifier)
         .adopt(
-          KYCApplication(
-            etag: 'new',
-            flow: KYCFlow(status: KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED),
-          ),
+          KYCApplication(etag: 'new', status: KYCStatus.KYC_STATUS_SUBMITTED),
         );
     stale.complete();
     await Future<void>.delayed(Duration.zero);
@@ -348,7 +340,7 @@ void main() {
     expect(store.calls, 1);
   });
 
-  test('一次重讀店家與認證流程（PayUni 狀態隨認證流程一起讀）', () async {
+  test('一次重讀店家與認證申請', () async {
     final counters = _Counters();
     final container = counters.container();
     await container.read(currentStoreProvider.future);

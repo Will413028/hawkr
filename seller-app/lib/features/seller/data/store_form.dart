@@ -65,10 +65,6 @@ enum StoreTextField {
   /// UpdateMyStore 的欄位錯誤路徑（`store.` 加 `Store` 的欄位名）。
   String get errorPath => 'store.$path';
 
-  /// 店名與商店介紹在 PayUni 綁定後鎖定（`GetMyKYC.flow.identity_locked`）。
-  bool get lockedByPayuni =>
-      this == StoreTextField.storeName || this == StoreTextField.description;
-
   /// 店家目前的值。
   String valueOf(Store? store) {
     if (store == null) return '';

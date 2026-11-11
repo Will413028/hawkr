@@ -3,7 +3,8 @@ import 'dart:typed_data';
 
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
-import 'package:hawkr_ui_text/hawkr_ui_text.dart' show commonUnknown;
+import 'package:hawkr_ui_text/hawkr_ui_text.dart'
+    show SellerKYCStatusUiText, commonUnknown;
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -27,7 +28,6 @@ import '../../../shared/widgets/truck_loading_overlay.dart';
 import '../data/contact_email.dart';
 import '../data/current_kyc.dart';
 import '../data/kyc_fields.dart';
-import '../data/kyc_flow.dart';
 import '../data/kyc_wizard.dart';
 import '../data/seller_agreements_repository.dart';
 import 'certification_status_view.dart';
@@ -313,7 +313,6 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
         wizardState.hydrated &&
         subject == KycSubject.business &&
         wizard.editable &&
-        !wizard.identityLocked &&
         current == KycStep.company;
     final lookupIdle = wizardState.lookup is KycLookupIdle;
     useEffect(() {
@@ -392,7 +391,6 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
                     ],
                     if (application != null) ...[
                       _RejectionBanner(
-                        application: application,
                         rejection: wizard.rejection,
                         issues: wizard.outstandingIssues,
                       ),
@@ -574,27 +572,18 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
-/// 被平台退回的申請：狀態說明、退回原因與伺服器算的待處理問題（欄位名稱加說明）。只看 [rejection]；PayUni 的問題另由
-/// [_PayuniProblemBanner] 呈現。
+/// 被平台退回的申請：狀態名稱、退回原因與伺服器算的待處理問題（欄位名稱加說明）。只看 [rejection]。
 class _RejectionBanner extends StatelessWidget {
-  const _RejectionBanner({
-    required this.application,
-    required this.rejection,
-    required this.issues,
-  });
+  const _RejectionBanner({required this.rejection, required this.issues});
 
-  final KYCApplication application;
   final KYCRejection? rejection;
   final List<KYCIssue> issues;
 
   @override
   Widget build(BuildContext context) {
-    final app = application;
-    if (!app.hasFlow()) return const SizedBox.shrink();
     final rejection = this.rejection;
     if (rejection == null) return const SizedBox.shrink();
     final l = context.uiLocale;
-    final copy = kycFlowCopy(KYCFlowStatus.KYC_FLOW_STATUS_REJECTED, l);
     return Padding(
       padding: const EdgeInsets.only(top: HkSpace.lg),
       child: SizedBox(
@@ -609,17 +598,12 @@ class _RejectionBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  copy.bannerTitle ?? commonUnknown(l),
+                  KYCStatus.KYC_STATUS_REJECTED.uiText(l) ?? commonUnknown(l),
                   style: TextStyle(
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w700,
                     color: AppColors.danger,
                   ),
-                ),
-                SizedBox(height: 4.h),
-                Text(
-                  copy.bannerDescription ?? commonUnknown(l),
-                  style: TextStyle(fontSize: 14.sp, color: AppColors.gray1),
                 ),
                 SizedBox(height: 8.h),
                 Text(

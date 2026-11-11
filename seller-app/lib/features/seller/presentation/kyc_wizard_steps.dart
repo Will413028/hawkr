@@ -20,7 +20,6 @@ import '../data/kyc_store_contact.dart';
 import '../data/kyc_wizard.dart';
 import '../data/seller_agreements_repository.dart';
 import 'kyc_wizard_widgets.dart';
-import 'profile_form_widgets.dart' show kPayuniLockOnSubmitNotice;
 import 'widgets/agreement_checkbox.dart';
 import 'widgets/certification_glass_step_card.dart';
 
@@ -149,7 +148,6 @@ class _CompanyStep extends StatelessWidget {
   Widget build(BuildContext context) {
     final f = c.form;
     final lookup = c.lookup;
-    final locked = c.identityLocked;
     return _card(
       title: '公司資訊',
       subtitle: '輸入統編後可自動帶入公司名稱、地址與設立日期',
@@ -161,7 +159,6 @@ class _CompanyStep extends StatelessWidget {
           value: f.taxId,
           hint: '請輸入統一編號（8碼）',
           keyboardType: TextInputType.number,
-          readOnly: locked,
           inputFormatters: [
             FilteringTextInputFormatter.digitsOnly,
             LengthLimitingTextInputFormatter(8),
@@ -184,8 +181,7 @@ class _CompanyStep extends StatelessWidget {
           },
         ),
         _LookupNotice(lookup),
-        if ((lookup is KycLookupNotFound || lookup is KycLookupFailed) &&
-            !locked)
+        if (lookup is KycLookupNotFound || lookup is KycLookupFailed)
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
@@ -200,7 +196,6 @@ class _CompanyStep extends StatelessWidget {
           label: _fieldLabel(context, KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME),
           value: f.companyName,
           hint: '請輸入公司名稱',
-          readOnly: locked,
           error: c.fieldError(KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME),
           onChanged: (v) => c.updateForm((f) => f.copyWith(companyName: v)),
         ),
@@ -252,7 +247,6 @@ class _CompanyStep extends StatelessWidget {
           label: _fieldLabel(context, KYCField.KYC_FIELD_PRODUCT_TYPE),
           value: f.productType,
           hint: '例如：水果 / 蔬菜 / 海鮮 / 加工食品',
-          readOnly: locked,
           error: c.fieldError(KYCField.KYC_FIELD_PRODUCT_TYPE),
           onChanged: (v) => c.updateForm((f) => f.copyWith(productType: v)),
         ),
@@ -586,17 +580,6 @@ class _ConfirmStep extends StatelessWidget {
             style: TextStyle(fontSize: 12.sp, color: AppColors.textMuted),
           ),
         ),
-        if (!c.identityLocked) ...[
-          _gap(4),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              kPayuniLockOnSubmitNotice,
-              key: const Key('kyc_lock_on_submit_notice'),
-              style: TextStyle(fontSize: 12.sp, color: AppColors.textMuted),
-            ),
-          ),
-        ],
         KycButtonBar(
           label: '送出認證',
           busy: c.submitting,

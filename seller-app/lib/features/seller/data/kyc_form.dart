@@ -400,15 +400,15 @@ KycDocs adoptSavedDocs(KycDocs current, KycDocs sent, KycDocs saved) {
 
 /* ===== 可編輯 ===== */
 
-/// 表單可以編輯：沒有申請（要建立），或伺服器說此刻能儲存草稿與重送（`flow.can_resubmit`：草稿、被退回、PayUni 拒絕或綁定失敗而且賣家能自己修正）。
+/// 表單可以編輯：沒有申請（要建立），或申請是草稿、已退回（審核中與已核准的申請不能改）。
 bool kycEditable(KYCApplication? app) =>
-    app == null || (app.hasFlow() && app.flow.canResubmit);
+    app == null ||
+    app.status == KYCStatus.KYC_STATUS_DRAFT ||
+    app.status == KYCStatus.KYC_STATUS_REJECTED;
 
-/// 可以捨棄草稿（`CancelKYC`）：還是草稿，而且身分欄位沒有被 PayUni 鎖住。
+/// 可以捨棄草稿（`CancelKYC`）：還是草稿。
 bool kycCanDiscard(KYCApplication? app) =>
-    app != null &&
-    app.status == KYCStatus.KYC_STATUS_DRAFT &&
-    !(app.hasFlow() && app.flow.identityLocked);
+    app != null && app.status == KYCStatus.KYC_STATUS_DRAFT;
 
 /* ===== 日期的顯示（表單存 `YYYY-MM-DD`，畫面是民國年） ===== */
 

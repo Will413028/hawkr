@@ -178,10 +178,6 @@ class KycWizard extends _$KycWizard {
       state.uploading.isNotEmpty;
 
   bool get editable => kycEditable(application);
-  bool get identityLocked {
-    final app = application;
-    return app != null && app.hasFlow() && app.flow.identityLocked;
-  }
 
   bool get canDiscard => kycCanDiscard(application);
 

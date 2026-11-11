@@ -54,7 +54,7 @@ enum KycStampKind { decide, submit }
 }
 
 /// 已送出審核 / 已完成審核的唯讀狀態畫面（D15）：兩區，平台審核區顯示申請（`KYCApplication.status`）的狀態與時間，收款帳戶區
-/// 是否開放由開通摘要（`GetMyOnboarding`）的平台審核任務決定，內容讀 `GetMyPaymentAccount`；不看 `KYCFlowStatus`。
+/// 是否開放由開通摘要（`GetMyOnboarding`）的平台審核任務決定，內容讀 `GetMyPaymentAccount`。
 ///
 /// 從外部瀏覽器（金流商的託管頁面）切回 App 時重讀狀態：[PaymentOnboarding.onResumed]，從瀏覽器回來先
 /// `RefreshMyPaymentAccount` 再 `fresh: true` 重讀。

@@ -424,24 +424,28 @@ void main() {
       expect(KycSubject.individual.steps, isNot(contains(KycStep.documents)));
     });
 
-    test('可編輯：沒有申請，或伺服器說能重送（can_resubmit）；與流程狀態的值無關', () {
-      bool editable(KYCFlowStatus status, {bool canResubmit = false}) =>
-          kycEditable(
-            individualApplication(status: status, canResubmit: canResubmit),
-          );
+    test('可編輯：沒有申請、草稿、已退回；審核中與已核准不可，UNSPECIFIED 不可', () {
+      bool editable(KYCStatus status) =>
+          kycEditable(individualApplication(kycStatus: status));
 
       expect(kycEditable(null), isTrue);
-      expect(
-        editable(KYCFlowStatus.KYC_FLOW_STATUS_DRAFT, canResubmit: true),
-        isTrue,
-      );
-      expect(
-        editable(KYCFlowStatus.KYC_FLOW_STATUS_REJECTED, canResubmit: true),
-        isTrue,
-      );
-      expect(editable(KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED), isFalse);
-      expect(editable(KYCFlowStatus.KYC_FLOW_STATUS_APPROVED), isFalse);
-      expect(editable(KYCFlowStatus.KYC_FLOW_STATUS_UNSPECIFIED), isFalse);
+      expect(editable(KYCStatus.KYC_STATUS_DRAFT), isTrue);
+      expect(editable(KYCStatus.KYC_STATUS_REJECTED), isTrue);
+      expect(editable(KYCStatus.KYC_STATUS_SUBMITTED), isFalse);
+      expect(editable(KYCStatus.KYC_STATUS_APPROVED), isFalse);
+      expect(editable(KYCStatus.KYC_STATUS_CANCELLED), isFalse);
+      expect(editable(KYCStatus.KYC_STATUS_UNSPECIFIED), isFalse);
+    });
+
+    test('可捨棄：只有草稿', () {
+      bool discardable(KYCStatus status) =>
+          kycCanDiscard(individualApplication(kycStatus: status));
+
+      expect(kycCanDiscard(null), isFalse);
+      expect(discardable(KYCStatus.KYC_STATUS_DRAFT), isTrue);
+      expect(discardable(KYCStatus.KYC_STATUS_REJECTED), isFalse);
+      expect(discardable(KYCStatus.KYC_STATUS_SUBMITTED), isFalse);
+      expect(discardable(KYCStatus.KYC_STATUS_APPROVED), isFalse);
     });
   });
 

@@ -103,9 +103,6 @@ class _NotificationBannerState extends State<NotificationBanner>
       case 'CERTIFICATION_APPROVED':
       case 'CERTIFICATION_REJECTED':
       case 'CERTIFICATION_PENDING_INFO':
-      case 'MERCHANT.VERIFICATION.APPROVED':
-      case 'MERCHANT.VERIFICATION.REJECTED':
-      case 'MERCHANT.VERIFICATION.PENDING_INFO':
         return AppIcons.verifiedRounded;
       case 'COUPON_RECEIVED':
         return AppIcons.localOfferRounded;
@@ -125,9 +122,6 @@ class _NotificationBannerState extends State<NotificationBanner>
       case 'CERTIFICATION_APPROVED':
       case 'CERTIFICATION_REJECTED':
       case 'CERTIFICATION_PENDING_INFO':
-      case 'MERCHANT.VERIFICATION.APPROVED':
-      case 'MERCHANT.VERIFICATION.REJECTED':
-      case 'MERCHANT.VERIFICATION.PENDING_INFO':
         return AppColors.warning;
       case 'COUPON_RECEIVED':
         return AppColors.primary;

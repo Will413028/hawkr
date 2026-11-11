@@ -32,7 +32,7 @@ class NotificationRouter {
   ///       讓已打開的訂單列表/同訂單詳情頁自動 refresh；無 orderSn 時退回 /main/orders
   /// - AFTER_SALE_REQUEST / AFTER_SALE_STATUS / REFUND_REQUESTED
   ///     → /after-sales/detail (帶 caseNo)；無 caseNo 時退回配送中 + 售後處理篩選
-  /// - CERTIFICATION_* / MERCHANT_VERIFICATION / MERCHANT.VERIFICATION.* / SELLER_REVIEW_STATUS /
+  /// - CERTIFICATION_* / MERCHANT_VERIFICATION / SELLER_REVIEW_STATUS /
   ///   PAYUNI_STATUS → 導向 /main/wallet（重讀由 manager 負責）
   /// - CHAT_MESSAGE → /chat/thread (帶 conversationId)
   /// - NEW_FOLLOWER / NEW_SUBSCRIBER → /subscribers

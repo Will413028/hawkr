@@ -58,27 +58,24 @@ class _Server {
   }
 }
 
-GetMyKYCResponse _flow(KYCFlowStatus status, {bool identityLocked = false}) =>
-    GetMyKYCResponse(
-      application: KYCApplication(
-        flow: KYCFlow(status: status, identityLocked: identityLocked),
-      ),
-    );
+GetMyKYCResponse _answer(KYCStatus status) =>
+    GetMyKYCResponse(application: KYCApplication(status: status));
 
 void main() {
-  test('讀到流程狀態、identity_locked', () async {
-    final server = _Server()
-      ..answer = _flow(
-        KYCFlowStatus.KYC_FLOW_STATUS_FORWARDED,
-        identityLocked: true,
-      );
+  test('讀到申請狀態；申請沒有 flow 也能建立', () async {
+    final server = _Server()..answer = _answer(KYCStatus.KYC_STATUS_SUBMITTED);
     final kyc = await server.container().read(
       accountKycProvider('acc-1').future,
     );
 
-    expect(kyc.status, KYCFlowStatus.KYC_FLOW_STATUS_FORWARDED);
-    expect(kyc.identityLocked, isTrue);
-    expect(kyc.status, isNot(KYCFlowStatus.KYC_FLOW_STATUS_APPROVED));
+    expect(kyc.reviewStatus, KYCStatus.KYC_STATUS_SUBMITTED);
+    expect(kyc.reviewStatus, isNot(KYCStatus.KYC_STATUS_APPROVED));
+    expect(
+      MyKyc.fromApplication(
+        KYCApplication(status: KYCStatus.KYC_STATUS_DRAFT),
+      ).reviewStatus,
+      KYCStatus.KYC_STATUS_DRAFT,
+    );
   });
 
   test('讀到整份申請（etag、欄位、缺項），沒有申請時 application 是 null', () async {
@@ -88,7 +85,7 @@ void main() {
           etag: 'v7',
           realName: '王小明',
           missingFields: [KYCField.KYC_FIELD_BANK_ACCOUNT],
-          flow: KYCFlow(status: KYCFlowStatus.KYC_FLOW_STATUS_DRAFT),
+          status: KYCStatus.KYC_STATUS_DRAFT,
         ),
       );
     final kyc = await server.container().read(
@@ -107,8 +104,7 @@ void main() {
   });
 
   test('adopt：寫入回的申請直接成為目前的狀態，不再呼叫 GetMyKYC；null 是申請已取消', () async {
-    final server = _Server()
-      ..answer = _flow(KYCFlowStatus.KYC_FLOW_STATUS_REJECTED);
+    final server = _Server()..answer = _answer(KYCStatus.KYC_STATUS_REJECTED);
     final container = server.container();
     final sub = container.listen(currentKycProvider, (_, _) {});
     addTearDown(sub.close);
@@ -117,29 +113,22 @@ void main() {
 
     container
         .read(kycReaderProvider.notifier)
-        .adopt(
-          KYCApplication(
-            etag: 'v2',
-            flow: KYCFlow(status: KYCFlowStatus.KYC_FLOW_STATUS_DRAFT),
-          ),
-        );
+        .adopt(KYCApplication(etag: 'v2', status: KYCStatus.KYC_STATUS_DRAFT));
 
     final adopted = container.read(currentKycProvider)!.value!;
-    expect(adopted.status, KYCFlowStatus.KYC_FLOW_STATUS_DRAFT);
+    expect(adopted.reviewStatus, KYCStatus.KYC_STATUS_DRAFT);
     expect(adopted.application?.etag, 'v2');
     expect(server.calls, 1);
 
     container.read(kycReaderProvider.notifier).adopt(null);
-    expect(
-      container.read(currentKycProvider)!.value!.status,
-      KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
-    );
+    final cancelled = container.read(currentKycProvider)!.value!;
+    expect(cancelled.application, isNull);
+    expect(cancelled.reviewStatus, isNull);
     expect(server.calls, 1);
   });
 
-  test('adopt 收到沒有有效流程狀態的回應：退回重讀，不寫入壞資料', () async {
-    final server = _Server()
-      ..answer = _flow(KYCFlowStatus.KYC_FLOW_STATUS_DRAFT);
+  test('adopt 收到沒有有效申請狀態的回應：退回重讀，不寫入壞資料', () async {
+    final server = _Server()..answer = _answer(KYCStatus.KYC_STATUS_DRAFT);
     final container = server.container();
     final sub = container.listen(currentKycProvider, (_, _) {});
     addTearDown(sub.close);
@@ -150,33 +139,31 @@ void main() {
 
     expect(server.calls, 2);
     expect(
-      container.read(currentKycProvider)!.value!.status,
-      KYCFlowStatus.KYC_FLOW_STATUS_DRAFT,
+      container.read(currentKycProvider)!.value!.reviewStatus,
+      KYCStatus.KYC_STATUS_DRAFT,
     );
   });
 
   test('只有 APPROVED 算已通過', () async {
-    final server = _Server()
-      ..answer = _flow(KYCFlowStatus.KYC_FLOW_STATUS_APPROVED);
+    final server = _Server()..answer = _answer(KYCStatus.KYC_STATUS_APPROVED);
     final kyc = await server.container().read(
       accountKycProvider('acc-1').future,
     );
 
-    expect(kyc.status, KYCFlowStatus.KYC_FLOW_STATUS_APPROVED);
+    expect(kyc.reviewStatus, KYCStatus.KYC_STATUS_APPROVED);
   });
 
-  test('not_found（沒有申請）是 NOT_STARTED，不是錯誤', () async {
+  test('not_found（沒有申請）是沒有申請，不是錯誤', () async {
     final server = _Server()..answer = ConnectException(Code.notFound, 'none');
     final kyc = await server.container().read(
       accountKycProvider('acc-1').future,
     );
 
-    expect(kyc.status, KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED);
-    expect(kyc.identityLocked, isFalse);
-    expect(kyc.status, isNot(KYCFlowStatus.KYC_FLOW_STATUS_APPROVED));
+    expect(kyc.application, isNull);
+    expect(kyc.reviewStatus, isNull);
   });
 
-  test('暫時失敗是 error 狀態，不當成 NOT_STARTED', () async {
+  test('暫時失敗是 error 狀態，不當成沒有申請', () async {
     final server = _Server()
       ..answer = ConnectException(Code.unavailable, 'later');
     final container = server.container();
@@ -192,33 +179,32 @@ void main() {
     expect(state.value, isNull);
   });
 
-  test('UNSPECIFIED 與沒有流程的回應是 error 狀態', () async {
+  test('申請狀態是 UNSPECIFIED 的回應是 error 狀態', () async {
     final unspecified = _Server()
-      ..answer = _flow(KYCFlowStatus.KYC_FLOW_STATUS_UNSPECIFIED);
+      ..answer = _answer(KYCStatus.KYC_STATUS_UNSPECIFIED);
     await expectLater(
       unspecified.container().read(accountKycProvider('acc-1').future),
       throwsFormatException,
     );
 
-    final noFlow = _Server()
+    final empty = _Server()
       ..answer = GetMyKYCResponse(application: KYCApplication());
     await expectLater(
-      noFlow.container().read(accountKycProvider('acc-1').future),
+      empty.container().read(accountKycProvider('acc-1').future),
       throwsFormatException,
     );
   });
 
   test('currentKyc 跟著登入的帳號；沒有登入是 null', () async {
-    final server = _Server()
-      ..answer = _flow(KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED);
+    final server = _Server()..answer = _answer(KYCStatus.KYC_STATUS_SUBMITTED);
     final container = server.container();
     final sub = container.listen(currentKycProvider, (_, _) {});
     addTearDown(sub.close);
     await container.read(accountKycProvider('acc-1').future);
 
     expect(
-      container.read(currentKycProvider)?.value?.status,
-      KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED,
+      container.read(currentKycProvider)?.value?.reviewStatus,
+      KYCStatus.KYC_STATUS_SUBMITTED,
     );
 
     final loggedOut = _Server().container(session: _LoggedOut.new);
@@ -227,21 +213,20 @@ void main() {
   });
 
   test('reload 重讀並回傳最新狀態；失敗時丟出錯誤，refresh 回 false', () async {
-    final server = _Server()
-      ..answer = _flow(KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED);
+    final server = _Server()..answer = _answer(KYCStatus.KYC_STATUS_SUBMITTED);
     final container = server.container();
     final sub = container.listen(currentKycProvider, (_, _) {});
     addTearDown(sub.close);
     await container.read(accountKycProvider('acc-1').future);
     final reader = container.read(kycReaderProvider.notifier);
 
-    server.answer = _flow(KYCFlowStatus.KYC_FLOW_STATUS_APPROVED);
+    server.answer = _answer(KYCStatus.KYC_STATUS_APPROVED);
     final reloaded = await reader.reload();
-    expect(reloaded?.status, KYCFlowStatus.KYC_FLOW_STATUS_APPROVED);
+    expect(reloaded?.reviewStatus, KYCStatus.KYC_STATUS_APPROVED);
     expect(server.calls, 2);
     expect(
-      container.read(currentKycProvider)?.value?.status,
-      KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
+      container.read(currentKycProvider)?.value?.reviewStatus,
+      KYCStatus.KYC_STATUS_APPROVED,
     );
 
     server.answer = ConnectException(Code.unavailable, 'later');
@@ -264,12 +249,9 @@ void main() {
               final call = ++calls;
               if (call == 1) {
                 await acc1Gate.future;
-                return _flow(
-                  KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
-                  identityLocked: true,
-                );
+                return _answer(KYCStatus.KYC_STATUS_APPROVED);
               }
-              return _flow(KYCFlowStatus.KYC_FLOW_STATUS_DRAFT);
+              return _answer(KYCStatus.KYC_STATUS_DRAFT);
             }).build(),
           ),
         ),
@@ -283,19 +265,18 @@ void main() {
 
     (container.read(sessionProvider.notifier) as _Switchable).switchTo('acc-2');
     final acc2 = await container.read(accountKycProvider('acc-2').future);
-    expect(acc2.status, KYCFlowStatus.KYC_FLOW_STATUS_DRAFT);
+    expect(acc2.reviewStatus, KYCStatus.KYC_STATUS_DRAFT);
     expect(
-      container.read(currentKycProvider)?.value?.status,
-      KYCFlowStatus.KYC_FLOW_STATUS_DRAFT,
+      container.read(currentKycProvider)?.value?.reviewStatus,
+      KYCStatus.KYC_STATUS_DRAFT,
     );
 
     acc1Gate.complete();
     final acc1 = await container.read(accountKycProvider('acc-1').future);
-    expect(acc1.status, KYCFlowStatus.KYC_FLOW_STATUS_APPROVED);
+    expect(acc1.reviewStatus, KYCStatus.KYC_STATUS_APPROVED);
     expect(
-      container.read(currentKycProvider)?.value?.status,
-      KYCFlowStatus.KYC_FLOW_STATUS_DRAFT,
+      container.read(currentKycProvider)?.value?.reviewStatus,
+      KYCStatus.KYC_STATUS_DRAFT,
     );
-    expect(container.read(currentKycProvider)?.value?.identityLocked, isFalse);
   });
 }

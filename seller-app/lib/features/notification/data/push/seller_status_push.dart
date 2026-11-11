@@ -12,8 +12,7 @@ bool isSellerStatusPushType(String? type) {
   return key == 'PAYUNI_STATUS' ||
       key == 'SELLER_REVIEW_STATUS' ||
       key == 'MERCHANT_VERIFICATION' ||
-      key.startsWith('CERTIFICATION_') ||
-      key.startsWith('MERCHANT.VERIFICATION.');
+      key.startsWith('CERTIFICATION_');
 }
 
 /// 伺服器剛改變了認證或 PayUni 狀態（推播）：重讀店家、認證流程與 PayUni 註冊。每個通知事件只呼叫一次，用 manager 的 container；
