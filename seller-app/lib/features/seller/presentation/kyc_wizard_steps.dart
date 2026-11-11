@@ -314,7 +314,7 @@ class _OtherStep extends StatelessWidget {
               StoreField.STORE_FIELD_CONTACT_NAME.uiText(context.uiLocale) ??
               commonUnknown(context.uiLocale),
           value: s.contactName,
-          hint: '最多 20 字，會寫入商店設定',
+          hint: '最多 50 字，會寫入商店設定',
           error: errors.name,
           onChanged: (v) => c.updateStore((s) => s.copyWith(contactName: v)),
         ),

@@ -104,13 +104,13 @@ void main() {
       expect(storeContactErrors(const StoreContactDraft()).any, isFalse);
 
       final errors = storeContactErrors(
-        const StoreContactDraft(
-          contactName: '一二三四五六七八九十一二三四五六七八九十一',
+        StoreContactDraft(
+          contactName: '一' * 51,
           contactMobile: '123',
           supportEmail: 'nope',
         ),
       );
-      expect(errors.name, '聯絡人姓名最多 20 字');
+      expect(errors.name, '聯絡人姓名最多 50 字');
       expect(errors.mobile, '請輸入 09 開頭的 10 碼手機號碼');
       expect(errors.email, 'Email 格式不正確');
     });
