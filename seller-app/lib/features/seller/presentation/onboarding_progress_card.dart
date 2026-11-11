@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hawkr_api/transport.dart' show Code;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../core/l10n/ui_locale.dart';
@@ -34,7 +35,10 @@ class OnboardingProgressCard extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final my = ref.watch(myStoreSnapshotProvider);
-    final summary = ref.watch(currentOnboardingProvider)?.value;
+    final summaryRead = ref.watch(currentOnboardingProvider);
+    final summary = summaryRead?.value;
+    final summaryLoading =
+        summaryRead == null || (summaryRead.isLoading && !summaryRead.hasValue);
     final inputs =
         ref.watch(onboardingInputsProvider).value ?? const OnboardingInputs();
     final actions = usePaymentAccountActions(context, ref);
@@ -53,6 +57,14 @@ class OnboardingProgressCard extends HookConsumerWidget {
         required.isNotEmpty && completedRequired == required.length;
     final collapsedOverride = useState<bool?>(null);
     final collapsed = collapsedOverride.value ?? allRequiredComplete;
+    // 「公開前必須」沒有任務時：讀取中顯示「載入中…」，讀取失敗顯示預設錯誤句（不自己推導，也不顯示 0/0）。
+    final requiredPlaceholder = required.isNotEmpty
+        ? null
+        : summaryLoading
+        ? '載入中…'
+        : summary == null
+        ? ref.watch(defaultErrorTextProvider)(Code.internal)
+        : null;
 
     // 進度卡常駐在主導航的分頁裡：去別的頁面辦事回來（成為可見）才重讀，離開時不讀。物流與商品數是辦事的結果，每次回來都重讀；
     // 店家與認證流程 30 秒內讀過就不再讀。
@@ -97,7 +109,9 @@ class OnboardingProgressCard extends HookConsumerWidget {
           ),
           if (!collapsed)
             for (final group in OnboardingTaskGroup.values)
-              if (tasks.any((task) => task.group == group)) ...[
+              if (tasks.any((task) => task.group == group) ||
+                  (group == OnboardingTaskGroup.beforePublish &&
+                      requiredPlaceholder != null)) ...[
                 const SizedBox(height: HkSpace.lg),
                 Semantics(
                   header: true,
@@ -110,6 +124,21 @@ class OnboardingProgressCard extends HookConsumerWidget {
                     ),
                   ),
                 ),
+                if (group == OnboardingTaskGroup.beforePublish &&
+                    requiredPlaceholder != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: HkSpace.md),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        requiredPlaceholder,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
                 for (final task in tasks.where((task) => task.group == group))
                   _TaskRow(
                     task: task,
@@ -149,6 +178,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showProgress = totalRequired > 0 && !allRequiredComplete;
     final progress = totalRequired == 0
         ? 0.0
         : completedRequired / totalRequired;
@@ -194,7 +224,7 @@ class _Header extends StatelessWidget {
                 ],
               ),
             ),
-            if (!allRequiredComplete)
+            if (showProgress)
               Text(
                 '$completedRequired/$totalRequired',
                 style: const TextStyle(
@@ -205,7 +235,7 @@ class _Header extends StatelessWidget {
               ),
           ],
         ),
-        if (!allRequiredComplete) ...[
+        if (showProgress) ...[
           const SizedBox(height: HkSpace.md),
           Semantics(
             label: '開店進度',

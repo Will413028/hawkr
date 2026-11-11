@@ -355,7 +355,7 @@ void main() {
       );
     });
 
-    test('confirmPaymentAccount 連續兩次失敗：每次都是新的事件', () async {
+    test('confirmPaymentAccount 失敗：交給呼叫端，不放進共享 state', () async {
       final server = _Server()
         ..refreshFailure = reasonError(Code.unavailable, 'DOWN');
       final container = server.container();
@@ -363,11 +363,32 @@ void main() {
       final seen = <PaymentRefreshFailure?>[];
       container.listen(paymentOnboardingProvider, (_, next) => seen.add(next));
 
-      await notifier.confirmPaymentAccount();
-      await notifier.confirmPaymentAccount();
+      final result = await notifier.confirmPaymentAccount();
+
+      expect(result.refreshError, isNotNull);
+      expect(result.read, isTrue);
+      expect(seen, isEmpty);
+      expect(container.read(paymentOnboardingProvider), isNull);
+    });
+
+    test('從瀏覽器回來連續兩次失敗：每次都是新的事件，取走後清空', () async {
+      final server = _Server()
+        ..refreshFailure = reasonError(Code.unavailable, 'DOWN');
+      final container = server.container();
+      final notifier = container.read(paymentOnboardingProvider.notifier);
+      final seen = <PaymentRefreshFailure?>[];
+      container.listen(paymentOnboardingProvider, (_, next) => seen.add(next));
+
+      await notifier.start(_hosted);
+      await notifier.onResumed();
+      await notifier.start(_hosted);
+      await notifier.onResumed();
 
       expect(seen, hasLength(2));
       expect(identical(seen.first, seen.last), isFalse);
+      expect(notifier.takeRefreshFailure(), isNotNull);
+      expect(notifier.takeRefreshFailure(), isNull);
+      expect(container.read(paymentOnboardingProvider), isNull);
     });
 
     test('從外部瀏覽器回來帶 fresh: true：進行中那一輪可能在狀態改變之前就開始讀了，之後再讀一輪', () async {

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart';
+import 'package:hawkr_seller/core/l10n/ui_locale.dart';
 import 'package:hawkr_seller/core/networking/connect_provider.dart';
 import 'package:hawkr_seller/core/refresh/refresh_clock.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
@@ -32,6 +35,8 @@ const _actionRequired =
 const _inProgress = OnboardingTaskState.ONBOARDING_TASK_STATE_IN_PROGRESS;
 const _locked = OnboardingTaskState.ONBOARDING_TASK_STATE_LOCKED;
 
+const _internalText = '內部錯誤（測試句）';
+
 class _LoggedIn extends Session {
   @override
   SessionModel build() =>
@@ -44,6 +49,7 @@ Future<GoRouter> _pump(
   List<SellerRequirement> shippingMissing = const [],
   Object? summary,
   Object? refresh,
+  Completer<void>? summaryGate,
   List<String>? calls,
   OnboardingInputs inputs = const OnboardingInputs(),
   String description = '',
@@ -58,13 +64,17 @@ Future<GoRouter> _pump(
   final container = ProviderContainer(
     overrides: [
       sessionProvider.overrideWith(_LoggedIn.new),
+      defaultErrorTextProvider.overrideWithValue(
+        (code) => code == Code.internal ? _internalText : '其他錯誤',
+      ),
       myStoreRepositoryProvider.overrideWithValue(server.repository),
       onboardingInputsProvider.overrideWith((ref) async => inputs),
       sellerClientProvider.overrideWithValue(
         SellerAppServiceClient(
           FakeTransportBuilder()
-              .unary(SellerAppService.getMyOnboarding, (_, _) {
+              .unary(SellerAppService.getMyOnboarding, (_, _) async {
                 calls?.add('getMyOnboarding');
+                await summaryGate?.future;
                 final answer = summary;
                 if (answer is ConnectException) throw answer;
                 return answer as GetMyOnboardingResponse;
@@ -166,16 +176,41 @@ void main() {
     );
   });
 
-  testWidgets('沒有摘要（讀取失敗）：沒有必要任務，也不自己推導', (tester) async {
+  testWidgets('沒有摘要（讀取失敗）：沒有必要任務，也不自己推導；顯示預設錯誤句，不顯示 0/0 與任務完成', (tester) async {
     await _pump(
       tester,
       missing: [_logo, _kyc],
       summary: ConnectException(Code.unavailable, 'later'),
     );
 
-    expect(find.text('公開前必須'), findsNothing);
+    expect(find.text('公開前必須'), findsOneWidget);
+    expect(find.text(_internalText), findsOneWidget);
+    expect(find.text('載入中…'), findsNothing);
     expect(find.text('平台審核'), findsNothing);
     expect(find.text('建議完成'), findsOneWidget);
+    expect(find.text('0/0'), findsNothing);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text('任務完成'), findsNothing);
+  });
+
+  testWidgets('摘要讀取中：顯示「載入中…」，不顯示 0/0、進度條與任務完成', (tester) async {
+    final gate = Completer<void>();
+    addTearDown(() {
+      if (!gate.isCompleted) gate.complete();
+    });
+    await _pump(
+      tester,
+      missing: [_logo, _kyc],
+      summaryGate: gate,
+      summary: completedSummary(),
+    );
+
+    expect(find.text('公開前必須'), findsOneWidget);
+    expect(find.text('載入中…'), findsOneWidget);
+    expect(find.text(_internalText), findsNothing);
+    expect(find.text('0/0'), findsNothing);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text('任務完成'), findsNothing);
   });
 
   testWidgets('公開前必須全部完成時預設收合，可以展開', (tester) async {

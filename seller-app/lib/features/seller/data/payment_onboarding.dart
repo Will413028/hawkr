@@ -61,13 +61,18 @@ final class _ResumeObserver with WidgetsBindingObserver {
   }
 }
 
-/// 一次「先重讀再讀」裡 `RefreshMyPaymentAccount` 的失敗，交給畫面顯示（[PaymentOnboarding] 的 state）。每次失敗是新的物件，
-/// 連續兩次失敗畫面也都會收到。
+/// 從外部瀏覽器回來那一次「先重讀再讀」裡 `RefreshMyPaymentAccount` 的失敗：沒有發起的畫面，放進 [PaymentOnboarding] 的 state
+/// 當一次性訊號，由第一個顯示它的畫面用 [PaymentOnboarding.takeRefreshFailure] 取走（取走即清空），其餘畫面不會再顯示。
+/// 每次失敗是新的物件，連續兩次失敗畫面也都會收到。
 final class PaymentRefreshFailure {
   PaymentRefreshFailure(this.error);
 
   final Object error;
 }
+
+/// 一次「先重讀再讀」的結果：[read] 是重讀有沒有成功，[refreshError] 是 `RefreshMyPaymentAccount` 的失敗（成功為 null）。
+/// 使用者按按鈕觸發時，錯誤由發起的畫面直接從這個回傳值顯示。
+typedef PaymentConfirmation = ({bool read, Object? refreshError});
 
 /// 收款帳戶的開通與回到前景時的重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
 /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面
@@ -126,13 +131,13 @@ class PaymentOnboarding extends _$PaymentOnboarding {
   Future<bool> onResumed() {
     final returnedFromBrowser = _awaitingReturn;
     _awaitingReturn = false;
-    if (returnedFromBrowser) return confirmPaymentAccount();
+    if (returnedFromBrowser) return _confirmAfterBrowser();
     return ref.read(sellerStatusRefreshProvider.notifier).refresh();
   }
 
   /// 從金流商回來與「重新整理」共用的一條路徑：先 `RefreshMyPaymentAccount`（伺服器同步向金流商重讀）再 `fresh: true` 重讀
-  /// 全部狀態（含開通摘要）。重讀失敗也照樣讀（快取不能留在舊的），讀完才把失敗放進 state 交給畫面。回傳讀取有沒有成功。
-  Future<bool> confirmPaymentAccount() async {
+  /// 全部狀態（含開通摘要）。重讀失敗也照樣讀（快取不能留在舊的）。失敗不經共享 state 廣播，回傳給呼叫端（發起的畫面）顯示。
+  Future<PaymentConfirmation> confirmPaymentAccount() async {
     Object? failure;
     try {
       await ref.read(paymentAccountRepositoryProvider).refresh();
@@ -140,11 +145,25 @@ class PaymentOnboarding extends _$PaymentOnboarding {
       HKLog.logW('[PaymentOnboarding] RefreshMyPaymentAccount failed: $error');
       failure = error;
     }
-    if (!ref.mounted) return false;
+    if (!ref.mounted) return (read: false, refreshError: failure);
     final read = await ref
         .read(sellerStatusRefreshProvider.notifier)
         .refresh(fresh: true);
+    return (read: read, refreshError: failure);
+  }
+
+  /// 從外部瀏覽器回來：沒有發起的畫面，失敗放進 state 當一次性訊號。
+  Future<bool> _confirmAfterBrowser() async {
+    final result = await confirmPaymentAccount();
+    final failure = result.refreshError;
     if (failure != null && ref.mounted) state = PaymentRefreshFailure(failure);
-    return read;
+    return result.read;
+  }
+
+  /// 取走 state 裡的一次性失敗訊號並清空；已被別的畫面取走時回 null。
+  Object? takeRefreshFailure() {
+    final failure = state?.error;
+    if (failure != null) state = null;
+    return failure;
   }
 }

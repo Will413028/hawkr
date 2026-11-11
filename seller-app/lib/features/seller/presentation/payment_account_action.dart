@@ -52,20 +52,28 @@ typedef PaymentAccountActions = ({
 });
 
 /// 收款帳戶動作的執行與進行中狀態（hook，只在 `HookConsumerWidget` 的 build 裡用）。「重新整理」（[PaymentAccountActions.refresh]，
-/// 與 `reload` 動作同一條路徑）先 `RefreshMyPaymentAccount` 再重讀；那一步的失敗（包含從金流商頁面回來時的那一次）以 toast 顯示
-/// 伺服器的句子。
+/// 與 `reload` 動作同一條路徑）先 `RefreshMyPaymentAccount` 再重讀；那一步的失敗以 toast 顯示伺服器的句子：按鈕觸發的由發起的畫面從回傳值顯示，
+/// 從金流商頁面回來的那一次沒有發起的畫面，由第一個取走一次性訊號的消費者顯示。
 PaymentAccountActions usePaymentAccountActions(
   BuildContext context,
   WidgetRef ref,
 ) {
   final busy = useState(false);
 
-  ref.listen(paymentOnboardingProvider, (previous, failure) {
-    if (failure == null || !context.mounted) return;
+  void showFailure(Object error) {
     FloatingToast.error(
       context,
-      errorText(failure.error, defaults: ref.read(defaultErrorTextProvider)),
+      errorText(error, defaults: ref.read(defaultErrorTextProvider)),
     );
+  }
+
+  // 從外部瀏覽器回來的失敗沒有發起的畫面：每個消費者都會收到通知，第一個取走的顯示，其餘取到 null。
+  ref.listen(paymentOnboardingProvider, (previous, failure) {
+    if (failure == null || !context.mounted) return;
+    final error = ref
+        .read(paymentOnboardingProvider.notifier)
+        .takeRefreshFailure();
+    if (error != null) showFailure(error);
   });
 
   Future<void> guarded(Future<void> Function() body) async {
@@ -91,7 +99,11 @@ PaymentAccountActions usePaymentAccountActions(
   });
 
   Future<void> reload() => guarded(() async {
-    await ref.read(paymentOnboardingProvider.notifier).confirmPaymentAccount();
+    final result = await ref
+        .read(paymentOnboardingProvider.notifier)
+        .confirmPaymentAccount();
+    final error = result.refreshError;
+    if (error != null && context.mounted) showFailure(error);
   });
 
   return (
