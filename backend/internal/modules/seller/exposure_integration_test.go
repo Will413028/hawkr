@@ -342,9 +342,9 @@ func TestPublicListingReportsAStoreThatIsWaitingForDeletion(t *testing.T) {
 	}
 }
 
-// 物流建店的前置條件是 KYC 流程核准，Authorize（經 ActingStore）從資料庫讀流程：沒有核准回 FailedPrecondition，
+// 物流建店的前置條件是 KYC 申請核准，Authorize（經 ActingStore）從資料庫讀開通條件：沒有核准回 FailedPrecondition，
 // reason SELLER_REQUIREMENT_MISSING，metadata 帶 ONBOARDING_COMPLETE；核准的店家通過；停權仍是 PermissionDenied。
-func TestActingStoreRequiresAnApprovedKYCFlowForShippingSetup(t *testing.T) {
+func TestActingStoreRequiresAnApprovedKYCForShippingSetup(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)

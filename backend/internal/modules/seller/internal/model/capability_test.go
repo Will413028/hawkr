@@ -76,7 +76,7 @@ func TestCapabilitiesOfReportsEveryCapabilityConsistently(t *testing.T) {
 }
 
 // 店家營運中：動作類能力都啟用，物流建店要 KYC 核准。
-func TestCapabilitiesOfShippingSetupNeedsAnApprovedKYCFlow(t *testing.T) {
+func TestCapabilitiesOfShippingSetupNeedsAnApprovedKYC(t *testing.T) {
 	for _, kyc := range []bool{true, false} {
 		s := fullStore(Active, false)
 		if !kyc {
