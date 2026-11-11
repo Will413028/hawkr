@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
-	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // BindIntent 是核准時寫入綁定意圖的輸入：店家與核准的申請。
@@ -221,48 +220,4 @@ func (s *Service) Observations(ctx context.Context, in model.PayUniObservationLi
 		page.Next = &model.PayUniObservationCursor{ExecutedAt: last.ExecutedAt, ObservationID: last.ID}
 	}
 	return page, nil
-}
-
-// CheckResubmit 回答申請此刻能不能儲存草稿或重新送出（流程狀態的 CanResubmit）：能時回 nil，否則是 FailedPrecondition，訊息是
-// model.ResubmitUnavailableReasons 第一個原因的句子（語系取自 ctx）。呼叫方已鎖住店家列與 PayUni 註冊列（需要時）。
-func CheckResubmit(ctx context.Context, q *store.Queries, row store.SellerKycApplication) error {
-	v, err := SellerViewOf(ctx, q, row)
-	if err != nil {
-		return err
-	}
-	if v.Flow.CanResubmit {
-		return nil
-	}
-	return model.ErrResubmitUnavailable(v.Reasons, uitext.LocaleFrom(ctx))
-}
-
-// SellerView 是申請在同一個時刻、同一份 PayUni 註冊上的流程狀態、賣家看到的 PayUni 狀態與不能重新送出的原因：註冊只載入一次
-// （帶申請的賣家型態與店家現在缺的欄位），三者都由它推導，所以 Flow.CanResubmit、PayUni.State 與 Reasons 不會分歧。PayUni 狀態沒有時是 nil。
-type SellerView struct {
-	Flow    model.KYCFlow
-	PayUni  *model.SellerPayUni
-	Reasons []model.KYCResubmitUnavailableReason
-}
-
-// SellerViewOf 讀申請所屬店家的註冊並推導 SellerView；賣家讀申請、SaveKYCDraft 與 SubmitKYC 的檢查都經它。
-func SellerViewOf(ctx context.Context, q *store.Queries, row store.SellerKycApplication) (SellerView, error) {
-	var reg *model.PayUniRegistration
-	regRow, err := q.PayUniRegistrationByStore(ctx, row.StoreID)
-	switch {
-	case err == nil:
-		r, err := withApplication(ctx, q, stint.ToPayUniRegistration(regRow))
-		if err != nil {
-			return SellerView{}, err
-		}
-		reg = &r
-	case !errors.Is(err, pgx.ErrNoRows):
-		return SellerView{}, err
-	}
-	status := model.KYCStatus(row.Status)
-	v := SellerView{Flow: model.DeriveKYCFlow(status, reg)}
-	if state, ok := model.SellerPayUniOf(status, reg != nil && reg.ApplicationID == row.ApplicationID, reg); ok {
-		v.PayUni = &state
-	}
-	v.Reasons = model.ResubmitUnavailableReasons(status, v.Flow, v.PayUni)
-	return v, nil
 }

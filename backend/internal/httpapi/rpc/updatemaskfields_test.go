@@ -33,7 +33,7 @@ func TestWritableFieldsFollowTheMask(t *testing.T) {
 	if got := writable(t, app, "birth_date", "real_name"); !slices.Equal(got, []string{"birth_date", "real_name"}) {
 		t.Fatalf("列出的欄位：%v", got)
 	}
-	got := writable(t, app, "id", "status", "flow", "missing_fields", "etag", "real_name", "individual.id_card_no", "individual.id_card_no_masked")
+	got := writable(t, app, "id", "status", "last_rejection", "missing_fields", "etag", "real_name", "individual.id_card_no", "individual.id_card_no_masked")
 	if !slices.Equal(got, []string{"etag", "real_name", "individual.id_card_no"}) {
 		t.Fatalf("只讀的欄位要略過：%v", got)
 	}

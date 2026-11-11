@@ -324,48 +324,13 @@ func InquiryUnavailableWithdrawn() uitext.Message {
 	return uitext.Message{Text: "這筆詢問已撤回。", Locale: uitext.ZhTW}
 }
 
-// KycResubmitUnavailablePayuniApproved 是模組句子 kyc.resubmit_unavailable.payuni_approved；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailablePayuniApproved(l uitext.Locale) uitext.Message {
+// KycEditUnavailableApproved 是模組句子 kyc.edit_unavailable.approved；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func KycEditUnavailableApproved(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "商家認證已通過，不需要修改或重新送出。", Locale: uitext.ZhTW}
 }
 
-// KycResubmitUnavailablePayuniContactSupport 是模組句子 kyc.resubmit_unavailable.payuni_contact_support；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailablePayuniContactSupport(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "這個問題無法以修改資料解決，請聯繫客服了解原因。", Locale: uitext.ZhTW}
-}
-
-// KycResubmitUnavailablePayuniFixViaSupport 是模組句子 kyc.resubmit_unavailable.payuni_fix_via_support；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailablePayuniFixViaSupport(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "要修正的是店家設定裡的資料，修正後請聯繫客服重新處理，商家認證不需要重新送出。", Locale: uitext.ZhTW}
-}
-
-// KycResubmitUnavailablePayuniPendingInfo 是模組句子 kyc.resubmit_unavailable.payuni_pending_info；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailablePayuniPendingInfo(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "PayUni 要求補件，請依 PayUni 通知信的指示處理，商家認證不需要在這裡修改或重新送出。", Locale: uitext.ZhTW}
-}
-
-// KycResubmitUnavailablePayuniRetryLater 是模組句子 kyc.resubmit_unavailable.payuni_retry_later；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailablePayuniRetryLater(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "PayUni 暫時無法處理，平台會協助重新送出，你不需要修改或重新送出。", Locale: uitext.ZhTW}
-}
-
-// KycResubmitUnavailablePayuniReviewing 是模組句子 kyc.resubmit_unavailable.payuni_reviewing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailablePayuniReviewing(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "PayUni 正在審查你的資料，審查期間不能修改或重新送出商家認證。", Locale: uitext.ZhTW}
-}
-
-// KycResubmitUnavailablePayuniTerminated 是模組句子 kyc.resubmit_unavailable.payuni_terminated；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailablePayuniTerminated(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "PayUni 收款帳戶已終止，無法修改或重新送出，請聯繫客服。", Locale: uitext.ZhTW}
-}
-
-// KycResubmitUnavailableUnderReview 是模組句子 kyc.resubmit_unavailable.under_review；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailableUnderReview(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "申請審核中，請等待審核結果。", Locale: uitext.ZhTW}
-}
-
-// KycResubmitUnavailableUnderReviewCancelable 是模組句子 kyc.resubmit_unavailable.under_review_cancelable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailableUnderReviewCancelable(l uitext.Locale) uitext.Message {
+// KycEditUnavailableUnderReview 是模組句子 kyc.edit_unavailable.under_review；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func KycEditUnavailableUnderReview(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "申請審核中，要修改請先取消申請。", Locale: uitext.ZhTW}
 }
 
@@ -663,41 +628,6 @@ func OpeningUnavailableSuspended(l uitext.Locale) uitext.Message {
 // OpeningUnavailableTerminated 是模組句子 opening.unavailable.terminated；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func OpeningUnavailableTerminated(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "此帳號因終止合作（第 21.3 條）不能重新開店。如有異議，可對該終止提出申覆。", Locale: uitext.ZhTW}
-}
-
-// PayuniStateContactSupport 是模組句子 payuni.state.contact_support；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func PayuniStateContactSupport(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "請聯繫客服了解原因，無法自行重新送出。", Locale: uitext.ZhTW}
-}
-
-// PayuniStateFixViaSupport 是模組句子 payuni.state.fix_via_support；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func PayuniStateFixViaSupport(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "修正後請聯繫客服重新處理，無法自行重新送出。", Locale: uitext.ZhTW}
-}
-
-// PayuniStateFixable 是模組句子 payuni.state.fixable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func PayuniStateFixable(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "請修正資料後重新送出，送出後平台會重新審核。", Locale: uitext.ZhTW}
-}
-
-// PayuniStatePendingInfo 是模組句子 payuni.state.pending_info；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func PayuniStatePendingInfo(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "請至信箱查看 PayUni 補件通知信件，依指示補齊資料後再次送出審核。", Locale: uitext.ZhTW}
-}
-
-// PayuniStateRetryLater 是模組句子 payuni.state.retry_later；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func PayuniStateRetryLater(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "PayUni 暫時無法處理這筆申請，平台會協助重新送出，你不需要重新送出。", Locale: uitext.ZhTW}
-}
-
-// PayuniStateReviewing 是模組句子 payuni.state.reviewing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func PayuniStateReviewing(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "平台審核已通過，PayUni 正在審查金流資料。", Locale: uitext.ZhTW}
-}
-
-// PayuniStateTerminated 是模組句子 payuni.state.terminated；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func PayuniStateTerminated(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "請聯繫客服了解原因。", Locale: uitext.ZhTW}
 }
 
 // RemediationUnavailableAppealPending 是模組句子 remediation.unavailable.appeal_pending；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。

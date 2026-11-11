@@ -709,7 +709,7 @@ func TestRegistryCheckJobsAreUniqueByCheckIDAndDuplicateDeliveryIsHarmless(t *te
 	must(t, jobs.Migrate(ctx, f.db))
 	jc, err := jobs.NewInsertOnly(f.db)
 	must(t, err)
-	f.module = f.newModule(t, f.payuni, jc)
+	f.module = f.newModule(t, jc)
 	_, _, sub := f.companySubmission(t, nil)
 	must(t, f.requery(ctx, RequeryKYCRegistrationInput{ApplicationID: sub.ID, AdminID: 7}))
 	const registryJobs = "SELECT count(*) FROM river.river_job WHERE kind='seller.kyc_registry_check'"

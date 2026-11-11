@@ -283,7 +283,7 @@ func TestAdminStoresFiltersAndDerivedFields(t *testing.T) {
 			t.Fatalf("query %q matched %v", q, got)
 		}
 	}
-	// 停權與 KYC 流程是推導出來的，不是儲存的篩選。
+	// 停權是推導出來的，不是儲存的篩選。
 	byID := map[int64]StoreListItem{}
 	for _, item := range list(StoreListInput{}) {
 		byID[item.Store.StoreID] = item
@@ -292,8 +292,8 @@ func TestAdminStoresFiltersAndDerivedFields(t *testing.T) {
 		t.Fatalf("suspension: %+v", byID)
 	}
 	for id, item := range byID {
-		if item.KYCFlow != FlowNotStarted {
-			t.Fatalf("store %d flow=%s", id, item.KYCFlow)
+		if item.KYCStatus != nil {
+			t.Fatalf("store %d 沒有申請，卻有申請狀態 %s", id, *item.KYCStatus)
 		}
 	}
 	// 不合法的篩選值被拒絕，不被忽略。
@@ -322,36 +322,37 @@ func TestAdminStoresFilterByKYCStatusAndShowTheFlow(t *testing.T) {
 	_, approvedStore, toApprove := f.submitted(t, idC, "012345678903")
 	must(t, approve(f, toApprove))
 
-	list := func(status KYCStatus) map[int64]KYCFlowStatus {
+	list := func(status KYCStatus) map[int64]*KYCStatus {
 		t.Helper()
 		page, err := f.module.AdminStores(ctx, StoreListInput{KYCStatus: &status})
 		must(t, err)
-		out := map[int64]KYCFlowStatus{}
+		out := map[int64]*KYCStatus{}
 		for _, item := range page.Items {
-			out[item.Store.StoreID] = item.KYCFlow
+			out[item.Store.StoreID] = item.KYCStatus
 		}
 		return out
 	}
 	awaiting, err := f.module.AdminStores(ctx, StoreListInput{KYCAwaitingReview: true})
 	must(t, err)
-	if len(awaiting.Items) != 1 || awaiting.Items[0].Store.StoreID != submittedStore.StoreID || awaiting.Items[0].KYCFlow != FlowSubmitted {
+	if len(awaiting.Items) != 1 || awaiting.Items[0].Store.StoreID != submittedStore.StoreID || awaiting.Items[0].KYCStatus == nil || *awaiting.Items[0].KYCStatus != KYCStatusSubmitted {
 		t.Fatalf("awaiting review=%+v", awaiting.Items)
 	}
-	if got := list(KYCStatusApproved); len(got) != 1 || got[approvedStore.StoreID] == FlowNotStarted || got[approvedStore.StoreID] == FlowSubmitted {
+	if got := list(KYCStatusApproved); len(got) != 1 || got[approvedStore.StoreID] == nil || *got[approvedStore.StoreID] != KYCStatusApproved {
 		t.Fatalf("approved=%v", got)
 	}
 	if got := list(KYCStatusRejected); len(got) != 0 {
 		t.Fatalf("rejected=%v", got)
 	}
-	// 沒有篩選時，草稿的店家只顯示它的流程狀態，沒有申請的是 NOT_STARTED。
+	// 沒有篩選時，草稿的店家顯示草稿，沒有申請的店家沒有申請狀態。
 	page, err := f.module.AdminStores(ctx, StoreListInput{})
 	must(t, err)
-	flows := map[int64]KYCFlowStatus{}
+	statuses := map[int64]*KYCStatus{}
 	for _, item := range page.Items {
-		flows[item.Store.StoreID] = item.KYCFlow
+		statuses[item.Store.StoreID] = item.KYCStatus
 	}
-	if flows[noApplication.StoreID] != FlowNotStarted || flows[draftOnly.StoreID] != FlowDraft || flows[submittedStore.StoreID] != FlowSubmitted {
-		t.Fatalf("flows=%v", flows)
+	if statuses[noApplication.StoreID] != nil || statuses[draftOnly.StoreID] == nil || *statuses[draftOnly.StoreID] != KYCStatusDraft ||
+		statuses[submittedStore.StoreID] == nil || *statuses[submittedStore.StoreID] != KYCStatusSubmitted {
+		t.Fatalf("statuses=%v", statuses)
 	}
 }
 
@@ -412,8 +413,7 @@ func TestStoreKYC(t *testing.T) {
 	}
 	got, ok, err := f.module.StoreKYC(ctx, submittedStore.StoreID)
 	must(t, err)
-	if !ok || got.ID != submitted.ID || got.Status != KYCStatusSubmitted || got.Flow == nil || got.Flow.Status != FlowSubmitted ||
-		got.SubmittedAt == nil || got.StoreID != submittedStore.StoreID || got.AccountID != submittedAccount {
+	if !ok || got.ID != submitted.ID || got.Status != KYCStatusSubmitted || got.SubmittedAt == nil || got.StoreID != submittedStore.StoreID || got.AccountID != submittedAccount {
 		t.Fatalf("got=%+v ok=%v", got, ok)
 	}
 	if got.IDCardNoMasked == nil || strings.Contains(*got.IDCardNoMasked, idB) || strings.Contains(*got.BankAccountMasked, "012345678902") {
@@ -434,7 +434,7 @@ func TestStoreKYC(t *testing.T) {
 	}
 }
 
-// approvedWith 開店、送出並核准一份申請（PayUni 註冊是 PENDING，job 還沒跑）。
+// approvedWith 開店、送出並核准一份申請。
 func (f *fixture) approvedWith(t *testing.T, idCard, bank string) (int64, Store) {
 	t.Helper()
 	accountID, s, submitted := f.submitted(t, idCard, bank)
@@ -494,8 +494,8 @@ func TestAdminStoresKYCFilterOnlyMatchesTheCurrentApplication(t *testing.T) {
 	page, err := f.module.AdminStores(ctx, StoreListInput{})
 	must(t, err)
 	for _, item := range page.Items {
-		if item.Store.StoreID == cancelledOnly.StoreID && item.KYCFlow != FlowNotStarted {
-			t.Fatalf("a store with only a cancelled application is NOT_STARTED, got %s", item.KYCFlow)
+		if item.Store.StoreID == cancelledOnly.StoreID && item.KYCStatus != nil {
+			t.Fatalf("a store with only a cancelled application has no application status, got %s", *item.KYCStatus)
 		}
 	}
 }

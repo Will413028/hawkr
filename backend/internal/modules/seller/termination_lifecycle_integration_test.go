@@ -313,12 +313,12 @@ func TestRevokingATerminationOfASuspendedAccountDoesNotReopen(t *testing.T) {
 }
 
 // 申覆期間內撤銷（或接受申覆）：同一個 store_id、店號、商品與 KYC 欄位仍在、SELLER 重新授予、store_closures 有一列、可曝光恢復、沒有
-// seller.deleted（StoreRetired）、PayUni 的綁定補排回去。
+// seller.deleted（StoreRetired）。
 // mutation：Reopen 不重新授予 SELLER。
 func TestRevokingATerminationInsideTheAppealWindowReopensTheSameStore(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	reopened, retired, announcements := record[StoreReopened](f), record[StoreRetired](f), record[StoreExposureChanged](f)
+	reopened, retired := record[StoreReopened](f), record[StoreRetired](f)
 	accountID, s := f.exposable(t)
 	before := f.storeRow(t, s.StoreID)
 	f.jobs.args = nil
@@ -331,7 +331,6 @@ func TestRevokingATerminationInsideTheAppealWindowReopensTheSameStore(t *testing
 		t.Fatal("關店之後不可曝光")
 	}
 	kycBefore := f.row(t, "kyc_applications", "store_id", s.StoreID)
-	syncBefore := countKind(f.jobs.kinds(), "seller.payuni_sync")
 	f.now = f.now.Add(40 * 24 * time.Hour)
 	f.revoke(t, m)
 	back := f.storeRow(t, s.StoreID)
@@ -357,52 +356,6 @@ func TestRevokingATerminationInsideTheAppealWindowReopensTheSameStore(t *testing
 	if f.isSuspended(t, s.StoreID) {
 		t.Fatal("撤銷之後帳號恢復")
 	}
-	if got := countKind(f.jobs.kinds(), "seller.payuni_sync"); got < syncBefore {
-		t.Fatalf("sync=%d", got)
-	}
-	_ = announcements
-}
-
-func countKind(kinds []string, kind string) int {
-	n := 0
-	for _, k := range kinds {
-		if k == kind {
-			n++
-		}
-	}
-	return n
-}
-
-// 恢復營業時補排 PayUni 的綁定：關店期間 sync job 對已關閉的店不做事、綁定意圖留在 PENDING，恢復後要重新排入。
-func TestReopenRequeuesThePayUniBindThatWasDroppedWhileClosed(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	_, s := f.approvedWith(t, idA, bankAcct)
-	if reg := f.payuniStatus(t, s.StoreID); reg != "PENDING" {
-		t.Fatalf("bind_status=%s，應該是等綁定", reg)
-	}
-	m := f.terminate(t, s.StoreID, GroundCeasedBusiness)
-	f.effect(t, m)
-	f.sync(t, s.StoreID)
-	if reg := f.payuniStatus(t, s.StoreID); reg != "PENDING" {
-		t.Fatalf("已關閉的店不做 sync，綁定仍在等：%s", reg)
-	}
-	f.jobs.args = nil
-	f.revoke(t, m)
-	if countKind(f.jobs.kinds(), "seller.payuni_sync") != 1 {
-		t.Fatalf("恢復營業後要補排一次 sync：%v", f.jobs.kinds())
-	}
-	f.sync(t, s.StoreID)
-	if reg := f.payuniStatus(t, s.StoreID); reg != "BOUND" {
-		t.Fatalf("恢復之後的 sync 要真的綁定：%s", reg)
-	}
-}
-
-func (f *fixture) payuniStatus(t *testing.T, storeID int64) string {
-	t.Helper()
-	var status string
-	must(t, f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT bind_status FROM seller.payuni_registrations WHERE store_id=$1", storeID).Scan(&status))
-	return status
 }
 
 // 帳號已開新店（21.2 允許）時撤銷：只撤銷、不重開；帳號在等待刪除時也不重開。
@@ -889,7 +842,7 @@ func TestLinkedAccountsAreFoundAcrossHMACKeyRotation(t *testing.T) {
 				must(t, err)
 				mac, err := seal.ParseMAC(newMAC + "," + oldMAC)
 				must(t, err)
-				f.module = f.newModuleWithKeys(t, f.payuni, f.jobs, enc, mac)
+				f.module = f.newModuleWithKeys(t, f.jobs, enc, mac)
 			}
 			var sA, sB Store
 			var accountB int64

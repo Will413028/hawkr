@@ -134,7 +134,7 @@ func TestAdminReviewsKYCOverConnect(t *testing.T) {
 	}
 	app := got.Msg.GetApplication()
 	if app.GetIndividual().GetIdCardNoMasked() != "A1******89" || app.GetBankAccountMasked() != "********8901" || len(app.GetDocuments()) != 3 ||
-		app.GetFlow().GetStatus() != pb.KYCFlowStatus_KYC_FLOW_STATUS_SUBMITTED || len(app.GetReviews()) != 1 || got.Header().Get("Cache-Control") != "private, no-store" {
+		app.GetStatus() != pb.KYCStatus_KYC_STATUS_SUBMITTED || len(app.GetReviews()) != 1 || got.Header().Get("Cache-Control") != "private, no-store" {
 		t.Fatalf("application=%+v", app)
 	}
 	var audits int64
@@ -168,7 +168,7 @@ func TestAdminReviewsKYCOverConnect(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := approved.Msg.GetApplication()
-	if a.GetStatus() != pb.KYCStatus_KYC_STATUS_APPROVED || a.GetFlow().GetStatus() != pb.KYCFlowStatus_KYC_FLOW_STATUS_BINDING || a.GetDecideTime() == nil || len(a.GetReviews()) != 2 ||
+	if a.GetStatus() != pb.KYCStatus_KYC_STATUS_APPROVED || a.GetDecideTime() == nil || len(a.GetReviews()) != 2 ||
 		a.GetReviews()[1].GetAction() != adminsellerpb.KYCReviewAction_KYC_REVIEW_ACTION_APPROVE || a.GetReviews()[1].GetReviewerAdminId() != sid(f.adminID) || a.GetReviews()[1].GetReason() != "資料齊全" {
 		t.Fatalf("approved=%+v", a)
 	}

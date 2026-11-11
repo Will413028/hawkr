@@ -104,7 +104,7 @@ type SellerAdminServiceClient interface {
 	// ListKYCDocumentAccesses 列出一筆申請的證件圖片讀取紀錄（誰、依據哪次顯示、哪個位置、何時），新到舊。申請不存在或是賣家的
 	// 草稿回 not_found。
 	ListKYCDocumentAccesses(context.Context, *connect.Request[v1alpha1.ListKYCDocumentAccessesRequest]) (*connect.Response[v1alpha1.ListKYCDocumentAccessesResponse], error)
-	// ApproveKYC 核准審核中的申請，並在同一個 transaction 寫入 PayUni 的綁定意圖（綁定由背景程序完成）。etag 必填。身分命中
+	// ApproveKYC 核准審核中的申請，並在同一個 transaction 排入收款帳戶的建立（建立由背景程序完成）。etag 必填。身分命中
 	// 別的帳號生效中的處分回 failed_precondition，文案不透露欄位或帳號。申請不能核准（不在審核中、店家已關閉或等待刪除、
 	// 帳號停權中）時回 failed_precondition，訊息是 KYCApplication.approve_unavailabilities 的第一句。
 	// 帳號停權時不能核准、可以退回；
@@ -327,7 +327,7 @@ type SellerAdminServiceHandler interface {
 	// ListKYCDocumentAccesses 列出一筆申請的證件圖片讀取紀錄（誰、依據哪次顯示、哪個位置、何時），新到舊。申請不存在或是賣家的
 	// 草稿回 not_found。
 	ListKYCDocumentAccesses(context.Context, *connect.Request[v1alpha1.ListKYCDocumentAccessesRequest]) (*connect.Response[v1alpha1.ListKYCDocumentAccessesResponse], error)
-	// ApproveKYC 核准審核中的申請，並在同一個 transaction 寫入 PayUni 的綁定意圖（綁定由背景程序完成）。etag 必填。身分命中
+	// ApproveKYC 核准審核中的申請，並在同一個 transaction 排入收款帳戶的建立（建立由背景程序完成）。etag 必填。身分命中
 	// 別的帳號生效中的處分回 failed_precondition，文案不透露欄位或帳號。申請不能核准（不在審核中、店家已關閉或等待刪除、
 	// 帳號停權中）時回 failed_precondition，訊息是 KYCApplication.approve_unavailabilities 的第一句。
 	// 帳號停權時不能核准、可以退回；

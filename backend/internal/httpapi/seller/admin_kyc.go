@@ -317,9 +317,6 @@ func toAdminKYC(a model.KYCAdminApplication) *adminpb.KYCApplication {
 	for _, d := range a.Documents {
 		out.Documents = append(out.Documents, &adminpb.KYCDocument{Field: documentFieldPB(d.Slot), Position: int32(d.Position)}) //nolint:gosec // position < 10
 	}
-	if a.Flow != nil {
-		out.Flow = toFlow(*a.Flow)
-	}
 	if a.PendingRegistrationCheck != nil {
 		out.PendingRegistrationCheck = toRegistrationCheck(*a.PendingRegistrationCheck)
 	}

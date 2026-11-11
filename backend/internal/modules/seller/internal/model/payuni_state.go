@@ -1,11 +1,6 @@
 package model
 
-import (
-	"slices"
-
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/text"
-	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
-)
+import "slices"
 
 // PayUniState 是賣家看到的 PayUni 收款狀態，一個值對應賣家的一種動作：等、看 PayUni 的信、改申請後重送、改店家設定後找客服、
 // 找客服、等平台重送、關店重新入駐、無。由 SellerPayUniOf 推導，不存。
@@ -36,28 +31,6 @@ func PayUniStateValues() []PayUniState {
 		PayUniStateReviewing, PayUniStatePendingInfo, PayUniStateFixable, PayUniStateFixViaSupport, PayUniStateContactSupport, PayUniStateRetryLater,
 		PayUniStateTerminated, PayUniStateApproved,
 	}
-}
-
-// Explanation 是狀態給賣家看的說明（語系 l），只由狀態決定。APPROVED（畫面不顯示面板）與不認得的值回 false。
-func (s PayUniState) Explanation(l uitext.Locale) (uitext.Message, bool) {
-	switch s {
-	case PayUniStateReviewing:
-		return text.PayuniStateReviewing(l), true
-	case PayUniStatePendingInfo:
-		return text.PayuniStatePendingInfo(l), true
-	case PayUniStateFixable:
-		return text.PayuniStateFixable(l), true
-	case PayUniStateFixViaSupport:
-		return text.PayuniStateFixViaSupport(l), true
-	case PayUniStateContactSupport:
-		return text.PayuniStateContactSupport(l), true
-	case PayUniStateRetryLater:
-		return text.PayuniStateRetryLater(l), true
-	case PayUniStateTerminated:
-		return text.PayuniStateTerminated(l), true
-	case PayUniStateApproved:
-	}
-	return uitext.Message{}, false
 }
 
 // SellerPayUni 是賣家看到的 PayUni 狀態與要處理的事。Reason 是 PayUni 的審核意見原文（去掉前後空白，沒有時空字串）；

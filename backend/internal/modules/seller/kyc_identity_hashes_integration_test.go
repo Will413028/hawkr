@@ -56,7 +56,7 @@ func TestIdentityHashesFollowTheApplication(t *testing.T) {
 		t.Fatalf("輪替前只有舊金鑰的列：%v", got)
 	}
 	enc, mac := rotatedKeys(t)
-	f.module = f.newModuleWithKeys(t, f.payuni, f.jobs, enc, mac)
+	f.module = f.newModuleWithKeys(t, f.jobs, enc, mac)
 	edited, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: draft.Version, IDCardNo: ptr("F131104093")})
 	must(t, err)
 	want := map[string]string{}
@@ -96,7 +96,7 @@ func TestRehashFillsTheKeysAddedByARotation(t *testing.T) {
 	_, sA, _ := f.submitted(t, idA, bankAcct)
 	accountB, sB, _ := f.submitted(t, idA, "999888777666")
 	enc, mac := rotatedKeys(t)
-	f.module = f.newModuleWithKeys(t, f.payuni, f.jobs, enc, mac)
+	f.module = f.newModuleWithKeys(t, f.jobs, enc, mac)
 	if n := f.count(t, "SELECT count(*) FROM seller.kyc_identity_hashes WHERE key_id = 'rot2'"); n != 0 {
 		t.Fatalf("輪替後既有申請還沒有新金鑰的列：%d", n)
 	}

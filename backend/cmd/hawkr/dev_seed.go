@@ -25,7 +25,6 @@ func devSeedStores() []seller.DevSeedStore {
 			ContactPhone: "0912345678", TownCode: "67000180", AddressDetail: "中山路88號",
 			ContactName: "李翠綠", ContactMobile: "0912345678", SupportEmail: "seller1@hawkr.test",
 			LogoKey: "public/seed/store/1009/logo.jpg", LogoAssetID: "seed-logo-1009",
-			PayUniMerStatus: "1", PayUniMemberStatus: "1",
 			KYC: seller.KYCDraftInput{
 				SellerType: &individual, RealName: ptr("李翠綠"), BirthDate: ptr("1980-05-20"), IDCardNo: ptr("A123456789"),
 				IDCardIssueDate: ptr("2020-03-15"), IDCardIssueType: ptr("換發"), IDCardIssueLocation: ptr("臺南市"),
@@ -40,7 +39,6 @@ func devSeedStores() []seller.DevSeedStore {
 			ContactPhone: "0923456789", TownCode: "10016010", AddressDetail: "中正路168號",
 			ContactName: "陳海鮮", ContactMobile: "0923456789", SupportEmail: "seller2@hawkr.test",
 			LogoKey: "public/seed/store/1004/logo.jpg", LogoAssetID: "seed-logo-1004",
-			PayUniMerStatus: "1", PayUniMemberStatus: "1",
 			KYC: seller.KYCDraftInput{
 				SellerType: &individual, RealName: ptr("陳海鮮"), BirthDate: ptr("1985-11-02"), IDCardNo: ptr("A123456789"),
 				IDCardIssueDate: ptr("2021-06-01"), IDCardIssueType: ptr("換發"), IDCardIssueLocation: ptr("澎湖縣"),

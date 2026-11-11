@@ -9,11 +9,11 @@ import manifest from "../src/enum-manifest.gen.json";
 import { createUiText, formatUiMessage, type Translate } from "../src/format";
 import {
 	commonUnknown,
-	sellerKYCFlowStatusAction,
 	sellerMeasureKind,
 	sellerMeasureRejectionCooldownWarning,
 	sellerMeasureState,
 	sellerMeasureTitleRisk,
+	sellerPaymentAccountStatusAction,
 } from "../src/keys.gen";
 import type { UiMessage } from "../src/message";
 import en from "../src/messages/en.gen.json";
@@ -89,11 +89,11 @@ describe("建構函式", () => {
 	});
 
 	it("變體：omit 的值回 undefined", () => {
-		const approved = 10;
-		expect(sellerKYCFlowStatusAction(approved)).toBeUndefined();
-		expect(sellerKYCFlowStatusAction(0)).toBeUndefined();
-		expect(sellerKYCFlowStatusAction(3)).toEqual({
-			key: "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_SUBMITTED",
+		const enabled = 4;
+		expect(sellerPaymentAccountStatusAction(enabled)).toBeUndefined();
+		expect(sellerPaymentAccountStatusAction(0)).toBeUndefined();
+		expect(sellerPaymentAccountStatusAction(5)).toEqual({
+			key: "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED",
 		});
 	});
 
@@ -150,13 +150,13 @@ describe("格式化", () => {
 	});
 
 	it("messages 是預設受眾：沒有 staff 專有的文字，也沒有 staff 專有的 key", () => {
-		const flow = (
-			zhTW as unknown as { seller: { KYCFlowStatus: Record<string, string> } }
-		).seller.KYCFlowStatus;
-		expect(flow.KYC_FLOW_STATUS_SUBMITTED).toBe("平台審核中");
-		expect(
-			formatStaff({ key: "seller.KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED" }),
-		).toBe("待審核");
+		const status = (
+			zhTW as unknown as { seller: { KYCStatus: Record<string, string> } }
+		).seller.KYCStatus;
+		expect(status.KYC_STATUS_SUBMITTED).toBe("審核中");
+		expect(formatStaff({ key: "seller.KYCStatus.KYC_STATUS_SUBMITTED" })).toBe(
+			"待審核",
+		);
 		const text = JSON.stringify(zhTW);
 		expect(text).not.toContain("待審核");
 		expect(text).not.toContain("申覆待裁定");
@@ -191,6 +191,6 @@ describe("manifest", () => {
 		).toMatchObject({
 			serverOwned: true,
 		});
-		expect(manifest.enums.filter((e) => e.inCatalog).length).toBe(21);
+		expect(manifest.enums.filter((e) => e.inCatalog).length).toBe(19);
 	});
 });

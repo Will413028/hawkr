@@ -4,9 +4,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-
-	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
-	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // stateReg 組出一筆與生產路徑一致的註冊：outcome、PaymentEnabled、NeedsReonboarding 由 bind 與狀態碼推導。
@@ -193,9 +190,7 @@ func checkInvariants(t *testing.T, app KYCStatus, same bool, reg *PayUniRegistra
 		t.Errorf("%s：已核准的申請一定有值", desc())
 	}
 	flow := DeriveKYCFlow(app, reg)
-	var payuni *SellerPayUni
 	if ok {
-		payuni = &state
 		if (state.State == PayUniStateTerminated) != (reg != nil && reg.NeedsReonboarding) {
 			t.Errorf("%s：TERMINATED ⇔ NeedsReonboarding 不成立：%+v", desc(), state)
 		}
@@ -225,11 +220,6 @@ func checkInvariants(t *testing.T, app KYCStatus, same bool, reg *PayUniRegistra
 	wantResubmit := app == KYCStatusDraft || app == KYCStatusRejected || app == KYCStatusCancelled || (app == KYCStatusApproved && ok && state.State == PayUniStateFixable)
 	if flow.CanResubmit != wantResubmit {
 		t.Errorf("%s：CanResubmit=%v，要 %v", desc(), flow.CanResubmit, wantResubmit)
-	}
-	reasons := ResubmitUnavailableReasons(app, flow, payuni)
-	// 已取消的申請不是目前的申請：流程是 NOT_STARTED、能重送（SaveKYCDraft 版本 0 會建立新的）、沒有原因，與「原因為空 ⇔ CanResubmit」一致。
-	if (len(reasons) == 0) != flow.CanResubmit {
-		t.Errorf("%s：原因 %v 與 CanResubmit=%v 不一致", desc(), reasons, flow.CanResubmit)
 	}
 	if app == KYCStatusCancelled && (!flow.CanResubmit || flow.Status != FlowNotStarted) {
 		t.Errorf("%s：已取消的流程要是 NOT_STARTED、能重送：%+v", desc(), flow)
@@ -300,73 +290,5 @@ func TestFlowCanResubmitAndSellerPayUniReadTheSameRegistration(t *testing.T) {
 		if flow.CanResubmit != (state.State == PayUniStateFixable) {
 			t.Errorf("%s：CanResubmit=%v，PayUni 狀態 %s", tc.sellerType, flow.CanResubmit, state.State)
 		}
-		if reasons := ResubmitUnavailableReasons(KYCStatusApproved, flow, &state); (len(reasons) == 0) != flow.CanResubmit {
-			t.Errorf("%s：原因 %v 與 CanResubmit=%v 不一致", tc.sellerType, reasons, flow.CanResubmit)
-		}
-	}
-}
-
-func TestPayUniStateExplanation(t *testing.T) {
-	for _, s := range PayUniStateValues() {
-		m, ok := s.Explanation(uitext.ZhTW)
-		if s == PayUniStateApproved {
-			if ok {
-				t.Errorf("APPROVED 沒有說明：%+v", m)
-			}
-			continue
-		}
-		if !ok || strings.TrimSpace(m.Text) == "" || m.Locale != uitext.ZhTW {
-			t.Errorf("%s：%+v ok=%v", s, m, ok)
-		}
-	}
-	if _, ok := PayUniState("").Explanation(uitext.ZhTW); ok {
-		t.Error("空字串不是有效的狀態")
-	}
-}
-
-func TestResubmitUnavailableText(t *testing.T) {
-	for _, r := range KYCResubmitUnavailableReasonValues() {
-		m := r.Text(uitext.ZhTW)
-		if !strings.HasSuffix(m.Text, "。") || m.Locale != uitext.ZhTW {
-			t.Errorf("%s：%+v", r, m)
-		}
-		// 訊息是第一個原因的句子，不含後面的。
-		other := ResubmitPayUniApproved
-		if r == other {
-			other = ResubmitUnderReview
-		}
-		err := ErrResubmitUnavailable([]KYCResubmitUnavailableReason{r, other}, uitext.ZhTW)
-		if apperr.KindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), m.Text) || strings.Contains(err.Error(), other.Text(uitext.ZhTW).Text) {
-			t.Errorf("%s：err=%v", r, err)
-		}
-	}
-	for name, reasons := range map[string][]KYCResubmitUnavailableReason{"空": nil, "不認得": {"X"}} {
-		if err := ErrResubmitUnavailable(reasons, uitext.ZhTW); err == nil || apperr.KindOf(err) == apperr.KindFailedPrecondition {
-			t.Errorf("%s：到不了的分支回 internal：%v", name, err)
-		}
-	}
-	if (KYCResubmitUnavailableReason("")).Text(uitext.ZhTW).Text != "" {
-		t.Error("不認得的原因沒有句子")
-	}
-}
-
-// 每個不能重送的 PayUni 狀態都有對應的原因；FIXABLE 能重送、不在表裡。
-func TestEveryNonFixablePayUniStateHasAResubmitReason(t *testing.T) {
-	for _, s := range PayUniStateValues() {
-		flow := KYCFlow{Status: FlowApproved, CanResubmit: s == PayUniStateFixable}
-		got := ResubmitUnavailableReasons(KYCStatusApproved, flow, &SellerPayUni{State: s})
-		if (s == PayUniStateFixable) != (len(got) == 0) || (s != PayUniStateFixable && len(got) != 1) {
-			t.Errorf("%s：%v", s, got)
-		}
-	}
-	for locked, want := range map[bool]KYCResubmitUnavailableReason{true: ResubmitUnderReview, false: ResubmitUnderReviewCancelable} {
-		got := ResubmitUnavailableReasons(KYCStatusSubmitted, KYCFlow{Status: FlowSubmitted, IdentityLocked: locked}, nil)
-		if !slices.Equal(got, []KYCResubmitUnavailableReason{want}) {
-			t.Errorf("送審中、鎖住=%v：%v", locked, got)
-		}
-	}
-	// 已取消的申請不是目前的申請（讀取回 not_found，可以重新開始）：沒有原因，流程能重送。
-	if got := ResubmitUnavailableReasons(KYCStatusCancelled, KYCFlow{Status: FlowNotStarted}, nil); len(got) != 0 {
-		t.Errorf("已取消：%v", got)
 	}
 }

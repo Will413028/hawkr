@@ -25,18 +25,13 @@ func TestFieldDiffsCoverEveryNonDocumentField(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Fatalf("diff 回報的欄位 %v，預期 %v", got, want)
 	}
-	for _, f := range model.LockedIdentityFields() {
-		if _, ok := fieldDiffs[f]; !ok {
-			t.Errorf("身分欄位 %s 沒有 diff", f)
-		}
-	}
 }
 
 func TestDiffRowsReportsOnlyTheFieldsThatChanged(t *testing.T) {
 	name, other, code := "王小明", "王大明", "004"
 	base := store.SellerKycApplication{SellerType: "INDIVIDUAL", RealName: &name, BankCode: &code, BankAccountEnc: []byte("x")}
 	var p protector
-	changed := func(next store.SellerKycApplication) (fields []string, identity bool) {
+	changed := func(next store.SellerKycApplication) (fields []string) {
 		d, err := p.diffRows(base, next)
 		if err != nil {
 			t.Fatal(err)
@@ -47,30 +42,25 @@ func TestDiffRowsReportsOnlyTheFieldsThatChanged(t *testing.T) {
 			}
 		}
 		slices.Sort(fields)
-		return fields, d.identity()
+		return fields
 	}
-	if f, id := changed(base); len(f) != 0 || id {
-		t.Errorf("沒改：%v %v", f, id)
+	if f := changed(base); len(f) != 0 {
+		t.Errorf("沒改：%v", f)
 	}
 	next := base
 	next.RealName = &other
-	if f, id := changed(next); !slices.Equal(f, []string{"real_name"}) || !id {
-		t.Errorf("改姓名：%v %v", f, id)
+	if f := changed(next); !slices.Equal(f, []string{"real_name"}) {
+		t.Errorf("改姓名：%v", f)
 	}
 	next = base
 	newCode := "005"
 	next.BankCode = &newCode
-	if f, id := changed(next); !slices.Equal(f, []string{"bank_code"}) || id {
-		t.Errorf("只改銀行代碼（密文沒變）：%v %v", f, id)
+	if f := changed(next); !slices.Equal(f, []string{"bank_code"}) {
+		t.Errorf("只改銀行代碼（密文沒變）：%v", f)
 	}
 	next = base
 	next.BankAccountEnc = nil
-	if f, _ := changed(next); !slices.Equal(f, []string{"bank_account"}) {
+	if f := changed(next); !slices.Equal(f, []string{"bank_account"}) {
 		t.Errorf("清掉銀行帳號：%v", f)
-	}
-	next = base
-	next.SellerType = "COMPANY"
-	if f, id := changed(next); len(f) != 0 || !id {
-		t.Errorf("改賣家型態：%v %v", f, id)
 	}
 }

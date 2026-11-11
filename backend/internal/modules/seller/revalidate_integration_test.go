@@ -10,7 +10,6 @@ import (
 	"time"
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
-	pu "github.com/Will413028/hawkr/backend/internal/platform/payuni"
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
 
@@ -26,35 +25,6 @@ func (f *fixture) revalidations(s Store) int {
 		}
 	}
 	return n
-}
-
-// 店面頁（GetStore）與卡片會隨「可公開曝光」的任何一個輸入改變：每個輸入的寫入者都在同一個 transaction 內排入快取失效。
-// PayUni 的審核狀態只在 record 寫入、綁定結果只在 finish 寫入。
-func TestPayUniStatusAndBindChangesInvalidateTheStorePage(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	f := setup(t)
-	_, s, sub := f.submitted(t, idA, bankAcct)
-	must(t, approve(f, sub))
-	before := f.revalidations(s)
-	f.sync(t, s.StoreID) // 綁定完成：流程從 BINDING 往前
-	if got := f.revalidations(s); got <= before {
-		t.Fatalf("綁定結果沒有排入快取失效：%d → %d", before, got)
-	}
-	before = f.revalidations(s)
-	f.now = f.now.Add(time.Hour)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "1"}
-	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourcePoll))
-	if got := f.revalidations(s); got != before+1 {
-		t.Fatalf("PayUni 核准沒有排入快取失效：%d → %d", before, got)
-	}
-	before = f.revalidations(s)
-	f.now = f.now.Add(time.Hour)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "8"}
-	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourceRefresh))
-	if got := f.revalidations(s); got != before+1 {
-		t.Fatalf("PayUni 拒絕沒有排入快取失效：%d → %d", before, got)
-	}
 }
 
 // 收款帳戶的轉帳能力是開通閘門的輸入：同步 job 在結果寫入的 transaction 內重新公告並排入快取失效；能力沒有變的同步不排。

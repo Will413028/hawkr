@@ -20,7 +20,7 @@ func TestRetirementAtThirtyDaysAndPersonalDataPurgeAtOneHundredEightyFourDays(t 
 	f := setup(t)
 	ctx := context.Background()
 	accountID, s := f.exposable(t)
-	// 公開內容直接寫進 fixture（PayUni 已收下店名與介紹，UpdateProfile 會鎖住它們）。
+	// 公開內容直接寫進 fixture。
 	_, err := f.db.Conn(ctx).Exec(ctx, `UPDATE seller.stores SET description='自家種的蔬果', prize='優良農民', website_url='https://farm.example.invalid' WHERE store_id=$1`, s.StoreID)
 	must(t, err)
 	retired := record[StoreRetired](f)

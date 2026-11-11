@@ -3172,407 +3172,6 @@ class KYCRejection extends $pb.GeneratedMessage {
   $pb.PbList<KYCIssue> get issues => $_getList(2);
 }
 
-/// PayUniProblem 是後台看的 PayUni 問題的事實：code 給員工與客服排查；fields、store_fields 是碼指出的欄位（未依身分鎖過濾）；
-/// reason 是 PayUni 的審核意見原文（去掉前後空白，沒有時是空字串）。賣家看的是 KYCFlow.payuni。
-class PayUniProblem extends $pb.GeneratedMessage {
-  factory PayUniProblem({
-    $core.String? code,
-    $core.Iterable<KYCField>? fields,
-    $core.String? reason,
-    $core.Iterable<StoreField>? storeFields,
-  }) {
-    final result = PayUniProblem._();
-    if (code != null) result.code = code;
-    if (fields != null) result.fields.addAll(fields);
-    if (reason != null) result.reason = reason;
-    if (storeFields != null) result.storeFields.addAll(storeFields);
-    return result;
-  }
-
-  PayUniProblem._();
-
-  factory PayUniProblem.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      PayUniProblem()..mergeFromBuffer(data, registry);
-  factory PayUniProblem.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      PayUniProblem()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'PayUniProblem',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
-      createEmptyInstance: PayUniProblem.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'code')
-    ..pc<KYCField>(3, _omitFieldNames ? '' : 'fields', $pb.PbFieldType.KE,
-        valueOf: KYCField.valueOf,
-        enumValues: KYCField.values,
-        defaultEnumValue: KYCField.KYC_FIELD_UNSPECIFIED)
-    ..aOS(4, _omitFieldNames ? '' : 'reason')
-    ..pc<StoreField>(
-        5, _omitFieldNames ? '' : 'storeFields', $pb.PbFieldType.KE,
-        valueOf: StoreField.valueOf,
-        enumValues: StoreField.values,
-        defaultEnumValue: StoreField.STORE_FIELD_UNSPECIFIED)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  PayUniProblem clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  PayUniProblem copyWith(void Function(PayUniProblem) updates) =>
-      super.copyWith((message) => updates(message as PayUniProblem))
-          as PayUniProblem;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated('Use PayUniProblem() / PayUniProblem.new instead')
-  static PayUniProblem create() => PayUniProblem._();
-  static $pb.GeneratedMessage $_createMessage() => PayUniProblem._();
-  @$core.override
-  PayUniProblem createEmptyInstance() => PayUniProblem._();
-  @$core.pragma('dart2js:noInline')
-  static PayUniProblem getDefault() =>
-      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PayUniProblem>(
-          PayUniProblem.$_createMessage);
-  static PayUniProblem? _defaultInstance;
-
-  /// 錯誤碼：我們自己的碼（INCOMPLETE_DATA、PAYUNI_NOT_CONFIGURED、PAYUNI_UNAVAILABLE、MERCHANT_TERMINAL）或 PayUni
-  /// 的碼（AGENT 開頭，MER_ 與 MEMBER_ 開頭的是審核狀態）。開放集合。
-  @$pb.TagNumber(1)
-  $core.String get code => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set code($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasCode() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearCode() => $_clearField(1);
-
-  /// 碼指出的申請欄位（與 KYCIssue.field 同一套）；問題不在申請欄位上時是空的。
-  @$pb.TagNumber(3)
-  $pb.PbList<KYCField> get fields => $_getList(1);
-
-  @$pb.TagNumber(4)
-  $core.String get reason => $_getSZ(2);
-  @$pb.TagNumber(4)
-  set reason($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(4)
-  $core.bool hasReason() => $_has(2);
-  @$pb.TagNumber(4)
-  void clearReason() => $_clearField(4);
-
-  /// 碼指出的店家欄位（UpdateMyStore）；問題不在店家欄位上時是空的。
-  @$pb.TagNumber(5)
-  $pb.PbList<StoreField> get storeFields => $_getList(3);
-}
-
-/// SellerPayUni 是賣家看到的 PayUni 狀態與要處理的事。
-class SellerPayUni extends $pb.GeneratedMessage {
-  factory SellerPayUni({
-    PayUniState? state,
-    $3.LocalizedMessage? explanation,
-    $core.String? reason,
-    $core.Iterable<KYCField>? fixFields,
-    $core.Iterable<StoreField>? fixStoreFields,
-  }) {
-    final result = SellerPayUni._();
-    if (state != null) result.state = state;
-    if (explanation != null) result.explanation = explanation;
-    if (reason != null) result.reason = reason;
-    if (fixFields != null) result.fixFields.addAll(fixFields);
-    if (fixStoreFields != null) result.fixStoreFields.addAll(fixStoreFields);
-    return result;
-  }
-
-  SellerPayUni._();
-
-  factory SellerPayUni.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      SellerPayUni()..mergeFromBuffer(data, registry);
-  factory SellerPayUni.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      SellerPayUni()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'SellerPayUni',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
-      createEmptyInstance: SellerPayUni.$_createMessage)
-    ..aE<PayUniState>(1, _omitFieldNames ? '' : 'state',
-        enumValues: PayUniState.values)
-    ..aOM<$3.LocalizedMessage>(2, _omitFieldNames ? '' : 'explanation',
-        subBuilder: $3.LocalizedMessage.$_createMessage)
-    ..aOS(3, _omitFieldNames ? '' : 'reason')
-    ..pc<KYCField>(4, _omitFieldNames ? '' : 'fixFields', $pb.PbFieldType.KE,
-        valueOf: KYCField.valueOf,
-        enumValues: KYCField.values,
-        defaultEnumValue: KYCField.KYC_FIELD_UNSPECIFIED)
-    ..pc<StoreField>(
-        5, _omitFieldNames ? '' : 'fixStoreFields', $pb.PbFieldType.KE,
-        valueOf: StoreField.valueOf,
-        enumValues: StoreField.values,
-        defaultEnumValue: StoreField.STORE_FIELD_UNSPECIFIED)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  SellerPayUni clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  SellerPayUni copyWith(void Function(SellerPayUni) updates) =>
-      super.copyWith((message) => updates(message as SellerPayUni))
-          as SellerPayUni;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated('Use SellerPayUni() / SellerPayUni.new instead')
-  static SellerPayUni create() => SellerPayUni._();
-  static $pb.GeneratedMessage $_createMessage() => SellerPayUni._();
-  @$core.override
-  SellerPayUni createEmptyInstance() => SellerPayUni._();
-  @$core.pragma('dart2js:noInline')
-  static SellerPayUni getDefault() =>
-      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SellerPayUni>(
-          SellerPayUni.$_createMessage);
-  static SellerPayUni? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  PayUniState get state => $_getN(0);
-  @$pb.TagNumber(1)
-  set state(PayUniState value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasState() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearState() => $_clearField(1);
-
-  /// 給賣家看的狀態說明（locale 是實際用的語系），只由 state 決定；state 是 APPROVED 時不設。
-  @$pb.TagNumber(2)
-  $3.LocalizedMessage get explanation => $_getN(1);
-  @$pb.TagNumber(2)
-  set explanation($3.LocalizedMessage value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasExplanation() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearExplanation() => $_clearField(2);
-  @$pb.TagNumber(2)
-  $3.LocalizedMessage ensureExplanation() => $_ensure(1);
-
-  /// PayUni 針對這家店寫的審核意見原文（去掉前後空白；沒有時是空字串）。第三方原文、不翻譯，client 另外顯示並標 zh-TW。
-  @$pb.TagNumber(3)
-  $core.String get reason => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set reason($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasReason() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearReason() => $_clearField(3);
-
-  /// 賣家此刻能在申請上修正的欄位（已依賣家型態與身分鎖過濾）；沒有具體欄位時是空的，client 不顯示清單。
-  @$pb.TagNumber(4)
-  $pb.PbList<KYCField> get fixFields => $_getList(3);
-
-  /// 賣家此刻能在店家設定（UpdateMyStore）修正的欄位；沒有時是空的。
-  @$pb.TagNumber(5)
-  $pb.PbList<StoreField> get fixStoreFields => $_getList(4);
-}
-
-/// KYCResubmitUnavailability 是 SaveKYCDraft 與 SubmitKYC 此刻不能做的一個原因。與兩個 RPC 的前置檢查是同一個規則，message 與
-/// 被擋下時錯誤的訊息是同一份文字（同一個 Go 函式）。
-class KYCResubmitUnavailability extends $pb.GeneratedMessage {
-  factory KYCResubmitUnavailability({
-    KYCResubmitUnavailableReason? reason,
-    $3.LocalizedMessage? message,
-  }) {
-    final result = KYCResubmitUnavailability._();
-    if (reason != null) result.reason = reason;
-    if (message != null) result.message = message;
-    return result;
-  }
-
-  KYCResubmitUnavailability._();
-
-  factory KYCResubmitUnavailability.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      KYCResubmitUnavailability()..mergeFromBuffer(data, registry);
-  factory KYCResubmitUnavailability.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      KYCResubmitUnavailability()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'KYCResubmitUnavailability',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
-      createEmptyInstance: KYCResubmitUnavailability.$_createMessage)
-    ..aE<KYCResubmitUnavailableReason>(1, _omitFieldNames ? '' : 'reason',
-        enumValues: KYCResubmitUnavailableReason.values)
-    ..aOM<$3.LocalizedMessage>(2, _omitFieldNames ? '' : 'message',
-        subBuilder: $3.LocalizedMessage.$_createMessage)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  KYCResubmitUnavailability clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  KYCResubmitUnavailability copyWith(
-          void Function(KYCResubmitUnavailability) updates) =>
-      super.copyWith((message) => updates(message as KYCResubmitUnavailability))
-          as KYCResubmitUnavailability;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated(
-      'Use KYCResubmitUnavailability() / KYCResubmitUnavailability.new instead')
-  static KYCResubmitUnavailability create() => KYCResubmitUnavailability._();
-  static $pb.GeneratedMessage $_createMessage() =>
-      KYCResubmitUnavailability._();
-  @$core.override
-  KYCResubmitUnavailability createEmptyInstance() =>
-      KYCResubmitUnavailability._();
-  @$core.pragma('dart2js:noInline')
-  static KYCResubmitUnavailability getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<KYCResubmitUnavailability>(
-          KYCResubmitUnavailability.$_createMessage);
-  static KYCResubmitUnavailability? _defaultInstance;
-
-  /// 原因。伺服器一律設，不會是 UNSPECIFIED。
-  @$pb.TagNumber(1)
-  KYCResubmitUnavailableReason get reason => $_getN(0);
-  @$pb.TagNumber(1)
-  set reason(KYCResubmitUnavailableReason value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasReason() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearReason() => $_clearField(1);
-
-  /// 給使用者看的完整一句話（locale 是實際用的語系），有主詞、不含 client 的畫面或選單名稱；client 直接顯示。
-  @$pb.TagNumber(2)
-  $3.LocalizedMessage get message => $_getN(1);
-  @$pb.TagNumber(2)
-  set message($3.LocalizedMessage value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasMessage() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearMessage() => $_clearField(2);
-  @$pb.TagNumber(2)
-  $3.LocalizedMessage ensureMessage() => $_ensure(1);
-}
-
-/// KYCFlow 是申請的流程狀態與衍生旗標：KYC 與 PayUni 兩條軸合成的結果。
-class KYCFlow extends $pb.GeneratedMessage {
-  factory KYCFlow({
-    KYCFlowStatus? status,
-    $core.bool? canResubmit,
-    $core.bool? identityLocked,
-    $core.Iterable<KYCResubmitUnavailability>? resubmitUnavailabilities,
-    SellerPayUni? payuni,
-  }) {
-    final result = KYCFlow._();
-    if (status != null) result.status = status;
-    if (canResubmit != null) result.canResubmit = canResubmit;
-    if (identityLocked != null) result.identityLocked = identityLocked;
-    if (resubmitUnavailabilities != null)
-      result.resubmitUnavailabilities.addAll(resubmitUnavailabilities);
-    if (payuni != null) result.payuni = payuni;
-    return result;
-  }
-
-  KYCFlow._();
-
-  factory KYCFlow.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      KYCFlow()..mergeFromBuffer(data, registry);
-  factory KYCFlow.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      KYCFlow()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'KYCFlow',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
-      createEmptyInstance: KYCFlow.$_createMessage)
-    ..aE<KYCFlowStatus>(1, _omitFieldNames ? '' : 'status',
-        enumValues: KYCFlowStatus.values)
-    ..aOB(2, _omitFieldNames ? '' : 'canResubmit')
-    ..aOB(3, _omitFieldNames ? '' : 'identityLocked')
-    ..pPM<KYCResubmitUnavailability>(
-        4, _omitFieldNames ? '' : 'resubmitUnavailabilities',
-        subBuilder: KYCResubmitUnavailability.$_createMessage)
-    ..aOM<SellerPayUni>(5, _omitFieldNames ? '' : 'payuni',
-        subBuilder: SellerPayUni.$_createMessage)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  KYCFlow clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  KYCFlow copyWith(void Function(KYCFlow) updates) =>
-      super.copyWith((message) => updates(message as KYCFlow)) as KYCFlow;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated('Use KYCFlow() / KYCFlow.new instead')
-  static KYCFlow create() => KYCFlow._();
-  static $pb.GeneratedMessage $_createMessage() => KYCFlow._();
-  @$core.override
-  KYCFlow createEmptyInstance() => KYCFlow._();
-  @$core.pragma('dart2js:noInline')
-  static KYCFlow getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<KYCFlow>(KYCFlow.$_createMessage);
-  static KYCFlow? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  KYCFlowStatus get status => $_getN(0);
-  @$pb.TagNumber(1)
-  set status(KYCFlowStatus value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasStatus() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearStatus() => $_clearField(1);
-
-  /// 此刻 SaveKYCDraft 與 SubmitKYC 會被接受（草稿、被退回、PayUni 拒絕或綁定失敗而且賣家能自己修正）。
-  @$pb.TagNumber(2)
-  $core.bool get canResubmit => $_getBF(1);
-  @$pb.TagNumber(2)
-  set canResubmit($core.bool value) => $_setBool(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasCanResubmit() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearCanResubmit() => $_clearField(2);
-
-  /// 註冊已有 MerID：身分欄位（店名、介紹、姓名或公司名稱、證號、統編、英文名稱、官網、商品類型、賣家型態）鎖住，只能
-  /// 更正聯絡欄位與地址。
-  @$pb.TagNumber(3)
-  $core.bool get identityLocked => $_getBF(2);
-  @$pb.TagNumber(3)
-  set identityLocked($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasIdentityLocked() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearIdentityLocked() => $_clearField(3);
-
-  /// can_resubmit 為假時的原因，依先後，至少一個；為真時是空的。SaveKYCDraft、SubmitKYC 不能做時回的
-  /// failed_precondition 是第一個的 message。只在賣家的回應設，admin 的 KYCApplication.flow 不設。
-  @$pb.TagNumber(4)
-  $pb.PbList<KYCResubmitUnavailability> get resubmitUnavailabilities =>
-      $_getList(3);
-
-  /// 申請在 PayUni 階段（已核准），或賣家正在修正 PayUni 拒絕、綁定失敗的那份申請（草稿）時才設。只在賣家的回應設，
-  /// admin 的 KYCApplication.flow 不設。
-  @$pb.TagNumber(5)
-  SellerPayUni get payuni => $_getN(4);
-  @$pb.TagNumber(5)
-  set payuni(SellerPayUni value) => $_setField(5, value);
-  @$pb.TagNumber(5)
-  $core.bool hasPayuni() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearPayuni() => $_clearField(5);
-  @$pb.TagNumber(5)
-  SellerPayUni ensurePayuni() => $_ensure(4);
-}
-
 /// IndividualKYC 是個人賣家專屬的欄位：身分證號是賣家本人的。
 class IndividualKYC extends $pb.GeneratedMessage {
   factory IndividualKYC({
@@ -3828,7 +3427,6 @@ class KYCApplication extends $pb.GeneratedMessage {
     KYCDocument? bankBook,
     IndividualKYC? individual,
     BusinessKYC? business,
-    KYCFlow? flow,
     KYCRejection? lastRejection,
     $core.Iterable<KYCField>? missingFields,
     $1.Timestamp? submitTime,
@@ -3860,7 +3458,6 @@ class KYCApplication extends $pb.GeneratedMessage {
     if (bankBook != null) result.bankBook = bankBook;
     if (individual != null) result.individual = individual;
     if (business != null) result.business = business;
-    if (flow != null) result.flow = flow;
     if (lastRejection != null) result.lastRejection = lastRejection;
     if (missingFields != null) result.missingFields.addAll(missingFields);
     if (submitTime != null) result.submitTime = submitTime;
@@ -3923,8 +3520,6 @@ class KYCApplication extends $pb.GeneratedMessage {
         subBuilder: IndividualKYC.$_createMessage)
     ..aOM<BusinessKYC>(23, _omitFieldNames ? '' : 'business',
         subBuilder: BusinessKYC.$_createMessage)
-    ..aOM<KYCFlow>(24, _omitFieldNames ? '' : 'flow',
-        subBuilder: KYCFlow.$_createMessage)
     ..aOM<KYCRejection>(25, _omitFieldNames ? '' : 'lastRejection',
         subBuilder: KYCRejection.$_createMessage)
     ..pc<KYCField>(
@@ -4175,88 +3770,77 @@ class KYCApplication extends $pb.GeneratedMessage {
   @$pb.TagNumber(23)
   BusinessKYC ensureBusiness() => $_ensure(19);
 
-  @$pb.TagNumber(24)
-  KYCFlow get flow => $_getN(20);
-  @$pb.TagNumber(24)
-  set flow(KYCFlow value) => $_setField(24, value);
-  @$pb.TagNumber(24)
-  $core.bool hasFlow() => $_has(20);
-  @$pb.TagNumber(24)
-  void clearFlow() => $_clearField(24);
-  @$pb.TagNumber(24)
-  KYCFlow ensureFlow() => $_ensure(20);
-
   /// 最近一次退回，只在「最近一次審核紀錄是退回、賣家還沒重新送出（核准、取消之後也算）」時設，其餘時候不設；client 直接看有沒有
   /// 這個欄位決定要不要顯示總理由與「需重新送出」的提示，不必自己推導。賣家把每一項問題都處理完、還沒重新送出時它仍在。
   @$pb.TagNumber(25)
-  KYCRejection get lastRejection => $_getN(21);
+  KYCRejection get lastRejection => $_getN(20);
   @$pb.TagNumber(25)
   set lastRejection(KYCRejection value) => $_setField(25, value);
   @$pb.TagNumber(25)
-  $core.bool hasLastRejection() => $_has(21);
+  $core.bool hasLastRejection() => $_has(20);
   @$pb.TagNumber(25)
   void clearLastRejection() => $_clearField(25);
   @$pb.TagNumber(25)
-  KYCRejection ensureLastRejection() => $_ensure(21);
+  KYCRejection ensureLastRejection() => $_ensure(20);
 
   /// 送出之前還缺的欄位（與 SubmitKYC 檢查的是同一份規則），依 KYCField 的數字順序；齊全時是空的。client 以它決定續填的
   /// 位置與哪些欄位標紅，不必自己重寫完整性規則。
   @$pb.TagNumber(26)
-  $pb.PbList<KYCField> get missingFields => $_getList(22);
+  $pb.PbList<KYCField> get missingFields => $_getList(21);
 
   @$pb.TagNumber(27)
-  $1.Timestamp get submitTime => $_getN(23);
+  $1.Timestamp get submitTime => $_getN(22);
   @$pb.TagNumber(27)
   set submitTime($1.Timestamp value) => $_setField(27, value);
   @$pb.TagNumber(27)
-  $core.bool hasSubmitTime() => $_has(23);
+  $core.bool hasSubmitTime() => $_has(22);
   @$pb.TagNumber(27)
   void clearSubmitTime() => $_clearField(27);
   @$pb.TagNumber(27)
-  $1.Timestamp ensureSubmitTime() => $_ensure(23);
+  $1.Timestamp ensureSubmitTime() => $_ensure(22);
 
   @$pb.TagNumber(28)
-  $1.Timestamp get decideTime => $_getN(24);
+  $1.Timestamp get decideTime => $_getN(23);
   @$pb.TagNumber(28)
   set decideTime($1.Timestamp value) => $_setField(28, value);
   @$pb.TagNumber(28)
-  $core.bool hasDecideTime() => $_has(24);
+  $core.bool hasDecideTime() => $_has(23);
   @$pb.TagNumber(28)
   void clearDecideTime() => $_clearField(28);
   @$pb.TagNumber(28)
-  $1.Timestamp ensureDecideTime() => $_ensure(24);
+  $1.Timestamp ensureDecideTime() => $_ensure(23);
 
   @$pb.TagNumber(29)
-  $1.Timestamp get createTime => $_getN(25);
+  $1.Timestamp get createTime => $_getN(24);
   @$pb.TagNumber(29)
   set createTime($1.Timestamp value) => $_setField(29, value);
   @$pb.TagNumber(29)
-  $core.bool hasCreateTime() => $_has(25);
+  $core.bool hasCreateTime() => $_has(24);
   @$pb.TagNumber(29)
   void clearCreateTime() => $_clearField(29);
   @$pb.TagNumber(29)
-  $1.Timestamp ensureCreateTime() => $_ensure(25);
+  $1.Timestamp ensureCreateTime() => $_ensure(24);
 
   @$pb.TagNumber(30)
-  $1.Timestamp get updateTime => $_getN(26);
+  $1.Timestamp get updateTime => $_getN(25);
   @$pb.TagNumber(30)
   set updateTime($1.Timestamp value) => $_setField(30, value);
   @$pb.TagNumber(30)
-  $core.bool hasUpdateTime() => $_has(26);
+  $core.bool hasUpdateTime() => $_has(25);
   @$pb.TagNumber(30)
   void clearUpdateTime() => $_clearField(30);
   @$pb.TagNumber(30)
-  $1.Timestamp ensureUpdateTime() => $_ensure(26);
+  $1.Timestamp ensureUpdateTime() => $_ensure(25);
 
   /// 送出之前還缺的店家欄位（必填的是地址與客服電子信箱，與 SubmitKYC 檢查的是同一份規則），依 StoreField 的數字順序；齊全時是空的。
   /// 這些欄位用 UpdateMyStore 寫，不在申請上。
   @$pb.TagNumber(31)
-  $pb.PbList<StoreField> get missingStoreFields => $_getList(27);
+  $pb.PbList<StoreField> get missingStoreFields => $_getList(26);
 
   /// 最近一次退回指出的問題裡賣家還沒處理的（已處理由伺服器判定：該欄位的值在退回之後被改過，或指到的文件已被移除或替換）；
   /// 重新送出、核准或取消之後是空的。client 以它標出要補的欄位與文件，不必自己推導退回是否仍然有效。
   @$pb.TagNumber(32)
-  $pb.PbList<KYCIssue> get outstandingIssues => $_getList(28);
+  $pb.PbList<KYCIssue> get outstandingIssues => $_getList(27);
 }
 
 class SaveKYCDraftRequest extends $pb.GeneratedMessage {
@@ -7944,8 +7528,7 @@ class SellerAppServiceApi {
   /// 店家還沒有申請時，不帶 etag 的呼叫建立它（subject 必須設定其中一支）；已經有申請時 etag 必填，沒帶 etag 回
   /// already_exists、與目前的版本不符回 aborted，兩者的 ErrorInfo.reason 都是 VERSION_CONFLICT（client 的處理相同：
   /// 保留輸入、顯示最新版本）。被退回的申請在這裡回到草稿重新編輯。全部欄位先驗證才寫入，任何一欄不合法都不會寫入。
-  /// 送出（SubmitKYC）才檢查必填欄位與證件是否齊全。流程狀態 can_resubmit 為 false 時回 failed_precondition，訊息是
-  /// KYCFlow.resubmit_unavailabilities 的第一句。
+  /// 送出（SubmitKYC）才檢查必填欄位與證件是否齊全。只有草稿與被退回的申請能儲存；審核中與已核准的回 failed_precondition。
   $async.Future<SaveKYCDraftResponse> saveKYCDraft(
           $pb.ClientContext? ctx, SaveKYCDraftRequest request) =>
       _client.invoke<SaveKYCDraftResponse>(ctx, 'SellerAppService',
@@ -7958,8 +7541,8 @@ class SellerAppServiceApi {
       _client.invoke<GetMyKYCResponse>(
           ctx, 'SellerAppService', 'GetMyKYC', request, GetMyKYCResponse());
 
-  /// SubmitKYC 送出申請給管理員審核。草稿，以及流程狀態 can_resubmit 為 true 的申請（被退回的、PayUni 拒絕或綁定失敗而且賣家能自己修正的）都能直接送出，
-  /// 不必先儲存；can_resubmit 為 false 的狀態回 failed_precondition，訊息是 KYCFlow.resubmit_unavailabilities 的第一句。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
+  /// SubmitKYC 送出申請給管理員審核。草稿與被退回的申請都能直接送出，
+  /// 不必先儲存；審核中與已核准的申請回 failed_precondition。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
   /// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（real_name、id_card_front、business.tax_id……，與 KYCField 一對一）。申請本身齊全之後，
   /// 店家的必填資料（地址、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
   /// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。帳號沒有聯絡信箱（IdentityAppService.GetContactEmail 沒有回信箱）時回

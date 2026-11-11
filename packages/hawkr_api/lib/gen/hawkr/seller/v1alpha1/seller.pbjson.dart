@@ -348,92 +348,6 @@ final $typed_data.Uint8List kYCIssueCodeDescriptor = $convert.base64Decode(
     'WUNfSVNTVUVfQ09ERV9FWFBJUkVEEAMSGgoWS1lDX0lTU1VFX0NPREVfTUlTU0lORxAEEhoKFk'
     'tZQ19JU1NVRV9DT0RFX0lOVkFMSUQQBRIYChRLWUNfSVNTVUVfQ09ERV9PVEhFUhAG');
 
-@$core.Deprecated('Use kYCFlowStatusDescriptor instead')
-const KYCFlowStatus$json = {
-  '1': 'KYCFlowStatus',
-  '2': [
-    {'1': 'KYC_FLOW_STATUS_UNSPECIFIED', '2': 0},
-    {'1': 'KYC_FLOW_STATUS_NOT_STARTED', '2': 1},
-    {'1': 'KYC_FLOW_STATUS_DRAFT', '2': 2},
-    {'1': 'KYC_FLOW_STATUS_SUBMITTED', '2': 3},
-    {'1': 'KYC_FLOW_STATUS_REJECTED', '2': 4},
-    {'1': 'KYC_FLOW_STATUS_BINDING', '2': 5},
-    {'1': 'KYC_FLOW_STATUS_BIND_FAILED', '2': 6},
-    {'1': 'KYC_FLOW_STATUS_FORWARDED', '2': 7},
-    {'1': 'KYC_FLOW_STATUS_UNDER_REVIEW', '2': 8},
-    {'1': 'KYC_FLOW_STATUS_PENDING_INFO', '2': 9},
-    {'1': 'KYC_FLOW_STATUS_APPROVED', '2': 10},
-    {'1': 'KYC_FLOW_STATUS_PAYUNI_REJECTED', '2': 11},
-  ],
-};
-
-/// Descriptor for `KYCFlowStatus`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List kYCFlowStatusDescriptor = $convert.base64Decode(
-    'Cg1LWUNGbG93U3RhdHVzEh8KG0tZQ19GTE9XX1NUQVRVU19VTlNQRUNJRklFRBAAEh8KG0tZQ1'
-    '9GTE9XX1NUQVRVU19OT1RfU1RBUlRFRBABEhkKFUtZQ19GTE9XX1NUQVRVU19EUkFGVBACEh0K'
-    'GUtZQ19GTE9XX1NUQVRVU19TVUJNSVRURUQQAxIcChhLWUNfRkxPV19TVEFUVVNfUkVKRUNURU'
-    'QQBBIbChdLWUNfRkxPV19TVEFUVVNfQklORElORxAFEh8KG0tZQ19GTE9XX1NUQVRVU19CSU5E'
-    'X0ZBSUxFRBAGEh0KGUtZQ19GTE9XX1NUQVRVU19GT1JXQVJERUQQBxIgChxLWUNfRkxPV19TVE'
-    'FUVVNfVU5ERVJfUkVWSUVXEAgSIAocS1lDX0ZMT1dfU1RBVFVTX1BFTkRJTkdfSU5GTxAJEhwK'
-    'GEtZQ19GTE9XX1NUQVRVU19BUFBST1ZFRBAKEiMKH0tZQ19GTE9XX1NUQVRVU19QQVlVTklfUk'
-    'VKRUNURUQQCw==');
-
-@$core.Deprecated('Use payUniStateDescriptor instead')
-const PayUniState$json = {
-  '1': 'PayUniState',
-  '2': [
-    {'1': 'PAY_UNI_STATE_UNSPECIFIED', '2': 0},
-    {'1': 'PAY_UNI_STATE_REVIEWING', '2': 1},
-    {'1': 'PAY_UNI_STATE_PENDING_INFO', '2': 2},
-    {'1': 'PAY_UNI_STATE_FIXABLE', '2': 3},
-    {'1': 'PAY_UNI_STATE_FIX_VIA_SUPPORT', '2': 4},
-    {'1': 'PAY_UNI_STATE_CONTACT_SUPPORT', '2': 5},
-    {'1': 'PAY_UNI_STATE_RETRY_LATER', '2': 6},
-    {'1': 'PAY_UNI_STATE_TERMINATED', '2': 7},
-    {'1': 'PAY_UNI_STATE_APPROVED', '2': 8},
-  ],
-};
-
-/// Descriptor for `PayUniState`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List payUniStateDescriptor = $convert.base64Decode(
-    'CgtQYXlVbmlTdGF0ZRIdChlQQVlfVU5JX1NUQVRFX1VOU1BFQ0lGSUVEEAASGwoXUEFZX1VOSV'
-    '9TVEFURV9SRVZJRVdJTkcQARIeChpQQVlfVU5JX1NUQVRFX1BFTkRJTkdfSU5GTxACEhkKFVBB'
-    'WV9VTklfU1RBVEVfRklYQUJMRRADEiEKHVBBWV9VTklfU1RBVEVfRklYX1ZJQV9TVVBQT1JUEA'
-    'QSIQodUEFZX1VOSV9TVEFURV9DT05UQUNUX1NVUFBPUlQQBRIdChlQQVlfVU5JX1NUQVRFX1JF'
-    'VFJZX0xBVEVSEAYSHAoYUEFZX1VOSV9TVEFURV9URVJNSU5BVEVEEAcSGgoWUEFZX1VOSV9TVE'
-    'FURV9BUFBST1ZFRBAI');
-
-@$core.Deprecated('Use kYCResubmitUnavailableReasonDescriptor instead')
-const KYCResubmitUnavailableReason$json = {
-  '1': 'KYCResubmitUnavailableReason',
-  '2': [
-    {'1': 'KYC_RESUBMIT_UNAVAILABLE_REASON_UNSPECIFIED', '2': 0},
-    {'1': 'KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW_CANCELABLE', '2': 1},
-    {'1': 'KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW', '2': 2},
-    {'1': 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_REVIEWING', '2': 3},
-    {'1': 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_PENDING_INFO', '2': 4},
-    {'1': 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_FIX_VIA_SUPPORT', '2': 5},
-    {'1': 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_CONTACT_SUPPORT', '2': 6},
-    {'1': 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_RETRY_LATER', '2': 7},
-    {'1': 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_TERMINATED', '2': 8},
-    {'1': 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_APPROVED', '2': 9},
-  ],
-};
-
-/// Descriptor for `KYCResubmitUnavailableReason`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List kYCResubmitUnavailableReasonDescriptor = $convert.base64Decode(
-    'ChxLWUNSZXN1Ym1pdFVuYXZhaWxhYmxlUmVhc29uEi8KK0tZQ19SRVNVQk1JVF9VTkFWQUlMQU'
-    'JMRV9SRUFTT05fVU5TUEVDSUZJRUQQABI7CjdLWUNfUkVTVUJNSVRfVU5BVkFJTEFCTEVfUkVB'
-    'U09OX1VOREVSX1JFVklFV19DQU5DRUxBQkxFEAESMAosS1lDX1JFU1VCTUlUX1VOQVZBSUxBQk'
-    'xFX1JFQVNPTl9VTkRFUl9SRVZJRVcQAhI0CjBLWUNfUkVTVUJNSVRfVU5BVkFJTEFCTEVfUkVB'
-    'U09OX1BBWVVOSV9SRVZJRVdJTkcQAxI3CjNLWUNfUkVTVUJNSVRfVU5BVkFJTEFCTEVfUkVBU0'
-    '9OX1BBWVVOSV9QRU5ESU5HX0lORk8QBBI6CjZLWUNfUkVTVUJNSVRfVU5BVkFJTEFCTEVfUkVB'
-    'U09OX1BBWVVOSV9GSVhfVklBX1NVUFBPUlQQBRI6CjZLWUNfUkVTVUJNSVRfVU5BVkFJTEFCTE'
-    'VfUkVBU09OX1BBWVVOSV9DT05UQUNUX1NVUFBPUlQQBhI2CjJLWUNfUkVTVUJNSVRfVU5BVkFJ'
-    'TEFCTEVfUkVBU09OX1BBWVVOSV9SRVRSWV9MQVRFUhAHEjUKMUtZQ19SRVNVQk1JVF9VTkFWQU'
-    'lMQUJMRV9SRUFTT05fUEFZVU5JX1RFUk1JTkFURUQQCBIzCi9LWUNfUkVTVUJNSVRfVU5BVkFJ'
-    'TEFCTEVfUkVBU09OX1BBWVVOSV9BUFBST1ZFRBAJ');
-
 @$core.Deprecated('Use paymentAccountStatusDescriptor instead')
 const PaymentAccountStatus$json = {
   '1': 'PaymentAccountStatus',
@@ -1810,171 +1724,6 @@ final $typed_data.Uint8List kYCRejectionDescriptor = $convert.base64Decode(
     'IAMoCzIfLmhhd2tyLnNlbGxlci52MWFscGhhMS5LWUNJc3N1ZVIGaXNzdWVzSgQIAhADUg9yZX'
     'F1aXJlZF9maWVsZHM=');
 
-@$core.Deprecated('Use payUniProblemDescriptor instead')
-const PayUniProblem$json = {
-  '1': 'PayUniProblem',
-  '2': [
-    {'1': 'code', '3': 1, '4': 1, '5': 9, '10': 'code'},
-    {
-      '1': 'fields',
-      '3': 3,
-      '4': 3,
-      '5': 14,
-      '6': '.hawkr.seller.v1alpha1.KYCField',
-      '10': 'fields'
-    },
-    {'1': 'reason', '3': 4, '4': 1, '5': 9, '10': 'reason'},
-    {
-      '1': 'store_fields',
-      '3': 5,
-      '4': 3,
-      '5': 14,
-      '6': '.hawkr.seller.v1alpha1.StoreField',
-      '10': 'storeFields'
-    },
-  ],
-  '9': [
-    {'1': 2, '2': 3},
-  ],
-  '10': ['remedy'],
-};
-
-/// Descriptor for `PayUniProblem`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List payUniProblemDescriptor = $convert.base64Decode(
-    'Cg1QYXlVbmlQcm9ibGVtEhIKBGNvZGUYASABKAlSBGNvZGUSNwoGZmllbGRzGAMgAygOMh8uaG'
-    'F3a3Iuc2VsbGVyLnYxYWxwaGExLktZQ0ZpZWxkUgZmaWVsZHMSFgoGcmVhc29uGAQgASgJUgZy'
-    'ZWFzb24SRAoMc3RvcmVfZmllbGRzGAUgAygOMiEuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN0b3'
-    'JlRmllbGRSC3N0b3JlRmllbGRzSgQIAhADUgZyZW1lZHk=');
-
-@$core.Deprecated('Use sellerPayUniDescriptor instead')
-const SellerPayUni$json = {
-  '1': 'SellerPayUni',
-  '2': [
-    {
-      '1': 'state',
-      '3': 1,
-      '4': 1,
-      '5': 14,
-      '6': '.hawkr.seller.v1alpha1.PayUniState',
-      '8': {},
-      '10': 'state'
-    },
-    {
-      '1': 'explanation',
-      '3': 2,
-      '4': 1,
-      '5': 11,
-      '6': '.google.rpc.LocalizedMessage',
-      '8': {},
-      '10': 'explanation'
-    },
-    {'1': 'reason', '3': 3, '4': 1, '5': 9, '8': {}, '10': 'reason'},
-    {
-      '1': 'fix_fields',
-      '3': 4,
-      '4': 3,
-      '5': 14,
-      '6': '.hawkr.seller.v1alpha1.KYCField',
-      '8': {},
-      '10': 'fixFields'
-    },
-    {
-      '1': 'fix_store_fields',
-      '3': 5,
-      '4': 3,
-      '5': 14,
-      '6': '.hawkr.seller.v1alpha1.StoreField',
-      '8': {},
-      '10': 'fixStoreFields'
-    },
-  ],
-};
-
-/// Descriptor for `SellerPayUni`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List sellerPayUniDescriptor = $convert.base64Decode(
-    'CgxTZWxsZXJQYXlVbmkSPQoFc3RhdGUYASABKA4yIi5oYXdrci5zZWxsZXIudjFhbHBoYTEuUG'
-    'F5VW5pU3RhdGVCA+BBA1IFc3RhdGUSQwoLZXhwbGFuYXRpb24YAiABKAsyHC5nb29nbGUucnBj'
-    'LkxvY2FsaXplZE1lc3NhZ2VCA+BBA1ILZXhwbGFuYXRpb24SGwoGcmVhc29uGAMgASgJQgPgQQ'
-    'NSBnJlYXNvbhJDCgpmaXhfZmllbGRzGAQgAygOMh8uaGF3a3Iuc2VsbGVyLnYxYWxwaGExLktZ'
-    'Q0ZpZWxkQgPgQQNSCWZpeEZpZWxkcxJQChBmaXhfc3RvcmVfZmllbGRzGAUgAygOMiEuaGF3a3'
-    'Iuc2VsbGVyLnYxYWxwaGExLlN0b3JlRmllbGRCA+BBA1IOZml4U3RvcmVGaWVsZHM=');
-
-@$core.Deprecated('Use kYCResubmitUnavailabilityDescriptor instead')
-const KYCResubmitUnavailability$json = {
-  '1': 'KYCResubmitUnavailability',
-  '2': [
-    {
-      '1': 'reason',
-      '3': 1,
-      '4': 1,
-      '5': 14,
-      '6': '.hawkr.seller.v1alpha1.KYCResubmitUnavailableReason',
-      '8': {},
-      '10': 'reason'
-    },
-    {
-      '1': 'message',
-      '3': 2,
-      '4': 1,
-      '5': 11,
-      '6': '.google.rpc.LocalizedMessage',
-      '8': {},
-      '10': 'message'
-    },
-  ],
-};
-
-/// Descriptor for `KYCResubmitUnavailability`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List kYCResubmitUnavailabilityDescriptor = $convert.base64Decode(
-    'ChlLWUNSZXN1Ym1pdFVuYXZhaWxhYmlsaXR5ElAKBnJlYXNvbhgBIAEoDjIzLmhhd2tyLnNlbG'
-    'xlci52MWFscGhhMS5LWUNSZXN1Ym1pdFVuYXZhaWxhYmxlUmVhc29uQgPgQQNSBnJlYXNvbhI7'
-    'CgdtZXNzYWdlGAIgASgLMhwuZ29vZ2xlLnJwYy5Mb2NhbGl6ZWRNZXNzYWdlQgPgQQNSB21lc3'
-    'NhZ2U=');
-
-@$core.Deprecated('Use kYCFlowDescriptor instead')
-const KYCFlow$json = {
-  '1': 'KYCFlow',
-  '2': [
-    {
-      '1': 'status',
-      '3': 1,
-      '4': 1,
-      '5': 14,
-      '6': '.hawkr.seller.v1alpha1.KYCFlowStatus',
-      '10': 'status'
-    },
-    {'1': 'can_resubmit', '3': 2, '4': 1, '5': 8, '10': 'canResubmit'},
-    {'1': 'identity_locked', '3': 3, '4': 1, '5': 8, '10': 'identityLocked'},
-    {
-      '1': 'resubmit_unavailabilities',
-      '3': 4,
-      '4': 3,
-      '5': 11,
-      '6': '.hawkr.seller.v1alpha1.KYCResubmitUnavailability',
-      '8': {},
-      '10': 'resubmitUnavailabilities'
-    },
-    {
-      '1': 'payuni',
-      '3': 5,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.seller.v1alpha1.SellerPayUni',
-      '8': {},
-      '10': 'payuni'
-    },
-  ],
-};
-
-/// Descriptor for `KYCFlow`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List kYCFlowDescriptor = $convert.base64Decode(
-    'CgdLWUNGbG93EjwKBnN0YXR1cxgBIAEoDjIkLmhhd2tyLnNlbGxlci52MWFscGhhMS5LWUNGbG'
-    '93U3RhdHVzUgZzdGF0dXMSIQoMY2FuX3Jlc3VibWl0GAIgASgIUgtjYW5SZXN1Ym1pdBInCg9p'
-    'ZGVudGl0eV9sb2NrZWQYAyABKAhSDmlkZW50aXR5TG9ja2VkEnIKGXJlc3VibWl0X3VuYXZhaW'
-    'xhYmlsaXRpZXMYBCADKAsyMC5oYXdrci5zZWxsZXIudjFhbHBoYTEuS1lDUmVzdWJtaXRVbmF2'
-    'YWlsYWJpbGl0eUID4EEDUhhyZXN1Ym1pdFVuYXZhaWxhYmlsaXRpZXMSQAoGcGF5dW5pGAUgAS'
-    'gLMiMuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlNlbGxlclBheVVuaUID4EEDUgZwYXl1bmk=');
-
 @$core.Deprecated('Use individualKYCDescriptor instead')
 const IndividualKYC$json = {
   '1': 'IndividualKYC',
@@ -2175,15 +1924,6 @@ const KYCApplication$json = {
       '10': 'business'
     },
     {
-      '1': 'flow',
-      '3': 24,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.seller.v1alpha1.KYCFlow',
-      '8': {},
-      '10': 'flow'
-    },
-    {
       '1': 'last_rejection',
       '3': 25,
       '4': 1,
@@ -2263,12 +2003,14 @@ const KYCApplication$json = {
     {'1': 15, '2': 16},
     {'1': 17, '2': 18},
     {'1': 18, '2': 19},
+    {'1': 24, '2': 25},
     {'1': 33, '2': 34},
   ],
   '10': [
     'contact_email',
     'contact_phone',
     'food_business',
+    'flow',
     'payout_contact_email'
   ],
 };
@@ -2292,20 +2034,20 @@ final $typed_data.Uint8List kYCApplicationDescriptor = $convert.base64Decode(
     'Ii5oYXdrci5zZWxsZXIudjFhbHBoYTEuS1lDRG9jdW1lbnRSCGJhbmtCb29rEkYKCmluZGl2aW'
     'R1YWwYFiABKAsyJC5oYXdrci5zZWxsZXIudjFhbHBoYTEuSW5kaXZpZHVhbEtZQ0gAUgppbmRp'
     'dmlkdWFsEkAKCGJ1c2luZXNzGBcgASgLMiIuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkJ1c2luZX'
-    'NzS1lDSABSCGJ1c2luZXNzEjcKBGZsb3cYGCABKAsyHi5oYXdrci5zZWxsZXIudjFhbHBoYTEu'
-    'S1lDRmxvd0ID4EEDUgRmbG93Ek8KDmxhc3RfcmVqZWN0aW9uGBkgASgLMiMuaGF3a3Iuc2VsbG'
-    'VyLnYxYWxwaGExLktZQ1JlamVjdGlvbkID4EEDUg1sYXN0UmVqZWN0aW9uEksKDm1pc3Npbmdf'
-    'ZmllbGRzGBogAygOMh8uaGF3a3Iuc2VsbGVyLnYxYWxwaGExLktZQ0ZpZWxkQgPgQQNSDW1pc3'
-    'NpbmdGaWVsZHMSWAoUbWlzc2luZ19zdG9yZV9maWVsZHMYHyADKA4yIS5oYXdrci5zZWxsZXIu'
-    'djFhbHBoYTEuU3RvcmVGaWVsZEID4EEDUhJtaXNzaW5nU3RvcmVGaWVsZHMSUwoSb3V0c3Rhbm'
-    'RpbmdfaXNzdWVzGCAgAygLMh8uaGF3a3Iuc2VsbGVyLnYxYWxwaGExLktZQ0lzc3VlQgPgQQNS'
-    'EW91dHN0YW5kaW5nSXNzdWVzEkAKC3N1Ym1pdF90aW1lGBsgASgLMhouZ29vZ2xlLnByb3RvYn'
-    'VmLlRpbWVzdGFtcEID4EEDUgpzdWJtaXRUaW1lEkAKC2RlY2lkZV90aW1lGBwgASgLMhouZ29v'
-    'Z2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgpkZWNpZGVUaW1lEkAKC2NyZWF0ZV90aW1lGB'
-    '0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgpjcmVhdGVUaW1lEkAKC3Vw'
-    'ZGF0ZV90aW1lGB4gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgp1cGRhdG'
-    'VUaW1lQgkKB3N1YmplY3RKBAgPEBBKBAgREBJKBAgSEBNKBAghECJSDWNvbnRhY3RfZW1haWxS'
-    'DWNvbnRhY3RfcGhvbmVSDWZvb2RfYnVzaW5lc3NSFHBheW91dF9jb250YWN0X2VtYWls');
+    'NzS1lDSABSCGJ1c2luZXNzEk8KDmxhc3RfcmVqZWN0aW9uGBkgASgLMiMuaGF3a3Iuc2VsbGVy'
+    'LnYxYWxwaGExLktZQ1JlamVjdGlvbkID4EEDUg1sYXN0UmVqZWN0aW9uEksKDm1pc3NpbmdfZm'
+    'llbGRzGBogAygOMh8uaGF3a3Iuc2VsbGVyLnYxYWxwaGExLktZQ0ZpZWxkQgPgQQNSDW1pc3Np'
+    'bmdGaWVsZHMSWAoUbWlzc2luZ19zdG9yZV9maWVsZHMYHyADKA4yIS5oYXdrci5zZWxsZXIudj'
+    'FhbHBoYTEuU3RvcmVGaWVsZEID4EEDUhJtaXNzaW5nU3RvcmVGaWVsZHMSUwoSb3V0c3RhbmRp'
+    'bmdfaXNzdWVzGCAgAygLMh8uaGF3a3Iuc2VsbGVyLnYxYWxwaGExLktZQ0lzc3VlQgPgQQNSEW'
+    '91dHN0YW5kaW5nSXNzdWVzEkAKC3N1Ym1pdF90aW1lGBsgASgLMhouZ29vZ2xlLnByb3RvYnVm'
+    'LlRpbWVzdGFtcEID4EEDUgpzdWJtaXRUaW1lEkAKC2RlY2lkZV90aW1lGBwgASgLMhouZ29vZ2'
+    'xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgpkZWNpZGVUaW1lEkAKC2NyZWF0ZV90aW1lGB0g'
+    'ASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgpjcmVhdGVUaW1lEkAKC3VwZG'
+    'F0ZV90aW1lGB4gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgp1cGRhdGVU'
+    'aW1lQgkKB3N1YmplY3RKBAgPEBBKBAgREBJKBAgSEBNKBAgYEBlKBAghECJSDWNvbnRhY3RfZW'
+    '1haWxSDWNvbnRhY3RfcGhvbmVSDWZvb2RfYnVzaW5lc3NSBGZsb3dSFHBheW91dF9jb250YWN0'
+    'X2VtYWls');
 
 @$core.Deprecated('Use saveKYCDraftRequestDescriptor instead')
 const SaveKYCDraftRequest$json = {
@@ -3738,10 +3480,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.KYCDocument': KYCDocument$json,
   '.hawkr.seller.v1alpha1.IndividualKYC': IndividualKYC$json,
   '.hawkr.seller.v1alpha1.BusinessKYC': BusinessKYC$json,
-  '.hawkr.seller.v1alpha1.KYCFlow': KYCFlow$json,
-  '.hawkr.seller.v1alpha1.KYCResubmitUnavailability':
-      KYCResubmitUnavailability$json,
-  '.hawkr.seller.v1alpha1.SellerPayUni': SellerPayUni$json,
   '.hawkr.seller.v1alpha1.KYCRejection': KYCRejection$json,
   '.hawkr.seller.v1alpha1.KYCIssue': KYCIssue$json,
   '.hawkr.seller.v1alpha1.SaveKYCDraftResponse': SaveKYCDraftResponse$json,

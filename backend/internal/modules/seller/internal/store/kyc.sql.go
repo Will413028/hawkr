@@ -1624,7 +1624,7 @@ SET status = 'DRAFT',
     rep_id_card_hash_key = $28,
     updated_at = $29,
     version = version + 1
-WHERE application_id = $30 AND version = $31 AND status IN ('DRAFT', 'REJECTED', 'APPROVED')
+WHERE application_id = $30 AND version = $31 AND status IN ('DRAFT', 'REJECTED')
 RETURNING application_id, store_id, status, version, seller_type, real_name, birth_date, id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location, english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key, product_type, website_url, company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date, company_town_code, company_address_detail, company_phone, rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
 `
 
@@ -1662,8 +1662,8 @@ type UpdateKYCDraftParams struct {
 	ExpectedVersion      int64
 }
 
-// 寫入已在列鎖內合併的草稿欄位，並讓被退回的申請回到 DRAFT；版本不符、或狀態不是 DRAFT／REJECTED／APPROVED 時 0 列
-// （APPROVED 只在 PayUni 拒絕、能重新綁定時由呼叫方在鎖內放行，見 kyc.editable）。
+// 寫入已在列鎖內合併的草稿欄位，並讓被退回的申請回到 DRAFT；版本不符、或狀態不是 DRAFT／REJECTED 時 0 列
+// （審核中與已核准的申請不能編輯，規則在 model.CanEditKYC）。
 // submitted_at 保留（歷史）。
 func (q *Queries) UpdateKYCDraft(ctx context.Context, arg UpdateKYCDraftParams) (SellerKycApplication, error) {
 	row := q.db.QueryRow(ctx, updateKYCDraft,

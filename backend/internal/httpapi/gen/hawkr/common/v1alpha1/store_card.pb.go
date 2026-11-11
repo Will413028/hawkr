@@ -27,10 +27,10 @@ type StoreCardStatus int32
 
 const (
 	StoreCardStatus_STORE_CARD_STATUS_UNSPECIFIED StoreCardStatus = 0
-	// 營業中：此刻可以公開曝光（營運中、沒有停權、身分認證與 PayUni 審核通過、店名與 logo 與所在地齊全），有公開的店面頁，
+	// 營業中：此刻可以公開曝光（營運中、沒有停權、身分認證核准且收款帳戶可收款、店名與 logo 與所在地齊全），有公開的店面頁，
 	// 也可以被追蹤。
 	StoreCardStatus_STORE_CARD_STATUS_OPEN StoreCardStatus = 1
-	// 暫停：沒有關閉，但此刻不可公開曝光（停權、等待刪除、PayUni 被拒絕、身分認證改回草稿、缺店名或 logo 或所在地）。
+	// 暫停：沒有關閉，但此刻不可公開曝光（停權、等待刪除、身分認證未核准或收款帳戶還不能收款、缺店名或 logo 或所在地）。
 	StoreCardStatus_STORE_CARD_STATUS_PAUSED StoreCardStatus = 2
 	// 已關閉。
 	StoreCardStatus_STORE_CARD_STATUS_CLOSED StoreCardStatus = 3

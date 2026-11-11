@@ -60,18 +60,6 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerKYCApplicationSubmitTime(goldenString(c, "time")), true
 	case "seller.KYCField":
 		return t.SellerKYCField(goldenEnum(c.Value, "KYC_FIELD_"))
-	case "seller.KYCFlowStatus":
-		return t.SellerKYCFlowStatus(goldenEnum(c.Value, "KYC_FLOW_STATUS_"))
-	case "seller.KYCFlowStatus.action":
-		return t.SellerKYCFlowStatusAction(goldenEnum(c.Value, "KYC_FLOW_STATUS_"))
-	case "seller.KYCFlowStatus.banner_description":
-		return t.SellerKYCFlowStatusBannerDescription(goldenEnum(c.Value, "KYC_FLOW_STATUS_"))
-	case "seller.KYCFlowStatus.banner_title":
-		return t.SellerKYCFlowStatusBannerTitle(goldenEnum(c.Value, "KYC_FLOW_STATUS_"))
-	case "seller.KYCFlowStatus.gate_heading":
-		return t.SellerKYCFlowStatusGateHeading(goldenEnum(c.Value, "KYC_FLOW_STATUS_"))
-	case "seller.KYCFlowStatus.gate_message":
-		return t.SellerKYCFlowStatusGateMessage(goldenEnum(c.Value, "KYC_FLOW_STATUS_"), goldenString(c, "subject"))
 	case "seller.KYCStatus":
 		return t.SellerKYCStatus(goldenEnum(c.Value, "KYC_STATUS_"))
 	case "seller.Measure.appeal_deadline":
@@ -126,8 +114,6 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerOnboardingTaskIdPanelDescription(goldenEnum(c.Value, "ONBOARDING_TASK_ID_"))
 	case "seller.OnboardingTaskId.panel_title":
 		return t.SellerOnboardingTaskIdPanelTitle(goldenEnum(c.Value, "ONBOARDING_TASK_ID_"))
-	case "seller.PayUniState":
-		return t.SellerPayUniState(goldenEnum(c.Value, "PAY_UNI_STATE_"))
 	case "seller.PaymentAccount.payouts_inactive_note":
 		return t.SellerPaymentAccountPayoutsInactiveNote(), true
 	case "seller.PaymentAccountStatus":
@@ -142,10 +128,6 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerRevokeReason(goldenEnum(c.Value, "REVOKE_REASON_"))
 	case "seller.RiskGround":
 		return t.SellerRiskGround(goldenEnum(c.Value, "RISK_GROUND_"))
-	case "seller.SellerPayUni.fix_fields_heading":
-		return t.SellerSellerPayUniFixFieldsHeading(), true
-	case "seller.SellerPayUni.reason_heading":
-		return t.SellerSellerPayUniReasonHeading(), true
 	case "seller.SellerRequirement":
 		return t.SellerSellerRequirement(goldenEnum(c.Value, "SELLER_REQUIREMENT_"))
 	case "seller.StoreField":

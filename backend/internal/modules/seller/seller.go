@@ -132,7 +132,7 @@ func New(d Deps) *Module {
 			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Identity: d.Identity, Now: d.Now, StoreCode: d.StoreCode,
 		}),
 		profile: profile.New(profile.Deps{
-			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Exposure: exposures, StorefrontBaseURL: d.StorefrontBaseURL,
+			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Exposure: exposures,
 			Now: d.Now, Logger: d.Logger,
 		}),
 		suspension: suspensions,

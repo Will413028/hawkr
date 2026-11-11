@@ -112,12 +112,14 @@ void main() {
 
   test('變體：omit 的值回 null', () {
     expect(
-      KYCFlowStatus.KYC_FLOW_STATUS_APPROVED.action(UiLocale.zhTW),
+      PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED.action(UiLocale.zhTW),
       isNull,
     );
     expect(
-      KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED.action(UiLocale.zhTW),
-      '查看進度',
+      PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED.action(
+        UiLocale.zhTW,
+      ),
+      '聯絡客服',
     );
     expect(
       MeasureRequestState.MEASURE_REQUEST_STATE_CLOSED.withKind(

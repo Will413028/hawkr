@@ -117,7 +117,7 @@ func TestKYCDraftSubmitAndCancel(t *testing.T) {
 	created := saveDraft(t, f.app, completeDraft(testID))
 	if created.GetId() == "" || created.GetStatus() != pb.KYCStatus_KYC_STATUS_DRAFT || created.GetEtag() == "" || created.GetIndividual().GetIdCardNoMasked() != "A1******89" ||
 		created.GetBankAccountMasked() != "********8901" || created.GetIndividual().GetIdCardNo() != "" || created.GetBankAccount() != "" || created.GetBirthDate().GetYear() != 1990 ||
-		created.GetIdCardFront().GetAssetId() != "asset-front" || created.GetBankBook().GetDownloadUri() != "/api/v1/app/media/secure_download/asset-book" || created.GetFlow().GetStatus() != pb.KYCFlowStatus_KYC_FLOW_STATUS_DRAFT {
+		created.GetIdCardFront().GetAssetId() != "asset-front" || created.GetBankBook().GetDownloadUri() != "/api/v1/app/media/secure_download/asset-book" {
 		t.Fatalf("created=%v", created)
 	}
 	got, err := f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{}))
@@ -160,8 +160,7 @@ func TestKYCDraftSubmitAndCancel(t *testing.T) {
 		Application: &pb.KYCApplication{Etag: updated.GetEtag(), EnglishName: "Wang Farm"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"english_name"}},
 	})
 	submitted, err := f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: restored.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
-	if err != nil || submitted.Msg.GetApplication().GetStatus() != pb.KYCStatus_KYC_STATUS_SUBMITTED || submitted.Msg.GetApplication().GetSubmitTime() == nil ||
-		submitted.Msg.GetApplication().GetFlow().GetStatus() != pb.KYCFlowStatus_KYC_FLOW_STATUS_SUBMITTED {
+	if err != nil || submitted.Msg.GetApplication().GetStatus() != pb.KYCStatus_KYC_STATUS_SUBMITTED || submitted.Msg.GetApplication().GetSubmitTime() == nil {
 		t.Fatalf("submitted=%v err=%v", submitted, err)
 	}
 	_, err = f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{}))
@@ -173,17 +172,13 @@ func TestKYCDraftSubmitAndCancel(t *testing.T) {
 	if err != nil || cancelled.Msg.GetApplication().GetStatus() != pb.KYCStatus_KYC_STATUS_CANCELLED {
 		t.Fatalf("cancelled=%v err=%v", cancelled, err)
 	}
-	// 取消的回應與重讀一致：重讀是「沒有申請」（not_found，client 當成 NOT_STARTED、可以開始＝能重送、沒有原因、沒有 PayUni 狀態）。
-	if flow := cancelled.Msg.GetApplication().GetFlow(); flow.GetStatus() != pb.KYCFlowStatus_KYC_FLOW_STATUS_NOT_STARTED || !flow.GetCanResubmit() ||
-		flow.GetIdentityLocked() || len(flow.GetResubmitUnavailabilities()) != 0 || flow.GetPayuni() != nil {
-		t.Fatalf("取消的回應與「沒有申請」的重讀不一致：%v", flow)
-	}
+	// 取消之後重讀是「沒有申請」（not_found）。
 	_, err = f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{}))
 	wantCode(t, err, connect.CodeNotFound, "")
 }
 
 // 沒有店家的帳號、停權的店家：KYC 的方法依宣告的能力被擋下。
-func TestKYCAndPayUniFollowTheDeclaredCapabilities(t *testing.T) {
+func TestKYCFollowsTheDeclaredCapabilities(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
@@ -361,9 +356,9 @@ func TestLookupBusinessRegistration(t *testing.T) {
 	}
 }
 
-// PayUni：核准之前 GetMyKYC 的流程沒有 payuni；核准後讀得到賣家看到的狀態與要處理的事（KYCFlow.payuni）；送給 PayUni 的聯絡資料是店家的
-// 欄位，以 UpdateMyStore 修改（過期的 etag 是 VERSION_CONFLICT，改了就登記同步），停權時仍可以讀、不能改。
-func TestMyPayUniReadAndStoreContactUpdate(t *testing.T) {
+// 已核准的申請不能再儲存或重送（failed_precondition）；店家的聯絡資料以 UpdateMyStore 修改（過期的 etag 是 VERSION_CONFLICT），
+// 停權時仍可以讀、不能改。
+func TestApprovedKYCCannotBeResubmittedAndStoreContactUpdate(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
@@ -372,9 +367,6 @@ func TestMyPayUniReadAndStoreContactUpdate(t *testing.T) {
 	submitted, err := f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: draft.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
 	if err != nil {
 		t.Fatal(err)
-	}
-	if submitted.Msg.GetApplication().GetFlow().GetPayuni() != nil {
-		t.Fatalf("送審中不該有 PayUni 狀態：%v", submitted.Msg.GetApplication().GetFlow())
 	}
 	version, err := strconv.ParseInt(submitted.Msg.GetApplication().GetEtag(), 10, 64)
 	if err != nil {
@@ -390,37 +382,19 @@ func TestMyPayUniReadAndStoreContactUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fl := got.Msg.GetApplication().GetFlow(); fl.GetPayuni().GetState() != pb.PayUniState_PAY_UNI_STATE_REVIEWING || fl.GetPayuni().GetExplanation().GetMessage() == "" ||
-		fl.GetCanResubmit() || len(fl.GetResubmitUnavailabilities()) != 1 ||
-		fl.GetResubmitUnavailabilities()[0].GetReason() != pb.KYCResubmitUnavailableReason_KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_REVIEWING {
-		t.Fatalf("核准之後 job 還沒有執行：flow=%v", fl)
+	if got.Msg.GetApplication().GetStatus() != pb.KYCStatus_KYC_STATUS_APPROVED {
+		t.Fatalf("status=%v", got.Msg.GetApplication().GetStatus())
 	}
-	// 測試沒有設定 PayUni：背景程序（這裡直接呼叫它的內容）把綁定記為失敗，問題是 PAYUNI_NOT_CONFIGURED（聯絡客服）。
-	if _, err := f.module.SyncPayUni(ctx, f.storeID(t), true); err != nil {
-		t.Fatal(err)
-	}
-	got, err = f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	flow := got.Msg.GetApplication().GetFlow()
-	// 有註冊之後，PayUni 必填的店家欄位不能清掉：欄位違規指向 store.contact_name。
-	_, err = f.app.UpdateMyStore(ctx, connect.NewRequest(&pb.UpdateMyStoreRequest{
-		Store: &pb.Store{Etag: f.get(t).GetStore().GetEtag()}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"contact_name"}},
+	approvedEtag := got.Msg.GetApplication().GetEtag()
+	_, err = f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: approvedEtag, AcceptedAgreements: kycAgreementsPB()}))
+	wantCode(t, err, connect.CodeFailedPrecondition, "")
+	_, err = f.app.SaveKYCDraft(ctx, connect.NewRequest(&pb.SaveKYCDraftRequest{
+		Application: &pb.KYCApplication{Etag: approvedEtag, EnglishName: "Wang Farm 2"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"english_name"}},
 	}))
-	if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "store.contact_name" {
-		t.Fatalf("清掉必填欄位：field=%q err=%v", field, err)
-	}
-	if flow.GetStatus() != pb.KYCFlowStatus_KYC_FLOW_STATUS_BIND_FAILED || flow.GetPayuni().GetState() != pb.PayUniState_PAY_UNI_STATE_CONTACT_SUPPORT ||
-		flow.GetPayuni().GetExplanation().GetLocale() != "zh-TW" || flow.GetPayuni().GetReason() != "" || len(flow.GetPayuni().GetFixFields()) != 0 ||
-		flow.GetCanResubmit() || len(flow.GetResubmitUnavailabilities()) != 1 ||
-		flow.GetResubmitUnavailabilities()[0].GetReason() != pb.KYCResubmitUnavailableReason_KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_CONTACT_SUPPORT {
-		t.Fatalf("flow=%v", flow)
-	}
-	// 不能重送時 SaveKYCDraft 與 SubmitKYC 回的 failed_precondition 是原因清單的第一句。
-	_, err = f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: got.Msg.GetApplication().GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
-	if wantCode(t, err, connect.CodeFailedPrecondition, ""); !strings.Contains(err.Error(), flow.GetResubmitUnavailabilities()[0].GetMessage().GetMessage()) {
-		t.Fatalf("submit err=%v", err)
+	wantCode(t, err, connect.CodeFailedPrecondition, "")
+	if again, err := f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{})); err != nil || again.Msg.GetApplication().GetStatus() != pb.KYCStatus_KYC_STATUS_APPROVED ||
+		again.Msg.GetApplication().GetEtag() != approvedEtag {
+		t.Fatalf("被擋下的寫入不該改動申請：%v err=%v", again, err)
 	}
 
 	store := f.get(t).GetStore()
@@ -454,7 +428,7 @@ func TestMyPayUniReadAndStoreContactUpdate(t *testing.T) {
 
 	f.suspendStore(t, f.storeID(t))
 	if _, err := f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{})); err != nil {
-		t.Fatalf("停權時讀 PayUni 狀態：%v", err)
+		t.Fatalf("停權時讀自己的申請：%v", err)
 	}
 	_, err = f.app.UpdateMyStore(ctx, connect.NewRequest(&pb.UpdateMyStoreRequest{
 		Store: &pb.Store{Etag: after.GetEtag(), ContactName: "停權中"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"contact_name"}},

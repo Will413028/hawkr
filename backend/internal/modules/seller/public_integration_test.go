@@ -11,7 +11,6 @@ import (
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
-	pu "github.com/Will413028/hawkr/backend/internal/platform/payuni"
 )
 
 // reconcile 跑一次可曝光的對帳，回傳掃描的店家數。
@@ -98,15 +97,13 @@ func TestPublicStoreByCodeHidesEveryStoreThatIsNotExposable(t *testing.T) {
 			f.logoed(t, accountID, s)
 			return s
 		},
-		"payuni not approved": func(t *testing.T, f *fixture) Store {
-			accountID, s := f.boundStore(t)
+		"payment account not enabled": func(t *testing.T, f *fixture) Store {
+			accountID, s := f.approvedStore(t)
 			f.logoed(t, accountID, s)
 			return s
 		},
 		"missing logo": func(t *testing.T, f *fixture) Store {
-			_, s := f.boundStore(t)
-			f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "1"}
-			must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourcePoll))
+			_, s := f.approvedStore(t)
 			f.setPayment(t, s.StoreID, enabledSnapshot)
 			return s
 		},
@@ -185,15 +182,13 @@ func TestStoreCardsReturnEveryEverExposedStoreWithItsStatus(t *testing.T) {
 	_, err := f.module.CloseCurrent(ctx, closer)
 	must(t, err)
 	f.now = f.now.Add(time.Hour)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "8"}
-	must(t, f.module.PollPayUni(ctx, rejected.StoreID, PayUniSourceRefresh))
 	f.setPayment(t, rejected.StoreID, rejectedSnapshot)
 	for name, c := range map[string]struct {
 		store  Store
 		status CardStatus
 	}{
 		"open": {open, CardOpen}, "suspended": {suspended, CardPaused}, "pending deletion": {deleting, CardPaused},
-		"closed": {closed, CardClosed}, "payuni rejected later": {rejected, CardPaused},
+		"closed": {closed, CardClosed}, "payment account rejected later": {rejected, CardPaused},
 	} {
 		got := f.card(t, c.store.StoreID)
 		if got.TownCode == nil || c.store.TownCode == nil || *got.TownCode != *c.store.TownCode {
@@ -271,27 +266,24 @@ func TestStoreCardsCoverTheStampLag(t *testing.T) {
 // first_exposed_at 只在公告為可曝光時記下（當場，不等對帳），已有的時間不覆寫；不可曝光的店沒有時間。
 func TestFirstExposedAtIsStampedWhenTheStoreBecomesExposableAndNeverOverwritten(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 	f := setup(t)
 	_, first := f.exposable(t)
 	_, unfinished := f.open(t)
-	accountID, pending := f.boundStore(t)
+	accountID, pending := f.approvedStore(t)
 	firstAt := f.now
 	f.reconcile(t)
 	if at := f.firstExposedAt(t, first.StoreID); at == nil || !at.Equal(firstAt) {
 		t.Fatalf("first=%v, want %v", at, firstAt)
 	}
-	for name, id := range map[string]int64{"unfinished": unfinished.StoreID, "payuni pending": pending.StoreID} {
+	for name, id := range map[string]int64{"unfinished": unfinished.StoreID, "payment account pending": pending.StoreID} {
 		if f.firstExposedAt(t, id) != nil {
 			t.Errorf("%s 不可曝光，不該有時間", name)
 		}
 	}
 	f.now = f.now.Add(time.Hour)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "1"}
-	must(t, f.module.PollPayUni(ctx, pending.StoreID, PayUniSourcePoll))
 	f.setPayment(t, pending.StoreID, enabledSnapshot)
 	if at := f.firstExposedAt(t, pending.StoreID); at != nil {
-		t.Fatalf("PayUni 核准但還沒有 logo，不該有時間：%v", at)
+		t.Fatalf("收款帳戶啟用但還沒有 logo，不該有時間：%v", at)
 	}
 	f.logoed(t, accountID, pending)
 	secondAt := f.now
@@ -305,7 +297,7 @@ func TestFirstExposedAtIsStampedWhenTheStoreBecomesExposableAndNeverOverwritten(
 	}
 }
 
-// store_id 連號可列舉：從沒公開過的店（還沒申請、審核中、被退回、管理員核准但 PayUni 還沒核准）不回卡片；不存在的略過，重複的只回一次，依輸入順序。
+// store_id 連號可列舉：從沒公開過的店（還沒申請、審核中、被退回、管理員核准但收款帳戶還沒啟用）不回卡片；不存在的略過，重複的只回一次，依輸入順序。
 func TestStoreCardsOmitStoresThatWereNeverExposed(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -316,7 +308,7 @@ func TestStoreCardsOmitStoresThatWereNeverExposed(t *testing.T) {
 	_, rejected, sub := f.submitted(t, idA, bankAcct)
 	_, err := f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: sub.ID, ExpectedVersion: sub.Version, AdminID: 9, Issues: anIssue(), Reason: "證件模糊"})
 	must(t, err)
-	_, approvedPending := f.boundStore(t)
+	_, approvedPending := f.approvedStore(t)
 	f.reconcile(t)
 	ids := []int64{noApplication.StoreID, inReview.StoreID, rejected.StoreID, approvedPending.StoreID, approved.StoreID}
 	if got := f.cardIDs(t, ids...); !slices.Equal(got, []int64{approved.StoreID}) {
@@ -368,7 +360,7 @@ func TestStoreCardsValidateTheBatch(t *testing.T) {
 	}
 }
 
-// OPEN 就是此刻可以公開曝光（同一個規則）：曾經公開、之後 PayUni 被拒絕的店是 PAUSED，不是 OPEN；OPEN 的卡片一定讀得到店面、
+// OPEN 就是此刻可以公開曝光（同一個規則）：曾經公開、之後收款帳戶被停用的店是 PAUSED，不是 OPEN；OPEN 的卡片一定讀得到店面、
 // 也可以被追蹤（PublicStores），PAUSED 的都不行。
 func TestAnOpenCardIsExactlyAnExposableStore(t *testing.T) {
 	t.Parallel()
@@ -378,13 +370,11 @@ func TestAnOpenCardIsExactlyAnExposableStore(t *testing.T) {
 	_, rejected := f.exposable(t)
 	f.reconcile(t)
 	f.now = f.now.Add(time.Hour)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "8"}
-	must(t, f.module.PollPayUni(ctx, rejected.StoreID, PayUniSourceRefresh))
 	f.setPayment(t, rejected.StoreID, rejectedSnapshot)
 	if got := f.card(t, rejected.StoreID); got.Status != CardPaused || got.Name == nil {
-		t.Fatalf("PayUni 被拒絕的店 card=%+v, want PAUSED", got)
+		t.Fatalf("收款帳戶被停用的店 card=%+v, want PAUSED", got)
 	}
-	_, unfinished := f.boundStore(t)
+	_, unfinished := f.approvedStore(t)
 	for _, c := range []struct {
 		store  Store
 		status CardStatus
@@ -713,8 +703,6 @@ func TestStoreCardsAndStoresWithExposureAgreeOnTheSameStores(t *testing.T) {
 	visible, hidden := f.hiddenWorld(t)
 	f.reconcile(t)
 	f.now = f.now.Add(time.Hour)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "8"}
-	must(t, f.module.PollPayUni(ctx, rejected.StoreID, PayUniSourceRefresh))
 	f.setPayment(t, rejected.StoreID, rejectedSnapshot)
 	ids := slices.Concat(visible, hidden, []int64{rejected.StoreID})
 	exposures, err := f.module.StoresWithExposure(ctx, ids)

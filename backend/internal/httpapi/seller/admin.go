@@ -163,7 +163,10 @@ func (h *Admin) ListStores(ctx context.Context, req *connect.Request[adminpb.Lis
 		out.Stores[i] = &adminpb.StoreListItem{
 			Store: store, Suspended: item.Store.Suspended(),
 			DelegationUnavailabilities: toStoreActionUnavailabilities(item.Store.ActionUnavailableReasons(model.StoreActionDelegate), model.StoreActionDelegate),
-			KycFlowStatus:              rpc.EnumToProto[pb.KYCFlowStatus](item.KYCFlow),
+		}
+		if item.KYCStatus != nil {
+			status := rpc.EnumToProto[pb.KYCStatus](*item.KYCStatus)
+			out.Stores[i].KycStatus = &status
 		}
 	}
 	return connect.NewResponse(out), nil
@@ -210,9 +213,6 @@ func (h *Admin) GetStore(ctx context.Context, req *connect.Request[adminpb.GetSt
 	if ok {
 		out.Kyc = &adminpb.KYCSummary{
 			ApplicationId: application.ID.String(), Status: rpc.EnumToProto[pb.KYCStatus](application.Status),
-		}
-		if application.Flow != nil {
-			out.Kyc.FlowStatus = rpc.EnumToProto[pb.KYCFlowStatus](application.Flow.Status)
 		}
 		if application.SubmittedAt != nil {
 			out.Kyc.SubmitTime = timestamppb.New(*application.SubmittedAt)

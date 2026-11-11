@@ -178,7 +178,7 @@ func TestStartupKeyCheckCoversTheAccountIdentityHashes(t *testing.T) {
 	enc, _ := rotatedKeys(t) // 加密金鑰舊的還在：失敗只可能來自 HASH
 	newMAC, err := seal.ParseMAC("rot2:" + base64.StdEncoding.EncodeToString([]byte("rotated-kyc-hash-hmac-key-0000002")))
 	must(t, err)
-	err = f.newModuleWithKeys(t, f.payuni, f.jobs, enc, newMAC).CheckKYCKeys(ctx)
+	err = f.newModuleWithKeys(t, f.jobs, enc, newMAC).CheckKYCKeys(ctx)
 	if err == nil || !strings.Contains(err.Error(), "HASH:test1") {
 		t.Fatalf("防詐保存參照的舊 HMAC 金鑰被拿掉時要失敗：%v", err)
 	}

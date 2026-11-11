@@ -181,7 +181,6 @@ type fixture struct {
 	bus      *events.Bus
 	jobs     *queue
 	media    *images
-	payuni   *fakePayUni
 	payment  *payment.Fake
 	// payments 是 payment 模組（provider 是 payment 這個 fake）：核准經它寫收款帳戶列，同步發的 PayoutAccountChanged 由 f.module 訂閱。
 	payments *payment.Module
@@ -199,7 +198,7 @@ func setup(t *testing.T) *fixture {
 		migrate.Module{Name: inbox.Schema, Dir: inbox.Migrations()}, migrate.Module{Name: "identity", Dir: identity.Migrations()},
 		migrate.Module{Name: "payment", Dir: payment.Migrations()}, migrate.Module{Name: "seller", Dir: Migrations()},
 	))
-	f := &fixture{db: d, bus: events.NewBus(), jobs: &queue{}, media: newImages(), payuni: &fakePayUni{t: t}, payment: payment.NewFake(), orders: &storeOrders{}, products: &fakeProductStores{}, registry: &fakeRegistry{t: t}, now: time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)}
+	f := &fixture{db: d, bus: events.NewBus(), jobs: &queue{}, media: newImages(), payment: payment.NewFake(), orders: &storeOrders{}, products: &fakeProductStores{}, registry: &fakeRegistry{t: t}, now: time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	f.identity = identity.New(identity.Deps{DB: d, Events: f.bus, Now: func() time.Time { return f.now }, Logger: log})
 	clock := func() time.Time { return f.now }
@@ -207,7 +206,7 @@ func setup(t *testing.T) *fixture {
 		DB: d, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: d, Jobs: f.jobs, Now: clock, Logger: log}), Provider: f.payment,
 		Owners: fixtureOwners{f}, Now: clock, Logger: log,
 	})
-	f.module = f.newModule(t, f.payuni, f.jobs)
+	f.module = f.newModule(t, f.jobs)
 	events.Subscribe(f.bus, func(ctx context.Context, e payment.PayoutAccountChanged) error {
 		return f.module.OnPayoutAccountChanged(ctx, e)
 	})
@@ -225,25 +224,25 @@ func (o fixtureOwners) OwnerActive(ctx context.Context, storeID int64) (bool, er
 	return err == nil && s.Status != Closed, err
 }
 
-// newModule 在同一個 DB 上組一個 seller 模組：PayUni 的 client 與 job 的排入可以換（沒有設定 PayUni、真的 River）。
-func (f *fixture) newModule(t *testing.T, client PayUniClient, jc jobs.ReportingEnqueuer) *Module {
+// newModule 在同一個 DB 上組一個 seller 模組：job 的排入可以換（真的 River）。
+func (f *fixture) newModule(t *testing.T, jc jobs.ReportingEnqueuer) *Module {
 	t.Helper()
 	kycKeys, kycMAC := sealtest.Keys(t)
-	return f.newModuleWithKeys(t, client, jc, kycKeys, kycMAC)
+	return f.newModuleWithKeys(t, jc, kycKeys, kycMAC)
 }
 
 // newModuleWithKeys 同 newModule，KYC 的金鑰環由呼叫方給（測試金鑰輪替）。
-func (f *fixture) newModuleWithKeys(t *testing.T, client PayUniClient, jc jobs.ReportingEnqueuer, kycKeys *seal.Keyring, kycMAC *seal.MAC) *Module {
+func (f *fixture) newModuleWithKeys(t *testing.T, jc jobs.ReportingEnqueuer, kycKeys *seal.Keyring, kycMAC *seal.MAC) *Module {
 	t.Helper()
-	return f.newModuleClock(t, client, jc, kycKeys, kycMAC, func() time.Time { return f.now })
+	return f.newModuleClock(t, jc, kycKeys, kycMAC, func() time.Time { return f.now })
 }
 
 // newModuleClock 同 newModuleWithKeys，時鐘由呼叫方給（測試多實例的時鐘差）。
-func (f *fixture) newModuleClock(t *testing.T, client PayUniClient, jc jobs.ReportingEnqueuer, kycKeys *seal.Keyring, kycMAC *seal.MAC, now func() time.Time) *Module {
+func (f *fixture) newModuleClock(t *testing.T, jc jobs.ReportingEnqueuer, kycKeys *seal.Keyring, kycMAC *seal.MAC, now func() time.Time) *Module {
 	t.Helper()
 	log := slog.New(slog.NewTextHandler(&f.logs, nil))
 	return New(Deps{
-		DB: f.db, Events: f.bus, Jobs: jc, Identity: f.identity, Media: f.media, Orders: f.orders, KYCKeys: kycKeys, KYCMAC: kycMAC, PayUni: client, Payment: f.payments, ProductStores: f.products, Registry: f.registry,
+		DB: f.db, Events: f.bus, Jobs: jc, Identity: f.identity, Media: f.media, Orders: f.orders, KYCKeys: kycKeys, KYCMAC: kycMAC, Payment: f.payments, ProductStores: f.products, Registry: f.registry,
 		StorefrontBaseURL: "https://store.example.invalid",
 		Now:               now, Logger: log,
 		StoreCode: func(now time.Time) (int64, error) {

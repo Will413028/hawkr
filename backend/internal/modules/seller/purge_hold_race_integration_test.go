@@ -182,7 +182,7 @@ func TestAppealAfterTheRetirementLockedTheStoreSeesItRetired(t *testing.T) {
 	accountID, s, m := f.terminated(t, GroundCeasedBusiness)
 	deadline := m.StartsAt.Add(4416 * time.Hour)
 	keys, mac := sealtest.Keys(t)
-	early := f.newModuleClock(t, f.payuni, f.jobs, keys, mac, func() time.Time { return deadline.Add(-time.Hour) })
+	early := f.newModuleClock(t, f.jobs, keys, mac, func() time.Time { return deadline.Add(-time.Hour) })
 	f.now = deadline.Add(time.Millisecond) // A 的時鐘：申覆期限已過，清理到期
 
 	h := f.holdPurgeAfterCandidates(t)

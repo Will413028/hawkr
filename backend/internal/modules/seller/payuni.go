@@ -50,21 +50,6 @@ type PayUniObservationPage = model.PayUniObservationPage
 // PayUniNotification 是 PayUni 的 AGENT_NOTIFY 通知。
 type PayUniNotification = model.PayUniNotification
 
-// KYCFlowStatus 是 cert 軸與 PayUni 軸合成的流程狀態。
-type KYCFlowStatus = model.KYCFlowStatus
-
-// KYCFlow 是流程狀態與衍生旗標（CanResubmit、IdentityLocked）；PayUni 的事實在 PayUniRegistration，賣家看到的 PayUni 狀態是 SellerPayUni。
-type KYCFlow = model.KYCFlow
-
-// PayUniState 是賣家看到的 PayUni 收款狀態（SellerPayUniOf 由申請與註冊推導）。
-type PayUniState = model.PayUniState
-
-// SellerPayUni 是賣家看到的 PayUni 狀態與要處理的事（KYCApplication.PayUni）。
-type SellerPayUni = model.SellerPayUni
-
-// KYCResubmitUnavailableReason 是儲存草稿與重新送出此刻不能做的原因（KYCApplication.ResubmitReasons）；Text 是它的句子。
-type KYCResubmitUnavailableReason = model.KYCResubmitUnavailableReason
-
 // PayUniObserveArgs 是套用一則 PayUni 通知的 job 參數。
 type PayUniObserveArgs = payuni.ObserveArgs
 
@@ -85,18 +70,6 @@ const (
 	PayUniSourceRefresh PayUniSource = model.SourceRefresh
 	PayUniSourceBind    PayUniSource = model.SourceBind
 
-	FlowNotStarted     KYCFlowStatus = model.FlowNotStarted
-	FlowDraft          KYCFlowStatus = model.FlowDraft
-	FlowSubmitted      KYCFlowStatus = model.FlowSubmitted
-	FlowRejected       KYCFlowStatus = model.FlowRejected
-	FlowBinding        KYCFlowStatus = model.FlowBinding
-	FlowBindFailed     KYCFlowStatus = model.FlowBindFailed
-	FlowForwarded      KYCFlowStatus = model.FlowForwarded
-	FlowUnderReview    KYCFlowStatus = model.FlowUnderReview
-	FlowPendingInfo    KYCFlowStatus = model.FlowPendingInfo
-	FlowApproved       KYCFlowStatus = model.FlowApproved
-	FlowPayUniRejected KYCFlowStatus = model.FlowPayUniRejected
-
 	// 我們自己的錯誤碼（PayUni 的碼是 AGENT 開頭，原樣保存在 BindErrorCode、SyncErrorCode）。
 	PayUniErrIncompleteData   = model.ErrIncompleteData
 	PayUniErrNotConfigured    = model.ErrNotConfigured
@@ -104,23 +77,12 @@ const (
 	PayUniErrMerchantTerminal = model.ErrMerchantTerminal
 )
 
-// PayUniStateValues 回傳全部賣家端的 PayUni 狀態。
-func PayUniStateValues() []PayUniState { return model.PayUniStateValues() }
-
-// KYCResubmitUnavailableReasonValues 回傳全部重新送出的不能原因。
-func KYCResubmitUnavailableReasonValues() []KYCResubmitUnavailableReason {
-	return model.KYCResubmitUnavailableReasonValues()
-}
-
 // PayUni 錯誤的處置類別（值與 ClassifyPayUniCode 回傳的一致）。
 const (
 	RemedySellerFix      = model.RemedySellerFix
 	RemedyContactSupport = model.RemedyContactSupport
 	RemedyRetryLater     = model.RemedyRetryLater
 )
-
-// KYCFlowStatusValues 回傳全部流程狀態。
-func KYCFlowStatusValues() []KYCFlowStatus { return model.KYCFlowStatusValues() }
 
 // ErrPayUniPermanent 標示重試也不會成功的 PayUni 通知處理失敗（未知的店家）：job 記錄後取消，consumer 不重送。
 var ErrPayUniPermanent = payuni.ErrPermanent

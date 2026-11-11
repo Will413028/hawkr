@@ -16,41 +16,13 @@
       "message": "終止合作的申覆期限已過",
       "description": "申覆不可用：終止合作的申覆期間已結束（APPEAL_WINDOW_ENDED）；期限本身另以「申覆期限」顯示。"
     },
-    "kyc.resubmit_unavailable.payuni_approved": {
+    "kyc.edit_unavailable.approved": {
       "message": "商家認證已通過，不需要修改或重新送出。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：已核准、PayUni 也核准（PAYUNI_APPROVED）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
+      "description": "SaveKYCDraft 與 SubmitKYC 不能做：申請已核准。"
     },
-    "kyc.resubmit_unavailable.payuni_contact_support": {
-      "message": "這個問題無法以修改資料解決，請聯繫客服了解原因。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：已核准、問題無法由賣家修正（PAYUNI_CONTACT_SUPPORT）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
-    },
-    "kyc.resubmit_unavailable.payuni_fix_via_support": {
-      "message": "要修正的是店家設定裡的資料，修正後請聯繫客服重新處理，商家認證不需要重新送出。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：已核准、PayUni 指出的是店家欄位（PAYUNI_FIX_VIA_SUPPORT）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
-    },
-    "kyc.resubmit_unavailable.payuni_pending_info": {
-      "message": "PayUni 要求補件，請依 PayUni 通知信的指示處理，商家認證不需要在這裡修改或重新送出。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：已核准、PayUni 要求補件（PAYUNI_PENDING_INFO）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
-    },
-    "kyc.resubmit_unavailable.payuni_retry_later": {
-      "message": "PayUni 暫時無法處理，平台會協助重新送出，你不需要修改或重新送出。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：已核准、PayUni 暫時無法處理（PAYUNI_RETRY_LATER）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
-    },
-    "kyc.resubmit_unavailable.payuni_reviewing": {
-      "message": "PayUni 正在審查你的資料，審查期間不能修改或重新送出商家認證。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：已核准、PayUni 綁定中或審核中（PAYUNI_REVIEWING）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
-    },
-    "kyc.resubmit_unavailable.payuni_terminated": {
-      "message": "PayUni 收款帳戶已終止，無法修改或重新送出，請聯繫客服。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：已核准、PayUni 端的商店已終止（PAYUNI_TERMINATED）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
-    },
-    "kyc.resubmit_unavailable.under_review": {
-      "message": "申請審核中，請等待審核結果。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：申請送審中，PayUni 已收下店家，不能取消（UNDER_REVIEW）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
-    },
-    "kyc.resubmit_unavailable.under_review_cancelable": {
+    "kyc.edit_unavailable.under_review": {
       "message": "申請審核中，要修改請先取消申請。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：申請送審中，PayUni 還沒收下店家，可以先取消再修改（UNDER_REVIEW_CANCELABLE）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
+      "description": "SaveKYCDraft 與 SubmitKYC 不能做：申請審核中（SUBMITTED），要修改先 CancelKYC。"
     },
     "measure.retry_exhausted": {
       "message": "措施剛剛有變動，請重試。",
@@ -172,34 +144,6 @@
     "opening.unavailable.terminated": {
       "message": "此帳號因終止合作（第 21.3 條）不能重新開店。如有異議，可對該終止提出申覆。",
       "description": "開店不可用：帳號有生效中的終止合作（StoreOpeningUnavailableReason.TERMINATED）。ApplyStore 被擋下時錯誤的訊息與 GetMyStoreOpeningResponse.unavailabilities 的 message 是同一句。"
-    },
-    "payuni.state.contact_support": {
-      "message": "請聯繫客服了解原因，無法自行重新送出。",
-      "description": "賣家的 PayUni 狀態說明，只由狀態決定（PayUniState.CONTACT_SUPPORT）。沒有賣家能修正的資料。"
-    },
-    "payuni.state.fix_via_support": {
-      "message": "修正後請聯繫客服重新處理，無法自行重新送出。",
-      "description": "賣家的 PayUni 狀態說明，只由狀態決定（PayUniState.FIX_VIA_SUPPORT）。店家設定的資料有問題，修正後由平台重新處理。"
-    },
-    "payuni.state.fixable": {
-      "message": "請修正資料後重新送出，送出後平台會重新審核。",
-      "description": "賣家的 PayUni 狀態說明，只由狀態決定（PayUniState.FIXABLE）。申請的資料有問題，賣家修正後自己重新送出（PayUni 拒絕或綁定失敗）。"
-    },
-    "payuni.state.pending_info": {
-      "message": "請至信箱查看 PayUni 補件通知信件，依指示補齊資料後再次送出審核。",
-      "description": "賣家的 PayUni 狀態說明，只由狀態決定（PayUniState.PENDING_INFO）。PayUni 要求補件。"
-    },
-    "payuni.state.retry_later": {
-      "message": "PayUni 暫時無法處理這筆申請，平台會協助重新送出，你不需要重新送出。",
-      "description": "賣家的 PayUni 狀態說明，只由狀態決定（PayUniState.RETRY_LATER）。綁定的暫時性失敗重試用完，進後台待辦等管理員重新綁定。"
-    },
-    "payuni.state.reviewing": {
-      "message": "平台審核已通過，PayUni 正在審查金流資料。",
-      "description": "賣家的 PayUni 狀態說明，只由狀態決定（PayUniState.REVIEWING）。綁定中或 PayUni 審核中。"
-    },
-    "payuni.state.terminated": {
-      "message": "請聯繫客服了解原因。",
-      "description": "賣家的 PayUni 狀態說明，只由狀態決定（PayUniState.TERMINATED）。PayUni 端的商店已是終止狀態。"
     },
     "remediation.unavailable.appeal_pending": {
       "message": "這筆措施的申覆審核中，審核完成前不能請求解除",

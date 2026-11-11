@@ -125,13 +125,6 @@ func TestDevSeedWritesStoresThatTheModuleServesAsExposable(t *testing.T) {
 		if version != 2 || !announced {
 			t.Errorf("店 %d 的公告列 = (version %d, exposable %v)，want (2, true)", s.StoreID, version, announced)
 		}
-		var code string
-		if err := d.Pool().QueryRow(ctx, `SELECT mer_id FROM seller.payuni_registrations WHERE store_id = $1`, s.StoreID).Scan(&code); err != nil {
-			t.Fatal(err)
-		}
-		if want := "HAWK" + strconv.FormatInt(s.StoreCode, 10); code != want {
-			t.Errorf("店 %d 的 mer_id = %s，want %s", s.StoreID, code, want)
-		}
 		var provider, paymentStatus string
 		var transfers, copied bool
 		if err := d.Pool().QueryRow(ctx, `SELECT provider, status, transfers_active FROM payment.accounts WHERE store_id = $1`, s.StoreID).Scan(&provider, &paymentStatus, &transfers); err != nil {
@@ -688,34 +681,6 @@ func TestDevSeedLogoNeverReusesARetiredAsset(t *testing.T) {
 	}
 	if n := count(t, d, `SELECT count(*) FROM seller.stores s JOIN seller.retired_assets r ON r.ref_type = $1 AND r.ref_id = s.store_id::text AND r.asset_id = s.logo_asset_id`, media.RefTypeSellerLogo); n != 0 {
 		t.Errorf("%d 家店的目前 logo 在退場名單裡", n)
-	}
-}
-
-// PayUni 的 intent_seq 重跑不重來、只增不減：在途的綁定 job 以舊的 seq 記結果，新的註冊的 seq 一定比它大，job 會再跑一輪，不會剛好對上。
-func TestDevSeedKeepsPayUniIntentSeqMonotonic(t *testing.T) {
-	d := devSeedEnv(t)
-	seedOK(t)
-	seq := func(id int64) int64 {
-		var n int64
-		if err := d.Pool().QueryRow(context.Background(), `SELECT intent_seq FROM seller.payuni_registrations WHERE store_id = $1`, id).Scan(&n); err != nil {
-			t.Fatal(err)
-		}
-		return n
-	}
-	for _, st := range devSeedStores() {
-		mustExec(t, d, `UPDATE seller.payuni_registrations SET intent_seq = 7 WHERE store_id = $1`, st.StoreID)
-		prev := int64(7)
-		for run := 0; run < 3; run++ {
-			seedOK(t)
-			got := seq(st.StoreID)
-			if got <= prev {
-				t.Fatalf("店 %d 第 %d 次重跑後 intent_seq = %d，want 大於 %d", st.StoreID, run+1, got, prev)
-			}
-			if synced := rowJSON(t, d, `SELECT synced_seq::text FROM seller.payuni_registrations WHERE store_id = $1`, st.StoreID); synced != strconv.FormatInt(got, 10) {
-				t.Errorf("店 %d 的 synced_seq = %s，want 等於 intent_seq %d（種子的註冊已綁定）", st.StoreID, synced, got)
-			}
-			prev = got
-		}
 	}
 }
 

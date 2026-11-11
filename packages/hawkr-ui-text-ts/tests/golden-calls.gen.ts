@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCFlowStatus, sellerKYCFlowStatusAction, sellerKYCFlowStatusBannerDescription, sellerKYCFlowStatusBannerTitle, sellerKYCFlowStatusGateHeading, sellerKYCFlowStatusGateMessage, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPayUniState, sellerPaymentAccountPayoutsInactiveNote, sellerPaymentAccountStatus, sellerPaymentAccountStatusAction, sellerPaymentAccountStatusDescription, sellerRequirementCollection, sellerRevokeReason, sellerRiskGround, sellerSellerPayUniFixFieldsHeading, sellerSellerPayUniReasonHeading, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
+import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerPaymentAccountStatus, sellerPaymentAccountStatusAction, sellerPaymentAccountStatusDescription, sellerRequirementCollection, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -46,18 +46,6 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"KYC_FIELD_REAL_NAME": 1,
 	"KYC_FIELD_UNSPECIFIED": 0,
 	"KYC_FIELD_WEBSITE_URL": 12,
-	"KYC_FLOW_STATUS_APPROVED": 10,
-	"KYC_FLOW_STATUS_BINDING": 5,
-	"KYC_FLOW_STATUS_BIND_FAILED": 6,
-	"KYC_FLOW_STATUS_DRAFT": 2,
-	"KYC_FLOW_STATUS_FORWARDED": 7,
-	"KYC_FLOW_STATUS_NOT_STARTED": 1,
-	"KYC_FLOW_STATUS_PAYUNI_REJECTED": 11,
-	"KYC_FLOW_STATUS_PENDING_INFO": 9,
-	"KYC_FLOW_STATUS_REJECTED": 4,
-	"KYC_FLOW_STATUS_SUBMITTED": 3,
-	"KYC_FLOW_STATUS_UNDER_REVIEW": 8,
-	"KYC_FLOW_STATUS_UNSPECIFIED": 0,
 	"KYC_STATUS_APPROVED": 3,
 	"KYC_STATUS_CANCELLED": 5,
 	"KYC_STATUS_DRAFT": 1,
@@ -104,15 +92,6 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"PAYMENT_ACCOUNT_STATUS_NOT_CREATED": 1,
 	"PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": 2,
 	"PAYMENT_ACCOUNT_STATUS_UNSPECIFIED": 0,
-	"PAY_UNI_STATE_APPROVED": 8,
-	"PAY_UNI_STATE_CONTACT_SUPPORT": 5,
-	"PAY_UNI_STATE_FIXABLE": 3,
-	"PAY_UNI_STATE_FIX_VIA_SUPPORT": 4,
-	"PAY_UNI_STATE_PENDING_INFO": 2,
-	"PAY_UNI_STATE_RETRY_LATER": 6,
-	"PAY_UNI_STATE_REVIEWING": 1,
-	"PAY_UNI_STATE_TERMINATED": 7,
-	"PAY_UNI_STATE_UNSPECIFIED": 0,
 	"POLICY_CATEGORY_COUNTERFEIT": 6,
 	"POLICY_CATEGORY_FAKE_CERTIFICATION": 5,
 	"POLICY_CATEGORY_FOOD_SAFETY": 1,
@@ -247,24 +226,6 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	case "seller.KYCField": {
 		return sellerKYCField(num(c.value));
 	}
-	case "seller.KYCFlowStatus": {
-		return sellerKYCFlowStatus(num(c.value));
-	}
-	case "seller.KYCFlowStatus.action": {
-		return sellerKYCFlowStatusAction(num(c.value));
-	}
-	case "seller.KYCFlowStatus.banner_description": {
-		return sellerKYCFlowStatusBannerDescription(num(c.value));
-	}
-	case "seller.KYCFlowStatus.banner_title": {
-		return sellerKYCFlowStatusBannerTitle(num(c.value));
-	}
-	case "seller.KYCFlowStatus.gate_heading": {
-		return sellerKYCFlowStatusGateHeading(num(c.value));
-	}
-	case "seller.KYCFlowStatus.gate_message": {
-		return sellerKYCFlowStatusGateMessage(num(c.value), { subject: p.subject as string });
-	}
 	case "seller.KYCStatus": {
 		return sellerKYCStatus(num(c.value));
 	}
@@ -347,9 +308,6 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	case "seller.OnboardingTaskId.panel_title": {
 		return sellerOnboardingTaskIdPanelTitle(num(c.value));
 	}
-	case "seller.PayUniState": {
-		return sellerPayUniState(num(c.value));
-	}
 	case "seller.PaymentAccount.payouts_inactive_note": {
 		return sellerPaymentAccountPayoutsInactiveNote();
 	}
@@ -370,12 +328,6 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "seller.RiskGround": {
 		return sellerRiskGround(num(c.value));
-	}
-	case "seller.SellerPayUni.fix_fields_heading": {
-		return sellerSellerPayUniFixFieldsHeading();
-	}
-	case "seller.SellerPayUni.reason_heading": {
-		return sellerSellerPayUniReasonHeading();
 	}
 	case "seller.SellerRequirement": {
 		return sellerSellerRequirement(num(c.value));

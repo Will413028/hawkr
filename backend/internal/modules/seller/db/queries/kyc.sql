@@ -41,8 +41,8 @@ VALUES (
 RETURNING *;
 
 -- name: UpdateKYCDraft :one
--- 寫入已在列鎖內合併的草稿欄位，並讓被退回的申請回到 DRAFT；版本不符、或狀態不是 DRAFT／REJECTED／APPROVED 時 0 列
--- （APPROVED 只在 PayUni 拒絕、能重新綁定時由呼叫方在鎖內放行，見 kyc.editable）。
+-- 寫入已在列鎖內合併的草稿欄位，並讓被退回的申請回到 DRAFT；版本不符、或狀態不是 DRAFT／REJECTED 時 0 列
+-- （審核中與已核准的申請不能編輯，規則在 model.CanEditKYC）。
 -- submitted_at 保留（歷史）。
 UPDATE seller.kyc_applications
 SET status = 'DRAFT',
@@ -77,7 +77,7 @@ SET status = 'DRAFT',
     rep_id_card_hash_key = sqlc.narg(rep_id_card_hash_key),
     updated_at = sqlc.arg(now),
     version = version + 1
-WHERE application_id = sqlc.arg(application_id) AND version = sqlc.arg(expected_version) AND status IN ('DRAFT', 'REJECTED', 'APPROVED')
+WHERE application_id = sqlc.arg(application_id) AND version = sqlc.arg(expected_version) AND status IN ('DRAFT', 'REJECTED')
 RETURNING *;
 
 -- name: TransitionKYCApplication :one

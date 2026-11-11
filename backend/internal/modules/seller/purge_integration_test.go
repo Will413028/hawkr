@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	pu "github.com/Will413028/hawkr/backend/internal/platform/payuni"
-
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -27,18 +25,9 @@ var (
 		"application_id", "store_id", "status", "version", "seller_type", "product_type",
 		"submitted_at", "submission_seq", "decided_at", "created_at", "updated_at", "pii_purged_at",
 	}
-	registrationKept = []string{
-		"store_id", "mer_id", "application_id", "bind_status", "bind_error_code", "bind_attempts", "bound_at", "intent_seq",
-		"synced_seq", "sync_error_code", "resubmitted_at", "mer_status", "member_status", "credit_status", "applepay_status",
-		"googlepay_status", "atm_status", "outcome", "status_observed_at", "status_checked_at", "created_at", "updated_at", "pii_purged_at",
-	}
-	observationKept = []string{
-		"observation_id", "store_id", "source", "event_key", "mer_status", "member_status", "credit_status", "applepay_status",
-		"googlepay_status", "atm_status", "executed_at", "received_at",
-	}
 )
 
-// loadedStore 建一間把每個個資欄位都填滿的店：profile、KYC（個人或企業，含證件）、核准、PayUni 綁定、輪詢與 webhook 的觀測。
+// loadedStore 建一間把每個個資欄位都填滿的店：profile、KYC（個人或企業，含證件）、核准。
 func (f *fixture) loadedStore(t *testing.T, company bool, idCard, bank string) (int64, Store) {
 	t.Helper()
 	ctx := context.Background()
@@ -59,12 +48,6 @@ func (f *fixture) loadedStore(t *testing.T, company bool, idCard, bank string) (
 	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
 	must(t, approve(f, sub))
-	f.sync(t, s.StoreID)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "5", Reason: "補件：身分證影本模糊", Credit: "1"}
-	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourcePoll))
-	n := notification(FormatPayUniMerID(s.StoreCode), "9", t1300)
-	n.MerStatusNote = "備註：負責人電話有誤"
-	must(t, f.deliver(t, n))
 	return accountID, s
 }
 
@@ -108,7 +91,7 @@ func (f *fixture) retired(t *testing.T, storeID int64) bool {
 	return f.count(t, "SELECT count(*) FROM seller.stores WHERE store_id=$1 AND retired_at IS NOT NULL", storeID) == 1
 }
 
-// 清理涵蓋每一個個資欄位：店家、KYC（個人與企業各一）、PayUni 註冊與觀測、證件列。清理之前先確認這些欄位真的有值，免得
+// 清理涵蓋每一個個資欄位：店家、KYC（個人與企業各一）、證件列。清理之前先確認這些欄位真的有值，免得
 // 測試空轉。拿掉任何一個欄位的清理，對應的 NULL 斷言與資料庫的 *_purged_check 都會失敗。
 func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 	t.Parallel()
@@ -139,13 +122,6 @@ func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 		if app["real_name"] == nil || app["bank_account_enc"] == nil || app["id_card_hash"] == nil && app["rep_id_card_hash"] == nil {
 			t.Fatalf("KYC 沒有填滿：%v", nonNull(app, kycKept))
 		}
-		reg := f.row(t, "payuni_registrations", "store_id", st.store.StoreID)
-		if reg["reason"] == nil {
-			t.Fatalf("PayUni 註冊沒有填滿：%v", nonNull(reg, registrationKept))
-		}
-		if f.count(t, "SELECT count(*) FROM seller.payuni_observations WHERE store_id=$1 AND reason IS NOT NULL", st.store.StoreID) == 0 {
-			t.Fatal("沒有帶 reason 的觀測")
-		}
 		if f.count(t, "SELECT count(*) FROM seller.kyc_documents WHERE application_id=$1::uuid", st.app) < 3 {
 			t.Fatal("沒有證件")
 		}
@@ -170,25 +146,10 @@ func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 		if cols := nonNull(f.row(t, "kyc_applications", "application_id", st.app), kycKept); len(cols) != 0 {
 			t.Errorf("kyc_applications 沒清：%v", cols)
 		}
-		if cols := nonNull(f.row(t, "payuni_registrations", "store_id", st.store.StoreID), registrationKept); len(cols) != 0 {
-			t.Errorf("payuni_registrations 沒清：%v", cols)
-		}
-		if f.count(t, "SELECT count(*) FROM seller.payuni_observations WHERE store_id=$1", st.store.StoreID) == 0 {
-			t.Error("觀測紀錄不該被刪（狀態碼與時間是事實）")
-		}
-		for _, o := range f.observations(t, st.store.StoreID) {
-			if cols := nonNull(o, observationKept); len(cols) != 0 {
-				t.Errorf("payuni_observations 沒清：%v", cols)
-			}
-		}
 		if f.count(t, "SELECT count(*) FROM seller.kyc_documents WHERE application_id=$1::uuid", st.app) != 0 {
 			t.Error("證件列沒刪")
 		}
-		// 保留的事實：狀態碼與流程狀態、審核紀錄。
-		reg := f.row(t, "payuni_registrations", "store_id", st.store.StoreID)
-		if reg["mer_status"] == nil || reg["outcome"] == "NONE" || reg["bind_status"] != "BOUND" {
-			t.Errorf("PayUni 的狀態碼被清掉：%v", reg)
-		}
+		// 保留的事實：審核紀錄。
 		if f.count(t, "SELECT count(*) FROM seller.kyc_reviews WHERE application_id=$1::uuid", st.app) < 2 {
 			t.Error("審核紀錄被清掉")
 		}
@@ -210,23 +171,6 @@ func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 	if got.Status != Closed || got.StoreName != "" || got.Description != nil || got.ContactPhone != nil || got.AddressDetail != nil {
 		t.Fatalf("store=%+v", got)
 	}
-}
-
-func (f *fixture) observations(t *testing.T, storeID int64) []map[string]any {
-	t.Helper()
-	rows, err := f.db.Conn(context.Background()).Query(context.Background(), "SELECT to_jsonb(o) FROM seller.payuni_observations o WHERE store_id=$1", storeID)
-	must(t, err)
-	defer rows.Close()
-	var out []map[string]any
-	for rows.Next() {
-		var raw []byte
-		must(t, rows.Scan(&raw))
-		var m map[string]any
-		must(t, json.Unmarshal(raw, &m))
-		out = append(out, m)
-	}
-	must(t, rows.Err())
-	return out
 }
 
 // 只清已關閉、關閉嚴格超過保留期（StoreRetention）的 stint：營業中的、還沒滿保留期的、剛好滿保留期的都不動；差一秒不動、晚一秒才清。
@@ -286,9 +230,6 @@ func TestPurgeOnlyTouchesStintsClosedForMoreThanTheStoreRetention(t *testing.T) 
 	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.kyc_applications SET pii_purged_at=$1 WHERE store_id=$2", f.now, openStore.StoreID); err == nil {
 		t.Error("KYC 標記清理卻沒有清欄位")
 	}
-	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.payuni_registrations SET pii_purged_at=$1 WHERE store_id=$2", f.now, openStore.StoreID); err == nil {
-		t.Error("PayUni 標記清理卻沒有清欄位")
-	}
 }
 
 // 措施的身分快照屬於措施：來源的 KYC 被清理之後它還在，同一個身分仍然不能在別的帳號通過認證；處分結束才刪。
@@ -330,8 +271,8 @@ func TestSanctionSnapshotSurvivesThePurgeOfItsSourceKYC(t *testing.T) {
 	}
 }
 
-// 重跑是 no-op：已清理的列不再是候選，清理時間不變；關店之後才到的 PayUni 通知不會把 reason 寫回去。
-func TestPurgeIsIdempotentAndLateNotificationsStayClean(t *testing.T) {
+// 重跑是 no-op：已清理的列不再是候選，清理時間不變。
+func TestPurgeIsIdempotent(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
@@ -349,17 +290,6 @@ func TestPurgeIsIdempotentAndLateNotificationsStayClean(t *testing.T) {
 	}
 	if f.row(t, "stores", "store_id", s.StoreID)["pii_purged_at"] != stamp {
 		t.Fatal("重跑改了清理時間")
-	}
-	late := notification(FormatPayUniMerID(s.StoreCode), "1", t1500)
-	late.MerStatusNote = "關店之後的備註"
-	must(t, f.deliver(t, late))
-	if f.row(t, "payuni_registrations", "store_id", s.StoreID)["reason"] != nil {
-		t.Fatal("關店之後的通知把 reason 寫回註冊列")
-	}
-	for _, o := range f.observations(t, s.StoreID) {
-		if o["reason"] != nil {
-			t.Fatalf("關店之後的觀測帶著 reason：%v", o)
-		}
 	}
 }
 

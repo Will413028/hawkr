@@ -252,7 +252,7 @@ class SellerRequirement extends $pb.ProtobufEnum {
 }
 
 /// StoreField 是店家上的一個欄位，值與 Store 的欄位一對一。送出 KYC 之前還缺的店家欄位
-/// （KYCApplication.missing_store_fields）與 PayUni 問題要賣家補的店家欄位（PayUniProblem.store_fields）都用這一套。
+/// （KYCApplication.missing_store_fields）都用這一套。
 class StoreField extends $pb.ProtobufEnum {
   static const StoreField STORE_FIELD_UNSPECIFIED =
       StoreField._(0, _omitEnumNames ? '' : 'STORE_FIELD_UNSPECIFIED');
@@ -478,7 +478,7 @@ class OnboardingAction extends $pb.ProtobufEnum {
   const OnboardingAction._(super.value, super.name);
 }
 
-/// KYCStatus 是申請的人工決定；PayUni 的綁定結果不在這條軸上（見 KYCFlow）。
+/// KYCStatus 是申請的人工決定。
 class KYCStatus extends $pb.ProtobufEnum {
   static const KYCStatus KYC_STATUS_UNSPECIFIED =
       KYCStatus._(0, _omitEnumNames ? '' : 'KYC_STATUS_UNSPECIFIED');
@@ -521,8 +521,8 @@ class KYCStatus extends $pb.ProtobufEnum {
 }
 
 /// KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：
-/// KYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的
-/// 欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。
+/// KYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的
+/// 欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。
 class KYCField extends $pb.ProtobufEnum {
   static const KYCField KYC_FIELD_UNSPECIFIED =
       KYCField._(0, _omitEnumNames ? '' : 'KYC_FIELD_UNSPECIFIED');
@@ -650,218 +650,6 @@ class KYCIssueCode extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const KYCIssueCode._(super.value, super.name);
-}
-
-/// KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。
-class KYCFlowStatus extends $pb.ProtobufEnum {
-  static const KYCFlowStatus KYC_FLOW_STATUS_UNSPECIFIED =
-      KYCFlowStatus._(0, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_UNSPECIFIED');
-
-  /// 沒有申請，或申請已取消。
-  static const KYCFlowStatus KYC_FLOW_STATUS_NOT_STARTED =
-      KYCFlowStatus._(1, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_NOT_STARTED');
-  static const KYCFlowStatus KYC_FLOW_STATUS_DRAFT =
-      KYCFlowStatus._(2, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_DRAFT');
-  static const KYCFlowStatus KYC_FLOW_STATUS_SUBMITTED =
-      KYCFlowStatus._(3, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_SUBMITTED');
-  static const KYCFlowStatus KYC_FLOW_STATUS_REJECTED =
-      KYCFlowStatus._(4, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_REJECTED');
-
-  /// 管理員核准，正在向 PayUni 註冊。
-  static const KYCFlowStatus KYC_FLOW_STATUS_BINDING =
-      KYCFlowStatus._(5, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_BINDING');
-
-  /// 向 PayUni 註冊失敗，等管理員處理。
-  static const KYCFlowStatus KYC_FLOW_STATUS_BIND_FAILED =
-      KYCFlowStatus._(6, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_BIND_FAILED');
-
-  /// 已向 PayUni 註冊，還沒有審核結果。
-  static const KYCFlowStatus KYC_FLOW_STATUS_FORWARDED =
-      KYCFlowStatus._(7, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_FORWARDED');
-  static const KYCFlowStatus KYC_FLOW_STATUS_UNDER_REVIEW =
-      KYCFlowStatus._(8, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_UNDER_REVIEW');
-  static const KYCFlowStatus KYC_FLOW_STATUS_PENDING_INFO =
-      KYCFlowStatus._(9, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_PENDING_INFO');
-
-  /// PayUni 核准，可以收款。
-  static const KYCFlowStatus KYC_FLOW_STATUS_APPROVED =
-      KYCFlowStatus._(10, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_APPROVED');
-  static const KYCFlowStatus KYC_FLOW_STATUS_PAYUNI_REJECTED = KYCFlowStatus._(
-      11, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_PAYUNI_REJECTED');
-
-  static const $core.List<KYCFlowStatus> values = <KYCFlowStatus>[
-    KYC_FLOW_STATUS_UNSPECIFIED,
-    KYC_FLOW_STATUS_NOT_STARTED,
-    KYC_FLOW_STATUS_DRAFT,
-    KYC_FLOW_STATUS_SUBMITTED,
-    KYC_FLOW_STATUS_REJECTED,
-    KYC_FLOW_STATUS_BINDING,
-    KYC_FLOW_STATUS_BIND_FAILED,
-    KYC_FLOW_STATUS_FORWARDED,
-    KYC_FLOW_STATUS_UNDER_REVIEW,
-    KYC_FLOW_STATUS_PENDING_INFO,
-    KYC_FLOW_STATUS_APPROVED,
-    KYC_FLOW_STATUS_PAYUNI_REJECTED,
-  ];
-
-  static final $core.List<KYCFlowStatus?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 11);
-  static KYCFlowStatus? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const KYCFlowStatus._(super.value, super.name);
-}
-
-/// PayUniState 是賣家看到的 PayUni 收款狀態，一個值對應賣家的一種動作。伺服器由申請與 PayUni 註冊推導。
-class PayUniState extends $pb.ProtobufEnum {
-  static const PayUniState PAY_UNI_STATE_UNSPECIFIED =
-      PayUniState._(0, _omitEnumNames ? '' : 'PAY_UNI_STATE_UNSPECIFIED');
-
-  /// 綁定中或 PayUni 審核中，賣家等結果。
-  static const PayUniState PAY_UNI_STATE_REVIEWING =
-      PayUniState._(1, _omitEnumNames ? '' : 'PAY_UNI_STATE_REVIEWING');
-
-  /// PayUni 要求補件，賣家依 PayUni 的通知信處理。
-  static const PayUniState PAY_UNI_STATE_PENDING_INFO =
-      PayUniState._(2, _omitEnumNames ? '' : 'PAY_UNI_STATE_PENDING_INFO');
-
-  /// 申請的資料有問題，賣家修正申請後自己重新送出。
-  static const PayUniState PAY_UNI_STATE_FIXABLE =
-      PayUniState._(3, _omitEnumNames ? '' : 'PAY_UNI_STATE_FIXABLE');
-
-  /// 店家設定的資料有問題，賣家修正後由平台重新處理，不能自己重新送出。
-  static const PayUniState PAY_UNI_STATE_FIX_VIA_SUPPORT =
-      PayUniState._(4, _omitEnumNames ? '' : 'PAY_UNI_STATE_FIX_VIA_SUPPORT');
-
-  /// 沒有賣家能修正的資料，賣家要聯絡客服，不能自己重新送出。
-  static const PayUniState PAY_UNI_STATE_CONTACT_SUPPORT =
-      PayUniState._(5, _omitEnumNames ? '' : 'PAY_UNI_STATE_CONTACT_SUPPORT');
-
-  /// PayUni 暫時無法處理，等平台重新送出。
-  static const PayUniState PAY_UNI_STATE_RETRY_LATER =
-      PayUniState._(6, _omitEnumNames ? '' : 'PAY_UNI_STATE_RETRY_LATER');
-
-  /// PayUni 端的商店已是終止狀態，同一個店家無法再綁定。
-  static const PayUniState PAY_UNI_STATE_TERMINATED =
-      PayUniState._(7, _omitEnumNames ? '' : 'PAY_UNI_STATE_TERMINATED');
-
-  /// 可以收款。
-  static const PayUniState PAY_UNI_STATE_APPROVED =
-      PayUniState._(8, _omitEnumNames ? '' : 'PAY_UNI_STATE_APPROVED');
-
-  static const $core.List<PayUniState> values = <PayUniState>[
-    PAY_UNI_STATE_UNSPECIFIED,
-    PAY_UNI_STATE_REVIEWING,
-    PAY_UNI_STATE_PENDING_INFO,
-    PAY_UNI_STATE_FIXABLE,
-    PAY_UNI_STATE_FIX_VIA_SUPPORT,
-    PAY_UNI_STATE_CONTACT_SUPPORT,
-    PAY_UNI_STATE_RETRY_LATER,
-    PAY_UNI_STATE_TERMINATED,
-    PAY_UNI_STATE_APPROVED,
-  ];
-
-  static final $core.List<PayUniState?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 8);
-  static PayUniState? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const PayUniState._(super.value, super.name);
-}
-
-/// KYCResubmitUnavailableReason 是 SaveKYCDraft 與 SubmitKYC 此刻不能做的原因（KYCResubmitUnavailability.reason）。
-class KYCResubmitUnavailableReason extends $pb.ProtobufEnum {
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_UNSPECIFIED =
-      KYCResubmitUnavailableReason._(0,
-          _omitEnumNames ? '' : 'KYC_RESUBMIT_UNAVAILABLE_REASON_UNSPECIFIED');
-
-  /// 申請送審中，可以先取消再修改。
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW_CANCELABLE =
-      KYCResubmitUnavailableReason._(
-          1,
-          _omitEnumNames
-              ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW_CANCELABLE');
-
-  /// 申請送審中，PayUni 已收下店家，不能取消。
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW =
-      KYCResubmitUnavailableReason._(2,
-          _omitEnumNames ? '' : 'KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW');
-
-  /// 以下對應 PayUniState 裡不能重送的值。
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_REVIEWING =
-      KYCResubmitUnavailableReason._(
-          3,
-          _omitEnumNames
-              ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_REVIEWING');
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_PENDING_INFO =
-      KYCResubmitUnavailableReason._(
-          4,
-          _omitEnumNames
-              ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_PENDING_INFO');
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_FIX_VIA_SUPPORT =
-      KYCResubmitUnavailableReason._(
-          5,
-          _omitEnumNames
-              ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_FIX_VIA_SUPPORT');
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_CONTACT_SUPPORT =
-      KYCResubmitUnavailableReason._(
-          6,
-          _omitEnumNames
-              ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_CONTACT_SUPPORT');
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_RETRY_LATER =
-      KYCResubmitUnavailableReason._(
-          7,
-          _omitEnumNames
-              ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_RETRY_LATER');
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_TERMINATED =
-      KYCResubmitUnavailableReason._(
-          8,
-          _omitEnumNames
-              ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_TERMINATED');
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_APPROVED =
-      KYCResubmitUnavailableReason._(
-          9,
-          _omitEnumNames
-              ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_APPROVED');
-
-  static const $core.List<KYCResubmitUnavailableReason> values =
-      <KYCResubmitUnavailableReason>[
-    KYC_RESUBMIT_UNAVAILABLE_REASON_UNSPECIFIED,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW_CANCELABLE,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_REVIEWING,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_PENDING_INFO,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_FIX_VIA_SUPPORT,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_CONTACT_SUPPORT,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_RETRY_LATER,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_TERMINATED,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_APPROVED,
-  ];
-
-  static final $core.List<KYCResubmitUnavailableReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 9);
-  static KYCResubmitUnavailableReason? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const KYCResubmitUnavailableReason._(super.value, super.name);
 }
 
 /// PaymentAccountStatus 是收款帳戶的中立狀態，由金流商的轉帳能力推導（不是金流商自己的狀態名）。

@@ -145,13 +145,13 @@ func TestEveryPolicyCategoryHasACatalogName(t *testing.T) {
 	}
 }
 
-// 變體依受眾 omit：APPROVED 沒有 action；CLOSED 的請求狀態標籤只有 staff 有。
+// 變體依受眾 omit：ENABLED 沒有 action；CLOSED 的請求狀態標籤只有 staff 有。
 func TestOmitByAudience(t *testing.T) {
-	if got, ok := For(ZhTW).SellerKYCFlowStatusAction("APPROVED"); ok {
-		t.Errorf("APPROVED 沒有 action，得到 %q", got)
+	if got, ok := For(ZhTW).SellerPaymentAccountStatusAction("ENABLED"); ok {
+		t.Errorf("ENABLED 沒有 action，得到 %q", got)
 	}
-	if got, ok := For(ZhTW).SellerKYCFlowStatusAction("SUBMITTED"); !ok || got != "查看進度" {
-		t.Errorf("SUBMITTED action = %q, %v", got, ok)
+	if got, ok := For(ZhTW).SellerPaymentAccountStatusAction("DISABLED"); !ok || got != "聯絡客服" {
+		t.Errorf("DISABLED action = %q, %v", got, ok)
 	}
 	if got, ok := For(ZhTW).SellerMeasureRequestStateWithKind("CLOSED", "APPEAL"); ok {
 		t.Errorf("賣家端不顯示 CLOSED，得到 %q", got)
@@ -163,9 +163,9 @@ func TestOmitByAudience(t *testing.T) {
 
 // staff 的名詞與預設受眾不同；沒有 staff 的 enum，後台用預設受眾。
 func TestStaffAudience(t *testing.T) {
-	d, _ := For(ZhTW).SellerKYCFlowStatus("SUBMITTED")
-	s, _ := Staff().SellerKYCFlowStatus("SUBMITTED")
-	if d != "平台審核中" || s != "待審核" {
+	d, _ := For(ZhTW).SellerKYCStatus("SUBMITTED")
+	s, _ := Staff().SellerKYCStatus("SUBMITTED")
+	if d != "審核中" || s != "待審核" {
 		t.Errorf("default=%q staff=%q", d, s)
 	}
 	if got, _ := Staff().SellerMeasureKind("WARNING"); got != "警告" {

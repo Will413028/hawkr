@@ -14,8 +14,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-// KYCStatus 是 KYC 申請的狀態：只記人工決定（ADR 2026-10-19-seller-kyc-payuni-consolidated），PayUni 的綁定結果不在
-// 這條軸上。
+// KYCStatus 是 KYC 申請的狀態：只記人工決定（ADR 2026-10-19-seller-kyc-payuni-consolidated）。
 type KYCStatus string
 
 const (
@@ -250,18 +249,12 @@ type KYCApplication struct {
 	CompanyRegisterDate                                   *string
 	CompanyTownCode, CompanyAddressDetail, CompanyPhone   *string
 	RepIDCardNoMasked                                     *string
-	// MissingFields 是送出之前還缺的欄位（KYCFieldNames 的路徑，依它的順序），與送出檢查的是同一份規則；Documents 與 Flow
-	// 一樣只在讀單筆時帶。
+	// MissingFields 是送出之前還缺的欄位（KYCFieldNames 的路徑，依它的順序），與送出檢查的是同一份規則。
 	MissingFields []string
 	// MissingStoreFields 是送出之前還缺的店家欄位（StoreFieldNames 的路徑，依它的順序），與送出檢查的是同一份規則。
 	MissingStoreFields []string
-	// Documents 與 Flow 只在讀單筆時帶（清單不帶，Flow 為 nil）。Flow 是 cert 軸與 PayUni 軸合成的流程狀態。
+	// Documents 只在讀單筆時帶（清單不帶）。
 	Documents []KYCDocument
-	Flow      *KYCFlow
-	// PayUni 與 ResubmitReasons 只在賣家讀自己的申請時帶（後台的檢視不帶）：PayUni 是賣家看到的 PayUni 狀態（SellerPayUniOf，沒有時
-	// nil）；ResubmitReasons 是 Flow.CanResubmit 為假時的原因（ResubmitUnavailableReasons），為真時是空的。
-	PayUni          *SellerPayUni
-	ResubmitReasons []KYCResubmitUnavailableReason
 	// LastRejection 是賣家要處理的那次退回（讀單筆時才帶）：最近一次審核紀錄是退回、之後還沒重新送出、核准或取消；賣家把每一項
 	// 問題都處理完、還沒重送時仍在。其他時候是 nil。
 	LastRejection *KYCRejection

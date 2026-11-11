@@ -218,8 +218,7 @@ extension type SellerAppServiceClient (connect.Transport _transport) {
   /// 店家還沒有申請時，不帶 etag 的呼叫建立它（subject 必須設定其中一支）；已經有申請時 etag 必填，沒帶 etag 回
   /// already_exists、與目前的版本不符回 aborted，兩者的 ErrorInfo.reason 都是 VERSION_CONFLICT（client 的處理相同：
   /// 保留輸入、顯示最新版本）。被退回的申請在這裡回到草稿重新編輯。全部欄位先驗證才寫入，任何一欄不合法都不會寫入。
-  /// 送出（SubmitKYC）才檢查必填欄位與證件是否齊全。流程狀態 can_resubmit 為 false 時回 failed_precondition，訊息是
-  /// KYCFlow.resubmit_unavailabilities 的第一句。
+  /// 送出（SubmitKYC）才檢查必填欄位與證件是否齊全。只有草稿與被退回的申請能儲存；審核中與已核准的回 failed_precondition。
   Future<hawkrsellerv1alpha1seller.SaveKYCDraftResponse> saveKYCDraft(
     hawkrsellerv1alpha1seller.SaveKYCDraftRequest input, {
     connect.Headers? headers,
@@ -256,8 +255,8 @@ extension type SellerAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// SubmitKYC 送出申請給管理員審核。草稿，以及流程狀態 can_resubmit 為 true 的申請（被退回的、PayUni 拒絕或綁定失敗而且賣家能自己修正的）都能直接送出，
-  /// 不必先儲存；can_resubmit 為 false 的狀態回 failed_precondition，訊息是 KYCFlow.resubmit_unavailabilities 的第一句。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
+  /// SubmitKYC 送出申請給管理員審核。草稿與被退回的申請都能直接送出，
+  /// 不必先儲存；審核中與已核准的申請回 failed_precondition。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
   /// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（real_name、id_card_front、business.tax_id……，與 KYCField 一對一）。申請本身齊全之後，
   /// 店家的必填資料（地址、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
   /// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。帳號沒有聯絡信箱（IdentityAppService.GetContactEmail 沒有回信箱）時回

@@ -28,7 +28,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
-	pu "github.com/Will413028/hawkr/backend/internal/platform/payuni"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
@@ -61,15 +60,6 @@ type noProducts struct{}
 
 func (noProducts) StoreIDs(context.Context, []int64) (map[int64]int64, error) {
 	return map[int64]int64{}, nil
-}
-
-// approvingPayUni 對綁定、同步與查詢都回成功，狀態是核准。
-type approvingPayUni struct{}
-
-func (approvingPayUni) BindMerchant(context.Context, pu.BindMerchantRequest) error     { return nil }
-func (approvingPayUni) UpdateMerchant(context.Context, pu.UpdateMerchantRequest) error { return nil }
-func (approvingPayUni) MerchantStatus(_ context.Context, merID string) (pu.MerchantStatus, error) {
-	return pu.MerchantStatus{MerID: merID, MerStatus: "1", MemberStatus: "1"}, nil
 }
 
 type fakeRatings struct {
@@ -157,7 +147,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	})
 	m = seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: noJobs{}, Identity: id, Media: fake, Orders: noOrders{}, KYCKeys: keys, KYCMAC: mac,
-		PayUni: approvingPayUni{}, Payment: payments, ProductStores: noProducts{}, Registry: noRegistry{}, StorefrontBaseURL: "https://store.example.invalid",
+		Payment: payments, ProductStores: noProducts{}, Registry: noRegistry{}, StorefrontBaseURL: "https://store.example.invalid",
 		Now: func() time.Time { return now }, Logger: log,
 	})
 	events.Subscribe(bus, m.OnPayoutAccountChanged)
@@ -203,9 +193,6 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		must(err)
 		_, err = m.ApproveKYC(ctx, seller.ApproveKYCInput{ApplicationID: sub.ID, ExpectedVersion: sub.Version, AdminID: 9})
 		must(err)
-		_, err = m.SyncPayUni(ctx, s.StoreID, false)
-		must(err)
-		must(m.PollPayUni(ctx, s.StoreID, seller.PayUniSourcePoll))
 		must(payments.EnsureAccount(ctx, s.StoreID, false))
 		_, err = payments.SyncAccount(ctx, s.StoreID)
 		must(err)

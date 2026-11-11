@@ -3,7 +3,7 @@
 // 現在讀出來的可曝光與最後公告的值比對，不同時更新 store_exposures 並在呼叫方的 transaction 內發 StoreExposureChanged
 // （ADR 2026-10-05-store-exposure-to-legacy 決策 1）。
 //
-// 它在 payuni 之下（payuni 的寫入也要公告），KYC 流程的推導（stint.FlowStatusesOf）放在兩者共用的 stint。
+// 它在 payuni 之下（payuni 的寫入也要公告）。
 package exposure
 
 import (
@@ -33,21 +33,6 @@ func New(d Deps) *Service {
 		panic("seller/exposure: missing dependency")
 	}
 	return &Service{d: d}
-}
-
-// KYCFlows 讀取店家的 KYC 流程（沒有申請的店家不在結果裡：零值的流程不是 APPROVED），給後台清單顯示流程狀態；曝光與能力的
-// 開通條件不讀它（model.Conditions.OnboardingComplete() 是 seller.store_requirement_flags 的 kyc_approved 與 transfers_active 的 AND：申請已核准且收款帳戶 transfers_active；這裡的流程狀態仍以 PayUni 推導）。
-// 固定兩次查詢（KYC 申請、PayUni 註冊），與 ID 數量無關。
-func (s *Service) KYCFlows(ctx context.Context, q *store.Queries, storeIDs []int64) (map[int64]model.KYCFlowStatus, error) {
-	applications, err := q.CurrentKYCStatuses(ctx, storeIDs)
-	if err != nil {
-		return nil, err
-	}
-	statuses := make(map[int64]model.KYCStatus, len(applications))
-	for _, a := range applications {
-		statuses[a.StoreID] = model.KYCStatus(a.Status)
-	}
-	return stint.FlowStatusesOf(ctx, q, statuses)
 }
 
 // Verdict 是一個店家（帶同一刻的停權與條件）與 seller.pub_exposable_stores 對它的判定。

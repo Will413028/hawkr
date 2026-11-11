@@ -89,59 +89,6 @@
       "KYC_FIELD_REAL_NAME": "真實姓名",
       "KYC_FIELD_WEBSITE_URL": "官方網站"
     },
-    "KYCFlowStatus": {
-      "KYC_FLOW_STATUS_APPROVED": "已通過",
-      "KYC_FLOW_STATUS_BINDING": "PayUni 審核中",
-      "KYC_FLOW_STATUS_BIND_FAILED": "PayUni 建檔失敗，處理中",
-      "KYC_FLOW_STATUS_DRAFT": "填寫中",
-      "KYC_FLOW_STATUS_FORWARDED": "PayUni 審核中",
-      "KYC_FLOW_STATUS_NOT_STARTED": "待認證",
-      "KYC_FLOW_STATUS_PAYUNI_REJECTED": "PayUni 審核未通過",
-      "KYC_FLOW_STATUS_PENDING_INFO": "需補件",
-      "KYC_FLOW_STATUS_REJECTED": "未通過",
-      "KYC_FLOW_STATUS_SUBMITTED": "平台審核中",
-      "KYC_FLOW_STATUS_UNDER_REVIEW": "PayUni 審核中",
-      "action": {
-        "KYC_FLOW_STATUS_BINDING": "查看進度",
-        "KYC_FLOW_STATUS_BIND_FAILED": "查看進度",
-        "KYC_FLOW_STATUS_DRAFT": "開始認證",
-        "KYC_FLOW_STATUS_FORWARDED": "查看進度",
-        "KYC_FLOW_STATUS_NOT_STARTED": "開始認證",
-        "KYC_FLOW_STATUS_PAYUNI_REJECTED": "前往補件",
-        "KYC_FLOW_STATUS_PENDING_INFO": "前往補件",
-        "KYC_FLOW_STATUS_REJECTED": "前往補件",
-        "KYC_FLOW_STATUS_SUBMITTED": "查看進度",
-        "KYC_FLOW_STATUS_UNDER_REVIEW": "查看進度"
-      },
-      "banner_description": {
-        "KYC_FLOW_STATUS_APPROVED": "可開始正式收款、提領與配送設定。",
-        "KYC_FLOW_STATUS_DRAFT": "完成認證後才能正式收款、提領與配送設定。",
-        "KYC_FLOW_STATUS_NOT_STARTED": "完成認證後才能正式收款、提領與配送設定。",
-        "KYC_FLOW_STATUS_REJECTED": "請查看退件原因並編輯後重新送出。",
-        "KYC_FLOW_STATUS_SUBMITTED": "審核通過後將自動送出至 PayUni 進行金流審核。"
-      },
-      "banner_title": {
-        "KYC_FLOW_STATUS_APPROVED": "商家認證已通過",
-        "KYC_FLOW_STATUS_DRAFT": "尚未開始商家認證",
-        "KYC_FLOW_STATUS_NOT_STARTED": "尚未開始商家認證",
-        "KYC_FLOW_STATUS_REJECTED": "認證未通過",
-        "KYC_FLOW_STATUS_SUBMITTED": "平台審核中"
-      },
-      "gate_heading": {
-        "KYC_FLOW_STATUS_APPROVED": "尚未通過商家認證",
-        "KYC_FLOW_STATUS_DRAFT": "尚未通過商家認證",
-        "KYC_FLOW_STATUS_NOT_STARTED": "尚未通過商家認證",
-        "KYC_FLOW_STATUS_REJECTED": "商家認證需要補件",
-        "KYC_FLOW_STATUS_SUBMITTED": "商家認證審核中"
-      },
-      "gate_message": {
-        "KYC_FLOW_STATUS_APPROVED": "請先完成商家認證，才能{subject}。",
-        "KYC_FLOW_STATUS_DRAFT": "請先完成商家認證，才能{subject}。",
-        "KYC_FLOW_STATUS_NOT_STARTED": "請先完成商家認證，才能{subject}。",
-        "KYC_FLOW_STATUS_REJECTED": "認證未通過，請修改資料後重新送審。",
-        "KYC_FLOW_STATUS_SUBMITTED": "你的商家認證平台審核中，通過後將自動送出至 PayUni 進行金流審核，完成後就能{subject}。"
-      }
-    },
     "KYCStatus": {
       "KYC_STATUS_APPROVED": "Approved",
       "KYC_STATUS_CANCELLED": "Cancelled",
@@ -231,16 +178,6 @@
         "ONBOARDING_TASK_ID_PROFILE": "Complete your store profile"
       }
     },
-    "PayUniState": {
-      "PAY_UNI_STATE_APPROVED": "PayUni 收款已啟用",
-      "PAY_UNI_STATE_CONTACT_SUPPORT": "PayUni 申請未通過",
-      "PAY_UNI_STATE_FIXABLE": "PayUni 需要補件",
-      "PAY_UNI_STATE_FIX_VIA_SUPPORT": "PayUni 需要補件",
-      "PAY_UNI_STATE_PENDING_INFO": "PayUni 需要補件",
-      "PAY_UNI_STATE_RETRY_LATER": "PayUni 暫時無法處理",
-      "PAY_UNI_STATE_REVIEWING": "PayUni 審核中",
-      "PAY_UNI_STATE_TERMINATED": "PayUni 收款帳戶已終止"
-    },
     "PaymentAccount": {
       "payouts_inactive_note": "Payouts to your bank account are not enabled yet. The payment provider may ask you for more information."
     },
@@ -285,10 +222,6 @@
       "RISK_GROUND_PERSONAL_DATA": "個人資料",
       "RISK_GROUND_SECURITY": "資安",
       "RISK_GROUND_TRANSACTION": "交易風險"
-    },
-    "SellerPayUni": {
-      "fix_fields_heading": "請修正以下資料",
-      "reason_heading": "PayUni 的審核意見"
     },
     "SellerRequirement": {
       "SELLER_REQUIREMENT_LOGO": "logo",

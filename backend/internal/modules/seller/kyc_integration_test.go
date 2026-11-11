@@ -1787,7 +1787,7 @@ func TestApproveAndRejectReturnTheAdminViewIncludingTheirOwnReview(t *testing.T)
 	approved, err := f.module.ApproveKYC(ctx, ApproveKYCInput{ApplicationID: a.ID, ExpectedVersion: a.Version, AdminID: 9, Comment: "齊全"})
 	must(t, err)
 	if approved.Status != KYCStatusApproved || approved.Version != a.Version+1 || len(approved.Reviews) != 2 || approved.Reviews[1].Action != ReviewApprove ||
-		*approved.Reviews[1].ReviewerAdminID != 9 || approved.Flow == nil || approved.Flow.Status != FlowBinding {
+		*approved.Reviews[1].ReviewerAdminID != 9 {
 		t.Fatalf("approved=%+v", approved)
 	}
 	rejected, err := f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: b.ID, ExpectedVersion: b.Version, AdminID: 9, Reason: "存摺不清楚", Issues: []KYCIssue{{Field: "bank_book", DocumentAssetID: "asset-book", Code: IssueUnreadable, Message: "反光"}}})
@@ -2194,5 +2194,83 @@ func TestStoreContactLimitsAndRejectedApplicationAreEnforcedByTheDatabase(t *tes
 	must(t, err)
 	if cur.SupportEmail != nil || cur.AddressDetail != nil {
 		t.Fatalf("清除後仍有值：%+v", cur)
+	}
+}
+
+// 儲存草稿與送出只看申請的狀態：草稿與已退回的可以；審核中只能取消；已核准的不能編輯也不能重送，而且被擋下時沒有寫入。
+// mutation：model.CanEditKYC 把 APPROVED 算進可編輯 → 已核准的申請被改成草稿，這個測試失敗。
+func TestSavingAndSubmittingDependOnlyOnTheApplicationStatus(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	accountID, s, sub := f.submitted(t, idA, bankAcct)
+	save := func(a KYCApplication) error {
+		_, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: a.Version, ProductType: ptr("水果")})
+		return err
+	}
+	submit := func(a KYCApplication) error {
+		_, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: a.Version})
+		return err
+	}
+	statusAndVersion := func() (string, int64) {
+		var status string
+		var version int64
+		must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT status, version FROM seller.kyc_applications WHERE store_id=$1 AND status <> 'CANCELLED'", s.StoreID).Scan(&status, &version))
+		return status, version
+	}
+	blocked := func(label string, err error) {
+		t.Helper()
+		if apperr.KindOf(err) != apperr.KindFailedPrecondition {
+			t.Errorf("%s：要 failed_precondition，得到 %v", label, err)
+		}
+	}
+	// 審核中：兩個都擋下，狀態與版本不變。
+	blocked("審核中儲存", save(sub))
+	blocked("審核中送出", submit(sub))
+	if status, version := statusAndVersion(); status != "SUBMITTED" || version != sub.Version {
+		t.Fatalf("審核中被擋下之後：%s v%d，要 SUBMITTED v%d", status, version, sub.Version)
+	}
+	// 已核准：兩個都擋下，狀態與版本不變。
+	must(t, approve(f, sub))
+	_, approvedVersion := statusAndVersion()
+	approved, err := f.module.MyKYC(ctx, accountID)
+	must(t, err)
+	blocked("已核准儲存", save(approved))
+	blocked("已核准送出", submit(approved))
+	if status, version := statusAndVersion(); status != "APPROVED" || version != approvedVersion {
+		t.Fatalf("已核准被擋下之後：%s v%d，要 APPROVED v%d", status, version, approvedVersion)
+	}
+	// 已退回：可以編輯、可以直接重送。
+	otherAccount, _, other := f.submitted(t, idB, "012345678902")
+	_, err = f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: other.ID, ExpectedVersion: other.Version, AdminID: 9, Issues: anIssue(), Reason: "請確認"})
+	must(t, err)
+	rejected, err := f.module.MyKYC(ctx, otherAccount)
+	must(t, err)
+	edited, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: otherAccount, ExpectedVersion: rejected.Version, ProductType: ptr("水果")})
+	must(t, err)
+	if edited.Status != KYCStatusDraft {
+		t.Fatalf("已退回編輯之後 status=%s", edited.Status)
+	}
+	if _, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: otherAccount, ExpectedVersion: edited.Version}); err != nil {
+		t.Fatalf("草稿重送：%v", err)
+	}
+}
+
+// 店名與介紹沒有鎖：審核中與核准之後都能改。
+func TestStoreNameAndDescriptionStayEditableWhileSubmittedAndAfterApproval(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	_, s, sub := f.submitted(t, idA, bankAcct)
+	if got, err := editStore(f, t, s.StoreID, UpdateProfileInput{StoreName: ptr("審核中的新店名"), Description: ptr("審核中的介紹")}); err != nil || got.StoreName != "審核中的新店名" {
+		t.Fatalf("審核中改店名：%+v err=%v", got, err)
+	}
+	must(t, approve(f, sub))
+	got, err := editStore(f, t, s.StoreID, UpdateProfileInput{StoreName: ptr("核准後的新店名"), Description: ptr("核准後的介紹")})
+	if err != nil || got.StoreName != "核准後的新店名" || deref(got.Description) != "核准後的介紹" {
+		t.Fatalf("核准後改店名：%+v err=%v", got, err)
+	}
+	if cur, err := f.module.Store(ctx, s.StoreID); err != nil || cur.StoreName != "核准後的新店名" {
+		t.Fatalf("讀回：%+v err=%v", cur, err)
 	}
 }

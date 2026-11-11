@@ -705,12 +705,12 @@ func (x *Store) GetSupportEmail() string {
 	return ""
 }
 
-// StoreListItem 是清單的一列：店家，加上帳號此刻是否停權與身分認證的流程狀態。
+// StoreListItem 是清單的一列：店家，加上帳號此刻是否停權與目前申請的狀態。
 type StoreListItem struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Store *Store                 `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
-	// 沒有申請（或申請已取消）是 NOT_STARTED。
-	KycFlowStatus v1alpha11.KYCFlowStatus `protobuf:"varint,3,opt,name=kyc_flow_status,json=kycFlowStatus,proto3,enum=hawkr.seller.v1alpha1.KYCFlowStatus" json:"kyc_flow_status,omitempty"`
+	// 目前申請的狀態；沒有申請（或申請已取消）時不設。
+	KycStatus *v1alpha11.KYCStatus `protobuf:"varint,6,opt,name=kyc_status,json=kycStatus,proto3,enum=hawkr.seller.v1alpha1.KYCStatus,oneof" json:"kyc_status,omitempty"`
 	// 帳號此刻是否停權（任何一個店家的生效中措施都算）。
 	Suspended bool `protobuf:"varint,4,opt,name=suspended,proto3" json:"suspended,omitempty"`
 	// 店家此刻不能被代行營運的店家狀態原因（已關閉、等待刪除、停權），與代行 preflight 的店家狀態檢查同一個規則；空不表示能代行：
@@ -757,11 +757,11 @@ func (x *StoreListItem) GetStore() *Store {
 	return nil
 }
 
-func (x *StoreListItem) GetKycFlowStatus() v1alpha11.KYCFlowStatus {
-	if x != nil {
-		return x.KycFlowStatus
+func (x *StoreListItem) GetKycStatus() v1alpha11.KYCStatus {
+	if x != nil && x.KycStatus != nil {
+		return *x.KycStatus
 	}
-	return v1alpha11.KYCFlowStatus(0)
+	return v1alpha11.KYCStatus(0)
 }
 
 func (x *StoreListItem) GetSuspended() bool {
@@ -780,12 +780,11 @@ func (x *StoreListItem) GetDelegationUnavailabilities() []*StoreActionUnavailabi
 
 // KYCSummary 是店家身分認證的摘要；申請的內容與審核在後台的 KYC 審核方法。
 type KYCSummary struct {
-	state         protoimpl.MessageState  `protogen:"open.v1"`
-	ApplicationId string                  `protobuf:"bytes,1,opt,name=application_id,json=applicationId,proto3" json:"application_id,omitempty"`
-	Status        v1alpha11.KYCStatus     `protobuf:"varint,2,opt,name=status,proto3,enum=hawkr.seller.v1alpha1.KYCStatus" json:"status,omitempty"`
-	FlowStatus    v1alpha11.KYCFlowStatus `protobuf:"varint,3,opt,name=flow_status,json=flowStatus,proto3,enum=hawkr.seller.v1alpha1.KYCFlowStatus" json:"flow_status,omitempty"`
-	SubmitTime    *timestamppb.Timestamp  `protobuf:"bytes,4,opt,name=submit_time,json=submitTime,proto3" json:"submit_time,omitempty"`
-	DecideTime    *timestamppb.Timestamp  `protobuf:"bytes,5,opt,name=decide_time,json=decideTime,proto3" json:"decide_time,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ApplicationId string                 `protobuf:"bytes,1,opt,name=application_id,json=applicationId,proto3" json:"application_id,omitempty"`
+	Status        v1alpha11.KYCStatus    `protobuf:"varint,2,opt,name=status,proto3,enum=hawkr.seller.v1alpha1.KYCStatus" json:"status,omitempty"`
+	SubmitTime    *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=submit_time,json=submitTime,proto3" json:"submit_time,omitempty"`
+	DecideTime    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=decide_time,json=decideTime,proto3" json:"decide_time,omitempty"`
 	// 審核的期限，只在審核中（SUBMITTED）時設：開始時間是 submit_time，期限 7 天。
 	DecideDeadline *v1alpha1.Deadline `protobuf:"bytes,6,opt,name=decide_deadline,json=decideDeadline,proto3" json:"decide_deadline,omitempty"`
 	unknownFields  protoimpl.UnknownFields
@@ -834,13 +833,6 @@ func (x *KYCSummary) GetStatus() v1alpha11.KYCStatus {
 		return x.Status
 	}
 	return v1alpha11.KYCStatus(0)
-}
-
-func (x *KYCSummary) GetFlowStatus() v1alpha11.KYCFlowStatus {
-	if x != nil {
-		return x.FlowStatus
-	}
-	return v1alpha11.KYCFlowStatus(0)
 }
 
 func (x *KYCSummary) GetSubmitTime() *timestamppb.Timestamp {
@@ -2204,8 +2196,6 @@ type KYCApplication struct {
 	//	*KYCApplication_Business
 	Subject   isKYCApplication_Subject `protobuf_oneof:"subject"`
 	Documents []*KYCDocument           `protobuf:"bytes,22,rep,name=documents,proto3" json:"documents,omitempty"`
-	// KYC 與 PayUni 兩條軸合成的流程狀態。
-	Flow *v1alpha11.KYCFlow `protobuf:"bytes,23,opt,name=flow,proto3" json:"flow,omitempty"`
 	// 審核紀錄，舊到新（筆數由人工動作限制，所以內嵌）。顯示全文與證件讀取的稽核紀錄隨使用增長，另用 ListKYCReveals 與
 	// ListKYCDocumentAccesses 分頁讀。
 	Reviews []*KYCReview `protobuf:"bytes,24,rep,name=reviews,proto3" json:"reviews,omitempty"`
@@ -2414,13 +2404,6 @@ func (x *KYCApplication) GetBusiness() *BusinessKYC {
 func (x *KYCApplication) GetDocuments() []*KYCDocument {
 	if x != nil {
 		return x.Documents
-	}
-	return nil
-}
-
-func (x *KYCApplication) GetFlow() *v1alpha11.KYCFlow {
-	if x != nil {
-		return x.Flow
 	}
 	return nil
 }
@@ -3603,23 +3586,23 @@ const file_hawkr_admin_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\aaddress\x18\x18 \x01(\v2$.hawkr.common.v1alpha1.PostalAddressB\x03\xe0A\x03R\aaddress\x12&\n" +
 	"\fcontact_name\x18\x1a \x01(\tB\x03\xe0A\x03R\vcontactName\x12*\n" +
 	"\x0econtact_mobile\x18\x1b \x01(\tB\x03\xe0A\x03R\rcontactMobile\x12(\n" +
-	"\rsupport_email\x18\x1c \x01(\tB\x03\xe0A\x03R\fsupportEmailJ\x04\b\a\x10\bJ\x04\b\b\x10\tJ\x04\b\v\x10\fJ\x04\b\f\x10\rJ\x04\b\x11\x10\x12J\x04\b\x12\x10\x13J\x04\b\x17\x10\x18J\x04\b\x19\x10\x1aJ\x04\b\x1d\x10\x1eJ\x04\b\x1e\x10\x1fR\ttown_codeR\x0eaddress_detailR\x0eprocessed_foodR\x14food_business_reg_noR\tseo_titleR\x0fseo_descriptionR\x04etagR\rfood_businessR\x1aapproved_food_registrationR\x16open_food_registration\"\xcc\x02\n" +
+	"\rsupport_email\x18\x1c \x01(\tB\x03\xe0A\x03R\fsupportEmailJ\x04\b\a\x10\bJ\x04\b\b\x10\tJ\x04\b\v\x10\fJ\x04\b\f\x10\rJ\x04\b\x11\x10\x12J\x04\b\x12\x10\x13J\x04\b\x17\x10\x18J\x04\b\x19\x10\x1aJ\x04\b\x1d\x10\x1eJ\x04\b\x1e\x10\x1fR\ttown_codeR\x0eaddress_detailR\x0eprocessed_foodR\x14food_business_reg_noR\tseo_titleR\x0fseo_descriptionR\x04etagR\rfood_businessR\x1aapproved_food_registrationR\x16open_food_registration\"\xea\x02\n" +
 	"\rStoreListItem\x128\n" +
-	"\x05store\x18\x01 \x01(\v2\".hawkr.admin.seller.v1alpha1.StoreR\x05store\x12L\n" +
-	"\x0fkyc_flow_status\x18\x03 \x01(\x0e2$.hawkr.seller.v1alpha1.KYCFlowStatusR\rkycFlowStatus\x12\x1c\n" +
+	"\x05store\x18\x01 \x01(\v2\".hawkr.admin.seller.v1alpha1.StoreR\x05store\x12D\n" +
+	"\n" +
+	"kyc_status\x18\x06 \x01(\x0e2 .hawkr.seller.v1alpha1.KYCStatusH\x00R\tkycStatus\x88\x01\x01\x12\x1c\n" +
 	"\tsuspended\x18\x04 \x01(\bR\tsuspended\x12|\n" +
-	"\x1bdelegation_unavailabilities\x18\x05 \x03(\v26.hawkr.admin.seller.v1alpha1.StoreActionUnavailabilityB\x03\xe0A\x03R\x1adelegationUnavailabilitiesJ\x04\b\x02\x10\x03R\x11suspension_source\"\xfd\x02\n" +
+	"\x1bdelegation_unavailabilities\x18\x05 \x03(\v26.hawkr.admin.seller.v1alpha1.StoreActionUnavailabilityB\x03\xe0A\x03R\x1adelegationUnavailabilitiesB\r\n" +
+	"\v_kyc_statusJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04R\x11suspension_sourceR\x0fkyc_flow_status\"\xc9\x02\n" +
 	"\n" +
 	"KYCSummary\x12%\n" +
 	"\x0eapplication_id\x18\x01 \x01(\tR\rapplicationId\x128\n" +
-	"\x06status\x18\x02 \x01(\x0e2 .hawkr.seller.v1alpha1.KYCStatusR\x06status\x12E\n" +
-	"\vflow_status\x18\x03 \x01(\x0e2$.hawkr.seller.v1alpha1.KYCFlowStatusR\n" +
-	"flowStatus\x12;\n" +
+	"\x06status\x18\x02 \x01(\x0e2 .hawkr.seller.v1alpha1.KYCStatusR\x06status\x12;\n" +
 	"\vsubmit_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"submitTime\x12;\n" +
 	"\vdecide_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"decideTime\x12M\n" +
-	"\x0fdecide_deadline\x18\x06 \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0edecideDeadline\"\xfc\x02\n" +
+	"\x0fdecide_deadline\x18\x06 \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0edecideDeadlineJ\x04\b\x03\x10\x04R\vflow_status\"\xfc\x02\n" +
 	"\x11ListStoresRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
@@ -3729,7 +3712,7 @@ const file_hawkr_admin_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\vreveal_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"revealTime\x12;\n" +
 	"\vexpire_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"expireTime\"\x8a\x12\n" +
+	"expireTime\"\xe2\x11\n" +
 	"\x0eKYCApplication\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x19\n" +
 	"\bstore_id\x18\x02 \x01(\tR\astoreId\x12\x1d\n" +
@@ -3755,8 +3738,7 @@ const file_hawkr_admin_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"individual\x18\x14 \x01(\v2*.hawkr.admin.seller.v1alpha1.IndividualKYCH\x00R\n" +
 	"individual\x12F\n" +
 	"\bbusiness\x18\x15 \x01(\v2(.hawkr.admin.seller.v1alpha1.BusinessKYCH\x00R\bbusiness\x12F\n" +
-	"\tdocuments\x18\x16 \x03(\v2(.hawkr.admin.seller.v1alpha1.KYCDocumentR\tdocuments\x122\n" +
-	"\x04flow\x18\x17 \x01(\v2\x1e.hawkr.seller.v1alpha1.KYCFlowR\x04flow\x12@\n" +
+	"\tdocuments\x18\x16 \x03(\v2(.hawkr.admin.seller.v1alpha1.KYCDocumentR\tdocuments\x12@\n" +
 	"\areviews\x18\x18 \x03(\v2&.hawkr.admin.seller.v1alpha1.KYCReviewR\areviews\x12[\n" +
 	"+shares_bank_account_with_sanctioned_account\x18\x1a \x01(\bR&sharesBankAccountWithSanctionedAccount\x12;\n" +
 	"\vsubmit_time\x18\x1b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
@@ -3779,7 +3761,7 @@ const file_hawkr_admin_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x17reject_unavailabilities\x18& \x03(\v26.hawkr.admin.seller.v1alpha1.StoreActionUnavailabilityB\x03\xe0A\x03R\x16rejectUnavailabilities\x12=\n" +
 	"\x18can_requery_registration\x18' \x01(\bB\x03\xe0A\x03R\x16canRequeryRegistration\x12\x8f\x01\n" +
 	"%requery_registration_unavailabilities\x18( \x03(\v26.hawkr.admin.seller.v1alpha1.StoreActionUnavailabilityB\x03\xe0A\x03R#requeryRegistrationUnavailabilitiesB\t\n" +
-	"\asubjectJ\x04\b\x10\x10\x11J\x04\b\x12\x10\x13J\x04\b\x13\x10\x14J\x04\b\x1f\x10 R\rcontact_emailR\rcontact_phoneR\rfood_businessR\x1aregistration_check_pending\"\xd5\x03\n" +
+	"\asubjectJ\x04\b\x10\x10\x11J\x04\b\x12\x10\x13J\x04\b\x13\x10\x14J\x04\b\x17\x10\x18J\x04\b\x1f\x10 R\rcontact_emailR\rcontact_phoneR\rfood_businessR\x04flowR\x1aregistration_check_pending\"\xd5\x03\n" +
 	"\x15KYCApplicationSummary\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x19\n" +
 	"\bstore_id\x18\x02 \x01(\tR\astoreId\x12\x1d\n" +
@@ -3971,16 +3953,14 @@ var file_hawkr_admin_seller_v1alpha1_seller_proto_goTypes = []any{
 	(v1alpha11.StoreStatus)(0),              // 48: hawkr.seller.v1alpha1.StoreStatus
 	(*timestamppb.Timestamp)(nil),           // 49: google.protobuf.Timestamp
 	(*v1alpha1.PostalAddress)(nil),          // 50: hawkr.common.v1alpha1.PostalAddress
-	(v1alpha11.KYCFlowStatus)(0),            // 51: hawkr.seller.v1alpha1.KYCFlowStatus
-	(v1alpha11.KYCStatus)(0),                // 52: hawkr.seller.v1alpha1.KYCStatus
-	(*v1alpha1.Deadline)(nil),               // 53: hawkr.common.v1alpha1.Deadline
-	(*v1alpha11.OnboardingTask)(nil),        // 54: hawkr.seller.v1alpha1.OnboardingTask
-	(*Measure)(nil),                         // 55: hawkr.admin.seller.v1alpha1.Measure
-	(*TerminationOption)(nil),               // 56: hawkr.admin.seller.v1alpha1.TerminationOption
-	(v1alpha11.KYCField)(0),                 // 57: hawkr.seller.v1alpha1.KYCField
-	(*date.Date)(nil),                       // 58: google.type.Date
-	(*v1alpha11.KYCIssue)(nil),              // 59: hawkr.seller.v1alpha1.KYCIssue
-	(*v1alpha11.KYCFlow)(nil),               // 60: hawkr.seller.v1alpha1.KYCFlow
+	(v1alpha11.KYCStatus)(0),                // 51: hawkr.seller.v1alpha1.KYCStatus
+	(*v1alpha1.Deadline)(nil),               // 52: hawkr.common.v1alpha1.Deadline
+	(*v1alpha11.OnboardingTask)(nil),        // 53: hawkr.seller.v1alpha1.OnboardingTask
+	(*Measure)(nil),                         // 54: hawkr.admin.seller.v1alpha1.Measure
+	(*TerminationOption)(nil),               // 55: hawkr.admin.seller.v1alpha1.TerminationOption
+	(v1alpha11.KYCField)(0),                 // 56: hawkr.seller.v1alpha1.KYCField
+	(*date.Date)(nil),                       // 57: google.type.Date
+	(*v1alpha11.KYCIssue)(nil),              // 58: hawkr.seller.v1alpha1.KYCIssue
 }
 var file_hawkr_admin_seller_v1alpha1_seller_proto_depIdxs = []int32{
 	0,  // 0: hawkr.admin.seller.v1alpha1.StoreActionUnavailability.reason:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailableReason
@@ -3995,109 +3975,107 @@ var file_hawkr_admin_seller_v1alpha1_seller_proto_depIdxs = []int32{
 	7,  // 9: hawkr.admin.seller.v1alpha1.Store.closure:type_name -> hawkr.admin.seller.v1alpha1.Closure
 	50, // 10: hawkr.admin.seller.v1alpha1.Store.address:type_name -> hawkr.common.v1alpha1.PostalAddress
 	8,  // 11: hawkr.admin.seller.v1alpha1.StoreListItem.store:type_name -> hawkr.admin.seller.v1alpha1.Store
-	51, // 12: hawkr.admin.seller.v1alpha1.StoreListItem.kyc_flow_status:type_name -> hawkr.seller.v1alpha1.KYCFlowStatus
+	51, // 12: hawkr.admin.seller.v1alpha1.StoreListItem.kyc_status:type_name -> hawkr.seller.v1alpha1.KYCStatus
 	6,  // 13: hawkr.admin.seller.v1alpha1.StoreListItem.delegation_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
-	52, // 14: hawkr.admin.seller.v1alpha1.KYCSummary.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
-	51, // 15: hawkr.admin.seller.v1alpha1.KYCSummary.flow_status:type_name -> hawkr.seller.v1alpha1.KYCFlowStatus
-	49, // 16: hawkr.admin.seller.v1alpha1.KYCSummary.submit_time:type_name -> google.protobuf.Timestamp
-	49, // 17: hawkr.admin.seller.v1alpha1.KYCSummary.decide_time:type_name -> google.protobuf.Timestamp
-	53, // 18: hawkr.admin.seller.v1alpha1.KYCSummary.decide_deadline:type_name -> hawkr.common.v1alpha1.Deadline
-	48, // 19: hawkr.admin.seller.v1alpha1.ListStoresRequest.status:type_name -> hawkr.seller.v1alpha1.StoreStatus
-	52, // 20: hawkr.admin.seller.v1alpha1.ListStoresRequest.kyc_status:type_name -> hawkr.seller.v1alpha1.KYCStatus
-	9,  // 21: hawkr.admin.seller.v1alpha1.ListStoresResponse.stores:type_name -> hawkr.admin.seller.v1alpha1.StoreListItem
-	54, // 22: hawkr.admin.seller.v1alpha1.GetStoreOnboardingResponse.tasks:type_name -> hawkr.seller.v1alpha1.OnboardingTask
-	8,  // 23: hawkr.admin.seller.v1alpha1.GetStoreResponse.store:type_name -> hawkr.admin.seller.v1alpha1.Store
-	10, // 24: hawkr.admin.seller.v1alpha1.GetStoreResponse.kyc:type_name -> hawkr.admin.seller.v1alpha1.KYCSummary
-	55, // 25: hawkr.admin.seller.v1alpha1.GetStoreResponse.active_measures:type_name -> hawkr.admin.seller.v1alpha1.Measure
-	56, // 26: hawkr.admin.seller.v1alpha1.GetStoreResponse.available_terminations:type_name -> hawkr.admin.seller.v1alpha1.TerminationOption
-	6,  // 27: hawkr.admin.seller.v1alpha1.GetStoreResponse.create_measure_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
-	57, // 28: hawkr.admin.seller.v1alpha1.KYCDocument.field:type_name -> hawkr.seller.v1alpha1.KYCField
-	57, // 29: hawkr.admin.seller.v1alpha1.KYCDocumentView.field:type_name -> hawkr.seller.v1alpha1.KYCField
-	57, // 30: hawkr.admin.seller.v1alpha1.KYCDocumentAccess.field:type_name -> hawkr.seller.v1alpha1.KYCField
-	49, // 31: hawkr.admin.seller.v1alpha1.KYCDocumentAccess.access_time:type_name -> google.protobuf.Timestamp
-	58, // 32: hawkr.admin.seller.v1alpha1.BusinessKYC.company_register_date:type_name -> google.type.Date
-	50, // 33: hawkr.admin.seller.v1alpha1.BusinessKYC.company_address:type_name -> hawkr.common.v1alpha1.PostalAddress
-	3,  // 34: hawkr.admin.seller.v1alpha1.KYCReview.action:type_name -> hawkr.admin.seller.v1alpha1.KYCReviewAction
-	49, // 35: hawkr.admin.seller.v1alpha1.KYCReview.decide_time:type_name -> google.protobuf.Timestamp
-	49, // 36: hawkr.admin.seller.v1alpha1.KYCReview.registration_check_query_time:type_name -> google.protobuf.Timestamp
-	59, // 37: hawkr.admin.seller.v1alpha1.KYCReview.issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
-	50, // 38: hawkr.admin.seller.v1alpha1.KYCRegistration.postal_address:type_name -> hawkr.common.v1alpha1.PostalAddress
-	58, // 39: hawkr.admin.seller.v1alpha1.KYCRegistration.setup_date:type_name -> google.type.Date
-	5,  // 40: hawkr.admin.seller.v1alpha1.KYCRegistration.status:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationStatus
-	58, // 41: hawkr.admin.seller.v1alpha1.KYCRegistration.suspend_start_date:type_name -> google.type.Date
-	58, // 42: hawkr.admin.seller.v1alpha1.KYCRegistration.suspend_end_date:type_name -> google.type.Date
-	4,  // 43: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.outcome:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationOutcome
-	49, // 44: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.query_time:type_name -> google.protobuf.Timestamp
-	25, // 45: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.registration:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistration
-	57, // 46: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.mismatched_fields:type_name -> hawkr.seller.v1alpha1.KYCField
-	57, // 47: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.unverifiable_fields:type_name -> hawkr.seller.v1alpha1.KYCField
-	49, // 48: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.request_time:type_name -> google.protobuf.Timestamp
-	49, // 49: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.deadline_time:type_name -> google.protobuf.Timestamp
-	49, // 50: hawkr.admin.seller.v1alpha1.KYCReveal.reveal_time:type_name -> google.protobuf.Timestamp
-	49, // 51: hawkr.admin.seller.v1alpha1.KYCReveal.expire_time:type_name -> google.protobuf.Timestamp
-	52, // 52: hawkr.admin.seller.v1alpha1.KYCApplication.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
-	58, // 53: hawkr.admin.seller.v1alpha1.KYCApplication.birth_date:type_name -> google.type.Date
-	58, // 54: hawkr.admin.seller.v1alpha1.KYCApplication.id_card_issue_date:type_name -> google.type.Date
-	22, // 55: hawkr.admin.seller.v1alpha1.KYCApplication.individual:type_name -> hawkr.admin.seller.v1alpha1.IndividualKYC
-	23, // 56: hawkr.admin.seller.v1alpha1.KYCApplication.business:type_name -> hawkr.admin.seller.v1alpha1.BusinessKYC
-	19, // 57: hawkr.admin.seller.v1alpha1.KYCApplication.documents:type_name -> hawkr.admin.seller.v1alpha1.KYCDocument
-	60, // 58: hawkr.admin.seller.v1alpha1.KYCApplication.flow:type_name -> hawkr.seller.v1alpha1.KYCFlow
-	24, // 59: hawkr.admin.seller.v1alpha1.KYCApplication.reviews:type_name -> hawkr.admin.seller.v1alpha1.KYCReview
-	49, // 60: hawkr.admin.seller.v1alpha1.KYCApplication.submit_time:type_name -> google.protobuf.Timestamp
-	49, // 61: hawkr.admin.seller.v1alpha1.KYCApplication.decide_time:type_name -> google.protobuf.Timestamp
-	49, // 62: hawkr.admin.seller.v1alpha1.KYCApplication.create_time:type_name -> google.protobuf.Timestamp
-	49, // 63: hawkr.admin.seller.v1alpha1.KYCApplication.update_time:type_name -> google.protobuf.Timestamp
-	26, // 64: hawkr.admin.seller.v1alpha1.KYCApplication.registration_check:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationCheck
-	26, // 65: hawkr.admin.seller.v1alpha1.KYCApplication.pending_registration_check:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationCheck
-	59, // 66: hawkr.admin.seller.v1alpha1.KYCApplication.outstanding_issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
-	57, // 67: hawkr.admin.seller.v1alpha1.KYCApplication.issuable_fields:type_name -> hawkr.seller.v1alpha1.KYCField
-	6,  // 68: hawkr.admin.seller.v1alpha1.KYCApplication.approve_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
-	6,  // 69: hawkr.admin.seller.v1alpha1.KYCApplication.reject_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
-	6,  // 70: hawkr.admin.seller.v1alpha1.KYCApplication.requery_registration_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
-	52, // 71: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
-	2,  // 72: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.seller_type:type_name -> hawkr.admin.seller.v1alpha1.KYCSellerType
-	49, // 73: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.submit_time:type_name -> google.protobuf.Timestamp
-	49, // 74: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.decide_time:type_name -> google.protobuf.Timestamp
-	52, // 75: hawkr.admin.seller.v1alpha1.ListKYCApplicationsRequest.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
-	29, // 76: hawkr.admin.seller.v1alpha1.ListKYCApplicationsResponse.applications:type_name -> hawkr.admin.seller.v1alpha1.KYCApplicationSummary
-	28, // 77: hawkr.admin.seller.v1alpha1.GetKYCApplicationResponse.application:type_name -> hawkr.admin.seller.v1alpha1.KYCApplication
-	27, // 78: hawkr.admin.seller.v1alpha1.ListKYCRevealsResponse.reveals:type_name -> hawkr.admin.seller.v1alpha1.KYCReveal
-	21, // 79: hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesResponse.document_accesses:type_name -> hawkr.admin.seller.v1alpha1.KYCDocumentAccess
-	28, // 80: hawkr.admin.seller.v1alpha1.ApproveKYCResponse.application:type_name -> hawkr.admin.seller.v1alpha1.KYCApplication
-	59, // 81: hawkr.admin.seller.v1alpha1.RejectKYCRequest.issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
-	28, // 82: hawkr.admin.seller.v1alpha1.RejectKYCResponse.application:type_name -> hawkr.admin.seller.v1alpha1.KYCApplication
-	49, // 83: hawkr.admin.seller.v1alpha1.RevealKYCSensitiveResponse.expire_time:type_name -> google.protobuf.Timestamp
-	20, // 84: hawkr.admin.seller.v1alpha1.RevealKYCSensitiveResponse.documents:type_name -> hawkr.admin.seller.v1alpha1.KYCDocumentView
-	26, // 85: hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationResponse.registration_check:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationCheck
-	11, // 86: hawkr.admin.seller.v1alpha1.SellerAdminService.ListStores:input_type -> hawkr.admin.seller.v1alpha1.ListStoresRequest
-	13, // 87: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreStats:input_type -> hawkr.admin.seller.v1alpha1.GetStoreStatsRequest
-	15, // 88: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStore:input_type -> hawkr.admin.seller.v1alpha1.GetStoreRequest
-	16, // 89: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreOnboarding:input_type -> hawkr.admin.seller.v1alpha1.GetStoreOnboardingRequest
-	30, // 90: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCApplications:input_type -> hawkr.admin.seller.v1alpha1.ListKYCApplicationsRequest
-	32, // 91: hawkr.admin.seller.v1alpha1.SellerAdminService.GetKYCApplication:input_type -> hawkr.admin.seller.v1alpha1.GetKYCApplicationRequest
-	34, // 92: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCReveals:input_type -> hawkr.admin.seller.v1alpha1.ListKYCRevealsRequest
-	36, // 93: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCDocumentAccesses:input_type -> hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesRequest
-	38, // 94: hawkr.admin.seller.v1alpha1.SellerAdminService.ApproveKYC:input_type -> hawkr.admin.seller.v1alpha1.ApproveKYCRequest
-	40, // 95: hawkr.admin.seller.v1alpha1.SellerAdminService.RejectKYC:input_type -> hawkr.admin.seller.v1alpha1.RejectKYCRequest
-	42, // 96: hawkr.admin.seller.v1alpha1.SellerAdminService.RevealKYCSensitive:input_type -> hawkr.admin.seller.v1alpha1.RevealKYCSensitiveRequest
-	44, // 97: hawkr.admin.seller.v1alpha1.SellerAdminService.RequeryKYCRegistration:input_type -> hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationRequest
-	12, // 98: hawkr.admin.seller.v1alpha1.SellerAdminService.ListStores:output_type -> hawkr.admin.seller.v1alpha1.ListStoresResponse
-	14, // 99: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreStats:output_type -> hawkr.admin.seller.v1alpha1.GetStoreStatsResponse
-	18, // 100: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStore:output_type -> hawkr.admin.seller.v1alpha1.GetStoreResponse
-	17, // 101: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreOnboarding:output_type -> hawkr.admin.seller.v1alpha1.GetStoreOnboardingResponse
-	31, // 102: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCApplications:output_type -> hawkr.admin.seller.v1alpha1.ListKYCApplicationsResponse
-	33, // 103: hawkr.admin.seller.v1alpha1.SellerAdminService.GetKYCApplication:output_type -> hawkr.admin.seller.v1alpha1.GetKYCApplicationResponse
-	35, // 104: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCReveals:output_type -> hawkr.admin.seller.v1alpha1.ListKYCRevealsResponse
-	37, // 105: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCDocumentAccesses:output_type -> hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesResponse
-	39, // 106: hawkr.admin.seller.v1alpha1.SellerAdminService.ApproveKYC:output_type -> hawkr.admin.seller.v1alpha1.ApproveKYCResponse
-	41, // 107: hawkr.admin.seller.v1alpha1.SellerAdminService.RejectKYC:output_type -> hawkr.admin.seller.v1alpha1.RejectKYCResponse
-	43, // 108: hawkr.admin.seller.v1alpha1.SellerAdminService.RevealKYCSensitive:output_type -> hawkr.admin.seller.v1alpha1.RevealKYCSensitiveResponse
-	45, // 109: hawkr.admin.seller.v1alpha1.SellerAdminService.RequeryKYCRegistration:output_type -> hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationResponse
-	98, // [98:110] is the sub-list for method output_type
-	86, // [86:98] is the sub-list for method input_type
-	86, // [86:86] is the sub-list for extension type_name
-	86, // [86:86] is the sub-list for extension extendee
-	0,  // [0:86] is the sub-list for field type_name
+	51, // 14: hawkr.admin.seller.v1alpha1.KYCSummary.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
+	49, // 15: hawkr.admin.seller.v1alpha1.KYCSummary.submit_time:type_name -> google.protobuf.Timestamp
+	49, // 16: hawkr.admin.seller.v1alpha1.KYCSummary.decide_time:type_name -> google.protobuf.Timestamp
+	52, // 17: hawkr.admin.seller.v1alpha1.KYCSummary.decide_deadline:type_name -> hawkr.common.v1alpha1.Deadline
+	48, // 18: hawkr.admin.seller.v1alpha1.ListStoresRequest.status:type_name -> hawkr.seller.v1alpha1.StoreStatus
+	51, // 19: hawkr.admin.seller.v1alpha1.ListStoresRequest.kyc_status:type_name -> hawkr.seller.v1alpha1.KYCStatus
+	9,  // 20: hawkr.admin.seller.v1alpha1.ListStoresResponse.stores:type_name -> hawkr.admin.seller.v1alpha1.StoreListItem
+	53, // 21: hawkr.admin.seller.v1alpha1.GetStoreOnboardingResponse.tasks:type_name -> hawkr.seller.v1alpha1.OnboardingTask
+	8,  // 22: hawkr.admin.seller.v1alpha1.GetStoreResponse.store:type_name -> hawkr.admin.seller.v1alpha1.Store
+	10, // 23: hawkr.admin.seller.v1alpha1.GetStoreResponse.kyc:type_name -> hawkr.admin.seller.v1alpha1.KYCSummary
+	54, // 24: hawkr.admin.seller.v1alpha1.GetStoreResponse.active_measures:type_name -> hawkr.admin.seller.v1alpha1.Measure
+	55, // 25: hawkr.admin.seller.v1alpha1.GetStoreResponse.available_terminations:type_name -> hawkr.admin.seller.v1alpha1.TerminationOption
+	6,  // 26: hawkr.admin.seller.v1alpha1.GetStoreResponse.create_measure_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
+	56, // 27: hawkr.admin.seller.v1alpha1.KYCDocument.field:type_name -> hawkr.seller.v1alpha1.KYCField
+	56, // 28: hawkr.admin.seller.v1alpha1.KYCDocumentView.field:type_name -> hawkr.seller.v1alpha1.KYCField
+	56, // 29: hawkr.admin.seller.v1alpha1.KYCDocumentAccess.field:type_name -> hawkr.seller.v1alpha1.KYCField
+	49, // 30: hawkr.admin.seller.v1alpha1.KYCDocumentAccess.access_time:type_name -> google.protobuf.Timestamp
+	57, // 31: hawkr.admin.seller.v1alpha1.BusinessKYC.company_register_date:type_name -> google.type.Date
+	50, // 32: hawkr.admin.seller.v1alpha1.BusinessKYC.company_address:type_name -> hawkr.common.v1alpha1.PostalAddress
+	3,  // 33: hawkr.admin.seller.v1alpha1.KYCReview.action:type_name -> hawkr.admin.seller.v1alpha1.KYCReviewAction
+	49, // 34: hawkr.admin.seller.v1alpha1.KYCReview.decide_time:type_name -> google.protobuf.Timestamp
+	49, // 35: hawkr.admin.seller.v1alpha1.KYCReview.registration_check_query_time:type_name -> google.protobuf.Timestamp
+	58, // 36: hawkr.admin.seller.v1alpha1.KYCReview.issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
+	50, // 37: hawkr.admin.seller.v1alpha1.KYCRegistration.postal_address:type_name -> hawkr.common.v1alpha1.PostalAddress
+	57, // 38: hawkr.admin.seller.v1alpha1.KYCRegistration.setup_date:type_name -> google.type.Date
+	5,  // 39: hawkr.admin.seller.v1alpha1.KYCRegistration.status:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationStatus
+	57, // 40: hawkr.admin.seller.v1alpha1.KYCRegistration.suspend_start_date:type_name -> google.type.Date
+	57, // 41: hawkr.admin.seller.v1alpha1.KYCRegistration.suspend_end_date:type_name -> google.type.Date
+	4,  // 42: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.outcome:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationOutcome
+	49, // 43: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.query_time:type_name -> google.protobuf.Timestamp
+	25, // 44: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.registration:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistration
+	56, // 45: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.mismatched_fields:type_name -> hawkr.seller.v1alpha1.KYCField
+	56, // 46: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.unverifiable_fields:type_name -> hawkr.seller.v1alpha1.KYCField
+	49, // 47: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.request_time:type_name -> google.protobuf.Timestamp
+	49, // 48: hawkr.admin.seller.v1alpha1.KYCRegistrationCheck.deadline_time:type_name -> google.protobuf.Timestamp
+	49, // 49: hawkr.admin.seller.v1alpha1.KYCReveal.reveal_time:type_name -> google.protobuf.Timestamp
+	49, // 50: hawkr.admin.seller.v1alpha1.KYCReveal.expire_time:type_name -> google.protobuf.Timestamp
+	51, // 51: hawkr.admin.seller.v1alpha1.KYCApplication.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
+	57, // 52: hawkr.admin.seller.v1alpha1.KYCApplication.birth_date:type_name -> google.type.Date
+	57, // 53: hawkr.admin.seller.v1alpha1.KYCApplication.id_card_issue_date:type_name -> google.type.Date
+	22, // 54: hawkr.admin.seller.v1alpha1.KYCApplication.individual:type_name -> hawkr.admin.seller.v1alpha1.IndividualKYC
+	23, // 55: hawkr.admin.seller.v1alpha1.KYCApplication.business:type_name -> hawkr.admin.seller.v1alpha1.BusinessKYC
+	19, // 56: hawkr.admin.seller.v1alpha1.KYCApplication.documents:type_name -> hawkr.admin.seller.v1alpha1.KYCDocument
+	24, // 57: hawkr.admin.seller.v1alpha1.KYCApplication.reviews:type_name -> hawkr.admin.seller.v1alpha1.KYCReview
+	49, // 58: hawkr.admin.seller.v1alpha1.KYCApplication.submit_time:type_name -> google.protobuf.Timestamp
+	49, // 59: hawkr.admin.seller.v1alpha1.KYCApplication.decide_time:type_name -> google.protobuf.Timestamp
+	49, // 60: hawkr.admin.seller.v1alpha1.KYCApplication.create_time:type_name -> google.protobuf.Timestamp
+	49, // 61: hawkr.admin.seller.v1alpha1.KYCApplication.update_time:type_name -> google.protobuf.Timestamp
+	26, // 62: hawkr.admin.seller.v1alpha1.KYCApplication.registration_check:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationCheck
+	26, // 63: hawkr.admin.seller.v1alpha1.KYCApplication.pending_registration_check:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationCheck
+	58, // 64: hawkr.admin.seller.v1alpha1.KYCApplication.outstanding_issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
+	56, // 65: hawkr.admin.seller.v1alpha1.KYCApplication.issuable_fields:type_name -> hawkr.seller.v1alpha1.KYCField
+	6,  // 66: hawkr.admin.seller.v1alpha1.KYCApplication.approve_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
+	6,  // 67: hawkr.admin.seller.v1alpha1.KYCApplication.reject_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
+	6,  // 68: hawkr.admin.seller.v1alpha1.KYCApplication.requery_registration_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.StoreActionUnavailability
+	51, // 69: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
+	2,  // 70: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.seller_type:type_name -> hawkr.admin.seller.v1alpha1.KYCSellerType
+	49, // 71: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.submit_time:type_name -> google.protobuf.Timestamp
+	49, // 72: hawkr.admin.seller.v1alpha1.KYCApplicationSummary.decide_time:type_name -> google.protobuf.Timestamp
+	51, // 73: hawkr.admin.seller.v1alpha1.ListKYCApplicationsRequest.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
+	29, // 74: hawkr.admin.seller.v1alpha1.ListKYCApplicationsResponse.applications:type_name -> hawkr.admin.seller.v1alpha1.KYCApplicationSummary
+	28, // 75: hawkr.admin.seller.v1alpha1.GetKYCApplicationResponse.application:type_name -> hawkr.admin.seller.v1alpha1.KYCApplication
+	27, // 76: hawkr.admin.seller.v1alpha1.ListKYCRevealsResponse.reveals:type_name -> hawkr.admin.seller.v1alpha1.KYCReveal
+	21, // 77: hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesResponse.document_accesses:type_name -> hawkr.admin.seller.v1alpha1.KYCDocumentAccess
+	28, // 78: hawkr.admin.seller.v1alpha1.ApproveKYCResponse.application:type_name -> hawkr.admin.seller.v1alpha1.KYCApplication
+	58, // 79: hawkr.admin.seller.v1alpha1.RejectKYCRequest.issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
+	28, // 80: hawkr.admin.seller.v1alpha1.RejectKYCResponse.application:type_name -> hawkr.admin.seller.v1alpha1.KYCApplication
+	49, // 81: hawkr.admin.seller.v1alpha1.RevealKYCSensitiveResponse.expire_time:type_name -> google.protobuf.Timestamp
+	20, // 82: hawkr.admin.seller.v1alpha1.RevealKYCSensitiveResponse.documents:type_name -> hawkr.admin.seller.v1alpha1.KYCDocumentView
+	26, // 83: hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationResponse.registration_check:type_name -> hawkr.admin.seller.v1alpha1.KYCRegistrationCheck
+	11, // 84: hawkr.admin.seller.v1alpha1.SellerAdminService.ListStores:input_type -> hawkr.admin.seller.v1alpha1.ListStoresRequest
+	13, // 85: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreStats:input_type -> hawkr.admin.seller.v1alpha1.GetStoreStatsRequest
+	15, // 86: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStore:input_type -> hawkr.admin.seller.v1alpha1.GetStoreRequest
+	16, // 87: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreOnboarding:input_type -> hawkr.admin.seller.v1alpha1.GetStoreOnboardingRequest
+	30, // 88: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCApplications:input_type -> hawkr.admin.seller.v1alpha1.ListKYCApplicationsRequest
+	32, // 89: hawkr.admin.seller.v1alpha1.SellerAdminService.GetKYCApplication:input_type -> hawkr.admin.seller.v1alpha1.GetKYCApplicationRequest
+	34, // 90: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCReveals:input_type -> hawkr.admin.seller.v1alpha1.ListKYCRevealsRequest
+	36, // 91: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCDocumentAccesses:input_type -> hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesRequest
+	38, // 92: hawkr.admin.seller.v1alpha1.SellerAdminService.ApproveKYC:input_type -> hawkr.admin.seller.v1alpha1.ApproveKYCRequest
+	40, // 93: hawkr.admin.seller.v1alpha1.SellerAdminService.RejectKYC:input_type -> hawkr.admin.seller.v1alpha1.RejectKYCRequest
+	42, // 94: hawkr.admin.seller.v1alpha1.SellerAdminService.RevealKYCSensitive:input_type -> hawkr.admin.seller.v1alpha1.RevealKYCSensitiveRequest
+	44, // 95: hawkr.admin.seller.v1alpha1.SellerAdminService.RequeryKYCRegistration:input_type -> hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationRequest
+	12, // 96: hawkr.admin.seller.v1alpha1.SellerAdminService.ListStores:output_type -> hawkr.admin.seller.v1alpha1.ListStoresResponse
+	14, // 97: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreStats:output_type -> hawkr.admin.seller.v1alpha1.GetStoreStatsResponse
+	18, // 98: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStore:output_type -> hawkr.admin.seller.v1alpha1.GetStoreResponse
+	17, // 99: hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreOnboarding:output_type -> hawkr.admin.seller.v1alpha1.GetStoreOnboardingResponse
+	31, // 100: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCApplications:output_type -> hawkr.admin.seller.v1alpha1.ListKYCApplicationsResponse
+	33, // 101: hawkr.admin.seller.v1alpha1.SellerAdminService.GetKYCApplication:output_type -> hawkr.admin.seller.v1alpha1.GetKYCApplicationResponse
+	35, // 102: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCReveals:output_type -> hawkr.admin.seller.v1alpha1.ListKYCRevealsResponse
+	37, // 103: hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCDocumentAccesses:output_type -> hawkr.admin.seller.v1alpha1.ListKYCDocumentAccessesResponse
+	39, // 104: hawkr.admin.seller.v1alpha1.SellerAdminService.ApproveKYC:output_type -> hawkr.admin.seller.v1alpha1.ApproveKYCResponse
+	41, // 105: hawkr.admin.seller.v1alpha1.SellerAdminService.RejectKYC:output_type -> hawkr.admin.seller.v1alpha1.RejectKYCResponse
+	43, // 106: hawkr.admin.seller.v1alpha1.SellerAdminService.RevealKYCSensitive:output_type -> hawkr.admin.seller.v1alpha1.RevealKYCSensitiveResponse
+	45, // 107: hawkr.admin.seller.v1alpha1.SellerAdminService.RequeryKYCRegistration:output_type -> hawkr.admin.seller.v1alpha1.RequeryKYCRegistrationResponse
+	96, // [96:108] is the sub-list for method output_type
+	84, // [84:96] is the sub-list for method input_type
+	84, // [84:84] is the sub-list for extension type_name
+	84, // [84:84] is the sub-list for extension extendee
+	0,  // [0:84] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_admin_seller_v1alpha1_seller_proto_init() }
@@ -4106,6 +4084,7 @@ func file_hawkr_admin_seller_v1alpha1_seller_proto_init() {
 		return
 	}
 	file_hawkr_admin_seller_v1alpha1_measure_proto_init()
+	file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[3].OneofWrappers = []any{}
 	file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[5].OneofWrappers = []any{}
 	file_hawkr_admin_seller_v1alpha1_seller_proto_msgTypes[22].OneofWrappers = []any{
 		(*KYCApplication_Individual)(nil),

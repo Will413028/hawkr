@@ -404,7 +404,7 @@
 |---|---|---|---|---|
 | website 的 `payuniKindOf`／`payuniCopy` 與 seller-app 的對應碼：各自從 `bind_status`、`outcome`、`problem.remedy` 推導「PayUni 現在是什麼狀態、賣家要做什麼」 | 賣家端要顯示 PayUni 階段的說明與下一步 | 需求成立；兩端各寫一份推導不成立（前提 2026-10-15：可用性與原因由伺服器給，client 只呈現） | 伺服器給封閉的 enum 與說明句，client 只依值選版面 | 已改：`model.SellerPayUniOf` 一個判斷推導 `PayUniState`（八個值，每個值對賣家只有一種動作）、`explanation` 與可改欄位（`fix_fields`／`fix_store_fields` 依身分鎖過濾），階段只讀 `PayUniPhaseOf(reg)`；`CanResubmit` ⇔ 推導結果是 FIXABLE；兩個 client 與兩份文字表的推導碼全部刪除 |
 | PayUni 拒絕只要不是商家層級終止就可重送，補救方式是聯絡客服也一樣 | 舊規則「被退回，或已核准且 PayUni 拒絕」可重送 | 不成立：賣家重送也改不了客服才能處理的原因（KYC ADR 文末修訂，Will 2026-10-21 F5 (a)） | 能不能自行重送與賣家被告知的動作是同一個判斷 | 已改：PayUni 拒絕而且補救方式是聯絡客服時是 CONTACT_SUPPORT，不能重送；`SaveKYCDraft`、`SubmitKYC` 不能做時回 `resubmit_unavailabilities`（九個 `KYCResubmitUnavailableReason`），`payuni.CheckResubmit` 在鎖內重查 |
-| 綁定重試用完後 client 顯示「平台會協助重新送出」，實際沒有東西接手（`PayUniBindFailed` 事件沒有訂閱者） | 賣家被告知有人處理 | 不成立：文案承諾了沒有人執行的事 | 狀態本身就是待辦的來源，處理完（重新綁定）待辦自然消失，不需要訂閱者或已讀狀態 | 已改：後台待辦種類 `PAYUNI_BIND_RETRY`（`seller.review_payuni_bind_retry`：綁定失敗且錯誤碼是 `PAYUNI_UNAVAILABLE`、店家 `ACTIVE`、申請是目前的而且 `APPROVED`），開始時間是新欄位 `payuni_registrations.bind_failed_at`（`updated_at` 會被店家改地址推後，不能用），期限 24 小時（上線前的起始值，Will 2026-10-21 核可，上線後校準）；其他綁定失敗（找客服）由客服接手，不進待辦；`PayUniBindFailed` 事件保留，仍沒有訂閱者 |
+| 綁定重試用完後 client 顯示「平台會協助重新送出」，實際沒有東西接手（`PayUniBindFailed` 事件沒有訂閱者） | 賣家被告知有人處理 | 不成立：文案承諾了沒有人執行的事 | 狀態本身就是待辦的來源，處理完（重新綁定）待辦自然消失，不需要訂閱者或已讀狀態 | 已移除：後台待辦種類 `PAYUNI_BIND_RETRY` 與重新綁定隨 PayUni 退場刪除（Stripe 計畫步驟 8a），seller 發布的待辦種類是 9 種；`PayUniBindFailed` 事件沒有訂閱者，PayUni 本體在後續單元整包刪除 |
 
 ## 10e 第 5b 刀：admin 對店家動作的可用性與原因（2026-10-21）
 

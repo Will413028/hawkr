@@ -42,18 +42,6 @@ const _enumNumber = <String, int>{
 	'KYC_FIELD_REAL_NAME': 1,
 	'KYC_FIELD_UNSPECIFIED': 0,
 	'KYC_FIELD_WEBSITE_URL': 12,
-	'KYC_FLOW_STATUS_APPROVED': 10,
-	'KYC_FLOW_STATUS_BINDING': 5,
-	'KYC_FLOW_STATUS_BIND_FAILED': 6,
-	'KYC_FLOW_STATUS_DRAFT': 2,
-	'KYC_FLOW_STATUS_FORWARDED': 7,
-	'KYC_FLOW_STATUS_NOT_STARTED': 1,
-	'KYC_FLOW_STATUS_PAYUNI_REJECTED': 11,
-	'KYC_FLOW_STATUS_PENDING_INFO': 9,
-	'KYC_FLOW_STATUS_REJECTED': 4,
-	'KYC_FLOW_STATUS_SUBMITTED': 3,
-	'KYC_FLOW_STATUS_UNDER_REVIEW': 8,
-	'KYC_FLOW_STATUS_UNSPECIFIED': 0,
 	'KYC_STATUS_APPROVED': 3,
 	'KYC_STATUS_CANCELLED': 5,
 	'KYC_STATUS_DRAFT': 1,
@@ -100,15 +88,6 @@ const _enumNumber = <String, int>{
 	'PAYMENT_ACCOUNT_STATUS_NOT_CREATED': 1,
 	'PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW': 2,
 	'PAYMENT_ACCOUNT_STATUS_UNSPECIFIED': 0,
-	'PAY_UNI_STATE_APPROVED': 8,
-	'PAY_UNI_STATE_CONTACT_SUPPORT': 5,
-	'PAY_UNI_STATE_FIXABLE': 3,
-	'PAY_UNI_STATE_FIX_VIA_SUPPORT': 4,
-	'PAY_UNI_STATE_PENDING_INFO': 2,
-	'PAY_UNI_STATE_RETRY_LATER': 6,
-	'PAY_UNI_STATE_REVIEWING': 1,
-	'PAY_UNI_STATE_TERMINATED': 7,
-	'PAY_UNI_STATE_UNSPECIFIED': 0,
 	'POLICY_CATEGORY_COUNTERFEIT': 6,
 	'POLICY_CATEGORY_FAKE_CERTIFICATION': 5,
 	'POLICY_CATEGORY_FOOD_SAFETY': 1,
@@ -227,18 +206,6 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return sellerKYCApplicationSubmitTime(l, time: params['time']! as String);
     case 'seller.KYCField':
       return hawkr_seller_v1alpha1_seller.KYCField.valueOf(_n(value))!.uiText(l);
-    case 'seller.KYCFlowStatus':
-      return hawkr_seller_v1alpha1_seller.KYCFlowStatus.valueOf(_n(value))!.uiText(l);
-    case 'seller.KYCFlowStatus.action':
-      return hawkr_seller_v1alpha1_seller.KYCFlowStatus.valueOf(_n(value))!.action(l);
-    case 'seller.KYCFlowStatus.banner_description':
-      return hawkr_seller_v1alpha1_seller.KYCFlowStatus.valueOf(_n(value))!.bannerDescription(l);
-    case 'seller.KYCFlowStatus.banner_title':
-      return hawkr_seller_v1alpha1_seller.KYCFlowStatus.valueOf(_n(value))!.bannerTitle(l);
-    case 'seller.KYCFlowStatus.gate_heading':
-      return hawkr_seller_v1alpha1_seller.KYCFlowStatus.valueOf(_n(value))!.gateHeading(l);
-    case 'seller.KYCFlowStatus.gate_message':
-      return hawkr_seller_v1alpha1_seller.KYCFlowStatus.valueOf(_n(value))!.gateMessage(l, subject: params['subject']! as String);
     case 'seller.KYCStatus':
       return hawkr_seller_v1alpha1_seller.KYCStatus.valueOf(_n(value))!.uiText(l);
     case 'seller.Measure.appeal_deadline':
@@ -293,8 +260,6 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_seller_v1alpha1_seller.OnboardingTaskId.valueOf(_n(value))!.panelDescription(l);
     case 'seller.OnboardingTaskId.panel_title':
       return hawkr_seller_v1alpha1_seller.OnboardingTaskId.valueOf(_n(value))!.panelTitle(l);
-    case 'seller.PayUniState':
-      return hawkr_seller_v1alpha1_seller.PayUniState.valueOf(_n(value))!.uiText(l);
     case 'seller.PaymentAccount.payouts_inactive_note':
       return sellerPaymentAccountPayoutsInactiveNote(l);
     case 'seller.PaymentAccountStatus':
@@ -309,10 +274,6 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_seller_v1alpha1_seller.RevokeReason.valueOf(_n(value))!.uiText(l);
     case 'seller.RiskGround':
       return hawkr_seller_v1alpha1_seller.RiskGround.valueOf(_n(value))!.uiText(l);
-    case 'seller.SellerPayUni.fix_fields_heading':
-      return sellerSellerPayUniFixFieldsHeading(l);
-    case 'seller.SellerPayUni.reason_heading':
-      return sellerSellerPayUniReasonHeading(l);
     case 'seller.SellerRequirement':
       return hawkr_seller_v1alpha1_seller.SellerRequirement.valueOf(_n(value))!.uiText(l);
     case 'seller.StoreField':

@@ -384,7 +384,7 @@ func TestAuthorityOrderRegisteredAfterThePurgeShowsAlreadyPurged(t *testing.T) {
 	}
 	f.now = closedAt.Add(StoreRetention + time.Hour)
 	keys, mac := sealtest.Keys(t)
-	registrar := f.newModuleClock(t, f.payuni, f.jobs, keys, mac, func() time.Time { return f.now.Add(-time.Hour) })
+	registrar := f.newModuleClock(t, f.jobs, keys, mac, func() time.Time { return f.now.Add(-time.Hour) })
 	h := f.holdPurgeStageTwoAfterCandidates(t)
 	var created CreateAuthorityOrderResult
 	var createErr error

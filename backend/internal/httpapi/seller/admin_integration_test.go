@@ -438,7 +438,7 @@ func TestListStoresPagesOverConnectAndGetStoreCarriesTheKYCSummary(t *testing.T)
 		}
 		for _, item := range resp.Msg.GetStores() {
 			got = append(got, item.GetStore().GetId())
-			if item.GetKycFlowStatus() != pb.KYCFlowStatus_KYC_FLOW_STATUS_NOT_STARTED || item.GetSuspended() {
+			if item.KycStatus != nil || item.GetSuspended() {
 				t.Fatalf("item=%+v", item)
 			}
 		}
@@ -511,7 +511,7 @@ func TestListStoresPagesOverConnectAndGetStoreCarriesTheKYCSummary(t *testing.T)
 	if d := k.GetDecideDeadline(); !d.GetStartTime().AsTime().Equal(k.GetSubmitTime().AsTime()) || !d.GetDueTime().AsTime().Equal(k.GetSubmitTime().AsTime().Add(7*24*time.Hour)) {
 		t.Fatalf("decide_deadline=%+v submit_time=%v", d, k.GetSubmitTime())
 	}
-	if k.GetApplicationId() != submitted.ID.String() || k.GetStatus() != pb.KYCStatus_KYC_STATUS_SUBMITTED || k.GetFlowStatus() != pb.KYCFlowStatus_KYC_FLOW_STATUS_SUBMITTED || k.GetSubmitTime() == nil || k.GetDecideTime() != nil {
+	if k.GetApplicationId() != submitted.ID.String() || k.GetStatus() != pb.KYCStatus_KYC_STATUS_SUBMITTED || k.GetSubmitTime() == nil || k.GetDecideTime() != nil {
 		t.Fatalf("kyc=%+v", k)
 	}
 	listed, err := f.admin.ListStores(ctx, connect.NewRequest(&adminsellerpb.ListStoresRequest{KycAwaitingReview: true}))

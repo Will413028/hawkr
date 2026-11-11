@@ -24,7 +24,6 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
-	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // kycModule 記下收到的輸入，回傳設定好的結果。
@@ -141,7 +140,7 @@ func TestSaveKYCDraftSendsOnlyTheFieldsInTheMask(t *testing.T) {
 // 設定 individual 或 business 其中一支，賣家型態就是那一支。
 func TestSaveKYCDraftClearsSelectedEmptyFieldsAndIgnoresOutputOnlyOnes(t *testing.T) {
 	m := &kycModule{}
-	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1"}, "birth_date", "real_name", "individual.id_card_no_masked", "status", "flow", "etag", "id", "missing_fields"); err != nil {
+	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1"}, "birth_date", "real_name", "individual.id_card_no_masked", "status", "last_rejection", "etag", "id", "missing_fields"); err != nil {
 		t.Fatal(err)
 	}
 	if in := m.draft; *in.BirthDate != "" || *in.RealName != "" || in.IDCardNo != nil || in.BankAccount != nil || in.SellerType != nil {
@@ -320,7 +319,6 @@ func withoutKeys(p rpc.FieldPaths, keys ...string) rpc.FieldPaths {
 
 func fullKYC(t model.KYCSellerType) model.KYCApplication {
 	text := func(s string) *string { return &s }
-	flow := model.KYCFlow{Status: model.FlowBindFailed, CanResubmit: true, IdentityLocked: true}
 	now := time.Date(2026, 10, 3, 0, 0, 0, 0, time.UTC)
 	return model.KYCApplication{
 		ID: uuid.MustParse("0192f1c0-0000-7000-8000-000000000001"), Status: model.KYCStatusRejected, Version: 3, SellerType: t,
@@ -331,7 +329,6 @@ func fullKYC(t model.KYCSellerType) model.KYCApplication {
 			{Slot: model.SlotCompanyDocument, Position: 0, AssetID: "co-1"}, {Slot: model.SlotCompanyDocument, Position: 1, AssetID: "co-2"},
 		},
 		MissingFields: []string{"business.company_name", "business.tax_id"},
-		Flow:          &flow,
 		LastRejection: &model.KYCRejection{Reason: "模糊", DecidedAt: now, Issues: []model.KYCIssue{
 			{Field: "real_name", Code: model.IssueMismatch, Message: "與證件上的姓名不同"},
 			{Field: "id_card_front", DocumentAssetID: "asset front", Code: model.IssueUnreadable, Message: "反光看不清楚"},
@@ -408,10 +405,6 @@ func TestKYCResponseCarriesOnlyMaskedValuesAndNoDocumentImages(t *testing.T) {
 	if want := []pb.KYCField{pb.KYCField_KYC_FIELD_BUSINESS_COMPANY_NAME, pb.KYCField_KYC_FIELD_BUSINESS_TAX_ID}; !slices.Equal(out.GetMissingFields(), want) {
 		t.Fatalf("missing_fields=%v", out.GetMissingFields())
 	}
-	flow := out.GetFlow()
-	if flow.GetStatus() != pb.KYCFlowStatus_KYC_FLOW_STATUS_BIND_FAILED || !flow.GetCanResubmit() || !flow.GetIdentityLocked() {
-		t.Fatalf("flow=%v", flow)
-	}
 }
 
 // SubmitKYC 的身分比對失敗是模組的固定文案：handler 原樣交回，不加欄位、帳號或原因的細節。
@@ -459,77 +452,22 @@ func TestKYCAndGovernanceEnumsMatchTheModule(t *testing.T) {
 		fields = append(fields, strings.ToUpper(strings.ReplaceAll(name, ".", "_")))
 	}
 	for name, mismatches := range map[string][]string{
-		"KYCStatus":                    rpc.EnumMismatches[pb.KYCStatus](model.KYCStatusValues()),
-		"KYCField":                     rpc.EnumMismatches[pb.KYCField](fields),
-		"KYCFlowStatus":                rpc.EnumMismatches[pb.KYCFlowStatus](model.KYCFlowStatusValues()),
-		"PayUniState":                  rpc.EnumMismatches[pb.PayUniState](model.PayUniStateValues()),
-		"KYCResubmitUnavailableReason": rpc.EnumMismatches[pb.KYCResubmitUnavailableReason](model.KYCResubmitUnavailableReasonValues()),
-		"PolicyCategory":               rpc.EnumMismatches[commonpb.PolicyCategory](policy.Values()),
-		"ViolationSeverity":            rpc.EnumMismatches[pb.ViolationSeverity](model.SeverityValues()),
-		"ViolationStatus":              rpc.EnumMismatches[pb.ViolationStatus](model.ViolationStatusValues()),
-		"RevokeReason":                 rpc.EnumMismatches[pb.RevokeReason](model.RevokeReasonValues()),
-		"MeasureKind":                  rpc.EnumMismatches[pb.MeasureKind](model.MeasureKindValues()),
-		"MeasureBasis":                 rpc.EnumMismatches[pb.MeasureBasis](model.BasisValues()),
-		"RiskGround":                   rpc.EnumMismatches[pb.RiskGround](model.RiskGroundValues()),
-		"MeasureState":                 rpc.EnumMismatches[pb.MeasureState](model.MeasureStateValues()),
-		"MeasureRequestState":          rpc.EnumMismatches[pb.MeasureRequestState](model.RequestStateValues()),
-		"MeasureRequestCloseCause":     rpc.EnumMismatches[pb.MeasureRequestCloseCause](model.RequestCloseCauseValues()),
+		"KYCStatus":                rpc.EnumMismatches[pb.KYCStatus](model.KYCStatusValues()),
+		"KYCField":                 rpc.EnumMismatches[pb.KYCField](fields),
+		"PolicyCategory":           rpc.EnumMismatches[commonpb.PolicyCategory](policy.Values()),
+		"ViolationSeverity":        rpc.EnumMismatches[pb.ViolationSeverity](model.SeverityValues()),
+		"ViolationStatus":          rpc.EnumMismatches[pb.ViolationStatus](model.ViolationStatusValues()),
+		"RevokeReason":             rpc.EnumMismatches[pb.RevokeReason](model.RevokeReasonValues()),
+		"MeasureKind":              rpc.EnumMismatches[pb.MeasureKind](model.MeasureKindValues()),
+		"MeasureBasis":             rpc.EnumMismatches[pb.MeasureBasis](model.BasisValues()),
+		"RiskGround":               rpc.EnumMismatches[pb.RiskGround](model.RiskGroundValues()),
+		"MeasureState":             rpc.EnumMismatches[pb.MeasureState](model.MeasureStateValues()),
+		"MeasureRequestState":      rpc.EnumMismatches[pb.MeasureRequestState](model.RequestStateValues()),
+		"MeasureRequestCloseCause": rpc.EnumMismatches[pb.MeasureRequestCloseCause](model.RequestCloseCauseValues()),
 	} {
 		if len(mismatches) > 0 {
 			t.Errorf("%s：%v", name, mismatches)
 		}
-	}
-}
-
-// 後台看的 PayUni 問題：碼、審核意見與欄位；處置類別不在契約裡（賣家看的是 KYCFlow.payuni）。
-func TestToProblemMapsCodeReasonAndFields(t *testing.T) {
-	text := func(s string) *string { return &s }
-	reg := model.PayUniRegistration{
-		StoreID: 11, BindStatus: model.BindStatusBound,
-		Status: model.PayUniStatus{MerStatus: text("8"), MemberStatus: text("0"), Reason: text("  請補上店面照片\n"), Outcome: model.PayUniOutcomeRejected},
-	}
-	want := model.PayUniProblemOf(reg)
-	got := toProblem(want)
-	if got.GetCode() != want.Code || got.GetReason() != "請補上店面照片" || len(got.GetFields()) != len(want.Fields) || len(want.Fields) == 0 {
-		t.Fatalf("problem=%v want=%+v", got, want)
-	}
-	if p := toProblem(model.PayUniProblemOf(model.PayUniRegistration{BindStatus: model.BindStatusPending})); p != nil {
-		t.Fatalf("綁定中不該有問題：%v", p)
-	}
-}
-
-// 賣家讀自己的申請：流程帶 PayUni 狀態（標題以外的事實與句子：說明的語系與內容、審核意見、能修正的欄位）與不能重新送出的原因；
-// 後台的 KYCApplication.flow 兩者都不設。
-func TestSellerFlowCarriesPayUniAndResubmitUnavailabilitiesButAdminFlowDoesNot(t *testing.T) {
-	flow := model.KYCFlow{Status: model.FlowPayUniRejected}
-	app := model.KYCApplication{
-		Flow: &flow,
-		PayUni: &model.SellerPayUni{
-			State: model.PayUniState("FIX_VIA_SUPPORT"), Reason: "地址不完整", FixStoreFields: []string{"address", "contact_phone"},
-		},
-		ResubmitReasons: []model.KYCResubmitUnavailableReason{model.KYCResubmitUnavailableReason("PAYUNI_FIX_VIA_SUPPORT")},
-	}
-	got := toKYC(context.Background(), app).GetFlow()
-	explanation, _ := app.PayUni.State.Explanation(uitext.ZhTW)
-	p := got.GetPayuni()
-	if p.GetState() != pb.PayUniState_PAY_UNI_STATE_FIX_VIA_SUPPORT || p.GetExplanation().GetLocale() != "zh-TW" || p.GetExplanation().GetMessage() != explanation.Text ||
-		explanation.Text == "" || p.GetReason() != "地址不完整" || len(p.GetFixFields()) != 0 ||
-		!slices.Equal(p.GetFixStoreFields(), []pb.StoreField{pb.StoreField_STORE_FIELD_ADDRESS, pb.StoreField_STORE_FIELD_CONTACT_PHONE}) {
-		t.Fatalf("payuni=%v", p)
-	}
-	reason := model.KYCResubmitUnavailableReason("PAYUNI_FIX_VIA_SUPPORT")
-	u := got.GetResubmitUnavailabilities()
-	if len(u) != 1 || u[0].GetReason() != pb.KYCResubmitUnavailableReason_KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_FIX_VIA_SUPPORT ||
-		u[0].GetMessage().GetMessage() != reason.Text(uitext.ZhTW).Text || u[0].GetMessage().GetMessage() == "" {
-		t.Fatalf("resubmit_unavailabilities=%v", u)
-	}
-	// 沒有 PayUni 狀態（申請不在 PayUni 階段）時不設。
-	if f := toKYC(context.Background(), model.KYCApplication{Flow: &flow}).GetFlow(); f.GetPayuni() != nil || len(f.GetResubmitUnavailabilities()) != 0 {
-		t.Fatalf("flow=%v", f)
-	}
-	admin := toAdminKYC(model.KYCAdminApplication{KYCApplication: app}).GetFlow()
-	if admin.GetPayuni() != nil || len(admin.GetResubmitUnavailabilities()) != 0 || admin.GetStatus() != pb.KYCFlowStatus_KYC_FLOW_STATUS_PAYUNI_REJECTED {
-		t.Fatalf("admin flow=%v", admin)
 	}
 }
 
@@ -653,14 +591,10 @@ func TestKYCFieldIsOneToOneWithTheWritableApplicationFields(t *testing.T) {
 	}
 }
 
-func TestStoreFieldsAreMappedOnTheKYCViewAndTheProblem(t *testing.T) {
+func TestStoreFieldsAreMappedOnTheKYCView(t *testing.T) {
 	out := toKYC(context.Background(), model.KYCApplication{MissingStoreFields: []string{"support_email", "address", "contact_name"}})
 	want := []pb.StoreField{pb.StoreField_STORE_FIELD_ADDRESS, pb.StoreField_STORE_FIELD_CONTACT_NAME, pb.StoreField_STORE_FIELD_SUPPORT_EMAIL}
 	if !slices.Equal(out.GetMissingStoreFields(), want) {
 		t.Fatalf("missing_store_fields=%v", out.GetMissingStoreFields())
-	}
-	p := toProblem(&model.PayUniProblem{Code: "AGENT06006", Remedy: model.RemedySellerFix, StoreFields: []string{"contact_mobile", "contact_phone"}})
-	if !slices.Equal(p.GetStoreFields(), []pb.StoreField{pb.StoreField_STORE_FIELD_CONTACT_MOBILE, pb.StoreField_STORE_FIELD_CONTACT_PHONE}) || len(p.GetFields()) != 0 {
-		t.Fatalf("problem=%v", p)
 	}
 }

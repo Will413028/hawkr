@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	pu "github.com/Will413028/hawkr/backend/internal/platform/payuni"
 )
 
 // announced 讀這家店最後公告的值；沒有列等同 version 0 的列。
@@ -49,18 +48,16 @@ func (f *fixture) wantAnnouncements(t *testing.T, got *recorded[StoreExposureCha
 }
 
 // 可曝光翻轉的寫入在它自己的 transaction 內公告，版本每次加一（ADR 2026-10-05-store-exposure-to-legacy 決策 1）。四類寫入路徑：
-// profile（logo、鄉鎮）、停權、KYC 與 PayUni 的結果、狀態（等待刪除）。
+// profile（logo、鄉鎮）、停權、KYC 與收款帳戶的結果、狀態（等待刪除）。
 func TestExposureFlipsAreAnnouncedByEveryKindOfWrite(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
 	announcements := record[StoreExposureChanged](f)
-	accountID, s := f.boundStore(t)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "1"}
-	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourcePoll))
+	accountID, s := f.approvedStore(t)
 	f.setPayment(t, s.StoreID, enabledSnapshot)
 	if got := announcements.all(); len(got) != 0 {
-		t.Fatalf("PayUni 核准但還沒有 logo，不可曝光：%+v", got)
+		t.Fatalf("收款帳戶啟用但還沒有 logo，不可曝光：%+v", got)
 	}
 
 	f.logoed(t, accountID, s)
@@ -79,21 +76,17 @@ func TestExposureFlipsAreAnnouncedByEveryKindOfWrite(t *testing.T) {
 
 	n = len(announcements.all())
 	f.now = f.now.Add(time.Hour)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "8"}
-	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourceRefresh))
 	f.setPayment(t, s.StoreID, rejectedSnapshot)
 	f.wantAnnouncements(t, announcements, n, s.StoreID, false)
 	n = len(announcements.all())
 	f.now = f.now.Add(time.Hour)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "1"}
-	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourceRefresh))
 	f.setPayment(t, s.StoreID, enabledSnapshot)
 	f.wantAnnouncements(t, announcements, n, s.StoreID, true)
 
 	n = len(announcements.all())
 	cur, err := f.module.Store(ctx, s.StoreID)
 	must(t, err)
-	// 有 PayUni 註冊的店家不能經 UpdateProfile 清掉地址：直接清（代表地址不合法的歷史資料），再以別的欄位的寫入觸發公告。
+	// 已核准的店家不能經 UpdateProfile 清掉地址：直接清（代表地址不合法的歷史資料），再以別的欄位的寫入觸發公告。
 	_, err = f.db.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET town_code = NULL, address_detail = NULL WHERE store_id = $1", s.StoreID)
 	must(t, err)
 	_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, Prize: ptr("優良農民")})
@@ -190,9 +183,7 @@ func TestAnExposureEventFailureRollsBackTheWriteAndTheAnnouncement(t *testing.T)
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
-	accountID, s := f.boundStore(t)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "1"}
-	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourcePoll))
+	accountID, s := f.approvedStore(t)
 	f.setPayment(t, s.StoreID, enabledSnapshot)
 	boom := errors.New("subscriber failed")
 	events.Subscribe(f.bus, func(context.Context, StoreExposureChanged) error { return boom })

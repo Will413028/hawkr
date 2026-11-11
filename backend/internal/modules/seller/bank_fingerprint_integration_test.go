@@ -78,7 +78,7 @@ func TestBankFingerprintRowsAreIdempotentKeptAndNeverPlaintext(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	enc, mac := rotatedKeys(t)
-	f.module = f.newModuleWithKeys(t, f.payuni, f.jobs, enc, mac)
+	f.module = f.newModuleWithKeys(t, f.jobs, enc, mac)
 	_, s := f.approvedWithFingerprints(t, idA, bankAcct, fpShared, fpOther)
 	keys := f.count(t, "SELECT count(DISTINCT key_id) FROM seller.account_identity_hashes WHERE source_store_id = $1 AND field = 'ID_CARD_NO'", s.StoreID)
 	if keys != 2 {

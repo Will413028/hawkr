@@ -96,8 +96,7 @@ service SellerAppService {
   // 店家還沒有申請時，不帶 etag 的呼叫建立它（subject 必須設定其中一支）；已經有申請時 etag 必填，沒帶 etag 回
   // already_exists、與目前的版本不符回 aborted，兩者的 ErrorInfo.reason 都是 VERSION_CONFLICT（client 的處理相同：
   // 保留輸入、顯示最新版本）。被退回的申請在這裡回到草稿重新編輯。全部欄位先驗證才寫入，任何一欄不合法都不會寫入。
-  // 送出（SubmitKYC）才檢查必填欄位與證件是否齊全。流程狀態 can_resubmit 為 false 時回 failed_precondition，訊息是
-  // KYCFlow.resubmit_unavailabilities 的第一句。
+  // 送出（SubmitKYC）才檢查必填欄位與證件是否齊全。只有草稿與被退回的申請能儲存；審核中與已核准的回 failed_precondition。
   rpc SaveKYCDraft(SaveKYCDraftRequest) returns (SaveKYCDraftResponse);
 
   // GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）與流程狀態。還沒有申請（或申請已取消）
@@ -106,8 +105,8 @@ service SellerAppService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  // SubmitKYC 送出申請給管理員審核。草稿，以及流程狀態 can_resubmit 為 true 的申請（被退回的、PayUni 拒絕或綁定失敗而且賣家能自己修正的）都能直接送出，
-  // 不必先儲存；can_resubmit 為 false 的狀態回 failed_precondition，訊息是 KYCFlow.resubmit_unavailabilities 的第一句。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
+  // SubmitKYC 送出申請給管理員審核。草稿與被退回的申請都能直接送出，
+  // 不必先儲存；審核中與已核准的申請回 failed_precondition。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
   // invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（real_name、id_card_front、business.tax_id……，與 KYCField 一對一）。申請本身齊全之後，
   // 店家的必填資料（地址、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
   // client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。帳號沒有聯絡信箱（IdentityAppService.GetContactEmail 沒有回信箱）時回
@@ -309,7 +308,7 @@ enum SellerRequirement {
 }
 
 // StoreField 是店家上的一個欄位，值與 Store 的欄位一對一。送出 KYC 之前還缺的店家欄位
-// （KYCApplication.missing_store_fields）與 PayUni 問題要賣家補的店家欄位（PayUniProblem.store_fields）都用這一套。
+// （KYCApplication.missing_store_fields）都用這一套。
 enum StoreField {
   STORE_FIELD_UNSPECIFIED = 0;
   // 店家地址（鄉鎮市區與地址明細）。
@@ -651,7 +650,7 @@ message CloseMyStoreResponse {
   Store store = 1;
 }
 
-// KYCStatus 是申請的人工決定；PayUni 的綁定結果不在這條軸上（見 KYCFlow）。
+// KYCStatus 是申請的人工決定。
 enum KYCStatus {
   KYC_STATUS_UNSPECIFIED = 0;
   // 填寫中；被退回的申請編輯時也回到這裡。
@@ -667,8 +666,8 @@ enum KYCStatus {
 }
 
 // KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：
-// KYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的
-// 欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。
+// KYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的
+// 欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。
 enum KYCField {
   KYC_FIELD_UNSPECIFIED = 0;
   KYC_FIELD_REAL_NAME = 1;
@@ -740,27 +739,6 @@ message KYCIssue {
   string message = 4;
 }
 
-// KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。
-enum KYCFlowStatus {
-  KYC_FLOW_STATUS_UNSPECIFIED = 0;
-  // 沒有申請，或申請已取消。
-  KYC_FLOW_STATUS_NOT_STARTED = 1;
-  KYC_FLOW_STATUS_DRAFT = 2;
-  KYC_FLOW_STATUS_SUBMITTED = 3;
-  KYC_FLOW_STATUS_REJECTED = 4;
-  // 管理員核准，正在向 PayUni 註冊。
-  KYC_FLOW_STATUS_BINDING = 5;
-  // 向 PayUni 註冊失敗，等管理員處理。
-  KYC_FLOW_STATUS_BIND_FAILED = 6;
-  // 已向 PayUni 註冊，還沒有審核結果。
-  KYC_FLOW_STATUS_FORWARDED = 7;
-  KYC_FLOW_STATUS_UNDER_REVIEW = 8;
-  KYC_FLOW_STATUS_PENDING_INFO = 9;
-  // PayUni 核准，可以收款。
-  KYC_FLOW_STATUS_APPROVED = 10;
-  KYC_FLOW_STATUS_PAYUNI_REJECTED = 11;
-}
-
 // KYCDocument 是申請上的一張證件圖片。證件含個資，下載要經有授權的 download_uri（只有申請的擁有者能下載），不是公開的
 // 圖片網址。
 message KYCDocument {
@@ -782,98 +760,6 @@ message KYCRejection {
   google.protobuf.Timestamp decide_time = 3;
   // 退回時逐項指出的問題（不管賣家後來有沒有處理）；賣家還沒處理的是 KYCApplication.outstanding_issues。
   repeated KYCIssue issues = 4;
-}
-
-// PayUniProblem 是後台看的 PayUni 問題的事實：code 給員工與客服排查；fields、store_fields 是碼指出的欄位（未依身分鎖過濾）；
-// reason 是 PayUni 的審核意見原文（去掉前後空白，沒有時是空字串）。賣家看的是 KYCFlow.payuni。
-message PayUniProblem {
-  reserved 2;
-  reserved "remedy";
-
-  // 錯誤碼：我們自己的碼（INCOMPLETE_DATA、PAYUNI_NOT_CONFIGURED、PAYUNI_UNAVAILABLE、MERCHANT_TERMINAL）或 PayUni
-  // 的碼（AGENT 開頭，MER_ 與 MEMBER_ 開頭的是審核狀態）。開放集合。
-  string code = 1;
-  // 碼指出的申請欄位（與 KYCIssue.field 同一套）；問題不在申請欄位上時是空的。
-  repeated KYCField fields = 3;
-  string reason = 4;
-  // 碼指出的店家欄位（UpdateMyStore）；問題不在店家欄位上時是空的。
-  repeated StoreField store_fields = 5;
-}
-
-// PayUniState 是賣家看到的 PayUni 收款狀態，一個值對應賣家的一種動作。伺服器由申請與 PayUni 註冊推導。
-enum PayUniState {
-  PAY_UNI_STATE_UNSPECIFIED = 0;
-  // 綁定中或 PayUni 審核中，賣家等結果。
-  PAY_UNI_STATE_REVIEWING = 1;
-  // PayUni 要求補件，賣家依 PayUni 的通知信處理。
-  PAY_UNI_STATE_PENDING_INFO = 2;
-  // 申請的資料有問題，賣家修正申請後自己重新送出。
-  PAY_UNI_STATE_FIXABLE = 3;
-  // 店家設定的資料有問題，賣家修正後由平台重新處理，不能自己重新送出。
-  PAY_UNI_STATE_FIX_VIA_SUPPORT = 4;
-  // 沒有賣家能修正的資料，賣家要聯絡客服，不能自己重新送出。
-  PAY_UNI_STATE_CONTACT_SUPPORT = 5;
-  // PayUni 暫時無法處理，等平台重新送出。
-  PAY_UNI_STATE_RETRY_LATER = 6;
-  // PayUni 端的商店已是終止狀態，同一個店家無法再綁定。
-  PAY_UNI_STATE_TERMINATED = 7;
-  // 可以收款。
-  PAY_UNI_STATE_APPROVED = 8;
-}
-
-// SellerPayUni 是賣家看到的 PayUni 狀態與要處理的事。
-message SellerPayUni {
-  PayUniState state = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 給賣家看的狀態說明（locale 是實際用的語系），只由 state 決定；state 是 APPROVED 時不設。
-  google.rpc.LocalizedMessage explanation = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // PayUni 針對這家店寫的審核意見原文（去掉前後空白；沒有時是空字串）。第三方原文、不翻譯，client 另外顯示並標 zh-TW。
-  string reason = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 賣家此刻能在申請上修正的欄位（已依賣家型態與身分鎖過濾）；沒有具體欄位時是空的，client 不顯示清單。
-  repeated KYCField fix_fields = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 賣家此刻能在店家設定（UpdateMyStore）修正的欄位；沒有時是空的。
-  repeated StoreField fix_store_fields = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-// KYCResubmitUnavailableReason 是 SaveKYCDraft 與 SubmitKYC 此刻不能做的原因（KYCResubmitUnavailability.reason）。
-enum KYCResubmitUnavailableReason {
-  KYC_RESUBMIT_UNAVAILABLE_REASON_UNSPECIFIED = 0;
-  // 申請送審中，可以先取消再修改。
-  KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW_CANCELABLE = 1;
-  // 申請送審中，PayUni 已收下店家，不能取消。
-  KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW = 2;
-  // 以下對應 PayUniState 裡不能重送的值。
-  KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_REVIEWING = 3;
-  KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_PENDING_INFO = 4;
-  KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_FIX_VIA_SUPPORT = 5;
-  KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_CONTACT_SUPPORT = 6;
-  KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_RETRY_LATER = 7;
-  KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_TERMINATED = 8;
-  KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_APPROVED = 9;
-}
-
-// KYCResubmitUnavailability 是 SaveKYCDraft 與 SubmitKYC 此刻不能做的一個原因。與兩個 RPC 的前置檢查是同一個規則，message 與
-// 被擋下時錯誤的訊息是同一份文字（同一個 Go 函式）。
-message KYCResubmitUnavailability {
-  // 原因。伺服器一律設，不會是 UNSPECIFIED。
-  KYCResubmitUnavailableReason reason = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 給使用者看的完整一句話（locale 是實際用的語系），有主詞、不含 client 的畫面或選單名稱；client 直接顯示。
-  google.rpc.LocalizedMessage message = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-// KYCFlow 是申請的流程狀態與衍生旗標：KYC 與 PayUni 兩條軸合成的結果。
-message KYCFlow {
-  KYCFlowStatus status = 1;
-  // 此刻 SaveKYCDraft 與 SubmitKYC 會被接受（草稿、被退回、PayUni 拒絕或綁定失敗而且賣家能自己修正）。
-  bool can_resubmit = 2;
-  // 註冊已有 MerID：身分欄位（店名、介紹、姓名或公司名稱、證號、統編、英文名稱、官網、商品類型、賣家型態）鎖住，只能
-  // 更正聯絡欄位與地址。
-  bool identity_locked = 3;
-  // can_resubmit 為假時的原因，依先後，至少一個；為真時是空的。SaveKYCDraft、SubmitKYC 不能做時回的
-  // failed_precondition 是第一個的 message。只在賣家的回應設，admin 的 KYCApplication.flow 不設。
-  repeated KYCResubmitUnavailability resubmit_unavailabilities = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 申請在 PayUni 階段（已核准），或賣家正在修正 PayUni 拒絕、綁定失敗的那份申請（草稿）時才設。只在賣家的回應設，
-  // admin 的 KYCApplication.flow 不設。
-  SellerPayUni payuni = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // IndividualKYC 是個人賣家專屬的欄位：身分證號是賣家本人的。
@@ -912,8 +798,8 @@ message BusinessKYC {
 // 是清掉），company_documents 整個換成請求的清單，每個元素是現有的圖片（asset_id，保留）或新上傳的圖片（staged_token），
 // 同一張圖片不能放進兩個位置。
 message KYCApplication {
-  reserved 15, 17, 18;
-  reserved "contact_email", "contact_phone", "food_business";
+  reserved 15, 17, 18, 24;
+  reserved "contact_email", "contact_phone", "food_business", "flow";
   // 33 是刪掉的 payout_contact_email（收款聯絡信箱改為帳號層級，IdentityAppService.GetContactEmail；SubmitKYC 要求帳號有聯絡信箱）。
   reserved 33;
   reserved "payout_contact_email";
@@ -942,7 +828,6 @@ message KYCApplication {
     IndividualKYC individual = 22;
     BusinessKYC business = 23;
   }
-  KYCFlow flow = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 最近一次退回，只在「最近一次審核紀錄是退回、賣家還沒重新送出（核准、取消之後也算）」時設，其餘時候不設；client 直接看有沒有
   // 這個欄位決定要不要顯示總理由與「需重新送出」的提示，不必自己推導。賣家把每一項問題都處理完、還沒重新送出時它仍在。
   KYCRejection last_rejection = 25 [(google.api.field_behavior) = OUTPUT_ONLY];

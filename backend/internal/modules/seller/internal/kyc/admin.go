@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payuni"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -430,9 +429,8 @@ func (s *Service) reviewReasons(ctx context.Context, q *store.Queries, locked st
 }
 
 // Approve 核准審核中的申請：鎖住帳號與申請列、在鎖內重新檢查（版本、狀態、店家還在營業、申請人的帳號沒有停權、身分
-// 沒有命中別的帳號生效中的處分）、設為 APPROVED、寫審核紀錄、發 KYCApproved；PayUni 的
-// 綁定意圖（bind_status = PENDING）與以 store_id 為唯一鍵的 sync job、收款帳戶「建立中」的列與建立 job 也在同一個 transaction（外部呼叫在 job，不在
-// transaction 內，盤點 D4、D5）。命中身分時回泛用錯誤，不透露欄位或帳號。
+// 沒有命中別的帳號生效中的處分）、設為 APPROVED、寫審核紀錄、發 KYCApproved；
+// 收款帳戶「建立中」的列與建立 job 也在同一個 transaction（外部呼叫在 job，不在 transaction 內，盤點 D4、D5）。命中身分時回泛用錯誤，不透露欄位或帳號。
 //
 // 版本不符一律回 VersionConflict（先於狀態檢查），不寫入；不推斷重送：已經核准的申請被舊版本再核准，client 重讀後看到結果。
 func (s *Service) Approve(ctx context.Context, in model.ApproveKYCInput) (model.KYCAdminApplication, error) {
@@ -464,9 +462,6 @@ func (s *Service) Approve(ctx context.Context, in model.ApproveKYCInput) (model.
 		}
 		review, err := q.InsertKYCReview(ctx, reviewParams(row.ApplicationID, model.ReviewApprove, &in.AdminID, comment, "", shown.id(), now))
 		if err != nil {
-			return err
-		}
-		if _, err := payuni.RequestBind(ctx, q, s.d.Jobs, payuni.BindIntent{Store: locked, Application: row}, now); err != nil {
 			return err
 		}
 		var contact *string

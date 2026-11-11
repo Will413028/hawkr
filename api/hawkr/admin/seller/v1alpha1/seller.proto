@@ -68,7 +68,7 @@ service SellerAdminService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  // ApproveKYC 核准審核中的申請，並在同一個 transaction 寫入 PayUni 的綁定意圖（綁定由背景程序完成）。etag 必填。身分命中
+  // ApproveKYC 核准審核中的申請，並在同一個 transaction 排入收款帳戶的建立（建立由背景程序完成）。etag 必填。身分命中
   // 別的帳號生效中的處分回 failed_precondition，文案不透露欄位或帳號。申請不能核准（不在審核中、店家已關閉或等待刪除、
   // 帳號停權中）時回 failed_precondition，訊息是 KYCApplication.approve_unavailabilities 的第一句。
   // 帳號停權時不能核准、可以退回；
@@ -194,14 +194,14 @@ message Store {
   string support_email = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// StoreListItem 是清單的一列：店家，加上帳號此刻是否停權與身分認證的流程狀態。
+// StoreListItem 是清單的一列：店家，加上帳號此刻是否停權與目前申請的狀態。
 message StoreListItem {
-  reserved 2;
-  reserved "suspension_source";
+  reserved 2, 3;
+  reserved "suspension_source", "kyc_flow_status";
 
   Store store = 1;
-  // 沒有申請（或申請已取消）是 NOT_STARTED。
-  hawkr.seller.v1alpha1.KYCFlowStatus kyc_flow_status = 3;
+  // 目前申請的狀態；沒有申請（或申請已取消）時不設。
+  optional hawkr.seller.v1alpha1.KYCStatus kyc_status = 6;
   // 帳號此刻是否停權（任何一個店家的生效中措施都算）。
   bool suspended = 4;
   // 店家此刻不能被代行營運的店家狀態原因（已關閉、等待刪除、停權），與代行 preflight 的店家狀態檢查同一個規則；空不表示能代行：
@@ -211,9 +211,11 @@ message StoreListItem {
 
 // KYCSummary 是店家身分認證的摘要；申請的內容與審核在後台的 KYC 審核方法。
 message KYCSummary {
+  reserved 3;
+  reserved "flow_status";
+
   string application_id = 1;
   hawkr.seller.v1alpha1.KYCStatus status = 2;
-  hawkr.seller.v1alpha1.KYCFlowStatus flow_status = 3;
   google.protobuf.Timestamp submit_time = 4;
   google.protobuf.Timestamp decide_time = 5;
   // 審核的期限，只在審核中（SUBMITTED）時設：開始時間是 submit_time，期限 7 天。
@@ -502,8 +504,8 @@ message KYCReveal {
 // KYCApplication 是後台看到的身分認證申請：只有遮蔽後的身分證號與銀行帳號（全文用 RevealKYCSensitive），沒有任何寫入用的
 // 欄位。
 message KYCApplication {
-  reserved 16, 18, 19;
-  reserved "contact_email", "contact_phone", "food_business";
+  reserved 16, 18, 19, 23;
+  reserved "contact_email", "contact_phone", "food_business", "flow";
 
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   string store_id = 2;
@@ -527,8 +529,6 @@ message KYCApplication {
     BusinessKYC business = 21;
   }
   repeated KYCDocument documents = 22;
-  // KYC 與 PayUni 兩條軸合成的流程狀態。
-  hawkr.seller.v1alpha1.KYCFlow flow = 23;
   // 審核紀錄，舊到新（筆數由人工動作限制，所以內嵌）。顯示全文與證件讀取的稽核紀錄隨使用增長，另用 ListKYCReveals 與
   // ListKYCDocumentAccesses 分頁讀。
   repeated KYCReview reviews = 24;

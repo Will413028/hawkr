@@ -17,7 +17,6 @@ import (
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
-	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // kycFields 是模組的草稿輸入的欄位名對應到 KYCApplication 的欄位路徑（與 KYCField 一對一）。
@@ -291,9 +290,6 @@ func toKYC(ctx context.Context, a model.KYCApplication) *pb.KYCApplication {
 			}
 		}
 	}
-	if a.Flow != nil {
-		out.Flow = toSellerFlow(ctx, *a.Flow, a)
-	}
 	if r := a.LastRejection; r != nil {
 		out.LastRejection = &pb.KYCRejection{Reason: r.Reason, DecideTime: timestamppb.New(r.DecidedAt), Issues: toKYCIssues(r.Issues)}
 	}
@@ -327,49 +323,6 @@ func kycFieldPB(name string) pb.KYCField {
 // storeFieldPB 把店家的欄位路徑（model.StoreFieldNames）轉成契約的列舉。
 func storeFieldPB(name string) pb.StoreField {
 	return rpc.EnumToProto[pb.StoreField](strings.ToUpper(name))
-}
-
-// toFlow 是流程狀態的共用部分（賣家與後台）；賣家受眾的 payuni 與 resubmit_unavailabilities 只在 toSellerFlow 設。
-func toFlow(f model.KYCFlow) *pb.KYCFlow {
-	return &pb.KYCFlow{Status: rpc.EnumToProto[pb.KYCFlowStatus](f.Status), CanResubmit: f.CanResubmit, IdentityLocked: f.IdentityLocked}
-}
-
-// toSellerFlow 是賣家讀自己的申請時的流程狀態：共用部分加上賣家看到的 PayUni 狀態與不能重新送出的原因（句子的語系取自 ctx）。
-func toSellerFlow(ctx context.Context, f model.KYCFlow, a model.KYCApplication) *pb.KYCFlow {
-	out := toFlow(f)
-	l := uitext.LocaleFrom(ctx)
-	for _, r := range a.ResubmitReasons {
-		out.ResubmitUnavailabilities = append(out.ResubmitUnavailabilities, &pb.KYCResubmitUnavailability{
-			Reason: rpc.EnumToProto[pb.KYCResubmitUnavailableReason](r), Message: rpc.LocalizedMessage(r.Text(l)),
-		})
-	}
-	if p := a.PayUni; p != nil {
-		out.Payuni = &pb.SellerPayUni{State: rpc.EnumToProto[pb.PayUniState](p.State), Reason: p.Reason}
-		if m, ok := p.State.Explanation(l); ok {
-			out.Payuni.Explanation = rpc.LocalizedMessage(m)
-		}
-		for _, f := range p.FixFields {
-			out.Payuni.FixFields = append(out.Payuni.FixFields, kycFieldPB(f))
-		}
-		for _, f := range p.FixStoreFields {
-			out.Payuni.FixStoreFields = append(out.Payuni.FixStoreFields, storeFieldPB(f))
-		}
-	}
-	return out
-}
-
-func toProblem(p *model.PayUniProblem) *pb.PayUniProblem {
-	if p == nil {
-		return nil
-	}
-	out := &pb.PayUniProblem{Code: p.Code, Reason: deref(p.Reason)}
-	for _, f := range p.Fields {
-		out.Fields = append(out.Fields, kycFieldPB(f))
-	}
-	for _, f := range p.StoreFields {
-		out.StoreFields = append(out.StoreFields, storeFieldPB(f))
-	}
-	return out
 }
 
 // toDate 把模組的日曆日（YYYY-MM-DD）轉成 google.type.Date；沒有值或格式不合時不設。

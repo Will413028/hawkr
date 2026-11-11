@@ -9,26 +9,11 @@ import (
 )
 
 // draftDiff 是一次草稿寫入真的改掉了什麼，由寫入路徑（applyDraft）回報，是「值有沒有變」的唯一來源：退回問題的「已處理」判定
-// （resolveIssues）與「PayUni 已收下之後不能改身分欄位」（checkIdentityUnchanged）都用它。比的是明文與正規化後的值，個資密文
+// （resolveIssues）用它。比的是明文與正規化後的值，個資密文
 // 每次加密都不同、blind index 隨金鑰版本與銀行代碼變，都不能拿來比。文件類欄位由證件的合併（mergeDocuments）判斷，不在這裡。
 type draftDiff struct {
 	// fields 是值有變的申請欄位（KYCFieldNames 的路徑，文件類除外）。
 	fields map[string]bool
-	// sellerType 是賣家型態有變。
-	sellerType bool
-}
-
-// identity 回報這次寫入有沒有改到身分欄位。
-func (d draftDiff) identity() bool {
-	if d.sellerType {
-		return true
-	}
-	for _, f := range model.LockedIdentityFields() {
-		if d.fields[f] {
-			return true
-		}
-	}
-	return false
 }
 
 type fieldDiff func(p protector, a, b store.SellerKycApplication) (bool, error)
@@ -99,7 +84,7 @@ var fieldDiffs = map[string]fieldDiff{
 
 // diffRows 比對寫入前後的申請列。
 func (p protector) diffRows(base, next store.SellerKycApplication) (draftDiff, error) {
-	d := draftDiff{fields: map[string]bool{}, sellerType: base.SellerType != next.SellerType}
+	d := draftDiff{fields: map[string]bool{}}
 	for field, differs := range fieldDiffs {
 		changed, err := differs(p, base, next)
 		if err != nil {

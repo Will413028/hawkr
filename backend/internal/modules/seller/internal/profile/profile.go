@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payuni"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -36,10 +35,8 @@ type Deps struct {
 	Media  media.Media
 	// Exposure 是可曝光規則的套用與公告（classify 與每個寫入的公告都經它）；必填。
 	Exposure *exposure.Service
-	// StorefrontBaseURL 是店家頁的網站根網址（PayUni 綁定的資料完整性要用它；空字串表示沒有）。
-	StorefrontBaseURL string
-	Now               func() time.Time
-	Logger            *slog.Logger
+	Now      func() time.Time
+	Logger   *slog.Logger
 }
 
 // Service 是 profile 的 use case。
@@ -350,7 +347,7 @@ type imageChange struct {
 	asset media.Asset
 }
 
-// preflight 在轉正圖片之前做所有不需要寫入就能判斷的拒絕（能力、版本、合併後的文字驗證、PayUni 的店名鎖）：被拒絕的請求
+// preflight 在轉正圖片之前做所有不需要寫入就能判斷的拒絕（能力、版本、合併後的文字驗證）：被拒絕的請求
 // 不消耗 staged token，client 修正之後可以用同一個 token 重送。transaction 內會再判斷一次（以列鎖內的資料為準）。
 func (s *Service) preflight(ctx context.Context, in model.UpdateProfileInput) error {
 	current, err := s.Store(ctx, in.StoreID)
@@ -367,7 +364,7 @@ func (s *Service) preflight(ctx context.Context, in model.UpdateProfileInput) er
 	return err
 }
 
-// mergeChecked 把輸入疊到 before 的 profile 並驗證；店名或介紹改變時要 PayUni 沒有持有它們（盤點 D17）。
+// mergeChecked 把輸入疊到 before 的 profile 並驗證；店名與介紹沒有鎖，審核中與核准之後都能改。
 func (s *Service) mergeChecked(ctx context.Context, q *store.Queries, before model.Store, in model.UpdateProfileInput) (model.Profile, error) {
 	merged := merge(before.Profile, in)
 	if err := model.Normalize(&merged); err != nil {
@@ -375,12 +372,6 @@ func (s *Service) mergeChecked(ctx context.Context, q *store.Queries, before mod
 	}
 	if err := checkRequiredNotCleared(ctx, q, before, merged); err != nil {
 		return model.Profile{}, err
-	}
-	// PayUni 持有的店名與介紹不會跟著 update_merchant 改變：KYC 審核中或 PayUni 已收下註冊時鎖住（盤點 D17）。
-	if merged.StoreName != before.StoreName || !equalText(merged.Description, before.Description) {
-		if err := payuni.CheckNameUnlocked(ctx, q, in.StoreID); err != nil {
-			return model.Profile{}, err
-		}
 	}
 	return merged, nil
 }
@@ -484,12 +475,6 @@ func (s *Service) writeProfile(ctx context.Context, in model.UpdateProfileInput,
 				return err
 			}
 			version = row.Version
-			// 地址與聯絡資料是送給 PayUni 的資料：改了就登記同步（同一個 transaction 排入以 store_id 為唯一鍵的 job，PENDING 期間也送）。
-			if payuni.SyncedFieldsChanged(before.Profile, merged) {
-				if err := payuni.RequestSync(ctx, q, s.d.Jobs, s.d.StorefrontBaseURL, in.StoreID, now); err != nil {
-					return err
-				}
-			}
 		}
 		for _, c := range changes {
 			ref := mediaref.StoreRef(c.kind.refType, in.StoreID)
@@ -523,13 +508,6 @@ func (s *Service) writeProfile(ctx context.Context, in model.UpdateProfileInput,
 		return err
 	})
 	return updated, err
-}
-
-func equalText(a, b *string) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	return *a == *b
 }
 
 // merge 把輸入疊到目前的 profile：nil 保留原值，空字串清成沒有值。

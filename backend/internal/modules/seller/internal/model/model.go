@@ -281,10 +281,10 @@ type StoreListInput struct {
 	After     *StoreCursor
 }
 
-// StoreListItem 是清單的一列：店家（帶推導的停權狀態）與它的 KYC 流程狀態（沒有申請是 NOT_STARTED）。
+// StoreListItem 是清單的一列：店家（帶推導的停權狀態）與目前申請的狀態（沒有申請或申請已取消時為 nil）。
 type StoreListItem struct {
-	Store   Store
-	KYCFlow KYCFlowStatus
+	Store     Store
+	KYCStatus *KYCStatus
 }
 
 // StorePage 是一頁店家；Next 為 nil 表示沒有下一頁。
@@ -318,7 +318,7 @@ type UpdateProfileInput struct {
 	StoreID, ExpectedVersion  int64
 	StoreName                 *string
 	Description, ContactPhone *string
-	// ContactName、ContactMobile、SupportEmail 是送給 PayUni 的聯絡資料。
+	// ContactName、ContactMobile、SupportEmail 是店家的聯絡資料。
 	ContactName, ContactMobile, SupportEmail *string
 	TownCode, AddressDetail                  *string
 	Prize, WebsiteURL                        *string

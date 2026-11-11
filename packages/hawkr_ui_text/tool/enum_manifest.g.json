@@ -113,25 +113,11 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.seller.v1alpha1.KYCFlowStatus",
-      "dartClass": "KYCFlowStatus",
-      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
-      "inCatalog": true,
-      "serverOwned": false
-    },
-    {
       "name": "hawkr.seller.v1alpha1.KYCIssueCode",
       "dartClass": "KYCIssueCode",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
       "inCatalog": false,
       "serverOwned": false
-    },
-    {
-      "name": "hawkr.seller.v1alpha1.KYCResubmitUnavailableReason",
-      "dartClass": "KYCResubmitUnavailableReason",
-      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
-      "inCatalog": false,
-      "serverOwned": true
     },
     {
       "name": "hawkr.seller.v1alpha1.KYCStatus",
@@ -208,13 +194,6 @@
       "dartClass": "OnboardingTaskState",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
       "inCatalog": false,
-      "serverOwned": false
-    },
-    {
-      "name": "hawkr.seller.v1alpha1.PayUniState",
-      "dartClass": "PayUniState",
-      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
-      "inCatalog": true,
       "serverOwned": false
     },
     {

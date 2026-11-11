@@ -10,7 +10,6 @@ import (
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
-	pu "github.com/Will413028/hawkr/backend/internal/platform/payuni"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
@@ -199,22 +198,20 @@ func TestMatchCertificateHolder(t *testing.T) {
 	}
 }
 
-// 比對基準是人工核准的 KYC（`docs/modules/seller.md` §1.3「已通過實名認證」）：PayUni 還沒核准、甚至被拒絕，基準都還在；申請還沒核准則沒有基準。
-func TestMatchCertificateHolderDoesNotNeedThePayUniApproval(t *testing.T) {
+// 比對基準是人工核准的 KYC（`docs/modules/seller.md` §1.3「已通過實名認證」）：收款帳戶還沒啟用、甚至被停用，基準都還在；申請還沒核准則沒有基準。
+func TestMatchCertificateHolderDoesNotNeedAnEnabledPaymentAccount(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	_, s := f.boundStore(t) // KYC 核准、已綁定，PayUni 還沒有審核結果。
+	_, s := f.approvedStore(t) // KYC 核准，收款帳戶還沒啟用。
 	got, err := f.module.MatchCertificateHolder(ctx, s.StoreID, "王小明")
 	must(t, err)
 	if !got.Matched || got.Field != "REAL_NAME" || !got.HasReference {
-		t.Fatalf("PayUni 未核准：%+v", got)
+		t.Fatalf("收款帳戶未啟用：%+v", got)
 	}
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "8"}
-	f.now = f.now.Add(24 * time.Hour)
-	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourceRefresh))
+	f.setPayment(t, s.StoreID, rejectedSnapshot)
 	if got, err = f.module.MatchCertificateHolder(ctx, s.StoreID, "王小明"); err != nil || !got.Matched || !got.HasReference {
-		t.Fatalf("PayUni 拒絕後：%+v %v", got, err)
+		t.Fatalf("收款帳戶停用後：%+v %v", got, err)
 	}
 	// 申請送出但還沒人工核准：賣家自己填的名稱不能當基準。
 	_, submittedStore, _ := f.submitted(t, idB, bankAcct)

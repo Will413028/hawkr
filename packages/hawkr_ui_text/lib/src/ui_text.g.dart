@@ -122,103 +122,6 @@ extension SellerKYCFieldUiText on hawkr_seller_v1alpha1_seller.KYCField {
   String? uiText(UiLocale l) => _sellerKYCField(l, value);
 }
 
-String? _sellerKYCFlowStatus(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => '待認證',
-(UiLocale.zhTW || UiLocale.en, 2) => '填寫中',
-(UiLocale.zhTW || UiLocale.en, 3) => '平台審核中',
-(UiLocale.zhTW || UiLocale.en, 4) => '未通過',
-(UiLocale.zhTW || UiLocale.en, 5) => 'PayUni 審核中',
-(UiLocale.zhTW || UiLocale.en, 6) => 'PayUni 建檔失敗，處理中',
-(UiLocale.zhTW || UiLocale.en, 7) => 'PayUni 審核中',
-(UiLocale.zhTW || UiLocale.en, 8) => 'PayUni 審核中',
-(UiLocale.zhTW || UiLocale.en, 9) => '需補件',
-(UiLocale.zhTW || UiLocale.en, 10) => '已通過',
-(UiLocale.zhTW || UiLocale.en, 11) => 'PayUni 審核未通過',
-_ => null,
-};
-}
-
-String? _sellerKYCFlowStatusAction(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => '開始認證',
-(UiLocale.zhTW || UiLocale.en, 2) => '開始認證',
-(UiLocale.zhTW || UiLocale.en, 3) => '查看進度',
-(UiLocale.zhTW || UiLocale.en, 4) => '前往補件',
-(UiLocale.zhTW || UiLocale.en, 5) => '查看進度',
-(UiLocale.zhTW || UiLocale.en, 6) => '查看進度',
-(UiLocale.zhTW || UiLocale.en, 7) => '查看進度',
-(UiLocale.zhTW || UiLocale.en, 8) => '查看進度',
-(UiLocale.zhTW || UiLocale.en, 9) => '前往補件',
-(UiLocale.zhTW || UiLocale.en, 11) => '前往補件',
-_ => null,
-};
-}
-
-String? _sellerKYCFlowStatusBannerDescription(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => '完成認證後才能正式收款、提領與配送設定。',
-(UiLocale.zhTW || UiLocale.en, 2) => '完成認證後才能正式收款、提領與配送設定。',
-(UiLocale.zhTW || UiLocale.en, 3) => '審核通過後將自動送出至 PayUni 進行金流審核。',
-(UiLocale.zhTW || UiLocale.en, 4) => '請查看退件原因並編輯後重新送出。',
-(UiLocale.zhTW || UiLocale.en, 10) => '可開始正式收款、提領與配送設定。',
-_ => null,
-};
-}
-
-String? _sellerKYCFlowStatusBannerTitle(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => '尚未開始商家認證',
-(UiLocale.zhTW || UiLocale.en, 2) => '尚未開始商家認證',
-(UiLocale.zhTW || UiLocale.en, 3) => '平台審核中',
-(UiLocale.zhTW || UiLocale.en, 4) => '認證未通過',
-(UiLocale.zhTW || UiLocale.en, 10) => '商家認證已通過',
-_ => null,
-};
-}
-
-String? _sellerKYCFlowStatusGateHeading(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => '尚未通過商家認證',
-(UiLocale.zhTW || UiLocale.en, 2) => '尚未通過商家認證',
-(UiLocale.zhTW || UiLocale.en, 3) => '商家認證審核中',
-(UiLocale.zhTW || UiLocale.en, 4) => '商家認證需要補件',
-(UiLocale.zhTW || UiLocale.en, 10) => '尚未通過商家認證',
-_ => null,
-};
-}
-
-String? _sellerKYCFlowStatusGateMessage(UiLocale l, int value, String subject) {
-return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => '請先完成商家認證，才能' + subject + '。',
-(UiLocale.zhTW || UiLocale.en, 2) => '請先完成商家認證，才能' + subject + '。',
-(UiLocale.zhTW || UiLocale.en, 3) => '你的商家認證平台審核中，通過後將自動送出至 PayUni 進行金流審核，完成後就能' + subject + '。',
-(UiLocale.zhTW || UiLocale.en, 4) => '認證未通過，請修改資料後重新送審。',
-(UiLocale.zhTW || UiLocale.en, 10) => '請先完成商家認證，才能' + subject + '。',
-_ => null,
-};
-}
-
-extension SellerKYCFlowStatusUiText on hawkr_seller_v1alpha1_seller.KYCFlowStatus {
-  /// seller.KYCFlowStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
-  String? uiText(UiLocale l) => _sellerKYCFlowStatus(l, value);
-
-  /// seller.KYCFlowStatus.action；沒有文字的值回 null。
-  String? action(UiLocale l) => _sellerKYCFlowStatusAction(l, value);
-
-  /// seller.KYCFlowStatus.banner_description；沒有文字的值回 null。
-  String? bannerDescription(UiLocale l) => _sellerKYCFlowStatusBannerDescription(l, value);
-
-  /// seller.KYCFlowStatus.banner_title；沒有文字的值回 null。
-  String? bannerTitle(UiLocale l) => _sellerKYCFlowStatusBannerTitle(l, value);
-
-  /// seller.KYCFlowStatus.gate_heading；沒有文字的值回 null。
-  String? gateHeading(UiLocale l) => _sellerKYCFlowStatusGateHeading(l, value);
-
-  /// seller.KYCFlowStatus.gate_message；沒有文字的值回 null。
-  String? gateMessage(UiLocale l, {required String subject}) => _sellerKYCFlowStatusGateMessage(l, value, subject);
-}
-
 String? _sellerKYCStatus(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW, 1) => '草稿',
@@ -402,25 +305,6 @@ extension SellerOnboardingTaskIdUiText on hawkr_seller_v1alpha1_seller.Onboardin
 
   /// seller.OnboardingTaskId.panel_title；沒有文字的值回 null。
   String? panelTitle(UiLocale l) => _sellerOnboardingTaskIdPanelTitle(l, value);
-}
-
-String? _sellerPayUniState(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => 'PayUni 審核中',
-(UiLocale.zhTW || UiLocale.en, 2) => 'PayUni 需要補件',
-(UiLocale.zhTW || UiLocale.en, 3) => 'PayUni 需要補件',
-(UiLocale.zhTW || UiLocale.en, 4) => 'PayUni 需要補件',
-(UiLocale.zhTW || UiLocale.en, 5) => 'PayUni 申請未通過',
-(UiLocale.zhTW || UiLocale.en, 6) => 'PayUni 暫時無法處理',
-(UiLocale.zhTW || UiLocale.en, 7) => 'PayUni 收款帳戶已終止',
-(UiLocale.zhTW || UiLocale.en, 8) => 'PayUni 收款已啟用',
-_ => null,
-};
-}
-
-extension SellerPayUniStateUiText on hawkr_seller_v1alpha1_seller.PayUniState {
-  /// seller.PayUniState 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
-  String? uiText(UiLocale l) => _sellerPayUniState(l, value);
 }
 
 String? _sellerPaymentAccountStatus(UiLocale l, int value) {
@@ -781,20 +665,6 @@ String sellerPaymentAccountPayoutsInactiveNote(UiLocale l) {
 return switch (l) {
 UiLocale.zhTW => '撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。',
 UiLocale.en => 'Payouts to your bank account are not enabled yet. The payment provider may ask you for more information.',
-};
-}
-
-/// seller.SellerPayUni.fix_fields_heading
-String sellerSellerPayUniFixFieldsHeading(UiLocale l) {
-return switch (l) {
-UiLocale.zhTW || UiLocale.en => '請修正以下資料',
-};
-}
-
-/// seller.SellerPayUni.reason_heading
-String sellerSellerPayUniReasonHeading(UiLocale l) {
-return switch (l) {
-UiLocale.zhTW || UiLocale.en => 'PayUni 的審核意見',
 };
 }
 

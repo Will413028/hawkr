@@ -344,25 +344,11 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.seller.v1alpha1.KYCFlowStatus",
-      "tsName": "KYCFlowStatus",
-      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
-      "inCatalog": true,
-      "serverOwned": false
-    },
-    {
       "name": "hawkr.seller.v1alpha1.KYCIssueCode",
       "tsName": "KYCIssueCode",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
       "inCatalog": false,
       "serverOwned": false
-    },
-    {
-      "name": "hawkr.seller.v1alpha1.KYCResubmitUnavailableReason",
-      "tsName": "KYCResubmitUnavailableReason",
-      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
-      "inCatalog": false,
-      "serverOwned": true
     },
     {
       "name": "hawkr.seller.v1alpha1.KYCStatus",
@@ -439,13 +425,6 @@
       "tsName": "OnboardingTaskState",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
       "inCatalog": false,
-      "serverOwned": false
-    },
-    {
-      "name": "hawkr.seller.v1alpha1.PayUniState",
-      "tsName": "PayUniState",
-      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
-      "inCatalog": true,
       "serverOwned": false
     },
     {
