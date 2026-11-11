@@ -120,6 +120,12 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerMeasureState(goldenEnum(c.Value, "MEASURE_STATE_"), goldenEnum(goldenString(c, "kind"), "MEASURE_KIND_"))
 	case "seller.OnboardingAction.button":
 		return t.SellerOnboardingActionButton(goldenEnum(c.Value, "ONBOARDING_ACTION_"))
+	case "seller.OnboardingTaskId.description":
+		return t.SellerOnboardingTaskIdDescription(goldenEnum(c.Value, "ONBOARDING_TASK_ID_"))
+	case "seller.OnboardingTaskId.panel_description":
+		return t.SellerOnboardingTaskIdPanelDescription(goldenEnum(c.Value, "ONBOARDING_TASK_ID_"))
+	case "seller.OnboardingTaskId.panel_title":
+		return t.SellerOnboardingTaskIdPanelTitle(goldenEnum(c.Value, "ONBOARDING_TASK_ID_"))
 	case "seller.PayUniState":
 		return t.SellerPayUniState(goldenEnum(c.Value, "PAY_UNI_STATE_"))
 	case "seller.PaymentAccount.payouts_inactive_note":

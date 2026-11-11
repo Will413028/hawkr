@@ -784,6 +784,78 @@ func (t Text) SellerOnboardingActionButton(v string) (string, bool) {
 	return "", false
 }
 
+// SellerOnboardingTaskIdDescription 是 seller.OnboardingTaskId.description 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerOnboardingTaskIdDescription(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PROFILE":
+			return "Store name, logo and location.", true
+		case "PLATFORM_REVIEW":
+			return "Platform review of your business details and tax ID.", true
+		case "PAYMENT_ACCOUNT":
+			return "Set up your identity and bank details with the payment provider.", true
+		}
+	}
+	switch v {
+	case "PROFILE":
+		return "店名、logo 與所在地。", true
+	case "PLATFORM_REVIEW":
+		return "商家資料與統編的平台審核。", true
+	case "PAYMENT_ACCOUNT":
+		return "向金流商設定身分與銀行資料。", true
+	}
+	return "", false
+}
+
+// SellerOnboardingTaskIdPanelDescription 是 seller.OnboardingTaskId.panel_description 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerOnboardingTaskIdPanelDescription(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PROFILE":
+			return "To be found by buyers, your store needs a name, a logo and a location.", true
+		case "PLATFORM_REVIEW":
+			return "Once the platform review is approved, your store can go public and you can set up a payout account.", true
+		case "PAYMENT_ACCOUNT":
+			return "Your identity and bank details are collected by the payment provider, not the platform; you can only receive payments once the payout account is enabled.", true
+		}
+	}
+	switch v {
+	case "PROFILE":
+		return "買家要看得到你的店，需要有店名、logo 與所在地。", true
+	case "PLATFORM_REVIEW":
+		return "平台審核通過後，店面才能公開，並開放設定收款帳戶。", true
+	case "PAYMENT_ACCOUNT":
+		return "身分與銀行資料由金流商收集，平台不經手；收款帳戶啟用後才能正式收款。", true
+	}
+	return "", false
+}
+
+// SellerOnboardingTaskIdPanelTitle 是 seller.OnboardingTaskId.panel_title 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerOnboardingTaskIdPanelTitle(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PROFILE":
+			return "Complete your store profile", true
+		case "PLATFORM_REVIEW":
+			return "Complete the platform review", true
+		case "PAYMENT_ACCOUNT":
+			return "Set up your payout account", true
+		}
+	}
+	switch v {
+	case "PROFILE":
+		return "完成商店資料", true
+	case "PLATFORM_REVIEW":
+		return "完成平台審核", true
+	case "PAYMENT_ACCOUNT":
+		return "設定收款帳戶", true
+	}
+	return "", false
+}
+
 // SellerPayUniState 是 seller.PayUniState 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerPayUniState(v string) (string, bool) {

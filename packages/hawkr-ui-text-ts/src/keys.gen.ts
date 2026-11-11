@@ -3,7 +3,7 @@ import { Code } from "@connectrpc/connect";
 import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
-import type { ContentKind, KYCField, KYCFlowStatus, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, PayUniState, PaymentAccountStatus, RequirementCollection, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import type { ContentKind, KYCField, KYCFlowStatus, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, PayUniState, PaymentAccountStatus, RequirementCollection, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { UiMessage } from "./message";
 
 export type { DefaultErrorText, UiMessage } from "./message";
@@ -166,6 +166,15 @@ export type UiTextKey =
 	| "seller.OnboardingAction.button.ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT"
 	| "seller.OnboardingAction.button.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING"
 	| "seller.OnboardingAction.button.ONBOARDING_ACTION_SUBMIT_CERTIFICATION"
+	| "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT"
+	| "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PLATFORM_REVIEW"
+	| "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PROFILE"
+	| "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT"
+	| "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PLATFORM_REVIEW"
+	| "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PROFILE"
+	| "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT"
+	| "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PLATFORM_REVIEW"
+	| "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PROFILE"
 	| "seller.PayUniState.PAY_UNI_STATE_APPROVED"
 	| "seller.PayUniState.PAY_UNI_STATE_CONTACT_SUPPORT"
 	| "seller.PayUniState.PAY_UNI_STATE_FIXABLE"
@@ -699,6 +708,45 @@ const SELLER_ONBOARDING_ACTION_BUTTON: Readonly<Partial<Record<number, UiTextKey
 /** seller.OnboardingAction.button；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
 export function sellerOnboardingActionButton(v: OnboardingAction): UiMessage | undefined {
 	const key = SELLER_ONBOARDING_ACTION_BUTTON[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SELLER_ONBOARDING_TASK_ID_DESCRIPTION: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PROFILE",
+	2: "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PLATFORM_REVIEW",
+	3: "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT",
+};
+
+/** seller.OnboardingTaskId.description；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
+export function sellerOnboardingTaskIdDescription(v: OnboardingTaskId): UiMessage | undefined {
+	const key = SELLER_ONBOARDING_TASK_ID_DESCRIPTION[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SELLER_ONBOARDING_TASK_ID_PANEL_DESCRIPTION: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PROFILE",
+	2: "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PLATFORM_REVIEW",
+	3: "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT",
+};
+
+/** seller.OnboardingTaskId.panel_description；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
+export function sellerOnboardingTaskIdPanelDescription(v: OnboardingTaskId): UiMessage | undefined {
+	const key = SELLER_ONBOARDING_TASK_ID_PANEL_DESCRIPTION[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SELLER_ONBOARDING_TASK_ID_PANEL_TITLE: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PROFILE",
+	2: "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PLATFORM_REVIEW",
+	3: "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT",
+};
+
+/** seller.OnboardingTaskId.panel_title；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
+export function sellerOnboardingTaskIdPanelTitle(v: OnboardingTaskId): UiMessage | undefined {
+	const key = SELLER_ONBOARDING_TASK_ID_PANEL_TITLE[v];
 	if (key === undefined) return undefined;
 	return { key };
 }

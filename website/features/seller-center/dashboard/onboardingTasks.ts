@@ -5,7 +5,12 @@ import {
 	OnboardingTaskState,
 	type OnboardingTask as ServerOnboardingTask,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
-import { sellerOnboardingActionButton } from "@hawkr/ui-text/keys";
+import {
+	sellerOnboardingActionButton,
+	sellerOnboardingTaskIdDescription,
+	sellerOnboardingTaskIdPanelDescription,
+	sellerOnboardingTaskIdPanelTitle,
+} from "@hawkr/ui-text/keys";
 import type { AppIconName } from "@/components/shared/AppIcon";
 import { optionalText, type UiText } from "@/lib/i18n/ui-text";
 import { CERT_PAGE_HREF } from "@/lib/seller/cert-gate";
@@ -47,42 +52,15 @@ export const ONBOARDING_GROUP_LABEL: Record<OnboardingTaskGroup, string> = {
 };
 
 /**
- * 必要任務只有圖示與面板文字是 client 的（依任務 id，不依狀態）；標題、狀態句、狀態與下一步都來自伺服器的
- * `GetMyOnboarding`（D26、D27）。
+ * 必要任務只有圖示與路由 id 是 client 的（依任務 id，不依狀態，是分支）；描述與面板文字取自共用文案目錄，
+ * 標題、狀態句、狀態與下一步都來自伺服器的 `GetMyOnboarding`（D26、D27）。
  */
 const REQUIRED_PRESENTATION: Readonly<
-	Partial<
-		Record<
-			OnboardingTaskId,
-			Pick<
-				OnboardingTask,
-				"id" | "description" | "panelTitle" | "panelDescription" | "icon"
-			>
-		>
-	>
+	Partial<Record<OnboardingTaskId, Pick<OnboardingTask, "id" | "icon">>>
 > = {
-	[OnboardingTaskId.PROFILE]: {
-		id: "profile",
-		description: "店名、logo 與所在地。",
-		panelTitle: "完成商店資料",
-		panelDescription: "買家要看得到你的店，需要有店名、logo 與所在地。",
-		icon: "home",
-	},
-	[OnboardingTaskId.PLATFORM_REVIEW]: {
-		id: "platform_review",
-		description: "商家資料與統編的平台審核。",
-		panelTitle: "完成平台審核",
-		panelDescription: "平台審核通過後，店面才能公開，並開放設定收款帳戶。",
-		icon: "shield",
-	},
-	[OnboardingTaskId.PAYMENT_ACCOUNT]: {
-		id: "payment_account",
-		description: "向金流商設定身分與銀行資料。",
-		panelTitle: "設定收款帳戶",
-		panelDescription:
-			"身分與銀行資料由金流商收集，平台不經手；收款帳戶啟用後才能正式收款。",
-		icon: "wallet",
-	},
+	[OnboardingTaskId.PROFILE]: { id: "profile", icon: "home" },
+	[OnboardingTaskId.PLATFORM_REVIEW]: { id: "platform_review", icon: "shield" },
+	[OnboardingTaskId.PAYMENT_ACCOUNT]: { id: "payment_account", icon: "wallet" },
 };
 
 /** action 對到網頁的位置（網頁與 App 的位置不同，路由是 client 的）；按鈕文字由共用文案目錄依 action 決定。 */
@@ -107,20 +85,11 @@ function nextOf(
 	}
 }
 
-/** 沒有專屬呈現的必要任務（伺服器新增的 id）：標題、狀態與下一步照伺服器，圖示是中性的預設，不寫 id 專屬的文字。 */
+/** 沒有專屬呈現的必要任務（伺服器新增的 id）：圖示是中性的預設，id 是由伺服器 id 組的。 */
 function genericRequiredPresentation(
 	task: ServerOnboardingTask,
-): Pick<
-	OnboardingTask,
-	"id" | "description" | "panelTitle" | "panelDescription" | "icon"
-> {
-	return {
-		id: `required_${task.id}`,
-		description: "",
-		panelTitle: task.title?.message ?? "",
-		panelDescription: task.status?.message ?? "",
-		icon: "activity",
-	};
+): Pick<OnboardingTask, "id" | "icon"> {
+	return { id: `required_${task.id}`, icon: "activity" };
 }
 
 function requiredTaskOf(
@@ -132,6 +101,16 @@ function requiredTaskOf(
 		REQUIRED_PRESENTATION[task.id] ?? genericRequiredPresentation(task);
 	return {
 		...presentation,
+		description:
+			optionalText(ut, sellerOnboardingTaskIdDescription(task.id)) ?? "",
+		panelTitle:
+			optionalText(ut, sellerOnboardingTaskIdPanelTitle(task.id)) ??
+			task.title?.message ??
+			"",
+		panelDescription:
+			optionalText(ut, sellerOnboardingTaskIdPanelDescription(task.id)) ??
+			task.status?.message ??
+			"",
 		group: "required",
 		title: task.title?.message ?? "",
 		statusLabel: task.status?.message ?? "",

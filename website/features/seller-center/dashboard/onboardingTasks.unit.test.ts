@@ -245,6 +245,37 @@ describe("公開前必須 comes from the server's GetMyOnboarding", () => {
 		expect(present(S.COMPLETED)).toEqual(present(S.UNKNOWN));
 	});
 
+	it("description and panel texts come from the shared catalog per task id", () => {
+		const tasks = build([], {
+			onboarding: onboardingFixture([
+				{ id: ID.PROFILE, state: S.COMPLETED },
+				{ id: ID.PLATFORM_REVIEW, state: S.COMPLETED },
+				{ id: ID.PAYMENT_ACCOUNT, state: S.COMPLETED },
+			]),
+		});
+		expect(
+			tasks
+				.slice(0, 3)
+				.map((t) => [t.description, t.panelTitle, t.panelDescription]),
+		).toEqual([
+			[
+				"店名、logo 與所在地。",
+				"完成商店資料",
+				"買家要看得到你的店，需要有店名、logo 與所在地。",
+			],
+			[
+				"商家資料與統編的平台審核。",
+				"完成平台審核",
+				"平台審核通過後，店面才能公開，並開放設定收款帳戶。",
+			],
+			[
+				"向金流商設定身分與銀行資料。",
+				"設定收款帳戶",
+				"身分與銀行資料由金流商收集，平台不經手；收款帳戶啟用後才能正式收款。",
+			],
+		]);
+	});
+
 	it("no summary (not loaded or failed): no required tasks, recommended stay", () => {
 		const tasks = build([], { onboarding: null });
 		expect(required(tasks)).toEqual([]);

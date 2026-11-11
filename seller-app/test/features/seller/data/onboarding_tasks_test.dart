@@ -1,5 +1,5 @@
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart'
-    hide OnboardingTask, OnboardingTaskId;
+    hide OnboardingTask;
 import 'package:hawkr_seller/features/seller/data/onboarding_tasks.dart';
 import 'package:hawkr_seller/features/seller/data/payment_account.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
@@ -15,10 +15,10 @@ const _kyc = SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE;
 const _active = SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE;
 const _notSuspended = SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED;
 
-OnboardingTask _task(List<OnboardingTask> tasks, OnboardingTaskId id) =>
+OnboardingTask _task(List<OnboardingTask> tasks, SellerOnboardingTaskKey id) =>
     tasks.singleWhere((task) => task.id == id);
 
-List<OnboardingTaskId> _ids(
+List<SellerOnboardingTaskKey> _ids(
   List<OnboardingTask> tasks,
   OnboardingTaskGroup group,
 ) => [
@@ -35,11 +35,11 @@ void main() {
         reviewStatus: KYCStatus.KYC_STATUS_APPROVED,
         paymentAccount: null,
       );
-      final profile = _task(tasks, OnboardingTaskId.profile);
+      final profile = _task(tasks, SellerOnboardingTaskKey.profile);
       expect(profile.completed, isFalse);
       expect(profile.statusLabel, '缺少：店名、logo、所在地');
       expect(profile.cta, '去設定');
-      final review = _task(tasks, OnboardingTaskId.platformReview);
+      final review = _task(tasks, SellerOnboardingTaskKey.platformReview);
       expect(review.completed, isTrue);
       expect(review.statusLabel, '已通過');
       expect(review.cta, isNull);
@@ -52,7 +52,10 @@ void main() {
         reviewStatus: null,
         paymentAccount: null,
       );
-      expect(_task(tasks, OnboardingTaskId.profile).statusLabel, '缺少：logo');
+      expect(
+        _task(tasks, SellerOnboardingTaskKey.profile).statusLabel,
+        '缺少：logo',
+      );
     });
 
     test('缺 ONBOARDING_COMPLETE、平台審核還沒通過：平台審核列是申請狀態，收款帳戶列鎖定', () {
@@ -62,17 +65,17 @@ void main() {
         reviewStatus: KYCStatus.KYC_STATUS_SUBMITTED,
         paymentAccount: null,
       );
-      final review = _task(tasks, OnboardingTaskId.platformReview);
+      final review = _task(tasks, SellerOnboardingTaskKey.platformReview);
       expect(review.completed, isFalse);
       expect(review.statusLabel, '審核中');
       expect(review.cta, '前往商家認證');
-      final payment = _task(tasks, OnboardingTaskId.paymentAccount);
+      final payment = _task(tasks, SellerOnboardingTaskKey.paymentAccount);
       expect(payment.completed, isFalse);
       expect(payment.locked, isTrue);
       expect(payment.statusLabel, '平台審核通過後開放設定');
       expect(payment.cta, isNull);
-      expect(_task(tasks, OnboardingTaskId.profile).completed, isTrue);
-      expect(_task(tasks, OnboardingTaskId.profile).statusLabel, '已完成');
+      expect(_task(tasks, SellerOnboardingTaskKey.profile).completed, isTrue);
+      expect(_task(tasks, SellerOnboardingTaskKey.profile).statusLabel, '已完成');
     });
 
     test('沒有申請或讀不到：平台審核列是「未送出」，引導去商家認證', () {
@@ -82,7 +85,7 @@ void main() {
         reviewStatus: null,
         paymentAccount: null,
       );
-      final review = _task(tasks, OnboardingTaskId.platformReview);
+      final review = _task(tasks, SellerOnboardingTaskKey.platformReview);
       expect(review.statusLabel, '未送出');
       expect(review.cta, '前往商家認證');
     });
@@ -95,7 +98,7 @@ void main() {
         reviewReadable: false,
         paymentAccount: null,
       );
-      final review = _task(tasks, OnboardingTaskId.platformReview);
+      final review = _task(tasks, SellerOnboardingTaskKey.platformReview);
       expect(review.statusLabel, '未知');
       expect(review.cta, '前往商家認證');
     });
@@ -109,7 +112,7 @@ void main() {
           status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED,
         ),
       );
-      final payment = _task(tasks, OnboardingTaskId.paymentAccount);
+      final payment = _task(tasks, SellerOnboardingTaskKey.paymentAccount);
       expect(payment.statusLabel, '已啟用');
       expect(payment.completed, isTrue);
       expect(payment.cta, isNull);
@@ -126,7 +129,7 @@ void main() {
         reviewStatus: KYCStatus.KYC_STATUS_SUBMITTED,
         paymentAccount: account,
       );
-      final payment = _task(tasks, OnboardingTaskId.paymentAccount);
+      final payment = _task(tasks, SellerOnboardingTaskKey.paymentAccount);
       expect(payment.completed, isFalse);
       expect(payment.locked, isTrue);
       expect(payment.statusLabel, '平台審核通過後開放設定');
@@ -140,7 +143,7 @@ void main() {
         paymentAccount: null,
         paymentReadable: false,
       );
-      final payment = _task(tasks, OnboardingTaskId.paymentAccount);
+      final payment = _task(tasks, SellerOnboardingTaskKey.paymentAccount);
       expect(payment.statusLabel, '未知');
       expect(payment.completed, isFalse);
       expect(payment.cta, '前往商家認證');
@@ -154,7 +157,7 @@ void main() {
         paymentAccount: null,
         paymentReadable: false,
       );
-      final payment = _task(tasks, OnboardingTaskId.paymentAccount);
+      final payment = _task(tasks, SellerOnboardingTaskKey.paymentAccount);
       expect(payment.statusLabel, '平台審核通過後開放設定');
       expect(payment.locked, isTrue);
     });
@@ -166,7 +169,10 @@ void main() {
         reviewStatus: KYCStatus.KYC_STATUS_UNSPECIFIED,
         paymentAccount: null,
       );
-      expect(_task(tasks, OnboardingTaskId.platformReview).statusLabel, '未知');
+      expect(
+        _task(tasks, SellerOnboardingTaskKey.platformReview).statusLabel,
+        '未知',
+      );
     });
 
     test('平台審核通過、收款帳戶還沒有（外部帳戶在建立）：與「準備中」同義，動作是重新整理', () {
@@ -176,7 +182,7 @@ void main() {
         reviewStatus: KYCStatus.KYC_STATUS_APPROVED,
         paymentAccount: null,
       );
-      final payment = _task(tasks, OnboardingTaskId.paymentAccount);
+      final payment = _task(tasks, SellerOnboardingTaskKey.paymentAccount);
       expect(payment.locked, isFalse);
       expect(payment.completed, isFalse);
       expect(payment.statusLabel, '準備中');
@@ -208,7 +214,7 @@ void main() {
           reviewStatus: KYCStatus.KYC_STATUS_APPROVED,
           paymentAccount: account(entry.key),
         );
-        final payment = _task(tasks, OnboardingTaskId.paymentAccount);
+        final payment = _task(tasks, SellerOnboardingTaskKey.paymentAccount);
         expect(payment.statusLabel, entry.value.$1, reason: entry.key.name);
         expect(payment.cta, entry.value.$2, reason: entry.key.name);
         expect(payment.completed, isFalse, reason: entry.key.name);
@@ -224,7 +230,7 @@ void main() {
         reviewStatus: KYCStatus.KYC_STATUS_APPROVED,
         paymentAccount: PaymentAccount(),
       );
-      final payment = _task(tasks, OnboardingTaskId.paymentAccount);
+      final payment = _task(tasks, SellerOnboardingTaskKey.paymentAccount);
       expect(payment.statusLabel, '未知');
       expect(payment.cta, isNull);
     });
@@ -237,9 +243,18 @@ void main() {
         reviewReadable: false,
         paymentAccount: null,
       );
-      expect(_task(tasks, OnboardingTaskId.platformReview).completed, isFalse);
-      expect(_task(tasks, OnboardingTaskId.platformReview).statusLabel, '未知');
-      expect(_task(tasks, OnboardingTaskId.paymentAccount).completed, isFalse);
+      expect(
+        _task(tasks, SellerOnboardingTaskKey.platformReview).completed,
+        isFalse,
+      );
+      expect(
+        _task(tasks, SellerOnboardingTaskKey.platformReview).statusLabel,
+        '未知',
+      );
+      expect(
+        _task(tasks, SellerOnboardingTaskKey.paymentAccount).completed,
+        isFalse,
+      );
     });
 
     test('停權與商店狀態列只在缺那個條件時出現', () {
@@ -250,9 +265,9 @@ void main() {
         paymentAccount: null,
       );
       expect(_ids(none, OnboardingTaskGroup.beforePublish), [
-        OnboardingTaskId.profile,
-        OnboardingTaskId.platformReview,
-        OnboardingTaskId.paymentAccount,
+        SellerOnboardingTaskKey.profile,
+        SellerOnboardingTaskKey.platformReview,
+        SellerOnboardingTaskKey.paymentAccount,
       ]);
 
       final both = buildOnboardingTasks(
@@ -264,17 +279,17 @@ void main() {
         paymentAccount: null,
       );
       expect(_ids(both, OnboardingTaskGroup.beforePublish), [
-        OnboardingTaskId.profile,
-        OnboardingTaskId.platformReview,
-        OnboardingTaskId.paymentAccount,
-        OnboardingTaskId.notSuspended,
-        OnboardingTaskId.storeActive,
+        SellerOnboardingTaskKey.profile,
+        SellerOnboardingTaskKey.platformReview,
+        SellerOnboardingTaskKey.paymentAccount,
+        SellerOnboardingTaskKey.notSuspended,
+        SellerOnboardingTaskKey.storeActive,
       ]);
-      final suspended = _task(both, OnboardingTaskId.notSuspended);
+      final suspended = _task(both, SellerOnboardingTaskKey.notSuspended);
       expect(suspended.title, '停權處分');
       expect(suspended.statusLabel, '停權中');
       expect(suspended.cta, '查看停權說明');
-      final inactive = _task(both, OnboardingTaskId.storeActive);
+      final inactive = _task(both, SellerOnboardingTaskKey.storeActive);
       expect(inactive.title, '商店狀態');
       expect(inactive.statusLabel, '未營業');
       expect(inactive.cta, '查看說明');
@@ -293,9 +308,12 @@ void main() {
         paymentAccount: null,
       );
       final ids = _ids(tasks, OnboardingTaskGroup.beforePublish);
-      expect(ids, contains(OnboardingTaskId.storeActive));
-      expect(ids, isNot(contains(OnboardingTaskId.otherRequirement)));
-      expect(_task(tasks, OnboardingTaskId.storeActive).statusLabel, '未營業');
+      expect(ids, contains(SellerOnboardingTaskKey.storeActive));
+      expect(ids, isNot(contains(SellerOnboardingTaskKey.otherRequirement)));
+      expect(
+        _task(tasks, SellerOnboardingTaskKey.storeActive).statusLabel,
+        '未營業',
+      );
     });
 
     test('物流設定未回報：鎖定並顯示未營業', () {
@@ -306,7 +324,7 @@ void main() {
           reviewStatus: null,
           paymentAccount: null,
         ),
-        OnboardingTaskId.shipping,
+        SellerOnboardingTaskKey.shipping,
       );
       expect(shipping.locked, isTrue);
       expect(shipping.statusLabel, '未營業');
@@ -323,7 +341,7 @@ void main() {
         reviewStatus: null,
         paymentAccount: null,
       );
-      final shipping = _task(tasks, OnboardingTaskId.shipping);
+      final shipping = _task(tasks, SellerOnboardingTaskKey.shipping);
       expect(shipping.locked, isTrue);
       expect(shipping.statusLabel, '未營業');
     });
@@ -336,13 +354,16 @@ void main() {
         paymentAccount: null,
       );
       expect(
-        _task(tasks, OnboardingTaskId.profile).statusLabel,
+        _task(tasks, SellerOnboardingTaskKey.profile).statusLabel,
         '缺少：店名、logo、所在地',
       );
-      expect(_task(tasks, OnboardingTaskId.paymentAccount).completed, isFalse);
+      expect(
+        _task(tasks, SellerOnboardingTaskKey.paymentAccount).completed,
+        isFalse,
+      );
       expect(
         _ids(tasks, OnboardingTaskGroup.beforePublish),
-        isNot(contains(OnboardingTaskId.otherRequirement)),
+        isNot(contains(SellerOnboardingTaskKey.otherRequirement)),
       );
     });
 
@@ -373,9 +394,9 @@ void main() {
         (t) => t.group == OnboardingTaskGroup.beforePublish,
       );
       expect(required.map((t) => t.id), [
-        OnboardingTaskId.profile,
-        OnboardingTaskId.platformReview,
-        OnboardingTaskId.paymentAccount,
+        SellerOnboardingTaskKey.profile,
+        SellerOnboardingTaskKey.platformReview,
+        SellerOnboardingTaskKey.paymentAccount,
       ]);
       expect(required.every((t) => t.completed), isTrue);
     });
@@ -390,9 +411,9 @@ void main() {
         paymentAccount: null,
       );
       expect(_ids(tasks, OnboardingTaskGroup.recommended), [
-        OnboardingTaskId.shipping,
-        OnboardingTaskId.product,
-        OnboardingTaskId.description,
+        SellerOnboardingTaskKey.shipping,
+        SellerOnboardingTaskKey.product,
+        SellerOnboardingTaskKey.description,
       ]);
     });
 
@@ -407,7 +428,7 @@ void main() {
           reviewStatus: status,
           paymentAccount: null,
         );
-        final shipping = _task(tasks, OnboardingTaskId.shipping);
+        final shipping = _task(tasks, SellerOnboardingTaskKey.shipping);
         expect(shipping.locked, isTrue, reason: '$status');
         expect(shipping.statusLabel, '需先通過認證');
       }
@@ -419,7 +440,7 @@ void main() {
             reviewStatus: null,
             paymentAccount: null,
           ),
-          OnboardingTaskId.shipping,
+          SellerOnboardingTaskKey.shipping,
         ).locked,
         isTrue,
       );
@@ -432,7 +453,7 @@ void main() {
         reviewStatus: null,
         paymentAccount: null,
       );
-      expect(_task(tasks, OnboardingTaskId.shipping).locked, isFalse);
+      expect(_task(tasks, SellerOnboardingTaskKey.shipping).locked, isFalse);
     });
 
     test('物流設定缺停權或等待刪除：鎖定並顯示對應的既有文字', () {
@@ -443,7 +464,7 @@ void main() {
           reviewStatus: null,
           paymentAccount: null,
         ),
-        OnboardingTaskId.shipping,
+        SellerOnboardingTaskKey.shipping,
       );
       expect(suspended.locked, isTrue);
       expect(suspended.statusLabel, '未營業');
@@ -459,7 +480,7 @@ void main() {
           reviewStatus: null,
           paymentAccount: null,
         ),
-        OnboardingTaskId.shipping,
+        SellerOnboardingTaskKey.shipping,
       );
       expect(pending.locked, isTrue);
       expect(pending.statusLabel, '未營業');
@@ -473,7 +494,7 @@ void main() {
         reviewReadable: false,
         paymentAccount: null,
       );
-      expect(_task(tasks, OnboardingTaskId.shipping).locked, isFalse);
+      expect(_task(tasks, SellerOnboardingTaskKey.shipping).locked, isFalse);
     });
 
     test('列的語氣只分完成與未完成', () {
@@ -501,7 +522,7 @@ void main() {
           paymentAccount: null,
           shipping: progress,
         ),
-        OnboardingTaskId.shipping,
+        SellerOnboardingTaskKey.shipping,
       );
 
       final todo = shippingOf(const ShippingProgress());
@@ -549,9 +570,12 @@ void main() {
         reviewStatus: KYCStatus.KYC_STATUS_APPROVED,
         paymentAccount: null,
       );
-      expect(_task(empty, OnboardingTaskId.product).statusLabel, '待上架');
-      expect(_task(empty, OnboardingTaskId.product).cta, '新增商品');
-      expect(_task(empty, OnboardingTaskId.description).statusLabel, '待完成');
+      expect(_task(empty, SellerOnboardingTaskKey.product).statusLabel, '待上架');
+      expect(_task(empty, SellerOnboardingTaskKey.product).cta, '新增商品');
+      expect(
+        _task(empty, SellerOnboardingTaskKey.description).statusLabel,
+        '待完成',
+      );
 
       final filled = buildOnboardingTasks(
         l: UiLocale.zhTW,
@@ -563,10 +587,16 @@ void main() {
         paymentAccount: null,
         productCount: 3,
       );
-      expect(_task(filled, OnboardingTaskId.product).completed, isTrue);
-      expect(_task(filled, OnboardingTaskId.product).statusLabel, '已上架');
-      expect(_task(filled, OnboardingTaskId.description).completed, isTrue);
-      expect(_task(filled, OnboardingTaskId.description).statusLabel, '已完成');
+      expect(_task(filled, SellerOnboardingTaskKey.product).completed, isTrue);
+      expect(_task(filled, SellerOnboardingTaskKey.product).statusLabel, '已上架');
+      expect(
+        _task(filled, SellerOnboardingTaskKey.description).completed,
+        isTrue,
+      );
+      expect(
+        _task(filled, SellerOnboardingTaskKey.description).statusLabel,
+        '已完成',
+      );
       expect(
         _task(
           buildOnboardingTasks(
@@ -578,7 +608,7 @@ void main() {
             reviewStatus: KYCStatus.KYC_STATUS_APPROVED,
             paymentAccount: null,
           ),
-          OnboardingTaskId.description,
+          SellerOnboardingTaskKey.description,
         ).completed,
         isFalse,
       );
@@ -592,7 +622,7 @@ void main() {
         paymentAccount: null,
         productCount: null,
       );
-      expect(_task(tasks, OnboardingTaskId.product).completed, isFalse);
+      expect(_task(tasks, SellerOnboardingTaskKey.product).completed, isFalse);
     });
   });
 }

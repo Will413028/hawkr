@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCFlowStatus, sellerKYCFlowStatusAction, sellerKYCFlowStatusBannerDescription, sellerKYCFlowStatusBannerTitle, sellerKYCFlowStatusGateHeading, sellerKYCFlowStatusGateMessage, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerOnboardingActionButton, sellerPayUniState, sellerPaymentAccountPayoutsInactiveNote, sellerPaymentAccountStatus, sellerPaymentAccountStatusAction, sellerPaymentAccountStatusDescription, sellerRequirementCollection, sellerRevokeReason, sellerRiskGround, sellerSellerPayUniFixFieldsHeading, sellerSellerPayUniReasonHeading, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
+import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCFlowStatus, sellerKYCFlowStatusAction, sellerKYCFlowStatusBannerDescription, sellerKYCFlowStatusBannerTitle, sellerKYCFlowStatusGateHeading, sellerKYCFlowStatusGateMessage, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPayUniState, sellerPaymentAccountPayoutsInactiveNote, sellerPaymentAccountStatus, sellerPaymentAccountStatusAction, sellerPaymentAccountStatusDescription, sellerRequirementCollection, sellerRevokeReason, sellerRiskGround, sellerSellerPayUniFixFieldsHeading, sellerSellerPayUniReasonHeading, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -94,6 +94,10 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"ONBOARDING_ACTION_START_PAYMENT_ONBOARDING": 4,
 	"ONBOARDING_ACTION_SUBMIT_CERTIFICATION": 3,
 	"ONBOARDING_ACTION_UNSPECIFIED": 0,
+	"ONBOARDING_TASK_ID_PAYMENT_ACCOUNT": 3,
+	"ONBOARDING_TASK_ID_PLATFORM_REVIEW": 2,
+	"ONBOARDING_TASK_ID_PROFILE": 1,
+	"ONBOARDING_TASK_ID_UNSPECIFIED": 0,
 	"PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": 3,
 	"PAYMENT_ACCOUNT_STATUS_DISABLED": 5,
 	"PAYMENT_ACCOUNT_STATUS_ENABLED": 4,
@@ -333,6 +337,15 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "seller.OnboardingAction.button": {
 		return sellerOnboardingActionButton(num(c.value));
+	}
+	case "seller.OnboardingTaskId.description": {
+		return sellerOnboardingTaskIdDescription(num(c.value));
+	}
+	case "seller.OnboardingTaskId.panel_description": {
+		return sellerOnboardingTaskIdPanelDescription(num(c.value));
+	}
+	case "seller.OnboardingTaskId.panel_title": {
+		return sellerOnboardingTaskIdPanelTitle(num(c.value));
 	}
 	case "seller.PayUniState": {
 		return sellerPayUniState(num(c.value));

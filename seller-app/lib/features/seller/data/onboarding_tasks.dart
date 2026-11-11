@@ -22,7 +22,7 @@ enum OnboardingTaskGroup {
   final String label;
 }
 
-enum OnboardingTaskId {
+enum SellerOnboardingTaskKey {
   profile,
   platformReview,
   paymentAccount,
@@ -47,7 +47,7 @@ final class OnboardingTask {
     this.locked = false,
   });
 
-  final OnboardingTaskId id;
+  final SellerOnboardingTaskKey id;
   final OnboardingTaskGroup group;
   final String title;
   final String description;
@@ -146,7 +146,7 @@ List<OnboardingTask> buildOnboardingTasks({
 
   final tasks = <OnboardingTask>[
     OnboardingTask(
-      id: OnboardingTaskId.profile,
+      id: SellerOnboardingTaskKey.profile,
       group: OnboardingTaskGroup.beforePublish,
       title: '商店資料',
       description: '店名、logo 與所在地。',
@@ -155,7 +155,7 @@ List<OnboardingTask> buildOnboardingTasks({
       statusLabel: profileDone ? '已完成' : '缺少：${missingProfile.join('、')}',
     ),
     OnboardingTask(
-      id: OnboardingTaskId.platformReview,
+      id: SellerOnboardingTaskKey.platformReview,
       group: OnboardingTaskGroup.beforePublish,
       title: '平台審核',
       description: '商家資料與統編的平台審核。',
@@ -167,7 +167,7 @@ List<OnboardingTask> buildOnboardingTasks({
           : reviewLabel ?? commonUnknown(l),
     ),
     OnboardingTask(
-      id: OnboardingTaskId.paymentAccount,
+      id: SellerOnboardingTaskKey.paymentAccount,
       group: OnboardingTaskGroup.beforePublish,
       title: '收款帳戶',
       description: '向金流商設定身分與銀行資料。',
@@ -191,7 +191,7 @@ List<OnboardingTask> buildOnboardingTasks({
       false) {
     tasks.add(
       const OnboardingTask(
-        id: OnboardingTaskId.notSuspended,
+        id: SellerOnboardingTaskKey.notSuspended,
         group: OnboardingTaskGroup.beforePublish,
         title: '停權處分',
         description: '帳號目前處於停權。',
@@ -209,7 +209,7 @@ List<OnboardingTask> buildOnboardingTasks({
           false)) {
     tasks.add(
       const OnboardingTask(
-        id: OnboardingTaskId.storeActive,
+        id: SellerOnboardingTaskKey.storeActive,
         group: OnboardingTaskGroup.beforePublish,
         title: '商店狀態',
         description: '商店目前不是營業中。',
@@ -224,7 +224,7 @@ List<OnboardingTask> buildOnboardingTasks({
   )) {
     tasks.add(
       const OnboardingTask(
-        id: OnboardingTaskId.otherRequirement,
+        id: SellerOnboardingTaskKey.otherRequirement,
         group: OnboardingTaskGroup.beforePublish,
         title: '其他公開條件',
         description: '還有公開條件尚未滿足。',
@@ -241,7 +241,7 @@ List<OnboardingTask> buildOnboardingTasks({
 
   tasks.addAll([
     OnboardingTask(
-      id: OnboardingTaskId.shipping,
+      id: SellerOnboardingTaskKey.shipping,
       group: OnboardingTaskGroup.recommended,
       title: '物流設定',
       description: '設定配送與退貨資訊。',
@@ -261,7 +261,7 @@ List<OnboardingTask> buildOnboardingTasks({
           : '待設定',
     ),
     OnboardingTask(
-      id: OnboardingTaskId.product,
+      id: SellerOnboardingTaskKey.product,
       group: OnboardingTaskGroup.recommended,
       title: '上架商品',
       description: '建立第一個可購買商品。',
@@ -270,7 +270,7 @@ List<OnboardingTask> buildOnboardingTasks({
       statusLabel: productsDone ? '已上架' : '待上架',
     ),
     OnboardingTask(
-      id: OnboardingTaskId.description,
+      id: SellerOnboardingTaskKey.description,
       group: OnboardingTaskGroup.recommended,
       title: '商店介紹',
       description: '說明你賣什麼、產地與品牌故事。',

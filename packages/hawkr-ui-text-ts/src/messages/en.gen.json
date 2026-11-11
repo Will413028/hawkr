@@ -214,6 +214,23 @@
         "ONBOARDING_ACTION_SUBMIT_CERTIFICATION": "Go to seller verification"
       }
     },
+    "OnboardingTaskId": {
+      "description": {
+        "ONBOARDING_TASK_ID_PAYMENT_ACCOUNT": "Set up your identity and bank details with the payment provider.",
+        "ONBOARDING_TASK_ID_PLATFORM_REVIEW": "Platform review of your business details and tax ID.",
+        "ONBOARDING_TASK_ID_PROFILE": "Store name, logo and location."
+      },
+      "panel_description": {
+        "ONBOARDING_TASK_ID_PAYMENT_ACCOUNT": "Your identity and bank details are collected by the payment provider, not the platform; you can only receive payments once the payout account is enabled.",
+        "ONBOARDING_TASK_ID_PLATFORM_REVIEW": "Once the platform review is approved, your store can go public and you can set up a payout account.",
+        "ONBOARDING_TASK_ID_PROFILE": "To be found by buyers, your store needs a name, a logo and a location."
+      },
+      "panel_title": {
+        "ONBOARDING_TASK_ID_PAYMENT_ACCOUNT": "Set up your payout account",
+        "ONBOARDING_TASK_ID_PLATFORM_REVIEW": "Complete the platform review",
+        "ONBOARDING_TASK_ID_PROFILE": "Complete your store profile"
+      }
+    },
     "PayUniState": {
       "PAY_UNI_STATE_APPROVED": "PayUni 收款已啟用",
       "PAY_UNI_STATE_CONTACT_SUPPORT": "PayUni 申請未通過",

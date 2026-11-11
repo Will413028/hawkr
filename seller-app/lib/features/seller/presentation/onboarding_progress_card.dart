@@ -69,21 +69,21 @@ class OnboardingProgressCard extends HookConsumerWidget {
 
     void open(OnboardingTask task) {
       switch (task.id) {
-        case OnboardingTaskId.profile:
-        case OnboardingTaskId.description:
+        case SellerOnboardingTaskKey.profile:
+        case SellerOnboardingTaskKey.description:
           _openProfile(context);
-        case OnboardingTaskId.platformReview:
-        case OnboardingTaskId.paymentAccount:
+        case SellerOnboardingTaskKey.platformReview:
+        case SellerOnboardingTaskKey.paymentAccount:
           context.go(MainRoutes.wallet);
-        case OnboardingTaskId.notSuspended:
+        case SellerOnboardingTaskKey.notSuspended:
           unawaited(context.push<void>(SellerRoutes.suspensionNotice));
-        case OnboardingTaskId.storeActive:
+        case SellerOnboardingTaskKey.storeActive:
           unawaited(context.push<void>(SellerRoutes.suspensionNotice));
-        case OnboardingTaskId.shipping:
+        case SellerOnboardingTaskKey.shipping:
           unawaited(context.push<void>(SettingsRoutes.shipping));
-        case OnboardingTaskId.product:
+        case SellerOnboardingTaskKey.product:
           unawaited(context.push<void>(ProductRoutes.picker));
-        case OnboardingTaskId.otherRequirement:
+        case SellerOnboardingTaskKey.otherRequirement:
           break;
       }
     }

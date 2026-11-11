@@ -78,6 +78,33 @@
     "seller.OnboardingAction.button.ONBOARDING_ACTION_SUBMIT_CERTIFICATION": {
       "message": "Go to seller verification"
     },
+    "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT": {
+      "message": "Set up your identity and bank details with the payment provider."
+    },
+    "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PLATFORM_REVIEW": {
+      "message": "Platform review of your business details and tax ID."
+    },
+    "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PROFILE": {
+      "message": "Store name, logo and location."
+    },
+    "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT": {
+      "message": "Your identity and bank details are collected by the payment provider, not the platform; you can only receive payments once the payout account is enabled."
+    },
+    "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PLATFORM_REVIEW": {
+      "message": "Once the platform review is approved, your store can go public and you can set up a payout account."
+    },
+    "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PROFILE": {
+      "message": "To be found by buyers, your store needs a name, a logo and a location."
+    },
+    "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT": {
+      "message": "Set up your payout account"
+    },
+    "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PLATFORM_REVIEW": {
+      "message": "Complete the platform review"
+    },
+    "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PROFILE": {
+      "message": "Complete your store profile"
+    },
     "seller.PaymentAccount.payouts_inactive_note": {
       "message": "Payouts to your bank account are not enabled yet. The payment provider may ask you for more information."
     },

@@ -90,6 +90,10 @@ const _enumNumber = <String, int>{
 	'ONBOARDING_ACTION_START_PAYMENT_ONBOARDING': 4,
 	'ONBOARDING_ACTION_SUBMIT_CERTIFICATION': 3,
 	'ONBOARDING_ACTION_UNSPECIFIED': 0,
+	'ONBOARDING_TASK_ID_PAYMENT_ACCOUNT': 3,
+	'ONBOARDING_TASK_ID_PLATFORM_REVIEW': 2,
+	'ONBOARDING_TASK_ID_PROFILE': 1,
+	'ONBOARDING_TASK_ID_UNSPECIFIED': 0,
 	'PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED': 3,
 	'PAYMENT_ACCOUNT_STATUS_DISABLED': 5,
 	'PAYMENT_ACCOUNT_STATUS_ENABLED': 4,
@@ -283,6 +287,12 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_seller_v1alpha1_seller.MeasureState.valueOf(_n(value))!.uiText(l, kind: hawkr_seller_v1alpha1_seller.MeasureKind.valueOf(_n(params['kind']))!);
     case 'seller.OnboardingAction.button':
       return hawkr_seller_v1alpha1_seller.OnboardingAction.valueOf(_n(value))!.button(l);
+    case 'seller.OnboardingTaskId.description':
+      return hawkr_seller_v1alpha1_seller.OnboardingTaskId.valueOf(_n(value))!.description(l);
+    case 'seller.OnboardingTaskId.panel_description':
+      return hawkr_seller_v1alpha1_seller.OnboardingTaskId.valueOf(_n(value))!.panelDescription(l);
+    case 'seller.OnboardingTaskId.panel_title':
+      return hawkr_seller_v1alpha1_seller.OnboardingTaskId.valueOf(_n(value))!.panelTitle(l);
     case 'seller.PayUniState':
       return hawkr_seller_v1alpha1_seller.PayUniState.valueOf(_n(value))!.uiText(l);
     case 'seller.PaymentAccount.payouts_inactive_note':

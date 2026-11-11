@@ -357,6 +357,53 @@ extension SellerOnboardingActionUiText on hawkr_seller_v1alpha1_seller.Onboardin
   String? button(UiLocale l) => _sellerOnboardingActionButton(l, value);
 }
 
+String? _sellerOnboardingTaskIdDescription(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '店名、logo 與所在地。',
+(UiLocale.en, 1) => 'Store name, logo and location.',
+(UiLocale.zhTW, 2) => '商家資料與統編的平台審核。',
+(UiLocale.en, 2) => 'Platform review of your business details and tax ID.',
+(UiLocale.zhTW, 3) => '向金流商設定身分與銀行資料。',
+(UiLocale.en, 3) => 'Set up your identity and bank details with the payment provider.',
+_ => null,
+};
+}
+
+String? _sellerOnboardingTaskIdPanelDescription(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '買家要看得到你的店，需要有店名、logo 與所在地。',
+(UiLocale.en, 1) => 'To be found by buyers, your store needs a name, a logo and a location.',
+(UiLocale.zhTW, 2) => '平台審核通過後，店面才能公開，並開放設定收款帳戶。',
+(UiLocale.en, 2) => 'Once the platform review is approved, your store can go public and you can set up a payout account.',
+(UiLocale.zhTW, 3) => '身分與銀行資料由金流商收集，平台不經手；收款帳戶啟用後才能正式收款。',
+(UiLocale.en, 3) => 'Your identity and bank details are collected by the payment provider, not the platform; you can only receive payments once the payout account is enabled.',
+_ => null,
+};
+}
+
+String? _sellerOnboardingTaskIdPanelTitle(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '完成商店資料',
+(UiLocale.en, 1) => 'Complete your store profile',
+(UiLocale.zhTW, 2) => '完成平台審核',
+(UiLocale.en, 2) => 'Complete the platform review',
+(UiLocale.zhTW, 3) => '設定收款帳戶',
+(UiLocale.en, 3) => 'Set up your payout account',
+_ => null,
+};
+}
+
+extension SellerOnboardingTaskIdUiText on hawkr_seller_v1alpha1_seller.OnboardingTaskId {
+  /// seller.OnboardingTaskId.description；沒有文字的值回 null。
+  String? description(UiLocale l) => _sellerOnboardingTaskIdDescription(l, value);
+
+  /// seller.OnboardingTaskId.panel_description；沒有文字的值回 null。
+  String? panelDescription(UiLocale l) => _sellerOnboardingTaskIdPanelDescription(l, value);
+
+  /// seller.OnboardingTaskId.panel_title；沒有文字的值回 null。
+  String? panelTitle(UiLocale l) => _sellerOnboardingTaskIdPanelTitle(l, value);
+}
+
 String? _sellerPayUniState(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => 'PayUni 審核中',

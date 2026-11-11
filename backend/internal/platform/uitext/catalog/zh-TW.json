@@ -738,6 +738,42 @@
       "message": "前往商家認證",
       "description": "開通任務的按鈕文字，只由下一步（OnboardingAction）決定；沒有下一步（NONE）沒有按鈕。（值 ONBOARDING_ACTION_SUBMIT_CERTIFICATION）"
     },
+    "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT": {
+      "message": "向金流商設定身分與銀行資料。",
+      "description": "開通任務的說明句，只由任務種類（OnboardingTaskId）決定；兩個 client 共用。（值 ONBOARDING_TASK_ID_PAYMENT_ACCOUNT）"
+    },
+    "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PLATFORM_REVIEW": {
+      "message": "商家資料與統編的平台審核。",
+      "description": "開通任務的說明句，只由任務種類（OnboardingTaskId）決定；兩個 client 共用。（值 ONBOARDING_TASK_ID_PLATFORM_REVIEW）"
+    },
+    "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PROFILE": {
+      "message": "店名、logo 與所在地。",
+      "description": "開通任務的說明句，只由任務種類（OnboardingTaskId）決定；兩個 client 共用。（值 ONBOARDING_TASK_ID_PROFILE）"
+    },
+    "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT": {
+      "message": "身分與銀行資料由金流商收集，平台不經手；收款帳戶啟用後才能正式收款。",
+      "description": "網頁開通任務面板的說明，只由任務種類決定。（值 ONBOARDING_TASK_ID_PAYMENT_ACCOUNT）"
+    },
+    "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PLATFORM_REVIEW": {
+      "message": "平台審核通過後，店面才能公開，並開放設定收款帳戶。",
+      "description": "網頁開通任務面板的說明，只由任務種類決定。（值 ONBOARDING_TASK_ID_PLATFORM_REVIEW）"
+    },
+    "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PROFILE": {
+      "message": "買家要看得到你的店，需要有店名、logo 與所在地。",
+      "description": "網頁開通任務面板的說明，只由任務種類決定。（值 ONBOARDING_TASK_ID_PROFILE）"
+    },
+    "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT": {
+      "message": "設定收款帳戶",
+      "description": "網頁開通任務面板的標題，只由任務種類決定。（值 ONBOARDING_TASK_ID_PAYMENT_ACCOUNT）"
+    },
+    "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PLATFORM_REVIEW": {
+      "message": "完成平台審核",
+      "description": "網頁開通任務面板的標題，只由任務種類決定。（值 ONBOARDING_TASK_ID_PLATFORM_REVIEW）"
+    },
+    "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PROFILE": {
+      "message": "完成商店資料",
+      "description": "網頁開通任務面板的標題，只由任務種類決定。（值 ONBOARDING_TASK_ID_PROFILE）"
+    },
     "seller.PayUniState.PAY_UNI_STATE_APPROVED": {
       "message": "PayUni 收款已啟用",
       "description": "可以收款。"
@@ -1194,6 +1230,15 @@
         ]
       },
       "description": "開通任務的按鈕文字，只由下一步（OnboardingAction）決定；沒有下一步（NONE）沒有按鈕。"
+    },
+    "seller.OnboardingTaskId.description": {
+      "description": "開通任務的說明句，只由任務種類（OnboardingTaskId）決定；兩個 client 共用。"
+    },
+    "seller.OnboardingTaskId.panel_description": {
+      "description": "網頁開通任務面板的說明，只由任務種類決定。"
+    },
+    "seller.OnboardingTaskId.panel_title": {
+      "description": "網頁開通任務面板的標題，只由任務種類決定。"
     },
     "seller.PaymentAccountStatus.action": {
       "omit": {
