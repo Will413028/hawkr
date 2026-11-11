@@ -2,11 +2,11 @@
 
 ## 職責
 
-店家業務身分與 profile 的擁有者：開店、KYC 與 PayUni、開通閘門（收款帳戶本身由 payment 模組擁有，seller 存轉帳能力的副本，`internal/payout`）、措施與停權、治理（通報、案件、申訴）、關店與清理、商家名單、商品瀏覽數、刪帳參與者。行為規格的唯一來源是 `docs/modules/seller.md`。
+店家業務身分與 profile 的擁有者：開店、KYC、開通閘門（收款帳戶本身由 payment 模組擁有，seller 存轉帳能力的副本，`internal/payout`）、措施與停權、治理（通報、案件、申訴）、關店與清理、商家名單、商品瀏覽數、刪帳參與者。行為規格的唯一來源是 `docs/modules/seller.md`。
 
 ## 擁有的資料
 
-schema `seller`（`db/schema.sql`；view 與函式在 `db/objects.sql`），依子領域：店家、措施與停權、治理（通報、案件、申訴）、KYC 與 PayUni、收款帳戶的閘門副本、商家名單、瀏覽、媒體同步與清理。表單見規格 §1。讀取模型：無。
+schema `seller`（`db/schema.sql`；view 與函式在 `db/objects.sql`），依子領域：店家、措施與停權、治理（通報、案件、申訴）、KYC、收款帳戶的閘門副本、商家名單、瀏覽、媒體同步與清理。表單見規格 §1。讀取模型：無。
 
 ## 發布的讀取介面
 
