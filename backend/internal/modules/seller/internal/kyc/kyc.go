@@ -620,13 +620,11 @@ func complete(row store.SellerKycApplication) error {
 
 // storeFieldLabels 是送出時缺少店家欄位的名稱。
 var storeFieldLabels = map[string]string{
-	model.StoreFieldAddress:       "店家地址",
-	model.StoreFieldContactName:   "聯絡人姓名",
-	model.StoreFieldContactMobile: "聯絡人手機",
-	model.StoreFieldSupportEmail:  "客服電子信箱",
+	model.StoreFieldAddress:      "店家地址",
+	model.StoreFieldSupportEmail: "客服電子信箱",
 }
 
-// storeIncomplete 是送出時店家的 PayUni 綁定資料還有缺：店家的狀態不在請求裡，所以是 failed_precondition（不是欄位違規）；
+// storeIncomplete 是送出時店家的必填資料（地址與客服信箱）還有缺：店家的狀態不在請求裡，所以是 failed_precondition（不是欄位違規）；
 // 缺哪些由申請檢視的 missing_store_fields 取得。
 func storeIncomplete(missing []string) error {
 	labels := make([]string, 0, len(missing))
@@ -642,7 +640,7 @@ func (s *Service) missingStoreFields(ctx context.Context, q *store.Queries, stor
 	if err != nil {
 		return nil, model.Error(err)
 	}
-	return payuni.MissingStoreFields(stint.ToStore(row).Profile), nil
+	return model.MissingStoreFields(stint.ToStore(row).Profile), nil
 }
 
 // reviewParams 組審核紀錄的寫入參數。admin 是管理員的 ID（賣家自己的動作是 nil）；text 是理由或 comment，已經由呼叫方依

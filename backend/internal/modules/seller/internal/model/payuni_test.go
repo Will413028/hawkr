@@ -324,10 +324,10 @@ func TestNormalizeContactFields(t *testing.T) {
 		t.Fatalf("err=%v %+v", err, ok)
 	}
 	for name, edit := range map[string]func(*Profile){
-		"姓名超過 20 字": func(p *Profile) { p.ContactName = ptrTo(strings.Repeat("字", ContactNameMaxRunes+1)) },
+		"姓名超過 50 字": func(p *Profile) { p.ContactName = ptrTo(strings.Repeat("字", ContactNameMaxRunes+1)) },
 		"手機是市話":     func(p *Profile) { p.ContactMobile = ptrTo("0229010572") },
 		"信箱沒有網域":    func(p *Profile) { p.SupportEmail = ptrTo("user@localhost") },
-		"信箱超過 50 字": func(p *Profile) {
+		"信箱超過 254 字": func(p *Profile) {
 			p.SupportEmail = ptrTo(strings.Repeat("a", SupportEmailMaxRunes-len("@example.com")+1) + "@example.com")
 		},
 	} {
@@ -336,6 +336,9 @@ func TestNormalizeContactFields(t *testing.T) {
 		if err := Normalize(&p); err == nil {
 			t.Errorf("%s 應該被拒絕", name)
 		}
+	}
+	if ContactNameMaxRunes != 50 || SupportEmailMaxRunes != 254 {
+		t.Errorf("上限是姓名 50 字、信箱 254：%d、%d", ContactNameMaxRunes, SupportEmailMaxRunes)
 	}
 	boundary := Profile{StoreName: "店", ContactName: ptrTo(strings.Repeat("字", ContactNameMaxRunes)),
 		SupportEmail: ptrTo(strings.Repeat("a", SupportEmailMaxRunes-len("@example.com")) + "@example.com")}

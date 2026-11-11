@@ -16,8 +16,8 @@ func completeProfile() model.Profile {
 	}
 }
 
-func TestMissingStoreFields(t *testing.T) {
-	if got := MissingStoreFields(completeProfile()); len(got) != 0 {
+func TestStoreDataMissingStillRequiresFourFields(t *testing.T) {
+	if got := StoreDataOf(completeProfile()).Missing(); len(got) != 0 {
 		t.Fatalf("齊全的店家缺 %v", got)
 	}
 	cases := map[string]struct {
@@ -35,7 +35,7 @@ func TestMissingStoreFields(t *testing.T) {
 	for name, tc := range cases {
 		p := completeProfile()
 		tc.edit(&p)
-		if got := MissingStoreFields(p); !slices.Equal(got, tc.want) {
+		if got := StoreDataOf(p).Missing(); !slices.Equal(got, tc.want) {
 			t.Errorf("%s：缺 %v，要 %v", name, got, tc.want)
 		}
 	}
@@ -58,19 +58,5 @@ func TestSyncedFieldsChangedCoversEveryPayUniField(t *testing.T) {
 	after.StoreName, after.Description, after.Prize = "別的店名", ptr("別的介紹"), ptr("金牌")
 	if SyncedFieldsChanged(completeProfile(), after) {
 		t.Error("店名、介紹與得獎紀錄不是同步欄位")
-	}
-}
-
-func TestNewlyMissingOnlyCountsFieldsThatWereClearedNow(t *testing.T) {
-	cleared := completeProfile()
-	cleared.ContactName, cleared.TownCode = nil, nil
-	if got := NewlyMissing(completeProfile(), cleared); !slices.Equal(got, []string{model.StoreFieldAddress, model.StoreFieldContactName}) {
-		t.Errorf("got %v", got)
-	}
-	if got := NewlyMissing(cleared, cleared); len(got) != 0 {
-		t.Errorf("原本就缺的不算：%v", got)
-	}
-	if got := NewlyMissing(cleared, completeProfile()); len(got) != 0 {
-		t.Errorf("補齊不算：%v", got)
 	}
 }

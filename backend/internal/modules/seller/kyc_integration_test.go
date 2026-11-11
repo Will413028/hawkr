@@ -1405,7 +1405,7 @@ func TestSubmitKYCRejectsPayUniTerms(t *testing.T) {
 	}
 }
 
-// 回歸：送出 KYC 要店家的 PayUni 綁定資料（地址、聯絡人姓名與手機、客服信箱）齊全；店家的狀態不在請求裡，缺的不是欄位違規而是
+// 回歸：送出 KYC 要店家的必填資料（地址、客服信箱）齊全，聯絡人姓名與手機是選填；店家的狀態不在請求裡，缺的不是欄位違規而是
 // failed_precondition，缺哪些看申請檢視的 missing_store_fields（與送出的檢查同一份規則）；申請自己的缺項先回 invalid_argument；
 // 補齊之後才能送出。
 func TestSubmitKYCRequiresTheStoreContactData(t *testing.T) {
@@ -1417,12 +1417,12 @@ func TestSubmitKYCRequiresTheStoreContactData(t *testing.T) {
 	if len(d.MissingStoreFields) != 0 {
 		t.Fatalf("店家資料齊全：%v", d.MissingStoreFields)
 	}
-	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET contact_name = NULL, support_email = NULL, town_code = NULL, address_detail = NULL WHERE store_id = $1", s.StoreID); err != nil {
+	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET contact_name = NULL, contact_mobile = NULL, support_email = NULL, town_code = NULL, address_detail = NULL WHERE store_id = $1", s.StoreID); err != nil {
 		t.Fatal(err)
 	}
 	mine, err := f.module.MyKYC(ctx, accountID)
 	must(t, err)
-	if want := []string{"address", "contact_name", "support_email"}; !slices.Equal(mine.MissingStoreFields, want) || len(mine.MissingFields) != 0 {
+	if want := []string{"address", "support_email"}; !slices.Equal(mine.MissingStoreFields, want) || len(mine.MissingFields) != 0 {
 		t.Fatalf("missing_store_fields=%v missing_fields=%v", mine.MissingStoreFields, mine.MissingFields)
 	}
 	_, err = f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
@@ -1439,7 +1439,7 @@ func TestSubmitKYCRequiresTheStoreContactData(t *testing.T) {
 	// 申請自己的缺項先檢查：回 invalid_argument 與欄位違規，不是店家的 failed_precondition。
 	other, _ := f.open(t)
 	blank := f.savedDraft(t, KYCDraftInput{AccountID: other, SellerType: ptr(KYCCompany)})
-	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET contact_name = NULL WHERE account_id = $1", other); err != nil {
+	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET support_email = NULL WHERE account_id = $1", other); err != nil {
 		t.Fatal(err)
 	}
 	_, err = f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: other, ExpectedVersion: blank.Version})
@@ -1447,7 +1447,7 @@ func TestSubmitKYCRequiresTheStoreContactData(t *testing.T) {
 		t.Fatalf("申請缺項要先回欄位違規：%v", err)
 	}
 	fixed, err := f.module.UpdateProfile(ctx, UpdateProfileInput{
-		StoreID: s.StoreID, ExpectedVersion: s.Version, ContactName: ptr("王小明"), SupportEmail: ptr("owner@example.com"),
+		StoreID: s.StoreID, ExpectedVersion: s.Version, SupportEmail: ptr("owner@example.com"),
 		TownCode: ptr("63000050"), AddressDetail: ptr("測試路一號"),
 	})
 	must(t, err)
@@ -2061,5 +2061,84 @@ func TestKYCCompanyDocumentElementProblemsAreIndexed(t *testing.T) {
 		if got := fields(c.docs); !slices.Equal(got, []string{c.want}) {
 			t.Errorf("%s：欄位 = %v，預期 %s", name, got, c.want)
 		}
+	}
+}
+
+// editStore 以店家目前的版本寫入店家資料。
+func editStore(f *fixture, t *testing.T, storeID int64, in UpdateProfileInput) (Store, error) {
+	t.Helper()
+	cur, err := f.module.Store(context.Background(), storeID)
+	must(t, err)
+	in.StoreID, in.ExpectedVersion = storeID, cur.Version
+	return f.module.UpdateProfile(context.Background(), in)
+}
+
+func hasField(e *apperr.Error, field string) bool {
+	for _, v := range e.FieldViolations() {
+		if v.Field == field {
+			return true
+		}
+	}
+	return false
+}
+
+// 回歸：店家目前的申請在審核中或已核准時，地址與客服信箱不能清掉；草稿、已退回與沒有申請時可以清；聯絡人姓名與手機任何時候都能清掉。
+func TestRequiredStoreFieldsCannotBeClearedWhileTheApplicationIsSubmittedOrApproved(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	accountID, s := f.open(t)
+	restore := UpdateProfileInput{SupportEmail: ptr("owner@example.com"), TownCode: ptr("63000050"), AddressDetail: ptr("測試路一號")}
+	clearRequired := func(label string) {
+		t.Helper()
+		for name, tc := range map[string]struct {
+			in    UpdateProfileInput
+			field string
+		}{
+			"客服信箱": {UpdateProfileInput{SupportEmail: ptr("")}, "SupportEmail"},
+			"整個地址": {UpdateProfileInput{TownCode: ptr(""), AddressDetail: ptr("")}, "TownCode"},
+			"地址明細": {UpdateProfileInput{AddressDetail: ptr("")}, "AddressDetail"},
+		} {
+			_, err := editStore(f, t, s.StoreID, tc.in)
+			var ae *apperr.Error
+			if apperr.KindOf(err) != apperr.KindInvalidInput || !errors.As(err, &ae) || !hasField(ae, tc.field) {
+				t.Errorf("%s %s：err=%v", label, name, err)
+			}
+		}
+		cur, err := f.module.Store(ctx, s.StoreID)
+		must(t, err)
+		if deref(cur.SupportEmail) != "owner@example.com" || cur.AddressDetail == nil {
+			t.Fatalf("%s：被拒絕的修改不該寫入：%+v", label, cur)
+		}
+	}
+	clearOptional := func(label string) {
+		t.Helper()
+		if _, err := editStore(f, t, s.StoreID, UpdateProfileInput{ContactName: ptr(""), ContactMobile: ptr(" ")}); err != nil {
+			t.Fatalf("%s：聯絡人姓名與手機應該可以清：%v", label, err)
+		}
+		if _, err := editStore(f, t, s.StoreID, UpdateProfileInput{ContactName: ptr("王小明"), ContactMobile: ptr("0912345678")}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// 沒有申請與草稿：地址與信箱可以清。
+	clearOptional("沒有申請")
+	if _, err := editStore(f, t, s.StoreID, UpdateProfileInput{SupportEmail: ptr(""), TownCode: ptr(""), AddressDetail: ptr("")}); err != nil {
+		t.Fatalf("沒有申請時應該可以清：%v", err)
+	}
+	if _, err := editStore(f, t, s.StoreID, restore); err != nil {
+		t.Fatal(err)
+	}
+	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	clearOptional("草稿")
+	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
+	must(t, err)
+	clearRequired("審核中")
+	clearOptional("審核中")
+	must(t, approve(f, sub))
+	clearRequired("已核准")
+	clearOptional("已核准")
+	// 換成別的值是允許的，商店電話不是必填、可以清。
+	if _, err := editStore(f, t, s.StoreID, UpdateProfileInput{SupportEmail: ptr("new@example.com"), ContactPhone: ptr("")}); err != nil {
+		t.Fatal(err)
 	}
 }

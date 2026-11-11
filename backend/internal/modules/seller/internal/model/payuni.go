@@ -119,21 +119,6 @@ var (
 	allStoreFields = StoreFieldNames()
 )
 
-// 店家上可以指出「有問題」的欄位路徑（與對外 Store 的欄位一對一）：送出 KYC 之前還缺的店家欄位與 PayUni 問題要補的店家欄位
-// 都用這一套。
-const (
-	StoreFieldAddress       = "address"
-	StoreFieldContactName   = "contact_name"
-	StoreFieldContactMobile = "contact_mobile"
-	StoreFieldSupportEmail  = "support_email"
-	StoreFieldContactPhone  = "contact_phone"
-)
-
-// StoreFieldNames 回傳全部店家欄位路徑，依對外 StoreField 的數字順序。
-func StoreFieldNames() []string {
-	return []string{StoreFieldAddress, StoreFieldContactName, StoreFieldContactMobile, StoreFieldSupportEmail, StoreFieldContactPhone}
-}
-
 type payuniErrorGroup struct {
 	remedy PayUniRemedy
 	// wholeForm 表示碼指出的是整份表單（哪個欄位都可能要改）：賣家端不列具體欄位，只告訴他整份要重看。

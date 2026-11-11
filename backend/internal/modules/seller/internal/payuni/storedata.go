@@ -37,7 +37,7 @@ func (d StoreData) Address() (text, postal string, ok bool) {
 }
 
 // Missing 回傳 PayUni 綁定需要、而店家還沒有（或不合法）的欄位路徑，依 model.StoreFieldNames 的順序：地址、聯絡人姓名、聯絡人手機、
-// 客服信箱（商店電話不是必填）。送出 KYC 的檢查、綁定與同步時的完整性檢查、清除必填欄位的檢查都用它，完整性的規則只有這一份。
+// 客服信箱（商店電話不是必填）。這是 PayUni 綁定與同步時的完整性檢查；送出 KYC 前的必填規則在 model.MissingStoreFields。
 func (d StoreData) Missing() []string {
 	out := []string{}
 	if _, _, ok := d.Address(); !ok {
@@ -51,28 +51,4 @@ func (d StoreData) Missing() []string {
 		}
 	}
 	return out
-}
-
-// MissingStoreFields 是 StoreDataOf(p).Missing()。
-func MissingStoreFields(p model.Profile) []string { return StoreDataOf(p).Missing() }
-
-// NewlyMissing 回傳 after 比 before 多出來的缺項：原本有、被清掉（或改成不合法）的必填欄位。
-func NewlyMissing(before, after model.Profile) []string {
-	was := MissingStoreFields(before)
-	out := []string{}
-	for _, f := range MissingStoreFields(after) {
-		if !contains(was, f) {
-			out = append(out, f)
-		}
-	}
-	return out
-}
-
-func contains(list []string, s string) bool {
-	for _, v := range list {
-		if v == s {
-			return true
-		}
-	}
-	return false
 }

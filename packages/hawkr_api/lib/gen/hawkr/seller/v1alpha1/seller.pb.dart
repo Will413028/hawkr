@@ -472,7 +472,7 @@ class Store extends $pb.GeneratedMessage {
   @$pb.TagNumber(20)
   void clearCoverStagedToken() => $_clearField(20);
 
-  /// 店家地址；不設表示沒有填。可以只填鄉鎮市區（address_detail 是空字串），有明細就一定有鄉鎮市區代碼。
+  /// 店家地址；不設表示沒有填。送出 KYC 之前要填，申請審核中或已核准時不能清掉。可以只填鄉鎮市區（address_detail 是空字串），有明細就一定有鄉鎮市區代碼。
   /// update_mask 列 address 時整個換成請求的地址，請求沒有 address 就是清掉。
   @$pb.TagNumber(21)
   $2.PostalAddress get address => $_getN(16);
@@ -485,7 +485,7 @@ class Store extends $pb.GeneratedMessage {
   @$pb.TagNumber(21)
   $2.PostalAddress ensureAddress() => $_ensure(16);
 
-  /// 聯絡人姓名，最多 20 字（PayUni 的 ContactName）；空字串表示沒有填。送出 KYC 之前要填；店家有 PayUni 註冊之後不能清掉。
+  /// 聯絡人姓名，最多 50 字；空字串表示沒有填。選填，任何時候都能清掉。
   @$pb.TagNumber(23)
   $core.String get contactName => $_getSZ(17);
   @$pb.TagNumber(23)
@@ -495,7 +495,7 @@ class Store extends $pb.GeneratedMessage {
   @$pb.TagNumber(23)
   void clearContactName() => $_clearField(23);
 
-  /// 聯絡人手機，09 開頭的 10 碼（PayUni 的 ContactMobile）；空字串表示沒有填。送出 KYC 之前要填；店家有 PayUni 註冊之後不能清掉。
+  /// 聯絡人手機，09 開頭的 10 碼；空字串表示沒有填。選填，任何時候都能清掉。
   @$pb.TagNumber(24)
   $core.String get contactMobile => $_getSZ(18);
   @$pb.TagNumber(24)
@@ -505,8 +505,7 @@ class Store extends $pb.GeneratedMessage {
   @$pb.TagNumber(24)
   void clearContactMobile() => $_clearField(24);
 
-  /// 客服電子信箱，最多 50 字（PayUni 的 MerEmail；綁定時同時是會員的 Email，綁定之後 PayUni 不能改它）；空字串表示沒有填。
-  /// 送出 KYC 之前要填；店家有 PayUni 註冊之後不能清掉。
+  /// 客服電子信箱，最多 254 字；空字串表示沒有填。物流用它聯絡店家：送出 KYC 之前要填，申請審核中或已核准時不能清掉。
   @$pb.TagNumber(25)
   $core.String get supportEmail => $_getSZ(19);
   @$pb.TagNumber(25)
@@ -4249,7 +4248,7 @@ class KYCApplication extends $pb.GeneratedMessage {
   @$pb.TagNumber(30)
   $1.Timestamp ensureUpdateTime() => $_ensure(26);
 
-  /// 送出之前還缺的店家欄位（PayUni 綁定需要的店家資料，與 SubmitKYC 檢查的是同一份規則），依 StoreField 的數字順序；齊全時是空的。
+  /// 送出之前還缺的店家欄位（必填的是地址與客服電子信箱，與 SubmitKYC 檢查的是同一份規則），依 StoreField 的數字順序；齊全時是空的。
   /// 這些欄位用 UpdateMyStore 寫，不在申請上。
   @$pb.TagNumber(31)
   $pb.PbList<StoreField> get missingStoreFields => $_getList(27);
@@ -7962,7 +7961,7 @@ class SellerAppServiceApi {
   /// SubmitKYC 送出申請給管理員審核。草稿，以及流程狀態 can_resubmit 為 true 的申請（被退回的、PayUni 拒絕或綁定失敗而且賣家能自己修正的）都能直接送出，
   /// 不必先儲存；can_resubmit 為 false 的狀態回 failed_precondition，訊息是 KYCFlow.resubmit_unavailabilities 的第一句。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
   /// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（real_name、id_card_front、business.tax_id……，與 KYCField 一對一）。申請本身齊全之後，
-  /// PayUni 綁定需要的店家資料（地址、聯絡人姓名與手機、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
+  /// 店家的必填資料（地址、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
   /// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。帳號沒有聯絡信箱（IdentityAppService.GetContactEmail 沒有回信箱）時回
   /// failed_precondition 與 ErrorReason CONTACT_EMAIL_REQUIRED，client 引導在 IdentityAppService.SetContactEmail 填一個再重送。 身分比對沒有通過時回
   /// failed_precondition，訊息固定，不透露是哪個欄位或哪個帳號。每個帳號每小時最多送出 5 次，超過回

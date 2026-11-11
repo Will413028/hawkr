@@ -2337,15 +2337,14 @@ type Store struct {
 	Description string `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
 	// 商店電話，台灣的手機或市話（PayUni 的 MerTel）；空字串表示沒有填。
 	ContactPhone string `protobuf:"bytes,5,opt,name=contact_phone,json=contactPhone,proto3" json:"contact_phone,omitempty"`
-	// 店家地址；不設表示沒有填。可以只填鄉鎮市區（address_detail 是空字串），有明細就一定有鄉鎮市區代碼。
+	// 店家地址；不設表示沒有填。送出 KYC 之前要填，申請審核中或已核准時不能清掉。可以只填鄉鎮市區（address_detail 是空字串），有明細就一定有鄉鎮市區代碼。
 	// update_mask 列 address 時整個換成請求的地址，請求沒有 address 就是清掉。
 	Address *v1alpha1.PostalAddress `protobuf:"bytes,21,opt,name=address,proto3" json:"address,omitempty"`
-	// 聯絡人姓名，最多 20 字（PayUni 的 ContactName）；空字串表示沒有填。送出 KYC 之前要填；店家有 PayUni 註冊之後不能清掉。
+	// 聯絡人姓名，最多 50 字；空字串表示沒有填。選填，任何時候都能清掉。
 	ContactName string `protobuf:"bytes,23,opt,name=contact_name,json=contactName,proto3" json:"contact_name,omitempty"`
-	// 聯絡人手機，09 開頭的 10 碼（PayUni 的 ContactMobile）；空字串表示沒有填。送出 KYC 之前要填；店家有 PayUni 註冊之後不能清掉。
+	// 聯絡人手機，09 開頭的 10 碼；空字串表示沒有填。選填，任何時候都能清掉。
 	ContactMobile string `protobuf:"bytes,24,opt,name=contact_mobile,json=contactMobile,proto3" json:"contact_mobile,omitempty"`
-	// 客服電子信箱，最多 50 字（PayUni 的 MerEmail；綁定時同時是會員的 Email，綁定之後 PayUni 不能改它）；空字串表示沒有填。
-	// 送出 KYC 之前要填；店家有 PayUni 註冊之後不能清掉。
+	// 客服電子信箱，最多 254 字；空字串表示沒有填。物流用它聯絡店家：送出 KYC 之前要填，申請審核中或已核准時不能清掉。
 	SupportEmail string `protobuf:"bytes,25,opt,name=support_email,json=supportEmail,proto3" json:"support_email,omitempty"`
 	// 得獎紀錄，最多 255 字。
 	Prize string `protobuf:"bytes,8,opt,name=prize,proto3" json:"prize,omitempty"`
@@ -4964,7 +4963,7 @@ type KYCApplication struct {
 	// 送出之前還缺的欄位（與 SubmitKYC 檢查的是同一份規則），依 KYCField 的數字順序；齊全時是空的。client 以它決定續填的
 	// 位置與哪些欄位標紅，不必自己重寫完整性規則。
 	MissingFields []KYCField `protobuf:"varint,26,rep,packed,name=missing_fields,json=missingFields,proto3,enum=hawkr.seller.v1alpha1.KYCField" json:"missing_fields,omitempty"`
-	// 送出之前還缺的店家欄位（PayUni 綁定需要的店家資料，與 SubmitKYC 檢查的是同一份規則），依 StoreField 的數字順序；齊全時是空的。
+	// 送出之前還缺的店家欄位（必填的是地址與客服電子信箱，與 SubmitKYC 檢查的是同一份規則），依 StoreField 的數字順序；齊全時是空的。
 	// 這些欄位用 UpdateMyStore 寫，不在申請上。
 	MissingStoreFields []StoreField `protobuf:"varint,31,rep,packed,name=missing_store_fields,json=missingStoreFields,proto3,enum=hawkr.seller.v1alpha1.StoreField" json:"missing_store_fields,omitempty"`
 	// 最近一次退回指出的問題裡賣家還沒處理的（已處理由伺服器判定：該欄位的值在退回之後被改過，或指到的文件已被移除或替換）；

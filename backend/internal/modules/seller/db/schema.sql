@@ -81,10 +81,10 @@ CREATE TABLE seller.stores (
     CONSTRAINT stores_images_check CHECK (logo_key <> '' AND cover_key <> '' AND logo_asset_id <> '' AND cover_asset_id <> ''),
     CONSTRAINT stores_image_assets_check CHECK ((logo_key IS NULL) = (logo_asset_id IS NULL) AND (cover_key IS NULL) = (cover_asset_id IS NULL)),
     CONSTRAINT stores_contact_phone_check CHECK (contact_phone ~ '^0[0-9]{8,9}$'),
-    CONSTRAINT stores_contact_name_check CHECK (char_length(contact_name) >= 1 AND char_length(contact_name) <= 20 AND contact_name !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
+    CONSTRAINT stores_contact_name_check CHECK (char_length(contact_name) >= 1 AND char_length(contact_name) <= 50 AND contact_name !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT stores_contact_mobile_check CHECK (contact_mobile ~ '^09[0-9]{8}$'),
     CONSTRAINT stores_support_email_check CHECK (
-        char_length(support_email) <= 50 AND support_email = lower(support_email) AND support_email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
+        char_length(support_email) <= 254 AND support_email = lower(support_email) AND support_email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
     ),
     CONSTRAINT stores_town_code_check CHECK (town_code ~ '^[0-9]{8}$'),
     CONSTRAINT stores_address_detail_check CHECK (

@@ -265,7 +265,7 @@ func withApplication(ctx context.Context, q *store.Queries, reg model.PayUniRegi
 		if err != nil {
 			return reg, "", model.Error(err)
 		}
-		reg.IncompleteStoreFields = MissingStoreFields(stint.ToStore(owner).Profile)
+		reg.IncompleteStoreFields = StoreDataOf(stint.ToStore(owner).Profile).Missing()
 	}
 	return reg, model.KYCStatus(app.Status), nil
 }

@@ -982,22 +982,13 @@ func TestSweepReschedulesSyncsThatWereLost(t *testing.T) {
 	}
 }
 
-// editStore 以店家目前的版本寫入店家資料。
-func editStore(f *fixture, t *testing.T, storeID int64, in UpdateProfileInput) (Store, error) {
-	t.Helper()
-	cur, err := f.module.Store(context.Background(), storeID)
-	must(t, err)
-	in.StoreID, in.ExpectedVersion = storeID, cur.Version
-	return f.module.UpdateProfile(context.Background(), in)
-}
-
 // 店家的聯絡資料是唯一來源：改了就和地址一樣登記同步，同一個 job 送到 PayUni；格式不對整筆不寫入、不登記。
 func TestStoreContactEditsRegisterTheSyncAndAreSentByTheSameJob(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	_, s := f.boundStore(t)
 	for name, in := range map[string]UpdateProfileInput{
-		"超過 20 字的聯絡人": {ContactName: ptr(strings.Repeat("字", 21))},
+		"超過 50 字的聯絡人": {ContactName: ptr(strings.Repeat("字", 51))},
 		"市話當手機":       {ContactMobile: ptr("0229010572")},
 		"壞的 email":    {SupportEmail: ptr("not-an-email")},
 		"壞的電話":        {ContactPhone: ptr("abc")},
@@ -1806,52 +1797,6 @@ func (f *fixture) observationPages(t *testing.T, storeID int64) []PayUniObservat
 	}
 }
 
-// 回歸：有 PayUni 註冊之後，PayUni 必填的店家欄位（聯絡人姓名與手機、客服信箱、地址）不能清掉；清掉會讓 PayUni 留著舊值、同步卻記成成功。
-// 沒有註冊（還沒核准）時可以清；原本就缺的欄位不相干的修改照常通過。
-func TestRequiredStoreFieldsCannotBeClearedOnceARegistrationExists(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	accountID, s := f.open(t)
-	// 還沒有註冊：清掉是允許的（送出 KYC 之前會再檢查完整性）。
-	if _, err := editStore(f, t, s.StoreID, UpdateProfileInput{ContactName: ptr("")}); err != nil {
-		t.Fatalf("沒有註冊時應該可以清：%v", err)
-	}
-	if _, err := editStore(f, t, s.StoreID, UpdateProfileInput{ContactName: ptr("王小明")}); err != nil {
-		t.Fatal(err)
-	}
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
-	sub, err := f.module.SubmitKYC(context.Background(), SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
-	must(t, err)
-	must(t, approve(f, sub))
-	f.sync(t, s.StoreID)
-	jobs := f.jobs.count(kindSync)
-	for name, tc := range map[string]struct {
-		in    UpdateProfileInput
-		field string
-	}{
-		"聯絡人姓名": {UpdateProfileInput{ContactName: ptr("")}, "ContactName"},
-		"聯絡人手機": {UpdateProfileInput{ContactMobile: ptr(" ")}, "ContactMobile"},
-		"客服信箱":  {UpdateProfileInput{SupportEmail: ptr("")}, "SupportEmail"},
-		"整個地址":  {UpdateProfileInput{TownCode: ptr(""), AddressDetail: ptr("")}, "TownCode"},
-		"地址明細":  {UpdateProfileInput{AddressDetail: ptr("")}, "AddressDetail"},
-	} {
-		_, err := editStore(f, t, s.StoreID, tc.in)
-		var ae *apperr.Error
-		if apperr.KindOf(err) != apperr.KindInvalidInput || !errors.As(err, &ae) || !hasField(ae, tc.field) {
-			t.Errorf("%s：err=%v", name, err)
-		}
-	}
-	cur, err := f.module.Store(context.Background(), s.StoreID)
-	must(t, err)
-	if deref(cur.ContactName) != "王小明" || deref(cur.SupportEmail) != "owner@example.com" || cur.AddressDetail == nil || f.jobs.count(kindSync) != jobs {
-		t.Fatalf("被拒絕的修改不該寫入或排 job：%+v", cur)
-	}
-	// 換成別的值是允許的，商店電話不是必填、可以清。
-	if _, err := editStore(f, t, s.StoreID, UpdateProfileInput{ContactName: ptr("李大華"), ContactPhone: ptr("")}); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // 同步時店家的必填資料是空的（例如繞過寫入檢查的資料問題）：不呼叫 PayUni、不記成成功，記下 INCOMPLETE_DATA 讓賣家看見。
 func TestSyncFailsLoudlyWhenARequiredStoreValueIsEmpty(t *testing.T) {
 	t.Parallel()
@@ -1871,13 +1816,4 @@ func TestSyncFailsLoudlyWhenARequiredStoreValueIsEmpty(t *testing.T) {
 	if r := f.registration(t, s.StoreID); deref(r.SyncErrorCode) != PayUniErrIncompleteData {
 		t.Fatalf("同步失敗要留下碼：%+v", r)
 	}
-}
-
-func hasField(e *apperr.Error, field string) bool {
-	for _, v := range e.FieldViolations() {
-		if v.Field == field {
-			return true
-		}
-	}
-	return false
 }

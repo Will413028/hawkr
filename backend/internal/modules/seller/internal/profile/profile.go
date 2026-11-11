@@ -385,27 +385,29 @@ func (s *Service) mergeChecked(ctx context.Context, q *store.Queries, before mod
 	return merged, nil
 }
 
-// requiredFieldNames 是 PayUni 必填的店家欄位被清掉時回報的輸入欄位名與說明（地址依缺的是鄉鎮市區還是明細）。
+// requiredFieldMessages 是審核中或已核准時必填的店家欄位被清掉時回報的說明。
 var requiredFieldMessages = map[string]string{
-	model.StoreFieldContactName:   "聯絡人姓名必填",
-	model.StoreFieldContactMobile: "聯絡人手機必填",
-	model.StoreFieldSupportEmail:  "客服電子信箱必填",
-	model.StoreFieldAddress:       "店家地址必填",
+	model.StoreFieldSupportEmail: "申請審核中或已核准時，客服電子信箱不能清除",
+	model.StoreFieldAddress:      "申請審核中或已核准時，店家地址不能清除",
 }
 
-// checkRequiredNotCleared：店家有 PayUni 註冊之後，PayUni 必填的店家欄位（地址、聯絡人姓名與手機、客服信箱）不能清掉：清掉之後 PayUni
-// 仍是舊值，卻會被記成同步成功。還沒有註冊時可以清（送出 KYC 之前會再檢查完整性）。原本就缺的欄位不算，不相干的修改照常通過。
+// checkRequiredNotCleared：店家目前的 KYC 申請在審核中或已核准時，必填的店家欄位（地址、客服信箱）不能清掉（規則在 model.ClearedLockedFields）。
+// 沒有申請或其他狀態可以清（送出 KYC 之前會再檢查完整性）。原本就缺的欄位不算，不相干的修改照常通過。
 func checkRequiredNotCleared(ctx context.Context, q *store.Queries, before model.Store, merged model.Profile) error {
-	cleared := payuni.NewlyMissing(before.Profile, merged)
+	if len(model.NewlyMissing(before.Profile, merged)) == 0 {
+		return nil
+	}
+	var status model.KYCStatus
+	if app, err := q.CurrentKYCApplication(ctx, before.StoreID); err == nil {
+		status = model.KYCStatus(app.Status)
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	cleared := model.ClearedLockedFields(before.Profile, merged, status)
 	if len(cleared) == 0 {
 		return nil
 	}
-	if _, err := q.PayUniRegistrationByStore(ctx, before.StoreID); errors.Is(err, pgx.ErrNoRows) {
-		return nil
-	} else if err != nil {
-		return err
-	}
-	field := map[string]string{model.StoreFieldContactName: "ContactName", model.StoreFieldContactMobile: "ContactMobile", model.StoreFieldSupportEmail: "SupportEmail"}[cleared[0]]
+	field := "SupportEmail"
 	if cleared[0] == model.StoreFieldAddress {
 		field = "AddressDetail"
 		if merged.TownCode == nil {
