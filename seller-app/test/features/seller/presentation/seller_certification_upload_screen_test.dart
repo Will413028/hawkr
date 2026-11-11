@@ -511,9 +511,7 @@ void main() {
       await tapKey(tester, 'kyc_privacy_checkbox');
     }
 
-    testWidgets('沒有缺項時停在確認；告知事項勾了才能送出，送出帶 etag 與現行版本，只帶個資告知', (
-      tester,
-    ) async {
+    testWidgets('沒有缺項時停在確認；告知事項勾了才能送出，送出帶 etag 與現行版本，只帶個資告知', (tester) async {
       await pumpScreen(tester, application: complete());
 
       expect(find.text('確認送出'), findsWidgets);
