@@ -376,8 +376,10 @@ void main() {
         ..refreshFailure = reasonError(Code.unavailable, 'DOWN');
       final container = server.container();
       final notifier = container.read(paymentOnboardingProvider.notifier);
-      final seen = <PaymentRefreshFailure?>[];
-      container.listen(paymentOnboardingProvider, (_, next) => seen.add(next));
+      final seen = <PaymentRefreshFailure>[];
+      container.listen(paymentOnboardingProvider, (_, next) {
+        if (next != null) seen.add(next);
+      });
 
       await notifier.start(_hosted);
       await notifier.onResumed();

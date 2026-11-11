@@ -137,7 +137,9 @@ class PaymentOnboarding extends _$PaymentOnboarding {
 
   /// 從金流商回來與「重新整理」共用的一條路徑：先 `RefreshMyPaymentAccount`（伺服器同步向金流商重讀）再 `fresh: true` 重讀
   /// 全部狀態（含開通摘要）。重讀失敗也照樣讀（快取不能留在舊的）。失敗不經共享 state 廣播，回傳給呼叫端（發起的畫面）顯示。
+  /// 一次新的 refresh 開始就清掉留著的失敗訊號：狀態一旦重新確認，之前那次失敗不能再被顯示（成功時它也就保持清空）。
   Future<PaymentConfirmation> confirmPaymentAccount() async {
+    if (state != null) state = null;
     Object? failure;
     try {
       await ref.read(paymentAccountRepositoryProvider).refresh();
