@@ -24,7 +24,6 @@ import {
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
 import {
 	KYCField,
-	KYCFlowStatus,
 	KYCIssueCode,
 	KYCStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -1127,7 +1126,7 @@ test("評分卡：只顯示讀到且大於 0 的平均分；讀不到、沒有�
 });
 
 // ---------------------------------------------------------------------------
-// 核准的提示、審核備註與聯絡資料（D40）
+// 核准的提示、審核備註與聯絡資料
 
 test("核准鈕上方的小字與核准成功的提示是同一句新文案，不再提 PayUni", async () => {
 	const copy = "核准後系統會建立收款帳戶，賣家再到金流商完成收款設定";

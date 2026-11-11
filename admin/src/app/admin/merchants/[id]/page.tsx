@@ -47,7 +47,7 @@ import { useScrollToHash } from "@/lib/use-scroll-to-hash";
 import { api } from "@/services/api";
 import { imageUri } from "@/utils/image";
 import { buildImageUrl } from "@/utils/media";
-import { flowBadge } from "../store-row";
+import { kycBadge } from "../store-row";
 import {
 	ActiveMeasureCards,
 	ScheduledTerminationNotice,
@@ -772,8 +772,8 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 	const termination = terminationAvailability(detail);
 	const lifecycle = lifecycleBadge(store.status);
 	const logo = imageUri(store.logo, "avatar");
-	// 商家認證：沒有送出過的申請（GetStore 沒有 kyc 摘要）時沒有狀態徽章與 KYC 區塊。
-	const statusBadge = kycSummary ? flowBadge(kycSummary.flowStatus) : undefined;
+	// 商家認證：沒有送出過的申請（GetStore 沒有 kyc 摘要）時徽章是「尚未申請」，沒有 KYC 區塊。
+	const statusBadge = kycBadge(kycSummary?.status);
 	// 顯示全文：過期的（或別份申請的）一律當作沒有；放大圖只在授權還在時顯示。
 	const liveReveal = activeReveal(secret.reveal, application?.id, new Date());
 	const previewImage = liveReveal ? secret.preview : null;
@@ -837,13 +837,9 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 						<div className="header-info">
 							<div className="header-title-row">
 								<h1 className="merchant-name">{store.storeName}</h1>
-								{kycSummary ? (
-									<StatusBadge variant={statusBadge?.variant ?? "gray"}>
-										{statusBadge?.label ?? "狀態不明"}
-									</StatusBadge>
-								) : (
-									<StatusBadge variant="gray">未申請認證</StatusBadge>
-								)}
+								<StatusBadge variant={statusBadge.variant}>
+									{statusBadge.label}
+								</StatusBadge>
 								{lifecycle && (
 									<StatusBadge variant={lifecycle.variant}>
 										{lifecycle.label}
