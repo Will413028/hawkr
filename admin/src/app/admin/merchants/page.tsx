@@ -375,7 +375,7 @@ export default function MerchantManagement() {
 												</div>
 											</div>
 										</td>
-										{/* 狀態:停權優先於認證流程;審核、綁定中的 PayUni 狀態也在這顆徽章上 */}
+										{/* 狀態:停權優先於申請狀態 */}
 										<td>
 											<StatusBadge variant={badge.variant}>
 												{badge.label}
