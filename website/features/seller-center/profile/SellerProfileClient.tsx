@@ -18,17 +18,12 @@ import { toast } from "@/lib/feedback/toast";
 import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
 import {
 	useInvalidateSellerSelf,
-	useMyKycFlow,
 	useSellerSelf,
 } from "@/lib/hooks/useSellerSelf";
 import { useVersionConflict } from "@/lib/hooks/useVersionConflict";
 import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { fetchProfile } from "@/lib/profile/repo";
 import { queryKeys } from "@/lib/query/keys";
-import {
-	payuniLockedNoticeFor,
-	stripPayuniLockedFields,
-} from "@/lib/seller/payuni-locked-fields";
 import { hasCapability, storeImageUrls } from "@/lib/seller/store";
 import {
 	hasStoreContactErrors,
@@ -73,7 +68,6 @@ export default function SellerProfileClient() {
 		loading: selfLoading,
 		error: selfError,
 	} = useSellerSelf();
-	const { flow } = useMyKycFlow();
 	const invalidateSelf = useInvalidateSellerSelf();
 	const scope = useSellerDataScope();
 	const delegated = scope.mode === "delegated";
@@ -159,24 +153,9 @@ export default function SellerProfileClient() {
 
 	const update = (patch: Partial<StoreForm>) =>
 		setEdits((prev) => ({ ...prev, ...patch }));
-	/**
-	 * 註冊已有 MerID 之後，商店名稱與商店介紹就鎖定（對應 PayUni 的 `MerName`／`MerDesc`）。
-	 *
-	 * 取伺服器推導的 `flow.identity_locked` 而不是表單狀態：這是伺服器端的事實。
-	 */
-	const payuniLockedNotice = payuniLockedNoticeFor(flow?.identityLocked);
-	const payuniLocked = payuniLockedNotice !== undefined;
-	/**
-	 * 鎖定欄位在這裡就從變更拿掉，而不是等送出前才濾。
-	 *
-	 * 這一個位置同時修好三件事：送出的變更不含必定被伺服器拒絕的欄位、
-	 * 「尚有未儲存的商店資料」不會因為一個送不出去的變更而恆亮、代行確認抽屜的
-	 * 變更摘要也不會列出根本不會送的欄位。
-	 */
 	const pendingProfileChanges = React.useMemo(
-		() =>
-			stripPayuniLockedFields(storeFormChanges(data, baseline), payuniLocked),
-		[data, baseline, payuniLocked],
+		() => storeFormChanges(data, baseline),
+		[data, baseline],
 	);
 	const localContactErrors = storeFormContactErrors(data);
 	const contactErrors: StoreContactErrors =
@@ -215,10 +194,7 @@ export default function SellerProfileClient() {
 		setAddressError(null);
 		const submitted: StoreForm = { ...data, websiteUrl };
 		if (data.websiteUrl !== websiteUrl) update({ websiteUrl });
-		const changes = stripPayuniLockedFields(
-			storeFormChanges(submitted, baseline),
-			payuniLocked,
-		);
+		const changes = storeFormChanges(submitted, baseline);
 		// 代行下開確認抽屜收齊修改原因／目前版本／通知賣家；賣家路徑立刻放行且不帶
 		// meta，這一段對 `/seller-center` 是零行為變化。
 		const decision = await scope.confirmMutation({
@@ -378,8 +354,7 @@ export default function SellerProfileClient() {
 									label="商店名稱"
 									value={data.storeName}
 									onChange={(e) => update({ storeName: e.target.value })}
-									readOnly={!canWrite || payuniLocked}
-									description={payuniLockedNotice}
+									readOnly={!canWrite}
 									maxLength={40}
 								/>
 								<Input
@@ -500,8 +475,7 @@ export default function SellerProfileClient() {
 									value={data.description}
 									onChange={(e) => update({ description: e.target.value })}
 									minRows={5}
-									readOnly={!canWrite || payuniLocked}
-									description={payuniLockedNotice}
+									readOnly={!canWrite}
 									maxLength={500}
 									placeholder="一段話告訴買家你是誰、種了什麼、為什麼買你的"
 								/>

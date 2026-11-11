@@ -3,7 +3,6 @@
 import type {
 	GetMyOnboardingResponse,
 	KYCApplication,
-	KYCFlow,
 	PaymentAccount,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -123,24 +122,6 @@ export function useMyKyc(options?: { enabled?: boolean }): UseMyKycResult {
 	const query = useMyKycQuery((app) => app, options?.enabled);
 	return {
 		application: query.data ?? null,
-		loading: query.isLoading,
-		error: query.error,
-	};
-}
-
-interface UseMyKycFlowResult {
-	flow: KYCFlow | null;
-	loading: boolean;
-	error: Error | null;
-}
-
-/** 申請的流程（`flow`）；沒有申請是 null。與 `useMyKyc` 共用同一份快取。 */
-export function useMyKycFlow(options?: {
-	enabled?: boolean;
-}): UseMyKycFlowResult {
-	const query = useMyKycQuery((app) => app?.flow ?? null, options?.enabled);
-	return {
-		flow: query.data ?? null,
 		loading: query.isLoading,
 		error: query.error,
 	};

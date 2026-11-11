@@ -144,11 +144,9 @@ test("the KYC fixture shape parses as a GetMyKYCResponse", () => {
 		application: {
 			id: "1",
 			status: "KYC_STATUS_APPROVED",
-			flow: { identityLocked: true },
 		},
 	});
 	assert.equal(message.application?.status, KYCStatus.KYC_STATUS_APPROVED);
-	assert.equal(message.application?.flow?.identityLocked, true);
 });
 
 test("the contact email fixture shape parses as a GetContactEmailResponse", () => {

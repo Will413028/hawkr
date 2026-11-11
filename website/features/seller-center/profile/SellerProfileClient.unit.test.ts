@@ -10,7 +10,8 @@ import {
 import { ErrorReason } from "@hawkr/api/gen/hawkr/common/v1alpha1/error_reason_pb";
 import {
 	GetMyStoreResponseSchema,
-	KYCFlowSchema,
+	KYCApplicationSchema,
+	KYCStatus,
 	SellerCapability,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -44,7 +45,7 @@ const cache = vi.hoisted(() => {
 });
 
 const mocks = vi.hoisted(() => ({
-	flow: null as unknown,
+	kyc: null as unknown,
 	invalidate: vi.fn(),
 	updateMyStore: vi.fn(),
 	fetchMyStore: vi.fn(),
@@ -65,7 +66,7 @@ vi.mock("@/lib/hooks/useSellerSelf", async () => {
 			error: null,
 			refresh: async () => {},
 		}),
-		useMyKycFlow: () => ({ flow: mocks.flow, loading: false, error: null }),
+		useMyKyc: () => ({ application: mocks.kyc, loading: false, error: null }),
 		useInvalidateSellerSelf: () => mocks.invalidate,
 	};
 });
@@ -237,7 +238,7 @@ async function save() {
 
 beforeEach(() => {
 	cache.set(store(FIRST));
-	mocks.flow = null;
+	mocks.kyc = null;
 	mocks.invalidate.mockReset();
 	mocks.invalidate.mockResolvedValue(undefined);
 	mocks.updateMyStore.mockReset();
@@ -480,21 +481,18 @@ describe("SellerProfileClient writes", () => {
 		);
 	});
 
-	it("locks the store name and description once PayUni holds the identity", async () => {
-		mocks.flow = create(KYCFlowSchema, {
-			identityLocked: true,
-		});
+	it.each([
+		["審核中", KYCStatus.KYC_STATUS_SUBMITTED],
+		["已通過", KYCStatus.KYC_STATUS_APPROVED],
+	])("%s：店名與商店介紹仍可編輯", async (_label, status) => {
+		mocks.kyc = create(KYCApplicationSchema, { status });
 		mount();
 
 		expect(
 			((await screen.findByLabelText("商店名稱")) as HTMLInputElement).readOnly,
-		).toBe(true);
+		).toBe(false);
 		expect(
 			(screen.getByLabelText("商店介紹") as HTMLTextAreaElement).readOnly,
-		).toBe(true);
-		expect(
-			(screen.getByLabelText("得獎紀錄 / 店鋪亮點") as HTMLInputElement)
-				.readOnly,
 		).toBe(false);
 	});
 

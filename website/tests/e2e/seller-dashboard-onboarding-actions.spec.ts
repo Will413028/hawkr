@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import {
 	fulfillConnect,
-	type MockKycFlowStatus,
+	type MockKycStatus,
 	type MockOnboardingTask,
 	type MockStore,
 	mockMyKyc,
@@ -36,7 +36,7 @@ const NOT_STARTED_STORE: MockStore = {
 
 interface SellerFixture {
 	store: MockStore;
-	flow: MockKycFlowStatus;
+	flow: MockKycStatus;
 	/** GetMyOnboarding 的回應；沒給時由申請狀態產生（見 mock-gateway 的 `onboardingOf`）。 */
 	onboarding?: MockOnboardingTask[] | "error";
 }

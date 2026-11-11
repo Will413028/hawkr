@@ -20,6 +20,7 @@ import {
 	fetchMyKyc,
 	type KycDocs,
 	type KycForm,
+	kycCancellable,
 	kycDocsOf,
 	kycDocumentNotice,
 	kycDraftDiscardable,
@@ -434,16 +435,13 @@ describe("版本衝突：保留輸入、顯示最新", () => {
 
 describe("放棄草稿", () => {
 	const app = (status: KYCStatus) => create(KYCApplicationSchema, { status });
-	it("只有草稿而且身分沒有鎖定時可以放棄", () => {
-		expect(kycDraftDiscardable(app(KYCStatus.KYC_STATUS_DRAFT), false)).toBe(
-			true,
-		);
-		expect(kycDraftDiscardable(app(KYCStatus.KYC_STATUS_DRAFT), true)).toBe(
+	it("只有草稿可以放棄", () => {
+		expect(kycDraftDiscardable(app(KYCStatus.KYC_STATUS_DRAFT))).toBe(true);
+		expect(kycDraftDiscardable(app(KYCStatus.KYC_STATUS_REJECTED))).toBe(false);
+		expect(kycDraftDiscardable(app(KYCStatus.KYC_STATUS_SUBMITTED))).toBe(
 			false,
 		);
-		expect(kycDraftDiscardable(app(KYCStatus.KYC_STATUS_REJECTED), false)).toBe(
-			false,
-		);
+		expect(kycDraftDiscardable(app(KYCStatus.KYC_STATUS_APPROVED))).toBe(false);
 	});
 });
 
@@ -458,12 +456,12 @@ describe("可編輯的狀態", () => {
 		expect(kycEditable(app(KYCStatus.KYC_STATUS_UNSPECIFIED))).toBe(false);
 	});
 
-	it("與 flow.can_resubmit 無關：狀態只看申請自己的 status", () => {
-		const submitted = create(KYCApplicationSchema, {
-			status: KYCStatus.KYC_STATUS_SUBMITTED,
-			flow: { canResubmit: true },
-		});
-		expect(kycEditable(submitted)).toBe(false);
+	it("只有審核中可以取消", () => {
+		expect(kycCancellable(KYCStatus.KYC_STATUS_SUBMITTED)).toBe(true);
+		expect(kycCancellable(KYCStatus.KYC_STATUS_DRAFT)).toBe(false);
+		expect(kycCancellable(KYCStatus.KYC_STATUS_REJECTED)).toBe(false);
+		expect(kycCancellable(KYCStatus.KYC_STATUS_APPROVED)).toBe(false);
+		expect(kycCancellable(undefined)).toBe(false);
 	});
 });
 

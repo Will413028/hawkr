@@ -524,12 +524,9 @@ export function kycCancellable(status: KYCStatus | undefined): boolean {
 	return status === KYCStatus.KYC_STATUS_SUBMITTED;
 }
 
-/** 草稿可以放棄：申請還是草稿，而且身分欄位沒有鎖定。 */
-export function kycDraftDiscardable(
-	app: KYCApplication,
-	identityLocked: boolean,
-): boolean {
-	return app.status === KYCStatus.KYC_STATUS_DRAFT && !identityLocked;
+/** 草稿可以放棄。 */
+export function kycDraftDiscardable(app: KYCApplication): boolean {
+	return app.status === KYCStatus.KYC_STATUS_DRAFT;
 }
 
 /**

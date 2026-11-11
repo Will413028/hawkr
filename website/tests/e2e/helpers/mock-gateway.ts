@@ -463,7 +463,7 @@ export function measureJson(measure: MockMeasure) {
 	};
 }
 
-export type MockKycFlowStatus =
+export type MockKycStatus =
 	| "NOT_STARTED"
 	| "DRAFT"
 	| "SUBMITTED"
@@ -521,7 +521,7 @@ function task(
  * 商店資料一律已完成（要缺項的 spec 指定 `onboarding`）。
  */
 export function onboardingOf(flow: {
-	status: MockKycFlowStatus;
+	status: MockKycStatus;
 	paymentAccount?: { status: MockPaymentAccountStatus };
 }): MockOnboardingTask[] {
 	const profile = task(
@@ -670,7 +670,7 @@ export async function mockMyOnboarding(
 }
 
 /**
- * proto3 JSON 的 GetMyKYCResponse：申請的 `status`（平台審核）與流程旗標（`application.flow`）。NOT_STARTED 在真實
+ * proto3 JSON 的 GetMyKYCResponse：申請的 `status`（平台審核）。NOT_STARTED 在真實
  * 契約上是 not_found，這裡用同樣的錯誤回應（client 把它讀成「還沒開始」）。
  *
  * 收款帳戶（GetMyPaymentAccount）：申請 APPROVED 時預設是 ENABLED，其餘是 not_found（平台審核還沒核准）；
@@ -682,10 +682,7 @@ export async function mockMyOnboarding(
 export async function mockMyKyc(
 	page: Page,
 	flow: {
-		status: MockKycFlowStatus;
-		identityLocked?: boolean;
-		canResubmit?: boolean;
-		resubmitUnavailabilities?: { reason: string; message: string }[];
+		status: MockKycStatus;
 		paymentAccount?: {
 			status: MockPaymentAccountStatus;
 			payoutsActive?: boolean;
@@ -729,19 +726,6 @@ export async function mockMyKyc(
 			application: {
 				id: "1",
 				status: `KYC_STATUS_${flow.status}`,
-				flow: {
-					identityLocked: flow.identityLocked ?? false,
-					// 伺服器的值：草稿與被退回一律能重送。
-					canResubmit:
-						flow.canResubmit ??
-						(flow.status === "DRAFT" || flow.status === "REJECTED"),
-					resubmitUnavailabilities: (flow.resubmitUnavailabilities ?? []).map(
-						(u) => ({
-							reason: `KYC_RESUBMIT_UNAVAILABLE_REASON_${u.reason}`,
-							message: { locale: "zh-TW", message: u.message },
-						}),
-					),
-				},
 			},
 		});
 	});

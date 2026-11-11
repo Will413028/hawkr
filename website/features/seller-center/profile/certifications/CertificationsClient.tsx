@@ -119,7 +119,6 @@ import {
 	submitKyc,
 } from "@/lib/seller/kyc";
 import { platformReviewCompleted } from "@/lib/seller/onboarding-summary";
-import { PAYUNI_LOCK_ON_SUBMIT_NOTICE } from "@/lib/seller/payuni-locked-fields";
 import { fetchMyStore, updateMyStore } from "@/lib/seller/repo";
 import { isStoreCertified, type MyStore } from "@/lib/seller/store";
 import {
@@ -367,7 +366,6 @@ export default function CertificationsClient() {
 		? KYCStatus.KYC_STATUS_APPROVED
 		: application?.status;
 	const editable = kycEditable(application);
-	const identityLocked = application?.flow?.identityLocked === true;
 
 	// 已通過認證的賣家不需要這頁 — 認證狀態已移到「錢包與認證」頁的
 	// 展開式 row。任何已通過的賣家（剛通過或事後造訪）
@@ -1160,7 +1158,7 @@ export default function CertificationsClient() {
 		ut,
 		sellerKYCStatus(KYCStatus.KYC_STATUS_REJECTED),
 	);
-	const canDiscard = kycDraftDiscardable(application, identityLocked);
+	const canDiscard = kycDraftDiscardable(application);
 
 	return (
 		<div className="seller-cert seller-cert--shell seller-cert--form-shell">
@@ -1299,7 +1297,6 @@ export default function CertificationsClient() {
 								onLookupBan={() => void handleBanLookup()}
 								banReg={banReg}
 								banLooking={busy === "ban-lookup"}
-								locked={identityLocked}
 								errorOf={errorOf}
 							/>
 						)}
@@ -1378,19 +1375,10 @@ export default function CertificationsClient() {
 								</span>
 							</>
 						) : (
-							<>
-								<strong>
-									所有必填欄位已完成
-									<AppIcon name="check" size={14} fill />
-								</strong>
-								{/*
-								 * 商店名稱與商店介紹住在「商店資訊」頁，這個流程原本一個字
-								 * 都沒提到它們——但送出那一刻它們就鎖了，而鎖定生效的時點
-								 * （admin 核准）不在賣家的控制範圍內，也不會有人通知他。
-								 * 送出前是他最後有選擇權的時點。
-								 */}
-								<span>{PAYUNI_LOCK_ON_SUBMIT_NOTICE}</span>
-							</>
+							<strong>
+								所有必填欄位已完成
+								<AppIcon name="check" size={14} fill />
+							</strong>
 						)}
 					</div>
 					<div className="seller-cert__bar-actions">
@@ -1532,7 +1520,6 @@ function SectionCompany({
 	onLookupBan,
 	banReg,
 	banLooking,
-	locked,
 	errorOf,
 }: {
 	form: KycForm;
@@ -1540,7 +1527,6 @@ function SectionCompany({
 	onLookupBan: () => void;
 	banReg: BusinessLookup | null;
 	banLooking: boolean;
-	locked: boolean;
 	errorOf: ErrorOf;
 }) {
 	const fieldLabel = useKycFieldLabel();
@@ -1568,14 +1554,13 @@ function SectionCompany({
 						hint="輸入 8 位數字會自動查詢，也可按「查詢」重試"
 						error={errorOf("taxId")}
 						required
-						readOnly={locked}
 					/>
 					<div className="seller-cert__ban-action">
 						<Button
 							variant="bordered"
 							color="default"
 							onClick={onLookupBan}
-							disabled={banLooking || form.taxId.length !== 8 || locked}
+							disabled={banLooking || form.taxId.length !== 8}
 							isLoading={banLooking}
 							loadingLabel="查詢公司資料中…"
 						>
@@ -1595,7 +1580,6 @@ function SectionCompany({
 					onChange={(v) => setForm((p) => ({ ...p, companyName: v }))}
 					error={errorOf("companyName")}
 					required
-					readOnly={locked}
 				/>
 				<DatePicker
 					label={fieldLabel(KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE)}
@@ -1634,7 +1618,6 @@ function SectionCompany({
 					onChange={(v) => setForm((p) => ({ ...p, productType: v }))}
 					hint="例如：水果 / 蔬菜 / 海鮮 / 加工食品"
 					error={errorOf("productType")}
-					readOnly={locked}
 				/>
 			</div>
 			{banLooking && (

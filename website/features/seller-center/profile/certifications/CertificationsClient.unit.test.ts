@@ -818,11 +818,10 @@ describe("D1：自動存檔的失敗不會無限重試", () => {
 });
 
 describe("審核中與已通過不能編輯", () => {
-	it("已通過：即使伺服器的 flow 說能重送，也是狀態頁而不是表單", async () => {
+	it("已通過：是狀態頁，沒有表單與送出入口", async () => {
 		kycStore.set(
 			app({
 				status: KYCStatus.KYC_STATUS_APPROVED,
-				flow: { canResubmit: true },
 				missingFields: [],
 			} as AppInit),
 		);
