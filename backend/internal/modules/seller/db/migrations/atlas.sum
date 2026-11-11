@@ -1,4 +1,4 @@
-h1:VxBjOKaPDoweloELYQMKinN293QGjAUnXjbjVb61Vb8=
+h1:jwnRZM9uG41SM0yngPscNE4yR+GyS29h5XjtFQGJlwI=
 20261001160141_seller_core.sql h1:hVkQ8Wo6S5BLgzr4nFSGS/1EZpRX9mHqRwpxmIP3Yeg=
 20261002120004_seller_governance.sql h1:Dj/zGg4clK5U8YBsKn+TWnE5ZizigjU9/s7EXXHuc+g=
 20261002133159_seller_kyc.sql h1:QiN6KkqvCU/lwdw0B66YQniBEGnAhojvTYHQJ8lOqlc=
@@ -74,4 +74,4 @@ h1:VxBjOKaPDoweloELYQMKinN293QGjAUnXjbjVb61Vb8=
 20261106120300_payment_moved_to_payment_module.sql h1:XPdxH54JobnEqlli21B+Bbag4pFX8NHGSHlRyrU6t2w=
 20261110160932_store_requirement_flags_two_sources.sql h1:QqC2m4yPimZjmlRKK6mMKX0U7Ob3SPNKndwZcNMei98=
 20261111172911_store_contact_limits.sql h1:/0LlA9Cr4Bhn87C0eSiY2CaQDnWVlCpYnBEOPAKFP/0=
-20261111173954_payuni_rebind_retired.sql h1:/xCR+wj1s5HfRoEaDBlXSHYg/PJ7ea8p18lD40UkRB8=
+20261111173954_payuni_rebind_retired.sql h1:YK9HBVsoqm3vlHoPJy2TgKp8MHxCUcPIhFup/BNKlD4=

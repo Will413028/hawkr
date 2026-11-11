@@ -2142,3 +2142,57 @@ func TestRequiredStoreFieldsCannotBeClearedWhileTheApplicationIsSubmittedOrAppro
 		t.Fatal(err)
 	}
 }
+
+// 回歸：DB 的 CHECK 接受 D39 的新上限（姓名 50 字、信箱 254），並拒絕超過的值；已退回的申請可以清掉地址與客服信箱；審核中可以清聯絡人姓名與手機。
+func TestStoreContactLimitsAndRejectedApplicationAreEnforcedByTheDatabase(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	accountID, s := f.open(t)
+	emailOfLen := func(n int) string {
+		label := strings.Repeat("b", 60)
+		e := strings.Repeat("a", 64) + "@" + label + "." + label + "." + label + "." + strings.Repeat("c", n-(64+1+3*61))
+		if len(e) != n {
+			t.Fatalf("test email length = %d, want %d", len(e), n)
+		}
+		return e
+	}
+	name50, name51 := strings.Repeat("王", 50), strings.Repeat("王", 51)
+	email254, email255 := emailOfLen(254), emailOfLen(255)
+	if _, err := editStore(f, t, s.StoreID, UpdateProfileInput{ContactName: ptr(name50), SupportEmail: ptr(email254)}); err != nil {
+		t.Fatalf("50 字姓名與 254 長度信箱應該可以寫入：%v", err)
+	}
+	cur, err := f.module.Store(ctx, s.StoreID)
+	must(t, err)
+	if deref(cur.ContactName) != name50 || deref(cur.SupportEmail) != email254 {
+		t.Fatalf("寫入後讀不回來：%+v", cur)
+	}
+	for name, in := range map[string]UpdateProfileInput{
+		"51 字姓名":   {ContactName: ptr(name51)},
+		"255 長度信箱": {SupportEmail: ptr(email255)},
+	} {
+		if _, err := editStore(f, t, s.StoreID, in); apperr.KindOf(err) != apperr.KindInvalidInput {
+			t.Errorf("%s 應該被拒絕：%v", name, err)
+		}
+	}
+	if _, err := editStore(f, t, s.StoreID, UpdateProfileInput{TownCode: ptr("63000050"), AddressDetail: ptr("測試路一號")}); err != nil {
+		t.Fatal(err)
+	}
+	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
+	must(t, err)
+	if _, err := editStore(f, t, s.StoreID, UpdateProfileInput{ContactName: ptr(""), ContactMobile: ptr("")}); err != nil {
+		t.Fatalf("審核中應該可以清聯絡人姓名與手機：%v", err)
+	}
+	if _, err := f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: sub.ID, ExpectedVersion: sub.Version, AdminID: 9, Issues: anIssue(), Reason: "請確認"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := editStore(f, t, s.StoreID, UpdateProfileInput{SupportEmail: ptr(""), TownCode: ptr(""), AddressDetail: ptr("")}); err != nil {
+		t.Fatalf("已退回時應該可以清地址與客服信箱：%v", err)
+	}
+	cur, err = f.module.Store(ctx, s.StoreID)
+	must(t, err)
+	if cur.SupportEmail != nil || cur.AddressDetail != nil {
+		t.Fatalf("清除後仍有值：%+v", cur)
+	}
+}

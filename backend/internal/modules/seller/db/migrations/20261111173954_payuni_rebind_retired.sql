@@ -1,6 +1,4 @@
--- 後台對外的 PayUni 入口退場（Stripe 計畫 D14、步驟 8a）：管理員重新綁定刪除，審核紀錄不再有 REBIND，後台待辦不再有 PAYUNI_BIND_RETRY。
--- 系統未上線，REBIND 的既有列直接刪（不轉換）；payuni_* 兩張表本次不動。
--- 手寫的 migration（單體規則 6）；定義與 schema.sql、objects.sql 相同（TestSchemaFileMatchesMigrations），註解見那兩個檔。
+-- Delete REBIND reviews and tighten the kyc_reviews checks; drop the PAYUNI_BIND_RETRY review item
 DELETE FROM seller.kyc_reviews WHERE action = 'REBIND';
 
 ALTER TABLE "seller"."kyc_reviews" DROP CONSTRAINT "kyc_reviews_action_check", DROP CONSTRAINT "kyc_reviews_reviewer_check",
