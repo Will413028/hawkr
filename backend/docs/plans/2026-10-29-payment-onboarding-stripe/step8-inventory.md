@@ -39,7 +39,9 @@
 - **個人賣家的證書比對已經沒有基準**：`MatchCertHolder` 以申請的 `real_name` 比對政府證書上的業者名稱（`backend/internal/modules/seller/internal/kyc/admin.go:647`），個人賣家沒有 `company_name`，`real_name` 是唯一基準。7b、7c 之後兩端表單都不送 `real_name`（`git grep -n -i -E 'real_?name' -- website/features website/lib seller-app/lib` 只剩訂單的收件人欄位），所以分支上新送件的個人賣家一律走「沒有基準、轉人工」。處置見 D37。
 - 7c 審查帳本的 R13 在 repo 裡找不到內容；推測是進度表同一格寫的「刪 flow 時要改 `MyKyc.fromApplication`」。
 
-## 要拍板的題目（D35–D45）
+## 決定題（D35–D45）
+
+Will 2026-11-12：D35–D41、D43、D44 與子步驟拆法照建議。D42、D45 在第 2 輪審查後重寫，未決。
 
 名詞：PayUni 註冊是核准後平台替店家向 PayUni 建立的商店紀錄（`payuni_registrations` 表）；fingerprint 是金流商回報的銀行帳號指紋，同一個銀行帳號在不同帳戶得到同一個值；CHECK 是資料表上限制欄位值域的約束；CARRYOVER 是模組的沿用盤點表（每個從舊服務照搬的機制一列）。
 
@@ -118,7 +120,7 @@
 
 | 欄位 | 讀者 |
 |---|---|
-| 地址 | 物流的店家資料（`internal/legacy/sellerserver/server.go:163,435`） |
+| 地址 | 回給 Java 的一般店家資訊與物流的店家資料（`internal/legacy/sellerserver/server.go:163,435`）；對外契約只有賣家自己與後台看得到（`git grep -n -i address_detail -- api/hawkr`） |
 | 客服信箱 | 物流的店家資料（`server.go:438`） |
 | 聯絡人姓名 | 只有後台顯示 |
 | 聯絡手機 | 只有後台顯示 |
@@ -156,44 +158,46 @@
 
 ### D42 只剩統編之後的雜湊比對
 
-- 現況：識別欄位原本只存密文，要比對就得另存用金鑰算的雜湊（HMAC）。每個識別的雜湊存三處：申請列的欄位、申請的雜湊表 `kyc_identity_hashes`、防詐保存表 `account_identity_hashes`。步驟 8 之後平台自己收的識別只剩統編，而統編在申請列是明文（`seller/db/schema.sql:946-948`），後台也不遮蔽。銀行 fingerprint 的雜湊只存在保存表，仍然需要金鑰。這一段的 schema 是審查者讀的，比對程式我只逐行讀過 `LinkedAccountHits`。
-- 業界基線：盲索引（blind index）用在加密欄位的查詢（CipherSweet 文件，https://ciphersweet.paragonie.com/internals/blind-index）；明文欄位直接等值比對。清理個資後仍要比對的，才需要另存雜湊。
+- 現況（讀過 `seller/db/queries/kyc.sql:241-292`、`seller/internal/kyc/identity.go:15-80`、`seller/db/schema.sql:1040-1075`）：統編的雜湊（用金鑰算的 HMAC）寫進三處：申請列的欄位（只給草稿判斷「欄位有沒有改」）、申請的雜湊表 `kyc_identity_hashes`（隨 184 天個資清理刪除）、防詐保存表 `account_identity_hashes`（保存 5 年）。用到它們的地方：
+  - 送出與核准時的比對 `match`：從申請的明文統編用每一把金鑰重算，再查處分快照。不讀這三處。
+  - 建立處分時的快照：從保存表複製。
+  - 處分的關聯帳號查詢 `LinkedAccountHits`：第一段連申請的雜湊表，第二段連保存表（只比銀行 fingerprint）。
+- 步驟 8 之後申請的雜湊表只剩統編一種，而且同一批列在保存表都有。
+- 業界基線：盲索引（blind index）用在加密欄位的查詢（CipherSweet，https://ciphersweet.paragonie.com/internals/blind-index）；同一份索引只存一處。
 - 選項：
-  - A（建議）：統編的雜湊只留保存表一份（清理申請之後仍要比對 5 年）。刪掉申請列的統編雜湊欄位與 `kyc_identity_hashes` 整張表；還沒清理的申請之間用明文統編比對。金鑰環、換鑰重算與啟動檢查留著，服務保存表。失敗條件：比對查詢改寫後，處分快照與保存表之間有一段對不上；8c 開工時要先逐行讀完比對路徑再定案。
-  - B：三處都留，只是種類剩一個。失敗條件：同一個公開識別碼的雜湊存三處，一張表只剩一種值。
-- 推翻建議的事實：有查詢需要在申請還沒清理時以雜湊比對（例如換鑰期間）。
-- 可逆性：加回一張表與回填，未上線時成本小。
+  - A（建議）：刪申請的雜湊表與申請列的統編雜湊欄位。關聯帳號查詢兩段併成一段，都連保存表；草稿的「有沒有改」直接比明文統編。金鑰環、換鑰重算與啟動檢查留著，服務保存表。行為差異：關聯帳號的統編命中從「申請清理前（184 天）」變成「保存期內（5 年）」，與 D3（防詐雜湊保存 5 年）的目的一致。失敗條件：換鑰重算目前從申請解密補算，改成只服務保存表後，統編的來源要改成申請的明文欄位；清理後的列無法補新金鑰（現況也是如此）。
+  - B：兩張表都留，只是種類剩一個。失敗條件：同一批雜湊存兩處、查詢分兩段，各有自己的清理時機。
+- 與 D38 選項 C 的差別：那裡是為了不會再產生的舊種類加一條比對路徑；這裡是把仍在用的統編比對從兩張表收成一張，少一張表與一段查詢。
+- 推翻建議的事實：有流程需要「申請清理後統編就不再列為關聯」。
+- 可逆性：加回一張表並從保存表回填，成本小。
 - 限制：無。
+- 狀態：未決（第 2 輪審查後重寫，等 Will）。
 
-### D43 平台審核退回的通知事件
+### D43 平台審核退回的通知事件（確認後果，不是新決定）
 
-- 現況：管理員退回申請時，單體經 `internal/legacy/sellerrelay` 發舊事件 `merchant.verification.rejected`（`relay.go:106,193,388`）給 Java 的通知服務；PayUni 的審核事件用同一組事件名。D18（舊事件停發，A8 恢復通知）的內文講的是 PayUni 審核通知，沒有單獨點名平台退回。seller-app 有一組對應的推播類型（`seller-app/lib/features/seller/data/seller_status_push.dart:9-17`）。
-- 選項：
-  - A（建議）：一起停發，seller-app 對應的推播類型也刪；步驟 9 給 A8 的需求寫成兩條：收款開通結果的通知、平台審核結果（核准、退回）的通知。失敗條件：A8 之前需要在本機示範退回通知。
-  - B：退回事件留到 A8，只停 PayUni 的。失敗條件：為沒有部署的 Java 通知服務留一條舊事件與它的接縫。
-- 業界基線：通知由通知模組訂閱領域事件產生，不由各模組轉發舊格式（單體計畫 A8 的方向）。
-- 推翻建議的事實：A8 排在上線之後。
-- 可逆性：A8 重做，不沿用舊事件。
-- 限制：無（保留到 A8 是 SELF-IMPOSED 的排程理由）。
+- 管理員退回申請時，單體經 `internal/legacy/sellerrelay` 發舊事件 `merchant.verification.rejected`（`relay.go:106,193,388`）給 Java 的通知服務；PayUni 的審核事件用同一組事件名。D18（舊事件停發，A8 搬通知模組時恢復）寫的是停發 `merchant.verification.*`，已經涵蓋它。
+- 後果：A8 之前，賣家被退回時不會收到通知（Java 通知服務本來就沒有部署）。
+- 處理：一起停發；seller-app 只刪這組事件專用的推播類型（`seller-app/lib/features/notification/data/push/seller_status_push.dart:9-17`，同組類型在 `notification_banner.dart:101-129` 與 `router.dart:35` 的對照一起刪），Java 仍會發的 `PAYUNI_STATUS` 留著。步驟 9 給 A8 的需求寫成兩條：收款開通結果的通知、平台審核結果（核准、退回）的通知。
 
 ### D44 物流用的商店代號（確認後果）
 
 - 現況：`GetSellerShippingProfile` 回給 Java 物流服務的 `MerId` 與付款用的 `payuni_mer_id` 都由店家代號組出來（`internal/legacy/sellerserver/server.go:187,437`），不讀 PayUni 的表。計畫前提段只記了你接受「Java 以 PayUni 下單的本機端到端不通，B2 恢復」。
 - 事實：新開通的店家沒有 PayUni 商店，PayUni 物流以這個代號建店與出貨，所以不管回什麼值，本機的物流端到端都不通；這是 D6（刪掉單體的 PayUni）的後果。
 - 建議：兩處都回空值，並在計畫前提段補一句「本機的物流建店與出貨也不通，B3（物流搬遷）恢復」。未採：留著格式化函式回一個 PayUni 那邊不存在的代號（Java 會拿它去呼叫 PayUni 而失敗在更晚的地方）。
-- 需要你確認的只有這個後果。
+- Will 2026-11-12 確認。
 
-### D45 申請上的「與受處分帳號共用銀行帳號」旗標
+### D45 「與受處分帳號共用銀行帳號」的提醒
 
-- 現況：後台審核申請時，後端用申請的銀行帳號重算雜湊，比對受處分帳號，回 `shares_bank_account_with_sanctioned_account`。申請不再有銀行帳號後它恆為 false；fingerprint 要到核准後建立收款帳戶才有（D16：核准後才建立外部帳戶）。現成的 fingerprint 比對方向是「處分 → 關聯帳號」（`kyc.sql:282-289`），不是「帳號 → 處分」。
-- 後果：審核當下不再有共用銀行帳號的警示；新核准的店家之後才出現的 fingerprint 若與受處分帳號相同，只有在看那筆處分的關聯帳號時才看得到，沒有主動提醒。
+- 現況：後台審核申請時，後端用申請的銀行帳號重算雜湊，查處分快照（`MeasureIdentityMatches`，`seller/db/queries/kyc.sql:254-261`，吃任意雜湊、方向是「帳號 → 處分」），回 `shares_bank_account_with_sanctioned_account`。申請不再有銀行帳號後它恆為 false；fingerprint 要到核准後建立收款帳戶、同步回來才有（D16：核准後才建立外部帳戶）。處分快照已經把 fingerprint 存成銀行帳號種類（`kyc.sql:246`）。
+- 後果：審核當下不再有共用銀行帳號的提醒。新核准的店家之後出現的 fingerprint 若與受處分帳號相同，目前只有打開那筆處分的關聯帳號才看得到。D4（共用銀行帳號列入關聯帳號，只標記、不自動終止）的「標記」在這個方向沒有人會看到。
+- 業界基線：金流商自己做重複帳戶與詐欺偵測；平台另做的比對是加值。出處未核（推測）。
 - 選項：
-  - A（建議）：刪欄位；主動提醒併入計畫已列的延後項「裝置與聯絡方式重疊、風險評分等防人頭措施」（觸發：上線前）。失敗條件：上線前沒有補上，人頭帳號換店重開不會被提醒。
-  - B：本步驟新增「fingerprint 同步時比對受處分帳號並產生審核待辦」。失敗條件：在刪除步驟裡新增一個機制，範圍擴大。
-- 業界基線：金流商自己做重複帳戶與詐欺偵測（Stripe Radar 與 Connect 的風險審查）；平台另做的是加值。出處未核（推測）。
-- 推翻建議的事實：作品集要示範主動的防人頭提醒。
-- 可逆性：之後加審核待辦是新增功能，不受這次刪除影響。
+  - A：刪欄位；主動提醒併入計畫已列的延後項「防人頭措施」（觸發：上線前）。失敗條件：上線前沒有補上，受處分的人換店重開、用同一個銀行帳號收款時沒有人被提醒。
+  - B（建議）：刪申請上的欄位，並在 fingerprint 寫入的同一個 transaction（`seller/internal/kyc/fingerprints.go` 的 `RecordBankFingerprints`）用現成的查詢比對處分快照；命中生效中的處分就產生一筆審核待辦（新的待辦種類，只提醒、不擋）。新機制的必要條件：D4 要求共用銀行帳號被標記，而訊號的來源已從審核當下移到核准之後；查詢與快照都現成，缺的是呼叫點、待辦種類與 admin 的標籤。失敗條件：測試模式的銀行帳號只有少數幾個，本機示範時幾乎每個店家都命中。
+- 推翻建議的事實：作品集不需要示範這個方向的提醒（那就選 A）。
+- 可逆性：待辦種類之後可以刪；不影響其他刪除。
 - 限制：無。
+- 狀態：未決（第 2 輪審查指出現況寫錯，重寫後等 Will）。選 B 時另開子步驟 8d，在 8b 之後。
 
 ## 不交拍板、照預設處理的項目
 
@@ -215,36 +219,34 @@
 | `seller-center.css` 沒有引用的 class | 只刪本步驟刪掉的元件用的 class | 其餘不是本步驟造成的 |
 | website、seller-app 的內部設計文件 | 只修寫錯事實的句子 | 驗收不涵蓋 client 文件 |
 
-## 子步驟
+## 子步驟（Will 2026-11-12 同意）
 
-步驟 8 改到約 190 個檔、五個區域，拆成各有驗收的子步驟；每個子步驟結束時 CI 要綠（D21：步驟 4–8 在分支完成才進 `main`），契約的每一刀與它的所有消費端同一個子步驟。順序由消費端往來源刪：流程狀態是從 PayUni 註冊推導的，所以先刪流程狀態，再刪 PayUni 本體。
+步驟 8 改到約 190 個檔、五個區域，拆成各有驗收的子步驟；每個子步驟結束時 CI 要綠（D21：步驟 4–8 在分支完成才進 `main`），契約的每一刀與它的所有消費端同一個子步驟。流程狀態與 PayUni 本體互相引用（流程狀態由 PayUni 註冊推導；PayUni 本體拿 `KYCFlowStatus` 當階段型別：`model/payuni.go:506`、`payuni_state.go:106`、`payuni/intent.go:250,326-346`、`store_action.go:223`、admin proto 的 PayUni 註冊 `flow_status`），兩個方向都切不開，所以併成一個子步驟。
 
 | 子步驟 | 範圍 | 被擋於 |
 |---|---|---|
-| 8a 流程狀態與鎖 | F 類：`KYCFlow`、`KYCFlowStatus`、`identity_locked`、`CheckNameUnlocked`、重送規則；文案目錄；seller-app `MyKyc.fromApplication` 與 `kyc_flow.dart`、admin 徽章與清單欄位、website 的鎖與相關文案 | D35、D40 |
-| 8b PayUni 本體與接縫 | P 類：proto 的 PayUni RPC、message、enum；`platform/payuni`、`seller/internal/payuni`（送出前必填的檢查先搬到 model）、`payuni_*` 表與審核待辦函式（新 migration）；`PAYUNI_TERMS`（proto、CHECK、manifest、`generate-legal.ts` 同一個 commit）；`internal/legacy` 的事件與商店代號；`cmd/hawkr` 的設定；admin 的 PayUni 卡、重新綁定、待辦種類、清單分頁；聯絡欄位規則 | 8a、D39、D40、D43、D44 |
-| 8c KYC 個資管線 | I 類：proto 欄位與退回欄位的值域、密文與雜湊欄位（新 migration）、顯示全文與讀取紀錄、舊雜湊、雜湊比對的形狀、加密金鑰與 `platform/seal`、種子、admin 的身分卡與文件檢視、`TestKYCNeverReturnsOrStoresPlaintext` 改寫與 mutation | 8b、D36、D37、D38、D42、D45 |
-| 8d 去向與驗收 | `payuni-inventory.md` 的去向、`check_inventory.py` 與 mutation、允許清單逐筆核對、`backend/docs/第三方整合/` 的檔頭、CARRYOVER、賣家指南等事實修正、與 CI 基線比對；開 `payment-onboarding` → `main` 的 PR | 8c、D41 |
+| 8a 流程狀態、鎖與 PayUni 本體 | F 類與 P 類。F：`KYCFlow`、`KYCFlowStatus`、`identity_locked`、`CheckNameUnlocked`、重送規則（`CheckResubmit` 刪除後，送出只看申請狀態：草稿、已退回可送，已核准不可）；文案目錄；seller-app `MyKyc.fromApplication` 與 `kyc_flow.dart`、admin 徽章與清單欄位、website 的鎖。P：proto 的 PayUni RPC、message、enum；`platform/payuni`、`seller/internal/payuni`（送出前必填的檢查先搬到 model）、`payuni_*` 表與審核待辦函式（新 migration）；`PAYUNI_TERMS`（proto、CHECK、manifest、`generate-legal.ts` 同一個 commit）；`internal/legacy` 的事件與商店代號；`cmd/hawkr` 的設定；admin 的 PayUni 卡、重新綁定、待辦種類、清單分頁；聯絡欄位規則；D40 的文案 | D35、D39、D40、D43、D44（皆已決） |
+| 8b KYC 個資管線 | I 類：proto 欄位與退回欄位的值域、密文與雜湊欄位（新 migration）、顯示全文與讀取紀錄、舊雜湊、雜湊比對的形狀、加密金鑰與 `platform/seal`、文件表的 `slot`、種子、admin 的身分卡與文件檢視、`TestKYCNeverReturnsOrStoresPlaintext` 改寫與 mutation | 8a、D36、D37、D38（已決）、D42、D45（未決） |
+| 8c 去向與驗收 | `payuni-inventory.md` 的去向、`check_inventory.py` 與 mutation、允許清單逐筆核對、`backend/docs/第三方整合/` 的檔頭、CARRYOVER、賣家指南等事實修正、與 CI 基線比對；開 `payment-onboarding` → `main` 的 PR | 8b（D45 選 B 時另加 8d，排在 8c 之前）、D41（已決） |
 
-backend 內的 commit 順序見 `step8-inventory/backend.md` 第 4 節。步驟 9 要修訂的 ADR 因本步驟增加：`2026-10-19-seller-kyc-payuni-consolidated.md` 的證件影像授權（D36）、身分比對與保存（D38、D42）、聯絡欄位（D39）。
+8a 內部的 commit 順序照 `step8-inventory/backend.md` 第 4 節的第 1–7 步（先搬共用件、切斷呼叫、對外入口、legacy 與組裝、刪本體、SQL、`PAYUNI_TERMS`），8b 是第 8 步，文案與生成物跟著各自的子步驟。步驟 9 要修訂的 ADR 因本步驟增加：`2026-10-19-seller-kyc-payuni-consolidated.md` 的證件影像授權（D36）、身分比對與保存（D38、D42）、聯絡欄位（D39）。
 
 ## 審查帳本（開工時，2026-11-12）
 
-兩輪獨立審查（第 1 輪：設計審查與決定簡報審查；第 2 輪只審修正）。第 2 輪找到第 1 輪修正造成的 blocking，依審查規則停止修正，以下未處理的項目等 Will 回覆後再改。
+兩輪獨立審查（第 1 輪：設計審查與決定簡報審查；第 2 輪只審修正）。第 2 輪找到第 1 輪修正造成的 blocking，依審查規則停下交 Will；Will 回覆後依下表處理，沒有再派第 3 輪。
 
-| # | 嚴重度 | 項目 | 狀態 |
+| # | 嚴重度 | 項目 | 狀態（佐證） |
 |---|---|---|---|
-| L1 | blocking | D35 沒有申請時 admin 徽章的文字來源 | 已修 |
-| L2 | should | 子步驟順序（流程狀態由 PayUni 註冊推導） | 未解，見 N1 |
-| L3–L14、L16–L18 | should、nit | 前提題、D36–D39、D42–D45、預設表各列 | 已修 |
-| L15 | should | D40、D41 缺基線、失敗條件、推翻事實 | 部分未解 |
-| L19 | nit | 7b、7c、7e1、B2 等編號未在同句說明 | 未解 |
-| N1 | blocking | 8a 刪不掉 `KYCFlowStatus`：PayUni 本體拿它當階段型別（`model/payuni.go:506`、`payuni_state.go:106`、`payuni/intent.go:250,326-346`、`store_action.go:223`、admin proto 的 PayUni 註冊 `flow_status`、`store-row.ts:62`）；`CheckResubmit` 拿掉後送出檢查由誰做沒寫 | 未解：8a、8b 在 backend 與 proto 要併成一刀，或把這些符號列進 8a |
-| N2 | should | D45 現況寫錯：`MeasureIdentityMatches`（`kyc.sql:254-261`）已有「帳號 → 處分」方向，選項 B 只缺 fingerprint 同步時的呼叫點與待辦 | 未解 |
-| N3 | should | D43 不是新決定：D18 已涵蓋同一個路由鍵；缺口只有給 A8 的需求少了平台審核結果 | 未解 |
-| N4 | should | D42 選項 A「申請之間用明文統編比對」做不到：處分快照只有雜湊，要改連保存表的統編列，與 D38 選項 C 不採的理由相同 | 未解 |
-| N5 | nit | D39 讀者表：`server.go:163` 是一般店家資訊不是物流；買家是否看得到地址未查 | 未解 |
-| N6 | nit | D43 的 seller-app 路徑應為 `lib/features/notification/data/push/seller_status_push.dart`，同組類型另在 `notification_banner.dart`、`router.dart` | 未解 |
-| N7 | nit | 送出前必填的檢查應在 8a 先搬（`payuni/storedata.go:57`） | 未解 |
+| L1 | blocking | D35 沒有申請時 admin 徽章的文字來源 | 已修（D35 選項 A） |
+| L2、N1 | should、blocking | 子步驟順序：流程狀態與 PayUni 本體互相引用 | 已修：併成 8a（「子步驟」段列出引用處） |
+| L3–L14、L16–L18 | should、nit | 前提題、D36–D39、預設表各列 | 已修 |
+| L15 | should | D40、D41 缺基線與推翻事實 | 記錄：D40 是文案對照、D41 是驗收清單，沒有可比的業界做法；Will 已同意 |
+| L19 | nit | 7b、7c、7e1、B2 等編號未在同句說明 | 記錄，不修 |
+| N2 | should | D45 現況寫錯（已有「帳號 → 處分」的查詢） | 已修：D45 重寫（`kyc.sql:254-261`），未決 |
+| N3 | should | D43 已被 D18 涵蓋 | 已修：改成確認後果 |
+| N4 | should | D42 選項 A 的做法不可行 | 已修：D42 重寫（讀過 `identity.go:15-80`），未決 |
+| N5 | nit | D39 讀者表的地址一格 | 已修 |
+| N6 | nit | D43 的 seller-app 路徑 | 已修 |
+| N7 | nit | 送出前必填的檢查先搬 | 已修：在 8a |
 
-第 1 輪 findings 25 (blocking 1)：修 24、記錄 1（L19）。第 2 輪 findings 10 (blocking 1)：全部未處理，交 Will。
+第 1 輪 findings 25 (blocking 1)：修 24、記錄 1。第 2 輪 findings 10 (blocking 1)：修 8、記錄 2。
