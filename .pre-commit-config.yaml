@@ -6,7 +6,7 @@ default_install_hook_types: [pre-commit, commit-msg, pre-push]
 repos:
   # 規則與上限在 .agentfile-lint.toml；掃全部追蹤的 AGENTS.md，所以不傳檔名。CI 同一份：.github/workflows/repo-hygiene.yml。
   - repo: https://github.com/Will413028/agentfile-lint
-    rev: 12c040051210047dc57f4ee416bdf1b64f23ae59 # v0.4.0
+    rev: 62bd0d4e43423e146bb258cb806ee3671ea4c9a0 # v0.9.0
     hooks:
       - id: agentfile-lint
         pass_filenames: false

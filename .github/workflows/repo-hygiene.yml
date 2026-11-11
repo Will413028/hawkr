@@ -40,10 +40,10 @@ jobs:
         run: bash scripts/check-fullwidth-var-expansion.sh
       - name: AGENTS.md 規則
         if: always()
-        uses: Will413028/agentfile-lint@12c040051210047dc57f4ee416bdf1b64f23ae59 # v0.4.0
+        uses: Will413028/agentfile-lint@62bd0d4e43423e146bb258cb806ee3671ea4c9a0 # v0.9.0
       - name: agentfile-lint 引用的 SHA 一致
         if: always()
-        run: pipx run --spec git+https://github.com/Will413028/agentfile-lint@12c040051210047dc57f4ee416bdf1b64f23ae59 agentfile-lint check-pins # v0.4.0
+        run: pipx run --spec git+https://github.com/Will413028/agentfile-lint@62bd0d4e43423e146bb258cb806ee3671ea4c9a0 agentfile-lint check-pins # v0.9.0
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         if: always()
         with:
@@ -58,7 +58,7 @@ jobs:
           sed -i 's/^var Dependencies = map\[string\]\[\]string{$/&\n\t"zzlintprobe": {},/' backend/internal/arch/modules.go
           (cd backend && GOWORK=off go run ./cmd/new-module module zzlintprobe)
           git add -N backend/internal/modules/zzlintprobe/AGENTS.md
-          pipx run --spec git+https://github.com/Will413028/agentfile-lint@12c040051210047dc57f4ee416bdf1b64f23ae59 agentfile-lint # v0.4.0
+          pipx run --spec git+https://github.com/Will413028/agentfile-lint@62bd0d4e43423e146bb258cb806ee3671ea4c9a0 agentfile-lint # v0.9.0
 
   gate:
     # The only required check on main: it passes when every other job in this workflow succeeded or was skipped.
