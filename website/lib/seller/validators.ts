@@ -12,8 +12,11 @@
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** 客服電子信箱的長度上限：PayUni 的 MerEmail、Email 與 MBCMail 至多 50 字，店家欄位的上限與它相同。 */
-export const SUPPORT_EMAIL_MAX_LENGTH = 50;
+/** 客服電子信箱的長度上限：254（RFC 5321 的路徑上限），與伺服器相同。 */
+export const SUPPORT_EMAIL_MAX_LENGTH = 254;
+
+/** 聯絡人姓名的長度上限（字數），與伺服器相同。 */
+export const CONTACT_NAME_MAX_LENGTH = 50;
 
 export function validateEmail(value: string): string | null {
 	const v = value.trim();
@@ -38,19 +41,21 @@ export function validatePhone(value: string): string | null {
 	return null;
 }
 
-/** 09 開頭的 10 碼手機（KYC 與 PayUni 的聯絡手機）；空白、橫線與括號先去掉。 */
+/** 09 開頭的 10 碼手機（聯絡手機，選填，空白不報錯）；橫線與括號先去掉。 */
 export function validateMobile(value: string): string | null {
 	const v = value.trim();
-	if (!v) return "請輸入聯絡手機";
+	if (!v) return null;
 	const digits = v.replace(/[\s\-()]/g, "");
 	if (!/^09\d{8}$/.test(digits)) return "請輸入 09 開頭的 10 碼手機號碼";
 	return null;
 }
 
-/** 聯絡人姓名：必填，最多 20 字（PayUni 的 ContactName 上限）。 */
+/** 聯絡人姓名：選填（空白不報錯），最多 50 字。 */
 export function validateContactName(value: string): string | null {
 	const v = value.trim();
-	if (!v) return "請輸入聯絡人姓名";
-	if ([...v].length > 20) return "聯絡人姓名最多 20 字";
+	if (!v) return null;
+	if ([...v].length > CONTACT_NAME_MAX_LENGTH) {
+		return `聯絡人姓名最多 ${CONTACT_NAME_MAX_LENGTH} 字`;
+	}
 	return null;
 }

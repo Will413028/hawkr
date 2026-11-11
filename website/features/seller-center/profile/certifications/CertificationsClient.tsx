@@ -1686,9 +1686,8 @@ function SectionOther({
 					label="聯絡人姓名"
 					value={storeContact.contactName}
 					onChange={(v) => setStoreContact((p) => ({ ...p, contactName: v }))}
-					hint={contactErrors.nameErr ?? "最多 20 字，會寫入商店設定"}
+					hint={contactErrors.nameErr ?? "最多 50 字，會寫入商店設定"}
 					error={contactErrors.nameErr}
-					required
 				/>
 				<TextField
 					label="聯絡人手機"
@@ -1701,7 +1700,6 @@ function SectionOther({
 					}
 					hint={contactErrors.mobileErr ?? "09 開頭的 10 碼手機號碼"}
 					error={contactErrors.mobileErr}
-					required
 				/>
 				<TextField
 					label="客服電子信箱"

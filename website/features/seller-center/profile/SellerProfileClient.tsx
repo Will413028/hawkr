@@ -46,7 +46,10 @@ import {
 	storeFormOf,
 	townLocation,
 } from "@/lib/seller/store-form";
-import { SUPPORT_EMAIL_MAX_LENGTH } from "@/lib/seller/validators";
+import {
+	CONTACT_NAME_MAX_LENGTH,
+	SUPPORT_EMAIL_MAX_LENGTH,
+} from "@/lib/seller/validators";
 import {
 	isValidWebsiteUrl,
 	normalizeWebsiteUrl,
@@ -397,7 +400,7 @@ export default function SellerProfileClient() {
 									errorMessage={contactErrors.nameErr ?? undefined}
 									isInvalid={contactErrors.nameErr !== null}
 									readOnly={!canWrite}
-									maxLength={20}
+									maxLength={CONTACT_NAME_MAX_LENGTH}
 								/>
 								<Input
 									variant="bordered"
@@ -426,7 +429,6 @@ export default function SellerProfileClient() {
 									label="客服電子信箱"
 									value={data.supportEmail}
 									onChange={(e) => update({ supportEmail: e.target.value })}
-									description="PayUni 會寄金流相關通知到這個信箱"
 									errorMessage={contactErrors.emailErr ?? undefined}
 									isInvalid={contactErrors.emailErr !== null}
 									readOnly={!canWrite}
