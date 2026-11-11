@@ -1,12 +1,12 @@
 import { create } from "@bufbuild/protobuf";
 import {
 	GetMyStoreResponseSchema,
-	PaymentAccountSchema,
-	PaymentAccountStatus,
+	OnboardingTaskState as S,
 	SellerRequirement,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { describe, expect, it } from "vitest";
 import { publicListingStatus } from "./capability-fixtures";
+import { requiredFixture } from "./onboarding-fixtures";
 import { walletShowsTransactions } from "./wallet-transactions";
 
 const store = (missing: SellerRequirement[] | undefined) =>
@@ -15,42 +15,42 @@ const store = (missing: SellerRequirement[] | undefined) =>
 		capabilities: missing === undefined ? [] : [publicListingStatus(missing)],
 	});
 
-const account = (status: PaymentAccountStatus) =>
-	create(PaymentAccountSchema, { status });
+const none = { state: S.ACTION_REQUIRED } as const;
+const done = { state: S.COMPLETED } as const;
+const summary = (payment: { state: S }) => requiredFixture(done, done, payment);
 
 describe("walletShowsTransactions", () => {
-	it("已認證而且收款帳戶是 ENABLED", () => {
-		expect(
-			walletShowsTransactions(store([]), account(PaymentAccountStatus.ENABLED)),
-		).toBe(true);
+	it("已認證而且摘要的收款帳戶任務是 COMPLETED", () => {
+		expect(walletShowsTransactions(store([]), summary(done))).toBe(true);
 	});
 
-	it("還缺 ONBOARDING_COMPLETE、沒有 PUBLIC_LISTING、沒有收款帳戶：都不顯示", () => {
-		const enabled = account(PaymentAccountStatus.ENABLED);
+	it("還缺 ONBOARDING_COMPLETE、沒有 PUBLIC_LISTING、沒有店家、沒有摘要：都不顯示", () => {
 		expect(
 			walletShowsTransactions(
 				store([SellerRequirement.ONBOARDING_COMPLETE]),
-				enabled,
+				summary(done),
 			),
 		).toBe(false);
-		expect(walletShowsTransactions(store(undefined), enabled)).toBe(false);
+		expect(walletShowsTransactions(store(undefined), summary(done))).toBe(
+			false,
+		);
+		expect(walletShowsTransactions(null, summary(done))).toBe(false);
 		expect(walletShowsTransactions(store([]), null)).toBe(false);
-		expect(walletShowsTransactions(null, enabled)).toBe(false);
 	});
 
-	it("收款帳戶還不能收款（含 UNSPECIFIED 與不認得的狀態）：不顯示", () => {
-		for (const status of [
-			PaymentAccountStatus.NOT_CREATED,
-			PaymentAccountStatus.UNDER_REVIEW,
-			PaymentAccountStatus.ACTION_REQUIRED,
-			PaymentAccountStatus.DISABLED,
-			PaymentAccountStatus.UNSPECIFIED,
-			99 as PaymentAccountStatus,
+	it("收款帳戶任務不是 COMPLETED（含 UNKNOWN、UNSPECIFIED）：不顯示", () => {
+		for (const state of [
+			S.ACTION_REQUIRED,
+			S.IN_PROGRESS,
+			S.LOCKED,
+			S.UNKNOWN,
+			S.UNSPECIFIED,
 		]) {
 			expect(
-				walletShowsTransactions(store([]), account(status)),
-				String(status),
+				walletShowsTransactions(store([]), summary({ state })),
+				String(state),
 			).toBe(false);
 		}
+		expect(walletShowsTransactions(store([]), summary(none))).toBe(false);
 	});
 });

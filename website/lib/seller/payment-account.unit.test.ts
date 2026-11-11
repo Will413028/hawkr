@@ -2,17 +2,20 @@ import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import {
 	OnboardingSurface,
+	OnboardingTaskState,
 	PaymentAccountSchema,
 	PaymentAccountStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { describe, expect, it, vi } from "vitest";
 import { uiTextFor } from "@/lib/i18n/ui-text";
+import { requiredFixture } from "./onboarding-fixtures";
 import {
 	createPaymentOnboardingSession,
 	fetchMyPaymentAccount,
 	paymentAccountCanOnboard,
 	paymentAccountCopy,
 	paymentAccountTone,
+	paymentBannerCopy,
 } from "./payment-account";
 
 const ut = uiTextFor("zh-TW");
@@ -225,5 +228,42 @@ describe("paymentAccountTone 與能否開通", () => {
 		]) {
 			expect(paymentAccountCanOnboard(account(status))).toBe(false);
 		}
+	});
+});
+
+describe("paymentBannerCopy（儀表板的收款帳戶提示）", () => {
+	const task = (state: OnboardingTaskState) =>
+		requiredFixture(
+			{ state: OnboardingTaskState.COMPLETED },
+			{ state: OnboardingTaskState.COMPLETED },
+			{ state },
+		);
+
+	it("摘要說收款帳戶任務未完成：即使帳戶 status 是 ENABLED 也顯示", () => {
+		const copy = paymentBannerCopy(
+			ut,
+			account(PaymentAccountStatus.ENABLED),
+			task(OnboardingTaskState.ACTION_REQUIRED),
+		);
+		expect(copy).not.toBeNull();
+	});
+
+	it("摘要說完成：即使帳戶 status 是 UNDER_REVIEW 也不顯示", () => {
+		expect(
+			paymentBannerCopy(
+				ut,
+				account(PaymentAccountStatus.UNDER_REVIEW),
+				task(OnboardingTaskState.COMPLETED),
+			),
+		).toBeNull();
+	});
+
+	it("沒讀到摘要或沒有帳戶：不顯示", () => {
+		expect(
+			paymentBannerCopy(ut, account(PaymentAccountStatus.UNDER_REVIEW), null),
+		).toBeNull();
+		expect(
+			paymentBannerCopy(ut, null, task(OnboardingTaskState.ACTION_REQUIRED)),
+		).toBeNull();
 	});
 });

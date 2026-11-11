@@ -38,6 +38,16 @@ export function onboardingTaskState(
 	return onboarding?.tasks.find((task) => task.id === id)?.state;
 }
 
+/** 收款帳戶任務已完成（伺服器定義：轉帳能力啟用）；沒有摘要或沒有這個任務不是完成。 */
+export function paymentAccountCompleted(
+	onboarding: GetMyOnboardingResponse | null | undefined,
+): boolean {
+	return (
+		onboardingTaskState(onboarding, OnboardingTaskId.PAYMENT_ACCOUNT) ===
+		OnboardingTaskState.COMPLETED
+	);
+}
+
 /** 平台審核已完成（伺服器定義：商家認證核准）。 */
 export function platformReviewCompleted(
 	onboarding: GetMyOnboardingResponse | null | undefined,

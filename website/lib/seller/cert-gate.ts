@@ -14,6 +14,7 @@
  */
 
 import type {
+	GetMyOnboardingResponse,
 	KYCApplication,
 	PaymentAccount,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -23,7 +24,10 @@ import {
 	useMyPaymentAccount,
 	useSellerSelf,
 } from "@/lib/hooks/useSellerSelf";
-import { platformReviewCompleted } from "./onboarding-summary";
+import {
+	paymentAccountCompleted,
+	platformReviewCompleted,
+} from "./onboarding-summary";
 import {
 	isStoreCertified,
 	type MyStore,
@@ -39,6 +43,10 @@ export interface CertGate {
 	shippingGate: ShippingGate;
 	/** 平台審核已完成（開通摘要 PLATFORM_REVIEW 是 COMPLETED）；沒讀到摘要時是 false。 */
 	platformReviewCompleted: boolean;
+	/** 收款帳戶任務已完成（開通摘要 PAYMENT_ACCOUNT 是 COMPLETED）；沒讀到摘要時是 false。 */
+	paymentAccountCompleted: boolean;
+	/** 開通摘要（GetMyOnboarding）；沒讀到時是 null。 */
+	onboarding: GetMyOnboardingResponse | null;
 	/** 申請（GetMyKYC）；沒有申請或沒讀到時是 null。 */
 	application: KYCApplication | null;
 	/** 收款帳戶（GetMyPaymentAccount，平台審核核准後才讀）；還沒有或沒讀到時是 null。 */
@@ -65,6 +73,8 @@ export function useCertGate(): CertGate {
 			loading: true,
 			approved: false,
 			platformReviewCompleted: false,
+			paymentAccountCompleted: false,
+			onboarding: null,
 			shippingGate: "unknown",
 			application: null,
 			paymentAccount: null,
@@ -85,6 +95,8 @@ export function useCertGate(): CertGate {
 			loading: false,
 			approved: false,
 			platformReviewCompleted: false,
+			paymentAccountCompleted: false,
+			onboarding: null,
 			shippingGate: "unknown",
 			application: null,
 			paymentAccount: null,
@@ -99,6 +111,8 @@ export function useCertGate(): CertGate {
 		loading: false,
 		approved,
 		platformReviewCompleted: platformReviewCompleted(onboarding),
+		paymentAccountCompleted: paymentAccountCompleted(onboarding),
+		onboarding,
 		shippingGate: shippingGateOf(seller),
 		application,
 		paymentAccount,

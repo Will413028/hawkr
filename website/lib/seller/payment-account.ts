@@ -8,6 +8,7 @@
 
 import { Code, ConnectError } from "@connectrpc/connect";
 import {
+	type GetMyOnboardingResponse,
 	OnboardingSurface,
 	type PaymentAccount,
 	PaymentAccountStatus,
@@ -21,6 +22,7 @@ import {
 import { sellerAppClient } from "../connect/seller";
 import { optionalText, type UiText } from "../i18n/ui-text";
 import { CERT_PAGE_HREF } from "./cert-gate";
+import { paymentAccountCompleted } from "./onboarding-summary";
 import type { StatusBannerTone } from "./status-tone";
 
 type SellerClient = ReturnType<typeof sellerAppClient>;
@@ -116,6 +118,18 @@ export function paymentAccountCopy(
 				? ut(sellerPaymentAccountPayoutsInactiveNote())
 				: undefined,
 	};
+}
+
+/** 儀表板的收款帳戶提示：摘要說收款帳戶任務還沒完成才顯示（不讀 `PaymentAccount.status` 判斷完成）；沒讀到摘要或沒有帳戶不顯示。 */
+export function paymentBannerCopy(
+	ut: UiText,
+	account: PaymentAccount | null | undefined,
+	onboarding: GetMyOnboardingResponse | null | undefined,
+): PaymentAccountCopy | null {
+	if (!account || !onboarding || paymentAccountCompleted(onboarding)) {
+		return null;
+	}
+	return paymentAccountCopy(ut, account);
 }
 
 /** 客服頁。 */

@@ -47,7 +47,7 @@ export default function WalletClient() {
 	const identity = useQueryIdentity();
 
 	const paymentAccount = cert.paymentAccount;
-	const fullyApproved = walletShowsTransactions(cert.seller, paymentAccount);
+	const fullyApproved = walletShowsTransactions(cert.seller, cert.onboarding);
 	const transactionParams = React.useMemo(
 		() => ({ view: "seller", status: "completed", pageSize: 20 }) as const,
 		[],
@@ -74,10 +74,9 @@ export default function WalletClient() {
 				<div className="min-h-[420px]" aria-hidden="true" />
 			) : (
 				<>
-					{paymentAccount &&
-					paymentAccount.status !== PaymentAccountStatus.ENABLED ? (
+					{cert.paymentAccountCompleted ? null : paymentAccount ? (
 						<StatusPanel account={paymentAccount} />
-					) : paymentAccount ? null : (
+					) : (
 						<SellerCertGate
 							application={cert.application}
 							platformReviewCompleted={cert.platformReviewCompleted}

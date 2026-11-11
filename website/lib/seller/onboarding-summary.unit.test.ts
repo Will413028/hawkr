@@ -7,6 +7,7 @@ import { requiredFixture } from "./onboarding-fixtures";
 import {
 	fetchMyOnboarding,
 	onboardingTaskState,
+	paymentAccountCompleted,
 	platformReviewCompleted,
 	refreshMyPaymentAccount,
 } from "./onboarding-summary";
@@ -46,6 +47,35 @@ describe("platformReviewCompleted", () => {
 				OnboardingTaskId.UNSPECIFIED,
 			),
 		).toBeUndefined();
+	});
+});
+
+describe("paymentAccountCompleted", () => {
+	it("只有 PAYMENT_ACCOUNT 這一項是 COMPLETED 才是完成", () => {
+		const done = { state: S.COMPLETED } as const;
+		expect(paymentAccountCompleted(requiredFixture(none, none, done))).toBe(
+			true,
+		);
+		expect(paymentAccountCompleted(requiredFixture(done, done, none))).toBe(
+			false,
+		);
+		for (const state of [
+			S.ACTION_REQUIRED,
+			S.IN_PROGRESS,
+			S.LOCKED,
+			S.UNKNOWN,
+			S.UNSPECIFIED,
+		]) {
+			expect(
+				paymentAccountCompleted(requiredFixture(none, none, { state })),
+				String(state),
+			).toBe(false);
+		}
+	});
+
+	it("沒有摘要：不是完成", () => {
+		expect(paymentAccountCompleted(null)).toBe(false);
+		expect(paymentAccountCompleted(undefined)).toBe(false);
 	});
 });
 

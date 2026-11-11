@@ -1,6 +1,5 @@
 "use client";
 
-import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import EmptyStatePanel from "@/components/shared/EmptyStatePanel";
@@ -42,7 +41,7 @@ import {
 	periodLabel,
 	type SellerDashboard,
 } from "@/lib/seller/dashboard";
-import { paymentAccountCopy } from "@/lib/seller/payment-account";
+import { paymentBannerCopy } from "@/lib/seller/payment-account";
 import { isTcatCalled } from "@/lib/seller/shipment";
 import type { ShipmentAnomalyItem } from "@/lib/shipping/anomalies";
 import { SellerTableSkeletonRows } from "../components/SellerSkeletons";
@@ -76,10 +75,7 @@ export default function DashboardPage() {
 	const { onboarding, loading: onboardingLoading } = useMyOnboarding();
 	const ut = useUiText();
 	const paymentAccount = certGate.paymentAccount;
-	const paymentBanner =
-		paymentAccount && paymentAccount.status !== PaymentAccountStatus.ENABLED
-			? paymentAccountCopy(ut, paymentAccount)
-			: null;
+	const paymentBanner = paymentBannerCopy(ut, paymentAccount, onboarding);
 	const {
 		data: dash,
 		loadFailed: dashLoadFailed,

@@ -63,6 +63,8 @@ vi.mock("@/components/ui/Button", () => ({
 			: React.createElement("button", { type: "button" }, children),
 }));
 
+import { uiTextFor } from "@/lib/i18n/ui-text";
+import { paymentAccountCopy } from "@/lib/seller/payment-account";
 import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import WalletClient from "./WalletClient";
 
@@ -85,6 +87,7 @@ function setCert(
 	kycStatus: KYCStatus,
 	paymentStatus?: PaymentAccountStatus,
 	payoutsActive = false,
+	paymentAccountCompleted = paymentStatus === PaymentAccountStatus.ENABLED,
 ) {
 	state.cert = {
 		loading: false,
@@ -99,6 +102,7 @@ function setCert(
 		seller: { capabilities: [{ capability: 2, active: true, missing: [] }] },
 		approved: kycStatus === KYCStatus.KYC_STATUS_APPROVED,
 		platformReviewCompleted: kycStatus === KYCStatus.KYC_STATUS_APPROVED,
+		paymentAccountCompleted,
 		refresh: () => {},
 	};
 }
@@ -166,5 +170,36 @@ describe("WalletClient 的收款帳戶狀態", () => {
 		mount();
 		expect(screen.getByText("商家認證")).toBeTruthy();
 		expect(screen.getByText("平台審核與收款帳戶")).toBeTruthy();
+	});
+
+	it("摘要說收款帳戶任務未完成：帳戶 status 是 ENABLED 也顯示面板", () => {
+		setCert(
+			KYCStatus.KYC_STATUS_APPROVED,
+			PaymentAccountStatus.ENABLED,
+			true,
+			false,
+		);
+		mount();
+		expect(screen.queryByTestId("cert-gate")).toBeNull();
+		const badge = paymentAccountCopy(
+			uiTextFor("zh-TW"),
+			create(PaymentAccountSchema, { status: PaymentAccountStatus.ENABLED }),
+		).badge;
+		expect(badge).toBeTruthy();
+		expect(screen.getByText(badge as string)).toBeTruthy();
+	});
+
+	it("摘要說收款帳戶任務完成：帳戶 status 是 UNDER_REVIEW 也不顯示面板與閘門", () => {
+		setCert(
+			KYCStatus.KYC_STATUS_APPROVED,
+			PaymentAccountStatus.UNDER_REVIEW,
+			false,
+			true,
+		);
+		mount();
+		expect(screen.queryByTestId("cert-gate")).toBeNull();
+		expect(
+			screen.queryByText("金流商正在審核你的資料，不需要額外操作。"),
+		).toBeNull();
 	});
 });

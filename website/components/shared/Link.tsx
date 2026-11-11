@@ -253,7 +253,7 @@ export default function Link(props: LinkProps) {
 					staleTime: 30_000,
 				})
 			: null;
-		if (!walletRule.walletShowsTransactions(seller, account)) return;
+		if (!walletRule.walletShowsTransactions(seller, onboarding)) return;
 		await Promise.all([
 			queryClient.ensureQueryData({
 				queryKey: queryKeys.seller.orders(identity, SELLER_WALLET_ORDER_PARAMS),
@@ -321,7 +321,7 @@ export default function Link(props: LinkProps) {
 			}
 			if (!platformApprovedRule(onboarding)) return false;
 			if (account === undefined) return true;
-			if (!walletTransactionRule(seller, account)) {
+			if (!walletTransactionRule(seller, onboarding)) {
 				return false;
 			}
 			return (
