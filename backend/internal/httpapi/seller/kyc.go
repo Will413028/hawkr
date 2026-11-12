@@ -107,21 +107,24 @@ func kycDraftInput(app *pb.KYCApplication, mask *fieldmaskpb.FieldMask, create b
 	maskLists := func(path string) bool { return mask != nil && slices.Contains(mask.GetPaths(), path) }
 	touchesBranch := func(branch string) bool { return touches(branch+".") || maskLists(branch) }
 	// selected 回報設定的那一支是否被這次寫入選到：列了它的欄位、直接列了它、「*」，或沒帶 mask（視為所有有值的欄位）。
-	selected := func(branch string, set bool) bool {
-		return set && (touchesBranch(branch) || maskLists("*") || len(mask.GetPaths()) == 0)
+	selected := func(branch string) bool {
+		return touchesBranch(branch) || maskLists("*") || len(mask.GetPaths()) == 0
 	}
 	switch {
 	case touchesBranch("individual") && business != nil,
 		touchesBranch("business") && individual != nil:
 		return in, rpc.Error(connect.CodeInvalidArgument, "update_mask 列到的欄位與設定的 individual 或 business 不一致")
+	case touchesBranch("individual") && individual == nil,
+		touchesBranch("business") && business == nil:
+		return in, rpc.Error(connect.CodeInvalidArgument, "update_mask 列到的 individual 或 business 沒有設定")
 	case touchesBranch("individual") && touchesBranch("business"):
 		return in, rpc.Error(connect.CodeInvalidArgument, "update_mask 不能同時列到 individual 與 business 的欄位")
 	}
 	switch {
-	case individual != nil && (create || selected("individual", true)):
+	case individual != nil && (create || selected("individual")):
 		t := model.KYCIndividual
 		in.SellerType = &t
-	case business != nil && (create || selected("business", true)):
+	case business != nil && (create || selected("business")):
 		t := model.KYCCompany
 		in.SellerType = &t
 	case create:

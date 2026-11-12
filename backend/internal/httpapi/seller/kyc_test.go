@@ -270,6 +270,14 @@ func TestSaveKYCDraftWildcardMaskCoversTheSetBranch(t *testing.T) {
 	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1"}, "individual", "business.tax_id"); err == nil {
 		t.Fatal("同時列到兩支的欄位通過了")
 	}
+	// mask 列了某一支、subject 卻沒設：不是靜默成功，是 invalid_argument。
+	for _, branch := range []string{"individual", "business", "business.tax_id"} {
+		before := m.draft
+		_, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1"}, branch)
+		if err == nil || !strings.HasPrefix(err.Error(), "invalid_argument:") || !strings.Contains(err.Error(), "沒有設定") || !reflect.DeepEqual(before, m.draft) {
+			t.Fatalf("mask 列了 %s 但 subject 沒設：err=%v", branch, err)
+		}
+	}
 }
 
 func TestSaveKYCDraftRejectsBadRequests(t *testing.T) {
