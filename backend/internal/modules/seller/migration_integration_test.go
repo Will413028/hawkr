@@ -1237,9 +1237,19 @@ func TestDropKYCPIIPipelineMigrationDeletesRetiredRowsAndKeepsTheRest(t *testing
 		exec(`INSERT INTO seller.account_identity_hashes (source_store_id, field, key_id, hash, account_id, created_at)
 			SELECT store_id, $1, 'k1', sha256(convert_to($1::text, 'UTF8')), account_id, now() FROM seller.stores WHERE store_code = 2600000710`, field)
 	}
-	exec(`INSERT INTO seller.measures (id, account_id, store_id, kind, basis, risk_ground, review_by, statement_to_seller, current_revision, created_by_admin_id, created_at, updated_at, starts_at)
-		SELECT '0199dddd-0000-7000-8000-000000000004', account_id, store_id, 'SUSPENSION', 'RISK', 'FRAUD', now() + interval '1 day', 'x', 1, 1, now(), now(), now() FROM seller.stores WHERE store_code = 2600000710`)
-	exec(`INSERT INTO seller.measure_revisions (measure_id, revision, statement_to_seller, admin_id, created_at) VALUES ('0199dddd-0000-7000-8000-000000000004', 1, 'x', 1, now())`)
+	// measures.current_revision 的外鍵是 DEFERRABLE INITIALLY DEFERRED，commit 時才檢查，措施與第 1 版要在同一個 transaction 寫入。
+	tx, err := d.Pool().Begin(ctx)
+	must(t, err)
+	defer func() { _ = tx.Rollback(ctx) }()
+	for _, stmt := range []string{
+		`INSERT INTO seller.measures (id, account_id, store_id, kind, basis, risk_ground, review_by, statement_to_seller, current_revision, created_by_admin_id, created_at, updated_at, starts_at)
+		SELECT '0199dddd-0000-7000-8000-000000000004', account_id, store_id, 'SUSPENSION', 'RISK', 'FRAUD', now() + interval '1 day', 'x', 1, 1, now(), now(), now() FROM seller.stores WHERE store_code = 2600000710`,
+		`INSERT INTO seller.measure_revisions (measure_id, revision, statement_to_seller, admin_id, created_at) VALUES ('0199dddd-0000-7000-8000-000000000004', 1, 'x', 1, now())`,
+	} {
+		_, err := tx.Exec(ctx, stmt)
+		must(t, err)
+	}
+	must(t, tx.Commit(ctx))
 	for _, kind := range []string{"ID_CARD", "TAX_ID", "BANK_ACCOUNT"} {
 		exec(`INSERT INTO seller.measure_identities (measure_id, kind, key_id, hash) VALUES ('0199dddd-0000-7000-8000-000000000004', $1, 'k1', sha256(convert_to($1::text, 'UTF8')))`, kind)
 	}
