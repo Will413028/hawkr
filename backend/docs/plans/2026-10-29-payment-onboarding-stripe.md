@@ -273,11 +273,12 @@
     - 驗收：KYC 申請的表與 request 沒有這些欄位（`TestKYCNeverReturnsOrStoresPlaintext` 改寫成「沒有這些欄位」，mutation：加回一個欄位，測試要失敗）；沒有後台 KYC 讀取權限讀不到補充文件、每次讀取寫一列紀錄（mutation：不寫紀錄，測試要失敗）；統編的關聯帳號命中仍成立（integration）；其餘同 8a。
     - 停止條件：刪旗標後 admin 有畫面仍需要它，停下回報。
   - [ ] **8d. 共用銀行帳號提醒**（被擋於：8b；D45 已決）
-    - 範圍：fingerprint 同步時比對處分快照，命中產生審核待辦；admin 待辦種類與文案。
-    - 消費端：`git grep -n -i -E 'fingerprint|shared_bank|SharedBank' -- backend/internal backend/cmd api/hawkr admin/src packages ':!**/gen/**'`。
-    - 不能動：fingerprint 本身的保存與同步；不得自動處分（既有測試 `TestSharedProviderBankFingerprintIsListedButNeverTerminates`）。
-    - 驗收：integration：同 fingerprint 與處分快照命中產生一筆待辦、重跑不重複、未命中不產生（mutation：拿掉比對，測試要失敗）；其餘同 8a。
-    - 停止條件：待辦種類需要新增對外契約欄位以外的改動，停下回報。
+    - 範圍（D45 的 2026-11-13 修訂）：待辦不是儲存的資料（ADR `2026-10-20-admin-review-queue.md`），所以成員用推導、只存處置。seller 新增 `review_shared_bank_account(at)` 並接進 `pub_review_items`：命中的定義沿用 `LinkedAccountHits`（`(hash, key_id)` 相等、`BANK_FINGERPRINT` 對快照的 `BANK_ACCOUNT`），每對（處分、帳號）一列；成員條件是處分在 `effective_measures(at)`、fingerprint 的寫入時間晚於處分建立（建立時已命中的在處分頁的關聯帳號已看得到，不進待辦）、命中的帳號自己沒有生效中的處分、這一對還沒有「已檢視」；開始是 fingerprint 的寫入時間，期限 168 小時。新表存「已檢視」（處分、帳號、時間、管理員），seller 治理 API 加一支把關聯帳號標為已檢視的 RPC（冪等），admin 在處分頁關聯帳號那一列加按鈕；`ReviewQueueItemKind` 加一個種類與它的對象、admin 待辦的種類文字與連結。同步的 transaction 不加寫入。
+    - 消費端：`git grep -n -i -E 'fingerprint|shared_bank|SharedBank' -- backend/internal backend/cmd api/hawkr admin/src packages ':!**/gen/**'`；待辦種類的消費端 `git grep -n -E 'PAYMENT_ACCOUNT_CREATE_FAILED|PaymentAccountCreateFailed' -- backend/internal api/hawkr admin/src ':!**/gen/**'`（每個列舉種類的地方都要有新種類）。
+    - 不能動：fingerprint 本身的保存與同步、處分快照的寫入；不得自動處分（既有測試 `TestSharedProviderBankFingerprintIsListedButNeverTerminates`）；`LinkedAccountHits` 的結果。
+    - 驗收：integration：處分建立後才同步進來的同一個 fingerprint 產生一筆待辦、重複同步與多把金鑰不重複、不同 fingerprint 不產生、處分建立前就有的 fingerprint 不產生、處分撤銷後消失、標為已檢視後消失且重複標記不出錯、沒有權限不能標記（mutation：拿掉 hash 比對、拿掉「已檢視」的排除、拿掉時間條件，各自測試要失敗）；`pub.sql` 的契約測試；其餘同 8a。
+    - 停止條件：命中的定義無法與 `LinkedAccountHits` 共用同一份條件，或 RPC 需要新的權限種類而 SSOT 沒寫歸屬，停下回報。
+    - 已知限制（未決，Will）：處分建立後，受處分帳號自己新同步的 fingerprint 不會進快照（`SnapshotMeasureIdentities` 只在建立時複製），所以比不到；補不補另行決定。測試模式的銀行帳號只有幾個，本機示範時多數店家會命中（D45 原列的失敗條件）。
   - [ ] **8c. 去向與驗收**（被擋於：8b；D41 已決）
     - 範圍：建立 `check_inventory.py` 並填完 `payuni-inventory.md` 的去向；允許清單逐筆核對；`backend/docs/第三方整合/` 的檔頭；CARRYOVER；賣家指南、FAQ、landing 的事實修正（D40）；之後開 `payment-onboarding` → `main` 的 PR。
     - 驗收：`git grep -n -i payuni -- backend/internal backend/cmd api/hawkr` 逐筆屬於允許清單；`check_inventory.py` 通過，mutation：一列去向改回 TBD，腳本要失敗；`buf breaking`；CI 與 `baseline-ci.md` 比對新增為 0。
@@ -357,7 +358,7 @@
 - **D42 只剩統編之後的雜湊比對**（已決 2026-11-12，Will，採建議；擋住：8b）：建議刪申請的雜湊表與申請列的統編雜湊欄位，關聯帳號查詢只連保存表。
 - **D43 平台審核退回的通知事件**（2026-11-12，Will 確認後果；D18 已涵蓋）：一起停發；A8 的需求加「平台審核結果的通知」。
 - **D44 物流用的商店代號**（2026-11-12，Will 確認後果）：回空值，見前提段。
-- **D45 共用銀行帳號的提醒**（已決 2026-11-12，Will，採建議；擋住：8b；新增 8d）：建議刪申請上的旗標，改在 fingerprint 同步時比對處分快照並產生審核待辦（選這個時另加子步驟 8d）。
+- **D45 共用銀行帳號的提醒**（已決 2026-11-12，Will，採建議；擋住：8b；新增 8d）：建議刪申請上的旗標，改在 fingerprint 同步時比對處分快照並產生審核待辦（選這個時另加子步驟 8d）。（2026-11-13 修訂，Will，採建議：後台待辦是推導的、不儲存，所以提醒的成員由 seller 的 SQL 推導，只存「已檢視」的處置與一支標記的 RPC，同步時不寫入；未採：純推導並限時消失、另存提醒列（業界做法，歷史現在沒有讀者，手寫開關是待辦 ADR 拒絕的形狀）、不做。細節見步驟 8d）
 
 ## 進度
 
