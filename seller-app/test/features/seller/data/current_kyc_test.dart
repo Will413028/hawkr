@@ -83,8 +83,8 @@ void main() {
       ..answer = GetMyKYCResponse(
         application: KYCApplication(
           etag: 'v7',
-          realName: '王小明',
-          missingFields: [KYCField.KYC_FIELD_BANK_ACCOUNT],
+          productType: '生鮮',
+          missingFields: [KYCField.KYC_FIELD_BUSINESS_TAX_ID],
           status: KYCStatus.KYC_STATUS_DRAFT,
         ),
       );
@@ -93,8 +93,10 @@ void main() {
     );
 
     expect(kyc.application?.etag, 'v7');
-    expect(kyc.application?.realName, '王小明');
-    expect(kyc.application?.missingFields, [KYCField.KYC_FIELD_BANK_ACCOUNT]);
+    expect(kyc.application?.productType, '生鮮');
+    expect(kyc.application?.missingFields, [
+      KYCField.KYC_FIELD_BUSINESS_TAX_ID,
+    ]);
 
     final none = _Server()..answer = ConnectException(Code.notFound, 'none');
     final notStarted = await none.container().read(

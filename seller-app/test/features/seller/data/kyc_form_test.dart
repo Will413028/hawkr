@@ -337,8 +337,6 @@ void main() {
 
     test('缺項略過不在表單上的欄位（不認得的值不列）', () {
       final items = missingItemsOf([
-        KYCField.KYC_FIELD_BANK_CODE,
-        KYCField.KYC_FIELD_REAL_NAME,
         KYCField.KYC_FIELD_BUSINESS_TAX_ID,
         KYCField.KYC_FIELD_UNSPECIFIED,
       ], UiLocale.zhTW);

@@ -64,15 +64,6 @@ class KycFakeServer {
           : doc.assetId,
       downloadUri: '/dl/${doc.stagedToken}${doc.assetId}',
     );
-    if (merged.hasIdCardFront()) {
-      merged.idCardFront = confirmed(merged.idCardFront);
-    }
-    if (merged.hasIdCardBack()) {
-      merged.idCardBack = confirmed(merged.idCardBack);
-    }
-    if (merged.hasBankBook()) {
-      merged.bankBook = confirmed(merged.bankBook);
-    }
     if (merged.hasBusiness()) {
       final docs = [
         for (final d in merged.business.companyDocuments) confirmed(d),

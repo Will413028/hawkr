@@ -12,8 +12,8 @@ describe("fieldMask", () => {
 
 	it("巢狀訊息欄位用點串接", () => {
 		expect(
-			fieldMask(KYCApplicationSchema, ["business.rep_id_card_no"]).paths,
-		).toEqual(["business.rep_id_card_no"]);
+			fieldMask(KYCApplicationSchema, ["business.company_phone"]).paths,
+		).toEqual(["business.company_phone"]);
 	});
 
 	it("空的路徑清單得到空 mask", () => {
@@ -52,14 +52,14 @@ describe("fieldMask", () => {
 		);
 	});
 
-	it("oneof 的子訊息可以往下一層（個人賣家）", () => {
+	it("oneof 的子訊息可以往下一層（企業賣家）", () => {
 		expect(
-			fieldMask(KYCApplicationSchema, ["individual.id_card_no"]).paths,
-		).toEqual(["individual.id_card_no"]);
+			fieldMask(KYCApplicationSchema, ["business.tax_id"]).paths,
+		).toEqual(["business.tax_id"]);
 	});
 
 	it("非 oneof 的子訊息後面不能再接子路徑", () => {
-		for (const path of ["bank_book.asset_id", "birth_date.year"]) {
+		for (const path of ["last_rejection.reason", "submit_time.seconds"]) {
 			expect(() => fieldMask(KYCApplicationSchema, [path])).toThrow(
 				/不是 oneof 的子訊息/,
 			);

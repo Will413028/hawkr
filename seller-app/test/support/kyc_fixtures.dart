@@ -7,32 +7,19 @@ import 'package:hawkr_seller/features/seller/data/current_kyc.dart';
 KYCApplication individualApplication({
   String etag = 'v1',
   KYCStatus kycStatus = KYCStatus.KYC_STATUS_DRAFT,
-  String realName = '',
-  String idMasked = '',
   List<KYCField> missing = const [],
   List<StoreField> missingStore = const [],
   KYCRejection? rejection,
   List<KYCIssue> outstanding = const [],
-  String? frontAssetId,
-}) {
-  final app = KYCApplication(
-    etag: etag,
-    status: kycStatus,
-    realName: realName,
-    individual: IndividualKYC(idCardNoMasked: idMasked),
-    missingFields: missing,
-    missingStoreFields: missingStore,
-    lastRejection: rejection,
-    outstandingIssues: outstanding,
-  );
-  if (frontAssetId != null) {
-    app.idCardFront = KYCDocument(
-      assetId: frontAssetId,
-      downloadUri: '/api/v1/app/media/secure_download/$frontAssetId',
-    );
-  }
-  return app;
-}
+}) => KYCApplication(
+  etag: etag,
+  status: kycStatus,
+  individual: IndividualKYC(),
+  missingFields: missing,
+  missingStoreFields: missingStore,
+  lastRejection: rejection,
+  outstandingIssues: outstanding,
+);
 
 /// 伺服器回的一份企業草稿申請。
 KYCApplication businessApplication({
