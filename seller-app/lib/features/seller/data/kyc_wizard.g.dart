@@ -56,7 +56,7 @@ final class KycWizardProvider
   }
 }
 
-String _$kycWizardHash() => r'8352e060f4e1c98bc1337ec89de162c90ef5ce99';
+String _$kycWizardHash() => r'8c11e3a6c8ec8f922d6e244045ef2d42a1f3d873';
 
 /// 認證 wizard 的動作與讀取：草稿、證件、統編查詢，以及寫進店家的聯絡資料與地址。
 ///

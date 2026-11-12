@@ -127,8 +127,8 @@ func TestLinkedTerminationAvailabilityIsTheSameRuleAsCreateMeasure(t *testing.T)
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountA, sA, _ := f.submitted(t)
-	accountB, sB, _ := f.submitted(t)
+	accountA, sA, _ := f.submittedCompany(t, taxIDOne)
+	accountB, sB, _ := f.submittedCompany(t, taxIDOne)
 
 	parity := func(label string, source Measure, wantAny map[int64]bool) {
 		t.Helper()
@@ -304,9 +304,9 @@ func TestCascadeRevocationReopensOnlyAccountsWithNoOtherEffectiveTermination(t *
 	t.Parallel()
 	f := setup(t)
 	reopened := record[StoreReopened](f)
-	_, sA, _ := f.submitted(t)
-	_, sB, _ := f.submitted(t)
-	_, sC, _ := f.submitted(t)
+	_, sA, _ := f.submittedCompany(t, taxIDOne)
+	_, sB, _ := f.submittedCompany(t, taxIDOne)
+	_, sC, _ := f.submittedCompany(t, taxIDOne)
 	source := f.terminate(t, sA.StoreID, GroundFraud)
 	f.effect(t, source)
 	src := source.ID

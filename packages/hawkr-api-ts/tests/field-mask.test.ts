@@ -53,9 +53,9 @@ describe("fieldMask", () => {
 	});
 
 	it("oneof 的子訊息可以往下一層（企業賣家）", () => {
-		expect(
-			fieldMask(KYCApplicationSchema, ["business.tax_id"]).paths,
-		).toEqual(["business.tax_id"]);
+		expect(fieldMask(KYCApplicationSchema, ["business.tax_id"]).paths).toEqual([
+			"business.tax_id",
+		]);
 	});
 
 	it("非 oneof 的子訊息後面不能再接子路徑", () => {

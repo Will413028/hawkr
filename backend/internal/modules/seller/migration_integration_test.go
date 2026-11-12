@@ -1235,13 +1235,13 @@ func TestDropKYCPIIPipelineMigrationDeletesRetiredRowsAndKeepsTheRest(t *testing
 	}
 	for _, field := range []string{"ID_CARD_NO", "REP_ID_CARD_NO", "BANK_ACCOUNT", "TAX_ID", "BANK_FINGERPRINT"} {
 		exec(`INSERT INTO seller.account_identity_hashes (source_store_id, field, key_id, hash, account_id, created_at)
-			SELECT store_id, $1, 'k1', sha256($1::bytea), account_id, now() FROM seller.stores WHERE store_code = 2600000710`, field)
+			SELECT store_id, $1, 'k1', sha256(convert_to($1::text, 'UTF8')), account_id, now() FROM seller.stores WHERE store_code = 2600000710`, field)
 	}
 	exec(`INSERT INTO seller.measures (id, account_id, store_id, kind, basis, risk_ground, review_by, statement_to_seller, current_revision, created_by_admin_id, created_at, updated_at, starts_at)
 		SELECT '0199dddd-0000-7000-8000-000000000004', account_id, store_id, 'SUSPENSION', 'RISK', 'FRAUD', now() + interval '1 day', 'x', 1, 1, now(), now(), now() FROM seller.stores WHERE store_code = 2600000710`)
 	exec(`INSERT INTO seller.measure_revisions (measure_id, revision, statement_to_seller, admin_id, created_at) VALUES ('0199dddd-0000-7000-8000-000000000004', 1, 'x', 1, now())`)
 	for _, kind := range []string{"ID_CARD", "TAX_ID", "BANK_ACCOUNT"} {
-		exec(`INSERT INTO seller.measure_identities (measure_id, kind, key_id, hash) VALUES ('0199dddd-0000-7000-8000-000000000004', $1, 'k1', sha256($1::bytea))`, kind)
+		exec(`INSERT INTO seller.measure_identities (measure_id, kind, key_id, hash) VALUES ('0199dddd-0000-7000-8000-000000000004', $1, 'k1', sha256(convert_to($1::text, 'UTF8')))`, kind)
 	}
 	exec(`INSERT INTO seller.kyc_reveals (reveal_id, application_id, admin_id, reason, revealed_at, expires_at)
 		VALUES ('0199dddd-0000-7000-8000-000000000003', '0199dddd-0000-7000-8000-000000000001', 9, '核對', now(), now() + interval '15 minutes')`)
