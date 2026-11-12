@@ -514,6 +514,17 @@ type LinkedAccount struct {
 	CanCreateLinkedTermination    bool
 	// TerminationEffect 是 CanCreateLinkedTermination 為 true 時建立這筆關聯終止的效果；false 時是 nil。
 	TerminationEffect *TerminationEffect
+	// SharedBankAccountPending 是這一對（措施、帳號）此刻在後台待辦 SHARED_BANK_ACCOUNT（成員的定義只有 SQL 的 review_shared_bank_account）；
+	// ReviewedAt 是管理員標為已檢視的時間（還沒有時是 nil）。
+	SharedBankAccountPending bool
+	ReviewedAt               *time.Time
+}
+
+// MarkLinkedAccountReviewedInput 是把措施的一個關聯帳號標為已檢視的輸入。
+type MarkLinkedAccountReviewedInput struct {
+	MeasureID uuid.UUID
+	AccountID int64
+	AdminID   int64
 }
 
 // TerminationTarget 是建立終止合作時目標店家（stint）的狀態：Closed 是 stint 已關閉；LatestOfAccount 是它為帳號最近的一個 stint。

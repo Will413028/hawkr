@@ -313,6 +313,20 @@ type SellerMeasureIdentity struct {
 	Hash      []byte
 }
 
+type SellerMeasureIdentityHit struct {
+	MeasureID uuid.UUID
+	AccountID int64
+	Field     string
+	CreatedAt time.Time
+}
+
+type SellerMeasureLinkedReview struct {
+	MeasureID         uuid.UUID
+	AccountID         int64
+	ReviewedAt        time.Time
+	ReviewedByAdminID int64
+}
+
 type SellerMeasureRequest struct {
 	ID               uuid.UUID
 	MeasureID        uuid.UUID

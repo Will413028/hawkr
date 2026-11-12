@@ -55,6 +55,16 @@ BEGIN ATOMIC
     WHERE m.status = 'ENFORCED' AND m.kind IN ('SUSPENSION', 'TERMINATION') AND m.starts_at <= at AND (m.ends_at IS NULL OR m.ends_at > at);
 END;
 
+-- 措施的身分快照與防詐保存的 hash 的命中，唯一的定義：快照裡 (hash, key_id) 相同的 account_identity_hashes 列，種類要對得上（統編 TAX_ID 對 TAX_ID，
+-- provider 回報的銀行帳號 fingerprint BANK_FINGERPRINT 對 BANK_ACCOUNT）。一列是一把金鑰的一筆命中（同一個帳號、同一個欄位可有多列），created_at 是那筆 hash 寫入的時間。
+-- 不判斷措施是否生效、也不排除被處分的帳號本身：呼叫方自己加條件。LinkedAccountHits（處分頁的關聯帳號）與 review_shared_bank_account（待辦）都讀它，
+-- 命中的條件只寫這一份；以 (key_id, hash) 的索引等值連接，不解密。
+CREATE VIEW seller.measure_identity_hits AS
+SELECT mi.measure_id, f.account_id, f.field, f.created_at
+FROM seller.measure_identities mi
+JOIN seller.account_identity_hashes f ON f.hash = mi.hash AND f.key_id = mi.key_id
+WHERE mi.kind = CASE f.field WHEN 'TAX_ID' THEN 'TAX_ID' ELSE 'BANK_ACCOUNT' END;
+
 -- 發布的讀取介面（pub_*，形狀宣告在 db/pub.sql，契約測試比對兩者）：at 這一刻可以公開曝光的店家。條件是 store_requirement_flags 全部為真，
 -- 而且帳號在 at 沒有生效中的措施（effective_measures）。「至少一個上架商品」不在這裡，由曝光端檢查。依賴表允許的上層模組在自己的 SQL 裡
 -- join 它（例如 `EXISTS (SELECT 1 FROM seller.pub_exposable_stores($now) e WHERE e.store_id = p.store_id)`）；seller 自己的 exposure.Classify
@@ -248,8 +258,38 @@ BEGIN ATOMIC
       AND NOT EXISTS (SELECT 1 FROM seller.effective_measures(at) e WHERE e.account_id = s.account_id);
 END;
 
+-- SHARED_BANK_ACCOUNT 共用銀行帳號：處分（在 effective_measures(at)）建立之後，別的帳號才同步了與被處分帳號相同的銀行帳號 fingerprint
+-- （measure_identity_hits 的 BANK_FINGERPRINT 命中，fingerprint 的寫入時間晚於處分的建立時間：建立時已命中的，處分頁的關聯帳號已看得到，不進待辦）。
+-- 一對（處分、命中的帳號）一列，多把金鑰不重複；命中的帳號自己有生效中的處分時不列；這一對已有 measure_linked_reviews（已檢視）時不列。
+-- 開始是這一對最早一筆符合條件的 fingerprint 寫入時間，期限 168 小時。店家是命中帳號最近的 stint（store_id 最大的，含已關閉；與處分頁關聯帳號的店家相同），
+-- 對象的鍵是 measure_id/account_id（item_id 同種類內唯一）。只列出、不自動處分。
+CREATE FUNCTION seller.review_shared_bank_account(at TIMESTAMPTZ) RETURNS SETOF seller.review_item
+LANGUAGE sql STABLE
+BEGIN ATOMIC
+    SELECT 'SHARED_BANK_ACCOUNT'::text, p.measure_id::text || '/' || p.account_id::text, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::smallint, p.account_id,
+           p.measure_id, NULL::uuid, NULL::uuid, st.store_id, COALESCE(st.store_name, ''),
+           p.start_at, p.start_at + INTERVAL '168 hours'
+    FROM (
+        SELECT m.id AS measure_id, h.account_id, min(h.created_at) AS start_at
+        FROM seller.effective_measures(at) e
+        JOIN seller.measures m ON m.id = e.id
+        JOIN seller.measure_identity_hits h ON h.measure_id = m.id
+        WHERE h.field = 'BANK_FINGERPRINT' AND h.account_id <> m.account_id AND h.created_at > m.created_at
+          AND NOT EXISTS (SELECT 1 FROM seller.effective_measures(at) x WHERE x.account_id = h.account_id)
+          AND NOT EXISTS (SELECT 1 FROM seller.measure_linked_reviews r WHERE r.measure_id = m.id AND r.account_id = h.account_id)
+        GROUP BY m.id, h.account_id
+    ) p
+    CROSS JOIN LATERAL (
+        SELECT s.store_id, s.store_name
+        FROM seller.stores s
+        WHERE s.account_id = p.account_id
+        ORDER BY s.store_id DESC
+        LIMIT 1
+    ) st;
+END;
+
 -- 發布的讀取介面（step10e-3d-design.md §2.1）：at 這一刻營運要處理的事項，後台待辦（reviewqueue 模組）的 seller 部分。每一列是一件待辦：種類、對象的鍵、
--- 店家、開始時間與期限，欄位的意義同 review_item。9 種都有期限，due_at 一律有值（E3）。是 9 支 review_<種類>(at) 的 UNION ALL：成員的條件與時長只寫在那些
+-- 店家、開始時間與期限，欄位的意義同 review_item。10 種都有期限，due_at 一律有值（E3）。是 10 支 review_<種類>(at) 的 UNION ALL：成員的條件與時長只寫在那些
 -- 函式（規則只有一個家，E10），這裡不重寫；成員與指令用的 Go 定義一致由資料集測試鎖住。時間由呼叫方以請求的 clock 傳入，不用 now()。
 -- 消費端排序與分頁（reviewqueue 的 keyset：due_at、start_at、kind COLLATE "C"、item_id COLLATE "C"）；kind 是 UPPER_SNAKE，item_id 的位元組順序穩定。
 CREATE TYPE seller.pub_review_item AS (
@@ -289,7 +329,9 @@ BEGIN ATOMIC
     UNION ALL
     SELECT * FROM seller.review_measure_review(at)
     UNION ALL
-    SELECT * FROM seller.review_kyc_application(at);
+    SELECT * FROM seller.review_kyc_application(at)
+    UNION ALL
+    SELECT * FROM seller.review_shared_bank_account(at);
 END;
 
 -- 發布的讀取介面（pub_*，形狀宣告在 db/pub.sql，契約測試比對兩者）：此刻生效中的內容下架措施的對象，一列是一個（措施，內容）。內容下架建立即生效、

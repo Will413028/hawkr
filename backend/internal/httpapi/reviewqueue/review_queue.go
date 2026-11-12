@@ -44,6 +44,7 @@ var kindPermissions = map[rq.Kind]adminperm.Permission{
 	rq.MeasureReview:              adminperm.SellerMeasuresList,
 	rq.KYCApplication:             adminperm.SellerKYCApplicationsList,
 	rq.PaymentAccountCreateFailed: adminperm.PaymentAccountsGet,
+	rq.SharedBankAccount:          adminperm.SellerMeasuresList,
 }
 
 // Lister 是 handler 需要的模組方法（*reviewqueue.Module 實作它）。
@@ -254,6 +255,13 @@ func toProto(item rq.Item) (*adminpb.ReviewQueueItem, error) {
 			return nil, missing("store_id")
 		}
 		out.Subject = &adminpb.ReviewQueueItem_PaymentAccount{PaymentAccount: &adminpb.PaymentAccountRef{StoreId: rpc.FormatID(*item.StoreID)}}
+	case rq.SharedBankAccount:
+		if item.MeasureID == nil || item.AccountID == nil {
+			return nil, missing("measure_id 或 account_id")
+		}
+		out.Subject = &adminpb.ReviewQueueItem_SharedBankAccount{SharedBankAccount: &adminpb.SharedBankAccountRef{
+			MeasureId: item.MeasureID.String(), AccountId: strconv.FormatInt(*item.AccountID, 10),
+		}}
 	default:
 		return nil, fmt.Errorf("httpapi/reviewqueue：不認得的種類 %q", item.Kind)
 	}

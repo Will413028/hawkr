@@ -178,6 +178,13 @@ service SellerGovernanceAdminService {
   // 必填）。只限生效中的 RISK 停權。後台的 etag 改變、賣家的 etag 不變。
   rpc ScheduleMeasureReview(ScheduleMeasureReviewRequest) returns (ScheduleMeasureReviewResponse);
 
+  // MarkLinkedAccountReviewed 把措施詳情上的一個關聯帳號標為已檢視（處置「共用銀行帳號」待辦）：這一對（措施、帳號）此後不再出現在待辦（SHARED_BANK_ACCOUNT）。
+  // 這一對必須是銀行帳號 fingerprint 命中的關聯帳號，措施或命中不存在回 not_found。冪等：已標過回成功、不改原來的時間與管理員。不改 measures，所以不帶 etag，
+  // 措施的 etag 不變。權限是獨立的 seller.measures.review_linked_account（adminauth 一支方法一個權限）。
+  rpc MarkLinkedAccountReviewed(MarkLinkedAccountReviewedRequest) returns (MarkLinkedAccountReviewedResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
   // DecideAppeal 裁定措施的申覆：ACCEPTED 在同一個 transaction 撤銷措施並解除效果（revoke_findings 為 true 時一併撤銷認定；終止合作的
   // 恢復店家與關聯終止的連帶撤銷同 RevokeMeasure）；終止合作期滿前提出的申覆，期滿後仍可裁定；
   // REJECTED 措施不變。兩者都必須附理由，賣家看得到。只有待處理的申覆可以。etag 必填；etag 不符（包含裁定已經生效後再帶舊
@@ -879,6 +886,15 @@ message ScheduleMeasureReviewRequest {
 message ScheduleMeasureReviewResponse {
   Measure measure = 1;
 }
+
+message MarkLinkedAccountReviewedRequest {
+  // 措施的 id。
+  string measure_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 關聯帳號的 id（LinkedAccount.account_id）。
+  string account_id = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message MarkLinkedAccountReviewedResponse {}
 
 message DecideAppealRequest {
   // 措施的 id。

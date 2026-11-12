@@ -107,6 +107,7 @@ var declarations = map[string]declaration{
 	sellerv1alpha1connect.SellerGovernanceAdminServiceEndMeasureProcedure:                  requires(adminperm.SellerMeasuresEnd),
 	sellerv1alpha1connect.SellerGovernanceAdminServiceRevokeMeasureProcedure:               requires(adminperm.SellerMeasuresRevoke),
 	sellerv1alpha1connect.SellerGovernanceAdminServiceScheduleMeasureReviewProcedure:       requires(adminperm.SellerMeasuresScheduleReview),
+	sellerv1alpha1connect.SellerGovernanceAdminServiceMarkLinkedAccountReviewedProcedure:   requires(adminperm.SellerMeasuresReviewLinkedAccount),
 	sellerv1alpha1connect.SellerGovernanceAdminServiceDecideAppealProcedure:                requires(adminperm.SellerMeasuresDecideAppeal),
 	sellerv1alpha1connect.SellerGovernanceAdminServiceDecideRemediationProcedure:           requires(adminperm.SellerMeasuresDecideRemediation),
 	sellerv1alpha1connect.SellerGovernanceAdminServiceCreateMeasureNoteProcedure:           requires(adminperm.SellerMeasureNotesCreate),

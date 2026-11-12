@@ -212,16 +212,45 @@ ORDER BY m.account_id, mi.kind;
 -- name: LinkedAccountHits :many
 -- 與這筆措施的身分快照相同的其他帳號（W9）：防詐保存的 account_identity_hashes（跨 stint，個資清理之後仍在）裡，統編（TAX_ID）對快照的 TAX_ID、
 -- provider 回報的銀行帳號 fingerprint（BANK_FINGERPRINT）對快照的 BANK_ACCOUNT（Stripe 計畫 D4、D42：銀行帳號命中只列出；能不能據以建立關聯終止由
--- model.LinkedIdentity.CountsAsGround 決定，不在這裡）。以 (key_id, hash) 索引等值連接，不解密；帳號取自來源 stint。
+-- model.LinkedIdentity.CountsAsGround 決定，不在這裡）。命中的定義只有 seller.measure_identity_hits 那一份（以 (key_id, hash) 索引等值連接，不解密）；帳號取自來源 stint。
 -- account_id 不為 NULL 時只看那個帳號。
-SELECT DISTINCT f.account_id, f.field
-FROM seller.measure_identities mi
-JOIN seller.account_identity_hashes f ON f.hash = mi.hash AND f.key_id = mi.key_id
-WHERE mi.measure_id = sqlc.arg(measure_id)
-  AND mi.kind = CASE f.field WHEN 'TAX_ID' THEN 'TAX_ID' ELSE 'BANK_ACCOUNT' END
-  AND f.account_id <> sqlc.arg(except_account_id)
-  AND (sqlc.narg(account_id)::bigint IS NULL OR f.account_id = sqlc.narg(account_id)::bigint)
-ORDER BY f.account_id, f.field;
+SELECT DISTINCT h.account_id, h.field
+FROM seller.measure_identity_hits h
+WHERE h.measure_id = sqlc.arg(measure_id)
+  AND h.account_id <> sqlc.arg(except_account_id)
+  AND (sqlc.narg(account_id)::bigint IS NULL OR h.account_id = sqlc.narg(account_id)::bigint)
+ORDER BY h.account_id, h.field;
+
+-- name: SharedBankAccountPendingAccounts :many
+-- 這筆措施在 at 的待辦 SHARED_BANK_ACCOUNT 裡的帳號：處分頁的關聯帳號要不要出現「標為已檢視」。成員的定義只有 seller.review_shared_bank_account 那一份，這裡不重寫。
+SELECT h.account_id
+FROM (SELECT DISTINCT account_id FROM seller.measure_identity_hits WHERE measure_id = sqlc.arg(measure_id)) h
+WHERE EXISTS (
+    SELECT 1 FROM seller.review_shared_bank_account(sqlc.arg(at)::timestamptz) r
+    WHERE r.measure_id = sqlc.arg(measure_id) AND r.account_id = h.account_id)
+ORDER BY h.account_id;
+
+-- name: MeasureLinkedReviews :many
+-- 這筆措施的關聯帳號已檢視的紀錄（處分頁顯示已檢視的時間）。
+SELECT account_id, reviewed_at
+FROM seller.measure_linked_reviews
+WHERE measure_id = $1
+ORDER BY account_id;
+
+-- name: BankFingerprintHitExists :one
+-- 這一對（措施、帳號）是銀行帳號 fingerprint 命中的關聯帳號（被處分的帳號本身不算）：標為已檢視前的存在性檢查，與處分頁的關聯帳號是同一份命中定義。
+SELECT EXISTS (
+    SELECT 1
+    FROM seller.measure_identity_hits h
+    JOIN seller.measures m ON m.id = h.measure_id
+    WHERE h.measure_id = sqlc.arg(measure_id) AND h.account_id = sqlc.arg(account_id) AND h.field = 'BANK_FINGERPRINT' AND h.account_id <> m.account_id
+);
+
+-- name: MarkLinkedAccountReviewed :execrows
+-- 把這一對標為已檢視；已標過的不改（保留原來的時間與管理員），所以重複標記冪等。
+INSERT INTO seller.measure_linked_reviews (measure_id, account_id, reviewed_at, reviewed_by_admin_id)
+VALUES (sqlc.arg(measure_id), sqlc.arg(account_id), sqlc.arg(now), sqlc.arg(admin_id))
+ON CONFLICT DO NOTHING;
 
 -- name: InsertAccountIdentityHash :exec
 -- 防詐保存的比對 hash（隨申請寫入的同一個 transaction、同一個呼叫點寫入）；帳號取自來源 stint；已存在的略過（補金鑰可重跑）。

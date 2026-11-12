@@ -53,6 +53,8 @@ const (
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION ReviewQueueItemKind = 11
 	// 建立重試用完的收款帳戶，等管理員重試建立（subject 是 payment_account）。
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED ReviewQueueItemKind = 13
+	// 處分建立之後，又有別的帳號同步了與被處分帳號相同的銀行帳號 fingerprint，等管理員在處分頁檢視這個關聯帳號（subject 是 shared_bank_account）。
+	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT ReviewQueueItemKind = 14
 )
 
 // Enum value maps for ReviewQueueItemKind.
@@ -69,6 +71,7 @@ var (
 		9:  "REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW",
 		11: "REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION",
 		13: "REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED",
+		14: "REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT",
 	}
 	ReviewQueueItemKind_value = map[string]int32{
 		"REVIEW_QUEUE_ITEM_KIND_UNSPECIFIED":                   0,
@@ -82,6 +85,7 @@ var (
 		"REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW":                9,
 		"REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION":               11,
 		"REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED": 13,
+		"REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT":           14,
 	}
 )
 
@@ -245,6 +249,7 @@ type ReviewQueueItem struct {
 	//	*ReviewQueueItem_MeasureId
 	//	*ReviewQueueItem_KycApplication
 	//	*ReviewQueueItem_PaymentAccount
+	//	*ReviewQueueItem_SharedBankAccount
 	Subject isReviewQueueItem_Subject `protobuf_oneof:"subject"`
 	// 對象所屬的店家；空字串表示這個項目沒有單一店家（例如來函）。
 	StoreId string `protobuf:"bytes,20,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
@@ -381,6 +386,15 @@ func (x *ReviewQueueItem) GetPaymentAccount() *PaymentAccountRef {
 	return nil
 }
 
+func (x *ReviewQueueItem) GetSharedBankAccount() *SharedBankAccountRef {
+	if x != nil {
+		if x, ok := x.Subject.(*ReviewQueueItem_SharedBankAccount); ok {
+			return x.SharedBankAccount
+		}
+	}
+	return nil
+}
+
 func (x *ReviewQueueItem) GetStoreId() string {
 	if x != nil {
 		return x.StoreId
@@ -442,6 +456,10 @@ type ReviewQueueItem_PaymentAccount struct {
 	PaymentAccount *PaymentAccountRef `protobuf:"bytes,11,opt,name=payment_account,json=paymentAccount,proto3,oneof"`
 }
 
+type ReviewQueueItem_SharedBankAccount struct {
+	SharedBankAccount *SharedBankAccountRef `protobuf:"bytes,12,opt,name=shared_bank_account,json=sharedBankAccount,proto3,oneof"`
+}
+
 func (*ReviewQueueItem_ReportId) isReviewQueueItem_Subject() {}
 
 func (*ReviewQueueItem_CaseId) isReviewQueueItem_Subject() {}
@@ -459,6 +477,8 @@ func (*ReviewQueueItem_MeasureId) isReviewQueueItem_Subject() {}
 func (*ReviewQueueItem_KycApplication) isReviewQueueItem_Subject() {}
 
 func (*ReviewQueueItem_PaymentAccount) isReviewQueueItem_Subject() {}
+
+func (*ReviewQueueItem_SharedBankAccount) isReviewQueueItem_Subject() {}
 
 // CaseInquiryRef 指到案件裡的一筆詢問。
 type CaseInquiryRef struct {
@@ -674,6 +694,59 @@ func (x *PaymentAccountRef) GetStoreId() string {
 	return ""
 }
 
+// SharedBankAccountRef 指到處分頁上的一個關聯帳號（處分、命中的帳號）。
+type SharedBankAccountRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MeasureId     string                 `protobuf:"bytes,1,opt,name=measure_id,json=measureId,proto3" json:"measure_id,omitempty"`
+	AccountId     string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SharedBankAccountRef) Reset() {
+	*x = SharedBankAccountRef{}
+	mi := &file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SharedBankAccountRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SharedBankAccountRef) ProtoMessage() {}
+
+func (x *SharedBankAccountRef) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SharedBankAccountRef.ProtoReflect.Descriptor instead.
+func (*SharedBankAccountRef) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SharedBankAccountRef) GetMeasureId() string {
+	if x != nil {
+		return x.MeasureId
+	}
+	return ""
+}
+
+func (x *SharedBankAccountRef) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
 // KYCApplicationRef 指到店家的一筆商家認證申請。
 type KYCApplicationRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -685,7 +758,7 @@ type KYCApplicationRef struct {
 
 func (x *KYCApplicationRef) Reset() {
 	*x = KYCApplicationRef{}
-	mi := &file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes[7]
+	mi := &file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -697,7 +770,7 @@ func (x *KYCApplicationRef) String() string {
 func (*KYCApplicationRef) ProtoMessage() {}
 
 func (x *KYCApplicationRef) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes[7]
+	mi := &file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -710,7 +783,7 @@ func (x *KYCApplicationRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KYCApplicationRef.ProtoReflect.Descriptor instead.
 func (*KYCApplicationRef) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDescGZIP(), []int{7}
+	return file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *KYCApplicationRef) GetStoreId() string {
@@ -739,7 +812,7 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"\x05kinds\x18\x03 \x03(\x0e25.hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKindR\x05kinds\"\x8a\x01\n" +
 	"\x17ListReviewQueueResponse\x12G\n" +
 	"\x05items\x18\x01 \x03(\v21.hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemR\x05items\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xe9\x06\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xd3\a\n" +
 	"\x0fReviewQueueItem\x12N\n" +
 	"\x04kind\x18\x01 \x01(\x0e25.hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKindB\x03\xe0A\x02R\x04kind\x12\x1d\n" +
 	"\treport_id\x18\x02 \x01(\tH\x00R\breportId\x12\x19\n" +
@@ -752,7 +825,8 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"measure_id\x18\b \x01(\tH\x00R\tmeasureId\x12^\n" +
 	"\x0fkyc_application\x18\n" +
 	" \x01(\v23.hawkr.admin.reviewqueue.v1alpha1.KYCApplicationRefH\x00R\x0ekycApplication\x12^\n" +
-	"\x0fpayment_account\x18\v \x01(\v23.hawkr.admin.reviewqueue.v1alpha1.PaymentAccountRefH\x00R\x0epaymentAccount\x12\x19\n" +
+	"\x0fpayment_account\x18\v \x01(\v23.hawkr.admin.reviewqueue.v1alpha1.PaymentAccountRefH\x00R\x0epaymentAccount\x12h\n" +
+	"\x13shared_bank_account\x18\f \x01(\v26.hawkr.admin.reviewqueue.v1alpha1.SharedBankAccountRefH\x00R\x11sharedBankAccount\x12\x19\n" +
 	"\bstore_id\x18\x14 \x01(\tR\astoreId\x12\x1d\n" +
 	"\n" +
 	"store_name\x18\x15 \x01(\tR\tstoreName\x12@\n" +
@@ -774,10 +848,15 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x02 \x01(\tR\trequestId\".\n" +
 	"\x11PaymentAccountRef\x12\x19\n" +
-	"\bstore_id\x18\x01 \x01(\tR\astoreId\"U\n" +
+	"\bstore_id\x18\x01 \x01(\tR\astoreId\"T\n" +
+	"\x14SharedBankAccountRef\x12\x1d\n" +
+	"\n" +
+	"measure_id\x18\x01 \x01(\tR\tmeasureId\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\"U\n" +
 	"\x11KYCApplicationRef\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12%\n" +
-	"\x0eapplication_id\x18\x02 \x01(\tR\rapplicationId*\x9f\x05\n" +
+	"\x0eapplication_id\x18\x02 \x01(\tR\rapplicationId*\xcf\x05\n" +
 	"\x13ReviewQueueItemKind\x12&\n" +
 	"\"REVIEW_QUEUE_ITEM_KIND_UNSPECIFIED\x10\x00\x12(\n" +
 	"$REVIEW_QUEUE_ITEM_KIND_REPORT_TRIAGE\x10\x01\x12(\n" +
@@ -789,7 +868,8 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"+REVIEW_QUEUE_ITEM_KIND_MEASURE_LIFT_REQUEST\x10\b\x12)\n" +
 	"%REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW\x10\t\x12*\n" +
 	"&REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION\x10\v\x128\n" +
-	"4REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED\x10\r\"\x04\b\x04\x10\x04\"\x04\b\n" +
+	"4REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED\x10\r\x12.\n" +
+	"*REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT\x10\x0e\"\x04\b\x04\x10\x04\"\x04\b\n" +
 	"\x10\n" +
 	"\"\x04\b\f\x10\f*(REVIEW_QUEUE_ITEM_KIND_CASE_FDA_REFERRAL*(REVIEW_QUEUE_ITEM_KIND_FOOD_REGISTRATION*(REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY2\xa7\x01\n" +
 	"\x17ReviewQueueAdminService\x12\x8b\x01\n" +
@@ -809,7 +889,7 @@ func file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDescGZIP() []by
 }
 
 var file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_goTypes = []any{
 	(ReviewQueueItemKind)(0),        // 0: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKind
 	(*ListReviewQueueRequest)(nil),  // 1: hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueRequest
@@ -819,8 +899,9 @@ var file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_goTypes = []any{
 	(*AuthorityTargetRef)(nil),      // 5: hawkr.admin.reviewqueue.v1alpha1.AuthorityTargetRef
 	(*MeasureRequestRef)(nil),       // 6: hawkr.admin.reviewqueue.v1alpha1.MeasureRequestRef
 	(*PaymentAccountRef)(nil),       // 7: hawkr.admin.reviewqueue.v1alpha1.PaymentAccountRef
-	(*KYCApplicationRef)(nil),       // 8: hawkr.admin.reviewqueue.v1alpha1.KYCApplicationRef
-	(*v1alpha1.Deadline)(nil),       // 9: hawkr.common.v1alpha1.Deadline
+	(*SharedBankAccountRef)(nil),    // 8: hawkr.admin.reviewqueue.v1alpha1.SharedBankAccountRef
+	(*KYCApplicationRef)(nil),       // 9: hawkr.admin.reviewqueue.v1alpha1.KYCApplicationRef
+	(*v1alpha1.Deadline)(nil),       // 10: hawkr.common.v1alpha1.Deadline
 }
 var file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_depIdxs = []int32{
 	0,  // 0: hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueRequest.kinds:type_name -> hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKind
@@ -829,16 +910,17 @@ var file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_depIdxs = []int32{
 	4,  // 3: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.case_inquiry:type_name -> hawkr.admin.reviewqueue.v1alpha1.CaseInquiryRef
 	5,  // 4: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.authority_target:type_name -> hawkr.admin.reviewqueue.v1alpha1.AuthorityTargetRef
 	6,  // 5: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.measure_request:type_name -> hawkr.admin.reviewqueue.v1alpha1.MeasureRequestRef
-	8,  // 6: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.kyc_application:type_name -> hawkr.admin.reviewqueue.v1alpha1.KYCApplicationRef
+	9,  // 6: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.kyc_application:type_name -> hawkr.admin.reviewqueue.v1alpha1.KYCApplicationRef
 	7,  // 7: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.payment_account:type_name -> hawkr.admin.reviewqueue.v1alpha1.PaymentAccountRef
-	9,  // 8: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.deadline:type_name -> hawkr.common.v1alpha1.Deadline
-	1,  // 9: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueAdminService.ListReviewQueue:input_type -> hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueRequest
-	2,  // 10: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueAdminService.ListReviewQueue:output_type -> hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueResponse
-	10, // [10:11] is the sub-list for method output_type
-	9,  // [9:10] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	8,  // 8: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.shared_bank_account:type_name -> hawkr.admin.reviewqueue.v1alpha1.SharedBankAccountRef
+	10, // 9: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.deadline:type_name -> hawkr.common.v1alpha1.Deadline
+	1,  // 10: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueAdminService.ListReviewQueue:input_type -> hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueRequest
+	2,  // 11: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueAdminService.ListReviewQueue:output_type -> hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueResponse
+	11, // [11:12] is the sub-list for method output_type
+	10, // [10:11] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_init() }
@@ -856,6 +938,7 @@ func file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_init() {
 		(*ReviewQueueItem_MeasureId)(nil),
 		(*ReviewQueueItem_KycApplication)(nil),
 		(*ReviewQueueItem_PaymentAccount)(nil),
+		(*ReviewQueueItem_SharedBankAccount)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -863,7 +946,7 @@ func file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc), len(file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

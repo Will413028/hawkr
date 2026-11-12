@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"time"
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
@@ -41,6 +42,22 @@ func (s *Service) linkedAccounts(ctx context.Context, q *store.Queries, m store.
 	for _, l := range linked {
 		linkedMeasure[l.AccountID] = l.ID
 	}
+	pendingRows, err := q.SharedBankAccountPendingAccounts(ctx, store.SharedBankAccountPendingAccountsParams{At: s.now(), MeasureID: m.ID})
+	if err != nil {
+		return nil, err
+	}
+	pending := make(map[int64]bool, len(pendingRows))
+	for _, id := range pendingRows {
+		pending[id] = true
+	}
+	reviewRows, err := q.MeasureLinkedReviews(ctx, m.ID)
+	if err != nil {
+		return nil, err
+	}
+	reviewedAt := make(map[int64]time.Time, len(reviewRows))
+	for _, r := range reviewRows {
+		reviewedAt[r.AccountID] = r.ReviewedAt
+	}
 	slices.Sort(accounts)
 	out := make([]model.LinkedAccount, 0, len(accounts))
 	for _, accountID := range accounts {
@@ -52,6 +69,10 @@ func (s *Service) linkedAccounts(ctx context.Context, q *store.Queries, m store.
 			return nil, err
 		}
 		entry := model.LinkedAccount{AccountID: accountID, StoreID: target.StoreID, StoreCode: target.StoreCode, Matched: firstMatched(matched[accountID])}
+		entry.SharedBankAccountPending = pending[accountID]
+		if at, ok := reviewedAt[accountID]; ok {
+			entry.ReviewedAt = &at
+		}
 		id, alreadyLinked := linkedMeasure[accountID]
 		if alreadyLinked {
 			entry.LinkedMeasureID = &id

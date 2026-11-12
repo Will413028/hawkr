@@ -240,6 +240,11 @@ message LinkedAccount {
   bool can_create_linked_termination = 6;
   // can_create_linked_termination 為 true 時，建立這筆關聯終止的生效時機與給員工的說明句；false 時不設。
   TerminationOption termination_option = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 這一對（本措施、這個帳號）此刻在後台待辦（SHARED_BANK_ACCOUNT）：措施建立之後，這個帳號才同步了相同的銀行帳號 fingerprint，而且還沒有人標為已檢視。
+  // 由伺服器推導（待辦的成員定義 seller.review_shared_bank_account）；true 時 client 顯示「標為已檢視」。
+  bool shared_bank_account_pending = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 管理員標為已檢視的時間；還沒有時不設。
+  google.protobuf.Timestamp reviewed_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // TerminationOption 是可以對某個事由建立的終止合作，帶建立之後措施何時生效，以及給員工的那一句說明。生效時間由伺服器依自己的預告期規則算，與 CreateMeasure 排定的

@@ -545,6 +545,8 @@ type (
 	TerminationEffect = model.TerminationEffect
 	// LinkedAccount 是措施詳情上相同身分的其他帳號。
 	LinkedAccount = model.LinkedAccount
+	// MarkLinkedAccountReviewedInput 是把關聯帳號標為已檢視的輸入。
+	MarkLinkedAccountReviewedInput = model.MarkLinkedAccountReviewedInput
 	// UpdateMeasureInput 是措施賣家可見內容的部分更新。
 	UpdateMeasureInput = model.UpdateMeasureInput
 	// EndMeasureInput 是結束 RISK 措施的輸入。
@@ -728,6 +730,11 @@ func (m *Module) RevokeMeasure(ctx context.Context, in RevokeMeasureInput) (Meas
 // ScheduleMeasureReview 重排 RISK 措施的複審期限並寫一則內部註記。
 func (m *Module) ScheduleMeasureReview(ctx context.Context, in ScheduleReviewInput) (Measure, error) {
 	return m.measure.ScheduleReview(ctx, in)
+}
+
+// MarkLinkedAccountReviewed 把措施的一個銀行帳號 fingerprint 命中的關聯帳號標為已檢視（處置待辦 SHARED_BANK_ACCOUNT）；冪等，措施或命中不存在回 NotFound。
+func (m *Module) MarkLinkedAccountReviewed(ctx context.Context, in MarkLinkedAccountReviewedInput) error {
+	return m.measure.MarkLinkedAccountReviewed(ctx, in)
 }
 
 // SubmitAppeal 帳號對自己的措施提出申覆；資格是帳號擁有這筆措施，不要求賣家角色、店家或任何能力（所有店家都已關閉的帳號

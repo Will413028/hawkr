@@ -43,6 +43,8 @@ enum ReviewQueueItemKind {
   REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION = 11;
   // 建立重試用完的收款帳戶，等管理員重試建立（subject 是 payment_account）。
   REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED = 13;
+  // 處分建立之後，又有別的帳號同步了與被處分帳號相同的銀行帳號 fingerprint，等管理員在處分頁檢視這個關聯帳號（subject 是 shared_bank_account）。
+  REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT = 14;
 
   reserved 4, 10, 12;
   reserved "REVIEW_QUEUE_ITEM_KIND_CASE_FDA_REFERRAL", "REVIEW_QUEUE_ITEM_KIND_FOOD_REGISTRATION", "REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY";
@@ -78,6 +80,7 @@ message ReviewQueueItem {
     string measure_id = 8;
     KYCApplicationRef kyc_application = 10;
     PaymentAccountRef payment_account = 11;
+    SharedBankAccountRef shared_bank_account = 12;
   }
 
   reserved 9;
@@ -115,6 +118,12 @@ message MeasureRequestRef {
 // PaymentAccountRef 指到店家的收款帳戶（一店一個）。
 message PaymentAccountRef {
   string store_id = 1;
+}
+
+// SharedBankAccountRef 指到處分頁上的一個關聯帳號（處分、命中的帳號）。
+message SharedBankAccountRef {
+  string measure_id = 1;
+  string account_id = 2;
 }
 
 // KYCApplicationRef 指到店家的一筆商家認證申請。

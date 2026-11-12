@@ -174,6 +174,10 @@ func toLinkedAccount(l model.LinkedAccount) *adminpb.LinkedAccount {
 	if l.TerminationEffect != nil {
 		out.TerminationOption = toTerminationOption(*l.TerminationEffect)
 	}
+	out.SharedBankAccountPending = l.SharedBankAccountPending
+	if l.ReviewedAt != nil {
+		out.ReviewedTime = timestamppb.New(*l.ReviewedAt)
+	}
 	return out
 }
 
@@ -708,4 +712,23 @@ func (h *Governance) ListViolations(ctx context.Context, req *connect.Request[ad
 		out.NextPageToken = rpc.TokenFor(scope, page.Next)
 	}
 	return connect.NewResponse(out), nil
+}
+
+func (h *Governance) MarkLinkedAccountReviewed(ctx context.Context, req *connect.Request[adminpb.MarkLinkedAccountReviewedRequest]) (*connect.Response[adminpb.MarkLinkedAccountReviewedResponse], error) {
+	adminID, err := adminFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	measureID, err := rpc.ParseUUID("measure_id", req.Msg.GetMeasureId())
+	if err != nil {
+		return nil, err
+	}
+	accountID, err := rpc.ParseID("account_id", req.Msg.GetAccountId())
+	if err != nil {
+		return nil, err
+	}
+	if err := h.m.MarkLinkedAccountReviewed(ctx, model.MarkLinkedAccountReviewedInput{MeasureID: measureID, AccountID: accountID, AdminID: adminID}); err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.MarkLinkedAccountReviewedResponse{}), nil
 }

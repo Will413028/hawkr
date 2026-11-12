@@ -78,6 +78,7 @@ var clearChildrenSQL = []string{
 	`DELETE FROM seller.evidence_accesses WHERE report_id IN (SELECT id FROM seller.reports WHERE store_id = ANY($1)) OR request_id IN (SELECT id FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))) OR inquiry_id IN (SELECT id FROM seller.case_inquiries WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.measure_request_evidence WHERE request_id IN (SELECT id FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1)))`,
 	`DELETE FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))`,
+	`DELETE FROM seller.measure_linked_reviews WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.measure_identities WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.governance_notes WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1)) OR case_id IN (SELECT id FROM seller.cases WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.measure_findings WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))`,

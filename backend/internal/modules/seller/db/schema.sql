@@ -907,6 +907,18 @@ CREATE TABLE seller.measure_identities (
 );
 CREATE INDEX measure_identities_hash ON seller.measure_identities (hash);
 
+-- 共用銀行帳號提醒的處置（Stripe 計畫 D45、步驟 8d）：管理員對處分頁的一個關聯帳號標為已檢視，這一對（措施、帳號）就離開後台待辦
+-- （seller.review_shared_bank_account）。待辦本身是推導的、不儲存（ADR 2026-10-20-admin-review-queue），只有這個處置存下來；沒有處置，項目永遠離不開待辦。
+-- 一對最多一列（主鍵），重複標記不改原來的時間與管理員。
+CREATE TABLE seller.measure_linked_reviews (
+    measure_id           UUID NOT NULL REFERENCES seller.measures (id),
+    account_id           BIGINT NOT NULL,
+    reviewed_at          TIMESTAMPTZ NOT NULL,
+    reviewed_by_admin_id BIGINT NOT NULL,
+    PRIMARY KEY (measure_id, account_id),
+    CONSTRAINT measure_linked_reviews_admin_check CHECK (reviewed_by_admin_id > 0)
+);
+
 -- KYC 認證申請（ADR 2026-10-19-seller-kyc-payuni-consolidated）：以 store_id 為鍵，一個店家同時最多一筆還沒取消的申請
 -- （kyc_applications_open；被退回的重送沿用原列，狀態回到 DRAFT）。草稿與送出共用同一組具型別的欄位（沒有自由格式的
 -- JSON），草稿時除了身分以外都可以是 NULL，送出之後必填由 kyc_applications_complete_check 表達。status 只記人工決定

@@ -53,6 +53,7 @@ type GovernanceModule interface {
 	EndMeasure(context.Context, model.EndMeasureInput) (model.Measure, error)
 	RevokeMeasure(context.Context, model.RevokeMeasureInput) (model.Measure, error)
 	ScheduleMeasureReview(context.Context, model.ScheduleReviewInput) (model.Measure, error)
+	MarkLinkedAccountReviewed(context.Context, model.MarkLinkedAccountReviewedInput) error
 	DecideAppeal(context.Context, model.DecideAppealInput) (model.Measure, error)
 	DecideRemediation(context.Context, model.DecideRemediationInput) (model.Measure, error)
 	CreateMeasureNote(context.Context, model.CreateMeasureNoteInput) (model.GovernanceNote, error)

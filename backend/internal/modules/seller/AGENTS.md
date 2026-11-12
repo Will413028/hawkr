@@ -25,6 +25,7 @@ schema `seller`（`db/schema.sql`；view 與函式在 `db/objects.sql`），依�
 - 動作可用性各只有一處來源（`Can*`、`*UnavailableReasons`、`BlockFor`），API 的 `can_*` 共用。守門：`TestCanFlagsMatchWhetherTheActionSucceeds`。規格：§5–§8。
 - 能力只由 `model.CapabilitiesOf` 推導；停權不擋關店與刪帳。守門：`TestActingStoreFailsClosed`。規格：§10。
 - 開通閘門讀 view `store_requirement_flags` 的 `kyc_approved` 與 `transfers_active`（seller 自存的副本）兩欄，`onboarding_complete` 是兩者的 AND、給 SQL 消費者；副本由 payment 的 `PayoutAccountChanged` 經同 transaction 的訂閱者（`internal/payout`）寫入，seller 不讀 payment 的表；核准與個資清理對 payment 只呼叫 `RequestAccount`（只 INSERT）與 `ForgetOwners`（只排 job）。守門：`TestExposureRequiresTheTransfersCapabilityOfThePaymentAccount`、`TestReapprovalKeepsTheFirstContactEmailSnapshot`、`TestPurgeAsksPaymentToForgetThePurgedStoreOnly`。規格：§13.1。
+- 身分快照命中的定義只有 view `measure_identity_hits`：`LinkedAccountHits`（處分頁的關聯帳號）與待辦 `SHARED_BANK_ACCOUNT`（`review_shared_bank_account`）都讀它；待辦是推導的，只存「已檢視」的處置（`measure_linked_reviews`），fingerprint 的同步不寫待辦也不自動處分。守門：`TestSharedBankAccountIsQueuedForAFingerprintSyncedAfterTheSanction`、`TestSharedProviderBankFingerprintIsListedButNeverTerminates`。規格：§8。
 - 事件與快取失效在寫入的 transaction 內；儲存代碼 UPPER_SNAKE 加 CHECK 等於 `Values()`。守門：`TestEventFailuresRollBackTheWholeCommand`、`TestChecksMatchGo`。規格：§18、§20。
 - 單一子領域的不變量在 `internal/<子領域>/AGENTS.md`（碰該目錄時才載入）；跨子領域的才放這裡。
 

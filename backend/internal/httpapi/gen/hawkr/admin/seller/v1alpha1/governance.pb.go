@@ -4592,6 +4592,96 @@ func (x *ScheduleMeasureReviewResponse) GetMeasure() *Measure {
 	return nil
 }
 
+type MarkLinkedAccountReviewedRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 措施的 id。
+	MeasureId string `protobuf:"bytes,1,opt,name=measure_id,json=measureId,proto3" json:"measure_id,omitempty"`
+	// 關聯帳號的 id（LinkedAccount.account_id）。
+	AccountId     string `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkLinkedAccountReviewedRequest) Reset() {
+	*x = MarkLinkedAccountReviewedRequest{}
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkLinkedAccountReviewedRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkLinkedAccountReviewedRequest) ProtoMessage() {}
+
+func (x *MarkLinkedAccountReviewedRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkLinkedAccountReviewedRequest.ProtoReflect.Descriptor instead.
+func (*MarkLinkedAccountReviewedRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *MarkLinkedAccountReviewedRequest) GetMeasureId() string {
+	if x != nil {
+		return x.MeasureId
+	}
+	return ""
+}
+
+func (x *MarkLinkedAccountReviewedRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type MarkLinkedAccountReviewedResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkLinkedAccountReviewedResponse) Reset() {
+	*x = MarkLinkedAccountReviewedResponse{}
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkLinkedAccountReviewedResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkLinkedAccountReviewedResponse) ProtoMessage() {}
+
+func (x *MarkLinkedAccountReviewedResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkLinkedAccountReviewedResponse.ProtoReflect.Descriptor instead.
+func (*MarkLinkedAccountReviewedResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{61}
+}
+
 type DecideAppealRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 措施的 id。
@@ -4610,7 +4700,7 @@ type DecideAppealRequest struct {
 
 func (x *DecideAppealRequest) Reset() {
 	*x = DecideAppealRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[60]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4622,7 +4712,7 @@ func (x *DecideAppealRequest) String() string {
 func (*DecideAppealRequest) ProtoMessage() {}
 
 func (x *DecideAppealRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[60]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4635,7 +4725,7 @@ func (x *DecideAppealRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecideAppealRequest.ProtoReflect.Descriptor instead.
 func (*DecideAppealRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{60}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *DecideAppealRequest) GetMeasureId() string {
@@ -4682,7 +4772,7 @@ type DecideAppealResponse struct {
 
 func (x *DecideAppealResponse) Reset() {
 	*x = DecideAppealResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[61]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4694,7 +4784,7 @@ func (x *DecideAppealResponse) String() string {
 func (*DecideAppealResponse) ProtoMessage() {}
 
 func (x *DecideAppealResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[61]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4707,7 +4797,7 @@ func (x *DecideAppealResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecideAppealResponse.ProtoReflect.Descriptor instead.
 func (*DecideAppealResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{61}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *DecideAppealResponse) GetMeasure() *Measure {
@@ -4733,7 +4823,7 @@ type DecideRemediationRequest struct {
 
 func (x *DecideRemediationRequest) Reset() {
 	*x = DecideRemediationRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[62]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4745,7 +4835,7 @@ func (x *DecideRemediationRequest) String() string {
 func (*DecideRemediationRequest) ProtoMessage() {}
 
 func (x *DecideRemediationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[62]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4758,7 +4848,7 @@ func (x *DecideRemediationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecideRemediationRequest.ProtoReflect.Descriptor instead.
 func (*DecideRemediationRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{62}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *DecideRemediationRequest) GetMeasureId() string {
@@ -4798,7 +4888,7 @@ type DecideRemediationResponse struct {
 
 func (x *DecideRemediationResponse) Reset() {
 	*x = DecideRemediationResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[63]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4810,7 +4900,7 @@ func (x *DecideRemediationResponse) String() string {
 func (*DecideRemediationResponse) ProtoMessage() {}
 
 func (x *DecideRemediationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[63]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4823,7 +4913,7 @@ func (x *DecideRemediationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecideRemediationResponse.ProtoReflect.Descriptor instead.
 func (*DecideRemediationResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{63}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *DecideRemediationResponse) GetMeasure() *Measure {
@@ -4849,7 +4939,7 @@ type GovernanceNote struct {
 
 func (x *GovernanceNote) Reset() {
 	*x = GovernanceNote{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[64]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4861,7 +4951,7 @@ func (x *GovernanceNote) String() string {
 func (*GovernanceNote) ProtoMessage() {}
 
 func (x *GovernanceNote) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[64]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4874,7 +4964,7 @@ func (x *GovernanceNote) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GovernanceNote.ProtoReflect.Descriptor instead.
 func (*GovernanceNote) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{64}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *GovernanceNote) GetId() string {
@@ -4923,7 +5013,7 @@ type SeverityChange struct {
 
 func (x *SeverityChange) Reset() {
 	*x = SeverityChange{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[65]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4935,7 +5025,7 @@ func (x *SeverityChange) String() string {
 func (*SeverityChange) ProtoMessage() {}
 
 func (x *SeverityChange) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[65]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4948,7 +5038,7 @@ func (x *SeverityChange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SeverityChange.ProtoReflect.Descriptor instead.
 func (*SeverityChange) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{65}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *SeverityChange) GetFromSeverity() v1alpha11.ViolationSeverity {
@@ -4977,7 +5067,7 @@ type CreateMeasureNoteRequest struct {
 
 func (x *CreateMeasureNoteRequest) Reset() {
 	*x = CreateMeasureNoteRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[66]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4989,7 +5079,7 @@ func (x *CreateMeasureNoteRequest) String() string {
 func (*CreateMeasureNoteRequest) ProtoMessage() {}
 
 func (x *CreateMeasureNoteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[66]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5002,7 +5092,7 @@ func (x *CreateMeasureNoteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateMeasureNoteRequest.ProtoReflect.Descriptor instead.
 func (*CreateMeasureNoteRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{66}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *CreateMeasureNoteRequest) GetMeasureId() string {
@@ -5028,7 +5118,7 @@ type CreateMeasureNoteResponse struct {
 
 func (x *CreateMeasureNoteResponse) Reset() {
 	*x = CreateMeasureNoteResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[67]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5040,7 +5130,7 @@ func (x *CreateMeasureNoteResponse) String() string {
 func (*CreateMeasureNoteResponse) ProtoMessage() {}
 
 func (x *CreateMeasureNoteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[67]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5053,7 +5143,7 @@ func (x *CreateMeasureNoteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateMeasureNoteResponse.ProtoReflect.Descriptor instead.
 func (*CreateMeasureNoteResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{67}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *CreateMeasureNoteResponse) GetNote() *GovernanceNote {
@@ -5076,7 +5166,7 @@ type ListMeasureNotesRequest struct {
 
 func (x *ListMeasureNotesRequest) Reset() {
 	*x = ListMeasureNotesRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[68]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5088,7 +5178,7 @@ func (x *ListMeasureNotesRequest) String() string {
 func (*ListMeasureNotesRequest) ProtoMessage() {}
 
 func (x *ListMeasureNotesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[68]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5101,7 +5191,7 @@ func (x *ListMeasureNotesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMeasureNotesRequest.ProtoReflect.Descriptor instead.
 func (*ListMeasureNotesRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{68}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *ListMeasureNotesRequest) GetMeasureId() string {
@@ -5136,7 +5226,7 @@ type ListMeasureNotesResponse struct {
 
 func (x *ListMeasureNotesResponse) Reset() {
 	*x = ListMeasureNotesResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[69]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5148,7 +5238,7 @@ func (x *ListMeasureNotesResponse) String() string {
 func (*ListMeasureNotesResponse) ProtoMessage() {}
 
 func (x *ListMeasureNotesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[69]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5161,7 +5251,7 @@ func (x *ListMeasureNotesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMeasureNotesResponse.ProtoReflect.Descriptor instead.
 func (*ListMeasureNotesResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{69}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *ListMeasureNotesResponse) GetNotes() []*GovernanceNote {
@@ -5190,7 +5280,7 @@ type CreateCaseNoteRequest struct {
 
 func (x *CreateCaseNoteRequest) Reset() {
 	*x = CreateCaseNoteRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[70]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5202,7 +5292,7 @@ func (x *CreateCaseNoteRequest) String() string {
 func (*CreateCaseNoteRequest) ProtoMessage() {}
 
 func (x *CreateCaseNoteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[70]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5215,7 +5305,7 @@ func (x *CreateCaseNoteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateCaseNoteRequest.ProtoReflect.Descriptor instead.
 func (*CreateCaseNoteRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{70}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *CreateCaseNoteRequest) GetCaseId() string {
@@ -5241,7 +5331,7 @@ type CreateCaseNoteResponse struct {
 
 func (x *CreateCaseNoteResponse) Reset() {
 	*x = CreateCaseNoteResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[71]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5253,7 +5343,7 @@ func (x *CreateCaseNoteResponse) String() string {
 func (*CreateCaseNoteResponse) ProtoMessage() {}
 
 func (x *CreateCaseNoteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[71]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5266,7 +5356,7 @@ func (x *CreateCaseNoteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateCaseNoteResponse.ProtoReflect.Descriptor instead.
 func (*CreateCaseNoteResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{71}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *CreateCaseNoteResponse) GetNote() *GovernanceNote {
@@ -5289,7 +5379,7 @@ type ListCaseNotesRequest struct {
 
 func (x *ListCaseNotesRequest) Reset() {
 	*x = ListCaseNotesRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[72]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5301,7 +5391,7 @@ func (x *ListCaseNotesRequest) String() string {
 func (*ListCaseNotesRequest) ProtoMessage() {}
 
 func (x *ListCaseNotesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[72]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5314,7 +5404,7 @@ func (x *ListCaseNotesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCaseNotesRequest.ProtoReflect.Descriptor instead.
 func (*ListCaseNotesRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{72}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *ListCaseNotesRequest) GetCaseId() string {
@@ -5349,7 +5439,7 @@ type ListCaseNotesResponse struct {
 
 func (x *ListCaseNotesResponse) Reset() {
 	*x = ListCaseNotesResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[73]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5361,7 +5451,7 @@ func (x *ListCaseNotesResponse) String() string {
 func (*ListCaseNotesResponse) ProtoMessage() {}
 
 func (x *ListCaseNotesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[73]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5374,7 +5464,7 @@ func (x *ListCaseNotesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCaseNotesResponse.ProtoReflect.Descriptor instead.
 func (*ListCaseNotesResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{73}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *ListCaseNotesResponse) GetNotes() []*GovernanceNote {
@@ -5400,7 +5490,7 @@ type GetViolationRequest struct {
 
 func (x *GetViolationRequest) Reset() {
 	*x = GetViolationRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[74]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5412,7 +5502,7 @@ func (x *GetViolationRequest) String() string {
 func (*GetViolationRequest) ProtoMessage() {}
 
 func (x *GetViolationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[74]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5425,7 +5515,7 @@ func (x *GetViolationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetViolationRequest.ProtoReflect.Descriptor instead.
 func (*GetViolationRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{74}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *GetViolationRequest) GetId() string {
@@ -5444,7 +5534,7 @@ type GetViolationResponse struct {
 
 func (x *GetViolationResponse) Reset() {
 	*x = GetViolationResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[75]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5456,7 +5546,7 @@ func (x *GetViolationResponse) String() string {
 func (*GetViolationResponse) ProtoMessage() {}
 
 func (x *GetViolationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[75]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5469,7 +5559,7 @@ func (x *GetViolationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetViolationResponse.ProtoReflect.Descriptor instead.
 func (*GetViolationResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{75}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *GetViolationResponse) GetViolation() *Violation {
@@ -5496,7 +5586,7 @@ type ListViolationsRequest struct {
 
 func (x *ListViolationsRequest) Reset() {
 	*x = ListViolationsRequest{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[76]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5508,7 +5598,7 @@ func (x *ListViolationsRequest) String() string {
 func (*ListViolationsRequest) ProtoMessage() {}
 
 func (x *ListViolationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[76]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5521,7 +5611,7 @@ func (x *ListViolationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListViolationsRequest.ProtoReflect.Descriptor instead.
 func (*ListViolationsRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{76}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *ListViolationsRequest) GetPageSize() int32 {
@@ -5569,7 +5659,7 @@ type ListViolationsResponse struct {
 
 func (x *ListViolationsResponse) Reset() {
 	*x = ListViolationsResponse{}
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[77]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5581,7 +5671,7 @@ func (x *ListViolationsResponse) String() string {
 func (*ListViolationsResponse) ProtoMessage() {}
 
 func (x *ListViolationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[77]
+	mi := &file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5594,7 +5684,7 @@ func (x *ListViolationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListViolationsResponse.ProtoReflect.Descriptor instead.
 func (*ListViolationsResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{77}
+	return file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *ListViolationsResponse) GetViolations() []*Violation {
@@ -5938,7 +6028,13 @@ const file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc = "" +
 	"\x04note\x18\x03 \x01(\tB\x03\xe0A\x02R\x04note\x12\x17\n" +
 	"\x04etag\x18\x04 \x01(\tB\x03\xe0A\x02R\x04etag\"_\n" +
 	"\x1dScheduleMeasureReviewResponse\x12>\n" +
-	"\ameasure\x18\x01 \x01(\v2$.hawkr.admin.seller.v1alpha1.MeasureR\ameasure\"\xe5\x01\n" +
+	"\ameasure\x18\x01 \x01(\v2$.hawkr.admin.seller.v1alpha1.MeasureR\ameasure\"j\n" +
+	" MarkLinkedAccountReviewedRequest\x12\"\n" +
+	"\n" +
+	"measure_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tmeasureId\x12\"\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tB\x03\xe0A\x02R\taccountId\"#\n" +
+	"!MarkLinkedAccountReviewedResponse\"\xe5\x01\n" +
 	"\x13DecideAppealRequest\x12\"\n" +
 	"\n" +
 	"measure_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tmeasureId\x12K\n" +
@@ -6038,7 +6134,7 @@ const file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc = "" +
 	"\x1fADMIN_REVOKE_REASON_UNSPECIFIED\x10\x00\x12(\n" +
 	"$ADMIN_REVOKE_REASON_ADMIN_CORRECTION\x10\x01\x12)\n" +
 	"%ADMIN_REVOKE_REASON_EXTERNAL_DECISION\x10\x02\x12\x1d\n" +
-	"\x19ADMIN_REVOKE_REASON_OTHER\x10\x032\xda$\n" +
+	"\x19ADMIN_REVOKE_REASON_OTHER\x10\x032\xfc%\n" +
 	"\x1cSellerGovernanceAdminService\x12u\n" +
 	"\vListReports\x12/.hawkr.admin.seller.v1alpha1.ListReportsRequest\x1a0.hawkr.admin.seller.v1alpha1.ListReportsResponse\"\x03\x90\x02\x01\x12o\n" +
 	"\tGetReport\x12-.hawkr.admin.seller.v1alpha1.GetReportRequest\x1a..hawkr.admin.seller.v1alpha1.GetReportResponse\"\x03\x90\x02\x01\x12\x9f\x01\n" +
@@ -6071,7 +6167,8 @@ const file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc = "" +
 	"\n" +
 	"EndMeasure\x12..hawkr.admin.seller.v1alpha1.EndMeasureRequest\x1a/.hawkr.admin.seller.v1alpha1.EndMeasureResponse\x12v\n" +
 	"\rRevokeMeasure\x121.hawkr.admin.seller.v1alpha1.RevokeMeasureRequest\x1a2.hawkr.admin.seller.v1alpha1.RevokeMeasureResponse\x12\x8e\x01\n" +
-	"\x15ScheduleMeasureReview\x129.hawkr.admin.seller.v1alpha1.ScheduleMeasureReviewRequest\x1a:.hawkr.admin.seller.v1alpha1.ScheduleMeasureReviewResponse\x12s\n" +
+	"\x15ScheduleMeasureReview\x129.hawkr.admin.seller.v1alpha1.ScheduleMeasureReviewRequest\x1a:.hawkr.admin.seller.v1alpha1.ScheduleMeasureReviewResponse\x12\x9f\x01\n" +
+	"\x19MarkLinkedAccountReviewed\x12=.hawkr.admin.seller.v1alpha1.MarkLinkedAccountReviewedRequest\x1a>.hawkr.admin.seller.v1alpha1.MarkLinkedAccountReviewedResponse\"\x03\x90\x02\x02\x12s\n" +
 	"\fDecideAppeal\x120.hawkr.admin.seller.v1alpha1.DecideAppealRequest\x1a1.hawkr.admin.seller.v1alpha1.DecideAppealResponse\x12\x82\x01\n" +
 	"\x11DecideRemediation\x125.hawkr.admin.seller.v1alpha1.DecideRemediationRequest\x1a6.hawkr.admin.seller.v1alpha1.DecideRemediationResponse\x12\x82\x01\n" +
 	"\x11CreateMeasureNote\x125.hawkr.admin.seller.v1alpha1.CreateMeasureNoteRequest\x1a6.hawkr.admin.seller.v1alpha1.CreateMeasureNoteResponse\x12\x84\x01\n" +
@@ -6095,7 +6192,7 @@ func file_hawkr_admin_seller_v1alpha1_governance_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_admin_seller_v1alpha1_governance_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes = make([]protoimpl.MessageInfo, 78)
+var file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes = make([]protoimpl.MessageInfo, 80)
 var file_hawkr_admin_seller_v1alpha1_governance_proto_goTypes = []any{
 	(ReportState)(0),                            // 0: hawkr.admin.seller.v1alpha1.ReportState
 	(CaseState)(0),                              // 1: hawkr.admin.seller.v1alpha1.CaseState
@@ -6163,130 +6260,132 @@ var file_hawkr_admin_seller_v1alpha1_governance_proto_goTypes = []any{
 	(*RevokeMeasureResponse)(nil),               // 63: hawkr.admin.seller.v1alpha1.RevokeMeasureResponse
 	(*ScheduleMeasureReviewRequest)(nil),        // 64: hawkr.admin.seller.v1alpha1.ScheduleMeasureReviewRequest
 	(*ScheduleMeasureReviewResponse)(nil),       // 65: hawkr.admin.seller.v1alpha1.ScheduleMeasureReviewResponse
-	(*DecideAppealRequest)(nil),                 // 66: hawkr.admin.seller.v1alpha1.DecideAppealRequest
-	(*DecideAppealResponse)(nil),                // 67: hawkr.admin.seller.v1alpha1.DecideAppealResponse
-	(*DecideRemediationRequest)(nil),            // 68: hawkr.admin.seller.v1alpha1.DecideRemediationRequest
-	(*DecideRemediationResponse)(nil),           // 69: hawkr.admin.seller.v1alpha1.DecideRemediationResponse
-	(*GovernanceNote)(nil),                      // 70: hawkr.admin.seller.v1alpha1.GovernanceNote
-	(*SeverityChange)(nil),                      // 71: hawkr.admin.seller.v1alpha1.SeverityChange
-	(*CreateMeasureNoteRequest)(nil),            // 72: hawkr.admin.seller.v1alpha1.CreateMeasureNoteRequest
-	(*CreateMeasureNoteResponse)(nil),           // 73: hawkr.admin.seller.v1alpha1.CreateMeasureNoteResponse
-	(*ListMeasureNotesRequest)(nil),             // 74: hawkr.admin.seller.v1alpha1.ListMeasureNotesRequest
-	(*ListMeasureNotesResponse)(nil),            // 75: hawkr.admin.seller.v1alpha1.ListMeasureNotesResponse
-	(*CreateCaseNoteRequest)(nil),               // 76: hawkr.admin.seller.v1alpha1.CreateCaseNoteRequest
-	(*CreateCaseNoteResponse)(nil),              // 77: hawkr.admin.seller.v1alpha1.CreateCaseNoteResponse
-	(*ListCaseNotesRequest)(nil),                // 78: hawkr.admin.seller.v1alpha1.ListCaseNotesRequest
-	(*ListCaseNotesResponse)(nil),               // 79: hawkr.admin.seller.v1alpha1.ListCaseNotesResponse
-	(*GetViolationRequest)(nil),                 // 80: hawkr.admin.seller.v1alpha1.GetViolationRequest
-	(*GetViolationResponse)(nil),                // 81: hawkr.admin.seller.v1alpha1.GetViolationResponse
-	(*ListViolationsRequest)(nil),               // 82: hawkr.admin.seller.v1alpha1.ListViolationsRequest
-	(*ListViolationsResponse)(nil),              // 83: hawkr.admin.seller.v1alpha1.ListViolationsResponse
-	(v1alpha1.PolicyCategory)(0),                // 84: hawkr.common.v1alpha1.PolicyCategory
-	(*timestamppb.Timestamp)(nil),               // 85: google.protobuf.Timestamp
-	(v1alpha11.ReportOutcome)(0),                // 86: hawkr.seller.v1alpha1.ReportOutcome
-	(*Evidence)(nil),                            // 87: hawkr.admin.seller.v1alpha1.Evidence
-	(*v1alpha1.Deadline)(nil),                   // 88: hawkr.common.v1alpha1.Deadline
-	(v1alpha11.ViolationSeverity)(0),            // 89: hawkr.seller.v1alpha1.ViolationSeverity
-	(CaseInquiryKind)(0),                        // 90: hawkr.admin.seller.v1alpha1.CaseInquiryKind
-	(*CaseInquiry)(nil),                         // 91: hawkr.admin.seller.v1alpha1.CaseInquiry
-	(CaseInquiryReplyChannel)(0),                // 92: hawkr.admin.seller.v1alpha1.CaseInquiryReplyChannel
-	(*v1alpha11.ContentRef)(nil),                // 93: hawkr.seller.v1alpha1.ContentRef
-	(v1alpha11.TerminationGround)(0),            // 94: hawkr.seller.v1alpha1.TerminationGround
-	(v1alpha11.RiskGround)(0),                   // 95: hawkr.seller.v1alpha1.RiskGround
-	(*Measure)(nil),                             // 96: hawkr.admin.seller.v1alpha1.Measure
-	(v1alpha11.MeasureState)(0),                 // 97: hawkr.seller.v1alpha1.MeasureState
-	(v1alpha11.MeasureBasis)(0),                 // 98: hawkr.seller.v1alpha1.MeasureBasis
-	(v1alpha11.MeasureRequestState)(0),          // 99: hawkr.seller.v1alpha1.MeasureRequestState
-	(v1alpha11.MeasureRequestKind)(0),           // 100: hawkr.seller.v1alpha1.MeasureRequestKind
-	(*fieldmaskpb.FieldMask)(nil),               // 101: google.protobuf.FieldMask
-	(*Violation)(nil),                           // 102: hawkr.admin.seller.v1alpha1.Violation
-	(v1alpha11.ViolationStatus)(0),              // 103: hawkr.seller.v1alpha1.ViolationStatus
-	(*CreateAuthorityOrderRequest)(nil),         // 104: hawkr.admin.seller.v1alpha1.CreateAuthorityOrderRequest
-	(*ListAuthorityOrdersRequest)(nil),          // 105: hawkr.admin.seller.v1alpha1.ListAuthorityOrdersRequest
-	(*GetAuthorityOrderRequest)(nil),            // 106: hawkr.admin.seller.v1alpha1.GetAuthorityOrderRequest
-	(*CompleteAuthorityOrderRequest)(nil),       // 107: hawkr.admin.seller.v1alpha1.CompleteAuthorityOrderRequest
-	(*ExtendAuthorityOrderHoldRequest)(nil),     // 108: hawkr.admin.seller.v1alpha1.ExtendAuthorityOrderHoldRequest
-	(*RecordAuthorityTargetNoticeRequest)(nil),  // 109: hawkr.admin.seller.v1alpha1.RecordAuthorityTargetNoticeRequest
-	(*RevokeAuthorityOrderRequest)(nil),         // 110: hawkr.admin.seller.v1alpha1.RevokeAuthorityOrderRequest
-	(*CreateAuthorityOrderResponse)(nil),        // 111: hawkr.admin.seller.v1alpha1.CreateAuthorityOrderResponse
-	(*ListAuthorityOrdersResponse)(nil),         // 112: hawkr.admin.seller.v1alpha1.ListAuthorityOrdersResponse
-	(*GetAuthorityOrderResponse)(nil),           // 113: hawkr.admin.seller.v1alpha1.GetAuthorityOrderResponse
-	(*CompleteAuthorityOrderResponse)(nil),      // 114: hawkr.admin.seller.v1alpha1.CompleteAuthorityOrderResponse
-	(*ExtendAuthorityOrderHoldResponse)(nil),    // 115: hawkr.admin.seller.v1alpha1.ExtendAuthorityOrderHoldResponse
-	(*RecordAuthorityTargetNoticeResponse)(nil), // 116: hawkr.admin.seller.v1alpha1.RecordAuthorityTargetNoticeResponse
-	(*RevokeAuthorityOrderResponse)(nil),        // 117: hawkr.admin.seller.v1alpha1.RevokeAuthorityOrderResponse
+	(*MarkLinkedAccountReviewedRequest)(nil),    // 66: hawkr.admin.seller.v1alpha1.MarkLinkedAccountReviewedRequest
+	(*MarkLinkedAccountReviewedResponse)(nil),   // 67: hawkr.admin.seller.v1alpha1.MarkLinkedAccountReviewedResponse
+	(*DecideAppealRequest)(nil),                 // 68: hawkr.admin.seller.v1alpha1.DecideAppealRequest
+	(*DecideAppealResponse)(nil),                // 69: hawkr.admin.seller.v1alpha1.DecideAppealResponse
+	(*DecideRemediationRequest)(nil),            // 70: hawkr.admin.seller.v1alpha1.DecideRemediationRequest
+	(*DecideRemediationResponse)(nil),           // 71: hawkr.admin.seller.v1alpha1.DecideRemediationResponse
+	(*GovernanceNote)(nil),                      // 72: hawkr.admin.seller.v1alpha1.GovernanceNote
+	(*SeverityChange)(nil),                      // 73: hawkr.admin.seller.v1alpha1.SeverityChange
+	(*CreateMeasureNoteRequest)(nil),            // 74: hawkr.admin.seller.v1alpha1.CreateMeasureNoteRequest
+	(*CreateMeasureNoteResponse)(nil),           // 75: hawkr.admin.seller.v1alpha1.CreateMeasureNoteResponse
+	(*ListMeasureNotesRequest)(nil),             // 76: hawkr.admin.seller.v1alpha1.ListMeasureNotesRequest
+	(*ListMeasureNotesResponse)(nil),            // 77: hawkr.admin.seller.v1alpha1.ListMeasureNotesResponse
+	(*CreateCaseNoteRequest)(nil),               // 78: hawkr.admin.seller.v1alpha1.CreateCaseNoteRequest
+	(*CreateCaseNoteResponse)(nil),              // 79: hawkr.admin.seller.v1alpha1.CreateCaseNoteResponse
+	(*ListCaseNotesRequest)(nil),                // 80: hawkr.admin.seller.v1alpha1.ListCaseNotesRequest
+	(*ListCaseNotesResponse)(nil),               // 81: hawkr.admin.seller.v1alpha1.ListCaseNotesResponse
+	(*GetViolationRequest)(nil),                 // 82: hawkr.admin.seller.v1alpha1.GetViolationRequest
+	(*GetViolationResponse)(nil),                // 83: hawkr.admin.seller.v1alpha1.GetViolationResponse
+	(*ListViolationsRequest)(nil),               // 84: hawkr.admin.seller.v1alpha1.ListViolationsRequest
+	(*ListViolationsResponse)(nil),              // 85: hawkr.admin.seller.v1alpha1.ListViolationsResponse
+	(v1alpha1.PolicyCategory)(0),                // 86: hawkr.common.v1alpha1.PolicyCategory
+	(*timestamppb.Timestamp)(nil),               // 87: google.protobuf.Timestamp
+	(v1alpha11.ReportOutcome)(0),                // 88: hawkr.seller.v1alpha1.ReportOutcome
+	(*Evidence)(nil),                            // 89: hawkr.admin.seller.v1alpha1.Evidence
+	(*v1alpha1.Deadline)(nil),                   // 90: hawkr.common.v1alpha1.Deadline
+	(v1alpha11.ViolationSeverity)(0),            // 91: hawkr.seller.v1alpha1.ViolationSeverity
+	(CaseInquiryKind)(0),                        // 92: hawkr.admin.seller.v1alpha1.CaseInquiryKind
+	(*CaseInquiry)(nil),                         // 93: hawkr.admin.seller.v1alpha1.CaseInquiry
+	(CaseInquiryReplyChannel)(0),                // 94: hawkr.admin.seller.v1alpha1.CaseInquiryReplyChannel
+	(*v1alpha11.ContentRef)(nil),                // 95: hawkr.seller.v1alpha1.ContentRef
+	(v1alpha11.TerminationGround)(0),            // 96: hawkr.seller.v1alpha1.TerminationGround
+	(v1alpha11.RiskGround)(0),                   // 97: hawkr.seller.v1alpha1.RiskGround
+	(*Measure)(nil),                             // 98: hawkr.admin.seller.v1alpha1.Measure
+	(v1alpha11.MeasureState)(0),                 // 99: hawkr.seller.v1alpha1.MeasureState
+	(v1alpha11.MeasureBasis)(0),                 // 100: hawkr.seller.v1alpha1.MeasureBasis
+	(v1alpha11.MeasureRequestState)(0),          // 101: hawkr.seller.v1alpha1.MeasureRequestState
+	(v1alpha11.MeasureRequestKind)(0),           // 102: hawkr.seller.v1alpha1.MeasureRequestKind
+	(*fieldmaskpb.FieldMask)(nil),               // 103: google.protobuf.FieldMask
+	(*Violation)(nil),                           // 104: hawkr.admin.seller.v1alpha1.Violation
+	(v1alpha11.ViolationStatus)(0),              // 105: hawkr.seller.v1alpha1.ViolationStatus
+	(*CreateAuthorityOrderRequest)(nil),         // 106: hawkr.admin.seller.v1alpha1.CreateAuthorityOrderRequest
+	(*ListAuthorityOrdersRequest)(nil),          // 107: hawkr.admin.seller.v1alpha1.ListAuthorityOrdersRequest
+	(*GetAuthorityOrderRequest)(nil),            // 108: hawkr.admin.seller.v1alpha1.GetAuthorityOrderRequest
+	(*CompleteAuthorityOrderRequest)(nil),       // 109: hawkr.admin.seller.v1alpha1.CompleteAuthorityOrderRequest
+	(*ExtendAuthorityOrderHoldRequest)(nil),     // 110: hawkr.admin.seller.v1alpha1.ExtendAuthorityOrderHoldRequest
+	(*RecordAuthorityTargetNoticeRequest)(nil),  // 111: hawkr.admin.seller.v1alpha1.RecordAuthorityTargetNoticeRequest
+	(*RevokeAuthorityOrderRequest)(nil),         // 112: hawkr.admin.seller.v1alpha1.RevokeAuthorityOrderRequest
+	(*CreateAuthorityOrderResponse)(nil),        // 113: hawkr.admin.seller.v1alpha1.CreateAuthorityOrderResponse
+	(*ListAuthorityOrdersResponse)(nil),         // 114: hawkr.admin.seller.v1alpha1.ListAuthorityOrdersResponse
+	(*GetAuthorityOrderResponse)(nil),           // 115: hawkr.admin.seller.v1alpha1.GetAuthorityOrderResponse
+	(*CompleteAuthorityOrderResponse)(nil),      // 116: hawkr.admin.seller.v1alpha1.CompleteAuthorityOrderResponse
+	(*ExtendAuthorityOrderHoldResponse)(nil),    // 117: hawkr.admin.seller.v1alpha1.ExtendAuthorityOrderHoldResponse
+	(*RecordAuthorityTargetNoticeResponse)(nil), // 118: hawkr.admin.seller.v1alpha1.RecordAuthorityTargetNoticeResponse
+	(*RevokeAuthorityOrderResponse)(nil),        // 119: hawkr.admin.seller.v1alpha1.RevokeAuthorityOrderResponse
 }
 var file_hawkr_admin_seller_v1alpha1_governance_proto_depIdxs = []int32{
-	84,  // 0: hawkr.admin.seller.v1alpha1.Report.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	86,  // 0: hawkr.admin.seller.v1alpha1.Report.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
 	6,   // 1: hawkr.admin.seller.v1alpha1.Report.contact:type_name -> hawkr.admin.seller.v1alpha1.ReporterContact
-	85,  // 2: hawkr.admin.seller.v1alpha1.Report.contact_erase_time:type_name -> google.protobuf.Timestamp
+	87,  // 2: hawkr.admin.seller.v1alpha1.Report.contact_erase_time:type_name -> google.protobuf.Timestamp
 	0,   // 3: hawkr.admin.seller.v1alpha1.Report.state:type_name -> hawkr.admin.seller.v1alpha1.ReportState
-	84,  // 4: hawkr.admin.seller.v1alpha1.Report.assessed_category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	85,  // 5: hawkr.admin.seller.v1alpha1.Report.triage_time:type_name -> google.protobuf.Timestamp
-	86,  // 6: hawkr.admin.seller.v1alpha1.Report.outcome:type_name -> hawkr.seller.v1alpha1.ReportOutcome
-	85,  // 7: hawkr.admin.seller.v1alpha1.Report.resolve_time:type_name -> google.protobuf.Timestamp
-	87,  // 8: hawkr.admin.seller.v1alpha1.Report.evidence:type_name -> hawkr.admin.seller.v1alpha1.Evidence
+	86,  // 4: hawkr.admin.seller.v1alpha1.Report.assessed_category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	87,  // 5: hawkr.admin.seller.v1alpha1.Report.triage_time:type_name -> google.protobuf.Timestamp
+	88,  // 6: hawkr.admin.seller.v1alpha1.Report.outcome:type_name -> hawkr.seller.v1alpha1.ReportOutcome
+	87,  // 7: hawkr.admin.seller.v1alpha1.Report.resolve_time:type_name -> google.protobuf.Timestamp
+	89,  // 8: hawkr.admin.seller.v1alpha1.Report.evidence:type_name -> hawkr.admin.seller.v1alpha1.Evidence
 	8,   // 9: hawkr.admin.seller.v1alpha1.Report.supplements:type_name -> hawkr.admin.seller.v1alpha1.ReportSupplement
-	85,  // 10: hawkr.admin.seller.v1alpha1.Report.latest_supplement_time:type_name -> google.protobuf.Timestamp
+	87,  // 10: hawkr.admin.seller.v1alpha1.Report.latest_supplement_time:type_name -> google.protobuf.Timestamp
 	10,  // 11: hawkr.admin.seller.v1alpha1.Report.available_outcomes:type_name -> hawkr.admin.seller.v1alpha1.OutcomeOption
-	84,  // 12: hawkr.admin.seller.v1alpha1.Report.effective_category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	86,  // 12: hawkr.admin.seller.v1alpha1.Report.effective_category:type_name -> hawkr.common.v1alpha1.PolicyCategory
 	11,  // 13: hawkr.admin.seller.v1alpha1.Report.triage_targets:type_name -> hawkr.admin.seller.v1alpha1.TriageTarget
-	85,  // 14: hawkr.admin.seller.v1alpha1.Report.create_time:type_name -> google.protobuf.Timestamp
-	85,  // 15: hawkr.admin.seller.v1alpha1.Report.update_time:type_name -> google.protobuf.Timestamp
-	88,  // 16: hawkr.admin.seller.v1alpha1.Report.triage_deadline:type_name -> hawkr.common.v1alpha1.Deadline
-	85,  // 17: hawkr.admin.seller.v1alpha1.ReportSupplement.create_time:type_name -> google.protobuf.Timestamp
+	87,  // 14: hawkr.admin.seller.v1alpha1.Report.create_time:type_name -> google.protobuf.Timestamp
+	87,  // 15: hawkr.admin.seller.v1alpha1.Report.update_time:type_name -> google.protobuf.Timestamp
+	90,  // 16: hawkr.admin.seller.v1alpha1.Report.triage_deadline:type_name -> hawkr.common.v1alpha1.Deadline
+	87,  // 17: hawkr.admin.seller.v1alpha1.ReportSupplement.create_time:type_name -> google.protobuf.Timestamp
 	4,   // 18: hawkr.admin.seller.v1alpha1.ReportSupplement.matched_by:type_name -> hawkr.admin.seller.v1alpha1.SupplementMatch
-	84,  // 19: hawkr.admin.seller.v1alpha1.Case.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	89,  // 20: hawkr.admin.seller.v1alpha1.Case.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
+	86,  // 19: hawkr.admin.seller.v1alpha1.Case.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	91,  // 20: hawkr.admin.seller.v1alpha1.Case.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
 	1,   // 21: hawkr.admin.seller.v1alpha1.Case.state:type_name -> hawkr.admin.seller.v1alpha1.CaseState
 	2,   // 22: hawkr.admin.seller.v1alpha1.Case.close_reason:type_name -> hawkr.admin.seller.v1alpha1.CaseCloseReason
 	3,   // 23: hawkr.admin.seller.v1alpha1.Case.decision:type_name -> hawkr.admin.seller.v1alpha1.CaseDecision
-	85,  // 24: hawkr.admin.seller.v1alpha1.Case.open_time:type_name -> google.protobuf.Timestamp
-	85,  // 25: hawkr.admin.seller.v1alpha1.Case.close_time:type_name -> google.protobuf.Timestamp
+	87,  // 24: hawkr.admin.seller.v1alpha1.Case.open_time:type_name -> google.protobuf.Timestamp
+	87,  // 25: hawkr.admin.seller.v1alpha1.Case.close_time:type_name -> google.protobuf.Timestamp
 	16,  // 26: hawkr.admin.seller.v1alpha1.Case.moves:type_name -> hawkr.admin.seller.v1alpha1.ReportMove
-	85,  // 27: hawkr.admin.seller.v1alpha1.Case.update_time:type_name -> google.protobuf.Timestamp
+	87,  // 27: hawkr.admin.seller.v1alpha1.Case.update_time:type_name -> google.protobuf.Timestamp
 	15,  // 28: hawkr.admin.seller.v1alpha1.Case.decision_options:type_name -> hawkr.admin.seller.v1alpha1.DecisionOption
-	88,  // 29: hawkr.admin.seller.v1alpha1.Case.decide_deadline:type_name -> hawkr.common.v1alpha1.Deadline
-	86,  // 30: hawkr.admin.seller.v1alpha1.OutcomeOption.outcome:type_name -> hawkr.seller.v1alpha1.ReportOutcome
-	84,  // 31: hawkr.admin.seller.v1alpha1.TriageTarget.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	89,  // 32: hawkr.admin.seller.v1alpha1.TriageTarget.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
+	90,  // 29: hawkr.admin.seller.v1alpha1.Case.decide_deadline:type_name -> hawkr.common.v1alpha1.Deadline
+	88,  // 30: hawkr.admin.seller.v1alpha1.OutcomeOption.outcome:type_name -> hawkr.seller.v1alpha1.ReportOutcome
+	86,  // 31: hawkr.admin.seller.v1alpha1.TriageTarget.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	91,  // 32: hawkr.admin.seller.v1alpha1.TriageTarget.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
 	13,  // 33: hawkr.admin.seller.v1alpha1.CaseTarget.join:type_name -> hawkr.admin.seller.v1alpha1.JoinCase
 	14,  // 34: hawkr.admin.seller.v1alpha1.CaseTarget.open_new:type_name -> hawkr.admin.seller.v1alpha1.OpenNewCase
-	89,  // 35: hawkr.admin.seller.v1alpha1.OpenNewCase.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
+	91,  // 35: hawkr.admin.seller.v1alpha1.OpenNewCase.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
 	3,   // 36: hawkr.admin.seller.v1alpha1.DecisionOption.decision:type_name -> hawkr.admin.seller.v1alpha1.CaseDecision
-	86,  // 37: hawkr.admin.seller.v1alpha1.DecisionOption.default_outcome:type_name -> hawkr.seller.v1alpha1.ReportOutcome
-	85,  // 38: hawkr.admin.seller.v1alpha1.ReportMove.move_time:type_name -> google.protobuf.Timestamp
-	84,  // 39: hawkr.admin.seller.v1alpha1.ListReportsRequest.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	88,  // 37: hawkr.admin.seller.v1alpha1.DecisionOption.default_outcome:type_name -> hawkr.seller.v1alpha1.ReportOutcome
+	87,  // 38: hawkr.admin.seller.v1alpha1.ReportMove.move_time:type_name -> google.protobuf.Timestamp
+	86,  // 39: hawkr.admin.seller.v1alpha1.ListReportsRequest.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
 	0,   // 40: hawkr.admin.seller.v1alpha1.ListReportsRequest.state:type_name -> hawkr.admin.seller.v1alpha1.ReportState
 	7,   // 41: hawkr.admin.seller.v1alpha1.ListReportsResponse.reports:type_name -> hawkr.admin.seller.v1alpha1.Report
 	7,   // 42: hawkr.admin.seller.v1alpha1.GetReportResponse.report:type_name -> hawkr.admin.seller.v1alpha1.Report
 	7,   // 43: hawkr.admin.seller.v1alpha1.MarkReportSupplementsSeenResponse.report:type_name -> hawkr.admin.seller.v1alpha1.Report
-	84,  // 44: hawkr.admin.seller.v1alpha1.TriageReportRequest.assessed_category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	86,  // 44: hawkr.admin.seller.v1alpha1.TriageReportRequest.assessed_category:type_name -> hawkr.common.v1alpha1.PolicyCategory
 	12,  // 45: hawkr.admin.seller.v1alpha1.TriageReportRequest.target:type_name -> hawkr.admin.seller.v1alpha1.CaseTarget
 	7,   // 46: hawkr.admin.seller.v1alpha1.TriageReportResponse.report:type_name -> hawkr.admin.seller.v1alpha1.Report
-	86,  // 47: hawkr.admin.seller.v1alpha1.ResolveReportRequest.outcome:type_name -> hawkr.seller.v1alpha1.ReportOutcome
+	88,  // 47: hawkr.admin.seller.v1alpha1.ResolveReportRequest.outcome:type_name -> hawkr.seller.v1alpha1.ReportOutcome
 	7,   // 48: hawkr.admin.seller.v1alpha1.ResolveReportResponse.report:type_name -> hawkr.admin.seller.v1alpha1.Report
-	84,  // 49: hawkr.admin.seller.v1alpha1.MoveReportRequest.assessed_category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	86,  // 49: hawkr.admin.seller.v1alpha1.MoveReportRequest.assessed_category:type_name -> hawkr.common.v1alpha1.PolicyCategory
 	12,  // 50: hawkr.admin.seller.v1alpha1.MoveReportRequest.target:type_name -> hawkr.admin.seller.v1alpha1.CaseTarget
 	7,   // 51: hawkr.admin.seller.v1alpha1.MoveReportResponse.report:type_name -> hawkr.admin.seller.v1alpha1.Report
 	1,   // 52: hawkr.admin.seller.v1alpha1.ListCasesRequest.state:type_name -> hawkr.admin.seller.v1alpha1.CaseState
-	84,  // 53: hawkr.admin.seller.v1alpha1.ListCasesRequest.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	86,  // 53: hawkr.admin.seller.v1alpha1.ListCasesRequest.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
 	9,   // 54: hawkr.admin.seller.v1alpha1.ListCasesResponse.cases:type_name -> hawkr.admin.seller.v1alpha1.Case
 	9,   // 55: hawkr.admin.seller.v1alpha1.GetCaseResponse.case:type_name -> hawkr.admin.seller.v1alpha1.Case
 	3,   // 56: hawkr.admin.seller.v1alpha1.DecideCaseRequest.decision:type_name -> hawkr.admin.seller.v1alpha1.CaseDecision
 	9,   // 57: hawkr.admin.seller.v1alpha1.DecideCaseResponse.case:type_name -> hawkr.admin.seller.v1alpha1.Case
-	89,  // 58: hawkr.admin.seller.v1alpha1.ChangeCaseSeverityRequest.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
+	91,  // 58: hawkr.admin.seller.v1alpha1.ChangeCaseSeverityRequest.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
 	9,   // 59: hawkr.admin.seller.v1alpha1.ChangeCaseSeverityResponse.case:type_name -> hawkr.admin.seller.v1alpha1.Case
-	90,  // 60: hawkr.admin.seller.v1alpha1.CreateCaseInquiryRequest.kind:type_name -> hawkr.admin.seller.v1alpha1.CaseInquiryKind
-	85,  // 61: hawkr.admin.seller.v1alpha1.CreateCaseInquiryRequest.due_time:type_name -> google.protobuf.Timestamp
-	91,  // 62: hawkr.admin.seller.v1alpha1.CreateCaseInquiryResponse.inquiry:type_name -> hawkr.admin.seller.v1alpha1.CaseInquiry
+	92,  // 60: hawkr.admin.seller.v1alpha1.CreateCaseInquiryRequest.kind:type_name -> hawkr.admin.seller.v1alpha1.CaseInquiryKind
+	87,  // 61: hawkr.admin.seller.v1alpha1.CreateCaseInquiryRequest.due_time:type_name -> google.protobuf.Timestamp
+	93,  // 62: hawkr.admin.seller.v1alpha1.CreateCaseInquiryResponse.inquiry:type_name -> hawkr.admin.seller.v1alpha1.CaseInquiry
 	9,   // 63: hawkr.admin.seller.v1alpha1.CreateCaseInquiryResponse.case:type_name -> hawkr.admin.seller.v1alpha1.Case
-	91,  // 64: hawkr.admin.seller.v1alpha1.ListCaseInquiriesResponse.inquiries:type_name -> hawkr.admin.seller.v1alpha1.CaseInquiry
-	92,  // 65: hawkr.admin.seller.v1alpha1.RecordCaseInquiryReplyRequest.channel:type_name -> hawkr.admin.seller.v1alpha1.CaseInquiryReplyChannel
-	85,  // 66: hawkr.admin.seller.v1alpha1.RecordCaseInquiryReplyRequest.receive_time:type_name -> google.protobuf.Timestamp
-	91,  // 67: hawkr.admin.seller.v1alpha1.RecordCaseInquiryReplyResponse.inquiry:type_name -> hawkr.admin.seller.v1alpha1.CaseInquiry
+	93,  // 64: hawkr.admin.seller.v1alpha1.ListCaseInquiriesResponse.inquiries:type_name -> hawkr.admin.seller.v1alpha1.CaseInquiry
+	94,  // 65: hawkr.admin.seller.v1alpha1.RecordCaseInquiryReplyRequest.channel:type_name -> hawkr.admin.seller.v1alpha1.CaseInquiryReplyChannel
+	87,  // 66: hawkr.admin.seller.v1alpha1.RecordCaseInquiryReplyRequest.receive_time:type_name -> google.protobuf.Timestamp
+	93,  // 67: hawkr.admin.seller.v1alpha1.RecordCaseInquiryReplyResponse.inquiry:type_name -> hawkr.admin.seller.v1alpha1.CaseInquiry
 	9,   // 68: hawkr.admin.seller.v1alpha1.RecordCaseInquiryReplyResponse.case:type_name -> hawkr.admin.seller.v1alpha1.Case
-	91,  // 69: hawkr.admin.seller.v1alpha1.WithdrawCaseInquiryResponse.inquiry:type_name -> hawkr.admin.seller.v1alpha1.CaseInquiry
+	93,  // 69: hawkr.admin.seller.v1alpha1.WithdrawCaseInquiryResponse.inquiry:type_name -> hawkr.admin.seller.v1alpha1.CaseInquiry
 	9,   // 70: hawkr.admin.seller.v1alpha1.WithdrawCaseInquiryResponse.case:type_name -> hawkr.admin.seller.v1alpha1.Case
 	46,  // 71: hawkr.admin.seller.v1alpha1.CreateMeasureRequest.warning:type_name -> hawkr.admin.seller.v1alpha1.WarningInput
 	47,  // 72: hawkr.admin.seller.v1alpha1.CreateMeasureRequest.suspension:type_name -> hawkr.admin.seller.v1alpha1.SuspensionInput
@@ -6295,48 +6394,48 @@ var file_hawkr_admin_seller_v1alpha1_governance_proto_depIdxs = []int32{
 	50,  // 75: hawkr.admin.seller.v1alpha1.WarningInput.violation:type_name -> hawkr.admin.seller.v1alpha1.ViolationBasis
 	50,  // 76: hawkr.admin.seller.v1alpha1.SuspensionInput.violation:type_name -> hawkr.admin.seller.v1alpha1.ViolationBasis
 	52,  // 77: hawkr.admin.seller.v1alpha1.SuspensionInput.risk:type_name -> hawkr.admin.seller.v1alpha1.RiskBasis
-	85,  // 78: hawkr.admin.seller.v1alpha1.SuspensionInput.end_time:type_name -> google.protobuf.Timestamp
-	85,  // 79: hawkr.admin.seller.v1alpha1.SuspensionInput.review_by:type_name -> google.protobuf.Timestamp
-	93,  // 80: hawkr.admin.seller.v1alpha1.ContentTakedownInput.contents:type_name -> hawkr.seller.v1alpha1.ContentRef
+	87,  // 78: hawkr.admin.seller.v1alpha1.SuspensionInput.end_time:type_name -> google.protobuf.Timestamp
+	87,  // 79: hawkr.admin.seller.v1alpha1.SuspensionInput.review_by:type_name -> google.protobuf.Timestamp
+	95,  // 80: hawkr.admin.seller.v1alpha1.ContentTakedownInput.contents:type_name -> hawkr.seller.v1alpha1.ContentRef
 	50,  // 81: hawkr.admin.seller.v1alpha1.ContentTakedownInput.violation:type_name -> hawkr.admin.seller.v1alpha1.ViolationBasis
-	94,  // 82: hawkr.admin.seller.v1alpha1.TerminationInput.ground:type_name -> hawkr.seller.v1alpha1.TerminationGround
+	96,  // 82: hawkr.admin.seller.v1alpha1.TerminationInput.ground:type_name -> hawkr.seller.v1alpha1.TerminationGround
 	50,  // 83: hawkr.admin.seller.v1alpha1.TerminationInput.violation:type_name -> hawkr.admin.seller.v1alpha1.ViolationBasis
 	51,  // 84: hawkr.admin.seller.v1alpha1.ViolationBasis.finding:type_name -> hawkr.admin.seller.v1alpha1.NewFinding
-	84,  // 85: hawkr.admin.seller.v1alpha1.NewFinding.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	89,  // 86: hawkr.admin.seller.v1alpha1.NewFinding.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
-	95,  // 87: hawkr.admin.seller.v1alpha1.RiskBasis.ground:type_name -> hawkr.seller.v1alpha1.RiskGround
-	96,  // 88: hawkr.admin.seller.v1alpha1.CreateMeasureResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
-	96,  // 89: hawkr.admin.seller.v1alpha1.GetMeasureResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
-	97,  // 90: hawkr.admin.seller.v1alpha1.ListMeasuresRequest.state:type_name -> hawkr.seller.v1alpha1.MeasureState
-	98,  // 91: hawkr.admin.seller.v1alpha1.ListMeasuresRequest.basis:type_name -> hawkr.seller.v1alpha1.MeasureBasis
-	99,  // 92: hawkr.admin.seller.v1alpha1.ListMeasuresRequest.request_state:type_name -> hawkr.seller.v1alpha1.MeasureRequestState
-	100, // 93: hawkr.admin.seller.v1alpha1.ListMeasuresRequest.request_kind:type_name -> hawkr.seller.v1alpha1.MeasureRequestKind
-	96,  // 94: hawkr.admin.seller.v1alpha1.ListMeasuresResponse.measures:type_name -> hawkr.admin.seller.v1alpha1.Measure
-	96,  // 95: hawkr.admin.seller.v1alpha1.UpdateMeasureRequest.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
-	101, // 96: hawkr.admin.seller.v1alpha1.UpdateMeasureRequest.update_mask:type_name -> google.protobuf.FieldMask
-	96,  // 97: hawkr.admin.seller.v1alpha1.UpdateMeasureResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
-	96,  // 98: hawkr.admin.seller.v1alpha1.EndMeasureResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
+	86,  // 85: hawkr.admin.seller.v1alpha1.NewFinding.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	91,  // 86: hawkr.admin.seller.v1alpha1.NewFinding.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
+	97,  // 87: hawkr.admin.seller.v1alpha1.RiskBasis.ground:type_name -> hawkr.seller.v1alpha1.RiskGround
+	98,  // 88: hawkr.admin.seller.v1alpha1.CreateMeasureResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
+	98,  // 89: hawkr.admin.seller.v1alpha1.GetMeasureResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
+	99,  // 90: hawkr.admin.seller.v1alpha1.ListMeasuresRequest.state:type_name -> hawkr.seller.v1alpha1.MeasureState
+	100, // 91: hawkr.admin.seller.v1alpha1.ListMeasuresRequest.basis:type_name -> hawkr.seller.v1alpha1.MeasureBasis
+	101, // 92: hawkr.admin.seller.v1alpha1.ListMeasuresRequest.request_state:type_name -> hawkr.seller.v1alpha1.MeasureRequestState
+	102, // 93: hawkr.admin.seller.v1alpha1.ListMeasuresRequest.request_kind:type_name -> hawkr.seller.v1alpha1.MeasureRequestKind
+	98,  // 94: hawkr.admin.seller.v1alpha1.ListMeasuresResponse.measures:type_name -> hawkr.admin.seller.v1alpha1.Measure
+	98,  // 95: hawkr.admin.seller.v1alpha1.UpdateMeasureRequest.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
+	103, // 96: hawkr.admin.seller.v1alpha1.UpdateMeasureRequest.update_mask:type_name -> google.protobuf.FieldMask
+	98,  // 97: hawkr.admin.seller.v1alpha1.UpdateMeasureResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
+	98,  // 98: hawkr.admin.seller.v1alpha1.EndMeasureResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
 	5,   // 99: hawkr.admin.seller.v1alpha1.RevokeMeasureRequest.reason:type_name -> hawkr.admin.seller.v1alpha1.AdminRevokeReason
-	96,  // 100: hawkr.admin.seller.v1alpha1.RevokeMeasureResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
-	85,  // 101: hawkr.admin.seller.v1alpha1.ScheduleMeasureReviewRequest.review_by:type_name -> google.protobuf.Timestamp
-	96,  // 102: hawkr.admin.seller.v1alpha1.ScheduleMeasureReviewResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
-	99,  // 103: hawkr.admin.seller.v1alpha1.DecideAppealRequest.decision:type_name -> hawkr.seller.v1alpha1.MeasureRequestState
-	96,  // 104: hawkr.admin.seller.v1alpha1.DecideAppealResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
-	99,  // 105: hawkr.admin.seller.v1alpha1.DecideRemediationRequest.decision:type_name -> hawkr.seller.v1alpha1.MeasureRequestState
-	96,  // 106: hawkr.admin.seller.v1alpha1.DecideRemediationResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
-	85,  // 107: hawkr.admin.seller.v1alpha1.GovernanceNote.create_time:type_name -> google.protobuf.Timestamp
-	71,  // 108: hawkr.admin.seller.v1alpha1.GovernanceNote.severity_change:type_name -> hawkr.admin.seller.v1alpha1.SeverityChange
-	89,  // 109: hawkr.admin.seller.v1alpha1.SeverityChange.from_severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
-	89,  // 110: hawkr.admin.seller.v1alpha1.SeverityChange.to_severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
-	70,  // 111: hawkr.admin.seller.v1alpha1.CreateMeasureNoteRequest.note:type_name -> hawkr.admin.seller.v1alpha1.GovernanceNote
-	70,  // 112: hawkr.admin.seller.v1alpha1.CreateMeasureNoteResponse.note:type_name -> hawkr.admin.seller.v1alpha1.GovernanceNote
-	70,  // 113: hawkr.admin.seller.v1alpha1.ListMeasureNotesResponse.notes:type_name -> hawkr.admin.seller.v1alpha1.GovernanceNote
-	70,  // 114: hawkr.admin.seller.v1alpha1.CreateCaseNoteRequest.note:type_name -> hawkr.admin.seller.v1alpha1.GovernanceNote
-	70,  // 115: hawkr.admin.seller.v1alpha1.CreateCaseNoteResponse.note:type_name -> hawkr.admin.seller.v1alpha1.GovernanceNote
-	70,  // 116: hawkr.admin.seller.v1alpha1.ListCaseNotesResponse.notes:type_name -> hawkr.admin.seller.v1alpha1.GovernanceNote
-	102, // 117: hawkr.admin.seller.v1alpha1.GetViolationResponse.violation:type_name -> hawkr.admin.seller.v1alpha1.Violation
-	103, // 118: hawkr.admin.seller.v1alpha1.ListViolationsRequest.status:type_name -> hawkr.seller.v1alpha1.ViolationStatus
-	102, // 119: hawkr.admin.seller.v1alpha1.ListViolationsResponse.violations:type_name -> hawkr.admin.seller.v1alpha1.Violation
+	98,  // 100: hawkr.admin.seller.v1alpha1.RevokeMeasureResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
+	87,  // 101: hawkr.admin.seller.v1alpha1.ScheduleMeasureReviewRequest.review_by:type_name -> google.protobuf.Timestamp
+	98,  // 102: hawkr.admin.seller.v1alpha1.ScheduleMeasureReviewResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
+	101, // 103: hawkr.admin.seller.v1alpha1.DecideAppealRequest.decision:type_name -> hawkr.seller.v1alpha1.MeasureRequestState
+	98,  // 104: hawkr.admin.seller.v1alpha1.DecideAppealResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
+	101, // 105: hawkr.admin.seller.v1alpha1.DecideRemediationRequest.decision:type_name -> hawkr.seller.v1alpha1.MeasureRequestState
+	98,  // 106: hawkr.admin.seller.v1alpha1.DecideRemediationResponse.measure:type_name -> hawkr.admin.seller.v1alpha1.Measure
+	87,  // 107: hawkr.admin.seller.v1alpha1.GovernanceNote.create_time:type_name -> google.protobuf.Timestamp
+	73,  // 108: hawkr.admin.seller.v1alpha1.GovernanceNote.severity_change:type_name -> hawkr.admin.seller.v1alpha1.SeverityChange
+	91,  // 109: hawkr.admin.seller.v1alpha1.SeverityChange.from_severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
+	91,  // 110: hawkr.admin.seller.v1alpha1.SeverityChange.to_severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
+	72,  // 111: hawkr.admin.seller.v1alpha1.CreateMeasureNoteRequest.note:type_name -> hawkr.admin.seller.v1alpha1.GovernanceNote
+	72,  // 112: hawkr.admin.seller.v1alpha1.CreateMeasureNoteResponse.note:type_name -> hawkr.admin.seller.v1alpha1.GovernanceNote
+	72,  // 113: hawkr.admin.seller.v1alpha1.ListMeasureNotesResponse.notes:type_name -> hawkr.admin.seller.v1alpha1.GovernanceNote
+	72,  // 114: hawkr.admin.seller.v1alpha1.CreateCaseNoteRequest.note:type_name -> hawkr.admin.seller.v1alpha1.GovernanceNote
+	72,  // 115: hawkr.admin.seller.v1alpha1.CreateCaseNoteResponse.note:type_name -> hawkr.admin.seller.v1alpha1.GovernanceNote
+	72,  // 116: hawkr.admin.seller.v1alpha1.ListCaseNotesResponse.notes:type_name -> hawkr.admin.seller.v1alpha1.GovernanceNote
+	104, // 117: hawkr.admin.seller.v1alpha1.GetViolationResponse.violation:type_name -> hawkr.admin.seller.v1alpha1.Violation
+	105, // 118: hawkr.admin.seller.v1alpha1.ListViolationsRequest.status:type_name -> hawkr.seller.v1alpha1.ViolationStatus
+	104, // 119: hawkr.admin.seller.v1alpha1.ListViolationsResponse.violations:type_name -> hawkr.admin.seller.v1alpha1.Violation
 	17,  // 120: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListReports:input_type -> hawkr.admin.seller.v1alpha1.ListReportsRequest
 	19,  // 121: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetReport:input_type -> hawkr.admin.seller.v1alpha1.GetReportRequest
 	21,  // 122: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.MarkReportSupplementsSeen:input_type -> hawkr.admin.seller.v1alpha1.MarkReportSupplementsSeenRequest
@@ -6351,13 +6450,13 @@ var file_hawkr_admin_seller_v1alpha1_governance_proto_depIdxs = []int32{
 	39,  // 131: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListCaseInquiries:input_type -> hawkr.admin.seller.v1alpha1.ListCaseInquiriesRequest
 	41,  // 132: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RecordCaseInquiryReply:input_type -> hawkr.admin.seller.v1alpha1.RecordCaseInquiryReplyRequest
 	43,  // 133: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.WithdrawCaseInquiry:input_type -> hawkr.admin.seller.v1alpha1.WithdrawCaseInquiryRequest
-	104, // 134: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateAuthorityOrder:input_type -> hawkr.admin.seller.v1alpha1.CreateAuthorityOrderRequest
-	105, // 135: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListAuthorityOrders:input_type -> hawkr.admin.seller.v1alpha1.ListAuthorityOrdersRequest
-	106, // 136: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetAuthorityOrder:input_type -> hawkr.admin.seller.v1alpha1.GetAuthorityOrderRequest
-	107, // 137: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CompleteAuthorityOrder:input_type -> hawkr.admin.seller.v1alpha1.CompleteAuthorityOrderRequest
-	108, // 138: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ExtendAuthorityOrderHold:input_type -> hawkr.admin.seller.v1alpha1.ExtendAuthorityOrderHoldRequest
-	109, // 139: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RecordAuthorityTargetNotice:input_type -> hawkr.admin.seller.v1alpha1.RecordAuthorityTargetNoticeRequest
-	110, // 140: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RevokeAuthorityOrder:input_type -> hawkr.admin.seller.v1alpha1.RevokeAuthorityOrderRequest
+	106, // 134: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateAuthorityOrder:input_type -> hawkr.admin.seller.v1alpha1.CreateAuthorityOrderRequest
+	107, // 135: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListAuthorityOrders:input_type -> hawkr.admin.seller.v1alpha1.ListAuthorityOrdersRequest
+	108, // 136: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetAuthorityOrder:input_type -> hawkr.admin.seller.v1alpha1.GetAuthorityOrderRequest
+	109, // 137: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CompleteAuthorityOrder:input_type -> hawkr.admin.seller.v1alpha1.CompleteAuthorityOrderRequest
+	110, // 138: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ExtendAuthorityOrderHold:input_type -> hawkr.admin.seller.v1alpha1.ExtendAuthorityOrderHoldRequest
+	111, // 139: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RecordAuthorityTargetNotice:input_type -> hawkr.admin.seller.v1alpha1.RecordAuthorityTargetNoticeRequest
+	112, // 140: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RevokeAuthorityOrder:input_type -> hawkr.admin.seller.v1alpha1.RevokeAuthorityOrderRequest
 	45,  // 141: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateMeasure:input_type -> hawkr.admin.seller.v1alpha1.CreateMeasureRequest
 	54,  // 142: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetMeasure:input_type -> hawkr.admin.seller.v1alpha1.GetMeasureRequest
 	56,  // 143: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListMeasures:input_type -> hawkr.admin.seller.v1alpha1.ListMeasuresRequest
@@ -6365,52 +6464,54 @@ var file_hawkr_admin_seller_v1alpha1_governance_proto_depIdxs = []int32{
 	60,  // 145: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.EndMeasure:input_type -> hawkr.admin.seller.v1alpha1.EndMeasureRequest
 	62,  // 146: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RevokeMeasure:input_type -> hawkr.admin.seller.v1alpha1.RevokeMeasureRequest
 	64,  // 147: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ScheduleMeasureReview:input_type -> hawkr.admin.seller.v1alpha1.ScheduleMeasureReviewRequest
-	66,  // 148: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.DecideAppeal:input_type -> hawkr.admin.seller.v1alpha1.DecideAppealRequest
-	68,  // 149: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.DecideRemediation:input_type -> hawkr.admin.seller.v1alpha1.DecideRemediationRequest
-	72,  // 150: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateMeasureNote:input_type -> hawkr.admin.seller.v1alpha1.CreateMeasureNoteRequest
-	74,  // 151: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListMeasureNotes:input_type -> hawkr.admin.seller.v1alpha1.ListMeasureNotesRequest
-	76,  // 152: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateCaseNote:input_type -> hawkr.admin.seller.v1alpha1.CreateCaseNoteRequest
-	78,  // 153: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListCaseNotes:input_type -> hawkr.admin.seller.v1alpha1.ListCaseNotesRequest
-	80,  // 154: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetViolation:input_type -> hawkr.admin.seller.v1alpha1.GetViolationRequest
-	82,  // 155: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListViolations:input_type -> hawkr.admin.seller.v1alpha1.ListViolationsRequest
-	18,  // 156: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListReports:output_type -> hawkr.admin.seller.v1alpha1.ListReportsResponse
-	20,  // 157: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetReport:output_type -> hawkr.admin.seller.v1alpha1.GetReportResponse
-	22,  // 158: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.MarkReportSupplementsSeen:output_type -> hawkr.admin.seller.v1alpha1.MarkReportSupplementsSeenResponse
-	24,  // 159: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.TriageReport:output_type -> hawkr.admin.seller.v1alpha1.TriageReportResponse
-	26,  // 160: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ResolveReport:output_type -> hawkr.admin.seller.v1alpha1.ResolveReportResponse
-	28,  // 161: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.MoveReport:output_type -> hawkr.admin.seller.v1alpha1.MoveReportResponse
-	30,  // 162: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListCases:output_type -> hawkr.admin.seller.v1alpha1.ListCasesResponse
-	32,  // 163: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetCase:output_type -> hawkr.admin.seller.v1alpha1.GetCaseResponse
-	34,  // 164: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.DecideCase:output_type -> hawkr.admin.seller.v1alpha1.DecideCaseResponse
-	36,  // 165: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ChangeCaseSeverity:output_type -> hawkr.admin.seller.v1alpha1.ChangeCaseSeverityResponse
-	38,  // 166: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateCaseInquiry:output_type -> hawkr.admin.seller.v1alpha1.CreateCaseInquiryResponse
-	40,  // 167: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListCaseInquiries:output_type -> hawkr.admin.seller.v1alpha1.ListCaseInquiriesResponse
-	42,  // 168: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RecordCaseInquiryReply:output_type -> hawkr.admin.seller.v1alpha1.RecordCaseInquiryReplyResponse
-	44,  // 169: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.WithdrawCaseInquiry:output_type -> hawkr.admin.seller.v1alpha1.WithdrawCaseInquiryResponse
-	111, // 170: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateAuthorityOrder:output_type -> hawkr.admin.seller.v1alpha1.CreateAuthorityOrderResponse
-	112, // 171: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListAuthorityOrders:output_type -> hawkr.admin.seller.v1alpha1.ListAuthorityOrdersResponse
-	113, // 172: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetAuthorityOrder:output_type -> hawkr.admin.seller.v1alpha1.GetAuthorityOrderResponse
-	114, // 173: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CompleteAuthorityOrder:output_type -> hawkr.admin.seller.v1alpha1.CompleteAuthorityOrderResponse
-	115, // 174: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ExtendAuthorityOrderHold:output_type -> hawkr.admin.seller.v1alpha1.ExtendAuthorityOrderHoldResponse
-	116, // 175: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RecordAuthorityTargetNotice:output_type -> hawkr.admin.seller.v1alpha1.RecordAuthorityTargetNoticeResponse
-	117, // 176: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RevokeAuthorityOrder:output_type -> hawkr.admin.seller.v1alpha1.RevokeAuthorityOrderResponse
-	53,  // 177: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateMeasure:output_type -> hawkr.admin.seller.v1alpha1.CreateMeasureResponse
-	55,  // 178: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetMeasure:output_type -> hawkr.admin.seller.v1alpha1.GetMeasureResponse
-	57,  // 179: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListMeasures:output_type -> hawkr.admin.seller.v1alpha1.ListMeasuresResponse
-	59,  // 180: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.UpdateMeasure:output_type -> hawkr.admin.seller.v1alpha1.UpdateMeasureResponse
-	61,  // 181: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.EndMeasure:output_type -> hawkr.admin.seller.v1alpha1.EndMeasureResponse
-	63,  // 182: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RevokeMeasure:output_type -> hawkr.admin.seller.v1alpha1.RevokeMeasureResponse
-	65,  // 183: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ScheduleMeasureReview:output_type -> hawkr.admin.seller.v1alpha1.ScheduleMeasureReviewResponse
-	67,  // 184: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.DecideAppeal:output_type -> hawkr.admin.seller.v1alpha1.DecideAppealResponse
-	69,  // 185: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.DecideRemediation:output_type -> hawkr.admin.seller.v1alpha1.DecideRemediationResponse
-	73,  // 186: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateMeasureNote:output_type -> hawkr.admin.seller.v1alpha1.CreateMeasureNoteResponse
-	75,  // 187: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListMeasureNotes:output_type -> hawkr.admin.seller.v1alpha1.ListMeasureNotesResponse
-	77,  // 188: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateCaseNote:output_type -> hawkr.admin.seller.v1alpha1.CreateCaseNoteResponse
-	79,  // 189: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListCaseNotes:output_type -> hawkr.admin.seller.v1alpha1.ListCaseNotesResponse
-	81,  // 190: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetViolation:output_type -> hawkr.admin.seller.v1alpha1.GetViolationResponse
-	83,  // 191: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListViolations:output_type -> hawkr.admin.seller.v1alpha1.ListViolationsResponse
-	156, // [156:192] is the sub-list for method output_type
-	120, // [120:156] is the sub-list for method input_type
+	66,  // 148: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.MarkLinkedAccountReviewed:input_type -> hawkr.admin.seller.v1alpha1.MarkLinkedAccountReviewedRequest
+	68,  // 149: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.DecideAppeal:input_type -> hawkr.admin.seller.v1alpha1.DecideAppealRequest
+	70,  // 150: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.DecideRemediation:input_type -> hawkr.admin.seller.v1alpha1.DecideRemediationRequest
+	74,  // 151: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateMeasureNote:input_type -> hawkr.admin.seller.v1alpha1.CreateMeasureNoteRequest
+	76,  // 152: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListMeasureNotes:input_type -> hawkr.admin.seller.v1alpha1.ListMeasureNotesRequest
+	78,  // 153: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateCaseNote:input_type -> hawkr.admin.seller.v1alpha1.CreateCaseNoteRequest
+	80,  // 154: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListCaseNotes:input_type -> hawkr.admin.seller.v1alpha1.ListCaseNotesRequest
+	82,  // 155: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetViolation:input_type -> hawkr.admin.seller.v1alpha1.GetViolationRequest
+	84,  // 156: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListViolations:input_type -> hawkr.admin.seller.v1alpha1.ListViolationsRequest
+	18,  // 157: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListReports:output_type -> hawkr.admin.seller.v1alpha1.ListReportsResponse
+	20,  // 158: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetReport:output_type -> hawkr.admin.seller.v1alpha1.GetReportResponse
+	22,  // 159: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.MarkReportSupplementsSeen:output_type -> hawkr.admin.seller.v1alpha1.MarkReportSupplementsSeenResponse
+	24,  // 160: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.TriageReport:output_type -> hawkr.admin.seller.v1alpha1.TriageReportResponse
+	26,  // 161: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ResolveReport:output_type -> hawkr.admin.seller.v1alpha1.ResolveReportResponse
+	28,  // 162: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.MoveReport:output_type -> hawkr.admin.seller.v1alpha1.MoveReportResponse
+	30,  // 163: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListCases:output_type -> hawkr.admin.seller.v1alpha1.ListCasesResponse
+	32,  // 164: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetCase:output_type -> hawkr.admin.seller.v1alpha1.GetCaseResponse
+	34,  // 165: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.DecideCase:output_type -> hawkr.admin.seller.v1alpha1.DecideCaseResponse
+	36,  // 166: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ChangeCaseSeverity:output_type -> hawkr.admin.seller.v1alpha1.ChangeCaseSeverityResponse
+	38,  // 167: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateCaseInquiry:output_type -> hawkr.admin.seller.v1alpha1.CreateCaseInquiryResponse
+	40,  // 168: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListCaseInquiries:output_type -> hawkr.admin.seller.v1alpha1.ListCaseInquiriesResponse
+	42,  // 169: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RecordCaseInquiryReply:output_type -> hawkr.admin.seller.v1alpha1.RecordCaseInquiryReplyResponse
+	44,  // 170: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.WithdrawCaseInquiry:output_type -> hawkr.admin.seller.v1alpha1.WithdrawCaseInquiryResponse
+	113, // 171: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateAuthorityOrder:output_type -> hawkr.admin.seller.v1alpha1.CreateAuthorityOrderResponse
+	114, // 172: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListAuthorityOrders:output_type -> hawkr.admin.seller.v1alpha1.ListAuthorityOrdersResponse
+	115, // 173: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetAuthorityOrder:output_type -> hawkr.admin.seller.v1alpha1.GetAuthorityOrderResponse
+	116, // 174: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CompleteAuthorityOrder:output_type -> hawkr.admin.seller.v1alpha1.CompleteAuthorityOrderResponse
+	117, // 175: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ExtendAuthorityOrderHold:output_type -> hawkr.admin.seller.v1alpha1.ExtendAuthorityOrderHoldResponse
+	118, // 176: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RecordAuthorityTargetNotice:output_type -> hawkr.admin.seller.v1alpha1.RecordAuthorityTargetNoticeResponse
+	119, // 177: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RevokeAuthorityOrder:output_type -> hawkr.admin.seller.v1alpha1.RevokeAuthorityOrderResponse
+	53,  // 178: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateMeasure:output_type -> hawkr.admin.seller.v1alpha1.CreateMeasureResponse
+	55,  // 179: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetMeasure:output_type -> hawkr.admin.seller.v1alpha1.GetMeasureResponse
+	57,  // 180: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListMeasures:output_type -> hawkr.admin.seller.v1alpha1.ListMeasuresResponse
+	59,  // 181: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.UpdateMeasure:output_type -> hawkr.admin.seller.v1alpha1.UpdateMeasureResponse
+	61,  // 182: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.EndMeasure:output_type -> hawkr.admin.seller.v1alpha1.EndMeasureResponse
+	63,  // 183: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RevokeMeasure:output_type -> hawkr.admin.seller.v1alpha1.RevokeMeasureResponse
+	65,  // 184: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ScheduleMeasureReview:output_type -> hawkr.admin.seller.v1alpha1.ScheduleMeasureReviewResponse
+	67,  // 185: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.MarkLinkedAccountReviewed:output_type -> hawkr.admin.seller.v1alpha1.MarkLinkedAccountReviewedResponse
+	69,  // 186: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.DecideAppeal:output_type -> hawkr.admin.seller.v1alpha1.DecideAppealResponse
+	71,  // 187: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.DecideRemediation:output_type -> hawkr.admin.seller.v1alpha1.DecideRemediationResponse
+	75,  // 188: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateMeasureNote:output_type -> hawkr.admin.seller.v1alpha1.CreateMeasureNoteResponse
+	77,  // 189: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListMeasureNotes:output_type -> hawkr.admin.seller.v1alpha1.ListMeasureNotesResponse
+	79,  // 190: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.CreateCaseNote:output_type -> hawkr.admin.seller.v1alpha1.CreateCaseNoteResponse
+	81,  // 191: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListCaseNotes:output_type -> hawkr.admin.seller.v1alpha1.ListCaseNotesResponse
+	83,  // 192: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetViolation:output_type -> hawkr.admin.seller.v1alpha1.GetViolationResponse
+	85,  // 193: hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ListViolations:output_type -> hawkr.admin.seller.v1alpha1.ListViolationsResponse
+	157, // [157:194] is the sub-list for method output_type
+	120, // [120:157] is the sub-list for method input_type
 	120, // [120:120] is the sub-list for extension type_name
 	120, // [120:120] is the sub-list for extension extendee
 	0,   // [0:120] is the sub-list for field type_name
@@ -6444,7 +6545,7 @@ func file_hawkr_admin_seller_v1alpha1_governance_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc), len(file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   78,
+			NumMessages:   80,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

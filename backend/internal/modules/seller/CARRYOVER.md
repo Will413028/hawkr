@@ -461,7 +461,7 @@ Stripe 計畫 D22、D36、D37、D38、D42、D45 與 8b 的「預設表」：KYC 
 | 證件位置（`slot`：身分證正反面、存摺、公司文件）與單張位置的合併邏輯 | 四種位置各一張，公司文件最多 10 張 | 不成立：只剩公司補充文件 | 同一種文件用一個有序清單 | `kyc_documents.slot` 刪除、主鍵 `(application_id, position)`；`KYCDocument` 帶欄位（`BUSINESS_COMPANY_DOCUMENTS`）與位置；檢視網址 `/documents/{position}` |
 | 申請的 `*_hash` 與 `*_hash_key` 欄位、`kyc_identity_hashes`（申請的比對 hash 表） | 申請被個資清理時比對 hash 跟著清，防詐保存另存一份 | 不成立：只剩統編一種，申請上已有明文統編（D42） | 能直接比明文就不另存 hash | 表與欄位刪除；草稿「有沒有改」直接比明文統編；`LinkedAccountHits` 兩段併成一段都連 `account_identity_hashes`；金鑰環、換鑰重算（統編來源改成申請的明文欄位）與啟動檢查留著服務保存表 |
 | 防詐保存的身分證號、負責人身分證號與平台自收銀行帳號三個種類（`account_identity_hashes`、`measure_identities`、`LinkedIdentity`、admin 的關聯類別） | 平台收了這些資料才算得出 hash | 不成立（D38） | 同上 | 三個種類的列與列舉值刪除（migration 先 DELETE 再縮 CHECK）；統編（`TAX_ID`）與 provider 回報的銀行 fingerprint（`BANK_FINGERPRINT`，進快照時是 `BANK_ACCOUNT`）不變；銀行帳號命中仍然只列出、不能建立關聯終止 |
-| 申請的「銀行帳號與受處分帳號相同」標記（`shares_bank_account_with_sanctioned_account`） | 審核員看出共用帳戶 | 不成立：平台沒有銀行帳號可比（D45） | 銀行帳號以 provider 的 fingerprint 比對 | 欄位刪除；替代機制是 8d（fingerprint 命中的審核提示），不在 8b |
+| 申請的「銀行帳號與受處分帳號相同」標記（`shares_bank_account_with_sanctioned_account`） | 審核員看出共用帳戶 | 不成立：平台沒有銀行帳號可比（D45） | 銀行帳號以 provider 的 fingerprint 比對 | 欄位刪除；替代機制是 8d：待辦 `SHARED_BANK_ACCOUNT`（`review_shared_bank_account`，命中的定義與處分頁的關聯帳號共用 `measure_identity_hits`；處置存在 `measure_linked_reviews`，同步不寫入、不自動處分） |
 | `IndividualKYC` 空 message | 個人與企業賣家互斥，型態由「設定了哪一支」表示 | 成立：個人賣家沒有專屬欄位後訊息變空，但 oneof 的分支仍是型態的唯一表示 | 空 message 作為 oneof 的旗標分支是 protobuf 的慣用寫法 | 保留空的 `IndividualKYC`（預設表）；`update_mask` 可以直接列 `individual` 或 `business` 這一支 |
 
 

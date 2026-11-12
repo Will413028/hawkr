@@ -208,6 +208,28 @@ func (q *Queries) AdminKYCApplicationsOldestFirst(ctx context.Context, arg Admin
 	return items, nil
 }
 
+const bankFingerprintHitExists = `-- name: BankFingerprintHitExists :one
+SELECT EXISTS (
+    SELECT 1
+    FROM seller.measure_identity_hits h
+    JOIN seller.measures m ON m.id = h.measure_id
+    WHERE h.measure_id = $1 AND h.account_id = $2 AND h.field = 'BANK_FINGERPRINT' AND h.account_id <> m.account_id
+)
+`
+
+type BankFingerprintHitExistsParams struct {
+	MeasureID uuid.UUID
+	AccountID int64
+}
+
+// 這一對（措施、帳號）是銀行帳號 fingerprint 命中的關聯帳號（被處分的帳號本身不算）：標為已檢視前的存在性檢查，與處分頁的關聯帳號是同一份命中定義。
+func (q *Queries) BankFingerprintHitExists(ctx context.Context, arg BankFingerprintHitExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, bankFingerprintHitExists, arg.MeasureID, arg.AccountID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const currentKYCApplication = `-- name: CurrentKYCApplication :one
 SELECT application_id, store_id, status, version, seller_type, product_type, website_url, company_name, tax_id, company_register_date, company_town_code, company_address_detail, company_phone, submitted_at, submission_seq, decided_at, created_at, updated_at, pii_purged_at
 FROM seller.kyc_applications
@@ -772,14 +794,12 @@ func (q *Queries) KYCReviews(ctx context.Context, applicationID uuid.UUID) ([]Se
 }
 
 const linkedAccountHits = `-- name: LinkedAccountHits :many
-SELECT DISTINCT f.account_id, f.field
-FROM seller.measure_identities mi
-JOIN seller.account_identity_hashes f ON f.hash = mi.hash AND f.key_id = mi.key_id
-WHERE mi.measure_id = $1
-  AND mi.kind = CASE f.field WHEN 'TAX_ID' THEN 'TAX_ID' ELSE 'BANK_ACCOUNT' END
-  AND f.account_id <> $2
-  AND ($3::bigint IS NULL OR f.account_id = $3::bigint)
-ORDER BY f.account_id, f.field
+SELECT DISTINCT h.account_id, h.field
+FROM seller.measure_identity_hits h
+WHERE h.measure_id = $1
+  AND h.account_id <> $2
+  AND ($3::bigint IS NULL OR h.account_id = $3::bigint)
+ORDER BY h.account_id, h.field
 `
 
 type LinkedAccountHitsParams struct {
@@ -795,7 +815,7 @@ type LinkedAccountHitsRow struct {
 
 // 與這筆措施的身分快照相同的其他帳號（W9）：防詐保存的 account_identity_hashes（跨 stint，個資清理之後仍在）裡，統編（TAX_ID）對快照的 TAX_ID、
 // provider 回報的銀行帳號 fingerprint（BANK_FINGERPRINT）對快照的 BANK_ACCOUNT（Stripe 計畫 D4、D42：銀行帳號命中只列出；能不能據以建立關聯終止由
-// model.LinkedIdentity.CountsAsGround 決定，不在這裡）。以 (key_id, hash) 索引等值連接，不解密；帳號取自來源 stint。
+// model.LinkedIdentity.CountsAsGround 決定，不在這裡）。命中的定義只有 seller.measure_identity_hits 那一份（以 (key_id, hash) 索引等值連接，不解密）；帳號取自來源 stint。
 // account_id 不為 NULL 時只看那個帳號。
 func (q *Queries) LinkedAccountHits(ctx context.Context, arg LinkedAccountHitsParams) ([]LinkedAccountHitsRow, error) {
 	rows, err := q.db.Query(ctx, linkedAccountHits, arg.MeasureID, arg.ExceptAccountID, arg.AccountID)
@@ -911,6 +931,33 @@ func (q *Queries) LockKYCApplication(ctx context.Context, applicationID uuid.UUI
 	return i, err
 }
 
+const markLinkedAccountReviewed = `-- name: MarkLinkedAccountReviewed :execrows
+INSERT INTO seller.measure_linked_reviews (measure_id, account_id, reviewed_at, reviewed_by_admin_id)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING
+`
+
+type MarkLinkedAccountReviewedParams struct {
+	MeasureID uuid.UUID
+	AccountID int64
+	Now       time.Time
+	AdminID   int64
+}
+
+// 把這一對標為已檢視；已標過的不改（保留原來的時間與管理員），所以重複標記冪等。
+func (q *Queries) MarkLinkedAccountReviewed(ctx context.Context, arg MarkLinkedAccountReviewedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markLinkedAccountReviewed,
+		arg.MeasureID,
+		arg.AccountID,
+		arg.Now,
+		arg.AdminID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const measureIdentityMatches = `-- name: MeasureIdentityMatches :many
 SELECT DISTINCT m.account_id, mi.kind
 FROM seller.measure_identities mi
@@ -941,6 +988,39 @@ func (q *Queries) MeasureIdentityMatches(ctx context.Context, arg MeasureIdentit
 	for rows.Next() {
 		var i MeasureIdentityMatchesRow
 		if err := rows.Scan(&i.AccountID, &i.Kind); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const measureLinkedReviews = `-- name: MeasureLinkedReviews :many
+SELECT account_id, reviewed_at
+FROM seller.measure_linked_reviews
+WHERE measure_id = $1
+ORDER BY account_id
+`
+
+type MeasureLinkedReviewsRow struct {
+	AccountID  int64
+	ReviewedAt time.Time
+}
+
+// 這筆措施的關聯帳號已檢視的紀錄（處分頁顯示已檢視的時間）。
+func (q *Queries) MeasureLinkedReviews(ctx context.Context, measureID uuid.UUID) ([]MeasureLinkedReviewsRow, error) {
+	rows, err := q.db.Query(ctx, measureLinkedReviews, measureID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []MeasureLinkedReviewsRow{}
+	for rows.Next() {
+		var i MeasureLinkedReviewsRow
+		if err := rows.Scan(&i.AccountID, &i.ReviewedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -1055,6 +1135,41 @@ func (q *Queries) ReviewKYCApplicationByIDs(ctx context.Context, arg ReviewKYCAp
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const sharedBankAccountPendingAccounts = `-- name: SharedBankAccountPendingAccounts :many
+SELECT h.account_id
+FROM (SELECT DISTINCT account_id FROM seller.measure_identity_hits WHERE measure_id = $1) h
+WHERE EXISTS (
+    SELECT 1 FROM seller.review_shared_bank_account($2::timestamptz) r
+    WHERE r.measure_id = $1 AND r.account_id = h.account_id)
+ORDER BY h.account_id
+`
+
+type SharedBankAccountPendingAccountsParams struct {
+	MeasureID uuid.UUID
+	At        time.Time
+}
+
+// 這筆措施在 at 的待辦 SHARED_BANK_ACCOUNT 裡的帳號：處分頁的關聯帳號要不要出現「標為已檢視」。成員的定義只有 seller.review_shared_bank_account 那一份，這裡不重寫。
+func (q *Queries) SharedBankAccountPendingAccounts(ctx context.Context, arg SharedBankAccountPendingAccountsParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, sharedBankAccountPendingAccounts, arg.MeasureID, arg.At)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var account_id int64
+		if err := rows.Scan(&account_id); err != nil {
+			return nil, err
+		}
+		items = append(items, account_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

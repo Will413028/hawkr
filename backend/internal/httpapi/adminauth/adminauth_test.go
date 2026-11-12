@@ -62,8 +62,8 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 	if err := Check(svcs); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(declarations), methodCount(t); got != want || got != 78 {
-		t.Fatalf("declarations=%d methods=%d，預期 78", got, want)
+	if got, want := len(declarations), methodCount(t); got != want || got != 79 {
+		t.Fatalf("declarations=%d methods=%d，預期 79", got, want)
 	}
 
 	for procedure := range declarations {
@@ -265,5 +265,23 @@ func TestEveryProspectMethodDeclaresItsOwnPermission(t *testing.T) {
 		if !adminperm.Allows([]adminperm.Role{adminperm.RoleOwner}, permission) || adminperm.Allows(nil, permission) {
 			t.Errorf("%s：OWNER 要允許、零角色要拒絕", permission)
 		}
+	}
+}
+
+// MarkLinkedAccountReviewed 宣告自己的權限 seller.measures.review_linked_account（一支方法一個權限）：OWNER 允許，零角色的管理員被攔下、不進 handler。
+// mutation：宣告成別的權限（例如 seller.measures.get）或拿掉宣告 → 宣告斷言或零角色的斷言失敗。
+func TestMarkLinkedAccountReviewedRequiresItsOwnPermission(t *testing.T) {
+	const procedure = sellerv1alpha1connect.SellerGovernanceAdminServiceMarkLinkedAccountReviewedProcedure
+	got, ok := declarations[procedure]
+	if !ok || got.permission != "seller.measures.review_linked_account" || got.exemptReason != "" {
+		t.Fatalf("宣告 = %+v", got)
+	}
+	i := &interceptor{table: declarations, log: slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))}
+	zero := principal(identity.PrincipalAdmin, 4)
+	if err := i.enter(rpc.WithPrincipal(context.Background(), zero), procedure); apperr.KindOf(err) != apperr.KindPermissionDenied {
+		t.Errorf("零角色的管理員 = %v，預期 permission denied", err)
+	}
+	if err := i.enter(rpc.WithPrincipal(context.Background(), principal(identity.PrincipalAdmin, 3, adminperm.RoleOwner)), procedure); err != nil {
+		t.Errorf("OWNER = %v", err)
 	}
 }

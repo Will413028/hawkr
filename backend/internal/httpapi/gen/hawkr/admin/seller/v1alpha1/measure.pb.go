@@ -1195,8 +1195,13 @@ type LinkedAccount struct {
 	CanCreateLinkedTermination bool `protobuf:"varint,6,opt,name=can_create_linked_termination,json=canCreateLinkedTermination,proto3" json:"can_create_linked_termination,omitempty"`
 	// can_create_linked_termination 為 true 時，建立這筆關聯終止的生效時機與給員工的說明句；false 時不設。
 	TerminationOption *TerminationOption `protobuf:"bytes,7,opt,name=termination_option,json=terminationOption,proto3" json:"termination_option,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// 這一對（本措施、這個帳號）此刻在後台待辦（SHARED_BANK_ACCOUNT）：措施建立之後，這個帳號才同步了相同的銀行帳號 fingerprint，而且還沒有人標為已檢視。
+	// 由伺服器推導（待辦的成員定義 seller.review_shared_bank_account）；true 時 client 顯示「標為已檢視」。
+	SharedBankAccountPending bool `protobuf:"varint,8,opt,name=shared_bank_account_pending,json=sharedBankAccountPending,proto3" json:"shared_bank_account_pending,omitempty"`
+	// 管理員標為已檢視的時間；還沒有時不設。
+	ReviewedTime  *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=reviewed_time,json=reviewedTime,proto3" json:"reviewed_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *LinkedAccount) Reset() {
@@ -1274,6 +1279,20 @@ func (x *LinkedAccount) GetCanCreateLinkedTermination() bool {
 func (x *LinkedAccount) GetTerminationOption() *TerminationOption {
 	if x != nil {
 		return x.TerminationOption
+	}
+	return nil
+}
+
+func (x *LinkedAccount) GetSharedBankAccountPending() bool {
+	if x != nil {
+		return x.SharedBankAccountPending
+	}
+	return false
+}
+
+func (x *LinkedAccount) GetReviewedTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ReviewedTime
 	}
 	return nil
 }
@@ -1459,7 +1478,7 @@ const file_hawkr_admin_seller_v1alpha1_measure_proto_rawDesc = "" +
 	"\bcontents\x18. \x03(\v2!.hawkr.seller.v1alpha1.ContentRefB\x03\xe0A\x03R\bcontentsJ\x04\b\x10\x10\x11J\x04\b\x1e\x10\x1fR\x06appealR\x14remediation_requests\"\xb4\x01\n" +
 	"\x1bMeasureActionUnavailability\x12X\n" +
 	"\x06reason\x18\x01 \x01(\x0e2;.hawkr.admin.seller.v1alpha1.MeasureActionUnavailableReasonB\x03\xe0A\x03R\x06reason\x12;\n" +
-	"\amessage\x18\x02 \x01(\v2\x1c.google.rpc.LocalizedMessageB\x03\xe0A\x03R\amessage\"\x93\x03\n" +
+	"\amessage\x18\x02 \x01(\v2\x1c.google.rpc.LocalizedMessageB\x03\xe0A\x03R\amessage\"\x9d\x04\n" +
 	"\rLinkedAccount\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
@@ -1469,7 +1488,9 @@ const file_hawkr_admin_seller_v1alpha1_measure_proto_rawDesc = "" +
 	"\x10matched_identity\x18\x04 \x01(\x0e2+.hawkr.admin.seller.v1alpha1.LinkedIdentityR\x0fmatchedIdentity\x12*\n" +
 	"\x11linked_measure_id\x18\x05 \x01(\tR\x0flinkedMeasureId\x12A\n" +
 	"\x1dcan_create_linked_termination\x18\x06 \x01(\bR\x1acanCreateLinkedTermination\x12b\n" +
-	"\x12termination_option\x18\a \x01(\v2..hawkr.admin.seller.v1alpha1.TerminationOptionB\x03\xe0A\x03R\x11terminationOption\"\xdf\x02\n" +
+	"\x12termination_option\x18\a \x01(\v2..hawkr.admin.seller.v1alpha1.TerminationOptionB\x03\xe0A\x03R\x11terminationOption\x12B\n" +
+	"\x1bshared_bank_account_pending\x18\b \x01(\bB\x03\xe0A\x03R\x18sharedBankAccountPending\x12D\n" +
+	"\rreviewed_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\freviewedTime\"\xdf\x02\n" +
 	"\x11TerminationOption\x12E\n" +
 	"\x06ground\x18\x01 \x01(\x0e2(.hawkr.seller.v1alpha1.TerminationGroundB\x03\xe0A\x03R\x06ground\x12F\n" +
 	"\x0eeffective_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\reffectiveTime\x12C\n" +
@@ -1592,15 +1613,16 @@ var file_hawkr_admin_seller_v1alpha1_measure_proto_depIdxs = []int32{
 	28, // 43: hawkr.admin.seller.v1alpha1.MeasureActionUnavailability.message:type_name -> google.rpc.LocalizedMessage
 	2,  // 44: hawkr.admin.seller.v1alpha1.LinkedAccount.matched_identity:type_name -> hawkr.admin.seller.v1alpha1.LinkedIdentity
 	11, // 45: hawkr.admin.seller.v1alpha1.LinkedAccount.termination_option:type_name -> hawkr.admin.seller.v1alpha1.TerminationOption
-	26, // 46: hawkr.admin.seller.v1alpha1.TerminationOption.ground:type_name -> hawkr.seller.v1alpha1.TerminationGround
-	16, // 47: hawkr.admin.seller.v1alpha1.TerminationOption.effective_time:type_name -> google.protobuf.Timestamp
-	28, // 48: hawkr.admin.seller.v1alpha1.TerminationOption.explanation:type_name -> google.rpc.LocalizedMessage
-	3,  // 49: hawkr.admin.seller.v1alpha1.TerminationOption.violation_requirement:type_name -> hawkr.admin.seller.v1alpha1.TerminationViolationRequirement
-	50, // [50:50] is the sub-list for method output_type
-	50, // [50:50] is the sub-list for method input_type
-	50, // [50:50] is the sub-list for extension type_name
-	50, // [50:50] is the sub-list for extension extendee
-	0,  // [0:50] is the sub-list for field type_name
+	16, // 46: hawkr.admin.seller.v1alpha1.LinkedAccount.reviewed_time:type_name -> google.protobuf.Timestamp
+	26, // 47: hawkr.admin.seller.v1alpha1.TerminationOption.ground:type_name -> hawkr.seller.v1alpha1.TerminationGround
+	16, // 48: hawkr.admin.seller.v1alpha1.TerminationOption.effective_time:type_name -> google.protobuf.Timestamp
+	28, // 49: hawkr.admin.seller.v1alpha1.TerminationOption.explanation:type_name -> google.rpc.LocalizedMessage
+	3,  // 50: hawkr.admin.seller.v1alpha1.TerminationOption.violation_requirement:type_name -> hawkr.admin.seller.v1alpha1.TerminationViolationRequirement
+	51, // [51:51] is the sub-list for method output_type
+	51, // [51:51] is the sub-list for method input_type
+	51, // [51:51] is the sub-list for extension type_name
+	51, // [51:51] is the sub-list for extension extendee
+	0,  // [0:51] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_admin_seller_v1alpha1_measure_proto_init() }

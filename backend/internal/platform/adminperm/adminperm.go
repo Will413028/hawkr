@@ -87,6 +87,7 @@ const (
 	SellerMeasuresEnd                 Permission = "seller.measures.end"
 	SellerMeasuresRevoke              Permission = "seller.measures.revoke"
 	SellerMeasuresScheduleReview      Permission = "seller.measures.schedule_review"
+	SellerMeasuresReviewLinkedAccount Permission = "seller.measures.review_linked_account"
 	SellerMeasuresDecideAppeal        Permission = "seller.measures.decide_appeal"
 	SellerMeasuresDecideRemediation   Permission = "seller.measures.decide_remediation"
 	SellerMeasureNotesCreate          Permission = "seller.measure_notes.create"
@@ -130,7 +131,7 @@ func Catalog() []Permission {
 		SellerAuthorityOrdersRecordNotice, SellerAuthorityOrdersRevoke,
 		SellerViolationsList, SellerViolationsGet,
 		SellerMeasuresList, SellerMeasuresGet, SellerMeasuresCreate, SellerMeasuresUpdate, SellerMeasuresEnd, SellerMeasuresRevoke,
-		SellerMeasuresScheduleReview, SellerMeasuresDecideAppeal, SellerMeasuresDecideRemediation, SellerMeasureNotesCreate, SellerMeasureNotesList,
+		SellerMeasuresScheduleReview, SellerMeasuresReviewLinkedAccount, SellerMeasuresDecideAppeal, SellerMeasuresDecideRemediation, SellerMeasureNotesCreate, SellerMeasureNotesList,
 		SellerMeasureRequestEvidenceGet,
 		SellerProspectsList, SellerProspectsGet, SellerProspectsCreate, SellerProspectsPreview, SellerProspectsUpdate,
 		SellerProspectsArchive, SellerProspectsRestore, SellerProspectsMerge, SellerProspectsConvert,
