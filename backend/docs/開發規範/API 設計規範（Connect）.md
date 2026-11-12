@@ -205,10 +205,10 @@
 
 - 回應是檔案本身、不能把 bytes 包成 Connect 訊息的欄位（base64 膨脹，也進不了瀏覽器的圖片快取）時，不經 Connect：路由放在 `/api/files/<使用者類別>/…` 底下（`/api/files/` 不是舊 gateway 的 `/api/v1/`，不轉給 gateway），例如 `GET /api/files/admin/seller/kyc_applications/{application_id}/documents/{slot}/{position}`。使用者類別同第二節（`public`、`app`、`admin`）。
 - 與 Connect 同一條入口中介鏈：tracing、CORS、CSRF、session（`Authorization: Bearer`）、限流（級別同該使用者類別的 Connect 方法，超過回 429 加 `Retry-After`）。授權由擁有這份檔案的 handler 做（先確認使用者類別，再做業務授權），不依賴路徑。錯誤只回 HTTP 狀態，不帶細節（沒有授權與不存在不可區分）。
-- 每條 `/api/files/admin/…` 端點宣告一個權限（`platform/adminperm` 目錄裡的 `<模組>.<資源>.<動詞>`，例如 `seller.kyc_documents.get`），宣告在 `internal/httpapi` 的 `fileRoute.permission`：入口在 handler 之前檢查呼叫者是管理員而且角色允許它（`adminauth.GuardFile`），模組自己的授權（例如 KYC 的限時 reveal）在那之後。啟動時檢查每條 `/api/files/admin/` 路由都宣告了目錄裡的權限、其他路由沒有宣告，不合法就不能啟動；新增端點沒寫宣告等於不能啟動。與 admin Connect 方法的宣告同一套目錄與規則（ADR `2026-10-04-admin-roles`）。
+- 每條 `/api/files/admin/…` 端點宣告一個權限（`platform/adminperm` 目錄裡的 `<模組>.<資源>.<動詞>`，例如 `seller.kyc_documents.get`），宣告在 `internal/httpapi` 的 `fileRoute.permission`：入口在 handler 之前檢查呼叫者是管理員而且角色允許它（`adminauth.GuardFile`），模組自己的授權在那之後。啟動時檢查每條 `/api/files/admin/` 路由都宣告了目錄裡的權限、其他路由沒有宣告，不合法就不能啟動；新增端點沒寫宣告等於不能啟動。與 admin Connect 方法的宣告同一套目錄與規則（ADR `2026-10-04-admin-roles`）。
 - 機敏檔案回應 `Cache-Control: private, no-store`，加 `X-Content-Type-Options: nosniff`；`Content-Type` 只放行確定安全的型別，其餘一律 `application/octet-stream`。
 - 以業務資源定址（申請、位置），不以 asset ID：asset ID 只在擁有者的資料表裡，不出現在 URL 與回應。每次讀取是否留稽核由擁有者決定；要稽核的先寫紀錄再送內容（寫不進去就不送）。
-- 取得網址的方式是擁有者的 Connect 方法回傳（例如 KYC 的 `RevealKYCSensitive` 回 `view_uri`），不由 client 自己組。
+- 取得網址的方式是擁有者的 Connect 方法回傳（例如 KYC 的 `GetKYCApplication` 回傳的 `KYCDocument.view_uri`），不由 client 自己組。
 
 ## 與〈API 設計規範〉的關係
 
