@@ -235,25 +235,29 @@ export function KycDocumentsCard({
 		application,
 		KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
 	);
-	const [loading, setLoading] = useState<string | null>(null);
+	const [loading, setLoading] = useState<ReadonlySet<string>>(new Set());
 	const [errors, setErrors] = useState<Record<string, string>>({});
 	const objectUrl = useRef<string | null>(null);
-	useEffect(
-		() => () => {
+	const mounted = useRef(true);
+	useEffect(() => {
+		mounted.current = true;
+		return () => {
+			mounted.current = false;
 			if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
-		},
-		[],
-	);
+		};
+	}, []);
 
 	const open = async (assetId: string, src: string, alt: string) => {
-		setLoading(assetId);
+		setLoading((prev) => new Set(prev).add(assetId));
 		setErrors(({ [assetId]: _cleared, ...rest }) => rest);
 		let failure: ConnectError | undefined;
 		try {
 			const res = await fetch(src, { credentials: "same-origin" });
 			if (res.ok) {
+				const blob = await res.blob();
+				if (!mounted.current) return;
 				if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
-				objectUrl.current = URL.createObjectURL(await res.blob());
+				objectUrl.current = URL.createObjectURL(blob);
 				onPreview(objectUrl.current, alt);
 			} else {
 				failure = fileFailure(res.status);
@@ -261,7 +265,12 @@ export function KycDocumentsCard({
 		} catch {
 			failure = fileFailure(undefined);
 		}
-		setLoading(null);
+		if (!mounted.current) return;
+		setLoading((prev) => {
+			const next = new Set(prev);
+			next.delete(assetId);
+			return next;
+		});
 		if (failure) {
 			const message = errorMessage(failure);
 			setErrors((prev) => ({ ...prev, [assetId]: message }));
@@ -289,7 +298,7 @@ export function KycDocumentsCard({
 												<button
 													type="button"
 													className="btn-reset document-link"
-													disabled={loading === doc.assetId}
+													disabled={loading.has(doc.assetId)}
 													onClick={() => open(doc.assetId, src, alt)}
 												>
 													<MaterialSymbol name="open_in_new" /> 查看原圖

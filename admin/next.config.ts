@@ -21,8 +21,8 @@ const CONTENT_SECURITY_POLICY = [
 	"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
 	"font-src 'self' https://fonts.gstatic.com",
 	// image-gateway（R2 + Cloudflare Worker）是唯一圖片來源，origin 取自
-	// NEXT_PUBLIC_MEDIA_BASE_URL；沒設就只剩 'self' 與 data:。
-	["img-src 'self' data:", MEDIA_ORIGIN].filter(Boolean).join(" "),
+	// NEXT_PUBLIC_MEDIA_BASE_URL；沒設就只剩 'self'、data: 與 blob:（KYC 補充文件以 blob URL 檢視）。
+	["img-src 'self' data: blob:", MEDIA_ORIGIN].filter(Boolean).join(" "),
 	"connect-src 'self'",
 	"frame-ancestors 'none'",
 	"base-uri 'self'",

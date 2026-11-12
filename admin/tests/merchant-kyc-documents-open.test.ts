@@ -57,17 +57,28 @@ const application = create(KYCApplicationSchema, {
 
 const requests: string[] = [];
 let status = 200;
+let gate: Map<string, Promise<void>> | undefined;
 g.fetch = async (url: string) => {
 	requests.push(url);
+	await gate?.get(url);
 	return {
 		ok: status >= 200 && status < 300,
 		status,
 		blob: async () => new Blob(["x"]),
 	};
 };
-(URL as unknown as { createObjectURL: () => string }).createObjectURL = () =>
-	"blob:doc";
-(URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = () => {};
+const created: string[] = [];
+const revoked: string[] = [];
+(URL as unknown as { createObjectURL: () => string }).createObjectURL = () => {
+	const u = `blob:doc${created.length}`;
+	created.push(u);
+	return u;
+};
+(URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL = (
+	u,
+) => {
+	revoked.push(u);
+};
 
 const container = dom.window.document.body;
 let root: ReturnType<typeof createRoot> | undefined;
@@ -75,6 +86,9 @@ afterEach(async () => {
 	await React.act(async () => root?.unmount());
 	root = undefined;
 	requests.length = 0;
+	created.length = 0;
+	revoked.length = 0;
+	gate = undefined;
 	status = 200;
 });
 
@@ -101,7 +115,7 @@ test("點一份才讀那一份：一次點擊一次請求，讀到的影像交�
 	await mount((src) => opened.push(src));
 	await React.act(async () => buttons()[1]?.click());
 	assert.deepEqual(requests, [`/api/bff${URIS[1]}`]);
-	assert.deepEqual(opened, ["blob:doc"]);
+	assert.deepEqual(opened, ["blob:doc0"]);
 	await React.act(async () =>
 		root?.render(
 			React.createElement(cards.KycDocumentsCard, {
@@ -127,4 +141,54 @@ test("讀取被拒（403）：該列顯示目錄的權限文字，不交出影�
 		expected,
 	);
 	assert.equal(container.querySelectorAll("img").length, 0);
+});
+
+function deferred() {
+	let resolve!: () => void;
+	const promise = new Promise<void>((r) => {
+		resolve = r;
+	});
+	return { promise, resolve };
+}
+
+test("兩份同時讀取：先完成的不會讓還在讀的那份按鈕重新啟用，也不會重複請求", async () => {
+	const a = deferred();
+	const b = deferred();
+	gate = new Map([
+		[`/api/bff${URIS[0]}`, a.promise],
+		[`/api/bff${URIS[1]}`, b.promise],
+	]);
+	await mount(() => {});
+	await React.act(async () => buttons()[0]?.click());
+	await React.act(async () => buttons()[1]?.click());
+	assert.equal(requests.length, 2);
+	assert.ok(buttons()[0]?.disabled);
+	assert.ok(buttons()[1]?.disabled);
+	await React.act(async () => a.resolve());
+	assert.equal(buttons()[0]?.disabled, false);
+	assert.equal(buttons()[1]?.disabled, true);
+	await React.act(async () => buttons()[1]?.click());
+	assert.equal(requests.length, 2);
+	await React.act(async () => b.resolve());
+	assert.equal(buttons()[1]?.disabled, false);
+});
+
+test("卸載後才完成的請求不建立 blob URL；卸載時釋放已建立的", async () => {
+	const a = deferred();
+	gate = new Map([[`/api/bff${URIS[0]}`, a.promise]]);
+	const opened: string[] = [];
+	await mount((src) => opened.push(src));
+	await React.act(async () => buttons()[0]?.click());
+	await React.act(async () => root?.unmount());
+	root = undefined;
+	await React.act(async () => a.resolve());
+	assert.deepEqual(created, []);
+	assert.deepEqual(opened, []);
+
+	await mount(() => {});
+	await React.act(async () => buttons()[1]?.click());
+	assert.equal(created.length, 1);
+	await React.act(async () => root?.unmount());
+	root = undefined;
+	assert.deepEqual(revoked, created);
 });
