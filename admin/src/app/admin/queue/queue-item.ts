@@ -21,6 +21,7 @@ export const QUEUE_KIND_TEXT: Record<
 	[ReviewQueueItemKind.MEASURE_REVIEW]: "複審停權",
 	[ReviewQueueItemKind.KYC_APPLICATION]: "審核商家認證",
 	[ReviewQueueItemKind.PAYMENT_ACCOUNT_CREATE_FAILED]: "重試建立收款帳戶",
+	[ReviewQueueItemKind.SHARED_BANK_ACCOUNT]: "共用銀行帳號",
 };
 
 /** 篩選下拉的選項順序：enum 的順序，不含 UNSPECIFIED。 */
@@ -66,6 +67,8 @@ export function itemHref(item: ReviewQueueItem): string | undefined {
 			return `/admin/merchants/${subject.value.storeId}#kyc`;
 		case "paymentAccount":
 			return `/admin/merchants/${subject.value.storeId}#payment-account`;
+		case "sharedBankAccount":
+			return `/admin/measures/${subject.value.measureId}#linked-account-${subject.value.accountId}`;
 		default:
 			return undefined;
 	}

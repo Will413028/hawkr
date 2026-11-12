@@ -100,7 +100,7 @@ const ALL_KIND_VALUES = (
 	) as ReviewQueueItemKind[]
 ).filter((v) => v !== ReviewQueueItemKind.UNSPECIFIED);
 
-test("itemHref：12 種逐種（含錨點）", () => {
+test("itemHref：逐種（含錨點）", () => {
 	const cases: [Init, string][] = [
 		[
 			{
@@ -187,6 +187,16 @@ test("itemHref：12 種逐種（含錨點）", () => {
 			},
 			"/admin/merchants/57#payment-account",
 		],
+		[
+			{
+				kind: ReviewQueueItemKind.SHARED_BANK_ACCOUNT,
+				subject: {
+					case: "sharedBankAccount",
+					value: { measureId: "m9", accountId: "901" },
+				},
+			},
+			"/admin/measures/m9#linked-account-901",
+		],
 	];
 	assert.equal(cases.length, ALL_KIND_VALUES.length, "每種都有一筆");
 	for (const [patch, want] of cases) assert.equal(itemHref(item(patch)), want);
@@ -214,6 +224,7 @@ test("種類標籤：涵蓋 enum 的每個非 UNSPECIFIED 值；UNSPECIFIED 不�
 		[ReviewQueueItemKind.MEASURE_REVIEW, "複審停權"],
 		[ReviewQueueItemKind.KYC_APPLICATION, "審核商家認證"],
 		[ReviewQueueItemKind.PAYMENT_ACCOUNT_CREATE_FAILED, "重試建立收款帳戶"],
+		[ReviewQueueItemKind.SHARED_BANK_ACCOUNT, "共用銀行帳號"],
 	];
 	assert.equal(expected.length, ALL_KIND_VALUES.length);
 	for (const [kind, text] of expected) {
