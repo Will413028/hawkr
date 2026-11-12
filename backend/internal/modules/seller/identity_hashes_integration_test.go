@@ -117,3 +117,41 @@ func TestRehashFillsTheKeysAddedByARotation(t *testing.T) {
 		t.Fatalf("補算之後仍列出同統編的帳號：%+v", linked)
 	}
 }
+
+// 同一個店家兩筆統編不同的申請，換鑰之後兩個統編都補到新金鑰的 hash（補算以店家為單位，同一店家的申請在同一個 transaction 內補完，不被批次邊界切開）。
+// mutation：補算只處理店家的第一筆申請，或以店家＋金鑰是否有列來略過第二筆 → 第二個統編沒有 rot2 的 hash，本測試失敗（只在 CI 的 integration 驗證）。
+func TestRehashCoversEveryTaxIDOfTheSameStore(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	_, s, _ := f.submittedCompany(t, taxIDOne)
+	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO seller.kyc_applications (application_id, store_id, status, submission_seq, seller_type, company_name, tax_id, created_at, updated_at)
+		VALUES (gen_random_uuid(), $1, 'CANCELLED', 0, 'COMPANY', '測試公司', $2, $3, $3)`, s.StoreID, taxIDTwo, f.now)
+	must(t, err)
+	mac := rotatedMAC(t)
+	f.module = f.newModuleWithKeys(t, f.jobs, mac)
+	if _, err := f.module.RehashKYCIdentities(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, taxID := range []string{taxIDOne, taxIDTwo} {
+		var n int
+		must(t, f.db.Conn(ctx).QueryRow(ctx, `SELECT count(*) FROM seller.account_identity_hashes WHERE source_store_id = $1 AND field = 'TAX_ID' AND key_id = 'rot2' AND hash = $2`,
+			s.StoreID, sumFor(mac, "rot2", taxID)).Scan(&n))
+		if n != 1 {
+			t.Fatalf("統編 %s 要有 rot2 的 hash：%d", taxID, n)
+		}
+	}
+}
+
+func seal2(mac *seal.MAC, taxID string) []seal.Hash {
+	return mac.SumAll(model.IdentityInput(model.IdentityTaxID, taxID))
+}
+
+func sumFor(mac *seal.MAC, keyID, taxID string) []byte {
+	for _, h := range seal2(mac, taxID) {
+		if h.KeyID == keyID {
+			return h.Sum
+		}
+	}
+	return nil
+}

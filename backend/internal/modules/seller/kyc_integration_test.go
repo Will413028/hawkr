@@ -22,6 +22,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // 測試用的統編（檢查碼正確，不是真實的公司）。
@@ -221,13 +222,13 @@ func TestKYCSubmitsDirectlyFromRejectedWithoutASave(t *testing.T) {
 }
 
 // 平台不收身分證號、負責人身分證號、銀行代碼與帳號、存摺與身分證影像、本名、英文姓名、生日與證件發證資料（Stripe 計畫 D22、D37）：KYC 的表
-// （information_schema.columns）與申請的輸入、檢視型別都沒有這些欄位，儲存這些資料的表（kyc_reveals、kyc_identity_hashes）也不存在。
+// （information_schema.columns）與申請的輸入、檢視型別都沒有這些欄位，儲存這些資料的表（kyc_reveals、kyc_identity_hashes）也不存在，申請也不再有自己的統編 hash 欄位（D42，防詐保存只在 account_identity_hashes）。
 // mutation：在 kyc_applications 加回任何一個被刪的欄位（例如 real_name）、或在 KYCDraftInput 加回欄位 → 本測試失敗（只在 CI 的 integration 驗證）。
 func TestKYCHasNoPersonalIdentityOrBankColumnsOrFields(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	forbidden := regexp.MustCompile(`id_card|idcard|bank|real_name|realname|english_name|englishname|birth|issue_date|issue_type|issue_place|slot|reveal`)
+	forbidden := regexp.MustCompile(`id_card|idcard|bank|real_name|realname|english_name|englishname|birth|issue_date|issue_type|issue_place|slot|reveal|tax_id_hash`)
 	rows, err := f.db.Conn(ctx).Query(ctx, `SELECT table_name, column_name FROM information_schema.columns
 		WHERE table_schema = 'seller' AND table_name IN ('kyc_applications', 'kyc_documents', 'kyc_document_accesses', 'kyc_reviews', 'kyc_review_issues', 'kyc_registration_checks')`)
 	must(t, err)
@@ -579,7 +580,7 @@ func TestKYCSchemaConstraints(t *testing.T) {
 		"individual with a tax id":                        "UPDATE seller.kyc_applications SET tax_id='33330333'",
 		"website without a scheme":                        "UPDATE seller.kyc_applications SET website_url='farm.example.com'",
 		"approved without a decision time":                "UPDATE seller.kyc_applications SET status='APPROVED', submission_seq=1",
-		"landline as mobile":                              "UPDATE seller.kyc_applications SET contact_phone='0229010572'",
+		"landline as mobile":                              "UPDATE seller.stores SET contact_mobile='0229010572'",
 		"unknown status":                                  "UPDATE seller.kyc_applications SET status='FORWARDED'",
 		"document position out of range":                  "INSERT INTO seller.kyc_documents (application_id, position, asset_id, object_key) SELECT application_id, 10, 'a', 'k' FROM seller.kyc_applications",
 		"review without a reviewer":                       "INSERT INTO seller.kyc_reviews (review_id, application_id, action, decided_at) SELECT uuidv7(), application_id, 'APPROVE', now() FROM seller.kyc_applications",
@@ -588,8 +589,10 @@ func TestKYCSchemaConstraints(t *testing.T) {
 		"approve by a non positive admin":                 "INSERT INTO seller.kyc_reviews (review_id, application_id, action, reviewer_admin_id, decided_at) SELECT uuidv7(), application_id, 'APPROVE', 0, now() FROM seller.kyc_applications",
 		"seller action with a reviewer":                   "INSERT INTO seller.kyc_reviews (review_id, application_id, action, reviewer_admin_id, decided_at) SELECT uuidv7(), application_id, 'SUBMIT', 1, now() FROM seller.kyc_applications",
 	} {
-		if _, err := f.db.Conn(ctx).Exec(ctx, query); err == nil {
-			t.Errorf("%s 應該被 CHECK 擋下", name)
+		_, err := f.db.Conn(ctx).Exec(ctx, query)
+		var pg *pgconn.PgError
+		if !errors.As(err, &pg) || pg.Code != "23514" {
+			t.Errorf("%s 應該被 CHECK 擋下（23514）：%v", name, err)
 		}
 	}
 	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.kyc_applications SET product_type=NULL"); err != nil {

@@ -1237,6 +1237,12 @@ func TestDropKYCPIIPipelineMigrationDeletesRetiredRowsAndKeepsTheRest(t *testing
 		exec(`INSERT INTO seller.account_identity_hashes (source_store_id, field, key_id, hash, account_id, created_at)
 			SELECT store_id, $1, 'k1', sha256($1::bytea), account_id, now() FROM seller.stores WHERE store_code = 2600000710`, field)
 	}
+	exec(`INSERT INTO seller.measures (id, account_id, store_id, kind, basis, risk_ground, review_by, statement_to_seller, current_revision, created_by_admin_id, created_at, updated_at, starts_at)
+		SELECT '0199dddd-0000-7000-8000-000000000004', account_id, store_id, 'SUSPENSION', 'RISK', 'FRAUD', now() + interval '1 day', 'x', 1, 1, now(), now(), now() FROM seller.stores WHERE store_code = 2600000710`)
+	exec(`INSERT INTO seller.measure_revisions (measure_id, revision, statement_to_seller, admin_id, created_at) VALUES ('0199dddd-0000-7000-8000-000000000004', 1, 'x', 1, now())`)
+	for _, kind := range []string{"ID_CARD", "TAX_ID", "BANK_ACCOUNT"} {
+		exec(`INSERT INTO seller.measure_identities (measure_id, kind, key_id, hash) VALUES ('0199dddd-0000-7000-8000-000000000004', $1, 'k1', sha256($1::bytea))`, kind)
+	}
 	exec(`INSERT INTO seller.kyc_reveals (reveal_id, application_id, admin_id, reason, revealed_at, expires_at)
 		VALUES ('0199dddd-0000-7000-8000-000000000003', '0199dddd-0000-7000-8000-000000000001', 9, '核對', now(), now() + interval '15 minutes')`)
 	exec(`INSERT INTO seller.kyc_document_accesses (access_id, application_id, reveal_id, slot, position, asset_id, accessed_at)
@@ -1278,6 +1284,18 @@ func TestDropKYCPIIPipelineMigrationDeletesRetiredRowsAndKeepsTheRest(t *testing
 	must(t, rows.Err())
 	if !slices.Equal(hashFields, []string{"BANK_FINGERPRINT", "TAX_ID"}) {
 		t.Errorf("防詐保存只留統編與銀行 fingerprint：%v", hashFields)
+	}
+	var kinds []string
+	rows, err = d.Pool().Query(ctx, `SELECT kind FROM seller.measure_identities ORDER BY kind`)
+	must(t, err)
+	for rows.Next() {
+		var k string
+		must(t, rows.Scan(&k))
+		kinds = append(kinds, k)
+	}
+	must(t, rows.Err())
+	if !slices.Equal(kinds, []string{"BANK_ACCOUNT", "TAX_ID"}) {
+		t.Errorf("措施的身分快照刪掉 ID_CARD，留下統編與銀行帳號：%v", kinds)
 	}
 	if n := count(`SELECT count(*) FROM seller.kyc_document_accesses`); n != 0 {
 		t.Errorf("舊的讀取紀錄掛在被刪的授權上，清空：%d", n)
