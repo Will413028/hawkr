@@ -39,10 +39,10 @@
 | 外部呼叫不在 transaction 內，一個帳戶一個 sync job | payment 模組的同步 job（唯一鍵 `store_id`）；PayUni 的 sync job 已在 8a 刪除 |
 | 收款帳戶快取不倒退：較早開始的讀取不覆蓋較晚開始的（D32） | `payment/db/queries` 的 `ApplyPaymentSnapshot`（`fetched_at` 條件）、`payment/internal/account/sync.go` 的 `Sync`（被擋下時不標記 inbox、不發 `PayoutAccountChanged`）、seller 的 `GetMyOnboarding` 同步重讀 |
 | 外部事件先寫 inbox 再處理 | `backend/AGENTS.md` 單體規則 5；單體目前沒有 webhook inbox（PayUni webhook 由舊服務收），步驟 4 新建 `seller.payment_provider_events` |
-| KYC 個資只存密文，身分比對只用 HMAC blind index | `seller/internal/kyc`、`kyc_identity_hashes`、`measure_identities`、`CheckKYCKeys`、`TestKYCNeverReturnsOrStoresPlaintext` |
+| 平台不收身分證號、銀行帳號、證件影像與個人姓名（D22、D37）；統編與銀行 fingerprint 的比對只用 HMAC blind index，存在防詐保存表（D42） | `seller/internal/kyc`、`account_identity_hashes`、`measure_identities`、`CheckKYCKeys`、`TestKYCHasNoPersonalIdentityOrBankColumnsOrFields` |
 | 關店兩段清理（30 天、184 天） | `seller/internal/purge`、`model.StoreRetireAfter`、`model.StoreRetention`、`stores_pii_purged_check`、`kyc_applications_purged_check`、`agreement_acceptances_purged_check`、payment 的 `ForgetOwners` |
 | 入駐同意的現行版本只有一個來源 | `internal/model/agreement_gen.go` 的 `CurrentAgreements`（`website/scripts/generate-legal.ts` 從 `website/docs/legal/` 產生）、`agreement_acceptances_kind_check`、已接受的紀錄；同意種類只有 `SELLER_TERMS`、`KYC_PRIVACY_NOTICE`（proto enum、DB CHECK、manifest，8a 起） |
-| 後台權限字串在宣告表登記，缺漏時單體不啟動 | `internal/platform/adminperm/adminperm.go`、`internal/httpapi/adminauth` 的宣告表（8a 起 80 支） |
+| 後台權限字串在宣告表登記，缺漏時單體不啟動 | `internal/platform/adminperm/adminperm.go`、`internal/httpapi/adminauth` 的宣告表（8a 起 80 支，8b 刪 `RevealKYCSensitive`、`ListKYCReveals` 後 78 支） |
 | 模組依賴圖的唯一來源 | `internal/arch/modules.go` |
 | `pub_*` 與 migration 一致 | `TestPubContractsMatchMigrations`（`cmd/hawkr`） |
 | 共用文案與法務生成物無 drift | `make uitext`、`ui-text-generated-diff.yml`、`generate-legal.ts` 的生成物 |
