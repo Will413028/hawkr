@@ -196,36 +196,10 @@ func (t Text) SellerKYCApplicationSubmitTime(time string) string {
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerKYCField(v string) (string, bool) {
 	switch v {
-	case "REAL_NAME":
-		return "真實姓名", true
-	case "BIRTH_DATE":
-		return "出生日期", true
-	case "ID_CARD_ISSUE_DATE":
-		return "發證日期", true
-	case "ID_CARD_ISSUE_TYPE":
-		return "發證類型", true
-	case "ID_CARD_ISSUE_LOCATION":
-		return "發證地點", true
-	case "ENGLISH_NAME":
-		return "英文姓名", true
-	case "BANK_NAME":
-		return "銀行名稱", true
-	case "BANK_CODE":
-		return "銀行代碼", true
-	case "BANK_ACCOUNT":
-		return "銀行帳號", true
 	case "PRODUCT_TYPE":
 		return "主要商品類型", true
 	case "WEBSITE_URL":
 		return "官方網站", true
-	case "ID_CARD_FRONT":
-		return "身分證正面照", true
-	case "ID_CARD_BACK":
-		return "身分證反面照", true
-	case "BANK_BOOK":
-		return "存摺封面", true
-	case "INDIVIDUAL_ID_CARD_NO":
-		return "身分證字號", true
 	case "BUSINESS_COMPANY_NAME":
 		return "公司名稱", true
 	case "BUSINESS_TAX_ID":
@@ -234,8 +208,6 @@ func (t Text) SellerKYCField(v string) (string, bool) {
 		return "設立日期", true
 	case "BUSINESS_COMPANY_PHONE":
 		return "公司電話", true
-	case "BUSINESS_REP_ID_CARD_NO":
-		return "負責人身分證字號", true
 	case "BUSINESS_COMPANY_DOCUMENTS":
 		return "補充文件", true
 	case "BUSINESS_COMPANY_ADDRESS":

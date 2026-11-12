@@ -54,27 +54,13 @@ export type UiTextKey =
 	| "seller.ContentKind.CONTENT_KIND_POST"
 	| "seller.KYCApplication.decide_time"
 	| "seller.KYCApplication.submit_time"
-	| "seller.KYCField.KYC_FIELD_BANK_ACCOUNT"
-	| "seller.KYCField.KYC_FIELD_BANK_BOOK"
-	| "seller.KYCField.KYC_FIELD_BANK_CODE"
-	| "seller.KYCField.KYC_FIELD_BANK_NAME"
-	| "seller.KYCField.KYC_FIELD_BIRTH_DATE"
 	| "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_ADDRESS"
 	| "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS"
 	| "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME"
 	| "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_PHONE"
 	| "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE"
-	| "seller.KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO"
 	| "seller.KYCField.KYC_FIELD_BUSINESS_TAX_ID"
-	| "seller.KYCField.KYC_FIELD_ENGLISH_NAME"
-	| "seller.KYCField.KYC_FIELD_ID_CARD_BACK"
-	| "seller.KYCField.KYC_FIELD_ID_CARD_FRONT"
-	| "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_DATE"
-	| "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_LOCATION"
-	| "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_TYPE"
-	| "seller.KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO"
 	| "seller.KYCField.KYC_FIELD_PRODUCT_TYPE"
-	| "seller.KYCField.KYC_FIELD_REAL_NAME"
 	| "seller.KYCField.KYC_FIELD_WEBSITE_URL"
 	| "seller.KYCStatus.KYC_STATUS_APPROVED"
 	| "seller.KYCStatus.KYC_STATUS_CANCELLED"
@@ -323,26 +309,12 @@ export function sellerKYCApplicationSubmitTime(a: { time: string }): UiMessage {
 }
 
 const SELLER_KYCFIELD: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "seller.KYCField.KYC_FIELD_REAL_NAME",
-	2: "seller.KYCField.KYC_FIELD_BIRTH_DATE",
-	3: "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_DATE",
-	4: "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_TYPE",
-	5: "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_LOCATION",
-	6: "seller.KYCField.KYC_FIELD_ENGLISH_NAME",
-	7: "seller.KYCField.KYC_FIELD_BANK_NAME",
-	8: "seller.KYCField.KYC_FIELD_BANK_CODE",
-	9: "seller.KYCField.KYC_FIELD_BANK_ACCOUNT",
 	10: "seller.KYCField.KYC_FIELD_PRODUCT_TYPE",
 	12: "seller.KYCField.KYC_FIELD_WEBSITE_URL",
-	15: "seller.KYCField.KYC_FIELD_ID_CARD_FRONT",
-	16: "seller.KYCField.KYC_FIELD_ID_CARD_BACK",
-	17: "seller.KYCField.KYC_FIELD_BANK_BOOK",
-	18: "seller.KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO",
 	20: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME",
 	21: "seller.KYCField.KYC_FIELD_BUSINESS_TAX_ID",
 	22: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE",
 	25: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_PHONE",
-	26: "seller.KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO",
 	27: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS",
 	28: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_ADDRESS",
 };

@@ -190,26 +190,6 @@
       },
       "description": "商家認證審核中時，平台審核區顯示送出時間的標籤。time 是台北時間（YYYY/MM/DD HH:mm）。"
     },
-    "seller.KYCField.KYC_FIELD_BANK_ACCOUNT": {
-      "message": "銀行帳號",
-      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BANK_ACCOUNT）"
-    },
-    "seller.KYCField.KYC_FIELD_BANK_BOOK": {
-      "message": "存摺封面",
-      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BANK_BOOK）"
-    },
-    "seller.KYCField.KYC_FIELD_BANK_CODE": {
-      "message": "銀行代碼",
-      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BANK_CODE）"
-    },
-    "seller.KYCField.KYC_FIELD_BANK_NAME": {
-      "message": "銀行名稱",
-      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BANK_NAME）"
-    },
-    "seller.KYCField.KYC_FIELD_BIRTH_DATE": {
-      "message": "出生日期",
-      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BIRTH_DATE）"
-    },
     "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_ADDRESS": {
       "message": "公司地址",
       "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BUSINESS_COMPANY_ADDRESS）"
@@ -230,49 +210,13 @@
       "message": "設立日期",
       "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE）"
     },
-    "seller.KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO": {
-      "message": "負責人身分證字號",
-      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BUSINESS_REP_ID_CARD_NO）"
-    },
     "seller.KYCField.KYC_FIELD_BUSINESS_TAX_ID": {
       "message": "統一編號",
       "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BUSINESS_TAX_ID）"
     },
-    "seller.KYCField.KYC_FIELD_ENGLISH_NAME": {
-      "message": "英文姓名",
-      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_ENGLISH_NAME）"
-    },
-    "seller.KYCField.KYC_FIELD_ID_CARD_BACK": {
-      "message": "身分證反面照",
-      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_ID_CARD_BACK）"
-    },
-    "seller.KYCField.KYC_FIELD_ID_CARD_FRONT": {
-      "message": "身分證正面照",
-      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_ID_CARD_FRONT）"
-    },
-    "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_DATE": {
-      "message": "發證日期",
-      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_ID_CARD_ISSUE_DATE）"
-    },
-    "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_LOCATION": {
-      "message": "發證地點",
-      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_ID_CARD_ISSUE_LOCATION）"
-    },
-    "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_TYPE": {
-      "message": "發證類型",
-      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_ID_CARD_ISSUE_TYPE）"
-    },
-    "seller.KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO": {
-      "message": "身分證字號",
-      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_INDIVIDUAL_ID_CARD_NO）"
-    },
     "seller.KYCField.KYC_FIELD_PRODUCT_TYPE": {
       "message": "主要商品類型",
       "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_PRODUCT_TYPE）"
-    },
-    "seller.KYCField.KYC_FIELD_REAL_NAME": {
-      "message": "真實姓名",
-      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的\n欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_REAL_NAME）"
     },
     "seller.KYCField.KYC_FIELD_WEBSITE_URL": {
       "message": "官方網站",
@@ -788,7 +732,7 @@
     },
     "seller.TerminationGround.TERMINATION_GROUND_LINKED_ACCOUNT": {
       "message": "關聯帳號",
-      "description": "與另一個帳號的終止（來源措施）使用同一個身分證明文件或統一編號，立即生效；來源措施撤銷時一併撤銷\n（RevokeReason.SOURCE_REVOKED）。賣家可對這筆單獨申覆。"
+      "description": "與另一個帳號的終止（來源措施）使用同一個統一編號，立即生效；來源措施撤銷時一併撤銷\n（RevokeReason.SOURCE_REVOKED）。賣家可對這筆單獨申覆。"
     },
     "seller.TerminationGround.TERMINATION_GROUND_MATERIAL_BREACH": {
       "message": "重大違約未改善",
