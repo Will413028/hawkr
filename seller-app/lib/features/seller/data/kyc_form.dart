@@ -221,6 +221,7 @@ SaveKYCDraftRequest? buildSaveKycDraftRequest({
   required KycDocs docs,
   required KycForm baseline,
   required KycDocs baselineDocs,
+  KycSubject? baselineSubject,
   String? etag,
 }) {
   final creating = etag == null || etag.isEmpty;
@@ -305,6 +306,14 @@ SaveKYCDraftRequest? buildSaveKycDraftRequest({
     biz.companyDocuments.addAll([
       for (final doc in docs.companyDocuments) doc.toDocument(),
     ]);
+    touchesBranch = true;
+  }
+
+  // 個人沒有欄位，型態只由 subject 設定的那一支表示：已有申請從企業改成個人時，update_mask 要直接列 individual，並送出空的 individual。
+  if (!creating &&
+      subject == KycSubject.individual &&
+      baselineSubject == KycSubject.business) {
+    paths.add('individual');
     touchesBranch = true;
   }
 

@@ -64,6 +64,15 @@ function json(request: ReturnType<typeof draft>) {
 }
 
 describe("SaveKYCDraft：建立與更新", () => {
+	it("既有公司申請改選個人：update_mask 列 individual、送出空的 individual（個人沒有欄位）", () => {
+		const request = draft(
+			{ sellerType: "individual" },
+			{ baseline: { sellerType: "business" }, etag: "e1" },
+		);
+		expect(request?.application?.subject.case).toBe("individual");
+		expect(json(request).updateMask).toBe("individual");
+	});
+
 	it("還沒有申請：不帶 etag、subject 一定設定（建立）", () => {
 		const request = draft({ sellerType: "business" });
 		expect(request?.application?.etag).toBe("");

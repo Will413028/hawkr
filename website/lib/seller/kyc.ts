@@ -283,6 +283,12 @@ export function buildSaveKycDraftRequest(
 		touchesBranch = true;
 	}
 
+	// 個人沒有欄位，型態只由 subject 設定的那一支表示：已有申請從公司改成個人時，要在 update_mask 直接列 individual 並送出空的 individual。
+	if (!creating && !business && baseline.sellerType === "business") {
+		paths.push(appPath("individual"));
+		touchesBranch = true;
+	}
+
 	if (!creating && paths.length === 0) return null;
 
 	if (creating || touchesBranch) {

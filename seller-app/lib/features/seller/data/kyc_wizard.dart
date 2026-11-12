@@ -422,6 +422,7 @@ class KycWizard extends _$KycWizard {
       docs: docs,
       baseline: creating ? const KycForm() : state.baseline,
       baselineDocs: creating ? const KycDocs() : state.baselineDocs,
+      baselineSubject: creating ? null : kycSubjectOf(application),
       etag: creating || _etag.isEmpty ? null : _etag,
     );
   }

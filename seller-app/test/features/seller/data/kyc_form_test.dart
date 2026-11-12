@@ -13,6 +13,7 @@ SaveKYCDraftRequest? _build({
   KycDocs docs = const KycDocs(),
   KycForm baseline = const KycForm(),
   KycDocs baselineDocs = const KycDocs(),
+  KycSubject? baselineSubject,
   String? etag = 'v1',
 }) => buildSaveKycDraftRequest(
   subject: subject,
@@ -20,6 +21,7 @@ SaveKYCDraftRequest? _build({
   docs: docs,
   baseline: baseline,
   baselineDocs: baselineDocs,
+  baselineSubject: baselineSubject,
   etag: etag,
 );
 
@@ -27,6 +29,16 @@ void main() {
   group('buildSaveKycDraftRequest', () {
     test('沒有改動就不送', () {
       expect(_build(), isNull);
+    });
+
+    test('既有企業申請改選個人：update_mask 列 individual，送出空的 individual', () {
+      final request = _build(
+        subject: KycSubject.individual,
+        baselineSubject: KycSubject.business,
+      )!;
+
+      expect(request.application.hasIndividual(), isTrue);
+      expect(request.updateMask.paths, ['individual']);
     });
 
     test('建立：沒有 etag，subject 一定設定，所有非零值都列進 update_mask', () {
