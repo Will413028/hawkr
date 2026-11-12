@@ -494,7 +494,7 @@ func LinkedIdentityValues() []LinkedIdentity {
 	return []LinkedIdentity{LinkedUBN, LinkedBankAccount}
 }
 
-// CountsAsGround 回報這種命中能不能當作建立關聯終止（LINKED_ACCOUNT）的依據：身分證號與統編可以，銀行帳號只列出。列出關聯帳號（linkedAccounts）與
+// CountsAsGround 回報這種命中能不能當作建立關聯終止（LINKED_ACCOUNT）的依據：統編可以，銀行帳號只列出。列出關聯帳號（linkedAccounts）與
 // 建立時的再驗證（CreateMeasure）都只問它，所以「只列出、不能建立」只有這一個判斷點。
 func (i LinkedIdentity) CountsAsGround() bool { return i != LinkedBankAccount }
 

@@ -142,7 +142,7 @@ LIMIT sqlc.arg(page_size);
 -- admin 審核佇列的「新到舊」：依送出時間（不是草稿的建立時間）。只列送出過的申請（不含草稿，也不含沒送出就取消的），
 -- 狀態篩選；query_pattern 是店名、公司名稱或統編的子字串（ILIKE，呼叫方已跳脫 % _ \）。篩選審核中的佇列走
 -- AdminKYCApplicationsOldestFirst（兩支的條件必須一致）。
-SELECT a.*
+SELECT sqlc.embed(a), s.account_id, s.store_name
 FROM seller.kyc_applications a
 JOIN seller.stores s ON s.store_id = a.store_id
 WHERE a.status <> 'DRAFT' AND a.submitted_at IS NOT NULL
@@ -162,7 +162,7 @@ LIMIT sqlc.arg(page_size);
 
 -- name: AdminKYCApplicationsOldestFirst :many
 -- admin 審核佇列的「舊到新」（篩選審核中時：等最久的在最前面），條件同 AdminKYCApplications，只有排序與 keyset 方向相反。
-SELECT a.*
+SELECT sqlc.embed(a), s.account_id, s.store_name
 FROM seller.kyc_applications a
 JOIN seller.stores s ON s.store_id = a.store_id
 WHERE a.status <> 'DRAFT' AND a.submitted_at IS NOT NULL
@@ -224,7 +224,7 @@ WHERE mi.measure_id = sqlc.arg(measure_id)
 ORDER BY f.account_id, f.field;
 
 -- name: InsertAccountIdentityHash :exec
--- 防詐保存的比對 hash（與 InsertKYCIdentityHash 在同一個 transaction、同一個呼叫點寫入）；帳號取自來源 stint；已存在的略過（補金鑰可重跑）。
+-- 防詐保存的比對 hash（隨申請寫入的同一個 transaction、同一個呼叫點寫入）；帳號取自來源 stint；已存在的略過（補金鑰可重跑）。
 INSERT INTO seller.account_identity_hashes (source_store_id, field, key_id, hash, account_id, created_at)
 SELECT s.store_id, sqlc.arg(field)::text, sqlc.arg(key_id)::text, sqlc.arg(hash)::bytea, s.account_id, sqlc.arg(created_at)::timestamptz
 FROM seller.stores s
@@ -246,18 +246,24 @@ WHERE a.source_store_id = sqlc.arg(store_id) AND a.field = 'TAX_ID'
   AND a.hash <> ALL(sqlc.arg(keep)::bytea[]);
 
 -- name: KYCApplicationsMissingHashKey :many
--- 還有統編、但防詐保存缺這把金鑰的 hash 的申請（個資清理過的沒有統編，不在其中）：換鑰之後補算用，依 application_id 一批一批取（after_id 是上一批最後一筆），
--- 鎖住申請列，與草稿寫入互斥。
+-- 缺這把金鑰的防詐保存 hash 的店家，連同它所有還有統編的申請（個資清理過的沒有統編，不在其中）：換鑰之後補算用。以店家為單位收斂：一批取 batch_limit 個店家
+-- （依 store_id，after_store_id 是上一批最後一個店家），店家的申請整批一起回來，同一店家不會被批次邊界切開，所以同店不同統編的申請都補得到。鎖住申請列，與草稿寫入互斥。
 SELECT a.*
 FROM seller.kyc_applications a
 WHERE a.pii_purged_at IS NULL
   AND a.tax_id IS NOT NULL
-  AND (sqlc.narg(after_id)::uuid IS NULL OR a.application_id > sqlc.narg(after_id)::uuid)
-  AND NOT EXISTS (
-    SELECT 1 FROM seller.account_identity_hashes h
-    WHERE h.source_store_id = a.store_id AND h.field = 'TAX_ID' AND h.key_id = sqlc.arg(key_id)::text)
-ORDER BY a.application_id
-LIMIT sqlc.arg(batch_limit)
+  AND a.store_id IN (
+    SELECT DISTINCT m.store_id
+    FROM seller.kyc_applications m
+    WHERE m.pii_purged_at IS NULL
+      AND m.tax_id IS NOT NULL
+      AND (sqlc.narg(after_store_id)::bigint IS NULL OR m.store_id > sqlc.narg(after_store_id)::bigint)
+      AND NOT EXISTS (
+        SELECT 1 FROM seller.account_identity_hashes h
+        WHERE h.source_store_id = m.store_id AND h.field = 'TAX_ID' AND h.key_id = sqlc.arg(key_id)::text)
+    ORDER BY m.store_id
+    LIMIT sqlc.arg(batch_limit))
+ORDER BY a.store_id, a.application_id
 FOR UPDATE OF a;
 
 -- name: DeleteIdentitiesOutside :exec
@@ -274,12 +280,6 @@ SELECT DISTINCT m.account_id
 FROM seller.measure_identities mi
 JOIN seller.measures m ON m.id = mi.measure_id
 ORDER BY m.account_id;
-
--- name: StoreAccounts :many
--- 一批店家所屬的帳號與店名（admin 清單補顯示欄位；申請列只存 store_id）。
-SELECT store_id, account_id, store_name
-FROM seller.stores
-WHERE store_id = ANY(sqlc.arg(store_ids)::bigint[]);
 
 -- name: ReferencedKeyIDs :many
 -- 資料庫裡被參照的每一把 HMAC 金鑰 ID（啟動檢查用）：防詐保存的 hash 與處分的身分快照。

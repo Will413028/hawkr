@@ -41,7 +41,7 @@ func (q *Queries) AccountsWithMeasureSnapshots(ctx context.Context) ([]int64, er
 }
 
 const adminKYCApplications = `-- name: AdminKYCApplications :many
-SELECT a.application_id, a.store_id, a.status, a.version, a.seller_type, a.product_type, a.website_url, a.company_name, a.tax_id, a.company_register_date, a.company_town_code, a.company_address_detail, a.company_phone, a.submitted_at, a.submission_seq, a.decided_at, a.created_at, a.updated_at, a.pii_purged_at
+SELECT a.application_id, a.store_id, a.status, a.version, a.seller_type, a.product_type, a.website_url, a.company_name, a.tax_id, a.company_register_date, a.company_town_code, a.company_address_detail, a.company_phone, a.submitted_at, a.submission_seq, a.decided_at, a.created_at, a.updated_at, a.pii_purged_at, s.account_id, s.store_name
 FROM seller.kyc_applications a
 JOIN seller.stores s ON s.store_id = a.store_id
 WHERE a.status <> 'DRAFT' AND a.submitted_at IS NOT NULL
@@ -68,10 +68,16 @@ type AdminKYCApplicationsParams struct {
 	PageSize         int32
 }
 
+type AdminKYCApplicationsRow struct {
+	SellerKycApplication SellerKycApplication
+	AccountID            int64
+	StoreName            *string
+}
+
 // admin 審核佇列的「新到舊」：依送出時間（不是草稿的建立時間）。只列送出過的申請（不含草稿，也不含沒送出就取消的），
 // 狀態篩選；query_pattern 是店名、公司名稱或統編的子字串（ILIKE，呼叫方已跳脫 % _ \）。篩選審核中的佇列走
 // AdminKYCApplicationsOldestFirst（兩支的條件必須一致）。
-func (q *Queries) AdminKYCApplications(ctx context.Context, arg AdminKYCApplicationsParams) ([]SellerKycApplication, error) {
+func (q *Queries) AdminKYCApplications(ctx context.Context, arg AdminKYCApplicationsParams) ([]AdminKYCApplicationsRow, error) {
 	rows, err := q.db.Query(ctx, adminKYCApplications,
 		arg.Status,
 		arg.QueryPattern,
@@ -83,29 +89,31 @@ func (q *Queries) AdminKYCApplications(ctx context.Context, arg AdminKYCApplicat
 		return nil, err
 	}
 	defer rows.Close()
-	items := []SellerKycApplication{}
+	items := []AdminKYCApplicationsRow{}
 	for rows.Next() {
-		var i SellerKycApplication
+		var i AdminKYCApplicationsRow
 		if err := rows.Scan(
-			&i.ApplicationID,
-			&i.StoreID,
-			&i.Status,
-			&i.Version,
-			&i.SellerType,
-			&i.ProductType,
-			&i.WebsiteUrl,
-			&i.CompanyName,
-			&i.TaxID,
-			&i.CompanyRegisterDate,
-			&i.CompanyTownCode,
-			&i.CompanyAddressDetail,
-			&i.CompanyPhone,
-			&i.SubmittedAt,
-			&i.SubmissionSeq,
-			&i.DecidedAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.PiiPurgedAt,
+			&i.SellerKycApplication.ApplicationID,
+			&i.SellerKycApplication.StoreID,
+			&i.SellerKycApplication.Status,
+			&i.SellerKycApplication.Version,
+			&i.SellerKycApplication.SellerType,
+			&i.SellerKycApplication.ProductType,
+			&i.SellerKycApplication.WebsiteUrl,
+			&i.SellerKycApplication.CompanyName,
+			&i.SellerKycApplication.TaxID,
+			&i.SellerKycApplication.CompanyRegisterDate,
+			&i.SellerKycApplication.CompanyTownCode,
+			&i.SellerKycApplication.CompanyAddressDetail,
+			&i.SellerKycApplication.CompanyPhone,
+			&i.SellerKycApplication.SubmittedAt,
+			&i.SellerKycApplication.SubmissionSeq,
+			&i.SellerKycApplication.DecidedAt,
+			&i.SellerKycApplication.CreatedAt,
+			&i.SellerKycApplication.UpdatedAt,
+			&i.SellerKycApplication.PiiPurgedAt,
+			&i.AccountID,
+			&i.StoreName,
 		); err != nil {
 			return nil, err
 		}
@@ -118,7 +126,7 @@ func (q *Queries) AdminKYCApplications(ctx context.Context, arg AdminKYCApplicat
 }
 
 const adminKYCApplicationsOldestFirst = `-- name: AdminKYCApplicationsOldestFirst :many
-SELECT a.application_id, a.store_id, a.status, a.version, a.seller_type, a.product_type, a.website_url, a.company_name, a.tax_id, a.company_register_date, a.company_town_code, a.company_address_detail, a.company_phone, a.submitted_at, a.submission_seq, a.decided_at, a.created_at, a.updated_at, a.pii_purged_at
+SELECT a.application_id, a.store_id, a.status, a.version, a.seller_type, a.product_type, a.website_url, a.company_name, a.tax_id, a.company_register_date, a.company_town_code, a.company_address_detail, a.company_phone, a.submitted_at, a.submission_seq, a.decided_at, a.created_at, a.updated_at, a.pii_purged_at, s.account_id, s.store_name
 FROM seller.kyc_applications a
 JOIN seller.stores s ON s.store_id = a.store_id
 WHERE a.status <> 'DRAFT' AND a.submitted_at IS NOT NULL
@@ -145,8 +153,14 @@ type AdminKYCApplicationsOldestFirstParams struct {
 	PageSize         int32
 }
 
+type AdminKYCApplicationsOldestFirstRow struct {
+	SellerKycApplication SellerKycApplication
+	AccountID            int64
+	StoreName            *string
+}
+
 // admin 審核佇列的「舊到新」（篩選審核中時：等最久的在最前面），條件同 AdminKYCApplications，只有排序與 keyset 方向相反。
-func (q *Queries) AdminKYCApplicationsOldestFirst(ctx context.Context, arg AdminKYCApplicationsOldestFirstParams) ([]SellerKycApplication, error) {
+func (q *Queries) AdminKYCApplicationsOldestFirst(ctx context.Context, arg AdminKYCApplicationsOldestFirstParams) ([]AdminKYCApplicationsOldestFirstRow, error) {
 	rows, err := q.db.Query(ctx, adminKYCApplicationsOldestFirst,
 		arg.Status,
 		arg.QueryPattern,
@@ -158,29 +172,31 @@ func (q *Queries) AdminKYCApplicationsOldestFirst(ctx context.Context, arg Admin
 		return nil, err
 	}
 	defer rows.Close()
-	items := []SellerKycApplication{}
+	items := []AdminKYCApplicationsOldestFirstRow{}
 	for rows.Next() {
-		var i SellerKycApplication
+		var i AdminKYCApplicationsOldestFirstRow
 		if err := rows.Scan(
-			&i.ApplicationID,
-			&i.StoreID,
-			&i.Status,
-			&i.Version,
-			&i.SellerType,
-			&i.ProductType,
-			&i.WebsiteUrl,
-			&i.CompanyName,
-			&i.TaxID,
-			&i.CompanyRegisterDate,
-			&i.CompanyTownCode,
-			&i.CompanyAddressDetail,
-			&i.CompanyPhone,
-			&i.SubmittedAt,
-			&i.SubmissionSeq,
-			&i.DecidedAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.PiiPurgedAt,
+			&i.SellerKycApplication.ApplicationID,
+			&i.SellerKycApplication.StoreID,
+			&i.SellerKycApplication.Status,
+			&i.SellerKycApplication.Version,
+			&i.SellerKycApplication.SellerType,
+			&i.SellerKycApplication.ProductType,
+			&i.SellerKycApplication.WebsiteUrl,
+			&i.SellerKycApplication.CompanyName,
+			&i.SellerKycApplication.TaxID,
+			&i.SellerKycApplication.CompanyRegisterDate,
+			&i.SellerKycApplication.CompanyTownCode,
+			&i.SellerKycApplication.CompanyAddressDetail,
+			&i.SellerKycApplication.CompanyPhone,
+			&i.SellerKycApplication.SubmittedAt,
+			&i.SellerKycApplication.SubmissionSeq,
+			&i.SellerKycApplication.DecidedAt,
+			&i.SellerKycApplication.CreatedAt,
+			&i.SellerKycApplication.UpdatedAt,
+			&i.SellerKycApplication.PiiPurgedAt,
+			&i.AccountID,
+			&i.StoreName,
 		); err != nil {
 			return nil, err
 		}
@@ -302,7 +318,7 @@ type InsertAccountIdentityHashParams struct {
 	StoreID   int64
 }
 
-// 防詐保存的比對 hash（與 InsertKYCIdentityHash 在同一個 transaction、同一個呼叫點寫入）；帳號取自來源 stint；已存在的略過（補金鑰可重跑）。
+// 防詐保存的比對 hash（隨申請寫入的同一個 transaction、同一個呼叫點寫入）；帳號取自來源 stint；已存在的略過（補金鑰可重跑）。
 func (q *Queries) InsertAccountIdentityHash(ctx context.Context, arg InsertAccountIdentityHashParams) error {
 	_, err := q.db.Exec(ctx, insertAccountIdentityHash,
 		arg.Field,
@@ -558,25 +574,31 @@ SELECT a.application_id, a.store_id, a.status, a.version, a.seller_type, a.produ
 FROM seller.kyc_applications a
 WHERE a.pii_purged_at IS NULL
   AND a.tax_id IS NOT NULL
-  AND ($1::uuid IS NULL OR a.application_id > $1::uuid)
-  AND NOT EXISTS (
-    SELECT 1 FROM seller.account_identity_hashes h
-    WHERE h.source_store_id = a.store_id AND h.field = 'TAX_ID' AND h.key_id = $2::text)
-ORDER BY a.application_id
-LIMIT $3
+  AND a.store_id IN (
+    SELECT DISTINCT m.store_id
+    FROM seller.kyc_applications m
+    WHERE m.pii_purged_at IS NULL
+      AND m.tax_id IS NOT NULL
+      AND ($1::bigint IS NULL OR m.store_id > $1::bigint)
+      AND NOT EXISTS (
+        SELECT 1 FROM seller.account_identity_hashes h
+        WHERE h.source_store_id = m.store_id AND h.field = 'TAX_ID' AND h.key_id = $2::text)
+    ORDER BY m.store_id
+    LIMIT $3)
+ORDER BY a.store_id, a.application_id
 FOR UPDATE OF a
 `
 
 type KYCApplicationsMissingHashKeyParams struct {
-	AfterID    *uuid.UUID
-	KeyID      string
-	BatchLimit int32
+	AfterStoreID *int64
+	KeyID        string
+	BatchLimit   int32
 }
 
-// 還有統編、但防詐保存缺這把金鑰的 hash 的申請（個資清理過的沒有統編，不在其中）：換鑰之後補算用，依 application_id 一批一批取（after_id 是上一批最後一筆），
-// 鎖住申請列，與草稿寫入互斥。
+// 缺這把金鑰的防詐保存 hash 的店家，連同它所有還有統編的申請（個資清理過的沒有統編，不在其中）：換鑰之後補算用。以店家為單位收斂：一批取 batch_limit 個店家
+// （依 store_id，after_store_id 是上一批最後一個店家），店家的申請整批一起回來，同一店家不會被批次邊界切開，所以同店不同統編的申請都補得到。鎖住申請列，與草稿寫入互斥。
 func (q *Queries) KYCApplicationsMissingHashKey(ctx context.Context, arg KYCApplicationsMissingHashKeyParams) ([]SellerKycApplication, error) {
-	rows, err := q.db.Query(ctx, kYCApplicationsMissingHashKey, arg.AfterID, arg.KeyID, arg.BatchLimit)
+	rows, err := q.db.Query(ctx, kYCApplicationsMissingHashKey, arg.AfterStoreID, arg.KeyID, arg.BatchLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -1062,39 +1084,6 @@ type SnapshotMeasureIdentitiesParams struct {
 func (q *Queries) SnapshotMeasureIdentities(ctx context.Context, arg SnapshotMeasureIdentitiesParams) error {
 	_, err := q.db.Exec(ctx, snapshotMeasureIdentities, arg.MeasureID, arg.AccountID)
 	return err
-}
-
-const storeAccounts = `-- name: StoreAccounts :many
-SELECT store_id, account_id, store_name
-FROM seller.stores
-WHERE store_id = ANY($1::bigint[])
-`
-
-type StoreAccountsRow struct {
-	StoreID   int64
-	AccountID int64
-	StoreName *string
-}
-
-// 一批店家所屬的帳號與店名（admin 清單補顯示欄位；申請列只存 store_id）。
-func (q *Queries) StoreAccounts(ctx context.Context, storeIds []int64) ([]StoreAccountsRow, error) {
-	rows, err := q.db.Query(ctx, storeAccounts, storeIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []StoreAccountsRow{}
-	for rows.Next() {
-		var i StoreAccountsRow
-		if err := rows.Scan(&i.StoreID, &i.AccountID, &i.StoreName); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const storeKYCTaxIDs = `-- name: StoreKYCTaxIDs :many

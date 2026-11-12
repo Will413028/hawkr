@@ -43,40 +43,39 @@ func (s *Service) AdminList(ctx context.Context, in model.KYCListInput) (model.K
 		afterAt, afterID = &in.After.SubmittedAt, &in.After.ApplicationID
 	}
 	q := store.New(s.d.DB.Conn(ctx))
-	var rows []store.SellerKycApplication
+	var items []model.KYCApplication
 	if in.OldestFirst() {
-		rows, err = q.AdminKYCApplicationsOldestFirst(ctx, store.AdminKYCApplicationsOldestFirstParams{
+		rows, err := q.AdminKYCApplicationsOldestFirst(ctx, store.AdminKYCApplicationsOldestFirstParams{
 			Status: status, QueryPattern: pattern, AfterSubmittedAt: afterAt, AfterID: afterID, PageSize: size + 1,
 		})
+		if err != nil {
+			return model.KYCPage{}, err
+		}
+		for _, r := range rows {
+			item := toApplication(r.SellerKycApplication, r.AccountID)
+			item.StoreName = r.StoreName
+			items = append(items, item)
+		}
 	} else {
-		rows, err = q.AdminKYCApplications(ctx, store.AdminKYCApplicationsParams{
+		rows, err := q.AdminKYCApplications(ctx, store.AdminKYCApplicationsParams{
 			Status: status, QueryPattern: pattern, AfterSubmittedAt: afterAt, AfterID: afterID, PageSize: size + 1,
 		})
+		if err != nil {
+			return model.KYCPage{}, err
+		}
+		for _, r := range rows {
+			item := toApplication(r.SellerKycApplication, r.AccountID)
+			item.StoreName = r.StoreName
+			items = append(items, item)
+		}
 	}
-	if err != nil {
-		return model.KYCPage{}, err
-	}
-	hasMore := len(rows) > int(size)
+	hasMore := len(items) > int(size)
 	if hasMore {
-		rows = rows[:size]
+		items = items[:size]
 	}
-	ids := make([]int64, 0, len(rows))
-	for _, row := range rows {
-		ids = append(ids, row.StoreID)
-	}
-	owners, err := q.StoreAccounts(ctx, ids)
-	if err != nil {
-		return model.KYCPage{}, err
-	}
-	accounts := make(map[int64]store.StoreAccountsRow, len(owners))
-	for _, o := range owners {
-		accounts[o.StoreID] = o
-	}
-	page := model.KYCPage{Items: make([]model.KYCApplication, 0, len(rows))}
-	for _, row := range rows {
-		item := toApplication(row, accounts[row.StoreID].AccountID)
-		item.StoreName = accounts[row.StoreID].StoreName
-		page.Items = append(page.Items, item)
+	page := model.KYCPage{Items: items}
+	if page.Items == nil {
+		page.Items = []model.KYCApplication{}
 	}
 	if hasMore {
 		last := page.Items[len(page.Items)-1]
