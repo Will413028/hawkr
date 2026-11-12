@@ -479,24 +479,16 @@ test("文件類的欄位只有補充文件：申請上的文件與退回的問�
 // ---------------------------------------------------------------------------
 // 公司補充文件：檢視網址與 asset_id 直接來自申請
 
-test("補充文件：影像是同源 /api/bff 加上申請給的 view_uri，沒有直連後端，也沒有任何身分或銀行的欄位與影像", () => {
+test("補充文件：初次 render 只列文件與「查看原圖」按鈕，不含任何 view_uri 的網址或 <img>（讀取才會留紀錄）", () => {
 	const app = businessApplication();
 	const html = render(cards.KycDocumentsCard as never, {
 		application: app,
 		onPreview: noop,
 	});
-	assert.match(
-		html,
-		/\/api\/bff\/api\/files\/admin\/seller\/kyc_applications\/app1\/documents\/0/u,
-	);
-	assert.match(
-		html,
-		/\/api\/bff\/api\/files\/admin\/seller\/kyc_applications\/app1\/documents\/1/u,
-	);
-	assert.doesNotMatch(html, /documents\/[a-z_]+\/\d/u, "檢視網址沒有 slot 段");
-	for (const src of html.match(/src="[^"]*"/gu) ?? []) {
-		assert.doesNotMatch(src, /^src="https?:/u, `不得直連：${src}`);
-	}
+	assert.doesNotMatch(html, /\/api\/files\/|\/api\/bff|<img|src=|href=/u);
+	assert.match(html, /補充文件 1/u);
+	assert.match(html, /補充文件 2/u);
+	assert.equal((html.match(/查看原圖/gu) ?? []).length, 2);
 	assert.doesNotMatch(
 		html,
 		/需先顯示全文|身分證|存摺|銀行|顯示全文/u,

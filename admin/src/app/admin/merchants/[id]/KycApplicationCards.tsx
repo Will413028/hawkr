@@ -1,16 +1,16 @@
 "use client";
 
 import { timestampDate } from "@bufbuild/protobuf/wkt";
+import { Code, ConnectError } from "@connectrpc/connect";
 import type {
 	KYCApplication,
-	KYCDocument,
 	Store,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
 import { KYCField } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
-import Image from "next/image";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Button, StatusBadge } from "@/components/UI";
+import { errorMessage } from "@/lib/error-text";
 import { formatDateTimeShort } from "@/lib/format";
 import {
 	documentSrc,
@@ -203,66 +203,27 @@ function GcisRowCells({
 // ---------------------------------------------------------------------------
 // 檢附文件
 
-/** 一張公司補充文件影像：經同源 /api/bff 讀取（點圖放大，載入失敗可開原檔）。 */
-function DocumentImage({
-	document,
-	alt,
-	width,
-	height,
-	onPreview,
-}: {
-	document: KYCDocument;
-	alt: string;
-	width: number;
-	height: number;
-	onPreview: (src: string, alt: string) => void;
-}) {
-	const [failed, setFailed] = useState(false);
-	const src = documentSrc(document.viewUri);
-	if (!src) {
-		return (
-			<div className="id-card-placeholder">
-				<MaterialSymbol name="image" />
-				<span>無法檢視</span>
-			</div>
-		);
+/** 檔案端點的 HTTP 狀態對應的錯誤碼，文字走目錄的預設文字（沒有收到回應視為暫時不可用）。 */
+function fileFailure(status: number | undefined): ConnectError {
+	switch (status) {
+		case 401:
+			return new ConnectError("", Code.Unauthenticated);
+		case 403:
+			return new ConnectError("", Code.PermissionDenied);
+		case 404:
+			return new ConnectError("", Code.NotFound);
+		case undefined:
+		case 503:
+			return new ConnectError("", Code.Unavailable);
+		default:
+			return new ConnectError("", Code.Internal);
 	}
-	if (failed) {
-		return (
-			<div className="id-card-placeholder">
-				<MaterialSymbol name="image" />
-				<span>載入失敗</span>
-				<a
-					href={src}
-					target="_blank"
-					rel="noopener noreferrer"
-					className="document-link"
-				>
-					<MaterialSymbol name="open_in_new" /> 開啟原檔
-				</a>
-			</div>
-		);
-	}
-	return (
-		<button
-			type="button"
-			className="btn-reset kyc-document-open"
-			onClick={() => onPreview(src, alt)}
-			aria-label={`放大檢視${alt}`}
-		>
-			<Image
-				src={src}
-				alt={alt}
-				width={width}
-				height={height}
-				unoptimized
-				onError={() => setFailed(true)}
-			/>
-		</button>
-	);
 }
 
-/** 公司補充文件。 */
+/**
+ * 公司補充文件：只列文件，不自動載入影像（每次讀取檔案端點都會留下讀取紀錄）。
+ * 點「查看原圖」才讀那一份（一次點擊一次請求），讀到後交給放大檢視；失敗時在該列顯示錯誤，不顯示破圖。
+ */
 export function KycDocumentsCard({
 	application,
 	onPreview,
@@ -274,6 +235,39 @@ export function KycDocumentsCard({
 		application,
 		KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
 	);
+	const [loading, setLoading] = useState<string | null>(null);
+	const [errors, setErrors] = useState<Record<string, string>>({});
+	const objectUrl = useRef<string | null>(null);
+	useEffect(
+		() => () => {
+			if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+		},
+		[],
+	);
+
+	const open = async (assetId: string, src: string, alt: string) => {
+		setLoading(assetId);
+		setErrors(({ [assetId]: _cleared, ...rest }) => rest);
+		let failure: ConnectError | undefined;
+		try {
+			const res = await fetch(src, { credentials: "same-origin" });
+			if (res.ok) {
+				if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+				objectUrl.current = URL.createObjectURL(await res.blob());
+				onPreview(objectUrl.current, alt);
+			} else {
+				failure = fileFailure(res.status);
+			}
+		} catch {
+			failure = fileFailure(undefined);
+		}
+		setLoading(null);
+		if (failure) {
+			const message = errorMessage(failure);
+			setErrors((prev) => ({ ...prev, [assetId]: message }));
+		}
+	};
+
 	return (
 		<div className="detail-card">
 			<div className="section-title">
@@ -288,27 +282,23 @@ export function KycDocumentsCard({
 							const alt = `${kycFieldLabel(doc.field)} ${doc.position + 1}`;
 							return (
 								<div className="document-item" key={doc.assetId}>
-									<div className="document-image">
-										<DocumentImage
-											document={doc}
-											alt={alt}
-											width={120}
-											height={80}
-											onPreview={onPreview}
-										/>
-									</div>
 									<div className="document-info">
 										<div className="document-info-text">
 											<span className="document-number">{alt}</span>
-											{src && (
-												<a
-													href={src}
-													target="_blank"
-													rel="noopener noreferrer"
-													className="document-link"
+											{src ? (
+												<button
+													type="button"
+													className="btn-reset document-link"
+													disabled={loading === doc.assetId}
+													onClick={() => open(doc.assetId, src, alt)}
 												>
 													<MaterialSymbol name="open_in_new" /> 查看原圖
-												</a>
+												</button>
+											) : (
+												<span>無法檢視</span>
+											)}
+											{errors[doc.assetId] && (
+												<span role="alert">{errors[doc.assetId]}</span>
 											)}
 										</div>
 									</div>

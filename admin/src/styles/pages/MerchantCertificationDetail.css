@@ -563,21 +563,6 @@
 	border: 1px solid #dadada;
 }
 
-.document-image {
-	width: 120px;
-	height: 80px;
-	border-radius: 10px;
-	overflow: hidden;
-	background: #f3f4f6;
-	flex-shrink: 0;
-}
-
-.document-image img {
-	width: 100%;
-	height: 100%;
-	object-fit: cover;
-}
-
 .document-info {
 	flex: 1;
 	display: flex;
@@ -1049,13 +1034,6 @@
 
 .kyc-gcis-requery {
 	margin-top: 8px;
-}
-
-.kyc-document-open {
-	display: block;
-	width: 100%;
-	height: 100%;
-	cursor: zoom-in;
 }
 
 .kyc-review-list {

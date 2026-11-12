@@ -1546,23 +1546,6 @@ textarea.form-control {
 	border-radius: 12px;
 }
 
-.document-image {
-	width: 100px;
-	height: 70px;
-	border-radius: 8px;
-	overflow: hidden;
-	background: var(--gray-200);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-
-.document-image img {
-	width: 100%;
-	height: 100%;
-	object-fit: cover;
-}
-
 .document-placeholder {
 	color: var(--gray-400);
 	font-size: 32px;
