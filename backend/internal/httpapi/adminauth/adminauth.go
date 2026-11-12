@@ -70,12 +70,10 @@ var declarations = map[string]declaration{
 	sellerv1alpha1connect.SellerAdminServiceGetStoreOnboardingProcedure:      requires(adminperm.SellerStoreOnboardingGet),
 	sellerv1alpha1connect.SellerAdminServiceListKYCApplicationsProcedure:     requires(adminperm.SellerKYCApplicationsList),
 	sellerv1alpha1connect.SellerAdminServiceGetKYCApplicationProcedure:       requires(adminperm.SellerKYCApplicationsGet),
-	sellerv1alpha1connect.SellerAdminServiceListKYCRevealsProcedure:          requires(adminperm.SellerKYCRevealsList),
 	sellerv1alpha1connect.SellerAdminServiceListKYCDocumentAccessesProcedure: requires(adminperm.SellerKYCDocumentAccessesList),
 	sellerv1alpha1connect.SellerAdminServiceApproveKYCProcedure:              requires(adminperm.SellerKYCApplicationsApprove),
 	sellerv1alpha1connect.SellerAdminServiceRejectKYCProcedure:               requires(adminperm.SellerKYCApplicationsReject),
 	sellerv1alpha1connect.SellerAdminServiceRequeryKYCRegistrationProcedure:  requires(adminperm.SellerKYCApplicationsRequery),
-	sellerv1alpha1connect.SellerAdminServiceRevealKYCSensitiveProcedure:      requires(adminperm.SellerKYCRevealsCreate),
 
 	sellerv1alpha1connect.SellerGovernanceAdminServiceListReportsProcedure:                 requires(adminperm.SellerReportsList),
 	sellerv1alpha1connect.SellerGovernanceAdminServiceGetReportProcedure:                   requires(adminperm.SellerReportsGet),

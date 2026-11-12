@@ -148,7 +148,7 @@ func TestExposableStoresExcludesEachFailingCondition(t *testing.T) {
 		},
 		"kyc not approved": func(t *testing.T, f *fixture) int64 {
 			accountID, s := f.open(t)
-			d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+			d := f.savedDraft(t, kycDraft(accountID))
 			_, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 			must(t, err)
 			cur, err := f.module.Store(ctx, s.StoreID)

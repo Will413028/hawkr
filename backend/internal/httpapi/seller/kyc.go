@@ -21,15 +21,11 @@ import (
 
 // kycFields 是模組的草稿輸入的欄位名對應到 KYCApplication 的欄位路徑（與 KYCField 一對一）。
 var kycFields = map[string]string{
-	"SellerType": "individual", "RealName": "real_name", "BirthDate": "birth_date", "IDCardNo": "individual.id_card_no",
-	"IDCardIssueDate": "id_card_issue_date", "IDCardIssueType": "id_card_issue_type",
-	"IDCardIssueLocation": "id_card_issue_location", "EnglishName": "english_name", "BankName": "bank_name",
-	"BankCode": "bank_code", "BankAccount": "bank_account", "ProductType": "product_type",
+	"SellerType": "individual", "ProductType": "product_type",
 	"WebsiteURL":  "website_url",
 	"CompanyName": "business.company_name",
 	"TaxID":       "business.tax_id", "CompanyRegisterDate": "business.company_register_date", "CompanyTownCode": "business.company_address.town_code",
 	"CompanyAddressDetail": "business.company_address.address_detail", "CompanyPhone": "business.company_phone",
-	"RepIDCardNo": "business.rep_id_card_no", "IDCardFront": "id_card_front", "IDCardBack": "id_card_back", "BankBook": "bank_book",
 	"CompanyDocuments[]": "business.company_documents[]",
 }
 
@@ -92,7 +88,7 @@ func (h *App) SaveKYCDraft(ctx context.Context, req *connect.Request[pb.SaveKYCD
 }
 
 // kycDraftInput 把 update_mask 選到的欄位轉成模組的部分更新：沒有選到的欄位是 nil（保留原值），選到卻沒有值的是空字串
-// （清成沒有值）。目前的值不在請求裡（身分證號與銀行帳號只能讀到遮蔽後的值），所以不能先合併再整筆送（API 設計規範 §七）。
+// （清成沒有值）。所以不能先合併再整筆送（API 設計規範 §七）。
 // 可寫的欄位集合由 proto 的 descriptor 決定（rpc.WritableFields），這裡沒有「哪個型態有哪些欄位」的清單：賣家型態是 subject
 // 設定的那一支。建立時必須設定其中一支；update_mask 列到的欄位在另一支底下是請求自相矛盾；設定的那一支與目前的型態不同
 // 時，模組切換型態並清掉另一型態專屬的欄位。
@@ -107,18 +103,25 @@ func kycDraftInput(app *pb.KYCApplication, mask *fieldmaskpb.FieldMask, create b
 		return slices.ContainsFunc(paths, func(p string) bool { return strings.HasPrefix(p, prefix) })
 	}
 	individual, business := app.GetIndividual(), app.GetBusiness()
+	// individual 沒有欄位（平台不收身分證號，D22），型態只由「設定了哪一支」表示，所以 mask 要能直接列 individual 或 business 這一支。
+	maskLists := func(path string) bool { return mask != nil && slices.Contains(mask.GetPaths(), path) }
+	touchesBranch := func(branch string) bool { return touches(branch+".") || maskLists(branch) }
+	// selected 回報設定的那一支是否被這次寫入選到：列了它的欄位、直接列了它、「*」，或沒帶 mask（視為所有有值的欄位）。
+	selected := func(branch string, set bool) bool {
+		return set && (touchesBranch(branch) || maskLists("*") || len(mask.GetPaths()) == 0)
+	}
 	switch {
-	case touches("individual.") && app.GetSubject() != nil && business != nil,
-		touches("business.") && app.GetSubject() != nil && individual != nil:
+	case touchesBranch("individual") && business != nil,
+		touchesBranch("business") && individual != nil:
 		return in, rpc.Error(connect.CodeInvalidArgument, "update_mask 列到的欄位與設定的 individual 或 business 不一致")
-	case touches("individual.") && touches("business."):
+	case touchesBranch("individual") && touchesBranch("business"):
 		return in, rpc.Error(connect.CodeInvalidArgument, "update_mask 不能同時列到 individual 與 business 的欄位")
 	}
 	switch {
-	case individual != nil && (create || touches("individual.")):
+	case individual != nil && (create || selected("individual", true)):
 		t := model.KYCIndividual
 		in.SellerType = &t
-	case business != nil && (create || touches("business.")):
+	case business != nil && (create || selected("business", true)):
 		t := model.KYCCompany
 		in.SellerType = &t
 	case create:
@@ -139,26 +142,8 @@ func kycDraftInput(app *pb.KYCApplication, mask *fieldmaskpb.FieldMask, create b
 		}
 		*dst = &v
 	}
-	single := func(path string, dst **model.KYCDocumentRef, d *pb.KYCDocument) {
-		if has(path) {
-			*dst = ptr(documentRef(d))
-		}
-	}
-	text("real_name", &in.RealName, app.GetRealName())
-	day("birth_date", &in.BirthDate, app.GetBirthDate())
-	day("id_card_issue_date", &in.IDCardIssueDate, app.GetIdCardIssueDate())
-	text("id_card_issue_type", &in.IDCardIssueType, app.GetIdCardIssueType())
-	text("id_card_issue_location", &in.IDCardIssueLocation, app.GetIdCardIssueLocation())
-	text("english_name", &in.EnglishName, app.GetEnglishName())
-	text("bank_name", &in.BankName, app.GetBankName())
-	text("bank_code", &in.BankCode, app.GetBankCode())
-	text("bank_account", &in.BankAccount, app.GetBankAccount())
 	text("product_type", &in.ProductType, app.GetProductType())
 	text("website_url", &in.WebsiteURL, app.GetWebsiteUrl())
-	single("id_card_front", &in.IDCardFront, app.GetIdCardFront())
-	single("id_card_back", &in.IDCardBack, app.GetIdCardBack())
-	single("bank_book", &in.BankBook, app.GetBankBook())
-	text("individual.id_card_no", &in.IDCardNo, individual.GetIdCardNo())
 	text("business.company_name", &in.CompanyName, business.GetCompanyName())
 	text("business.tax_id", &in.TaxID, business.GetTaxId())
 	day("business.company_register_date", &in.CompanyRegisterDate, business.GetCompanyRegisterDate())
@@ -175,7 +160,6 @@ func kycDraftInput(app *pb.KYCApplication, mask *fieldmaskpb.FieldMask, create b
 		}
 	}
 	text("business.company_phone", &in.CompanyPhone, business.GetCompanyPhone())
-	text("business.rep_id_card_no", &in.RepIDCardNo, business.GetRepIdCardNo())
 	if has("business.company_documents") {
 		refs := make([]model.KYCDocumentRef, 0, len(business.GetCompanyDocuments()))
 		for _, d := range business.GetCompanyDocuments() {
@@ -186,7 +170,7 @@ func kycDraftInput(app *pb.KYCApplication, mask *fieldmaskpb.FieldMask, create b
 	return in, nil
 }
 
-// documentRef 是請求裡一張證件的指定；沒有值（nil 訊息）是空的指定：單張的位置清掉。
+// documentRef 是請求裡一張公司文件的指定（保留現有的 asset 或換上新上傳的）。
 func documentRef(d *pb.KYCDocument) model.KYCDocumentRef {
 	return model.KYCDocumentRef{AssetID: d.GetAssetId(), StagedToken: d.GetStagedToken()}
 }
@@ -240,24 +224,21 @@ func (h *App) CancelKYC(ctx context.Context, req *connect.Request[pb.CancelKYCRe
 	return connect.NewResponse(&pb.CancelKYCResponse{Application: toKYC(ctx, cancelled)}), nil
 }
 
-// toKYC 轉成契約的申請：只有遮蔽後的值（模組的型別沒有明文欄位），證件只有 asset ID 與有授權的下載網址。
+// toKYC 轉成契約的申請（模組的型別沒有身分證號、銀行帳號與個人姓名的欄位），補充文件只有 asset ID 與有授權的下載網址。
 func toKYC(ctx context.Context, a model.KYCApplication) *pb.KYCApplication {
 	out := &pb.KYCApplication{
 		Id: a.ID.String(), Status: rpc.EnumToProto[pb.KYCStatus](a.Status), Etag: rpc.Etag(a.Version),
-		RealName: deref(a.RealName), BirthDate: toDate(a.BirthDate),
-		IdCardIssueDate: toDate(a.IDCardIssueDate), IdCardIssueType: deref(a.IDCardIssueType), IdCardIssueLocation: deref(a.IDCardIssueLocation),
-		EnglishName: deref(a.EnglishName), BankName: deref(a.BankName), BankCode: deref(a.BankCode), BankAccountMasked: deref(a.BankAccountMasked),
 		ProductType: deref(a.ProductType),
 		WebsiteUrl:  deref(a.WebsiteURL),
 		CreateTime:  timestamppb.New(a.CreatedAt), UpdateTime: timestamppb.New(a.UpdatedAt),
 	}
 	switch a.SellerType {
 	case model.KYCIndividual:
-		out.Subject = &pb.KYCApplication_Individual{Individual: &pb.IndividualKYC{IdCardNoMasked: deref(a.IDCardNoMasked)}}
+		out.Subject = &pb.KYCApplication_Individual{Individual: &pb.IndividualKYC{}}
 	case model.KYCCompany:
 		b := &pb.BusinessKYC{
 			CompanyName: deref(a.CompanyName), TaxId: deref(a.TaxID),
-			CompanyRegisterDate: toDate(a.CompanyRegisterDate), CompanyPhone: deref(a.CompanyPhone), RepIdCardNoMasked: deref(a.RepIDCardNoMasked),
+			CompanyRegisterDate: toDate(a.CompanyRegisterDate), CompanyPhone: deref(a.CompanyPhone),
 		}
 		if a.CompanyTownCode != nil {
 			b.CompanyAddress = &commonpb.PostalAddress{
@@ -277,17 +258,8 @@ func toKYC(ctx context.Context, a model.KYCApplication) *pb.KYCApplication {
 	slices.Sort(out.MissingStoreFields)
 	for _, d := range a.Documents {
 		doc := &pb.KYCDocument{AssetId: d.AssetID, DownloadUri: secureDownloadURI(d.AssetID)}
-		switch d.Slot {
-		case model.SlotIDCardFront:
-			out.IdCardFront = doc
-		case model.SlotIDCardBack:
-			out.IdCardBack = doc
-		case model.SlotBankBook:
-			out.BankBook = doc
-		case model.SlotCompanyDocument:
-			if business := out.GetBusiness(); business != nil {
-				business.CompanyDocuments = append(business.CompanyDocuments, doc)
-			}
+		if business := out.GetBusiness(); business != nil {
+			business.CompanyDocuments = append(business.CompanyDocuments, doc)
 		}
 	}
 	if r := a.LastRejection; r != nil {

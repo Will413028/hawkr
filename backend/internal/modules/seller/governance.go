@@ -216,9 +216,7 @@ const (
 	AppealReasonWindowEnded          = model.AppealReasonWindowEnded
 	AppealReasonRequestPending       = model.AppealReasonRequestPending
 	RevisionStoreClosed              = model.RevisionStoreClosed
-	LinkedNationalID                 = model.LinkedNationalID
 	LinkedUBN                        = model.LinkedUBN
-	LinkedResponsiblePersonID        = model.LinkedResponsiblePersonID
 	LinkedBankAccount                = model.LinkedBankAccount
 	RiskTransaction                  = model.RiskTransaction
 	RiskFoodSafety                   = model.RiskFoodSafety

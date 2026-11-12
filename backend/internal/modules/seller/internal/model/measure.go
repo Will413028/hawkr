@@ -482,20 +482,16 @@ type Measure struct {
 type LinkedIdentity string
 
 const (
-	// LinkedNationalID 賣家本人的身分證號相同。
-	LinkedNationalID LinkedIdentity = "NATIONAL_ID"
 	// LinkedUBN 統一編號相同。
 	LinkedUBN LinkedIdentity = "UBN"
-	// LinkedResponsiblePersonID 企業負責人的身分證號相同。
-	LinkedResponsiblePersonID LinkedIdentity = "RESPONSIBLE_PERSON_ID"
-	// LinkedBankAccount 銀行帳號（連同銀行代碼）相同。只列出、不能據以建立關聯終止（Stripe 計畫 D4：家人或配偶共用帳戶是常態，與 ADR
+	// LinkedBankAccount 金流商回報的銀行帳號 fingerprint 相同。只列出、不能據以建立關聯終止（Stripe 計畫 D4：家人或配偶共用帳戶是常態，與 ADR
 	// 2026-10-19-seller-kyc-payuni-consolidated「銀行帳號命中只標記，不擋」同一個判斷）。
 	LinkedBankAccount LinkedIdentity = "BANK_ACCOUNT"
 )
 
 // LinkedIdentityValues 回傳全部命中的身分類別，依同時命中多種時的取用順序。
 func LinkedIdentityValues() []LinkedIdentity {
-	return []LinkedIdentity{LinkedNationalID, LinkedUBN, LinkedResponsiblePersonID, LinkedBankAccount}
+	return []LinkedIdentity{LinkedUBN, LinkedBankAccount}
 }
 
 // CountsAsGround 回報這種命中能不能當作建立關聯終止（LINKED_ACCOUNT）的依據：身分證號與統編可以，銀行帳號只列出。列出關聯帳號（linkedAccounts）與

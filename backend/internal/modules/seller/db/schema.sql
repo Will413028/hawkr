@@ -892,7 +892,7 @@ CREATE UNIQUE INDEX suspension_periods_open ON seller.suspension_periods (store_
 
 -- 措施的身分快照（ADR 2026-10-19-seller-kyc-payuni-consolidated「身分比對與比對 hash」）：停權措施建立時，把被處分帳號全部
 -- KYC 申請（跨 stint）的身分 blind index 複製過來，措施結束或撤銷時刪除；KYC 列的個資照常清理，這裡是措施擁有的、
--- 唯一保留的比對依據。kind 是比對的種類（身分證號與企業負責人身分證號同一種：同一個人不論以個人或負責人入駐都算），
+-- 唯一保留的比對依據。kind 是比對的種類（統編 TAX_ID；金流商回報的銀行帳號指紋 BANK_ACCOUNT，Stripe 計畫 D38：平台不再收身分證號與銀行帳號），
 -- key_id 是算出 hash 的 HMAC 金鑰：快照沒有明文可以重算，所以這把金鑰要留在金鑰環直到措施結束。比對只讀這張表，
 -- 「生效中」的判斷一律經 stint.Derive（不在這裡再寫一份）。
 CREATE TABLE seller.measure_identities (
@@ -901,7 +901,7 @@ CREATE TABLE seller.measure_identities (
     key_id     TEXT NOT NULL,
     hash       BYTEA NOT NULL,
     PRIMARY KEY (measure_id, kind, hash),
-    CONSTRAINT measure_identities_kind_check CHECK (kind IN ('ID_CARD', 'TAX_ID', 'BANK_ACCOUNT')),
+    CONSTRAINT measure_identities_kind_check CHECK (kind IN ('TAX_ID', 'BANK_ACCOUNT')),
     CONSTRAINT measure_identities_key_check CHECK (key_id <> ''),
     CONSTRAINT measure_identities_hash_check CHECK (octet_length(hash) = 32)
 );
@@ -912,13 +912,11 @@ CREATE INDEX measure_identities_hash ON seller.measure_identities (hash);
 -- JSON），草稿時除了身分以外都可以是 NULL，送出之後必填由 kyc_applications_complete_check 表達。status 只記人工決定
 -- （草稿、送出、核准、退回、取消）；收款帳戶的狀態由 payment 模組擁有，不混進這條軸。ID 是 UUIDv7（應用層產生）：申請
 -- 是 media 引用、事件與稽核指稱的實體，Java 不存它（row-identity ADR）。
--- 個資：id_card_no、rep_id_card_no（企業負責人）與 bank_account 是 AES-256-GCM 的密文（platform/seal，AAD 是申請 ID
--- 加欄位名），real_name 與 birth_date 明文（後台以姓名模糊搜尋，ADR 2026-07-20）。每個識別欄位另有一個 blind index
--- （HMAC，輸入帶欄位標籤；*_hash_key 是算出它的金鑰 ID），給處分的身分快照用。聯絡資料（聯絡人、聯絡手機、
+-- 個資：平台不收身分證號、銀行帳號、證件影像與個人姓名（Stripe 計畫 D22、D37）；統編 tax_id 是市集登記資料（明文），它的 blind index
+-- 只在防詐保存的 account_identity_hashes（D42），草稿的「欄位有沒有改」直接比明文。聯絡資料（聯絡人、聯絡手機、
 -- 客服信箱）是店家的欄位（stores），不在申請上。收款聯絡信箱不在申請上：它是帳號的聯絡信箱（identity，D23 2026-11-03 修訂），送出時要求帳號有，核准時傳給 payment 模組快照到收款帳戶列（payment.accounts.contact_email）。公司地址以內政部的鄉鎮市區代碼表示（同 stores）。
 -- version 是樂觀鎖（etag 的來源）：所有寫入者必帶讀到的版本。
--- 個資清理：店家關閉滿保留期後 purge 套件清掉全部個人欄位（密文、blind index、姓名、生日、證件資訊、聯絡方式、公司與
--- 地址），記下 pii_purged_at；審核的事實（狀態、時間、審核紀錄）與不具名的欄位（seller_type、product_type）保留。kyc_applications_purged_check 列出被清掉的欄位：清理過的列這些一定是 NULL。處分的身分快照不在這裡
+-- 個資清理：店家關閉滿保留期後 purge 套件清掉全部個人欄位（統編、公司與地址），記下 pii_purged_at；審核的事實（狀態、時間、審核紀錄）與不具名的欄位（seller_type、product_type）保留。kyc_applications_purged_check 列出被清掉的欄位：清理過的列這些一定是 NULL。處分的身分快照不在這裡
 -- （measure_identities，隨措施結束才刪），所以清理不影響身分比對。
 CREATE TABLE seller.kyc_applications (
     application_id          UUID PRIMARY KEY,
@@ -926,33 +924,14 @@ CREATE TABLE seller.kyc_applications (
     status                  TEXT NOT NULL DEFAULT 'DRAFT',
     version                 BIGINT NOT NULL DEFAULT 1,
     seller_type             TEXT NOT NULL,
-    real_name               TEXT,
-    birth_date              DATE,
-    id_card_no_enc          BYTEA,
-    id_card_hash            BYTEA,
-    id_card_hash_key        TEXT,
-    id_card_issue_date      DATE,
-    id_card_issue_type      TEXT,
-    id_card_issue_location  TEXT,
-    english_name            TEXT,
-    bank_name               TEXT,
-    bank_code               TEXT,
-    bank_account_enc        BYTEA,
-    bank_account_hash       BYTEA,
-    bank_account_hash_key   TEXT,
     product_type            TEXT,
     website_url             TEXT,
     company_name            TEXT,
     tax_id                  TEXT,
-    tax_id_hash             BYTEA,
-    tax_id_hash_key         TEXT,
     company_register_date   DATE,
     company_town_code       TEXT,
     company_address_detail  TEXT,
     company_phone           TEXT,
-    rep_id_card_no_enc      BYTEA,
-    rep_id_card_hash        BYTEA,
-    rep_id_card_hash_key    TEXT,
     submitted_at            TIMESTAMPTZ,
     submission_seq          BIGINT NOT NULL DEFAULT 0,
     decided_at              TIMESTAMPTZ,
@@ -963,14 +942,6 @@ CREATE TABLE seller.kyc_applications (
     CONSTRAINT kyc_applications_seller_type_check CHECK (seller_type IN ('INDIVIDUAL', 'COMPANY')),
     CONSTRAINT kyc_applications_version_check CHECK (version >= 1),
     CONSTRAINT kyc_applications_submission_seq_check CHECK (submission_seq >= 0 AND (status IN ('DRAFT', 'CANCELLED') OR submission_seq >= 1)),
-    CONSTRAINT kyc_applications_real_name_check CHECK (char_length(real_name) >= 1 AND char_length(real_name) <= 100 AND real_name !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
-    CONSTRAINT kyc_applications_birth_date_check CHECK (birth_date >= DATE '1900-01-01'),
-    CONSTRAINT kyc_applications_issue_date_check CHECK (id_card_issue_date >= DATE '1900-01-01'),
-    CONSTRAINT kyc_applications_issue_type_check CHECK (char_length(id_card_issue_type) BETWEEN 1 AND 20),
-    CONSTRAINT kyc_applications_issue_location_check CHECK (char_length(id_card_issue_location) BETWEEN 1 AND 100),
-    CONSTRAINT kyc_applications_english_name_check CHECK (char_length(english_name) BETWEEN 1 AND 50),
-    CONSTRAINT kyc_applications_bank_name_check CHECK (char_length(bank_name) BETWEEN 1 AND 100),
-    CONSTRAINT kyc_applications_bank_code_check CHECK (bank_code ~ '^[0-9]{3}([0-9]{4})?$'),
     CONSTRAINT kyc_applications_product_type_check CHECK (char_length(product_type) BETWEEN 1 AND 100),
     CONSTRAINT kyc_applications_website_check CHECK (website_url ~ '^https?://[^/?#]+' AND char_length(website_url) <= 500),
     CONSTRAINT kyc_applications_company_name_check CHECK (char_length(company_name) BETWEEN 1 AND 200),
@@ -981,27 +952,11 @@ CREATE TABLE seller.kyc_applications (
         company_address_detail IS NULL OR (company_town_code IS NOT NULL AND char_length(company_address_detail) BETWEEN 1 AND 255)
     ),
     CONSTRAINT kyc_applications_company_phone_check CHECK (company_phone ~ '^0[0-9]{8,9}$'),
-    -- 密文、blind index 與它的金鑰 ID 成組：有值就一起有、一起沒有。
-    CONSTRAINT kyc_applications_id_card_check CHECK (
-        (id_card_no_enc IS NULL) = (id_card_hash IS NULL) AND (id_card_hash IS NULL) = (id_card_hash_key IS NULL)
-    ),
-    CONSTRAINT kyc_applications_rep_id_card_check CHECK (
-        (rep_id_card_no_enc IS NULL) = (rep_id_card_hash IS NULL) AND (rep_id_card_hash IS NULL) = (rep_id_card_hash_key IS NULL)
-    ),
-    CONSTRAINT kyc_applications_bank_account_check CHECK (
-        (bank_account_enc IS NULL) = (bank_account_hash IS NULL) AND (bank_account_hash IS NULL) = (bank_account_hash_key IS NULL)
-    ),
-    CONSTRAINT kyc_applications_tax_id_hash_check CHECK ((tax_id IS NULL) = (tax_id_hash IS NULL) AND (tax_id_hash IS NULL) = (tax_id_hash_key IS NULL)),
-    CONSTRAINT kyc_applications_hash_length_check CHECK (
-        octet_length(id_card_hash) = 32 AND octet_length(rep_id_card_hash) = 32 AND octet_length(bank_account_hash) = 32 AND
-        octet_length(tax_id_hash) = 32
-    ),
-    -- 個人只有自己的身分證號，公司只有負責人的；公司欄位只屬於公司。
+    -- 公司欄位只屬於公司。
     CONSTRAINT kyc_applications_type_fields_check CHECK (
-        (seller_type = 'INDIVIDUAL' AND company_name IS NULL AND tax_id IS NULL AND
-         company_register_date IS NULL AND company_town_code IS NULL AND company_address_detail IS NULL AND
-         company_phone IS NULL AND rep_id_card_no_enc IS NULL) OR
-        (seller_type = 'COMPANY' AND id_card_no_enc IS NULL)
+        seller_type = 'COMPANY' OR
+        (company_name IS NULL AND tax_id IS NULL AND company_register_date IS NULL AND company_town_code IS NULL AND
+         company_address_detail IS NULL AND company_phone IS NULL)
     ),
     -- 送出之後（含核准、退回）的必填；草稿可以缺。
     CONSTRAINT kyc_applications_complete_check CHECK (
@@ -1014,13 +969,8 @@ CREATE TABLE seller.kyc_applications (
     ),
     CONSTRAINT kyc_applications_purged_check CHECK (
         pii_purged_at IS NULL OR (
-            real_name IS NULL AND birth_date IS NULL AND id_card_no_enc IS NULL AND id_card_hash IS NULL AND id_card_hash_key IS NULL AND
-            id_card_issue_date IS NULL AND id_card_issue_type IS NULL AND id_card_issue_location IS NULL AND english_name IS NULL AND
-            bank_name IS NULL AND bank_code IS NULL AND bank_account_enc IS NULL AND bank_account_hash IS NULL AND
-            bank_account_hash_key IS NULL AND website_url IS NULL AND
-            company_name IS NULL AND tax_id IS NULL AND tax_id_hash IS NULL AND tax_id_hash_key IS NULL AND
-            company_register_date IS NULL AND company_town_code IS NULL AND company_address_detail IS NULL AND company_phone IS NULL AND
-            rep_id_card_no_enc IS NULL AND rep_id_card_hash IS NULL AND rep_id_card_hash_key IS NULL
+            website_url IS NULL AND company_name IS NULL AND tax_id IS NULL AND
+            company_register_date IS NULL AND company_town_code IS NULL AND company_address_detail IS NULL AND company_phone IS NULL
         )
     ),
     CONSTRAINT kyc_applications_decided_check CHECK ((status IN ('APPROVED', 'REJECTED')) = (decided_at IS NOT NULL))
@@ -1035,31 +985,15 @@ CREATE INDEX kyc_applications_status_submitted ON seller.kyc_applications (statu
 CREATE INDEX kyc_applications_submitted ON seller.kyc_applications (submitted_at, application_id)
     WHERE status <> 'DRAFT' AND submitted_at IS NOT NULL;
 
--- 申請的身分比對索引：每個識別欄位（身分證號、企業負責人身分證號、統編、銀行帳號）用金鑰環每一把金鑰算的 blind index 各一列，所以措施的身分快照（同樣存每把金鑰的 hash）
--- 與申請以 (key_id, hash) 等值連接就能反查同身分的帳號，不必解密（ADR 2026-10-19-seller-kyc-payuni-consolidated「身分比對與比對 hash」）。新增金鑰（輪替）之後，
--- 既有申請缺新金鑰的列，由 seller 模組的 RehashKYCIdentities 在啟動時補算（只解密缺列的申請）；舊金鑰的列不會被刪，只隨個資清理整列刪除，啟動檢查 CheckKYCKeys 要求被參照的金鑰都在金鑰環裡。
--- kyc_applications 上的 *_hash 與 *_hash_key 是寫入當下第一把金鑰的值，只給草稿的「欄位有沒有改」判斷用。個資清理時整列刪除。
-CREATE TABLE seller.kyc_identity_hashes (
-    application_id UUID NOT NULL REFERENCES seller.kyc_applications (application_id),
-    field          TEXT NOT NULL,
-    key_id         TEXT NOT NULL,
-    hash           BYTEA NOT NULL,
-    PRIMARY KEY (application_id, field, key_id),
-    CONSTRAINT kyc_identity_hashes_field_check CHECK (field IN ('ID_CARD_NO', 'REP_ID_CARD_NO', 'TAX_ID', 'BANK_ACCOUNT')),
-    CONSTRAINT kyc_identity_hashes_key_check CHECK (key_id <> ''),
-    CONSTRAINT kyc_identity_hashes_hash_check CHECK (octet_length(hash) = 32)
-);
-CREATE INDEX kyc_identity_hashes_hash ON seller.kyc_identity_hashes (hash, key_id);
-
 -- 防詐用的身分比對索引（ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-30 修訂，Stripe 計畫 D3）：與 KYC 個資分開保存，只有 blind index、沒有明文。
--- 來源有兩種：申請的識別欄位（與 kyc_identity_hashes 同一個 transaction、同一支 writeHashes 寫入；欄位被改掉時同步修剪），以及 provider 回報的外部銀行帳號
+-- 來源有兩種：申請的統編（同一個 transaction、同一支 writeHashes 寫入；統編被改掉時同步修剪；Stripe 計畫 D42：申請沒有自己的 hash 表），以及 provider 回報的外部銀行帳號
 -- fingerprint（BANK_FINGERPRINT，收款帳戶同步在寫快取的同一個 transaction 寫入，kyc.Fingerprints；不是草稿的值，不修剪，只由過期刪除）。兩種都不隨 184 天的個資清理刪除：
 -- 停權措施建立時 SnapshotMeasureIdentities 從這裡取，所以舊 stint 的 KYC 清掉之後，之後才建立的處分仍取得到它的身分。
--- 一列是（來源 stint，種類，金鑰，hash）：field 是 kyc_identity_hashes.field 的值加上 BANK_FINGERPRINT（本人與負責人的身分證號分開，進措施快照時才合成 ID_CARD；
--- BANK_FINGERPRINT 進快照時是 BANK_ACCOUNT，但 hash 輸入的標籤不同，不會等於申請的銀行帳號 hash）；
+-- 一列是（來源 stint，種類，金鑰，hash）：field 是 TAX_ID 或 BANK_FINGERPRINT（身分證號、負責人身分證號與平台自收的銀行帳號三個舊種類已刪，D38；
+-- BANK_FINGERPRINT 進快照時是 BANK_ACCOUNT）；
 -- source_store_id 是 stint（stores 一列一個 stint）；account_id 是該 stint 所屬的帳號（stores.account_id 不會變，這裡複製是為了快照不必 join）。
--- 刪除只有兩條路：欄位被改掉的修剪（只刪已沒有任何申請持有的值；不處理 BANK_FINGERPRINT），以及來源 stint 的目前這次關店滿 model.IdentityHashRetention（5 年）後由 seller 的清理 job 刪
--- （被調取資料的保存擋下的不刪；stint 恢復營業就不算關閉）。金鑰環的舊金鑰要留到這些列被刪，CheckKYCKeys 涵蓋這張表。
+-- 刪除只有兩條路：統編被改掉的修剪（只刪已沒有任何申請持有的值；不處理 BANK_FINGERPRINT），以及來源 stint 的目前這次關店滿 model.IdentityHashRetention（5 年）後由 seller 的清理 job 刪
+-- （被調取資料的保存擋下的不刪；stint 恢復營業就不算關閉）。金鑰環的舊金鑰要留到這些列被刪，CheckKeys 涵蓋這張表。
 CREATE TABLE seller.account_identity_hashes (
     source_store_id BIGINT NOT NULL REFERENCES seller.stores (store_id),
     field           TEXT NOT NULL,
@@ -1068,24 +1002,22 @@ CREATE TABLE seller.account_identity_hashes (
     account_id      BIGINT NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (source_store_id, field, key_id, hash),
-    CONSTRAINT account_identity_hashes_field_check CHECK (field IN ('ID_CARD_NO', 'REP_ID_CARD_NO', 'TAX_ID', 'BANK_ACCOUNT', 'BANK_FINGERPRINT')),
+    CONSTRAINT account_identity_hashes_field_check CHECK (field IN ('TAX_ID', 'BANK_FINGERPRINT')),
     CONSTRAINT account_identity_hashes_key_check CHECK (key_id <> ''),
     CONSTRAINT account_identity_hashes_hash_check CHECK (octet_length(hash) = 32)
 );
 CREATE INDEX account_identity_hashes_account ON seller.account_identity_hashes (account_id);
 CREATE INDEX account_identity_hashes_hash ON seller.account_identity_hashes (hash, key_id);
 
--- 證件與文件圖片：身分證正反面、存摺封面各一張（position 0），公司文件最多 10 張。media 的引用以
--- ref_id = application_id 登記（CERTIFICATION），存 asset ID 是同步 job 登記引用時業務列目前指著的資產。
+-- 公司補充文件的圖片（最多 10 張，position 是順序）。media 的引用以 ref_id = application_id 登記（CERTIFICATION），存 asset ID 是同步 job
+-- 登記引用時業務列目前指著的資產。
 CREATE TABLE seller.kyc_documents (
     application_id UUID NOT NULL REFERENCES seller.kyc_applications (application_id),
-    slot           TEXT NOT NULL,
     position       INTEGER NOT NULL DEFAULT 0,
     asset_id       TEXT NOT NULL,
     object_key     TEXT NOT NULL,
-    PRIMARY KEY (application_id, slot, position),
-    CONSTRAINT kyc_documents_slot_check CHECK (slot IN ('ID_CARD_FRONT', 'ID_CARD_BACK', 'BANK_BOOK', 'COMPANY_DOCUMENT')),
-    CONSTRAINT kyc_documents_position_check CHECK (position >= 0 AND position < 10 AND (slot = 'COMPANY_DOCUMENT' OR position = 0)),
+    PRIMARY KEY (application_id, position),
+    CONSTRAINT kyc_documents_position_check CHECK (position >= 0 AND position < 10),
     CONSTRAINT kyc_documents_asset_check CHECK (asset_id <> '' AND object_key <> '')
 );
 
@@ -1209,69 +1141,35 @@ CREATE TABLE seller.kyc_review_issues (
     CONSTRAINT kyc_review_issues_position_key UNIQUE (review_id, position),
     CONSTRAINT kyc_review_issues_position_check CHECK (position >= 0),
     CONSTRAINT kyc_review_issues_field_check CHECK (field IN (
-        'real_name',
-        'birth_date',
-        'id_card_issue_date',
-        'id_card_issue_type',
-        'id_card_issue_location',
-        'english_name',
-        'bank_name',
-        'bank_code',
-        'bank_account',
         'product_type',
         'website_url',
-        'id_card_front',
-        'id_card_back',
-        'bank_book',
-        'individual.id_card_no',
         'business.company_name',
         'business.tax_id',
         'business.company_register_date',
         'business.company_address',
         'business.company_phone',
-        'business.rep_id_card_no',
         'business.company_documents'
     )),
     CONSTRAINT kyc_review_issues_code_check CHECK (code IN ('UNREADABLE', 'MISMATCH', 'EXPIRED', 'MISSING', 'INVALID', 'OTHER')),
     CONSTRAINT kyc_review_issues_message_check CHECK (char_length(message) BETWEEN 1 AND 500),
     CONSTRAINT kyc_review_issues_asset_check CHECK (
         document_asset_id IS NULL OR
-        (document_asset_id <> '' AND field IN ('id_card_front', 'id_card_back', 'bank_book', 'business.company_documents'))
+        (document_asset_id <> '' AND field = 'business.company_documents')
     )
 );
 
--- 後台「顯示全文」的稽核紀錄，同時是限時授權（JIT 存取）：誰、哪一筆申請、何時、理由，永遠不含值；append-only。expires_at
--- 是授權到期的時間（revealed_at 之後 15 分鐘，時間來自注入的時鐘）：同一位管理員在到期之前才能讀這筆申請的證件圖片，
--- 每次讀取寫一列 kyc_document_accesses。
-CREATE TABLE seller.kyc_reveals (
-    reveal_id      UUID PRIMARY KEY,
-    application_id UUID NOT NULL REFERENCES seller.kyc_applications (application_id),
-    admin_id       BIGINT NOT NULL,
-    reason         TEXT NOT NULL,
-    revealed_at    TIMESTAMPTZ NOT NULL,
-    expires_at     TIMESTAMPTZ NOT NULL,
-    CONSTRAINT kyc_reveals_admin_check CHECK (admin_id > 0),
-    CONSTRAINT kyc_reveals_reason_check CHECK (char_length(reason) BETWEEN 1 AND 1000),
-    CONSTRAINT kyc_reveals_expiry_check CHECK (expires_at > revealed_at),
-    CONSTRAINT kyc_reveals_grant_key UNIQUE (reveal_id, application_id)
-);
-CREATE INDEX kyc_reveals_application ON seller.kyc_reveals (application_id, revealed_at DESC, reveal_id DESC);
-
--- 證件圖片的讀取紀錄：每次後台讀一張證件圖片寫一列，在送出內容之前寫入（寫不進去就不送）。append-only，記實際送出的那張圖片的
--- asset_id（資產 ID 不是個資；證件換過圖之後還查得出當時看的是哪一張），不含內容；reveal_id 是讀取所依據的授權（誰讀的從授權來）。
+-- 補充文件的讀取紀錄（形狀同 evidence_accesses：誰、哪一張、何時；不掛授權，Stripe 計畫 D36）：每次後台讀一張公司補充文件寫一列，在送出內容之前寫入
+-- （寫不進去就不送）。append-only，記實際送出的那張圖片的 asset_id（資產 ID 不是個資；文件換過圖之後還查得出當時看的是哪一張），不含內容。
 CREATE TABLE seller.kyc_document_accesses (
     access_id      UUID PRIMARY KEY,
-    application_id UUID NOT NULL,
-    reveal_id      UUID NOT NULL,
-    slot           TEXT NOT NULL,
+    application_id UUID NOT NULL REFERENCES seller.kyc_applications (application_id),
     position       INTEGER NOT NULL,
     asset_id       TEXT NOT NULL,
+    admin_id       BIGINT NOT NULL,
     accessed_at    TIMESTAMPTZ NOT NULL,
-    -- 讀取與它依據的授權是同一筆申請（複合外鍵，application_id 只為了翻頁而存）。
-    CONSTRAINT kyc_document_accesses_grant_fkey FOREIGN KEY (reveal_id, application_id) REFERENCES seller.kyc_reveals (reveal_id, application_id),
     CONSTRAINT kyc_document_accesses_asset_check CHECK (asset_id <> ''),
-    CONSTRAINT kyc_document_accesses_slot_check CHECK (slot IN ('ID_CARD_FRONT', 'ID_CARD_BACK', 'BANK_BOOK', 'COMPANY_DOCUMENT')),
-    CONSTRAINT kyc_document_accesses_position_check CHECK (position >= 0 AND position < 10 AND (slot = 'COMPANY_DOCUMENT' OR position = 0))
+    CONSTRAINT kyc_document_accesses_position_check CHECK (position >= 0 AND position < 10),
+    CONSTRAINT kyc_document_accesses_admin_check CHECK (admin_id > 0)
 );
 CREATE INDEX kyc_document_accesses_application ON seller.kyc_document_accesses (application_id, accessed_at DESC, access_id DESC);
 

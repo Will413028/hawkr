@@ -50,19 +50,14 @@ service SellerAdminService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  // GetKYCApplication 讀一筆申請：身分證號與銀行帳號只有遮蔽後的值，連同審核紀錄與銀行帳號命中的標記。顯示全文與證件讀取的
-  // 稽核紀錄用 ListKYCReveals、ListKYCDocumentAccesses。
-  // 賣家的草稿讀不到（not_found）。要看全文用 RevealKYCSensitive。
+  // GetKYCApplication 讀一筆申請：登記資料、審核紀錄與公司補充文件（每張帶檢視網址與 asset_id；有後台的 KYC 讀取權限就能讀，
+  // 每次讀取寫一列稽核）。讀取紀錄用 ListKYCDocumentAccesses。
+  // 賣家的草稿讀不到（not_found）。
   rpc GetKYCApplication(GetKYCApplicationRequest) returns (GetKYCApplicationResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  // ListKYCReveals 列出一筆申請的顯示全文紀錄（誰、何時、理由、授權到期），新到舊。申請不存在或是賣家的草稿回 not_found。
-  rpc ListKYCReveals(ListKYCRevealsRequest) returns (ListKYCRevealsResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-
-  // ListKYCDocumentAccesses 列出一筆申請的證件圖片讀取紀錄（誰、依據哪次顯示、哪個位置、何時），新到舊。申請不存在或是賣家的
+  // ListKYCDocumentAccesses 列出一筆申請的補充文件讀取紀錄（誰、哪一張、何時），新到舊。申請不存在或是賣家的
   // 草稿回 not_found。
   rpc ListKYCDocumentAccesses(ListKYCDocumentAccessesRequest) returns (ListKYCDocumentAccessesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -81,12 +76,6 @@ service SellerAdminService {
   // 申請不能退回（不在審核中、店家已關閉或等待刪除）時回 failed_precondition，訊息是 KYCApplication.reject_unavailabilities 的第一句；
   // 帳號停權中仍可退回。
   rpc RejectKYC(RejectKYCRequest) returns (RejectKYCResponse);
-
-  // RevealKYCSensitive 顯示一筆申請的身分證號、負責人身分證號與銀行帳號全文，並授權這位管理員在 15 分鐘內讀這筆申請的證件
-  // 圖片（回應的每張證件有一個 view_uri，是 GET，要帶同一位管理員的登入）。這是寫入稽核紀錄的動作（誰、哪筆申請、何時、
-  // 理由、授權到期的時間，不含值），所以是 POST，不是讀取；稽核寫入失敗就不回傳明文。回應不可快取。到期之後、或別的
-  // 管理員讀證件圖片都是 403，要再看就再顯示一次（再寫一列稽核）。
-  rpc RevealKYCSensitive(RevealKYCSensitiveRequest) returns (RevealKYCSensitiveResponse);
 
   // RequeryKYCRegistration 對審核中（SUBMITTED）的公司型申請重新查一次經濟部商業司的登記資料（送件時已查過一次，這是
   // 手動補查：例如當時來源不可用或查無）。回應不等結果：排入背景工作，回傳這筆進行中的查詢（含期限），結果從 GetKYCApplication 的
@@ -312,9 +301,9 @@ message GetStoreResponse {
 // KYCSellerType 是賣家型態。
 enum KYCSellerType {
   KYC_SELLER_TYPE_UNSPECIFIED = 0;
-  // 個人賣家：身分證號是賣家本人的。
+  // 個人賣家。
   KYC_SELLER_TYPE_INDIVIDUAL = 1;
-  // 企業賣家：身分證號是公司負責人的，另有統編與公司資料。
+  // 企業賣家：有統編與公司資料。
   KYC_SELLER_TYPE_COMPANY = 2;
 }
 
@@ -331,41 +320,30 @@ enum KYCReviewAction {
   reserved "KYC_REVIEW_ACTION_REBIND";
 }
 
-// KYCDocument 是申請上的一張證件或文件：只有位置，沒有圖片的 ID 與下載網址。後台要看圖片時先 RevealKYCSensitive（理由必填、
-// 寫稽核，授權 15 分鐘），回應的 KYCDocumentView.view_uri 才讀得到。
+// KYCDocument 是申請上的一張公司補充文件：位置、asset_id 與檢視網址。
 message KYCDocument {
   // 1 是刪掉的 slot（證件位置的 enum）：文件用它所屬的欄位表示，與退回的 KYCIssue.field 同一套。
   reserved 1;
   reserved "slot";
 
-  // 文件所屬的欄位：ID_CARD_FRONT、ID_CARD_BACK、BANK_BOOK 或 BUSINESS_COMPANY_DOCUMENTS。
+  // 文件所屬的欄位：BUSINESS_COMPANY_DOCUMENTS。
   hawkr.seller.v1alpha1.KYCField field = 3;
-  // 同一個欄位內的順序（從 0 起）；只有公司文件有多張。
+  // 同一個欄位內的順序（從 0 起）。
   int32 position = 2;
-}
-
-// KYCDocumentView 是一張證件圖片的檢視網址：只在 RevealKYCSensitive 的回應裡出現，要有那次顯示建立的授權（15 分鐘、同一位
-// 管理員）才讀得到；每次讀取都寫一列稽核。
-message KYCDocumentView {
-  reserved 1;
-  reserved "slot";
-
-  // 文件所屬的欄位（同 KYCDocument.field）。
-  hawkr.seller.v1alpha1.KYCField field = 5;
-  int32 position = 2;
-  // 相對於 API 的網址：GET /api/files/admin/seller/kyc_applications/{application_id}/documents/{slot}/{position}，同樣的管理員
+  // 相對於 API 的網址：GET /api/files/admin/seller/kyc_applications/{application_id}/documents/{position}，同樣的管理員
   // 驗證（Authorization: Bearer；admin 的 BFF 以 /api/bff 為前綴轉送）。回應是圖片本身，Cache-Control: no-store；每次讀取都寫稽核。
-  string view_uri = 3;
+  string view_uri = 4;
   // 這張圖片的 asset_id（不是個資）：退回時用它指出有問題的那一張（RejectKYCRequest.issues 的 document_asset_id），
-  // 公司文件換順序也不會指錯。只在顯示全文的回應帶（遮蔽的 GetKYCApplication 不帶），所以管理員要先顯示全文（寫稽核）才能指定某一張。
-  string asset_id = 4;
+  // 公司文件換順序也不會指錯。
+  string asset_id = 5;
 }
 
-// KYCDocumentAccess 是一筆證件圖片的讀取紀錄：哪位管理員、依據哪次顯示（授權）、讀哪個位置、何時。
+// KYCDocumentAccess 是一筆補充文件的讀取紀錄：哪位管理員、讀哪一張（asset_id 與當時的位置）、何時。
 message KYCDocumentAccess {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
-  // 讀取所依據的顯示全文紀錄（KYCReveal.id）。
-  string reveal_id = 2;
+  // 2 是刪掉的讀取所依據的顯示全文紀錄（reveal_id，限時授權已刪）。
+  reserved 2;
+  reserved "reveal_id";
   string admin_id = 3;
   reserved 4;
   reserved "slot";
@@ -374,23 +352,29 @@ message KYCDocumentAccess {
   hawkr.seller.v1alpha1.KYCField field = 7;
   int32 position = 5;
   google.protobuf.Timestamp access_time = 6;
+  // 實際送出的那張圖片的 asset_id（文件換過圖之後還查得出當時看的是哪一張）。
+  string asset_id = 8;
 }
 
-// IndividualKYC 是個人賣家專屬的欄位。
+// IndividualKYC 是個人賣家專屬的欄位；目前沒有欄位（平台不收身分證號，Stripe 計畫 D22），設定它表示賣家型態是個人。
 message IndividualKYC {
-  string id_card_no_masked = 1;
+  // 1 是刪掉的遮蔽身分證號（D22）。
+  reserved 1;
+  reserved "id_card_no_masked";
 }
 
-// BusinessKYC 是企業賣家專屬的欄位。real_name 是公司負責人。
+// BusinessKYC 是企業賣家專屬的欄位。
 message BusinessKYC {
   reserved 1, 5, 6;
   reserved "company_type", "company_town_code", "company_address_detail";
+  // 8 是刪掉的遮蔽負責人身分證號（D22）。
+  reserved 8;
+  reserved "rep_id_card_no_masked";
 
   string company_name = 2;
   string tax_id = 3;
   google.type.Date company_register_date = 4;
   string company_phone = 7;
-  string rep_id_card_no_masked = 8;
   // 公司地址；沒有填時不設。
   hawkr.common.v1alpha1.PostalAddress company_address = 9;
 }
@@ -491,18 +475,7 @@ message KYCRegistrationCheck {
   google.protobuf.Timestamp deadline_time = 8;
 }
 
-// KYCReveal 是一筆顯示全文的稽核紀錄：誰、何時、理由，不含值。
-message KYCReveal {
-  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
-  string admin_id = 2;
-  string reason = 3;
-  google.protobuf.Timestamp reveal_time = 4;
-  // 這次顯示建立的授權到期的時間（顯示之後 15 分鐘）。
-  google.protobuf.Timestamp expire_time = 5;
-}
-
-// KYCApplication 是後台看到的身分認證申請：只有遮蔽後的身分證號與銀行帳號（全文用 RevealKYCSensitive），沒有任何寫入用的
-// 欄位。
+// KYCApplication 是後台看到的身分認證申請：沒有任何寫入用的欄位（平台不收身分證號、銀行帳號與證件影像，Stripe 計畫 D22）。
 message KYCApplication {
   reserved 16, 18, 19, 23;
   reserved "contact_email", "contact_phone", "food_business", "flow";
@@ -513,15 +486,10 @@ message KYCApplication {
   hawkr.seller.v1alpha1.KYCStatus status = 4;
   // 核准與退回要帶這個版本（申請的版本加顯示的登記資料查詢的序號，格式不透明）。
   string etag = 5;
-  string real_name = 6;
-  google.type.Date birth_date = 7;
-  google.type.Date id_card_issue_date = 8;
-  string id_card_issue_type = 9;
-  string id_card_issue_location = 10;
-  string english_name = 11;
-  string bank_name = 12;
-  string bank_code = 13;
-  string bank_account_masked = 14;
+  // 6 到 14 是刪掉的本名、生日、發證資料、英文姓名與銀行資料（D22、D37）。
+  reserved 6 to 14;
+  reserved "real_name", "birth_date", "id_card_issue_date", "id_card_issue_type", "id_card_issue_location", "english_name",
+      "bank_name", "bank_code", "bank_account_masked";
   string product_type = 15;
   string website_url = 17;
   oneof subject {
@@ -529,11 +497,11 @@ message KYCApplication {
     BusinessKYC business = 21;
   }
   repeated KYCDocument documents = 22;
-  // 審核紀錄，舊到新（筆數由人工動作限制，所以內嵌）。顯示全文與證件讀取的稽核紀錄隨使用增長，另用 ListKYCReveals 與
-  // ListKYCDocumentAccesses 分頁讀。
+  // 審核紀錄，舊到新（筆數由人工動作限制，所以內嵌）。補充文件的讀取紀錄隨使用增長，另用 ListKYCDocumentAccesses 分頁讀。
   repeated KYCReview reviews = 24;
-  // 申請的銀行帳號與別的、目前處分生效中的帳號相同。只是標記，不擋核准（家人共用帳戶是常態），由審核員判斷。
-  bool shares_bank_account_with_sanctioned_account = 26;
+  // 26 是刪掉的申請的銀行帳號與受處分帳號相同的標記（平台不收銀行帳號，D45）。
+  reserved 26;
+  reserved "shares_bank_account_with_sanctioned_account";
   google.protobuf.Timestamp submit_time = 27;
   google.protobuf.Timestamp decide_time = 28;
   google.protobuf.Timestamp create_time = 29;
@@ -569,14 +537,16 @@ message KYCApplication {
   repeated StoreActionUnavailability requery_registration_unavailabilities = 40 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// KYCApplicationSummary 是審核佇列的一列。企業賣家的 real_name 是負責人，所以另列公司名稱與統編。
+// KYCApplicationSummary 是審核佇列的一列：店名、公司名稱與統編。
 message KYCApplicationSummary {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   string store_id = 2;
   string account_id = 3;
   hawkr.seller.v1alpha1.KYCStatus status = 4;
   KYCSellerType seller_type = 5;
-  string real_name = 6;
+  // 6 是刪掉的本名（D37：列名改成店名）。
+  reserved 6;
+  reserved "real_name";
   // 企業賣家才有。
   string company_name = 7;
   string tax_id = 8;
@@ -586,6 +556,8 @@ message KYCApplicationSummary {
   // 審核期限只在商家詳情的 KYCSummary.decide_deadline（清單沒有消費者）。
   reserved 11;
   reserved "decide_deadline";
+  // 申請所屬店家的店名（D37：審核佇列的列名）。
+  string store_name = 12;
 }
 
 message ListKYCApplicationsRequest {
@@ -594,7 +566,7 @@ message ListKYCApplicationsRequest {
   string page_token = 2;
   // 只列這個狀態的申請；UNSPECIFIED 不篩選，DRAFT 回 invalid_argument。SUBMITTED 的佇列舊到新，其他新到舊。
   hawkr.seller.v1alpha1.KYCStatus status = 3;
-  // 姓名、公司名稱或統編包含這段文字（不分大小寫）；空字串不篩選。
+  // 店名、公司名稱或統編包含這段文字（不分大小寫）；空字串不篩選。
   string query = 4;
 }
 
@@ -609,18 +581,6 @@ message GetKYCApplicationRequest {
 
 message GetKYCApplicationResponse {
   KYCApplication application = 1;
-}
-
-message ListKYCRevealsRequest {
-  string id = 1 [(google.api.field_behavior) = REQUIRED];
-  // 每頁筆數：0 用預設值 20，上限 100。
-  int32 page_size = 2;
-  string page_token = 3;
-}
-
-message ListKYCRevealsResponse {
-  repeated KYCReveal reveals = 1;
-  string next_page_token = 2;
 }
 
 message ListKYCDocumentAccessesRequest {
@@ -656,8 +616,8 @@ message RejectKYCRequest {
   reserved "required_fields";
 
   // 逐項指出的問題，至少 1 項；賣家看得到。每項的 field 與 code 不可以是 UNSPECIFIED，message 必填（1 到 500 字）；
-  // field 要是 KYCApplication.issuable_fields 之一。document_asset_id 要是這筆申請目前實際有的文件（來自顯示全文回應的
-  // KYCDocumentView.asset_id），而且 field 要是文件類的欄位，非文件類的欄位不可以帶；文件類欄位依原因碼：UNREADABLE、EXPIRED、
+  // field 要是 KYCApplication.issuable_fields 之一。document_asset_id 要是這筆申請目前實際有的文件（來自 GetKYCApplication 回應的
+  // KYCDocument.asset_id），而且 field 要是文件類的欄位，非文件類的欄位不可以帶；文件類欄位依原因碼：UNREADABLE、EXPIRED、
   // MISMATCH、INVALID 必須帶，MISSING 不可以帶，OTHER 兩者皆可（見 KYCIssue.document_asset_id）。
   // 違反時回 invalid_argument，FieldViolation 指到 issues[i] 的欄位。
   repeated hawkr.seller.v1alpha1.KYCIssue issues = 5 [(google.api.field_behavior) = REQUIRED];
@@ -667,22 +627,6 @@ message RejectKYCRequest {
 
 message RejectKYCResponse {
   KYCApplication application = 1;
-}
-
-message RevealKYCSensitiveRequest {
-  string id = 1 [(google.api.field_behavior) = REQUIRED];
-  // 顯示全文的理由，最多 1000 字；寫進稽核紀錄。
-  string reason = 2 [(google.api.field_behavior) = REQUIRED];
-}
-
-// RevealKYCSensitiveResponse 是全文；沒有的欄位（例如個人賣家沒有負責人身分證號）是空字串。
-message RevealKYCSensitiveResponse {
-  string id_card_no = 1;
-  string rep_id_card_no = 2;
-  string bank_account = 3;
-  // 這次顯示建立的授權到期的時間：之前同一位管理員可以用 documents 的 view_uri 讀證件圖片。
-  google.protobuf.Timestamp expire_time = 4;
-  repeated KYCDocumentView documents = 5;
 }
 
 message RequeryKYCRegistrationRequest {

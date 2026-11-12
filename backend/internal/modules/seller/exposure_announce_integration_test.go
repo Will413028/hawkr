@@ -149,7 +149,7 @@ func TestWritesThatDoNotFlipExposureAnnounceNothing(t *testing.T) {
 	f := setup(t)
 	announcements := record[StoreExposureChanged](f)
 	_, s := f.exposable(t)
-	_, other, sub := f.submitted(t, idB, bankAcct)
+	_, other, sub := f.submitted(t)
 	n := len(announcements.all())
 	_, versionBefore := f.announced(t, s.StoreID)
 

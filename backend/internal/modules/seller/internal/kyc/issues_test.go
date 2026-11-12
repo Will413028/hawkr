@@ -10,7 +10,7 @@ import (
 // 文件類欄位依原因碼決定要不要帶 asset：UNREADABLE、EXPIRED、MISMATCH、INVALID 必須帶，MISSING 一律不能帶，OTHER 兩者皆可；
 // 非文件類的欄位永遠不能帶。違反回 invalid_argument 並指到 DocumentAssetID。
 func TestValidateIssuesDocumentAssetRulesByCode(t *testing.T) {
-	const doc, plain = "business.company_documents", "real_name"
+	const doc, plain = "business.company_documents", "business.company_name"
 	cases := []struct {
 		name    string
 		field   string
@@ -20,8 +20,8 @@ func TestValidateIssuesDocumentAssetRulesByCode(t *testing.T) {
 	}{
 		{"UNREADABLE 帶 asset", doc, model.IssueUnreadable, "a1", false},
 		{"UNREADABLE 不帶 asset", doc, model.IssueUnreadable, "", true},
-		{"EXPIRED 不帶 asset", "id_card_front", model.IssueExpired, "", true},
-		{"MISMATCH 不帶 asset", "bank_book", model.IssueMismatch, "", true},
+		{"EXPIRED 不帶 asset", doc, model.IssueExpired, "", true},
+		{"MISMATCH 不帶 asset", doc, model.IssueMismatch, "", true},
 		{"INVALID 不帶 asset", doc, model.IssueInvalid, "", true},
 		{"INVALID 帶 asset", doc, model.IssueInvalid, "a1", false},
 		{"MISSING 不帶 asset", doc, model.IssueMissing, "", false},
@@ -67,10 +67,10 @@ func TestIssuableFieldsFollowTheSellerType(t *testing.T) {
 		return false
 	}
 	ind, biz := model.IssuableFields(model.KYCIndividual), model.IssuableFields(model.KYCCompany)
-	if !contains(ind, "individual.id_card_no") || contains(ind, "business.tax_id") || !contains(ind, "real_name") {
+	if contains(ind, "business.tax_id") || !contains(ind, "product_type") || !contains(ind, "website_url") {
 		t.Errorf("個人：%v", ind)
 	}
-	if contains(biz, "individual.id_card_no") || !contains(biz, "business.tax_id") || !contains(biz, "business.company_documents") {
+	if !contains(biz, "business.tax_id") || !contains(biz, "business.company_documents") || !contains(biz, "product_type") {
 		t.Errorf("企業：%v", biz)
 	}
 	// 驗證用同一份：個人申請指企業欄位被擋，企業欄位在企業申請可用。

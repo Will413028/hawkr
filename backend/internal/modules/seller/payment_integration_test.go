@@ -110,7 +110,7 @@ func TestApprovalSnapshotsTheAccountContactEmailVerifiedFirst(t *testing.T) {
 	f := setup(t)
 	accountID, s := f.open(t)
 	f.setContactEmails(t, accountID, ptr("Pay.Out@Example.COM"), ptr("self@example.com"))
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	d := f.savedDraft(t, kycDraft(accountID))
 	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
 	must(t, approve(f, sub))
@@ -129,7 +129,7 @@ func TestApprovalSnapshotsTheSelfEnteredEmailWhenThereIsNoVerifiedOne(t *testing
 	f := setup(t)
 	accountID, s := f.open(t)
 	f.setContactEmails(t, accountID, nil, ptr("self@example.com"))
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	d := f.savedDraft(t, kycDraft(accountID))
 	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
 	must(t, approve(f, sub))
@@ -146,7 +146,7 @@ func (f *fixture) reapprove(t *testing.T, accountID int64, email string) {
 	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.kyc_applications SET status = 'CANCELLED', decided_at = NULL WHERE store_id IN (SELECT store_id FROM seller.stores WHERE account_id = $1)", accountID)
 	must(t, err)
 	f.setContactEmails(t, accountID, &email, nil)
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	d := f.savedDraft(t, kycDraft(accountID))
 	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
 	must(t, approve(f, sub))
@@ -160,7 +160,7 @@ func TestSubmitKYCRequiresAContactEmail(t *testing.T) {
 	f := setup(t)
 	accountID, _ := f.open(t)
 	f.setContactEmails(t, accountID, nil, nil)
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	d := f.savedDraft(t, kycDraft(accountID))
 	_, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	var ae *apperr.Error
 	if !errors.As(err, &ae) || ae.Kind() != apperr.KindFailedPrecondition || ae.Reason != apperr.ReasonContactEmailRequired {
@@ -180,7 +180,7 @@ func TestSubmitKYCRequiresAContactEmail(t *testing.T) {
 func TestReapprovalKeepsTheFirstContactEmailSnapshot(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	accountID, s := f.approvedWith(t, idA, bankAcct)
+	accountID, s := f.approvedWith(t)
 	f.reapprove(t, accountID, "New.Owner@Example.com")
 	if got := f.jobs.queuedStoreIDs(t, kindPaymentEnsure); !slices.Equal(got, []int64{s.StoreID, s.StoreID}) {
 		t.Fatalf("兩次核准排入的建立 job=%v", got)
@@ -253,7 +253,7 @@ func TestExposureRequiresTheTransfersCapabilityOfThePaymentAccount(t *testing.T)
 		t.Fatalf("轉帳能力又失效後仍可曝光：%v", got)
 	}
 	// 沒有帳戶列的已核准店家不通過閘門。
-	accountID2, s2, sub2 := f.submitted(t, idB, "999888777666")
+	accountID2, s2, sub2 := f.submitted(t)
 	_ = accountID2
 	must(t, approve(f, sub2))
 	if got := f.exposed(t, s2.StoreID); len(got) != 0 {

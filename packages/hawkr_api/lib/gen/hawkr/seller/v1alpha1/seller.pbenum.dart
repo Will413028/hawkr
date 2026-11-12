@@ -521,36 +521,10 @@ class KYCStatus extends $pb.ProtobufEnum {
 class KYCField extends $pb.ProtobufEnum {
   static const KYCField KYC_FIELD_UNSPECIFIED =
       KYCField._(0, _omitEnumNames ? '' : 'KYC_FIELD_UNSPECIFIED');
-  static const KYCField KYC_FIELD_REAL_NAME =
-      KYCField._(1, _omitEnumNames ? '' : 'KYC_FIELD_REAL_NAME');
-  static const KYCField KYC_FIELD_BIRTH_DATE =
-      KYCField._(2, _omitEnumNames ? '' : 'KYC_FIELD_BIRTH_DATE');
-  static const KYCField KYC_FIELD_ID_CARD_ISSUE_DATE =
-      KYCField._(3, _omitEnumNames ? '' : 'KYC_FIELD_ID_CARD_ISSUE_DATE');
-  static const KYCField KYC_FIELD_ID_CARD_ISSUE_TYPE =
-      KYCField._(4, _omitEnumNames ? '' : 'KYC_FIELD_ID_CARD_ISSUE_TYPE');
-  static const KYCField KYC_FIELD_ID_CARD_ISSUE_LOCATION =
-      KYCField._(5, _omitEnumNames ? '' : 'KYC_FIELD_ID_CARD_ISSUE_LOCATION');
-  static const KYCField KYC_FIELD_ENGLISH_NAME =
-      KYCField._(6, _omitEnumNames ? '' : 'KYC_FIELD_ENGLISH_NAME');
-  static const KYCField KYC_FIELD_BANK_NAME =
-      KYCField._(7, _omitEnumNames ? '' : 'KYC_FIELD_BANK_NAME');
-  static const KYCField KYC_FIELD_BANK_CODE =
-      KYCField._(8, _omitEnumNames ? '' : 'KYC_FIELD_BANK_CODE');
-  static const KYCField KYC_FIELD_BANK_ACCOUNT =
-      KYCField._(9, _omitEnumNames ? '' : 'KYC_FIELD_BANK_ACCOUNT');
   static const KYCField KYC_FIELD_PRODUCT_TYPE =
       KYCField._(10, _omitEnumNames ? '' : 'KYC_FIELD_PRODUCT_TYPE');
   static const KYCField KYC_FIELD_WEBSITE_URL =
       KYCField._(12, _omitEnumNames ? '' : 'KYC_FIELD_WEBSITE_URL');
-  static const KYCField KYC_FIELD_ID_CARD_FRONT =
-      KYCField._(15, _omitEnumNames ? '' : 'KYC_FIELD_ID_CARD_FRONT');
-  static const KYCField KYC_FIELD_ID_CARD_BACK =
-      KYCField._(16, _omitEnumNames ? '' : 'KYC_FIELD_ID_CARD_BACK');
-  static const KYCField KYC_FIELD_BANK_BOOK =
-      KYCField._(17, _omitEnumNames ? '' : 'KYC_FIELD_BANK_BOOK');
-  static const KYCField KYC_FIELD_INDIVIDUAL_ID_CARD_NO =
-      KYCField._(18, _omitEnumNames ? '' : 'KYC_FIELD_INDIVIDUAL_ID_CARD_NO');
   static const KYCField KYC_FIELD_BUSINESS_COMPANY_NAME =
       KYCField._(20, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_NAME');
   static const KYCField KYC_FIELD_BUSINESS_TAX_ID =
@@ -559,8 +533,6 @@ class KYCField extends $pb.ProtobufEnum {
       22, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE');
   static const KYCField KYC_FIELD_BUSINESS_COMPANY_PHONE =
       KYCField._(25, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_PHONE');
-  static const KYCField KYC_FIELD_BUSINESS_REP_ID_CARD_NO =
-      KYCField._(26, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_REP_ID_CARD_NO');
   static const KYCField KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS = KYCField._(
       27, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS');
   static const KYCField KYC_FIELD_BUSINESS_COMPANY_ADDRESS = KYCField._(
@@ -568,34 +540,19 @@ class KYCField extends $pb.ProtobufEnum {
 
   static const $core.List<KYCField> values = <KYCField>[
     KYC_FIELD_UNSPECIFIED,
-    KYC_FIELD_REAL_NAME,
-    KYC_FIELD_BIRTH_DATE,
-    KYC_FIELD_ID_CARD_ISSUE_DATE,
-    KYC_FIELD_ID_CARD_ISSUE_TYPE,
-    KYC_FIELD_ID_CARD_ISSUE_LOCATION,
-    KYC_FIELD_ENGLISH_NAME,
-    KYC_FIELD_BANK_NAME,
-    KYC_FIELD_BANK_CODE,
-    KYC_FIELD_BANK_ACCOUNT,
     KYC_FIELD_PRODUCT_TYPE,
     KYC_FIELD_WEBSITE_URL,
-    KYC_FIELD_ID_CARD_FRONT,
-    KYC_FIELD_ID_CARD_BACK,
-    KYC_FIELD_BANK_BOOK,
-    KYC_FIELD_INDIVIDUAL_ID_CARD_NO,
     KYC_FIELD_BUSINESS_COMPANY_NAME,
     KYC_FIELD_BUSINESS_TAX_ID,
     KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE,
     KYC_FIELD_BUSINESS_COMPANY_PHONE,
-    KYC_FIELD_BUSINESS_REP_ID_CARD_NO,
     KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
     KYC_FIELD_BUSINESS_COMPANY_ADDRESS,
   ];
 
-  static final $core.List<KYCField?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 28);
-  static KYCField? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
+  static final $core.Map<$core.int, KYCField> _byValue =
+      $pb.ProtobufEnum.initByValue(values);
+  static KYCField? valueOf($core.int value) => _byValue[value];
 
   const KYCField._(super.value, super.name);
 }
@@ -1240,7 +1197,7 @@ class TerminationGround extends $pb.ProtobufEnum {
       TerminationGround._(
           10, _omitEnumNames ? '' : 'TERMINATION_GROUND_OTHER_SERIOUS');
 
-  /// 與另一個帳號的終止（來源措施）使用同一個身分證明文件或統一編號，立即生效；來源措施撤銷時一併撤銷
+  /// 與另一個帳號的終止（來源措施）使用同一個統一編號，立即生效；來源措施撤銷時一併撤銷
   /// （RevokeReason.SOURCE_REVOKED）。賣家可對這筆單獨申覆。
   static const TerminationGround TERMINATION_GROUND_LINKED_ACCOUNT =
       TerminationGround._(

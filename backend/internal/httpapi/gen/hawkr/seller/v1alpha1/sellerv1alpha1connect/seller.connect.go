@@ -170,12 +170,12 @@ type SellerAppServiceClient interface {
 	// 保留輸入、顯示最新版本）。被退回的申請在這裡回到草稿重新編輯。全部欄位先驗證才寫入，任何一欄不合法都不會寫入。
 	// 送出（SubmitKYC）才檢查必填欄位與證件是否齊全。只有草稿與被退回的申請能儲存；審核中與已核准的回 failed_precondition。
 	SaveKYCDraft(context.Context, *connect.Request[v1alpha1.SaveKYCDraftRequest]) (*connect.Response[v1alpha1.SaveKYCDraftResponse], error)
-	// GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）。還沒有申請（或申請已取消）
+	// GetMyKYC 回傳呼叫者店家目前的 KYC 申請。還沒有申請（或申請已取消）
 	// 時回 not_found。
 	GetMyKYC(context.Context, *connect.Request[v1alpha1.GetMyKYCRequest]) (*connect.Response[v1alpha1.GetMyKYCResponse], error)
 	// SubmitKYC 送出申請給管理員審核。草稿與被退回的申請都能直接送出，
 	// 不必先儲存；審核中與已核准的申請回 failed_precondition。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
-	// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（real_name、id_card_front、business.tax_id……，與 KYCField 一對一）。申請本身齊全之後，
+	// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（business.tax_id、business.company_documents……，與 KYCField 一對一）。申請本身齊全之後，
 	// 店家的必填資料（地址、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
 	// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。帳號沒有聯絡信箱（IdentityAppService.GetContactEmail 沒有回信箱）時回
 	// failed_precondition 與 ErrorReason CONTACT_EMAIL_REQUIRED，client 引導在 IdentityAppService.SetContactEmail 填一個再重送。 身分比對沒有通過時回
@@ -547,12 +547,12 @@ type SellerAppServiceHandler interface {
 	// 保留輸入、顯示最新版本）。被退回的申請在這裡回到草稿重新編輯。全部欄位先驗證才寫入，任何一欄不合法都不會寫入。
 	// 送出（SubmitKYC）才檢查必填欄位與證件是否齊全。只有草稿與被退回的申請能儲存；審核中與已核准的回 failed_precondition。
 	SaveKYCDraft(context.Context, *connect.Request[v1alpha1.SaveKYCDraftRequest]) (*connect.Response[v1alpha1.SaveKYCDraftResponse], error)
-	// GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）。還沒有申請（或申請已取消）
+	// GetMyKYC 回傳呼叫者店家目前的 KYC 申請。還沒有申請（或申請已取消）
 	// 時回 not_found。
 	GetMyKYC(context.Context, *connect.Request[v1alpha1.GetMyKYCRequest]) (*connect.Response[v1alpha1.GetMyKYCResponse], error)
 	// SubmitKYC 送出申請給管理員審核。草稿與被退回的申請都能直接送出，
 	// 不必先儲存；審核中與已核准的申請回 failed_precondition。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
-	// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（real_name、id_card_front、business.tax_id……，與 KYCField 一對一）。申請本身齊全之後，
+	// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（business.tax_id、business.company_documents……，與 KYCField 一對一）。申請本身齊全之後，
 	// 店家的必填資料（地址、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
 	// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。帳號沒有聯絡信箱（IdentityAppService.GetContactEmail 沒有回信箱）時回
 	// failed_precondition 與 ErrorReason CONTACT_EMAIL_REQUIRED，client 引導在 IdentityAppService.SetContactEmail 填一個再重送。 身分比對沒有通過時回

@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -27,7 +26,6 @@ func setSellerEnv(t *testing.T) {
 	t.Setenv("MEDIA_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("ORDER_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("PRODUCT_SERVICE_ADDR", "127.0.0.1:1")
-	t.Setenv("KYC_ENCRYPTION_KEYS", "test1:dGVzdC1reWMtZW5jcnlwdGlvbi1rZXktMDAwMDAwMDE=")
 	t.Setenv("KYC_HASH_KEYS", "test1:dGVzdC1reWMtaGFzaC1obWFjLWtleS0wMDAwMDAwMDE=")
 }
 
@@ -72,8 +70,7 @@ func count(t *testing.T, d *db.DB, query string, args ...any) int {
 	return n
 }
 
-// 種子的店家全部在 seller 模組的可曝光集合裡（模組自己的規則判斷，不是 SQL 重寫一份），後台揭露回的是 fixture 的明文，資料庫參照的金鑰
-// 都在執行中的金鑰環裡。種子以 payment 的 fake 同步收款帳戶時，seller 的訂閱者在轉帳能力啟用時公告一次（version 1），全量重新公告之後是 version 2、可曝光。
+// 種子的店家全部在 seller 模組的可曝光集合裡（模組自己的規則判斷，不是 SQL 重寫一份），資料庫參照的金鑰都在執行中的金鑰環裡。種子以 payment 的 fake 同步收款帳戶時，seller 的訂閱者在轉帳能力啟用時公告一次（version 1），全量重新公告之後是 version 2、可曝光。
 func TestDevSeedWritesStoresThatTheModuleServesAsExposable(t *testing.T) {
 	ctx := context.Background()
 	d := devSeedEnv(t)
@@ -106,17 +103,6 @@ func TestDevSeedWritesStoresThatTheModuleServesAsExposable(t *testing.T) {
 		if !exposable[s.StoreID] {
 			t.Errorf("種子帳號名下的店家 %d 不在可曝光的集合裡（%v）", s.StoreID, got)
 		}
-		var applicationID uuid.UUID
-		if err := d.Pool().QueryRow(ctx, `SELECT application_id FROM seller.kyc_applications WHERE store_id = $1`, s.StoreID).Scan(&applicationID); err != nil {
-			t.Fatal(err)
-		}
-		revealed, err := module.RevealKYCSensitive(ctx, seller.RevealKYCInput{AdminID: 1, ApplicationID: applicationID, Reason: "驗證種子的明文"})
-		if err != nil {
-			t.Fatalf("店 %d 的揭露：%v", s.StoreID, err)
-		}
-		if revealed.IDCardNo == nil || *revealed.IDCardNo != *s.KYC.IDCardNo || revealed.BankAccount == nil || *revealed.BankAccount != *s.KYC.BankAccount {
-			t.Errorf("店 %d 的揭露 = %+v，want 身分證號 %s、銀行帳號 %s", s.StoreID, revealed, *s.KYC.IDCardNo, *s.KYC.BankAccount)
-		}
 		var version int64
 		var announced bool
 		if err := d.Pool().QueryRow(ctx, `SELECT version, exposable FROM seller.store_exposures WHERE store_id = $1`, s.StoreID).Scan(&version, &announced); err != nil {
@@ -143,9 +129,6 @@ func TestDevSeedWritesStoresThatTheModuleServesAsExposable(t *testing.T) {
 	}
 	if n := count(t, d, `SELECT count(*) FROM seller.stores WHERE store_id = ANY($1)`, ids); n != len(fixture) {
 		t.Errorf("seller.stores 有 %d 家種子店家，want %d", n, len(fixture))
-	}
-	if n := count(t, d, `SELECT count(*) FROM seller.kyc_applications WHERE id_card_no_enc IS NOT NULL AND position(convert_to('A123456789', 'UTF8') in id_card_no_enc) > 0`); n != 0 {
-		t.Errorf("身分證號的明文出現在密文欄位（%d 列）", n)
 	}
 	var next int64
 	if err := d.Pool().QueryRow(ctx, `SELECT nextval(pg_get_serial_sequence('seller.stores', 'store_id'))`).Scan(&next); err != nil {
@@ -640,7 +623,7 @@ func TestDevSeedRetiresTheAssetsOfTheEvidenceItDeletes(t *testing.T) {
 	seedOK(t)
 	id := devSeedStores()[0].StoreID
 	app := rowJSON(t, d, `SELECT application_id::text FROM seller.kyc_applications WHERE store_id = $1`, id)
-	mustExec(t, d, `INSERT INTO seller.kyc_documents (application_id, slot, position, asset_id, object_key) VALUES ($1, 'ID_CARD_FRONT', 0, 'kyc-asset-1', 'secure/k1')`, app)
+	mustExec(t, d, `INSERT INTO seller.kyc_documents (application_id, position, asset_id, object_key) VALUES ($1, 0, 'kyc-asset-1', 'secure/k1')`, app)
 	mustExec(t, d, `INSERT INTO seller.reports (id, store_id, category, description, reporter_buyer_id, created_at, updated_at)
 		VALUES ('00000000-0000-7000-8000-0000000000a1', $1, 'OTHER', 'd', 7, now(), now())`, id)
 	mustExec(t, d, `INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('00000000-0000-7000-8000-0000000000a1', 0, 0, 'report-asset-1', 'secure/r1')`)

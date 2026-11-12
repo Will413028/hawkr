@@ -186,33 +186,14 @@ type SellerKycApplication struct {
 	Status               string
 	Version              int64
 	SellerType           string
-	RealName             *string
-	BirthDate            *time.Time
-	IDCardNoEnc          []byte
-	IDCardHash           []byte
-	IDCardHashKey        *string
-	IDCardIssueDate      *time.Time
-	IDCardIssueType      *string
-	IDCardIssueLocation  *string
-	EnglishName          *string
-	BankName             *string
-	BankCode             *string
-	BankAccountEnc       []byte
-	BankAccountHash      []byte
-	BankAccountHashKey   *string
 	ProductType          *string
 	WebsiteUrl           *string
 	CompanyName          *string
 	TaxID                *string
-	TaxIDHash            []byte
-	TaxIDHashKey         *string
 	CompanyRegisterDate  *time.Time
 	CompanyTownCode      *string
 	CompanyAddressDetail *string
 	CompanyPhone         *string
-	RepIDCardNoEnc       []byte
-	RepIDCardHash        []byte
-	RepIDCardHashKey     *string
 	SubmittedAt          *time.Time
 	SubmissionSeq        int64
 	DecidedAt            *time.Time
@@ -223,7 +204,6 @@ type SellerKycApplication struct {
 
 type SellerKycDocument struct {
 	ApplicationID uuid.UUID
-	Slot          string
 	Position      int32
 	AssetID       string
 	ObjectKey     string
@@ -232,18 +212,10 @@ type SellerKycDocument struct {
 type SellerKycDocumentAccess struct {
 	AccessID      uuid.UUID
 	ApplicationID uuid.UUID
-	RevealID      uuid.UUID
-	Slot          string
 	Position      int32
 	AssetID       string
+	AdminID       int64
 	AccessedAt    time.Time
-}
-
-type SellerKycIdentityHash struct {
-	ApplicationID uuid.UUID
-	Field         string
-	KeyID         string
-	Hash          []byte
 }
 
 type SellerKycRegistrationCheck struct {
@@ -270,15 +242,6 @@ type SellerKycRegistrationCheck struct {
 	SuspendedUntil     *time.Time
 	MismatchedFields   []string
 	UnverifiableFields []string
-}
-
-type SellerKycReveal struct {
-	RevealID      uuid.UUID
-	ApplicationID uuid.UUID
-	AdminID       int64
-	Reason        string
-	RevealedAt    time.Time
-	ExpiresAt     time.Time
 }
 
 type SellerKycReview struct {

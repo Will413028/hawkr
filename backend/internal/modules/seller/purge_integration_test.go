@@ -28,7 +28,7 @@ var (
 )
 
 // loadedStore 建一間把每個個資欄位都填滿的店：profile、KYC（個人或企業，含證件）、核准。
-func (f *fixture) loadedStore(t *testing.T, company bool, idCard, bank string) (int64, Store) {
+func (f *fixture) loadedStore(t *testing.T, company bool) (int64, Store) {
 	t.Helper()
 	ctx := context.Background()
 	accountID, s := f.open(t)
@@ -37,9 +37,11 @@ func (f *fixture) loadedStore(t *testing.T, company bool, idCard, bank string) (
 		TownCode: ptr("63000050"), AddressDetail: ptr("光復路一段 1 號"), Prize: ptr("優良農民"), WebsiteURL: ptr("https://farm.example.invalid"),
 	})
 	must(t, err)
-	draft := kycDraft(accountID, idCard, bank)
+	draft := kycDraft(accountID)
+	draft.WebsiteURL = ptr("https://farm.example.invalid")
 	if company {
-		draft = companyDraft(accountID, idRep, taxIDOne, bank)
+		draft = companyDraft(accountID, taxIDOne)
+		draft.WebsiteURL = ptr("https://farm.example.invalid")
 		draft.CompanyPhone, draft.CompanyTownCode, draft.CompanyAddressDetail = ptr("0229010572"), ptr("63000050"), ptr("中山路 2 號")
 		draft.CompanyRegisterDate = ptr("2015-03-04")
 		draft.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "co1"}}
@@ -101,15 +103,12 @@ func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 		account int64
 		store   Store
 		app     string
+		company bool
 	}
 	var stints []stint
 	for _, company := range []bool{false, true} {
-		bank := bankAcct
-		if company {
-			bank = "999888777666"
-		}
-		account, s := f.loadedStore(t, company, idA, bank)
-		stints = append(stints, stint{account, s, f.applicationID(t, s.StoreID)})
+		account, s := f.loadedStore(t, company)
+		stints = append(stints, stint{account, s, f.applicationID(t, s.StoreID), company})
 	}
 	for _, st := range stints {
 		store := f.row(t, "stores", "store_id", st.store.StoreID)
@@ -119,15 +118,19 @@ func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 			}
 		}
 		app := f.row(t, "kyc_applications", "application_id", st.app)
-		if app["real_name"] == nil || app["bank_account_enc"] == nil || app["id_card_hash"] == nil && app["rep_id_card_hash"] == nil {
+		if app["website_url"] == nil || st.company && (app["company_name"] == nil || app["tax_id"] == nil) {
 			t.Fatalf("KYC 沒有填滿：%v", nonNull(app, kycKept))
 		}
-		if f.count(t, "SELECT count(*) FROM seller.kyc_documents WHERE application_id=$1::uuid", st.app) < 3 {
-			t.Fatal("沒有證件")
+		wantDocs := int64(0)
+		if st.company {
+			wantDocs = 1
+		}
+		if f.count(t, "SELECT count(*) FROM seller.kyc_documents WHERE application_id=$1::uuid", st.app) != wantDocs {
+			t.Fatal("公司文件的數量不對")
 		}
 		certRef := media.Ref{Type: media.RefTypeCertification, ID: st.app}
 		f.syncMedia(t, certRef)
-		if len(f.media.Referenced(certRef)) < 3 {
+		if int64(len(f.media.Referenced(certRef))) != wantDocs {
 			t.Fatalf("清理之前證件的引用應該已登記：%v", f.media.Referenced(certRef))
 		}
 		_, err := f.module.CloseCurrent(ctx, st.account)
@@ -147,7 +150,7 @@ func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 			t.Errorf("kyc_applications 沒清：%v", cols)
 		}
 		if f.count(t, "SELECT count(*) FROM seller.kyc_documents WHERE application_id=$1::uuid", st.app) != 0 {
-			t.Error("證件列沒刪")
+			t.Error("公司文件列沒刪")
 		}
 		// 保留的事實：審核紀錄。
 		if f.count(t, "SELECT count(*) FROM seller.kyc_reviews WHERE application_id=$1::uuid", st.app) < 2 {
@@ -179,16 +182,16 @@ func TestPurgeOnlyTouchesStintsClosedForMoreThanTheStoreRetention(t *testing.T) 
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	_, openStore := f.loadedStore(t, false, idA, bankAcct)
-	oldAccount, oldStore := f.loadedStore(t, false, idB, "111222333444")
+	_, openStore := f.loadedStore(t, false)
+	oldAccount, oldStore := f.loadedStore(t, false)
 	_, err := f.module.CloseCurrent(ctx, oldAccount)
 	must(t, err)
 	closedAt := f.now
-	midAccount, midStore := f.loadedStore(t, false, idC, "555666777888")
+	midAccount, midStore := f.loadedStore(t, false)
 	f.now = closedAt.Add(11 * 24 * time.Hour)
 	_, err = f.module.CloseCurrent(ctx, midAccount)
 	must(t, err)
-	recentAccount, recentStore := f.loadedStore(t, false, idRep, "123123123123")
+	recentAccount, recentStore := f.loadedStore(t, false)
 	f.now = closedAt.Add(StoreRetention - 24*time.Hour)
 	_, err = f.module.CloseCurrent(ctx, recentAccount)
 	must(t, err)
@@ -212,7 +215,7 @@ func TestPurgeOnlyTouchesStintsClosedForMoreThanTheStoreRetention(t *testing.T) 
 		if f.purged(t, id) {
 			t.Errorf("%s的店被清了", name)
 		}
-		if f.row(t, "stores", "store_id", id)["store_name"] == nil || f.row(t, "kyc_applications", "store_id", id)["real_name"] == nil ||
+		if f.row(t, "stores", "store_id", id)["store_name"] == nil || f.row(t, "kyc_applications", "store_id", id)["website_url"] == nil ||
 			f.row(t, "stores", "store_id", id)["contact_name"] == nil || f.row(t, "stores", "store_id", id)["support_email"] == nil {
 			t.Errorf("%s的店個資被動到", name)
 		}
@@ -237,7 +240,7 @@ func TestSanctionSnapshotSurvivesThePurgeOfItsSourceKYC(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	account, s := f.loadedStore(t, false, idA, bankAcct)
+	account, s := f.loadedStore(t, true)
 	sanction := f.suspend(t, s.StoreID)
 	before := f.count(t, "SELECT count(*) FROM seller.measure_identities")
 	if before == 0 {
@@ -249,19 +252,16 @@ func TestSanctionSnapshotSurvivesThePurgeOfItsSourceKYC(t *testing.T) {
 	if n, err := f.module.PurgePII(ctx); err != nil || n != 1 {
 		t.Fatalf("n=%d err=%v", n, err)
 	}
-	if f.row(t, "kyc_applications", "store_id", s.StoreID)["id_card_hash"] != nil {
-		t.Fatal("KYC 的 hash 沒清")
-	}
-	if n := f.count(t, "SELECT count(*) FROM seller.kyc_identity_hashes"); n != 0 {
-		t.Fatalf("申請的比對 hash 要隨個資清理刪除：%d", n)
+	if f.row(t, "kyc_applications", "store_id", s.StoreID)["tax_id"] != nil {
+		t.Fatal("KYC 的統編沒清")
 	}
 	if after := f.count(t, "SELECT count(*) FROM seller.measure_identities"); after != before {
 		t.Fatalf("快照被清理動到：%d → %d", before, after)
 	}
 	other, _ := f.open(t)
-	d := f.savedDraft(t, kycDraft(other, idA, "444555666777"))
+	d := f.savedDraft(t, companyDraft(other, taxIDOne))
 	if _, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: other, ExpectedVersion: d.Version}); err == nil {
-		t.Fatal("清理之後同一個身分證號不該通過認證")
+		t.Fatal("清理之後同一個統編不該通過認證")
 	}
 	// 措施結束才刪快照。
 	_, err = f.lift(ctx, sanction)
@@ -276,7 +276,7 @@ func TestPurgeIsIdempotent(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	account, s := f.loadedStore(t, false, idA, bankAcct)
+	account, s := f.loadedStore(t, false)
 	_, err := f.module.CloseCurrent(ctx, account)
 	must(t, err)
 	f.now = f.now.Add(StoreRetention + time.Second)

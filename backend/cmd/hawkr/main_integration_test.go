@@ -180,7 +180,6 @@ func TestWorkerRunsQueuedJobs(t *testing.T) {
 	t.Setenv("DATABASE_URL", url)
 	t.Setenv("WEB_REVALIDATE_BASE_URL", website.URL)
 	t.Setenv("WEB_REVALIDATE_SECRET", "test")
-	t.Setenv("KYC_ENCRYPTION_KEYS", "test1:dGVzdC1reWMtZW5jcnlwdGlvbi1rZXktMDAwMDAwMDE=")
 	t.Setenv("KYC_HASH_KEYS", "test1:dGVzdC1reWMtaGFzaC1obWFjLWtleS0wMDAwMDAwMDE=")
 	t.Setenv("SMS_SENDER", "log")
 	// 連線在第一次送出時才建立；這個測試不送事件。

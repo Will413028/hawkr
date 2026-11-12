@@ -2969,7 +2969,7 @@ class KYCIssue extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearField_1() => $_clearField(1);
 
-  /// field 是文件類（id_card_front、id_card_back、bank_book、business.company_documents）時，指出的那一張文件的 asset_id
+  /// field 是文件類（business.company_documents）時，指出的那一張文件的 asset_id
   /// （KYCDocument.asset_id），公司文件有多張時用它指到其中一張，順序改變也不會指錯。非文件類的欄位必須是空字串。
   /// 文件類欄位的規則依原因碼：UNREADABLE、EXPIRED、MISMATCH、INVALID 必須指定是哪一張文件（這些問題出在某一張文件上）；
   /// MISSING 不可以指定（缺的是整個位置，沒有那一張）；OTHER 兩者皆可。違反時 RejectKYC 回 invalid_argument。
@@ -3002,7 +3002,7 @@ class KYCIssue extends $pb.GeneratedMessage {
   void clearMessage() => $_clearField(4);
 }
 
-/// KYCDocument 是申請上的一張證件圖片。證件含個資，下載要經有授權的 download_uri（只有申請的擁有者能下載），不是公開的
+/// KYCDocument 是申請上的一張公司補充文件。文件可能帶個人姓名與簽名，下載要經有授權的 download_uri（只有申請的擁有者能下載），不是公開的
 /// 圖片網址。
 class KYCDocument extends $pb.GeneratedMessage {
   factory KYCDocument({
@@ -3058,7 +3058,7 @@ class KYCDocument extends $pb.GeneratedMessage {
           KYCDocument.$_createMessage);
   static KYCDocument? _defaultInstance;
 
-  /// 這份申請目前的這張圖片；寫入時指定它表示保留這一張（單張的位置不指定就是沿用，公司文件清單裡的現有圖片要列出來才保留）。
+  /// 這份申請目前的這張圖片；寫入時指定它表示保留這一張（公司文件清單裡的現有圖片要列出來才保留）。
   @$pb.TagNumber(1)
   $core.String get assetId => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -3172,17 +3172,9 @@ class KYCRejection extends $pb.GeneratedMessage {
   $pb.PbList<KYCIssue> get issues => $_getList(2);
 }
 
-/// IndividualKYC 是個人賣家專屬的欄位：身分證號是賣家本人的。
+/// IndividualKYC 是個人賣家專屬的欄位；目前沒有欄位（平台不收身分證號，Stripe 計畫 D22），設定它表示賣家型態是個人。
 class IndividualKYC extends $pb.GeneratedMessage {
-  factory IndividualKYC({
-    $core.String? idCardNo,
-    $core.String? idCardNoMasked,
-  }) {
-    final result = IndividualKYC._();
-    if (idCardNo != null) result.idCardNo = idCardNo;
-    if (idCardNoMasked != null) result.idCardNoMasked = idCardNoMasked;
-    return result;
-  }
+  factory IndividualKYC() => IndividualKYC._();
 
   IndividualKYC._();
 
@@ -3198,8 +3190,6 @@ class IndividualKYC extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: IndividualKYC.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'idCardNo')
-    ..aOS(2, _omitFieldNames ? '' : 'idCardNoMasked')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3223,36 +3213,15 @@ class IndividualKYC extends $pb.GeneratedMessage {
       _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<IndividualKYC>(
           IndividualKYC.$_createMessage);
   static IndividualKYC? _defaultInstance;
-
-  /// 身分證字號（寫入用）。
-  @$pb.TagNumber(1)
-  $core.String get idCardNo => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set idCardNo($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasIdCardNo() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearIdCardNo() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.String get idCardNoMasked => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set idCardNoMasked($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasIdCardNoMasked() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearIdCardNoMasked() => $_clearField(2);
 }
 
-/// BusinessKYC 是企業賣家專屬的欄位：公司資料與負責人的身分證號。
+/// BusinessKYC 是企業賣家專屬的欄位：公司資料。
 class BusinessKYC extends $pb.GeneratedMessage {
   factory BusinessKYC({
     $core.String? companyName,
     $core.String? taxId,
     $5.Date? companyRegisterDate,
     $core.String? companyPhone,
-    $core.String? repIdCardNo,
-    $core.String? repIdCardNoMasked,
     $core.Iterable<KYCDocument>? companyDocuments,
     $2.PostalAddress? companyAddress,
   }) {
@@ -3262,8 +3231,6 @@ class BusinessKYC extends $pb.GeneratedMessage {
     if (companyRegisterDate != null)
       result.companyRegisterDate = companyRegisterDate;
     if (companyPhone != null) result.companyPhone = companyPhone;
-    if (repIdCardNo != null) result.repIdCardNo = repIdCardNo;
-    if (repIdCardNoMasked != null) result.repIdCardNoMasked = repIdCardNoMasked;
     if (companyDocuments != null)
       result.companyDocuments.addAll(companyDocuments);
     if (companyAddress != null) result.companyAddress = companyAddress;
@@ -3289,8 +3256,6 @@ class BusinessKYC extends $pb.GeneratedMessage {
     ..aOM<$5.Date>(4, _omitFieldNames ? '' : 'companyRegisterDate',
         subBuilder: $5.Date.$_createMessage)
     ..aOS(7, _omitFieldNames ? '' : 'companyPhone')
-    ..aOS(8, _omitFieldNames ? '' : 'repIdCardNo')
-    ..aOS(9, _omitFieldNames ? '' : 'repIdCardNoMasked')
     ..pPM<KYCDocument>(10, _omitFieldNames ? '' : 'companyDocuments',
         subBuilder: KYCDocument.$_createMessage)
     ..aOM<$2.PostalAddress>(11, _omitFieldNames ? '' : 'companyAddress',
@@ -3358,73 +3323,40 @@ class BusinessKYC extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearCompanyPhone() => $_clearField(7);
 
-  /// 負責人的身分證字號（寫入用）。
-  @$pb.TagNumber(8)
-  $core.String get repIdCardNo => $_getSZ(4);
-  @$pb.TagNumber(8)
-  set repIdCardNo($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(8)
-  $core.bool hasRepIdCardNo() => $_has(4);
-  @$pb.TagNumber(8)
-  void clearRepIdCardNo() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $core.String get repIdCardNoMasked => $_getSZ(5);
-  @$pb.TagNumber(9)
-  set repIdCardNoMasked($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(9)
-  $core.bool hasRepIdCardNoMasked() => $_has(5);
-  @$pb.TagNumber(9)
-  void clearRepIdCardNoMasked() => $_clearField(9);
-
   /// 公司文件，最多 10 張，順序就是位置；列進 update_mask 時整個換成請求的清單。
   @$pb.TagNumber(10)
-  $pb.PbList<KYCDocument> get companyDocuments => $_getList(6);
+  $pb.PbList<KYCDocument> get companyDocuments => $_getList(4);
 
   /// 公司地址；列進 update_mask 時整個換成請求的地址，請求沒有 address 就是清掉。可以只填鄉鎮市區。
   @$pb.TagNumber(11)
-  $2.PostalAddress get companyAddress => $_getN(7);
+  $2.PostalAddress get companyAddress => $_getN(5);
   @$pb.TagNumber(11)
   set companyAddress($2.PostalAddress value) => $_setField(11, value);
   @$pb.TagNumber(11)
-  $core.bool hasCompanyAddress() => $_has(7);
+  $core.bool hasCompanyAddress() => $_has(5);
   @$pb.TagNumber(11)
   void clearCompanyAddress() => $_clearField(11);
   @$pb.TagNumber(11)
-  $2.PostalAddress ensureCompanyAddress() => $_ensure(7);
+  $2.PostalAddress ensureCompanyAddress() => $_ensure(5);
 }
 
 enum KYCApplication_Subject { individual, business, notSet }
 
 /// KYCApplication 是店家的身分認證申請，每個店家同時最多一筆（以呼叫者為範圍，沒有申請 ID 的定址）。賣家型態是 subject 設定
-/// 的是哪一支（個人 individual 或企業 business）；個人與企業共用的欄位（姓名、銀行、聯絡方式、證件）在最上層，各自專屬的
-/// 欄位在那一支裡面。update_mask 的路徑可以下到那一支（individual.id_card_no、business.tax_id），列 individual 或 business
+/// 的是哪一支（個人 individual 或企業 business）；個人與企業共用的欄位（產品類型、網站）在最上層，各自專屬的
+/// 欄位在那一支裡面。update_mask 的路徑可以下到那一支（business.tax_id），列 individual 或 business
 /// 本身是那一支全部可寫的欄位，"*" 是所有最上層欄位加上設定的那一支。建立時 subject 必須設定其中一支；後來設定另一支並且
-/// update_mask 列到它的欄位，就是切換型態，原本那一支專屬的欄位（個人的身分證號、企業的公司資料與公司文件）一併清掉。
-/// 身分證號、負責人身分證號與銀行帳號寫入時用 id_card_no、rep_id_card_no、bank_account，讀出時只有遮蔽後的值。日期是日曆日。
-/// 證件圖片是狀態：單張的位置（id_card_front、id_card_back、bank_book）列進 update_mask 時整個換成請求的那一張（不帶值
-/// 是清掉），company_documents 整個換成請求的清單，每個元素是現有的圖片（asset_id，保留）或新上傳的圖片（staged_token），
+/// update_mask 列到它的欄位，就是切換型態，原本那一支專屬的欄位（企業的公司資料與公司文件）一併清掉。
+/// 平台不收身分證號、銀行帳號、證件影像與個人姓名（Stripe 計畫 D22、D37）；統編是市集登記資料。日期是日曆日。
+/// 公司文件是狀態：company_documents 整個換成請求的清單，每個元素是現有的圖片（asset_id，保留）或新上傳的圖片（staged_token），
 /// 同一張圖片不能放進兩個位置。
 class KYCApplication extends $pb.GeneratedMessage {
   factory KYCApplication({
     $core.String? id,
     KYCStatus? status,
     $core.String? etag,
-    $core.String? realName,
-    $5.Date? birthDate,
-    $5.Date? idCardIssueDate,
-    $core.String? idCardIssueType,
-    $core.String? idCardIssueLocation,
-    $core.String? englishName,
-    $core.String? bankName,
-    $core.String? bankCode,
-    $core.String? bankAccount,
-    $core.String? bankAccountMasked,
     $core.String? productType,
     $core.String? websiteUrl,
-    KYCDocument? idCardFront,
-    KYCDocument? idCardBack,
-    KYCDocument? bankBook,
     IndividualKYC? individual,
     BusinessKYC? business,
     KYCRejection? lastRejection,
@@ -3440,22 +3372,8 @@ class KYCApplication extends $pb.GeneratedMessage {
     if (id != null) result.id = id;
     if (status != null) result.status = status;
     if (etag != null) result.etag = etag;
-    if (realName != null) result.realName = realName;
-    if (birthDate != null) result.birthDate = birthDate;
-    if (idCardIssueDate != null) result.idCardIssueDate = idCardIssueDate;
-    if (idCardIssueType != null) result.idCardIssueType = idCardIssueType;
-    if (idCardIssueLocation != null)
-      result.idCardIssueLocation = idCardIssueLocation;
-    if (englishName != null) result.englishName = englishName;
-    if (bankName != null) result.bankName = bankName;
-    if (bankCode != null) result.bankCode = bankCode;
-    if (bankAccount != null) result.bankAccount = bankAccount;
-    if (bankAccountMasked != null) result.bankAccountMasked = bankAccountMasked;
     if (productType != null) result.productType = productType;
     if (websiteUrl != null) result.websiteUrl = websiteUrl;
-    if (idCardFront != null) result.idCardFront = idCardFront;
-    if (idCardBack != null) result.idCardBack = idCardBack;
-    if (bankBook != null) result.bankBook = bankBook;
     if (individual != null) result.individual = individual;
     if (business != null) result.business = business;
     if (lastRejection != null) result.lastRejection = lastRejection;
@@ -3496,26 +3414,8 @@ class KYCApplication extends $pb.GeneratedMessage {
     ..aE<KYCStatus>(2, _omitFieldNames ? '' : 'status',
         enumValues: KYCStatus.values)
     ..aOS(3, _omitFieldNames ? '' : 'etag')
-    ..aOS(4, _omitFieldNames ? '' : 'realName')
-    ..aOM<$5.Date>(5, _omitFieldNames ? '' : 'birthDate',
-        subBuilder: $5.Date.$_createMessage)
-    ..aOM<$5.Date>(6, _omitFieldNames ? '' : 'idCardIssueDate',
-        subBuilder: $5.Date.$_createMessage)
-    ..aOS(7, _omitFieldNames ? '' : 'idCardIssueType')
-    ..aOS(8, _omitFieldNames ? '' : 'idCardIssueLocation')
-    ..aOS(9, _omitFieldNames ? '' : 'englishName')
-    ..aOS(10, _omitFieldNames ? '' : 'bankName')
-    ..aOS(11, _omitFieldNames ? '' : 'bankCode')
-    ..aOS(12, _omitFieldNames ? '' : 'bankAccount')
-    ..aOS(13, _omitFieldNames ? '' : 'bankAccountMasked')
     ..aOS(14, _omitFieldNames ? '' : 'productType')
     ..aOS(16, _omitFieldNames ? '' : 'websiteUrl')
-    ..aOM<KYCDocument>(19, _omitFieldNames ? '' : 'idCardFront',
-        subBuilder: KYCDocument.$_createMessage)
-    ..aOM<KYCDocument>(20, _omitFieldNames ? '' : 'idCardBack',
-        subBuilder: KYCDocument.$_createMessage)
-    ..aOM<KYCDocument>(21, _omitFieldNames ? '' : 'bankBook',
-        subBuilder: KYCDocument.$_createMessage)
     ..aOM<IndividualKYC>(22, _omitFieldNames ? '' : 'individual',
         subBuilder: IndividualKYC.$_createMessage)
     ..aOM<BusinessKYC>(23, _omitFieldNames ? '' : 'business',
@@ -3602,245 +3502,117 @@ class KYCApplication extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearEtag() => $_clearField(3);
 
-  @$pb.TagNumber(4)
-  $core.String get realName => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set realName($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasRealName() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearRealName() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $5.Date get birthDate => $_getN(4);
-  @$pb.TagNumber(5)
-  set birthDate($5.Date value) => $_setField(5, value);
-  @$pb.TagNumber(5)
-  $core.bool hasBirthDate() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearBirthDate() => $_clearField(5);
-  @$pb.TagNumber(5)
-  $5.Date ensureBirthDate() => $_ensure(4);
-
-  @$pb.TagNumber(6)
-  $5.Date get idCardIssueDate => $_getN(5);
-  @$pb.TagNumber(6)
-  set idCardIssueDate($5.Date value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasIdCardIssueDate() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearIdCardIssueDate() => $_clearField(6);
-  @$pb.TagNumber(6)
-  $5.Date ensureIdCardIssueDate() => $_ensure(5);
-
-  @$pb.TagNumber(7)
-  $core.String get idCardIssueType => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set idCardIssueType($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasIdCardIssueType() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearIdCardIssueType() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.String get idCardIssueLocation => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set idCardIssueLocation($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasIdCardIssueLocation() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearIdCardIssueLocation() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $core.String get englishName => $_getSZ(8);
-  @$pb.TagNumber(9)
-  set englishName($core.String value) => $_setString(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasEnglishName() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearEnglishName() => $_clearField(9);
-
-  @$pb.TagNumber(10)
-  $core.String get bankName => $_getSZ(9);
-  @$pb.TagNumber(10)
-  set bankName($core.String value) => $_setString(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasBankName() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearBankName() => $_clearField(10);
-
-  /// 3 碼銀行代碼，或 3 碼加 4 碼分行代碼。
-  @$pb.TagNumber(11)
-  $core.String get bankCode => $_getSZ(10);
-  @$pb.TagNumber(11)
-  set bankCode($core.String value) => $_setString(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasBankCode() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearBankCode() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  $core.String get bankAccount => $_getSZ(11);
-  @$pb.TagNumber(12)
-  set bankAccount($core.String value) => $_setString(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasBankAccount() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearBankAccount() => $_clearField(12);
-
-  @$pb.TagNumber(13)
-  $core.String get bankAccountMasked => $_getSZ(12);
-  @$pb.TagNumber(13)
-  set bankAccountMasked($core.String value) => $_setString(12, value);
-  @$pb.TagNumber(13)
-  $core.bool hasBankAccountMasked() => $_has(12);
-  @$pb.TagNumber(13)
-  void clearBankAccountMasked() => $_clearField(13);
-
   @$pb.TagNumber(14)
-  $core.String get productType => $_getSZ(13);
+  $core.String get productType => $_getSZ(3);
   @$pb.TagNumber(14)
-  set productType($core.String value) => $_setString(13, value);
+  set productType($core.String value) => $_setString(3, value);
   @$pb.TagNumber(14)
-  $core.bool hasProductType() => $_has(13);
+  $core.bool hasProductType() => $_has(3);
   @$pb.TagNumber(14)
   void clearProductType() => $_clearField(14);
 
   @$pb.TagNumber(16)
-  $core.String get websiteUrl => $_getSZ(14);
+  $core.String get websiteUrl => $_getSZ(4);
   @$pb.TagNumber(16)
-  set websiteUrl($core.String value) => $_setString(14, value);
+  set websiteUrl($core.String value) => $_setString(4, value);
   @$pb.TagNumber(16)
-  $core.bool hasWebsiteUrl() => $_has(14);
+  $core.bool hasWebsiteUrl() => $_has(4);
   @$pb.TagNumber(16)
   void clearWebsiteUrl() => $_clearField(16);
 
-  @$pb.TagNumber(19)
-  KYCDocument get idCardFront => $_getN(15);
-  @$pb.TagNumber(19)
-  set idCardFront(KYCDocument value) => $_setField(19, value);
-  @$pb.TagNumber(19)
-  $core.bool hasIdCardFront() => $_has(15);
-  @$pb.TagNumber(19)
-  void clearIdCardFront() => $_clearField(19);
-  @$pb.TagNumber(19)
-  KYCDocument ensureIdCardFront() => $_ensure(15);
-
-  @$pb.TagNumber(20)
-  KYCDocument get idCardBack => $_getN(16);
-  @$pb.TagNumber(20)
-  set idCardBack(KYCDocument value) => $_setField(20, value);
-  @$pb.TagNumber(20)
-  $core.bool hasIdCardBack() => $_has(16);
-  @$pb.TagNumber(20)
-  void clearIdCardBack() => $_clearField(20);
-  @$pb.TagNumber(20)
-  KYCDocument ensureIdCardBack() => $_ensure(16);
-
-  @$pb.TagNumber(21)
-  KYCDocument get bankBook => $_getN(17);
-  @$pb.TagNumber(21)
-  set bankBook(KYCDocument value) => $_setField(21, value);
-  @$pb.TagNumber(21)
-  $core.bool hasBankBook() => $_has(17);
-  @$pb.TagNumber(21)
-  void clearBankBook() => $_clearField(21);
-  @$pb.TagNumber(21)
-  KYCDocument ensureBankBook() => $_ensure(17);
-
   @$pb.TagNumber(22)
-  IndividualKYC get individual => $_getN(18);
+  IndividualKYC get individual => $_getN(5);
   @$pb.TagNumber(22)
   set individual(IndividualKYC value) => $_setField(22, value);
   @$pb.TagNumber(22)
-  $core.bool hasIndividual() => $_has(18);
+  $core.bool hasIndividual() => $_has(5);
   @$pb.TagNumber(22)
   void clearIndividual() => $_clearField(22);
   @$pb.TagNumber(22)
-  IndividualKYC ensureIndividual() => $_ensure(18);
+  IndividualKYC ensureIndividual() => $_ensure(5);
 
   @$pb.TagNumber(23)
-  BusinessKYC get business => $_getN(19);
+  BusinessKYC get business => $_getN(6);
   @$pb.TagNumber(23)
   set business(BusinessKYC value) => $_setField(23, value);
   @$pb.TagNumber(23)
-  $core.bool hasBusiness() => $_has(19);
+  $core.bool hasBusiness() => $_has(6);
   @$pb.TagNumber(23)
   void clearBusiness() => $_clearField(23);
   @$pb.TagNumber(23)
-  BusinessKYC ensureBusiness() => $_ensure(19);
+  BusinessKYC ensureBusiness() => $_ensure(6);
 
   /// 最近一次退回，只在「最近一次審核紀錄是退回、賣家還沒重新送出（核准、取消之後也算）」時設，其餘時候不設；client 直接看有沒有
   /// 這個欄位決定要不要顯示總理由與「需重新送出」的提示，不必自己推導。賣家把每一項問題都處理完、還沒重新送出時它仍在。
   @$pb.TagNumber(25)
-  KYCRejection get lastRejection => $_getN(20);
+  KYCRejection get lastRejection => $_getN(7);
   @$pb.TagNumber(25)
   set lastRejection(KYCRejection value) => $_setField(25, value);
   @$pb.TagNumber(25)
-  $core.bool hasLastRejection() => $_has(20);
+  $core.bool hasLastRejection() => $_has(7);
   @$pb.TagNumber(25)
   void clearLastRejection() => $_clearField(25);
   @$pb.TagNumber(25)
-  KYCRejection ensureLastRejection() => $_ensure(20);
+  KYCRejection ensureLastRejection() => $_ensure(7);
 
   /// 送出之前還缺的欄位（與 SubmitKYC 檢查的是同一份規則），依 KYCField 的數字順序；齊全時是空的。client 以它決定續填的
   /// 位置與哪些欄位標紅，不必自己重寫完整性規則。
   @$pb.TagNumber(26)
-  $pb.PbList<KYCField> get missingFields => $_getList(21);
+  $pb.PbList<KYCField> get missingFields => $_getList(8);
 
   @$pb.TagNumber(27)
-  $1.Timestamp get submitTime => $_getN(22);
+  $1.Timestamp get submitTime => $_getN(9);
   @$pb.TagNumber(27)
   set submitTime($1.Timestamp value) => $_setField(27, value);
   @$pb.TagNumber(27)
-  $core.bool hasSubmitTime() => $_has(22);
+  $core.bool hasSubmitTime() => $_has(9);
   @$pb.TagNumber(27)
   void clearSubmitTime() => $_clearField(27);
   @$pb.TagNumber(27)
-  $1.Timestamp ensureSubmitTime() => $_ensure(22);
+  $1.Timestamp ensureSubmitTime() => $_ensure(9);
 
   @$pb.TagNumber(28)
-  $1.Timestamp get decideTime => $_getN(23);
+  $1.Timestamp get decideTime => $_getN(10);
   @$pb.TagNumber(28)
   set decideTime($1.Timestamp value) => $_setField(28, value);
   @$pb.TagNumber(28)
-  $core.bool hasDecideTime() => $_has(23);
+  $core.bool hasDecideTime() => $_has(10);
   @$pb.TagNumber(28)
   void clearDecideTime() => $_clearField(28);
   @$pb.TagNumber(28)
-  $1.Timestamp ensureDecideTime() => $_ensure(23);
+  $1.Timestamp ensureDecideTime() => $_ensure(10);
 
   @$pb.TagNumber(29)
-  $1.Timestamp get createTime => $_getN(24);
+  $1.Timestamp get createTime => $_getN(11);
   @$pb.TagNumber(29)
   set createTime($1.Timestamp value) => $_setField(29, value);
   @$pb.TagNumber(29)
-  $core.bool hasCreateTime() => $_has(24);
+  $core.bool hasCreateTime() => $_has(11);
   @$pb.TagNumber(29)
   void clearCreateTime() => $_clearField(29);
   @$pb.TagNumber(29)
-  $1.Timestamp ensureCreateTime() => $_ensure(24);
+  $1.Timestamp ensureCreateTime() => $_ensure(11);
 
   @$pb.TagNumber(30)
-  $1.Timestamp get updateTime => $_getN(25);
+  $1.Timestamp get updateTime => $_getN(12);
   @$pb.TagNumber(30)
   set updateTime($1.Timestamp value) => $_setField(30, value);
   @$pb.TagNumber(30)
-  $core.bool hasUpdateTime() => $_has(25);
+  $core.bool hasUpdateTime() => $_has(12);
   @$pb.TagNumber(30)
   void clearUpdateTime() => $_clearField(30);
   @$pb.TagNumber(30)
-  $1.Timestamp ensureUpdateTime() => $_ensure(25);
+  $1.Timestamp ensureUpdateTime() => $_ensure(12);
 
   /// 送出之前還缺的店家欄位（必填的是地址與客服電子信箱，與 SubmitKYC 檢查的是同一份規則），依 StoreField 的數字順序；齊全時是空的。
   /// 這些欄位用 UpdateMyStore 寫，不在申請上。
   @$pb.TagNumber(31)
-  $pb.PbList<StoreField> get missingStoreFields => $_getList(26);
+  $pb.PbList<StoreField> get missingStoreFields => $_getList(13);
 
   /// 最近一次退回指出的問題裡賣家還沒處理的（已處理由伺服器判定：該欄位的值在退回之後被改過，或指到的文件已被移除或替換）；
   /// 重新送出、核准或取消之後是空的。client 以它標出要補的欄位與文件，不必自己推導退回是否仍然有效。
   @$pb.TagNumber(32)
-  $pb.PbList<KYCIssue> get outstandingIssues => $_getList(27);
+  $pb.PbList<KYCIssue> get outstandingIssues => $_getList(14);
 }
 
 class SaveKYCDraftRequest extends $pb.GeneratedMessage {
@@ -7534,7 +7306,7 @@ class SellerAppServiceApi {
       _client.invoke<SaveKYCDraftResponse>(ctx, 'SellerAppService',
           'SaveKYCDraft', request, SaveKYCDraftResponse());
 
-  /// GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）。還沒有申請（或申請已取消）
+  /// GetMyKYC 回傳呼叫者店家目前的 KYC 申請。還沒有申請（或申請已取消）
   /// 時回 not_found。
   $async.Future<GetMyKYCResponse> getMyKYC(
           $pb.ClientContext? ctx, GetMyKYCRequest request) =>
@@ -7543,7 +7315,7 @@ class SellerAppServiceApi {
 
   /// SubmitKYC 送出申請給管理員審核。草稿與被退回的申請都能直接送出，
   /// 不必先儲存；審核中與已核准的申請回 failed_precondition。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
-  /// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（real_name、id_card_front、business.tax_id……，與 KYCField 一對一）。申請本身齊全之後，
+  /// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（business.tax_id、business.company_documents……，與 KYCField 一對一）。申請本身齊全之後，
   /// 店家的必填資料（地址、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
   /// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。帳號沒有聯絡信箱（IdentityAppService.GetContactEmail 沒有回信箱）時回
   /// failed_precondition 與 ErrorReason CONTACT_EMAIL_REQUIRED，client 引導在 IdentityAppService.SetContactEmail 填一個再重送。 身分比對沒有通過時回

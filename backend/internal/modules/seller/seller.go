@@ -58,8 +58,7 @@ type Orders interface {
 }
 
 // Deps 是模組需要的外部依賴；clock 由組裝點注入。StoreCode 是 store_code 的產生器，測試以外不給（預設是
-// 年份加密碼學亂數）。KYCKeys 是 KYC 個資的加密金鑰環，KYCMAC 是比對用的 HMAC 金鑰環（兩者必須是不同的金鑰，
-// seal.Distinct），都是必填。
+// 年份加密碼學亂數）。KYCMAC 是統編比對用的 HMAC 金鑰環（Stripe 計畫 D22：平台不再加密保存個資），必填。
 type Deps struct {
 	DB       *db.DB
 	Events   *events.Bus
@@ -67,7 +66,6 @@ type Deps struct {
 	Identity *identity.Module
 	Media    media.Media
 	Orders   Orders
-	KYCKeys  *seal.Keyring
 	KYCMAC   *seal.MAC
 	// Payment 是收款帳戶的擁有者（payment 模組，Stripe 計畫 D28），必填：核准的 transaction 內請它寫「建立中」的帳戶列並排入建立 job，個資清理時請它
 	// 刪除帳戶列。沒有設定 provider 的 payment 模組讓核准不建立收款帳戶。
@@ -101,7 +99,7 @@ type Module struct {
 
 // New 建立模組。
 func New(d Deps) *Module {
-	if d.DB == nil || d.Events == nil || d.Jobs == nil || d.Identity == nil || d.Media == nil || d.Orders == nil || d.KYCKeys == nil || d.KYCMAC == nil || d.ProductStores == nil || d.Registry == nil || d.Payment == nil {
+	if d.DB == nil || d.Events == nil || d.Jobs == nil || d.Identity == nil || d.Media == nil || d.Orders == nil || d.KYCMAC == nil || d.ProductStores == nil || d.Registry == nil || d.Payment == nil {
 		panic("seller: missing dependency")
 	}
 	if d.Now == nil {
@@ -110,16 +108,13 @@ func New(d Deps) *Module {
 	if d.Logger == nil {
 		d.Logger = slog.Default()
 	}
-	if err := seal.Distinct(d.KYCKeys, d.KYCMAC); err != nil {
-		panic("seller: " + err.Error())
-	}
 	exposures := exposure.New(exposure.Deps{Events: d.Events})
 	suspensions := suspension.New(suspension.Deps{DB: d.DB, Events: d.Events, Jobs: d.Jobs, Exposure: exposures, Now: d.Now})
 	closings := closing.New(closing.Deps{
 		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Identity: d.Identity, Orders: d.Orders, Exposure: exposures, Now: d.Now,
 	})
 	kycService := kyc.New(kyc.Deps{
-		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Exposure: exposures, Payment: d.Payment, Identity: d.Identity, Keys: d.KYCKeys, MAC: d.KYCMAC, Registry: d.Registry, Now: d.Now, Logger: d.Logger,
+		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Exposure: exposures, Payment: d.Payment, Identity: d.Identity, MAC: d.KYCMAC, Registry: d.Registry, Now: d.Now, Logger: d.Logger,
 	})
 	return &Module{
 		onboarding: onboarding.New(onboarding.Deps{

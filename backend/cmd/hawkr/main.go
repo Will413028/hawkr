@@ -154,7 +154,7 @@ func runServe(ctx context.Context) error {
 	verifierCtx, stopVerifiers := context.WithCancel(context.WithoutCancel(ctx))
 	defer stopVerifiers()
 	idc := readIdentityConfig(verifierCtx, e)
-	kyc := readKYCKeys(e)
+	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
 	registry := readGCIS(e)
 	if err := e.Err(); err != nil {
@@ -222,7 +222,7 @@ func runServe(ctx context.Context) error {
 	subscribeBuyerLifecycle(bus, buyerModule)
 	box := newInbox(d, jc, log)
 	payments, owners := newPayment(d, bus, jc, box, paymentProvider, log)
-	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kyc, payments, registry, log)
+	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)
 	// 資料庫參照的金鑰（KYC 的密文、blind index、處分的身分快照）都要在設定的金鑰環裡，缺了就不啟動。
@@ -335,7 +335,7 @@ func runWorker(ctx context.Context) error {
 	verifierCtx, stopVerifiers := context.WithCancel(context.WithoutCancel(ctx))
 	defer stopVerifiers()
 	idc := readIdentityConfig(verifierCtx, e)
-	kyc := readKYCKeys(e)
+	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
 	registry := readGCIS(e)
 	if err := e.Err(); err != nil {
@@ -386,7 +386,7 @@ func runWorker(ctx context.Context) error {
 	subscribeBuyerLifecycle(bus, buyerModule)
 	box := newInbox(d, jc, log)
 	payments, owners := newPayment(d, bus, jc, box, paymentProvider, log)
-	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kyc, payments, registry, log)
+	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)
 	// 資料庫參照的金鑰（KYC 的密文、blind index、處分的身分快照）都要在設定的金鑰環裡，缺了就不啟動。

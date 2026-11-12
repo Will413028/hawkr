@@ -199,8 +199,8 @@ func setup(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	kycKeys, kycMAC := sealtest.Keys(t)
-	sellerModule := seller.New(seller.Deps{KYCKeys: kycKeys, KYCMAC: kycMAC, DB: d, Events: bus, Jobs: queue, Identity: id, Media: noMedia{}, Orders: s, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})})
+	kycMAC := sealtest.MAC(t)
+	sellerModule := seller.New(seller.Deps{KYCMAC: kycMAC, DB: d, Events: bus, Jobs: queue, Identity: id, Media: noMedia{}, Orders: s, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})})
 	h, err := httpapi.NewHandler(httpapi.Deps{Social: &social.Module{}, Ready: d.Ping, Buyer: m, Seller: sellerModule, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, BuyerPorts: httpbuyer.Ports{Products: s, Stores: stores, Orders: s, CRM: s}, Deletion: accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: m, Seller: sellerModule, Identity: id, Orders: s, Now: time.Now}), Identity: id, Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: sellerModule, Now: time.Now, Logger: log}), Images: images, Logger: log})
 	if err != nil {
 		t.Fatal(err)

@@ -21,44 +21,26 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
 )
 
-// kycKeys 是 KYC 個資的金鑰：加密金鑰環與比對用的 HMAC 金鑰環。
-type kycKeys struct {
-	enc *seal.Keyring
-	mac *seal.MAC
-}
-
-// readKYCKeys 讀 KYC 的金鑰設定：
-//
-//   - KYC_ENCRYPTION_KEYS：身分證號、銀行帳號的 AES-256-GCM 加密金鑰，逗號分隔的 id:base64(32 bytes)，第一把是目前的金鑰；
-//     換金鑰時把新的放最前面、舊的留到它加密的資料都不在了。
-//   - KYC_HASH_KEYS：身分比對（blind index）的 HMAC 金鑰，格式相同、每把至少 32 bytes，第一把計算、全部可以查詢；處分的身分
-//     快照沒有明文可以重算，所以舊的金鑰要留到用它算的快照所屬的處分都結束。與加密金鑰必須是不同的金鑰（啟動時檢查）。
-//
-// 兩個都是必填（沒設定、空的、太短或兩者共用同一把金鑰都會讓啟動失敗）。
-func readKYCKeys(e *config.Env) *kycKeys {
-	keys, err := parseKYCKeys(e.String("KYC_ENCRYPTION_KEYS"), e.String("KYC_HASH_KEYS"))
+// readKYCHashKeys 讀統編比對（blind index）的 HMAC 金鑰 KYC_HASH_KEYS：逗號分隔的 id:base64，每把至少 32 bytes，第一把計算、全部可以查詢；
+// 處分的身分快照沒有明文可以重算，所以舊的金鑰要留到用它算的快照所屬的處分都結束，也要留到防詐保存的 hash 過期被刪。
+// 必填（沒設定、空的或太短都會讓啟動失敗）。平台不再加密保存個資（Stripe 計畫 D22），沒有加密金鑰。
+func readKYCHashKeys(e *config.Env) *seal.MAC {
+	mac, err := parseKYCHashKeys(e.String("KYC_HASH_KEYS"))
 	if err != nil {
 		e.Fail("KYC 金鑰：%v", err)
 	}
-	return keys
+	return mac
 }
 
-func parseKYCKeys(enc, mac string) (*kycKeys, error) {
-	if enc == "" || mac == "" {
-		return nil, errors.New("KYC_ENCRYPTION_KEYS 與 KYC_HASH_KEYS 都必須設定")
-	}
-	ring, err := seal.Parse(enc)
-	if err != nil {
-		return nil, fmt.Errorf("KYC_ENCRYPTION_KEYS：%w", err)
+func parseKYCHashKeys(mac string) (*seal.MAC, error) {
+	if mac == "" {
+		return nil, errors.New("KYC_HASH_KEYS 必須設定")
 	}
 	macs, err := seal.ParseMAC(mac)
 	if err != nil {
 		return nil, fmt.Errorf("KYC_HASH_KEYS：%w", err)
 	}
-	if err := seal.Distinct(ring, macs); err != nil {
-		return nil, err
-	}
-	return &kycKeys{enc: ring, mac: macs}, nil
+	return macs, nil
 }
 
 // readGCIS 讀統一編號查詢（經濟部商業司的公開資料，不是舊公司的服務）的設定：GCIS_BASE_URL（預設是公開資料平台
@@ -74,13 +56,13 @@ func readGCIS(e *config.Env) *gcis.Client {
 }
 
 // newSeller 組裝 seller 模組。serve 與 worker 都需要它：serve 給 accountdeletion 當參與者，worker 另外執行它的
-// job（圖片、治理佐證與 KYC 證件的引用收斂、處分的到期與對帳、匿名通報人聯絡欄位的清理、關店滿保留期的個資清理、
+// job（圖片、治理佐證與 KYC 補充文件的引用收斂、處分的到期與對帳、匿名通報人聯絡欄位的清理、關店滿保留期的個資清理、
 // 商家名單圖片的引用收斂、商品瀏覽事件的彙總與清理；排程的是 PeriodicJobs）。orders 是店家未結訂單的 port（自己關店用；刪帳號的
 // accountdeletion 用同一個實作），products 是商品所屬店家的 port（彙總瀏覽事件用，見 sellerProducts）。
 // 它的事件由 subscribeSellerRelay 轉成給舊服務的 RabbitMQ 訊息（sellerrelay），治理事件的通知在 A8。
-func newSeller(d *db.DB, bus *events.Bus, jc jobs.ReportingEnqueuer, id *identity.Module, med media.Media, orders seller.Orders, products seller.ProductStores, kyc *kycKeys, payments *payment.Module, registry *gcis.Client, log *slog.Logger) *seller.Module {
+func newSeller(d *db.DB, bus *events.Bus, jc jobs.ReportingEnqueuer, id *identity.Module, med media.Media, orders seller.Orders, products seller.ProductStores, kycMAC *seal.MAC, payments *payment.Module, registry *gcis.Client, log *slog.Logger) *seller.Module {
 	return seller.New(seller.Deps{
-		DB: d, Events: bus, Jobs: jc, Identity: id, Media: med, Orders: orders, KYCKeys: kyc.enc, KYCMAC: kyc.mac,
+		DB: d, Events: bus, Jobs: jc, Identity: id, Media: med, Orders: orders, KYCMAC: kycMAC,
 		ProductStores: products, Payment: payments, Registry: registry, Now: time.Now, Logger: log,
 	})
 }

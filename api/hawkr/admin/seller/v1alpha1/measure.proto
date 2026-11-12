@@ -215,13 +215,12 @@ enum MeasureActionUnavailableReason {
 // LinkedIdentity 是兩個帳號相同的身分類別。
 enum LinkedIdentity {
   LINKED_IDENTITY_UNSPECIFIED = 0;
-  // 賣家本人的身分證號相同。
-  LINKED_IDENTITY_NATIONAL_ID = 1;
+  // 1、3 是刪掉的身分證號與負責人身分證號（平台不再收身分證號，Stripe 計畫 D22、D38）。
+  reserved 1, 3;
+  reserved "LINKED_IDENTITY_NATIONAL_ID", "LINKED_IDENTITY_RESPONSIBLE_PERSON_ID";
   // 統一編號相同。
   LINKED_IDENTITY_UBN = 2;
-  // 企業負責人的身分證號相同。
-  LINKED_IDENTITY_RESPONSIBLE_PERSON_ID = 3;
-  // 銀行帳號（連同銀行代碼）相同。只列出，不能據以建立關聯終止（can_create_linked_termination 為 false，除非同時命中上面的身分）。
+  // 金流商回報的銀行帳號指紋相同。只列出，不能據以建立關聯終止（can_create_linked_termination 為 false，除非同時命中統一編號）。
   LINKED_IDENTITY_BANK_ACCOUNT = 4;
 }
 
@@ -231,7 +230,7 @@ message LinkedAccount {
   // 這個帳號目前的店家；沒有目前的店家時是最近的一個 stint。
   string store_id = 2;
   string store_code = 3;
-  // 命中的身分類別；同時命中多種時依 NATIONAL_ID、UBN、RESPONSIBLE_PERSON_ID、BANK_ACCOUNT 的順序取第一種。
+  // 命中的身分類別；同時命中多種時依 UBN、BANK_ACCOUNT 的順序取第一種。
   LinkedIdentity matched_identity = 4;
   // 以本措施為來源、仍生效（未撤銷）的關聯終止；還沒有時是空字串（管理員可以用 CreateMeasure 建立）。
   string linked_measure_id = 5;

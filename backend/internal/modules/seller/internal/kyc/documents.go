@@ -3,7 +3,6 @@ package kyc
 import (
 	"context"
 	"slices"
-	"strings"
 	"time"
 	"uuid"
 
@@ -15,8 +14,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// 證件圖片的 media 引用以 ref_id = application_id 登記（CERTIFICATION，7111）。轉正在 transaction 外、不建立引用；寫入業務列的
-// transaction 內把被換掉的證件記成退場並排入同步（mediaref），申請取消與個資清理把全部證件記成退場；引用只由同步 job 登記與解除。
+// 公司補充文件的 media 引用以 ref_id = application_id 登記（CERTIFICATION，7111）。轉正在 transaction 外、不建立引用；寫入業務列的
+// transaction 內把被換掉的文件記成退場並排入同步（mediaref），申請取消與個資清理把全部文件記成退場；引用只由同步 job 登記與解除。
 
 // uploaded 是已轉正的圖片，以它的 staged token 對應回請求。
 type uploaded struct {
@@ -25,54 +24,32 @@ type uploaded struct {
 	asset media.Asset
 }
 
-type singleDocument struct {
-	slot  model.KYCDocumentSlot
-	field string
-	ref   *model.KYCDocumentRef
-}
+// documentField 是公司文件在草稿輸入的欄位：帶它在清單的索引（單一元素的問題指到那一張，整個清單的問題如張數上限指 "CompanyDocuments"）。
+func documentField(i int) string { return apperr.IndexedField("CompanyDocuments", i) }
 
-// singles 是草稿輸入裡單張的位置（身分證正反面、存摺封面）。
-func singles(in model.KYCDraftInput) []singleDocument {
-	return []singleDocument{
-		{model.SlotIDCardFront, "IDCardFront", in.IDCardFront},
-		{model.SlotIDCardBack, "IDCardBack", in.IDCardBack},
-		{model.SlotBankBook, "BankBook", in.BankBook},
-	}
-}
-
-// documentField 是證件在草稿輸入的欄位名：單張的位置是欄位本身，公司文件帶它在清單的索引（單一元素的問題指到那一張，整個清單的
-// 問題如張數上限指 "CompanyDocuments"）。
-func documentField(slot model.KYCDocumentSlot, position int) string {
-	switch slot {
-	case model.SlotIDCardFront:
-		return "IDCardFront"
-	case model.SlotIDCardBack:
-		return "IDCardBack"
-	case model.SlotBankBook:
-		return "BankBook"
-	case model.SlotCompanyDocument:
-	}
-	return companyDocumentField(position)
-}
-
-func companyDocumentField(i int) string { return apperr.IndexedField("CompanyDocuments", i) }
-
-func validateRef(ref model.KYCDocumentRef, allowEmpty bool, field string) error {
+func validateRef(ref model.KYCDocumentRef, field string) error {
 	switch {
 	case ref.AssetID != "" && ref.StagedToken != "":
 		return apperr.InvalidInputOn([]string{field}, "證件只能指定現有的圖片或新上傳的圖片其中之一")
-	case ref.AssetID == "" && ref.StagedToken == "" && !allowEmpty:
+	case ref.AssetID == "" && ref.StagedToken == "":
 		return apperr.InvalidInputOn([]string{field}, "必須提供圖片")
 	}
 	return nil
 }
 
 // validateDocumentInput 在轉正之前（不打 media）檢查請求：每個指定恰好是現有的圖片或新的 staged token，同一個 staged token
-// 在整個請求（單張的位置與公司文件一起）只能出現一次，錯誤指向後出現的那個欄位。
+// 在整個請求只能出現一次，錯誤指向後出現的那個欄位。
 func validateDocumentInput(in model.KYCDraftInput) error {
+	if in.CompanyDocuments == nil {
+		return nil
+	}
+	if len(*in.CompanyDocuments) > model.MaxCompanyDocuments {
+		return apperr.InvalidInputOn([]string{"CompanyDocuments"}, "公司文件最多 %d 張", model.MaxCompanyDocuments)
+	}
 	seen := map[string]bool{}
-	check := func(ref model.KYCDocumentRef, allowEmpty bool, field string) error {
-		if err := validateRef(ref, allowEmpty, field); err != nil {
+	for i, ref := range *in.CompanyDocuments {
+		field := documentField(i)
+		if err := validateRef(ref, field); err != nil {
 			return err
 		}
 		if ref.StagedToken != "" {
@@ -80,25 +57,6 @@ func validateDocumentInput(in model.KYCDraftInput) error {
 				return apperr.InvalidInputOn([]string{field}, "同一張圖片不能放進兩個證件位置")
 			}
 			seen[ref.StagedToken] = true
-		}
-		return nil
-	}
-	for _, d := range singles(in) {
-		if d.ref != nil {
-			if err := check(*d.ref, true, d.field); err != nil {
-				return err
-			}
-		}
-	}
-	if in.CompanyDocuments == nil {
-		return nil
-	}
-	if len(*in.CompanyDocuments) > model.MaxCompanyDocuments {
-		return apperr.InvalidInputOn([]string{"CompanyDocuments"}, "公司文件最多 %d 張", model.MaxCompanyDocuments)
-	}
-	for i, ref := range *in.CompanyDocuments {
-		if err := check(ref, false, companyDocumentField(i)); err != nil {
-			return err
 		}
 	}
 	return nil
@@ -110,15 +68,10 @@ type newToken struct{ field, token string }
 // newTokens 依請求的順序列出要轉正的 staged token。
 func newTokens(in model.KYCDraftInput) []newToken {
 	var out []newToken
-	for _, d := range singles(in) {
-		if d.ref != nil && d.ref.StagedToken != "" {
-			out = append(out, newToken{d.field, d.ref.StagedToken})
-		}
-	}
 	if in.CompanyDocuments != nil {
 		for i, ref := range *in.CompanyDocuments {
 			if ref.StagedToken != "" {
-				out = append(out, newToken{companyDocumentField(i), ref.StagedToken})
+				out = append(out, newToken{documentField(i), ref.StagedToken})
 			}
 		}
 	}
@@ -150,11 +103,9 @@ func (s *Service) finalizeUploads(ctx context.Context, in model.KYCDraftInput) (
 	return out, nil
 }
 
-// mergeDocuments 把請求的證件合併到目前的證件並整組寫回（沒有任何改變時不寫）。請求裡出現的位置是狀態，不是指令：
-// 單張的位置整個換成請求的那一張（現有的圖片以 asset ID 保留、新的以 staged token 轉正、空的清掉），公司文件整個換成請求的
-// 清單（順序就是位置，上限 model.MaxCompanyDocuments）；沒有出現的位置不動。現有的圖片必須是這份申請目前的證件；新轉正的
-// 圖片不能是已退場的。改成個人賣家時公司文件一併清掉。回傳整組新證件，以及不再被任何位置指著的 asset（退場，位置之間移動的
-// 證件不算）。
+// mergeDocuments 把請求的公司文件合併到目前的文件並整組寫回（沒有任何改變時不寫）。請求裡出現的清單是狀態，不是指令：整個換成請求的
+// 清單（順序就是位置，上限 model.MaxCompanyDocuments）；沒有出現時不動。現有的圖片必須是這份申請目前的文件；新轉正的圖片不能是已退場的。
+// 改成個人賣家時文件一併清掉。回傳整組新文件，以及不再被任何位置指著的 asset（退場，位置之間移動的文件不算）。
 func (s *Service) mergeDocuments(ctx context.Context, q *store.Queries, row store.SellerKycApplication, in model.KYCDraftInput, ups []uploaded) (docs []store.SellerKycDocument, retired []string, err error) {
 	ref := mediaref.CertificationRef(row.ApplicationID)
 	for _, up := range ups {
@@ -168,67 +119,42 @@ func (s *Service) mergeDocuments(ctx context.Context, q *store.Queries, row stor
 	}
 	next := slices.Clone(current)
 	if row.SellerType == string(model.KYCIndividual) {
-		next = slices.DeleteFunc(next, func(d store.SellerKycDocument) bool { return d.Slot == string(model.SlotCompanyDocument) })
+		next = nil
 	}
 	fresh := make(map[string]media.Asset, len(ups))
 	for _, up := range ups {
 		fresh[up.token] = up.asset
 	}
-	resolve := func(ref model.KYCDocumentRef, slot model.KYCDocumentSlot, position int, field string) (store.SellerKycDocument, error) {
-		if ref.StagedToken != "" {
-			// 機敏上傳已在 finalizeUploads 檢查過。
-			asset := fresh[ref.StagedToken]
-			return store.SellerKycDocument{ApplicationID: row.ApplicationID, Slot: string(slot), Position: int32(position), AssetID: asset.ID, ObjectKey: asset.ObjectKey}, nil //nolint:gosec // 0 到 MaxCompanyDocuments
-		}
-		i := slices.IndexFunc(current, func(d store.SellerKycDocument) bool { return d.Slot == string(slot) && d.AssetID == ref.AssetID })
-		if i < 0 || (slot == model.SlotCompanyDocument && row.SellerType != string(model.KYCCompany)) {
-			return store.SellerKycDocument{}, apperr.InvalidInputOn([]string{field}, "指定的圖片不是這份申請目前的證件")
-		}
-		d := current[i]
-		d.Position = int32(position) //nolint:gosec // 0 到 MaxCompanyDocuments
-		return d, nil
-	}
-	for _, d := range singles(in) {
-		if d.ref == nil {
-			continue
-		}
-		next = slices.DeleteFunc(next, func(x store.SellerKycDocument) bool { return x.Slot == string(d.slot) })
-		if *d.ref == (model.KYCDocumentRef{}) {
-			continue
-		}
-		doc, err := resolve(*d.ref, d.slot, 0, d.field)
-		if err != nil {
-			return nil, nil, err
-		}
-		next = append(next, doc)
-	}
 	if in.CompanyDocuments != nil {
 		if len(*in.CompanyDocuments) > 0 && row.SellerType != string(model.KYCCompany) {
 			return nil, nil, apperr.InvalidInputOn([]string{"CompanyDocuments"}, "只有企業賣家上傳公司文件")
 		}
-		next = slices.DeleteFunc(next, func(x store.SellerKycDocument) bool { return x.Slot == string(model.SlotCompanyDocument) })
+		next = nil
 		for i, ref := range *in.CompanyDocuments {
-			doc, err := resolve(ref, model.SlotCompanyDocument, i, companyDocumentField(i))
-			if err != nil {
-				return nil, nil, err
+			if ref.StagedToken != "" {
+				// 機敏上傳已在 finalizeUploads 檢查過。
+				asset := fresh[ref.StagedToken]
+				next = append(next, store.SellerKycDocument{ApplicationID: row.ApplicationID, Position: int32(i), AssetID: asset.ID, ObjectKey: asset.ObjectKey}) //nolint:gosec // 0 到 MaxCompanyDocuments
+				continue
 			}
-			next = append(next, doc)
+			j := slices.IndexFunc(current, func(d store.SellerKycDocument) bool { return d.AssetID == ref.AssetID })
+			if j < 0 || row.SellerType != string(model.KYCCompany) {
+				return nil, nil, apperr.InvalidInputOn([]string{documentField(i)}, "指定的圖片不是這份申請目前的證件")
+			}
+			d := current[j]
+			d.Position = int32(i) //nolint:gosec // 0 到 MaxCompanyDocuments
+			next = append(next, d)
 		}
 	}
-	// 保底：不同的 staged token 轉正成同一個 asset 時也一樣，同一張圖片在整份申請只能是一個證件。
-	owner := map[string]string{}
+	// 保底：不同的 staged token 轉正成同一個 asset 時也一樣，同一張圖片在整份申請只能是一個文件。
+	owner := map[string]bool{}
 	for _, d := range next {
-		if _, dup := owner[d.AssetID]; dup {
-			return nil, nil, apperr.InvalidInputOn([]string{documentField(model.KYCDocumentSlot(d.Slot), int(d.Position))}, "同一張圖片不能放進兩個證件位置")
+		if owner[d.AssetID] {
+			return nil, nil, apperr.InvalidInputOn([]string{documentField(int(d.Position))}, "同一張圖片不能放進兩個證件位置")
 		}
-		owner[d.AssetID] = d.Slot
+		owner[d.AssetID] = true
 	}
-	slices.SortFunc(next, func(a, b store.SellerKycDocument) int {
-		if c := strings.Compare(a.Slot, b.Slot); c != 0 {
-			return c
-		}
-		return int(a.Position) - int(b.Position)
-	})
+	slices.SortFunc(next, func(a, b store.SellerKycDocument) int { return int(a.Position) - int(b.Position) })
 	if slices.EqualFunc(current, next, func(a, b store.SellerKycDocument) bool { return a == b }) {
 		return current, nil, nil
 	}

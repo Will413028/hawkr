@@ -6,55 +6,26 @@ import (
 	"uuid"
 )
 
-func TestNormalizeIDCardNo(t *testing.T) {
-	for raw, want := range map[string]string{"A123456789": "A123456789", " a123456789 ": "A123456789", "F 131104093": "F131104093"} {
-		if got, ok := NormalizeIDCardNo(raw); !ok || got != want {
-			t.Errorf("NormalizeIDCardNo(%q) = %q, %v", raw, got, ok)
-		}
-	}
-	for _, raw := range []string{"", "A123456780", "A323456789", "1234567890", "A12345678", "AA23456789"} {
-		if _, ok := NormalizeIDCardNo(raw); ok {
-			t.Errorf("NormalizeIDCardNo(%q) 應該被拒絕", raw)
-		}
-	}
-}
-
-func TestNormalizeBankAccountKeepsLeadingZeros(t *testing.T) {
-	if got, ok := NormalizeBankAccount(" 0123-456 789.01 "); !ok || got != "012345678901" {
-		t.Fatalf("got %q, %v", got, ok)
-	}
-	for _, raw := range []string{"", "12345", "12a456789", "123456789012345678901"} {
-		if _, ok := NormalizeBankAccount(raw); ok {
-			t.Errorf("NormalizeBankAccount(%q) 應該被拒絕", raw)
-		}
-	}
-}
-
-// 不同標籤的輸入不會相同：身分證號、統編、銀行帳號即使值相同也算不同的比對。
+// 統編的 blind index 輸入與銀行帳號 fingerprint 的輸入是不同的 hash 空間：值相同也不會互相命中。
 func TestIdentityInputIsDomainSeparated(t *testing.T) {
-	seen := map[string]SanctionIdentityKind{}
-	for _, kind := range SanctionIdentityKindValues() {
-		in := string(IdentityInput(kind, "12345678"))
-		if other, dup := seen[in]; dup {
-			t.Fatalf("%s 與 %s 的輸入相同：%q", kind, other, in)
-		}
-		seen[in] = kind
+	tax := string(IdentityInput(IdentityTaxID, "12345678"))
+	fingerprint := string(BankFingerprintInput("stripe", "12345678"))
+	if tax == fingerprint {
+		t.Fatalf("統編與 fingerprint 的輸入相同：%q", tax)
 	}
-	if string(IdentityInput(IdentityBankAccount, BankIdentityValue("004", "123456"))) == string(IdentityInput(IdentityBankAccount, BankIdentityValue("812", "123456"))) {
-		t.Fatal("銀行代碼要進 blind index 的輸入")
+	if string(BankFingerprintInput("stripe", "x")) == string(BankFingerprintInput("other", "x")) {
+		t.Fatal("provider 代碼要進 fingerprint 的輸入")
 	}
 }
 
-func TestMasks(t *testing.T) {
-	if got := MaskIDCardNo("A123456789"); got != "A1******89" {
-		t.Errorf("id = %q", got)
-	}
-	if got := MaskBankAccount("012345678901"); got != "********8901" {
-		t.Errorf("bank = %q", got)
-	}
-	if got := MaskBankAccount("123"); got != "***" {
-		t.Errorf("short = %q", got)
-	}
+// 申請只持有統編一種識別值（D22、D38）：其他種類不是可以算 hash 的輸入。
+func TestIdentityInputOnlyKnowsTheTaxID(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("IdentityInput(BANK_ACCOUNT) 應該 panic")
+		}
+	}()
+	IdentityInput(IdentityBankAccount, "12345678")
 }
 
 func TestParseDate(t *testing.T) {

@@ -209,7 +209,7 @@ func TestSubmitKYCRecordsTheAcceptance(t *testing.T) {
 	f := setup(t)
 	accountID, s := f.open(t)
 	before := f.acceptances(t, s.StoreID)
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	d := f.savedDraft(t, kycDraft(accountID))
 	f.now = f.now.Add(time.Hour)
 	_, err := f.kycSubmit(accountID, d.Version, CurrentKYCAcceptances(), "2001:db8::7", "hk-app/2.0")
 	must(t, err)
@@ -244,7 +244,7 @@ func TestSubmitKYCWithBadAgreementsDoesNotSubmit(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	accountID, s := f.open(t)
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	d := f.savedDraft(t, kycDraft(accountID))
 	outdated := []AgreementAcceptance{{Kind: AgreementKYCPrivacyNotice, Version: "2026-01-01"}}
 	_, err := f.kycSubmit(accountID, d.Version, outdated, "", "")
 	if ae := apperrOf(t, err); ae.Kind() != apperr.KindFailedPrecondition || ae.Reason != apperr.ReasonAgreementOutdated {
@@ -276,7 +276,7 @@ func TestSubmitKYCWithBadAgreementsDoesNotSubmit(t *testing.T) {
 func TestResubmittingKYCAddsNewAcceptancesBoundToTheNewSubmission(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	accountID, s, sub := f.submitted(t, idA, bankAcct)
+	accountID, s, sub := f.submitted(t)
 	first := f.acceptances(t, s.StoreID)
 	if len(first) != 2 {
 		t.Fatalf("rows=%+v", first)
@@ -317,7 +317,7 @@ func TestResubmittingKYCAddsNewAcceptancesBoundToTheNewSubmission(t *testing.T) 
 func TestAgreementAcceptanceTableConstraints(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	accountID, s, _ := f.submitted(t, idA, bankAcct)
+	accountID, s, _ := f.submitted(t)
 	ctx := context.Background()
 	reviews := f.submitReviewIDs(t, s.StoreID)
 	insert := func(kind, version string, review *string, ua *string) error {
@@ -353,7 +353,7 @@ func TestPurgeClearsAgreementSourcesAndKeepsTheRest(t *testing.T) {
 	s, err := f.applyWith(accountID, CurrentApplyAcceptances(), "203.0.113.9", "hk-test/1.0")
 	must(t, err)
 	f.setContact(t, s.StoreID)
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	d := f.savedDraft(t, kycDraft(accountID))
 	_, err = f.kycSubmit(accountID, d.Version, CurrentKYCAcceptances(), "2001:db8::7", "hk-app/2.0")
 	must(t, err)
 	before := f.acceptances(t, s.StoreID)
@@ -394,7 +394,7 @@ func TestSubmitKYCRollsTheAcceptanceBackWithTheSubmission(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	accountID, s := f.open(t)
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	d := f.savedDraft(t, kycDraft(accountID))
 	before := f.acceptances(t, s.StoreID)
 	boom := errors.New("subscriber failed")
 	events.Subscribe(f.bus, func(context.Context, KYCSubmitted) error { return boom })
@@ -441,7 +441,7 @@ func TestApplyWithAnEmptyVersionIsInvalidInput(t *testing.T) {
 func TestAgreementAcceptancesBindExactlyOneSourceByKind(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	accountID, s, _ := f.submitted(t, idA, bankAcct)
+	accountID, s, _ := f.submitted(t)
 	ctx := context.Background()
 	review := f.submitReviewIDs(t, s.StoreID)[0]
 	_, err := f.db.Conn(ctx).Exec(ctx, "DELETE FROM seller.agreement_acceptances WHERE store_id = $1 AND kind = 'SELLER_TERMS'", s.StoreID)

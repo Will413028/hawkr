@@ -248,9 +248,6 @@ func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int6
 		if err != nil {
 			return err
 		}
-		if err := q.PurgeKYCIdentityHashes(ctx, applications); err != nil {
-			return err
-		}
 		// 登記資料的查詢快照含公司名稱與地址，與申請的個資同時清除；審核紀錄的引用由外鍵（ON DELETE SET NULL）置 NULL。
 		if _, err := q.PurgeKYCRegistrationChecks(ctx, applications); err != nil {
 			return err

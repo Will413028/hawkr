@@ -4,7 +4,6 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
-	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
@@ -64,29 +63,23 @@ func setDate(dst **time.Time, v *string, now time.Time, field, msg string) error
 	return nil
 }
 
-func clearIndividual(r *store.SellerKycApplication) {
-	r.IDCardNoEnc, r.IDCardHash, r.IDCardHashKey = nil, nil, nil
-}
-
 func clearCompany(r *store.SellerKycApplication) {
-	r.CompanyName, r.TaxID, r.TaxIDHash, r.TaxIDHashKey = nil, nil, nil, nil
+	r.CompanyName, r.TaxID = nil, nil
 	r.CompanyRegisterDate, r.CompanyTownCode, r.CompanyAddressDetail, r.CompanyPhone = nil, nil, nil, nil
-	r.RepIDCardNoEnc, r.RepIDCardHash, r.RepIDCardHashKey = nil, nil, nil
 }
 
 // applyDraft 是寫入路徑：合併並驗證（mergeDraft），再回報這次真的改了哪些欄位（draftDiff，create 時沒有「改了什麼」，是空的）。
-func (p protector) applyDraft(base store.SellerKycApplication, in model.KYCDraftInput, create bool, now time.Time) (store.SellerKycApplication, draftDiff, error) {
-	next, err := p.mergeDraft(base, in, create, now)
+func applyDraft(base store.SellerKycApplication, in model.KYCDraftInput, create bool, now time.Time) (store.SellerKycApplication, draftDiff, error) {
+	next, err := mergeDraft(base, in, create, now)
 	if err != nil || create {
 		return next, draftDiff{}, err
 	}
-	diff, err := p.diffRows(base, next)
-	return next, diff, err
+	return next, diffRows(base, next), nil
 }
 
-// mergeDraft 把部分更新合併到 base 並驗證每一個欄位，回傳要寫入的列；任何一欄不合法就整筆不寫入。個資在這裡加密、
-// 計算 blind index（沒有動到的欄位保留原本的密文與 hash，不解密）。create 為 true 時 base 是空白的新列，必須給 SellerType。
-func (p protector) mergeDraft(base store.SellerKycApplication, in model.KYCDraftInput, create bool, now time.Time) (store.SellerKycApplication, error) {
+// mergeDraft 把部分更新合併到 base 並驗證每一個欄位，回傳要寫入的列；任何一欄不合法就整筆不寫入。create 為 true 時 base 是空白的新列，
+// 必須給 SellerType。
+func mergeDraft(base store.SellerKycApplication, in model.KYCDraftInput, create bool, now time.Time) (store.SellerKycApplication, error) {
 	next := base
 	if create && in.SellerType == nil {
 		return next, apperr.InvalidInputOn([]string{"SellerType"}, "建立申請時必須指定賣家型態")
@@ -98,9 +91,6 @@ func (p protector) mergeDraft(base store.SellerKycApplication, in model.KYCDraft
 				clearCompany(&next)
 			}
 		case model.KYCCompany:
-			if next.SellerType == string(model.KYCIndividual) {
-				clearIndividual(&next)
-			}
 		default:
 			return next, apperr.InvalidInputOn([]string{"SellerType"}, "賣家型態不合法")
 		}
@@ -108,35 +98,10 @@ func (p protector) mergeDraft(base store.SellerKycApplication, in model.KYCDraft
 	}
 	individual := next.SellerType == string(model.KYCIndividual)
 	if individual && (in.CompanyName != nil || in.TaxID != nil || in.CompanyRegisterDate != nil ||
-		in.CompanyTownCode != nil || in.CompanyAddressDetail != nil || in.CompanyPhone != nil || in.RepIDCardNo != nil) {
+		in.CompanyTownCode != nil || in.CompanyAddressDetail != nil || in.CompanyPhone != nil) {
 		return next, apperr.InvalidInputOn([]string{"SellerType"}, "個人賣家不填公司資料")
 	}
-	if !individual && in.IDCardNo != nil {
-		return next, apperr.InvalidInputOn([]string{"IDCardNo"}, "企業賣家填的是負責人的身分證號")
-	}
 	for _, step := range []func() error{
-		func() error {
-			return setText(&next.RealName, in.RealName, 100, "RealName", "姓名不可超過 100 字")
-		},
-		func() error {
-			return setDate(&next.BirthDate, in.BirthDate, now, "BirthDate", "生日不是有效的日期（YYYY-MM-DD，不可晚於今天）")
-		},
-		func() error {
-			return setDate(&next.IDCardIssueDate, in.IDCardIssueDate, now, "IDCardIssueDate", "發證日期不是有效的日期（YYYY-MM-DD，不可晚於今天）")
-		},
-		func() error {
-			return setText(&next.IDCardIssueType, in.IDCardIssueType, 20, "IDCardIssueType", "領補換類別不可超過 20 字")
-		},
-		func() error {
-			return setText(&next.IDCardIssueLocation, in.IDCardIssueLocation, 100, "IDCardIssueLocation", "發證地點不可超過 100 字")
-		},
-		func() error {
-			return setNormalized(&next.EnglishName, trimmed(in.EnglishName), "EnglishName", "商店英文名稱僅容許英數、半形空白與符號，至多 50 字",
-				func(s string) (string, bool) { return s, model.ValidEnglishName(s) })
-		},
-		func() error {
-			return setText(&next.BankName, in.BankName, 100, "BankName", "銀行名稱不可超過 100 字")
-		},
 		func() error {
 			return setText(&next.ProductType, in.ProductType, 100, "ProductType", "產品類型不可超過 100 字")
 		},
@@ -145,6 +110,9 @@ func (p protector) mergeDraft(base store.SellerKycApplication, in model.KYCDraft
 		},
 		func() error {
 			return setText(&next.CompanyName, in.CompanyName, 200, "CompanyName", "公司名稱不可超過 200 字")
+		},
+		func() error {
+			return setNormalized(&next.TaxID, in.TaxID, "TaxID", "統一編號格式不符，需為 8 碼數字", model.NormalizeTaxID)
 		},
 		func() error {
 			return setDate(&next.CompanyRegisterDate, in.CompanyRegisterDate, now, "CompanyRegisterDate", "公司登記日期不是有效的日期（YYYY-MM-DD，不可晚於今天）")
@@ -167,108 +135,5 @@ func (p protector) mergeDraft(base store.SellerKycApplication, in model.KYCDraft
 	if next.CompanyAddressDetail != nil && next.CompanyTownCode == nil {
 		return next, apperr.InvalidInputOn([]string{"CompanyAddressDetail"}, "填寫公司地址前要先選鄉鎮市區")
 	}
-	if err := p.applyIdentity(&next, in, individual); err != nil {
-		return next, err
-	}
 	return next, nil
-}
-
-// trimmed 回傳去掉前後空白的值（nil 仍是 nil）。
-func trimmed(v *string) *string {
-	if v == nil {
-		return nil
-	}
-	t := strings.TrimSpace(*v)
-	return &t
-}
-
-// applyIdentity 套用識別欄位（身分證號、負責人身分證號、統編、銀行帳號）：加密並計算 blind index。銀行帳號的 blind index
-// 輸入帶銀行代碼，所以銀行代碼改變時要以原本的帳號重算（解密一次）；清掉銀行代碼時帳號要一併清掉。
-func (p protector) applyIdentity(next *store.SellerKycApplication, in model.KYCDraftInput, individual bool) error {
-	id := next.ApplicationID
-	if in.IDCardNo != nil && individual {
-		if err := p.setID(in.IDCardNo, id, colIDCardNo, "IDCardNo", "身分證字號格式不符", &next.IDCardNoEnc, &next.IDCardHash, &next.IDCardHashKey); err != nil {
-			return err
-		}
-	}
-	if in.RepIDCardNo != nil {
-		if err := p.setID(in.RepIDCardNo, id, colRepIDCardNo, "RepIDCardNo", "負責人身分證字號格式不符", &next.RepIDCardNoEnc, &next.RepIDCardHash, &next.RepIDCardHashKey); err != nil {
-			return err
-		}
-	}
-	if in.TaxID != nil {
-		if err := setNormalized(&next.TaxID, in.TaxID, "TaxID", "統一編號格式不符，需為 8 碼數字", model.NormalizeTaxID); err != nil {
-			return err
-		}
-		next.TaxIDHash, next.TaxIDHashKey = nil, nil
-		if next.TaxID != nil {
-			h := p.mac.Sum(taxInput(*next.TaxID))
-			next.TaxIDHash, next.TaxIDHashKey = h.Sum, &h.KeyID
-		}
-	}
-	return p.applyBank(next, in)
-}
-
-func (p protector) setID(v *string, applicationID uuid.UUID, column, field, msg string, enc, hash *[]byte, keyID **string) error {
-	if strings.TrimSpace(*v) == "" {
-		*enc, *hash, *keyID = nil, nil, nil
-		return nil
-	}
-	n, ok := model.NormalizeIDCardNo(*v)
-	if !ok {
-		return apperr.InvalidInputOn([]string{field}, "%s", msg)
-	}
-	prot, err := p.protect(applicationID, column, n, idInput(n))
-	if err != nil {
-		return err
-	}
-	*enc, *hash, *keyID = prot.Enc, prot.Hash, prot.HashID
-	return nil
-}
-
-func (p protector) applyBank(next *store.SellerKycApplication, in model.KYCDraftInput) error {
-	if in.BankCode != nil {
-		code := strings.TrimSpace(*in.BankCode)
-		switch {
-		case code == "":
-			next.BankCode = nil
-		case !model.ValidBankCode(code):
-			return apperr.InvalidInputOn([]string{"BankCode"}, "銀行代碼需為 3 碼，或 3 碼加 4 碼分行代碼")
-		default:
-			next.BankCode = &code
-		}
-	}
-	if in.BankAccount != nil {
-		if strings.TrimSpace(*in.BankAccount) == "" {
-			next.BankAccountEnc, next.BankAccountHash, next.BankAccountHashKey = nil, nil, nil
-		} else {
-			account, ok := model.NormalizeBankAccount(*in.BankAccount)
-			if !ok {
-				return apperr.InvalidInputOn([]string{"BankAccount"}, "銀行帳號需為 6 到 20 碼數字")
-			}
-			if next.BankCode == nil {
-				return apperr.InvalidInputOn([]string{"BankCode"}, "設定銀行帳號前要先填銀行代碼")
-			}
-			prot, err := p.protect(next.ApplicationID, colBankAccount, account, bankInput(*next.BankCode, account))
-			if err != nil {
-				return err
-			}
-			next.BankAccountEnc, next.BankAccountHash, next.BankAccountHashKey = prot.Enc, prot.Hash, prot.HashID
-			return nil
-		}
-	}
-	if in.BankCode == nil || next.BankAccountEnc == nil {
-		return nil
-	}
-	// 只改了銀行代碼：以原本的帳號重算 blind index（密文不變）。
-	if next.BankCode == nil {
-		return apperr.InvalidInputOn([]string{"BankCode"}, "清掉銀行代碼時要一併清掉銀行帳號")
-	}
-	account, err := p.open(next.ApplicationID, colBankAccount, next.BankAccountEnc)
-	if err != nil {
-		return err
-	}
-	h := p.mac.Sum(bankInput(*next.BankCode, *account))
-	next.BankAccountHash, next.BankAccountHashKey = h.Sum, &h.KeyID
-	return nil
 }

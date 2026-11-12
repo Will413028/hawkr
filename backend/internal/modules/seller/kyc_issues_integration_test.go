@@ -13,9 +13,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// anIssue 是測試用的一個有效問題（個人與企業的申請都有 real_name）。
+// anIssue 是測試用的一個有效問題（個人與企業的申請都有 product_type）。
 func anIssue() []KYCIssue {
-	return []KYCIssue{{Field: "real_name", Code: IssueOther, Message: "請確認姓名"}}
+	return []KYCIssue{{Field: "product_type", Code: IssueOther, Message: "請確認商品類型"}}
 }
 
 func issueOn(field string, code KYCIssueCode) KYCIssue {
@@ -59,31 +59,41 @@ func TestRejectKYCValidatesIssuesAgainstTheApplication(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	_, _, sub := f.submitted(t, idA, bankAcct)
+	_, _, individualSub := f.submitted(t)
+	_, _, companySub := f.companySubmission(t, func(in *KYCDraftInput) {
+		in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "co1"}, {StagedToken: "co2"}}
+	})
 	long := strings.Repeat("字", 501)
+	const docs = "business.company_documents"
 	for name, c := range map[string]struct {
-		issues []KYCIssue
-		field  string
+		company bool
+		issues  []KYCIssue
+		field   string
 	}{
-		"no issues":                    {nil, "Issues"},
-		"unspecified field":            {[]KYCIssue{{Code: IssueOther, Message: "x"}}, "Issues[0].Field"},
-		"unknown field":                {[]KYCIssue{{Field: "favourite_colour", Code: IssueOther, Message: "x"}}, "Issues[0].Field"},
-		"unspecified code":             {[]KYCIssue{{Field: "real_name", Message: "x"}}, "Issues[0].Code"},
-		"unknown code":                 {[]KYCIssue{{Field: "real_name", Code: "FINAL", Message: "x"}}, "Issues[0].Code"},
-		"empty message":                {[]KYCIssue{{Field: "real_name", Code: IssueOther}}, "Issues[0].Message"},
-		"blank message":                {[]KYCIssue{{Field: "real_name", Code: IssueOther, Message: " \n "}}, "Issues[0].Message"},
-		"overlong message":             {[]KYCIssue{{Field: "real_name", Code: IssueOther, Message: long}}, "Issues[0].Message"},
-		"asset on a non document":      {[]KYCIssue{{Field: "real_name", DocumentAssetID: "asset-front", Code: IssueOther, Message: "x"}}, "Issues[0].DocumentAssetID"},
-		"asset not on the application": {[]KYCIssue{documentIssue("id_card_front", "asset-nope", IssueUnreadable)}, "Issues[0].DocumentAssetID"},
-		"asset in another slot":        {[]KYCIssue{issueOn("real_name", IssueMismatch), documentIssue("bank_book", "asset-front", IssueUnreadable)}, "Issues[1].DocumentAssetID"},
-		"business field on individual": {[]KYCIssue{issueOn("business.tax_id", IssueMismatch)}, "Issues[0].Field"},
+		"no issues":                    {false, nil, "Issues"},
+		"unspecified field":            {false, []KYCIssue{{Code: IssueOther, Message: "x"}}, "Issues[0].Field"},
+		"unknown field":                {false, []KYCIssue{{Field: "favourite_colour", Code: IssueOther, Message: "x"}}, "Issues[0].Field"},
+		"removed field":                {false, []KYCIssue{{Field: "real_name", Code: IssueOther, Message: "x"}}, "Issues[0].Field"},
+		"unspecified code":             {false, []KYCIssue{{Field: "product_type", Message: "x"}}, "Issues[0].Code"},
+		"unknown code":                 {false, []KYCIssue{{Field: "product_type", Code: "FINAL", Message: "x"}}, "Issues[0].Code"},
+		"empty message":                {false, []KYCIssue{{Field: "product_type", Code: IssueOther}}, "Issues[0].Message"},
+		"blank message":                {false, []KYCIssue{{Field: "product_type", Code: IssueOther, Message: " \n "}}, "Issues[0].Message"},
+		"overlong message":             {false, []KYCIssue{{Field: "product_type", Code: IssueOther, Message: long}}, "Issues[0].Message"},
+		"asset on a non document":      {true, []KYCIssue{{Field: "product_type", DocumentAssetID: "asset-co1", Code: IssueOther, Message: "x"}}, "Issues[0].DocumentAssetID"},
+		"asset not on the application": {true, []KYCIssue{documentIssue(docs, "asset-nope", IssueUnreadable)}, "Issues[0].DocumentAssetID"},
+		"business field on individual": {false, []KYCIssue{issueOn("business.tax_id", IssueMismatch)}, "Issues[0].Field"},
+		"document field on individual": {false, []KYCIssue{issueOn(docs, IssueMissing)}, "Issues[0].Field"},
 		// 文件類欄位依原因碼：看不清楚、過期、不一致、格式不符必須指定是哪一張；缺少不可以指定。
-		"unreadable without an asset": {[]KYCIssue{issueOn("id_card_front", IssueUnreadable)}, "Issues[0].DocumentAssetID"},
-		"expired without an asset":    {[]KYCIssue{issueOn("id_card_back", IssueExpired)}, "Issues[0].DocumentAssetID"},
-		"mismatch without an asset":   {[]KYCIssue{issueOn("bank_book", IssueMismatch)}, "Issues[0].DocumentAssetID"},
-		"invalid without an asset":    {[]KYCIssue{issueOn("id_card_front", IssueInvalid)}, "Issues[0].DocumentAssetID"},
-		"missing with an asset":       {[]KYCIssue{documentIssue("id_card_front", "asset-front", IssueMissing)}, "Issues[0].DocumentAssetID"},
+		"unreadable without an asset": {true, []KYCIssue{issueOn(docs, IssueUnreadable)}, "Issues[0].DocumentAssetID"},
+		"expired without an asset":    {true, []KYCIssue{issueOn(docs, IssueExpired)}, "Issues[0].DocumentAssetID"},
+		"mismatch without an asset":   {true, []KYCIssue{issueOn(docs, IssueMismatch)}, "Issues[0].DocumentAssetID"},
+		"invalid without an asset":    {true, []KYCIssue{issueOn(docs, IssueInvalid)}, "Issues[0].DocumentAssetID"},
+		"missing with an asset":       {true, []KYCIssue{documentIssue(docs, "asset-co1", IssueMissing)}, "Issues[0].DocumentAssetID"},
 	} {
+		sub := individualSub
+		if c.company {
+			sub = companySub
+		}
 		_, err := f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: sub.ID, ExpectedVersion: sub.Version, AdminID: 9, Reason: "x", Issues: c.issues})
 		ae := apperrOf(t, err)
 		if ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != c.field {
@@ -91,7 +101,7 @@ func TestRejectKYCValidatesIssuesAgainstTheApplication(t *testing.T) {
 		}
 	}
 	// 內部備註的上限同理由（1000 字）。
-	_, err := f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: sub.ID, ExpectedVersion: sub.Version, AdminID: 9, Reason: "x", Issues: anIssue(), InternalNote: strings.Repeat("註", 1001)})
+	_, err := f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: individualSub.ID, ExpectedVersion: individualSub.Version, AdminID: 9, Reason: "x", Issues: anIssue(), InternalNote: strings.Repeat("註", 1001)})
 	if ae := apperrOf(t, err); ae.Kind() != apperr.KindInvalidInput || ae.FieldViolations()[0].Field != "InternalNote" {
 		t.Errorf("overlong internal note: %v", err)
 	}
@@ -102,14 +112,14 @@ func TestRejectKYCValidatesIssuesAgainstTheApplication(t *testing.T) {
 		t.Fatalf("被拒絕的退回寫入了審核紀錄：%d", n)
 	}
 	// 合法的問題：說明去掉前後空白；文件類的欄位可以不指定特定一張。
-	rej := f.reject(t, sub,
-		documentIssue("id_card_front", "asset-front", IssueUnreadable),
-		KYCIssue{Field: "bank_book", Code: IssueMissing, Message: "  請重新上傳存摺  "},
-		documentIssue("id_card_back", "asset-back", IssueOther),
-		KYCIssue{Field: "real_name", Code: IssueUnreadable, Message: "非文件欄位的看不清楚不需要 asset"},
+	rej := f.reject(t, companySub,
+		documentIssue(docs, "asset-co1", IssueUnreadable),
+		KYCIssue{Field: docs, Code: IssueMissing, Message: "  請重新上傳公司文件  "},
+		documentIssue(docs, "asset-co2", IssueOther),
+		KYCIssue{Field: "business.tax_id", Code: IssueUnreadable, Message: "非文件欄位的看不清楚不需要 asset"},
 	)
 	last := rej.Reviews[len(rej.Reviews)-1]
-	if last.Action != ReviewReject || len(last.Issues) != 4 || last.Issues[1].Message != "請重新上傳存摺" || last.Issues[1].DocumentAssetID != "" {
+	if last.Action != ReviewReject || len(last.Issues) != 4 || last.Issues[1].Message != "請重新上傳公司文件" || last.Issues[1].DocumentAssetID != "" {
 		t.Fatalf("review=%+v", last)
 	}
 	if got := f.count(t, "SELECT count(*) FROM seller.kyc_review_issues WHERE resolved_at IS NULL"); got != 4 {
@@ -122,7 +132,7 @@ func TestInternalNoteIsOnlyOnTheAdminReviewRecord(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountID, _, sub := f.submitted(t, idA, bankAcct)
+	accountID, _, sub := f.submitted(t)
 	const note = "疑似翻拍，下次先打電話確認"
 	rej, err := f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: sub.ID, ExpectedVersion: sub.Version, AdminID: 9, Reason: "存摺不清楚", Issues: anIssue(), InternalNote: "  " + note + " "})
 	must(t, err)
@@ -153,26 +163,22 @@ func TestInternalNoteIsOnlyOnTheAdminReviewRecord(t *testing.T) {
 		}
 	}
 	// 沒寫備註時不存。
-	_, _, other := f.submitted(t, idB, "999888777666")
+	_, _, other := f.submitted(t)
 	again := f.reject(t, other, anIssue()...)
 	if got := again.Reviews[len(again.Reviews)-1].InternalNote; got != nil {
 		t.Fatalf("note=%v", *got)
 	}
 }
 
-// outstanding 由伺服器在寫入申請時判定：值被改過才算處理（重填同一個值不算）、只改銀行代碼不算處理銀行帳號、文件被換掉才算處理
-// 那一張（保留的不算）；重新送出之後是空的，再次退回時只算新的那一批。
+// outstanding 由伺服器在寫入申請時判定：值被改過才算處理（重填同一個值不算）；重新送出之後是空的，再次退回時只算新的那一批。
+// 文件被換掉才算處理那一張的規則由公司文件的測試涵蓋。
 func TestOutstandingIssuesAreResolvedByTheSellersEdits(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountID, _, sub := f.submitted(t, idA, bankAcct)
-	f.reject(t, sub,
-		issueOn("real_name", IssueMismatch), issueOn("bank_account", IssueInvalid), issueOn("birth_date", IssueMismatch),
-		documentIssue("id_card_front", "asset-front", IssueUnreadable), documentIssue("id_card_back", "asset-back", IssueExpired),
-		KYCIssue{Field: "bank_book", Code: IssueMissing, Message: "存摺封面缺少"},
-	)
-	all := []string{"real_name", "bank_account", "birth_date", "id_card_front@asset-front", "id_card_back@asset-back", "bank_book"}
+	accountID, _, sub := f.submitted(t)
+	f.reject(t, sub, issueOn("product_type", IssueMismatch), issueOn("website_url", IssueInvalid))
+	all := []string{"product_type", "website_url"}
 	if got := f.outstanding(t, accountID); !slices.Equal(got, all) {
 		t.Fatalf("outstanding=%v", got)
 	}
@@ -196,29 +202,15 @@ func TestOutstandingIssuesAreResolvedByTheSellersEdits(t *testing.T) {
 			t.Fatalf("%s：MyKYC 的 outstanding=%v，預期 %v", step, got, remaining)
 		}
 	}
-	// 沒改任何東西、重填同樣的值、保留同一張圖：都不算處理。
+	// 沒改任何東西、重填同樣的值：都不算處理。
 	save(KYCDraftInput{})
 	want("empty save", all...)
-	save(KYCDraftInput{RealName: ptr("王小明"), BirthDate: ptr("1990-05-06"), BankAccount: ptr(bankAcct), IDCardBack: &KYCDocumentRef{AssetID: "asset-back"}})
-	want("same values", all...)
-	// 只改銀行代碼：銀行帳號的問題還在。
-	save(KYCDraftInput{BankCode: ptr("005")})
-	want("bank code only", all...)
-	// 同時改銀行代碼並重填同一個帳號：銀行帳號的值沒變，不算處理（blind index 會隨銀行代碼變，不能拿來比）。
-	save(KYCDraftInput{BankCode: ptr("006"), BankAccount: ptr(bankAcct)})
-	want("bank code with the same account", all...)
-	// 改了值才算：姓名、銀行帳號。
-	save(KYCDraftInput{RealName: ptr("王大明")})
-	want("real name", "bank_account", "birth_date", "id_card_front@asset-front", "id_card_back@asset-back", "bank_book")
-	save(KYCDraftInput{BankAccount: ptr("999888777666")})
-	want("bank account", "birth_date", "id_card_front@asset-front", "id_card_back@asset-back", "bank_book")
-	// 換掉被指出的那張證件；另一張保留的不算。
-	save(KYCDraftInput{IDCardFront: &KYCDocumentRef{StagedToken: "front2"}})
-	want("front replaced", "birth_date", "id_card_back@asset-back", "bank_book")
-	// 沒有指定特定一張的文件問題：那個位置的文件換掉才算。
-	save(KYCDraftInput{BankBook: &KYCDocumentRef{StagedToken: "book2"}})
-	want("book replaced", "birth_date", "id_card_back@asset-back")
-	if n := f.count(t, "SELECT count(*) FROM seller.kyc_review_issues WHERE resolved_at IS NOT NULL"); n != 4 {
+	save(KYCDraftInput{ProductType: ptr("蔬果")})
+	want("same value", all...)
+	// 改了值才算。
+	save(KYCDraftInput{ProductType: ptr("水果")})
+	want("product type", "website_url")
+	if n := f.count(t, "SELECT count(*) FROM seller.kyc_review_issues WHERE resolved_at IS NOT NULL"); n != 1 {
 		t.Fatalf("已處理的問題=%d", n)
 	}
 	// 重新送出：outstanding 與 last_rejection 都清空；沒處理的問題不被標記（已處理與否只由寫入申請判定）。
@@ -230,12 +222,12 @@ func TestOutstandingIssuesAreResolvedByTheSellersEdits(t *testing.T) {
 	if got := f.outstanding(t, accountID); len(got) != 0 {
 		t.Fatalf("after submit outstanding=%v", got)
 	}
-	if n := f.count(t, "SELECT count(*) FROM seller.kyc_review_issues WHERE resolved_at IS NULL"); n != 2 {
+	if n := f.count(t, "SELECT count(*) FROM seller.kyc_review_issues WHERE resolved_at IS NULL"); n != 1 {
 		t.Fatalf("重送不該標記問題：未處理=%d", n)
 	}
 	// 再次退回：只算新的一批，上一批沒處理的不會回來。
-	second := f.reject(t, again, issueOn("english_name", IssueInvalid))
-	if got := fields(second.OutstandingIssues); !slices.Equal(got, []string{"english_name"}) {
+	second := f.reject(t, again, issueOn("product_type", IssueInvalid))
+	if got := fields(second.OutstandingIssues); !slices.Equal(got, []string{"product_type"}) {
 		t.Fatalf("second outstanding=%v", got)
 	}
 	// 重新送出後取消：沒有待處理的問題。
@@ -253,9 +245,9 @@ func TestRejectionIsClearedByCancelAndApprove(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountID, _, sub := f.submitted(t, idA, bankAcct)
-	rej := f.reject(t, sub, issueOn("real_name", IssueMismatch))
-	draft, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: rej.Version, EnglishName: ptr("Wang Farm Two")})
+	accountID, _, sub := f.submitted(t)
+	rej := f.reject(t, sub, issueOn("product_type", IssueMismatch), issueOn("website_url", IssueInvalid))
+	draft, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: rej.Version, ProductType: ptr("水果")})
 	must(t, err)
 	if draft.LastRejection == nil || len(draft.OutstandingIssues) != 1 {
 		t.Fatalf("取消之前仍是要處理的退回：%+v %+v", draft.LastRejection, draft.OutstandingIssues)
@@ -266,8 +258,8 @@ func TestRejectionIsClearedByCancelAndApprove(t *testing.T) {
 		t.Fatalf("cancelled=%+v %+v", cancelled.LastRejection, cancelled.OutstandingIssues)
 	}
 
-	_, _, other := f.submitted(t, idB, "999888777666")
-	rejected := f.reject(t, other, issueOn("real_name", IssueMismatch))
+	_, _, other := f.submitted(t)
+	rejected := f.reject(t, other, issueOn("product_type", IssueMismatch))
 	again, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: rejected.AccountID, ExpectedVersion: rejected.Version})
 	must(t, err)
 	approved, err := f.module.ApproveKYC(ctx, ApproveKYCInput{ApplicationID: again.ID, ExpectedVersion: again.Version, AdminID: 9})
@@ -283,11 +275,11 @@ func TestLastRejectionStaysUntilResubmit(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountID, _, sub := f.submitted(t, idA, bankAcct)
-	f.reject(t, sub, issueOn("real_name", IssueMismatch), issueOn("birth_date", IssueMismatch))
+	accountID, _, sub := f.submitted(t)
+	f.reject(t, sub, issueOn("product_type", IssueMismatch), issueOn("website_url", IssueInvalid))
 	mine, err := f.module.MyKYC(ctx, accountID)
 	must(t, err)
-	edited, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: mine.Version, RealName: ptr("王大明"), BirthDate: ptr("1991-01-02")})
+	edited, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: mine.Version, ProductType: ptr("水果"), WebsiteURL: ptr("https://farm.example.com")})
 	must(t, err)
 	for name, got := range map[string]KYCApplication{"save response": edited, "MyKYC": func() KYCApplication { a, err := f.module.MyKYC(ctx, accountID); must(t, err); return a }()} {
 		if len(got.OutstandingIssues) != 0 || got.LastRejection == nil || got.LastRejection.Reason != "請補件" || len(got.LastRejection.Issues) != 2 {
@@ -300,8 +292,8 @@ func TestLastRejectionStaysUntilResubmit(t *testing.T) {
 		t.Fatalf("重送之後：%+v", again.LastRejection)
 	}
 	// 再次退回：新的一次才是要處理的。
-	second := f.reject(t, again, issueOn("english_name", IssueInvalid))
-	if second.LastRejection == nil || len(second.LastRejection.Issues) != 1 || second.LastRejection.Issues[0].Field != "english_name" {
+	second := f.reject(t, again, issueOn("website_url", IssueInvalid))
+	if second.LastRejection == nil || len(second.LastRejection.Issues) != 1 || second.LastRejection.Issues[0].Field != "website_url" {
 		t.Fatalf("second=%+v", second.LastRejection)
 	}
 }
@@ -313,7 +305,7 @@ func TestOutstandingCompanyDocumentIssuesFollowTheAssetNotThePosition(t *testing
 	f := setup(t)
 	ctx := context.Background()
 	accountID, _ := f.open(t)
-	in := companyDraft(accountID, idRep, taxIDOne, bankAcct)
+	in := companyDraft(accountID, taxIDOne)
 	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "co1"}, {StagedToken: "co2"}}
 	d := f.savedDraft(t, in)
 	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
@@ -376,7 +368,7 @@ func TestKYCReviewIssueChecksMatchGoAndRejectBadRows(t *testing.T) {
 			t.Errorf("kyc_review_issues_asset_check 對 %s 的設定與 Go 不同：%s", field, assetDef)
 		}
 	}
-	_, _, sub := f.submitted(t, idA, bankAcct)
+	_, _, sub := f.submitted(t)
 	rej := f.reject(t, sub, anIssue()...)
 	review := rej.Reviews[len(rej.Reviews)-1].ID.String()
 	insert := func(field, asset, code, message string, position int) error {
@@ -384,17 +376,17 @@ func TestKYCReviewIssueChecksMatchGoAndRejectBadRows(t *testing.T) {
 			VALUES (uuidv7(), $1, $2, $3, NULLIF($4, ''), $5, $6)`, review, position, field, asset, code, message)
 		return err
 	}
-	if err := insert("bank_book", "asset-book", "OTHER", "x", 5); err != nil {
+	if err := insert("business.company_documents", "asset-doc", "OTHER", "x", 5); err != nil {
 		t.Fatalf("合法的列被擋下：%v", err)
 	}
 	for name, err := range map[string]error{
-		"asset on a non document": insert("real_name", "asset-x", "OTHER", "x", 6),
+		"asset on a non document": insert("product_type", "asset-x", "OTHER", "x", 6),
 		"unknown field":           insert("favourite_colour", "", "OTHER", "x", 7),
-		"unknown code":            insert("real_name", "", "FINAL", "x", 8),
-		"empty message":           insert("real_name", "", "OTHER", "", 9),
-		"overlong message":        insert("real_name", "", "OTHER", strings.Repeat("字", 501), 10),
-		"negative position":       insert("real_name", "", "OTHER", "x", -1),
-		"duplicate position":      insert("real_name", "", "OTHER", "x", 0),
+		"unknown code":            insert("product_type", "", "FINAL", "x", 8),
+		"empty message":           insert("product_type", "", "OTHER", "", 9),
+		"overlong message":        insert("product_type", "", "OTHER", strings.Repeat("字", 501), 10),
+		"negative position":       insert("product_type", "", "OTHER", "x", -1),
+		"duplicate position":      insert("product_type", "", "OTHER", "x", 0),
 	} {
 		if err == nil {
 			t.Errorf("%s 應該被 CHECK 擋下", name)

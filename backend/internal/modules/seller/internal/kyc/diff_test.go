@@ -12,7 +12,7 @@ import (
 func TestFieldDiffsCoverEveryNonDocumentField(t *testing.T) {
 	var want []string
 	for _, f := range model.KYCFieldNames() {
-		if _, document := model.KYCFieldDocumentSlot(f); !document {
+		if !model.IsDocumentField(f) {
 			want = append(want, f)
 		}
 	}
@@ -28,15 +28,10 @@ func TestFieldDiffsCoverEveryNonDocumentField(t *testing.T) {
 }
 
 func TestDiffRowsReportsOnlyTheFieldsThatChanged(t *testing.T) {
-	name, other, code := "王小明", "王大明", "004"
-	base := store.SellerKycApplication{SellerType: "INDIVIDUAL", RealName: &name, BankCode: &code, BankAccountEnc: []byte("x")}
-	var p protector
+	name, other, tax, otherTax := "範例小農有限公司", "範例大農有限公司", "12345678", "23456781"
+	base := store.SellerKycApplication{SellerType: "COMPANY", CompanyName: &name, TaxID: &tax}
 	changed := func(next store.SellerKycApplication) (fields []string) {
-		d, err := p.diffRows(base, next)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for f, c := range d.fields {
+		for f, c := range diffRows(base, next).fields {
 			if c {
 				fields = append(fields, f)
 			}
@@ -48,19 +43,19 @@ func TestDiffRowsReportsOnlyTheFieldsThatChanged(t *testing.T) {
 		t.Errorf("沒改：%v", f)
 	}
 	next := base
-	next.RealName = &other
-	if f := changed(next); !slices.Equal(f, []string{"real_name"}) {
-		t.Errorf("改姓名：%v", f)
+	next.CompanyName = &other
+	if f := changed(next); !slices.Equal(f, []string{"business.company_name"}) {
+		t.Errorf("改公司名稱：%v", f)
+	}
+	// 統編直接比明文（D42）：改值算有變，清掉也算。
+	next = base
+	next.TaxID = &otherTax
+	if f := changed(next); !slices.Equal(f, []string{"business.tax_id"}) {
+		t.Errorf("改統編：%v", f)
 	}
 	next = base
-	newCode := "005"
-	next.BankCode = &newCode
-	if f := changed(next); !slices.Equal(f, []string{"bank_code"}) {
-		t.Errorf("只改銀行代碼（密文沒變）：%v", f)
-	}
-	next = base
-	next.BankAccountEnc = nil
-	if f := changed(next); !slices.Equal(f, []string{"bank_account"}) {
-		t.Errorf("清掉銀行帳號：%v", f)
+	next.TaxID = nil
+	if f := changed(next); !slices.Equal(f, []string{"business.tax_id"}) {
+		t.Errorf("清掉統編：%v", f)
 	}
 }

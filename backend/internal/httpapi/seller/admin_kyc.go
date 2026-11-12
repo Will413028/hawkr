@@ -20,8 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 後台的身分認證（KYC）審核方法。後台的訊息與前台的 KYCApplication 分開：前台的有寫入用的
-// 明文欄位，後台的型別沒有任何欄位能放明文；全文只由 RevealKYCSensitive 回傳。
+// 後台的身分認證（KYC）審核方法。後台的訊息與前台的 KYCApplication 分開：前台的有寫入用的欄位，後台的訊息沒有任何寫入用的欄位。
 
 // 模組輸入的欄位對應到請求的路徑。
 var (
@@ -32,7 +31,6 @@ var (
 		"Issues[].Field": "issues[].field", "Issues[].DocumentAssetID": "issues[].document_asset_id",
 		"Issues[].Code": "issues[].code", "Issues[].Message": "issues[].message",
 	}
-	revealKYCPaths = rpc.FieldPaths{"Reason": "reason"}
 )
 
 // kycFieldNames 是契約的 KYCField 對應到模組的欄位路徑（model.KYCFieldNames 的反向，kycFieldPB 的逆運算）。
@@ -149,59 +147,6 @@ func (h *Admin) RejectKYC(ctx context.Context, req *connect.Request[adminpb.Reje
 	return connect.NewResponse(&adminpb.RejectKYCResponse{Application: toAdminKYC(rejected)}), nil
 }
 
-// RevealKYCSensitive 是寫入稽核的動作（POST）：理由必填，稽核寫入失敗就不回傳明文。回應不可快取由 httpcache 對所有後台
-// 回應統一設定（private, no-store）。
-func (h *Admin) RevealKYCSensitive(ctx context.Context, req *connect.Request[adminpb.RevealKYCSensitiveRequest]) (*connect.Response[adminpb.RevealKYCSensitiveResponse], error) {
-	adminID, err := adminFrom(ctx)
-	if err != nil {
-		return nil, err
-	}
-	id, err := rpc.ParseUUID("id", req.Msg.GetId())
-	if err != nil {
-		return nil, err
-	}
-	got, err := h.m.RevealKYCSensitive(ctx, model.RevealKYCInput{AdminID: adminID, ApplicationID: id, Reason: req.Msg.GetReason()})
-	if err != nil {
-		return nil, rpc.WithFieldPaths(err, revealKYCPaths)
-	}
-	out := &adminpb.RevealKYCSensitiveResponse{
-		IdCardNo: deref(got.IDCardNo), RepIdCardNo: deref(got.RepIDCardNo), BankAccount: deref(got.BankAccount),
-		ExpireTime: timestamppb.New(got.ExpiresAt),
-	}
-	for _, d := range got.Documents {
-		out.Documents = append(out.Documents, &adminpb.KYCDocumentView{
-			Field: documentFieldPB(d.Slot), Position: int32(d.Position), ViewUri: documentURI(id, d), AssetId: d.AssetID, //nolint:gosec // position < 10
-		})
-	}
-	return connect.NewResponse(out), nil
-}
-
-func (h *Admin) ListKYCReveals(ctx context.Context, req *connect.Request[adminpb.ListKYCRevealsRequest]) (*connect.Response[adminpb.ListKYCRevealsResponse], error) {
-	id, err := rpc.ParseUUID("id", req.Msg.GetId())
-	if err != nil {
-		return nil, err
-	}
-	scope := auditScope(sellerv1alpha1connect.SellerAdminServiceListKYCRevealsProcedure, id)
-	after, err := rpc.ValidCursor[model.KYCAuditCursor](scope, req.Msg.GetPageToken())
-	if err != nil {
-		return nil, err
-	}
-	page, err := h.m.ListKYCReveals(ctx, model.KYCAuditListInput{ApplicationID: id, PageSize: req.Msg.GetPageSize(), After: after})
-	if err != nil {
-		return nil, err
-	}
-	out := &adminpb.ListKYCRevealsResponse{Reveals: make([]*adminpb.KYCReveal, len(page.Items))}
-	for i, r := range page.Items {
-		out.Reveals[i] = &adminpb.KYCReveal{
-			Id: r.ID.String(), AdminId: rpc.FormatID(r.AdminID), Reason: r.Reason, RevealTime: timestamppb.New(r.RevealedAt), ExpireTime: timestamppb.New(r.ExpiresAt),
-		}
-	}
-	if page.Next != nil {
-		out.NextPageToken = rpc.TokenFor(scope, page.Next)
-	}
-	return connect.NewResponse(out), nil
-}
-
 func (h *Admin) ListKYCDocumentAccesses(ctx context.Context, req *connect.Request[adminpb.ListKYCDocumentAccessesRequest]) (*connect.Response[adminpb.ListKYCDocumentAccessesResponse], error) {
 	id, err := rpc.ParseUUID("id", req.Msg.GetId())
 	if err != nil {
@@ -219,8 +164,8 @@ func (h *Admin) ListKYCDocumentAccesses(ctx context.Context, req *connect.Reques
 	out := &adminpb.ListKYCDocumentAccessesResponse{DocumentAccesses: make([]*adminpb.KYCDocumentAccess, len(page.Items))}
 	for i, acc := range page.Items {
 		out.DocumentAccesses[i] = &adminpb.KYCDocumentAccess{
-			Id: acc.ID.String(), RevealId: acc.RevealID.String(), AdminId: rpc.FormatID(acc.AdminID),
-			Field: documentFieldPB(acc.Slot), Position: int32(acc.Position), AccessTime: timestamppb.New(acc.AccessedAt), //nolint:gosec // position < 10
+			Id: acc.ID.String(), AdminId: rpc.FormatID(acc.AdminID), AssetId: acc.AssetID,
+			Field: kycFieldPB(model.CompanyDocumentsField), Position: int32(acc.Position), AccessTime: timestamppb.New(acc.AccessedAt), //nolint:gosec // position < 10
 		}
 	}
 	if page.Next != nil {
@@ -255,7 +200,7 @@ func toKYCSummary(a model.KYCApplication) *adminpb.KYCApplicationSummary {
 	out := &adminpb.KYCApplicationSummary{
 		Id: a.ID.String(), StoreId: rpc.FormatID(a.StoreID), AccountId: rpc.FormatID(a.AccountID),
 		Status: rpc.EnumToProto[pb.KYCStatus](a.Status), SellerType: rpc.EnumToProto[adminpb.KYCSellerType](a.SellerType),
-		RealName: deref(a.RealName), CompanyName: deref(a.CompanyName), TaxId: deref(a.TaxID),
+		StoreName: deref(a.StoreName), CompanyName: deref(a.CompanyName), TaxId: deref(a.TaxID),
 	}
 	if a.SubmittedAt != nil {
 		out.SubmitTime = timestamppb.New(*a.SubmittedAt)
@@ -266,42 +211,28 @@ func toKYCSummary(a model.KYCApplication) *adminpb.KYCApplicationSummary {
 	return out
 }
 
-// toAdminKYC 轉成後台的申請：只有遮蔽後的值（模組的型別沒有明文欄位）；證件只有位置。
-// documentFieldPB 把證件位置轉成它所屬的欄位（後台契約用欄位表示文件，位置只留在模組內部）；不認得的位置是 UNSPECIFIED。
-func documentFieldPB(slot model.KYCDocumentSlot) pb.KYCField {
-	field, ok := model.KYCSlotField(slot)
-	if !ok {
-		return pb.KYCField_KYC_FIELD_UNSPECIFIED
-	}
-	return kycFieldPB(field)
-}
-
 func toAdminKYC(a model.KYCAdminApplication) *adminpb.KYCApplication {
 	out := &adminpb.KYCApplication{
 		Id: a.ID.String(), StoreId: rpc.FormatID(a.StoreID), AccountId: rpc.FormatID(a.AccountID),
 		Status: rpc.EnumToProto[pb.KYCStatus](a.Status), Etag: kycAdminEtag(a.Version, a.RegistrationCheckSeq()),
-		RealName: deref(a.RealName), BirthDate: toDate(a.BirthDate),
-		IdCardIssueDate: toDate(a.IDCardIssueDate), IdCardIssueType: deref(a.IDCardIssueType), IdCardIssueLocation: deref(a.IDCardIssueLocation),
-		EnglishName: deref(a.EnglishName), BankName: deref(a.BankName), BankCode: deref(a.BankCode), BankAccountMasked: deref(a.BankAccountMasked),
-		ProductType:                            deref(a.ProductType),
-		WebsiteUrl:                             deref(a.WebsiteURL),
-		SharesBankAccountWithSanctionedAccount: a.SharesBankAccountWithSanctionedAccount,
-		OutstandingIssues:                      toKYCIssues(a.OutstandingIssues),
-		CanApprove:                             len(a.ApproveUnavailable) == 0,
-		ApproveUnavailabilities:                toStoreActionUnavailabilities(a.ApproveUnavailable, model.StoreActionApproveKYC),
-		CanReject:                              len(a.RejectUnavailable) == 0,
-		RejectUnavailabilities:                 toStoreActionUnavailabilities(a.RejectUnavailable, model.StoreActionRejectKYC),
-		CanRequeryRegistration:                 len(a.RequeryUnavailable) == 0,
-		RequeryRegistrationUnavailabilities:    toStoreActionUnavailabilities(a.RequeryUnavailable, model.StoreActionRequeryKYC),
-		CreateTime:                             timestamppb.New(a.CreatedAt), UpdateTime: timestamppb.New(a.UpdatedAt),
+		ProductType:                         deref(a.ProductType),
+		WebsiteUrl:                          deref(a.WebsiteURL),
+		OutstandingIssues:                   toKYCIssues(a.OutstandingIssues),
+		CanApprove:                          len(a.ApproveUnavailable) == 0,
+		ApproveUnavailabilities:             toStoreActionUnavailabilities(a.ApproveUnavailable, model.StoreActionApproveKYC),
+		CanReject:                           len(a.RejectUnavailable) == 0,
+		RejectUnavailabilities:              toStoreActionUnavailabilities(a.RejectUnavailable, model.StoreActionRejectKYC),
+		CanRequeryRegistration:              len(a.RequeryUnavailable) == 0,
+		RequeryRegistrationUnavailabilities: toStoreActionUnavailabilities(a.RequeryUnavailable, model.StoreActionRequeryKYC),
+		CreateTime:                          timestamppb.New(a.CreatedAt), UpdateTime: timestamppb.New(a.UpdatedAt),
 	}
 	switch a.SellerType {
 	case model.KYCIndividual:
-		out.Subject = &adminpb.KYCApplication_Individual{Individual: &adminpb.IndividualKYC{IdCardNoMasked: deref(a.IDCardNoMasked)}}
+		out.Subject = &adminpb.KYCApplication_Individual{Individual: &adminpb.IndividualKYC{}}
 	case model.KYCCompany:
 		b := &adminpb.BusinessKYC{
 			CompanyName: deref(a.CompanyName), TaxId: deref(a.TaxID),
-			CompanyRegisterDate: toDate(a.CompanyRegisterDate), CompanyPhone: deref(a.CompanyPhone), RepIdCardNoMasked: deref(a.RepIDCardNoMasked),
+			CompanyRegisterDate: toDate(a.CompanyRegisterDate), CompanyPhone: deref(a.CompanyPhone),
 		}
 		if a.CompanyTownCode != nil {
 			b.CompanyAddress = &commonpb.PostalAddress{
@@ -315,7 +246,9 @@ func toAdminKYC(a model.KYCAdminApplication) *adminpb.KYCApplication {
 		out.IssuableFields = append(out.IssuableFields, kycFieldPB(f))
 	}
 	for _, d := range a.Documents {
-		out.Documents = append(out.Documents, &adminpb.KYCDocument{Field: documentFieldPB(d.Slot), Position: int32(d.Position)}) //nolint:gosec // position < 10
+		out.Documents = append(out.Documents, &adminpb.KYCDocument{
+			Field: kycFieldPB(model.CompanyDocumentsField), Position: int32(d.Position), ViewUri: documentURI(a.ID, d.Position), AssetId: d.AssetID, //nolint:gosec // position < 10
+		})
 	}
 	if a.PendingRegistrationCheck != nil {
 		out.PendingRegistrationCheck = toRegistrationCheck(*a.PendingRegistrationCheck)

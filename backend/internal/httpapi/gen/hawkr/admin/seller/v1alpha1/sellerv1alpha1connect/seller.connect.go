@@ -60,9 +60,6 @@ const (
 	// SellerAdminServiceGetKYCApplicationProcedure is the fully-qualified name of the
 	// SellerAdminService's GetKYCApplication RPC.
 	SellerAdminServiceGetKYCApplicationProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/GetKYCApplication"
-	// SellerAdminServiceListKYCRevealsProcedure is the fully-qualified name of the SellerAdminService's
-	// ListKYCReveals RPC.
-	SellerAdminServiceListKYCRevealsProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/ListKYCReveals"
 	// SellerAdminServiceListKYCDocumentAccessesProcedure is the fully-qualified name of the
 	// SellerAdminService's ListKYCDocumentAccesses RPC.
 	SellerAdminServiceListKYCDocumentAccessesProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/ListKYCDocumentAccesses"
@@ -72,9 +69,6 @@ const (
 	// SellerAdminServiceRejectKYCProcedure is the fully-qualified name of the SellerAdminService's
 	// RejectKYC RPC.
 	SellerAdminServiceRejectKYCProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RejectKYC"
-	// SellerAdminServiceRevealKYCSensitiveProcedure is the fully-qualified name of the
-	// SellerAdminService's RevealKYCSensitive RPC.
-	SellerAdminServiceRevealKYCSensitiveProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RevealKYCSensitive"
 	// SellerAdminServiceRequeryKYCRegistrationProcedure is the fully-qualified name of the
 	// SellerAdminService's RequeryKYCRegistration RPC.
 	SellerAdminServiceRequeryKYCRegistrationProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RequeryKYCRegistration"
@@ -95,13 +89,11 @@ type SellerAdminServiceClient interface {
 	// ListKYCApplications 是身分認證的審核佇列：只列送出過的申請（不含賣家的草稿，也不含沒送出就取消的）。依送出時間排序：
 	// status 是 SUBMITTED（待審核）時舊到新，等最久的在最前面；其他（含沒有指定）新到舊。DRAFT 回 invalid_argument。
 	ListKYCApplications(context.Context, *connect.Request[v1alpha1.ListKYCApplicationsRequest]) (*connect.Response[v1alpha1.ListKYCApplicationsResponse], error)
-	// GetKYCApplication 讀一筆申請：身分證號與銀行帳號只有遮蔽後的值，連同審核紀錄與銀行帳號命中的標記。顯示全文與證件讀取的
-	// 稽核紀錄用 ListKYCReveals、ListKYCDocumentAccesses。
-	// 賣家的草稿讀不到（not_found）。要看全文用 RevealKYCSensitive。
+	// GetKYCApplication 讀一筆申請：登記資料、審核紀錄與公司補充文件（每張帶檢視網址與 asset_id；有後台的 KYC 讀取權限就能讀，
+	// 每次讀取寫一列稽核）。讀取紀錄用 ListKYCDocumentAccesses。
+	// 賣家的草稿讀不到（not_found）。
 	GetKYCApplication(context.Context, *connect.Request[v1alpha1.GetKYCApplicationRequest]) (*connect.Response[v1alpha1.GetKYCApplicationResponse], error)
-	// ListKYCReveals 列出一筆申請的顯示全文紀錄（誰、何時、理由、授權到期），新到舊。申請不存在或是賣家的草稿回 not_found。
-	ListKYCReveals(context.Context, *connect.Request[v1alpha1.ListKYCRevealsRequest]) (*connect.Response[v1alpha1.ListKYCRevealsResponse], error)
-	// ListKYCDocumentAccesses 列出一筆申請的證件圖片讀取紀錄（誰、依據哪次顯示、哪個位置、何時），新到舊。申請不存在或是賣家的
+	// ListKYCDocumentAccesses 列出一筆申請的補充文件讀取紀錄（誰、哪一張、何時），新到舊。申請不存在或是賣家的
 	// 草稿回 not_found。
 	ListKYCDocumentAccesses(context.Context, *connect.Request[v1alpha1.ListKYCDocumentAccessesRequest]) (*connect.Response[v1alpha1.ListKYCDocumentAccessesResponse], error)
 	// ApproveKYC 核准審核中的申請，並在同一個 transaction 排入收款帳戶的建立（建立由背景程序完成）。etag 必填。身分命中
@@ -116,11 +108,6 @@ type SellerAdminServiceClient interface {
 	// 申請不能退回（不在審核中、店家已關閉或等待刪除）時回 failed_precondition，訊息是 KYCApplication.reject_unavailabilities 的第一句；
 	// 帳號停權中仍可退回。
 	RejectKYC(context.Context, *connect.Request[v1alpha1.RejectKYCRequest]) (*connect.Response[v1alpha1.RejectKYCResponse], error)
-	// RevealKYCSensitive 顯示一筆申請的身分證號、負責人身分證號與銀行帳號全文，並授權這位管理員在 15 分鐘內讀這筆申請的證件
-	// 圖片（回應的每張證件有一個 view_uri，是 GET，要帶同一位管理員的登入）。這是寫入稽核紀錄的動作（誰、哪筆申請、何時、
-	// 理由、授權到期的時間，不含值），所以是 POST，不是讀取；稽核寫入失敗就不回傳明文。回應不可快取。到期之後、或別的
-	// 管理員讀證件圖片都是 403，要再看就再顯示一次（再寫一列稽核）。
-	RevealKYCSensitive(context.Context, *connect.Request[v1alpha1.RevealKYCSensitiveRequest]) (*connect.Response[v1alpha1.RevealKYCSensitiveResponse], error)
 	// RequeryKYCRegistration 對審核中（SUBMITTED）的公司型申請重新查一次經濟部商業司的登記資料（送件時已查過一次，這是
 	// 手動補查：例如當時來源不可用或查無）。回應不等結果：排入背景工作，回傳這筆進行中的查詢（含期限），結果從 GetKYCApplication 的
 	// registration_check 看（查詢中時 pending_registration_check 有值）。伺服器保證這筆查詢在 deadline_time 之前到終態（查到、查無或
@@ -184,13 +171,6 @@ func NewSellerAdminServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
-		listKYCReveals: connect.NewClient[v1alpha1.ListKYCRevealsRequest, v1alpha1.ListKYCRevealsResponse](
-			httpClient,
-			baseURL+SellerAdminServiceListKYCRevealsProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("ListKYCReveals")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
 		listKYCDocumentAccesses: connect.NewClient[v1alpha1.ListKYCDocumentAccessesRequest, v1alpha1.ListKYCDocumentAccessesResponse](
 			httpClient,
 			baseURL+SellerAdminServiceListKYCDocumentAccessesProcedure,
@@ -210,12 +190,6 @@ func NewSellerAdminServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			connect.WithSchema(sellerAdminServiceMethods.ByName("RejectKYC")),
 			connect.WithClientOptions(opts...),
 		),
-		revealKYCSensitive: connect.NewClient[v1alpha1.RevealKYCSensitiveRequest, v1alpha1.RevealKYCSensitiveResponse](
-			httpClient,
-			baseURL+SellerAdminServiceRevealKYCSensitiveProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("RevealKYCSensitive")),
-			connect.WithClientOptions(opts...),
-		),
 		requeryKYCRegistration: connect.NewClient[v1alpha1.RequeryKYCRegistrationRequest, v1alpha1.RequeryKYCRegistrationResponse](
 			httpClient,
 			baseURL+SellerAdminServiceRequeryKYCRegistrationProcedure,
@@ -233,11 +207,9 @@ type sellerAdminServiceClient struct {
 	getStoreOnboarding      *connect.Client[v1alpha1.GetStoreOnboardingRequest, v1alpha1.GetStoreOnboardingResponse]
 	listKYCApplications     *connect.Client[v1alpha1.ListKYCApplicationsRequest, v1alpha1.ListKYCApplicationsResponse]
 	getKYCApplication       *connect.Client[v1alpha1.GetKYCApplicationRequest, v1alpha1.GetKYCApplicationResponse]
-	listKYCReveals          *connect.Client[v1alpha1.ListKYCRevealsRequest, v1alpha1.ListKYCRevealsResponse]
 	listKYCDocumentAccesses *connect.Client[v1alpha1.ListKYCDocumentAccessesRequest, v1alpha1.ListKYCDocumentAccessesResponse]
 	approveKYC              *connect.Client[v1alpha1.ApproveKYCRequest, v1alpha1.ApproveKYCResponse]
 	rejectKYC               *connect.Client[v1alpha1.RejectKYCRequest, v1alpha1.RejectKYCResponse]
-	revealKYCSensitive      *connect.Client[v1alpha1.RevealKYCSensitiveRequest, v1alpha1.RevealKYCSensitiveResponse]
 	requeryKYCRegistration  *connect.Client[v1alpha1.RequeryKYCRegistrationRequest, v1alpha1.RequeryKYCRegistrationResponse]
 }
 
@@ -271,11 +243,6 @@ func (c *sellerAdminServiceClient) GetKYCApplication(ctx context.Context, req *c
 	return c.getKYCApplication.CallUnary(ctx, req)
 }
 
-// ListKYCReveals calls hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCReveals.
-func (c *sellerAdminServiceClient) ListKYCReveals(ctx context.Context, req *connect.Request[v1alpha1.ListKYCRevealsRequest]) (*connect.Response[v1alpha1.ListKYCRevealsResponse], error) {
-	return c.listKYCReveals.CallUnary(ctx, req)
-}
-
 // ListKYCDocumentAccesses calls
 // hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCDocumentAccesses.
 func (c *sellerAdminServiceClient) ListKYCDocumentAccesses(ctx context.Context, req *connect.Request[v1alpha1.ListKYCDocumentAccessesRequest]) (*connect.Response[v1alpha1.ListKYCDocumentAccessesResponse], error) {
@@ -290,11 +257,6 @@ func (c *sellerAdminServiceClient) ApproveKYC(ctx context.Context, req *connect.
 // RejectKYC calls hawkr.admin.seller.v1alpha1.SellerAdminService.RejectKYC.
 func (c *sellerAdminServiceClient) RejectKYC(ctx context.Context, req *connect.Request[v1alpha1.RejectKYCRequest]) (*connect.Response[v1alpha1.RejectKYCResponse], error) {
 	return c.rejectKYC.CallUnary(ctx, req)
-}
-
-// RevealKYCSensitive calls hawkr.admin.seller.v1alpha1.SellerAdminService.RevealKYCSensitive.
-func (c *sellerAdminServiceClient) RevealKYCSensitive(ctx context.Context, req *connect.Request[v1alpha1.RevealKYCSensitiveRequest]) (*connect.Response[v1alpha1.RevealKYCSensitiveResponse], error) {
-	return c.revealKYCSensitive.CallUnary(ctx, req)
 }
 
 // RequeryKYCRegistration calls
@@ -318,13 +280,11 @@ type SellerAdminServiceHandler interface {
 	// ListKYCApplications 是身分認證的審核佇列：只列送出過的申請（不含賣家的草稿，也不含沒送出就取消的）。依送出時間排序：
 	// status 是 SUBMITTED（待審核）時舊到新，等最久的在最前面；其他（含沒有指定）新到舊。DRAFT 回 invalid_argument。
 	ListKYCApplications(context.Context, *connect.Request[v1alpha1.ListKYCApplicationsRequest]) (*connect.Response[v1alpha1.ListKYCApplicationsResponse], error)
-	// GetKYCApplication 讀一筆申請：身分證號與銀行帳號只有遮蔽後的值，連同審核紀錄與銀行帳號命中的標記。顯示全文與證件讀取的
-	// 稽核紀錄用 ListKYCReveals、ListKYCDocumentAccesses。
-	// 賣家的草稿讀不到（not_found）。要看全文用 RevealKYCSensitive。
+	// GetKYCApplication 讀一筆申請：登記資料、審核紀錄與公司補充文件（每張帶檢視網址與 asset_id；有後台的 KYC 讀取權限就能讀，
+	// 每次讀取寫一列稽核）。讀取紀錄用 ListKYCDocumentAccesses。
+	// 賣家的草稿讀不到（not_found）。
 	GetKYCApplication(context.Context, *connect.Request[v1alpha1.GetKYCApplicationRequest]) (*connect.Response[v1alpha1.GetKYCApplicationResponse], error)
-	// ListKYCReveals 列出一筆申請的顯示全文紀錄（誰、何時、理由、授權到期），新到舊。申請不存在或是賣家的草稿回 not_found。
-	ListKYCReveals(context.Context, *connect.Request[v1alpha1.ListKYCRevealsRequest]) (*connect.Response[v1alpha1.ListKYCRevealsResponse], error)
-	// ListKYCDocumentAccesses 列出一筆申請的證件圖片讀取紀錄（誰、依據哪次顯示、哪個位置、何時），新到舊。申請不存在或是賣家的
+	// ListKYCDocumentAccesses 列出一筆申請的補充文件讀取紀錄（誰、哪一張、何時），新到舊。申請不存在或是賣家的
 	// 草稿回 not_found。
 	ListKYCDocumentAccesses(context.Context, *connect.Request[v1alpha1.ListKYCDocumentAccessesRequest]) (*connect.Response[v1alpha1.ListKYCDocumentAccessesResponse], error)
 	// ApproveKYC 核准審核中的申請，並在同一個 transaction 排入收款帳戶的建立（建立由背景程序完成）。etag 必填。身分命中
@@ -339,11 +299,6 @@ type SellerAdminServiceHandler interface {
 	// 申請不能退回（不在審核中、店家已關閉或等待刪除）時回 failed_precondition，訊息是 KYCApplication.reject_unavailabilities 的第一句；
 	// 帳號停權中仍可退回。
 	RejectKYC(context.Context, *connect.Request[v1alpha1.RejectKYCRequest]) (*connect.Response[v1alpha1.RejectKYCResponse], error)
-	// RevealKYCSensitive 顯示一筆申請的身分證號、負責人身分證號與銀行帳號全文，並授權這位管理員在 15 分鐘內讀這筆申請的證件
-	// 圖片（回應的每張證件有一個 view_uri，是 GET，要帶同一位管理員的登入）。這是寫入稽核紀錄的動作（誰、哪筆申請、何時、
-	// 理由、授權到期的時間，不含值），所以是 POST，不是讀取；稽核寫入失敗就不回傳明文。回應不可快取。到期之後、或別的
-	// 管理員讀證件圖片都是 403，要再看就再顯示一次（再寫一列稽核）。
-	RevealKYCSensitive(context.Context, *connect.Request[v1alpha1.RevealKYCSensitiveRequest]) (*connect.Response[v1alpha1.RevealKYCSensitiveResponse], error)
 	// RequeryKYCRegistration 對審核中（SUBMITTED）的公司型申請重新查一次經濟部商業司的登記資料（送件時已查過一次，這是
 	// 手動補查：例如當時來源不可用或查無）。回應不等結果：排入背景工作，回傳這筆進行中的查詢（含期限），結果從 GetKYCApplication 的
 	// registration_check 看（查詢中時 pending_registration_check 有值）。伺服器保證這筆查詢在 deadline_time 之前到終態（查到、查無或
@@ -402,13 +357,6 @@ func NewSellerAdminServiceHandler(svc SellerAdminServiceHandler, opts ...connect
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
-	sellerAdminServiceListKYCRevealsHandler := connect.NewUnaryHandler(
-		SellerAdminServiceListKYCRevealsProcedure,
-		svc.ListKYCReveals,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("ListKYCReveals")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
 	sellerAdminServiceListKYCDocumentAccessesHandler := connect.NewUnaryHandler(
 		SellerAdminServiceListKYCDocumentAccessesProcedure,
 		svc.ListKYCDocumentAccesses,
@@ -426,12 +374,6 @@ func NewSellerAdminServiceHandler(svc SellerAdminServiceHandler, opts ...connect
 		SellerAdminServiceRejectKYCProcedure,
 		svc.RejectKYC,
 		connect.WithSchema(sellerAdminServiceMethods.ByName("RejectKYC")),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerAdminServiceRevealKYCSensitiveHandler := connect.NewUnaryHandler(
-		SellerAdminServiceRevealKYCSensitiveProcedure,
-		svc.RevealKYCSensitive,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("RevealKYCSensitive")),
 		connect.WithHandlerOptions(opts...),
 	)
 	sellerAdminServiceRequeryKYCRegistrationHandler := connect.NewUnaryHandler(
@@ -454,16 +396,12 @@ func NewSellerAdminServiceHandler(svc SellerAdminServiceHandler, opts ...connect
 			sellerAdminServiceListKYCApplicationsHandler.ServeHTTP(w, r)
 		case SellerAdminServiceGetKYCApplicationProcedure:
 			sellerAdminServiceGetKYCApplicationHandler.ServeHTTP(w, r)
-		case SellerAdminServiceListKYCRevealsProcedure:
-			sellerAdminServiceListKYCRevealsHandler.ServeHTTP(w, r)
 		case SellerAdminServiceListKYCDocumentAccessesProcedure:
 			sellerAdminServiceListKYCDocumentAccessesHandler.ServeHTTP(w, r)
 		case SellerAdminServiceApproveKYCProcedure:
 			sellerAdminServiceApproveKYCHandler.ServeHTTP(w, r)
 		case SellerAdminServiceRejectKYCProcedure:
 			sellerAdminServiceRejectKYCHandler.ServeHTTP(w, r)
-		case SellerAdminServiceRevealKYCSensitiveProcedure:
-			sellerAdminServiceRevealKYCSensitiveHandler.ServeHTTP(w, r)
 		case SellerAdminServiceRequeryKYCRegistrationProcedure:
 			sellerAdminServiceRequeryKYCRegistrationHandler.ServeHTTP(w, r)
 		default:
@@ -499,10 +437,6 @@ func (UnimplementedSellerAdminServiceHandler) GetKYCApplication(context.Context,
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.GetKYCApplication is not implemented"))
 }
 
-func (UnimplementedSellerAdminServiceHandler) ListKYCReveals(context.Context, *connect.Request[v1alpha1.ListKYCRevealsRequest]) (*connect.Response[v1alpha1.ListKYCRevealsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCReveals is not implemented"))
-}
-
 func (UnimplementedSellerAdminServiceHandler) ListKYCDocumentAccesses(context.Context, *connect.Request[v1alpha1.ListKYCDocumentAccessesRequest]) (*connect.Response[v1alpha1.ListKYCDocumentAccessesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCDocumentAccesses is not implemented"))
 }
@@ -513,10 +447,6 @@ func (UnimplementedSellerAdminServiceHandler) ApproveKYC(context.Context, *conne
 
 func (UnimplementedSellerAdminServiceHandler) RejectKYC(context.Context, *connect.Request[v1alpha1.RejectKYCRequest]) (*connect.Response[v1alpha1.RejectKYCResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.RejectKYC is not implemented"))
-}
-
-func (UnimplementedSellerAdminServiceHandler) RevealKYCSensitive(context.Context, *connect.Request[v1alpha1.RevealKYCSensitiveRequest]) (*connect.Response[v1alpha1.RevealKYCSensitiveResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.RevealKYCSensitive is not implemented"))
 }
 
 func (UnimplementedSellerAdminServiceHandler) RequeryKYCRegistration(context.Context, *connect.Request[v1alpha1.RequeryKYCRegistrationRequest]) (*connect.Response[v1alpha1.RequeryKYCRegistrationResponse], error) {

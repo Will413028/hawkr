@@ -15,7 +15,7 @@ import (
 // approvedStore 建立一間已核准的店家（申請送出並核准；收款帳戶由 payment 的 fake 另外建立）。
 func (f *fixture) approvedStore(t *testing.T) (int64, Store) {
 	t.Helper()
-	accountID, s, sub := f.submitted(t, idA, bankAcct)
+	accountID, s, sub := f.submitted(t)
 	must(t, approve(f, sub))
 	return accountID, s
 }
@@ -48,7 +48,7 @@ func TestStaleEtagAfterApproveAndRejectConflicts(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	approved, rejected := record[KYCApproved](f), record[KYCRejected](f)
-	_, _, sub := f.submitted(t, idA, bankAcct)
+	_, _, sub := f.submitted(t)
 	first, err := f.module.ApproveKYC(ctx, ApproveKYCInput{ApplicationID: sub.ID, ExpectedVersion: sub.Version, AdminID: 9})
 	must(t, err)
 	for _, v := range []int64{sub.Version, sub.Version - 1} {
@@ -71,7 +71,7 @@ func TestStaleEtagAfterApproveAndRejectConflicts(t *testing.T) {
 	}
 
 	// 退回生效後帶退回之前的版本：衝突，審核紀錄與事件各只有一筆。
-	_, _, sub2 := f.submitted(t, idB, "012345678902")
+	_, _, sub2 := f.submitted(t)
 	done, err := f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: sub2.ID, ExpectedVersion: sub2.Version, AdminID: 9, Issues: anIssue(), Reason: "資料不符"})
 	must(t, err)
 	if _, err := f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: sub2.ID, ExpectedVersion: sub2.Version, AdminID: 9, Issues: anIssue(), Reason: "資料不符"}); apperr.KindOf(err) != apperr.KindVersionConflict {
@@ -89,7 +89,7 @@ func TestStaleEtagAfterApproveAndRejectConflicts(t *testing.T) {
 func TestApproveIsAtomicWithTheAccountRequest(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	_, s, sub := f.submitted(t, idB, bankAcct)
+	_, s, sub := f.submitted(t)
 	boom := errors.New("boom")
 	subscribeFail[KYCApproved](f, boom)
 	if err := approve(f, sub); !errors.Is(err, boom) {

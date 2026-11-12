@@ -41,7 +41,7 @@ func TestOnboardingTasksAgreeWithTheGateAndTheView(t *testing.T) {
 	f := setup(t)
 	accountID, s := f.approvedStore(t)
 	f.logoed(t, accountID, s)
-	_, pending, _ := f.submitted(t, idB, "999888777666")
+	_, pending, _ := f.submitted(t)
 	stages := []struct {
 		name  string
 		store int64

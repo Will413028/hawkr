@@ -317,9 +317,9 @@ func TestAdminStoresFilterByKYCStatusAndShowTheFlow(t *testing.T) {
 	ctx := context.Background()
 	_, noApplication := f.open(t)
 	accountDraft, draftOnly := f.open(t)
-	f.savedDraft(t, kycDraft(accountDraft, idA, bankAcct))
-	_, submittedStore, _ := f.submitted(t, idB, "012345678902")
-	_, approvedStore, toApprove := f.submitted(t, idC, "012345678903")
+	f.savedDraft(t, kycDraft(accountDraft))
+	_, submittedStore, _ := f.submitted(t)
+	_, approvedStore, toApprove := f.submitted(t)
 	must(t, approve(f, toApprove))
 
 	list := func(status KYCStatus) map[int64]*KYCStatus {
@@ -370,14 +370,14 @@ func TestAdminStoreStats(t *testing.T) {
 	f.now = taipeiOct1.Add(time.Hour)
 	_, err := f.module.CloseCurrent(ctx, closedAccount)
 	must(t, err)
-	_, _, _ = f.submitted(t, idB, "012345678902")
-	_, _, toApprove := f.submitted(t, idC, "012345678903")
+	_, _, _ = f.submitted(t)
+	_, _, toApprove := f.submitted(t)
 	must(t, approve(f, toApprove))
-	_, _, toReject := f.submitted(t, idRep, "012345678904")
+	_, _, toReject := f.submitted(t)
 	_, err = f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: toReject.ID, ExpectedVersion: toReject.Version, AdminID: 9, Issues: anIssue(), Reason: "照片不清楚"})
 	must(t, err)
 	accountDraft, _ := f.open(t)
-	f.savedDraft(t, kycDraft(accountDraft, idA, bankAcct))
+	f.savedDraft(t, kycDraft(accountDraft))
 
 	// 目前的店家：測月界的三家、三家有申請的、一家草稿，共 7 家（已關閉的不算）；其中九月那家以外的 6 家是十月開的。
 	f.now = time.Date(2026, 10, 20, 4, 0, 0, 0, time.UTC)
@@ -401,8 +401,8 @@ func TestStoreKYC(t *testing.T) {
 	ctx := context.Background()
 	_, none := f.open(t)
 	draftAccount, draft := f.open(t)
-	f.savedDraft(t, kycDraft(draftAccount, idA, bankAcct))
-	submittedAccount, submittedStore, submitted := f.submitted(t, idB, "012345678902")
+	f.savedDraft(t, kycDraft(draftAccount))
+	submittedAccount, submittedStore, submitted := f.submitted(t)
 
 	if _, ok, err := f.module.StoreKYC(ctx, none.StoreID); err != nil || ok {
 		t.Fatalf("no application: ok=%v err=%v", ok, err)
@@ -415,9 +415,6 @@ func TestStoreKYC(t *testing.T) {
 	must(t, err)
 	if !ok || got.ID != submitted.ID || got.Status != KYCStatusSubmitted || got.SubmittedAt == nil || got.StoreID != submittedStore.StoreID || got.AccountID != submittedAccount {
 		t.Fatalf("got=%+v ok=%v", got, ok)
-	}
-	if got.IDCardNoMasked == nil || strings.Contains(*got.IDCardNoMasked, idB) || strings.Contains(*got.BankAccountMasked, "012345678902") {
-		t.Fatalf("the view must be masked: %+v", got)
 	}
 	// 取消之後也讀不到。
 	if _, err := f.module.CancelKYC(ctx, CancelKYCInput{AccountID: submittedAccount, ExpectedVersion: submitted.Version}); err != nil {
@@ -435,9 +432,9 @@ func TestStoreKYC(t *testing.T) {
 }
 
 // approvedWith 開店、送出並核准一份申請。
-func (f *fixture) approvedWith(t *testing.T, idCard, bank string) (int64, Store) {
+func (f *fixture) approvedWith(t *testing.T) (int64, Store) {
 	t.Helper()
-	accountID, s, submitted := f.submitted(t, idCard, bank)
+	accountID, s, submitted := f.submitted(t)
 	must(t, approve(f, submitted))
 	return accountID, s
 }
@@ -463,16 +460,16 @@ func TestAdminStoresKYCFilterOnlyMatchesTheCurrentApplication(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	resubmittedAccount, resubmitted, first := f.submitted(t, idB, "012345678902")
+	resubmittedAccount, resubmitted, first := f.submitted(t)
 	_, err := f.module.CancelKYC(ctx, CancelKYCInput{AccountID: resubmittedAccount, ExpectedVersion: first.Version})
 	must(t, err)
-	again := f.savedDraft(t, kycDraft(resubmittedAccount, idB, "012345678902"))
+	again := f.savedDraft(t, kycDraft(resubmittedAccount))
 	if again.ID == first.ID {
 		t.Fatal("重建的申請應該是新的一列")
 	}
 	_, err = f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: resubmittedAccount, ExpectedVersion: again.Version})
 	must(t, err)
-	cancelledAccount, cancelledOnly, toCancel := f.submitted(t, idC, "012345678903")
+	cancelledAccount, cancelledOnly, toCancel := f.submitted(t)
 	_, err = f.module.CancelKYC(ctx, CancelKYCInput{AccountID: cancelledAccount, ExpectedVersion: toCancel.Version})
 	must(t, err)
 
@@ -505,9 +502,9 @@ func TestAdminStoresFilterByAccountAndSuspension(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	boundAccount, bound := f.approvedWith(t, idA, bankAcct)
-	_, second := f.approvedWith(t, idB, "012345678902")
-	_, third := f.approvedWith(t, idC, "012345678903")
+	boundAccount, bound := f.approvedWith(t)
+	_, second := f.approvedWith(t)
+	_, third := f.approvedWith(t)
 	_, none := f.open(t)
 
 	// 帳號：完全相符，換過店的帳號有兩個 stint。

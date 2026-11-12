@@ -263,7 +263,7 @@ func TestImmediateTerminationSuspendsAtOnceAndSnapshotsTheIdentityPerMeasure(t *
 	t.Parallel()
 	f := setup(t)
 	suspended := record[StoreSuspended](f)
-	accountID, s, _ := f.submitted(t, idA, bankAcct)
+	accountID, s, _ := f.submittedCompany(t, taxIDOne)
 	f.suspend(t, s.StoreID)
 	if len(suspended.all()) != 1 {
 		t.Fatal("先有一個風險停權")
@@ -280,7 +280,7 @@ func TestImmediateTerminationSuspendsAtOnceAndSnapshotsTheIdentityPerMeasure(t *
 	}
 	_ = accountID
 	// 預告終止從頭到尾沒有快照。
-	_, s2, _ := f.submitted(t, idB, bankAcct)
+	_, s2, _ := f.submitted(t)
 	notice := f.terminate(t, s2.StoreID, GroundNotice)
 	f.now = f.now.Add(721 * time.Hour)
 	f.orders.open = true
@@ -460,12 +460,12 @@ func TestNoticeEndsOnEveryPathThatClosesTheStore(t *testing.T) {
 	}
 }
 
-// 21.3：關店之後同帳號開店被擋，別的帳號以同一個身分證號送 KYC 被擋（既有的 stint.Derive 與身分快照），措施仍是 ACTIVE。
+// 21.3：關店之後同帳號開店被擋，別的帳號以同一個統編送 KYC 被擋（既有的 stint.Derive 與身分快照），措施仍是 ACTIVE。
 func TestMaterialTerminationBlocksReapplicationAndTheSameIdentityElsewhere(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountID, s, _ := f.submitted(t, idA, bankAcct)
+	accountID, s, _ := f.submittedCompany(t, taxIDOne)
 	m := f.terminate(t, s.StoreID, GroundFraud)
 	f.effect(t, m)
 	if f.storeRow(t, s.StoreID).Status != Closed {
@@ -475,10 +475,10 @@ func TestMaterialTerminationBlocksReapplicationAndTheSameIdentityElsewhere(t *te
 		t.Fatalf("21.3 之後同帳號開店要被擋：%v", err)
 	}
 	other, _ := f.open(t)
-	draft := f.savedDraft(t, kycDraft(other, idA, "999888777666"))
+	draft := f.savedDraft(t, companyDraft(other, taxIDOne))
 	_, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: other, ExpectedVersion: draft.Version})
 	if apperr.KindOf(err) != apperr.KindFailedPrecondition {
-		t.Fatalf("別的帳號以同一個身分證號送 KYC 要被擋：%v", err)
+		t.Fatalf("別的帳號以同一個統編送 KYC 要被擋：%v", err)
 	}
 	if got := f.measureOf(t, m.ID); got.State != StateActive {
 		t.Fatalf("state=%s", got.State)

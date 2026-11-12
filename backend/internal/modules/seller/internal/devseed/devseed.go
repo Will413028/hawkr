@@ -3,7 +3,7 @@
 // 繞過開店、送出與審核的狀態轉移（不寫那些轉移的事件；審核紀錄只寫送出那一筆，入駐同意要綁定它）；還原 profile 時發 StoreProfileChanged（與模組自己寫 profile 同一個事件），
 // 刪掉的證據與證件經模組的退場機制釋放 media 的引用。
 //
-// 明文的 fixture 是來源：KYC 的識別欄位經 kyc.Service.SeedApproved（SaveDraft 同一支加密與 hash）、以執行中的金鑰寫入，種子檔不含密文。
+// 明文的 fixture 是來源：KYC 的欄位經 kyc.Service.SeedApproved（SaveDraft 同一支驗證與統編 hash）、以執行中的金鑰寫入，種子檔不含 hash。
 package devseed
 
 import (
@@ -29,7 +29,7 @@ import (
 )
 
 // Store 是一家種子店家（明文）。StoreID 與 StoreCode 固定（Java 資料庫的 psql 種子寫死 store_id，MerID 是 HAWK 加 StoreCode）；
-// KYC 是核准的申請內容（含明文的識別欄位）。
+// KYC 是核准的申請內容。
 type Store struct {
 	StoreID, StoreCode, AccountID                            int64
 	Name, Description, ContactPhone, TownCode, AddressDetail string
@@ -108,13 +108,11 @@ var clearChildrenSQL = []string{
 	`DELETE FROM seller.payout_capabilities WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.agreement_acceptances WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.kyc_document_accesses WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
-	`DELETE FROM seller.kyc_reveals WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.kyc_review_issues WHERE review_id IN (SELECT review_id FROM seller.kyc_reviews WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1)))`,
 	`DELETE FROM seller.kyc_reviews WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.kyc_registration_checks WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.kyc_documents WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.account_identity_hashes WHERE source_store_id = ANY($1)`,
-	`DELETE FROM seller.kyc_identity_hashes WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.kyc_applications WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.product_views_daily WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.product_view_events WHERE store_id = ANY($1)`,

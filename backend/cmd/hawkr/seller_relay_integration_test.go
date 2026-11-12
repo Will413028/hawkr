@@ -44,12 +44,12 @@ func newSellerRelayFixture(t *testing.T) *sellerRelayFixture {
 	clock := func() time.Time { return now }
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	accounts := identity.New(identity.Deps{DB: d, Events: bus, Now: clock, Logger: logger})
-	kycKeys, kycMAC := sealtest.Keys(t)
+	kycMAC := sealtest.MAC(t)
 	kycImages := media.NewFake()
 	kycImages.Key = func(refType, token string) string { return refType + "/" + token }
 	sellers := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: accounts, Media: kycImages, Orders: noOrders{}, ProductStores: &productStoresStub{}, Registry: noRegistry{},
-		KYCKeys: kycKeys, KYCMAC: kycMAC, Now: clock, Logger: logger,
+		KYCMAC: kycMAC, Now: clock, Logger: logger,
 		Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger}),
 	})
 	subscribeSellerRelay(bus, queue)
@@ -179,9 +179,7 @@ func TestRejectingAKYCApplicationEnqueuesNoLegacyRelayJob(t *testing.T) {
 	individual := seller.KYCIndividual
 	str := func(s string) *string { return &s }
 	draft, err := f.sellers.SaveKYCDraft(ctx, seller.KYCDraftInput{
-		AccountID: f.account, SellerType: &individual, RealName: str("王小明"), BirthDate: str("1990-05-06"), IDCardNo: str("A123456789"),
-		EnglishName: str("Wang Farm"), BankName: str("臺灣銀行"), BankCode: str("004"), BankAccount: str("012345678901"), ProductType: str("蔬果"),
-		IDCardFront: &seller.KYCDocumentRef{StagedToken: "front"}, IDCardBack: &seller.KYCDocumentRef{StagedToken: "back"}, BankBook: &seller.KYCDocumentRef{StagedToken: "book"},
+		AccountID: f.account, SellerType: &individual, ProductType: str("蔬果"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -199,8 +197,8 @@ func TestRejectingAKYCApplicationEnqueuesNoLegacyRelayJob(t *testing.T) {
 		before[kind] = len(f.relayJobs(t, kind))
 	}
 	if _, err := f.sellers.RejectKYC(ctx, seller.RejectKYCInput{
-		ApplicationID: submitted.ID, ExpectedVersion: submitted.Version, AdminID: 9, Reason: "請確認姓名",
-		Issues: []seller.KYCIssue{{Field: "real_name", Code: seller.IssueOther, Message: "請確認姓名"}},
+		ApplicationID: submitted.ID, ExpectedVersion: submitted.Version, AdminID: 9, Reason: "請確認商品類型",
+		Issues: []seller.KYCIssue{{Field: "product_type", Code: seller.IssueOther, Message: "請確認商品類型"}},
 	}); err != nil {
 		t.Fatal(err)
 	}

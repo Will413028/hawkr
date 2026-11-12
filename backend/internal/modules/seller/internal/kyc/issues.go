@@ -41,7 +41,7 @@ func validateIssues(in []model.KYCIssue) ([]model.KYCIssue, error) {
 			return nil, apperr.InvalidInputOn([]string{issueField(i, "Message")}, "說明必填，最多 %d 字", model.MaxKYCIssueMessage)
 		}
 		asset := strings.TrimSpace(issue.DocumentAssetID)
-		_, isDocument := model.KYCFieldDocumentSlot(issue.Field)
+		isDocument := model.IsDocumentField(issue.Field)
 		switch {
 		case asset != "" && !isDocument:
 			return nil, apperr.InvalidInputOn([]string{issueField(i, "DocumentAssetID")}, "只有文件類的欄位可以指到一張文件")
@@ -56,7 +56,7 @@ func validateIssues(in []model.KYCIssue) ([]model.KYCIssue, error) {
 }
 
 // checkIssuesAgainstApplication 檢查問題指到的是這份申請實際有的東西：欄位適用於申請的賣家型態；指到的文件是申請目前的文件，
-// 而且在欄位對應的位置。
+// （文件類的欄位只有公司補充文件）。
 func checkIssuesAgainstApplication(issues []model.KYCIssue, sellerType model.KYCSellerType, docs []store.SellerKycDocument) error {
 	for i, issue := range issues {
 		if !slices.Contains(model.IssuableFields(sellerType), issue.Field) {
@@ -65,10 +65,7 @@ func checkIssuesAgainstApplication(issues []model.KYCIssue, sellerType model.KYC
 		if issue.DocumentAssetID == "" {
 			continue
 		}
-		slot, _ := model.KYCFieldDocumentSlot(issue.Field)
-		onApplication := slices.ContainsFunc(docs, func(d store.SellerKycDocument) bool {
-			return d.AssetID == issue.DocumentAssetID && d.Slot == string(slot)
-		})
+		onApplication := slices.ContainsFunc(docs, func(d store.SellerKycDocument) bool { return d.AssetID == issue.DocumentAssetID })
 		if !onApplication {
 			return apperr.InvalidInputOn([]string{issueField(i, "DocumentAssetID")}, "指定的文件不是這份申請在這個欄位目前的文件")
 		}
@@ -131,29 +128,26 @@ func outstandingIssues(reviews []store.SellerKycReview, rows []store.SellerKycRe
 	return out
 }
 
-// assetIDs 回傳某個位置的 asset ID（排序，順序不算）。
-func assetIDs(docs []store.SellerKycDocument, slot string) []string {
-	var out []string
+// assetIDs 回傳文件的 asset ID（排序，順序不算）。
+func assetIDs(docs []store.SellerKycDocument) []string {
+	out := make([]string, 0, len(docs))
 	for _, d := range docs {
-		if d.Slot == slot {
-			out = append(out, d.AssetID)
-		}
+		out = append(out, d.AssetID)
 	}
 	slices.Sort(out)
 	return out
 }
 
 // issueResolved 回報一個問題在這次寫入之後是不是已處理：非文件類的欄位是值有變；文件類的欄位指到一張文件時是那張文件不在了
-// （移除或替換），沒有指到特定一張時是那個位置的文件組成變了。
+// （移除或替換），沒有指到特定一張時是文件的組成變了。
 func issueResolved(field, assetID string, changed map[string]bool, before, after []store.SellerKycDocument) bool {
-	slot, isDocument := model.KYCFieldDocumentSlot(field)
 	switch {
-	case !isDocument:
+	case !model.IsDocumentField(field):
 		return changed[field]
 	case assetID != "":
 		return !slices.ContainsFunc(after, func(d store.SellerKycDocument) bool { return d.AssetID == assetID })
 	default:
-		return !slices.Equal(assetIDs(before, string(slot)), assetIDs(after, string(slot)))
+		return !slices.Equal(assetIDs(before), assetIDs(after))
 	}
 }
 

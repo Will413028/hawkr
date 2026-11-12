@@ -94,41 +94,17 @@ RETURNING store_id, store_code;
 -- 審核的事實（status、時間、kyc_reviews）、seller_type、product_type 保留。回傳被清理的申請，
 -- 呼叫方刪證件並把證件記成退場。
 UPDATE seller.kyc_applications a
-SET real_name = NULL,
-    birth_date = NULL,
-    id_card_no_enc = NULL,
-    id_card_hash = NULL,
-    id_card_hash_key = NULL,
-    id_card_issue_date = NULL,
-    id_card_issue_type = NULL,
-    id_card_issue_location = NULL,
-    english_name = NULL,
-    bank_name = NULL,
-    bank_code = NULL,
-    bank_account_enc = NULL,
-    bank_account_hash = NULL,
-    bank_account_hash_key = NULL,
-    website_url = NULL,
+SET website_url = NULL,
     company_name = NULL,
     tax_id = NULL,
-    tax_id_hash = NULL,
-    tax_id_hash_key = NULL,
     company_register_date = NULL,
     company_town_code = NULL,
     company_address_detail = NULL,
     company_phone = NULL,
-    rep_id_card_no_enc = NULL,
-    rep_id_card_hash = NULL,
-    rep_id_card_hash_key = NULL,
     pii_purged_at = sqlc.arg(now)
 FROM seller.stores s
 WHERE a.store_id = ANY(sqlc.arg(store_ids)::bigint[]) AND s.store_id = a.store_id AND s.pii_purged_at IS NOT NULL AND a.pii_purged_at IS NULL
 RETURNING a.application_id;
-
--- name: PurgeKYCIdentityHashes :exec
--- 清掉已清理的申請的比對 hash（blind index 與申請的個人欄位同時清除；措施的身分快照是措施擁有的，防詐保存的 account_identity_hashes 由
--- DeleteExpiredAccountIdentityHashes 在關店滿 5 年後刪，都不在這裡）。
-DELETE FROM seller.kyc_identity_hashes WHERE application_id = ANY(sqlc.arg(application_ids)::uuid[]);
 
 -- name: ExpiredIdentityHashStores :many
 -- 防詐保存的比對 hash（account_identity_hashes）過期的來源 stint：stint 目前這次關店（store_closures 沒有 reopened_at 的那一列）滿 hours（model.IdentityHashRetentionHours，

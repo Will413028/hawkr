@@ -116,7 +116,7 @@ func TestKYCReviewPausesWhileTheStoreIsClosedAndResumesFromTheReopening(t *testi
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	_, s, sub := f.submitted(t, idA, bankAcct)
+	_, s, sub := f.submitted(t)
 	submittedAt := f.now
 	if got := f.kycReviewStarts(t, f.now); !got[s.StoreID].Equal(submittedAt) {
 		t.Fatalf("營運中：開始是送出時間：%v", got)
@@ -183,7 +183,7 @@ func TestKYCReviewStartsFromTheReopeningWhenItIsTheLatest(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountID, s, _ := f.submitted(t, idA, bankAcct)
+	accountID, s, _ := f.submitted(t)
 	submittedAt := f.now
 	m := f.terminate(t, s.StoreID, GroundFraud)
 	f.effect(t, m)
@@ -212,7 +212,7 @@ func TestKYCReviewStartsFromTheReopeningWhenItIsTheLatest(t *testing.T) {
 func TestKYCReviewPausesWhileTheStoreIsPendingDeletion(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	accountID, s, sub := f.submitted(t, idA, bankAcct)
+	accountID, s, sub := f.submitted(t)
 	f.beginDeletion(t, accountID, s.StoreID)
 	text := "店家等待刪除，這份商家認證申請不再審核。"
 	pending := []StoreActionUnavailableReason{StoreReasonStorePendingDeletion}
@@ -239,7 +239,7 @@ func TestKYCReviewPausesDuringSuspensionAndResumesWhenItEnds(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountID, s, sub := f.submitted(t, idA, bankAcct)
+	accountID, s, sub := f.submitted(t)
 	submittedAt := f.now
 	f.tick(time.Hour)
 	ends := f.now.Add(24 * time.Hour)
@@ -271,7 +271,7 @@ func TestKYCReviewPausesDuringSuspensionAndResumesWhenItEnds(t *testing.T) {
 		t.Fatalf("到期之後開始是停權結束的時間 %v：%v", ends, got)
 	}
 	// 撤銷也是一種結束：另一家店，停權再撤銷。
-	account2, s2, _ := f.submitted(t, idB, "012345678902")
+	account2, s2, _ := f.submitted(t)
 	f.tick(time.Hour)
 	risk := f.suspend(t, s2.StoreID)
 	if len(f.kycReviewStarts(t, f.now)) != 0 || f.liftedAt(t, account2, f.now) != nil {
@@ -292,7 +292,7 @@ func TestKYCReviewPausesDuringSuspensionAndResumesWhenItEnds(t *testing.T) {
 func TestRejectingDuringSuspensionStillWorks(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	_, s, sub := f.submitted(t, idA, bankAcct)
+	_, s, sub := f.submitted(t)
 	f.suspend(t, s.StoreID)
 	rej := f.reject(t, sub, anIssue()...)
 	if rej.Status != KYCStatusRejected {
@@ -309,7 +309,7 @@ func TestASuspensionThatEndedBeforeSubmittingDoesNotMoveTheStart(t *testing.T) {
 	f.tick(time.Hour)
 	f.revoke(t, risk)
 	f.tick(time.Hour)
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	d := f.savedDraft(t, kycDraft(accountID))
 	_, err := f.module.SubmitKYC(context.Background(), SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
 	// 較早結束的停權讓 greatest 取它，但送出時間更晚，所以開始是送出時間。
@@ -327,7 +327,7 @@ func TestAwaitingReviewIsOneDefinitionAcrossTheQueueTheListAndTheStats(t *testin
 	ctx := context.Background()
 	sub := func(serial int) (int64, Store, KYCApplication) {
 		accountID, store := f.open(t)
-		return accountID, store, f.submitKYCFor(t, accountID, serial)
+		return accountID, store, f.submitKYCFor(t, accountID)
 	}
 	_, operating, _ := sub(1)
 	_, closedStore, _ := sub(2)
@@ -344,10 +344,10 @@ func TestAwaitingReviewIsOneDefinitionAcrossTheQueueTheListAndTheStats(t *testin
 	f.revoke(t, reopenTerm)
 	_, _, toApprove := sub(6)
 	must(t, approve(f, toApprove))
-	// 身分命中：別的帳號以同一個身分證號入駐過、之後被停權，這一份在送出時還沒有處分；核准會失敗，但仍留在待辦讓員工退回。
+	// 身分命中：別的帳號以同一個統編入駐過、之後被停權，這一份在送出時還沒有處分；核准會失敗，但仍留在待辦讓員工退回。
 	otherAccount, otherStore := f.open(t)
-	f.savedDraft(t, kycDraft(otherAccount, taiwanID(7), "999888777666"))
-	_, hitStore, hitSub := sub(7)
+	f.savedDraft(t, companyDraft(otherAccount, taxIDOne))
+	_, hitStore, hitSub := f.submittedCompany(t, taxIDOne)
 	f.suspend(t, otherStore.StoreID)
 	if err := approve(f, hitSub); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("身分命中核准要失敗：%v", err)

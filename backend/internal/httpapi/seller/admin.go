@@ -27,11 +27,9 @@ type AdminModule interface {
 	StoreWithActiveMeasures(ctx context.Context, storeID int64) (model.StoreMeasures, error)
 	AdminKYCApplications(context.Context, model.KYCListInput) (model.KYCPage, error)
 	AdminKYCApplication(ctx context.Context, applicationID uuid.UUID) (model.KYCAdminApplication, error)
-	ListKYCReveals(context.Context, model.KYCAuditListInput) (model.KYCRevealPage, error)
 	ListKYCDocumentAccesses(context.Context, model.KYCAuditListInput) (model.KYCDocumentAccessPage, error)
 	ApproveKYC(context.Context, model.ApproveKYCInput) (model.KYCAdminApplication, error)
 	RejectKYC(context.Context, model.RejectKYCInput) (model.KYCAdminApplication, error)
-	RevealKYCSensitive(context.Context, model.RevealKYCInput) (model.KYCSensitive, error)
 	RequeryKYCRegistration(context.Context, model.RequeryKYCRegistrationInput) (model.RegistrationCheck, error)
 }
 

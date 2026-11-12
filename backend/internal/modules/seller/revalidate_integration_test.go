@@ -56,7 +56,7 @@ func TestKYCStatusChangesInvalidateTheStorePage(t *testing.T) {
 	ctx := context.Background()
 	f := setup(t)
 	accountID, s := f.open(t)
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	d := f.savedDraft(t, kycDraft(accountID))
 	before := f.revalidations(s)
 	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
@@ -68,7 +68,7 @@ func TestKYCStatusChangesInvalidateTheStorePage(t *testing.T) {
 	if got := f.revalidations(s); got <= before {
 		t.Fatalf("核准沒有排入快取失效：%d → %d", before, got)
 	}
-	accountID2, s2, sub2 := f.submitted(t, idA, bankAcct)
+	accountID2, s2, sub2 := f.submitted(t)
 	_ = accountID2
 	before = f.revalidations(s2)
 	_, err = f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: sub2.ID, ExpectedVersion: sub2.Version, AdminID: 9, Issues: anIssue(), Reason: "證件模糊"})

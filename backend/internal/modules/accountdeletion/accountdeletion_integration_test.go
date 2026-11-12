@@ -123,9 +123,9 @@ func setupWith(t *testing.T, extra ...migrate.Module) *fixture {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	b := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
-	kycKeys, kycMAC := sealtest.Keys(t)
+	kycMAC := sealtest.MAC(t)
 	orders := &testOrders{}
-	sl := seller.New(seller.Deps{KYCKeys: kycKeys, KYCMAC: kycMAC, DB: d, Events: bus, Jobs: queue, Identity: id, Media: testMedia{}, Orders: orders, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})})
+	sl := seller.New(seller.Deps{KYCMAC: kycMAC, DB: d, Events: bus, Jobs: queue, Identity: id, Media: testMedia{}, Orders: orders, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})})
 	m := New(Deps{DB: d, Identity: id, Buyer: b, Seller: sl, Orders: orders, Now: time.Now})
 	return &fixture{db: d, identity: id, buyer: b, seller: sl, orders: orders, module: m, queue: queue, bus: bus}
 }

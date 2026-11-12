@@ -99,7 +99,7 @@ service SellerAppService {
   // 送出（SubmitKYC）才檢查必填欄位與證件是否齊全。只有草稿與被退回的申請能儲存；審核中與已核准的回 failed_precondition。
   rpc SaveKYCDraft(SaveKYCDraftRequest) returns (SaveKYCDraftResponse);
 
-  // GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）。還沒有申請（或申請已取消）
+  // GetMyKYC 回傳呼叫者店家目前的 KYC 申請。還沒有申請（或申請已取消）
   // 時回 not_found。
   rpc GetMyKYC(GetMyKYCRequest) returns (GetMyKYCResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -107,7 +107,7 @@ service SellerAppService {
 
   // SubmitKYC 送出申請給管理員審核。草稿與被退回的申請都能直接送出，
   // 不必先儲存；審核中與已核准的申請回 failed_precondition。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
-  // invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（real_name、id_card_front、business.tax_id……，與 KYCField 一對一）。申請本身齊全之後，
+  // invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（business.tax_id、business.company_documents……，與 KYCField 一對一）。申請本身齊全之後，
   // 店家的必填資料（地址、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
   // client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。帳號沒有聯絡信箱（IdentityAppService.GetContactEmail 沒有回信箱）時回
   // failed_precondition 與 ErrorReason CONTACT_EMAIL_REQUIRED，client 引導在 IdentityAppService.SetContactEmail 填一個再重送。 身分比對沒有通過時回
@@ -668,15 +668,10 @@ enum KYCStatus {
 // 欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。
 enum KYCField {
   KYC_FIELD_UNSPECIFIED = 0;
-  KYC_FIELD_REAL_NAME = 1;
-  KYC_FIELD_BIRTH_DATE = 2;
-  KYC_FIELD_ID_CARD_ISSUE_DATE = 3;
-  KYC_FIELD_ID_CARD_ISSUE_TYPE = 4;
-  KYC_FIELD_ID_CARD_ISSUE_LOCATION = 5;
-  KYC_FIELD_ENGLISH_NAME = 6;
-  KYC_FIELD_BANK_NAME = 7;
-  KYC_FIELD_BANK_CODE = 8;
-  KYC_FIELD_BANK_ACCOUNT = 9;
+  // 1 到 9 是刪掉的本名、生日、發證資料、英文姓名與銀行資料（平台不收身分與銀行資料，Stripe 計畫 D22、D37）。
+  reserved 1 to 9;
+  reserved "KYC_FIELD_REAL_NAME", "KYC_FIELD_BIRTH_DATE", "KYC_FIELD_ID_CARD_ISSUE_DATE", "KYC_FIELD_ID_CARD_ISSUE_TYPE",
+      "KYC_FIELD_ID_CARD_ISSUE_LOCATION", "KYC_FIELD_ENGLISH_NAME", "KYC_FIELD_BANK_NAME", "KYC_FIELD_BANK_CODE", "KYC_FIELD_BANK_ACCOUNT";
   KYC_FIELD_PRODUCT_TYPE = 10;
   reserved 11;
   reserved "KYC_FIELD_FOOD_BUSINESS";
@@ -684,10 +679,9 @@ enum KYCField {
   reserved 13, 14;
   reserved "KYC_FIELD_CONTACT_EMAIL", "KYC_FIELD_CONTACT_PHONE";
 
-  KYC_FIELD_ID_CARD_FRONT = 15;
-  KYC_FIELD_ID_CARD_BACK = 16;
-  KYC_FIELD_BANK_BOOK = 17;
-  KYC_FIELD_INDIVIDUAL_ID_CARD_NO = 18;
+  // 15 到 18 是刪掉的身分證、存摺影像與身分證號（D22）。
+  reserved 15 to 18;
+  reserved "KYC_FIELD_ID_CARD_FRONT", "KYC_FIELD_ID_CARD_BACK", "KYC_FIELD_BANK_BOOK", "KYC_FIELD_INDIVIDUAL_ID_CARD_NO";
   reserved 19;
   reserved "KYC_FIELD_BUSINESS_COMPANY_TYPE";
 
@@ -698,7 +692,9 @@ enum KYCField {
 
   KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE = 22;
   KYC_FIELD_BUSINESS_COMPANY_PHONE = 25;
-  KYC_FIELD_BUSINESS_REP_ID_CARD_NO = 26;
+  // 26 是刪掉的負責人身分證號（D22）。
+  reserved 26;
+  reserved "KYC_FIELD_BUSINESS_REP_ID_CARD_NO";
   KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS = 27;
   KYC_FIELD_BUSINESS_COMPANY_ADDRESS = 28;
   // 29 是刪掉的 KYC_FIELD_PAYOUT_CONTACT_EMAIL（收款聯絡信箱改為帳號層級，IdentityAppService.GetContactEmail）。
@@ -727,7 +723,7 @@ enum KYCIssueCode {
 message KYCIssue {
   // 有問題的欄位。
   KYCField field = 1;
-  // field 是文件類（id_card_front、id_card_back、bank_book、business.company_documents）時，指出的那一張文件的 asset_id
+  // field 是文件類（business.company_documents）時，指出的那一張文件的 asset_id
   // （KYCDocument.asset_id），公司文件有多張時用它指到其中一張，順序改變也不會指錯。非文件類的欄位必須是空字串。
   // 文件類欄位的規則依原因碼：UNREADABLE、EXPIRED、MISMATCH、INVALID 必須指定是哪一張文件（這些問題出在某一張文件上）；
   // MISSING 不可以指定（缺的是整個位置，沒有那一張）；OTHER 兩者皆可。違反時 RejectKYC 回 invalid_argument。
@@ -737,10 +733,10 @@ message KYCIssue {
   string message = 4;
 }
 
-// KYCDocument 是申請上的一張證件圖片。證件含個資，下載要經有授權的 download_uri（只有申請的擁有者能下載），不是公開的
+// KYCDocument 是申請上的一張公司補充文件。文件可能帶個人姓名與簽名，下載要經有授權的 download_uri（只有申請的擁有者能下載），不是公開的
 // 圖片網址。
 message KYCDocument {
-  // 這份申請目前的這張圖片；寫入時指定它表示保留這一張（單張的位置不指定就是沿用，公司文件清單裡的現有圖片要列出來才保留）。
+  // 這份申請目前的這張圖片；寫入時指定它表示保留這一張（公司文件清單裡的現有圖片要列出來才保留）。
   string asset_id = 1;
   // 下載網址（含 asset_id）；需要登入，只有申請的擁有者能下載。
   string download_uri = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -760,26 +756,26 @@ message KYCRejection {
   repeated KYCIssue issues = 4;
 }
 
-// IndividualKYC 是個人賣家專屬的欄位：身分證號是賣家本人的。
+// IndividualKYC 是個人賣家專屬的欄位；目前沒有欄位（平台不收身分證號，Stripe 計畫 D22），設定它表示賣家型態是個人。
 message IndividualKYC {
-  // 身分證字號（寫入用）。
-  string id_card_no = 1 [(google.api.field_behavior) = INPUT_ONLY];
-  string id_card_no_masked = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 1、2 是刪掉的身分證字號與遮蔽值（D22）。
+  reserved 1, 2;
+  reserved "id_card_no", "id_card_no_masked";
 }
 
-// BusinessKYC 是企業賣家專屬的欄位：公司資料與負責人的身分證號。
+// BusinessKYC 是企業賣家專屬的欄位：公司資料。
 message BusinessKYC {
   reserved 1, 5, 6;
   reserved "company_type", "company_town_code", "company_address_detail";
+  // 8、9 是刪掉的負責人身分證字號與遮蔽值（D22）。
+  reserved 8, 9;
+  reserved "rep_id_card_no", "rep_id_card_no_masked";
 
   string company_name = 2;
   // 8 碼統一編號，含檢查碼（2023 年起的規則）。
   string tax_id = 3;
   google.type.Date company_register_date = 4;
   string company_phone = 7;
-  // 負責人的身分證字號（寫入用）。
-  string rep_id_card_no = 8 [(google.api.field_behavior) = INPUT_ONLY];
-  string rep_id_card_no_masked = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 公司文件，最多 10 張，順序就是位置；列進 update_mask 時整個換成請求的清單。
   repeated KYCDocument company_documents = 10;
   // 公司地址；列進 update_mask 時整個換成請求的地址，請求沒有 address 就是清掉。可以只填鄉鎮市區。
@@ -787,17 +783,20 @@ message BusinessKYC {
 }
 
 // KYCApplication 是店家的身分認證申請，每個店家同時最多一筆（以呼叫者為範圍，沒有申請 ID 的定址）。賣家型態是 subject 設定
-// 的是哪一支（個人 individual 或企業 business）；個人與企業共用的欄位（姓名、銀行、聯絡方式、證件）在最上層，各自專屬的
-// 欄位在那一支裡面。update_mask 的路徑可以下到那一支（individual.id_card_no、business.tax_id），列 individual 或 business
+// 的是哪一支（個人 individual 或企業 business）；個人與企業共用的欄位（產品類型、網站）在最上層，各自專屬的
+// 欄位在那一支裡面。update_mask 的路徑可以下到那一支（business.tax_id），列 individual 或 business
 // 本身是那一支全部可寫的欄位，"*" 是所有最上層欄位加上設定的那一支。建立時 subject 必須設定其中一支；後來設定另一支並且
-// update_mask 列到它的欄位，就是切換型態，原本那一支專屬的欄位（個人的身分證號、企業的公司資料與公司文件）一併清掉。
-// 身分證號、負責人身分證號與銀行帳號寫入時用 id_card_no、rep_id_card_no、bank_account，讀出時只有遮蔽後的值。日期是日曆日。
-// 證件圖片是狀態：單張的位置（id_card_front、id_card_back、bank_book）列進 update_mask 時整個換成請求的那一張（不帶值
-// 是清掉），company_documents 整個換成請求的清單，每個元素是現有的圖片（asset_id，保留）或新上傳的圖片（staged_token），
+// update_mask 列到它的欄位，就是切換型態，原本那一支專屬的欄位（企業的公司資料與公司文件）一併清掉。
+// 平台不收身分證號、銀行帳號、證件影像與個人姓名（Stripe 計畫 D22、D37）；統編是市集登記資料。日期是日曆日。
+// 公司文件是狀態：company_documents 整個換成請求的清單，每個元素是現有的圖片（asset_id，保留）或新上傳的圖片（staged_token），
 // 同一張圖片不能放進兩個位置。
 message KYCApplication {
   reserved 15, 17, 18, 24;
   reserved "contact_email", "contact_phone", "food_business", "flow";
+  // 4 到 13 是刪掉的本名、生日、發證資料、英文姓名與銀行資料，19 到 21 是刪掉的身分證與存摺影像（D22、D37）。
+  reserved 4 to 13, 19 to 21;
+  reserved "real_name", "birth_date", "id_card_issue_date", "id_card_issue_type", "id_card_issue_location", "english_name",
+      "bank_name", "bank_code", "bank_account", "bank_account_masked", "id_card_front", "id_card_back", "bank_book";
   // 33 是刪掉的 payout_contact_email（收款聯絡信箱改為帳號層級，IdentityAppService.GetContactEmail；SubmitKYC 要求帳號有聯絡信箱）。
   reserved 33;
   reserved "payout_contact_email";
@@ -806,22 +805,8 @@ message KYCApplication {
   KYCStatus status = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 建立時不帶；修改必填。
   string etag = 3;
-  string real_name = 4;
-  google.type.Date birth_date = 5;
-  google.type.Date id_card_issue_date = 6;
-  string id_card_issue_type = 7;
-  string id_card_issue_location = 8;
-  string english_name = 9;
-  string bank_name = 10;
-  // 3 碼銀行代碼，或 3 碼加 4 碼分行代碼。
-  string bank_code = 11;
-  string bank_account = 12 [(google.api.field_behavior) = INPUT_ONLY];
-  string bank_account_masked = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
   string product_type = 14;
   string website_url = 16;
-  KYCDocument id_card_front = 19;
-  KYCDocument id_card_back = 20;
-  KYCDocument bank_book = 21;
   oneof subject {
     IndividualKYC individual = 22;
     BusinessKYC business = 23;
@@ -1167,7 +1152,7 @@ enum TerminationGround {
   TERMINATION_GROUND_PLATFORM_SECURITY = 9;
   // 第 21.3 條，立即生效。
   TERMINATION_GROUND_OTHER_SERIOUS = 10;
-  // 與另一個帳號的終止（來源措施）使用同一個身分證明文件或統一編號，立即生效；來源措施撤銷時一併撤銷
+  // 與另一個帳號的終止（來源措施）使用同一個統一編號，立即生效；來源措施撤銷時一併撤銷
   // （RevokeReason.SOURCE_REVOKED）。賣家可對這筆單獨申覆。
   TERMINATION_GROUND_LINKED_ACCOUNT = 11;
 }

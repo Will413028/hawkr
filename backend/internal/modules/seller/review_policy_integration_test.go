@@ -137,20 +137,10 @@ func fmtTime(t *time.Time) string {
 	return t.Format(time.RFC3339Nano)
 }
 
-// taiwanID 產生格式與檢查碼都正確的身分證號（A + 性別碼 1 + 7 位序號 + 檢查碼；不是真實的人）。
-func taiwanID(serial int) string {
-	body := fmt.Sprintf("1%07d", serial)
-	sum := 1 // 'A' = 10：十位數 1 權重 1、個位數 0 權重 9
-	for i, c := range body {
-		sum += int(c-'0') * (8 - i)
-	}
-	return "A" + body + fmt.Sprint((10-sum%10)%10)
-}
-
-// submitKYCFor 為帳號建立並送出一份個人賣家的申請（身分證號與銀行帳號各用序號換一個），回傳送出的申請。
-func (f *fixture) submitKYCFor(t *testing.T, accountID int64, serial int) KYCApplication {
+// submitKYCFor 為帳號建立並送出一份個人賣家的申請，回傳送出的申請。
+func (f *fixture) submitKYCFor(t *testing.T, accountID int64) KYCApplication {
 	t.Helper()
-	d := f.savedDraft(t, kycDraft(accountID, taiwanID(serial), fmt.Sprintf("0123456789%02d", serial%100)))
+	d := f.savedDraft(t, kycDraft(accountID))
 	a, err := f.module.SubmitKYC(context.Background(), SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
 	return a
@@ -330,13 +320,13 @@ func newReviewWorld(t *testing.T, f *fixture) *reviewWorld {
 	// 商家認證：審核中的；草稿、被退回、已核准的不是。
 	f.tick(hour)
 	accountK1, sK1 := f.open(t)
-	k1 := f.submitKYCFor(t, accountK1, 106)
+	k1 := f.submitKYCFor(t, accountK1)
 	add("KYC_APPLICATION", k1.ID.String(), sK1.StoreID, f.now, f.now.Add(7*day))
 	accountK2, _ := f.open(t)
-	k2 := f.submitKYCFor(t, accountK2, 107)
+	k2 := f.submitKYCFor(t, accountK2)
 	f.reject(t, k2, anIssue()...)
 	accountK3, _ := f.open(t)
-	f.savedDraft(t, kycDraft(accountK3, taiwanID(108), "012345678908"))
+	f.savedDraft(t, kycDraft(accountK3))
 
 	f.tick(hour)
 	w.at = f.now
@@ -811,7 +801,7 @@ func TestResourceDeadlinesExistWhileTheObligationDoes(t *testing.T) {
 	// 商家認證：審核中有期限（送出起算 7 天），核准後沒有。
 	f.tick(hour)
 	accountK, sK := f.open(t)
-	kyc := f.submitKYCFor(t, accountK, 301)
+	kyc := f.submitKYCFor(t, accountK)
 	submittedKYC := f.now
 	wantDeadline(t, "審核中的商家認證（送出的回應不帶，重讀）", mustStoreKYC(t, f, sK.StoreID).DecideDeadline, submittedKYC, submittedKYC.Add(7*24*hour))
 	f.tick(hour)

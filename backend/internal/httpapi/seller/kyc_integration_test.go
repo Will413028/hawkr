@@ -14,7 +14,6 @@ import (
 
 	"connectrpc.com/connect"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
-	"google.golang.org/genproto/googleapis/type/date"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
@@ -32,7 +31,8 @@ import (
 )
 
 // 測試用的身分證號（格式與檢查碼都正確，不是真實的人）。
-const testID = "A123456789"
+// testTaxID 是測試用的統編（檢查碼正確，不是真實的公司）。
+const testTaxID = "33330333"
 
 type fakeRegistry struct {
 	reg   gcis.Registration
@@ -46,20 +46,27 @@ func (r *fakeRegistry) Lookup(context.Context, string) (gcis.Registration, bool,
 	return r.reg, r.found, r.err
 }
 
-var draftPaths = []string{
-	"individual.id_card_no", "real_name", "birth_date", "english_name", "bank_name", "bank_code", "bank_account",
-	"product_type", "id_card_front", "id_card_back", "bank_book",
-}
+var draftPaths = []string{"individual", "product_type", "website_url"}
 
-// completeDraft 是一份完整、合法的個人賣家草稿請求。
-func completeDraft(idNo string) *pb.SaveKYCDraftRequest {
+// completeDraft 是一份完整、合法的個人賣家草稿請求（個人賣家沒有身分欄位，只有商品類型與網站）。
+func completeDraft() *pb.SaveKYCDraftRequest {
 	return &pb.SaveKYCDraftRequest{
 		Application: &pb.KYCApplication{
-			Subject:  &pb.KYCApplication_Individual{Individual: &pb.IndividualKYC{IdCardNo: idNo}},
-			RealName: "王小明", BirthDate: &date.Date{Year: 1990, Month: 5, Day: 6}, EnglishName: "Wang Farm", BankName: "臺灣銀行", BankCode: "004", BankAccount: "012345678901", ProductType: "蔬果",
-			IdCardFront: &pb.KYCDocument{StagedToken: "front"}, IdCardBack: &pb.KYCDocument{StagedToken: "back"}, BankBook: &pb.KYCDocument{StagedToken: "book"},
+			Subject:     &pb.KYCApplication_Individual{Individual: &pb.IndividualKYC{}},
+			ProductType: "蔬果", WebsiteUrl: "https://farm.example.com",
 		},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: draftPaths},
+	}
+}
+
+// companyDraftRequest 是一份完整、合法的企業賣家草稿請求（公司名稱與統編）。
+func companyDraftRequest(taxID string) *pb.SaveKYCDraftRequest {
+	return &pb.SaveKYCDraftRequest{
+		Application: &pb.KYCApplication{
+			Subject:     &pb.KYCApplication_Business{Business: &pb.BusinessKYC{CompanyName: "範例小農有限公司", TaxId: taxID}},
+			ProductType: "蔬果",
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"business.company_name", "business.tax_id", "product_type"}},
 	}
 }
 
@@ -104,8 +111,8 @@ func hasRetryInfo(t *testing.T, err error) bool {
 	return false
 }
 
-// 草稿、送出與取消：沒有申請時 GetMyKYC 是 not_found；建立（不帶 etag）與修改（帶 etag，mask 選到的欄位）；身分證號與
-// 銀行帳號只有遮蔽後的值；證件只有位置；過期的 etag 是 VERSION_CONFLICT；取消之後又回到沒有申請。
+// 草稿、送出與取消：沒有申請時 GetMyKYC 是 not_found；建立（不帶 etag）與修改（帶 etag，mask 選到的欄位）；
+// 過期的 etag 是 VERSION_CONFLICT；取消之後又回到沒有申請。
 func TestKYCDraftSubmitAndCancel(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -114,10 +121,9 @@ func TestKYCDraftSubmitAndCancel(t *testing.T) {
 	_, err := f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{}))
 	wantCode(t, err, connect.CodeNotFound, "")
 
-	created := saveDraft(t, f.app, completeDraft(testID))
-	if created.GetId() == "" || created.GetStatus() != pb.KYCStatus_KYC_STATUS_DRAFT || created.GetEtag() == "" || created.GetIndividual().GetIdCardNoMasked() != "A1******89" ||
-		created.GetBankAccountMasked() != "********8901" || created.GetIndividual().GetIdCardNo() != "" || created.GetBankAccount() != "" || created.GetBirthDate().GetYear() != 1990 ||
-		created.GetIdCardFront().GetAssetId() != "asset-front" || created.GetBankBook().GetDownloadUri() != "/api/v1/app/media/secure_download/asset-book" {
+	created := saveDraft(t, f.app, completeDraft())
+	if created.GetId() == "" || created.GetStatus() != pb.KYCStatus_KYC_STATUS_DRAFT || created.GetEtag() == "" || created.GetIndividual() == nil ||
+		created.GetProductType() != "蔬果" || created.GetWebsiteUrl() != "https://farm.example.com" {
 		t.Fatalf("created=%v", created)
 	}
 	got, err := f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{}))
@@ -126,39 +132,41 @@ func TestKYCDraftSubmitAndCancel(t *testing.T) {
 	}
 
 	// 沒有帶 etag 又已經有申請：already_exists（VERSION_CONFLICT），不是再建一份；帶過期的 etag 才是 aborted。
-	_, err = f.app.SaveKYCDraft(ctx, connect.NewRequest(completeDraft(testID)))
+	_, err = f.app.SaveKYCDraft(ctx, connect.NewRequest(completeDraft()))
 	wantCode(t, err, connect.CodeAlreadyExists, "VERSION_CONFLICT")
 
-	// 只改 mask 選到的欄位；沒選到的（銀行、證號）不動，清掉的欄位（english_name）回到空。
+	// 只改 mask 選到的欄位；沒選到的（網站）不動，mask 選到又沒帶值的欄位（website_url）回到空。
 	updated := saveDraft(t, f.app, &pb.SaveKYCDraftRequest{
-		Application: &pb.KYCApplication{Etag: created.GetEtag(), RealName: "王大明", ProductType: "不在 mask"},
-		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"real_name", "english_name"}},
+		Application: &pb.KYCApplication{Etag: created.GetEtag(), ProductType: "水果", WebsiteUrl: "https://不在-mask.example.com"},
+		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"product_type"}},
 	})
-	if updated.GetRealName() != "王大明" || updated.GetEnglishName() != "" || updated.GetProductType() != "蔬果" || updated.GetIndividual().GetIdCardNoMasked() != "A1******89" ||
-		updated.GetEtag() == created.GetEtag() {
+	if updated.GetProductType() != "水果" || updated.GetWebsiteUrl() != "https://farm.example.com" || updated.GetEtag() == created.GetEtag() {
 		t.Fatalf("updated=%v", updated)
 	}
+	cleared := saveDraft(t, f.app, &pb.SaveKYCDraftRequest{
+		Application: &pb.KYCApplication{Etag: updated.GetEtag()}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"website_url"}},
+	})
+	if cleared.GetWebsiteUrl() != "" || cleared.GetProductType() != "水果" {
+		t.Fatalf("cleared=%v", cleared)
+	}
 	_, err = f.app.SaveKYCDraft(ctx, connect.NewRequest(&pb.SaveKYCDraftRequest{
-		Application: &pb.KYCApplication{Etag: created.GetEtag(), RealName: "過期的"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"real_name"}},
+		Application: &pb.KYCApplication{Etag: created.GetEtag(), ProductType: "過期的"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"product_type"}},
 	}))
 	wantCode(t, err, connect.CodeAborted, "VERSION_CONFLICT")
 
-	// 日期不合法：整筆不寫入，錯誤指向請求的欄位。
+	// 網址不合法：整筆不寫入，錯誤指向請求的欄位。
 	_, err = f.app.SaveKYCDraft(ctx, connect.NewRequest(&pb.SaveKYCDraftRequest{
-		Application: &pb.KYCApplication{Etag: updated.GetEtag(), BirthDate: &date.Date{Year: 2999, Month: 1, Day: 1}, RealName: "不該寫入"},
-		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"birth_date", "real_name"}},
+		Application: &pb.KYCApplication{Etag: cleared.GetEtag(), WebsiteUrl: "ftp://x", ProductType: "不該寫入"},
+		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"website_url", "product_type"}},
 	}))
-	if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "application.birth_date" {
+	if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "application.website_url" {
 		t.Fatalf("field=%q", field)
 	}
-	if got, _ := f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{})); got.Msg.GetApplication().GetRealName() != "王大明" {
+	if got, _ := f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{})); got.Msg.GetApplication().GetProductType() != "水果" {
 		t.Fatalf("不合法的請求留下了部分寫入：%v", got)
 	}
 
-	// 補回清掉的英文名稱（送出要求必填欄位齊全）。
-	restored := saveDraft(t, f.app, &pb.SaveKYCDraftRequest{
-		Application: &pb.KYCApplication{Etag: updated.GetEtag(), EnglishName: "Wang Farm"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"english_name"}},
-	})
+	restored := cleared
 	submitted, err := f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: restored.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
 	if err != nil || submitted.Msg.GetApplication().GetStatus() != pb.KYCStatus_KYC_STATUS_SUBMITTED || submitted.Msg.GetApplication().GetSubmitTime() == nil {
 		t.Fatalf("submitted=%v err=%v", submitted, err)
@@ -184,19 +192,19 @@ func TestKYCFollowsTheDeclaredCapabilities(t *testing.T) {
 	ctx := context.Background()
 	_, err := f.other.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{}))
 	wantCode(t, err, connect.CodeNotFound, "")
-	_, err = f.other.SaveKYCDraft(ctx, connect.NewRequest(completeDraft(testID)))
+	_, err = f.other.SaveKYCDraft(ctx, connect.NewRequest(completeDraft()))
 	wantCode(t, err, connect.CodeNotFound, "")
 	_, err = f.other.LookupBusinessRegistration(ctx, connect.NewRequest(&pb.LookupBusinessRegistrationRequest{TaxId: "33330333"}))
 	wantCode(t, err, connect.CodeNotFound, "")
 
 	f.applyComplete(t, f.app)
-	draft := saveDraft(t, f.app, completeDraft(testID))
+	draft := saveDraft(t, f.app, completeDraft())
 	f.suspendStore(t, f.storeID(t))
 	// 停權：讀自己的申請仍可以，寫入與統編查詢不行。
 	if _, err := f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{})); err != nil {
 		t.Fatal(err)
 	}
-	_, err = f.app.SaveKYCDraft(ctx, connect.NewRequest(&pb.SaveKYCDraftRequest{Application: &pb.KYCApplication{Etag: draft.GetEtag(), RealName: "x"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"real_name"}}}))
+	_, err = f.app.SaveKYCDraft(ctx, connect.NewRequest(&pb.SaveKYCDraftRequest{Application: &pb.KYCApplication{Etag: draft.GetEtag(), ProductType: "x"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"product_type"}}}))
 	wantCode(t, err, connect.CodePermissionDenied, "SELLER_SUSPENDED")
 	_, err = f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: draft.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
 	wantCode(t, err, connect.CodePermissionDenied, "SELLER_SUSPENDED")
@@ -212,7 +220,7 @@ func TestSubmitKYCIdentityConflictIsGeneric(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	f.applyComplete(t, f.other)
-	theirs := saveDraft(t, f.other, completeDraft(testID))
+	theirs := saveDraft(t, f.other, companyDraftRequest(testTaxID))
 	if _, err := f.other.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: theirs.GetEtag(), AcceptedAgreements: kycAgreementsPB()})); err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +231,7 @@ func TestSubmitKYCIdentityConflictIsGeneric(t *testing.T) {
 	f.suspendStore(t, theirStore.StoreID)
 
 	f.applyComplete(t, f.app)
-	mine := saveDraft(t, f.app, completeDraft(testID))
+	mine := saveDraft(t, f.app, companyDraftRequest(testTaxID))
 	_, err = f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: mine.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
 	wantCode(t, err, connect.CodeFailedPrecondition, "")
 	var ce *connect.Error
@@ -236,7 +244,7 @@ func TestSubmitKYCIdentityConflictIsGeneric(t *testing.T) {
 	if ce.Message() != "failed_precondition: 無法通過認證，請聯絡客服" && ce.Message() != "無法通過認證，請聯絡客服" {
 		t.Fatalf("message=%q", ce.Message())
 	}
-	for _, leak := range []string{testID, "身分證", "統編", "停權", strconv.FormatInt(f.otherID, 10)} {
+	for _, leak := range []string{testTaxID, "身分證", "統編", "停權", strconv.FormatInt(f.otherID, 10)} {
 		if strings.Contains(ce.Error(), leak) {
 			t.Fatalf("錯誤洩漏了 %q：%v", leak, ce)
 		}
@@ -255,7 +263,7 @@ func TestSubmitKYCAgreementErrorsReachTheClient(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	f.applyComplete(t, f.app)
-	draft := saveDraft(t, f.app, completeDraft(testID))
+	draft := saveDraft(t, f.app, completeDraft())
 	outdated := kycAgreementsPB()
 	outdated[0].Version = "2026-01-01"
 	_, err := f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: draft.GetEtag(), AcceptedAgreements: outdated}))
@@ -277,7 +285,7 @@ func TestSubmitKYCIsRateLimitedPerAccount(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	f.applyComplete(t, f.app)
-	draft := saveDraft(t, f.app, completeDraft(testID))
+	draft := saveDraft(t, f.app, completeDraft())
 	// 過期的 etag：每次都是版本衝突，仍然計一次。
 	stale := &pb.SubmitKYCRequest{Etag: "99", AcceptedAgreements: kycAgreementsPB()}
 	for i := range 5 {
@@ -297,7 +305,7 @@ func TestSubmitKYCIsRateLimitedPerAccount(t *testing.T) {
 	}
 	// 別的帳號不受影響。
 	f.applyComplete(t, f.other)
-	theirs := saveDraft(t, f.other, completeDraft("F131104093"))
+	theirs := saveDraft(t, f.other, completeDraft())
 	if _, err := f.other.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: theirs.GetEtag(), AcceptedAgreements: kycAgreementsPB()})); err != nil {
 		t.Fatalf("別的帳號被限流：%v", err)
 	}
@@ -363,7 +371,7 @@ func TestApprovedKYCCannotBeResubmittedAndStoreContactUpdate(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	f.applyComplete(t, f.app)
-	draft := saveDraft(t, f.app, completeDraft(testID))
+	draft := saveDraft(t, f.app, completeDraft())
 	submitted, err := f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: draft.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
 	if err != nil {
 		t.Fatal(err)
@@ -389,7 +397,7 @@ func TestApprovedKYCCannotBeResubmittedAndStoreContactUpdate(t *testing.T) {
 	_, err = f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: approvedEtag, AcceptedAgreements: kycAgreementsPB()}))
 	wantCode(t, err, connect.CodeFailedPrecondition, "")
 	_, err = f.app.SaveKYCDraft(ctx, connect.NewRequest(&pb.SaveKYCDraftRequest{
-		Application: &pb.KYCApplication{Etag: approvedEtag, EnglishName: "Wang Farm 2"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"english_name"}},
+		Application: &pb.KYCApplication{Etag: approvedEtag, ProductType: "水果"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"product_type"}},
 	}))
 	wantCode(t, err, connect.CodeFailedPrecondition, "")
 	if again, err := f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{})); err != nil || again.Msg.GetApplication().GetStatus() != pb.KYCStatus_KYC_STATUS_APPROVED ||
@@ -769,7 +777,7 @@ func TestSubmitKYCReportsEveryMissingItemAsAFieldViolation(t *testing.T) {
 			t.Fatalf("企業賣家缺少的欄位沒有 %s：%v", field, got)
 		}
 	}
-	for _, absent := range []string{"individual.id_card_no", "business.rep_id_card_no", "real_name", "bank_account", "id_card_front"} {
+	for _, absent := range []string{"individual.id_card_no", "business.rep_id_card_no", "real_name", "bank_account", "id_card_front", "bank_book"} {
 		if slices.Contains(got, absent) {
 			t.Fatalf("送出不再要求 %s：%v", absent, got)
 		}
@@ -804,31 +812,42 @@ func missingPaths(a *pb.KYCApplication) []string {
 	return out
 }
 
-// 證件是狀態：換掉單張的位置、以 asset_id 保留現有的、清掉一張；回應帶有授權的下載網址，不帶 staged token。
+// 公司文件是狀態：換掉清單、以 asset_id 保留現有的；回應帶每張的 asset_id 與擁有者的下載網址，不帶 staged token。
 func TestKYCDocumentsAreStateOverConnect(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	f.applyComplete(t, f.app)
-	created := saveDraft(t, f.app, completeDraft(testID))
+	req := companyDraftRequest(testTaxID)
+	req.Application.GetBusiness().CompanyDocuments = []*pb.KYCDocument{{StagedToken: "co1"}, {StagedToken: "co2"}}
+	req.UpdateMask.Paths = append(req.UpdateMask.Paths, "business.company_documents")
+	created := saveDraft(t, f.app, req)
+	docs := created.GetBusiness().GetCompanyDocuments()
+	if len(docs) != 2 || docs[0].GetAssetId() != "asset-co1" || docs[1].GetAssetId() != "asset-co2" {
+		t.Fatalf("created documents=%v", docs)
+	}
 	next := saveDraft(t, f.app, &pb.SaveKYCDraftRequest{
 		Application: &pb.KYCApplication{
-			Etag: created.GetEtag(), IdCardFront: &pb.KYCDocument{StagedToken: "front2"}, IdCardBack: &pb.KYCDocument{AssetId: created.GetIdCardBack().GetAssetId()},
+			Etag: created.GetEtag(),
+			Subject: &pb.KYCApplication_Business{Business: &pb.BusinessKYC{
+				CompanyDocuments: []*pb.KYCDocument{{StagedToken: "co3"}, {AssetId: docs[1].GetAssetId()}},
+			}},
 		},
-		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"id_card_front", "id_card_back", "bank_book"}},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"business.company_documents"}},
 	})
-	if next.GetIdCardFront().GetAssetId() != "asset-front2" || next.GetIdCardBack().GetAssetId() != created.GetIdCardBack().GetAssetId() || next.GetBankBook() != nil {
-		t.Fatalf("documents: front=%v back=%v book=%v", next.GetIdCardFront(), next.GetIdCardBack(), next.GetBankBook())
+	got := next.GetBusiness().GetCompanyDocuments()
+	if len(got) != 2 || got[0].GetAssetId() != "asset-co3" || got[1].GetAssetId() != docs[1].GetAssetId() || got[0].GetStagedToken() != "" {
+		t.Fatalf("documents=%v", got)
 	}
-	if next.GetIdCardFront().GetDownloadUri() != "/api/v1/app/media/secure_download/asset-front2" {
-		t.Fatalf("download uri=%q", next.GetIdCardFront().GetDownloadUri())
+	if got[0].GetDownloadUri() != "/api/v1/app/media/secure_download/asset-co3" {
+		t.Fatalf("download uri=%q", got[0].GetDownloadUri())
 	}
-	// 指定的現有圖片不是這份申請目前的證件。
+	// 指定的現有圖片不是這份申請目前的文件。
 	_, err := f.app.SaveKYCDraft(ctx, connect.NewRequest(&pb.SaveKYCDraftRequest{
-		Application: &pb.KYCApplication{Etag: next.GetEtag(), IdCardFront: &pb.KYCDocument{AssetId: "asset-of-someone-else"}},
-		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"id_card_front"}},
+		Application: &pb.KYCApplication{Etag: next.GetEtag(), Subject: &pb.KYCApplication_Business{Business: &pb.BusinessKYC{CompanyDocuments: []*pb.KYCDocument{{AssetId: "asset-of-someone-else"}}}}},
+		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"business.company_documents"}},
 	}))
-	if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "application.id_card_front" {
+	if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "application.business.company_documents[0]" {
 		t.Fatalf("field=%q", field)
 	}
 }
@@ -838,23 +857,22 @@ func TestSaveKYCDraftWildcardMaskOverConnect(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	f.applyComplete(t, f.app)
-	req := completeDraft(testID)
+	req := completeDraft()
 	req.UpdateMask = &fieldmaskpb.FieldMask{Paths: []string{"*"}}
-	if got := saveDraft(t, f.app, req); got.GetIndividual() == nil || got.GetBusiness() != nil || got.GetRealName() != "王小明" || got.GetIndividual().GetIdCardNoMasked() == "" {
+	if got := saveDraft(t, f.app, req); got.GetIndividual() == nil || got.GetBusiness() != nil || got.GetProductType() != "蔬果" {
 		t.Fatalf("個人賣家：%v", got)
 	}
 	f.applyComplete(t, f.other)
 	company := saveDraft(t, f.other, &pb.SaveKYCDraftRequest{
 		Application: &pb.KYCApplication{
-			RealName: "王小明",
+			ProductType: "蔬果",
 			Subject: &pb.KYCApplication_Business{Business: &pb.BusinessKYC{
-				CompanyName: "範例小農有限公司", TaxId: "33330333", RepIdCardNo: "X223456789", CompanyDocuments: []*pb.KYCDocument{{StagedToken: "co1"}},
+				CompanyName: "範例小農有限公司", TaxId: testTaxID, CompanyDocuments: []*pb.KYCDocument{{StagedToken: "co1"}},
 			}},
 		},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"*"}},
 	})
-	if company.GetBusiness().GetCompanyName() != "範例小農有限公司" || company.GetIndividual() != nil || company.GetBusiness().GetRepIdCardNoMasked() == "" ||
-		len(company.GetBusiness().GetCompanyDocuments()) != 1 {
+	if company.GetBusiness().GetCompanyName() != "範例小農有限公司" || company.GetIndividual() != nil || len(company.GetBusiness().GetCompanyDocuments()) != 1 {
 		t.Fatalf("企業賣家：%v", company)
 	}
 }
@@ -872,7 +890,7 @@ func TestDeclaredCapabilitiesMatchWhatTheModuleEnforces(t *testing.T) {
 			f := setup(t)
 			ctx := context.Background()
 			f.applyComplete(t, f.app)
-			draft := saveDraft(t, f.app, completeDraft(testID))
+			draft := saveDraft(t, f.app, completeDraft())
 			switch state {
 			case "suspended":
 				f.suspendStore(t, f.storeID(t))
@@ -888,7 +906,7 @@ func TestDeclaredCapabilitiesMatchWhatTheModuleEnforces(t *testing.T) {
 			}
 			calls := map[string]func() error{
 				sellerconnect.SellerAppServiceSaveKYCDraftProcedure: func() error {
-					_, err := f.app.SaveKYCDraft(ctx, connect.NewRequest(&pb.SaveKYCDraftRequest{Application: &pb.KYCApplication{Etag: draft.GetEtag(), RealName: "改"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"real_name"}}}))
+					_, err := f.app.SaveKYCDraft(ctx, connect.NewRequest(&pb.SaveKYCDraftRequest{Application: &pb.KYCApplication{Etag: draft.GetEtag(), ProductType: "改"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"product_type"}}}))
 					return err
 				},
 				sellerconnect.SellerAppServiceGetMyKYCProcedure: func() error {
@@ -927,8 +945,8 @@ func TestSaveKYCDraftSwitchesTheSellerTypeAndValidatesTheTaxID(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	f.applyComplete(t, f.app)
-	created := saveDraft(t, f.app, completeDraft(testID))
-	if created.GetIndividual().GetIdCardNoMasked() == "" {
+	created := saveDraft(t, f.app, completeDraft())
+	if created.GetIndividual() == nil || created.GetBusiness() != nil {
 		t.Fatalf("created=%v", created)
 	}
 	bad := &pb.SaveKYCDraftRequest{
@@ -944,8 +962,8 @@ func TestSaveKYCDraftSwitchesTheSellerTypeAndValidatesTheTaxID(t *testing.T) {
 	if switched.GetIndividual() != nil || switched.GetBusiness().GetTaxId() != "33330333" || switched.GetBusiness().GetCompanyName() != "某某有限公司" {
 		t.Fatalf("switched=%v", switched)
 	}
-	// 個人專屬的身分證號隨型態切換清掉；共用的欄位保留。
-	if switched.GetRealName() != "王小明" || switched.GetBusiness().GetRepIdCardNoMasked() != "" || len(missingPaths(switched)) != 0 {
+	// 共用的欄位保留。
+	if switched.GetProductType() != "蔬果" || len(missingPaths(switched)) != 0 {
 		t.Fatalf("switched=%v missing=%v", switched, missingPaths(switched))
 	}
 }

@@ -49,7 +49,7 @@ func openSeller(ctx context.Context, prepare func(*config.Env) error) (*sellerCo
 	orderAddr := e.String("ORDER_SERVICE_ADDR")
 	productAddr := e.String("PRODUCT_SERVICE_ADDR")
 	log := newLogger()
-	kyc := readKYCKeys(e)
+	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
 	registry := readGCIS(e)
 	if err := e.Err(); err != nil {
@@ -82,7 +82,7 @@ func openSeller(ctx context.Context, prepare func(*config.Env) error) (*sellerCo
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	payments, owners := newPayment(d, bus, jc, newInbox(d, jc, log), paymentProvider, log)
-	module := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kyc, payments, registry, log)
+	module := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
 	owners.bind(module)
 	subscribeSellerPayout(bus, module)
 	subscribeSellerRelay(bus, jc)

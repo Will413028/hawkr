@@ -39,10 +39,10 @@ func TestProspectArchiveAndMergeRevokeVendorPortalAccess(t *testing.T) {
 	clock := func() time.Time { return now }
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	accounts := identity.New(identity.Deps{DB: d, Events: bus, Now: clock, Logger: logger})
-	kycKeys, kycMAC := sealtest.Keys(t)
+	kycMAC := sealtest.MAC(t)
 	sellers := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: accounts, Media: noMedia{}, Orders: noOrders{}, ProductStores: &productStoresStub{}, Registry: noRegistry{},
-		KYCKeys: kycKeys, KYCMAC: kycMAC, Now: clock, Logger: logger,
+		KYCMAC: kycMAC, Now: clock, Logger: logger,
 		Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger}),
 	})
 	agents := agent.New(agent.Deps{DB: d, Prospects: sellers, Now: clock})

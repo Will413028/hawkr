@@ -88,7 +88,7 @@ func TestPublicStoreByCodeHidesEveryStoreThatIsNotExposable(t *testing.T) {
 			return s
 		},
 		"kyc not approved": func(t *testing.T, f *fixture) Store {
-			accountID, s, _ := f.submitted(t, idA, bankAcct)
+			accountID, s, _ := f.submitted(t)
 			f.logoed(t, accountID, s)
 			return s
 		},
@@ -304,8 +304,8 @@ func TestStoreCardsOmitStoresThatWereNeverExposed(t *testing.T) {
 	f := setup(t)
 	_, approved := f.exposable(t)
 	_, noApplication := f.open(t)
-	_, inReview, _ := f.submitted(t, idA, bankAcct)
-	_, rejected, sub := f.submitted(t, idA, bankAcct)
+	_, inReview, _ := f.submitted(t)
+	_, rejected, sub := f.submitted(t)
 	_, err := f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: sub.ID, ExpectedVersion: sub.Version, AdminID: 9, Issues: anIssue(), Reason: "證件模糊"})
 	must(t, err)
 	_, approvedPending := f.approvedStore(t)
@@ -440,7 +440,7 @@ func (f *fixture) hiddenWorld(t *testing.T) (visible, hidden []int64) {
 	_, suspended := f.exposable(t)
 	_, c := f.exposable(t)
 	f.suspend(t, suspended.StoreID)
-	accountID, notApproved, _ := f.submitted(t, idB, "012345678902")
+	accountID, notApproved, _ := f.submitted(t)
 	f.logoed(t, accountID, notApproved)
 	_, unfinished := f.open(t)
 	return []int64{a.StoreID, b.StoreID, c.StoreID}, []int64{closed.StoreID, deleting.StoreID, suspended.StoreID, notApproved.StoreID, unfinished.StoreID}

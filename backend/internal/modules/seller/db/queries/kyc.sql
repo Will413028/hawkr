@@ -19,23 +19,17 @@ WHERE store_id = $1 AND status <> 'CANCELLED';
 -- name: InsertKYCApplication :one
 -- 建立草稿；店家已有還沒取消的申請時違反 kyc_applications_open（呼叫方鎖住店家列後先檢查，所以只在不變量被破壞時發生）。
 INSERT INTO seller.kyc_applications (
-    application_id, store_id, seller_type, real_name, birth_date,
-    id_card_no_enc, id_card_hash, id_card_hash_key, id_card_issue_date, id_card_issue_type, id_card_issue_location,
-    english_name, bank_name, bank_code, bank_account_enc, bank_account_hash, bank_account_hash_key,
+    application_id, store_id, seller_type,
     product_type, website_url,
-    company_name, tax_id, tax_id_hash, tax_id_hash_key, company_register_date,
+    company_name, tax_id, company_register_date,
     company_town_code, company_address_detail, company_phone,
-    rep_id_card_no_enc, rep_id_card_hash, rep_id_card_hash_key,
     created_at, updated_at
 )
 VALUES (
-    sqlc.arg(application_id), sqlc.arg(store_id), sqlc.arg(seller_type), sqlc.narg(real_name), sqlc.narg(birth_date),
-    sqlc.narg(id_card_no_enc), sqlc.narg(id_card_hash), sqlc.narg(id_card_hash_key), sqlc.narg(id_card_issue_date), sqlc.narg(id_card_issue_type), sqlc.narg(id_card_issue_location),
-    sqlc.narg(english_name), sqlc.narg(bank_name), sqlc.narg(bank_code), sqlc.narg(bank_account_enc), sqlc.narg(bank_account_hash), sqlc.narg(bank_account_hash_key),
+    sqlc.arg(application_id), sqlc.arg(store_id), sqlc.arg(seller_type),
     sqlc.narg(product_type), sqlc.narg(website_url),
-    sqlc.narg(company_name), sqlc.narg(tax_id), sqlc.narg(tax_id_hash), sqlc.narg(tax_id_hash_key), sqlc.narg(company_register_date),
+    sqlc.narg(company_name), sqlc.narg(tax_id), sqlc.narg(company_register_date),
     sqlc.narg(company_town_code), sqlc.narg(company_address_detail), sqlc.narg(company_phone),
-    sqlc.narg(rep_id_card_no_enc), sqlc.narg(rep_id_card_hash), sqlc.narg(rep_id_card_hash_key),
     sqlc.arg(now), sqlc.arg(now)
 )
 RETURNING *;
@@ -48,33 +42,14 @@ UPDATE seller.kyc_applications
 SET status = 'DRAFT',
     decided_at = NULL,
     seller_type = sqlc.arg(seller_type),
-    real_name = sqlc.narg(real_name),
-    birth_date = sqlc.narg(birth_date),
-    id_card_no_enc = sqlc.narg(id_card_no_enc),
-    id_card_hash = sqlc.narg(id_card_hash),
-    id_card_hash_key = sqlc.narg(id_card_hash_key),
-    id_card_issue_date = sqlc.narg(id_card_issue_date),
-    id_card_issue_type = sqlc.narg(id_card_issue_type),
-    id_card_issue_location = sqlc.narg(id_card_issue_location),
-    english_name = sqlc.narg(english_name),
-    bank_name = sqlc.narg(bank_name),
-    bank_code = sqlc.narg(bank_code),
-    bank_account_enc = sqlc.narg(bank_account_enc),
-    bank_account_hash = sqlc.narg(bank_account_hash),
-    bank_account_hash_key = sqlc.narg(bank_account_hash_key),
     product_type = sqlc.narg(product_type),
     website_url = sqlc.narg(website_url),
     company_name = sqlc.narg(company_name),
     tax_id = sqlc.narg(tax_id),
-    tax_id_hash = sqlc.narg(tax_id_hash),
-    tax_id_hash_key = sqlc.narg(tax_id_hash_key),
     company_register_date = sqlc.narg(company_register_date),
     company_town_code = sqlc.narg(company_town_code),
     company_address_detail = sqlc.narg(company_address_detail),
     company_phone = sqlc.narg(company_phone),
-    rep_id_card_no_enc = sqlc.narg(rep_id_card_no_enc),
-    rep_id_card_hash = sqlc.narg(rep_id_card_hash),
-    rep_id_card_hash_key = sqlc.narg(rep_id_card_hash_key),
     updated_at = sqlc.arg(now),
     version = version + 1
 WHERE application_id = sqlc.arg(application_id) AND version = sqlc.arg(expected_version) AND status IN ('DRAFT', 'REJECTED')
@@ -97,14 +72,14 @@ RETURNING *;
 SELECT *
 FROM seller.kyc_documents
 WHERE application_id = $1
-ORDER BY slot, position;
+ORDER BY position;
 
 -- name: DeleteKYCDocuments :exec
 DELETE FROM seller.kyc_documents WHERE application_id = $1;
 
 -- name: InsertKYCDocument :exec
-INSERT INTO seller.kyc_documents (application_id, slot, position, asset_id, object_key)
-VALUES (sqlc.arg(application_id), sqlc.arg(slot), sqlc.arg(position), sqlc.arg(asset_id), sqlc.arg(object_key));
+INSERT INTO seller.kyc_documents (application_id, position, asset_id, object_key)
+VALUES (sqlc.arg(application_id), sqlc.arg(position), sqlc.arg(asset_id), sqlc.arg(object_key));
 
 -- name: InsertKYCReview :one
 -- 審核紀錄只有這一支寫入（append-only）。registration_check_id 只在核准、退回時帶（kyc_reviews_registration_check_check）。
@@ -145,90 +120,64 @@ FROM seller.kyc_reviews
 WHERE application_id = $1
 ORDER BY decided_at, review_id;
 
--- name: InsertKYCReveal :one
--- 顯示全文的稽核紀錄（同時是限時授權）只有這一支寫入（append-only），不含值；expires_at 由呼叫方以注入的時鐘算。
-INSERT INTO seller.kyc_reveals (reveal_id, application_id, admin_id, reason, revealed_at, expires_at)
-VALUES (sqlc.arg(reveal_id), sqlc.arg(application_id), sqlc.arg(admin_id), sqlc.arg(reason), sqlc.arg(now), sqlc.arg(expires_at))
-RETURNING *;
-
--- name: ActiveKYCGrant :one
--- 這位管理員對這筆申請目前有效的授權（顯示全文的紀錄，到期時間晚於 now）；有多筆時取最晚到期的。沒有時 0 列。
-SELECT *
-FROM seller.kyc_reveals
-WHERE application_id = sqlc.arg(application_id) AND admin_id = sqlc.arg(admin_id) AND expires_at > sqlc.arg(now)
-ORDER BY expires_at DESC, reveal_id DESC
-LIMIT 1;
-
 -- name: InsertKYCDocumentAccess :one
--- 證件圖片的讀取紀錄只有這一支寫入（append-only）：記實際送出的 asset_id，不含內容。application_id 與授權的 application_id
--- 由複合外鍵保證一致。
-INSERT INTO seller.kyc_document_accesses (access_id, application_id, reveal_id, slot, position, asset_id, accessed_at)
-VALUES (sqlc.arg(access_id), sqlc.arg(application_id), sqlc.arg(reveal_id), sqlc.arg(slot), sqlc.arg(position), sqlc.arg(asset_id), sqlc.arg(now))
+-- 補充文件的讀取紀錄只有這一支寫入（append-only）：記實際送出的 asset_id 與讀的管理員，不含內容。
+INSERT INTO seller.kyc_document_accesses (access_id, application_id, position, asset_id, admin_id, accessed_at)
+VALUES (sqlc.arg(access_id), sqlc.arg(application_id), sqlc.arg(position), sqlc.arg(asset_id), sqlc.arg(admin_id), sqlc.arg(now))
 RETURNING *;
 
 -- name: ListKYCDocumentAccesses :many
--- 一筆申請的證件讀取紀錄（誰從授權來），新到舊的 keyset（accessed_at, access_id）。
-SELECT a.access_id, a.reveal_id, r.admin_id, a.slot, a.position, a.accessed_at
-FROM seller.kyc_document_accesses a
-JOIN seller.kyc_reveals r ON r.reveal_id = a.reveal_id
-WHERE a.application_id = sqlc.arg(application_id)
-  AND (
-    sqlc.narg(after_at)::timestamptz IS NULL OR
-    (a.accessed_at, a.access_id) < (sqlc.narg(after_at)::timestamptz, sqlc.narg(after_id)::uuid)
-  )
-ORDER BY a.accessed_at DESC, a.access_id DESC
-LIMIT sqlc.arg(page_size);
-
--- name: ListKYCReveals :many
--- 一筆申請的顯示全文紀錄，新到舊的 keyset（revealed_at, reveal_id）。
-SELECT *
-FROM seller.kyc_reveals
+-- 一筆申請的補充文件讀取紀錄，新到舊的 keyset（accessed_at, access_id）。
+SELECT access_id, admin_id, position, asset_id, accessed_at
+FROM seller.kyc_document_accesses
 WHERE application_id = sqlc.arg(application_id)
   AND (
     sqlc.narg(after_at)::timestamptz IS NULL OR
-    (revealed_at, reveal_id) < (sqlc.narg(after_at)::timestamptz, sqlc.narg(after_id)::uuid)
+    (accessed_at, access_id) < (sqlc.narg(after_at)::timestamptz, sqlc.narg(after_id)::uuid)
   )
-ORDER BY revealed_at DESC, reveal_id DESC
+ORDER BY accessed_at DESC, access_id DESC
 LIMIT sqlc.arg(page_size);
 
 -- name: AdminKYCApplications :many
 -- admin 審核佇列的「新到舊」：依送出時間（不是草稿的建立時間）。只列送出過的申請（不含草稿，也不含沒送出就取消的），
--- 狀態篩選；query_pattern 是姓名、公司名稱或統編的子字串（ILIKE，呼叫方已跳脫 % _ \）。篩選審核中的佇列走
+-- 狀態篩選；query_pattern 是店名、公司名稱或統編的子字串（ILIKE，呼叫方已跳脫 % _ \）。篩選審核中的佇列走
 -- AdminKYCApplicationsOldestFirst（兩支的條件必須一致）。
-SELECT *
-FROM seller.kyc_applications
-WHERE status <> 'DRAFT' AND submitted_at IS NOT NULL
-  AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text)
+SELECT a.*
+FROM seller.kyc_applications a
+JOIN seller.stores s ON s.store_id = a.store_id
+WHERE a.status <> 'DRAFT' AND a.submitted_at IS NOT NULL
+  AND (sqlc.narg(status)::text IS NULL OR a.status = sqlc.narg(status)::text)
   AND (
     sqlc.narg(query_pattern)::text IS NULL OR
-    real_name ILIKE sqlc.narg(query_pattern)::text ESCAPE '\' OR
-    company_name ILIKE sqlc.narg(query_pattern)::text ESCAPE '\' OR
-    tax_id ILIKE sqlc.narg(query_pattern)::text ESCAPE '\'
+    s.store_name ILIKE sqlc.narg(query_pattern)::text ESCAPE '\' OR
+    a.company_name ILIKE sqlc.narg(query_pattern)::text ESCAPE '\' OR
+    a.tax_id ILIKE sqlc.narg(query_pattern)::text ESCAPE '\'
   )
   AND (
     sqlc.narg(after_submitted_at)::timestamptz IS NULL OR
-    (submitted_at, application_id) < (sqlc.narg(after_submitted_at)::timestamptz, sqlc.narg(after_id)::uuid)
+    (a.submitted_at, a.application_id) < (sqlc.narg(after_submitted_at)::timestamptz, sqlc.narg(after_id)::uuid)
   )
-ORDER BY submitted_at DESC, application_id DESC
+ORDER BY a.submitted_at DESC, a.application_id DESC
 LIMIT sqlc.arg(page_size);
 
 -- name: AdminKYCApplicationsOldestFirst :many
 -- admin 審核佇列的「舊到新」（篩選審核中時：等最久的在最前面），條件同 AdminKYCApplications，只有排序與 keyset 方向相反。
-SELECT *
-FROM seller.kyc_applications
-WHERE status <> 'DRAFT' AND submitted_at IS NOT NULL
-  AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text)
+SELECT a.*
+FROM seller.kyc_applications a
+JOIN seller.stores s ON s.store_id = a.store_id
+WHERE a.status <> 'DRAFT' AND a.submitted_at IS NOT NULL
+  AND (sqlc.narg(status)::text IS NULL OR a.status = sqlc.narg(status)::text)
   AND (
     sqlc.narg(query_pattern)::text IS NULL OR
-    real_name ILIKE sqlc.narg(query_pattern)::text ESCAPE '\' OR
-    company_name ILIKE sqlc.narg(query_pattern)::text ESCAPE '\' OR
-    tax_id ILIKE sqlc.narg(query_pattern)::text ESCAPE '\'
+    s.store_name ILIKE sqlc.narg(query_pattern)::text ESCAPE '\' OR
+    a.company_name ILIKE sqlc.narg(query_pattern)::text ESCAPE '\' OR
+    a.tax_id ILIKE sqlc.narg(query_pattern)::text ESCAPE '\'
   )
   AND (
     sqlc.narg(after_submitted_at)::timestamptz IS NULL OR
-    (submitted_at, application_id) > (sqlc.narg(after_submitted_at)::timestamptz, sqlc.narg(after_id)::uuid)
+    (a.submitted_at, a.application_id) > (sqlc.narg(after_submitted_at)::timestamptz, sqlc.narg(after_id)::uuid)
   )
-ORDER BY submitted_at, application_id
+ORDER BY a.submitted_at, a.application_id
 LIMIT sqlc.arg(page_size);
 
 -- name: KYCDocumentAssets :many
@@ -240,12 +189,12 @@ WHERE d.application_id = $1 AND a.status <> 'CANCELLED';
 
 -- name: SnapshotMeasureIdentities :exec
 -- 停權措施建立時，複製被處分帳號全部 stint 的身分 blind index 到措施擁有的快照：每個識別欄位金鑰環裡每一把金鑰算的 hash 各一筆，之後換鑰也查得到；
--- 同一個 hash 只留一筆。來源是 account_identity_hashes（防詐保存，ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-30 修訂），不是
--- kyc_identity_hashes：後者隨 184 天的個資清理刪除，舊 stint 清理之後才建立的處分取不到它的身分。身分證號與企業負責人身分證號同一種（ID_CARD）；
--- provider 回報的銀行帳號 fingerprint（BANK_FINGERPRINT）與銀行帳號同一種（BANK_ACCOUNT），hash 空間不同，不會等於申請的銀行帳號 hash。
+-- 同一個 hash 只留一筆。來源是 account_identity_hashes（防詐保存，ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-30 修訂）：
+-- 申請的統編在 stint 的個資清理之後仍在這裡，所以舊 stint 清理之後才建立的處分取得到它。統編（TAX_ID）的種類是 TAX_ID；provider 回報的銀行帳號
+-- fingerprint（BANK_FINGERPRINT）的種類是 BANK_ACCOUNT（Stripe 計畫 D38：身分證號、負責人身分證號與平台自收的銀行帳號已不存在）。
 INSERT INTO seller.measure_identities (measure_id, kind, key_id, hash)
 SELECT sqlc.arg(measure_id)::uuid,
-       CASE h.field WHEN 'TAX_ID' THEN 'TAX_ID' WHEN 'BANK_ACCOUNT' THEN 'BANK_ACCOUNT' WHEN 'BANK_FINGERPRINT' THEN 'BANK_ACCOUNT' ELSE 'ID_CARD' END,
+       CASE h.field WHEN 'TAX_ID' THEN 'TAX_ID' ELSE 'BANK_ACCOUNT' END,
        h.key_id, h.hash
 FROM seller.account_identity_hashes h
 WHERE h.account_id = sqlc.arg(account_id)
@@ -261,44 +210,18 @@ WHERE mi.hash = ANY(sqlc.arg(hashes)::bytea[]) AND m.account_id <> sqlc.arg(acco
 ORDER BY m.account_id, mi.kind;
 
 -- name: LinkedAccountHits :many
--- 與這筆措施的身分快照相同的其他帳號（W9）：別的帳號的申請（跨 stint、含已取消的）裡，身分證號（本人與企業負責人）對快照的 ID_CARD、統一編號對
--- TAX_ID、銀行帳號對 BANK_ACCOUNT（Stripe 計畫 D4：銀行帳號命中只列出；能不能據以建立關聯終止由 model.LinkedIdentity.CountsAsGround 決定，不在這裡）。
--- 快照與申請都存金鑰環每一把金鑰算的 (key_id, hash)，以索引等值連接，不解密；個資清理過的申請沒有這些列，不命中。
--- 另有一支比對 provider 回報的銀行帳號 fingerprint（BANK_FINGERPRINT，只在 account_identity_hashes）對快照的 BANK_ACCOUNT，同樣只列出。
+-- 與這筆措施的身分快照相同的其他帳號（W9）：防詐保存的 account_identity_hashes（跨 stint，個資清理之後仍在）裡，統編（TAX_ID）對快照的 TAX_ID、
+-- provider 回報的銀行帳號 fingerprint（BANK_FINGERPRINT）對快照的 BANK_ACCOUNT（Stripe 計畫 D4、D42：銀行帳號命中只列出；能不能據以建立關聯終止由
+-- model.LinkedIdentity.CountsAsGround 決定，不在這裡）。以 (key_id, hash) 索引等值連接，不解密；帳號取自來源 stint。
 -- account_id 不為 NULL 時只看那個帳號。
-SELECT hit.account_id, hit.field
-FROM (
-    SELECT DISTINCT st.account_id, h.field
-    FROM seller.measure_identities mi
-    JOIN seller.kyc_identity_hashes h ON h.hash = mi.hash AND h.key_id = mi.key_id
-    JOIN seller.kyc_applications a ON a.application_id = h.application_id
-    JOIN seller.stores st ON st.store_id = a.store_id
-    WHERE mi.measure_id = sqlc.arg(measure_id)
-      AND mi.kind = CASE h.field WHEN 'TAX_ID' THEN 'TAX_ID' WHEN 'BANK_ACCOUNT' THEN 'BANK_ACCOUNT' ELSE 'ID_CARD' END
-      AND st.account_id <> sqlc.arg(except_account_id)
-      AND (sqlc.narg(account_id)::bigint IS NULL OR st.account_id = sqlc.narg(account_id)::bigint)
-    UNION
-    -- provider 回報的銀行帳號 fingerprint 只在 account_identity_hashes（來源不是申請），對快照的 BANK_ACCOUNT；帳號取自來源 stint。
-    SELECT DISTINCT f.account_id, f.field
-    FROM seller.measure_identities mi
-    JOIN seller.account_identity_hashes f ON f.hash = mi.hash AND f.key_id = mi.key_id
-    WHERE mi.measure_id = sqlc.arg(measure_id)
-      AND mi.kind = 'BANK_ACCOUNT'
-      AND f.field = 'BANK_FINGERPRINT'
-      AND f.account_id <> sqlc.arg(except_account_id)
-      AND (sqlc.narg(account_id)::bigint IS NULL OR f.account_id = sqlc.narg(account_id)::bigint)
-) hit
-ORDER BY hit.account_id, hit.field;
-
--- name: DeleteKYCIdentityHashes :exec
--- 清掉這筆申請某個識別欄位的比對 hash（欄位被改掉或清空時，寫入同一個 transaction）。
-DELETE FROM seller.kyc_identity_hashes WHERE application_id = $1 AND field = $2;
-
--- name: InsertKYCIdentityHash :exec
--- 寫入一筆比對 hash；已存在的略過（補金鑰可重跑）。
-INSERT INTO seller.kyc_identity_hashes (application_id, field, key_id, hash)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT DO NOTHING;
+SELECT DISTINCT f.account_id, f.field
+FROM seller.measure_identities mi
+JOIN seller.account_identity_hashes f ON f.hash = mi.hash AND f.key_id = mi.key_id
+WHERE mi.measure_id = sqlc.arg(measure_id)
+  AND mi.kind = CASE f.field WHEN 'TAX_ID' THEN 'TAX_ID' ELSE 'BANK_ACCOUNT' END
+  AND f.account_id <> sqlc.arg(except_account_id)
+  AND (sqlc.narg(account_id)::bigint IS NULL OR f.account_id = sqlc.narg(account_id)::bigint)
+ORDER BY f.account_id, f.field;
 
 -- name: InsertAccountIdentityHash :exec
 -- 防詐保存的比對 hash（與 InsertKYCIdentityHash 在同一個 transaction、同一個呼叫點寫入）；帳號取自來源 stint；已存在的略過（補金鑰可重跑）。
@@ -308,34 +231,31 @@ FROM seller.stores s
 WHERE s.store_id = sqlc.arg(store_id)
 ON CONFLICT DO NOTHING;
 
+-- name: StoreKYCTaxIDs :many
+-- 這個 stint 所有申請（含已取消的）目前持有的統編：修剪防詐保存的統編 hash 時，保留這些值的 hash（呼叫方在申請寫入之後的同一個 transaction 讀）。
+SELECT tax_id::text AS tax_id
+FROM seller.kyc_applications
+WHERE store_id = $1 AND tax_id IS NOT NULL;
+
 -- name: PruneAccountIdentityHashes :exec
--- 欄位被改掉之後，修剪這個 stint 這個欄位已經沒有任何申請持有的值（草稿裡改掉的值不是送出的事實，不保存）。在 DeleteKYCIdentityHashes 之後、寫入新值之前執行；
--- 還有別的申請（同一個 stint 的已取消申請）持有同一個值的列不刪。只在 stint 還有未清理的申請時呼叫：清理之後申請不能再編輯，這張表的列由
--- DeleteExpiredAccountIdentityHashes 刪。
+-- 統編被改掉或清掉之後，修剪這個 stint 已沒有任何申請持有的統編 hash（草稿裡改掉的值不是送出的事實，不保存）：keep 是 stint 目前持有的統編在金鑰環每一把金鑰算的 hash，
+-- 不在其中的 TAX_ID 列刪除，在其中的保留（還有別的申請，例如同一個 stint 的已取消申請，持有同一個值）。只在 stint 還有未清理的申請時呼叫：清理之後申請不能再編輯，
+-- 這張表的列由 DeleteExpiredAccountIdentityHashes 刪。
 DELETE FROM seller.account_identity_hashes a
-WHERE a.source_store_id = sqlc.arg(store_id) AND a.field = sqlc.arg(field)::text
-  AND NOT EXISTS (
-    SELECT 1 FROM seller.kyc_identity_hashes h
-    JOIN seller.kyc_applications ap ON ap.application_id = h.application_id
-    WHERE ap.store_id = a.source_store_id AND h.field = a.field AND h.key_id = a.key_id AND h.hash = a.hash);
+WHERE a.source_store_id = sqlc.arg(store_id) AND a.field = 'TAX_ID'
+  AND a.hash <> ALL(sqlc.arg(keep)::bytea[]);
 
 -- name: KYCApplicationsMissingHashKey :many
--- 還有識別欄位、但缺這把金鑰的比對 hash 的申請（個資清理過的沒有欄位，不在其中）：換鑰之後補算用，依 application_id 一批一批取（after_id 是上一批最後一筆），
+-- 還有統編、但防詐保存缺這把金鑰的 hash 的申請（個資清理過的沒有統編，不在其中）：換鑰之後補算用，依 application_id 一批一批取（after_id 是上一批最後一筆），
 -- 鎖住申請列，與草稿寫入互斥。
 SELECT a.*
 FROM seller.kyc_applications a
 WHERE a.pii_purged_at IS NULL
+  AND a.tax_id IS NOT NULL
   AND (sqlc.narg(after_id)::uuid IS NULL OR a.application_id > sqlc.narg(after_id)::uuid)
-  AND (
-    (a.id_card_no_enc IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM seller.kyc_identity_hashes h WHERE h.application_id = a.application_id AND h.field = 'ID_CARD_NO' AND h.key_id = sqlc.arg(key_id)::text)) OR
-    (a.rep_id_card_no_enc IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM seller.kyc_identity_hashes h WHERE h.application_id = a.application_id AND h.field = 'REP_ID_CARD_NO' AND h.key_id = sqlc.arg(key_id)::text)) OR
-    (a.tax_id IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM seller.kyc_identity_hashes h WHERE h.application_id = a.application_id AND h.field = 'TAX_ID' AND h.key_id = sqlc.arg(key_id)::text)) OR
-    (a.bank_account_enc IS NOT NULL AND a.bank_code IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM seller.kyc_identity_hashes h WHERE h.application_id = a.application_id AND h.field = 'BANK_ACCOUNT' AND h.key_id = sqlc.arg(key_id)::text))
-)
+  AND NOT EXISTS (
+    SELECT 1 FROM seller.account_identity_hashes h
+    WHERE h.source_store_id = a.store_id AND h.field = 'TAX_ID' AND h.key_id = sqlc.arg(key_id)::text)
 ORDER BY a.application_id
 LIMIT sqlc.arg(batch_limit)
 FOR UPDATE OF a;
@@ -356,31 +276,16 @@ JOIN seller.measures m ON m.id = mi.measure_id
 ORDER BY m.account_id;
 
 -- name: StoreAccounts :many
--- 一批店家所屬的帳號（admin 清單補顯示欄位；申請列只存 store_id）。
-SELECT store_id, account_id
+-- 一批店家所屬的帳號與店名（admin 清單補顯示欄位；申請列只存 store_id）。
+SELECT store_id, account_id, store_name
 FROM seller.stores
 WHERE store_id = ANY(sqlc.arg(store_ids)::bigint[]);
 
 -- name: ReferencedKeyIDs :many
--- 資料庫裡被參照的每一把金鑰 ID（啟動檢查用）：ENCRYPTION 是密文開頭的金鑰 ID（1 byte 的長度、ID），HASH 是 blind index
--- 的金鑰 ID（申請的 hash、比對用的 hash、防詐保存的 hash 與處分的身分快照）。已清理（NULL）的欄位不參照任何金鑰。
-SELECT 'ENCRYPTION'::text AS kind, convert_from(substring(c FROM 2 FOR get_byte(c, 0)), 'UTF8')::text AS key_id
+-- 資料庫裡被參照的每一把 HMAC 金鑰 ID（啟動檢查用）：防詐保存的 hash 與處分的身分快照。
+SELECT 'HASH'::text AS kind, k.key_id::text AS key_id
 FROM (
-    SELECT id_card_no_enc AS c FROM seller.kyc_applications
-    UNION ALL SELECT rep_id_card_no_enc FROM seller.kyc_applications
-    UNION ALL SELECT bank_account_enc FROM seller.kyc_applications
-) e
-WHERE c IS NOT NULL
-GROUP BY 2
-UNION
-SELECT 'HASH'::text, k.key_id::text
-FROM (
-    SELECT id_card_hash_key AS key_id FROM seller.kyc_applications
-    UNION SELECT rep_id_card_hash_key FROM seller.kyc_applications
-    UNION SELECT tax_id_hash_key FROM seller.kyc_applications
-    UNION SELECT bank_account_hash_key FROM seller.kyc_applications
-    UNION SELECT key_id FROM seller.kyc_identity_hashes
-    UNION SELECT key_id FROM seller.account_identity_hashes
+    SELECT key_id FROM seller.account_identity_hashes
     UNION SELECT key_id FROM seller.measure_identities
 ) k
 WHERE k.key_id IS NOT NULL

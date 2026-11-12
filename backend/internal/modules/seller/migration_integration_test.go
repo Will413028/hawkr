@@ -1198,6 +1198,106 @@ func TestKYCIdentityHashesMigrationBackfillsTheStoredHashes(t *testing.T) {
 	}
 }
 
+// 刪個人身分與銀行管線的 migration（Stripe 計畫 D22、D36、D37、D38、D42）：舊值的列先刪、CHECK 才縮窄，所以在已有舊資料的資料庫上套用成功；
+// 公司文件、統編與銀行 fingerprint 的保存列、仍有效的退回問題留下；證件位置的列刪掉、公司文件的主鍵改成 (申請, 位置)；
+// 讀取紀錄清空並改成帶管理員；授權表與申請的 hash 表刪除。
+// mutation：拿掉任一個 DELETE → migration 在加 CHECK 時失敗；DELETE 寫成清掉整張表 → 留下的列斷言失敗。
+func TestDropKYCPIIPipelineMigrationDeletesRetiredRowsAndKeepsTheRest(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	d := pg.NewDB(t)
+	files, err := fs.Glob(Migrations(), "*.sql")
+	must(t, err)
+	at := slices.IndexFunc(files, func(name string) bool { return strings.HasSuffix(name, "_seller_drop_kyc_pii_pipeline.sql") })
+	if at < 1 {
+		t.Fatalf("找不到 seller_drop_kyc_pii_pipeline 的 migration：%v", files)
+	}
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		_, err := d.Pool().Exec(ctx, sql, args...)
+		must(t, err)
+	}
+	for _, name := range files[:at] {
+		raw, err := fs.ReadFile(Migrations(), name)
+		must(t, err)
+		exec(string(raw))
+	}
+	exec("INSERT INTO seller.stores (store_code, account_id, store_name, created_at, updated_at) VALUES (2600000710, 941, 'x', now(), now())")
+	exec(`INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, real_name, created_at, updated_at)
+		SELECT '0199dddd-0000-7000-8000-000000000001', store_id, 'DRAFT', 'INDIVIDUAL', '王小明', now(), now() FROM seller.stores WHERE store_code = 2600000710`)
+	for _, slot := range []string{"ID_CARD_FRONT", "COMPANY_DOCUMENT"} {
+		exec(`INSERT INTO seller.kyc_documents (application_id, slot, position, asset_id, object_key) VALUES ('0199dddd-0000-7000-8000-000000000001', $1, 0, $2, 'secure/k')`, slot, "asset-"+slot)
+	}
+	exec(`INSERT INTO seller.kyc_reviews (review_id, application_id, action, reviewer_admin_id, reason, decided_at)
+		VALUES ('0199dddd-0000-7000-8000-000000000002', '0199dddd-0000-7000-8000-000000000001', 'REJECT', 1, '補件', now())`)
+	for i, field := range []string{"real_name", "bank_book", "product_type", "business.tax_id"} {
+		exec(`INSERT INTO seller.kyc_review_issues (issue_id, review_id, position, field, code, message) VALUES (uuidv7(), '0199dddd-0000-7000-8000-000000000002', $1, $2, 'MISSING', 'x')`, i, field)
+	}
+	for _, field := range []string{"ID_CARD_NO", "REP_ID_CARD_NO", "BANK_ACCOUNT", "TAX_ID", "BANK_FINGERPRINT"} {
+		exec(`INSERT INTO seller.account_identity_hashes (source_store_id, field, key_id, hash, account_id, created_at)
+			SELECT store_id, $1, 'k1', sha256($1::bytea), account_id, now() FROM seller.stores WHERE store_code = 2600000710`, field)
+	}
+	exec(`INSERT INTO seller.kyc_reveals (reveal_id, application_id, admin_id, reason, revealed_at, expires_at)
+		VALUES ('0199dddd-0000-7000-8000-000000000003', '0199dddd-0000-7000-8000-000000000001', 9, '核對', now(), now() + interval '15 minutes')`)
+	exec(`INSERT INTO seller.kyc_document_accesses (access_id, application_id, reveal_id, slot, position, asset_id, accessed_at)
+		VALUES (uuidv7(), '0199dddd-0000-7000-8000-000000000001', '0199dddd-0000-7000-8000-000000000003', 'ID_CARD_FRONT', 0, 'asset-ID_CARD_FRONT', now())`)
+
+	raw, err := fs.ReadFile(Migrations(), files[at])
+	must(t, err)
+	exec(string(raw))
+
+	count := func(sql string, args ...any) int {
+		t.Helper()
+		var n int
+		must(t, d.Pool().QueryRow(ctx, sql, args...).Scan(&n))
+		return n
+	}
+	if n := count(`SELECT count(*) FROM seller.kyc_documents`); n != 1 {
+		t.Errorf("只剩公司文件：%d", n)
+	}
+	var fields []string
+	rows, err := d.Pool().Query(ctx, `SELECT field FROM seller.kyc_review_issues ORDER BY position`)
+	must(t, err)
+	for rows.Next() {
+		var f string
+		must(t, rows.Scan(&f))
+		fields = append(fields, f)
+	}
+	must(t, rows.Err())
+	if !slices.Equal(fields, []string{"product_type", "business.tax_id"}) {
+		t.Errorf("留下仍有效欄位的退回問題：%v", fields)
+	}
+	var hashFields []string
+	rows, err = d.Pool().Query(ctx, `SELECT field FROM seller.account_identity_hashes ORDER BY field`)
+	must(t, err)
+	for rows.Next() {
+		var f string
+		must(t, rows.Scan(&f))
+		hashFields = append(hashFields, f)
+	}
+	must(t, rows.Err())
+	if !slices.Equal(hashFields, []string{"BANK_FINGERPRINT", "TAX_ID"}) {
+		t.Errorf("防詐保存只留統編與銀行 fingerprint：%v", hashFields)
+	}
+	if n := count(`SELECT count(*) FROM seller.kyc_document_accesses`); n != 0 {
+		t.Errorf("舊的讀取紀錄掛在被刪的授權上，清空：%d", n)
+	}
+	if n := count(`SELECT count(*) FROM information_schema.tables WHERE table_schema = 'seller' AND table_name IN ('kyc_reveals', 'kyc_identity_hashes')`); n != 0 {
+		t.Errorf("授權表與申請的 hash 表應該刪除：%d", n)
+	}
+	if n := count(`SELECT count(*) FROM information_schema.columns WHERE table_schema = 'seller' AND table_name = 'kyc_applications' AND column_name IN ('real_name', 'id_card_no_enc', 'bank_account_enc', 'tax_id_hash')`); n != 0 {
+		t.Errorf("被刪的欄位：%d", n)
+	}
+	// 新形狀：同一申請同一位置只能一張；讀取紀錄帶管理員。
+	if _, err := d.Pool().Exec(ctx, `INSERT INTO seller.kyc_documents (application_id, position, asset_id, object_key) VALUES ('0199dddd-0000-7000-8000-000000000001', 0, 'dup', 'secure/d')`); err == nil {
+		t.Error("主鍵是 (申請, 位置)，同位置第二張應該被擋下")
+	}
+	exec(`INSERT INTO seller.kyc_document_accesses (access_id, application_id, admin_id, position, asset_id, accessed_at) VALUES (uuidv7(), '0199dddd-0000-7000-8000-000000000001', 9, 0, 'asset-COMPANY_DOCUMENT', now())`)
+	if _, err := d.Pool().Exec(ctx, `INSERT INTO seller.kyc_review_issues (issue_id, review_id, position, field, code, message) VALUES (uuidv7(), '0199dddd-0000-7000-8000-000000000002', 9, 'real_name', 'MISSING', 'x')`); err == nil {
+		t.Error("被刪的欄位不能再當退回的欄位")
+	}
+}
+
 // 政策分類的 migration（platform/policy）：UNAUTHORIZED_SALE 在通報與認定都改名 UNLICENSED_SALE，其他值不動；通報的 CHECK 不再接受
 // PLATFORM_ABUSE、認定的 CHECK 不再接受 OTHER。認定的類別是 OTHER 的列沒有誠實的對應，整個 migration 失敗並列出認定的 ID，什麼都不改。
 func TestPolicyCategoryMigrationRenamesTheValueAndRefusesOtherFindings(t *testing.T) {

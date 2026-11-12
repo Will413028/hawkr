@@ -707,26 +707,12 @@ type KYCField int32
 
 const (
 	KYCField_KYC_FIELD_UNSPECIFIED                    KYCField = 0
-	KYCField_KYC_FIELD_REAL_NAME                      KYCField = 1
-	KYCField_KYC_FIELD_BIRTH_DATE                     KYCField = 2
-	KYCField_KYC_FIELD_ID_CARD_ISSUE_DATE             KYCField = 3
-	KYCField_KYC_FIELD_ID_CARD_ISSUE_TYPE             KYCField = 4
-	KYCField_KYC_FIELD_ID_CARD_ISSUE_LOCATION         KYCField = 5
-	KYCField_KYC_FIELD_ENGLISH_NAME                   KYCField = 6
-	KYCField_KYC_FIELD_BANK_NAME                      KYCField = 7
-	KYCField_KYC_FIELD_BANK_CODE                      KYCField = 8
-	KYCField_KYC_FIELD_BANK_ACCOUNT                   KYCField = 9
 	KYCField_KYC_FIELD_PRODUCT_TYPE                   KYCField = 10
 	KYCField_KYC_FIELD_WEBSITE_URL                    KYCField = 12
-	KYCField_KYC_FIELD_ID_CARD_FRONT                  KYCField = 15
-	KYCField_KYC_FIELD_ID_CARD_BACK                   KYCField = 16
-	KYCField_KYC_FIELD_BANK_BOOK                      KYCField = 17
-	KYCField_KYC_FIELD_INDIVIDUAL_ID_CARD_NO          KYCField = 18
 	KYCField_KYC_FIELD_BUSINESS_COMPANY_NAME          KYCField = 20
 	KYCField_KYC_FIELD_BUSINESS_TAX_ID                KYCField = 21
 	KYCField_KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE KYCField = 22
 	KYCField_KYC_FIELD_BUSINESS_COMPANY_PHONE         KYCField = 25
-	KYCField_KYC_FIELD_BUSINESS_REP_ID_CARD_NO        KYCField = 26
 	KYCField_KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS     KYCField = 27
 	KYCField_KYC_FIELD_BUSINESS_COMPANY_ADDRESS       KYCField = 28
 )
@@ -735,51 +721,23 @@ const (
 var (
 	KYCField_name = map[int32]string{
 		0:  "KYC_FIELD_UNSPECIFIED",
-		1:  "KYC_FIELD_REAL_NAME",
-		2:  "KYC_FIELD_BIRTH_DATE",
-		3:  "KYC_FIELD_ID_CARD_ISSUE_DATE",
-		4:  "KYC_FIELD_ID_CARD_ISSUE_TYPE",
-		5:  "KYC_FIELD_ID_CARD_ISSUE_LOCATION",
-		6:  "KYC_FIELD_ENGLISH_NAME",
-		7:  "KYC_FIELD_BANK_NAME",
-		8:  "KYC_FIELD_BANK_CODE",
-		9:  "KYC_FIELD_BANK_ACCOUNT",
 		10: "KYC_FIELD_PRODUCT_TYPE",
 		12: "KYC_FIELD_WEBSITE_URL",
-		15: "KYC_FIELD_ID_CARD_FRONT",
-		16: "KYC_FIELD_ID_CARD_BACK",
-		17: "KYC_FIELD_BANK_BOOK",
-		18: "KYC_FIELD_INDIVIDUAL_ID_CARD_NO",
 		20: "KYC_FIELD_BUSINESS_COMPANY_NAME",
 		21: "KYC_FIELD_BUSINESS_TAX_ID",
 		22: "KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE",
 		25: "KYC_FIELD_BUSINESS_COMPANY_PHONE",
-		26: "KYC_FIELD_BUSINESS_REP_ID_CARD_NO",
 		27: "KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS",
 		28: "KYC_FIELD_BUSINESS_COMPANY_ADDRESS",
 	}
 	KYCField_value = map[string]int32{
 		"KYC_FIELD_UNSPECIFIED":                    0,
-		"KYC_FIELD_REAL_NAME":                      1,
-		"KYC_FIELD_BIRTH_DATE":                     2,
-		"KYC_FIELD_ID_CARD_ISSUE_DATE":             3,
-		"KYC_FIELD_ID_CARD_ISSUE_TYPE":             4,
-		"KYC_FIELD_ID_CARD_ISSUE_LOCATION":         5,
-		"KYC_FIELD_ENGLISH_NAME":                   6,
-		"KYC_FIELD_BANK_NAME":                      7,
-		"KYC_FIELD_BANK_CODE":                      8,
-		"KYC_FIELD_BANK_ACCOUNT":                   9,
 		"KYC_FIELD_PRODUCT_TYPE":                   10,
 		"KYC_FIELD_WEBSITE_URL":                    12,
-		"KYC_FIELD_ID_CARD_FRONT":                  15,
-		"KYC_FIELD_ID_CARD_BACK":                   16,
-		"KYC_FIELD_BANK_BOOK":                      17,
-		"KYC_FIELD_INDIVIDUAL_ID_CARD_NO":          18,
 		"KYC_FIELD_BUSINESS_COMPANY_NAME":          20,
 		"KYC_FIELD_BUSINESS_TAX_ID":                21,
 		"KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE": 22,
 		"KYC_FIELD_BUSINESS_COMPANY_PHONE":         25,
-		"KYC_FIELD_BUSINESS_REP_ID_CARD_NO":        26,
 		"KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS":     27,
 		"KYC_FIELD_BUSINESS_COMPANY_ADDRESS":       28,
 	}
@@ -1738,7 +1696,7 @@ const (
 	TerminationGround_TERMINATION_GROUND_PLATFORM_SECURITY TerminationGround = 9
 	// 第 21.3 條，立即生效。
 	TerminationGround_TERMINATION_GROUND_OTHER_SERIOUS TerminationGround = 10
-	// 與另一個帳號的終止（來源措施）使用同一個身分證明文件或統一編號，立即生效；來源措施撤銷時一併撤銷
+	// 與另一個帳號的終止（來源措施）使用同一個統一編號，立即生效；來源措施撤銷時一併撤銷
 	// （RevokeReason.SOURCE_REVOKED）。賣家可對這筆單獨申覆。
 	TerminationGround_TERMINATION_GROUND_LINKED_ACCOUNT TerminationGround = 11
 )
@@ -3977,7 +3935,7 @@ type KYCIssue struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 有問題的欄位。
 	Field KYCField `protobuf:"varint,1,opt,name=field,proto3,enum=hawkr.seller.v1alpha1.KYCField" json:"field,omitempty"`
-	// field 是文件類（id_card_front、id_card_back、bank_book、business.company_documents）時，指出的那一張文件的 asset_id
+	// field 是文件類（business.company_documents）時，指出的那一張文件的 asset_id
 	// （KYCDocument.asset_id），公司文件有多張時用它指到其中一張，順序改變也不會指錯。非文件類的欄位必須是空字串。
 	// 文件類欄位的規則依原因碼：UNREADABLE、EXPIRED、MISMATCH、INVALID 必須指定是哪一張文件（這些問題出在某一張文件上）；
 	// MISSING 不可以指定（缺的是整個位置，沒有那一張）；OTHER 兩者皆可。違反時 RejectKYC 回 invalid_argument。
@@ -4047,11 +4005,11 @@ func (x *KYCIssue) GetMessage() string {
 	return ""
 }
 
-// KYCDocument 是申請上的一張證件圖片。證件含個資，下載要經有授權的 download_uri（只有申請的擁有者能下載），不是公開的
+// KYCDocument 是申請上的一張公司補充文件。文件可能帶個人姓名與簽名，下載要經有授權的 download_uri（只有申請的擁有者能下載），不是公開的
 // 圖片網址。
 type KYCDocument struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 這份申請目前的這張圖片；寫入時指定它表示保留這一張（單張的位置不指定就是沿用，公司文件清單裡的現有圖片要列出來才保留）。
+	// 這份申請目前的這張圖片；寫入時指定它表示保留這一張（公司文件清單裡的現有圖片要列出來才保留）。
 	AssetId string `protobuf:"bytes,1,opt,name=asset_id,json=assetId,proto3" json:"asset_id,omitempty"`
 	// 下載網址（含 asset_id）；需要登入，只有申請的擁有者能下載。
 	DownloadUri string `protobuf:"bytes,2,opt,name=download_uri,json=downloadUri,proto3" json:"download_uri,omitempty"`
@@ -4175,14 +4133,11 @@ func (x *KYCRejection) GetIssues() []*KYCIssue {
 	return nil
 }
 
-// IndividualKYC 是個人賣家專屬的欄位：身分證號是賣家本人的。
+// IndividualKYC 是個人賣家專屬的欄位；目前沒有欄位（平台不收身分證號，Stripe 計畫 D22），設定它表示賣家型態是個人。
 type IndividualKYC struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 身分證字號（寫入用）。
-	IdCardNo       string `protobuf:"bytes,1,opt,name=id_card_no,json=idCardNo,proto3" json:"id_card_no,omitempty"`
-	IdCardNoMasked string `protobuf:"bytes,2,opt,name=id_card_no_masked,json=idCardNoMasked,proto3" json:"id_card_no_masked,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *IndividualKYC) Reset() {
@@ -4215,21 +4170,7 @@ func (*IndividualKYC) Descriptor() ([]byte, []int) {
 	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{38}
 }
 
-func (x *IndividualKYC) GetIdCardNo() string {
-	if x != nil {
-		return x.IdCardNo
-	}
-	return ""
-}
-
-func (x *IndividualKYC) GetIdCardNoMasked() string {
-	if x != nil {
-		return x.IdCardNoMasked
-	}
-	return ""
-}
-
-// BusinessKYC 是企業賣家專屬的欄位：公司資料與負責人的身分證號。
+// BusinessKYC 是企業賣家專屬的欄位：公司資料。
 type BusinessKYC struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
 	CompanyName string                 `protobuf:"bytes,2,opt,name=company_name,json=companyName,proto3" json:"company_name,omitempty"`
@@ -4237,9 +4178,6 @@ type BusinessKYC struct {
 	TaxId               string     `protobuf:"bytes,3,opt,name=tax_id,json=taxId,proto3" json:"tax_id,omitempty"`
 	CompanyRegisterDate *date.Date `protobuf:"bytes,4,opt,name=company_register_date,json=companyRegisterDate,proto3" json:"company_register_date,omitempty"`
 	CompanyPhone        string     `protobuf:"bytes,7,opt,name=company_phone,json=companyPhone,proto3" json:"company_phone,omitempty"`
-	// 負責人的身分證字號（寫入用）。
-	RepIdCardNo       string `protobuf:"bytes,8,opt,name=rep_id_card_no,json=repIdCardNo,proto3" json:"rep_id_card_no,omitempty"`
-	RepIdCardNoMasked string `protobuf:"bytes,9,opt,name=rep_id_card_no_masked,json=repIdCardNoMasked,proto3" json:"rep_id_card_no_masked,omitempty"`
 	// 公司文件，最多 10 張，順序就是位置；列進 update_mask 時整個換成請求的清單。
 	CompanyDocuments []*KYCDocument `protobuf:"bytes,10,rep,name=company_documents,json=companyDocuments,proto3" json:"company_documents,omitempty"`
 	// 公司地址；列進 update_mask 時整個換成請求的地址，請求沒有 address 就是清掉。可以只填鄉鎮市區。
@@ -4306,20 +4244,6 @@ func (x *BusinessKYC) GetCompanyPhone() string {
 	return ""
 }
 
-func (x *BusinessKYC) GetRepIdCardNo() string {
-	if x != nil {
-		return x.RepIdCardNo
-	}
-	return ""
-}
-
-func (x *BusinessKYC) GetRepIdCardNoMasked() string {
-	if x != nil {
-		return x.RepIdCardNoMasked
-	}
-	return ""
-}
-
 func (x *BusinessKYC) GetCompanyDocuments() []*KYCDocument {
 	if x != nil {
 		return x.CompanyDocuments
@@ -4335,36 +4259,21 @@ func (x *BusinessKYC) GetCompanyAddress() *v1alpha1.PostalAddress {
 }
 
 // KYCApplication 是店家的身分認證申請，每個店家同時最多一筆（以呼叫者為範圍，沒有申請 ID 的定址）。賣家型態是 subject 設定
-// 的是哪一支（個人 individual 或企業 business）；個人與企業共用的欄位（姓名、銀行、聯絡方式、證件）在最上層，各自專屬的
-// 欄位在那一支裡面。update_mask 的路徑可以下到那一支（individual.id_card_no、business.tax_id），列 individual 或 business
+// 的是哪一支（個人 individual 或企業 business）；個人與企業共用的欄位（產品類型、網站）在最上層，各自專屬的
+// 欄位在那一支裡面。update_mask 的路徑可以下到那一支（business.tax_id），列 individual 或 business
 // 本身是那一支全部可寫的欄位，"*" 是所有最上層欄位加上設定的那一支。建立時 subject 必須設定其中一支；後來設定另一支並且
-// update_mask 列到它的欄位，就是切換型態，原本那一支專屬的欄位（個人的身分證號、企業的公司資料與公司文件）一併清掉。
-// 身分證號、負責人身分證號與銀行帳號寫入時用 id_card_no、rep_id_card_no、bank_account，讀出時只有遮蔽後的值。日期是日曆日。
-// 證件圖片是狀態：單張的位置（id_card_front、id_card_back、bank_book）列進 update_mask 時整個換成請求的那一張（不帶值
-// 是清掉），company_documents 整個換成請求的清單，每個元素是現有的圖片（asset_id，保留）或新上傳的圖片（staged_token），
+// update_mask 列到它的欄位，就是切換型態，原本那一支專屬的欄位（企業的公司資料與公司文件）一併清掉。
+// 平台不收身分證號、銀行帳號、證件影像與個人姓名（Stripe 計畫 D22、D37）；統編是市集登記資料。日期是日曆日。
+// 公司文件是狀態：company_documents 整個換成請求的清單，每個元素是現有的圖片（asset_id，保留）或新上傳的圖片（staged_token），
 // 同一張圖片不能放進兩個位置。
 type KYCApplication struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Id     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Status KYCStatus              `protobuf:"varint,2,opt,name=status,proto3,enum=hawkr.seller.v1alpha1.KYCStatus" json:"status,omitempty"`
 	// 建立時不帶；修改必填。
-	Etag                string     `protobuf:"bytes,3,opt,name=etag,proto3" json:"etag,omitempty"`
-	RealName            string     `protobuf:"bytes,4,opt,name=real_name,json=realName,proto3" json:"real_name,omitempty"`
-	BirthDate           *date.Date `protobuf:"bytes,5,opt,name=birth_date,json=birthDate,proto3" json:"birth_date,omitempty"`
-	IdCardIssueDate     *date.Date `protobuf:"bytes,6,opt,name=id_card_issue_date,json=idCardIssueDate,proto3" json:"id_card_issue_date,omitempty"`
-	IdCardIssueType     string     `protobuf:"bytes,7,opt,name=id_card_issue_type,json=idCardIssueType,proto3" json:"id_card_issue_type,omitempty"`
-	IdCardIssueLocation string     `protobuf:"bytes,8,opt,name=id_card_issue_location,json=idCardIssueLocation,proto3" json:"id_card_issue_location,omitempty"`
-	EnglishName         string     `protobuf:"bytes,9,opt,name=english_name,json=englishName,proto3" json:"english_name,omitempty"`
-	BankName            string     `protobuf:"bytes,10,opt,name=bank_name,json=bankName,proto3" json:"bank_name,omitempty"`
-	// 3 碼銀行代碼，或 3 碼加 4 碼分行代碼。
-	BankCode          string       `protobuf:"bytes,11,opt,name=bank_code,json=bankCode,proto3" json:"bank_code,omitempty"`
-	BankAccount       string       `protobuf:"bytes,12,opt,name=bank_account,json=bankAccount,proto3" json:"bank_account,omitempty"`
-	BankAccountMasked string       `protobuf:"bytes,13,opt,name=bank_account_masked,json=bankAccountMasked,proto3" json:"bank_account_masked,omitempty"`
-	ProductType       string       `protobuf:"bytes,14,opt,name=product_type,json=productType,proto3" json:"product_type,omitempty"`
-	WebsiteUrl        string       `protobuf:"bytes,16,opt,name=website_url,json=websiteUrl,proto3" json:"website_url,omitempty"`
-	IdCardFront       *KYCDocument `protobuf:"bytes,19,opt,name=id_card_front,json=idCardFront,proto3" json:"id_card_front,omitempty"`
-	IdCardBack        *KYCDocument `protobuf:"bytes,20,opt,name=id_card_back,json=idCardBack,proto3" json:"id_card_back,omitempty"`
-	BankBook          *KYCDocument `protobuf:"bytes,21,opt,name=bank_book,json=bankBook,proto3" json:"bank_book,omitempty"`
+	Etag        string `protobuf:"bytes,3,opt,name=etag,proto3" json:"etag,omitempty"`
+	ProductType string `protobuf:"bytes,14,opt,name=product_type,json=productType,proto3" json:"product_type,omitempty"`
+	WebsiteUrl  string `protobuf:"bytes,16,opt,name=website_url,json=websiteUrl,proto3" json:"website_url,omitempty"`
 	// Types that are valid to be assigned to Subject:
 	//
 	//	*KYCApplication_Individual
@@ -4441,76 +4350,6 @@ func (x *KYCApplication) GetEtag() string {
 	return ""
 }
 
-func (x *KYCApplication) GetRealName() string {
-	if x != nil {
-		return x.RealName
-	}
-	return ""
-}
-
-func (x *KYCApplication) GetBirthDate() *date.Date {
-	if x != nil {
-		return x.BirthDate
-	}
-	return nil
-}
-
-func (x *KYCApplication) GetIdCardIssueDate() *date.Date {
-	if x != nil {
-		return x.IdCardIssueDate
-	}
-	return nil
-}
-
-func (x *KYCApplication) GetIdCardIssueType() string {
-	if x != nil {
-		return x.IdCardIssueType
-	}
-	return ""
-}
-
-func (x *KYCApplication) GetIdCardIssueLocation() string {
-	if x != nil {
-		return x.IdCardIssueLocation
-	}
-	return ""
-}
-
-func (x *KYCApplication) GetEnglishName() string {
-	if x != nil {
-		return x.EnglishName
-	}
-	return ""
-}
-
-func (x *KYCApplication) GetBankName() string {
-	if x != nil {
-		return x.BankName
-	}
-	return ""
-}
-
-func (x *KYCApplication) GetBankCode() string {
-	if x != nil {
-		return x.BankCode
-	}
-	return ""
-}
-
-func (x *KYCApplication) GetBankAccount() string {
-	if x != nil {
-		return x.BankAccount
-	}
-	return ""
-}
-
-func (x *KYCApplication) GetBankAccountMasked() string {
-	if x != nil {
-		return x.BankAccountMasked
-	}
-	return ""
-}
-
 func (x *KYCApplication) GetProductType() string {
 	if x != nil {
 		return x.ProductType
@@ -4523,27 +4362,6 @@ func (x *KYCApplication) GetWebsiteUrl() string {
 		return x.WebsiteUrl
 	}
 	return ""
-}
-
-func (x *KYCApplication) GetIdCardFront() *KYCDocument {
-	if x != nil {
-		return x.IdCardFront
-	}
-	return nil
-}
-
-func (x *KYCApplication) GetIdCardBack() *KYCDocument {
-	if x != nil {
-		return x.IdCardBack
-	}
-	return nil
-}
-
-func (x *KYCApplication) GetBankBook() *KYCDocument {
-	if x != nil {
-		return x.BankBook
-	}
-	return nil
 }
 
 func (x *KYCApplication) GetSubject() isKYCApplication_Subject {
@@ -7362,44 +7180,25 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x06reason\x18\x01 \x01(\tR\x06reason\x12;\n" +
 	"\vdecide_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"decideTime\x127\n" +
-	"\x06issues\x18\x04 \x03(\v2\x1f.hawkr.seller.v1alpha1.KYCIssueR\x06issuesJ\x04\b\x02\x10\x03R\x0frequired_fields\"b\n" +
-	"\rIndividualKYC\x12!\n" +
-	"\n" +
-	"id_card_no\x18\x01 \x01(\tB\x03\xe0A\x04R\bidCardNo\x12.\n" +
-	"\x11id_card_no_masked\x18\x02 \x01(\tB\x03\xe0A\x03R\x0eidCardNoMasked\"\xff\x03\n" +
+	"\x06issues\x18\x04 \x03(\v2\x1f.hawkr.seller.v1alpha1.KYCIssueR\x06issuesJ\x04\b\x02\x10\x03R\x0frequired_fields\":\n" +
+	"\rIndividualKYCJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03R\n" +
+	"id_card_noR\x11id_card_no_masked\"\xd1\x03\n" +
 	"\vBusinessKYC\x12!\n" +
 	"\fcompany_name\x18\x02 \x01(\tR\vcompanyName\x12\x15\n" +
 	"\x06tax_id\x18\x03 \x01(\tR\x05taxId\x12E\n" +
 	"\x15company_register_date\x18\x04 \x01(\v2\x11.google.type.DateR\x13companyRegisterDate\x12#\n" +
-	"\rcompany_phone\x18\a \x01(\tR\fcompanyPhone\x12(\n" +
-	"\x0erep_id_card_no\x18\b \x01(\tB\x03\xe0A\x04R\vrepIdCardNo\x125\n" +
-	"\x15rep_id_card_no_masked\x18\t \x01(\tB\x03\xe0A\x03R\x11repIdCardNoMasked\x12O\n" +
+	"\rcompany_phone\x18\a \x01(\tR\fcompanyPhone\x12O\n" +
 	"\x11company_documents\x18\n" +
 	" \x03(\v2\".hawkr.seller.v1alpha1.KYCDocumentR\x10companyDocuments\x12M\n" +
-	"\x0fcompany_address\x18\v \x01(\v2$.hawkr.common.v1alpha1.PostalAddressR\x0ecompanyAddressJ\x04\b\x01\x10\x02J\x04\b\x05\x10\x06J\x04\b\x06\x10\aR\fcompany_typeR\x11company_town_codeR\x16company_address_detail\"\x87\r\n" +
+	"\x0fcompany_address\x18\v \x01(\v2$.hawkr.common.v1alpha1.PostalAddressR\x0ecompanyAddressJ\x04\b\x01\x10\x02J\x04\b\x05\x10\x06J\x04\b\x06\x10\aJ\x04\b\b\x10\tJ\x04\b\t\x10\n" +
+	"R\fcompany_typeR\x11company_town_codeR\x16company_address_detailR\x0erep_id_card_noR\x15rep_id_card_no_masked\"\xdf\t\n" +
 	"\x0eKYCApplication\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12=\n" +
 	"\x06status\x18\x02 \x01(\x0e2 .hawkr.seller.v1alpha1.KYCStatusB\x03\xe0A\x03R\x06status\x12\x12\n" +
-	"\x04etag\x18\x03 \x01(\tR\x04etag\x12\x1b\n" +
-	"\treal_name\x18\x04 \x01(\tR\brealName\x120\n" +
-	"\n" +
-	"birth_date\x18\x05 \x01(\v2\x11.google.type.DateR\tbirthDate\x12>\n" +
-	"\x12id_card_issue_date\x18\x06 \x01(\v2\x11.google.type.DateR\x0fidCardIssueDate\x12+\n" +
-	"\x12id_card_issue_type\x18\a \x01(\tR\x0fidCardIssueType\x123\n" +
-	"\x16id_card_issue_location\x18\b \x01(\tR\x13idCardIssueLocation\x12!\n" +
-	"\fenglish_name\x18\t \x01(\tR\venglishName\x12\x1b\n" +
-	"\tbank_name\x18\n" +
-	" \x01(\tR\bbankName\x12\x1b\n" +
-	"\tbank_code\x18\v \x01(\tR\bbankCode\x12&\n" +
-	"\fbank_account\x18\f \x01(\tB\x03\xe0A\x04R\vbankAccount\x123\n" +
-	"\x13bank_account_masked\x18\r \x01(\tB\x03\xe0A\x03R\x11bankAccountMasked\x12!\n" +
+	"\x04etag\x18\x03 \x01(\tR\x04etag\x12!\n" +
 	"\fproduct_type\x18\x0e \x01(\tR\vproductType\x12\x1f\n" +
 	"\vwebsite_url\x18\x10 \x01(\tR\n" +
 	"websiteUrl\x12F\n" +
-	"\rid_card_front\x18\x13 \x01(\v2\".hawkr.seller.v1alpha1.KYCDocumentR\vidCardFront\x12D\n" +
-	"\fid_card_back\x18\x14 \x01(\v2\".hawkr.seller.v1alpha1.KYCDocumentR\n" +
-	"idCardBack\x12?\n" +
-	"\tbank_book\x18\x15 \x01(\v2\".hawkr.seller.v1alpha1.KYCDocumentR\bbankBook\x12F\n" +
 	"\n" +
 	"individual\x18\x16 \x01(\v2$.hawkr.seller.v1alpha1.IndividualKYCH\x00R\n" +
 	"individual\x12@\n" +
@@ -7416,7 +7215,8 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"createTime\x12@\n" +
 	"\vupdate_time\x18\x1e \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTimeB\t\n" +
-	"\asubjectJ\x04\b\x0f\x10\x10J\x04\b\x11\x10\x12J\x04\b\x12\x10\x13J\x04\b\x18\x10\x19J\x04\b!\x10\"R\rcontact_emailR\rcontact_phoneR\rfood_businessR\x04flowR\x14payout_contact_email\"\xa0\x01\n" +
+	"\asubjectJ\x04\b\x0f\x10\x10J\x04\b\x11\x10\x12J\x04\b\x12\x10\x13J\x04\b\x18\x10\x19J\x04\b\x04\x10\x0eJ\x04\b\x13\x10\x16J\x04\b!\x10\"R\rcontact_emailR\rcontact_phoneR\rfood_businessR\x04flowR\treal_nameR\n" +
+	"birth_dateR\x12id_card_issue_dateR\x12id_card_issue_typeR\x16id_card_issue_locationR\fenglish_nameR\tbank_nameR\tbank_codeR\fbank_accountR\x13bank_account_maskedR\rid_card_frontR\fid_card_backR\tbank_bookR\x14payout_contact_email\"\xa0\x01\n" +
 	"\x13SaveKYCDraftRequest\x12L\n" +
 	"\vapplication\x18\x01 \x01(\v2%.hawkr.seller.v1alpha1.KYCApplicationB\x03\xe0A\x02R\vapplication\x12;\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
@@ -7686,32 +7486,18 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x14KYC_STATUS_SUBMITTED\x10\x02\x12\x17\n" +
 	"\x13KYC_STATUS_APPROVED\x10\x03\x12\x17\n" +
 	"\x13KYC_STATUS_REJECTED\x10\x04\x12\x18\n" +
-	"\x14KYC_STATUS_CANCELLED\x10\x05*\xf2\a\n" +
+	"\x14KYC_STATUS_CANCELLED\x10\x05*\xcc\a\n" +
 	"\bKYCField\x12\x19\n" +
-	"\x15KYC_FIELD_UNSPECIFIED\x10\x00\x12\x17\n" +
-	"\x13KYC_FIELD_REAL_NAME\x10\x01\x12\x18\n" +
-	"\x14KYC_FIELD_BIRTH_DATE\x10\x02\x12 \n" +
-	"\x1cKYC_FIELD_ID_CARD_ISSUE_DATE\x10\x03\x12 \n" +
-	"\x1cKYC_FIELD_ID_CARD_ISSUE_TYPE\x10\x04\x12$\n" +
-	" KYC_FIELD_ID_CARD_ISSUE_LOCATION\x10\x05\x12\x1a\n" +
-	"\x16KYC_FIELD_ENGLISH_NAME\x10\x06\x12\x17\n" +
-	"\x13KYC_FIELD_BANK_NAME\x10\a\x12\x17\n" +
-	"\x13KYC_FIELD_BANK_CODE\x10\b\x12\x1a\n" +
-	"\x16KYC_FIELD_BANK_ACCOUNT\x10\t\x12\x1a\n" +
+	"\x15KYC_FIELD_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16KYC_FIELD_PRODUCT_TYPE\x10\n" +
 	"\x12\x19\n" +
-	"\x15KYC_FIELD_WEBSITE_URL\x10\f\x12\x1b\n" +
-	"\x17KYC_FIELD_ID_CARD_FRONT\x10\x0f\x12\x1a\n" +
-	"\x16KYC_FIELD_ID_CARD_BACK\x10\x10\x12\x17\n" +
-	"\x13KYC_FIELD_BANK_BOOK\x10\x11\x12#\n" +
-	"\x1fKYC_FIELD_INDIVIDUAL_ID_CARD_NO\x10\x12\x12#\n" +
+	"\x15KYC_FIELD_WEBSITE_URL\x10\f\x12#\n" +
 	"\x1fKYC_FIELD_BUSINESS_COMPANY_NAME\x10\x14\x12\x1d\n" +
 	"\x19KYC_FIELD_BUSINESS_TAX_ID\x10\x15\x12,\n" +
 	"(KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE\x10\x16\x12$\n" +
-	" KYC_FIELD_BUSINESS_COMPANY_PHONE\x10\x19\x12%\n" +
-	"!KYC_FIELD_BUSINESS_REP_ID_CARD_NO\x10\x1a\x12(\n" +
+	" KYC_FIELD_BUSINESS_COMPANY_PHONE\x10\x19\x12(\n" +
 	"$KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS\x10\x1b\x12&\n" +
-	"\"KYC_FIELD_BUSINESS_COMPANY_ADDRESS\x10\x1c\"\x04\b\v\x10\v\"\x04\b\r\x10\r\"\x04\b\x0e\x10\x0e\"\x04\b\x13\x10\x13\"\x04\b\x17\x10\x17\"\x04\b\x18\x10\x18\"\x04\b\x1d\x10\x1d*\x17KYC_FIELD_FOOD_BUSINESS*\x17KYC_FIELD_CONTACT_EMAIL*\x17KYC_FIELD_CONTACT_PHONE*\x1fKYC_FIELD_BUSINESS_COMPANY_TYPE*$KYC_FIELD_BUSINESS_COMPANY_TOWN_CODE*)KYC_FIELD_BUSINESS_COMPANY_ADDRESS_DETAIL*\x1eKYC_FIELD_PAYOUT_CONTACT_EMAIL*\xd8\x01\n" +
+	"\"KYC_FIELD_BUSINESS_COMPANY_ADDRESS\x10\x1c\"\x04\b\x01\x10\t\"\x04\b\v\x10\v\"\x04\b\r\x10\r\"\x04\b\x0e\x10\x0e\"\x04\b\x0f\x10\x12\"\x04\b\x13\x10\x13\"\x04\b\x17\x10\x17\"\x04\b\x18\x10\x18\"\x04\b\x1a\x10\x1a\"\x04\b\x1d\x10\x1d*\x13KYC_FIELD_REAL_NAME*\x14KYC_FIELD_BIRTH_DATE*\x1cKYC_FIELD_ID_CARD_ISSUE_DATE*\x1cKYC_FIELD_ID_CARD_ISSUE_TYPE* KYC_FIELD_ID_CARD_ISSUE_LOCATION*\x16KYC_FIELD_ENGLISH_NAME*\x13KYC_FIELD_BANK_NAME*\x13KYC_FIELD_BANK_CODE*\x16KYC_FIELD_BANK_ACCOUNT*\x17KYC_FIELD_FOOD_BUSINESS*\x17KYC_FIELD_CONTACT_EMAIL*\x17KYC_FIELD_CONTACT_PHONE*\x17KYC_FIELD_ID_CARD_FRONT*\x16KYC_FIELD_ID_CARD_BACK*\x13KYC_FIELD_BANK_BOOK*\x1fKYC_FIELD_INDIVIDUAL_ID_CARD_NO*\x1fKYC_FIELD_BUSINESS_COMPANY_TYPE*$KYC_FIELD_BUSINESS_COMPANY_TOWN_CODE*)KYC_FIELD_BUSINESS_COMPANY_ADDRESS_DETAIL*!KYC_FIELD_BUSINESS_REP_ID_CARD_NO*\x1eKYC_FIELD_PAYOUT_CONTACT_EMAIL*\xd8\x01\n" +
 	"\fKYCIssueCode\x12\x1e\n" +
 	"\x1aKYC_ISSUE_CODE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19KYC_ISSUE_CODE_UNREADABLE\x10\x01\x12\x1b\n" +
@@ -8056,140 +7842,135 @@ var file_hawkr_seller_v1alpha1_seller_proto_depIdxs = []int32{
 	65,  // 52: hawkr.seller.v1alpha1.BusinessKYC.company_documents:type_name -> hawkr.seller.v1alpha1.KYCDocument
 	113, // 53: hawkr.seller.v1alpha1.BusinessKYC.company_address:type_name -> hawkr.common.v1alpha1.PostalAddress
 	9,   // 54: hawkr.seller.v1alpha1.KYCApplication.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
-	118, // 55: hawkr.seller.v1alpha1.KYCApplication.birth_date:type_name -> google.type.Date
-	118, // 56: hawkr.seller.v1alpha1.KYCApplication.id_card_issue_date:type_name -> google.type.Date
-	65,  // 57: hawkr.seller.v1alpha1.KYCApplication.id_card_front:type_name -> hawkr.seller.v1alpha1.KYCDocument
-	65,  // 58: hawkr.seller.v1alpha1.KYCApplication.id_card_back:type_name -> hawkr.seller.v1alpha1.KYCDocument
-	65,  // 59: hawkr.seller.v1alpha1.KYCApplication.bank_book:type_name -> hawkr.seller.v1alpha1.KYCDocument
-	67,  // 60: hawkr.seller.v1alpha1.KYCApplication.individual:type_name -> hawkr.seller.v1alpha1.IndividualKYC
-	68,  // 61: hawkr.seller.v1alpha1.KYCApplication.business:type_name -> hawkr.seller.v1alpha1.BusinessKYC
-	66,  // 62: hawkr.seller.v1alpha1.KYCApplication.last_rejection:type_name -> hawkr.seller.v1alpha1.KYCRejection
-	10,  // 63: hawkr.seller.v1alpha1.KYCApplication.missing_fields:type_name -> hawkr.seller.v1alpha1.KYCField
-	4,   // 64: hawkr.seller.v1alpha1.KYCApplication.missing_store_fields:type_name -> hawkr.seller.v1alpha1.StoreField
-	64,  // 65: hawkr.seller.v1alpha1.KYCApplication.outstanding_issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
-	115, // 66: hawkr.seller.v1alpha1.KYCApplication.submit_time:type_name -> google.protobuf.Timestamp
-	115, // 67: hawkr.seller.v1alpha1.KYCApplication.decide_time:type_name -> google.protobuf.Timestamp
-	115, // 68: hawkr.seller.v1alpha1.KYCApplication.create_time:type_name -> google.protobuf.Timestamp
-	115, // 69: hawkr.seller.v1alpha1.KYCApplication.update_time:type_name -> google.protobuf.Timestamp
-	69,  // 70: hawkr.seller.v1alpha1.SaveKYCDraftRequest.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
-	117, // 71: hawkr.seller.v1alpha1.SaveKYCDraftRequest.update_mask:type_name -> google.protobuf.FieldMask
-	69,  // 72: hawkr.seller.v1alpha1.SaveKYCDraftResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
-	12,  // 73: hawkr.seller.v1alpha1.PaymentAccount.status:type_name -> hawkr.seller.v1alpha1.PaymentAccountStatus
-	13,  // 74: hawkr.seller.v1alpha1.PaymentAccount.requirement_collection:type_name -> hawkr.seller.v1alpha1.RequirementCollection
-	14,  // 75: hawkr.seller.v1alpha1.PaymentAccount.onboarding_surface:type_name -> hawkr.seller.v1alpha1.OnboardingSurface
-	119, // 76: hawkr.seller.v1alpha1.PaymentAccount.requirements:type_name -> google.protobuf.Struct
-	115, // 77: hawkr.seller.v1alpha1.PaymentAccount.fetch_time:type_name -> google.protobuf.Timestamp
-	72,  // 78: hawkr.seller.v1alpha1.GetMyPaymentAccountResponse.account:type_name -> hawkr.seller.v1alpha1.PaymentAccount
-	14,  // 79: hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse.surface:type_name -> hawkr.seller.v1alpha1.OnboardingSurface
-	115, // 80: hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse.expire_time:type_name -> google.protobuf.Timestamp
-	69,  // 81: hawkr.seller.v1alpha1.GetMyKYCResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
-	29,  // 82: hawkr.seller.v1alpha1.SubmitKYCRequest.accepted_agreements:type_name -> hawkr.seller.v1alpha1.AgreementAcceptance
-	69,  // 83: hawkr.seller.v1alpha1.SubmitKYCResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
-	69,  // 84: hawkr.seller.v1alpha1.CancelKYCResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
-	118, // 85: hawkr.seller.v1alpha1.BusinessRegistration.setup_date:type_name -> google.type.Date
-	113, // 86: hawkr.seller.v1alpha1.BusinessRegistration.postal_address:type_name -> hawkr.common.v1alpha1.PostalAddress
-	83,  // 87: hawkr.seller.v1alpha1.LookupBusinessRegistrationResponse.registration:type_name -> hawkr.seller.v1alpha1.BusinessRegistration
-	19,  // 88: hawkr.seller.v1alpha1.ContentRef.kind:type_name -> hawkr.seller.v1alpha1.ContentKind
-	25,  // 89: hawkr.seller.v1alpha1.RemediationUnavailability.reason:type_name -> hawkr.seller.v1alpha1.RemediationUnavailableReason
-	116, // 90: hawkr.seller.v1alpha1.RemediationUnavailability.message:type_name -> google.rpc.LocalizedMessage
-	27,  // 91: hawkr.seller.v1alpha1.AppealUnavailability.reason:type_name -> hawkr.seller.v1alpha1.AppealUnavailableReason
-	116, // 92: hawkr.seller.v1alpha1.AppealUnavailability.message:type_name -> google.rpc.LocalizedMessage
-	120, // 93: hawkr.seller.v1alpha1.MeasureFinding.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	15,  // 94: hawkr.seller.v1alpha1.MeasureFinding.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
-	115, // 95: hawkr.seller.v1alpha1.MeasureFinding.create_time:type_name -> google.protobuf.Timestamp
-	115, // 96: hawkr.seller.v1alpha1.MeasurePeriod.start_time:type_name -> google.protobuf.Timestamp
-	115, // 97: hawkr.seller.v1alpha1.MeasurePeriod.end_time:type_name -> google.protobuf.Timestamp
-	24,  // 98: hawkr.seller.v1alpha1.MeasureRequest.state:type_name -> hawkr.seller.v1alpha1.MeasureRequestState
-	115, // 99: hawkr.seller.v1alpha1.MeasureRequest.submit_time:type_name -> google.protobuf.Timestamp
-	115, // 100: hawkr.seller.v1alpha1.MeasureRequest.decide_time:type_name -> google.protobuf.Timestamp
-	28,  // 101: hawkr.seller.v1alpha1.MeasureRequest.close_cause:type_name -> hawkr.seller.v1alpha1.MeasureRequestCloseCause
-	23,  // 102: hawkr.seller.v1alpha1.MeasureRequest.kind:type_name -> hawkr.seller.v1alpha1.MeasureRequestKind
-	18,  // 103: hawkr.seller.v1alpha1.Measure.kind:type_name -> hawkr.seller.v1alpha1.MeasureKind
-	20,  // 104: hawkr.seller.v1alpha1.Measure.basis:type_name -> hawkr.seller.v1alpha1.MeasureBasis
-	89,  // 105: hawkr.seller.v1alpha1.Measure.findings:type_name -> hawkr.seller.v1alpha1.MeasureFinding
-	21,  // 106: hawkr.seller.v1alpha1.Measure.risk_ground:type_name -> hawkr.seller.v1alpha1.RiskGround
-	22,  // 107: hawkr.seller.v1alpha1.Measure.state:type_name -> hawkr.seller.v1alpha1.MeasureState
-	90,  // 108: hawkr.seller.v1alpha1.Measure.period:type_name -> hawkr.seller.v1alpha1.MeasurePeriod
-	115, // 109: hawkr.seller.v1alpha1.Measure.create_time:type_name -> google.protobuf.Timestamp
-	16,  // 110: hawkr.seller.v1alpha1.Measure.revoke_reason:type_name -> hawkr.seller.v1alpha1.RevokeReason
-	115, // 111: hawkr.seller.v1alpha1.Measure.next_remediation_time:type_name -> google.protobuf.Timestamp
-	121, // 112: hawkr.seller.v1alpha1.Measure.rejection_cooldown:type_name -> google.protobuf.Duration
-	91,  // 113: hawkr.seller.v1alpha1.Measure.requests:type_name -> hawkr.seller.v1alpha1.MeasureRequest
-	87,  // 114: hawkr.seller.v1alpha1.Measure.remediation_unavailabilities:type_name -> hawkr.seller.v1alpha1.RemediationUnavailability
-	26,  // 115: hawkr.seller.v1alpha1.Measure.termination_ground:type_name -> hawkr.seller.v1alpha1.TerminationGround
-	115, // 116: hawkr.seller.v1alpha1.Measure.appeal_deadline_time:type_name -> google.protobuf.Timestamp
-	88,  // 117: hawkr.seller.v1alpha1.Measure.appeal_unavailabilities:type_name -> hawkr.seller.v1alpha1.AppealUnavailability
-	86,  // 118: hawkr.seller.v1alpha1.Measure.contents:type_name -> hawkr.seller.v1alpha1.ContentRef
-	22,  // 119: hawkr.seller.v1alpha1.ListMyMeasuresRequest.state:type_name -> hawkr.seller.v1alpha1.MeasureState
-	92,  // 120: hawkr.seller.v1alpha1.ListMyMeasuresResponse.measures:type_name -> hawkr.seller.v1alpha1.Measure
-	92,  // 121: hawkr.seller.v1alpha1.GetMyMeasureResponse.measure:type_name -> hawkr.seller.v1alpha1.Measure
-	92,  // 122: hawkr.seller.v1alpha1.SubmitAppealResponse.measure:type_name -> hawkr.seller.v1alpha1.Measure
-	92,  // 123: hawkr.seller.v1alpha1.RequestRemediationResponse.measure:type_name -> hawkr.seller.v1alpha1.Measure
-	114, // 124: hawkr.seller.v1alpha1.PublicStore.logo:type_name -> hawkr.common.v1alpha1.Image
-	114, // 125: hawkr.seller.v1alpha1.PublicStore.cover_image:type_name -> hawkr.common.v1alpha1.Image
-	115, // 126: hawkr.seller.v1alpha1.PublicStore.update_time:type_name -> google.protobuf.Timestamp
-	101, // 127: hawkr.seller.v1alpha1.GetStoreResponse.store:type_name -> hawkr.seller.v1alpha1.PublicStore
-	102, // 128: hawkr.seller.v1alpha1.GetStoreResponse.stats:type_name -> hawkr.seller.v1alpha1.StoreStats
-	101, // 129: hawkr.seller.v1alpha1.ListStoresResponse.stores:type_name -> hawkr.seller.v1alpha1.PublicStore
-	122, // 130: hawkr.seller.v1alpha1.BatchGetStoresResponse.stores:type_name -> hawkr.common.v1alpha1.StoreCard
-	30,  // 131: hawkr.seller.v1alpha1.GetSellerAgreementsResponse.agreements:type_name -> hawkr.seller.v1alpha1.SellerAgreement
-	33,  // 132: hawkr.seller.v1alpha1.SellerAppService.ApplyStore:input_type -> hawkr.seller.v1alpha1.ApplyStoreRequest
-	35,  // 133: hawkr.seller.v1alpha1.SellerAppService.GetMyStoreOpening:input_type -> hawkr.seller.v1alpha1.GetMyStoreOpeningRequest
-	38,  // 134: hawkr.seller.v1alpha1.SellerAppService.GetMyStore:input_type -> hawkr.seller.v1alpha1.GetMyStoreRequest
-	40,  // 135: hawkr.seller.v1alpha1.SellerAppService.GetMyOnboarding:input_type -> hawkr.seller.v1alpha1.GetMyOnboardingRequest
-	45,  // 136: hawkr.seller.v1alpha1.SellerAppService.RefreshMyPaymentAccount:input_type -> hawkr.seller.v1alpha1.RefreshMyPaymentAccountRequest
-	43,  // 137: hawkr.seller.v1alpha1.SellerAppService.UpdateMyStore:input_type -> hawkr.seller.v1alpha1.UpdateMyStoreRequest
-	47,  // 138: hawkr.seller.v1alpha1.SellerAppService.CompleteMyStoreOnboarding:input_type -> hawkr.seller.v1alpha1.CompleteMyStoreOnboardingRequest
-	49,  // 139: hawkr.seller.v1alpha1.SellerAppService.ListMyFollowers:input_type -> hawkr.seller.v1alpha1.ListMyFollowersRequest
-	53,  // 140: hawkr.seller.v1alpha1.SellerAppService.GetMyDashboard:input_type -> hawkr.seller.v1alpha1.GetMyDashboardRequest
-	62,  // 141: hawkr.seller.v1alpha1.SellerAppService.CloseMyStore:input_type -> hawkr.seller.v1alpha1.CloseMyStoreRequest
-	70,  // 142: hawkr.seller.v1alpha1.SellerAppService.SaveKYCDraft:input_type -> hawkr.seller.v1alpha1.SaveKYCDraftRequest
-	77,  // 143: hawkr.seller.v1alpha1.SellerAppService.GetMyKYC:input_type -> hawkr.seller.v1alpha1.GetMyKYCRequest
-	79,  // 144: hawkr.seller.v1alpha1.SellerAppService.SubmitKYC:input_type -> hawkr.seller.v1alpha1.SubmitKYCRequest
-	81,  // 145: hawkr.seller.v1alpha1.SellerAppService.CancelKYC:input_type -> hawkr.seller.v1alpha1.CancelKYCRequest
-	73,  // 146: hawkr.seller.v1alpha1.SellerAppService.GetMyPaymentAccount:input_type -> hawkr.seller.v1alpha1.GetMyPaymentAccountRequest
-	75,  // 147: hawkr.seller.v1alpha1.SellerAppService.CreatePaymentOnboardingSession:input_type -> hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionRequest
-	84,  // 148: hawkr.seller.v1alpha1.SellerAppService.LookupBusinessRegistration:input_type -> hawkr.seller.v1alpha1.LookupBusinessRegistrationRequest
-	93,  // 149: hawkr.seller.v1alpha1.SellerAppService.ListMyMeasures:input_type -> hawkr.seller.v1alpha1.ListMyMeasuresRequest
-	95,  // 150: hawkr.seller.v1alpha1.SellerAppService.GetMyMeasure:input_type -> hawkr.seller.v1alpha1.GetMyMeasureRequest
-	97,  // 151: hawkr.seller.v1alpha1.SellerAppService.SubmitAppeal:input_type -> hawkr.seller.v1alpha1.SubmitAppealRequest
-	99,  // 152: hawkr.seller.v1alpha1.SellerAppService.RequestRemediation:input_type -> hawkr.seller.v1alpha1.RequestRemediationRequest
-	103, // 153: hawkr.seller.v1alpha1.SellerPublicService.GetStore:input_type -> hawkr.seller.v1alpha1.GetStoreRequest
-	105, // 154: hawkr.seller.v1alpha1.SellerPublicService.ListStores:input_type -> hawkr.seller.v1alpha1.ListStoresRequest
-	107, // 155: hawkr.seller.v1alpha1.SellerPublicService.BatchGetStores:input_type -> hawkr.seller.v1alpha1.BatchGetStoresRequest
-	109, // 156: hawkr.seller.v1alpha1.SellerPublicService.GetSellerAgreements:input_type -> hawkr.seller.v1alpha1.GetSellerAgreementsRequest
-	111, // 157: hawkr.seller.v1alpha1.SellerPublicService.RecordProductView:input_type -> hawkr.seller.v1alpha1.RecordProductViewRequest
-	34,  // 158: hawkr.seller.v1alpha1.SellerAppService.ApplyStore:output_type -> hawkr.seller.v1alpha1.ApplyStoreResponse
-	36,  // 159: hawkr.seller.v1alpha1.SellerAppService.GetMyStoreOpening:output_type -> hawkr.seller.v1alpha1.GetMyStoreOpeningResponse
-	39,  // 160: hawkr.seller.v1alpha1.SellerAppService.GetMyStore:output_type -> hawkr.seller.v1alpha1.GetMyStoreResponse
-	41,  // 161: hawkr.seller.v1alpha1.SellerAppService.GetMyOnboarding:output_type -> hawkr.seller.v1alpha1.GetMyOnboardingResponse
-	46,  // 162: hawkr.seller.v1alpha1.SellerAppService.RefreshMyPaymentAccount:output_type -> hawkr.seller.v1alpha1.RefreshMyPaymentAccountResponse
-	44,  // 163: hawkr.seller.v1alpha1.SellerAppService.UpdateMyStore:output_type -> hawkr.seller.v1alpha1.UpdateMyStoreResponse
-	48,  // 164: hawkr.seller.v1alpha1.SellerAppService.CompleteMyStoreOnboarding:output_type -> hawkr.seller.v1alpha1.CompleteMyStoreOnboardingResponse
-	50,  // 165: hawkr.seller.v1alpha1.SellerAppService.ListMyFollowers:output_type -> hawkr.seller.v1alpha1.ListMyFollowersResponse
-	54,  // 166: hawkr.seller.v1alpha1.SellerAppService.GetMyDashboard:output_type -> hawkr.seller.v1alpha1.GetMyDashboardResponse
-	63,  // 167: hawkr.seller.v1alpha1.SellerAppService.CloseMyStore:output_type -> hawkr.seller.v1alpha1.CloseMyStoreResponse
-	71,  // 168: hawkr.seller.v1alpha1.SellerAppService.SaveKYCDraft:output_type -> hawkr.seller.v1alpha1.SaveKYCDraftResponse
-	78,  // 169: hawkr.seller.v1alpha1.SellerAppService.GetMyKYC:output_type -> hawkr.seller.v1alpha1.GetMyKYCResponse
-	80,  // 170: hawkr.seller.v1alpha1.SellerAppService.SubmitKYC:output_type -> hawkr.seller.v1alpha1.SubmitKYCResponse
-	82,  // 171: hawkr.seller.v1alpha1.SellerAppService.CancelKYC:output_type -> hawkr.seller.v1alpha1.CancelKYCResponse
-	74,  // 172: hawkr.seller.v1alpha1.SellerAppService.GetMyPaymentAccount:output_type -> hawkr.seller.v1alpha1.GetMyPaymentAccountResponse
-	76,  // 173: hawkr.seller.v1alpha1.SellerAppService.CreatePaymentOnboardingSession:output_type -> hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse
-	85,  // 174: hawkr.seller.v1alpha1.SellerAppService.LookupBusinessRegistration:output_type -> hawkr.seller.v1alpha1.LookupBusinessRegistrationResponse
-	94,  // 175: hawkr.seller.v1alpha1.SellerAppService.ListMyMeasures:output_type -> hawkr.seller.v1alpha1.ListMyMeasuresResponse
-	96,  // 176: hawkr.seller.v1alpha1.SellerAppService.GetMyMeasure:output_type -> hawkr.seller.v1alpha1.GetMyMeasureResponse
-	98,  // 177: hawkr.seller.v1alpha1.SellerAppService.SubmitAppeal:output_type -> hawkr.seller.v1alpha1.SubmitAppealResponse
-	100, // 178: hawkr.seller.v1alpha1.SellerAppService.RequestRemediation:output_type -> hawkr.seller.v1alpha1.RequestRemediationResponse
-	104, // 179: hawkr.seller.v1alpha1.SellerPublicService.GetStore:output_type -> hawkr.seller.v1alpha1.GetStoreResponse
-	106, // 180: hawkr.seller.v1alpha1.SellerPublicService.ListStores:output_type -> hawkr.seller.v1alpha1.ListStoresResponse
-	108, // 181: hawkr.seller.v1alpha1.SellerPublicService.BatchGetStores:output_type -> hawkr.seller.v1alpha1.BatchGetStoresResponse
-	110, // 182: hawkr.seller.v1alpha1.SellerPublicService.GetSellerAgreements:output_type -> hawkr.seller.v1alpha1.GetSellerAgreementsResponse
-	112, // 183: hawkr.seller.v1alpha1.SellerPublicService.RecordProductView:output_type -> hawkr.seller.v1alpha1.RecordProductViewResponse
-	158, // [158:184] is the sub-list for method output_type
-	132, // [132:158] is the sub-list for method input_type
-	132, // [132:132] is the sub-list for extension type_name
-	132, // [132:132] is the sub-list for extension extendee
-	0,   // [0:132] is the sub-list for field type_name
+	67,  // 55: hawkr.seller.v1alpha1.KYCApplication.individual:type_name -> hawkr.seller.v1alpha1.IndividualKYC
+	68,  // 56: hawkr.seller.v1alpha1.KYCApplication.business:type_name -> hawkr.seller.v1alpha1.BusinessKYC
+	66,  // 57: hawkr.seller.v1alpha1.KYCApplication.last_rejection:type_name -> hawkr.seller.v1alpha1.KYCRejection
+	10,  // 58: hawkr.seller.v1alpha1.KYCApplication.missing_fields:type_name -> hawkr.seller.v1alpha1.KYCField
+	4,   // 59: hawkr.seller.v1alpha1.KYCApplication.missing_store_fields:type_name -> hawkr.seller.v1alpha1.StoreField
+	64,  // 60: hawkr.seller.v1alpha1.KYCApplication.outstanding_issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
+	115, // 61: hawkr.seller.v1alpha1.KYCApplication.submit_time:type_name -> google.protobuf.Timestamp
+	115, // 62: hawkr.seller.v1alpha1.KYCApplication.decide_time:type_name -> google.protobuf.Timestamp
+	115, // 63: hawkr.seller.v1alpha1.KYCApplication.create_time:type_name -> google.protobuf.Timestamp
+	115, // 64: hawkr.seller.v1alpha1.KYCApplication.update_time:type_name -> google.protobuf.Timestamp
+	69,  // 65: hawkr.seller.v1alpha1.SaveKYCDraftRequest.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
+	117, // 66: hawkr.seller.v1alpha1.SaveKYCDraftRequest.update_mask:type_name -> google.protobuf.FieldMask
+	69,  // 67: hawkr.seller.v1alpha1.SaveKYCDraftResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
+	12,  // 68: hawkr.seller.v1alpha1.PaymentAccount.status:type_name -> hawkr.seller.v1alpha1.PaymentAccountStatus
+	13,  // 69: hawkr.seller.v1alpha1.PaymentAccount.requirement_collection:type_name -> hawkr.seller.v1alpha1.RequirementCollection
+	14,  // 70: hawkr.seller.v1alpha1.PaymentAccount.onboarding_surface:type_name -> hawkr.seller.v1alpha1.OnboardingSurface
+	119, // 71: hawkr.seller.v1alpha1.PaymentAccount.requirements:type_name -> google.protobuf.Struct
+	115, // 72: hawkr.seller.v1alpha1.PaymentAccount.fetch_time:type_name -> google.protobuf.Timestamp
+	72,  // 73: hawkr.seller.v1alpha1.GetMyPaymentAccountResponse.account:type_name -> hawkr.seller.v1alpha1.PaymentAccount
+	14,  // 74: hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse.surface:type_name -> hawkr.seller.v1alpha1.OnboardingSurface
+	115, // 75: hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse.expire_time:type_name -> google.protobuf.Timestamp
+	69,  // 76: hawkr.seller.v1alpha1.GetMyKYCResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
+	29,  // 77: hawkr.seller.v1alpha1.SubmitKYCRequest.accepted_agreements:type_name -> hawkr.seller.v1alpha1.AgreementAcceptance
+	69,  // 78: hawkr.seller.v1alpha1.SubmitKYCResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
+	69,  // 79: hawkr.seller.v1alpha1.CancelKYCResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
+	118, // 80: hawkr.seller.v1alpha1.BusinessRegistration.setup_date:type_name -> google.type.Date
+	113, // 81: hawkr.seller.v1alpha1.BusinessRegistration.postal_address:type_name -> hawkr.common.v1alpha1.PostalAddress
+	83,  // 82: hawkr.seller.v1alpha1.LookupBusinessRegistrationResponse.registration:type_name -> hawkr.seller.v1alpha1.BusinessRegistration
+	19,  // 83: hawkr.seller.v1alpha1.ContentRef.kind:type_name -> hawkr.seller.v1alpha1.ContentKind
+	25,  // 84: hawkr.seller.v1alpha1.RemediationUnavailability.reason:type_name -> hawkr.seller.v1alpha1.RemediationUnavailableReason
+	116, // 85: hawkr.seller.v1alpha1.RemediationUnavailability.message:type_name -> google.rpc.LocalizedMessage
+	27,  // 86: hawkr.seller.v1alpha1.AppealUnavailability.reason:type_name -> hawkr.seller.v1alpha1.AppealUnavailableReason
+	116, // 87: hawkr.seller.v1alpha1.AppealUnavailability.message:type_name -> google.rpc.LocalizedMessage
+	120, // 88: hawkr.seller.v1alpha1.MeasureFinding.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	15,  // 89: hawkr.seller.v1alpha1.MeasureFinding.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
+	115, // 90: hawkr.seller.v1alpha1.MeasureFinding.create_time:type_name -> google.protobuf.Timestamp
+	115, // 91: hawkr.seller.v1alpha1.MeasurePeriod.start_time:type_name -> google.protobuf.Timestamp
+	115, // 92: hawkr.seller.v1alpha1.MeasurePeriod.end_time:type_name -> google.protobuf.Timestamp
+	24,  // 93: hawkr.seller.v1alpha1.MeasureRequest.state:type_name -> hawkr.seller.v1alpha1.MeasureRequestState
+	115, // 94: hawkr.seller.v1alpha1.MeasureRequest.submit_time:type_name -> google.protobuf.Timestamp
+	115, // 95: hawkr.seller.v1alpha1.MeasureRequest.decide_time:type_name -> google.protobuf.Timestamp
+	28,  // 96: hawkr.seller.v1alpha1.MeasureRequest.close_cause:type_name -> hawkr.seller.v1alpha1.MeasureRequestCloseCause
+	23,  // 97: hawkr.seller.v1alpha1.MeasureRequest.kind:type_name -> hawkr.seller.v1alpha1.MeasureRequestKind
+	18,  // 98: hawkr.seller.v1alpha1.Measure.kind:type_name -> hawkr.seller.v1alpha1.MeasureKind
+	20,  // 99: hawkr.seller.v1alpha1.Measure.basis:type_name -> hawkr.seller.v1alpha1.MeasureBasis
+	89,  // 100: hawkr.seller.v1alpha1.Measure.findings:type_name -> hawkr.seller.v1alpha1.MeasureFinding
+	21,  // 101: hawkr.seller.v1alpha1.Measure.risk_ground:type_name -> hawkr.seller.v1alpha1.RiskGround
+	22,  // 102: hawkr.seller.v1alpha1.Measure.state:type_name -> hawkr.seller.v1alpha1.MeasureState
+	90,  // 103: hawkr.seller.v1alpha1.Measure.period:type_name -> hawkr.seller.v1alpha1.MeasurePeriod
+	115, // 104: hawkr.seller.v1alpha1.Measure.create_time:type_name -> google.protobuf.Timestamp
+	16,  // 105: hawkr.seller.v1alpha1.Measure.revoke_reason:type_name -> hawkr.seller.v1alpha1.RevokeReason
+	115, // 106: hawkr.seller.v1alpha1.Measure.next_remediation_time:type_name -> google.protobuf.Timestamp
+	121, // 107: hawkr.seller.v1alpha1.Measure.rejection_cooldown:type_name -> google.protobuf.Duration
+	91,  // 108: hawkr.seller.v1alpha1.Measure.requests:type_name -> hawkr.seller.v1alpha1.MeasureRequest
+	87,  // 109: hawkr.seller.v1alpha1.Measure.remediation_unavailabilities:type_name -> hawkr.seller.v1alpha1.RemediationUnavailability
+	26,  // 110: hawkr.seller.v1alpha1.Measure.termination_ground:type_name -> hawkr.seller.v1alpha1.TerminationGround
+	115, // 111: hawkr.seller.v1alpha1.Measure.appeal_deadline_time:type_name -> google.protobuf.Timestamp
+	88,  // 112: hawkr.seller.v1alpha1.Measure.appeal_unavailabilities:type_name -> hawkr.seller.v1alpha1.AppealUnavailability
+	86,  // 113: hawkr.seller.v1alpha1.Measure.contents:type_name -> hawkr.seller.v1alpha1.ContentRef
+	22,  // 114: hawkr.seller.v1alpha1.ListMyMeasuresRequest.state:type_name -> hawkr.seller.v1alpha1.MeasureState
+	92,  // 115: hawkr.seller.v1alpha1.ListMyMeasuresResponse.measures:type_name -> hawkr.seller.v1alpha1.Measure
+	92,  // 116: hawkr.seller.v1alpha1.GetMyMeasureResponse.measure:type_name -> hawkr.seller.v1alpha1.Measure
+	92,  // 117: hawkr.seller.v1alpha1.SubmitAppealResponse.measure:type_name -> hawkr.seller.v1alpha1.Measure
+	92,  // 118: hawkr.seller.v1alpha1.RequestRemediationResponse.measure:type_name -> hawkr.seller.v1alpha1.Measure
+	114, // 119: hawkr.seller.v1alpha1.PublicStore.logo:type_name -> hawkr.common.v1alpha1.Image
+	114, // 120: hawkr.seller.v1alpha1.PublicStore.cover_image:type_name -> hawkr.common.v1alpha1.Image
+	115, // 121: hawkr.seller.v1alpha1.PublicStore.update_time:type_name -> google.protobuf.Timestamp
+	101, // 122: hawkr.seller.v1alpha1.GetStoreResponse.store:type_name -> hawkr.seller.v1alpha1.PublicStore
+	102, // 123: hawkr.seller.v1alpha1.GetStoreResponse.stats:type_name -> hawkr.seller.v1alpha1.StoreStats
+	101, // 124: hawkr.seller.v1alpha1.ListStoresResponse.stores:type_name -> hawkr.seller.v1alpha1.PublicStore
+	122, // 125: hawkr.seller.v1alpha1.BatchGetStoresResponse.stores:type_name -> hawkr.common.v1alpha1.StoreCard
+	30,  // 126: hawkr.seller.v1alpha1.GetSellerAgreementsResponse.agreements:type_name -> hawkr.seller.v1alpha1.SellerAgreement
+	33,  // 127: hawkr.seller.v1alpha1.SellerAppService.ApplyStore:input_type -> hawkr.seller.v1alpha1.ApplyStoreRequest
+	35,  // 128: hawkr.seller.v1alpha1.SellerAppService.GetMyStoreOpening:input_type -> hawkr.seller.v1alpha1.GetMyStoreOpeningRequest
+	38,  // 129: hawkr.seller.v1alpha1.SellerAppService.GetMyStore:input_type -> hawkr.seller.v1alpha1.GetMyStoreRequest
+	40,  // 130: hawkr.seller.v1alpha1.SellerAppService.GetMyOnboarding:input_type -> hawkr.seller.v1alpha1.GetMyOnboardingRequest
+	45,  // 131: hawkr.seller.v1alpha1.SellerAppService.RefreshMyPaymentAccount:input_type -> hawkr.seller.v1alpha1.RefreshMyPaymentAccountRequest
+	43,  // 132: hawkr.seller.v1alpha1.SellerAppService.UpdateMyStore:input_type -> hawkr.seller.v1alpha1.UpdateMyStoreRequest
+	47,  // 133: hawkr.seller.v1alpha1.SellerAppService.CompleteMyStoreOnboarding:input_type -> hawkr.seller.v1alpha1.CompleteMyStoreOnboardingRequest
+	49,  // 134: hawkr.seller.v1alpha1.SellerAppService.ListMyFollowers:input_type -> hawkr.seller.v1alpha1.ListMyFollowersRequest
+	53,  // 135: hawkr.seller.v1alpha1.SellerAppService.GetMyDashboard:input_type -> hawkr.seller.v1alpha1.GetMyDashboardRequest
+	62,  // 136: hawkr.seller.v1alpha1.SellerAppService.CloseMyStore:input_type -> hawkr.seller.v1alpha1.CloseMyStoreRequest
+	70,  // 137: hawkr.seller.v1alpha1.SellerAppService.SaveKYCDraft:input_type -> hawkr.seller.v1alpha1.SaveKYCDraftRequest
+	77,  // 138: hawkr.seller.v1alpha1.SellerAppService.GetMyKYC:input_type -> hawkr.seller.v1alpha1.GetMyKYCRequest
+	79,  // 139: hawkr.seller.v1alpha1.SellerAppService.SubmitKYC:input_type -> hawkr.seller.v1alpha1.SubmitKYCRequest
+	81,  // 140: hawkr.seller.v1alpha1.SellerAppService.CancelKYC:input_type -> hawkr.seller.v1alpha1.CancelKYCRequest
+	73,  // 141: hawkr.seller.v1alpha1.SellerAppService.GetMyPaymentAccount:input_type -> hawkr.seller.v1alpha1.GetMyPaymentAccountRequest
+	75,  // 142: hawkr.seller.v1alpha1.SellerAppService.CreatePaymentOnboardingSession:input_type -> hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionRequest
+	84,  // 143: hawkr.seller.v1alpha1.SellerAppService.LookupBusinessRegistration:input_type -> hawkr.seller.v1alpha1.LookupBusinessRegistrationRequest
+	93,  // 144: hawkr.seller.v1alpha1.SellerAppService.ListMyMeasures:input_type -> hawkr.seller.v1alpha1.ListMyMeasuresRequest
+	95,  // 145: hawkr.seller.v1alpha1.SellerAppService.GetMyMeasure:input_type -> hawkr.seller.v1alpha1.GetMyMeasureRequest
+	97,  // 146: hawkr.seller.v1alpha1.SellerAppService.SubmitAppeal:input_type -> hawkr.seller.v1alpha1.SubmitAppealRequest
+	99,  // 147: hawkr.seller.v1alpha1.SellerAppService.RequestRemediation:input_type -> hawkr.seller.v1alpha1.RequestRemediationRequest
+	103, // 148: hawkr.seller.v1alpha1.SellerPublicService.GetStore:input_type -> hawkr.seller.v1alpha1.GetStoreRequest
+	105, // 149: hawkr.seller.v1alpha1.SellerPublicService.ListStores:input_type -> hawkr.seller.v1alpha1.ListStoresRequest
+	107, // 150: hawkr.seller.v1alpha1.SellerPublicService.BatchGetStores:input_type -> hawkr.seller.v1alpha1.BatchGetStoresRequest
+	109, // 151: hawkr.seller.v1alpha1.SellerPublicService.GetSellerAgreements:input_type -> hawkr.seller.v1alpha1.GetSellerAgreementsRequest
+	111, // 152: hawkr.seller.v1alpha1.SellerPublicService.RecordProductView:input_type -> hawkr.seller.v1alpha1.RecordProductViewRequest
+	34,  // 153: hawkr.seller.v1alpha1.SellerAppService.ApplyStore:output_type -> hawkr.seller.v1alpha1.ApplyStoreResponse
+	36,  // 154: hawkr.seller.v1alpha1.SellerAppService.GetMyStoreOpening:output_type -> hawkr.seller.v1alpha1.GetMyStoreOpeningResponse
+	39,  // 155: hawkr.seller.v1alpha1.SellerAppService.GetMyStore:output_type -> hawkr.seller.v1alpha1.GetMyStoreResponse
+	41,  // 156: hawkr.seller.v1alpha1.SellerAppService.GetMyOnboarding:output_type -> hawkr.seller.v1alpha1.GetMyOnboardingResponse
+	46,  // 157: hawkr.seller.v1alpha1.SellerAppService.RefreshMyPaymentAccount:output_type -> hawkr.seller.v1alpha1.RefreshMyPaymentAccountResponse
+	44,  // 158: hawkr.seller.v1alpha1.SellerAppService.UpdateMyStore:output_type -> hawkr.seller.v1alpha1.UpdateMyStoreResponse
+	48,  // 159: hawkr.seller.v1alpha1.SellerAppService.CompleteMyStoreOnboarding:output_type -> hawkr.seller.v1alpha1.CompleteMyStoreOnboardingResponse
+	50,  // 160: hawkr.seller.v1alpha1.SellerAppService.ListMyFollowers:output_type -> hawkr.seller.v1alpha1.ListMyFollowersResponse
+	54,  // 161: hawkr.seller.v1alpha1.SellerAppService.GetMyDashboard:output_type -> hawkr.seller.v1alpha1.GetMyDashboardResponse
+	63,  // 162: hawkr.seller.v1alpha1.SellerAppService.CloseMyStore:output_type -> hawkr.seller.v1alpha1.CloseMyStoreResponse
+	71,  // 163: hawkr.seller.v1alpha1.SellerAppService.SaveKYCDraft:output_type -> hawkr.seller.v1alpha1.SaveKYCDraftResponse
+	78,  // 164: hawkr.seller.v1alpha1.SellerAppService.GetMyKYC:output_type -> hawkr.seller.v1alpha1.GetMyKYCResponse
+	80,  // 165: hawkr.seller.v1alpha1.SellerAppService.SubmitKYC:output_type -> hawkr.seller.v1alpha1.SubmitKYCResponse
+	82,  // 166: hawkr.seller.v1alpha1.SellerAppService.CancelKYC:output_type -> hawkr.seller.v1alpha1.CancelKYCResponse
+	74,  // 167: hawkr.seller.v1alpha1.SellerAppService.GetMyPaymentAccount:output_type -> hawkr.seller.v1alpha1.GetMyPaymentAccountResponse
+	76,  // 168: hawkr.seller.v1alpha1.SellerAppService.CreatePaymentOnboardingSession:output_type -> hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse
+	85,  // 169: hawkr.seller.v1alpha1.SellerAppService.LookupBusinessRegistration:output_type -> hawkr.seller.v1alpha1.LookupBusinessRegistrationResponse
+	94,  // 170: hawkr.seller.v1alpha1.SellerAppService.ListMyMeasures:output_type -> hawkr.seller.v1alpha1.ListMyMeasuresResponse
+	96,  // 171: hawkr.seller.v1alpha1.SellerAppService.GetMyMeasure:output_type -> hawkr.seller.v1alpha1.GetMyMeasureResponse
+	98,  // 172: hawkr.seller.v1alpha1.SellerAppService.SubmitAppeal:output_type -> hawkr.seller.v1alpha1.SubmitAppealResponse
+	100, // 173: hawkr.seller.v1alpha1.SellerAppService.RequestRemediation:output_type -> hawkr.seller.v1alpha1.RequestRemediationResponse
+	104, // 174: hawkr.seller.v1alpha1.SellerPublicService.GetStore:output_type -> hawkr.seller.v1alpha1.GetStoreResponse
+	106, // 175: hawkr.seller.v1alpha1.SellerPublicService.ListStores:output_type -> hawkr.seller.v1alpha1.ListStoresResponse
+	108, // 176: hawkr.seller.v1alpha1.SellerPublicService.BatchGetStores:output_type -> hawkr.seller.v1alpha1.BatchGetStoresResponse
+	110, // 177: hawkr.seller.v1alpha1.SellerPublicService.GetSellerAgreements:output_type -> hawkr.seller.v1alpha1.GetSellerAgreementsResponse
+	112, // 178: hawkr.seller.v1alpha1.SellerPublicService.RecordProductView:output_type -> hawkr.seller.v1alpha1.RecordProductViewResponse
+	153, // [153:179] is the sub-list for method output_type
+	127, // [127:153] is the sub-list for method input_type
+	127, // [127:127] is the sub-list for extension type_name
+	127, // [127:127] is the sub-list for extension extendee
+	0,   // [0:127] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_seller_v1alpha1_seller_proto_init() }

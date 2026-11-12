@@ -240,9 +240,7 @@ LEGACY_GRPC_ADDR = :9941
 RABBITMQ_URL = amqp://guest:guest@localhost:5672/
 # 瀏覽器直接呼叫單體的 origin（website 的 next dev）。admin 的瀏覽器只打自己的 BFF，由 BFF 以伺服器身分呼叫，不在這裡
 CORS_ALLOWED_ORIGINS = http://localhost:3000
-# KYC 個資的金鑰（身分證號、銀行帳號的加密，與身分比對用的 HMAC；只給本機開發用，兩者必須不同，格式 id:base64，詳見
-# cmd/hawkr/seller.go 的 readKYCKeys）。正式環境放部署設定，不進版控。
-KYC_ENCRYPTION_KEYS ?= dev1:ZGV2LW9ubHkta3ljLWVuY3J5cHRpb24ta2V5LTAwMDE=
+# 統編比對用的 HMAC 金鑰（只給本機開發用，格式 id:base64，詳見 cmd/hawkr/seller.go 的 readKYCHashKeys）。正式環境放部署設定，不進版控。
 KYC_HASH_KEYS ?= dev1:ZGV2LW9ubHkta3ljLWhhc2gtaG1hYy1rZXktMDAwMDE=
 # 收款開通的 provider（詳見 cmd/hawkr/seller.go 的 readPayment）：本機用 fake（記憶體內，所有帳戶都回轉帳能力已啟用），空字串表示沒有設定。
 PAYMENT_PROVIDER ?= fake
@@ -252,7 +250,7 @@ MONOLITH_ENV = GOWORK=off DATABASE_URL='$(DATABASE_URL)' MEDIA_SERVICE_ADDR='$(M
 	GATEWAY_URL='$(GATEWAY_URL)' \
 	CORS_ALLOWED_ORIGINS='$(CORS_ALLOWED_ORIGINS)' \
 	DEV_AUTH_KEY_FILE='$(DEV_AUTH_KEY_FILE)' LEGACY_GRPC_ADDR='$(LEGACY_GRPC_ADDR)' \
-	KYC_ENCRYPTION_KEYS='$(KYC_ENCRYPTION_KEYS)' KYC_HASH_KEYS='$(KYC_HASH_KEYS)' \
+	KYC_HASH_KEYS='$(KYC_HASH_KEYS)' \
 	PAYMENT_PROVIDER='$(PAYMENT_PROVIDER)' \
 	RABBITMQ_URL='$(RABBITMQ_URL)' \
 	PRODUCT_SERVICE_ADDR='$(PRODUCT_SERVICE_ADDR)' ORDER_SERVICE_ADDR='$(ORDER_SERVICE_ADDR)' CRM_SERVICE_ADDR='$(CRM_SERVICE_ADDR)' \

@@ -20,10 +20,10 @@ const (
 	fpOther  = "fp_other_bank_0002"
 )
 
-// approvedWithFingerprints 核准一家新店（身分證號與銀行帳號都不同於其他店）並讓外部帳戶回這些 fingerprint，執行同步一輪。
-func (f *fixture) approvedWithFingerprints(t *testing.T, idCard, bank string, fingerprints ...string) (int64, Store) {
+// approvedWithFingerprints 核准一家新店並讓外部帳戶回這些 fingerprint，執行同步一輪。
+func (f *fixture) approvedWithFingerprints(t *testing.T, fingerprints ...string) (int64, Store) {
 	t.Helper()
-	accountID, s, sub := f.submitted(t, idCard, bank)
+	accountID, s, sub := f.submitted(t)
 	must(t, approve(f, sub))
 	snap := enabledSnapshot
 	snap.BankFingerprints = fingerprints
@@ -43,9 +43,9 @@ func (f *fixture) fingerprintRows(t *testing.T, storeID int64) int64 {
 func TestSharedProviderBankFingerprintIsListedButNeverTerminates(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	accountS, sS := f.approvedWithFingerprints(t, idA, bankAcct, fpShared)
-	accountO, sO := f.approvedWithFingerprints(t, idB, "999888777666", fpShared)
-	accountN, _ := f.approvedWithFingerprints(t, idC, "012345678903", fpOther)
+	accountS, sS := f.approvedWithFingerprints(t, fpShared)
+	accountO, sO := f.approvedWithFingerprints(t, fpShared)
+	accountN, _ := f.approvedWithFingerprints(t, fpOther)
 	source := f.terminate(t, sS.StoreID, GroundFraud)
 	byAccount := map[int64]LinkedAccount{}
 	for _, l := range f.measureOf(t, source.ID).LinkedAccounts {
@@ -70,17 +70,16 @@ func TestSharedProviderBankFingerprintIsListedButNeverTerminates(t *testing.T) {
 }
 
 // 寫入的形狀：每個 fingerprint 每把 HMAC 金鑰一列；重複同步不增加列；fingerprint 之後從快照消失，列仍保留（已掛上並經 provider 驗證的事實，只由過期刪除）；
-// 新的 fingerprint 另外加列；資料庫（兩張表）裡沒有 fingerprint 明文。
+// 新的 fingerprint 另外加列；資料庫裡沒有 fingerprint 明文。
 // 金鑰環是兩把金鑰（輪替之後），列數斷言為 2 把 × fingerprint 數。
 // mutation：只用第一把金鑰寫（Sum 取代 SumAll）→ 列數 N 而不是 2N，斷言失敗；INSERT 拿掉 ON CONFLICT → 第二輪同步失敗或重複；
 // Sync 在 fingerprint 消失時修剪 → 保留的那一步失敗；寫入明文 → 明文檢查失敗。
 func TestBankFingerprintRowsAreIdempotentKeptAndNeverPlaintext(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	enc, mac := rotatedKeys(t)
-	f.module = f.newModuleWithKeys(t, f.jobs, enc, mac)
-	_, s := f.approvedWithFingerprints(t, idA, bankAcct, fpShared, fpOther)
-	keys := f.count(t, "SELECT count(DISTINCT key_id) FROM seller.account_identity_hashes WHERE source_store_id = $1 AND field = 'ID_CARD_NO'", s.StoreID)
+	f.module = f.newModuleWithKeys(t, f.jobs, rotatedMAC(t))
+	_, s := f.approvedWithFingerprints(t, fpShared, fpOther)
+	keys := f.count(t, "SELECT count(DISTINCT key_id) FROM seller.account_identity_hashes WHERE source_store_id = $1 AND field = 'BANK_FINGERPRINT'", s.StoreID)
 	if keys != 2 {
 		t.Fatalf("前提：金鑰環兩把金鑰：%d", keys)
 	}
@@ -99,24 +98,22 @@ func TestBankFingerprintRowsAreIdempotentKeptAndNeverPlaintext(t *testing.T) {
 	if n := f.fingerprintRows(t, s.StoreID); n != keys*3 {
 		t.Fatalf("新的 fingerprint 另外加列：%d", n)
 	}
-	for _, table := range []string{"account_identity_hashes", "kyc_identity_hashes"} {
-		for _, fp := range []string{fpShared, fpOther, "fp_third_bank_0003"} {
-			if n := f.count(t, "SELECT count(*) FROM seller."+table+" r WHERE r::text LIKE '%' || $1 || '%'", fp); n != 0 {
-				t.Fatalf("%s 有 fingerprint 明文：%d", table, n)
-			}
+	for _, fp := range []string{fpShared, fpOther, "fp_third_bank_0003"} {
+		if n := f.count(t, "SELECT count(*) FROM seller.account_identity_hashes r WHERE r::text LIKE '%' || $1 || '%'", fp); n != 0 {
+			t.Fatalf("account_identity_hashes 有 fingerprint 明文：%d", n)
 		}
 	}
 }
 
 // 措施的快照含 fingerprint 的 hash（kind BANK_ACCOUNT），快照裡沒有明文。
-// mutation：SnapshotMeasureIdentities 不複製 BANK_FINGERPRINT → 快照列數少；對成 ID_CARD → kind 檢查失敗。
+// mutation：SnapshotMeasureIdentities 不複製 BANK_FINGERPRINT → 快照列數少；對成 TAX_ID → kind 檢查失敗。
 func TestMeasureSnapshotCarriesTheBankFingerprintAsBankAccount(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	_, s := f.approvedWithFingerprints(t, idA, bankAcct, fpShared)
+	_, s := f.approvedWithFingerprints(t, fpShared)
 	m := f.terminate(t, s.StoreID, GroundFraud)
-	if n := f.count(t, "SELECT count(*) FROM seller.measure_identities WHERE measure_id = $1 AND kind = 'BANK_ACCOUNT'", m.ID); n < 2 {
-		t.Fatalf("快照要有 KYC 銀行帳號與 fingerprint 各一列（BANK_ACCOUNT）：%d", n)
+	if n := f.count(t, "SELECT count(*) FROM seller.measure_identities WHERE measure_id = $1 AND kind = 'BANK_ACCOUNT'", m.ID); n != 1 {
+		t.Fatalf("快照要有 fingerprint 一列（BANK_ACCOUNT）：%d", n)
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.measure_identities r WHERE r::text LIKE '%' || $1 || '%'", fpShared); n != 0 {
 		t.Fatalf("快照有 fingerprint 明文：%d", n)
@@ -129,7 +126,7 @@ func TestBankFingerprintRowsExpireWithTheStint(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	account, s := f.approvedWithFingerprints(t, idA, bankAcct, fpShared)
+	account, s := f.approvedWithFingerprints(t, fpShared)
 	_, err := f.module.CloseCurrent(ctx, account)
 	must(t, err)
 	closedAt := f.now
@@ -160,8 +157,8 @@ func TestLinkedAccountLookupUsesTheFingerprintHashIndex(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	_, sS := f.approvedWithFingerprints(t, idA, bankAcct, fpShared)
-	accountO, _ := f.approvedWithFingerprints(t, idB, "999888777666", fpShared)
+	_, sS := f.approvedWithFingerprints(t, fpShared)
+	accountO, _ := f.approvedWithFingerprints(t, fpShared)
 	source := f.terminate(t, sS.StoreID, GroundFraud)
 	must(t, f.db.InTx(ctx, func(ctx context.Context) error {
 		c := f.db.Conn(ctx)

@@ -23,6 +23,8 @@ func TestRetirementAtThirtyDaysAndPersonalDataPurgeAtOneHundredEightyFourDays(t 
 	// 公開內容直接寫進 fixture。
 	_, err := f.db.Conn(ctx).Exec(ctx, `UPDATE seller.stores SET description='自家種的蔬果', prize='優良農民', website_url='https://farm.example.invalid' WHERE store_id=$1`, s.StoreID)
 	must(t, err)
+	_, err = f.db.Conn(ctx).Exec(ctx, `UPDATE seller.kyc_applications SET website_url='https://farm.example.invalid' WHERE store_id=$1`, s.StoreID)
+	must(t, err)
 	retired := record[StoreRetired](f)
 	_, err = f.module.CloseCurrent(ctx, accountID)
 	must(t, err)
@@ -49,7 +51,7 @@ func TestRetirementAtThirtyDaysAndPersonalDataPurgeAtOneHundredEightyFourDays(t 
 			t.Errorf("退場不清註冊資料 %s", c)
 		}
 	}
-	if f.row(t, "kyc_applications", "store_id", s.StoreID)["real_name"] == nil {
+	if f.row(t, "kyc_applications", "store_id", s.StoreID)["website_url"] == nil {
 		t.Error("退場不清 KYC")
 	}
 	if events := retired.all(); len(events) != 1 || events[0].StoreID != s.StoreID || !events[0].OccurredAt.Equal(f.now) {
@@ -70,7 +72,7 @@ func TestRetirementAtThirtyDaysAndPersonalDataPurgeAtOneHundredEightyFourDays(t 
 			t.Errorf("第二段要清掉 %s", c)
 		}
 	}
-	if f.row(t, "kyc_applications", "store_id", s.StoreID)["real_name"] != nil {
+	if f.row(t, "kyc_applications", "store_id", s.StoreID)["website_url"] != nil {
 		t.Error("第二段要清 KYC")
 	}
 	if len(retired.all()) != 1 {

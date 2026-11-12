@@ -265,70 +265,72 @@ const KYCField$json = {
   '1': 'KYCField',
   '2': [
     {'1': 'KYC_FIELD_UNSPECIFIED', '2': 0},
-    {'1': 'KYC_FIELD_REAL_NAME', '2': 1},
-    {'1': 'KYC_FIELD_BIRTH_DATE', '2': 2},
-    {'1': 'KYC_FIELD_ID_CARD_ISSUE_DATE', '2': 3},
-    {'1': 'KYC_FIELD_ID_CARD_ISSUE_TYPE', '2': 4},
-    {'1': 'KYC_FIELD_ID_CARD_ISSUE_LOCATION', '2': 5},
-    {'1': 'KYC_FIELD_ENGLISH_NAME', '2': 6},
-    {'1': 'KYC_FIELD_BANK_NAME', '2': 7},
-    {'1': 'KYC_FIELD_BANK_CODE', '2': 8},
-    {'1': 'KYC_FIELD_BANK_ACCOUNT', '2': 9},
     {'1': 'KYC_FIELD_PRODUCT_TYPE', '2': 10},
     {'1': 'KYC_FIELD_WEBSITE_URL', '2': 12},
-    {'1': 'KYC_FIELD_ID_CARD_FRONT', '2': 15},
-    {'1': 'KYC_FIELD_ID_CARD_BACK', '2': 16},
-    {'1': 'KYC_FIELD_BANK_BOOK', '2': 17},
-    {'1': 'KYC_FIELD_INDIVIDUAL_ID_CARD_NO', '2': 18},
     {'1': 'KYC_FIELD_BUSINESS_COMPANY_NAME', '2': 20},
     {'1': 'KYC_FIELD_BUSINESS_TAX_ID', '2': 21},
     {'1': 'KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE', '2': 22},
     {'1': 'KYC_FIELD_BUSINESS_COMPANY_PHONE', '2': 25},
-    {'1': 'KYC_FIELD_BUSINESS_REP_ID_CARD_NO', '2': 26},
     {'1': 'KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS', '2': 27},
     {'1': 'KYC_FIELD_BUSINESS_COMPANY_ADDRESS', '2': 28},
   ],
   '4': [
+    {'1': 1, '2': 9},
     {'1': 11, '2': 11},
     {'1': 13, '2': 13},
     {'1': 14, '2': 14},
+    {'1': 15, '2': 18},
     {'1': 19, '2': 19},
     {'1': 23, '2': 23},
     {'1': 24, '2': 24},
+    {'1': 26, '2': 26},
     {'1': 29, '2': 29},
   ],
   '5': [
+    'KYC_FIELD_REAL_NAME',
+    'KYC_FIELD_BIRTH_DATE',
+    'KYC_FIELD_ID_CARD_ISSUE_DATE',
+    'KYC_FIELD_ID_CARD_ISSUE_TYPE',
+    'KYC_FIELD_ID_CARD_ISSUE_LOCATION',
+    'KYC_FIELD_ENGLISH_NAME',
+    'KYC_FIELD_BANK_NAME',
+    'KYC_FIELD_BANK_CODE',
+    'KYC_FIELD_BANK_ACCOUNT',
     'KYC_FIELD_FOOD_BUSINESS',
     'KYC_FIELD_CONTACT_EMAIL',
     'KYC_FIELD_CONTACT_PHONE',
+    'KYC_FIELD_ID_CARD_FRONT',
+    'KYC_FIELD_ID_CARD_BACK',
+    'KYC_FIELD_BANK_BOOK',
+    'KYC_FIELD_INDIVIDUAL_ID_CARD_NO',
     'KYC_FIELD_BUSINESS_COMPANY_TYPE',
     'KYC_FIELD_BUSINESS_COMPANY_TOWN_CODE',
     'KYC_FIELD_BUSINESS_COMPANY_ADDRESS_DETAIL',
+    'KYC_FIELD_BUSINESS_REP_ID_CARD_NO',
     'KYC_FIELD_PAYOUT_CONTACT_EMAIL'
   ],
 };
 
 /// Descriptor for `KYCField`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List kYCFieldDescriptor = $convert.base64Decode(
-    'CghLWUNGaWVsZBIZChVLWUNfRklFTERfVU5TUEVDSUZJRUQQABIXChNLWUNfRklFTERfUkVBTF'
-    '9OQU1FEAESGAoUS1lDX0ZJRUxEX0JJUlRIX0RBVEUQAhIgChxLWUNfRklFTERfSURfQ0FSRF9J'
-    'U1NVRV9EQVRFEAMSIAocS1lDX0ZJRUxEX0lEX0NBUkRfSVNTVUVfVFlQRRAEEiQKIEtZQ19GSU'
-    'VMRF9JRF9DQVJEX0lTU1VFX0xPQ0FUSU9OEAUSGgoWS1lDX0ZJRUxEX0VOR0xJU0hfTkFNRRAG'
-    'EhcKE0tZQ19GSUVMRF9CQU5LX05BTUUQBxIXChNLWUNfRklFTERfQkFOS19DT0RFEAgSGgoWS1'
-    'lDX0ZJRUxEX0JBTktfQUNDT1VOVBAJEhoKFktZQ19GSUVMRF9QUk9EVUNUX1RZUEUQChIZChVL'
-    'WUNfRklFTERfV0VCU0lURV9VUkwQDBIbChdLWUNfRklFTERfSURfQ0FSRF9GUk9OVBAPEhoKFk'
-    'tZQ19GSUVMRF9JRF9DQVJEX0JBQ0sQEBIXChNLWUNfRklFTERfQkFOS19CT09LEBESIwofS1lD'
-    'X0ZJRUxEX0lORElWSURVQUxfSURfQ0FSRF9OTxASEiMKH0tZQ19GSUVMRF9CVVNJTkVTU19DT0'
-    '1QQU5ZX05BTUUQFBIdChlLWUNfRklFTERfQlVTSU5FU1NfVEFYX0lEEBUSLAooS1lDX0ZJRUxE'
-    'X0JVU0lORVNTX0NPTVBBTllfUkVHSVNURVJfREFURRAWEiQKIEtZQ19GSUVMRF9CVVNJTkVTU1'
-    '9DT01QQU5ZX1BIT05FEBkSJQohS1lDX0ZJRUxEX0JVU0lORVNTX1JFUF9JRF9DQVJEX05PEBoS'
-    'KAokS1lDX0ZJRUxEX0JVU0lORVNTX0NPTVBBTllfRE9DVU1FTlRTEBsSJgoiS1lDX0ZJRUxEX0'
-    'JVU0lORVNTX0NPTVBBTllfQUREUkVTUxAcIgQICxALIgQIDRANIgQIDhAOIgQIExATIgQIFxAX'
-    'IgQIGBAYIgQIHRAdKhdLWUNfRklFTERfRk9PRF9CVVNJTkVTUyoXS1lDX0ZJRUxEX0NPTlRBQ1'
-    'RfRU1BSUwqF0tZQ19GSUVMRF9DT05UQUNUX1BIT05FKh9LWUNfRklFTERfQlVTSU5FU1NfQ09N'
-    'UEFOWV9UWVBFKiRLWUNfRklFTERfQlVTSU5FU1NfQ09NUEFOWV9UT1dOX0NPREUqKUtZQ19GSU'
-    'VMRF9CVVNJTkVTU19DT01QQU5ZX0FERFJFU1NfREVUQUlMKh5LWUNfRklFTERfUEFZT1VUX0NP'
-    'TlRBQ1RfRU1BSUw=');
+    'CghLWUNGaWVsZBIZChVLWUNfRklFTERfVU5TUEVDSUZJRUQQABIaChZLWUNfRklFTERfUFJPRF'
+    'VDVF9UWVBFEAoSGQoVS1lDX0ZJRUxEX1dFQlNJVEVfVVJMEAwSIwofS1lDX0ZJRUxEX0JVU0lO'
+    'RVNTX0NPTVBBTllfTkFNRRAUEh0KGUtZQ19GSUVMRF9CVVNJTkVTU19UQVhfSUQQFRIsCihLWU'
+    'NfRklFTERfQlVTSU5FU1NfQ09NUEFOWV9SRUdJU1RFUl9EQVRFEBYSJAogS1lDX0ZJRUxEX0JV'
+    'U0lORVNTX0NPTVBBTllfUEhPTkUQGRIoCiRLWUNfRklFTERfQlVTSU5FU1NfQ09NUEFOWV9ET0'
+    'NVTUVOVFMQGxImCiJLWUNfRklFTERfQlVTSU5FU1NfQ09NUEFOWV9BRERSRVNTEBwiBAgBEAki'
+    'BAgLEAsiBAgNEA0iBAgOEA4iBAgPEBIiBAgTEBMiBAgXEBciBAgYEBgiBAgaEBoiBAgdEB0qE0'
+    'tZQ19GSUVMRF9SRUFMX05BTUUqFEtZQ19GSUVMRF9CSVJUSF9EQVRFKhxLWUNfRklFTERfSURf'
+    'Q0FSRF9JU1NVRV9EQVRFKhxLWUNfRklFTERfSURfQ0FSRF9JU1NVRV9UWVBFKiBLWUNfRklFTE'
+    'RfSURfQ0FSRF9JU1NVRV9MT0NBVElPTioWS1lDX0ZJRUxEX0VOR0xJU0hfTkFNRSoTS1lDX0ZJ'
+    'RUxEX0JBTktfTkFNRSoTS1lDX0ZJRUxEX0JBTktfQ09ERSoWS1lDX0ZJRUxEX0JBTktfQUNDT1'
+    'VOVCoXS1lDX0ZJRUxEX0ZPT0RfQlVTSU5FU1MqF0tZQ19GSUVMRF9DT05UQUNUX0VNQUlMKhdL'
+    'WUNfRklFTERfQ09OVEFDVF9QSE9ORSoXS1lDX0ZJRUxEX0lEX0NBUkRfRlJPTlQqFktZQ19GSU'
+    'VMRF9JRF9DQVJEX0JBQ0sqE0tZQ19GSUVMRF9CQU5LX0JPT0sqH0tZQ19GSUVMRF9JTkRJVklE'
+    'VUFMX0lEX0NBUkRfTk8qH0tZQ19GSUVMRF9CVVNJTkVTU19DT01QQU5ZX1RZUEUqJEtZQ19GSU'
+    'VMRF9CVVNJTkVTU19DT01QQU5ZX1RPV05fQ09ERSopS1lDX0ZJRUxEX0JVU0lORVNTX0NPTVBB'
+    'TllfQUREUkVTU19ERVRBSUwqIUtZQ19GSUVMRF9CVVNJTkVTU19SRVBfSURfQ0FSRF9OTyoeS1'
+    'lDX0ZJRUxEX1BBWU9VVF9DT05UQUNUX0VNQUlM');
 
 @$core.Deprecated('Use kYCIssueCodeDescriptor instead')
 const KYCIssueCode$json = {
@@ -1730,23 +1732,17 @@ final $typed_data.Uint8List kYCRejectionDescriptor = $convert.base64Decode(
 @$core.Deprecated('Use individualKYCDescriptor instead')
 const IndividualKYC$json = {
   '1': 'IndividualKYC',
-  '2': [
-    {'1': 'id_card_no', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'idCardNo'},
-    {
-      '1': 'id_card_no_masked',
-      '3': 2,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'idCardNoMasked'
-    },
+  '9': [
+    {'1': 1, '2': 2},
+    {'1': 2, '2': 3},
   ],
+  '10': ['id_card_no', 'id_card_no_masked'],
 };
 
 /// Descriptor for `IndividualKYC`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List individualKYCDescriptor = $convert.base64Decode(
-    'Cg1JbmRpdmlkdWFsS1lDEiEKCmlkX2NhcmRfbm8YASABKAlCA+BBBFIIaWRDYXJkTm8SLgoRaW'
-    'RfY2FyZF9ub19tYXNrZWQYAiABKAlCA+BBA1IOaWRDYXJkTm9NYXNrZWQ=');
+    'Cg1JbmRpdmlkdWFsS1lDSgQIARACSgQIAhADUgppZF9jYXJkX25vUhFpZF9jYXJkX25vX21hc2'
+    'tlZA==');
 
 @$core.Deprecated('Use businessKYCDescriptor instead')
 const BusinessKYC$json = {
@@ -1763,22 +1759,6 @@ const BusinessKYC$json = {
       '10': 'companyRegisterDate'
     },
     {'1': 'company_phone', '3': 7, '4': 1, '5': 9, '10': 'companyPhone'},
-    {
-      '1': 'rep_id_card_no',
-      '3': 8,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'repIdCardNo'
-    },
-    {
-      '1': 'rep_id_card_no_masked',
-      '3': 9,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'repIdCardNoMasked'
-    },
     {
       '1': 'company_documents',
       '3': 10,
@@ -1800,8 +1780,16 @@ const BusinessKYC$json = {
     {'1': 1, '2': 2},
     {'1': 5, '2': 6},
     {'1': 6, '2': 7},
+    {'1': 8, '2': 9},
+    {'1': 9, '2': 10},
   ],
-  '10': ['company_type', 'company_town_code', 'company_address_detail'],
+  '10': [
+    'company_type',
+    'company_town_code',
+    'company_address_detail',
+    'rep_id_card_no',
+    'rep_id_card_no_masked'
+  ],
 };
 
 /// Descriptor for `BusinessKYC`. Decode as a `google.protobuf.DescriptorProto`.
@@ -1809,13 +1797,12 @@ final $typed_data.Uint8List businessKYCDescriptor = $convert.base64Decode(
     'CgtCdXNpbmVzc0tZQxIhCgxjb21wYW55X25hbWUYAiABKAlSC2NvbXBhbnlOYW1lEhUKBnRheF'
     '9pZBgDIAEoCVIFdGF4SWQSRQoVY29tcGFueV9yZWdpc3Rlcl9kYXRlGAQgASgLMhEuZ29vZ2xl'
     'LnR5cGUuRGF0ZVITY29tcGFueVJlZ2lzdGVyRGF0ZRIjCg1jb21wYW55X3Bob25lGAcgASgJUg'
-    'xjb21wYW55UGhvbmUSKAoOcmVwX2lkX2NhcmRfbm8YCCABKAlCA+BBBFILcmVwSWRDYXJkTm8S'
-    'NQoVcmVwX2lkX2NhcmRfbm9fbWFza2VkGAkgASgJQgPgQQNSEXJlcElkQ2FyZE5vTWFza2VkEk'
-    '8KEWNvbXBhbnlfZG9jdW1lbnRzGAogAygLMiIuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLktZQ0Rv'
-    'Y3VtZW50UhBjb21wYW55RG9jdW1lbnRzEk0KD2NvbXBhbnlfYWRkcmVzcxgLIAEoCzIkLmhhd2'
-    'tyLmNvbW1vbi52MWFscGhhMS5Qb3N0YWxBZGRyZXNzUg5jb21wYW55QWRkcmVzc0oECAEQAkoE'
-    'CAUQBkoECAYQB1IMY29tcGFueV90eXBlUhFjb21wYW55X3Rvd25fY29kZVIWY29tcGFueV9hZG'
-    'RyZXNzX2RldGFpbA==');
+    'xjb21wYW55UGhvbmUSTwoRY29tcGFueV9kb2N1bWVudHMYCiADKAsyIi5oYXdrci5zZWxsZXIu'
+    'djFhbHBoYTEuS1lDRG9jdW1lbnRSEGNvbXBhbnlEb2N1bWVudHMSTQoPY29tcGFueV9hZGRyZX'
+    'NzGAsgASgLMiQuaGF3a3IuY29tbW9uLnYxYWxwaGExLlBvc3RhbEFkZHJlc3NSDmNvbXBhbnlB'
+    'ZGRyZXNzSgQIARACSgQIBRAGSgQIBhAHSgQICBAJSgQICRAKUgxjb21wYW55X3R5cGVSEWNvbX'
+    'BhbnlfdG93bl9jb2RlUhZjb21wYW55X2FkZHJlc3NfZGV0YWlsUg5yZXBfaWRfY2FyZF9ub1IV'
+    'cmVwX2lkX2NhcmRfbm9fbWFza2Vk');
 
 @$core.Deprecated('Use kYCApplicationDescriptor instead')
 const KYCApplication$json = {
@@ -1832,82 +1819,8 @@ const KYCApplication$json = {
       '10': 'status'
     },
     {'1': 'etag', '3': 3, '4': 1, '5': 9, '10': 'etag'},
-    {'1': 'real_name', '3': 4, '4': 1, '5': 9, '10': 'realName'},
-    {
-      '1': 'birth_date',
-      '3': 5,
-      '4': 1,
-      '5': 11,
-      '6': '.google.type.Date',
-      '10': 'birthDate'
-    },
-    {
-      '1': 'id_card_issue_date',
-      '3': 6,
-      '4': 1,
-      '5': 11,
-      '6': '.google.type.Date',
-      '10': 'idCardIssueDate'
-    },
-    {
-      '1': 'id_card_issue_type',
-      '3': 7,
-      '4': 1,
-      '5': 9,
-      '10': 'idCardIssueType'
-    },
-    {
-      '1': 'id_card_issue_location',
-      '3': 8,
-      '4': 1,
-      '5': 9,
-      '10': 'idCardIssueLocation'
-    },
-    {'1': 'english_name', '3': 9, '4': 1, '5': 9, '10': 'englishName'},
-    {'1': 'bank_name', '3': 10, '4': 1, '5': 9, '10': 'bankName'},
-    {'1': 'bank_code', '3': 11, '4': 1, '5': 9, '10': 'bankCode'},
-    {
-      '1': 'bank_account',
-      '3': 12,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'bankAccount'
-    },
-    {
-      '1': 'bank_account_masked',
-      '3': 13,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'bankAccountMasked'
-    },
     {'1': 'product_type', '3': 14, '4': 1, '5': 9, '10': 'productType'},
     {'1': 'website_url', '3': 16, '4': 1, '5': 9, '10': 'websiteUrl'},
-    {
-      '1': 'id_card_front',
-      '3': 19,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.seller.v1alpha1.KYCDocument',
-      '10': 'idCardFront'
-    },
-    {
-      '1': 'id_card_back',
-      '3': 20,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.seller.v1alpha1.KYCDocument',
-      '10': 'idCardBack'
-    },
-    {
-      '1': 'bank_book',
-      '3': 21,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.seller.v1alpha1.KYCDocument',
-      '10': 'bankBook'
-    },
     {
       '1': 'individual',
       '3': 22,
@@ -2007,6 +1920,8 @@ const KYCApplication$json = {
     {'1': 17, '2': 18},
     {'1': 18, '2': 19},
     {'1': 24, '2': 25},
+    {'1': 4, '2': 14},
+    {'1': 19, '2': 22},
     {'1': 33, '2': 34},
   ],
   '10': [
@@ -2014,6 +1929,19 @@ const KYCApplication$json = {
     'contact_phone',
     'food_business',
     'flow',
+    'real_name',
+    'birth_date',
+    'id_card_issue_date',
+    'id_card_issue_type',
+    'id_card_issue_location',
+    'english_name',
+    'bank_name',
+    'bank_code',
+    'bank_account',
+    'bank_account_masked',
+    'id_card_front',
+    'id_card_back',
+    'bank_book',
     'payout_contact_email'
   ],
 };
@@ -2022,35 +1950,27 @@ const KYCApplication$json = {
 final $typed_data.Uint8List kYCApplicationDescriptor = $convert.base64Decode(
     'Cg5LWUNBcHBsaWNhdGlvbhITCgJpZBgBIAEoCUID4EEIUgJpZBI9CgZzdGF0dXMYAiABKA4yIC'
     '5oYXdrci5zZWxsZXIudjFhbHBoYTEuS1lDU3RhdHVzQgPgQQNSBnN0YXR1cxISCgRldGFnGAMg'
-    'ASgJUgRldGFnEhsKCXJlYWxfbmFtZRgEIAEoCVIIcmVhbE5hbWUSMAoKYmlydGhfZGF0ZRgFIA'
-    'EoCzIRLmdvb2dsZS50eXBlLkRhdGVSCWJpcnRoRGF0ZRI+ChJpZF9jYXJkX2lzc3VlX2RhdGUY'
-    'BiABKAsyES5nb29nbGUudHlwZS5EYXRlUg9pZENhcmRJc3N1ZURhdGUSKwoSaWRfY2FyZF9pc3'
-    'N1ZV90eXBlGAcgASgJUg9pZENhcmRJc3N1ZVR5cGUSMwoWaWRfY2FyZF9pc3N1ZV9sb2NhdGlv'
-    'bhgIIAEoCVITaWRDYXJkSXNzdWVMb2NhdGlvbhIhCgxlbmdsaXNoX25hbWUYCSABKAlSC2VuZ2'
-    'xpc2hOYW1lEhsKCWJhbmtfbmFtZRgKIAEoCVIIYmFua05hbWUSGwoJYmFua19jb2RlGAsgASgJ'
-    'UghiYW5rQ29kZRImCgxiYW5rX2FjY291bnQYDCABKAlCA+BBBFILYmFua0FjY291bnQSMwoTYm'
-    'Fua19hY2NvdW50X21hc2tlZBgNIAEoCUID4EEDUhFiYW5rQWNjb3VudE1hc2tlZBIhCgxwcm9k'
-    'dWN0X3R5cGUYDiABKAlSC3Byb2R1Y3RUeXBlEh8KC3dlYnNpdGVfdXJsGBAgASgJUgp3ZWJzaX'
-    'RlVXJsEkYKDWlkX2NhcmRfZnJvbnQYEyABKAsyIi5oYXdrci5zZWxsZXIudjFhbHBoYTEuS1lD'
-    'RG9jdW1lbnRSC2lkQ2FyZEZyb250EkQKDGlkX2NhcmRfYmFjaxgUIAEoCzIiLmhhd2tyLnNlbG'
-    'xlci52MWFscGhhMS5LWUNEb2N1bWVudFIKaWRDYXJkQmFjaxI/CgliYW5rX2Jvb2sYFSABKAsy'
-    'Ii5oYXdrci5zZWxsZXIudjFhbHBoYTEuS1lDRG9jdW1lbnRSCGJhbmtCb29rEkYKCmluZGl2aW'
-    'R1YWwYFiABKAsyJC5oYXdrci5zZWxsZXIudjFhbHBoYTEuSW5kaXZpZHVhbEtZQ0gAUgppbmRp'
-    'dmlkdWFsEkAKCGJ1c2luZXNzGBcgASgLMiIuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkJ1c2luZX'
-    'NzS1lDSABSCGJ1c2luZXNzEk8KDmxhc3RfcmVqZWN0aW9uGBkgASgLMiMuaGF3a3Iuc2VsbGVy'
-    'LnYxYWxwaGExLktZQ1JlamVjdGlvbkID4EEDUg1sYXN0UmVqZWN0aW9uEksKDm1pc3NpbmdfZm'
-    'llbGRzGBogAygOMh8uaGF3a3Iuc2VsbGVyLnYxYWxwaGExLktZQ0ZpZWxkQgPgQQNSDW1pc3Np'
-    'bmdGaWVsZHMSWAoUbWlzc2luZ19zdG9yZV9maWVsZHMYHyADKA4yIS5oYXdrci5zZWxsZXIudj'
-    'FhbHBoYTEuU3RvcmVGaWVsZEID4EEDUhJtaXNzaW5nU3RvcmVGaWVsZHMSUwoSb3V0c3RhbmRp'
-    'bmdfaXNzdWVzGCAgAygLMh8uaGF3a3Iuc2VsbGVyLnYxYWxwaGExLktZQ0lzc3VlQgPgQQNSEW'
-    '91dHN0YW5kaW5nSXNzdWVzEkAKC3N1Ym1pdF90aW1lGBsgASgLMhouZ29vZ2xlLnByb3RvYnVm'
-    'LlRpbWVzdGFtcEID4EEDUgpzdWJtaXRUaW1lEkAKC2RlY2lkZV90aW1lGBwgASgLMhouZ29vZ2'
-    'xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgpkZWNpZGVUaW1lEkAKC2NyZWF0ZV90aW1lGB0g'
-    'ASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgpjcmVhdGVUaW1lEkAKC3VwZG'
-    'F0ZV90aW1lGB4gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgp1cGRhdGVU'
-    'aW1lQgkKB3N1YmplY3RKBAgPEBBKBAgREBJKBAgSEBNKBAgYEBlKBAghECJSDWNvbnRhY3RfZW'
-    '1haWxSDWNvbnRhY3RfcGhvbmVSDWZvb2RfYnVzaW5lc3NSBGZsb3dSFHBheW91dF9jb250YWN0'
-    'X2VtYWls');
+    'ASgJUgRldGFnEiEKDHByb2R1Y3RfdHlwZRgOIAEoCVILcHJvZHVjdFR5cGUSHwoLd2Vic2l0ZV'
+    '91cmwYECABKAlSCndlYnNpdGVVcmwSRgoKaW5kaXZpZHVhbBgWIAEoCzIkLmhhd2tyLnNlbGxl'
+    'ci52MWFscGhhMS5JbmRpdmlkdWFsS1lDSABSCmluZGl2aWR1YWwSQAoIYnVzaW5lc3MYFyABKA'
+    'syIi5oYXdrci5zZWxsZXIudjFhbHBoYTEuQnVzaW5lc3NLWUNIAFIIYnVzaW5lc3MSTwoObGFz'
+    'dF9yZWplY3Rpb24YGSABKAsyIy5oYXdrci5zZWxsZXIudjFhbHBoYTEuS1lDUmVqZWN0aW9uQg'
+    'PgQQNSDWxhc3RSZWplY3Rpb24SSwoObWlzc2luZ19maWVsZHMYGiADKA4yHy5oYXdrci5zZWxs'
+    'ZXIudjFhbHBoYTEuS1lDRmllbGRCA+BBA1INbWlzc2luZ0ZpZWxkcxJYChRtaXNzaW5nX3N0b3'
+    'JlX2ZpZWxkcxgfIAMoDjIhLmhhd2tyLnNlbGxlci52MWFscGhhMS5TdG9yZUZpZWxkQgPgQQNS'
+    'Em1pc3NpbmdTdG9yZUZpZWxkcxJTChJvdXRzdGFuZGluZ19pc3N1ZXMYICADKAsyHy5oYXdrci'
+    '5zZWxsZXIudjFhbHBoYTEuS1lDSXNzdWVCA+BBA1IRb3V0c3RhbmRpbmdJc3N1ZXMSQAoLc3Vi'
+    'bWl0X3RpbWUYGyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCnN1Ym1pdF'
+    'RpbWUSQAoLZGVjaWRlX3RpbWUYHCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPg'
+    'QQNSCmRlY2lkZVRpbWUSQAoLY3JlYXRlX3RpbWUYHSABKAsyGi5nb29nbGUucHJvdG9idWYuVG'
+    'ltZXN0YW1wQgPgQQNSCmNyZWF0ZVRpbWUSQAoLdXBkYXRlX3RpbWUYHiABKAsyGi5nb29nbGUu'
+    'cHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCnVwZGF0ZVRpbWVCCQoHc3ViamVjdEoECA8QEEoECB'
+    'EQEkoECBIQE0oECBgQGUoECAQQDkoECBMQFkoECCEQIlINY29udGFjdF9lbWFpbFINY29udGFj'
+    'dF9waG9uZVINZm9vZF9idXNpbmVzc1IEZmxvd1IJcmVhbF9uYW1lUgpiaXJ0aF9kYXRlUhJpZF'
+    '9jYXJkX2lzc3VlX2RhdGVSEmlkX2NhcmRfaXNzdWVfdHlwZVIWaWRfY2FyZF9pc3N1ZV9sb2Nh'
+    'dGlvblIMZW5nbGlzaF9uYW1lUgliYW5rX25hbWVSCWJhbmtfY29kZVIMYmFua19hY2NvdW50Uh'
+    'NiYW5rX2FjY291bnRfbWFza2VkUg1pZF9jYXJkX2Zyb250UgxpZF9jYXJkX2JhY2tSCWJhbmtf'
+    'Ym9va1IUcGF5b3V0X2NvbnRhY3RfZW1haWw=');
 
 @$core.Deprecated('Use saveKYCDraftRequestDescriptor instead')
 const SaveKYCDraftRequest$json = {
@@ -3480,9 +3400,9 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.CloseMyStoreResponse': CloseMyStoreResponse$json,
   '.hawkr.seller.v1alpha1.SaveKYCDraftRequest': SaveKYCDraftRequest$json,
   '.hawkr.seller.v1alpha1.KYCApplication': KYCApplication$json,
-  '.hawkr.seller.v1alpha1.KYCDocument': KYCDocument$json,
   '.hawkr.seller.v1alpha1.IndividualKYC': IndividualKYC$json,
   '.hawkr.seller.v1alpha1.BusinessKYC': BusinessKYC$json,
+  '.hawkr.seller.v1alpha1.KYCDocument': KYCDocument$json,
   '.hawkr.seller.v1alpha1.KYCRejection': KYCRejection$json,
   '.hawkr.seller.v1alpha1.KYCIssue': KYCIssue$json,
   '.hawkr.seller.v1alpha1.SaveKYCDraftResponse': SaveKYCDraftResponse$json,

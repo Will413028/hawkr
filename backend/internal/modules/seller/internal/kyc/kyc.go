@@ -1,6 +1,6 @@
-// Package kyc 是賣家的 KYC 認證：賣家填寫草稿、送出與取消，管理員審核（核准、退回、顯示全文），以及身分比對
-// （ADR 2026-10-19-seller-kyc-payuni-consolidated）。申請以 store_id 為鍵；個資加密、以 blind index 比對；人工決定
-// 與稽核紀錄在寫入的同一個 transaction，證件圖片的 media 引用由收斂 job 維護。
+// Package kyc 是賣家的 KYC 認證：賣家填寫草稿、送出與取消，管理員審核（核准、退回、讀公司補充文件），以及統編的身分比對
+// （ADR 2026-10-19-seller-kyc-payuni-consolidated）。申請以 store_id 為鍵；平台不收身分證號、銀行帳號與證件影像（Stripe 計畫 D22），統編以 blind index 比對；
+// 人工決定與稽核紀錄在寫入的同一個 transaction，補充文件的 media 引用由收斂 job 維護。
 package kyc
 
 import (
@@ -36,7 +36,7 @@ type Identity interface {
 	ContactEmail(ctx context.Context, accountID int64) (identity.ContactEmail, bool, error)
 }
 
-// Deps 外部依賴；clock 由組裝點注入。Keys 與 MAC 必填（seller.New 檢查）：個資不能在沒有加密的情況下寫入。
+// Deps 外部依賴；clock 由組裝點注入。MAC 必填（seller.New 檢查）：統編的 blind index 要有金鑰。
 type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
@@ -47,7 +47,6 @@ type Deps struct {
 	// Payment 是收款帳戶的擁有者（payment 模組）：核准的 transaction 內寫「建立中」的列並排入建立 job（Stripe 計畫 D16、D28）。
 	Payment  Payment
 	Identity Identity
-	Keys     *seal.Keyring
 	MAC      *seal.MAC
 	// Registry 是登記資料來源（公司型申請送件時的查詢快照）；必填：公開資料，沒有「沒有設定」的情形。
 	Registry Registry
@@ -73,7 +72,7 @@ func New(d Deps) *Service {
 	if d.Registry == nil || d.Payment == nil || d.Identity == nil {
 		panic("kyc: Registry, Payment and Identity are required")
 	}
-	return &Service{d: d, p: protector{keys: d.Keys, mac: d.MAC}}
+	return &Service{d: d, p: protector{mac: d.MAC}}
 }
 
 // contactEmail 回傳帳號的聯絡信箱，identity 已依它的規則正規化並略過格式不合的值；帳號沒有可用的信箱時 ok 是 false。在呼叫方的 transaction 內讀取。
@@ -119,8 +118,8 @@ func (s *Service) actingStore(ctx context.Context, q *store.Queries, accountID i
 }
 
 // SaveDraft 部分更新草稿（店家還沒有申請時建立，ExpectedVersion 為 0）：被退回的申請在這裡回到 DRAFT 重新編輯。
-// 授權由模組做（申請以帳號目前的店家為準，不接受別人的申請 ID，盤點 D22）；需要 CapStorefrontWrite。全部輸入先驗證、
-// 個資加密之後才寫入；證件圖片在 transaction 外轉正（不建立引用），寫入的 transaction 內把被換掉的證件記成退場並排入引用的同步。必須在 transaction 外呼叫。
+// 授權由模組做（申請以帳號目前的店家為準，不接受別人的申請 ID，盤點 D22）；需要 CapStorefrontWrite。全部輸入先驗證才寫入；
+// 補充文件在 transaction 外轉正（不建立引用），寫入的 transaction 內把被換掉的文件記成退場並排入引用的同步。必須在 transaction 外呼叫。
 func (s *Service) SaveDraft(ctx context.Context, in model.KYCDraftInput) (model.KYCApplication, error) {
 	if err := model.Positive(in.AccountID); err != nil {
 		return model.KYCApplication{}, err
@@ -144,7 +143,7 @@ func (s *Service) SaveDraft(ctx context.Context, in model.KYCDraftInput) (model.
 	if err != nil {
 		return model.KYCApplication{}, err
 	}
-	next, diff, err := s.p.applyDraft(base, in, create, now)
+	next, diff, err := applyDraft(base, in, create, now)
 	if err != nil {
 		return model.KYCApplication{}, err
 	}
@@ -275,7 +274,7 @@ func (s *Service) lockCurrent(ctx context.Context, q *store.Queries, storeID int
 	return &locked, nil
 }
 
-// Mine 回傳帳號目前店家的申請（遮蔽的檢視，帶證件圖片與最近一次退回的理由）；沒有申請時回 NotFound。
+// Mine 回傳帳號目前店家的申請（帶補充文件與最近一次退回的理由）；沒有申請時回 NotFound。
 func (s *Service) Mine(ctx context.Context, accountID int64) (model.KYCApplication, error) {
 	if err := model.Positive(accountID); err != nil {
 		return model.KYCApplication{}, err
@@ -300,7 +299,7 @@ func (s *Service) sellerView(ctx context.Context, q *store.Queries, row store.Se
 	return s.view(ctx, q, row, accountID)
 }
 
-// view 轉成遮蔽檢視並帶上證件圖片與最近一次退回。
+// view 轉成檢視並帶上補充文件與最近一次退回。
 func (s *Service) view(ctx context.Context, q *store.Queries, row store.SellerKycApplication, accountID int64) (model.KYCApplication, error) {
 	out, _, err := s.viewWithReviews(ctx, q, row, accountID)
 	return out, err
@@ -308,10 +307,7 @@ func (s *Service) view(ctx context.Context, q *store.Queries, row store.SellerKy
 
 // viewWithReviews 是 view，另外回傳讀到的審核紀錄（含逐項問題；後台的檢視要它，不必再讀一次）。
 func (s *Service) viewWithReviews(ctx context.Context, q *store.Queries, row store.SellerKycApplication, accountID int64) (model.KYCApplication, []model.KYCReview, error) {
-	out, err := s.p.toApplication(row, accountID)
-	if err != nil {
-		return out, nil, err
-	}
+	out := toApplication(row, accountID)
 	docs, err := q.KYCDocuments(ctx, row.ApplicationID)
 	if err != nil {
 		return out, nil, err
@@ -384,7 +380,7 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitKYCInput) (model.KY
 			return storeIncomplete(missingStore)
 		}
 		now := s.d.Now().UTC()
-		if blocked, _, err := s.match(ctx, q, row, locked.AccountID, now); err != nil {
+		if blocked, err := s.match(ctx, q, row, locked.AccountID, now); err != nil {
 			return err
 		} else if blocked {
 			return model.ErrIdentityNotEligible()

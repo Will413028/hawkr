@@ -227,22 +227,22 @@ func (o fixtureOwners) OwnerActive(ctx context.Context, storeID int64) (bool, er
 // newModule 在同一個 DB 上組一個 seller 模組：job 的排入可以換（真的 River）。
 func (f *fixture) newModule(t *testing.T, jc jobs.ReportingEnqueuer) *Module {
 	t.Helper()
-	kycKeys, kycMAC := sealtest.Keys(t)
-	return f.newModuleWithKeys(t, jc, kycKeys, kycMAC)
+	kycMAC := sealtest.MAC(t)
+	return f.newModuleWithKeys(t, jc, kycMAC)
 }
 
 // newModuleWithKeys 同 newModule，KYC 的金鑰環由呼叫方給（測試金鑰輪替）。
-func (f *fixture) newModuleWithKeys(t *testing.T, jc jobs.ReportingEnqueuer, kycKeys *seal.Keyring, kycMAC *seal.MAC) *Module {
+func (f *fixture) newModuleWithKeys(t *testing.T, jc jobs.ReportingEnqueuer, kycMAC *seal.MAC) *Module {
 	t.Helper()
-	return f.newModuleClock(t, jc, kycKeys, kycMAC, func() time.Time { return f.now })
+	return f.newModuleClock(t, jc, kycMAC, func() time.Time { return f.now })
 }
 
 // newModuleClock 同 newModuleWithKeys，時鐘由呼叫方給（測試多實例的時鐘差）。
-func (f *fixture) newModuleClock(t *testing.T, jc jobs.ReportingEnqueuer, kycKeys *seal.Keyring, kycMAC *seal.MAC, now func() time.Time) *Module {
+func (f *fixture) newModuleClock(t *testing.T, jc jobs.ReportingEnqueuer, kycMAC *seal.MAC, now func() time.Time) *Module {
 	t.Helper()
 	log := slog.New(slog.NewTextHandler(&f.logs, nil))
 	return New(Deps{
-		DB: f.db, Events: f.bus, Jobs: jc, Identity: f.identity, Media: f.media, Orders: f.orders, KYCKeys: kycKeys, KYCMAC: kycMAC, Payment: f.payments, ProductStores: f.products, Registry: f.registry,
+		DB: f.db, Events: f.bus, Jobs: jc, Identity: f.identity, Media: f.media, Orders: f.orders, KYCMAC: kycMAC, Payment: f.payments, ProductStores: f.products, Registry: f.registry,
 		Now: now, Logger: log,
 		StoreCode: func(now time.Time) (int64, error) {
 			if len(f.codes) > 0 {

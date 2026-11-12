@@ -155,9 +155,9 @@ func setup(t *testing.T) *fixture {
 	}
 	registry := &fakeRegistry{}
 	o := &orders{}
-	kycKeys, kycMAC := sealtest.Keys(t)
+	kycMAC := sealtest.MAC(t)
 	m := seller.New(seller.Deps{
-		DB: d, Events: bus, Jobs: queue, Identity: id, Media: stagedMedia{}, Orders: o, KYCKeys: kycKeys, KYCMAC: kycMAC,
+		DB: d, Events: bus, Jobs: queue, Identity: id, Media: stagedMedia{}, Orders: o, KYCMAC: kycMAC,
 		ProductStores: noProducts{}, Registry: registry, Now: time.Now, Logger: log,
 		Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log}),
 	})
