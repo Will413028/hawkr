@@ -308,12 +308,11 @@ describe("續填：位置與缺項由 missing_fields 決定", () => {
 		expect(resumeSectionOf([])).toBeNull();
 	});
 
-	it("缺項清單依欄位順序列出區塊與名詞；表單沒有的欄位與 UNSPECIFIED 略過", () => {
+	it("缺項清單依欄位順序列出區塊與名詞；UNSPECIFIED 略過", () => {
 		expect(
 			missingItemsOf(ut, [
 				KYCField.KYC_FIELD_BUSINESS_TAX_ID,
 				KYCField.KYC_FIELD_WEBSITE_URL,
-				KYCField.KYC_FIELD_BANK_NAME,
 				KYCField.KYC_FIELD_UNSPECIFIED,
 			]),
 		).toEqual([
@@ -546,18 +545,12 @@ describe("待處理的退回問題", () => {
 		});
 	});
 
-	it("表單已經沒有的欄位（舊申請的身分、銀行問題）不對到任何表單位置，名稱仍在", () => {
-		const messages = kycIssueMessages(
-			app(
-				issue(KYCField.KYC_FIELD_ID_CARD_FRONT, "反光", "asset-front"),
-				issue(KYCField.KYC_FIELD_BANK_CODE, "銀行代碼不存在"),
-			),
-		);
+	it("不認得的欄位值（新版伺服器才有）不對到任何表單位置，也沒有名稱", () => {
+		const unknown = 9999 as KYCField;
+		const messages = kycIssueMessages(app(issue(unknown, "新欄位的問題")));
 		expect(messages.form).toEqual({});
 		expect(messages.companyDocuments).toBeNull();
-		expect(kycFieldLabel(ut, KYCField.KYC_FIELD_ID_CARD_FRONT)).toBe(
-			"身分證正面照",
-		);
+		expect(kycFieldLabel(ut, unknown)).toBeUndefined();
 	});
 
 	it("公司文件的說明以 asset ID 對到那一張，沒有指到特定一張的另外放", () => {

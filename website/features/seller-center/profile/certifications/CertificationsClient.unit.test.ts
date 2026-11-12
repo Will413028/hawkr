@@ -433,25 +433,6 @@ describe("續填：由 GetMyKYC 還原", () => {
 		expect(screen.getByText("統一編號：與登記不符")).toBeTruthy();
 	});
 
-	it("退回指到表單已經沒有的欄位（舊申請）：總理由與逐項說明照樣顯示欄位名稱", async () => {
-		kycStore.set(
-			app({
-				status: KYCStatus.KYC_STATUS_REJECTED,
-				lastRejection: { reason: "存摺照片模糊" },
-				outstandingIssues: [
-					{
-						field: KYCField.KYC_FIELD_BANK_BOOK,
-						code: KYCIssueCode.KYC_ISSUE_CODE_UNREADABLE,
-						message: "封面反光看不清楚",
-					},
-				],
-			}),
-		);
-		await mount();
-		expect(screen.getByText("存摺照片模糊")).toBeTruthy();
-		expect(screen.getByText("存摺封面：封面反光看不清楚")).toBeTruthy();
-	});
-
 	it("退回之後回到草稿：逐項說明看 outstanding_issues，處理完之後總理由仍在，直到重送（伺服器不再回 last_rejection）為止", async () => {
 		const draft = (
 			outstandingIssues: NonNullable<AppInit>["outstandingIssues"],
@@ -653,14 +634,14 @@ function rejectedApp(init: AppInit = {}) {
 		status: KYCStatus.KYC_STATUS_REJECTED,
 		submitTime: timestampFromMs(1000),
 		lastRejection: {
-			reason: "存摺照片模糊",
+			reason: "統編資料不符",
 			decideTime: timestampFromMs(2000),
 		},
 		outstandingIssues: [
 			{
-				field: KYCField.KYC_FIELD_BANK_BOOK,
+				field: KYCField.KYC_FIELD_BUSINESS_TAX_ID,
 				code: KYCIssueCode.KYC_ISSUE_CODE_UNREADABLE,
-				message: "封面反光看不清楚",
+				message: "與登記不符",
 			},
 		],
 		missingFields: [],
@@ -842,12 +823,12 @@ describe("D2：退回原因在存檔之後還在", () => {
 			}),
 		);
 		await mount();
-		expect(screen.getByText("存摺照片模糊")).toBeTruthy();
+		expect(screen.getByText("統編資料不符")).toBeTruthy();
 		await typeInto("公司名稱", "wang@example.com");
 		await autosave();
 		expect(mocks.saveKycDraft).toHaveBeenCalledTimes(1);
-		expect(screen.getByText("存摺照片模糊")).toBeTruthy();
-		expect(screen.getByText("存摺封面：封面反光看不清楚")).toBeTruthy();
+		expect(screen.getByText("統編資料不符")).toBeTruthy();
+		expect(screen.getByText("統一編號：與登記不符")).toBeTruthy();
 	});
 
 	it("重新整理後（流程是草稿、伺服器還有待處理的問題）仍顯示原因", async () => {
@@ -857,7 +838,7 @@ describe("D2：退回原因在存檔之後還在", () => {
 			}),
 		);
 		await mount();
-		expect(screen.getByText("存摺照片模糊")).toBeTruthy();
+		expect(screen.getByText("統編資料不符")).toBeTruthy();
 	});
 
 	it("重送、核准後回到草稿：伺服器不回 last_rejection，不顯示退回橫幅", async () => {
@@ -869,7 +850,7 @@ describe("D2：退回原因在存檔之後還在", () => {
 			}),
 		);
 		await mount();
-		expect(screen.queryByText("存摺照片模糊")).toBeNull();
+		expect(screen.queryByText("統編資料不符")).toBeNull();
 		expect(screen.queryByText("認證未通過")).toBeNull();
 	});
 });

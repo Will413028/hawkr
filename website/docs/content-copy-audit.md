@@ -117,7 +117,7 @@ Last updated: 2026-05-12
 | `/seller-center/coupons` | H1 `優惠券`；建立活動券、補償券、狀態、領取數 | 優惠券文案要明確：折多少、門檻、期限、適用商品 |
 | `/seller-center/coupons/new`, `/edit` | 建立/編輯優惠券；名稱、類型、金額/百分比、最低消費、上限、起訖時間 | 表單 hint 要防止誤設：百分比 1-99、時間、發行上限 |
 | `/seller-center/me` | H1 `商店設定`；商店資訊、進階設定 | 商店文案要變成公開商家頁的資料來源，欄位提示要說明會顯示在哪 |
-| `/seller-center/me/certifications` | H1 `商家認證`；公司資訊、身分證明、銀行帳戶、其他資訊、補充文件 | 認證頁文案要降低焦慮：為何需要、會如何保護、審核多久、哪裡會公開 |
+| `/seller-center/me/certifications` | H1 `商家認證`；公司資訊、其他資訊、補充文件 | 認證頁文案要降低焦慮：為何需要、會如何保護、審核多久、哪裡會公開 |
 | `/seller-center/me/payuni` | H1 `PayUni 收款設定`；KYC 後才能收款、申請資料、已啟用狀態 | PayUni 文案要區分「Hawkr 認證」與「金流審核」 |
 | `/seller-center/me/shipping` | H1 `物流與退貨`；黑貓宅急便、7-11 店到店、認證 gate | 物流設定要清楚說明每種溫層、費用、適用商品、何時可用 |
 | `/seller-center/ai` | H1 `AI 工具`；即將推出；AI 商品文案、圖片美化、客服建議、行銷文案 | AI 頁目前是 roadmap，可保留但應標示 beta/可用功能入口 |
