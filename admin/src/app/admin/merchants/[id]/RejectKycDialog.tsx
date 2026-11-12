@@ -33,7 +33,7 @@ interface RejectKycDialogProps {
 	onDraftChange: (draft: ReviewDraft) => void;
 	/** 這份申請可以指出問題的欄位。 */
 	options: readonly IssueFieldOption[];
-	/** 此刻可以指定的文件（顯示全文之後才有）。 */
+	/** 可以指定的文件（申請上的公司補充文件）。 */
 	choices: readonly DocumentChoice[];
 	/** 伺服器說此刻不能退回的原因（`reject_unavailabilities` 第一個原因的句子，本身是完整一句）；有值時保留輸入，但不能再送出。 */
 	blockedReason: string | undefined;
@@ -45,7 +45,7 @@ interface RejectKycDialogProps {
 let issueSeq = 0;
 
 /**
- * 退回申請（RejectKYC）：逐項指出問題（欄位、原因碼、給賣家看的說明；文件類欄位在顯示全文之後可以指定某一張，缺件只標欄位），
+ * 退回申請（RejectKYC）：逐項指出問題（欄位、原因碼、給賣家看的說明；文件類欄位可以指定某一張，缺件只標欄位），
  * 加上必填的總理由（賣家看得到）與選填的內部備註（只有後台看得到）。2b-0 契約：issues 至少一項。
  */
 export default function RejectKycDialog({
@@ -237,7 +237,7 @@ export default function RejectKycDialog({
 						</select>
 						{fieldChoices.length === 0 && (
 							<span className="adm-operation-field-note">
-								要指定某一張文件，請先在頁面上「顯示全文」。
+								這個欄位目前沒有可指定的文件。
 							</span>
 						)}
 					</div>

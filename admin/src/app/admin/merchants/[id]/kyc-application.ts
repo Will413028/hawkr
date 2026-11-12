@@ -4,14 +4,13 @@ import { createQueryOptions } from "@connectrpc/connect-query";
 import {
 	type GetKYCApplicationResponse,
 	type KYCApplication,
-	type KYCDocumentView,
+	type KYCDocument,
 	type KYCRegistration,
 	type KYCRegistrationCheck,
 	KYCRegistrationOutcome,
 	KYCRegistrationStatus,
 	type KYCReview,
 	KYCReviewAction,
-	type RevealKYCSensitiveResponse,
 	SellerAdminService,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
 import {
@@ -29,17 +28,14 @@ import { staffTextOrUnknown, unknownText } from "@/lib/ui-text";
 import { firstVisibleLabel } from "@/lib/unavailability";
 import { addressText } from "./store-detail";
 
-// 商家詳情的商家認證（KYC）審核的顯示判斷與文案（SellerAdminService.GetKYCApplication、RevealKYCSensitive、
+// 商家詳情的商家認證（KYC）審核的顯示判斷與文案（SellerAdminService.GetKYCApplication、
 // ApproveKYC、RejectKYC、RequeryKYCRegistration）。畫面只管呈現；哪個狀態
-// 可以核准、退回的逐項問題怎麼組成與驗證、顯示全文何時收回、GCIS 並列怎麼標記、背景工作怎麼輪詢都在這裡，才能不靠畫面測試
+// 可以核准、退回的逐項問題怎麼組成與驗證、GCIS 並列怎麼標記、背景工作怎麼輪詢都在這裡，才能不靠畫面測試
 // （決策簡報 K7、K8、K9、K15、K16、D4 第 4、5、6 點；2b 設計簡報題 1 (b′)、題 2）。
 
 // ---------------------------------------------------------------------------
 // D4 的文案（已核准，照原文；標註「實作者補」的是 D4 沒有原文的部分）
 
-export const REVEAL_DIALOG_TEXT =
-	"顯示全文會記錄你的帳號、時間與理由；15 分鐘內可以檢視完整號碼與證件影像。";
-export const DOCUMENT_NEEDS_REVEAL_TEXT = "需先顯示全文";
 export const GCIS_PENDING_TEXT = "登記資料查詢中…";
 /** 實作者補：查詢超過伺服器保證的期限仍沒有終態（伺服器的錯誤，或這台電腦的時鐘比伺服器快）時的說明。 */
 export const GCIS_OVERDUE_TEXT = "登記資料查詢超過預定時間仍未完成";
@@ -196,21 +192,11 @@ export function kycFieldLabel(field: KYCField): string {
 	return staffTextOrUnknown(sellerKYCField(field));
 }
 
-/** 身分證字號對應的退回欄位：個人是賣家本人的，企業是負責人的。 */
-export function idCardNoField(application: KYCApplication): KYCField {
-	return application.subject.case === "business"
-		? KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO
-		: KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO;
-}
-
 /**
- * 文件類的欄位：契約的 KYCIssue.document_asset_id 只有這四個欄位能指到某一張文件；申請上的文件（KYCDocument.field、
- * KYCDocumentView.field）也用這幾個欄位表示，後台契約沒有另一套證件位置的列舉。這是畫面上唯一一張「欄位是不是文件」的表。
+ * 文件類的欄位：契約的 KYCIssue.document_asset_id 只有這個欄位能指到某一張文件；申請上的文件（KYCDocument.field）也用它表示。
+ * 這是畫面上唯一一張「欄位是不是文件」的表。
  */
 const DOCUMENT_FIELDS: ReadonlySet<KYCField> = new Set([
-	KYCField.KYC_FIELD_ID_CARD_FRONT,
-	KYCField.KYC_FIELD_ID_CARD_BACK,
-	KYCField.KYC_FIELD_BANK_BOOK,
 	KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
 ]);
 
@@ -300,27 +286,24 @@ export function issuableFieldOptions(
 	}));
 }
 
-/** 顯示全文之後才有的、可以指定的一張文件（asset_id 來自 RevealKYCSensitive 的 KYCDocumentView）。 */
+/** 可以指定的一張文件（asset_id 來自申請上的 KYCDocument）。 */
 export interface DocumentChoice {
 	field: KYCField;
 	assetId: string;
 	label: string;
 }
 
-/** 文件的顯示名稱：補充文件依順序編號，其他是欄位名稱。 */
+/** 文件的顯示名稱：補充文件依順序編號。 */
 function documentLabel(field: KYCField, position: number): string {
-	return field === KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS
-		? `${kycFieldLabel(field)} ${position + 1}`
-		: kycFieldLabel(field);
+	return `${kycFieldLabel(field)} ${position + 1}`;
 }
 
-/** 此刻有效的顯示全文裡、有 asset_id 的文件；沒有顯示全文（或已到期）時是空的：不能指定某一張。 */
+/** 申請上有 asset_id 的文件，退回時可以指定其中一張。 */
 export function documentChoices(
-	reveal: KycReveal | undefined,
+	application: Pick<KYCApplication, "documents">,
 ): DocumentChoice[] {
-	if (!reveal) return [];
 	const out: DocumentChoice[] = [];
-	for (const d of reveal.documents) {
+	for (const d of application.documents) {
 		if (!isDocumentField(d.field) || !d.assetId) continue;
 		out.push({
 			field: d.field,
@@ -337,7 +320,7 @@ export interface KycIssueDraft {
 	field: KYCField;
 	/** 文件類欄位指定的那一張；整個位置（例如缺件）不指定時是空字串。 */
 	documentAssetId: string;
-	/** 指定的那一張文件的顯示名稱（加入當下記下，之後顯示全文到期也看得到）。 */
+	/** 指定的那一張文件的顯示名稱（加入當下記下）。 */
 	documentLabel: string;
 	code: KYCIssueCode;
 	message: string;
@@ -390,9 +373,7 @@ export function validateIssueDraft(
 			return ISSUE_ASSET_FORBIDDEN_TEXT;
 		}
 		if (!issue.documentAssetId && issueAssetRequired(issue.code)) {
-			return choices.some((c) => c.field === issue.field)
-				? ISSUE_ASSET_REQUIRED_TEXT
-				: `${ISSUE_ASSET_REQUIRED_TEXT}；請先在頁面上「顯示全文」，才選得到文件。`;
+			return ISSUE_ASSET_REQUIRED_TEXT;
 		}
 	}
 	if (
@@ -516,86 +497,16 @@ export function lastRejection(
 	return undefined;
 }
 
-// ---------------------------------------------------------------------------
-// 顯示全文（K15、D4 第 5 點）
-
-/** 一次顯示全文的結果（只存在瀏覽器記憶體，不寫進任何儲存）。 */
-export interface KycReveal {
-	applicationId: string;
-	idCardNo: string;
-	repIdCardNo: string;
-	bankAccount: string;
-	/** 授權到期的時間（伺服器給的）；到期後要收回成遮蔽值。 */
-	expireTime: Date;
-	documents: readonly KYCDocumentView[];
-}
-
-/** 回應沒有到期時間時不當成可顯示（沒有期限的明文不存在）：回 undefined。 */
-export function revealFrom(
-	applicationId: string,
-	res: RevealKYCSensitiveResponse,
-): KycReveal | undefined {
-	if (!applicationId || !res.expireTime) return undefined;
-	return {
-		applicationId,
-		idCardNo: res.idCardNo,
-		repIdCardNo: res.repIdCardNo,
-		bankAccount: res.bankAccount,
-		expireTime: timestampDate(res.expireTime),
-		documents: res.documents,
-	};
-}
-
-/** 此刻還有效的顯示全文：申請不同、或到期（含剛好到期的那一刻）都是 undefined。 */
-export function activeReveal(
-	reveal: KycReveal | null | undefined,
-	applicationId: string | undefined,
-	now: Date,
-): KycReveal | undefined {
-	if (!reveal || !applicationId || reveal.applicationId !== applicationId) {
-		return undefined;
-	}
-	return now.getTime() < reveal.expireTime.getTime() ? reveal : undefined;
-}
-
-/** 距離到期還有幾毫秒；已到期是 0。 */
-export function revealRemainingMs(reveal: KycReveal, now: Date): number {
-	return Math.max(0, reveal.expireTime.getTime() - now.getTime());
-}
-
-/** 「全文顯示到 HH:mm」（台北時間）。 */
-export function revealUntilText(reveal: KycReveal): string {
-	return `全文顯示到 ${formatDateTimeShort(reveal.expireTime).slice(-5)}`;
-}
-
-/**
- * 敏感欄位的顯示值：顯示全文且有明文時用明文，否則用遮蔽值；兩者都沒有回 `-`。
- * 明文是空字串（這個型態沒有該欄位）時退回遮蔽值，不顯示空白。
- */
-export function sensitiveValue(
-	masked: string,
-	full: string | undefined,
-	revealed: boolean,
-): string {
-	if (revealed && full) return full;
-	return masked || "-";
-}
-
-/** 這個位置的檢視網址（只在顯示全文之後有）。 */
-export function documentViewOf(
-	reveal: KycReveal | undefined,
-	field: KYCField,
-	position: number,
-): KYCDocumentView | undefined {
-	return reveal?.documents.find(
-		(d) => d.field === field && d.position === position,
-	);
+/** 放大檢視中的證件影像。 */
+export interface PreviewImage {
+	src: string;
+	alt: string;
 }
 
 const ADMIN_FILES_PREFIX = "/api/files/admin/";
 
 /**
- * 證件影像的瀏覽器網址：只收伺服器給的相對路徑（`/api/files/admin/…`），經同源 `/api/bff` 讀取；
+ * 補充文件的瀏覽器網址：只收伺服器給的相對路徑（`/api/files/admin/…`），經同源 `/api/bff` 讀取；
  * 絕對網址、協定相對網址、帶 `..` 的路徑一律不收（回 undefined），不直連後端。
  */
 export function documentSrc(viewUri: string): string | undefined {
@@ -605,15 +516,14 @@ export function documentSrc(viewUri: string): string | undefined {
 	return `/api/bff${viewUri}`;
 }
 
-/** 申請上某個文件欄位的文件（只有順序，從 0）。 */
+/** 申請上某個文件欄位的文件，依順序（從 0）排列。 */
 export function documentsOf(
-	application: KYCApplication,
+	application: Pick<KYCApplication, "documents">,
 	field: KYCField,
-): number[] {
+): KYCDocument[] {
 	return application.documents
 		.filter((d) => d.field === field)
-		.map((d) => d.position)
-		.sort((a, b) => a - b);
+		.sort((a, b) => a.position - b.position);
 }
 
 // ---------------------------------------------------------------------------

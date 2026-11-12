@@ -63,26 +63,23 @@ import {
 import {
 	KycBasicInfoCard,
 	KycDocumentsCard,
-	KycIdentityCard,
 	KycOtherInfoCard,
 	KycRejectionNotice,
-	KycRevealBar,
 	KycReviewHistoryCard,
 } from "./KycApplicationCards";
 import {
 	APPROVE_HINT_TEXT,
 	APPROVE_SUCCESS_TEXT,
-	activeReveal,
 	buildRejectRequest,
 	documentChoices,
 	draftAfter,
 	EMPTY_REVIEW_DRAFT,
 	issuableFieldOptions,
 	KYC_CONFLICT_TEXT,
+	type PreviewImage,
 	REJECT_SUCCESS_TEXT,
 	REQUERY_SUCCESS_TEXT,
 	type ReviewDraft,
-	revealFrom,
 	reviewActions,
 	reviewBlockedLabel,
 	writeRequeryResult,
@@ -97,17 +94,6 @@ import { OnboardingSummaryCard } from "./OnboardingSummaryCard";
 import { PaymentAccountSection } from "./PaymentAccountCard";
 import ProductForceUnpublishDialog from "./ProductForceUnpublishDialog";
 import RejectKycDialog from "./RejectKycDialog";
-import RevealKycDialog from "./RevealKycDialog";
-import {
-	closePreview as closePreviewState,
-	EMPTY_REVEAL_STATE,
-	expireReveal,
-	hideReveal,
-	openPreview as openPreviewState,
-	type RevealState,
-	scheduleRevealExpiry,
-	showReveal,
-} from "./reveal-state";
 import SellerAccountDeleteDialog from "./SellerAccountDeleteDialog";
 import {
 	closerLabel,
@@ -220,10 +206,9 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 	// 審核員正在填的內容（退回的逐項問題、總理由與內部備註）。送出失敗（含版本衝突）時整份保留，成功才清空（draftAfter）。
 	const [draft, setDraft] = useState<ReviewDraft>(EMPTY_REVIEW_DRAFT);
 	const [showRejectModal, setShowRejectModal] = useState(false);
-	const [showRevealDialog, setShowRevealDialog] = useState(false);
-	// 顯示全文的結果與放大中的證件影像只在這裡（瀏覽器記憶體）：到期、收起或離開頁面就一起沒了（reveal-state.ts），不寫進任何儲存。
-	const [secret, setSecret] = useState<RevealState>(EMPTY_REVEAL_STATE);
-	// 建立風險措施、建立終止合作、措施詳情、結束措施、刪除帳號、退回、顯示全文的對話框各自在獨立元件（它們的 a11y 三件套與輸入狀態在那裡）。
+	// 放大中的補充文件影像只在這裡（瀏覽器記憶體），不寫進任何儲存。
+	const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
+	// 建立風險措施、建立終止合作、措施詳情、結束措施、刪除帳號、退回的對話框各自在獨立元件（它們的 a11y 三件套與輸入狀態在那裡）。
 	// 結束措施記要結束的措施 id，不記整個措施：對話框每次都顯示最新讀到的那一筆（etag 也是），重讀之後不會拿舊的 etag 送出。
 	const [showCreateMeasureModal, setShowCreateMeasureModal] = useState(false);
 	const [showCreateViolationMeasure, setShowCreateViolationMeasure] =
@@ -451,11 +436,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		SellerAdminService.method.rejectKYC,
 		{ onSuccess: invalidateKyc },
 	);
-	// 回應含明文：不讓它留在 mutation cache（gcTime 0），到期、收起時另外 reset()。
-	const revealMutation = useConnectMutation(
-		SellerAdminService.method.revealKYCSensitive,
-		{ gcTime: 0 },
-	);
 	// 重新查詢成功不整筆重讀申請：回應就是那筆進行中的查詢（帶期限），直接寫進申請的快取（handleRequery），輪詢隨後接手。
 	const requeryMutation = useConnectMutation(
 		SellerAdminService.method.requeryKYCRegistration,
@@ -469,42 +449,8 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 	);
 
 	const openPreview = (src: string, alt: string) =>
-		setSecret((cur) => openPreviewState(cur, { src, alt }));
-	const closePreview = () => setSecret((cur) => closePreviewState(cur));
-	// 收起全文：明文、放大圖一起清掉，mutation 的回應資料也一起清（明文不留在 mutation data）。
-	const hideSecret = () => {
-		setSecret(hideReveal());
-		revealMutation.reset();
-	};
-
-	// 顯示全文到期就收回成遮蔽值（K15、D4 第 5 點）：明文與已打開的放大圖一起清掉。計時器可能提早觸發或在背景分頁被延後，
-	// 所以觸發時還沒到期就重排（scheduleRevealExpiry），回到前景時也再檢查一次。換店時整頁以 key 重新掛載，狀態一起沒了。
-	const revealMutationReset = revealMutation.reset;
-	useEffect(() => {
-		const reveal = secret.reveal;
-		if (!reveal) return;
-		const schedule = scheduleRevealExpiry(
-			reveal,
-			() => {
-				setSecret((cur) => expireReveal(cur, new Date()));
-				revealMutationReset();
-			},
-			{
-				now: () => new Date(),
-				setTimer: (callback, ms) => setTimeout(callback, ms),
-				clearTimer: (handle) =>
-					clearTimeout(handle as ReturnType<typeof setTimeout>),
-			},
-		);
-		const onVisible = () => {
-			if (document.visibilityState === "visible") schedule.recheck();
-		};
-		document.addEventListener("visibilitychange", onVisible);
-		return () => {
-			schedule.cancel();
-			document.removeEventListener("visibilitychange", onVisible);
-		};
-	}, [secret.reveal, revealMutationReset]);
+		setPreviewImage({ src, alt });
+	const closePreview = () => setPreviewImage(null);
 
 	// 強制下架的按鈕在商品分頁的表格裡，而結果提示掛在頁首下方——不捲進來的話,
 	// 使用者會在一個看不到任何回饋的位置以為操作沒有發生。`block: "nearest"` 讓
@@ -674,25 +620,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		return result;
 	};
 
-	// 顯示全文：寫稽核、授權 15 分鐘。失敗交回對話框顯示；成功才存下結果。
-	const handleReveal = async (reason: string) => {
-		if (!application) {
-			throw new Error("申請內容還沒載入，請稍後再試。");
-		}
-		const res = await revealMutation.mutateAsync({
-			id: application.id,
-			reason,
-		});
-		const next = revealFrom(application.id, res);
-		if (!next) {
-			throw new Error(
-				"伺服器沒有回傳全文的有效期限，所以不顯示全文；請稍後再試。",
-			);
-		}
-		setSecret(showReveal(next));
-		setShowRevealDialog(false);
-	};
-
 	const handleRequery = async () => {
 		if (!application) return;
 		setNotice(null);
@@ -774,13 +701,9 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 	const logo = imageUri(store.logo, "avatar");
 	// 商家認證：沒有送出過的申請（GetStore 沒有 kyc 摘要）時徽章是「尚未申請」，沒有 KYC 區塊。
 	const statusBadge = kycBadge(kycSummary?.status);
-	// 顯示全文：過期的（或別份申請的）一律當作沒有；放大圖只在授權還在時顯示。
-	const liveReveal = activeReveal(secret.reveal, application?.id, new Date());
-	const previewImage = liveReveal ? secret.preview : null;
 	const isRejected = application?.status === KYCStatus.KYC_STATUS_REJECTED;
 	const anyDialogOpen =
 		showRejectModal ||
-		showRevealDialog ||
 		showCreateMeasureModal ||
 		showCreateViolationMeasure ||
 		endTarget !== undefined ||
@@ -1167,36 +1090,20 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				/>
 			)}
 
-			{/* 商家認證：顯示全文列。沒有送出過的申請時不顯示。 */}
-			{(!isApproved || activeTab === "basic") && application && (
-				<KycRevealBar
-					reveal={liveReveal}
-					onReveal={() => openDialog(() => setShowRevealDialog(true))}
-					onHide={hideSecret}
-				/>
-			)}
-
 			{/* Main Content: 2-column grid — basic info tab or non-approved view */}
 			{(!isApproved || activeTab === "basic") && (
 				<div id="kyc" className="detail-content-grid">
 					{/* Left Column */}
 					<div className="detail-left-column">
 						{application ? (
-							<>
-								<KycBasicInfoCard
-									store={store}
-									application={application}
-									now={now}
-									canRequery={reviewable.canRequery}
-									requerying={requeryMutation.isPending}
-									onRequery={() => void handleRequery()}
-								/>
-								<KycIdentityCard
-									application={application}
-									reveal={liveReveal}
-									onPreview={openPreview}
-								/>
-							</>
+							<KycBasicInfoCard
+								store={store}
+								application={application}
+								now={now}
+								canRequery={reviewable.canRequery}
+								requerying={requeryMutation.isPending}
+								onRequery={() => void handleRequery()}
+							/>
 						) : (
 							<div
 								style={{
@@ -1240,7 +1147,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 						<div className="detail-right-column">
 							<KycDocumentsCard
 								application={application}
-								reveal={liveReveal}
 								onPreview={openPreview}
 							/>
 							<KycOtherInfoCard store={store} application={application} />
@@ -1471,7 +1377,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 					draft={draft}
 					onDraftChange={setDraft}
 					options={issuableFieldOptions(application)}
-					choices={documentChoices(liveReveal)}
+					choices={documentChoices(application)}
 					blockedReason={
 						reviewable.canReject
 							? undefined
@@ -1479,15 +1385,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 					}
 					onClose={() => setShowRejectModal(false)}
 					onConfirm={handleReject}
-				/>
-			)}
-
-			{/* 顯示全文（RevealKYCSensitive）：理由必填，授權 15 分鐘。 */}
-			{showRevealDialog && (
-				<RevealKycDialog
-					storeName={store.storeName}
-					onClose={() => setShowRevealDialog(false)}
-					onConfirm={handleReveal}
 				/>
 			)}
 
