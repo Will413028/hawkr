@@ -142,13 +142,13 @@ func (f *fixture) archive(t *testing.T, prospectID int64) {
 	}))
 }
 
-// 邀請建立時存的是 SHA-256 與去空白的 email 快照；明文 secret 是 32 bytes 的 base64url（無 padding）。
+// 邀請建立時存的是 SHA-256 與正規化（去空白、轉小寫）的 email 快照；明文 secret 是 32 bytes 的 base64url（無 padding）。
 func TestEnsureInviteCreatesTheInviteAndStoresOnlyTheHash(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	f.prospects.set(prospectA, "  Vendor@Example.com  ")
 	inv := f.invite(t, prospectA, 1)
-	if inv.InviteID == (uuid.UUID{}) || inv.InvitedEmail != "Vendor@Example.com" {
+	if inv.InviteID == (uuid.UUID{}) || inv.InvitedEmail != "vendor@example.com" {
 		t.Fatalf("inv=%+v", inv)
 	}
 	raw, err := base64.RawURLEncoding.Strict().DecodeString(inv.Secret)
