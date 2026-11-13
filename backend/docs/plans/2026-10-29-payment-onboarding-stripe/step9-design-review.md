@@ -10,19 +10,19 @@
 
 | # | 位置 | 嚴重度 | 發現 | 處置 | 狀態 |
 |---|---|---|---|---|---|
-| B1 | `internal/platform/stripe/client.go`、`webhook.go` | should | 手寫 Stripe HTTP client 與驗簽，沒用官方 stripe-go，也沒寫理由 | 改（D51，9b）：先確認 SDK 支援 Accounts v2 與釘住的 preview 版本 | open |
+| B1 | `internal/platform/stripe/client.go`、`webhook.go` | should | 手寫 Stripe HTTP client 與驗簽，沒用官方 stripe-go，也沒寫理由 | 改（D51，9b）：先確認 SDK 支援 Accounts v2 與釘住的 preview 版本 | fixed（`fa8ad019`、`6d681a2e`）：`internal/platform/stripe` 建在 stripe-go v87.1.0 上，contract 測試重放 `2026-10-28.endive` 的錄製；`git grep -n 'Stripe-Version' -- backend/internal backend/cmd` 只剩註解與測試的斷言 |
 | B2 | 分支新增的 migration 24 支（seller 19 支） | should | 建了又刪的表與欄位全留成 migration；只在本分支與 `diag/*` 套用過 | 改（D48，9d）：壓成淨差異 | open |
-| B3 | `payment/internal/account/service.go` 的 `Purge` | should | 個資清理刪掉本地對應，外部帳戶永遠開著、之後找不到 | 改（D52，9b）：關閉成功才刪對應 | open |
-| B4 | `cmd/hawkr/payment.go` 的 `PAYMENT_PROVIDER=fake` | should | fake provider 讓所有帳戶直接啟用，沒有 dev 環境保護；repo 已有 `requireDevEnvironment` | 改（9b） | open |
+| B3 | `payment/internal/account/service.go` 的 `Purge` | should | 個資清理刪掉本地對應，外部帳戶永遠開著、之後找不到 | 改（D52，9b）：關閉成功才刪對應 | fixed（`603bc2b8`、`6d681a2e`、`9fa7d985`、`ab467882`）：`TestForgetOwnersClosesTheExternalAccountThenDeletesTheRow`、`TestAFailedCloseKeepsTheRowMarkedExcludedFromPollingAndRetriedByTheSweep`、`TestPurgeOfARowWithoutExternalIDStoresTheResolvedIDBeforeClosing`（CI run 43471966103） |
+| B4 | `cmd/hawkr/payment.go` 的 `PAYMENT_PROVIDER=fake` | should | fake provider 讓所有帳戶直接啟用，沒有 dev 環境保護；repo 已有 `requireDevEnvironment` | 改（9b） | fixed（`95343fc8`）：`TestFakePaymentProviderOnlyInDevEnvironment` |
 | B5 | `.github/workflows/backend-db-proto-checks.yml` | should | `internal/platform/inbox/db` 的 migration 不在 CI 的 atlas 檢查內 | 改（9d） | open |
-| B6 | `payment.accounts.contact_email` | should | 信箱快照是帳戶還在 seller 時的決定，搬家後多一條已知限制 | 改（D50，9b）：建立外部帳戶當下經 `Owners` 讀 | open |
-| B7 | `account/jobs.go` 的 `Sweep` | nit | 每 15 分鐘輪詢所有未啟用帳戶，沒有年齡上限或退避 | 記：payment `CARRYOVER.md`，觸發：上線前定上限（9b 寫入） | open |
+| B6 | `payment.accounts.contact_email` | should | 信箱快照是帳戶還在 seller 時的決定，搬家後多一條已知限制 | 改（D50，9b）：建立外部帳戶當下經 `Owners` 讀 | fixed（`603bc2b8`、`8d2f34e7`，D55）：`contact_email` 欄刪除；`TestEnsureReadsTheOwnersContactEmailAtCreationTime`、`TestARetriedCreateWithAChangedEmailKeepsOneExternalAccount`（CI run 43471966103） |
+| B7 | `account/jobs.go` 的 `Sweep` | nit | 每 15 分鐘輪詢所有未啟用帳戶，沒有年齡上限或退避 | 記：payment `CARRYOVER.md`，觸發：上線前定上限（9b 寫入） | recorded（`95343fc8`）：payment `CARRYOVER.md`「輪詢補漏」列，觸發：上線前 |
 | B8 | `payment/db/schema.sql` 的 `accounts_poll` | nit | 索引前導欄位 `fetched_at` 沒有查詢用到 | 改（9d，隨壓平） | open |
-| B9 | `docs/modules/payment.md` §8 第 2 點 | nit | 已關閉店家的建立失敗待辦要管理員手動清 | 記：同處補觸發條件「上線前，或後台待辦出現已關閉店家時」（9b 寫入） | open |
-| B10 | `account/sync.go`、`service.go` 的 provider 分支 | nit | provider 不符就靜默略過，換 provider 後舊列沒有去向 | 記：payment `CARRYOVER.md`，觸發：接第二家金流商（9b 寫入） | open |
-| B11 | `internal/platform/inbox/inbox.go` 的 `Purge`、`Sweep` | nit | 未處理事件永不刪、沒有終局狀態，每個新 handler 要自己補掃 | 記：payment `CARRYOVER.md`，觸發：第二個 handler 接上 inbox 時（9b 寫入） | open |
-| B12 | `internal/platform/emailaddr` | nit | `agent/internal/model/email.go`、`seller/internal/governance/report.go` 仍各寫一份信箱規則 | 改（9b，待 Will 確認兩個行為改變；不同意就改成記錄） | open |
-| B13 | `payment/CARRYOVER.md` | nit | 漏列 Stripe client、不倒退條件、重讀名額、fake provider、`Owners`、`provider` 欄位 | 改（9b） | open |
+| B9 | `docs/modules/payment.md` §8 第 2 點 | nit | 已關閉店家的建立失敗待辦要管理員手動清 | 記：同處補觸發條件「上線前，或後台待辦出現已關閉店家時」（9b 寫入） | recorded（`95343fc8`）：`docs/modules/payment.md` §8 補觸發條件 |
+| B10 | `account/sync.go`、`service.go` 的 provider 分支 | nit | provider 不符就靜默略過，換 provider 後舊列沒有去向 | 記：payment `CARRYOVER.md`，觸發：接第二家金流商（9b 寫入） | recorded（`95343fc8`）：payment `CARRYOVER.md`「`provider` 欄位」列，觸發：接第二家金流商 |
+| B11 | `internal/platform/inbox/inbox.go` 的 `Purge`、`Sweep` | nit | 未處理事件永不刪、沒有終局狀態，每個新 handler 要自己補掃 | 記：payment `CARRYOVER.md`，觸發：第二個 handler 接上 inbox 時（9b 寫入） | recorded（`95343fc8`）：payment `CARRYOVER.md`「`inbox.events`」列，觸發：第二個 handler 接上 inbox 時 |
+| B12 | `internal/platform/emailaddr` | nit | `agent/internal/model/email.go`、`seller/internal/governance/report.go` 仍各寫一份信箱規則 | 改（9b，待 Will 確認兩個行為改變；不同意就改成記錄） | fixed（`7305492a`，Will 2026-11-13、11-14 同意五項行為改變）：`git grep -n 'mail\.ParseAddress' -- backend/internal backend/cmd` 只剩 `emailaddr`；`TestValidateSubmitAnonymousEmailRule` |
+| B13 | `payment/CARRYOVER.md` | nit | 漏列 Stripe client、不倒退條件、重讀名額、fake provider、`Owners`、`provider` 欄位 | 改（9b） | fixed（`95343fc8`、`8d2f34e7`）：payment `CARRYOVER.md` 補列 Stripe client、不倒退條件、重讀名額、`requirements`、fake provider、`Owners`、`provider` 欄位、兩步建立的延後項 |
 
 ## 契約與 client
 
