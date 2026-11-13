@@ -2,9 +2,9 @@
   "status": 200,
   "body": {
     "object": "v2.core.account_link",
-    "account": "acct_1UXUVeEfy6as5ms7",
-    "created": "2026-11-02T23:19:33.000Z",
-    "expires_at": "2026-11-02T23:24:33.000Z",
+    "account": "acct_1UbMbREpWhcqRxKs",
+    "created": "2026-11-13T15:41:31.000Z",
+    "expires_at": "2026-11-13T15:46:31.000Z",
     "url": "<MASKED>",
     "use_case": {
       "account_onboarding": {

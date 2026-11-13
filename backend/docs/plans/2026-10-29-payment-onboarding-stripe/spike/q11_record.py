@@ -1,9 +1,9 @@
-# Step 5: record raw responses for the adapter's contract tests (Stripe-Version 2026-09-30.preview).
+# Step 5: record raw responses for the adapter's contract tests (Stripe-Version 2026-10-28.endive).
 # Writes one JSON per call to argv[1]; the caller scrubs each file into outputs/fixtures/.
 import base64, json, sys, time, urllib.error, urllib.request, uuid
 import sp
 
-VER = "2026-09-30.preview"
+VER = "2026-10-28.endive"
 OUT = sys.argv[1]
 INC = ["configuration.recipient", "requirements", "identity", "defaults"]
 
@@ -47,7 +47,7 @@ for mode, dash in [("platform", "none"), ("provider", "express")]:
     s, t = v2("POST", "/v2/core/account_links", {"account": aid, "use_case": {"type": "account_onboarding", "account_onboarding": {
         "return_url": "https://accessible.stripe.com/r", "refresh_url": "https://accessible.stripe.com/f"}}})
     save(f"account_link_{mode}", s, t)
-    s, o, _ = sp.call("POST", "/v1/account_sessions", {"account": aid, "components": {"account_onboarding": {"enabled": True}}}, headers={"Stripe-Version": "2026-09-30.endive"})
+    s, o, _ = sp.call("POST", "/v1/account_sessions", {"account": aid, "components": {"account_onboarding": {"enabled": True}}}, headers={"Stripe-Version": VER})
     save(f"account_session_{mode}", s, json.dumps(o))
 
 s, t = v2("GET", "/v2/core/accounts/acct_doesnotexist000"); save("retrieve_not_found", s, t)
