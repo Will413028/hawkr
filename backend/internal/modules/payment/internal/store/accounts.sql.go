@@ -231,7 +231,7 @@ const markPaymentAccountCreateFailed = `-- name: MarkPaymentAccountCreateFailed 
 UPDATE payment.accounts
 SET create_failed_at = $1,
     updated_at = $1
-WHERE store_id = $2 AND external_account_id IS NULL AND create_failed_at IS NULL
+WHERE store_id = $2 AND external_account_id IS NULL AND create_failed_at IS NULL AND purge_pending_at IS NULL
 `
 
 type MarkPaymentAccountCreateFailedParams struct {
@@ -252,7 +252,7 @@ const markPaymentAccountPurgePending = `-- name: MarkPaymentAccountPurgePending 
 UPDATE payment.accounts
 SET purge_pending_at = COALESCE(purge_pending_at, $1),
     updated_at = $1
-WHERE store_id = $2 AND external_account_id IS NOT NULL
+WHERE store_id = $2
 `
 
 type MarkPaymentAccountPurgePendingParams struct {
@@ -260,7 +260,7 @@ type MarkPaymentAccountPurgePendingParams struct {
 	StoreID int64
 }
 
-// 擁有者清理時外部帳戶還沒關閉成功：記下時刻（已記過的保留最早的時刻）；沒有外部 ID 的列不寫。
+// 擁有者要求清理、還沒完成：記下時刻（已記過的保留最早的時刻），有沒有外部 ID 都寫。
 func (q *Queries) MarkPaymentAccountPurgePending(ctx context.Context, arg MarkPaymentAccountPurgePendingParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markPaymentAccountPurgePending, arg.Now, arg.StoreID)
 	if err != nil {
@@ -346,7 +346,7 @@ type PaymentAccountStoreIDsByExternalParams struct {
 	ExternalAccountIds []string
 }
 
-// 外部帳戶 ID 對應的擁有者（inbox 的路由鍵是外部帳戶 ID）；等待關閉的帳戶不排同步。
+// 外部帳戶 ID 對應的擁有者（inbox 的路由鍵是外部帳戶 ID）；等待清理的帳戶不排同步。
 func (q *Queries) PaymentAccountStoreIDsByExternal(ctx context.Context, arg PaymentAccountStoreIDsByExternalParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, paymentAccountStoreIDsByExternal, arg.Provider, arg.ExternalAccountIds)
 	if err != nil {
@@ -385,7 +385,7 @@ type PollablePaymentAccountStoreIDsParams struct {
 	Batch        int32
 }
 
-// 輪詢補漏（等待關閉的帳戶除外）：UNDER_REVIEW、ACTION_REQUIRED 的帳戶，DISABLED 但原因碼不是終局（rejected*、unsupported*）的帳戶（restricted 加 contact_stripe 或 no_resolution
+// 輪詢補漏（等待清理的帳戶除外）：UNDER_REVIEW、ACTION_REQUIRED 的帳戶，DISABLED 但原因碼不是終局（rejected*、unsupported*）的帳戶（restricted 加 contact_stripe 或 no_resolution
 // 可以被 Stripe 解除，掉了 webhook 時只有輪詢補得到；rejected 與 unsupported 不會再啟用，不輪詢），依 store_id 分批。inbox 有舊的未處理事件的帳戶由
 // Sweep 經 platform inbox 的 StaleRoutes 另外找。
 func (q *Queries) PollablePaymentAccountStoreIDs(ctx context.Context, arg PollablePaymentAccountStoreIDsParams) ([]int64, error) {
@@ -421,7 +421,7 @@ type PurgePendingPaymentAccountStoreIDsParams struct {
 	Batch        int32
 }
 
-// 週期掃描重排「關閉後刪除」用：等待關閉的帳戶，依 store_id 分批。
+// 週期掃描重排「關閉後刪除」用：等待清理的帳戶，依 store_id 分批。
 func (q *Queries) PurgePendingPaymentAccountStoreIDs(ctx context.Context, arg PurgePendingPaymentAccountStoreIDsParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, purgePendingPaymentAccountStoreIDs, arg.AfterStoreID, arg.Batch)
 	if err != nil {
@@ -448,7 +448,7 @@ SET external_account_id = $1,
     status = 'ACTION_REQUIRED',
     create_failed_at = NULL,
     updated_at = $2
-WHERE store_id = $3 AND external_account_id IS NULL
+WHERE store_id = $3 AND external_account_id IS NULL AND purge_pending_at IS NULL
 RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at
 `
 
@@ -458,7 +458,7 @@ type SetPaymentAccountExternalParams struct {
 	StoreID           int64
 }
 
-// 外部帳戶建立後填上外部 ID，狀態從 NOT_CREATED 進 ACTION_REQUIRED（新帳戶要賣家補資料，同步 job 重讀後覆寫）；只在還沒有外部 ID 時寫（重送安全）。
+// 外部帳戶建立後填上外部 ID，狀態從 NOT_CREATED 進 ACTION_REQUIRED（新帳戶要賣家補資料，同步 job 重讀後覆寫）；只在還沒有外部 ID 時寫（重送安全），等待清理的列不寫（清理以冪等鍵取得同一個帳戶）。
 func (q *Queries) SetPaymentAccountExternal(ctx context.Context, arg SetPaymentAccountExternalParams) (PaymentAccount, error) {
 	row := q.db.QueryRow(ctx, setPaymentAccountExternal, arg.ExternalAccountID, arg.Now, arg.StoreID)
 	var i PaymentAccount
@@ -486,7 +486,7 @@ func (q *Queries) SetPaymentAccountExternal(ctx context.Context, arg SetPaymentA
 const stalePaymentAccountCreateStoreIDs = `-- name: StalePaymentAccountCreateStoreIDs :many
 SELECT store_id
 FROM payment.accounts
-WHERE external_account_id IS NULL AND create_failed_at IS NULL
+WHERE external_account_id IS NULL AND create_failed_at IS NULL AND purge_pending_at IS NULL
   AND updated_at < $1 AND store_id > $2
 ORDER BY store_id
 LIMIT $3
@@ -498,7 +498,7 @@ type StalePaymentAccountCreateStoreIDsParams struct {
 	Batch        int32
 }
 
-// 保底：核准後建立 job 沒有跑成（例如擁有者關閉期間被略過）而且沒有進入失敗的帳戶；擁有者是否營運中由呼叫方經 Owners 確認後才補排建立。
+// 保底：核准後建立 job 沒有跑成（例如擁有者關閉期間被略過）而且沒有進入失敗的帳戶（等待清理的除外）；擁有者是否營運中由呼叫方經 Owners 確認後才補排建立。
 func (q *Queries) StalePaymentAccountCreateStoreIDs(ctx context.Context, arg StalePaymentAccountCreateStoreIDsParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, stalePaymentAccountCreateStoreIDs, arg.IdleBefore, arg.AfterStoreID, arg.Batch)
 	if err != nil {

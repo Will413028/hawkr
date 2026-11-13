@@ -219,14 +219,43 @@ func TestDeleteRowRecheckAfterLockRefusesARowThatGainedAnExternalID(t *testing.T
 	}
 }
 
-// 清理 job 在呼叫 provider 之前先把有外部 ID 的列標成等待清理（讓週期掃描能接手），沒有外部 ID 的列不標。
-// mutation：永遠回 false → 有外部 ID 的案例失敗。
-func TestPurgeMarksRowsWithAnExternalIDBeforeAnyProviderCall(t *testing.T) {
+// 清理 job 在呼叫 provider 之前先把每一列（有或沒有外部 ID）標成等待清理（讓週期掃描能接手），已經標過的不重標。
+// mutation：沒有外部 ID 的列不標 → 沒有外部 ID 的案例失敗；永遠回 false → 兩個案例失敗。
+func TestPurgeMarksEveryRowBeforeAnyProviderCall(t *testing.T) {
 	a := "acct_a"
-	if !purgeNeedsMark(store.PaymentAccount{ExternalAccountID: &a}) {
-		t.Error("有外部 ID 的列要先標記")
+	now := time.Now()
+	for name, tc := range map[string]struct {
+		row  store.PaymentAccount
+		want bool
+	}{
+		"有外部 ID":      {store.PaymentAccount{ExternalAccountID: &a}, true},
+		"沒有外部 ID":     {store.PaymentAccount{}, true},
+		"已標記、有外部 ID":  {store.PaymentAccount{ExternalAccountID: &a, PurgePendingAt: &now}, false},
+		"已標記、沒有外部 ID": {store.PaymentAccount{PurgePendingAt: &now}, false},
+	} {
+		if got := purgeNeedsMark(tc.row); got != tc.want {
+			t.Errorf("%s：purgeNeedsMark=%v，want %v", name, got, tc.want)
+		}
 	}
-	if purgeNeedsMark(store.PaymentAccount{}) {
-		t.Error("沒有外部 ID 的列不標記")
+}
+
+// 建立（Ensure 與 RequestAccount 排 job）只對沒有外部 ID、沒有建立失敗、沒有等待清理的列進行，不論列有沒有外部 ID，標記了就不建立。
+// mutation：不看 PurgePendingAt → 兩個已標記的案例失敗。
+func TestCreateIsWantedOnlyForAnUnmarkedRowWithoutExternalIDOrFailure(t *testing.T) {
+	a := "acct_a"
+	now := time.Now()
+	for name, tc := range map[string]struct {
+		row  store.PaymentAccount
+		want bool
+	}{
+		"建立中的列":       {store.PaymentAccount{}, true},
+		"已有外部 ID":     {store.PaymentAccount{ExternalAccountID: &a}, false},
+		"建立失敗":        {store.PaymentAccount{CreateFailedAt: &now}, false},
+		"已標記、沒有外部 ID": {store.PaymentAccount{PurgePendingAt: &now}, false},
+		"已標記、有外部 ID":  {store.PaymentAccount{PurgePendingAt: &now, ExternalAccountID: &a}, false},
+	} {
+		if got := createWanted(tc.row); got != tc.want {
+			t.Errorf("%s：createWanted=%v，want %v", name, got, tc.want)
+		}
 	}
 }

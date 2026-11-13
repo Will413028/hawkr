@@ -113,9 +113,10 @@ func decode(t *testing.T, s string) map[string]any {
 }
 
 func TestCreateAccountSendsOnlyMetadataThenTheUpdateForBothDashboards(t *testing.T) {
-	for dash, fx := range map[Dashboard]string{DashboardExpress: "create_provider", DashboardNone: "create_platform"} {
-		want := loadFixture(t, fx).object(t)["id"].(string)
-		s := &stub{resp: twoStepResp(want)}
+	for dash, fx := range map[Dashboard][2]string{DashboardExpress: {"create_shell_provider", "update_provider"}, DashboardNone: {"create_shell_platform", "update_platform"}} {
+		shell, update := loadFixture(t, fx[0]), loadFixture(t, fx[1])
+		want := shell.object(t)["id"].(string)
+		s := &stub{resp: twoStepResp(shell, update)}
 		c := newTestClient(t, s)
 		id, err := c.CreateAccount(context.Background(), "42", 7, dash, "seller@example.com")
 		if err != nil || id != want || !strings.HasPrefix(id, "acct_") {
@@ -148,16 +149,18 @@ func TestCreateAccountSendsOnlyMetadataThenTheUpdateForBothDashboards(t *testing
 	}
 }
 
-func twoStepResp(id string) func(int) (int, string, http.Header) {
+func twoStepResp(shell, update fixture) func(int) (int, string, http.Header) {
 	return func(n int) (int, string, http.Header) {
 		if n%2 == 1 {
-			return 200, `{"id":"` + id + `","object":"v2.core.account"}`, nil
+			return shell.Status, string(shell.Body), nil
 		}
-		return 200, `{"id":"` + id + `","object":"v2.core.account","applied_configurations":["recipient"]}`, nil
+		return update.Status, string(update.Body), nil
 	}
 }
 
 func TestARetryAfterALostCreateResponseWithAnotherEmailReusesTheAccountAndNeverHitsAnIdempotencyError(t *testing.T) {
+	shell, update := loadFixture(t, "create_shell_platform"), loadFixture(t, "update_platform")
+	want := shell.object(t)["id"].(string)
 	s := &stub{}
 	s.resp = func(n int) (int, string, http.Header) {
 		r := s.requests()[n-1]
@@ -168,16 +171,16 @@ func TestARetryAfterALostCreateResponseWithAnotherEmailReusesTheAccountAndNeverH
 			if n == 1 {
 				return 500, `{"error":{"message":"lost"}}`, nil
 			}
-			return 200, `{"id":"acct_same","object":"v2.core.account"}`, nil
+			return shell.Status, string(shell.Body), nil
 		}
-		return 200, `{"id":"acct_same","object":"v2.core.account"}`, nil
+		return update.Status, string(update.Body), nil
 	}
 	c := newTestClient(t, s)
 	if _, err := c.CreateAccount(context.Background(), "k", 7, DashboardNone, "old@example.com"); err == nil {
 		t.Fatal("第一次應失敗")
 	}
 	id, err := c.CreateAccount(context.Background(), "k", 7, DashboardNone, "new@example.com")
-	if err != nil || id != "acct_same" {
+	if err != nil || id != want {
 		t.Fatalf("id=%q err=%v", id, err)
 	}
 	reqs := s.requests()
@@ -190,14 +193,16 @@ func TestARetryAfterALostCreateResponseWithAnotherEmailReusesTheAccountAndNeverH
 }
 
 func TestAFailedUpdateIsAnErrorAndARetryRunsBothStepsAgain(t *testing.T) {
+	shell, update := loadFixture(t, "create_shell_platform"), loadFixture(t, "update_platform")
+	want := shell.object(t)["id"].(string)
 	s := &stub{resp: func(n int) (int, string, http.Header) {
 		switch n {
 		case 2:
 			return 400, `{"error":{"code":"invalid_fields","message":"bad"}}`, nil
 		case 4:
-			return 200, `{"id":"acct_1","object":"v2.core.account","applied_configurations":["recipient"]}`, nil
+			return update.Status, string(update.Body), nil
 		}
-		return 200, `{"id":"acct_1","object":"v2.core.account"}`, nil
+		return shell.Status, string(shell.Body), nil
 	}}
 	c := newTestClient(t, s)
 	id, err := c.CreateAccount(context.Background(), "k", 7, DashboardNone, "a@example.com")
@@ -206,7 +211,7 @@ func TestAFailedUpdateIsAnErrorAndARetryRunsBothStepsAgain(t *testing.T) {
 		t.Fatalf("id=%q err=%v", id, err)
 	}
 	id, err = c.CreateAccount(context.Background(), "k", 7, DashboardNone, "a@example.com")
-	if err != nil || id != "acct_1" {
+	if err != nil || id != want {
 		t.Fatalf("id=%q err=%v", id, err)
 	}
 	if reqs := s.requests(); len(reqs) != 4 || reqs[2].Idempotency != "k" || reqs[2].Body != reqs[0].Body {
@@ -215,9 +220,10 @@ func TestAFailedUpdateIsAnErrorAndARetryRunsBothStepsAgain(t *testing.T) {
 }
 
 func TestCreateAccountShellSendsOnlyTheStoreIDMetadata(t *testing.T) {
-	s := &stub{resp: func(int) (int, string, http.Header) { return 200, `{"id":"acct_1","object":"v2.core.account"}`, nil }}
+	shell := loadFixture(t, "create_shell_platform")
+	s := &stub{resp: replay(shell)}
 	id, err := newTestClient(t, s).CreateAccountShell(context.Background(), "k", 9)
-	if err != nil || id != "acct_1" {
+	if err != nil || id != shell.object(t)["id"].(string) {
 		t.Fatalf("id=%q err=%v", id, err)
 	}
 	reqs := s.requests()

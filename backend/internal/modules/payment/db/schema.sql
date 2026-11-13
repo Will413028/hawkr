@@ -18,8 +18,8 @@ CREATE SCHEMA payment;
 -- 經 PayoutAccountChanged 複製的 transfers_active；ENABLED 等於 transfers_active）。requirements 是快照的原始內容，status_reason 是導出目前狀態的金流商原因碼（只給後台）。
 -- create_failed_at 是建立重試用完的時刻（只有還沒有外部 ID 的列才有；後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED 的開始時間，重試建立時清空）。
 -- seller_read_claimed_at 是上次賣家觸發的讀取被受理的時刻（含失敗與並行的；條件式 UPDATE 搶名額），同步 job 不讀寫。
--- purge_pending_at 是擁有者要求清理、外部帳戶還沒關閉的時刻（清理 job 呼叫 provider 之前先標；關閉成功刪列之前一直在）：本地列留著（保住 store_id 與外部 ID 的對應），
--- 不進同步輪詢與賣家／管理員的重新整理，由 payment 的週期掃描重排「關閉後刪除」，關閉成功才刪列；只有有外部 ID 的列才有。
+-- purge_pending_at 是擁有者的清理已要求、還沒完成的時刻，與有沒有外部 ID 無關（清理 job 呼叫 provider 之前先標；刪列之前一直在）：本地列留著（保住 store_id 與外部 ID 或冪等鍵的對應），
+-- 不被建立、不進同步輪詢、不被賣家／管理員的重新整理讀，由 payment 的週期掃描重排「關閉後刪除」，關閉（沒有外部 ID 的列先以冪等鍵取得外部帳戶）成功才刪列。
 -- create_idempotency_key 是寫入「建立中」的列時產生的隨機 UUID（v4），建立外部帳戶的每次重試都用它當冪等鍵（Stripe 建議每個邏輯請求用隨機 UUID；
 -- 不用 store_id，兩個資料庫共用同一個 Stripe 帳號時才不會撞到別人的帳戶）。
 CREATE TABLE payment.accounts (
@@ -49,8 +49,7 @@ CREATE TABLE payment.accounts (
     CONSTRAINT accounts_snapshot_check CHECK (external_account_id IS NOT NULL OR (fetched_at IS NULL AND NOT payouts_active AND status_reason IS NULL)),
     CONSTRAINT accounts_requirements_check CHECK (jsonb_typeof(requirements) = 'object'),
     CONSTRAINT accounts_status_reason_check CHECK (status_reason IS NULL OR char_length(status_reason) BETWEEN 1 AND 200),
-    CONSTRAINT accounts_create_failed_check CHECK (create_failed_at IS NULL OR external_account_id IS NULL),
-    CONSTRAINT accounts_purge_pending_check CHECK (purge_pending_at IS NULL OR external_account_id IS NOT NULL)
+    CONSTRAINT accounts_create_failed_check CHECK (create_failed_at IS NULL OR external_account_id IS NULL)
 );
 CREATE UNIQUE INDEX accounts_external ON payment.accounts (provider, external_account_id) WHERE external_account_id IS NOT NULL;
 CREATE INDEX accounts_poll ON payment.accounts (fetched_at NULLS FIRST, store_id) WHERE status IN ('UNDER_REVIEW', 'ACTION_REQUIRED', 'DISABLED');

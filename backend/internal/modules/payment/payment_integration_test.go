@@ -1002,6 +1002,46 @@ func TestPurgeDeletesRowsWithoutAnExternalAccountAndKeepsRowsOfAnotherProvider(t
 	}
 }
 
+// 沒有外部 ID 的列取得帳戶失敗：清理 job 在呼叫 provider 之前已標記，最後一次失敗後列留著，週期掃描重排清理；標記的列不被建立、不被管理員重試建立、不被閒置建立的補排；重排的清理成功後刪列。
+// mutation 0：沒有外部 ID 的列不標記 → 失敗後沒有標記，失敗（尚未本機執行，需要資料庫）。mutation 1：閒置建立的查詢不排除 purge_pending_at → 標記的列被補排建立，失敗。
+func TestAFailedResolveKeepsTheMarkedRowWithoutExternalIDAndTheSweepRetriesIt(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	boom := errors.New("provider down")
+	f.fake.FailResolve(boom, boom)
+	if err := f.module.PurgeAccount(ctx, s, false); !errors.Is(err, boom) {
+		t.Fatalf("暫時性的失敗要回傳給 River 重試：%v", err)
+	}
+	must(t, f.module.PurgeAccount(ctx, s, true))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND external_account_id IS NULL AND purge_pending_at IS NOT NULL", s) != 1 {
+		t.Fatal("最後一次失敗後沒有外部 ID 的列應該留著並標成等待清理")
+	}
+	before := f.jobs.count(kindEnsure)
+	must(t, f.module.EnsureAccount(ctx, s, false))
+	if got := f.fake.Accounts(); got != 0 || f.jobs.count(kindEnsure) != before {
+		t.Fatalf("標記的列被建立：帳戶數=%d", got)
+	}
+	if _, err := f.module.RetryAccountCreate(ctx, s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("標記的列重試建立 err=%v，預期 failed_precondition", err)
+	}
+	f.now = f.now.Add(24 * time.Hour)
+	if _, _, err := f.module.SweepAccounts(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if f.jobs.count(kindEnsure) != before {
+		t.Fatal("閒置建立的補排排了標記的列")
+	}
+	if got := f.jobs.storeIDs(t, kindPurge); !slices.Contains(got, s) {
+		t.Fatalf("週期掃描沒有重排沒有外部 ID 的標記列的清理：%v", got)
+	}
+	must(t, f.module.PurgeAccount(ctx, s, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 {
+		t.Fatal("重排的清理成功後應該刪列")
+	}
+}
+
 // 建立的第一次呼叫結果未知、信箱又改了：重試沿用同一把鍵，provider 回同一個帳戶，帶的是這次的信箱（D55）；不會多出第二個帳戶。
 // mutation：Fake 的建立不以鍵回同一個帳戶 → 出現第二個帳戶，失敗。
 func TestARetriedCreateWithAChangedEmailKeepsOneExternalAccount(t *testing.T) {

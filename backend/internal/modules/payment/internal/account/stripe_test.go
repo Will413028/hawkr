@@ -1,6 +1,7 @@
 package account
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -45,6 +46,32 @@ func fixtureResponder(t *testing.T, name string) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(f.Status)
 		_, _ = w.Write(f.Body)
+	}
+}
+
+func fixtureID(t *testing.T, name string) string {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	fixtureResponder(t, name)(rec, nil)
+	var b struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil || b.ID == "" {
+		t.Fatalf("fixture %s 沒有 id：%v", name, err)
+	}
+	return b.ID
+}
+
+// twoStepResponder 重播兩步建立的實測回應：POST /v2/core/accounts 回建立的那一個，其餘（更新）回更新的那一個。
+func twoStepResponder(t *testing.T) http.HandlerFunc {
+	t.Helper()
+	shell, update := fixtureResponder(t, "create_shell_provider"), fixtureResponder(t, "update_provider")
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/v2/core/accounts" {
+			shell(w, r)
+			return
+		}
+		update(w, r)
 	}
 }
 
@@ -93,12 +120,18 @@ func TestStripeEnsureAccountUsesTheDashboardOfTheStoredCollection(t *testing.T) 
 			configured = model.CollectionPlatform
 		}
 		var got map[string]any
+		replay := twoStepResponder(t)
+		want := fixtureID(t, "create_shell_provider")
 		p := stripeProvider(t, configured, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			_ = json.NewDecoder(r.Body).Decode(&got)
-			_, _ = w.Write([]byte(`{"id":"acct_1"}`))
+			b, _ := io.ReadAll(r.Body)
+			if r.URL.Path != "/v2/core/accounts" {
+				_ = json.Unmarshal(b, &got)
+			}
+			r.Body = io.NopCloser(bytes.NewReader(b))
+			replay(w, r)
 		}))
 		id, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "k", ContactEmail: "seller@example.com", Collection: stored})
-		if err != nil || id != "acct_1" || got["dashboard"] != dash || got["contact_email"] != "seller@example.com" {
+		if err != nil || id != want || got["dashboard"] != dash || got["contact_email"] != "seller@example.com" {
 			t.Errorf("列 %s：id=%q err=%v dashboard=%v contact_email=%v", stored, id, err, got["dashboard"], got["contact_email"])
 		}
 	}
@@ -111,9 +144,10 @@ func TestStripeEnsureAccountUsesTheDashboardOfTheStoredCollection(t *testing.T) 
 // 沒有聯絡信箱時不呼叫 Stripe：有收款設定的帳戶沒有信箱一定被拒，重試也不會成功。
 func TestStripeEnsureAccountWithoutContactEmailIsPermanentAndSendsNothing(t *testing.T) {
 	called := false
-	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	replay := twoStepResponder(t)
+	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		_, _ = w.Write([]byte(`{"id":"acct_1"}`))
+		replay(w, r)
 	}))
 	if _, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "k", Collection: model.CollectionProvider}); !errors.Is(err, ErrPermanent) || called {
 		t.Errorf("err=%v called=%v，預期 ErrPermanent 且沒有送出請求", err, called)
@@ -123,13 +157,14 @@ func TestStripeEnsureAccountWithoutContactEmailIsPermanentAndSendsNothing(t *tes
 // 重試沿用同一把鍵：adapter 原樣把 EnsureInput 的鍵送成建立請求的 Idempotency-Key，建立請求的本文只有 metadata.store_id，信箱換了也不變。
 func TestStripeEnsureAccountSendsTheGivenKeyAndAFixedCreateBodyOnEveryAttempt(t *testing.T) {
 	var keys, bodies []string
+	replay := twoStepResponder(t)
 	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v2/core/accounts" {
 			keys = append(keys, r.Header.Get("Idempotency-Key"))
 			b, _ := io.ReadAll(r.Body)
 			bodies = append(bodies, string(b))
 		}
-		_, _ = w.Write([]byte(`{"id":"acct_1"}`))
+		replay(w, r)
 	}))
 	for _, email := range []string{"a@example.com", "b@example.com"} {
 		if _, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "6f1c0a52-0000-4000-8000-000000000001", ContactEmail: email, Collection: model.CollectionProvider}); err != nil {
@@ -146,13 +181,15 @@ func TestStripeEnsureAccountSendsTheGivenKeyAndAFixedCreateBodyOnEveryAttempt(t 
 
 func TestStripeResolveAccountReplaysTheCreateStepWithTheStoredKeyAndSendsNoOwnerData(t *testing.T) {
 	var reqs []string
+	replay := twoStepResponder(t)
+	want := fixtureID(t, "create_shell_provider")
 	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		reqs = append(reqs, r.Method+" "+r.URL.Path+" "+r.Header.Get("Idempotency-Key")+" "+string(b))
-		_, _ = w.Write([]byte(`{"id":"acct_1"}`))
+		replay(w, r)
 	}))
 	id, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 5, IdempotencyKey: "k"})
-	if err != nil || id != "acct_1" || fmt.Sprint(reqs) != `[POST /v2/core/accounts k {"metadata":{"store_id":"5"}}]` {
+	if err != nil || id != want || fmt.Sprint(reqs) != `[POST /v2/core/accounts k {"metadata":{"store_id":"5"}}]` {
 		t.Errorf("id=%q err=%v 請求=%v", id, err, reqs)
 	}
 	if _, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 5}); !errors.Is(err, ErrPermanent) {

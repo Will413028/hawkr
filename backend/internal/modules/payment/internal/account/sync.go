@@ -223,6 +223,9 @@ func (s *Service) RetryCreate(ctx context.Context, storeID int64) (model.Payment
 		if locked.ExternalAccountID != nil || locked.CreateFailedAt == nil {
 			return apperr.FailedPrecondition("收款帳戶不是建立失敗的狀態")
 		}
+		if locked.PurgePendingAt != nil {
+			return apperr.FailedPrecondition("收款帳戶正在關閉")
+		}
 		if _, err := q.ClearPaymentAccountCreateFailed(ctx, store.ClearPaymentAccountCreateFailedParams{StoreID: storeID, Now: s.d.Now().UTC()}); err != nil {
 			return err
 		}
@@ -246,6 +249,11 @@ func (s *Service) CreateOnboardingSession(ctx context.Context, storeID int64, re
 	acct, err := s.Account(ctx, storeID)
 	if err != nil {
 		return model.OnboardingSession{}, err
+	}
+	if row, err := store.New(s.d.DB.Conn(ctx)).PaymentAccountByStore(ctx, storeID); err != nil {
+		return model.OnboardingSession{}, err
+	} else if row.PurgePendingAt != nil {
+		return model.OnboardingSession{}, apperr.FailedPrecondition("收款帳戶正在關閉")
 	}
 	if acct.ExternalAccountID == nil || acct.Provider != s.d.Provider.Name() {
 		return model.OnboardingSession{}, apperr.FailedPrecondition("收款帳戶還沒有建立")

@@ -106,7 +106,7 @@ func (s *Service) RequestAccount(ctx context.Context, storeID int64, now time.Ti
 	if err != nil {
 		return err
 	}
-	if row.ExternalAccountID != nil || row.CreateFailedAt != nil {
+	if !createWanted(row) {
 		return nil
 	}
 	return enqueueEnsure(ctx, s.d.Jobs, storeID)
@@ -153,7 +153,7 @@ func (s *Service) Ensure(ctx context.Context, storeID int64, final bool) error {
 	if err != nil {
 		return err
 	}
-	if row.ExternalAccountID != nil || row.CreateFailedAt != nil || row.Provider != p.Name() {
+	if !createWanted(row) || row.Provider != p.Name() {
 		return nil
 	}
 	active, err := s.d.Owners.OwnerActive(ctx, storeID)
@@ -260,7 +260,7 @@ func planPurge(row store.PaymentAccount, provider string) purgePlan {
 	}
 }
 
-// Purge 是「關閉後刪除」job 的內容（D52）：第一步，有外部 ID 的列先在自己的 transaction 標成等待清理（purge_pending_at，之後任何錯誤、逾時或程序被殺都有週期掃描接手）；
+// Purge 是「關閉後刪除」job 的內容（D52）：第一步，每一列（有或沒有外部 ID）先在自己的 transaction 標成等待清理（purge_pending_at，之後任何錯誤、逾時或程序被殺都有週期掃描接手）；
 // 沒有外部 ID 的列在 provider 相同時走 purgeResolved（以冪等鍵取得外部帳戶、關閉、刪；D55），問不到 provider 時記警示 log 後直接刪。有外部帳戶時在 transaction 外關閉它（冪等：已關閉視為成功），成功之後才在同一個 transaction 刪掉列，並把它外部帳戶在 inbox 裡到現在為止的
 // 未處理事件標為已處理（帳戶不在了，不會再有同步涵蓋它們；不標記的話 platform 的清理永遠不刪，原始 payload 一直留著；inbox 列之後由 platform 的清理依保存期刪除）。
 // 列的 provider 與目前設定不同、或沒有設定 provider 時不關也不刪，記警示 log，設定回來之後由週期掃描重排。暫時性的失敗回傳錯誤由 River 退避重試；final 為 true
@@ -309,7 +309,7 @@ func (s *Service) Purge(ctx context.Context, storeID int64, final bool) error {
 }
 
 // purgeResolved 清理沒有外部 ID 的列（D55）：以列上的冪等鍵取得外部帳戶（建立已成功就是那一個，否則建一個沒有擁有者個資的空帳戶），關閉它，成功才刪列。
-// 列沒有外部 ID 所以標不了 purge_pending_at（CHECK），失敗時沒有週期掃描接手：暫時性的失敗由 River 重試；最後一次或永久失敗時列留著並記警示 log。
+// 列已在 Purge 的第一步標成等待清理：暫時性的失敗由 River 重試；最後一次或永久失敗時列留著並記警示 log，週期掃描之後重排。
 func (s *Service) purgeResolved(ctx context.Context, row store.PaymentAccount, final bool) error {
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
@@ -328,9 +328,14 @@ func (s *Service) purgeResolved(ctx context.Context, row store.PaymentAccount, f
 	return nil
 }
 
-// purgeNeedsMark 是清理 job 呼叫 provider 之前是否要先標記：有外部 ID 的列才標（CHECK 只允許有外部 ID 的列有標記）。
+// purgeNeedsMark 是清理 job 呼叫 provider 之前是否要先標記：每一列（有或沒有外部 ID）都標，已經標過的不重標。
 func purgeNeedsMark(row store.PaymentAccount) bool {
-	return row.ExternalAccountID != nil
+	return row.PurgePendingAt == nil
+}
+
+// createWanted 是列是否還需要建立外部帳戶：還沒有外部 ID、沒有進入建立失敗、沒有等待清理（標記了就不建立）。
+func createWanted(row store.PaymentAccount) bool {
+	return row.ExternalAccountID == nil && row.CreateFailedAt == nil && row.PurgePendingAt == nil
 }
 
 // errExternalAccountAppeared 是計畫直接刪列、鎖住之後卻發現列已有外部 ID（並行的建立剛寫入）：不能刪，回傳錯誤讓 job 重試並走關閉的路。

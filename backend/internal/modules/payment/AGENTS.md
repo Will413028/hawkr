@@ -24,7 +24,7 @@ schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵
 
 - 外部呼叫不在 transaction 內（單體規則 5）。守門：fake provider 的 `Violations`（integration 測試）。規格 §2。
 - 擁有者的 transaction 對 payment 只 INSERT 帳戶列（`ON CONFLICT DO NOTHING`）與排 job，不鎖、不改既有列；既有列只由本模組的 job 與後台指令寫（全域鎖順序 payment 先於 seller）。守門：integration 的 `lockorder` 檢查、`TestRequestKeepsAnExistingRow`。規格 §2、§7。
-- 擁有者個資清理時先關閉外部帳戶、成功才刪本地列（沒有外部 ID 的列以冪等鍵取得帳戶再關閉，D55）；job 先標 `purge_pending_at`（呼叫 provider 之前），失敗留列，不進同步輪詢，由週期掃描重排；ForgetOwners 的 transaction 仍只排 job。守門：`TestForgetOwnersClosesTheExternalAccountThenDeletesTheRow`、`TestAFailedCloseKeepsTheRowMarkedExcludedFromPollingAndRetriedByTheSweep`。規格 §2。
+- 擁有者個資清理時先關閉外部帳戶、成功才刪本地列（沒有外部 ID 的列以冪等鍵取得帳戶再關閉，D55）；job 先標每一列的 `purge_pending_at`（呼叫 provider 之前，與外部 ID 無關），失敗留列，不被建立、不進同步輪詢，由週期掃描重排；ForgetOwners 的 transaction 仍只排 job。守門：`TestForgetOwnersClosesTheExternalAccountThenDeletesTheRow`、`TestAFailedCloseKeepsTheRowMarkedExcludedFromPollingAndRetriedByTheSweep`。規格 §2。
 - 同步在寫快照的 transaction 內發 `PayoutAccountChanged`；payload 與明文 fingerprint 不寫 log、不保存。守門：`TestSyncPublishesPayoutAccountChangedInsideTheWrite`、`TestDuplicateProviderEventIsRecordedOnceAndDispatchedOnce`。規格 §3、§5。
 - 收款事件的 handler 只排同步、不標記已處理；同步只把讀取開始前收到的事件標為已處理。守門：`TestAnEventArrivingWhileTheAccountIsBeingReadIsNotLostWhenItsSyncIsCoalesced`。規格 §3。
 

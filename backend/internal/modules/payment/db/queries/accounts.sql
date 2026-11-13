@@ -24,13 +24,13 @@ VALUES (sqlc.arg(store_id), sqlc.arg(provider), sqlc.arg(requirement_collection)
 ON CONFLICT (store_id) DO NOTHING;
 
 -- name: SetPaymentAccountExternal :one
--- 外部帳戶建立後填上外部 ID，狀態從 NOT_CREATED 進 ACTION_REQUIRED（新帳戶要賣家補資料，同步 job 重讀後覆寫）；只在還沒有外部 ID 時寫（重送安全）。
+-- 外部帳戶建立後填上外部 ID，狀態從 NOT_CREATED 進 ACTION_REQUIRED（新帳戶要賣家補資料，同步 job 重讀後覆寫）；只在還沒有外部 ID 時寫（重送安全），等待清理的列不寫（清理以冪等鍵取得同一個帳戶）。
 UPDATE payment.accounts
 SET external_account_id = sqlc.arg(external_account_id),
     status = 'ACTION_REQUIRED',
     create_failed_at = NULL,
     updated_at = sqlc.arg(now)
-WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NULL
+WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NULL AND purge_pending_at IS NULL
 RETURNING *;
 
 -- name: MarkPaymentAccountCreateFailed :execrows
@@ -38,7 +38,7 @@ RETURNING *;
 UPDATE payment.accounts
 SET create_failed_at = sqlc.arg(now),
     updated_at = sqlc.arg(now)
-WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NULL AND create_failed_at IS NULL;
+WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NULL AND create_failed_at IS NULL AND purge_pending_at IS NULL;
 
 -- name: ClearPaymentAccountCreateFailed :execrows
 -- 管理員重試建立：只有建立失敗的列清空失敗時刻，由呼叫方同一個 transaction 重新排入建立 job。
@@ -96,10 +96,10 @@ WHERE provider = sqlc.arg(provider) AND external_account_id = ANY(sqlc.arg(exter
 ORDER BY store_id;
 
 -- name: StalePaymentAccountCreateStoreIDs :many
--- 保底：核准後建立 job 沒有跑成（例如擁有者關閉期間被略過）而且沒有進入失敗的帳戶；擁有者是否營運中由呼叫方經 Owners 確認後才補排建立。
+-- 保底：核准後建立 job 沒有跑成（例如擁有者關閉期間被略過）而且沒有進入失敗的帳戶（等待清理的除外）；擁有者是否營運中由呼叫方經 Owners 確認後才補排建立。
 SELECT store_id
 FROM payment.accounts
-WHERE external_account_id IS NULL AND create_failed_at IS NULL
+WHERE external_account_id IS NULL AND create_failed_at IS NULL AND purge_pending_at IS NULL
   AND updated_at < sqlc.arg(idle_before) AND store_id > sqlc.arg(after_store_id)
 ORDER BY store_id
 LIMIT sqlc.arg(batch);
@@ -112,11 +112,11 @@ WHERE store_id = ANY(sqlc.arg(store_ids)::bigint[])
 RETURNING provider, external_account_id;
 
 -- name: MarkPaymentAccountPurgePending :execrows
--- 擁有者要求清理、外部帳戶還沒關閉：記下時刻（已記過的保留最早的時刻）；沒有外部 ID 的列不寫。
+-- 擁有者要求清理、還沒完成：記下時刻（已記過的保留最早的時刻），有沒有外部 ID 都寫。
 UPDATE payment.accounts
 SET purge_pending_at = COALESCE(purge_pending_at, sqlc.arg(now)),
     updated_at = sqlc.arg(now)
-WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NOT NULL;
+WHERE store_id = sqlc.arg(store_id);
 
 -- name: PurgePendingPaymentAccountStoreIDs :many
 -- 週期掃描重排「關閉後刪除」用：等待清理的帳戶，依 store_id 分批。
