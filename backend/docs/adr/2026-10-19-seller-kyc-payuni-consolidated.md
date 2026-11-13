@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted（整合 `2026-10-02-seller-kyc-payuni-in-monolith.md` 的原決策與 8 次修訂；整合不改任何決策，2026-10-19。舊檔沒寫、照現行程式補上的幾條各附出處；文末 2026-10-20 修訂把關店後的清理改成兩段） |
+| 狀態 | superseded by 2026-11-13-seller-platform-review-and-identity-matching.md（原狀態 accepted：整合 `2026-10-02-seller-kyc-payuni-in-monolith.md` 的原決策與 8 次修訂，2026-10-19） |
 | 日期 | 2026-10-19 |
 | 影響範圍 | `internal/modules/seller`（KYC、PayUni、登記資料查詢、入駐同意、關店與個資清理）、`internal/platform/seal`、`internal/platform/payuni`、`internal/legacy`（PayUni webhook 的 consumer、`merchant.verification.*` 與 `seller.deleted` 的 relay）、admin、website、seller-app |
 | 取代 | `2026-10-02-seller-kyc-payuni-in-monolith.md`（本檔取代它，它標 `superseded by` 本檔）。原 ADR 修訂 `2026-07-20-seller-kyc-pii-encryption-scope.md` 的加密實作（範圍不變），本檔承接這個修訂 |

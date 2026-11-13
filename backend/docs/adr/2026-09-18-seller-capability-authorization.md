@@ -126,3 +126,18 @@ Gateway 零顯式入口的 5 條 ai-service HTTP 端點（recommend×3、chat×2
 ## 修訂：pricebook 刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D1；計畫 `plans/2026-10-27-ecommerce-scope-cut.md` 步驟 6）
 
 D8（賣家 pricebook 市場行情端點的歸屬）作廢：這些端點隨 pricebook 刪除，`CAP_MARKETING` 的其餘宣告不變。
+
+## 修訂：`KYC_APPROVED` 與公開曝光的條件改看平台審核加收款能力（2026-11-13，Will 2026-10-29、2026-11-02 決定；與收款開通同批，見 `2026-11-13-payment-onboarding-provider-port-stripe.md`）
+
+原決策段與 2026-10-08 修訂保留歷史。
+
+**脈絡。** 2026-10-08 的前置條件 `KYC_APPROVED` 是「KYC 流程核准」，而流程的後半段是 PayUni 子商店。PayUni 的開通與代理商 API 已刪除，收款開通改走 provider 中立的 payment port（收款開通 ADR D1、D7）；店家能不能收款，現在看收款帳戶的轉帳能力，不再看流程。
+
+**決策。**
+
+- 前置條件改名並改定義：`SELLER_REQUIREMENT_KYC_APPROVED` 變成 `SELLER_REQUIREMENT_ONBOARDING_COMPLETE`（proto 值 3，Go 的 `RequirementOnboardingComplete`），意思是「平台審核核准，而且收款帳戶的轉帳能力 active」。它由 view `seller.store_requirement_flags` 的兩個來源欄位 `kyc_approved`（有一筆 KYC 申請是 `APPROVED`）與 `transfers_active`（seller 自存的轉帳能力副本，`seller.payout_capabilities`，由 payment 的 `PayoutAccountChanged` 經同 transaction 訂閱者更新）決定，`onboarding_complete` 是兩者的 AND；`model.CapabilitiesOf` 讀這兩欄，Go 只做能力對條件的對應。
+- 取決於它的能力不變：`CAP_SHIPPING_SETUP` 與狀態 `CAP_PUBLIC_LISTING`（缺的條件仍是 `MissingExposure`）；其餘能力的前置條件沒有變。
+- 推導點的簽章變了：`CapabilitiesOf(store, kycFlow)` 變成只讀 `Store.Conditions`。2026-10-08 修訂的「流程的讀取只在能力取決於 KYC 時才發生（`DependsOnKYC`）」隨之消失：條件由 view 在讀店家時一次讀出，沒有額外的流程查詢；`Store.Can` 對取決於這個條件的能力也能回正確的值，不再一律 false。
+- 開通任務清單（`GetMyOnboarding`）與能力推導讀同一組來源欄位，不是同一個 Go 函式，因為可曝光公告在 SQL 端直接讀 view；兩邊一致由 integration 測試鎖住。
+- 2026-10-08 修訂「觸發」中「PayUni sandbox 確認 C2C 與宅配可在審核中建店時，`SHIPPING_SETUP` 的條件放寬成『PayUni 已註冊』」作廢（PayUni 已刪除，這條放寬沒有對象）；「優惠券、金流若有前置條件同樣加進能力」仍有效。
+- 未採：閘門只看平台審核：店家可能在金流商未開通時曝光卻收不了款。未採：看 Stripe 的 `charges_enabled`：v2 的 recipient 帳戶沒有這個欄位，轉帳能力才是 destination charges 的前提。未採：Go 算完寫回欄位：寫入時機要與 KYC、副本的更新同步，機制較重。
