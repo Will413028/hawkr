@@ -84,7 +84,7 @@ func openSeller(ctx context.Context, prepare func(*config.Env) error) (*sellerCo
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	payments, owners := newPayment(d, bus, jc, newInbox(d, jc, log), paymentProvider, log)
 	module := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
-	owners.bind(module, id)
+	owners.bind(module)
 	subscribeSellerPayout(bus, module)
 	subscribeSellerRelay(bus, jc)
 	return &sellerCommand{DB: d, Bus: bus, Jobs: jc, Identity: id, Seller: module, Owners: owners, Logger: log}, nil

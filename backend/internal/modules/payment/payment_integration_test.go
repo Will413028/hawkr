@@ -1002,6 +1002,31 @@ func TestPurgeDeletesRowsWithoutAnExternalAccountAndKeepsRowsOfAnotherProvider(t
 	}
 }
 
+// 沒有外部 ID 的列清理：取得外部帳戶之後先把 ID 存回已標記的列、才關閉；關閉成功但刪列失敗時，重試走有外部 ID 的路，不再取得（已關閉帳戶的同一把鍵重放是永久失敗），列最後被刪除。
+// mutation：關閉放在存 ID 之前 → 刪列失敗後列上沒有外部 ID，重試取得已關閉的帳戶失敗，列留著，失敗（尚未本機執行，需要資料庫）。
+func TestPurgeRetryAfterCloseSucceededButDeleteFailedDoesNotResolveAClosedAccount(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	_, err := f.db.Conn(ctx).Exec(ctx, `CREATE OR REPLACE FUNCTION payment.test_block_delete() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'delete blocked'; END $$`)
+	must(t, err)
+	_, err = f.db.Conn(ctx).Exec(ctx, `CREATE TRIGGER test_block_delete BEFORE DELETE ON payment.accounts FOR EACH ROW WHEN (OLD.store_id = `+fmt.Sprint(s)+`) EXECUTE FUNCTION payment.test_block_delete()`)
+	must(t, err)
+	if err := f.module.PurgeAccount(ctx, s, false); err == nil {
+		t.Fatal("刪列被擋，清理應回錯誤")
+	}
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND external_account_id IS NOT NULL AND purge_pending_at IS NOT NULL", s) != 1 || len(f.fake.Closes()) != 1 {
+		t.Fatalf("關閉之前應該已把外部 ID 存回標記的列：關閉=%v", f.fake.Closes())
+	}
+	_, err = f.db.Conn(ctx).Exec(ctx, `DROP TRIGGER test_block_delete ON payment.accounts`)
+	must(t, err)
+	must(t, f.module.PurgeAccount(ctx, s, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 || len(f.fake.Resolves()) != 1 {
+		t.Fatalf("重試應該刪列且不再取得帳戶：取得=%v", f.fake.Resolves())
+	}
+}
+
 // 沒有外部 ID 的列取得帳戶失敗：清理 job 在呼叫 provider 之前已標記，最後一次失敗後列留著，週期掃描重排清理；標記的列不被建立、不被管理員重試建立、不被閒置建立的補排；重排的清理成功後刪列。
 // mutation 0：沒有外部 ID 的列不標記 → 失敗後沒有標記，失敗（尚未本機執行，需要資料庫）。mutation 1：閒置建立的查詢不排除 purge_pending_at → 標記的列被補排建立，失敗。
 func TestAFailedResolveKeepsTheMarkedRowWithoutExternalIDAndTheSweepRetriesIt(t *testing.T) {

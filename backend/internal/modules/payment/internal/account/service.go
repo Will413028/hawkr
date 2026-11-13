@@ -277,7 +277,7 @@ func (s *Service) Purge(ctx context.Context, storeID int64, final bool) error {
 	if s.d.Provider != nil {
 		provider = s.d.Provider.Name()
 	}
-	if purgeNeedsMark(row) {
+	if row.PurgePendingAt == nil {
 		if err := s.markPurgePending(ctx, storeID); err != nil {
 			return err
 		}
@@ -285,7 +285,7 @@ func (s *Service) Purge(ctx context.Context, storeID int64, final bool) error {
 	switch planPurge(row, provider) {
 	case purgeDelete:
 		s.d.Logger.WarnContext(ctx, "payment：沒有外部 ID 的收款帳戶列問不到 provider，直接刪除（若金流商那邊已有帳戶不會被關閉）", "store_id", storeID, "row_provider", row.Provider, "configured_provider", provider)
-		return s.deleteRow(ctx, storeID, nil, false)
+		return s.deleteRow(ctx, storeID, nil)
 	case purgeResolve:
 		return s.purgeResolved(ctx, row, final)
 	case purgeDefer:
@@ -293,44 +293,86 @@ func (s *Service) Purge(ctx context.Context, storeID int64, final bool) error {
 		return nil
 	case purgeClose:
 	}
-	external := *row.ExternalAccountID
-	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
-	defer cancel()
-	callErr := s.d.Provider.CloseAccount(callCtx, external)
-	if callErr == nil {
-		return s.deleteRow(ctx, storeID, &external, false)
-	}
-	permanent := errors.Is(callErr, ErrPermanent)
-	if !permanent && !final {
-		return callErr
-	}
-	s.d.Logger.WarnContext(ctx, "payment：關閉外部帳戶失敗，本地列留著等週期掃描重排", "store_id", storeID, "external_account_id", external, "permanent", permanent, "error", callErr)
-	return nil
+	return s.closeThenDelete(ctx, storeID, *row.ExternalAccountID, final)
 }
 
-// purgeResolved 清理沒有外部 ID 的列（D55）：以列上的冪等鍵取得外部帳戶（建立已成功就是那一個，否則建一個沒有擁有者個資的空帳戶），關閉它，成功才刪列。
-// 列已在 Purge 的第一步標成等待清理：暫時性的失敗由 River 重試；最後一次或永久失敗時列留著並記警示 log，週期掃描之後重排。
+// purgeResolved 清理沒有外部 ID 的列（D55）：以列上的冪等鍵取得外部帳戶（建立已成功就是那一個，否則建一個沒有擁有者個資的空帳戶），先把它的 ID 寫回已標記的列，
+// 再走和有外部 ID 的列相同的關閉後刪除。順序是關鍵：關閉之後同一把鍵的重放會被金流商拒絕（measured：409 idempotency_error，永久），所以 ID 一定要在關閉之前存下，
+// 關閉成功但刪列失敗的重試就不必再取得已關閉的帳戶。暫時性的失敗由 River 重試；最後一次或永久失敗時列留著並記警示 log，週期掃描之後重排。
 func (s *Service) purgeResolved(ctx context.Context, row store.PaymentAccount, final bool) error {
+	return resolveStoreThenClose(ctx, s.d.Provider, ResolveInput{StoreID: row.StoreID, IdempotencyKey: row.CreateIdempotencyKey.String()},
+		func(ctx context.Context, external string) (bool, error) {
+			return s.storeResolvedExternal(ctx, row.StoreID, external)
+		},
+		func(ctx context.Context, external string) error {
+			return s.closeThenDelete(ctx, row.StoreID, external, final)
+		},
+		func(err error) error { return s.purgeFailed(ctx, row.StoreID, nil, err, final) })
+}
+
+// resolveStoreThenClose 是 purgeResolved 的順序：取得外部帳戶（自己的逾時）、save 寫回列（回報列已不在時結束）、才 closeDelete；取得失敗交給 onResolveErr。
+func resolveStoreThenClose(ctx context.Context, p Provider, in ResolveInput,
+	save func(ctx context.Context, external string) (gone bool, err error),
+	closeDelete func(ctx context.Context, external string) error,
+	onResolveErr func(error) error,
+) error {
+	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
+	external, err := p.ResolveAccount(callCtx, in)
+	cancel()
+	if err != nil {
+		return onResolveErr(err)
+	}
+	if gone, err := save(ctx, external); gone || err != nil {
+		return err
+	}
+	return closeDelete(ctx, external)
+}
+
+// storeResolvedExternal 在 transaction 內把取得的外部 ID 寫回已標記等待清理的列（欄位與 Ensure 寫入時相同）；列已經不在時 gone 為真。列上已經有外部 ID
+// （標記前並行的建立寫入了同一個帳戶）時不改它。
+func (s *Service) storeResolvedExternal(ctx context.Context, storeID int64, external string) (gone bool, err error) {
+	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
+	defer cancel()
+	err = s.d.DB.InTx(wctx, func(ctx context.Context) error {
+		q := store.New(s.d.DB.Conn(ctx))
+		if _, err := q.LockPaymentAccount(ctx, storeID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				gone = true
+				return nil
+			}
+			return err
+		}
+		_, err := q.SetPaymentAccountExternalForPurge(ctx, store.SetPaymentAccountExternalForPurgeParams{StoreID: storeID, ExternalAccountID: &external, Now: s.d.Now().UTC()})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	})
+	return gone, err
+}
+
+// closeThenDelete 在 transaction 外關閉外部帳戶（冪等：已關閉視為成功），成功才刪列；每次 provider 呼叫有自己的逾時。
+func (s *Service) closeThenDelete(ctx context.Context, storeID int64, external string, final bool) error {
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
-	external, err := s.d.Provider.ResolveAccount(callCtx, ResolveInput{StoreID: row.StoreID, IdempotencyKey: row.CreateIdempotencyKey.String()})
-	if err == nil {
-		err = s.d.Provider.CloseAccount(callCtx, external)
+	if err := s.d.Provider.CloseAccount(callCtx, external); err != nil {
+		return s.purgeFailed(ctx, storeID, &external, err, final)
 	}
-	if err == nil {
-		return s.deleteRow(ctx, row.StoreID, &external, true)
-	}
+	return s.deleteRow(ctx, storeID, &external)
+}
+
+// purgeFailed 處理清理時 provider 呼叫的失敗：暫時性且不是最後一次嘗試時回傳錯誤由 River 重試，否則本地列（已標記）留著並記警示 log，等週期掃描重排。
+func (s *Service) purgeFailed(ctx context.Context, storeID int64, external *string, err error, final bool) error {
 	permanent := errors.Is(err, ErrPermanent)
 	if !permanent && !final {
 		return err
 	}
-	s.d.Logger.WarnContext(ctx, "payment：取得或關閉沒有外部 ID 的帳戶失敗，本地列留著", "store_id", row.StoreID, "permanent", permanent, "error", err)
+	ext := ""
+	if external != nil {
+		ext = *external
+	}
+	s.d.Logger.WarnContext(ctx, "payment：取得或關閉外部帳戶失敗，本地列留著等週期掃描重排", "store_id", storeID, "external_account_id", ext, "permanent", permanent, "error", err)
 	return nil
-}
-
-// purgeNeedsMark 是清理 job 呼叫 provider 之前是否要先標記：每一列（有或沒有外部 ID）都標，已經標過的不重標。
-func purgeNeedsMark(row store.PaymentAccount) bool {
-	return row.PurgePendingAt == nil
 }
 
 // createWanted 是列是否還需要建立外部帳戶：還沒有外部 ID、沒有進入建立失敗、沒有等待清理（標記了就不建立）。
@@ -342,23 +384,19 @@ func createWanted(row store.PaymentAccount) bool {
 var errExternalAccountAppeared = errors.New("payment：要直接刪的帳戶列已經有外部帳戶，改走關閉")
 
 // lockedRowMayBeDeleted 在鎖住列之後再檢查它是否還能照計畫刪：planned 是 nil（計畫是直接刪）時列上必須仍沒有外部 ID，否則回 errExternalAccountAppeared；
-// planned 不是 nil（已關閉的那個帳戶）時，列上的外部 ID 必須還是它；resolved 為真（計畫起點的列沒有外部 ID，帳戶由冪等鍵取得）時列上仍沒有外部 ID 也可以刪，
-// 並行的建立寫入的是同一把鍵的同一個帳戶；其他情況不刪也不是錯誤。
-func lockedRowMayBeDeleted(locked store.PaymentAccount, planned *string, resolved bool) (bool, error) {
+// planned 不是 nil（已關閉的那個帳戶）時，列上的外部 ID 必須還是它，否則不刪也不是錯誤。
+func lockedRowMayBeDeleted(locked store.PaymentAccount, planned *string) (bool, error) {
 	if planned == nil {
 		if locked.ExternalAccountID != nil {
 			return false, errExternalAccountAppeared
 		}
 		return true, nil
 	}
-	if locked.ExternalAccountID == nil {
-		return resolved, nil
-	}
-	return *locked.ExternalAccountID == *planned, nil
+	return locked.ExternalAccountID != nil && *locked.ExternalAccountID == *planned, nil
 }
 
-// deleteRow 刪掉擁有者的列；鎖住之後依 lockedRowMayBeDeleted 再檢查（external 是 nil 表示計畫是直接刪；resolved 見該函式）。
-func (s *Service) deleteRow(ctx context.Context, storeID int64, external *string, resolved bool) error {
+// deleteRow 刪掉擁有者的列；鎖住之後依 lockedRowMayBeDeleted 再檢查（external 是 nil 表示計畫是直接刪）。
+func (s *Service) deleteRow(ctx context.Context, storeID int64, external *string) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
 	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
@@ -370,7 +408,7 @@ func (s *Service) deleteRow(ctx context.Context, storeID int64, external *string
 		if err != nil {
 			return err
 		}
-		if ok, err := lockedRowMayBeDeleted(locked, external, resolved); !ok {
+		if ok, err := lockedRowMayBeDeleted(locked, external); !ok {
 			return err
 		}
 		rows, err := q.DeletePaymentAccounts(ctx, []int64{storeID})

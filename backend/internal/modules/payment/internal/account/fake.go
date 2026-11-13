@@ -41,6 +41,7 @@ type Fake struct {
 	fetchErrs    []error
 	closeErrs    []error
 	closed       []string
+	closedIDs    map[string]bool
 	ensures      int
 	ensureKeys   []string
 	ensureEmails []string
@@ -52,9 +53,10 @@ type Fake struct {
 // NewFake 建立 Fake：預設是 provider 收件、託管介面。
 func NewFake() *Fake {
 	return &Fake{
-		caps:     Capabilities{RequirementCollection: model.CollectionProvider, OnboardingSurface: model.SurfaceHosted},
-		byKey:    map[string]string{},
-		accounts: map[string]Snapshot{},
+		caps:      Capabilities{RequirementCollection: model.CollectionProvider, OnboardingSurface: model.SurfaceHosted},
+		byKey:     map[string]string{},
+		accounts:  map[string]Snapshot{},
+		closedIDs: map[string]bool{},
 	}
 }
 
@@ -220,7 +222,7 @@ func (f *Fake) EnsureAccount(ctx context.Context, in EnsureInput) (string, error
 	return id, nil
 }
 
-// ResolveAccount 實作 Provider：同一個冪等鍵回同一個帳戶，沒有就建立。
+// ResolveAccount 實作 Provider：同一個冪等鍵回同一個帳戶，沒有就建立；帳戶已關閉之後重放同一把鍵是永久失敗（measured）。
 func (f *Fake) ResolveAccount(ctx context.Context, in ResolveInput) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -228,6 +230,9 @@ func (f *Fake) ResolveAccount(ctx context.Context, in ResolveInput) (string, err
 	f.resolves = append(f.resolves, in.IdempotencyKey)
 	if err := pop(&f.resolveErrs); err != nil {
 		return "", err
+	}
+	if id, ok := f.byKey[in.IdempotencyKey]; ok && f.closedIDs[id] {
+		return "", fmt.Errorf("%w：冪等鍵對應的帳戶已關閉（金流商回 409 idempotency_error）", ErrPermanent)
 	}
 	return f.accountFor(in.IdempotencyKey), nil
 }
@@ -285,6 +290,7 @@ func (f *Fake) CloseAccount(ctx context.Context, externalID string) error {
 	if _, ok := f.accounts[externalID]; !ok && !f.AutoActive {
 		return fmt.Errorf("%w：沒有外部帳戶 %s", ErrPermanent, externalID)
 	}
+	f.closedIDs[externalID] = true
 	return nil
 }
 

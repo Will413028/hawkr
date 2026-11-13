@@ -9,7 +9,6 @@ import (
 
 	"github.com/riverqueue/river"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -82,13 +81,10 @@ func readStripe(e *config.Env, log *slog.Logger) payment.Provider {
 
 // sellerOwners 以 seller 與 identity 的公開 API 實作 payment 的擁有者查詢（payment 是葉節點，不讀上層）：店家存在而且沒有關閉才算營運中；
 // 聯絡信箱是店家所屬帳號的聯絡信箱（identity 已驗證的信箱優先，其次自填，與送審檢查同一條路徑）。
-// payment 先於 seller 組裝（seller 依賴 payment），所以 seller 與 identity 在組裝之後才設定（bind）。
-type sellerOwners struct {
-	m  *seller.Module
-	id *identity.Module
-}
+// payment 先於 seller 組裝（seller 依賴 payment），所以 seller 在組裝之後才設定（bind）。
+type sellerOwners struct{ m *seller.Module }
 
-func (o *sellerOwners) bind(m *seller.Module, id *identity.Module) { o.m, o.id = m, id }
+func (o *sellerOwners) bind(m *seller.Module) { o.m = m }
 
 // OwnerContactEmail 回傳店家所屬帳號目前的聯絡信箱：由 seller 解析（與核准前的送審檢查同一個規則）；店家不存在或沒有可用的信箱時 ok 是 false。
 func (o *sellerOwners) OwnerContactEmail(ctx context.Context, storeID int64) (string, bool, error) {
@@ -149,13 +145,19 @@ func seedPaymentAccounts(ctx context.Context, c *sellerCommand, fake *payment.Fa
 		if err != nil {
 			return err
 		}
-		if acct.ExternalAccountID == nil {
-			return fmt.Errorf("種子店家 %d 沒有建立出外部收款帳戶（店家所屬帳號沒有可用的聯絡信箱？）", id)
-		}
 		if acct.Provider != payment.FakeName {
 			if _, err := fmt.Fprintf(out, "提醒：種子店家 %d 的收款帳戶屬於 %s，種子沒有改它（開通閘門照該帳戶的狀態）\n", id, acct.Provider); err != nil {
 				return err
 			}
+			continue
+		}
+		if acct.ExternalAccountID != nil {
+			continue
+		}
+		if active, err := c.Owners.OwnerActive(ctx, id); err != nil {
+			return err
+		} else if active {
+			return fmt.Errorf("種子店家 %d 的收款帳戶沒有外部帳戶（建立沒有完成）", id)
 		}
 	}
 	return nil

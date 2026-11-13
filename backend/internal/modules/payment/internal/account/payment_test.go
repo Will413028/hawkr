@@ -199,42 +199,18 @@ func TestDeleteRowRecheckAfterLockRefusesARowThatGainedAnExternalID(t *testing.T
 	for name, tc := range map[string]struct {
 		locked   store.PaymentAccount
 		planned  *string
-		resolved bool
 		wantOK   bool
 		wantFail bool
 	}{
-		"直接刪、列仍沒有外部 ID":   {store.PaymentAccount{}, nil, false, true, false},
-		"直接刪、並行寫入外部 ID":   {store.PaymentAccount{ExternalAccountID: &a}, nil, false, false, true},
-		"關閉後刪、外部 ID 相同":   {store.PaymentAccount{ExternalAccountID: &a}, &a, false, true, false},
-		"關閉後刪、外部 ID 不同":   {store.PaymentAccount{ExternalAccountID: &b}, &a, false, false, false},
-		"關閉後刪、外部 ID 不見了":  {store.PaymentAccount{}, &a, false, false, false},
-		"取得後刪、列仍沒有外部 ID":  {store.PaymentAccount{}, &a, true, true, false},
-		"取得後刪、並行寫入同一個 ID": {store.PaymentAccount{ExternalAccountID: &a}, &a, true, true, false},
-		"取得後刪、並行寫入別的 ID":  {store.PaymentAccount{ExternalAccountID: &b}, &a, true, false, false},
+		"直接刪、列仍沒有外部 ID":  {store.PaymentAccount{}, nil, true, false},
+		"直接刪、並行寫入外部 ID":  {store.PaymentAccount{ExternalAccountID: &a}, nil, false, true},
+		"關閉後刪、外部 ID 相同":  {store.PaymentAccount{ExternalAccountID: &a}, &a, true, false},
+		"關閉後刪、外部 ID 不同":  {store.PaymentAccount{ExternalAccountID: &b}, &a, false, false},
+		"關閉後刪、外部 ID 不見了": {store.PaymentAccount{}, &a, false, false},
 	} {
-		ok, err := lockedRowMayBeDeleted(tc.locked, tc.planned, tc.resolved)
+		ok, err := lockedRowMayBeDeleted(tc.locked, tc.planned)
 		if ok != tc.wantOK || (err != nil) != tc.wantFail {
 			t.Errorf("%s：ok=%v err=%v，want ok=%v fail=%v", name, ok, err, tc.wantOK, tc.wantFail)
-		}
-	}
-}
-
-// 清理 job 在呼叫 provider 之前先把每一列（有或沒有外部 ID）標成等待清理（讓週期掃描能接手），已經標過的不重標。
-// mutation：沒有外部 ID 的列不標 → 沒有外部 ID 的案例失敗；永遠回 false → 兩個案例失敗。
-func TestPurgeMarksEveryRowBeforeAnyProviderCall(t *testing.T) {
-	a := "acct_a"
-	now := time.Now()
-	for name, tc := range map[string]struct {
-		row  store.PaymentAccount
-		want bool
-	}{
-		"有外部 ID":      {store.PaymentAccount{ExternalAccountID: &a}, true},
-		"沒有外部 ID":     {store.PaymentAccount{}, true},
-		"已標記、有外部 ID":  {store.PaymentAccount{ExternalAccountID: &a, PurgePendingAt: &now}, false},
-		"已標記、沒有外部 ID": {store.PaymentAccount{PurgePendingAt: &now}, false},
-	} {
-		if got := purgeNeedsMark(tc.row); got != tc.want {
-			t.Errorf("%s：purgeNeedsMark=%v，want %v", name, got, tc.want)
 		}
 	}
 }
@@ -257,5 +233,30 @@ func TestCreateIsWantedOnlyForAnUnmarkedRowWithoutExternalIDOrFailure(t *testing
 		if got := createWanted(tc.row); got != tc.want {
 			t.Errorf("%s：createWanted=%v，want %v", name, got, tc.want)
 		}
+	}
+}
+
+// 沒有外部 ID 的列清理：先取得外部帳戶、把 ID 存回列，之後才關閉；關閉之後同一把鍵的取得是永久失敗（measured：409 idempotency_error），所以重試必須走已存 ID 的路。
+// mutation：關閉放到存 ID 之前 → 存 ID 時已有關閉紀錄，失敗。
+func TestPurgeOfARowWithoutExternalIDStoresTheResolvedIDBeforeClosing(t *testing.T) {
+	f := NewFake()
+	ctx := deadlineCtx(t)
+	var stored string
+	var closesWhenStoring int
+	err := resolveStoreThenClose(ctx, f, ResolveInput{StoreID: 1, IdempotencyKey: "k"},
+		func(_ context.Context, external string) (bool, error) {
+			stored, closesWhenStoring = external, len(f.Closes())
+			return false, nil
+		},
+		func(ctx context.Context, external string) error { return f.CloseAccount(ctx, external) },
+		func(err error) error { t.Fatalf("取得不該失敗：%v", err); return err })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored == "" || closesWhenStoring != 0 || len(f.Closes()) != 1 || f.Closes()[0] != stored {
+		t.Fatalf("存入=%q 存入時的關閉次數=%d 關閉=%v", stored, closesWhenStoring, f.Closes())
+	}
+	if _, err := f.ResolveAccount(ctx, ResolveInput{StoreID: 1, IdempotencyKey: "k"}); !errors.Is(err, ErrPermanent) {
+		t.Fatalf("關閉之後重放同一把鍵應是永久失敗：%v", err)
 	}
 }

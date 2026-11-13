@@ -246,15 +246,20 @@ func (s *Service) CreateOnboardingSession(ctx context.Context, storeID int64, re
 	if s.d.Provider == nil {
 		return model.OnboardingSession{}, apperr.FailedPrecondition("尚未設定收款開通")
 	}
-	acct, err := s.Account(ctx, storeID)
+	if err := model.Positive(storeID); err != nil {
+		return model.OnboardingSession{}, err
+	}
+	row, err := store.New(s.d.DB.Conn(ctx)).PaymentAccountByStore(ctx, storeID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.OnboardingSession{}, apperr.NotFound("店家還沒有收款帳戶")
+	}
 	if err != nil {
 		return model.OnboardingSession{}, err
 	}
-	if row, err := store.New(s.d.DB.Conn(ctx)).PaymentAccountByStore(ctx, storeID); err != nil {
-		return model.OnboardingSession{}, err
-	} else if row.PurgePendingAt != nil {
+	if row.PurgePendingAt != nil {
 		return model.OnboardingSession{}, apperr.FailedPrecondition("收款帳戶正在關閉")
 	}
+	acct := ToModel(row)
 	if acct.ExternalAccountID == nil || acct.Provider != s.d.Provider.Name() {
 		return model.OnboardingSession{}, apperr.FailedPrecondition("收款帳戶還沒有建立")
 	}

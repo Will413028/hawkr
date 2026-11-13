@@ -207,6 +207,34 @@ func TestDevSeedPaymentAccountsFailsWhenAnOwnerHasNoContactEmail(t *testing.T) {
 	}
 }
 
+// 種子店家的收款帳戶列屬於別的 provider 且還沒有外部 ID 時，fake 不碰它：種子印出提醒並繼續，不回「建立沒有完成」的錯誤。
+// mutation：沒有外部 ID 的檢查放在 provider 的檢查之前 → 回錯誤，失敗（尚未本機執行，需要資料庫）。
+func TestDevSeedPaymentAccountsKeepsAnotherProvidersRowWithoutExternalID(t *testing.T) {
+	ctx := context.Background()
+	d := devSeedEnv(t)
+	var out bytes.Buffer
+	if err := runDevSeed(ctx, nil, &out); err != nil {
+		t.Fatalf("dev-seed：%v", err)
+	}
+	if _, err := d.Pool().Exec(ctx, `UPDATE payment.accounts SET provider = 'stripe', external_account_id = NULL, status = 'NOT_CREATED', transfers_active = false, payouts_active = false, fetched_at = NULL, disabled_reason = NULL WHERE store_id = $1`, devSeedStoreA); err != nil {
+		t.Fatal(err)
+	}
+	c, err := openSeller(ctx, requireDevEnvironment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	fake := payment.NewFake()
+	fake.AutoActive = true
+	out.Reset()
+	if err := seedPaymentAccounts(ctx, c, fake, []int64{devSeedStoreA}, &out); err != nil {
+		t.Fatalf("別的 provider 的列不該讓種子失敗：%v", err)
+	}
+	if !strings.Contains(out.String(), "提醒") {
+		t.Fatalf("沒有提醒：%q", out.String())
+	}
+}
+
 func TestDevSeedWritesTheAgreementAcceptancesTheInvariantRequires(t *testing.T) {
 	ctx := context.Background()
 	d := devSeedEnv(t)

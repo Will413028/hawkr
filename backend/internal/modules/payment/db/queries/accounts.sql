@@ -33,6 +33,16 @@ SET external_account_id = sqlc.arg(external_account_id),
 WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NULL AND purge_pending_at IS NULL
 RETURNING *;
 
+-- name: SetPaymentAccountExternalForPurge :one
+-- 清理把冪等鍵取得的外部帳戶 ID 寫回已標記等待清理的列，讓之後的關閉與刪除走有外部 ID 的路（重試不必再取得已關閉的帳戶）；只在還沒有外部 ID 時寫，欄位與 SetPaymentAccountExternal 相同。
+UPDATE payment.accounts
+SET external_account_id = sqlc.arg(external_account_id),
+    status = 'ACTION_REQUIRED',
+    create_failed_at = NULL,
+    updated_at = sqlc.arg(now)
+WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NULL AND purge_pending_at IS NOT NULL
+RETURNING *;
+
 -- name: MarkPaymentAccountCreateFailed :execrows
 -- 建立重試用完：記下失敗的時刻（進後台待辦）；已經有外部 ID 的列不寫。
 UPDATE payment.accounts

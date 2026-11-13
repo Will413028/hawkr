@@ -1,0 +1,5 @@
+create shell 200 replayed= None
+close shell [] 200 None closed= True
+create shell again, same key 409 same id= False replayed= None closed= None
+update closed account 403 forbidden Permission denied. API Key does not have permission to access account acct_1U**********OvuM. To make an authorized request, make sure that the API Key making the request has the correct permissions for the resource in the API call. In some cases, you may also need to supply an Account ID in the Stripe-Context header.
+retrieve 200 {'closed': True, 'contact_email_set': False, 'applied': []}

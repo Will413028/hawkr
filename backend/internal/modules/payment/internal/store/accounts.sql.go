@@ -483,6 +483,47 @@ func (q *Queries) SetPaymentAccountExternal(ctx context.Context, arg SetPaymentA
 	return i, err
 }
 
+const setPaymentAccountExternalForPurge = `-- name: SetPaymentAccountExternalForPurge :one
+UPDATE payment.accounts
+SET external_account_id = $1,
+    status = 'ACTION_REQUIRED',
+    create_failed_at = NULL,
+    updated_at = $2
+WHERE store_id = $3 AND external_account_id IS NULL AND purge_pending_at IS NOT NULL
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at
+`
+
+type SetPaymentAccountExternalForPurgeParams struct {
+	ExternalAccountID *string
+	Now               time.Time
+	StoreID           int64
+}
+
+// 清理把冪等鍵取得的外部帳戶 ID 寫回已標記等待清理的列，讓之後的關閉與刪除走有外部 ID 的路（重試不必再取得已關閉的帳戶）；只在還沒有外部 ID 時寫，欄位與 SetPaymentAccountExternal 相同。
+func (q *Queries) SetPaymentAccountExternalForPurge(ctx context.Context, arg SetPaymentAccountExternalForPurgeParams) (PaymentAccount, error) {
+	row := q.db.QueryRow(ctx, setPaymentAccountExternalForPurge, arg.ExternalAccountID, arg.Now, arg.StoreID)
+	var i PaymentAccount
+	err := row.Scan(
+		&i.StoreID,
+		&i.Provider,
+		&i.ExternalAccountID,
+		&i.RequirementCollection,
+		&i.Status,
+		&i.TransfersActive,
+		&i.PayoutsActive,
+		&i.Requirements,
+		&i.StatusReason,
+		&i.FetchedAt,
+		&i.CreateFailedAt,
+		&i.CreateIdempotencyKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SellerReadClaimedAt,
+		&i.PurgePendingAt,
+	)
+	return i, err
+}
+
 const stalePaymentAccountCreateStoreIDs = `-- name: StalePaymentAccountCreateStoreIDs :many
 SELECT store_id
 FROM payment.accounts
