@@ -70,7 +70,7 @@ export default function LinkedAccountsSection({
 										>
 											建立關聯終止
 										</Button>
-									) : (
+									) : row.sharedBankAccountPending ? null : (
 										"-"
 									)}
 									{row.sharedBankAccountPending && (

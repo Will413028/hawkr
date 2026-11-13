@@ -64,6 +64,13 @@ test("標為已檢視只在待辦中的列出現，列有錨點，按下帶措�
 		dom.window.document.getElementById("linked-account-902")?.textContent ?? "",
 		/標為已檢視/u,
 	);
+	const lastCell = (id: string) =>
+		dom.window.document
+			.getElementById(id)
+			?.querySelector("td:last-child")
+			?.textContent?.trim();
+	assert.equal(lastCell("linked-account-901"), "標為已檢視");
+	assert.equal(lastCell("linked-account-902"), "-");
 	await click("標為已檢視");
 	assert.deepEqual(calls, [["m1", "901"]]);
 	assert.match(bodyText(), /相同身分的其他帳號/u);
