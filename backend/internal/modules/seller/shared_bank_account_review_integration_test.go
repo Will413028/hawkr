@@ -202,29 +202,47 @@ func TestSharedBankAccountStoreIsTheSameAsTheLinkedAccountRow(t *testing.T) {
 }
 
 // 處分建立之前這一對就已命中的帳號，之後同一個 fingerprint 再多出較晚的列（金鑰輪替之後補上新金鑰的列）也不進待辦：
-// 時間條件看這一對全部命中列的最早寫入時間，不逐列過濾。
-// mutation：把 HAVING min(h.created_at) > m.created_at 改回逐列的 WHERE h.created_at > m.created_at → 較晚的新金鑰列單獨通過，這裡出現一筆。
+// 時間條件看這一對全部命中列的最早寫入時間，不逐列過濾。命中要求 (hash, key_id) 與處分的快照相等，所以被處分的帳號 S 要在處分前
+// 就用兩把金鑰的金鑰環同步（快照含兩把金鑰的 hash）；O 處分前只用舊金鑰同步一列，處分後用金鑰環再同步，多出的新金鑰列晚於處分、也命中快照。
+// mutation：WHERE 加 h.created_at > m.created_at 並把 HAVING min(h.created_at) > m.created_at 改成 HAVING true → 較晚的新金鑰列單獨通過，這裡出現一筆。
 func TestSharedBankAccountHitBeforeTheSanctionStaysOutWhenLaterRowsAppear(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
+	ctx := context.Background()
+	snap := enabledSnapshot
+	snap.BankFingerprints = []string{fpShared}
+	// 舊金鑰：S 與 O 各一列，都早於處分。
 	_, sS := f.approvedWithFingerprints(t, fpShared)
 	f.tick(time.Hour)
-	_, sO := f.approvedWithFingerprints(t, fpShared)
+	accountO, sO := f.approvedWithFingerprints(t, fpShared)
 	if n := f.fingerprintRows(t, sO.StoreID); n != 1 {
-		t.Fatalf("前提：輪替前一把金鑰一列：%d", n)
+		t.Fatalf("前提：輪替前 O 一把金鑰一列：%d", n)
 	}
+	// 輪替：S 以兩把金鑰的金鑰環再同步，快照會含兩把金鑰的 hash；之後才處分。
 	f.tick(time.Hour)
 	f.module = f.newModuleWithKeys(t, f.jobs, rotatedMAC(t))
-	f.terminate(t, sS.StoreID, GroundFraud)
+	f.setPayment(t, sS.StoreID, snap)
+	if n := f.fingerprintRows(t, sS.StoreID); n != 2 {
+		t.Fatalf("前提：S 兩把金鑰兩列：%d", n)
+	}
+	f.tick(time.Hour)
+	m := f.terminate(t, sS.StoreID, GroundFraud)
 	f.tick(time.Hour)
 	if items := f.sharedBankItems(t); len(items) != 0 {
 		t.Fatalf("前提：處分前已命中的不進待辦：%+v", items)
 	}
-	snap := enabledSnapshot
-	snap.BankFingerprints = []string{fpShared}
+	// 處分之後 O 以金鑰環再同步：多出新金鑰的一列。
 	f.setPayment(t, sO.StoreID, snap)
 	if n := f.fingerprintRows(t, sO.StoreID); n != 2 {
-		t.Fatalf("前提：處分之後補上新金鑰的一列（較晚的命中）：%d", n)
+		t.Fatalf("前提：處分之後 O 補上新金鑰的一列：%d", n)
+	}
+	var created time.Time
+	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT created_at FROM seller.measures WHERE id = $1", m.ID).Scan(&created))
+	var early, late int64
+	must(t, f.db.Conn(ctx).QueryRow(ctx, `SELECT count(*) FILTER (WHERE created_at <= $3), count(*) FILTER (WHERE created_at > $3)
+		FROM seller.measure_identity_hits WHERE measure_id = $1 AND account_id = $2 AND field = 'BANK_FINGERPRINT'`, m.ID, accountO, created).Scan(&early, &late))
+	if early < 1 || late < 1 {
+		t.Fatalf("前提不成立：O 在處分之後的命中列應有早於或等於處分建立的 >=1 列與晚於它的 >=1 列，實際 early=%d late=%d", early, late)
 	}
 	if items := f.sharedBankItems(t); len(items) != 0 {
 		t.Fatalf("最早的命中早於處分建立，較晚多出的列不讓這一對進待辦：%+v", items)
