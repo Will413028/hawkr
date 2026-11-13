@@ -161,7 +161,7 @@ func TestEnsureInviteCreatesTheInviteAndStoresOnlyTheHash(t *testing.T) {
 	var delivered *time.Time
 	must(t, f.db.Conn(context.Background()).QueryRow(context.Background(),
 		"SELECT secret_hash, invited_email, secret_delivered_at FROM agent.vendor_portal_invites WHERE invite_id = $1", inv.InviteID).Scan(&hash, &email, &delivered))
-	if !slices.Equal(hash, sum[:]) || email != "Vendor@Example.com" || delivered != nil {
+	if !slices.Equal(hash, sum[:]) || email != "vendor@example.com" || delivered != nil {
 		t.Fatalf("hash=%x email=%q delivered=%v", hash, email, delivered)
 	}
 	if n := f.count(t, "SELECT count(*) FROM agent.vendor_portal_invites WHERE secret_hash = $1", []byte(inv.Secret)); n != 0 {
@@ -392,7 +392,7 @@ func TestEnsureInviteRejectsAnotherProspectsRecipient(t *testing.T) {
 	var email string
 	var prospect int64
 	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT prospect_id, invited_email FROM agent.vendor_portal_invites WHERE rfq_recipient_id = 1").Scan(&prospect, &email))
-	if prospect != prospectA || email != "Vendor@Example.com" {
+	if prospect != prospectA || email != "vendor@example.com" {
 		t.Fatalf("prospect=%d email=%q", prospect, email)
 	}
 	// 已寄出的邀請也先判斷歸屬，不把別人的呼叫說成「已寄出」。
@@ -695,7 +695,7 @@ func TestPreviewMasksTheEmailAndHasNoSideEffects(t *testing.T) {
 	for range 3 {
 		p, err := f.module.PreviewInvite(ctx, inv.Secret)
 		must(t, err)
-		if p.MaskedEmail != "V***@Example.com" || !p.ExpiresAt.Equal(f.expiry(30*24*time.Hour)) {
+		if p.MaskedEmail != "v***@example.com" || !p.ExpiresAt.Equal(f.expiry(30*24*time.Hour)) {
 			t.Fatalf("preview=%+v", p)
 		}
 		if p.InviteID != inv.InviteID || p.RfqRecipientID != 1 {
@@ -806,7 +806,7 @@ func TestVerifySessionComparesTheNormalizedEmail(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	_, s := f.session(t, prospectA, 1) // 快照是 Vendor@Example.com
+	_, s := f.session(t, prospectA, 1) // 快照是 vendor@example.com
 	for _, wrong := range []string{"other@example.com", "vendor@example.com.evil.com", "", "   ", "xvendor@example.com"} {
 		_, err := f.module.VerifySession(ctx, s.Token, VerificationGoogle, wrong)
 		wantKind(t, err, apperr.KindPermissionDenied)
@@ -991,7 +991,7 @@ func TestProspectMergedRepointsTheSourceInvitesToTheWinner(t *testing.T) {
 	}
 	var email string
 	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT invited_email FROM agent.vendor_portal_invites WHERE rfq_recipient_id = 1").Scan(&email))
-	if email != "Vendor@Example.com" {
+	if email != "vendor@example.com" {
 		t.Fatalf("email 快照 = %q", email)
 	}
 	// 之後贏家封存：改掛過來的邀請一併撤銷。

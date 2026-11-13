@@ -985,9 +985,10 @@ func TestPurgeDeletesRowsWithoutAnExternalAccountAndKeepsRowsOfAnotherProvider(t
 	f.ensure(t, other)
 	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET provider = 'stripe' WHERE store_id = $1", other)
 	must(t, err)
+	closedBefore := f.fake.Closes()
 	must(t, f.module.PurgeAccount(ctx, other, true))
-	if len(f.fake.Closes()) != 0 {
-		t.Fatalf("別的 provider 的帳戶被關閉：%v", f.fake.Closes())
+	if got := f.fake.Closes(); !slices.Equal(got, closedBefore) {
+		t.Fatalf("別的 provider 的帳戶被關閉：之前=%v 之後=%v", closedBefore, got)
 	}
 	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_pending_at IS NOT NULL", other) != 1 {
 		t.Fatal("別的 provider 的列應該留著並標成等待清理")
