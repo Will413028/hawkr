@@ -189,10 +189,10 @@ func (m *Module) Configured() bool { return m.accounts.Configured() }
 // Capabilities 回傳目前 provider 的能力描述（誰收件、用什麼介面）；沒有設定收款開通時 ok 為 false。
 func (m *Module) Capabilities() (caps Capabilities, ok bool) { return m.accounts.Capabilities() }
 
-// RequestAccount 在擁有者核准的 transaction 內（ctx）寫「建立中」的收款帳戶列並排入建立 job；已有列時不改它（關店再開沿用）。contactEmail 是
-// 擁有者傳入的聯絡信箱（D23），沒有時回 failed_precondition。沒有設定 provider 時什麼都不做。
-func (m *Module) RequestAccount(ctx context.Context, storeID int64, contactEmail *string, now time.Time) error {
-	return m.accounts.RequestAccount(ctx, storeID, contactEmail, now)
+// RequestAccount 在擁有者核准的 transaction 內（ctx）寫「建立中」的收款帳戶列並排入建立 job；已有列時不改它（關店再開沿用）。聯絡信箱不在這裡傳也不存，
+// 建立 job 在呼叫金流商的當下經 Owners 讀（D50）。沒有設定 provider 時什麼都不做。
+func (m *Module) RequestAccount(ctx context.Context, storeID int64, now time.Time) error {
+	return m.accounts.RequestAccount(ctx, storeID, now)
 }
 
 // Account 讀擁有者的收款帳戶；還沒有回 NotFound。呼叫方先確認呼叫者是擁有者或管理員。
@@ -220,7 +220,7 @@ func (m *Module) ReceiveEvent(ctx context.Context, header http.Header, body []by
 	return m.accounts.ReceiveEvent(ctx, header, body)
 }
 
-// ForgetOwners 在擁有者個資清理的 transaction 內（ctx）排入刪除這些擁有者收款帳戶列的 job。
+// ForgetOwners 在擁有者個資清理的 transaction 內（ctx）為每個擁有者排入「關閉外部帳戶後刪除收款帳戶列」的 job。
 func (m *Module) ForgetOwners(ctx context.Context, storeIDs []int64) error {
 	return m.accounts.ForgetOwners(ctx, storeIDs)
 }
@@ -248,9 +248,9 @@ func (m *Module) SweepAccounts(ctx context.Context) (synced, ensured int, err er
 	return m.accounts.Sweep(ctx)
 }
 
-// PurgeAccounts 是刪除 job（payment.account_purge）的內容，給 worker 與測試呼叫。
-func (m *Module) PurgeAccounts(ctx context.Context, storeIDs []int64) error {
-	return m.accounts.Purge(ctx, storeIDs)
+// PurgeAccount 是「關閉後刪除」job（payment.account_purge）的內容，給 worker 與測試呼叫；finalAttempt 為 true 時關閉失敗改記為等待關閉，本地列留著。
+func (m *Module) PurgeAccount(ctx context.Context, storeID int64, finalAttempt bool) error {
+	return m.accounts.Purge(ctx, storeID, finalAttempt)
 }
 
 // AddWorkers 登記 River worker。

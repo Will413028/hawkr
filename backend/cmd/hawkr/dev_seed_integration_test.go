@@ -11,11 +11,13 @@ import (
 	"encoding/pem"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
@@ -58,6 +60,12 @@ func devSeedEnv(t *testing.T) *db.DB {
 		t.Fatal(err)
 	}
 	t.Cleanup(d.Close)
+	// 01-account.sql 建立的種子帳號（infra/seed-data）：帶登入信箱，建立收款帳戶時向它讀聯絡信箱。
+	for id, email := range map[int64]string{9: "seller1@hawkr.test", 4: "seller2@hawkr.test"} {
+		if _, err := d.Pool().Exec(ctx, `INSERT INTO identity.accounts (id, email) OVERRIDING SYSTEM VALUE VALUES ($1, $2)`, id, email); err != nil {
+			t.Fatal(err)
+		}
+	}
 	return d
 }
 
@@ -140,6 +148,36 @@ func TestDevSeedWritesStoresThatTheModuleServesAsExposable(t *testing.T) {
 }
 
 // 種子店家都有入駐同意的紀錄（開店的 SELLER_TERMS 與已核准的 KYC 要求的文件），版本是現行版本；重跑之後筆數相同，不重複。
+// 種子建立的收款帳戶帶店家所屬帳號的聯絡信箱（建立當下向 identity 讀，種子不再傳假信箱）。
+// mutation：種子回到傳固定的假信箱，或建立不讀擁有者的信箱 → provider 收到的不是帳號的信箱，失敗。
+func TestDevSeedPaymentAccountsAreCreatedWithTheOwnersContactEmail(t *testing.T) {
+	ctx := context.Background()
+	d := devSeedEnv(t)
+	var out bytes.Buffer
+	if err := runDevSeed(ctx, nil, &out); err != nil {
+		t.Fatalf("dev-seed：%v", err)
+	}
+	if _, err := d.Pool().Exec(ctx, `DELETE FROM payment.accounts`); err != nil {
+		t.Fatal(err)
+	}
+	c, err := openSeller(ctx, requireDevEnvironment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	fake := payment.NewFake()
+	fake.AutoActive = true
+	ids := []int64{devSeedStoreA, devSeedStoreB}
+	if err := seedPaymentAccounts(ctx, c, fake, ids, &out); err != nil {
+		t.Fatal(err)
+	}
+	got := fake.EnsureEmails()
+	slices.Sort(got)
+	if want := []string{"seller1@hawkr.test", "seller2@hawkr.test"}; !slices.Equal(got, want) {
+		t.Fatalf("建立收款帳戶送給 provider 的信箱=%v，want %v", got, want)
+	}
+}
+
 func TestDevSeedWritesTheAgreementAcceptancesTheInvariantRequires(t *testing.T) {
 	ctx := context.Background()
 	d := devSeedEnv(t)

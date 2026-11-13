@@ -58,7 +58,7 @@ func enqueueSync(ctx context.Context, jc jobs.Enqueuer, storeID int64) error {
 	return jc.Enqueue(ctx, args, &opts)
 }
 
-// SweepArgs 是定期的掃描：輪詢補漏（排 UNDER_REVIEW、ACTION_REQUIRED 與原因碼非終局的 DISABLED 帳戶的同步）與補排閒置的建立。
+// SweepArgs 是定期的掃描：輪詢補漏（排 UNDER_REVIEW、ACTION_REQUIRED 與原因碼非終局的 DISABLED 帳戶的同步，等待關閉的帳戶除外）、重排等待關閉的清理與補排閒置的建立。
 type SweepArgs struct{}
 
 // Kind 是 River 的 job 種類。
@@ -146,30 +146,42 @@ func (s *Service) PeriodicJobs() []*river.PeriodicJob {
 	)}
 }
 
-// PurgeArgs 是擁有者個資清理後刪除帳戶列的 job（ForgetOwners 在清理的 transaction 內排入）。
+// PurgeArgs 是擁有者個資清理時「關閉外部帳戶後刪除帳戶列」的 job（ForgetOwners 在清理的 transaction 內排入），以 store_id 為唯一鍵。
 type PurgeArgs struct {
-	StoreIDs []int64 `json:"store_ids"`
+	StoreID int64 `json:"store_id" river:"unique"`
 }
 
 // Kind 是 River 的 job 種類。
 func (PurgeArgs) Kind() string { return "payment.account_purge" }
 
-// InsertOpts 是刪除 job 的排入選項。
-func (PurgeArgs) InsertOpts() river.InsertOpts { return river.InsertOpts{MaxAttempts: maxAttempts} }
+// InsertOpts 是清理 job 的排入選項：以 store_id 去重（不含已完成的），暫時性的失敗最多重試 maxAttempts 次。
+func (PurgeArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: maxAttempts, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: openStates()}}
+}
+
+func enqueuePurge(ctx context.Context, jc jobs.Enqueuer, storeID int64) error {
+	args := PurgeArgs{StoreID: storeID}
+	opts := args.InsertOpts()
+	return jc.Enqueue(ctx, args, &opts)
+}
 
 type purgeWorker struct {
 	river.WorkerDefaults[PurgeArgs]
 	service *Service
 }
 
-// Work 刪除帳戶列。
+// Work 執行一次「關閉後刪除」；最後一次嘗試仍失敗時由 Purge 把列標成等待關閉。
 func (w *purgeWorker) Work(ctx context.Context, job *river.Job[PurgeArgs]) error {
-	return w.service.Purge(ctx, job.Args.StoreIDs)
+	return w.service.Purge(ctx, job.Args.StoreID, job.Attempt >= job.MaxAttempts)
 }
+
+// Timeout 是一次清理的時間上限：一次關閉呼叫加資料庫。
+func (w *purgeWorker) Timeout(*river.Job[PurgeArgs]) time.Duration { return jobTimeout }
 
 // Sweep 是 payment 自己的輪詢補漏（D29 的補掃分工：platform 只重派沒有派送成功的 inbox 列），各自分批、各批一個 transaction：
 //   - 狀態：UNDER_REVIEW、ACTION_REQUIRED、原因碼不是 rejected*／unsupported* 的 DISABLED 帳戶排同步（掉了 webhook 時的保底，DISABLED 可能被解除）；
 //   - 事件：inbox 有超過 eventGrace 還沒處理的事件的帳戶排同步（任何狀態）；
+//   - 清理：等待關閉的帳戶（close_deferred_at，不進上面兩種同步）重排「關閉後刪除」job；沒有人工處理可做，所以不進後台待辦，警示在 job 的 log；
 //   - 建立：閒置的建立列，擁有者營運中時排建立 job。
 //
 // 回傳排入同步與建立的帳戶數（唯一鍵合併掉的也算；兩種同步的帳戶重複時算兩次）。沒有設定 provider 時什麼都不做。
@@ -214,6 +226,22 @@ func (s *Service) Sweep(ctx context.Context) (synced, ensured int, err error) {
 			break
 		}
 		route = next
+	}
+	after = 0
+	for {
+		ids, err := s.closeDeferred(ctx, after)
+		if err != nil {
+			return synced, ensured, err
+		}
+		for _, id := range ids {
+			after = id
+			if err := s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueuePurge(ctx, s.d.Jobs, id) }); err != nil {
+				return synced, ensured, err
+			}
+		}
+		if len(ids) < sweepBatch {
+			break
+		}
 	}
 	after = 0
 	for {

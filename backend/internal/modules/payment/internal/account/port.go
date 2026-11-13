@@ -91,7 +91,7 @@ type Snapshot struct {
 }
 
 // EnsureInput 是建立外部帳戶的輸入。IdempotencyKey 是「建立中」的列寫入時產生並保存的隨機 UUID：同一家店的每次重試都用它，得到同一個帳戶；
-// 兩個資料庫共用同一個 provider 帳號時不會撞鍵。Collection 是帳戶列保存的收件方式（D2），不是行程設定。ContactEmail 是帳戶列保存的聯絡信箱（D23），金流商要求有收款設定的帳戶必須有。
+// 兩個資料庫共用同一個 provider 帳號時不會撞鍵。Collection 是帳戶列保存的收件方式（D2），不是行程設定。ContactEmail 是建立當下向擁有者讀到的聯絡信箱（D50），金流商要求有收款設定的帳戶必須有。
 type EnsureInput struct {
 	StoreID        int64
 	IdempotencyKey string
@@ -125,6 +125,8 @@ type Provider interface {
 	CreateOnboardingSession(ctx context.Context, in SessionInput) (model.OnboardingSession, error)
 	// FetchAccount 讀外部帳戶目前的狀態與掛著的外部銀行帳號識別碼；任何一項讀取失敗整個呼叫失敗。
 	FetchAccount(ctx context.Context, externalID string) (Snapshot, error)
+	// CloseAccount 關閉外部帳戶（擁有者個資清理，D52）；冪等：帳戶已經關閉視為成功。不存在的帳戶是永久失敗（ErrPermanent）。
+	CloseAccount(ctx context.Context, externalID string) error
 	// ParseEvent 驗簽並取出事件 ID 與外部帳戶 ID；簽章不符或格式不合回 ErrInvalidEvent，驗過簽章但不是本平台要處理的事件回 ErrIgnoredEvent。
 	ParseEvent(header http.Header, body []byte) (Event, error)
 }

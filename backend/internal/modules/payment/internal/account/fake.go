@@ -36,6 +36,8 @@ type Fake struct {
 	accounts     map[string]Snapshot
 	ensureErrs   []error
 	fetchErrs    []error
+	closeErrs    []error
+	closed       []string
 	ensures      int
 	ensureKeys   []string
 	ensureEmails []string
@@ -80,6 +82,20 @@ func (f *Fake) FailFetch(errs ...error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.fetchErrs = append(f.fetchErrs, errs...)
+}
+
+// FailClose 讓接下來的關閉依序回這些錯誤（排完就成功）。
+func (f *Fake) FailClose(errs ...error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.closeErrs = append(f.closeErrs, errs...)
+}
+
+// Closes 回傳每次 CloseAccount 收到的外部帳戶 ID（依呼叫順序，失敗的呼叫也算）。
+func (f *Fake) Closes() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.closed...)
 }
 
 // Calls 回傳建立、重讀、開通 session 的呼叫次數。
@@ -210,6 +226,21 @@ func (f *Fake) FetchAccount(ctx context.Context, externalID string) (Snapshot, e
 		return Snapshot{}, fmt.Errorf("%w：沒有外部帳戶 %s", ErrPermanent, externalID)
 	}
 	return s, nil
+}
+
+// CloseAccount 實作 Provider：冪等，同一個帳戶關第二次也成功；不認得的帳戶是永久失敗。AutoActive 時不認得的 ID（例如種子資料的帳戶）也視為存在。
+func (f *Fake) CloseAccount(ctx context.Context, externalID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.check(ctx, "CloseAccount")
+	f.closed = append(f.closed, externalID)
+	if err := pop(&f.closeErrs); err != nil {
+		return err
+	}
+	if _, ok := f.accounts[externalID]; !ok && !f.AutoActive {
+		return fmt.Errorf("%w：沒有外部帳戶 %s", ErrPermanent, externalID)
+	}
+	return nil
 }
 
 // ParseEvent 實作 Provider：沒有簽章，header 帶事件 ID，body 是外部帳戶 ID。

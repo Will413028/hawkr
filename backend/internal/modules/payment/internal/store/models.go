@@ -14,7 +14,6 @@ type PaymentAccount struct {
 	StoreID               int64
 	Provider              string
 	ExternalAccountID     *string
-	ContactEmail          string
 	RequirementCollection string
 	Status                string
 	TransfersActive       bool
@@ -27,4 +26,5 @@ type PaymentAccount struct {
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 	SellerReadClaimedAt   *time.Time
+	CloseDeferredAt       *time.Time
 }

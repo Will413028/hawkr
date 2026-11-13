@@ -109,10 +109,28 @@ func (q *queue) outsideTx() bool {
 	return slices.Contains(q.out, true)
 }
 
-// owners 是擁有者查詢的 fake：預設營運中，closed 裡的不是。
+// owners 是擁有者查詢的 fake：預設營運中，closed 裡的不是；聯絡信箱是 emails 裡「現在」的值（沒有就是沒有信箱）。
 type owners struct {
 	mu     sync.Mutex
 	closed map[int64]bool
+	emails map[int64]string
+}
+
+func (o *owners) setEmail(storeID int64, email string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if email == "" {
+		delete(o.emails, storeID)
+		return
+	}
+	o.emails[storeID] = email
+}
+
+func (o *owners) OwnerContactEmail(_ context.Context, storeID int64) (string, bool, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	email, ok := o.emails[storeID]
+	return email, ok, nil
 }
 
 func (o *owners) OwnerActive(_ context.Context, storeID int64) (bool, error) {
@@ -138,7 +156,7 @@ type fixture struct {
 func setup(t *testing.T, steps ...testdb.Step) *fixture {
 	t.Helper()
 	steps = append(steps, testdb.Migrations(migrate.Module{Name: inbox.Schema, Dir: inbox.Migrations()}, migrate.Module{Name: "payment", Dir: Migrations()}))
-	f := &fixture{db: pg.NewDB(t, steps...), bus: events.NewBus(), jobs: &queue{}, fake: NewFake(), owners: &owners{closed: map[int64]bool{}}, now: time.Date(2026, 11, 6, 4, 0, 0, 0, time.UTC)}
+	f := &fixture{db: pg.NewDB(t, steps...), bus: events.NewBus(), jobs: &queue{}, fake: NewFake(), owners: &owners{closed: map[int64]bool{}, emails: map[int64]string{}}, now: time.Date(2026, 11, 6, 4, 0, 0, 0, time.UTC)}
 	f.build(t, f.jobs)
 	events.Subscribe(f.bus, func(ctx context.Context, e PayoutAccountChanged) error {
 		_, ok := db.TxFrom(ctx)
@@ -176,10 +194,11 @@ func (f *fixture) count(t *testing.T, sql string, args ...any) int64 {
 // nextStore 是平行測試共用的擁有者 ID 來源（atomic：每次取到不同的值）。
 var nextStore atomic.Int64
 
-// request 模擬擁有者核准的 transaction：寫「建立中」的帳戶列並排入建立 job。
+// request 模擬擁有者核准的 transaction：寫「建立中」的帳戶列並排入建立 job。email 是擁有者此刻的聯絡信箱（空字串是沒有），不傳給 payment。
 func (f *fixture) request(t *testing.T, storeID int64, email string) {
 	t.Helper()
-	must(t, f.db.InTx(context.Background(), func(ctx context.Context) error { return f.module.RequestAccount(ctx, storeID, &email, f.now) }))
+	f.owners.setEmail(storeID, email)
+	must(t, f.db.InTx(context.Background(), func(ctx context.Context) error { return f.module.RequestAccount(ctx, storeID, f.now) }))
 }
 
 func (f *fixture) newStore(t *testing.T) int64 {
@@ -289,20 +308,22 @@ func TestRequestQueuesOneAccountCreationAndAReplayedCreateKeepsOneExternalAccoun
 	}
 }
 
-// 已有帳戶列時 RequestAccount 不改它（INSERT ON CONFLICT DO NOTHING：核准的 transaction 不鎖 payment 的既有列，platform/lockorder）：聯絡信箱維持
-// 第一次的快照；還沒有外部帳戶的列重新排入建立 job，已建立或建立失敗的不排。沒有信箱時 failed_precondition。
-// mutation：InsertPaymentAccount 改成 ON CONFLICT DO UPDATE SET contact_email → 第二次的信箱覆寫了列，失敗。
-func TestRequestKeepsAnExistingRowAndItsContactEmail(t *testing.T) {
+// 已有帳戶列時 RequestAccount 不改它（INSERT ON CONFLICT DO NOTHING：核准的 transaction 不鎖 payment 的既有列，platform/lockorder）；還沒有外部帳戶的列
+// 重新排入建立 job，已建立或建立失敗的不排。列上不存聯絡信箱：provider 收到的是建立當下擁有者的信箱。
+// mutation：InsertPaymentAccount 改成 ON CONFLICT DO UPDATE SET provider → 既有列被改寫（provider 欄），失敗。
+func TestRequestKeepsAnExistingRow(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
 	f.request(t, 7, "first@example.com")
+	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET provider = 'other', created_at = created_at - interval '1 day' WHERE store_id = 7")
+	must(t, err)
 	f.request(t, 7, "second@example.com")
-	var email string
-	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT contact_email FROM payment.accounts WHERE store_id = 7").Scan(&email))
-	if email != "first@example.com" {
-		t.Fatalf("既有列的信箱=%q，預期保留第一次的快照", email)
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = 7 AND provider = 'other'") != 1 {
+		t.Fatal("既有列被 RequestAccount 改寫")
 	}
+	_, err = f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET provider = 'fake' WHERE store_id = 7")
+	must(t, err)
 	if got := f.jobs.storeIDs(t, kindEnsure); !slices.Equal(got, []int64{7, 7}) {
 		t.Fatalf("還沒有外部帳戶時的建立 job=%v", got)
 	}
@@ -311,12 +332,48 @@ func TestRequestKeepsAnExistingRowAndItsContactEmail(t *testing.T) {
 	if got := f.jobs.storeIDs(t, kindEnsure); len(got) != 2 {
 		t.Fatalf("已建立的帳戶又排了建立 job：%v", got)
 	}
-	if got := f.fake.EnsureEmails(); !slices.Equal(got, []string{"first@example.com"}) {
+	if got := f.fake.EnsureEmails(); !slices.Equal(got, []string{"third@example.com"}) {
+		t.Fatalf("provider 收到的信箱=%v，預期建立當下擁有者的信箱", got)
+	}
+}
+
+// 建立外部帳戶的當下才向擁有者讀聯絡信箱（D50）：核准之後、建立之前信箱改了，用新的；沒有存快照的欄位。
+// mutation：Ensure 改回讀快照（建立中的列寫入時記下信箱）→ provider 收到 old@example.com，失敗。
+func TestEnsureReadsTheOwnersContactEmailAtCreationTime(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	s := f.newStore(t)
+	f.owners.setEmail(s, "new@example.com")
+	f.ensure(t, s)
+	if got := f.fake.EnsureEmails(); !slices.Equal(got, []string{"new@example.com"}) {
 		t.Fatalf("provider 收到的信箱=%v", got)
 	}
-	err := f.db.InTx(ctx, func(ctx context.Context) error { return f.module.RequestAccount(ctx, 8, nil, f.now) })
-	if apperr.KindOf(err) != apperr.KindFailedPrecondition || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = 8") != 0 {
-		t.Fatalf("沒有信箱 err=%v", err)
+	if f.count(t, "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'payment' AND table_name = 'accounts' AND column_name = 'contact_email'") != 0 {
+		t.Fatal("帳戶表還有 contact_email 欄")
+	}
+}
+
+// 擁有者沒有聯絡信箱時不建立（不呼叫 provider），視為永久失敗：記下建立失敗的時刻（進後台待辦），重試不會再呼叫；補上信箱之後管理員重試建立可以建立。
+// mutation：Ensure 沒有信箱也呼叫 provider → provider 被呼叫、帳戶建出來，失敗。
+func TestEnsureWithoutAContactEmailRecordsACreateFailureAndNeverCallsTheProvider(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	f.owners.setEmail(s, "")
+	must(t, f.module.EnsureAccount(ctx, s, false))
+	if ensures, _, _ := f.fake.Calls(); ensures != 0 {
+		t.Fatalf("沒有信箱仍呼叫了 provider：%d 次", ensures)
+	}
+	if a := f.account(t, s); a.ExternalAccountID != nil || a.CreateFailedAt == nil {
+		t.Fatalf("帳戶=%+v，預期沒有外部帳戶且記下建立失敗", a)
+	}
+	f.owners.setEmail(s, "late@example.com")
+	_, err := f.module.RetryAccountCreate(ctx, s)
+	must(t, err)
+	f.ensure(t, s)
+	if got := f.fake.EnsureEmails(); !slices.Equal(got, []string{"late@example.com"}) {
+		t.Fatalf("重試時 provider 收到的信箱=%v", got)
 	}
 }
 
@@ -326,8 +383,7 @@ func TestUnconfiguredProviderWritesNothing(t *testing.T) {
 	ctx := context.Background()
 	f := setup(t)
 	m := New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: time.Now, Logger: slog.Default()}), Owners: f.owners, Now: time.Now, Logger: slog.Default()})
-	email := "a@example.com"
-	must(t, f.db.InTx(ctx, func(ctx context.Context) error { return m.RequestAccount(ctx, 1, &email, f.now) }))
+	must(t, f.db.InTx(ctx, func(ctx context.Context) error { return m.RequestAccount(ctx, 1, f.now) }))
 	if m.Configured() || f.count(t, "SELECT count(*) FROM payment.accounts") != 0 || len(f.jobs.args) != 0 {
 		t.Fatal("沒有 provider 仍寫了列或排了 job")
 	}
@@ -341,7 +397,7 @@ func TestUnconfiguredProviderWritesNothing(t *testing.T) {
 }
 
 // 建立與同步 job 都以 store_id 為唯一鍵（排隊中、執行中、等重試不重複排）；收款事件的派送 job 以 (provider, event_id) 為唯一鍵。
-// mutation：SyncArgs 拿掉 `river:"unique"`（或 ByArgs）→ 同一擁有者排了多個 job，失敗。
+// mutation：SyncArgs 或 PurgeArgs 拿掉 `river:"unique"`（或 ByArgs）→ 同一擁有者排了多個 job，失敗。
 func TestJobsAreUniquePerOwnerInRiver(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -377,6 +433,12 @@ func TestJobsAreUniquePerOwnerInRiver(t *testing.T) {
 	f.ensure(t, 2)
 	if n := f.count(t, "SELECT count(*) FROM river.river_job WHERE kind=$1 AND state = ANY($2)", kindSync, open); n != 2 {
 		t.Fatalf("兩個擁有者的同步 job=%d", n)
+	}
+	for range 2 {
+		must(t, f.db.InTx(ctx, func(ctx context.Context) error { return f.module.ForgetOwners(ctx, []int64{2}) }))
+	}
+	if n := jobCount(kindPurge, 2); n != 1 {
+		t.Fatalf("同一擁有者的清理 job=%d，應該合併成一個", n)
 	}
 	_, err = f.db.Conn(ctx).Exec(ctx, "UPDATE river.river_job SET state='running', attempted_at=now() WHERE kind=$1 AND args->>'store_id'='1'", kindSync)
 	must(t, err)
@@ -585,8 +647,8 @@ func TestSweepQueuesSyncForOpenAndLiftableStatusesOnly(t *testing.T) {
 	f := setup(t)
 	insert := func(storeID int64, status, external, reason any) {
 		_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.accounts
-			(store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, status_reason, created_at, updated_at)
-			VALUES ($1, 'fake', $2, 'seller@example.com', 'PROVIDER', $3, $3 = 'ENABLED', $4, $5, $5)`, storeID, external, status, reason, f.now.Add(-time.Hour))
+			(store_id, provider, external_account_id, requirement_collection, status, transfers_active, status_reason, created_at, updated_at)
+			VALUES ($1, 'fake', $2, 'PROVIDER', $3, $3 = 'ENABLED', $4, $5, $5)`, storeID, external, status, reason, f.now.Add(-time.Hour))
 		must(t, err)
 	}
 	byStatus := map[AccountStatus]int64{}
@@ -776,20 +838,156 @@ func TestOnboardingSessionNeedsAnExternalAccountThatIsNotDisabled(t *testing.T) 
 	}
 }
 
-// 擁有者的個資清理：ForgetOwners 在呼叫方的 transaction 內只排入刪除 job（不碰帳戶列），job 刪掉那些擁有者的列，其他擁有者的不動。
-// mutation：Purge 不帶 store_ids 條件 → 其他擁有者的列也被刪，失敗。
-func TestForgetOwnersDeletesTheirAccountsInItsOwnJob(t *testing.T) {
+// 擁有者的個資清理：ForgetOwners 在呼叫方的 transaction 內只為每個擁有者排入「關閉後刪除」job（不碰帳戶列、不呼叫 provider），job 先關閉外部帳戶、
+// 成功之後才刪那一個擁有者的列，其他擁有者的不動。
+// mutation 1：Purge 不呼叫 CloseAccount → 沒有關閉紀錄，失敗。mutation 2：Purge 不帶 store_id 條件 → 其他擁有者的列也被刪，失敗。
+func TestForgetOwnersClosesTheExternalAccountThenDeletesTheRow(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
 	gone, kept := f.newStore(t), f.newStore(t)
+	goneExternal := f.ensure(t, gone)
+	f.ensure(t, kept)
 	must(t, f.db.InTx(ctx, func(ctx context.Context) error { return f.module.ForgetOwners(ctx, []int64{gone}) }))
-	if f.count(t, "SELECT count(*) FROM payment.accounts") != 2 || f.jobs.count(kindPurge) != 1 {
-		t.Fatal("ForgetOwners 直接刪了列或沒有排 job")
+	if f.count(t, "SELECT count(*) FROM payment.accounts") != 2 || f.jobs.count(kindPurge) != 1 || len(f.fake.Closes()) != 0 {
+		t.Fatal("ForgetOwners 直接刪了列、呼叫了 provider 或沒有排 job")
 	}
-	must(t, f.module.PurgeAccounts(ctx, []int64{gone}))
+	if got := f.jobs.storeIDs(t, kindPurge); !slices.Equal(got, []int64{gone}) {
+		t.Fatalf("清理 job 的擁有者=%v", got)
+	}
+	must(t, f.module.PurgeAccount(ctx, gone, false))
+	if got := f.fake.Closes(); !slices.Equal(got, []string{goneExternal}) {
+		t.Fatalf("關閉的外部帳戶=%v，預期只有 %s", got, goneExternal)
+	}
 	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", gone) != 0 || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", kept) != 1 {
 		t.Fatal("清理刪錯了列")
+	}
+	if v := f.fake.Violations(); len(v) != 0 {
+		t.Fatalf("違反呼叫規則：%v", v)
+	}
+}
+
+// 已經關閉的外部帳戶再清理一次（job 重送、列還在）也成功：關閉是冪等的，列照樣刪。
+// mutation：Purge 只在第一次關閉時刪列（以本地狀態判斷已關閉就略過刪除）→ 第二次清理後列還在，失敗。
+func TestPurgeOfAnAlreadyClosedAccountStillDeletesTheRow(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	external := f.ensure(t, s)
+	must(t, f.module.PurgeAccount(ctx, s, false))
+	f.request(t, s, "again@example.com")
+	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET external_account_id = $2, status = 'ACTION_REQUIRED' WHERE store_id = $1", s, external)
+	must(t, err)
+	must(t, f.module.PurgeAccount(ctx, s, false))
+	if got := f.fake.Closes(); !slices.Equal(got, []string{external, external}) || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 {
+		t.Fatalf("關閉=%v，列應該刪掉", got)
+	}
+}
+
+// 關閉失敗：暫時性的錯誤回傳給 River 重試、列照舊；最後一次嘗試仍失敗，或失敗是永久的，列留著並標成等待關閉（保住 store_id 與外部 ID 的對應），記警示 log
+// （store_id 與外部帳戶 ID），不進後台待辦；等待關閉的列不進同步輪詢、不被賣家或管理員的重新整理讀；週期掃描重排它的清理，關閉成功才刪列。
+// mutation 1：失敗仍刪列 → 列不見，失敗。mutation 2：輪詢查詢不排除 close_deferred_at → 等待關閉的列被排同步，失敗。mutation 3：Sweep 不重排 → 沒有清理 job，失敗。
+func TestAFailedCloseKeepsTheRowMarkedExcludedFromPollingAndRetriedByTheSweep(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	external := f.ensure(t, s)
+	f.fake.Set(external, needsSellerSnapshot)
+	boom := errors.New("provider down")
+	f.fake.FailClose(boom, boom)
+	if err := f.module.PurgeAccount(ctx, s, false); !errors.Is(err, boom) {
+		t.Fatalf("暫時性的失敗要回傳給 River 重試：%v", err)
+	}
+	if a := f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND close_deferred_at IS NULL", s); a != 1 {
+		t.Fatal("暫時性的失敗不該標記列")
+	}
+	must(t, f.module.PurgeAccount(ctx, s, true))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND external_account_id = $2 AND close_deferred_at IS NOT NULL", s, external) != 1 {
+		t.Fatal("最後一次失敗後列應該留著並標成等待關閉")
+	}
+	if !bytes.Contains(f.logs.Bytes(), []byte("store_id="+fmt.Sprint(s))) || !bytes.Contains(f.logs.Bytes(), []byte(external)) {
+		t.Fatalf("警示 log 沒有 store_id 與外部帳戶 ID：%s", f.logs.String())
+	}
+	if n := f.count(t, "SELECT count(*) FROM payment.pub_review_items($1) WHERE store_id = $2", f.now, s); n != 0 {
+		t.Fatalf("等待關閉的列進了後台待辦：%d 項", n)
+	}
+	before := f.jobs.count(kindSync)
+	synced, _, err := f.module.SweepAccounts(ctx)
+	must(t, err)
+	if synced != 0 || f.jobs.count(kindSync) != before {
+		t.Fatalf("等待關閉的列被排了同步：synced=%d", synced)
+	}
+	if got := f.jobs.storeIDs(t, kindPurge); !slices.Equal(got, []int64{s}) {
+		t.Fatalf("週期掃描沒有重排清理：%v", got)
+	}
+	if _, fetches, _ := f.fake.Calls(); fetches != 0 {
+		t.Fatalf("等待關閉的列被讀了 provider：%d 次", fetches)
+	}
+	if err := f.module.RefreshAccount(ctx, s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("管理員重新整理 err=%v，預期 failed_precondition", err)
+	}
+	if err := f.module.SyncAccountUnlessFresh(ctx, s); err != nil {
+		t.Fatalf("賣家重新整理 err=%v，預期成功且不讀 provider", err)
+	}
+	if again, err := f.module.SyncAccount(ctx, s); err != nil || again {
+		t.Fatalf("同步 job again=%v err=%v", again, err)
+	}
+	if _, fetches, _ := f.fake.Calls(); fetches != 0 {
+		t.Fatalf("重新整理與同步讀了 provider：%d 次", fetches)
+	}
+	must(t, f.module.PurgeAccount(ctx, s, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 {
+		t.Fatal("重排的清理關閉成功後應該刪列")
+	}
+}
+
+// 關閉的失敗是永久的（金流商沒有這個帳戶，重試不會成功）：第一次嘗試就把列標成等待關閉，不等重試用完。
+// mutation：永久失敗也回傳錯誤等重試 → 列沒有被標記，失敗。
+func TestAPermanentCloseFailureMarksTheRowOnTheFirstAttempt(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	f.ensure(t, s)
+	f.fake.FailClose(fmt.Errorf("%w：沒有這個帳戶", ErrPermanent))
+	must(t, f.module.PurgeAccount(ctx, s, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND close_deferred_at IS NOT NULL", s) != 1 {
+		t.Fatal("永久失敗後列應該留著並標成等待關閉")
+	}
+}
+
+// 沒有外部 ID 的列（還沒建立）直接刪，不呼叫 provider；provider 與目前設定不同的列不關也不刪，記警示 log 並標成等待關閉，等設定回來再清理
+// （刪掉就永遠找不到外部帳戶）。
+// mutation 1：沒有外部 ID 也呼叫 CloseAccount → provider 被呼叫，失敗。mutation 2：provider 不符也刪列 → 列不見，失敗。
+func TestPurgeDeletesRowsWithoutAnExternalAccountAndKeepsRowsOfAnotherProvider(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	fresh := f.newStore(t)
+	must(t, f.module.PurgeAccount(ctx, fresh, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", fresh) != 0 || len(f.fake.Closes()) != 0 {
+		t.Fatalf("沒有外部 ID 的列應該直接刪、不呼叫 provider：關閉=%v", f.fake.Closes())
+	}
+	other := f.newStore(t)
+	f.ensure(t, other)
+	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET provider = 'stripe' WHERE store_id = $1", other)
+	must(t, err)
+	must(t, f.module.PurgeAccount(ctx, other, true))
+	if len(f.fake.Closes()) != 0 {
+		t.Fatalf("別的 provider 的帳戶被關閉：%v", f.fake.Closes())
+	}
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND close_deferred_at IS NOT NULL", other) != 1 {
+		t.Fatal("別的 provider 的列應該留著並標成等待關閉")
+	}
+	if !bytes.Contains(f.logs.Bytes(), []byte("level=WARN")) || !bytes.Contains(f.logs.Bytes(), []byte("store_id="+fmt.Sprint(other))) {
+		t.Fatalf("沒有警示 log：%s", f.logs.String())
+	}
+	noProvider := New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()})
+	must(t, noProvider.PurgeAccount(ctx, other, true))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", other) != 1 {
+		t.Fatal("沒有設定 provider 時不該刪列")
 	}
 }
 
@@ -805,7 +1003,7 @@ func TestForgottenOwnersEventsArePurgedAfterRetention(t *testing.T) {
 	if f.processed(t, "evt_forgotten") {
 		t.Fatal("事件在清理前就已處理")
 	}
-	must(t, f.module.PurgeAccounts(ctx, []int64{s}))
+	must(t, f.module.PurgeAccount(ctx, s, false))
 	if !f.processed(t, "evt_forgotten") {
 		t.Fatal("清理沒有把事件標為已處理")
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
@@ -135,6 +136,10 @@ type activeOwners struct{}
 
 func (activeOwners) OwnerActive(context.Context, int64) (bool, error) { return true, nil }
 
+func (activeOwners) OwnerContactEmail(context.Context, int64) (string, bool, error) {
+	return "owner@example.com", true, nil
+}
+
 // 設定了 provider 時，組裝缺 Owners 要在啟動就失敗，不能讓建立 job 不檢查擁有者是否營運中；沒有 provider（沒有設定收款開通）時不需要。設定了 provider 時
 // 把事件處理登記到 inbox（同一個 provider 登記兩次是組裝錯誤）。
 // mutation：New 不檢查 Owners → 第一段沒有 panic；New 不登記 inbox → 第二次 New 沒有 panic。
@@ -161,4 +166,27 @@ func TestNewRequiresOwnersAndRegistersTheProviderWithTheInbox(t *testing.T) {
 		}()
 		New(d)
 	}()
+}
+
+// 清理一列的處理方式：沒有外部 ID 的列不論 provider 都直接刪；有外部 ID 時 provider 與目前設定相同才關閉，不同或沒有設定 provider 時不動它
+// （刪掉就永遠找不到外部帳戶）。
+// mutation：provider 不符也走關閉 → 兩個 defer 案例失敗；沒有外部 ID 也走關閉 → 直接刪的案例失敗。
+func TestPlanPurgeDeletesRowsWithoutExternalIDClosesMatchingProviderAndDefersTheRest(t *testing.T) {
+	external := "acct_1"
+	for name, tc := range map[string]struct {
+		row      store.PaymentAccount
+		provider string
+		want     purgePlan
+	}{
+		"沒有外部 ID、provider 相同":   {store.PaymentAccount{Provider: "fake"}, "fake", purgeDelete},
+		"沒有外部 ID、provider 不同":   {store.PaymentAccount{Provider: "stripe"}, "fake", purgeDelete},
+		"沒有外部 ID、沒有設定 provider": {store.PaymentAccount{Provider: "stripe"}, "", purgeDelete},
+		"有外部 ID、provider 相同":    {store.PaymentAccount{Provider: "fake", ExternalAccountID: &external}, "fake", purgeClose},
+		"有外部 ID、provider 不同":    {store.PaymentAccount{Provider: "stripe", ExternalAccountID: &external}, "fake", purgeDefer},
+		"有外部 ID、沒有設定 provider":  {store.PaymentAccount{Provider: "stripe", ExternalAccountID: &external}, "", purgeDefer},
+	} {
+		if got := planPurge(tc.row, tc.provider); got != tc.want {
+			t.Errorf("%s：planPurge=%d，want %d", name, got, tc.want)
+		}
+	}
 }

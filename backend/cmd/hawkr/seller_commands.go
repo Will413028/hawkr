@@ -13,6 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -83,7 +84,7 @@ func openSeller(ctx context.Context, prepare func(*config.Env) error) (*sellerCo
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	payments, owners := newPayment(d, bus, jc, newInbox(d, jc, log), paymentProvider, log)
 	module := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
-	owners.bind(module)
+	owners.bind(module, id)
 	subscribeSellerPayout(bus, module)
 	subscribeSellerRelay(bus, jc)
 	return &sellerCommand{DB: d, Bus: bus, Jobs: jc, Identity: id, Seller: module, Owners: owners, Logger: log}, nil
@@ -179,7 +180,9 @@ func runDevSeed(ctx context.Context, args []string, out io.Writer) error {
 	for _, st := range stores {
 		ids = append(ids, st.StoreID)
 	}
-	if err := seedPaymentAccounts(ctx, c, ids, out); err != nil {
+	seedFake := payment.NewFake()
+	seedFake.AutoActive = true
+	if err := seedPaymentAccounts(ctx, c, seedFake, ids, out); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(out, "已寫入 %d 家種子店家（接著執行 reannounce-exposures）\n", len(stores))

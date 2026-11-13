@@ -224,6 +224,22 @@ func (o fixtureOwners) OwnerActive(ctx context.Context, storeID int64) (bool, er
 	return err == nil && s.Status != Closed, err
 }
 
+// OwnerContactEmail 是組裝點的 sellerOwners.OwnerContactEmail 的測試版：店家所屬帳號在 identity 的聯絡信箱。
+func (o fixtureOwners) OwnerContactEmail(ctx context.Context, storeID int64) (string, bool, error) {
+	s, err := o.f.module.Store(ctx, storeID)
+	if apperr.KindOf(err) == apperr.KindNotFound {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	c, ok, err := o.f.identity.ContactEmail(ctx, s.AccountID)
+	if err != nil || !ok {
+		return "", false, err
+	}
+	return c.Address, true, nil
+}
+
 // newModule 在同一個 DB 上組一個 seller 模組：job 的排入可以換（真的 River）。
 func (f *fixture) newModule(t *testing.T, jc jobs.ReportingEnqueuer) *Module {
 	t.Helper()

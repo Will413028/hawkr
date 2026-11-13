@@ -363,18 +363,7 @@ func (s *Service) Approve(ctx context.Context, in model.ApproveKYCInput) (model.
 		if err != nil {
 			return err
 		}
-		var contact *string
-		if s.d.Payment.Configured() {
-			email, ok, err := s.contactEmail(ctx, locked.AccountID)
-			if err != nil {
-				return err
-			}
-			if !ok {
-				return apperr.FailedPrecondition("賣家帳號沒有可用的聯絡信箱（登入信箱與自填信箱都沒有或格式不合），請賣家先填寫後再核准")
-			}
-			contact = &email
-		}
-		if err := s.d.Payment.RequestAccount(ctx, row.StoreID, contact, now); err != nil {
+		if err := s.d.Payment.RequestAccount(ctx, row.StoreID, now); err != nil {
 			return err
 		}
 		if err := s.d.Exposure.Announce(ctx, q, now, row.StoreID); err != nil {

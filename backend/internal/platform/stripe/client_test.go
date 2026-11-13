@@ -545,7 +545,6 @@ func TestCloseAccountOnAnAlreadyClosedAccountSucceedsOnlyWhenTheAccountIsClosed(
 func TestCloseAccountForbiddenOnAnOpenAccountReturnsTheOriginalError(t *testing.T) {
 	for name, second := range map[string]func() (int, string){
 		"帳戶沒關":        func() (int, string) { return 200, closeFixtureBody(false) },
-		"讀帳戶也失敗":      func() (int, string) { return 503, `{"error":{"message":"down"}}` },
 		"回應沒有 closed": func() (int, string) { return 200, `{"id":"acct_1"}` },
 	} {
 		s := &stub{resp: func(n int) (int, string, http.Header) {
@@ -560,6 +559,21 @@ func TestCloseAccountForbiddenOnAnOpenAccountReturnsTheOriginalError(t *testing.
 		if !errors.As(err, &api) || api.Status != 403 || api.Code != "forbidden" || len(s.requests()) != 2 {
 			t.Errorf("%s：err=%v 請求=%d", name, err, len(s.requests()))
 		}
+	}
+}
+
+// 403 之後讀帳戶本身失敗：不知道帳戶是不是已關閉，回讀取的錯誤（暫時性的讀取失敗由呼叫方重試），不回永久的 403。
+func TestCloseAccountForbiddenThenFailedLookupReturnsTheLookupError(t *testing.T) {
+	s := &stub{resp: func(n int) (int, string, http.Header) {
+		if n == 1 {
+			return 403, forbiddenBody, nil
+		}
+		return 503, `{"error":{"message":"down"}}`, nil
+	}}
+	err := newTestClient(t, s).CloseAccount(context.Background(), "acct_1")
+	var api *APIError
+	if !errors.As(err, &api) || api.Status != 503 || api.Permanent() || len(s.requests()) != 2 {
+		t.Fatalf("err=%v 請求=%d，預期讀取的 503 且不是永久錯誤", err, len(s.requests()))
 	}
 }
 

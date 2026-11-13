@@ -9,6 +9,7 @@ import (
 
 	"github.com/riverqueue/river"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -75,11 +76,31 @@ func readStripe(e *config.Env, log *slog.Logger) payment.Provider {
 	return provider
 }
 
-// sellerOwners 以 seller 的公開 API 實作 payment 的擁有者查詢（payment 是葉節點，不讀 seller）：店家存在而且沒有關閉才算營運中。
-// payment 先於 seller 組裝（seller 依賴 payment），所以 seller 在組裝之後才設定（bind）。
-type sellerOwners struct{ m *seller.Module }
+// sellerOwners 以 seller 與 identity 的公開 API 實作 payment 的擁有者查詢（payment 是葉節點，不讀上層）：店家存在而且沒有關閉才算營運中；
+// 聯絡信箱是店家所屬帳號的聯絡信箱（identity 已驗證的信箱優先，其次自填，與送審檢查同一條路徑）。
+// payment 先於 seller 組裝（seller 依賴 payment），所以 seller 與 identity 在組裝之後才設定（bind）。
+type sellerOwners struct {
+	m  *seller.Module
+	id *identity.Module
+}
 
-func (o *sellerOwners) bind(m *seller.Module) { o.m = m }
+func (o *sellerOwners) bind(m *seller.Module, id *identity.Module) { o.m, o.id = m, id }
+
+// OwnerContactEmail 回傳店家所屬帳號目前的聯絡信箱；店家不存在或帳號沒有可用的信箱時 ok 是 false。
+func (o *sellerOwners) OwnerContactEmail(ctx context.Context, storeID int64) (string, bool, error) {
+	s, err := o.m.Store(ctx, storeID)
+	if apperr.KindOf(err) == apperr.KindNotFound {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	c, ok, err := o.id.ContactEmail(ctx, s.AccountID)
+	if err != nil || !ok {
+		return "", false, err
+	}
+	return c.Address, true, nil
+}
 
 func (o *sellerOwners) OwnerActive(ctx context.Context, storeID int64) (bool, error) {
 	s, err := o.m.Store(ctx, storeID)
@@ -116,16 +137,13 @@ type discardJobs struct{}
 func (discardJobs) Enqueue(context.Context, river.JobArgs, *river.InsertOpts) error { return nil }
 
 // seedPaymentAccounts 讓種子店家有「可以收款」的收款帳戶（Stripe 計畫 7d′）：以 payment 的 fake provider（AutoActive）走正式的核准寫入、建立與同步，
-// 同步發的 PayoutAccountChanged 經 seller 的訂閱者寫入開通閘門的副本。已有帳戶列的店家沿用（D19，聯絡信箱不改）；帳戶是別的 provider 的（例如本機
+// 同步發的 PayoutAccountChanged 經 seller 的訂閱者寫入開通閘門的副本。聯絡信箱由建立時向店家所屬帳號讀（種子帳號的 identity 信箱，D50）。已有帳戶列的店家沿用（D19）；帳戶是別的 provider 的（例如本機
 // 接過 Stripe sandbox）時 fake 不碰它，只印出提醒，那家店的閘門照該帳戶的狀態。
-func seedPaymentAccounts(ctx context.Context, c *sellerCommand, storeIDs []int64, out io.Writer) error {
-	fake := payment.NewFake()
-	fake.AutoActive = true
+func seedPaymentAccounts(ctx context.Context, c *sellerCommand, fake *payment.Fake, storeIDs []int64, out io.Writer) error {
 	jc := discardJobs{}
 	m := payment.New(payment.Deps{DB: c.DB, Events: c.Bus, Jobs: jc, Inbox: newInbox(c.DB, jc, c.Logger), Provider: fake, Owners: c.Owners, Now: time.Now, Logger: c.Logger})
 	for _, id := range storeIDs {
-		email := fmt.Sprintf("seed-%d@example.com", id)
-		if err := c.DB.InTx(ctx, func(ctx context.Context) error { return m.RequestAccount(ctx, id, &email, time.Now().UTC()) }); err != nil {
+		if err := c.DB.InTx(ctx, func(ctx context.Context) error { return m.RequestAccount(ctx, id, time.Now().UTC()) }); err != nil {
 			return fmt.Errorf("種子店家 %d 的收款帳戶：%w", id, err)
 		}
 		if err := m.EnsureAccount(ctx, id, false); err != nil {

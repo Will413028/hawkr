@@ -397,7 +397,8 @@ func rawRequirements(res *sdk.APIResponse) json.RawMessage {
 	return env.Requirements
 }
 
-// CloseAccount 關閉 v2 帳戶的 recipient 設定。已關閉的帳戶再關會回 403：此時讀帳戶，closed 為真就視為成功，否則回原本的錯誤。
+// CloseAccount 關閉 v2 帳戶的 recipient 設定。已關閉的帳戶再關會回 403：此時讀帳戶，closed 為真就視為成功；讀取成功但帳戶沒關時回原本的 403；
+// 讀取本身失敗時回讀取的錯誤（不知道帳戶是否已關閉，暫時性的讀取失敗讓呼叫方重試，不被永久的 403 蓋掉）。
 func (c *Client) CloseAccount(ctx context.Context, accountID string) error {
 	params := &sdk.V2CoreAccountCloseParams{AppliedConfigurations: sdk.StringSlice([]string{"recipient"})}
 	err := c.call(ctx, func(ctx context.Context) error {
@@ -412,7 +413,10 @@ func (c *Client) CloseAccount(ctx context.Context, accountID string) error {
 	if rerr := c.call(ctx, func(ctx context.Context) (err error) {
 		acct, err = c.sdk.V2CoreAccounts.Retrieve(ctx, accountID, &sdk.V2CoreAccountRetrieveParams{})
 		return err
-	}); rerr == nil && acct != nil && acct.Closed {
+	}); rerr != nil {
+		return rerr
+	}
+	if acct != nil && acct.Closed {
 		return nil
 	}
 	return err

@@ -21,7 +21,7 @@ SET status = $1,
     updated_at = $7
 WHERE store_id = $8 AND external_account_id IS NOT NULL
   AND (fetched_at IS NULL OR fetched_at <= $6)
-RETURNING store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, close_deferred_at
 `
 
 type ApplyPaymentSnapshotParams struct {
@@ -53,7 +53,6 @@ func (q *Queries) ApplyPaymentSnapshot(ctx context.Context, arg ApplyPaymentSnap
 		&i.StoreID,
 		&i.Provider,
 		&i.ExternalAccountID,
-		&i.ContactEmail,
 		&i.RequirementCollection,
 		&i.Status,
 		&i.TransfersActive,
@@ -66,6 +65,7 @@ func (q *Queries) ApplyPaymentSnapshot(ctx context.Context, arg ApplyPaymentSnap
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SellerReadClaimedAt,
+		&i.CloseDeferredAt,
 	)
 	return i, err
 }
@@ -73,10 +73,10 @@ func (q *Queries) ApplyPaymentSnapshot(ctx context.Context, arg ApplyPaymentSnap
 const claimPaymentAccountSellerRead = `-- name: ClaimPaymentAccountSellerRead :one
 UPDATE payment.accounts
 SET seller_read_claimed_at = $1
-WHERE store_id = $2 AND external_account_id IS NOT NULL
+WHERE store_id = $2 AND external_account_id IS NOT NULL AND close_deferred_at IS NULL
   AND (seller_read_claimed_at IS NULL OR seller_read_claimed_at <= $3)
   AND (fetched_at IS NULL OR fetched_at <= $3)
-RETURNING store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, close_deferred_at
 `
 
 type ClaimPaymentAccountSellerReadParams struct {
@@ -95,7 +95,6 @@ func (q *Queries) ClaimPaymentAccountSellerRead(ctx context.Context, arg ClaimPa
 		&i.StoreID,
 		&i.Provider,
 		&i.ExternalAccountID,
-		&i.ContactEmail,
 		&i.RequirementCollection,
 		&i.Status,
 		&i.TransfersActive,
@@ -108,6 +107,7 @@ func (q *Queries) ClaimPaymentAccountSellerRead(ctx context.Context, arg ClaimPa
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SellerReadClaimedAt,
+		&i.CloseDeferredAt,
 	)
 	return i, err
 }
@@ -133,6 +133,40 @@ func (q *Queries) ClearPaymentAccountCreateFailed(ctx context.Context, arg Clear
 	return result.RowsAffected(), nil
 }
 
+const closeDeferredPaymentAccountStoreIDs = `-- name: CloseDeferredPaymentAccountStoreIDs :many
+SELECT store_id
+FROM payment.accounts
+WHERE close_deferred_at IS NOT NULL AND store_id > $1
+ORDER BY store_id
+LIMIT $2
+`
+
+type CloseDeferredPaymentAccountStoreIDsParams struct {
+	AfterStoreID int64
+	Batch        int32
+}
+
+// 週期掃描重排「關閉後刪除」用：等待關閉的帳戶，依 store_id 分批。
+func (q *Queries) CloseDeferredPaymentAccountStoreIDs(ctx context.Context, arg CloseDeferredPaymentAccountStoreIDsParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, closeDeferredPaymentAccountStoreIDs, arg.AfterStoreID, arg.Batch)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var store_id int64
+		if err := rows.Scan(&store_id); err != nil {
+			return nil, err
+		}
+		items = append(items, store_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deletePaymentAccounts = `-- name: DeletePaymentAccounts :many
 DELETE FROM payment.accounts
 WHERE store_id = ANY($1::bigint[])
@@ -144,8 +178,8 @@ type DeletePaymentAccountsRow struct {
 	ExternalAccountID *string
 }
 
-// 擁有者的個資清理：刪除這些擁有者的帳戶列（含聯絡信箱），回傳有外部帳戶的列的 provider 與外部 ID（呼叫方把它們在 inbox 的未處理事件標為已處理）。
-// 外部帳戶本身不在這裡處理。
+// 擁有者的個資清理：刪除這些擁有者的帳戶列，回傳有外部帳戶的列的 provider 與外部 ID（呼叫方把它們在 inbox 的未處理事件標為已處理）。
+// 外部帳戶要先由呼叫方關閉成功（或列沒有外部 ID），這裡不處理外部帳戶。
 func (q *Queries) DeletePaymentAccounts(ctx context.Context, storeIds []int64) ([]DeletePaymentAccountsRow, error) {
 	rows, err := q.db.Query(ctx, deletePaymentAccounts, storeIds)
 	if err != nil {
@@ -167,27 +201,25 @@ func (q *Queries) DeletePaymentAccounts(ctx context.Context, storeIds []int64) (
 }
 
 const insertPaymentAccount = `-- name: InsertPaymentAccount :execrows
-INSERT INTO payment.accounts (store_id, provider, contact_email, requirement_collection, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $5)
+INSERT INTO payment.accounts (store_id, provider, requirement_collection, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $4)
 ON CONFLICT (store_id) DO NOTHING
 `
 
 type InsertPaymentAccountParams struct {
 	StoreID               int64
 	Provider              string
-	ContactEmail          string
 	RequirementCollection string
 	Now                   time.Time
 }
 
-// seller 核准時在它的 transaction 內寫「建立中」的列（沒有外部 ID），contact_email 是 seller 傳入的聯絡信箱快照。一個擁有者一列，關店再開沿用既有的列；
+// seller 核准時在它的 transaction 內寫「建立中」的列（沒有外部 ID；聯絡信箱不存，建立外部帳戶時才讀）。一個擁有者一列，關店再開沿用既有的列；
 // 既有的列不改（ON CONFLICT DO NOTHING）：核准的 transaction 已鎖住 seller 的列，再鎖下層 payment 的既有列會違反全域鎖順序（platform/lockorder），
 // 既有的列只由本模組的 job 與管理員的指令寫。
 func (q *Queries) InsertPaymentAccount(ctx context.Context, arg InsertPaymentAccountParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertPaymentAccount,
 		arg.StoreID,
 		arg.Provider,
-		arg.ContactEmail,
 		arg.RequirementCollection,
 		arg.Now,
 	)
@@ -198,7 +230,7 @@ func (q *Queries) InsertPaymentAccount(ctx context.Context, arg InsertPaymentAcc
 }
 
 const lockPaymentAccount = `-- name: LockPaymentAccount :one
-SELECT store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at
+SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, close_deferred_at
 FROM payment.accounts
 WHERE store_id = $1
 FOR UPDATE
@@ -212,7 +244,6 @@ func (q *Queries) LockPaymentAccount(ctx context.Context, storeID int64) (Paymen
 		&i.StoreID,
 		&i.Provider,
 		&i.ExternalAccountID,
-		&i.ContactEmail,
 		&i.RequirementCollection,
 		&i.Status,
 		&i.TransfersActive,
@@ -225,8 +256,30 @@ func (q *Queries) LockPaymentAccount(ctx context.Context, storeID int64) (Paymen
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SellerReadClaimedAt,
+		&i.CloseDeferredAt,
 	)
 	return i, err
+}
+
+const markPaymentAccountCloseDeferred = `-- name: MarkPaymentAccountCloseDeferred :execrows
+UPDATE payment.accounts
+SET close_deferred_at = COALESCE(close_deferred_at, $1),
+    updated_at = $1
+WHERE store_id = $2 AND external_account_id IS NOT NULL
+`
+
+type MarkPaymentAccountCloseDeferredParams struct {
+	Now     time.Time
+	StoreID int64
+}
+
+// 擁有者清理時外部帳戶還沒關閉成功：記下時刻（已記過的保留最早的時刻）；沒有外部 ID 的列不寫。
+func (q *Queries) MarkPaymentAccountCloseDeferred(ctx context.Context, arg MarkPaymentAccountCloseDeferredParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markPaymentAccountCloseDeferred, arg.Now, arg.StoreID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const markPaymentAccountCreateFailed = `-- name: MarkPaymentAccountCreateFailed :execrows
@@ -251,7 +304,7 @@ func (q *Queries) MarkPaymentAccountCreateFailed(ctx context.Context, arg MarkPa
 }
 
 const paymentAccountByExternal = `-- name: PaymentAccountByExternal :one
-SELECT store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at
+SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, close_deferred_at
 FROM payment.accounts
 WHERE provider = $1 AND external_account_id = $2
 `
@@ -268,7 +321,6 @@ func (q *Queries) PaymentAccountByExternal(ctx context.Context, arg PaymentAccou
 		&i.StoreID,
 		&i.Provider,
 		&i.ExternalAccountID,
-		&i.ContactEmail,
 		&i.RequirementCollection,
 		&i.Status,
 		&i.TransfersActive,
@@ -281,12 +333,13 @@ func (q *Queries) PaymentAccountByExternal(ctx context.Context, arg PaymentAccou
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SellerReadClaimedAt,
+		&i.CloseDeferredAt,
 	)
 	return i, err
 }
 
 const paymentAccountByStore = `-- name: PaymentAccountByStore :one
-SELECT store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at
+SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, close_deferred_at
 FROM payment.accounts
 WHERE store_id = $1
 `
@@ -298,7 +351,6 @@ func (q *Queries) PaymentAccountByStore(ctx context.Context, storeID int64) (Pay
 		&i.StoreID,
 		&i.Provider,
 		&i.ExternalAccountID,
-		&i.ContactEmail,
 		&i.RequirementCollection,
 		&i.Status,
 		&i.TransfersActive,
@@ -311,6 +363,7 @@ func (q *Queries) PaymentAccountByStore(ctx context.Context, storeID int64) (Pay
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SellerReadClaimedAt,
+		&i.CloseDeferredAt,
 	)
 	return i, err
 }
@@ -318,7 +371,7 @@ func (q *Queries) PaymentAccountByStore(ctx context.Context, storeID int64) (Pay
 const paymentAccountStoreIDsByExternal = `-- name: PaymentAccountStoreIDsByExternal :many
 SELECT store_id
 FROM payment.accounts
-WHERE provider = $1 AND external_account_id = ANY($2::text[])
+WHERE provider = $1 AND external_account_id = ANY($2::text[]) AND close_deferred_at IS NULL
 ORDER BY store_id
 `
 
@@ -327,7 +380,7 @@ type PaymentAccountStoreIDsByExternalParams struct {
 	ExternalAccountIds []string
 }
 
-// 外部帳戶 ID 對應的擁有者（inbox 的路由鍵是外部帳戶 ID）。
+// 外部帳戶 ID 對應的擁有者（inbox 的路由鍵是外部帳戶 ID）；等待關閉的帳戶不排同步。
 func (q *Queries) PaymentAccountStoreIDsByExternal(ctx context.Context, arg PaymentAccountStoreIDsByExternalParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, paymentAccountStoreIDsByExternal, arg.Provider, arg.ExternalAccountIds)
 	if err != nil {
@@ -355,6 +408,7 @@ WHERE (a.status IN ('UNDER_REVIEW', 'ACTION_REQUIRED')
        OR (a.status = 'DISABLED'
            AND (a.status_reason IS NULL
                 OR (a.status_reason NOT LIKE 'rejected%' AND a.status_reason NOT LIKE 'unsupported%'))))
+  AND a.close_deferred_at IS NULL
   AND a.store_id > $1
 ORDER BY a.store_id
 LIMIT $2
@@ -365,7 +419,7 @@ type PollablePaymentAccountStoreIDsParams struct {
 	Batch        int32
 }
 
-// 輪詢補漏：UNDER_REVIEW、ACTION_REQUIRED 的帳戶，DISABLED 但原因碼不是終局（rejected*、unsupported*）的帳戶（restricted 加 contact_stripe 或 no_resolution
+// 輪詢補漏（等待關閉的帳戶除外）：UNDER_REVIEW、ACTION_REQUIRED 的帳戶，DISABLED 但原因碼不是終局（rejected*、unsupported*）的帳戶（restricted 加 contact_stripe 或 no_resolution
 // 可以被 Stripe 解除，掉了 webhook 時只有輪詢補得到；rejected 與 unsupported 不會再啟用，不輪詢），依 store_id 分批。inbox 有舊的未處理事件的帳戶由
 // Sweep 經 platform inbox 的 StaleRoutes 另外找。
 func (q *Queries) PollablePaymentAccountStoreIDs(ctx context.Context, arg PollablePaymentAccountStoreIDsParams) ([]int64, error) {
@@ -395,7 +449,7 @@ SET external_account_id = $1,
     create_failed_at = NULL,
     updated_at = $2
 WHERE store_id = $3 AND external_account_id IS NULL
-RETURNING store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, close_deferred_at
 `
 
 type SetPaymentAccountExternalParams struct {
@@ -412,7 +466,6 @@ func (q *Queries) SetPaymentAccountExternal(ctx context.Context, arg SetPaymentA
 		&i.StoreID,
 		&i.Provider,
 		&i.ExternalAccountID,
-		&i.ContactEmail,
 		&i.RequirementCollection,
 		&i.Status,
 		&i.TransfersActive,
@@ -425,6 +478,7 @@ func (q *Queries) SetPaymentAccountExternal(ctx context.Context, arg SetPaymentA
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SellerReadClaimedAt,
+		&i.CloseDeferredAt,
 	)
 	return i, err
 }

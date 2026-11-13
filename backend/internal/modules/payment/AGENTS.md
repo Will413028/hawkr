@@ -18,12 +18,13 @@ schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名、事件（`events.go`）與錯誤。
 - `internal/account`：收款帳戶的 use case、port 與 adapter、job（子領域規則見 `internal/account/AGENTS.md`）。`internal/model`：對外型別與事件。`internal/store`：sqlc 生成，不得手改。
-- 依賴圖的唯一來源是 `internal/arch/modules.go`：payment 是葉節點，不 import 任何模組；擁有者是否營運中經組裝點注入的 `Owners`。
+- 依賴圖的唯一來源是 `internal/arch/modules.go`：payment 是葉節點，不 import 任何模組；擁有者是否營運中與聯絡信箱經組裝點注入的 `Owners`（信箱建立外部帳戶時才讀，不存副本）。
 
 ## 不變量
 
 - 外部呼叫不在 transaction 內（單體規則 5）。守門：fake provider 的 `Violations`（integration 測試）。規格 §2。
-- 擁有者的 transaction 對 payment 只 INSERT 帳戶列（`ON CONFLICT DO NOTHING`）與排 job，不鎖、不改既有列；既有列只由本模組的 job 與後台指令寫（全域鎖順序 payment 先於 seller）。守門：integration 的 `lockorder` 檢查、`TestRequestKeepsAnExistingRowAndItsContactEmail`。規格 §2、§7。
+- 擁有者的 transaction 對 payment 只 INSERT 帳戶列（`ON CONFLICT DO NOTHING`）與排 job，不鎖、不改既有列；既有列只由本模組的 job 與後台指令寫（全域鎖順序 payment 先於 seller）。守門：integration 的 `lockorder` 檢查、`TestRequestKeepsAnExistingRow`。規格 §2、§7。
+- 擁有者個資清理時先關閉外部帳戶、成功才刪本地列；失敗留列標 `close_deferred_at`，不進同步輪詢，由週期掃描重排。守門：`TestForgetOwnersClosesTheExternalAccountThenDeletesTheRow`、`TestAFailedCloseKeepsTheRowMarkedExcludedFromPollingAndRetriedByTheSweep`。規格 §2。
 - 同步在寫快照的 transaction 內發 `PayoutAccountChanged`；payload 與明文 fingerprint 不寫 log、不保存。守門：`TestSyncPublishesPayoutAccountChangedInsideTheWrite`、`TestDuplicateProviderEventIsRecordedOnceAndDispatchedOnce`。規格 §3、§5。
 - 收款事件的 handler 只排同步、不標記已處理；同步只把讀取開始前收到的事件標為已處理。守門：`TestAnEventArrivingWhileTheAccountIsBeingReadIsNotLostWhenItsSyncIsCoalesced`。規格 §3。
 

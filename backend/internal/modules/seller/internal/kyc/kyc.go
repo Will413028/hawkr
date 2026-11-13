@@ -58,7 +58,7 @@ type Deps struct {
 // 不鎖 payment 的既有列（全域鎖順序 payment 先於 seller，核准已鎖住店家與申請列）。
 type Payment interface {
 	Configured() bool
-	RequestAccount(ctx context.Context, storeID int64, contactEmail *string, now time.Time) error
+	RequestAccount(ctx context.Context, storeID int64, now time.Time) error
 }
 
 // Service 是 KYC 的 use case。

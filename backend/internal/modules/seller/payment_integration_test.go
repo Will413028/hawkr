@@ -101,10 +101,10 @@ func (f *fixture) setContactEmails(t *testing.T, accountID int64, verified, self
 	must(t, err)
 }
 
-// 核准時從 identity 讀帳號的聯絡信箱（已驗證的 email 優先於自填的），正規化後傳給 payment 快照到帳戶列，建立 job 從列上讀出來交給 provider；之後帳號的信箱
-// 再改，列上的值不變（provider 收到的仍是核准當下的）。
-// mutation：改成自填優先 → provider 收到 self@example.com，失敗；核准不傳帳號的信箱（固定值）→ provider 收到的不是帳號的，失敗。
-func TestApprovalSnapshotsTheAccountContactEmailVerifiedFirst(t *testing.T) {
+// 建立外部帳戶的當下才從 identity 讀帳號的聯絡信箱（已驗證的 email 優先於自填的，正規化後給 provider），不在核准時快照：核准之後、建立之前帳號的信箱改了，
+// provider 收到的是新的。
+// mutation：改成自填優先 → provider 收到 self@example.com，失敗；建立時讀核准當下記下的值（快照）→ provider 收到 pay.out@example.com，失敗。
+func TestCreateReadsTheAccountContactEmailAtCreationTimeVerifiedFirst(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
@@ -114,16 +114,41 @@ func TestApprovalSnapshotsTheAccountContactEmailVerifiedFirst(t *testing.T) {
 	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
 	must(t, approve(f, sub))
-	f.setContactEmails(t, accountID, ptr("changed@example.com"), nil)
+	f.setContactEmails(t, accountID, ptr("Changed@example.com"), nil)
 	f.ensureAccount(t, s.StoreID)
-	if got := f.payment.EnsureEmails(); !slices.Equal(got, []string{"pay.out@example.com"}) {
-		t.Fatalf("provider 收到的信箱=%v，預期核准當下已驗證的 email（小寫）", got)
+	if got := f.payment.EnsureEmails(); !slices.Equal(got, []string{"changed@example.com"}) {
+		t.Fatalf("provider 收到的信箱=%v，預期建立當下已驗證的 email（小寫）", got)
+	}
+}
+
+// 核准不再檢查聯絡信箱（送審才檢查）：送審之後、核准之前帳號沒有信箱了，核准照常並排入建立 job；建立 job 讀不到信箱時不呼叫 provider、記成建立失敗。
+// mutation：建立 job 沒有信箱也呼叫 provider → provider 被呼叫，失敗；核准改回檢查信箱 → 核准被拒，失敗。
+func TestApprovalWithoutAContactEmailQueuesCreationAndCreationFailsWithoutCallingTheProvider(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	accountID, s := f.open(t)
+	f.setContactEmails(t, accountID, nil, ptr("seller@example.com"))
+	d := f.savedDraft(t, kycDraft(accountID))
+	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
+	must(t, err)
+	f.setContactEmails(t, accountID, nil, nil)
+	must(t, approve(f, sub))
+	if got := f.jobs.queuedStoreIDs(t, kindPaymentEnsure); !slices.Equal(got, []int64{s.StoreID}) {
+		t.Fatalf("核准排入的建立 job=%v", got)
+	}
+	must(t, f.payments.EnsureAccount(ctx, s.StoreID, false))
+	if ensures, _, _ := f.payment.Calls(); ensures != 0 {
+		t.Fatalf("沒有信箱仍呼叫了 provider：%d 次", ensures)
+	}
+	if a := f.paymentAccount(t, s.StoreID); a.ExternalAccountID != nil || a.CreateFailedAt == nil {
+		t.Fatalf("帳戶=%+v，預期沒有外部帳戶且記下建立失敗", a)
 	}
 }
 
 // 沒有已驗證的 email 時用自填的（identity 只存小寫的自填信箱，accounts_self_entered_email_check）。
-// mutation：核准只讀已驗證的 email → 核准因沒有聯絡信箱被拒，失敗。
-func TestApprovalSnapshotsTheSelfEnteredEmailWhenThereIsNoVerifiedOne(t *testing.T) {
+// mutation：建立只讀已驗證的 email → 沒有信箱，不建立，失敗。
+func TestCreateUsesTheSelfEnteredEmailWhenThereIsNoVerifiedOne(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
@@ -175,9 +200,9 @@ func TestSubmitKYCRequiresAContactEmail(t *testing.T) {
 }
 
 // 再次核准時帳戶列已存在：核准的 transaction 只 INSERT 帳戶列（ON CONFLICT DO NOTHING），不鎖、不改 payment 的既有列（全域鎖順序 payment 先於
-// seller，Stripe 計畫 7d′），所以聯絡信箱維持第一次核准的快照，建立外部帳戶送的也是它；還沒有外部帳戶的列重新排入建立 job。
-// mutation：RequestAccount 改回 upsert 信箱 → provider 收到新的信箱，失敗（integration 的 lockorder 檢查也會報核准鎖了下層的既有列）。
-func TestReapprovalKeepsTheFirstContactEmailSnapshot(t *testing.T) {
+// seller，Stripe 計畫 7d′）；還沒有外部帳戶的列重新排入建立 job，建立時送的是帳號當下的信箱（payment 不存信箱）。
+// mutation：RequestAccount 改成 ON CONFLICT DO UPDATE → integration 的 lockorder 檢查報核准鎖了下層的既有列，失敗。
+func TestReapprovalQueuesCreationAgainAndCreationUsesTheCurrentContactEmail(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	accountID, s := f.approvedWith(t)
@@ -186,8 +211,8 @@ func TestReapprovalKeepsTheFirstContactEmailSnapshot(t *testing.T) {
 		t.Fatalf("兩次核准排入的建立 job=%v", got)
 	}
 	f.ensureAccount(t, s.StoreID)
-	if got := f.payment.EnsureEmails(); !slices.Equal(got, []string{"seller@example.com"}) {
-		t.Fatalf("provider 收到的信箱=%v，預期第一次核准的快照", got)
+	if got := f.payment.EnsureEmails(); !slices.Equal(got, []string{"new.owner@example.com"}) {
+		t.Fatalf("provider 收到的信箱=%v，預期建立當下帳號的信箱", got)
 	}
 }
 

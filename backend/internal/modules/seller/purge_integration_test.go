@@ -348,16 +348,18 @@ func TestPurgeAsksPaymentToForgetThePurgedStoreOnly(t *testing.T) {
 		raw, err := json.Marshal(a)
 		must(t, err)
 		var v struct {
-			StoreIDs []int64 `json:"store_ids"`
+			StoreID int64 `json:"store_id"`
 		}
 		must(t, json.Unmarshal(raw, &v))
-		forgotten = append(forgotten, v.StoreIDs...)
+		forgotten = append(forgotten, v.StoreID)
 	}
 	f.jobs.mu.Unlock()
 	if !slices.Equal(forgotten, []int64{goneStore.StoreID}) {
 		t.Fatalf("排入刪除的店家=%v", forgotten)
 	}
-	must(t, f.payments.PurgeAccounts(ctx, forgotten))
+	for _, id := range forgotten {
+		must(t, f.payments.PurgeAccount(ctx, id, false))
+	}
 	if _, err := f.payments.Account(ctx, goneStore.StoreID); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("清理之後帳戶列還在：%v", err)
 	}

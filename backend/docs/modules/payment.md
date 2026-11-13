@@ -5,7 +5,7 @@ payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monoli
 ## 1. 範圍與公開面
 
 - 資料：schema `payment`，表 `accounts`（收款帳戶，`db/schema.sql`）；`db/objects.sql` 有發布的 `pub_review_item`／`pub_review_items(at)`（後台待辦）。
-- 子領域套件：`internal/account`（port、Stripe 與 fake adapter、帳戶快取、建立／同步／輪詢／刪除的 job、收款事件的 inbox handler）、`internal/model`（對外型別與 `PayoutAccountChanged`）、`internal/store`（sqlc）。
+- 子領域套件：`internal/account`（port、Stripe 與 fake adapter、帳戶快取、建立／同步／輪詢／關閉後刪除的 job、收款事件的 inbox handler）、`internal/model`（對外型別與 `PayoutAccountChanged`）、`internal/store`（sqlc）。
 - 公開 API（根套件 `payment`）：
   - 擁有者用（seller 呼叫）：`RequestAccount`（擁有者核准的 transaction 內）、`Account`、`CreateOnboardingSession`、`SyncAccountUnlessFresh`（賣家觸發的 transaction 外同步重讀，§2）、`Capabilities`、`Configured`、`ForgetOwners`（擁有者個資清理的 transaction 內）。呼叫方先確認呼叫者是擁有者（Stripe 計畫 D30：賣家端的 `GetMyPaymentAccount`、`CreatePaymentOnboardingSession` 留在 `SellerAppService`）。
   - 後台：`RefreshAccount`、`RetryAccountCreate`，對外是 `hawkr.admin.payment.v1alpha1.PaymentAdminService`（`GetPaymentAccount`、`RefreshPaymentAccount`、`RetryPaymentAccountCreate`；權限 `payment.accounts.get`、`.refresh`、`.retry_create`）。
@@ -16,15 +16,15 @@ payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monoli
 
 ## 2. 收款帳戶
 
-- 一個擁有者一列，關店再開沿用（D19）；列只存狀態與建立外部帳戶要用的聯絡信箱（D23）。外部呼叫（建立帳戶、重讀帳戶、開通 session）不在 transaction 內（單體規則 5）。
-- 建立：擁有者核准的 transaction 內 `RequestAccount` 只 INSERT「建立中」的列（`external_account_id` NULL、`NOT_CREATED`；`ON CONFLICT DO NOTHING`）並排入以 `store_id` 為唯一鍵的建立 job（`payment.account_ensure`）；已有列時不改它（聯絡信箱維持第一次的快照），還沒有外部 ID、也沒有進入建立失敗時重新排入建立 job。沒有聯絡信箱回 `FAILED_PRECONDITION`，核准整筆不寫入。沒有設定 provider 時什麼都不做。
-- 建立 job：讀本地列，`Owners` 回答擁有者不在營運中就略過；在 transaction 外以列上保存的 UUID（`create_idempotency_key`，寫列時產生的 v4）為冪等鍵呼叫 provider，收件方式取列上的 `requirement_collection`；再於 transaction 內填上外部 ID（狀態先記 `ACTION_REQUIRED`）並排入同步 job。暫時性失敗由 River 退避重試（最多 8 次）；最後一次或永久失敗記 `create_failed_at`，進後台待辦 `PAYMENT_ACCOUNT_CREATE_FAILED`（§6），管理員「重試建立」清空並重排。
+- 一個擁有者一列，關店再開沿用（D19）；列只存狀態，不存擁有者的個資：聯絡信箱在建立外部帳戶的當下經 `Owners` 向擁有者讀（D50，修訂 D23 的核准時快照）。外部呼叫（建立帳戶、重讀帳戶、開通 session）不在 transaction 內（單體規則 5）。
+- 建立：擁有者核准的 transaction 內 `RequestAccount` 只 INSERT「建立中」的列（`external_account_id` NULL、`NOT_CREATED`；`ON CONFLICT DO NOTHING`）並排入以 `store_id` 為唯一鍵的建立 job（`payment.account_ensure`）；已有列時不改它，還沒有外部 ID、也沒有進入建立失敗時重新排入建立 job。`RequestAccount` 不收也不檢查聯絡信箱（送審才要求帳號有信箱）。沒有設定 provider 時什麼都不做。
+- 建立 job：讀本地列，`Owners` 回答擁有者不在營運中就略過；在 transaction 外讀擁有者目前的聯絡信箱（`Owners.OwnerContactEmail`：identity 已驗證的信箱優先，其次自填；核准之後信箱改了用新的），沒有信箱時不呼叫 provider、視為永久失敗（重試不會生出信箱），並以列上保存的 UUID（`create_idempotency_key`，寫列時產生的 v4）為冪等鍵呼叫 provider，收件方式取列上的 `requirement_collection`；再於 transaction 內填上外部 ID（狀態先記 `ACTION_REQUIRED`）並排入同步 job。暫時性失敗由 River 退避重試（最多 8 次）；最後一次或永久失敗記 `create_failed_at`，進後台待辦 `PAYMENT_ACCOUNT_CREATE_FAILED`（§6），管理員「重試建立」清空並重排。
 - 同步 job（`payment.account_sync`，唯一鍵 `store_id`）：在 transaction 外重讀外部帳戶，在 transaction 內鎖帳戶列、整列覆寫快照（沒有觀測歷史，重讀即最新）、發布 `PayoutAccountChanged`（§5），並經 platform inbox 把這個外部帳戶在讀取開始前收到的事件整批標記已處理（`MarkRouteProcessed`，處理者 `payment.account_sync`）；之後仍有未處理事件（讀取期間到的）時回 `again`，worker 以 snooze 再跑一輪。外部帳戶不存在是永久失敗（job 取消）。
 - 同步與同步並行（D32）：`SyncAccountUnlessFresh` 給 seller 的 `RefreshMyPaymentAccount` 在 job 之外同步呼叫，所以「一個帳戶同一時間一個同步」只剩 River 唯一鍵保證。寫快照時只有這次讀取的開始時間不早於已存的 `fetched_at`（NULL 一律寫）才寫；被擋下的同步（較晚開始的讀取已經先寫入）不寫快取、不標記 inbox 事件、不發布 `PayoutAccountChanged`，`again` 由唯讀的 `RoutePending` 回答（較晚開始的那一次標記了在它開始之前收到的事件，之後收到的仍未處理，所以要回報）。必要條件是存在 job 以外的同步呼叫，那個呼叫拿掉時條件一起拿掉。賣家的同步呼叫遇到 `again` 自己排同步 job。守門：`TestAnOlderReadNeverOverwritesANewerCommittedRead`、`TestARejectedSyncDoesNotMarkEventsOrPublish`。
 - 賣家觸發的重讀間隔（D33）：`SyncAccountUnlessFresh` 在讀 provider 之前以單一條件式 UPDATE 搶名額（`payment.accounts.seller_read_claimed_at` 與 `fetched_at` 都早於 `now - ReadDebounce`，10 秒，具名常數，時鐘由組裝點注入）；搶不到（間隔內已有讀取，含失敗的與並行的）不呼叫 provider，依列上的時間回答（`busyRetryAfter`）：`fetched_at` 不早於 `seller_read_claimed_at`（快取已涵蓋占名額的讀取）才成功，否則（那次讀取失敗或還在進行中）回 `ResourceExhausted` 並帶窗的剩餘時間（傳輸層放進 `google.rpc.RetryInfo`，至少 1 秒；client 對可重試的 `resource_exhausted` 照它等待後重試），失敗不會被舊快取蓋成成功；搶到才走同步，用搶到的那一列（不重讀），讀完仍有未處理事件就在自己的 transaction 排同步 job。同步 job 不受間隔限制、不寫這一欄。必要條件：外部讀取由賣家觸發，頻率不受 job 唯一鍵約束；那個呼叫拿掉時間隔與該欄一起拿掉。沒有 provider 回 `FailedPrecondition`；帳戶列的 provider 與目前的不同也回 `FailedPrecondition`；沒有帳戶列或還沒有外部 ID 時什麼都不做；排同步 job 的寫入不隨呼叫者取消；重讀失敗是明確動作的失敗：暫時性回 `Unavailable`，外部帳戶不存在（`ErrPermanent`）回 `FailedPrecondition`。守門：`TestStaleBeforeIsOneDebounceWindowBack`、`TestBusyRetryAfterDecidesBetweenSuccessAndRetry`、`TestBusyOutcomeCarriesTheRetryDelay`、`TestSyncUnlessFreshWithoutProviderIsFailedPrecondition`、`TestSellerTriggeredRereadIsDebouncedAndFailsLoudly`、`TestConcurrentSellerRefreshesReadTheProviderOnce`、`TestASellerRefreshRejectedByTheGuardQueuesASyncForLaterEvents`。
 - 狀態推導（`account.StatusOf`，D13）：沒有外部 ID＝`NOT_CREATED`；`active`＝`ENABLED`；`rejected`、`unsupported`＝`DISABLED`；任何一筆細節的行動方是賣家（含 `pending`）＝`ACTION_REQUIRED`；`pending`＝`UNDER_REVIEW`；`restricted` 加平台處理或無解法的細節＝`DISABLED`；不認得的狀態或行動方、`restricted` 但沒有細節＝`UNDER_REVIEW` 並記警示。細節多筆時賣家能行動的優先，其次 `DISABLED`。`status_reason` 是導出狀態的那一筆細節的 provider 原因碼（只給後台）。`transfers_active` 等於 `ENABLED`；`payouts_active` 只顯示。守門：`TestStatusOfFollowsTheDecisionTable`。
 - 開通 session：外部帳戶建立之前、被停用（`DISABLED`）時回 `FAILED_PRECONDITION`；介面由列上的收件方式決定（託管連結或內嵌元件）。
-- 刪除：擁有者個資清理的 transaction 內 `ForgetOwners` 只排入刪除 job（`payment.account_purge`），job 在自己的 transaction 刪除那些擁有者的列（含聯絡信箱）。外部帳戶不處理。
+- 關閉後刪除（D52）：擁有者個資清理的 transaction 內 `ForgetOwners` 為每個擁有者排入 `payment.account_purge`（唯一鍵 `store_id`，只排 job、不碰列、不呼叫 provider）。job 依列分流（`planPurge`）：沒有外部 ID 的列直接刪；有外部 ID 且 provider 與目前設定相同時，在 transaction 外呼叫 port 的 `CloseAccount`（冪等：已關閉視為成功；Stripe adapter 呼叫 v2 close，已關閉回 403 時讀帳戶，`closed` 才算成功，讀取失敗回讀取的錯誤），成功之後才在同一個 transaction 刪列並把該外部帳戶在 inbox 的未處理事件標為已處理（處理者 `payment.account_purge`）；provider 與目前設定不同或沒有設定 provider 時不關也不刪，記警示 log 並標成等待關閉（刪掉就永遠找不到外部帳戶）。暫時性失敗由 River 退避重試（最多 8 次）；最後一次或永久失敗（金流商沒有這個帳戶）時本地列留著（保住 `store_id` 與外部 ID 的對應）、記 `close_deferred_at`、警示 log 帶 `store_id` 與外部帳戶 ID。等待關閉的列（`close_deferred_at` 不是 NULL）不進同步輪詢（`Sweep` 的狀態與事件兩條路）、賣家與管理員的重新整理、同步 job；週期掃描（`payment.account_sweep`）把它們重排成清理 job，直到關閉成功。這個訊號是警示 log、不進後台待辦：待辦只放等營運人員動作的項目（`docs/modules/reviewqueue.md` §1），這裡由週期 job 自己重試，沒有營運人員可做的事。
 
 ## 3. 收款事件與 inbox（D29）
 
@@ -35,7 +35,7 @@ payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monoli
 
 ## 4. 後台
 
-- `GetPaymentAccount` 讀擁有者的帳戶（沒有回 `NOT_FOUND`）；`RefreshPaymentAccount` 只排同步 job（沒有 provider 或還沒有外部 ID 回 `FAILED_PRECONDITION`）；`RetryPaymentAccountCreate` 只有建立失敗的列可以重試（其他狀態 `FAILED_PRECONDITION`）。
+- `GetPaymentAccount` 讀擁有者的帳戶（沒有回 `NOT_FOUND`）；`RefreshPaymentAccount` 只排同步 job（沒有 provider、還沒有外部 ID 或帳戶在等待關閉回 `FAILED_PRECONDITION`）；`RetryPaymentAccountCreate` 只有建立失敗的列可以重試（其他狀態 `FAILED_PRECONDITION`）。
 
 ## 5. 事件
 
@@ -51,6 +51,5 @@ payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monoli
 
 ## 8. 已知限制
 
-- 同一家店再次核准時不更新還沒建立外部帳戶的列的聯絡信箱（核准不能寫 payment 的既有列，§2）；建立後改信箱本來就延後（D23）。
 - `PAYMENT_ACCOUNT_CREATE_FAILED` 不再排除已關閉的店家（payment 不讀 seller 的店家狀態）：關閉店家的待辦由管理員「重試建立」清掉，建立 job 會因擁有者不在營運中而略過。
 - 本機種子（`dev-seed`）以 fake provider 走正式的建立與同步；店家已有別的 provider 的帳戶時種子不改它，只印出提醒。

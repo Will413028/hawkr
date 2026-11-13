@@ -538,3 +538,7 @@ type ownerFunc func(ctx context.Context, storeID int64) (bool, error)
 func (f ownerFunc) OwnerActive(ctx context.Context, storeID int64) (bool, error) {
 	return f(ctx, storeID)
 }
+
+func (ownerFunc) OwnerContactEmail(context.Context, int64) (string, bool, error) {
+	return "owner@example.com", true, nil
+}

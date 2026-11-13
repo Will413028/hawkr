@@ -3,6 +3,7 @@ package account
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -40,10 +41,12 @@ const (
 	purgeProcessor = "payment.account_purge"
 )
 
-// Owners 是擁有者（店家）是否營運中的查詢，由組裝點以 seller 的公開 API 實作（payment 是葉節點，不讀 seller）。建立 job 與補排建立只為營運中的擁有者
-// 建立外部帳戶。
+// Owners 是擁有者（店家）的查詢，由組裝點以 seller 與 identity 的公開 API 實作（payment 是葉節點，不讀上層）。建立 job 與補排建立只為營運中的擁有者
+// 建立外部帳戶；聯絡信箱在建立外部帳戶的當下讀（D50），payment 不保存它的副本。
 type Owners interface {
 	OwnerActive(ctx context.Context, storeID int64) (bool, error)
+	// OwnerContactEmail 回傳擁有者目前的聯絡信箱（已正規化）；沒有可用的信箱時 ok 是 false。
+	OwnerContactEmail(ctx context.Context, storeID int64) (email string, ok bool, err error)
 }
 
 // Deps 外部依賴；clock 由組裝點注入。Provider 為 nil 表示沒有設定收款開通：RequestAccount 什麼都不做，開通相關的呼叫回 FailedPrecondition，
@@ -83,21 +86,18 @@ func (s *Service) Configured() bool { return s.d.Provider != nil }
 // RequestAccount 在擁有者核准的 transaction 內（呼叫方的 ctx）寫「建立中」的帳戶列並排入以 store_id 為唯一鍵的建立 job（D16、D19）；列寫入時由
 // 資料庫產生建立用的冪等鍵 UUID。已有列時不改它（INSERT ON CONFLICT DO NOTHING：呼叫方已鎖住上層的列，不再等下層 payment 的既有列，
 // platform/lockorder），關店再開沿用同一個外部帳戶；既有列還沒有外部 ID、也沒有進入建立失敗時重新排入建立 job（唯一鍵合併）。
-// contactEmail 是呼叫方傳入的聯絡信箱（D23），只在寫新列時快照；沒有時回 failed_precondition，核准整筆不寫入。這裡不呼叫 provider（規則 5）。
+// 聯絡信箱不在這裡讀也不存：建立 job 在呼叫 provider 的當下才向擁有者讀（D50）。這裡不呼叫 provider（規則 5）。
 // 沒有設定 provider 時什麼都不做。
-func (s *Service) RequestAccount(ctx context.Context, storeID int64, contactEmail *string, now time.Time) error {
+func (s *Service) RequestAccount(ctx context.Context, storeID int64, now time.Time) error {
 	if s.d.Provider == nil {
 		return nil
 	}
 	if err := model.Positive(storeID); err != nil {
 		return err
 	}
-	if contactEmail == nil {
-		return apperr.FailedPrecondition("帳號缺少聯絡信箱，無法建立收款帳戶")
-	}
 	q := store.New(s.d.DB.Conn(ctx))
 	_, err := q.InsertPaymentAccount(ctx, store.InsertPaymentAccountParams{
-		StoreID: storeID, Provider: s.d.Provider.Name(), ContactEmail: *contactEmail, RequirementCollection: string(s.d.Provider.Capabilities().RequirementCollection), Now: now,
+		StoreID: storeID, Provider: s.d.Provider.Name(), RequirementCollection: string(s.d.Provider.Capabilities().RequirementCollection), Now: now,
 	})
 	if err != nil {
 		return err
@@ -137,8 +137,9 @@ func (s *Service) Account(ctx context.Context, storeID int64) (model.PaymentAcco
 	return ToModel(row), nil
 }
 
-// Ensure 是建立 job 的內容：先讀本地列，確認擁有者營運中（Owners），在 transaction 外呼叫 provider 建立外部帳戶（冪等鍵是列上保存的 UUID），
-// 再於 transaction 內填上外部 ID 並排入同步 job。已經有外部 ID、已進入失敗、擁有者已關閉時什麼都不做。暫時性的失敗回傳錯誤由 River 退避重試；
+// Ensure 是建立 job 的內容：先讀本地列，確認擁有者營運中（Owners），在 transaction 外讀擁有者目前的聯絡信箱（D50）並呼叫 provider 建立外部帳戶
+// （冪等鍵是列上保存的 UUID），再於 transaction 內填上外部 ID 並排入同步 job。已經有外部 ID、已進入失敗、擁有者已關閉時什麼都不做。擁有者沒有聯絡信箱
+// 時不呼叫 provider，視為永久失敗（重試不會憑空生出信箱；擁有者補填之後由管理員重試建立）。暫時性的失敗回傳錯誤由 River 退避重試；
 // final 為 true（最後一次嘗試）或失敗是永久的時，記下建立失敗的時刻（進後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED）並結束。
 func (s *Service) Ensure(ctx context.Context, storeID int64, final bool) error {
 	p := s.d.Provider
@@ -162,9 +163,19 @@ func (s *Service) Ensure(ctx context.Context, storeID int64, final bool) error {
 	if !active {
 		return nil
 	}
-	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
-	defer cancel()
-	externalID, callErr := p.EnsureAccount(callCtx, EnsureInput{StoreID: storeID, IdempotencyKey: row.CreateIdempotencyKey.String(), ContactEmail: row.ContactEmail, Collection: model.RequirementCollection(row.RequirementCollection)})
+	email, hasEmail, err := s.d.Owners.OwnerContactEmail(ctx, storeID)
+	if err != nil {
+		return err
+	}
+	var externalID string
+	var callErr error
+	if hasEmail {
+		callCtx, cancel := context.WithTimeout(ctx, callTimeout)
+		defer cancel()
+		externalID, callErr = p.EnsureAccount(callCtx, EnsureInput{StoreID: storeID, IdempotencyKey: row.CreateIdempotencyKey.String(), ContactEmail: email, Collection: model.RequirementCollection(row.RequirementCollection)})
+	} else {
+		callErr = fmt.Errorf("%w：擁有者沒有可用的聯絡信箱", ErrPermanent)
+	}
 	permanent := errors.Is(callErr, ErrPermanent)
 	if callErr != nil && !permanent && !final {
 		return callErr
@@ -203,8 +214,8 @@ func (s *Service) Capabilities() (caps Capabilities, ok bool) {
 	return s.d.Provider.Capabilities(), true
 }
 
-// ForgetOwners 在呼叫方（擁有者個資清理）的 transaction 內排入刪除這些擁有者帳戶列的 job：呼叫方已鎖住上層的列，不在同一個 transaction
-// 等下層 payment 的列（platform/lockorder），刪除由本模組的 job 在自己的 transaction 做。沒有 ID 時什麼都不做。
+// ForgetOwners 在呼叫方（擁有者個資清理）的 transaction 內，為每個擁有者排入「關閉外部帳戶後刪除帳戶列」的 job（唯一鍵 store_id）：呼叫方已鎖住上層的列，
+// 不在同一個 transaction 等下層 payment 的列（platform/lockorder），關閉與刪除由本模組的 job 做。沒有 ID 時什麼都不做。
 func (s *Service) ForgetOwners(ctx context.Context, storeIDs []int64) error {
 	if len(storeIDs) == 0 {
 		return nil
@@ -212,16 +223,95 @@ func (s *Service) ForgetOwners(ctx context.Context, storeIDs []int64) error {
 	if err := model.Positive(storeIDs...); err != nil {
 		return err
 	}
-	args := PurgeArgs{StoreIDs: storeIDs}
-	opts := args.InsertOpts()
-	return s.d.Jobs.Enqueue(ctx, args, &opts)
+	for _, id := range storeIDs {
+		if err := enqueuePurge(ctx, s.d.Jobs, id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-// Purge 是刪除 job 的內容：同一個 transaction 刪掉這些擁有者的帳戶列（含聯絡信箱），並把它們外部帳戶在 inbox 裡到現在為止的未處理事件標為已處理
-// （帳戶不在了，不會再有同步涵蓋它們；不標記的話 platform 的清理永遠不刪，原始 payload 一直留著）。inbox 列之後由 platform 的清理依保存期刪除。
-func (s *Service) Purge(ctx context.Context, storeIDs []int64) error {
-	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		rows, err := store.New(s.d.DB.Conn(ctx)).DeletePaymentAccounts(ctx, storeIDs)
+// purgePlan 是清理一列的處理方式。
+type purgePlan int
+
+const (
+	// purgeDelete 是直接刪列：還沒有外部帳戶。
+	purgeDelete purgePlan = iota
+	// purgeClose 是先關閉外部帳戶，成功才刪列。
+	purgeClose
+	// purgeDefer 是不動外部帳戶也不刪列：列的 provider 與目前設定的不同，或沒有設定 provider（刪掉就永遠找不到外部帳戶）。
+	purgeDefer
+)
+
+// planPurge 決定清理一列的處理方式；provider 是目前設定的 provider 代碼，沒有設定時是空字串。沒有外部 ID 的列不論 provider 都直接刪。
+func planPurge(row store.PaymentAccount, provider string) purgePlan {
+	switch {
+	case row.ExternalAccountID == nil:
+		return purgeDelete
+	case provider == "" || row.Provider != provider:
+		return purgeDefer
+	default:
+		return purgeClose
+	}
+}
+
+// Purge 是「關閉後刪除」job 的內容（D52）：沒有外部 ID 的列直接刪；有外部帳戶時在 transaction 外關閉它（冪等：已關閉視為成功），成功之後才在同一個
+// transaction 刪掉列，並把它外部帳戶在 inbox 裡到現在為止的未處理事件標為已處理（帳戶不在了，不會再有同步涵蓋它們；不標記的話 platform 的清理永遠不刪，
+// 原始 payload 一直留著；inbox 列之後由 platform 的清理依保存期刪除）。列的 provider 與目前設定不同、或沒有設定 provider 時不關也不刪，記警示 log 並標成
+// 等待關閉（close_deferred_at），設定回來之後由週期掃描重排。暫時性的失敗回傳錯誤由 River 退避重試；final 為 true（最後一次嘗試）或失敗是永久的
+// （例如金流商沒有這個帳戶，重試不會成功）時，本地列留著、標成等待關閉並記警示 log（store_id 與外部帳戶 ID）；週期掃描之後重排。
+func (s *Service) Purge(ctx context.Context, storeID int64, final bool) error {
+	row, err := store.New(s.d.DB.Conn(ctx)).PaymentAccountByStore(ctx, storeID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	provider := ""
+	if s.d.Provider != nil {
+		provider = s.d.Provider.Name()
+	}
+	switch planPurge(row, provider) {
+	case purgeDelete:
+		return s.deleteRow(ctx, storeID, nil)
+	case purgeDefer:
+		s.d.Logger.WarnContext(ctx, "payment：收款帳戶的 provider 與目前設定不同，沒有關閉外部帳戶也沒有刪除，等設定回來再清理", "store_id", storeID, "external_account_id", *row.ExternalAccountID, "row_provider", row.Provider, "configured_provider", provider)
+		return s.deferClose(ctx, storeID)
+	case purgeClose:
+	}
+	external := *row.ExternalAccountID
+	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
+	defer cancel()
+	callErr := s.d.Provider.CloseAccount(callCtx, external)
+	if callErr == nil {
+		return s.deleteRow(ctx, storeID, &external)
+	}
+	permanent := errors.Is(callErr, ErrPermanent)
+	if !permanent && !final {
+		return callErr
+	}
+	s.d.Logger.WarnContext(ctx, "payment：關閉外部帳戶失敗，本地列留著等週期掃描重排", "store_id", storeID, "external_account_id", external, "permanent", permanent, "error", callErr)
+	return s.deferClose(ctx, storeID)
+}
+
+// deleteRow 刪掉擁有者的列；external 不是 nil 時要求列上的外部 ID 還是它（關閉成功的就是這個帳戶）。
+func (s *Service) deleteRow(ctx context.Context, storeID int64, external *string) error {
+	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
+	defer cancel()
+	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
+		q := store.New(s.d.DB.Conn(ctx))
+		locked, err := q.LockPaymentAccount(ctx, storeID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if external != nil && (locked.ExternalAccountID == nil || *locked.ExternalAccountID != *external) {
+			return nil
+		}
+		rows, err := q.DeletePaymentAccounts(ctx, []int64{storeID})
 		if err != nil || s.d.Inbox == nil {
 			return err
 		}
@@ -235,5 +325,22 @@ func (s *Service) Purge(ctx context.Context, storeIDs []int64) error {
 			}
 		}
 		return nil
+	})
+}
+
+// deferClose 把列標成等待關閉（記下時刻，已標過的保留最早的），排除在同步輪詢之外。
+func (s *Service) deferClose(ctx context.Context, storeID int64) error {
+	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
+	defer cancel()
+	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
+		q := store.New(s.d.DB.Conn(ctx))
+		if _, err := q.LockPaymentAccount(ctx, storeID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			return err
+		}
+		_, err := q.MarkPaymentAccountCloseDeferred(ctx, store.MarkPaymentAccountCloseDeferredParams{StoreID: storeID, Now: s.d.Now().UTC()})
+		return err
 	})
 }

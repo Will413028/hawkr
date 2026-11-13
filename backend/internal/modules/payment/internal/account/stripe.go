@@ -113,6 +113,14 @@ func (s *Stripe) FetchAccount(ctx context.Context, externalID string) (Snapshot,
 	return snap, nil
 }
 
+// CloseAccount 實作 Provider。
+func (s *Stripe) CloseAccount(ctx context.Context, externalID string) error {
+	if externalID == "" {
+		return fmt.Errorf("%w：缺少外部帳戶 ID", ErrPermanent)
+	}
+	return classify(s.client.CloseAccount(ctx, externalID))
+}
+
 // ParseEvent 實作 Provider。
 func (s *Stripe) ParseEvent(header http.Header, body []byte) (Event, error) {
 	ev, err := s.client.ParseEvent(header, body)

@@ -373,3 +373,27 @@ func TestStripeFetchFillsBankFingerprintsAndFailsWholeWhenTheListFails(t *testin
 		t.Fatalf("4xx 的列表錯誤是永久失敗：%v", err)
 	}
 }
+
+// 關閉：不存在的帳戶與空 ID 是永久失敗，暫時性的 5xx 是一般錯誤（job 重試），成功回 nil。
+func TestStripeCloseAccountClassifiesErrors(t *testing.T) {
+	p := stripeProvider(t, model.CollectionProvider, fixtureResponder(t, "retrieve_not_found"))
+	if err := p.CloseAccount(context.Background(), "acct_doesnotexist000"); !errors.Is(err, ErrPermanent) {
+		t.Fatalf("不存在的帳戶：%v", err)
+	}
+	if err := p.CloseAccount(context.Background(), ""); !errors.Is(err, ErrPermanent) {
+		t.Fatalf("空的帳戶 ID：%v", err)
+	}
+	down := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":{"message":"down"}}`))
+	}))
+	if err := down.CloseAccount(context.Background(), "acct_1"); err == nil || errors.Is(err, ErrPermanent) {
+		t.Fatalf("5xx：%v，預期一般錯誤", err)
+	}
+	ok := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"id":"acct_1","object":"v2.core.account","closed":true,"applied_configurations":["recipient"]}`))
+	}))
+	if err := ok.CloseAccount(context.Background(), "acct_1"); err != nil {
+		t.Fatalf("成功的關閉：%v", err)
+	}
+}
