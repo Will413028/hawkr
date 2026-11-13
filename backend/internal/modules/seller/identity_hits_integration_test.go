@@ -262,8 +262,9 @@ func TestEffectiveNoticeTerminationCarriesNoIdentityEffect(t *testing.T) {
 // 回傳處分與命中的帳號。
 func (f *fixture) gainedIdentities(t *testing.T, sanction func(storeID int64) Measure) (m Measure, accountO, accountR int64) {
 	t.Helper()
-	accountS, storeS := f.open(t)
-	f.savedDraft(t, companyDraft(accountS, taxIDOne))
+	_, storeS, subS := f.submittedCompany(t, taxIDOne)
+	must(t, approve(f, subS))
+	f.setPayment(t, storeS.StoreID, enabledSnapshot)
 	accountO, _ = f.approvedWithFingerprints(t, fpShared)
 	accountR, storeR := f.open(t)
 	f.savedDraft(t, companyDraft(accountR, taxIDTwo))

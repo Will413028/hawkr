@@ -219,18 +219,31 @@ func TestMeasureIdentityMatchesUsesTheHashIndexes(t *testing.T) {
 		}
 		return nil
 	}))
-	for _, table := range []string{"stores", "account_identity_hashes", "measure_identities"} {
+	f.seedHistory(t, 3000, 0, 6000, 6000, 0, 0)
+	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO seller.measure_identities (measure_id, kind, key_id, hash)
+		SELECT m.id, k.kind, 'test1', decode(md5(m.id::text || k.kind) || md5(k.kind || m.id::text), 'hex')
+		FROM seller.measures m, (VALUES ('TAX_ID'), ('BANK_ACCOUNT')) k(kind) WHERE m.created_by_admin_id = 1`)
+	must(t, err)
+	for _, table := range []string{"stores", "account_identity_hashes", "measures", "measure_identities"} {
 		_, err := f.db.Conn(ctx).Exec(ctx, "ANALYZE seller."+table)
 		must(t, err)
 	}
 	rec := &recorder{inner: f.db.Conn(ctx)}
-	_, err := store.New(rec).MeasureIdentityMatches(ctx, store.MeasureIdentityMatchesParams{At: f.now, Hashes: [][]byte{[]byte("no-such-hash")}, AccountID: 0})
+	_, err = store.New(rec).MeasureIdentityMatches(ctx, store.MeasureIdentityMatchesParams{At: f.now, Hashes: [][]byte{[]byte("no-such-hash")}, AccountID: 0})
 	must(t, err)
 	plan := f.explain(t, rec)
 	t.Logf("MeasureIdentityMatches：\n%s", plan)
 	for _, table := range []string{"account_identity_hashes", "measure_identities"} {
 		if strings.Contains(plan, "Seq Scan on "+table) {
 			t.Errorf("不得掃描整張 %s：\n%s", table, plan)
+		}
+	}
+	if !regexp.MustCompile(`Index (Only )?Scan using measure_identities_hash on measure_identities`).MatchString(plan) {
+		t.Errorf("快照那一段要以 measure_identities_hash 索引查找：\n%s", plan)
+	}
+	for _, scan := range []string{"Seq Scan on measures", "Bitmap Heap Scan on measures", "measures_active_open", "measures_active_timed"} {
+		if strings.Contains(plan, scan) {
+			t.Errorf("措施只能由命中的 hash 驅動探測，不得先掃生效中的措施（%s）：\n%s", scan, plan)
 		}
 	}
 }
