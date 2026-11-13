@@ -280,10 +280,10 @@
     - 停止條件：命中的定義無法與 `LinkedAccountHits` 共用同一份條件，或 RPC 需要新的權限種類而 SSOT 沒寫歸屬，停下回報。
     - 已知限制：處分建立後，受處分帳號自己新同步的 fingerprint 不會進快照（`SnapshotMeasureIdentities` 只在建立時複製），所以比不到；由 8e 處理（D46）。測試模式的銀行帳號只有幾個，本機示範時多數店家會命中（D45 原列的失敗條件）。
   - [ ] **8e. 命中的定義涵蓋受處分帳號目前的雜湊**（被擋於：8d；D46 已決）
-    - 範圍：第一步先寫 integration 測試證明前提：帳號在生效中的停權、終止合作之下，收款帳戶的同步仍會寫入新的 fingerprint。前提不成立（處分後同步不會發生）就停下回報，本步驟取消。成立時：命中的定義改成「處分的快照，加上受處分帳號目前還在 `account_identity_hashes` 的雜湊」，只改共用的 view `seller.measure_identity_hits`（新 migration），同步與快照的寫入都不加；送出與核准申請時的比對 `MeasureIdentityMatches` 改讀同一份定義，「命中」只有一個定義。統編與銀行 fingerprint 都適用。快照留著：它讓處分在雜湊 5 年到期刪除後仍比得到。
+    - 範圍：第一步先寫 integration 測試證明前提：帳號在生效中的停權、終止合作之下，收款帳戶的同步仍會寫入新的 fingerprint。前提不成立（處分後同步不會發生）就停下回報，本步驟取消。成立時（前提已由 `6f549677` 的測試證明）：命中的定義改成「在 at 生效、而且帶身分效果的處分的快照，加上受處分帳號目前還在 `account_identity_hashes` 的雜湊」。共用的 view `seller.measure_identity_hits` 改成帶時間的函式（新 migration）：目前的雜湊沒有快照「處分結束就刪」的壽命，view 拿不到時間，只改 view 的話已結束、已撤銷的處分會繼續命中。「帶身分效果的處分」（停權，以及非預告的終止合作；預告終止不禁止日後重新申請）的規則只寫在 SQL 一處，快照的寫入與讀取端都讀它，Go 的 `takeEffect` 不再自己判斷（D47）。同步不加寫入；送出與核准申請時的比對 `MeasureIdentityMatches` 改讀同一份定義，「命中」只有一個定義。命中的時間是兩邊雜湊都存在的那一刻（快照那一半是對方雜湊的寫入時間，目前雜湊那一半取兩筆寫入時間較晚的）。統編與銀行 fingerprint 都適用。快照留著：它讓處分在雜湊 5 年到期刪除後仍比得到。
     - 消費端：`git grep -n -E 'measure_identities|measure_identity_hits|MeasureIdentityMatches|LinkedAccountHits|BankFingerprintHitExists' -- backend/internal ':!**/migrations/**' ':!**/store/*.sql.go'`，逐一寫去向。
-    - 不能動：`RecordBankFingerprints`、`writeHashes`、`SnapshotMeasureIdentities` 的寫入；不得自動處分（`TestSharedProviderBankFingerprintIsListedButNeverTerminates`）；8d 的待辦成員條件（時間條件仍以這一對最早的命中與處分建立時間比較）。
-    - 驗收：integration：處分建立後受處分帳號新同步的 fingerprint，與別的帳號相同時，處分頁的關聯帳號列出它、待辦產生一筆；受處分帳號新增的統編同理列為關聯；申請送出與核准時的比對命中同一批；快照裡有、目前雜湊已刪的仍命中（mutation：view 拿掉目前雜湊的那一半、`MeasureIdentityMatches` 改回只讀快照，各自測試要失敗）；既有關聯終止與 8d 的測試不變；其餘同 8a。
+    - 不能動：`RecordBankFingerprints`、`writeHashes` 的寫入；`SnapshotMeasureIdentities` 寫入的內容與時機（哪些處分取快照改由 D47 的 SQL 規則決定，結果不變）；不得自動處分（`TestSharedProviderBankFingerprintIsListedButNeverTerminates`）；8d 的待辦成員條件（時間條件仍以這一對最早的命中與處分建立時間比較）。
+    - 驗收：integration：處分建立後受處分帳號新同步的 fingerprint，與別的帳號相同時，處分頁的關聯帳號列出它、待辦產生一筆；受處分帳號新增的統編同理列為關聯；申請送出與核准時的比對命中同一批；快照裡有、目前雜湊已刪的仍命中（mutation：view 拿掉目前雜湊的那一半、`MeasureIdentityMatches` 改回只讀快照，各自測試要失敗）；預告終止的帳號新增的雜湊不命中、不擋別人送出（mutation：SQL 規則拿掉預告終止的排除，測試要失敗）；處分撤銷或到期後目前雜湊那一半不再命中；既有關聯終止與 8d 的測試不變；其餘同 8a。
     - 停止條件：前提不成立；或合併後 `LinkedAccountHits` 在既有測試的資料上結果改變而原因不是新涵蓋的雜湊。
   - [ ] **8c. 去向與驗收**（被擋於：8b、8d、8e；D41 已決）
     - 範圍：建立 `check_inventory.py` 並填完 `payuni-inventory.md` 的去向；允許清單逐筆核對；`backend/docs/第三方整合/` 的檔頭；CARRYOVER；賣家指南、FAQ、landing 的事實修正（D40）；之後開 `payment-onboarding` → `main` 的 PR。
@@ -365,7 +365,8 @@
 - **D43 平台審核退回的通知事件**（2026-11-12，Will 確認後果；D18 已涵蓋）：一起停發；A8 的需求加「平台審核結果的通知」。
 - **D44 物流用的商店代號**（2026-11-12，Will 確認後果）：回空值，見前提段。
 - **D45 共用銀行帳號的提醒**（已決 2026-11-12，Will，採建議；擋住：8b；新增 8d）：建議刪申請上的旗標，改在 fingerprint 同步時比對處分快照並產生審核待辦（選這個時另加子步驟 8d）。（2026-11-13 修訂，Will，採建議：後台待辦是推導的、不儲存，所以提醒的成員由 seller 的 SQL 推導，只存「已檢視」的處置與一支標記的 RPC，同步時不寫入；未採：純推導並限時消失、另存提醒列（業界做法，歷史現在沒有讀者，手寫開關是待辦 ADR 拒絕的形狀）、不做。細節見步驟 8d）
-- **D46 受處分帳號事後新增的雜湊**（已決 2026-11-13，Will，採建議；新增 8e）：命中的定義在讀取端併入受處分帳號目前的雜湊，另開子步驟 8e，不放進 8d。快照存在的理由是保存期（雜湊 5 年到期、終止合作是永久的），不是凍結在處分當下。未採：同步時補寫快照（統編與 fingerprint 兩個寫入點，漏一個就默默少比對）；不補（停權中的店家在 Stripe 換銀行帳號後，共用新帳號的第三個帳號比不到）。推翻條件：處分後同步不會發生（8e 第一步驗證）。
+- **D46 受處分帳號事後新增的雜湊**（已決 2026-11-13，Will，採建議；新增 8e）：命中的定義在讀取端併入受處分帳號目前的雜湊，另開子步驟 8e，不放進 8d。快照存在的理由是保存期（雜湊 5 年到期、終止合作是永久的），不是凍結在處分當下。未採：同步時補寫快照（統編與 fingerprint 兩個寫入點，漏一個就默默少比對）；不補（停權中的店家在 Stripe 換銀行帳號後，共用新帳號的第三個帳號比不到）。推翻條件：處分後同步不會發生（8e 第一步驗證；`6f549677` 的測試證明會發生）。
+- **D47 「帶身分效果的處分」的規則放哪裡**（已決 2026-11-13，Will，採建議；8e 開工時發現）：預告終止刻意不取快照，讀取端併入目前雜湊時必須排除它。規則只留在 SQL，快照的寫入也讀它，Go 不再判斷。未採：SQL 再寫一份、以資料集測試鎖住和 Go 一致（兩份規則靠測試對齊，違反 D46「命中只有一個定義」）。同一次確認：命中從 view 改成帶時間的函式（理由見 8e 範圍）。
 
 ## 進度
 
