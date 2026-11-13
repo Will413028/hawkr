@@ -1,7 +1,7 @@
 {
   "status": 200,
   "body": {
-    "id": "acct_1UXUVeEfy6as5ms7",
+    "id": "acct_1UbMbREpWhcqRxKs",
     "object": "v2.core.account",
     "applied_configurations": [
       "recipient"
@@ -14,33 +14,31 @@
         "applied": true,
         "capabilities": {
           "bank_accounts": {
+            "ach": null,
+            "fedwire": null,
+            "fps": null,
             "local": null,
-            "wire": null
+            "rtp": null,
+            "sepa": null,
+            "swift": null
           },
           "cards": null,
-          "crypto_wallets": null,
           "stripe_balance": {
             "payouts": {
-              "status": "restricted",
-              "status_details": [
-                {
-                  "code": "requirements_past_due",
-                  "resolution": "provide_info"
-                }
-              ]
+              "status": "active",
+              "status_details": []
             },
             "stripe_transfers": {
               "status": "active",
               "status_details": []
             }
           }
-        },
-        "default_outbound_destination": null
+        }
       }
     },
     "contact_email": "<EMAIL-MASKED>",
     "contact_phone": null,
-    "created": "2026-11-02T23:19:29.000Z",
+    "created": "2026-11-13T15:41:27.000Z",
     "dashboard": "none",
     "identity": {
       "attestations": {
@@ -79,9 +77,9 @@
       "country": "US",
       "entity_type": "individual",
       "individual": {
-        "id": "person_test_61VgsTHb4lagc3yiBA6VgsT1Q9SQjxjXyFbkJOI5gBsO",
+        "id": "person_test_61VkkZ1Mv69ilsBRtA6VkkYnPsSQhDgdska5Fy9N21kW",
         "object": "v2.core.account_person",
-        "account": "acct_1UXUVeEfy6as5ms7",
+        "account": "acct_1UbMbREpWhcqRxKs",
         "additional_addresses": [],
         "additional_names": null,
         "additional_terms_of_service": null,
@@ -94,7 +92,7 @@
           "state": "<MASKED>",
           "town": null
         },
-        "created": "2026-11-02T23:19:43.000Z",
+        "created": "2026-11-13T15:41:39.000Z",
         "date_of_birth": {
           "day": 1,
           "month": 1,
@@ -126,7 +124,7 @@
         "script_addresses": null,
         "script_names": null,
         "surname": "Rosen",
-        "updated": "2026-11-02T23:19:43.000Z"
+        "updated": "2026-11-13T15:41:40.000Z"
       }
     },
     "defaults": {
@@ -142,13 +140,13 @@
         "fees_collector": "application",
         "losses_collector": "application",
         "requirements_collector": "application"
-      },
-      "timezone": null
+      }
     },
     "display_name": "Spike Store",
     "future_requirements": null,
     "metadata": {},
     "requirements": {
+      "alternatives": [],
       "entries": [],
       "summary": null
     },

@@ -24,7 +24,8 @@ var _ Provider = (*Stripe)(nil)
 
 const whsecret = "whsec_test"
 
-var clock = time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
+// clock 是測試開始時的真實時間：SDK 以系統時間驗 webhook 簽章的時間戳。
+var clock = time.Now()
 
 // fixtures 是 platform/stripe/testdata 的實測回應（{status, body}，遮罩過）。
 func fixtureResponder(t *testing.T, name string) http.HandlerFunc {
@@ -51,7 +52,7 @@ func stripeProvider(t *testing.T, collection model.RequirementCollection, h http
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	c, err := stripe.New(stripe.Config{
-		BaseURL: srv.URL, SecretKey: "sk_test_x", WebhookSecret: whsecret, Now: func() time.Time { return clock },
+		BaseURL: srv.URL, SecretKey: "sk_test_x", WebhookSecret: whsecret,
 		Wait: func(context.Context, time.Duration) error { return nil },
 	})
 	if err != nil {

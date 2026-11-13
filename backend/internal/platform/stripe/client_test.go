@@ -7,12 +7,15 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	sdk "github.com/stripe/stripe-go/v87"
 )
 
 type fixture struct {
@@ -33,12 +36,23 @@ func loadFixture(t *testing.T, name string) fixture {
 	return f
 }
 
+func (f fixture) object(t *testing.T) map[string]any {
+	t.Helper()
+	var m map[string]any
+	if err := json.Unmarshal(f.Body, &m); err != nil {
+		t.Fatal(err)
+	}
+	return m
+}
+
 type recorded struct {
-	Method, URI, ContentType, Version, Idempotency, User string
-	Body                                                 string
+	Method, URI, ContentType, Version, Idempotency, Authorization string
+	Body                                                          string
+	Header                                                        http.Header
 }
 
 type stub struct {
+	t    *testing.T
 	mu   sync.Mutex
 	reqs []recorded
 	resp func(n int) (int, string, http.Header)
@@ -46,11 +60,13 @@ type stub struct {
 
 func (s *stub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	body, _ := io.ReadAll(r.Body)
-	user, _, _ := r.BasicAuth()
 	s.mu.Lock()
-	s.reqs = append(s.reqs, recorded{r.Method, r.URL.RequestURI(), r.Header.Get("Content-Type"), r.Header.Get("Stripe-Version"), r.Header.Get("Idempotency-Key"), user, string(body)})
+	s.reqs = append(s.reqs, recorded{r.Method, r.URL.RequestURI(), r.Header.Get("Content-Type"), r.Header.Get("Stripe-Version"), r.Header.Get("Idempotency-Key"), r.Header.Get("Authorization"), string(body), r.Header.Clone()})
 	n := len(s.reqs)
 	s.mu.Unlock()
+	if v := r.Header.Get("Stripe-Version"); v != sdk.APIVersion {
+		s.t.Errorf("Stripe-Version %q，預期 SDK 釘住的 %q", v, sdk.APIVersion)
+	}
 	status, out, hdr := s.resp(n)
 	for k, v := range hdr {
 		w.Header()[k] = v
@@ -73,6 +89,7 @@ const testSecret = "whsec_test"
 
 func newTestClient(t *testing.T, s *stub, mutate ...func(*Config)) *Client {
 	t.Helper()
+	s.t = t
 	srv := httptest.NewServer(s)
 	t.Cleanup(srv.Close)
 	cfg := Config{BaseURL: srv.URL, SecretKey: "sk_test_x", WebhookSecret: testSecret, Wait: func(context.Context, time.Duration) error { return nil }}
@@ -100,11 +117,11 @@ func TestCreateAccountSendsTheSpikeBodyForBothDashboards(t *testing.T) {
 		s := &stub{resp: replay(loadFixture(t, fx))}
 		c := newTestClient(t, s)
 		id, err := c.CreateAccount(context.Background(), "42", dash, "seller@example.com")
-		if err != nil || !strings.HasPrefix(id, "acct_") {
+		if err != nil || id != loadFixture(t, fx).object(t)["id"] || !strings.HasPrefix(id, "acct_") {
 			t.Fatalf("%s：id=%q err=%v", dash, id, err)
 		}
 		r := s.requests()[0]
-		if r.Method != "POST" || r.URI != "/v2/core/accounts" || r.Version != APIVersion || r.Idempotency != "42" || r.User != "sk_test_x" || r.ContentType != "application/json" {
+		if r.Method != "POST" || r.URI != "/v2/core/accounts" || r.Idempotency != "42" || r.Authorization != "Bearer sk_test_x" || !strings.HasPrefix(r.ContentType, "application/json") {
 			t.Errorf("%s：請求 %+v", dash, r)
 		}
 		got := decode(t, r.Body)
@@ -156,22 +173,34 @@ func TestOnlyAnIdempotencyMismatchConflictIsPermanent(t *testing.T) {
 }
 
 func TestRetrieveAccountSendsIncludesAndKeepsOnlyTheOnboardingFields(t *testing.T) {
-	s := &stub{resp: replay(loadFixture(t, "retrieve_provider_new"))}
+	fx := loadFixture(t, "retrieve_provider_new")
+	s := &stub{resp: replay(fx)}
 	a, err := newTestClient(t, s).RetrieveAccount(context.Background(), "acct_1UXO50EWUjgLkPE9")
 	if err != nil {
 		t.Fatal(err)
 	}
 	r := s.requests()[0]
-	if r.Method != "GET" || r.URI != "/v2/core/accounts/acct_1UXO50EWUjgLkPE9?include=configuration.recipient&include=requirements" || r.Version != APIVersion || r.Body != "" {
+	u, perr := url.Parse(r.URI)
+	if perr != nil || r.Method != "GET" || u.Path != "/v2/core/accounts/acct_1UXO50EWUjgLkPE9" || r.Body != "" ||
+		u.Query().Get("include[0]") != "configuration.recipient" || u.Query().Get("include[1]") != "requirements" || len(u.Query()) != 2 {
 		t.Errorf("請求 %+v", r)
 	}
-	wantDetails := []StatusDetail{{Code: "requirements_past_due", Resolution: "provide_info"}}
-	if a.Transfers.Status != "restricted" || !jsonEqual(a.Transfers.Details, wantDetails) || a.Payouts.Status != "restricted" {
-		t.Errorf("能力 %+v / %+v", a.Transfers, a.Payouts)
+	body := fx.object(t)
+	bal := body["configuration"].(map[string]any)["recipient"].(map[string]any)["capabilities"].(map[string]any)["stripe_balance"].(map[string]any)
+	wantTransfers := bal["stripe_transfers"].(map[string]any)
+	wantPayouts := bal["payouts"].(map[string]any)
+	if a.ID != body["id"] || a.Transfers.Status != wantTransfers["status"] || !jsonEqual(a.Transfers.Details, wantTransfers["status_details"]) ||
+		a.Payouts.Status != wantPayouts["status"] || !jsonEqual(a.Payouts.Details, wantPayouts["status_details"]) {
+		t.Errorf("帳戶 %+v", a)
 	}
-	req := decode(t, string(a.Requirements))
-	if _, ok := req["entries"]; !ok {
-		t.Errorf("requirements 不是原始物件：%s", a.Requirements)
+	if len(a.Transfers.Details) == 0 {
+		t.Fatalf("fixture 沒有 status_details，細節沒被驗到")
+	}
+	if !jsonEqual(decode(t, string(a.Requirements)), body["requirements"]) {
+		t.Errorf("requirements 不是回應本文裡的原始物件：%s", a.Requirements)
+	}
+	if _, ok := decode(t, string(a.Requirements))["entries"]; !ok {
+		t.Errorf("requirements 缺 entries：%s", a.Requirements)
 	}
 }
 
@@ -199,39 +228,49 @@ func TestRetrieveNotFoundFixtureIsAPermanentAPIError(t *testing.T) {
 }
 
 func TestAccountSessionIsFormEncodedAndReturnsTheClientSecret(t *testing.T) {
-	s := &stub{resp: replay(loadFixture(t, "account_session_platform"))}
+	fx := loadFixture(t, "account_session_platform")
+	s := &stub{resp: replay(fx)}
 	sess, err := newTestClient(t, s).CreateAccountSession(context.Background(), "acct_1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	r := s.requests()[0]
-	if r.Method != "POST" || r.URI != "/v1/account_sessions" || r.ContentType != "application/x-www-form-urlencoded" || r.Version != APIVersionV1 {
+	if r.Method != "POST" || r.URI != "/v1/account_sessions" || r.ContentType != "application/x-www-form-urlencoded" {
 		t.Errorf("請求 %+v", r)
 	}
-	if r.Body != "account=acct_1&components%5Baccount_onboarding%5D%5Benabled%5D=true&components%5Baccount_onboarding%5D%5Bfeatures%5D%5Bdisable_stripe_user_authentication%5D=true" {
+	form, perr := url.ParseQuery(r.Body)
+	want := url.Values{
+		"account": {"acct_1"},
+		"components[account_onboarding][enabled]":                                      {"true"},
+		"components[account_onboarding][features][disable_stripe_user_authentication]": {"true"},
+	}
+	if perr != nil || !jsonEqual(form, want) {
 		t.Errorf("本文 %q", r.Body)
 	}
-	if sess.ClientSecret != "<CLIENT-SECRET-MASKED>" || sess.ExpiresAt == nil || sess.ExpiresAt.Unix() != 1793661693 {
+	body := fx.object(t)
+	if sess.ClientSecret != body["client_secret"] || sess.ExpiresAt == nil || sess.ExpiresAt.Unix() != int64(body["expires_at"].(float64)) || sess.ExpiresAt.Location() != time.UTC {
 		t.Errorf("session %+v", sess)
 	}
 }
 
 // 回應是 sandbox 錄下的 account_link_platform；請求形狀是這個測試要守的。
 func TestAccountLinkRequestHasNoConfigurationsField(t *testing.T) {
-	s := &stub{resp: replay(loadFixture(t, "account_link_platform"))}
+	fx := loadFixture(t, "account_link_platform")
+	s := &stub{resp: replay(fx)}
 	link, err := newTestClient(t, s).CreateAccountLink(context.Background(), "acct_1", "https://app.test/return", "https://app.test/refresh")
 	if err != nil {
 		t.Fatal(err)
 	}
 	r := s.requests()[0]
-	if r.Method != "POST" || r.URI != "/v2/core/account_links" || r.Version != APIVersion || r.ContentType != "application/json" || r.Idempotency != "" {
+	if r.Method != "POST" || r.URI != "/v2/core/account_links" || !strings.HasPrefix(r.ContentType, "application/json") {
 		t.Errorf("請求 %+v", r)
 	}
 	want := decode(t, `{"account":"acct_1","use_case":{"type":"account_onboarding","account_onboarding":{"return_url":"https://app.test/return","refresh_url":"https://app.test/refresh"}}}`)
 	if !jsonEqual(decode(t, r.Body), want) || strings.Contains(r.Body, "configurations") {
 		t.Errorf("本文 %s", r.Body)
 	}
-	if link.URL != "<MASKED>" || link.ExpiresAt == nil || !link.ExpiresAt.Equal(time.Date(2026, 11, 2, 23, 24, 33, 0, time.UTC)) {
+	wantExpiry, terr := time.Parse(time.RFC3339, fx.object(t)["expires_at"].(string))
+	if terr != nil || link.URL != fx.object(t)["url"] || link.ExpiresAt == nil || !link.ExpiresAt.Equal(wantExpiry) {
 		t.Errorf("link %+v", link)
 	}
 }
@@ -305,6 +344,66 @@ func TestServerErrorsAreNotRetriedInsideTheClientAndAreNotPermanent(t *testing.T
 	}
 }
 
+// 帶 Stripe-Should-Retry: true 的 409 與 5xx 是 SDK 預設會自動重試的情況；這裡一律只送一次，重試交給呼叫方。
+func TestSDKAutomaticRetriesAreDisabled(t *testing.T) {
+	for name, resp := range map[string]func(int) (int, string, http.Header){
+		"409 in use": func(int) (int, string, http.Header) { return 409, `{"error":{"code":"idempotency_key_in_use"}}`, nil },
+		"500 should retry": func(int) (int, string, http.Header) {
+			return 500, `{"error":{}}`, http.Header{"Stripe-Should-Retry": {"true"}}
+		},
+	} {
+		s := &stub{resp: resp}
+		_, err := newTestClient(t, s).CreateAccount(context.Background(), "k", DashboardNone, "a@example.com")
+		var api *APIError
+		if !errors.As(err, &api) || len(s.requests()) != 1 {
+			t.Errorf("%s：err=%v 請求=%d", name, err, len(s.requests()))
+		}
+	}
+}
+
+func TestConnectionFailureIsNotRetriedAndIsNotAnAPIError(t *testing.T) {
+	var mu sync.Mutex
+	hits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		hits++
+		mu.Unlock()
+		conn, _, err := w.(http.Hijacker).Hijack()
+		if err == nil {
+			_ = conn.Close()
+		}
+	}))
+	t.Cleanup(srv.Close)
+	c, err := New(Config{BaseURL: srv.URL, SecretKey: "sk_test_x", WebhookSecret: testSecret})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.RetrieveAccount(context.Background(), "acct_1")
+	var api *APIError
+	mu.Lock()
+	defer mu.Unlock()
+	if err == nil || errors.As(err, &api) || hits != 1 {
+		t.Fatalf("err=%v 請求=%d", err, hits)
+	}
+}
+
+func TestNoTelemetryHeaderIsSent(t *testing.T) {
+	s := &stub{resp: func(int) (int, string, http.Header) { return 200, `{}`, nil }}
+	c := newTestClient(t, s)
+	for range 2 {
+		_, _ = c.CreateAccountSession(context.Background(), "a")
+	}
+	reqs := s.requests()
+	if len(reqs) != 2 {
+		t.Fatalf("請求 %d", len(reqs))
+	}
+	for _, r := range reqs {
+		if v := r.Header.Get("X-Stripe-Client-Telemetry"); v != "" {
+			t.Errorf("送了遙測：%s", v)
+		}
+	}
+}
+
 func TestEveryCallRunsUnderTheConfiguredDeadline(t *testing.T) {
 	release := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
@@ -340,8 +439,8 @@ func TestNewRejectsMissingSecretsAndBadBaseURL(t *testing.T) {
 	}
 }
 
-// ListBankAccountFingerprints 帶 v1 版本與 bank_account 篩選，回傳回應裡每個項目的 fingerprint（期望值從 fixture 讀，不寫死）。
-// mutation：版本改用 APIVersion、不帶 object=bank_account、或回傳 last4 → 本測試失敗。
+// ListBankAccountFingerprints 帶 bank_account 篩選，回傳回應裡每個項目的 fingerprint（期望值從 fixture 讀，不寫死）。
+// mutation：不帶 object=bank_account、或回傳 last4 → 本測試失敗。
 func TestListBankAccountFingerprintsReadsTheFingerprintFieldOnTheV1Version(t *testing.T) {
 	fx := loadFixture(t, "external_accounts_bank")
 	var list struct {
@@ -358,7 +457,7 @@ func TestListBankAccountFingerprintsReadsTheFingerprintFieldOnTheV1Version(t *te
 		t.Fatalf("got=%v err=%v", got, err)
 	}
 	r := s.requests()
-	if len(r) != 1 || r[0].Method != "GET" || r[0].Version != APIVersionV1 || r[0].Body != "" ||
+	if len(r) != 1 || r[0].Method != "GET" || r[0].Body != "" ||
 		r[0].URI != "/v1/accounts/acct_1/external_accounts?limit=100&object=bank_account" {
 		t.Errorf("請求 %+v", r)
 	}
@@ -401,6 +500,74 @@ func TestListBankAccountFingerprintsPropagatesErrorsAndRejectsAnUnfollowablePage
 	}
 	s = &stub{resp: func(int) (int, string, http.Header) { return 200, `{"has_more":true,"data":[]}`, nil }}
 	if _, err := newTestClient(t, s).ListBankAccountFingerprints(context.Background(), "acct_1"); err == nil || len(s.requests()) != 1 {
+		t.Fatalf("err=%v 請求=%d", err, len(s.requests()))
+	}
+}
+
+func closeFixtureBody(closed bool) string {
+	if closed {
+		return `{"id":"acct_1","object":"v2.core.account","closed":true,"applied_configurations":["recipient"]}`
+	}
+	return `{"id":"acct_1","object":"v2.core.account","closed":false,"applied_configurations":["recipient"]}`
+}
+
+const forbiddenBody = `{"error":{"code":"forbidden","message":"closed"}}`
+
+func TestCloseAccountPostsTheRecipientConfiguration(t *testing.T) {
+	s := &stub{resp: func(int) (int, string, http.Header) { return 200, closeFixtureBody(true), nil }}
+	if err := newTestClient(t, s).CloseAccount(context.Background(), "acct_1"); err != nil {
+		t.Fatal(err)
+	}
+	reqs := s.requests()
+	if len(reqs) != 1 || reqs[0].Method != "POST" || reqs[0].URI != "/v2/core/accounts/acct_1/close" || !strings.HasPrefix(reqs[0].ContentType, "application/json") ||
+		!jsonEqual(decode(t, reqs[0].Body), map[string]any{"applied_configurations": []any{"recipient"}}) {
+		t.Fatalf("請求 %+v", reqs)
+	}
+}
+
+// 已關閉的帳戶再關回 403：讀帳戶，closed 為真才算成功。
+func TestCloseAccountOnAnAlreadyClosedAccountSucceedsOnlyWhenTheAccountIsClosed(t *testing.T) {
+	s := &stub{resp: func(n int) (int, string, http.Header) {
+		if n == 1 {
+			return 403, forbiddenBody, nil
+		}
+		return 200, closeFixtureBody(true), nil
+	}}
+	if err := newTestClient(t, s).CloseAccount(context.Background(), "acct_1"); err != nil {
+		t.Fatalf("err=%v", err)
+	}
+	reqs := s.requests()
+	if len(reqs) != 2 || reqs[1].Method != "GET" || !strings.HasPrefix(reqs[1].URI, "/v2/core/accounts/acct_1") || strings.HasSuffix(reqs[1].URI, "/close") {
+		t.Fatalf("請求 %+v", reqs)
+	}
+}
+
+func TestCloseAccountForbiddenOnAnOpenAccountReturnsTheOriginalError(t *testing.T) {
+	for name, second := range map[string]func() (int, string){
+		"帳戶沒關":        func() (int, string) { return 200, closeFixtureBody(false) },
+		"讀帳戶也失敗":      func() (int, string) { return 503, `{"error":{"message":"down"}}` },
+		"回應沒有 closed": func() (int, string) { return 200, `{"id":"acct_1"}` },
+	} {
+		s := &stub{resp: func(n int) (int, string, http.Header) {
+			if n == 1 {
+				return 403, forbiddenBody, nil
+			}
+			status, body := second()
+			return status, body, nil
+		}}
+		err := newTestClient(t, s).CloseAccount(context.Background(), "acct_1")
+		var api *APIError
+		if !errors.As(err, &api) || api.Status != 403 || api.Code != "forbidden" || len(s.requests()) != 2 {
+			t.Errorf("%s：err=%v 請求=%d", name, err, len(s.requests()))
+		}
+	}
+}
+
+func TestCloseAccountUnknownIDIsAPermanentErrorWithoutALookup(t *testing.T) {
+	s := &stub{resp: replay(loadFixture(t, "retrieve_not_found"))}
+	err := newTestClient(t, s).CloseAccount(context.Background(), "acct_doesnotexist000")
+	var api *APIError
+	if !errors.As(err, &api) || api.Status != 400 || !api.Permanent() || len(s.requests()) != 1 {
 		t.Fatalf("err=%v 請求=%d", err, len(s.requests()))
 	}
 }

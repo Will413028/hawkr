@@ -1,22 +1,20 @@
 package stripe
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
+
+	sdk "github.com/stripe/stripe-go/v87"
 )
 
-// SignatureTolerance 是簽章時間戳與現在的最大差距。
+// SignatureTolerance 是簽章時間戳與現在的最大差距（SDK 只拒絕過舊的時間戳）。
 const SignatureTolerance = 300 * time.Second
 
-// ErrSignature 標示簽章缺漏、格式錯、時間超出容許或不符。
+// ErrSignature 標示簽章缺漏、格式錯、時間戳過舊或不符。
 var ErrSignature = errors.New("stripe：簽章驗證失敗")
 
 // ErrMalformed 標示簽章正確但事件本文不合格式（缺 id 或相關物件）。
@@ -33,69 +31,44 @@ type AccountEvent struct {
 
 const accountObjectType = "v2.core.account"
 
-// ParseEvent 驗 Stripe-Signature（`t=…,v1=…`，HMAC-SHA256 對 `{t}.{本文}`，任一 v1 相符即可，時間差在 SignatureTolerance 內）後，
-// 只收 type 為 v2.core.account.* 或 v2.core.account[…].* 而且 related_object.type 為 v2.core.account 的 thin event。
+// ParseEvent 以 SDK 的 ParseEventNotification 驗 Stripe-Signature（時間戳容許 SignatureTolerance，任一 v1 相符即可）並解析 thin event 後，
+// 只收 type 為 v2.core.account.* 或 v2.core.account[…].* 而且 related_object.type 為 v2.core.account 的事件。
 func (c *Client) ParseEvent(header http.Header, body []byte) (AccountEvent, error) {
-	if err := c.verify(header.Get("Stripe-Signature"), body); err != nil {
-		return AccountEvent{}, err
-	}
-	var ev struct {
-		ID            string `json:"id"`
-		Type          string `json:"type"`
-		RelatedObject struct {
-			ID   string `json:"id"`
-			Type string `json:"type"`
-		} `json:"related_object"`
-	}
-	if err := json.Unmarshal(body, &ev); err != nil {
+	n, err := c.sdk.ParseEventNotification(body, header.Get("Stripe-Signature"), c.whsecret, sdk.WithTolerance(SignatureTolerance))
+	if err != nil {
+		switch {
+		case errors.Is(err, sdk.ErrWebhookEmptySecret), errors.Is(err, sdk.ErrWebhookInvalidHeader), errors.Is(err, sdk.ErrWebhookNoValidSignature),
+			errors.Is(err, sdk.ErrWebhookNotSigned), errors.Is(err, sdk.ErrWebhookTooOld):
+			return AccountEvent{}, fmt.Errorf("%w：%w", ErrSignature, err)
+		}
+		var obj struct {
+			Object string `json:"object"`
+		}
+		if json.Unmarshal(body, &obj) == nil && obj.Object == "event" {
+			return AccountEvent{}, fmt.Errorf("%w：snapshot 事件", ErrNotHandled)
+		}
 		return AccountEvent{}, fmt.Errorf("%w：%w", ErrMalformed, err)
 	}
+	ev := n.GetEventNotification()
 	if ev.ID == "" || ev.Type == "" {
 		return AccountEvent{}, fmt.Errorf("%w：缺少 id 或 type", ErrMalformed)
 	}
-	if !accountEventType(ev.Type) || ev.RelatedObject.Type != accountObjectType {
+	var related struct {
+		RelatedObject sdk.V2CoreEventRelatedObject `json:"related_object"`
+	}
+	if err := json.Unmarshal(body, &related); err != nil {
+		return AccountEvent{}, fmt.Errorf("%w：%w", ErrMalformed, err)
+	}
+	if !accountEventType(ev.Type) || related.RelatedObject.Type != accountObjectType {
 		return AccountEvent{}, fmt.Errorf("%w：%s", ErrNotHandled, ev.Type)
 	}
-	if ev.RelatedObject.ID == "" {
+	if related.RelatedObject.ID == "" {
 		return AccountEvent{}, fmt.Errorf("%w：缺少 related_object.id", ErrMalformed)
 	}
-	return AccountEvent{ID: ev.ID, AccountID: ev.RelatedObject.ID}, nil
+	return AccountEvent{ID: ev.ID, AccountID: related.RelatedObject.ID}, nil
 }
 
 func accountEventType(t string) bool {
 	rest, ok := strings.CutPrefix(t, accountObjectType)
 	return ok && (strings.HasPrefix(rest, ".") || strings.HasPrefix(rest, "["))
-}
-
-func (c *Client) verify(header string, body []byte) error {
-	var ts string
-	var sigs []string
-	for _, part := range strings.Split(header, ",") {
-		k, v, ok := strings.Cut(strings.TrimSpace(part), "=")
-		switch {
-		case !ok:
-		case k == "t":
-			ts = v
-		case k == "v1":
-			sigs = append(sigs, v)
-		}
-	}
-	sec, err := strconv.ParseInt(ts, 10, 64)
-	if err != nil || len(sigs) == 0 {
-		return fmt.Errorf("%w：標頭缺少 t 或 v1", ErrSignature)
-	}
-	if d := c.now().Sub(time.Unix(sec, 0)); d > SignatureTolerance || d < -SignatureTolerance {
-		return fmt.Errorf("%w：時間戳超出容許範圍", ErrSignature)
-	}
-	mac := hmac.New(sha256.New, []byte(c.whsecret))
-	mac.Write([]byte(ts + "."))
-	mac.Write(body)
-	want := mac.Sum(nil)
-	for _, s := range sigs {
-		got, err := hex.DecodeString(s)
-		if err == nil && hmac.Equal(got, want) {
-			return nil
-		}
-	}
-	return fmt.Errorf("%w：簽章不符", ErrSignature)
 }

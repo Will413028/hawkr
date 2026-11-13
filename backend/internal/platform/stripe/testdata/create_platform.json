@@ -1,7 +1,7 @@
 {
   "status": 200,
   "body": {
-    "id": "acct_1UXUVeEfy6as5ms7",
+    "id": "acct_1UbMbREpWhcqRxKs",
     "object": "v2.core.account",
     "applied_configurations": [
       "recipient"
@@ -14,11 +14,15 @@
         "applied": true,
         "capabilities": {
           "bank_accounts": {
+            "ach": null,
+            "fedwire": null,
+            "fps": null,
             "local": null,
-            "wire": null
+            "rtp": null,
+            "sepa": null,
+            "swift": null
           },
           "cards": null,
-          "crypto_wallets": null,
           "stripe_balance": {
             "payouts": {
               "status": "restricted",
@@ -39,13 +43,12 @@
               ]
             }
           }
-        },
-        "default_outbound_destination": null
+        }
       }
     },
     "contact_email": "<EMAIL-MASKED>",
     "contact_phone": null,
-    "created": "2026-11-02T23:19:29.000Z",
+    "created": "2026-11-13T15:41:27.000Z",
     "dashboard": "none",
     "identity": {
       "attestations": {
@@ -80,13 +83,13 @@
         "fees_collector": "application",
         "losses_collector": "application",
         "requirements_collector": "application"
-      },
-      "timezone": null
+      }
     },
     "display_name": "Spike Store",
     "future_requirements": null,
     "metadata": {},
     "requirements": {
+      "alternatives": [],
       "entries": [
         {
           "awaiting_action_from": "user",

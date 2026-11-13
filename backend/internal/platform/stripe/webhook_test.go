@@ -12,11 +12,12 @@ import (
 	"time"
 )
 
-var clock = time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
+// clock 是測試開始時的真實時間：SDK 以系統時間驗時間戳，所以簽章用它起算，邊界測試離容許值留 10 秒餘裕。
+var clock = time.Now()
 
 func webhookClient(t *testing.T) *Client {
 	t.Helper()
-	c, err := New(Config{SecretKey: "sk_test_x", WebhookSecret: testSecret, Now: func() time.Time { return clock }})
+	c, err := New(Config{SecretKey: "sk_test_x", WebhookSecret: testSecret})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,8 +69,8 @@ func TestParseEventRejectsBadSignatures(t *testing.T) {
 		"沒有 t":      {"Stripe-Signature": {"v1=" + good}},
 		"t 不是數字":    {"Stripe-Signature": {"t=abc,v1=" + good}},
 		"v1 不是 hex": header(clock, "zz"),
-		"時間戳太舊":     header(clock.Add(-SignatureTolerance-time.Second), sign(testSecret, clock.Add(-SignatureTolerance-time.Second), body)),
-		"時間戳太新":     header(clock.Add(SignatureTolerance+time.Second), sign(testSecret, clock.Add(SignatureTolerance+time.Second), body)),
+		"本文空白":      header(clock, sign(testSecret, clock, "")),
+		"時間戳太舊":     header(clock.Add(-SignatureTolerance-10*time.Second), sign(testSecret, clock.Add(-SignatureTolerance-10*time.Second), body)),
 	} {
 		if _, err := webhookClient(t).ParseEvent(h, []byte(body)); !errors.Is(err, ErrSignature) {
 			t.Errorf("%s：err=%v", name, err)
@@ -79,9 +80,9 @@ func TestParseEventRejectsBadSignatures(t *testing.T) {
 
 func TestParseEventToleranceBoundaryAndMultipleV1(t *testing.T) {
 	body := eventBody("evt_1", "v2.core.account.created", "acct_1", "v2.core.account")
-	edge := clock.Add(-SignatureTolerance)
-	if _, err := webhookClient(t).ParseEvent(header(edge, sign(testSecret, edge, body)), []byte(body)); err != nil {
-		t.Errorf("剛好在容許邊界：%v", err)
+	inside := clock.Add(-SignatureTolerance + 10*time.Second)
+	if _, err := webhookClient(t).ParseEvent(header(inside, sign(testSecret, inside, body)), []byte(body)); err != nil {
+		t.Errorf("容許範圍內：%v", err)
 	}
 	h := header(clock, sign("whsec_rotated_out", clock, body), sign(testSecret, clock, body))
 	if _, err := webhookClient(t).ParseEvent(h, []byte(body)); err != nil {
@@ -120,5 +121,16 @@ func TestParseEventRejectsSignedButMalformedBodies(t *testing.T) {
 		if !errors.Is(err, ErrMalformed) {
 			t.Errorf("%s：err=%v", name, err)
 		}
+	}
+}
+
+func TestParseEventSnapshotEventsAreNotHandled(t *testing.T) {
+	body := `{"id":"evt_1","object":"event","type":"account.updated","data":{"object":{"id":"acct_1"}}}`
+	_, err := webhookClient(t).ParseEvent(header(clock, sign(testSecret, clock, body)), []byte(body))
+	if !errors.Is(err, ErrNotHandled) {
+		t.Errorf("err=%v", err)
+	}
+	if _, err := webhookClient(t).ParseEvent(header(clock, sign("whsec_other", clock, body)), []byte(body)); !errors.Is(err, ErrSignature) {
+		t.Errorf("簽章不符：%v", err)
 	}
 }
