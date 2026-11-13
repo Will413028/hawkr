@@ -19,11 +19,32 @@ func TestPaymentProviderConfig(t *testing.T) {
 	if p, err := readPaymentWith(nil); p != nil || err != nil {
 		t.Errorf("沒有設定：%v %v", p, err)
 	}
-	if p, err := readPaymentWith(map[string]string{"PAYMENT_PROVIDER": "fake"}); p == nil || err != nil {
-		t.Errorf("fake：%v %v", p, err)
-	}
 	if _, err := readPaymentWith(map[string]string{"PAYMENT_PROVIDER": "unsupported"}); err == nil || !strings.Contains(err.Error(), "PAYMENT_PROVIDER") {
 		t.Errorf("不認得的 provider：%v", err)
+	}
+}
+
+// fake provider 只能在 dev 環境（requireDevEnvironment 成立）選到：沒有 dev 金鑰、或 dev 金鑰與 Cloudflare Access 設定並存都讓啟動失敗。
+func TestFakePaymentProviderOnlyInDevEnvironment(t *testing.T) {
+	keyFile := writeDevKey(t)
+	access := map[string]string{"CF_ACCESS_TEAM_DOMAIN": "https://team.cloudflareaccess.com", "CF_ACCESS_ADMIN_AUD": "aud"}
+	env := func(kv map[string]string) map[string]string {
+		m := map[string]string{"PAYMENT_PROVIDER": "fake"}
+		for k, v := range kv {
+			m[k] = v
+		}
+		return m
+	}
+	if p, err := readPaymentWith(env(nil)); err == nil || !strings.Contains(err.Error(), "PAYMENT_PROVIDER") {
+		t.Errorf("fake 沒有 dev 金鑰必須讓啟動失敗：%v %v", p, err)
+	}
+	withAccess := env(access)
+	withAccess["DEV_AUTH_KEY_FILE"] = keyFile
+	if p, err := readPaymentWith(withAccess); err == nil || !strings.Contains(err.Error(), "PAYMENT_PROVIDER") {
+		t.Errorf("fake 在有 Cloudflare Access 的環境必須讓啟動失敗：%v %v", p, err)
+	}
+	if p, err := readPaymentWith(env(map[string]string{"DEV_AUTH_KEY_FILE": keyFile})); p == nil || err != nil {
+		t.Errorf("fake 在 dev 環境：%v %v", p, err)
 	}
 }
 

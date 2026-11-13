@@ -22,7 +22,7 @@ import (
 )
 
 // readPayment 讀收款開通的 provider：PAYMENT_PROVIDER 為空表示沒有設定（核准不建立收款帳戶，開通相關的方法回 failed_precondition），
-// fake 是記憶體內的 provider（所有帳戶都回轉帳能力已啟用，只給本機開發），stripe 是 Stripe Connect（Accounts v2）；其他值讓啟動失敗。
+// fake 是記憶體內的 provider（所有帳戶都回轉帳能力已啟用，只能在 requireDevEnvironment 成立的 dev 環境選到，否則啟動失敗），stripe 是 Stripe Connect（Accounts v2）；其他值讓啟動失敗。
 // stripe 讀 STRIPE_SECRET_KEY（沒有設定時等於沒有 provider，serve 照常啟動）、STRIPE_WEBHOOK_SECRET（有金鑰卻沒有它，啟動失敗）與
 // STRIPE_REQUIREMENT_COLLECTION（provider 是 Stripe 收件、託管頁面，預設；platform 是平台收件、內嵌元件；其他值啟動失敗）。
 func readPayment(e *config.Env, log *slog.Logger) payment.Provider {
@@ -31,6 +31,10 @@ func readPayment(e *config.Env, log *slog.Logger) payment.Provider {
 		log.Warn("收款開通沒有設定：核准後不會建立收款帳戶，店家不會通過開通閘門")
 		return nil
 	case "fake":
+		if err := requireDevEnvironment(e); err != nil {
+			e.Fail("PAYMENT_PROVIDER=fake 只能在 dev 環境選到：%v", err)
+			return nil
+		}
 		fake := payment.NewFake()
 		fake.AutoActive = true
 		return fake

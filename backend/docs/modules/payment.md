@@ -51,5 +51,5 @@ payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monoli
 
 ## 8. 已知限制
 
-- `PAYMENT_ACCOUNT_CREATE_FAILED` 不再排除已關閉的店家（payment 不讀 seller 的店家狀態）：關閉店家的待辦由管理員「重試建立」清掉，建立 job 會因擁有者不在營運中而略過。
+- `PAYMENT_ACCOUNT_CREATE_FAILED` 不再排除已關閉的店家（payment 不讀 seller 的店家狀態）：關閉店家的待辦由管理員「重試建立」清掉，建立 job 會因擁有者不在營運中而略過。觸發：上線前，或後台待辦出現已關閉店家時。
 - 本機種子（`dev-seed`）以 fake provider 走正式的建立與同步；店家已有別的 provider 的帳戶時種子不改它，只印出提醒。
