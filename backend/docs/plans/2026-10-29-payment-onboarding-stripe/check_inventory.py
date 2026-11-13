@@ -29,7 +29,7 @@ EXPECTED_G11_ROWS = 7
 
 def is_empty_dest(value):
     v = value.strip().strip("`*").strip()
-    return v == "" or v.upper() == "TBD"
+    return v == "" or re.match(r"TBD(?![A-Za-z0-9_])", v, re.I) is not None
 
 
 def check_inventory(path):
@@ -101,9 +101,6 @@ class Ctx:
             lines, names = reserved_line_numbers(proto.read_text(encoding="utf-8"))
             self.reserved_lines[rel] = lines
             self.reserved_names |= names
-
-
-TOKEN = re.compile(r"[A-Za-z0-9_]*payuni[A-Za-z0-9_]*", re.I)
 
 
 def r_proto_reserved(ctx, path, no, text):
