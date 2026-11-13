@@ -200,3 +200,33 @@ func TestSharedBankAccountStoreIsTheSameAsTheLinkedAccountRow(t *testing.T) {
 		t.Fatalf("待辦的店家 %s、關聯帳號的店家 %d，預期都是最近的 stint %d（不是 %d）", ptrStr(items[0].StoreID), linked[0].StoreID, second.StoreID, firstStint.StoreID)
 	}
 }
+
+// 處分建立之前這一對就已命中的帳號，之後同一個 fingerprint 再多出較晚的列（金鑰輪替之後補上新金鑰的列）也不進待辦：
+// 時間條件看這一對全部命中列的最早寫入時間，不逐列過濾。
+// mutation：把 HAVING min(h.created_at) > m.created_at 改回逐列的 WHERE h.created_at > m.created_at → 較晚的新金鑰列單獨通過，這裡出現一筆。
+func TestSharedBankAccountHitBeforeTheSanctionStaysOutWhenLaterRowsAppear(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	_, sS := f.approvedWithFingerprints(t, fpShared)
+	f.tick(time.Hour)
+	_, sO := f.approvedWithFingerprints(t, fpShared)
+	if n := f.fingerprintRows(t, sO.StoreID); n != 1 {
+		t.Fatalf("前提：輪替前一把金鑰一列：%d", n)
+	}
+	f.tick(time.Hour)
+	f.module = f.newModuleWithKeys(t, f.jobs, rotatedMAC(t))
+	f.terminate(t, sS.StoreID, GroundFraud)
+	f.tick(time.Hour)
+	if items := f.sharedBankItems(t); len(items) != 0 {
+		t.Fatalf("前提：處分前已命中的不進待辦：%+v", items)
+	}
+	snap := enabledSnapshot
+	snap.BankFingerprints = []string{fpShared}
+	f.setPayment(t, sO.StoreID, snap)
+	if n := f.fingerprintRows(t, sO.StoreID); n != 2 {
+		t.Fatalf("前提：處分之後補上新金鑰的一列（較晚的命中）：%d", n)
+	}
+	if items := f.sharedBankItems(t); len(items) != 0 {
+		t.Fatalf("最早的命中早於處分建立，較晚多出的列不讓這一對進待辦：%+v", items)
+	}
+}

@@ -17,10 +17,11 @@ BEGIN ATOMIC
         FROM seller.effective_measures(at) e
         JOIN seller.measures m ON m.id = e.id
         JOIN seller.measure_identity_hits h ON h.measure_id = m.id
-        WHERE h.field = 'BANK_FINGERPRINT' AND h.account_id <> m.account_id AND h.created_at > m.created_at
+        WHERE h.field = 'BANK_FINGERPRINT' AND h.account_id <> m.account_id
           AND NOT EXISTS (SELECT 1 FROM seller.effective_measures(at) x WHERE x.account_id = h.account_id)
           AND NOT EXISTS (SELECT 1 FROM seller.measure_linked_reviews r WHERE r.measure_id = m.id AND r.account_id = h.account_id)
-        GROUP BY m.id, h.account_id
+        GROUP BY m.id, m.created_at, h.account_id
+        HAVING min(h.created_at) > m.created_at
     ) p
     CROSS JOIN LATERAL (
         SELECT s.store_id, s.store_name

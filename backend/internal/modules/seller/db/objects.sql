@@ -259,9 +259,10 @@ BEGIN ATOMIC
 END;
 
 -- SHARED_BANK_ACCOUNT 共用銀行帳號：處分（在 effective_measures(at)）建立之後，別的帳號才同步了與被處分帳號相同的銀行帳號 fingerprint
--- （measure_identity_hits 的 BANK_FINGERPRINT 命中，fingerprint 的寫入時間晚於處分的建立時間：建立時已命中的，處分頁的關聯帳號已看得到，不進待辦）。
+-- （measure_identity_hits 的 BANK_FINGERPRINT 命中：這一對全部命中列裡最早的 fingerprint 寫入時間晚於處分的建立時間；最早的命中早於或等於處分建立的，處分頁的關聯帳號已看得到，
+-- 之後關店重開的新 stint 或補金鑰多出較晚的列也不進待辦）。
 -- 一對（處分、命中的帳號）一列，多把金鑰不重複；命中的帳號自己有生效中的處分時不列；這一對已有 measure_linked_reviews（已檢視）時不列。
--- 開始是這一對最早一筆符合條件的 fingerprint 寫入時間，期限 168 小時。店家是命中帳號最近的 stint（store_id 最大的，含已關閉；與處分頁關聯帳號的店家相同），
+-- 開始是這一對全部銀行 fingerprint 命中列的最早寫入時間，期限 168 小時。店家是命中帳號最近的 stint（store_id 最大的，含已關閉；與處分頁關聯帳號的店家相同），
 -- 對象的鍵是 measure_id/account_id（item_id 同種類內唯一）。只列出、不自動處分。
 CREATE FUNCTION seller.review_shared_bank_account(at TIMESTAMPTZ) RETURNS SETOF seller.review_item
 LANGUAGE sql STABLE
@@ -274,10 +275,11 @@ BEGIN ATOMIC
         FROM seller.effective_measures(at) e
         JOIN seller.measures m ON m.id = e.id
         JOIN seller.measure_identity_hits h ON h.measure_id = m.id
-        WHERE h.field = 'BANK_FINGERPRINT' AND h.account_id <> m.account_id AND h.created_at > m.created_at
+        WHERE h.field = 'BANK_FINGERPRINT' AND h.account_id <> m.account_id
           AND NOT EXISTS (SELECT 1 FROM seller.effective_measures(at) x WHERE x.account_id = h.account_id)
           AND NOT EXISTS (SELECT 1 FROM seller.measure_linked_reviews r WHERE r.measure_id = m.id AND r.account_id = h.account_id)
-        GROUP BY m.id, h.account_id
+        GROUP BY m.id, m.created_at, h.account_id
+        HAVING min(h.created_at) > m.created_at
     ) p
     CROSS JOIN LATERAL (
         SELECT s.store_id, s.store_name

@@ -73,7 +73,7 @@ func TestPubReviewItemsIsTheUnionOfTheReviewFunctions(t *testing.T) {
 		for _, r := range pub {
 			set, ok := pubSets[r.Kind]
 			if !ok {
-				t.Errorf("%s：pub_review_items 有不在 11 種裡的種類 %q（%s）", tt.name, r.Kind, r.ItemID)
+				t.Errorf("%s：pub_review_items 有不在 10 種裡的種類 %q（%s）", tt.name, r.Kind, r.ItemID)
 				continue
 			}
 			if _, dup := set[r.ItemID]; dup {
@@ -116,9 +116,9 @@ func TestPubReviewItemsIsTheUnionOfTheReviewFunctions(t *testing.T) {
 			}
 		}
 		if len(pub) != total {
-			t.Errorf("%s：pub_review_items %d 列，11 支函式合計 %d 列", tt.name, len(pub), total)
+			t.Errorf("%s：pub_review_items %d 列，10 支函式合計 %d 列", tt.name, len(pub), total)
 		}
-		// 11 種都有期限（E3）：due_at、start_at 沒有 NULL，期限不早於開始。
+		// 10 種都有期限（E3）：due_at、start_at 沒有 NULL，期限不早於開始。
 		for _, r := range pub {
 			if r.Start == nil || r.Due == nil || r.Due.Before(*r.Start) {
 				t.Errorf("%s：%s %s 的開始 %s、期限 %s", tt.name, r.Kind, r.ItemID, fmtTime(r.Start), fmtTime(r.Due))

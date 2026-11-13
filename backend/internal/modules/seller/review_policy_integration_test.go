@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -31,6 +32,7 @@ var reviewKinds = []struct{ kind, fn string }{
 	{"MEASURE_LIFT_REQUEST", "review_measure_lift_request"},
 	{"MEASURE_REVIEW", "review_measure_review"},
 	{"KYC_APPLICATION", "review_kyc_application"},
+	{"SHARED_BANK_ACCOUNT", "review_shared_bank_account"},
 }
 
 // reviewRow 是函式的一列（seller.review_item 的欄位）。
@@ -328,6 +330,19 @@ func newReviewWorld(t *testing.T, f *fixture) *reviewWorld {
 	accountK3, _ := f.open(t)
 	f.savedDraft(t, kycDraft(accountK3))
 
+	// 共用銀行帳號：處分建立之後才同步同一個 fingerprint 的帳號 O 是成員（開始是它最早的 fingerprint 寫入時間，期限 168 小時）；
+	// 處分建立之前就已同步的 P、fingerprint 不同的 N 不是。
+	f.tick(hour)
+	_, sBankS := f.approvedWithFingerprints(t, fpShared)
+	f.approvedWithFingerprints(t, fpShared)
+	f.tick(hour)
+	bankMeasure := f.terminate(t, sBankS.StoreID, GroundFraud)
+	f.tick(hour)
+	accountBankO, sBankO := f.approvedWithFingerprints(t, fpShared)
+	f.approvedWithFingerprints(t, fpOther)
+	bankStart := f.firstFingerprintAt(t, sBankO.StoreID)
+	add("SHARED_BANK_ACCOUNT", bankMeasure.ID.String()+"/"+strconv.FormatInt(accountBankO, 10), sBankO.StoreID, bankStart, bankStart.Add(168*hour))
+
 	f.tick(hour)
 	w.at = f.now
 	return w
@@ -552,6 +567,23 @@ func (f *fixture) goReviewSets(t *testing.T) (sets map[string]map[string]bool, d
 		must(t, err)
 		for _, m := range page.Items {
 			sets["MEASURE_REVIEW"][m.ID.String()] = true
+		}
+		if page.Next == nil {
+			break
+		}
+		afterMeasure = page.Next
+	}
+	// 共用銀行帳號：處分頁關聯帳號列的「在待辦」旗標（sqlc 查詢路徑，與函式分開讀）。
+	afterMeasure = nil
+	for {
+		page, err := f.module.AdminMeasures(ctx, AdminMeasureListInput{PageSize: 3, After: afterMeasure})
+		must(t, err)
+		for _, m := range page.Items {
+			for _, l := range f.measureOf(t, m.ID).LinkedAccounts {
+				if l.SharedBankAccountPending {
+					sets["SHARED_BANK_ACCOUNT"][m.ID.String()+"/"+strconv.FormatInt(l.AccountID, 10)] = true
+				}
+			}
 		}
 		if page.Next == nil {
 			break
