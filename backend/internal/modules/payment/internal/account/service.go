@@ -87,7 +87,7 @@ func (s *Service) Configured() bool { return s.d.Provider != nil }
 // 資料庫產生建立用的冪等鍵 UUID。已有列時不改它（INSERT ON CONFLICT DO NOTHING：呼叫方已鎖住上層的列，不再等下層 payment 的既有列，
 // platform/lockorder），關店再開沿用同一個外部帳戶；既有列還沒有外部 ID、也沒有進入建立失敗時重新排入建立 job（唯一鍵合併）。
 // 聯絡信箱不在這裡讀也不存：建立 job 在呼叫 provider 的當下才向擁有者讀（D50）。這裡不呼叫 provider（規則 5）。
-// 沒有設定 provider 時什麼都不做。
+// 既有列已標記等待清理（purge_pending_at）時回 FailedPrecondition，呼叫方的核准隨之失敗。沒有設定 provider 時什麼都不做。
 func (s *Service) RequestAccount(ctx context.Context, storeID int64, now time.Time) error {
 	if s.d.Provider == nil {
 		return nil
@@ -106,10 +106,20 @@ func (s *Service) RequestAccount(ctx context.Context, storeID int64, now time.Ti
 	if err != nil {
 		return err
 	}
-	if !createWanted(row) {
-		return nil
+	enqueue, err := requestOutcome(row)
+	if err != nil || !enqueue {
+		return err
 	}
 	return enqueueEnsure(ctx, s.d.Jobs, storeID)
+}
+
+// requestOutcome 是 RequestAccount 讀到既有列後的決定：列已標記等待清理時回 FailedPrecondition（核准要等清理完成，不鎖也不改該列），
+// 否則回傳是否要排入建立 job。
+func requestOutcome(row store.PaymentAccount) (enqueue bool, err error) {
+	if row.PurgePendingAt != nil {
+		return false, apperr.FailedPrecondition("店家的收款帳戶正在清理中，等清理完成後才能核准")
+	}
+	return createWanted(row), nil
 }
 
 // ToModel 轉成對外的型別。

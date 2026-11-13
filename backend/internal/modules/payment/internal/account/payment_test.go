@@ -13,6 +13,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
@@ -258,5 +259,29 @@ func TestPurgeOfARowWithoutExternalIDStoresTheResolvedIDBeforeClosing(t *testing
 	}
 	if _, err := f.ResolveAccount(ctx, ResolveInput{StoreID: 1, IdempotencyKey: "k"}); !errors.Is(err, ErrPermanent) {
 		t.Fatalf("關閉之後重放同一把鍵應是永久失敗：%v", err)
+	}
+}
+
+// RequestAccount 讀到已標記等待清理的列回 FailedPrecondition 且不排建立 job；其餘列依 createWanted 決定。
+// mutation：已標記時回 nil → 已標記的案例失敗。
+func TestRequestOutcomeRejectsAMarkedRow(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	a := "acct_1"
+	for name, tc := range map[string]struct {
+		row     store.PaymentAccount
+		enqueue bool
+		fail    bool
+	}{
+		"沒有外部 ID":     {store.PaymentAccount{}, true, false},
+		"已有外部 ID":     {store.PaymentAccount{ExternalAccountID: &a}, false, false},
+		"建立失敗":        {store.PaymentAccount{CreateFailedAt: &now}, false, false},
+		"已標記、沒有外部 ID": {store.PaymentAccount{PurgePendingAt: &now}, false, true},
+		"已標記、有外部 ID":  {store.PaymentAccount{PurgePendingAt: &now, ExternalAccountID: &a}, false, true},
+	} {
+		enqueue, err := requestOutcome(tc.row)
+		if tc.fail != (apperr.KindOf(err) == apperr.KindFailedPrecondition) || (!tc.fail && err != nil) || enqueue != tc.enqueue {
+			t.Errorf("%s：enqueue=%v err=%v", name, enqueue, err)
+		}
 	}
 }

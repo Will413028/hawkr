@@ -1346,3 +1346,27 @@ func TestASellerRefreshRejectedByTheGuardQueuesASyncForLaterEvents(t *testing.T)
 		t.Fatal("有 job 在 transaction 外排入")
 	}
 }
+
+// 已標記等待清理的列：RequestAccount 回 FailedPrecondition，不排建立 job，也不改列（尚未本機執行，需要資料庫）。
+// mutation：已標記時回 nil → 沒有錯誤，失敗。
+func TestRequestOnAPurgePendingRowFailsWithoutTouchingIt(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	f.request(t, s, "owner@example.com")
+	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET purge_pending_at = $2 WHERE store_id = $1", s, f.now)
+	must(t, err)
+	before := f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_pending_at = $2 AND provider = 'fake'", s, f.now)
+	ensures := len(f.jobs.storeIDs(t, kindEnsure))
+	err = f.db.InTx(ctx, func(ctx context.Context) error { return f.module.RequestAccount(ctx, s, f.now.Add(time.Hour)) })
+	if apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("err=%v，預期 FailedPrecondition", err)
+	}
+	if got := len(f.jobs.storeIDs(t, kindEnsure)); got != ensures {
+		t.Fatalf("建立 job 從 %d 變成 %d", ensures, got)
+	}
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_pending_at = $2 AND provider = 'fake'", s, f.now) != before || before != 1 {
+		t.Fatal("既有列被改動")
+	}
+}
