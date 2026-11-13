@@ -1,5 +1,7 @@
 # PAYUNi 代理商專用 API 官方文檔（統整版）
 
+> **狀態**：Java 舊服務的現行規格，B 階段刪除。單體的賣家收款開通已改走 payment port（Stripe Connect），不再使用本文件。
+
 > **整合來源**：PAYUNi 開發專區「代理商專區」官方 API 文件 + Hawkr 實作對照
 > **最後更新**：2026-07-08
 > **涵蓋範圍**：多功能收付 (agent_fee) + 多功能收付交易查詢 (agent_fee_query) + 多功能收付批次上傳 (SFTP) + 撥款指示 (grant) + 撥款查詢 (grant_query) + 新增合作商店 (bind_merchant) + 修改合作商店 (update_merchant)

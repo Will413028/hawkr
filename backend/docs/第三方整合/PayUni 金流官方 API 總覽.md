@@ -1,5 +1,7 @@
 # PAYUNi 金流 API 官方文檔（統整版）
 
+> **狀態**：Java 舊服務的現行規格，B 階段刪除。單體的賣家收款開通已改走 payment port（Stripe Connect），不再使用本文件。
+
 > **整合來源**：PAYUNi 開發專區官方 API 文件
 > **最後更新**：2026-03-10
 > **涵蓋範圍**：整合式支付頁 UNiPaypage (UPP) + 虛擬帳號幕後 (ATM) + Apple Pay 幕後 + Google Pay 幕後

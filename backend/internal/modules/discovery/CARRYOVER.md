@@ -49,7 +49,7 @@ seller-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 
 - 新表 `discovery.seller_scores`；舊服務沒有排行的存續資料（欄位 `published_at` 取代 `opened_at`）。
 - 排序由營收改為公式 v1 的綜合分數；沒有補位路徑。
-- 候選從「營收前 3×limit」改為「全部合格店家」；曝光資格是 seller 的 `ExposableStores`（含 KYC、PayUni、停權、店家資料完整度），不再只看 status 與 PayUni。
+- 候選從「營收前 3×limit」改為「全部合格店家」；曝光資格是 seller 的 `ExposableStores`（含 KYC 核准、收款帳戶轉帳能力啟用、停權、店家資料完整度），不再只看 status 與 PayUni。
 - 回傳是店家 ID、近 30 天成立訂單數，以及快照的計算時間；評價與其餘顯示欄位由 httpapi 組裝。
 - limit 必須是 1 到 50，沒有預設值。
 - 新的上游：order 的 `ListStoreOrderStats`（Java 新增）、review 的 `ListStoreRatingStats`（review-service 新增的批次 RPC）；`REVIEW_SERVICE_ADDR` 是新的 worker 設定。
