@@ -134,3 +134,18 @@ func TestParseEventSnapshotEventsAreNotHandled(t *testing.T) {
 		t.Errorf("簽章不符：%v", err)
 	}
 }
+
+// 簽章正確但 SDK 的型別化結構解不了的事件，照舊分類：不是帳戶事件的 → ErrNotHandled；帳戶事件多了未知形狀的欄位 → 照常處理。只有簽章走 SDK。
+// mutation：改回以 SDK 的 ParseEventNotification 解析 → 兩個案例回 ErrMalformed，失敗。
+func TestParseEventLenientParseAfterSignatureForShapesTheSDKStructCannotDecode(t *testing.T) {
+	other := `{"id":"evt_1","object":"v2.core.event","type":"v2.billing.meter.error_report_triggered","created":123,"related_object":{"id":"mtr_1","type":"v2.billing.meter","url":7},"data":{"x":[1,2]}}`
+	_, err := webhookClient(t).ParseEvent(header(clock, sign(testSecret, clock, other)), []byte(other))
+	if !errors.Is(err, ErrNotHandled) {
+		t.Errorf("其他物件的事件：err=%v", err)
+	}
+	extra := `{"id":"evt_2","object":"v2.core.event","type":"v2.core.account.updated","created":{"unexpected":true},"livemode":"maybe","context":{"a":1},"reason":[1],"data":42,"related_object":{"id":"acct_1","type":"v2.core.account","url":9,"extra":{"k":1}}}`
+	ev, err := webhookClient(t).ParseEvent(header(clock, sign(testSecret, clock, extra)), []byte(extra))
+	if err != nil || ev.ID != "evt_2" || ev.AccountID != "acct_1" {
+		t.Errorf("帳戶事件多了未知欄位：%+v %v", ev, err)
+	}
+}

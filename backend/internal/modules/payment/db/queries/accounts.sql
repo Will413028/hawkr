@@ -68,13 +68,13 @@ RETURNING *;
 -- 並行的呼叫由列鎖序列化，後到的重新檢查條件而拿不到。同步 job 不經過這裡。
 UPDATE payment.accounts
 SET seller_read_claimed_at = sqlc.arg(now)
-WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NOT NULL AND close_deferred_at IS NULL
+WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NOT NULL AND purge_pending_at IS NULL
   AND (seller_read_claimed_at IS NULL OR seller_read_claimed_at <= sqlc.arg(stale_before))
   AND (fetched_at IS NULL OR fetched_at <= sqlc.arg(stale_before))
 RETURNING *;
 
 -- name: PollablePaymentAccountStoreIDs :many
--- 輪詢補漏（等待關閉的帳戶除外）：UNDER_REVIEW、ACTION_REQUIRED 的帳戶，DISABLED 但原因碼不是終局（rejected*、unsupported*）的帳戶（restricted 加 contact_stripe 或 no_resolution
+-- 輪詢補漏（等待清理的帳戶除外）：UNDER_REVIEW、ACTION_REQUIRED 的帳戶，DISABLED 但原因碼不是終局（rejected*、unsupported*）的帳戶（restricted 加 contact_stripe 或 no_resolution
 -- 可以被 Stripe 解除，掉了 webhook 時只有輪詢補得到；rejected 與 unsupported 不會再啟用，不輪詢），依 store_id 分批。inbox 有舊的未處理事件的帳戶由
 -- Sweep 經 platform inbox 的 StaleRoutes 另外找。
 SELECT a.store_id
@@ -83,16 +83,16 @@ WHERE (a.status IN ('UNDER_REVIEW', 'ACTION_REQUIRED')
        OR (a.status = 'DISABLED'
            AND (a.status_reason IS NULL
                 OR (a.status_reason NOT LIKE 'rejected%' AND a.status_reason NOT LIKE 'unsupported%'))))
-  AND a.close_deferred_at IS NULL
+  AND a.purge_pending_at IS NULL
   AND a.store_id > sqlc.arg(after_store_id)
 ORDER BY a.store_id
 LIMIT sqlc.arg(batch);
 
 -- name: PaymentAccountStoreIDsByExternal :many
--- 外部帳戶 ID 對應的擁有者（inbox 的路由鍵是外部帳戶 ID）；等待關閉的帳戶不排同步。
+-- 外部帳戶 ID 對應的擁有者（inbox 的路由鍵是外部帳戶 ID）；等待清理的帳戶不排同步。
 SELECT store_id
 FROM payment.accounts
-WHERE provider = sqlc.arg(provider) AND external_account_id = ANY(sqlc.arg(external_account_ids)::text[]) AND close_deferred_at IS NULL
+WHERE provider = sqlc.arg(provider) AND external_account_id = ANY(sqlc.arg(external_account_ids)::text[]) AND purge_pending_at IS NULL
 ORDER BY store_id;
 
 -- name: StalePaymentAccountCreateStoreIDs :many
@@ -111,17 +111,17 @@ DELETE FROM payment.accounts
 WHERE store_id = ANY(sqlc.arg(store_ids)::bigint[])
 RETURNING provider, external_account_id;
 
--- name: MarkPaymentAccountCloseDeferred :execrows
--- 擁有者清理時外部帳戶還沒關閉成功：記下時刻（已記過的保留最早的時刻）；沒有外部 ID 的列不寫。
+-- name: MarkPaymentAccountPurgePending :execrows
+-- 擁有者要求清理、外部帳戶還沒關閉：記下時刻（已記過的保留最早的時刻）；沒有外部 ID 的列不寫。
 UPDATE payment.accounts
-SET close_deferred_at = COALESCE(close_deferred_at, sqlc.arg(now)),
+SET purge_pending_at = COALESCE(purge_pending_at, sqlc.arg(now)),
     updated_at = sqlc.arg(now)
 WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NOT NULL;
 
--- name: CloseDeferredPaymentAccountStoreIDs :many
--- 週期掃描重排「關閉後刪除」用：等待關閉的帳戶，依 store_id 分批。
+-- name: PurgePendingPaymentAccountStoreIDs :many
+-- 週期掃描重排「關閉後刪除」用：等待清理的帳戶，依 store_id 分批。
 SELECT store_id
 FROM payment.accounts
-WHERE close_deferred_at IS NOT NULL AND store_id > sqlc.arg(after_store_id)
+WHERE purge_pending_at IS NOT NULL AND store_id > sqlc.arg(after_store_id)
 ORDER BY store_id
 LIMIT sqlc.arg(batch);

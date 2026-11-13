@@ -248,7 +248,7 @@ func (m *Module) SweepAccounts(ctx context.Context) (synced, ensured int, err er
 	return m.accounts.Sweep(ctx)
 }
 
-// PurgeAccount 是「關閉後刪除」job（payment.account_purge）的內容，給 worker 與測試呼叫；finalAttempt 為 true 時關閉失敗改記為等待關閉，本地列留著。
+// PurgeAccount 是「關閉後刪除」job（payment.account_purge）的內容，給 worker 與測試呼叫；finalAttempt 為 true 時關閉失敗只記警示 log，本地列（已標成等待清理）留著給週期掃描。
 func (m *Module) PurgeAccount(ctx context.Context, storeID int64, finalAttempt bool) error {
 	return m.accounts.Purge(ctx, storeID, finalAttempt)
 }

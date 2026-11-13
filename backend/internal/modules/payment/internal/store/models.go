@@ -26,5 +26,5 @@ type PaymentAccount struct {
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 	SellerReadClaimedAt   *time.Time
-	CloseDeferredAt       *time.Time
+	PurgePendingAt        *time.Time
 }

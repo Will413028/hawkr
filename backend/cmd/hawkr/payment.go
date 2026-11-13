@@ -90,20 +90,9 @@ type sellerOwners struct {
 
 func (o *sellerOwners) bind(m *seller.Module, id *identity.Module) { o.m, o.id = m, id }
 
-// OwnerContactEmail 回傳店家所屬帳號目前的聯絡信箱；店家不存在或帳號沒有可用的信箱時 ok 是 false。
+// OwnerContactEmail 回傳店家所屬帳號目前的聯絡信箱：由 seller 解析（與核准前的送審檢查同一個規則）；店家不存在或沒有可用的信箱時 ok 是 false。
 func (o *sellerOwners) OwnerContactEmail(ctx context.Context, storeID int64) (string, bool, error) {
-	s, err := o.m.Store(ctx, storeID)
-	if apperr.KindOf(err) == apperr.KindNotFound {
-		return "", false, nil
-	}
-	if err != nil {
-		return "", false, err
-	}
-	c, ok, err := o.id.ContactEmail(ctx, s.AccountID)
-	if err != nil || !ok {
-		return "", false, err
-	}
-	return c.Address, true, nil
+	return o.m.OwnerContactEmail(ctx, storeID)
 }
 
 func (o *sellerOwners) OwnerActive(ctx context.Context, storeID int64) (bool, error) {
@@ -159,6 +148,9 @@ func seedPaymentAccounts(ctx context.Context, c *sellerCommand, fake *payment.Fa
 		acct, err := m.Account(ctx, id)
 		if err != nil {
 			return err
+		}
+		if acct.ExternalAccountID == nil {
+			return fmt.Errorf("種子店家 %d 沒有建立出外部收款帳戶（店家所屬帳號沒有可用的聯絡信箱？）", id)
 		}
 		if acct.Provider != payment.FakeName {
 			if _, err := fmt.Fprintf(out, "提醒：種子店家 %d 的收款帳戶屬於 %s，種子沒有改它（開通閘門照該帳戶的狀態）\n", id, acct.Provider); err != nil {

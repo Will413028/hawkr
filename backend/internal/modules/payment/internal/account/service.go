@@ -255,11 +255,11 @@ func planPurge(row store.PaymentAccount, provider string) purgePlan {
 	}
 }
 
-// Purge 是「關閉後刪除」job 的內容（D52）：沒有外部 ID 的列直接刪；有外部帳戶時在 transaction 外關閉它（冪等：已關閉視為成功），成功之後才在同一個
-// transaction 刪掉列，並把它外部帳戶在 inbox 裡到現在為止的未處理事件標為已處理（帳戶不在了，不會再有同步涵蓋它們；不標記的話 platform 的清理永遠不刪，
-// 原始 payload 一直留著；inbox 列之後由 platform 的清理依保存期刪除）。列的 provider 與目前設定不同、或沒有設定 provider 時不關也不刪，記警示 log 並標成
-// 等待關閉（close_deferred_at），設定回來之後由週期掃描重排。暫時性的失敗回傳錯誤由 River 退避重試；final 為 true（最後一次嘗試）或失敗是永久的
-// （例如金流商沒有這個帳戶，重試不會成功）時，本地列留著、標成等待關閉並記警示 log（store_id 與外部帳戶 ID）；週期掃描之後重排。
+// Purge 是「關閉後刪除」job 的內容（D52）：第一步，有外部 ID 的列先在自己的 transaction 標成等待清理（purge_pending_at，之後任何錯誤、逾時或程序被殺都有週期掃描接手）；
+// 沒有外部 ID 的列直接刪。有外部帳戶時在 transaction 外關閉它（冪等：已關閉視為成功），成功之後才在同一個 transaction 刪掉列，並把它外部帳戶在 inbox 裡到現在為止的
+// 未處理事件標為已處理（帳戶不在了，不會再有同步涵蓋它們；不標記的話 platform 的清理永遠不刪，原始 payload 一直留著；inbox 列之後由 platform 的清理依保存期刪除）。
+// 列的 provider 與目前設定不同、或沒有設定 provider 時不關也不刪，記警示 log，設定回來之後由週期掃描重排。暫時性的失敗回傳錯誤由 River 退避重試；final 為 true
+// （最後一次嘗試）或失敗是永久的（例如金流商沒有這個帳戶，重試不會成功）時，本地列留著（已標記）並記警示 log（store_id 與外部帳戶 ID）；週期掃描之後重排。
 func (s *Service) Purge(ctx context.Context, storeID int64, final bool) error {
 	row, err := store.New(s.d.DB.Conn(ctx)).PaymentAccountByStore(ctx, storeID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -272,12 +272,17 @@ func (s *Service) Purge(ctx context.Context, storeID int64, final bool) error {
 	if s.d.Provider != nil {
 		provider = s.d.Provider.Name()
 	}
+	if purgeNeedsMark(row) {
+		if err := s.markPurgePending(ctx, storeID); err != nil {
+			return err
+		}
+	}
 	switch planPurge(row, provider) {
 	case purgeDelete:
 		return s.deleteRow(ctx, storeID, nil)
 	case purgeDefer:
 		s.d.Logger.WarnContext(ctx, "payment：收款帳戶的 provider 與目前設定不同，沒有關閉外部帳戶也沒有刪除，等設定回來再清理", "store_id", storeID, "external_account_id", *row.ExternalAccountID, "row_provider", row.Provider, "configured_provider", provider)
-		return s.deferClose(ctx, storeID)
+		return nil
 	case purgeClose:
 	}
 	external := *row.ExternalAccountID
@@ -292,10 +297,30 @@ func (s *Service) Purge(ctx context.Context, storeID int64, final bool) error {
 		return callErr
 	}
 	s.d.Logger.WarnContext(ctx, "payment：關閉外部帳戶失敗，本地列留著等週期掃描重排", "store_id", storeID, "external_account_id", external, "permanent", permanent, "error", callErr)
-	return s.deferClose(ctx, storeID)
+	return nil
 }
 
-// deleteRow 刪掉擁有者的列；external 不是 nil 時要求列上的外部 ID 還是它（關閉成功的就是這個帳戶）。
+// purgeNeedsMark 是清理 job 呼叫 provider 之前是否要先標記：有外部 ID 的列才標（CHECK 只允許有外部 ID 的列有標記）。
+func purgeNeedsMark(row store.PaymentAccount) bool {
+	return row.ExternalAccountID != nil
+}
+
+// errExternalAccountAppeared 是計畫直接刪列、鎖住之後卻發現列已有外部 ID（並行的建立剛寫入）：不能刪，回傳錯誤讓 job 重試並走關閉的路。
+var errExternalAccountAppeared = errors.New("payment：要直接刪的帳戶列已經有外部帳戶，改走關閉")
+
+// lockedRowMayBeDeleted 在鎖住列之後再檢查它是否還能照計畫刪：planned 是 nil（計畫是直接刪）時列上必須仍沒有外部 ID，否則回 errExternalAccountAppeared；
+// planned 不是 nil（關閉成功的那個帳戶）時列上的外部 ID 必須還是它，不是就不刪也不是錯誤。
+func lockedRowMayBeDeleted(locked store.PaymentAccount, planned *string) (bool, error) {
+	if planned == nil {
+		if locked.ExternalAccountID != nil {
+			return false, errExternalAccountAppeared
+		}
+		return true, nil
+	}
+	return locked.ExternalAccountID != nil && *locked.ExternalAccountID == *planned, nil
+}
+
+// deleteRow 刪掉擁有者的列；鎖住之後依 lockedRowMayBeDeleted 再檢查（external 是 nil 表示計畫是直接刪）。
 func (s *Service) deleteRow(ctx context.Context, storeID int64, external *string) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
@@ -308,8 +333,8 @@ func (s *Service) deleteRow(ctx context.Context, storeID int64, external *string
 		if err != nil {
 			return err
 		}
-		if external != nil && (locked.ExternalAccountID == nil || *locked.ExternalAccountID != *external) {
-			return nil
+		if ok, err := lockedRowMayBeDeleted(locked, external); !ok {
+			return err
 		}
 		rows, err := q.DeletePaymentAccounts(ctx, []int64{storeID})
 		if err != nil || s.d.Inbox == nil {
@@ -328,8 +353,8 @@ func (s *Service) deleteRow(ctx context.Context, storeID int64, external *string
 	})
 }
 
-// deferClose 把列標成等待關閉（記下時刻，已標過的保留最早的），排除在同步輪詢之外。
-func (s *Service) deferClose(ctx context.Context, storeID int64) error {
+// markPurgePending 把列標成等待清理（記下時刻，已標過的保留最早的），排除在同步輪詢之外。
+func (s *Service) markPurgePending(ctx context.Context, storeID int64) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
 	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
@@ -340,7 +365,7 @@ func (s *Service) deferClose(ctx context.Context, storeID int64) error {
 			}
 			return err
 		}
-		_, err := q.MarkPaymentAccountCloseDeferred(ctx, store.MarkPaymentAccountCloseDeferredParams{StoreID: storeID, Now: s.d.Now().UTC()})
+		_, err := q.MarkPaymentAccountPurgePending(ctx, store.MarkPaymentAccountPurgePendingParams{StoreID: storeID, Now: s.d.Now().UTC()})
 		return err
 	})
 }

@@ -206,6 +206,11 @@ func (m *Module) AdminKYCApplications(ctx context.Context, in KYCListInput) (KYC
 	return m.kyc.AdminList(ctx, in)
 }
 
+// OwnerContactEmail 回傳店家所屬帳號目前的聯絡信箱（已正規化；與送審檢查是同一個解析）；店家不存在或帳號沒有可用的信箱時 ok 是 false。
+func (m *Module) OwnerContactEmail(ctx context.Context, storeID int64) (string, bool, error) {
+	return m.kyc.OwnerContactEmail(ctx, storeID)
+}
+
 // StoreKYC 以店家讀它目前那一筆還沒取消的申請（遮蔽的檢視，帶流程狀態與證件）。草稿是賣家自己的，後台讀不到：沒有申請、
 // 已取消或只有草稿時 ok 為 false；店家不存在回 NotFound。
 func (m *Module) StoreKYC(ctx context.Context, storeID int64) (application KYCApplication, ok bool, err error) {

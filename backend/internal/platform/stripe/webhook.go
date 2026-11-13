@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
-	sdk "github.com/stripe/stripe-go/v87"
+	"github.com/stripe/stripe-go/v87/webhook"
 )
 
 // SignatureTolerance 是簽章時間戳與現在的最大差距（SDK 只拒絕過舊的時間戳）。
-const SignatureTolerance = 300 * time.Second
+const SignatureTolerance = webhook.DefaultTolerance
 
 // ErrSignature 標示簽章缺漏、格式錯、時間戳過舊或不符。
 var ErrSignature = errors.New("stripe：簽章驗證失敗")
@@ -31,41 +30,33 @@ type AccountEvent struct {
 
 const accountObjectType = "v2.core.account"
 
-// ParseEvent 以 SDK 的 ParseEventNotification 驗 Stripe-Signature（時間戳容許 SignatureTolerance，任一 v1 相符即可）並解析 thin event 後，
-// 只收 type 為 v2.core.account.* 或 v2.core.account[…].* 而且 related_object.type 為 v2.core.account 的事件。
+// ParseEvent 以 SDK 驗 Stripe-Signature（預設時間戳容許，任一 v1 相符即可）；簽章之後只讀 id、type 與 related_object.{id,type}，其餘欄位不管。
+// 只收 type 為 v2.core.account.* 或 v2.core.account[…].* 而且 related_object.type 為 v2.core.account 的 thin event。
 func (c *Client) ParseEvent(header http.Header, body []byte) (AccountEvent, error) {
-	n, err := c.sdk.ParseEventNotification(body, header.Get("Stripe-Signature"), c.whsecret, sdk.WithTolerance(SignatureTolerance))
-	if err != nil {
-		switch {
-		case errors.Is(err, sdk.ErrWebhookEmptySecret), errors.Is(err, sdk.ErrWebhookInvalidHeader), errors.Is(err, sdk.ErrWebhookNoValidSignature),
-			errors.Is(err, sdk.ErrWebhookNotSigned), errors.Is(err, sdk.ErrWebhookTooOld):
-			return AccountEvent{}, fmt.Errorf("%w：%w", ErrSignature, err)
-		}
-		var obj struct {
-			Object string `json:"object"`
-		}
-		if json.Unmarshal(body, &obj) == nil && obj.Object == "event" {
-			return AccountEvent{}, fmt.Errorf("%w：snapshot 事件", ErrNotHandled)
-		}
+	if err := webhook.ValidatePayload(body, header.Get("Stripe-Signature"), c.whsecret); err != nil {
+		return AccountEvent{}, fmt.Errorf("%w：%w", ErrSignature, err)
+	}
+	var ev struct {
+		ID            string `json:"id"`
+		Type          string `json:"type"`
+		RelatedObject struct {
+			ID   string `json:"id"`
+			Type string `json:"type"`
+		} `json:"related_object"`
+	}
+	if err := json.Unmarshal(body, &ev); err != nil {
 		return AccountEvent{}, fmt.Errorf("%w：%w", ErrMalformed, err)
 	}
-	ev := n.GetEventNotification()
 	if ev.ID == "" || ev.Type == "" {
 		return AccountEvent{}, fmt.Errorf("%w：缺少 id 或 type", ErrMalformed)
 	}
-	var related struct {
-		RelatedObject sdk.V2CoreEventRelatedObject `json:"related_object"`
-	}
-	if err := json.Unmarshal(body, &related); err != nil {
-		return AccountEvent{}, fmt.Errorf("%w：%w", ErrMalformed, err)
-	}
-	if !accountEventType(ev.Type) || related.RelatedObject.Type != accountObjectType {
+	if !accountEventType(ev.Type) || ev.RelatedObject.Type != accountObjectType {
 		return AccountEvent{}, fmt.Errorf("%w：%s", ErrNotHandled, ev.Type)
 	}
-	if related.RelatedObject.ID == "" {
+	if ev.RelatedObject.ID == "" {
 		return AccountEvent{}, fmt.Errorf("%w：缺少 related_object.id", ErrMalformed)
 	}
-	return AccountEvent{ID: ev.ID, AccountID: related.RelatedObject.ID}, nil
+	return AccountEvent{ID: ev.ID, AccountID: ev.RelatedObject.ID}, nil
 }
 
 func accountEventType(t string) bool {

@@ -432,6 +432,8 @@ func TestNewRejectsMissingSecretsAndBadBaseURL(t *testing.T) {
 		"沒有金鑰":       {WebhookSecret: "w"},
 		"沒有 webhook": {SecretKey: "k"},
 		"網址不合":       {SecretKey: "k", WebhookSecret: "w", BaseURL: "api.stripe.com"},
+		"密鑰前面有空白":    {SecretKey: "k", WebhookSecret: " w"},
+		"密鑰後面有換行":    {SecretKey: "k", WebhookSecret: "w\n"},
 	} {
 		if _, err := New(cfg); err == nil {
 			t.Errorf("%s：通過了", name)

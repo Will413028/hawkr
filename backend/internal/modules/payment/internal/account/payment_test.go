@@ -190,3 +190,39 @@ func TestPlanPurgeDeletesRowsWithoutExternalIDClosesMatchingProviderAndDefersThe
 		}
 	}
 }
+
+// 刪列前在鎖住的列上再檢查：計畫是直接刪（沒有外部 ID）時，列上不能已經有外部 ID（並行的建立剛寫入），否則回傳錯誤讓 job 重試並走關閉的路；
+// 計畫是關閉成功後刪時，列上的外部 ID 要還是關閉的那一個。
+// mutation：沒有外部 ID 的計畫不檢查鎖住的列 → 「並行寫入外部 ID」案例失敗。
+func TestDeleteRowRecheckAfterLockRefusesARowThatGainedAnExternalID(t *testing.T) {
+	a, b := "acct_a", "acct_b"
+	for name, tc := range map[string]struct {
+		locked   store.PaymentAccount
+		planned  *string
+		wantOK   bool
+		wantFail bool
+	}{
+		"直接刪、列仍沒有外部 ID":  {store.PaymentAccount{}, nil, true, false},
+		"直接刪、並行寫入外部 ID":  {store.PaymentAccount{ExternalAccountID: &a}, nil, false, true},
+		"關閉後刪、外部 ID 相同":  {store.PaymentAccount{ExternalAccountID: &a}, &a, true, false},
+		"關閉後刪、外部 ID 不同":  {store.PaymentAccount{ExternalAccountID: &b}, &a, false, false},
+		"關閉後刪、外部 ID 不見了": {store.PaymentAccount{}, &a, false, false},
+	} {
+		ok, err := lockedRowMayBeDeleted(tc.locked, tc.planned)
+		if ok != tc.wantOK || (err != nil) != tc.wantFail {
+			t.Errorf("%s：ok=%v err=%v，want ok=%v fail=%v", name, ok, err, tc.wantOK, tc.wantFail)
+		}
+	}
+}
+
+// 清理 job 在呼叫 provider 之前先把有外部 ID 的列標成等待清理（讓週期掃描能接手），沒有外部 ID 的列不標。
+// mutation：永遠回 false → 有外部 ID 的案例失敗。
+func TestPurgeMarksRowsWithAnExternalIDBeforeAnyProviderCall(t *testing.T) {
+	a := "acct_a"
+	if !purgeNeedsMark(store.PaymentAccount{ExternalAccountID: &a}) {
+		t.Error("有外部 ID 的列要先標記")
+	}
+	if purgeNeedsMark(store.PaymentAccount{}) {
+		t.Error("沒有外部 ID 的列不標記")
+	}
+}

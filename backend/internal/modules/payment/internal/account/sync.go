@@ -38,7 +38,7 @@ func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err erro
 // syncRow 是 Sync 的本體，row 是呼叫方剛讀到的帳戶列（只用它的外部 ID 與 provider，寫入在 transaction 內重新鎖列）。
 func (s *Service) syncRow(ctx context.Context, row store.PaymentAccount) (again bool, err error) {
 	p := s.d.Provider
-	if row.ExternalAccountID == nil || row.Provider != p.Name() || row.CloseDeferredAt != nil {
+	if row.ExternalAccountID == nil || row.Provider != p.Name() || row.PurgePendingAt != nil {
 		return false, nil
 	}
 	storeID := row.StoreID
@@ -196,7 +196,7 @@ func (s *Service) Refresh(ctx context.Context, storeID int64) error {
 	if row.ExternalAccountID == nil {
 		return apperr.FailedPrecondition("收款帳戶還沒有建立")
 	}
-	if row.CloseDeferredAt != nil {
+	if row.PurgePendingAt != nil {
 		return apperr.FailedPrecondition("收款帳戶正在關閉")
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueueSync(ctx, s.d.Jobs, storeID) })

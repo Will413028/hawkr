@@ -332,7 +332,7 @@ func TestRequestKeepsAnExistingRow(t *testing.T) {
 	if got := f.jobs.storeIDs(t, kindEnsure); len(got) != 2 {
 		t.Fatalf("已建立的帳戶又排了建立 job：%v", got)
 	}
-	if got := f.fake.EnsureEmails(); !slices.Equal(got, []string{"third@example.com"}) {
+	if got := f.fake.EnsureEmails(); !slices.Equal(got, []string{"second@example.com"}) {
 		t.Fatalf("provider 收到的信箱=%v，預期建立當下擁有者的信箱", got)
 	}
 }
@@ -885,9 +885,9 @@ func TestPurgeOfAnAlreadyClosedAccountStillDeletesTheRow(t *testing.T) {
 	}
 }
 
-// 關閉失敗：暫時性的錯誤回傳給 River 重試、列照舊；最後一次嘗試仍失敗，或失敗是永久的，列留著並標成等待關閉（保住 store_id 與外部 ID 的對應），記警示 log
-// （store_id 與外部帳戶 ID），不進後台待辦；等待關閉的列不進同步輪詢、不被賣家或管理員的重新整理讀；週期掃描重排它的清理，關閉成功才刪列。
-// mutation 1：失敗仍刪列 → 列不見，失敗。mutation 2：輪詢查詢不排除 close_deferred_at → 等待關閉的列被排同步，失敗。mutation 3：Sweep 不重排 → 沒有清理 job，失敗。
+// 關閉失敗：暫時性的錯誤回傳給 River 重試、列照舊；最後一次嘗試仍失敗，或失敗是永久的，列留著並標成等待清理（保住 store_id 與外部 ID 的對應），記警示 log
+// （store_id 與外部帳戶 ID），不進後台待辦；等待清理的列不進同步輪詢、不被賣家或管理員的重新整理讀；週期掃描重排它的清理，關閉成功才刪列。
+// mutation 0：清理 job 不先標記 → 暫時性失敗後沒有標記，失敗（尚未本機執行，需要資料庫）。mutation 1：失敗仍刪列 → 列不見，失敗。mutation 2：輪詢查詢不排除 purge_pending_at → 等待清理的列被排同步，失敗。mutation 3：Sweep 不重排 → 沒有清理 job，失敗。
 func TestAFailedCloseKeepsTheRowMarkedExcludedFromPollingAndRetriedByTheSweep(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -900,30 +900,33 @@ func TestAFailedCloseKeepsTheRowMarkedExcludedFromPollingAndRetriedByTheSweep(t 
 	if err := f.module.PurgeAccount(ctx, s, false); !errors.Is(err, boom) {
 		t.Fatalf("暫時性的失敗要回傳給 River 重試：%v", err)
 	}
-	if a := f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND close_deferred_at IS NULL", s); a != 1 {
-		t.Fatal("暫時性的失敗不該標記列")
+	if a := f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_pending_at IS NOT NULL", s); a != 1 {
+		t.Fatal("清理 job 在呼叫 provider 之前就該標記列，暫時性的失敗之後也要在")
+	}
+	if got := f.jobs.storeIDs(t, kindPurge); slices.Contains(got, s) {
+		t.Fatalf("暫時性的失敗由 River 重試，不該由 PurgeAccount 自己排：%v", got)
 	}
 	must(t, f.module.PurgeAccount(ctx, s, true))
-	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND external_account_id = $2 AND close_deferred_at IS NOT NULL", s, external) != 1 {
-		t.Fatal("最後一次失敗後列應該留著並標成等待關閉")
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND external_account_id = $2 AND purge_pending_at IS NOT NULL", s, external) != 1 {
+		t.Fatal("最後一次失敗後列應該留著並標成等待清理")
 	}
 	if !bytes.Contains(f.logs.Bytes(), []byte("store_id="+fmt.Sprint(s))) || !bytes.Contains(f.logs.Bytes(), []byte(external)) {
 		t.Fatalf("警示 log 沒有 store_id 與外部帳戶 ID：%s", f.logs.String())
 	}
 	if n := f.count(t, "SELECT count(*) FROM payment.pub_review_items($1) WHERE store_id = $2", f.now, s); n != 0 {
-		t.Fatalf("等待關閉的列進了後台待辦：%d 項", n)
+		t.Fatalf("等待清理的列進了後台待辦：%d 項", n)
 	}
 	before := f.jobs.count(kindSync)
 	synced, _, err := f.module.SweepAccounts(ctx)
 	must(t, err)
 	if synced != 0 || f.jobs.count(kindSync) != before {
-		t.Fatalf("等待關閉的列被排了同步：synced=%d", synced)
+		t.Fatalf("等待清理的列被排了同步：synced=%d", synced)
 	}
 	if got := f.jobs.storeIDs(t, kindPurge); !slices.Equal(got, []int64{s}) {
 		t.Fatalf("週期掃描沒有重排清理：%v", got)
 	}
 	if _, fetches, _ := f.fake.Calls(); fetches != 0 {
-		t.Fatalf("等待關閉的列被讀了 provider：%d 次", fetches)
+		t.Fatalf("等待清理的列被讀了 provider：%d 次", fetches)
 	}
 	if err := f.module.RefreshAccount(ctx, s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("管理員重新整理 err=%v，預期 failed_precondition", err)
@@ -943,7 +946,7 @@ func TestAFailedCloseKeepsTheRowMarkedExcludedFromPollingAndRetriedByTheSweep(t 
 	}
 }
 
-// 關閉的失敗是永久的（金流商沒有這個帳戶，重試不會成功）：第一次嘗試就把列標成等待關閉，不等重試用完。
+// 關閉的失敗是永久的（金流商沒有這個帳戶，重試不會成功）：第一次嘗試就把列標成等待清理，不等重試用完。
 // mutation：永久失敗也回傳錯誤等重試 → 列沒有被標記，失敗。
 func TestAPermanentCloseFailureMarksTheRowOnTheFirstAttempt(t *testing.T) {
 	t.Parallel()
@@ -953,12 +956,12 @@ func TestAPermanentCloseFailureMarksTheRowOnTheFirstAttempt(t *testing.T) {
 	f.ensure(t, s)
 	f.fake.FailClose(fmt.Errorf("%w：沒有這個帳戶", ErrPermanent))
 	must(t, f.module.PurgeAccount(ctx, s, false))
-	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND close_deferred_at IS NOT NULL", s) != 1 {
-		t.Fatal("永久失敗後列應該留著並標成等待關閉")
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_pending_at IS NOT NULL", s) != 1 {
+		t.Fatal("永久失敗後列應該留著並標成等待清理")
 	}
 }
 
-// 沒有外部 ID 的列（還沒建立）直接刪，不呼叫 provider；provider 與目前設定不同的列不關也不刪，記警示 log 並標成等待關閉，等設定回來再清理
+// 沒有外部 ID 的列（還沒建立）直接刪，不呼叫 provider；provider 與目前設定不同的列不關也不刪，記警示 log 並標成等待清理，等設定回來再清理
 // （刪掉就永遠找不到外部帳戶）。
 // mutation 1：沒有外部 ID 也呼叫 CloseAccount → provider 被呼叫，失敗。mutation 2：provider 不符也刪列 → 列不見，失敗。
 func TestPurgeDeletesRowsWithoutAnExternalAccountAndKeepsRowsOfAnotherProvider(t *testing.T) {
@@ -978,8 +981,8 @@ func TestPurgeDeletesRowsWithoutAnExternalAccountAndKeepsRowsOfAnotherProvider(t
 	if len(f.fake.Closes()) != 0 {
 		t.Fatalf("別的 provider 的帳戶被關閉：%v", f.fake.Closes())
 	}
-	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND close_deferred_at IS NOT NULL", other) != 1 {
-		t.Fatal("別的 provider 的列應該留著並標成等待關閉")
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_pending_at IS NOT NULL", other) != 1 {
+		t.Fatal("別的 provider 的列應該留著並標成等待清理")
 	}
 	if !bytes.Contains(f.logs.Bytes(), []byte("level=WARN")) || !bytes.Contains(f.logs.Bytes(), []byte("store_id="+fmt.Sprint(other))) {
 		t.Fatalf("沒有警示 log：%s", f.logs.String())

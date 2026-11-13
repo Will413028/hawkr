@@ -61,6 +61,9 @@ func New(cfg Config) (*Client, error) {
 	if strings.TrimSpace(cfg.WebhookSecret) == "" {
 		return nil, errors.New("stripe：缺少 WebhookSecret")
 	}
+	if strings.TrimSpace(cfg.WebhookSecret) != cfg.WebhookSecret {
+		return nil, errors.New("stripe：WebhookSecret 前後有空白或換行，請去掉後再設定")
+	}
 	raw := cfg.BaseURL
 	if raw == "" {
 		raw = DefaultBaseURL

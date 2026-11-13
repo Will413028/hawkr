@@ -18,8 +18,8 @@ CREATE SCHEMA payment;
 -- 經 PayoutAccountChanged 複製的 transfers_active；ENABLED 等於 transfers_active）。requirements 是快照的原始內容，status_reason 是導出目前狀態的金流商原因碼（只給後台）。
 -- create_failed_at 是建立重試用完的時刻（只有還沒有外部 ID 的列才有；後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED 的開始時間，重試建立時清空）。
 -- seller_read_claimed_at 是上次賣家觸發的讀取被受理的時刻（含失敗與並行的；條件式 UPDATE 搶名額），同步 job 不讀寫。
--- close_deferred_at 是擁有者個資清理時外部帳戶還沒關閉成功的時刻（關閉重試用完、永久失敗，或 provider 與目前設定不同、沒有設定 provider）：本地列留著（保住 store_id 與外部
--- ID 的對應），不進同步輪詢與賣家／管理員的重新整理，由 payment 的週期掃描重排「關閉後刪除」，關閉成功才刪列；只有有外部 ID 的列才有。
+-- purge_pending_at 是擁有者要求清理、外部帳戶還沒關閉的時刻（清理 job 呼叫 provider 之前先標；關閉成功刪列之前一直在）：本地列留著（保住 store_id 與外部 ID 的對應），
+-- 不進同步輪詢與賣家／管理員的重新整理，由 payment 的週期掃描重排「關閉後刪除」，關閉成功才刪列；只有有外部 ID 的列才有。
 -- create_idempotency_key 是寫入「建立中」的列時產生的隨機 UUID（v4），建立外部帳戶的每次重試都用它當冪等鍵（Stripe 建議每個邏輯請求用隨機 UUID；
 -- 不用 store_id，兩個資料庫共用同一個 Stripe 帳號時才不會撞到別人的帳戶）。
 CREATE TABLE payment.accounts (
@@ -38,7 +38,7 @@ CREATE TABLE payment.accounts (
     created_at             TIMESTAMPTZ NOT NULL,
     updated_at             TIMESTAMPTZ NOT NULL,
     seller_read_claimed_at TIMESTAMPTZ,
-    close_deferred_at      TIMESTAMPTZ,
+    purge_pending_at       TIMESTAMPTZ,
     CONSTRAINT accounts_store_id_check CHECK (store_id > 0),
     CONSTRAINT accounts_provider_check CHECK (provider ~ '^[a-z][a-z0-9_]{0,39}$'),
     CONSTRAINT accounts_external_id_check CHECK (external_account_id IS NULL OR char_length(external_account_id) BETWEEN 1 AND 255),
@@ -50,9 +50,9 @@ CREATE TABLE payment.accounts (
     CONSTRAINT accounts_requirements_check CHECK (jsonb_typeof(requirements) = 'object'),
     CONSTRAINT accounts_status_reason_check CHECK (status_reason IS NULL OR char_length(status_reason) BETWEEN 1 AND 200),
     CONSTRAINT accounts_create_failed_check CHECK (create_failed_at IS NULL OR external_account_id IS NULL),
-    CONSTRAINT accounts_close_deferred_check CHECK (close_deferred_at IS NULL OR external_account_id IS NOT NULL)
+    CONSTRAINT accounts_purge_pending_check CHECK (purge_pending_at IS NULL OR external_account_id IS NOT NULL)
 );
 CREATE UNIQUE INDEX accounts_external ON payment.accounts (provider, external_account_id) WHERE external_account_id IS NOT NULL;
 CREATE INDEX accounts_poll ON payment.accounts (fetched_at NULLS FIRST, store_id) WHERE status IN ('UNDER_REVIEW', 'ACTION_REQUIRED', 'DISABLED');
 CREATE INDEX accounts_create_failed ON payment.accounts (create_failed_at) WHERE create_failed_at IS NOT NULL;
-CREATE INDEX accounts_close_deferred ON payment.accounts (store_id) WHERE close_deferred_at IS NOT NULL;
+CREATE INDEX accounts_purge_pending ON payment.accounts (store_id) WHERE purge_pending_at IS NOT NULL;

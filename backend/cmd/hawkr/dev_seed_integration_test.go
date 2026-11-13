@@ -9,6 +9,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -175,6 +176,34 @@ func TestDevSeedPaymentAccountsAreCreatedWithTheOwnersContactEmail(t *testing.T)
 	slices.Sort(got)
 	if want := []string{"seller1@hawkr.test", "seller2@hawkr.test"}; !slices.Equal(got, want) {
 		t.Fatalf("建立收款帳戶送給 provider 的信箱=%v，want %v", got, want)
+	}
+}
+
+// 種子店家所屬帳號沒有可用的聯絡信箱時，建立收款帳戶不會成功：種子要回錯誤並指名店家，不能印成功。
+// mutation：種子不檢查建立出的外部帳戶 ID → 回 nil，失敗。
+func TestDevSeedPaymentAccountsFailsWhenAnOwnerHasNoContactEmail(t *testing.T) {
+	ctx := context.Background()
+	d := devSeedEnv(t)
+	var out bytes.Buffer
+	if err := runDevSeed(ctx, nil, &out); err != nil {
+		t.Fatalf("dev-seed：%v", err)
+	}
+	if _, err := d.Pool().Exec(ctx, `DELETE FROM payment.accounts`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Pool().Exec(ctx, `UPDATE identity.accounts SET email = NULL, self_entered_email = NULL WHERE id = (SELECT account_id FROM seller.stores WHERE store_id = $1)`, devSeedStoreA); err != nil {
+		t.Fatal(err)
+	}
+	c, err := openSeller(ctx, requireDevEnvironment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	fake := payment.NewFake()
+	fake.AutoActive = true
+	err = seedPaymentAccounts(ctx, c, fake, []int64{devSeedStoreA}, &out)
+	if err == nil || !strings.Contains(err.Error(), fmt.Sprint(devSeedStoreA)) {
+		t.Fatalf("err=%v，want 指名店家 %d 的錯誤", err, devSeedStoreA)
 	}
 }
 

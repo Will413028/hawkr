@@ -84,6 +84,18 @@ func (s *Service) contactEmail(ctx context.Context, accountID int64) (string, bo
 	return c.Address, true, nil
 }
 
+// OwnerContactEmail 回傳店家所屬帳號目前的聯絡信箱（與送審檢查同一個解析：contactEmail）；店家不存在或帳號沒有可用的信箱時 ok 是 false。
+func (s *Service) OwnerContactEmail(ctx context.Context, storeID int64) (string, bool, error) {
+	owner, err := store.New(s.d.DB.Conn(ctx)).StoreByID(ctx, storeID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return s.contactEmail(ctx, owner.AccountID)
+}
+
 // requireContactEmail 是送審的檢查：帳號沒有聯絡信箱回 failed_precondition 與 CONTACT_EMAIL_REQUIRED。
 func (s *Service) requireContactEmail(ctx context.Context, accountID int64) (string, error) {
 	email, ok, err := s.contactEmail(ctx, accountID)

@@ -16,8 +16,8 @@ func (s *Service) pollable(ctx context.Context, after int64) ([]int64, error) {
 	return store.New(s.d.DB.Conn(ctx)).PollablePaymentAccountStoreIDs(ctx, store.PollablePaymentAccountStoreIDsParams{AfterStoreID: after, Batch: sweepBatch})
 }
 
-func (s *Service) closeDeferred(ctx context.Context, after int64) ([]int64, error) {
-	return store.New(s.d.DB.Conn(ctx)).CloseDeferredPaymentAccountStoreIDs(ctx, store.CloseDeferredPaymentAccountStoreIDsParams{AfterStoreID: after, Batch: sweepBatch})
+func (s *Service) purgePending(ctx context.Context, after int64) ([]int64, error) {
+	return store.New(s.d.DB.Conn(ctx)).PurgePendingPaymentAccountStoreIDs(ctx, store.PurgePendingPaymentAccountStoreIDsParams{AfterStoreID: after, Batch: sweepBatch})
 }
 
 func (s *Service) stale(ctx context.Context, after int64) ([]int64, error) {
