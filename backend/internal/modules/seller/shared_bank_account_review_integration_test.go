@@ -240,7 +240,7 @@ func TestSharedBankAccountHitBeforeTheSanctionStaysOutWhenLaterRowsAppear(t *tes
 	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT created_at FROM seller.measures WHERE id = $1", m.ID).Scan(&created))
 	var early, late int64
 	must(t, f.db.Conn(ctx).QueryRow(ctx, `SELECT count(*) FILTER (WHERE created_at <= $3), count(*) FILTER (WHERE created_at > $3)
-		FROM seller.measure_identity_hits WHERE measure_id = $1 AND account_id = $2 AND field = 'BANK_FINGERPRINT'`, m.ID, accountO, created).Scan(&early, &late))
+		FROM seller.measure_identity_hits($4) WHERE measure_id = $1 AND account_id = $2 AND field = 'BANK_FINGERPRINT'`, m.ID, accountO, created, f.now).Scan(&early, &late))
 	if early < 1 || late < 1 {
 		t.Fatalf("前提不成立：O 在處分之後的命中列應有早於或等於處分建立的 >=1 列與晚於它的 >=1 列，實際 early=%d late=%d", early, late)
 	}

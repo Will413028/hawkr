@@ -194,3 +194,43 @@ func TestLinkedAccountLookupUsesTheFingerprintHashIndex(t *testing.T) {
 		t.Errorf("不得掃描整張表：\n%s", plan)
 	}
 }
+
+// MeasureIdentityMatches（入駐檢查）以 hash = ANY(...) 進 measure_identity_sources：兩段（快照、被處分帳號目前的 hash）都由 hash 索引進入，
+// 不掃整張 account_identity_hashes 或 measure_identities，成本不隨累積的處分數成長。
+// mutation：把 measure_identity_sources 改回對每筆生效措施的 CROSS JOIN LATERAL → 計畫出現 Seq Scan，斷言失敗。
+func TestMeasureIdentityMatchesUsesTheHashIndexes(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	_, sS := f.approvedWithFingerprints(t, fpShared)
+	f.terminate(t, sS.StoreID, GroundFraud)
+	must(t, f.db.InTx(ctx, func(ctx context.Context) error {
+		c := f.db.Conn(ctx)
+		for _, sql := range []string{
+			`INSERT INTO seller.stores (store_code, account_id, store_name, created_at, updated_at)
+				SELECT 2800000000 + g, 500000 + g, 'x', now(), now() FROM generate_series(1, 20000) g`,
+			`INSERT INTO seller.account_identity_hashes (source_store_id, field, key_id, hash, account_id, created_at)
+				SELECT s.store_id, 'BANK_FINGERPRINT', k, decode(md5(s.store_id::text || k) || md5(k || s.store_id::text), 'hex'), s.account_id, now()
+				FROM seller.stores s, (VALUES ('test1'), ('rot2')) v(k) WHERE s.store_code > 2800000000`,
+		} {
+			if _, err := c.Exec(ctx, sql); err != nil {
+				return err
+			}
+		}
+		return nil
+	}))
+	for _, table := range []string{"stores", "account_identity_hashes", "measure_identities"} {
+		_, err := f.db.Conn(ctx).Exec(ctx, "ANALYZE seller."+table)
+		must(t, err)
+	}
+	rec := &recorder{inner: f.db.Conn(ctx)}
+	_, err := store.New(rec).MeasureIdentityMatches(ctx, store.MeasureIdentityMatchesParams{At: f.now, Hashes: [][]byte{[]byte("no-such-hash")}, AccountID: 0})
+	must(t, err)
+	plan := f.explain(t, rec)
+	t.Logf("MeasureIdentityMatches：\n%s", plan)
+	for _, table := range []string{"account_identity_hashes", "measure_identities"} {
+		if strings.Contains(plan, "Seq Scan on "+table) {
+			t.Errorf("不得掃描整張 %s：\n%s", table, plan)
+		}
+	}
+}

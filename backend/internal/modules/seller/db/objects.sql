@@ -67,23 +67,22 @@ WHERE m.kind = 'SUSPENSION' OR (m.kind = 'TERMINATION' AND m.termination_ground 
 -- (b) 被處分帳號此刻還在 account_identity_hashes 的 hash（措施建立之後才同步進來的 fingerprint 與統編）。
 -- kind 是快照的種類（統編 TAX_ID、provider 回報的銀行帳號 fingerprint 是 BANK_ACCOUNT）；created_at 只有 (b) 有值（hash 的寫入時間），(a) 是 NULL。
 -- 同一個 hash 同時在兩個來源時有兩列，讀取方以 DISTINCT 或 min 聚合。
+-- 寫成頂層的 UNION ALL、兩段都是單純的連接（沒有 LATERAL）：內聯之後呼叫方的 hash = ANY(...) 與 measure_id = ... 推進兩段，各自走
+-- account_identity_hashes_hash、measure_identities 的索引，不必探測每一筆生效中的措施。計畫由 TestMeasureIdentityMatchesUsesTheHashIndexes 鎖住。
 CREATE TYPE seller.measure_identity_source AS (measure_id UUID, account_id BIGINT, kind TEXT, key_id TEXT, hash BYTEA, created_at TIMESTAMPTZ);
 
 CREATE FUNCTION seller.measure_identity_sources(at TIMESTAMPTZ) RETURNS SETOF seller.measure_identity_source
 LANGUAGE sql STABLE
 BEGIN ATOMIC
-    SELECT i.id, i.account_id, s.kind, s.key_id, s.hash, s.created_at
-    FROM seller.effective_measures(at) e
-    JOIN seller.identity_effect_measures i ON i.id = e.id
-    CROSS JOIN LATERAL (
-        SELECT mi.kind, mi.key_id, mi.hash, NULL::timestamptz AS created_at
-        FROM seller.measure_identities mi
-        WHERE mi.measure_id = i.id
-        UNION ALL
-        SELECT CASE o.field WHEN 'TAX_ID' THEN 'TAX_ID' ELSE 'BANK_ACCOUNT' END, o.key_id, o.hash, o.created_at
-        FROM seller.account_identity_hashes o
-        WHERE o.account_id = i.account_id
-    ) s;
+    SELECT i.id, i.account_id, mi.kind, mi.key_id, mi.hash, NULL::timestamptz
+    FROM seller.measure_identities mi
+    JOIN seller.identity_effect_measures i ON i.id = mi.measure_id
+    JOIN seller.effective_measures(at) e ON e.id = i.id
+    UNION ALL
+    SELECT i.id, i.account_id, CASE o.field WHEN 'TAX_ID' THEN 'TAX_ID' ELSE 'BANK_ACCOUNT' END, o.key_id, o.hash, o.created_at
+    FROM seller.account_identity_hashes o
+    JOIN seller.identity_effect_measures i ON i.account_id = o.account_id
+    JOIN seller.effective_measures(at) e ON e.id = i.id;
 END;
 
 -- 命中，唯一的定義：measure_identity_sources(at) 的來源與 account_identity_hashes 裡 (hash, key_id) 相同的列，種類要對得上（統編 TAX_ID 對 TAX_ID，

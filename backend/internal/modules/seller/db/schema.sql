@@ -929,7 +929,7 @@ CREATE TABLE seller.measure_linked_reviews (
 -- 客服信箱）是店家的欄位（stores），不在申請上。收款聯絡信箱不在申請上：它是帳號的聯絡信箱（identity，D23 2026-11-03 修訂），送出時要求帳號有，核准時傳給 payment 模組快照到收款帳戶列（payment.accounts.contact_email）。公司地址以內政部的鄉鎮市區代碼表示（同 stores）。
 -- version 是樂觀鎖（etag 的來源）：所有寫入者必帶讀到的版本。
 -- 個資清理：店家關閉滿保留期後 purge 套件清掉全部個人欄位（統編、公司與地址），記下 pii_purged_at；審核的事實（狀態、時間、審核紀錄）與不具名的欄位（seller_type、product_type）保留。kyc_applications_purged_check 列出被清掉的欄位：清理過的列這些一定是 NULL。處分的身分快照不在這裡
--- （measure_identities，隨措施結束才刪），所以清理不影響身分比對。
+-- （measure_identities，隨措施結束才刪）；身分比對讀快照加上被處分帳號仍在 account_identity_hashes 的 hash，所以清理不影響身分比對。
 CREATE TABLE seller.kyc_applications (
     application_id          UUID PRIMARY KEY,
     store_id                BIGINT NOT NULL REFERENCES seller.stores (store_id),
