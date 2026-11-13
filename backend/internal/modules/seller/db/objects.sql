@@ -55,15 +55,52 @@ BEGIN ATOMIC
     WHERE m.status = 'ENFORCED' AND m.kind IN ('SUSPENSION', 'TERMINATION') AND m.starts_at <= at AND (m.ends_at IS NULL OR m.ends_at > at);
 END;
 
--- 措施的身分快照與防詐保存的 hash 的命中，唯一的定義：快照裡 (hash, key_id) 相同的 account_identity_hashes 列，種類要對得上（統編 TAX_ID 對 TAX_ID，
--- provider 回報的銀行帳號 fingerprint BANK_FINGERPRINT 對 BANK_ACCOUNT）。一列是一把金鑰的一筆命中（同一個帳號、同一個欄位可有多列），created_at 是那筆 hash 寫入的時間。
--- 不判斷措施是否生效、也不排除被處分的帳號本身：呼叫方自己加條件。LinkedAccountHits（處分頁的關聯帳號）與 review_shared_bank_account（待辦）都讀它，
--- 命中的條件只寫這一份；以 (key_id, hash) 的索引等值連接，不解密。
-CREATE VIEW seller.measure_identity_hits AS
-SELECT mi.measure_id, f.account_id, f.field, f.created_at
-FROM seller.measure_identities mi
-JOIN seller.account_identity_hashes f ON f.hash = mi.hash AND f.key_id = mi.key_id
-WHERE mi.kind = CASE f.field WHEN 'TAX_ID' THEN 'TAX_ID' ELSE 'BANK_ACCOUNT' END;
+-- 「帶身分效果的措施」唯一的定義：停權，以及非預告的終止合作（含關聯帳號的終止）；預告終止（NOTICE）不禁止日後重新申請，不帶身分效果。
+-- 與時間無關（是否生效另由 effective_measures 決定）。快照的寫入（SnapshotMeasureIdentities）與命中的讀取（measure_identity_sources）都讀它，Go 不判斷。
+CREATE VIEW seller.identity_effect_measures AS
+SELECT m.id, m.account_id
+FROM seller.measures m
+WHERE m.kind = 'SUSPENSION' OR (m.kind = 'TERMINATION' AND m.termination_ground <> 'NOTICE');
+
+-- 措施在 at 帶身分效果的 hash 來源，唯一的定義：措施在 effective_measures(at) 而且帶身分效果（identity_effect_measures），來源是
+-- (a) 措施的身分快照（措施建立時從被處分帳號的 account_identity_hashes 複製；保存期過後帳號的 hash 被刪，快照仍在）與
+-- (b) 被處分帳號此刻還在 account_identity_hashes 的 hash（措施建立之後才同步進來的 fingerprint 與統編）。
+-- kind 是快照的種類（統編 TAX_ID、provider 回報的銀行帳號 fingerprint 是 BANK_ACCOUNT）；created_at 只有 (b) 有值（hash 的寫入時間），(a) 是 NULL。
+-- 同一個 hash 同時在兩個來源時有兩列，讀取方以 DISTINCT 或 min 聚合。
+CREATE TYPE seller.measure_identity_source AS (measure_id UUID, account_id BIGINT, kind TEXT, key_id TEXT, hash BYTEA, created_at TIMESTAMPTZ);
+
+CREATE FUNCTION seller.measure_identity_sources(at TIMESTAMPTZ) RETURNS SETOF seller.measure_identity_source
+LANGUAGE sql STABLE
+BEGIN ATOMIC
+    SELECT i.id, i.account_id, s.kind, s.key_id, s.hash, s.created_at
+    FROM seller.effective_measures(at) e
+    JOIN seller.identity_effect_measures i ON i.id = e.id
+    CROSS JOIN LATERAL (
+        SELECT mi.kind, mi.key_id, mi.hash, NULL::timestamptz AS created_at
+        FROM seller.measure_identities mi
+        WHERE mi.measure_id = i.id
+        UNION ALL
+        SELECT CASE o.field WHEN 'TAX_ID' THEN 'TAX_ID' ELSE 'BANK_ACCOUNT' END, o.key_id, o.hash, o.created_at
+        FROM seller.account_identity_hashes o
+        WHERE o.account_id = i.account_id
+    ) s;
+END;
+
+-- 命中，唯一的定義：measure_identity_sources(at) 的來源與 account_identity_hashes 裡 (hash, key_id) 相同的列，種類要對得上（統編 TAX_ID 對 TAX_ID，
+-- BANK_FINGERPRINT 對 BANK_ACCOUNT）。一列是一把金鑰的一筆命中（同一個帳號、同一個欄位可有多列），created_at 是兩邊 hash 都存在的時刻：
+-- 快照來源是對方 hash 的寫入時間，目前 hash 來源是兩筆寫入時間較晚的。措施不在 at 生效或不帶身分效果時沒有列。
+-- 不排除被處分的帳號本身（它自己的 hash 也會命中自己）：呼叫方自己加條件。LinkedAccountHits（處分頁的關聯帳號）、BankFingerprintHitExists 與
+-- review_shared_bank_account（待辦）都讀它，命中的條件只寫這一份；以 (hash, key_id) 的索引等值連接，不解密。
+CREATE TYPE seller.measure_identity_hit AS (measure_id UUID, account_id BIGINT, field TEXT, created_at TIMESTAMPTZ);
+
+CREATE FUNCTION seller.measure_identity_hits(at TIMESTAMPTZ) RETURNS SETOF seller.measure_identity_hit
+LANGUAGE sql STABLE
+BEGIN ATOMIC
+    SELECT s.measure_id, f.account_id, f.field, GREATEST(f.created_at, s.created_at)
+    FROM seller.measure_identity_sources(at) s
+    JOIN seller.account_identity_hashes f ON f.hash = s.hash AND f.key_id = s.key_id
+    WHERE s.kind = CASE f.field WHEN 'TAX_ID' THEN 'TAX_ID' ELSE 'BANK_ACCOUNT' END;
+END;
 
 -- 發布的讀取介面（pub_*，形狀宣告在 db/pub.sql，契約測試比對兩者）：at 這一刻可以公開曝光的店家。條件是 store_requirement_flags 全部為真，
 -- 而且帳號在 at 沒有生效中的措施（effective_measures）。「至少一個上架商品」不在這裡，由曝光端檢查。依賴表允許的上層模組在自己的 SQL 裡
@@ -259,7 +296,7 @@ BEGIN ATOMIC
 END;
 
 -- SHARED_BANK_ACCOUNT 共用銀行帳號：處分（在 effective_measures(at)）建立之後，別的帳號才同步了與被處分帳號相同的銀行帳號 fingerprint
--- （measure_identity_hits 的 BANK_FINGERPRINT 命中：這一對全部命中列裡最早的 fingerprint 寫入時間晚於處分的建立時間；最早的命中早於或等於處分建立的，處分頁的關聯帳號已看得到，
+-- （measure_identity_hits(at) 的 BANK_FINGERPRINT 命中：這一對全部命中列裡最早的 fingerprint 寫入時間晚於處分的建立時間；最早的命中早於或等於處分建立的，處分頁的關聯帳號已看得到，
 -- 之後關店重開的新 stint 或補金鑰多出較晚的列也不進待辦）。
 -- 一對（處分、命中的帳號）一列，多把金鑰不重複；命中的帳號自己有生效中的處分時不列；這一對已有 measure_linked_reviews（已檢視）時不列。
 -- 開始是這一對全部銀行 fingerprint 命中列的最早寫入時間，期限 168 小時。店家是命中帳號最近的 stint（store_id 最大的，含已關閉；與處分頁關聯帳號的店家相同），
@@ -274,7 +311,7 @@ BEGIN ATOMIC
         SELECT m.id AS measure_id, h.account_id, min(h.created_at) AS start_at
         FROM seller.effective_measures(at) e
         JOIN seller.measures m ON m.id = e.id
-        JOIN seller.measure_identity_hits h ON h.measure_id = m.id
+        JOIN seller.measure_identity_hits(at) h ON h.measure_id = m.id
         WHERE h.field = 'BANK_FINGERPRINT' AND h.account_id <> m.account_id
           AND NOT EXISTS (SELECT 1 FROM seller.effective_measures(at) x WHERE x.account_id = h.account_id)
           AND NOT EXISTS (SELECT 1 FROM seller.measure_linked_reviews r WHERE r.measure_id = m.id AND r.account_id = h.account_id)

@@ -511,17 +511,14 @@ func (s *Service) requestIDTakenElsewhere(ctx context.Context, q *store.Queries,
 }
 
 // takeEffect 是限制效果的措施（停權與終止合作）建立時的副作用，都在建立的 transaction 內：建立即生效且有禁止效果的措施（停權，以及非預告的終止
-// 合作，含關聯帳號）快照身分（逐措施、在建立時取，不靠 Recompute：帳號已因其他措施停權時 Recompute 不會「發現」新措施；預告終止不禁止日後重新
-// 申請，不取）、有結束時間的停權排入到期 job、終止合作排入生效 job（排在 starts_at，生效時關店）、立即生效的重算停權期間。
+// 合作，含關聯帳號）快照身分（逐措施、在建立時取，不靠 Recompute：帳號已因其他措施停權時 Recompute 不會「發現」新措施；哪些措施帶身分效果只由 SQL 的
+// identity_effect_measures 決定，這裡對每個限制效果的措施都呼叫，不帶的什麼都不寫）、有結束時間的停權排入到期 job、終止合作排入生效 job（排在 starts_at，生效時關店）、立即生效的重算停權期間。
 func (s *Service) takeEffect(ctx context.Context, q *store.Queries, in model.CreateMeasureInput, row store.SellerMeasure, locked store.SellerStore, now time.Time) error {
 	if !in.Kind.Restrictive() {
 		return nil
 	}
-	immediate := in.Termination == nil || in.Termination.Ground != model.GroundNotice
-	if immediate {
-		if err := suspension.RecordIdentities(ctx, q, row.ID, locked.AccountID); err != nil {
-			return err
-		}
+	if err := suspension.RecordIdentities(ctx, q, row.ID, locked.AccountID); err != nil {
+		return err
 	}
 	if in.Kind == model.MeasureSuspension && in.EndsAt != nil {
 		if err := suspension.ScheduleExpiry(ctx, s.d.Jobs, row.ID, *in.EndsAt); err != nil {
@@ -533,6 +530,8 @@ func (s *Service) takeEffect(ctx context.Context, q *store.Queries, in model.Cre
 			return err
 		}
 	}
+	// 預告終止在 starts_at 才生效，建立時不重算停權期間（與身分效果無關）。
+	immediate := in.Termination == nil || in.Termination.Ground != model.GroundNotice
 	if immediate {
 		return suspension.Recompute(ctx, q, s.d.Events, s.d.Jobs, s.d.Exposure, locked.AccountID, now)
 	}
@@ -599,7 +598,7 @@ func (s *Service) checkTarget(ctx context.Context, q *store.Queries, in model.Cr
 
 // checkTermination 是終止合作的有狀態驗證（帳號與來源措施已鎖住）：重大違約引用的認定至少一筆未撤銷、屬於這個帳號、而且建立它的措施早於現在七日
 // （條款第 21.3 條第 1 款要求通知後七日內未改善）；關聯帳號的來源措施必須未撤銷、是另一個帳號、事由不是預告或關聯帳號（不成鏈）的終止，而且本帳號的 KYC
-// 身分確實命中來源措施的身分快照（伺服器再驗證一次，與 admin 看到的 linked_accounts 同一支查詢）；同一個來源對同一個帳號第二筆在鎖住帳號後檢查並回 AlreadyExists（唯一索引只是保底）。
+// 身分確實命中來源措施的身分（快照加上來源帳號目前的 hash；伺服器再驗證一次，與 admin 看到的 linked_accounts 同一支查詢）；同一個來源對同一個帳號第二筆在鎖住帳號後檢查並回 AlreadyExists（唯一索引只是保底）。
 func (s *Service) checkTermination(ctx context.Context, q *store.Queries, in model.CreateMeasureInput, locked store.SellerStore, now time.Time) error {
 	t := in.Termination
 	if age := t.Ground.CitedFindingMinAge(); age > 0 {
@@ -639,7 +638,7 @@ func (s *Service) checkTermination(ctx context.Context, q *store.Queries, in mod
 	if exists {
 		return apperr.AlreadyExists("這個帳號已經有以這筆措施為來源的關聯終止")
 	}
-	hits, err := s.d.Linked.LinkedAccountHits(ctx, q, source.ID, source.AccountID, &locked.AccountID)
+	hits, err := s.d.Linked.LinkedAccountHits(ctx, q, now, source.ID, source.AccountID, &locked.AccountID)
 	if err != nil {
 		return err
 	}

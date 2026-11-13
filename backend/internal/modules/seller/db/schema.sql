@@ -890,11 +890,11 @@ CREATE TABLE seller.suspension_periods (
 );
 CREATE UNIQUE INDEX suspension_periods_open ON seller.suspension_periods (store_id) WHERE ended_at IS NULL;
 
--- 措施的身分快照（ADR 2026-10-19-seller-kyc-payuni-consolidated「身分比對與比對 hash」）：停權措施建立時，把被處分帳號全部
+-- 措施的身分快照（ADR 2026-10-19-seller-kyc-payuni-consolidated「身分比對與比對 hash」）：帶身分效果的措施（identity_effect_measures）建立時，把被處分帳號全部
 -- KYC 申請（跨 stint）的身分 blind index 複製過來，措施結束或撤銷時刪除；KYC 列的個資照常清理，這裡是措施擁有的、
 -- 唯一保留的比對依據。kind 是比對的種類（統編 TAX_ID；金流商回報的銀行帳號指紋 BANK_ACCOUNT，Stripe 計畫 D38：平台不再收身分證號與銀行帳號），
--- key_id 是算出 hash 的 HMAC 金鑰：快照沒有明文可以重算，所以這把金鑰要留在金鑰環直到措施結束。比對只讀這張表，
--- 「生效中」的判斷一律經 stint.Derive（不在這裡再寫一份）。
+-- key_id 是算出 hash 的 HMAC 金鑰：快照沒有明文可以重算，所以這把金鑰要留在金鑰環直到措施結束。比對讀 measure_identity_sources(at)：
+-- 措施在 at 生效而且帶身分效果時，這張表加上被處分帳號目前的 account_identity_hashes 是它的身分；「生效中」只由 effective_measures 決定。
 CREATE TABLE seller.measure_identities (
     measure_id UUID NOT NULL REFERENCES seller.measures (id),
     kind       TEXT NOT NULL,
@@ -1000,7 +1000,7 @@ CREATE INDEX kyc_applications_submitted ON seller.kyc_applications (submitted_at
 -- 防詐用的身分比對索引（ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-30 修訂，Stripe 計畫 D3）：與 KYC 個資分開保存，只有 blind index、沒有明文。
 -- 來源有兩種：申請的統編（同一個 transaction、同一支 writeHashes 寫入；統編被改掉時同步修剪；Stripe 計畫 D42：申請沒有自己的 hash 表），以及 provider 回報的外部銀行帳號
 -- fingerprint（BANK_FINGERPRINT，收款帳戶同步在寫快取的同一個 transaction 寫入，kyc.Fingerprints；不是草稿的值，不修剪，只由過期刪除）。兩種都不隨 184 天的個資清理刪除：
--- 停權措施建立時 SnapshotMeasureIdentities 從這裡取，所以舊 stint 的 KYC 清掉之後，之後才建立的處分仍取得到它的身分。
+-- 帶身分效果的措施建立時 SnapshotMeasureIdentities 從這裡取，被處分帳號目前還在這裡的列也是措施的身分（measure_identity_hits），所以舊 stint 的 KYC 清掉之後，之後才建立的處分仍取得到它的身分。
 -- 一列是（來源 stint，種類，金鑰，hash）：field 是 TAX_ID 或 BANK_FINGERPRINT（身分證號、負責人身分證號與平台自收的銀行帳號三個舊種類已刪，D38；
 -- BANK_FINGERPRINT 進快照時是 BANK_ACCOUNT）；
 -- source_store_id 是 stint（stores 一列一個 stint）；account_id 是該 stint 所屬的帳號（stores.account_id 不會變，這裡複製是為了快照不必 join）。

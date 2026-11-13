@@ -13,14 +13,14 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 )
 
-// linkedAccounts 是措施的身分快照反查：與這筆措施的帳號使用同一個身分證明文件、統一編號或銀行帳號的其他帳號（W9；銀行帳號只列出，不能建立關聯終止）。只有留有身分快照的措施有結果（停權與非預告
-// 的終止合作；快照在措施撤銷或結束時刪除），其他措施沒有。命中的判斷與建立關聯終止時伺服器的再驗證是同一支比對（LinkedIdentities.LinkedAccountHits）；每一列的 CanCreateLinkedTermination 與建立時的前置條件是同一組 model 規則
+// linkedAccounts 是措施的身分快照反查：與這筆措施的帳號使用同一個身分證明文件、統一編號或銀行帳號的其他帳號（W9；銀行帳號只列出，不能建立關聯終止）。只有生效中而且帶身分效果的措施（停權與非預告
+// 的終止合作）有結果，其他措施沒有。命中的判斷與建立關聯終止時伺服器的再驗證是同一支比對（LinkedIdentities.LinkedAccountHits）；每一列的 CanCreateLinkedTermination 與建立時的前置條件是同一組 model 規則
 // （目標店家是帳號目前的店家，沒有時是最近的 stint，所以一定是帳號最近的一個）。
 func (s *Service) linkedAccounts(ctx context.Context, q *store.Queries, m store.SellerMeasure) ([]model.LinkedAccount, error) {
 	if m.Status != string(model.MeasureStatusEnforced) || !model.MeasureKind(m.Kind).Restrictive() {
 		return nil, nil
 	}
-	hits, err := s.d.Linked.LinkedAccountHits(ctx, q, m.ID, m.AccountID, nil)
+	hits, err := s.d.Linked.LinkedAccountHits(ctx, q, s.now(), m.ID, m.AccountID, nil)
 	if err != nil || len(hits) == 0 {
 		return nil, err
 	}

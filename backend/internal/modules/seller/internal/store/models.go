@@ -180,6 +180,11 @@ type SellerGovernanceNote struct {
 	CreatedAt    time.Time
 }
 
+type SellerIdentityEffectMeasure struct {
+	ID        uuid.UUID
+	AccountID int64
+}
+
 type SellerKycApplication struct {
 	ApplicationID        uuid.UUID
 	StoreID              int64
@@ -311,13 +316,6 @@ type SellerMeasureIdentity struct {
 	Kind      string
 	KeyID     string
 	Hash      []byte
-}
-
-type SellerMeasureIdentityHit struct {
-	MeasureID uuid.UUID
-	AccountID int64
-	Field     string
-	CreatedAt time.Time
 }
 
 type SellerMeasureLinkedReview struct {

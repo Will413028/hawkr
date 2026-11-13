@@ -180,7 +180,7 @@ func TestLinkedAccountLookupUsesTheFingerprintHashIndex(t *testing.T) {
 		must(t, err)
 	}
 	rec := &recorder{inner: f.db.Conn(ctx)}
-	hits, err := store.New(rec).LinkedAccountHits(ctx, store.LinkedAccountHitsParams{MeasureID: source.ID, ExceptAccountID: sS.AccountID})
+	hits, err := store.New(rec).LinkedAccountHits(ctx, store.LinkedAccountHitsParams{At: f.now, MeasureID: source.ID, ExceptAccountID: sS.AccountID})
 	must(t, err)
 	if len(hits) != 1 || hits[0].AccountID != accountO || hits[0].Field != "BANK_FINGERPRINT" {
 		t.Fatalf("hits=%+v", hits)

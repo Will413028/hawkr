@@ -19,7 +19,7 @@ func (s *Service) MarkLinkedAccountReviewed(ctx context.Context, in model.MarkLi
 		return err
 	}
 	q := store.New(s.d.DB.Conn(ctx))
-	hit, err := q.BankFingerprintHitExists(ctx, store.BankFingerprintHitExistsParams{MeasureID: in.MeasureID, AccountID: in.AccountID})
+	hit, err := q.BankFingerprintHitExists(ctx, store.BankFingerprintHitExistsParams{At: s.now(), MeasureID: in.MeasureID, AccountID: in.AccountID})
 	if err != nil {
 		return err
 	}

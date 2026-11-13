@@ -211,23 +211,26 @@ func (q *Queries) AdminKYCApplicationsOldestFirst(ctx context.Context, arg Admin
 const bankFingerprintHitExists = `-- name: BankFingerprintHitExists :one
 SELECT EXISTS (
     SELECT 1
-    FROM seller.measure_identity_hits h
-    JOIN seller.measures m ON m.id = h.measure_id
-    WHERE h.measure_id = $1 AND h.account_id = $2 AND h.field = 'BANK_FINGERPRINT' AND h.account_id <> m.account_id
-)
+    FROM seller.measures m
+    WHERE m.id = $1
+      AND EXISTS (
+          SELECT 1 FROM seller.measure_identity_hits($2::timestamptz) h
+          WHERE h.measure_id = m.id AND h.account_id = $3::bigint AND h.field = 'BANK_FINGERPRINT' AND h.account_id <> m.account_id)
+)::boolean
 `
 
 type BankFingerprintHitExistsParams struct {
 	MeasureID uuid.UUID
+	At        time.Time
 	AccountID int64
 }
 
-// 這一對（措施、帳號）是銀行帳號 fingerprint 命中的關聯帳號（被處分的帳號本身不算）：標為已檢視前的存在性檢查，與處分頁的關聯帳號是同一份命中定義。
+// 這一對（措施、帳號）在 at 是銀行帳號 fingerprint 命中的關聯帳號（被處分的帳號本身不算）：標為已檢視前的存在性檢查，與處分頁的關聯帳號是同一份命中定義。
 func (q *Queries) BankFingerprintHitExists(ctx context.Context, arg BankFingerprintHitExistsParams) (bool, error) {
-	row := q.db.QueryRow(ctx, bankFingerprintHitExists, arg.MeasureID, arg.AccountID)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
+	row := q.db.QueryRow(ctx, bankFingerprintHitExists, arg.MeasureID, arg.At, arg.AccountID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const currentKYCApplication = `-- name: CurrentKYCApplication :one
@@ -794,15 +797,16 @@ func (q *Queries) KYCReviews(ctx context.Context, applicationID uuid.UUID) ([]Se
 }
 
 const linkedAccountHits = `-- name: LinkedAccountHits :many
-SELECT DISTINCT h.account_id, h.field
-FROM seller.measure_identity_hits h
-WHERE h.measure_id = $1
-  AND h.account_id <> $2
-  AND ($3::bigint IS NULL OR h.account_id = $3::bigint)
-ORDER BY h.account_id, h.field
+SELECT DISTINCT h.account_id::bigint AS account_id, h.field::text AS field
+FROM seller.measure_identity_hits($1::timestamptz) h
+WHERE h.measure_id = $2::uuid
+  AND h.account_id <> $3::bigint
+  AND ($4::bigint IS NULL OR h.account_id = $4::bigint)
+ORDER BY 1, 2
 `
 
 type LinkedAccountHitsParams struct {
+	At              time.Time
 	MeasureID       uuid.UUID
 	ExceptAccountID int64
 	AccountID       *int64
@@ -813,12 +817,17 @@ type LinkedAccountHitsRow struct {
 	Field     string
 }
 
-// 與這筆措施的身分快照相同的其他帳號（W9）：防詐保存的 account_identity_hashes（跨 stint，個資清理之後仍在）裡，統編（TAX_ID）對快照的 TAX_ID、
-// provider 回報的銀行帳號 fingerprint（BANK_FINGERPRINT）對快照的 BANK_ACCOUNT（Stripe 計畫 D4、D42：銀行帳號命中只列出；能不能據以建立關聯終止由
-// model.LinkedIdentity.CountsAsGround 決定，不在這裡）。命中的定義只有 seller.measure_identity_hits 那一份（以 (key_id, hash) 索引等值連接，不解密）；帳號取自來源 stint。
+// 與這筆措施的身分相同的其他帳號（W9）：防詐保存的 account_identity_hashes（跨 stint，個資清理之後仍在）裡，統編（TAX_ID）對措施的 TAX_ID、
+// provider 回報的銀行帳號 fingerprint（BANK_FINGERPRINT）對措施的 BANK_ACCOUNT；措施的身分是快照加上被處分帳號目前的 hash，措施在 at 不生效或不帶身分效果時沒有命中（Stripe 計畫 D4、D42：銀行帳號命中只列出；能不能據以建立關聯終止由
+// model.LinkedIdentity.CountsAsGround 決定，不在這裡）。命中的定義只有 seller.measure_identity_hits(at) 那一份（以 (key_id, hash) 索引等值連接，不解密）；帳號取自來源 stint。
 // account_id 不為 NULL 時只看那個帳號。
 func (q *Queries) LinkedAccountHits(ctx context.Context, arg LinkedAccountHitsParams) ([]LinkedAccountHitsRow, error) {
-	rows, err := q.db.Query(ctx, linkedAccountHits, arg.MeasureID, arg.ExceptAccountID, arg.AccountID)
+	rows, err := q.db.Query(ctx, linkedAccountHits,
+		arg.At,
+		arg.MeasureID,
+		arg.ExceptAccountID,
+		arg.AccountID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -959,14 +968,14 @@ func (q *Queries) MarkLinkedAccountReviewed(ctx context.Context, arg MarkLinkedA
 }
 
 const measureIdentityMatches = `-- name: MeasureIdentityMatches :many
-SELECT DISTINCT m.account_id, mi.kind
-FROM seller.measure_identities mi
-JOIN seller.measures m ON m.id = mi.measure_id
-WHERE mi.hash = ANY($1::bytea[]) AND m.account_id <> $2
-ORDER BY m.account_id, mi.kind
+SELECT DISTINCT s.account_id::bigint AS account_id, s.kind::text AS kind
+FROM seller.measure_identity_sources($1::timestamptz) s
+WHERE s.hash = ANY($2::bytea[]) AND s.account_id <> $3::bigint
+ORDER BY 1, 2
 `
 
 type MeasureIdentityMatchesParams struct {
+	At        time.Time
 	Hashes    [][]byte
 	AccountID int64
 }
@@ -976,10 +985,11 @@ type MeasureIdentityMatchesRow struct {
 	Kind      string
 }
 
-// 快照裡與這些 hash 相同、而且屬於別的帳號的列。只讀快照，不判斷措施是否生效：呼叫方對每個帳號以 stint.Derive 判斷
-// （生效中的定義只有 EffectiveMeasures 那一份）。
+// 別的帳號在 at 生效而且帶身分效果的措施，其身分來源（快照加上帳號目前的 hash）裡與這些 hash 相同的列。「生效」與「帶身分效果」都只由
+// seller.measure_identity_sources 那一份決定，呼叫方不再判斷。
+// 輸出欄位的轉型是給 sqlc 的（它不型別化複合型別函式的輸出欄位）。
 func (q *Queries) MeasureIdentityMatches(ctx context.Context, arg MeasureIdentityMatchesParams) ([]MeasureIdentityMatchesRow, error) {
-	rows, err := q.db.Query(ctx, measureIdentityMatches, arg.Hashes, arg.AccountID)
+	rows, err := q.db.Query(ctx, measureIdentityMatches, arg.At, arg.Hashes, arg.AccountID)
 	if err != nil {
 		return nil, err
 	}
@@ -1144,21 +1154,21 @@ func (q *Queries) ReviewKYCApplicationByIDs(ctx context.Context, arg ReviewKYCAp
 
 const sharedBankAccountPendingAccounts = `-- name: SharedBankAccountPendingAccounts :many
 SELECT h.account_id
-FROM (SELECT DISTINCT account_id FROM seller.measure_identity_hits WHERE measure_id = $1) h
+FROM (SELECT DISTINCT x.account_id::bigint AS account_id FROM seller.measure_identity_hits($1::timestamptz) x WHERE x.measure_id = $2::uuid) h
 WHERE EXISTS (
-    SELECT 1 FROM seller.review_shared_bank_account($2::timestamptz) r
-    WHERE r.measure_id = $1 AND r.account_id = h.account_id)
+    SELECT 1 FROM seller.review_shared_bank_account($1::timestamptz) r
+    WHERE r.measure_id = $2 AND r.account_id = h.account_id)
 ORDER BY h.account_id
 `
 
 type SharedBankAccountPendingAccountsParams struct {
-	MeasureID uuid.UUID
 	At        time.Time
+	MeasureID uuid.UUID
 }
 
 // 這筆措施在 at 的待辦 SHARED_BANK_ACCOUNT 裡的帳號：處分頁的關聯帳號要不要出現「標為已檢視」。成員的定義只有 seller.review_shared_bank_account 那一份，這裡不重寫。
 func (q *Queries) SharedBankAccountPendingAccounts(ctx context.Context, arg SharedBankAccountPendingAccountsParams) ([]int64, error) {
-	rows, err := q.db.Query(ctx, sharedBankAccountPendingAccounts, arg.MeasureID, arg.At)
+	rows, err := q.db.Query(ctx, sharedBankAccountPendingAccounts, arg.At, arg.MeasureID)
 	if err != nil {
 		return nil, err
 	}
@@ -1184,6 +1194,7 @@ SELECT $1::uuid,
        h.key_id, h.hash
 FROM seller.account_identity_hashes h
 WHERE h.account_id = $2
+  AND EXISTS (SELECT 1 FROM seller.identity_effect_measures i WHERE i.id = $1::uuid)
 ON CONFLICT DO NOTHING
 `
 
@@ -1192,10 +1203,11 @@ type SnapshotMeasureIdentitiesParams struct {
 	AccountID int64
 }
 
-// 停權措施建立時，複製被處分帳號全部 stint 的身分 blind index 到措施擁有的快照：每個識別欄位金鑰環裡每一把金鑰算的 hash 各一筆，之後換鑰也查得到；
+// 措施建立時，若它帶身分效果（seller.identity_effect_measures 那一份定義：停權與非預告的終止合作），複製被處分帳號全部 stint 的身分 blind index 到措施擁有的快照：每個識別欄位金鑰環裡每一把金鑰算的 hash 各一筆，之後換鑰也查得到；
 // 同一個 hash 只留一筆。來源是 account_identity_hashes（防詐保存，ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-30 修訂）：
 // 申請的統編在 stint 的個資清理之後仍在這裡，所以舊 stint 清理之後才建立的處分取得到它。統編（TAX_ID）的種類是 TAX_ID；provider 回報的銀行帳號
 // fingerprint（BANK_FINGERPRINT）的種類是 BANK_ACCOUNT（Stripe 計畫 D38：身分證號、負責人身分證號與平台自收的銀行帳號已不存在）。
+// 不帶身分效果的措施（預告終止、其他種類）一列都不寫；呼叫方不判斷。
 func (q *Queries) SnapshotMeasureIdentities(ctx context.Context, arg SnapshotMeasureIdentitiesParams) error {
 	_, err := q.db.Exec(ctx, snapshotMeasureIdentities, arg.MeasureID, arg.AccountID)
 	return err
