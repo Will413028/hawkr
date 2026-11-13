@@ -23,22 +23,22 @@
 		"@hawkr/twaddr": "workspace:*",
 		"@hawkr/ui-text": "workspace:*",
 		"@sentry/nextjs": "10.75.2",
-		"@tanstack/react-query": "^5.104.0",
-		"@tanstack/react-query-devtools": "^5.104.0",
-		"chart.js": "^4.4.1",
+		"@tanstack/react-query": "^5.106.1",
+		"@tanstack/react-query-devtools": "^5.106.1",
+		"chart.js": "^4.6.1",
 		"clsx": "^2.1.1",
 		"fabric": "^7.4.0",
 		"framer-motion": "^12.29.2",
-		"konva": "^10.0.12",
+		"konva": "^10.9.1",
 		"next": "catalog:",
 		"react": "catalog:",
 		"react-dom": "catalog:",
-		"react-konva": "^19.2.1",
-		"tailwind-merge": "^3.4.0"
+		"react-konva": "^19.3.2",
+		"tailwind-merge": "^3.7.0"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "catalog:",
-		"@opennextjs/cloudflare": "^1.20.0",
+		"@opennextjs/cloudflare": "^1.20.16",
 		"@tailwindcss/postcss": "^4",
 		"@types/fabric": "^5.3.10",
 		"@types/jsdom": "^21.1.7",
@@ -48,9 +48,9 @@
 		"canvas": "^3.2.3",
 		"jsdom": "^26.1.0",
 		"tailwindcss": "^4",
-		"tsx": "^4.22.4",
+		"tsx": "^4.23.15",
 		"typescript": "catalog:",
 		"typescript-compiler-api": "catalog:",
-		"wrangler": "^4.105.0"
+		"wrangler": "^4.158.0"
 	}
 }
