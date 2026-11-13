@@ -99,6 +99,12 @@ type EnsureInput struct {
 	Collection     model.RequirementCollection
 }
 
+// ResolveInput 是以冪等鍵取得外部帳戶的輸入：StoreID 與 IdempotencyKey 是帳戶列上的值。
+type ResolveInput struct {
+	StoreID        int64
+	IdempotencyKey string
+}
+
 // SessionInput 是開通 session 的輸入；Collection 是帳戶列保存的收件方式（D2），介面由它決定；ReturnURL 是賣家完成或離開後回到的頁面，RefreshURL 是連結過期時重新取得的頁面。
 type SessionInput struct {
 	ExternalAccountID string
@@ -119,8 +125,11 @@ type Provider interface {
 	// Name 是 provider 的代碼（小寫英數與底線），存在帳戶列的 provider 欄。
 	Name() string
 	Capabilities() Capabilities
-	// EnsureAccount 建立外部帳戶，以 IdempotencyKey 冪等，收件方式取 in.Collection。回傳外部帳戶 ID。
+	// EnsureAccount 建立外部帳戶，以 IdempotencyKey 冪等，收件方式取 in.Collection。回傳外部帳戶 ID。實作可以分多步，同一把鍵的重試（信箱可能已經不同）
+	// 得到同一個帳戶（D55）；所有步驟都成功才回傳 ID。
 	EnsureAccount(ctx context.Context, in EnsureInput) (externalID string, err error)
+	// ResolveAccount 以 IdempotencyKey 取得外部帳戶：已建立過就回那一個，沒有就建一個不含擁有者個資的空帳戶（清理沒有外部 ID 的列時用，D55）。
+	ResolveAccount(ctx context.Context, in ResolveInput) (externalID string, err error)
 	// CreateOnboardingSession 產生開通的連結或內嵌元件的 session。
 	CreateOnboardingSession(ctx context.Context, in SessionInput) (model.OnboardingSession, error)
 	// FetchAccount 讀外部帳戶目前的狀態與掛著的外部銀行帳號識別碼；任何一項讀取失敗整個呼叫失敗。

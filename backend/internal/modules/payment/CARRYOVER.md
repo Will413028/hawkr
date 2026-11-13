@@ -20,9 +20,10 @@
 | 賣家觸發的重讀名額（`seller_read_claimed_at`，10 秒） | 外部讀取由賣家觸發，頻率不受 job 唯一鍵約束 | 成立（D33） | 對由使用者觸發的外部呼叫限頻 | 在讀 provider 之前以條件式 UPDATE 搶名額，失敗與並行的讀取都占名額，名額內依 `fetched_at` 回成功或 `ResourceExhausted`（帶剩餘秒數）。`httpapi` 的限流器是傳輸層行程內的固定時間窗計數（`internal/httpapi/ratelimit.go`），不看帳戶列上的讀取結果；這裡的回答要看快取是否已涵蓋占名額的讀取，所以名額放在帳戶列。呼叫拿掉時，名額與該欄一起拿掉 |
 | 快取存 `requirements` 的原始 JSON | 補件內容只用來顯示，狀態不從它推導 | 成立（D13） | 開通完成看 `stripe_transfers.status`，`requirements` 只用來顯示要補什麼 | 整份原樣存（非物件的值存成 `{}`，`accounts_requirements_check`），後台與賣家端經 `httpapi/payment` 轉成公開條件；不另建欄位表，Stripe 增減條目不需要 migration |
 | 記憶體內的 fake provider | 本機與測試要在沒有真的金流商時走完開通 | 成立 | 以 fake 取代外部服務，正式環境不可選 | `PAYMENT_PROVIDER=fake` 只在 `requireDevEnvironment` 成立時選得到（有 `DEV_AUTH_KEY_FILE` 且沒有 Cloudflare Access 設定），否則啟動失敗（`cmd/hawkr/payment.go`）；每個呼叫檢查不在 DB transaction 內且有 deadline（規則 5），`AutoActive` 讓不認得的外部帳戶也回轉帳已啟用 |
-| 核准時把聯絡信箱複製到帳戶列（`contact_email`） | 帳戶還在 seller，核准與建立在同一個模組 | 不成立（D50，修訂 D23） | 下層不存上層個資的副本，需要時向擁有者讀 | 欄位刪除；`Owners.OwnerContactEmail` 在建立外部帳戶的當下讀擁有者目前的信箱，讀不到時不建立、記成建立失敗（永久失敗，補填後由管理員重試） |
+| 核准時把聯絡信箱複製到帳戶列（`contact_email`） | 帳戶還在 seller，核准與建立在同一個模組 | 不成立（D50，修訂 D23） | 下層不存上層個資的副本，需要時向擁有者讀 | 欄位刪除；`Owners.OwnerContactEmail` 在建立外部帳戶的當下讀擁有者目前的信箱，讀不到時不建立、記成建立失敗（永久失敗，補填後由管理員重試）；建立分兩步（D55）：第一步只帶 `metadata.store_id` 與列上的冪等鍵，信箱在第二步的更新寫入，所以信箱換了也不會 `idempotency_error` |
+| 結果未知的建立請求放超過 Stripe v2 冪等鍵的保存期（30 天）再重試 | 冪等鍵保存期內同一把鍵回同一個帳戶（D55） | 部分成立：超過保存期同一把鍵會建出第二個帳戶 | 以 `metadata.store_id` 對帳，找出並關閉多出的帳戶 | 沒有對帳：只靠 River 的重試窗與後台重試都遠短於 30 天。觸發重新評估：上線前 |
 | `provider` 欄位：帳戶列記下建立它的 provider | 同一個部署同時只設定一個 provider，但列要知道外部 ID 屬於誰 | 成立 | 外部 ID 與 provider 一起存，唯一鍵含 provider | 列的 provider 與目前設定不同時，同步、建立與重新整理略過它，賣家端重讀回 `FailedPrecondition`，清理不關也不刪、記警示 log（列在清理 job 的第一步已標 `purge_pending_at`）；舊列沒有自動搬遷或重建的去向，換 provider 的流程還沒有設計。觸發重新評估：接第二家金流商時 |
-| 清理的永久失敗沒有終局狀態 | 金流商回報帳戶不存在、或列的 provider 沒有設定時，關不掉也不能刪列 | 部分成立：分不出「帳戶真的不存在」與「金鑰指向另一個 sandbox」，所以不刪對應 | 有終局狀態或人工處理入口 | 沒有終局狀態：這些列每次週期掃描都重排清理、重試並記警示 log，對應不刪。觸發重新評估：上線前 |
+| 清理的永久失敗沒有終局狀態 | 金流商回報帳戶不存在、或列的 provider 沒有設定時，關不掉也不能刪列 | 部分成立：分不出「帳戶真的不存在」與「金鑰指向另一個 sandbox」，所以不刪對應 | 有終局狀態或人工處理入口 | 沒有終局狀態：這些列每次週期掃描都重排清理、重試並記警示 log，對應不刪；沒有外部 ID 的列（建立到一半）標不了 `purge_pending_at`，取得或關閉最後失敗後沒有週期掃描接手。觸發重新評估：上線前 |
 | 輪詢補漏（15 分鐘）對所有未啟用的帳戶，沒有年齡上限或退避 | 事件可能遺失，要有補漏 | 成立 | 輪詢加上限或退避 | 沿用，不設上限。觸發：上線前定上限 |
 | `inbox.events` 的未處理事件永不刪、沒有終局狀態 | 目前只有收款帳戶一個 handler，補掃重派到被處理為止 | 成立（只有一個 handler） | 事件有終局狀態（死信），到期後移出補掃 | 沿用：`Purge` 只刪已處理而且過了保存期的事件，未處理的由補掃或模組的掃描處理，每個新 handler 要自己補掃。觸發：第二個 handler 接上 inbox 時 |
 

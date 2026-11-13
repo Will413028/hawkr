@@ -35,6 +35,9 @@ type Fake struct {
 	byKey        map[string]string
 	accounts     map[string]Snapshot
 	ensureErrs   []error
+	lostErrs     []error
+	resolveErrs  []error
+	resolves     []string
 	fetchErrs    []error
 	closeErrs    []error
 	closed       []string
@@ -75,6 +78,27 @@ func (f *Fake) FailEnsure(errs ...error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.ensureErrs = append(f.ensureErrs, errs...)
+}
+
+// FailEnsureAfterCreate 讓接下來的建立依序在帳戶已建立之後回這些錯誤（回應遺失；排完就成功）。
+func (f *Fake) FailEnsureAfterCreate(errs ...error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.lostErrs = append(f.lostErrs, errs...)
+}
+
+// FailResolve 讓接下來的取得依序回這些錯誤（排完就成功）。
+func (f *Fake) FailResolve(errs ...error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.resolveErrs = append(f.resolveErrs, errs...)
+}
+
+// Resolves 回傳每次 ResolveAccount 收到的冪等鍵（依呼叫順序，失敗的呼叫也算）。
+func (f *Fake) Resolves() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.resolves...)
 }
 
 // FailFetch 讓接下來的重讀依序回這些錯誤（排完就成功）。
@@ -162,7 +186,23 @@ func (f *Fake) Capabilities() Capabilities {
 	return f.caps
 }
 
-// EnsureAccount 實作 Provider：同一個冪等鍵回同一個帳戶。
+// accountFor 要持有 f.mu：回傳冪等鍵對應的帳戶，沒有就建立。
+func (f *Fake) accountFor(key string) string {
+	if id, ok := f.byKey[key]; ok {
+		return id
+	}
+	f.next++
+	id := fmt.Sprintf("fake_acct_%d", f.next)
+	f.byKey[key] = id
+	f.accounts[id] = Snapshot{
+		Transfers:    CapabilityRestricted,
+		Details:      []StatusDetail{{Resolution: ResolutionSellerAction, Reason: "routine_onboarding"}},
+		Requirements: json.RawMessage(`{}`),
+	}
+	return id
+}
+
+// EnsureAccount 實作 Provider：一步完成，同一個冪等鍵回同一個帳戶（信箱不同也一樣）。
 func (f *Fake) EnsureAccount(ctx context.Context, in EnsureInput) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -173,18 +213,23 @@ func (f *Fake) EnsureAccount(ctx context.Context, in EnsureInput) (string, error
 	if err := pop(&f.ensureErrs); err != nil {
 		return "", err
 	}
-	if id, ok := f.byKey[in.IdempotencyKey]; ok {
-		return id, nil
-	}
-	f.next++
-	id := fmt.Sprintf("fake_acct_%d", f.next)
-	f.byKey[in.IdempotencyKey] = id
-	f.accounts[id] = Snapshot{
-		Transfers:    CapabilityRestricted,
-		Details:      []StatusDetail{{Resolution: ResolutionSellerAction, Reason: "routine_onboarding"}},
-		Requirements: json.RawMessage(`{}`),
+	id := f.accountFor(in.IdempotencyKey)
+	if err := pop(&f.lostErrs); err != nil {
+		return "", err
 	}
 	return id, nil
+}
+
+// ResolveAccount 實作 Provider：同一個冪等鍵回同一個帳戶，沒有就建立。
+func (f *Fake) ResolveAccount(ctx context.Context, in ResolveInput) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.check(ctx, "ResolveAccount")
+	f.resolves = append(f.resolves, in.IdempotencyKey)
+	if err := pop(&f.resolveErrs); err != nil {
+		return "", err
+	}
+	return f.accountFor(in.IdempotencyKey), nil
 }
 
 // CreateOnboardingSession 實作 Provider。

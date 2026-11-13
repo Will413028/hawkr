@@ -208,6 +208,14 @@ func (f *fixture) newStore(t *testing.T) int64 {
 	return id
 }
 
+func (f *fixture) key(t *testing.T, storeID int64) string {
+	t.Helper()
+	ctx := context.Background()
+	var k string
+	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT create_idempotency_key::text FROM payment.accounts WHERE store_id = $1", storeID).Scan(&k))
+	return k
+}
+
 func (f *fixture) account(t *testing.T, storeID int64) Account {
 	t.Helper()
 	a, err := f.module.Account(context.Background(), storeID)
@@ -961,17 +969,17 @@ func TestAPermanentCloseFailureMarksTheRowOnTheFirstAttempt(t *testing.T) {
 	}
 }
 
-// 沒有外部 ID 的列（還沒建立）直接刪，不呼叫 provider；provider 與目前設定不同的列不關也不刪，記警示 log 並標成等待清理，等設定回來再清理
+// 沒有外部 ID 的列（D55）：以列上的冪等鍵取得外部帳戶、關閉它、再刪列；provider 與目前設定不同的列不關也不刪，記警示 log 並標成等待清理，等設定回來再清理
 // （刪掉就永遠找不到外部帳戶）。
-// mutation 1：沒有外部 ID 也呼叫 CloseAccount → provider 被呼叫，失敗。mutation 2：provider 不符也刪列 → 列不見，失敗。
+// mutation 1：沒有外部 ID 直接刪列（m2）→ 沒有取得也沒有關閉，失敗。mutation 2：provider 不符也刪列 → 列不見，失敗。
 func TestPurgeDeletesRowsWithoutAnExternalAccountAndKeepsRowsOfAnotherProvider(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
 	fresh := f.newStore(t)
 	must(t, f.module.PurgeAccount(ctx, fresh, false))
-	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", fresh) != 0 || len(f.fake.Closes()) != 0 {
-		t.Fatalf("沒有外部 ID 的列應該直接刪、不呼叫 provider：關閉=%v", f.fake.Closes())
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", fresh) != 0 || len(f.fake.Closes()) != 1 || len(f.fake.Resolves()) != 1 {
+		t.Fatalf("沒有外部 ID 的列應該以冪等鍵取得外部帳戶、關閉、再刪：關閉=%v 取得=%v", f.fake.Closes(), f.fake.Resolves())
 	}
 	other := f.newStore(t)
 	f.ensure(t, other)
@@ -991,6 +999,44 @@ func TestPurgeDeletesRowsWithoutAnExternalAccountAndKeepsRowsOfAnotherProvider(t
 	must(t, noProvider.PurgeAccount(ctx, other, true))
 	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", other) != 1 {
 		t.Fatal("沒有設定 provider 時不該刪列")
+	}
+}
+
+// 建立的第一次呼叫結果未知、信箱又改了：重試沿用同一把鍵，provider 回同一個帳戶，帶的是這次的信箱（D55）；不會多出第二個帳戶。
+// mutation：Fake 的建立不以鍵回同一個帳戶 → 出現第二個帳戶，失敗。
+func TestARetriedCreateWithAChangedEmailKeepsOneExternalAccount(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	s := f.newStore(t)
+	f.owners.setEmail(s, "old@example.com")
+	f.fake.FailEnsureAfterCreate(errors.New("timeout"))
+	_ = f.module.EnsureAccount(context.Background(), s, false)
+	f.owners.setEmail(s, "new@example.com")
+	f.ensure(t, s)
+	if got := f.fake.EnsureEmails(); !slices.Equal(got, []string{"old@example.com", "new@example.com"}) || f.fake.Accounts() != 1 {
+		t.Fatalf("信箱=%v 帳戶數=%d", got, f.fake.Accounts())
+	}
+	if a := f.account(t, s); a.ExternalAccountID == nil {
+		t.Fatalf("帳戶=%+v", a)
+	}
+}
+
+// 清理遇到沒有外部 ID 但 provider 那邊已經建好帳戶的列（建立成功、ID 還沒寫入前程序被殺）：取得到的是同一個帳戶，關閉它再刪列，不留下沒人關的帳戶。
+// mutation：沒有外部 ID 直接刪列 → 沒有關閉，失敗。
+func TestPurgeOfARowWhoseAccountWasCreatedButNeverStoredClosesThatAccount(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	key := f.key(t, s)
+	id, err := f.fake.ResolveAccount(ctx, account.ResolveInput{StoreID: s, IdempotencyKey: key})
+	must(t, err)
+	must(t, f.module.PurgeAccount(ctx, s, false))
+	if got := f.fake.Closes(); !slices.Equal(got, []string{id}) || f.fake.Accounts() != 1 {
+		t.Fatalf("關閉=%v 帳戶數=%d，預期關閉 %s", got, f.fake.Accounts(), id)
+	}
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 {
+		t.Fatal("列應該已刪除")
 	}
 }
 

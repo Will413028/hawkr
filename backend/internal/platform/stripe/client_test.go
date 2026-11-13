@@ -112,28 +112,117 @@ func decode(t *testing.T, s string) map[string]any {
 	return m
 }
 
-func TestCreateAccountSendsTheSpikeBodyForBothDashboards(t *testing.T) {
+func TestCreateAccountSendsOnlyMetadataThenTheUpdateForBothDashboards(t *testing.T) {
 	for dash, fx := range map[Dashboard]string{DashboardExpress: "create_provider", DashboardNone: "create_platform"} {
-		s := &stub{resp: replay(loadFixture(t, fx))}
+		want := loadFixture(t, fx).object(t)["id"].(string)
+		s := &stub{resp: twoStepResp(want)}
 		c := newTestClient(t, s)
-		id, err := c.CreateAccount(context.Background(), "42", dash, "seller@example.com")
-		if err != nil || id != loadFixture(t, fx).object(t)["id"] || !strings.HasPrefix(id, "acct_") {
+		id, err := c.CreateAccount(context.Background(), "42", 7, dash, "seller@example.com")
+		if err != nil || id != want || !strings.HasPrefix(id, "acct_") {
 			t.Fatalf("%s：id=%q err=%v", dash, id, err)
 		}
-		r := s.requests()[0]
-		if r.Method != "POST" || r.URI != "/v2/core/accounts" || r.Idempotency != "42" || r.Authorization != "Bearer sk_test_x" || !strings.HasPrefix(r.ContentType, "application/json") {
-			t.Errorf("%s：請求 %+v", dash, r)
+		reqs := s.requests()
+		if len(reqs) != 2 {
+			t.Fatalf("%s：請求數 %d", dash, len(reqs))
 		}
-		got := decode(t, r.Body)
-		want := decode(t, `{
+		r := reqs[0]
+		if r.Method != "POST" || r.URI != "/v2/core/accounts" || r.Idempotency != "42" || r.Authorization != "Bearer sk_test_x" || !strings.HasPrefix(r.ContentType, "application/json") {
+			t.Errorf("%s：建立請求 %+v", dash, r)
+		}
+		if !jsonEqual(decode(t, r.Body), decode(t, `{"metadata": {"store_id": "7"}}`)) {
+			t.Errorf("%s：建立本文 %s", dash, r.Body)
+		}
+		u := reqs[1]
+		if u.Method != "POST" || u.URI != "/v2/core/accounts/"+want || !strings.HasPrefix(u.ContentType, "application/json") {
+			t.Errorf("%s：更新請求 %+v", dash, u)
+		}
+		wantBody := decode(t, `{
 			"identity": {"country": "us", "entity_type": "individual"},
 			"configuration": {"recipient": {"capabilities": {"stripe_balance": {"stripe_transfers": {"requested": true}}}}},
 			"defaults": {"responsibilities": {"fees_collector": "application", "losses_collector": "application"}},
 			"dashboard": "`+string(dash)+`",
 			"contact_email": "seller@example.com"}`)
-		if !jsonEqual(got, want) {
-			t.Errorf("%s：本文 %s", dash, r.Body)
+		if !jsonEqual(decode(t, u.Body), wantBody) {
+			t.Errorf("%s：更新本文 %s", dash, u.Body)
 		}
+	}
+}
+
+func twoStepResp(id string) func(int) (int, string, http.Header) {
+	return func(n int) (int, string, http.Header) {
+		if n%2 == 1 {
+			return 200, `{"id":"` + id + `","object":"v2.core.account"}`, nil
+		}
+		return 200, `{"id":"` + id + `","object":"v2.core.account","applied_configurations":["recipient"]}`, nil
+	}
+}
+
+func TestARetryAfterALostCreateResponseWithAnotherEmailReusesTheAccountAndNeverHitsAnIdempotencyError(t *testing.T) {
+	s := &stub{}
+	s.resp = func(n int) (int, string, http.Header) {
+		r := s.requests()[n-1]
+		if r.Method == "POST" && r.URI == "/v2/core/accounts" {
+			if r.Body != `{"metadata":{"store_id":"7"}}` {
+				return 409, `{"error":{"code":"idempotency_error","message":"different params"}}`, nil
+			}
+			if n == 1 {
+				return 500, `{"error":{"message":"lost"}}`, nil
+			}
+			return 200, `{"id":"acct_same","object":"v2.core.account"}`, nil
+		}
+		return 200, `{"id":"acct_same","object":"v2.core.account"}`, nil
+	}
+	c := newTestClient(t, s)
+	if _, err := c.CreateAccount(context.Background(), "k", 7, DashboardNone, "old@example.com"); err == nil {
+		t.Fatal("第一次應失敗")
+	}
+	id, err := c.CreateAccount(context.Background(), "k", 7, DashboardNone, "new@example.com")
+	if err != nil || id != "acct_same" {
+		t.Fatalf("id=%q err=%v", id, err)
+	}
+	reqs := s.requests()
+	if len(reqs) != 3 || reqs[0].Body != reqs[1].Body || reqs[0].Idempotency != reqs[1].Idempotency {
+		t.Fatalf("請求 %+v", reqs)
+	}
+	if got := decode(t, reqs[2].Body)["contact_email"]; got != "new@example.com" {
+		t.Errorf("更新帶的信箱 %v", got)
+	}
+}
+
+func TestAFailedUpdateIsAnErrorAndARetryRunsBothStepsAgain(t *testing.T) {
+	s := &stub{resp: func(n int) (int, string, http.Header) {
+		switch n {
+		case 2:
+			return 400, `{"error":{"code":"invalid_fields","message":"bad"}}`, nil
+		case 4:
+			return 200, `{"id":"acct_1","object":"v2.core.account","applied_configurations":["recipient"]}`, nil
+		}
+		return 200, `{"id":"acct_1","object":"v2.core.account"}`, nil
+	}}
+	c := newTestClient(t, s)
+	id, err := c.CreateAccount(context.Background(), "k", 7, DashboardNone, "a@example.com")
+	var api *APIError
+	if !errors.As(err, &api) || !api.Permanent() || id != "" {
+		t.Fatalf("id=%q err=%v", id, err)
+	}
+	id, err = c.CreateAccount(context.Background(), "k", 7, DashboardNone, "a@example.com")
+	if err != nil || id != "acct_1" {
+		t.Fatalf("id=%q err=%v", id, err)
+	}
+	if reqs := s.requests(); len(reqs) != 4 || reqs[2].Idempotency != "k" || reqs[2].Body != reqs[0].Body {
+		t.Fatalf("請求 %+v", reqs)
+	}
+}
+
+func TestCreateAccountShellSendsOnlyTheStoreIDMetadata(t *testing.T) {
+	s := &stub{resp: func(int) (int, string, http.Header) { return 200, `{"id":"acct_1","object":"v2.core.account"}`, nil }}
+	id, err := newTestClient(t, s).CreateAccountShell(context.Background(), "k", 9)
+	if err != nil || id != "acct_1" {
+		t.Fatalf("id=%q err=%v", id, err)
+	}
+	reqs := s.requests()
+	if len(reqs) != 1 || reqs[0].Idempotency != "k" || !jsonEqual(decode(t, reqs[0].Body), decode(t, `{"metadata":{"store_id":"9"}}`)) {
+		t.Fatalf("請求 %+v", reqs)
 	}
 }
 
@@ -145,7 +234,7 @@ func jsonEqual(a, b any) bool {
 
 func TestIdempotencyConflictIsAnAPIErrorThatIsPermanent(t *testing.T) {
 	s := &stub{resp: replay(loadFixture(t, "create_provider_idem_conflict"))}
-	_, err := newTestClient(t, s).CreateAccount(context.Background(), "42", DashboardExpress, "seller@example.com")
+	_, err := newTestClient(t, s).CreateAccountShell(context.Background(), "42", 7)
 	var api *APIError
 	if !errors.As(err, &api) || api.Status != 409 || api.Code != "idempotency_error" || !api.Permanent() {
 		t.Fatalf("err=%v", err)
@@ -279,7 +368,7 @@ func TestResponsesMissingRequiredFieldsAreErrorsNotValues(t *testing.T) {
 	s := &stub{resp: func(int) (int, string, http.Header) { return 200, `{}`, nil }}
 	c := newTestClient(t, s)
 	ctx := context.Background()
-	if id, err := c.CreateAccount(ctx, "1", DashboardNone, "seller@example.com"); err == nil || id != "" {
+	if id, err := c.CreateAccount(ctx, "1", 7, DashboardNone, "seller@example.com"); err == nil || id != "" {
 		t.Errorf("CreateAccount id=%q err=%v", id, err)
 	}
 	if l, err := c.CreateAccountLink(ctx, "a", "r", "f"); err == nil || l.URL != "" {
@@ -304,7 +393,7 @@ func TestRateLimitIsRetriedInsideTheClientWithBackoffThenSucceeds(t *testing.T) 
 	c := newTestClient(t, s, func(cfg *Config) {
 		cfg.Wait = func(_ context.Context, d time.Duration) error { waits = append(waits, d); return nil }
 	})
-	id, err := c.CreateAccount(context.Background(), "7", DashboardExpress, "seller@example.com")
+	id, err := c.CreateAccountShell(context.Background(), "7", 7)
 	if err != nil || id != "acct_9" {
 		t.Fatalf("id=%q err=%v", id, err)
 	}
@@ -353,7 +442,7 @@ func TestSDKAutomaticRetriesAreDisabled(t *testing.T) {
 		},
 	} {
 		s := &stub{resp: resp}
-		_, err := newTestClient(t, s).CreateAccount(context.Background(), "k", DashboardNone, "a@example.com")
+		_, err := newTestClient(t, s).CreateAccount(context.Background(), "k", 7, DashboardNone, "a@example.com")
 		var api *APIError
 		if !errors.As(err, &api) || len(s.requests()) != 1 {
 			t.Errorf("%s：err=%v 請求=%d", name, err, len(s.requests()))

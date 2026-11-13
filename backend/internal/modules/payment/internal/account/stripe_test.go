@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -119,20 +120,43 @@ func TestStripeEnsureAccountWithoutContactEmailIsPermanentAndSendsNothing(t *tes
 	}
 }
 
-// 重試沿用同一把鍵：adapter 原樣把 EnsureInput 的鍵送成 Idempotency-Key。
-func TestStripeEnsureAccountSendsTheGivenKeyOnEveryAttempt(t *testing.T) {
-	var keys []string
+// 重試沿用同一把鍵：adapter 原樣把 EnsureInput 的鍵送成建立請求的 Idempotency-Key，建立請求的本文只有 metadata.store_id，信箱換了也不變。
+func TestStripeEnsureAccountSendsTheGivenKeyAndAFixedCreateBodyOnEveryAttempt(t *testing.T) {
+	var keys, bodies []string
 	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		keys = append(keys, r.Header.Get("Idempotency-Key"))
+		if r.URL.Path == "/v2/core/accounts" {
+			keys = append(keys, r.Header.Get("Idempotency-Key"))
+			b, _ := io.ReadAll(r.Body)
+			bodies = append(bodies, string(b))
+		}
 		_, _ = w.Write([]byte(`{"id":"acct_1"}`))
 	}))
-	for range 2 {
-		if _, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "6f1c0a52-0000-4000-8000-000000000001", ContactEmail: "seller@example.com", Collection: model.CollectionProvider}); err != nil {
+	for _, email := range []string{"a@example.com", "b@example.com"} {
+		if _, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "6f1c0a52-0000-4000-8000-000000000001", ContactEmail: email, Collection: model.CollectionProvider}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if fmt.Sprint(keys) != "[6f1c0a52-0000-4000-8000-000000000001 6f1c0a52-0000-4000-8000-000000000001]" {
 		t.Errorf("Idempotency-Key %v", keys)
+	}
+	if len(bodies) != 2 || bodies[0] != bodies[1] || bodies[0] != `{"metadata":{"store_id":"5"}}` {
+		t.Errorf("建立本文 %q", bodies)
+	}
+}
+
+func TestStripeResolveAccountReplaysTheCreateStepWithTheStoredKeyAndSendsNoOwnerData(t *testing.T) {
+	var reqs []string
+	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		reqs = append(reqs, r.Method+" "+r.URL.Path+" "+r.Header.Get("Idempotency-Key")+" "+string(b))
+		_, _ = w.Write([]byte(`{"id":"acct_1"}`))
+	}))
+	id, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 5, IdempotencyKey: "k"})
+	if err != nil || id != "acct_1" || fmt.Sprint(reqs) != `[POST /v2/core/accounts k {"metadata":{"store_id":"5"}}]` {
+		t.Errorf("id=%q err=%v 請求=%v", id, err, reqs)
+	}
+	if _, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 5}); !errors.Is(err, ErrPermanent) {
+		t.Errorf("缺冪等鍵：%v，預期 ErrPermanent", err)
 	}
 }
 

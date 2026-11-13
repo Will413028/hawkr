@@ -222,24 +222,10 @@ const (
 	DashboardNone    Dashboard = "none"
 )
 
-// CreateAccount 建立 v2 recipient 帳戶（US、individual、轉帳能力），以 idempotencyKey 冪等；回傳帳戶 ID。
-// contactEmail 必填：有 recipient 設定的帳戶沒有它時 Stripe 回 400。
-func (c *Client) CreateAccount(ctx context.Context, idempotencyKey string, dashboard Dashboard, contactEmail string) (string, error) {
-	params := &sdk.V2CoreAccountCreateParams{
-		Identity: &sdk.V2CoreAccountCreateIdentityParams{Country: sdk.String("us"), EntityType: sdk.String("individual")},
-		Configuration: &sdk.V2CoreAccountCreateConfigurationParams{Recipient: &sdk.V2CoreAccountCreateConfigurationRecipientParams{
-			Capabilities: &sdk.V2CoreAccountCreateConfigurationRecipientCapabilitiesParams{
-				StripeBalance: &sdk.V2CoreAccountCreateConfigurationRecipientCapabilitiesStripeBalanceParams{
-					StripeTransfers: &sdk.V2CoreAccountCreateConfigurationRecipientCapabilitiesStripeBalanceStripeTransfersParams{Requested: sdk.Bool(true)},
-				},
-			},
-		}},
-		Defaults: &sdk.V2CoreAccountCreateDefaultsParams{Responsibilities: &sdk.V2CoreAccountCreateDefaultsResponsibilitiesParams{
-			FeesCollector: sdk.String("application"), LossesCollector: sdk.String("application"),
-		}},
-		Dashboard:    sdk.String(string(dashboard)),
-		ContactEmail: sdk.String(contactEmail),
-	}
+// CreateAccountShell 是建立的第一步（D55）：只帶 metadata.store_id、用呼叫方保存的冪等鍵；本文固定，同一把鍵永遠得到同一個帳戶，
+// 帳戶上沒有任何擁有者個資。回傳帳戶 ID。
+func (c *Client) CreateAccountShell(ctx context.Context, idempotencyKey string, storeID int64) (string, error) {
+	params := &sdk.V2CoreAccountCreateParams{Metadata: map[string]string{"store_id": strconv.FormatInt(storeID, 10)}}
 	if idempotencyKey != "" {
 		params.IdempotencyKey = sdk.String(idempotencyKey)
 	}
@@ -254,6 +240,43 @@ func (c *Client) CreateAccount(ctx context.Context, idempotencyKey string, dashb
 		return "", errors.New("stripe：建立帳戶的回應沒有 id")
 	}
 	return out.ID, nil
+}
+
+// UpdateAccount 是建立的第二步（D55）：寫入聯絡信箱、recipient 設定（US、individual、轉帳能力）、責任歸屬與 dashboard；可重複送出。
+// contactEmail 必填：有 recipient 設定的帳戶沒有它時 Stripe 回 400。
+func (c *Client) UpdateAccount(ctx context.Context, accountID string, dashboard Dashboard, contactEmail string) error {
+	params := &sdk.V2CoreAccountUpdateParams{
+		Identity: &sdk.V2CoreAccountUpdateIdentityParams{Country: sdk.String("us"), EntityType: sdk.String("individual")},
+		Configuration: &sdk.V2CoreAccountUpdateConfigurationParams{Recipient: &sdk.V2CoreAccountUpdateConfigurationRecipientParams{
+			Capabilities: &sdk.V2CoreAccountUpdateConfigurationRecipientCapabilitiesParams{
+				StripeBalance: &sdk.V2CoreAccountUpdateConfigurationRecipientCapabilitiesStripeBalanceParams{
+					StripeTransfers: &sdk.V2CoreAccountUpdateConfigurationRecipientCapabilitiesStripeBalanceStripeTransfersParams{Requested: sdk.Bool(true)},
+				},
+			},
+		}},
+		Defaults: &sdk.V2CoreAccountUpdateDefaultsParams{Responsibilities: &sdk.V2CoreAccountUpdateDefaultsResponsibilitiesParams{
+			FeesCollector: sdk.String("application"), LossesCollector: sdk.String("application"),
+		}},
+		Dashboard:    sdk.String(string(dashboard)),
+		ContactEmail: sdk.String(contactEmail),
+	}
+	return c.call(ctx, func(ctx context.Context) error {
+		_, err := c.sdk.V2CoreAccounts.Update(ctx, accountID, params)
+		return err
+	})
+}
+
+// CreateAccount 建立 v2 recipient 帳戶：先 CreateAccountShell（冪等），再 UpdateAccount；兩步都成功才回傳帳戶 ID。第二步失敗時帳戶已存在，
+// 同一把鍵重來會得到同一個帳戶。
+func (c *Client) CreateAccount(ctx context.Context, idempotencyKey string, storeID int64, dashboard Dashboard, contactEmail string) (string, error) {
+	id, err := c.CreateAccountShell(ctx, idempotencyKey, storeID)
+	if err != nil {
+		return "", err
+	}
+	if err := c.UpdateAccount(ctx, id, dashboard, contactEmail); err != nil {
+		return "", err
+	}
+	return id, nil
 }
 
 // AccountLink 是託管開通頁面的連結。

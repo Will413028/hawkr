@@ -168,9 +168,9 @@ func TestNewRequiresOwnersAndRegistersTheProviderWithTheInbox(t *testing.T) {
 	}()
 }
 
-// 清理一列的處理方式：沒有外部 ID 的列不論 provider 都直接刪；有外部 ID 時 provider 與目前設定相同才關閉，不同或沒有設定 provider 時不動它
+// 清理一列的處理方式：沒有外部 ID 的列在 provider 相同時以冪等鍵取得外部帳戶再關閉（D55），問不到 provider（不同或沒有設定）時直接刪；有外部 ID 時 provider 與目前設定相同才關閉，不同或沒有設定 provider 時不動它
 // （刪掉就永遠找不到外部帳戶）。
-// mutation：provider 不符也走關閉 → 兩個 defer 案例失敗；沒有外部 ID 也走關閉 → 直接刪的案例失敗。
+// mutation：provider 不符也走關閉 → 兩個 defer 案例失敗；沒有外部 ID 也走關閉 → 直接刪的案例失敗；沒有外部 ID 直接刪 → 取得外部帳戶的案例失敗（m2）。
 func TestPlanPurgeDeletesRowsWithoutExternalIDClosesMatchingProviderAndDefersTheRest(t *testing.T) {
 	external := "acct_1"
 	for name, tc := range map[string]struct {
@@ -178,7 +178,7 @@ func TestPlanPurgeDeletesRowsWithoutExternalIDClosesMatchingProviderAndDefersThe
 		provider string
 		want     purgePlan
 	}{
-		"沒有外部 ID、provider 相同":   {store.PaymentAccount{Provider: "fake"}, "fake", purgeDelete},
+		"沒有外部 ID、provider 相同":   {store.PaymentAccount{Provider: "fake"}, "fake", purgeResolve},
 		"沒有外部 ID、provider 不同":   {store.PaymentAccount{Provider: "stripe"}, "fake", purgeDelete},
 		"沒有外部 ID、沒有設定 provider": {store.PaymentAccount{Provider: "stripe"}, "", purgeDelete},
 		"有外部 ID、provider 相同":    {store.PaymentAccount{Provider: "fake", ExternalAccountID: &external}, "fake", purgeClose},
@@ -199,16 +199,20 @@ func TestDeleteRowRecheckAfterLockRefusesARowThatGainedAnExternalID(t *testing.T
 	for name, tc := range map[string]struct {
 		locked   store.PaymentAccount
 		planned  *string
+		resolved bool
 		wantOK   bool
 		wantFail bool
 	}{
-		"直接刪、列仍沒有外部 ID":  {store.PaymentAccount{}, nil, true, false},
-		"直接刪、並行寫入外部 ID":  {store.PaymentAccount{ExternalAccountID: &a}, nil, false, true},
-		"關閉後刪、外部 ID 相同":  {store.PaymentAccount{ExternalAccountID: &a}, &a, true, false},
-		"關閉後刪、外部 ID 不同":  {store.PaymentAccount{ExternalAccountID: &b}, &a, false, false},
-		"關閉後刪、外部 ID 不見了": {store.PaymentAccount{}, &a, false, false},
+		"直接刪、列仍沒有外部 ID":   {store.PaymentAccount{}, nil, false, true, false},
+		"直接刪、並行寫入外部 ID":   {store.PaymentAccount{ExternalAccountID: &a}, nil, false, false, true},
+		"關閉後刪、外部 ID 相同":   {store.PaymentAccount{ExternalAccountID: &a}, &a, false, true, false},
+		"關閉後刪、外部 ID 不同":   {store.PaymentAccount{ExternalAccountID: &b}, &a, false, false, false},
+		"關閉後刪、外部 ID 不見了":  {store.PaymentAccount{}, &a, false, false, false},
+		"取得後刪、列仍沒有外部 ID":  {store.PaymentAccount{}, &a, true, true, false},
+		"取得後刪、並行寫入同一個 ID": {store.PaymentAccount{ExternalAccountID: &a}, &a, true, true, false},
+		"取得後刪、並行寫入別的 ID":  {store.PaymentAccount{ExternalAccountID: &b}, &a, true, false, false},
 	} {
-		ok, err := lockedRowMayBeDeleted(tc.locked, tc.planned)
+		ok, err := lockedRowMayBeDeleted(tc.locked, tc.planned, tc.resolved)
 		if ok != tc.wantOK || (err != nil) != tc.wantFail {
 			t.Errorf("%s：ok=%v err=%v，want ok=%v fail=%v", name, ok, err, tc.wantOK, tc.wantFail)
 		}

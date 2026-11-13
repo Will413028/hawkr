@@ -61,7 +61,16 @@ func (s *Stripe) EnsureAccount(ctx context.Context, in EnsureInput) (string, err
 	if in.ContactEmail == "" {
 		return "", fmt.Errorf("%w：缺少聯絡信箱", ErrPermanent)
 	}
-	id, err := s.client.CreateAccount(ctx, in.IdempotencyKey, dashboard, in.ContactEmail)
+	id, err := s.client.CreateAccount(ctx, in.IdempotencyKey, in.StoreID, dashboard, in.ContactEmail)
+	return id, classify(err)
+}
+
+// ResolveAccount 實作 Provider：重送建立的第一步（本文固定，同一把鍵回同一個帳戶）。
+func (s *Stripe) ResolveAccount(ctx context.Context, in ResolveInput) (string, error) {
+	if in.IdempotencyKey == "" {
+		return "", fmt.Errorf("%w：缺少冪等鍵", ErrPermanent)
+	}
+	id, err := s.client.CreateAccountShell(ctx, in.IdempotencyKey, in.StoreID)
 	return id, classify(err)
 }
 
