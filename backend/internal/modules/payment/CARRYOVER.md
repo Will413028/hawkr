@@ -26,7 +26,6 @@
 | 清理的永久失敗沒有終局狀態 | 金流商回報帳戶不存在、或列的 provider 沒有設定時，關不掉也不能刪列 | 部分成立：分不出「帳戶真的不存在」與「金鑰指向另一個 sandbox」，所以不刪對應 | 有終局狀態或人工處理入口 | 沒有終局狀態：這些列每次週期掃描都重排清理、重試並記警示 log，對應不刪。觸發重新評估：上線前 |
 | 同步讀到已關閉的外部帳戶沒有終局狀態 | 已關閉的帳戶讀取時回應沒有 `stripe_transfers` 能力，adapter 回一般錯誤，同步 job 當成暫時性失敗重試（sandbox 實測 2026-11-14，計畫附件 `spike/outputs/q22_adapter.txt`） | 部分成立：清理是關閉後就刪列，正常讀不到；帳戶在金流商那邊被關閉時才會遇到 | 讀取分辨「已關閉」並把列帶到終局狀態或人工處理入口 | 與上一列一起處理（Will 2026-11-14）。觸發重新評估：上線前 |
 | 輪詢補漏（15 分鐘）對所有未啟用的帳戶，沒有年齡上限或退避 | 事件可能遺失，要有補漏 | 成立 | 輪詢加上限或退避 | 沿用，不設上限。觸發：上線前定上限 |
-| 啟動檢查 `STRIPE_PUBLISHABLE_KEY` 看行程設定，session 是不是 EMBEDDED 看帳戶列 | 嵌入式收件（收件方式 platform）需要 publishable key，缺了要在啟動就擋 | 部分成立：啟動檢查只看 `STRIPE_REQUIREMENT_COLLECTION`（`cmd/hawkr/payment.go`），`CreateOnboardingSession` 依帳戶列的收件方式分支（`account/stripe.go`） | 檢查與 session 看同一個來源，或換收件方式時處理既有列 | 沒有處理：把設定切到 provider 收件而沒設 publishable key 後，既有 platform 收件的列仍回 EMBEDDED session、`publishable_key` 是空的，網站顯示錯誤狀態。觸發重新評估：切換收件方式（`STRIPE_REQUIREMENT_COLLECTION`）而既有帳戶列還在時 |
 | `inbox.events` 的未處理事件永不刪、沒有終局狀態 | 目前只有收款帳戶一個 handler，補掃重派到被處理為止 | 成立（只有一個 handler） | 事件有終局狀態（死信），到期後移出補掃 | 沿用：`Purge` 只刪已處理而且過了保存期的事件，未處理的由補掃或模組的掃描處理，每個新 handler 要自己補掃。觸發：第二個 handler 接上 inbox 時 |
 
 ## 傳輸層的沿用盤點
@@ -35,6 +34,10 @@
 |---|---|---|---|---|
 | 後台的 3 支收款帳戶 RPC 在 `SellerAdminService` | 帳戶在 seller | 不成立 | 資源的 API 在擁有者的 service | 搬到 `hawkr.admin.payment.v1alpha1.PaymentAdminService`，權限改成 `payment.accounts.*`（D30） |
 | 賣家端的 `GetMyPaymentAccount`、`CreatePaymentOnboardingSession` 在 `SellerAppService` | 要先確認呼叫者是店家擁有者 | 成立：payment 是葉節點，不能向上讀 seller 驗證擁有者 | 擁有者驗證留在上層的入口 | 沿用；seller 的 handler 確認店家後呼叫 payment（D30） |
+| 網站頁面的路徑由伺服器持有（`rpc/web_origin.go`） | 回跳網址在向金流商建立連結時就要給定，origin 是部署設定（`PUBLIC_WEB_ORIGIN`） | 成立 | 伺服器依部署設定組絕對回跳網址 | 路徑與語系前綴只在這一處，client 不傳網址（D49-2）；`TestOnboardingReturnPagesExistInTheWebsiteRoutes` 守門路徑在 website 的路由存在 |
+| 回跳目的地（`OnboardingReturnDestination`） | 網站認證頁與 App 的回跳頁不同（App 的頁面免登入、沒有語系前綴） | 成立 | client 傳目的地的 enum，不傳網址 | 請求帶 enum，沒有網址也沒有 `locale`（語系走 `Accept-Language`，D58）；未指定回 `INVALID_ARGUMENT` |
+| 內嵌能力宣告（`embedded_runtimes`） | 只有呼叫端知道自己能不能承載內嵌元件，決定表要用它 | 成立 | 呼叫端宣告能力，伺服器據以回不同形狀的資源（Stripe 的內嵌元件不能放 App 的 web view） | `repeated` enum，空表示不能內嵌，不認得的值與 `UNSPECIFIED` 忽略；形狀只由 `account.ChooseSession`（帳戶列的 provider、收件方式加宣告）決定，website 宣告 `STRIPE_CONNECT_JS`，seller-app 送空清單（D58） |
+| 自動重讀的觸發點（進入認證頁、從開通頁回來、App 回前景） | 賣家沒有手動重新整理的按鈕，狀態靠 webhook 加重讀更新 | 成立 | 動作只在一個設定頁，狀態由 webhook 與自動重讀更新 | client 在這三個時點呼叫 `RefreshMyPaymentAccount`，任務已完成或鎖住時不呼叫，失敗不顯示；伺服器端 10 秒間隔（D33） |
 | webhook 入口 `POST /webhooks/stripe` 在身分與 CSRF 中介層之外 | 簽章就是驗證 | 成立 | 同 | 沿用；handler 搬到 `internal/httpapi/payment`，寫 inbox 後才回 2xx |
 
 ## 與 舊服務的差異

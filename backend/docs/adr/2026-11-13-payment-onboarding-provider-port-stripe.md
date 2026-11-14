@@ -32,7 +32,7 @@
 | 決定 | 基準（業界做法與來源） | 採用 | 未採 |
 |---|---|---|---|
 | 收款 adapter | 平台把開通交給 connected account 的 provider（Stripe Connect recipient 帳戶，https://docs.stripe.com/connect/accounts-v2） | Stripe Connect 測試模式，PayUni adapter 刪除 | PayUni adapter 留在 port 後面；簽 PayUni |
-| port 的兩軸 | Stripe 分開「誰收資料」與「用什麼介面」（https://docs.stripe.com/connect/onboarding、https://docs.stripe.com/connect/hosted-onboarding） | 收件方式與介面兩軸，預設金流商收件加託管頁面 | 預設平台收件；平台自建表單再送出 |
+| port 的兩軸 | Stripe 分開「誰收資料」與「用什麼介面」（https://docs.stripe.com/connect/onboarding、https://docs.stripe.com/connect/hosted-onboarding） | 收件方式是 port 的軸（預設金流商收件）；session 的形狀由帳戶列的收件方式與呼叫端宣告的內嵌能力決定，不是第二個軸 | 預設平台收件；平台自建表單再送出 |
 | 內嵌元件的使用者驗證 | 平台負責補件的帳戶可關掉 Stripe 登入視窗，代價是平台承擔負餘額（https://docs.stripe.com/connect/get-started-connect-embedded-components?platform=web） | 關掉 | 維持預設 |
 | 測試平台國別 | 平台與 connected account 在支援的國別組合內（脈絡的外部約束） | US | SG、JP、US 平台跨境撥到台灣 |
 | Stripe API 與 client | 新整合用 Accounts v2，事件用 thin events 並重讀物件，client 用官方 SDK（https://docs.stripe.com/connect/accounts-v2、https://docs.stripe.com/webhooks） | v2、官方 stripe-go v87.1.0 釘的 API 版本、收到後一律重讀 | 手寫 HTTP client 加釘 preview 版本；舊 preview；v1 Accounts；信任事件內容 |
@@ -54,13 +54,13 @@
 
 ## 決策
 
-賣家收款開通只經 provider 中立的 payment port。作品集的 adapter 是 Stripe Connect 測試模式，預設由 Stripe 收件加託管頁面，平台收件用內嵌元件；平台不收身分證號、銀行帳號與證件；PayUni adapter 刪除。店家公開曝光要平台審核核准且轉帳能力 active，狀態、任務清單、下一步與閘門由伺服器從同一組來源欄位推導，client 只呈現。
+賣家收款開通只經 provider 中立的 payment port。作品集的 adapter 是 Stripe Connect 測試模式，預設由 Stripe 收件加託管頁面，平台收件的帳戶在能承載內嵌元件的 client（website）用內嵌元件、其餘用託管頁面；平台不收身分證號、銀行帳號與證件；PayUni adapter 刪除。店家公開曝光要平台審核核准且轉帳能力 active，狀態、任務清單、下一步與閘門由伺服器從同一組來源欄位推導，client 只呈現。
 
 **收款 adapter**（Will 2026-10-29、2026-11-02）：Stripe Connect 測試模式，單體的 PayUni adapter 刪除，PayUni 的付款、退款、撥款與物流留在 Java 舊服務，由單體計畫的 B2、B3、B8–B10 搬。
 - 未採：PayUni adapter 留在 port 後面當第二個 adapter：沒有測試帳號無法驗證，會隨 port 演進失真；git 找得回。
 - 未採：簽 PayUni：測試帳號要簽約，作品集要展示國際標準。
 
-**port 的兩軸**（Will 2026-10-29、2026-11-02）：port 的能力描述有兩個獨立的軸，`requirement_collection`（`provider` 金流商收件、`platform` 平台收件，帳戶列上也存）與 `onboarding_surface`（`hosted` 託管頁面、`embedded` 內嵌元件）。預設是金流商收件加託管頁面；平台收件用 Stripe 內嵌元件。port（`Provider`）的方法是 `Name`、`Capabilities`、`EnsureAccount`、`ResolveAccount`、`CreateOnboardingSession`、`FetchAccount`、`CloseAccount`、`ParseEvent`，沒有 `SubmitKYC`，平台不自建 KYC 表單，也不再收身分證號、銀行帳號與證件；統編是市集登記資料，仍由平台收。
+**port 的能力描述與 session 的形狀**（Will 2026-10-29、2026-11-02；2026-11-14 改為 D58）：port 的能力描述只有 `requirement_collection`（`provider` 金流商收件、`platform` 平台收件，帳戶列上也存；行程設定只決定新列寫入的值）。開通 session 的形狀不是 port 的第二個軸：由 `account.ChooseSession` 唯一決定，條件是帳戶列的 provider 是 `stripe`、列保存的收件方式是平台收件，而且呼叫端宣告的內嵌執行環境含 `STRIPE_CONNECT_JS` 才回內嵌（Account Session），其餘一律回託管連結（Account Link；平台收件的帳戶走託管連結可行，`spike/README.md` Q23）。預設是金流商收件加託管頁面。port（`Provider`）的方法是 `Name`、`Capabilities`、`EnsureAccount`、`ResolveAccount`、`CreateOnboardingSession`、`FetchAccount`、`CloseAccount`、`ParseEvent`，沒有 `SubmitKYC`，平台不自建 KYC 表單，也不再收身分證號、銀行帳號與證件；統編是市集登記資料，仍由平台收。這修訂了先前的「介面由收件方式決定」（D2）。
 - 未採：預設平台收件：沿用舊畫面最多，但平台持有的個資最多。
 - 未採：兩種收件都由平台自建表單再送出：兩邊重複收個資。
 - 防詐訊號改用銀行帳號 fingerprint 與統編的雜湊，細節在平台審核 ADR。觸發重建：決定接台灣金流商。
@@ -122,17 +122,20 @@
 
 **收款帳戶的下一步**（Will 2026-11-14）：進行中的收款任務 `action` 是 `NONE`；`OnboardingAction` 沒有「重新整理」，賣家端不再有「重新整理」按鈕，按鈕與說明句只讀任務，徽章讀帳戶狀態。三項：
 - `RefreshMyPaymentAccount` 保留，由 client 在進入認證頁、從開通流程返回、App 回前景時自動呼叫（必要條件：返回時 webhook 可能還沒到）；自動呼叫失敗（含 `resource_exhausted`、停權的 `permission_denied`）不顯示，照常讀 `GetMyOnboarding`。未採「刪掉 RPC、由 `GetMyOnboarding` 重讀」：它不重讀，而且停權的店家可以讀它但不能觸發外部呼叫。
-- 「開始設定」在每個 client 都能執行：`CreatePaymentOnboardingSession` 的目的地是賣家 App 而介面是內嵌時，伺服器照常檢查前置條件，但不建立內嵌 session，回 `url` 指向網站的認證頁（由 `PUBLIC_WEB_ORIGIN` 與語系組成）；App 一律開 `url`，不判斷介面，「到網頁完成」的提示刪除。代價：賣家要在網頁再登入一次。未採：App 自己判斷介面只顯示提示（沒有出口）、讀摘要時帶 client 能力。
+- 「開始設定」在每個 client 都能執行：App 送空的內嵌能力清單，一律拿託管連結並開外部瀏覽器；「到網頁完成」的提示與路徑刪除（修訂 D56 第 2 項：原本回網站認證頁、賣家要在網頁再登入一次，現在平台收件的賣家在 App 看到 Stripe 品牌的託管頁，Will 2026-11-14 接受）。未採：App 自己判斷介面只顯示提示（沒有出口）、讀摘要時帶 client 能力。
 - 入口頁（網站的閘門橫幅、錢包面板，以及 seller-app 的錢包面板）不讀 `action`，未完成時固定顯示「前往商家認證」連到認證頁。伺服器句子「收款帳戶的狀態正在更新，請稍後重新整理。」因按鈕刪除改成「請稍後再查看。」（英文 `Please check back later.`）；共用文案目錄與後台的重新整理成功訊息跟著改。
 - 做法依據：開工前逐分支比對伺服器的 `paymentAccountTask` 與兩個 client 的分支，再與業界做法（下一步由伺服器決定、狀態靠 webhook 與自動重讀、動作只在一個設定頁執行）比較後決定。
 
-**開通 session 帶 provider 與公開金鑰**（Will 2026-11-13）：內嵌是中立的介面，client 要知道載入哪一家的元件；`CreatePaymentOnboardingSessionResponse` 在內嵌時帶 `provider`（金流商的代碼，例如 `stripe`）與 `publishable_key`（初始化元件的公開金鑰，不是 secret），金鑰由後端設定 `STRIPE_PUBLISHABLE_KEY` 一處維護：設了 `STRIPE_SECRET_KEY` 而且收件方式是平台收件卻沒有它，啟動失敗。website 依 `provider` 選元件，不認得的值顯示既有的錯誤狀態；website 的 build 設定不再放金鑰。
+**開通 session 帶金流商與公開金鑰**（Will 2026-11-13；形狀改為 oneof 2026-11-14）：內嵌是中立的介面，client 要知道載入哪一家的元件；內嵌 session 以 `embedded` 的 `oneof provider` 分支表示金流商（目前只有 `stripe`，帶 `client_secret` 與 `publishable_key`，初始化元件的公開金鑰，不是 secret），不再有字串型的 `provider` 欄位；金鑰由後端設定 `STRIPE_PUBLISHABLE_KEY` 一處維護：設了 `STRIPE_SECRET_KEY` 卻沒有它，啟動失敗，與收件方式無關（行程設定改成金流商收件後，既有的平台收件帳戶仍會開內嵌 session）。website 依分支選元件，不認得的分支顯示既有的錯誤狀態；website 的 build 設定不再放金鑰。
 - 未採：延後到接第二家金流商時再做，維持 website 的 build 設定放金鑰。
 
-**回跳網址由伺服器組**（Will 2026-11-13）：`CreatePaymentOnboardingSessionRequest` 的 client 不傳網址，只傳回跳目的地的 enum（`OnboardingReturnDestination`：網站的認證頁、App 的回跳頁）與語系；伺服器以 `PUBLIC_WEB_ORIGIN` 組成完成與過期兩個網址，網站路徑與語系前綴只在 `internal/httpapi/rpc/web_origin.go` 一處，測試確認每個目的地的路徑在 website 的路由存在（`TestOnboardingReturnPagesExistInTheWebsiteRoutes`）。seller-app 與 website 刪掉各自的網站來源設定。
+**回跳網址由伺服器組**（Will 2026-11-13；語系改走 `Accept-Language` 2026-11-14）：`CreatePaymentOnboardingSessionRequest` 的 client 不傳網址，只傳回跳目的地的 enum（`OnboardingReturnDestination`：網站的認證頁、App 的回跳頁）；語系不再是請求欄位，伺服器取 rpc interceptor 協商 `Accept-Language` 的結果（`uitext.LocaleFrom(ctx)`），修訂了先前的 `locale` 欄位（D49-2：它是語系 ADR 之外的第二條通道）。伺服器以 `PUBLIC_WEB_ORIGIN` 組成完成與過期兩個網址，網站路徑與語系前綴只在 `internal/httpapi/rpc/web_origin.go` 一處，測試確認每個目的地的路徑在 website 的路由存在（`TestOnboardingReturnPagesExistInTheWebsiteRoutes`）。seller-app 與 website 刪掉各自的網站來源設定。
 - 未採：維持 client 傳完整網址：網站路徑與語系前綴要在 website 與 seller-app 各寫一份；搬到伺服器後只在一處。
 
-**賣家端移除沒有消費端的欄位，列舉搬到擁有者**（Will 2026-11-13）：賣家端 `PaymentAccount` 刪除 `requirement_collection`、`transfers_active`、`requirements`，`CreatePaymentOnboardingSessionResponse` 刪除 `expire_time`（沒有 client 讀；後台的 message 不動）。`PaymentAccountStatus`、`RequirementCollection`、`OnboardingSurface` 定義在 payment 擁有的 proto package `hawkr.payment.v1alpha1`，seller 與 admin payment 的 message 都 import 它；共用文案目錄的鍵跟著搬到 `payment.PaymentAccountStatus.*`、`payment.RequirementCollection.*`。
+**開通 session 的契約是兩支 `oneof`**（Will 2026-11-14，D58）：第 2 輪設計審查指出回應是型態欄位加攤平欄位，會出現「內嵌介面但網址是網站認證頁」的第三種組合，`PaymentAccount.onboarding_surface` 與 session 的介面來源不同，`locale` 是語系 ADR 之外的第二條通道。與業界做法比較（Stripe、Adyen 都是託管回網址、內嵌回 token 兩種資源；Stripe 的內嵌元件不能放 App 的 web view，沒有原生元件時連到瀏覽器）後決定：請求分開帶回跳目的地與呼叫端能承載的內嵌執行環境清單（`embedded_runtimes`，空表示不能內嵌；enum `EmbeddedOnboardingRuntime` 目前只有 `STRIPE_CONNECT_JS`），回應是 `oneof session`（`hosted` 託管連結、`embedded` 內嵌，內嵌再以 `oneof provider` 分金流商），`PaymentAccount.onboarding_surface` 與 `OnboardingSurface` 刪除。伺服器的決定表只在 `account.ChooseSession`（只看帳戶列的 provider 與收件方式，加呼叫端宣告），fake provider 一律回託管連結。語系走 `Accept-Language`（rpc interceptor 協商）。修訂：D2「介面由收件方式決定」、D53 的回應形狀、D56 第 2 項「到網站完成」、D49-2 的 `locale`。推翻條件：平台收件的帳戶在託管頁面走不完開通（2026-11-14 在 sandbox 實測走得完，`spike/README.md` Q23）。
+- 未採：三支 `oneof`（保留 App 到網站再登入；是 spike 不成立時的退路）；記錄並延後（留著違反 API 設計規範的型態欄位加攤平欄位）。
+
+**賣家端移除沒有消費端的欄位，列舉搬到擁有者**（Will 2026-11-13）：賣家端 `PaymentAccount` 刪除 `requirement_collection`、`transfers_active`、`requirements`，`CreatePaymentOnboardingSessionResponse` 刪除 `expire_time`（沒有 client 讀；後台的 message 不動），`PaymentAccount` 也刪除 `onboarding_surface`（D58）。`PaymentAccountStatus`、`RequirementCollection` 與呼叫端宣告用的 `EmbeddedOnboardingRuntime` 定義在 payment 擁有的 proto package `hawkr.payment.v1alpha1`，seller 與 admin payment 的 message 都 import 它；共用文案目錄的鍵跟著搬到 `payment.PaymentAccountStatus.*`、`payment.RequirementCollection.*`。
 - 未採：只刪欄位、列舉搬家留到付款模組搬進來時；全部延後（計畫沒有寫理由）。
 
 **`v1alpha1` 不留 `reserved`**（Will 2026-11-13）：`api/hawkr/**/v1alpha1` 刪掉欄位或 enum 值時不留 `reserved`，欄位編號與 enum 值連續重編；`reserved` 防的是已發佈的 client 與已存的資料，系統未上線時沒有保護對象，改名 `v1` 之後才留，刪除的編號與名稱都要留。規則寫在 `API 設計規範（Connect）.md`。
@@ -146,7 +149,7 @@
 - 未採：賣家端 RPC 全搬 payment：要讓 payment 收已驗證的擁有者參照，website 與 App 都要改。
 - 未採：後台 RPC 全留 seller：後台讀收款帳戶仍掛在 seller。
 
-**App 內不做 Stripe 內嵌開通**（Will 2026-11-03、2026-11-05）：seller-app 開通一律開外部瀏覽器：託管頁面的 `return_url` 與 `refresh_url` 指向 website 的免登入靜態頁（`website/app/[locale]/(public)/seller-app/payment-return/`），App 回到前景時重讀；平台收件的內嵌元件只在 website，App 拿到認證頁網址開網頁完成。這是不新增依賴的選擇，不是 Stripe 的限制。
+**App 內不做 Stripe 內嵌開通**（Will 2026-11-03、2026-11-05）：seller-app 開通一律開外部瀏覽器：託管頁面的 `return_url` 與 `refresh_url` 指向 website 的免登入靜態頁（`website/app/[locale]/(public)/seller-app/payment-return/`），App 回到前景時重讀；平台收件的內嵌元件只在 website；App 送空的內嵌能力清單，對平台收件的帳戶也拿到託管連結。這是不新增依賴的選擇，不是 Stripe 的限制。
 - 未採：App 內嵌 SDK：要新增依賴與原生設定；deep link：要新增 App 端的路由與平台設定。
 - 觸發：App 的開通完成率偏低，或平台收件成為主要模式。
 
