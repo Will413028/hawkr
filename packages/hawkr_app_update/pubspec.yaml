@@ -10,4 +10,4 @@ dependencies:
     path: ../hawkr_api
 
 dev_dependencies:
-  test: 1.26.3
+  test: 1.33.0
