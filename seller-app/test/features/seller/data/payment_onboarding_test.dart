@@ -93,9 +93,7 @@ class _Server {
         .build(),
   );
 
-  ProviderContainer container({
-    bool allowInsecureUrl = false,
-  }) {
+  ProviderContainer container({bool allowInsecureUrl = false}) {
     final container = ProviderContainer(
       overrides: [
         allowInsecureOnboardingUrlProvider.overrideWithValue(allowInsecureUrl),

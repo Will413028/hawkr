@@ -81,8 +81,8 @@ final class PaymentAccountRepository {
   }) async {
     final response = await _client.createPaymentOnboardingSession(
       CreatePaymentOnboardingSessionRequest(
-        destination:
-            OnboardingReturnDestination.ONBOARDING_RETURN_DESTINATION_SELLER_APP,
+        destination: OnboardingReturnDestination
+            .ONBOARDING_RETURN_DESTINATION_SELLER_APP,
         locale: locale,
       ),
     );
