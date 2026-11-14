@@ -5928,7 +5928,7 @@ type HashtagItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`                                     // canonical 名稱（lower），查詢與比對基準
 	DisplayName   string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`    // 顯示名稱（保留原大小寫）；auto-complete 場景填空字串
-	ProductCount  string                 `protobuf:"bytes,3,opt,name=product_count,json=productCount,proto3" json:"product_count,omitempty"` // 引用數量（hashtag.product_count 即時值，字串型別，docs/開發規範/Java 微服務開發規範.md §2.1；見 33 §5.4）
+	ProductCount  string                 `protobuf:"bytes,3,opt,name=product_count,json=productCount,proto3" json:"product_count,omitempty"` // 引用數量（hashtag.product_count 即時值，字串型別，backend/docs/開發規範/Java 微服務開發規範.md §2.1；見 33 §5.4）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6228,7 +6228,7 @@ func (x *GetPopularHashtagsResponse) GetRecords() []*PopularHashtagItem {
 type PopularHashtagItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Hashtag       string                 `protobuf:"bytes,1,opt,name=hashtag,proto3" json:"hashtag,omitempty"` // 區間內最多 ACTIVE 商品使用的原始大小寫版本（33 §5.2.3）
-	Count         string                 `protobuf:"bytes,2,opt,name=count,proto3" json:"count,omitempty"`     // 區間內掛上此 hashtag 的 distinct ACTIVE 商品數（字串型別，docs/開發規範/Java 微服務開發規範.md §2.1）
+	Count         string                 `protobuf:"bytes,2,opt,name=count,proto3" json:"count,omitempty"`     // 區間內掛上此 hashtag 的 distinct ACTIVE 商品數（字串型別，backend/docs/開發規範/Java 微服務開發規範.md §2.1）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6392,7 +6392,7 @@ func (x *GetPublicOriginsSummaryResponse) GetRecords() []*OriginSummaryItem {
 type OriginSummaryItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Origin        string                 `protobuf:"bytes,1,opt,name=origin,proto3" json:"origin,omitempty"`                                 // 產地字串（如「台灣」「日本」），永不為空（origin IS NULL / '' 不回）
-	ProductCount  string                 `protobuf:"bytes,2,opt,name=product_count,json=productCount,proto3" json:"product_count,omitempty"` // 該產地下 ACTIVE 商品數（數字字串，docs/開發規範/Java 微服務開發規範.md §2.1）
+	ProductCount  string                 `protobuf:"bytes,2,opt,name=product_count,json=productCount,proto3" json:"product_count,omitempty"` // 該產地下 ACTIVE 商品數（數字字串，backend/docs/開發規範/Java 微服務開發規範.md §2.1）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

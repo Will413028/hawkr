@@ -111,7 +111,7 @@ const (
 //   - 所有數字（ID/金額/數量/計數/版本/頁碼）一律 string；
 //     例外僅 Request 內由 Gateway 注入的身分欄位（buyer_id / store_id / actor_account_id）用 int64
 //   - 所有時間一律 string，ISO 8601 UTC 秒精度（YYYY-MM-DDTHH:mm:ssZ）
-//   - 狀態/類型碼一律 string，值域見 docs/代碼管理（CodeMeta）/{業務狀態碼,業務類型碼,內部技術碼}.md
+//   - 狀態/類型碼一律 string，值域見 backend/docs/代碼管理（CodeMeta）/{業務狀態碼,業務類型碼,內部技術碼}.md
 //   - 金額單位「元」的整數字串，禁止 double/decimal
 //   - 本服務不 import common/delegation.proto：發票是 ADM 代行禁區（56 §6.1.1）
 type InvoiceServiceClient interface {
@@ -1004,7 +1004,7 @@ func (c *invoiceServiceClient) GetSellerInvoiceCapabilitySimple(ctx context.Cont
 //   - 所有數字（ID/金額/數量/計數/版本/頁碼）一律 string；
 //     例外僅 Request 內由 Gateway 注入的身分欄位（buyer_id / store_id / actor_account_id）用 int64
 //   - 所有時間一律 string，ISO 8601 UTC 秒精度（YYYY-MM-DDTHH:mm:ssZ）
-//   - 狀態/類型碼一律 string，值域見 docs/代碼管理（CodeMeta）/{業務狀態碼,業務類型碼,內部技術碼}.md
+//   - 狀態/類型碼一律 string，值域見 backend/docs/代碼管理（CodeMeta）/{業務狀態碼,業務類型碼,內部技術碼}.md
 //   - 金額單位「元」的整數字串，禁止 double/decimal
 //   - 本服務不 import common/delegation.proto：發票是 ADM 代行禁區（56 §6.1.1）
 type InvoiceServiceServer interface {

@@ -68,7 +68,7 @@ func (HashtagSearchMode) EnumDescriptor() ([]byte, []int) {
 	return file_social_social_proto_rawDescGZIP(), []int{0}
 }
 
-// target_type 的值域見 CodeMeta `ReportTargetType`（docs/代碼管理（CodeMeta）/業務類型碼.md）。
+// target_type 的值域見 CodeMeta `ReportTargetType`（backend/docs/代碼管理（CodeMeta）/業務類型碼.md）。
 // reason_code 的值域見 CodeMeta `ReportReasonCode`（同上）。
 // 兩者刻意不在此重列：這段註解曾列出 HATE / ADULT 兩個 DB CHECK 從未接受的值，
 // 同時漏掉 SEXUAL / FOOD_SAFETY / POLITICAL / FAKE_NEWS——照抄註解就會抄到死值。
@@ -992,7 +992,7 @@ func (x *AdminGetReportResponse) GetReport() *Report {
 	return nil
 }
 
-// action 的值域見 CodeMeta `ReportResolveAction`（docs/代碼管理（CodeMeta）/業務類型碼.md）。
+// action 的值域見 CodeMeta `ReportResolveAction`（backend/docs/代碼管理（CodeMeta）/業務類型碼.md）。
 // 注意它與稽核 log 的 `ModerationActionType`（內部技術碼）不同軸：後者是前者的嚴格
 // 超集（多 AUTO_REJECT / REOPEN），不得拿來當本欄位的值域。
 type AdminResolveReportRequest struct {
@@ -4848,7 +4848,7 @@ func (x *SearchHashtagsRequest) GetLimit() int32 {
 type HashtagSuggestItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`                            // canonical 名稱
-	PostCount     string                 `protobuf:"bytes,2,opt,name=post_count,json=postCount,proto3" json:"post_count,omitempty"` // 對外數字一律 string（docs/開發規範/Java 微服務開發規範.md §2）
+	PostCount     string                 `protobuf:"bytes,2,opt,name=post_count,json=postCount,proto3" json:"post_count,omitempty"` // 對外數字一律 string（backend/docs/開發規範/Java 微服務開發規範.md §2）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
