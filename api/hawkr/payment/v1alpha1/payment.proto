@@ -27,11 +27,9 @@ enum RequirementCollection {
   REQUIREMENT_COLLECTION_PLATFORM = 2;
 }
 
-// OnboardingSurface 是開通用的介面。
-enum OnboardingSurface {
-  ONBOARDING_SURFACE_UNSPECIFIED = 0;
-  // 金流商託管的頁面（連結）。
-  ONBOARDING_SURFACE_HOSTED = 1;
-  // 嵌在網頁上的元件（client secret）。
-  ONBOARDING_SURFACE_EMBEDDED = 2;
+// EmbeddedOnboardingRuntime 是呼叫端能承載的內嵌開通執行環境。
+enum EmbeddedOnboardingRuntime {
+  EMBEDDED_ONBOARDING_RUNTIME_UNSPECIFIED = 0;
+  // Stripe Connect.js（瀏覽器）。
+  EMBEDDED_ONBOARDING_RUNTIME_STRIPE_CONNECT_JS = 1;
 }

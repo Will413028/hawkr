@@ -1833,18 +1833,10 @@ const PaymentAccount$json = {
       '6': '.hawkr.payment.v1alpha1.PaymentAccountStatus',
       '10': 'status'
     },
-    {
-      '1': 'onboarding_surface',
-      '3': 2,
-      '4': 1,
-      '5': 14,
-      '6': '.hawkr.payment.v1alpha1.OnboardingSurface',
-      '10': 'onboardingSurface'
-    },
-    {'1': 'payouts_active', '3': 3, '4': 1, '5': 8, '10': 'payoutsActive'},
+    {'1': 'payouts_active', '3': 2, '4': 1, '5': 8, '10': 'payoutsActive'},
     {
       '1': 'fetch_time',
-      '3': 4,
+      '3': 3,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
@@ -1856,10 +1848,9 @@ const PaymentAccount$json = {
 /// Descriptor for `PaymentAccount`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List paymentAccountDescriptor = $convert.base64Decode(
     'Cg5QYXltZW50QWNjb3VudBJECgZzdGF0dXMYASABKA4yLC5oYXdrci5wYXltZW50LnYxYWxwaG'
-    'ExLlBheW1lbnRBY2NvdW50U3RhdHVzUgZzdGF0dXMSWAoSb25ib2FyZGluZ19zdXJmYWNlGAIg'
-    'ASgOMikuaGF3a3IucGF5bWVudC52MWFscGhhMS5PbmJvYXJkaW5nU3VyZmFjZVIRb25ib2FyZG'
-    'luZ1N1cmZhY2USJQoOcGF5b3V0c19hY3RpdmUYAyABKAhSDXBheW91dHNBY3RpdmUSOQoKZmV0'
-    'Y2hfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBSCWZldGNoVGltZQ==');
+    'ExLlBheW1lbnRBY2NvdW50U3RhdHVzUgZzdGF0dXMSJQoOcGF5b3V0c19hY3RpdmUYAiABKAhS'
+    'DXBheW91dHNBY3RpdmUSOQoKZmV0Y2hfdGltZRgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW'
+    '1lc3RhbXBSCWZldGNoVGltZQ==');
 
 @$core.Deprecated('Use getMyPaymentAccountRequestDescriptor instead')
 const GetMyPaymentAccountRequest$json = {
@@ -1904,7 +1895,14 @@ const CreatePaymentOnboardingSessionRequest$json = {
       '8': {},
       '10': 'destination'
     },
-    {'1': 'locale', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'locale'},
+    {
+      '1': 'embedded_runtimes',
+      '3': 2,
+      '4': 3,
+      '5': 14,
+      '6': '.hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime',
+      '10': 'embeddedRuntimes'
+    },
   ],
 };
 
@@ -1913,7 +1911,9 @@ final $typed_data.Uint8List createPaymentOnboardingSessionRequestDescriptor =
     $convert.base64Decode(
         'CiVDcmVhdGVQYXltZW50T25ib2FyZGluZ1Nlc3Npb25SZXF1ZXN0ElkKC2Rlc3RpbmF0aW9uGA'
         'EgASgOMjIuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLk9uYm9hcmRpbmdSZXR1cm5EZXN0aW5hdGlv'
-        'bkID4EECUgtkZXN0aW5hdGlvbhIbCgZsb2NhbGUYAiABKAlCA+BBAlIGbG9jYWxl');
+        'bkID4EECUgtkZXN0aW5hdGlvbhJeChFlbWJlZGRlZF9ydW50aW1lcxgCIAMoDjIxLmhhd2tyLn'
+        'BheW1lbnQudjFhbHBoYTEuRW1iZWRkZWRPbmJvYXJkaW5nUnVudGltZVIQZW1iZWRkZWRSdW50'
+        'aW1lcw==');
 
 @$core
     .Deprecated('Use createPaymentOnboardingSessionResponseDescriptor instead')
@@ -1921,28 +1921,87 @@ const CreatePaymentOnboardingSessionResponse$json = {
   '1': 'CreatePaymentOnboardingSessionResponse',
   '2': [
     {
-      '1': 'surface',
+      '1': 'hosted',
       '3': 1,
       '4': 1,
-      '5': 14,
-      '6': '.hawkr.payment.v1alpha1.OnboardingSurface',
-      '10': 'surface'
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.HostedOnboarding',
+      '9': 0,
+      '10': 'hosted'
     },
-    {'1': 'url', '3': 2, '4': 1, '5': 9, '10': 'url'},
-    {'1': 'client_secret', '3': 3, '4': 1, '5': 9, '10': 'clientSecret'},
-    {'1': 'provider', '3': 4, '4': 1, '5': 9, '10': 'provider'},
-    {'1': 'publishable_key', '3': 5, '4': 1, '5': 9, '10': 'publishableKey'},
+    {
+      '1': 'embedded',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.EmbeddedOnboarding',
+      '9': 0,
+      '10': 'embedded'
+    },
+  ],
+  '8': [
+    {'1': 'session'},
   ],
 };
 
 /// Descriptor for `CreatePaymentOnboardingSessionResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List createPaymentOnboardingSessionResponseDescriptor =
     $convert.base64Decode(
-        'CiZDcmVhdGVQYXltZW50T25ib2FyZGluZ1Nlc3Npb25SZXNwb25zZRJDCgdzdXJmYWNlGAEgAS'
-        'gOMikuaGF3a3IucGF5bWVudC52MWFscGhhMS5PbmJvYXJkaW5nU3VyZmFjZVIHc3VyZmFjZRIQ'
-        'CgN1cmwYAiABKAlSA3VybBIjCg1jbGllbnRfc2VjcmV0GAMgASgJUgxjbGllbnRTZWNyZXQSGg'
-        'oIcHJvdmlkZXIYBCABKAlSCHByb3ZpZGVyEicKD3B1Ymxpc2hhYmxlX2tleRgFIAEoCVIOcHVi'
-        'bGlzaGFibGVLZXk=');
+        'CiZDcmVhdGVQYXltZW50T25ib2FyZGluZ1Nlc3Npb25SZXNwb25zZRJBCgZob3N0ZWQYASABKA'
+        'syJy5oYXdrci5zZWxsZXIudjFhbHBoYTEuSG9zdGVkT25ib2FyZGluZ0gAUgZob3N0ZWQSRwoI'
+        'ZW1iZWRkZWQYAiABKAsyKS5oYXdrci5zZWxsZXIudjFhbHBoYTEuRW1iZWRkZWRPbmJvYXJkaW'
+        '5nSABSCGVtYmVkZGVkQgkKB3Nlc3Npb24=');
+
+@$core.Deprecated('Use hostedOnboardingDescriptor instead')
+const HostedOnboarding$json = {
+  '1': 'HostedOnboarding',
+  '2': [
+    {'1': 'url', '3': 1, '4': 1, '5': 9, '10': 'url'},
+  ],
+};
+
+/// Descriptor for `HostedOnboarding`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List hostedOnboardingDescriptor =
+    $convert.base64Decode('ChBIb3N0ZWRPbmJvYXJkaW5nEhAKA3VybBgBIAEoCVIDdXJs');
+
+@$core.Deprecated('Use embeddedOnboardingDescriptor instead')
+const EmbeddedOnboarding$json = {
+  '1': 'EmbeddedOnboarding',
+  '2': [
+    {
+      '1': 'stripe',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.StripeEmbeddedOnboarding',
+      '9': 0,
+      '10': 'stripe'
+    },
+  ],
+  '8': [
+    {'1': 'provider'},
+  ],
+};
+
+/// Descriptor for `EmbeddedOnboarding`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List embeddedOnboardingDescriptor = $convert.base64Decode(
+    'ChJFbWJlZGRlZE9uYm9hcmRpbmcSSQoGc3RyaXBlGAEgASgLMi8uaGF3a3Iuc2VsbGVyLnYxYW'
+    'xwaGExLlN0cmlwZUVtYmVkZGVkT25ib2FyZGluZ0gAUgZzdHJpcGVCCgoIcHJvdmlkZXI=');
+
+@$core.Deprecated('Use stripeEmbeddedOnboardingDescriptor instead')
+const StripeEmbeddedOnboarding$json = {
+  '1': 'StripeEmbeddedOnboarding',
+  '2': [
+    {'1': 'client_secret', '3': 1, '4': 1, '5': 9, '10': 'clientSecret'},
+    {'1': 'publishable_key', '3': 2, '4': 1, '5': 9, '10': 'publishableKey'},
+  ],
+};
+
+/// Descriptor for `StripeEmbeddedOnboarding`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List stripeEmbeddedOnboardingDescriptor =
+    $convert.base64Decode(
+        'ChhTdHJpcGVFbWJlZGRlZE9uYm9hcmRpbmcSIwoNY2xpZW50X3NlY3JldBgBIAEoCVIMY2xpZW'
+        '50U2VjcmV0EicKD3B1Ymxpc2hhYmxlX2tleRgCIAEoCVIOcHVibGlzaGFibGVLZXk=');
 
 @$core.Deprecated('Use getMyKYCRequestDescriptor instead')
 const GetMyKYCRequest$json = {
@@ -3173,6 +3232,10 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       CreatePaymentOnboardingSessionRequest$json,
   '.hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse':
       CreatePaymentOnboardingSessionResponse$json,
+  '.hawkr.seller.v1alpha1.HostedOnboarding': HostedOnboarding$json,
+  '.hawkr.seller.v1alpha1.EmbeddedOnboarding': EmbeddedOnboarding$json,
+  '.hawkr.seller.v1alpha1.StripeEmbeddedOnboarding':
+      StripeEmbeddedOnboarding$json,
   '.hawkr.seller.v1alpha1.LookupBusinessRegistrationRequest':
       LookupBusinessRegistrationRequest$json,
   '.hawkr.seller.v1alpha1.LookupBusinessRegistrationResponse':

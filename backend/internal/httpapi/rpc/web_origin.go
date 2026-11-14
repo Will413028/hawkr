@@ -70,13 +70,6 @@ func sitePrefix(locale uitext.Locale) (string, error) {
 	return "", fmt.Errorf("%w：%q", ErrUnsupportedLocale, locale)
 }
 
-// ValidWebLocale 回報 locale 是不是網站路由的語系。
-func ValidWebLocale(locale string) (uitext.Locale, bool) {
-	l := uitext.Locale(locale)
-	_, err := sitePrefix(l)
-	return l, err == nil
-}
-
 // onboardingReturnPaths 是各回跳頁的站內路徑與 query；回跳頁的網站路由必須存在（web_origin_test.go 守門）。
 func onboardingReturnPaths(page ReturnPage, locale uitext.Locale) (done, expired string, err error) {
 	prefix, err := sitePrefix(locale)
@@ -112,13 +105,4 @@ func (w WebOrigin) OnboardingReturnURLs(page ReturnPage, locale uitext.Locale) (
 		return "", "", err
 	}
 	return done, expired, nil
-}
-
-// CertificationURL 組出賣家中心認證頁的絕對網址（含語系前綴），給不能在自己畫面完成內嵌開通的 client 開網頁。
-func (w WebOrigin) CertificationURL(locale uitext.Locale) (string, error) {
-	prefix, err := sitePrefix(locale)
-	if err != nil {
-		return "", err
-	}
-	return w.URL(prefix + CertificationPath)
 }

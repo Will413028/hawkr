@@ -10,6 +10,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -26,6 +29,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
+	"github.com/Will413028/hawkr/backend/internal/platform/stripe"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
@@ -824,13 +828,13 @@ func TestOnboardingSessionNeedsAnExternalAccountThatIsNotDisabled(t *testing.T) 
 	ctx := context.Background()
 	f := setup(t)
 	s := f.newStore(t)
-	if _, err := f.module.CreateOnboardingSession(ctx, s, "https://web.example.test/ok", "https://web.example.test/again", true); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.CreateOnboardingSession(ctx, s, "https://web.example.test/ok", "https://web.example.test/again", nil); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("還沒有外部帳戶 err=%v", err)
 	}
 	external := f.ensure(t, s)
-	session, err := f.module.CreateOnboardingSession(ctx, s, "https://web.example.test/ok", "https://web.example.test/again", true)
+	session, err := f.module.CreateOnboardingSession(ctx, s, "https://web.example.test/ok", "https://web.example.test/again", nil)
 	must(t, err)
-	if session.Surface != SurfaceHosted || session.URL == "" || session.ClientSecret != "" {
+	if h, ok := session.(HostedSession); !ok || h.URL == "" {
 		t.Fatalf("session=%+v", session)
 	}
 	f.fake.Set(external, rejectedSnapshot)
@@ -839,7 +843,7 @@ func TestOnboardingSessionNeedsAnExternalAccountThatIsNotDisabled(t *testing.T) 
 	if a := f.account(t, s); a.Status != StatusDisabled || a.StatusReason == nil || *a.StatusReason != "rejected.fraud" {
 		t.Fatalf("帳戶=%+v", a)
 	}
-	if _, err := f.module.CreateOnboardingSession(ctx, s, "https://web.example.test/ok", "https://web.example.test/again", true); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.CreateOnboardingSession(ctx, s, "https://web.example.test/ok", "https://web.example.test/again", nil); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("被停用的帳戶 err=%v", err)
 	}
 	if v := f.fake.Violations(); len(v) != 0 {
@@ -847,76 +851,119 @@ func TestOnboardingSessionNeedsAnExternalAccountThatIsNotDisabled(t *testing.T) 
 	}
 }
 
-// App 不能內嵌：帳戶列是內嵌介面時前置條件照常檢查（沒有帳戶、沒有外部帳戶、被停用、關閉中都是 failed_precondition 或 not_found）且不呼叫 provider；
-// 通過後回 CompleteOnWebsite 的內嵌 session，同樣不呼叫 provider。介面取自列的收件方式，不看目前的設定。
-// mutation：App 路徑略過前置條件 → 沒有外部帳戶與被停用的案例回成功，失敗。
-func TestOnboardingSessionForACallerThatCannotEmbedKeepsThePreconditionsAndNeverCallsTheProvider(t *testing.T) {
+// 前置條件與呼叫端宣告的內嵌能力無關：沒有帳戶、沒有外部帳戶、被停用、關閉中都是 not_found 或 failed_precondition，且不向 provider 建立 session；
+// 通過後 fake provider 一律回託管連結（契約的內嵌分支只有 Stripe）。
+// mutation：略過前置條件 → 沒有外部帳戶與被停用的案例回成功，失敗。
+func TestOnboardingSessionKeepsThePreconditionsWhateverTheCallerDeclares(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
-	f.fake.WithCapabilities(Capabilities{RequirementCollection: CollectionPlatform, OnboardingSurface: SurfaceEmbedded})
-	url := func(s int64) (OnboardingSession, error) {
-		return f.module.CreateOnboardingSession(ctx, s, "https://web.example.test/ok", "https://web.example.test/again", false)
+	f.fake.WithCapabilities(Capabilities{RequirementCollection: CollectionPlatform})
+	open := func(s int64) (OnboardingSession, error) {
+		return f.module.CreateOnboardingSession(ctx, s, "https://web.example.test/ok", "https://web.example.test/again", []EmbeddedRuntime{RuntimeStripeConnectJS})
 	}
-	if _, err := url(987654); apperr.KindOf(err) != apperr.KindNotFound {
+	if _, err := open(987654); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("沒有帳戶列 err=%v", err)
 	}
 	s := f.newStore(t)
-	if _, err := url(s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := open(s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("還沒有外部帳戶 err=%v", err)
 	}
+	if _, _, sessions := f.fake.Calls(); sessions != 0 {
+		t.Fatalf("前置條件沒過卻向 provider 建立了 %d 個 session", sessions)
+	}
 	external := f.ensure(t, s)
-	session, err := url(s)
+	session, err := open(s)
 	must(t, err)
-	if session.Surface != SurfaceEmbedded || !session.CompleteOnWebsite || session.URL != "" || session.ClientSecret != "" || session.Provider != "" || session.PublishableKey != "" {
-		t.Fatalf("session=%+v", session)
+	if h, ok := session.(HostedSession); !ok || h.URL == "" {
+		t.Fatalf("fake provider 一律回託管連結：%+v", session)
 	}
 	f.fake.Set(external, rejectedSnapshot)
 	_, err = f.module.SyncAccount(ctx, s)
 	must(t, err)
-	if _, err := url(s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := open(s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("被停用 err=%v", err)
 	}
 	closing := f.newStore(t)
 	f.ensure(t, closing)
 	_, err = f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET purge_pending_at = now() WHERE store_id = $1", closing)
 	must(t, err)
-	if _, err := url(closing); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := open(closing); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("關閉中 err=%v", err)
 	}
-	if _, _, sessions := f.fake.Calls(); sessions != 0 {
-		t.Fatalf("向 provider 建立了 %d 個 session", sessions)
+	if _, _, sessions := f.fake.Calls(); sessions != 1 {
+		t.Fatalf("向 provider 建立了 %d 個 session，預期只有通過前置條件的那一個", sessions)
 	}
 	if v := f.fake.Violations(); len(v) != 0 {
 		t.Fatalf("違反呼叫規則：%v", v)
 	}
 }
 
-// 介面取自帳戶列：列是內嵌（平台收件）而目前設定是託管時，App 仍回「到網站完成」；列是託管而設定是內嵌時，App 仍拿到 provider 的連結。
-func TestOnboardingSessionSurfaceComesFromTheAccountRowNotTheCurrentConfiguration(t *testing.T) {
+// stripeSessionCalls 回傳一個 Stripe 的假伺服器（重播實測回應）與它收到的路徑紀錄。
+func stripeSessionCalls(t *testing.T) (client *stripe.Client, paths func() []string) {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "platform", "stripe", "testdata", "account_session_platform.json"))
+	must(t, err)
+	var fx struct {
+		Status int             `json:"status"`
+		Body   json.RawMessage `json:"body"`
+	}
+	must(t, json.Unmarshal(raw, &fx))
+	var mu sync.Mutex
+	var got []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		got = append(got, r.URL.Path)
+		mu.Unlock()
+		if r.URL.Path == "/v1/account_sessions" {
+			w.WriteHeader(fx.Status)
+			_, _ = w.Write(fx.Body)
+			return
+		}
+		_, _ = w.Write([]byte(`{"object":"v2.core.account_link","url":"https://connect.stripe.com/x","expires_at":"2026-11-04T01:02:03Z"}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := stripe.New(stripe.Config{BaseURL: srv.URL, SecretKey: "sk_test_x", WebhookSecret: "whsec_test"})
+	must(t, err)
+	return c, func() []string { mu.Lock(); defer mu.Unlock(); return slices.Clone(got) }
+}
+
+// session 的形狀取自帳戶列保存的收件方式，不看目前的行程設定：列是平台收件而設定改成金流商收件時，宣告內嵌的呼叫端仍拿到內嵌 session；
+// 列是金流商收件而設定改成平台收件時，宣告內嵌的呼叫端仍拿到託管連結。
+// mutation：改讀行程設定（provider 的目前收件方式）→ 兩個案例的形狀互換，失敗。
+func TestOnboardingSessionShapeComesFromTheAccountRowNotTheCurrentConfiguration(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
-	f.fake.WithCapabilities(Capabilities{RequirementCollection: CollectionPlatform, OnboardingSurface: SurfaceEmbedded})
-	embeddedRow := f.newStore(t)
-	f.ensure(t, embeddedRow)
-	f.fake.WithCapabilities(Capabilities{RequirementCollection: CollectionProvider, OnboardingSurface: SurfaceHosted})
-	hostedRow := f.newStore(t)
-	f.ensure(t, hostedRow)
+	f.fake.WithCapabilities(Capabilities{RequirementCollection: CollectionPlatform})
+	platformRow := f.newStore(t)
+	f.ensure(t, platformRow)
+	f.fake.WithCapabilities(Capabilities{RequirementCollection: CollectionProvider})
+	providerRow := f.newStore(t)
+	f.ensure(t, providerRow)
+	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET provider = 'stripe' WHERE store_id = ANY($1)", []int64{platformRow, providerRow})
+	must(t, err)
 
-	got, err := f.module.CreateOnboardingSession(ctx, embeddedRow, "https://web.example.test/ok", "https://web.example.test/again", false)
+	embedded := []EmbeddedRuntime{RuntimeStripeConnectJS}
+	client, paths := stripeSessionCalls(t)
+	configured, err := NewStripe(client, CollectionProvider, "pk_test_x")
 	must(t, err)
-	if !got.CompleteOnWebsite || got.Surface != SurfaceEmbedded {
-		t.Fatalf("內嵌列、設定是託管：%+v", got)
-	}
-	if _, _, sessions := f.fake.Calls(); sessions != 0 {
-		t.Fatalf("內嵌列向 provider 建立了 %d 個 session", sessions)
-	}
-	f.fake.WithCapabilities(Capabilities{RequirementCollection: CollectionPlatform, OnboardingSurface: SurfaceEmbedded})
-	got, err = f.module.CreateOnboardingSession(ctx, hostedRow, "https://web.example.test/ok", "https://web.example.test/again", false)
+	f.module = New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Inbox: f.inbox, Provider: configured, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.New(slog.NewTextHandler(&f.logs, nil))})
+	got, err := f.module.CreateOnboardingSession(ctx, platformRow, "https://web.example.test/ok", "https://web.example.test/again", embedded)
 	must(t, err)
-	if got.CompleteOnWebsite || got.Surface != SurfaceHosted || got.URL == "" {
-		t.Fatalf("託管列、設定是內嵌：%+v", got)
+	if e, ok := got.(StripeEmbeddedSession); !ok || e.ClientSecret == "" || e.PublishableKey != "pk_test_x" {
+		t.Fatalf("平台收件的列、設定是金流商收件：%+v", got)
+	}
+	configured, err = NewStripe(client, CollectionPlatform, "pk_test_x")
+	must(t, err)
+	f.module = New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Inbox: f.inbox, Provider: configured, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.New(slog.NewTextHandler(&f.logs, nil))})
+	got, err = f.module.CreateOnboardingSession(ctx, providerRow, "https://web.example.test/ok", "https://web.example.test/again", embedded)
+	must(t, err)
+	if h, ok := got.(HostedSession); !ok || h.URL == "" {
+		t.Fatalf("金流商收件的列、設定是平台收件：%+v", got)
+	}
+	if fmt.Sprint(paths()) != "[/v1/account_sessions /v2/core/account_links]" {
+		t.Fatalf("呼叫的路徑 %v", paths())
 	}
 }
 

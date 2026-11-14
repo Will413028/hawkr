@@ -15,8 +15,8 @@ import (
 const StripeName = "stripe"
 
 // Stripe 是 Provider 的 Stripe 實作（Accounts v2）。收件方式決定 dashboard 與開通介面：provider 收件用 express 加託管的 Account Link，平台收件
-// 用 none 加內嵌的 Account Session（計畫 D2、D7，spike Q9）。每次呼叫的收件方式取自帳戶列保存的值（EnsureInput、SessionInput 的 Collection），
-// 行程設定的 collection 只決定新列寫入的值（Capabilities）。
+// 用 none 加內嵌的 Account Session（計畫 D2、D7，spike Q9）。建立外部帳戶的收件方式取自帳戶列保存的值（EnsureInput 的 Collection），
+// 開通 session 的形狀由 ChooseSession 決定（SessionInput 的 Kind），行程設定的 collection 只決定新列寫入的值（Capabilities）。
 type Stripe struct {
 	client         *stripe.Client
 	collection     model.RequirementCollection
@@ -24,7 +24,7 @@ type Stripe struct {
 }
 
 // NewStripe 建立 Stripe adapter；collection 只接受 CollectionProvider 與 CollectionPlatform。publishableKey 是內嵌元件初始化用的公開金鑰，
-// 平台收件（內嵌元件）必填，託管頁面不用。
+// 一律必填：行程設定的收件方式可以和既有帳戶列保存的不同，既有的平台收件帳戶仍會開內嵌 session。
 func NewStripe(client *stripe.Client, collection model.RequirementCollection, publishableKey string) (*Stripe, error) {
 	if client == nil {
 		return nil, errors.New("payment：Stripe client 必填")
@@ -32,8 +32,8 @@ func NewStripe(client *stripe.Client, collection model.RequirementCollection, pu
 	if collection != model.CollectionProvider && collection != model.CollectionPlatform {
 		return nil, fmt.Errorf("payment：Stripe 不支援收件方式 %q", collection)
 	}
-	if collection == model.CollectionPlatform && publishableKey == "" {
-		return nil, errors.New("payment：Stripe 平台收件需要公開金鑰")
+	if publishableKey == "" {
+		return nil, errors.New("payment：Stripe 需要公開金鑰")
 	}
 	return &Stripe{client: client, collection: collection, publishableKey: publishableKey}, nil
 }
@@ -44,9 +44,9 @@ func (s *Stripe) Name() string { return StripeName }
 // Capabilities 實作 Provider。
 func (s *Stripe) Capabilities() Capabilities {
 	if s.collection == model.CollectionPlatform {
-		return Capabilities{RequirementCollection: model.CollectionPlatform, OnboardingSurface: model.SurfaceEmbedded}
+		return Capabilities{RequirementCollection: model.CollectionPlatform}
 	}
-	return Capabilities{RequirementCollection: model.CollectionProvider, OnboardingSurface: model.SurfaceHosted}
+	return Capabilities{RequirementCollection: model.CollectionProvider}
 }
 
 // EnsureAccount 實作 Provider。
@@ -82,23 +82,23 @@ func (s *Stripe) ResolveAccount(ctx context.Context, in ResolveInput) (string, e
 // CreateOnboardingSession 實作 Provider。
 func (s *Stripe) CreateOnboardingSession(ctx context.Context, in SessionInput) (model.OnboardingSession, error) {
 	if in.ExternalAccountID == "" {
-		return model.OnboardingSession{}, fmt.Errorf("%w：缺少外部帳戶 ID", ErrPermanent)
+		return nil, fmt.Errorf("%w：缺少外部帳戶 ID", ErrPermanent)
 	}
-	switch in.Collection {
-	case model.CollectionPlatform:
+	switch in.Kind {
+	case SessionEmbedded:
 		sess, err := s.client.CreateAccountSession(ctx, in.ExternalAccountID)
 		if err != nil {
-			return model.OnboardingSession{}, classify(err)
+			return nil, classify(err)
 		}
-		return model.OnboardingSession{Surface: model.SurfaceEmbedded, ClientSecret: sess.ClientSecret, Provider: StripeName, PublishableKey: s.publishableKey, ExpiresAt: sess.ExpiresAt}, nil
-	case model.CollectionProvider:
+		return model.StripeEmbeddedSession{ClientSecret: sess.ClientSecret, PublishableKey: s.publishableKey, ExpiresAt: sess.ExpiresAt}, nil
+	case SessionHosted:
 		link, err := s.client.CreateAccountLink(ctx, in.ExternalAccountID, in.ReturnURL, in.RefreshURL)
 		if err != nil {
-			return model.OnboardingSession{}, classify(err)
+			return nil, classify(err)
 		}
-		return model.OnboardingSession{Surface: model.SurfaceHosted, URL: link.URL, ExpiresAt: link.ExpiresAt}, nil
+		return model.HostedSession{URL: link.URL, ExpiresAt: link.ExpiresAt}, nil
 	}
-	return model.OnboardingSession{}, fmt.Errorf("%w：不支援的收件方式 %q", ErrPermanent, in.Collection)
+	return nil, fmt.Errorf("%w：不支援的 session 形狀 %d", ErrPermanent, in.Kind)
 }
 
 // FetchAccount 實作 Provider：取轉帳能力（狀態與細節）、撥款能力是否 active、requirements 原始 JSON 與外部銀行帳號的 fingerprint，其餘欄位丟棄；

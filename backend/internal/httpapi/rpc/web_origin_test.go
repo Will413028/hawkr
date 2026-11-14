@@ -151,43 +151,17 @@ func TestOnboardingReturnPagesExistInTheWebsiteRoutes(t *testing.T) {
 	}
 }
 
-func TestCertificationURLExistsInTheWebsiteRoutes(t *testing.T) {
-	routes := websiteRoutes(t)
-	w, err := NewWebOrigin("https://www.example")
-	if err != nil {
-		t.Fatal(err)
-	}
-	supported, def := websiteLocales(t)
-	for _, locale := range supported {
-		raw, err := w.CertificationURL(uitext.Locale(locale))
-		if err != nil {
-			t.Fatalf("locale=%s：%v", locale, err)
-		}
-		u, err := url.Parse(raw)
-		if err != nil || u.Scheme+"://"+u.Host != w.Origin() {
-			t.Errorf("認證頁網址 %q 不在網站的 origin %q 之下", raw, w.Origin())
-			continue
-		}
-		path := u.Path
-		if locale != def {
-			if !strings.HasPrefix(path, "/"+locale+"/") {
-				t.Errorf("%q 沒有語系前綴 /%s", raw, locale)
-			}
-			path = strings.TrimPrefix(path, "/"+locale)
-		}
-		if !routes[path] {
-			t.Errorf("認證頁網址 %q 的路徑 %q 在 website/app/[locale] 沒有對應的 page.tsx", raw, path)
-		}
-	}
-	if _, err := w.CertificationURL("fr"); err == nil {
-		t.Error("不支援的語系被接受")
-	}
+// validWebLocale 回報 locale 是不是 sitePrefix 接受的網站語系。
+func validWebLocale(locale string) (uitext.Locale, bool) {
+	l := uitext.Locale(locale)
+	_, err := sitePrefix(l)
+	return l, err == nil
 }
 
 func TestWebLocalesMatchTheWebsiteRouting(t *testing.T) {
 	supported, def := websiteLocales(t)
 	for _, locale := range supported {
-		l, ok := ValidWebLocale(locale)
+		l, ok := validWebLocale(locale)
 		if !ok {
 			t.Errorf("website 路由的語系 %q 伺服器不認得", locale)
 			continue
@@ -207,13 +181,13 @@ func TestWebLocalesMatchTheWebsiteRouting(t *testing.T) {
 		site[locale] = true
 	}
 	for _, candidate := range []string{"zh-TW", "en", "zh-CN", "zh-HK", "ja", "ko", "fr", "de", "es", "th", "vi", "id", "en-US", "en-GB", "ja-JP"} {
-		if _, ok := ValidWebLocale(candidate); ok && !site[candidate] {
+		if _, ok := validWebLocale(candidate); ok && !site[candidate] {
 			t.Errorf("伺服器接受語系 %q，但 website/lib/intl/locales.ts 的 supportedLocales 沒有它", candidate)
 		}
 	}
 	for _, bad := range []string{"", "fr", "EN", "zh", "zh-tw", "/en"} {
-		if _, ok := ValidWebLocale(bad); ok {
-			t.Errorf("ValidWebLocale(%q) 應該不通過", bad)
+		if _, ok := validWebLocale(bad); ok {
+			t.Errorf("validWebLocale(%q) 應該不通過", bad)
 		}
 	}
 }

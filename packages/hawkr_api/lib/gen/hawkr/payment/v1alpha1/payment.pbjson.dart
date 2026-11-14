@@ -52,18 +52,17 @@ final $typed_data.Uint8List requirementCollectionDescriptor = $convert.base64Dec
     'NJRklFRBAAEiMKH1JFUVVJUkVNRU5UX0NPTExFQ1RJT05fUFJPVklERVIQARIjCh9SRVFVSVJF'
     'TUVOVF9DT0xMRUNUSU9OX1BMQVRGT1JNEAI=');
 
-@$core.Deprecated('Use onboardingSurfaceDescriptor instead')
-const OnboardingSurface$json = {
-  '1': 'OnboardingSurface',
+@$core.Deprecated('Use embeddedOnboardingRuntimeDescriptor instead')
+const EmbeddedOnboardingRuntime$json = {
+  '1': 'EmbeddedOnboardingRuntime',
   '2': [
-    {'1': 'ONBOARDING_SURFACE_UNSPECIFIED', '2': 0},
-    {'1': 'ONBOARDING_SURFACE_HOSTED', '2': 1},
-    {'1': 'ONBOARDING_SURFACE_EMBEDDED', '2': 2},
+    {'1': 'EMBEDDED_ONBOARDING_RUNTIME_UNSPECIFIED', '2': 0},
+    {'1': 'EMBEDDED_ONBOARDING_RUNTIME_STRIPE_CONNECT_JS', '2': 1},
   ],
 };
 
-/// Descriptor for `OnboardingSurface`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List onboardingSurfaceDescriptor = $convert.base64Decode(
-    'ChFPbmJvYXJkaW5nU3VyZmFjZRIiCh5PTkJPQVJESU5HX1NVUkZBQ0VfVU5TUEVDSUZJRUQQAB'
-    'IdChlPTkJPQVJESU5HX1NVUkZBQ0VfSE9TVEVEEAESHwobT05CT0FSRElOR19TVVJGQUNFX0VN'
-    'QkVEREVEEAI=');
+/// Descriptor for `EmbeddedOnboardingRuntime`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List embeddedOnboardingRuntimeDescriptor = $convert.base64Decode(
+    'ChlFbWJlZGRlZE9uYm9hcmRpbmdSdW50aW1lEisKJ0VNQkVEREVEX09OQk9BUkRJTkdfUlVOVE'
+    'lNRV9VTlNQRUNJRklFRBAAEjEKLUVNQkVEREVEX09OQk9BUkRJTkdfUlVOVElNRV9TVFJJUEVf'
+    'Q09OTkVDVF9KUxAB');

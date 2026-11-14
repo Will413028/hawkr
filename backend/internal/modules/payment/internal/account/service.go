@@ -216,14 +216,6 @@ func (s *Service) Ensure(ctx context.Context, storeID int64, final bool) error {
 	})
 }
 
-// Capabilities 回傳目前 provider 的能力描述；沒有設定 provider 時 ok 為 false。
-func (s *Service) Capabilities() (caps Capabilities, ok bool) {
-	if s.d.Provider == nil {
-		return Capabilities{}, false
-	}
-	return s.d.Provider.Capabilities(), true
-}
-
 // ForgetOwners 在呼叫方（擁有者個資清理）的 transaction 內，為每個擁有者排入「關閉外部帳戶後刪除帳戶列」的 job（唯一鍵 store_id）：呼叫方已鎖住上層的列，
 // 不在同一個 transaction 等下層 payment 的列（platform/lockorder），關閉與刪除由本模組的 job 做。沒有 ID 時什麼都不做。
 func (s *Service) ForgetOwners(ctx context.Context, storeIDs []int64) error {

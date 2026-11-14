@@ -45,24 +45,14 @@ func RequirementCollectionValues() []RequirementCollection {
 	return []RequirementCollection{CollectionProvider, CollectionPlatform}
 }
 
-// OnboardingSurface 是開通用的介面。
-type OnboardingSurface string
+// EmbeddedRuntime 是呼叫端能承載的內嵌開通執行環境（呼叫端宣告，空清單表示不能內嵌）。
+type EmbeddedRuntime string
 
-// 開通介面。
+// 內嵌開通執行環境。
 const (
-	// SurfaceHosted 金流商託管的頁面（連結）。
-	SurfaceHosted OnboardingSurface = "HOSTED"
-	// SurfaceEmbedded 嵌在自己網頁的元件（client secret）。
-	SurfaceEmbedded OnboardingSurface = "EMBEDDED"
+	// RuntimeStripeConnectJS 是 Stripe Connect.js（瀏覽器）。
+	RuntimeStripeConnectJS EmbeddedRuntime = "STRIPE_CONNECT_JS"
 )
-
-// SurfaceOf 是收件方式對應的開通介面：平台收件用內嵌元件，金流商收件用託管頁面。
-func SurfaceOf(c RequirementCollection) OnboardingSurface {
-	if c == CollectionPlatform {
-		return SurfaceEmbedded
-	}
-	return SurfaceHosted
-}
 
 // PaymentAccount 是擁有者（店家）的收款帳戶：外部帳戶的本地快取（聯絡信箱不對外）。
 type PaymentAccount struct {
@@ -84,19 +74,28 @@ type PaymentAccount struct {
 	UpdatedAt      time.Time
 }
 
-// OnboardingSession 是開通用的 session：託管用 URL，內嵌用 ClientSecret、Provider（金流商代碼，client 依它選元件）與
-// PublishableKey（初始化元件用的公開金鑰，不是 secret）；託管的 session 兩者都是空字串。
-// CompleteOnWebsite 為 true 表示帳戶是內嵌介面而呼叫端無法內嵌：沒有呼叫金流商，其餘欄位都是空，由呼叫端引導到網站完成。
-type OnboardingSession struct {
-	Surface        OnboardingSurface
-	URL            string
+// OnboardingSession 是開通用的 session，只有兩種形狀：HostedSession（託管連結）與各金流商的內嵌 session（目前只有 StripeEmbeddedSession）。
+// 它是封閉的 interface（方法未匯出，只有本套件的型別能實作），每種形狀只帶自己用得到的欄位，所以沒有「型態欄位加攤平欄位」的第三種組合；
+// 錯誤時回 nil，不回零值。
+type OnboardingSession interface {
+	onboardingSession()
+}
+
+// HostedSession 是金流商託管的開通頁面：一次性、短效的連結。
+type HostedSession struct {
+	URL       string
+	ExpiresAt *time.Time
+}
+
+// StripeEmbeddedSession 是 Stripe Connect.js 內嵌元件的初始化資料：client secret 與公開金鑰（不是 secret）。
+type StripeEmbeddedSession struct {
 	ClientSecret   string
-	Provider       string
 	PublishableKey string
 	ExpiresAt      *time.Time
-	// CompleteOnWebsite 見型別說明。
-	CompleteOnWebsite bool
 }
+
+func (HostedSession) onboardingSession()         {}
+func (StripeEmbeddedSession) onboardingSession() {}
 
 // PayoutAccountChanged 是同步 job 寫入帳戶快照的 transaction 內發布的事件（Stripe 計畫 D28）：seller 以同 transaction 的訂閱者更新開通閘門讀的
 // transfers_active 副本，並把 BankFingerprints 寫成防詐比對 hash（D12）。每次同步都發布（fingerprint 可能在轉帳能力不變時改變）。

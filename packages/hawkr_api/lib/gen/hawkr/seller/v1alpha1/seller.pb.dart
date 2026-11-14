@@ -3760,13 +3760,11 @@ class SaveKYCDraftResponse extends $pb.GeneratedMessage {
 class PaymentAccount extends $pb.GeneratedMessage {
   factory PaymentAccount({
     $8.PaymentAccountStatus? status,
-    $8.OnboardingSurface? onboardingSurface,
     $core.bool? payoutsActive,
     $2.Timestamp? fetchTime,
   }) {
     final result = PaymentAccount._();
     if (status != null) result.status = status;
-    if (onboardingSurface != null) result.onboardingSurface = onboardingSurface;
     if (payoutsActive != null) result.payoutsActive = payoutsActive;
     if (fetchTime != null) result.fetchTime = fetchTime;
     return result;
@@ -3788,10 +3786,8 @@ class PaymentAccount extends $pb.GeneratedMessage {
       createEmptyInstance: PaymentAccount.$_createMessage)
     ..aE<$8.PaymentAccountStatus>(1, _omitFieldNames ? '' : 'status',
         enumValues: $8.PaymentAccountStatus.values)
-    ..aE<$8.OnboardingSurface>(2, _omitFieldNames ? '' : 'onboardingSurface',
-        enumValues: $8.OnboardingSurface.values)
-    ..aOB(3, _omitFieldNames ? '' : 'payoutsActive')
-    ..aOM<$2.Timestamp>(4, _omitFieldNames ? '' : 'fetchTime',
+    ..aOB(2, _omitFieldNames ? '' : 'payoutsActive')
+    ..aOM<$2.Timestamp>(3, _omitFieldNames ? '' : 'fetchTime',
         subBuilder: $2.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
 
@@ -3826,37 +3822,27 @@ class PaymentAccount extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearStatus() => $_clearField(1);
 
-  /// 目前設定的 provider 用哪種介面開通；沒有設定收款開通時是 UNSPECIFIED。
-  @$pb.TagNumber(2)
-  $8.OnboardingSurface get onboardingSurface => $_getN(1);
-  @$pb.TagNumber(2)
-  set onboardingSurface($8.OnboardingSurface value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasOnboardingSurface() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearOnboardingSurface() => $_clearField(2);
-
   /// 撥款能力是否啟用。
-  @$pb.TagNumber(3)
-  $core.bool get payoutsActive => $_getBF(2);
-  @$pb.TagNumber(3)
-  set payoutsActive($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasPayoutsActive() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearPayoutsActive() => $_clearField(3);
+  @$pb.TagNumber(2)
+  $core.bool get payoutsActive => $_getBF(1);
+  @$pb.TagNumber(2)
+  set payoutsActive($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPayoutsActive() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPayoutsActive() => $_clearField(2);
 
   /// 最近一次向金流商讀取帳戶的時間；還沒讀過時不設。
-  @$pb.TagNumber(4)
-  $2.Timestamp get fetchTime => $_getN(3);
-  @$pb.TagNumber(4)
-  set fetchTime($2.Timestamp value) => $_setField(4, value);
-  @$pb.TagNumber(4)
-  $core.bool hasFetchTime() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearFetchTime() => $_clearField(4);
-  @$pb.TagNumber(4)
-  $2.Timestamp ensureFetchTime() => $_ensure(3);
+  @$pb.TagNumber(3)
+  $2.Timestamp get fetchTime => $_getN(2);
+  @$pb.TagNumber(3)
+  set fetchTime($2.Timestamp value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFetchTime() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFetchTime() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $2.Timestamp ensureFetchTime() => $_ensure(2);
 }
 
 class GetMyPaymentAccountRequest extends $pb.GeneratedMessage {
@@ -3976,11 +3962,12 @@ class GetMyPaymentAccountResponse extends $pb.GeneratedMessage {
 class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
   factory CreatePaymentOnboardingSessionRequest({
     OnboardingReturnDestination? destination,
-    $core.String? locale,
+    $core.Iterable<$8.EmbeddedOnboardingRuntime>? embeddedRuntimes,
   }) {
     final result = CreatePaymentOnboardingSessionRequest._();
     if (destination != null) result.destination = destination;
-    if (locale != null) result.locale = locale;
+    if (embeddedRuntimes != null)
+      result.embeddedRuntimes.addAll(embeddedRuntimes);
     return result;
   }
 
@@ -4002,7 +3989,12 @@ class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
           CreatePaymentOnboardingSessionRequest.$_createMessage)
     ..aE<OnboardingReturnDestination>(1, _omitFieldNames ? '' : 'destination',
         enumValues: OnboardingReturnDestination.values)
-    ..aOS(2, _omitFieldNames ? '' : 'locale')
+    ..pc<$8.EmbeddedOnboardingRuntime>(
+        2, _omitFieldNames ? '' : 'embeddedRuntimes', $pb.PbFieldType.KE,
+        valueOf: $8.EmbeddedOnboardingRuntime.valueOf,
+        enumValues: $8.EmbeddedOnboardingRuntime.values,
+        defaultEnumValue: $8
+            .EmbeddedOnboardingRuntime.EMBEDDED_ONBOARDING_RUNTIME_UNSPECIFIED)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4035,6 +4027,7 @@ class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
   static CreatePaymentOnboardingSessionRequest? _defaultInstance;
 
   /// 開通結束後回到的頁面；UNSPECIFIED 回 invalid_argument。連結過期或已使用時，賣家被送回同一目的地的重新取得入口，client 在那裡重新呼叫本方法。
+  /// 回跳頁的網站語系取自請求的 Accept-Language；賣家 App 的回跳頁沒有語系前綴。
   @$pb.TagNumber(1)
   OnboardingReturnDestination get destination => $_getN(0);
   @$pb.TagNumber(1)
@@ -4044,32 +4037,21 @@ class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearDestination() => $_clearField(1);
 
-  /// 回跳頁的網站語系（BCP-47：zh-TW 或 en），決定網站頁的路徑前綴；空或不支援回 invalid_argument。
-  /// 賣家 App 的回跳頁沒有語系前綴，這個值仍要合法，但不影響網址。
+  /// 呼叫端能承載的內嵌執行環境；空表示不能內嵌（一律拿託管連結）。不認得的值與 UNSPECIFIED 忽略。
   @$pb.TagNumber(2)
-  $core.String get locale => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set locale($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasLocale() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearLocale() => $_clearField(2);
+  $pb.PbList<$8.EmbeddedOnboardingRuntime> get embeddedRuntimes => $_getList(1);
 }
+
+enum CreatePaymentOnboardingSessionResponse_Session { hosted, embedded, notSet }
 
 class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
   factory CreatePaymentOnboardingSessionResponse({
-    $8.OnboardingSurface? surface,
-    $core.String? url,
-    $core.String? clientSecret,
-    $core.String? provider,
-    $core.String? publishableKey,
+    HostedOnboarding? hosted,
+    EmbeddedOnboarding? embedded,
   }) {
     final result = CreatePaymentOnboardingSessionResponse._();
-    if (surface != null) result.surface = surface;
-    if (url != null) result.url = url;
-    if (clientSecret != null) result.clientSecret = clientSecret;
-    if (provider != null) result.provider = provider;
-    if (publishableKey != null) result.publishableKey = publishableKey;
+    if (hosted != null) result.hosted = hosted;
+    if (embedded != null) result.embedded = embedded;
     return result;
   }
 
@@ -4083,18 +4065,24 @@ class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       CreatePaymentOnboardingSessionResponse()..mergeFromJson(json, registry);
 
+  static const $core
+      .Map<$core.int, CreatePaymentOnboardingSessionResponse_Session>
+      _CreatePaymentOnboardingSessionResponse_SessionByTag = {
+    1: CreatePaymentOnboardingSessionResponse_Session.hosted,
+    2: CreatePaymentOnboardingSessionResponse_Session.embedded,
+    0: CreatePaymentOnboardingSessionResponse_Session.notSet
+  };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'CreatePaymentOnboardingSessionResponse',
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance:
           CreatePaymentOnboardingSessionResponse.$_createMessage)
-    ..aE<$8.OnboardingSurface>(1, _omitFieldNames ? '' : 'surface',
-        enumValues: $8.OnboardingSurface.values)
-    ..aOS(2, _omitFieldNames ? '' : 'url')
-    ..aOS(3, _omitFieldNames ? '' : 'clientSecret')
-    ..aOS(4, _omitFieldNames ? '' : 'provider')
-    ..aOS(5, _omitFieldNames ? '' : 'publishableKey')
+    ..oo(0, [1, 2])
+    ..aOM<HostedOnboarding>(1, _omitFieldNames ? '' : 'hosted',
+        subBuilder: HostedOnboarding.$_createMessage)
+    ..aOM<EmbeddedOnboarding>(2, _omitFieldNames ? '' : 'embedded',
+        subBuilder: EmbeddedOnboarding.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4127,55 +4115,248 @@ class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
   static CreatePaymentOnboardingSessionResponse? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $8.OnboardingSurface get surface => $_getN(0);
+  @$pb.TagNumber(2)
+  CreatePaymentOnboardingSessionResponse_Session whichSession() =>
+      _CreatePaymentOnboardingSessionResponse_SessionByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(1)
-  set surface($8.OnboardingSurface value) => $_setField(1, value);
+  @$pb.TagNumber(2)
+  void clearSession() => $_clearField($_whichOneof(0));
+
+  /// 金流商的一次性、短效連結，在瀏覽器開啟。
   @$pb.TagNumber(1)
-  $core.bool hasSurface() => $_has(0);
+  HostedOnboarding get hosted => $_getN(0);
   @$pb.TagNumber(1)
-  void clearSurface() => $_clearField(1);
+  set hosted(HostedOnboarding value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasHosted() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHosted() => $_clearField(1);
+  @$pb.TagNumber(1)
+  HostedOnboarding ensureHosted() => $_ensure(0);
 
-  /// 要在瀏覽器開啟的網址：surface 是 HOSTED 時是金流商的一次性、短效開通連結；surface 是 EMBEDDED 而 destination 是 SELLER_APP 時是網站的認證頁
-  /// （賣家在網頁完成開通；伺服器仍照常檢查前置條件，但不建立內嵌 session，client_secret、provider、publishable_key 是空字串）。
-  /// surface 是 EMBEDDED 而 destination 是 WEBSITE_CERTIFICATION 時是空字串。surface 是帳戶實際的開通介面。
+  /// 內嵌在呼叫端裡的元件。
   @$pb.TagNumber(2)
-  $core.String get url => $_getSZ(1);
+  EmbeddedOnboarding get embedded => $_getN(1);
   @$pb.TagNumber(2)
-  set url($core.String value) => $_setString(1, value);
+  set embedded(EmbeddedOnboarding value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasUrl() => $_has(1);
+  $core.bool hasEmbedded() => $_has(1);
   @$pb.TagNumber(2)
-  void clearUrl() => $_clearField(2);
+  void clearEmbedded() => $_clearField(2);
+  @$pb.TagNumber(2)
+  EmbeddedOnboarding ensureEmbedded() => $_ensure(1);
+}
 
-  /// surface 是 EMBEDDED 時（只在 destination 是 WEBSITE_CERTIFICATION），初始化內嵌元件用的 client secret；只給這個賣家的瀏覽器，不記錄。
-  @$pb.TagNumber(3)
-  $core.String get clientSecret => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set clientSecret($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasClientSecret() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearClientSecret() => $_clearField(3);
+/// HostedOnboarding 是金流商託管的開通頁面。
+class HostedOnboarding extends $pb.GeneratedMessage {
+  factory HostedOnboarding({
+    $core.String? url,
+  }) {
+    final result = HostedOnboarding._();
+    if (url != null) result.url = url;
+    return result;
+  }
 
-  /// surface 是 EMBEDDED 時，金流商的代碼（例如 stripe），client 依它選內嵌元件；其他情況是空字串。client 不認得的值視為不能開通。
-  @$pb.TagNumber(4)
-  $core.String get provider => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set provider($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasProvider() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearProvider() => $_clearField(4);
+  HostedOnboarding._();
 
-  /// surface 是 EMBEDDED 時，內嵌元件初始化用的公開金鑰（不是 secret）；其他情況是空字串。
-  @$pb.TagNumber(5)
-  $core.String get publishableKey => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set publishableKey($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasPublishableKey() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearPublishableKey() => $_clearField(5);
+  factory HostedOnboarding.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      HostedOnboarding()..mergeFromBuffer(data, registry);
+  factory HostedOnboarding.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      HostedOnboarding()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'HostedOnboarding',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: HostedOnboarding.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'url')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HostedOnboarding clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HostedOnboarding copyWith(void Function(HostedOnboarding) updates) =>
+      super.copyWith((message) => updates(message as HostedOnboarding))
+          as HostedOnboarding;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use HostedOnboarding() / HostedOnboarding.new instead')
+  static HostedOnboarding create() => HostedOnboarding._();
+  static $pb.GeneratedMessage $_createMessage() => HostedOnboarding._();
+  @$core.override
+  HostedOnboarding createEmptyInstance() => HostedOnboarding._();
+  @$core.pragma('dart2js:noInline')
+  static HostedOnboarding getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<HostedOnboarding>(
+          HostedOnboarding.$_createMessage);
+  static HostedOnboarding? _defaultInstance;
+
+  /// 要在瀏覽器開啟的網址；一次性、短效，不記錄。
+  @$pb.TagNumber(1)
+  $core.String get url => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set url($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUrl() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUrl() => $_clearField(1);
+}
+
+enum EmbeddedOnboarding_Provider { stripe, notSet }
+
+/// EmbeddedOnboarding 是內嵌開通元件的初始化資料，依金流商分支。
+class EmbeddedOnboarding extends $pb.GeneratedMessage {
+  factory EmbeddedOnboarding({
+    StripeEmbeddedOnboarding? stripe,
+  }) {
+    final result = EmbeddedOnboarding._();
+    if (stripe != null) result.stripe = stripe;
+    return result;
+  }
+
+  EmbeddedOnboarding._();
+
+  factory EmbeddedOnboarding.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      EmbeddedOnboarding()..mergeFromBuffer(data, registry);
+  factory EmbeddedOnboarding.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      EmbeddedOnboarding()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, EmbeddedOnboarding_Provider>
+      _EmbeddedOnboarding_ProviderByTag = {
+    1: EmbeddedOnboarding_Provider.stripe,
+    0: EmbeddedOnboarding_Provider.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EmbeddedOnboarding',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: EmbeddedOnboarding.$_createMessage)
+    ..oo(0, [1])
+    ..aOM<StripeEmbeddedOnboarding>(1, _omitFieldNames ? '' : 'stripe',
+        subBuilder: StripeEmbeddedOnboarding.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EmbeddedOnboarding clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EmbeddedOnboarding copyWith(void Function(EmbeddedOnboarding) updates) =>
+      super.copyWith((message) => updates(message as EmbeddedOnboarding))
+          as EmbeddedOnboarding;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use EmbeddedOnboarding() / EmbeddedOnboarding.new instead')
+  static EmbeddedOnboarding create() => EmbeddedOnboarding._();
+  static $pb.GeneratedMessage $_createMessage() => EmbeddedOnboarding._();
+  @$core.override
+  EmbeddedOnboarding createEmptyInstance() => EmbeddedOnboarding._();
+  @$core.pragma('dart2js:noInline')
+  static EmbeddedOnboarding getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EmbeddedOnboarding>(
+          EmbeddedOnboarding.$_createMessage);
+  static EmbeddedOnboarding? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  EmbeddedOnboarding_Provider whichProvider() =>
+      _EmbeddedOnboarding_ProviderByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(1)
+  void clearProvider() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  StripeEmbeddedOnboarding get stripe => $_getN(0);
+  @$pb.TagNumber(1)
+  set stripe(StripeEmbeddedOnboarding value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStripe() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStripe() => $_clearField(1);
+  @$pb.TagNumber(1)
+  StripeEmbeddedOnboarding ensureStripe() => $_ensure(0);
+}
+
+/// StripeEmbeddedOnboarding 是 Stripe Connect.js 內嵌元件的初始化資料。
+class StripeEmbeddedOnboarding extends $pb.GeneratedMessage {
+  factory StripeEmbeddedOnboarding({
+    $core.String? clientSecret,
+    $core.String? publishableKey,
+  }) {
+    final result = StripeEmbeddedOnboarding._();
+    if (clientSecret != null) result.clientSecret = clientSecret;
+    if (publishableKey != null) result.publishableKey = publishableKey;
+    return result;
+  }
+
+  StripeEmbeddedOnboarding._();
+
+  factory StripeEmbeddedOnboarding.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StripeEmbeddedOnboarding()..mergeFromBuffer(data, registry);
+  factory StripeEmbeddedOnboarding.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StripeEmbeddedOnboarding()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StripeEmbeddedOnboarding',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: StripeEmbeddedOnboarding.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'clientSecret')
+    ..aOS(2, _omitFieldNames ? '' : 'publishableKey')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StripeEmbeddedOnboarding clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StripeEmbeddedOnboarding copyWith(
+          void Function(StripeEmbeddedOnboarding) updates) =>
+      super.copyWith((message) => updates(message as StripeEmbeddedOnboarding))
+          as StripeEmbeddedOnboarding;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use StripeEmbeddedOnboarding() / StripeEmbeddedOnboarding.new instead')
+  static StripeEmbeddedOnboarding create() => StripeEmbeddedOnboarding._();
+  static $pb.GeneratedMessage $_createMessage() => StripeEmbeddedOnboarding._();
+  @$core.override
+  StripeEmbeddedOnboarding createEmptyInstance() =>
+      StripeEmbeddedOnboarding._();
+  @$core.pragma('dart2js:noInline')
+  static StripeEmbeddedOnboarding getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<StripeEmbeddedOnboarding>(
+          StripeEmbeddedOnboarding.$_createMessage);
+  static StripeEmbeddedOnboarding? _defaultInstance;
+
+  /// 初始化元件用的 client secret；只給這個賣家的瀏覽器，不記錄。
+  @$pb.TagNumber(1)
+  $core.String get clientSecret => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set clientSecret($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasClientSecret() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearClientSecret() => $_clearField(1);
+
+  /// 初始化元件用的公開金鑰（不是 secret）。
+  @$pb.TagNumber(2)
+  $core.String get publishableKey => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set publishableKey($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPublishableKey() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPublishableKey() => $_clearField(2);
 }
 
 class GetMyKYCRequest extends $pb.GeneratedMessage {
@@ -7301,16 +7482,17 @@ class SellerAppServiceApi {
       _client.invoke<CancelKYCResponse>(
           ctx, 'SellerAppService', 'CancelKYC', request, CancelKYCResponse());
 
-  /// GetMyPaymentAccount 回傳呼叫者店家的收款帳戶：中立的狀態（PaymentAccountStatus）、誰收身分與銀行資料、開通用的介面。
+  /// GetMyPaymentAccount 回傳呼叫者店家的收款帳戶：中立的狀態（PaymentAccountStatus）、撥款能力是否啟用、最近一次讀取的時間。
   /// 店家還沒有收款帳戶（平台審核還沒核准，或沒有設定收款開通）時回 not_found。
   $async.Future<GetMyPaymentAccountResponse> getMyPaymentAccount(
           $pb.ClientContext? ctx, GetMyPaymentAccountRequest request) =>
       _client.invoke<GetMyPaymentAccountResponse>(ctx, 'SellerAppService',
           'GetMyPaymentAccount', request, GetMyPaymentAccountResponse());
 
-  /// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session：onboarding_surface 是 HOSTED 時回連結（賣家開外部瀏覽器完成後回到
-  /// destination 與 locale 決定的頁面；連結過期時回到同一目的地的重新取得入口），是 EMBEDDED 時回內嵌元件的 client_secret（destination 是 SELLER_APP 時不建立內嵌 session，回網站認證頁的連結，surface 仍是 EMBEDDED）。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
-  /// 停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
+  /// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session。回應是兩種互斥的 session 之一：託管連結（hosted，金流商的一次性、
+  /// 短效連結，賣家開瀏覽器完成後回到 destination 與請求語系（Accept-Language）決定的頁面；連結過期時回到同一目的地的重新取得入口），或內嵌元件
+  /// （embedded，初始化元件用的憑證）。只有帳戶的收款方式是平台收件、金流商支援、而且 embedded_runtimes 含對應的執行環境時才回內嵌，其餘一律回託管連結。
+  /// 外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
   $async.Future<CreatePaymentOnboardingSessionResponse>
       createPaymentOnboardingSession($pb.ClientContext? ctx,
               CreatePaymentOnboardingSessionRequest request) =>

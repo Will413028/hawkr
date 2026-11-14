@@ -11,7 +11,7 @@ import { enumDesc, fileDesc } from "@bufbuild/protobuf/codegenv2";
  * Describes the file hawkr/payment/v1alpha1/payment.proto.
  */
 export const file_hawkr_payment_v1alpha1_payment: GenFile = /*@__PURE__*/
-  fileDesc("CiRoYXdrci9wYXltZW50L3YxYWxwaGExL3BheW1lbnQucHJvdG8SFmhhd2tyLnBheW1lbnQudjFhbHBoYTEqhAIKFFBheW1lbnRBY2NvdW50U3RhdHVzEiYKIlBBWU1FTlRfQUNDT1VOVF9TVEFUVVNfVU5TUEVDSUZJRUQQABImCiJQQVlNRU5UX0FDQ09VTlRfU1RBVFVTX05PVF9DUkVBVEVEEAESJwojUEFZTUVOVF9BQ0NPVU5UX1NUQVRVU19VTkRFUl9SRVZJRVcQAhIqCiZQQVlNRU5UX0FDQ09VTlRfU1RBVFVTX0FDVElPTl9SRVFVSVJFRBADEiIKHlBBWU1FTlRfQUNDT1VOVF9TVEFUVVNfRU5BQkxFRBAEEiMKH1BBWU1FTlRfQUNDT1VOVF9TVEFUVVNfRElTQUJMRUQQBSqJAQoVUmVxdWlyZW1lbnRDb2xsZWN0aW9uEiYKIlJFUVVJUkVNRU5UX0NPTExFQ1RJT05fVU5TUEVDSUZJRUQQABIjCh9SRVFVSVJFTUVOVF9DT0xMRUNUSU9OX1BST1ZJREVSEAESIwofUkVRVUlSRU1FTlRfQ09MTEVDVElPTl9QTEFURk9STRACKncKEU9uYm9hcmRpbmdTdXJmYWNlEiIKHk9OQk9BUkRJTkdfU1VSRkFDRV9VTlNQRUNJRklFRBAAEh0KGU9OQk9BUkRJTkdfU1VSRkFDRV9IT1NURUQQARIfChtPTkJPQVJESU5HX1NVUkZBQ0VfRU1CRURERUQQAmIGcHJvdG8z");
+  fileDesc("CiRoYXdrci9wYXltZW50L3YxYWxwaGExL3BheW1lbnQucHJvdG8SFmhhd2tyLnBheW1lbnQudjFhbHBoYTEqhAIKFFBheW1lbnRBY2NvdW50U3RhdHVzEiYKIlBBWU1FTlRfQUNDT1VOVF9TVEFUVVNfVU5TUEVDSUZJRUQQABImCiJQQVlNRU5UX0FDQ09VTlRfU1RBVFVTX05PVF9DUkVBVEVEEAESJwojUEFZTUVOVF9BQ0NPVU5UX1NUQVRVU19VTkRFUl9SRVZJRVcQAhIqCiZQQVlNRU5UX0FDQ09VTlRfU1RBVFVTX0FDVElPTl9SRVFVSVJFRBADEiIKHlBBWU1FTlRfQUNDT1VOVF9TVEFUVVNfRU5BQkxFRBAEEiMKH1BBWU1FTlRfQUNDT1VOVF9TVEFUVVNfRElTQUJMRUQQBSqJAQoVUmVxdWlyZW1lbnRDb2xsZWN0aW9uEiYKIlJFUVVJUkVNRU5UX0NPTExFQ1RJT05fVU5TUEVDSUZJRUQQABIjCh9SRVFVSVJFTUVOVF9DT0xMRUNUSU9OX1BST1ZJREVSEAESIwofUkVRVUlSRU1FTlRfQ09MTEVDVElPTl9QTEFURk9STRACKnsKGUVtYmVkZGVkT25ib2FyZGluZ1J1bnRpbWUSKwonRU1CRURERURfT05CT0FSRElOR19SVU5USU1FX1VOU1BFQ0lGSUVEEAASMQotRU1CRURERURfT05CT0FSRElOR19SVU5USU1FX1NUUklQRV9DT05ORUNUX0pTEAFiBnByb3RvMw");
 
 /**
  * PaymentAccountStatus 是收款帳戶的中立狀態，由金流商的轉帳能力推導（不是金流商自己的狀態名）。
@@ -99,34 +99,27 @@ export const RequirementCollectionSchema: GenEnum<RequirementCollection> = /*@__
   enumDesc(file_hawkr_payment_v1alpha1_payment, 1);
 
 /**
- * OnboardingSurface 是開通用的介面。
+ * EmbeddedOnboardingRuntime 是呼叫端能承載的內嵌開通執行環境。
  *
- * @generated from enum hawkr.payment.v1alpha1.OnboardingSurface
+ * @generated from enum hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime
  */
-export enum OnboardingSurface {
+export enum EmbeddedOnboardingRuntime {
   /**
-   * @generated from enum value: ONBOARDING_SURFACE_UNSPECIFIED = 0;
+   * @generated from enum value: EMBEDDED_ONBOARDING_RUNTIME_UNSPECIFIED = 0;
    */
   UNSPECIFIED = 0,
 
   /**
-   * 金流商託管的頁面（連結）。
+   * Stripe Connect.js（瀏覽器）。
    *
-   * @generated from enum value: ONBOARDING_SURFACE_HOSTED = 1;
+   * @generated from enum value: EMBEDDED_ONBOARDING_RUNTIME_STRIPE_CONNECT_JS = 1;
    */
-  HOSTED = 1,
-
-  /**
-   * 嵌在網頁上的元件（client secret）。
-   *
-   * @generated from enum value: ONBOARDING_SURFACE_EMBEDDED = 2;
-   */
-  EMBEDDED = 2,
+  STRIPE_CONNECT_JS = 1,
 }
 
 /**
- * Describes the enum hawkr.payment.v1alpha1.OnboardingSurface.
+ * Describes the enum hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime.
  */
-export const OnboardingSurfaceSchema: GenEnum<OnboardingSurface> = /*@__PURE__*/
+export const EmbeddedOnboardingRuntimeSchema: GenEnum<EmbeddedOnboardingRuntime> = /*@__PURE__*/
   enumDesc(file_hawkr_payment_v1alpha1_payment, 2);
 

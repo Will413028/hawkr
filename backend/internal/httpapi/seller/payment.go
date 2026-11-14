@@ -2,6 +2,7 @@ package seller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"connectrpc.com/connect"
@@ -11,6 +12,7 @@ import (
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // returnPage 轉成 rpc 的回跳頁；UNSPECIFIED 與不認得的值回 invalid_argument。
@@ -28,14 +30,14 @@ func returnPage(d pb.OnboardingReturnDestination) (rpc.ReturnPage, error) {
 // PaymentReader 是收款帳戶的讀取來源（賣家端與後台的開通任務共用）。
 type PaymentReader interface {
 	Account(ctx context.Context, storeID int64) (payment.Account, error)
-	Capabilities() (payment.Capabilities, bool)
+	Configured() bool
 }
 
 // Payments 是賣家收款帳戶的來源（payment 模組，Stripe 計畫 D30）：handler 先由能力檢查取得呼叫者的店家（擁有者），再以店家呼叫。
 // SyncAccountUnlessFresh 是 RefreshMyPaymentAccount 的同步重讀（transaction 外的外部呼叫，可以與同步 job 並行，D32；上次讀取在 10 秒內不呼叫金流商，D33）。
 type Payments interface {
 	PaymentReader
-	CreateOnboardingSession(ctx context.Context, storeID int64, returnURL, refreshURL string, canEmbed bool) (payment.OnboardingSession, error)
+	CreateOnboardingSession(ctx context.Context, storeID int64, returnURL, refreshURL string, runtimes []payment.EmbeddedRuntime) (payment.OnboardingSession, error)
 	SyncAccountUnlessFresh(ctx context.Context, storeID int64) error
 }
 
@@ -60,9 +62,6 @@ func (h *App) GetMyPaymentAccount(ctx context.Context, _ *connect.Request[pb.Get
 		Status:        rpc.EnumToProto[paymentpb.PaymentAccountStatus](acct.Status),
 		PayoutsActive: acct.PayoutsActive, FetchTime: optTimestamp(acct.FetchedAt),
 	}
-	if caps, ok := h.payments.Capabilities(); ok {
-		out.OnboardingSurface = rpc.EnumToProto[paymentpb.OnboardingSurface](caps.OnboardingSurface)
-	}
 	return connect.NewResponse(&pb.GetMyPaymentAccountResponse{Account: out}), nil
 }
 
@@ -76,32 +75,47 @@ func (h *App) CreatePaymentOnboardingSession(ctx context.Context, req *connect.R
 	if err != nil {
 		return nil, err
 	}
-	locale, ok := rpc.ValidWebLocale(req.Msg.GetLocale())
-	if !ok {
-		return nil, rpc.RequiredField("locale", "locale 必須是 zh-TW 或 en")
-	}
-	returnURL, refreshURL, err := h.web.OnboardingReturnURLs(page, locale)
+	returnURL, refreshURL, err := h.web.OnboardingReturnURLs(page, uitext.LocaleFrom(ctx))
 	if err != nil {
 		return nil, err
 	}
-	// App 無法承載內嵌元件；帳戶是內嵌介面時由 payment 檢查前置條件後回「到網站完成」，這裡填網站的認證頁。
-	session, err := h.payments.CreateOnboardingSession(ctx, current.StoreID, returnURL, refreshURL, page != rpc.ReturnPageSellerApp)
+	session, err := h.payments.CreateOnboardingSession(ctx, current.StoreID, returnURL, refreshURL, embeddedRuntimes(req.Msg.GetEmbeddedRuntimes()))
 	if err != nil {
 		return nil, err
 	}
-	if session.CompleteOnWebsite {
-		u, err := h.web.CertificationURL(locale)
-		if err != nil {
-			return nil, err
+	out, err := sessionToProto(session)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(out), nil
+}
+
+// embeddedRuntimes 把呼叫端宣告的內嵌執行環境轉成 payment 的型別；UNSPECIFIED 與不認得的值忽略（呼叫端可能比伺服器新）。
+func embeddedRuntimes(in []paymentpb.EmbeddedOnboardingRuntime) []payment.EmbeddedRuntime {
+	var out []payment.EmbeddedRuntime
+	for _, r := range in {
+		if r == paymentpb.EmbeddedOnboardingRuntime_EMBEDDED_ONBOARDING_RUNTIME_STRIPE_CONNECT_JS {
+			out = append(out, payment.RuntimeStripeConnectJS)
 		}
-		return connect.NewResponse(&pb.CreatePaymentOnboardingSessionResponse{
-			Surface: rpc.EnumToProto[paymentpb.OnboardingSurface](session.Surface), Url: u,
-		}), nil
 	}
-	return connect.NewResponse(&pb.CreatePaymentOnboardingSessionResponse{
-		Surface: rpc.EnumToProto[paymentpb.OnboardingSurface](session.Surface), Url: session.URL, ClientSecret: session.ClientSecret,
-		Provider: session.Provider, PublishableKey: session.PublishableKey,
-	}), nil
+	return out
+}
+
+// sessionToProto 把 payment 的 session 轉成回應的 oneof；不認得的形狀是伺服器的錯（payment 新增形狀時要同步改這裡）。
+func sessionToProto(session payment.OnboardingSession) (*pb.CreatePaymentOnboardingSessionResponse, error) {
+	switch v := session.(type) {
+	case payment.HostedSession:
+		return &pb.CreatePaymentOnboardingSessionResponse{Session: &pb.CreatePaymentOnboardingSessionResponse_Hosted{
+			Hosted: &pb.HostedOnboarding{Url: v.URL},
+		}}, nil
+	case payment.StripeEmbeddedSession:
+		return &pb.CreatePaymentOnboardingSessionResponse{Session: &pb.CreatePaymentOnboardingSessionResponse_Embedded{
+			Embedded: &pb.EmbeddedOnboarding{Provider: &pb.EmbeddedOnboarding_Stripe{
+				Stripe: &pb.StripeEmbeddedOnboarding{ClientSecret: v.ClientSecret, PublishableKey: v.PublishableKey},
+			}},
+		}}, nil
+	}
+	return nil, fmt.Errorf("seller：不認得的開通 session 形狀 %T", session)
 }
 
 // RefreshMyPaymentAccount 同步向金流商重讀呼叫者店家的收款帳戶並更新快取（D33）；重讀失敗是這個明確動作的失敗，原樣回給 client

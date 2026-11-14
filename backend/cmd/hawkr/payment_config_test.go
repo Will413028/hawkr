@@ -65,21 +65,24 @@ func TestStripePaymentConfig(t *testing.T) {
 	if err != nil || p == nil || p.Name() != "stripe" {
 		t.Fatalf("預設：%v %v", p, err)
 	}
-	if c := p.Capabilities(); c.RequirementCollection != payment.CollectionProvider || c.OnboardingSurface != payment.SurfaceHosted {
-		t.Errorf("預設要是 Stripe 收件加託管頁面：%+v", c)
+	if c := p.Capabilities(); c.RequirementCollection != payment.CollectionProvider {
+		t.Errorf("預設新列要是 Stripe 收件：%+v", c)
 	}
 	p, err = readPaymentWith(with("STRIPE_REQUIREMENT_COLLECTION", "platform"))
 	if err != nil || p == nil {
 		t.Fatalf("platform：%v %v", p, err)
 	}
-	if c := p.Capabilities(); c.RequirementCollection != payment.CollectionPlatform || c.OnboardingSurface != payment.SurfaceEmbedded {
-		t.Errorf("platform 要是平台收件加內嵌元件：%+v", c)
+	if c := p.Capabilities(); c.RequirementCollection != payment.CollectionPlatform {
+		t.Errorf("platform 新列要是平台收件：%+v", c)
 	}
-	if _, err := readPaymentWith(with("STRIPE_REQUIREMENT_COLLECTION", "platform", "STRIPE_PUBLISHABLE_KEY", "")); err == nil || !strings.Contains(err.Error(), "STRIPE_PUBLISHABLE_KEY") {
-		t.Errorf("平台收件沒有公開金鑰：%v", err)
+	// 公開金鑰與收件方式無關：既有的平台收件帳戶在行程改成金流商收件後仍會開內嵌 session。
+	for _, collection := range []string{"provider", "platform"} {
+		if _, err := readPaymentWith(with("STRIPE_REQUIREMENT_COLLECTION", collection, "STRIPE_PUBLISHABLE_KEY", "")); err == nil || !strings.Contains(err.Error(), "STRIPE_PUBLISHABLE_KEY") {
+			t.Errorf("收件方式 %s 沒有公開金鑰必須讓啟動失敗：%v", collection, err)
+		}
 	}
-	if p, err := readPaymentWith(with("STRIPE_PUBLISHABLE_KEY", "")); p == nil || err != nil {
-		t.Errorf("託管頁面不需要公開金鑰：%v %v", p, err)
+	if _, err := readPaymentWith(with("STRIPE_PUBLISHABLE_KEY", "")); err == nil || !strings.Contains(err.Error(), "STRIPE_PUBLISHABLE_KEY") {
+		t.Errorf("沒設收件方式（預設金流商收件）沒有公開金鑰必須讓啟動失敗：%v", err)
 	}
 	if _, err := readPaymentWith(with("STRIPE_REQUIREMENT_COLLECTION", "both")); err == nil || !strings.Contains(err.Error(), "STRIPE_REQUIREMENT_COLLECTION") {
 		t.Errorf("不認得的收件方式：%v", err)

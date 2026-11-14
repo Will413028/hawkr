@@ -184,12 +184,13 @@ type SellerAppServiceClient interface {
 	SubmitKYC(context.Context, *connect.Request[v1alpha1.SubmitKYCRequest]) (*connect.Response[v1alpha1.SubmitKYCResponse], error)
 	// CancelKYC 取消草稿或審核中的申請；取消之後可以重新建立。
 	CancelKYC(context.Context, *connect.Request[v1alpha1.CancelKYCRequest]) (*connect.Response[v1alpha1.CancelKYCResponse], error)
-	// GetMyPaymentAccount 回傳呼叫者店家的收款帳戶：中立的狀態（PaymentAccountStatus）、誰收身分與銀行資料、開通用的介面。
+	// GetMyPaymentAccount 回傳呼叫者店家的收款帳戶：中立的狀態（PaymentAccountStatus）、撥款能力是否啟用、最近一次讀取的時間。
 	// 店家還沒有收款帳戶（平台審核還沒核准，或沒有設定收款開通）時回 not_found。
 	GetMyPaymentAccount(context.Context, *connect.Request[v1alpha1.GetMyPaymentAccountRequest]) (*connect.Response[v1alpha1.GetMyPaymentAccountResponse], error)
-	// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session：onboarding_surface 是 HOSTED 時回連結（賣家開外部瀏覽器完成後回到
-	// destination 與 locale 決定的頁面；連結過期時回到同一目的地的重新取得入口），是 EMBEDDED 時回內嵌元件的 client_secret（destination 是 SELLER_APP 時不建立內嵌 session，回網站認證頁的連結，surface 仍是 EMBEDDED）。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
-	// 停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
+	// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session。回應是兩種互斥的 session 之一：託管連結（hosted，金流商的一次性、
+	// 短效連結，賣家開瀏覽器完成後回到 destination 與請求語系（Accept-Language）決定的頁面；連結過期時回到同一目的地的重新取得入口），或內嵌元件
+	// （embedded，初始化元件用的憑證）。只有帳戶的收款方式是平台收件、金流商支援、而且 embedded_runtimes 含對應的執行環境時才回內嵌，其餘一律回託管連結。
+	// 外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
 	CreatePaymentOnboardingSession(context.Context, *connect.Request[v1alpha1.CreatePaymentOnboardingSessionRequest]) (*connect.Response[v1alpha1.CreatePaymentOnboardingSessionResponse], error)
 	// LookupBusinessRegistration 以統一編號查經濟部商業司的公開登記資料，給 KYC 表單帶入公司資料。查無這個統編不是錯誤：
 	// 回應沒有 registration；資料來源暫時無法使用回 unavailable，畫面退回手動填寫。每個帳號每分鐘最多查 10 次，超過回
@@ -561,12 +562,13 @@ type SellerAppServiceHandler interface {
 	SubmitKYC(context.Context, *connect.Request[v1alpha1.SubmitKYCRequest]) (*connect.Response[v1alpha1.SubmitKYCResponse], error)
 	// CancelKYC 取消草稿或審核中的申請；取消之後可以重新建立。
 	CancelKYC(context.Context, *connect.Request[v1alpha1.CancelKYCRequest]) (*connect.Response[v1alpha1.CancelKYCResponse], error)
-	// GetMyPaymentAccount 回傳呼叫者店家的收款帳戶：中立的狀態（PaymentAccountStatus）、誰收身分與銀行資料、開通用的介面。
+	// GetMyPaymentAccount 回傳呼叫者店家的收款帳戶：中立的狀態（PaymentAccountStatus）、撥款能力是否啟用、最近一次讀取的時間。
 	// 店家還沒有收款帳戶（平台審核還沒核准，或沒有設定收款開通）時回 not_found。
 	GetMyPaymentAccount(context.Context, *connect.Request[v1alpha1.GetMyPaymentAccountRequest]) (*connect.Response[v1alpha1.GetMyPaymentAccountResponse], error)
-	// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session：onboarding_surface 是 HOSTED 時回連結（賣家開外部瀏覽器完成後回到
-	// destination 與 locale 決定的頁面；連結過期時回到同一目的地的重新取得入口），是 EMBEDDED 時回內嵌元件的 client_secret（destination 是 SELLER_APP 時不建立內嵌 session，回網站認證頁的連結，surface 仍是 EMBEDDED）。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
-	// 停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
+	// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session。回應是兩種互斥的 session 之一：託管連結（hosted，金流商的一次性、
+	// 短效連結，賣家開瀏覽器完成後回到 destination 與請求語系（Accept-Language）決定的頁面；連結過期時回到同一目的地的重新取得入口），或內嵌元件
+	// （embedded，初始化元件用的憑證）。只有帳戶的收款方式是平台收件、金流商支援、而且 embedded_runtimes 含對應的執行環境時才回內嵌，其餘一律回託管連結。
+	// 外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
 	CreatePaymentOnboardingSession(context.Context, *connect.Request[v1alpha1.CreatePaymentOnboardingSessionRequest]) (*connect.Response[v1alpha1.CreatePaymentOnboardingSessionResponse], error)
 	// LookupBusinessRegistration 以統一編號查經濟部商業司的公開登記資料，給 KYC 表單帶入公司資料。查無這個統編不是錯誤：
 	// 回應沒有 registration；資料來源暫時無法使用回 unavailable，畫面退回手動填寫。每個帳號每分鐘最多查 10 次，超過回

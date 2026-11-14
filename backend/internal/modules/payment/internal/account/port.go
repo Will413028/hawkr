@@ -20,10 +20,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 )
 
-// Capabilities 是 provider 的能力描述：誰收身分與銀行資料、用什麼介面開通。兩軸互相獨立。
+// Capabilities 是 provider 的能力描述：新建的帳戶列用哪種收件方式（誰收身分與銀行資料）。開通 session 的形狀不在這裡：
+// 它只由帳戶列保存的收件方式與呼叫端宣告的內嵌執行環境決定（ChooseSession）。
 type Capabilities struct {
 	RequirementCollection model.RequirementCollection
-	OnboardingSurface     model.OnboardingSurface
 }
 
 // CapabilityState 是轉帳能力的中立狀態，由 adapter 從 provider 的回應對應而來；不認得的值對應成 CapabilityUnknown（空值同）。
@@ -105,10 +105,10 @@ type ResolveInput struct {
 	IdempotencyKey string
 }
 
-// SessionInput 是開通 session 的輸入；Collection 是帳戶列保存的收件方式（D2），介面由它決定；ReturnURL 是賣家完成或離開後回到的頁面，RefreshURL 是連結過期時重新取得的頁面。
+// SessionInput 是開通 session 的輸入；Kind 是 ChooseSession 的結果；ReturnURL 是賣家完成或離開後回到的頁面，RefreshURL 是連結過期時重新取得的頁面。
 type SessionInput struct {
 	ExternalAccountID string
-	Collection        model.RequirementCollection
+	Kind              SessionKind
 	ReturnURL         string
 	RefreshURL        string
 }
@@ -130,7 +130,7 @@ type Provider interface {
 	EnsureAccount(ctx context.Context, in EnsureInput) (externalID string, err error)
 	// ResolveAccount 以 IdempotencyKey 取得外部帳戶：已建立過就回那一個，沒有就建一個不含擁有者個資的空帳戶（清理沒有外部 ID 的列時用，D55）。
 	ResolveAccount(ctx context.Context, in ResolveInput) (externalID string, err error)
-	// CreateOnboardingSession 產生開通的連結或內嵌元件的 session。
+	// CreateOnboardingSession 依 in.Kind 產生開通的連結（SessionHosted）或內嵌元件的 session（SessionEmbedded）；回傳的形狀必須與 Kind 一致。
 	CreateOnboardingSession(ctx context.Context, in SessionInput) (model.OnboardingSession, error)
 	// FetchAccount 讀外部帳戶目前的狀態與掛著的外部銀行帳號識別碼；任何一項讀取失敗整個呼叫失敗。
 	FetchAccount(ctx context.Context, externalID string) (Snapshot, error)

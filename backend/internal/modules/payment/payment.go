@@ -98,7 +98,7 @@ const (
 // StatusDetail 是轉帳能力某個限制的行動方與 provider 的原因碼。
 type StatusDetail = account.StatusDetail
 
-// Capabilities 是 provider 的能力描述（誰收件、用什麼介面）。
+// Capabilities 是 provider 的能力描述（新建的帳戶列用哪種收件方式）。
 type Capabilities = account.Capabilities
 
 // Event 是驗過簽章的 provider 事件。
@@ -116,14 +116,20 @@ type AccountStatus = model.PaymentAccountStatus
 // RequirementCollection 是誰向賣家收身分與銀行資料。
 type RequirementCollection = model.RequirementCollection
 
-// OnboardingSurface 是開通用的介面。
-type OnboardingSurface = model.OnboardingSurface
+// EmbeddedRuntime 是呼叫端能承載的內嵌開通執行環境。
+type EmbeddedRuntime = model.EmbeddedRuntime
 
 // Account 是擁有者的收款帳戶。
 type Account = model.PaymentAccount
 
-// OnboardingSession 是開通用的 session。
+// OnboardingSession 是開通用的 session：HostedSession 或 StripeEmbeddedSession 其中之一（封閉的 interface）。
 type OnboardingSession = model.OnboardingSession
+
+// HostedSession 是金流商託管的開通連結。
+type HostedSession = model.HostedSession
+
+// StripeEmbeddedSession 是 Stripe 內嵌開通元件的初始化資料。
+type StripeEmbeddedSession = model.StripeEmbeddedSession
 
 // 收款帳戶的狀態。
 const (
@@ -134,12 +140,11 @@ const (
 	StatusDisabled       = model.PaymentDisabled
 )
 
-// 收件方式與開通介面。
+// 收件方式與內嵌開通執行環境。
 const (
-	CollectionProvider = model.CollectionProvider
-	CollectionPlatform = model.CollectionPlatform
-	SurfaceHosted      = model.SurfaceHosted
-	SurfaceEmbedded    = model.SurfaceEmbedded
+	CollectionProvider     = model.CollectionProvider
+	CollectionPlatform     = model.CollectionPlatform
+	RuntimeStripeConnectJS = model.RuntimeStripeConnectJS
 )
 
 // ErrPermanent 標示重試也不會成功的 provider 失敗。
@@ -163,7 +168,7 @@ const FakeName = account.FakeName
 // EventRetention 是收款事件原始 payload 在 inbox 的保存期。
 const EventRetention = account.EventRetention
 
-// NewStripe 建立 Stripe 的收款 provider（Accounts v2）；collection 是 CollectionProvider（託管頁面）或 CollectionPlatform（內嵌元件，publishableKey 必填）。
+// NewStripe 建立 Stripe 的收款 provider（Accounts v2）；collection 是新帳戶列的收件方式（CollectionProvider 或 CollectionPlatform）；publishableKey 必填（既有的平台收件帳戶仍會開內嵌 session）。
 func NewStripe(client *stripe.Client, collection RequirementCollection, publishableKey string) (Provider, error) {
 	p, err := account.NewStripe(client, collection, publishableKey)
 	if err != nil {
@@ -186,9 +191,6 @@ func RequirementCollectionValues() []RequirementCollection {
 // Configured 回傳是否設定了收款開通的 provider。
 func (m *Module) Configured() bool { return m.accounts.Configured() }
 
-// Capabilities 回傳目前 provider 的能力描述（誰收件、用什麼介面）；沒有設定收款開通時 ok 為 false。
-func (m *Module) Capabilities() (caps Capabilities, ok bool) { return m.accounts.Capabilities() }
-
 // RequestAccount 在擁有者核准的 transaction 內（ctx）寫「建立中」的收款帳戶列並排入建立 job；已有列時不改它（關店再開沿用）。聯絡信箱不在這裡傳也不存，
 // 建立 job 在呼叫金流商的當下經 Owners 讀（D50）。沒有設定 provider 時什麼都不做。
 func (m *Module) RequestAccount(ctx context.Context, storeID int64, now time.Time) error {
@@ -201,9 +203,9 @@ func (m *Module) Account(ctx context.Context, storeID int64) (Account, error) {
 }
 
 // CreateOnboardingSession 為擁有者的收款帳戶產生開通 session（託管連結或內嵌元件）；外部呼叫在 transaction 外。呼叫方先確認呼叫者是擁有者。
-// canEmbed 是呼叫端能否承載內嵌元件：帳戶是內嵌介面而呼叫端不能時，前置條件照常檢查、不呼叫 provider，回 CompleteOnWebsite 的 session。
-func (m *Module) CreateOnboardingSession(ctx context.Context, storeID int64, returnURL, refreshURL string, canEmbed bool) (OnboardingSession, error) {
-	return m.accounts.CreateOnboardingSession(ctx, storeID, returnURL, refreshURL, canEmbed)
+// runtimes 是呼叫端宣告能承載的內嵌執行環境（空表示不能內嵌）：帳戶列是 Stripe 的平台收件而且清單含 RuntimeStripeConnectJS 才回內嵌，其餘一律回託管連結。
+func (m *Module) CreateOnboardingSession(ctx context.Context, storeID int64, returnURL, refreshURL string, runtimes []EmbeddedRuntime) (OnboardingSession, error) {
+	return m.accounts.CreateOnboardingSession(ctx, storeID, returnURL, refreshURL, runtimes)
 }
 
 // RefreshAccount 管理員的「重新整理狀態」：與賣家的 SyncAccountUnlessFresh 同一條同步重讀（同一個名額與間隔，D33），回傳重讀後的帳戶；

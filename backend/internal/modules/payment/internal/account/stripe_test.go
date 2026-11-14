@@ -96,8 +96,8 @@ func stripeProvider(t *testing.T, collection model.RequirementCollection, h http
 func TestStripeCapabilitiesFollowTheCollectionMode(t *testing.T) {
 	c, _ := stripe.New(stripe.Config{SecretKey: "k", WebhookSecret: "w"})
 	for mode, want := range map[model.RequirementCollection]Capabilities{
-		model.CollectionProvider: {RequirementCollection: model.CollectionProvider, OnboardingSurface: model.SurfaceHosted},
-		model.CollectionPlatform: {RequirementCollection: model.CollectionPlatform, OnboardingSurface: model.SurfaceEmbedded},
+		model.CollectionProvider: {RequirementCollection: model.CollectionProvider},
+		model.CollectionPlatform: {RequirementCollection: model.CollectionPlatform},
 	} {
 		p, err := NewStripe(c, mode, "pk_test_x")
 		if err != nil || p.Capabilities() != want || p.Name() != "stripe" {
@@ -107,11 +107,10 @@ func TestStripeCapabilitiesFollowTheCollectionMode(t *testing.T) {
 	if _, err := NewStripe(c, "", "pk_test_x"); err == nil {
 		t.Error("空的收件方式通過了")
 	}
-	if _, err := NewStripe(c, model.CollectionPlatform, ""); err == nil {
-		t.Error("平台收件沒有公開金鑰通過了")
-	}
-	if _, err := NewStripe(c, model.CollectionProvider, ""); err != nil {
-		t.Errorf("託管頁面不需要公開金鑰：%v", err)
+	for _, mode := range model.RequirementCollectionValues() {
+		if _, err := NewStripe(c, mode, ""); err == nil {
+			t.Errorf("收件方式 %s 沒有公開金鑰通過了", mode)
+		}
 	}
 	if _, err := NewStripe(nil, model.CollectionProvider, ""); err == nil {
 		t.Error("沒有 client 通過了")
@@ -228,7 +227,7 @@ func TestStripeEnsureAccountClassifiesErrors(t *testing.T) {
 	url := srv.URL
 	srv.Close()
 	c, _ := stripe.New(stripe.Config{BaseURL: url, SecretKey: "k", WebhookSecret: "w"})
-	p, _ := NewStripe(c, model.CollectionProvider, "")
+	p, _ := NewStripe(c, model.CollectionProvider, "pk_test_x")
 	if _, err := p.EnsureAccount(context.Background(), EnsureInput{IdempotencyKey: "5", ContactEmail: "seller@example.com", Collection: model.CollectionProvider}); err == nil || errors.Is(err, ErrPermanent) {
 		t.Errorf("傳輸錯誤：%v，預期一般錯誤", err)
 	}
@@ -342,7 +341,7 @@ func TestStripeFetchWithoutTheTransfersCapabilityIsARetryableError(t *testing.T)
 	}
 }
 
-func TestStripeOnboardingSessionByCollectionMode(t *testing.T) {
+func TestStripeOnboardingSessionFollowsTheRequestedKind(t *testing.T) {
 	var paths []string
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.URL.Path)
@@ -354,25 +353,25 @@ func TestStripeOnboardingSessionByCollectionMode(t *testing.T) {
 	})
 	in := SessionInput{ExternalAccountID: "acct_1", ReturnURL: "https://a.test/r", RefreshURL: "https://a.test/f"}
 
-	// 介面取自帳戶列的收件方式；adapter 設定成相反的值，結果仍跟著列走。
-	in.Collection = model.CollectionProvider
+	// 形狀取自 Kind（ChooseSession 的結果），不是 adapter 的行程設定：adapter 設定成相反的收件方式，結果仍跟著 Kind 走。
+	in.Kind = SessionHosted
 	hosted, err := stripeProvider(t, model.CollectionPlatform, handler).CreateOnboardingSession(context.Background(), in)
-	if err != nil || hosted.Surface != model.SurfaceHosted || hosted.URL != "https://connect.stripe.com/x" || hosted.ClientSecret != "" || hosted.Provider != "" || hosted.PublishableKey != "" || hosted.ExpiresAt == nil {
+	if h, ok := hosted.(model.HostedSession); err != nil || !ok || h.URL != "https://connect.stripe.com/x" || h.ExpiresAt == nil {
 		t.Errorf("託管 %+v err=%v", hosted, err)
 	}
-	in.Collection = model.CollectionPlatform
+	in.Kind = SessionEmbedded
 	embedded, err := stripeProvider(t, model.CollectionProvider, handler).CreateOnboardingSession(context.Background(), in)
-	if err != nil || embedded.Surface != model.SurfaceEmbedded || embedded.ClientSecret == "" || embedded.URL != "" || embedded.Provider != "stripe" || embedded.PublishableKey != "pk_test_x" || embedded.ExpiresAt == nil {
+	if e, ok := embedded.(model.StripeEmbeddedSession); err != nil || !ok || e.ClientSecret == "" || e.PublishableKey != "pk_test_x" || e.ExpiresAt == nil {
 		t.Errorf("內嵌 %+v err=%v", embedded, err)
 	}
 	if fmt.Sprint(paths) != "[/v2/core/account_links /v1/account_sessions]" {
 		t.Errorf("呼叫的路徑 %v", paths)
 	}
-	if _, err := stripeProvider(t, model.CollectionProvider, handler).CreateOnboardingSession(context.Background(), SessionInput{Collection: model.CollectionProvider}); !errors.Is(err, ErrPermanent) {
+	if _, err := stripeProvider(t, model.CollectionProvider, handler).CreateOnboardingSession(context.Background(), SessionInput{Kind: SessionHosted}); !errors.Is(err, ErrPermanent) {
 		t.Errorf("沒有帳戶 ID：%v", err)
 	}
 	if _, err := stripeProvider(t, model.CollectionProvider, handler).CreateOnboardingSession(context.Background(), SessionInput{ExternalAccountID: "acct_1"}); !errors.Is(err, ErrPermanent) {
-		t.Errorf("空的收件方式：%v", err)
+		t.Errorf("沒有指定形狀：%v", err)
 	}
 }
 

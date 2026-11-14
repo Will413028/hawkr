@@ -43,8 +43,8 @@ func readPaymentAccount(ctx context.Context, log *slog.Logger, storeID int64, pa
 		log.WarnContext(ctx, "httpapi/seller：開通任務讀不到收款帳戶，收款帳戶標為未知", "store_id", storeID, "error", err)
 		return model.OnboardingPaymentRead{Err: err}
 	}
-	caps, configured := payments.Capabilities()
-	read := model.OnboardingPaymentRead{CanStartOnboarding: configured && caps.OnboardingSurface != "", Configured: configured}
+	configured := payments.Configured()
+	read := model.OnboardingPaymentRead{CanStartOnboarding: configured, Configured: configured}
 	if err == nil {
 		read.Found, read.Status, read.CreateFailed = true, string(acct.Status), acct.CreateFailedAt != nil
 	}

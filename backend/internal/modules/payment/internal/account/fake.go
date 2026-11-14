@@ -53,14 +53,14 @@ type Fake struct {
 // NewFake 建立 Fake：預設是 provider 收件、託管介面。
 func NewFake() *Fake {
 	return &Fake{
-		caps:      Capabilities{RequirementCollection: model.CollectionProvider, OnboardingSurface: model.SurfaceHosted},
+		caps:      Capabilities{RequirementCollection: model.CollectionProvider},
 		byKey:     map[string]string{},
 		accounts:  map[string]Snapshot{},
 		closedIDs: map[string]bool{},
 	}
 }
 
-// WithCapabilities 換掉能力描述（測試平台收件與內嵌介面）。
+// WithCapabilities 換掉能力描述（測試新列寫入的收件方式）。
 func (f *Fake) WithCapabilities(c Capabilities) *Fake {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -244,12 +244,9 @@ func (f *Fake) CreateOnboardingSession(ctx context.Context, in SessionInput) (mo
 	f.check(ctx, "CreateOnboardingSession")
 	f.sessions++
 	if in.ExternalAccountID == "" {
-		return model.OnboardingSession{}, ErrPermanent
+		return nil, ErrPermanent
 	}
-	if model.SurfaceOf(in.Collection) == model.SurfaceEmbedded {
-		return model.OnboardingSession{Surface: model.SurfaceEmbedded, ClientSecret: "fake_secret_" + in.ExternalAccountID, Provider: FakeName, PublishableKey: "pk_fake"}, nil
-	}
-	return model.OnboardingSession{Surface: model.SurfaceHosted, URL: "https://onboarding.example.invalid/" + in.ExternalAccountID}, nil
+	return model.HostedSession{URL: "https://onboarding.example.invalid/" + in.ExternalAccountID}, nil
 }
 
 // FetchAccount 實作 Provider。

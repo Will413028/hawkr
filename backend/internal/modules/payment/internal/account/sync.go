@@ -245,46 +245,40 @@ func (s *Service) RetryCreate(ctx context.Context, storeID int64) (model.Payment
 }
 
 // CreateOnboardingSession 為店家的帳戶產生開通 session（託管連結或內嵌元件）。外部呼叫在 transaction 外。帳戶還沒有外部 ID 回 FailedPrecondition。
-// 介面由帳戶列的收件方式決定；列是內嵌介面而呼叫端無法內嵌（canEmbed 為 false）時，前置條件照常檢查、不呼叫 provider，
-// 回 CompleteOnWebsite 的 session（內嵌介面，其餘欄位空），由呼叫端引導到網站完成。
-func (s *Service) CreateOnboardingSession(ctx context.Context, storeID int64, returnURL, refreshURL string, canEmbed bool) (model.OnboardingSession, error) {
+// session 的形狀由 ChooseSession 決定：只看帳戶列保存的 provider 與收件方式，加上呼叫端宣告的內嵌執行環境（runtimes，空表示不能內嵌）。
+func (s *Service) CreateOnboardingSession(ctx context.Context, storeID int64, returnURL, refreshURL string, runtimes []model.EmbeddedRuntime) (model.OnboardingSession, error) {
 	if s.d.Provider == nil {
-		return model.OnboardingSession{}, apperr.FailedPrecondition("尚未設定收款開通")
+		return nil, apperr.FailedPrecondition("尚未設定收款開通")
 	}
 	if err := model.Positive(storeID); err != nil {
-		return model.OnboardingSession{}, err
+		return nil, err
 	}
 	row, err := store.New(s.d.DB.Conn(ctx)).PaymentAccountByStore(ctx, storeID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return model.OnboardingSession{}, apperr.NotFound("店家還沒有收款帳戶")
+		return nil, apperr.NotFound("店家還沒有收款帳戶")
 	}
 	if err != nil {
-		return model.OnboardingSession{}, err
+		return nil, err
 	}
-	acct, completeOnWebsite, err := planSession(row, s.d.Provider.Name(), canEmbed)
+	return s.openSession(ctx, row, returnURL, refreshURL, runtimes)
+}
+
+// openSession 檢查帳戶列的前置條件，再依 ChooseSession 的結果向 provider 要 session；與讀列分開，讓決定與 provider 呼叫可以不經資料庫測試。
+func (s *Service) openSession(ctx context.Context, row store.PaymentAccount, returnURL, refreshURL string, runtimes []model.EmbeddedRuntime) (model.OnboardingSession, error) {
+	acct, err := sessionTarget(row, s.d.Provider.Name())
 	if err != nil {
-		return model.OnboardingSession{}, err
-	}
-	if completeOnWebsite {
-		return model.OnboardingSession{Surface: model.SurfaceEmbedded, CompleteOnWebsite: true}, nil
+		return nil, err
 	}
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
-	session, err := s.d.Provider.CreateOnboardingSession(callCtx, SessionInput{ExternalAccountID: *acct.ExternalAccountID, Collection: acct.RequirementCollection, ReturnURL: returnURL, RefreshURL: refreshURL})
+	session, err := s.d.Provider.CreateOnboardingSession(callCtx, SessionInput{
+		ExternalAccountID: *acct.ExternalAccountID, Kind: ChooseSession(acct.Provider, acct.RequirementCollection, runtimes),
+		ReturnURL: returnURL, RefreshURL: refreshURL,
+	})
 	if errors.Is(err, ErrPermanent) {
-		return model.OnboardingSession{}, apperr.FailedPrecondition("目前無法開通收款帳戶")
+		return nil, apperr.FailedPrecondition("目前無法開通收款帳戶")
 	}
 	return session, err
-}
-
-// planSession 決定開通 session 怎麼產生：前置條件一律先檢查；介面取自帳戶列的收件方式，列是內嵌介面而呼叫端不能內嵌時
-// completeOnWebsite 為 true（不呼叫 provider，由呼叫端引導到網站完成）。
-func planSession(row store.PaymentAccount, providerName string, canEmbed bool) (acct model.PaymentAccount, completeOnWebsite bool, err error) {
-	acct, err = sessionTarget(row, providerName)
-	if err != nil {
-		return model.PaymentAccount{}, false, err
-	}
-	return acct, !canEmbed && model.SurfaceOf(acct.RequirementCollection) == model.SurfaceEmbedded, nil
 }
 
 // sessionTarget 檢查帳戶列可以開通 session 的前置條件（沒有在關閉、已有同 provider 的外部帳戶、沒有被停用）。

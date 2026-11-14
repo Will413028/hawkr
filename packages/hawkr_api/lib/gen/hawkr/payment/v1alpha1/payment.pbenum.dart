@@ -93,33 +93,33 @@ class RequirementCollection extends $pb.ProtobufEnum {
   const RequirementCollection._(super.value, super.name);
 }
 
-/// OnboardingSurface 是開通用的介面。
-class OnboardingSurface extends $pb.ProtobufEnum {
-  static const OnboardingSurface ONBOARDING_SURFACE_UNSPECIFIED =
-      OnboardingSurface._(
-          0, _omitEnumNames ? '' : 'ONBOARDING_SURFACE_UNSPECIFIED');
+/// EmbeddedOnboardingRuntime 是呼叫端能承載的內嵌開通執行環境。
+class EmbeddedOnboardingRuntime extends $pb.ProtobufEnum {
+  static const EmbeddedOnboardingRuntime
+      EMBEDDED_ONBOARDING_RUNTIME_UNSPECIFIED = EmbeddedOnboardingRuntime._(
+          0, _omitEnumNames ? '' : 'EMBEDDED_ONBOARDING_RUNTIME_UNSPECIFIED');
 
-  /// 金流商託管的頁面（連結）。
-  static const OnboardingSurface ONBOARDING_SURFACE_HOSTED =
-      OnboardingSurface._(1, _omitEnumNames ? '' : 'ONBOARDING_SURFACE_HOSTED');
+  /// Stripe Connect.js（瀏覽器）。
+  static const EmbeddedOnboardingRuntime
+      EMBEDDED_ONBOARDING_RUNTIME_STRIPE_CONNECT_JS =
+      EmbeddedOnboardingRuntime._(
+          1,
+          _omitEnumNames
+              ? ''
+              : 'EMBEDDED_ONBOARDING_RUNTIME_STRIPE_CONNECT_JS');
 
-  /// 嵌在網頁上的元件（client secret）。
-  static const OnboardingSurface ONBOARDING_SURFACE_EMBEDDED =
-      OnboardingSurface._(
-          2, _omitEnumNames ? '' : 'ONBOARDING_SURFACE_EMBEDDED');
-
-  static const $core.List<OnboardingSurface> values = <OnboardingSurface>[
-    ONBOARDING_SURFACE_UNSPECIFIED,
-    ONBOARDING_SURFACE_HOSTED,
-    ONBOARDING_SURFACE_EMBEDDED,
+  static const $core.List<EmbeddedOnboardingRuntime> values =
+      <EmbeddedOnboardingRuntime>[
+    EMBEDDED_ONBOARDING_RUNTIME_UNSPECIFIED,
+    EMBEDDED_ONBOARDING_RUNTIME_STRIPE_CONNECT_JS,
   ];
 
-  static final $core.List<OnboardingSurface?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
-  static OnboardingSurface? valueOf($core.int value) =>
+  static final $core.List<EmbeddedOnboardingRuntime?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 1);
+  static EmbeddedOnboardingRuntime? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
-  const OnboardingSurface._(super.value, super.name);
+  const EmbeddedOnboardingRuntime._(super.value, super.name);
 }
 
 const $core.bool _omitEnumNames =

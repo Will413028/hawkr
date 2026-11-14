@@ -139,55 +139,51 @@ func (RequirementCollection) EnumDescriptor() ([]byte, []int) {
 	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{1}
 }
 
-// OnboardingSurface 是開通用的介面。
-type OnboardingSurface int32
+// EmbeddedOnboardingRuntime 是呼叫端能承載的內嵌開通執行環境。
+type EmbeddedOnboardingRuntime int32
 
 const (
-	OnboardingSurface_ONBOARDING_SURFACE_UNSPECIFIED OnboardingSurface = 0
-	// 金流商託管的頁面（連結）。
-	OnboardingSurface_ONBOARDING_SURFACE_HOSTED OnboardingSurface = 1
-	// 嵌在網頁上的元件（client secret）。
-	OnboardingSurface_ONBOARDING_SURFACE_EMBEDDED OnboardingSurface = 2
+	EmbeddedOnboardingRuntime_EMBEDDED_ONBOARDING_RUNTIME_UNSPECIFIED EmbeddedOnboardingRuntime = 0
+	// Stripe Connect.js（瀏覽器）。
+	EmbeddedOnboardingRuntime_EMBEDDED_ONBOARDING_RUNTIME_STRIPE_CONNECT_JS EmbeddedOnboardingRuntime = 1
 )
 
-// Enum value maps for OnboardingSurface.
+// Enum value maps for EmbeddedOnboardingRuntime.
 var (
-	OnboardingSurface_name = map[int32]string{
-		0: "ONBOARDING_SURFACE_UNSPECIFIED",
-		1: "ONBOARDING_SURFACE_HOSTED",
-		2: "ONBOARDING_SURFACE_EMBEDDED",
+	EmbeddedOnboardingRuntime_name = map[int32]string{
+		0: "EMBEDDED_ONBOARDING_RUNTIME_UNSPECIFIED",
+		1: "EMBEDDED_ONBOARDING_RUNTIME_STRIPE_CONNECT_JS",
 	}
-	OnboardingSurface_value = map[string]int32{
-		"ONBOARDING_SURFACE_UNSPECIFIED": 0,
-		"ONBOARDING_SURFACE_HOSTED":      1,
-		"ONBOARDING_SURFACE_EMBEDDED":    2,
+	EmbeddedOnboardingRuntime_value = map[string]int32{
+		"EMBEDDED_ONBOARDING_RUNTIME_UNSPECIFIED":       0,
+		"EMBEDDED_ONBOARDING_RUNTIME_STRIPE_CONNECT_JS": 1,
 	}
 )
 
-func (x OnboardingSurface) Enum() *OnboardingSurface {
-	p := new(OnboardingSurface)
+func (x EmbeddedOnboardingRuntime) Enum() *EmbeddedOnboardingRuntime {
+	p := new(EmbeddedOnboardingRuntime)
 	*p = x
 	return p
 }
 
-func (x OnboardingSurface) String() string {
+func (x EmbeddedOnboardingRuntime) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (OnboardingSurface) Descriptor() protoreflect.EnumDescriptor {
+func (EmbeddedOnboardingRuntime) Descriptor() protoreflect.EnumDescriptor {
 	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[2].Descriptor()
 }
 
-func (OnboardingSurface) Type() protoreflect.EnumType {
+func (EmbeddedOnboardingRuntime) Type() protoreflect.EnumType {
 	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[2]
 }
 
-func (x OnboardingSurface) Number() protoreflect.EnumNumber {
+func (x EmbeddedOnboardingRuntime) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use OnboardingSurface.Descriptor instead.
-func (OnboardingSurface) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use EmbeddedOnboardingRuntime.Descriptor instead.
+func (EmbeddedOnboardingRuntime) EnumDescriptor() ([]byte, []int) {
 	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{2}
 }
 
@@ -206,11 +202,10 @@ const file_hawkr_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"\x15RequirementCollection\x12&\n" +
 	"\"REQUIREMENT_COLLECTION_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fREQUIREMENT_COLLECTION_PROVIDER\x10\x01\x12#\n" +
-	"\x1fREQUIREMENT_COLLECTION_PLATFORM\x10\x02*w\n" +
-	"\x11OnboardingSurface\x12\"\n" +
-	"\x1eONBOARDING_SURFACE_UNSPECIFIED\x10\x00\x12\x1d\n" +
-	"\x19ONBOARDING_SURFACE_HOSTED\x10\x01\x12\x1f\n" +
-	"\x1bONBOARDING_SURFACE_EMBEDDED\x10\x02B\x85\x02\n" +
+	"\x1fREQUIREMENT_COLLECTION_PLATFORM\x10\x02*{\n" +
+	"\x19EmbeddedOnboardingRuntime\x12+\n" +
+	"'EMBEDDED_ONBOARDING_RUNTIME_UNSPECIFIED\x10\x00\x121\n" +
+	"-EMBEDDED_ONBOARDING_RUNTIME_STRIPE_CONNECT_JS\x10\x01B\x85\x02\n" +
 	"\x1acom.hawkr.payment.v1alpha1B\fPaymentProtoP\x01Z_github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1;paymentv1alpha1\xa2\x02\x03HPX\xaa\x02\x16Hawkr.Payment.V1alpha1\xca\x02\x16Hawkr\\Payment\\V1alpha1\xe2\x02\"Hawkr\\Payment\\V1alpha1\\GPBMetadata\xea\x02\x18Hawkr::Payment::V1alpha1b\x06proto3"
 
 var (
@@ -227,9 +222,9 @@ func file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP() []byte {
 
 var file_hawkr_payment_v1alpha1_payment_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_hawkr_payment_v1alpha1_payment_proto_goTypes = []any{
-	(PaymentAccountStatus)(0),  // 0: hawkr.payment.v1alpha1.PaymentAccountStatus
-	(RequirementCollection)(0), // 1: hawkr.payment.v1alpha1.RequirementCollection
-	(OnboardingSurface)(0),     // 2: hawkr.payment.v1alpha1.OnboardingSurface
+	(PaymentAccountStatus)(0),      // 0: hawkr.payment.v1alpha1.PaymentAccountStatus
+	(RequirementCollection)(0),     // 1: hawkr.payment.v1alpha1.RequirementCollection
+	(EmbeddedOnboardingRuntime)(0), // 2: hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime
 }
 var file_hawkr_payment_v1alpha1_payment_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type

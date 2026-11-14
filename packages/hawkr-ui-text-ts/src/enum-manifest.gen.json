@@ -316,8 +316,8 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.payment.v1alpha1.OnboardingSurface",
-      "tsName": "OnboardingSurface",
+      "name": "hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime",
+      "tsName": "EmbeddedOnboardingRuntime",
       "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
       "inCatalog": false,
       "serverOwned": false

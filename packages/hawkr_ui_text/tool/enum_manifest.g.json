@@ -85,8 +85,8 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.payment.v1alpha1.OnboardingSurface",
-      "dartClass": "OnboardingSurface",
+      "name": "hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime",
+      "dartClass": "EmbeddedOnboardingRuntime",
       "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",
       "inCatalog": false,
       "serverOwned": false

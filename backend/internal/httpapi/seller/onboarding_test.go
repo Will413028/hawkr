@@ -196,7 +196,7 @@ func TestOnboardingMethodsDeclareReadAndWriteCapabilities(t *testing.T) {
 func TestGetMyOnboardingStartActionNeedsConfiguredPaymentOnboarding(t *testing.T) {
 	for _, configured := range []bool{true, false} {
 		h := &App{m: &onboardingModule{kyc: model.KYCApplication{Status: model.KYCStatusApproved}}, payments: &paymentModule{
-			configured: configured, caps: payment.Capabilities{OnboardingSurface: payment.SurfaceHosted}, account: payment.Account{Status: payment.StatusActionRequired},
+			configured: configured, account: payment.Account{Status: payment.StatusActionRequired},
 		}, log: quietLog}
 		got, err := h.GetMyOnboarding(ctxWithStore(storeWithGate(true, false)), connect.NewRequest(&pb.GetMyOnboardingRequest{}))
 		if err != nil {
