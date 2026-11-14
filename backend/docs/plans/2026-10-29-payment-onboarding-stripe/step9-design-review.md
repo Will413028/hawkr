@@ -28,13 +28,13 @@
 
 | # | 位置 | 嚴重度 | 發現 | 處置 | 狀態 |
 |---|---|---|---|---|---|
-| C1 | `website/lib/seller/payment-account.ts`、`PaymentAccountSection.tsx`、seller-app `payment_account_action.dart` | should | 兩個 client 仍從 `PaymentAccount.status` 推導下一步，與 `OnboardingTask.action` 重複；目錄有兩套按鈕文字 | 改（D49，9c） | open |
-| C2 | `CreatePaymentOnboardingSessionRequest.return_url`／`refresh_url`、seller-app `HAWKR_WEB_ORIGIN` | should | 回跳網址由 client 組，伺服器接受任何 https 網址；後端已有 `PUBLIC_WEB_ORIGIN` | 改（D49，9c） | open |
-| C3 | admin payment 的 `RefreshPaymentAccount` 與 admin 的輪詢 | should | 後台重讀是排 job 加 client 輪詢，賣家端已有同步重讀 | 改（D49，9c） | open |
-| C4 | seller `PaymentAccount` 的 `requirement_collection`、`transfers_active`、`requirements`，session 的 `expire_time` | should | 賣家端沒有消費端；`requirements` 是金流商原始 JSON | 改（D49，9c） | open |
-| C5 | `api/hawkr/admin/payment/v1alpha1/payment.proto` import seller | should | 收款帳戶的 enum 還在 seller 的 package，方向與模組擁有者相反 | 改（D49，9c） | open |
-| C6 | `EmbeddedPaymentOnboarding.tsx`、`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | should | 中立的 `EMBEDDED` 在 website 一律當成 Stripe，公開金鑰要與後端人工對齊 | 改（D53，9c） | open |
-| C7 | `api/hawkr/**` 新增的 48 行 `reserved` | nit | 系統未上線，不需要保留編號與名稱 | 改（D54，9c） | open |
+| C1 | `website/lib/seller/payment-account.ts`、`PaymentAccountSection.tsx`、seller-app `payment_account_action.dart` | should | 兩個 client 仍從 `PaymentAccount.status` 推導下一步，與 `OnboardingTask.action` 重複；目錄有兩套按鈕文字 | 改（D49，9c） | open（等 D56：開工前比對，畫面與現況不同，停止條件成立） |
+| C2 | `CreatePaymentOnboardingSessionRequest.return_url`／`refresh_url`、seller-app `HAWKR_WEB_ORIGIN` | should | 回跳網址由 client 組，伺服器接受任何 https 網址；後端已有 `PUBLIC_WEB_ORIGIN` | 改（D49，9c） | fixed（`cb3b91ae`、`8a33414b`）：`TestOnboardingReturnPagesExistInTheWebsiteRoutes`、`TestWebLocalesMatchTheWebsiteRouting`；`git grep -n -E 'return_url|refresh_url|HAWKR_WEB_ORIGIN|onboardingUrls'` 在程式 0 筆 |
+| C3 | admin payment 的 `RefreshPaymentAccount` 與 admin 的輪詢 | should | 後台重讀是排 job 加 client 輪詢，賣家端已有同步重讀 | 改（D49，9c） | fixed（`fdaab813`）：`TestAdminRefreshRereadsSynchronouslyThroughTheSellerPath`（CI mutation run 43541657688 失敗）；`git grep -n REFRESH_REREAD -- admin` 0 筆 |
+| C4 | seller `PaymentAccount` 的 `requirement_collection`、`transfers_active`、`requirements`，session 的 `expire_time` | should | 賣家端沒有消費端；`requirements` 是金流商原始 JSON | 改（D49，9c） | fixed（`9f807664`）：seller `PaymentAccount` 只剩 `status`、`onboarding_surface`、`payouts_active`、`fetch_time`，session 回應沒有 `expire_time` |
+| C5 | `api/hawkr/admin/payment/v1alpha1/payment.proto` import seller | should | 收款帳戶的 enum 還在 seller 的 package，方向與模組擁有者相反 | 改（D49，9c） | fixed（`a78c016f`）：`git grep -n 'hawkr/seller/v1alpha1/seller.proto' -- api/hawkr/admin/payment` 0 筆；enum 定義在 `api/hawkr/payment/v1alpha1/payment.proto` |
+| C6 | `EmbeddedPaymentOnboarding.tsx`、`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | should | 中立的 `EMBEDDED` 在 website 一律當成 Stripe，公開金鑰要與後端人工對齊 | 改（D53，9c） | fixed（`63d3c7e1`）：`TestStripePaymentConfig`；website 不認得的 provider 顯示錯誤狀態的兩個 unit 測試；`git grep -n NEXT_PUBLIC_STRIPE -- website` 0 筆 |
+| C7 | `api/hawkr/**` 新增的 48 行 `reserved` | nit | 系統未上線，不需要保留編號與名稱 | 改（D54，9c） | fixed（`96c6c0ef`、`ac7fe9a0`）：`git grep -n -E '^[[:space:]]*reserved ' -- api/hawkr` 0 筆；`check_inventory.py` 對加回的 `reserved` 失敗 |
 | C8 | `website/lib/seller/contact-email.ts`、seller-app `contact_email.dart` | nit | 聯絡信箱的格式規則在 TS 與 Dart 各一份，與客服信箱的 regex 也不同 | 記：延後，觸發：下一次改聯絡信箱規則時（計畫「延後」） | recorded |
 
 ## 審查者沒有涵蓋的範圍
