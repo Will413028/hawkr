@@ -365,3 +365,76 @@ func TestOnlyReadsAndNamedExceptionsAreReadOnly(t *testing.T) {
 		}
 	}
 }
+
+// frozenAuditPending 是現在允許宣告 auditPending 的 procedure 的完整清單（D62 延後項，遷入的觸發條件是上線前）。
+// 這份清單只能縮小：遷入平台紀錄的方法改成 auditAudited 並從這裡刪掉；新的後台寫入方法一律宣告 auditAudited，
+// 不得加進這份清單。
+// mutation：把任何一支不在清單內的方法（例如 payment 的 RetryPaymentAccountPurge）宣告成 auditPending → 下面的測試失敗。
+var frozenAuditPending = []string{
+	"/hawkr.admin.buyer.v1alpha1.BuyerAdminService/UpdateMembershipPlan",
+	"/hawkr.admin.content.v1alpha1.ContentAdminService/CreateAppVersionGate",
+	"/hawkr.admin.content.v1alpha1.ContentAdminService/CreateBanner",
+	"/hawkr.admin.content.v1alpha1.ContentAdminService/DeleteBanner",
+	"/hawkr.admin.content.v1alpha1.ContentAdminService/UpdateAppVersionGate",
+	"/hawkr.admin.content.v1alpha1.ContentAdminService/UpdateBanner",
+	"/hawkr.admin.identity.v1alpha1.IdentityAdminService/DeleteAccount",
+	"/hawkr.admin.seller.v1alpha1.SellerAdminService/ApproveKYC",
+	"/hawkr.admin.seller.v1alpha1.SellerAdminService/RejectKYC",
+	"/hawkr.admin.seller.v1alpha1.SellerAdminService/RequeryKYCRegistration",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/ChangeCaseSeverity",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/CompleteAuthorityOrder",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/CreateAuthorityOrder",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/CreateCaseInquiry",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/CreateCaseNote",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/CreateMeasure",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/CreateMeasureNote",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/DecideAppeal",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/DecideCase",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/DecideRemediation",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/EndMeasure",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/ExtendAuthorityOrderHold",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/MarkLinkedAccountReviewed",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/MarkReportSupplementsSeen",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/MoveReport",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/RecordAuthorityTargetNotice",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/RecordCaseInquiryReply",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/ResolveReport",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/RevokeAuthorityOrder",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/RevokeMeasure",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/ScheduleMeasureReview",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/TriageReport",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/UpdateMeasure",
+	"/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/WithdrawCaseInquiry",
+	"/hawkr.admin.seller.v1alpha1.SellerProspectAdminService/ArchiveProspect",
+	"/hawkr.admin.seller.v1alpha1.SellerProspectAdminService/ConvertProspect",
+	"/hawkr.admin.seller.v1alpha1.SellerProspectAdminService/CreateProspect",
+	"/hawkr.admin.seller.v1alpha1.SellerProspectAdminService/MarkProspectsDistinct",
+	"/hawkr.admin.seller.v1alpha1.SellerProspectAdminService/MergeProspects",
+	"/hawkr.admin.seller.v1alpha1.SellerProspectAdminService/RestoreProspect",
+	"/hawkr.admin.seller.v1alpha1.SellerProspectAdminService/UpdateProspect",
+}
+
+func TestAuditPendingIsFrozenAndOnlyShrinks(t *testing.T) {
+	allowed := map[string]bool{}
+	for _, p := range frozenAuditPending {
+		if allowed[p] {
+			t.Errorf("凍結清單重複列出 %s", p)
+		}
+		allowed[p] = true
+	}
+	for _, p := range AuditPendingProcedures() {
+		if !allowed[p] {
+			t.Errorf("%s 宣告了 auditPending，但它不在凍結清單內：新的後台寫入方法必須宣告 auditAudited 並呼叫 adminaudit.Record", p)
+		}
+	}
+	for p := range allowed {
+		d, ok := declarations[p]
+		if !ok {
+			t.Errorf("凍結清單列出的 %s 沒有宣告：方法刪除後也要從清單刪掉", p)
+			continue
+		}
+		if d.audit != auditPending {
+			t.Errorf("%s 已經不是 auditPending（%s）：從凍結清單刪掉它，清單只能縮小", p, d.audit)
+		}
+	}
+}

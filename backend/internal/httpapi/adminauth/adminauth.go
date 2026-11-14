@@ -29,7 +29,8 @@ import (
 // auditMode 是一支 admin 方法在後台動作紀錄（platform/adminaudit，D62）上的宣告，每支方法都必須明列：
 //   - auditAudited：寫入方法，use case 在領域變更的同一個 transaction 內呼叫 adminaudit.Record；
 //   - auditReadOnly：不改領域狀態（讀取，或只重讀 provider 刷新快取、結束自己的 session），不留紀錄；
-//   - auditPending：既有的寫入方法還沒遷移（D62 延後項，觸發條件是上線前），新的寫入方法不得宣告它。
+//   - auditPending：既有的寫入方法還沒遷移（D62 延後項，觸發條件是上線前），新的寫入方法不得宣告它；
+//     能宣告它的 procedure 由 adminauth_test.go 的 frozenAuditPending 凍結，只能縮小。
 type auditMode string
 
 const (
