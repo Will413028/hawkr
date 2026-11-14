@@ -3,7 +3,7 @@
 > **狀態**：v1.3。v1 經一輪獨立審查（附錄 A），v1.2 經開工前 design-review（F1-F7，重點是刀 1 契約；逐條對照程式查證後全部接受，對照見附錄 B；全文在 session scratchpad `enum-guard-design-review-start.md`，不入庫）。v1.1 的主要變更：規則 `E` 只算「確定等於某成員」的區域（K3）；目錄分界改在多語系 ADR D2 加文末修訂（K12，§4.1）；拆成契約、目錄與 client、守門三刀（§7）。**v1.3 的變更（Will 2026-10-22，§0.6）**：食品業者登錄不加可用性布林，改把 `open_food_registration` 拆成待審與被退回兩個欄位（Q4 改 (A)）；終止表單的契約只加依據的三態需求，不加 `requires_source_measure`，條件句寫進伺服器的 `TerminationOption.explanation`；admin 關聯帳號終止的說明句改由 `explanation` 提供，不進目錄。§5 #12-#16 的新句（zh-TW）Will 2026-10-22 已核可原文，**沒有待決項目**。
 
 v1.3 讀取的是 `local/10e` 的 `b10f015bc`（v1.2、計畫與 ADR D4 修訂已提交）；v1.1 以前讀的是 `0a3265c1f`。計畫行號（`:383,399,400`）照 v1.2 時的內容；本文不改 ADR 與計畫。
-SSOT：計畫 `2026-09-29-a3-buyer-seller.md:383,399`；ADR `docs/adr/2026-10-17-multi-locale-architecture.md`（D2 分界 `:77`）；`step10e-Lprime-design.md`（下稱 L′：§1.2 key、§1.3 `params`、§1.4 ICU 子集（禁止 `{arg, date}`）、§5.2 守門、O4 `:835`、§7(d) `:716-721`、R6 `:856`）；`step10e-5d-design.md` G10；`backend/docs/開發規範/使用者面用語術語表.md`；根目錄與各 client 的 `AGENTS.md`；契約 `api/hawkr/admin/seller/v1alpha1/{measure,governance}.proto`、`api/hawkr/seller/v1alpha1/seller.proto`。
+SSOT：計畫 `2026-09-29-a3-buyer-seller.md:383,399`；ADR `docs/adr/2026-10-17-multi-locale-architecture.md`（D2 分界 `:77`）；`step10e-Lprime-design.md`（下稱 L′：§1.2 key、§1.3 `params`、§1.4 ICU 子集（禁止 `{arg, date}`）、§5.2 守門、O4 `:835`、§7(d) `:716-721`、R6 `:856`）；`step10e-5d-design.md` G10；`docs/共通規範/使用者面用語術語表.md`；根目錄與各 client 的 `AGENTS.md`；契約 `api/hawkr/admin/seller/v1alpha1/{measure,governance}.proto`、`api/hawkr/seller/v1alpha1/seller.proto`。
 路徑縮寫：`W` worktree 根、`DT`＝`W/packages/hawkr_ui_text`、`TT`＝`W/packages/hawkr-ui-text-ts`、`C`＝`W/backend/internal/platform/uitext/catalog`、`AD`＝`W/admin/src/app/admin`、`SA`＝`W/seller-app/lib`、`WS`＝`W/website`、`FR`＝`W/backend/internal/modules/seller/internal/foodreg/foodreg.go`、`SM`＝`W/backend/internal/modules/seller/internal`。
 標記：**[量測]** 讀碼或執行命令看到的；**[推論]** 由量測推出、沒有執行驗證；**[外部]** 業界做法。量測用的原型在 session scratchpad `eg/proto.mts`（TS，v1.1 的正向版）、`eg/proto-v1.mts`（v1 版）、`eg/dartproto/bin/proto.dart`（Dart，v1 版），輸出 `eg/ts-hits6.tsv`（v1.1）、`eg/ts-hits4.tsv`、`eg/dart-hits3.tsv`（v1）（不入庫）。
 
@@ -212,7 +212,7 @@ v1 列的 website `measureDisplay.ts:136`（期間句）、`violation-measure.ts
 
 `C/en.json` 加三個的 en（§5，Will 2026-10-22 已核可）。
 admin 關聯帳號終止的說明句不進目錄（§2 #6），所以 v1.2 的 `admin.seller` key 前綴風險不存在。
-術語表 `backend/docs/開發規範/使用者面用語術語表.md` 加一列：「定期複審｜periodic review｜沒有固定結束時間的停權，由平台定期檢查是否繼續｜賣家端措施效果句、admin 複審期限」（H13；新詞先進術語表，en 句引用它）。
+術語表 `docs/共通規範/使用者面用語術語表.md` 加一列：「定期複審｜periodic review｜沒有固定結束時間的停權，由平台定期檢查是否繼續｜賣家端措施效果句、admin 複審期限」（H13；新詞先進術語表，en 句引用它）。
 
 ## 4. 文件
 

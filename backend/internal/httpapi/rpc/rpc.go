@@ -1,5 +1,5 @@
 // Package rpc 是單體各模組的 Connect handler 共用的傳輸層元件：身分與授權、錯誤轉換、逾時、log，
-// 以及分頁 token 與 field mask。規則見 docs/開發規範/API 設計規範（Connect）.md。
+// 以及分頁 token 與 field mask。規則見 `docs/共通規範/API 設計規範（Connect）.md`。
 package rpc
 
 import (

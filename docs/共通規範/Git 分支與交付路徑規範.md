@@ -6,7 +6,7 @@
 > 制定：2026-08-05。
 > 源起：2026-06-08 連續 4 個 PR base=`main` 造成 dev 部署 baseline drift ＋ prod 付款 down 9 分鐘。
 > 本檔為最終權威。
-> 相關：[開發工作流程](開發工作流程.md)、[Cloudflare Worker 與 Serverless 部署治理規範](Cloudflare%20Worker%20與%20Serverless%20部署治理規範.md)
+> 相關：[開發工作流程](../../backend/docs/開發規範/開發工作流程.md)、[Cloudflare Worker 與 Serverless 部署治理規範](../../backend/docs/開發規範/Cloudflare%20Worker%20與%20Serverless%20部署治理規範.md)
 
 ## 1. 分支策略（backend-payuni）
 
@@ -83,7 +83,7 @@ iOS 走 Xcode Cloud run 序號，皆非 semver；repo 內也無商店查詢管�
 因此做不出伺服端拒絕條件，**這一步只能靠人記得**。
 
 漏做不會報錯、不會有 log，只會**靜默**：gate 永遠停在上線那天的版本，等於不存在。
-機制見 [content 模組規格](../modules/content.md) §5 與 [App 版本門檻 Runbook](../runbooks/app-version-gate.md)。
+機制見 [content 模組規格](../../backend/docs/modules/content.md) §5 與 [App 版本門檻 Runbook](../../backend/docs/runbooks/app-version-gate.md)。
 
 ### 2.2 為什麼 Flutter 與 web 的把關方式不同（理解這個才不會又推定錯）
 

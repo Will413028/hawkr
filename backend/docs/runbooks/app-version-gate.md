@@ -52,4 +52,4 @@ sum(count_over_time({container="gateway", environment="prod"} |= `gateway reques
 
 ## 4. minimum_version 的維護
 
-`minimum_version` 必須是已發布的版本，每次 App 送審通過或放量後都回後台更新；流程見 `docs/開發規範/Git 分支與交付路徑規範.md` §2.1。漏做不會報錯，只會讓 gate 停在舊版本而形同不存在。
+`minimum_version` 必須是已發布的版本，每次 App 送審通過或放量後都回後台更新；流程見 `docs/共通規範/Git 分支與交付路徑規範.md` §2.1。漏做不會報錯，只會讓 gate 停在舊版本而形同不存在。

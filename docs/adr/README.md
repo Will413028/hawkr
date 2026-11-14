@@ -2,7 +2,7 @@
 
 > **ADR 回答的唯一問題：`WHY THIS DESIGN` / `WHY NOT THE ALTERNATIVES`。**
 >
-> 責任劃分 SSOT：`backend/docs/開發規範/設計文件治理規範.md` §4。
+> 責任劃分 SSOT：`docs/共通規範/設計文件治理規範.md` §4。
 
 ## 這個資料夾裝什麼
 

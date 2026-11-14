@@ -3,7 +3,7 @@
 | 項目 | 值 |
 |---|---|
 | 狀態 | 現行（ADR `docs/adr/2026-09-26-external-contract-protobuf-connect.md`；Connect 試點 2026-09-26 通過）。新的對外 API 一律依本規範；〈API 設計規範〉只剩舊 gateway 的 REST 與文末列出仍然有效的條文 |
-| 適用範圍 | 根目錄 `api/` 的 Protobuf 契約、單體 `internal/httpapi` 的 Connect handler、四個 client |
+| 適用範圍 | 根目錄 `api/` 的 Protobuf 契約、單體 `backend/internal/httpapi` 的 Connect handler、四個 client |
 | 依據 | Google AIP（121–193）、Connect 協定、buf lint STANDARD |
 | 範例 | `api/hawkr/content/v1alpha1/content.proto`、`api/hawkr/admin/content/v1alpha1/content.proto` |
 
@@ -12,7 +12,7 @@
 - 一個模組、一個使用者類別一個 package，一個檔案：
   - 前台（不需要登入，或買家、賣家登入）：`api/hawkr/<模組>/<版本>/<模組>.proto`，package `hawkr.<模組>.<版本>`。
   - 後台（管理員）：`api/hawkr/admin/<模組>/<版本>/<模組>.proto`，package `hawkr.admin.<模組>.<版本>`。
-  - 跨模組共用的訊息：`hawkr.common.<版本>`，只放真的被多個模組用到的（目前有圖片的 `Image`、錯誤原因的 `ErrorReason`、各處顯示一家店的 `StoreCard`、一組期限的 `Deadline`（開始與到期，伺服器給，client 只拿現在比較）與政策分類的 `PolicyCategory`——seller 與 A7 的 moderation 共用，Go 的值與各入口的子集在 `internal/platform/policy`）。
+  - 跨模組共用的訊息：`hawkr.common.<版本>`，只放真的被多個模組用到的（目前有圖片的 `Image`、錯誤原因的 `ErrorReason`、各處顯示一家店的 `StoreCard`、一組期限的 `Deadline`（開始與到期，伺服器給，client 只拿現在比較）與政策分類的 `PolicyCategory`——seller 與 A7 的 moderation 共用，Go 的值與各入口的子集在 `backend/internal/platform/policy`）。
 - 後台獨立成 `hawkr.admin.*`：同名資源在前後台的欄位不同（前台逐欄列出，見第五節），分開 package 才能各自叫 `Banner`；website 與兩支 App 以一條 `exclude_paths: [hawkr/admin]` 就不生成後台 API。
 - 版本：上線前一律 `v1alpha1`（AIP-185），`buf breaking` 不檢查，契約可以直接改。上線時一次改名成 `v1`，之後 `WIRE_JSON` 的 breaking 才生效（`api/buf.yaml`）。
 - 編號與 `reserved`（收款開通 ADR D54）：`v1alpha1` 刪掉欄位或 enum 值時不留 `reserved`，欄位編號從 1、enum 值從 0（`_UNSPECIFIED`）連續，刪掉之後重新編號；沒有已發佈的 client 與已存的 wire 資料需要保護。改名 `v1` 之後才留 `reserved`，刪除的編號與名稱都要留。
@@ -27,20 +27,20 @@
   | `<模組>PublicService` | `hawkr.<模組>.*` | 任何人 | 不需要登入；有帶有效的 token 時 ctx 裡有呼叫者 |
   | `<模組>AppService` | `hawkr.<模組>.*` | 登入的帳號（買家、賣家） | 沒有登入回 `UNAUTHENTICATED`，管理員回 `PERMISSION_DENIED` |
   | `<模組>InviteeService` | `hawkr.<模組>.*` | 兌換了邀請的供應商（沒有帳號） | 不讀顧客身分；憑證是 service 自己的 interceptor 驗證的 cookie，沒有或無效回 `UNAUTHENTICATED`（見下方 vendor portal 的 session） |
-  | `<模組>AdminService` | `hawkr.admin.<模組>.*` | 管理員 | 沒有登入回 `UNAUTHENTICATED`，帳號回 `PERMISSION_DENIED`；管理員的角色不允許該方法宣告的權限（`internal/httpapi/adminauth`，只有 `GetSession`、`SignOut` 豁免）也回 `PERMISSION_DENIED` |
+  | `<模組>AdminService` | `hawkr.admin.<模組>.*` | 管理員 | 沒有登入回 `UNAUTHENTICATED`，帳號回 `PERMISSION_DENIED`；管理員的角色不允許該方法宣告的權限（`backend/internal/httpapi/adminauth`，只有 `GetSession`、`SignOut` 豁免）也回 `PERMISSION_DENIED` |
 
 - 單體是對外的入口（遷移計畫 A2）：登入由 identity 處理（Google、LINE 聯合登入，憑證是 opaque session），入口的中介層以 identity 解析 session token（App 以 `Authorization: Bearer` 帶；web 是同源的 httpOnly cookie `__Host-hk_session`，瀏覽器直接導覽的下載也靠它；兩者都有時以 Bearer 為準，query、`token` header 與其他 scheme 一律不讀；cookie 請求的 CSRF 規則見 ADR D6），把呼叫者放進 ctx（`rpc.PrincipalFrom`）。決策見 ADR `2026-10-30-identity-self-hosted-federated-login.md`。token 無效、逾時或帳號已刪除時以訪客繼續，停權的帳號照樣認證、授權依動作性質（A7-D18），後台的使用者不是允許的帳號時回 `PERMISSION_DENIED`，問不到公鑰或資料庫時回 `UNAVAILABLE`，不當成訪客。帳號與管理員的 ID 各自發號，呼叫者一定連同類型判斷。
-- 角色與視角：每個帳號都是買家（帳號活著就是買家，ADR `2026-09-30-account-created-provisions-buyer`），買家不是角色；角色只有要另外申請的賣家（`Role.ROLE_SELLER`），每個請求從資料庫讀，變更下一個請求就生效。Connect 沒有視角（ADR `2026-10-07-connect-without-perspective`）：Connect 的服務名稱（`BuyerAppService`、`SellerAppService`）本身就表示以哪個身分呼叫（資源被兩種身分共用的模組，例如 social，用 `<模組>AppService`，身分由伺服器依資源歸屬推導，見 ADR `2026-10-07-connect-without-perspective` 文末修訂），client 不送 `X-Active-Role`，伺服器不讀它，`GetSession` 不回視角；「正在看哪個工作區」是 client 的 UI 狀態。只有賣家能做的事，由模組檢查帳號有沒有賣家角色（`Principal.HasRole`），不是授權的另有「視角」。`X-Active-Role`（`BUYER` 或 `SELLER`）只留在舊 REST、SSE、AI chat 與 chat ws-ticket 的送出端：舊 gateway 在同一條路由內以 `X-Login-Role` 選擇以買家或賣家身分動作，`internal/legacy/gatewayproxy` 從轉發的請求讀它、以 `internal/legacy/accounttype.OfLoginRole` 推導（`SELLER` 而且帳號有賣家角色時是賣家，其他情況是買家，管理員沒有）。最後一個讀 loginRole 的 gateway handler 或 IM 消費端退場時，header 與推導一起刪除。
+- 角色與視角：每個帳號都是買家（帳號活著就是買家，ADR `2026-09-30-account-created-provisions-buyer`），買家不是角色；角色只有要另外申請的賣家（`Role.ROLE_SELLER`），每個請求從資料庫讀，變更下一個請求就生效。Connect 沒有視角（ADR `2026-10-07-connect-without-perspective`）：Connect 的服務名稱（`BuyerAppService`、`SellerAppService`）本身就表示以哪個身分呼叫（資源被兩種身分共用的模組，例如 social，用 `<模組>AppService`，身分由伺服器依資源歸屬推導，見 ADR `2026-10-07-connect-without-perspective` 文末修訂），client 不送 `X-Active-Role`，伺服器不讀它，`GetSession` 不回視角；「正在看哪個工作區」是 client 的 UI 狀態。只有賣家能做的事，由模組檢查帳號有沒有賣家角色（`Principal.HasRole`），不是授權的另有「視角」。`X-Active-Role`（`BUYER` 或 `SELLER`）只留在舊 REST、SSE、AI chat 與 chat ws-ticket 的送出端：舊 gateway 在同一條路由內以 `X-Login-Role` 選擇以買家或賣家身分動作，`backend/internal/legacy/gatewayproxy` 從轉發的請求讀它、以 `backend/internal/legacy/accounttype.OfLoginRole` 推導（`SELLER` 而且帳號有賣家角色時是賣家，其他情況是買家，管理員沒有）。最後一個讀 loginRole 的 gateway handler 或 IM 消費端退場時，header 與推導一起刪除。
 - service 以外更細的條件（例如只有賣家、只能改自己的資料）在模組裡判斷。
-- 賣家區的能力宣告（ADR `2026-09-29-seller-suspension-and-business-identity-in-monolith.md`；文末修訂：資源被買家與店家共用的模組，其 `AppService` 也可以宣告以店家身分動作時需要的賣家能力，由擁有資料的模組推導身分後再向 seller 檢查，宣告表各 service 一張，下面描述 `SellerAppService` 的做法；沿用 `2026-09-18-seller-capability-authorization.md` 的 D1「宣告＝掛載」）：`SellerAppService` 的每個方法在 `internal/httpapi/seller` 的宣告表（key 是生成的 procedure 常數）宣告需要的賣家能力（`seller.Cap*`），或明列豁免與理由。只掛在這個 service、位在 `rpc.NewInterceptor` 之內的 interceptor 依宣告呼叫 `seller.ActingStore`，把店家放進 ctx；handler 只從 ctx 取店家，不自己呼叫 `ActingStore`。豁免的方法不查店家，也不要求賣家角色（例如申請開店）。啟動時以 service descriptor 雙向對照宣告表，方法缺宣告或宣告指向不存在的方法，`NewHandler` 回錯誤。能力由 `seller.CapabilitiesOf` 推導：生命週期、停權與前置條件（物流建店要平台審核核准與收款帳戶啟用），`GetMyStore.capabilities` 回報每個能力的 `{active, missing}`（`missing` 是 `SellerRequirement`），狀態 `PUBLIC_LISTING`（買家看得到店面）只出現在那裡，方法不能宣告它。停權的拒絕是 `permission_denied`，`ErrorInfo.reason` 是 `SELLER_SUSPENDED`；其他前置條件沒有滿足（等待刪除、KYC 未核准）是 `failed_precondition`，`ErrorInfo.reason` 是 `SELLER_REQUIREMENT_MISSING`，metadata 的 `missingRequirements` 是缺的條件（`SellerRequirement` 的值名，不加前綴，依列舉的數字由小到大以逗號連接，例如 `ONBOARDING_COMPLETE,NOT_PENDING_DELETION`）。
+- 賣家區的能力宣告（ADR `2026-09-29-seller-suspension-and-business-identity-in-monolith.md`；文末修訂：資源被買家與店家共用的模組，其 `AppService` 也可以宣告以店家身分動作時需要的賣家能力，由擁有資料的模組推導身分後再向 seller 檢查，宣告表各 service 一張，下面描述 `SellerAppService` 的做法；沿用 `2026-09-18-seller-capability-authorization.md` 的 D1「宣告＝掛載」）：`SellerAppService` 的每個方法在 `backend/internal/httpapi/seller` 的宣告表（key 是生成的 procedure 常數）宣告需要的賣家能力（`seller.Cap*`），或明列豁免與理由。只掛在這個 service、位在 `rpc.NewInterceptor` 之內的 interceptor 依宣告呼叫 `seller.ActingStore`，把店家放進 ctx；handler 只從 ctx 取店家，不自己呼叫 `ActingStore`。豁免的方法不查店家，也不要求賣家角色（例如申請開店）。啟動時以 service descriptor 雙向對照宣告表，方法缺宣告或宣告指向不存在的方法，`NewHandler` 回錯誤。能力由 `seller.CapabilitiesOf` 推導：生命週期、停權與前置條件（物流建店要平台審核核准與收款帳戶啟用），`GetMyStore.capabilities` 回報每個能力的 `{active, missing}`（`missing` 是 `SellerRequirement`），狀態 `PUBLIC_LISTING`（買家看得到店面）只出現在那裡，方法不能宣告它。停權的拒絕是 `permission_denied`，`ErrorInfo.reason` 是 `SELLER_SUSPENDED`；其他前置條件沒有滿足（等待刪除、KYC 未核准）是 `failed_precondition`，`ErrorInfo.reason` 是 `SELLER_REQUIREMENT_MISSING`，metadata 的 `missingRequirements` 是缺的條件（`SellerRequirement` 的值名，不加前綴，依列舉的數字由小到大以逗號連接，例如 `ONBOARDING_COMPLETE,NOT_PENDING_DELETION`）。
 - 越權存取（已登入、資源存在但不屬於呼叫者）預設回 `not_found`，code、`LocalizedMessage` 與 details 都和「不存在」完全相同，寫入的方法也一樣，不能讓人以回應的差異探測資源是否存在（防枚舉）。只有資源的存在與 ID 本身就公開（例如公開的貼文）時才回 `permission_denied`。未登入、使用者類別不符不適用本條，照常回 `unauthenticated`、`permission_denied`；以伺服器簽發的憑證（例如 staged token）識別的資源，憑證無效回 `invalid_argument`。
 - 瀏覽器跨來源：CORS 只在入口處理，允許設定的 web 與後台的 origin 帶 cookie；CSRF 以 Go 標準庫的 `http.CrossOriginProtection`（`Sec-Fetch-Site` 或 Origin）擋下其他 origin 的非安全請求，金流與物流的瀏覽器回跳列為例外。client 不必送 `X-Requested-With`。
-- **單體→gateway 的身分**（過渡期；還沒搬的 REST、SSE 與 WebSocket 由 `internal/legacy/gatewayproxy` 轉給 gateway）：入口先刪掉 client 帶來的 `X-Account-Id`、`X-Account-Type`、`X-Login-Role`、`X-Active-Role`、`X-Buyer-Id`、`X-Store-Id`、`X-Seller-Suspended`、`X-Seller-Capabilities`，登入時再設上：
+- **單體→gateway 的身分**（過渡期；還沒搬的 REST、SSE 與 WebSocket 由 `backend/internal/legacy/gatewayproxy` 轉給 gateway）：入口先刪掉 client 帶來的 `X-Account-Id`、`X-Account-Type`、`X-Login-Role`、`X-Active-Role`、`X-Buyer-Id`、`X-Store-Id`、`X-Seller-Suspended`、`X-Seller-Capabilities`，登入時再設上：
 
   | header | 值 |
   |---|---|
   | `X-Account-Id` | 帳號或管理員的 ID |
-  | `X-Account-Type` | 舊契約的角色 bitmask：帳號一定有買家 1，是賣家時再加 2（兩者 3）；管理員 4。買家位元由 `internal/legacy/accounttype` 合成，identity 不存 |
+  | `X-Account-Type` | 舊契約的角色 bitmask：帳號一定有買家 1，是賣家時再加 2（兩者 3）；管理員 4。買家位元由 `backend/internal/legacy/accounttype` 合成，identity 不存 |
   | `X-Login-Role` | 這個請求的視角：買家 1、賣家 2、管理員 4 |
   | `X-Buyer-Id` | 帳號（非管理員）現任買家的正整數 ID |
   | `X-Store-Id` | 非管理員且具有 SELLER 角色的帳號，其現任店家的正整數 ID；沒有角色時不設（有 SELLER 卻沒有現任店家是不變量被破壞，入口回 500、不轉發） |
@@ -57,7 +57,7 @@
   |---|---|
   | cookie | 每張邀請一個：`__Host-hk_vp_<rfq_recipient_id>`（十進位，名稱與屬性只在 `rpc.VendorPortalCookieName`、`rpc.NewVendorPortalCookie` 建構）。`Path=/`、`Secure`、`HttpOnly`、`SameSite=Lax`，不帶 `Domain`；`Max-Age` 是 session 到絕對期限（已被邀請的到期時間截斷）剩餘的秒數，至少 1。`__Host-` 讓兄弟子網域塞不進同名的 cookie；`Path=/` 是為了同時送到 Connect 與 gateway 的 RFQ 路由（Path 不能用來區分邀請）。同名的 cookie 出現不只一個視同沒有 |
   | 怎麼選 | Connect：請求訊息的 `rfq_recipient_id`（`VendorPortalInviteeService` 每個方法的請求都有，必填、十進位字串）；gateway 的 RFQ 路由：路徑 `/api/v1/public/vendor_portal/rfqs/{rfq_recipient_id}/…` 的 `{rfq_recipient_id}`。只讀名稱含那個 ID 的 cookie，其他邀請的 cookie 不讀 |
-  | 誰讀 | `VendorPortalInviteeService` 的 interceptor（`internal/httpapi/agent`）：授權跟著 service 的邊界，這個 service 的每個方法都需要 session，沒有逐方法的宣告；沒有指名的 cookie、session 無效或 session 的收件人不是指名的那個，一律回同一個 `unauthenticated`；請求沒有 `rfq_recipient_id` 欄位（新增了不帶它的方法）回 `internal`，不放行。轉給 gateway 的 RFQ 路由由 `gatewayproxy` 以路徑的 ID 驗證（見下） |
+  | 誰讀 | `VendorPortalInviteeService` 的 interceptor（`backend/internal/httpapi/agent`）：授權跟著 service 的邊界，這個 service 的每個方法都需要 session，沒有逐方法的宣告；沒有指名的 cookie、session 無效或 session 的收件人不是指名的那個，一律回同一個 `unauthenticated`；請求沒有 `rfq_recipient_id` 欄位（新增了不帶它的方法）回 `internal`，不放行。轉給 gateway 的 RFQ 路由由 `gatewayproxy` 以路徑的 ID 驗證（見下） |
   | 兌換 | `ExchangeInvite` 先解出 secret 對應的邀請；請求帶這張邀請的 cookie 而且它是這張邀請的有效 session 就沿用：不發新的 session、不重設 cookie（它的 `Max-Age` 已是同一個絕對期限），回應是那個 session 的驗證狀態與 `google_nonce`；沒有、無效或不是這張邀請的就發新的 session（新的 `Set-Cookie` 蓋掉舊的）。別張邀請的 cookie 不動 |
   | 上限 | 請求帶的 `__Host-hk_vp_*` cookie 超過 20 個時，`ExchangeInvite` 的回應以 `Max-Age=0` 清掉多出的，不含這次發出或沿用的那個。看不到 cookie 的年齡，所以清收件人 ID 最小的（ID 依序發號，小的是較舊的邀請），格式不對的名稱最先清；結果只取決於請求帶的名稱（`rpc.ExcessVendorPortalCookies`） |
   | Google 驗證的 nonce | `google_nonce` = base64url（無 padding）的 SHA-256（用途前綴 `"hawkr vendor-portal google nonce\x00"` 加 session token），每次由 token 算、不儲存，與資料庫存的 token 雜湊是不同的輸入。`ExchangeInvite` 與 `GetSession` 回給 client，client 傳給 Google Identity Services 的 `initialize({nonce})`；`VerifySession` 驗 ID token 時要求 `nonce` claim 相等、`iat` 不早於 10 分鐘前（OIDC Core §3.2.2.1、§15.5.2），不符與其他無效 token 同樣回 `permission_denied`（同一段訊息） |
@@ -153,7 +153,7 @@
   - `RetryInfo`：伺服器知道多久之後能重試時（入口的限流、驗證碼的冷卻）。
 - `message` 給開發者看，client 不顯示、不解析。trace id 在回應的 `X-Trace-Id` header。
 - 每個錯誤回應有一筆 log：interceptor 記它經手的；connect-go 在 interceptor 之前就回的錯誤（請求無法解碼、超過大小上限）由 HTTP 層的 `rpc.LogUnhandled` 補上。
-- 單體的轉換點（`internal/httpapi/rpc`）只轉換模組的 `apperr` 與傳輸層以 `rpc.Error` 建立的錯誤，其他一律 `internal`（訊息固定、細節只進 log），下游回的 Connect 錯誤也不例外：
+- 單體的轉換點（`backend/internal/httpapi/rpc`）只轉換模組的 `apperr` 與傳輸層以 `rpc.Error` 建立的錯誤，其他一律 `internal`（訊息固定、細節只進 log），下游回的 Connect 錯誤也不例外：
 
   | 模組錯誤（apperr） | Connect | details |
   |---|---|---|
@@ -206,7 +206,7 @@
 
 - 回應是檔案本身、不能把 bytes 包成 Connect 訊息的欄位（base64 膨脹，也進不了瀏覽器的圖片快取）時，不經 Connect：路由放在 `/api/files/<使用者類別>/…` 底下（`/api/files/` 不是舊 gateway 的 `/api/v1/`，不轉給 gateway），例如 `GET /api/files/admin/seller/kyc_applications/{application_id}/documents/{slot}/{position}`。使用者類別同第二節（`public`、`app`、`admin`）。
 - 與 Connect 同一條入口中介鏈：tracing、CORS、CSRF、session（`Authorization: Bearer`）、限流（級別同該使用者類別的 Connect 方法，超過回 429 加 `Retry-After`）。授權由擁有這份檔案的 handler 做（先確認使用者類別，再做業務授權），不依賴路徑。錯誤只回 HTTP 狀態，不帶細節（沒有授權與不存在不可區分）。
-- 每條 `/api/files/admin/…` 端點宣告一個權限（`platform/adminperm` 目錄裡的 `<模組>.<資源>.<動詞>`，例如 `seller.kyc_documents.get`），宣告在 `internal/httpapi` 的 `fileRoute.permission`：入口在 handler 之前檢查呼叫者是管理員而且角色允許它（`adminauth.GuardFile`），模組自己的授權在那之後。啟動時檢查每條 `/api/files/admin/` 路由都宣告了目錄裡的權限、其他路由沒有宣告，不合法就不能啟動；新增端點沒寫宣告等於不能啟動。與 admin Connect 方法的宣告同一套目錄與規則（ADR `2026-10-04-admin-roles`）。
+- 每條 `/api/files/admin/…` 端點宣告一個權限（`platform/adminperm` 目錄裡的 `<模組>.<資源>.<動詞>`，例如 `seller.kyc_documents.get`），宣告在 `backend/internal/httpapi` 的 `fileRoute.permission`：入口在 handler 之前檢查呼叫者是管理員而且角色允許它（`adminauth.GuardFile`），模組自己的授權在那之後。啟動時檢查每條 `/api/files/admin/` 路由都宣告了目錄裡的權限、其他路由沒有宣告，不合法就不能啟動；新增端點沒寫宣告等於不能啟動。與 admin Connect 方法的宣告同一套目錄與規則（ADR `2026-10-04-admin-roles`）。
 - 機敏檔案回應 `Cache-Control: private, no-store`，加 `X-Content-Type-Options: nosniff`；`Content-Type` 只放行確定安全的型別，其餘一律 `application/octet-stream`。
 - 以業務資源定址（申請、位置），不以 asset ID：asset ID 只在擁有者的資料表裡，不出現在 URL 與回應。每次讀取是否留稽核由擁有者決定；要稽核的先寫紀錄再送內容（寫不進去就不送）。
 - 取得網址的方式是擁有者的 Connect 方法回傳（例如 KYC 的 `GetKYCApplication` 回傳的 `KYCDocument.view_uri`），不由 client 自己組。
