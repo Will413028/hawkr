@@ -86,3 +86,7 @@
 - `2026-09-24-go-modular-monolith.md`（修訂「部署目標」）
 - `2026-10-30-identity-self-hosted-federated-login.md`
 - `website/next.config.ts`、`website/open-next.config.ts`（#338 的註解）
+
+## 修訂：執行計畫已刪除（2026-11-15）
+
+執行計畫 `2026-11-01-website-server-auth-vercel` 與附件 `spikes.md` 依「完成的計畫不留在 repo」的決定在 2026-11-15 分流後刪除，git 歷史是紀錄。登入狀態由伺服器決定的決定（DAL、受保護區的伺服器端檢查、四態與骨架、整頁導向取代暫時目標態、顯示資料由 `GetSession` 帶、拒絕路徑刪除）在 `2026-10-30-identity-self-hosted-federated-login.md` 的「修訂：web 登入狀態由伺服器決定」與本檔上方「修訂：身分不以根層 Suspense 包住頁面」；訪客 IP 只讀 `x-real-ip`（Vercel 覆寫、`cf-connecting-ip` 會原樣透傳而不可信）與部署設定在 `website/AGENTS.md`；同源反代的 `rewrites().beforeFiles` 在 `website/next.config.ts`。

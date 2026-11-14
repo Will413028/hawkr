@@ -41,7 +41,7 @@ type Config struct {
 	JWKSURL      string
 	PublicKey    *rsa.PublicKey
 	PublicKeyPEM string
-	// Algorithm 是遠端公鑰（JWKSURL）簽章的演算法：RS256（預設）或 ES256（LINE 原生 SDK 的 ID token，spikes.md §a）。
+	// Algorithm 是遠端公鑰（JWKSURL）簽章的演算法：RS256（預設）或 ES256（LINE 原生 SDK 的 ID token，ADR backend/docs/adr/2026-10-30-identity-self-hosted-federated-login.md 的約束）。
 	// 只收這一種；HMACSecret 與固定的 RSA 公鑰另有自己的演算法，不能設它。
 	Algorithm string
 	// HMACSecret 驗 HS256 的 token（LINE web 登入的 ID token 以 channel secret 簽）；設了就只收 HS256。

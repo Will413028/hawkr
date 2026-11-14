@@ -137,3 +137,7 @@ A2 把 account-service 搬進單體時，登入、session、手機驗證都是�
 
 落地順序：A7-1d′ 先建停權紀錄與 `accountsuspension`；A7-1d″ 移除停權時排 ban 的 job（連同 `BanUser`）、認證改帶停權狀態、加上宣告表與 `withSession` 的執行。不做 unban job：先前被停用的開發用 Clerk 測試帳號由 Will 在 Clerk dashboard 手動解除。原決策段保留歷史。
 
+
+## 修訂：A2 計畫已刪除（2026-11-15）
+
+A2 計畫 `2026-09-27-a2-identity` 依「完成的計畫不留在 repo」的決定在 2026-11-15 分流後刪除，git 歷史是紀錄。上方提到的「A2 計畫的設計審查段」與「A2 計畫 C9」：設計審查的決定已在本檔各修訂與「待決項的去向」；模組的沿用盤點（含刪除的功能清單、nonce、代行 session 的 IDENTITY 主鍵）在 `backend/internal/modules/identity/CARRYOVER.md`；本檔已被 `2026-10-30-identity-self-hosted-federated-login.md` 取代，其中 Clerk 專屬的待辦（`clerk_auth` 登出、Clerk dashboard 設定）已隨 Clerk 移除而不再成立。

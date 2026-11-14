@@ -92,7 +92,7 @@ func TestDevAuthKeyFileExcludesAccess(t *testing.T) {
 	}
 }
 
-// 不提供 Sign in with Apple（計畫 2026-10-30-self-hosted-auth 前提段）：設定表裡沒有 APPLE_ 與 IDENTITY_TOKEN_KEYS 的鍵，設了也不啟用
+// 不提供 Sign in with Apple（ADR backend/docs/adr/2026-10-30-identity-self-hosted-federated-login.md 的「重新評估的條件」）：設定表裡沒有 APPLE_ 與 IDENTITY_TOKEN_KEYS 的鍵，設了也不啟用
 // 任何東西、不算設定錯誤（舊的 .env 還留著也能啟動），更不影響 DEV_AUTH_KEY_FILE。
 func TestAppleEnvironmentIsNotRead(t *testing.T) {
 	keyFile := writeDevKey(t)

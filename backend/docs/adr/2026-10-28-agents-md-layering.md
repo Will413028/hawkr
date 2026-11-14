@@ -5,7 +5,7 @@
 | 狀態 | superseded by `2026-10-31-agents-md-layering-consolidated.md`（修訂已滿 3 段，整合並加上子領域檔案；本檔保留脈絡、方案與歷史） |
 | 日期 | 2026-10-28（Will 決定） |
 | 影響範圍 | repo 內所有 `AGENTS.md`、`cmd/new-module` 的模板、`docs/開發規範/設計文件治理規範.md` 的文件 taxonomy、單體 ADR `2026-09-24-go-modular-monolith.md` 對模組 `AGENTS.md` 的定義 |
-| 執行計畫 | `docs/plans/2026-10-28-agents-md-layering.md` |
+| 執行計畫 | `2026-10-28-agents-md-layering`（已刪除，見文末修訂） |
 
 ## 脈絡
 
@@ -75,3 +75,7 @@
 ## 修訂：D4 的後備沒有用上（2026-10-29）
 
 D4 為 seller 預留的後備（拆成多個模組，期間列在例外清單）沒有用上：seller 的行為規格搬進 `docs/modules/seller.md` 之後，模組 `AGENTS.md` 收成模板的七個固定節（5,991 bytes），低於 6,000 bytes 上限，例外清單為空。「碰任何模組時 28,000 bytes 的上限」因此沒有 seller 的例外；Followup 的「seller 拆模組的階段計畫」不需要建立。拆模組仍可以因為別的理由（依賴、schema、事件）另案提出，但不再是本決策的後續。
+
+## 修訂：執行計畫已刪除（2026-11-15）
+
+執行計畫 `2026-10-28-agents-md-layering` 依「完成的計畫不留在 repo」的決定在 2026-11-15 分流後刪除，git 歷史是紀錄。它的決定 D1（大小上限）、D2（各層內容界線）、D3（模組規格放 `docs/modules/`）、D4（seller 例外，後備沒有用上）、D5（兄弟子專案共用規則）、D6（子領域檔案與 pre-commit）都在 `2026-10-28-agents-md-layering.md` 與 `2026-10-31-agents-md-layering-consolidated.md`；檢查改由 instruction-lint 執行（見 `2026-10-31-agents-md-layering-consolidated.md` 的「修訂：檢查改由 instruction-lint 執行」），模板是 `backend/cmd/new-module/templates/module/AGENTS.md.tmpl`；沒有未結的延後項。

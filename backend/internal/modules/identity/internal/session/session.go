@@ -29,7 +29,7 @@ const (
 	// Absolute 是絕對逾時：無論多常使用，建立後超過就失效。
 	Absolute = 90 * 24 * time.Hour
 	// ReauthWindow 是終止 session 這類敏感操作要求的重新驗證期限：目前的 session 最近一次以 provider 驗證不得早於這麼久之前
-	// （計畫 2026-10-30-self-hosted-auth 步驟 2「session 管理」，ASVS）。
+	// （ASVS；ADR backend/docs/adr/2026-10-30-identity-self-hosted-federated-login.md D7）。
 	ReauthWindow = 15 * time.Minute
 	// RenewEvery 是 last_used_at 最多寫入一次的間隔。
 	RenewEvery = 24 * time.Hour

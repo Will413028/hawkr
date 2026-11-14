@@ -9,7 +9,7 @@
 | 影響範圍 | identity 模組、`internal/httpapi` 的認證與 CSRF；website 的登入與 transport；`packages/hawkr_auth` 與兩支 App |
 | 上層決策 | `2026-09-24-go-modular-monolith.md` D1、D5；`2026-09-26-external-contract-protobuf-connect.md` D6 |
 
-取代 `2026-09-27-identity-clerk.md`（全文，沿用部分見「沿用與作廢」）。恢復 `2026-09-27-identity-opaque-sessions.md` 的 D1（憑證）、D2（期限）、D3 全文（撤銷即刪列）；它的 D4、D5（手機 OTP、三竹簡訊）維持作廢。計畫：`docs/plans/2026-10-30-self-hosted-auth.md`。
+取代 `2026-09-27-identity-clerk.md`（全文，沿用部分見「沿用與作廢」）。恢復 `2026-09-27-identity-opaque-sessions.md` 的 D1（憑證）、D2（期限）、D3 全文（撤銷即刪列）；它的 D4、D5（手機 OTP、三竹簡訊）維持作廢。計畫：`2026-10-30-self-hosted-auth`（已刪除，見文末修訂）。
 
 ## 脈絡
 
@@ -21,7 +21,7 @@ Clerk 時期的問題（A7-D19，Will 2026-10-30）：session 期限要付費方
 
 約束：
 
-- 外部：LINE web channel 的 ID token 是 HS256（channel secret），原生 SDK 是 ES256（JWKS）；同一個 LINE provider 底下的 channel `sub` 才相同；使用者可以拒給 email（`docs/plans/2026-10-30-self-hosted-auth/spikes.md` a）。
+- 外部：LINE web channel 的 ID token 是 HS256（channel secret），原生 SDK 是 ES256（JWKS）；同一個 LINE provider 底下的 channel `sub` 才相同；使用者可以拒給 email（計畫附件 `spikes.md` a，已刪除，見文末修訂）。
 - 外部：三家只有 Google 在授權回應帶 `iss`（RFC 9207，spike e）。
 - 外部：Google 在嵌入式 WebView 擋 OAuth。
 - 繼承：其他模組只以 account ID 參照帳號；停權、角色、刪帳下一個請求就生效；`withSession` 是唯一的授權執行點（A7-D18）。
@@ -81,7 +81,7 @@ Clerk 時期的問題（A7-D19，Will 2026-10-30）：session 期限要付費方
 
 ## 相關
 
-- 計畫與事實：`docs/plans/2026-10-30-self-hosted-auth.md`、附件 `spikes.md`、`clerk-inventory.md`
+- 計畫與事實：`2026-10-30-self-hosted-auth` 與附件 `spikes.md`、`clerk-inventory.md`（已刪除，見文末修訂）
 - 決定來源：`docs/plans/2026-10-18-a7-social.md` A7-D17、A7-D18、A7-D19
 - 被取代：`2026-09-27-identity-clerk.md`；部分恢復：`2026-09-27-identity-opaque-sessions.md`
 - 通知的 email：`2026-10-05-notification-module.md` 決策 8
@@ -114,3 +114,7 @@ D4 不變：`accounts.email` 仍是 provider 回報、已驗證的 email，登�
 - **賣家送審前帳號要有聯絡信箱**：Stripe 的收款帳戶必須帶聯絡信箱，而 LINE 使用者可以不給 email。帳號沒有已驗證的 email 時，賣家在送出 KYC 申請前自己填一個（`IdentityAppService.SetContactEmail`），存在 `accounts.self_entered_email`；`SubmitKYC` 要求帳號有其中之一，沒有回 `failed_precondition` 與 `CONTACT_EMAIL_REQUIRED`。payment 建立外部帳戶當下讀取聯絡信箱（已驗證的優先），不另存快照（`2026-11-13-payment-onboarding-provider-port-stripe.md` 的「聯絡信箱」）。
 - **買家不變**：買家沒有這個要求，不必填聯絡信箱。
 - **自填的信箱未驗證，也不是寄件地址**：它不寫進 `account_identities`，不成為自動連結的依據；有已驗證 email 的帳號不能設定自填信箱。通知 A8 只寄已驗證的信箱（通知 ADR `2026-10-05-notification-module.md` 決策 8 不變）；自填信箱以驗證碼驗證延後到 A8 的 email 管道上線。
+
+## 修訂：自建登入計畫已刪除（2026-11-15）
+
+計畫 `2026-10-30-self-hosted-auth` 與附件 `spikes.md`、`clerk-inventory.md` 依「完成的計畫不留在 repo」的決定在 2026-11-15 分流後刪除，git 歷史是紀錄。上方「相關」、約束與修訂段提到它們的地方，內容的去向如下。決策 D1–D7 與已知限制在本檔；provider 事實（LINE 的簽章演算法與 `sub` 範圍、三家授權回應的 `iss`、Google 的 `aud` 與 `azp`）在「脈絡」的約束與 D2；實作取捨（自動連結資格、刪帳墓碑、cookie 期限、重新驗證等）在 `backend/docs/modules/identity.md` 與 `backend/internal/modules/identity/CARRYOVER.md`；Google 原生登入 nonce 的實測結果在上方的修訂段，iOS 模擬器的實測原始紀錄只在 git 歷史；延後項（解除連結、passkey、session 快取、Sign in with Apple、Swift 原生 App、App 內連結登入方式、部署環境反代對 3xx 與多個 `Set-Cookie` 的驗證）的觸發條件在上方「重新評估的條件」與模組文件，其餘由主清單追蹤。

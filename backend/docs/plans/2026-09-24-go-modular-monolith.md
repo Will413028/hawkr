@@ -10,7 +10,7 @@
 
 > **階段 B 的改寫順序（2026-09-24 確認）**：依 D8「從依賴最少的往核心」，payment 排在 ordering 之前。這樣 ordering 改寫時，可以直接以 in-process 的方式呼叫 Go 版 payment，下單到付款當下就能用單一 transaction，不必先為遠端的 Java payment 寫一套過渡用的 outbox 或事件。金流「編排」仍然最後做：ordering（checkout 與付款結果）、aftersales（退款）、finance（撥款）。
 
-> **對外契約定案（2026-09-26）**：Protobuf＋Connect 取代 D7 的 OpenAPI spec-first（ADR `2026-09-26-external-contract-protobuf-connect.md`；content 試點 `2026-09-25-connect-contract-pilot.md` 通過）。前端改用生成的 client 併進「模組完成的定義」，原本的階段 D 取消；0.6 的規格改為現有 API 清單，生成的 server 與 oapi-codegen 已刪除。A0 改為 gateway 當過渡入口、隨模組搬遷縮小（Will 決定）。
+> **對外契約定案（2026-09-26）**：Protobuf＋Connect 取代 D7 的 OpenAPI spec-first（ADR `2026-09-26-external-contract-protobuf-connect.md`；content 試點通過，證據併入該 ADR）。前端改用生成的 client 併進「模組完成的定義」，原本的階段 D 取消；0.6 的規格改為現有 API 清單，生成的 server 與 oapi-codegen 已刪除。A0 改為 gateway 當過渡入口、隨模組搬遷縮小（Will 決定）。
 
 ## 全域約束
 
@@ -177,7 +177,7 @@
 - [x] **A1 content**（試點，2026-09-27 完成）
   - 用它驗證整套做法：模板、schema、Connect 的 handler，以及 media 的公開 API 加上呼叫 Java 的暫時實作。
   - 試點結束後，把學到的調整回寫模板與本計畫：模板見 0.5，本計畫的模組完成定義加上傳輸層的沿用盤點與特性測試的骨架。
-  - 對外契約由 Connect 試點驗證並通過（`2026-09-25-connect-contract-pilot.md`，ADR `2026-09-26-external-contract-protobuf-connect.md`）。
+  - 對外契約由 Connect 試點驗證並通過（ADR `2026-09-26-external-contract-protobuf-connect.md`）。
   - [x] 模組本體（2026-09-25）：`internal/modules/content` 的 schema 與新 baseline、sqlc、公開 API、unit 與 integration 測試；與 content-service 的差異寫在模組的 `CARRYOVER.md`。media 只有公開 API（`internal/modules/media`，登記在 `apiOnly`）。
   - [x] worker 角色：`hawkr worker`，第一個 job 是 website 的快取失效。
   - [x] http 層與 `internal/legacy` 裡呼叫 Java media-service 的 client（2026-09-25，Connect 試點的步驟 4）：`internal/httpapi/{rpc,content}`、`internal/legacy/mediaservice`，gateway 以 Connect 代理給單體。
@@ -193,7 +193,7 @@
     - 相關 ADR：版本門檻 ADR 的 D2、D7 加註；D10 的前提（兩個 repo、沒有共用套件）在 monorepo 不成立，由 `2026-09-27-app-version-gate-shared-package.md` 取代，檢查邏輯抽成 `packages/hawkr_app_update`（Will 決定）；首頁動態排序的 ADR 加註從未實作、依 D8 不搬。
     - D9：baseline 鎖在 317 個檔案、1210 個命中。
     - 獨立設計審查：9 項發現，沒有駁回。改 4：排程的 CHECK 與寫入端不一致（新 migration 與測試）、A7 與 B4 記下 banner 點擊行為要確認商品與貼文存在、設計書 25 與 50 加上單體註記、A1 逐項寫出結論。記 2：盤點表補上 CodeMeta 的 `AccountType`、`AssetReferenceType`；刪掉的兩條告警沒有替代，單體的監控（River job 的狀態、存活）記進 wiki 的 CD 待辦。交給 Will 決定 3 項並照決定做完：快取失效的重試改成退避（§9.5 的單體註記）、特性測試的共用部分抽成 `internal/httpapi/characterize` 並保留經 gateway 的執行到 A2（另一項「只剩一個 driver 的特性測試與 handler 測試重複」併入這個決定：A2 時一起退役）。
-- [x] **A2 identity**（2026-09-29 完成；交給 Will 的 Clerk、Apple 設定與 App 實機驗收在 A2 計畫的 C9 段）：來自 account-service，不含代行編排；入口從 gateway 移到單體（見 A0），IM 的 WebSocket 與還沒搬的 SSE、REST 經單體轉給 gateway，直到所屬模組搬遷。步驟、驗收與進度在 `2026-09-27-a2-identity.md`；身分驗證改用 Clerk（ADR `2026-09-27-identity-clerk.md`，Will 2026-09-27），它取代 ADR `2026-09-27-identity-opaque-sessions.md` 的憑證與 OTP 決策，步驟在 A2 計畫的〈改用 Clerk〉。
+- [x] **A2 identity**（2026-09-29 完成；Clerk 已由自建登入取代，ADR `2026-10-30-identity-self-hosted-federated-login.md`）：來自 account-service，不含代行編排；入口從 gateway 移到單體（見 A0），IM 的 WebSocket 與還沒搬的 SSE、REST 經單體轉給 gateway，直到所屬模組搬遷。A2 計畫已依 D9 分流後刪除：沿用盤點在模組 `CARRYOVER.md`，決定在 ADR `2026-09-27-identity-opaque-sessions.md`、`2026-09-27-identity-clerk.md`（含後台改用 Cloudflare Access 的修訂）與 `2026-10-30-identity-self-hosted-federated-login.md`。
 - [ ] **A3 buyer、seller**：seller 不含推薦排行；buyer 往上的補資料移到 http。步驟、決定與進度在 `2026-09-29-a3-buyer-seller.md`（盤點在同名目錄）；下面兩個子項已併入該檔的步驟 7。
   - seller 第一個 `*AppService`：實作錯誤模型 ADR `2026-09-25-api-error-model.md` D10 的賣家停權（`permission_denied` 加 `ErrorInfo.reason` `SELLER_SUSPENDED`，取代 9240 加 HTTP 409），在同一個變更加入 `ErrorReason` 的值、單體裡能力檢查的產生、client 把它轉成賣家身分的停權狀態，並端到端驗證（Connect 試點的通過條件 7）。能力檢查的做法（逐方法宣告、Redis 快取、fail-open）依模組完成的定義重新評估 ADR `2026-09-18-seller-capability-authorization.md`。
   - 申請成為商家：舊 gateway 的 `POST /app/sellers` 在 seller-service 建店並授予 SELLER 之後，才驗證城市代碼，驗證失敗回 400 而商店與角色已經寫入（A2 的 compose 驗收，2026-09-29）。搬進 seller 模組時，輸入驗證放在建店之前，建店與授予角色同一個 transaction。

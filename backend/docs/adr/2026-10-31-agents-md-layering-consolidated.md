@@ -5,7 +5,7 @@
 | 狀態 | accepted；取代 `2026-10-28-agents-md-layering.md`（該檔修訂已滿 3 段，依 `README.md` 慣例整合；它的脈絡、方案與歷史保留在原檔） |
 | 日期 | 2026-10-31（Will 決定 F＋B）；其餘決定日期見各條 |
 | 影響範圍 | repo 內所有 `AGENTS.md`、`cmd/new-module` 的模板、`.instruction-lint.toml`、`.pre-commit-config.yaml`、`docs/開發規範/設計文件治理規範.md` 的文件 taxonomy、單體 ADR `2026-09-24-go-modular-monolith.md` 對模組 `AGENTS.md` 的定義 |
-| 執行計畫 | `docs/plans/2026-10-28-agents-md-layering.md` |
+| 執行計畫 | `2026-10-28-agents-md-layering`（已刪除，見文末修訂） |
 
 ## 脈絡
 
@@ -68,3 +68,7 @@
 脈絡：檢查腳本 `scripts/check-agents-md.py` 只服務這個 repo，同類檢查在其他 repo 各寫一份。改用共用工具 instruction-lint（Will 自有，釘 v0.3.0），規則與上限集中在根目錄 `.instruction-lint.toml`。
 
 決策：決策 1 與 5 的檢查器改為 instruction-lint；三層上限、單行 500 字元、七節、hook 觸發條件與 CI 步驟的數值和範圍不變。例外清單改為設定檔的 `allowlist`，每筆有理由與到期日（最長 90 天）。模組七節的唯一來源是設定檔的 R2 shape；CI 用 new-module 產生一個模組再交給檢查器驗，不另存生成檔。原決策段保留歷史。
+
+## 修訂：執行計畫已刪除（2026-11-15）
+
+執行計畫 `2026-10-28-agents-md-layering` 依「完成的計畫不留在 repo」的決定在 2026-11-15 分流後刪除，git 歷史是紀錄。它的決定 D1（大小上限）、D2（各層內容界線）、D3（模組規格放 `docs/modules/`）、D4（seller 例外，後備沒有用上）、D5（兄弟子專案共用規則）、D6（子領域檔案與 pre-commit）都在 `2026-10-28-agents-md-layering.md` 與 `2026-10-31-agents-md-layering-consolidated.md`；檢查改由 instruction-lint 執行（見 `2026-10-31-agents-md-layering-consolidated.md` 的「修訂：檢查改由 instruction-lint 執行」），模板是 `backend/cmd/new-module/templates/module/AGENTS.md.tmpl`；沒有未結的延後項。
