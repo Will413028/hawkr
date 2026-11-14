@@ -23,8 +23,8 @@ import (
 // readPayment 讀收款開通的 provider：PAYMENT_PROVIDER 為空表示沒有設定（核准不建立收款帳戶，開通相關的方法回 failed_precondition），
 // fake 是記憶體內的 provider（所有帳戶都回轉帳能力已啟用，只能在 requireDevEnvironment 成立的 dev 環境選到，否則啟動失敗），stripe 是 Stripe Connect（Accounts v2）；其他值讓啟動失敗。
 // stripe 讀 STRIPE_SECRET_KEY（沒有設定時等於沒有 provider，serve 照常啟動）、STRIPE_WEBHOOK_SECRET（有金鑰卻沒有它，啟動失敗）與
-// STRIPE_REQUIREMENT_COLLECTION（provider 是 Stripe 收件、託管頁面，預設；platform 是平台收件、內嵌元件；其他值啟動失敗）與
-// STRIPE_PUBLISHABLE_KEY（內嵌元件的公開金鑰，不是 secret；有金鑰卻沒有它，啟動失敗，與收件方式無關：既有的平台收件帳戶仍會開內嵌 session）。
+// STRIPE_REQUIREMENT_COLLECTION（新建帳戶列的收件方式：provider 是 Stripe 收件，預設；platform 是平台收件；其他值啟動失敗。開通 session 的形狀由 ChooseSession 決定，不看這個設定）與
+// STRIPE_PUBLISHABLE_KEY（內嵌 session 的公開金鑰，不是 secret；有金鑰卻沒有它，啟動失敗，與收件方式無關：既有的平台收件帳戶仍會開內嵌 session）。
 func readPayment(e *config.Env, log *slog.Logger) payment.Provider {
 	switch name := e.StringOr("PAYMENT_PROVIDER", ""); name {
 	case "":

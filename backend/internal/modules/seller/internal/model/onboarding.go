@@ -78,12 +78,11 @@ type OnboardingKYCRead struct {
 }
 
 // OnboardingPaymentRead 是讀收款帳戶的結果：Err 非 nil 是讀取失敗；沒有失敗時 Found 表示有帳戶列（Status 是 payment 的狀態值：NOT_CREATED、
-// UNDER_REVIEW、ACTION_REQUIRED、ENABLED、DISABLED）。CanStartOnboarding 是這個環境能不能產生開通 session（有設定收款開通）。
+// UNDER_REVIEW、ACTION_REQUIRED、ENABLED、DISABLED）。
 type OnboardingPaymentRead struct {
-	Err                error
-	Found              bool
-	Status             string
-	CanStartOnboarding bool
+	Err    error
+	Found  bool
+	Status string
 	// Configured 是這個環境有沒有設定收款開通：沒有時帳戶列不會被建立或更新，重新整理不會有結果，所以不論帳戶列是什麼狀態都沒有動作可做。
 	Configured bool
 	// CreateFailed 是帳戶列的建立重試用完（沒有外部帳戶、有 create_failed_at），等營運重試建立。
@@ -243,10 +242,7 @@ func paymentAccountTask(l uitext.Locale, c Conditions, p OnboardingPaymentRead) 
 	}
 	switch p.Status {
 	case "ACTION_REQUIRED":
-		if p.CanStartOnboarding {
-			return set(OnboardingActionRequired, OnboardingActionStartPaymentOnboarding, text.OnboardingPaymentAccountActionRequired(l))
-		}
-		return set(OnboardingActionRequired, OnboardingActionNone, text.OnboardingPaymentAccountActionRequiredUnavailable(l))
+		return set(OnboardingActionRequired, OnboardingActionStartPaymentOnboarding, text.OnboardingPaymentAccountActionRequired(l))
 	case "DISABLED":
 		return set(OnboardingActionRequired, OnboardingActionContactSupport, text.OnboardingPaymentAccountDisabled(l))
 	case "ENABLED":

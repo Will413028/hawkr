@@ -127,23 +127,25 @@ func asksForUpgrade(r *http.Request) bool {
 // writeUnavailable 回 503：Connect 的請求寫 Connect 的錯誤（unavailable），其他路徑（轉給 gateway 的 REST）寫 gateway
 // 的 envelope，兩種 client 都以既有的方式處理（web 把 503 當成「暫時問不到」，保留登入狀態）。
 func writeUnavailable(w http.ResponseWriter, r *http.Request) {
+	ctx := rpc.NegotiateRequest(w, r)
 	if _, ok := rpc.AudienceOf(r.URL.Path); ok {
-		_ = connect.NewErrorWriter().Write(w, r, rpc.CommonError(r.Context(), connect.CodeUnavailable))
+		_ = connect.NewErrorWriter().Write(w, r, rpc.CommonError(ctx, connect.CodeUnavailable))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusServiceUnavailable)
-	body, _ := json.Marshal(map[string]any{"code": http.StatusServiceUnavailable, "message": rpc.CommonText(r.Context(), connect.CodeUnavailable).Text})
+	body, _ := json.Marshal(map[string]any{"code": http.StatusServiceUnavailable, "message": rpc.CommonText(ctx, connect.CodeUnavailable).Text})
 	_, _ = w.Write(body)
 }
 
 // writePermissionDenied 回 403，帶模組給使用者的文字，沒有時用共用文案目錄的 PERMISSION_DENIED（語系取自 ctx）；形狀同 writeUnavailable。
 // Connect 的請求另帶錯誤的 reason（apperr.Reason）；gateway 的 envelope 沒有 reason 欄位。
 func writePermissionDenied(w http.ResponseWriter, r *http.Request, err error) {
-	ce := rpc.CommonError(r.Context(), connect.CodePermissionDenied)
+	ctx := rpc.NegotiateRequest(w, r)
+	ce := rpc.CommonError(ctx, connect.CodePermissionDenied)
 	var ae *apperr.Error
 	if errors.As(err, &ae) && ae.Message != "" {
-		ce = rpc.ConnectError(r.Context(), ae)
+		ce = rpc.ConnectError(ctx, ae)
 	}
 	if _, ok := rpc.AudienceOf(r.URL.Path); ok {
 		_ = connect.NewErrorWriter().Write(w, r, ce)

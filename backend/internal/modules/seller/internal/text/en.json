@@ -3,9 +3,6 @@
     "onboarding.payment_account.action_required": {
       "message": "Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it."
     },
-    "onboarding.payment_account.action_required_unavailable": {
-      "message": "Your payout account needs more information, but setup is not available right now. Please try again later or contact support."
-    },
     "onboarding.payment_account.completed": {
       "message": "Your payout account is active."
     },

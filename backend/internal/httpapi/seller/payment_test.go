@@ -58,15 +58,14 @@ func (m *paymentModule) CreateOnboardingSession(_ context.Context, storeID int64
 	if m.session != nil {
 		return m.session, nil
 	}
-	exp := time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)
-	return payment.HostedSession{URL: "https://onboarding.example.test/x", ExpiresAt: &exp}, nil
+	return payment.HostedSession{URL: "https://onboarding.example.test/x"}, nil
 }
 
 func TestPaymentEnumsMatchTheModule(t *testing.T) {
 	for name, got := range map[string][]string{
 		"PaymentAccountStatus":      rpc.EnumMismatches[paymentpb.PaymentAccountStatus](payment.AccountStatusValues()),
 		"RequirementCollection":     rpc.EnumMismatches[paymentpb.RequirementCollection](payment.RequirementCollectionValues()),
-		"EmbeddedOnboardingRuntime": rpc.EnumMismatches[paymentpb.EmbeddedOnboardingRuntime]([]payment.EmbeddedRuntime{payment.RuntimeStripeConnectJS}),
+		"EmbeddedOnboardingRuntime": rpc.EnumMismatches[paymentpb.EmbeddedOnboardingRuntime](payment.EmbeddedRuntimeValues()),
 	} {
 		if len(got) != 0 {
 			t.Errorf("%s：%v", name, got)
@@ -191,6 +190,27 @@ func TestCreatePaymentOnboardingSessionPassesOnlyKnownRuntimesToPayment(t *testi
 		if !slices.Equal(m.runtimes, c.want) {
 			t.Errorf("%s：payment 收到 %v，預期 %v", name, m.runtimes, c.want)
 		}
+	}
+}
+
+// 契約的每個內嵌執行環境（UNSPECIFIED 除外）都轉成 payment 的值；不認得的數字不會傳下去。
+func TestEmbeddedRuntimesMapsEveryProtoValue(t *testing.T) {
+	vs := paymentpb.EmbeddedOnboardingRuntime(0).Descriptor().Values()
+	for i := range vs.Len() {
+		e := paymentpb.EmbeddedOnboardingRuntime(vs.Get(i).Number())
+		got := embeddedRuntimes([]paymentpb.EmbeddedOnboardingRuntime{e})
+		if e == 0 {
+			if len(got) != 0 {
+				t.Errorf("UNSPECIFIED 不該傳下去：%v", got)
+			}
+			continue
+		}
+		if len(got) != 1 || !slices.Contains(payment.EmbeddedRuntimeValues(), got[0]) {
+			t.Errorf("%s：轉成 %v", e, got)
+		}
+	}
+	if got := embeddedRuntimes([]paymentpb.EmbeddedOnboardingRuntime{99}); len(got) != 0 {
+		t.Errorf("不認得的值傳下去了：%v", got)
 	}
 }
 

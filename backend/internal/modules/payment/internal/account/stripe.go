@@ -14,8 +14,8 @@ import (
 // StripeName 是 Stripe adapter 的 provider 代碼。
 const StripeName = "stripe"
 
-// Stripe 是 Provider 的 Stripe 實作（Accounts v2）。收件方式決定 dashboard 與開通介面：provider 收件用 express 加託管的 Account Link，平台收件
-// 用 none 加內嵌的 Account Session（計畫 D2、D7，spike Q9）。建立外部帳戶的收件方式取自帳戶列保存的值（EnsureInput 的 Collection），
+// Stripe 是 Provider 的 Stripe 實作（Accounts v2）。收件方式決定外部帳戶的 dashboard：provider 收件用 express，平台收件
+// 用 none（計畫 D2、D7，spike Q9）；兩種都可以開託管的 Account Link，平台收件的帳戶在呼叫端宣告內嵌時另可開內嵌的 Account Session。建立外部帳戶的收件方式取自帳戶列保存的值（EnsureInput 的 Collection），
 // 開通 session 的形狀由 ChooseSession 決定（SessionInput 的 Kind），行程設定的 collection 只決定新列寫入的值（Capabilities）。
 type Stripe struct {
 	client         *stripe.Client
@@ -43,10 +43,11 @@ func (s *Stripe) Name() string { return StripeName }
 
 // Capabilities 實作 Provider。
 func (s *Stripe) Capabilities() Capabilities {
+	embedded := []model.EmbeddedRuntime{model.RuntimeStripeConnectJS}
 	if s.collection == model.CollectionPlatform {
-		return Capabilities{RequirementCollection: model.CollectionPlatform}
+		return Capabilities{RequirementCollection: model.CollectionPlatform, EmbeddedRuntimes: embedded}
 	}
-	return Capabilities{RequirementCollection: model.CollectionProvider}
+	return Capabilities{RequirementCollection: model.CollectionProvider, EmbeddedRuntimes: embedded}
 }
 
 // EnsureAccount 實作 Provider。
@@ -90,13 +91,13 @@ func (s *Stripe) CreateOnboardingSession(ctx context.Context, in SessionInput) (
 		if err != nil {
 			return nil, classify(err)
 		}
-		return model.StripeEmbeddedSession{ClientSecret: sess.ClientSecret, PublishableKey: s.publishableKey, ExpiresAt: sess.ExpiresAt}, nil
+		return model.StripeEmbeddedSession{ClientSecret: sess.ClientSecret, PublishableKey: s.publishableKey}, nil
 	case SessionHosted:
 		link, err := s.client.CreateAccountLink(ctx, in.ExternalAccountID, in.ReturnURL, in.RefreshURL)
 		if err != nil {
 			return nil, classify(err)
 		}
-		return model.HostedSession{URL: link.URL, ExpiresAt: link.ExpiresAt}, nil
+		return model.HostedSession{URL: link.URL}, nil
 	}
 	return nil, fmt.Errorf("%w：不支援的 session 形狀 %d", ErrPermanent, in.Kind)
 }

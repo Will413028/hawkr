@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -125,5 +126,18 @@ func TestGuardLegacyOnlyBlocksAdminsWithoutTheForwardPermission(t *testing.T) {
 				t.Errorf("%s：403 的格式 = %q %q", name, rec.Header().Get("Content-Type"), body)
 			}
 		}
+	}
+}
+
+func TestGuardLegacyNegotiatesTheLocaleOfItsDenial(t *testing.T) {
+	zero := principal(identity.PrincipalAdmin, 4)
+	h := GuardLegacy(counter(new(int)), nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/admin/stores", nil)
+	r.Header.Set("Accept-Language", "en")
+	r = r.WithContext(rpc.WithPrincipal(r.Context(), zero))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, r)
+	if rec.Code != http.StatusForbidden || !slices.Contains(rec.Header().Values("Vary"), "Accept-Language") {
+		t.Fatalf("403 = %d，Vary = %v", rec.Code, rec.Header().Values("Vary"))
 	}
 }

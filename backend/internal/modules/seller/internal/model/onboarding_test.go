@@ -37,7 +37,7 @@ func taskOf(t *testing.T, o Onboarding, id OnboardingTaskID) OnboardingTask {
 // mutation 3：KYC 讀取失敗時整個函式回空清單（模擬讓 RPC 失敗）→ 其他任務消失，失敗。
 func TestOnboardingTaskStatesAndActions(t *testing.T) {
 	t.Parallel()
-	enabled := OnboardingPaymentRead{Found: true, Status: "ENABLED", CanStartOnboarding: true, Configured: true}
+	enabled := OnboardingPaymentRead{Found: true, Status: "ENABLED", Configured: true}
 	cases := []struct {
 		name    string
 		c       Conditions
@@ -77,10 +77,8 @@ func TestOnboardingTaskStatesAndActions(t *testing.T) {
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionNone}},
 		{"收款帳戶審核中", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "UNDER_REVIEW", Configured: true},
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionNone}},
-		{"收款帳戶待設定、可以開通", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED", CanStartOnboarding: true, Configured: true},
+		{"收款帳戶待設定、可以開通", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED", Configured: true},
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionStartPaymentOnboarding}},
-		{"收款帳戶待設定、已設定但沒有可用的開通介面", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED", Configured: true},
-			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingActionRequired, OnboardingActionNone}},
 		{"沒有設定收款開通、帳戶列已有外部帳戶：不論狀態都沒有動作", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "UNDER_REVIEW"},
 			[2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingCompleted, OnboardingActionNone}, [2]any{OnboardingInProgress, OnboardingActionNone}},
 		{"沒有設定收款開通、帳戶 ACTION_REQUIRED", conds(true, false, true), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED"},
@@ -142,10 +140,10 @@ func TestOnboardingActionsAreNoneWhenTheStoreCannotWrite(t *testing.T) {
 	}{
 		{"停權、缺資料、沒有申請", suspended, OnboardingKYCRead{}, OnboardingPaymentRead{}},
 		{"停權、KYC 被退回", suspended, OnboardingKYCRead{Found: true, Status: KYCStatusRejected}, OnboardingPaymentRead{}},
-		{"停權、帳戶待設定", withKYC(suspended), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED", CanStartOnboarding: true, Configured: true}},
+		{"停權、帳戶待設定", withKYC(suspended), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED", Configured: true}},
 		{"停權、帳戶審核中", withKYC(suspended), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "UNDER_REVIEW", Configured: true}},
 		{"等待刪除、缺資料、沒有申請", pending, OnboardingKYCRead{}, OnboardingPaymentRead{}},
-		{"等待刪除、帳戶待設定", withKYC(pending), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED", CanStartOnboarding: true, Configured: true}},
+		{"等待刪除、帳戶待設定", withKYC(pending), OnboardingKYCRead{Found: true, Status: KYCStatusApproved}, OnboardingPaymentRead{Found: true, Status: "ACTION_REQUIRED", Configured: true}},
 	}
 	for _, tc := range cases {
 		if tc.store.Can(CapStorefrontWrite) {
@@ -188,7 +186,7 @@ func TestOnboardingUnknownOnlyOnReadFailure(t *testing.T) {
 	kycs := []OnboardingKYCRead{{}, {Found: true, Status: KYCStatusDraft}, {Found: true, Status: KYCStatusSubmitted}, {Found: true, Status: KYCStatusApproved},
 		{Found: true, Status: KYCStatusRejected}, {Found: true, Status: KYCStatusCancelled}, {Found: true, Status: "SOMETHING_NEW"}}
 	pays := []OnboardingPaymentRead{{}, {Configured: true}, {Found: true, Status: "NOT_CREATED", CreateFailed: true, Configured: true}, {Found: true, Status: "NOT_CREATED"}, {Found: true, Status: "UNDER_REVIEW"}, {Found: true, Status: "ACTION_REQUIRED"},
-		{Found: true, Status: "ACTION_REQUIRED", CanStartOnboarding: true}, {Found: true, Status: "ENABLED"}, {Found: true, Status: "DISABLED"}, {Found: true, Status: "SOMETHING_NEW"}}
+		{Found: true, Status: "ACTION_REQUIRED", Configured: true}, {Found: true, Status: "ENABLED"}, {Found: true, Status: "DISABLED"}, {Found: true, Status: "SOMETHING_NEW"}}
 	for _, kyc := range []bool{false, true} {
 		for _, transfers := range []bool{false, true} {
 			for _, profile := range []bool{false, true} {

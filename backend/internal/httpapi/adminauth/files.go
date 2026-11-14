@@ -75,12 +75,13 @@ func GuardLegacy(next http.Handler, log *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if p, ok := rpc.PrincipalFrom(r.Context()); ok && p.Kind == identity.PrincipalAdmin && !p.AdminAllows(adminperm.LegacyGatewayForward) {
 			log.WarnContext(r.Context(), "adminauth：拒絕", "admin_id", strconv.FormatInt(p.ID, 10), "path", r.URL.Path, "need", string(adminperm.LegacyGatewayForward))
+			ctx := rpc.NegotiateRequest(w, r)
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			w.WriteHeader(http.StatusForbidden)
 			body, _ := json.Marshal(struct {
 				Code    int    `json:"code"`
 				Message string `json:"message"`
-			}{http.StatusForbidden, rpc.CommonText(r.Context(), connect.CodePermissionDenied).Text})
+			}{http.StatusForbidden, rpc.CommonText(ctx, connect.CodePermissionDenied).Text})
 			_, _ = w.Write(body)
 			return
 		}

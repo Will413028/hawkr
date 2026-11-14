@@ -54,6 +54,9 @@ const (
 	RuntimeStripeConnectJS EmbeddedRuntime = "STRIPE_CONNECT_JS"
 )
 
+// EmbeddedRuntimeValues 回傳全部內嵌開通執行環境。
+func EmbeddedRuntimeValues() []EmbeddedRuntime { return []EmbeddedRuntime{RuntimeStripeConnectJS} }
+
 // PaymentAccount 是擁有者（店家）的收款帳戶：外部帳戶的本地快取（聯絡信箱不對外）。
 type PaymentAccount struct {
 	StoreID               int64
@@ -83,15 +86,13 @@ type OnboardingSession interface {
 
 // HostedSession 是金流商託管的開通頁面：一次性、短效的連結。
 type HostedSession struct {
-	URL       string
-	ExpiresAt *time.Time
+	URL string
 }
 
 // StripeEmbeddedSession 是 Stripe Connect.js 內嵌元件的初始化資料：client secret 與公開金鑰（不是 secret）。
 type StripeEmbeddedSession struct {
 	ClientSecret   string
 	PublishableKey string
-	ExpiresAt      *time.Time
 }
 
 func (HostedSession) onboardingSession()         {}

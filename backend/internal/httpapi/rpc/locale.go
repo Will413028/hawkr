@@ -50,6 +50,18 @@ func withRequestLocale(ctx context.Context, procedure string, header http.Header
 	return uitext.WithLocale(ctx, loc), varies
 }
 
+// NegotiateRequest 給 interceptor 之外、自己寫使用者文字的入口中介層（限流、session 驗證、轉發閘）用：
+// 規則與 interceptor 相同（依 procedure 與 Accept-Language 協商，admin 的 service 固定 zh-TW），回傳帶語系的 ctx，
+// 並在回應會依 header 變化時加 Vary: Accept-Language。要在寫任何回應之前呼叫。
+// 不是 Connect 的路徑（轉給 gateway 的 REST）同樣協商。
+func NegotiateRequest(w http.ResponseWriter, r *http.Request) context.Context {
+	ctx, varies := withRequestLocale(r.Context(), r.URL.Path, r.Header)
+	if varies {
+		markVary(w.Header())
+	}
+	return ctx
+}
+
 // markVary 在成功回應的 header 與錯誤回應的 metadata 上加 Vary: Accept-Language。
 func markVary(h http.Header) { h.Add("Vary", "Accept-Language") }
 

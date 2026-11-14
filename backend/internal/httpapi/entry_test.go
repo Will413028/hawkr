@@ -539,3 +539,22 @@ func TestFileRoutesMustDeclareAnAdminPermission(t *testing.T) {
 		t.Fatalf("合法的宣告：%v", err)
 	}
 }
+
+func TestSessionFailureResponsesNegotiateTheLocale(t *testing.T) {
+	h := entryWithAuth(t, caller)
+	for name, path := range map[string]string{
+		"REST":    "/api/v1/app/buyers/me",
+		"Connect": "/hawkr.identity.v1alpha1.IdentityAppService/GetSession",
+	} {
+		for status, token := range map[int]string{http.StatusServiceUnavailable: "boom", http.StatusForbidden: "denied-bare"} {
+			r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, strings.NewReader("{}"))
+			r.Header.Set("Content-Type", "application/json")
+			r.Header.Set("Authorization", "Bearer "+token)
+			r.Header.Set("Accept-Language", "en")
+			rec := do(h, r)
+			if rec.Code != status || !slices.Contains(rec.Header().Values("Vary"), "Accept-Language") {
+				t.Errorf("%s %d：status=%d Vary=%v", name, status, rec.Code, rec.Header().Values("Vary"))
+			}
+		}
+	}
+}

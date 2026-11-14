@@ -94,8 +94,11 @@ func (h *App) CreatePaymentOnboardingSession(ctx context.Context, req *connect.R
 func embeddedRuntimes(in []paymentpb.EmbeddedOnboardingRuntime) []payment.EmbeddedRuntime {
 	var out []payment.EmbeddedRuntime
 	for _, r := range in {
-		if r == paymentpb.EmbeddedOnboardingRuntime_EMBEDDED_ONBOARDING_RUNTIME_STRIPE_CONNECT_JS {
-			out = append(out, payment.RuntimeStripeConnectJS)
+		if r.Descriptor().Values().ByNumber(r.Number()) == nil {
+			continue
+		}
+		if v := rpc.EnumFromProto[payment.EmbeddedRuntime](r); v != "" {
+			out = append(out, v)
 		}
 	}
 	return out

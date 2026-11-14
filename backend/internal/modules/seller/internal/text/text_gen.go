@@ -398,15 +398,6 @@ func OnboardingPaymentAccountActionRequired(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。", Locale: uitext.ZhTW}
 }
 
-// OnboardingPaymentAccountActionRequiredUnavailable 是模組句子 onboarding.payment_account.action_required_unavailable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func OnboardingPaymentAccountActionRequiredUnavailable(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "Your payout account needs more information, but setup is not available right now. Please try again later or contact support.", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "收款帳戶還需要補資料，但目前無法開始設定，請稍後再試或聯絡客服。", Locale: uitext.ZhTW}
-}
-
 // OnboardingPaymentAccountCompleted 是模組句子 onboarding.payment_account.completed；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func OnboardingPaymentAccountCompleted(l uitext.Locale) uitext.Message {
 	switch l {

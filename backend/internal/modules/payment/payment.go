@@ -183,6 +183,9 @@ func NewFake() *Fake { return account.NewFake() }
 // AccountStatusValues 回傳全部收款帳戶狀態。
 func AccountStatusValues() []AccountStatus { return model.PaymentAccountStatusValues() }
 
+// EmbeddedRuntimeValues 回傳全部內嵌開通執行環境。
+func EmbeddedRuntimeValues() []EmbeddedRuntime { return model.EmbeddedRuntimeValues() }
+
 // RequirementCollectionValues 回傳全部收件方式。
 func RequirementCollectionValues() []RequirementCollection {
 	return model.RequirementCollectionValues()

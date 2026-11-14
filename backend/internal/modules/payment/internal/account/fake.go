@@ -50,7 +50,7 @@ type Fake struct {
 	violations   []string
 }
 
-// NewFake 建立 Fake：預設是 provider 收件、託管介面。
+// NewFake 建立 Fake：預設是 provider 收件；只支援託管連結（不支援任何內嵌執行環境）。
 func NewFake() *Fake {
 	return &Fake{
 		caps:      Capabilities{RequirementCollection: model.CollectionProvider},
@@ -243,7 +243,7 @@ func (f *Fake) CreateOnboardingSession(ctx context.Context, in SessionInput) (mo
 	defer f.mu.Unlock()
 	f.check(ctx, "CreateOnboardingSession")
 	f.sessions++
-	if in.ExternalAccountID == "" {
+	if in.ExternalAccountID == "" || in.Kind != SessionHosted {
 		return nil, ErrPermanent
 	}
 	return model.HostedSession{URL: "https://onboarding.example.invalid/" + in.ExternalAccountID}, nil

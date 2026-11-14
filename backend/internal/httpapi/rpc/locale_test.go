@@ -145,3 +145,33 @@ func TestAdminServiceIgnoresAcceptLanguage(t *testing.T) {
 		t.Fatalf("admin 的回應不依 header 變化，不該有 Vary：%v", got)
 	}
 }
+
+func TestNegotiateRequestFollowsTheInterceptorRules(t *testing.T) {
+	adminPath := contentv1alpha1connect.ContentAdminServiceListBannersProcedure
+	publicPath := publicconnect.ContentPublicServiceListLiveBannersProcedure
+	for name, tc := range map[string]struct {
+		path, header string
+		want         uitext.Locale
+		vary         bool
+	}{
+		"Connect 公開 en":     {publicPath, "en", uitext.EN, true},
+		"Connect 沒有 header": {publicPath, "", uitext.ZhTW, true},
+		"REST en":           {"/api/v1/public/products", "en", uitext.EN, true},
+		"admin 固定 zh-TW":    {adminPath, "en", uitext.ZhTW, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, tc.path, nil)
+			if tc.header != "" {
+				r.Header.Set("Accept-Language", tc.header)
+			}
+			w := httptest.NewRecorder()
+			ctx := NegotiateRequest(w, r)
+			if got := uitext.LocaleFrom(ctx); got != tc.want {
+				t.Fatalf("語系 = %q，要 %q", got, tc.want)
+			}
+			if got := containsFold(w.Header().Values("Vary"), "Accept-Language"); got != tc.vary {
+				t.Fatalf("Vary = %v，要 %v", w.Header().Values("Vary"), tc.vary)
+			}
+		})
+	}
+}

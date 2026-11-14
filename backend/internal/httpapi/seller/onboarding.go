@@ -44,7 +44,7 @@ func readPaymentAccount(ctx context.Context, log *slog.Logger, storeID int64, pa
 		return model.OnboardingPaymentRead{Err: err}
 	}
 	configured := payments.Configured()
-	read := model.OnboardingPaymentRead{CanStartOnboarding: configured, Configured: configured}
+	read := model.OnboardingPaymentRead{Configured: configured}
 	if err == nil {
 		read.Found, read.Status, read.CreateFailed = true, string(acct.Status), acct.CreateFailedAt != nil
 	}

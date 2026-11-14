@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -271,14 +272,31 @@ func (s *Service) openSession(ctx context.Context, row store.PaymentAccount, ret
 	}
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
+	kind := ChooseSession(acct.RequirementCollection, s.d.Provider.Capabilities().EmbeddedRuntimes, runtimes)
 	session, err := s.d.Provider.CreateOnboardingSession(callCtx, SessionInput{
-		ExternalAccountID: *acct.ExternalAccountID, Kind: ChooseSession(acct.Provider, acct.RequirementCollection, runtimes),
-		ReturnURL: returnURL, RefreshURL: refreshURL,
+		ExternalAccountID: *acct.ExternalAccountID, Kind: kind, ReturnURL: returnURL, RefreshURL: refreshURL,
 	})
 	if errors.Is(err, ErrPermanent) {
 		return nil, apperr.FailedPrecondition("目前無法開通收款帳戶")
 	}
-	return session, err
+	if err != nil {
+		return nil, err
+	}
+	if !sessionMatchesKind(session, kind) {
+		return nil, fmt.Errorf("payment：provider %s 回傳 %T，與要求的 session 形狀 %d 不一致", s.d.Provider.Name(), session, kind)
+	}
+	return session, nil
+}
+
+// sessionMatchesKind 回報 provider 回來的 session 形狀是否與要求的 Kind 一致（port 的約定）；不一致時不能把內容交給呼叫端。
+func sessionMatchesKind(session model.OnboardingSession, kind SessionKind) bool {
+	switch session.(type) {
+	case model.HostedSession:
+		return kind == SessionHosted
+	case model.StripeEmbeddedSession:
+		return kind == SessionEmbedded
+	}
+	return false
 }
 
 // sessionTarget 檢查帳戶列可以開通 session 的前置條件（沒有在關閉、已有同 provider 的外部帳戶、沒有被停用）。

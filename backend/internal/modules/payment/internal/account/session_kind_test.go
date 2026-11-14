@@ -6,27 +6,26 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 )
 
-// 決定表：provider 是 Stripe、列是平台收件、而且清單含 STRIPE_CONNECT_JS 才內嵌，其餘一律託管連結。
+// 決定表：列是平台收件、而且 provider 支援的內嵌執行環境與呼叫端宣告的有交集才內嵌，其餘一律託管連結。
 func TestChooseSessionIsEmbeddedOnlyForStripePlatformRowsWhenTheCallerCanEmbed(t *testing.T) {
 	connect := []model.EmbeddedRuntime{model.RuntimeStripeConnectJS}
 	for _, tc := range []struct {
 		name       string
-		provider   string
 		collection model.RequirementCollection
-		runtimes   []model.EmbeddedRuntime
+		supported  []model.EmbeddedRuntime
+		declared   []model.EmbeddedRuntime
 		want       SessionKind
 	}{
-		{"stripe 平台收件、宣告內嵌", StripeName, model.CollectionPlatform, connect, SessionEmbedded},
-		{"stripe 平台收件、清單另有不認得的值", StripeName, model.CollectionPlatform, []model.EmbeddedRuntime{"UNKNOWN", model.RuntimeStripeConnectJS}, SessionEmbedded},
-		{"stripe 平台收件、空清單", StripeName, model.CollectionPlatform, nil, SessionHosted},
-		{"stripe 平台收件、清單只有不認得的值", StripeName, model.CollectionPlatform, []model.EmbeddedRuntime{"UNKNOWN", ""}, SessionHosted},
-		{"stripe 金流商收件、宣告內嵌", StripeName, model.CollectionProvider, connect, SessionHosted},
-		{"stripe 金流商收件、空清單", StripeName, model.CollectionProvider, nil, SessionHosted},
-		{"fake 平台收件、宣告內嵌", FakeName, model.CollectionPlatform, connect, SessionHosted},
-		{"fake 金流商收件、宣告內嵌", FakeName, model.CollectionProvider, connect, SessionHosted},
-		{"空的收件方式、宣告內嵌", StripeName, "", connect, SessionHosted},
+		{"平台收件、支援、宣告內嵌", model.CollectionPlatform, connect, connect, SessionEmbedded},
+		{"平台收件、支援、清單另有不認得的值", model.CollectionPlatform, connect, []model.EmbeddedRuntime{"UNKNOWN", model.RuntimeStripeConnectJS}, SessionEmbedded},
+		{"平台收件、支援、呼叫端沒宣告", model.CollectionPlatform, connect, nil, SessionHosted},
+		{"平台收件、支援、清單只有不認得的值", model.CollectionPlatform, connect, []model.EmbeddedRuntime{"UNKNOWN", ""}, SessionHosted},
+		{"金流商收件、支援、宣告內嵌", model.CollectionProvider, connect, connect, SessionHosted},
+		{"金流商收件、支援、沒宣告", model.CollectionProvider, connect, nil, SessionHosted},
+		{"平台收件、provider 不支援（fake）、宣告內嵌", model.CollectionPlatform, nil, connect, SessionHosted},
+		{"空的收件方式、支援、宣告內嵌", "", connect, connect, SessionHosted},
 	} {
-		if got := ChooseSession(tc.provider, tc.collection, tc.runtimes); got != tc.want {
+		if got := ChooseSession(tc.collection, tc.supported, tc.declared); got != tc.want {
 			t.Errorf("%s：got=%d want=%d", tc.name, got, tc.want)
 		}
 	}

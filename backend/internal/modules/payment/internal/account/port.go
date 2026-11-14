@@ -20,10 +20,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 )
 
-// Capabilities 是 provider 的能力描述：新建的帳戶列用哪種收件方式（誰收身分與銀行資料）。開通 session 的形狀不在這裡：
-// 它只由帳戶列保存的收件方式與呼叫端宣告的內嵌執行環境決定（ChooseSession）。
+// Capabilities 是 provider 的能力描述：新建的帳戶列用哪種收件方式（誰收身分與銀行資料），以及 provider 能開內嵌 session 的執行環境。
+// 開通 session 的形狀由帳戶列保存的收件方式、EmbeddedRuntimes 與呼叫端宣告的內嵌執行環境決定（ChooseSession）。
 type Capabilities struct {
 	RequirementCollection model.RequirementCollection
+	// EmbeddedRuntimes 是 provider 能開內嵌 session 的執行環境；空表示只有託管連結。
+	EmbeddedRuntimes []model.EmbeddedRuntime
 }
 
 // CapabilityState 是轉帳能力的中立狀態，由 adapter 從 provider 的回應對應而來；不認得的值對應成 CapabilityUnknown（空值同）。

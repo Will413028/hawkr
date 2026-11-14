@@ -32,10 +32,6 @@
       "message": "提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。",
       "description": "開通任務收款帳戶的狀態句：賣家要補資料（ACTION_REQUIRED，可以開通 session）。"
     },
-    "onboarding.payment_account.action_required_unavailable": {
-      "message": "收款帳戶還需要補資料，但目前無法開始設定，請稍後再試或聯絡客服。",
-      "description": "開通任務收款帳戶的狀態句：賣家要補資料但沒有設定收款開通（ACTION_REQUIRED，沒有下一步）。"
-    },
     "onboarding.payment_account.completed": {
       "message": "收款帳戶已啟用。",
       "description": "開通任務收款帳戶的狀態句：已啟用（COMPLETED，依 seller 自存的轉帳能力副本）。"

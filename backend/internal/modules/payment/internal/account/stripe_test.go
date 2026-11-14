@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -95,12 +96,13 @@ func stripeProvider(t *testing.T, collection model.RequirementCollection, h http
 
 func TestStripeCapabilitiesFollowTheCollectionMode(t *testing.T) {
 	c, _ := stripe.New(stripe.Config{SecretKey: "k", WebhookSecret: "w"})
+	embedded := []model.EmbeddedRuntime{model.RuntimeStripeConnectJS}
 	for mode, want := range map[model.RequirementCollection]Capabilities{
-		model.CollectionProvider: {RequirementCollection: model.CollectionProvider},
-		model.CollectionPlatform: {RequirementCollection: model.CollectionPlatform},
+		model.CollectionProvider: {RequirementCollection: model.CollectionProvider, EmbeddedRuntimes: embedded},
+		model.CollectionPlatform: {RequirementCollection: model.CollectionPlatform, EmbeddedRuntimes: embedded},
 	} {
 		p, err := NewStripe(c, mode, "pk_test_x")
-		if err != nil || p.Capabilities() != want || p.Name() != "stripe" {
+		if err != nil || !reflect.DeepEqual(p.Capabilities(), want) || p.Name() != "stripe" {
 			t.Errorf("%s：%+v %v", mode, p, err)
 		}
 	}
@@ -356,12 +358,12 @@ func TestStripeOnboardingSessionFollowsTheRequestedKind(t *testing.T) {
 	// 形狀取自 Kind（ChooseSession 的結果），不是 adapter 的行程設定：adapter 設定成相反的收件方式，結果仍跟著 Kind 走。
 	in.Kind = SessionHosted
 	hosted, err := stripeProvider(t, model.CollectionPlatform, handler).CreateOnboardingSession(context.Background(), in)
-	if h, ok := hosted.(model.HostedSession); err != nil || !ok || h.URL != "https://connect.stripe.com/x" || h.ExpiresAt == nil {
+	if h, ok := hosted.(model.HostedSession); err != nil || !ok || h.URL != "https://connect.stripe.com/x" {
 		t.Errorf("託管 %+v err=%v", hosted, err)
 	}
 	in.Kind = SessionEmbedded
 	embedded, err := stripeProvider(t, model.CollectionProvider, handler).CreateOnboardingSession(context.Background(), in)
-	if e, ok := embedded.(model.StripeEmbeddedSession); err != nil || !ok || e.ClientSecret == "" || e.PublishableKey != "pk_test_x" || e.ExpiresAt == nil {
+	if e, ok := embedded.(model.StripeEmbeddedSession); err != nil || !ok || e.ClientSecret == "" || e.PublishableKey != "pk_test_x" {
 		t.Errorf("內嵌 %+v err=%v", embedded, err)
 	}
 	if fmt.Sprint(paths) != "[/v2/core/account_links /v1/account_sessions]" {
