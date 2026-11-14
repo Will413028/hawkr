@@ -87,8 +87,6 @@ export function PaymentAccountSection({
 		{ kind: "embedded" }
 	> | null>(null);
 	const [failure, setFailure] = React.useState<{ error: unknown } | null>(null);
-	const accountRef = React.useRef(account);
-	accountRef.current = account;
 	const handledRef = React.useRef(false);
 
 	const refreshPaymentAccount = useRefreshPaymentAccount();
@@ -130,16 +128,15 @@ export function PaymentAccountSection({
 	const param = paymentParamOf(searchParams?.get(PAYMENT_PARAM) ?? null);
 	React.useEffect(() => {
 		if (!platformApproved || !param || handledRef.current) return;
-		if (param === "refresh" && !account) return;
 		handledRef.current = true;
 		autoRefreshedRef.current = true;
 		window.history.replaceState(null, "", window.location.pathname);
 		if (param === "return") {
 			void confirm();
-		} else if (account) {
+		} else {
 			void begin();
 		}
-	}, [platformApproved, param, account, confirm, begin]);
+	}, [platformApproved, param, confirm, begin]);
 
 	// 進入頁面：任務還沒完成（也不是鎖住）時同步重讀一次，背景進行；沒有 query 的進入才做（回跳另有 confirm）。
 	const taskState = task?.state;

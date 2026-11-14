@@ -23,6 +23,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
 	account: null as unknown,
+	accountLoading: false,
+	accountError: null as Error | null,
 	hookEnabled: [] as boolean[],
 	param: null as string | null,
 	createSession: vi.fn(),
@@ -43,8 +45,8 @@ vi.mock("@/lib/hooks/useSellerSelf", () => ({
 		mocks.hookEnabled.push(options?.enabled ?? true);
 		return {
 			account: mocks.account,
-			loading: false,
-			error: null,
+			loading: mocks.accountLoading,
+			error: mocks.accountError,
 			refetch: mocks.refetch,
 		};
 	},
@@ -152,6 +154,8 @@ async function mount(
 
 beforeEach(() => {
 	mocks.account = null;
+	mocks.accountLoading = false;
+	mocks.accountError = null;
 	mocks.hookEnabled = [];
 	mocks.param = null;
 	mocks.createSession.mockReset();
@@ -509,6 +513,31 @@ describe("回跳的 ?payment=", () => {
 			"https://connect.stripe.test/setup/new",
 		);
 		expect(mocks.refreshAndReload).not.toHaveBeenCalled();
+	});
+
+	it("refresh：收款帳戶還沒載入或載入失敗，也照樣重新取得連結", async () => {
+		for (const state of [
+			{ loading: true, error: null },
+			{ loading: false, error: new Error("account down") },
+			{ loading: false, error: null },
+		]) {
+			cleanup();
+			mocks.createSession.mockReset();
+			mocks.navigate.mockReset();
+			mocks.param = "refresh";
+			mocks.account = null;
+			mocks.accountLoading = state.loading;
+			mocks.accountError = state.error;
+			mocks.createSession.mockResolvedValue({
+				kind: "hosted",
+				url: "https://connect.stripe.test/setup/new",
+			});
+			await mount(true, {}, START);
+			expect(mocks.createSession).toHaveBeenCalledTimes(1);
+			expect(mocks.navigate).toHaveBeenCalledWith(
+				"https://connect.stripe.test/setup/new",
+			);
+		}
 	});
 
 	it("平台審核還沒通過時忽略 ?payment=", async () => {
