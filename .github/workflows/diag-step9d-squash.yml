@@ -61,3 +61,39 @@ jobs:
           grep -E '^[+-][^+-]' "$RUNNER_TEMP/schema.diff" | grep -v 'accounts_poll' && exit 1
           echo "none"
           test "$(grep -c -E '^[+-][^+-]' "$RUNNER_TEMP/schema.diff")" -eq 2
+
+  delete-mutations:
+    name: squash test ${{ matrix.line }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        line: [baseline, 9, 10, 11, 12, 13, 14, 15, 16]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: backend/go.sum
+      - name: remove one DELETE
+        if: matrix.line != 'baseline'
+        working-directory: backend/internal/modules/seller/db/migrations
+        run: |
+          set -euo pipefail
+          f=20261114054941_seller_payment_onboarding_drop_objects.sql
+          sed -n "${{ matrix.line }}p" "$f" | grep -q '^DELETE FROM'
+          sed -n "${{ matrix.line }}p" "$f"
+          sed -i "${{ matrix.line }}d" "$f"
+      - name: run test
+        working-directory: backend
+        run: |
+          set +e
+          go test -count=1 -tags integration -run 'TestPaymentOnboardingSquashedMigrationDeletesRetiredRowsAndKeepsTheRest' ./internal/modules/seller/ -v 2>&1 | tail -40
+          rc=${PIPESTATUS[0]}
+          echo "go test exit: $rc"
+          if [ "${{ matrix.line }}" = baseline ]; then exit $rc; fi
+          if [ "$rc" -eq 0 ]; then echo "MUTATION SURVIVED"; exit 1; fi
+          echo "MUTATION KILLED"
