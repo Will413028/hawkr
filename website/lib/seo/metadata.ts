@@ -21,7 +21,7 @@ const ZH_TW_IDENTITY: SiteIdentity = {
 
 /**
  * 英文的品牌名、標題模板與預設標題來自術語表「品牌」一列（L0 文案，
- * `docs/plans/2026-09-29-a3-buyer-seller/step10e-L0-copy.md` D7）。術語表沒有英文描述，沿用中文的，
+ * `backend/docs/plans/2026-09-29-a3-buyer-seller/step10e-L0-copy.md` D7）。術語表沒有英文描述，沿用中文的，
  * 英文發佈前由發佈門檻（沒有未翻譯文字）補上。
  */
 const EN_IDENTITY: SiteIdentity = {

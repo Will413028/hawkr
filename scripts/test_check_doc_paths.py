@@ -1,0 +1,99 @@
+import importlib.util
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+
+_spec = importlib.util.spec_from_file_location(
+    "check_doc_paths", Path(__file__).with_name("check-doc-paths.py"))
+cdp = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(cdp)
+
+README = """# 文件
+
+## 遺留基準
+
+- `backend/services/`
+
+## 過渡基準
+
+- `backend/`
+"""
+
+
+class CheckDocPathsTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        self.write("docs/README.md", README)
+        self.write("docs/adr/a.md", "# a\n")
+        self.write("backend/docs/adr/b.md", "# b\n")
+        self.write("backend/docs/plans/p.md", "# p\n")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def write(self, rel, text):
+        path = self.root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        subprocess.run(["git", "-C", str(self.root), "add", rel], check=True)
+
+    def errors(self):
+        return cdp.run(self.root)
+
+    def test_existing_references_pass(self):
+        self.write("AGENTS.md", "see `docs/adr/a.md` and backend/docs/plans/p.md#step-1.\n")
+        self.assertEqual(self.errors(), [])
+
+    def test_missing_root_reference_fails(self):
+        self.write("AGENTS.md", "see `docs/adr/missing.md`\n")
+        self.assertEqual(len(self.errors()), 1)
+
+    def test_transitional_file_falls_back_to_backend(self):
+        self.write("backend/AGENTS.md", "see `docs/adr/b.md`\n")
+        self.assertEqual(self.errors(), [])
+
+    def test_transitional_file_missing_everywhere_fails(self):
+        self.write("backend/x.go", "// docs/adr/missing.md\n")
+        self.assertEqual(len(self.errors()), 1)
+
+    def test_root_file_does_not_fall_back_to_backend(self):
+        self.write("website/x.ts", "// docs/adr/b.md\n")
+        self.assertEqual(len(self.errors()), 1)
+
+    def test_legacy_files_are_skipped(self):
+        self.write("backend/services/x.go", "// docs/adr/missing.md\n")
+        self.assertEqual(self.errors(), [])
+
+    def test_header_base_resolves_first(self):
+        self.write("docs/adr/c.md", "| 路徑基準 | `backend/` |\n|---|---|\n\n`docs/plans/p.md`\n")
+        self.assertEqual(self.errors(), [])
+
+    def test_markdown_relative_link(self):
+        self.write("backend/docs/adr/d.md", "[b](b.md) [x](../plans/p.md)\n")
+        self.assertEqual(self.errors(), [])
+        self.write("backend/docs/adr/e.md", "[gone](gone.md)\n")
+        self.assertEqual(len(self.errors()), 1)
+
+    def test_markdown_root_link_is_url_decoded(self):
+        self.write("docs/adr/中.md", "# 中\n")
+        self.write("README.md", "[x](/docs/adr/%E4%B8%AD.md) [y](/docs/adr/nope.md)\n")
+        self.assertEqual(len(self.errors()), 1)
+
+    def test_unchecked_prefixes_and_placeholders_are_ignored(self):
+        self.write("AGENTS.md", "`docs/modules/x.md` `docs/adr/YYYY-MM-DD-<slug>.md` `docs/adr/` `docs/plans/a/rpc-*.csv`\n")
+        self.assertEqual(self.errors(), [])
+
+    def test_line_suffixes_are_stripped(self):
+        self.write("AGENTS.md", "docs/adr/a.md:L8,L12 docs/adr/a.md:30\n")
+        self.assertEqual(self.errors(), [])
+
+    def test_urls_are_ignored(self):
+        self.write("AGENTS.md", "https://github.com/o/r/blob/dev/docs/adr/zz.md\n")
+        self.assertEqual(self.errors(), [])
+
+
+if __name__ == "__main__":
+    unittest.main()
