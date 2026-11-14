@@ -71,11 +71,11 @@ type PaymentAdminServiceClient interface {
 	// RetryPaymentAccountPurge 對清理進了終局（後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK：金流商拒絕關閉，或等待清理超過 7 天仍關不掉）的收款帳戶重試關閉：
 	// 清除終局、期限從現在重新計算，並重新排入清理。終局原因是 unresolved_creation（建立結果不明、沒有外部 ID）時看金流商保存冪等鍵的期間（30 天）：保存期內以同一把鍵重送取回
 	// 外部 ID，取回後清除終局並關閉；帳戶的 create_unresolved 為真（超過保存期）時回 failed_precondition，只能刪除對應。同一個交易寫一筆後台紀錄。
-	// 帳戶不是終局的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。
+	// 帳戶不是終局的狀態、或帳戶的 purge_replay_pending 為真（重送進行中）時回 failed_precondition，店家沒有收款帳戶回 not_found。
 	RetryPaymentAccountPurge(context.Context, *connect.Request[v1alpha1.RetryPaymentAccountPurgeRequest]) (*connect.Response[v1alpha1.RetryPaymentAccountPurgeResponse], error)
 	// DeletePaymentAccountMapping 是「已在金流商處理，刪除對應」：只有清理進了終局的收款帳戶可以做，管理員確認金流商那邊的帳戶已另行處理。
 	// 不呼叫金流商；同一個交易寫一筆只增不改的紀錄（店家、金流商、外部帳戶 ID、操作的管理員與時間）並刪除帳戶列。帳戶不是終局的狀態回 failed_precondition，
-	// 店家沒有收款帳戶回 not_found。需要權限 payment.accounts.delete_mapping。
+	// 店家沒有收款帳戶回 not_found。帳戶的 purge_replay_pending 為真（重送取回外部 ID 進行中）時回 failed_precondition。需要權限 payment.accounts.delete_mapping。
 	DeletePaymentAccountMapping(context.Context, *connect.Request[v1alpha1.DeletePaymentAccountMappingRequest]) (*connect.Response[v1alpha1.DeletePaymentAccountMappingResponse], error)
 }
 
@@ -181,11 +181,11 @@ type PaymentAdminServiceHandler interface {
 	// RetryPaymentAccountPurge 對清理進了終局（後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK：金流商拒絕關閉，或等待清理超過 7 天仍關不掉）的收款帳戶重試關閉：
 	// 清除終局、期限從現在重新計算，並重新排入清理。終局原因是 unresolved_creation（建立結果不明、沒有外部 ID）時看金流商保存冪等鍵的期間（30 天）：保存期內以同一把鍵重送取回
 	// 外部 ID，取回後清除終局並關閉；帳戶的 create_unresolved 為真（超過保存期）時回 failed_precondition，只能刪除對應。同一個交易寫一筆後台紀錄。
-	// 帳戶不是終局的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。
+	// 帳戶不是終局的狀態、或帳戶的 purge_replay_pending 為真（重送進行中）時回 failed_precondition，店家沒有收款帳戶回 not_found。
 	RetryPaymentAccountPurge(context.Context, *connect.Request[v1alpha1.RetryPaymentAccountPurgeRequest]) (*connect.Response[v1alpha1.RetryPaymentAccountPurgeResponse], error)
 	// DeletePaymentAccountMapping 是「已在金流商處理，刪除對應」：只有清理進了終局的收款帳戶可以做，管理員確認金流商那邊的帳戶已另行處理。
 	// 不呼叫金流商；同一個交易寫一筆只增不改的紀錄（店家、金流商、外部帳戶 ID、操作的管理員與時間）並刪除帳戶列。帳戶不是終局的狀態回 failed_precondition，
-	// 店家沒有收款帳戶回 not_found。需要權限 payment.accounts.delete_mapping。
+	// 店家沒有收款帳戶回 not_found。帳戶的 purge_replay_pending 為真（重送取回外部 ID 進行中）時回 failed_precondition。需要權限 payment.accounts.delete_mapping。
 	DeletePaymentAccountMapping(context.Context, *connect.Request[v1alpha1.DeletePaymentAccountMappingRequest]) (*connect.Response[v1alpha1.DeletePaymentAccountMappingResponse], error)
 }
 

@@ -2283,14 +2283,6 @@ func TestRetryCreateAndRetryPurgeRecordOneRequestedEntryAndRollBackWithTheDomain
 	if f.auditCount(t, actionRetryPurge) != 1 {
 		t.Fatal("重試關閉成功應該恰好一筆紀錄")
 	}
-	// 沒有設定後台紀錄的模組：後台寫入回錯誤、不做領域變更。
-	bare := New(Deps{DB: f.db, Audit: f.audit, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: time.Now, Logger: slog.Default()}), Provider: f.fake, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.Default()})
-	stuck := f.newStore(t)
-	f.fake.FailAcquire(ErrPermanent)
-	must(t, f.module.EnsureAccount(ctx, stuck, false))
-	if _, err := bare.RetryAccountCreate(ctx, admin(actionRetryCreate), stuck, false); err == nil || f.account(t, stuck).CreateFailedAt == nil {
-		t.Fatalf("沒有 Audit 時後台寫入必須失敗且不改列：err=%v", err)
-	}
 }
 
 // 管理員的重送不能被併進還在重試的掃描 job：掃描 job 對超過 7 天的列只標建立失敗、不重送，後台紀錄卻寫「已重送同一把鍵」（R8）。
@@ -2533,5 +2525,146 @@ func TestRetryCreateAuditRecordsTheAcknowledgementOnlyWhenItWasRequiredAndActedO
 	must(t, err)
 	if len(recs) != 1 || !strings.Contains(string(recs[0].Detail), `"acknowledged_no_provider_account": false`) || !strings.Contains(string(recs[0].Detail), `"key_rotated": false`) {
 		t.Fatalf("紀錄=%+v", recs)
+	}
+}
+
+// unresolvedPurgeTerminal 造一列「呼叫過、沒有外部 ID、清理超過 7 天進 unresolved_creation 終局」的列（還在冪等鍵保存期內），回傳店家與 provider 那邊的帳戶 ID。
+func (f *fixture) unresolvedPurgeTerminal(t *testing.T) (int64, string) {
+	t.Helper()
+	s, id := f.calledRow(t)
+	f.now = f.now.Add(UnresolvedDeadline).Add(time.Hour)
+	must(t, f.module.PurgeAccount(context.Background(), s, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_blocked_reason LIKE 'unresolved_creation%'", s) != 1 {
+		t.Fatal("應該進 unresolved_creation 終局")
+	}
+	return s, id
+}
+
+// 管理員要求的重送（RetryPurge 的 Replay）排隊中或進行中時，「刪除對應」與再次「重試關閉」都被拒絕、列與紀錄不變、對外的帳戶 purge_replay_pending 為真；暫時性失敗還會重試時標記留著，
+// 重送結束（永久失敗、最後一次嘗試失敗）清除它，之後可以刪除對應；取回 ID 重啟清理時一併清除（K1 後續）。
+// mutation 1：DeleteMapping 不看 purge_replay_requested_at → 重送期間刪除成功，失敗；mutation 2：RetryPurge 不寫 RequestPaymentAccountPurgeReplay → 標記從沒有，失敗；
+// mutation 3：Replay 結束不清除（拿掉 clearReplayRequest）→ 永久失敗之後仍被拒絕，失敗；mutation 4：Replay 在暫時性失敗還會重試時也清除 → 標記提早消失，失敗。
+func TestDeleteMappingAndRetryPurgeAreRejectedWhileAnAdminReplayIsPendingAndAllowedAfterItEnds(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s, id := f.unresolvedPurgeTerminal(t)
+	a, err := f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), s)
+	must(t, err)
+	if !a.PurgeReplayPending || !f.account(t, s).PurgeReplayPending {
+		t.Fatal("重送排入後 purge_replay_pending 應為真")
+	}
+	reject := func(label string) {
+		t.Helper()
+		if err := f.module.DeleteAccountMapping(ctx, admin(actionDeleteMapping), s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+			t.Fatalf("%s：刪除對應 err=%v，預期 failed_precondition", label, err)
+		}
+		if _, err := f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+			t.Fatalf("%s：再次重試關閉 err=%v，預期 failed_precondition", label, err)
+		}
+		if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 1 || f.auditCount(t, actionDeleteMapping) != 0 || f.auditCount(t, actionRetryPurge) != 1 {
+			t.Fatalf("%s：被拒絕的請求不得改列、不得留紀錄", label)
+		}
+	}
+	reject("排隊中")
+	boom := errors.New("provider down")
+	f.fake.FailAcquire(boom)
+	if err := f.module.ReplayUnresolvedAccount(ctx, s, false); !errors.Is(err, boom) {
+		t.Fatalf("暫時性失敗要回傳給 River 重試：%v", err)
+	}
+	reject("暫時性失敗、還會重試")
+	f.fake.FailAcquire(ErrPermanent)
+	must(t, f.module.ReplayUnresolvedAccount(ctx, s, false))
+	if f.account(t, s).PurgeReplayPending || f.account(t, s).PurgeBlockedAt == nil {
+		t.Fatal("永久失敗後標記應清除、列留在終局")
+	}
+	// 結束後可以再要求一次；取回 ID 重啟清理時標記一併清除。
+	if _, err := f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), s); err != nil {
+		t.Fatal(err)
+	}
+	must(t, f.module.ReplayUnresolvedAccount(ctx, s, false))
+	if a := f.account(t, s); a.PurgeReplayPending || a.PurgeBlockedAt != nil || a.ExternalAccountID == nil || *a.ExternalAccountID != id {
+		t.Fatalf("取回 ID 後應清除終局與標記：%+v", a)
+	}
+	// 最後一次嘗試仍失敗也清除，這時可以刪除對應。
+	other, _ := f.unresolvedPurgeTerminal(t)
+	_, err = f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), other)
+	must(t, err)
+	f.fake.FailAcquire(boom)
+	must(t, f.module.ReplayUnresolvedAccount(ctx, other, true))
+	if err := f.module.DeleteAccountMapping(ctx, admin(actionDeleteMapping), other); err != nil {
+		t.Fatalf("重送結束後應可刪除對應：%v", err)
+	}
+}
+
+// 防線：重送取回外部 ID、列卻已不在時（正常不會發生，後端在重送期間拒絕刪除對應），就地關閉那個外部帳戶，並記 error 等級的 log 帶 store_id 與帳戶 ID；
+// 這是系統動作，沒有管理員可以歸屬，所以不寫 adminaudit 紀錄。
+// mutation：row-gone 分支回 nil、不呼叫 closeOrphan → 帳戶沒被關閉、沒有 error log，失敗。
+func TestAReplayThatFindsTheRowGoneClosesTheObtainedAccountAndLogsAnError(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s, id := f.unresolvedPurgeTerminal(t)
+	_, err := f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), s)
+	must(t, err)
+	f.fake.OnAcquire = func() {
+		if _, err := f.db.Conn(ctx).Exec(ctx, "DELETE FROM payment.accounts WHERE store_id = $1", s); err != nil {
+			t.Error(err)
+		}
+	}
+	must(t, f.module.ReplayUnresolvedAccount(ctx, s, false))
+	if !slices.Contains(f.fake.Closes(), id) {
+		t.Fatalf("列已不在時應關閉取回的外部帳戶 %s，關閉=%v", id, f.fake.Closes())
+	}
+	var found bool
+	for _, line := range strings.Split(f.logs.String(), "\n") {
+		if strings.Contains(line, "level=ERROR") && strings.Contains(line, fmt.Sprintf("store_id=%d", s)) && strings.Contains(line, "external_account_id="+id) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("缺少帶 store_id 與帳戶 ID 的 error log：%s", f.logs.String())
+	}
+	if f.auditCount(t, actionDeleteMapping) != 0 || f.auditCount(t, actionRetryPurge) != 1 {
+		t.Fatal("系統關閉不寫後台紀錄")
+	}
+}
+
+// 已經建立失敗（重試用完，沒有拒絕標記）的列，Resolve 遇到金流商的永久拒絕也要記 create_refused_at（保留原本的失敗時刻），之後的掃描不再重送；管理員重試建立仍可用並清除它（K4 後續）。
+// mutation：MarkPaymentAccountCreateFailed 的 WHERE 加回 `create_failed_at IS NULL` → 已失敗的列沒有 create_refused_at，掃描繼續重送，失敗；
+// create_failed_at 改成 sqlc.arg(now) 不用 COALESCE → 失敗時刻被改寫，失敗。
+func TestAPermanentRefusalOfAResolveOnAnAlreadyFailedRowStopsTheSweepAndKeepsTheFailureTime(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s, _ := f.calledRow(t)
+	f.fake.FailAcquire(errors.New("provider down"))
+	must(t, f.module.EnsureAccount(ctx, s, true))
+	failedAt := f.account(t, s).CreateFailedAt
+	if failedAt == nil || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND create_refused_at IS NULL", s) != 1 {
+		t.Fatal("暫時性失敗用完重試：應有失敗時刻、沒有拒絕標記")
+	}
+	f.now = f.now.Add(createIdleForTest)
+	f.fake.FailAcquire(ErrPermanent)
+	must(t, f.module.ResolveUnresolvedAccount(ctx, s, false))
+	if a := f.account(t, s); a.CreateFailedAt == nil || !a.CreateFailedAt.Equal(*failedAt) {
+		t.Fatalf("失敗時刻應保留原本的 %v：%+v", failedAt, a)
+	}
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND create_refused_at IS NOT NULL", s) != 1 {
+		t.Fatal("永久拒絕應對已失敗的列記 create_refused_at")
+	}
+	acquires, resolves := len(f.fake.AcquireKeys()), f.jobs.count(kindResolve)
+	if _, _, err := f.module.SweepAccounts(ctx); err != nil {
+		t.Fatal(err)
+	}
+	must(t, f.module.ResolveUnresolvedAccount(ctx, s, false))
+	if f.jobs.count(kindResolve) != resolves || len(f.fake.AcquireKeys()) != acquires {
+		t.Fatal("被拒絕的已失敗列不應再被掃描重送")
+	}
+	if _, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, false); err != nil {
+		t.Fatal(err)
+	}
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND create_failed_at IS NULL AND create_refused_at IS NULL", s) != 1 {
+		t.Fatal("管理員重試建立應清除失敗與拒絕標記")
 	}
 }

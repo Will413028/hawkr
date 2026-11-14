@@ -29,6 +29,7 @@ import type { GovernanceNotice } from "./GovernanceNotice";
 import PaymentMappingDeleteDialog from "./PaymentMappingDeleteDialog";
 import PaymentRetryCreateConfirmDialog from "./PaymentRetryCreateConfirmDialog";
 import {
+	canDeleteMapping,
 	canRetryPurge,
 	type PaymentAccountState,
 	paymentAccountCreated,
@@ -243,13 +244,15 @@ export function PaymentAccountCard({
 								重試關閉
 							</Button>
 						)}
-						<Button
-							variant="danger"
-							onClick={onDeleteMapping}
-							disabled={purging}
-						>
-							已在金流商處理，刪除對應
-						</Button>
+						{canDeleteMapping(account) && (
+							<Button
+								variant="danger"
+								onClick={onDeleteMapping}
+								disabled={purging}
+							>
+								已在金流商處理，刪除對應
+							</Button>
+						)}
 					</>
 				)}
 			</div>

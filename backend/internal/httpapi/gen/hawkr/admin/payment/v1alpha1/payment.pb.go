@@ -62,8 +62,11 @@ type PaymentAccount struct {
 	CreateUnresolved bool `protobuf:"varint,16,opt,name=create_unresolved,json=createUnresolved,proto3" json:"create_unresolved,omitempty"`
 	// 清理已要求、還沒完成（等待關閉）的時間（D63）；沒有等待清理時不設。等待清理而還沒進終局時，卡片顯示「關閉中」並隱藏其他動作；進了終局（purge_blocked_time）改顯示被擋下的原因。
 	PurgePendingTime *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=purge_pending_time,json=purgePendingTime,proto3" json:"purge_pending_time,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// 管理員對清理終局（unresolved_creation）要求的「以同一把鍵重送」排隊中或進行中時為真：重送取回的外部帳戶 ID 在帳戶列被刪之後無人關閉，所以這段期間
+	// RetryPaymentAccountPurge 與 DeletePaymentAccountMapping 都回 failed_precondition，後台隱藏「重試關閉」與「已在金流商處理，刪除對應」。重送結束（不論結果）後為假。
+	PurgeReplayPending bool `protobuf:"varint,18,opt,name=purge_replay_pending,json=purgeReplayPending,proto3" json:"purge_replay_pending,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *PaymentAccount) Reset() {
@@ -213,6 +216,13 @@ func (x *PaymentAccount) GetPurgePendingTime() *timestamppb.Timestamp {
 		return x.PurgePendingTime
 	}
 	return nil
+}
+
+func (x *PaymentAccount) GetPurgeReplayPending() bool {
+	if x != nil {
+		return x.PurgeReplayPending
+	}
+	return false
 }
 
 type GetPaymentAccountRequest struct {
@@ -660,7 +670,7 @@ var File_hawkr_admin_payment_v1alpha1_payment_proto protoreflect.FileDescriptor
 
 const file_hawkr_admin_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"\n" +
-	"*hawkr/admin/payment/v1alpha1/payment.proto\x12\x1chawkr.admin.payment.v1alpha1\x1a$hawkr/payment/v1alpha1/payment.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc9\a\n" +
+	"*hawkr/admin/payment/v1alpha1/payment.proto\x12\x1chawkr.admin.payment.v1alpha1\x1a$hawkr/payment/v1alpha1/payment.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfb\a\n" +
 	"\x0ePaymentAccount\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12\x1a\n" +
 	"\bprovider\x18\x02 \x01(\tR\bprovider\x12.\n" +
@@ -682,7 +692,8 @@ const file_hawkr_admin_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"\x12purge_blocked_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x10purgeBlockedTime\x120\n" +
 	"\x14purge_blocked_reason\x18\x0f \x01(\tR\x12purgeBlockedReason\x12+\n" +
 	"\x11create_unresolved\x18\x10 \x01(\bR\x10createUnresolved\x12H\n" +
-	"\x12purge_pending_time\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\x10purgePendingTime\":\n" +
+	"\x12purge_pending_time\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\x10purgePendingTime\x120\n" +
+	"\x14purge_replay_pending\x18\x12 \x01(\bR\x12purgeReplayPending\":\n" +
 	"\x18GetPaymentAccountRequest\x12\x1e\n" +
 	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\"c\n" +
 	"\x19GetPaymentAccountResponse\x12F\n" +

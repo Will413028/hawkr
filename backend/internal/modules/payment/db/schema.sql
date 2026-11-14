@@ -29,6 +29,8 @@ CREATE SCHEMA payment;
 -- 不被建立、不進同步輪詢、不被賣家／管理員的重新整理讀，由 payment 的週期掃描重排「關閉後刪除」，關閉（沒有外部 ID 的列先以冪等鍵取得外部帳戶）成功才刪列。
 -- purge_blocked_at 與 purge_blocked_reason 是清理的終局（D59、D60）：關閉被金流商拒絕、或標成等待清理後 7 天仍然關不掉或問不到金流商；列留著，不再被週期掃描重排，
 -- 出現在後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK，由管理員「重試關閉」（清除終局並重新計算期限；原因是 unresolved_creation 的，冪等鍵保存期內以同一把鍵重送取回 ID 再關閉，超過保存期不能重試）或「已在金流商處理，刪除對應」（同一個 transaction 寫一筆 adminaudit 的後台紀錄並刪列，D62）。
+-- purge_replay_requested_at 是管理員對清理終局（unresolved_creation）的列要求「以同一把鍵重送」的時刻（RetryPurge 排入 Replay job 時寫，重送結束不論結果都清除，取回 ID 重啟清理時一併清除）：
+-- 有它表示重送排隊中或進行中，這段期間後端拒絕「刪除對應」與再次「重試關閉」，避免重送取回的帳戶 ID 因列被刪而無人關閉（K1）。只有終局的列才有（CHECK accounts_purge_replay_check）。
 -- create_idempotency_key 是寫入「建立中」的列時產生的隨機 UUID（v4），建立外部帳戶的每次重試都用它當冪等鍵（Stripe 建議每個邏輯請求用隨機 UUID；
 -- 不用 store_id，兩個資料庫共用同一個 Stripe 帳號時才不會撞到別人的帳戶）。同一個理由，建立外部帳戶時除了 metadata.store_id 還寫 metadata.hawkr_namespace
 -- （設定 STRIPE_ACCOUNT_NAMESPACE，每個環境不同，D61）；程式不以 metadata 列出對帳（D63），寫它是為了之後要做全平台孤兒帳戶稽核時不必回填。
@@ -54,6 +56,7 @@ CREATE TABLE payment.accounts (
     purge_pending_at       TIMESTAMPTZ,
     purge_blocked_at       TIMESTAMPTZ,
     purge_blocked_reason   TEXT,
+    purge_replay_requested_at TIMESTAMPTZ,
     CONSTRAINT accounts_store_id_check CHECK (store_id > 0),
     CONSTRAINT accounts_provider_check CHECK (provider ~ '^[a-z][a-z0-9_]{0,39}$'),
     CONSTRAINT accounts_external_id_check CHECK (external_account_id IS NULL OR char_length(external_account_id) BETWEEN 1 AND 255),
@@ -69,6 +72,7 @@ CREATE TABLE payment.accounts (
     CONSTRAINT accounts_completed_check CHECK (create_completed_at IS NULL OR external_account_id IS NOT NULL),
     CONSTRAINT accounts_called_check CHECK (external_account_id IS NULL OR create_called_at IS NOT NULL),
     CONSTRAINT accounts_purge_blocked_check CHECK ((purge_blocked_at IS NULL) = (purge_blocked_reason IS NULL) AND (purge_blocked_at IS NULL OR purge_pending_at IS NOT NULL)),
+    CONSTRAINT accounts_purge_replay_check CHECK (purge_replay_requested_at IS NULL OR purge_blocked_at IS NOT NULL),
     CONSTRAINT accounts_purge_blocked_reason_check CHECK (purge_blocked_reason IS NULL OR char_length(purge_blocked_reason) BETWEEN 1 AND 200)
 );
 CREATE UNIQUE INDEX accounts_external ON payment.accounts (provider, external_account_id) WHERE external_account_id IS NOT NULL;

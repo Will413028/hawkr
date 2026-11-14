@@ -186,6 +186,24 @@ test("清理終局是 unresolved_creation：冪等鍵保存期內給「重試關
 	assert.match(blocked("provider_refused：no", true), /重試關閉/);
 });
 
+test("purge_replay_pending（重送取回外部 ID 進行中）：終局卡片同時隱藏「重試關閉」與「已在金流商處理，刪除對應」，沒有重送時兩個都在", () => {
+	const blocked = (purgeReplayPending: boolean) =>
+		render({
+			state: "ready",
+			account: account({
+				purgeBlockedTime: timestampFromDate(new Date("2026-11-14T02:00:00Z")),
+				purgeBlockedReason: "unresolved_creation：建立結果不明",
+				purgeReplayPending,
+			}),
+		});
+	const idle = blocked(false);
+	assert.match(idle, /重試關閉/);
+	assert.match(idle, /已在金流商處理，刪除對應/);
+	const replaying = blocked(true);
+	assert.doesNotMatch(replaying, /重試關閉/);
+	assert.doesNotMatch(replaying, /已在金流商處理，刪除對應/);
+});
+
 test("轉帳與撥款能力分別顯示", () => {
 	const html = render({
 		state: "ready",

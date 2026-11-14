@@ -26,13 +26,19 @@ export function paymentAccountCreated(account: PaymentAccount): boolean {
 /**
  * 「重試關閉」只在後端會受理時顯示：終局原因是 unresolved_creation（建立結果不明、沒有外部 ID）而且 create_unresolved 為真（冪等鍵已過保存期，
  * 同一把鍵不能再重送）時，RetryPaymentAccountPurge 回 failed_precondition，只剩刪除對應。保存期內的 unresolved_creation 終局仍可重試（以同一把鍵重送取回 ID）。
+ * 重送排隊中或進行中（purge_replay_pending）時也不顯示：後端回 failed_precondition，見 canDeleteMapping。
  */
 export function canRetryPurge(account: PaymentAccount): boolean {
-	if (!account.purgeBlockedTime) return false;
+	if (!account.purgeBlockedTime || account.purgeReplayPending) return false;
 	const unresolved = account.purgeBlockedReason.startsWith(
 		"unresolved_creation",
 	);
 	return !(unresolved && account.createUnresolved);
+}
+
+/** 「已在金流商處理，刪除對應」只在後端會受理時顯示：終局的列，且沒有重送在排隊或進行中（重送取回的帳戶 ID 在列被刪之後無人關閉，後端回 failed_precondition）。 */
+export function canDeleteMapping(account: PaymentAccount): boolean {
+	return Boolean(account.purgeBlockedTime) && !account.purgeReplayPending;
 }
 
 /** 讀取狀態的規則同 accountEmailOf：有錯誤就是錯誤（not_found 是尚未建立），成功卻沒有帳戶是讀取錯誤。 */

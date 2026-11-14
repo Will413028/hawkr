@@ -71,13 +71,14 @@ WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NULL AND create_c
 RETURNING *;
 
 -- name: MarkPaymentAccountCreateFailed :execrows
--- 建立失敗：記下失敗的時刻（進後台待辦）；已完成建立的列不寫（有外部 ID 但第二步沒成功的半建立列照寫）。refused 為真（金流商明確拒絕）時同時記 create_refused_at，
--- 週期掃描不再為這列重送。
+-- 建立失敗：記下失敗的時刻（進後台待辦）；已完成建立的列不寫（有外部 ID 但第二步沒成功的半建立列照寫）。已記過失敗的列保留最早的失敗時刻（COALESCE）。
+-- refused 為真（金流商明確拒絕）時同時記 create_refused_at（已記過的保留最早的），週期掃描不再為這列重送；已經建立失敗的列在 Resolve 遇到永久拒絕時也要寫它，
+-- 否則掃描要重送到 7 天期限。refused 為假不動既有的 create_refused_at。
 UPDATE payment.accounts
-SET create_failed_at = sqlc.arg(now),
-    create_refused_at = CASE WHEN sqlc.arg(refused)::boolean THEN sqlc.arg(now)::timestamptz END,
+SET create_failed_at = COALESCE(create_failed_at, sqlc.arg(now)::timestamptz),
+    create_refused_at = CASE WHEN sqlc.arg(refused)::boolean THEN COALESCE(create_refused_at, sqlc.arg(now)::timestamptz) ELSE create_refused_at END,
     updated_at = sqlc.arg(now)
-WHERE store_id = sqlc.arg(store_id) AND create_completed_at IS NULL AND create_failed_at IS NULL AND purge_pending_at IS NULL;
+WHERE store_id = sqlc.arg(store_id) AND create_completed_at IS NULL AND purge_pending_at IS NULL;
 
 -- name: ClearPaymentAccountCreateFailed :execrows
 -- 管理員重試建立：只有建立失敗的列清空失敗時刻，由呼叫方同一個 transaction 重新排入建立 job。
@@ -192,6 +193,21 @@ UPDATE payment.accounts
 SET purge_blocked_at = NULL,
     purge_blocked_reason = NULL,
     purge_pending_at = sqlc.arg(now)::timestamptz,
+    purge_replay_requested_at = NULL,
     updated_at = sqlc.arg(now)
 WHERE store_id = sqlc.arg(store_id) AND purge_blocked_at IS NOT NULL
 RETURNING *;
+
+-- name: RequestPaymentAccountPurgeReplay :execrows
+-- 管理員對清理終局（unresolved_creation）的列要求以同一把鍵重送：記下時刻，重送排隊中或進行中時後端拒絕「刪除對應」與再次「重試關閉」（K1）。只有終局的列才能記。
+UPDATE payment.accounts
+SET purge_replay_requested_at = sqlc.arg(now)::timestamptz,
+    updated_at = sqlc.arg(now)
+WHERE store_id = sqlc.arg(store_id) AND purge_blocked_at IS NOT NULL;
+
+-- name: ClearPaymentAccountPurgeReplay :execrows
+-- 重送結束（取回、失敗或不再適用，不論結果）：清除標記，管理員才又能刪除對應或重試關閉。
+UPDATE payment.accounts
+SET purge_replay_requested_at = NULL,
+    updated_at = sqlc.arg(now)
+WHERE store_id = sqlc.arg(store_id) AND purge_replay_requested_at IS NOT NULL;

@@ -21,7 +21,7 @@ SET status = $1,
     updated_at = $7
 WHERE store_id = $8 AND create_completed_at IS NOT NULL
   AND (fetched_at IS NULL OR fetched_at <= $6)
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason, purge_replay_requested_at
 `
 
 type ApplyPaymentSnapshotParams struct {
@@ -71,6 +71,7 @@ func (q *Queries) ApplyPaymentSnapshot(ctx context.Context, arg ApplyPaymentSnap
 		&i.PurgePendingAt,
 		&i.PurgeBlockedAt,
 		&i.PurgeBlockedReason,
+		&i.PurgeReplayRequestedAt,
 	)
 	return i, err
 }
@@ -104,7 +105,7 @@ SET seller_read_claimed_at = $1
 WHERE store_id = $2 AND create_completed_at IS NOT NULL AND purge_pending_at IS NULL
   AND (seller_read_claimed_at IS NULL OR seller_read_claimed_at <= $3)
   AND (fetched_at IS NULL OR fetched_at <= $3)
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason, purge_replay_requested_at
 `
 
 type ClaimPaymentAccountSellerReadParams struct {
@@ -141,6 +142,7 @@ func (q *Queries) ClaimPaymentAccountSellerRead(ctx context.Context, arg ClaimPa
 		&i.PurgePendingAt,
 		&i.PurgeBlockedAt,
 		&i.PurgeBlockedReason,
+		&i.PurgeReplayRequestedAt,
 	)
 	return i, err
 }
@@ -167,6 +169,27 @@ func (q *Queries) ClearPaymentAccountCreateFailed(ctx context.Context, arg Clear
 	return result.RowsAffected(), nil
 }
 
+const clearPaymentAccountPurgeReplay = `-- name: ClearPaymentAccountPurgeReplay :execrows
+UPDATE payment.accounts
+SET purge_replay_requested_at = NULL,
+    updated_at = $1
+WHERE store_id = $2 AND purge_replay_requested_at IS NOT NULL
+`
+
+type ClearPaymentAccountPurgeReplayParams struct {
+	Now     time.Time
+	StoreID int64
+}
+
+// 重送結束（取回、失敗或不再適用，不論結果）：清除標記，管理員才又能刪除對應或重試關閉。
+func (q *Queries) ClearPaymentAccountPurgeReplay(ctx context.Context, arg ClearPaymentAccountPurgeReplayParams) (int64, error) {
+	result, err := q.db.Exec(ctx, clearPaymentAccountPurgeReplay, arg.Now, arg.StoreID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const completePaymentAccountCreate = `-- name: CompletePaymentAccountCreate :one
 UPDATE payment.accounts
 SET create_completed_at = $1::timestamptz,
@@ -175,7 +198,7 @@ SET create_completed_at = $1::timestamptz,
     create_refused_at = NULL,
     updated_at = $1
 WHERE store_id = $2 AND external_account_id IS NOT NULL AND create_completed_at IS NULL AND purge_pending_at IS NULL
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason, purge_replay_requested_at
 `
 
 type CompletePaymentAccountCreateParams struct {
@@ -210,6 +233,7 @@ func (q *Queries) CompletePaymentAccountCreate(ctx context.Context, arg Complete
 		&i.PurgePendingAt,
 		&i.PurgeBlockedAt,
 		&i.PurgeBlockedReason,
+		&i.PurgeReplayRequestedAt,
 	)
 	return i, err
 }
@@ -277,7 +301,7 @@ func (q *Queries) InsertPaymentAccount(ctx context.Context, arg InsertPaymentAcc
 }
 
 const lockPaymentAccount = `-- name: LockPaymentAccount :one
-SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
+SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason, purge_replay_requested_at
 FROM payment.accounts
 WHERE store_id = $1
 FOR UPDATE
@@ -309,6 +333,7 @@ func (q *Queries) LockPaymentAccount(ctx context.Context, storeID int64) (Paymen
 		&i.PurgePendingAt,
 		&i.PurgeBlockedAt,
 		&i.PurgeBlockedReason,
+		&i.PurgeReplayRequestedAt,
 	)
 	return i, err
 }
@@ -318,7 +343,7 @@ UPDATE payment.accounts
 SET create_called_at = COALESCE(create_called_at, $1::timestamptz),
     updated_at = $1
 WHERE store_id = $2 AND create_completed_at IS NULL AND purge_pending_at IS NULL
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason, purge_replay_requested_at
 `
 
 type MarkPaymentAccountCreateCalledParams struct {
@@ -352,26 +377,28 @@ func (q *Queries) MarkPaymentAccountCreateCalled(ctx context.Context, arg MarkPa
 		&i.PurgePendingAt,
 		&i.PurgeBlockedAt,
 		&i.PurgeBlockedReason,
+		&i.PurgeReplayRequestedAt,
 	)
 	return i, err
 }
 
 const markPaymentAccountCreateFailed = `-- name: MarkPaymentAccountCreateFailed :execrows
 UPDATE payment.accounts
-SET create_failed_at = $1,
-    create_refused_at = CASE WHEN $2::boolean THEN $1::timestamptz END,
+SET create_failed_at = COALESCE(create_failed_at, $1::timestamptz),
+    create_refused_at = CASE WHEN $2::boolean THEN COALESCE(create_refused_at, $1::timestamptz) ELSE create_refused_at END,
     updated_at = $1
-WHERE store_id = $3 AND create_completed_at IS NULL AND create_failed_at IS NULL AND purge_pending_at IS NULL
+WHERE store_id = $3 AND create_completed_at IS NULL AND purge_pending_at IS NULL
 `
 
 type MarkPaymentAccountCreateFailedParams struct {
-	Now     *time.Time
+	Now     time.Time
 	Refused bool
 	StoreID int64
 }
 
-// 建立失敗：記下失敗的時刻（進後台待辦）；已完成建立的列不寫（有外部 ID 但第二步沒成功的半建立列照寫）。refused 為真（金流商明確拒絕）時同時記 create_refused_at，
-// 週期掃描不再為這列重送。
+// 建立失敗：記下失敗的時刻（進後台待辦）；已完成建立的列不寫（有外部 ID 但第二步沒成功的半建立列照寫）。已記過失敗的列保留最早的失敗時刻（COALESCE）。
+// refused 為真（金流商明確拒絕）時同時記 create_refused_at（已記過的保留最早的），週期掃描不再為這列重送；已經建立失敗的列在 Resolve 遇到永久拒絕時也要寫它，
+// 否則掃描要重送到 7 天期限。refused 為假不動既有的 create_refused_at。
 func (q *Queries) MarkPaymentAccountCreateFailed(ctx context.Context, arg MarkPaymentAccountCreateFailedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markPaymentAccountCreateFailed, arg.Now, arg.Refused, arg.StoreID)
 	if err != nil {
@@ -402,7 +429,7 @@ func (q *Queries) MarkPaymentAccountPurgePending(ctx context.Context, arg MarkPa
 }
 
 const paymentAccountByExternal = `-- name: PaymentAccountByExternal :one
-SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
+SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason, purge_replay_requested_at
 FROM payment.accounts
 WHERE provider = $1 AND external_account_id = $2
 `
@@ -437,12 +464,13 @@ func (q *Queries) PaymentAccountByExternal(ctx context.Context, arg PaymentAccou
 		&i.PurgePendingAt,
 		&i.PurgeBlockedAt,
 		&i.PurgeBlockedReason,
+		&i.PurgeReplayRequestedAt,
 	)
 	return i, err
 }
 
 const paymentAccountByStore = `-- name: PaymentAccountByStore :one
-SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
+SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason, purge_replay_requested_at
 FROM payment.accounts
 WHERE store_id = $1
 `
@@ -472,6 +500,7 @@ func (q *Queries) PaymentAccountByStore(ctx context.Context, storeID int64) (Pay
 		&i.PurgePendingAt,
 		&i.PurgeBlockedAt,
 		&i.PurgeBlockedReason,
+		&i.PurgeReplayRequestedAt,
 	)
 	return i, err
 }
@@ -584,14 +613,36 @@ func (q *Queries) PurgePendingPaymentAccountStoreIDs(ctx context.Context, arg Pu
 	return items, nil
 }
 
+const requestPaymentAccountPurgeReplay = `-- name: RequestPaymentAccountPurgeReplay :execrows
+UPDATE payment.accounts
+SET purge_replay_requested_at = $1::timestamptz,
+    updated_at = $1
+WHERE store_id = $2 AND purge_blocked_at IS NOT NULL
+`
+
+type RequestPaymentAccountPurgeReplayParams struct {
+	Now     time.Time
+	StoreID int64
+}
+
+// 管理員對清理終局（unresolved_creation）的列要求以同一把鍵重送：記下時刻，重送排隊中或進行中時後端拒絕「刪除對應」與再次「重試關閉」（K1）。只有終局的列才能記。
+func (q *Queries) RequestPaymentAccountPurgeReplay(ctx context.Context, arg RequestPaymentAccountPurgeReplayParams) (int64, error) {
+	result, err := q.db.Exec(ctx, requestPaymentAccountPurgeReplay, arg.Now, arg.StoreID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const restartPaymentAccountPurge = `-- name: RestartPaymentAccountPurge :one
 UPDATE payment.accounts
 SET purge_blocked_at = NULL,
     purge_blocked_reason = NULL,
     purge_pending_at = $1::timestamptz,
+    purge_replay_requested_at = NULL,
     updated_at = $1
 WHERE store_id = $2 AND purge_blocked_at IS NOT NULL
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason, purge_replay_requested_at
 `
 
 type RestartPaymentAccountPurgeParams struct {
@@ -625,6 +676,7 @@ func (q *Queries) RestartPaymentAccountPurge(ctx context.Context, arg RestartPay
 		&i.PurgePendingAt,
 		&i.PurgeBlockedAt,
 		&i.PurgeBlockedReason,
+		&i.PurgeReplayRequestedAt,
 	)
 	return i, err
 }
@@ -635,7 +687,7 @@ SET create_idempotency_key = gen_random_uuid(),
     create_called_at = $1::timestamptz,
     updated_at = $1
 WHERE store_id = $2 AND external_account_id IS NULL AND create_completed_at IS NULL AND purge_pending_at IS NULL
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason, purge_replay_requested_at
 `
 
 type RotatePaymentAccountIdempotencyKeyParams struct {
@@ -670,6 +722,7 @@ func (q *Queries) RotatePaymentAccountIdempotencyKey(ctx context.Context, arg Ro
 		&i.PurgePendingAt,
 		&i.PurgeBlockedAt,
 		&i.PurgeBlockedReason,
+		&i.PurgeReplayRequestedAt,
 	)
 	return i, err
 }
@@ -679,7 +732,7 @@ UPDATE payment.accounts
 SET external_account_id = $1,
     updated_at = $2
 WHERE store_id = $3 AND external_account_id IS NULL AND create_completed_at IS NULL AND purge_pending_at IS NULL
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason, purge_replay_requested_at
 `
 
 type SetPaymentAccountExternalParams struct {
@@ -715,6 +768,7 @@ func (q *Queries) SetPaymentAccountExternal(ctx context.Context, arg SetPaymentA
 		&i.PurgePendingAt,
 		&i.PurgeBlockedAt,
 		&i.PurgeBlockedReason,
+		&i.PurgeReplayRequestedAt,
 	)
 	return i, err
 }
@@ -724,7 +778,7 @@ UPDATE payment.accounts
 SET external_account_id = $1,
     updated_at = $2
 WHERE store_id = $3 AND external_account_id IS NULL AND purge_pending_at IS NOT NULL
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_refused_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason, purge_replay_requested_at
 `
 
 type SetPaymentAccountExternalForPurgeParams struct {
@@ -759,6 +813,7 @@ func (q *Queries) SetPaymentAccountExternalForPurge(ctx context.Context, arg Set
 		&i.PurgePendingAt,
 		&i.PurgeBlockedAt,
 		&i.PurgeBlockedReason,
+		&i.PurgeReplayRequestedAt,
 	)
 	return i, err
 }

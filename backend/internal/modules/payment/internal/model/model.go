@@ -82,8 +82,10 @@ type PaymentAccount struct {
 	// CreateUnresolved 表示建立結果不明（呼叫過、沒有外部 ID）的建立失敗列已超過金流商保存冪等鍵的期限（30 天，D63）：同一把鍵不再保證回同一個帳戶，
 	// 管理員重試建立會換新鍵並建立新的帳戶，等於聲明金流商那邊沒有這家店的帳戶，需要明確確認。保存期內（含已超過 7 天自動重送期限的）為假：重試以同一把鍵重送，不需要確認。
 	CreateUnresolved bool
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	// PurgeReplayPending 表示管理員要求的「以同一把鍵重送」排隊中或進行中（K1）：這段期間後端拒絕刪除對應與再次重試關閉，後台隱藏兩個動作。
+	PurgeReplayPending bool
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 // OnboardingSession 是開通用的 session，只有兩種形狀：HostedSession（託管連結）與各金流商的內嵌 session（目前只有 StripeEmbeddedSession）。

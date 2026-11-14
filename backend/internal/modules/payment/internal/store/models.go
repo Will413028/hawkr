@@ -11,25 +11,26 @@ import (
 )
 
 type PaymentAccount struct {
-	StoreID               int64
-	Provider              string
-	ExternalAccountID     *string
-	RequirementCollection string
-	Status                string
-	TransfersActive       bool
-	PayoutsActive         bool
-	Requirements          []byte
-	StatusReason          *string
-	FetchedAt             *time.Time
-	CreateFailedAt        *time.Time
-	CreateRefusedAt       *time.Time
-	CreateCalledAt        *time.Time
-	CreateCompletedAt     *time.Time
-	CreateIdempotencyKey  uuid.UUID
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
-	SellerReadClaimedAt   *time.Time
-	PurgePendingAt        *time.Time
-	PurgeBlockedAt        *time.Time
-	PurgeBlockedReason    *string
+	StoreID                int64
+	Provider               string
+	ExternalAccountID      *string
+	RequirementCollection  string
+	Status                 string
+	TransfersActive        bool
+	PayoutsActive          bool
+	Requirements           []byte
+	StatusReason           *string
+	FetchedAt              *time.Time
+	CreateFailedAt         *time.Time
+	CreateRefusedAt        *time.Time
+	CreateCalledAt         *time.Time
+	CreateCompletedAt      *time.Time
+	CreateIdempotencyKey   uuid.UUID
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
+	SellerReadClaimedAt    *time.Time
+	PurgePendingAt         *time.Time
+	PurgeBlockedAt         *time.Time
+	PurgeBlockedReason     *string
+	PurgeReplayRequestedAt *time.Time
 }

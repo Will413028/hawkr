@@ -144,7 +144,7 @@ func requestOutcome(row store.PaymentAccount) (enqueue bool, err error) {
 // ToModel 轉成對外的型別。
 func ToModel(r store.PaymentAccount, now time.Time) model.PaymentAccount {
 	return model.PaymentAccount{
-		PurgePendingAt: r.PurgePendingAt, CreateUnresolved: createUnresolved(r, now),
+		PurgePendingAt: r.PurgePendingAt, CreateUnresolved: createUnresolved(r, now), PurgeReplayPending: r.PurgeReplayRequestedAt != nil,
 		StoreID: r.StoreID, Provider: r.Provider, ExternalAccountID: r.ExternalAccountID,
 		RequirementCollection: model.RequirementCollection(r.RequirementCollection), Status: model.PaymentAccountStatus(r.Status),
 		TransfersActive: r.TransfersActive, PayoutsActive: r.PayoutsActive, Requirements: r.Requirements, StatusReason: r.StatusReason,
@@ -386,7 +386,7 @@ func (s *Service) createFailed(ctx context.Context, storeID int64, callErr error
 		}
 		s.d.Logger.WarnContext(ctx, "payment：建立收款帳戶失敗", "store_id", storeID, "permanent", permanent, "error", callErr)
 		now := s.d.Now().UTC()
-		_, err := q.MarkPaymentAccountCreateFailed(ctx, store.MarkPaymentAccountCreateFailedParams{StoreID: storeID, Now: &now, Refused: permanent})
+		_, err := q.MarkPaymentAccountCreateFailed(ctx, store.MarkPaymentAccountCreateFailedParams{StoreID: storeID, Now: now, Refused: permanent})
 		return err
 	})
 }
@@ -456,6 +456,35 @@ func (s *Service) storeResolved(ctx context.Context, storeID int64, id string) e
 // 以列上同一把鍵重送 AcquireAccount；取回 ID 就在同一個 transaction 寫進列、清空建立失敗並排入建立 job 接續第二步。已呼叫的時刻與鍵都不變。
 // 超過 IdempotencyRetention、列已不是這個狀態時什麼都不做。永久失敗或最後一次嘗試仍失敗只記警示 log，列留在建立失敗，管理員可再重試。
 func (s *Service) Replay(ctx context.Context, storeID int64, final bool) error {
+	err := s.replay(ctx, storeID, final)
+	if err != nil && !final {
+		return err
+	}
+	if cerr := s.clearReplayRequest(ctx, storeID); cerr != nil {
+		return errors.Join(err, cerr)
+	}
+	return err
+}
+
+// clearReplayRequest 清除清理終局列的「重送進行中」標記（Replay 結束，不論結果；暫時性失敗還會重試時保留）。列已不在或沒有標記時什麼都不做。
+func (s *Service) clearReplayRequest(ctx context.Context, storeID int64) error {
+	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
+	defer cancel()
+	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
+		q := store.New(s.d.DB.Conn(ctx))
+		if _, err := q.LockPaymentAccount(ctx, storeID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			return err
+		}
+		_, err := q.ClearPaymentAccountPurgeReplay(ctx, store.ClearPaymentAccountPurgeReplayParams{StoreID: storeID, Now: s.d.Now().UTC()})
+		return err
+	})
+}
+
+// replay 是 Replay 的本體：呼叫 provider 與寫入；標記由 Replay 在結束時清除。
+func (s *Service) replay(ctx context.Context, storeID int64, final bool) error {
 	p := s.d.Provider
 	if p == nil {
 		return nil
@@ -482,11 +511,13 @@ func (s *Service) Replay(ctx context.Context, storeID int64, final bool) error {
 	}
 	wctx, cancelWrite := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancelWrite()
-	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
+	rowGone := false
+	err = s.d.DB.InTx(wctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
 		locked, err := q.LockPaymentAccount(ctx, storeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
+				rowGone = true
 				return nil
 			}
 			return err
@@ -506,6 +537,23 @@ func (s *Service) Replay(ctx context.Context, storeID int64, final bool) error {
 		}
 		return enqueueEnsure(ctx, s.d.Jobs, storeID)
 	})
+	if err != nil {
+		return err
+	}
+	if rowGone {
+		return s.closeOrphan(ctx, storeID, id)
+	}
+	return nil
+}
+
+// closeOrphan 處理重送取回外部 ID、列卻已不在的情況（正常不會發生：重送期間後端拒絕刪除對應，這是防線）：ID 沒有地方記，就地關閉那個外部帳戶（CloseAccount 照帳戶實際的設定關閉），
+// 並記一行 error 等級的 log（store_id 與帳戶 ID）。這不是後台紀錄（adminaudit）：沒有管理員可以歸屬，是系統自己關閉的；關閉失敗回傳錯誤（job 留下失敗紀錄）。
+// 列不在了，重試也取不回更多資訊，帳戶 ID 只留在這行 log。
+func (s *Service) closeOrphan(ctx context.Context, storeID int64, id string) error {
+	s.d.Logger.ErrorContext(ctx, "payment：重送取回外部帳戶時帳戶列已不存在，關閉該外部帳戶（系統動作，無管理員）", "store_id", storeID, "external_account_id", id)
+	callCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), callTimeout)
+	defer cancel()
+	return s.d.Provider.CloseAccount(callCtx, id)
 }
 
 // replayable 回傳列是否停在管理員可以要求以同一把鍵重送的終局：建立失敗（沒有等待清理），或清理的終局且原因是 unresolved_creation。
@@ -732,6 +780,7 @@ func (s *Service) blockPurge(ctx context.Context, storeID int64, reason string) 
 // 紀錄說的是「已要求重試」：關閉本身由之後的清理 job 呼叫 provider。原因是 unresolved_creation（建立結果不明、沒有外部 ID）的終局看冪等鍵保存期（與 RetryCreate 一致，D63）：
 // 還在保存期內，同一把鍵重送一定回同一個帳戶，列保持終局（掃描不會再把它標成終局），同一個 transaction 排入 Replay job，取回 ID 才清除終局並由清理關閉（見 Replay）；
 // 超過 IdempotencyRetention 同一把鍵不再保證回同一個帳戶，不重送，只能刪除對應。
+// 重送排隊中或進行中（purge_replay_requested_at）時再次重試回 FailedPrecondition（K1）。
 func (s *Service) RetryPurge(ctx context.Context, actor adminaudit.Actor, storeID int64) (model.PaymentAccount, error) {
 	if err := model.Positive(storeID); err != nil {
 		return model.PaymentAccount{}, err
@@ -749,6 +798,9 @@ func (s *Service) RetryPurge(ctx context.Context, actor adminaudit.Actor, storeI
 		if locked.PurgeBlockedAt == nil {
 			return apperr.FailedPrecondition("收款帳戶的清理不在無法關閉的狀態")
 		}
+		if locked.PurgeReplayRequestedAt != nil {
+			return apperr.FailedPrecondition("正在以同一把鍵向金流商取回外部帳戶，請稍後重新整理")
+		}
 		now := s.d.Now().UTC()
 		replay := blockedAsUnresolved(locked) && calledWithoutID(locked)
 		if replay && keyExpired(locked, now) {
@@ -758,10 +810,15 @@ func (s *Service) RetryPurge(ctx context.Context, actor adminaudit.Actor, storeI
 			return err
 		}
 		if replay {
+			if _, err := q.RequestPaymentAccountPurgeReplay(ctx, store.RequestPaymentAccountPurgeReplayParams{StoreID: storeID, Now: now}); err != nil {
+				return err
+			}
 			if err := enqueueReplay(ctx, s.d.Jobs, storeID); err != nil {
 				return err
 			}
-			out = locked
+			if out, err = q.PaymentAccountByStore(ctx, storeID); err != nil {
+				return err
+			}
 			return nil
 		}
 		if out, err = q.RestartPaymentAccountPurge(ctx, store.RestartPaymentAccountPurgeParams{StoreID: storeID, Now: now}); err != nil {
@@ -776,7 +833,7 @@ func (s *Service) RetryPurge(ctx context.Context, actor adminaudit.Actor, storeI
 }
 
 // DeleteMapping 是管理員的「已在金流商處理，刪除對應」：只有終局的列可以做；同一個 transaction 寫一筆後台紀錄（platform adminaudit：誰、何時、哪家店，detail 帶 provider 與
-// 外部 ID 與終局原因代碼，D62）並刪列（外部帳戶在 inbox 的未處理事件標為已處理）。不呼叫 provider。紀錄比列活得久，由 cmd/hawkr 的營運子命令讀回。
+// 外部 ID 與終局原因代碼，D62）並刪列（外部帳戶在 inbox 的未處理事件標為已處理）。不呼叫 provider。重送（RetryPurge 的 Replay）排隊中或進行中時回 FailedPrecondition：重送取回的帳戶 ID 在列被刪之後無人關閉（K1）。紀錄比列活得久，由 cmd/hawkr 的營運子命令讀回。
 func (s *Service) DeleteMapping(ctx context.Context, actor adminaudit.Actor, storeID int64) error {
 	if err := model.Positive(storeID); err != nil {
 		return err
@@ -792,6 +849,9 @@ func (s *Service) DeleteMapping(ctx context.Context, actor adminaudit.Actor, sto
 		}
 		if locked.PurgeBlockedAt == nil {
 			return apperr.FailedPrecondition("收款帳戶的清理不在無法關閉的狀態")
+		}
+		if locked.PurgeReplayRequestedAt != nil {
+			return apperr.FailedPrecondition("正在以同一把鍵向金流商取回外部帳戶，完成前不能刪除對應；請稍後重新整理")
 		}
 		detail := map[string]any{"provider": locked.Provider, "blocked_reason": codeOf(locked.PurgeBlockedReason)}
 		if locked.ExternalAccountID != nil {
