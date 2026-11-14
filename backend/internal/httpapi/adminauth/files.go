@@ -13,6 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // filesPrefix 是後台檔案路由的路徑前綴（API 設計規範（Connect）§十三）。
@@ -75,7 +76,7 @@ func GuardLegacy(next http.Handler, log *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if p, ok := rpc.PrincipalFrom(r.Context()); ok && p.Kind == identity.PrincipalAdmin && !p.AdminAllows(adminperm.LegacyGatewayForward) {
 			log.WarnContext(r.Context(), "adminauth：拒絕", "admin_id", strconv.FormatInt(p.ID, 10), "path", r.URL.Path, "need", string(adminperm.LegacyGatewayForward))
-			ctx := rpc.NegotiateRequest(w, r)
+			ctx := uitext.WithLocale(r.Context(), uitext.ZhTW)
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			w.WriteHeader(http.StatusForbidden)
 			body, _ := json.Marshal(struct {

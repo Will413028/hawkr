@@ -146,7 +146,7 @@ func TestAdminServiceIgnoresAcceptLanguage(t *testing.T) {
 	}
 }
 
-func TestNegotiateRequestFollowsTheInterceptorRules(t *testing.T) {
+func TestNegotiatedFollowsTheInterceptorRules(t *testing.T) {
 	adminPath := contentv1alpha1connect.ContentAdminServiceListBannersProcedure
 	publicPath := publicconnect.ContentPublicServiceListLiveBannersProcedure
 	for name, tc := range map[string]struct {
@@ -165,8 +165,8 @@ func TestNegotiateRequestFollowsTheInterceptorRules(t *testing.T) {
 				r.Header.Set("Accept-Language", tc.header)
 			}
 			w := httptest.NewRecorder()
-			ctx := NegotiateRequest(w, r)
-			if got := uitext.LocaleFrom(ctx); got != tc.want {
+			got := Negotiated(w, r, func(ctx context.Context) uitext.Locale { return uitext.LocaleFrom(ctx) })
+			if got != tc.want {
 				t.Fatalf("語系 = %q，要 %q", got, tc.want)
 			}
 			if got := containsFold(w.Header().Values("Vary"), "Accept-Language"); got != tc.vary {

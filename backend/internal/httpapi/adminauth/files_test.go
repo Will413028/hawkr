@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"slices"
 	"testing"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -129,7 +128,7 @@ func TestGuardLegacyOnlyBlocksAdminsWithoutTheForwardPermission(t *testing.T) {
 	}
 }
 
-func TestGuardLegacyNegotiatesTheLocaleOfItsDenial(t *testing.T) {
+func TestGuardLegacyDenialIsAlwaysZhTW(t *testing.T) {
 	zero := principal(identity.PrincipalAdmin, 4)
 	h := GuardLegacy(counter(new(int)), nil)
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/admin/stores", nil)
@@ -137,7 +136,7 @@ func TestGuardLegacyNegotiatesTheLocaleOfItsDenial(t *testing.T) {
 	r = r.WithContext(rpc.WithPrincipal(r.Context(), zero))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, r)
-	if rec.Code != http.StatusForbidden || !slices.Contains(rec.Header().Values("Vary"), "Accept-Language") {
-		t.Fatalf("403 = %d，Vary = %v", rec.Code, rec.Header().Values("Vary"))
+	if rec.Code != http.StatusForbidden || len(rec.Header().Values("Vary")) != 0 {
+		t.Fatalf("403 = %d，管理員的回應不依 header 變化，不該有 Vary：%v", rec.Code, rec.Header().Values("Vary"))
 	}
 }
