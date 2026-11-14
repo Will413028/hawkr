@@ -246,7 +246,7 @@ func (f *Fake) CreateOnboardingSession(ctx context.Context, in SessionInput) (mo
 	if in.ExternalAccountID == "" {
 		return model.OnboardingSession{}, ErrPermanent
 	}
-	if f.caps.OnboardingSurface == model.SurfaceEmbedded {
+	if model.SurfaceOf(in.Collection) == model.SurfaceEmbedded {
 		return model.OnboardingSession{Surface: model.SurfaceEmbedded, ClientSecret: "fake_secret_" + in.ExternalAccountID, Provider: FakeName, PublishableKey: "pk_fake"}, nil
 	}
 	return model.OnboardingSession{Surface: model.SurfaceHosted, URL: "https://onboarding.example.invalid/" + in.ExternalAccountID}, nil
