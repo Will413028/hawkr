@@ -75,44 +75,9 @@ def check_inventory(path):
 # (b) ---------------------------------------------------------------------
 
 
-def reserved_line_numbers(text):
-    """Line numbers (1-based) inside `reserved ...;` statements, and the quoted names."""
-    inside = False
-    lines = set()
-    names = set()
-    for no, line in enumerate(text.splitlines(), 1):
-        if not inside and re.match(r"\s*reserved\b", line):
-            inside = True
-        if inside:
-            lines.add(no)
-            names.update(n.lower() for n in re.findall(r'"([^"]*)"', line.split("//")[0]))
-            if ";" in line:
-                inside = False
-    return lines, names
-
-
 class Ctx:
     def __init__(self, root):
         self.root = root
-        self.reserved_lines = {}
-        self.reserved_names = set()
-        for proto in sorted(root.glob("api/hawkr/**/*.proto")):
-            rel = proto.relative_to(root).as_posix()
-            lines, names = reserved_line_numbers(proto.read_text(encoding="utf-8"))
-            self.reserved_lines[rel] = lines
-            self.reserved_names |= names
-
-
-def r_proto_reserved(ctx, path, no, text):
-    return path in ctx.reserved_lines and no in ctx.reserved_lines[path]
-
-
-def r_pb_descriptor(ctx, path, no, text):
-    # Remove every reserved name; descriptor bytes put length prefixes before names.
-    rest = text.lower()
-    for name in sorted(ctx.reserved_names, key=len, reverse=True):
-        rest = rest.replace(name, "")
-    return "payuni" not in rest and "payuni" in text.lower()
 
 
 def r_adr_name_only(ctx, path, no, text):
@@ -136,10 +101,6 @@ ALLOWLIST = [
      "carry-over records and rows pointing at phase B"),
     (6, "backend/internal/platform/codemeta/**", "glob", None,
      "frozen generated codemeta files"),
-    (7, r"api/hawkr/.+\.proto", "regex", r_proto_reserved,
-     "reserved names in proto files"),
-    (7, "backend/internal/httpapi/gen/**/*.pb.go", "glob", r_pb_descriptor,
-     "descriptor strings that carry only names reserved in the protos"),
     (8, "backend/internal/modules/seller/migration_integration_test.go", "glob", None,
      "tests of the applied migrations"),
     (9, "*_test.go", "glob", re.compile(r'"PAYUNI_TERMS"'),

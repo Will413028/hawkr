@@ -15,6 +15,7 @@
   - 跨模組共用的訊息：`hawkr.common.<版本>`，只放真的被多個模組用到的（目前有圖片的 `Image`、錯誤原因的 `ErrorReason`、各處顯示一家店的 `StoreCard`、一組期限的 `Deadline`（開始與到期，伺服器給，client 只拿現在比較）與政策分類的 `PolicyCategory`——seller 與 A7 的 moderation 共用，Go 的值與各入口的子集在 `internal/platform/policy`）。
 - 後台獨立成 `hawkr.admin.*`：同名資源在前後台的欄位不同（前台逐欄列出，見第五節），分開 package 才能各自叫 `Banner`；website 與兩支 App 以一條 `exclude_paths: [hawkr/admin]` 就不生成後台 API。
 - 版本：上線前一律 `v1alpha1`（AIP-185），`buf breaking` 不檢查，契約可以直接改。上線時一次改名成 `v1`，之後 `WIRE_JSON` 的 breaking 才生效（`api/buf.yaml`）。
+- 編號與 `reserved`（ADR 計畫 D54）：`v1alpha1` 刪掉欄位或 enum 值時不留 `reserved`，欄位編號從 1、enum 值從 0（`_UNSPECIFIED`）連續，刪掉之後重新編號；沒有已發佈的 client 與已存的 wire 資料需要保護。改名 `v1` 之後才留 `reserved`，刪除的編號與名稱都要留。
 - lint 是 buf 的 STANDARD。唯一的例外是 `common` 的 `error_reason.proto` 不檢查 `ENUM_VALUE_PREFIX`：值名就是 `ErrorInfo.reason` 的字串（第八節）。proto 裡不寫語言相關的選項（`go_package` 等），由各消費端的 `buf.gen.yaml` 以 managed mode 決定。
 
 ## 二、Service 與授權
