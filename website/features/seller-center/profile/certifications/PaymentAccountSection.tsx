@@ -18,7 +18,7 @@ import {
 	useRefreshPaymentAccount,
 } from "@/lib/hooks/useSellerSelf";
 import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
-import { useLocalizedHref } from "@/lib/intl/use-router";
+import { useRoutedLocale } from "@/lib/intl/routed-locale";
 import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 import {
 	CONTACT_HREF,
@@ -29,7 +29,6 @@ import {
 } from "@/lib/seller/payment-account";
 import {
 	embeddedClientSecret,
-	onboardingUrls,
 	PAYMENT_PARAM,
 	paymentParamOf,
 	startOnboarding,
@@ -39,8 +38,6 @@ const EmbeddedPaymentOnboarding = dynamic(
 	() => import("./EmbeddedPaymentOnboarding"),
 	{ ssr: false },
 );
-
-const CERT_PATH = "/seller-center/me/certifications";
 
 function formatUpdated(account: PaymentAccount): string | null {
 	if (!account.fetchTime) return null;
@@ -75,7 +72,7 @@ export function PaymentAccountSection({
 	} = useMyPaymentAccount({
 		enabled: platformApproved,
 	});
-	const localizedPath = useLocalizedHref(CERT_PATH);
+	const locale = useRoutedLocale();
 	const [busy, setBusy] = React.useState(false);
 	const [confirming, setConfirming] = React.useState(false);
 	const [embeddedOpen, setEmbeddedOpen] = React.useState(false);
@@ -84,13 +81,9 @@ export function PaymentAccountSection({
 	accountRef.current = account;
 	const handledRef = React.useRef(false);
 
-	const urls = React.useCallback(
-		() => onboardingUrls(window.location.origin, localizedPath),
-		[localizedPath],
-	);
 	const createSession = React.useCallback(
-		() => createPaymentOnboardingSession(urls()),
-		[urls],
+		() => createPaymentOnboardingSession(locale),
+		[locale],
 	);
 	const refreshPaymentAccount = useRefreshPaymentAccount();
 

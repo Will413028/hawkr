@@ -63,7 +63,6 @@ _pump(WidgetTester tester, {int probes = 2}) async {
         toasts.add(code);
         return '錯誤';
       }),
-      webOriginProvider.overrideWithValue('https://web.example.test'),
       allowInsecureOnboardingUrlProvider.overrideWithValue(false),
       externalBrowserLauncherProvider.overrideWithValue((_) async => true),
       sellerClientProvider.overrideWithValue(

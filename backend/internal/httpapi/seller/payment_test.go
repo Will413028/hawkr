@@ -3,7 +3,6 @@ package seller
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"testing"
 	"time"
 
@@ -60,31 +59,6 @@ func TestPaymentEnumsMatchTheModule(t *testing.T) {
 	}
 }
 
-func TestCheckReturnURLAcceptsOnlyAbsoluteHTTPSOrLocalHTTP(t *testing.T) {
-	for raw, ok := range map[string]bool{
-		"https://web.example.test/seller/payment?x=1": true,
-		"http://localhost:3000/seller/payment":        true,
-		"http://127.0.0.1:3000/x":                     true,
-		"":                                            false,
-		"   ":                                         false,
-		"http://web.example.test/x":                   false,
-		"javascript:alert(1)":                         false,
-		"hawkr://seller/payment":                      false,
-		"/seller/payment":                             false,
-		"https://user:pw@web.example.test/x":          false,
-		"https://web.example.test/x#frag":             false,
-		"https://" + strings.Repeat("a", 2100) + ".test/": false,
-	} {
-		err := checkReturnURL("return_url", raw)
-		if (err == nil) != ok {
-			t.Errorf("%.40q：err=%v，want ok=%v", raw, err, ok)
-		}
-		if err != nil && apperr.KindOf(err) != apperr.KindInvalidInput {
-			t.Errorf("%.40q：err=%v 不是 invalid argument", raw, err)
-		}
-	}
-}
-
 func TestGetMyPaymentAccountReturnsTheNeutralStatusAndTheProviderSurface(t *testing.T) {
 	fetched := time.Date(2026, 11, 2, 3, 0, 0, 0, time.UTC)
 	m := &paymentModule{
@@ -111,31 +85,47 @@ func TestGetMyPaymentAccountReturnsTheNeutralStatusAndTheProviderSurface(t *test
 	}
 }
 
-func TestCreatePaymentOnboardingSessionValidatesTheUrlsBeforeCallingTheModule(t *testing.T) {
+func TestCreatePaymentOnboardingSessionBuildsTheReturnUrlsOnTheServer(t *testing.T) {
 	m := &paymentModule{}
-	app := &App{payments: m}
+	app := &App{payments: m, web: mustWebOrigin(t)}
+	origin := mustWebOrigin(t).Origin()
+	cert := pb.OnboardingReturnDestination_ONBOARDING_RETURN_DESTINATION_WEBSITE_CERTIFICATION
+	appDest := pb.OnboardingReturnDestination_ONBOARDING_RETURN_DESTINATION_SELLER_APP
 	for name, req := range map[string]*pb.CreatePaymentOnboardingSessionRequest{
-		"沒有 return_url":  {RefreshUrl: "https://web.example.test/again"},
-		"沒有 refresh_url": {ReturnUrl: "https://web.example.test/ok"},
-		"不是 https":       {ReturnUrl: "http://web.example.test/ok", RefreshUrl: "https://web.example.test/again"},
+		"destination 未指定":  {Locale: "zh-TW"},
+		"destination 不認得":  {Destination: 99, Locale: "zh-TW"},
+		"沒有 locale":        {Destination: cert},
+		"不支援的 locale":      {Destination: cert, Locale: "fr"},
+		"App 目的地也驗 locale": {Destination: appDest, Locale: "fr"},
+		"locale 大小寫不同":     {Destination: cert, Locale: "EN"},
 	} {
 		if _, err := app.CreatePaymentOnboardingSession(ctxWithStore(currentStore()), connect.NewRequest(req)); apperr.KindOf(err) != apperr.KindInvalidInput {
 			t.Errorf("%s：err=%v", name, err)
 		}
 	}
 	if m.sessionFor != 0 {
-		t.Fatal("網址不合仍然呼叫了模組")
+		t.Fatal("請求不合仍然呼叫了模組")
 	}
-	got, err := app.CreatePaymentOnboardingSession(ctxWithStore(currentStore()), connect.NewRequest(&pb.CreatePaymentOnboardingSessionRequest{
-		ReturnUrl: " https://web.example.test/ok ", RefreshUrl: "https://web.example.test/again",
-	}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if m.sessionFor != 11 || m.returnURL != "https://web.example.test/ok" || m.refreshURL != "https://web.example.test/again" {
-		t.Fatalf("模組收到 store=%d return=%q refresh=%q", m.sessionFor, m.returnURL, m.refreshURL)
-	}
-	if got.Msg.GetSurface() != paymentpb.OnboardingSurface_ONBOARDING_SURFACE_HOSTED || got.Msg.GetUrl() == "" || got.Msg.GetClientSecret() != "" {
-		t.Fatalf("response=%v", got.Msg)
+	for name, c := range map[string]struct {
+		dest             pb.OnboardingReturnDestination
+		locale           string
+		wantRet, wantRef string
+	}{
+		"網站 zh-TW":  {cert, "zh-TW", origin + "/seller-center/me/certifications?payment=return", origin + "/seller-center/me/certifications?payment=refresh"},
+		"網站 en":     {cert, "en", origin + "/en/seller-center/me/certifications?payment=return", origin + "/en/seller-center/me/certifications?payment=refresh"},
+		"App zh-TW": {appDest, "zh-TW", origin + "/seller-app/payment-return?state=done", origin + "/seller-app/payment-return?state=expired"},
+		"App en":    {appDest, "en", origin + "/seller-app/payment-return?state=done", origin + "/seller-app/payment-return?state=expired"},
+	} {
+		m.sessionFor = 0
+		got, err := app.CreatePaymentOnboardingSession(ctxWithStore(currentStore()), connect.NewRequest(&pb.CreatePaymentOnboardingSessionRequest{Destination: c.dest, Locale: c.locale}))
+		if err != nil {
+			t.Fatalf("%s：%v", name, err)
+		}
+		if m.sessionFor != 11 || m.returnURL != c.wantRet || m.refreshURL != c.wantRef {
+			t.Errorf("%s：模組收到 store=%d return=%q refresh=%q", name, m.sessionFor, m.returnURL, m.refreshURL)
+		}
+		if got.Msg.GetSurface() != paymentpb.OnboardingSurface_ONBOARDING_SURFACE_HOSTED || got.Msg.GetUrl() == "" || got.Msg.GetClientSecret() != "" {
+			t.Errorf("%s：response=%v", name, got.Msg)
+		}
 	}
 }

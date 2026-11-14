@@ -4,7 +4,6 @@ import type { OnboardingSession } from "./payment-account";
 import {
 	confirmPaymentReturn,
 	embeddedClientSecret,
-	onboardingUrls,
 	paymentParamOf,
 	startOnboarding,
 } from "./payment-onboarding";
@@ -17,27 +16,6 @@ const embedded: OnboardingSession = {
 	surface: "embedded",
 	clientSecret: "secret_123",
 };
-
-describe("onboardingUrls", () => {
-	it("return 與 refresh 是同一個認證頁加上不同的 payment 參數，帶語系前綴與 origin", () => {
-		expect(
-			onboardingUrls("https://hawkr.test", "/seller-center/me/certifications"),
-		).toEqual({
-			returnUrl:
-				"https://hawkr.test/seller-center/me/certifications?payment=return",
-			refreshUrl:
-				"https://hawkr.test/seller-center/me/certifications?payment=refresh",
-		});
-		expect(
-			onboardingUrls(
-				"https://hawkr.test",
-				"/en/seller-center/me/certifications",
-			).returnUrl,
-		).toBe(
-			"https://hawkr.test/en/seller-center/me/certifications?payment=return",
-		);
-	});
-});
 
 describe("paymentParamOf", () => {
 	it("只認得 return 與 refresh", () => {

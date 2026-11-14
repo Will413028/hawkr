@@ -604,6 +604,41 @@ class KYCIssueCode extends $pb.ProtobufEnum {
   const KYCIssueCode._(super.value, super.name);
 }
 
+/// OnboardingReturnDestination 是開通結束後金流商把賣家送回的頁面；網址由伺服器依 PUBLIC_WEB_ORIGIN 組，client 不傳網址。
+class OnboardingReturnDestination extends $pb.ProtobufEnum {
+  static const OnboardingReturnDestination
+      ONBOARDING_RETURN_DESTINATION_UNSPECIFIED = OnboardingReturnDestination._(
+          0, _omitEnumNames ? '' : 'ONBOARDING_RETURN_DESTINATION_UNSPECIFIED');
+
+  /// 網站賣家中心的認證頁：完成回到 ?payment=return，連結過期回到 ?payment=refresh。
+  static const OnboardingReturnDestination
+      ONBOARDING_RETURN_DESTINATION_WEBSITE_CERTIFICATION =
+      OnboardingReturnDestination._(
+          1,
+          _omitEnumNames
+              ? ''
+              : 'ONBOARDING_RETURN_DESTINATION_WEBSITE_CERTIFICATION');
+
+  /// 網站給賣家 App 的回跳頁（請回到賣家 App）：完成回到 ?state=done，連結過期回到 ?state=expired。
+  static const OnboardingReturnDestination
+      ONBOARDING_RETURN_DESTINATION_SELLER_APP = OnboardingReturnDestination._(
+          2, _omitEnumNames ? '' : 'ONBOARDING_RETURN_DESTINATION_SELLER_APP');
+
+  static const $core.List<OnboardingReturnDestination> values =
+      <OnboardingReturnDestination>[
+    ONBOARDING_RETURN_DESTINATION_UNSPECIFIED,
+    ONBOARDING_RETURN_DESTINATION_WEBSITE_CERTIFICATION,
+    ONBOARDING_RETURN_DESTINATION_SELLER_APP,
+  ];
+
+  static final $core.List<OnboardingReturnDestination?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static OnboardingReturnDestination? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const OnboardingReturnDestination._(super.value, super.name);
+}
+
 /// ViolationSeverity 是認定套用的嚴重度，也是案件的嚴重度（開案時決定，之後只經 ChangeCaseSeverity 修改）。
 class ViolationSeverity extends $pb.ProtobufEnum {
   static const ViolationSeverity VIOLATION_SEVERITY_UNSPECIFIED =

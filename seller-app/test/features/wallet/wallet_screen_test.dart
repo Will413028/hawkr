@@ -161,7 +161,6 @@ List<Override> _overrides(_Server server) => [
   sellerClientProvider.overrideWithValue(server.client),
   myStoreRepositoryProvider.overrideWithValue(server.store.repository),
   couponListControllerProvider.overrideWith(_CouponFixture.new),
-  webOriginProvider.overrideWithValue('https://web.example.test'),
   externalBrowserLauncherProvider.overrideWithValue((uri) async {
     server.launched.add(uri);
     final gate = server.launchGate;

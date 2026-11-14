@@ -327,7 +327,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	if err != nil {
 		return nil, err
 	}
-	sellerApp, err := httpseller.NewApp(deps.Seller, deps.Payment, deps.Buyer, deps.Images, dashboard, stats, deps.Logger)
+	sellerApp, err := httpseller.NewApp(deps.Seller, deps.Payment, deps.Buyer, deps.Images, dashboard, stats, deps.WebOrigin, deps.Logger)
 	if err != nil {
 		return nil, err
 	}

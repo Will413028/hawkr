@@ -5,6 +5,7 @@ import {
 	PaymentAccountStatus,
 } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import {
+	OnboardingReturnDestination,
 	OnboardingTaskState,
 	PaymentAccountSchema,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -57,10 +58,6 @@ describe("fetchMyPaymentAccount", () => {
 });
 
 describe("createPaymentOnboardingSession", () => {
-	const urls = {
-		returnUrl: "https://h.test/r",
-		refreshUrl: "https://h.test/f",
-	};
 	const client = (res: object) => {
 		const createPaymentOnboardingSessionRpc = vi.fn().mockResolvedValue(res);
 		return {
@@ -72,29 +69,29 @@ describe("createPaymentOnboardingSession", () => {
 		};
 	};
 
-	it("把 return_url 與 refresh_url 交給伺服器", async () => {
+	it("只送回跳目的地與路由的語系，網址由伺服器組", async () => {
 		const c = client({
 			surface: OnboardingSurface.HOSTED,
 			url: "https://x.test",
 		});
-		await createPaymentOnboardingSession(urls, c.factory);
+		await createPaymentOnboardingSession("en", c.factory);
 		expect(c.rpc).toHaveBeenCalledWith({
-			returnUrl: urls.returnUrl,
-			refreshUrl: urls.refreshUrl,
+			destination: OnboardingReturnDestination.WEBSITE_CERTIFICATION,
+			locale: "en",
 		});
 	});
 
 	it("HOSTED 回連結，EMBEDDED 回 client secret", async () => {
 		await expect(
 			createPaymentOnboardingSession(
-				urls,
+				"zh-TW",
 				client({ surface: OnboardingSurface.HOSTED, url: "https://x.test" })
 					.factory,
 			),
 		).resolves.toEqual({ surface: "hosted", url: "https://x.test" });
 		await expect(
 			createPaymentOnboardingSession(
-				urls,
+				"zh-TW",
 				client({ surface: OnboardingSurface.EMBEDDED, clientSecret: "cs_1" })
 					.factory,
 			),
@@ -108,7 +105,7 @@ describe("createPaymentOnboardingSession", () => {
 			{ surface: OnboardingSurface.UNSPECIFIED, url: "https://x.test" },
 		]) {
 			await expect(
-				createPaymentOnboardingSession(urls, client(res).factory),
+				createPaymentOnboardingSession("zh-TW", client(res).factory),
 			).rejects.toThrow();
 		}
 	});

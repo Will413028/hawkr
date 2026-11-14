@@ -18,20 +18,6 @@ export function paymentParamOf(value: string | null): PaymentParam | null {
 	return value === "return" || value === "refresh" ? value : null;
 }
 
-/**
- * 金流商要回跳的絕對網址。`localizedPath` 是已經帶語系前綴的認證頁路徑（`useLocalizedHref` 的結果），
- * `origin` 是目前頁面的 origin。
- */
-export function onboardingUrls(
-	origin: string,
-	localizedPath: string,
-): { returnUrl: string; refreshUrl: string } {
-	return {
-		returnUrl: `${origin}${localizedPath}?${PAYMENT_PARAM}=return`,
-		refreshUrl: `${origin}${localizedPath}?${PAYMENT_PARAM}=refresh`,
-	};
-}
-
 export type OnboardingStart =
 	| { kind: "redirect"; url: string }
 	| { kind: "embedded" };

@@ -3975,12 +3975,12 @@ class GetMyPaymentAccountResponse extends $pb.GeneratedMessage {
 
 class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
   factory CreatePaymentOnboardingSessionRequest({
-    $core.String? returnUrl,
-    $core.String? refreshUrl,
+    OnboardingReturnDestination? destination,
+    $core.String? locale,
   }) {
     final result = CreatePaymentOnboardingSessionRequest._();
-    if (returnUrl != null) result.returnUrl = returnUrl;
-    if (refreshUrl != null) result.refreshUrl = refreshUrl;
+    if (destination != null) result.destination = destination;
+    if (locale != null) result.locale = locale;
     return result;
   }
 
@@ -4000,8 +4000,9 @@ class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance:
           CreatePaymentOnboardingSessionRequest.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'returnUrl')
-    ..aOS(2, _omitFieldNames ? '' : 'refreshUrl')
+    ..aE<OnboardingReturnDestination>(3, _omitFieldNames ? '' : 'destination',
+        enumValues: OnboardingReturnDestination.values)
+    ..aOS(4, _omitFieldNames ? '' : 'locale')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4033,25 +4034,26 @@ class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
           CreatePaymentOnboardingSessionRequest.$_createMessage);
   static CreatePaymentOnboardingSessionRequest? _defaultInstance;
 
-  /// 賣家完成或離開開通流程後回到的網址：https，或本機開發的 http://localhost。
-  @$pb.TagNumber(1)
-  $core.String get returnUrl => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set returnUrl($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasReturnUrl() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearReturnUrl() => $_clearField(1);
+  /// 開通結束後回到的頁面；UNSPECIFIED 回 invalid_argument。連結過期或已使用時，賣家被送回同一目的地的重新取得入口，client 在那裡重新呼叫本方法。
+  @$pb.TagNumber(3)
+  OnboardingReturnDestination get destination => $_getN(0);
+  @$pb.TagNumber(3)
+  set destination(OnboardingReturnDestination value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDestination() => $_has(0);
+  @$pb.TagNumber(3)
+  void clearDestination() => $_clearField(3);
 
-  /// 連結過期或已使用時，金流商把賣家送回的網址，client 在那裡重新呼叫本方法；規則同 return_url。
-  @$pb.TagNumber(2)
-  $core.String get refreshUrl => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set refreshUrl($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasRefreshUrl() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearRefreshUrl() => $_clearField(2);
+  /// 回跳頁的網站語系（BCP-47：zh-TW 或 en），決定網站頁的路徑前綴；空或不支援回 invalid_argument。
+  /// 賣家 App 的回跳頁沒有語系前綴，這個值仍要合法，但不影響網址。
+  @$pb.TagNumber(4)
+  $core.String get locale => $_getSZ(1);
+  @$pb.TagNumber(4)
+  set locale($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(4)
+  $core.bool hasLocale() => $_has(1);
+  @$pb.TagNumber(4)
+  void clearLocale() => $_clearField(4);
 }
 
 class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
@@ -7279,7 +7281,7 @@ class SellerAppServiceApi {
           'GetMyPaymentAccount', request, GetMyPaymentAccountResponse());
 
   /// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session：onboarding_surface 是 HOSTED 時回連結（賣家開外部瀏覽器完成後回到
-  /// return_url；連結過期時回到 refresh_url 重新取得），是 EMBEDDED 時回內嵌元件的 client_secret。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
+  /// destination 與 locale 決定的頁面；連結過期時回到同一目的地的重新取得入口），是 EMBEDDED 時回內嵌元件的 client_secret。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
   /// 停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
   $async.Future<CreatePaymentOnboardingSessionResponse>
       createPaymentOnboardingSession($pb.ClientContext? ctx,

@@ -11,9 +11,10 @@ import {
 	OnboardingSurface,
 	PaymentAccountStatus,
 } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
-import type {
-	GetMyOnboardingResponse,
-	PaymentAccount,
+import {
+	type GetMyOnboardingResponse,
+	OnboardingReturnDestination,
+	type PaymentAccount,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import {
 	paymentPaymentAccountStatus,
@@ -23,6 +24,7 @@ import {
 } from "@hawkr/ui-text/keys";
 import { sellerAppClient } from "../connect/seller";
 import { optionalText, type UiText } from "../i18n/ui-text";
+import type { AppLocale } from "../intl/locales";
 import { CERT_PAGE_HREF } from "./cert-gate";
 import { paymentAccountCompleted } from "./onboarding-summary";
 import type { StatusBannerTone } from "./status-tone";
@@ -47,13 +49,14 @@ export type OnboardingSession =
 	| { surface: "hosted"; url: string }
 	| { surface: "embedded"; clientSecret: string };
 
+/** 回跳網址由伺服器依目的地與語系組；網站頁面的回跳目的地是認證頁。 */
 export async function createPaymentOnboardingSession(
-	urls: { returnUrl: string; refreshUrl: string },
+	locale: AppLocale,
 	client: () => SellerClient = sellerAppClient,
 ): Promise<OnboardingSession> {
 	const res = await client().createPaymentOnboardingSession({
-		returnUrl: urls.returnUrl,
-		refreshUrl: urls.refreshUrl,
+		destination: OnboardingReturnDestination.WEBSITE_CERTIFICATION,
+		locale,
 	});
 	switch (res.surface) {
 		case OnboardingSurface.HOSTED:

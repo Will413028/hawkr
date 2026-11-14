@@ -107,7 +107,6 @@ Future<void> _pump(
       sessionProvider.overrideWith(_LoggedIn.new),
       sellerClientProvider.overrideWithValue(server.client),
       myStoreRepositoryProvider.overrideWithValue(store.repository),
-      webOriginProvider.overrideWithValue('https://web.example.test'),
       externalBrowserLauncherProvider.overrideWithValue((uri) async {
         server.launched.add(uri);
         return true;
@@ -244,13 +243,10 @@ void main() {
 
       final request = server.sessions.single;
       expect(
-        request.returnUrl,
-        'https://web.example.test/seller-app/payment-return?state=done',
+        request.destination,
+        OnboardingReturnDestination.ONBOARDING_RETURN_DESTINATION_SELLER_APP,
       );
-      expect(
-        request.refreshUrl,
-        'https://web.example.test/seller-app/payment-return?state=expired',
-      );
+      expect(request.locale, 'zh-TW');
       expect(server.launched, [
         Uri.parse('https://connect.example.test/setup'),
       ]);

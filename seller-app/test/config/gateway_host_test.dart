@@ -50,40 +50,8 @@ void main() {
     });
   });
 
-  group('resolveWebOrigin', () {
-    test('a provided define wins for every flavor', () {
-      for (final flavor in Flavor.values) {
-        expect(
-          resolveWebOrigin(flavor, 'https://web.example.test'),
-          'https://web.example.test',
-          reason: flavor.name,
-        );
-      }
-    });
-
-    test('dev falls back to the local website', () {
-      expect(resolveWebOrigin(Flavor.dev, ''), 'http://localhost:3000');
-    });
-
-    test('stage and prod fail fast naming HAWKR_WEB_ORIGIN', () {
-      for (final flavor in [Flavor.stage, Flavor.prod]) {
-        expect(
-          () => resolveWebOrigin(flavor, ''),
-          throwsA(
-            isA<StateError>().having(
-              (e) => e.message,
-              'message',
-              contains('HAWKR_WEB_ORIGIN'),
-            ),
-          ),
-          reason: flavor.name,
-        );
-      }
-    });
-  });
-
   group('Makefile require-gateway', () {
-    // stage 與 prod 的建置也要擋 HAWKR_WEB_ORIGIN：只擋 GATEWAY_HOST 會讓缺值的建置通過、啟動時才丟 StateError。
+    // stage 與 prod 的建置要擋缺少的 GATEWAY_HOST：不然缺值的建置通過、啟動時才丟 StateError。
     Future<ProcessResult> run(Map<String, String> vars) => Process.run('make', [
       '-s',
       'require-gateway',
@@ -91,25 +59,14 @@ void main() {
       for (final entry in vars.entries) '${entry.key}=${entry.value}',
     ]);
 
-    test('missing HAWKR_WEB_ORIGIN fails and names it', () async {
-      final result = await run({'GATEWAY_HOST': 'https://api.example.test'});
-      expect(result.exitCode, isNot(0));
-      expect(result.stderr, contains('HAWKR_WEB_ORIGIN'));
-    });
-
-    test('missing GATEWAY_HOST still fails', () async {
-      final result = await run({
-        'HAWKR_WEB_ORIGIN': 'https://web.example.test',
-      });
+    test('missing GATEWAY_HOST fails and names it', () async {
+      final result = await run({});
       expect(result.exitCode, isNot(0));
       expect(result.stderr, contains('GATEWAY_HOST'));
     });
 
-    test('both provided passes', () async {
-      final result = await run({
-        'GATEWAY_HOST': 'https://api.example.test',
-        'HAWKR_WEB_ORIGIN': 'https://web.example.test',
-      });
+    test('provided GATEWAY_HOST passes', () async {
+      final result = await run({'GATEWAY_HOST': 'https://api.example.test'});
       expect(result.exitCode, 0);
     });
   });

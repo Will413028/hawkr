@@ -125,7 +125,7 @@ service SellerAppService {
   }
 
   // CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session：onboarding_surface 是 HOSTED 時回連結（賣家開外部瀏覽器完成後回到
-  // return_url；連結過期時回到 refresh_url 重新取得），是 EMBEDDED 時回內嵌元件的 client_secret。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
+  // destination 與 locale 決定的頁面；連結過期時回到同一目的地的重新取得入口），是 EMBEDDED 時回內嵌元件的 client_secret。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
   // 停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
   rpc CreatePaymentOnboardingSession(CreatePaymentOnboardingSessionRequest) returns (CreatePaymentOnboardingSessionResponse);
 
@@ -857,11 +857,21 @@ message GetMyPaymentAccountResponse {
   PaymentAccount account = 1;
 }
 
+// OnboardingReturnDestination 是開通結束後金流商把賣家送回的頁面；網址由伺服器依 PUBLIC_WEB_ORIGIN 組，client 不傳網址。
+enum OnboardingReturnDestination {
+  ONBOARDING_RETURN_DESTINATION_UNSPECIFIED = 0;
+  // 網站賣家中心的認證頁：完成回到 ?payment=return，連結過期回到 ?payment=refresh。
+  ONBOARDING_RETURN_DESTINATION_WEBSITE_CERTIFICATION = 1;
+  // 網站給賣家 App 的回跳頁（請回到賣家 App）：完成回到 ?state=done，連結過期回到 ?state=expired。
+  ONBOARDING_RETURN_DESTINATION_SELLER_APP = 2;
+}
+
 message CreatePaymentOnboardingSessionRequest {
-  // 賣家完成或離開開通流程後回到的網址：https，或本機開發的 http://localhost。
-  string return_url = 1 [(google.api.field_behavior) = REQUIRED];
-  // 連結過期或已使用時，金流商把賣家送回的網址，client 在那裡重新呼叫本方法；規則同 return_url。
-  string refresh_url = 2 [(google.api.field_behavior) = REQUIRED];
+  // 開通結束後回到的頁面；UNSPECIFIED 回 invalid_argument。連結過期或已使用時，賣家被送回同一目的地的重新取得入口，client 在那裡重新呼叫本方法。
+  OnboardingReturnDestination destination = 3 [(google.api.field_behavior) = REQUIRED];
+  // 回跳頁的網站語系（BCP-47：zh-TW 或 en），決定網站頁的路徑前綴；空或不支援回 invalid_argument。
+  // 賣家 App 的回跳頁沒有語系前綴，這個值仍要合法，但不影響網址。
+  string locale = 4 [(google.api.field_behavior) = REQUIRED];
 }
 
 message CreatePaymentOnboardingSessionResponse {

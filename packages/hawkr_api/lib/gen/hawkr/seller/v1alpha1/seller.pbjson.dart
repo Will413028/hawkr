@@ -351,6 +351,23 @@ final $typed_data.Uint8List kYCIssueCodeDescriptor = $convert.base64Decode(
     'WUNfSVNTVUVfQ09ERV9FWFBJUkVEEAMSGgoWS1lDX0lTU1VFX0NPREVfTUlTU0lORxAEEhoKFk'
     'tZQ19JU1NVRV9DT0RFX0lOVkFMSUQQBRIYChRLWUNfSVNTVUVfQ09ERV9PVEhFUhAG');
 
+@$core.Deprecated('Use onboardingReturnDestinationDescriptor instead')
+const OnboardingReturnDestination$json = {
+  '1': 'OnboardingReturnDestination',
+  '2': [
+    {'1': 'ONBOARDING_RETURN_DESTINATION_UNSPECIFIED', '2': 0},
+    {'1': 'ONBOARDING_RETURN_DESTINATION_WEBSITE_CERTIFICATION', '2': 1},
+    {'1': 'ONBOARDING_RETURN_DESTINATION_SELLER_APP', '2': 2},
+  ],
+};
+
+/// Descriptor for `OnboardingReturnDestination`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List onboardingReturnDestinationDescriptor = $convert.base64Decode(
+    'ChtPbmJvYXJkaW5nUmV0dXJuRGVzdGluYXRpb24SLQopT05CT0FSRElOR19SRVRVUk5fREVTVE'
+    'lOQVRJT05fVU5TUEVDSUZJRUQQABI3CjNPTkJPQVJESU5HX1JFVFVSTl9ERVNUSU5BVElPTl9X'
+    'RUJTSVRFX0NFUlRJRklDQVRJT04QARIsCihPTkJPQVJESU5HX1JFVFVSTl9ERVNUSU5BVElPTl'
+    '9TRUxMRVJfQVBQEAI=');
+
 @$core.Deprecated('Use violationSeverityDescriptor instead')
 const ViolationSeverity$json = {
   '1': 'ViolationSeverity',
@@ -2041,17 +2058,25 @@ final $typed_data.Uint8List getMyPaymentAccountResponseDescriptor =
 const CreatePaymentOnboardingSessionRequest$json = {
   '1': 'CreatePaymentOnboardingSessionRequest',
   '2': [
-    {'1': 'return_url', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'returnUrl'},
-    {'1': 'refresh_url', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'refreshUrl'},
+    {
+      '1': 'destination',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.OnboardingReturnDestination',
+      '8': {},
+      '10': 'destination'
+    },
+    {'1': 'locale', '3': 4, '4': 1, '5': 9, '8': {}, '10': 'locale'},
   ],
 };
 
 /// Descriptor for `CreatePaymentOnboardingSessionRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List createPaymentOnboardingSessionRequestDescriptor =
     $convert.base64Decode(
-        'CiVDcmVhdGVQYXltZW50T25ib2FyZGluZ1Nlc3Npb25SZXF1ZXN0EiIKCnJldHVybl91cmwYAS'
-        'ABKAlCA+BBAlIJcmV0dXJuVXJsEiQKC3JlZnJlc2hfdXJsGAIgASgJQgPgQQJSCnJlZnJlc2hV'
-        'cmw=');
+        'CiVDcmVhdGVQYXltZW50T25ib2FyZGluZ1Nlc3Npb25SZXF1ZXN0ElkKC2Rlc3RpbmF0aW9uGA'
+        'MgASgOMjIuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLk9uYm9hcmRpbmdSZXR1cm5EZXN0aW5hdGlv'
+        'bkID4EECUgtkZXN0aW5hdGlvbhIbCgZsb2NhbGUYBCABKAlCA+BBAlIGbG9jYWxl');
 
 @$core
     .Deprecated('Use createPaymentOnboardingSessionResponseDescriptor instead')

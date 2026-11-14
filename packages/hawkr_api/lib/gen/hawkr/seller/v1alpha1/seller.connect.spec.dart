@@ -179,7 +179,7 @@ abstract final class SellerAppService {
   );
 
   /// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session：onboarding_surface 是 HOSTED 時回連結（賣家開外部瀏覽器完成後回到
-  /// return_url；連結過期時回到 refresh_url 重新取得），是 EMBEDDED 時回內嵌元件的 client_secret。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
+  /// destination 與 locale 決定的頁面；連結過期時回到同一目的地的重新取得入口），是 EMBEDDED 時回內嵌元件的 client_secret。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
   /// 停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
   static const createPaymentOnboardingSession = connect.Spec(
     '/$name/CreatePaymentOnboardingSession',

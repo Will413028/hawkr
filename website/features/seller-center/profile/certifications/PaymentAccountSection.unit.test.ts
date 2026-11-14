@@ -49,8 +49,8 @@ vi.mock("@/lib/hooks/useSellerSelf", () => ({
 		};
 	},
 }));
-vi.mock("@/lib/intl/use-router", () => ({
-	useLocalizedHref: (href: string) => `/en${href}`,
+vi.mock("@/lib/intl/routed-locale", () => ({
+	useRoutedLocale: () => "en",
 }));
 vi.mock("@/lib/navigation/document-location", () => ({
 	commitDocumentNavigation: mocks.navigate,
@@ -309,7 +309,7 @@ describe("狀態文字來自目錄", () => {
 });
 
 describe("HOSTED：導頁", () => {
-	it("建立 session（return 與 refresh 帶語系與 origin）後整頁導到連結", async () => {
+	it("建立 session（帶路由的語系）後整頁導到連結", async () => {
 		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED);
 		mocks.createSession.mockResolvedValue({
 			surface: "hosted",
@@ -319,10 +319,7 @@ describe("HOSTED：導頁", () => {
 		await act(async () => {
 			fireEvent.click(screen.getByText("前往設定收款帳戶"));
 		});
-		expect(mocks.createSession).toHaveBeenCalledWith({
-			returnUrl: `${window.location.origin}/en/seller-center/me/certifications?payment=return`,
-			refreshUrl: `${window.location.origin}/en/seller-center/me/certifications?payment=refresh`,
-		});
+		expect(mocks.createSession).toHaveBeenCalledWith("en");
 		expect(mocks.navigate).toHaveBeenCalledWith(
 			"https://connect.stripe.test/setup/abc",
 		);

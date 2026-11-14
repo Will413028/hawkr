@@ -48,7 +48,6 @@ Hawkr Seller 是 Hawkr 平台的商家端 Flutter App，提供商品管理、訂
   App 不呼叫原生 `FirebaseApp.configure()`。
 - `SENTRY_DSN`：空值時 Sentry 不送任何事件。
 - `GATEWAY_HOST`、`MEDIA_BASE_HOST`：API 與媒體主機；`dev` 沒有提供時連本機單體。
-- `HAWKR_WEB_ORIGIN`：website 的 origin（收款開通完成後回跳的靜態頁）；`dev` 沒有提供時是 `http://localhost:3000`，`stage` 與 `prod` 缺少時 App 啟動時直接報錯。
 - `HELP_CENTER_LINE_ID`、`HELP_CENTER_LINE_URL`：幫助中心的客服 LINE 官方帳號；沒有提供時不顯示 LINE 入口。
 
 **Native 建構** (iOS):

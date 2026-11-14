@@ -73,17 +73,17 @@ final class PaymentAccountRepository {
     await _client.refreshMyPaymentAccount(RefreshMyPaymentAccountRequest());
   }
 
-  /// 託管頁面的開通連結（一次性、短效）；只收 https，[allowInsecureUrl]（只有 dev 的本機測試）才收 http。回應的介面不是 HOSTED 或沒有連結是契約被違反，丟 [FormatException]：
+  /// 託管頁面的開通連結（一次性、短效）；回跳到網站給 App 的回跳頁，網址由伺服器組；只收 https，[allowInsecureUrl]（只有 dev 的本機測試）才收 http。回應的介面不是 HOSTED 或沒有連結是契約被違反，丟 [FormatException]：
   /// 不猜一個預設介面。
   Future<HostedSession> createHostedSession({
-    required Uri returnUrl,
-    required Uri refreshUrl,
+    required String locale,
     bool allowInsecureUrl = false,
   }) async {
     final response = await _client.createPaymentOnboardingSession(
       CreatePaymentOnboardingSessionRequest(
-        returnUrl: returnUrl.toString(),
-        refreshUrl: refreshUrl.toString(),
+        destination:
+            OnboardingReturnDestination.ONBOARDING_RETURN_DESTINATION_SELLER_APP,
+        locale: locale,
       ),
     );
     if (response.surface != OnboardingSurface.ONBOARDING_SURFACE_HOSTED) {

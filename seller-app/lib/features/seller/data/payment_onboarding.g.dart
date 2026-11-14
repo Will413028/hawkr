@@ -8,52 +8,6 @@ part of 'payment_onboarding.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// website 的 origin（`--dart-define=HAWKR_WEB_ORIGIN`，見 [FlavorExtension.webOrigin]）。
-
-@ProviderFor(webOrigin)
-final webOriginProvider = WebOriginProvider._();
-
-/// website 的 origin（`--dart-define=HAWKR_WEB_ORIGIN`，見 [FlavorExtension.webOrigin]）。
-
-final class WebOriginProvider
-    extends $FunctionalProvider<String, String, String>
-    with $Provider<String> {
-  /// website 的 origin（`--dart-define=HAWKR_WEB_ORIGIN`，見 [FlavorExtension.webOrigin]）。
-  WebOriginProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'webOriginProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$webOriginHash();
-
-  @$internal
-  @override
-  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  String create(Ref ref) {
-    return webOrigin(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(String value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<String>(value),
-    );
-  }
-}
-
-String _$webOriginHash() => r'3040edafbef14ddcb78d9036502c709eaf56716b';
-
 /// 開通連結允許 http（本機測試）：只有 dev。stage 與 prod 的金流商頁面一律 https。
 
 @ProviderFor(allowInsecureOnboardingUrl)
@@ -197,7 +151,7 @@ final class PaymentOnboardingProvider
   }
 }
 
-String _$paymentOnboardingHash() => r'6efc1a647d0272b0789923fae1b8cf1b44420ecc';
+String _$paymentOnboardingHash() => r'8381f9e8f9e03c5d3315ff012b05d129672468e7';
 
 /// 收款帳戶的開通與回到前景時的重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
 /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面

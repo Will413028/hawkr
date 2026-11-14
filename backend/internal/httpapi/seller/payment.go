@@ -2,8 +2,6 @@ package seller
 
 import (
 	"context"
-	"net/url"
-	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -15,25 +13,16 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 )
 
-// maxReturnURLLength 是開通後回到的網址的長度上限。
-const maxReturnURLLength = 2048
-
-// checkReturnURL 檢查開通 session 的回跳網址：絕對的 https 網址，或本機開發的 http://localhost。金流商會把賣家導向這個網址，不接受其他 scheme、帶帳密的網址。
-func checkReturnURL(path, raw string) error {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return rpc.RequiredField(path, path+" 必填")
+// returnPage 轉成 rpc 的回跳頁；UNSPECIFIED 與不認得的值回 invalid_argument。
+func returnPage(d pb.OnboardingReturnDestination) (rpc.ReturnPage, error) {
+	switch d {
+	case pb.OnboardingReturnDestination_ONBOARDING_RETURN_DESTINATION_WEBSITE_CERTIFICATION:
+		return rpc.ReturnPageCertification, nil
+	case pb.OnboardingReturnDestination_ONBOARDING_RETURN_DESTINATION_SELLER_APP:
+		return rpc.ReturnPageSellerApp, nil
+	case pb.OnboardingReturnDestination_ONBOARDING_RETURN_DESTINATION_UNSPECIFIED:
 	}
-	u, err := url.Parse(raw)
-	invalid := err != nil || len(raw) > maxReturnURLLength || u.Host == "" || u.User != nil || u.Fragment != ""
-	if !invalid {
-		local := u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"
-		invalid = u.Scheme != "https" && (u.Scheme != "http" || !local)
-	}
-	if invalid {
-		return rpc.RequiredField(path, path+" 必須是 https 網址（本機開發可用 http://localhost）")
-	}
-	return nil
+	return 0, rpc.RequiredField("destination", "destination 必須是有效的回跳目的地")
 }
 
 // PaymentReader 是收款帳戶的讀取來源（賣家端與後台的開通任務共用）。
@@ -83,13 +72,19 @@ func (h *App) CreatePaymentOnboardingSession(ctx context.Context, req *connect.R
 	if err != nil {
 		return nil, err
 	}
-	if err := checkReturnURL("return_url", req.Msg.GetReturnUrl()); err != nil {
+	page, err := returnPage(req.Msg.GetDestination())
+	if err != nil {
 		return nil, err
 	}
-	if err := checkReturnURL("refresh_url", req.Msg.GetRefreshUrl()); err != nil {
+	locale, ok := rpc.ValidWebLocale(req.Msg.GetLocale())
+	if !ok {
+		return nil, rpc.RequiredField("locale", "locale 必須是 zh-TW 或 en")
+	}
+	returnURL, refreshURL, err := h.web.OnboardingReturnURLs(page, locale)
+	if err != nil {
 		return nil, err
 	}
-	session, err := h.payments.CreateOnboardingSession(ctx, current.StoreID, strings.TrimSpace(req.Msg.GetReturnUrl()), strings.TrimSpace(req.Msg.GetRefreshUrl()))
+	session, err := h.payments.CreateOnboardingSession(ctx, current.StoreID, returnURL, refreshURL)
 	if err != nil {
 		return nil, err
 	}

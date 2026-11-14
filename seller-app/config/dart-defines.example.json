@@ -11,7 +11,6 @@
   "LINE_CHANNEL_ID": "<LINE Login channel ID（與後端、web 同一個 channel）>",
   "SENTRY_DSN": "",
   "GATEWAY_HOST": "",
-  "HAWKR_WEB_ORIGIN": "",
   "MEDIA_BASE_HOST": "",
   "HELP_CENTER_LINE_ID": "",
   "HELP_CENTER_LINE_URL": ""

@@ -94,7 +94,6 @@ class _Server {
   );
 
   ProviderContainer container({
-    String origin = 'https://web.example.test',
     bool allowInsecureUrl = false,
   }) {
     final container = ProviderContainer(
@@ -103,7 +102,6 @@ class _Server {
         sessionProvider.overrideWith(_LoggedIn.new),
         sellerClientProvider.overrideWithValue(client),
         myStoreRepositoryProvider.overrideWithValue(store.repository),
-        webOriginProvider.overrideWithValue(origin),
         externalBrowserLauncherProvider.overrideWithValue((uri) async {
           launched.add(uri);
           return launchResult;
@@ -131,39 +129,6 @@ void main() {
     binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   }
-
-  group('paymentReturnUri：website 的回跳頁', () {
-    test(
-      '<origin>/seller-app/payment-return?state=done|expired，預設語系沒有路徑前綴',
-      () {
-        expect(
-          paymentReturnUri('https://web.example.test', PaymentReturnState.done),
-          Uri.parse(
-            'https://web.example.test/seller-app/payment-return?state=done',
-          ),
-        );
-        expect(
-          paymentReturnUri(
-            'http://localhost:3000',
-            PaymentReturnState.expired,
-          ).toString(),
-          'http://localhost:3000/seller-app/payment-return?state=expired',
-        );
-      },
-    );
-  });
-
-  group('paymentReturnUri 的 origin 結尾斜線', () {
-    test('結尾有斜線也不會出現 //', () {
-      expect(
-        paymentReturnUri(
-          'https://web.example.test/',
-          PaymentReturnState.done,
-        ).toString(),
-        'https://web.example.test/seller-app/payment-return?state=done',
-      );
-    });
-  });
 
   group('開通連結只收 https（dev 才收 http）', () {
     test('stage 與 prod：http 連結失敗，不開瀏覽器', () async {
@@ -196,7 +161,7 @@ void main() {
   });
 
   group('start', () {
-    test('HOSTED：return_url 與 refresh_url 指向回跳頁，在外部瀏覽器開啟連結', () async {
+    test('HOSTED：只送 App 回跳目的地與語系（網址由伺服器組），在外部瀏覽器開啟連結', () async {
       final server = _Server();
       final container = server.container();
 
@@ -207,13 +172,10 @@ void main() {
       expect(outcome, PaymentOnboardingOutcome.launched);
       final request = server.sessions.single;
       expect(
-        request.returnUrl,
-        'https://web.example.test/seller-app/payment-return?state=done',
+        request.destination,
+        OnboardingReturnDestination.ONBOARDING_RETURN_DESTINATION_SELLER_APP,
       );
-      expect(
-        request.refreshUrl,
-        'https://web.example.test/seller-app/payment-return?state=expired',
-      );
+      expect(request.locale, 'zh-TW');
       expect(server.launched, [
         Uri.parse('https://connect.example.test/setup/abc'),
       ]);
