@@ -197,6 +197,13 @@ test("itemHref：逐種（含錨點）", () => {
 			},
 			"/admin/measures/m9#linked-account-901",
 		],
+		[
+			{
+				kind: ReviewQueueItemKind.PAYMENT_ACCOUNT_PURGE_STUCK,
+				subject: { case: "paymentAccount", value: { storeId: "57" } },
+			},
+			"/admin/merchants/57#payment-account",
+		],
 	];
 	assert.equal(cases.length, ALL_KIND_VALUES.length, "每種都有一筆");
 	for (const [patch, want] of cases) assert.equal(itemHref(item(patch)), want);
@@ -225,6 +232,7 @@ test("種類標籤：涵蓋 enum 的每個非 UNSPECIFIED 值；UNSPECIFIED 不�
 		[ReviewQueueItemKind.KYC_APPLICATION, "審核商家認證"],
 		[ReviewQueueItemKind.PAYMENT_ACCOUNT_CREATE_FAILED, "重試建立收款帳戶"],
 		[ReviewQueueItemKind.SHARED_BANK_ACCOUNT, "共用銀行帳號"],
+		[ReviewQueueItemKind.PAYMENT_ACCOUNT_PURGE_STUCK, "處理無法關閉的收款帳戶"],
 	];
 	assert.equal(expected.length, ALL_KIND_VALUES.length);
 	for (const [kind, text] of expected) {

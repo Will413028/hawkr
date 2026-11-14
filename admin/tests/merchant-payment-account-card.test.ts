@@ -42,8 +42,11 @@ function render(state: State): string {
 			state,
 			refreshing: false,
 			retrying: false,
+			purging: false,
 			onRefresh: () => {},
 			onRetryCreate: () => {},
+			onRetryPurge: () => {},
+			onDeleteMapping: () => {},
 			onReload: () => {},
 		}),
 	);
@@ -89,6 +92,27 @@ test("有 create_failed_time：顯示建立失敗時間與重試建立", () => {
 	// 還沒有外部帳戶：RefreshPaymentAccount 會回 failed_precondition，不給重新整理。
 	assert.doesNotMatch(html, /重新整理/);
 	assert.match(html, /準備中/);
+});
+
+test("有 purge_blocked_time：在重試建立的位置顯示原因與時間、重試關閉與已在金流商處理，刪除對應；不給重新整理與重試建立", () => {
+	const html = render({
+		state: "ready",
+		account: account({
+			createFailedTime: timestampFromDate(new Date("2026-11-03T06:20:00Z")),
+			purgeBlockedTime: timestampFromDate(new Date("2026-11-14T06:20:00Z")),
+			purgeBlockedReason: "provider_refused：no such account",
+		}),
+	});
+	assert.match(html, /收款帳戶無法關閉：provider_refused：no such account/);
+	assert.match(html, /2026\/11\/14 14:20/);
+	assert.match(html, /重試關閉/);
+	assert.match(html, /已在金流商處理，刪除對應/);
+	assert.doesNotMatch(html, /重試建立/);
+	assert.doesNotMatch(html, /建立失敗於/);
+	// 等待清理的帳戶 RefreshPaymentAccount 回 failed_precondition，不給重新整理。
+	assert.doesNotMatch(html, /重新整理/);
+	const plain = render({ state: "ready", account: account() });
+	assert.doesNotMatch(plain, /重試關閉|刪除對應|無法關閉/);
 });
 
 test("轉帳與撥款能力分別顯示", () => {

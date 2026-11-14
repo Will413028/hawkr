@@ -22,6 +22,7 @@ export const QUEUE_KIND_TEXT: Record<
 	[ReviewQueueItemKind.KYC_APPLICATION]: "審核商家認證",
 	[ReviewQueueItemKind.PAYMENT_ACCOUNT_CREATE_FAILED]: "重試建立收款帳戶",
 	[ReviewQueueItemKind.SHARED_BANK_ACCOUNT]: "共用銀行帳號",
+	[ReviewQueueItemKind.PAYMENT_ACCOUNT_PURGE_STUCK]: "處理無法關閉的收款帳戶",
 };
 
 /** 篩選下拉的選項順序：enum 的順序，不含 UNSPECIFIED。 */

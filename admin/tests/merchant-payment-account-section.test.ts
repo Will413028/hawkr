@@ -67,8 +67,16 @@ function setup(handlers: {
 	get: (call: number) => ReturnType<typeof account> | ConnectError;
 	refresh?: () => ReturnType<typeof account> | ConnectError;
 	retry?: () => ReturnType<typeof account>;
+	retryPurge?: () => ReturnType<typeof account> | ConnectError;
+	deleteMapping?: () => ConnectError | undefined;
 }) {
-	const calls = { get: 0, refresh: 0, retry: 0 };
+	const calls = {
+		get: 0,
+		refresh: 0,
+		retry: 0,
+		retryPurge: 0,
+		deleteMapping: 0,
+	};
 	const transport = createRouterTransport(({ service }) => {
 		service(PaymentAdminService, {
 			getPaymentAccount: () => {
@@ -86,6 +94,18 @@ function setup(handlers: {
 			retryPaymentAccountCreate: () => {
 				calls.retry += 1;
 				return { account: handlers.retry?.() };
+			},
+			retryPaymentAccountPurge: () => {
+				calls.retryPurge += 1;
+				const r = handlers.retryPurge?.();
+				if (r instanceof ConnectError) throw r;
+				return { account: r };
+			},
+			deletePaymentAccountMapping: () => {
+				calls.deleteMapping += 1;
+				const r = handlers.deleteMapping?.();
+				if (r) throw r;
+				return {};
 			},
 		});
 	});
@@ -177,6 +197,71 @@ test("重試建立：回應的帳戶直接寫進快取（不再讀一次）、�
 		{ tone: "success", text: sectionModule.RETRY_QUEUED_TEXT },
 	]);
 	assert.equal(queueInvalidated(), true);
+});
+
+const blocked = () =>
+	account({
+		purgeBlockedTime: at(2),
+		purgeBlockedReason: "provider_refused：no",
+	});
+
+test("重試關閉：回應的帳戶直接寫進快取（不再讀一次）、待辦重讀、notice 成功", async () => {
+	const { calls, notices, view, queueInvalidated } = setup({
+		get: blocked,
+		retryPurge: () => account({ statusReason: "after_retry_purge" }),
+	});
+	await view.render();
+	assert.match(bodyText(), /收款帳戶無法關閉/);
+	await click("重試關閉");
+	await until(() => bodyText().includes("after_retry_purge"), "快取已寫入");
+	assert.equal(calls.retryPurge, 1);
+	assert.equal(calls.get, 1);
+	assert.doesNotMatch(bodyText(), /收款帳戶無法關閉/);
+	assert.deepEqual(notices, [
+		null,
+		{ tone: "success", text: sectionModule.PURGE_RETRY_QUEUED_TEXT },
+	]);
+	assert.equal(queueInvalidated(), true);
+});
+
+test("已在金流商處理，刪除對應：先確認、確認前不送出；確認後送出、待辦與帳戶重讀、notice 成功", async () => {
+	const { calls, notices, view, queueInvalidated } = setup({
+		get: (n) => (n === 1 ? blocked() : new ConnectError("gone", Code.NotFound)),
+	});
+	await view.render();
+	await click("已在金流商處理，刪除對應");
+	assert.match(bodyText(), /確定已在金流商處理這個收款帳戶嗎？/);
+	assert.equal(calls.deleteMapping, 0, "確認前不得送出");
+	await click("返回");
+	assert.equal(calls.deleteMapping, 0);
+	assert.doesNotMatch(bodyText(), /確定已在金流商處理/);
+	await click("已在金流商處理，刪除對應");
+	await click("刪除對應");
+	await until(() => bodyText().includes("尚未建立"), "帳戶重讀後是尚未建立");
+	assert.equal(calls.deleteMapping, 1);
+	assert.equal(calls.get, 2);
+	assert.deepEqual(notices, [
+		{ tone: "success", text: sectionModule.MAPPING_DELETED_TEXT },
+	]);
+	assert.equal(queueInvalidated(), true);
+});
+
+test("刪除對應失敗：對話框留著並就地顯示原因，不宣告成功", async () => {
+	const { calls, notices, view } = setup({
+		get: blocked,
+		deleteMapping: () => new ConnectError("denied", Code.PermissionDenied),
+	});
+	await view.render();
+	await click("已在金流商處理，刪除對應");
+	await click("刪除對應");
+	await until(
+		() =>
+			bodyText().includes("確定已在金流商處理這個收款帳戶嗎？") &&
+			calls.deleteMapping === 1,
+		"送出一次",
+	);
+	assert.deepEqual(notices, []);
+	assert.match(bodyText(), /確定已在金流商處理這個收款帳戶嗎？/);
 });
 
 test("讀取：not_found 是尚未建立；其他錯誤是讀取失敗，重試會再讀", async () => {
