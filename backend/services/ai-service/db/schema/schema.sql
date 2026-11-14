@@ -25,6 +25,8 @@ CREATE TABLE events (
   requested_input_json        JSONB,
   branch                      TEXT,
   isolation_scope             TEXT,
+  input_transcription         JSONB,
+  output_transcription        JSONB,
   "timestamp"                 TIMESTAMPTZ(6),
   content                     JSONB,
   grounding_metadata          JSONB,
