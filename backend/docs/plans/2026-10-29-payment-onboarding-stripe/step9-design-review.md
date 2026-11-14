@@ -76,3 +76,16 @@
 | N-a | `platform/stripe/client.go` 的 `ListAccountIDsByStore` | nit | 「新的在前」靠 Stripe 的列表順序，錄製的 fixture 顯示它不嚴格依建立時間 | 改：依帳戶 `created` 由新到舊穩定排序，同時間維持列表順序 | fixed：`TestListAccountIDsByStoreOrdersMatchesByCreatedNewestFirst` |
 | N-b | 同上 | nit | 翻頁中列表位移會讓同一個 ID 出現兩次，呼叫方的 `ids[1:]` 含 `ids[0]`，建立會關掉剛採用的帳戶 | 改：回傳前以 ID 去重 | fixed：`TestListAccountIDsByStoreReturnsAnIDListedOnTwoPagesOnce` |
 | N-c | `account/service.go`、`account/AGENTS.md`、`payment.go`、整合測試的註解 | nit | 對帳敘述只寫 `metadata.store_id` | 改：補上 `metadata.hawkr_namespace` 與全部符合者都處理 | fixed：`rg -n "metadata.store_id" backend/internal backend/docs/modules backend/docs/adr` 的剩餘行都已含命名空間或是欄位說明 |
+
+## /code-review (9g)
+
+來源：9g 修正後的 `/code-review`，C1–C6。第 1–3 輪各列不得回退。整合測試交 CI（本機只跑 unit、`go vet -tags integration`）。
+
+| # | 位置 | 嚴重度 | 發現 | 處置 | 狀態 |
+|---|---|---|---|---|---|
+| C1 | `platform/stripe/client.go` 的 `APIError.Permanent`、`account/service.go` 的 `purgeFailed` | blocking | 任何 4xx（408、409、429 除外）都算永久，401、403（金鑰填錯或輪替）被當成 provider 拒絕關閉而直接進終局，7 天期限（D60）形同虛設 | 改：401、403 不算永久，清理維持可重試到期限；建立路徑共用同一分類，401、403 改為重試到最後一次嘗試才記建立失敗（沒有同樣的缺陷，不另改） | fixed：`TestAPIErrorPermanence`、`TestClassifyTreatsAuthenticationAndPermissionFailuresAsRetryable`、`TestStripeFetchFillsBankFingerprintsAndFailsWholeWhenTheListFails` |
+| C2 | `account/events.go` 的 `handleEvent` | should | 半建立的列（已有外部 ID）收到事件時排同步、同步提早返回，事件永遠不被標記；與 `docs/modules/payment.md` 不符 | 改：`create_completed_at` 為 NULL 時與對不到帳戶相同，標記已處理 | fixed：`TestAnEventForAHalfCreatedRowEnqueuesNoSyncAndIsMarkedProcessed` |
+| C3 | `account/service.go` 清理的對帳分支 | should | 空列表立刻刪列；標記前剛送出的建立呼叫可能還沒出現在列表 | 改：標記滿 `purgeListMargin`（1 小時）才信空列表，之前留著由掃描重跑 | fixed：`TestPurgeListingThatIsEmptyOnlyDeletesTheRowAfterTheSafetyMargin`（`TestPurgeAfterTheIdempotencyKeyExpiredReconcilesByListingNotByReplay` 同步調整） |
+| C4 | `account/service.go` 的 `jobTimeout`、`purgeFailed` | should | 60 秒只夠一次呼叫，清理與建立會串多次；job 自己逾時還可能被記成 `deadline_exceeded` | 改：一次最多關 3 個多餘帳戶（`maxExtrasPerRun`），時間上限由最多呼叫數推出；job 的 ctx 已取消時不進終局 | fixed：`TestJobTimeoutCoversTheMostProviderCallsAJobCanMake`、`TestPurgeClosesAtMostAFewExtraAccountsPerRunAndOnlyDeletesTheRowWhenAllAreClosed`、`TestAJobCancelledPastTheDeadlineIsNotRecordedAsDeadlineExceeded` |
+| C5 | `account/service.go` 的 `Purge` | nit | 內嵌重寫了 `closeExtra` | 改：與建立共用 `closeExtras`（呼叫 `closeExtra`） | fixed：`TestPurgeAfterTheIdempotencyKeyExpiredClosesEveryMatchingAccountBeforeDeletingTheRow` |
+| C6 | `account/service.go` 的 `MappingDeletions` | nit | 缺其他入口都有的 `model.Positive` | 改 | fixed：`TestAccountMappingDeletionsRejectsANonPositiveStoreID` |

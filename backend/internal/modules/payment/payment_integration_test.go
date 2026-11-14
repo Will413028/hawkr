@@ -1365,6 +1365,8 @@ func TestPurgeAfterTheIdempotencyKeyExpiredReconcilesByListingNotByReplay(t *tes
 	f.now = f.now.Add(IdempotencyRetention).Add(time.Hour)
 	closes := len(f.fake.Closes())
 	must(t, f.module.PurgeAccount(ctx, none, false))
+	f.now = f.now.Add(time.Hour)
+	must(t, f.module.PurgeAccount(ctx, none, false))
 	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", none) != 0 || len(f.fake.Closes()) != closes {
 		t.Fatal("整份列完都沒有帳戶時應該不關閉、直接刪列")
 	}
@@ -2051,5 +2053,132 @@ func TestEnsureAfterTheIdempotencyKeyExpiredAdoptsTheNewestMatchAndClosesTheRest
 	must(t, f2.module.EnsureAccount(ctx, s2, false))
 	if a := f2.account(t, s2); a.ExternalAccountID == nil || *a.ExternalAccountID != newer2 || !slices.Contains(f2.fake.Closes(), older2) {
 		t.Fatalf("重試後帳戶=%+v 關閉=%v", a, f2.fake.Closes())
+	}
+}
+
+// 對帳列出的空列表要等標記滿安全邊際才可信（標記前剛送出的建立呼叫可能還沒出現在列表）：邊際內留著標記的列、不關閉，邊際到了才刪。
+// mutation：Purge 對帳分支空列表立刻 deleteRow（拿掉 purgeListMargin 檢查）→ 第一次呼叫就刪列，失敗。
+func TestPurgeListingThatIsEmptyOnlyDeletesTheRowAfterTheSafetyMargin(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	f.fake.FailAcquire(errors.New("down"))
+	_ = f.module.EnsureAccount(ctx, s, false)
+	f.now = f.now.Add(IdempotencyRetention).Add(time.Hour)
+	must(t, f.module.PurgeAccount(ctx, s, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_pending_at = $2", s, f.now) != 1 {
+		t.Fatal("標記的當下列表是空的也不能刪列")
+	}
+	f.now = f.now.Add(59 * time.Minute)
+	must(t, f.module.PurgeAccount(ctx, s, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 1 {
+		t.Fatal("邊際內不能刪列")
+	}
+	f.now = f.now.Add(time.Minute)
+	must(t, f.module.PurgeAccount(ctx, s, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 || len(f.fake.Closes()) != 0 {
+		t.Fatal("滿邊際後空列表應該刪列且不關閉任何帳戶")
+	}
+}
+
+// 半建立的列（有外部 ID、沒有 create_completed_at）收到事件：不排同步，事件直接標記已處理（和對不到帳戶的事件相同）；建立完成後才排的同步讀到最新狀態。
+// mutation：handleEvent 拿掉 CreateCompletedAt 的檢查 → 排了同步而事件沒標記，失敗。
+func TestAnEventForAHalfCreatedRowEnqueuesNoSyncAndIsMarkedProcessed(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	boom := errors.New("configure failed")
+	f.fake.FailConfigure(boom)
+	if err := f.module.EnsureAccount(ctx, s, false); !errors.Is(err, boom) {
+		t.Fatalf("err=%v", err)
+	}
+	external := *f.account(t, s).ExternalAccountID
+	f.receive(t, "evt_half_row", external)
+	if !f.processed(t, "evt_half_row") || f.jobs.count(kindSync) != 0 {
+		t.Fatalf("processed=%v 同步 job=%d，預期事件已處理且沒有同步", f.processed(t, "evt_half_row"), f.jobs.count(kindSync))
+	}
+}
+
+// 管理員讀「刪除對應」紀錄的入口和其他入口一樣檢查店家 ID。
+// mutation：MappingDeletions 拿掉 model.Positive → 0 與負數回空清單而不是 invalid_input，失敗。
+func TestAccountMappingDeletionsRejectsANonPositiveStoreID(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	for _, id := range []int64{0, -1} {
+		if _, err := f.module.AccountMappingDeletions(context.Background(), id); apperr.KindOf(err) != apperr.KindInvalidInput {
+			t.Fatalf("store %d err=%v，預期 invalid_input", id, err)
+		}
+	}
+}
+
+// 對帳找到的多餘帳戶一次 job 最多關閉 maxExtrasPerRun 個（job 的時間上限由呼叫數推出）：沒關完回錯誤重試、列留著、不採用 ID 也不刪列；已關閉的下一輪列不出來，最後全部關閉才刪列。
+// mutation：closeExtras 不設上限 → 第一次呼叫就關完並刪列，失敗；上限之後仍刪列或採用 ID → 列不見或外部 ID 不是 NULL，失敗。
+func TestPurgeClosesAtMostAFewExtraAccountsPerRunAndOnlyDeletesTheRowWhenAllAreClosed(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s, first := f.calledRow(t)
+	f.fake.ExpireKeys()
+	all := []string{first}
+	for i := range 4 {
+		id, err := f.fake.AcquireAccount(deadlineCtx(t), AcquireInput{StoreID: s, IdempotencyKey: fmt.Sprintf("many-%d", i)})
+		must(t, err)
+		all = append(all, id)
+	}
+	f.now = f.now.Add(IdempotencyRetention).Add(time.Hour)
+	if err := f.module.PurgeAccount(ctx, s, false); err == nil {
+		t.Fatal("多餘帳戶沒關完要回傳錯誤給 River 重試")
+	}
+	if n := len(f.fake.Closes()); n != 3 {
+		t.Fatalf("第一輪關閉 %d 個，預期上限 3", n)
+	}
+	if f.account(t, s).ExternalAccountID != nil || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 1 {
+		t.Fatal("沒關完時列必須留著且不採用外部 ID")
+	}
+	must(t, f.module.PurgeAccount(ctx, s, false))
+	got := f.fake.Closes()
+	slices.Sort(got)
+	slices.Sort(all)
+	if !slices.Equal(got, all) || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 {
+		t.Fatalf("關閉=%v，預期五個各關一次並刪列", got)
+	}
+}
+
+// cancelOnClose 在關閉時取消 job 的 ctx 並回 ctx 的錯誤，模擬 job 自己逾時被取消。
+type cancelOnClose struct {
+	*Fake
+	cancel context.CancelFunc
+}
+
+func (c *cancelOnClose) CloseAccount(ctx context.Context, externalID string) error {
+	c.cancel()
+	return ctx.Err()
+}
+
+// 過了 7 天的列，失敗只是 job 自己的 ctx 被取消或逾時：不是 provider 的失敗，不能記成 deadline_exceeded 進終局，維持可重試。
+// mutation：purgeFailed 的 expired 分支拿掉 ctx.Err() == nil → 列進終局，失敗。
+func TestAJobCancelledPastTheDeadlineIsNotRecordedAsDeadlineExceeded(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	f.ensure(t, s)
+	boom := errors.New("provider down")
+	f.fake.FailClose(boom)
+	if err := f.module.PurgeAccount(ctx, s, false); !errors.Is(err, boom) {
+		t.Fatalf("err=%v", err)
+	}
+	f.now = f.now.Add(PurgeDeadline).Add(time.Second)
+	jobCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	log := slog.New(slog.NewTextHandler(&f.logs, nil))
+	m := New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Inbox: f.inbox, Provider: &cancelOnClose{Fake: f.fake, cancel: cancel}, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: log})
+	if err := m.PurgeAccount(jobCtx, s, false); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err=%v，預期回傳取消的錯誤給 River 重試", err)
+	}
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_blocked_at IS NULL", s) != 1 {
+		t.Fatal("job 自己被取消不能進終局")
 	}
 }

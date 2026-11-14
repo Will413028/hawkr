@@ -256,7 +256,7 @@ func TestIdempotencyConflictIsAnAPIErrorThatIsPermanent(t *testing.T) {
 }
 
 func TestAPIErrorPermanence(t *testing.T) {
-	for status, want := range map[int]bool{400: true, 401: true, 404: true, 408: false, 429: false, 500: false, 503: false} {
+	for status, want := range map[int]bool{400: true, 401: false, 403: false, 404: true, 408: false, 429: false, 500: false, 503: false} {
 		if got := (&APIError{Status: status}).Permanent(); got != want {
 			t.Errorf("%d：%v，want %v", status, got, want)
 		}

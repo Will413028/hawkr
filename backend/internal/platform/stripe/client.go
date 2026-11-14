@@ -164,13 +164,18 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("stripe：HTTP %d %s：%s", e.Status, e.Code, e.Message)
 }
 
-// Permanent 回傳重試也不會成功：4xx 而且不是逾時（408）與限流（429）。409 只有 code 為 idempotency_error（冪等鍵搭配了不同的參數）才是永久的；
+// Permanent 回傳重試也不會成功：4xx 而且不是逾時（408）、限流（429），也不是認證（401）與權限（403）失敗：金鑰填錯或輪替、權限被調整是設定問題，
+// 修正設定後重試就會成功，不是金流商拒絕這個請求（清理的 7 天期限就是為了涵蓋這種情況，D60）。409 只有 code 為 idempotency_error（冪等鍵搭配了不同的參數）才是永久的；
 // 其他 409 是同一把鍵的另一個請求還在執行，等一下用同一把鍵重送即可（https://docs.stripe.com/error-low-level 的 Content errors）。
 func (e *APIError) Permanent() bool {
 	if e.Status == http.StatusConflict {
 		return e.Code == "idempotency_error"
 	}
-	return e.Status >= 400 && e.Status < 500 && e.Status != http.StatusRequestTimeout && e.Status != http.StatusTooManyRequests
+	switch e.Status {
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusRequestTimeout, http.StatusTooManyRequests:
+		return false
+	}
+	return e.Status >= 400 && e.Status < 500
 }
 
 // exchange 是一次非 2xx 回應的狀態、標頭與本文；SDK 的錯誤型別依 API 版本與錯誤種類而異（有的不帶狀態碼），

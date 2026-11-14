@@ -530,9 +530,13 @@ func TestStripeFetchFillsBankFingerprintsAndFailsWholeWhenTheListFails(t *testin
 	if err == nil || errors.Is(err, ErrPermanent) || snap.Transfers != "" || snap.BankFingerprints != nil {
 		t.Fatalf("snap=%+v err=%v，預期一般錯誤且沒有快照", snap, err)
 	}
-	listStatus = 403
+	listStatus = 400
 	if _, err := p.FetchAccount(context.Background(), "acct_1"); !errors.Is(err, ErrPermanent) {
 		t.Fatalf("4xx 的列表錯誤是永久失敗：%v", err)
+	}
+	listStatus = 403
+	if _, err := p.FetchAccount(context.Background(), "acct_1"); err == nil || errors.Is(err, ErrPermanent) {
+		t.Fatalf("403 是權限設定問題、可重試：%v", err)
 	}
 }
 
@@ -557,5 +561,24 @@ func TestStripeCloseAccountClassifiesErrors(t *testing.T) {
 	}))
 	if err := ok.CloseAccount(context.Background(), "acct_1"); err != nil {
 		t.Fatalf("成功的關閉：%v", err)
+	}
+}
+
+// 認證（401）與權限（403）失敗是設定問題（金鑰填錯或輪替），修正後重試會成功，不算金流商拒絕：不得包成 ErrPermanent（清理的 7 天期限涵蓋它，D60）。
+func TestClassifyTreatsAuthenticationAndPermissionFailuresAsRetryable(t *testing.T) {
+	for status, want := range map[int]bool{400: true, 401: false, 403: false, 404: true, 429: false, 500: false} {
+		err := classify(&stripe.APIError{Status: status})
+		if got := errors.Is(err, ErrPermanent); got != want {
+			t.Errorf("%d：permanent=%v，want %v", status, got, want)
+		}
+	}
+}
+
+func TestJobTimeoutCoversTheMostProviderCallsAJobCanMake(t *testing.T) {
+	if jobTimeout < time.Duration(maxProviderCallsPerJob)*callTimeout {
+		t.Fatalf("jobTimeout %v 小於 %d 次呼叫各 %v", jobTimeout, maxProviderCallsPerJob, callTimeout)
+	}
+	if maxProviderCallsPerJob < maxExtrasPerRun+3 {
+		t.Fatalf("呼叫數 %d 少於多餘帳戶 %d 加上列出、取得、設定", maxProviderCallsPerJob, maxExtrasPerRun)
 	}
 }

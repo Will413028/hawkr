@@ -21,8 +21,14 @@ import (
 const (
 	// callTimeout 是單次呼叫 provider 的上限。
 	callTimeout = 20 * time.Second
-	// jobTimeout 是一次 job 的上限：一次呼叫加資料庫。
-	jobTimeout = 60 * time.Second
+	// maxExtrasPerRun 是一次 job 最多關閉的多餘帳戶數（對帳找到的、除了採用或最後關閉的那一個之外）；超過的留給下一輪，沒關完不刪列、不採用 ID。
+	maxExtrasPerRun = 3
+	// maxProviderCallsPerJob 是一次 job 最多的 provider 呼叫數：建立是列出、多餘帳戶、取得、設定；清理是列出、多餘帳戶、關閉（建立較多）。
+	maxProviderCallsPerJob = maxExtrasPerRun + 3
+	// jobTimeout 是一次 job 的上限：最多的 provider 呼叫各佔 callTimeout，加上幾次寫結果的 transaction（writeTimeout 內）。
+	jobTimeout = maxProviderCallsPerJob*callTimeout + 4*writeTimeout
+	// purgeListMargin 是清理列出對帳時，空的列表要等標記之後多久才可信：標記前剛送出的建立呼叫可能還沒出現在列表。
+	purgeListMargin = time.Hour
 	// writeTimeout 是寫結果的 transaction 的上限（job 的 ctx 逾時被取消後仍要能寫入）。
 	writeTimeout = 15 * time.Second
 	// maxAttempts 是 job 暫時性失敗時 River 重試的上限（退避是 River 預設的 attempt^4 秒，約 80 分鐘內用完）。
@@ -272,10 +278,8 @@ func (s *Service) acquire(ctx context.Context, row store.PaymentAccount) (id str
 		if found {
 			id = ids[0]
 			// 採用最新的一個，其餘關閉（D61）；先關再寫進列：寫進列之後這條路不會再列出，沒關掉的多餘帳戶就沒有人處理了。
-			for _, extra := range ids[1:] {
-				if err := s.closeExtra(ctx, extra); err != nil {
-					return "", false, err
-				}
+			if _, err := s.closeExtras(ctx, ids[1:]); err != nil {
+				return "", false, err
 			}
 		} else {
 			var rotated bool
@@ -293,6 +297,23 @@ func (s *Service) acquire(ctx context.Context, row store.PaymentAccount) (id str
 	}
 	stored, err = s.storeExternal(ctx, row.StoreID, id, false)
 	return id, stored, err
+}
+
+// errExtrasRemain 表示一次 job 關不完多餘的帳戶，剩下的下一輪處理（暫時性）。
+var errExtrasRemain = errors.New("payment：還有多餘的外部帳戶沒關閉，留給下一輪")
+
+// closeExtras 關閉多餘的帳戶，一次最多 maxExtrasPerRun 個（已關閉的下一輪列不出來）；沒關完回 errExtrasRemain，呼叫方不得刪列或採用 ID。
+// failed 是關閉失敗的那一個帳戶（沒有失敗時為 nil）。
+func (s *Service) closeExtras(ctx context.Context, extras []string) (failed *string, err error) {
+	for i, extra := range extras {
+		if i == maxExtrasPerRun {
+			return nil, errExtrasRemain
+		}
+		if err := s.closeExtra(ctx, extra); err != nil {
+			return &extras[i], err
+		}
+	}
+	return nil, nil
 }
 
 // closeExtra 關閉建立時對帳多找到的帳戶（冪等：已關閉視為成功）。
@@ -497,16 +518,15 @@ func (s *Service) Purge(ctx context.Context, storeID int64, final bool) error {
 			return s.purgeFailed(ctx, row, nil, err, final, expired)
 		}
 		if len(ids) == 0 {
+			// 標記前剛送出的建立呼叫可能還沒出現在列表：標記滿 purgeListMargin 才信空列表，之前留著由掃描重跑。
+			if row.PurgePendingAt == nil || now.Sub(*row.PurgePendingAt) < purgeListMargin {
+				return nil
+			}
 			return s.deleteRow(ctx, row, nil)
 		}
 		// 全部符合的都要關閉才刪列（D61）：先關多餘的，任何一個失敗照既有的失敗路徑處理、列留著；已關閉的下一輪列不出來，重試只剩沒關掉的。
-		for _, extra := range ids[1:] {
-			callCtx, cancel := context.WithTimeout(ctx, callTimeout)
-			err := s.d.Provider.CloseAccount(callCtx, extra)
-			cancel()
-			if err != nil {
-				return s.purgeFailed(ctx, row, &extra, err, final, expired)
-			}
+		if failed, err := s.closeExtras(ctx, ids[1:]); err != nil {
+			return s.purgeFailed(ctx, row, failed, err, final, expired)
 		}
 		return s.storeThenClose(ctx, row, ids[0], final, expired)
 	}
@@ -552,7 +572,8 @@ func (s *Service) purgeFailed(ctx context.Context, row store.PaymentAccount, ext
 	switch {
 	case permanent:
 		return s.blockPurge(ctx, row.StoreID, blockProviderRefused+"："+err.Error())
-	case expired:
+	case expired && ctx.Err() == nil:
+		// job 自己被取消或逾時（ctx.Err）不算 provider 的失敗，不能因此進終局；留給下一輪。
 		return s.blockPurge(ctx, row.StoreID, blockDeadlineExceeded+"："+err.Error())
 	case !final:
 		return err
@@ -641,6 +662,9 @@ func (s *Service) DeleteMapping(ctx context.Context, storeID, adminID int64) err
 
 // MappingDeletions 讀回店家的「刪除對應」紀錄（新的在前）。
 func (s *Service) MappingDeletions(ctx context.Context, storeID int64) ([]model.MappingDeletion, error) {
+	if err := model.Positive(storeID); err != nil {
+		return nil, err
+	}
 	rows, err := store.New(s.d.DB.Conn(ctx)).PaymentMappingDeletionsByStore(ctx, storeID)
 	if err != nil {
 		return nil, err
