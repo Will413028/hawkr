@@ -455,7 +455,7 @@ Stripe 計畫 D22、D36、D37、D38、D42、D45 與 8b 的「預設表」：KYC 
 
 | 被取代的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
 |---|---|---|---|---|
-| 身分證號、負責人身分證號、銀行代碼與帳號的欄位、AES-GCM 密文（AAD 綁申請與欄位）、遮蔽型別轉換、`KYC_ENCRYPTION_KEYS` | 平台自己做實名與收款帳號核對 | 不成立：實名與銀行帳號由 Stripe 驗證，平台不留這些資料（D22） | 資料最小化：不收就沒有外洩面 | 欄位、密文、遮蔽、加密金鑰與 `platform/seal` 的加解密刪除（migration `seller_drop_kyc_pii_pipeline`）；`TestKYCHasNoPersonalIdentityOrBankColumnsOrFields` 守「表與型別沒有這些欄位」 |
+| 身分證號、負責人身分證號、銀行代碼與帳號的欄位、AES-GCM 密文（AAD 綁申請與欄位）、遮蔽型別轉換、`KYC_ENCRYPTION_KEYS` | 平台自己做實名與收款帳號核對 | 不成立：實名與銀行帳號由 Stripe 驗證，平台不留這些資料（D22） | 資料最小化：不收就沒有外洩面 | 欄位、密文、遮蔽、加密金鑰與 `platform/seal` 的加解密刪除（migration `seller_payment_onboarding_schema`）；`TestKYCHasNoPersonalIdentityOrBankColumnsOrFields` 守「表與型別沒有這些欄位」 |
 | 本名、英文姓名、生日、發證日期／類型／地點、銀行名稱的欄位與 `KYCField` 值 | 同上；本名也是後台佇列的列名與搜尋、憑證持有人比對的基準 | 不成立（D22、D37） | 同上 | 欄位刪除，proto 的欄位與 enum 值直接刪除，`v1alpha1` 不留 `reserved`（規則在 `開發規範/API 設計規範（Connect）.md`）；佇列的列名與搜尋改用店名（`KYCApplicationSummary.store_name`），公司名稱與統編照舊可搜；`MatchCertHolder` 只比對核准的公司名稱，個人賣家沒有基準（`HasReference = false`，交人工判斷） |
 | `kyc_reveals` 加 `RevealKYCSensitive`、`ListKYCReveals`（限時授權、理由必填） | 看全文要有目的、限時、留痕 | 不成立：沒有全文可看；公司補充文件不是證件影像，有後台的 KYC 讀取權限就能讀（D36 選項 B） | 業界的 JIT 存取只用在機敏個資；一般營業文件用權限加讀取紀錄 | 兩支 RPC、授權表與 `RevealGrantTTL` 刪除；`GetKYCApplication` 直接帶補充文件的檢視網址與 `asset_id`；每次讀取先寫一列 `kyc_document_accesses`（誰、哪一張、何時，不掛授權，形狀同 `evidence_accesses`）才讀內容，寫不進去就不送（fail closed）；`TestKYCDocumentAccessIsRecordedBeforeTheBytesAreRead`、`TestKYCDocumentsNeedTheKYCReadPermissionAndEveryReadIsRecorded` |
 | 證件位置（`slot`：身分證正反面、存摺、公司文件）與單張位置的合併邏輯 | 四種位置各一張，公司文件最多 10 張 | 不成立：只剩公司補充文件 | 同一種文件用一個有序清單 | `kyc_documents.slot` 刪除、主鍵 `(application_id, position)`；`KYCDocument` 帶欄位（`BUSINESS_COMPANY_DOCUMENTS`）與位置；檢視網址 `/documents/{position}` |
