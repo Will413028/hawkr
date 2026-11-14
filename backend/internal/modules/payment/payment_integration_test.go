@@ -944,11 +944,12 @@ func TestOnboardingSessionShapeComesFromTheAccountRowNotTheCurrentConfiguration(
 	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET provider = 'stripe' WHERE store_id = ANY($1)", []int64{platformRow, providerRow})
 	must(t, err)
 
+	// 每個模組用自己的 inbox：同一個 inbox 登記兩次 stripe 會 panic（組裝錯誤）。
 	embedded := []EmbeddedRuntime{RuntimeStripeConnectJS}
 	client, paths := stripeSessionCalls(t)
 	configured, err := NewStripe(client, CollectionProvider, "pk_test_x")
 	must(t, err)
-	f.module = New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Inbox: f.inbox, Provider: configured, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.New(slog.NewTextHandler(&f.logs, nil))})
+	f.module = New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()}), Provider: configured, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.New(slog.NewTextHandler(&f.logs, nil))})
 	got, err := f.module.CreateOnboardingSession(ctx, platformRow, "https://web.example.test/ok", "https://web.example.test/again", embedded)
 	must(t, err)
 	if e, ok := got.(StripeEmbeddedSession); !ok || e.ClientSecret == "" || e.PublishableKey != "pk_test_x" {
@@ -956,7 +957,7 @@ func TestOnboardingSessionShapeComesFromTheAccountRowNotTheCurrentConfiguration(
 	}
 	configured, err = NewStripe(client, CollectionPlatform, "pk_test_x")
 	must(t, err)
-	f.module = New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Inbox: f.inbox, Provider: configured, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.New(slog.NewTextHandler(&f.logs, nil))})
+	f.module = New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()}), Provider: configured, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.New(slog.NewTextHandler(&f.logs, nil))})
 	got, err = f.module.CreateOnboardingSession(ctx, providerRow, "https://web.example.test/ok", "https://web.example.test/again", embedded)
 	must(t, err)
 	if h, ok := got.(HostedSession); !ok || h.URL == "" {
