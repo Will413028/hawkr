@@ -25,6 +25,7 @@
 | `packages/hawkr-ui-text-ts/` | 共用文案目錄（契約值到使用者面文字）的 TypeScript 版，套件名 `@hawkr/ui-text`；`src/**/*.gen.*` 與 `tests/*.gen.*` 由 `backend/cmd/uitext-gen` 生成，不得手改，`src/format.ts` 與守門工具 `tools/check-enum-text.ts` 是手寫的。website 與 admin 共用 | `.github/workflows/ts-packages.yml`、`.github/workflows/ui-text-generated-diff.yml` |
 | `packages/hawkr_ui_text/` | 共用文案目錄的 Dart 版（純 Dart）；`lib/src/ui_text.g.dart`、`tool/enum_manifest.g.json`、`test/golden.g.json`、`test/golden_calls.g.dart` 由 `backend/cmd/uitext-gen` 生成，不得手改，`UiLocale` 與守門工具 `tool/check_enum_text.dart` 是手寫的。兩支 App 共用 | `.github/workflows/dart-packages.yml`、`.github/workflows/ui-text-generated-diff.yml` |
 | `brand/` | 作品集改名後的品牌素材（`brand/hawkr/`：logo 的 SVG 與用法） | 無 |
+| `docs/` | ADR、共通規範、跨專案計畫；分界與路徑寫法見 `docs/README.md` | `.github/workflows/repo-hygiene.yml` |
 | `scripts/` | 跨專案的檢查 | `.github/workflows/repo-hygiene.yml` |
 | 根目錄供應鏈設定 | `SECURITY.md`、`.github/dependabot.yml`、`.github/zizmor.yml`、`.gitleaks.toml` 與 `.gitleaks-baseline.json`、`osv-scanner.toml`、`scripts/govulncheck-allowlist.json` | `.github/workflows/supply-chain.yml`（govulncheck、OSV-Scanner、gitleaks、zizmor） |
 
