@@ -26,14 +26,15 @@ BASELINE = Path(__file__).with_name("payuni-residue-baseline.json")
 
 def current_counts(root: Path) -> dict[str, int]:
     proc = subprocess.run(
-        ["git", "grep", "-c", "-i", "-I", "payuni", "--", *SCOPE],
+        ["git", "grep", "-z", "-c", "-i", "-I", "payuni", "--", *SCOPE],
         cwd=root, capture_output=True, text=True,
     )
     if proc.returncode not in (0, 1):
         sys.exit(f"git grep 失敗：{proc.stderr.strip()}")
     counts = {}
+    # -z：路徑不加引號、不轉義（中文路徑與 core.quotepath 無關），以 NUL 與計數分開。
     for line in proc.stdout.splitlines():
-        path, _, n = line.rpartition(":")
+        path, _, n = line.rpartition("\0")
         counts[path] = int(n)
     return counts
 
