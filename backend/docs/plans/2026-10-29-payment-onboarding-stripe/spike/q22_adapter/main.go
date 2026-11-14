@@ -2,7 +2,8 @@
 
 // q22_adapter 用正式的 adapter（internal/platform/stripe）對 Stripe sandbox 走一次：
 // create（兩步建立＋開通連結）、status（讀帳戶）、close（關閉，連關兩次確認冪等）。
-// 用法：go run -tags spike ./docs/plans/2026-10-29-payment-onboarding-stripe/spike/q22_adapter <create|status|close> [account id]
+// 用法：go run -tags spike ./docs/plans/2026-10-29-payment-onboarding-stripe/spike/q22_adapter <create [none]|link|status|close> [account id]
+// create 後面加 none 是平台收件（dashboard=none，Q23），不加是 Stripe 收件（express，Q22）。
 // 金鑰從環境變數 STRIPE_SECRET_KEY 讀。
 package main
 
@@ -39,7 +40,11 @@ func run() error {
 			return err
 		}
 		key := "q22-" + hex.EncodeToString(raw)
-		id, err := c.CreateAccount(ctx, key, 990022, stripe.DashboardExpress, "seller-q22@example.com")
+		dashboard := stripe.DashboardExpress
+		if len(os.Args) > 2 && os.Args[2] == "none" {
+			dashboard = stripe.DashboardNone
+		}
+		id, err := c.CreateAccount(ctx, key, 990022, dashboard, "seller-q22@example.com")
 		if err != nil {
 			return fmt.Errorf("CreateAccount: %w", err)
 		}

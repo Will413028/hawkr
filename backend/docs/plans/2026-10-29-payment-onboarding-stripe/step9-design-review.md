@@ -43,3 +43,18 @@
 - client：`CertificationsClient.tsx`、`kyc.ts`、seller-app 的 KYC 精靈與錢包畫面、admin 的 `KycApplicationCards.tsx`、CSS、法務文件、測試；`governance.proto`、`measure.proto` 只看前段；三個子專案的 `AGENTS.md` 與兩份 ADR 全文沒有讀。
 
 這些範圍各自在 7、8 的子步驟有 diff 審查（進度表），沒有設計視角的審查。
+
+## 第 2 輪（9e，2026-11-14）
+
+審查對象：`e542bed1..938bbe7f`，兩位沒有參與撰寫的唯讀審查者（後端；契約加 client），只審 9b–9d 的修改。findings 9 (blocking 0)：修 1、記錄 2、交 Will 4（D58、D59）、駁回 0；兩位重複 2（語系欄位、`CARRYOVER.md` 漏列）。第 1 輪的 B1–B13、C1–C8 在 `938bbe7f` 逐列核對，無回退（列上的 CI run 與 mutation 沒有重跑）。
+
+| # | 位置 | 嚴重度 | 發現 | 處置 | 狀態 |
+|---|---|---|---|---|---|
+| R1 | `seller.proto` 的 `CreatePaymentOnboardingSessionRequest.locale`、`rpc.ValidWebLocale` | should | 語系 ADR 定的通道是 `Accept-Language`；`uitext.WithLocale` 在正式程式沒有呼叫者，欄位是通道沒做的替代品 | 交 Will：改（D58，9f）：做協商 interceptor、刪欄位 | open（9f） |
+| R2 | `PaymentAccount.onboarding_surface`、website `startOnboarding` | should | 欄位只剩預先分支在用，與 session 的介面來源不同，切換收件方式後會擋下賣家 | 交 Will：改（D58，9f） | open（9f） |
+| R3 | `CreatePaymentOnboardingSessionResponse` | should | 型態欄位加攤平欄位，有第三種組合；規範要求互斥型態用 `oneof` | 交 Will：改（D58，9f） | open（9f） |
+| R4 | `payment/internal/account/service.go` 的 `planPurge` | should | 沒有外部 ID 又問不到 provider 的列直接刪，丟掉冪等鍵；`CARRYOVER.md` 的敘述與行為相反 | 交 Will：改（D59，9g） | open（9g） |
+| R5 | `seller.proto` 的 `locale` 註解 | nit | 註解寫「不影響網址」，App 加內嵌介面時會影響 | 改：隨 R1 刪欄位 | open（9f） |
+| R6 | payment `CARRYOVER.md` 傳輸層表（兩位都提） | nit | 9b–9d 的新機制沒有列 | 記：9f、9g 各自補列改完後還在的機制 | open（9f、9g） |
+| R7 | payment `CARRYOVER.md` 四列「上線前」的延後項 | nit | repo 沒有上線前的彙整處 | 記：9g 關掉其中三列，剩下的隨 9e 的延後項搬回主清單 | open（9g、9e） |
+| 附註 | 帳本 C2、B1 的檢查（核對時的附註，不計入發現） | nit | C2 的 `git grep` 沒寫路徑；B1 的 grep 另命中兩個文件 | 記：檢查的範圍是 `backend/internal backend/cmd api/hawkr admin website seller-app packages` 的程式，命中都是 Stripe 自己的欄位名與文件 | recorded |
