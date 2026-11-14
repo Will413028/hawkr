@@ -33,7 +33,7 @@ const (
 	eventGrace = time.Minute
 	// createIdle 是建立列閒置多久之後由掃描補排建立 job（保底，平常 job 一定存在）。
 	createIdle = 10 * time.Minute
-	// IdempotencyRetention 是金流商保證同一把冪等鍵回同一個結果的時間（Stripe 保存 30 天）；超過之後重送同一把鍵可能建出新的帳戶，所以改以 metadata.store_id 列出對帳。
+	// IdempotencyRetention 是金流商保證同一把冪等鍵回同一個結果的時間（Stripe 保存 30 天）；超過之後重送同一把鍵可能建出新的帳戶，所以改以 metadata.store_id 加 metadata.hawkr_namespace 列出對帳。
 	IdempotencyRetention = 30 * 24 * time.Hour
 	// PurgeDeadline 是列被標成等待清理之後，仍然關不掉或問不到 provider 的最長時間，超過進終局（D60：既有重試是單一 job 8 次約 80 分鐘、掃描每 15 分鐘，
 	// 7 天涵蓋金流商故障與金鑰設定修正）。
@@ -155,7 +155,7 @@ func (s *Service) Account(ctx context.Context, storeID int64) (model.PaymentAcco
 
 // Ensure 是建立 job 的內容：先讀本地列，確認擁有者營運中（Owners），在 transaction 外讀擁有者目前的聯絡信箱（D50），分兩步建立外部帳戶（D55、D59）：
 //  0. 呼叫 provider 之前先在 transaction 內記「已呼叫」的時刻（create_called_at；之後列上分得出「從沒呼叫」與「結果不明」）；
-//  1. 取得外部 ID（冪等鍵 30 天內重送得到同一個帳戶；超過 30 天先列出 provider 的帳戶以 metadata.store_id 對帳，找到就用它，整份列完都沒有才換新鍵），
+//  1. 取得外部 ID（冪等鍵 30 天內重送得到同一個帳戶；超過 30 天先列出 provider 的帳戶以 metadata.store_id 加 metadata.hawkr_namespace 對帳，找到就用最新的並關閉其餘，整份列完都沒有才換新鍵），
 //     拿到 ID 立刻在 transaction 內寫進列（不等第二步）；
 //  2. 完成設定（寫入信箱與收款設定），成功才在 transaction 內記 create_completed_at 並排入同步 job：從這一刻起帳戶才算已建立，可以開通、輪詢、同步。
 //
@@ -402,7 +402,7 @@ const (
 	purgeClose
 	// purgeReplay 是呼叫過、沒有外部 ID、冪等鍵還在保存期（30 天）內：以同一把鍵取得 ID 寫回，再關閉（D55）。
 	purgeReplay
-	// purgeList 是呼叫過、沒有外部 ID、冪等鍵已過期：列出 provider 的帳戶以 metadata.store_id 對帳，找到就寫回再關閉，整份列完都沒有才刪列（D59）。
+	// purgeList 是呼叫過、沒有外部 ID、冪等鍵已過期：列出 provider 的帳戶以 metadata.store_id 加 metadata.hawkr_namespace 對帳，找到的全部都要關閉（其中一個寫回列），，整份列完都沒有才刪列（D59）。
 	purgeList
 	// purgeDefer 是呼叫過、但問不到 provider（沒有設定，或列的 provider 與目前設定不同）：列留著，超過期限進終局。
 	purgeDefer

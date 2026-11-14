@@ -934,6 +934,38 @@ func TestListAccountIDsByStoreMatchesBothStoreIDAndNamespaceAcrossPages(t *testi
 	}
 }
 
+// 順序依 created 由新到舊，不依 Stripe 的列表順序；同時間維持列表順序。
+func TestListAccountIDsByStoreOrdersMatchesByCreatedNewestFirst(t *testing.T) {
+	acct := func(id, created string) string {
+		return `{"id":"` + id + `","object":"v2.core.account","closed":false,"created":"` + created + `","applied_configurations":[],"metadata":{"store_id":"5","hawkr_namespace":"env-a"}}`
+	}
+	body := `{"data":[` + acct("acct_old", "2026-01-01T00:00:00.000Z") + `,` + acct("acct_new", "2026-03-01T00:00:00.000Z") + `,` + acct("acct_tie_a", "2026-02-01T00:00:00.000Z") + `,` + acct("acct_tie_b", "2026-02-01T00:00:00.000Z") + `],"next_page_url":null}`
+	s := &stub{resp: func(int) (int, string, http.Header) { return 200, body, nil }}
+	ids, err := newTestClient(t, s).ListAccountIDsByStore(context.Background(), 5)
+	if err != nil || !slices.Equal(ids, []string{"acct_new", "acct_tie_a", "acct_tie_b", "acct_old"}) {
+		t.Fatalf("ids=%v err=%v", ids, err)
+	}
+}
+
+// 列表在翻頁中位移時同一個 ID 會出現在兩頁，只回一筆。
+func TestListAccountIDsByStoreReturnsAnIDListedOnTwoPagesOnce(t *testing.T) {
+	acct := func(id string) string {
+		return `{"id":"` + id + `","object":"v2.core.account","closed":false,"created":"2026-01-01T00:00:00.000Z","applied_configurations":[],"metadata":{"store_id":"5","hawkr_namespace":"env-a"}}`
+	}
+	page1 := `{"data":[` + acct("acct_a") + `,` + acct("acct_b") + `],"next_page_url":"/v2/core/accounts?page=2&limit=20"}`
+	page2 := `{"data":[` + acct("acct_b") + `,` + acct("acct_c") + `],"next_page_url":null}`
+	s := &stub{resp: func(n int) (int, string, http.Header) {
+		if n == 1 {
+			return 200, page1, nil
+		}
+		return 200, page2, nil
+	}}
+	ids, err := newTestClient(t, s).ListAccountIDsByStore(context.Background(), 5)
+	if err != nil || !slices.Equal(ids, []string{"acct_a", "acct_b", "acct_c"}) {
+		t.Fatalf("ids=%v err=%v", ids, err)
+	}
+}
+
 // 翻頁中途失敗不回部分結果：呼叫方只在整份列完都沒有時才刪列。
 func TestListAccountIDsByStoreReturnsAnErrorNotAPartialListWhenAPageFails(t *testing.T) {
 	p1 := loadFixture(t, "list_accounts_page1")

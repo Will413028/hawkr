@@ -539,18 +539,23 @@ func (c *Client) retrieveRaw(ctx context.Context, accountID string) (*sdk.V2Core
 const (
 	// accountsPageLimit 是列出帳戶每頁的上限（Stripe v2 上限 20，spike Q24）。
 	accountsPageLimit = 20
-	// maxAccountPages 是以 metadata.store_id 對帳時最多翻的頁數（整個列表在一次呼叫的總上限內讀完）；超過回錯誤，呼叫方不得把它當成「沒有找到」。
+	// maxAccountPages 是以 metadata.store_id 加命名空間對帳時最多翻的頁數（整個列表在一次呼叫的總上限內讀完）；超過回錯誤，呼叫方不得把它當成「沒有找到」。
 	maxAccountPages = 100
 )
 
 // ListAccountIDsByStore 列出沒有關閉的 v2 帳戶（預設不含已關閉的；已關閉的帳戶 metadata 被清成 null，所以比對不到同一家店先前關閉的帳戶，spike Q24），
-// 回傳 metadata.store_id 等於 storeID 而且 metadata.hawkr_namespace 等於這個 client 的命名空間的帳戶 ID（D61；沒有命名空間的舊帳戶不符）（Stripe 的順序，新的在前）。含只做完第一步的空帳戶。整份列完才回傳；翻頁到上限或任何一頁失敗回錯誤，
+// 回傳 metadata.store_id 等於 storeID 而且 metadata.hawkr_namespace 等於這個 client 的命名空間的帳戶 ID（D61；沒有命名空間的舊帳戶不符）（依帳戶的 created 由新到舊，同時間維持列表順序；同一個 ID 只出現一次）。含只做完第一步的空帳戶。整份列完才回傳；翻頁到上限或任何一頁失敗回錯誤，
 // 不回部分結果（呼叫方只在「整份列完都沒有」時才刪列）。
 func (c *Client) ListAccountIDsByStore(ctx context.Context, storeID int64) ([]string, error) {
 	want := strconv.FormatInt(storeID, 10)
-	var ids []string
+	type match struct {
+		id      string
+		created time.Time
+	}
+	var found []match
 	err := c.call(ctx, func(ctx context.Context) error {
-		ids = ids[:0]
+		found = found[:0]
+		listed := map[string]bool{}
 		params := &sdk.V2CoreAccountListParams{Limit: sdk.Int64(accountsPageLimit)}
 		seen := 0
 		for a, err := range c.sdk.V2CoreAccounts.List(ctx, params).All(ctx) {
@@ -561,7 +566,10 @@ func (c *Client) ListAccountIDsByStore(ctx context.Context, storeID int64) ([]st
 				return fmt.Errorf("stripe：帳戶列表超過 %d 頁", maxAccountPages)
 			}
 			if a != nil && a.ID != "" && a.Metadata[metaStoreID] == want && a.Metadata[metaNamespace] == c.namespace {
-				ids = append(ids, a.ID)
+				if !listed[a.ID] {
+					listed[a.ID] = true
+					found = append(found, match{a.ID, a.Created})
+				}
 			}
 		}
 		return nil
@@ -569,7 +577,12 @@ func (c *Client) ListAccountIDsByStore(ctx context.Context, storeID int64) ([]st
 	if err != nil {
 		return nil, err
 	}
-	return slices.Clone(ids), nil
+	slices.SortStableFunc(found, func(x, y match) int { return y.created.Compare(x.created) })
+	ids := make([]string, len(found))
+	for i, m := range found {
+		ids[i] = m.id
+	}
+	return ids, nil
 }
 
 const (

@@ -1340,7 +1340,7 @@ func TestPurgeOfARowWhoseAccountWasCreatedButNeverStoredClosesThatAccount(t *tes
 	}
 }
 
-// 冪等鍵超過 30 天：清理走列出對帳（metadata.store_id），不重送同一把鍵（過期之後重送會建出新帳戶）：找到就關閉再刪，整份列完都沒有才刪列；列出失敗不刪。
+// 冪等鍵超過 30 天：清理走列出對帳（metadata.store_id 加 metadata.hawkr_namespace），不重送同一把鍵（過期之後重送會建出新帳戶）：找到就關閉再刪，整份列完都沒有才刪列；列出失敗不刪。
 // mutation：一律重送（planPurge 不看 30 天）→ Fake 在鍵過期後建出第二個帳戶，關閉的不是原帳戶，列出次數 0，失敗；列出失敗仍刪列 → 失敗案例的列不見。
 func TestPurgeAfterTheIdempotencyKeyExpiredReconcilesByListingNotByReplay(t *testing.T) {
 	t.Parallel()

@@ -180,7 +180,7 @@ const FakeName = account.FakeName
 // EventRetention 是收款事件原始 payload 在 inbox 的保存期。
 const EventRetention = account.EventRetention
 
-// IdempotencyRetention 是金流商保存冪等鍵結果的時間（30 天）：超過之後建立與清理改以 metadata.store_id 列出對帳。
+// IdempotencyRetention 是金流商保存冪等鍵結果的時間（30 天）：超過之後建立與清理改以 metadata.store_id 加 metadata.hawkr_namespace 列出對帳。
 const IdempotencyRetention = account.IdempotencyRetention
 
 // PurgeDeadline 是列被標成等待清理後，仍關不掉或問不到金流商的最長時間（7 天，D60），超過進終局。
