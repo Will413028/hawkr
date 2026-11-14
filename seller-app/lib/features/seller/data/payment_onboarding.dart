@@ -6,7 +6,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/flavor.dart';
-import '../../../core/l10n/ui_locale.dart';
 import '../../../core/session/session_provider.dart';
 import '../../../shared/utils/hk_log.dart';
 import 'account_scope.dart';
@@ -80,14 +79,12 @@ class PaymentOnboarding extends _$PaymentOnboarding {
     };
   }
 
-  /// 開始（或繼續）開通：目的地是賣家 App，取得連結並在外部瀏覽器開啟。連結是託管頁面，或帳戶用內嵌元件時伺服器回的網站認證頁
-  /// （App 不判斷介面）。
+  /// 開始（或繼續）開通：目的地是賣家 App，取得託管連結並在外部瀏覽器開啟。
   Future<PaymentOnboardingOutcome> start() async {
     try {
       final session = await ref
           .read(paymentAccountRepositoryProvider)
           .createSession(
-            locale: ref.read(uiLocaleProvider).tag,
             allowInsecureUrl: ref.read(allowInsecureOnboardingUrlProvider),
           );
       if (!ref.mounted) return PaymentOnboardingOutcome.failed;

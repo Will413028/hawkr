@@ -161,8 +161,7 @@ class _Server {
         .unary(
           SellerAppService.createPaymentOnboardingSession,
           (_, _) => CreatePaymentOnboardingSessionResponse(
-            surface: OnboardingSurface.ONBOARDING_SURFACE_HOSTED,
-            url: 'https://connect.example.test/setup',
+            hosted: HostedOnboarding(url: 'https://connect.example.test/setup'),
           ),
         )
         .build(),
@@ -649,7 +648,6 @@ void main() {
       final server = _Server(
         payment: PaymentAccount(
           status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED,
-          onboardingSurface: OnboardingSurface.ONBOARDING_SURFACE_HOSTED,
         ),
         certified: false,
       );
@@ -711,7 +709,6 @@ void main() {
               payment: PaymentAccount(
                 status:
                     PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED,
-                onboardingSurface: OnboardingSurface.ONBOARDING_SURFACE_HOSTED,
               ),
             )
             ..summary = onboardingSummary([
@@ -767,7 +764,6 @@ void main() {
     testWidgets('同一個面板經過不認得的狀態再回到認得的狀態：不丟例外，按鈕回來', (tester) async {
       final recognised = PaymentAccount(
         status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED,
-        onboardingSurface: OnboardingSurface.ONBOARDING_SURFACE_HOSTED,
       );
       final server = _Server(payment: recognised, certified: false);
       await _pump(tester, server);

@@ -24,9 +24,6 @@ import '../../../support/connect_errors.dart';
 import '../../../support/kyc_fixtures.dart';
 import '../../../support/onboarding_fixtures.dart';
 
-const _hosted = OnboardingSurface.ONBOARDING_SURFACE_HOSTED;
-const _embedded = OnboardingSurface.ONBOARDING_SURFACE_EMBEDDED;
-
 class _LoggedIn extends Session {
   @override
   SessionModel build() =>
@@ -55,8 +52,7 @@ class _Server {
   final gates = <int, Completer<void>>{};
   CreatePaymentOnboardingSessionResponse sessionResponse =
       CreatePaymentOnboardingSessionResponse(
-        surface: _hosted,
-        url: 'https://connect.example.test/setup/abc',
+        hosted: HostedOnboarding(url: 'https://connect.example.test/setup/abc'),
       );
 
   late final store = FakeMyStoreServer();
@@ -86,7 +82,6 @@ class _Server {
             account: PaymentAccount(
               status:
                   PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED,
-              onboardingSurface: _hosted,
             ),
           );
         })
@@ -137,8 +132,7 @@ void main() {
     test('stage 與 prod：http 連結失敗，不開瀏覽器', () async {
       final server = _Server()
         ..sessionResponse = CreatePaymentOnboardingSessionResponse(
-          surface: _hosted,
-          url: 'http://connect.example.test/setup',
+          hosted: HostedOnboarding(url: 'http://connect.example.test/setup'),
         );
       final container = server.container();
       expect(
@@ -151,8 +145,7 @@ void main() {
     test('dev：http 連結可以開（本機測試）', () async {
       final server = _Server()
         ..sessionResponse = CreatePaymentOnboardingSessionResponse(
-          surface: _hosted,
-          url: 'http://localhost:4242/setup',
+          hosted: HostedOnboarding(url: 'http://localhost:4242/setup'),
         );
       final container = server.container(allowInsecureUrl: true);
       expect(
@@ -164,7 +157,7 @@ void main() {
   });
 
   group('start', () {
-    test('HOSTED：只送 App 回跳目的地與語系（網址由伺服器組），在外部瀏覽器開啟連結', () async {
+    test('只送 App 回跳目的地、不宣告內嵌執行環境（網址與語系由伺服器處理），在外部瀏覽器開啟連結', () async {
       final server = _Server();
       final container = server.container();
 
@@ -178,37 +171,33 @@ void main() {
         request.destination,
         OnboardingReturnDestination.ONBOARDING_RETURN_DESTINATION_SELLER_APP,
       );
-      expect(request.locale, 'zh-TW');
+      expect(request.embeddedRuntimes, isEmpty);
       expect(server.launched, [
         Uri.parse('https://connect.example.test/setup/abc'),
       ]);
     });
 
-    test('帳戶用內嵌元件時伺服器回網站認證頁（介面是 EMBEDDED）：App 開那個連結，不依介面分支', () async {
+    test('回應不是託管連結（伺服器回了內嵌）：失敗，不開瀏覽器', () async {
       final server = _Server()
         ..sessionResponse = CreatePaymentOnboardingSessionResponse(
-          surface: _embedded,
-          url: 'https://www.example.test/seller-center/me/certifications',
+          embedded: EmbeddedOnboarding(
+            stripe: StripeEmbeddedOnboarding(
+              clientSecret: 'secret',
+              publishableKey: 'pk_test_x',
+            ),
+          ),
         );
       final container = server.container();
-
-      final outcome = await container
-          .read(paymentOnboardingProvider.notifier)
-          .start();
-
-      expect(outcome, PaymentOnboardingOutcome.launched);
-      expect(server.sessions, hasLength(1));
-      expect(server.launched, [
-        Uri.parse('https://www.example.test/seller-center/me/certifications'),
-      ]);
+      expect(
+        await container.read(paymentOnboardingProvider.notifier).start(),
+        PaymentOnboardingOutcome.failed,
+      );
+      expect(server.launched, isEmpty);
     });
 
-    test('伺服器回的連結為空（不論介面）：失敗，不開瀏覽器', () async {
+    test('兩支都沒設，或託管連結為空：失敗，不開瀏覽器', () async {
       final server = _Server()
-        ..sessionResponse = CreatePaymentOnboardingSessionResponse(
-          surface: _embedded,
-          clientSecret: 'secret',
-        );
+        ..sessionResponse = CreatePaymentOnboardingSessionResponse();
       final container = server.container();
       expect(
         await container.read(paymentOnboardingProvider.notifier).start(),
@@ -216,7 +205,7 @@ void main() {
       );
 
       server.sessionResponse = CreatePaymentOnboardingSessionResponse(
-        surface: _hosted,
+        hosted: HostedOnboarding(),
       );
       expect(
         await container.read(paymentOnboardingProvider.notifier).start(),

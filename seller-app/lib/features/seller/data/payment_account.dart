@@ -29,8 +29,8 @@ HkStatusTone? paymentAccountTone(
 /// 平台審核還沒通過時，收款帳戶區的提示（沒有收款帳戶可看）。
 const paymentAccountNotYetOpenNotice = '平台審核通過後開放設定';
 
-/// 一次 `CreatePaymentOnboardingSession`（目的地是賣家 App）的結果：[OnboardingSession.url] 是要在外部瀏覽器開的連結，
-/// 託管頁面，或帳戶用內嵌元件時伺服器回的網站認證頁。內嵌元件的 client secret 只給網頁的瀏覽器，App 不使用。
+/// 一次 `CreatePaymentOnboardingSession`（目的地是賣家 App）的結果：[OnboardingSession.url] 是要在外部瀏覽器開的託管連結。
+/// App 不宣告內嵌執行環境，伺服器一律回託管連結。
 final class OnboardingSession {
   const OnboardingSession(this.url);
 
@@ -62,23 +62,25 @@ final class PaymentAccountRepository {
     await _client.refreshMyPaymentAccount(RefreshMyPaymentAccountRequest());
   }
 
-  /// 要在瀏覽器開啟的網址（託管頁面為一次性、短效，回跳到網站給 App 的回跳頁；帳戶用內嵌元件時是網站的認證頁），網址由伺服器組；只收 https，[allowInsecureUrl]（只有 dev 的本機測試）才收 http。
-  /// 不依介面分支：有網址就開。沒有網址或網址無效是契約被違反，丟 [FormatException]。
+  /// 要在瀏覽器開啟的託管連結（一次性、短效，完成後回跳到網站給 App 的回跳頁），網址由伺服器組；只收 https，[allowInsecureUrl]（只有 dev 的本機測試）才收 http。
+  /// 不宣告內嵌執行環境（空清單），語系由 transport 的 `Accept-Language` 帶。回應不是 `hosted`（內嵌或兩支都沒設）、沒有網址或網址無效都是契約被違反，丟 [FormatException]。
   Future<OnboardingSession> createSession({
-    required String locale,
     bool allowInsecureUrl = false,
   }) async {
     final response = await _client.createPaymentOnboardingSession(
       CreatePaymentOnboardingSessionRequest(
         destination: OnboardingReturnDestination
             .ONBOARDING_RETURN_DESTINATION_SELLER_APP,
-        locale: locale,
       ),
     );
-    final url = Uri.tryParse(response.url);
+    if (!response.hasHosted()) {
+      throw const FormatException('開通 session 不是託管連結');
+    }
+    final raw = response.hosted.url;
+    final url = Uri.tryParse(raw);
     if (url == null ||
         !url.isScheme('https') && !(allowInsecureUrl && url.isScheme('http'))) {
-      throw FormatException('開通連結無效：${response.url}');
+      throw FormatException('開通連結無效：$raw');
     }
     return OnboardingSession(url);
   }

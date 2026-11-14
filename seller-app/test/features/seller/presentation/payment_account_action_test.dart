@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
-import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart' show Code;
@@ -96,9 +95,10 @@ Future<_Harness> _pump(
               ) {
                 sessions.add(request);
                 return CreatePaymentOnboardingSessionResponse(
-                  surface: OnboardingSurface.ONBOARDING_SURFACE_HOSTED,
-                  url:
-                      'https://www.example.test/seller-center/me/certifications',
+                  hosted: HostedOnboarding(
+                    url:
+                        'https://www.example.test/seller-center/me/certifications',
+                  ),
                 );
               })
               .build(),
