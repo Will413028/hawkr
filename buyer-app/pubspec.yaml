@@ -82,7 +82,7 @@ dependencies:
   webview_flutter: ^4.13.1
   pay: ^3.0.0
   flutter_screenutil: ^5.9.3
-  sensors_plus: ^6.1.1
+  sensors_plus: ^7.1.1
   firebase_analytics: ^12.4.2
   flutter_client_sse: ^2.0.3
 
