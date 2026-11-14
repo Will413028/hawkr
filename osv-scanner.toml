@@ -5,6 +5,51 @@
 # 升級依賴要先經核准（根目錄 AGENTS.md），修好就從這裡刪掉該筆。同一個漏洞的 GO-／GHSA-／CVE- 編號各列一筆。
 
 [[IgnoredVulns]]
+id = "GHSA-8474-xrp6-wh69"
+ignoreUntil = 2026-12-15
+reason = "基準：RubyGems activesupport@7.2.2.2（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 7.5，HIGH，2026-11-15 發現；修正版 8.0.5.2 是大版號升級）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-539f-xcgw-2gjg"
+ignoreUntil = 2027-02-13
+reason = "基準：RubyGems addressable@2.8.8（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 3.1，LOW，2026-11-15 發現；修正版 2.9.1）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-8gmh-2hhj-2hv9"
+ignoreUntil = 2027-02-13
+reason = "基準：RubyGems addressable@2.8.8（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 4.8，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-9crm-g4mf-wc5j"
+ignoreUntil = 2027-02-13
+reason = "基準：RubyGems addressable@2.8.8（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 4.3，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-9f42-57jx-vpp3"
+ignoreUntil = 2027-02-13
+reason = "基準：RubyGems addressable@2.8.8（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 5.9，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-j82w-28jv-3pmj"
+ignoreUntil = 2027-02-13
+reason = "基準：RubyGems addressable@2.8.8（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 5.9，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-qq38-m9mg-xjj5"
+ignoreUntil = 2027-02-13
+reason = "基準：RubyGems addressable@2.8.8（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 5.9，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-5pm8-86m8-9m6r"
+ignoreUntil = 2027-02-13
+reason = "基準：npm basic-ftp@5.3.1（CVSS 5.3，MEDIUM，2026-11-15 發現；修正版 6.2.4 是大版號升級）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-r4jh-29pc-gfqr"
+ignoreUntil = 2027-02-13
+reason = "基準：npm basic-ftp@5.3.1（CVSS 5.9，MEDIUM，2026-11-15 發現；修正版 6.2.4 是大版號升級）；升級待核准"
+
+[[IgnoredVulns]]
 id = "GHSA-3g3m-2fjr-6pw4"
 ignoreUntil = 2027-01-29
 reason = "基準：npm glob@9.3.5, 12.0.0, 13.0.6（CVSS 6.3，MEDIUM，2026-10-31 發現；修正版 14.0.2 是大版號升級）；升級待核准"
@@ -13,11 +58,6 @@ reason = "基準：npm glob@9.3.5, 12.0.0, 13.0.6（CVSS 6.3，MEDIUM，2026-10-
 id = "GHSA-g3hv-75wg-m249"
 ignoreUntil = 2027-01-29
 reason = "基準：npm minimatch@3.1.5, 8.0.7, 10.2.5（CVSS 6.9，MEDIUM，2026-10-31 發現；修正版 11.0.1 是大版號升級）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-259r-337f-4rfw"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/klauspost/compress@1.18.5（CVSS 7.5，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-2v4p-qf9q-27wj"
