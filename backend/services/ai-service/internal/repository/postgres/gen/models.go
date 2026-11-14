@@ -87,6 +87,8 @@ type Event struct {
 	RequestedInputJson     []byte     `db:"requested_input_json" json:"requested_input_json"`
 	Branch                 *string    `db:"branch" json:"branch"`
 	IsolationScope         *string    `db:"isolation_scope" json:"isolation_scope"`
+	InputTranscription     []byte     `db:"input_transcription" json:"input_transcription"`
+	OutputTranscription    []byte     `db:"output_transcription" json:"output_transcription"`
 	Timestamp              *time.Time `db:"timestamp" json:"timestamp"`
 	Content                []byte     `db:"content" json:"content"`
 	GroundingMetadata      []byte     `db:"grounding_metadata" json:"grounding_metadata"`
