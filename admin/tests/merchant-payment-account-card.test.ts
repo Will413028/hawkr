@@ -137,6 +137,37 @@ test("有 purge_blocked_time：在重試建立的位置顯示原因與時間、�
 	assert.doesNotMatch(plain, /重試關閉|刪除對應|無法關閉/);
 });
 
+test("有 purge_pending_time、還沒進終局：顯示「收款帳戶關閉中（時間 起）」，隱藏重新整理、重試建立與其他動作；建立失敗的說明也不顯示", () => {
+	const html = render({
+		state: "ready",
+		account: account({
+			purgePendingTime: timestampFromDate(new Date("2026-11-14T01:00:00Z")),
+			createFailedTime: timestampFromDate(new Date("2026-11-13T01:00:00Z")),
+		}),
+	});
+	assert.match(html, /收款帳戶關閉中（2026\/11\/14 09:00 起）/);
+	assert.doesNotMatch(html, /重新整理/);
+	assert.doesNotMatch(html, /重試建立/);
+	assert.doesNotMatch(html, /重試關閉/);
+	assert.doesNotMatch(html, /刪除對應/);
+	assert.doesNotMatch(html, /建立失敗於/);
+	assert.doesNotMatch(html, /收款帳戶無法關閉/);
+});
+
+test("purge_pending_time 與 purge_blocked_time 同時有（進終局）：只顯示被擋下的原因與終局的動作，不顯示關閉中", () => {
+	const html = render({
+		state: "ready",
+		account: account({
+			purgePendingTime: timestampFromDate(new Date("2026-11-14T01:00:00Z")),
+			purgeBlockedTime: timestampFromDate(new Date("2026-11-14T02:00:00Z")),
+			purgeBlockedReason: "provider_refused：no",
+		}),
+	});
+	assert.doesNotMatch(html, /收款帳戶關閉中/);
+	assert.match(html, /收款帳戶無法關閉：provider_refused：no/);
+	assert.match(html, /重試關閉/);
+});
+
 test("轉帳與撥款能力分別顯示", () => {
 	const html = render({
 		state: "ready",

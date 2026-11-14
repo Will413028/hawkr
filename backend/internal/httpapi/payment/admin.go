@@ -86,7 +86,7 @@ func toAdminAccount(a payment.Account) *adminpb.PaymentAccount {
 		RequirementCollection: rpc.EnumToProto[paymentpb.RequirementCollection](a.RequirementCollection),
 		TransfersActive:       a.TransfersActive, PayoutsActive: a.PayoutsActive, Requirements: requirements(a.Requirements),
 		StatusReason: deref(a.StatusReason), FetchTime: optTimestamp(a.FetchedAt), CreateFailedTime: optTimestamp(a.CreateFailedAt),
-		PurgeBlockedTime: optTimestamp(a.PurgeBlockedAt), PurgeBlockedReason: deref(a.PurgeBlockedReason), CreateUnresolved: a.CreateUnresolved,
+		PurgeBlockedTime: optTimestamp(a.PurgeBlockedAt), PurgeBlockedReason: deref(a.PurgeBlockedReason), CreateUnresolved: a.CreateUnresolved, PurgePendingTime: optTimestamp(a.PurgePendingAt),
 		CreateTime: timestamppb.New(a.CreatedAt), UpdateTime: timestamppb.New(a.UpdatedAt),
 	}
 }

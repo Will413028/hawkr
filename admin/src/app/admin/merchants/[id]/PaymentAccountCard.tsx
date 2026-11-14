@@ -146,7 +146,10 @@ export function PaymentAccountCard({
 	};
 	// 清理進終局（金流商拒絕關閉，或等待清理超過期限仍關不掉）：卡片在「重試建立」的位置改顯示被擋下的原因與時間，以及「重試關閉」「已在金流商處理，刪除對應」。
 	const blockedTime = account.purgeBlockedTime;
-	const failedTime = blockedTime ? undefined : account.createFailedTime;
+	// 等待清理、還沒進終局（D63）：在同一個位置顯示「關閉中」，隱藏重新整理、重試建立與其他動作（關閉由清理 job 處理）。
+	const closingTime = blockedTime ? undefined : account.purgePendingTime;
+	const failedTime =
+		blockedTime || closingTime ? undefined : account.createFailedTime;
 	const requirements = account.requirements;
 	return (
 		<DetailCardShell {...SHELL} badge={badge}>
@@ -186,6 +189,11 @@ export function PaymentAccountCard({
 					建立失敗於 {formatDateTimeShort(timestampDate(failedTime))}
 				</p>
 			)}
+			{closingTime && (
+				<p className="payment-desc payment-account-failed" role="alert">
+					收款帳戶關閉中（{formatDateTimeShort(timestampDate(closingTime))} 起）
+				</p>
+			)}
 			{blockedTime && (
 				<p className="payment-desc payment-account-failed" role="alert">
 					收款帳戶無法關閉：{account.purgeBlockedReason || "-"}（
@@ -202,7 +210,7 @@ export function PaymentAccountCard({
 			)}
 			<div className="payment-account-actions">
 				{/* RefreshPaymentAccount 在外部帳戶還沒建立完成時回 failed_precondition（半建立的列已有外部 ID，狀態仍是 NOT_CREATED）：只在已建立時給這個動作。 */}
-				{paymentAccountCreated(account) && !blockedTime && (
+				{paymentAccountCreated(account) && !blockedTime && !closingTime && (
 					<Button
 						variant="outline"
 						onClick={onRefresh}

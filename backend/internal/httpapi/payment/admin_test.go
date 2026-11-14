@@ -118,11 +118,11 @@ func TestAdminPaymentAccountHandlersMapTheAccountAndPassTheStore(t *testing.T) {
 func TestAdminPurgeHandlersPassTheStoreAndTheCallingAdmin(t *testing.T) {
 	blocked := time.Date(2026, 11, 14, 1, 0, 0, 0, time.UTC)
 	reason := "provider_refused：no"
-	m := &paymentAdminModule{account: payment.Account{StoreID: 11, Provider: "stripe", PurgeBlockedAt: &blocked, PurgeBlockedReason: &reason, CreatedAt: blocked, UpdatedAt: blocked}}
+	m := &paymentAdminModule{account: payment.Account{StoreID: 11, Provider: "stripe", PurgePendingAt: &blocked, PurgeBlockedAt: &blocked, PurgeBlockedReason: &reason, CreateUnresolved: true, CreatedAt: blocked, UpdatedAt: blocked}}
 	h := NewAdmin(m)
 	adminCtx := rpc.WithPrincipal(context.Background(), identity.Principal{Kind: identity.PrincipalAdmin, ID: 77})
 	got, err := h.RetryPaymentAccountPurge(adminCtx, connect.NewRequest(&adminpb.RetryPaymentAccountPurgeRequest{StoreId: "11"}))
-	if err != nil || m.purgeRetried != 11 || got.Msg.GetAccount().GetPurgeBlockedReason() != reason || got.Msg.GetAccount().GetPurgeBlockedTime() == nil {
+	if err != nil || m.purgeRetried != 11 || got.Msg.GetAccount().GetPurgeBlockedReason() != reason || got.Msg.GetAccount().GetPurgeBlockedTime() == nil || !got.Msg.GetAccount().GetPurgePendingTime().AsTime().Equal(blocked) || !got.Msg.GetAccount().GetCreateUnresolved() {
 		t.Fatalf("retry purge: %v %d %v", err, m.purgeRetried, got)
 	}
 	ctx := adminCtx

@@ -58,6 +58,8 @@ type PaymentAccount struct {
 	// 建立結果不明、超過可向金流商查回的期限仍取不回外部 ID（建立失敗的終局，待辦 PAYMENT_ACCOUNT_CREATE_FAILED）時為真：重試建立前要先請管理員確認金流商那邊沒有
 	// 這家店的收款帳戶（RetryPaymentAccountCreateRequest.acknowledge_no_provider_account）。
 	CreateUnresolved bool `protobuf:"varint,16,opt,name=create_unresolved,json=createUnresolved,proto3" json:"create_unresolved,omitempty"`
+	// 清理已要求、還沒完成（等待關閉）的時間（D63）；沒有等待清理時不設。等待清理而還沒進終局時，卡片顯示「關閉中」並隱藏其他動作；進了終局（purge_blocked_time）改顯示被擋下的原因。
+	PurgePendingTime *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=purge_pending_time,json=purgePendingTime,proto3" json:"purge_pending_time,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -202,6 +204,13 @@ func (x *PaymentAccount) GetCreateUnresolved() bool {
 		return x.CreateUnresolved
 	}
 	return false
+}
+
+func (x *PaymentAccount) GetPurgePendingTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.PurgePendingTime
+	}
+	return nil
 }
 
 type GetPaymentAccountRequest struct {
@@ -649,7 +658,7 @@ var File_hawkr_admin_payment_v1alpha1_payment_proto protoreflect.FileDescriptor
 
 const file_hawkr_admin_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"\n" +
-	"*hawkr/admin/payment/v1alpha1/payment.proto\x12\x1chawkr.admin.payment.v1alpha1\x1a$hawkr/payment/v1alpha1/payment.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xff\x06\n" +
+	"*hawkr/admin/payment/v1alpha1/payment.proto\x12\x1chawkr.admin.payment.v1alpha1\x1a$hawkr/payment/v1alpha1/payment.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc9\a\n" +
 	"\x0ePaymentAccount\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12\x1a\n" +
 	"\bprovider\x18\x02 \x01(\tR\bprovider\x12.\n" +
@@ -670,7 +679,8 @@ const file_hawkr_admin_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"updateTime\x12H\n" +
 	"\x12purge_blocked_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x10purgeBlockedTime\x120\n" +
 	"\x14purge_blocked_reason\x18\x0f \x01(\tR\x12purgeBlockedReason\x12+\n" +
-	"\x11create_unresolved\x18\x10 \x01(\bR\x10createUnresolved\":\n" +
+	"\x11create_unresolved\x18\x10 \x01(\bR\x10createUnresolved\x12H\n" +
+	"\x12purge_pending_time\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\x10purgePendingTime\":\n" +
 	"\x18GetPaymentAccountRequest\x12\x1e\n" +
 	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\"c\n" +
 	"\x19GetPaymentAccountResponse\x12F\n" +
@@ -738,25 +748,26 @@ var file_hawkr_admin_payment_v1alpha1_payment_proto_depIdxs = []int32{
 	14, // 5: hawkr.admin.payment.v1alpha1.PaymentAccount.create_time:type_name -> google.protobuf.Timestamp
 	14, // 6: hawkr.admin.payment.v1alpha1.PaymentAccount.update_time:type_name -> google.protobuf.Timestamp
 	14, // 7: hawkr.admin.payment.v1alpha1.PaymentAccount.purge_blocked_time:type_name -> google.protobuf.Timestamp
-	0,  // 8: hawkr.admin.payment.v1alpha1.GetPaymentAccountResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
-	0,  // 9: hawkr.admin.payment.v1alpha1.RefreshPaymentAccountResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
-	0,  // 10: hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
-	0,  // 11: hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
-	1,  // 12: hawkr.admin.payment.v1alpha1.PaymentAdminService.GetPaymentAccount:input_type -> hawkr.admin.payment.v1alpha1.GetPaymentAccountRequest
-	3,  // 13: hawkr.admin.payment.v1alpha1.PaymentAdminService.RefreshPaymentAccount:input_type -> hawkr.admin.payment.v1alpha1.RefreshPaymentAccountRequest
-	5,  // 14: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountCreate:input_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateRequest
-	7,  // 15: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountPurge:input_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeRequest
-	9,  // 16: hawkr.admin.payment.v1alpha1.PaymentAdminService.DeletePaymentAccountMapping:input_type -> hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingRequest
-	2,  // 17: hawkr.admin.payment.v1alpha1.PaymentAdminService.GetPaymentAccount:output_type -> hawkr.admin.payment.v1alpha1.GetPaymentAccountResponse
-	4,  // 18: hawkr.admin.payment.v1alpha1.PaymentAdminService.RefreshPaymentAccount:output_type -> hawkr.admin.payment.v1alpha1.RefreshPaymentAccountResponse
-	6,  // 19: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountCreate:output_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateResponse
-	8,  // 20: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountPurge:output_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeResponse
-	10, // 21: hawkr.admin.payment.v1alpha1.PaymentAdminService.DeletePaymentAccountMapping:output_type -> hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingResponse
-	17, // [17:22] is the sub-list for method output_type
-	12, // [12:17] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	14, // 8: hawkr.admin.payment.v1alpha1.PaymentAccount.purge_pending_time:type_name -> google.protobuf.Timestamp
+	0,  // 9: hawkr.admin.payment.v1alpha1.GetPaymentAccountResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
+	0,  // 10: hawkr.admin.payment.v1alpha1.RefreshPaymentAccountResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
+	0,  // 11: hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
+	0,  // 12: hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
+	1,  // 13: hawkr.admin.payment.v1alpha1.PaymentAdminService.GetPaymentAccount:input_type -> hawkr.admin.payment.v1alpha1.GetPaymentAccountRequest
+	3,  // 14: hawkr.admin.payment.v1alpha1.PaymentAdminService.RefreshPaymentAccount:input_type -> hawkr.admin.payment.v1alpha1.RefreshPaymentAccountRequest
+	5,  // 15: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountCreate:input_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateRequest
+	7,  // 16: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountPurge:input_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeRequest
+	9,  // 17: hawkr.admin.payment.v1alpha1.PaymentAdminService.DeletePaymentAccountMapping:input_type -> hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingRequest
+	2,  // 18: hawkr.admin.payment.v1alpha1.PaymentAdminService.GetPaymentAccount:output_type -> hawkr.admin.payment.v1alpha1.GetPaymentAccountResponse
+	4,  // 19: hawkr.admin.payment.v1alpha1.PaymentAdminService.RefreshPaymentAccount:output_type -> hawkr.admin.payment.v1alpha1.RefreshPaymentAccountResponse
+	6,  // 20: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountCreate:output_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateResponse
+	8,  // 21: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountPurge:output_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeResponse
+	10, // 22: hawkr.admin.payment.v1alpha1.PaymentAdminService.DeletePaymentAccountMapping:output_type -> hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingResponse
+	18, // [18:23] is the sub-list for method output_type
+	13, // [13:18] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_admin_payment_v1alpha1_payment_proto_init() }
