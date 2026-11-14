@@ -47,7 +47,7 @@ jobs:
           DATABASE_URL='postgres://postgres:pg@localhost:5432/after_db?sslmode=disable' go run ./cmd/hawkr migrate
       - name: diff the schemas
         run: |
-          set -uo pipefail
+          set +e -uo pipefail
           docker exec pg pg_dump -U postgres --schema-only --no-owner --restrict-key=diag before_db > "$RUNNER_TEMP/before.sql"
           docker exec pg pg_dump -U postgres --schema-only --no-owner --restrict-key=diag after_db > "$RUNNER_TEMP/after.sql"
           wc -l "$RUNNER_TEMP/before.sql" "$RUNNER_TEMP/after.sql"
