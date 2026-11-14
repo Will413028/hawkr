@@ -17,7 +17,6 @@ import "hawkr/payment/v1alpha1/payment.proto";
 import "google/api/field_behavior.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/field_mask.proto";
-import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "google/rpc/error_details.proto";
 import "google/type/date.proto";
@@ -844,15 +843,10 @@ message SaveKYCDraftResponse {
 // PaymentAccount 是賣家看到的收款帳戶。
 message PaymentAccount {
   hawkr.payment.v1alpha1.PaymentAccountStatus status = 1;
-  hawkr.payment.v1alpha1.RequirementCollection requirement_collection = 2;
   // 目前設定的 provider 用哪種介面開通；沒有設定收款開通時是 UNSPECIFIED。
   hawkr.payment.v1alpha1.OnboardingSurface onboarding_surface = 3;
-  // 轉帳能力是否啟用（開通閘門的輸入）。
-  bool transfers_active = 4;
   // 撥款能力是否啟用。
   bool payouts_active = 5;
-  // 金流商回報的待補條件原始內容（物件，內容由金流商定義）；沒有時是空物件。
-  google.protobuf.Struct requirements = 6;
   // 最近一次向金流商讀取帳戶的時間；還沒讀過時不設。
   google.protobuf.Timestamp fetch_time = 7;
 }
@@ -876,8 +870,6 @@ message CreatePaymentOnboardingSessionResponse {
   string url = 2;
   // surface 是 EMBEDDED 時，初始化內嵌元件用的 client secret；只給這個賣家的瀏覽器，不記錄。
   string client_secret = 3;
-  // session 的到期時間；金流商沒有給時不設。
-  google.protobuf.Timestamp expire_time = 4;
 }
 
 message GetMyKYCRequest {}

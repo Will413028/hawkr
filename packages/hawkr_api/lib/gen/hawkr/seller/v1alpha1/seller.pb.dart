@@ -16,20 +16,19 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 import 'package:protobuf/well_known_types/google/protobuf/duration.pb.dart'
-    as $7;
+    as $6;
 import 'package:protobuf/well_known_types/google/protobuf/field_mask.pb.dart'
     as $4;
-import 'package:protobuf/well_known_types/google/protobuf/struct.pb.dart' as $6;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
     as $1;
 
 import '../../../google/rpc/error_details.pb.dart' as $3;
 import '../../../google/type/date.pb.dart' as $5;
 import '../../common/v1alpha1/image.pb.dart' as $0;
-import '../../common/v1alpha1/policy_category.pbenum.dart' as $10;
+import '../../common/v1alpha1/policy_category.pbenum.dart' as $9;
 import '../../common/v1alpha1/postal_address.pb.dart' as $2;
-import '../../common/v1alpha1/store_card.pb.dart' as $8;
-import '../../payment/v1alpha1/payment.pbenum.dart' as $9;
+import '../../common/v1alpha1/store_card.pb.dart' as $7;
+import '../../payment/v1alpha1/payment.pbenum.dart' as $8;
 import 'seller.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -3760,22 +3759,15 @@ class SaveKYCDraftResponse extends $pb.GeneratedMessage {
 /// PaymentAccount 是賣家看到的收款帳戶。
 class PaymentAccount extends $pb.GeneratedMessage {
   factory PaymentAccount({
-    $9.PaymentAccountStatus? status,
-    $9.RequirementCollection? requirementCollection,
-    $9.OnboardingSurface? onboardingSurface,
-    $core.bool? transfersActive,
+    $8.PaymentAccountStatus? status,
+    $8.OnboardingSurface? onboardingSurface,
     $core.bool? payoutsActive,
-    $6.Struct? requirements,
     $1.Timestamp? fetchTime,
   }) {
     final result = PaymentAccount._();
     if (status != null) result.status = status;
-    if (requirementCollection != null)
-      result.requirementCollection = requirementCollection;
     if (onboardingSurface != null) result.onboardingSurface = onboardingSurface;
-    if (transfersActive != null) result.transfersActive = transfersActive;
     if (payoutsActive != null) result.payoutsActive = payoutsActive;
-    if (requirements != null) result.requirements = requirements;
     if (fetchTime != null) result.fetchTime = fetchTime;
     return result;
   }
@@ -3794,17 +3786,11 @@ class PaymentAccount extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: PaymentAccount.$_createMessage)
-    ..aE<$9.PaymentAccountStatus>(1, _omitFieldNames ? '' : 'status',
-        enumValues: $9.PaymentAccountStatus.values)
-    ..aE<$9.RequirementCollection>(
-        2, _omitFieldNames ? '' : 'requirementCollection',
-        enumValues: $9.RequirementCollection.values)
-    ..aE<$9.OnboardingSurface>(3, _omitFieldNames ? '' : 'onboardingSurface',
-        enumValues: $9.OnboardingSurface.values)
-    ..aOB(4, _omitFieldNames ? '' : 'transfersActive')
+    ..aE<$8.PaymentAccountStatus>(1, _omitFieldNames ? '' : 'status',
+        enumValues: $8.PaymentAccountStatus.values)
+    ..aE<$8.OnboardingSurface>(3, _omitFieldNames ? '' : 'onboardingSurface',
+        enumValues: $8.OnboardingSurface.values)
     ..aOB(5, _omitFieldNames ? '' : 'payoutsActive')
-    ..aOM<$6.Struct>(6, _omitFieldNames ? '' : 'requirements',
-        subBuilder: $6.Struct.$_createMessage)
     ..aOM<$1.Timestamp>(7, _omitFieldNames ? '' : 'fetchTime',
         subBuilder: $1.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
@@ -3832,77 +3818,45 @@ class PaymentAccount extends $pb.GeneratedMessage {
   static PaymentAccount? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $9.PaymentAccountStatus get status => $_getN(0);
+  $8.PaymentAccountStatus get status => $_getN(0);
   @$pb.TagNumber(1)
-  set status($9.PaymentAccountStatus value) => $_setField(1, value);
+  set status($8.PaymentAccountStatus value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasStatus() => $_has(0);
   @$pb.TagNumber(1)
   void clearStatus() => $_clearField(1);
 
-  @$pb.TagNumber(2)
-  $9.RequirementCollection get requirementCollection => $_getN(1);
-  @$pb.TagNumber(2)
-  set requirementCollection($9.RequirementCollection value) =>
-      $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasRequirementCollection() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearRequirementCollection() => $_clearField(2);
-
   /// 目前設定的 provider 用哪種介面開通；沒有設定收款開通時是 UNSPECIFIED。
   @$pb.TagNumber(3)
-  $9.OnboardingSurface get onboardingSurface => $_getN(2);
+  $8.OnboardingSurface get onboardingSurface => $_getN(1);
   @$pb.TagNumber(3)
-  set onboardingSurface($9.OnboardingSurface value) => $_setField(3, value);
+  set onboardingSurface($8.OnboardingSurface value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasOnboardingSurface() => $_has(2);
+  $core.bool hasOnboardingSurface() => $_has(1);
   @$pb.TagNumber(3)
   void clearOnboardingSurface() => $_clearField(3);
 
-  /// 轉帳能力是否啟用（開通閘門的輸入）。
-  @$pb.TagNumber(4)
-  $core.bool get transfersActive => $_getBF(3);
-  @$pb.TagNumber(4)
-  set transfersActive($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasTransfersActive() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearTransfersActive() => $_clearField(4);
-
   /// 撥款能力是否啟用。
   @$pb.TagNumber(5)
-  $core.bool get payoutsActive => $_getBF(4);
+  $core.bool get payoutsActive => $_getBF(2);
   @$pb.TagNumber(5)
-  set payoutsActive($core.bool value) => $_setBool(4, value);
+  set payoutsActive($core.bool value) => $_setBool(2, value);
   @$pb.TagNumber(5)
-  $core.bool hasPayoutsActive() => $_has(4);
+  $core.bool hasPayoutsActive() => $_has(2);
   @$pb.TagNumber(5)
   void clearPayoutsActive() => $_clearField(5);
 
-  /// 金流商回報的待補條件原始內容（物件，內容由金流商定義）；沒有時是空物件。
-  @$pb.TagNumber(6)
-  $6.Struct get requirements => $_getN(5);
-  @$pb.TagNumber(6)
-  set requirements($6.Struct value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasRequirements() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearRequirements() => $_clearField(6);
-  @$pb.TagNumber(6)
-  $6.Struct ensureRequirements() => $_ensure(5);
-
   /// 最近一次向金流商讀取帳戶的時間；還沒讀過時不設。
   @$pb.TagNumber(7)
-  $1.Timestamp get fetchTime => $_getN(6);
+  $1.Timestamp get fetchTime => $_getN(3);
   @$pb.TagNumber(7)
   set fetchTime($1.Timestamp value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasFetchTime() => $_has(6);
+  $core.bool hasFetchTime() => $_has(3);
   @$pb.TagNumber(7)
   void clearFetchTime() => $_clearField(7);
   @$pb.TagNumber(7)
-  $1.Timestamp ensureFetchTime() => $_ensure(6);
+  $1.Timestamp ensureFetchTime() => $_ensure(3);
 }
 
 class GetMyPaymentAccountRequest extends $pb.GeneratedMessage {
@@ -4102,16 +4056,14 @@ class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
 
 class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
   factory CreatePaymentOnboardingSessionResponse({
-    $9.OnboardingSurface? surface,
+    $8.OnboardingSurface? surface,
     $core.String? url,
     $core.String? clientSecret,
-    $1.Timestamp? expireTime,
   }) {
     final result = CreatePaymentOnboardingSessionResponse._();
     if (surface != null) result.surface = surface;
     if (url != null) result.url = url;
     if (clientSecret != null) result.clientSecret = clientSecret;
-    if (expireTime != null) result.expireTime = expireTime;
     return result;
   }
 
@@ -4131,12 +4083,10 @@ class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance:
           CreatePaymentOnboardingSessionResponse.$_createMessage)
-    ..aE<$9.OnboardingSurface>(1, _omitFieldNames ? '' : 'surface',
-        enumValues: $9.OnboardingSurface.values)
+    ..aE<$8.OnboardingSurface>(1, _omitFieldNames ? '' : 'surface',
+        enumValues: $8.OnboardingSurface.values)
     ..aOS(2, _omitFieldNames ? '' : 'url')
     ..aOS(3, _omitFieldNames ? '' : 'clientSecret')
-    ..aOM<$1.Timestamp>(4, _omitFieldNames ? '' : 'expireTime',
-        subBuilder: $1.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4169,9 +4119,9 @@ class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
   static CreatePaymentOnboardingSessionResponse? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $9.OnboardingSurface get surface => $_getN(0);
+  $8.OnboardingSurface get surface => $_getN(0);
   @$pb.TagNumber(1)
-  set surface($9.OnboardingSurface value) => $_setField(1, value);
+  set surface($8.OnboardingSurface value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasSurface() => $_has(0);
   @$pb.TagNumber(1)
@@ -4196,18 +4146,6 @@ class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
   $core.bool hasClientSecret() => $_has(2);
   @$pb.TagNumber(3)
   void clearClientSecret() => $_clearField(3);
-
-  /// session 的到期時間；金流商沒有給時不設。
-  @$pb.TagNumber(4)
-  $1.Timestamp get expireTime => $_getN(3);
-  @$pb.TagNumber(4)
-  set expireTime($1.Timestamp value) => $_setField(4, value);
-  @$pb.TagNumber(4)
-  $core.bool hasExpireTime() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearExpireTime() => $_clearField(4);
-  @$pb.TagNumber(4)
-  $1.Timestamp ensureExpireTime() => $_ensure(3);
 }
 
 class GetMyKYCRequest extends $pb.GeneratedMessage {
@@ -5078,7 +5016,7 @@ class AppealUnavailability extends $pb.GeneratedMessage {
 class MeasureFinding extends $pb.GeneratedMessage {
   factory MeasureFinding({
     $core.String? id,
-    $10.PolicyCategory? category,
+    $9.PolicyCategory? category,
     ViolationSeverity? severity,
     $1.Timestamp? createTime,
   }) {
@@ -5105,8 +5043,8 @@ class MeasureFinding extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: MeasureFinding.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'id')
-    ..aE<$10.PolicyCategory>(2, _omitFieldNames ? '' : 'category',
-        enumValues: $10.PolicyCategory.values)
+    ..aE<$9.PolicyCategory>(2, _omitFieldNames ? '' : 'category',
+        enumValues: $9.PolicyCategory.values)
     ..aE<ViolationSeverity>(3, _omitFieldNames ? '' : 'severity',
         enumValues: ViolationSeverity.values)
     ..aOM<$1.Timestamp>(4, _omitFieldNames ? '' : 'createTime',
@@ -5146,9 +5084,9 @@ class MeasureFinding extends $pb.GeneratedMessage {
 
   /// 認定的類別：政策分類中平台判定與認定可用的值（不含 OTHER）。
   @$pb.TagNumber(2)
-  $10.PolicyCategory get category => $_getN(1);
+  $9.PolicyCategory get category => $_getN(1);
   @$pb.TagNumber(2)
-  set category($10.PolicyCategory value) => $_setField(2, value);
+  set category($9.PolicyCategory value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasCategory() => $_has(1);
   @$pb.TagNumber(2)
@@ -5428,7 +5366,7 @@ class Measure extends $pb.GeneratedMessage {
     RevokeReason? revokeReason,
     $core.bool? canRequestRemediation,
     $1.Timestamp? nextRemediationTime,
-    $7.Duration? rejectionCooldown,
+    $6.Duration? rejectionCooldown,
     $core.Iterable<MeasureRequest>? requests,
     TerminationGround? terminationGround,
     $1.Timestamp? appealDeadlineTime,
@@ -5503,8 +5441,8 @@ class Measure extends $pb.GeneratedMessage {
     ..aOB(15, _omitFieldNames ? '' : 'canRequestRemediation')
     ..aOM<$1.Timestamp>(16, _omitFieldNames ? '' : 'nextRemediationTime',
         subBuilder: $1.Timestamp.$_createMessage)
-    ..aOM<$7.Duration>(17, _omitFieldNames ? '' : 'rejectionCooldown',
-        subBuilder: $7.Duration.$_createMessage)
+    ..aOM<$6.Duration>(17, _omitFieldNames ? '' : 'rejectionCooldown',
+        subBuilder: $6.Duration.$_createMessage)
     ..pPM<MeasureRequest>(18, _omitFieldNames ? '' : 'requests',
         subBuilder: MeasureRequest.$_createMessage)
     ..aE<TerminationGround>(20, _omitFieldNames ? '' : 'terminationGround',
@@ -5684,15 +5622,15 @@ class Measure extends $pb.GeneratedMessage {
   /// 這筆措施的下一個請求若被駁回，會開始的冷卻期長度；只在 RISK 依據、措施生效中時才可能設，不設表示不會有冷卻。給送出前的警告用（「若本次經駁回，將於這段期間內不得
   /// 再提出」），client 不用自己從駁回次數推導。冷卻規則由伺服器決定（條款第 17.4 條）。
   @$pb.TagNumber(17)
-  $7.Duration get rejectionCooldown => $_getN(14);
+  $6.Duration get rejectionCooldown => $_getN(14);
   @$pb.TagNumber(17)
-  set rejectionCooldown($7.Duration value) => $_setField(17, value);
+  set rejectionCooldown($6.Duration value) => $_setField(17, value);
   @$pb.TagNumber(17)
   $core.bool hasRejectionCooldown() => $_has(14);
   @$pb.TagNumber(17)
   void clearRejectionCooldown() => $_clearField(17);
   @$pb.TagNumber(17)
-  $7.Duration ensureRejectionCooldown() => $_ensure(14);
+  $6.Duration ensureRejectionCooldown() => $_ensure(14);
 
   /// 措施上賣家的請求（申覆與解除請求，看 MeasureRequest.kind），新到舊；沒有請求過時是空的。每一筆的 state 由伺服器推導（見
   /// MeasureRequest）；同時至多一筆 PENDING，所以「目前的請求」是第一筆不是 CLOSED 的。
@@ -6930,7 +6868,7 @@ class BatchGetStoresRequest extends $pb.GeneratedMessage {
 
 class BatchGetStoresResponse extends $pb.GeneratedMessage {
   factory BatchGetStoresResponse({
-    $core.Iterable<$8.StoreCard>? stores,
+    $core.Iterable<$7.StoreCard>? stores,
   }) {
     final result = BatchGetStoresResponse._();
     if (stores != null) result.stores.addAll(stores);
@@ -6951,8 +6889,8 @@ class BatchGetStoresResponse extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: BatchGetStoresResponse.$_createMessage)
-    ..pPM<$8.StoreCard>(1, _omitFieldNames ? '' : 'stores',
-        subBuilder: $8.StoreCard.$_createMessage)
+    ..pPM<$7.StoreCard>(1, _omitFieldNames ? '' : 'stores',
+        subBuilder: $7.StoreCard.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6980,7 +6918,7 @@ class BatchGetStoresResponse extends $pb.GeneratedMessage {
   static BatchGetStoresResponse? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $pb.PbList<$8.StoreCard> get stores => $_getList(0);
+  $pb.PbList<$7.StoreCard> get stores => $_getList(0);
 }
 
 class GetSellerAgreementsRequest extends $pb.GeneratedMessage {

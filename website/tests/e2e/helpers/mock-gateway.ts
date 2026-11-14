@@ -744,9 +744,7 @@ export async function mockMyKyc(
 		void fulfillConnect(route, {
 			account: {
 				status: `PAYMENT_ACCOUNT_STATUS_${account.status}`,
-				requirementCollection: "REQUIREMENT_COLLECTION_PROVIDER",
 				onboardingSurface: `ONBOARDING_SURFACE_${account.surface ?? "HOSTED"}`,
-				transfersActive: account.status === "ENABLED",
 				payoutsActive: account.payoutsActive ?? account.status === "ENABLED",
 			},
 		});

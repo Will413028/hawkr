@@ -16,11 +16,9 @@ import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
 import 'package:protobuf/well_known_types/google/protobuf/duration.pbjson.dart'
-    as $7;
+    as $6;
 import 'package:protobuf/well_known_types/google/protobuf/field_mask.pbjson.dart'
     as $4;
-import 'package:protobuf/well_known_types/google/protobuf/struct.pbjson.dart'
-    as $6;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
     as $1;
 
@@ -28,7 +26,7 @@ import '../../../google/rpc/error_details.pbjson.dart' as $3;
 import '../../../google/type/date.pbjson.dart' as $5;
 import '../../common/v1alpha1/image.pbjson.dart' as $0;
 import '../../common/v1alpha1/postal_address.pbjson.dart' as $2;
-import '../../common/v1alpha1/store_card.pbjson.dart' as $8;
+import '../../common/v1alpha1/store_card.pbjson.dart' as $7;
 
 @$core.Deprecated('Use agreementKindDescriptor instead')
 const AgreementKind$json = {
@@ -1982,14 +1980,6 @@ const PaymentAccount$json = {
       '10': 'status'
     },
     {
-      '1': 'requirement_collection',
-      '3': 2,
-      '4': 1,
-      '5': 14,
-      '6': '.hawkr.payment.v1alpha1.RequirementCollection',
-      '10': 'requirementCollection'
-    },
-    {
       '1': 'onboarding_surface',
       '3': 3,
       '4': 1,
@@ -1997,16 +1987,7 @@ const PaymentAccount$json = {
       '6': '.hawkr.payment.v1alpha1.OnboardingSurface',
       '10': 'onboardingSurface'
     },
-    {'1': 'transfers_active', '3': 4, '4': 1, '5': 8, '10': 'transfersActive'},
     {'1': 'payouts_active', '3': 5, '4': 1, '5': 8, '10': 'payoutsActive'},
-    {
-      '1': 'requirements',
-      '3': 6,
-      '4': 1,
-      '5': 11,
-      '6': '.google.protobuf.Struct',
-      '10': 'requirements'
-    },
     {
       '1': 'fetch_time',
       '3': 7,
@@ -2021,14 +2002,10 @@ const PaymentAccount$json = {
 /// Descriptor for `PaymentAccount`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List paymentAccountDescriptor = $convert.base64Decode(
     'Cg5QYXltZW50QWNjb3VudBJECgZzdGF0dXMYASABKA4yLC5oYXdrci5wYXltZW50LnYxYWxwaG'
-    'ExLlBheW1lbnRBY2NvdW50U3RhdHVzUgZzdGF0dXMSZAoWcmVxdWlyZW1lbnRfY29sbGVjdGlv'
-    'bhgCIAEoDjItLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuUmVxdWlyZW1lbnRDb2xsZWN0aW9uUh'
-    'VyZXF1aXJlbWVudENvbGxlY3Rpb24SWAoSb25ib2FyZGluZ19zdXJmYWNlGAMgASgOMikuaGF3'
-    'a3IucGF5bWVudC52MWFscGhhMS5PbmJvYXJkaW5nU3VyZmFjZVIRb25ib2FyZGluZ1N1cmZhY2'
-    'USKQoQdHJhbnNmZXJzX2FjdGl2ZRgEIAEoCFIPdHJhbnNmZXJzQWN0aXZlEiUKDnBheW91dHNf'
-    'YWN0aXZlGAUgASgIUg1wYXlvdXRzQWN0aXZlEjsKDHJlcXVpcmVtZW50cxgGIAEoCzIXLmdvb2'
-    'dsZS5wcm90b2J1Zi5TdHJ1Y3RSDHJlcXVpcmVtZW50cxI5CgpmZXRjaF90aW1lGAcgASgLMhou'
-    'Z29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcFIJZmV0Y2hUaW1l');
+    'ExLlBheW1lbnRBY2NvdW50U3RhdHVzUgZzdGF0dXMSWAoSb25ib2FyZGluZ19zdXJmYWNlGAMg'
+    'ASgOMikuaGF3a3IucGF5bWVudC52MWFscGhhMS5PbmJvYXJkaW5nU3VyZmFjZVIRb25ib2FyZG'
+    'luZ1N1cmZhY2USJQoOcGF5b3V0c19hY3RpdmUYBSABKAhSDXBheW91dHNBY3RpdmUSOQoKZmV0'
+    'Y2hfdGltZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBSCWZldGNoVGltZQ==');
 
 @$core.Deprecated('Use getMyPaymentAccountRequestDescriptor instead')
 const GetMyPaymentAccountRequest$json = {
@@ -2091,14 +2068,6 @@ const CreatePaymentOnboardingSessionResponse$json = {
     },
     {'1': 'url', '3': 2, '4': 1, '5': 9, '10': 'url'},
     {'1': 'client_secret', '3': 3, '4': 1, '5': 9, '10': 'clientSecret'},
-    {
-      '1': 'expire_time',
-      '3': 4,
-      '4': 1,
-      '5': 11,
-      '6': '.google.protobuf.Timestamp',
-      '10': 'expireTime'
-    },
   ],
 };
 
@@ -2107,9 +2076,7 @@ final $typed_data.Uint8List createPaymentOnboardingSessionResponseDescriptor =
     $convert.base64Decode(
         'CiZDcmVhdGVQYXltZW50T25ib2FyZGluZ1Nlc3Npb25SZXNwb25zZRJDCgdzdXJmYWNlGAEgAS'
         'gOMikuaGF3a3IucGF5bWVudC52MWFscGhhMS5PbmJvYXJkaW5nU3VyZmFjZVIHc3VyZmFjZRIQ'
-        'CgN1cmwYAiABKAlSA3VybBIjCg1jbGllbnRfc2VjcmV0GAMgASgJUgxjbGllbnRTZWNyZXQSOw'
-        'oLZXhwaXJlX3RpbWUYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wUgpleHBpcmVU'
-        'aW1l');
+        'CgN1cmwYAiABKAlSA3VybBIjCg1jbGllbnRfc2VjcmV0GAMgASgJUgxjbGllbnRTZWNyZXQ=');
 
 @$core.Deprecated('Use getMyKYCRequestDescriptor instead')
 const GetMyKYCRequest$json = {
@@ -3364,10 +3331,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.GetMyPaymentAccountResponse':
       GetMyPaymentAccountResponse$json,
   '.hawkr.seller.v1alpha1.PaymentAccount': PaymentAccount$json,
-  '.google.protobuf.Struct': $6.Struct$json,
-  '.google.protobuf.Struct.FieldsEntry': $6.Struct_FieldsEntry$json,
-  '.google.protobuf.Value': $6.Value$json,
-  '.google.protobuf.ListValue': $6.ListValue$json,
   '.hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionRequest':
       CreatePaymentOnboardingSessionRequest$json,
   '.hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse':
@@ -3382,7 +3345,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.Measure': Measure$json,
   '.hawkr.seller.v1alpha1.MeasureFinding': MeasureFinding$json,
   '.hawkr.seller.v1alpha1.MeasurePeriod': MeasurePeriod$json,
-  '.google.protobuf.Duration': $7.Duration$json,
+  '.google.protobuf.Duration': $6.Duration$json,
   '.hawkr.seller.v1alpha1.MeasureRequest': MeasureRequest$json,
   '.hawkr.seller.v1alpha1.RemediationUnavailability':
       RemediationUnavailability$json,
@@ -3494,7 +3457,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.ListStoresResponse': ListStoresResponse$json,
   '.hawkr.seller.v1alpha1.BatchGetStoresRequest': BatchGetStoresRequest$json,
   '.hawkr.seller.v1alpha1.BatchGetStoresResponse': BatchGetStoresResponse$json,
-  '.hawkr.common.v1alpha1.StoreCard': $8.StoreCard$json,
+  '.hawkr.common.v1alpha1.StoreCard': $7.StoreCard$json,
   '.hawkr.seller.v1alpha1.GetSellerAgreementsRequest':
       GetSellerAgreementsRequest$json,
   '.hawkr.seller.v1alpha1.GetSellerAgreementsResponse':

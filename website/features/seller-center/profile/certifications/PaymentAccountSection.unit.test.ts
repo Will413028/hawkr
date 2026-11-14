@@ -306,16 +306,6 @@ describe("狀態文字來自目錄", () => {
 		expect(screen.getByRole("alert")).toBeTruthy();
 		expect(screen.queryByText("待設定")).toBeNull();
 	});
-
-	it("不顯示金流商的待補條件細項", async () => {
-		mocks.account = create(PaymentAccountSchema, {
-			status: PaymentAccountStatus.ACTION_REQUIRED,
-			onboardingSurface: OnboardingSurface.HOSTED,
-			requirements: { currently_due: ["individual.id_number"] },
-		});
-		await mount();
-		expect(document.body.textContent).not.toContain("individual.id_number");
-	});
 });
 
 describe("HOSTED：導頁", () => {

@@ -11,7 +11,6 @@ import (
 
 	paymentpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
-	httppayment "github.com/Will413028/hawkr/backend/internal/httpapi/payment"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 )
@@ -69,10 +68,8 @@ func (h *App) GetMyPaymentAccount(ctx context.Context, _ *connect.Request[pb.Get
 		return nil, err
 	}
 	out := &pb.PaymentAccount{
-		Status:                rpc.EnumToProto[paymentpb.PaymentAccountStatus](acct.Status),
-		RequirementCollection: rpc.EnumToProto[paymentpb.RequirementCollection](acct.RequirementCollection),
-		TransfersActive:       acct.TransfersActive, PayoutsActive: acct.PayoutsActive,
-		Requirements: httppayment.Requirements(acct.Requirements), FetchTime: optTimestamp(acct.FetchedAt),
+		Status:        rpc.EnumToProto[paymentpb.PaymentAccountStatus](acct.Status),
+		PayoutsActive: acct.PayoutsActive, FetchTime: optTimestamp(acct.FetchedAt),
 	}
 	if caps, ok := h.payments.Capabilities(); ok {
 		out.OnboardingSurface = rpc.EnumToProto[paymentpb.OnboardingSurface](caps.OnboardingSurface)
@@ -98,7 +95,6 @@ func (h *App) CreatePaymentOnboardingSession(ctx context.Context, req *connect.R
 	}
 	return connect.NewResponse(&pb.CreatePaymentOnboardingSessionResponse{
 		Surface: rpc.EnumToProto[paymentpb.OnboardingSurface](session.Surface), Url: session.URL, ClientSecret: session.ClientSecret,
-		ExpireTime: optTimestamp(session.ExpiresAt),
 	}), nil
 }
 

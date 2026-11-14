@@ -31,8 +31,8 @@ var _ paymentv1alpha1connect.PaymentAdminServiceHandler = (*Admin)(nil)
 // NewAdmin 建立後台的 handler。
 func NewAdmin(m AdminModule) *Admin { return &Admin{m: m} }
 
-// Requirements 把金流商回報的待補條件原始 JSON 轉成 Struct；不是物件時回空物件（賣家端的 GetMyPaymentAccount 共用）。
-func Requirements(raw json.RawMessage) *structpb.Struct {
+// requirements 把金流商回報的待補條件原始 JSON 轉成 Struct；不是物件時回空物件。
+func requirements(raw json.RawMessage) *structpb.Struct {
 	out := &structpb.Struct{}
 	if len(raw) == 0 || out.UnmarshalJSON(raw) != nil {
 		return &structpb.Struct{Fields: map[string]*structpb.Value{}}
@@ -59,7 +59,7 @@ func toAdminAccount(a payment.Account) *adminpb.PaymentAccount {
 		StoreId: rpc.FormatID(a.StoreID), Provider: a.Provider, ExternalAccountId: deref(a.ExternalAccountID),
 		Status:                rpc.EnumToProto[paymentpb.PaymentAccountStatus](a.Status),
 		RequirementCollection: rpc.EnumToProto[paymentpb.RequirementCollection](a.RequirementCollection),
-		TransfersActive:       a.TransfersActive, PayoutsActive: a.PayoutsActive, Requirements: Requirements(a.Requirements),
+		TransfersActive:       a.TransfersActive, PayoutsActive: a.PayoutsActive, Requirements: requirements(a.Requirements),
 		StatusReason: deref(a.StatusReason), FetchTime: optTimestamp(a.FetchedAt), CreateFailedTime: optTimestamp(a.CreateFailedAt),
 		CreateTime: timestamppb.New(a.CreatedAt), UpdateTime: timestamppb.New(a.UpdatedAt),
 	}

@@ -90,7 +90,7 @@ func TestGetMyPaymentAccountReturnsTheNeutralStatusAndTheProviderSurface(t *test
 	m := &paymentModule{
 		configured: true, caps: payment.Capabilities{RequirementCollection: payment.CollectionPlatform, OnboardingSurface: payment.SurfaceEmbedded},
 		account: payment.Account{
-			StoreID: 11, Status: payment.StatusActionRequired, RequirementCollection: payment.CollectionPlatform, TransfersActive: false, PayoutsActive: false,
+			StoreID: 11, Status: payment.StatusActionRequired, RequirementCollection: payment.CollectionPlatform, TransfersActive: false, PayoutsActive: true,
 			Requirements: json.RawMessage(`{"currently_due":["individual.id_number"]}`), FetchedAt: &fetched,
 		},
 	}
@@ -100,12 +100,9 @@ func TestGetMyPaymentAccountReturnsTheNeutralStatusAndTheProviderSurface(t *test
 		t.Fatal(err)
 	}
 	a := got.Msg.GetAccount()
-	if a.GetStatus() != paymentpb.PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED || a.GetRequirementCollection() != paymentpb.RequirementCollection_REQUIREMENT_COLLECTION_PLATFORM ||
-		a.GetOnboardingSurface() != paymentpb.OnboardingSurface_ONBOARDING_SURFACE_EMBEDDED || a.GetTransfersActive() || !a.GetFetchTime().AsTime().Equal(fetched) {
+	if a.GetStatus() != paymentpb.PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED ||
+		a.GetOnboardingSurface() != paymentpb.OnboardingSurface_ONBOARDING_SURFACE_EMBEDDED || !a.GetPayoutsActive() || !a.GetFetchTime().AsTime().Equal(fetched) {
 		t.Fatalf("account=%v", a)
-	}
-	if due := a.GetRequirements().AsMap()["currently_due"]; due == nil {
-		t.Fatalf("requirements=%v", a.GetRequirements())
 	}
 	m.configured = false
 	got, err = app.GetMyPaymentAccount(ctxWithStore(currentStore()), connect.NewRequest(&pb.GetMyPaymentAccountRequest{}))
@@ -138,7 +135,7 @@ func TestCreatePaymentOnboardingSessionValidatesTheUrlsBeforeCallingTheModule(t 
 	if m.sessionFor != 11 || m.returnURL != "https://web.example.test/ok" || m.refreshURL != "https://web.example.test/again" {
 		t.Fatalf("模組收到 store=%d return=%q refresh=%q", m.sessionFor, m.returnURL, m.refreshURL)
 	}
-	if got.Msg.GetSurface() != paymentpb.OnboardingSurface_ONBOARDING_SURFACE_HOSTED || got.Msg.GetUrl() == "" || got.Msg.GetClientSecret() != "" || got.Msg.GetExpireTime() == nil {
+	if got.Msg.GetSurface() != paymentpb.OnboardingSurface_ONBOARDING_SURFACE_HOSTED || got.Msg.GetUrl() == "" || got.Msg.GetClientSecret() != "" {
 		t.Fatalf("response=%v", got.Msg)
 	}
 }
