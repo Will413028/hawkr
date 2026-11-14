@@ -154,6 +154,7 @@ type SellerCapability int32
 
 const (
 	SellerCapability_SELLER_CAPABILITY_UNSPECIFIED SellerCapability = 0
+	// 8 曾是查違規與申覆的能力：違規與申覆以帳號為範圍，沒有任何方法需要店家能力，已刪除。
 	// 看自己的店家資料與停權狀態。
 	SellerCapability_SELLER_CAPABILITY_ACCOUNT_SELF_READ SellerCapability = 1
 	// 店面設定：資料、logo、封面、新手引導。
@@ -169,22 +170,22 @@ const (
 	// 收縮型的內容動作（刪除、下架自己的貼文，撤回自己的券）。
 	SellerCapability_SELLER_CAPABILITY_CONTENT_CONTRACT SellerCapability = 7
 	// 送出訊息。
-	SellerCapability_SELLER_CAPABILITY_CHAT_SEND SellerCapability = 9
+	SellerCapability_SELLER_CAPABILITY_CHAT_SEND SellerCapability = 8
 	// 讀取訊息。
-	SellerCapability_SELLER_CAPABILITY_CHAT_READ SellerCapability = 10
+	SellerCapability_SELLER_CAPABILITY_CHAT_READ SellerCapability = 9
 	// 通知收件箱、偏好與裝置。
-	SellerCapability_SELLER_CAPABILITY_NOTIFICATION SellerCapability = 11
+	SellerCapability_SELLER_CAPABILITY_NOTIFICATION SellerCapability = 10
 	// 關店。
-	SellerCapability_SELLER_CAPABILITY_ACCOUNT_CLOSE SellerCapability = 12
+	SellerCapability_SELLER_CAPABILITY_ACCOUNT_CLOSE SellerCapability = 11
 	// 發票與稅務憑證的查詢與設定。
-	SellerCapability_SELLER_CAPABILITY_INVOICE_MANAGE SellerCapability = 13
+	SellerCapability_SELLER_CAPABILITY_INVOICE_MANAGE SellerCapability = 12
 	// 稅務身分的申請、補件與延長。
-	SellerCapability_SELLER_CAPABILITY_INVOICE_TAX_REMEDY SellerCapability = 14
+	SellerCapability_SELLER_CAPABILITY_INVOICE_TAX_REMEDY SellerCapability = 13
 	// 物流建店、啟用與關閉配送方式。前置條件是開通完成（SELLER_REQUIREMENT_ONBOARDING_COMPLETE：平台審核核准且收款帳戶的轉帳能力啟用）。
-	SellerCapability_SELLER_CAPABILITY_SHIPPING_SETUP SellerCapability = 15
+	SellerCapability_SELLER_CAPABILITY_SHIPPING_SETUP SellerCapability = 14
 	// 店家的狀態：買家看得到店面、可以結帳。缺的條件是公開曝光的全部條件（SellerRequirement）。這是狀態而不是
 	// 賣家能做的動作，只出現在 GetMyStore 的 capabilities，沒有任何方法需要它；「至少一個上架商品」由商品的曝光端檢查，不在其中。
-	SellerCapability_SELLER_CAPABILITY_PUBLIC_LISTING SellerCapability = 16
+	SellerCapability_SELLER_CAPABILITY_PUBLIC_LISTING SellerCapability = 15
 )
 
 // Enum value maps for SellerCapability.
@@ -198,14 +199,14 @@ var (
 		5:  "SELLER_CAPABILITY_ORDER_CONTRACT",
 		6:  "SELLER_CAPABILITY_MARKETING",
 		7:  "SELLER_CAPABILITY_CONTENT_CONTRACT",
-		9:  "SELLER_CAPABILITY_CHAT_SEND",
-		10: "SELLER_CAPABILITY_CHAT_READ",
-		11: "SELLER_CAPABILITY_NOTIFICATION",
-		12: "SELLER_CAPABILITY_ACCOUNT_CLOSE",
-		13: "SELLER_CAPABILITY_INVOICE_MANAGE",
-		14: "SELLER_CAPABILITY_INVOICE_TAX_REMEDY",
-		15: "SELLER_CAPABILITY_SHIPPING_SETUP",
-		16: "SELLER_CAPABILITY_PUBLIC_LISTING",
+		8:  "SELLER_CAPABILITY_CHAT_SEND",
+		9:  "SELLER_CAPABILITY_CHAT_READ",
+		10: "SELLER_CAPABILITY_NOTIFICATION",
+		11: "SELLER_CAPABILITY_ACCOUNT_CLOSE",
+		12: "SELLER_CAPABILITY_INVOICE_MANAGE",
+		13: "SELLER_CAPABILITY_INVOICE_TAX_REMEDY",
+		14: "SELLER_CAPABILITY_SHIPPING_SETUP",
+		15: "SELLER_CAPABILITY_PUBLIC_LISTING",
 	}
 	SellerCapability_value = map[string]int32{
 		"SELLER_CAPABILITY_UNSPECIFIED":        0,
@@ -216,14 +217,14 @@ var (
 		"SELLER_CAPABILITY_ORDER_CONTRACT":     5,
 		"SELLER_CAPABILITY_MARKETING":          6,
 		"SELLER_CAPABILITY_CONTENT_CONTRACT":   7,
-		"SELLER_CAPABILITY_CHAT_SEND":          9,
-		"SELLER_CAPABILITY_CHAT_READ":          10,
-		"SELLER_CAPABILITY_NOTIFICATION":       11,
-		"SELLER_CAPABILITY_ACCOUNT_CLOSE":      12,
-		"SELLER_CAPABILITY_INVOICE_MANAGE":     13,
-		"SELLER_CAPABILITY_INVOICE_TAX_REMEDY": 14,
-		"SELLER_CAPABILITY_SHIPPING_SETUP":     15,
-		"SELLER_CAPABILITY_PUBLIC_LISTING":     16,
+		"SELLER_CAPABILITY_CHAT_SEND":          8,
+		"SELLER_CAPABILITY_CHAT_READ":          9,
+		"SELLER_CAPABILITY_NOTIFICATION":       10,
+		"SELLER_CAPABILITY_ACCOUNT_CLOSE":      11,
+		"SELLER_CAPABILITY_INVOICE_MANAGE":     12,
+		"SELLER_CAPABILITY_INVOICE_TAX_REMEDY": 13,
+		"SELLER_CAPABILITY_SHIPPING_SETUP":     14,
+		"SELLER_CAPABILITY_PUBLIC_LISTING":     15,
 	}
 )
 
@@ -707,39 +708,39 @@ type KYCField int32
 
 const (
 	KYCField_KYC_FIELD_UNSPECIFIED                    KYCField = 0
-	KYCField_KYC_FIELD_PRODUCT_TYPE                   KYCField = 10
-	KYCField_KYC_FIELD_WEBSITE_URL                    KYCField = 12
-	KYCField_KYC_FIELD_BUSINESS_COMPANY_NAME          KYCField = 20
-	KYCField_KYC_FIELD_BUSINESS_TAX_ID                KYCField = 21
-	KYCField_KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE KYCField = 22
-	KYCField_KYC_FIELD_BUSINESS_COMPANY_PHONE         KYCField = 25
-	KYCField_KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS     KYCField = 27
-	KYCField_KYC_FIELD_BUSINESS_COMPANY_ADDRESS       KYCField = 28
+	KYCField_KYC_FIELD_PRODUCT_TYPE                   KYCField = 1
+	KYCField_KYC_FIELD_WEBSITE_URL                    KYCField = 2
+	KYCField_KYC_FIELD_BUSINESS_COMPANY_NAME          KYCField = 3
+	KYCField_KYC_FIELD_BUSINESS_TAX_ID                KYCField = 4
+	KYCField_KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE KYCField = 5
+	KYCField_KYC_FIELD_BUSINESS_COMPANY_PHONE         KYCField = 6
+	KYCField_KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS     KYCField = 7
+	KYCField_KYC_FIELD_BUSINESS_COMPANY_ADDRESS       KYCField = 8
 )
 
 // Enum value maps for KYCField.
 var (
 	KYCField_name = map[int32]string{
-		0:  "KYC_FIELD_UNSPECIFIED",
-		10: "KYC_FIELD_PRODUCT_TYPE",
-		12: "KYC_FIELD_WEBSITE_URL",
-		20: "KYC_FIELD_BUSINESS_COMPANY_NAME",
-		21: "KYC_FIELD_BUSINESS_TAX_ID",
-		22: "KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE",
-		25: "KYC_FIELD_BUSINESS_COMPANY_PHONE",
-		27: "KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS",
-		28: "KYC_FIELD_BUSINESS_COMPANY_ADDRESS",
+		0: "KYC_FIELD_UNSPECIFIED",
+		1: "KYC_FIELD_PRODUCT_TYPE",
+		2: "KYC_FIELD_WEBSITE_URL",
+		3: "KYC_FIELD_BUSINESS_COMPANY_NAME",
+		4: "KYC_FIELD_BUSINESS_TAX_ID",
+		5: "KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE",
+		6: "KYC_FIELD_BUSINESS_COMPANY_PHONE",
+		7: "KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS",
+		8: "KYC_FIELD_BUSINESS_COMPANY_ADDRESS",
 	}
 	KYCField_value = map[string]int32{
 		"KYC_FIELD_UNSPECIFIED":                    0,
-		"KYC_FIELD_PRODUCT_TYPE":                   10,
-		"KYC_FIELD_WEBSITE_URL":                    12,
-		"KYC_FIELD_BUSINESS_COMPANY_NAME":          20,
-		"KYC_FIELD_BUSINESS_TAX_ID":                21,
-		"KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE": 22,
-		"KYC_FIELD_BUSINESS_COMPANY_PHONE":         25,
-		"KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS":     27,
-		"KYC_FIELD_BUSINESS_COMPANY_ADDRESS":       28,
+		"KYC_FIELD_PRODUCT_TYPE":                   1,
+		"KYC_FIELD_WEBSITE_URL":                    2,
+		"KYC_FIELD_BUSINESS_COMPANY_NAME":          3,
+		"KYC_FIELD_BUSINESS_TAX_ID":                4,
+		"KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE": 5,
+		"KYC_FIELD_BUSINESS_COMPANY_PHONE":         6,
+		"KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS":     7,
+		"KYC_FIELD_BUSINESS_COMPANY_ADDRESS":       8,
 	}
 )
 
@@ -1890,17 +1891,17 @@ type Store struct {
 	ContactPhone string `protobuf:"bytes,5,opt,name=contact_phone,json=contactPhone,proto3" json:"contact_phone,omitempty"`
 	// 店家地址；不設表示沒有填。送出 KYC 之前要填，申請審核中或已核准時不能清掉。可以只填鄉鎮市區（address_detail 是空字串），有明細就一定有鄉鎮市區代碼。
 	// update_mask 列 address 時整個換成請求的地址，請求沒有 address 就是清掉。
-	Address *v1alpha1.PostalAddress `protobuf:"bytes,21,opt,name=address,proto3" json:"address,omitempty"`
+	Address *v1alpha1.PostalAddress `protobuf:"bytes,6,opt,name=address,proto3" json:"address,omitempty"`
 	// 聯絡人姓名，最多 50 字；空字串表示沒有填。選填，任何時候都能清掉。
-	ContactName string `protobuf:"bytes,23,opt,name=contact_name,json=contactName,proto3" json:"contact_name,omitempty"`
+	ContactName string `protobuf:"bytes,7,opt,name=contact_name,json=contactName,proto3" json:"contact_name,omitempty"`
 	// 聯絡人手機，09 開頭的 10 碼；空字串表示沒有填。選填，任何時候都能清掉。
-	ContactMobile string `protobuf:"bytes,24,opt,name=contact_mobile,json=contactMobile,proto3" json:"contact_mobile,omitempty"`
+	ContactMobile string `protobuf:"bytes,8,opt,name=contact_mobile,json=contactMobile,proto3" json:"contact_mobile,omitempty"`
 	// 客服電子信箱，最多 254 字；空字串表示沒有填。物流用它聯絡店家：送出 KYC 之前要填，申請審核中或已核准時不能清掉。
-	SupportEmail string `protobuf:"bytes,25,opt,name=support_email,json=supportEmail,proto3" json:"support_email,omitempty"`
+	SupportEmail string `protobuf:"bytes,9,opt,name=support_email,json=supportEmail,proto3" json:"support_email,omitempty"`
 	// 得獎紀錄，最多 255 字。
-	Prize string `protobuf:"bytes,8,opt,name=prize,proto3" json:"prize,omitempty"`
+	Prize string `protobuf:"bytes,10,opt,name=prize,proto3" json:"prize,omitempty"`
 	// 官網，http 或 https 網址。
-	WebsiteUrl string `protobuf:"bytes,9,opt,name=website_url,json=websiteUrl,proto3" json:"website_url,omitempty"`
+	WebsiteUrl string `protobuf:"bytes,11,opt,name=website_url,json=websiteUrl,proto3" json:"website_url,omitempty"`
 	// 已完成新手引導；由 CompleteMyStoreOnboarding 設定，完成之後不能改回未完成。
 	OnboardingCompleted bool `protobuf:"varint,12,opt,name=onboarding_completed,json=onboardingCompleted,proto3" json:"onboarding_completed,omitempty"`
 	// 沒有設定時不設。
@@ -2162,14 +2163,14 @@ type ApplyStoreRequest struct {
 	// 聯絡電話，台灣的手機或市話。
 	ContactPhone string `protobuf:"bytes,3,opt,name=contact_phone,json=contactPhone,proto3" json:"contact_phone,omitempty"`
 	// 得獎紀錄，最多 255 字。
-	Prize string `protobuf:"bytes,6,opt,name=prize,proto3" json:"prize,omitempty"`
+	Prize string `protobuf:"bytes,4,opt,name=prize,proto3" json:"prize,omitempty"`
 	// 店家地址；不設表示沒有填。可以只填鄉鎮市區（address_detail 是空字串）。
-	Address *v1alpha1.PostalAddress `protobuf:"bytes,7,opt,name=address,proto3" json:"address,omitempty"`
+	Address *v1alpha1.PostalAddress `protobuf:"bytes,5,opt,name=address,proto3" json:"address,omitempty"`
 	// 賣家同意的文件，剛好是 SELLER_TERMS 一份。缺種類、多出不屬於這個操作的種類、同一種重複或 UNSPECIFIED 回
 	// invalid_argument（field violation 指向 accepted_agreements）；版本不是現行版本回 failed_precondition，
 	// ErrorInfo.reason 是 AGREEMENT_OUTDATED，client 重讀 GetSellerAgreements，請賣家重新勾選。同意與開店同一個
 	// transaction，連同時間與來源 IP、User-Agent 記錄。
-	AcceptedAgreements []*AgreementAcceptance `protobuf:"bytes,8,rep,name=accepted_agreements,json=acceptedAgreements,proto3" json:"accepted_agreements,omitempty"`
+	AcceptedAgreements []*AgreementAcceptance `protobuf:"bytes,6,rep,name=accepted_agreements,json=acceptedAgreements,proto3" json:"accepted_agreements,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -2331,7 +2332,7 @@ type GetMyStoreOpeningResponse struct {
 	// 此刻能不能申請開店；等於 unavailabilities 為空。client 只呈現，不從 GetMyStore 的狀態或措施推導。
 	CanApplyStore bool `protobuf:"varint,1,opt,name=can_apply_store,json=canApplyStore,proto3" json:"can_apply_store,omitempty"`
 	// 不能申請的原因，依優先序（結構性的在前，第一個是主要原因，終止合作先於停權：終止撤銷之前解除停權也開不了店）；can_apply_store 為 true 時為空。
-	Unavailabilities []*StoreOpeningUnavailability `protobuf:"bytes,3,rep,name=unavailabilities,proto3" json:"unavailabilities,omitempty"`
+	Unavailabilities []*StoreOpeningUnavailability `protobuf:"bytes,2,rep,name=unavailabilities,proto3" json:"unavailabilities,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -2477,12 +2478,12 @@ type GetMyStoreResponse struct {
 	Store *Store                 `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
 	// 每個能力（含 PUBLIC_LISTING，不含 UNSPECIFIED）此刻的狀態，依 SellerCapability 的數字順序，所以沒有出現的能力
 	// 不代表沒有啟用。
-	Capabilities []*CapabilityStatus `protobuf:"bytes,3,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
+	Capabilities []*CapabilityStatus `protobuf:"bytes,2,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
 	// 店家自己看的統計，與前台店面頁的 StoreStats 同一份組裝。粉絲與評價各自讀，讀不到的欄位不設；預覽自己的店，不論是否公開都讀得到。
-	Stats *StoreStats `protobuf:"bytes,5,opt,name=stats,proto3" json:"stats,omitempty"`
+	Stats *StoreStats `protobuf:"bytes,3,opt,name=stats,proto3" json:"stats,omitempty"`
 	// 帳號此刻是否停權（任何一個店家的生效中措施都算）。與 capabilities 裡的 NOT_SUSPENDED 缺項來自同一次推導；
 	// 停權的內容讀 ListMyMeasures(state=ACTIVE)。
-	Suspended     bool `protobuf:"varint,6,opt,name=suspended,proto3" json:"suspended,omitempty"`
+	Suspended     bool `protobuf:"varint,4,opt,name=suspended,proto3" json:"suspended,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3959,9 +3960,9 @@ type KYCRejection struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 退回的總理由。
 	Reason     string                 `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
-	DecideTime *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=decide_time,json=decideTime,proto3" json:"decide_time,omitempty"`
+	DecideTime *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=decide_time,json=decideTime,proto3" json:"decide_time,omitempty"`
 	// 退回時逐項指出的問題（不管賣家後來有沒有處理）；賣家還沒處理的是 KYCApplication.outstanding_issues。
-	Issues        []*KYCIssue `protobuf:"bytes,4,rep,name=issues,proto3" json:"issues,omitempty"`
+	Issues        []*KYCIssue `protobuf:"bytes,3,rep,name=issues,proto3" json:"issues,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4057,15 +4058,15 @@ func (*IndividualKYC) Descriptor() ([]byte, []int) {
 // BusinessKYC 是企業賣家專屬的欄位：公司資料。
 type BusinessKYC struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
-	CompanyName string                 `protobuf:"bytes,2,opt,name=company_name,json=companyName,proto3" json:"company_name,omitempty"`
+	CompanyName string                 `protobuf:"bytes,1,opt,name=company_name,json=companyName,proto3" json:"company_name,omitempty"`
 	// 8 碼統一編號，含檢查碼（2023 年起的規則）。
-	TaxId               string     `protobuf:"bytes,3,opt,name=tax_id,json=taxId,proto3" json:"tax_id,omitempty"`
-	CompanyRegisterDate *date.Date `protobuf:"bytes,4,opt,name=company_register_date,json=companyRegisterDate,proto3" json:"company_register_date,omitempty"`
-	CompanyPhone        string     `protobuf:"bytes,7,opt,name=company_phone,json=companyPhone,proto3" json:"company_phone,omitempty"`
+	TaxId               string     `protobuf:"bytes,2,opt,name=tax_id,json=taxId,proto3" json:"tax_id,omitempty"`
+	CompanyRegisterDate *date.Date `protobuf:"bytes,3,opt,name=company_register_date,json=companyRegisterDate,proto3" json:"company_register_date,omitempty"`
+	CompanyPhone        string     `protobuf:"bytes,4,opt,name=company_phone,json=companyPhone,proto3" json:"company_phone,omitempty"`
 	// 公司文件，最多 10 張，順序就是位置；列進 update_mask 時整個換成請求的清單。
-	CompanyDocuments []*KYCDocument `protobuf:"bytes,10,rep,name=company_documents,json=companyDocuments,proto3" json:"company_documents,omitempty"`
+	CompanyDocuments []*KYCDocument `protobuf:"bytes,5,rep,name=company_documents,json=companyDocuments,proto3" json:"company_documents,omitempty"`
 	// 公司地址；列進 update_mask 時整個換成請求的地址，請求沒有 address 就是清掉。可以只填鄉鎮市區。
-	CompanyAddress *v1alpha1.PostalAddress `protobuf:"bytes,11,opt,name=company_address,json=companyAddress,proto3" json:"company_address,omitempty"`
+	CompanyAddress *v1alpha1.PostalAddress `protobuf:"bytes,6,opt,name=company_address,json=companyAddress,proto3" json:"company_address,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -4156,8 +4157,8 @@ type KYCApplication struct {
 	Status KYCStatus              `protobuf:"varint,2,opt,name=status,proto3,enum=hawkr.seller.v1alpha1.KYCStatus" json:"status,omitempty"`
 	// 建立時不帶；修改必填。
 	Etag        string `protobuf:"bytes,3,opt,name=etag,proto3" json:"etag,omitempty"`
-	ProductType string `protobuf:"bytes,14,opt,name=product_type,json=productType,proto3" json:"product_type,omitempty"`
-	WebsiteUrl  string `protobuf:"bytes,16,opt,name=website_url,json=websiteUrl,proto3" json:"website_url,omitempty"`
+	ProductType string `protobuf:"bytes,4,opt,name=product_type,json=productType,proto3" json:"product_type,omitempty"`
+	WebsiteUrl  string `protobuf:"bytes,5,opt,name=website_url,json=websiteUrl,proto3" json:"website_url,omitempty"`
 	// Types that are valid to be assigned to Subject:
 	//
 	//	*KYCApplication_Individual
@@ -4165,20 +4166,20 @@ type KYCApplication struct {
 	Subject isKYCApplication_Subject `protobuf_oneof:"subject"`
 	// 最近一次退回，只在「最近一次審核紀錄是退回、賣家還沒重新送出（核准、取消之後也算）」時設，其餘時候不設；client 直接看有沒有
 	// 這個欄位決定要不要顯示總理由與「需重新送出」的提示，不必自己推導。賣家把每一項問題都處理完、還沒重新送出時它仍在。
-	LastRejection *KYCRejection `protobuf:"bytes,25,opt,name=last_rejection,json=lastRejection,proto3" json:"last_rejection,omitempty"`
+	LastRejection *KYCRejection `protobuf:"bytes,8,opt,name=last_rejection,json=lastRejection,proto3" json:"last_rejection,omitempty"`
 	// 送出之前還缺的欄位（與 SubmitKYC 檢查的是同一份規則），依 KYCField 的數字順序；齊全時是空的。client 以它決定續填的
 	// 位置與哪些欄位標紅，不必自己重寫完整性規則。
-	MissingFields []KYCField `protobuf:"varint,26,rep,packed,name=missing_fields,json=missingFields,proto3,enum=hawkr.seller.v1alpha1.KYCField" json:"missing_fields,omitempty"`
+	MissingFields []KYCField `protobuf:"varint,9,rep,packed,name=missing_fields,json=missingFields,proto3,enum=hawkr.seller.v1alpha1.KYCField" json:"missing_fields,omitempty"`
 	// 送出之前還缺的店家欄位（必填的是地址與客服電子信箱，與 SubmitKYC 檢查的是同一份規則），依 StoreField 的數字順序；齊全時是空的。
 	// 這些欄位用 UpdateMyStore 寫，不在申請上。
-	MissingStoreFields []StoreField `protobuf:"varint,31,rep,packed,name=missing_store_fields,json=missingStoreFields,proto3,enum=hawkr.seller.v1alpha1.StoreField" json:"missing_store_fields,omitempty"`
+	MissingStoreFields []StoreField `protobuf:"varint,10,rep,packed,name=missing_store_fields,json=missingStoreFields,proto3,enum=hawkr.seller.v1alpha1.StoreField" json:"missing_store_fields,omitempty"`
 	// 最近一次退回指出的問題裡賣家還沒處理的（已處理由伺服器判定：該欄位的值在退回之後被改過，或指到的文件已被移除或替換）；
 	// 重新送出、核准或取消之後是空的。client 以它標出要補的欄位與文件，不必自己推導退回是否仍然有效。
-	OutstandingIssues []*KYCIssue            `protobuf:"bytes,32,rep,name=outstanding_issues,json=outstandingIssues,proto3" json:"outstanding_issues,omitempty"`
-	SubmitTime        *timestamppb.Timestamp `protobuf:"bytes,27,opt,name=submit_time,json=submitTime,proto3" json:"submit_time,omitempty"`
-	DecideTime        *timestamppb.Timestamp `protobuf:"bytes,28,opt,name=decide_time,json=decideTime,proto3" json:"decide_time,omitempty"`
-	CreateTime        *timestamppb.Timestamp `protobuf:"bytes,29,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
-	UpdateTime        *timestamppb.Timestamp `protobuf:"bytes,30,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	OutstandingIssues []*KYCIssue            `protobuf:"bytes,11,rep,name=outstanding_issues,json=outstandingIssues,proto3" json:"outstanding_issues,omitempty"`
+	SubmitTime        *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=submit_time,json=submitTime,proto3" json:"submit_time,omitempty"`
+	DecideTime        *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=decide_time,json=decideTime,proto3" json:"decide_time,omitempty"`
+	CreateTime        *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	UpdateTime        *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -4334,11 +4335,11 @@ type isKYCApplication_Subject interface {
 }
 
 type KYCApplication_Individual struct {
-	Individual *IndividualKYC `protobuf:"bytes,22,opt,name=individual,proto3,oneof"`
+	Individual *IndividualKYC `protobuf:"bytes,6,opt,name=individual,proto3,oneof"`
 }
 
 type KYCApplication_Business struct {
-	Business *BusinessKYC `protobuf:"bytes,23,opt,name=business,proto3,oneof"`
+	Business *BusinessKYC `protobuf:"bytes,7,opt,name=business,proto3,oneof"`
 }
 
 func (*KYCApplication_Individual) isKYCApplication_Subject() {}
@@ -4448,11 +4449,11 @@ type PaymentAccount struct {
 	state  protoimpl.MessageState         `protogen:"open.v1"`
 	Status v1alpha11.PaymentAccountStatus `protobuf:"varint,1,opt,name=status,proto3,enum=hawkr.payment.v1alpha1.PaymentAccountStatus" json:"status,omitempty"`
 	// 目前設定的 provider 用哪種介面開通；沒有設定收款開通時是 UNSPECIFIED。
-	OnboardingSurface v1alpha11.OnboardingSurface `protobuf:"varint,3,opt,name=onboarding_surface,json=onboardingSurface,proto3,enum=hawkr.payment.v1alpha1.OnboardingSurface" json:"onboarding_surface,omitempty"`
+	OnboardingSurface v1alpha11.OnboardingSurface `protobuf:"varint,2,opt,name=onboarding_surface,json=onboardingSurface,proto3,enum=hawkr.payment.v1alpha1.OnboardingSurface" json:"onboarding_surface,omitempty"`
 	// 撥款能力是否啟用。
-	PayoutsActive bool `protobuf:"varint,5,opt,name=payouts_active,json=payoutsActive,proto3" json:"payouts_active,omitempty"`
+	PayoutsActive bool `protobuf:"varint,3,opt,name=payouts_active,json=payoutsActive,proto3" json:"payouts_active,omitempty"`
 	// 最近一次向金流商讀取帳戶的時間；還沒讀過時不設。
-	FetchTime     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=fetch_time,json=fetchTime,proto3" json:"fetch_time,omitempty"`
+	FetchTime     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=fetch_time,json=fetchTime,proto3" json:"fetch_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4598,10 +4599,10 @@ func (x *GetMyPaymentAccountResponse) GetAccount() *PaymentAccount {
 type CreatePaymentOnboardingSessionRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 開通結束後回到的頁面；UNSPECIFIED 回 invalid_argument。連結過期或已使用時，賣家被送回同一目的地的重新取得入口，client 在那裡重新呼叫本方法。
-	Destination OnboardingReturnDestination `protobuf:"varint,3,opt,name=destination,proto3,enum=hawkr.seller.v1alpha1.OnboardingReturnDestination" json:"destination,omitempty"`
+	Destination OnboardingReturnDestination `protobuf:"varint,1,opt,name=destination,proto3,enum=hawkr.seller.v1alpha1.OnboardingReturnDestination" json:"destination,omitempty"`
 	// 回跳頁的網站語系（BCP-47：zh-TW 或 en），決定網站頁的路徑前綴；空或不支援回 invalid_argument。
 	// 賣家 App 的回跳頁沒有語系前綴，這個值仍要合法，但不影響網址。
-	Locale        string `protobuf:"bytes,4,opt,name=locale,proto3" json:"locale,omitempty"`
+	Locale        string `protobuf:"bytes,2,opt,name=locale,proto3" json:"locale,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5017,11 +5018,11 @@ type BusinessRegistration struct {
 	// 登記的地址，原樣的文字。
 	Address string `protobuf:"bytes,3,opt,name=address,proto3" json:"address,omitempty"`
 	// 設立日期；來源缺漏時不設。
-	SetupDate *date.Date `protobuf:"bytes,6,opt,name=setup_date,json=setupDate,proto3" json:"setup_date,omitempty"`
+	SetupDate *date.Date `protobuf:"bytes,4,opt,name=setup_date,json=setupDate,proto3" json:"setup_date,omitempty"`
 	// 組織型態（股份有限公司、有限公司、獨資、合夥……）；判斷不出時是空字串。
-	OrganizationType string `protobuf:"bytes,7,opt,name=organization_type,json=organizationType,proto3" json:"organization_type,omitempty"`
+	OrganizationType string `protobuf:"bytes,5,opt,name=organization_type,json=organizationType,proto3" json:"organization_type,omitempty"`
 	// 登記的地址開頭是現行的縣市與鄉鎮市區時，拆出來的鄉鎮市區代碼與其後的地址；拆不出來時不設，client 讓使用者自己選。
-	PostalAddress *v1alpha1.PostalAddress `protobuf:"bytes,8,opt,name=postal_address,json=postalAddress,proto3" json:"postal_address,omitempty"`
+	PostalAddress *v1alpha1.PostalAddress `protobuf:"bytes,6,opt,name=postal_address,json=postalAddress,proto3" json:"postal_address,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5600,40 +5601,40 @@ type Measure struct {
 	State     MeasureState `protobuf:"varint,7,opt,name=state,proto3,enum=hawkr.seller.v1alpha1.MeasureState" json:"state,omitempty"`
 	// 警告沒有期間，不設。
 	Period     *MeasurePeriod         `protobuf:"bytes,8,opt,name=period,proto3" json:"period,omitempty"`
-	CreateTime *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// 提出申覆時帶的版本；由賣家看得到的版本產生，平台寫內部註記、調整複審期限都不改變它。
-	Etag string `protobuf:"bytes,11,opt,name=etag,proto3" json:"etag,omitempty"`
+	Etag string `protobuf:"bytes,10,opt,name=etag,proto3" json:"etag,omitempty"`
 	// 賣家此刻能不能對這筆措施提出申覆：措施未撤銷、還沒申覆過、沒有待處理的請求（措施已結束而仍待處理的解除請求不算，它的 state 已是
 	// CLOSED）、終止合作還在申覆期限內。由伺服器判斷，與 SubmitAppeal 的前置檢查是同一個規則（appeal_unavailabilities 為空），client 不用自己從
 	// state 與 requests 推導。已結束的措施也可以申覆；預定生效（SCHEDULED）的措施可以申覆。
-	CanAppeal bool `protobuf:"varint,12,opt,name=can_appeal,json=canAppeal,proto3" json:"can_appeal,omitempty"`
+	CanAppeal bool `protobuf:"varint,11,opt,name=can_appeal,json=canAppeal,proto3" json:"can_appeal,omitempty"`
 	// 已撤銷時的原因；FINDING_REVOKED 表示依據的認定被撤銷。沒有撤銷時是 UNSPECIFIED。
-	RevokeReason RevokeReason `protobuf:"varint,13,opt,name=revoke_reason,json=revokeReason,proto3,enum=hawkr.seller.v1alpha1.RevokeReason" json:"revoke_reason,omitempty"`
+	RevokeReason RevokeReason `protobuf:"varint,12,opt,name=revoke_reason,json=revokeReason,proto3,enum=hawkr.seller.v1alpha1.RevokeReason" json:"revoke_reason,omitempty"`
 	// 賣家此刻能不能請求解除：RISK 依據、措施生效中、沒有待處理的請求（申覆或解除請求）、不在冷卻期。由伺服器判斷，與
 	// RequestRemediation 的前置檢查是同一個規則，client 不用自己推導；不能用時的原因看 remediation_unavailabilities（可以用時
 	// 是空的）。
-	CanRequestRemediation bool `protobuf:"varint,15,opt,name=can_request_remediation,json=canRequestRemediation,proto3" json:"can_request_remediation,omitempty"`
+	CanRequestRemediation bool `protobuf:"varint,13,opt,name=can_request_remediation,json=canRequestRemediation,proto3" json:"can_request_remediation,omitempty"`
 	// 冷卻期的結束時間；只在 RISK 依據、措施生效中而且在冷卻期內設（此刻起不得提出解除請求，到這個時間可以再提出），其餘不設。
-	NextRemediationTime *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=next_remediation_time,json=nextRemediationTime,proto3" json:"next_remediation_time,omitempty"`
+	NextRemediationTime *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=next_remediation_time,json=nextRemediationTime,proto3" json:"next_remediation_time,omitempty"`
 	// 這筆措施的下一個請求若被駁回，會開始的冷卻期長度；只在 RISK 依據、措施生效中時才可能設，不設表示不會有冷卻。給送出前的警告用（「若本次經駁回，將於這段期間內不得
 	// 再提出」），client 不用自己從駁回次數推導。冷卻規則由伺服器決定（條款第 17.4 條）。
-	RejectionCooldown *durationpb.Duration `protobuf:"bytes,17,opt,name=rejection_cooldown,json=rejectionCooldown,proto3" json:"rejection_cooldown,omitempty"`
+	RejectionCooldown *durationpb.Duration `protobuf:"bytes,15,opt,name=rejection_cooldown,json=rejectionCooldown,proto3" json:"rejection_cooldown,omitempty"`
 	// 措施上賣家的請求（申覆與解除請求，看 MeasureRequest.kind），新到舊；沒有請求過時是空的。每一筆的 state 由伺服器推導（見
 	// MeasureRequest）；同時至多一筆 PENDING，所以「目前的請求」是第一筆不是 CLOSED 的。
-	Requests []*MeasureRequest `protobuf:"bytes,18,rep,name=requests,proto3" json:"requests,omitempty"`
+	Requests []*MeasureRequest `protobuf:"bytes,16,rep,name=requests,proto3" json:"requests,omitempty"`
 	// 不能請求解除的原因，依優先序排列（依據不是 RISK、不在生效中、待處理的請求、冷卻期）；結構性的原因在前，第一個的 reason 是 NOT_RISK 或 NOT_ACTIVE 表示這筆措施沒有解除請求入口（client 不顯示入口）；其餘的原因 client 顯示第一個的 message。
 	// can_request_remediation 是 true 時是空的，反之不為空，兩者來自同一個規則。冷卻期結束的時間另見 next_remediation_time，message 已帶好格式化的時間。
-	RemediationUnavailabilities []*RemediationUnavailability `protobuf:"bytes,23,rep,name=remediation_unavailabilities,json=remediationUnavailabilities,proto3" json:"remediation_unavailabilities,omitempty"`
+	RemediationUnavailabilities []*RemediationUnavailability `protobuf:"bytes,17,rep,name=remediation_unavailabilities,json=remediationUnavailabilities,proto3" json:"remediation_unavailabilities,omitempty"`
 	// 終止合作（kind 是 TERMINATION）的事由；其他種類是 UNSPECIFIED。
-	TerminationGround TerminationGround `protobuf:"varint,20,opt,name=termination_ground,json=terminationGround,proto3,enum=hawkr.seller.v1alpha1.TerminationGround" json:"termination_ground,omitempty"`
+	TerminationGround TerminationGround `protobuf:"varint,18,opt,name=termination_ground,json=terminationGround,proto3,enum=hawkr.seller.v1alpha1.TerminationGround" json:"termination_ground,omitempty"`
 	// 終止合作的申覆期限：生效（period.start_time）後 184 天（任何連續六個曆月的最大長度，不短於條款的「六個月」）；期限內（含預告期間）可以申覆，
 	// 之後 can_appeal 是 false、appeal_unavailabilities 含 APPEAL_WINDOW_ENDED，已在期限內提出的申覆照常裁定。其他種類不設。
-	AppealDeadlineTime *timestamppb.Timestamp `protobuf:"bytes,21,opt,name=appeal_deadline_time,json=appealDeadlineTime,proto3" json:"appeal_deadline_time,omitempty"`
+	AppealDeadlineTime *timestamppb.Timestamp `protobuf:"bytes,19,opt,name=appeal_deadline_time,json=appealDeadlineTime,proto3" json:"appeal_deadline_time,omitempty"`
 	// 不能申覆的原因，依優先序排列（已撤銷、已申覆過、申覆期限已過、有審核中的請求）；can_appeal 是 true 時是空的，反之不為空，兩者來自同一個
 	// 規則（與 SubmitAppeal 的前置檢查相同），client 顯示第一個的 message，不自己推導。
-	AppealUnavailabilities []*AppealUnavailability `protobuf:"bytes,24,rep,name=appeal_unavailabilities,json=appealUnavailabilities,proto3" json:"appeal_unavailabilities,omitempty"`
+	AppealUnavailabilities []*AppealUnavailability `protobuf:"bytes,20,rep,name=appeal_unavailabilities,json=appealUnavailabilities,proto3" json:"appeal_unavailabilities,omitempty"`
 	// 內容下架（kind 是 CONTENT_TAKEDOWN）的對象，依種類、id 排序，賣家據此知道被下架的是哪些內容、申覆什麼；其他種類沒有。建立後不能改。
-	Contents      []*ContentRef `protobuf:"bytes,25,rep,name=contents,proto3" json:"contents,omitempty"`
+	Contents      []*ContentRef `protobuf:"bytes,21,rep,name=contents,proto3" json:"contents,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6269,7 +6270,7 @@ type PublicStore struct {
 	// 這家店的公開資料最後更新的時間，給 sitemap 的 lastmod：取店家資料的最後修改時間、第一次可公開曝光的時間與最後一次可曝光狀態翻轉
 	// 的時間中最晚的一個，所以不會早於上架日，停權結束後重新曝光也會前進，
 	// 全量重新公告重發同一個狀態則不會。店家的非公開欄位（例如聯絡資料）改變也會讓它前進，因此偶爾比公開內容的實際變更晚。
-	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6903,7 +6904,7 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x0fSellerAgreement\x128\n" +
 	"\x04kind\x18\x01 \x01(\x0e2$.hawkr.seller.v1alpha1.AgreementKindR\x04kind\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x10\n" +
-	"\x03url\x18\x03 \x01(\tR\x03url\"\xfb\b\n" +
+	"\x03url\x18\x03 \x01(\tR\x03url\"\x81\a\n" +
 	"\x05Store\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\"\n" +
 	"\n" +
@@ -6912,12 +6913,13 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"store_name\x18\x03 \x01(\tB\x03\xe0A\x02R\tstoreName\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12#\n" +
 	"\rcontact_phone\x18\x05 \x01(\tR\fcontactPhone\x12>\n" +
-	"\aaddress\x18\x15 \x01(\v2$.hawkr.common.v1alpha1.PostalAddressR\aaddress\x12!\n" +
-	"\fcontact_name\x18\x17 \x01(\tR\vcontactName\x12%\n" +
-	"\x0econtact_mobile\x18\x18 \x01(\tR\rcontactMobile\x12#\n" +
-	"\rsupport_email\x18\x19 \x01(\tR\fsupportEmail\x12\x14\n" +
-	"\x05prize\x18\b \x01(\tR\x05prize\x12\x1f\n" +
-	"\vwebsite_url\x18\t \x01(\tR\n" +
+	"\aaddress\x18\x06 \x01(\v2$.hawkr.common.v1alpha1.PostalAddressR\aaddress\x12!\n" +
+	"\fcontact_name\x18\a \x01(\tR\vcontactName\x12%\n" +
+	"\x0econtact_mobile\x18\b \x01(\tR\rcontactMobile\x12#\n" +
+	"\rsupport_email\x18\t \x01(\tR\fsupportEmail\x12\x14\n" +
+	"\x05prize\x18\n" +
+	" \x01(\tR\x05prize\x12\x1f\n" +
+	"\vwebsite_url\x18\v \x01(\tR\n" +
 	"websiteUrl\x126\n" +
 	"\x14onboarding_completed\x18\f \x01(\bB\x03\xe0A\x03R\x13onboardingCompleted\x125\n" +
 	"\x04logo\x18\r \x01(\v2\x1c.hawkr.common.v1alpha1.ImageB\x03\xe0A\x03R\x04logo\x12B\n" +
@@ -6930,38 +6932,36 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"updateTime\x12\x12\n" +
 	"\x04etag\x18\x12 \x01(\tR\x04etag\x12/\n" +
 	"\x11logo_staged_token\x18\x13 \x01(\tB\x03\xe0A\x04R\x0flogoStagedToken\x121\n" +
-	"\x12cover_staged_token\x18\x14 \x01(\tB\x03\xe0A\x04R\x10coverStagedTokenJ\x04\b\x06\x10\aJ\x04\b\a\x10\bJ\x04\b\n" +
-	"\x10\vJ\x04\b\v\x10\fJ\x04\b\x16\x10\x17J\x04\b\x1a\x10\x1fR\ttown_codeR\x0eaddress_detailR\x0eprocessed_foodR\x14food_business_reg_noR\rfood_businessR\x16open_food_registrationR\x1aapproved_food_registrationR\x19revoked_food_registrationR\x19pending_food_registrationR\x1arejected_food_registration\"\xb7\x01\n" +
+	"\x12cover_staged_token\x18\x14 \x01(\tB\x03\xe0A\x04R\x10coverStagedToken\"\xb7\x01\n" +
 	"\x10CapabilityStatus\x12G\n" +
 	"\n" +
 	"capability\x18\x01 \x01(\x0e2'.hawkr.seller.v1alpha1.SellerCapabilityR\n" +
 	"capability\x12\x16\n" +
 	"\x06active\x18\x02 \x01(\bR\x06active\x12B\n" +
-	"\amissing\x18\x03 \x03(\x0e2(.hawkr.seller.v1alpha1.SellerRequirementR\amissing\"\xdd\x02\n" +
+	"\amissing\x18\x03 \x03(\x0e2(.hawkr.seller.v1alpha1.SellerRequirementR\amissing\"\xb6\x02\n" +
 	"\x11ApplyStoreRequest\x12\"\n" +
 	"\n" +
 	"store_name\x18\x01 \x01(\tB\x03\xe0A\x02R\tstoreName\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12#\n" +
 	"\rcontact_phone\x18\x03 \x01(\tR\fcontactPhone\x12\x14\n" +
-	"\x05prize\x18\x06 \x01(\tR\x05prize\x12>\n" +
-	"\aaddress\x18\a \x01(\v2$.hawkr.common.v1alpha1.PostalAddressR\aaddress\x12`\n" +
-	"\x13accepted_agreements\x18\b \x03(\v2*.hawkr.seller.v1alpha1.AgreementAcceptanceB\x03\xe0A\x02R\x12acceptedAgreementsJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\ttown_codeR\x0eaddress_detail\"H\n" +
+	"\x05prize\x18\x04 \x01(\tR\x05prize\x12>\n" +
+	"\aaddress\x18\x05 \x01(\v2$.hawkr.common.v1alpha1.PostalAddressR\aaddress\x12`\n" +
+	"\x13accepted_agreements\x18\x06 \x03(\v2*.hawkr.seller.v1alpha1.AgreementAcceptanceB\x03\xe0A\x02R\x12acceptedAgreements\"H\n" +
 	"\x12ApplyStoreResponse\x122\n" +
 	"\x05store\x18\x01 \x01(\v2\x1c.hawkr.seller.v1alpha1.StoreR\x05store\"\x1a\n" +
-	"\x18GetMyStoreOpeningRequest\"\xc7\x01\n" +
+	"\x18GetMyStoreOpeningRequest\"\xac\x01\n" +
 	"\x19GetMyStoreOpeningResponse\x12+\n" +
 	"\x0fcan_apply_store\x18\x01 \x01(\bB\x03\xe0A\x03R\rcanApplyStore\x12b\n" +
-	"\x10unavailabilities\x18\x03 \x03(\v21.hawkr.seller.v1alpha1.StoreOpeningUnavailabilityB\x03\xe0A\x03R\x10unavailabilitiesJ\x04\b\x02\x10\x03R\x13unavailable_reasons\"\xac\x01\n" +
+	"\x10unavailabilities\x18\x02 \x03(\v21.hawkr.seller.v1alpha1.StoreOpeningUnavailabilityB\x03\xe0A\x03R\x10unavailabilities\"\xac\x01\n" +
 	"\x1aStoreOpeningUnavailability\x12Q\n" +
 	"\x06reason\x18\x01 \x01(\x0e24.hawkr.seller.v1alpha1.StoreOpeningUnavailableReasonB\x03\xe0A\x03R\x06reason\x12;\n" +
 	"\amessage\x18\x02 \x01(\v2\x1c.google.rpc.LocalizedMessageB\x03\xe0A\x03R\amessage\"\x13\n" +
-	"\x11GetMyStoreRequest\"\x93\x02\n" +
+	"\x11GetMyStoreRequest\"\xf1\x01\n" +
 	"\x12GetMyStoreResponse\x122\n" +
 	"\x05store\x18\x01 \x01(\v2\x1c.hawkr.seller.v1alpha1.StoreR\x05store\x12K\n" +
-	"\fcapabilities\x18\x03 \x03(\v2'.hawkr.seller.v1alpha1.CapabilityStatusR\fcapabilities\x127\n" +
-	"\x05stats\x18\x05 \x01(\v2!.hawkr.seller.v1alpha1.StoreStatsR\x05stats\x12!\n" +
-	"\tsuspended\x18\x06 \x01(\bB\x03\xe0A\x03R\tsuspendedJ\x04\b\x02\x10\x03J\x04\b\x04\x10\x05R\n" +
-	"suspensionR\bexposure\"\x18\n" +
+	"\fcapabilities\x18\x02 \x03(\v2'.hawkr.seller.v1alpha1.CapabilityStatusR\fcapabilities\x127\n" +
+	"\x05stats\x18\x03 \x01(\v2!.hawkr.seller.v1alpha1.StoreStatsR\x05stats\x12!\n" +
+	"\tsuspended\x18\x04 \x01(\bB\x03\xe0A\x03R\tsuspended\"\x18\n" +
 	"\x16GetMyOnboardingRequest\"|\n" +
 	"\x17GetMyOnboardingResponse\x12@\n" +
 	"\x05tasks\x18\x01 \x03(\v2%.hawkr.seller.v1alpha1.OnboardingTaskB\x03\xe0A\x03R\x05tasks\x12\x1f\n" +
@@ -7043,48 +7043,45 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\vKYCDocument\x12\x19\n" +
 	"\basset_id\x18\x01 \x01(\tR\aassetId\x12&\n" +
 	"\fdownload_uri\x18\x02 \x01(\tB\x03\xe0A\x03R\vdownloadUri\x12&\n" +
-	"\fstaged_token\x18\x03 \x01(\tB\x03\xe0A\x04R\vstagedToken\"\xb3\x01\n" +
+	"\fstaged_token\x18\x03 \x01(\tB\x03\xe0A\x04R\vstagedToken\"\x9c\x01\n" +
 	"\fKYCRejection\x12\x16\n" +
 	"\x06reason\x18\x01 \x01(\tR\x06reason\x12;\n" +
-	"\vdecide_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"\vdecide_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"decideTime\x127\n" +
-	"\x06issues\x18\x04 \x03(\v2\x1f.hawkr.seller.v1alpha1.KYCIssueR\x06issuesJ\x04\b\x02\x10\x03R\x0frequired_fields\":\n" +
-	"\rIndividualKYCJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03R\n" +
-	"id_card_noR\x11id_card_no_masked\"\xd1\x03\n" +
+	"\x06issues\x18\x03 \x03(\v2\x1f.hawkr.seller.v1alpha1.KYCIssueR\x06issues\"\x0f\n" +
+	"\rIndividualKYC\"\xd3\x02\n" +
 	"\vBusinessKYC\x12!\n" +
-	"\fcompany_name\x18\x02 \x01(\tR\vcompanyName\x12\x15\n" +
-	"\x06tax_id\x18\x03 \x01(\tR\x05taxId\x12E\n" +
-	"\x15company_register_date\x18\x04 \x01(\v2\x11.google.type.DateR\x13companyRegisterDate\x12#\n" +
-	"\rcompany_phone\x18\a \x01(\tR\fcompanyPhone\x12O\n" +
-	"\x11company_documents\x18\n" +
-	" \x03(\v2\".hawkr.seller.v1alpha1.KYCDocumentR\x10companyDocuments\x12M\n" +
-	"\x0fcompany_address\x18\v \x01(\v2$.hawkr.common.v1alpha1.PostalAddressR\x0ecompanyAddressJ\x04\b\x01\x10\x02J\x04\b\x05\x10\x06J\x04\b\x06\x10\aJ\x04\b\b\x10\tJ\x04\b\t\x10\n" +
-	"R\fcompany_typeR\x11company_town_codeR\x16company_address_detailR\x0erep_id_card_noR\x15rep_id_card_no_masked\"\xdf\t\n" +
+	"\fcompany_name\x18\x01 \x01(\tR\vcompanyName\x12\x15\n" +
+	"\x06tax_id\x18\x02 \x01(\tR\x05taxId\x12E\n" +
+	"\x15company_register_date\x18\x03 \x01(\v2\x11.google.type.DateR\x13companyRegisterDate\x12#\n" +
+	"\rcompany_phone\x18\x04 \x01(\tR\fcompanyPhone\x12O\n" +
+	"\x11company_documents\x18\x05 \x03(\v2\".hawkr.seller.v1alpha1.KYCDocumentR\x10companyDocuments\x12M\n" +
+	"\x0fcompany_address\x18\x06 \x01(\v2$.hawkr.common.v1alpha1.PostalAddressR\x0ecompanyAddress\"\xa6\a\n" +
 	"\x0eKYCApplication\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12=\n" +
 	"\x06status\x18\x02 \x01(\x0e2 .hawkr.seller.v1alpha1.KYCStatusB\x03\xe0A\x03R\x06status\x12\x12\n" +
 	"\x04etag\x18\x03 \x01(\tR\x04etag\x12!\n" +
-	"\fproduct_type\x18\x0e \x01(\tR\vproductType\x12\x1f\n" +
-	"\vwebsite_url\x18\x10 \x01(\tR\n" +
+	"\fproduct_type\x18\x04 \x01(\tR\vproductType\x12\x1f\n" +
+	"\vwebsite_url\x18\x05 \x01(\tR\n" +
 	"websiteUrl\x12F\n" +
 	"\n" +
-	"individual\x18\x16 \x01(\v2$.hawkr.seller.v1alpha1.IndividualKYCH\x00R\n" +
+	"individual\x18\x06 \x01(\v2$.hawkr.seller.v1alpha1.IndividualKYCH\x00R\n" +
 	"individual\x12@\n" +
-	"\bbusiness\x18\x17 \x01(\v2\".hawkr.seller.v1alpha1.BusinessKYCH\x00R\bbusiness\x12O\n" +
-	"\x0elast_rejection\x18\x19 \x01(\v2#.hawkr.seller.v1alpha1.KYCRejectionB\x03\xe0A\x03R\rlastRejection\x12K\n" +
-	"\x0emissing_fields\x18\x1a \x03(\x0e2\x1f.hawkr.seller.v1alpha1.KYCFieldB\x03\xe0A\x03R\rmissingFields\x12X\n" +
-	"\x14missing_store_fields\x18\x1f \x03(\x0e2!.hawkr.seller.v1alpha1.StoreFieldB\x03\xe0A\x03R\x12missingStoreFields\x12S\n" +
-	"\x12outstanding_issues\x18  \x03(\v2\x1f.hawkr.seller.v1alpha1.KYCIssueB\x03\xe0A\x03R\x11outstandingIssues\x12@\n" +
-	"\vsubmit_time\x18\x1b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\bbusiness\x18\a \x01(\v2\".hawkr.seller.v1alpha1.BusinessKYCH\x00R\bbusiness\x12O\n" +
+	"\x0elast_rejection\x18\b \x01(\v2#.hawkr.seller.v1alpha1.KYCRejectionB\x03\xe0A\x03R\rlastRejection\x12K\n" +
+	"\x0emissing_fields\x18\t \x03(\x0e2\x1f.hawkr.seller.v1alpha1.KYCFieldB\x03\xe0A\x03R\rmissingFields\x12X\n" +
+	"\x14missing_store_fields\x18\n" +
+	" \x03(\x0e2!.hawkr.seller.v1alpha1.StoreFieldB\x03\xe0A\x03R\x12missingStoreFields\x12S\n" +
+	"\x12outstanding_issues\x18\v \x03(\v2\x1f.hawkr.seller.v1alpha1.KYCIssueB\x03\xe0A\x03R\x11outstandingIssues\x12@\n" +
+	"\vsubmit_time\x18\f \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"submitTime\x12@\n" +
-	"\vdecide_time\x18\x1c \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\vdecide_time\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"decideTime\x12@\n" +
-	"\vcreate_time\x18\x1d \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\vcreate_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12@\n" +
-	"\vupdate_time\x18\x1e \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\vupdate_time\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTimeB\t\n" +
-	"\asubjectJ\x04\b\x0f\x10\x10J\x04\b\x11\x10\x12J\x04\b\x12\x10\x13J\x04\b\x18\x10\x19J\x04\b\x04\x10\x0eJ\x04\b\x13\x10\x16J\x04\b!\x10\"R\rcontact_emailR\rcontact_phoneR\rfood_businessR\x04flowR\treal_nameR\n" +
-	"birth_dateR\x12id_card_issue_dateR\x12id_card_issue_typeR\x16id_card_issue_locationR\fenglish_nameR\tbank_nameR\tbank_codeR\fbank_accountR\x13bank_account_maskedR\rid_card_frontR\fid_card_backR\tbank_bookR\x14payout_contact_email\"\xa0\x01\n" +
+	"\asubject\"\xa0\x01\n" +
 	"\x13SaveKYCDraftRequest\x12L\n" +
 	"\vapplication\x18\x01 \x01(\v2%.hawkr.seller.v1alpha1.KYCApplicationB\x03\xe0A\x02R\vapplication\x12;\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
@@ -7093,16 +7090,16 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\vapplication\x18\x01 \x01(\v2%.hawkr.seller.v1alpha1.KYCApplicationR\vapplication\"\x92\x02\n" +
 	"\x0ePaymentAccount\x12D\n" +
 	"\x06status\x18\x01 \x01(\x0e2,.hawkr.payment.v1alpha1.PaymentAccountStatusR\x06status\x12X\n" +
-	"\x12onboarding_surface\x18\x03 \x01(\x0e2).hawkr.payment.v1alpha1.OnboardingSurfaceR\x11onboardingSurface\x12%\n" +
-	"\x0epayouts_active\x18\x05 \x01(\bR\rpayoutsActive\x129\n" +
+	"\x12onboarding_surface\x18\x02 \x01(\x0e2).hawkr.payment.v1alpha1.OnboardingSurfaceR\x11onboardingSurface\x12%\n" +
+	"\x0epayouts_active\x18\x03 \x01(\bR\rpayoutsActive\x129\n" +
 	"\n" +
-	"fetch_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tfetchTime\"\x1c\n" +
+	"fetch_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tfetchTime\"\x1c\n" +
 	"\x1aGetMyPaymentAccountRequest\"^\n" +
 	"\x1bGetMyPaymentAccountResponse\x12?\n" +
 	"\aaccount\x18\x01 \x01(\v2%.hawkr.seller.v1alpha1.PaymentAccountR\aaccount\"\x9f\x01\n" +
 	"%CreatePaymentOnboardingSessionRequest\x12Y\n" +
-	"\vdestination\x18\x03 \x01(\x0e22.hawkr.seller.v1alpha1.OnboardingReturnDestinationB\x03\xe0A\x02R\vdestination\x12\x1b\n" +
-	"\x06locale\x18\x04 \x01(\tB\x03\xe0A\x02R\x06locale\"\xe9\x01\n" +
+	"\vdestination\x18\x01 \x01(\x0e22.hawkr.seller.v1alpha1.OnboardingReturnDestinationB\x03\xe0A\x02R\vdestination\x12\x1b\n" +
+	"\x06locale\x18\x02 \x01(\tB\x03\xe0A\x02R\x06locale\"\xe9\x01\n" +
 	"&CreatePaymentOnboardingSessionResponse\x12C\n" +
 	"\asurface\x18\x01 \x01(\x0e2).hawkr.payment.v1alpha1.OnboardingSurfaceR\asurface\x12\x10\n" +
 	"\x03url\x18\x02 \x01(\tR\x03url\x12#\n" +
@@ -7121,15 +7118,15 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x04etag\x18\x01 \x01(\tB\x03\xe0A\x02R\x04etag\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\"\\\n" +
 	"\x11CancelKYCResponse\x12G\n" +
-	"\vapplication\x18\x01 \x01(\v2%.hawkr.seller.v1alpha1.KYCApplicationR\vapplication\"\xae\x02\n" +
+	"\vapplication\x18\x01 \x01(\v2%.hawkr.seller.v1alpha1.KYCApplicationR\vapplication\"\x87\x02\n" +
 	"\x14BusinessRegistration\x12\x15\n" +
 	"\x06tax_id\x18\x01 \x01(\tR\x05taxId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
 	"\aaddress\x18\x03 \x01(\tR\aaddress\x120\n" +
 	"\n" +
-	"setup_date\x18\x06 \x01(\v2\x11.google.type.DateR\tsetupDate\x12+\n" +
-	"\x11organization_type\x18\a \x01(\tR\x10organizationType\x12K\n" +
-	"\x0epostal_address\x18\b \x01(\v2$.hawkr.common.v1alpha1.PostalAddressR\rpostalAddressJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\ttown_codeR\x0eaddress_detail\"?\n" +
+	"setup_date\x18\x04 \x01(\v2\x11.google.type.DateR\tsetupDate\x12+\n" +
+	"\x11organization_type\x18\x05 \x01(\tR\x10organizationType\x12K\n" +
+	"\x0epostal_address\x18\x06 \x01(\v2$.hawkr.common.v1alpha1.PostalAddressR\rpostalAddress\"?\n" +
 	"!LookupBusinessRegistrationRequest\x12\x1a\n" +
 	"\x06tax_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x05taxId\"u\n" +
 	"\"LookupBusinessRegistrationResponse\x12O\n" +
@@ -7165,7 +7162,7 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"decideTime\x12U\n" +
 	"\vclose_cause\x18\a \x01(\x0e2/.hawkr.seller.v1alpha1.MeasureRequestCloseCauseB\x03\xe0A\x03R\n" +
 	"closeCause\x12B\n" +
-	"\x04kind\x18\b \x01(\x0e2).hawkr.seller.v1alpha1.MeasureRequestKindB\x03\xe0A\x03R\x04kind\"\x96\f\n" +
+	"\x04kind\x18\b \x01(\x0e2).hawkr.seller.v1alpha1.MeasureRequestKindB\x03\xe0A\x03R\x04kind\"\xa3\v\n" +
 	"\aMeasure\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12;\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\".hawkr.seller.v1alpha1.MeasureKindB\x03\xe0A\x03R\x04kind\x12>\n" +
@@ -7176,23 +7173,22 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\tstatement\x18\x06 \x01(\tB\x03\xe0A\x03R\tstatement\x12>\n" +
 	"\x05state\x18\a \x01(\x0e2#.hawkr.seller.v1alpha1.MeasureStateB\x03\xe0A\x03R\x05state\x12A\n" +
 	"\x06period\x18\b \x01(\v2$.hawkr.seller.v1alpha1.MeasurePeriodB\x03\xe0A\x03R\x06period\x12@\n" +
-	"\vcreate_time\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\vcreate_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12\x17\n" +
-	"\x04etag\x18\v \x01(\tB\x03\xe0A\x03R\x04etag\x12\"\n" +
+	"\x04etag\x18\n" +
+	" \x01(\tB\x03\xe0A\x03R\x04etag\x12\"\n" +
 	"\n" +
-	"can_appeal\x18\f \x01(\bB\x03\xe0A\x03R\tcanAppeal\x12M\n" +
-	"\rrevoke_reason\x18\r \x01(\x0e2#.hawkr.seller.v1alpha1.RevokeReasonB\x03\xe0A\x03R\frevokeReason\x12;\n" +
-	"\x17can_request_remediation\x18\x0f \x01(\bB\x03\xe0A\x03R\x15canRequestRemediation\x12S\n" +
-	"\x15next_remediation_time\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x13nextRemediationTime\x12M\n" +
-	"\x12rejection_cooldown\x18\x11 \x01(\v2\x19.google.protobuf.DurationB\x03\xe0A\x03R\x11rejectionCooldown\x12F\n" +
-	"\brequests\x18\x12 \x03(\v2%.hawkr.seller.v1alpha1.MeasureRequestB\x03\xe0A\x03R\brequests\x12x\n" +
-	"\x1cremediation_unavailabilities\x18\x17 \x03(\v20.hawkr.seller.v1alpha1.RemediationUnavailabilityB\x03\xe0A\x03R\x1bremediationUnavailabilities\x12\\\n" +
-	"\x12termination_ground\x18\x14 \x01(\x0e2(.hawkr.seller.v1alpha1.TerminationGroundB\x03\xe0A\x03R\x11terminationGround\x12Q\n" +
-	"\x14appeal_deadline_time\x18\x15 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x12appealDeadlineTime\x12i\n" +
-	"\x17appeal_unavailabilities\x18\x18 \x03(\v2+.hawkr.seller.v1alpha1.AppealUnavailabilityB\x03\xe0A\x03R\x16appealUnavailabilities\x12B\n" +
-	"\bcontents\x18\x19 \x03(\v2!.hawkr.seller.v1alpha1.ContentRefB\x03\xe0A\x03R\bcontentsJ\x04\b\t\x10\n" +
-	"J\x04\b\x0e\x10\x0fJ\x04\b\x13\x10\x14J\x04\b\x16\x10\x17R\x06appealR\x14remediation_requestsR\x1fremediation_unavailable_reasonsR\x1aappeal_unavailable_reasons\"\x8e\x01\n" +
+	"can_appeal\x18\v \x01(\bB\x03\xe0A\x03R\tcanAppeal\x12M\n" +
+	"\rrevoke_reason\x18\f \x01(\x0e2#.hawkr.seller.v1alpha1.RevokeReasonB\x03\xe0A\x03R\frevokeReason\x12;\n" +
+	"\x17can_request_remediation\x18\r \x01(\bB\x03\xe0A\x03R\x15canRequestRemediation\x12S\n" +
+	"\x15next_remediation_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x13nextRemediationTime\x12M\n" +
+	"\x12rejection_cooldown\x18\x0f \x01(\v2\x19.google.protobuf.DurationB\x03\xe0A\x03R\x11rejectionCooldown\x12F\n" +
+	"\brequests\x18\x10 \x03(\v2%.hawkr.seller.v1alpha1.MeasureRequestB\x03\xe0A\x03R\brequests\x12x\n" +
+	"\x1cremediation_unavailabilities\x18\x11 \x03(\v20.hawkr.seller.v1alpha1.RemediationUnavailabilityB\x03\xe0A\x03R\x1bremediationUnavailabilities\x12\\\n" +
+	"\x12termination_ground\x18\x12 \x01(\x0e2(.hawkr.seller.v1alpha1.TerminationGroundB\x03\xe0A\x03R\x11terminationGround\x12Q\n" +
+	"\x14appeal_deadline_time\x18\x13 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x12appealDeadlineTime\x12i\n" +
+	"\x17appeal_unavailabilities\x18\x14 \x03(\v2+.hawkr.seller.v1alpha1.AppealUnavailabilityB\x03\xe0A\x03R\x16appealUnavailabilities\x12B\n" +
+	"\bcontents\x18\x15 \x03(\v2!.hawkr.seller.v1alpha1.ContentRefB\x03\xe0A\x03R\bcontents\"\x8e\x01\n" +
 	"\x15ListMyMeasuresRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
@@ -7221,7 +7217,7 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x16evidence_staged_tokens\x18\x03 \x03(\tR\x14evidenceStagedTokens\x12\x17\n" +
 	"\x04etag\x18\x04 \x01(\tB\x03\xe0A\x02R\x04etag\"V\n" +
 	"\x1aRequestRemediationResponse\x128\n" +
-	"\ameasure\x18\x01 \x01(\v2\x1e.hawkr.seller.v1alpha1.MeasureR\ameasure\"\xdf\x03\n" +
+	"\ameasure\x18\x01 \x01(\v2\x1e.hawkr.seller.v1alpha1.MeasureR\ameasure\"\x8e\x03\n" +
 	"\vPublicStore\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\"\n" +
 	"\n" +
@@ -7236,9 +7232,9 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x04logo\x18\b \x01(\v2\x1c.hawkr.common.v1alpha1.ImageR\x04logo\x12=\n" +
 	"\vcover_image\x18\t \x01(\v2\x1c.hawkr.common.v1alpha1.ImageR\n" +
 	"coverImage\x12@\n" +
-	"\vupdate_time\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"updateTimeJ\x04\b\n" +
-	"\x10\vJ\x04\b\v\x10\fJ\x04\b\f\x10\rR\tseo_titleR\x0fseo_descriptionR!food_business_registration_number\"\xc3\x01\n" +
+	"\vupdate_time\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"updateTime\"\xc3\x01\n" +
 	"\n" +
 	"StoreStats\x12*\n" +
 	"\x0efollower_count\x18\x01 \x01(\x05H\x00R\rfollowerCount\x88\x01\x01\x12&\n" +
@@ -7272,16 +7268,16 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x18RecordProductViewRequest\x12\"\n" +
 	"\n" +
 	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"\x1b\n" +
-	"\x19RecordProductViewResponse*\xc9\x01\n" +
+	"\x19RecordProductViewResponse*w\n" +
 	"\rAgreementKind\x12\x1e\n" +
 	"\x1aAGREEMENT_KIND_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bAGREEMENT_KIND_SELLER_TERMS\x10\x01\x12%\n" +
-	"!AGREEMENT_KIND_KYC_PRIVACY_NOTICE\x10\x02\"\x04\b\x03\x10\x03\"\x04\b\x04\x10\x04*\x1bAGREEMENT_KIND_PAYUNI_TERMS*'AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE*\x80\x01\n" +
+	"!AGREEMENT_KIND_KYC_PRIVACY_NOTICE\x10\x02*\x80\x01\n" +
 	"\vStoreStatus\x12\x1c\n" +
 	"\x18STORE_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13STORE_STATUS_ACTIVE\x10\x01\x12!\n" +
 	"\x1dSTORE_STATUS_PENDING_DELETION\x10\x02\x12\x17\n" +
-	"\x13STORE_STATUS_CLOSED\x10\x03*\x92\x05\n" +
+	"\x13STORE_STATUS_CLOSED\x10\x03*\xe7\x04\n" +
 	"\x10SellerCapability\x12!\n" +
 	"\x1dSELLER_CAPABILITY_UNSPECIFIED\x10\x00\x12'\n" +
 	"#SELLER_CAPABILITY_ACCOUNT_SELF_READ\x10\x01\x12&\n" +
@@ -7291,15 +7287,15 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	" SELLER_CAPABILITY_ORDER_CONTRACT\x10\x05\x12\x1f\n" +
 	"\x1bSELLER_CAPABILITY_MARKETING\x10\x06\x12&\n" +
 	"\"SELLER_CAPABILITY_CONTENT_CONTRACT\x10\a\x12\x1f\n" +
-	"\x1bSELLER_CAPABILITY_CHAT_SEND\x10\t\x12\x1f\n" +
-	"\x1bSELLER_CAPABILITY_CHAT_READ\x10\n" +
-	"\x12\"\n" +
-	"\x1eSELLER_CAPABILITY_NOTIFICATION\x10\v\x12#\n" +
-	"\x1fSELLER_CAPABILITY_ACCOUNT_CLOSE\x10\f\x12$\n" +
-	" SELLER_CAPABILITY_INVOICE_MANAGE\x10\r\x12(\n" +
-	"$SELLER_CAPABILITY_INVOICE_TAX_REMEDY\x10\x0e\x12$\n" +
-	" SELLER_CAPABILITY_SHIPPING_SETUP\x10\x0f\x12$\n" +
-	" SELLER_CAPABILITY_PUBLIC_LISTING\x10\x10\"\x04\b\b\x10\b*#SELLER_CAPABILITY_GOVERNANCE_APPEAL*\xbd\x02\n" +
+	"\x1bSELLER_CAPABILITY_CHAT_SEND\x10\b\x12\x1f\n" +
+	"\x1bSELLER_CAPABILITY_CHAT_READ\x10\t\x12\"\n" +
+	"\x1eSELLER_CAPABILITY_NOTIFICATION\x10\n" +
+	"\x12#\n" +
+	"\x1fSELLER_CAPABILITY_ACCOUNT_CLOSE\x10\v\x12$\n" +
+	" SELLER_CAPABILITY_INVOICE_MANAGE\x10\f\x12(\n" +
+	"$SELLER_CAPABILITY_INVOICE_TAX_REMEDY\x10\r\x12$\n" +
+	" SELLER_CAPABILITY_SHIPPING_SETUP\x10\x0e\x12$\n" +
+	" SELLER_CAPABILITY_PUBLIC_LISTING\x10\x0f*\xbd\x02\n" +
 	"\x11SellerRequirement\x12\"\n" +
 	"\x1eSELLER_REQUIREMENT_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fSELLER_REQUIREMENT_STORE_ACTIVE\x10\x01\x12$\n" +
@@ -7349,18 +7345,17 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x14KYC_STATUS_SUBMITTED\x10\x02\x12\x17\n" +
 	"\x13KYC_STATUS_APPROVED\x10\x03\x12\x17\n" +
 	"\x13KYC_STATUS_REJECTED\x10\x04\x12\x18\n" +
-	"\x14KYC_STATUS_CANCELLED\x10\x05*\xcc\a\n" +
+	"\x14KYC_STATUS_CANCELLED\x10\x05*\xc6\x02\n" +
 	"\bKYCField\x12\x19\n" +
 	"\x15KYC_FIELD_UNSPECIFIED\x10\x00\x12\x1a\n" +
-	"\x16KYC_FIELD_PRODUCT_TYPE\x10\n" +
-	"\x12\x19\n" +
-	"\x15KYC_FIELD_WEBSITE_URL\x10\f\x12#\n" +
-	"\x1fKYC_FIELD_BUSINESS_COMPANY_NAME\x10\x14\x12\x1d\n" +
-	"\x19KYC_FIELD_BUSINESS_TAX_ID\x10\x15\x12,\n" +
-	"(KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE\x10\x16\x12$\n" +
-	" KYC_FIELD_BUSINESS_COMPANY_PHONE\x10\x19\x12(\n" +
-	"$KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS\x10\x1b\x12&\n" +
-	"\"KYC_FIELD_BUSINESS_COMPANY_ADDRESS\x10\x1c\"\x04\b\x01\x10\t\"\x04\b\v\x10\v\"\x04\b\r\x10\r\"\x04\b\x0e\x10\x0e\"\x04\b\x0f\x10\x12\"\x04\b\x13\x10\x13\"\x04\b\x17\x10\x17\"\x04\b\x18\x10\x18\"\x04\b\x1a\x10\x1a\"\x04\b\x1d\x10\x1d*\x13KYC_FIELD_REAL_NAME*\x14KYC_FIELD_BIRTH_DATE*\x1cKYC_FIELD_ID_CARD_ISSUE_DATE*\x1cKYC_FIELD_ID_CARD_ISSUE_TYPE* KYC_FIELD_ID_CARD_ISSUE_LOCATION*\x16KYC_FIELD_ENGLISH_NAME*\x13KYC_FIELD_BANK_NAME*\x13KYC_FIELD_BANK_CODE*\x16KYC_FIELD_BANK_ACCOUNT*\x17KYC_FIELD_FOOD_BUSINESS*\x17KYC_FIELD_CONTACT_EMAIL*\x17KYC_FIELD_CONTACT_PHONE*\x17KYC_FIELD_ID_CARD_FRONT*\x16KYC_FIELD_ID_CARD_BACK*\x13KYC_FIELD_BANK_BOOK*\x1fKYC_FIELD_INDIVIDUAL_ID_CARD_NO*\x1fKYC_FIELD_BUSINESS_COMPANY_TYPE*$KYC_FIELD_BUSINESS_COMPANY_TOWN_CODE*)KYC_FIELD_BUSINESS_COMPANY_ADDRESS_DETAIL*!KYC_FIELD_BUSINESS_REP_ID_CARD_NO*\x1eKYC_FIELD_PAYOUT_CONTACT_EMAIL*\xd8\x01\n" +
+	"\x16KYC_FIELD_PRODUCT_TYPE\x10\x01\x12\x19\n" +
+	"\x15KYC_FIELD_WEBSITE_URL\x10\x02\x12#\n" +
+	"\x1fKYC_FIELD_BUSINESS_COMPANY_NAME\x10\x03\x12\x1d\n" +
+	"\x19KYC_FIELD_BUSINESS_TAX_ID\x10\x04\x12,\n" +
+	"(KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE\x10\x05\x12$\n" +
+	" KYC_FIELD_BUSINESS_COMPANY_PHONE\x10\x06\x12(\n" +
+	"$KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS\x10\a\x12&\n" +
+	"\"KYC_FIELD_BUSINESS_COMPANY_ADDRESS\x10\b*\xd8\x01\n" +
 	"\fKYCIssueCode\x12\x1e\n" +
 	"\x1aKYC_ISSUE_CODE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19KYC_ISSUE_CODE_UNREADABLE\x10\x01\x12\x1b\n" +

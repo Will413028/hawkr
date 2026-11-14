@@ -427,70 +427,70 @@ type Report struct {
 	Id      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	StoreId string                 `protobuf:"bytes,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
 	// 店名；個資清理之後沒有店名時是空字串，client 顯示店家 ID。
-	StoreName string `protobuf:"bytes,24,opt,name=store_name,json=storeName,proto3" json:"store_name,omitempty"`
+	StoreName string `protobuf:"bytes,3,opt,name=store_name,json=storeName,proto3" json:"store_name,omitempty"`
 	// 空字串表示沒有提供。
-	ProductId string `protobuf:"bytes,3,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	ProductId string `protobuf:"bytes,4,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
 	// 空字串表示沒有提供。
-	OrderNo string `protobuf:"bytes,4,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
+	OrderNo string `protobuf:"bytes,5,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
 	// 檢舉人選的類別：政策分類中檢舉人可選的值（不含 PLATFORM_ABUSE）。
-	Category    v1alpha1.PolicyCategory `protobuf:"varint,5,opt,name=category,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"category,omitempty"`
-	Description string                  `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	Category    v1alpha1.PolicyCategory `protobuf:"varint,6,opt,name=category,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"category,omitempty"`
+	Description string                  `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
 	// 登入的檢舉人（買家 id）；匿名檢舉是空字串。
-	ReporterBuyerId string `protobuf:"bytes,7,opt,name=reporter_buyer_id,json=reporterBuyerId,proto3" json:"reporter_buyer_id,omitempty"`
+	ReporterBuyerId string `protobuf:"bytes,8,opt,name=reporter_buyer_id,json=reporterBuyerId,proto3" json:"reporter_buyer_id,omitempty"`
 	// 匿名檢舉人的聯絡方式；登入的檢舉人、聯絡方式已清除時不設。只有 GetReport 帶（ListReports 不帶個資）。
-	Contact *ReporterContact `protobuf:"bytes,8,opt,name=contact,proto3" json:"contact,omitempty"`
+	Contact *ReporterContact `protobuf:"bytes,9,opt,name=contact,proto3" json:"contact,omitempty"`
 	// 匿名檢舉人的聯絡方式被清除的時間；沒有清除時不設。
-	ContactEraseTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=contact_erase_time,json=contactEraseTime,proto3" json:"contact_erase_time,omitempty"`
+	ContactEraseTime *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=contact_erase_time,json=contactEraseTime,proto3" json:"contact_erase_time,omitempty"`
 	// 此刻的處理狀態。
-	State ReportState `protobuf:"varint,25,opt,name=state,proto3,enum=hawkr.admin.seller.v1alpha1.ReportState" json:"state,omitempty"`
+	State ReportState `protobuf:"varint,11,opt,name=state,proto3,enum=hawkr.admin.seller.v1alpha1.ReportState" json:"state,omitempty"`
 	// 所在的案件；沒有案件時是空字串。
-	CaseId string `protobuf:"bytes,26,opt,name=case_id,json=caseId,proto3" json:"case_id,omitempty"`
+	CaseId string `protobuf:"bytes,12,opt,name=case_id,json=caseId,proto3" json:"case_id,omitempty"`
 	// 平台判定類別，等於案件的類別；沒有案件時是 UNSPECIFIED。
-	AssessedCategory v1alpha1.PolicyCategory `protobuf:"varint,27,opt,name=assessed_category,json=assessedCategory,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"assessed_category,omitempty"`
+	AssessedCategory v1alpha1.PolicyCategory `protobuf:"varint,13,opt,name=assessed_category,json=assessedCategory,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"assessed_category,omitempty"`
 	// 第一次分案的時間，移動不改；沒有分案過時不設。
-	TriageTime       *timestamppb.Timestamp `protobuf:"bytes,28,opt,name=triage_time,json=triageTime,proto3" json:"triage_time,omitempty"`
-	TriagedByAdminId string                 `protobuf:"bytes,29,opt,name=triaged_by_admin_id,json=triagedByAdminId,proto3" json:"triaged_by_admin_id,omitempty"`
+	TriageTime       *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=triage_time,json=triageTime,proto3" json:"triage_time,omitempty"`
+	TriagedByAdminId string                 `protobuf:"bytes,15,opt,name=triaged_by_admin_id,json=triagedByAdminId,proto3" json:"triaged_by_admin_id,omitempty"`
 	// 結果；還沒有結果時是 UNSPECIFIED。
-	Outcome v1alpha11.ReportOutcome `protobuf:"varint,31,opt,name=outcome,proto3,enum=hawkr.seller.v1alpha1.ReportOutcome" json:"outcome,omitempty"`
+	Outcome v1alpha11.ReportOutcome `protobuf:"varint,16,opt,name=outcome,proto3,enum=hawkr.seller.v1alpha1.ReportOutcome" json:"outcome,omitempty"`
 	// 結果設定的時間；還沒有結果時不設。
-	ResolveTime       *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=resolve_time,json=resolveTime,proto3" json:"resolve_time,omitempty"`
-	ResolvedByAdminId string                 `protobuf:"bytes,17,opt,name=resolved_by_admin_id,json=resolvedByAdminId,proto3" json:"resolved_by_admin_id,omitempty"`
+	ResolveTime       *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=resolve_time,json=resolveTime,proto3" json:"resolve_time,omitempty"`
+	ResolvedByAdminId string                 `protobuf:"bytes,18,opt,name=resolved_by_admin_id,json=resolvedByAdminId,proto3" json:"resolved_by_admin_id,omitempty"`
 	// 給檢舉人的結果說明；沒有時是空字串。
-	ResolutionNote string `protobuf:"bytes,18,opt,name=resolution_note,json=resolutionNote,proto3" json:"resolution_note,omitempty"`
+	ResolutionNote string `protobuf:"bytes,19,opt,name=resolution_note,json=resolutionNote,proto3" json:"resolution_note,omitempty"`
 	// 佐證，原通報與補充的都在這裡（依位置）；只有 GetReport 帶。
 	Evidence []*Evidence `protobuf:"bytes,20,rep,name=evidence,proto3" json:"evidence,omitempty"`
 	// 補充，舊到新；只有 GetReport 帶。
-	Supplements     []*ReportSupplement `protobuf:"bytes,32,rep,name=supplements,proto3" json:"supplements,omitempty"`
-	SupplementCount int32               `protobuf:"varint,33,opt,name=supplement_count,json=supplementCount,proto3" json:"supplement_count,omitempty"`
+	Supplements     []*ReportSupplement `protobuf:"bytes,21,rep,name=supplements,proto3" json:"supplements,omitempty"`
+	SupplementCount int32               `protobuf:"varint,22,opt,name=supplement_count,json=supplementCount,proto3" json:"supplement_count,omitempty"`
 	// 最新一則補充的時間；沒有補充時不設。
-	LatestSupplementTime *timestamppb.Timestamp `protobuf:"bytes,34,opt,name=latest_supplement_time,json=latestSupplementTime,proto3" json:"latest_supplement_time,omitempty"`
+	LatestSupplementTime *timestamppb.Timestamp `protobuf:"bytes,23,opt,name=latest_supplement_time,json=latestSupplementTime,proto3" json:"latest_supplement_time,omitempty"`
 	// 補充已達上限、內容沒有存下的匿名送出次數。
-	DiscardedSubmissionCount int32 `protobuf:"varint,35,opt,name=discarded_submission_count,json=discardedSubmissionCount,proto3" json:"discarded_submission_count,omitempty"`
+	DiscardedSubmissionCount int32 `protobuf:"varint,24,opt,name=discarded_submission_count,json=discardedSubmissionCount,proto3" json:"discarded_submission_count,omitempty"`
 	// 通報的版本；補充、分案、設定結果與移動都讓它前進。
-	Etag string `protobuf:"bytes,36,opt,name=etag,proto3" json:"etag,omitempty"`
+	Etag string `protobuf:"bytes,25,opt,name=etag,proto3" json:"etag,omitempty"`
 	// 此刻可以分案。
-	CanTriage bool `protobuf:"varint,37,opt,name=can_triage,json=canTriage,proto3" json:"can_triage,omitempty"`
+	CanTriage bool `protobuf:"varint,26,opt,name=can_triage,json=canTriage,proto3" json:"can_triage,omitempty"`
 	// 此刻可以設定結果；等於 available_outcomes 不為空。
-	CanResolve bool `protobuf:"varint,38,opt,name=can_resolve,json=canResolve,proto3" json:"can_resolve,omitempty"`
+	CanResolve bool `protobuf:"varint,27,opt,name=can_resolve,json=canResolve,proto3" json:"can_resolve,omitempty"`
 	// 此刻可以設定的結果，順序固定：已採取措施、未違規、內容不足、重複、濫報；每個結果帶設定之後會不會否定這筆通報（client 不自己對應）。
-	AvailableOutcomes []*OutcomeOption `protobuf:"bytes,39,rep,name=available_outcomes,json=availableOutcomes,proto3" json:"available_outcomes,omitempty"`
+	AvailableOutcomes []*OutcomeOption `protobuf:"bytes,28,rep,name=available_outcomes,json=availableOutcomes,proto3" json:"available_outcomes,omitempty"`
 	// 此刻可以移到其他案件。
-	CanMove bool `protobuf:"varint,40,opt,name=can_move,json=canMove,proto3" json:"can_move,omitempty"`
+	CanMove bool `protobuf:"varint,29,opt,name=can_move,json=canMove,proto3" json:"can_move,omitempty"`
 	// 此刻可以當認定的來源（結果不是未違規、內容不足或濫報，而且店家沒有關閉）。建立措施的來源通報選項看它，client 不自己看狀態。
-	CanCiteAsSource bool `protobuf:"varint,41,opt,name=can_cite_as_source,json=canCiteAsSource,proto3" json:"can_cite_as_source,omitempty"`
+	CanCiteAsSource bool `protobuf:"varint,30,opt,name=can_cite_as_source,json=canCiteAsSource,proto3" json:"can_cite_as_source,omitempty"`
 	// 生效的類別：在案件裡的是平台判定類別（assessed_category），其他是檢舉人選的類別（category）。ListReports 的 category 篩選用的就是它。
-	EffectiveCategory v1alpha1.PolicyCategory `protobuf:"varint,42,opt,name=effective_category,json=effectiveCategory,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"effective_category,omitempty"`
+	EffectiveCategory v1alpha1.PolicyCategory `protobuf:"varint,31,opt,name=effective_category,json=effectiveCategory,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"effective_category,omitempty"`
 	// 有補充是管理員還沒看過的：這筆通報還沒有結果，而且存在編號比「管理員看過的最新補充」更大的補充（分案、移動與 MarkReportSupplementsSeen 會記下看過的編號；
 	// 比編號不比時間，不依賴時鐘）。有了結果的通報不再提醒。補充不改案件的 etag，所以案件頁與通報頁都看這個標示提醒。
 	// 讀取（GetReport）、設定結果、結案時帶入的預設結果、改案件嚴重度都不記。
-	HasUnseenSupplements bool `protobuf:"varint,43,opt,name=has_unseen_supplements,json=hasUnseenSupplements,proto3" json:"has_unseen_supplements,omitempty"`
+	HasUnseenSupplements bool `protobuf:"varint,32,opt,name=has_unseen_supplements,json=hasUnseenSupplements,proto3" json:"has_unseen_supplements,omitempty"`
 	// 分案與移動時每個平台判定類別的去處，只有 GetReport 帶，而且只在 can_triage 或 can_move 時有值：每個可判定的類別一筆（移動時不含目前的類別），
 	// 順序同政策分類。client 依它顯示「加入案件（嚴重度）」或「開新案件」，並把選的去處原樣放進請求（TriageReportRequest.target、MoveReportRequest.target）。
-	TriageTargets []*TriageTarget        `protobuf:"bytes,45,rep,name=triage_targets,json=triageTargets,proto3" json:"triage_targets,omitempty"`
-	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,22,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
-	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,23,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	TriageTargets []*TriageTarget        `protobuf:"bytes,33,rep,name=triage_targets,json=triageTargets,proto3" json:"triage_targets,omitempty"`
+	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,34,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,35,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	// 分案的期限，只在待分案時設：開始時間是通報的建立時間，期限依審閱政策（檢舉人選了食安的 4 小時，其他類別 72 小時）。
-	TriageDeadline *v1alpha1.Deadline `protobuf:"bytes,46,opt,name=triage_deadline,json=triageDeadline,proto3" json:"triage_deadline,omitempty"`
+	TriageDeadline *v1alpha1.Deadline `protobuf:"bytes,36,opt,name=triage_deadline,json=triageDeadline,proto3" json:"triage_deadline,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -882,32 +882,32 @@ type Case struct {
 	// 還沒有結果的通報數：結案時會帶入預設結果的筆數。
 	UnresolvedReportCount int32 `protobuf:"varint,15,opt,name=unresolved_report_count,json=unresolvedReportCount,proto3" json:"unresolved_report_count,omitempty"`
 	// 移入與移出這個案件的移動，舊到新；只有 GetCase 帶。
-	Moves []*ReportMove `protobuf:"bytes,17,rep,name=moves,proto3" json:"moves,omitempty"`
+	Moves []*ReportMove `protobuf:"bytes,16,rep,name=moves,proto3" json:"moves,omitempty"`
 	// 上一次處理的時間：成員進出、成員有了結果、改嚴重度、詢問的建立與回覆與撤回、結案。補充、註記與措施的建立或撤銷不改它（它不再用來判斷補充有沒有看過）。
-	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,18,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	// 案件的版本；成員進出、成員有了結果、改嚴重度、決定、自動關閉與詢問的建立、記下回覆、撤回都讓它前進，補充、註記與措施不會。
-	Etag string `protobuf:"bytes,20,opt,name=etag,proto3" json:"etag,omitempty"`
+	Etag string `protobuf:"bytes,18,opt,name=etag,proto3" json:"etag,omitempty"`
 	// 此刻可以決定；等於 decision_options 不為空。進行中的案件一定是 true（每個進行中的案件至少有一個可以選的決定）。
-	CanDecide bool `protobuf:"varint,21,opt,name=can_decide,json=canDecide,proto3" json:"can_decide,omitempty"`
+	CanDecide bool `protobuf:"varint,19,opt,name=can_decide,json=canDecide,proto3" json:"can_decide,omitempty"`
 	// 此刻可以選的決定，順序固定：採取措施、不採取措施。
-	DecisionOptions   []*DecisionOption `protobuf:"bytes,22,rep,name=decision_options,json=decisionOptions,proto3" json:"decision_options,omitempty"`
-	CanChangeSeverity bool              `protobuf:"varint,23,opt,name=can_change_severity,json=canChangeSeverity,proto3" json:"can_change_severity,omitempty"`
+	DecisionOptions   []*DecisionOption `protobuf:"bytes,20,rep,name=decision_options,json=decisionOptions,proto3" json:"decision_options,omitempty"`
+	CanChangeSeverity bool              `protobuf:"varint,21,opt,name=can_change_severity,json=canChangeSeverity,proto3" json:"can_change_severity,omitempty"`
 	// 案件進行中：新的措施可以記它為來源案件（終止合作的入口另看 GetStore.can_create_termination）。
-	CanLinkMeasure bool `protobuf:"varint,24,opt,name=can_link_measure,json=canLinkMeasure,proto3" json:"can_link_measure,omitempty"`
+	CanLinkMeasure bool `protobuf:"varint,22,opt,name=can_link_measure,json=canLinkMeasure,proto3" json:"can_link_measure,omitempty"`
 	// can_link_measure 而且店家沒有關閉（警告、停權與風險措施要開著的店）。
-	CanCreateMeasure bool `protobuf:"varint,25,opt,name=can_create_measure,json=canCreateMeasure,proto3" json:"can_create_measure,omitempty"`
+	CanCreateMeasure bool `protobuf:"varint,23,opt,name=can_create_measure,json=canCreateMeasure,proto3" json:"can_create_measure,omitempty"`
 	// 成員裡有補充還沒被管理員看過的通報數（該成員的 Report.has_unseen_supplements 為 true 的筆數）。補充不改案件的 etag，改由這個數字提醒結案前先看過；
 	// 要知道是哪幾筆看成員通報的 has_unseen_supplements。
-	UnseenSupplementReportCount int32 `protobuf:"varint,28,opt,name=unseen_supplement_report_count,json=unseenSupplementReportCount,proto3" json:"unseen_supplement_report_count,omitempty"`
+	UnseenSupplementReportCount int32 `protobuf:"varint,24,opt,name=unseen_supplement_report_count,json=unseenSupplementReportCount,proto3" json:"unseen_supplement_report_count,omitempty"`
 	// 有還沒結束的詢問（等賣家，推導）；這時案件不在「待決定」。結案會撤回它。
-	AwaitingSeller bool `protobuf:"varint,29,opt,name=awaiting_seller,json=awaitingSeller,proto3" json:"awaiting_seller,omitempty"`
+	AwaitingSeller bool `protobuf:"varint,25,opt,name=awaiting_seller,json=awaitingSeller,proto3" json:"awaiting_seller,omitempty"`
 	// awaiting_seller 時那一筆詢問的 ID；否則是空字串。
-	OpenInquiryId string `protobuf:"bytes,30,opt,name=open_inquiry_id,json=openInquiryId,proto3" json:"open_inquiry_id,omitempty"`
+	OpenInquiryId string `protobuf:"bytes,26,opt,name=open_inquiry_id,json=openInquiryId,proto3" json:"open_inquiry_id,omitempty"`
 	// 此刻可以對賣家發詢問：案件進行中、店家的個資還沒清除、沒有還沒結束的詢問。
-	CanCreateInquiry bool `protobuf:"varint,31,opt,name=can_create_inquiry,json=canCreateInquiry,proto3" json:"can_create_inquiry,omitempty"`
+	CanCreateInquiry bool `protobuf:"varint,27,opt,name=can_create_inquiry,json=canCreateInquiry,proto3" json:"can_create_inquiry,omitempty"`
 	// 決定的期限，只在待決定時設（進行中而且沒有還沒結束的詢問）：開始時間是開案，或最後一筆詢問被回覆或被管理員撤回的時間，期限依嚴重度
 	// （嚴重 24 小時、高 72 小時、中 7 天、低 14 天）。
-	DecideDeadline *v1alpha1.Deadline `protobuf:"bytes,35,opt,name=decide_deadline,json=decideDeadline,proto3" json:"decide_deadline,omitempty"`
+	DecideDeadline *v1alpha1.Deadline `protobuf:"bytes,28,opt,name=decide_deadline,json=decideDeadline,proto3" json:"decide_deadline,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1594,15 +1594,15 @@ type ListReportsRequest struct {
 	PageSize  int32  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	PageToken string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	// 只列這個生效的類別的通報：在案件裡的是平台判定類別，其他是檢舉人選的類別；UNSPECIFIED 不篩選。
-	Category v1alpha1.PolicyCategory `protobuf:"varint,4,opt,name=category,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"category,omitempty"`
+	Category v1alpha1.PolicyCategory `protobuf:"varint,3,opt,name=category,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"category,omitempty"`
 	// 只列這家店的通報；空字串不篩選。
-	StoreId string `protobuf:"bytes,5,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	StoreId string `protobuf:"bytes,4,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
 	// 只列這個處理狀態的通報；UNSPECIFIED 不篩選。
-	State ReportState `protobuf:"varint,6,opt,name=state,proto3,enum=hawkr.admin.seller.v1alpha1.ReportState" json:"state,omitempty"`
+	State ReportState `protobuf:"varint,5,opt,name=state,proto3,enum=hawkr.admin.seller.v1alpha1.ReportState" json:"state,omitempty"`
 	// 只列這個案件的通報；空字串不篩選。排序：state 是 AWAITING_TRIAGE 或設了 case_id 時依建立時間舊到新（兩者都設時一樣，結果是交集），其他新到舊。
-	CaseId string `protobuf:"bytes,7,opt,name=case_id,json=caseId,proto3" json:"case_id,omitempty"`
+	CaseId string `protobuf:"bytes,6,opt,name=case_id,json=caseId,proto3" json:"case_id,omitempty"`
 	// true 時只列此刻可以當認定的來源的通報（Report.can_cite_as_source 為 true）；false 不篩選。建立措施預填來源通報用。
-	CitableAsSource bool `protobuf:"varint,8,opt,name=citable_as_source,json=citableAsSource,proto3" json:"citable_as_source,omitempty"`
+	CitableAsSource bool `protobuf:"varint,7,opt,name=citable_as_source,json=citableAsSource,proto3" json:"citable_as_source,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1930,7 +1930,7 @@ type TriageReportRequest struct {
 	// 平台判定類別：政策分類中平台判定與認定可用的值，OTHER 不行（OTHER 只給檢舉人選）；UNSPECIFIED 與 OTHER 回 invalid_argument。
 	AssessedCategory v1alpha1.PolicyCategory `protobuf:"varint,2,opt,name=assessed_category,json=assessedCategory,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"assessed_category,omitempty"`
 	// 去處：取自 Report.triage_targets 對應類別的那一筆（有 case_id 就 join，沒有就 open_new 並選嚴重度）。必填；嚴重度以案件為準，要改請用 ChangeCaseSeverity。
-	Target *CaseTarget `protobuf:"bytes,5,opt,name=target,proto3" json:"target,omitempty"`
+	Target *CaseTarget `protobuf:"bytes,3,opt,name=target,proto3" json:"target,omitempty"`
 	// 讀到的通報的 etag。
 	Etag          string `protobuf:"bytes,4,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -2160,7 +2160,7 @@ type MoveReportRequest struct {
 	// 新的平台判定類別，必須和目前的不同；子集同 TriageReportRequest.assessed_category。
 	AssessedCategory v1alpha1.PolicyCategory `protobuf:"varint,2,opt,name=assessed_category,json=assessedCategory,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"assessed_category,omitempty"`
 	// 規則同 TriageReportRequest.target。
-	Target *CaseTarget `protobuf:"bytes,5,opt,name=target,proto3" json:"target,omitempty"`
+	Target *CaseTarget `protobuf:"bytes,3,opt,name=target,proto3" json:"target,omitempty"`
 	// 讀到的通報的 etag。
 	Etag          string `protobuf:"bytes,4,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -3235,9 +3235,9 @@ type CreateMeasureRequest struct {
 	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	StoreId   string `protobuf:"bytes,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
 	// 給賣家的理由，1 到 2000 字。
-	Statement string `protobuf:"bytes,4,opt,name=statement,proto3" json:"statement,omitempty"`
+	Statement string `protobuf:"bytes,3,opt,name=statement,proto3" json:"statement,omitempty"`
 	// 第一則內部註記，1 到 2000 字。
-	Note string `protobuf:"bytes,7,opt,name=note,proto3" json:"note,omitempty"`
+	Note string `protobuf:"bytes,4,opt,name=note,proto3" json:"note,omitempty"`
 	// 措施的種類：設定的是哪一支就是哪一種，必須設定其中一支。各種類專屬的欄位在那一支裡面，所以不會有跨欄位的種類對應。
 	//
 	// Types that are valid to be assigned to Measure:
@@ -3249,10 +3249,10 @@ type CreateMeasureRequest struct {
 	Measure isCreateMeasureRequest_Measure `protobuf_oneof:"measure"`
 	// 選填：從案件建立時帶案件 id。任何種類與依據都可以帶；措施的店家必須是案件的店家（invalid_argument），案件必須進行中（failed_precondition）。
 	// 之後這個措施算是案件導出的措施（ListMeasuresRequest.source_case_id）。同一個 request_id 帶不同的案件是不同的請求。
-	SourceCaseId string `protobuf:"bytes,14,opt,name=source_case_id,json=sourceCaseId,proto3" json:"source_case_id,omitempty"`
+	SourceCaseId string `protobuf:"bytes,9,opt,name=source_case_id,json=sourceCaseId,proto3" json:"source_case_id,omitempty"`
 	// 選填：從主管機關來函建立時帶來函 id。任何種類與依據都可以帶；來函必須指名這個措施的帳號（invalid_argument；指名店家時只算那一家）。
 	// 來函已完成也可以。之後這個措施算是來函導出的措施（ListMeasuresRequest.source_authority_order_id）。同一個 request_id 帶不同的來函是不同的請求。
-	SourceAuthorityOrderId string `protobuf:"bytes,15,opt,name=source_authority_order_id,json=sourceAuthorityOrderId,proto3" json:"source_authority_order_id,omitempty"`
+	SourceAuthorityOrderId string `protobuf:"bytes,10,opt,name=source_authority_order_id,json=sourceAuthorityOrderId,proto3" json:"source_authority_order_id,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -3377,19 +3377,19 @@ type isCreateMeasureRequest_Measure interface {
 }
 
 type CreateMeasureRequest_Warning struct {
-	Warning *WarningInput `protobuf:"bytes,11,opt,name=warning,proto3,oneof"`
+	Warning *WarningInput `protobuf:"bytes,5,opt,name=warning,proto3,oneof"`
 }
 
 type CreateMeasureRequest_Suspension struct {
-	Suspension *SuspensionInput `protobuf:"bytes,12,opt,name=suspension,proto3,oneof"`
+	Suspension *SuspensionInput `protobuf:"bytes,6,opt,name=suspension,proto3,oneof"`
 }
 
 type CreateMeasureRequest_Termination struct {
-	Termination *TerminationInput `protobuf:"bytes,13,opt,name=termination,proto3,oneof"`
+	Termination *TerminationInput `protobuf:"bytes,7,opt,name=termination,proto3,oneof"`
 }
 
 type CreateMeasureRequest_ContentTakedown struct {
-	ContentTakedown *ContentTakedownInput `protobuf:"bytes,16,opt,name=content_takedown,json=contentTakedown,proto3,oneof"`
+	ContentTakedown *ContentTakedownInput `protobuf:"bytes,8,opt,name=content_takedown,json=contentTakedown,proto3,oneof"`
 }
 
 func (*CreateMeasureRequest_Warning) isCreateMeasureRequest_Measure() {}
@@ -3984,19 +3984,19 @@ type ListMeasuresRequest struct {
 	// 只列這個依據的措施；UNSPECIFIED 不篩選。
 	Basis v1alpha11.MeasureBasis `protobuf:"varint,6,opt,name=basis,proto3,enum=hawkr.seller.v1alpha1.MeasureBasis" json:"basis,omitempty"`
 	// true 只列複審中的措施：RISK、生效中、現在不早於 review_by 前 24 小時（與 Measure.review_deadline 同一個定義，review_by 過了之後仍在），依 review_by 舊到新；false 與不設不篩選。
-	ReviewDue bool `protobuf:"varint,8,opt,name=review_due,json=reviewDue,proto3" json:"review_due,omitempty"`
+	ReviewDue bool `protobuf:"varint,7,opt,name=review_due,json=reviewDue,proto3" json:"review_due,omitempty"`
 	// 只列有任一筆請求（申覆或解除請求，一個措施可以有多筆不同狀態的）是這個狀態的措施，狀態是伺服器推導的 MeasureRequest.state：措施已不在
 	// 生效中而仍待處理的解除請求算 CLOSED，不算 PENDING。PENDING 是待處理請求的收件匣，依請求提出時間舊到新（優先序在 review_due 之後）；
 	// UNSPECIFIED 不篩選。
-	RequestState v1alpha11.MeasureRequestState `protobuf:"varint,10,opt,name=request_state,json=requestState,proto3,enum=hawkr.seller.v1alpha1.MeasureRequestState" json:"request_state,omitempty"`
+	RequestState v1alpha11.MeasureRequestState `protobuf:"varint,8,opt,name=request_state,json=requestState,proto3,enum=hawkr.seller.v1alpha1.MeasureRequestState" json:"request_state,omitempty"`
 	// 只列有任一筆這個種類且（有 request_state 時）符合該狀態的請求的措施；UNSPECIFIED 不篩選種類。
-	RequestKind v1alpha11.MeasureRequestKind `protobuf:"varint,11,opt,name=request_kind,json=requestKind,proto3,enum=hawkr.seller.v1alpha1.MeasureRequestKind" json:"request_kind,omitempty"`
+	RequestKind v1alpha11.MeasureRequestKind `protobuf:"varint,9,opt,name=request_kind,json=requestKind,proto3,enum=hawkr.seller.v1alpha1.MeasureRequestKind" json:"request_kind,omitempty"`
 	// 只列這個案件導出的措施：source_case_id 是這個案件，或依據的認定（含引用的既有認定）以這個案件的通報為來源；空字串不篩選。
-	SourceCaseId string `protobuf:"bytes,12,opt,name=source_case_id,json=sourceCaseId,proto3" json:"source_case_id,omitempty"`
+	SourceCaseId string `protobuf:"bytes,10,opt,name=source_case_id,json=sourceCaseId,proto3" json:"source_case_id,omitempty"`
 	// 只列依據的認定（含引用的既有認定）以這筆通報為來源的措施；空字串不篩選。設定結果的對話框用它提示「這筆通報已是措施的依據來源」。
-	SourceReportId string `protobuf:"bytes,13,opt,name=source_report_id,json=sourceReportId,proto3" json:"source_report_id,omitempty"`
+	SourceReportId string `protobuf:"bytes,11,opt,name=source_report_id,json=sourceReportId,proto3" json:"source_report_id,omitempty"`
 	// 只列這份來函導出的措施：source_authority_order_id 是它，或依據的認定（含引用的既有認定）引用了它；空字串不篩選。
-	SourceAuthorityOrderId string `protobuf:"bytes,14,opt,name=source_authority_order_id,json=sourceAuthorityOrderId,proto3" json:"source_authority_order_id,omitempty"`
+	SourceAuthorityOrderId string `protobuf:"bytes,12,opt,name=source_authority_order_id,json=sourceAuthorityOrderId,proto3" json:"source_authority_order_id,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -5709,52 +5709,52 @@ const file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc = "" +
 	"\x0fReporterContact\x12\x14\n" +
 	"\x05phone\x18\x01 \x01(\tR\x05phone\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\"\x88\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\"\xb8\x10\n" +
 	"\x06Report\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1e\n" +
 	"\bstore_id\x18\x02 \x01(\tB\x03\xe0A\x03R\astoreId\x12\"\n" +
 	"\n" +
-	"store_name\x18\x18 \x01(\tB\x03\xe0A\x03R\tstoreName\x12\"\n" +
+	"store_name\x18\x03 \x01(\tB\x03\xe0A\x03R\tstoreName\x12\"\n" +
 	"\n" +
-	"product_id\x18\x03 \x01(\tB\x03\xe0A\x03R\tproductId\x12\x1e\n" +
-	"\border_no\x18\x04 \x01(\tB\x03\xe0A\x03R\aorderNo\x12F\n" +
-	"\bcategory\x18\x05 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x03R\bcategory\x12%\n" +
-	"\vdescription\x18\x06 \x01(\tB\x03\xe0A\x03R\vdescription\x12/\n" +
-	"\x11reporter_buyer_id\x18\a \x01(\tB\x03\xe0A\x03R\x0freporterBuyerId\x12K\n" +
-	"\acontact\x18\b \x01(\v2,.hawkr.admin.seller.v1alpha1.ReporterContactB\x03\xe0A\x03R\acontact\x12M\n" +
-	"\x12contact_erase_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x10contactEraseTime\x12C\n" +
-	"\x05state\x18\x19 \x01(\x0e2(.hawkr.admin.seller.v1alpha1.ReportStateB\x03\xe0A\x03R\x05state\x12\x1c\n" +
-	"\acase_id\x18\x1a \x01(\tB\x03\xe0A\x03R\x06caseId\x12W\n" +
-	"\x11assessed_category\x18\x1b \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x03R\x10assessedCategory\x12@\n" +
-	"\vtriage_time\x18\x1c \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"product_id\x18\x04 \x01(\tB\x03\xe0A\x03R\tproductId\x12\x1e\n" +
+	"\border_no\x18\x05 \x01(\tB\x03\xe0A\x03R\aorderNo\x12F\n" +
+	"\bcategory\x18\x06 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x03R\bcategory\x12%\n" +
+	"\vdescription\x18\a \x01(\tB\x03\xe0A\x03R\vdescription\x12/\n" +
+	"\x11reporter_buyer_id\x18\b \x01(\tB\x03\xe0A\x03R\x0freporterBuyerId\x12K\n" +
+	"\acontact\x18\t \x01(\v2,.hawkr.admin.seller.v1alpha1.ReporterContactB\x03\xe0A\x03R\acontact\x12M\n" +
+	"\x12contact_erase_time\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x10contactEraseTime\x12C\n" +
+	"\x05state\x18\v \x01(\x0e2(.hawkr.admin.seller.v1alpha1.ReportStateB\x03\xe0A\x03R\x05state\x12\x1c\n" +
+	"\acase_id\x18\f \x01(\tB\x03\xe0A\x03R\x06caseId\x12W\n" +
+	"\x11assessed_category\x18\r \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x03R\x10assessedCategory\x12@\n" +
+	"\vtriage_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"triageTime\x122\n" +
-	"\x13triaged_by_admin_id\x18\x1d \x01(\tB\x03\xe0A\x03R\x10triagedByAdminId\x12C\n" +
-	"\aoutcome\x18\x1f \x01(\x0e2$.hawkr.seller.v1alpha1.ReportOutcomeB\x03\xe0A\x03R\aoutcome\x12B\n" +
-	"\fresolve_time\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\vresolveTime\x124\n" +
-	"\x14resolved_by_admin_id\x18\x11 \x01(\tB\x03\xe0A\x03R\x11resolvedByAdminId\x12,\n" +
-	"\x0fresolution_note\x18\x12 \x01(\tB\x03\xe0A\x03R\x0eresolutionNote\x12F\n" +
+	"\x13triaged_by_admin_id\x18\x0f \x01(\tB\x03\xe0A\x03R\x10triagedByAdminId\x12C\n" +
+	"\aoutcome\x18\x10 \x01(\x0e2$.hawkr.seller.v1alpha1.ReportOutcomeB\x03\xe0A\x03R\aoutcome\x12B\n" +
+	"\fresolve_time\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\vresolveTime\x124\n" +
+	"\x14resolved_by_admin_id\x18\x12 \x01(\tB\x03\xe0A\x03R\x11resolvedByAdminId\x12,\n" +
+	"\x0fresolution_note\x18\x13 \x01(\tB\x03\xe0A\x03R\x0eresolutionNote\x12F\n" +
 	"\bevidence\x18\x14 \x03(\v2%.hawkr.admin.seller.v1alpha1.EvidenceB\x03\xe0A\x03R\bevidence\x12T\n" +
-	"\vsupplements\x18  \x03(\v2-.hawkr.admin.seller.v1alpha1.ReportSupplementB\x03\xe0A\x03R\vsupplements\x12.\n" +
-	"\x10supplement_count\x18! \x01(\x05B\x03\xe0A\x03R\x0fsupplementCount\x12U\n" +
-	"\x16latest_supplement_time\x18\" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x14latestSupplementTime\x12A\n" +
-	"\x1adiscarded_submission_count\x18# \x01(\x05B\x03\xe0A\x03R\x18discardedSubmissionCount\x12\x12\n" +
-	"\x04etag\x18$ \x01(\tR\x04etag\x12\"\n" +
+	"\vsupplements\x18\x15 \x03(\v2-.hawkr.admin.seller.v1alpha1.ReportSupplementB\x03\xe0A\x03R\vsupplements\x12.\n" +
+	"\x10supplement_count\x18\x16 \x01(\x05B\x03\xe0A\x03R\x0fsupplementCount\x12U\n" +
+	"\x16latest_supplement_time\x18\x17 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x14latestSupplementTime\x12A\n" +
+	"\x1adiscarded_submission_count\x18\x18 \x01(\x05B\x03\xe0A\x03R\x18discardedSubmissionCount\x12\x12\n" +
+	"\x04etag\x18\x19 \x01(\tR\x04etag\x12\"\n" +
 	"\n" +
-	"can_triage\x18% \x01(\bB\x03\xe0A\x03R\tcanTriage\x12$\n" +
-	"\vcan_resolve\x18& \x01(\bB\x03\xe0A\x03R\n" +
+	"can_triage\x18\x1a \x01(\bB\x03\xe0A\x03R\tcanTriage\x12$\n" +
+	"\vcan_resolve\x18\x1b \x01(\bB\x03\xe0A\x03R\n" +
 	"canResolve\x12^\n" +
-	"\x12available_outcomes\x18' \x03(\v2*.hawkr.admin.seller.v1alpha1.OutcomeOptionB\x03\xe0A\x03R\x11availableOutcomes\x12\x1e\n" +
-	"\bcan_move\x18( \x01(\bB\x03\xe0A\x03R\acanMove\x120\n" +
-	"\x12can_cite_as_source\x18) \x01(\bB\x03\xe0A\x03R\x0fcanCiteAsSource\x12Y\n" +
-	"\x12effective_category\x18* \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x03R\x11effectiveCategory\x129\n" +
-	"\x16has_unseen_supplements\x18+ \x01(\bB\x03\xe0A\x03R\x14hasUnseenSupplements\x12U\n" +
-	"\x0etriage_targets\x18- \x03(\v2).hawkr.admin.seller.v1alpha1.TriageTargetB\x03\xe0A\x03R\rtriageTargets\x12@\n" +
-	"\vcreate_time\x18\x16 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\x12available_outcomes\x18\x1c \x03(\v2*.hawkr.admin.seller.v1alpha1.OutcomeOptionB\x03\xe0A\x03R\x11availableOutcomes\x12\x1e\n" +
+	"\bcan_move\x18\x1d \x01(\bB\x03\xe0A\x03R\acanMove\x120\n" +
+	"\x12can_cite_as_source\x18\x1e \x01(\bB\x03\xe0A\x03R\x0fcanCiteAsSource\x12Y\n" +
+	"\x12effective_category\x18\x1f \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x03R\x11effectiveCategory\x129\n" +
+	"\x16has_unseen_supplements\x18  \x01(\bB\x03\xe0A\x03R\x14hasUnseenSupplements\x12U\n" +
+	"\x0etriage_targets\x18! \x03(\v2).hawkr.admin.seller.v1alpha1.TriageTargetB\x03\xe0A\x03R\rtriageTargets\x12@\n" +
+	"\vcreate_time\x18\" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12@\n" +
-	"\vupdate_time\x18\x17 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\vupdate_time\x18# \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12M\n" +
-	"\x0ftriage_deadline\x18. \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0etriageDeadlineJ\x04\b\n" +
-	"\x10\x10J\x04\b\x13\x10\x14J\x04\b\x15\x10\x16J\x04\b\x1e\x10\x1fJ\x04\b,\x10-R\x06statusR\bseverityR\x14acknowledge_due_timeR\x10acknowledge_timeR\x18acknowledged_by_admin_idR\x10investigate_timeR\ffda_referralR\x14cooperation_requestsR\x0ftriage_due_timeR\x15supplements_seen_time\"\xfd\x01\n" +
+	"\x0ftriage_deadline\x18$ \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0etriageDeadline\"\xfd\x01\n" +
 	"\x10ReportSupplement\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12;\n" +
@@ -5762,7 +5762,7 @@ const file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc = "" +
 	"createTime\x12-\n" +
 	"\x12evidence_positions\x18\x04 \x03(\x05R\x11evidencePositions\x12K\n" +
 	"\n" +
-	"matched_by\x18\x05 \x01(\x0e2,.hawkr.admin.seller.v1alpha1.SupplementMatchR\tmatchedBy\"\xf4\r\n" +
+	"matched_by\x18\x05 \x01(\x0e2,.hawkr.admin.seller.v1alpha1.SupplementMatchR\tmatchedBy\"\xa1\f\n" +
 	"\x04Case\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1e\n" +
 	"\bstore_id\x18\x02 \x01(\tB\x03\xe0A\x03R\astoreId\x12\"\n" +
@@ -5782,21 +5782,21 @@ const file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc = "" +
 	"close_time\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\tcloseTime\x12&\n" +
 	"\freport_count\x18\x0e \x01(\x05B\x03\xe0A\x03R\vreportCount\x12;\n" +
 	"\x17unresolved_report_count\x18\x0f \x01(\x05B\x03\xe0A\x03R\x15unresolvedReportCount\x12B\n" +
-	"\x05moves\x18\x11 \x03(\v2'.hawkr.admin.seller.v1alpha1.ReportMoveB\x03\xe0A\x03R\x05moves\x12@\n" +
-	"\vupdate_time\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\x05moves\x18\x10 \x03(\v2'.hawkr.admin.seller.v1alpha1.ReportMoveB\x03\xe0A\x03R\x05moves\x12@\n" +
+	"\vupdate_time\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x12\n" +
-	"\x04etag\x18\x14 \x01(\tR\x04etag\x12\"\n" +
+	"\x04etag\x18\x12 \x01(\tR\x04etag\x12\"\n" +
 	"\n" +
-	"can_decide\x18\x15 \x01(\bB\x03\xe0A\x03R\tcanDecide\x12[\n" +
-	"\x10decision_options\x18\x16 \x03(\v2+.hawkr.admin.seller.v1alpha1.DecisionOptionB\x03\xe0A\x03R\x0fdecisionOptions\x123\n" +
-	"\x13can_change_severity\x18\x17 \x01(\bB\x03\xe0A\x03R\x11canChangeSeverity\x12-\n" +
-	"\x10can_link_measure\x18\x18 \x01(\bB\x03\xe0A\x03R\x0ecanLinkMeasure\x121\n" +
-	"\x12can_create_measure\x18\x19 \x01(\bB\x03\xe0A\x03R\x10canCreateMeasure\x12H\n" +
-	"\x1eunseen_supplement_report_count\x18\x1c \x01(\x05B\x03\xe0A\x03R\x1bunseenSupplementReportCount\x12,\n" +
-	"\x0fawaiting_seller\x18\x1d \x01(\bB\x03\xe0A\x03R\x0eawaitingSeller\x12+\n" +
-	"\x0fopen_inquiry_id\x18\x1e \x01(\tB\x03\xe0A\x03R\ropenInquiryId\x121\n" +
-	"\x12can_create_inquiry\x18\x1f \x01(\bB\x03\xe0A\x03R\x10canCreateInquiry\x12M\n" +
-	"\x0fdecide_deadline\x18# \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0edecideDeadlineJ\x04\b\x13\x10\x14J\x04\b\x10\x10\x11J\x04\b\x1a\x10\x1bJ\x04\b\x1b\x10\x1cJ\x04\b \x10#J\x04\b$\x10%R\x13has_new_supplementsR\ffda_referralR\x17can_record_fda_referralR\x0ecan_export_fdaR\x13fda_referral_waiverR\x16can_waive_fda_referralR\x1dcan_record_fda_referral_replyR\x15fda_referral_deadline\"v\n" +
+	"can_decide\x18\x13 \x01(\bB\x03\xe0A\x03R\tcanDecide\x12[\n" +
+	"\x10decision_options\x18\x14 \x03(\v2+.hawkr.admin.seller.v1alpha1.DecisionOptionB\x03\xe0A\x03R\x0fdecisionOptions\x123\n" +
+	"\x13can_change_severity\x18\x15 \x01(\bB\x03\xe0A\x03R\x11canChangeSeverity\x12-\n" +
+	"\x10can_link_measure\x18\x16 \x01(\bB\x03\xe0A\x03R\x0ecanLinkMeasure\x121\n" +
+	"\x12can_create_measure\x18\x17 \x01(\bB\x03\xe0A\x03R\x10canCreateMeasure\x12H\n" +
+	"\x1eunseen_supplement_report_count\x18\x18 \x01(\x05B\x03\xe0A\x03R\x1bunseenSupplementReportCount\x12,\n" +
+	"\x0fawaiting_seller\x18\x19 \x01(\bB\x03\xe0A\x03R\x0eawaitingSeller\x12+\n" +
+	"\x0fopen_inquiry_id\x18\x1a \x01(\tB\x03\xe0A\x03R\ropenInquiryId\x121\n" +
+	"\x12can_create_inquiry\x18\x1b \x01(\bB\x03\xe0A\x03R\x10canCreateInquiry\x12M\n" +
+	"\x0fdecide_deadline\x18\x1c \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0edecideDeadline\"v\n" +
 	"\rOutcomeOption\x12>\n" +
 	"\aoutcome\x18\x01 \x01(\x0e2$.hawkr.seller.v1alpha1.ReportOutcomeR\aoutcome\x12%\n" +
 	"\x0enegates_source\x18\x02 \x01(\bR\rnegatesSource\"\xf9\x01\n" +
@@ -5827,16 +5827,16 @@ const file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc = "" +
 	"\n" +
 	"to_case_id\x18\x03 \x01(\tR\btoCaseId\x12)\n" +
 	"\x11moved_by_admin_id\x18\x04 \x01(\tR\x0emovedByAdminId\x127\n" +
-	"\tmove_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bmoveTime\"\xc1\x02\n" +
+	"\tmove_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bmoveTime\"\xb3\x02\n" +
 	"\x12ListReportsRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
 	"page_token\x18\x02 \x01(\tR\tpageToken\x12A\n" +
-	"\bcategory\x18\x04 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryR\bcategory\x12\x19\n" +
-	"\bstore_id\x18\x05 \x01(\tR\astoreId\x12>\n" +
-	"\x05state\x18\x06 \x01(\x0e2(.hawkr.admin.seller.v1alpha1.ReportStateR\x05state\x12\x17\n" +
-	"\acase_id\x18\a \x01(\tR\x06caseId\x12*\n" +
-	"\x11citable_as_source\x18\b \x01(\bR\x0fcitableAsSourceJ\x04\b\x03\x10\x04R\x06status\"|\n" +
+	"\bcategory\x18\x03 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryR\bcategory\x12\x19\n" +
+	"\bstore_id\x18\x04 \x01(\tR\astoreId\x12>\n" +
+	"\x05state\x18\x05 \x01(\x0e2(.hawkr.admin.seller.v1alpha1.ReportStateR\x05state\x12\x17\n" +
+	"\acase_id\x18\x06 \x01(\tR\x06caseId\x12*\n" +
+	"\x11citable_as_source\x18\a \x01(\bR\x0fcitableAsSource\"|\n" +
 	"\x13ListReportsResponse\x12=\n" +
 	"\areports\x18\x01 \x03(\v2#.hawkr.admin.seller.v1alpha1.ReportR\areports\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"'\n" +
@@ -5848,12 +5848,12 @@ const file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x02R\x04etag\"`\n" +
 	"!MarkReportSupplementsSeenResponse\x12;\n" +
-	"\x06report\x18\x01 \x01(\v2#.hawkr.admin.seller.v1alpha1.ReportR\x06report\"\xf2\x01\n" +
+	"\x06report\x18\x01 \x01(\v2#.hawkr.admin.seller.v1alpha1.ReportR\x06report\"\xe2\x01\n" +
 	"\x13TriageReportRequest\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\x12W\n" +
 	"\x11assessed_category\x18\x02 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x02R\x10assessedCategory\x12D\n" +
-	"\x06target\x18\x05 \x01(\v2'.hawkr.admin.seller.v1alpha1.CaseTargetB\x03\xe0A\x02R\x06target\x12\x17\n" +
-	"\x04etag\x18\x04 \x01(\tB\x03\xe0A\x02R\x04etagJ\x04\b\x03\x10\x04R\bseverity\"S\n" +
+	"\x06target\x18\x03 \x01(\v2'.hawkr.admin.seller.v1alpha1.CaseTargetB\x03\xe0A\x02R\x06target\x12\x17\n" +
+	"\x04etag\x18\x04 \x01(\tB\x03\xe0A\x02R\x04etag\"S\n" +
 	"\x14TriageReportResponse\x12;\n" +
 	"\x06report\x18\x01 \x01(\v2#.hawkr.admin.seller.v1alpha1.ReportR\x06report\"\x9d\x01\n" +
 	"\x14ResolveReportRequest\x12\x13\n" +
@@ -5862,12 +5862,12 @@ const file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc = "" +
 	"\x04note\x18\x03 \x01(\tR\x04note\x12\x17\n" +
 	"\x04etag\x18\x04 \x01(\tB\x03\xe0A\x02R\x04etag\"T\n" +
 	"\x15ResolveReportResponse\x12;\n" +
-	"\x06report\x18\x01 \x01(\v2#.hawkr.admin.seller.v1alpha1.ReportR\x06report\"\xf0\x01\n" +
+	"\x06report\x18\x01 \x01(\v2#.hawkr.admin.seller.v1alpha1.ReportR\x06report\"\xe0\x01\n" +
 	"\x11MoveReportRequest\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\x12W\n" +
 	"\x11assessed_category\x18\x02 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x02R\x10assessedCategory\x12D\n" +
-	"\x06target\x18\x05 \x01(\v2'.hawkr.admin.seller.v1alpha1.CaseTargetB\x03\xe0A\x02R\x06target\x12\x17\n" +
-	"\x04etag\x18\x04 \x01(\tB\x03\xe0A\x02R\x04etagJ\x04\b\x03\x10\x04R\bseverity\"\x7f\n" +
+	"\x06target\x18\x03 \x01(\v2'.hawkr.admin.seller.v1alpha1.CaseTargetB\x03\xe0A\x02R\x06target\x12\x17\n" +
+	"\x04etag\x18\x04 \x01(\tB\x03\xe0A\x02R\x04etag\"\x7f\n" +
 	"\x12MoveReportResponse\x12;\n" +
 	"\x06report\x18\x01 \x01(\v2#.hawkr.admin.seller.v1alpha1.ReportR\x06report\x12,\n" +
 	"\x12source_case_closed\x18\x02 \x01(\bR\x10sourceCaseClosed\"\x93\x02\n" +
@@ -5933,24 +5933,23 @@ const file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc = "" +
 	"\x1bWithdrawCaseInquiryResponse\x12B\n" +
 	"\ainquiry\x18\x01 \x01(\v2(.hawkr.admin.seller.v1alpha1.CaseInquiryR\ainquiry\x125\n" +
 	"\x04case\x18\x02 \x01(\v2!.hawkr.admin.seller.v1alpha1.CaseR\x04case\x12+\n" +
-	"\x11already_withdrawn\x18\x03 \x01(\bR\x10alreadyWithdrawn\"\xa1\x05\n" +
+	"\x11already_withdrawn\x18\x03 \x01(\bR\x10alreadyWithdrawn\"\xd1\x04\n" +
 	"\x14CreateMeasureRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xe2\x8c\xcf\xd7\b\x02\b\x01R\trequestId\x12\x1e\n" +
 	"\bstore_id\x18\x02 \x01(\tB\x03\xe0A\x02R\astoreId\x12!\n" +
-	"\tstatement\x18\x04 \x01(\tB\x03\xe0A\x02R\tstatement\x12\x17\n" +
-	"\x04note\x18\a \x01(\tB\x03\xe0A\x02R\x04note\x12E\n" +
-	"\awarning\x18\v \x01(\v2).hawkr.admin.seller.v1alpha1.WarningInputH\x00R\awarning\x12N\n" +
+	"\tstatement\x18\x03 \x01(\tB\x03\xe0A\x02R\tstatement\x12\x17\n" +
+	"\x04note\x18\x04 \x01(\tB\x03\xe0A\x02R\x04note\x12E\n" +
+	"\awarning\x18\x05 \x01(\v2).hawkr.admin.seller.v1alpha1.WarningInputH\x00R\awarning\x12N\n" +
 	"\n" +
-	"suspension\x18\f \x01(\v2,.hawkr.admin.seller.v1alpha1.SuspensionInputH\x00R\n" +
+	"suspension\x18\x06 \x01(\v2,.hawkr.admin.seller.v1alpha1.SuspensionInputH\x00R\n" +
 	"suspension\x12Q\n" +
-	"\vtermination\x18\r \x01(\v2-.hawkr.admin.seller.v1alpha1.TerminationInputH\x00R\vtermination\x12^\n" +
-	"\x10content_takedown\x18\x10 \x01(\v21.hawkr.admin.seller.v1alpha1.ContentTakedownInputH\x00R\x0fcontentTakedown\x12$\n" +
-	"\x0esource_case_id\x18\x0e \x01(\tR\fsourceCaseId\x129\n" +
-	"\x19source_authority_order_id\x18\x0f \x01(\tR\x16sourceAuthorityOrderIdB\t\n" +
-	"\ameasureJ\x04\b\x03\x10\x04J\x04\b\x05\x10\x06J\x04\b\x06\x10\aJ\x04\b\b\x10\tJ\x04\b\t\x10\n" +
-	"J\x04\b\n" +
-	"\x10\vR\x04kindR\bend_timeR\treview_byR\tviolationR\x04risk\"^\n" +
+	"\vtermination\x18\a \x01(\v2-.hawkr.admin.seller.v1alpha1.TerminationInputH\x00R\vtermination\x12^\n" +
+	"\x10content_takedown\x18\b \x01(\v21.hawkr.admin.seller.v1alpha1.ContentTakedownInputH\x00R\x0fcontentTakedown\x12$\n" +
+	"\x0esource_case_id\x18\t \x01(\tR\fsourceCaseId\x129\n" +
+	"\x19source_authority_order_id\x18\n" +
+	" \x01(\tR\x16sourceAuthorityOrderIdB\t\n" +
+	"\ameasure\"^\n" +
 	"\fWarningInput\x12N\n" +
 	"\tviolation\x18\x01 \x01(\v2+.hawkr.admin.seller.v1alpha1.ViolationBasisB\x03\xe0A\x02R\tviolation\"\x95\x02\n" +
 	"\x0fSuspensionInput\x12K\n" +
@@ -5982,7 +5981,7 @@ const file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc = "" +
 	"\x11GetMeasureRequest\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\"T\n" +
 	"\x12GetMeasureResponse\x12>\n" +
-	"\ameasure\x18\x01 \x01(\v2$.hawkr.admin.seller.v1alpha1.MeasureR\ameasure\"\xf7\x04\n" +
+	"\ameasure\x18\x01 \x01(\v2$.hawkr.admin.seller.v1alpha1.MeasureR\ameasure\"\xca\x04\n" +
 	"\x13ListMeasuresRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
@@ -5993,14 +5992,13 @@ const file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc = "" +
 	"\x05state\x18\x05 \x01(\x0e2#.hawkr.seller.v1alpha1.MeasureStateR\x05state\x129\n" +
 	"\x05basis\x18\x06 \x01(\x0e2#.hawkr.seller.v1alpha1.MeasureBasisR\x05basis\x12\x1d\n" +
 	"\n" +
-	"review_due\x18\b \x01(\bR\treviewDue\x12O\n" +
-	"\rrequest_state\x18\n" +
-	" \x01(\x0e2*.hawkr.seller.v1alpha1.MeasureRequestStateR\frequestState\x12L\n" +
-	"\frequest_kind\x18\v \x01(\x0e2).hawkr.seller.v1alpha1.MeasureRequestKindR\vrequestKind\x12$\n" +
-	"\x0esource_case_id\x18\f \x01(\tR\fsourceCaseId\x12(\n" +
-	"\x10source_report_id\x18\r \x01(\tR\x0esourceReportId\x129\n" +
-	"\x19source_authority_order_id\x18\x0e \x01(\tR\x16sourceAuthorityOrderIdJ\x04\b\a\x10\bJ\x04\b\t\x10\n" +
-	"R\fappeal_stateR\x11remediation_state\"\x80\x01\n" +
+	"review_due\x18\a \x01(\bR\treviewDue\x12O\n" +
+	"\rrequest_state\x18\b \x01(\x0e2*.hawkr.seller.v1alpha1.MeasureRequestStateR\frequestState\x12L\n" +
+	"\frequest_kind\x18\t \x01(\x0e2).hawkr.seller.v1alpha1.MeasureRequestKindR\vrequestKind\x12$\n" +
+	"\x0esource_case_id\x18\n" +
+	" \x01(\tR\fsourceCaseId\x12(\n" +
+	"\x10source_report_id\x18\v \x01(\tR\x0esourceReportId\x129\n" +
+	"\x19source_authority_order_id\x18\f \x01(\tR\x16sourceAuthorityOrderId\"\x80\x01\n" +
 	"\x14ListMeasuresResponse\x12@\n" +
 	"\bmeasures\x18\x01 \x03(\v2$.hawkr.admin.seller.v1alpha1.MeasureR\bmeasures\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x9d\x01\n" +

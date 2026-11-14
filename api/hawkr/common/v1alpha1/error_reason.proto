@@ -18,52 +18,46 @@ enum ErrorReason {
   VERSION_CONFLICT = 1;
   // 賣家帳號停權中，這個操作不在停權時仍可做的範圍（搭配 permission_denied）。client 轉成賣家的停權狀態：
   // 顯示停權通知，並以 GetMyStore 讀停權的來源與原因。
-  SELLER_SUSPENDED = 3;
+  SELLER_SUSPENDED = 2;
   // 商家名單的聯絡方式與其他未封存（進行中或已入駐）的業者相同、而且沒有標記為不是同一家（搭配 failed_precondition）。ErrorInfo.metadata 的
   // prospectIds 是相符的業者 ID（十進位，由小到大以逗號連接）。client 顯示相符的業者，讓管理員選擇合併，或確認不是同一家後
   // 在請求帶上 confirmed_distinct_prospect_ids 再送一次（ADR 2026-10-04-prospect-contact-points-and-matching）。
-  PROSPECT_MATCH_FOUND = 4;
+  PROSPECT_MATCH_FOUND = 3;
   // 商家名單的統一編號已由另一筆未封存（進行中或已入駐）的業者持有：建立搭配 already_exists，修改與還原搭配
   // failed_precondition。ErrorInfo.metadata 的 prospectIds 是持有者的 ID（十進位，只有一筆，格式同
   // PROSPECT_MATCH_FOUND）。修改時持有者是進行中的，client 可以讓管理員與它合併；還原時是同一家就不需要還原
   // （ADR 2026-10-04-prospect-contact-points-and-matching）。
-  PROSPECT_TAX_ID_HELD = 10;
+  PROSPECT_TAX_ID_HELD = 4;
   // 賣家同意的入駐文件版本不是現行版本（搭配 failed_precondition）。client 重讀
   // seller.v1alpha1.SellerPublicService.GetSellerAgreements，顯示新版本，請賣家重新勾選後再送出。
-  AGREEMENT_OUTDATED = 6;
+  AGREEMENT_OUTDATED = 5;
   // 賣家做這個操作需要的前置條件沒有滿足（搭配 failed_precondition）：身分認證未核准，或店家正在隨帳號刪除。停權不用它，
   // 停權是 SELLER_SUSPENDED。ErrorInfo.metadata 的 missingRequirements 是缺的條件，值是
   // seller.v1alpha1.SellerRequirement 的值名（不加 SELLER_REQUIREMENT_ 前綴，例如 ONBOARDING_COMPLETE），依列舉的數字由小到大以逗號連接。client 先看 GetMyStore 的能力狀態，這個 reason 只是
   // 伺服器逐方法檢查的後備：重讀 GetMyStore，依缺的條件顯示。
-  SELLER_REQUIREMENT_MISSING = 7;
+  SELLER_REQUIREMENT_MISSING = 6;
   // 帳號停權中，不能申請開店（搭配 failed_precondition）；解除停權後可以再申請。client 顯示 LocalizedMessage，並導向措施與申覆。帳號同時有生效中的終止合作時是
   // STORE_OPENING_TERMINATED。
-  STORE_OPENING_SUSPENDED = 8;
+  STORE_OPENING_SUSPENDED = 7;
   // 帳號有生效中的終止合作（條款第 21.3 條；終止撤銷之前同一個帳號不能再開店），不能申請開店（搭配 failed_precondition）。client 顯示 LocalizedMessage，
   // 並導向措施與申覆。換身分認證被另一個帳號的終止擋下的情形不用它（隱私：不透露命中的帳號或欄位），那條路徑維持通用的 failed_precondition 與文字。
-  STORE_OPENING_TERMINATED = 9;
+  STORE_OPENING_TERMINATED = 8;
   // 帳號擁有商店，不能被停權（搭配 failed_precondition）：停權對店家、未結訂單與撥款的效果由賣家條款決定，條款定出之前有店的帳號不停權。
   // 只出現在後台與內部的處分路徑；client 顯示 LocalizedMessage，請營運先處理店家（措施或關店），再停權帳號。
-  ACCOUNT_HAS_STORE = 11;
+  ACCOUNT_HAS_STORE = 9;
   // 帳號停權中，這個操作是寫入，不在停權時仍可做的範圍（搭配 permission_denied）。停權的帳號仍能登入、讀取與刪除帳號：
   // client 轉成帳號的受限狀態，顯示停權通知，並以 identity.v1alpha1.IdentityAppService.GetSession 的 suspension 讀停權的狀態。
   // 舊 gateway 的 REST 路徑（/api/v1）沒有 ErrorInfo，停權的非 GET／HEAD 請求只回 403。
-  ACCOUNT_SUSPENDED = 12;
+  ACCOUNT_SUSPENDED = 10;
   // 要連結的登入方式（Google、LINE 的身分）已經連結到另一個帳號，包含已刪除帳號留下的身分（搭配 already_exists）；什麼都沒有改。
   // client 顯示 LocalizedMessage，請使用者改用那個帳號登入，或換一個登入方式。
   // IdentityAppService.LinkIdentity（web 的連結走 /api/auth，不在 Connect）。
-  IDENTITY_ALREADY_LINKED = 13;
+  IDENTITY_ALREADY_LINKED = 11;
   // 這個操作要求最近重新驗證過，而目前的 session 沒有（搭配 failed_precondition）：IdentityAppService.RevokeSession 要求目前的 session
   // 在 15 分鐘內以 provider 驗證過。client 引導使用者重新走一次登入（web 的 /api/auth/{provider}/start、App 的 ExchangeIdToken，
   // 登入會換發新 session），再重送。
-  REAUTHENTICATION_REQUIRED = 14;
+  REAUTHENTICATION_REQUIRED = 12;
   // 帳號沒有聯絡信箱（沒有 provider 驗證過的 email，也沒有自填的），不能送出 KYC 申請（搭配 failed_precondition）：SellerAppService.SubmitKYC。
   // client 引導使用者在 IdentityAppService.SetContactEmail 填一個，再重送。
-  CONTACT_EMAIL_REQUIRED = 15;
-  // 2 是刪掉的 PHONE_CODE_EXPIRED（新帳號不驗證手機，ADR 2026-09-27-identity-clerk）。
-  reserved 2;
-  reserved "PHONE_CODE_EXPIRED";
-  // 5 是刪掉的 ACCOUNT_HAS_OPEN_STORE（本人刪帳號時店家是參與者，不再要求先關店，ADR 2026-09-30-account-deletion-module 的修訂）。
-  reserved 5;
-  reserved "ACCOUNT_HAS_OPEN_STORE";
+  CONTACT_EMAIL_REQUIRED = 13;
 }

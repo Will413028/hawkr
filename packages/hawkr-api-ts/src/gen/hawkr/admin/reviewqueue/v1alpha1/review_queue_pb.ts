@@ -18,7 +18,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/admin/reviewqueue/v1alpha1/review_queue.proto.
  */
 export const file_hawkr_admin_reviewqueue_v1alpha1_review_queue: GenFile = /*@__PURE__*/
-  fileDesc("CjNoYXdrci9hZG1pbi9yZXZpZXdxdWV1ZS92MWFscGhhMS9yZXZpZXdfcXVldWUucHJvdG8SIGhhd2tyLmFkbWluLnJldmlld3F1ZXVlLnYxYWxwaGExIoUBChZMaXN0UmV2aWV3UXVldWVSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJEkQKBWtpbmRzGAMgAygOMjUuaGF3a3IuYWRtaW4ucmV2aWV3cXVldWUudjFhbHBoYTEuUmV2aWV3UXVldWVJdGVtS2luZCJ0ChdMaXN0UmV2aWV3UXVldWVSZXNwb25zZRJACgVpdGVtcxgBIAMoCzIxLmhhd2tyLmFkbWluLnJldmlld3F1ZXVlLnYxYWxwaGExLlJldmlld1F1ZXVlSXRlbRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkinwYKD1Jldmlld1F1ZXVlSXRlbRJICgRraW5kGAEgASgOMjUuaGF3a3IuYWRtaW4ucmV2aWV3cXVldWUudjFhbHBoYTEuUmV2aWV3UXVldWVJdGVtS2luZEID4EECEhMKCXJlcG9ydF9pZBgCIAEoCUgAEhEKB2Nhc2VfaWQYAyABKAlIABJICgxjYXNlX2lucXVpcnkYBCABKAsyMC5oYXdrci5hZG1pbi5yZXZpZXdxdWV1ZS52MWFscGhhMS5DYXNlSW5xdWlyeVJlZkgAEhwKEmF1dGhvcml0eV9vcmRlcl9pZBgFIAEoCUgAElAKEGF1dGhvcml0eV90YXJnZXQYBiABKAsyNC5oYXdrci5hZG1pbi5yZXZpZXdxdWV1ZS52MWFscGhhMS5BdXRob3JpdHlUYXJnZXRSZWZIABJOCg9tZWFzdXJlX3JlcXVlc3QYByABKAsyMy5oYXdrci5hZG1pbi5yZXZpZXdxdWV1ZS52MWFscGhhMS5NZWFzdXJlUmVxdWVzdFJlZkgAEhQKCm1lYXN1cmVfaWQYCCABKAlIABJOCg9reWNfYXBwbGljYXRpb24YCiABKAsyMy5oYXdrci5hZG1pbi5yZXZpZXdxdWV1ZS52MWFscGhhMS5LWUNBcHBsaWNhdGlvblJlZkgAEk4KD3BheW1lbnRfYWNjb3VudBgLIAEoCzIzLmhhd2tyLmFkbWluLnJldmlld3F1ZXVlLnYxYWxwaGExLlBheW1lbnRBY2NvdW50UmVmSAASVQoTc2hhcmVkX2JhbmtfYWNjb3VudBgMIAEoCzI2Lmhhd2tyLmFkbWluLnJldmlld3F1ZXVlLnYxYWxwaGExLlNoYXJlZEJhbmtBY2NvdW50UmVmSAASEAoIc3RvcmVfaWQYFCABKAkSEgoKc3RvcmVfbmFtZRgVIAEoCRI2CghkZWFkbGluZRgWIAEoCzIfLmhhd2tyLmNvbW1vbi52MWFscGhhMS5EZWFkbGluZUID4EECQgkKB3N1YmplY3RKBAgJEApSFGZvb2RfcmVnaXN0cmF0aW9uX2lkIjUKDkNhc2VJbnF1aXJ5UmVmEg8KB2Nhc2VfaWQYASABKAkSEgoKaW5xdWlyeV9pZBgCIAEoCSJMChJBdXRob3JpdHlUYXJnZXRSZWYSEAoIb3JkZXJfaWQYASABKAkSEAoIcG9zaXRpb24YAiABKAUSEgoKYWNjb3VudF9pZBgDIAEoCSI7ChFNZWFzdXJlUmVxdWVzdFJlZhISCgptZWFzdXJlX2lkGAEgASgJEhIKCnJlcXVlc3RfaWQYAiABKAkiJQoRUGF5bWVudEFjY291bnRSZWYSEAoIc3RvcmVfaWQYASABKAkiPgoUU2hhcmVkQmFua0FjY291bnRSZWYSEgoKbWVhc3VyZV9pZBgBIAEoCRISCgphY2NvdW50X2lkGAIgASgJIj0KEUtZQ0FwcGxpY2F0aW9uUmVmEhAKCHN0b3JlX2lkGAEgASgJEhYKDmFwcGxpY2F0aW9uX2lkGAIgASgJKs8FChNSZXZpZXdRdWV1ZUl0ZW1LaW5kEiYKIlJFVklFV19RVUVVRV9JVEVNX0tJTkRfVU5TUEVDSUZJRUQQABIoCiRSRVZJRVdfUVVFVUVfSVRFTV9LSU5EX1JFUE9SVF9UUklBR0UQARIoCiRSRVZJRVdfUVVFVUVfSVRFTV9LSU5EX0NBU0VfREVDSVNJT04QAhIvCitSRVZJRVdfUVVFVUVfSVRFTV9LSU5EX0NBU0VfSU5RVUlSWV9PVkVSRFVFEAMSKgomUkVWSUVXX1FVRVVFX0lURU1fS0lORF9BVVRIT1JJVFlfT1JERVIQBRIyCi5SRVZJRVdfUVVFVUVfSVRFTV9LSU5EX0FVVEhPUklUWV9UQVJHRVRfTk9USUNFEAYSKQolUkVWSUVXX1FVRVVFX0lURU1fS0lORF9NRUFTVVJFX0FQUEVBTBAHEi8KK1JFVklFV19RVUVVRV9JVEVNX0tJTkRfTUVBU1VSRV9MSUZUX1JFUVVFU1QQCBIpCiVSRVZJRVdfUVVFVUVfSVRFTV9LSU5EX01FQVNVUkVfUkVWSUVXEAkSKgomUkVWSUVXX1FVRVVFX0lURU1fS0lORF9LWUNfQVBQTElDQVRJT04QCxI4CjRSRVZJRVdfUVVFVUVfSVRFTV9LSU5EX1BBWU1FTlRfQUNDT1VOVF9DUkVBVEVfRkFJTEVEEA0SLgoqUkVWSUVXX1FVRVVFX0lURU1fS0lORF9TSEFSRURfQkFOS19BQ0NPVU5UEA4iBAgEEAQiBAgKEAoiBAgMEAwqKFJFVklFV19RVUVVRV9JVEVNX0tJTkRfQ0FTRV9GREFfUkVGRVJSQUwqKFJFVklFV19RVUVVRV9JVEVNX0tJTkRfRk9PRF9SRUdJU1RSQVRJT04qKFJFVklFV19RVUVVRV9JVEVNX0tJTkRfUEFZVU5JX0JJTkRfUkVUUlkypwEKF1Jldmlld1F1ZXVlQWRtaW5TZXJ2aWNlEosBCg9MaXN0UmV2aWV3UXVldWUSOC5oYXdrci5hZG1pbi5yZXZpZXdxdWV1ZS52MWFscGhhMS5MaXN0UmV2aWV3UXVldWVSZXF1ZXN0GjkuaGF3a3IuYWRtaW4ucmV2aWV3cXVldWUudjFhbHBoYTEuTGlzdFJldmlld1F1ZXVlUmVzcG9uc2UiA5ACAWIGcHJvdG8z", [file_hawkr_common_v1alpha1_deadline, file_google_api_field_behavior]);
+  fileDesc("CjNoYXdrci9hZG1pbi9yZXZpZXdxdWV1ZS92MWFscGhhMS9yZXZpZXdfcXVldWUucHJvdG8SIGhhd2tyLmFkbWluLnJldmlld3F1ZXVlLnYxYWxwaGExIoUBChZMaXN0UmV2aWV3UXVldWVSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJEkQKBWtpbmRzGAMgAygOMjUuaGF3a3IuYWRtaW4ucmV2aWV3cXVldWUudjFhbHBoYTEuUmV2aWV3UXVldWVJdGVtS2luZCJ0ChdMaXN0UmV2aWV3UXVldWVSZXNwb25zZRJACgVpdGVtcxgBIAMoCzIxLmhhd2tyLmFkbWluLnJldmlld3F1ZXVlLnYxYWxwaGExLlJldmlld1F1ZXVlSXRlbRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkigwYKD1Jldmlld1F1ZXVlSXRlbRJICgRraW5kGAEgASgOMjUuaGF3a3IuYWRtaW4ucmV2aWV3cXVldWUudjFhbHBoYTEuUmV2aWV3UXVldWVJdGVtS2luZEID4EECEhMKCXJlcG9ydF9pZBgCIAEoCUgAEhEKB2Nhc2VfaWQYAyABKAlIABJICgxjYXNlX2lucXVpcnkYBCABKAsyMC5oYXdrci5hZG1pbi5yZXZpZXdxdWV1ZS52MWFscGhhMS5DYXNlSW5xdWlyeVJlZkgAEhwKEmF1dGhvcml0eV9vcmRlcl9pZBgFIAEoCUgAElAKEGF1dGhvcml0eV90YXJnZXQYBiABKAsyNC5oYXdrci5hZG1pbi5yZXZpZXdxdWV1ZS52MWFscGhhMS5BdXRob3JpdHlUYXJnZXRSZWZIABJOCg9tZWFzdXJlX3JlcXVlc3QYByABKAsyMy5oYXdrci5hZG1pbi5yZXZpZXdxdWV1ZS52MWFscGhhMS5NZWFzdXJlUmVxdWVzdFJlZkgAEhQKCm1lYXN1cmVfaWQYCCABKAlIABJOCg9reWNfYXBwbGljYXRpb24YCSABKAsyMy5oYXdrci5hZG1pbi5yZXZpZXdxdWV1ZS52MWFscGhhMS5LWUNBcHBsaWNhdGlvblJlZkgAEk4KD3BheW1lbnRfYWNjb3VudBgKIAEoCzIzLmhhd2tyLmFkbWluLnJldmlld3F1ZXVlLnYxYWxwaGExLlBheW1lbnRBY2NvdW50UmVmSAASVQoTc2hhcmVkX2JhbmtfYWNjb3VudBgLIAEoCzI2Lmhhd2tyLmFkbWluLnJldmlld3F1ZXVlLnYxYWxwaGExLlNoYXJlZEJhbmtBY2NvdW50UmVmSAASEAoIc3RvcmVfaWQYDCABKAkSEgoKc3RvcmVfbmFtZRgNIAEoCRI2CghkZWFkbGluZRgOIAEoCzIfLmhhd2tyLmNvbW1vbi52MWFscGhhMS5EZWFkbGluZUID4EECQgkKB3N1YmplY3QiNQoOQ2FzZUlucXVpcnlSZWYSDwoHY2FzZV9pZBgBIAEoCRISCgppbnF1aXJ5X2lkGAIgASgJIkwKEkF1dGhvcml0eVRhcmdldFJlZhIQCghvcmRlcl9pZBgBIAEoCRIQCghwb3NpdGlvbhgCIAEoBRISCgphY2NvdW50X2lkGAMgASgJIjsKEU1lYXN1cmVSZXF1ZXN0UmVmEhIKCm1lYXN1cmVfaWQYASABKAkSEgoKcmVxdWVzdF9pZBgCIAEoCSIlChFQYXltZW50QWNjb3VudFJlZhIQCghzdG9yZV9pZBgBIAEoCSI+ChRTaGFyZWRCYW5rQWNjb3VudFJlZhISCgptZWFzdXJlX2lkGAEgASgJEhIKCmFjY291bnRfaWQYAiABKAkiPQoRS1lDQXBwbGljYXRpb25SZWYSEAoIc3RvcmVfaWQYASABKAkSFgoOYXBwbGljYXRpb25faWQYAiABKAkqvwQKE1Jldmlld1F1ZXVlSXRlbUtpbmQSJgoiUkVWSUVXX1FVRVVFX0lURU1fS0lORF9VTlNQRUNJRklFRBAAEigKJFJFVklFV19RVUVVRV9JVEVNX0tJTkRfUkVQT1JUX1RSSUFHRRABEigKJFJFVklFV19RVUVVRV9JVEVNX0tJTkRfQ0FTRV9ERUNJU0lPThACEi8KK1JFVklFV19RVUVVRV9JVEVNX0tJTkRfQ0FTRV9JTlFVSVJZX09WRVJEVUUQAxIqCiZSRVZJRVdfUVVFVUVfSVRFTV9LSU5EX0FVVEhPUklUWV9PUkRFUhAEEjIKLlJFVklFV19RVUVVRV9JVEVNX0tJTkRfQVVUSE9SSVRZX1RBUkdFVF9OT1RJQ0UQBRIpCiVSRVZJRVdfUVVFVUVfSVRFTV9LSU5EX01FQVNVUkVfQVBQRUFMEAYSLworUkVWSUVXX1FVRVVFX0lURU1fS0lORF9NRUFTVVJFX0xJRlRfUkVRVUVTVBAHEikKJVJFVklFV19RVUVVRV9JVEVNX0tJTkRfTUVBU1VSRV9SRVZJRVcQCBIqCiZSRVZJRVdfUVVFVUVfSVRFTV9LSU5EX0tZQ19BUFBMSUNBVElPThAJEjgKNFJFVklFV19RVUVVRV9JVEVNX0tJTkRfUEFZTUVOVF9BQ0NPVU5UX0NSRUFURV9GQUlMRUQQChIuCipSRVZJRVdfUVVFVUVfSVRFTV9LSU5EX1NIQVJFRF9CQU5LX0FDQ09VTlQQCzKnAQoXUmV2aWV3UXVldWVBZG1pblNlcnZpY2USiwEKD0xpc3RSZXZpZXdRdWV1ZRI4Lmhhd2tyLmFkbWluLnJldmlld3F1ZXVlLnYxYWxwaGExLkxpc3RSZXZpZXdRdWV1ZVJlcXVlc3QaOS5oYXdrci5hZG1pbi5yZXZpZXdxdWV1ZS52MWFscGhhMS5MaXN0UmV2aWV3UXVldWVSZXNwb25zZSIDkAIBYgZwcm90bzM", [file_hawkr_common_v1alpha1_deadline, file_google_api_field_behavior]);
 
 /**
  * @generated from message hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueRequest
@@ -137,19 +137,19 @@ export type ReviewQueueItem = Message<"hawkr.admin.reviewqueue.v1alpha1.ReviewQu
     case: "measureId";
   } | {
     /**
-     * @generated from field: hawkr.admin.reviewqueue.v1alpha1.KYCApplicationRef kyc_application = 10;
+     * @generated from field: hawkr.admin.reviewqueue.v1alpha1.KYCApplicationRef kyc_application = 9;
      */
     value: KYCApplicationRef;
     case: "kycApplication";
   } | {
     /**
-     * @generated from field: hawkr.admin.reviewqueue.v1alpha1.PaymentAccountRef payment_account = 11;
+     * @generated from field: hawkr.admin.reviewqueue.v1alpha1.PaymentAccountRef payment_account = 10;
      */
     value: PaymentAccountRef;
     case: "paymentAccount";
   } | {
     /**
-     * @generated from field: hawkr.admin.reviewqueue.v1alpha1.SharedBankAccountRef shared_bank_account = 12;
+     * @generated from field: hawkr.admin.reviewqueue.v1alpha1.SharedBankAccountRef shared_bank_account = 11;
      */
     value: SharedBankAccountRef;
     case: "sharedBankAccount";
@@ -158,21 +158,21 @@ export type ReviewQueueItem = Message<"hawkr.admin.reviewqueue.v1alpha1.ReviewQu
   /**
    * 對象所屬的店家；空字串表示這個項目沒有單一店家（例如來函）。
    *
-   * @generated from field: string store_id = 20;
+   * @generated from field: string store_id = 12;
    */
   storeId: string;
 
   /**
    * 店名；沒有店家或店家的個資已清理時是空字串（client 顯示「店家 {id}」）。
    *
-   * @generated from field: string store_name = 21;
+   * @generated from field: string store_name = 13;
    */
   storeName: string;
 
   /**
    * 這件待辦的開始時間與期限。
    *
-   * @generated from field: hawkr.common.v1alpha1.Deadline deadline = 22;
+   * @generated from field: hawkr.common.v1alpha1.Deadline deadline = 14;
    */
   deadline?: Deadline | undefined;
 };
@@ -367,58 +367,58 @@ export enum ReviewQueueItemKind {
   /**
    * 處理中的主管機關來函（subject 是 authority_order_id）。
    *
-   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_AUTHORITY_ORDER = 5;
+   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_AUTHORITY_ORDER = 4;
    */
-  AUTHORITY_ORDER = 5,
+  AUTHORITY_ORDER = 4,
 
   /**
    * 來函中暫不告知的對象，確認日期已到，要確認是否可以告知（subject 是 authority_target）。
    *
-   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_AUTHORITY_TARGET_NOTICE = 6;
+   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_AUTHORITY_TARGET_NOTICE = 5;
    */
-  AUTHORITY_TARGET_NOTICE = 6,
+  AUTHORITY_TARGET_NOTICE = 5,
 
   /**
    * 待裁定的申覆（subject 是 measure_request）。
    *
-   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_MEASURE_APPEAL = 7;
+   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_MEASURE_APPEAL = 6;
    */
-  MEASURE_APPEAL = 7,
+  MEASURE_APPEAL = 6,
 
   /**
    * 待裁定的解除請求（subject 是 measure_request）。
    *
-   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_MEASURE_LIFT_REQUEST = 8;
+   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_MEASURE_LIFT_REQUEST = 7;
    */
-  MEASURE_LIFT_REQUEST = 8,
+  MEASURE_LIFT_REQUEST = 7,
 
   /**
    * 複審期限將到的風險停權（subject 是 measure_id）。
    *
-   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW = 9;
+   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW = 8;
    */
-  MEASURE_REVIEW = 9,
+  MEASURE_REVIEW = 8,
 
   /**
    * 待審核的商家認證（subject 是 kyc_application）。
    *
-   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION = 11;
+   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION = 9;
    */
-  KYC_APPLICATION = 11,
+  KYC_APPLICATION = 9,
 
   /**
    * 建立重試用完的收款帳戶，等管理員重試建立（subject 是 payment_account）。
    *
-   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED = 13;
+   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED = 10;
    */
-  PAYMENT_ACCOUNT_CREATE_FAILED = 13,
+  PAYMENT_ACCOUNT_CREATE_FAILED = 10,
 
   /**
    * 處分建立之後，又有別的帳號同步了與被處分帳號相同的銀行帳號 fingerprint，等管理員在處分頁檢視這個關聯帳號（subject 是 shared_bank_account）。
    *
-   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT = 14;
+   * @generated from enum value: REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT = 11;
    */
-  SHARED_BANK_ACCOUNT = 14,
+  SHARED_BANK_ACCOUNT = 11,
 }
 
 /**

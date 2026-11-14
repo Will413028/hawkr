@@ -41,18 +41,18 @@ type Role int32
 
 const (
 	Role_ROLE_UNSPECIFIED Role = 0
-	Role_ROLE_SELLER      Role = 2
+	Role_ROLE_SELLER      Role = 1
 )
 
 // Enum value maps for Role.
 var (
 	Role_name = map[int32]string{
 		0: "ROLE_UNSPECIFIED",
-		2: "ROLE_SELLER",
+		1: "ROLE_SELLER",
 	}
 	Role_value = map[string]int32{
 		"ROLE_UNSPECIFIED": 0,
-		"ROLE_SELLER":      2,
+		"ROLE_SELLER":      1,
 	}
 )
 
@@ -1160,15 +1160,15 @@ func (*GetSessionRequest) Descriptor() ([]byte, []int) {
 
 type GetSessionResponse struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
-	Account *Account               `protobuf:"bytes,2,opt,name=account,proto3" json:"account,omitempty"`
+	Account *Account               `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
 	// 帳號被停權時的狀態；沒有停權時不設。停權的帳號仍能登入、讀取與刪除帳號，寫入回 permission_denied 與
 	// hawkr.common.v1alpha1.ErrorReason.ACCOUNT_SUSPENDED。
-	Suspension *Suspension `protobuf:"bytes,3,opt,name=suspension,proto3" json:"suspension,omitempty"`
+	Suspension *Suspension `protobuf:"bytes,2,opt,name=suspension,proto3" json:"suspension,omitempty"`
 	// 買家的顯示名稱（頁首與帳號選單用），與 BuyerAppService 的 Profile.display_name 同一份。讀取買家資料失敗時不設；
 	// 登入狀態不受影響，client 不可把沒有這個欄位當成未登入。
-	DisplayName string `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	DisplayName string `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	// 買家的頭像，與 Profile.avatar 同一份。沒有頭像、或讀取買家資料失敗時不設。
-	Avatar        *v1alpha1.Image `protobuf:"bytes,5,opt,name=avatar,proto3" json:"avatar,omitempty"`
+	Avatar        *v1alpha1.Image `protobuf:"bytes,4,opt,name=avatar,proto3" json:"avatar,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1585,10 +1585,10 @@ var File_hawkr_identity_v1alpha1_identity_proto protoreflect.FileDescriptor
 
 const file_hawkr_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"\n" +
-	"&hawkr/identity/v1alpha1/identity.proto\x12\x17hawkr.identity.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\"\x84\x01\n" +
+	"&hawkr/identity/v1alpha1/identity.proto\x12\x17hawkr.identity.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\"X\n" +
 	"\aAccount\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x128\n" +
-	"\x05roles\x18\x02 \x03(\x0e2\x1d.hawkr.identity.v1alpha1.RoleB\x03\xe0A\x03R\x05rolesJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\vactive_roleR\vperspective\"\x1b\n" +
+	"\x05roles\x18\x02 \x03(\x0e2\x1d.hawkr.identity.v1alpha1.RoleB\x03\xe0A\x03R\x05roles\"\x1b\n" +
 	"\x19IssueAppLoginNonceRequest\"y\n" +
 	"\x1aIssueAppLoginNonceResponse\x12\x19\n" +
 	"\x05nonce\x18\x01 \x01(\tB\x03\xe0A\x03R\x05nonce\x12@\n" +
@@ -1636,14 +1636,14 @@ const file_hawkr_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"createTime\x12C\n" +
 	"\rlast_use_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\vlastUseTime\x12\x1d\n" +
 	"\acurrent\x18\x05 \x01(\bB\x03\xe0A\x03R\acurrent\"\x13\n" +
-	"\x11GetSessionRequest\"\x83\x02\n" +
+	"\x11GetSessionRequest\"\xfd\x01\n" +
 	"\x12GetSessionResponse\x12:\n" +
-	"\aaccount\x18\x02 \x01(\v2 .hawkr.identity.v1alpha1.AccountR\aaccount\x12H\n" +
+	"\aaccount\x18\x01 \x01(\v2 .hawkr.identity.v1alpha1.AccountR\aaccount\x12H\n" +
 	"\n" +
-	"suspension\x18\x03 \x01(\v2#.hawkr.identity.v1alpha1.SuspensionB\x03\xe0A\x03R\n" +
+	"suspension\x18\x02 \x01(\v2#.hawkr.identity.v1alpha1.SuspensionB\x03\xe0A\x03R\n" +
 	"suspension\x12&\n" +
-	"\fdisplay_name\x18\x04 \x01(\tB\x03\xe0A\x03R\vdisplayName\x129\n" +
-	"\x06avatar\x18\x05 \x01(\v2\x1c.hawkr.common.v1alpha1.ImageB\x03\xe0A\x03R\x06avatarJ\x04\b\x01\x10\x02\"P\n" +
+	"\fdisplay_name\x18\x03 \x01(\tB\x03\xe0A\x03R\vdisplayName\x129\n" +
+	"\x06avatar\x18\x04 \x01(\v2\x1c.hawkr.common.v1alpha1.ImageB\x03\xe0A\x03R\x06avatar\"P\n" +
 	"\n" +
 	"Suspension\x12B\n" +
 	"\fsuspended_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\vsuspendedAt\"\x16\n" +
@@ -1663,11 +1663,10 @@ const file_hawkr_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"\x16SetContactEmailRequest\x12\x19\n" +
 	"\x05email\x18\x01 \x01(\tB\x03\xe0A\x02R\x05email\"e\n" +
 	"\x17SetContactEmailResponse\x12J\n" +
-	"\rcontact_email\x18\x01 \x01(\v2%.hawkr.identity.v1alpha1.ContactEmailR\fcontactEmail*?\n" +
+	"\rcontact_email\x18\x01 \x01(\v2%.hawkr.identity.v1alpha1.ContactEmailR\fcontactEmail*-\n" +
 	"\x04Role\x12\x14\n" +
 	"\x10ROLE_UNSPECIFIED\x10\x00\x12\x0f\n" +
-	"\vROLE_SELLER\x10\x02\"\x04\b\x01\x10\x01*\n" +
-	"ROLE_BUYER*c\n" +
+	"\vROLE_SELLER\x10\x01*c\n" +
 	"\rLoginProvider\x12\x1e\n" +
 	"\x1aLOGIN_PROVIDER_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15LOGIN_PROVIDER_GOOGLE\x10\x01\x12\x17\n" +

@@ -27,18 +27,13 @@ const Role$json = {
   '1': 'Role',
   '2': [
     {'1': 'ROLE_UNSPECIFIED', '2': 0},
-    {'1': 'ROLE_SELLER', '2': 2},
+    {'1': 'ROLE_SELLER', '2': 1},
   ],
-  '4': [
-    {'1': 1, '2': 1},
-  ],
-  '5': ['ROLE_BUYER'],
 };
 
 /// Descriptor for `Role`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List roleDescriptor = $convert.base64Decode(
-    'CgRSb2xlEhQKEFJPTEVfVU5TUEVDSUZJRUQQABIPCgtST0xFX1NFTExFUhACIgQIARABKgpST0'
-    'xFX0JVWUVS');
+    'CgRSb2xlEhQKEFJPTEVfVU5TUEVDSUZJRUQQABIPCgtST0xFX1NFTExFUhAB');
 
 @$core.Deprecated('Use loginProviderDescriptor instead')
 const LoginProvider$json = {
@@ -101,19 +96,12 @@ const Account$json = {
       '10': 'roles'
     },
   ],
-  '9': [
-    {'1': 3, '2': 4},
-    {'1': 4, '2': 5},
-    {'1': 5, '2': 6},
-  ],
-  '10': ['active_role', 'perspective'],
 };
 
 /// Descriptor for `Account`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List accountDescriptor = $convert.base64Decode(
     'CgdBY2NvdW50EhMKAmlkGAEgASgJQgPgQQhSAmlkEjgKBXJvbGVzGAIgAygOMh0uaGF3a3IuaW'
-    'RlbnRpdHkudjFhbHBoYTEuUm9sZUID4EEDUgVyb2xlc0oECAMQBEoECAQQBUoECAUQBlILYWN0'
-    'aXZlX3JvbGVSC3BlcnNwZWN0aXZl');
+    'RlbnRpdHkudjFhbHBoYTEuUm9sZUID4EEDUgVyb2xlcw==');
 
 @$core.Deprecated('Use issueAppLoginNonceRequestDescriptor instead')
 const IssueAppLoginNonceRequest$json = {
@@ -441,7 +429,7 @@ const GetSessionResponse$json = {
   '2': [
     {
       '1': 'account',
-      '3': 2,
+      '3': 1,
       '4': 1,
       '5': 11,
       '6': '.hawkr.identity.v1alpha1.Account',
@@ -449,17 +437,17 @@ const GetSessionResponse$json = {
     },
     {
       '1': 'suspension',
-      '3': 3,
+      '3': 2,
       '4': 1,
       '5': 11,
       '6': '.hawkr.identity.v1alpha1.Suspension',
       '8': {},
       '10': 'suspension'
     },
-    {'1': 'display_name', '3': 4, '4': 1, '5': 9, '8': {}, '10': 'displayName'},
+    {'1': 'display_name', '3': 3, '4': 1, '5': 9, '8': {}, '10': 'displayName'},
     {
       '1': 'avatar',
-      '3': 5,
+      '3': 4,
       '4': 1,
       '5': 11,
       '6': '.hawkr.common.v1alpha1.Image',
@@ -467,18 +455,15 @@ const GetSessionResponse$json = {
       '10': 'avatar'
     },
   ],
-  '9': [
-    {'1': 1, '2': 2},
-  ],
 };
 
 /// Descriptor for `GetSessionResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List getSessionResponseDescriptor = $convert.base64Decode(
-    'ChJHZXRTZXNzaW9uUmVzcG9uc2USOgoHYWNjb3VudBgCIAEoCzIgLmhhd2tyLmlkZW50aXR5Ln'
-    'YxYWxwaGExLkFjY291bnRSB2FjY291bnQSSAoKc3VzcGVuc2lvbhgDIAEoCzIjLmhhd2tyLmlk'
+    'ChJHZXRTZXNzaW9uUmVzcG9uc2USOgoHYWNjb3VudBgBIAEoCzIgLmhhd2tyLmlkZW50aXR5Ln'
+    'YxYWxwaGExLkFjY291bnRSB2FjY291bnQSSAoKc3VzcGVuc2lvbhgCIAEoCzIjLmhhd2tyLmlk'
     'ZW50aXR5LnYxYWxwaGExLlN1c3BlbnNpb25CA+BBA1IKc3VzcGVuc2lvbhImCgxkaXNwbGF5X2'
-    '5hbWUYBCABKAlCA+BBA1ILZGlzcGxheU5hbWUSOQoGYXZhdGFyGAUgASgLMhwuaGF3a3IuY29t'
-    'bW9uLnYxYWxwaGExLkltYWdlQgPgQQNSBmF2YXRhckoECAEQAg==');
+    '5hbWUYAyABKAlCA+BBA1ILZGlzcGxheU5hbWUSOQoGYXZhdGFyGAQgASgLMhwuaGF3a3IuY29t'
+    'bW9uLnYxYWxwaGExLkltYWdlQgPgQQNSBmF2YXRhcg==');
 
 @$core.Deprecated('Use suspensionDescriptor instead')
 const Suspension$json = {

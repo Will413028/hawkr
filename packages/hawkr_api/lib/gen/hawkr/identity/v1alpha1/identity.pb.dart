@@ -1222,12 +1222,12 @@ class GetSessionResponse extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.identity.v1alpha1'),
       createEmptyInstance: GetSessionResponse.$_createMessage)
-    ..aOM<Account>(2, _omitFieldNames ? '' : 'account',
+    ..aOM<Account>(1, _omitFieldNames ? '' : 'account',
         subBuilder: Account.$_createMessage)
-    ..aOM<Suspension>(3, _omitFieldNames ? '' : 'suspension',
+    ..aOM<Suspension>(2, _omitFieldNames ? '' : 'suspension',
         subBuilder: Suspension.$_createMessage)
-    ..aOS(4, _omitFieldNames ? '' : 'displayName')
-    ..aOM<$2.Image>(5, _omitFieldNames ? '' : 'avatar',
+    ..aOS(3, _omitFieldNames ? '' : 'displayName')
+    ..aOM<$2.Image>(4, _omitFieldNames ? '' : 'avatar',
         subBuilder: $2.Image.$_createMessage)
     ..hasRequiredFields = false;
 
@@ -1253,51 +1253,51 @@ class GetSessionResponse extends $pb.GeneratedMessage {
           GetSessionResponse.$_createMessage);
   static GetSessionResponse? _defaultInstance;
 
-  @$pb.TagNumber(2)
+  @$pb.TagNumber(1)
   Account get account => $_getN(0);
-  @$pb.TagNumber(2)
-  set account(Account value) => $_setField(2, value);
-  @$pb.TagNumber(2)
+  @$pb.TagNumber(1)
+  set account(Account value) => $_setField(1, value);
+  @$pb.TagNumber(1)
   $core.bool hasAccount() => $_has(0);
-  @$pb.TagNumber(2)
-  void clearAccount() => $_clearField(2);
-  @$pb.TagNumber(2)
+  @$pb.TagNumber(1)
+  void clearAccount() => $_clearField(1);
+  @$pb.TagNumber(1)
   Account ensureAccount() => $_ensure(0);
 
   /// 帳號被停權時的狀態；沒有停權時不設。停權的帳號仍能登入、讀取與刪除帳號，寫入回 permission_denied 與
   /// hawkr.common.v1alpha1.ErrorReason.ACCOUNT_SUSPENDED。
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   Suspension get suspension => $_getN(1);
-  @$pb.TagNumber(3)
-  set suspension(Suspension value) => $_setField(3, value);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
+  set suspension(Suspension value) => $_setField(2, value);
+  @$pb.TagNumber(2)
   $core.bool hasSuspension() => $_has(1);
-  @$pb.TagNumber(3)
-  void clearSuspension() => $_clearField(3);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
+  void clearSuspension() => $_clearField(2);
+  @$pb.TagNumber(2)
   Suspension ensureSuspension() => $_ensure(1);
 
   /// 買家的顯示名稱（頁首與帳號選單用），與 BuyerAppService 的 Profile.display_name 同一份。讀取買家資料失敗時不設；
   /// 登入狀態不受影響，client 不可把沒有這個欄位當成未登入。
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   $core.String get displayName => $_getSZ(2);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   set displayName($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   $core.bool hasDisplayName() => $_has(2);
-  @$pb.TagNumber(4)
-  void clearDisplayName() => $_clearField(4);
+  @$pb.TagNumber(3)
+  void clearDisplayName() => $_clearField(3);
 
   /// 買家的頭像，與 Profile.avatar 同一份。沒有頭像、或讀取買家資料失敗時不設。
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
   $2.Image get avatar => $_getN(3);
-  @$pb.TagNumber(5)
-  set avatar($2.Image value) => $_setField(5, value);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
+  set avatar($2.Image value) => $_setField(4, value);
+  @$pb.TagNumber(4)
   $core.bool hasAvatar() => $_has(3);
-  @$pb.TagNumber(5)
-  void clearAvatar() => $_clearField(5);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
+  void clearAvatar() => $_clearField(4);
+  @$pb.TagNumber(4)
   $2.Image ensureAvatar() => $_ensure(3);
 }
 

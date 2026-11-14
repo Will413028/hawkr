@@ -173,7 +173,7 @@ class RecommendedSeller extends $pb.GeneratedMessage {
       createEmptyInstance: RecommendedSeller.$_createMessage)
     ..aOM<$0.StoreCard>(1, _omitFieldNames ? '' : 'store',
         subBuilder: $0.StoreCard.$_createMessage)
-    ..aI(4, _omitFieldNames ? '' : 'followerCount')
+    ..aI(2, _omitFieldNames ? '' : 'followerCount')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -210,15 +210,16 @@ class RecommendedSeller extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   $0.StoreCard ensureStore() => $_ensure(0);
 
+  /// 評價數與平均評分由卡片提供（store.review_count、store.rating_average）；排名用的評價只留在快照內。
   /// 粉絲數；0 是確實沒有粉絲，讀取失敗時不設。
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(2)
   $core.int get followerCount => $_getIZ(1);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(2)
   set followerCount($core.int value) => $_setSignedInt32(1, value);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(2)
   $core.bool hasFollowerCount() => $_has(1);
-  @$pb.TagNumber(4)
-  void clearFollowerCount() => $_clearField(4);
+  @$pb.TagNumber(2)
+  void clearFollowerCount() => $_clearField(2);
 }
 
 /// DiscoveryPublicService 是任何人都能讀的探索資料，不需要登入。

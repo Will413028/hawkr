@@ -165,22 +165,22 @@ type LinkedIdentity int32
 const (
 	LinkedIdentity_LINKED_IDENTITY_UNSPECIFIED LinkedIdentity = 0
 	// 統一編號相同。
-	LinkedIdentity_LINKED_IDENTITY_UBN LinkedIdentity = 2
+	LinkedIdentity_LINKED_IDENTITY_UBN LinkedIdentity = 1
 	// 金流商回報的銀行帳號指紋相同。只列出，不能據以建立關聯終止（can_create_linked_termination 為 false，除非同時命中統一編號）。
-	LinkedIdentity_LINKED_IDENTITY_BANK_ACCOUNT LinkedIdentity = 4
+	LinkedIdentity_LINKED_IDENTITY_BANK_ACCOUNT LinkedIdentity = 2
 )
 
 // Enum value maps for LinkedIdentity.
 var (
 	LinkedIdentity_name = map[int32]string{
 		0: "LINKED_IDENTITY_UNSPECIFIED",
-		2: "LINKED_IDENTITY_UBN",
-		4: "LINKED_IDENTITY_BANK_ACCOUNT",
+		1: "LINKED_IDENTITY_UBN",
+		2: "LINKED_IDENTITY_BANK_ACCOUNT",
 	}
 	LinkedIdentity_value = map[string]int32{
 		"LINKED_IDENTITY_UNSPECIFIED":  0,
-		"LINKED_IDENTITY_UBN":          2,
-		"LINKED_IDENTITY_BANK_ACCOUNT": 4,
+		"LINKED_IDENTITY_UBN":          1,
+		"LINKED_IDENTITY_BANK_ACCOUNT": 2,
 	}
 )
 
@@ -726,60 +726,60 @@ type Measure struct {
 	RevokeTime *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=revoke_time,json=revokeTime,proto3" json:"revoke_time,omitempty"`
 	// 期間；警告不設。
 	Period           *v1alpha11.MeasurePeriod `protobuf:"bytes,15,opt,name=period,proto3" json:"period,omitempty"`
-	CreatedByAdminId string                   `protobuf:"bytes,17,opt,name=created_by_admin_id,json=createdByAdminId,proto3" json:"created_by_admin_id,omitempty"`
-	CreateTime       *timestamppb.Timestamp   `protobuf:"bytes,18,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
-	UpdateTime       *timestamppb.Timestamp   `protobuf:"bytes,19,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	CreatedByAdminId string                   `protobuf:"bytes,16,opt,name=created_by_admin_id,json=createdByAdminId,proto3" json:"created_by_admin_id,omitempty"`
+	CreateTime       *timestamppb.Timestamp   `protobuf:"bytes,17,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	UpdateTime       *timestamppb.Timestamp   `protobuf:"bytes,18,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	// 由 version 產生：版本、狀態、複審期限、請求狀態改變時變；寫內部註記不變。
-	Etag string `protobuf:"bytes,20,opt,name=etag,proto3" json:"etag,omitempty"`
+	Etag string `protobuf:"bytes,19,opt,name=etag,proto3" json:"etag,omitempty"`
 	// 目前的版本，是 revisions 裡最後一版的 revision。
-	CurrentRevision int32 `protobuf:"varint,21,opt,name=current_revision,json=currentRevision,proto3" json:"current_revision,omitempty"`
+	CurrentRevision int32 `protobuf:"varint,20,opt,name=current_revision,json=currentRevision,proto3" json:"current_revision,omitempty"`
 	// 全部版本，舊到新；只有單筆讀取與寫入的回應帶，清單不設。
-	Revisions []*MeasureRevision `protobuf:"bytes,22,rep,name=revisions,proto3" json:"revisions,omitempty"`
+	Revisions []*MeasureRevision `protobuf:"bytes,21,rep,name=revisions,proto3" json:"revisions,omitempty"`
 	// 以下 can_* 由伺服器判斷，與對應方法的前置檢查是同一個規則（model/measure.go）。
-	CanUpdateStatement bool `protobuf:"varint,23,opt,name=can_update_statement,json=canUpdateStatement,proto3" json:"can_update_statement,omitempty"`
-	CanExtend          bool `protobuf:"varint,24,opt,name=can_extend,json=canExtend,proto3" json:"can_extend,omitempty"`
-	CanShorten         bool `protobuf:"varint,25,opt,name=can_shorten,json=canShorten,proto3" json:"can_shorten,omitempty"`
+	CanUpdateStatement bool `protobuf:"varint,22,opt,name=can_update_statement,json=canUpdateStatement,proto3" json:"can_update_statement,omitempty"`
+	CanExtend          bool `protobuf:"varint,23,opt,name=can_extend,json=canExtend,proto3" json:"can_extend,omitempty"`
+	CanShorten         bool `protobuf:"varint,24,opt,name=can_shorten,json=canShorten,proto3" json:"can_shorten,omitempty"`
 	// 不看店家是否關閉（措施以帳號為範圍）。
-	CanEnd            bool `protobuf:"varint,26,opt,name=can_end,json=canEnd,proto3" json:"can_end,omitempty"`
-	CanRevoke         bool `protobuf:"varint,27,opt,name=can_revoke,json=canRevoke,proto3" json:"can_revoke,omitempty"`
-	CanScheduleReview bool `protobuf:"varint,28,opt,name=can_schedule_review,json=canScheduleReview,proto3" json:"can_schedule_review,omitempty"`
-	CanDecideAppeal   bool `protobuf:"varint,29,opt,name=can_decide_appeal,json=canDecideAppeal,proto3" json:"can_decide_appeal,omitempty"`
+	CanEnd            bool `protobuf:"varint,25,opt,name=can_end,json=canEnd,proto3" json:"can_end,omitempty"`
+	CanRevoke         bool `protobuf:"varint,26,opt,name=can_revoke,json=canRevoke,proto3" json:"can_revoke,omitempty"`
+	CanScheduleReview bool `protobuf:"varint,27,opt,name=can_schedule_review,json=canScheduleReview,proto3" json:"can_schedule_review,omitempty"`
+	CanDecideAppeal   bool `protobuf:"varint,28,opt,name=can_decide_appeal,json=canDecideAppeal,proto3" json:"can_decide_appeal,omitempty"`
 	// 有待處理的解除請求而且措施生效中（DecideRemediation 的前置條件）。措施已結束而仍待處理的解除請求不能裁定（它的 state 已是 CLOSED）。
-	CanDecideRemediation bool `protobuf:"varint,31,opt,name=can_decide_remediation,json=canDecideRemediation,proto3" json:"can_decide_remediation,omitempty"`
+	CanDecideRemediation bool `protobuf:"varint,29,opt,name=can_decide_remediation,json=canDecideRemediation,proto3" json:"can_decide_remediation,omitempty"`
 	// 賣家的解除請求冷卻期的結束時間；只在 RISK 依據、措施生效中而且在冷卻期內設。
-	NextRemediationTime *timestamppb.Timestamp `protobuf:"bytes,32,opt,name=next_remediation_time,json=nextRemediationTime,proto3" json:"next_remediation_time,omitempty"`
+	NextRemediationTime *timestamppb.Timestamp `protobuf:"bytes,30,opt,name=next_remediation_time,json=nextRemediationTime,proto3" json:"next_remediation_time,omitempty"`
 	// 措施上賣家的請求（申覆與解除請求，看 MeasureRequest.kind），新到舊，含佐證（單筆讀取與寫入的回應）；清單也帶（佐證除外）。每一筆的 state 由
 	// 伺服器推導（見 MeasureRequest），ListMeasures 的 request_state 篩選用同一個推導。
-	Requests []*MeasureRequest `protobuf:"bytes,33,rep,name=requests,proto3" json:"requests,omitempty"`
+	Requests []*MeasureRequest `protobuf:"bytes,31,rep,name=requests,proto3" json:"requests,omitempty"`
 	// 終止合作（kind 是 TERMINATION）的事由；其他種類是 UNSPECIFIED。
-	TerminationGround v1alpha11.TerminationGround `protobuf:"varint,34,opt,name=termination_ground,json=terminationGround,proto3,enum=hawkr.seller.v1alpha1.TerminationGround" json:"termination_ground,omitempty"`
+	TerminationGround v1alpha11.TerminationGround `protobuf:"varint,32,opt,name=termination_ground,json=terminationGround,proto3,enum=hawkr.seller.v1alpha1.TerminationGround" json:"termination_ground,omitempty"`
 	// 關聯帳號的終止（termination_ground 是 LINKED_ACCOUNT）的來源措施 id：來源撤銷時這筆一併撤銷（revoke_reason 是 SOURCE_REVOKED）；其他是空字串。
-	SourceMeasureId string `protobuf:"bytes,35,opt,name=source_measure_id,json=sourceMeasureId,proto3" json:"source_measure_id,omitempty"`
+	SourceMeasureId string `protobuf:"bytes,33,opt,name=source_measure_id,json=sourceMeasureId,proto3" json:"source_measure_id,omitempty"`
 	// 終止合作的申覆期限（生效後 184 天，見 hawkr.seller.v1alpha1.Measure.appeal_deadline_time）；其他種類不設。
-	AppealDeadlineTime *timestamppb.Timestamp `protobuf:"bytes,36,opt,name=appeal_deadline_time,json=appealDeadlineTime,proto3" json:"appeal_deadline_time,omitempty"`
+	AppealDeadlineTime *timestamppb.Timestamp `protobuf:"bytes,34,opt,name=appeal_deadline_time,json=appealDeadlineTime,proto3" json:"appeal_deadline_time,omitempty"`
 	// 與這筆措施的帳號使用同一個身分證明文件或統一編號的其他帳號（由本措施建立時的身分快照反查）；只有單筆讀取（GetMeasure）帶，清單與寫入的回應
 	// 不設。只有留有身分快照的措施有：停權，以及非預告（NOTICE）的終止合作；快照在措施撤銷時刪除，個資清理之後也取不到新的命中。
-	LinkedAccounts []*LinkedAccount `protobuf:"bytes,37,rep,name=linked_accounts,json=linkedAccounts,proto3" json:"linked_accounts,omitempty"`
+	LinkedAccounts []*LinkedAccount `protobuf:"bytes,35,rep,name=linked_accounts,json=linkedAccounts,proto3" json:"linked_accounts,omitempty"`
 	// 店名；空字串表示沒有（個資清理之後也是：一般關店滿保留期（6 個月），終止合作關店要等申覆期滿）。清單與單筆都帶。
-	StoreName string `protobuf:"bytes,38,opt,name=store_name,json=storeName,proto3" json:"store_name,omitempty"`
+	StoreName string `protobuf:"bytes,36,opt,name=store_name,json=storeName,proto3" json:"store_name,omitempty"`
 	// 不能改給賣家的理由的原因，依優先序排列（結構性的在前）；空表示可以改（can_update_statement 是 true）。
-	UpdateStatementUnavailabilities []*MeasureActionUnavailability `protobuf:"bytes,39,rep,name=update_statement_unavailabilities,json=updateStatementUnavailabilities,proto3" json:"update_statement_unavailabilities,omitempty"`
+	UpdateStatementUnavailabilities []*MeasureActionUnavailability `protobuf:"bytes,37,rep,name=update_statement_unavailabilities,json=updateStatementUnavailabilities,proto3" json:"update_statement_unavailabilities,omitempty"`
 	// 不能延長結束時間的原因；空表示可以延長（can_extend 是 true）。
-	ExtendUnavailabilities []*MeasureActionUnavailability `protobuf:"bytes,40,rep,name=extend_unavailabilities,json=extendUnavailabilities,proto3" json:"extend_unavailabilities,omitempty"`
+	ExtendUnavailabilities []*MeasureActionUnavailability `protobuf:"bytes,38,rep,name=extend_unavailabilities,json=extendUnavailabilities,proto3" json:"extend_unavailabilities,omitempty"`
 	// 不能縮短結束時間的原因；空表示可以縮短（can_shorten 是 true）。
-	ShortenUnavailabilities []*MeasureActionUnavailability `protobuf:"bytes,41,rep,name=shorten_unavailabilities,json=shortenUnavailabilities,proto3" json:"shorten_unavailabilities,omitempty"`
+	ShortenUnavailabilities []*MeasureActionUnavailability `protobuf:"bytes,39,rep,name=shorten_unavailabilities,json=shortenUnavailabilities,proto3" json:"shorten_unavailabilities,omitempty"`
 	// 不能撤銷的原因；空表示可以撤銷（can_revoke 是 true）。
-	RevokeUnavailabilities []*MeasureActionUnavailability `protobuf:"bytes,42,rep,name=revoke_unavailabilities,json=revokeUnavailabilities,proto3" json:"revoke_unavailabilities,omitempty"`
+	RevokeUnavailabilities []*MeasureActionUnavailability `protobuf:"bytes,40,rep,name=revoke_unavailabilities,json=revokeUnavailabilities,proto3" json:"revoke_unavailabilities,omitempty"`
 	// 不能結束的原因；空表示可以結束（can_end 是 true）。依據違規認定的停權沒有結束入口，原因是 VIOLATION_BASIS，client 直接顯示它的句子。
-	EndUnavailabilities []*MeasureActionUnavailability `protobuf:"bytes,45,rep,name=end_unavailabilities,json=endUnavailabilities,proto3" json:"end_unavailabilities,omitempty"`
+	EndUnavailabilities []*MeasureActionUnavailability `protobuf:"bytes,41,rep,name=end_unavailabilities,json=endUnavailabilities,proto3" json:"end_unavailabilities,omitempty"`
 	// 撤銷或接受申覆時能不能一併撤銷認定（RevokeMeasureRequest、DecideAppealRequest 的 revoke_findings）：依據是 VIOLATION，而且這個措施自己建立了至少一筆
 	// 尚未撤銷的認定；只引用別的措施建立的認定時是 false。與兩個方法對 revoke_findings 的檢查是同一個規則（model/measure.go）。
-	CanRevokeFindings bool `protobuf:"varint,43,opt,name=can_revoke_findings,json=canRevokeFindings,proto3" json:"can_revoke_findings,omitempty"`
+	CanRevokeFindings bool `protobuf:"varint,42,opt,name=can_revoke_findings,json=canRevokeFindings,proto3" json:"can_revoke_findings,omitempty"`
 	// 複審的期限，只在風險類型（RISK）的措施、生效中、而且已進入 review_by 前 24 小時時設：開始時間是 review_by 前 24 小時，期限是 review_by；
 	// review_by 過了之後仍在，直到措施結束或撤銷。review_by 本身是事實欄位，撤銷後仍輸出。
-	ReviewDeadline *v1alpha1.Deadline `protobuf:"bytes,44,opt,name=review_deadline,json=reviewDeadline,proto3" json:"review_deadline,omitempty"`
+	ReviewDeadline *v1alpha1.Deadline `protobuf:"bytes,43,opt,name=review_deadline,json=reviewDeadline,proto3" json:"review_deadline,omitempty"`
 	// 內容下架（kind 是 CONTENT_TAKEDOWN）的對象，依種類、id 排序；其他種類沒有。建立後不能改（UpdateMeasure 不收），要改就撤銷再建立。
-	Contents      []*v1alpha11.ContentRef `protobuf:"bytes,46,rep,name=contents,proto3" json:"contents,omitempty"`
+	Contents      []*v1alpha11.ContentRef `protobuf:"bytes,44,rep,name=contents,proto3" json:"contents,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1420,7 +1420,7 @@ const file_hawkr_admin_seller_v1alpha1_measure_proto_rawDesc = "" +
 	" \x01(\x0e2/.hawkr.seller.v1alpha1.MeasureRequestCloseCauseB\x03\xe0A\x03R\n" +
 	"closeCause\x12B\n" +
 	"\x04kind\x18\v \x01(\x0e2).hawkr.seller.v1alpha1.MeasureRequestKindB\x03\xe0A\x03R\x04kind\x12M\n" +
-	"\x0fdecide_deadline\x18\f \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0edecideDeadline\"\xda\x16\n" +
+	"\x0fdecide_deadline\x18\f \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0edecideDeadline\"\xb0\x16\n" +
 	"\aMeasure\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1e\n" +
 	"\bstore_id\x18\x02 \x01(\tB\x03\xe0A\x03R\astoreId\x12\"\n" +
@@ -1441,41 +1441,41 @@ const file_hawkr_admin_seller_v1alpha1_measure_proto_rawDesc = "" +
 	"\vrevoke_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"revokeTime\x12A\n" +
 	"\x06period\x18\x0f \x01(\v2$.hawkr.seller.v1alpha1.MeasurePeriodB\x03\xe0A\x03R\x06period\x122\n" +
-	"\x13created_by_admin_id\x18\x11 \x01(\tB\x03\xe0A\x03R\x10createdByAdminId\x12@\n" +
-	"\vcreate_time\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\x13created_by_admin_id\x18\x10 \x01(\tB\x03\xe0A\x03R\x10createdByAdminId\x12@\n" +
+	"\vcreate_time\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12@\n" +
-	"\vupdate_time\x18\x13 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\vupdate_time\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x12\n" +
-	"\x04etag\x18\x14 \x01(\tR\x04etag\x12.\n" +
-	"\x10current_revision\x18\x15 \x01(\x05B\x03\xe0A\x03R\x0fcurrentRevision\x12O\n" +
-	"\trevisions\x18\x16 \x03(\v2,.hawkr.admin.seller.v1alpha1.MeasureRevisionB\x03\xe0A\x03R\trevisions\x125\n" +
-	"\x14can_update_statement\x18\x17 \x01(\bB\x03\xe0A\x03R\x12canUpdateStatement\x12\"\n" +
+	"\x04etag\x18\x13 \x01(\tR\x04etag\x12.\n" +
+	"\x10current_revision\x18\x14 \x01(\x05B\x03\xe0A\x03R\x0fcurrentRevision\x12O\n" +
+	"\trevisions\x18\x15 \x03(\v2,.hawkr.admin.seller.v1alpha1.MeasureRevisionB\x03\xe0A\x03R\trevisions\x125\n" +
+	"\x14can_update_statement\x18\x16 \x01(\bB\x03\xe0A\x03R\x12canUpdateStatement\x12\"\n" +
 	"\n" +
-	"can_extend\x18\x18 \x01(\bB\x03\xe0A\x03R\tcanExtend\x12$\n" +
-	"\vcan_shorten\x18\x19 \x01(\bB\x03\xe0A\x03R\n" +
+	"can_extend\x18\x17 \x01(\bB\x03\xe0A\x03R\tcanExtend\x12$\n" +
+	"\vcan_shorten\x18\x18 \x01(\bB\x03\xe0A\x03R\n" +
 	"canShorten\x12\x1c\n" +
-	"\acan_end\x18\x1a \x01(\bB\x03\xe0A\x03R\x06canEnd\x12\"\n" +
+	"\acan_end\x18\x19 \x01(\bB\x03\xe0A\x03R\x06canEnd\x12\"\n" +
 	"\n" +
-	"can_revoke\x18\x1b \x01(\bB\x03\xe0A\x03R\tcanRevoke\x123\n" +
-	"\x13can_schedule_review\x18\x1c \x01(\bB\x03\xe0A\x03R\x11canScheduleReview\x12/\n" +
-	"\x11can_decide_appeal\x18\x1d \x01(\bB\x03\xe0A\x03R\x0fcanDecideAppeal\x129\n" +
-	"\x16can_decide_remediation\x18\x1f \x01(\bB\x03\xe0A\x03R\x14canDecideRemediation\x12S\n" +
-	"\x15next_remediation_time\x18  \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x13nextRemediationTime\x12L\n" +
-	"\brequests\x18! \x03(\v2+.hawkr.admin.seller.v1alpha1.MeasureRequestB\x03\xe0A\x03R\brequests\x12\\\n" +
-	"\x12termination_ground\x18\" \x01(\x0e2(.hawkr.seller.v1alpha1.TerminationGroundB\x03\xe0A\x03R\x11terminationGround\x12/\n" +
-	"\x11source_measure_id\x18# \x01(\tB\x03\xe0A\x03R\x0fsourceMeasureId\x12Q\n" +
-	"\x14appeal_deadline_time\x18$ \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x12appealDeadlineTime\x12X\n" +
-	"\x0flinked_accounts\x18% \x03(\v2*.hawkr.admin.seller.v1alpha1.LinkedAccountB\x03\xe0A\x03R\x0elinkedAccounts\x12\"\n" +
+	"can_revoke\x18\x1a \x01(\bB\x03\xe0A\x03R\tcanRevoke\x123\n" +
+	"\x13can_schedule_review\x18\x1b \x01(\bB\x03\xe0A\x03R\x11canScheduleReview\x12/\n" +
+	"\x11can_decide_appeal\x18\x1c \x01(\bB\x03\xe0A\x03R\x0fcanDecideAppeal\x129\n" +
+	"\x16can_decide_remediation\x18\x1d \x01(\bB\x03\xe0A\x03R\x14canDecideRemediation\x12S\n" +
+	"\x15next_remediation_time\x18\x1e \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x13nextRemediationTime\x12L\n" +
+	"\brequests\x18\x1f \x03(\v2+.hawkr.admin.seller.v1alpha1.MeasureRequestB\x03\xe0A\x03R\brequests\x12\\\n" +
+	"\x12termination_ground\x18  \x01(\x0e2(.hawkr.seller.v1alpha1.TerminationGroundB\x03\xe0A\x03R\x11terminationGround\x12/\n" +
+	"\x11source_measure_id\x18! \x01(\tB\x03\xe0A\x03R\x0fsourceMeasureId\x12Q\n" +
+	"\x14appeal_deadline_time\x18\" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x12appealDeadlineTime\x12X\n" +
+	"\x0flinked_accounts\x18# \x03(\v2*.hawkr.admin.seller.v1alpha1.LinkedAccountB\x03\xe0A\x03R\x0elinkedAccounts\x12\"\n" +
 	"\n" +
-	"store_name\x18& \x01(\tB\x03\xe0A\x03R\tstoreName\x12\x89\x01\n" +
-	"!update_statement_unavailabilities\x18' \x03(\v28.hawkr.admin.seller.v1alpha1.MeasureActionUnavailabilityB\x03\xe0A\x03R\x1fupdateStatementUnavailabilities\x12v\n" +
-	"\x17extend_unavailabilities\x18( \x03(\v28.hawkr.admin.seller.v1alpha1.MeasureActionUnavailabilityB\x03\xe0A\x03R\x16extendUnavailabilities\x12x\n" +
-	"\x18shorten_unavailabilities\x18) \x03(\v28.hawkr.admin.seller.v1alpha1.MeasureActionUnavailabilityB\x03\xe0A\x03R\x17shortenUnavailabilities\x12v\n" +
-	"\x17revoke_unavailabilities\x18* \x03(\v28.hawkr.admin.seller.v1alpha1.MeasureActionUnavailabilityB\x03\xe0A\x03R\x16revokeUnavailabilities\x12p\n" +
-	"\x14end_unavailabilities\x18- \x03(\v28.hawkr.admin.seller.v1alpha1.MeasureActionUnavailabilityB\x03\xe0A\x03R\x13endUnavailabilities\x123\n" +
-	"\x13can_revoke_findings\x18+ \x01(\bB\x03\xe0A\x03R\x11canRevokeFindings\x12M\n" +
-	"\x0freview_deadline\x18, \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0ereviewDeadline\x12B\n" +
-	"\bcontents\x18. \x03(\v2!.hawkr.seller.v1alpha1.ContentRefB\x03\xe0A\x03R\bcontentsJ\x04\b\x10\x10\x11J\x04\b\x1e\x10\x1fR\x06appealR\x14remediation_requests\"\xb4\x01\n" +
+	"store_name\x18$ \x01(\tB\x03\xe0A\x03R\tstoreName\x12\x89\x01\n" +
+	"!update_statement_unavailabilities\x18% \x03(\v28.hawkr.admin.seller.v1alpha1.MeasureActionUnavailabilityB\x03\xe0A\x03R\x1fupdateStatementUnavailabilities\x12v\n" +
+	"\x17extend_unavailabilities\x18& \x03(\v28.hawkr.admin.seller.v1alpha1.MeasureActionUnavailabilityB\x03\xe0A\x03R\x16extendUnavailabilities\x12x\n" +
+	"\x18shorten_unavailabilities\x18' \x03(\v28.hawkr.admin.seller.v1alpha1.MeasureActionUnavailabilityB\x03\xe0A\x03R\x17shortenUnavailabilities\x12v\n" +
+	"\x17revoke_unavailabilities\x18( \x03(\v28.hawkr.admin.seller.v1alpha1.MeasureActionUnavailabilityB\x03\xe0A\x03R\x16revokeUnavailabilities\x12p\n" +
+	"\x14end_unavailabilities\x18) \x03(\v28.hawkr.admin.seller.v1alpha1.MeasureActionUnavailabilityB\x03\xe0A\x03R\x13endUnavailabilities\x123\n" +
+	"\x13can_revoke_findings\x18* \x01(\bB\x03\xe0A\x03R\x11canRevokeFindings\x12M\n" +
+	"\x0freview_deadline\x18+ \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0ereviewDeadline\x12B\n" +
+	"\bcontents\x18, \x03(\v2!.hawkr.seller.v1alpha1.ContentRefB\x03\xe0A\x03R\bcontents\"\xb4\x01\n" +
 	"\x1bMeasureActionUnavailability\x12X\n" +
 	"\x06reason\x18\x01 \x01(\x0e2;.hawkr.admin.seller.v1alpha1.MeasureActionUnavailableReasonB\x03\xe0A\x03R\x06reason\x12;\n" +
 	"\amessage\x18\x02 \x01(\v2\x1c.google.rpc.LocalizedMessageB\x03\xe0A\x03R\amessage\"\x9d\x04\n" +
@@ -1509,11 +1509,11 @@ const file_hawkr_admin_seller_v1alpha1_measure_proto_rawDesc = "" +
 	"0MEASURE_ACTION_UNAVAILABLE_REASON_APPEAL_PENDING\x10\x06\x125\n" +
 	"1MEASURE_ACTION_UNAVAILABLE_REASON_VIOLATION_BASIS\x10\a\x129\n" +
 	"5MEASURE_ACTION_UNAVAILABLE_REASON_REMEDIATION_PENDING\x10\b\x12B\n" +
-	">MEASURE_ACTION_UNAVAILABLE_REASON_CONTENT_TAKEDOWN_REVOKE_ONLY\x10\t*\xbc\x01\n" +
+	">MEASURE_ACTION_UNAVAILABLE_REASON_CONTENT_TAKEDOWN_REVOKE_ONLY\x10\t*l\n" +
 	"\x0eLinkedIdentity\x12\x1f\n" +
 	"\x1bLINKED_IDENTITY_UNSPECIFIED\x10\x00\x12\x17\n" +
-	"\x13LINKED_IDENTITY_UBN\x10\x02\x12 \n" +
-	"\x1cLINKED_IDENTITY_BANK_ACCOUNT\x10\x04\"\x04\b\x01\x10\x01\"\x04\b\x03\x10\x03*\x1bLINKED_IDENTITY_NATIONAL_ID*%LINKED_IDENTITY_RESPONSIBLE_PERSON_ID*\xe5\x01\n" +
+	"\x13LINKED_IDENTITY_UBN\x10\x01\x12 \n" +
+	"\x1cLINKED_IDENTITY_BANK_ACCOUNT\x10\x02*\xe5\x01\n" +
 	"\x1fTerminationViolationRequirement\x121\n" +
 	"-TERMINATION_VIOLATION_REQUIREMENT_UNSPECIFIED\x10\x00\x12.\n" +
 	"*TERMINATION_VIOLATION_REQUIREMENT_REQUIRED\x10\x01\x12.\n" +

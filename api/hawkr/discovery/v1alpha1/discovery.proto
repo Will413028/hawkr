@@ -35,8 +35,6 @@ message RecommendedSeller {
   // 店家卡片；清單上的每家店都有營業中（OPEN）的卡片。
   hawkr.common.v1alpha1.StoreCard store = 1;
   // 評價數與平均評分由卡片提供（store.review_count、store.rating_average）；排名用的評價只留在快照內。
-  reserved 2, 3;
-  reserved "review_count", "rating_average";
   // 粉絲數；0 是確實沒有粉絲，讀取失敗時不設。
-  optional int32 follower_count = 4;
+  optional int32 follower_count = 2;
 }

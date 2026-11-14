@@ -161,7 +161,7 @@ const CheckAppVersionRequest$json = {
     },
     {
       '1': 'client_version',
-      '3': 3,
+      '3': 2,
       '4': 1,
       '5': 9,
       '8': {},
@@ -173,7 +173,7 @@ const CheckAppVersionRequest$json = {
 /// Descriptor for `CheckAppVersionRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List checkAppVersionRequestDescriptor = $convert.base64Decode(
     'ChZDaGVja0FwcFZlcnNpb25SZXF1ZXN0Ej8KCGFwcF90eXBlGAEgASgOMh8uaGF3a3IuY29udG'
-    'VudC52MWFscGhhMS5BcHBUeXBlQgPgQQJSB2FwcFR5cGUSKgoOY2xpZW50X3ZlcnNpb24YAyAB'
+    'VudC52MWFscGhhMS5BcHBUeXBlQgPgQQJSB2FwcFR5cGUSKgoOY2xpZW50X3ZlcnNpb24YAiAB'
     'KAlCA+BBAlINY2xpZW50VmVyc2lvbg==');
 
 @$core.Deprecated('Use checkAppVersionResponseDescriptor instead')

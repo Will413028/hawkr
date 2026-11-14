@@ -428,6 +428,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.seller.v1alpha1.OnboardingReturnDestination",
+      "tsName": "OnboardingReturnDestination",
+      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.seller.v1alpha1.OnboardingTaskId",
       "tsName": "OnboardingTaskId",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",

@@ -197,6 +197,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.seller.v1alpha1.OnboardingReturnDestination",
+      "dartClass": "OnboardingReturnDestination",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.seller.v1alpha1.OnboardingTaskId",
       "dartClass": "OnboardingTaskId",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",

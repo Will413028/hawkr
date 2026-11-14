@@ -19,16 +19,17 @@ class Role extends $pb.ProtobufEnum {
   static const Role ROLE_UNSPECIFIED =
       Role._(0, _omitEnumNames ? '' : 'ROLE_UNSPECIFIED');
   static const Role ROLE_SELLER =
-      Role._(2, _omitEnumNames ? '' : 'ROLE_SELLER');
+      Role._(1, _omitEnumNames ? '' : 'ROLE_SELLER');
 
   static const $core.List<Role> values = <Role>[
     ROLE_UNSPECIFIED,
     ROLE_SELLER,
   ];
 
-  static final $core.Map<$core.int, Role> _byValue =
-      $pb.ProtobufEnum.initByValue(values);
-  static Role? valueOf($core.int value) => _byValue[value];
+  static final $core.List<Role?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 1);
+  static Role? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const Role._(super.value, super.name);
 }

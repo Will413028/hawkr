@@ -255,21 +255,21 @@ class Address extends $pb.GeneratedMessage {
     $core.String? id,
     $core.String? receiverName,
     $core.String? receiverPhone,
+    $3.PostalAddress? postalAddress,
     $core.bool? defaultAddress,
     $2.Timestamp? createTime,
     $2.Timestamp? updateTime,
     $core.String? etag,
-    $3.PostalAddress? postalAddress,
   }) {
     final result = Address._();
     if (id != null) result.id = id;
     if (receiverName != null) result.receiverName = receiverName;
     if (receiverPhone != null) result.receiverPhone = receiverPhone;
+    if (postalAddress != null) result.postalAddress = postalAddress;
     if (defaultAddress != null) result.defaultAddress = defaultAddress;
     if (createTime != null) result.createTime = createTime;
     if (updateTime != null) result.updateTime = updateTime;
     if (etag != null) result.etag = etag;
-    if (postalAddress != null) result.postalAddress = postalAddress;
     return result;
   }
 
@@ -288,16 +288,16 @@ class Address extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
       createEmptyInstance: Address.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'id')
-    ..aOS(3, _omitFieldNames ? '' : 'receiverName')
-    ..aOS(4, _omitFieldNames ? '' : 'receiverPhone')
-    ..aOB(8, _omitFieldNames ? '' : 'defaultAddress')
-    ..aOM<$2.Timestamp>(9, _omitFieldNames ? '' : 'createTime',
-        subBuilder: $2.Timestamp.$_createMessage)
-    ..aOM<$2.Timestamp>(10, _omitFieldNames ? '' : 'updateTime',
-        subBuilder: $2.Timestamp.$_createMessage)
-    ..aOS(11, _omitFieldNames ? '' : 'etag')
-    ..aOM<$3.PostalAddress>(12, _omitFieldNames ? '' : 'postalAddress',
+    ..aOS(2, _omitFieldNames ? '' : 'receiverName')
+    ..aOS(3, _omitFieldNames ? '' : 'receiverPhone')
+    ..aOM<$3.PostalAddress>(4, _omitFieldNames ? '' : 'postalAddress',
         subBuilder: $3.PostalAddress.$_createMessage)
+    ..aOB(5, _omitFieldNames ? '' : 'defaultAddress')
+    ..aOM<$2.Timestamp>(6, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$2.Timestamp>(7, _omitFieldNames ? '' : 'updateTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOS(8, _omitFieldNames ? '' : 'etag')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -329,76 +329,76 @@ class Address extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearId() => $_clearField(1);
 
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $core.String get receiverName => $_getSZ(1);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   set receiverName($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $core.bool hasReceiverName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearReceiverName() => $_clearField(2);
+
   @$pb.TagNumber(3)
-  void clearReceiverName() => $_clearField(3);
-
-  @$pb.TagNumber(4)
   $core.String get receiverPhone => $_getSZ(2);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   set receiverPhone($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   $core.bool hasReceiverPhone() => $_has(2);
-  @$pb.TagNumber(4)
-  void clearReceiverPhone() => $_clearField(4);
-
-  /// 是否為預設地址。
-  @$pb.TagNumber(8)
-  $core.bool get defaultAddress => $_getBF(3);
-  @$pb.TagNumber(8)
-  set defaultAddress($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(8)
-  $core.bool hasDefaultAddress() => $_has(3);
-  @$pb.TagNumber(8)
-  void clearDefaultAddress() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $2.Timestamp get createTime => $_getN(4);
-  @$pb.TagNumber(9)
-  set createTime($2.Timestamp value) => $_setField(9, value);
-  @$pb.TagNumber(9)
-  $core.bool hasCreateTime() => $_has(4);
-  @$pb.TagNumber(9)
-  void clearCreateTime() => $_clearField(9);
-  @$pb.TagNumber(9)
-  $2.Timestamp ensureCreateTime() => $_ensure(4);
-
-  @$pb.TagNumber(10)
-  $2.Timestamp get updateTime => $_getN(5);
-  @$pb.TagNumber(10)
-  set updateTime($2.Timestamp value) => $_setField(10, value);
-  @$pb.TagNumber(10)
-  $core.bool hasUpdateTime() => $_has(5);
-  @$pb.TagNumber(10)
-  void clearUpdateTime() => $_clearField(10);
-  @$pb.TagNumber(10)
-  $2.Timestamp ensureUpdateTime() => $_ensure(5);
-
-  @$pb.TagNumber(11)
-  $core.String get etag => $_getSZ(6);
-  @$pb.TagNumber(11)
-  set etag($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(11)
-  $core.bool hasEtag() => $_has(6);
-  @$pb.TagNumber(11)
-  void clearEtag() => $_clearField(11);
+  @$pb.TagNumber(3)
+  void clearReceiverPhone() => $_clearField(3);
 
   /// 收貨的地點；明細必填（1–255 字）。update_mask 列 postal_address 時整個換成請求的地址。
-  @$pb.TagNumber(12)
-  $3.PostalAddress get postalAddress => $_getN(7);
-  @$pb.TagNumber(12)
-  set postalAddress($3.PostalAddress value) => $_setField(12, value);
-  @$pb.TagNumber(12)
-  $core.bool hasPostalAddress() => $_has(7);
-  @$pb.TagNumber(12)
-  void clearPostalAddress() => $_clearField(12);
-  @$pb.TagNumber(12)
-  $3.PostalAddress ensurePostalAddress() => $_ensure(7);
+  @$pb.TagNumber(4)
+  $3.PostalAddress get postalAddress => $_getN(3);
+  @$pb.TagNumber(4)
+  set postalAddress($3.PostalAddress value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasPostalAddress() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearPostalAddress() => $_clearField(4);
+  @$pb.TagNumber(4)
+  $3.PostalAddress ensurePostalAddress() => $_ensure(3);
+
+  /// 是否為預設地址。
+  @$pb.TagNumber(5)
+  $core.bool get defaultAddress => $_getBF(4);
+  @$pb.TagNumber(5)
+  set defaultAddress($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasDefaultAddress() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearDefaultAddress() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $2.Timestamp get createTime => $_getN(5);
+  @$pb.TagNumber(6)
+  set createTime($2.Timestamp value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCreateTime() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCreateTime() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $2.Timestamp ensureCreateTime() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  $2.Timestamp get updateTime => $_getN(6);
+  @$pb.TagNumber(7)
+  set updateTime($2.Timestamp value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasUpdateTime() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearUpdateTime() => $_clearField(7);
+  @$pb.TagNumber(7)
+  $2.Timestamp ensureUpdateTime() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  $core.String get etag => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set etag($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasEtag() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearEtag() => $_clearField(8);
 }
 
 /// ProductCard 是清單上的商品卡片。
@@ -413,8 +413,8 @@ class ProductCard extends $pb.GeneratedMessage {
     $core.double? rating,
     $core.bool? available,
     $core.bool? restockSubscribed,
-    $4.StoreCard? store,
     $core.String? storeId,
+    $4.StoreCard? store,
   }) {
     final result = ProductCard._();
     if (id != null) result.id = id;
@@ -426,8 +426,8 @@ class ProductCard extends $pb.GeneratedMessage {
     if (rating != null) result.rating = rating;
     if (available != null) result.available = available;
     if (restockSubscribed != null) result.restockSubscribed = restockSubscribed;
-    if (store != null) result.store = store;
     if (storeId != null) result.storeId = storeId;
+    if (store != null) result.store = store;
     return result;
   }
 
@@ -455,9 +455,9 @@ class ProductCard extends $pb.GeneratedMessage {
     ..aD(7, _omitFieldNames ? '' : 'rating', fieldType: $pb.PbFieldType.OF)
     ..aOB(8, _omitFieldNames ? '' : 'available')
     ..aOB(9, _omitFieldNames ? '' : 'restockSubscribed')
-    ..aOM<$4.StoreCard>(10, _omitFieldNames ? '' : 'store',
+    ..aOS(10, _omitFieldNames ? '' : 'storeId')
+    ..aOM<$4.StoreCard>(11, _omitFieldNames ? '' : 'store',
         subBuilder: $4.StoreCard.$_createMessage)
-    ..aOS(11, _omitFieldNames ? '' : 'storeId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -570,26 +570,26 @@ class ProductCard extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearRestockSubscribed() => $_clearField(9);
 
-  /// 商品所屬店家的卡片；不設表示這家店不顯示（從沒公開過或不存在）。
   @$pb.TagNumber(10)
-  $4.StoreCard get store => $_getN(9);
+  $core.String get storeId => $_getSZ(9);
   @$pb.TagNumber(10)
-  set store($4.StoreCard value) => $_setField(10, value);
+  set storeId($core.String value) => $_setString(9, value);
   @$pb.TagNumber(10)
-  $core.bool hasStore() => $_has(9);
+  $core.bool hasStoreId() => $_has(9);
   @$pb.TagNumber(10)
-  void clearStore() => $_clearField(10);
-  @$pb.TagNumber(10)
-  $4.StoreCard ensureStore() => $_ensure(9);
+  void clearStoreId() => $_clearField(10);
 
+  /// 商品所屬店家的卡片；不設表示這家店不顯示（從沒公開過或不存在）。
   @$pb.TagNumber(11)
-  $core.String get storeId => $_getSZ(10);
+  $4.StoreCard get store => $_getN(10);
   @$pb.TagNumber(11)
-  set storeId($core.String value) => $_setString(10, value);
+  set store($4.StoreCard value) => $_setField(11, value);
   @$pb.TagNumber(11)
-  $core.bool hasStoreId() => $_has(10);
+  $core.bool hasStore() => $_has(10);
   @$pb.TagNumber(11)
-  void clearStoreId() => $_clearField(11);
+  void clearStore() => $_clearField(11);
+  @$pb.TagNumber(11)
+  $4.StoreCard ensureStore() => $_ensure(10);
 }
 
 /// Favorite 是收藏的商品。
@@ -670,14 +670,14 @@ class Favorite extends $pb.GeneratedMessage {
 /// Follow 是追蹤的店家。
 class Follow extends $pb.GeneratedMessage {
   factory Follow({
+    $core.String? storeId,
     $4.StoreCard? store,
     $2.Timestamp? createTime,
-    $core.String? storeId,
   }) {
     final result = Follow._();
+    if (storeId != null) result.storeId = storeId;
     if (store != null) result.store = store;
     if (createTime != null) result.createTime = createTime;
-    if (storeId != null) result.storeId = storeId;
     return result;
   }
 
@@ -695,11 +695,11 @@ class Follow extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
       createEmptyInstance: Follow.$_createMessage)
-    ..aOM<$4.StoreCard>(1, _omitFieldNames ? '' : 'store',
+    ..aOS(1, _omitFieldNames ? '' : 'storeId')
+    ..aOM<$4.StoreCard>(2, _omitFieldNames ? '' : 'store',
         subBuilder: $4.StoreCard.$_createMessage)
-    ..aOM<$2.Timestamp>(2, _omitFieldNames ? '' : 'createTime',
+    ..aOM<$2.Timestamp>(3, _omitFieldNames ? '' : 'createTime',
         subBuilder: $2.Timestamp.$_createMessage)
-    ..aOS(3, _omitFieldNames ? '' : 'storeId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -722,37 +722,37 @@ class Follow extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<Follow>(Follow.$_createMessage);
   static Follow? _defaultInstance;
 
+  @$pb.TagNumber(1)
+  $core.String get storeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set storeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStoreId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStoreId() => $_clearField(1);
+
   /// 不設表示這家店不顯示（從沒公開過或不存在）。
-  @$pb.TagNumber(1)
-  $4.StoreCard get store => $_getN(0);
-  @$pb.TagNumber(1)
-  set store($4.StoreCard value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasStore() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearStore() => $_clearField(1);
-  @$pb.TagNumber(1)
-  $4.StoreCard ensureStore() => $_ensure(0);
-
   @$pb.TagNumber(2)
-  $2.Timestamp get createTime => $_getN(1);
+  $4.StoreCard get store => $_getN(1);
   @$pb.TagNumber(2)
-  set createTime($2.Timestamp value) => $_setField(2, value);
+  set store($4.StoreCard value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasCreateTime() => $_has(1);
+  $core.bool hasStore() => $_has(1);
   @$pb.TagNumber(2)
-  void clearCreateTime() => $_clearField(2);
+  void clearStore() => $_clearField(2);
   @$pb.TagNumber(2)
-  $2.Timestamp ensureCreateTime() => $_ensure(1);
+  $4.StoreCard ensureStore() => $_ensure(1);
 
   @$pb.TagNumber(3)
-  $core.String get storeId => $_getSZ(2);
+  $2.Timestamp get createTime => $_getN(2);
   @$pb.TagNumber(3)
-  set storeId($core.String value) => $_setString(2, value);
+  set createTime($2.Timestamp value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasStoreId() => $_has(2);
+  $core.bool hasCreateTime() => $_has(2);
   @$pb.TagNumber(3)
-  void clearStoreId() => $_clearField(3);
+  void clearCreateTime() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $2.Timestamp ensureCreateTime() => $_ensure(2);
 }
 
 /// Visit 是瀏覽過的商品。
@@ -911,16 +911,16 @@ class RestockSubscription extends $pb.GeneratedMessage {
 /// MemberCard 是買家在一個店家的會員卡。
 class MemberCard extends $pb.GeneratedMessage {
   factory MemberCard({
+    $core.String? storeId,
     $4.StoreCard? store,
     $fixnum.Int64? totalSpent,
     $core.bool? vip,
-    $core.String? storeId,
   }) {
     final result = MemberCard._();
+    if (storeId != null) result.storeId = storeId;
     if (store != null) result.store = store;
     if (totalSpent != null) result.totalSpent = totalSpent;
     if (vip != null) result.vip = vip;
-    if (storeId != null) result.storeId = storeId;
     return result;
   }
 
@@ -938,11 +938,11 @@ class MemberCard extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
       createEmptyInstance: MemberCard.$_createMessage)
-    ..aOM<$4.StoreCard>(1, _omitFieldNames ? '' : 'store',
+    ..aOS(1, _omitFieldNames ? '' : 'storeId')
+    ..aOM<$4.StoreCard>(2, _omitFieldNames ? '' : 'store',
         subBuilder: $4.StoreCard.$_createMessage)
-    ..aInt64(2, _omitFieldNames ? '' : 'totalSpent')
-    ..aOB(3, _omitFieldNames ? '' : 'vip')
-    ..aOS(4, _omitFieldNames ? '' : 'storeId')
+    ..aInt64(3, _omitFieldNames ? '' : 'totalSpent')
+    ..aOB(4, _omitFieldNames ? '' : 'vip')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -965,46 +965,46 @@ class MemberCard extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<MemberCard>(MemberCard.$_createMessage);
   static MemberCard? _defaultInstance;
 
+  @$pb.TagNumber(1)
+  $core.String get storeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set storeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStoreId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStoreId() => $_clearField(1);
+
   /// 不設表示這家店不顯示（從沒公開過或不存在）。
-  @$pb.TagNumber(1)
-  $4.StoreCard get store => $_getN(0);
-  @$pb.TagNumber(1)
-  set store($4.StoreCard value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasStore() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearStore() => $_clearField(1);
-  @$pb.TagNumber(1)
-  $4.StoreCard ensureStore() => $_ensure(0);
+  @$pb.TagNumber(2)
+  $4.StoreCard get store => $_getN(1);
+  @$pb.TagNumber(2)
+  set store($4.StoreCard value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasStore() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearStore() => $_clearField(2);
+  @$pb.TagNumber(2)
+  $4.StoreCard ensureStore() => $_ensure(1);
 
   /// 累計消費額（扣除退款），新台幣元。
-  @$pb.TagNumber(2)
-  $fixnum.Int64 get totalSpent => $_getI64(1);
-  @$pb.TagNumber(2)
-  set totalSpent($fixnum.Int64 value) => $_setInt64(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasTotalSpent() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearTotalSpent() => $_clearField(2);
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get totalSpent => $_getI64(2);
+  @$pb.TagNumber(3)
+  set totalSpent($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTotalSpent() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTotalSpent() => $_clearField(3);
 
   /// 買家是這個店家的 VIP。
-  @$pb.TagNumber(3)
-  $core.bool get vip => $_getBF(2);
-  @$pb.TagNumber(3)
-  set vip($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasVip() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearVip() => $_clearField(3);
-
   @$pb.TagNumber(4)
-  $core.String get storeId => $_getSZ(3);
+  $core.bool get vip => $_getBF(3);
   @$pb.TagNumber(4)
-  set storeId($core.String value) => $_setString(3, value);
+  set vip($core.bool value) => $_setBool(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasStoreId() => $_has(3);
+  $core.bool hasVip() => $_has(3);
   @$pb.TagNumber(4)
-  void clearStoreId() => $_clearField(4);
+  void clearVip() => $_clearField(4);
 }
 
 /// SpendingRecord 是一筆訂單的消費紀錄。

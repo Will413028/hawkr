@@ -366,14 +366,14 @@ export function sellerKYCApplicationSubmitTime(a: { time: string }): UiMessage {
 }
 
 const SELLER_KYCFIELD: Readonly<Partial<Record<number, UiTextKey>>> = {
-	10: "seller.KYCField.KYC_FIELD_PRODUCT_TYPE",
-	12: "seller.KYCField.KYC_FIELD_WEBSITE_URL",
-	20: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME",
-	21: "seller.KYCField.KYC_FIELD_BUSINESS_TAX_ID",
-	22: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE",
-	25: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_PHONE",
-	27: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS",
-	28: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_ADDRESS",
+	1: "seller.KYCField.KYC_FIELD_PRODUCT_TYPE",
+	2: "seller.KYCField.KYC_FIELD_WEBSITE_URL",
+	3: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME",
+	4: "seller.KYCField.KYC_FIELD_BUSINESS_TAX_ID",
+	5: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE",
+	6: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_PHONE",
+	7: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS",
+	8: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_ADDRESS",
 };
 
 /** seller.KYCField 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */

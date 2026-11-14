@@ -400,9 +400,9 @@ type Account struct {
 	// 最近一次登入時 provider 回報的已驗證 email（也是寄件地址）；沒有時是空字串（例如 LINE 沒有給 email）。
 	Email string `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
 	// 另外申請的角色（目前只有 ROLE_SELLER）；每個帳號都是買家，不列出。
-	Roles         []v1alpha1.Role        `protobuf:"varint,4,rep,packed,name=roles,proto3,enum=hawkr.identity.v1alpha1.Role" json:"roles,omitempty"`
-	Suspended     bool                   `protobuf:"varint,5,opt,name=suspended,proto3" json:"suspended,omitempty"`
-	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	Roles         []v1alpha1.Role        `protobuf:"varint,3,rep,packed,name=roles,proto3,enum=hawkr.identity.v1alpha1.Role" json:"roles,omitempty"`
+	Suspended     bool                   `protobuf:"varint,4,opt,name=suspended,proto3" json:"suspended,omitempty"`
+	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -646,12 +646,12 @@ var File_hawkr_admin_identity_v1alpha1_identity_proto protoreflect.FileDescripto
 const file_hawkr_admin_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"\n" +
 	",hawkr/admin/identity/v1alpha1/identity.proto\x12\x1dhawkr.admin.identity.v1alpha1\x1a&hawkr/identity/v1alpha1/identity.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x13\n" +
-	"\x11GetSessionRequest\"V\n" +
+	"\x11GetSessionRequest\"P\n" +
 	"\x12GetSessionResponse\x12:\n" +
-	"\x05admin\x18\x01 \x01(\v2$.hawkr.admin.identity.v1alpha1.AdminR\x05adminJ\x04\b\x02\x10\x03\"V\n" +
+	"\x05admin\x18\x01 \x01(\v2$.hawkr.admin.identity.v1alpha1.AdminR\x05admin\"7\n" +
 	"\x05Admin\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x19\n" +
-	"\x05email\x18\x02 \x01(\tB\x03\xe0A\x03R\x05emailJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05R\x04nameR\vpicture_uri\"\xb0\x01\n" +
+	"\x05email\x18\x02 \x01(\tB\x03\xe0A\x03R\x05email\"\xb0\x01\n" +
 	"\x13ListAccountsRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
@@ -668,14 +668,14 @@ const file_hawkr_admin_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tB\x03\xe0A\x02R\taccountId\"V\n" +
 	"\x12GetAccountResponse\x12@\n" +
-	"\aaccount\x18\x01 \x01(\v2&.hawkr.admin.identity.v1alpha1.AccountR\aaccount\"\xde\x01\n" +
+	"\aaccount\x18\x01 \x01(\v2&.hawkr.admin.identity.v1alpha1.AccountR\aaccount\"\xd8\x01\n" +
 	"\aAccount\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x19\n" +
 	"\x05email\x18\x02 \x01(\tB\x03\xe0A\x03R\x05email\x128\n" +
-	"\x05roles\x18\x04 \x03(\x0e2\x1d.hawkr.identity.v1alpha1.RoleB\x03\xe0A\x03R\x05roles\x12!\n" +
-	"\tsuspended\x18\x05 \x01(\bB\x03\xe0A\x03R\tsuspended\x12@\n" +
-	"\vcreate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTimeJ\x04\b\x03\x10\x04\"\x10\n" +
+	"\x05roles\x18\x03 \x03(\x0e2\x1d.hawkr.identity.v1alpha1.RoleB\x03\xe0A\x03R\x05roles\x12!\n" +
+	"\tsuspended\x18\x04 \x01(\bB\x03\xe0A\x03R\tsuspended\x12@\n" +
+	"\vcreate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\"\x10\n" +
 	"\x0eSignOutRequest\"\x11\n" +
 	"\x0fSignOutResponse\"W\n" +
 	"\x14DeleteAccountRequest\x12\"\n" +

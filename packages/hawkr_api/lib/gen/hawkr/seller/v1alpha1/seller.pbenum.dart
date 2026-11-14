@@ -84,6 +84,7 @@ class SellerCapability extends $pb.ProtobufEnum {
       SellerCapability._(
           0, _omitEnumNames ? '' : 'SELLER_CAPABILITY_UNSPECIFIED');
 
+  /// 8 曾是查違規與申覆的能力：違規與申覆以帳號為範圍，沒有任何方法需要店家能力，已刪除。
   /// 看自己的店家資料與停權狀態。
   static const SellerCapability SELLER_CAPABILITY_ACCOUNT_SELF_READ =
       SellerCapability._(
@@ -122,43 +123,43 @@ class SellerCapability extends $pb.ProtobufEnum {
   /// 送出訊息。
   static const SellerCapability SELLER_CAPABILITY_CHAT_SEND =
       SellerCapability._(
-          9, _omitEnumNames ? '' : 'SELLER_CAPABILITY_CHAT_SEND');
+          8, _omitEnumNames ? '' : 'SELLER_CAPABILITY_CHAT_SEND');
 
   /// 讀取訊息。
   static const SellerCapability SELLER_CAPABILITY_CHAT_READ =
       SellerCapability._(
-          10, _omitEnumNames ? '' : 'SELLER_CAPABILITY_CHAT_READ');
+          9, _omitEnumNames ? '' : 'SELLER_CAPABILITY_CHAT_READ');
 
   /// 通知收件箱、偏好與裝置。
   static const SellerCapability SELLER_CAPABILITY_NOTIFICATION =
       SellerCapability._(
-          11, _omitEnumNames ? '' : 'SELLER_CAPABILITY_NOTIFICATION');
+          10, _omitEnumNames ? '' : 'SELLER_CAPABILITY_NOTIFICATION');
 
   /// 關店。
   static const SellerCapability SELLER_CAPABILITY_ACCOUNT_CLOSE =
       SellerCapability._(
-          12, _omitEnumNames ? '' : 'SELLER_CAPABILITY_ACCOUNT_CLOSE');
+          11, _omitEnumNames ? '' : 'SELLER_CAPABILITY_ACCOUNT_CLOSE');
 
   /// 發票與稅務憑證的查詢與設定。
   static const SellerCapability SELLER_CAPABILITY_INVOICE_MANAGE =
       SellerCapability._(
-          13, _omitEnumNames ? '' : 'SELLER_CAPABILITY_INVOICE_MANAGE');
+          12, _omitEnumNames ? '' : 'SELLER_CAPABILITY_INVOICE_MANAGE');
 
   /// 稅務身分的申請、補件與延長。
   static const SellerCapability SELLER_CAPABILITY_INVOICE_TAX_REMEDY =
       SellerCapability._(
-          14, _omitEnumNames ? '' : 'SELLER_CAPABILITY_INVOICE_TAX_REMEDY');
+          13, _omitEnumNames ? '' : 'SELLER_CAPABILITY_INVOICE_TAX_REMEDY');
 
   /// 物流建店、啟用與關閉配送方式。前置條件是開通完成（SELLER_REQUIREMENT_ONBOARDING_COMPLETE：平台審核核准且收款帳戶的轉帳能力啟用）。
   static const SellerCapability SELLER_CAPABILITY_SHIPPING_SETUP =
       SellerCapability._(
-          15, _omitEnumNames ? '' : 'SELLER_CAPABILITY_SHIPPING_SETUP');
+          14, _omitEnumNames ? '' : 'SELLER_CAPABILITY_SHIPPING_SETUP');
 
   /// 店家的狀態：買家看得到店面、可以結帳。缺的條件是公開曝光的全部條件（SellerRequirement）。這是狀態而不是
   /// 賣家能做的動作，只出現在 GetMyStore 的 capabilities，沒有任何方法需要它；「至少一個上架商品」由商品的曝光端檢查，不在其中。
   static const SellerCapability SELLER_CAPABILITY_PUBLIC_LISTING =
       SellerCapability._(
-          16, _omitEnumNames ? '' : 'SELLER_CAPABILITY_PUBLIC_LISTING');
+          15, _omitEnumNames ? '' : 'SELLER_CAPABILITY_PUBLIC_LISTING');
 
   static const $core.List<SellerCapability> values = <SellerCapability>[
     SELLER_CAPABILITY_UNSPECIFIED,
@@ -180,7 +181,7 @@ class SellerCapability extends $pb.ProtobufEnum {
   ];
 
   static final $core.List<SellerCapability?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 16);
+      $pb.ProtobufEnum.$_initByValueList(values, 15);
   static SellerCapability? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -522,21 +523,21 @@ class KYCField extends $pb.ProtobufEnum {
   static const KYCField KYC_FIELD_UNSPECIFIED =
       KYCField._(0, _omitEnumNames ? '' : 'KYC_FIELD_UNSPECIFIED');
   static const KYCField KYC_FIELD_PRODUCT_TYPE =
-      KYCField._(10, _omitEnumNames ? '' : 'KYC_FIELD_PRODUCT_TYPE');
+      KYCField._(1, _omitEnumNames ? '' : 'KYC_FIELD_PRODUCT_TYPE');
   static const KYCField KYC_FIELD_WEBSITE_URL =
-      KYCField._(12, _omitEnumNames ? '' : 'KYC_FIELD_WEBSITE_URL');
+      KYCField._(2, _omitEnumNames ? '' : 'KYC_FIELD_WEBSITE_URL');
   static const KYCField KYC_FIELD_BUSINESS_COMPANY_NAME =
-      KYCField._(20, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_NAME');
+      KYCField._(3, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_NAME');
   static const KYCField KYC_FIELD_BUSINESS_TAX_ID =
-      KYCField._(21, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_TAX_ID');
+      KYCField._(4, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_TAX_ID');
   static const KYCField KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE = KYCField._(
-      22, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE');
+      5, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE');
   static const KYCField KYC_FIELD_BUSINESS_COMPANY_PHONE =
-      KYCField._(25, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_PHONE');
+      KYCField._(6, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_PHONE');
   static const KYCField KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS = KYCField._(
-      27, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS');
-  static const KYCField KYC_FIELD_BUSINESS_COMPANY_ADDRESS = KYCField._(
-      28, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_ADDRESS');
+      7, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS');
+  static const KYCField KYC_FIELD_BUSINESS_COMPANY_ADDRESS =
+      KYCField._(8, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_ADDRESS');
 
   static const $core.List<KYCField> values = <KYCField>[
     KYC_FIELD_UNSPECIFIED,
@@ -550,9 +551,10 @@ class KYCField extends $pb.ProtobufEnum {
     KYC_FIELD_BUSINESS_COMPANY_ADDRESS,
   ];
 
-  static final $core.Map<$core.int, KYCField> _byValue =
-      $pb.ProtobufEnum.initByValue(values);
-  static KYCField? valueOf($core.int value) => _byValue[value];
+  static final $core.List<KYCField?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 8);
+  static KYCField? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const KYCField._(super.value, super.name);
 }

@@ -20,13 +20,13 @@ import 'package:protobuf/well_known_types/google/protobuf/duration.pb.dart'
 import 'package:protobuf/well_known_types/google/protobuf/field_mask.pb.dart'
     as $4;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
-    as $1;
+    as $2;
 
 import '../../../google/rpc/error_details.pb.dart' as $3;
 import '../../../google/type/date.pb.dart' as $5;
-import '../../common/v1alpha1/image.pb.dart' as $0;
+import '../../common/v1alpha1/image.pb.dart' as $1;
 import '../../common/v1alpha1/policy_category.pbenum.dart' as $9;
-import '../../common/v1alpha1/postal_address.pb.dart' as $2;
+import '../../common/v1alpha1/postal_address.pb.dart' as $0;
 import '../../common/v1alpha1/store_card.pb.dart' as $7;
 import '../../payment/v1alpha1/payment.pbenum.dart' as $8;
 import 'seller.pbenum.dart';
@@ -205,21 +205,21 @@ class Store extends $pb.GeneratedMessage {
     $core.String? storeName,
     $core.String? description,
     $core.String? contactPhone,
-    $core.String? prize,
-    $core.String? websiteUrl,
-    $core.bool? onboardingCompleted,
-    $0.Image? logo,
-    $0.Image? coverImage,
-    StoreStatus? status,
-    $1.Timestamp? createTime,
-    $1.Timestamp? updateTime,
-    $core.String? etag,
-    $core.String? logoStagedToken,
-    $core.String? coverStagedToken,
-    $2.PostalAddress? address,
+    $0.PostalAddress? address,
     $core.String? contactName,
     $core.String? contactMobile,
     $core.String? supportEmail,
+    $core.String? prize,
+    $core.String? websiteUrl,
+    $core.bool? onboardingCompleted,
+    $1.Image? logo,
+    $1.Image? coverImage,
+    StoreStatus? status,
+    $2.Timestamp? createTime,
+    $2.Timestamp? updateTime,
+    $core.String? etag,
+    $core.String? logoStagedToken,
+    $core.String? coverStagedToken,
   }) {
     final result = Store._();
     if (id != null) result.id = id;
@@ -227,6 +227,10 @@ class Store extends $pb.GeneratedMessage {
     if (storeName != null) result.storeName = storeName;
     if (description != null) result.description = description;
     if (contactPhone != null) result.contactPhone = contactPhone;
+    if (address != null) result.address = address;
+    if (contactName != null) result.contactName = contactName;
+    if (contactMobile != null) result.contactMobile = contactMobile;
+    if (supportEmail != null) result.supportEmail = supportEmail;
     if (prize != null) result.prize = prize;
     if (websiteUrl != null) result.websiteUrl = websiteUrl;
     if (onboardingCompleted != null)
@@ -239,10 +243,6 @@ class Store extends $pb.GeneratedMessage {
     if (etag != null) result.etag = etag;
     if (logoStagedToken != null) result.logoStagedToken = logoStagedToken;
     if (coverStagedToken != null) result.coverStagedToken = coverStagedToken;
-    if (address != null) result.address = address;
-    if (contactName != null) result.contactName = contactName;
-    if (contactMobile != null) result.contactMobile = contactMobile;
-    if (supportEmail != null) result.supportEmail = supportEmail;
     return result;
   }
 
@@ -265,27 +265,27 @@ class Store extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'storeName')
     ..aOS(4, _omitFieldNames ? '' : 'description')
     ..aOS(5, _omitFieldNames ? '' : 'contactPhone')
-    ..aOS(8, _omitFieldNames ? '' : 'prize')
-    ..aOS(9, _omitFieldNames ? '' : 'websiteUrl')
+    ..aOM<$0.PostalAddress>(6, _omitFieldNames ? '' : 'address',
+        subBuilder: $0.PostalAddress.$_createMessage)
+    ..aOS(7, _omitFieldNames ? '' : 'contactName')
+    ..aOS(8, _omitFieldNames ? '' : 'contactMobile')
+    ..aOS(9, _omitFieldNames ? '' : 'supportEmail')
+    ..aOS(10, _omitFieldNames ? '' : 'prize')
+    ..aOS(11, _omitFieldNames ? '' : 'websiteUrl')
     ..aOB(12, _omitFieldNames ? '' : 'onboardingCompleted')
-    ..aOM<$0.Image>(13, _omitFieldNames ? '' : 'logo',
-        subBuilder: $0.Image.$_createMessage)
-    ..aOM<$0.Image>(14, _omitFieldNames ? '' : 'coverImage',
-        subBuilder: $0.Image.$_createMessage)
+    ..aOM<$1.Image>(13, _omitFieldNames ? '' : 'logo',
+        subBuilder: $1.Image.$_createMessage)
+    ..aOM<$1.Image>(14, _omitFieldNames ? '' : 'coverImage',
+        subBuilder: $1.Image.$_createMessage)
     ..aE<StoreStatus>(15, _omitFieldNames ? '' : 'status',
         enumValues: StoreStatus.values)
-    ..aOM<$1.Timestamp>(16, _omitFieldNames ? '' : 'createTime',
-        subBuilder: $1.Timestamp.$_createMessage)
-    ..aOM<$1.Timestamp>(17, _omitFieldNames ? '' : 'updateTime',
-        subBuilder: $1.Timestamp.$_createMessage)
+    ..aOM<$2.Timestamp>(16, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$2.Timestamp>(17, _omitFieldNames ? '' : 'updateTime',
+        subBuilder: $2.Timestamp.$_createMessage)
     ..aOS(18, _omitFieldNames ? '' : 'etag')
     ..aOS(19, _omitFieldNames ? '' : 'logoStagedToken')
     ..aOS(20, _omitFieldNames ? '' : 'coverStagedToken')
-    ..aOM<$2.PostalAddress>(21, _omitFieldNames ? '' : 'address',
-        subBuilder: $2.PostalAddress.$_createMessage)
-    ..aOS(23, _omitFieldNames ? '' : 'contactName')
-    ..aOS(24, _omitFieldNames ? '' : 'contactMobile')
-    ..aOS(25, _omitFieldNames ? '' : 'supportEmail')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -357,163 +357,163 @@ class Store extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearContactPhone() => $_clearField(5);
 
+  /// 店家地址；不設表示沒有填。送出 KYC 之前要填，申請審核中或已核准時不能清掉。可以只填鄉鎮市區（address_detail 是空字串），有明細就一定有鄉鎮市區代碼。
+  /// update_mask 列 address 時整個換成請求的地址，請求沒有 address 就是清掉。
+  @$pb.TagNumber(6)
+  $0.PostalAddress get address => $_getN(5);
+  @$pb.TagNumber(6)
+  set address($0.PostalAddress value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasAddress() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAddress() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $0.PostalAddress ensureAddress() => $_ensure(5);
+
+  /// 聯絡人姓名，最多 50 字；空字串表示沒有填。選填，任何時候都能清掉。
+  @$pb.TagNumber(7)
+  $core.String get contactName => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set contactName($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasContactName() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearContactName() => $_clearField(7);
+
+  /// 聯絡人手機，09 開頭的 10 碼；空字串表示沒有填。選填，任何時候都能清掉。
+  @$pb.TagNumber(8)
+  $core.String get contactMobile => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set contactMobile($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasContactMobile() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearContactMobile() => $_clearField(8);
+
+  /// 客服電子信箱，最多 254 字；空字串表示沒有填。物流用它聯絡店家：送出 KYC 之前要填，申請審核中或已核准時不能清掉。
+  @$pb.TagNumber(9)
+  $core.String get supportEmail => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set supportEmail($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasSupportEmail() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearSupportEmail() => $_clearField(9);
+
   /// 得獎紀錄，最多 255 字。
-  @$pb.TagNumber(8)
-  $core.String get prize => $_getSZ(5);
-  @$pb.TagNumber(8)
-  set prize($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(8)
-  $core.bool hasPrize() => $_has(5);
-  @$pb.TagNumber(8)
-  void clearPrize() => $_clearField(8);
+  @$pb.TagNumber(10)
+  $core.String get prize => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set prize($core.String value) => $_setString(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasPrize() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearPrize() => $_clearField(10);
 
   /// 官網，http 或 https 網址。
-  @$pb.TagNumber(9)
-  $core.String get websiteUrl => $_getSZ(6);
-  @$pb.TagNumber(9)
-  set websiteUrl($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(9)
-  $core.bool hasWebsiteUrl() => $_has(6);
-  @$pb.TagNumber(9)
-  void clearWebsiteUrl() => $_clearField(9);
+  @$pb.TagNumber(11)
+  $core.String get websiteUrl => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set websiteUrl($core.String value) => $_setString(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasWebsiteUrl() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearWebsiteUrl() => $_clearField(11);
 
   /// 已完成新手引導；由 CompleteMyStoreOnboarding 設定，完成之後不能改回未完成。
   @$pb.TagNumber(12)
-  $core.bool get onboardingCompleted => $_getBF(7);
+  $core.bool get onboardingCompleted => $_getBF(11);
   @$pb.TagNumber(12)
-  set onboardingCompleted($core.bool value) => $_setBool(7, value);
+  set onboardingCompleted($core.bool value) => $_setBool(11, value);
   @$pb.TagNumber(12)
-  $core.bool hasOnboardingCompleted() => $_has(7);
+  $core.bool hasOnboardingCompleted() => $_has(11);
   @$pb.TagNumber(12)
   void clearOnboardingCompleted() => $_clearField(12);
 
   /// 沒有設定時不設。
   @$pb.TagNumber(13)
-  $0.Image get logo => $_getN(8);
+  $1.Image get logo => $_getN(12);
   @$pb.TagNumber(13)
-  set logo($0.Image value) => $_setField(13, value);
+  set logo($1.Image value) => $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasLogo() => $_has(8);
+  $core.bool hasLogo() => $_has(12);
   @$pb.TagNumber(13)
   void clearLogo() => $_clearField(13);
   @$pb.TagNumber(13)
-  $0.Image ensureLogo() => $_ensure(8);
+  $1.Image ensureLogo() => $_ensure(12);
 
   /// 沒有設定時不設。
   @$pb.TagNumber(14)
-  $0.Image get coverImage => $_getN(9);
+  $1.Image get coverImage => $_getN(13);
   @$pb.TagNumber(14)
-  set coverImage($0.Image value) => $_setField(14, value);
+  set coverImage($1.Image value) => $_setField(14, value);
   @$pb.TagNumber(14)
-  $core.bool hasCoverImage() => $_has(9);
+  $core.bool hasCoverImage() => $_has(13);
   @$pb.TagNumber(14)
   void clearCoverImage() => $_clearField(14);
   @$pb.TagNumber(14)
-  $0.Image ensureCoverImage() => $_ensure(9);
+  $1.Image ensureCoverImage() => $_ensure(13);
 
   @$pb.TagNumber(15)
-  StoreStatus get status => $_getN(10);
+  StoreStatus get status => $_getN(14);
   @$pb.TagNumber(15)
   set status(StoreStatus value) => $_setField(15, value);
   @$pb.TagNumber(15)
-  $core.bool hasStatus() => $_has(10);
+  $core.bool hasStatus() => $_has(14);
   @$pb.TagNumber(15)
   void clearStatus() => $_clearField(15);
 
   @$pb.TagNumber(16)
-  $1.Timestamp get createTime => $_getN(11);
+  $2.Timestamp get createTime => $_getN(15);
   @$pb.TagNumber(16)
-  set createTime($1.Timestamp value) => $_setField(16, value);
+  set createTime($2.Timestamp value) => $_setField(16, value);
   @$pb.TagNumber(16)
-  $core.bool hasCreateTime() => $_has(11);
+  $core.bool hasCreateTime() => $_has(15);
   @$pb.TagNumber(16)
   void clearCreateTime() => $_clearField(16);
   @$pb.TagNumber(16)
-  $1.Timestamp ensureCreateTime() => $_ensure(11);
+  $2.Timestamp ensureCreateTime() => $_ensure(15);
 
   /// 店家資料最後一次被編輯的時間。
   @$pb.TagNumber(17)
-  $1.Timestamp get updateTime => $_getN(12);
+  $2.Timestamp get updateTime => $_getN(16);
   @$pb.TagNumber(17)
-  set updateTime($1.Timestamp value) => $_setField(17, value);
+  set updateTime($2.Timestamp value) => $_setField(17, value);
   @$pb.TagNumber(17)
-  $core.bool hasUpdateTime() => $_has(12);
+  $core.bool hasUpdateTime() => $_has(16);
   @$pb.TagNumber(17)
   void clearUpdateTime() => $_clearField(17);
   @$pb.TagNumber(17)
-  $1.Timestamp ensureUpdateTime() => $_ensure(12);
+  $2.Timestamp ensureUpdateTime() => $_ensure(16);
 
   @$pb.TagNumber(18)
-  $core.String get etag => $_getSZ(13);
+  $core.String get etag => $_getSZ(17);
   @$pb.TagNumber(18)
-  set etag($core.String value) => $_setString(13, value);
+  set etag($core.String value) => $_setString(17, value);
   @$pb.TagNumber(18)
-  $core.bool hasEtag() => $_has(13);
+  $core.bool hasEtag() => $_has(17);
   @$pb.TagNumber(18)
   void clearEtag() => $_clearField(18);
 
   /// 上傳完成後拿到的 staged token；換 logo 時列進 update_mask。
   @$pb.TagNumber(19)
-  $core.String get logoStagedToken => $_getSZ(14);
+  $core.String get logoStagedToken => $_getSZ(18);
   @$pb.TagNumber(19)
-  set logoStagedToken($core.String value) => $_setString(14, value);
+  set logoStagedToken($core.String value) => $_setString(18, value);
   @$pb.TagNumber(19)
-  $core.bool hasLogoStagedToken() => $_has(14);
+  $core.bool hasLogoStagedToken() => $_has(18);
   @$pb.TagNumber(19)
   void clearLogoStagedToken() => $_clearField(19);
 
   /// 上傳完成後拿到的 staged token；換封面時列進 update_mask。
   @$pb.TagNumber(20)
-  $core.String get coverStagedToken => $_getSZ(15);
+  $core.String get coverStagedToken => $_getSZ(19);
   @$pb.TagNumber(20)
-  set coverStagedToken($core.String value) => $_setString(15, value);
+  set coverStagedToken($core.String value) => $_setString(19, value);
   @$pb.TagNumber(20)
-  $core.bool hasCoverStagedToken() => $_has(15);
+  $core.bool hasCoverStagedToken() => $_has(19);
   @$pb.TagNumber(20)
   void clearCoverStagedToken() => $_clearField(20);
-
-  /// 店家地址；不設表示沒有填。送出 KYC 之前要填，申請審核中或已核准時不能清掉。可以只填鄉鎮市區（address_detail 是空字串），有明細就一定有鄉鎮市區代碼。
-  /// update_mask 列 address 時整個換成請求的地址，請求沒有 address 就是清掉。
-  @$pb.TagNumber(21)
-  $2.PostalAddress get address => $_getN(16);
-  @$pb.TagNumber(21)
-  set address($2.PostalAddress value) => $_setField(21, value);
-  @$pb.TagNumber(21)
-  $core.bool hasAddress() => $_has(16);
-  @$pb.TagNumber(21)
-  void clearAddress() => $_clearField(21);
-  @$pb.TagNumber(21)
-  $2.PostalAddress ensureAddress() => $_ensure(16);
-
-  /// 聯絡人姓名，最多 50 字；空字串表示沒有填。選填，任何時候都能清掉。
-  @$pb.TagNumber(23)
-  $core.String get contactName => $_getSZ(17);
-  @$pb.TagNumber(23)
-  set contactName($core.String value) => $_setString(17, value);
-  @$pb.TagNumber(23)
-  $core.bool hasContactName() => $_has(17);
-  @$pb.TagNumber(23)
-  void clearContactName() => $_clearField(23);
-
-  /// 聯絡人手機，09 開頭的 10 碼；空字串表示沒有填。選填，任何時候都能清掉。
-  @$pb.TagNumber(24)
-  $core.String get contactMobile => $_getSZ(18);
-  @$pb.TagNumber(24)
-  set contactMobile($core.String value) => $_setString(18, value);
-  @$pb.TagNumber(24)
-  $core.bool hasContactMobile() => $_has(18);
-  @$pb.TagNumber(24)
-  void clearContactMobile() => $_clearField(24);
-
-  /// 客服電子信箱，最多 254 字；空字串表示沒有填。物流用它聯絡店家：送出 KYC 之前要填，申請審核中或已核准時不能清掉。
-  @$pb.TagNumber(25)
-  $core.String get supportEmail => $_getSZ(19);
-  @$pb.TagNumber(25)
-  set supportEmail($core.String value) => $_setString(19, value);
-  @$pb.TagNumber(25)
-  $core.bool hasSupportEmail() => $_has(19);
-  @$pb.TagNumber(25)
-  void clearSupportEmail() => $_clearField(25);
 }
 
 /// CapabilityStatus 是一個能力此刻的狀態：啟用，或沒有啟用與還缺的條件。
@@ -606,7 +606,7 @@ class ApplyStoreRequest extends $pb.GeneratedMessage {
     $core.String? description,
     $core.String? contactPhone,
     $core.String? prize,
-    $2.PostalAddress? address,
+    $0.PostalAddress? address,
     $core.Iterable<AgreementAcceptance>? acceptedAgreements,
   }) {
     final result = ApplyStoreRequest._();
@@ -637,10 +637,10 @@ class ApplyStoreRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'storeName')
     ..aOS(2, _omitFieldNames ? '' : 'description')
     ..aOS(3, _omitFieldNames ? '' : 'contactPhone')
-    ..aOS(6, _omitFieldNames ? '' : 'prize')
-    ..aOM<$2.PostalAddress>(7, _omitFieldNames ? '' : 'address',
-        subBuilder: $2.PostalAddress.$_createMessage)
-    ..pPM<AgreementAcceptance>(8, _omitFieldNames ? '' : 'acceptedAgreements',
+    ..aOS(4, _omitFieldNames ? '' : 'prize')
+    ..aOM<$0.PostalAddress>(5, _omitFieldNames ? '' : 'address',
+        subBuilder: $0.PostalAddress.$_createMessage)
+    ..pPM<AgreementAcceptance>(6, _omitFieldNames ? '' : 'acceptedAgreements',
         subBuilder: AgreementAcceptance.$_createMessage)
     ..hasRequiredFields = false;
 
@@ -697,32 +697,32 @@ class ApplyStoreRequest extends $pb.GeneratedMessage {
   void clearContactPhone() => $_clearField(3);
 
   /// 得獎紀錄，最多 255 字。
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(4)
   $core.String get prize => $_getSZ(3);
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(4)
   set prize($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(4)
   $core.bool hasPrize() => $_has(3);
-  @$pb.TagNumber(6)
-  void clearPrize() => $_clearField(6);
+  @$pb.TagNumber(4)
+  void clearPrize() => $_clearField(4);
 
   /// 店家地址；不設表示沒有填。可以只填鄉鎮市區（address_detail 是空字串）。
-  @$pb.TagNumber(7)
-  $2.PostalAddress get address => $_getN(4);
-  @$pb.TagNumber(7)
-  set address($2.PostalAddress value) => $_setField(7, value);
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(5)
+  $0.PostalAddress get address => $_getN(4);
+  @$pb.TagNumber(5)
+  set address($0.PostalAddress value) => $_setField(5, value);
+  @$pb.TagNumber(5)
   $core.bool hasAddress() => $_has(4);
-  @$pb.TagNumber(7)
-  void clearAddress() => $_clearField(7);
-  @$pb.TagNumber(7)
-  $2.PostalAddress ensureAddress() => $_ensure(4);
+  @$pb.TagNumber(5)
+  void clearAddress() => $_clearField(5);
+  @$pb.TagNumber(5)
+  $0.PostalAddress ensureAddress() => $_ensure(4);
 
   /// 賣家同意的文件，剛好是 SELLER_TERMS 一份。缺種類、多出不屬於這個操作的種類、同一種重複或 UNSPECIFIED 回
   /// invalid_argument（field violation 指向 accepted_agreements）；版本不是現行版本回 failed_precondition，
   /// ErrorInfo.reason 是 AGREEMENT_OUTDATED，client 重讀 GetSellerAgreements，請賣家重新勾選。同意與開店同一個
   /// transaction，連同時間與來源 IP、User-Agent 記錄。
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(6)
   $pb.PbList<AgreementAcceptance> get acceptedAgreements => $_getList(5);
 }
 
@@ -860,7 +860,7 @@ class GetMyStoreOpeningResponse extends $pb.GeneratedMessage {
       createEmptyInstance: GetMyStoreOpeningResponse.$_createMessage)
     ..aOB(1, _omitFieldNames ? '' : 'canApplyStore')
     ..pPM<StoreOpeningUnavailability>(
-        3, _omitFieldNames ? '' : 'unavailabilities',
+        2, _omitFieldNames ? '' : 'unavailabilities',
         subBuilder: StoreOpeningUnavailability.$_createMessage)
     ..hasRequiredFields = false;
 
@@ -901,7 +901,7 @@ class GetMyStoreOpeningResponse extends $pb.GeneratedMessage {
   void clearCanApplyStore() => $_clearField(1);
 
   /// 不能申請的原因，依優先序（結構性的在前，第一個是主要原因，終止合作先於停權：終止撤銷之前解除停權也開不了店）；can_apply_store 為 true 時為空。
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $pb.PbList<StoreOpeningUnavailability> get unavailabilities => $_getList(1);
 }
 
@@ -1061,11 +1061,11 @@ class GetMyStoreResponse extends $pb.GeneratedMessage {
       createEmptyInstance: GetMyStoreResponse.$_createMessage)
     ..aOM<Store>(1, _omitFieldNames ? '' : 'store',
         subBuilder: Store.$_createMessage)
-    ..pPM<CapabilityStatus>(3, _omitFieldNames ? '' : 'capabilities',
+    ..pPM<CapabilityStatus>(2, _omitFieldNames ? '' : 'capabilities',
         subBuilder: CapabilityStatus.$_createMessage)
-    ..aOM<StoreStats>(5, _omitFieldNames ? '' : 'stats',
+    ..aOM<StoreStats>(3, _omitFieldNames ? '' : 'stats',
         subBuilder: StoreStats.$_createMessage)
-    ..aOB(6, _omitFieldNames ? '' : 'suspended')
+    ..aOB(4, _omitFieldNames ? '' : 'suspended')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1103,31 +1103,31 @@ class GetMyStoreResponse extends $pb.GeneratedMessage {
 
   /// 每個能力（含 PUBLIC_LISTING，不含 UNSPECIFIED）此刻的狀態，依 SellerCapability 的數字順序，所以沒有出現的能力
   /// 不代表沒有啟用。
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $pb.PbList<CapabilityStatus> get capabilities => $_getList(1);
 
   /// 店家自己看的統計，與前台店面頁的 StoreStats 同一份組裝。粉絲與評價各自讀，讀不到的欄位不設；預覽自己的店，不論是否公開都讀得到。
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(3)
   StoreStats get stats => $_getN(2);
-  @$pb.TagNumber(5)
-  set stats(StoreStats value) => $_setField(5, value);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(3)
+  set stats(StoreStats value) => $_setField(3, value);
+  @$pb.TagNumber(3)
   $core.bool hasStats() => $_has(2);
-  @$pb.TagNumber(5)
-  void clearStats() => $_clearField(5);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(3)
+  void clearStats() => $_clearField(3);
+  @$pb.TagNumber(3)
   StoreStats ensureStats() => $_ensure(2);
 
   /// 帳號此刻是否停權（任何一個店家的生效中措施都算）。與 capabilities 裡的 NOT_SUSPENDED 缺項來自同一次推導；
   /// 停權的內容讀 ListMyMeasures(state=ACTIVE)。
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(4)
   $core.bool get suspended => $_getBF(3);
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(4)
   set suspended($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(4)
   $core.bool hasSuspended() => $_has(3);
-  @$pb.TagNumber(6)
-  void clearSuspended() => $_clearField(6);
+  @$pb.TagNumber(4)
+  void clearSuspended() => $_clearField(4);
 }
 
 class GetMyOnboardingRequest extends $pb.GeneratedMessage {
@@ -1886,7 +1886,7 @@ class BuyerCard extends $pb.GeneratedMessage {
     $core.String? id,
     $core.bool? deleted,
     $core.String? displayName,
-    $0.Image? avatar,
+    $1.Image? avatar,
   }) {
     final result = BuyerCard._();
     if (id != null) result.id = id;
@@ -1913,8 +1913,8 @@ class BuyerCard extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'id')
     ..aOB(2, _omitFieldNames ? '' : 'deleted')
     ..aOS(3, _omitFieldNames ? '' : 'displayName')
-    ..aOM<$0.Image>(4, _omitFieldNames ? '' : 'avatar',
-        subBuilder: $0.Image.$_createMessage)
+    ..aOM<$1.Image>(4, _omitFieldNames ? '' : 'avatar',
+        subBuilder: $1.Image.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1966,22 +1966,22 @@ class BuyerCard extends $pb.GeneratedMessage {
   void clearDisplayName() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $0.Image get avatar => $_getN(3);
+  $1.Image get avatar => $_getN(3);
   @$pb.TagNumber(4)
-  set avatar($0.Image value) => $_setField(4, value);
+  set avatar($1.Image value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasAvatar() => $_has(3);
   @$pb.TagNumber(4)
   void clearAvatar() => $_clearField(4);
   @$pb.TagNumber(4)
-  $0.Image ensureAvatar() => $_ensure(3);
+  $1.Image ensureAvatar() => $_ensure(3);
 }
 
 /// Follower 是追蹤店家的買家。
 class Follower extends $pb.GeneratedMessage {
   factory Follower({
     BuyerCard? buyer,
-    $1.Timestamp? createTime,
+    $2.Timestamp? createTime,
   }) {
     final result = Follower._();
     if (buyer != null) result.buyer = buyer;
@@ -2005,8 +2005,8 @@ class Follower extends $pb.GeneratedMessage {
       createEmptyInstance: Follower.$_createMessage)
     ..aOM<BuyerCard>(1, _omitFieldNames ? '' : 'buyer',
         subBuilder: BuyerCard.$_createMessage)
-    ..aOM<$1.Timestamp>(2, _omitFieldNames ? '' : 'createTime',
-        subBuilder: $1.Timestamp.$_createMessage)
+    ..aOM<$2.Timestamp>(2, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $2.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2041,15 +2041,15 @@ class Follower extends $pb.GeneratedMessage {
   BuyerCard ensureBuyer() => $_ensure(0);
 
   @$pb.TagNumber(2)
-  $1.Timestamp get createTime => $_getN(1);
+  $2.Timestamp get createTime => $_getN(1);
   @$pb.TagNumber(2)
-  set createTime($1.Timestamp value) => $_setField(2, value);
+  set createTime($2.Timestamp value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasCreateTime() => $_has(1);
   @$pb.TagNumber(2)
   void clearCreateTime() => $_clearField(2);
   @$pb.TagNumber(2)
-  $1.Timestamp ensureCreateTime() => $_ensure(1);
+  $2.Timestamp ensureCreateTime() => $_ensure(1);
 }
 
 class GetMyDashboardRequest extends $pb.GeneratedMessage {
@@ -3093,7 +3093,7 @@ class KYCDocument extends $pb.GeneratedMessage {
 class KYCRejection extends $pb.GeneratedMessage {
   factory KYCRejection({
     $core.String? reason,
-    $1.Timestamp? decideTime,
+    $2.Timestamp? decideTime,
     $core.Iterable<KYCIssue>? issues,
   }) {
     final result = KYCRejection._();
@@ -3118,9 +3118,9 @@ class KYCRejection extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: KYCRejection.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'reason')
-    ..aOM<$1.Timestamp>(3, _omitFieldNames ? '' : 'decideTime',
-        subBuilder: $1.Timestamp.$_createMessage)
-    ..pPM<KYCIssue>(4, _omitFieldNames ? '' : 'issues',
+    ..aOM<$2.Timestamp>(2, _omitFieldNames ? '' : 'decideTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..pPM<KYCIssue>(3, _omitFieldNames ? '' : 'issues',
         subBuilder: KYCIssue.$_createMessage)
     ..hasRequiredFields = false;
 
@@ -3156,19 +3156,19 @@ class KYCRejection extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearReason() => $_clearField(1);
 
-  @$pb.TagNumber(3)
-  $1.Timestamp get decideTime => $_getN(1);
-  @$pb.TagNumber(3)
-  set decideTime($1.Timestamp value) => $_setField(3, value);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
+  $2.Timestamp get decideTime => $_getN(1);
+  @$pb.TagNumber(2)
+  set decideTime($2.Timestamp value) => $_setField(2, value);
+  @$pb.TagNumber(2)
   $core.bool hasDecideTime() => $_has(1);
-  @$pb.TagNumber(3)
-  void clearDecideTime() => $_clearField(3);
-  @$pb.TagNumber(3)
-  $1.Timestamp ensureDecideTime() => $_ensure(1);
+  @$pb.TagNumber(2)
+  void clearDecideTime() => $_clearField(2);
+  @$pb.TagNumber(2)
+  $2.Timestamp ensureDecideTime() => $_ensure(1);
 
   /// 退回時逐項指出的問題（不管賣家後來有沒有處理）；賣家還沒處理的是 KYCApplication.outstanding_issues。
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   $pb.PbList<KYCIssue> get issues => $_getList(2);
 }
 
@@ -3223,7 +3223,7 @@ class BusinessKYC extends $pb.GeneratedMessage {
     $5.Date? companyRegisterDate,
     $core.String? companyPhone,
     $core.Iterable<KYCDocument>? companyDocuments,
-    $2.PostalAddress? companyAddress,
+    $0.PostalAddress? companyAddress,
   }) {
     final result = BusinessKYC._();
     if (companyName != null) result.companyName = companyName;
@@ -3251,15 +3251,15 @@ class BusinessKYC extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: BusinessKYC.$_createMessage)
-    ..aOS(2, _omitFieldNames ? '' : 'companyName')
-    ..aOS(3, _omitFieldNames ? '' : 'taxId')
-    ..aOM<$5.Date>(4, _omitFieldNames ? '' : 'companyRegisterDate',
+    ..aOS(1, _omitFieldNames ? '' : 'companyName')
+    ..aOS(2, _omitFieldNames ? '' : 'taxId')
+    ..aOM<$5.Date>(3, _omitFieldNames ? '' : 'companyRegisterDate',
         subBuilder: $5.Date.$_createMessage)
-    ..aOS(7, _omitFieldNames ? '' : 'companyPhone')
-    ..pPM<KYCDocument>(10, _omitFieldNames ? '' : 'companyDocuments',
+    ..aOS(4, _omitFieldNames ? '' : 'companyPhone')
+    ..pPM<KYCDocument>(5, _omitFieldNames ? '' : 'companyDocuments',
         subBuilder: KYCDocument.$_createMessage)
-    ..aOM<$2.PostalAddress>(11, _omitFieldNames ? '' : 'companyAddress',
-        subBuilder: $2.PostalAddress.$_createMessage)
+    ..aOM<$0.PostalAddress>(6, _omitFieldNames ? '' : 'companyAddress',
+        subBuilder: $0.PostalAddress.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3284,60 +3284,60 @@ class BusinessKYC extends $pb.GeneratedMessage {
           BusinessKYC.$_createMessage);
   static BusinessKYC? _defaultInstance;
 
-  @$pb.TagNumber(2)
+  @$pb.TagNumber(1)
   $core.String get companyName => $_getSZ(0);
-  @$pb.TagNumber(2)
+  @$pb.TagNumber(1)
   set companyName($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(2)
+  @$pb.TagNumber(1)
   $core.bool hasCompanyName() => $_has(0);
-  @$pb.TagNumber(2)
-  void clearCompanyName() => $_clearField(2);
+  @$pb.TagNumber(1)
+  void clearCompanyName() => $_clearField(1);
 
   /// 8 碼統一編號，含檢查碼（2023 年起的規則）。
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $core.String get taxId => $_getSZ(1);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   set taxId($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $core.bool hasTaxId() => $_has(1);
-  @$pb.TagNumber(3)
-  void clearTaxId() => $_clearField(3);
+  @$pb.TagNumber(2)
+  void clearTaxId() => $_clearField(2);
 
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   $5.Date get companyRegisterDate => $_getN(2);
-  @$pb.TagNumber(4)
-  set companyRegisterDate($5.Date value) => $_setField(4, value);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
+  set companyRegisterDate($5.Date value) => $_setField(3, value);
+  @$pb.TagNumber(3)
   $core.bool hasCompanyRegisterDate() => $_has(2);
-  @$pb.TagNumber(4)
-  void clearCompanyRegisterDate() => $_clearField(4);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
+  void clearCompanyRegisterDate() => $_clearField(3);
+  @$pb.TagNumber(3)
   $5.Date ensureCompanyRegisterDate() => $_ensure(2);
 
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(4)
   $core.String get companyPhone => $_getSZ(3);
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(4)
   set companyPhone($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(4)
   $core.bool hasCompanyPhone() => $_has(3);
-  @$pb.TagNumber(7)
-  void clearCompanyPhone() => $_clearField(7);
+  @$pb.TagNumber(4)
+  void clearCompanyPhone() => $_clearField(4);
 
   /// 公司文件，最多 10 張，順序就是位置；列進 update_mask 時整個換成請求的清單。
-  @$pb.TagNumber(10)
+  @$pb.TagNumber(5)
   $pb.PbList<KYCDocument> get companyDocuments => $_getList(4);
 
   /// 公司地址；列進 update_mask 時整個換成請求的地址，請求沒有 address 就是清掉。可以只填鄉鎮市區。
-  @$pb.TagNumber(11)
-  $2.PostalAddress get companyAddress => $_getN(5);
-  @$pb.TagNumber(11)
-  set companyAddress($2.PostalAddress value) => $_setField(11, value);
-  @$pb.TagNumber(11)
+  @$pb.TagNumber(6)
+  $0.PostalAddress get companyAddress => $_getN(5);
+  @$pb.TagNumber(6)
+  set companyAddress($0.PostalAddress value) => $_setField(6, value);
+  @$pb.TagNumber(6)
   $core.bool hasCompanyAddress() => $_has(5);
-  @$pb.TagNumber(11)
-  void clearCompanyAddress() => $_clearField(11);
-  @$pb.TagNumber(11)
-  $2.PostalAddress ensureCompanyAddress() => $_ensure(5);
+  @$pb.TagNumber(6)
+  void clearCompanyAddress() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $0.PostalAddress ensureCompanyAddress() => $_ensure(5);
 }
 
 enum KYCApplication_Subject { individual, business, notSet }
@@ -3361,12 +3361,12 @@ class KYCApplication extends $pb.GeneratedMessage {
     BusinessKYC? business,
     KYCRejection? lastRejection,
     $core.Iterable<KYCField>? missingFields,
-    $1.Timestamp? submitTime,
-    $1.Timestamp? decideTime,
-    $1.Timestamp? createTime,
-    $1.Timestamp? updateTime,
     $core.Iterable<StoreField>? missingStoreFields,
     $core.Iterable<KYCIssue>? outstandingIssues,
+    $2.Timestamp? submitTime,
+    $2.Timestamp? decideTime,
+    $2.Timestamp? createTime,
+    $2.Timestamp? updateTime,
   }) {
     final result = KYCApplication._();
     if (id != null) result.id = id;
@@ -3378,14 +3378,14 @@ class KYCApplication extends $pb.GeneratedMessage {
     if (business != null) result.business = business;
     if (lastRejection != null) result.lastRejection = lastRejection;
     if (missingFields != null) result.missingFields.addAll(missingFields);
-    if (submitTime != null) result.submitTime = submitTime;
-    if (decideTime != null) result.decideTime = decideTime;
-    if (createTime != null) result.createTime = createTime;
-    if (updateTime != null) result.updateTime = updateTime;
     if (missingStoreFields != null)
       result.missingStoreFields.addAll(missingStoreFields);
     if (outstandingIssues != null)
       result.outstandingIssues.addAll(outstandingIssues);
+    if (submitTime != null) result.submitTime = submitTime;
+    if (decideTime != null) result.decideTime = decideTime;
+    if (createTime != null) result.createTime = createTime;
+    if (updateTime != null) result.updateTime = updateTime;
     return result;
   }
 
@@ -3400,8 +3400,8 @@ class KYCApplication extends $pb.GeneratedMessage {
 
   static const $core.Map<$core.int, KYCApplication_Subject>
       _KYCApplication_SubjectByTag = {
-    22: KYCApplication_Subject.individual,
-    23: KYCApplication_Subject.business,
+    6: KYCApplication_Subject.individual,
+    7: KYCApplication_Subject.business,
     0: KYCApplication_Subject.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -3409,39 +3409,39 @@ class KYCApplication extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: KYCApplication.$_createMessage)
-    ..oo(0, [22, 23])
+    ..oo(0, [6, 7])
     ..aOS(1, _omitFieldNames ? '' : 'id')
     ..aE<KYCStatus>(2, _omitFieldNames ? '' : 'status',
         enumValues: KYCStatus.values)
     ..aOS(3, _omitFieldNames ? '' : 'etag')
-    ..aOS(14, _omitFieldNames ? '' : 'productType')
-    ..aOS(16, _omitFieldNames ? '' : 'websiteUrl')
-    ..aOM<IndividualKYC>(22, _omitFieldNames ? '' : 'individual',
+    ..aOS(4, _omitFieldNames ? '' : 'productType')
+    ..aOS(5, _omitFieldNames ? '' : 'websiteUrl')
+    ..aOM<IndividualKYC>(6, _omitFieldNames ? '' : 'individual',
         subBuilder: IndividualKYC.$_createMessage)
-    ..aOM<BusinessKYC>(23, _omitFieldNames ? '' : 'business',
+    ..aOM<BusinessKYC>(7, _omitFieldNames ? '' : 'business',
         subBuilder: BusinessKYC.$_createMessage)
-    ..aOM<KYCRejection>(25, _omitFieldNames ? '' : 'lastRejection',
+    ..aOM<KYCRejection>(8, _omitFieldNames ? '' : 'lastRejection',
         subBuilder: KYCRejection.$_createMessage)
     ..pc<KYCField>(
-        26, _omitFieldNames ? '' : 'missingFields', $pb.PbFieldType.KE,
+        9, _omitFieldNames ? '' : 'missingFields', $pb.PbFieldType.KE,
         valueOf: KYCField.valueOf,
         enumValues: KYCField.values,
         defaultEnumValue: KYCField.KYC_FIELD_UNSPECIFIED)
-    ..aOM<$1.Timestamp>(27, _omitFieldNames ? '' : 'submitTime',
-        subBuilder: $1.Timestamp.$_createMessage)
-    ..aOM<$1.Timestamp>(28, _omitFieldNames ? '' : 'decideTime',
-        subBuilder: $1.Timestamp.$_createMessage)
-    ..aOM<$1.Timestamp>(29, _omitFieldNames ? '' : 'createTime',
-        subBuilder: $1.Timestamp.$_createMessage)
-    ..aOM<$1.Timestamp>(30, _omitFieldNames ? '' : 'updateTime',
-        subBuilder: $1.Timestamp.$_createMessage)
     ..pc<StoreField>(
-        31, _omitFieldNames ? '' : 'missingStoreFields', $pb.PbFieldType.KE,
+        10, _omitFieldNames ? '' : 'missingStoreFields', $pb.PbFieldType.KE,
         valueOf: StoreField.valueOf,
         enumValues: StoreField.values,
         defaultEnumValue: StoreField.STORE_FIELD_UNSPECIFIED)
-    ..pPM<KYCIssue>(32, _omitFieldNames ? '' : 'outstandingIssues',
+    ..pPM<KYCIssue>(11, _omitFieldNames ? '' : 'outstandingIssues',
         subBuilder: KYCIssue.$_createMessage)
+    ..aOM<$2.Timestamp>(12, _omitFieldNames ? '' : 'submitTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$2.Timestamp>(13, _omitFieldNames ? '' : 'decideTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$2.Timestamp>(14, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$2.Timestamp>(15, _omitFieldNames ? '' : 'updateTime',
+        subBuilder: $2.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3466,12 +3466,12 @@ class KYCApplication extends $pb.GeneratedMessage {
           KYCApplication.$_createMessage);
   static KYCApplication? _defaultInstance;
 
-  @$pb.TagNumber(22)
-  @$pb.TagNumber(23)
+  @$pb.TagNumber(6)
+  @$pb.TagNumber(7)
   KYCApplication_Subject whichSubject() =>
       _KYCApplication_SubjectByTag[$_whichOneof(0)]!;
-  @$pb.TagNumber(22)
-  @$pb.TagNumber(23)
+  @$pb.TagNumber(6)
+  @$pb.TagNumber(7)
   void clearSubject() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -3502,117 +3502,117 @@ class KYCApplication extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearEtag() => $_clearField(3);
 
-  @$pb.TagNumber(14)
+  @$pb.TagNumber(4)
   $core.String get productType => $_getSZ(3);
-  @$pb.TagNumber(14)
+  @$pb.TagNumber(4)
   set productType($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(14)
+  @$pb.TagNumber(4)
   $core.bool hasProductType() => $_has(3);
-  @$pb.TagNumber(14)
-  void clearProductType() => $_clearField(14);
+  @$pb.TagNumber(4)
+  void clearProductType() => $_clearField(4);
 
-  @$pb.TagNumber(16)
+  @$pb.TagNumber(5)
   $core.String get websiteUrl => $_getSZ(4);
-  @$pb.TagNumber(16)
+  @$pb.TagNumber(5)
   set websiteUrl($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(16)
+  @$pb.TagNumber(5)
   $core.bool hasWebsiteUrl() => $_has(4);
-  @$pb.TagNumber(16)
-  void clearWebsiteUrl() => $_clearField(16);
+  @$pb.TagNumber(5)
+  void clearWebsiteUrl() => $_clearField(5);
 
-  @$pb.TagNumber(22)
+  @$pb.TagNumber(6)
   IndividualKYC get individual => $_getN(5);
-  @$pb.TagNumber(22)
-  set individual(IndividualKYC value) => $_setField(22, value);
-  @$pb.TagNumber(22)
+  @$pb.TagNumber(6)
+  set individual(IndividualKYC value) => $_setField(6, value);
+  @$pb.TagNumber(6)
   $core.bool hasIndividual() => $_has(5);
-  @$pb.TagNumber(22)
-  void clearIndividual() => $_clearField(22);
-  @$pb.TagNumber(22)
+  @$pb.TagNumber(6)
+  void clearIndividual() => $_clearField(6);
+  @$pb.TagNumber(6)
   IndividualKYC ensureIndividual() => $_ensure(5);
 
-  @$pb.TagNumber(23)
+  @$pb.TagNumber(7)
   BusinessKYC get business => $_getN(6);
-  @$pb.TagNumber(23)
-  set business(BusinessKYC value) => $_setField(23, value);
-  @$pb.TagNumber(23)
+  @$pb.TagNumber(7)
+  set business(BusinessKYC value) => $_setField(7, value);
+  @$pb.TagNumber(7)
   $core.bool hasBusiness() => $_has(6);
-  @$pb.TagNumber(23)
-  void clearBusiness() => $_clearField(23);
-  @$pb.TagNumber(23)
+  @$pb.TagNumber(7)
+  void clearBusiness() => $_clearField(7);
+  @$pb.TagNumber(7)
   BusinessKYC ensureBusiness() => $_ensure(6);
 
   /// 最近一次退回，只在「最近一次審核紀錄是退回、賣家還沒重新送出（核准、取消之後也算）」時設，其餘時候不設；client 直接看有沒有
   /// 這個欄位決定要不要顯示總理由與「需重新送出」的提示，不必自己推導。賣家把每一項問題都處理完、還沒重新送出時它仍在。
-  @$pb.TagNumber(25)
+  @$pb.TagNumber(8)
   KYCRejection get lastRejection => $_getN(7);
-  @$pb.TagNumber(25)
-  set lastRejection(KYCRejection value) => $_setField(25, value);
-  @$pb.TagNumber(25)
+  @$pb.TagNumber(8)
+  set lastRejection(KYCRejection value) => $_setField(8, value);
+  @$pb.TagNumber(8)
   $core.bool hasLastRejection() => $_has(7);
-  @$pb.TagNumber(25)
-  void clearLastRejection() => $_clearField(25);
-  @$pb.TagNumber(25)
+  @$pb.TagNumber(8)
+  void clearLastRejection() => $_clearField(8);
+  @$pb.TagNumber(8)
   KYCRejection ensureLastRejection() => $_ensure(7);
 
   /// 送出之前還缺的欄位（與 SubmitKYC 檢查的是同一份規則），依 KYCField 的數字順序；齊全時是空的。client 以它決定續填的
   /// 位置與哪些欄位標紅，不必自己重寫完整性規則。
-  @$pb.TagNumber(26)
+  @$pb.TagNumber(9)
   $pb.PbList<KYCField> get missingFields => $_getList(8);
-
-  @$pb.TagNumber(27)
-  $1.Timestamp get submitTime => $_getN(9);
-  @$pb.TagNumber(27)
-  set submitTime($1.Timestamp value) => $_setField(27, value);
-  @$pb.TagNumber(27)
-  $core.bool hasSubmitTime() => $_has(9);
-  @$pb.TagNumber(27)
-  void clearSubmitTime() => $_clearField(27);
-  @$pb.TagNumber(27)
-  $1.Timestamp ensureSubmitTime() => $_ensure(9);
-
-  @$pb.TagNumber(28)
-  $1.Timestamp get decideTime => $_getN(10);
-  @$pb.TagNumber(28)
-  set decideTime($1.Timestamp value) => $_setField(28, value);
-  @$pb.TagNumber(28)
-  $core.bool hasDecideTime() => $_has(10);
-  @$pb.TagNumber(28)
-  void clearDecideTime() => $_clearField(28);
-  @$pb.TagNumber(28)
-  $1.Timestamp ensureDecideTime() => $_ensure(10);
-
-  @$pb.TagNumber(29)
-  $1.Timestamp get createTime => $_getN(11);
-  @$pb.TagNumber(29)
-  set createTime($1.Timestamp value) => $_setField(29, value);
-  @$pb.TagNumber(29)
-  $core.bool hasCreateTime() => $_has(11);
-  @$pb.TagNumber(29)
-  void clearCreateTime() => $_clearField(29);
-  @$pb.TagNumber(29)
-  $1.Timestamp ensureCreateTime() => $_ensure(11);
-
-  @$pb.TagNumber(30)
-  $1.Timestamp get updateTime => $_getN(12);
-  @$pb.TagNumber(30)
-  set updateTime($1.Timestamp value) => $_setField(30, value);
-  @$pb.TagNumber(30)
-  $core.bool hasUpdateTime() => $_has(12);
-  @$pb.TagNumber(30)
-  void clearUpdateTime() => $_clearField(30);
-  @$pb.TagNumber(30)
-  $1.Timestamp ensureUpdateTime() => $_ensure(12);
 
   /// 送出之前還缺的店家欄位（必填的是地址與客服電子信箱，與 SubmitKYC 檢查的是同一份規則），依 StoreField 的數字順序；齊全時是空的。
   /// 這些欄位用 UpdateMyStore 寫，不在申請上。
-  @$pb.TagNumber(31)
-  $pb.PbList<StoreField> get missingStoreFields => $_getList(13);
+  @$pb.TagNumber(10)
+  $pb.PbList<StoreField> get missingStoreFields => $_getList(9);
 
   /// 最近一次退回指出的問題裡賣家還沒處理的（已處理由伺服器判定：該欄位的值在退回之後被改過，或指到的文件已被移除或替換）；
   /// 重新送出、核准或取消之後是空的。client 以它標出要補的欄位與文件，不必自己推導退回是否仍然有效。
-  @$pb.TagNumber(32)
-  $pb.PbList<KYCIssue> get outstandingIssues => $_getList(14);
+  @$pb.TagNumber(11)
+  $pb.PbList<KYCIssue> get outstandingIssues => $_getList(10);
+
+  @$pb.TagNumber(12)
+  $2.Timestamp get submitTime => $_getN(11);
+  @$pb.TagNumber(12)
+  set submitTime($2.Timestamp value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasSubmitTime() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearSubmitTime() => $_clearField(12);
+  @$pb.TagNumber(12)
+  $2.Timestamp ensureSubmitTime() => $_ensure(11);
+
+  @$pb.TagNumber(13)
+  $2.Timestamp get decideTime => $_getN(12);
+  @$pb.TagNumber(13)
+  set decideTime($2.Timestamp value) => $_setField(13, value);
+  @$pb.TagNumber(13)
+  $core.bool hasDecideTime() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearDecideTime() => $_clearField(13);
+  @$pb.TagNumber(13)
+  $2.Timestamp ensureDecideTime() => $_ensure(12);
+
+  @$pb.TagNumber(14)
+  $2.Timestamp get createTime => $_getN(13);
+  @$pb.TagNumber(14)
+  set createTime($2.Timestamp value) => $_setField(14, value);
+  @$pb.TagNumber(14)
+  $core.bool hasCreateTime() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearCreateTime() => $_clearField(14);
+  @$pb.TagNumber(14)
+  $2.Timestamp ensureCreateTime() => $_ensure(13);
+
+  @$pb.TagNumber(15)
+  $2.Timestamp get updateTime => $_getN(14);
+  @$pb.TagNumber(15)
+  set updateTime($2.Timestamp value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasUpdateTime() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearUpdateTime() => $_clearField(15);
+  @$pb.TagNumber(15)
+  $2.Timestamp ensureUpdateTime() => $_ensure(14);
 }
 
 class SaveKYCDraftRequest extends $pb.GeneratedMessage {
@@ -3762,7 +3762,7 @@ class PaymentAccount extends $pb.GeneratedMessage {
     $8.PaymentAccountStatus? status,
     $8.OnboardingSurface? onboardingSurface,
     $core.bool? payoutsActive,
-    $1.Timestamp? fetchTime,
+    $2.Timestamp? fetchTime,
   }) {
     final result = PaymentAccount._();
     if (status != null) result.status = status;
@@ -3788,11 +3788,11 @@ class PaymentAccount extends $pb.GeneratedMessage {
       createEmptyInstance: PaymentAccount.$_createMessage)
     ..aE<$8.PaymentAccountStatus>(1, _omitFieldNames ? '' : 'status',
         enumValues: $8.PaymentAccountStatus.values)
-    ..aE<$8.OnboardingSurface>(3, _omitFieldNames ? '' : 'onboardingSurface',
+    ..aE<$8.OnboardingSurface>(2, _omitFieldNames ? '' : 'onboardingSurface',
         enumValues: $8.OnboardingSurface.values)
-    ..aOB(5, _omitFieldNames ? '' : 'payoutsActive')
-    ..aOM<$1.Timestamp>(7, _omitFieldNames ? '' : 'fetchTime',
-        subBuilder: $1.Timestamp.$_createMessage)
+    ..aOB(3, _omitFieldNames ? '' : 'payoutsActive')
+    ..aOM<$2.Timestamp>(4, _omitFieldNames ? '' : 'fetchTime',
+        subBuilder: $2.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3827,36 +3827,36 @@ class PaymentAccount extends $pb.GeneratedMessage {
   void clearStatus() => $_clearField(1);
 
   /// 目前設定的 provider 用哪種介面開通；沒有設定收款開通時是 UNSPECIFIED。
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $8.OnboardingSurface get onboardingSurface => $_getN(1);
-  @$pb.TagNumber(3)
-  set onboardingSurface($8.OnboardingSurface value) => $_setField(3, value);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
+  set onboardingSurface($8.OnboardingSurface value) => $_setField(2, value);
+  @$pb.TagNumber(2)
   $core.bool hasOnboardingSurface() => $_has(1);
-  @$pb.TagNumber(3)
-  void clearOnboardingSurface() => $_clearField(3);
+  @$pb.TagNumber(2)
+  void clearOnboardingSurface() => $_clearField(2);
 
   /// 撥款能力是否啟用。
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(3)
   $core.bool get payoutsActive => $_getBF(2);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(3)
   set payoutsActive($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(3)
   $core.bool hasPayoutsActive() => $_has(2);
-  @$pb.TagNumber(5)
-  void clearPayoutsActive() => $_clearField(5);
+  @$pb.TagNumber(3)
+  void clearPayoutsActive() => $_clearField(3);
 
   /// 最近一次向金流商讀取帳戶的時間；還沒讀過時不設。
-  @$pb.TagNumber(7)
-  $1.Timestamp get fetchTime => $_getN(3);
-  @$pb.TagNumber(7)
-  set fetchTime($1.Timestamp value) => $_setField(7, value);
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(4)
+  $2.Timestamp get fetchTime => $_getN(3);
+  @$pb.TagNumber(4)
+  set fetchTime($2.Timestamp value) => $_setField(4, value);
+  @$pb.TagNumber(4)
   $core.bool hasFetchTime() => $_has(3);
-  @$pb.TagNumber(7)
-  void clearFetchTime() => $_clearField(7);
-  @$pb.TagNumber(7)
-  $1.Timestamp ensureFetchTime() => $_ensure(3);
+  @$pb.TagNumber(4)
+  void clearFetchTime() => $_clearField(4);
+  @$pb.TagNumber(4)
+  $2.Timestamp ensureFetchTime() => $_ensure(3);
 }
 
 class GetMyPaymentAccountRequest extends $pb.GeneratedMessage {
@@ -4000,9 +4000,9 @@ class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance:
           CreatePaymentOnboardingSessionRequest.$_createMessage)
-    ..aE<OnboardingReturnDestination>(3, _omitFieldNames ? '' : 'destination',
+    ..aE<OnboardingReturnDestination>(1, _omitFieldNames ? '' : 'destination',
         enumValues: OnboardingReturnDestination.values)
-    ..aOS(4, _omitFieldNames ? '' : 'locale')
+    ..aOS(2, _omitFieldNames ? '' : 'locale')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4035,25 +4035,25 @@ class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
   static CreatePaymentOnboardingSessionRequest? _defaultInstance;
 
   /// 開通結束後回到的頁面；UNSPECIFIED 回 invalid_argument。連結過期或已使用時，賣家被送回同一目的地的重新取得入口，client 在那裡重新呼叫本方法。
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(1)
   OnboardingReturnDestination get destination => $_getN(0);
-  @$pb.TagNumber(3)
-  set destination(OnboardingReturnDestination value) => $_setField(3, value);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(1)
+  set destination(OnboardingReturnDestination value) => $_setField(1, value);
+  @$pb.TagNumber(1)
   $core.bool hasDestination() => $_has(0);
-  @$pb.TagNumber(3)
-  void clearDestination() => $_clearField(3);
+  @$pb.TagNumber(1)
+  void clearDestination() => $_clearField(1);
 
   /// 回跳頁的網站語系（BCP-47：zh-TW 或 en），決定網站頁的路徑前綴；空或不支援回 invalid_argument。
   /// 賣家 App 的回跳頁沒有語系前綴，這個值仍要合法，但不影響網址。
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(2)
   $core.String get locale => $_getSZ(1);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(2)
   set locale($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(2)
   $core.bool hasLocale() => $_has(1);
-  @$pb.TagNumber(4)
-  void clearLocale() => $_clearField(4);
+  @$pb.TagNumber(2)
+  void clearLocale() => $_clearField(2);
 }
 
 class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
@@ -4552,7 +4552,7 @@ class BusinessRegistration extends $pb.GeneratedMessage {
     $core.String? address,
     $5.Date? setupDate,
     $core.String? organizationType,
-    $2.PostalAddress? postalAddress,
+    $0.PostalAddress? postalAddress,
   }) {
     final result = BusinessRegistration._();
     if (taxId != null) result.taxId = taxId;
@@ -4581,11 +4581,11 @@ class BusinessRegistration extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'taxId')
     ..aOS(2, _omitFieldNames ? '' : 'name')
     ..aOS(3, _omitFieldNames ? '' : 'address')
-    ..aOM<$5.Date>(6, _omitFieldNames ? '' : 'setupDate',
+    ..aOM<$5.Date>(4, _omitFieldNames ? '' : 'setupDate',
         subBuilder: $5.Date.$_createMessage)
-    ..aOS(7, _omitFieldNames ? '' : 'organizationType')
-    ..aOM<$2.PostalAddress>(8, _omitFieldNames ? '' : 'postalAddress',
-        subBuilder: $2.PostalAddress.$_createMessage)
+    ..aOS(5, _omitFieldNames ? '' : 'organizationType')
+    ..aOM<$0.PostalAddress>(6, _omitFieldNames ? '' : 'postalAddress',
+        subBuilder: $0.PostalAddress.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4640,38 +4640,38 @@ class BusinessRegistration extends $pb.GeneratedMessage {
   void clearAddress() => $_clearField(3);
 
   /// 設立日期；來源缺漏時不設。
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(4)
   $5.Date get setupDate => $_getN(3);
-  @$pb.TagNumber(6)
-  set setupDate($5.Date value) => $_setField(6, value);
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(4)
+  set setupDate($5.Date value) => $_setField(4, value);
+  @$pb.TagNumber(4)
   $core.bool hasSetupDate() => $_has(3);
-  @$pb.TagNumber(6)
-  void clearSetupDate() => $_clearField(6);
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(4)
+  void clearSetupDate() => $_clearField(4);
+  @$pb.TagNumber(4)
   $5.Date ensureSetupDate() => $_ensure(3);
 
   /// 組織型態（股份有限公司、有限公司、獨資、合夥……）；判斷不出時是空字串。
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(5)
   $core.String get organizationType => $_getSZ(4);
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(5)
   set organizationType($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(5)
   $core.bool hasOrganizationType() => $_has(4);
-  @$pb.TagNumber(7)
-  void clearOrganizationType() => $_clearField(7);
+  @$pb.TagNumber(5)
+  void clearOrganizationType() => $_clearField(5);
 
   /// 登記的地址開頭是現行的縣市與鄉鎮市區時，拆出來的鄉鎮市區代碼與其後的地址；拆不出來時不設，client 讓使用者自己選。
-  @$pb.TagNumber(8)
-  $2.PostalAddress get postalAddress => $_getN(5);
-  @$pb.TagNumber(8)
-  set postalAddress($2.PostalAddress value) => $_setField(8, value);
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(6)
+  $0.PostalAddress get postalAddress => $_getN(5);
+  @$pb.TagNumber(6)
+  set postalAddress($0.PostalAddress value) => $_setField(6, value);
+  @$pb.TagNumber(6)
   $core.bool hasPostalAddress() => $_has(5);
-  @$pb.TagNumber(8)
-  void clearPostalAddress() => $_clearField(8);
-  @$pb.TagNumber(8)
-  $2.PostalAddress ensurePostalAddress() => $_ensure(5);
+  @$pb.TagNumber(6)
+  void clearPostalAddress() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $0.PostalAddress ensurePostalAddress() => $_ensure(5);
 }
 
 class LookupBusinessRegistrationRequest extends $pb.GeneratedMessage {
@@ -5046,7 +5046,7 @@ class MeasureFinding extends $pb.GeneratedMessage {
     $core.String? id,
     $9.PolicyCategory? category,
     ViolationSeverity? severity,
-    $1.Timestamp? createTime,
+    $2.Timestamp? createTime,
   }) {
     final result = MeasureFinding._();
     if (id != null) result.id = id;
@@ -5075,8 +5075,8 @@ class MeasureFinding extends $pb.GeneratedMessage {
         enumValues: $9.PolicyCategory.values)
     ..aE<ViolationSeverity>(3, _omitFieldNames ? '' : 'severity',
         enumValues: ViolationSeverity.values)
-    ..aOM<$1.Timestamp>(4, _omitFieldNames ? '' : 'createTime',
-        subBuilder: $1.Timestamp.$_createMessage)
+    ..aOM<$2.Timestamp>(4, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $2.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5130,22 +5130,22 @@ class MeasureFinding extends $pb.GeneratedMessage {
   void clearSeverity() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $1.Timestamp get createTime => $_getN(3);
+  $2.Timestamp get createTime => $_getN(3);
   @$pb.TagNumber(4)
-  set createTime($1.Timestamp value) => $_setField(4, value);
+  set createTime($2.Timestamp value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasCreateTime() => $_has(3);
   @$pb.TagNumber(4)
   void clearCreateTime() => $_clearField(4);
   @$pb.TagNumber(4)
-  $1.Timestamp ensureCreateTime() => $_ensure(3);
+  $2.Timestamp ensureCreateTime() => $_ensure(3);
 }
 
 /// MeasurePeriod 是措施的期間。時間到了不改變這些時間欄位（也不改變措施的 etag），此刻是否仍生效看 Measure.state。
 class MeasurePeriod extends $pb.GeneratedMessage {
   factory MeasurePeriod({
-    $1.Timestamp? startTime,
-    $1.Timestamp? endTime,
+    $2.Timestamp? startTime,
+    $2.Timestamp? endTime,
   }) {
     final result = MeasurePeriod._();
     if (startTime != null) result.startTime = startTime;
@@ -5167,10 +5167,10 @@ class MeasurePeriod extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: MeasurePeriod.$_createMessage)
-    ..aOM<$1.Timestamp>(1, _omitFieldNames ? '' : 'startTime',
-        subBuilder: $1.Timestamp.$_createMessage)
-    ..aOM<$1.Timestamp>(2, _omitFieldNames ? '' : 'endTime',
-        subBuilder: $1.Timestamp.$_createMessage)
+    ..aOM<$2.Timestamp>(1, _omitFieldNames ? '' : 'startTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$2.Timestamp>(2, _omitFieldNames ? '' : 'endTime',
+        subBuilder: $2.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5197,28 +5197,28 @@ class MeasurePeriod extends $pb.GeneratedMessage {
 
   /// 措施開始的時間：停權與立即生效的終止是建立的時間，預告終止（NOTICE）是建立後 30 日，不可變；警告不設。
   @$pb.TagNumber(1)
-  $1.Timestamp get startTime => $_getN(0);
+  $2.Timestamp get startTime => $_getN(0);
   @$pb.TagNumber(1)
-  set startTime($1.Timestamp value) => $_setField(1, value);
+  set startTime($2.Timestamp value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasStartTime() => $_has(0);
   @$pb.TagNumber(1)
   void clearStartTime() => $_clearField(1);
   @$pb.TagNumber(1)
-  $1.Timestamp ensureStartTime() => $_ensure(0);
+  $2.Timestamp ensureStartTime() => $_ensure(0);
 
   /// 預定結束的時間；沒有固定期間（由平台定期複審）時不設。管理員可以調整它。終止合作沒有預定結束時間：只在預告終止（NOTICE）的店家關閉時，
   /// 由系統寫入關店的時間（此時 end_time 可能早於 start_time，state 是 ENDED）。
   @$pb.TagNumber(2)
-  $1.Timestamp get endTime => $_getN(1);
+  $2.Timestamp get endTime => $_getN(1);
   @$pb.TagNumber(2)
-  set endTime($1.Timestamp value) => $_setField(2, value);
+  set endTime($2.Timestamp value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasEndTime() => $_has(1);
   @$pb.TagNumber(2)
   void clearEndTime() => $_clearField(2);
   @$pb.TagNumber(2)
-  $1.Timestamp ensureEndTime() => $_ensure(1);
+  $2.Timestamp ensureEndTime() => $_ensure(1);
 }
 
 /// MeasureRequest 是措施上賣家的請求（申覆或解除請求，看 kind）。全部欄位由伺服器推導：措施已不在生效中而仍待處理的解除請求，
@@ -5228,9 +5228,9 @@ class MeasureRequest extends $pb.GeneratedMessage {
     $core.String? id,
     MeasureRequestState? state,
     $core.String? reason,
-    $1.Timestamp? submitTime,
+    $2.Timestamp? submitTime,
     $core.String? decisionReason,
-    $1.Timestamp? decideTime,
+    $2.Timestamp? decideTime,
     MeasureRequestCloseCause? closeCause,
     MeasureRequestKind? kind,
   }) {
@@ -5264,11 +5264,11 @@ class MeasureRequest extends $pb.GeneratedMessage {
     ..aE<MeasureRequestState>(2, _omitFieldNames ? '' : 'state',
         enumValues: MeasureRequestState.values)
     ..aOS(3, _omitFieldNames ? '' : 'reason')
-    ..aOM<$1.Timestamp>(4, _omitFieldNames ? '' : 'submitTime',
-        subBuilder: $1.Timestamp.$_createMessage)
+    ..aOM<$2.Timestamp>(4, _omitFieldNames ? '' : 'submitTime',
+        subBuilder: $2.Timestamp.$_createMessage)
     ..aOS(5, _omitFieldNames ? '' : 'decisionReason')
-    ..aOM<$1.Timestamp>(6, _omitFieldNames ? '' : 'decideTime',
-        subBuilder: $1.Timestamp.$_createMessage)
+    ..aOM<$2.Timestamp>(6, _omitFieldNames ? '' : 'decideTime',
+        subBuilder: $2.Timestamp.$_createMessage)
     ..aE<MeasureRequestCloseCause>(7, _omitFieldNames ? '' : 'closeCause',
         enumValues: MeasureRequestCloseCause.values)
     ..aE<MeasureRequestKind>(8, _omitFieldNames ? '' : 'kind',
@@ -5325,15 +5325,15 @@ class MeasureRequest extends $pb.GeneratedMessage {
   void clearReason() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $1.Timestamp get submitTime => $_getN(3);
+  $2.Timestamp get submitTime => $_getN(3);
   @$pb.TagNumber(4)
-  set submitTime($1.Timestamp value) => $_setField(4, value);
+  set submitTime($2.Timestamp value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasSubmitTime() => $_has(3);
   @$pb.TagNumber(4)
   void clearSubmitTime() => $_clearField(4);
   @$pb.TagNumber(4)
-  $1.Timestamp ensureSubmitTime() => $_ensure(3);
+  $2.Timestamp ensureSubmitTime() => $_ensure(3);
 
   /// 裁定的理由（接受與駁回都有）；待處理或結案時是空字串。
   @$pb.TagNumber(5)
@@ -5347,15 +5347,15 @@ class MeasureRequest extends $pb.GeneratedMessage {
 
   /// 裁定或結案的時間；待處理時不設。
   @$pb.TagNumber(6)
-  $1.Timestamp get decideTime => $_getN(5);
+  $2.Timestamp get decideTime => $_getN(5);
   @$pb.TagNumber(6)
-  set decideTime($1.Timestamp value) => $_setField(6, value);
+  set decideTime($2.Timestamp value) => $_setField(6, value);
   @$pb.TagNumber(6)
   $core.bool hasDecideTime() => $_has(5);
   @$pb.TagNumber(6)
   void clearDecideTime() => $_clearField(6);
   @$pb.TagNumber(6)
-  $1.Timestamp ensureDecideTime() => $_ensure(5);
+  $2.Timestamp ensureDecideTime() => $_ensure(5);
 
   /// 結案的原因；只有 state 是 CLOSED 時設，其他是 UNSPECIFIED。
   @$pb.TagNumber(7)
@@ -5388,17 +5388,17 @@ class Measure extends $pb.GeneratedMessage {
     $core.String? statement,
     MeasureState? state,
     MeasurePeriod? period,
-    $1.Timestamp? createTime,
+    $2.Timestamp? createTime,
     $core.String? etag,
     $core.bool? canAppeal,
     RevokeReason? revokeReason,
     $core.bool? canRequestRemediation,
-    $1.Timestamp? nextRemediationTime,
+    $2.Timestamp? nextRemediationTime,
     $6.Duration? rejectionCooldown,
     $core.Iterable<MeasureRequest>? requests,
-    TerminationGround? terminationGround,
-    $1.Timestamp? appealDeadlineTime,
     $core.Iterable<RemediationUnavailability>? remediationUnavailabilities,
+    TerminationGround? terminationGround,
+    $2.Timestamp? appealDeadlineTime,
     $core.Iterable<AppealUnavailability>? appealUnavailabilities,
     $core.Iterable<ContentRef>? contents,
   }) {
@@ -5421,11 +5421,11 @@ class Measure extends $pb.GeneratedMessage {
       result.nextRemediationTime = nextRemediationTime;
     if (rejectionCooldown != null) result.rejectionCooldown = rejectionCooldown;
     if (requests != null) result.requests.addAll(requests);
+    if (remediationUnavailabilities != null)
+      result.remediationUnavailabilities.addAll(remediationUnavailabilities);
     if (terminationGround != null) result.terminationGround = terminationGround;
     if (appealDeadlineTime != null)
       result.appealDeadlineTime = appealDeadlineTime;
-    if (remediationUnavailabilities != null)
-      result.remediationUnavailabilities.addAll(remediationUnavailabilities);
     if (appealUnavailabilities != null)
       result.appealUnavailabilities.addAll(appealUnavailabilities);
     if (contents != null) result.contents.addAll(contents);
@@ -5460,30 +5460,30 @@ class Measure extends $pb.GeneratedMessage {
         enumValues: MeasureState.values)
     ..aOM<MeasurePeriod>(8, _omitFieldNames ? '' : 'period',
         subBuilder: MeasurePeriod.$_createMessage)
-    ..aOM<$1.Timestamp>(10, _omitFieldNames ? '' : 'createTime',
-        subBuilder: $1.Timestamp.$_createMessage)
-    ..aOS(11, _omitFieldNames ? '' : 'etag')
-    ..aOB(12, _omitFieldNames ? '' : 'canAppeal')
-    ..aE<RevokeReason>(13, _omitFieldNames ? '' : 'revokeReason',
+    ..aOM<$2.Timestamp>(9, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOS(10, _omitFieldNames ? '' : 'etag')
+    ..aOB(11, _omitFieldNames ? '' : 'canAppeal')
+    ..aE<RevokeReason>(12, _omitFieldNames ? '' : 'revokeReason',
         enumValues: RevokeReason.values)
-    ..aOB(15, _omitFieldNames ? '' : 'canRequestRemediation')
-    ..aOM<$1.Timestamp>(16, _omitFieldNames ? '' : 'nextRemediationTime',
-        subBuilder: $1.Timestamp.$_createMessage)
-    ..aOM<$6.Duration>(17, _omitFieldNames ? '' : 'rejectionCooldown',
+    ..aOB(13, _omitFieldNames ? '' : 'canRequestRemediation')
+    ..aOM<$2.Timestamp>(14, _omitFieldNames ? '' : 'nextRemediationTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$6.Duration>(15, _omitFieldNames ? '' : 'rejectionCooldown',
         subBuilder: $6.Duration.$_createMessage)
-    ..pPM<MeasureRequest>(18, _omitFieldNames ? '' : 'requests',
+    ..pPM<MeasureRequest>(16, _omitFieldNames ? '' : 'requests',
         subBuilder: MeasureRequest.$_createMessage)
-    ..aE<TerminationGround>(20, _omitFieldNames ? '' : 'terminationGround',
-        enumValues: TerminationGround.values)
-    ..aOM<$1.Timestamp>(21, _omitFieldNames ? '' : 'appealDeadlineTime',
-        subBuilder: $1.Timestamp.$_createMessage)
     ..pPM<RemediationUnavailability>(
-        23, _omitFieldNames ? '' : 'remediationUnavailabilities',
+        17, _omitFieldNames ? '' : 'remediationUnavailabilities',
         subBuilder: RemediationUnavailability.$_createMessage)
+    ..aE<TerminationGround>(18, _omitFieldNames ? '' : 'terminationGround',
+        enumValues: TerminationGround.values)
+    ..aOM<$2.Timestamp>(19, _omitFieldNames ? '' : 'appealDeadlineTime',
+        subBuilder: $2.Timestamp.$_createMessage)
     ..pPM<AppealUnavailability>(
-        24, _omitFieldNames ? '' : 'appealUnavailabilities',
+        20, _omitFieldNames ? '' : 'appealUnavailabilities',
         subBuilder: AppealUnavailability.$_createMessage)
-    ..pPM<ContentRef>(25, _omitFieldNames ? '' : 'contents',
+    ..pPM<ContentRef>(21, _omitFieldNames ? '' : 'contents',
         subBuilder: ContentRef.$_createMessage)
     ..hasRequiredFields = false;
 
@@ -5580,127 +5580,127 @@ class Measure extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   MeasurePeriod ensurePeriod() => $_ensure(7);
 
-  @$pb.TagNumber(10)
-  $1.Timestamp get createTime => $_getN(8);
-  @$pb.TagNumber(10)
-  set createTime($1.Timestamp value) => $_setField(10, value);
-  @$pb.TagNumber(10)
+  @$pb.TagNumber(9)
+  $2.Timestamp get createTime => $_getN(8);
+  @$pb.TagNumber(9)
+  set createTime($2.Timestamp value) => $_setField(9, value);
+  @$pb.TagNumber(9)
   $core.bool hasCreateTime() => $_has(8);
-  @$pb.TagNumber(10)
-  void clearCreateTime() => $_clearField(10);
-  @$pb.TagNumber(10)
-  $1.Timestamp ensureCreateTime() => $_ensure(8);
+  @$pb.TagNumber(9)
+  void clearCreateTime() => $_clearField(9);
+  @$pb.TagNumber(9)
+  $2.Timestamp ensureCreateTime() => $_ensure(8);
 
   /// 提出申覆時帶的版本；由賣家看得到的版本產生，平台寫內部註記、調整複審期限都不改變它。
-  @$pb.TagNumber(11)
+  @$pb.TagNumber(10)
   $core.String get etag => $_getSZ(9);
-  @$pb.TagNumber(11)
+  @$pb.TagNumber(10)
   set etag($core.String value) => $_setString(9, value);
-  @$pb.TagNumber(11)
+  @$pb.TagNumber(10)
   $core.bool hasEtag() => $_has(9);
-  @$pb.TagNumber(11)
-  void clearEtag() => $_clearField(11);
+  @$pb.TagNumber(10)
+  void clearEtag() => $_clearField(10);
 
   /// 賣家此刻能不能對這筆措施提出申覆：措施未撤銷、還沒申覆過、沒有待處理的請求（措施已結束而仍待處理的解除請求不算，它的 state 已是
   /// CLOSED）、終止合作還在申覆期限內。由伺服器判斷，與 SubmitAppeal 的前置檢查是同一個規則（appeal_unavailabilities 為空），client 不用自己從
   /// state 與 requests 推導。已結束的措施也可以申覆；預定生效（SCHEDULED）的措施可以申覆。
-  @$pb.TagNumber(12)
+  @$pb.TagNumber(11)
   $core.bool get canAppeal => $_getBF(10);
-  @$pb.TagNumber(12)
+  @$pb.TagNumber(11)
   set canAppeal($core.bool value) => $_setBool(10, value);
-  @$pb.TagNumber(12)
+  @$pb.TagNumber(11)
   $core.bool hasCanAppeal() => $_has(10);
-  @$pb.TagNumber(12)
-  void clearCanAppeal() => $_clearField(12);
+  @$pb.TagNumber(11)
+  void clearCanAppeal() => $_clearField(11);
 
   /// 已撤銷時的原因；FINDING_REVOKED 表示依據的認定被撤銷。沒有撤銷時是 UNSPECIFIED。
-  @$pb.TagNumber(13)
+  @$pb.TagNumber(12)
   RevokeReason get revokeReason => $_getN(11);
-  @$pb.TagNumber(13)
-  set revokeReason(RevokeReason value) => $_setField(13, value);
-  @$pb.TagNumber(13)
+  @$pb.TagNumber(12)
+  set revokeReason(RevokeReason value) => $_setField(12, value);
+  @$pb.TagNumber(12)
   $core.bool hasRevokeReason() => $_has(11);
-  @$pb.TagNumber(13)
-  void clearRevokeReason() => $_clearField(13);
+  @$pb.TagNumber(12)
+  void clearRevokeReason() => $_clearField(12);
 
   /// 賣家此刻能不能請求解除：RISK 依據、措施生效中、沒有待處理的請求（申覆或解除請求）、不在冷卻期。由伺服器判斷，與
   /// RequestRemediation 的前置檢查是同一個規則，client 不用自己推導；不能用時的原因看 remediation_unavailabilities（可以用時
   /// 是空的）。
-  @$pb.TagNumber(15)
+  @$pb.TagNumber(13)
   $core.bool get canRequestRemediation => $_getBF(12);
-  @$pb.TagNumber(15)
+  @$pb.TagNumber(13)
   set canRequestRemediation($core.bool value) => $_setBool(12, value);
-  @$pb.TagNumber(15)
+  @$pb.TagNumber(13)
   $core.bool hasCanRequestRemediation() => $_has(12);
-  @$pb.TagNumber(15)
-  void clearCanRequestRemediation() => $_clearField(15);
+  @$pb.TagNumber(13)
+  void clearCanRequestRemediation() => $_clearField(13);
 
   /// 冷卻期的結束時間；只在 RISK 依據、措施生效中而且在冷卻期內設（此刻起不得提出解除請求，到這個時間可以再提出），其餘不設。
-  @$pb.TagNumber(16)
-  $1.Timestamp get nextRemediationTime => $_getN(13);
-  @$pb.TagNumber(16)
-  set nextRemediationTime($1.Timestamp value) => $_setField(16, value);
-  @$pb.TagNumber(16)
+  @$pb.TagNumber(14)
+  $2.Timestamp get nextRemediationTime => $_getN(13);
+  @$pb.TagNumber(14)
+  set nextRemediationTime($2.Timestamp value) => $_setField(14, value);
+  @$pb.TagNumber(14)
   $core.bool hasNextRemediationTime() => $_has(13);
-  @$pb.TagNumber(16)
-  void clearNextRemediationTime() => $_clearField(16);
-  @$pb.TagNumber(16)
-  $1.Timestamp ensureNextRemediationTime() => $_ensure(13);
+  @$pb.TagNumber(14)
+  void clearNextRemediationTime() => $_clearField(14);
+  @$pb.TagNumber(14)
+  $2.Timestamp ensureNextRemediationTime() => $_ensure(13);
 
   /// 這筆措施的下一個請求若被駁回，會開始的冷卻期長度；只在 RISK 依據、措施生效中時才可能設，不設表示不會有冷卻。給送出前的警告用（「若本次經駁回，將於這段期間內不得
   /// 再提出」），client 不用自己從駁回次數推導。冷卻規則由伺服器決定（條款第 17.4 條）。
-  @$pb.TagNumber(17)
+  @$pb.TagNumber(15)
   $6.Duration get rejectionCooldown => $_getN(14);
-  @$pb.TagNumber(17)
-  set rejectionCooldown($6.Duration value) => $_setField(17, value);
-  @$pb.TagNumber(17)
+  @$pb.TagNumber(15)
+  set rejectionCooldown($6.Duration value) => $_setField(15, value);
+  @$pb.TagNumber(15)
   $core.bool hasRejectionCooldown() => $_has(14);
-  @$pb.TagNumber(17)
-  void clearRejectionCooldown() => $_clearField(17);
-  @$pb.TagNumber(17)
+  @$pb.TagNumber(15)
+  void clearRejectionCooldown() => $_clearField(15);
+  @$pb.TagNumber(15)
   $6.Duration ensureRejectionCooldown() => $_ensure(14);
 
   /// 措施上賣家的請求（申覆與解除請求，看 MeasureRequest.kind），新到舊；沒有請求過時是空的。每一筆的 state 由伺服器推導（見
   /// MeasureRequest）；同時至多一筆 PENDING，所以「目前的請求」是第一筆不是 CLOSED 的。
-  @$pb.TagNumber(18)
+  @$pb.TagNumber(16)
   $pb.PbList<MeasureRequest> get requests => $_getList(15);
-
-  /// 終止合作（kind 是 TERMINATION）的事由；其他種類是 UNSPECIFIED。
-  @$pb.TagNumber(20)
-  TerminationGround get terminationGround => $_getN(16);
-  @$pb.TagNumber(20)
-  set terminationGround(TerminationGround value) => $_setField(20, value);
-  @$pb.TagNumber(20)
-  $core.bool hasTerminationGround() => $_has(16);
-  @$pb.TagNumber(20)
-  void clearTerminationGround() => $_clearField(20);
-
-  /// 終止合作的申覆期限：生效（period.start_time）後 184 天（任何連續六個曆月的最大長度，不短於條款的「六個月」）；期限內（含預告期間）可以申覆，
-  /// 之後 can_appeal 是 false、appeal_unavailabilities 含 APPEAL_WINDOW_ENDED，已在期限內提出的申覆照常裁定。其他種類不設。
-  @$pb.TagNumber(21)
-  $1.Timestamp get appealDeadlineTime => $_getN(17);
-  @$pb.TagNumber(21)
-  set appealDeadlineTime($1.Timestamp value) => $_setField(21, value);
-  @$pb.TagNumber(21)
-  $core.bool hasAppealDeadlineTime() => $_has(17);
-  @$pb.TagNumber(21)
-  void clearAppealDeadlineTime() => $_clearField(21);
-  @$pb.TagNumber(21)
-  $1.Timestamp ensureAppealDeadlineTime() => $_ensure(17);
 
   /// 不能請求解除的原因，依優先序排列（依據不是 RISK、不在生效中、待處理的請求、冷卻期）；結構性的原因在前，第一個的 reason 是 NOT_RISK 或 NOT_ACTIVE 表示這筆措施沒有解除請求入口（client 不顯示入口）；其餘的原因 client 顯示第一個的 message。
   /// can_request_remediation 是 true 時是空的，反之不為空，兩者來自同一個規則。冷卻期結束的時間另見 next_remediation_time，message 已帶好格式化的時間。
-  @$pb.TagNumber(23)
+  @$pb.TagNumber(17)
   $pb.PbList<RemediationUnavailability> get remediationUnavailabilities =>
-      $_getList(18);
+      $_getList(16);
+
+  /// 終止合作（kind 是 TERMINATION）的事由；其他種類是 UNSPECIFIED。
+  @$pb.TagNumber(18)
+  TerminationGround get terminationGround => $_getN(17);
+  @$pb.TagNumber(18)
+  set terminationGround(TerminationGround value) => $_setField(18, value);
+  @$pb.TagNumber(18)
+  $core.bool hasTerminationGround() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearTerminationGround() => $_clearField(18);
+
+  /// 終止合作的申覆期限：生效（period.start_time）後 184 天（任何連續六個曆月的最大長度，不短於條款的「六個月」）；期限內（含預告期間）可以申覆，
+  /// 之後 can_appeal 是 false、appeal_unavailabilities 含 APPEAL_WINDOW_ENDED，已在期限內提出的申覆照常裁定。其他種類不設。
+  @$pb.TagNumber(19)
+  $2.Timestamp get appealDeadlineTime => $_getN(18);
+  @$pb.TagNumber(19)
+  set appealDeadlineTime($2.Timestamp value) => $_setField(19, value);
+  @$pb.TagNumber(19)
+  $core.bool hasAppealDeadlineTime() => $_has(18);
+  @$pb.TagNumber(19)
+  void clearAppealDeadlineTime() => $_clearField(19);
+  @$pb.TagNumber(19)
+  $2.Timestamp ensureAppealDeadlineTime() => $_ensure(18);
 
   /// 不能申覆的原因，依優先序排列（已撤銷、已申覆過、申覆期限已過、有審核中的請求）；can_appeal 是 true 時是空的，反之不為空，兩者來自同一個
   /// 規則（與 SubmitAppeal 的前置檢查相同），client 顯示第一個的 message，不自己推導。
-  @$pb.TagNumber(24)
+  @$pb.TagNumber(20)
   $pb.PbList<AppealUnavailability> get appealUnavailabilities => $_getList(19);
 
   /// 內容下架（kind 是 CONTENT_TAKEDOWN）的對象，依種類、id 排序，賣家據此知道被下架的是哪些內容、申覆什麼；其他種類沒有。建立後不能改。
-  @$pb.TagNumber(25)
+  @$pb.TagNumber(21)
   $pb.PbList<ContentRef> get contents => $_getList(20);
 }
 
@@ -6306,9 +6306,9 @@ class PublicStore extends $pb.GeneratedMessage {
     $core.String? townCode,
     $core.String? prize,
     $core.String? websiteUrl,
-    $0.Image? logo,
-    $0.Image? coverImage,
-    $1.Timestamp? updateTime,
+    $1.Image? logo,
+    $1.Image? coverImage,
+    $2.Timestamp? updateTime,
   }) {
     final result = PublicStore._();
     if (id != null) result.id = id;
@@ -6345,12 +6345,12 @@ class PublicStore extends $pb.GeneratedMessage {
     ..aOS(5, _omitFieldNames ? '' : 'townCode')
     ..aOS(6, _omitFieldNames ? '' : 'prize')
     ..aOS(7, _omitFieldNames ? '' : 'websiteUrl')
-    ..aOM<$0.Image>(8, _omitFieldNames ? '' : 'logo',
-        subBuilder: $0.Image.$_createMessage)
-    ..aOM<$0.Image>(9, _omitFieldNames ? '' : 'coverImage',
-        subBuilder: $0.Image.$_createMessage)
-    ..aOM<$1.Timestamp>(13, _omitFieldNames ? '' : 'updateTime',
-        subBuilder: $1.Timestamp.$_createMessage)
+    ..aOM<$1.Image>(8, _omitFieldNames ? '' : 'logo',
+        subBuilder: $1.Image.$_createMessage)
+    ..aOM<$1.Image>(9, _omitFieldNames ? '' : 'coverImage',
+        subBuilder: $1.Image.$_createMessage)
+    ..aOM<$2.Timestamp>(10, _omitFieldNames ? '' : 'updateTime',
+        subBuilder: $2.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6445,41 +6445,41 @@ class PublicStore extends $pb.GeneratedMessage {
 
   /// 沒有設定時不設。
   @$pb.TagNumber(8)
-  $0.Image get logo => $_getN(7);
+  $1.Image get logo => $_getN(7);
   @$pb.TagNumber(8)
-  set logo($0.Image value) => $_setField(8, value);
+  set logo($1.Image value) => $_setField(8, value);
   @$pb.TagNumber(8)
   $core.bool hasLogo() => $_has(7);
   @$pb.TagNumber(8)
   void clearLogo() => $_clearField(8);
   @$pb.TagNumber(8)
-  $0.Image ensureLogo() => $_ensure(7);
+  $1.Image ensureLogo() => $_ensure(7);
 
   /// 沒有設定時不設。
   @$pb.TagNumber(9)
-  $0.Image get coverImage => $_getN(8);
+  $1.Image get coverImage => $_getN(8);
   @$pb.TagNumber(9)
-  set coverImage($0.Image value) => $_setField(9, value);
+  set coverImage($1.Image value) => $_setField(9, value);
   @$pb.TagNumber(9)
   $core.bool hasCoverImage() => $_has(8);
   @$pb.TagNumber(9)
   void clearCoverImage() => $_clearField(9);
   @$pb.TagNumber(9)
-  $0.Image ensureCoverImage() => $_ensure(8);
+  $1.Image ensureCoverImage() => $_ensure(8);
 
   /// 這家店的公開資料最後更新的時間，給 sitemap 的 lastmod：取店家資料的最後修改時間、第一次可公開曝光的時間與最後一次可曝光狀態翻轉
   /// 的時間中最晚的一個，所以不會早於上架日，停權結束後重新曝光也會前進，
   /// 全量重新公告重發同一個狀態則不會。店家的非公開欄位（例如聯絡資料）改變也會讓它前進，因此偶爾比公開內容的實際變更晚。
-  @$pb.TagNumber(13)
-  $1.Timestamp get updateTime => $_getN(9);
-  @$pb.TagNumber(13)
-  set updateTime($1.Timestamp value) => $_setField(13, value);
-  @$pb.TagNumber(13)
+  @$pb.TagNumber(10)
+  $2.Timestamp get updateTime => $_getN(9);
+  @$pb.TagNumber(10)
+  set updateTime($2.Timestamp value) => $_setField(10, value);
+  @$pb.TagNumber(10)
   $core.bool hasUpdateTime() => $_has(9);
-  @$pb.TagNumber(13)
-  void clearUpdateTime() => $_clearField(13);
-  @$pb.TagNumber(13)
-  $1.Timestamp ensureUpdateTime() => $_ensure(9);
+  @$pb.TagNumber(10)
+  void clearUpdateTime() => $_clearField(10);
+  @$pb.TagNumber(10)
+  $2.Timestamp ensureUpdateTime() => $_ensure(9);
 }
 
 /// StoreStats 是店面頁的統計。每個欄位都只在讀得到時才設：粉絲與評價各自來自別的模組，讀取失敗不是零。

@@ -50,8 +50,6 @@ enum CaseInquiryWithdrawCause {
 
 // CaseInquiry 是案件上對賣家的一筆詢問。賣家端的畫面上線（10f）之前，系統不會通知賣家；期限從建立起算，10f 改成從出現在賣家中心起算。
 message CaseInquiry {
-  reserved 8;
-  reserved "due_time";
 
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   string case_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -61,20 +59,20 @@ message CaseInquiry {
   string message = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
   google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
   string created_by_admin_id = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
-  CaseInquiryState state = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  CaseInquiryState state = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 只在 REPLIED 時設。
-  CaseInquiryReply reply = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  CaseInquiryReply reply = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 只在 WITHDRAWN 時設。
-  CaseInquiryWithdrawCause withdraw_cause = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
-  google.protobuf.Timestamp withdraw_time = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  CaseInquiryWithdrawCause withdraw_cause = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp withdraw_time = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 系統撤回（案件結案）時是結案的管理員。
-  string withdrawn_by_admin_id = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
-  bool can_record_reply = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
-  bool can_withdraw = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string withdrawn_by_admin_id = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_record_reply = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_withdraw = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 記下回覆時最多可以帶的附件數（伺服器的上限，RecordCaseInquiryReply 的 evidence_tokens 超過就回 invalid_argument）；client 以它在上傳之前擋下超過的檔。
-  int32 reply_evidence_max = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 reply_evidence_max = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 賣家回覆的期限，只在 OPEN 時設（義務還在時才輸出）：開始時間是 create_time，期限是建立時存下的 due_at。
-  hawkr.common.v1alpha1.Deadline reply_deadline = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.Deadline reply_deadline = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // CaseInquiryReply 是管理員記下的賣家回覆（系統外收到）。

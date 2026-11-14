@@ -98,16 +98,12 @@ enum StoreActionUnavailableReason {
   // 不是公司型的申請，沒有登記資料可以查詢。表示沒有入口。
   STORE_ACTION_UNAVAILABLE_REASON_KYC_NOT_BUSINESS = 2;
   // 店家已關閉。
-  STORE_ACTION_UNAVAILABLE_REASON_STORE_CLOSED = 8;
+  STORE_ACTION_UNAVAILABLE_REASON_STORE_CLOSED = 3;
   // 店家等待刪除（帳號刪除在等未完成的訂單）。
-  STORE_ACTION_UNAVAILABLE_REASON_STORE_PENDING_DELETION = 9;
+  STORE_ACTION_UNAVAILABLE_REASON_STORE_PENDING_DELETION = 4;
   // 帳號有生效中的停權措施。
-  STORE_ACTION_UNAVAILABLE_REASON_ACCOUNT_SUSPENDED = 10;
+  STORE_ACTION_UNAVAILABLE_REASON_ACCOUNT_SUSPENDED = 5;
 
-  reserved 3, 4, 5, 6, 7;
-  reserved "STORE_ACTION_UNAVAILABLE_REASON_PAYUNI_MERCHANT_TERMINAL", "STORE_ACTION_UNAVAILABLE_REASON_PAYUNI_BIND_IN_PROGRESS",
-      "STORE_ACTION_UNAVAILABLE_REASON_PAYUNI_BOUND", "STORE_ACTION_UNAVAILABLE_REASON_FOOD_REGISTRATION_NOT_PENDING",
-      "STORE_ACTION_UNAVAILABLE_REASON_KYC_NOT_APPROVED";
 }
 
 // StoreActionUnavailability 是此刻不能做某個動作的一個原因；message 與該方法被拒絕時錯誤的 LocalizedMessage 是同一句（同一個 Go 函式）。
@@ -120,34 +116,26 @@ message StoreActionUnavailability {
 
 // StoreCloser 是關閉店家的原因。管理員沒有直接關店的方法：平台關店一律經終止合作的措施（理由與作者記在措施裡）。
 enum StoreCloser {
-  reserved 2;
-  reserved "STORE_CLOSER_ADMIN";
 
   STORE_CLOSER_UNSPECIFIED = 0;
   // 賣家自己關店。
   STORE_CLOSER_ACCOUNT_OWNER = 1;
   // 隨帳號刪除關閉。
-  STORE_CLOSER_ACCOUNT_DELETION = 3;
+  STORE_CLOSER_ACCOUNT_DELETION = 2;
   // 終止合作生效且沒有未結訂單後由系統關店；關閉的措施是 Closure.measure_id。
-  STORE_CLOSER_TERMINATION = 4;
+  STORE_CLOSER_TERMINATION = 3;
 }
 
 // Closure 是店家目前這一次關閉的紀錄（店家恢復後這一次的紀錄結束、歷史留著，這裡不再有）。
 message Closure {
-  reserved 2, 3;
-  reserved "admin_id", "reason";
 
   StoreCloser closer = 1;
   // closer 是 TERMINATION 時才有：造成關店的終止合作措施 id。
-  string measure_id = 4;
+  string measure_id = 2;
 }
 
 // Store 是後台看到的店家，欄位都是唯讀。
 message Store {
-  reserved 7, 8, 11, 12, 17, 18, 23, 25;
-  reserved "town_code", "address_detail", "processed_food", "food_business_reg_no", "seo_title", "seo_description", "etag", "food_business";
-  reserved 29, 30;
-  reserved "approved_food_registration", "open_food_registration";
 
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   // 店家網址的路徑段。
@@ -158,62 +146,56 @@ message Store {
   string store_name = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
   string description = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
   string contact_phone = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
-  string prize = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
-  string website_url = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
-  bool onboarding_completed = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string prize = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string website_url = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool onboarding_completed = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 沒有設定時不設。
-  hawkr.common.v1alpha1.Image logo = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.Image logo = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 沒有設定時不設。
-  hawkr.common.v1alpha1.Image cover_image = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
-  hawkr.seller.v1alpha1.StoreStatus status = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
-  google.protobuf.Timestamp create_time = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.Image cover_image = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.seller.v1alpha1.StoreStatus status = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 店家資料最後一次被編輯的時間。
-  google.protobuf.Timestamp update_time = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 關店的時間；沒有關閉時不設。
-  google.protobuf.Timestamp close_time = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp close_time = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 關店的紀錄；已關閉的店一定有，沒有關閉時不設。
-  Closure closure = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
+  Closure closure = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 店家地址（可以只有鄉鎮市區）；沒有填或個資清除之後不設。
-  hawkr.common.v1alpha1.PostalAddress address = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.PostalAddress address = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 聯絡人姓名；沒有填或個資清除之後是空字串。
-  string contact_name = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string contact_name = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 聯絡人手機；沒有填或個資清除之後是空字串。
-  string contact_mobile = 27 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string contact_mobile = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 客服電子信箱；沒有填或個資清除之後是空字串。
-  string support_email = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string support_email = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // StoreListItem 是清單的一列：店家，加上帳號此刻是否停權與目前申請的狀態。
 message StoreListItem {
-  reserved 2, 3;
-  reserved "suspension_source", "kyc_flow_status";
 
   Store store = 1;
   // 目前申請的狀態；沒有申請（或申請已取消）時不設。
-  optional hawkr.seller.v1alpha1.KYCStatus kyc_status = 6;
+  optional hawkr.seller.v1alpha1.KYCStatus kyc_status = 2;
   // 帳號此刻是否停權（任何一個店家的生效中措施都算）。
-  bool suspended = 4;
+  bool suspended = 3;
   // 店家此刻不能被代行營運的店家狀態原因（已關閉、等待刪除、停權），與代行 preflight 的店家狀態檢查同一個規則；空不表示能代行：
   // 授權、管理員資格與進行中的代行在 preflight 判斷。
-  repeated StoreActionUnavailability delegation_unavailabilities = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated StoreActionUnavailability delegation_unavailabilities = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // KYCSummary 是店家身分認證的摘要；申請的內容與審核在後台的 KYC 審核方法。
 message KYCSummary {
-  reserved 3;
-  reserved "flow_status";
 
   string application_id = 1;
   hawkr.seller.v1alpha1.KYCStatus status = 2;
-  google.protobuf.Timestamp submit_time = 4;
-  google.protobuf.Timestamp decide_time = 5;
+  google.protobuf.Timestamp submit_time = 3;
+  google.protobuf.Timestamp decide_time = 4;
   // 審核的期限，只在審核中（SUBMITTED）時設：開始時間是 submit_time，期限 7 天。
-  hawkr.common.v1alpha1.Deadline decide_deadline = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.Deadline decide_deadline = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message ListStoresRequest {
-  reserved 7;
-  reserved "payuni_bind_status";
 
   // 每頁筆數：0 用預設值 20，上限 100。
   int32 page_size = 1;
@@ -229,10 +211,10 @@ message ListStoresRequest {
   // 要在 status 明列。
   string account_id = 6;
   // true 只列帳號此刻停權中的店家（有生效中的措施），false 只列沒有停權的；沒有設定不篩選。
-  optional bool suspended = 8;
+  optional bool suspended = 7;
   // true 只列商家認證申請在後台待辦裡的店家：審核中、店家營運中、帳號沒有停權，與後台待辦、GetStoreStatsResponse.kyc_awaiting_review_stores
   // 同一個成員；false 不篩選。
-  bool kyc_awaiting_review = 9;
+  bool kyc_awaiting_review = 8;
 }
 
 message ListStoresResponse {
@@ -244,18 +226,16 @@ message GetStoreStatsRequest {}
 
 // GetStoreStatsResponse 的家數都只算目前的店家（營運中與等待刪除），來自同一個 snapshot。
 message GetStoreStatsResponse {
-  reserved 2;
-  reserved "kyc_submitted_stores";
 
   int32 total_stores = 1;
   // 申請已核准的店家數。
-  int32 kyc_approved_stores = 3;
+  int32 kyc_approved_stores = 2;
   // 申請被退回的店家數。
-  int32 kyc_rejected_stores = 4;
+  int32 kyc_rejected_stores = 3;
   // 台北時間本月新開的店家數。
-  int32 new_stores_this_month = 5;
+  int32 new_stores_this_month = 4;
   // 商家認證申請在後台待辦裡的店家數（審核中、店家營運中、帳號沒有停權），與 ListStoresRequest.kyc_awaiting_review 同一個成員。
-  int32 kyc_awaiting_review_stores = 6;
+  int32 kyc_awaiting_review_stores = 5;
 }
 
 message GetStoreRequest {
@@ -274,28 +254,26 @@ message GetStoreOnboardingResponse {
 }
 
 message GetStoreResponse {
-  reserved 2, 3, 5, 8;
-  reserved "suspension_source", "admin_suspension", "active_suspensions", "available_termination_grounds";
   Store store = 1;
   // 身分認證的摘要；沒有送出過的申請（沒有申請、已取消、只有草稿）時不設。
-  KYCSummary kyc = 4;
+  KYCSummary kyc = 2;
   // 帳號此刻所有生效中的措施（停權與生效中的終止合作，終止的 state 是 ACTIVE；預定生效的預告終止 state 是 SCHEDULED，不在內，用 ListMeasures 讀），
   // 與 store 來自同一次讀取。措施以帳號為範圍，記在舊 stint、新 stint 繼承的也在內。結束或撤銷用 Measure 的 id 與 etag 呼叫
   // SellerGovernanceAdminService。沒有生效中的措施時是空清單。
-  repeated Measure active_measures = 6;
+  repeated Measure active_measures = 3;
   // 此刻能不能對這個店家所屬的帳號建立終止合作（CreateMeasure 的 termination）。由伺服器推導，與 CreateMeasure 的前置條件是同一份規則：
   // 店家開著時所有事由都可以；店家已經關閉時，只剩帳號最近的一個店家可以建立第 21.3 條的事由（效果只剩禁止入駐），預告終止不行；
   // 已關閉而且帳號有較新店家時都不行。等於 available_terminations 不為空。client 只呈現，不從 store.status 推導。
-  bool can_create_termination = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_create_termination = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 此刻可以建立的終止合作（依 TerminationGround 的數字順序），每個事由一筆，帶生效時機與給員工的說明句；生效時間與句子由伺服器產生，client 不推算。
   // 關聯帳號（LINKED_ACCOUNT）不在內：它要指定來源措施，能不能建立看 LinkedAccount.can_create_linked_termination。每個選項的 violation_requirement 說明建立時依據（termination.violation）的需求，
   // 條件（例如引用的認定須存在多久）寫在它的 explanation；那是輸入的條件，不是帳號的狀態，不符回 invalid_argument 指到 termination.violation.cited_finding_ids。
-  repeated TerminationOption available_terminations = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated TerminationOption available_terminations = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 此刻能不能對這個店家建立警告、停權與風險措施（CreateMeasure）。與 CreateMeasure 的前置條件同一份規則：店家還沒關閉。
   // 等於 create_measure_unavailabilities 是空的。client 只呈現，不從 store.status 推導。
-  bool can_create_measure = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_create_measure = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 不能建立的原因（只會有 STORE_CLOSED）；CreateMeasure 被拒絕時訊息是第一句。
-  repeated StoreActionUnavailability create_measure_unavailabilities = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated StoreActionUnavailability create_measure_unavailabilities = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // KYCSellerType 是賣家型態。
@@ -316,67 +294,49 @@ enum KYCReviewAction {
   KYC_REVIEW_ACTION_REJECT = 3;
   // 賣家取消。
   KYC_REVIEW_ACTION_CANCEL = 4;
-  reserved 5;
-  reserved "KYC_REVIEW_ACTION_REBIND";
 }
 
 // KYCDocument 是申請上的一張公司補充文件：位置、asset_id 與檢視網址。
 message KYCDocument {
-  // 1 是刪掉的 slot（證件位置的 enum）：文件用它所屬的欄位表示，與退回的 KYCIssue.field 同一套。
-  reserved 1;
-  reserved "slot";
 
   // 文件所屬的欄位：BUSINESS_COMPANY_DOCUMENTS。
-  hawkr.seller.v1alpha1.KYCField field = 3;
+  hawkr.seller.v1alpha1.KYCField field = 1;
   // 同一個欄位內的順序（從 0 起）。
   int32 position = 2;
   // 相對於 API 的網址：GET /api/files/admin/seller/kyc_applications/{application_id}/documents/{position}，同樣的管理員
   // 驗證（Authorization: Bearer；admin 的 BFF 以 /api/bff 為前綴轉送）。回應是圖片本身，Cache-Control: no-store；每次讀取都寫稽核。
-  string view_uri = 4;
+  string view_uri = 3;
   // 這張圖片的 asset_id（不是個資）：退回時用它指出有問題的那一張（RejectKYCRequest.issues 的 document_asset_id），
   // 公司文件換順序也不會指錯。
-  string asset_id = 5;
+  string asset_id = 4;
 }
 
 // KYCDocumentAccess 是一筆補充文件的讀取紀錄：哪位管理員、讀哪一張（asset_id 與當時的位置）、何時。
 message KYCDocumentAccess {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
-  // 2 是刪掉的讀取所依據的顯示全文紀錄（reveal_id，限時授權已刪）。
-  reserved 2;
-  reserved "reveal_id";
-  string admin_id = 3;
-  reserved 4;
-  reserved "slot";
+  string admin_id = 2;
 
   // 讀的文件所屬的欄位（同 KYCDocument.field）。
-  hawkr.seller.v1alpha1.KYCField field = 7;
-  int32 position = 5;
-  google.protobuf.Timestamp access_time = 6;
+  hawkr.seller.v1alpha1.KYCField field = 3;
+  int32 position = 4;
+  google.protobuf.Timestamp access_time = 5;
   // 實際送出的那張圖片的 asset_id（文件換過圖之後還查得出當時看的是哪一張）。
-  string asset_id = 8;
+  string asset_id = 6;
 }
 
 // IndividualKYC 是個人賣家專屬的欄位；目前沒有欄位（平台不收身分證號，Stripe 計畫 D22），設定它表示賣家型態是個人。
 message IndividualKYC {
-  // 1 是刪掉的遮蔽身分證號（D22）。
-  reserved 1;
-  reserved "id_card_no_masked";
 }
 
 // BusinessKYC 是企業賣家專屬的欄位。
 message BusinessKYC {
-  reserved 1, 5, 6;
-  reserved "company_type", "company_town_code", "company_address_detail";
-  // 8 是刪掉的遮蔽負責人身分證號（D22）。
-  reserved 8;
-  reserved "rep_id_card_no_masked";
 
-  string company_name = 2;
-  string tax_id = 3;
-  google.type.Date company_register_date = 4;
-  string company_phone = 7;
+  string company_name = 1;
+  string tax_id = 2;
+  google.type.Date company_register_date = 3;
+  string company_phone = 4;
   // 公司地址；沒有填時不設。
-  hawkr.common.v1alpha1.PostalAddress company_address = 9;
+  hawkr.common.v1alpha1.PostalAddress company_address = 5;
 }
 
 // KYCReview 是一筆審核紀錄：誰、何時、什麼決定與理由，不含任何欄位值。
@@ -387,34 +347,30 @@ message KYCReview {
   string reviewer_admin_id = 3;
   // 退回的理由、核准的備註、賣家取消的原因；沒有時是空字串。
   string reason = 4;
-  reserved 5;
-  reserved "required_fields";
 
-  google.protobuf.Timestamp decide_time = 6;
+  google.protobuf.Timestamp decide_time = 5;
   // 核准或退回當下後台顯示的登記資料查詢（審核的依據）：它的序號與查詢完成的時間，內容用 GetKYCApplication 的
   // registration_check（只顯示目前這一輪送件的最新一筆已完成查詢）；沒有引用時序號是 0、時間不設（賣家自己的動作、個人型申請、當時沒有已完成的查詢，
   // 或個資清理之後）。
-  int64 registration_check_seq = 7;
-  google.protobuf.Timestamp registration_check_query_time = 8;
+  int64 registration_check_seq = 6;
+  google.protobuf.Timestamp registration_check_query_time = 7;
   // 退回時逐項指出的問題；其他動作是空的。
-  repeated hawkr.seller.v1alpha1.KYCIssue issues = 9;
+  repeated hawkr.seller.v1alpha1.KYCIssue issues = 8;
   // 退回時審核員寫的內部備註，只有後台看得到（賣家端的 KYCRejection 沒有這個欄位）；沒有時是空字串。
-  string internal_note = 10;
+  string internal_note = 9;
 }
 
 // KYCRegistrationOutcome 是一次已完成的登記資料查詢的結果。
 enum KYCRegistrationOutcome {
   KYC_REGISTRATION_OUTCOME_UNSPECIFIED = 0;
   // 沒有「還沒查完」的值：查詢中不是一個結果，用 KYCApplication.pending_registration_check 表示（registration_check 顯示的永遠是已完成的查詢）。
-  reserved 1;
-  reserved "KYC_REGISTRATION_OUTCOME_PENDING";
 
   // 查到登記資料。
-  KYC_REGISTRATION_OUTCOME_FOUND = 2;
+  KYC_REGISTRATION_OUTCOME_FOUND = 1;
   // 公司登記與商業登記都查無這個統編。
-  KYC_REGISTRATION_OUTCOME_NOT_FOUND = 3;
+  KYC_REGISTRATION_OUTCOME_NOT_FOUND = 2;
   // 資料來源在重試之後仍然不可用；不代表查無。
-  KYC_REGISTRATION_OUTCOME_UNAVAILABLE = 4;
+  KYC_REGISTRATION_OUTCOME_UNAVAILABLE = 3;
 }
 
 // KYCRegistrationStatus 是登記現況的分類。
@@ -477,8 +433,6 @@ message KYCRegistrationCheck {
 
 // KYCApplication 是後台看到的身分認證申請：沒有任何寫入用的欄位（平台不收身分證號、銀行帳號與證件影像，Stripe 計畫 D22）。
 message KYCApplication {
-  reserved 16, 18, 19, 23;
-  reserved "contact_email", "contact_phone", "food_business", "flow";
 
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   string store_id = 2;
@@ -486,55 +440,45 @@ message KYCApplication {
   hawkr.seller.v1alpha1.KYCStatus status = 4;
   // 核准與退回要帶這個版本（申請的版本加顯示的登記資料查詢的序號，格式不透明）。
   string etag = 5;
-  // 6 到 14 是刪掉的本名、生日、發證資料、英文姓名與銀行資料（D22、D37）。
-  reserved 6 to 14;
-  reserved "real_name", "birth_date", "id_card_issue_date", "id_card_issue_type", "id_card_issue_location", "english_name",
-      "bank_name", "bank_code", "bank_account_masked";
-  string product_type = 15;
-  string website_url = 17;
+  string product_type = 6;
+  string website_url = 7;
   oneof subject {
-    IndividualKYC individual = 20;
-    BusinessKYC business = 21;
+    IndividualKYC individual = 8;
+    BusinessKYC business = 9;
   }
-  repeated KYCDocument documents = 22;
+  repeated KYCDocument documents = 10;
   // 審核紀錄，舊到新（筆數由人工動作限制，所以內嵌）。補充文件的讀取紀錄隨使用增長，另用 ListKYCDocumentAccesses 分頁讀。
-  repeated KYCReview reviews = 24;
-  // 26 是刪掉的申請的銀行帳號與受處分帳號相同的標記（平台不收銀行帳號，D45）。
-  reserved 26;
-  reserved "shares_bank_account_with_sanctioned_account";
-  google.protobuf.Timestamp submit_time = 27;
-  google.protobuf.Timestamp decide_time = 28;
-  google.protobuf.Timestamp create_time = 29;
-  google.protobuf.Timestamp update_time = 30;
+  repeated KYCReview reviews = 11;
+  google.protobuf.Timestamp submit_time = 12;
+  google.protobuf.Timestamp decide_time = 13;
+  google.protobuf.Timestamp create_time = 14;
+  google.protobuf.Timestamp update_time = 15;
   // 對經濟部商業司登記資料的查詢：申請目前這一輪送件（退回後重送是新的一輪）、序號最大的已完成查詢；這一輪還沒有已完成的查詢時不設
   // （上一輪的快照不顯示）。只有公司型申請會有。etag 由申請的版本與這一筆的序號（沒有時是 0）組成：顯示的查詢變了而 etag 是舊的，核准與退回回 aborted（VERSION_CONFLICT）。
-  KYCRegistrationCheck registration_check = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 31 是刪掉的 registration_check_pending（bool，沒有開始與期限，client 只能猜輪詢的上限）。
-  reserved 31;
-  reserved "registration_check_pending";
+  KYCRegistrationCheck registration_check = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // 申請審核中（SUBMITTED），而且目前這一輪有比顯示的這一筆更新的查詢還在進行中：這筆進行中的查詢（seq、request_time、
   // deadline_time；outcome 是 UNSPECIFIED，其他欄位不設）。伺服器保證在 deadline_time 之前到終態，顯示端可以提示「查詢中，
   // 最晚 HH:mm 會有結果」；沒有進行中的查詢時不設（其他狀態的申請一律不設）。
-  KYCRegistrationCheck pending_registration_check = 33 [(google.api.field_behavior) = OUTPUT_ONLY];
+  KYCRegistrationCheck pending_registration_check = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 最近一次退回指出的問題裡賣家還沒處理的（與賣家端 KYCApplication.outstanding_issues 同一份）；重新送出、核准或取消之後是空的。
-  repeated hawkr.seller.v1alpha1.KYCIssue outstanding_issues = 32 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated hawkr.seller.v1alpha1.KYCIssue outstanding_issues = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 這份申請可以在退回時指出問題的欄位（依賣家型態：個人與企業各自的欄位，與 RejectKYC 驗證 KYCIssue.field 用的是同一份規則），
   // 依 KYCField 的數字順序。後台的退回表單以它決定欄位選項，不自己寫一份型態對欄位的對照。
-  repeated hawkr.seller.v1alpha1.KYCField issuable_fields = 34 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated hawkr.seller.v1alpha1.KYCField issuable_fields = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 此刻能不能核准：審核中、店家營運中、帳號沒有停權。等於 approve_unavailabilities 是空的。身分命中別的帳號生效中的處分時核准仍回
   // failed_precondition，不列在原因裡（不透露）。
-  bool can_approve = 35 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_approve = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 不能核准的原因，依先後；ApproveKYC 被拒絕時訊息是第一句。
-  repeated StoreActionUnavailability approve_unavailabilities = 36 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated StoreActionUnavailability approve_unavailabilities = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 此刻能不能退回：審核中、店家營運中（帳號停權不擋退回）。等於 reject_unavailabilities 是空的。
-  bool can_reject = 37 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_reject = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 不能退回的原因，依先後；RejectKYC 被拒絕時訊息是第一句。
-  repeated StoreActionUnavailability reject_unavailabilities = 38 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated StoreActionUnavailability reject_unavailabilities = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 此刻能不能重新查詢登記資料：審核中、公司型、店家營運中。等於 requery_registration_unavailabilities 是空的。
-  bool can_requery_registration = 39 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_requery_registration = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 不能重新查詢的原因，依先後；RequeryKYCRegistration 被拒絕時訊息是第一句。
-  repeated StoreActionUnavailability requery_registration_unavailabilities = 40 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated StoreActionUnavailability requery_registration_unavailabilities = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // KYCApplicationSummary 是審核佇列的一列：店名、公司名稱與統編。
@@ -544,20 +488,15 @@ message KYCApplicationSummary {
   string account_id = 3;
   hawkr.seller.v1alpha1.KYCStatus status = 4;
   KYCSellerType seller_type = 5;
-  // 6 是刪掉的本名（D37：列名改成店名）。
-  reserved 6;
-  reserved "real_name";
   // 企業賣家才有。
-  string company_name = 7;
-  string tax_id = 8;
-  google.protobuf.Timestamp submit_time = 9;
+  string company_name = 6;
+  string tax_id = 7;
+  google.protobuf.Timestamp submit_time = 8;
   // 核准或退回的時間；還沒有決定時不設。
-  google.protobuf.Timestamp decide_time = 10;
+  google.protobuf.Timestamp decide_time = 9;
   // 審核期限只在商家詳情的 KYCSummary.decide_deadline（清單沒有消費者）。
-  reserved 11;
-  reserved "decide_deadline";
   // 申請所屬店家的店名（D37：審核佇列的列名）。
-  string store_name = 12;
+  string store_name = 10;
 }
 
 message ListKYCApplicationsRequest {
@@ -612,17 +551,15 @@ message RejectKYCRequest {
   string etag = 2 [(google.api.field_behavior) = REQUIRED];
   // 退回的理由，最多 1000 字；賣家看得到。
   string reason = 3 [(google.api.field_behavior) = REQUIRED];
-  reserved 4;
-  reserved "required_fields";
 
   // 逐項指出的問題，至少 1 項；賣家看得到。每項的 field 與 code 不可以是 UNSPECIFIED，message 必填（1 到 500 字）；
   // field 要是 KYCApplication.issuable_fields 之一。document_asset_id 要是這筆申請目前實際有的文件（來自 GetKYCApplication 回應的
   // KYCDocument.asset_id），而且 field 要是文件類的欄位，非文件類的欄位不可以帶；文件類欄位依原因碼：UNREADABLE、EXPIRED、
   // MISMATCH、INVALID 必須帶，MISSING 不可以帶，OTHER 兩者皆可（見 KYCIssue.document_asset_id）。
   // 違反時回 invalid_argument，FieldViolation 指到 issues[i] 的欄位。
-  repeated hawkr.seller.v1alpha1.KYCIssue issues = 5 [(google.api.field_behavior) = REQUIRED];
+  repeated hawkr.seller.v1alpha1.KYCIssue issues = 4 [(google.api.field_behavior) = REQUIRED];
   // 內部備註，選填，最多 1000 字；只給後台看，賣家看不到。
-  string internal_note = 6;
+  string internal_note = 5;
 }
 
 message RejectKYCResponse {

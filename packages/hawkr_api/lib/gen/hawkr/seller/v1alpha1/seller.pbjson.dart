@@ -20,12 +20,12 @@ import 'package:protobuf/well_known_types/google/protobuf/duration.pbjson.dart'
 import 'package:protobuf/well_known_types/google/protobuf/field_mask.pbjson.dart'
     as $4;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
-    as $1;
+    as $2;
 
 import '../../../google/rpc/error_details.pbjson.dart' as $3;
 import '../../../google/type/date.pbjson.dart' as $5;
-import '../../common/v1alpha1/image.pbjson.dart' as $0;
-import '../../common/v1alpha1/postal_address.pbjson.dart' as $2;
+import '../../common/v1alpha1/image.pbjson.dart' as $1;
+import '../../common/v1alpha1/postal_address.pbjson.dart' as $0;
 import '../../common/v1alpha1/store_card.pbjson.dart' as $7;
 
 @$core.Deprecated('Use agreementKindDescriptor instead')
@@ -36,22 +36,13 @@ const AgreementKind$json = {
     {'1': 'AGREEMENT_KIND_SELLER_TERMS', '2': 1},
     {'1': 'AGREEMENT_KIND_KYC_PRIVACY_NOTICE', '2': 2},
   ],
-  '4': [
-    {'1': 3, '2': 3},
-    {'1': 4, '2': 4},
-  ],
-  '5': [
-    'AGREEMENT_KIND_PAYUNI_TERMS',
-    'AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE'
-  ],
 };
 
 /// Descriptor for `AgreementKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List agreementKindDescriptor = $convert.base64Decode(
     'Cg1BZ3JlZW1lbnRLaW5kEh4KGkFHUkVFTUVOVF9LSU5EX1VOU1BFQ0lGSUVEEAASHwobQUdSRU'
     'VNRU5UX0tJTkRfU0VMTEVSX1RFUk1TEAESJQohQUdSRUVNRU5UX0tJTkRfS1lDX1BSSVZBQ1lf'
-    'Tk9USUNFEAIiBAgDEAMiBAgEEAQqG0FHUkVFTUVOVF9LSU5EX1BBWVVOSV9URVJNUyonQUdSRU'
-    'VNRU5UX0tJTkRfRk9PRF9SRUdJU1RSQVRJT05fTk9USUNF');
+    'Tk9USUNFEAI=');
 
 @$core.Deprecated('Use storeStatusDescriptor instead')
 const StoreStatus$json = {
@@ -82,19 +73,15 @@ const SellerCapability$json = {
     {'1': 'SELLER_CAPABILITY_ORDER_CONTRACT', '2': 5},
     {'1': 'SELLER_CAPABILITY_MARKETING', '2': 6},
     {'1': 'SELLER_CAPABILITY_CONTENT_CONTRACT', '2': 7},
-    {'1': 'SELLER_CAPABILITY_CHAT_SEND', '2': 9},
-    {'1': 'SELLER_CAPABILITY_CHAT_READ', '2': 10},
-    {'1': 'SELLER_CAPABILITY_NOTIFICATION', '2': 11},
-    {'1': 'SELLER_CAPABILITY_ACCOUNT_CLOSE', '2': 12},
-    {'1': 'SELLER_CAPABILITY_INVOICE_MANAGE', '2': 13},
-    {'1': 'SELLER_CAPABILITY_INVOICE_TAX_REMEDY', '2': 14},
-    {'1': 'SELLER_CAPABILITY_SHIPPING_SETUP', '2': 15},
-    {'1': 'SELLER_CAPABILITY_PUBLIC_LISTING', '2': 16},
+    {'1': 'SELLER_CAPABILITY_CHAT_SEND', '2': 8},
+    {'1': 'SELLER_CAPABILITY_CHAT_READ', '2': 9},
+    {'1': 'SELLER_CAPABILITY_NOTIFICATION', '2': 10},
+    {'1': 'SELLER_CAPABILITY_ACCOUNT_CLOSE', '2': 11},
+    {'1': 'SELLER_CAPABILITY_INVOICE_MANAGE', '2': 12},
+    {'1': 'SELLER_CAPABILITY_INVOICE_TAX_REMEDY', '2': 13},
+    {'1': 'SELLER_CAPABILITY_SHIPPING_SETUP', '2': 14},
+    {'1': 'SELLER_CAPABILITY_PUBLIC_LISTING', '2': 15},
   ],
-  '4': [
-    {'1': 8, '2': 8},
-  ],
-  '5': ['SELLER_CAPABILITY_GOVERNANCE_APPEAL'],
 };
 
 /// Descriptor for `SellerCapability`. Decode as a `google.protobuf.EnumDescriptorProto`.
@@ -105,12 +92,12 @@ final $typed_data.Uint8List sellerCapabilityDescriptor = $convert.base64Decode(
     '5BR0UQAxIjCh9TRUxMRVJfQ0FQQUJJTElUWV9PUkRFUl9GVUxGSUxMEAQSJAogU0VMTEVSX0NB'
     'UEFCSUxJVFlfT1JERVJfQ09OVFJBQ1QQBRIfChtTRUxMRVJfQ0FQQUJJTElUWV9NQVJLRVRJTk'
     'cQBhImCiJTRUxMRVJfQ0FQQUJJTElUWV9DT05URU5UX0NPTlRSQUNUEAcSHwobU0VMTEVSX0NB'
-    'UEFCSUxJVFlfQ0hBVF9TRU5EEAkSHwobU0VMTEVSX0NBUEFCSUxJVFlfQ0hBVF9SRUFEEAoSIg'
-    'oeU0VMTEVSX0NBUEFCSUxJVFlfTk9USUZJQ0FUSU9OEAsSIwofU0VMTEVSX0NBUEFCSUxJVFlf'
-    'QUNDT1VOVF9DTE9TRRAMEiQKIFNFTExFUl9DQVBBQklMSVRZX0lOVk9JQ0VfTUFOQUdFEA0SKA'
-    'okU0VMTEVSX0NBUEFCSUxJVFlfSU5WT0lDRV9UQVhfUkVNRURZEA4SJAogU0VMTEVSX0NBUEFC'
-    'SUxJVFlfU0hJUFBJTkdfU0VUVVAQDxIkCiBTRUxMRVJfQ0FQQUJJTElUWV9QVUJMSUNfTElTVE'
-    'lORxAQIgQICBAIKiNTRUxMRVJfQ0FQQUJJTElUWV9HT1ZFUk5BTkNFX0FQUEVBTA==');
+    'UEFCSUxJVFlfQ0hBVF9TRU5EEAgSHwobU0VMTEVSX0NBUEFCSUxJVFlfQ0hBVF9SRUFEEAkSIg'
+    'oeU0VMTEVSX0NBUEFCSUxJVFlfTk9USUZJQ0FUSU9OEAoSIwofU0VMTEVSX0NBUEFCSUxJVFlf'
+    'QUNDT1VOVF9DTE9TRRALEiQKIFNFTExFUl9DQVBBQklMSVRZX0lOVk9JQ0VfTUFOQUdFEAwSKA'
+    'okU0VMTEVSX0NBUEFCSUxJVFlfSU5WT0lDRV9UQVhfUkVNRURZEA0SJAogU0VMTEVSX0NBUEFC'
+    'SUxJVFlfU0hJUFBJTkdfU0VUVVAQDhIkCiBTRUxMRVJfQ0FQQUJJTElUWV9QVUJMSUNfTElTVE'
+    'lORxAP');
 
 @$core.Deprecated('Use sellerRequirementDescriptor instead')
 const SellerRequirement$json = {
@@ -263,72 +250,25 @@ const KYCField$json = {
   '1': 'KYCField',
   '2': [
     {'1': 'KYC_FIELD_UNSPECIFIED', '2': 0},
-    {'1': 'KYC_FIELD_PRODUCT_TYPE', '2': 10},
-    {'1': 'KYC_FIELD_WEBSITE_URL', '2': 12},
-    {'1': 'KYC_FIELD_BUSINESS_COMPANY_NAME', '2': 20},
-    {'1': 'KYC_FIELD_BUSINESS_TAX_ID', '2': 21},
-    {'1': 'KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE', '2': 22},
-    {'1': 'KYC_FIELD_BUSINESS_COMPANY_PHONE', '2': 25},
-    {'1': 'KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS', '2': 27},
-    {'1': 'KYC_FIELD_BUSINESS_COMPANY_ADDRESS', '2': 28},
-  ],
-  '4': [
-    {'1': 1, '2': 9},
-    {'1': 11, '2': 11},
-    {'1': 13, '2': 13},
-    {'1': 14, '2': 14},
-    {'1': 15, '2': 18},
-    {'1': 19, '2': 19},
-    {'1': 23, '2': 23},
-    {'1': 24, '2': 24},
-    {'1': 26, '2': 26},
-    {'1': 29, '2': 29},
-  ],
-  '5': [
-    'KYC_FIELD_REAL_NAME',
-    'KYC_FIELD_BIRTH_DATE',
-    'KYC_FIELD_ID_CARD_ISSUE_DATE',
-    'KYC_FIELD_ID_CARD_ISSUE_TYPE',
-    'KYC_FIELD_ID_CARD_ISSUE_LOCATION',
-    'KYC_FIELD_ENGLISH_NAME',
-    'KYC_FIELD_BANK_NAME',
-    'KYC_FIELD_BANK_CODE',
-    'KYC_FIELD_BANK_ACCOUNT',
-    'KYC_FIELD_FOOD_BUSINESS',
-    'KYC_FIELD_CONTACT_EMAIL',
-    'KYC_FIELD_CONTACT_PHONE',
-    'KYC_FIELD_ID_CARD_FRONT',
-    'KYC_FIELD_ID_CARD_BACK',
-    'KYC_FIELD_BANK_BOOK',
-    'KYC_FIELD_INDIVIDUAL_ID_CARD_NO',
-    'KYC_FIELD_BUSINESS_COMPANY_TYPE',
-    'KYC_FIELD_BUSINESS_COMPANY_TOWN_CODE',
-    'KYC_FIELD_BUSINESS_COMPANY_ADDRESS_DETAIL',
-    'KYC_FIELD_BUSINESS_REP_ID_CARD_NO',
-    'KYC_FIELD_PAYOUT_CONTACT_EMAIL'
+    {'1': 'KYC_FIELD_PRODUCT_TYPE', '2': 1},
+    {'1': 'KYC_FIELD_WEBSITE_URL', '2': 2},
+    {'1': 'KYC_FIELD_BUSINESS_COMPANY_NAME', '2': 3},
+    {'1': 'KYC_FIELD_BUSINESS_TAX_ID', '2': 4},
+    {'1': 'KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE', '2': 5},
+    {'1': 'KYC_FIELD_BUSINESS_COMPANY_PHONE', '2': 6},
+    {'1': 'KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS', '2': 7},
+    {'1': 'KYC_FIELD_BUSINESS_COMPANY_ADDRESS', '2': 8},
   ],
 };
 
 /// Descriptor for `KYCField`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List kYCFieldDescriptor = $convert.base64Decode(
     'CghLWUNGaWVsZBIZChVLWUNfRklFTERfVU5TUEVDSUZJRUQQABIaChZLWUNfRklFTERfUFJPRF'
-    'VDVF9UWVBFEAoSGQoVS1lDX0ZJRUxEX1dFQlNJVEVfVVJMEAwSIwofS1lDX0ZJRUxEX0JVU0lO'
-    'RVNTX0NPTVBBTllfTkFNRRAUEh0KGUtZQ19GSUVMRF9CVVNJTkVTU19UQVhfSUQQFRIsCihLWU'
-    'NfRklFTERfQlVTSU5FU1NfQ09NUEFOWV9SRUdJU1RFUl9EQVRFEBYSJAogS1lDX0ZJRUxEX0JV'
-    'U0lORVNTX0NPTVBBTllfUEhPTkUQGRIoCiRLWUNfRklFTERfQlVTSU5FU1NfQ09NUEFOWV9ET0'
-    'NVTUVOVFMQGxImCiJLWUNfRklFTERfQlVTSU5FU1NfQ09NUEFOWV9BRERSRVNTEBwiBAgBEAki'
-    'BAgLEAsiBAgNEA0iBAgOEA4iBAgPEBIiBAgTEBMiBAgXEBciBAgYEBgiBAgaEBoiBAgdEB0qE0'
-    'tZQ19GSUVMRF9SRUFMX05BTUUqFEtZQ19GSUVMRF9CSVJUSF9EQVRFKhxLWUNfRklFTERfSURf'
-    'Q0FSRF9JU1NVRV9EQVRFKhxLWUNfRklFTERfSURfQ0FSRF9JU1NVRV9UWVBFKiBLWUNfRklFTE'
-    'RfSURfQ0FSRF9JU1NVRV9MT0NBVElPTioWS1lDX0ZJRUxEX0VOR0xJU0hfTkFNRSoTS1lDX0ZJ'
-    'RUxEX0JBTktfTkFNRSoTS1lDX0ZJRUxEX0JBTktfQ09ERSoWS1lDX0ZJRUxEX0JBTktfQUNDT1'
-    'VOVCoXS1lDX0ZJRUxEX0ZPT0RfQlVTSU5FU1MqF0tZQ19GSUVMRF9DT05UQUNUX0VNQUlMKhdL'
-    'WUNfRklFTERfQ09OVEFDVF9QSE9ORSoXS1lDX0ZJRUxEX0lEX0NBUkRfRlJPTlQqFktZQ19GSU'
-    'VMRF9JRF9DQVJEX0JBQ0sqE0tZQ19GSUVMRF9CQU5LX0JPT0sqH0tZQ19GSUVMRF9JTkRJVklE'
-    'VUFMX0lEX0NBUkRfTk8qH0tZQ19GSUVMRF9CVVNJTkVTU19DT01QQU5ZX1RZUEUqJEtZQ19GSU'
-    'VMRF9CVVNJTkVTU19DT01QQU5ZX1RPV05fQ09ERSopS1lDX0ZJRUxEX0JVU0lORVNTX0NPTVBB'
-    'TllfQUREUkVTU19ERVRBSUwqIUtZQ19GSUVMRF9CVVNJTkVTU19SRVBfSURfQ0FSRF9OTyoeS1'
-    'lDX0ZJRUxEX1BBWU9VVF9DT05UQUNUX0VNQUlM');
+    'VDVF9UWVBFEAESGQoVS1lDX0ZJRUxEX1dFQlNJVEVfVVJMEAISIwofS1lDX0ZJRUxEX0JVU0lO'
+    'RVNTX0NPTVBBTllfTkFNRRADEh0KGUtZQ19GSUVMRF9CVVNJTkVTU19UQVhfSUQQBBIsCihLWU'
+    'NfRklFTERfQlVTSU5FU1NfQ09NUEFOWV9SRUdJU1RFUl9EQVRFEAUSJAogS1lDX0ZJRUxEX0JV'
+    'U0lORVNTX0NPTVBBTllfUEhPTkUQBhIoCiRLWUNfRklFTERfQlVTSU5FU1NfQ09NUEFOWV9ET0'
+    'NVTUVOVFMQBxImCiJLWUNfRklFTERfQlVTSU5FU1NfQ09NUEFOWV9BRERSRVNTEAg=');
 
 @$core.Deprecated('Use kYCIssueCodeDescriptor instead')
 const KYCIssueCode$json = {
@@ -702,17 +642,17 @@ const Store$json = {
     {'1': 'contact_phone', '3': 5, '4': 1, '5': 9, '10': 'contactPhone'},
     {
       '1': 'address',
-      '3': 21,
+      '3': 6,
       '4': 1,
       '5': 11,
       '6': '.hawkr.common.v1alpha1.PostalAddress',
       '10': 'address'
     },
-    {'1': 'contact_name', '3': 23, '4': 1, '5': 9, '10': 'contactName'},
-    {'1': 'contact_mobile', '3': 24, '4': 1, '5': 9, '10': 'contactMobile'},
-    {'1': 'support_email', '3': 25, '4': 1, '5': 9, '10': 'supportEmail'},
-    {'1': 'prize', '3': 8, '4': 1, '5': 9, '10': 'prize'},
-    {'1': 'website_url', '3': 9, '4': 1, '5': 9, '10': 'websiteUrl'},
+    {'1': 'contact_name', '3': 7, '4': 1, '5': 9, '10': 'contactName'},
+    {'1': 'contact_mobile', '3': 8, '4': 1, '5': 9, '10': 'contactMobile'},
+    {'1': 'support_email', '3': 9, '4': 1, '5': 9, '10': 'supportEmail'},
+    {'1': 'prize', '3': 10, '4': 1, '5': 9, '10': 'prize'},
+    {'1': 'website_url', '3': 11, '4': 1, '5': 9, '10': 'websiteUrl'},
     {
       '1': 'onboarding_completed',
       '3': 12,
@@ -784,26 +724,6 @@ const Store$json = {
       '10': 'coverStagedToken'
     },
   ],
-  '9': [
-    {'1': 6, '2': 7},
-    {'1': 7, '2': 8},
-    {'1': 10, '2': 11},
-    {'1': 11, '2': 12},
-    {'1': 22, '2': 23},
-    {'1': 26, '2': 31},
-  ],
-  '10': [
-    'town_code',
-    'address_detail',
-    'processed_food',
-    'food_business_reg_no',
-    'food_business',
-    'open_food_registration',
-    'approved_food_registration',
-    'revoked_food_registration',
-    'pending_food_registration',
-    'rejected_food_registration'
-  ],
 };
 
 /// Descriptor for `Store`. Decode as a `google.protobuf.DescriptorProto`.
@@ -811,10 +731,10 @@ final $typed_data.Uint8List storeDescriptor = $convert.base64Decode(
     'CgVTdG9yZRITCgJpZBgBIAEoCUID4EEIUgJpZBIiCgpzdG9yZV9jb2RlGAIgASgJQgPgQQNSCX'
     'N0b3JlQ29kZRIiCgpzdG9yZV9uYW1lGAMgASgJQgPgQQJSCXN0b3JlTmFtZRIgCgtkZXNjcmlw'
     'dGlvbhgEIAEoCVILZGVzY3JpcHRpb24SIwoNY29udGFjdF9waG9uZRgFIAEoCVIMY29udGFjdF'
-    'Bob25lEj4KB2FkZHJlc3MYFSABKAsyJC5oYXdrci5jb21tb24udjFhbHBoYTEuUG9zdGFsQWRk'
-    'cmVzc1IHYWRkcmVzcxIhCgxjb250YWN0X25hbWUYFyABKAlSC2NvbnRhY3ROYW1lEiUKDmNvbn'
-    'RhY3RfbW9iaWxlGBggASgJUg1jb250YWN0TW9iaWxlEiMKDXN1cHBvcnRfZW1haWwYGSABKAlS'
-    'DHN1cHBvcnRFbWFpbBIUCgVwcml6ZRgIIAEoCVIFcHJpemUSHwoLd2Vic2l0ZV91cmwYCSABKA'
+    'Bob25lEj4KB2FkZHJlc3MYBiABKAsyJC5oYXdrci5jb21tb24udjFhbHBoYTEuUG9zdGFsQWRk'
+    'cmVzc1IHYWRkcmVzcxIhCgxjb250YWN0X25hbWUYByABKAlSC2NvbnRhY3ROYW1lEiUKDmNvbn'
+    'RhY3RfbW9iaWxlGAggASgJUg1jb250YWN0TW9iaWxlEiMKDXN1cHBvcnRfZW1haWwYCSABKAlS'
+    'DHN1cHBvcnRFbWFpbBIUCgVwcml6ZRgKIAEoCVIFcHJpemUSHwoLd2Vic2l0ZV91cmwYCyABKA'
     'lSCndlYnNpdGVVcmwSNgoUb25ib2FyZGluZ19jb21wbGV0ZWQYDCABKAhCA+BBA1ITb25ib2Fy'
     'ZGluZ0NvbXBsZXRlZBI1CgRsb2dvGA0gASgLMhwuaGF3a3IuY29tbW9uLnYxYWxwaGExLkltYW'
     'dlQgPgQQNSBGxvZ28SQgoLY292ZXJfaW1hZ2UYDiABKAsyHC5oYXdrci5jb21tb24udjFhbHBo'
@@ -824,11 +744,7 @@ final $typed_data.Uint8List storeDescriptor = $convert.base64Decode(
     '90aW1lGBEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgp1cGRhdGVUaW1l'
     'EhIKBGV0YWcYEiABKAlSBGV0YWcSLwoRbG9nb19zdGFnZWRfdG9rZW4YEyABKAlCA+BBBFIPbG'
     '9nb1N0YWdlZFRva2VuEjEKEmNvdmVyX3N0YWdlZF90b2tlbhgUIAEoCUID4EEEUhBjb3ZlclN0'
-    'YWdlZFRva2VuSgQIBhAHSgQIBxAISgQIChALSgQICxAMSgQIFhAXSgQIGhAfUgl0b3duX2NvZG'
-    'VSDmFkZHJlc3NfZGV0YWlsUg5wcm9jZXNzZWRfZm9vZFIUZm9vZF9idXNpbmVzc19yZWdfbm9S'
-    'DWZvb2RfYnVzaW5lc3NSFm9wZW5fZm9vZF9yZWdpc3RyYXRpb25SGmFwcHJvdmVkX2Zvb2Rfcm'
-    'VnaXN0cmF0aW9uUhlyZXZva2VkX2Zvb2RfcmVnaXN0cmF0aW9uUhlwZW5kaW5nX2Zvb2RfcmVn'
-    'aXN0cmF0aW9uUhpyZWplY3RlZF9mb29kX3JlZ2lzdHJhdGlvbg==');
+    'YWdlZFRva2Vu');
 
 @$core.Deprecated('Use capabilityStatusDescriptor instead')
 const CapabilityStatus$json = {
@@ -868,10 +784,10 @@ const ApplyStoreRequest$json = {
     {'1': 'store_name', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'storeName'},
     {'1': 'description', '3': 2, '4': 1, '5': 9, '10': 'description'},
     {'1': 'contact_phone', '3': 3, '4': 1, '5': 9, '10': 'contactPhone'},
-    {'1': 'prize', '3': 6, '4': 1, '5': 9, '10': 'prize'},
+    {'1': 'prize', '3': 4, '4': 1, '5': 9, '10': 'prize'},
     {
       '1': 'address',
-      '3': 7,
+      '3': 5,
       '4': 1,
       '5': 11,
       '6': '.hawkr.common.v1alpha1.PostalAddress',
@@ -879,7 +795,7 @@ const ApplyStoreRequest$json = {
     },
     {
       '1': 'accepted_agreements',
-      '3': 8,
+      '3': 6,
       '4': 3,
       '5': 11,
       '6': '.hawkr.seller.v1alpha1.AgreementAcceptance',
@@ -887,22 +803,16 @@ const ApplyStoreRequest$json = {
       '10': 'acceptedAgreements'
     },
   ],
-  '9': [
-    {'1': 4, '2': 5},
-    {'1': 5, '2': 6},
-  ],
-  '10': ['town_code', 'address_detail'],
 };
 
 /// Descriptor for `ApplyStoreRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List applyStoreRequestDescriptor = $convert.base64Decode(
     'ChFBcHBseVN0b3JlUmVxdWVzdBIiCgpzdG9yZV9uYW1lGAEgASgJQgPgQQJSCXN0b3JlTmFtZR'
     'IgCgtkZXNjcmlwdGlvbhgCIAEoCVILZGVzY3JpcHRpb24SIwoNY29udGFjdF9waG9uZRgDIAEo'
-    'CVIMY29udGFjdFBob25lEhQKBXByaXplGAYgASgJUgVwcml6ZRI+CgdhZGRyZXNzGAcgASgLMi'
+    'CVIMY29udGFjdFBob25lEhQKBXByaXplGAQgASgJUgVwcml6ZRI+CgdhZGRyZXNzGAUgASgLMi'
     'QuaGF3a3IuY29tbW9uLnYxYWxwaGExLlBvc3RhbEFkZHJlc3NSB2FkZHJlc3MSYAoTYWNjZXB0'
-    'ZWRfYWdyZWVtZW50cxgIIAMoCzIqLmhhd2tyLnNlbGxlci52MWFscGhhMS5BZ3JlZW1lbnRBY2'
-    'NlcHRhbmNlQgPgQQJSEmFjY2VwdGVkQWdyZWVtZW50c0oECAQQBUoECAUQBlIJdG93bl9jb2Rl'
-    'Ug5hZGRyZXNzX2RldGFpbA==');
+    'ZWRfYWdyZWVtZW50cxgGIAMoCzIqLmhhd2tyLnNlbGxlci52MWFscGhhMS5BZ3JlZW1lbnRBY2'
+    'NlcHRhbmNlQgPgQQJSEmFjY2VwdGVkQWdyZWVtZW50cw==');
 
 @$core.Deprecated('Use applyStoreResponseDescriptor instead')
 const ApplyStoreResponse$json = {
@@ -947,7 +857,7 @@ const GetMyStoreOpeningResponse$json = {
     },
     {
       '1': 'unavailabilities',
-      '3': 3,
+      '3': 2,
       '4': 3,
       '5': 11,
       '6': '.hawkr.seller.v1alpha1.StoreOpeningUnavailability',
@@ -955,18 +865,14 @@ const GetMyStoreOpeningResponse$json = {
       '10': 'unavailabilities'
     },
   ],
-  '9': [
-    {'1': 2, '2': 3},
-  ],
-  '10': ['unavailable_reasons'],
 };
 
 /// Descriptor for `GetMyStoreOpeningResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List getMyStoreOpeningResponseDescriptor = $convert.base64Decode(
     'ChlHZXRNeVN0b3JlT3BlbmluZ1Jlc3BvbnNlEisKD2Nhbl9hcHBseV9zdG9yZRgBIAEoCEID4E'
-    'EDUg1jYW5BcHBseVN0b3JlEmIKEHVuYXZhaWxhYmlsaXRpZXMYAyADKAsyMS5oYXdrci5zZWxs'
+    'EDUg1jYW5BcHBseVN0b3JlEmIKEHVuYXZhaWxhYmlsaXRpZXMYAiADKAsyMS5oYXdrci5zZWxs'
     'ZXIudjFhbHBoYTEuU3RvcmVPcGVuaW5nVW5hdmFpbGFiaWxpdHlCA+BBA1IQdW5hdmFpbGFiaW'
-    'xpdGllc0oECAIQA1ITdW5hdmFpbGFibGVfcmVhc29ucw==');
+    'xpdGllcw==');
 
 @$core.Deprecated('Use storeOpeningUnavailabilityDescriptor instead')
 const StoreOpeningUnavailability$json = {
@@ -1023,7 +929,7 @@ const GetMyStoreResponse$json = {
     },
     {
       '1': 'capabilities',
-      '3': 3,
+      '3': 2,
       '4': 3,
       '5': 11,
       '6': '.hawkr.seller.v1alpha1.CapabilityStatus',
@@ -1031,28 +937,23 @@ const GetMyStoreResponse$json = {
     },
     {
       '1': 'stats',
-      '3': 5,
+      '3': 3,
       '4': 1,
       '5': 11,
       '6': '.hawkr.seller.v1alpha1.StoreStats',
       '10': 'stats'
     },
-    {'1': 'suspended', '3': 6, '4': 1, '5': 8, '8': {}, '10': 'suspended'},
+    {'1': 'suspended', '3': 4, '4': 1, '5': 8, '8': {}, '10': 'suspended'},
   ],
-  '9': [
-    {'1': 2, '2': 3},
-    {'1': 4, '2': 5},
-  ],
-  '10': ['suspension', 'exposure'],
 };
 
 /// Descriptor for `GetMyStoreResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List getMyStoreResponseDescriptor = $convert.base64Decode(
     'ChJHZXRNeVN0b3JlUmVzcG9uc2USMgoFc3RvcmUYASABKAsyHC5oYXdrci5zZWxsZXIudjFhbH'
-    'BoYTEuU3RvcmVSBXN0b3JlEksKDGNhcGFiaWxpdGllcxgDIAMoCzInLmhhd2tyLnNlbGxlci52'
-    'MWFscGhhMS5DYXBhYmlsaXR5U3RhdHVzUgxjYXBhYmlsaXRpZXMSNwoFc3RhdHMYBSABKAsyIS'
-    '5oYXdrci5zZWxsZXIudjFhbHBoYTEuU3RvcmVTdGF0c1IFc3RhdHMSIQoJc3VzcGVuZGVkGAYg'
-    'ASgIQgPgQQNSCXN1c3BlbmRlZEoECAIQA0oECAQQBVIKc3VzcGVuc2lvblIIZXhwb3N1cmU=');
+    'BoYTEuU3RvcmVSBXN0b3JlEksKDGNhcGFiaWxpdGllcxgCIAMoCzInLmhhd2tyLnNlbGxlci52'
+    'MWFscGhhMS5DYXBhYmlsaXR5U3RhdHVzUgxjYXBhYmlsaXRpZXMSNwoFc3RhdHMYAyABKAsyIS'
+    '5oYXdrci5zZWxsZXIudjFhbHBoYTEuU3RvcmVTdGF0c1IFc3RhdHMSIQoJc3VzcGVuZGVkGAQg'
+    'ASgIQgPgQQNSCXN1c3BlbmRlZA==');
 
 @$core.Deprecated('Use getMyOnboardingRequestDescriptor instead')
 const GetMyOnboardingRequest$json = {
@@ -1663,7 +1564,7 @@ const KYCRejection$json = {
     {'1': 'reason', '3': 1, '4': 1, '5': 9, '10': 'reason'},
     {
       '1': 'decide_time',
-      '3': 3,
+      '3': 2,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
@@ -1671,59 +1572,48 @@ const KYCRejection$json = {
     },
     {
       '1': 'issues',
-      '3': 4,
+      '3': 3,
       '4': 3,
       '5': 11,
       '6': '.hawkr.seller.v1alpha1.KYCIssue',
       '10': 'issues'
     },
   ],
-  '9': [
-    {'1': 2, '2': 3},
-  ],
-  '10': ['required_fields'],
 };
 
 /// Descriptor for `KYCRejection`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List kYCRejectionDescriptor = $convert.base64Decode(
-    'CgxLWUNSZWplY3Rpb24SFgoGcmVhc29uGAEgASgJUgZyZWFzb24SOwoLZGVjaWRlX3RpbWUYAy'
-    'ABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wUgpkZWNpZGVUaW1lEjcKBmlzc3VlcxgE'
-    'IAMoCzIfLmhhd2tyLnNlbGxlci52MWFscGhhMS5LWUNJc3N1ZVIGaXNzdWVzSgQIAhADUg9yZX'
-    'F1aXJlZF9maWVsZHM=');
+    'CgxLWUNSZWplY3Rpb24SFgoGcmVhc29uGAEgASgJUgZyZWFzb24SOwoLZGVjaWRlX3RpbWUYAi'
+    'ABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wUgpkZWNpZGVUaW1lEjcKBmlzc3VlcxgD'
+    'IAMoCzIfLmhhd2tyLnNlbGxlci52MWFscGhhMS5LWUNJc3N1ZVIGaXNzdWVz');
 
 @$core.Deprecated('Use individualKYCDescriptor instead')
 const IndividualKYC$json = {
   '1': 'IndividualKYC',
-  '9': [
-    {'1': 1, '2': 2},
-    {'1': 2, '2': 3},
-  ],
-  '10': ['id_card_no', 'id_card_no_masked'],
 };
 
 /// Descriptor for `IndividualKYC`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List individualKYCDescriptor = $convert.base64Decode(
-    'Cg1JbmRpdmlkdWFsS1lDSgQIARACSgQIAhADUgppZF9jYXJkX25vUhFpZF9jYXJkX25vX21hc2'
-    'tlZA==');
+final $typed_data.Uint8List individualKYCDescriptor =
+    $convert.base64Decode('Cg1JbmRpdmlkdWFsS1lD');
 
 @$core.Deprecated('Use businessKYCDescriptor instead')
 const BusinessKYC$json = {
   '1': 'BusinessKYC',
   '2': [
-    {'1': 'company_name', '3': 2, '4': 1, '5': 9, '10': 'companyName'},
-    {'1': 'tax_id', '3': 3, '4': 1, '5': 9, '10': 'taxId'},
+    {'1': 'company_name', '3': 1, '4': 1, '5': 9, '10': 'companyName'},
+    {'1': 'tax_id', '3': 2, '4': 1, '5': 9, '10': 'taxId'},
     {
       '1': 'company_register_date',
-      '3': 4,
+      '3': 3,
       '4': 1,
       '5': 11,
       '6': '.google.type.Date',
       '10': 'companyRegisterDate'
     },
-    {'1': 'company_phone', '3': 7, '4': 1, '5': 9, '10': 'companyPhone'},
+    {'1': 'company_phone', '3': 4, '4': 1, '5': 9, '10': 'companyPhone'},
     {
       '1': 'company_documents',
-      '3': 10,
+      '3': 5,
       '4': 3,
       '5': 11,
       '6': '.hawkr.seller.v1alpha1.KYCDocument',
@@ -1731,40 +1621,24 @@ const BusinessKYC$json = {
     },
     {
       '1': 'company_address',
-      '3': 11,
+      '3': 6,
       '4': 1,
       '5': 11,
       '6': '.hawkr.common.v1alpha1.PostalAddress',
       '10': 'companyAddress'
     },
   ],
-  '9': [
-    {'1': 1, '2': 2},
-    {'1': 5, '2': 6},
-    {'1': 6, '2': 7},
-    {'1': 8, '2': 9},
-    {'1': 9, '2': 10},
-  ],
-  '10': [
-    'company_type',
-    'company_town_code',
-    'company_address_detail',
-    'rep_id_card_no',
-    'rep_id_card_no_masked'
-  ],
 };
 
 /// Descriptor for `BusinessKYC`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List businessKYCDescriptor = $convert.base64Decode(
-    'CgtCdXNpbmVzc0tZQxIhCgxjb21wYW55X25hbWUYAiABKAlSC2NvbXBhbnlOYW1lEhUKBnRheF'
-    '9pZBgDIAEoCVIFdGF4SWQSRQoVY29tcGFueV9yZWdpc3Rlcl9kYXRlGAQgASgLMhEuZ29vZ2xl'
-    'LnR5cGUuRGF0ZVITY29tcGFueVJlZ2lzdGVyRGF0ZRIjCg1jb21wYW55X3Bob25lGAcgASgJUg'
-    'xjb21wYW55UGhvbmUSTwoRY29tcGFueV9kb2N1bWVudHMYCiADKAsyIi5oYXdrci5zZWxsZXIu'
+    'CgtCdXNpbmVzc0tZQxIhCgxjb21wYW55X25hbWUYASABKAlSC2NvbXBhbnlOYW1lEhUKBnRheF'
+    '9pZBgCIAEoCVIFdGF4SWQSRQoVY29tcGFueV9yZWdpc3Rlcl9kYXRlGAMgASgLMhEuZ29vZ2xl'
+    'LnR5cGUuRGF0ZVITY29tcGFueVJlZ2lzdGVyRGF0ZRIjCg1jb21wYW55X3Bob25lGAQgASgJUg'
+    'xjb21wYW55UGhvbmUSTwoRY29tcGFueV9kb2N1bWVudHMYBSADKAsyIi5oYXdrci5zZWxsZXIu'
     'djFhbHBoYTEuS1lDRG9jdW1lbnRSEGNvbXBhbnlEb2N1bWVudHMSTQoPY29tcGFueV9hZGRyZX'
-    'NzGAsgASgLMiQuaGF3a3IuY29tbW9uLnYxYWxwaGExLlBvc3RhbEFkZHJlc3NSDmNvbXBhbnlB'
-    'ZGRyZXNzSgQIARACSgQIBRAGSgQIBhAHSgQICBAJSgQICRAKUgxjb21wYW55X3R5cGVSEWNvbX'
-    'BhbnlfdG93bl9jb2RlUhZjb21wYW55X2FkZHJlc3NfZGV0YWlsUg5yZXBfaWRfY2FyZF9ub1IV'
-    'cmVwX2lkX2NhcmRfbm9fbWFza2Vk');
+    'NzGAYgASgLMiQuaGF3a3IuY29tbW9uLnYxYWxwaGExLlBvc3RhbEFkZHJlc3NSDmNvbXBhbnlB'
+    'ZGRyZXNz');
 
 @$core.Deprecated('Use kYCApplicationDescriptor instead')
 const KYCApplication$json = {
@@ -1781,11 +1655,11 @@ const KYCApplication$json = {
       '10': 'status'
     },
     {'1': 'etag', '3': 3, '4': 1, '5': 9, '10': 'etag'},
-    {'1': 'product_type', '3': 14, '4': 1, '5': 9, '10': 'productType'},
-    {'1': 'website_url', '3': 16, '4': 1, '5': 9, '10': 'websiteUrl'},
+    {'1': 'product_type', '3': 4, '4': 1, '5': 9, '10': 'productType'},
+    {'1': 'website_url', '3': 5, '4': 1, '5': 9, '10': 'websiteUrl'},
     {
       '1': 'individual',
-      '3': 22,
+      '3': 6,
       '4': 1,
       '5': 11,
       '6': '.hawkr.seller.v1alpha1.IndividualKYC',
@@ -1794,7 +1668,7 @@ const KYCApplication$json = {
     },
     {
       '1': 'business',
-      '3': 23,
+      '3': 7,
       '4': 1,
       '5': 11,
       '6': '.hawkr.seller.v1alpha1.BusinessKYC',
@@ -1803,7 +1677,7 @@ const KYCApplication$json = {
     },
     {
       '1': 'last_rejection',
-      '3': 25,
+      '3': 8,
       '4': 1,
       '5': 11,
       '6': '.hawkr.seller.v1alpha1.KYCRejection',
@@ -1812,7 +1686,7 @@ const KYCApplication$json = {
     },
     {
       '1': 'missing_fields',
-      '3': 26,
+      '3': 9,
       '4': 3,
       '5': 14,
       '6': '.hawkr.seller.v1alpha1.KYCField',
@@ -1821,7 +1695,7 @@ const KYCApplication$json = {
     },
     {
       '1': 'missing_store_fields',
-      '3': 31,
+      '3': 10,
       '4': 3,
       '5': 14,
       '6': '.hawkr.seller.v1alpha1.StoreField',
@@ -1830,7 +1704,7 @@ const KYCApplication$json = {
     },
     {
       '1': 'outstanding_issues',
-      '3': 32,
+      '3': 11,
       '4': 3,
       '5': 11,
       '6': '.hawkr.seller.v1alpha1.KYCIssue',
@@ -1839,7 +1713,7 @@ const KYCApplication$json = {
     },
     {
       '1': 'submit_time',
-      '3': 27,
+      '3': 12,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
@@ -1848,7 +1722,7 @@ const KYCApplication$json = {
     },
     {
       '1': 'decide_time',
-      '3': 28,
+      '3': 13,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
@@ -1857,7 +1731,7 @@ const KYCApplication$json = {
     },
     {
       '1': 'create_time',
-      '3': 29,
+      '3': 14,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
@@ -1866,7 +1740,7 @@ const KYCApplication$json = {
     },
     {
       '1': 'update_time',
-      '3': 30,
+      '3': 15,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
@@ -1877,62 +1751,27 @@ const KYCApplication$json = {
   '8': [
     {'1': 'subject'},
   ],
-  '9': [
-    {'1': 15, '2': 16},
-    {'1': 17, '2': 18},
-    {'1': 18, '2': 19},
-    {'1': 24, '2': 25},
-    {'1': 4, '2': 14},
-    {'1': 19, '2': 22},
-    {'1': 33, '2': 34},
-  ],
-  '10': [
-    'contact_email',
-    'contact_phone',
-    'food_business',
-    'flow',
-    'real_name',
-    'birth_date',
-    'id_card_issue_date',
-    'id_card_issue_type',
-    'id_card_issue_location',
-    'english_name',
-    'bank_name',
-    'bank_code',
-    'bank_account',
-    'bank_account_masked',
-    'id_card_front',
-    'id_card_back',
-    'bank_book',
-    'payout_contact_email'
-  ],
 };
 
 /// Descriptor for `KYCApplication`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List kYCApplicationDescriptor = $convert.base64Decode(
     'Cg5LWUNBcHBsaWNhdGlvbhITCgJpZBgBIAEoCUID4EEIUgJpZBI9CgZzdGF0dXMYAiABKA4yIC'
     '5oYXdrci5zZWxsZXIudjFhbHBoYTEuS1lDU3RhdHVzQgPgQQNSBnN0YXR1cxISCgRldGFnGAMg'
-    'ASgJUgRldGFnEiEKDHByb2R1Y3RfdHlwZRgOIAEoCVILcHJvZHVjdFR5cGUSHwoLd2Vic2l0ZV'
-    '91cmwYECABKAlSCndlYnNpdGVVcmwSRgoKaW5kaXZpZHVhbBgWIAEoCzIkLmhhd2tyLnNlbGxl'
-    'ci52MWFscGhhMS5JbmRpdmlkdWFsS1lDSABSCmluZGl2aWR1YWwSQAoIYnVzaW5lc3MYFyABKA'
+    'ASgJUgRldGFnEiEKDHByb2R1Y3RfdHlwZRgEIAEoCVILcHJvZHVjdFR5cGUSHwoLd2Vic2l0ZV'
+    '91cmwYBSABKAlSCndlYnNpdGVVcmwSRgoKaW5kaXZpZHVhbBgGIAEoCzIkLmhhd2tyLnNlbGxl'
+    'ci52MWFscGhhMS5JbmRpdmlkdWFsS1lDSABSCmluZGl2aWR1YWwSQAoIYnVzaW5lc3MYByABKA'
     'syIi5oYXdrci5zZWxsZXIudjFhbHBoYTEuQnVzaW5lc3NLWUNIAFIIYnVzaW5lc3MSTwoObGFz'
-    'dF9yZWplY3Rpb24YGSABKAsyIy5oYXdrci5zZWxsZXIudjFhbHBoYTEuS1lDUmVqZWN0aW9uQg'
-    'PgQQNSDWxhc3RSZWplY3Rpb24SSwoObWlzc2luZ19maWVsZHMYGiADKA4yHy5oYXdrci5zZWxs'
+    'dF9yZWplY3Rpb24YCCABKAsyIy5oYXdrci5zZWxsZXIudjFhbHBoYTEuS1lDUmVqZWN0aW9uQg'
+    'PgQQNSDWxhc3RSZWplY3Rpb24SSwoObWlzc2luZ19maWVsZHMYCSADKA4yHy5oYXdrci5zZWxs'
     'ZXIudjFhbHBoYTEuS1lDRmllbGRCA+BBA1INbWlzc2luZ0ZpZWxkcxJYChRtaXNzaW5nX3N0b3'
-    'JlX2ZpZWxkcxgfIAMoDjIhLmhhd2tyLnNlbGxlci52MWFscGhhMS5TdG9yZUZpZWxkQgPgQQNS'
-    'Em1pc3NpbmdTdG9yZUZpZWxkcxJTChJvdXRzdGFuZGluZ19pc3N1ZXMYICADKAsyHy5oYXdrci'
+    'JlX2ZpZWxkcxgKIAMoDjIhLmhhd2tyLnNlbGxlci52MWFscGhhMS5TdG9yZUZpZWxkQgPgQQNS'
+    'Em1pc3NpbmdTdG9yZUZpZWxkcxJTChJvdXRzdGFuZGluZ19pc3N1ZXMYCyADKAsyHy5oYXdrci'
     '5zZWxsZXIudjFhbHBoYTEuS1lDSXNzdWVCA+BBA1IRb3V0c3RhbmRpbmdJc3N1ZXMSQAoLc3Vi'
-    'bWl0X3RpbWUYGyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCnN1Ym1pdF'
-    'RpbWUSQAoLZGVjaWRlX3RpbWUYHCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPg'
-    'QQNSCmRlY2lkZVRpbWUSQAoLY3JlYXRlX3RpbWUYHSABKAsyGi5nb29nbGUucHJvdG9idWYuVG'
-    'ltZXN0YW1wQgPgQQNSCmNyZWF0ZVRpbWUSQAoLdXBkYXRlX3RpbWUYHiABKAsyGi5nb29nbGUu'
-    'cHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCnVwZGF0ZVRpbWVCCQoHc3ViamVjdEoECA8QEEoECB'
-    'EQEkoECBIQE0oECBgQGUoECAQQDkoECBMQFkoECCEQIlINY29udGFjdF9lbWFpbFINY29udGFj'
-    'dF9waG9uZVINZm9vZF9idXNpbmVzc1IEZmxvd1IJcmVhbF9uYW1lUgpiaXJ0aF9kYXRlUhJpZF'
-    '9jYXJkX2lzc3VlX2RhdGVSEmlkX2NhcmRfaXNzdWVfdHlwZVIWaWRfY2FyZF9pc3N1ZV9sb2Nh'
-    'dGlvblIMZW5nbGlzaF9uYW1lUgliYW5rX25hbWVSCWJhbmtfY29kZVIMYmFua19hY2NvdW50Uh'
-    'NiYW5rX2FjY291bnRfbWFza2VkUg1pZF9jYXJkX2Zyb250UgxpZF9jYXJkX2JhY2tSCWJhbmtf'
-    'Ym9va1IUcGF5b3V0X2NvbnRhY3RfZW1haWw=');
+    'bWl0X3RpbWUYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCnN1Ym1pdF'
+    'RpbWUSQAoLZGVjaWRlX3RpbWUYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPg'
+    'QQNSCmRlY2lkZVRpbWUSQAoLY3JlYXRlX3RpbWUYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVG'
+    'ltZXN0YW1wQgPgQQNSCmNyZWF0ZVRpbWUSQAoLdXBkYXRlX3RpbWUYDyABKAsyGi5nb29nbGUu'
+    'cHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCnVwZGF0ZVRpbWVCCQoHc3ViamVjdA==');
 
 @$core.Deprecated('Use saveKYCDraftRequestDescriptor instead')
 const SaveKYCDraftRequest$json = {
@@ -1998,16 +1837,16 @@ const PaymentAccount$json = {
     },
     {
       '1': 'onboarding_surface',
-      '3': 3,
+      '3': 2,
       '4': 1,
       '5': 14,
       '6': '.hawkr.payment.v1alpha1.OnboardingSurface',
       '10': 'onboardingSurface'
     },
-    {'1': 'payouts_active', '3': 5, '4': 1, '5': 8, '10': 'payoutsActive'},
+    {'1': 'payouts_active', '3': 3, '4': 1, '5': 8, '10': 'payoutsActive'},
     {
       '1': 'fetch_time',
-      '3': 7,
+      '3': 4,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
@@ -2019,10 +1858,10 @@ const PaymentAccount$json = {
 /// Descriptor for `PaymentAccount`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List paymentAccountDescriptor = $convert.base64Decode(
     'Cg5QYXltZW50QWNjb3VudBJECgZzdGF0dXMYASABKA4yLC5oYXdrci5wYXltZW50LnYxYWxwaG'
-    'ExLlBheW1lbnRBY2NvdW50U3RhdHVzUgZzdGF0dXMSWAoSb25ib2FyZGluZ19zdXJmYWNlGAMg'
+    'ExLlBheW1lbnRBY2NvdW50U3RhdHVzUgZzdGF0dXMSWAoSb25ib2FyZGluZ19zdXJmYWNlGAIg'
     'ASgOMikuaGF3a3IucGF5bWVudC52MWFscGhhMS5PbmJvYXJkaW5nU3VyZmFjZVIRb25ib2FyZG'
-    'luZ1N1cmZhY2USJQoOcGF5b3V0c19hY3RpdmUYBSABKAhSDXBheW91dHNBY3RpdmUSOQoKZmV0'
-    'Y2hfdGltZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBSCWZldGNoVGltZQ==');
+    'luZ1N1cmZhY2USJQoOcGF5b3V0c19hY3RpdmUYAyABKAhSDXBheW91dHNBY3RpdmUSOQoKZmV0'
+    'Y2hfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBSCWZldGNoVGltZQ==');
 
 @$core.Deprecated('Use getMyPaymentAccountRequestDescriptor instead')
 const GetMyPaymentAccountRequest$json = {
@@ -2060,14 +1899,14 @@ const CreatePaymentOnboardingSessionRequest$json = {
   '2': [
     {
       '1': 'destination',
-      '3': 3,
+      '3': 1,
       '4': 1,
       '5': 14,
       '6': '.hawkr.seller.v1alpha1.OnboardingReturnDestination',
       '8': {},
       '10': 'destination'
     },
-    {'1': 'locale', '3': 4, '4': 1, '5': 9, '8': {}, '10': 'locale'},
+    {'1': 'locale', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'locale'},
   ],
 };
 
@@ -2075,8 +1914,8 @@ const CreatePaymentOnboardingSessionRequest$json = {
 final $typed_data.Uint8List createPaymentOnboardingSessionRequestDescriptor =
     $convert.base64Decode(
         'CiVDcmVhdGVQYXltZW50T25ib2FyZGluZ1Nlc3Npb25SZXF1ZXN0ElkKC2Rlc3RpbmF0aW9uGA'
-        'MgASgOMjIuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLk9uYm9hcmRpbmdSZXR1cm5EZXN0aW5hdGlv'
-        'bkID4EECUgtkZXN0aW5hdGlvbhIbCgZsb2NhbGUYBCABKAlCA+BBAlIGbG9jYWxl');
+        'EgASgOMjIuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLk9uYm9hcmRpbmdSZXR1cm5EZXN0aW5hdGlv'
+        'bkID4EECUgtkZXN0aW5hdGlvbhIbCgZsb2NhbGUYAiABKAlCA+BBAlIGbG9jYWxl');
 
 @$core
     .Deprecated('Use createPaymentOnboardingSessionResponseDescriptor instead')
@@ -2222,7 +2061,7 @@ const BusinessRegistration$json = {
     {'1': 'address', '3': 3, '4': 1, '5': 9, '10': 'address'},
     {
       '1': 'setup_date',
-      '3': 6,
+      '3': 4,
       '4': 1,
       '5': 11,
       '6': '.google.type.Date',
@@ -2230,35 +2069,29 @@ const BusinessRegistration$json = {
     },
     {
       '1': 'organization_type',
-      '3': 7,
+      '3': 5,
       '4': 1,
       '5': 9,
       '10': 'organizationType'
     },
     {
       '1': 'postal_address',
-      '3': 8,
+      '3': 6,
       '4': 1,
       '5': 11,
       '6': '.hawkr.common.v1alpha1.PostalAddress',
       '10': 'postalAddress'
     },
   ],
-  '9': [
-    {'1': 4, '2': 5},
-    {'1': 5, '2': 6},
-  ],
-  '10': ['town_code', 'address_detail'],
 };
 
 /// Descriptor for `BusinessRegistration`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List businessRegistrationDescriptor = $convert.base64Decode(
     'ChRCdXNpbmVzc1JlZ2lzdHJhdGlvbhIVCgZ0YXhfaWQYASABKAlSBXRheElkEhIKBG5hbWUYAi'
-    'ABKAlSBG5hbWUSGAoHYWRkcmVzcxgDIAEoCVIHYWRkcmVzcxIwCgpzZXR1cF9kYXRlGAYgASgL'
-    'MhEuZ29vZ2xlLnR5cGUuRGF0ZVIJc2V0dXBEYXRlEisKEW9yZ2FuaXphdGlvbl90eXBlGAcgAS'
-    'gJUhBvcmdhbml6YXRpb25UeXBlEksKDnBvc3RhbF9hZGRyZXNzGAggASgLMiQuaGF3a3IuY29t'
-    'bW9uLnYxYWxwaGExLlBvc3RhbEFkZHJlc3NSDXBvc3RhbEFkZHJlc3NKBAgEEAVKBAgFEAZSCX'
-    'Rvd25fY29kZVIOYWRkcmVzc19kZXRhaWw=');
+    'ABKAlSBG5hbWUSGAoHYWRkcmVzcxgDIAEoCVIHYWRkcmVzcxIwCgpzZXR1cF9kYXRlGAQgASgL'
+    'MhEuZ29vZ2xlLnR5cGUuRGF0ZVIJc2V0dXBEYXRlEisKEW9yZ2FuaXphdGlvbl90eXBlGAUgAS'
+    'gJUhBvcmdhbml6YXRpb25UeXBlEksKDnBvc3RhbF9hZGRyZXNzGAYgASgLMiQuaGF3a3IuY29t'
+    'bW9uLnYxYWxwaGExLlBvc3RhbEFkZHJlc3NSDXBvc3RhbEFkZHJlc3M=');
 
 @$core.Deprecated('Use lookupBusinessRegistrationRequestDescriptor instead')
 const LookupBusinessRegistrationRequest$json = {
@@ -2588,18 +2421,18 @@ const Measure$json = {
     },
     {
       '1': 'create_time',
-      '3': 10,
+      '3': 9,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
       '8': {},
       '10': 'createTime'
     },
-    {'1': 'etag', '3': 11, '4': 1, '5': 9, '8': {}, '10': 'etag'},
-    {'1': 'can_appeal', '3': 12, '4': 1, '5': 8, '8': {}, '10': 'canAppeal'},
+    {'1': 'etag', '3': 10, '4': 1, '5': 9, '8': {}, '10': 'etag'},
+    {'1': 'can_appeal', '3': 11, '4': 1, '5': 8, '8': {}, '10': 'canAppeal'},
     {
       '1': 'revoke_reason',
-      '3': 13,
+      '3': 12,
       '4': 1,
       '5': 14,
       '6': '.hawkr.seller.v1alpha1.RevokeReason',
@@ -2608,7 +2441,7 @@ const Measure$json = {
     },
     {
       '1': 'can_request_remediation',
-      '3': 15,
+      '3': 13,
       '4': 1,
       '5': 8,
       '8': {},
@@ -2616,7 +2449,7 @@ const Measure$json = {
     },
     {
       '1': 'next_remediation_time',
-      '3': 16,
+      '3': 14,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
@@ -2625,7 +2458,7 @@ const Measure$json = {
     },
     {
       '1': 'rejection_cooldown',
-      '3': 17,
+      '3': 15,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Duration',
@@ -2634,7 +2467,7 @@ const Measure$json = {
     },
     {
       '1': 'requests',
-      '3': 18,
+      '3': 16,
       '4': 3,
       '5': 11,
       '6': '.hawkr.seller.v1alpha1.MeasureRequest',
@@ -2643,7 +2476,7 @@ const Measure$json = {
     },
     {
       '1': 'remediation_unavailabilities',
-      '3': 23,
+      '3': 17,
       '4': 3,
       '5': 11,
       '6': '.hawkr.seller.v1alpha1.RemediationUnavailability',
@@ -2652,7 +2485,7 @@ const Measure$json = {
     },
     {
       '1': 'termination_ground',
-      '3': 20,
+      '3': 18,
       '4': 1,
       '5': 14,
       '6': '.hawkr.seller.v1alpha1.TerminationGround',
@@ -2661,7 +2494,7 @@ const Measure$json = {
     },
     {
       '1': 'appeal_deadline_time',
-      '3': 21,
+      '3': 19,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
@@ -2670,7 +2503,7 @@ const Measure$json = {
     },
     {
       '1': 'appeal_unavailabilities',
-      '3': 24,
+      '3': 20,
       '4': 3,
       '5': 11,
       '6': '.hawkr.seller.v1alpha1.AppealUnavailability',
@@ -2679,25 +2512,13 @@ const Measure$json = {
     },
     {
       '1': 'contents',
-      '3': 25,
+      '3': 21,
       '4': 3,
       '5': 11,
       '6': '.hawkr.seller.v1alpha1.ContentRef',
       '8': {},
       '10': 'contents'
     },
-  ],
-  '9': [
-    {'1': 9, '2': 10},
-    {'1': 14, '2': 15},
-    {'1': 19, '2': 20},
-    {'1': 22, '2': 23},
-  ],
-  '10': [
-    'appeal',
-    'remediation_requests',
-    'remediation_unavailable_reasons',
-    'appeal_unavailable_reasons'
   ],
 };
 
@@ -2711,27 +2532,24 @@ final $typed_data.Uint8List measureDescriptor = $convert.base64Decode(
     'dyb3VuZEID4EEDUgpyaXNrR3JvdW5kEiEKCXN0YXRlbWVudBgGIAEoCUID4EEDUglzdGF0ZW1l'
     'bnQSPgoFc3RhdGUYByABKA4yIy5oYXdrci5zZWxsZXIudjFhbHBoYTEuTWVhc3VyZVN0YXRlQg'
     'PgQQNSBXN0YXRlEkEKBnBlcmlvZBgIIAEoCzIkLmhhd2tyLnNlbGxlci52MWFscGhhMS5NZWFz'
-    'dXJlUGVyaW9kQgPgQQNSBnBlcmlvZBJACgtjcmVhdGVfdGltZRgKIAEoCzIaLmdvb2dsZS5wcm'
-    '90b2J1Zi5UaW1lc3RhbXBCA+BBA1IKY3JlYXRlVGltZRIXCgRldGFnGAsgASgJQgPgQQNSBGV0'
-    'YWcSIgoKY2FuX2FwcGVhbBgMIAEoCEID4EEDUgljYW5BcHBlYWwSTQoNcmV2b2tlX3JlYXNvbh'
-    'gNIAEoDjIjLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXZva2VSZWFzb25CA+BBA1IMcmV2b2tl'
-    'UmVhc29uEjsKF2Nhbl9yZXF1ZXN0X3JlbWVkaWF0aW9uGA8gASgIQgPgQQNSFWNhblJlcXVlc3'
-    'RSZW1lZGlhdGlvbhJTChVuZXh0X3JlbWVkaWF0aW9uX3RpbWUYECABKAsyGi5nb29nbGUucHJv'
+    'dXJlUGVyaW9kQgPgQQNSBnBlcmlvZBJACgtjcmVhdGVfdGltZRgJIAEoCzIaLmdvb2dsZS5wcm'
+    '90b2J1Zi5UaW1lc3RhbXBCA+BBA1IKY3JlYXRlVGltZRIXCgRldGFnGAogASgJQgPgQQNSBGV0'
+    'YWcSIgoKY2FuX2FwcGVhbBgLIAEoCEID4EEDUgljYW5BcHBlYWwSTQoNcmV2b2tlX3JlYXNvbh'
+    'gMIAEoDjIjLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXZva2VSZWFzb25CA+BBA1IMcmV2b2tl'
+    'UmVhc29uEjsKF2Nhbl9yZXF1ZXN0X3JlbWVkaWF0aW9uGA0gASgIQgPgQQNSFWNhblJlcXVlc3'
+    'RSZW1lZGlhdGlvbhJTChVuZXh0X3JlbWVkaWF0aW9uX3RpbWUYDiABKAsyGi5nb29nbGUucHJv'
     'dG9idWYuVGltZXN0YW1wQgPgQQNSE25leHRSZW1lZGlhdGlvblRpbWUSTQoScmVqZWN0aW9uX2'
-    'Nvb2xkb3duGBEgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQgPgQQNSEXJlamVjdGlv'
-    'bkNvb2xkb3duEkYKCHJlcXVlc3RzGBIgAygLMiUuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLk1lYX'
+    'Nvb2xkb3duGA8gASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQgPgQQNSEXJlamVjdGlv'
+    'bkNvb2xkb3duEkYKCHJlcXVlc3RzGBAgAygLMiUuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLk1lYX'
     'N1cmVSZXF1ZXN0QgPgQQNSCHJlcXVlc3RzEngKHHJlbWVkaWF0aW9uX3VuYXZhaWxhYmlsaXRp'
-    'ZXMYFyADKAsyMC5oYXdrci5zZWxsZXIudjFhbHBoYTEuUmVtZWRpYXRpb25VbmF2YWlsYWJpbG'
+    'ZXMYESADKAsyMC5oYXdrci5zZWxsZXIudjFhbHBoYTEuUmVtZWRpYXRpb25VbmF2YWlsYWJpbG'
     'l0eUID4EEDUhtyZW1lZGlhdGlvblVuYXZhaWxhYmlsaXRpZXMSXAoSdGVybWluYXRpb25fZ3Jv'
-    'dW5kGBQgASgOMiguaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlRlcm1pbmF0aW9uR3JvdW5kQgPgQQ'
-    'NSEXRlcm1pbmF0aW9uR3JvdW5kElEKFGFwcGVhbF9kZWFkbGluZV90aW1lGBUgASgLMhouZ29v'
+    'dW5kGBIgASgOMiguaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlRlcm1pbmF0aW9uR3JvdW5kQgPgQQ'
+    'NSEXRlcm1pbmF0aW9uR3JvdW5kElEKFGFwcGVhbF9kZWFkbGluZV90aW1lGBMgASgLMhouZ29v'
     'Z2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUhJhcHBlYWxEZWFkbGluZVRpbWUSaQoXYXBwZW'
-    'FsX3VuYXZhaWxhYmlsaXRpZXMYGCADKAsyKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuQXBwZWFs'
+    'FsX3VuYXZhaWxhYmlsaXRpZXMYFCADKAsyKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuQXBwZWFs'
     'VW5hdmFpbGFiaWxpdHlCA+BBA1IWYXBwZWFsVW5hdmFpbGFiaWxpdGllcxJCCghjb250ZW50cx'
-    'gZIAMoCzIhLmhhd2tyLnNlbGxlci52MWFscGhhMS5Db250ZW50UmVmQgPgQQNSCGNvbnRlbnRz'
-    'SgQICRAKSgQIDhAPSgQIExAUSgQIFhAXUgZhcHBlYWxSFHJlbWVkaWF0aW9uX3JlcXVlc3RzUh'
-    '9yZW1lZGlhdGlvbl91bmF2YWlsYWJsZV9yZWFzb25zUhphcHBlYWxfdW5hdmFpbGFibGVfcmVh'
-    'c29ucw==');
+    'gVIAMoCzIhLmhhd2tyLnNlbGxlci52MWFscGhhMS5Db250ZW50UmVmQgPgQQNSCGNvbnRlbnRz');
 
 @$core.Deprecated('Use listMyMeasuresRequestDescriptor instead')
 const ListMyMeasuresRequest$json = {
@@ -2928,7 +2746,7 @@ const PublicStore$json = {
     },
     {
       '1': 'update_time',
-      '3': 13,
+      '3': 10,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
@@ -2936,12 +2754,6 @@ const PublicStore$json = {
       '10': 'updateTime'
     },
   ],
-  '9': [
-    {'1': 10, '2': 11},
-    {'1': 11, '2': 12},
-    {'1': 12, '2': 13},
-  ],
-  '10': ['seo_title', 'seo_description', 'food_business_registration_number'],
 };
 
 /// Descriptor for `PublicStore`. Decode as a `google.protobuf.DescriptorProto`.
@@ -2952,9 +2764,8 @@ final $typed_data.Uint8List publicStoreDescriptor = $convert.base64Decode(
     'oFcHJpemUYBiABKAlSBXByaXplEh8KC3dlYnNpdGVfdXJsGAcgASgJUgp3ZWJzaXRlVXJsEjAK'
     'BGxvZ28YCCABKAsyHC5oYXdrci5jb21tb24udjFhbHBoYTEuSW1hZ2VSBGxvZ28SPQoLY292ZX'
     'JfaW1hZ2UYCSABKAsyHC5oYXdrci5jb21tb24udjFhbHBoYTEuSW1hZ2VSCmNvdmVySW1hZ2US'
-    'QAoLdXBkYXRlX3RpbWUYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCn'
-    'VwZGF0ZVRpbWVKBAgKEAtKBAgLEAxKBAgMEA1SCXNlb190aXRsZVIPc2VvX2Rlc2NyaXB0aW9u'
-    'UiFmb29kX2J1c2luZXNzX3JlZ2lzdHJhdGlvbl9udW1iZXI=');
+    'QAoLdXBkYXRlX3RpbWUYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCn'
+    'VwZGF0ZVRpbWU=');
 
 @$core.Deprecated('Use storeStatsDescriptor instead')
 const StoreStats$json = {
@@ -3292,12 +3103,12 @@ const $core.Map<$core.String, $core.dynamic> SellerAppServiceBase$json = {
 const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
     SellerAppServiceBase$messageJson = {
   '.hawkr.seller.v1alpha1.ApplyStoreRequest': ApplyStoreRequest$json,
-  '.hawkr.common.v1alpha1.PostalAddress': $2.PostalAddress$json,
+  '.hawkr.common.v1alpha1.PostalAddress': $0.PostalAddress$json,
   '.hawkr.seller.v1alpha1.AgreementAcceptance': AgreementAcceptance$json,
   '.hawkr.seller.v1alpha1.ApplyStoreResponse': ApplyStoreResponse$json,
   '.hawkr.seller.v1alpha1.Store': Store$json,
-  '.hawkr.common.v1alpha1.Image': $0.Image$json,
-  '.google.protobuf.Timestamp': $1.Timestamp$json,
+  '.hawkr.common.v1alpha1.Image': $1.Image$json,
+  '.google.protobuf.Timestamp': $2.Timestamp$json,
   '.hawkr.seller.v1alpha1.GetMyStoreOpeningRequest':
       GetMyStoreOpeningRequest$json,
   '.hawkr.seller.v1alpha1.GetMyStoreOpeningResponse':
@@ -3479,8 +3290,8 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.GetStoreRequest': GetStoreRequest$json,
   '.hawkr.seller.v1alpha1.GetStoreResponse': GetStoreResponse$json,
   '.hawkr.seller.v1alpha1.PublicStore': PublicStore$json,
-  '.hawkr.common.v1alpha1.Image': $0.Image$json,
-  '.google.protobuf.Timestamp': $1.Timestamp$json,
+  '.hawkr.common.v1alpha1.Image': $1.Image$json,
+  '.google.protobuf.Timestamp': $2.Timestamp$json,
   '.hawkr.seller.v1alpha1.StoreStats': StoreStats$json,
   '.hawkr.seller.v1alpha1.ListStoresRequest': ListStoresRequest$json,
   '.hawkr.seller.v1alpha1.ListStoresResponse': ListStoresResponse$json,

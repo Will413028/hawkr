@@ -164,14 +164,14 @@ extension SellerContentKindUiText on hawkr_seller_v1alpha1_seller.ContentKind {
 
 String? _sellerKYCField(UiLocale l, int value) {
 return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 10) => '主要商品類型',
-(UiLocale.zhTW || UiLocale.en, 12) => '官方網站',
-(UiLocale.zhTW || UiLocale.en, 20) => '公司名稱',
-(UiLocale.zhTW || UiLocale.en, 21) => '統一編號',
-(UiLocale.zhTW || UiLocale.en, 22) => '設立日期',
-(UiLocale.zhTW || UiLocale.en, 25) => '公司電話',
-(UiLocale.zhTW || UiLocale.en, 27) => '補充文件',
-(UiLocale.zhTW || UiLocale.en, 28) => '公司地址',
+(UiLocale.zhTW || UiLocale.en, 1) => '主要商品類型',
+(UiLocale.zhTW || UiLocale.en, 2) => '官方網站',
+(UiLocale.zhTW || UiLocale.en, 3) => '公司名稱',
+(UiLocale.zhTW || UiLocale.en, 4) => '統一編號',
+(UiLocale.zhTW || UiLocale.en, 5) => '設立日期',
+(UiLocale.zhTW || UiLocale.en, 6) => '公司電話',
+(UiLocale.zhTW || UiLocale.en, 7) => '補充文件',
+(UiLocale.zhTW || UiLocale.en, 8) => '公司地址',
 _ => null,
 };
 }
