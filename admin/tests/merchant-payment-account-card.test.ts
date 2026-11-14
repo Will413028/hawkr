@@ -94,6 +94,28 @@ test("有 create_failed_time：顯示建立失敗時間與重試建立", () => {
 	assert.match(html, /準備中/);
 });
 
+// 半建立的列（第一步成功、第二步還沒成功）已有外部 ID，但對外狀態仍是 NOT_CREATED：RefreshPaymentAccount 回 failed_precondition，不給重新整理。
+test("半建立（有外部 ID、狀態 NOT_CREATED）：看狀態判斷尚未建立，不給重新整理；外部 ID 照常顯示", () => {
+	const half = account({ status: PaymentAccountStatus.NOT_CREATED });
+	assert.equal(half.externalAccountId, "acct_1UXVfaID6WkY4CJw");
+	assert.equal(accountModule.paymentAccountCreated(half), false);
+	const html = render({ state: "ready", account: half });
+	assert.doesNotMatch(html, /重新整理/);
+	assert.match(html, /acct_1UXVfaID6WkY4CJw/);
+	for (const status of [
+		PaymentAccountStatus.ACTION_REQUIRED,
+		PaymentAccountStatus.UNDER_REVIEW,
+		PaymentAccountStatus.ENABLED,
+		PaymentAccountStatus.DISABLED,
+	]) {
+		assert.equal(
+			accountModule.paymentAccountCreated(account({ status })),
+			true,
+			PaymentAccountStatus[status],
+		);
+	}
+});
+
 test("有 purge_blocked_time：在重試建立的位置顯示原因與時間、重試關閉與已在金流商處理，刪除對應；不給重新整理與重試建立", () => {
 	const html = render({
 		state: "ready",

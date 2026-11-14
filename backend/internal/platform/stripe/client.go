@@ -39,6 +39,9 @@ type Config struct {
 	BaseURL       string
 	SecretKey     string
 	WebhookSecret string
+	// AccountNamespace 是這個環境的帳戶命名空間（ValidateNamespace 的規則）：建立帳戶時寫進 metadata.hawkr_namespace，
+	// 對帳列出帳戶時要 store_id 與它都相符，兩個環境共用同一個 Stripe 帳號時不會互相看到對方的帳戶。必填。
+	AccountNamespace string
 	// Timeout 是一次呼叫的總上限，零值用 DefaultTimeout。
 	Timeout    time.Duration
 	HTTPClient *http.Client
@@ -48,10 +51,11 @@ type Config struct {
 
 // Client 呼叫 Stripe。
 type Client struct {
-	sdk      *sdk.Client
-	whsecret string
-	timeout  time.Duration
-	wait     func(ctx context.Context, d time.Duration) error
+	sdk       *sdk.Client
+	whsecret  string
+	namespace string
+	timeout   time.Duration
+	wait      func(ctx context.Context, d time.Duration) error
 }
 
 // New 建立 Client；金鑰與 webhook 密鑰必填。SDK 的自動網路重試、遙測與記錄都關掉：重試由這裡只對 429 做，其餘失敗交給呼叫方（River job）重試。
@@ -64,6 +68,9 @@ func New(cfg Config) (*Client, error) {
 	}
 	if strings.TrimSpace(cfg.WebhookSecret) != cfg.WebhookSecret {
 		return nil, errors.New("stripe：WebhookSecret 前後有空白或換行，請去掉後再設定")
+	}
+	if err := ValidateNamespace(cfg.AccountNamespace); err != nil {
+		return nil, err
 	}
 	raw := cfg.BaseURL
 	if raw == "" {
@@ -91,10 +98,11 @@ func New(cfg Config) (*Client, error) {
 		LeveledLogger:     &sdk.LeveledLogger{Level: sdk.LevelNull},
 	})
 	c := &Client{
-		sdk:      sdk.NewClient(cfg.SecretKey, sdk.WithBackends(backends)),
-		whsecret: cfg.WebhookSecret,
-		timeout:  cfg.Timeout,
-		wait:     cfg.Wait,
+		sdk:       sdk.NewClient(cfg.SecretKey, sdk.WithBackends(backends)),
+		whsecret:  cfg.WebhookSecret,
+		namespace: cfg.AccountNamespace,
+		timeout:   cfg.Timeout,
+		wait:      cfg.Wait,
 	}
 	if c.timeout <= 0 {
 		c.timeout = DefaultTimeout
@@ -103,6 +111,35 @@ func New(cfg Config) (*Client, error) {
 		c.wait = sleep
 	}
 	return c, nil
+}
+
+const (
+	metaStoreID   = "store_id"
+	metaNamespace = "hawkr_namespace"
+	// maxNamespaceLen 是命名空間的長度上限（保守值，遠小於 Stripe 的 metadata 值上限）。
+	maxNamespaceLen = 40
+)
+
+// ValidateNamespace 檢查帳戶命名空間：1 到 40 個字元，只含小寫英文字母、數字、連字號與底線，開頭是英數。
+func ValidateNamespace(ns string) error {
+	if ns == "" {
+		return errors.New("stripe：缺少 AccountNamespace")
+	}
+	if len(ns) > maxNamespaceLen {
+		return fmt.Errorf("stripe：AccountNamespace 超過 %d 個字元", maxNamespaceLen)
+	}
+	for i, r := range ns {
+		alnum := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
+		if alnum || (i > 0 && (r == '-' || r == '_')) {
+			continue
+		}
+		return fmt.Errorf("stripe：AccountNamespace %q 只能用小寫英文字母、數字、連字號與底線，開頭是英數", ns)
+	}
+	return nil
+}
+
+func (c *Client) accountMetadata(storeID int64) map[string]string {
+	return map[string]string{metaStoreID: strconv.FormatInt(storeID, 10), metaNamespace: c.namespace}
 }
 
 func sleep(ctx context.Context, d time.Duration) error {
@@ -223,10 +260,10 @@ const (
 	DashboardNone    Dashboard = "none"
 )
 
-// CreateAccountShell 是建立的第一步（D55）：只帶 metadata.store_id、用呼叫方保存的冪等鍵；本文固定，同一把鍵永遠得到同一個帳戶，
+// CreateAccountShell 是建立的第一步（D55）：只帶 metadata.store_id 與 metadata.hawkr_namespace（D61）、用呼叫方保存的冪等鍵；本文固定，同一把鍵永遠得到同一個帳戶，
 // 帳戶上沒有任何擁有者個資。回傳帳戶 ID。
 func (c *Client) CreateAccountShell(ctx context.Context, idempotencyKey string, storeID int64) (string, error) {
-	params := &sdk.V2CoreAccountCreateParams{Metadata: map[string]string{"store_id": strconv.FormatInt(storeID, 10)}}
+	params := &sdk.V2CoreAccountCreateParams{Metadata: c.accountMetadata(storeID)}
 	if idempotencyKey != "" {
 		params.IdempotencyKey = sdk.String(idempotencyKey)
 	}
@@ -365,7 +402,9 @@ type Capability struct {
 
 // Account 是 v2 帳戶中收款開通用得到的欄位；其餘欄位丟棄。Requirements 是回應本文裡 requirements 的原始 JSON。
 type Account struct {
-	ID           string
+	ID string
+	// Closed 為真表示帳戶已在 Stripe 關閉：沒有能力與 requirements，其餘欄位都是零值。
+	Closed       bool
 	Transfers    Capability
 	Payouts      Capability
 	Requirements json.RawMessage
@@ -383,6 +422,9 @@ func (c *Client) RetrieveAccount(ctx context.Context, accountID string) (Account
 	}
 	if out == nil || out.ID == "" {
 		return Account{}, errors.New("stripe：讀取帳戶的回應沒有 id")
+	}
+	if out.Closed {
+		return Account{ID: out.ID, Closed: true}, nil
 	}
 	var bal *sdk.V2CoreAccountConfigurationRecipientCapabilitiesStripeBalance
 	if out.Configuration != nil && out.Configuration.Recipient != nil && out.Configuration.Recipient.Capabilities != nil {
@@ -427,36 +469,50 @@ func rawRequirements(res *sdk.APIResponse) json.RawMessage {
 // CloseAccount 關閉 v2 帳戶。先讀回帳戶：已關閉就視為成功；否則 applied_configurations 取自讀回的帳戶（關閉要求傳帳戶實際的全部設定：
 // 第一步之後還沒完成設定的空帳戶是 []，傳 ["recipient"] 或省略都是 400 configs_must_match_to_close，D60、spike Q25）。讀取失敗直接回讀取的錯誤；
 // 關閉回 403（並行的關閉剛完成）時再讀一次，closed 為真就視為成功，否則回原本的 403。
+// 關閉回 400 configs_must_match_to_close 時（讀與關閉之間並行的設定讓帳戶的設定變了）再讀一次、用新讀到的設定重送一次關閉；第二次仍不符就回那個錯誤。
 func (c *Client) CloseAccount(ctx context.Context, accountID string) error {
-	acct, err := c.retrieveRaw(ctx, accountID)
-	if err != nil {
+	const attempts = 2
+	for attempt := 1; ; attempt++ {
+		acct, err := c.retrieveRaw(ctx, accountID)
+		if err != nil {
+			return err
+		}
+		if acct.Closed {
+			return nil
+		}
+		err = c.closeWith(ctx, accountID, acct)
+		var api *APIError
+		if err == nil || !errors.As(err, &api) {
+			return err
+		}
+		switch {
+		case api.Status == http.StatusForbidden:
+			again, rerr := c.retrieveRaw(ctx, accountID)
+			if rerr != nil {
+				return rerr
+			}
+			if again.Closed {
+				return nil
+			}
+			return err
+		case api.Code == "configs_must_match_to_close" && attempt < attempts:
+			continue
+		}
 		return err
 	}
-	if acct.Closed {
-		return nil
-	}
+}
+
+func (c *Client) closeWith(ctx context.Context, accountID string, acct *sdk.V2CoreAccount) error {
 	applied := make([]string, 0, len(acct.AppliedConfigurations))
 	for _, cfg := range acct.AppliedConfigurations {
 		applied = append(applied, string(cfg))
 	}
-	err = c.call(ctx, func(ctx context.Context) error {
+	return c.call(ctx, func(ctx context.Context) error {
 		svc := c.sdk.V2CoreAccounts
 		params := &closeParams{AppliedConfigurations: applied}
 		params.Context = ctx
 		return svc.B.Call(http.MethodPost, sdk.FormatURLPath("/v2/core/accounts/%s/close", accountID), svc.Key, params, &sdk.V2CoreAccount{})
 	})
-	var api *APIError
-	if err == nil || !errors.As(err, &api) || api.Status != http.StatusForbidden {
-		return err
-	}
-	again, rerr := c.retrieveRaw(ctx, accountID)
-	if rerr != nil {
-		return rerr
-	}
-	if again.Closed {
-		return nil
-	}
-	return err
 }
 
 // closeParams 是關閉請求的本文：SDK 的 V2CoreAccountCloseParams 對 applied_configurations 用 omitempty，空陣列會被省略（Stripe 回 400 configs_must_match_to_close），
@@ -488,7 +544,7 @@ const (
 )
 
 // ListAccountIDsByStore 列出沒有關閉的 v2 帳戶（預設不含已關閉的；已關閉的帳戶 metadata 被清成 null，所以比對不到同一家店先前關閉的帳戶，spike Q24），
-// 回傳 metadata.store_id 等於 storeID 的帳戶 ID（Stripe 的順序，新的在前）。含只做完第一步的空帳戶。整份列完才回傳；翻頁到上限或任何一頁失敗回錯誤，
+// 回傳 metadata.store_id 等於 storeID 而且 metadata.hawkr_namespace 等於這個 client 的命名空間的帳戶 ID（D61；沒有命名空間的舊帳戶不符）（Stripe 的順序，新的在前）。含只做完第一步的空帳戶。整份列完才回傳；翻頁到上限或任何一頁失敗回錯誤，
 // 不回部分結果（呼叫方只在「整份列完都沒有」時才刪列）。
 func (c *Client) ListAccountIDsByStore(ctx context.Context, storeID int64) ([]string, error) {
 	want := strconv.FormatInt(storeID, 10)
@@ -504,7 +560,7 @@ func (c *Client) ListAccountIDsByStore(ctx context.Context, storeID int64) ([]st
 			if seen++; seen > maxAccountPages*accountsPageLimit {
 				return fmt.Errorf("stripe：帳戶列表超過 %d 頁", maxAccountPages)
 			}
-			if a != nil && a.ID != "" && a.Metadata["store_id"] == want {
+			if a != nil && a.ID != "" && a.Metadata[metaStoreID] == want && a.Metadata[metaNamespace] == c.namespace {
 				ids = append(ids, a.ID)
 			}
 		}

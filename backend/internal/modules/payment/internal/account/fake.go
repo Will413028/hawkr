@@ -263,22 +263,23 @@ func (f *Fake) ConfigureAccount(ctx context.Context, in ConfigureInput) error {
 	return nil
 }
 
-// ResolveAccount 實作 Provider：只找不建。列出沒有關閉的帳戶，回傳 store_id 相符的第一個（新的在前）。
-func (f *Fake) ResolveAccount(ctx context.Context, in ResolveInput) (string, bool, error) {
+// ResolveAccount 實作 Provider：只找不建。列出沒有關閉的帳戶，回傳 store_id 相符的全部（新的在前）。
+func (f *Fake) ResolveAccount(ctx context.Context, in ResolveInput) ([]string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.check(ctx, "ResolveAccount")
 	f.resolves = append(f.resolves, in.StoreID)
 	if err := pop(&f.resolveErrs); err != nil {
-		return "", false, err
+		return nil, err
 	}
 	ids := f.byStore[in.StoreID]
+	var open []string
 	for i := len(ids) - 1; i >= 0; i-- {
 		if !f.closedIDs[ids[i]] {
-			return ids[i], true, nil
+			open = append(open, ids[i])
 		}
 	}
-	return "", false, nil
+	return open, nil
 }
 
 // CreateOnboardingSession 實作 Provider。
@@ -293,7 +294,7 @@ func (f *Fake) CreateOnboardingSession(ctx context.Context, in SessionInput) (mo
 	return model.HostedSession{URL: "https://onboarding.example.invalid/" + in.ExternalAccountID}, nil
 }
 
-// FetchAccount 實作 Provider。
+// FetchAccount 實作 Provider；已關閉（CloseAccount）的帳戶回 Closed 的快照，與 Stripe 讀到已關閉帳戶一致。
 func (f *Fake) FetchAccount(ctx context.Context, externalID string) (Snapshot, error) {
 	f.mu.Lock()
 	hook := f.OnFetch
@@ -308,6 +309,9 @@ func (f *Fake) FetchAccount(ctx context.Context, externalID string) (Snapshot, e
 	f.fetches++
 	if err := pop(&f.fetchErrs); err != nil {
 		return Snapshot{}, err
+	}
+	if f.closedIDs[externalID] {
+		return Snapshot{Closed: true, Requirements: json.RawMessage(`{}`)}, nil
 	}
 	if f.AutoActive {
 		return Snapshot{Transfers: CapabilityActive, PayoutsActive: true, Requirements: json.RawMessage(`{}`)}, nil

@@ -90,12 +90,14 @@ func replay(f fixture) func(int) (int, string, http.Header) {
 
 const testSecret = "whsec_test"
 
+const testNamespace = "env-a"
+
 func newTestClient(t *testing.T, s *stub, mutate ...func(*Config)) *Client {
 	t.Helper()
 	s.t = t
 	srv := httptest.NewServer(s)
 	t.Cleanup(srv.Close)
-	cfg := Config{BaseURL: srv.URL, SecretKey: "sk_test_x", WebhookSecret: testSecret, Wait: func(context.Context, time.Duration) error { return nil }}
+	cfg := Config{BaseURL: srv.URL, SecretKey: "sk_test_x", WebhookSecret: testSecret, AccountNamespace: testNamespace, Wait: func(context.Context, time.Duration) error { return nil }}
 	for _, m := range mutate {
 		m(&cfg)
 	}
@@ -133,7 +135,7 @@ func TestCreateAccountSendsOnlyMetadataThenTheUpdateForBothDashboards(t *testing
 		if r.Method != "POST" || r.URI != "/v2/core/accounts" || r.Idempotency != "42" || r.Authorization != "Bearer sk_test_x" || !strings.HasPrefix(r.ContentType, "application/json") {
 			t.Errorf("%s：建立請求 %+v", dash, r)
 		}
-		if !jsonEqual(decode(t, r.Body), decode(t, `{"metadata": {"store_id": "7"}}`)) {
+		if !jsonEqual(decode(t, r.Body), decode(t, `{"metadata": {"store_id": "7", "hawkr_namespace": "env-a"}}`)) {
 			t.Errorf("%s：建立本文 %s", dash, r.Body)
 		}
 		u := reqs[1]
@@ -168,7 +170,7 @@ func TestARetryAfterALostCreateResponseWithAnotherEmailReusesTheAccountAndNeverH
 	s.resp = func(n int) (int, string, http.Header) {
 		r := s.requests()[n-1]
 		if r.Method == "POST" && r.URI == "/v2/core/accounts" {
-			if r.Body != `{"metadata":{"store_id":"7"}}` {
+			if r.Body != `{"metadata":{"hawkr_namespace":"env-a","store_id":"7"}}` {
 				return 409, `{"error":{"code":"idempotency_error","message":"different params"}}`, nil
 			}
 			if n == 1 {
@@ -222,7 +224,7 @@ func TestAFailedUpdateIsAnErrorAndARetryRunsBothStepsAgain(t *testing.T) {
 	}
 }
 
-func TestCreateAccountShellSendsOnlyTheStoreIDMetadata(t *testing.T) {
+func TestCreateAccountShellSendsOnlyTheStoreIDAndNamespaceMetadata(t *testing.T) {
 	shell := loadFixture(t, "create_shell_platform")
 	s := &stub{resp: replay(shell)}
 	id, err := newTestClient(t, s).CreateAccountShell(context.Background(), "k", 9)
@@ -230,7 +232,7 @@ func TestCreateAccountShellSendsOnlyTheStoreIDMetadata(t *testing.T) {
 		t.Fatalf("id=%q err=%v", id, err)
 	}
 	reqs := s.requests()
-	if len(reqs) != 1 || reqs[0].Idempotency != "k" || !jsonEqual(decode(t, reqs[0].Body), decode(t, `{"metadata":{"store_id":"9"}}`)) {
+	if len(reqs) != 1 || reqs[0].Idempotency != "k" || !jsonEqual(decode(t, reqs[0].Body), decode(t, `{"metadata":{"store_id":"9","hawkr_namespace":"env-a"}}`)) {
 		t.Fatalf("請求 %+v", reqs)
 	}
 }
@@ -472,7 +474,7 @@ func TestConnectionFailureIsNotRetriedAndIsNotAnAPIError(t *testing.T) {
 		}
 	}))
 	t.Cleanup(srv.Close)
-	c, err := New(Config{BaseURL: srv.URL, SecretKey: "sk_test_x", WebhookSecret: testSecret})
+	c, err := New(Config{BaseURL: srv.URL, SecretKey: "sk_test_x", WebhookSecret: testSecret, AccountNamespace: testNamespace})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -511,7 +513,7 @@ func TestEveryCallRunsUnderTheConfiguredDeadline(t *testing.T) {
 		}
 	}))
 	t.Cleanup(func() { close(release); srv.Close() })
-	c, err := New(Config{BaseURL: srv.URL, SecretKey: "sk_test_x", WebhookSecret: testSecret, Timeout: 20 * time.Millisecond})
+	c, err := New(Config{BaseURL: srv.URL, SecretKey: "sk_test_x", WebhookSecret: testSecret, AccountNamespace: testNamespace, Timeout: 20 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -532,9 +534,26 @@ func TestNewRejectsMissingSecretsAndBadBaseURL(t *testing.T) {
 		"網址不合":       {SecretKey: "k", WebhookSecret: "w", BaseURL: "api.stripe.com"},
 		"密鑰前面有空白":    {SecretKey: "k", WebhookSecret: " w"},
 		"密鑰後面有換行":    {SecretKey: "k", WebhookSecret: "w\n"},
+		"沒有命名空間":     {SecretKey: "k", WebhookSecret: "w"},
 	} {
+		if cfg.AccountNamespace == "" && name != "沒有命名空間" {
+			cfg.AccountNamespace = testNamespace
+		}
 		if _, err := New(cfg); err == nil {
 			t.Errorf("%s：通過了", name)
+		}
+	}
+}
+
+func TestValidateNamespace(t *testing.T) {
+	for _, ok := range []string{"a", "dev", "staging-2", "prod_eu1", "0abc", strings.Repeat("a", 40)} {
+		if err := ValidateNamespace(ok); err != nil {
+			t.Errorf("%q：%v", ok, err)
+		}
+	}
+	for _, bad := range []string{"", "Dev", "-a", "_a", "a b", "a.b", "a/b", "環境", "a\n", strings.Repeat("a", 41)} {
+		if err := ValidateNamespace(bad); err == nil {
+			t.Errorf("%q 通過了", bad)
 		}
 	}
 }
@@ -651,11 +670,11 @@ func TestCloseAccountOnABareAccountPostsAnEmptyConfigurationList(t *testing.T) {
 	}
 }
 
-// 帳戶設定與關閉請求不符的 400 是永久錯誤（照 fixture 的形狀）。
-func TestCloseAccountConfigsMustMatchIsAPermanentError(t *testing.T) {
+// 帳戶設定與關閉請求不符的 400 是永久錯誤（照 fixture 的形狀）：重讀一次、重送一次，第二次仍不符就回這個錯誤。
+func TestCloseAccountConfigsMustMatchTwiceIsAPermanentError(t *testing.T) {
 	bare, refuse := loadFixture(t, "create_shell_provider"), loadFixture(t, "close_configs_must_match")
 	s := &stub{resp: func(n int) (int, string, http.Header) {
-		if n == 1 {
+		if n%2 == 1 {
 			return bare.Status, string(bare.Body), nil
 		}
 		return refuse.Status, string(refuse.Body), nil
@@ -664,6 +683,70 @@ func TestCloseAccountConfigsMustMatchIsAPermanentError(t *testing.T) {
 	var api *APIError
 	if !errors.As(err, &api) || api.Status != 400 || api.Code != "configs_must_match_to_close" || !api.Permanent() {
 		t.Fatalf("err=%v", err)
+	}
+	if reqs := s.requests(); len(reqs) != 4 {
+		t.Fatalf("請求數 %d，預期讀、關、讀、關共 4 次", len(reqs))
+	}
+}
+
+// 讀與關閉之間並行的設定讓帳戶的設定變了：重讀、用新讀到的設定重送一次關閉。
+func TestCloseAccountRereadsAndRetriesOnceWhenAConfigurationAppearedBetweenReadAndClose(t *testing.T) {
+	refuse := loadFixture(t, "close_configs_must_match")
+	s := &stub{resp: func(n int) (int, string, http.Header) {
+		switch n {
+		case 1:
+			return 200, accountBody(false, `[]`), nil
+		case 2:
+			return refuse.Status, string(refuse.Body), nil
+		case 3:
+			return 200, accountBody(false, `["recipient"]`), nil
+		}
+		return 200, accountBody(true, `["recipient"]`), nil
+	}}
+	if err := newTestClient(t, s).CloseAccount(context.Background(), "acct_1"); err != nil {
+		t.Fatal(err)
+	}
+	reqs := s.requests()
+	if len(reqs) != 4 || reqs[0].Method != "GET" || reqs[1].Method != "POST" || reqs[2].Method != "GET" || reqs[3].Method != "POST" {
+		t.Fatalf("請求 %+v", reqs)
+	}
+	if !jsonEqual(decode(t, reqs[1].Body), map[string]any{"applied_configurations": []any{}}) ||
+		!jsonEqual(decode(t, reqs[3].Body), map[string]any{"applied_configurations": []any{"recipient"}}) {
+		t.Fatalf("兩次關閉的本文 %s、%s", reqs[1].Body, reqs[3].Body)
+	}
+}
+
+// 重讀時帳戶已經被並行的動作關掉：視為成功，不再送關閉。
+func TestCloseAccountConfigsMustMatchThenAlreadyClosedSucceeds(t *testing.T) {
+	refuse := loadFixture(t, "close_configs_must_match")
+	s := &stub{resp: func(n int) (int, string, http.Header) {
+		switch n {
+		case 1:
+			return 200, accountBody(false, `[]`), nil
+		case 2:
+			return refuse.Status, string(refuse.Body), nil
+		}
+		return 200, accountBody(true, `["recipient"]`), nil
+	}}
+	if err := newTestClient(t, s).CloseAccount(context.Background(), "acct_1"); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.requests()) != 3 {
+		t.Fatalf("請求數 %d", len(s.requests()))
+	}
+}
+
+// 已在 Stripe 關閉的帳戶：RetrieveAccount 回 Closed，不要求 stripe_transfers（關閉的帳戶可以沒有設定）。
+func TestRetrieveAccountOnAClosedAccountReturnsClosedWithoutCapabilities(t *testing.T) {
+	for name, body := range map[string]string{
+		"沒有 configuration":               `{"id":"acct_1","object":"v2.core.account","closed":true,"metadata":null}`,
+		"configuration.recipient 是 null": `{"id":"acct_1","closed":true,"configuration":{"recipient":null}}`,
+	} {
+		s := &stub{resp: func(int) (int, string, http.Header) { return 200, body, nil }}
+		a, err := newTestClient(t, s).RetrieveAccount(context.Background(), "acct_1")
+		if err != nil || !a.Closed || a.ID != "acct_1" || a.Transfers.Status != "" {
+			t.Errorf("%s：a=%+v err=%v", name, a, err)
+		}
 	}
 }
 
@@ -747,14 +830,14 @@ func TestCloseAccountUnknownIDIsAPermanentErrorWithoutALookup(t *testing.T) {
 	}
 }
 
-// 列出帳戶：整份翻頁列完，只回 metadata.store_id 相符的（含空帳戶；metadata 是空的略過）。預期值讀自 fixture（sandbox 錄的兩頁）。
-func TestListAccountIDsByStorePagesThroughTheWholeListAndMatchesMetadata(t *testing.T) {
+// 列出帳戶：整份翻頁列完，只回 metadata.store_id 與 metadata.hawkr_namespace 都相符的。fixture（sandbox 錄的兩頁）錄在加入命名空間之前，
+// 帳戶 metadata 沒有 hawkr_namespace，所以一個都不符；預期的 store_id 讀自 fixture，證明比對確實是被命名空間擋下的。
+func TestListAccountIDsByStoreSkipsRecordedAccountsWithoutTheNamespace(t *testing.T) {
 	p1, p2 := loadFixture(t, "list_accounts_page1"), loadFixture(t, "list_accounts_page2")
 	type page struct {
 		Data []struct {
-			ID                    string            `json:"id"`
-			AppliedConfigurations []string          `json:"applied_configurations"`
-			Metadata              map[string]string `json:"metadata"`
+			ID       string            `json:"id"`
+			Metadata map[string]string `json:"metadata"`
 		} `json:"data"`
 		NextPageURL *string `json:"next_page_url"`
 	}
@@ -768,23 +851,21 @@ func TestListAccountIDsByStorePagesThroughTheWholeListAndMatchesMetadata(t *test
 	if first.NextPageURL == nil || second.NextPageURL != nil {
 		t.Fatalf("fixture 不是剛好兩頁")
 	}
-	want := map[string][]string{}
-	bare := ""
+	stores := map[string]bool{}
 	for _, pg := range []page{first, second} {
 		for _, a := range pg.Data {
 			if id := a.Metadata["store_id"]; id != "" {
-				want[id] = append(want[id], a.ID)
-				if len(a.AppliedConfigurations) == 0 {
-					bare = id
+				if a.Metadata["hawkr_namespace"] != "" {
+					t.Fatalf("fixture 已經帶命名空間，這個測試不再成立（重錄後改成正向比對）：%s", a.ID)
 				}
+				stores[id] = true
 			}
 		}
 	}
-	onSecond := second.Data[0].Metadata["store_id"]
-	if bare == "" || len(want[bare]) < 2 || onSecond == "" || onSecond == bare {
-		t.Fatalf("fixture 需要第一頁有同一家店的兩個帳戶（含空帳戶）、第二頁有另一家店：%v", want)
+	if len(stores) == 0 {
+		t.Fatalf("fixture 沒有帶 store_id 的帳戶")
 	}
-	for _, store := range []string{bare, onSecond} {
+	for store := range stores {
 		s := &stub{resp: func(n int) (int, string, http.Header) {
 			if n == 1 {
 				return p1.Status, string(p1.Body), nil
@@ -796,17 +877,38 @@ func TestListAccountIDsByStorePagesThroughTheWholeListAndMatchesMetadata(t *test
 			t.Fatal(err)
 		}
 		ids, err := newTestClient(t, s).ListAccountIDsByStore(context.Background(), storeID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !slices.Equal(ids, want[store]) {
-			t.Fatalf("store %s ids=%v，預期 %v", store, ids, want[store])
+		if err != nil || len(ids) != 0 {
+			t.Fatalf("store %s ids=%v err=%v，沒有命名空間的帳戶不得符合", store, ids, err)
 		}
 		reqs := s.requests()
 		if len(reqs) != 2 || reqs[0].Method != "GET" || !strings.HasPrefix(reqs[0].URI, "/v2/core/accounts") || !strings.Contains(reqs[0].URI, "limit=20") ||
 			strings.Contains(reqs[0].URI, "closed") || reqs[1].URI != *first.NextPageURL {
 			t.Fatalf("請求 %+v", reqs)
 		}
+	}
+}
+
+// 正向比對：兩頁的合成回應（不是錄製的本文），只有 store_id 與命名空間都相符的帳戶符合，順序照 Stripe（新的在前）。
+func TestListAccountIDsByStoreMatchesBothStoreIDAndNamespaceAcrossPages(t *testing.T) {
+	acct := func(id, store, ns string) string {
+		md := `{"store_id":"` + store + `"`
+		if ns != "" {
+			md += `,"hawkr_namespace":"` + ns + `"`
+		}
+		md += `}`
+		return `{"id":"` + id + `","object":"v2.core.account","closed":false,"applied_configurations":[],"metadata":` + md + `}`
+	}
+	page1 := `{"data":[` + acct("acct_new", "5", "env-a") + `,` + acct("acct_other_env", "5", "env-b") + `,` + acct("acct_no_ns", "5", "") + `],"next_page_url":"/v2/core/accounts?page=2&limit=20"}`
+	page2 := `{"data":[` + acct("acct_other_store", "6", "env-a") + `,` + acct("acct_old", "5", "env-a") + `],"next_page_url":null}`
+	s := &stub{resp: func(n int) (int, string, http.Header) {
+		if n == 1 {
+			return 200, page1, nil
+		}
+		return 200, page2, nil
+	}}
+	ids, err := newTestClient(t, s).ListAccountIDsByStore(context.Background(), 5)
+	if err != nil || !slices.Equal(ids, []string{"acct_new", "acct_old"}) {
+		t.Fatalf("ids=%v err=%v", ids, err)
 	}
 }
 

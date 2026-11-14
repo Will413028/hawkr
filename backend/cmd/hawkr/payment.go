@@ -24,7 +24,9 @@ import (
 // fake 是記憶體內的 provider（所有帳戶都回轉帳能力已啟用，只能在 requireDevEnvironment 成立的 dev 環境選到，否則啟動失敗），stripe 是 Stripe Connect（Accounts v2）；其他值讓啟動失敗。
 // stripe 讀 STRIPE_SECRET_KEY（沒有設定時等於沒有 provider，serve 照常啟動）、STRIPE_WEBHOOK_SECRET（有金鑰卻沒有它，啟動失敗）與
 // STRIPE_REQUIREMENT_COLLECTION（新建帳戶列的收件方式：provider 是 Stripe 收件，預設；platform 是平台收件；其他值啟動失敗。開通 session 的形狀由 ChooseSession 決定，不看這個設定）與
-// STRIPE_PUBLISHABLE_KEY（內嵌 session 的公開金鑰，不是 secret；有金鑰卻沒有它，啟動失敗，與收件方式無關：既有的平台收件帳戶仍會開內嵌 session）。
+// STRIPE_PUBLISHABLE_KEY（內嵌 session 的公開金鑰，不是 secret；有金鑰卻沒有它，啟動失敗，與收件方式無關：既有的平台收件帳戶仍會開內嵌 session）與
+// STRIPE_ACCOUNT_NAMESPACE（這個環境的帳戶命名空間，寫進外部帳戶的 metadata.hawkr_namespace、對帳時與 store_id 一起比對；每個環境不同，兩個環境共用同一個 Stripe 帳號時才不會互相關閉對方的帳戶；
+// 有金鑰卻沒有它或格式不合——小寫英數、連字號、底線，1 到 40 個字元，開頭是英數——啟動失敗）。
 func readPayment(e *config.Env, log *slog.Logger) payment.Provider {
 	switch name := e.StringOr("PAYMENT_PROVIDER", ""); name {
 	case "":
@@ -72,7 +74,16 @@ func readStripe(e *config.Env, log *slog.Logger) payment.Provider {
 		e.Fail("STRIPE_PUBLISHABLE_KEY：設了 STRIPE_SECRET_KEY 就必填")
 		return nil
 	}
-	client, err := stripe.New(stripe.Config{SecretKey: key, WebhookSecret: whsecret})
+	namespace := e.StringOr("STRIPE_ACCOUNT_NAMESPACE", "")
+	if namespace == "" {
+		e.Fail("STRIPE_ACCOUNT_NAMESPACE：設了 STRIPE_SECRET_KEY 就必填")
+		return nil
+	}
+	if err := stripe.ValidateNamespace(namespace); err != nil {
+		e.Fail("STRIPE_ACCOUNT_NAMESPACE：%v", err)
+		return nil
+	}
+	client, err := stripe.New(stripe.Config{SecretKey: key, WebhookSecret: whsecret, AccountNamespace: namespace})
 	if err != nil {
 		e.Fail("Stripe：%v", err)
 		return nil

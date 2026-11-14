@@ -5,7 +5,7 @@
 
 CREATE SCHEMA payment;
 
--- 後台待辦的一列：kind 是 UPPER_SNAKE 的種類（PAYMENT_ACCOUNT_CREATE_FAILED），item_id 是同一種類內唯一、位元組順序穩定的鍵（店家 ID 的文字），
+-- 後台待辦的一列：kind 是 UPPER_SNAKE 的種類（PAYMENT_ACCOUNT_CREATE_FAILED、PAYMENT_ACCOUNT_PURGE_STUCK），item_id 是同一種類內唯一、位元組順序穩定的鍵（店家 ID 的文字），
 -- store_id 是擁有者（店家），開始時間與期限一定有值。真實的 pub_review_item 是複合型別。
 CREATE TABLE payment.pub_review_item (
     kind     TEXT        NOT NULL,

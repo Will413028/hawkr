@@ -92,14 +92,14 @@
 - 未採：看 `charges_enabled`：v2 的 recipient 帳戶沒有這個欄位，轉帳能力才是 destination charges 的前提。
 
 **建立外部帳戶的時點、冪等與分兩步建立**（時點與冪等 Will 2026-11-02；分兩步 2026-11-14）：平台審核核准後才建立。核准的 transaction 內只 INSERT「建立中」的列（`external_account_id` 為空，`create_idempotency_key` 是寫列時產生並保存的 UUID，`ON CONFLICT DO NOTHING`）並排以 `store_id` 為唯一鍵的建立 job；外部呼叫在 transaction 外，同一家店的每次重試都用列上的鍵。一店一個外部帳戶，關店再開沿用。建立失敗由 River 退避重試，用完記 `create_failed_at`，進後台待辦 `PAYMENT_ACCOUNT_CREATE_FAILED`；管理員只有「重新整理」與「重試建立」，缺件由賣家經新的開通連結補。
-建立分兩步，都在 Stripe adapter 內：第一步只帶不會變的內容（`metadata.store_id`），用列上的冪等鍵，本文固定，同一把鍵永遠得到同一個帳戶；第二步用更新寫入當下的聯絡信箱、recipient 設定、責任歸屬、identity 與 dashboard，可重複送出。第一步拿到外部 ID 就寫進帳戶列（不等第二步），第二步成功才記 `create_completed_at`，「已建立」「可開通」「輪詢」「同步」都看它，不看有沒有外部 ID（D59，2026-11-14 修訂「兩步都成功才寫外部 ID」）；port 因此拆成「取得 ID」（`AcquireAccount`）、「完成設定」（`ConfigureAccount`）與只找不建的 `ResolveAccount`（列出沒有關閉的帳戶、以 `metadata.store_id` 比對）。原因：第 2 輪設計審查指出，兩步都成功才寫 ID、列上又分不出「從沒呼叫」與「結果不明」，且會過期（30 天）的冪等鍵被當成查詢鍵，沒有外部 ID 又問不到 provider 的列被直接刪、丟掉唯一能找回外部帳戶的鍵；現在呼叫前先記 `create_called_at`，從沒呼叫過的列直接刪，呼叫過的 30 天內重送同一把鍵、超過 30 天以 `metadata.store_id` 列出對帳。原因（兩步本身）：聯絡信箱改成每次嘗試讀當下的值之後，冪等鍵與請求內容不再是一個單位：第一次請求結果未知而信箱又變了，Stripe 回 `idempotency_error`，後台重試沿用同一把鍵，永遠建不出來。sandbox 實測：只帶 `metadata` 建立成功；更新寫入信箱與設定成功、重送成功；更新之後才建得出 Account Link；失敗的請求不重播，同一把鍵改對內容後成功。
+建立分兩步，都在 Stripe adapter 內：第一步只帶不會變的內容（`metadata.store_id` 與 `metadata.hawkr_namespace`，後者來自每個環境不同的必填設定 `STRIPE_ACCOUNT_NAMESPACE`，D61），用列上的冪等鍵，本文固定，同一把鍵永遠得到同一個帳戶；第二步用更新寫入當下的聯絡信箱、recipient 設定、責任歸屬、identity 與 dashboard，可重複送出。第一步拿到外部 ID 就寫進帳戶列（不等第二步），第二步成功才記 `create_completed_at`，「已建立」「可開通」「輪詢」「同步」都看它，不看有沒有外部 ID（D59，2026-11-14 修訂「兩步都成功才寫外部 ID」）；port 因此拆成「取得 ID」（`AcquireAccount`）、「完成設定」（`ConfigureAccount`）與只找不建的 `ResolveAccount`（列出沒有關閉的帳戶、以 `metadata.store_id` 與命名空間比對，回傳全部符合的，新的在前）。原因：第 2 輪設計審查指出，兩步都成功才寫 ID、列上又分不出「從沒呼叫」與「結果不明」，且會過期（30 天）的冪等鍵被當成查詢鍵，沒有外部 ID 又問不到 provider 的列被直接刪、丟掉唯一能找回外部帳戶的鍵；現在呼叫前先記 `create_called_at`，從沒呼叫過的列直接刪，呼叫過的 30 天內重送同一把鍵、超過 30 天以 `metadata.store_id` 列出對帳。原因（兩步本身）：聯絡信箱改成每次嘗試讀當下的值之後，冪等鍵與請求內容不再是一個單位：第一次請求結果未知而信箱又變了，Stripe 回 `idempotency_error`，後台重試沿用同一把鍵，永遠建不出來。sandbox 實測：只帶 `metadata` 建立成功；更新寫入信箱與設定成功、重送成功；更新之後才建得出 Account Link；失敗的請求不重播，同一把鍵改對內容後成功。
 - 未採：申請送出就建：被退回的申請也會留下外部帳戶。
 - 未採：賣家第一次要收款才建：要改建立 job、輪詢與後台重試。
 - 未採：每次呼叫產生新鍵：重試會建第二個帳戶；關店再開另建帳戶：賣家要重新開通，外部帳戶變兩個。
 - 未採：管理員重新綁定或補件：管理員沒有可補的資料。
 - 未採：把冪等鍵與這次用的信箱一起存在列上、結果未知時原樣重送：信箱副本會留到管理員處理，還要定義哪些錯誤算明確拒絕。
 - 未採：後台重試時換鍵：第一次已建成時留下沒人知道的帳戶。
-- 對帳（D59）：結果未知的請求放超過 Stripe v2 冪等鍵的保存期（30 天）不再重送，建立與清理都先列出沒有關閉的帳戶以 `metadata.store_id` 對帳（sandbox 實測 2026-11-14，spike Q24：列表含只做完第一步的空帳戶並帶 `metadata`，`limit` 上限 20 以 `next_page_url` 翻頁，預設不列已關閉的帳戶、已關閉的帳戶 `metadata` 被清成 null，所以同一家店先前關閉的帳戶不會被比對到）；整份列完才算「沒有」，列出失敗不是「沒有」。推翻條件：列出不含空帳戶或不帶 `metadata`（則超過 30 天的那一列直接進終局交人處理）。未採：只把直接刪改成留列（列永遠留著、沒有終局）；維持直接刪（丟掉唯一的鍵）。
+- 對帳（D59）：結果未知的請求放超過 Stripe v2 冪等鍵的保存期（30 天）不再重送，建立與清理都先列出沒有關閉的帳戶以 `metadata.store_id` 與 `metadata.hawkr_namespace` 對帳（sandbox 實測 2026-11-14，spike Q24：列表含只做完第一步的空帳戶並帶 `metadata`，`limit` 上限 20 以 `next_page_url` 翻頁，預設不列已關閉的帳戶、已關閉的帳戶 `metadata` 被清成 null，所以同一家店先前關閉的帳戶不會被比對到）；比對要兩者都相符（D61：兩個資料庫可能共用同一個 Stripe 帳號，只比 `store_id` 會關到另一個環境的帳戶；未採：規定每個環境用自己的 Stripe 帳號，那是靠人守）；符合的帳戶有多個時，清理全部關閉才刪列，建立採用最新的一個並關閉其餘；整份列完才算「沒有」，列出失敗不是「沒有」。推翻條件：列出不含空帳戶或不帶 `metadata`（則超過 30 天的那一列直接進終局交人處理）。未採：只把直接刪改成留列（列永遠留著、沒有終局）；維持直接刪（丟掉唯一的鍵）。
 
 **聯絡信箱在建立外部帳戶的當下讀取**（Will 2026-11-03；改為建立當下讀取 2026-11-13）：信箱在帳號層級：provider 驗證過的 `email` 優先，沒有才用自填的聯絡信箱（`api/hawkr/identity` 的 `GetContactEmail`、`SetContactEmail`；自填的未驗證，只在沒有可用的已驗證信箱時可設）。賣家送審要求帳號有其中之一（`CONTACT_EMAIL_REQUIRED`）；核准不再檢查信箱。payment 不存信箱：建立 job 在呼叫金流商的當下經 `Owners` 的 `OwnerContactEmail` 讀取（由組裝點以 seller 與 identity 的公開 API 實作），讀不到時不呼叫金流商、記成建立失敗。核准之後賣家改了信箱，建立時用新的。快照到收款帳戶列是帳戶還在 seller 時的形狀；payment 成為獨立模組之後建立 job 已能向上讀，下層不存上層個資的副本。
 - 未採：直接用登入信箱：LINE 可能沒有信箱，賣家也改不了。
@@ -173,4 +173,4 @@
 - 沒有存收款帳戶的首次啟用時間與補件期限（Stripe 回報的 requirements 摘要裡最早的期限），也沒有期限前提醒；觸發：開通結果通知（A8）開工。
 - 自填聯絡信箱未驗證；觸發：A8 的 email 管道上線時加驗證碼，並把帳號信箱變更同步到 Stripe。A8 只寄已驗證的信箱。
 - 平台承擔負餘額；要上線且改變損失歸屬時重新評估內嵌元件關掉使用者驗證的決定。
-- 沿用機制與延後項的觸發條件（輪詢沒有上限、同步讀到已關閉的帳戶與 inbox 沒有終局狀態、`provider` 欄位在換 provider 時舊列的去向；清理的終局已在 9g 處理）寫在 `internal/modules/payment/CARRYOVER.md` 與 `docs/modules/payment.md` §8。
+- 沿用機制與延後項的觸發條件（輪詢沒有上限、inbox 沒有終局狀態（同步讀到已關閉的帳戶已在 9g 處理：列標 `DISABLED`、原因碼 `closed`，不再輪詢，D61）、`provider` 欄位在換 provider 時舊列的去向；清理的終局已在 9g 處理）寫在 `internal/modules/payment/CARRYOVER.md` 與 `docs/modules/payment.md` §8。

@@ -29,6 +29,7 @@ import type { GovernanceNotice } from "./GovernanceNotice";
 import PaymentMappingDeleteDialog from "./PaymentMappingDeleteDialog";
 import {
 	type PaymentAccountState,
+	paymentAccountCreated,
 	paymentAccountQueryOptions,
 } from "./payment-account";
 import type { usePaymentAccount } from "./use-store-detail";
@@ -199,8 +200,8 @@ export function PaymentAccountCard({
 				</details>
 			)}
 			<div className="payment-account-actions">
-				{/* RefreshPaymentAccount 在外部帳戶還沒建立時回 failed_precondition：只在有外部帳戶時給這個動作。 */}
-				{account.externalAccountId && !blockedTime && (
+				{/* RefreshPaymentAccount 在外部帳戶還沒建立完成時回 failed_precondition（半建立的列已有外部 ID，狀態仍是 NOT_CREATED）：只在已建立時給這個動作。 */}
+				{paymentAccountCreated(account) && !blockedTime && (
 					<Button
 						variant="outline"
 						onClick={onRefresh}

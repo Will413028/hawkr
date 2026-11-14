@@ -90,7 +90,12 @@ type Snapshot struct {
 	PayoutsActive    bool
 	Requirements     json.RawMessage
 	BankFingerprints []string
+	// Closed 為真表示外部帳戶已在 provider 關閉（終局：不會再開啟）；其餘欄位沒有意義。StatusOf 把它推導成 DISABLED、原因碼 ReasonClosed。
+	Closed bool
 }
+
+// ReasonClosed 是外部帳戶已在 provider 關閉時存的原因碼（D61）。輪詢補漏把它視為終局，不再排同步。
+const ReasonClosed = "closed"
 
 // AcquireInput 是建立的第一步（取得外部帳戶 ID）的輸入。IdempotencyKey 是帳戶列上保存的隨機 UUID：同一家店的每次重送都用它，30 天內得到同一個帳戶；
 // 兩個資料庫共用同一個 provider 帳號時不會撞鍵。本文固定、帳戶上沒有任何擁有者個資，帳戶上帶 StoreID 讓之後能以它對帳（D59）。
@@ -137,9 +142,9 @@ type Provider interface {
 	AcquireAccount(ctx context.Context, in AcquireInput) (externalID string, err error)
 	// ConfigureAccount 是建立的第二步：寫入聯絡信箱、收款設定與收件方式（D55）；可重複送出，同一個帳戶的重送（信箱可能已經不同）安全。成功才算建立完成。
 	ConfigureAccount(ctx context.Context, in ConfigureInput) error
-	// ResolveAccount 只找不建：列出 provider 上沒有關閉的帳戶（要整份列完；翻頁中途失敗回錯誤，不回部分結果），回傳 StoreID 對應的帳戶；
-	// 整份列完都沒有時 found 為 false。已關閉的帳戶不會被找到（金流商關閉時清掉它的對應資料）。
-	ResolveAccount(ctx context.Context, in ResolveInput) (externalID string, found bool, err error)
+	// ResolveAccount 只找不建：列出 provider 上沒有關閉的帳戶（要整份列完；翻頁中途失敗回錯誤，不回部分結果），回傳 StoreID 對應的全部帳戶 ID，新的在前
+	// （D61：同一家店可能有多個；對應的條件包含這個環境的命名空間，別的環境的帳戶不會出現）；整份列完都沒有時回空。已關閉的帳戶不會被找到（金流商關閉時清掉它的對應資料）。
+	ResolveAccount(ctx context.Context, in ResolveInput) (externalIDs []string, err error)
 	// CreateOnboardingSession 依 in.Kind 產生開通的連結（SessionHosted）或內嵌元件的 session（SessionEmbedded）；回傳的形狀必須與 Kind 一致。
 	CreateOnboardingSession(ctx context.Context, in SessionInput) (model.OnboardingSession, error)
 	// FetchAccount 讀外部帳戶目前的狀態與掛著的外部銀行帳號識別碼；任何一項讀取失敗整個呼叫失敗。
@@ -178,11 +183,14 @@ const (
 	NoteUnknownState StatusNote = "unknown_state"
 )
 
-// StatusOf 由快照推導中立的狀態、要存的原因碼與註記（Stripe 計畫 D13）。純函式，不記 log。順序：轉帳能力已啟用 → ENABLED；被拒絕或不支援 → DISABLED；
+// StatusOf 由快照推導中立的狀態、要存的原因碼與註記（Stripe 計畫 D13）。純函式，不記 log。順序：外部帳戶已關閉 → DISABLED（原因碼 ReasonClosed）；轉帳能力已啟用 → ENABLED；被拒絕或不支援 → DISABLED；
 // 任何一筆細節要賣家行動（含 pending）→ ACTION_REQUIRED；pending → UNDER_REVIEW；restricted 而且有細節要平台處理或沒有解法 → DISABLED；
 // 其餘（不認得的狀態、restricted 但沒有可判讀的細節）→ UNDER_REVIEW 並帶註記，由呼叫方記警示。細節有多筆時取最嚴重的：賣家能行動的優先，其次是 DISABLED。
 // 原因碼是導出狀態的那一筆細節的 Reason（rejected、unsupported 沒有細節時用狀態名）；ENABLED 與沒有原因碼時是空字串。
 func StatusOf(s Snapshot) (model.PaymentAccountStatus, string, StatusNote) {
+	if s.Closed {
+		return model.PaymentDisabled, ReasonClosed, NoteNone
+	}
 	state := s.Transfers
 	if !state.Valid() {
 		state = CapabilityUnknown

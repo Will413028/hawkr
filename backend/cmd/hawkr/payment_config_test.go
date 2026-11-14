@@ -49,7 +49,7 @@ func TestFakePaymentProviderOnlyInDevEnvironment(t *testing.T) {
 }
 
 func TestStripePaymentConfig(t *testing.T) {
-	full := map[string]string{"PAYMENT_PROVIDER": "stripe", "STRIPE_SECRET_KEY": "sk_test_x", "STRIPE_WEBHOOK_SECRET": "whsec_x", "STRIPE_PUBLISHABLE_KEY": "pk_test_x"}
+	full := map[string]string{"PAYMENT_PROVIDER": "stripe", "STRIPE_SECRET_KEY": "sk_test_x", "STRIPE_WEBHOOK_SECRET": "whsec_x", "STRIPE_PUBLISHABLE_KEY": "pk_test_x", "STRIPE_ACCOUNT_NAMESPACE": "env-a"}
 	with := func(kv ...string) map[string]string {
 		m := map[string]string{}
 		for k, v := range full {
@@ -83,6 +83,14 @@ func TestStripePaymentConfig(t *testing.T) {
 	}
 	if _, err := readPaymentWith(with("STRIPE_PUBLISHABLE_KEY", "")); err == nil || !strings.Contains(err.Error(), "STRIPE_PUBLISHABLE_KEY") {
 		t.Errorf("沒設收件方式（預設金流商收件）沒有公開金鑰必須讓啟動失敗：%v", err)
+	}
+	if _, err := readPaymentWith(with("STRIPE_ACCOUNT_NAMESPACE", "")); err == nil || !strings.Contains(err.Error(), "STRIPE_ACCOUNT_NAMESPACE") {
+		t.Errorf("有金鑰沒有命名空間必須讓啟動失敗：%v", err)
+	}
+	for _, bad := range []string{"Prod", "a b", "-a", "環境", strings.Repeat("a", 41)} {
+		if _, err := readPaymentWith(with("STRIPE_ACCOUNT_NAMESPACE", bad)); err == nil || !strings.Contains(err.Error(), "STRIPE_ACCOUNT_NAMESPACE") {
+			t.Errorf("命名空間 %q 格式不合必須讓啟動失敗：%v", bad, err)
+		}
 	}
 	if _, err := readPaymentWith(with("STRIPE_REQUIREMENT_COLLECTION", "both")); err == nil || !strings.Contains(err.Error(), "STRIPE_REQUIREMENT_COLLECTION") {
 		t.Errorf("不認得的收件方式：%v", err)

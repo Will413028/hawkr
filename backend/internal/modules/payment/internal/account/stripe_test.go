@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -82,7 +83,7 @@ func stripeProvider(t *testing.T, collection model.RequirementCollection, h http
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	c, err := stripe.New(stripe.Config{
-		BaseURL: srv.URL, SecretKey: "sk_test_x", WebhookSecret: whsecret,
+		BaseURL: srv.URL, SecretKey: "sk_test_x", WebhookSecret: whsecret, AccountNamespace: "env-a",
 		Wait: func(context.Context, time.Duration) error { return nil },
 	})
 	if err != nil {
@@ -96,7 +97,7 @@ func stripeProvider(t *testing.T, collection model.RequirementCollection, h http
 }
 
 func TestStripeCapabilitiesFollowTheCollectionMode(t *testing.T) {
-	c, _ := stripe.New(stripe.Config{SecretKey: "k", WebhookSecret: "w"})
+	c, _ := stripe.New(stripe.Config{SecretKey: "k", WebhookSecret: "w", AccountNamespace: "env-a"})
 	embedded := []model.EmbeddedRuntime{model.RuntimeStripeConnectJS}
 	for mode, want := range map[model.RequirementCollection]Capabilities{
 		model.CollectionProvider: {RequirementCollection: model.CollectionProvider, EmbeddedRuntimes: embedded},
@@ -164,7 +165,7 @@ func TestStripeConfigureAccountWithoutContactEmailIsPermanentAndSendsNothing(t *
 	}
 }
 
-// 取得 ID 重送沿用同一把鍵：adapter 原樣把 AcquireInput 的鍵送成建立請求的 Idempotency-Key，本文只有 metadata.store_id，沒有任何擁有者個資。
+// 取得 ID 重送沿用同一把鍵：adapter 原樣把 AcquireInput 的鍵送成建立請求的 Idempotency-Key，本文只有 metadata.store_id 與 metadata.hawkr_namespace，沒有任何擁有者個資。
 func TestStripeAcquireAccountSendsTheGivenKeyAndAFixedBodyOnEveryAttempt(t *testing.T) {
 	var reqs []string
 	replay := twoStepResponder(t)
@@ -180,7 +181,7 @@ func TestStripeAcquireAccountSendsTheGivenKeyAndAFixedBodyOnEveryAttempt(t *test
 			t.Fatalf("id=%q err=%v", id, err)
 		}
 	}
-	line := `POST /v2/core/accounts 6f1c0a52-0000-4000-8000-000000000001 {"metadata":{"store_id":"5"}}`
+	line := `POST /v2/core/accounts 6f1c0a52-0000-4000-8000-000000000001 {"metadata":{"hawkr_namespace":"env-a","store_id":"5"}}`
 	if fmt.Sprint(reqs) != "["+line+" "+line+"]" {
 		t.Errorf("請求 %v", reqs)
 	}
@@ -189,8 +190,9 @@ func TestStripeAcquireAccountSendsTheGivenKeyAndAFixedBodyOnEveryAttempt(t *test
 	}
 }
 
-// ResolveAccount 只找不建：列出帳戶（GET，不 POST），以 metadata.store_id 比對；沒有符合的回 found=false，不送出任何建立請求。
-func TestStripeResolveAccountOnlyListsAndMatchesByStoreID(t *testing.T) {
+// ResolveAccount 只找不建：列出帳戶（GET，不 POST），以 metadata.store_id 與 metadata.hawkr_namespace 比對。fixture（sandbox 錄的）錄在加入命名空間之前，
+// 帳戶沒有 hawkr_namespace，所以一個都不符；預期的店家 ID 讀自 fixture。
+func TestStripeResolveAccountOnlyListsAndDoesNotMatchRecordedAccountsWithoutTheNamespace(t *testing.T) {
 	var methods []string
 	p1, p2 := fixtureResponder(t, "list_accounts_page1"), fixtureResponder(t, "list_accounts_page2")
 	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -201,17 +203,89 @@ func TestStripeResolveAccountOnlyListsAndMatchesByStoreID(t *testing.T) {
 		}
 		p1(w, r)
 	}))
-	id, found, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 10000})
-	if err != nil || !found || id != "acct_1UbYvoI5OYGDmlPA" {
-		t.Fatalf("id=%q found=%v err=%v", id, found, err)
+	stores := fixtureStoreIDs(t, "list_accounts_page1", "list_accounts_page2")
+	if len(stores) == 0 {
+		t.Fatal("fixture 沒有帶 store_id 的帳戶")
 	}
-	if _, found, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 8}); err != nil || found {
-		t.Fatalf("沒有符合的店家：found=%v err=%v", found, err)
+	for _, store := range stores {
+		ids, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: store})
+		if err != nil || len(ids) != 0 {
+			t.Fatalf("店家 %d：ids=%v err=%v，沒有命名空間的帳戶不得符合", store, ids, err)
+		}
+	}
+	if len(methods) == 0 {
+		t.Fatal("沒有送出任何請求")
 	}
 	for _, m := range methods {
 		if m != http.MethodGet {
 			t.Fatalf("ResolveAccount 送出了 %s，只能列出", m)
 		}
+	}
+}
+
+// fixtureStoreIDs 讀 fixture 裡每個帳戶 metadata.store_id（整數的）。
+func fixtureStoreIDs(t *testing.T, names ...string) []int64 {
+	t.Helper()
+	var out []int64
+	for _, name := range names {
+		rec := httptest.NewRecorder()
+		fixtureResponder(t, name)(rec, nil)
+		var b struct {
+			Data []struct {
+				Metadata map[string]string `json:"metadata"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil {
+			t.Fatal(err)
+		}
+		for _, a := range b.Data {
+			if id, err := strconv.ParseInt(a.Metadata["store_id"], 10, 64); err == nil {
+				out = append(out, id)
+			}
+		}
+	}
+	return out
+}
+
+// 全部符合的都回，新的在前；別的環境（命名空間不同）與沒有命名空間的帳戶不在其中。
+func TestStripeResolveAccountReturnsEveryMatchNewestFirstAndOnlyInItsNamespace(t *testing.T) {
+	acct := func(id, store, ns string) string {
+		md := `{"store_id":"` + store + `"`
+		if ns != "" {
+			md += `,"hawkr_namespace":"` + ns + `"`
+		}
+		return `{"id":"` + id + `","object":"v2.core.account","closed":false,"applied_configurations":[],"metadata":` + md + `}}`
+	}
+	body := `{"data":[` + acct("acct_new", "5", "env-a") + `,` + acct("acct_other_env", "5", "env-b") + `,` + acct("acct_no_ns", "5", "") + `,` +
+		acct("acct_old", "5", "env-a") + `,` + acct("acct_other_store", "6", "env-a") + `],"next_page_url":null}`
+	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	ids, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 5})
+	if err != nil || !slices.Equal(ids, []string{"acct_new", "acct_old"}) {
+		t.Fatalf("ids=%v err=%v", ids, err)
+	}
+	if ids, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 8}); err != nil || len(ids) != 0 {
+		t.Fatalf("沒有符合的店家：ids=%v err=%v", ids, err)
+	}
+}
+
+// 已在 Stripe 關閉的帳戶：FetchAccount 回 Closed 的快照，只讀帳戶一次，不讀銀行帳號、不當成錯誤。
+func TestStripeFetchAccountOfAClosedAccountReturnsClosedWithoutReadingBankAccounts(t *testing.T) {
+	var paths []string
+	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		_, _ = w.Write([]byte(`{"id":"acct_1","object":"v2.core.account","closed":true,"metadata":null}`))
+	}))
+	snap, err := p.FetchAccount(context.Background(), "acct_1")
+	if err != nil || !snap.Closed || len(snap.BankFingerprints) != 0 {
+		t.Fatalf("snap=%+v err=%v", snap, err)
+	}
+	if len(paths) != 1 || paths[0] != "/v2/core/accounts/acct_1" {
+		t.Fatalf("請求 %v，預期只讀帳戶一次", paths)
+	}
+	if status, reason, _ := StatusOf(snap); status != model.PaymentDisabled || reason != ReasonClosed {
+		t.Fatalf("StatusOf=%s %q", status, reason)
 	}
 }
 
@@ -221,9 +295,9 @@ func TestStripeResolveAccountListFailureIsAnErrorNotNotFound(t *testing.T) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = w.Write([]byte(`{"error":{"message":"down"}}`))
 	}))
-	id, found, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 7})
-	if err == nil || found || id != "" || errors.Is(err, ErrPermanent) {
-		t.Fatalf("id=%q found=%v err=%v，預期一般錯誤", id, found, err)
+	ids, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 7})
+	if err == nil || len(ids) != 0 || errors.Is(err, ErrPermanent) {
+		t.Fatalf("ids=%v err=%v，預期一般錯誤", ids, err)
 	}
 }
 
@@ -251,7 +325,7 @@ func TestStripeAcquireAccountClassifiesErrors(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	url := srv.URL
 	srv.Close()
-	c, _ := stripe.New(stripe.Config{BaseURL: url, SecretKey: "k", WebhookSecret: "w"})
+	c, _ := stripe.New(stripe.Config{BaseURL: url, SecretKey: "k", WebhookSecret: "w", AccountNamespace: "env-a"})
 	p, _ := NewStripe(c, model.CollectionProvider, "pk_test_x")
 	if _, err := p.AcquireAccount(context.Background(), AcquireInput{IdempotencyKey: "5"}); err == nil || errors.Is(err, ErrPermanent) {
 		t.Errorf("傳輸錯誤：%v，預期一般錯誤", err)

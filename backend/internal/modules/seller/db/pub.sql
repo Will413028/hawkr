@@ -22,7 +22,7 @@ AS $$ SELECT * FROM seller.pub_exposable_store $$;
 
 -- 後台待辦的一列（step10e-3d-design.md §2.1）。真實的 pub_review_item 是複合型別，宣告成表只為了讓 sqlc 型別化欄位。每一列是一件待辦：
 -- kind 是 UPPER_SNAKE 的種類（REPORT_TRIAGE、CASE_DECISION、CASE_INQUIRY_OVERDUE、AUTHORITY_ORDER、AUTHORITY_TARGET_NOTICE、
--- MEASURE_APPEAL、MEASURE_LIFT_REQUEST、MEASURE_REVIEW、KYC_APPLICATION、SHARED_BANK_ACCOUNT；收款帳戶的 PAYMENT_ACCOUNT_CREATE_FAILED 由 payment 的 pub_review_items 發布）；item_id 是同一種類內唯一、位元組順序穩定的鍵
+-- MEASURE_APPEAL、MEASURE_LIFT_REQUEST、MEASURE_REVIEW、KYC_APPLICATION、SHARED_BANK_ACCOUNT；收款帳戶的 PAYMENT_ACCOUNT_CREATE_FAILED、PAYMENT_ACCOUNT_PURGE_STUCK 由 payment 的 pub_review_items 發布）；item_id 是同一種類內唯一、位元組順序穩定的鍵
 -- （UUID 的 ::text；來函的對象是 order_id::text || '/' || lpad(position::text, 5, '0')）；其餘是對象的鍵（依種類只有相關的有值，其餘 NULL）、
 -- 店家（沒有單一店家時 NULL，店名已清理時 store_name 是空字串）、開始時間與期限（10 種都有期限，E3）。kind、item_id、start_at、due_at 一定有值。
 CREATE TABLE seller.pub_review_item (

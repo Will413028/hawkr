@@ -17,7 +17,7 @@ var clock = time.Now()
 
 func webhookClient(t *testing.T) *Client {
 	t.Helper()
-	c, err := New(Config{SecretKey: "sk_test_x", WebhookSecret: testSecret})
+	c, err := New(Config{SecretKey: "sk_test_x", WebhookSecret: testSecret, AccountNamespace: testNamespace})
 	if err != nil {
 		t.Fatal(err)
 	}

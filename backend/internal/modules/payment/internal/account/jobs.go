@@ -184,11 +184,12 @@ func (w *purgeWorker) Timeout(*river.Job[PurgeArgs]) time.Duration { return jobT
 //   - 清理：等待清理的帳戶（purge_pending_at，不進上面兩種同步）重排「關閉後刪除」job（進了終局 purge_blocked_at 的不重排，它們在後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK 等管理員處理）；
 //   - 建立：閒置的建立列，擁有者營運中時排建立 job。
 //
-// 回傳排入同步與建立的帳戶數（唯一鍵合併掉的也算；兩種同步的帳戶重複時算兩次）。沒有設定 provider 時什麼都不做。
+// 回傳排入同步與建立的帳戶數（唯一鍵合併掉的也算；兩種同步的帳戶重複時算兩次）。沒有設定 provider 時只重排清理（同步與建立都要 provider）：
+// 呼叫過 provider 的帳戶在 provider 沒有設定時，清理 job 把它留著，只有這裡重排才會讓它在期限後進終局（purgeDefer 的 expired 分支）。
 func (s *Service) Sweep(ctx context.Context) (synced, ensured int, err error) {
 	p := s.d.Provider
 	if p == nil {
-		return 0, 0, nil
+		return 0, 0, s.sweepPurge(ctx)
 	}
 	queueSync := func(id int64) error {
 		return s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueueSync(ctx, s.d.Jobs, id) })
@@ -227,21 +228,8 @@ func (s *Service) Sweep(ctx context.Context) (synced, ensured int, err error) {
 		}
 		route = next
 	}
-	after = 0
-	for {
-		ids, err := s.purgePending(ctx, after)
-		if err != nil {
-			return synced, ensured, err
-		}
-		for _, id := range ids {
-			after = id
-			if err := s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueuePurge(ctx, s.d.Jobs, id) }); err != nil {
-				return synced, ensured, err
-			}
-		}
-		if len(ids) < sweepBatch {
-			break
-		}
+	if err := s.sweepPurge(ctx); err != nil {
+		return synced, ensured, err
 	}
 	after = 0
 	for {
@@ -265,6 +253,26 @@ func (s *Service) Sweep(ctx context.Context) (synced, ensured int, err error) {
 		}
 		if len(ids) < sweepBatch {
 			return synced, ensured, nil
+		}
+	}
+}
+
+// sweepPurge 為等待清理、沒有進終局的帳戶重排「關閉後刪除」job，分批、各批一個 transaction。
+func (s *Service) sweepPurge(ctx context.Context) error {
+	var after int64
+	for {
+		ids, err := s.purgePending(ctx, after)
+		if err != nil {
+			return err
+		}
+		for _, id := range ids {
+			after = id
+			if err := s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueuePurge(ctx, s.d.Jobs, id) }); err != nil {
+				return err
+			}
+		}
+		if len(ids) < sweepBatch {
+			return nil
 		}
 	}
 }

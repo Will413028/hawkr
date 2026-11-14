@@ -256,19 +256,28 @@ func (s *Service) markCalled(ctx context.Context, storeID int64) (row store.Paym
 }
 
 // acquire 是建立的第一步：取得外部 ID 並立刻寫進列。冪等鍵保存期（30 天，從「已呼叫」起算）內重送同一把鍵；超過之後金流商不再保證同一把鍵回同一個帳戶，
-// 先 ResolveAccount（列出帳戶以 metadata.store_id 對帳）：找到就用那一個，整份列完都沒有才換新鍵（已呼叫的時刻改成新鍵第一次呼叫之前的時刻）。
+// 先 ResolveAccount（列出帳戶以 metadata.store_id 與命名空間對帳）：找到就用最新的一個並關閉其餘，整份列完都沒有才換新鍵（已呼叫的時刻改成新鍵第一次呼叫之前的時刻）。
 // stored 為 false 表示列已不需要建立（被並行的清理標記或已刪），ID 沒有寫入（清理會以冪等鍵或對帳找回它）。
 func (s *Service) acquire(ctx context.Context, row store.PaymentAccount) (id string, stored bool, err error) {
 	p := s.d.Provider
 	found := false
 	if row.CreateCalledAt != nil && s.d.Now().Sub(*row.CreateCalledAt) > IdempotencyRetention {
 		callCtx, cancel := context.WithTimeout(ctx, callTimeout)
-		id, found, err = p.ResolveAccount(callCtx, ResolveInput{StoreID: row.StoreID})
+		ids, err := p.ResolveAccount(callCtx, ResolveInput{StoreID: row.StoreID})
 		cancel()
 		if err != nil {
 			return "", false, err
 		}
-		if !found {
+		found = len(ids) > 0
+		if found {
+			id = ids[0]
+			// 採用最新的一個，其餘關閉（D61）；先關再寫進列：寫進列之後這條路不會再列出，沒關掉的多餘帳戶就沒有人處理了。
+			for _, extra := range ids[1:] {
+				if err := s.closeExtra(ctx, extra); err != nil {
+					return "", false, err
+				}
+			}
+		} else {
 			var rotated bool
 			if row, rotated, err = s.rotateKey(ctx, row.StoreID); err != nil || !rotated {
 				return "", false, err
@@ -284,6 +293,13 @@ func (s *Service) acquire(ctx context.Context, row store.PaymentAccount) (id str
 	}
 	stored, err = s.storeExternal(ctx, row.StoreID, id, false)
 	return id, stored, err
+}
+
+// closeExtra 關閉建立時對帳多找到的帳戶（冪等：已關閉視為成功）。
+func (s *Service) closeExtra(ctx context.Context, external string) error {
+	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
+	defer cancel()
+	return s.d.Provider.CloseAccount(callCtx, external)
 }
 
 // rotateKey 換新的冪等鍵並把已呼叫的時刻改成現在（在呼叫新鍵之前），回傳最新的列；列已不需要建立時 ok 為 false。
@@ -419,7 +435,7 @@ const (
 // 標好之後重讀列，依 planPurge 處理：
 //   - 從沒呼叫過 provider 的列直接刪，不需要 provider；
 //   - 有外部 ID 而 provider 可用：在 transaction 外先讀帳戶、照它實際的設定關閉（冪等：已關閉視為成功），成功才刪列並把它外部帳戶在 inbox 的未處理事件標為已處理；
-//   - 呼叫過、沒有外部 ID、provider 可用：冪等鍵 30 天內以同一把鍵取得 ID 寫回再關閉；超過 30 天列出 provider 的帳戶以 metadata.store_id 比對，找到就寫回再關閉，
+//   - 呼叫過、沒有外部 ID、provider 可用：冪等鍵 30 天內以同一把鍵取得 ID 寫回再關閉；超過 30 天列出 provider 的帳戶以 metadata.store_id 與命名空間比對，找到的全部都要關閉（其中一個寫回列），
 //     整份列完都沒有才刪；
 //   - 呼叫過、問不到 provider（沒有設定或不同）：列留著。
 //
@@ -475,15 +491,24 @@ func (s *Service) Purge(ctx context.Context, storeID int64, final bool) error {
 		return s.storeThenClose(ctx, row, external, final, expired)
 	default:
 		callCtx, cancel := context.WithTimeout(ctx, callTimeout)
-		external, found, err := s.d.Provider.ResolveAccount(callCtx, ResolveInput{StoreID: storeID})
+		ids, err := s.d.Provider.ResolveAccount(callCtx, ResolveInput{StoreID: storeID})
 		cancel()
 		if err != nil {
 			return s.purgeFailed(ctx, row, nil, err, final, expired)
 		}
-		if !found {
+		if len(ids) == 0 {
 			return s.deleteRow(ctx, row, nil)
 		}
-		return s.storeThenClose(ctx, row, external, final, expired)
+		// 全部符合的都要關閉才刪列（D61）：先關多餘的，任何一個失敗照既有的失敗路徑處理、列留著；已關閉的下一輪列不出來，重試只剩沒關掉的。
+		for _, extra := range ids[1:] {
+			callCtx, cancel := context.WithTimeout(ctx, callTimeout)
+			err := s.d.Provider.CloseAccount(callCtx, extra)
+			cancel()
+			if err != nil {
+				return s.purgeFailed(ctx, row, &extra, err, final, expired)
+			}
+		}
+		return s.storeThenClose(ctx, row, ids[0], final, expired)
 	}
 }
 

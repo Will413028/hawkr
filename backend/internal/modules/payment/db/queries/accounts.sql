@@ -110,15 +110,15 @@ WHERE store_id = sqlc.arg(store_id) AND create_completed_at IS NOT NULL AND purg
 RETURNING *;
 
 -- name: PollablePaymentAccountStoreIDs :many
--- 輪詢補漏（等待清理的帳戶除外）：UNDER_REVIEW、ACTION_REQUIRED 的帳戶，DISABLED 但原因碼不是終局（rejected*、unsupported*）的帳戶（restricted 加 contact_stripe 或 no_resolution
--- 可以被 Stripe 解除，掉了 webhook 時只有輪詢補得到；rejected 與 unsupported 不會再啟用，不輪詢），依 store_id 分批。inbox 有舊的未處理事件的帳戶由
+-- 輪詢補漏（等待清理的帳戶除外）：UNDER_REVIEW、ACTION_REQUIRED 的帳戶，DISABLED 但原因碼不是終局（rejected*、unsupported*、closed）的帳戶（restricted 加 contact_stripe 或 no_resolution
+-- 可以被 Stripe 解除，掉了 webhook 時只有輪詢補得到；rejected、unsupported 與外部帳戶已關閉（closed）不會再啟用，不輪詢），依 store_id 分批。inbox 有舊的未處理事件的帳戶由
 -- Sweep 經 platform inbox 的 StaleRoutes 另外找。
 SELECT a.store_id
 FROM payment.accounts a
 WHERE (a.status IN ('UNDER_REVIEW', 'ACTION_REQUIRED')
        OR (a.status = 'DISABLED'
            AND (a.status_reason IS NULL
-                OR (a.status_reason NOT LIKE 'rejected%' AND a.status_reason NOT LIKE 'unsupported%'))))
+                OR (a.status_reason NOT LIKE 'rejected%' AND a.status_reason NOT LIKE 'unsupported%' AND a.status_reason <> 'closed'))))
   AND a.purge_pending_at IS NULL
   AND a.store_id > sqlc.arg(after_store_id)
 ORDER BY a.store_id

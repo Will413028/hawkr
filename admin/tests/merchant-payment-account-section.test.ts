@@ -231,6 +231,10 @@ test("已在金流商處理，刪除對應：先確認、確認前不送出；�
 	await view.render();
 	await click("已在金流商處理，刪除對應");
 	assert.match(bodyText(), /確定已在金流商處理這個收款帳戶嗎？/);
+	assert.match(
+		bodyText(),
+		/這個動作不會呼叫金流商：只刪除平台這邊的帳戶對應，並記下是誰、什麼時候刪的。刪除之後平台找不回外部帳戶，請先確認金流商那邊已經關閉或處理。/,
+	);
 	assert.equal(calls.deleteMapping, 0, "確認前不得送出");
 	await click("返回");
 	assert.equal(calls.deleteMapping, 0);

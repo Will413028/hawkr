@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -255,23 +256,23 @@ func TestCreateIsWantedUntilTheSecondStepSucceeds(t *testing.T) {
 func TestFakeResolveOnlyFindsAndKeyExpiryCreatesANewAccount(t *testing.T) {
 	f := NewFake()
 	ctx := deadlineCtx(t)
-	if _, found, err := f.ResolveAccount(ctx, ResolveInput{StoreID: 1}); err != nil || found || f.Accounts() != 0 {
-		t.Fatalf("沒有帳戶時 ResolveAccount 不得建立：found=%v err=%v 帳戶數=%d", found, err, f.Accounts())
+	if ids, err := f.ResolveAccount(ctx, ResolveInput{StoreID: 1}); err != nil || len(ids) != 0 || f.Accounts() != 0 {
+		t.Fatalf("沒有帳戶時 ResolveAccount 不得建立：ids=%v err=%v 帳戶數=%d", ids, err, f.Accounts())
 	}
 	first, err := f.AcquireAccount(ctx, AcquireInput{StoreID: 1, IdempotencyKey: "k"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id, found, err := f.ResolveAccount(ctx, ResolveInput{StoreID: 1}); err != nil || !found || id != first {
-		t.Fatalf("id=%q found=%v err=%v", id, found, err)
+	if ids, err := f.ResolveAccount(ctx, ResolveInput{StoreID: 1}); err != nil || !slices.Equal(ids, []string{first}) {
+		t.Fatalf("ids=%v err=%v", ids, err)
 	}
 	f.ExpireKeys()
 	second, err := f.AcquireAccount(ctx, AcquireInput{StoreID: 1, IdempotencyKey: "k"})
 	if err != nil || second == first {
 		t.Fatalf("鍵過期後應建出新帳戶：%q %q err=%v", first, second, err)
 	}
-	if id, _, _ := f.ResolveAccount(ctx, ResolveInput{StoreID: 1}); id != second {
-		t.Fatalf("列出應回新的帳戶：%q", id)
+	if ids, _ := f.ResolveAccount(ctx, ResolveInput{StoreID: 1}); !slices.Equal(ids, []string{second, first}) {
+		t.Fatalf("列出應回全部未關閉的帳戶、新的在前：%v", ids)
 	}
 	if err := f.CloseAccount(ctx, second); err != nil {
 		t.Fatal(err)
@@ -279,8 +280,11 @@ func TestFakeResolveOnlyFindsAndKeyExpiryCreatesANewAccount(t *testing.T) {
 	if _, err := f.AcquireAccount(ctx, AcquireInput{StoreID: 1, IdempotencyKey: "k"}); !errors.Is(err, ErrPermanent) {
 		t.Fatalf("關閉之後重放同一把鍵應是永久失敗：%v", err)
 	}
-	if id, _, _ := f.ResolveAccount(ctx, ResolveInput{StoreID: 1}); id != first {
-		t.Fatalf("關閉新帳戶後列出應只剩舊的未關閉帳戶：%q", id)
+	if ids, _ := f.ResolveAccount(ctx, ResolveInput{StoreID: 1}); !slices.Equal(ids, []string{first}) {
+		t.Fatalf("關閉新帳戶後列出應只剩舊的未關閉帳戶：%v", ids)
+	}
+	if snap, err := f.FetchAccount(ctx, second); err != nil || !snap.Closed {
+		t.Fatalf("讀已關閉的帳戶要回 Closed：%+v err=%v", snap, err)
 	}
 }
 

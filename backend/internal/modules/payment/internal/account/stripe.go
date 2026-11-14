@@ -79,17 +79,14 @@ func (s *Stripe) ConfigureAccount(ctx context.Context, in ConfigureInput) error 
 	return classify(s.client.UpdateAccount(ctx, in.ExternalID, dashboard, in.ContactEmail))
 }
 
-// ResolveAccount 實作 Provider：列出沒有關閉的帳戶，以 metadata.store_id 比對（第一步已經寫入）。同一家店有多個符合時（不該發生）回第一個，
-// 其餘留在金流商那邊；沒有符合的才回 found 為 false。
-func (s *Stripe) ResolveAccount(ctx context.Context, in ResolveInput) (string, bool, error) {
+// ResolveAccount 實作 Provider：列出沒有關閉的帳戶，以 metadata.store_id 與 metadata.hawkr_namespace 比對（第一步已經寫入，D61），
+// 回傳全部符合的帳戶（Stripe 的順序，新的在前）；呼叫方決定怎麼處理多個。
+func (s *Stripe) ResolveAccount(ctx context.Context, in ResolveInput) ([]string, error) {
 	ids, err := s.client.ListAccountIDsByStore(ctx, in.StoreID)
 	if err != nil {
-		return "", false, classify(err)
+		return nil, classify(err)
 	}
-	if len(ids) == 0 {
-		return "", false, nil
-	}
-	return ids[0], true, nil
+	return ids, nil
 }
 
 // CreateOnboardingSession 實作 Provider。
@@ -114,7 +111,7 @@ func (s *Stripe) CreateOnboardingSession(ctx context.Context, in SessionInput) (
 	return nil, fmt.Errorf("%w：不支援的 session 形狀 %d", ErrPermanent, in.Kind)
 }
 
-// FetchAccount 實作 Provider：取轉帳能力（狀態與細節）、撥款能力是否 active、requirements 原始 JSON 與外部銀行帳號的 fingerprint，其餘欄位丟棄；
+// FetchAccount 實作 Provider：帳戶已在 Stripe 關閉時回 Closed 的快照（不讀銀行帳號）；否則取轉帳能力（狀態與細節）、撥款能力是否 active、requirements 原始 JSON 與外部銀行帳號的 fingerprint，其餘欄位丟棄；
 // 讀 fingerprint 失敗整個呼叫失敗（job 重試）。
 func (s *Stripe) FetchAccount(ctx context.Context, externalID string) (Snapshot, error) {
 	if externalID == "" {
@@ -123,6 +120,9 @@ func (s *Stripe) FetchAccount(ctx context.Context, externalID string) (Snapshot,
 	acct, err := s.client.RetrieveAccount(ctx, externalID)
 	if err != nil {
 		return Snapshot{}, classify(err)
+	}
+	if acct.Closed {
+		return Snapshot{Closed: true, Requirements: json.RawMessage(`{}`)}, nil
 	}
 	fingerprints, err := s.client.ListBankAccountFingerprints(ctx, externalID)
 	if err != nil {

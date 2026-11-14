@@ -71,6 +71,9 @@ type Fake = account.Fake
 // Snapshot 是外部帳戶某一刻的狀態。
 type Snapshot = account.Snapshot
 
+// ReasonClosed 是外部帳戶已在 provider 關閉時，帳戶列的原因碼（狀態 DISABLED，終局，不再輪詢）。
+const ReasonClosed = account.ReasonClosed
+
 // CapabilityState 是轉帳能力的中立狀態。
 type CapabilityState = account.CapabilityState
 

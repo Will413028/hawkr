@@ -4,7 +4,7 @@
 // create（兩步建立＋開通連結）、shell（只做第一步的空帳戶）、find（以 metadata.store_id 列出比對）、status（讀帳戶）、close（關閉，連關兩次確認冪等）。
 // 用法：go run -tags spike ./docs/plans/2026-10-29-payment-onboarding-stripe/spike/q22_adapter <create [none]|shell|find|link|status|close> [account id]
 // create 後面加 none 是平台收件（dashboard=none，Q23），不加是 Stripe 收件（express，Q22）。
-// 金鑰從環境變數 STRIPE_SECRET_KEY 讀。
+// 金鑰從環境變數 STRIPE_SECRET_KEY 讀，命名空間從 STRIPE_ACCOUNT_NAMESPACE 讀（沒設時用 spike；create、shell、find 帶它）。
 package main
 
 import (
@@ -24,11 +24,18 @@ func main() {
 	}
 }
 
+func namespace() string {
+	if ns := os.Getenv("STRIPE_ACCOUNT_NAMESPACE"); ns != "" {
+		return ns
+	}
+	return "spike"
+}
+
 func run() error {
 	if len(os.Args) < 2 {
 		return fmt.Errorf("usage: q22_adapter <create|status|close> [account id]")
 	}
-	c, err := stripe.New(stripe.Config{SecretKey: os.Getenv("STRIPE_SECRET_KEY"), WebhookSecret: "whsec_unused"})
+	c, err := stripe.New(stripe.Config{SecretKey: os.Getenv("STRIPE_SECRET_KEY"), WebhookSecret: "whsec_unused", AccountNamespace: namespace()})
 	if err != nil {
 		return err
 	}
