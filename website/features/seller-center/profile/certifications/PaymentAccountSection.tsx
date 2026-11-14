@@ -3,7 +3,6 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { errorText } from "@hawkr/api/connect/errors";
-import { OnboardingSurface } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import {
 	OnboardingAction,
 	type OnboardingTask,
@@ -25,7 +24,6 @@ import {
 	useDefaultErrorText,
 	useUiText,
 } from "@/lib/i18n/ui-text";
-import { useRoutedLocale } from "@/lib/intl/routed-locale";
 import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 import {
 	CONTACT_HREF,
@@ -82,7 +80,6 @@ export function PaymentAccountSection({
 	} = useMyPaymentAccount({
 		enabled: platformApproved,
 	});
-	const locale = useRoutedLocale();
 	const [busy, setBusy] = React.useState(false);
 	const [confirming, setConfirming] = React.useState(false);
 	const [embedded, setEmbedded] = React.useState<Extract<
@@ -94,31 +91,26 @@ export function PaymentAccountSection({
 	accountRef.current = account;
 	const handledRef = React.useRef(false);
 
-	const createSession = React.useCallback(
-		() => createPaymentOnboardingSession(locale),
-		[locale],
-	);
 	const refreshPaymentAccount = useRefreshPaymentAccount();
 
-	const begin = React.useCallback(
-		async (surface: OnboardingSurface) => {
-			setBusy(true);
-			setFailure(null);
-			try {
-				const started = await startOnboarding(surface, { createSession });
-				if (started.kind === "redirect") {
-					commitDocumentNavigation(started.url);
-					return;
-				}
-				setEmbedded(started);
-			} catch (error) {
-				setFailure({ error });
-			} finally {
-				setBusy(false);
+	const begin = React.useCallback(async () => {
+		setBusy(true);
+		setFailure(null);
+		try {
+			const started = await startOnboarding({
+				createSession: () => createPaymentOnboardingSession(),
+			});
+			if (started.kind === "redirect") {
+				commitDocumentNavigation(started.url);
+				return;
 			}
-		},
-		[createSession],
-	);
+			setEmbedded(started);
+		} catch (error) {
+			setFailure({ error });
+		} finally {
+			setBusy(false);
+		}
+	}, []);
 
 	// 從金流商回來：先同步重讀（失敗不顯示），再重新讀開通摘要與帳戶。
 	const autoRefreshedRef = React.useRef(false);
@@ -145,7 +137,7 @@ export function PaymentAccountSection({
 		if (param === "return") {
 			void confirm();
 		} else if (account) {
-			void begin(account.onboardingSurface);
+			void begin();
 		}
 	}, [platformApproved, param, account, confirm, begin]);
 
@@ -264,11 +256,7 @@ export function PaymentAccountSection({
 							isLoading={busy}
 							loadingLabel="開啟設定中…"
 							disabled={busy || embedded !== null}
-							onClick={() =>
-								void begin(
-									account?.onboardingSurface ?? OnboardingSurface.UNSPECIFIED,
-								)
-							}
+							onClick={() => void begin()}
 						>
 							{actionLabel}
 						</Button>

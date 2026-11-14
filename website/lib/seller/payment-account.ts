@@ -8,7 +8,7 @@
 
 import { Code, ConnectError } from "@connectrpc/connect";
 import {
-	OnboardingSurface,
+	EmbeddedOnboardingRuntime,
 	PaymentAccountStatus,
 } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import {
@@ -22,7 +22,6 @@ import {
 } from "@hawkr/ui-text/keys";
 import { sellerAppClient } from "../connect/seller";
 import { optionalText, type UiText } from "../i18n/ui-text";
-import type { AppLocale } from "../intl/locales";
 import {
 	paymentAccountCompleted,
 	paymentAccountTask,
@@ -45,43 +44,52 @@ export async function fetchMyPaymentAccount(
 }
 
 /**
- * 開通 session：託管頁面是 `url`，內嵌元件是 `clientSecret` 加金流商代碼 `provider` 與初始化元件用的公開金鑰
- * `publishableKey`；缺對應欄位的回應是契約被違反。
+ * 開通 session：託管頁面是 `url`，內嵌元件是金流商代碼 `provider` 加 `clientSecret` 與初始化元件用的公開金鑰
+ * `publishableKey`。形狀完全由回應的 `oneof` 分支決定；缺對應欄位或分支不認得的回應是契約被違反。
  */
 export type OnboardingSession =
-	| { surface: "hosted"; url: string }
+	| { kind: "hosted"; url: string }
 	| {
-			surface: "embedded";
+			kind: "embedded";
+			provider: "stripe";
 			clientSecret: string;
-			provider: string;
 			publishableKey: string;
 	  };
 
-/** 回跳網址由伺服器依目的地與語系組；網站頁面的回跳目的地是認證頁。 */
+/**
+ * 回跳網址與語系由伺服器處理（語系取自請求的 Accept-Language）；網站頁面的回跳目的地是認證頁，
+ * 並宣告這個頁面能承載 Stripe Connect.js。
+ */
 export async function createPaymentOnboardingSession(
-	locale: AppLocale,
 	client: () => SellerClient = sellerAppClient,
 ): Promise<OnboardingSession> {
 	const res = await client().createPaymentOnboardingSession({
 		destination: OnboardingReturnDestination.WEBSITE_CERTIFICATION,
-		locale,
+		embeddedRuntimes: [EmbeddedOnboardingRuntime.STRIPE_CONNECT_JS],
 	});
-	switch (res.surface) {
-		case OnboardingSurface.HOSTED:
-			if (!res.url) throw new Error("開通連結為空");
-			return { surface: "hosted", url: res.url };
-		case OnboardingSurface.EMBEDDED:
-			if (!res.clientSecret) throw new Error("開通 client secret 為空");
-			if (!res.provider) throw new Error("開通的金流商為空");
-			if (!res.publishableKey) throw new Error("開通的公開金鑰為空");
+	const session = res.session;
+	switch (session.case) {
+		case "hosted":
+			if (!session.value.url) throw new Error("開通連結為空");
+			return { kind: "hosted", url: session.value.url };
+		case "embedded": {
+			const provider = session.value.provider;
+			if (provider.case !== "stripe") throw new Error("不認得的金流商");
+			if (!provider.value.clientSecret) {
+				throw new Error("開通 client secret 為空");
+			}
+			if (!provider.value.publishableKey) {
+				throw new Error("開通的公開金鑰為空");
+			}
 			return {
-				surface: "embedded",
-				clientSecret: res.clientSecret,
-				provider: res.provider,
-				publishableKey: res.publishableKey,
+				kind: "embedded",
+				provider: "stripe",
+				clientSecret: provider.value.clientSecret,
+				publishableKey: provider.value.publishableKey,
 			};
+		}
 		default:
-			throw new Error("不認得的開通介面");
+			throw new Error("不認得的開通 session");
 	}
 }
 

@@ -685,7 +685,6 @@ export async function mockMyKyc(
 		paymentAccount?: {
 			status: MockPaymentAccountStatus;
 			payoutsActive?: boolean;
-			surface?: "HOSTED" | "EMBEDDED";
 		};
 		contactEmail?: {
 			email: string;
@@ -743,7 +742,6 @@ export async function mockMyKyc(
 		void fulfillConnect(route, {
 			account: {
 				status: `PAYMENT_ACCOUNT_STATUS_${account.status}`,
-				onboardingSurface: `ONBOARDING_SURFACE_${account.surface ?? "HOSTED"}`,
 				payoutsActive: account.payoutsActive ?? account.status === "ENABLED",
 			},
 		});

@@ -1,7 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import {
-	OnboardingSurface,
+	EmbeddedOnboardingRuntime,
 	PaymentAccountStatus,
 } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import {
@@ -24,11 +24,10 @@ import {
 const ut = uiTextFor("zh-TW");
 const account = (
 	status: PaymentAccountStatus,
-	extra: { surface?: OnboardingSurface; payoutsActive?: boolean } = {},
+	extra: { payoutsActive?: boolean } = {},
 ) =>
 	create(PaymentAccountSchema, {
 		status,
-		onboardingSurface: extra.surface ?? OnboardingSurface.HOSTED,
 		payoutsActive: extra.payoutsActive ?? false,
 	});
 
@@ -68,70 +67,54 @@ describe("createPaymentOnboardingSession", () => {
 				}) as never,
 		};
 	};
+	const hosted = {
+		session: { case: "hosted", value: { url: "https://x.test" } },
+	};
+	const stripe = (value: object) => ({
+		session: {
+			case: "embedded",
+			value: { provider: { case: "stripe", value } },
+		},
+	});
 
-	it("只送回跳目的地與路由的語系，網址由伺服器組", async () => {
-		const c = client({
-			surface: OnboardingSurface.HOSTED,
-			url: "https://x.test",
-		});
-		await createPaymentOnboardingSession("en", c.factory);
+	it("只送回跳目的地與宣告能承載的內嵌執行環境 STRIPE_CONNECT_JS，網址與語系由伺服器處理", async () => {
+		const c = client(hosted);
+		await createPaymentOnboardingSession(c.factory);
 		expect(c.rpc).toHaveBeenCalledWith({
 			destination: OnboardingReturnDestination.WEBSITE_CERTIFICATION,
-			locale: "en",
+			embeddedRuntimes: [EmbeddedOnboardingRuntime.STRIPE_CONNECT_JS],
 		});
 	});
 
-	it("HOSTED 回連結，EMBEDDED 回 client secret", async () => {
+	it("hosted 回連結，embedded.stripe 回 client secret 與公開金鑰", async () => {
+		await expect(
+			createPaymentOnboardingSession(client(hosted).factory),
+		).resolves.toEqual({ kind: "hosted", url: "https://x.test" });
 		await expect(
 			createPaymentOnboardingSession(
-				"zh-TW",
-				client({ surface: OnboardingSurface.HOSTED, url: "https://x.test" })
+				client(stripe({ clientSecret: "cs_1", publishableKey: "pk_1" }))
 					.factory,
 			),
-		).resolves.toEqual({ surface: "hosted", url: "https://x.test" });
-		await expect(
-			createPaymentOnboardingSession(
-				"zh-TW",
-				client({
-					surface: OnboardingSurface.EMBEDDED,
-					clientSecret: "cs_1",
-					provider: "stripe",
-					publishableKey: "pk_1",
-				}).factory,
-			),
 		).resolves.toEqual({
-			surface: "embedded",
-			clientSecret: "cs_1",
+			kind: "embedded",
 			provider: "stripe",
+			clientSecret: "cs_1",
 			publishableKey: "pk_1",
 		});
 	});
 
-	it("缺對應欄位或介面未知：丟錯，不當成有效的 session", async () => {
+	it("兩支都沒設、embedded 的金流商不認得或缺欄位：丟錯，不當成有效的 session", async () => {
 		for (const res of [
-			{ surface: OnboardingSurface.HOSTED, url: "" },
+			{ session: { case: undefined } },
+			{ session: { case: "hosted", value: { url: "" } } },
 			{
-				surface: OnboardingSurface.EMBEDDED,
-				clientSecret: "",
-				provider: "stripe",
-				publishableKey: "pk_1",
+				session: { case: "embedded", value: { provider: { case: undefined } } },
 			},
-			{
-				surface: OnboardingSurface.EMBEDDED,
-				clientSecret: "cs_1",
-				provider: "",
-				publishableKey: "pk_1",
-			},
-			{
-				surface: OnboardingSurface.EMBEDDED,
-				clientSecret: "cs_1",
-				provider: "stripe",
-				publishableKey: "",
-			},
-			{ surface: OnboardingSurface.UNSPECIFIED, url: "https://x.test" },
+			stripe({ clientSecret: "", publishableKey: "pk_1" }),
+			stripe({ clientSecret: "cs_1", publishableKey: "" }),
 		]) {
 			await expect(
-				createPaymentOnboardingSession("zh-TW", client(res).factory),
+				createPaymentOnboardingSession(client(res).factory),
 			).rejects.toThrow();
 		}
 	});

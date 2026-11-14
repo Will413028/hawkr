@@ -3,10 +3,7 @@
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { LocalizedMessageSchema } from "@hawkr/api/gen/google/rpc/error_details_pb";
-import {
-	OnboardingSurface,
-	PaymentAccountStatus,
-} from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import {
 	OnboardingAction,
 	OnboardingTaskId,
@@ -51,9 +48,6 @@ vi.mock("@/lib/hooks/useSellerSelf", () => ({
 			refetch: mocks.refetch,
 		};
 	},
-}));
-vi.mock("@/lib/intl/routed-locale", () => ({
-	useRoutedLocale: () => "en",
 }));
 vi.mock("@/lib/navigation/document-location", () => ({
 	commitDocumentNavigation: mocks.navigate,
@@ -112,11 +106,10 @@ const render = (ui: React.ReactElement) =>
 
 function account(
 	status: PaymentAccountStatus,
-	extra: { surface?: OnboardingSurface; payoutsActive?: boolean } = {},
+	extra: { payoutsActive?: boolean } = {},
 ): PaymentAccount {
 	return create(PaymentAccountSchema, {
 		status,
-		onboardingSurface: extra.surface ?? OnboardingSurface.HOSTED,
 		payoutsActive: extra.payoutsActive ?? false,
 	});
 }
@@ -378,17 +371,17 @@ describe("進入頁面自動重讀", () => {
 });
 
 describe("HOSTED：導頁", () => {
-	it("建立 session（帶路由的語系）後整頁導到連結", async () => {
+	it("建立 session 後整頁導到連結", async () => {
 		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED);
 		mocks.createSession.mockResolvedValue({
-			surface: "hosted",
+			kind: "hosted",
 			url: "https://connect.stripe.test/setup/abc",
 		});
 		await mount(true, {}, START);
 		await act(async () => {
 			fireEvent.click(screen.getByText("前往設定收款帳戶"));
 		});
-		expect(mocks.createSession).toHaveBeenCalledWith("en");
+		expect(mocks.createSession).toHaveBeenCalledWith();
 		expect(mocks.navigate).toHaveBeenCalledWith(
 			"https://connect.stripe.test/setup/abc",
 		);
@@ -407,19 +400,17 @@ describe("HOSTED：導頁", () => {
 	});
 });
 
-const embeddedSession = (provider = "stripe") => ({
-	surface: "embedded",
+const embeddedSession = () => ({
+	kind: "embedded",
+	provider: "stripe",
 	clientSecret: "cs_1",
-	provider,
 	publishableKey: "pk_from_server",
 });
 
 describe("EMBEDDED：內嵌元件", () => {
 	it("建立 session，依伺服器給的金流商展開元件、帶伺服器給的公開金鑰；不導頁", async () => {
 		mocks.createSession.mockResolvedValue(embeddedSession());
-		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED, {
-			surface: OnboardingSurface.EMBEDDED,
-		});
+		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED);
 		await mount(true, {}, START);
 		await act(async () => {
 			fireEvent.click(screen.getByText("前往設定收款帳戶"));
@@ -431,9 +422,7 @@ describe("EMBEDDED：內嵌元件", () => {
 
 	it("元件的 onExit：收起元件，再走共用的重讀路徑（hook）一次", async () => {
 		mocks.createSession.mockResolvedValue(embeddedSession());
-		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED, {
-			surface: OnboardingSurface.EMBEDDED,
-		});
+		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED);
 		await mount(true, {}, START);
 		await act(async () => {
 			fireEvent.click(screen.getByText("前往設定收款帳戶"));
@@ -447,11 +436,9 @@ describe("EMBEDDED：內嵌元件", () => {
 		expect(screen.queryByTestId("embedded")).toBeNull();
 	});
 
-	it("金流商不是這個網站有元件的：顯示既有的錯誤狀態，不展開元件", async () => {
-		mocks.createSession.mockResolvedValue(embeddedSession("acme"));
-		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED, {
-			surface: OnboardingSurface.EMBEDDED,
-		});
+	it("session 不是兩種已知的形狀：顯示既有的錯誤狀態，不展開元件", async () => {
+		mocks.createSession.mockResolvedValue({ kind: "other" });
+		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED);
 		await mount(true, {}, START);
 		await act(async () => {
 			fireEvent.click(screen.getByText("前往設定收款帳戶"));
@@ -513,7 +500,7 @@ describe("回跳的 ?payment=", () => {
 		mocks.param = "refresh";
 		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED);
 		mocks.createSession.mockResolvedValue({
-			surface: "hosted",
+			kind: "hosted",
 			url: "https://connect.stripe.test/setup/new",
 		});
 		await mount(true, {}, START);

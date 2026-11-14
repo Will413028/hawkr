@@ -1,13 +1,13 @@
 /**
  * 收款帳戶開通的流程（純邏輯，元件只負責接線）。
  *
- * - HOSTED：呼叫 `CreatePaymentOnboardingSession`，整頁導到金流商的連結；回到 `?payment=return` 時先呼叫
+ * 開始開通只依伺服器回應的 session 形狀行動：
+ * - hosted：整頁導到金流商的連結；回到 `?payment=return` 時先呼叫
  *   `RefreshMyPaymentAccount`（伺服器同步向金流商重讀，D33）再讀帳戶與開通摘要（`confirmPaymentReturn`），不輪詢；重讀失敗不顯示；回到 `?payment=refresh`（連結過期）時重新取得連結再導。
- * - EMBEDDED：先建立 session 取得金流商代碼與公開金鑰（元件要它們才能初始化），依代碼選元件；第一次 `fetchClientSecret`
+ * - embedded：session 帶金流商代碼與公開金鑰（元件要它們才能初始化）；第一次 `fetchClientSecret`
  *   用這個 session 的 client secret，之後每次都是新的 session。
  */
 
-import { OnboardingSurface } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import type { OnboardingSession } from "./payment-account";
 
 /** 開通完成與離開都回到認證頁，用 query 區分。 */
@@ -18,18 +18,11 @@ export function paymentParamOf(value: string | null): PaymentParam | null {
 	return value === "return" || value === "refresh" ? value : null;
 }
 
-/** 這個網站有內嵌元件的金流商；伺服器回其他代碼是不能開通。 */
-export type EmbeddedProvider = "stripe";
-
-export function embeddedProviderOf(provider: string): EmbeddedProvider | null {
-	return provider === "stripe" ? "stripe" : null;
-}
-
 export type OnboardingStart =
 	| { kind: "redirect"; url: string }
 	| {
 			kind: "embedded";
-			provider: EmbeddedProvider;
+			provider: "stripe";
 			publishableKey: string;
 			fetchClientSecret: () => Promise<string>;
 	  };
@@ -38,33 +31,19 @@ interface StartDeps {
 	createSession: () => Promise<OnboardingSession>;
 }
 
-/**
- * 依伺服器告知的介面開始開通。介面不是 HOSTED 或 EMBEDDED（沒有設定收款開通、不認得的值）丟錯：
- * 不猜一個預設介面。
- */
+/** 依伺服器回的 session 形狀開始開通；不是兩種已知形狀之一（較新的伺服器）丟錯，不猜。 */
 export async function startOnboarding(
-	surface: OnboardingSurface,
 	deps: StartDeps,
 ): Promise<OnboardingStart> {
-	switch (surface) {
-		case OnboardingSurface.HOSTED: {
-			const session = await deps.createSession();
-			if (session.surface !== "hosted") {
-				throw new Error("開通介面與伺服器告知的不一致");
-			}
+	const session = await deps.createSession();
+	switch (session.kind) {
+		case "hosted":
 			return { kind: "redirect", url: session.url };
-		}
-		case OnboardingSurface.EMBEDDED: {
-			const session = await deps.createSession();
-			if (session.surface !== "embedded") {
-				throw new Error("開通介面與伺服器告知的不一致");
-			}
-			const provider = embeddedProviderOf(session.provider);
-			if (!provider) throw new Error("不認得的金流商");
+		case "embedded": {
 			let first: string | null = session.clientSecret;
 			return {
 				kind: "embedded",
-				provider,
+				provider: session.provider,
 				publishableKey: session.publishableKey,
 				fetchClientSecret: () => {
 					if (first !== null) {
@@ -77,7 +56,7 @@ export async function startOnboarding(
 			};
 		}
 		default:
-			throw new Error("不認得的開通介面");
+			throw new Error("不認得的開通 session");
 	}
 }
 
@@ -86,8 +65,8 @@ export async function embeddedClientSecret(
 	createSession: () => Promise<OnboardingSession>,
 ): Promise<string> {
 	const session = await createSession();
-	if (session.surface !== "embedded") {
-		throw new Error("開通介面與伺服器告知的不一致");
+	if (session.kind !== "embedded") {
+		throw new Error("開通 session 不是內嵌");
 	}
 	return session.clientSecret;
 }
