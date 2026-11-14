@@ -93,16 +93,16 @@ message AppVersionGate {
     (google.api.field_behavior) = IMMUTABLE
   ];
   // 最低可用版本，x.y.z 三段數字；低於它的 App 必須更新。
-  string minimum_version = 3 [(google.api.field_behavior) = REQUIRED];
+  string minimum_version = 2 [(google.api.field_behavior) = REQUIRED];
   // 前往更新的商店網址，只接受 https://、itms-apps:// 開頭；空字串表示還沒設定。
-  string store_url = 4;
+  string store_url = 3;
   // 強制更新畫面的標題。
-  string notice_title = 5;
+  string notice_title = 4;
   // 強制更新畫面的內文。
-  string notice_body = 6;
-  google.protobuf.Timestamp update_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string notice_body = 5;
+  google.protobuf.Timestamp update_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 目前的版本，client 當成不透明的字串。修改時帶讀到的值。
-  string etag = 8;
+  string etag = 7;
 }
 
 message ListBannersRequest {

@@ -3,6 +3,7 @@ import {
 	useTransport,
 } from "@connectrpc/connect-query";
 import { IdentityAdminService } from "@hawkr/api/gen/hawkr/admin/identity/v1alpha1/identity_pb";
+import { PaymentAdminService } from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1/payment_pb";
 import { SellerAdminService } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
 import { SellerPublicService } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { skipToken, useQuery } from "@tanstack/react-query";
@@ -10,15 +11,15 @@ import { useEffect, useState } from "react";
 import {
 	kycApplicationOf,
 	kycApplicationQueryOptions,
-	payUniOf,
-	payUniPollInterval,
 	ratingText,
 	registrationPollInterval,
 } from "./kyc-application";
+import { onboardingSummaryOf } from "./onboarding-summary";
+import { paymentAccountOf } from "./payment-account";
 import { accountEmailOf } from "./store-detail";
 
-// 商家詳情頁的資料來源（SellerAdminService.GetStore、GetKYCApplication、GetPayUniRegistration；IdentityAdminService.GetAccount；
-// 公開的 SellerPublicService.GetStore 的評分統計）。查詢都經 connect-query
+// 商家詳情頁的資料來源（SellerAdminService.GetStore、GetKYCApplication、GetStoreOnboarding；
+// PaymentAdminService.GetPaymentAccount；IdentityAdminService.GetAccount；公開的 SellerPublicService.GetStore 的評分統計）。查詢都經 connect-query
 // 的 transport（K1），頁面只讀結果。
 
 /** 店家詳情（GetStore）。已關閉的店照樣回傳；生效中的措施（active_measures）與店家是同一次讀取。storeId 為空時不發請求。 */
@@ -42,7 +43,7 @@ export function useAccountEmail(accountId: string | undefined) {
 }
 
 // ---------------------------------------------------------------------------
-// 商家認證（KYC）與 PayUni（第 2b 刀）
+// 商家認證（KYC）（第 2b 刀）
 
 /**
  * 商家認證的申請內容（GetKYCApplication）。申請 ID 來自 GetStore.kyc.application_id；沒有送出過的申請時 ID 為空，不發請求。
@@ -63,19 +64,27 @@ export function useKycApplication(applicationId: string | undefined) {
 }
 
 /**
- * PayUni 子商店註冊（GetPayUniRegistration）。第一次核准前是 not_found（尚未註冊）。店家 ID 為空時不發請求。
- * 綁定中（bind_status = PENDING）時以退避輪詢到終態（伺服器的 payuni_sweep 保證會到 BOUND 或 FAILED，所以沒有次數上限，間隔有上限）。
+ * 收款帳戶（PaymentAdminService.GetPaymentAccount；收款帳戶由 payment 模組擁有）。核准前還沒建立時是 not_found（尚未建立）。店家 ID 為空時不發請求。
+ * 重新整理後的重讀由 PaymentAccountSection 依 fetch_time 排程，這裡不輪詢。狀態的判斷在 paymentAccountOf。
  */
-export function usePayUniRegistration(storeId: string | undefined) {
+export function usePaymentAccount(storeId: string | undefined) {
 	const query = useConnectQuery(
-		SellerAdminService.method.getPayUniRegistration,
+		PaymentAdminService.method.getPaymentAccount,
 		storeId ? { storeId } : skipToken,
-		{
-			refetchInterval: (q) =>
-				payUniPollInterval(q.state.data?.registration, new Date()),
-		},
 	);
-	return { query, value: payUniOf(query) };
+	return { query, value: paymentAccountOf(query) };
+}
+
+/**
+ * 開通任務（SellerAdminService.GetStoreOnboarding）：與賣家自己看到的同一份推導，後台只讀、不重讀金流商。單一來源讀不到只讓該項是 UNKNOWN。
+ * 店家 ID 為空時不發請求。平台審核與收款帳戶變動後由頁面與 PaymentAccountSection 讓它重讀；狀態的判斷在 onboardingSummaryOf。
+ */
+export function useStoreOnboarding(storeId: string | undefined) {
+	const query = useConnectQuery(
+		SellerAdminService.method.getStoreOnboarding,
+		storeId ? { storeId } : skipToken,
+	);
+	return { query, value: onboardingSummaryOf(query) };
 }
 
 /**

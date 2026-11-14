@@ -96,9 +96,7 @@ void main() {
 
   test('本地通知點擊（payload）：重讀一次', () async {
     await container();
-    manager.navigateFromPayloadForTest(
-      '{"type":"MERCHANT.VERIFICATION.FORWARDED"}',
-    );
+    manager.navigateFromPayloadForTest('{"type":"CERTIFICATION_APPROVED"}');
     await settle();
     expect(kyc, 1);
   });

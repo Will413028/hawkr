@@ -16,6 +16,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
@@ -62,8 +63,8 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 	if err := Check(svcs); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(declarations), methodCount(t); got != want || got != 80 {
-		t.Fatalf("declarations=%d methods=%d，預期 80", got, want)
+	if got, want := len(declarations), methodCount(t); got != want || got != 81 {
+		t.Fatalf("declarations=%d methods=%d，預期 81", got, want)
 	}
 
 	for procedure := range declarations {
@@ -265,5 +266,47 @@ func TestEveryProspectMethodDeclaresItsOwnPermission(t *testing.T) {
 		if !adminperm.Allows([]adminperm.Role{adminperm.RoleOwner}, permission) || adminperm.Allows(nil, permission) {
 			t.Errorf("%s：OWNER 要允許、零角色要拒絕", permission)
 		}
+	}
+}
+
+// MarkLinkedAccountReviewed 宣告自己的權限 seller.measures.review_linked_account（一支方法一個權限）：OWNER 允許，零角色的管理員被攔下、不進 handler。
+// mutation：宣告成別的權限（例如 seller.measures.get）或拿掉宣告 → 宣告斷言或零角色的斷言失敗。
+func TestMarkLinkedAccountReviewedRequiresItsOwnPermission(t *testing.T) {
+	const procedure = sellerv1alpha1connect.SellerGovernanceAdminServiceMarkLinkedAccountReviewedProcedure
+	got, ok := declarations[procedure]
+	if !ok || got.permission != "seller.measures.review_linked_account" || got.exemptReason != "" {
+		t.Fatalf("宣告 = %+v", got)
+	}
+	i := &interceptor{table: declarations, log: slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))}
+	zero := principal(identity.PrincipalAdmin, 4)
+	if err := i.enter(rpc.WithPrincipal(context.Background(), zero), procedure); apperr.KindOf(err) != apperr.KindPermissionDenied {
+		t.Errorf("零角色的管理員 = %v，預期 permission denied", err)
+	}
+	if err := i.enter(rpc.WithPrincipal(context.Background(), principal(identity.PrincipalAdmin, 3, adminperm.RoleOwner)), procedure); err != nil {
+		t.Errorf("OWNER = %v", err)
+	}
+}
+
+// 收款帳戶清理終局的兩個動作各有自己的權限：沒有角色的管理員被拒，OWNER 放行；「刪除對應」的權限與「重試關閉」不共用。
+// mutation：「刪除對應」改成 requires(PaymentAccountsRetryPurge) 或豁免 → 宣告斷言失敗；權限不在目錄 → Check 失敗。
+func TestPaymentPurgeActionsRequireTheirOwnPermissions(t *testing.T) {
+	for procedure, want := range map[string]adminperm.Permission{
+		paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountPurgeProcedure:    "payment.accounts.retry_purge",
+		paymentv1alpha1connect.PaymentAdminServiceDeletePaymentAccountMappingProcedure: "payment.accounts.delete_mapping",
+	} {
+		got, ok := declarations[procedure]
+		if !ok || got.permission != want || got.exemptReason != "" || !adminperm.InCatalog(want) {
+			t.Fatalf("%s 的宣告 = %+v", procedure, got)
+		}
+		i := &interceptor{table: declarations, log: slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))}
+		if err := i.enter(rpc.WithPrincipal(context.Background(), principal(identity.PrincipalAdmin, 4)), procedure); apperr.KindOf(err) != apperr.KindPermissionDenied {
+			t.Errorf("%s：沒有角色的管理員 = %v，預期 permission denied", procedure, err)
+		}
+		if err := i.enter(rpc.WithPrincipal(context.Background(), principal(identity.PrincipalAdmin, 3, adminperm.RoleOwner)), procedure); err != nil {
+			t.Errorf("%s：OWNER = %v", procedure, err)
+		}
+	}
+	if declarations[paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountPurgeProcedure].permission == declarations[paymentv1alpha1connect.PaymentAdminServiceDeletePaymentAccountMappingProcedure].permission {
+		t.Error("重試關閉與刪除對應共用同一個權限")
 	}
 }

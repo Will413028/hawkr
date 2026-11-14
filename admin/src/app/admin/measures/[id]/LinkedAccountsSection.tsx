@@ -16,10 +16,13 @@ import { linkedIdentityLabel } from "../../merchants/[id]/measure";
 export default function LinkedAccountsSection({
 	measure,
 	onCreateLinked,
+	onMarkReviewed,
 }: {
 	measure: Pick<Measure, "id" | "linkedAccounts">;
 	/** 從某一列建立關聯終止（來源是這筆措施）。 */
 	onCreateLinked: (sourceMeasureId: string, account: LinkedAccount) => void;
+	/** 把這一列標為已檢視（待辦「共用銀行帳號」的處置）；只在伺服器說這一對在待辦（shared_bank_account_pending）時出現按鈕。 */
+	onMarkReviewed: (measureId: string, account: LinkedAccount) => void;
 }) {
 	if (measure.linkedAccounts.length === 0) return null;
 	return (
@@ -43,7 +46,7 @@ export default function LinkedAccountsSection({
 					</thead>
 					<tbody>
 						{measure.linkedAccounts.map((row) => (
-							<tr key={row.accountId}>
+							<tr key={row.accountId} id={`linked-account-${row.accountId}`}>
 								<td>{row.accountId}</td>
 								<td>
 									<Link href={`/admin/merchants/${row.storeId}`}>
@@ -67,8 +70,16 @@ export default function LinkedAccountsSection({
 										>
 											建立關聯終止
 										</Button>
-									) : (
+									) : row.sharedBankAccountPending ? null : (
 										"-"
+									)}
+									{row.sharedBankAccountPending && (
+										<Button
+											variant="outline"
+											onClick={() => onMarkReviewed(measure.id, row)}
+										>
+											標為已檢視
+										</Button>
 									)}
 								</td>
 							</tr>

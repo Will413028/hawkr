@@ -125,7 +125,7 @@ describe("聯絡資料", () => {
 		).toEqual({ contactName: "李大華", supportEmail: "a@example.com" });
 	});
 
-	it("格式錯誤：手機、信箱、聯絡人最長 20 字；空白不報錯", () => {
+	it("格式錯誤：手機、信箱、聯絡人最長 50 字；空白不報錯", () => {
 		expect(storeFormContactErrors(baseline)).toEqual({
 			nameErr: null,
 			mobileErr: null,
@@ -133,7 +133,7 @@ describe("聯絡資料", () => {
 		});
 		const bad = storeFormContactErrors({
 			...baseline,
-			contactName: "字".repeat(21),
+			contactName: "字".repeat(51),
 			contactMobile: "0212345678",
 			supportEmail: "not-an-email",
 		});

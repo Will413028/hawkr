@@ -30,22 +30,24 @@ enum ReviewQueueItemKind {
   // 案件裡逾期未回覆的詢問，營運要跟進（subject 是 case_inquiry）。
   REVIEW_QUEUE_ITEM_KIND_CASE_INQUIRY_OVERDUE = 3;
   // 處理中的主管機關來函（subject 是 authority_order_id）。
-  REVIEW_QUEUE_ITEM_KIND_AUTHORITY_ORDER = 5;
+  REVIEW_QUEUE_ITEM_KIND_AUTHORITY_ORDER = 4;
   // 來函中暫不告知的對象，確認日期已到，要確認是否可以告知（subject 是 authority_target）。
-  REVIEW_QUEUE_ITEM_KIND_AUTHORITY_TARGET_NOTICE = 6;
+  REVIEW_QUEUE_ITEM_KIND_AUTHORITY_TARGET_NOTICE = 5;
   // 待裁定的申覆（subject 是 measure_request）。
-  REVIEW_QUEUE_ITEM_KIND_MEASURE_APPEAL = 7;
+  REVIEW_QUEUE_ITEM_KIND_MEASURE_APPEAL = 6;
   // 待裁定的解除請求（subject 是 measure_request）。
-  REVIEW_QUEUE_ITEM_KIND_MEASURE_LIFT_REQUEST = 8;
+  REVIEW_QUEUE_ITEM_KIND_MEASURE_LIFT_REQUEST = 7;
   // 複審期限將到的風險停權（subject 是 measure_id）。
-  REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW = 9;
+  REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW = 8;
   // 待審核的商家認證（subject 是 kyc_application）。
-  REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION = 11;
-  // 重試用完的 PayUni 綁定失敗，等管理員重新綁定（subject 是 kyc_application）。
-  REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY = 12;
+  REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION = 9;
+  // 建立重試用完的收款帳戶，等管理員重試建立（subject 是 payment_account）。
+  REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED = 10;
+  // 處分建立之後，又有別的帳號同步了與被處分帳號相同的銀行帳號 fingerprint，等管理員在處分頁檢視這個關聯帳號（subject 是 shared_bank_account）。
+  REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT = 11;
+  // 收款帳戶的清理無法完成（金流商拒絕關閉，或等待清理超過 7 天仍關不掉），等管理員重試關閉或確認已在金流商處理後刪除對應（subject 是 payment_account）。
+  REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_PURGE_STUCK = 12;
 
-  reserved 4, 10;
-  reserved "REVIEW_QUEUE_ITEM_KIND_CASE_FDA_REFERRAL", "REVIEW_QUEUE_ITEM_KIND_FOOD_REGISTRATION";
 }
 
 message ListReviewQueueRequest {
@@ -76,18 +78,18 @@ message ReviewQueueItem {
     AuthorityTargetRef authority_target = 6;
     MeasureRequestRef measure_request = 7;
     string measure_id = 8;
-    KYCApplicationRef kyc_application = 10;
+    KYCApplicationRef kyc_application = 9;
+    PaymentAccountRef payment_account = 10;
+    SharedBankAccountRef shared_bank_account = 11;
   }
 
-  reserved 9;
-  reserved "food_registration_id";
 
   // 對象所屬的店家；空字串表示這個項目沒有單一店家（例如來函）。
-  string store_id = 20;
+  string store_id = 12;
   // 店名；沒有店家或店家的個資已清理時是空字串（client 顯示「店家 {id}」）。
-  string store_name = 21;
+  string store_name = 13;
   // 這件待辦的開始時間與期限。
-  hawkr.common.v1alpha1.Deadline deadline = 22 [(google.api.field_behavior) = REQUIRED];
+  hawkr.common.v1alpha1.Deadline deadline = 14 [(google.api.field_behavior) = REQUIRED];
 }
 
 // CaseInquiryRef 指到案件裡的一筆詢問。
@@ -109,6 +111,17 @@ message AuthorityTargetRef {
 message MeasureRequestRef {
   string measure_id = 1;
   string request_id = 2;
+}
+
+// PaymentAccountRef 指到店家的收款帳戶（一店一個）。
+message PaymentAccountRef {
+  string store_id = 1;
+}
+
+// SharedBankAccountRef 指到處分頁上的一個關聯帳號（處分、命中的帳號）。
+message SharedBankAccountRef {
+  string measure_id = 1;
+  string account_id = 2;
 }
 
 // KYCApplicationRef 指到店家的一筆商家認證申請。

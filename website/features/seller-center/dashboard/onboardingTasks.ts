@@ -1,26 +1,32 @@
 import {
-	KYCFlowStatus,
-	SellerRequirement,
+	type GetMyOnboardingResponse,
+	OnboardingAction,
+	OnboardingTaskId,
+	OnboardingTaskState,
+	type OnboardingTask as ServerOnboardingTask,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
-import { commonUnknown, sellerSellerRequirement } from "@hawkr/ui-text/keys";
+import {
+	sellerOnboardingActionButton,
+	sellerOnboardingTaskIdDescription,
+	sellerOnboardingTaskIdPanelDescription,
+	sellerOnboardingTaskIdPanelTitle,
+} from "@hawkr/ui-text/keys";
 import type { AppIconName } from "@/components/shared/AppIcon";
-import type { UiText } from "@/lib/i18n/ui-text";
+import { optionalText, type UiText } from "@/lib/i18n/ui-text";
 import { CERT_PAGE_HREF } from "@/lib/seller/cert-gate";
-import { kycFlowActionLabel, kycFlowStatusLabel } from "@/lib/seller/kyc-flow";
+import { CONTACT_HREF } from "@/lib/seller/payment-account";
 import {
 	isApproved,
 	isProcessing,
 	type ShippingOnboarding,
 } from "@/lib/seller/shipping";
-import {
-	isStoreCertified,
-	type MyStore,
-	missingRequirements,
-	shippingGateOf,
-} from "@/lib/seller/store";
+import { type MyStore, shippingGateOf } from "@/lib/seller/store";
 import type { SellerOnboardingTaskId } from "./dashboardUiStore";
 
 export type OnboardingTaskGroup = "required" | "recommended";
+
+/** 任務的下一步：換頁。 */
+export type OnboardingNext = { kind: "link"; href: string; label: string };
 
 export interface OnboardingTask {
 	id: SellerOnboardingTaskId;
@@ -29,10 +35,9 @@ export interface OnboardingTask {
 	description: string;
 	panelTitle: string;
 	panelDescription: string;
-	href: string;
 	/** Omitted when the task leaves nothing to do — the panel then shows
 	 * status only, with no action button. */
-	cta?: string;
+	next?: OnboardingNext;
 	icon: AppIconName;
 	completed: boolean;
 	statusLabel: string;
@@ -44,115 +49,79 @@ export const ONBOARDING_GROUP_LABEL: Record<OnboardingTaskGroup, string> = {
 	recommended: "建議完成",
 };
 
-/** 商店資料任務涵蓋的公開條件；名詞取自共用文案目錄。 */
-const PROFILE_REQUIREMENTS: readonly SellerRequirement[] = [
-	SellerRequirement.STORE_NAME,
-	SellerRequirement.LOGO,
-	SellerRequirement.TOWN_CODE,
-];
-
 /**
- * 缺這三個條件時外框一律導去公告頁（`pageCapabilities.ts`），開店進度卡不會在這時顯示，所以沒有專屬列；
- * 仍要列為已知，否則會掉進「其他公開條件」。
+ * 必要任務只有圖示與路由 id 是 client 的（依任務 id，不依狀態，是分支）；描述與面板文字取自共用文案目錄，
+ * 標題、狀態句、狀態與下一步都來自伺服器的 `GetMyOnboarding`（D26、D27）。
  */
-const HANDLED_BY_NOTICE_PAGE: readonly SellerRequirement[] = [
-	SellerRequirement.STORE_ACTIVE,
-	SellerRequirement.NOT_PENDING_DELETION,
-	SellerRequirement.NOT_SUSPENDED,
-];
+const REQUIRED_PRESENTATION: Readonly<
+	Partial<Record<OnboardingTaskId, Pick<OnboardingTask, "id" | "icon">>>
+> = {
+	[OnboardingTaskId.PROFILE]: { id: "profile", icon: "home" },
+	[OnboardingTaskId.PLATFORM_REVIEW]: { id: "platform_review", icon: "shield" },
+	[OnboardingTaskId.PAYMENT_ACCOUNT]: { id: "payment_account", icon: "wallet" },
+};
 
-const KNOWN_REQUIREMENTS: ReadonlySet<SellerRequirement> = new Set([
-	...HANDLED_BY_NOTICE_PAGE,
-	SellerRequirement.KYC_APPROVED,
-	...PROFILE_REQUIREMENTS,
-]);
-
-/**
- * 「公開前必須」只由伺服器的 `PUBLIC_LISTING` 缺的條件（`missing`）推導，client 不自己判斷：伺服器新增
- * 條件時，沒有專屬列的條件會以「其他公開條件」出現，只要補呈現層的文字。沒有 `PUBLIC_LISTING`（還沒
- * 讀到）時每個條件都當成還缺。
- */
-function buildRequiredTasks(
+/** action 對到網頁的位置（網頁與 App 的位置不同，路由是 client 的）；按鈕文字由共用文案目錄依 action 決定。 */
+function nextOf(
 	ut: UiText,
-	my: MyStore | null,
-	flowStatus: KYCFlowStatus | undefined,
-): OnboardingTask[] {
-	const missing = missingRequirements(my);
-	const lacks = (requirement: SellerRequirement) =>
-		missing === undefined || missing.includes(requirement);
-
-	const missingProfile = PROFILE_REQUIREMENTS.filter(lacks).map((requirement) =>
-		ut(sellerSellerRequirement(requirement) ?? commonUnknown()),
-	);
-	const profileDone = missingProfile.length === 0;
-	const certDone = !lacks(SellerRequirement.KYC_APPROVED);
-
-	const tasks: OnboardingTask[] = [
-		{
-			id: "profile",
-			group: "required",
-			title: "商店資料",
-			description: "店名、logo 與所在地。",
-			panelTitle: "完成商店資料",
-			panelDescription: "買家要看得到你的店，需要有店名、logo 與所在地。",
-			href: "/seller-center/me",
-			cta: "去設定",
-			icon: "home",
-			completed: profileDone,
-			statusLabel: profileDone
-				? "已完成"
-				: `缺少：${missingProfile.join("、")}`,
-		},
-		{
-			id: "cert",
-			group: "required",
-			title: "商家認證",
-			description: "身分認證與 PayUni 收款審核。",
-			panelTitle: "完成商家認證",
-			panelDescription:
-				"通過商家認證（含 PayUni 收款審核）後，店面才會公開，也才能正式收款。",
-			href: CERT_PAGE_HREF,
-			// 已通過就沒有要辦的認證了 — 不再給按鈕。
-			cta: certDone ? undefined : kycFlowActionLabel(ut, flowStatus),
-			icon: "shield",
-			completed: certDone,
-			statusLabel: kycFlowStatusLabel(
-				ut,
-				certDone ? KYCFlowStatus.KYC_FLOW_STATUS_APPROVED : flowStatus,
-			),
-		},
-	];
-
-	const unrecognized = (missing ?? []).filter(
-		(requirement) =>
-			requirement !== SellerRequirement.UNSPECIFIED &&
-			!KNOWN_REQUIREMENTS.has(requirement),
-	);
-	if (unrecognized.length > 0) {
-		tasks.push({
-			id: "other_requirement",
-			group: "required",
-			title: "其他公開條件",
-			description: "還有公開條件尚未滿足。",
-			panelTitle: "其他公開條件",
-			panelDescription: "還有公開條件尚未滿足，請聯絡客服。",
-			href: "/seller-center/me",
-			icon: "home",
-			completed: false,
-			statusLabel: "待完成",
-		});
+	action: OnboardingAction,
+): OnboardingNext | undefined {
+	const label = optionalText(ut, sellerOnboardingActionButton(action));
+	if (label === undefined) return undefined;
+	switch (action) {
+		case OnboardingAction.EDIT_PROFILE:
+			return { kind: "link", href: "/seller-center/me", label };
+		case OnboardingAction.SUBMIT_CERTIFICATION:
+		case OnboardingAction.START_PAYMENT_ONBOARDING:
+			return { kind: "link", href: CERT_PAGE_HREF, label };
+		case OnboardingAction.CONTACT_SUPPORT:
+			return { kind: "link", href: CONTACT_HREF, label };
+		default:
+			return undefined;
 	}
-	return tasks;
+}
+
+/** 沒有專屬呈現的必要任務（伺服器新增的 id）：圖示是中性的預設，id 是由伺服器 id 組的。 */
+function genericRequiredPresentation(
+	task: ServerOnboardingTask,
+): Pick<OnboardingTask, "id" | "icon"> {
+	return { id: `required_${task.id}`, icon: "activity" };
+}
+
+function requiredTaskOf(
+	ut: UiText,
+	task: ServerOnboardingTask,
+): OnboardingTask | undefined {
+	if (task.id === OnboardingTaskId.UNSPECIFIED) return undefined;
+	const presentation =
+		REQUIRED_PRESENTATION[task.id] ?? genericRequiredPresentation(task);
+	return {
+		...presentation,
+		description:
+			optionalText(ut, sellerOnboardingTaskIdDescription(task.id)) ?? "",
+		panelTitle:
+			optionalText(ut, sellerOnboardingTaskIdPanelTitle(task.id)) ??
+			task.title?.message ??
+			"",
+		panelDescription:
+			optionalText(ut, sellerOnboardingTaskIdPanelDescription(task.id)) ??
+			task.status?.message ??
+			"",
+		group: "required",
+		title: task.title?.message ?? "",
+		statusLabel: task.status?.message ?? "",
+		completed: task.state === OnboardingTaskState.COMPLETED,
+		locked: task.state === OnboardingTaskState.LOCKED,
+		next: nextOf(ut, task.action),
+	};
 }
 
 function buildRecommendedTasks({
 	my,
-	flowStatus,
 	shippingRows,
 	productCount,
 }: {
 	my: MyStore | null;
-	flowStatus: KYCFlowStatus | undefined;
 	shippingRows: ShippingOnboarding[];
 	productCount: number | null;
 }): OnboardingTask[] {
@@ -173,12 +142,15 @@ function buildRecommendedTasks({
 			panelTitle: "設定物流與退貨",
 			panelDescription:
 				"開通可用的配送方式，包含黑貓宅配、7-11 店到店、寄件地址與退貨資訊。",
-			href: "/seller-center/me/shipping",
-			cta: shippingDone
-				? "查看物流設定"
-				: shippingProcessing
-					? "查看審核進度"
-					: "設定物流",
+			next: {
+				kind: "link",
+				href: "/seller-center/me/shipping",
+				label: shippingDone
+					? "查看物流設定"
+					: shippingProcessing
+						? "查看審核進度"
+						: "設定物流",
+			},
 			icon: "truck",
 			completed: shippingDone,
 			locked: !shippingOpen,
@@ -200,8 +172,11 @@ function buildRecommendedTasks({
 			panelTitle: "上架第一個商品",
 			panelDescription:
 				"完成商品圖片、規格、售價、庫存與配送方式後，買家就能開始下單。",
-			href: "/seller-center/products/new",
-			cta: "新增商品",
+			next: {
+				kind: "link",
+				href: "/seller-center/products/new",
+				label: "新增商品",
+			},
 			icon: "bag",
 			completed: productsDone,
 			statusLabel: productsDone ? "已上架" : "待上架",
@@ -213,8 +188,7 @@ function buildRecommendedTasks({
 			description: "說明你賣什麼、產地與品牌故事。",
 			panelTitle: "完成商店介紹",
 			panelDescription: "一段話告訴買家你是誰、種了什麼、為什麼買你的。",
-			href: "/seller-center/me",
-			cta: "去設定",
+			next: { kind: "link", href: "/seller-center/me", label: "去設定" },
 			icon: "edit",
 			completed: hasDescription,
 			statusLabel: hasDescription ? "已完成" : "待完成",
@@ -222,21 +196,28 @@ function buildRecommendedTasks({
 	];
 }
 
+/**
+ * 必要任務取自伺服器的開通摘要（`onboarding`，還沒讀到或讀取失敗是 null：沒有必要任務）；建議任務由 client 組（D31 Q1）。
+ */
 export function buildOnboardingTasks({
 	ut,
 	my,
-	flowStatus,
+	onboarding,
 	shippingRows,
 	productCount,
 }: {
 	ut: UiText;
 	my: MyStore | null;
-	flowStatus: KYCFlowStatus | undefined;
+	onboarding: GetMyOnboardingResponse | null;
 	shippingRows: ShippingOnboarding[];
 	productCount: number | null;
 }): OnboardingTask[] {
+	const required = (onboarding?.tasks ?? []).flatMap((task) => {
+		const built = requiredTaskOf(ut, task);
+		return built ? [built] : [];
+	});
 	return [
-		...buildRequiredTasks(ut, my, flowStatus),
-		...buildRecommendedTasks({ my, flowStatus, shippingRows, productCount }),
+		...required,
+		...buildRecommendedTasks({ my, shippingRows, productCount }),
 	];
 }

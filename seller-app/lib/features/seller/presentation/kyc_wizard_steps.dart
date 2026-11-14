@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart';
 import 'package:hawkr_twaddr/hawkr_twaddr.dart' as twaddr;
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
@@ -11,22 +13,20 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/icons/app_icon_colors.dart';
 import '../../../shared/widgets/hk_icon.dart';
 import '../../../shared/widgets/hk_button_label.dart';
+import '../data/contact_email.dart';
 import '../data/kyc_fields.dart';
 import '../data/kyc_form.dart';
 import '../data/kyc_store_contact.dart';
 import '../data/kyc_wizard.dart';
 import '../data/seller_agreements_repository.dart';
-import '../../settings/presentation/shipping_settings/data/taiwan_cities_data.dart';
 import 'kyc_wizard_widgets.dart';
-import 'profile_form_widgets.dart' show kPayuniLockOnSubmitNotice;
 import 'widgets/agreement_checkbox.dart';
 import 'widgets/certification_glass_step_card.dart';
 
-/// 步驟裡會觸發的動作，由畫面實作（選圖、OCR、開地址對話框、開條款）。
+/// 步驟裡會觸發的動作，由畫面實作（選圖、開地址對話框、開條款）。
 class KycStepActions {
   const KycStepActions({
     required this.next,
-    required this.pickDocument,
     required this.addCompanyDocument,
     required this.editStoreAddress,
     required this.editCompanyAddress,
@@ -35,9 +35,8 @@ class KycStepActions {
     required this.retryAgreements,
   });
 
-  /// 存檔後前進一步（上傳步驟會先做 OCR）。
+  /// 存檔後前進一步。
   final Future<void> Function() next;
-  final Future<void> Function(KycDocSlot slot) pickDocument;
   final Future<void> Function() addCompanyDocument;
   final Future<void> Function() editStoreAddress;
   final Future<void> Function() editCompanyAddress;
@@ -45,8 +44,6 @@ class KycStepActions {
   final Future<void> Function() submit;
   final VoidCallback retryAgreements;
 }
-
-const _issueTypes = ['初發', '補發', '換發'];
 
 /// 表單控制項的標籤：與缺項清單同一組共用文案目錄的欄位名詞。
 String _fieldLabel(BuildContext context, KYCField field) =>
@@ -78,9 +75,7 @@ class KycStepCard extends StatelessWidget {
     required this.actions,
     required this.agreements,
     required this.privacyChecked,
-    required this.payuniChecked,
     required this.onPrivacyChanged,
-    required this.onPayuniChanged,
   });
 
   final KycStep step;
@@ -88,19 +83,12 @@ class KycStepCard extends StatelessWidget {
   final KycStepActions actions;
   final AsyncValue<KycAgreements> agreements;
   final bool privacyChecked;
-  final bool payuniChecked;
   final ValueChanged<bool> onPrivacyChanged;
-  final ValueChanged<bool> onPayuniChanged;
 
   @override
   Widget build(BuildContext context) {
     return switch (step) {
       KycStep.company => _CompanyStep(controller, actions),
-      KycStep.idUpload => _IdUploadStep(controller, actions),
-      KycStep.idFront => _IdFrontStep(controller, actions),
-      KycStep.idBack => _IdBackStep(controller, actions),
-      KycStep.bankUpload => _BankUploadStep(controller, actions),
-      KycStep.bankInfo => _BankInfoStep(controller, actions),
       KycStep.other => _OtherStep(controller, actions),
       KycStep.documents => _DocumentsStep(controller, actions),
       KycStep.confirm => _ConfirmStep(
@@ -108,9 +96,7 @@ class KycStepCard extends StatelessWidget {
         actions: actions,
         agreements: agreements,
         privacyChecked: privacyChecked,
-        payuniChecked: payuniChecked,
         onPrivacyChanged: onPrivacyChanged,
-        onPayuniChanged: onPayuniChanged,
       ),
     };
   }
@@ -162,7 +148,6 @@ class _CompanyStep extends StatelessWidget {
   Widget build(BuildContext context) {
     final f = c.form;
     final lookup = c.lookup;
-    final locked = c.identityLocked;
     return _card(
       title: '公司資訊',
       subtitle: '輸入統編後可自動帶入公司名稱、地址與設立日期',
@@ -174,7 +159,6 @@ class _CompanyStep extends StatelessWidget {
           value: f.taxId,
           hint: '請輸入統一編號（8碼）',
           keyboardType: TextInputType.number,
-          readOnly: locked,
           inputFormatters: [
             FilteringTextInputFormatter.digitsOnly,
             LengthLimitingTextInputFormatter(8),
@@ -197,8 +181,7 @@ class _CompanyStep extends StatelessWidget {
           },
         ),
         _LookupNotice(lookup),
-        if ((lookup is KycLookupNotFound || lookup is KycLookupFailed) &&
-            !locked)
+        if (lookup is KycLookupNotFound || lookup is KycLookupFailed)
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
@@ -213,7 +196,6 @@ class _CompanyStep extends StatelessWidget {
           label: _fieldLabel(context, KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME),
           value: f.companyName,
           hint: '請輸入公司名稱',
-          readOnly: locked,
           error: c.fieldError(KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME),
           onChanged: (v) => c.updateForm((f) => f.copyWith(companyName: v)),
         ),
@@ -265,7 +247,6 @@ class _CompanyStep extends StatelessWidget {
           label: _fieldLabel(context, KYCField.KYC_FIELD_PRODUCT_TYPE),
           value: f.productType,
           hint: '例如：水果 / 蔬菜 / 海鮮 / 加工食品',
-          readOnly: locked,
           error: c.fieldError(KYCField.KYC_FIELD_PRODUCT_TYPE),
           onChanged: (v) => c.updateForm((f) => f.copyWith(productType: v)),
         ),
@@ -304,252 +285,7 @@ class _LookupNotice extends StatelessWidget {
   }
 }
 
-/* ===== 身分證 ===== */
-
-class _IdUploadStep extends StatelessWidget {
-  const _IdUploadStep(this.c, this.actions);
-
-  final KycWizard c;
-  final KycStepActions actions;
-
-  @override
-  Widget build(BuildContext context) {
-    return _card(
-      title: '上傳身分證',
-      subtitle: '證件只用於 Hawkr 身分核驗，請上傳本人清晰證件',
-      icon: HkIconName.shield,
-      children: [
-        KycUploadBox(
-          key: const Key('kyc_id_front'),
-          label: _fieldLabel(context, KYCField.KYC_FIELD_ID_CARD_FRONT),
-          doc: c.docs.idCardFront,
-          error: c.documentIssue(KycDocSlot.idCardFront),
-          uploading: c.isUploading(KycDocSlot.idCardFront.path),
-          onTap: () => actions.pickDocument(KycDocSlot.idCardFront),
-        ),
-        _gap(),
-        KycUploadBox(
-          key: const Key('kyc_id_back'),
-          label: _fieldLabel(context, KYCField.KYC_FIELD_ID_CARD_BACK),
-          doc: c.docs.idCardBack,
-          error: c.documentIssue(KycDocSlot.idCardBack),
-          uploading: c.isUploading(KycDocSlot.idCardBack.path),
-          onTap: () => actions.pickDocument(KycDocSlot.idCardBack),
-        ),
-        _nextBar(
-          c,
-          actions,
-          enabled: c.docs.idCardFront != null && c.docs.idCardBack != null,
-        ),
-      ],
-    );
-  }
-}
-
-class _IdFrontStep extends StatelessWidget {
-  const _IdFrontStep(this.c, this.actions);
-
-  final KycWizard c;
-  final KycStepActions actions;
-
-  @override
-  Widget build(BuildContext context) {
-    final f = c.form;
-    final locked = c.identityLocked;
-    final masked = c.maskedId;
-    return _card(
-      title: c.subject == KycSubject.business ? '負責人身分資訊' : '個人身分資訊',
-      subtitle: '系統已協助辨識，請逐項確認身分證正面資料',
-      icon: HkIconName.user,
-      children: [
-        KycTextField(
-          key: const Key('kyc_real_name'),
-          label: _fieldLabel(context, KYCField.KYC_FIELD_REAL_NAME),
-          value: f.realName,
-          hint: '請輸入姓名',
-          readOnly: locked,
-          error: c.fieldError(KYCField.KYC_FIELD_REAL_NAME),
-          onChanged: (v) => c.updateForm((f) => f.copyWith(realName: v)),
-        ),
-        _gap(),
-        KycDateField(
-          key: const Key('kyc_birth_date'),
-          label: _fieldLabel(context, KYCField.KYC_FIELD_BIRTH_DATE),
-          value: f.birthDate,
-          error: c.fieldError(KYCField.KYC_FIELD_BIRTH_DATE),
-          onChanged: (v) => c.updateForm((f) => f.copyWith(birthDate: v)),
-        ),
-        _gap(),
-        KycTextField(
-          key: const Key('kyc_id_card_no'),
-          label: _fieldLabel(
-            context,
-            c.subject == KycSubject.business
-                ? KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO
-                : KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO,
-          ),
-          value: f.idCardNo,
-          hint: '例: A123456789',
-          readOnly: locked,
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
-            LengthLimitingTextInputFormatter(10),
-            UpperCaseTextFormatter(),
-          ],
-          error:
-              c.inputErrors.idError ??
-              c.fieldError(KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO),
-          helper: masked.isNotEmpty && f.idCardNo.isEmpty
-              ? '已填寫（$masked），如需修改請重新輸入'
-              : null,
-          onChanged: (v) => c.updateForm((f) => f.copyWith(idCardNo: v)),
-        ),
-        _nextBar(c, actions),
-      ],
-    );
-  }
-}
-
-class _IdBackStep extends StatelessWidget {
-  const _IdBackStep(this.c, this.actions);
-
-  final KycWizard c;
-  final KycStepActions actions;
-
-  @override
-  Widget build(BuildContext context) {
-    final f = c.form;
-    return _card(
-      title: '發證資訊',
-      subtitle: '請確認身分證反面資料',
-      icon: HkIconName.document,
-      children: [
-        KycDateField(
-          key: const Key('kyc_issue_date'),
-          label: _fieldLabel(context, KYCField.KYC_FIELD_ID_CARD_ISSUE_DATE),
-          value: f.idCardIssueDate,
-          error: c.fieldError(KYCField.KYC_FIELD_ID_CARD_ISSUE_DATE),
-          onChanged: (v) => c.updateForm((f) => f.copyWith(idCardIssueDate: v)),
-        ),
-        _gap(),
-        KycPickerField(
-          key: const Key('kyc_issue_type'),
-          label: _fieldLabel(context, KYCField.KYC_FIELD_ID_CARD_ISSUE_TYPE),
-          value: f.idCardIssueType,
-          hint: '選擇發證類型',
-          options: _issueTypes,
-          error: c.fieldError(KYCField.KYC_FIELD_ID_CARD_ISSUE_TYPE),
-          onChanged: (v) => c.updateForm((f) => f.copyWith(idCardIssueType: v)),
-        ),
-        _gap(),
-        KycPickerField(
-          key: const Key('kyc_issue_location'),
-          label: _fieldLabel(
-            context,
-            KYCField.KYC_FIELD_ID_CARD_ISSUE_LOCATION,
-          ),
-          value: f.idCardIssueLocation,
-          hint: '選擇發證縣市',
-          options: taiwanCities.keys.toList(),
-          error: c.fieldError(KYCField.KYC_FIELD_ID_CARD_ISSUE_LOCATION),
-          onChanged: (v) =>
-              c.updateForm((f) => f.copyWith(idCardIssueLocation: v)),
-        ),
-        _nextBar(c, actions),
-      ],
-    );
-  }
-}
-
-/* ===== 銀行 ===== */
-
-class _BankUploadStep extends StatelessWidget {
-  const _BankUploadStep(this.c, this.actions);
-
-  final KycWizard c;
-  final KycStepActions actions;
-
-  @override
-  Widget build(BuildContext context) {
-    return _card(
-      title: '上傳存摺',
-      subtitle: '請上傳本人或公司收款帳戶封面，畫面需清晰完整',
-      icon: HkIconName.cloudUpload,
-      children: [
-        KycUploadBox(
-          key: const Key('kyc_bank_book'),
-          label: _fieldLabel(context, KYCField.KYC_FIELD_BANK_BOOK),
-          doc: c.docs.bankBook,
-          error: c.documentIssue(KycDocSlot.bankBook),
-          uploading: c.isUploading(KycDocSlot.bankBook.path),
-          onTap: () => actions.pickDocument(KycDocSlot.bankBook),
-        ),
-        _nextBar(c, actions, enabled: c.docs.bankBook != null),
-      ],
-    );
-  }
-}
-
-class _BankInfoStep extends StatelessWidget {
-  const _BankInfoStep(this.c, this.actions);
-
-  final KycWizard c;
-  final KycStepActions actions;
-
-  @override
-  Widget build(BuildContext context) {
-    final f = c.form;
-    final masked = c.maskedBankAccount;
-    return _card(
-      title: '收款帳戶',
-      subtitle: '確認辨識結果；帳戶名稱需與認證身分一致',
-      icon: HkIconName.wallet,
-      children: [
-        KycTextField(
-          key: const Key('kyc_bank_code'),
-          label: _fieldLabel(context, KYCField.KYC_FIELD_BANK_CODE),
-          value: f.bankCode,
-          hint: '例: 004',
-          keyboardType: TextInputType.number,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(7),
-          ],
-          error: c.fieldError(KYCField.KYC_FIELD_BANK_CODE),
-          onChanged: (v) => c.updateForm((f) => f.copyWith(bankCode: v)),
-        ),
-        _gap(),
-        KycTextField(
-          key: const Key('kyc_bank_name'),
-          label: _fieldLabel(context, KYCField.KYC_FIELD_BANK_NAME),
-          value: f.bankName,
-          hint: '例: 台北富邦銀行',
-          error: c.fieldError(KYCField.KYC_FIELD_BANK_NAME),
-          onChanged: (v) => c.updateForm((f) => f.copyWith(bankName: v)),
-        ),
-        _gap(),
-        KycTextField(
-          key: const Key('kyc_bank_account'),
-          label: _fieldLabel(context, KYCField.KYC_FIELD_BANK_ACCOUNT),
-          value: f.bankAccount,
-          hint: '請輸入銀行帳號',
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          error:
-              c.inputErrors.accountError ??
-              c.fieldError(KYCField.KYC_FIELD_BANK_ACCOUNT),
-          helper: masked.isNotEmpty && f.bankAccount.isEmpty
-              ? '已填寫（$masked），如需修改請重新輸入'
-              : '只能輸入數字（8–16 碼）',
-          onChanged: (v) => c.updateForm((f) => f.copyWith(bankAccount: v)),
-        ),
-        _nextBar(c, actions),
-      ],
-    );
-  }
-}
-
-/* ===== 其他資訊（聯絡人、店家地址、英文姓名、商品） ===== */
+/* ===== 商家營運資訊（聯絡人、店家地址） ===== */
 
 class _OtherStep extends StatelessWidget {
   const _OtherStep(this.c, this.actions);
@@ -559,13 +295,11 @@ class _OtherStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final f = c.form;
     final s = c.store;
     final errors = c.contactErrors;
-    final locked = c.identityLocked;
     return _card(
       title: '商家營運資訊',
-      subtitle: '店家地址與聯絡資料會同步到你的商店設定；其他欄位幫助 PayUni 加速審核',
+      subtitle: '店家地址與聯絡資料會同步到你的商店設定',
       icon: HkIconName.info,
       children: [
         KycTextField(
@@ -574,7 +308,7 @@ class _OtherStep extends StatelessWidget {
               StoreField.STORE_FIELD_CONTACT_NAME.uiText(context.uiLocale) ??
               commonUnknown(context.uiLocale),
           value: s.contactName,
-          hint: '最多 20 字，會寫入商店設定',
+          hint: '最多 50 字，會寫入商店設定',
           error: errors.name,
           onChanged: (v) => c.updateStore((s) => s.copyWith(contactName: v)),
         ),
@@ -597,27 +331,13 @@ class _OtherStep extends StatelessWidget {
           key: const Key('kyc_support_email'),
           label: '客服電子信箱',
           value: s.supportEmail,
-          hint: 'PayUni 會寄金流相關通知到這個信箱',
+          hint: '請輸入客服電子信箱',
           keyboardType: TextInputType.emailAddress,
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9@._\-+]')),
           ],
           error: errors.email,
           onChanged: (v) => c.updateStore((s) => s.copyWith(supportEmail: v)),
-        ),
-        _gap(),
-        KycTextField(
-          key: const Key('kyc_english_name'),
-          label: _fieldLabel(context, KYCField.KYC_FIELD_ENGLISH_NAME),
-          value: f.englishName,
-          hint: '請輸入英文姓名',
-          helper: 'PayUni 金流註冊必填，請與護照英文姓名一致',
-          readOnly: locked,
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s\-\.]')),
-          ],
-          error: c.fieldError(KYCField.KYC_FIELD_ENGLISH_NAME),
-          onChanged: (v) => c.updateForm((f) => f.copyWith(englishName: v)),
         ),
         _gap(),
         KycAddressField(
@@ -702,24 +422,83 @@ class _DocumentsStep extends StatelessWidget {
 
 /* ===== 確認送出 ===== */
 
+/// 收款聯絡信箱欄位（D23 修訂）：金流商用這個信箱聯絡賣家。帳號有 provider 驗證過的信箱時唯讀、不給輸入；沒有任何信箱或
+/// 只有自填的信箱時才可以輸入（寫回帳號）。帳號的信箱還沒讀到時不顯示；讀取失敗顯示重試。
+class KycContactEmailField extends StatelessWidget {
+  const KycContactEmailField({
+    super.key,
+    required this.contact,
+    required this.value,
+    required this.error,
+    required this.onChanged,
+    required this.onRetry,
+  });
+
+  final AsyncValue<AccountContactEmail?>? contact;
+  final String value;
+  final String? error;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onRetry;
+
+  static const label = '金流商聯絡信箱';
+  static const hint = '金流商會用這個信箱聯絡你收款事宜';
+
+  @override
+  Widget build(BuildContext context) {
+    final read = contact;
+    if (read == null || (read.isLoading && !read.hasValue)) {
+      return const SizedBox.shrink();
+    }
+    if (!read.hasValue) {
+      return Row(
+        key: const Key('kyc_contact_email_error'),
+        children: [
+          const Expanded(child: Text(label)),
+          TextButton(onPressed: onRetry, child: const HkButtonLabel('重新載入')),
+        ],
+      );
+    }
+    final account = read.requireValue;
+    if (!contactEmailEditable(account)) {
+      return Column(
+        key: const Key('kyc_contact_email_verified'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          KycInfoRow(label, account!.email),
+          Text(
+            hint,
+            style: TextStyle(fontSize: 12.sp, color: AppColors.textMuted),
+          ),
+        ],
+      );
+    }
+    return KycTextField(
+      key: const Key('kyc_contact_email'),
+      label: label,
+      value: value,
+      hint: '例如 name@example.com',
+      helper: hint,
+      keyboardType: TextInputType.emailAddress,
+      error: error,
+      onChanged: onChanged,
+    );
+  }
+}
+
 class _ConfirmStep extends StatelessWidget {
   const _ConfirmStep({
     required this.controller,
     required this.actions,
     required this.agreements,
     required this.privacyChecked,
-    required this.payuniChecked,
     required this.onPrivacyChanged,
-    required this.onPayuniChanged,
   });
 
   final KycWizard controller;
   final KycStepActions actions;
   final AsyncValue<KycAgreements> agreements;
   final bool privacyChecked;
-  final bool payuniChecked;
   final ValueChanged<bool> onPrivacyChanged;
-  final ValueChanged<bool> onPayuniChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -731,38 +510,21 @@ class _ConfirmStep extends StatelessWidget {
     final loaded = agreements.value;
     final ready =
         privacyChecked &&
-        payuniChecked &&
         loaded != null &&
         missingItemsOf(
           c.application?.missingFields ?? const [],
           context.uiLocale,
         ).isEmpty &&
+        c.contactEmailBlocker == null &&
         !c.hasUnsavedDraft &&
         c.addressInputError == null &&
         !c.busy;
-    final maskedId = c.maskedId;
-    final maskedAccount = c.maskedBankAccount;
     return _card(
       title: '確認送出',
-      subtitle: '最後確認資料正確；送出後進入平台與金流審核',
+      subtitle: '最後確認資料正確；送出後進入平台審核',
       icon: HkIconName.check,
       children: [
-        KycInfoRow(
-          _fieldLabel(context, KYCField.KYC_FIELD_REAL_NAME),
-          f.realName,
-        ),
-        KycInfoRow(
-          _fieldLabel(
-            context,
-            business
-                ? KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO
-                : KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO,
-          ),
-          f.idCardNo.isNotEmpty ? f.idCardNo : maskedId,
-        ),
         if (business) ...[
-          _gap(8),
-          const Divider(color: AppColors.dividerLight),
           KycInfoRow(
             _fieldLabel(context, KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME),
             f.companyName,
@@ -771,35 +533,27 @@ class _ConfirmStep extends StatelessWidget {
             _fieldLabel(context, KYCField.KYC_FIELD_BUSINESS_TAX_ID),
             f.taxId,
           ),
-        ],
-        _gap(8),
-        const Divider(color: AppColors.dividerLight),
-        if (f.bankCode.isNotEmpty)
-          KycInfoRow(
-            _fieldLabel(context, KYCField.KYC_FIELD_BANK_CODE),
-            f.bankCode,
-          ),
-        KycInfoRow(
-          _fieldLabel(context, KYCField.KYC_FIELD_BANK_NAME),
-          f.bankName,
-        ),
-        KycInfoRow(
-          _fieldLabel(context, KYCField.KYC_FIELD_BANK_ACCOUNT),
-          f.bankAccount.isNotEmpty ? f.bankAccount : maskedAccount,
-        ),
-        _gap(8),
-        const Divider(color: AppColors.dividerLight),
-        if (business)
           KycInfoRow(
             _fieldLabel(context, KYCField.KYC_FIELD_PRODUCT_TYPE),
             f.productType,
           ),
+          _gap(8),
+          const Divider(color: AppColors.dividerLight),
+        ],
         KycInfoRow(
           StoreField.STORE_FIELD_CONTACT_NAME.uiText(context.uiLocale) ??
               commonUnknown(context.uiLocale),
           s.contactName,
         ),
         KycInfoRow('店家地址', _storeAddressText(s)),
+        _gap(8),
+        KycContactEmailField(
+          contact: c.contactEmailRead,
+          value: c.contactEmailValue,
+          error: c.contactEmailError,
+          onChanged: c.updateContactEmail,
+          onRetry: () => unawaited(c.reloadContactEmail()),
+        ),
         if (missing.isNotEmpty) ...[
           _gap(8),
           _MissingList(missing: missing, onJump: actions.jumpTo),
@@ -817,37 +571,15 @@ class _ConfirmStep extends StatelessWidget {
           onChanged: onPrivacyChanged,
           onRetry: actions.retryAgreements,
         ),
-        AgreementCheckbox(
-          checkboxKey: const Key('kyc_payuni_checkbox'),
-          before: '我同意',
-          linkText: 'PAYUNi 服務條款',
-          after: '，並了解平台會為我向 PAYUNi 申請子商店與會員',
-          url: loaded?.payuniTerms.url,
-          loadFailed: agreements.hasError,
-          checked: payuniChecked,
-          enabled: !c.submitting,
-          onChanged: onPayuniChanged,
-          onRetry: actions.retryAgreements,
-        ),
         _gap(12),
         Align(
           alignment: Alignment.centerLeft,
           child: Text(
-            '送出後 PayUni 預設密碼為你的${business ? '統一編號' : '身分證字號'}',
+            '身分與銀行帳號會在審核通過後，由金流商收集，平台不經手。',
+            key: const Key('kyc_provider_collects_notice'),
             style: TextStyle(fontSize: 12.sp, color: AppColors.textMuted),
           ),
         ),
-        if (!c.identityLocked) ...[
-          _gap(4),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              kPayuniLockOnSubmitNotice,
-              key: const Key('kyc_lock_on_submit_notice'),
-              style: TextStyle(fontSize: 12.sp, color: AppColors.textMuted),
-            ),
-          ),
-        ],
         KycButtonBar(
           label: '送出認證',
           busy: c.submitting,

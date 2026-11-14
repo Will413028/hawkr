@@ -127,8 +127,8 @@ func TestLinkedTerminationAvailabilityIsTheSameRuleAsCreateMeasure(t *testing.T)
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountA, sA, _ := f.submitted(t, idA, bankAcct)
-	accountB, sB, _ := f.submitted(t, idA, "999888777666")
+	accountA, sA, _ := f.submittedCompany(t, taxIDOne)
+	accountB, sB, _ := f.submittedCompany(t, taxIDOne)
 
 	parity := func(label string, source Measure, wantAny map[int64]bool) {
 		t.Helper()
@@ -243,11 +243,11 @@ func TestApplyStoreSeparatesSuspensionFromTermination(t *testing.T) {
 	}
 
 	// KYC 的身分比對維持通用錯誤。
-	blockedAccount, blockedStore, _ := f.submitted(t, idA, bankAcct)
+	blockedAccount, blockedStore, _ := f.submittedCompany(t, taxIDOne)
 	f.effect(t, f.terminate(t, blockedStore.StoreID, GroundFraud))
 	_ = blockedAccount
 	other, _ := f.open(t)
-	draft := f.savedDraft(t, kycDraft(other, idA, "999888777666"))
+	draft := f.savedDraft(t, companyDraft(other, taxIDOne))
 	_, err = f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: other, ExpectedVersion: draft.Version})
 	var ae *apperr.Error
 	if apperr.KindOf(err) != apperr.KindFailedPrecondition || !errors.As(err, &ae) || ae.Reason != (apperr.Reason{}) || ae.Message != "無法通過認證，請聯絡客服" {
@@ -304,9 +304,9 @@ func TestCascadeRevocationReopensOnlyAccountsWithNoOtherEffectiveTermination(t *
 	t.Parallel()
 	f := setup(t)
 	reopened := record[StoreReopened](f)
-	_, sA, _ := f.submitted(t, idA, bankAcct)
-	_, sB, _ := f.submitted(t, idA, "999888777666")
-	_, sC, _ := f.submitted(t, idA, "555444333222")
+	_, sA, _ := f.submittedCompany(t, taxIDOne)
+	_, sB, _ := f.submittedCompany(t, taxIDOne)
+	_, sC, _ := f.submittedCompany(t, taxIDOne)
 	source := f.terminate(t, sA.StoreID, GroundFraud)
 	f.effect(t, source)
 	src := source.ID

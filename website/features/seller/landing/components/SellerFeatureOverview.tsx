@@ -61,8 +61,9 @@ export default function SellerFeatureOverview() {
 			<header className="seller-feature-overview__intro">
 				<h2 id="seller-feature-overview-title">賣家中心功能導覽</h2>
 				<p>
-					從品牌店面、商品與庫存，到訂單、顧客及營運，九個工作區各自負責一件事。需要商家認證、PayUni
-					或物流商開通的能力，會在對應章節直接說明。
+					{
+						"從品牌店面、商品與庫存，到訂單、顧客及營運，九個工作區各自負責一件事。需要商家認證、金流商或物流商開通的能力，會在對應章節直接說明。"
+					}
 				</p>
 			</header>
 

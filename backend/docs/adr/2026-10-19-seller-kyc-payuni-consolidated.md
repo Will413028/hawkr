@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted（整合 `2026-10-02-seller-kyc-payuni-in-monolith.md` 的原決策與 8 次修訂；整合不改任何決策，2026-10-19。舊檔沒寫、照現行程式補上的幾條各附出處；文末 2026-10-20 修訂把關店後的清理改成兩段） |
+| 狀態 | superseded by 2026-11-13-seller-platform-review-and-identity-matching.md（原狀態 accepted：整合 `2026-10-02-seller-kyc-payuni-in-monolith.md` 的原決策與 8 次修訂，2026-10-19） |
 | 日期 | 2026-10-19 |
 | 影響範圍 | `internal/modules/seller`（KYC、PayUni、登記資料查詢、入駐同意、關店與個資清理）、`internal/platform/seal`、`internal/platform/payuni`、`internal/legacy`（PayUni webhook 的 consumer、`merchant.verification.*` 與 `seller.deleted` 的 relay）、admin、website、seller-app |
 | 取代 | `2026-10-02-seller-kyc-payuni-in-monolith.md`（本檔取代它，它標 `superseded by` 本檔）。原 ADR 修訂 `2026-07-20-seller-kyc-pii-encryption-scope.md` 的加密實作（範圍不變），本檔承接這個修訂 |
@@ -162,3 +162,8 @@ KYC 認證與 PayUni 子商店從 seller-service 搬進 seller 模組。舊實�
 - 關聯帳號的反查（本檔「身分比對」）納入銀行帳號（D4）：命中種類為銀行帳號，只列出，不能據以建立關聯終止、不自動建立任何措施（家人或配偶共用帳戶是常態，與本檔「銀行帳號命中只標記，不擋」同一個判斷）。反查的申請一側仍讀 `kyc_identity_hashes`，已清理的申請不命中；要涵蓋已清理的 stint 時另議。
 - 條款 21.3、賣家身分認證告知事項第 4 項與隱私政策的保存目的與期間要寫入這個 5 年的 blind index（草稿待 Will 核可，不在本次 commit）。
 - 系統未上線，migration 不回填既有申請。
+
+## 修訂：收款帳戶的擁有者改成 payment 模組（2026-11-06，Will 決定 D28、D30；計畫 `plans/2026-10-29-payment-onboarding-stripe.md` 步驟 7d′）
+
+- 收款帳戶（`payment.accounts`）、它的建立與同步 job、webhook 的處理與後台的 3 支收款帳戶 RPC（`PaymentAdminService`）由 payment 模組擁有；seller 不再有 `payment_accounts` 與 `payment_provider_events`。
+- seller 保留平台審核、開通閘門（讀自存的副本 `seller.payout_capabilities.transfers_active`，由 payment 的 `PayoutAccountChanged` 經同 transaction 的訂閱者寫入）、曝光公告與 fingerprint 防詐 hash（同一個訂閱者寫入，D12 不變）。核准時 seller 呼叫 payment 的 `RequestAccount`（聯絡信箱由 seller 傳入，D23 不變；只 INSERT，同一家店再次核准不改既有列的信箱）；賣家端的 `GetMyPaymentAccount`、`CreatePaymentOnboardingSession` 留在 seller，確認店家擁有者後呼叫 payment（D30）。

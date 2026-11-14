@@ -1,4 +1,4 @@
-import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -9,7 +9,6 @@ import '../../../shared/widgets/hk_status_badge.dart';
 import '../../product/data/product_repository.dart';
 import '../../settings/data/shipping_settings_remote_service.dart';
 import 'current_store.dart';
-import 'kyc_flow.dart';
 
 part 'onboarding_tasks.g.dart';
 
@@ -22,41 +21,63 @@ enum OnboardingTaskGroup {
   final String label;
 }
 
-enum OnboardingTaskId {
-  profile,
-  cert,
-  notSuspended,
-  storeActive,
-  otherRequirement,
+/// 進度卡一列的按鈕去哪裡（路由是 client 的，位置依伺服器的 `OnboardingAction` 或建議任務決定）。
+enum OnboardingStepTarget {
+  /// 沒有按鈕。
+  none,
+
+  /// 商店資料（商店設定頁）。
+  editProfile,
+
+  /// 商家認證與收款帳戶（錢包頁）。
+  certification,
+
+  /// 聯絡客服（說明頁）。
+  support,
+
+  /// 物流設定。
   shipping,
+
+  /// 新增商品。
   product,
-  description,
 }
 
-/// 開店進度的一項任務：和 website 的 `onboardingTasks.ts` 同一套語意與文字。
-final class OnboardingTask {
-  const OnboardingTask({
+const shippingStepId = 'shipping';
+const productStepId = 'product';
+const descriptionStepId = 'description';
+
+/// 伺服器的必要任務在進度卡的列 id；伺服器新增的任務 id 同樣有自己的列 id。
+String requiredStepId(OnboardingTaskId id) => 'required_${id.value}';
+
+/// 開店進度的一列。必要任務（[OnboardingTaskGroup.beforePublish]）的狀態、下一步與標題、狀態句取自伺服器的開通摘要，
+/// 說明句與按鈕文字取自共用文案目錄；建議任務由 client 組。
+final class OnboardingStep {
+  const OnboardingStep({
     required this.id,
     required this.group,
     required this.title,
-    required this.description,
     required this.statusLabel,
     required this.completed,
+    this.description,
     this.cta,
+    this.target = OnboardingStepTarget.none,
     this.locked = false,
   });
 
-  final OnboardingTaskId id;
+  final String id;
   final OnboardingTaskGroup group;
   final String title;
-  final String description;
+  final String? description;
   final String statusLabel;
   final bool completed;
 
   /// 按鈕文字；這項沒有要辦的事時是 null。
   final String? cta;
 
-  /// 還不能做（物流設定在伺服器的 `SHIPPING_SETUP` 啟用之前）。
+  /// 按鈕去哪裡；[cta] 是 null 時是 [OnboardingStepTarget.none]。
+  final OnboardingStepTarget target;
+
+  /// 還不能做（必要任務的 `LOCKED`；物流設定在伺服器的 `SHIPPING_SETUP` 啟用之前）。
   final bool locked;
 
   HkStatusTone get tone =>
@@ -90,124 +111,53 @@ final class OnboardingInputs {
   final int? productCount;
 }
 
-const _knownRequirements = {
-  SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE,
-  SellerRequirement.SELLER_REQUIREMENT_NOT_PENDING_DELETION,
-  SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED,
-  SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
-  SellerRequirement.SELLER_REQUIREMENT_STORE_NAME,
-  SellerRequirement.SELLER_REQUIREMENT_LOGO,
-  SellerRequirement.SELLER_REQUIREMENT_TOWN_CODE,
+OnboardingStepTarget _targetOf(OnboardingAction action) => switch (action) {
+  OnboardingAction.ONBOARDING_ACTION_EDIT_PROFILE =>
+    OnboardingStepTarget.editProfile,
+  OnboardingAction.ONBOARDING_ACTION_SUBMIT_CERTIFICATION ||
+  OnboardingAction.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING =>
+    OnboardingStepTarget.certification,
+  OnboardingAction.ONBOARDING_ACTION_CONTACT_SUPPORT =>
+    OnboardingStepTarget.support,
+  _ => OnboardingStepTarget.none,
 };
 
-/// 商店資料任務涵蓋的公開條件；名詞取自共用文案目錄。
-const _profileRequirements = [
-  SellerRequirement.SELLER_REQUIREMENT_STORE_NAME,
-  SellerRequirement.SELLER_REQUIREMENT_LOGO,
-  SellerRequirement.SELLER_REQUIREMENT_TOWN_CODE,
-];
+String _textOrUnknown(String text, UiLocale l) =>
+    text.isEmpty ? commonUnknown(l) : text;
 
-/// 「公開前必須」只由伺服器的 `PUBLIC_LISTING` 缺的條件（`missing`）推導，client 不自己判斷：伺服器新增條件時，沒有專屬列的
-/// 條件以「其他公開條件」出現。沒有 `PUBLIC_LISTING`（還沒讀到）時每個條件都當成還缺。
-///
-/// [flowStatus] 是 `GetMyKYC` 的流程狀態；讀不到時是 null。[l] 是 UI 語系（名詞與狀態文字取自共用文案目錄）。
-List<OnboardingTask> buildOnboardingTasks({
+OnboardingStep? _requiredStep(UiLocale l, OnboardingTask task) {
+  if (task.id == OnboardingTaskId.ONBOARDING_TASK_ID_UNSPECIFIED) return null;
+  final cta = task.action.button(l);
+  final target = cta == null
+      ? OnboardingStepTarget.none
+      : _targetOf(task.action);
+  return OnboardingStep(
+    id: requiredStepId(task.id),
+    group: OnboardingTaskGroup.beforePublish,
+    title: _textOrUnknown(task.title.message, l),
+    description: task.id.description(l),
+    statusLabel: _textOrUnknown(task.status.message, l),
+    completed:
+        task.state == OnboardingTaskState.ONBOARDING_TASK_STATE_COMPLETED,
+    locked: task.state == OnboardingTaskState.ONBOARDING_TASK_STATE_LOCKED,
+    cta: target == OnboardingStepTarget.none ? null : cta,
+    target: target,
+  );
+}
+
+/// 開店進度的列。「公開前必須」只是伺服器開通摘要（`GetMyOnboarding`）的任務依序呈現，client 不自己判斷狀態；沒有摘要
+/// （還沒讀到或讀取失敗）時沒有必要任務。「建議完成」（物流、商品、簡介）由 client 組。[l] 是 UI 語系。
+List<OnboardingStep> buildOnboardingSteps({
   required UiLocale l,
   required MyStore? my,
-  required KYCFlowStatus? flowStatus,
+  GetMyOnboardingResponse? summary,
   ShippingProgress shipping = const ShippingProgress(),
   int? productCount,
 }) {
-  final missing = my?.missingFor(
-    SellerCapability.SELLER_CAPABILITY_PUBLIC_LISTING,
-  );
-  bool lacks(SellerRequirement requirement) =>
-      missing == null || missing.contains(requirement);
-
-  final missingProfile = [
-    for (final requirement in _profileRequirements)
-      if (lacks(requirement)) requirement.uiText(l) ?? commonUnknown(l),
+  final tasks = <OnboardingStep>[
+    for (final task in summary?.tasks ?? const <OnboardingTask>[])
+      ?_requiredStep(l, task),
   ];
-  final profileDone = missingProfile.isEmpty;
-  final certDone = my?.isCertified ?? false;
-  // 讀不到流程狀態時和「尚未開始」一樣引導開始認證（website `kycFlowActionLabel`）。
-  final action = kycFlowCopy(
-    flowStatus ?? KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
-    l,
-  ).action;
-  final statusLabel =
-      (certDone ? KYCFlowStatus.KYC_FLOW_STATUS_APPROVED : flowStatus)?.uiText(
-        l,
-      ) ??
-      commonUnknown(l);
-
-  final tasks = <OnboardingTask>[
-    OnboardingTask(
-      id: OnboardingTaskId.profile,
-      group: OnboardingTaskGroup.beforePublish,
-      title: '商店資料',
-      description: '店名、logo 與所在地。',
-      cta: '去設定',
-      completed: profileDone,
-      statusLabel: profileDone ? '已完成' : '缺少：${missingProfile.join('、')}',
-    ),
-    OnboardingTask(
-      id: OnboardingTaskId.cert,
-      group: OnboardingTaskGroup.beforePublish,
-      title: '商家認證',
-      description: '身分認證與 PayUni 收款審核。',
-      cta: certDone ? null : action,
-      completed: certDone,
-      statusLabel: statusLabel,
-    ),
-  ];
-
-  if (missing?.contains(SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED) ??
-      false) {
-    tasks.add(
-      const OnboardingTask(
-        id: OnboardingTaskId.notSuspended,
-        group: OnboardingTaskGroup.beforePublish,
-        title: '停權處分',
-        description: '帳號目前處於停權。',
-        cta: '查看停權說明',
-        completed: false,
-        statusLabel: '停權中',
-      ),
-    );
-  }
-  if ((missing?.contains(SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE) ??
-          false) ||
-      (missing?.contains(
-            SellerRequirement.SELLER_REQUIREMENT_NOT_PENDING_DELETION,
-          ) ??
-          false)) {
-    tasks.add(
-      const OnboardingTask(
-        id: OnboardingTaskId.storeActive,
-        group: OnboardingTaskGroup.beforePublish,
-        title: '商店狀態',
-        description: '商店目前不是營業中。',
-        cta: '查看說明',
-        completed: false,
-        statusLabel: '未營業',
-      ),
-    );
-  }
-  if ((missing ?? const <SellerRequirement>[]).any(
-    (requirement) => !_knownRequirements.contains(requirement),
-  )) {
-    tasks.add(
-      const OnboardingTask(
-        id: OnboardingTaskId.otherRequirement,
-        group: OnboardingTaskGroup.beforePublish,
-        title: '其他公開條件',
-        description: '還有公開條件尚未滿足。',
-        completed: false,
-        statusLabel: '待完成',
-      ),
-    );
-  }
 
   final shippingGate = my?.shippingGate ?? ShippingGate.unknown;
   final shippingOpen = shippingGate == ShippingGate.open;
@@ -215,11 +165,12 @@ List<OnboardingTask> buildOnboardingTasks({
   final hasDescription = my?.description != null;
 
   tasks.addAll([
-    OnboardingTask(
-      id: OnboardingTaskId.shipping,
+    OnboardingStep(
+      id: shippingStepId,
       group: OnboardingTaskGroup.recommended,
       title: '物流設定',
       description: '設定配送與退貨資訊。',
+      target: OnboardingStepTarget.shipping,
       cta: shipping.done
           ? '查看物流設定'
           : shipping.processing
@@ -235,20 +186,22 @@ List<OnboardingTask> buildOnboardingTasks({
           ? '審核中'
           : '待設定',
     ),
-    OnboardingTask(
-      id: OnboardingTaskId.product,
+    OnboardingStep(
+      id: productStepId,
       group: OnboardingTaskGroup.recommended,
       title: '上架商品',
       description: '建立第一個可購買商品。',
+      target: OnboardingStepTarget.product,
       cta: '新增商品',
       completed: productsDone,
       statusLabel: productsDone ? '已上架' : '待上架',
     ),
-    OnboardingTask(
-      id: OnboardingTaskId.description,
+    OnboardingStep(
+      id: descriptionStepId,
       group: OnboardingTaskGroup.recommended,
       title: '商店介紹',
       description: '說明你賣什麼、產地與品牌故事。',
+      target: OnboardingStepTarget.editProfile,
       cta: '去設定',
       completed: hasDescription,
       statusLabel: hasDescription ? '已完成' : '待完成',

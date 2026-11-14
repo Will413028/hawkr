@@ -398,7 +398,7 @@ type CheckAppVersionRequest struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	AppType AppType                `protobuf:"varint,1,opt,name=app_type,json=appType,proto3,enum=hawkr.content.v1alpha1.AppType" json:"app_type,omitempty"`
 	// App 的版本 x.y.z，不含 build number。格式不對時不要求更新。
-	ClientVersion string `protobuf:"bytes,3,opt,name=client_version,json=clientVersion,proto3" json:"client_version,omitempty"`
+	ClientVersion string `protobuf:"bytes,2,opt,name=client_version,json=clientVersion,proto3" json:"client_version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -594,7 +594,7 @@ const file_hawkr_content_v1alpha1_content_proto_rawDesc = "" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x85\x01\n" +
 	"\x16CheckAppVersionRequest\x12?\n" +
 	"\bapp_type\x18\x01 \x01(\x0e2\x1f.hawkr.content.v1alpha1.AppTypeB\x03\xe0A\x02R\aappType\x12*\n" +
-	"\x0eclient_version\x18\x03 \x01(\tB\x03\xe0A\x02R\rclientVersion\"\xcc\x01\n" +
+	"\x0eclient_version\x18\x02 \x01(\tB\x03\xe0A\x02R\rclientVersion\"\xcc\x01\n" +
 	"\x17CheckAppVersionResponse\x12'\n" +
 	"\x0fupdate_required\x18\x01 \x01(\bR\x0eupdateRequired\x12'\n" +
 	"\x0fminimum_version\x18\x02 \x01(\tR\x0eminimumVersion\x12\x1b\n" +

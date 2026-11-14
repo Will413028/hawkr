@@ -10,12 +10,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 )
 
-// SeedApproved 寫入一筆已核准的申請給本機開發種子（seller 的 SeedDevStores）：明文的輸入經 SaveDraft 同一支 applyDraft 驗證、加密並計算
-// blind index（加密的 AAD 與 hash 的輸入只有這一份實作，金鑰是執行中的金鑰環），再以草稿插入、依序轉成 SUBMITTED 與 APPROVED（同一個 TransitionKYCApplication，submission_seq 因此與正式流程一致）。它不經送出與審核的
+// SeedApproved 寫入一筆已核准的申請給本機開發種子（seller 的 SeedDevStores）：明文的輸入經 SaveDraft 同一支 applyDraft 驗證，統編的
+// blind index 由 syncHashes 計算（hash 的輸入只有這一份實作，金鑰是執行中的金鑰環），再以草稿插入、依序轉成 SUBMITTED 與 APPROVED（同一個 TransitionKYCApplication，submission_seq 因此與正式流程一致）。它不經送出與審核的
 // 服務流程（只寫送出的 SUBMIT 審核紀錄，給入駐同意綁定；不寫核准的審核紀錄、不發事件、不排 job），與 SQL 種子一樣只給本機開發的資料用；呼叫方在自己的 transaction 內呼叫。
 func (s *Service) SeedApproved(ctx context.Context, q *store.Queries, storeID int64, in model.KYCDraftInput, now time.Time) (store.SellerKycApplication, uuid.UUID, error) {
 	now = now.UTC()
-	row, _, err := s.p.applyDraft(store.SellerKycApplication{ApplicationID: uuid.NewV7(), StoreID: storeID}, in, true, now)
+	row, _, err := applyDraft(store.SellerKycApplication{ApplicationID: uuid.NewV7(), StoreID: storeID}, in, true, now)
 	if err != nil {
 		return store.SellerKycApplication{}, uuid.Nil(), err
 	}

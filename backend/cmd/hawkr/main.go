@@ -46,7 +46,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
 	"github.com/Will413028/hawkr/backend/internal/legacy/reviewservice"
-	"github.com/Will413028/hawkr/backend/internal/legacy/sellerconsumer"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerserver"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
@@ -155,8 +154,8 @@ func runServe(ctx context.Context) error {
 	verifierCtx, stopVerifiers := context.WithCancel(context.WithoutCancel(ctx))
 	defer stopVerifiers()
 	idc := readIdentityConfig(verifierCtx, e)
-	kyc := readKYCKeys(e)
-	pay := readPayUni(e, log)
+	kycMAC := readKYCHashKeys(e)
+	paymentProvider := readPayment(e, log)
 	registry := readGCIS(e)
 	if err := e.Err(); err != nil {
 		return err
@@ -221,8 +220,12 @@ func runServe(ctx context.Context) error {
 		Media: med, Now: time.Now, Logger: log,
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
-	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kyc, pay, registry, log)
-	// 資料庫參照的金鑰（KYC 的密文、blind index、處分的身分快照）都要在設定的金鑰環裡，缺了就不啟動。
+	box := newInbox(d, jc, log)
+	payments, owners := newPayment(d, bus, jc, box, paymentProvider, log)
+	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
+	owners.bind(sellerModule)
+	subscribeSellerPayout(bus, sellerModule)
+	// 資料庫參照的 HMAC 金鑰（防詐保存的 blind index、處分的身分快照）都要在設定的金鑰環裡，缺了就不啟動。
 	if err := sellerModule.CheckKYCKeys(ctx); err != nil {
 		return err
 	}
@@ -272,6 +275,7 @@ func runServe(ctx context.Context) error {
 		AppLogin:        appLogin,
 		Buyer:           buyerModule,
 		Seller:          sellerModule,
+		Payment:         payments,
 		Agent:           agentModule,
 		Discovery:       discoveryModule,
 		ReviewQueue:     reviewqueue.New(reviewqueue.Deps{DB: d}),
@@ -331,8 +335,8 @@ func runWorker(ctx context.Context) error {
 	verifierCtx, stopVerifiers := context.WithCancel(context.WithoutCancel(ctx))
 	defer stopVerifiers()
 	idc := readIdentityConfig(verifierCtx, e)
-	kyc := readKYCKeys(e)
-	pay := readPayUni(e, log)
+	kycMAC := readKYCHashKeys(e)
+	paymentProvider := readPayment(e, log)
 	registry := readGCIS(e)
 	if err := e.Err(); err != nil {
 		return err
@@ -380,8 +384,12 @@ func runWorker(ctx context.Context) error {
 		Media: med, Now: time.Now, Logger: log,
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
-	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kyc, pay, registry, log)
-	// 資料庫參照的金鑰（KYC 的密文、blind index、處分的身分快照）都要在設定的金鑰環裡，缺了就不啟動。
+	box := newInbox(d, jc, log)
+	payments, owners := newPayment(d, bus, jc, box, paymentProvider, log)
+	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
+	owners.bind(sellerModule)
+	subscribeSellerPayout(bus, sellerModule)
+	// 資料庫參照的 HMAC 金鑰（防詐保存的 blind index、處分的身分快照）都要在設定的金鑰環裡，缺了就不啟動。
 	if err := sellerModule.CheckKYCKeys(ctx); err != nil {
 		return err
 	}
@@ -416,6 +424,8 @@ func runWorker(ctx context.Context) error {
 	contentModule.AddWorkers(workers)
 	buyerModule.AddWorkers(workers)
 	sellerModule.AddWorkers(workers)
+	payments.AddWorkers(workers)
+	box.AddWorkers(workers)
 	socialModule.AddWorkers(workers)
 	discoveryModule.AddWorkers(workers)
 	agentModule.AddWorkers(workers)
@@ -427,6 +437,8 @@ func runWorker(ctx context.Context) error {
 	periodic := append(id.PeriodicJobs(), buyerModule.PeriodicJobs()...)
 	periodic = append(periodic, deletion.PeriodicJobs()...)
 	periodic = append(periodic, sellerModule.PeriodicJobs()...)
+	periodic = append(periodic, payments.PeriodicJobs()...)
+	periodic = append(periodic, box.PeriodicJobs()...)
 	periodic = append(periodic, socialModule.PeriodicJobs()...)
 	periodic = append(periodic, discoveryModule.PeriodicJobs()...)
 	periodic = append(periodic, agentModule.PeriodicJobs()...)
@@ -437,19 +449,14 @@ func runWorker(ctx context.Context) error {
 	}
 	consumerCtx, stopConsumer := context.WithCancel(ctx)
 	defer stopConsumer()
-	// 單體自己的 queue（hawkr.monolith 前綴）各一個 consumer：買家的訂單完成與補貨、seller 的 PayUni 審核通知。
-	consumerDone := make(chan struct{}, 2)
+	// 單體自己的 queue（hawkr.monolith 前綴）的 consumer：買家的訂單完成與補貨。
+	consumerDone := make(chan struct{})
 	go func() {
-		defer func() { consumerDone <- struct{}{} }()
+		defer close(consumerDone)
 		consumer.Run(consumerCtx, rabbitURL, log)
-	}()
-	go func() {
-		defer func() { consumerDone <- struct{}{} }()
-		sellerconsumer.Consumer{Seller: sellerModule}.Run(consumerCtx, rabbitURL, log)
 	}()
 	err = c.Run(ctx)
 	stopConsumer()
-	<-consumerDone
 	<-consumerDone
 	return err
 }
@@ -474,7 +481,7 @@ func runMigrate(ctx context.Context) error {
 	if err := jobs.Migrate(ctx, d); err != nil {
 		return err
 	}
-	return migrate.Apply(ctx, d, modules())
+	return migrate.Apply(ctx, d, migrations())
 }
 
 // serve 在 ctx 結束前持續服務；ctx 結束後停止接新連線，並等進行中的請求收尾。

@@ -18,6 +18,13 @@
  *   Google Pay                       pay.google.com
  *   Apple Pay                        applepay.cdn-apple.com,
  *                                    smp-paymentservices.apple.com
+ *   Stripe Connect embedded          connect-js.stripe.com, js.stripe.com
+ *   components (script-src,          (script-src, frame-src). The same page lists
+ *   frame-src)                       img-src https://*.stripe.com (covered by
+ *                                    `img-src https:`) and the style-src hash of an
+ *                                    empty style element (covered by 'unsafe-inline');
+ *                                    it lists no connect-src host.
+ *                                    https://docs.stripe.com/connect/get-started-connect-embedded-components
  *   Backend gateway + chat WS        API base env (https + wss)
  *   Media (image-gateway)            NEXT_PUBLIC_MEDIA_BASE_URL
  *   Sentry ingest                    NEXT_PUBLIC_SENTRY_DSN host
@@ -130,7 +137,7 @@ export function buildContentSecurityPolicy(
 		"form-action 'self' https:",
 		sources(
 			"script-src 'self' 'unsafe-inline' 'report-sample'",
-			"https://www.googletagmanager.com https://www.gstatic.com https://www.google.com https://apis.google.com https://accounts.google.com https://pay.google.com https://applepay.cdn-apple.com",
+			"https://www.googletagmanager.com https://www.gstatic.com https://www.google.com https://apis.google.com https://accounts.google.com https://pay.google.com https://applepay.cdn-apple.com https://connect-js.stripe.com https://js.stripe.com",
 		),
 		"style-src 'self' 'unsafe-inline' https://accounts.google.com",
 		"style-src-elem 'self' 'unsafe-inline' https://accounts.google.com",
@@ -142,7 +149,7 @@ export function buildContentSecurityPolicy(
 			input.uploadOrigins,
 			"https://www.googletagmanager.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://stats.g.doubleclick.net https://*.googleapis.com https://google.com https://www.google.com https://*.gstatic.com https://accounts.google.com https://pay.google.com https://smp-paymentservices.apple.com",
 		),
-		"frame-src 'self' https://accounts.google.com https://apis.google.com https://pay.google.com https://applepay.cdn-apple.com",
+		"frame-src 'self' https://accounts.google.com https://apis.google.com https://pay.google.com https://applepay.cdn-apple.com https://connect-js.stripe.com https://js.stripe.com",
 		"worker-src 'self' blob:",
 		"manifest-src 'self'",
 		// Collects violations at app/api/csp-report/route.ts → Sentry.

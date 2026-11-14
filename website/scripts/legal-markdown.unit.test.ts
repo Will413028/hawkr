@@ -112,14 +112,21 @@ describe("generate-legal 的輸出", () => {
 		}
 	});
 
-	it("版本取自正本的版本行；沒有正本的 PAYUNI_TERMS 取 manifest 的版本", () => {
+	it("manifest 只有賣家契約與個資告知兩種，各自有正本", () => {
 		const manifest = JSON.parse(
 			readFileSync(
 				resolve(ROOT, "website/docs/legal/seller-agreements.json"),
 				"utf8",
 			),
-		) as { agreements: { kind: string; version?: string }[] };
-		const payuni = manifest.agreements.find((a) => a.kind === "PAYUNI_TERMS");
+		) as { agreements: { kind: string; doc?: string }[] };
+		expect(manifest.agreements.map((a) => a.kind)).toEqual([
+			"SELLER_TERMS",
+			"KYC_PRIVACY_NOTICE",
+		]);
+		for (const a of manifest.agreements) expect(a.doc, a.kind).toBeTruthy();
+	});
+
+	it("版本取自正本的版本行", () => {
 		const go = outputs.get(
 			"backend/internal/modules/seller/internal/model/agreement_gen.go",
 		) as string;
@@ -129,7 +136,6 @@ describe("generate-legal 的輸出", () => {
 			);
 			expect(go).toContain(`Version: "${version}"`);
 		}
-		expect(go).toContain(`Version: "${payuni?.version}"`);
 	});
 
 	it("manifest 的網址原樣進到兩邊的生成物", () => {

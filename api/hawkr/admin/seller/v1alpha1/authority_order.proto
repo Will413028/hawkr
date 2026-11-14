@@ -95,8 +95,6 @@ enum AuthorityTargetNoticeKind {
 
 // AuthorityOrder 是主管機關的一份來函。
 message AuthorityOrder {
-  reserved 8;
-  reserved "due_time";
 
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   // 機關名稱，1 到 100 字。
@@ -109,33 +107,33 @@ message AuthorityOrder {
   // 來函內容摘要，1 到 4000 字。
   string summary = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
   repeated AuthorityOrderTarget targets = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
-  AuthorityOrderState state = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
-  google.protobuf.Timestamp complete_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
-  string completed_by_admin_id = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  AuthorityOrderState state = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp complete_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string completed_by_admin_id = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 處理摘要，1 到 4000 字。
-  string resolution_summary = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string resolution_summary = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 保存期限：被指名者在 seller 的個資到這時之前不清理（預設收文後 184 天；只能延長）。
-  google.protobuf.Timestamp hold_until = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp hold_until = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 現在早於 hold_until。
-  bool hold_active = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
-  string registered_by_admin_id = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
-  google.protobuf.Timestamp create_time = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool hold_active = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string registered_by_admin_id = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 來函的版本；完成、延長保存與記下告知都讓它前進。
-  string etag = 17;
-  bool can_complete = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
-  bool can_extend_hold = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string etag = 16;
+  bool can_complete = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_extend_hold = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 保存期限的延長歷史，舊到新；只有 GetAuthorityOrder 帶。
-  repeated AuthorityHoldExtension hold_extensions = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated AuthorityHoldExtension hold_extensions = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 只在 REVOKED：撤銷登記的時間、管理員與原因（1 到 2000 字）。
-  google.protobuf.Timestamp revoke_time = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
-  string revoked_by_admin_id = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
-  string revoke_reason = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp revoke_time = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string revoked_by_admin_id = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string revoke_reason = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 此刻能不能撤銷登記（還沒完成、還沒撤銷）；等於 revoke_unavailabilities 是空的。
-  bool can_revoke = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_revoke = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 不能撤銷登記的原因，依優先序；第一個的句子就是 RevokeAuthorityOrder 被拒絕時的訊息。
-  repeated AuthorityOrderUnavailability revoke_unavailabilities = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated AuthorityOrderUnavailability revoke_unavailabilities = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 處理來函的期限，只在 OPEN 時設（義務還在時才輸出）：開始時間是 receive_time，期限是登記時存下的 due_at。
-  hawkr.common.v1alpha1.Deadline deadline = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.Deadline deadline = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // AuthorityOrderTarget 是來函指名的對象：帳號（任何帳號，不一定是賣家），選填店家與商品。

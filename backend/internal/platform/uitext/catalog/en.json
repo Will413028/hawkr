@@ -33,6 +33,48 @@
     "common.StoreCardStatus.STORE_CARD_STATUS_PAUSED": {
       "message": "Temporarily closed"
     },
+    "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
+      "message": "Setup needed"
+    },
+    "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED": {
+      "message": "Unavailable"
+    },
+    "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED": {
+      "message": "Active"
+    },
+    "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
+      "message": "Preparing"
+    },
+    "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
+      "message": "Under review"
+    },
+    "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM": {
+      "message": "Embedded on platform"
+    },
+    "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": {
+      "message": "Provider-hosted"
+    },
+    "seller.KYCApplication.decide_time": {
+      "message": "Approved at: {time}"
+    },
+    "seller.KYCApplication.submit_time": {
+      "message": "Submitted at: {time}"
+    },
+    "seller.KYCStatus.KYC_STATUS_APPROVED": {
+      "message": "Approved"
+    },
+    "seller.KYCStatus.KYC_STATUS_CANCELLED": {
+      "message": "Cancelled"
+    },
+    "seller.KYCStatus.KYC_STATUS_DRAFT": {
+      "message": "Draft"
+    },
+    "seller.KYCStatus.KYC_STATUS_REJECTED": {
+      "message": "Needs changes"
+    },
+    "seller.KYCStatus.KYC_STATUS_SUBMITTED": {
+      "message": "Under review"
+    },
     "seller.Measure.suspension_active_open": {
       "message": "Suspended (no end date; under periodic review by the platform)"
     },
@@ -41,6 +83,51 @@
     },
     "seller.Measure.suspension_ended": {
       "message": "Ended on {end}"
+    },
+    "seller.OnboardingAction.button.ONBOARDING_ACTION_CONTACT_SUPPORT": {
+      "message": "Contact support"
+    },
+    "seller.OnboardingAction.button.ONBOARDING_ACTION_EDIT_PROFILE": {
+      "message": "Go to settings"
+    },
+    "seller.OnboardingAction.button.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING": {
+      "message": "Go to payout account setup"
+    },
+    "seller.OnboardingAction.button.ONBOARDING_ACTION_SUBMIT_CERTIFICATION": {
+      "message": "Go to seller verification"
+    },
+    "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT": {
+      "message": "Set up your identity and bank details with the payment provider."
+    },
+    "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PLATFORM_REVIEW": {
+      "message": "Platform review of your business details and tax ID."
+    },
+    "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PROFILE": {
+      "message": "Store name, logo and location."
+    },
+    "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT": {
+      "message": "Your identity and bank details are collected by the payment provider, not the platform; you can only receive payments once the payout account is enabled."
+    },
+    "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PLATFORM_REVIEW": {
+      "message": "Once the platform review is approved, your store can go public and you can set up a payout account."
+    },
+    "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PROFILE": {
+      "message": "To be found by buyers, your store needs a name, a logo and a location."
+    },
+    "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT": {
+      "message": "Set up your payout account"
+    },
+    "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PLATFORM_REVIEW": {
+      "message": "Complete the platform review"
+    },
+    "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PROFILE": {
+      "message": "Complete your store profile"
+    },
+    "seller.PaymentAccount.payouts_inactive_note": {
+      "message": "Payouts to your bank account are not enabled yet. The payment provider may ask you for more information."
+    },
+    "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE": {
+      "message": "Platform review and payout account both completed"
     }
   }
 }

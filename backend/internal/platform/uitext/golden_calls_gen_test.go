@@ -52,22 +52,20 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return m.Text, ok
 	case "common.unknown":
 		return t.CommonUnknown(), true
+	case "payment.PaymentAccountStatus":
+		return t.PaymentPaymentAccountStatus(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
+	case "payment.RequirementCollection":
+		return t.PaymentRequirementCollection(goldenEnum(c.Value, "REQUIREMENT_COLLECTION_"))
 	case "seller.ContentKind":
 		return t.SellerContentKind(goldenEnum(c.Value, "CONTENT_KIND_"))
+	case "seller.KYCApplication.decide_time":
+		return t.SellerKYCApplicationDecideTime(goldenString(c, "time")), true
+	case "seller.KYCApplication.submit_time":
+		return t.SellerKYCApplicationSubmitTime(goldenString(c, "time")), true
 	case "seller.KYCField":
 		return t.SellerKYCField(goldenEnum(c.Value, "KYC_FIELD_"))
-	case "seller.KYCFlowStatus":
-		return t.SellerKYCFlowStatus(goldenEnum(c.Value, "KYC_FLOW_STATUS_"))
-	case "seller.KYCFlowStatus.action":
-		return t.SellerKYCFlowStatusAction(goldenEnum(c.Value, "KYC_FLOW_STATUS_"))
-	case "seller.KYCFlowStatus.banner_description":
-		return t.SellerKYCFlowStatusBannerDescription(goldenEnum(c.Value, "KYC_FLOW_STATUS_"))
-	case "seller.KYCFlowStatus.banner_title":
-		return t.SellerKYCFlowStatusBannerTitle(goldenEnum(c.Value, "KYC_FLOW_STATUS_"))
-	case "seller.KYCFlowStatus.gate_heading":
-		return t.SellerKYCFlowStatusGateHeading(goldenEnum(c.Value, "KYC_FLOW_STATUS_"))
-	case "seller.KYCFlowStatus.gate_message":
-		return t.SellerKYCFlowStatusGateMessage(goldenEnum(c.Value, "KYC_FLOW_STATUS_"), goldenString(c, "subject"))
+	case "seller.KYCStatus":
+		return t.SellerKYCStatus(goldenEnum(c.Value, "KYC_STATUS_"))
 	case "seller.Measure.appeal_deadline":
 		return t.SellerMeasureAppealDeadline(goldenString(c, "deadline")), true
 	case "seller.Measure.meta_kind":
@@ -112,16 +110,20 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerMeasureRequestStateWithKind(goldenEnum(c.Value, "MEASURE_REQUEST_STATE_"), goldenEnum(goldenString(c, "kind"), "MEASURE_REQUEST_KIND_"))
 	case "seller.MeasureState":
 		return t.SellerMeasureState(goldenEnum(c.Value, "MEASURE_STATE_"), goldenEnum(goldenString(c, "kind"), "MEASURE_KIND_"))
-	case "seller.PayUniState":
-		return t.SellerPayUniState(goldenEnum(c.Value, "PAY_UNI_STATE_"))
+	case "seller.OnboardingAction.button":
+		return t.SellerOnboardingActionButton(goldenEnum(c.Value, "ONBOARDING_ACTION_"))
+	case "seller.OnboardingTaskId.description":
+		return t.SellerOnboardingTaskIdDescription(goldenEnum(c.Value, "ONBOARDING_TASK_ID_"))
+	case "seller.OnboardingTaskId.panel_description":
+		return t.SellerOnboardingTaskIdPanelDescription(goldenEnum(c.Value, "ONBOARDING_TASK_ID_"))
+	case "seller.OnboardingTaskId.panel_title":
+		return t.SellerOnboardingTaskIdPanelTitle(goldenEnum(c.Value, "ONBOARDING_TASK_ID_"))
+	case "seller.PaymentAccount.payouts_inactive_note":
+		return t.SellerPaymentAccountPayoutsInactiveNote(), true
 	case "seller.RevokeReason":
 		return t.SellerRevokeReason(goldenEnum(c.Value, "REVOKE_REASON_"))
 	case "seller.RiskGround":
 		return t.SellerRiskGround(goldenEnum(c.Value, "RISK_GROUND_"))
-	case "seller.SellerPayUni.fix_fields_heading":
-		return t.SellerSellerPayUniFixFieldsHeading(), true
-	case "seller.SellerPayUni.reason_heading":
-		return t.SellerSellerPayUniReasonHeading(), true
 	case "seller.SellerRequirement":
 		return t.SellerSellerRequirement(goldenEnum(c.Value, "SELLER_REQUIREMENT_"))
 	case "seller.StoreField":

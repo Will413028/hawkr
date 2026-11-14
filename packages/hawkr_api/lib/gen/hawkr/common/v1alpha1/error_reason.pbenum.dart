@@ -35,65 +35,70 @@ class ErrorReason extends $pb.ProtobufEnum {
   /// 賣家帳號停權中，這個操作不在停權時仍可做的範圍（搭配 permission_denied）。client 轉成賣家的停權狀態：
   /// 顯示停權通知，並以 GetMyStore 讀停權的來源與原因。
   static const ErrorReason SELLER_SUSPENDED =
-      ErrorReason._(3, _omitEnumNames ? '' : 'SELLER_SUSPENDED');
+      ErrorReason._(2, _omitEnumNames ? '' : 'SELLER_SUSPENDED');
 
   /// 商家名單的聯絡方式與其他未封存（進行中或已入駐）的業者相同、而且沒有標記為不是同一家（搭配 failed_precondition）。ErrorInfo.metadata 的
   /// prospectIds 是相符的業者 ID（十進位，由小到大以逗號連接）。client 顯示相符的業者，讓管理員選擇合併，或確認不是同一家後
   /// 在請求帶上 confirmed_distinct_prospect_ids 再送一次（ADR 2026-10-04-prospect-contact-points-and-matching）。
   static const ErrorReason PROSPECT_MATCH_FOUND =
-      ErrorReason._(4, _omitEnumNames ? '' : 'PROSPECT_MATCH_FOUND');
+      ErrorReason._(3, _omitEnumNames ? '' : 'PROSPECT_MATCH_FOUND');
 
   /// 商家名單的統一編號已由另一筆未封存（進行中或已入駐）的業者持有：建立搭配 already_exists，修改與還原搭配
   /// failed_precondition。ErrorInfo.metadata 的 prospectIds 是持有者的 ID（十進位，只有一筆，格式同
   /// PROSPECT_MATCH_FOUND）。修改時持有者是進行中的，client 可以讓管理員與它合併；還原時是同一家就不需要還原
   /// （ADR 2026-10-04-prospect-contact-points-and-matching）。
   static const ErrorReason PROSPECT_TAX_ID_HELD =
-      ErrorReason._(10, _omitEnumNames ? '' : 'PROSPECT_TAX_ID_HELD');
+      ErrorReason._(4, _omitEnumNames ? '' : 'PROSPECT_TAX_ID_HELD');
 
   /// 賣家同意的入駐文件版本不是現行版本（搭配 failed_precondition）。client 重讀
   /// seller.v1alpha1.SellerPublicService.GetSellerAgreements，顯示新版本，請賣家重新勾選後再送出。
   static const ErrorReason AGREEMENT_OUTDATED =
-      ErrorReason._(6, _omitEnumNames ? '' : 'AGREEMENT_OUTDATED');
+      ErrorReason._(5, _omitEnumNames ? '' : 'AGREEMENT_OUTDATED');
 
   /// 賣家做這個操作需要的前置條件沒有滿足（搭配 failed_precondition）：身分認證未核准，或店家正在隨帳號刪除。停權不用它，
   /// 停權是 SELLER_SUSPENDED。ErrorInfo.metadata 的 missingRequirements 是缺的條件，值是
-  /// seller.v1alpha1.SellerRequirement 的值名（不加 SELLER_REQUIREMENT_ 前綴，例如 KYC_APPROVED），依列舉的數字由小到大以逗號連接。client 先看 GetMyStore 的能力狀態，這個 reason 只是
+  /// seller.v1alpha1.SellerRequirement 的值名（不加 SELLER_REQUIREMENT_ 前綴，例如 ONBOARDING_COMPLETE），依列舉的數字由小到大以逗號連接。client 先看 GetMyStore 的能力狀態，這個 reason 只是
   /// 伺服器逐方法檢查的後備：重讀 GetMyStore，依缺的條件顯示。
   static const ErrorReason SELLER_REQUIREMENT_MISSING =
-      ErrorReason._(7, _omitEnumNames ? '' : 'SELLER_REQUIREMENT_MISSING');
+      ErrorReason._(6, _omitEnumNames ? '' : 'SELLER_REQUIREMENT_MISSING');
 
   /// 帳號停權中，不能申請開店（搭配 failed_precondition）；解除停權後可以再申請。client 顯示 LocalizedMessage，並導向措施與申覆。帳號同時有生效中的終止合作時是
   /// STORE_OPENING_TERMINATED。
   static const ErrorReason STORE_OPENING_SUSPENDED =
-      ErrorReason._(8, _omitEnumNames ? '' : 'STORE_OPENING_SUSPENDED');
+      ErrorReason._(7, _omitEnumNames ? '' : 'STORE_OPENING_SUSPENDED');
 
   /// 帳號有生效中的終止合作（條款第 21.3 條；終止撤銷之前同一個帳號不能再開店），不能申請開店（搭配 failed_precondition）。client 顯示 LocalizedMessage，
   /// 並導向措施與申覆。換身分認證被另一個帳號的終止擋下的情形不用它（隱私：不透露命中的帳號或欄位），那條路徑維持通用的 failed_precondition 與文字。
   static const ErrorReason STORE_OPENING_TERMINATED =
-      ErrorReason._(9, _omitEnumNames ? '' : 'STORE_OPENING_TERMINATED');
+      ErrorReason._(8, _omitEnumNames ? '' : 'STORE_OPENING_TERMINATED');
 
   /// 帳號擁有商店，不能被停權（搭配 failed_precondition）：停權對店家、未結訂單與撥款的效果由賣家條款決定，條款定出之前有店的帳號不停權。
   /// 只出現在後台與內部的處分路徑；client 顯示 LocalizedMessage，請營運先處理店家（措施或關店），再停權帳號。
   static const ErrorReason ACCOUNT_HAS_STORE =
-      ErrorReason._(11, _omitEnumNames ? '' : 'ACCOUNT_HAS_STORE');
+      ErrorReason._(9, _omitEnumNames ? '' : 'ACCOUNT_HAS_STORE');
 
   /// 帳號停權中，這個操作是寫入，不在停權時仍可做的範圍（搭配 permission_denied）。停權的帳號仍能登入、讀取與刪除帳號：
   /// client 轉成帳號的受限狀態，顯示停權通知，並以 identity.v1alpha1.IdentityAppService.GetSession 的 suspension 讀停權的狀態。
   /// 舊 gateway 的 REST 路徑（/api/v1）沒有 ErrorInfo，停權的非 GET／HEAD 請求只回 403。
   static const ErrorReason ACCOUNT_SUSPENDED =
-      ErrorReason._(12, _omitEnumNames ? '' : 'ACCOUNT_SUSPENDED');
+      ErrorReason._(10, _omitEnumNames ? '' : 'ACCOUNT_SUSPENDED');
 
   /// 要連結的登入方式（Google、LINE 的身分）已經連結到另一個帳號，包含已刪除帳號留下的身分（搭配 already_exists）；什麼都沒有改。
   /// client 顯示 LocalizedMessage，請使用者改用那個帳號登入，或換一個登入方式。
   /// IdentityAppService.LinkIdentity（web 的連結走 /api/auth，不在 Connect）。
   static const ErrorReason IDENTITY_ALREADY_LINKED =
-      ErrorReason._(13, _omitEnumNames ? '' : 'IDENTITY_ALREADY_LINKED');
+      ErrorReason._(11, _omitEnumNames ? '' : 'IDENTITY_ALREADY_LINKED');
 
   /// 這個操作要求最近重新驗證過，而目前的 session 沒有（搭配 failed_precondition）：IdentityAppService.RevokeSession 要求目前的 session
   /// 在 15 分鐘內以 provider 驗證過。client 引導使用者重新走一次登入（web 的 /api/auth/{provider}/start、App 的 ExchangeIdToken，
   /// 登入會換發新 session），再重送。
   static const ErrorReason REAUTHENTICATION_REQUIRED =
-      ErrorReason._(14, _omitEnumNames ? '' : 'REAUTHENTICATION_REQUIRED');
+      ErrorReason._(12, _omitEnumNames ? '' : 'REAUTHENTICATION_REQUIRED');
+
+  /// 帳號沒有聯絡信箱（沒有 provider 驗證過的 email，也沒有自填的），不能送出 KYC 申請（搭配 failed_precondition）：SellerAppService.SubmitKYC。
+  /// client 引導使用者在 IdentityAppService.SetContactEmail 填一個，再重送。
+  static const ErrorReason CONTACT_EMAIL_REQUIRED =
+      ErrorReason._(13, _omitEnumNames ? '' : 'CONTACT_EMAIL_REQUIRED');
 
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
@@ -109,10 +114,11 @@ class ErrorReason extends $pb.ProtobufEnum {
     ACCOUNT_SUSPENDED,
     IDENTITY_ALREADY_LINKED,
     REAUTHENTICATION_REQUIRED,
+    CONTACT_EMAIL_REQUIRED,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 14);
+      $pb.ProtobufEnum.$_initByValueList(values, 13);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

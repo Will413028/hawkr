@@ -59,7 +59,7 @@ func (f *fixture) post(t *testing.T, procedure, tok string) (int, string) {
 	return resp.StatusCode, body.Code
 }
 
-const kycDocument = "/api/files/admin/seller/kyc_applications/not-a-uuid/documents/id_card_front/0"
+const kycDocument = "/api/files/admin/seller/kyc_applications/not-a-uuid/documents/0"
 
 // 零角色的管理員（Access 白名單登入一次的人）：每一支 admin 方法都被拒絕，只有 GetSession 與 SignOut 成功；檔案與舊 gateway 的
 // 請求被擋在 handler 與轉發之前。沒有管理員 principal 的請求（沒有 token、顧客）照舊轉發。
@@ -77,8 +77,8 @@ func TestAdminWithoutRolesIsDeniedEverywhereExceptTheExemptions(t *testing.T) {
 		"/hawkr.admin.identity.v1alpha1.IdentityAdminService/SignOut":    true,
 	}
 	procedures := adminauth.Procedures()
-	if len(procedures) != 80 {
-		t.Fatalf("admin 方法 %d 支，預期 80", len(procedures))
+	if len(procedures) != 79 {
+		t.Fatalf("admin 方法 %d 支，預期 79", len(procedures))
 	}
 	for _, procedure := range procedures {
 		status, code := f.post(t, procedure, tok)

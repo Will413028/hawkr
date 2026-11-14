@@ -53,3 +53,20 @@
 ## 修訂：刪除兩種待辦（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D3；計畫 `plans/2026-10-27-ecommerce-scope-cut.md` 步驟 4）
 
 FDA 轉報與食品業者登錄刪除，待辦少了 `CASE_FDA_REFERRAL`（待轉報）與 `FOOD_REGISTRATION`（審核食品業者登錄），seller 發布的種類剩 10 種；`seller.review_item` 與 `seller.pub_review_item` 少了 `food_registration_id`，`ReviewQueueItem.subject` 少了 `food_registration_id`（欄號 reserved）。排序、游標與「每一項都有期限」的決策不變。
+
+## 修訂：待辦種類的增減與第一個存下來的處置（2026-11-13，Will 2026-11-02、2026-11-13 決定；收款開通見 `2026-11-13-payment-onboarding-provider-port-stripe.md`，銀行帳號提醒見 `2026-10-18-seller-governance-consolidated.md` 2026-11-13 修訂）
+
+原決策段與 2026-10-28 修訂保留歷史。
+
+**脈絡。** 收款開通改走 payment port 後，PayUni 的重新綁定不存在了，收款帳戶的建立失敗成為新的待辦來源；防詐用的銀行帳號 fingerprint 讓「處分之後才共用同一個銀行帳號」成為需要人看的事。同一頁要回答「現在最急的是哪一件」，所以兩者都進待辦。
+
+**決策。**
+
+- 種類現況（`ReviewQueueItemKind`）：刪除 PayUni 重新綁定的種類；新增 `PAYMENT_ACCOUNT_CREATE_FAILED`（值 10，由 payment 發布，subject 是 `PaymentAccountRef`）與 `SHARED_BANK_ACCOUNT`（值 11，由 seller 發布，subject 是 `SharedBankAccountRef`）。刪掉的種類不留 `reserved`（`v1alpha1` 的規則見收款開通 ADR），其後的值連續重編。seller 發布 10 種（含 `SHARED_BANK_ACCOUNT`）、payment 發布 1 種。第二個來源 payment 依決策 2 的方式加入：`payment.pub_review_items(at)` 與 seller 的 `pub_review_items` 在同一支查詢 `UNION ALL`，`reviewqueue` 依賴 payment，不 import 它的 Go 套件；payment 的列只有店家 ID，店名由 `internal/httpapi/reviewqueue` 經 seller 的店家卡片補上。
+- `PAYMENT_ACCOUNT_CREATE_FAILED`：`payment.accounts` 的 `create_failed_at` 有值的帳戶，建立 job 的重試用完才進來；期限 24 小時（上線前的起始值）；管理員只有「重試建立」。
+- `SHARED_BANK_ACCOUNT` 的成員仍是推導的，由 `seller.review_shared_bank_account(at)` 從處分與命中的雜湊算出，沒有待辦列。唯一存下來的是處置：表 `seller.measure_linked_reviews`（處分、帳號、時間、管理員），管理員把處分頁的一個關聯帳號標為「已檢視」，這一對就離開待辦。
+- 這不違反決策 1「待辦不儲存」：存的是管理員做過的處置，不是待辦列；成員資格、開始與期限仍在讀取時推導，處置只是推導條件的一項（「這一對還沒有已檢視」）。沒有處置，項目永遠離不開待辦，所以處置不能省。
+- 未採：另存提醒列（業界做法是保留歷史，但歷史現在沒有讀者）：要由同步的 transaction 寫入，手寫開啟與關閉的開關正是本 ADR 拒絕的形狀；純推導並限時消失：營運有沒有看過沒有紀錄（推測）。
+- 未採：為 PayUni 重新綁定保留種類：缺件由賣家經新的開通連結補，管理員沒有可補的資料。
+
+期限規則仍只有一個家（擁有者的 SQL）。

@@ -23,10 +23,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/agent"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
-	pu "github.com/Will413028/hawkr/backend/internal/platform/payuni"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
@@ -59,15 +60,6 @@ type noProducts struct{}
 
 func (noProducts) StoreIDs(context.Context, []int64) (map[int64]int64, error) {
 	return map[int64]int64{}, nil
-}
-
-// approvingPayUni 對綁定、同步與查詢都回成功，狀態是核准。
-type approvingPayUni struct{}
-
-func (approvingPayUni) BindMerchant(context.Context, pu.BindMerchantRequest) error     { return nil }
-func (approvingPayUni) UpdateMerchant(context.Context, pu.UpdateMerchantRequest) error { return nil }
-func (approvingPayUni) MerchantStatus(_ context.Context, merID string) (pu.MerchantStatus, error) {
-	return pu.MerchantStatus{MerID: merID, MerStatus: "1", MemberStatus: "1"}, nil
 }
 
 type fakeRatings struct {
@@ -133,23 +125,36 @@ func (c *ratingCall) check(t *testing.T, what string) {
 func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "identity", Dir: identity.Migrations()}, migrate.Module{Name: "seller", Dir: seller.Migrations()}))
+	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: inbox.Schema, Dir: inbox.Migrations()}, migrate.Module{Name: "identity", Dir: identity.Migrations()},
+		migrate.Module{Name: "payment", Dir: payment.Migrations()}, migrate.Module{Name: "seller", Dir: seller.Migrations()}))
 	now := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: func() time.Time { return now }, Logger: log})
 	fake := media.NewFake()
 	fake.Key = func(refType, token string) string { return refType + "/" + token }
-	keys, mac := sealtest.Keys(t)
-	m := seller.New(seller.Deps{
-		DB: d, Events: bus, Jobs: noJobs{}, Identity: id, Media: fake, Orders: noOrders{}, KYCKeys: keys, KYCMAC: mac,
-		PayUni: approvingPayUni{}, ProductStores: noProducts{}, Registry: noRegistry{}, StorefrontBaseURL: "https://store.example.invalid",
+	mac := sealtest.MAC(t)
+	provider := payment.NewFake()
+	provider.AutoActive = true
+	var m *seller.Module
+	clock := func() time.Time { return now }
+	payments := payment.New(payment.Deps{
+		DB: d, Events: bus, Jobs: noJobs{}, Inbox: inbox.New(inbox.Deps{DB: d, Jobs: noJobs{}, Now: clock, Logger: log}), Provider: provider,
+		Owners: ownerFunc(func(ctx context.Context, storeID int64) (bool, error) {
+			s, err := m.Store(ctx, storeID)
+			return err == nil && s.Status != seller.Closed, err
+		}), Now: clock, Logger: log,
+	})
+	m = seller.New(seller.Deps{
+		DB: d, Events: bus, Jobs: noJobs{}, Identity: id, Media: fake, Orders: noOrders{}, KYCMAC: mac,
+		Payment: payments, ProductStores: noProducts{}, Registry: noRegistry{},
 		Now: func() time.Time { return now }, Logger: log,
 	})
+	events.Subscribe(bus, m.OnPayoutAccountChanged)
 	account := func() int64 {
 		var accountID int64
 		for range 3 { // account_id 與 store_id 不同值，互換 ID 的缺陷才藏不住
-			if err := d.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&accountID); err != nil {
+			if err := d.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts (self_entered_email) VALUES ('seller@example.com') RETURNING id").Scan(&accountID); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -173,24 +178,21 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		must(err)
 		return accountID, s
 	}
-	exposable := func(name, idCard, bank string) (int64, seller.Store) {
+	exposable := func(name string) (int64, seller.Store) {
 		accountID, s := open(name)
 		str := func(v string) *string { return &v }
 		kind := seller.KYCIndividual
 		draft, err := m.SaveKYCDraft(ctx, seller.KYCDraftInput{
-			AccountID: accountID, SellerType: &kind, RealName: str("王小明"), BirthDate: str("1990-05-06"), IDCardNo: str(idCard),
-			EnglishName: str("Wang Farm"), BankName: str("臺灣銀行"), BankCode: str("004"), BankAccount: str(bank),
-			ProductType: str("蔬果"),
-			IDCardFront: &seller.KYCDocumentRef{StagedToken: "front"}, IDCardBack: &seller.KYCDocumentRef{StagedToken: "back"}, BankBook: &seller.KYCDocumentRef{StagedToken: "book"},
+			AccountID: accountID, SellerType: &kind, ProductType: str("蔬果"),
 		})
 		must(err)
 		sub, err := m.SubmitKYC(ctx, seller.SubmitKYCInput{AcceptedAgreements: seller.CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: draft.Version})
 		must(err)
 		_, err = m.ApproveKYC(ctx, seller.ApproveKYCInput{ApplicationID: sub.ID, ExpectedVersion: sub.Version, AdminID: 9})
 		must(err)
-		_, err = m.SyncPayUni(ctx, s.StoreID, false)
+		must(payments.EnsureAccount(ctx, s.StoreID, false))
+		_, err = payments.SyncAccount(ctx, s.StoreID)
 		must(err)
-		must(m.PollPayUni(ctx, s.StoreID, seller.PayUniSourcePoll))
 		cur, err := m.Store(ctx, s.StoreID)
 		must(err)
 		s, err = m.UpdateProfile(ctx, seller.UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: "logo", UploaderID: accountID})
@@ -198,9 +200,9 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		return accountID, s
 	}
 
-	exposedAccount, exposed := exposable("範例小農", "A123456789", "012345678901")
+	exposedAccount, exposed := exposable("範例小農")
 	_, pending := open("剛開店")
-	suspendedAccount, suspended := exposable("被停權", "F131104093", "012345678902")
+	suspendedAccount, suspended := exposable("被停權")
 	review := now.Add(7 * 24 * time.Hour)
 	riskSuspend := func(storeID int64, ground seller.RiskGround) {
 		t.Helper()
@@ -212,7 +214,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		}
 	}
 	riskSuspend(suspended.StoreID, seller.RiskFulfillment)
-	_, deleting := exposable("等待刪除", "H200000000", "012345678904")
+	_, deleting := exposable("等待刪除")
 	if err := d.InTx(ctx, func(ctx context.Context) error { return m.BeginDeletion(ctx, deleting.StoreID) }); err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +228,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		t.Fatal(err)
 	}
 	// 處分記在舊 stint、帳號目前的 stint 繼承停權：Apply 在停權中會拒絕，直接寫一個新 stint。
-	inheritedAccount, inheritedOld := exposable("舊店", "F222222222", "012345678905")
+	inheritedAccount, inheritedOld := exposable("舊店")
 	riskSuspend(inheritedOld.StoreID, seller.RiskSecurity)
 	if _, err := m.CloseCurrent(ctx, inheritedAccount); err != nil {
 		t.Fatal(err)
@@ -236,7 +238,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		inheritedOld.StoreCode+1, inheritedAccount, now).Scan(&inheritedNew); err != nil {
 		t.Fatal(err)
 	}
-	_, governance := exposable("違規停權", "J223456789", "012345678906")
+	_, governance := exposable("違規停權")
 	ends := now.Add(30 * 24 * time.Hour)
 	if _, err := m.CreateMeasure(ctx, seller.CreateMeasureInput{
 		AdminID: 7, StoreID: governance.StoreID, Kind: seller.MeasureSuspension, StatementToSeller: "商品頁宣稱有機但沒有認證", Note: "內部紀錄", EndsAt: &ends,
@@ -244,7 +246,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	closedAccount, closed := exposable("已關店", "V223456789", "012345678903")
+	closedAccount, closed := exposable("已關店")
 	if _, err := m.CloseCurrent(ctx, closedAccount); err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +342,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 			}
 		}
 		e1 := r.Msg.GetSellers()[exposed.StoreID]
-		if e1.GetPayuniMerId() != seller.FormatPayUniMerID(exposed.StoreCode) || e1.GetZipCode() != "100" || e1.GetAccountId() != exposedAccount || e1.GetSellerName() != "範例小農" {
+		if e1.GetPayuniMerId() != "" || e1.GetZipCode() != "100" || e1.GetAccountId() != exposedAccount || e1.GetSellerName() != "範例小農" {
 			t.Fatalf("%v", e1)
 		}
 	})
@@ -365,7 +367,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	t.Run("GetSellerShippingProfile", func(t *testing.T) {
 		r, e := s.GetSellerShippingProfile(ctx, connect.NewRequest(&pb.GetSellerShippingProfileRequest{StoreId: exposed.StoreID}))
 		d := r.Msg.GetData()
-		if e != nil || d.GetContactEmail() != "owner@example.com" || d.GetZipCode() != "100" || d.GetMerId() != seller.FormatPayUniMerID(exposed.StoreCode) || d.GetSenderPhone() != "0912345678" {
+		if e != nil || d.GetContactEmail() != "owner@example.com" || d.GetZipCode() != "100" || d.GetMerId() != "" || d.GetSenderPhone() != "0912345678" {
 			t.Fatalf("%v %v", r, e)
 		}
 		// 已關閉的店找不到（舊 server 的 store_id 路徑濾掉 deleted_at）。
@@ -390,18 +392,29 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		}
 	})
 	t.Run("MatchCertificateHolder", func(t *testing.T) {
-		r, e := s.MatchCertificateHolder(ctx, connect.NewRequest(&pb.MatchCertificateHolderRequest{StoreId: exposed.StoreID, HolderName: " 王 小明 "}))
-		if e != nil || !r.Msg.GetMatched() || r.Msg.GetMatchedField() != "REAL_NAME" || !r.Msg.GetHasReference() {
+		// 比對基準是核准的公司名稱（D37：平台不收本名）；個人賣家沒有基準，交人工判斷。
+		companyName, taxID, companyKind := "範例小農有限公司", "33330333", seller.KYCCompany
+		companyAccount, company := open("公司店")
+		companyDraft, err := m.SaveKYCDraft(ctx, seller.KYCDraftInput{AccountID: companyAccount, SellerType: &companyKind, CompanyName: &companyName, TaxID: &taxID})
+		must(err)
+		companySub, err := m.SubmitKYC(ctx, seller.SubmitKYCInput{AcceptedAgreements: seller.CurrentKYCAcceptances(), AccountID: companyAccount, ExpectedVersion: companyDraft.Version})
+		must(err)
+		_, err = m.ApproveKYC(ctx, seller.ApproveKYCInput{ApplicationID: companySub.ID, ExpectedVersion: companySub.Version, AdminID: 9})
+		must(err)
+		r, e := s.MatchCertificateHolder(ctx, connect.NewRequest(&pb.MatchCertificateHolderRequest{StoreId: company.StoreID, HolderName: " 範例 小農有限公司 "}))
+		if e != nil || !r.Msg.GetMatched() || r.Msg.GetMatchedField() != "COMPANY_NAME" || !r.Msg.GetHasReference() {
 			t.Fatalf("%v %v", r, e)
 		}
-		r, e = s.MatchCertificateHolder(ctx, connect.NewRequest(&pb.MatchCertificateHolderRequest{StoreId: exposed.StoreID, HolderName: "別人有限公司"}))
+		r, e = s.MatchCertificateHolder(ctx, connect.NewRequest(&pb.MatchCertificateHolderRequest{StoreId: company.StoreID, HolderName: "別人有限公司"}))
 		if e != nil || r.Msg.GetMatched() || r.Msg.GetMatchedField() != "NONE" || !r.Msg.GetHasReference() {
 			t.Fatalf("%v %v", r, e)
 		}
-		// 沒有核准的申請：沒有基準。
-		r, e = s.MatchCertificateHolder(ctx, connect.NewRequest(&pb.MatchCertificateHolderRequest{StoreId: pending.StoreID, HolderName: "王小明"}))
-		if e != nil || r.Msg.GetMatched() || r.Msg.GetHasReference() {
-			t.Fatalf("%v %v", r, e)
+		// 個人賣家與沒有核准的申請：沒有基準。
+		for name, id := range map[string]int64{"個人賣家": exposed.StoreID, "沒有申請": pending.StoreID} {
+			r, e = s.MatchCertificateHolder(ctx, connect.NewRequest(&pb.MatchCertificateHolderRequest{StoreId: id, HolderName: "王小明"}))
+			if e != nil || r.Msg.GetMatched() || r.Msg.GetHasReference() {
+				t.Fatalf("%s：%v %v", name, r, e)
+			}
 		}
 	})
 	t.Run("ListPublicStoreIDsByCity", func(t *testing.T) {
@@ -517,4 +530,15 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 			}
 		}
 	})
+}
+
+// ownerFunc 是 payment 的擁有者查詢的函式版本。
+type ownerFunc func(ctx context.Context, storeID int64) (bool, error)
+
+func (f ownerFunc) OwnerActive(ctx context.Context, storeID int64) (bool, error) {
+	return f(ctx, storeID)
+}
+
+func (ownerFunc) OwnerContactEmail(context.Context, int64) (string, bool, error) {
+	return "owner@example.com", true, nil
 }

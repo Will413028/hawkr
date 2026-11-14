@@ -77,22 +77,15 @@ WHERE st.status = ANY($1::text[])
     EXISTS (SELECT 1 FROM seller.review_kyc_application($7::timestamptz) r WHERE r.store_id = st.store_id)
   )
   AND (
-    $8::text IS NULL OR
-    EXISTS (
-      SELECT 1 FROM seller.payuni_registrations r
-      WHERE r.store_id = st.store_id AND r.bind_status = $8::text
-    )
+    $8::bool IS NULL OR
+    (st.account_id = ANY($9::bigint[])) = $8::bool
   )
   AND (
-    $9::bool IS NULL OR
-    (st.account_id = ANY($10::bigint[])) = $9::bool
-  )
-  AND (
-    $11::timestamptz IS NULL OR
-    (st.created_at, st.store_id) < ($11::timestamptz, $12::bigint)
+    $10::timestamptz IS NULL OR
+    (st.created_at, st.store_id) < ($10::timestamptz, $11::bigint)
   )
 ORDER BY st.created_at DESC, st.store_id DESC
-LIMIT $13
+LIMIT $12
 `
 
 type AdminStoresParams struct {
@@ -103,7 +96,6 @@ type AdminStoresParams struct {
 	KycStatus         *string
 	KycAwaitingReview bool
 	Now               time.Time
-	BindStatus        *string
 	Suspended         *bool
 	SuspendedAccounts []int64
 	AfterCreatedAt    *time.Time
@@ -112,7 +104,7 @@ type AdminStoresParams struct {
 }
 
 // 後台的店家清單：生命週期（呼叫方一定給至少一個）、名稱或電話（ILIKE，呼叫方已跳脫 % _ \）或 store_code 相同、帳號、
-// 目前那一筆還沒取消的 KYC 申請的狀態、PayUni 註冊的綁定狀態（儲存的事實），新到舊的 keyset。停權不在這裡判斷：它的定義
+// 目前那一筆還沒取消的 KYC 申請的狀態，新到舊的 keyset。停權不在這裡判斷：它的定義
 // 只有 EffectiveMeasures 一處，呼叫方先以它取得生效中停權措施的帳號（suspended_accounts），suspended 為 true 只列這些帳號的
 // 店家、false 只列不在其中的。
 func (q *Queries) AdminStores(ctx context.Context, arg AdminStoresParams) ([]SellerStore, error) {
@@ -124,7 +116,6 @@ func (q *Queries) AdminStores(ctx context.Context, arg AdminStoresParams) ([]Sel
 		arg.KycStatus,
 		arg.KycAwaitingReview,
 		arg.Now,
-		arg.BindStatus,
 		arg.Suspended,
 		arg.SuspendedAccounts,
 		arg.AfterCreatedAt,

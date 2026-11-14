@@ -3,7 +3,8 @@ import 'dart:typed_data';
 
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
-import 'package:hawkr_ui_text/hawkr_ui_text.dart' show commonUnknown;
+import 'package:hawkr_ui_text/hawkr_ui_text.dart'
+    show SellerKYCStatusUiText, commonUnknown;
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -24,21 +25,15 @@ import '../../../shared/widgets/hk_async_state_panel.dart';
 import '../../../shared/widgets/hk_frosted_card_surface.dart';
 import '../../../shared/widgets/hk_glass_app_bar.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
-import '../data/bank_book_ocr_service.dart';
+import '../data/contact_email.dart';
 import '../data/current_kyc.dart';
-import "../data/current_store.dart";
-import '../data/id_card_ocr_service.dart';
 import '../data/kyc_fields.dart';
-import '../data/kyc_flow.dart';
-import '../data/kyc_form.dart';
-import '../data/kyc_ocr.dart';
 import '../data/kyc_wizard.dart';
-import '../data/payuni.dart';
 import '../data/seller_agreements_repository.dart';
+import 'certification_status_view.dart';
 import 'kyc_wizard_steps.dart';
 import 'kyc_wizard_widgets.dart';
 import 'store_address_edit_dialog.dart';
-import 'widgets/payuni_status_body.dart';
 import 'widgets/certification_journey_stepper.dart';
 
 /// 呼叫端帶來的賣家型態提示（路由參數，可省略）；沒帶或不認得回 null。
@@ -65,13 +60,12 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
     final wizard = ref.read(kycWizardProvider.notifier);
     final stepState = useState<KycStep?>(null);
     final privacyChecked = useState(false);
-    final payuniChecked = useState(false);
-    final isProcessingOcr = useState(false);
+    // 確認步驟的聯絡信箱欄位依它顯示；讀取在這裡開始，讀完重建畫面。
+    ref.watch(currentContactEmailProvider);
 
     final entered = useState(false);
     void resetScreen() {
       privacyChecked.value = false;
-      payuniChecked.value = false;
       stepState.value = null;
     }
 
@@ -212,66 +206,6 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
       }
     }
 
-    /// 裝置上的 OCR：選圖當下辨識，只預填空白欄位，不覆蓋使用者已填的值；辨識失敗不擋流程。
-    Future<void> recognize(KycDocSlot slot, File file) async {
-      isProcessingOcr.value = true;
-      try {
-        switch (slot) {
-          case KycDocSlot.idCardFront:
-            final result = await IdCardOcrService.recognizeFront(file);
-            if (!context.mounted) return;
-            wizard.updateForm(
-              (f) => applyIdCardOcr(
-                f,
-                result,
-                hasMaskedId: wizard.maskedId.isNotEmpty,
-                identityLocked: wizard.identityLocked,
-              ),
-            );
-          case KycDocSlot.idCardBack:
-            final result = await IdCardOcrService.recognizeBack(file);
-            if (!context.mounted) return;
-            wizard.updateForm(
-              (f) => applyIdCardOcr(
-                f,
-                result,
-                hasMaskedId: wizard.maskedId.isNotEmpty,
-                identityLocked: wizard.identityLocked,
-              ),
-            );
-          case KycDocSlot.bankBook:
-            final result = await BankBookOcrService.recognize(file);
-            if (!context.mounted) return;
-            wizard.updateForm(
-              (f) => applyBankBookOcr(
-                f,
-                result,
-                hasMaskedAccount: wizard.maskedBankAccount.isNotEmpty,
-              ),
-            );
-        }
-      } catch (error) {
-        HKLog.logW('[CertUpload] OCR failed: $error');
-        if (context.mounted) FloatingToast.error(context, '辨識失敗，請手動填寫');
-      } finally {
-        if (context.mounted) isProcessingOcr.value = false;
-      }
-    }
-
-    Future<void> pickDocument(KycDocSlot slot) async {
-      final picked = await pickImage();
-      if (picked == null || !context.mounted) return;
-      final stamp = DateTime.now().millisecondsSinceEpoch;
-      await wizard.uploadDocument(
-        slot,
-        picked.bytes,
-        docType: slot == KycDocSlot.bankBook ? 'bank_account' : 'id_card',
-        filename: '${slot.path}_$stamp.jpg',
-      );
-      if (!context.mounted || wizard.docs.slot(slot) == null) return;
-      await recognize(slot, picked.file);
-    }
-
     Future<void> addCompanyDocument() async {
       final picked = await pickImage();
       if (picked == null || !context.mounted) return;
@@ -317,14 +251,10 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
       if (!context.mounted) return;
       switch (outcome) {
         case KycSubmitOutcome.submitted:
-          await _showSubmittedDialog(
-            context,
-            business: wizard.subject == KycSubject.business,
-          );
+          await _showSubmittedDialog(context);
           if (context.mounted) context.pop(true);
         case KycSubmitOutcome.agreementOutdated:
           privacyChecked.value = false;
-          payuniChecked.value = false;
         case KycSubmitOutcome.failed:
           break;
       }
@@ -343,7 +273,6 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
 
     final actions = KycStepActions(
       next: next,
-      pickDocument: pickDocument,
       addCompanyDocument: addCompanyDocument,
       editStoreAddress: () => editAddress(
         title: '編輯店家地址',
@@ -384,7 +313,6 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
         wizardState.hydrated &&
         subject == KycSubject.business &&
         wizard.editable &&
-        !wizard.identityLocked &&
         current == KycStep.company;
     final lookupIdle = wizardState.lookup is KycLookupIdle;
     useEffect(() {
@@ -434,10 +362,7 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
         );
       }
       if (locked) {
-        return _LockedStatusView(
-          application: application,
-          certified: ref.watch(myStoreSnapshotProvider)?.isCertified ?? false,
-        );
+        return CertificationStatusView(application: application);
       }
       return Stack(
         children: [
@@ -466,16 +391,8 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
                     ],
                     if (application != null) ...[
                       _RejectionBanner(
-                        application: application,
                         rejection: wizard.rejection,
                         issues: wizard.outstandingIssues,
-                      ),
-                      _PayuniProblemBanner(
-                        payuni:
-                            application.hasFlow() &&
-                                application.flow.hasPayuni()
-                            ? application.flow.payuni
-                            : null,
                       ),
                     ],
                     const SizedBox(height: HkSpace.lg),
@@ -505,9 +422,7 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
                             actions: actions,
                             agreements: agreements,
                             privacyChecked: privacyChecked.value,
-                            payuniChecked: payuniChecked.value,
                             onPrivacyChanged: (v) => privacyChecked.value = v,
-                            onPayuniChanged: (v) => payuniChecked.value = v,
                           ),
                         ),
                       ),
@@ -528,11 +443,6 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
               ),
             ),
           ),
-          if (isProcessingOcr.value)
-            Container(
-              color: AppColors.textSecondary,
-              child: const TruckLoadingOverlay(message: '正在辨識證件資料...'),
-            ),
         ],
       );
     }
@@ -577,10 +487,7 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
   }
 }
 
-Future<void> _showSubmittedDialog(
-  BuildContext context, {
-  required bool business,
-}) {
+Future<void> _showSubmittedDialog(BuildContext context) {
   return showDialog<void>(
     context: context,
     barrierDismissible: false,
@@ -607,17 +514,6 @@ Future<void> _showSubmittedDialog(
               style: TextStyle(
                 fontSize: 16.sp,
                 color: AppColors.textEmphasis,
-                height: 1.6,
-              ),
-            ),
-            SizedBox(height: 8.h),
-            Text(
-              '送出後 PayUni 預設密碼為你的${business ? '統一編號' : '身分證字號'}',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14.sp,
-                fontWeight: FontWeight.w700,
-                color: AppColors.warningText,
                 height: 1.6,
               ),
             ),
@@ -676,27 +572,21 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
-/// 被平台退回的申請：狀態說明、退回原因與伺服器算的待處理問題（欄位名稱加說明）。只看 [rejection]；PayUni 的問題另由
-/// [_PayuniProblemBanner] 呈現。
-class _RejectionBanner extends StatelessWidget {
-  const _RejectionBanner({
-    required this.application,
-    required this.rejection,
-    required this.issues,
-  });
+/// 退回框的說明行；website 的退回框顯示同一句。
+const _rejectionResubmitHint = '請查看退件原因並編輯後重新送出。';
 
-  final KYCApplication application;
+/// 被平台退回的申請：狀態名稱、退回原因與伺服器算的待處理問題（欄位名稱加說明）。只看 [rejection]。
+class _RejectionBanner extends StatelessWidget {
+  const _RejectionBanner({required this.rejection, required this.issues});
+
   final KYCRejection? rejection;
   final List<KYCIssue> issues;
 
   @override
   Widget build(BuildContext context) {
-    final app = application;
-    if (!app.hasFlow()) return const SizedBox.shrink();
     final rejection = this.rejection;
     if (rejection == null) return const SizedBox.shrink();
     final l = context.uiLocale;
-    final copy = kycFlowCopy(KYCFlowStatus.KYC_FLOW_STATUS_REJECTED, l);
     return Padding(
       padding: const EdgeInsets.only(top: HkSpace.lg),
       child: SizedBox(
@@ -711,7 +601,7 @@ class _RejectionBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  copy.bannerTitle ?? commonUnknown(l),
+                  KYCStatus.KYC_STATUS_REJECTED.uiText(l) ?? commonUnknown(l),
                   style: TextStyle(
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w700,
@@ -720,7 +610,7 @@ class _RejectionBanner extends StatelessWidget {
                 ),
                 SizedBox(height: 4.h),
                 Text(
-                  copy.bannerDescription ?? commonUnknown(l),
+                  _rejectionResubmitHint,
                   style: TextStyle(fontSize: 14.sp, color: AppColors.gray1),
                 ),
                 SizedBox(height: 8.h),
@@ -737,49 +627,6 @@ class _RejectionBanner extends StatelessWidget {
                     style: TextStyle(fontSize: 14.sp, color: AppColors.gray1),
                   ),
                 ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 賣家正在修正 PayUni 拒絕或綁定失敗的申請（FIXABLE，含存成草稿之後）：PayUni 的標題、伺服器的說明、審核意見與要修正的欄位。
-/// 沒有 PayUni 狀態時不顯示；樣式沿用 [_RejectionBanner]。
-class _PayuniProblemBanner extends StatelessWidget {
-  const _PayuniProblemBanner({required this.payuni});
-
-  final SellerPayUni? payuni;
-
-  @override
-  Widget build(BuildContext context) {
-    final payuni = this.payuni;
-    if (!payuniHasState(payuni)) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: HkSpace.lg),
-      child: SizedBox(
-        width: double.infinity,
-        child: HkFrostedCardSurface(
-          radius: HkRadius.lg,
-          shadows: HkShadows.sm,
-          child: Padding(
-            padding: const EdgeInsets.all(HkSpace.lg),
-            child: Column(
-              key: const Key('kyc_payuni_problem'),
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  payuniStateTitle(payuni!.state, context.uiLocale),
-                  style: TextStyle(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.danger,
-                  ),
-                ),
-                SizedBox(height: 4.h),
-                PayuniStatusBody(payuni: payuni),
               ],
             ),
           ),
@@ -864,116 +711,12 @@ class _SubjectPicker extends StatelessWidget {
           style: TextStyle(fontSize: 14.sp, color: AppColors.textSecondary),
         ),
         SizedBox(height: 16.h),
-        option(KycSubject.individual, '個人賣家', const [
-          '以個人名義販售農產品 / 自家產品',
-          '需身分證 + 存摺',
-        ]),
+        option(KycSubject.individual, '個人賣家', const ['以個人名義販售農產品 / 自家產品']),
         SizedBox(height: 12.h),
-        option(KycSubject.business, '企業用戶', const [
-          '以行號或公司名義販售（需統一編號）',
-          '需公司資訊 + 負責人身分證 + 公司帳戶存摺',
-        ]),
+        option(KycSubject.business, '企業用戶', const ['以行號或公司名義販售（需統一編號）']),
         SizedBox(height: 24.h),
         KycPrimaryButton(label: '開始填寫', busy: busy, onTap: onStart),
       ],
-    );
-  }
-}
-
-/// 已送出審核 / 已完成認證的唯讀狀態畫面（不含任何可編輯欄位或送出按鈕）。
-class _LockedStatusView extends StatelessWidget {
-  const _LockedStatusView({required this.application, required this.certified});
-
-  final KYCApplication application;
-  final bool certified;
-
-  @override
-  Widget build(BuildContext context) {
-    final status = certified
-        ? KYCFlowStatus.KYC_FLOW_STATUS_APPROVED
-        : application.flow.status;
-    final l = context.uiLocale;
-    final copy = kycFlowCopy(status, l);
-    final approved = status == KYCFlowStatus.KYC_FLOW_STATUS_APPROVED;
-    final payuni =
-        !certified && application.hasFlow() && application.flow.hasPayuni()
-        ? application.flow.payuni
-        : null;
-    final showPayuni = payuniHasState(payuni);
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CertificationJourneyStepper(currentStep: 3),
-              const SizedBox(height: 16),
-              HkFrostedCardSurface(
-                radius: HkRadius.xl,
-                shadows: HkShadows.lg,
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    key: const Key('kyc_locked'),
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: approved
-                              ? AppColors.primarySoft
-                              : AppColors.bgCard,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          approved
-                              ? AppIcons.checkCircle
-                              : AppIcons.hourglassTop,
-                          size: 32,
-                          color: approved
-                              ? AppIconColors.success
-                              : AppIconColors.active,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        showPayuni
-                            ? payuniStateTitle(payuni!.state, l)
-                            : copy.bannerTitle ?? commonUnknown(l),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textEmphasis,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      if (showPayuni)
-                        PayuniStatusBody(
-                          payuni: payuni!,
-                          textAlign: TextAlign.center,
-                        )
-                      else
-                        Text(
-                          copy.bannerDescription ?? commonUnknown(l),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppColors.gray1,
-                            height: 1.5,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

@@ -20,12 +20,14 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
@@ -179,7 +181,9 @@ type fixture struct {
 	bus      *events.Bus
 	jobs     *queue
 	media    *images
-	payuni   *fakePayUni
+	payment  *payment.Fake
+	// payments 是 payment 模組（provider 是 payment 這個 fake）：核准經它寫收款帳戶列，同步發的 PayoutAccountChanged 由 f.module 訂閱。
+	payments *payment.Module
 	orders   *storeOrders
 	products *fakeProductStores
 	registry *fakeRegistry
@@ -191,36 +195,71 @@ type fixture struct {
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Migrations(
-		migrate.Module{Name: "identity", Dir: identity.Migrations()}, migrate.Module{Name: "seller", Dir: Migrations()},
+		migrate.Module{Name: inbox.Schema, Dir: inbox.Migrations()}, migrate.Module{Name: "identity", Dir: identity.Migrations()},
+		migrate.Module{Name: "payment", Dir: payment.Migrations()}, migrate.Module{Name: "seller", Dir: Migrations()},
 	))
-	f := &fixture{db: d, bus: events.NewBus(), jobs: &queue{}, media: newImages(), payuni: &fakePayUni{t: t}, orders: &storeOrders{}, products: &fakeProductStores{}, registry: &fakeRegistry{t: t}, now: time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)}
+	f := &fixture{db: d, bus: events.NewBus(), jobs: &queue{}, media: newImages(), payment: payment.NewFake(), orders: &storeOrders{}, products: &fakeProductStores{}, registry: &fakeRegistry{t: t}, now: time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	f.identity = identity.New(identity.Deps{DB: d, Events: f.bus, Now: func() time.Time { return f.now }, Logger: log})
-	f.module = f.newModule(t, f.payuni, f.jobs)
+	clock := func() time.Time { return f.now }
+	f.payments = payment.New(payment.Deps{
+		DB: d, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: d, Jobs: f.jobs, Now: clock, Logger: log}), Provider: f.payment,
+		Owners: fixtureOwners{f}, Now: clock, Logger: log,
+	})
+	f.module = f.newModule(t, f.jobs)
+	events.Subscribe(f.bus, func(ctx context.Context, e payment.PayoutAccountChanged) error {
+		return f.module.OnPayoutAccountChanged(ctx, e)
+	})
 	return f
 }
 
-// newModule 在同一個 DB 上組一個 seller 模組：PayUni 的 client 與 job 的排入可以換（沒有設定 PayUni、真的 River）。
-func (f *fixture) newModule(t *testing.T, client PayUniClient, jc jobs.ReportingEnqueuer) *Module {
+// fixtureOwners 是 payment 的擁有者查詢（組裝點的 sellerOwners 的測試版）：店家存在而且沒有關閉。
+type fixtureOwners struct{ f *fixture }
+
+func (o fixtureOwners) OwnerActive(ctx context.Context, storeID int64) (bool, error) {
+	s, err := o.f.module.Store(ctx, storeID)
+	if apperr.KindOf(err) == apperr.KindNotFound {
+		return false, nil
+	}
+	return err == nil && s.Status != Closed, err
+}
+
+// OwnerContactEmail 是組裝點的 sellerOwners.OwnerContactEmail 的測試版：店家所屬帳號在 identity 的聯絡信箱。
+func (o fixtureOwners) OwnerContactEmail(ctx context.Context, storeID int64) (string, bool, error) {
+	s, err := o.f.module.Store(ctx, storeID)
+	if apperr.KindOf(err) == apperr.KindNotFound {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	c, ok, err := o.f.identity.ContactEmail(ctx, s.AccountID)
+	if err != nil || !ok {
+		return "", false, err
+	}
+	return c.Address, true, nil
+}
+
+// newModule 在同一個 DB 上組一個 seller 模組：job 的排入可以換（真的 River）。
+func (f *fixture) newModule(t *testing.T, jc jobs.ReportingEnqueuer) *Module {
 	t.Helper()
-	kycKeys, kycMAC := sealtest.Keys(t)
-	return f.newModuleWithKeys(t, client, jc, kycKeys, kycMAC)
+	kycMAC := sealtest.MAC(t)
+	return f.newModuleWithKeys(t, jc, kycMAC)
 }
 
 // newModuleWithKeys 同 newModule，KYC 的金鑰環由呼叫方給（測試金鑰輪替）。
-func (f *fixture) newModuleWithKeys(t *testing.T, client PayUniClient, jc jobs.ReportingEnqueuer, kycKeys *seal.Keyring, kycMAC *seal.MAC) *Module {
+func (f *fixture) newModuleWithKeys(t *testing.T, jc jobs.ReportingEnqueuer, kycMAC *seal.MAC) *Module {
 	t.Helper()
-	return f.newModuleClock(t, client, jc, kycKeys, kycMAC, func() time.Time { return f.now })
+	return f.newModuleClock(t, jc, kycMAC, func() time.Time { return f.now })
 }
 
 // newModuleClock 同 newModuleWithKeys，時鐘由呼叫方給（測試多實例的時鐘差）。
-func (f *fixture) newModuleClock(t *testing.T, client PayUniClient, jc jobs.ReportingEnqueuer, kycKeys *seal.Keyring, kycMAC *seal.MAC, now func() time.Time) *Module {
+func (f *fixture) newModuleClock(t *testing.T, jc jobs.ReportingEnqueuer, kycMAC *seal.MAC, now func() time.Time) *Module {
 	t.Helper()
 	log := slog.New(slog.NewTextHandler(&f.logs, nil))
 	return New(Deps{
-		DB: f.db, Events: f.bus, Jobs: jc, Identity: f.identity, Media: f.media, Orders: f.orders, KYCKeys: kycKeys, KYCMAC: kycMAC, PayUni: client, ProductStores: f.products, Registry: f.registry,
-		StorefrontBaseURL: "https://store.example.invalid",
-		Now:               now, Logger: log,
+		DB: f.db, Events: f.bus, Jobs: jc, Identity: f.identity, Media: f.media, Orders: f.orders, KYCMAC: kycMAC, Payment: f.payments, ProductStores: f.products, Registry: f.registry,
+		Now: now, Logger: log,
 		StoreCode: func(now time.Time) (int64, error) {
 			if len(f.codes) > 0 {
 				code := f.codes[0]
@@ -247,13 +286,13 @@ func must(t *testing.T, err error) {
 
 func ptr[T any](v T) *T { return &v }
 
-// account 建立一個帳號。先多建兩個，讓 account_id 與第一個 store_id 不同值：互換 ID 的缺陷才藏不住。
+// account 建立一個帳號（有自填的聯絡信箱 seller@example.com，KYC 才送得出去）。先多建兩個，讓 account_id 與第一個 store_id 不同值：互換 ID 的缺陷才藏不住。
 func (f *fixture) account(t *testing.T) int64 {
 	t.Helper()
 	ctx := context.Background()
 	var id int64
 	for range 3 {
-		must(t, f.db.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&id))
+		must(t, f.db.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts (self_entered_email) VALUES ('seller@example.com') RETURNING id").Scan(&id))
 	}
 	return id
 }

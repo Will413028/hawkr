@@ -71,7 +71,42 @@ func reportItem(id string, due time.Time) rq.Item {
 	return rq.Item{Kind: rq.ReportTriage, ItemID: id, ReportID: &r, Start: due.Add(-72 * time.Hour), Due: due}
 }
 
-func newAdmin(f *fakeLister) *Admin { return NewAdmin(f, func() time.Time { return now }) }
+// fakeNames 回店名並記下每次查詢的店家。
+type fakeNames struct {
+	names map[int64]string
+	calls [][]int64
+}
+
+func (f *fakeNames) StoreNames(_ context.Context, ids []int64) (map[int64]string, error) {
+	f.calls = append(f.calls, slices.Clone(ids))
+	return f.names, nil
+}
+
+func newAdmin(f *fakeLister) *Admin {
+	return NewAdmin(f, &fakeNames{}, func() time.Time { return now })
+}
+
+// payment 的待辦只有店家 ID（店名在模組的查詢是空字串）：handler 一頁批次讀一次店名補上；來源已經給店名的項目不查、不覆寫。
+// mutation：拿掉 fillStoreNames → 收款帳戶待辦的 store_name 是空的；補名字時不跳過已有店名的項目 → 呼叫的店家多了 2。
+func TestStoreNamesAreFilledForItemsWithoutOne(t *testing.T) {
+	s1, s2 := int64(1), int64(2)
+	f := &fakeLister{items: []rq.Item{
+		{Kind: rq.PaymentAccountCreateFailed, ItemID: "1", StoreID: &s1, Start: now, Due: now.Add(24 * time.Hour)},
+		{Kind: rq.PaymentAccountCreateFailed, ItemID: "2", StoreID: &s2, StoreName: "已有店名", Start: now, Due: now.Add(25 * time.Hour)},
+	}}
+	names := &fakeNames{names: map[int64]string{1: "收款店", 2: "不該用到"}}
+	h := NewAdmin(f, names, func() time.Time { return now })
+	resp, err := list(t, h, asOwner, &adminpb.ListReviewQueueRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Items) != 2 || resp.Items[0].GetStoreName() != "收款店" || resp.Items[1].GetStoreName() != "已有店名" {
+		t.Fatalf("items=%v", resp.Items)
+	}
+	if len(names.calls) != 1 || !slices.Equal(names.calls[0], []int64{1}) {
+		t.Fatalf("店名查詢=%v", names.calls)
+	}
+}
 
 // 呼叫者：以 header 選擇放進 ctx 的 principal（真實的入口是 withSession），其餘走真正的 interceptor 與 Connect 的 wire，錯誤碼因此是 client 看到的。
 const (
@@ -134,8 +169,8 @@ func TestKindsAreOneToOneWithTheContract(t *testing.T) {
 	if !slices.Equal(fromProto, all) {
 		t.Errorf("proto %v，模組 %v", fromProto, all)
 	}
-	if len(all) != 10 {
-		t.Errorf("種類 %d 個，預期 10 個", len(all))
+	if len(all) != 12 {
+		t.Errorf("種類 %d 個，預期 12 個", len(all))
 	}
 	// 權限表：逐種類寫死期望的來源讀取權限（E13），每個權限都在目錄裡。
 	wantPerm := map[rq.Kind]adminperm.Permission{
@@ -148,8 +183,11 @@ func TestKindsAreOneToOneWithTheContract(t *testing.T) {
 		rq.MeasureLiftRequest:    adminperm.SellerMeasuresList,
 		rq.MeasureReview:         adminperm.SellerMeasuresList,
 		rq.KYCApplication:        adminperm.SellerKYCApplicationsList,
-		// PayUni 註冊只有 get 讀取權（沒有 list RPC）。
-		rq.PayUniBindRetry: adminperm.SellerPayUniRegistrationsGet,
+		// 收款帳戶的讀取權（沒有 list RPC）。
+		rq.PaymentAccountCreateFailed: adminperm.PaymentAccountsGet,
+		rq.PaymentAccountPurgeStuck:   adminperm.PaymentAccountsGet,
+		// 共用銀行帳號提醒的來源是措施：看得到它的是措施的讀取權（處分頁的關聯帳號列）。
+		rq.SharedBankAccount: adminperm.SellerMeasuresList,
 	}
 	for _, k := range rq.Kinds() {
 		perm, ok := kindPermissions[k]
@@ -247,7 +285,7 @@ func TestKindsRejectUnspecifiedAndUnknown(t *testing.T) {
 		"UNSPECIFIED": {[]adminpb.ReviewQueueItemKind{adminpb.ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_UNSPECIFIED}, "kinds[0]"},
 		"未知數字":        {[]adminpb.ReviewQueueItemKind{adminpb.ReviewQueueItemKind(99)}, "kinds[0]"},
 		"負數":          {[]adminpb.ReviewQueueItemKind{adminpb.ReviewQueueItemKind(-1)}, "kinds[0]"},
-		"有效的種類之間夾著未知的值": {[]adminpb.ReviewQueueItemKind{adminpb.ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_REPORT_TRIAGE, adminpb.ReviewQueueItemKind(13)}, "kinds[1]"},
+		"有效的種類之間夾著未知的值": {[]adminpb.ReviewQueueItemKind{adminpb.ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_REPORT_TRIAGE, adminpb.ReviewQueueItemKind(15)}, "kinds[1]"},
 		"有效的種類後面接著未指定":  {[]adminpb.ReviewQueueItemKind{adminpb.ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION, 0}, "kinds[1]"},
 	} {
 		f := &fakeLister{}
@@ -347,7 +385,7 @@ func TestKindsAreIntersectedWithThePermissionsOfTheCaller(t *testing.T) {
 	if _, err := list(t, h, who, kinds()); err != nil {
 		t.Fatal(err)
 	}
-	want := []rq.Kind{rq.KYCApplication, rq.MeasureAppeal, rq.MeasureLiftRequest, rq.MeasureReview}
+	want := []rq.Kind{rq.KYCApplication, rq.MeasureAppeal, rq.MeasureLiftRequest, rq.MeasureReview, rq.SharedBankAccount}
 	if got := sorted(f.calls[0].kinds); !slices.Equal(got, want) {
 		t.Errorf("空的 kinds 展開成 %v，預期有權的全部 %v", got, want)
 	}
@@ -374,7 +412,7 @@ func TestKindsAreIntersectedWithThePermissionsOfTheCaller(t *testing.T) {
 	}
 	// OWNER 是全部。
 	f.calls = nil
-	if _, err := list(t, newAdmin(f), asOwner, kinds()); err != nil || len(f.calls[0].kinds) != 10 {
+	if _, err := list(t, newAdmin(f), asOwner, kinds()); err != nil || len(f.calls[0].kinds) != 12 {
 		t.Errorf("OWNER：%v %v", err, f.calls)
 	}
 	// 呼叫者不是管理員、或沒有認證：interceptor 在 handler 之前擋下，不呼叫模組。
@@ -429,9 +467,11 @@ func TestToProtoBuildsTheSubjectOfEachKind(t *testing.T) {
 		{rq.Item{Kind: rq.KYCApplication, KYCApplicationID: id(), StoreID: &store}, func(p *adminpb.ReviewQueueItem) string {
 			return p.GetKycApplication().GetStoreId() + "/" + p.GetKycApplication().GetApplicationId()
 		}, "kyc"},
-		{rq.Item{Kind: rq.PayUniBindRetry, KYCApplicationID: id(), StoreID: &store}, func(p *adminpb.ReviewQueueItem) string {
-			return p.GetKycApplication().GetStoreId() + "/" + p.GetKycApplication().GetApplicationId()
-		}, "payuni_bind_retry"},
+		{rq.Item{Kind: rq.SharedBankAccount, MeasureID: id(), AccountID: &acc}, func(p *adminpb.ReviewQueueItem) string {
+			return p.GetSharedBankAccount().GetMeasureId() + "/" + p.GetSharedBankAccount().GetAccountId()
+		}, "shared_bank_account"},
+		{rq.Item{Kind: rq.PaymentAccountCreateFailed}, func(p *adminpb.ReviewQueueItem) string { return p.GetPaymentAccount().GetStoreId() }, "payment_account_create_failed"},
+		{rq.Item{Kind: rq.PaymentAccountPurgeStuck}, func(p *adminpb.ReviewQueueItem) string { return p.GetPaymentAccount().GetStoreId() }, "payment_account_purge_stuck"},
 	} {
 		it := tt.item
 		it.ItemID, it.Start, it.Due = "x", start, due
@@ -475,7 +515,7 @@ func TestToProtoBuildsTheSubjectOfEachKind(t *testing.T) {
 				set++
 			}
 		}
-		for _, present := range []bool{p.GetCaseInquiry() != nil, p.GetAuthorityTarget() != nil, p.GetMeasureRequest() != nil, p.GetKycApplication() != nil} {
+		for _, present := range []bool{p.GetCaseInquiry() != nil, p.GetAuthorityTarget() != nil, p.GetMeasureRequest() != nil, p.GetKycApplication() != nil, p.GetPaymentAccount() != nil, p.GetSharedBankAccount() != nil} {
 			if present {
 				set++
 			}

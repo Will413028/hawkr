@@ -9,7 +9,11 @@ import {
 	storeMissingItemsOf,
 	submitPreconditionMessage,
 } from "./store-contact";
-import { SUPPORT_EMAIL_MAX_LENGTH } from "./validators";
+import {
+	SUPPORT_EMAIL_MAX_LENGTH,
+	validateContactName,
+	validateMobile,
+} from "./validators";
 
 const ut = uiTextFor("zh-TW");
 
@@ -84,7 +88,7 @@ describe("storeContactErrors", () => {
 		).not.toBeNull();
 	});
 
-	it("客服信箱與聯絡人姓名的長度上限等於 PayUni 的上限", () => {
+	it("客服信箱與聯絡人姓名的長度上限", () => {
 		const email = (n: number) => `${"a".repeat(n - 12)}@example.com`;
 		expect(email(SUPPORT_EMAIL_MAX_LENGTH).length).toBe(
 			SUPPORT_EMAIL_MAX_LENGTH,
@@ -93,7 +97,16 @@ describe("storeContactErrors", () => {
 			storeContactErrors({ contactName, contactMobile: "", supportEmail });
 		expect(at(email(SUPPORT_EMAIL_MAX_LENGTH)).emailErr).toBeNull();
 		expect(at(email(SUPPORT_EMAIL_MAX_LENGTH + 1)).emailErr).not.toBeNull();
-		expect(at("a@example.com", "字".repeat(20)).nameErr).toBeNull();
-		expect(at("a@example.com", "字".repeat(21)).nameErr).not.toBeNull();
+		expect(at("a@example.com", "字".repeat(50)).nameErr).toBeNull();
+		expect(at("a@example.com", "字".repeat(51)).nameErr).not.toBeNull();
+	});
+});
+
+describe("聯絡人姓名與手機是選填", () => {
+	it("空白不報錯，已填的照格式檢查", () => {
+		expect(validateContactName("  ")).toBeNull();
+		expect(validateMobile("")).toBeNull();
+		expect(validateContactName("字".repeat(51))).not.toBeNull();
+		expect(validateMobile("0229010572")).not.toBeNull();
 	});
 });

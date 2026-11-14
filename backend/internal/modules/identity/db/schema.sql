@@ -24,16 +24,25 @@ CREATE SCHEMA identity;
 -- 等待刪除的帳號不能再授予角色；刪除時清掉。
 --
 -- email 是 provider 回報的已驗證 email（LINE 可能沒有），登入時更新，是寄件地址，也給後台的清單顯示與搜尋。它不是識別：不唯一。
+--
+-- self_entered_email 是帳號自己填的聯絡信箱（D23 2026-11-03 修訂；賣家送審、收款帳戶的聯絡信箱要有）：未驗證，不是寄件地址
+-- （通知只寄已驗證的 email，通知 ADR 決策 8），不是識別，也不寫進 account_identities、不成為自動連結的依據。只在帳號沒有已驗證的
+-- email 時可設（應用層檢查；帳號之後才取得已驗證 email 時保留原值，讀取時已驗證的 email 優先）。格式與長度同收款帳戶的聯絡信箱。
 CREATE TABLE identity.accounts (
     id            BIGINT       GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     email         TEXT,
+    self_entered_email TEXT,
     suspended_at  TIMESTAMPTZ,
     deleted_at    TIMESTAMPTZ,
     deletion_pending_at TIMESTAMPTZ,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     -- 刪除的帳號沒有個資，也不再是停權狀態。
-    CONSTRAINT accounts_deleted_check CHECK (deleted_at IS NULL OR (email IS NULL AND suspended_at IS NULL)),
+    CONSTRAINT accounts_deleted_check CHECK (deleted_at IS NULL OR (email IS NULL AND self_entered_email IS NULL AND suspended_at IS NULL)),
+    -- 自填信箱已正規化：小寫、至多 254 字、恰好一個 @ 且兩側非空。
+    CONSTRAINT accounts_self_entered_email_check CHECK (
+        self_entered_email = lower(self_entered_email) AND char_length(self_entered_email) <= 254 AND self_entered_email ~ '^[^@[:space:]]+@[^@[:space:]]+$'
+    ),
     -- 刪除的帳號不再是等待刪除。
     CONSTRAINT accounts_deletion_pending_check CHECK (deleted_at IS NULL OR deletion_pending_at IS NULL)
 );

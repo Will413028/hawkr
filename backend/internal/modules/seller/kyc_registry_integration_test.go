@@ -87,7 +87,7 @@ func matchingRegistration() gcis.Registration {
 func (f *fixture) companySubmission(t *testing.T, mutate func(*KYCDraftInput)) (int64, Store, KYCApplication) {
 	t.Helper()
 	accountID, s := f.open(t)
-	in := companyDraft(accountID, idRep, taxIDOne, bankAcct)
+	in := companyDraft(accountID, taxIDOne)
 	in.CompanyRegisterDate, in.CompanyTownCode, in.CompanyAddressDetail = ptr("2015-03-04"), ptr("63000050"), ptr("中山路 2 號")
 	if mutate != nil {
 		mutate(&in)
@@ -158,7 +158,7 @@ func TestCompanySubmitCreatesAPendingCheckAndEnqueuesTheJob(t *testing.T) {
 	if f.registry.callCount() != 0 {
 		t.Fatal("送件的 transaction 內不該呼叫資料來源")
 	}
-	_, _, individual := f.submitted(t, idA, bankAcct)
+	_, _, individual := f.submitted(t)
 	if got := f.checkIDs(t, individual.ID); len(got) != 0 {
 		t.Fatalf("個人型建立了查詢：%v", got)
 	}
@@ -530,12 +530,12 @@ func TestRequeryRegistrationRules(t *testing.T) {
 	requery := func(id uuid.UUID) error {
 		return f.requery(ctx, RequeryKYCRegistrationInput{ApplicationID: id, AdminID: 7})
 	}
-	_, _, individual := f.submitted(t, idA, bankAcct)
+	_, _, individual := f.submitted(t)
 	if err := requery(individual.ID); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("個人型：%v", err)
 	}
 	accountID, _ := f.open(t)
-	draft := f.savedDraft(t, companyDraft(accountID, idRep, taxIDOne, "999888777666"))
+	draft := f.savedDraft(t, companyDraft(accountID, taxIDOne))
 	if err := requery(draft.ID); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("草稿：%v", err)
 	}
@@ -640,7 +640,7 @@ func TestApproveAndRejectWithoutAFinishedCheckRecordNoReference(t *testing.T) {
 	_, _, sub := f.companySubmission(t, nil) // 查詢還在 PENDING
 	_, err := f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: sub.ID, ExpectedVersion: sub.Version, ExpectedCheckSeq: 0, AdminID: 9, Issues: anIssue(), Reason: "資料不齊"})
 	must(t, err)
-	_, _, individual := f.submitted(t, idB, "999888777666")
+	_, _, individual := f.submitted(t)
 	_, err = f.module.ApproveKYC(ctx, ApproveKYCInput{ApplicationID: individual.ID, ExpectedVersion: individual.Version, AdminID: 9})
 	must(t, err)
 	if n := f.count(t, "SELECT count(*) FROM seller.kyc_reviews WHERE action IN ('APPROVE','REJECT') AND registration_check_id IS NULL"); n != 2 {
@@ -709,7 +709,7 @@ func TestRegistryCheckJobsAreUniqueByCheckIDAndDuplicateDeliveryIsHarmless(t *te
 	must(t, jobs.Migrate(ctx, f.db))
 	jc, err := jobs.NewInsertOnly(f.db)
 	must(t, err)
-	f.module = f.newModule(t, f.payuni, jc)
+	f.module = f.newModule(t, jc)
 	_, _, sub := f.companySubmission(t, nil)
 	must(t, f.requery(ctx, RequeryKYCRegistrationInput{ApplicationID: sub.ID, AdminID: 7}))
 	const registryJobs = "SELECT count(*) FROM river.river_job WHERE kind='seller.kyc_registry_check'"
@@ -759,7 +759,7 @@ func TestRegistryCheckSchemaConstraints(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	_, _, sub := f.companySubmission(t, nil)
-	other, _, individual := f.submitted(t, idB, "999888777666")
+	other, _, individual := f.submitted(t)
 	_ = other
 	id := f.checkIDs(t, sub.ID)[0]
 	for name, query := range map[string]string{

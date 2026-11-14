@@ -24,7 +24,7 @@ WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND suspended_at IS NOT NULL;
 -- name: DeleteAccount :execrows
 -- 留下沒有個資的墓碑（accounts_deleted_check）。已經刪除時沒有列被更新（冪等）。
 UPDATE identity.accounts
-SET deleted_at = sqlc.arg(now)::timestamptz, email = NULL, suspended_at = NULL, deletion_pending_at = NULL,
+SET deleted_at = sqlc.arg(now)::timestamptz, email = NULL, self_entered_email = NULL, suspended_at = NULL, deletion_pending_at = NULL,
     updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
@@ -71,3 +71,10 @@ UPDATE identity.accounts
 SET email = sqlc.arg(email), updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND email IS DISTINCT FROM sqlc.arg(email);
 
+
+-- name: SetSelfEnteredEmail :execrows
+-- 自填聯絡信箱：呼叫方已在同一個 transaction 內鎖住帳號列（LockLiveAccount）並以 Go 的 validEmail 確認沒有可用的已驗證 email；
+-- 「可用」的規則只在 Go（emailaddr.Normalize），SQL 不重述它。依 id 寫入存活的帳號，受影響列數必為 1（相同值也寫入，不是 no-op）。
+UPDATE identity.accounts
+SET self_entered_email = sqlc.arg(self_entered_email), updated_at = sqlc.arg(now)::timestamptz
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL;

@@ -137,7 +137,7 @@ void main() {
 
   test('欄位錯誤：對應到畫面欄位的路徑', () async {
     final e = editor();
-    failure = fieldError('store.contact_name', '聯絡人姓名最多 20 字');
+    failure = fieldError('store.contact_name', '聯絡人姓名最多 50 字');
 
     final outcome = await e.save(StoreTextField.contactName.changes('x'));
 
@@ -147,7 +147,7 @@ void main() {
         outcome,
         fieldPaths: [StoreTextField.contactName.errorPath],
       ),
-      '聯絡人姓名最多 20 字',
+      '聯絡人姓名最多 50 字',
     );
     expect(reloads, 0);
   });
@@ -161,7 +161,14 @@ void main() {
       expect(StoreTextField.contactMobile.validate('0912345678'), isNull);
       expect(StoreTextField.supportEmail.validate('a@b'), 'Email 格式不正確');
       expect(StoreTextField.supportEmail.validate('a@b.tw'), isNull);
-      expect(StoreTextField.contactName.validate('一' * 21), '聯絡人姓名最多 20 字');
+      expect(StoreTextField.contactName.validate('一' * 51), '聯絡人姓名最多 50 字');
+      expect(StoreTextField.contactName.validate('一' * 50), isNull);
+      expect(StoreTextField.contactName.maxLength, 50);
+      expect(
+        StoreTextField.supportEmail.validate('${'a' * 250}@b.tw'),
+        '客服電子信箱最多 254 字',
+      );
+      expect(StoreTextField.supportEmail.validate('${'a' * 248}@b.tw'), isNull);
       expect(
         StoreTextField.websiteUrl.validate('ftp://x.tw'),
         '請輸入有效的網站網址，例如 https://example.com',
@@ -177,19 +184,9 @@ void main() {
       expect(StoreTextField.supportEmail.validate(''), isNull);
     });
 
-    test('店名與介紹受 PayUni 鎖定，其他欄位不受', () {
-      expect(
-        [
-          for (final f in StoreTextField.values)
-            if (f.lockedByPayuni) f,
-        ],
-        [StoreTextField.storeName, StoreTextField.description],
-      );
-    });
-
     test('標籤用兩端一起改的名稱', () {
       expect(StoreTextField.contactPhone.label, '商店電話');
-      expect(StoreTextField.supportEmail.hint, 'PayUni 會寄金流相關通知到這個信箱');
+      expect(StoreTextField.supportEmail.hint, isNull);
       expect(StoreTextField.contactMobile.hint, '09 開頭的 10 碼手機號碼');
     });
   });

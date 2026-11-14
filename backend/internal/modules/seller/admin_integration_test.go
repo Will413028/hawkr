@@ -283,7 +283,7 @@ func TestAdminStoresFiltersAndDerivedFields(t *testing.T) {
 			t.Fatalf("query %q matched %v", q, got)
 		}
 	}
-	// 停權與 KYC 流程是推導出來的，不是儲存的篩選。
+	// 停權是推導出來的，不是儲存的篩選。
 	byID := map[int64]StoreListItem{}
 	for _, item := range list(StoreListInput{}) {
 		byID[item.Store.StoreID] = item
@@ -292,8 +292,8 @@ func TestAdminStoresFiltersAndDerivedFields(t *testing.T) {
 		t.Fatalf("suspension: %+v", byID)
 	}
 	for id, item := range byID {
-		if item.KYCFlow != FlowNotStarted {
-			t.Fatalf("store %d flow=%s", id, item.KYCFlow)
+		if item.KYCStatus != nil {
+			t.Fatalf("store %d 沒有申請，卻有申請狀態 %s", id, *item.KYCStatus)
 		}
 	}
 	// 不合法的篩選值被拒絕，不被忽略。
@@ -317,41 +317,42 @@ func TestAdminStoresFilterByKYCStatusAndShowTheFlow(t *testing.T) {
 	ctx := context.Background()
 	_, noApplication := f.open(t)
 	accountDraft, draftOnly := f.open(t)
-	f.savedDraft(t, kycDraft(accountDraft, idA, bankAcct))
-	_, submittedStore, _ := f.submitted(t, idB, "012345678902")
-	_, approvedStore, toApprove := f.submitted(t, idC, "012345678903")
+	f.savedDraft(t, kycDraft(accountDraft))
+	_, submittedStore, _ := f.submitted(t)
+	_, approvedStore, toApprove := f.submitted(t)
 	must(t, approve(f, toApprove))
 
-	list := func(status KYCStatus) map[int64]KYCFlowStatus {
+	list := func(status KYCStatus) map[int64]*KYCStatus {
 		t.Helper()
 		page, err := f.module.AdminStores(ctx, StoreListInput{KYCStatus: &status})
 		must(t, err)
-		out := map[int64]KYCFlowStatus{}
+		out := map[int64]*KYCStatus{}
 		for _, item := range page.Items {
-			out[item.Store.StoreID] = item.KYCFlow
+			out[item.Store.StoreID] = item.KYCStatus
 		}
 		return out
 	}
 	awaiting, err := f.module.AdminStores(ctx, StoreListInput{KYCAwaitingReview: true})
 	must(t, err)
-	if len(awaiting.Items) != 1 || awaiting.Items[0].Store.StoreID != submittedStore.StoreID || awaiting.Items[0].KYCFlow != FlowSubmitted {
+	if len(awaiting.Items) != 1 || awaiting.Items[0].Store.StoreID != submittedStore.StoreID || awaiting.Items[0].KYCStatus == nil || *awaiting.Items[0].KYCStatus != KYCStatusSubmitted {
 		t.Fatalf("awaiting review=%+v", awaiting.Items)
 	}
-	if got := list(KYCStatusApproved); len(got) != 1 || got[approvedStore.StoreID] == FlowNotStarted || got[approvedStore.StoreID] == FlowSubmitted {
+	if got := list(KYCStatusApproved); len(got) != 1 || got[approvedStore.StoreID] == nil || *got[approvedStore.StoreID] != KYCStatusApproved {
 		t.Fatalf("approved=%v", got)
 	}
 	if got := list(KYCStatusRejected); len(got) != 0 {
 		t.Fatalf("rejected=%v", got)
 	}
-	// 沒有篩選時，草稿的店家只顯示它的流程狀態，沒有申請的是 NOT_STARTED。
+	// 沒有篩選時，草稿的店家顯示草稿，沒有申請的店家沒有申請狀態。
 	page, err := f.module.AdminStores(ctx, StoreListInput{})
 	must(t, err)
-	flows := map[int64]KYCFlowStatus{}
+	statuses := map[int64]*KYCStatus{}
 	for _, item := range page.Items {
-		flows[item.Store.StoreID] = item.KYCFlow
+		statuses[item.Store.StoreID] = item.KYCStatus
 	}
-	if flows[noApplication.StoreID] != FlowNotStarted || flows[draftOnly.StoreID] != FlowDraft || flows[submittedStore.StoreID] != FlowSubmitted {
-		t.Fatalf("flows=%v", flows)
+	if statuses[noApplication.StoreID] != nil || statuses[draftOnly.StoreID] == nil || *statuses[draftOnly.StoreID] != KYCStatusDraft ||
+		statuses[submittedStore.StoreID] == nil || *statuses[submittedStore.StoreID] != KYCStatusSubmitted {
+		t.Fatalf("statuses=%v", statuses)
 	}
 }
 
@@ -369,14 +370,14 @@ func TestAdminStoreStats(t *testing.T) {
 	f.now = taipeiOct1.Add(time.Hour)
 	_, err := f.module.CloseCurrent(ctx, closedAccount)
 	must(t, err)
-	_, _, _ = f.submitted(t, idB, "012345678902")
-	_, _, toApprove := f.submitted(t, idC, "012345678903")
+	_, _, _ = f.submitted(t)
+	_, _, toApprove := f.submitted(t)
 	must(t, approve(f, toApprove))
-	_, _, toReject := f.submitted(t, idRep, "012345678904")
+	_, _, toReject := f.submitted(t)
 	_, err = f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: toReject.ID, ExpectedVersion: toReject.Version, AdminID: 9, Issues: anIssue(), Reason: "照片不清楚"})
 	must(t, err)
 	accountDraft, _ := f.open(t)
-	f.savedDraft(t, kycDraft(accountDraft, idA, bankAcct))
+	f.savedDraft(t, kycDraft(accountDraft))
 
 	// 目前的店家：測月界的三家、三家有申請的、一家草稿，共 7 家（已關閉的不算）；其中九月那家以外的 6 家是十月開的。
 	f.now = time.Date(2026, 10, 20, 4, 0, 0, 0, time.UTC)
@@ -400,8 +401,8 @@ func TestStoreKYC(t *testing.T) {
 	ctx := context.Background()
 	_, none := f.open(t)
 	draftAccount, draft := f.open(t)
-	f.savedDraft(t, kycDraft(draftAccount, idA, bankAcct))
-	submittedAccount, submittedStore, submitted := f.submitted(t, idB, "012345678902")
+	f.savedDraft(t, kycDraft(draftAccount))
+	submittedAccount, submittedStore, submitted := f.submitted(t)
 
 	if _, ok, err := f.module.StoreKYC(ctx, none.StoreID); err != nil || ok {
 		t.Fatalf("no application: ok=%v err=%v", ok, err)
@@ -412,12 +413,8 @@ func TestStoreKYC(t *testing.T) {
 	}
 	got, ok, err := f.module.StoreKYC(ctx, submittedStore.StoreID)
 	must(t, err)
-	if !ok || got.ID != submitted.ID || got.Status != KYCStatusSubmitted || got.Flow == nil || got.Flow.Status != FlowSubmitted ||
-		got.SubmittedAt == nil || got.StoreID != submittedStore.StoreID || got.AccountID != submittedAccount {
+	if !ok || got.ID != submitted.ID || got.Status != KYCStatusSubmitted || got.SubmittedAt == nil || got.StoreID != submittedStore.StoreID || got.AccountID != submittedAccount {
 		t.Fatalf("got=%+v ok=%v", got, ok)
-	}
-	if got.IDCardNoMasked == nil || strings.Contains(*got.IDCardNoMasked, idB) || strings.Contains(*got.BankAccountMasked, "012345678902") {
-		t.Fatalf("the view must be masked: %+v", got)
 	}
 	// 取消之後也讀不到。
 	if _, err := f.module.CancelKYC(ctx, CancelKYCInput{AccountID: submittedAccount, ExpectedVersion: submitted.Version}); err != nil {
@@ -434,10 +431,10 @@ func TestStoreKYC(t *testing.T) {
 	}
 }
 
-// approvedWith 開店、送出並核准一份申請（PayUni 註冊是 PENDING，job 還沒跑）。
-func (f *fixture) approvedWith(t *testing.T, idCard, bank string) (int64, Store) {
+// approvedWith 開店、送出並核准一份申請。
+func (f *fixture) approvedWith(t *testing.T) (int64, Store) {
 	t.Helper()
-	accountID, s, submitted := f.submitted(t, idCard, bank)
+	accountID, s, submitted := f.submitted(t)
 	must(t, approve(f, submitted))
 	return accountID, s
 }
@@ -463,16 +460,16 @@ func TestAdminStoresKYCFilterOnlyMatchesTheCurrentApplication(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	resubmittedAccount, resubmitted, first := f.submitted(t, idB, "012345678902")
+	resubmittedAccount, resubmitted, first := f.submitted(t)
 	_, err := f.module.CancelKYC(ctx, CancelKYCInput{AccountID: resubmittedAccount, ExpectedVersion: first.Version})
 	must(t, err)
-	again := f.savedDraft(t, kycDraft(resubmittedAccount, idB, "012345678902"))
+	again := f.savedDraft(t, kycDraft(resubmittedAccount))
 	if again.ID == first.ID {
 		t.Fatal("重建的申請應該是新的一列")
 	}
 	_, err = f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: resubmittedAccount, ExpectedVersion: again.Version})
 	must(t, err)
-	cancelledAccount, cancelledOnly, toCancel := f.submitted(t, idC, "012345678903")
+	cancelledAccount, cancelledOnly, toCancel := f.submitted(t)
 	_, err = f.module.CancelKYC(ctx, CancelKYCInput{AccountID: cancelledAccount, ExpectedVersion: toCancel.Version})
 	must(t, err)
 
@@ -494,38 +491,21 @@ func TestAdminStoresKYCFilterOnlyMatchesTheCurrentApplication(t *testing.T) {
 	page, err := f.module.AdminStores(ctx, StoreListInput{})
 	must(t, err)
 	for _, item := range page.Items {
-		if item.Store.StoreID == cancelledOnly.StoreID && item.KYCFlow != FlowNotStarted {
-			t.Fatalf("a store with only a cancelled application is NOT_STARTED, got %s", item.KYCFlow)
+		if item.Store.StoreID == cancelledOnly.StoreID && item.KYCStatus != nil {
+			t.Fatalf("a store with only a cancelled application has no application status, got %s", *item.KYCStatus)
 		}
 	}
 }
 
-// 帳號、PayUni 綁定狀態與停權的篩選。停權和能力檢查是同一個定義：結束、到期之後篩選與 CapabilitiesOf 一起變。
-func TestAdminStoresFilterByAccountBindStatusAndSuspension(t *testing.T) {
+// 帳號與停權的篩選。停權和能力檢查是同一個定義：結束、到期之後篩選與 CapabilitiesOf 一起變。
+func TestAdminStoresFilterByAccountAndSuspension(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	boundAccount, bound := f.approvedWith(t, idA, bankAcct)
-	f.sync(t, bound.StoreID)
-	_, failed := f.approvedWith(t, idB, "012345678902")
-	f.payuni.bindErr = []error{apiErr("AGENT03003")}
-	f.sync(t, failed.StoreID)
-	_, pending := f.approvedWith(t, idC, "012345678903")
+	boundAccount, bound := f.approvedWith(t)
+	_, second := f.approvedWith(t)
+	_, third := f.approvedWith(t)
 	_, none := f.open(t)
-	all := []int64{bound.StoreID, failed.StoreID, pending.StoreID, none.StoreID}
-	slices.Sort(all)
-
-	for status, want := range map[PayUniBindStatus][]int64{
-		BindStatusBound: {bound.StoreID}, BindStatusFailed: {failed.StoreID}, BindStatusPending: {pending.StoreID},
-	} {
-		if got := listIDs(t, f, StoreListInput{PayUniBindStatus: &status}); !slices.Equal(got, want) {
-			t.Fatalf("bind %s=%v want=%v", status, got, want)
-		}
-	}
-	weird := PayUniBindStatus("WEIRD")
-	if _, err := f.module.AdminStores(ctx, StoreListInput{PayUniBindStatus: &weird}); apperr.KindOf(err) != apperr.KindInvalidInput {
-		t.Fatalf("weird bind: %v", err)
-	}
 
 	// 帳號：完全相符，換過店的帳號有兩個 stint。
 	if got := listIDs(t, f, StoreListInput{AccountID: &boundAccount}); !slices.Equal(got, []int64{bound.StoreID}) {
@@ -573,14 +553,14 @@ func TestAdminStoresFilterByAccountBindStatusAndSuspension(t *testing.T) {
 		}
 	}
 	check("nobody", nil)
-	rec := f.suspend(t, failed.StoreID)
-	check("risk suspension", []int64{failed.StoreID})
+	rec := f.suspend(t, second.StoreID)
+	check("risk suspension", []int64{second.StoreID})
 	_, err = f.lift(ctx, rec)
 	must(t, err)
 	check("ended", nil)
 	ends := f.now.Add(48 * time.Hour)
-	f.violate(t, pending.StoreID, SeverityHigh, MeasureSuspension, &ends)
-	check("violation suspension", []int64{pending.StoreID})
+	f.violate(t, third.StoreID, SeverityHigh, MeasureSuspension, &ends)
+	check("violation suspension", []int64{third.StoreID})
 	f.now = ends.Add(time.Second)
 	check("violation suspension expired", nil)
 	f.suspend(t, none.StoreID)

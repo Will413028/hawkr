@@ -17,6 +17,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/reviewqueue/v1alpha1/reviewqueuev1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -54,27 +55,27 @@ var declarations = map[string]declaration{
 	contentv1alpha1connect.ContentAdminServiceCreateAppVersionGateProcedure: requires(adminperm.ContentAppVersionGatesCreate),
 	contentv1alpha1connect.ContentAdminServiceUpdateAppVersionGateProcedure: requires(adminperm.ContentAppVersionGatesUpdate),
 
-	identityv1alpha1connect.IdentityAdminServiceGetSessionProcedure:    exempt(sessionReason),
-	identityv1alpha1connect.IdentityAdminServiceListAccountsProcedure:  requires(adminperm.IdentityAccountsList),
-	identityv1alpha1connect.IdentityAdminServiceGetAccountProcedure:    requires(adminperm.IdentityAccountsGet),
-	identityv1alpha1connect.IdentityAdminServiceDeleteAccountProcedure: requires(adminperm.IdentityAccountsDelete),
-	identityv1alpha1connect.IdentityAdminServiceSignOutProcedure:       exempt(sessionReason),
+	paymentv1alpha1connect.PaymentAdminServiceGetPaymentAccountProcedure:           requires(adminperm.PaymentAccountsGet),
+	paymentv1alpha1connect.PaymentAdminServiceRefreshPaymentAccountProcedure:       requires(adminperm.PaymentAccountsRefresh),
+	paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountCreateProcedure:   requires(adminperm.PaymentAccountsRetryCreate),
+	paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountPurgeProcedure:    requires(adminperm.PaymentAccountsRetryPurge),
+	paymentv1alpha1connect.PaymentAdminServiceDeletePaymentAccountMappingProcedure: requires(adminperm.PaymentAccountsDeleteMapping),
+	identityv1alpha1connect.IdentityAdminServiceGetSessionProcedure:                exempt(sessionReason),
+	identityv1alpha1connect.IdentityAdminServiceListAccountsProcedure:              requires(adminperm.IdentityAccountsList),
+	identityv1alpha1connect.IdentityAdminServiceGetAccountProcedure:                requires(adminperm.IdentityAccountsGet),
+	identityv1alpha1connect.IdentityAdminServiceDeleteAccountProcedure:             requires(adminperm.IdentityAccountsDelete),
+	identityv1alpha1connect.IdentityAdminServiceSignOutProcedure:                   exempt(sessionReason),
 
 	sellerv1alpha1connect.SellerAdminServiceListStoresProcedure:              requires(adminperm.SellerStoresList),
 	sellerv1alpha1connect.SellerAdminServiceGetStoreStatsProcedure:           requires(adminperm.SellerStoreStatsGet),
 	sellerv1alpha1connect.SellerAdminServiceGetStoreProcedure:                requires(adminperm.SellerStoresGet),
+	sellerv1alpha1connect.SellerAdminServiceGetStoreOnboardingProcedure:      requires(adminperm.SellerStoreOnboardingGet),
 	sellerv1alpha1connect.SellerAdminServiceListKYCApplicationsProcedure:     requires(adminperm.SellerKYCApplicationsList),
 	sellerv1alpha1connect.SellerAdminServiceGetKYCApplicationProcedure:       requires(adminperm.SellerKYCApplicationsGet),
-	sellerv1alpha1connect.SellerAdminServiceListKYCRevealsProcedure:          requires(adminperm.SellerKYCRevealsList),
 	sellerv1alpha1connect.SellerAdminServiceListKYCDocumentAccessesProcedure: requires(adminperm.SellerKYCDocumentAccessesList),
 	sellerv1alpha1connect.SellerAdminServiceApproveKYCProcedure:              requires(adminperm.SellerKYCApplicationsApprove),
 	sellerv1alpha1connect.SellerAdminServiceRejectKYCProcedure:               requires(adminperm.SellerKYCApplicationsReject),
 	sellerv1alpha1connect.SellerAdminServiceRequeryKYCRegistrationProcedure:  requires(adminperm.SellerKYCApplicationsRequery),
-	sellerv1alpha1connect.SellerAdminServiceRevealKYCSensitiveProcedure:      requires(adminperm.SellerKYCRevealsCreate),
-	sellerv1alpha1connect.SellerAdminServiceGetPayUniRegistrationProcedure:   requires(adminperm.SellerPayUniRegistrationsGet),
-	sellerv1alpha1connect.SellerAdminServiceRebindPayUniProcedure:            requires(adminperm.SellerPayUniRegistrationsRebind),
-	sellerv1alpha1connect.SellerAdminServiceListPayUniObservationsProcedure:  requires(adminperm.SellerPayUniObservationsList),
-	sellerv1alpha1connect.SellerAdminServiceRefreshPayUniStatusProcedure:     requires(adminperm.SellerPayUniRegistrationsRefresh),
 
 	sellerv1alpha1connect.SellerGovernanceAdminServiceListReportsProcedure:                 requires(adminperm.SellerReportsList),
 	sellerv1alpha1connect.SellerGovernanceAdminServiceGetReportProcedure:                   requires(adminperm.SellerReportsGet),
@@ -108,6 +109,7 @@ var declarations = map[string]declaration{
 	sellerv1alpha1connect.SellerGovernanceAdminServiceEndMeasureProcedure:                  requires(adminperm.SellerMeasuresEnd),
 	sellerv1alpha1connect.SellerGovernanceAdminServiceRevokeMeasureProcedure:               requires(adminperm.SellerMeasuresRevoke),
 	sellerv1alpha1connect.SellerGovernanceAdminServiceScheduleMeasureReviewProcedure:       requires(adminperm.SellerMeasuresScheduleReview),
+	sellerv1alpha1connect.SellerGovernanceAdminServiceMarkLinkedAccountReviewedProcedure:   requires(adminperm.SellerMeasuresReviewLinkedAccount),
 	sellerv1alpha1connect.SellerGovernanceAdminServiceDecideAppealProcedure:                requires(adminperm.SellerMeasuresDecideAppeal),
 	sellerv1alpha1connect.SellerGovernanceAdminServiceDecideRemediationProcedure:           requires(adminperm.SellerMeasuresDecideRemediation),
 	sellerv1alpha1connect.SellerGovernanceAdminServiceCreateMeasureNoteProcedure:           requires(adminperm.SellerMeasureNotesCreate),

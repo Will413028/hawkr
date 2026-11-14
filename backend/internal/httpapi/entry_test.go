@@ -282,7 +282,7 @@ func TestCSRF(t *testing.T) {
 		{"只有 Origin、不是自己的", "/api/v1/app/orders", "", "https://evil.example", http.StatusForbidden},
 		{"自己的 web", "/api/v1/app/orders", "cross-site", testOrigin, http.StatusOK},
 		{"App 與伺服器（沒有 Sec-Fetch-Site 與 Origin）", "/api/v1/app/orders", "", "", http.StatusOK},
-		{"金流的瀏覽器回跳", "/payment/return", "cross-site", "https://payuni.example", http.StatusOK},
+		{"金流的瀏覽器回跳", "/payment/return", "cross-site", "https://pay.example", http.StatusOK},
 	}
 	for _, c := range cases {
 		if got := post(c.path, c.site, c.origin); got != c.want {
@@ -537,5 +537,24 @@ func TestFileRoutesMustDeclareAnAdminPermission(t *testing.T) {
 	valid := fileRoute{pattern: "GET /api/files/admin/x/{id}", handler: ok, permission: adminperm.SellerKYCDocumentsGet}
 	if _, err := assemble(Deps{Logger: slog.New(slog.DiscardHandler)}, nil, valid); err != nil {
 		t.Fatalf("合法的宣告：%v", err)
+	}
+}
+
+func TestSessionFailureResponsesNegotiateTheLocale(t *testing.T) {
+	h := entryWithAuth(t, caller)
+	for name, path := range map[string]string{
+		"REST":    "/api/v1/app/buyers/me",
+		"Connect": "/hawkr.identity.v1alpha1.IdentityAppService/GetSession",
+	} {
+		for status, token := range map[int]string{http.StatusServiceUnavailable: "boom", http.StatusForbidden: "denied-bare"} {
+			r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, strings.NewReader("{}"))
+			r.Header.Set("Content-Type", "application/json")
+			r.Header.Set("Authorization", "Bearer "+token)
+			r.Header.Set("Accept-Language", "en")
+			rec := do(h, r)
+			if rec.Code != status || !slices.Contains(rec.Header().Values("Vary"), "Accept-Language") {
+				t.Errorf("%s %d：status=%d Vary=%v", name, status, rec.Code, rec.Header().Values("Vary"))
+			}
+		}
 	}
 }

@@ -1,0 +1,186 @@
+{
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "id": "acct_1UbfLDITnavwPf9M",
+        "object": "v2.core.account",
+        "applied_configurations": [],
+        "closed": false,
+        "configuration": null,
+        "contact_email": null,
+        "contact_phone": null,
+        "created": "2026-11-14T11:41:56.000Z",
+        "dashboard": null,
+        "identity": null,
+        "defaults": {
+          "currency": null,
+          "locales": [],
+          "payout_methods": null,
+          "profile": {
+            "business_url": null,
+            "doing_business_as": null,
+            "product_description": null
+          },
+          "responsibilities": {
+            "fees_collector": null,
+            "losses_collector": null,
+            "requirements_collector": "application"
+          }
+        },
+        "display_name": null,
+        "future_requirements": null,
+        "metadata": {
+          "store_id": "990025",
+          "hawkr_namespace": "spike"
+        },
+        "requirements": null,
+        "livemode": false
+      },
+      {
+        "id": "acct_1UbfLCILaRobr6gn",
+        "object": "v2.core.account",
+        "applied_configurations": [],
+        "closed": false,
+        "configuration": null,
+        "contact_email": null,
+        "contact_phone": null,
+        "created": "2026-11-14T11:41:54.000Z",
+        "dashboard": null,
+        "identity": null,
+        "defaults": {
+          "currency": null,
+          "locales": [],
+          "payout_methods": null,
+          "profile": {
+            "business_url": null,
+            "doing_business_as": null,
+            "product_description": null
+          },
+          "responsibilities": {
+            "fees_collector": null,
+            "losses_collector": null,
+            "requirements_collector": "application"
+          }
+        },
+        "display_name": null,
+        "future_requirements": null,
+        "metadata": {
+          "store_id": "990025",
+          "hawkr_namespace": "spike"
+        },
+        "requirements": null,
+        "livemode": false
+      },
+      {
+        "id": "acct_1UbfLCIBnW5sPYPC",
+        "object": "v2.core.account",
+        "applied_configurations": [],
+        "closed": false,
+        "configuration": null,
+        "contact_email": null,
+        "contact_phone": null,
+        "created": "2026-11-14T11:41:55.000Z",
+        "dashboard": null,
+        "identity": null,
+        "defaults": {
+          "currency": null,
+          "locales": [],
+          "payout_methods": null,
+          "profile": {
+            "business_url": null,
+            "doing_business_as": null,
+            "product_description": null
+          },
+          "responsibilities": {
+            "fees_collector": null,
+            "losses_collector": null,
+            "requirements_collector": "application"
+          }
+        },
+        "display_name": null,
+        "future_requirements": null,
+        "metadata": {
+          "store_id": "990026",
+          "hawkr_namespace": "spike"
+        },
+        "requirements": null,
+        "livemode": false
+      },
+      {
+        "id": "acct_1Ube4FRCeiuh2SHH",
+        "object": "v2.core.account",
+        "applied_configurations": [
+          "recipient"
+        ],
+        "closed": false,
+        "configuration": null,
+        "contact_email": "<EMAIL-MASKED>",
+        "contact_phone": null,
+        "created": "2026-11-14T10:20:19.000Z",
+        "dashboard": "none",
+        "identity": null,
+        "defaults": {
+          "currency": "usd",
+          "locales": [],
+          "payout_methods": null,
+          "profile": {
+            "business_url": "https://accessible.stripe.com",
+            "doing_business_as": null,
+            "product_description": null
+          },
+          "responsibilities": {
+            "fees_collector": "application",
+            "losses_collector": "application",
+            "requirements_collector": "application"
+          }
+        },
+        "display_name": null,
+        "future_requirements": null,
+        "metadata": {
+          "store_id": "1009"
+        },
+        "requirements": null,
+        "livemode": false
+      },
+      {
+        "id": "acct_1UbdzlI76fNujGUW",
+        "object": "v2.core.account",
+        "applied_configurations": [
+          "recipient"
+        ],
+        "closed": false,
+        "configuration": null,
+        "contact_email": "<EMAIL-MASKED>",
+        "contact_phone": null,
+        "created": "2026-11-14T10:15:42.000Z",
+        "dashboard": "none",
+        "identity": null,
+        "defaults": {
+          "currency": "usd",
+          "locales": [],
+          "payout_methods": null,
+          "profile": {
+            "business_url": "https://accessible.stripe.com",
+            "doing_business_as": null,
+            "product_description": null
+          },
+          "responsibilities": {
+            "fees_collector": "application",
+            "losses_collector": "application",
+            "requirements_collector": "application"
+          }
+        },
+        "display_name": null,
+        "future_requirements": null,
+        "metadata": {
+          "store_id": "1004"
+        },
+        "requirements": null,
+        "livemode": false
+      }
+    ],
+    "next_page_url": "/v2/core/accounts?page=page_BYTA4A8DwBrW0cDDxq3rw8dcAWI6ZNB4E46y80NEyf22r5wZGQ0G3h3uFBww6zH5GH3bB1NLGSRD19EU0B6jB7vEDKAe0Dd95d5FW28B98ck0wr6WzFub8oS9u17NC2rO39&limit=5",
+    "previous_page_url": null
+  }
+}

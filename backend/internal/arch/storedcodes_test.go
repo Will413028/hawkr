@@ -14,7 +14,6 @@ var storedCodeExceptions = []StoredCodeException{
 	{"delegation", "seller_delegation_authorizations_capabilities_check", "同上：能力的權限識別字"},
 	{"seller", "kyc_registration_checks_fields_check", "值是欄位路徑（business.company_name），對應 proto 的欄位名，不是列舉代碼"},
 	{"seller", "kyc_review_issues_field_check", "同上：欄位路徑，審核退件指向的表單欄位"},
-	{"seller", "kyc_review_issues_asset_check", "同上：欄位路徑（id_card_front 等），限制哪些欄位可以掛證件圖片"},
 	{"content", "banners_action_check", "待改（另案）：action_type 的 popup、url、product、post 是代碼，要連同 Go 型別、proto 與 admin／client 的對應一起改成 UPPER_SNAKE；本次只收 delegation"},
 }
 

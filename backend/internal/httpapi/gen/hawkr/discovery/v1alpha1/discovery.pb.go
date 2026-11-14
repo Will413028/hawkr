@@ -121,8 +121,9 @@ type RecommendedSeller struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 店家卡片；清單上的每家店都有營業中（OPEN）的卡片。
 	Store *v1alpha1.StoreCard `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
+	// 評價數與平均評分由卡片提供（store.review_count、store.rating_average）；排名用的評價只留在快照內。
 	// 粉絲數；0 是確實沒有粉絲，讀取失敗時不設。
-	FollowerCount *int32 `protobuf:"varint,4,opt,name=follower_count,json=followerCount,proto3,oneof" json:"follower_count,omitempty"`
+	FollowerCount *int32 `protobuf:"varint,2,opt,name=follower_count,json=followerCount,proto3,oneof" json:"follower_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -180,11 +181,11 @@ const file_hawkr_discovery_v1alpha1_discovery_proto_rawDesc = "" +
 	"\vmax_results\x18\x01 \x01(\x05R\n" +
 	"maxResults\"j\n" +
 	"!SuggestRecommendedSellersResponse\x12E\n" +
-	"\asellers\x18\x01 \x03(\v2+.hawkr.discovery.v1alpha1.RecommendedSellerR\asellers\"\xb4\x01\n" +
+	"\asellers\x18\x01 \x03(\v2+.hawkr.discovery.v1alpha1.RecommendedSellerR\asellers\"\x8a\x01\n" +
 	"\x11RecommendedSeller\x126\n" +
 	"\x05store\x18\x01 \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05store\x12*\n" +
-	"\x0efollower_count\x18\x04 \x01(\x05H\x00R\rfollowerCount\x88\x01\x01B\x11\n" +
-	"\x0f_follower_countJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04R\freview_countR\x0erating_average2\xb4\x01\n" +
+	"\x0efollower_count\x18\x02 \x01(\x05H\x00R\rfollowerCount\x88\x01\x01B\x11\n" +
+	"\x0f_follower_count2\xb4\x01\n" +
 	"\x16DiscoveryPublicService\x12\x99\x01\n" +
 	"\x19SuggestRecommendedSellers\x12:.hawkr.discovery.v1alpha1.SuggestRecommendedSellersRequest\x1a;.hawkr.discovery.v1alpha1.SuggestRecommendedSellersResponse\"\x03\x90\x02\x01B\x95\x02\n" +
 	"\x1ccom.hawkr.discovery.v1alpha1B\x0eDiscoveryProtoP\x01Zcgithub.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1;discoveryv1alpha1\xa2\x02\x03HDX\xaa\x02\x18Hawkr.Discovery.V1alpha1\xca\x02\x18Hawkr\\Discovery\\V1alpha1\xe2\x02$Hawkr\\Discovery\\V1alpha1\\GPBMetadata\xea\x02\x1aHawkr::Discovery::V1alpha1b\x06proto3"

@@ -98,14 +98,10 @@ class _NotificationBannerState extends State<NotificationBanner>
       case 'ORDER_STATUS':
       case 'ORDER_DELIVERED':
         return AppIcons.receiptLongRounded;
-      case 'MERCHANT_VERIFICATION':
       case 'SELLER_REVIEW_STATUS':
       case 'CERTIFICATION_APPROVED':
       case 'CERTIFICATION_REJECTED':
       case 'CERTIFICATION_PENDING_INFO':
-      case 'MERCHANT.VERIFICATION.APPROVED':
-      case 'MERCHANT.VERIFICATION.REJECTED':
-      case 'MERCHANT.VERIFICATION.PENDING_INFO':
         return AppIcons.verifiedRounded;
       case 'COUPON_RECEIVED':
         return AppIcons.localOfferRounded;
@@ -120,14 +116,10 @@ class _NotificationBannerState extends State<NotificationBanner>
     switch (widget.type?.toUpperCase()) {
       case 'CHAT_MESSAGE':
         return AppColors.primary;
-      case 'MERCHANT_VERIFICATION':
       case 'SELLER_REVIEW_STATUS':
       case 'CERTIFICATION_APPROVED':
       case 'CERTIFICATION_REJECTED':
       case 'CERTIFICATION_PENDING_INFO':
-      case 'MERCHANT.VERIFICATION.APPROVED':
-      case 'MERCHANT.VERIFICATION.REJECTED':
-      case 'MERCHANT.VERIFICATION.PENDING_INFO':
         return AppColors.warning;
       case 'COUPON_RECEIVED':
         return AppColors.primary;

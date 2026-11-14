@@ -10,15 +10,13 @@ import (
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
-	pu "github.com/Will413028/hawkr/backend/internal/platform/payuni"
 )
 
-// exposable 建立一間符合全部曝光條件的店家：營運中、沒有停權、KYC 核准且 PayUni 核准、店名、logo、鄉鎮市區代碼齊全。
+// exposable 建立一間符合全部曝光條件的店家：營運中、沒有停權、平台審核核准且收款帳戶的轉帳能力啟用、店名、logo、鄉鎮市區代碼齊全。
 func (f *fixture) exposable(t *testing.T) (int64, Store) {
 	t.Helper()
-	accountID, s := f.boundStore(t)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "1"}
-	must(t, f.module.PollPayUni(context.Background(), s.StoreID, PayUniSourcePoll))
+	accountID, s := f.approvedStore(t)
+	f.setPayment(t, s.StoreID, enabledSnapshot)
 	cur, err := f.module.Store(context.Background(), s.StoreID)
 	must(t, err)
 	s, err = f.module.UpdateProfile(context.Background(), UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: "logo", UploaderID: accountID})
@@ -72,11 +70,9 @@ func (f *fixture) publishedAt(t *testing.T, storeID int64) time.Time {
 // 重新核准、時間流逝都不改它）。
 func TestPublishedAtStartsWhenTheStoreFirstBecomesExposable(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 	f := setup(t)
-	accountID, s := f.boundStore(t)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "1"}
-	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourcePoll))
+	accountID, s := f.approvedStore(t)
+	f.setPayment(t, s.StoreID, enabledSnapshot)
 	approved := f.now
 	f.now = approved.Add(60 * 24 * time.Hour)
 	f.reconcile(t)
@@ -94,11 +90,9 @@ func TestPublishedAtStartsWhenTheStoreFirstBecomesExposable(t *testing.T) {
 	f.now = f.now.Add(time.Hour)
 	f.reconcile(t)
 	f.now = f.now.Add(10 * 24 * time.Hour)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "8"}
-	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourceRefresh))
+	f.setPayment(t, s.StoreID, rejectedSnapshot)
 	f.now = f.now.Add(24 * time.Hour)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "1"}
-	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourceRefresh))
+	f.setPayment(t, s.StoreID, enabledSnapshot)
 	if got := f.publishedAt(t, s.StoreID); !got.Equal(logoAt) {
 		t.Fatalf("PublishedAt=%v moved after reject and re-approval, want %v", got, logoAt)
 	}
@@ -154,7 +148,7 @@ func TestExposableStoresExcludesEachFailingCondition(t *testing.T) {
 		},
 		"kyc not approved": func(t *testing.T, f *fixture) int64 {
 			accountID, s := f.open(t)
-			d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+			d := f.savedDraft(t, kycDraft(accountID))
 			_, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 			must(t, err)
 			cur, err := f.module.Store(ctx, s.StoreID)
@@ -169,8 +163,8 @@ func TestExposableStoresExcludesEachFailingCondition(t *testing.T) {
 			must(t, err)
 			return s.StoreID
 		},
-		"kyc approved but payuni not approved": func(t *testing.T, f *fixture) int64 {
-			accountID, s := f.boundStore(t) // 已綁定，PayUni 還沒有審核結果。
+		"kyc approved but payment account not enabled": func(t *testing.T, f *fixture) int64 {
+			accountID, s := f.approvedStore(t) // 申請已核准，收款帳戶還沒有建立。
 			cur, err := f.module.Store(ctx, s.StoreID)
 			must(t, err)
 			_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: "logo", UploaderID: accountID})
@@ -178,15 +172,14 @@ func TestExposableStoresExcludesEachFailingCondition(t *testing.T) {
 			return s.StoreID
 		},
 		"missing logo": func(t *testing.T, f *fixture) int64 {
-			_, s := f.boundStore(t)
-			f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "1"}
-			must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourcePoll))
+			_, s := f.approvedStore(t)
+			f.setPayment(t, s.StoreID, enabledSnapshot)
 			return s.StoreID
 		},
 		"missing town code": func(t *testing.T, f *fixture) int64 {
 			// town_code 與 address_detail 一起清掉（address_detail 需要 town_code）。
 			_, s := f.exposable(t)
-			// 有 PayUni 註冊的店家不能經 UpdateProfile 清掉地址：直接清，再以別的欄位的寫入重新計算公告。
+			// 已核准的店家不能經 UpdateProfile 清掉地址：直接清，再以別的欄位的寫入重新計算公告。
 			_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET town_code = NULL, address_detail = NULL WHERE store_id = $1", s.StoreID)
 			must(t, err)
 			cur, err := f.module.Store(ctx, s.StoreID)
@@ -314,7 +307,7 @@ func TestPublicListingAgreesWithExposableStores(t *testing.T) {
 	}
 	// 新店：沒有 KYC 申請（NOT_STARTED）也沒有 logo，店名與鄉鎮市區代碼已經有了。
 	_, fresh := f.open(t)
-	if got := missing(fresh); !slices.Equal(got, []Requirement{RequirementKYCApproved, RequirementLogo}) {
+	if got := missing(fresh); !slices.Equal(got, []Requirement{RequirementOnboardingComplete, RequirementLogo}) {
 		t.Fatalf("fresh store missing=%v", got)
 	}
 	_, s := f.exposable(t)
@@ -349,16 +342,16 @@ func TestPublicListingReportsAStoreThatIsWaitingForDeletion(t *testing.T) {
 	}
 }
 
-// 物流建店的前置條件是 KYC 流程核准，Authorize（經 ActingStore）從資料庫讀流程：沒有核准回 FailedPrecondition，
-// reason SELLER_REQUIREMENT_MISSING，metadata 帶 KYC_APPROVED；核准的店家通過；停權仍是 PermissionDenied。
-func TestActingStoreRequiresAnApprovedKYCFlowForShippingSetup(t *testing.T) {
+// 物流建店的前置條件是 KYC 申請核准，Authorize（經 ActingStore）從資料庫讀開通條件：沒有核准回 FailedPrecondition，
+// reason SELLER_REQUIREMENT_MISSING，metadata 帶 ONBOARDING_COMPLETE；核准的店家通過；停權仍是 PermissionDenied。
+func TestActingStoreRequiresAnApprovedKYCForShippingSetup(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
 	account, _ := f.open(t)
 	_, err := f.module.ActingStore(ctx, account, CapShippingSetup)
 	ae := apperrOf(t, err)
-	if ae.Kind() != apperr.KindFailedPrecondition || ae.Reason != apperr.ReasonSellerRequirementMissing || ae.Metadata[MissingRequirementsMetadataKey] != "KYC_APPROVED" {
+	if ae.Kind() != apperr.KindFailedPrecondition || ae.Reason != apperr.ReasonSellerRequirementMissing || ae.Metadata[MissingRequirementsMetadataKey] != "ONBOARDING_COMPLETE" {
 		t.Fatalf("unapproved store: %+v", ae)
 	}
 	if _, err := f.module.ActingStore(ctx, account, CapProductManage); err != nil {

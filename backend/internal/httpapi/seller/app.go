@@ -4,6 +4,7 @@ package seller
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"slices"
 	"strings"
 	"uuid"
@@ -26,6 +27,7 @@ type Module interface {
 	LookupBusinessRegistration(ctx context.Context, taxID string) (model.Registration, bool, error)
 	Apply(context.Context, model.ApplyInput) (model.Store, error)
 	StoreOpening(ctx context.Context, accountID int64) (model.StoreOpening, error)
+	Store(ctx context.Context, storeID int64) (model.Store, error)
 	UpdateProfile(context.Context, model.UpdateProfileInput) (model.Store, error)
 	CompleteOnboarding(ctx context.Context, storeID, expectedVersion int64) (model.Store, error)
 	CloseCurrent(context.Context, int64) (model.Store, error)
@@ -48,21 +50,37 @@ type Followers interface {
 // App 是 SellerAppService 的 handler。
 type App struct {
 	m         Module
+	payments  Payments
 	followers Followers
 	images    rpc.Images
 	dash      Dashboard
 	stats     *StatsSource
+	web       rpc.WebOrigin
+	log       *slog.Logger
 }
 
 var _ sellerv1alpha1connect.SellerAppServiceHandler = (*App)(nil)
 
+// ErrPaymentsRequired 是 NewApp 沒有收款帳戶來源時的錯誤。
+var ErrPaymentsRequired = errors.New("httpapi/seller：需要收款帳戶的來源（payment 模組）")
+
 // NewApp 建立賣家 handler。dash 是儀表板的來源與時鐘，GetMyDashboard 用，三個來源由組裝點提供。stats 是 GetMyStore 的統計來源（粉絲與評價），
 // 與前台店面頁（NewPublic）是同一份 *StatsSource（NewStatsSource 建立，nil 回錯誤）。統編的登記資料經模組（Module.LookupBusinessRegistration）。
-func NewApp(m Module, followers Followers, images rpc.Images, dash Dashboard, stats *StatsSource) (*App, error) {
+// payments 是收款帳戶的來源（payment 模組），nil 回錯誤。web 是網站網域（開通結束的回跳網址由它組），零值回錯誤。log 記錄開通任務讀不到的來源（GetMyOnboarding），nil 時不記錄；與儀表板的 Dashboard.Log 各自獨立。
+func NewApp(m Module, payments Payments, followers Followers, images rpc.Images, dash Dashboard, stats *StatsSource, web rpc.WebOrigin, log *slog.Logger) (*App, error) {
 	if stats == nil {
 		return nil, ErrStatsSourceRequired
 	}
-	return &App{m: m, followers: followers, images: images, dash: dash, stats: stats}, nil
+	if payments == nil {
+		return nil, ErrPaymentsRequired
+	}
+	if web.IsZero() {
+		return nil, ErrWebOriginRequired
+	}
+	if log == nil {
+		log = slog.New(slog.DiscardHandler)
+	}
+	return &App{m: m, payments: payments, followers: followers, images: images, dash: dash, stats: stats, web: web, log: log}, nil
 }
 
 // deref 是可選文字的值：沒有值是空字串（契約以空字串表示沒有填）。

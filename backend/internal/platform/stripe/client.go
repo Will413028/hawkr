@@ -1,0 +1,637 @@
+// Package stripe 是 Stripe API 的 client（官方 SDK stripe-go 之上）：只含收款開通需要的呼叫（Accounts v2、Account Link、Account Session）與 webhook 簽章驗證。
+// 它不認得賣家模組的型別；對應成中立快照的 adapter 在 payment 模組的 internal/account。
+// 所有呼叫用 SDK 釘住的 API 版本（stripe.APIVersion），不覆寫 Stripe-Version。
+package stripe
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+
+	sdk "github.com/stripe/stripe-go/v87"
+)
+
+// DefaultBaseURL 是 Stripe API 的位址。
+const DefaultBaseURL = "https://api.stripe.com"
+
+// DefaultTimeout 是一次呼叫（含 429 退避）的總上限。
+const DefaultTimeout = 30 * time.Second
+
+const (
+	maxResponseBytes = 8 << 20
+	maxAttempts      = 3
+	baseBackoff      = 500 * time.Millisecond
+	maxBackoff       = 5 * time.Second
+)
+
+// Config 是 Client 的設定。
+type Config struct {
+	// BaseURL 預設 DefaultBaseURL；測試指向 httptest。
+	BaseURL       string
+	SecretKey     string
+	WebhookSecret string
+	// AccountNamespace 是這個環境的帳戶命名空間（ValidateNamespace 的規則）：建立帳戶時寫進 metadata.hawkr_namespace，
+	// 對帳列出帳戶時要 store_id 與它都相符，兩個環境共用同一個 Stripe 帳號時不會互相看到對方的帳戶。必填。
+	AccountNamespace string
+	// Timeout 是一次呼叫的總上限，零值用 DefaultTimeout。
+	Timeout    time.Duration
+	HTTPClient *http.Client
+	// Wait 是 429 退避的等待；nil 時用計時器，ctx 結束就回傳。
+	Wait func(ctx context.Context, d time.Duration) error
+}
+
+// Client 呼叫 Stripe。
+type Client struct {
+	sdk       *sdk.Client
+	whsecret  string
+	namespace string
+	timeout   time.Duration
+	wait      func(ctx context.Context, d time.Duration) error
+}
+
+// New 建立 Client；金鑰與 webhook 密鑰必填。SDK 的自動網路重試、遙測與記錄都關掉：重試由這裡只對 429 做，其餘失敗交給呼叫方（River job）重試。
+func New(cfg Config) (*Client, error) {
+	if cfg.SecretKey == "" {
+		return nil, errors.New("stripe：缺少 SecretKey")
+	}
+	if strings.TrimSpace(cfg.WebhookSecret) == "" {
+		return nil, errors.New("stripe：缺少 WebhookSecret")
+	}
+	if strings.TrimSpace(cfg.WebhookSecret) != cfg.WebhookSecret {
+		return nil, errors.New("stripe：WebhookSecret 前後有空白或換行，請去掉後再設定")
+	}
+	if err := ValidateNamespace(cfg.AccountNamespace); err != nil {
+		return nil, err
+	}
+	raw := cfg.BaseURL
+	if raw == "" {
+		raw = DefaultBaseURL
+	}
+	base, err := url.Parse(strings.TrimRight(raw, "/"))
+	if err != nil || base.Host == "" || (base.Scheme != "https" && base.Scheme != "http") {
+		return nil, fmt.Errorf("stripe：BaseURL %q 不是有效的網址", raw)
+	}
+	hc := &http.Client{}
+	if cfg.HTTPClient != nil {
+		cp := *cfg.HTTPClient
+		hc = &cp
+	}
+	next := hc.Transport
+	if next == nil {
+		next = http.DefaultTransport
+	}
+	hc.Transport = recorder{next: next}
+	backends := sdk.NewBackendsWithConfig(&sdk.BackendConfig{
+		URL:               sdk.String(base.String()),
+		HTTPClient:        hc,
+		MaxNetworkRetries: sdk.Int64(0),
+		EnableTelemetry:   sdk.Bool(false),
+		LeveledLogger:     &sdk.LeveledLogger{Level: sdk.LevelNull},
+	})
+	c := &Client{
+		sdk:       sdk.NewClient(cfg.SecretKey, sdk.WithBackends(backends)),
+		whsecret:  cfg.WebhookSecret,
+		namespace: cfg.AccountNamespace,
+		timeout:   cfg.Timeout,
+		wait:      cfg.Wait,
+	}
+	if c.timeout <= 0 {
+		c.timeout = DefaultTimeout
+	}
+	if c.wait == nil {
+		c.wait = sleep
+	}
+	return c, nil
+}
+
+const (
+	metaStoreID   = "store_id"
+	metaNamespace = "hawkr_namespace"
+	// maxNamespaceLen 是命名空間的長度上限（保守值，遠小於 Stripe 的 metadata 值上限）。
+	maxNamespaceLen = 40
+)
+
+// ValidateNamespace 檢查帳戶命名空間：1 到 40 個字元，只含小寫英文字母、數字、連字號與底線，開頭是英數。
+func ValidateNamespace(ns string) error {
+	if ns == "" {
+		return errors.New("stripe：缺少 AccountNamespace")
+	}
+	if len(ns) > maxNamespaceLen {
+		return fmt.Errorf("stripe：AccountNamespace 超過 %d 個字元", maxNamespaceLen)
+	}
+	for i, r := range ns {
+		alnum := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
+		if alnum || (i > 0 && (r == '-' || r == '_')) {
+			continue
+		}
+		return fmt.Errorf("stripe：AccountNamespace %q 只能用小寫英文字母、數字、連字號與底線，開頭是英數", ns)
+	}
+	return nil
+}
+
+func (c *Client) accountMetadata(storeID int64) map[string]string {
+	return map[string]string{metaStoreID: strconv.FormatInt(storeID, 10), metaNamespace: c.namespace}
+}
+
+func sleep(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// APIError 是 Stripe 回的非 2xx 回應。
+type APIError struct {
+	Status  int
+	Code    string
+	Message string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("stripe：HTTP %d %s：%s", e.Status, e.Code, e.Message)
+}
+
+// Permanent 回傳重試也不會成功：4xx 而且不是逾時（408）、限流（429），也不是認證（401）與權限（403）失敗：金鑰填錯或輪替、權限被調整是設定問題，
+// 修正設定後重試就會成功，不是金流商拒絕這個請求（清理的 7 天期限就是為了涵蓋這種情況，D60）。409 只有 code 為 idempotency_error（冪等鍵搭配了不同的參數）才是永久的；
+// 其他 409 是同一把鍵的另一個請求還在執行，等一下用同一把鍵重送即可（https://docs.stripe.com/error-low-level 的 Content errors）。
+func (e *APIError) Permanent() bool {
+	if e.Status == http.StatusConflict {
+		return e.Code == "idempotency_error"
+	}
+	switch e.Status {
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusRequestTimeout, http.StatusTooManyRequests:
+		return false
+	}
+	return e.Status >= 400 && e.Status < 500
+}
+
+// exchange 是一次非 2xx 回應的狀態、標頭與本文；SDK 的錯誤型別依 API 版本與錯誤種類而異（有的不帶狀態碼），
+// 所以錯誤分類只看 HTTP 層記下的這份。
+type exchange struct {
+	status int
+	header http.Header
+	body   []byte
+}
+
+type exchangeKey struct{}
+
+func (e *exchange) apiError() *APIError {
+	var env struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	_ = json.Unmarshal(e.body, &env)
+	return &APIError{Status: e.status, Code: env.Error.Code, Message: env.Error.Message}
+}
+
+// recorder 讀完回應本文（上限 maxResponseBytes）再還給 SDK，非 2xx 時把狀態、標頭與本文記進呼叫的 ctx。
+type recorder struct{ next http.RoundTripper }
+
+func (r recorder) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := r.next.RoundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
+	_ = resp.Body.Close()
+	if err != nil {
+		return nil, fmt.Errorf("stripe：讀回應失敗：%w", err)
+	}
+	if len(data) > maxResponseBytes {
+		return nil, fmt.Errorf("stripe：回應超過 %d bytes", maxResponseBytes)
+	}
+	resp.Body = io.NopCloser(bytes.NewReader(data))
+	resp.ContentLength = int64(len(data))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if ex, ok := req.Context().Value(exchangeKey{}).(*exchange); ok {
+			*ex = exchange{status: resp.StatusCode, header: resp.Header.Clone(), body: data}
+		}
+	}
+	return resp, nil
+}
+
+// call 在總上限 timeout 內執行一次 SDK 呼叫：429 依 Retry-After（沒有就指數退避）等待後重送，最多 maxAttempts 次；
+// 其他非 2xx 轉成 *APIError；沒有 HTTP 回應的失敗（連線、逾時、ctx 取消）原樣回傳。
+func (c *Client) call(ctx context.Context, fn func(ctx context.Context) error) error {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	for attempt := 1; ; attempt++ {
+		ex := &exchange{}
+		err := fn(context.WithValue(ctx, exchangeKey{}, ex))
+		if err == nil {
+			return nil
+		}
+		if ex.status == 0 {
+			return err
+		}
+		if ex.status == http.StatusTooManyRequests && attempt < maxAttempts {
+			if werr := c.wait(ctx, backoff(attempt, ex.header.Get("Retry-After"))); werr != nil {
+				return fmt.Errorf("stripe：限流退避被中斷：%w", werr)
+			}
+			continue
+		}
+		return ex.apiError()
+	}
+}
+
+func backoff(attempt int, retryAfter string) time.Duration {
+	if s, err := strconv.Atoi(strings.TrimSpace(retryAfter)); err == nil && s >= 0 {
+		return min(time.Duration(s)*time.Second, maxBackoff)
+	}
+	return min(baseBackoff<<(attempt-1), maxBackoff)
+}
+
+// Dashboard 是連線帳戶的 dashboard 種類，決定誰向賣家收件：express 由 Stripe 收，none 由平台收（spike Q9）。
+type Dashboard string
+
+// Dashboard 的值。
+const (
+	DashboardExpress Dashboard = "express"
+	DashboardNone    Dashboard = "none"
+)
+
+// CreateAccountShell 是建立的第一步（D55）：只帶 metadata.store_id 與 metadata.hawkr_namespace（D61）、用呼叫方保存的冪等鍵；本文固定，同一把鍵永遠得到同一個帳戶，
+// 帳戶上沒有任何擁有者個資。回傳帳戶 ID。
+func (c *Client) CreateAccountShell(ctx context.Context, idempotencyKey string, storeID int64) (string, error) {
+	params := &sdk.V2CoreAccountCreateParams{Metadata: c.accountMetadata(storeID)}
+	if idempotencyKey != "" {
+		params.IdempotencyKey = sdk.String(idempotencyKey)
+	}
+	var out *sdk.V2CoreAccount
+	if err := c.call(ctx, func(ctx context.Context) (err error) {
+		out, err = c.sdk.V2CoreAccounts.Create(ctx, params)
+		return err
+	}); err != nil {
+		return "", err
+	}
+	if out == nil || out.ID == "" {
+		return "", errors.New("stripe：建立帳戶的回應沒有 id")
+	}
+	return out.ID, nil
+}
+
+// UpdateAccount 是建立的第二步（D55）：寫入聯絡信箱、recipient 設定（US、individual、轉帳能力）、責任歸屬與 dashboard；可重複送出。
+// contactEmail 必填：有 recipient 設定的帳戶沒有它時 Stripe 回 400。
+func (c *Client) UpdateAccount(ctx context.Context, accountID string, dashboard Dashboard, contactEmail string) error {
+	params := &sdk.V2CoreAccountUpdateParams{
+		Identity: &sdk.V2CoreAccountUpdateIdentityParams{Country: sdk.String("us"), EntityType: sdk.String("individual")},
+		Configuration: &sdk.V2CoreAccountUpdateConfigurationParams{Recipient: &sdk.V2CoreAccountUpdateConfigurationRecipientParams{
+			Capabilities: &sdk.V2CoreAccountUpdateConfigurationRecipientCapabilitiesParams{
+				StripeBalance: &sdk.V2CoreAccountUpdateConfigurationRecipientCapabilitiesStripeBalanceParams{
+					StripeTransfers: &sdk.V2CoreAccountUpdateConfigurationRecipientCapabilitiesStripeBalanceStripeTransfersParams{Requested: sdk.Bool(true)},
+				},
+			},
+		}},
+		Defaults: &sdk.V2CoreAccountUpdateDefaultsParams{Responsibilities: &sdk.V2CoreAccountUpdateDefaultsResponsibilitiesParams{
+			FeesCollector: sdk.String("application"), LossesCollector: sdk.String("application"),
+		}},
+		Dashboard:    sdk.String(string(dashboard)),
+		ContactEmail: sdk.String(contactEmail),
+	}
+	return c.call(ctx, func(ctx context.Context) error {
+		_, err := c.sdk.V2CoreAccounts.Update(ctx, accountID, params)
+		return err
+	})
+}
+
+// CreateAccount 建立 v2 recipient 帳戶：先 CreateAccountShell（冪等），再 UpdateAccount；兩步都成功才回傳帳戶 ID。第二步失敗時帳戶已存在，
+// 同一把鍵重來會得到同一個帳戶。
+func (c *Client) CreateAccount(ctx context.Context, idempotencyKey string, storeID int64, dashboard Dashboard, contactEmail string) (string, error) {
+	id, err := c.CreateAccountShell(ctx, idempotencyKey, storeID)
+	if err != nil {
+		return "", err
+	}
+	if err := c.UpdateAccount(ctx, id, dashboard, contactEmail); err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+// AccountLink 是託管開通頁面的連結。
+type AccountLink struct {
+	URL       string
+	ExpiresAt *time.Time
+}
+
+// CreateAccountLink 產生 v2 Account Link（託管的開通頁面）。
+func (c *Client) CreateAccountLink(ctx context.Context, accountID, returnURL, refreshURL string) (AccountLink, error) {
+	params := &sdk.V2CoreAccountLinkCreateParams{
+		Account: sdk.String(accountID),
+		UseCase: &sdk.V2CoreAccountLinkCreateUseCaseParams{
+			Type: sdk.String("account_onboarding"),
+			AccountOnboarding: &sdk.V2CoreAccountLinkCreateUseCaseAccountOnboardingParams{
+				ReturnURL:  sdk.String(returnURL),
+				RefreshURL: sdk.String(refreshURL),
+			},
+		},
+	}
+	var out *sdk.V2CoreAccountLink
+	if err := c.call(ctx, func(ctx context.Context) (err error) {
+		out, err = c.sdk.V2CoreAccountLinks.Create(ctx, params)
+		return err
+	}); err != nil {
+		return AccountLink{}, err
+	}
+	if out == nil || out.URL == "" {
+		return AccountLink{}, errors.New("stripe：Account Link 的回應沒有 url")
+	}
+	link := AccountLink{URL: out.URL}
+	if !out.ExpiresAt.IsZero() {
+		t := out.ExpiresAt.UTC()
+		link.ExpiresAt = &t
+	}
+	return link, nil
+}
+
+// AccountSession 是內嵌開通元件的 session。
+type AccountSession struct {
+	ClientSecret string
+	ExpiresAt    *time.Time
+}
+
+// CreateAccountSession 產生 v1 Account Session（內嵌的 account_onboarding 元件）。
+// 平台收集需求並承擔損失（losses_collector=application），所以停用 Stripe 使用者驗證
+// （disable_stripe_user_authentication），內嵌表單直接顯示，不經 Stripe 登入視窗。
+func (c *Client) CreateAccountSession(ctx context.Context, accountID string) (AccountSession, error) {
+	params := &sdk.AccountSessionCreateParams{
+		Account: sdk.String(accountID),
+		Components: &sdk.AccountSessionCreateComponentsParams{AccountOnboarding: &sdk.AccountSessionCreateComponentsAccountOnboardingParams{
+			Enabled:  sdk.Bool(true),
+			Features: &sdk.AccountSessionCreateComponentsAccountOnboardingFeaturesParams{DisableStripeUserAuthentication: sdk.Bool(true)},
+		}},
+	}
+	var out *sdk.AccountSession
+	if err := c.call(ctx, func(ctx context.Context) (err error) {
+		out, err = c.sdk.V1AccountSessions.Create(ctx, params)
+		return err
+	}); err != nil {
+		return AccountSession{}, err
+	}
+	if out == nil || out.ClientSecret == "" {
+		return AccountSession{}, errors.New("stripe：Account Session 的回應沒有 client_secret")
+	}
+	s := AccountSession{ClientSecret: out.ClientSecret}
+	if out.ExpiresAt != 0 {
+		t := time.Unix(out.ExpiresAt, 0).UTC()
+		s.ExpiresAt = &t
+	}
+	return s, nil
+}
+
+// StatusDetail 是能力狀態的一筆細節：code 是原因碼，resolution 是誰要行動（provide_info、contact_stripe、no_resolution）。
+type StatusDetail struct {
+	Code       string `json:"code"`
+	Resolution string `json:"resolution"`
+}
+
+// Capability 是能力的狀態與細節。
+type Capability struct {
+	Status  string
+	Details []StatusDetail
+}
+
+// Account 是 v2 帳戶中收款開通用得到的欄位；其餘欄位丟棄。Requirements 是回應本文裡 requirements 的原始 JSON。
+type Account struct {
+	ID string
+	// Closed 為真表示帳戶已在 Stripe 關閉：沒有能力與 requirements，其餘欄位都是零值。
+	Closed       bool
+	Transfers    Capability
+	Payouts      Capability
+	Requirements json.RawMessage
+}
+
+// RetrieveAccount 讀 v2 帳戶，include recipient 設定與 requirements。
+func (c *Client) RetrieveAccount(ctx context.Context, accountID string) (Account, error) {
+	params := &sdk.V2CoreAccountRetrieveParams{Include: sdk.StringSlice([]string{"configuration.recipient", "requirements"})}
+	var out *sdk.V2CoreAccount
+	if err := c.call(ctx, func(ctx context.Context) (err error) {
+		out, err = c.sdk.V2CoreAccounts.Retrieve(ctx, accountID, params)
+		return err
+	}); err != nil {
+		return Account{}, err
+	}
+	if out == nil || out.ID == "" {
+		return Account{}, errors.New("stripe：讀取帳戶的回應沒有 id")
+	}
+	if out.Closed {
+		return Account{ID: out.ID, Closed: true}, nil
+	}
+	var bal *sdk.V2CoreAccountConfigurationRecipientCapabilitiesStripeBalance
+	if out.Configuration != nil && out.Configuration.Recipient != nil && out.Configuration.Recipient.Capabilities != nil {
+		bal = out.Configuration.Recipient.Capabilities.StripeBalance
+	}
+	if bal == nil || bal.StripeTransfers == nil {
+		// 沒有轉帳能力的回應是格式錯誤，不是一個狀態；回一般錯誤讓呼叫方重試，不能當成「審核中」存下來。
+		return Account{}, fmt.Errorf("stripe：帳戶 %s 的回應沒有 stripe_transfers 能力", out.ID)
+	}
+	acct := Account{ID: out.ID, Requirements: rawRequirements(out.LastResponse)}
+	acct.Transfers = Capability{Status: string(bal.StripeTransfers.Status)}
+	for _, d := range bal.StripeTransfers.StatusDetails {
+		if d != nil {
+			acct.Transfers.Details = append(acct.Transfers.Details, StatusDetail{Code: string(d.Code), Resolution: string(d.Resolution)})
+		}
+	}
+	if p := bal.Payouts; p != nil {
+		acct.Payouts = Capability{Status: string(p.Status)}
+		for _, d := range p.StatusDetails {
+			if d != nil {
+				acct.Payouts.Details = append(acct.Payouts.Details, StatusDetail{Code: string(d.Code), Resolution: string(d.Resolution)})
+			}
+		}
+	}
+	return acct, nil
+}
+
+// rawRequirements 取回應本文裡 requirements 的原始 JSON（SDK 型別只保留它認得的欄位）。
+func rawRequirements(res *sdk.APIResponse) json.RawMessage {
+	if res == nil {
+		return nil
+	}
+	var env struct {
+		Requirements json.RawMessage `json:"requirements"`
+	}
+	if json.Unmarshal(res.RawJSON, &env) != nil {
+		return nil
+	}
+	return env.Requirements
+}
+
+// CloseAccount 關閉 v2 帳戶。先讀回帳戶：已關閉就視為成功；否則 applied_configurations 取自讀回的帳戶（關閉要求傳帳戶實際的全部設定：
+// 第一步之後還沒完成設定的空帳戶是 []，傳 ["recipient"] 或省略都是 400 configs_must_match_to_close，D60、spike Q25）。讀取失敗直接回讀取的錯誤；
+// 關閉回 403（並行的關閉剛完成）時再讀一次，closed 為真就視為成功，否則回原本的 403。
+// 關閉回 400 configs_must_match_to_close 時（讀與關閉之間並行的設定讓帳戶的設定變了）再讀一次、用新讀到的設定重送一次關閉；第二次仍不符就回那個錯誤。
+func (c *Client) CloseAccount(ctx context.Context, accountID string) error {
+	const attempts = 2
+	for attempt := 1; ; attempt++ {
+		acct, err := c.retrieveRaw(ctx, accountID)
+		if err != nil {
+			return err
+		}
+		if acct.Closed {
+			return nil
+		}
+		err = c.closeWith(ctx, accountID, acct)
+		var api *APIError
+		if err == nil || !errors.As(err, &api) {
+			return err
+		}
+		switch {
+		case api.Status == http.StatusForbidden:
+			again, rerr := c.retrieveRaw(ctx, accountID)
+			if rerr != nil {
+				return rerr
+			}
+			if again.Closed {
+				return nil
+			}
+			return err
+		case api.Code == "configs_must_match_to_close" && attempt < attempts:
+			continue
+		}
+		return err
+	}
+}
+
+func (c *Client) closeWith(ctx context.Context, accountID string, acct *sdk.V2CoreAccount) error {
+	applied := make([]string, 0, len(acct.AppliedConfigurations))
+	for _, cfg := range acct.AppliedConfigurations {
+		applied = append(applied, string(cfg))
+	}
+	return c.call(ctx, func(ctx context.Context) error {
+		svc := c.sdk.V2CoreAccounts
+		params := &closeParams{AppliedConfigurations: applied}
+		params.Context = ctx
+		return svc.B.Call(http.MethodPost, sdk.FormatURLPath("/v2/core/accounts/%s/close", accountID), svc.Key, params, &sdk.V2CoreAccount{})
+	})
+}
+
+// closeParams 是關閉請求的本文：SDK 的 V2CoreAccountCloseParams 對 applied_configurations 用 omitempty，空陣列會被省略（Stripe 回 400 configs_must_match_to_close），
+// 所以這裡自己定義，空陣列照送。
+type closeParams struct {
+	sdk.Params            `json:"-"`
+	AppliedConfigurations []string `json:"applied_configurations"`
+}
+
+func (c *Client) retrieveRaw(ctx context.Context, accountID string) (*sdk.V2CoreAccount, error) {
+	var acct *sdk.V2CoreAccount
+	if err := c.call(ctx, func(ctx context.Context) (err error) {
+		acct, err = c.sdk.V2CoreAccounts.Retrieve(ctx, accountID, &sdk.V2CoreAccountRetrieveParams{})
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	if acct == nil || acct.ID == "" {
+		return nil, errors.New("stripe：讀取帳戶的回應沒有 id")
+	}
+	return acct, nil
+}
+
+const (
+	// accountsPageLimit 是列出帳戶每頁的上限（Stripe v2 上限 20，spike Q24）。
+	accountsPageLimit = 20
+	// maxAccountPages 是以 metadata.store_id 加命名空間對帳時最多翻的頁數（整個列表在一次呼叫的總上限內讀完）；超過回錯誤，呼叫方不得把它當成「沒有找到」。
+	maxAccountPages = 100
+)
+
+// ListAccountIDsByStore 列出沒有關閉的 v2 帳戶（預設不含已關閉的；已關閉的帳戶 metadata 被清成 null，所以比對不到同一家店先前關閉的帳戶，spike Q24），
+// 回傳 metadata.store_id 等於 storeID 而且 metadata.hawkr_namespace 等於這個 client 的命名空間的帳戶 ID（D61；沒有命名空間的舊帳戶不符）（依帳戶的 created 由新到舊，同時間維持列表順序；同一個 ID 只出現一次）。含只做完第一步的空帳戶。整份列完才回傳；翻頁到上限或任何一頁失敗回錯誤，
+// 不回部分結果（呼叫方只在「整份列完都沒有」時才刪列）。
+func (c *Client) ListAccountIDsByStore(ctx context.Context, storeID int64) ([]string, error) {
+	want := strconv.FormatInt(storeID, 10)
+	type match struct {
+		id      string
+		created time.Time
+	}
+	var found []match
+	err := c.call(ctx, func(ctx context.Context) error {
+		found = found[:0]
+		listed := map[string]bool{}
+		params := &sdk.V2CoreAccountListParams{Limit: sdk.Int64(accountsPageLimit)}
+		seen := 0
+		for a, err := range c.sdk.V2CoreAccounts.List(ctx, params).All(ctx) {
+			if err != nil {
+				return err
+			}
+			if seen++; seen > maxAccountPages*accountsPageLimit {
+				return fmt.Errorf("stripe：帳戶列表超過 %d 頁", maxAccountPages)
+			}
+			if a != nil && a.ID != "" && a.Metadata[metaStoreID] == want && a.Metadata[metaNamespace] == c.namespace {
+				if !listed[a.ID] {
+					listed[a.ID] = true
+					found = append(found, match{a.ID, a.Created})
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	slices.SortStableFunc(found, func(x, y match) int { return y.created.Compare(x.created) })
+	ids := make([]string, len(found))
+	for i, m := range found {
+		ids[i] = m.id
+	}
+	return ids, nil
+}
+
+const (
+	bankAccountsPageLimit = 100
+	// maxBankAccountPages 是讀外部銀行帳號時最多翻的頁數；超過視為回應異常，不無限翻頁。
+	maxBankAccountPages = 20
+)
+
+// ListBankAccountFingerprints 讀連線帳戶目前掛著的外部銀行帳號的 fingerprint（v1 external_accounts，只列 bank_account），翻頁讀完；
+// 沒有 fingerprint 的項目略過。fingerprint 是 Stripe 對同一組銀行帳號在平台內一致的識別碼（https://docs.stripe.com/api/external_account_bank_accounts/list）。
+func (c *Client) ListBankAccountFingerprints(ctx context.Context, accountID string) ([]string, error) {
+	var out []string
+	startingAfter := ""
+	for range maxBankAccountPages {
+		params := &sdk.BankAccountListParams{Account: sdk.String(accountID)}
+		params.Limit = sdk.Int64(bankAccountsPageLimit)
+		params.Single = true
+		if startingAfter != "" {
+			params.StartingAfter = sdk.String(startingAfter)
+		}
+		var data []*sdk.BankAccount
+		var hasMore bool
+		if err := c.call(ctx, func(ctx context.Context) error {
+			list := c.sdk.V1BankAccounts.List(ctx, params)
+			if err := list.Err(); err != nil {
+				return err
+			}
+			data, hasMore = list.Data(), list.Meta().HasMore
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+		for _, ba := range data {
+			if ba != nil && ba.Fingerprint != "" {
+				out = append(out, ba.Fingerprint)
+			}
+		}
+		if !hasMore {
+			return out, nil
+		}
+		if len(data) == 0 || data[len(data)-1] == nil || data[len(data)-1].ID == "" {
+			return nil, errors.New("stripe：外部銀行帳號的回應 has_more 為真但沒有可接續的項目")
+		}
+		startingAfter = data[len(data)-1].ID
+	}
+	return nil, fmt.Errorf("stripe：外部銀行帳號超過 %d 頁", maxBankAccountPages)
+}

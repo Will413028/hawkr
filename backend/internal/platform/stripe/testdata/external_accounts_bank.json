@@ -1,0 +1,43 @@
+{
+  "status": 200,
+  "body": {
+    "object": "list",
+    "data": [
+      {
+        "id": "ba_<MASKED:793a>",
+        "object": "bank_account",
+        "account": "acct_1UXVfaID6WkY4CJw",
+        "account_holder_name": null,
+        "account_holder_type": null,
+        "account_type": null,
+        "available_payout_methods": [
+          "standard",
+          "instant"
+        ],
+        "bank_name": "STRIPE TEST BANK",
+        "country": "US",
+        "currency": "usd",
+        "default_for_currency": true,
+        "fingerprint": "x2q5SoRmGsxVpsYY",
+        "future_requirements": {
+          "currently_due": [],
+          "errors": [],
+          "past_due": [],
+          "pending_verification": []
+        },
+        "last4": "<MASKED>",
+        "metadata": {},
+        "requirements": {
+          "currently_due": [],
+          "errors": [],
+          "past_due": [],
+          "pending_verification": []
+        },
+        "routing_number": "<MASKED>",
+        "status": "verified"
+      }
+    ],
+    "has_more": false,
+    "url": "<MASKED>"
+  }
+}

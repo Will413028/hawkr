@@ -16,7 +16,8 @@ mixin _$KycWizardState implements DiagnosticableTreeMixin {
 
 /// 已經從申請（或沒有申請）載入。
  bool get hydrated;/// 申請的身分；還沒有申請也還沒選時是 null（顯示選擇畫面）。
- KycSubject? get subject; KycForm get form; KycForm get baseline; KycDocs get docs; KycDocs get baselineDocs; StoreContactDraft get store; StoreContactDraft get storeBaseline; StoreContactErrors get storeServerErrors; StoreContactDraft? get storeServerErrorsFor;/// 最近一次動作失敗或提醒的文字。
+ KycSubject? get subject; KycForm get form; KycForm get baseline; KycDocs get docs; KycDocs get baselineDocs; StoreContactDraft get store; StoreContactDraft get storeBaseline; StoreContactErrors get storeServerErrors; StoreContactDraft? get storeServerErrorsFor;/// 賣家在確認步驟輸入的聯絡信箱；還沒輸入過是 null（顯示帳號目前的信箱）。
+ String? get contactEmailDraft;/// 最近一次動作失敗或提醒的文字。
  String? get error;/// 載入後要停在哪一步；沒有申請或沒有缺項時是 null（從頭開始）。
  KycStep? get resumeStep; KycLookup get lookup; Map<KYCField, KycFieldError> get fieldErrors; Set<String> get uploading; bool get saving; bool get storeSaving; bool get submitting; bool get discarding; bool get creating;
 /// Create a copy of KycWizardState
@@ -30,21 +31,21 @@ $KycWizardStateCopyWith<KycWizardState> get copyWith => _$KycWizardStateCopyWith
 void debugFillProperties(DiagnosticPropertiesBuilder properties) {
   properties
     ..add(DiagnosticsProperty('type', 'KycWizardState'))
-    ..add(DiagnosticsProperty('hydrated', hydrated))..add(DiagnosticsProperty('subject', subject))..add(DiagnosticsProperty('form', form))..add(DiagnosticsProperty('baseline', baseline))..add(DiagnosticsProperty('docs', docs))..add(DiagnosticsProperty('baselineDocs', baselineDocs))..add(DiagnosticsProperty('store', store))..add(DiagnosticsProperty('storeBaseline', storeBaseline))..add(DiagnosticsProperty('storeServerErrors', storeServerErrors))..add(DiagnosticsProperty('storeServerErrorsFor', storeServerErrorsFor))..add(DiagnosticsProperty('error', error))..add(DiagnosticsProperty('resumeStep', resumeStep))..add(DiagnosticsProperty('lookup', lookup))..add(DiagnosticsProperty('fieldErrors', fieldErrors))..add(DiagnosticsProperty('uploading', uploading))..add(DiagnosticsProperty('saving', saving))..add(DiagnosticsProperty('storeSaving', storeSaving))..add(DiagnosticsProperty('submitting', submitting))..add(DiagnosticsProperty('discarding', discarding))..add(DiagnosticsProperty('creating', creating));
+    ..add(DiagnosticsProperty('hydrated', hydrated))..add(DiagnosticsProperty('subject', subject))..add(DiagnosticsProperty('form', form))..add(DiagnosticsProperty('baseline', baseline))..add(DiagnosticsProperty('docs', docs))..add(DiagnosticsProperty('baselineDocs', baselineDocs))..add(DiagnosticsProperty('store', store))..add(DiagnosticsProperty('storeBaseline', storeBaseline))..add(DiagnosticsProperty('storeServerErrors', storeServerErrors))..add(DiagnosticsProperty('storeServerErrorsFor', storeServerErrorsFor))..add(DiagnosticsProperty('contactEmailDraft', contactEmailDraft))..add(DiagnosticsProperty('error', error))..add(DiagnosticsProperty('resumeStep', resumeStep))..add(DiagnosticsProperty('lookup', lookup))..add(DiagnosticsProperty('fieldErrors', fieldErrors))..add(DiagnosticsProperty('uploading', uploading))..add(DiagnosticsProperty('saving', saving))..add(DiagnosticsProperty('storeSaving', storeSaving))..add(DiagnosticsProperty('submitting', submitting))..add(DiagnosticsProperty('discarding', discarding))..add(DiagnosticsProperty('creating', creating));
 }
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is KycWizardState&&(identical(other.hydrated, hydrated) || other.hydrated == hydrated)&&(identical(other.subject, subject) || other.subject == subject)&&(identical(other.form, form) || other.form == form)&&(identical(other.baseline, baseline) || other.baseline == baseline)&&(identical(other.docs, docs) || other.docs == docs)&&(identical(other.baselineDocs, baselineDocs) || other.baselineDocs == baselineDocs)&&(identical(other.store, store) || other.store == store)&&(identical(other.storeBaseline, storeBaseline) || other.storeBaseline == storeBaseline)&&(identical(other.storeServerErrors, storeServerErrors) || other.storeServerErrors == storeServerErrors)&&(identical(other.storeServerErrorsFor, storeServerErrorsFor) || other.storeServerErrorsFor == storeServerErrorsFor)&&(identical(other.error, error) || other.error == error)&&(identical(other.resumeStep, resumeStep) || other.resumeStep == resumeStep)&&(identical(other.lookup, lookup) || other.lookup == lookup)&&const DeepCollectionEquality().equals(other.fieldErrors, fieldErrors)&&const DeepCollectionEquality().equals(other.uploading, uploading)&&(identical(other.saving, saving) || other.saving == saving)&&(identical(other.storeSaving, storeSaving) || other.storeSaving == storeSaving)&&(identical(other.submitting, submitting) || other.submitting == submitting)&&(identical(other.discarding, discarding) || other.discarding == discarding)&&(identical(other.creating, creating) || other.creating == creating));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is KycWizardState&&(identical(other.hydrated, hydrated) || other.hydrated == hydrated)&&(identical(other.subject, subject) || other.subject == subject)&&(identical(other.form, form) || other.form == form)&&(identical(other.baseline, baseline) || other.baseline == baseline)&&(identical(other.docs, docs) || other.docs == docs)&&(identical(other.baselineDocs, baselineDocs) || other.baselineDocs == baselineDocs)&&(identical(other.store, store) || other.store == store)&&(identical(other.storeBaseline, storeBaseline) || other.storeBaseline == storeBaseline)&&(identical(other.storeServerErrors, storeServerErrors) || other.storeServerErrors == storeServerErrors)&&(identical(other.storeServerErrorsFor, storeServerErrorsFor) || other.storeServerErrorsFor == storeServerErrorsFor)&&(identical(other.contactEmailDraft, contactEmailDraft) || other.contactEmailDraft == contactEmailDraft)&&(identical(other.error, error) || other.error == error)&&(identical(other.resumeStep, resumeStep) || other.resumeStep == resumeStep)&&(identical(other.lookup, lookup) || other.lookup == lookup)&&const DeepCollectionEquality().equals(other.fieldErrors, fieldErrors)&&const DeepCollectionEquality().equals(other.uploading, uploading)&&(identical(other.saving, saving) || other.saving == saving)&&(identical(other.storeSaving, storeSaving) || other.storeSaving == storeSaving)&&(identical(other.submitting, submitting) || other.submitting == submitting)&&(identical(other.discarding, discarding) || other.discarding == discarding)&&(identical(other.creating, creating) || other.creating == creating));
 }
 
 
 @override
-int get hashCode => Object.hashAll([runtimeType,hydrated,subject,form,baseline,docs,baselineDocs,store,storeBaseline,storeServerErrors,storeServerErrorsFor,error,resumeStep,lookup,const DeepCollectionEquality().hash(fieldErrors),const DeepCollectionEquality().hash(uploading),saving,storeSaving,submitting,discarding,creating]);
+int get hashCode => Object.hashAll([runtimeType,hydrated,subject,form,baseline,docs,baselineDocs,store,storeBaseline,storeServerErrors,storeServerErrorsFor,contactEmailDraft,error,resumeStep,lookup,const DeepCollectionEquality().hash(fieldErrors),const DeepCollectionEquality().hash(uploading),saving,storeSaving,submitting,discarding,creating]);
 
 @override
 String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
-  return 'KycWizardState(hydrated: $hydrated, subject: $subject, form: $form, baseline: $baseline, docs: $docs, baselineDocs: $baselineDocs, store: $store, storeBaseline: $storeBaseline, storeServerErrors: $storeServerErrors, storeServerErrorsFor: $storeServerErrorsFor, error: $error, resumeStep: $resumeStep, lookup: $lookup, fieldErrors: $fieldErrors, uploading: $uploading, saving: $saving, storeSaving: $storeSaving, submitting: $submitting, discarding: $discarding, creating: $creating)';
+  return 'KycWizardState(hydrated: $hydrated, subject: $subject, form: $form, baseline: $baseline, docs: $docs, baselineDocs: $baselineDocs, store: $store, storeBaseline: $storeBaseline, storeServerErrors: $storeServerErrors, storeServerErrorsFor: $storeServerErrorsFor, contactEmailDraft: $contactEmailDraft, error: $error, resumeStep: $resumeStep, lookup: $lookup, fieldErrors: $fieldErrors, uploading: $uploading, saving: $saving, storeSaving: $storeSaving, submitting: $submitting, discarding: $discarding, creating: $creating)';
 }
 
 
@@ -55,7 +56,7 @@ abstract mixin class $KycWizardStateCopyWith<$Res>  {
   factory $KycWizardStateCopyWith(KycWizardState value, $Res Function(KycWizardState) _then) = _$KycWizardStateCopyWithImpl;
 @useResult
 $Res call({
- bool hydrated, KycSubject? subject, KycForm form, KycForm baseline, KycDocs docs, KycDocs baselineDocs, StoreContactDraft store, StoreContactDraft storeBaseline, StoreContactErrors storeServerErrors, StoreContactDraft? storeServerErrorsFor, String? error, KycStep? resumeStep, KycLookup lookup, Map<KYCField, KycFieldError> fieldErrors, Set<String> uploading, bool saving, bool storeSaving, bool submitting, bool discarding, bool creating
+ bool hydrated, KycSubject? subject, KycForm form, KycForm baseline, KycDocs docs, KycDocs baselineDocs, StoreContactDraft store, StoreContactDraft storeBaseline, StoreContactErrors storeServerErrors, StoreContactDraft? storeServerErrorsFor, String? contactEmailDraft, String? error, KycStep? resumeStep, KycLookup lookup, Map<KYCField, KycFieldError> fieldErrors, Set<String> uploading, bool saving, bool storeSaving, bool submitting, bool discarding, bool creating
 });
 
 
@@ -72,7 +73,7 @@ class _$KycWizardStateCopyWithImpl<$Res>
 
 /// Create a copy of KycWizardState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? hydrated = null,Object? subject = freezed,Object? form = null,Object? baseline = null,Object? docs = null,Object? baselineDocs = null,Object? store = null,Object? storeBaseline = null,Object? storeServerErrors = null,Object? storeServerErrorsFor = freezed,Object? error = freezed,Object? resumeStep = freezed,Object? lookup = null,Object? fieldErrors = null,Object? uploading = null,Object? saving = null,Object? storeSaving = null,Object? submitting = null,Object? discarding = null,Object? creating = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? hydrated = null,Object? subject = freezed,Object? form = null,Object? baseline = null,Object? docs = null,Object? baselineDocs = null,Object? store = null,Object? storeBaseline = null,Object? storeServerErrors = null,Object? storeServerErrorsFor = freezed,Object? contactEmailDraft = freezed,Object? error = freezed,Object? resumeStep = freezed,Object? lookup = null,Object? fieldErrors = null,Object? uploading = null,Object? saving = null,Object? storeSaving = null,Object? submitting = null,Object? discarding = null,Object? creating = null,}) {
   return _then(_self.copyWith(
 hydrated: null == hydrated ? _self.hydrated : hydrated // ignore: cast_nullable_to_non_nullable
 as bool,subject: freezed == subject ? _self.subject : subject // ignore: cast_nullable_to_non_nullable
@@ -84,7 +85,8 @@ as KycDocs,store: null == store ? _self.store : store // ignore: cast_nullable_t
 as StoreContactDraft,storeBaseline: null == storeBaseline ? _self.storeBaseline : storeBaseline // ignore: cast_nullable_to_non_nullable
 as StoreContactDraft,storeServerErrors: null == storeServerErrors ? _self.storeServerErrors : storeServerErrors // ignore: cast_nullable_to_non_nullable
 as StoreContactErrors,storeServerErrorsFor: freezed == storeServerErrorsFor ? _self.storeServerErrorsFor : storeServerErrorsFor // ignore: cast_nullable_to_non_nullable
-as StoreContactDraft?,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
+as StoreContactDraft?,contactEmailDraft: freezed == contactEmailDraft ? _self.contactEmailDraft : contactEmailDraft // ignore: cast_nullable_to_non_nullable
+as String?,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
 as String?,resumeStep: freezed == resumeStep ? _self.resumeStep : resumeStep // ignore: cast_nullable_to_non_nullable
 as KycStep?,lookup: null == lookup ? _self.lookup : lookup // ignore: cast_nullable_to_non_nullable
 as KycLookup,fieldErrors: null == fieldErrors ? _self.fieldErrors : fieldErrors // ignore: cast_nullable_to_non_nullable
@@ -179,10 +181,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( bool hydrated,  KycSubject? subject,  KycForm form,  KycForm baseline,  KycDocs docs,  KycDocs baselineDocs,  StoreContactDraft store,  StoreContactDraft storeBaseline,  StoreContactErrors storeServerErrors,  StoreContactDraft? storeServerErrorsFor,  String? error,  KycStep? resumeStep,  KycLookup lookup,  Map<KYCField, KycFieldError> fieldErrors,  Set<String> uploading,  bool saving,  bool storeSaving,  bool submitting,  bool discarding,  bool creating)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( bool hydrated,  KycSubject? subject,  KycForm form,  KycForm baseline,  KycDocs docs,  KycDocs baselineDocs,  StoreContactDraft store,  StoreContactDraft storeBaseline,  StoreContactErrors storeServerErrors,  StoreContactDraft? storeServerErrorsFor,  String? contactEmailDraft,  String? error,  KycStep? resumeStep,  KycLookup lookup,  Map<KYCField, KycFieldError> fieldErrors,  Set<String> uploading,  bool saving,  bool storeSaving,  bool submitting,  bool discarding,  bool creating)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _KycWizardState() when $default != null:
-return $default(_that.hydrated,_that.subject,_that.form,_that.baseline,_that.docs,_that.baselineDocs,_that.store,_that.storeBaseline,_that.storeServerErrors,_that.storeServerErrorsFor,_that.error,_that.resumeStep,_that.lookup,_that.fieldErrors,_that.uploading,_that.saving,_that.storeSaving,_that.submitting,_that.discarding,_that.creating);case _:
+return $default(_that.hydrated,_that.subject,_that.form,_that.baseline,_that.docs,_that.baselineDocs,_that.store,_that.storeBaseline,_that.storeServerErrors,_that.storeServerErrorsFor,_that.contactEmailDraft,_that.error,_that.resumeStep,_that.lookup,_that.fieldErrors,_that.uploading,_that.saving,_that.storeSaving,_that.submitting,_that.discarding,_that.creating);case _:
   return orElse();
 
 }
@@ -200,10 +202,10 @@ return $default(_that.hydrated,_that.subject,_that.form,_that.baseline,_that.doc
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( bool hydrated,  KycSubject? subject,  KycForm form,  KycForm baseline,  KycDocs docs,  KycDocs baselineDocs,  StoreContactDraft store,  StoreContactDraft storeBaseline,  StoreContactErrors storeServerErrors,  StoreContactDraft? storeServerErrorsFor,  String? error,  KycStep? resumeStep,  KycLookup lookup,  Map<KYCField, KycFieldError> fieldErrors,  Set<String> uploading,  bool saving,  bool storeSaving,  bool submitting,  bool discarding,  bool creating)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( bool hydrated,  KycSubject? subject,  KycForm form,  KycForm baseline,  KycDocs docs,  KycDocs baselineDocs,  StoreContactDraft store,  StoreContactDraft storeBaseline,  StoreContactErrors storeServerErrors,  StoreContactDraft? storeServerErrorsFor,  String? contactEmailDraft,  String? error,  KycStep? resumeStep,  KycLookup lookup,  Map<KYCField, KycFieldError> fieldErrors,  Set<String> uploading,  bool saving,  bool storeSaving,  bool submitting,  bool discarding,  bool creating)  $default,) {final _that = this;
 switch (_that) {
 case _KycWizardState():
-return $default(_that.hydrated,_that.subject,_that.form,_that.baseline,_that.docs,_that.baselineDocs,_that.store,_that.storeBaseline,_that.storeServerErrors,_that.storeServerErrorsFor,_that.error,_that.resumeStep,_that.lookup,_that.fieldErrors,_that.uploading,_that.saving,_that.storeSaving,_that.submitting,_that.discarding,_that.creating);case _:
+return $default(_that.hydrated,_that.subject,_that.form,_that.baseline,_that.docs,_that.baselineDocs,_that.store,_that.storeBaseline,_that.storeServerErrors,_that.storeServerErrorsFor,_that.contactEmailDraft,_that.error,_that.resumeStep,_that.lookup,_that.fieldErrors,_that.uploading,_that.saving,_that.storeSaving,_that.submitting,_that.discarding,_that.creating);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -220,10 +222,10 @@ return $default(_that.hydrated,_that.subject,_that.form,_that.baseline,_that.doc
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( bool hydrated,  KycSubject? subject,  KycForm form,  KycForm baseline,  KycDocs docs,  KycDocs baselineDocs,  StoreContactDraft store,  StoreContactDraft storeBaseline,  StoreContactErrors storeServerErrors,  StoreContactDraft? storeServerErrorsFor,  String? error,  KycStep? resumeStep,  KycLookup lookup,  Map<KYCField, KycFieldError> fieldErrors,  Set<String> uploading,  bool saving,  bool storeSaving,  bool submitting,  bool discarding,  bool creating)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( bool hydrated,  KycSubject? subject,  KycForm form,  KycForm baseline,  KycDocs docs,  KycDocs baselineDocs,  StoreContactDraft store,  StoreContactDraft storeBaseline,  StoreContactErrors storeServerErrors,  StoreContactDraft? storeServerErrorsFor,  String? contactEmailDraft,  String? error,  KycStep? resumeStep,  KycLookup lookup,  Map<KYCField, KycFieldError> fieldErrors,  Set<String> uploading,  bool saving,  bool storeSaving,  bool submitting,  bool discarding,  bool creating)?  $default,) {final _that = this;
 switch (_that) {
 case _KycWizardState() when $default != null:
-return $default(_that.hydrated,_that.subject,_that.form,_that.baseline,_that.docs,_that.baselineDocs,_that.store,_that.storeBaseline,_that.storeServerErrors,_that.storeServerErrorsFor,_that.error,_that.resumeStep,_that.lookup,_that.fieldErrors,_that.uploading,_that.saving,_that.storeSaving,_that.submitting,_that.discarding,_that.creating);case _:
+return $default(_that.hydrated,_that.subject,_that.form,_that.baseline,_that.docs,_that.baselineDocs,_that.store,_that.storeBaseline,_that.storeServerErrors,_that.storeServerErrorsFor,_that.contactEmailDraft,_that.error,_that.resumeStep,_that.lookup,_that.fieldErrors,_that.uploading,_that.saving,_that.storeSaving,_that.submitting,_that.discarding,_that.creating);case _:
   return null;
 
 }
@@ -235,7 +237,7 @@ return $default(_that.hydrated,_that.subject,_that.form,_that.baseline,_that.doc
 
 
 class _KycWizardState with DiagnosticableTreeMixin implements KycWizardState {
-  const _KycWizardState({this.hydrated = false, this.subject, this.form = const KycForm(), this.baseline = const KycForm(), this.docs = const KycDocs(), this.baselineDocs = const KycDocs(), this.store = const StoreContactDraft(), this.storeBaseline = const StoreContactDraft(), this.storeServerErrors = const StoreContactErrors(), this.storeServerErrorsFor, this.error, this.resumeStep, this.lookup = const KycLookupIdle(), final  Map<KYCField, KycFieldError> fieldErrors = const {}, final  Set<String> uploading = const {}, this.saving = false, this.storeSaving = false, this.submitting = false, this.discarding = false, this.creating = false}): _fieldErrors = fieldErrors,_uploading = uploading;
+  const _KycWizardState({this.hydrated = false, this.subject, this.form = const KycForm(), this.baseline = const KycForm(), this.docs = const KycDocs(), this.baselineDocs = const KycDocs(), this.store = const StoreContactDraft(), this.storeBaseline = const StoreContactDraft(), this.storeServerErrors = const StoreContactErrors(), this.storeServerErrorsFor, this.contactEmailDraft, this.error, this.resumeStep, this.lookup = const KycLookupIdle(), final  Map<KYCField, KycFieldError> fieldErrors = const {}, final  Set<String> uploading = const {}, this.saving = false, this.storeSaving = false, this.submitting = false, this.discarding = false, this.creating = false}): _fieldErrors = fieldErrors,_uploading = uploading;
   
 
 /// 已經從申請（或沒有申請）載入。
@@ -250,6 +252,8 @@ class _KycWizardState with DiagnosticableTreeMixin implements KycWizardState {
 @override@JsonKey() final  StoreContactDraft storeBaseline;
 @override@JsonKey() final  StoreContactErrors storeServerErrors;
 @override final  StoreContactDraft? storeServerErrorsFor;
+/// 賣家在確認步驟輸入的聯絡信箱；還沒輸入過是 null（顯示帳號目前的信箱）。
+@override final  String? contactEmailDraft;
 /// 最近一次動作失敗或提醒的文字。
 @override final  String? error;
 /// 載入後要停在哪一步；沒有申請或沒有缺項時是 null（從頭開始）。
@@ -286,21 +290,21 @@ _$KycWizardStateCopyWith<_KycWizardState> get copyWith => __$KycWizardStateCopyW
 void debugFillProperties(DiagnosticPropertiesBuilder properties) {
   properties
     ..add(DiagnosticsProperty('type', 'KycWizardState'))
-    ..add(DiagnosticsProperty('hydrated', hydrated))..add(DiagnosticsProperty('subject', subject))..add(DiagnosticsProperty('form', form))..add(DiagnosticsProperty('baseline', baseline))..add(DiagnosticsProperty('docs', docs))..add(DiagnosticsProperty('baselineDocs', baselineDocs))..add(DiagnosticsProperty('store', store))..add(DiagnosticsProperty('storeBaseline', storeBaseline))..add(DiagnosticsProperty('storeServerErrors', storeServerErrors))..add(DiagnosticsProperty('storeServerErrorsFor', storeServerErrorsFor))..add(DiagnosticsProperty('error', error))..add(DiagnosticsProperty('resumeStep', resumeStep))..add(DiagnosticsProperty('lookup', lookup))..add(DiagnosticsProperty('fieldErrors', fieldErrors))..add(DiagnosticsProperty('uploading', uploading))..add(DiagnosticsProperty('saving', saving))..add(DiagnosticsProperty('storeSaving', storeSaving))..add(DiagnosticsProperty('submitting', submitting))..add(DiagnosticsProperty('discarding', discarding))..add(DiagnosticsProperty('creating', creating));
+    ..add(DiagnosticsProperty('hydrated', hydrated))..add(DiagnosticsProperty('subject', subject))..add(DiagnosticsProperty('form', form))..add(DiagnosticsProperty('baseline', baseline))..add(DiagnosticsProperty('docs', docs))..add(DiagnosticsProperty('baselineDocs', baselineDocs))..add(DiagnosticsProperty('store', store))..add(DiagnosticsProperty('storeBaseline', storeBaseline))..add(DiagnosticsProperty('storeServerErrors', storeServerErrors))..add(DiagnosticsProperty('storeServerErrorsFor', storeServerErrorsFor))..add(DiagnosticsProperty('contactEmailDraft', contactEmailDraft))..add(DiagnosticsProperty('error', error))..add(DiagnosticsProperty('resumeStep', resumeStep))..add(DiagnosticsProperty('lookup', lookup))..add(DiagnosticsProperty('fieldErrors', fieldErrors))..add(DiagnosticsProperty('uploading', uploading))..add(DiagnosticsProperty('saving', saving))..add(DiagnosticsProperty('storeSaving', storeSaving))..add(DiagnosticsProperty('submitting', submitting))..add(DiagnosticsProperty('discarding', discarding))..add(DiagnosticsProperty('creating', creating));
 }
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _KycWizardState&&(identical(other.hydrated, hydrated) || other.hydrated == hydrated)&&(identical(other.subject, subject) || other.subject == subject)&&(identical(other.form, form) || other.form == form)&&(identical(other.baseline, baseline) || other.baseline == baseline)&&(identical(other.docs, docs) || other.docs == docs)&&(identical(other.baselineDocs, baselineDocs) || other.baselineDocs == baselineDocs)&&(identical(other.store, store) || other.store == store)&&(identical(other.storeBaseline, storeBaseline) || other.storeBaseline == storeBaseline)&&(identical(other.storeServerErrors, storeServerErrors) || other.storeServerErrors == storeServerErrors)&&(identical(other.storeServerErrorsFor, storeServerErrorsFor) || other.storeServerErrorsFor == storeServerErrorsFor)&&(identical(other.error, error) || other.error == error)&&(identical(other.resumeStep, resumeStep) || other.resumeStep == resumeStep)&&(identical(other.lookup, lookup) || other.lookup == lookup)&&const DeepCollectionEquality().equals(other._fieldErrors, _fieldErrors)&&const DeepCollectionEquality().equals(other._uploading, _uploading)&&(identical(other.saving, saving) || other.saving == saving)&&(identical(other.storeSaving, storeSaving) || other.storeSaving == storeSaving)&&(identical(other.submitting, submitting) || other.submitting == submitting)&&(identical(other.discarding, discarding) || other.discarding == discarding)&&(identical(other.creating, creating) || other.creating == creating));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _KycWizardState&&(identical(other.hydrated, hydrated) || other.hydrated == hydrated)&&(identical(other.subject, subject) || other.subject == subject)&&(identical(other.form, form) || other.form == form)&&(identical(other.baseline, baseline) || other.baseline == baseline)&&(identical(other.docs, docs) || other.docs == docs)&&(identical(other.baselineDocs, baselineDocs) || other.baselineDocs == baselineDocs)&&(identical(other.store, store) || other.store == store)&&(identical(other.storeBaseline, storeBaseline) || other.storeBaseline == storeBaseline)&&(identical(other.storeServerErrors, storeServerErrors) || other.storeServerErrors == storeServerErrors)&&(identical(other.storeServerErrorsFor, storeServerErrorsFor) || other.storeServerErrorsFor == storeServerErrorsFor)&&(identical(other.contactEmailDraft, contactEmailDraft) || other.contactEmailDraft == contactEmailDraft)&&(identical(other.error, error) || other.error == error)&&(identical(other.resumeStep, resumeStep) || other.resumeStep == resumeStep)&&(identical(other.lookup, lookup) || other.lookup == lookup)&&const DeepCollectionEquality().equals(other._fieldErrors, _fieldErrors)&&const DeepCollectionEquality().equals(other._uploading, _uploading)&&(identical(other.saving, saving) || other.saving == saving)&&(identical(other.storeSaving, storeSaving) || other.storeSaving == storeSaving)&&(identical(other.submitting, submitting) || other.submitting == submitting)&&(identical(other.discarding, discarding) || other.discarding == discarding)&&(identical(other.creating, creating) || other.creating == creating));
 }
 
 
 @override
-int get hashCode => Object.hashAll([runtimeType,hydrated,subject,form,baseline,docs,baselineDocs,store,storeBaseline,storeServerErrors,storeServerErrorsFor,error,resumeStep,lookup,const DeepCollectionEquality().hash(_fieldErrors),const DeepCollectionEquality().hash(_uploading),saving,storeSaving,submitting,discarding,creating]);
+int get hashCode => Object.hashAll([runtimeType,hydrated,subject,form,baseline,docs,baselineDocs,store,storeBaseline,storeServerErrors,storeServerErrorsFor,contactEmailDraft,error,resumeStep,lookup,const DeepCollectionEquality().hash(_fieldErrors),const DeepCollectionEquality().hash(_uploading),saving,storeSaving,submitting,discarding,creating]);
 
 @override
 String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
-  return 'KycWizardState(hydrated: $hydrated, subject: $subject, form: $form, baseline: $baseline, docs: $docs, baselineDocs: $baselineDocs, store: $store, storeBaseline: $storeBaseline, storeServerErrors: $storeServerErrors, storeServerErrorsFor: $storeServerErrorsFor, error: $error, resumeStep: $resumeStep, lookup: $lookup, fieldErrors: $fieldErrors, uploading: $uploading, saving: $saving, storeSaving: $storeSaving, submitting: $submitting, discarding: $discarding, creating: $creating)';
+  return 'KycWizardState(hydrated: $hydrated, subject: $subject, form: $form, baseline: $baseline, docs: $docs, baselineDocs: $baselineDocs, store: $store, storeBaseline: $storeBaseline, storeServerErrors: $storeServerErrors, storeServerErrorsFor: $storeServerErrorsFor, contactEmailDraft: $contactEmailDraft, error: $error, resumeStep: $resumeStep, lookup: $lookup, fieldErrors: $fieldErrors, uploading: $uploading, saving: $saving, storeSaving: $storeSaving, submitting: $submitting, discarding: $discarding, creating: $creating)';
 }
 
 
@@ -311,7 +315,7 @@ abstract mixin class _$KycWizardStateCopyWith<$Res> implements $KycWizardStateCo
   factory _$KycWizardStateCopyWith(_KycWizardState value, $Res Function(_KycWizardState) _then) = __$KycWizardStateCopyWithImpl;
 @override @useResult
 $Res call({
- bool hydrated, KycSubject? subject, KycForm form, KycForm baseline, KycDocs docs, KycDocs baselineDocs, StoreContactDraft store, StoreContactDraft storeBaseline, StoreContactErrors storeServerErrors, StoreContactDraft? storeServerErrorsFor, String? error, KycStep? resumeStep, KycLookup lookup, Map<KYCField, KycFieldError> fieldErrors, Set<String> uploading, bool saving, bool storeSaving, bool submitting, bool discarding, bool creating
+ bool hydrated, KycSubject? subject, KycForm form, KycForm baseline, KycDocs docs, KycDocs baselineDocs, StoreContactDraft store, StoreContactDraft storeBaseline, StoreContactErrors storeServerErrors, StoreContactDraft? storeServerErrorsFor, String? contactEmailDraft, String? error, KycStep? resumeStep, KycLookup lookup, Map<KYCField, KycFieldError> fieldErrors, Set<String> uploading, bool saving, bool storeSaving, bool submitting, bool discarding, bool creating
 });
 
 
@@ -328,7 +332,7 @@ class __$KycWizardStateCopyWithImpl<$Res>
 
 /// Create a copy of KycWizardState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? hydrated = null,Object? subject = freezed,Object? form = null,Object? baseline = null,Object? docs = null,Object? baselineDocs = null,Object? store = null,Object? storeBaseline = null,Object? storeServerErrors = null,Object? storeServerErrorsFor = freezed,Object? error = freezed,Object? resumeStep = freezed,Object? lookup = null,Object? fieldErrors = null,Object? uploading = null,Object? saving = null,Object? storeSaving = null,Object? submitting = null,Object? discarding = null,Object? creating = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? hydrated = null,Object? subject = freezed,Object? form = null,Object? baseline = null,Object? docs = null,Object? baselineDocs = null,Object? store = null,Object? storeBaseline = null,Object? storeServerErrors = null,Object? storeServerErrorsFor = freezed,Object? contactEmailDraft = freezed,Object? error = freezed,Object? resumeStep = freezed,Object? lookup = null,Object? fieldErrors = null,Object? uploading = null,Object? saving = null,Object? storeSaving = null,Object? submitting = null,Object? discarding = null,Object? creating = null,}) {
   return _then(_KycWizardState(
 hydrated: null == hydrated ? _self.hydrated : hydrated // ignore: cast_nullable_to_non_nullable
 as bool,subject: freezed == subject ? _self.subject : subject // ignore: cast_nullable_to_non_nullable
@@ -340,7 +344,8 @@ as KycDocs,store: null == store ? _self.store : store // ignore: cast_nullable_t
 as StoreContactDraft,storeBaseline: null == storeBaseline ? _self.storeBaseline : storeBaseline // ignore: cast_nullable_to_non_nullable
 as StoreContactDraft,storeServerErrors: null == storeServerErrors ? _self.storeServerErrors : storeServerErrors // ignore: cast_nullable_to_non_nullable
 as StoreContactErrors,storeServerErrorsFor: freezed == storeServerErrorsFor ? _self.storeServerErrorsFor : storeServerErrorsFor // ignore: cast_nullable_to_non_nullable
-as StoreContactDraft?,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
+as StoreContactDraft?,contactEmailDraft: freezed == contactEmailDraft ? _self.contactEmailDraft : contactEmailDraft // ignore: cast_nullable_to_non_nullable
+as String?,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
 as String?,resumeStep: freezed == resumeStep ? _self.resumeStep : resumeStep // ignore: cast_nullable_to_non_nullable
 as KycStep?,lookup: null == lookup ? _self.lookup : lookup // ignore: cast_nullable_to_non_nullable
 as KycLookup,fieldErrors: null == fieldErrors ? _self._fieldErrors : fieldErrors // ignore: cast_nullable_to_non_nullable

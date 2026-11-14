@@ -18,8 +18,6 @@ import (
 type CertHolderField string
 
 const (
-	// CertHolderRealName 與 KYC 的負責人姓名相符。
-	CertHolderRealName CertHolderField = "REAL_NAME"
 	// CertHolderCompanyName 與 KYC 的公司名稱相符。
 	CertHolderCompanyName CertHolderField = "COMPANY_NAME"
 	// CertHolderNone 沒有相符的欄位。
@@ -96,24 +94,19 @@ func stripHolderSuffixes(s string) string {
 	}
 }
 
-// MatchCertHolder 回報 holderName 是否屬於 KYC 的姓名 realName 或公司名稱 companyName（正規化後完全相同）。先比 realName（已核准的
-// 申請裡 real_name 的覆蓋率遠高於 company_name），兩者都相符時才看得出順序。兩個名稱正規化後都是空字串時沒有基準
-// （HasReference=false），要轉人工，不是放行也不是拒絕；holderName 正規化後是空字串一律不相符。
-func MatchCertHolder(holderName string, realName, companyName *string) CertHolderMatch {
+// MatchCertHolder 回報 holderName 是否屬於 KYC 的公司名稱 companyName（正規化後完全相同）。基準只有公司名稱（Stripe 計畫 D37：平台不再收個人姓名，
+// 個人賣家沒有基準）。公司名稱正規化後是空字串（個人賣家，或沒有公司名稱）時沒有基準（HasReference=false），要轉人工，不是放行也不是拒絕；
+// holderName 正規化後是空字串一律不相符。
+func MatchCertHolder(holderName string, companyName *string) CertHolderMatch {
 	holder := NormalizeHolderName(holderName)
-	personal, company := "", ""
-	if realName != nil {
-		personal = NormalizeHolderName(*realName)
-	}
+	company := ""
 	if companyName != nil {
 		company = NormalizeHolderName(*companyName)
 	}
-	hasReference := personal != "" || company != ""
+	hasReference := company != ""
 	switch {
 	case holder == "" || !hasReference:
 		return CertHolderMatch{Field: CertHolderNone, HasReference: hasReference}
-	case personal == holder:
-		return CertHolderMatch{Matched: true, Field: CertHolderRealName, HasReference: true}
 	case company == holder:
 		return CertHolderMatch{Matched: true, Field: CertHolderCompanyName, HasReference: true}
 	}

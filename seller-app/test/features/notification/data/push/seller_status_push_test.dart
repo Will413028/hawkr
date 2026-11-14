@@ -1,6 +1,5 @@
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
-import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart';
 import 'package:hawkr_seller/app.dart';
@@ -59,21 +58,28 @@ void main() {
       'PAYUNI_STATUS',
       'payuni_status',
       'SELLER_REVIEW_STATUS',
-      'MERCHANT_VERIFICATION',
       'CERTIFICATION_APPROVED',
       'CERTIFICATION_REJECTED',
       'CERTIFICATION_PENDING_INFO',
-      'MERCHANT.VERIFICATION.APPROVED',
-      'MERCHANT.VERIFICATION.FORWARDED',
     ]) {
       expect(isSellerStatusPushType(type), isTrue, reason: type);
     }
-    for (final type in [null, '', 'ORDER_STATUS', 'CHAT_MESSAGE', 'PAYOUT']) {
+    for (final type in [
+      null,
+      '',
+      'ORDER_STATUS',
+      'CHAT_MESSAGE',
+      'PAYOUT',
+      'MERCHANT_VERIFICATION',
+      'MERCHANT.VERIFICATION.APPROVED',
+      'MERCHANT.VERIFICATION.REJECTED',
+      'MERCHANT.VERIFICATION.FORWARDED',
+    ]) {
       expect(isSellerStatusPushType(type), isFalse, reason: '$type');
     }
   });
 
-  test('推播只觸發重讀店家與認證流程（PayUni 狀態在認證流程裡），不帶任何推播內容進狀態', () async {
+  test('推播只觸發重讀店家與認證申請，不帶任何推播內容進狀態', () async {
     final reads = _Reads();
     final container = ProviderContainer(overrides: reads.overrides);
     addTearDown(container.dispose);
@@ -90,8 +96,8 @@ void main() {
     expect(reads.kyc, kycBefore + 1);
     expect(reads.store.calls, storeBefore + 1);
     expect(
-      container.read(accountKycProvider('acc-1')).requireValue.status,
-      KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
+      container.read(accountKycProvider('acc-1')).requireValue.application,
+      isNull,
     );
   });
 

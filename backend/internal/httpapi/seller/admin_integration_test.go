@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
 
@@ -142,13 +143,14 @@ func setupAdmin(t *testing.T) *adminFixture {
 	// 與正式組裝相同：買家在建帳的 transaction 內由 AccountCreated 建立。
 	events.Subscribe(bus, buyers.OnAccountCreated)
 	orders := &adminOrders{}
-	kycKeys, kycMAC := sealtest.Keys(t)
+	kycMAC := sealtest.MAC(t)
 	// 轉正回以 token 命名的資產（asset-<token>），object key 是 <ref_type>/<token>。
 	mediaFake := media.NewFake()
 	mediaFake.Key = func(refType, token string) string { return refType + "/" + token }
 	m := seller.New(seller.Deps{
-		DB: d, Events: bus, Jobs: queue, Identity: id, Media: mediaFake, Orders: orders, KYCKeys: kycKeys, KYCMAC: kycMAC,
+		DB: d, Events: bus, Jobs: queue, Identity: id, Media: mediaFake, Orders: orders, KYCMAC: kycMAC,
 		ProductStores: noProducts{}, Registry: f.registry, Now: f.now, Logger: log,
+		Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: f.now, Logger: log}),
 	})
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: m, Orders: orders, Now: time.Now, Logger: log})
 	socialModule := social.New(social.Deps{
@@ -162,7 +164,7 @@ func setupAdmin(t *testing.T) *adminFixture {
 	}
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Ready: d.Ping, Identity: id, Seller: m, Social: socialModule, Buyer: buyers, Images: images, Logger: log, Deletion: deletion,
-		Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: m, Now: time.Now, Logger: log}), Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{},
+		Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: m, Now: time.Now, Logger: log}), Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -217,6 +219,9 @@ func (f *adminFixture) newSeller(t *testing.T, name string) (int64, seller.Store
 	}
 	authenticated, err := f.id.Authenticate(context.Background(), token)
 	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.id.SetSelfEnteredEmail(context.Background(), authenticated.Principal.ID, "seller@example.com"); err != nil {
 		t.Fatal(err)
 	}
 	s, err := f.module.Apply(context.Background(), seller.ApplyInput{AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: authenticated.Principal.ID, StoreName: name, TownCode: "63000050", AddressDetail: "測試路一號"})
@@ -433,7 +438,7 @@ func TestListStoresPagesOverConnectAndGetStoreCarriesTheKYCSummary(t *testing.T)
 		}
 		for _, item := range resp.Msg.GetStores() {
 			got = append(got, item.GetStore().GetId())
-			if item.GetKycFlowStatus() != pb.KYCFlowStatus_KYC_FLOW_STATUS_NOT_STARTED || item.GetSuspended() {
+			if item.KycStatus != nil || item.GetSuspended() {
 				t.Fatalf("item=%+v", item)
 			}
 		}
@@ -481,12 +486,7 @@ func TestListStoresPagesOverConnectAndGetStoreCarriesTheKYCSummary(t *testing.T)
 	if err != nil || noKYC.Msg.GetKyc() != nil {
 		t.Fatalf("kyc=%+v err=%v", noKYC.Msg.GetKyc(), err)
 	}
-	draft, err := f.module.SaveKYCDraft(ctx, seller.KYCDraftInput{
-		AccountID: accountID, SellerType: ptr(seller.KYCIndividual), RealName: ptr("王小明"), BirthDate: ptr("1990-05-06"), IDCardNo: ptr("A123456789"),
-		EnglishName: ptr("Wang Farm"), BankName: ptr("臺灣銀行"), BankCode: ptr("004"), BankAccount: ptr("012345678901"),
-		ProductType: ptr("蔬果"),
-		IDCardFront: &seller.KYCDocumentRef{StagedToken: "front"}, IDCardBack: &seller.KYCDocumentRef{StagedToken: "back"}, BankBook: &seller.KYCDocumentRef{StagedToken: "book"},
-	})
+	draft, err := f.module.SaveKYCDraft(ctx, seller.KYCDraftInput{AccountID: accountID, SellerType: ptr(seller.KYCIndividual), ProductType: ptr("蔬果")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -506,7 +506,7 @@ func TestListStoresPagesOverConnectAndGetStoreCarriesTheKYCSummary(t *testing.T)
 	if d := k.GetDecideDeadline(); !d.GetStartTime().AsTime().Equal(k.GetSubmitTime().AsTime()) || !d.GetDueTime().AsTime().Equal(k.GetSubmitTime().AsTime().Add(7*24*time.Hour)) {
 		t.Fatalf("decide_deadline=%+v submit_time=%v", d, k.GetSubmitTime())
 	}
-	if k.GetApplicationId() != submitted.ID.String() || k.GetStatus() != pb.KYCStatus_KYC_STATUS_SUBMITTED || k.GetFlowStatus() != pb.KYCFlowStatus_KYC_FLOW_STATUS_SUBMITTED || k.GetSubmitTime() == nil || k.GetDecideTime() != nil {
+	if k.GetApplicationId() != submitted.ID.String() || k.GetStatus() != pb.KYCStatus_KYC_STATUS_SUBMITTED || k.GetSubmitTime() == nil || k.GetDecideTime() != nil {
 		t.Fatalf("kyc=%+v", k)
 	}
 	listed, err := f.admin.ListStores(ctx, connect.NewRequest(&adminsellerpb.ListStoresRequest{KycAwaitingReview: true}))
@@ -844,10 +844,10 @@ func TestGetMeasureLinkedAccountCarriesTheLinkedTerminationOption(t *testing.T) 
 	f := setupAdmin(t)
 	ctx := context.Background()
 	_, sA := f.newSeller(t, "來源店")
-	_, sB := f.newSeller(t, "同身分的店")
-	_, sC := f.newSeller(t, "同身分的另一店")
-	for i, s := range []seller.Store{sA, sB, sC} {
-		f.submitKYC(t, s.StoreID, "A123456789", []string{"012345678901", "999888777666", "555444333222"}[i])
+	_, sB := f.newSeller(t, "同統編的店")
+	_, sC := f.newSeller(t, "同統編的另一店")
+	for _, s := range []seller.Store{sA, sB, sC} {
+		f.submitKYC(t, s.StoreID, "33330333")
 	}
 	source, err := f.module.CreateMeasure(ctx, seller.CreateMeasureInput{
 		AdminID: f.adminID, StoreID: sA.StoreID, Kind: seller.MeasureTermination, StatementToSeller: "終止合作", Note: "內部",
@@ -896,17 +896,14 @@ func TestGetMeasureLinkedAccountCarriesTheLinkedTerminationOption(t *testing.T) 
 	}
 }
 
-// submitKYC 為店家所屬的帳號存草稿並送出申請（身分證號與銀行帳號由參數給，同一個身分證號的帳號互為關聯帳號）。
-func (f *adminFixture) submitKYC(t *testing.T, storeID int64, idCard, bank string) {
+// submitKYC 為店家所屬的帳號存企業賣家草稿並送出申請（統編由參數給，同一個統編的帳號互為關聯帳號）。
+func (f *adminFixture) submitKYC(t *testing.T, storeID int64, taxID string) {
 	t.Helper()
 	ctx := context.Background()
 	var accountID int64
 	f.scan(t, &accountID, "SELECT account_id FROM seller.stores WHERE store_id=$1", storeID)
 	draft, err := f.module.SaveKYCDraft(ctx, seller.KYCDraftInput{
-		AccountID: accountID, SellerType: ptr(seller.KYCIndividual), RealName: ptr("王小明"), BirthDate: ptr("1990-05-06"), IDCardNo: ptr(idCard),
-		EnglishName: ptr("Wang Farm"), BankName: ptr("臺灣銀行"), BankCode: ptr("004"), BankAccount: ptr(bank),
-		ProductType: ptr("蔬果"),
-		IDCardFront: &seller.KYCDocumentRef{StagedToken: "front"}, IDCardBack: &seller.KYCDocumentRef{StagedToken: "back"}, BankBook: &seller.KYCDocumentRef{StagedToken: "book"},
+		AccountID: accountID, SellerType: ptr(seller.KYCCompany), CompanyName: ptr("範例小農有限公司"), TaxID: ptr(taxID), ProductType: ptr("蔬果"),
 	})
 	if err != nil {
 		t.Fatal(err)

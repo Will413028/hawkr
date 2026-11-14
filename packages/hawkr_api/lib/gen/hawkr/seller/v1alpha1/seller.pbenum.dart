@@ -15,7 +15,7 @@ import 'dart:core' as $core;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 /// AgreementKind 是賣家入駐時要同意或確認已閱讀的文件種類。每個操作要求的種類固定：ApplyStore 要 SELLER_TERMS；SubmitKYC 要
-/// KYC_PRIVACY_NOTICE 與 PAYUNI_TERMS。
+/// KYC_PRIVACY_NOTICE。
 class AgreementKind extends $pb.ProtobufEnum {
   static const AgreementKind AGREEMENT_KIND_UNSPECIFIED =
       AgreementKind._(0, _omitEnumNames ? '' : 'AGREEMENT_KIND_UNSPECIFIED');
@@ -29,19 +29,14 @@ class AgreementKind extends $pb.ProtobufEnum {
       AgreementKind._(
           2, _omitEnumNames ? '' : 'AGREEMENT_KIND_KYC_PRIVACY_NOTICE');
 
-  /// PayUni 的服務條款，送出 KYC（SubmitKYC）時同意。
-  static const AgreementKind AGREEMENT_KIND_PAYUNI_TERMS =
-      AgreementKind._(3, _omitEnumNames ? '' : 'AGREEMENT_KIND_PAYUNI_TERMS');
-
   static const $core.List<AgreementKind> values = <AgreementKind>[
     AGREEMENT_KIND_UNSPECIFIED,
     AGREEMENT_KIND_SELLER_TERMS,
     AGREEMENT_KIND_KYC_PRIVACY_NOTICE,
-    AGREEMENT_KIND_PAYUNI_TERMS,
   ];
 
   static final $core.List<AgreementKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
   static AgreementKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -89,6 +84,7 @@ class SellerCapability extends $pb.ProtobufEnum {
       SellerCapability._(
           0, _omitEnumNames ? '' : 'SELLER_CAPABILITY_UNSPECIFIED');
 
+  /// 8 曾是查違規與申覆的能力：違規與申覆以帳號為範圍，沒有任何方法需要店家能力，已刪除。
   /// 看自己的店家資料與停權狀態。
   static const SellerCapability SELLER_CAPABILITY_ACCOUNT_SELF_READ =
       SellerCapability._(
@@ -104,7 +100,7 @@ class SellerCapability extends $pb.ProtobufEnum {
       SellerCapability._(
           3, _omitEnumNames ? '' : 'SELLER_CAPABILITY_PRODUCT_MANAGE');
 
-  /// 出貨、售後、訂單查詢、PayUni 狀態。
+  /// 出貨、售後、訂單查詢。
   static const SellerCapability SELLER_CAPABILITY_ORDER_FULFILL =
       SellerCapability._(
           4, _omitEnumNames ? '' : 'SELLER_CAPABILITY_ORDER_FULFILL');
@@ -127,43 +123,43 @@ class SellerCapability extends $pb.ProtobufEnum {
   /// 送出訊息。
   static const SellerCapability SELLER_CAPABILITY_CHAT_SEND =
       SellerCapability._(
-          9, _omitEnumNames ? '' : 'SELLER_CAPABILITY_CHAT_SEND');
+          8, _omitEnumNames ? '' : 'SELLER_CAPABILITY_CHAT_SEND');
 
   /// 讀取訊息。
   static const SellerCapability SELLER_CAPABILITY_CHAT_READ =
       SellerCapability._(
-          10, _omitEnumNames ? '' : 'SELLER_CAPABILITY_CHAT_READ');
+          9, _omitEnumNames ? '' : 'SELLER_CAPABILITY_CHAT_READ');
 
   /// 通知收件箱、偏好與裝置。
   static const SellerCapability SELLER_CAPABILITY_NOTIFICATION =
       SellerCapability._(
-          11, _omitEnumNames ? '' : 'SELLER_CAPABILITY_NOTIFICATION');
+          10, _omitEnumNames ? '' : 'SELLER_CAPABILITY_NOTIFICATION');
 
   /// 關店。
   static const SellerCapability SELLER_CAPABILITY_ACCOUNT_CLOSE =
       SellerCapability._(
-          12, _omitEnumNames ? '' : 'SELLER_CAPABILITY_ACCOUNT_CLOSE');
+          11, _omitEnumNames ? '' : 'SELLER_CAPABILITY_ACCOUNT_CLOSE');
 
   /// 發票與稅務憑證的查詢與設定。
   static const SellerCapability SELLER_CAPABILITY_INVOICE_MANAGE =
       SellerCapability._(
-          13, _omitEnumNames ? '' : 'SELLER_CAPABILITY_INVOICE_MANAGE');
+          12, _omitEnumNames ? '' : 'SELLER_CAPABILITY_INVOICE_MANAGE');
 
   /// 稅務身分的申請、補件與延長。
   static const SellerCapability SELLER_CAPABILITY_INVOICE_TAX_REMEDY =
       SellerCapability._(
-          14, _omitEnumNames ? '' : 'SELLER_CAPABILITY_INVOICE_TAX_REMEDY');
+          13, _omitEnumNames ? '' : 'SELLER_CAPABILITY_INVOICE_TAX_REMEDY');
 
-  /// 物流建店、啟用與關閉配送方式。前置條件是商家認證（含 PayUni 審核）核准：物流商以 PayUni 已成立的子商店建店。
+  /// 物流建店、啟用與關閉配送方式。前置條件是開通完成（SELLER_REQUIREMENT_ONBOARDING_COMPLETE：平台審核核准且收款帳戶的轉帳能力啟用）。
   static const SellerCapability SELLER_CAPABILITY_SHIPPING_SETUP =
       SellerCapability._(
-          15, _omitEnumNames ? '' : 'SELLER_CAPABILITY_SHIPPING_SETUP');
+          14, _omitEnumNames ? '' : 'SELLER_CAPABILITY_SHIPPING_SETUP');
 
   /// 店家的狀態：買家看得到店面、可以結帳。缺的條件是公開曝光的全部條件（SellerRequirement）。這是狀態而不是
   /// 賣家能做的動作，只出現在 GetMyStore 的 capabilities，沒有任何方法需要它；「至少一個上架商品」由商品的曝光端檢查，不在其中。
   static const SellerCapability SELLER_CAPABILITY_PUBLIC_LISTING =
       SellerCapability._(
-          16, _omitEnumNames ? '' : 'SELLER_CAPABILITY_PUBLIC_LISTING');
+          15, _omitEnumNames ? '' : 'SELLER_CAPABILITY_PUBLIC_LISTING');
 
   static const $core.List<SellerCapability> values = <SellerCapability>[
     SELLER_CAPABILITY_UNSPECIFIED,
@@ -185,7 +181,7 @@ class SellerCapability extends $pb.ProtobufEnum {
   ];
 
   static final $core.List<SellerCapability?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 16);
+      $pb.ProtobufEnum.$_initByValueList(values, 15);
   static SellerCapability? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -208,10 +204,10 @@ class SellerRequirement extends $pb.ProtobufEnum {
       SellerRequirement._(
           2, _omitEnumNames ? '' : 'SELLER_REQUIREMENT_NOT_SUSPENDED');
 
-  /// 商家認證（含 PayUni 審核）已核准。
-  static const SellerRequirement SELLER_REQUIREMENT_KYC_APPROVED =
+  /// 平台審核已核准，而且收款帳戶的轉帳能力已啟用。
+  static const SellerRequirement SELLER_REQUIREMENT_ONBOARDING_COMPLETE =
       SellerRequirement._(
-          3, _omitEnumNames ? '' : 'SELLER_REQUIREMENT_KYC_APPROVED');
+          3, _omitEnumNames ? '' : 'SELLER_REQUIREMENT_ONBOARDING_COMPLETE');
 
   /// 有店名。
   static const SellerRequirement SELLER_REQUIREMENT_STORE_NAME =
@@ -236,7 +232,7 @@ class SellerRequirement extends $pb.ProtobufEnum {
     SELLER_REQUIREMENT_UNSPECIFIED,
     SELLER_REQUIREMENT_STORE_ACTIVE,
     SELLER_REQUIREMENT_NOT_SUSPENDED,
-    SELLER_REQUIREMENT_KYC_APPROVED,
+    SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
     SELLER_REQUIREMENT_STORE_NAME,
     SELLER_REQUIREMENT_LOGO,
     SELLER_REQUIREMENT_TOWN_CODE,
@@ -252,7 +248,7 @@ class SellerRequirement extends $pb.ProtobufEnum {
 }
 
 /// StoreField 是店家上的一個欄位，值與 Store 的欄位一對一。送出 KYC 之前還缺的店家欄位
-/// （KYCApplication.missing_store_fields）與 PayUni 問題要賣家補的店家欄位（PayUniProblem.store_fields）都用這一套。
+/// （KYCApplication.missing_store_fields）都用這一套。
 class StoreField extends $pb.ProtobufEnum {
   static const StoreField STORE_FIELD_UNSPECIFIED =
       StoreField._(0, _omitEnumNames ? '' : 'STORE_FIELD_UNSPECIFIED');
@@ -342,7 +338,137 @@ class StoreOpeningUnavailableReason extends $pb.ProtobufEnum {
   const StoreOpeningUnavailableReason._(super.value, super.name);
 }
 
-/// KYCStatus 是申請的人工決定；PayUni 的綁定結果不在這條軸上（見 KYCFlow）。
+/// OnboardingTaskId 是開通任務的種類。client 用它分支（圖示、路由），不用它組顯示文字。
+class OnboardingTaskId extends $pb.ProtobufEnum {
+  static const OnboardingTaskId ONBOARDING_TASK_ID_UNSPECIFIED =
+      OnboardingTaskId._(
+          0, _omitEnumNames ? '' : 'ONBOARDING_TASK_ID_UNSPECIFIED');
+
+  /// 商店資料：店名、logo 與所在地都有值（公開曝光的條件）。
+  static const OnboardingTaskId ONBOARDING_TASK_ID_PROFILE =
+      OnboardingTaskId._(1, _omitEnumNames ? '' : 'ONBOARDING_TASK_ID_PROFILE');
+
+  /// 平台審核：商家認證（KYC）核准。
+  static const OnboardingTaskId ONBOARDING_TASK_ID_PLATFORM_REVIEW =
+      OnboardingTaskId._(
+          2, _omitEnumNames ? '' : 'ONBOARDING_TASK_ID_PLATFORM_REVIEW');
+
+  /// 收款帳戶：金流商的收款帳戶轉帳能力啟用；平台審核完成之前是 LOCKED。
+  static const OnboardingTaskId ONBOARDING_TASK_ID_PAYMENT_ACCOUNT =
+      OnboardingTaskId._(
+          3, _omitEnumNames ? '' : 'ONBOARDING_TASK_ID_PAYMENT_ACCOUNT');
+
+  static const $core.List<OnboardingTaskId> values = <OnboardingTaskId>[
+    ONBOARDING_TASK_ID_UNSPECIFIED,
+    ONBOARDING_TASK_ID_PROFILE,
+    ONBOARDING_TASK_ID_PLATFORM_REVIEW,
+    ONBOARDING_TASK_ID_PAYMENT_ACCOUNT,
+  ];
+
+  static final $core.List<OnboardingTaskId?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static OnboardingTaskId? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const OnboardingTaskId._(super.value, super.name);
+}
+
+/// OnboardingTaskState 是開通任務的狀態，只供 client 分支。
+class OnboardingTaskState extends $pb.ProtobufEnum {
+  static const OnboardingTaskState ONBOARDING_TASK_STATE_UNSPECIFIED =
+      OnboardingTaskState._(
+          0, _omitEnumNames ? '' : 'ONBOARDING_TASK_STATE_UNSPECIFIED');
+
+  /// 已完成。
+  static const OnboardingTaskState ONBOARDING_TASK_STATE_COMPLETED =
+      OnboardingTaskState._(
+          1, _omitEnumNames ? '' : 'ONBOARDING_TASK_STATE_COMPLETED');
+
+  /// 需要賣家動作；action 說明下一步。
+  static const OnboardingTaskState ONBOARDING_TASK_STATE_ACTION_REQUIRED =
+      OnboardingTaskState._(
+          2, _omitEnumNames ? '' : 'ONBOARDING_TASK_STATE_ACTION_REQUIRED');
+
+  /// 進行中，賣家沒有要做的事（等平台或金流商）；action 是 NONE。
+  static const OnboardingTaskState ONBOARDING_TASK_STATE_IN_PROGRESS =
+      OnboardingTaskState._(
+          3, _omitEnumNames ? '' : 'ONBOARDING_TASK_STATE_IN_PROGRESS');
+
+  /// 前一項還沒完成，這一項尚未開放。
+  static const OnboardingTaskState ONBOARDING_TASK_STATE_LOCKED =
+      OnboardingTaskState._(
+          4, _omitEnumNames ? '' : 'ONBOARDING_TASK_STATE_LOCKED');
+
+  /// 這一項的來源暫時讀不到，狀態不明。
+  static const OnboardingTaskState ONBOARDING_TASK_STATE_UNKNOWN =
+      OnboardingTaskState._(
+          5, _omitEnumNames ? '' : 'ONBOARDING_TASK_STATE_UNKNOWN');
+
+  static const $core.List<OnboardingTaskState> values = <OnboardingTaskState>[
+    ONBOARDING_TASK_STATE_UNSPECIFIED,
+    ONBOARDING_TASK_STATE_COMPLETED,
+    ONBOARDING_TASK_STATE_ACTION_REQUIRED,
+    ONBOARDING_TASK_STATE_IN_PROGRESS,
+    ONBOARDING_TASK_STATE_LOCKED,
+    ONBOARDING_TASK_STATE_UNKNOWN,
+  ];
+
+  static final $core.List<OnboardingTaskState?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
+  static OnboardingTaskState? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const OnboardingTaskState._(super.value, super.name);
+}
+
+/// OnboardingAction 是開通任務的下一步。client 對到自己的路由（網頁與 App 的位置不同）；按鈕文字由共用文案目錄依值決定。
+class OnboardingAction extends $pb.ProtobufEnum {
+  static const OnboardingAction ONBOARDING_ACTION_UNSPECIFIED =
+      OnboardingAction._(
+          0, _omitEnumNames ? '' : 'ONBOARDING_ACTION_UNSPECIFIED');
+
+  /// 沒有賣家能做的事。
+  static const OnboardingAction ONBOARDING_ACTION_NONE =
+      OnboardingAction._(1, _omitEnumNames ? '' : 'ONBOARDING_ACTION_NONE');
+
+  /// 到店家資料補齊店名、logo 或所在地。
+  static const OnboardingAction ONBOARDING_ACTION_EDIT_PROFILE =
+      OnboardingAction._(
+          2, _omitEnumNames ? '' : 'ONBOARDING_ACTION_EDIT_PROFILE');
+
+  /// 到商家認證送出或重新送出申請（尚未送出、草稿、被退回、已取消）。
+  static const OnboardingAction ONBOARDING_ACTION_SUBMIT_CERTIFICATION =
+      OnboardingAction._(
+          3, _omitEnumNames ? '' : 'ONBOARDING_ACTION_SUBMIT_CERTIFICATION');
+
+  /// 開始（或繼續）金流商的收款帳戶設定：呼叫 CreatePaymentOnboardingSession。
+  static const OnboardingAction ONBOARDING_ACTION_START_PAYMENT_ONBOARDING =
+      OnboardingAction._(4,
+          _omitEnumNames ? '' : 'ONBOARDING_ACTION_START_PAYMENT_ONBOARDING');
+
+  /// 聯絡客服：問題無法由賣家自行解決。
+  static const OnboardingAction ONBOARDING_ACTION_CONTACT_SUPPORT =
+      OnboardingAction._(
+          5, _omitEnumNames ? '' : 'ONBOARDING_ACTION_CONTACT_SUPPORT');
+
+  static const $core.List<OnboardingAction> values = <OnboardingAction>[
+    ONBOARDING_ACTION_UNSPECIFIED,
+    ONBOARDING_ACTION_NONE,
+    ONBOARDING_ACTION_EDIT_PROFILE,
+    ONBOARDING_ACTION_SUBMIT_CERTIFICATION,
+    ONBOARDING_ACTION_START_PAYMENT_ONBOARDING,
+    ONBOARDING_ACTION_CONTACT_SUPPORT,
+  ];
+
+  static final $core.List<OnboardingAction?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
+  static OnboardingAction? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const OnboardingAction._(super.value, super.name);
+}
+
+/// KYCStatus 是申請的人工決定。
 class KYCStatus extends $pb.ProtobufEnum {
   static const KYCStatus KYC_STATUS_UNSPECIFIED =
       KYCStatus._(0, _omitEnumNames ? '' : 'KYC_STATUS_UNSPECIFIED');
@@ -385,84 +511,42 @@ class KYCStatus extends $pb.ProtobufEnum {
 }
 
 /// KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：
-/// KYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的
-/// 欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。
+/// KYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、還缺的
+/// 欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。
 class KYCField extends $pb.ProtobufEnum {
   static const KYCField KYC_FIELD_UNSPECIFIED =
       KYCField._(0, _omitEnumNames ? '' : 'KYC_FIELD_UNSPECIFIED');
-  static const KYCField KYC_FIELD_REAL_NAME =
-      KYCField._(1, _omitEnumNames ? '' : 'KYC_FIELD_REAL_NAME');
-  static const KYCField KYC_FIELD_BIRTH_DATE =
-      KYCField._(2, _omitEnumNames ? '' : 'KYC_FIELD_BIRTH_DATE');
-  static const KYCField KYC_FIELD_ID_CARD_ISSUE_DATE =
-      KYCField._(3, _omitEnumNames ? '' : 'KYC_FIELD_ID_CARD_ISSUE_DATE');
-  static const KYCField KYC_FIELD_ID_CARD_ISSUE_TYPE =
-      KYCField._(4, _omitEnumNames ? '' : 'KYC_FIELD_ID_CARD_ISSUE_TYPE');
-  static const KYCField KYC_FIELD_ID_CARD_ISSUE_LOCATION =
-      KYCField._(5, _omitEnumNames ? '' : 'KYC_FIELD_ID_CARD_ISSUE_LOCATION');
-  static const KYCField KYC_FIELD_ENGLISH_NAME =
-      KYCField._(6, _omitEnumNames ? '' : 'KYC_FIELD_ENGLISH_NAME');
-  static const KYCField KYC_FIELD_BANK_NAME =
-      KYCField._(7, _omitEnumNames ? '' : 'KYC_FIELD_BANK_NAME');
-  static const KYCField KYC_FIELD_BANK_CODE =
-      KYCField._(8, _omitEnumNames ? '' : 'KYC_FIELD_BANK_CODE');
-  static const KYCField KYC_FIELD_BANK_ACCOUNT =
-      KYCField._(9, _omitEnumNames ? '' : 'KYC_FIELD_BANK_ACCOUNT');
   static const KYCField KYC_FIELD_PRODUCT_TYPE =
-      KYCField._(10, _omitEnumNames ? '' : 'KYC_FIELD_PRODUCT_TYPE');
+      KYCField._(1, _omitEnumNames ? '' : 'KYC_FIELD_PRODUCT_TYPE');
   static const KYCField KYC_FIELD_WEBSITE_URL =
-      KYCField._(12, _omitEnumNames ? '' : 'KYC_FIELD_WEBSITE_URL');
-  static const KYCField KYC_FIELD_ID_CARD_FRONT =
-      KYCField._(15, _omitEnumNames ? '' : 'KYC_FIELD_ID_CARD_FRONT');
-  static const KYCField KYC_FIELD_ID_CARD_BACK =
-      KYCField._(16, _omitEnumNames ? '' : 'KYC_FIELD_ID_CARD_BACK');
-  static const KYCField KYC_FIELD_BANK_BOOK =
-      KYCField._(17, _omitEnumNames ? '' : 'KYC_FIELD_BANK_BOOK');
-  static const KYCField KYC_FIELD_INDIVIDUAL_ID_CARD_NO =
-      KYCField._(18, _omitEnumNames ? '' : 'KYC_FIELD_INDIVIDUAL_ID_CARD_NO');
+      KYCField._(2, _omitEnumNames ? '' : 'KYC_FIELD_WEBSITE_URL');
   static const KYCField KYC_FIELD_BUSINESS_COMPANY_NAME =
-      KYCField._(20, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_NAME');
+      KYCField._(3, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_NAME');
   static const KYCField KYC_FIELD_BUSINESS_TAX_ID =
-      KYCField._(21, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_TAX_ID');
+      KYCField._(4, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_TAX_ID');
   static const KYCField KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE = KYCField._(
-      22, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE');
+      5, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE');
   static const KYCField KYC_FIELD_BUSINESS_COMPANY_PHONE =
-      KYCField._(25, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_PHONE');
-  static const KYCField KYC_FIELD_BUSINESS_REP_ID_CARD_NO =
-      KYCField._(26, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_REP_ID_CARD_NO');
+      KYCField._(6, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_PHONE');
   static const KYCField KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS = KYCField._(
-      27, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS');
-  static const KYCField KYC_FIELD_BUSINESS_COMPANY_ADDRESS = KYCField._(
-      28, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_ADDRESS');
+      7, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS');
+  static const KYCField KYC_FIELD_BUSINESS_COMPANY_ADDRESS =
+      KYCField._(8, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_ADDRESS');
 
   static const $core.List<KYCField> values = <KYCField>[
     KYC_FIELD_UNSPECIFIED,
-    KYC_FIELD_REAL_NAME,
-    KYC_FIELD_BIRTH_DATE,
-    KYC_FIELD_ID_CARD_ISSUE_DATE,
-    KYC_FIELD_ID_CARD_ISSUE_TYPE,
-    KYC_FIELD_ID_CARD_ISSUE_LOCATION,
-    KYC_FIELD_ENGLISH_NAME,
-    KYC_FIELD_BANK_NAME,
-    KYC_FIELD_BANK_CODE,
-    KYC_FIELD_BANK_ACCOUNT,
     KYC_FIELD_PRODUCT_TYPE,
     KYC_FIELD_WEBSITE_URL,
-    KYC_FIELD_ID_CARD_FRONT,
-    KYC_FIELD_ID_CARD_BACK,
-    KYC_FIELD_BANK_BOOK,
-    KYC_FIELD_INDIVIDUAL_ID_CARD_NO,
     KYC_FIELD_BUSINESS_COMPANY_NAME,
     KYC_FIELD_BUSINESS_TAX_ID,
     KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE,
     KYC_FIELD_BUSINESS_COMPANY_PHONE,
-    KYC_FIELD_BUSINESS_REP_ID_CARD_NO,
     KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
     KYC_FIELD_BUSINESS_COMPANY_ADDRESS,
   ];
 
   static final $core.List<KYCField?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 28);
+      $pb.ProtobufEnum.$_initByValueList(values, 8);
   static KYCField? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -516,248 +600,39 @@ class KYCIssueCode extends $pb.ProtobufEnum {
   const KYCIssueCode._(super.value, super.name);
 }
 
-/// KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。
-class KYCFlowStatus extends $pb.ProtobufEnum {
-  static const KYCFlowStatus KYC_FLOW_STATUS_UNSPECIFIED =
-      KYCFlowStatus._(0, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_UNSPECIFIED');
+/// OnboardingReturnDestination 是開通結束後金流商把賣家送回的頁面；網址由伺服器依 PUBLIC_WEB_ORIGIN 組，client 不傳網址。
+class OnboardingReturnDestination extends $pb.ProtobufEnum {
+  static const OnboardingReturnDestination
+      ONBOARDING_RETURN_DESTINATION_UNSPECIFIED = OnboardingReturnDestination._(
+          0, _omitEnumNames ? '' : 'ONBOARDING_RETURN_DESTINATION_UNSPECIFIED');
 
-  /// 沒有申請，或申請已取消。
-  static const KYCFlowStatus KYC_FLOW_STATUS_NOT_STARTED =
-      KYCFlowStatus._(1, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_NOT_STARTED');
-  static const KYCFlowStatus KYC_FLOW_STATUS_DRAFT =
-      KYCFlowStatus._(2, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_DRAFT');
-  static const KYCFlowStatus KYC_FLOW_STATUS_SUBMITTED =
-      KYCFlowStatus._(3, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_SUBMITTED');
-  static const KYCFlowStatus KYC_FLOW_STATUS_REJECTED =
-      KYCFlowStatus._(4, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_REJECTED');
-
-  /// 管理員核准，正在向 PayUni 註冊。
-  static const KYCFlowStatus KYC_FLOW_STATUS_BINDING =
-      KYCFlowStatus._(5, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_BINDING');
-
-  /// 向 PayUni 註冊失敗，等管理員處理。
-  static const KYCFlowStatus KYC_FLOW_STATUS_BIND_FAILED =
-      KYCFlowStatus._(6, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_BIND_FAILED');
-
-  /// 已向 PayUni 註冊，還沒有審核結果。
-  static const KYCFlowStatus KYC_FLOW_STATUS_FORWARDED =
-      KYCFlowStatus._(7, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_FORWARDED');
-  static const KYCFlowStatus KYC_FLOW_STATUS_UNDER_REVIEW =
-      KYCFlowStatus._(8, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_UNDER_REVIEW');
-  static const KYCFlowStatus KYC_FLOW_STATUS_PENDING_INFO =
-      KYCFlowStatus._(9, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_PENDING_INFO');
-
-  /// PayUni 核准，可以收款。
-  static const KYCFlowStatus KYC_FLOW_STATUS_APPROVED =
-      KYCFlowStatus._(10, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_APPROVED');
-  static const KYCFlowStatus KYC_FLOW_STATUS_PAYUNI_REJECTED = KYCFlowStatus._(
-      11, _omitEnumNames ? '' : 'KYC_FLOW_STATUS_PAYUNI_REJECTED');
-
-  static const $core.List<KYCFlowStatus> values = <KYCFlowStatus>[
-    KYC_FLOW_STATUS_UNSPECIFIED,
-    KYC_FLOW_STATUS_NOT_STARTED,
-    KYC_FLOW_STATUS_DRAFT,
-    KYC_FLOW_STATUS_SUBMITTED,
-    KYC_FLOW_STATUS_REJECTED,
-    KYC_FLOW_STATUS_BINDING,
-    KYC_FLOW_STATUS_BIND_FAILED,
-    KYC_FLOW_STATUS_FORWARDED,
-    KYC_FLOW_STATUS_UNDER_REVIEW,
-    KYC_FLOW_STATUS_PENDING_INFO,
-    KYC_FLOW_STATUS_APPROVED,
-    KYC_FLOW_STATUS_PAYUNI_REJECTED,
-  ];
-
-  static final $core.List<KYCFlowStatus?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 11);
-  static KYCFlowStatus? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const KYCFlowStatus._(super.value, super.name);
-}
-
-/// PayUniBindStatus 是 PayUni 子商店的綁定狀態。
-class PayUniBindStatus extends $pb.ProtobufEnum {
-  static const PayUniBindStatus PAY_UNI_BIND_STATUS_UNSPECIFIED =
-      PayUniBindStatus._(
-          0, _omitEnumNames ? '' : 'PAY_UNI_BIND_STATUS_UNSPECIFIED');
-
-  /// 意圖已寫入，背景程序還沒有送出或正在重試。
-  static const PayUniBindStatus PAY_UNI_BIND_STATUS_PENDING =
-      PayUniBindStatus._(
-          1, _omitEnumNames ? '' : 'PAY_UNI_BIND_STATUS_PENDING');
-  static const PayUniBindStatus PAY_UNI_BIND_STATUS_BOUND =
-      PayUniBindStatus._(2, _omitEnumNames ? '' : 'PAY_UNI_BIND_STATUS_BOUND');
-
-  /// 綁定失敗，等管理員重新綁定。
-  static const PayUniBindStatus PAY_UNI_BIND_STATUS_FAILED =
-      PayUniBindStatus._(3, _omitEnumNames ? '' : 'PAY_UNI_BIND_STATUS_FAILED');
-
-  static const $core.List<PayUniBindStatus> values = <PayUniBindStatus>[
-    PAY_UNI_BIND_STATUS_UNSPECIFIED,
-    PAY_UNI_BIND_STATUS_PENDING,
-    PAY_UNI_BIND_STATUS_BOUND,
-    PAY_UNI_BIND_STATUS_FAILED,
-  ];
-
-  static final $core.List<PayUniBindStatus?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
-  static PayUniBindStatus? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const PayUniBindStatus._(super.value, super.name);
-}
-
-/// PayUniState 是賣家看到的 PayUni 收款狀態，一個值對應賣家的一種動作。伺服器由申請與 PayUni 註冊推導。
-class PayUniState extends $pb.ProtobufEnum {
-  static const PayUniState PAY_UNI_STATE_UNSPECIFIED =
-      PayUniState._(0, _omitEnumNames ? '' : 'PAY_UNI_STATE_UNSPECIFIED');
-
-  /// 綁定中或 PayUni 審核中，賣家等結果。
-  static const PayUniState PAY_UNI_STATE_REVIEWING =
-      PayUniState._(1, _omitEnumNames ? '' : 'PAY_UNI_STATE_REVIEWING');
-
-  /// PayUni 要求補件，賣家依 PayUni 的通知信處理。
-  static const PayUniState PAY_UNI_STATE_PENDING_INFO =
-      PayUniState._(2, _omitEnumNames ? '' : 'PAY_UNI_STATE_PENDING_INFO');
-
-  /// 申請的資料有問題，賣家修正申請後自己重新送出。
-  static const PayUniState PAY_UNI_STATE_FIXABLE =
-      PayUniState._(3, _omitEnumNames ? '' : 'PAY_UNI_STATE_FIXABLE');
-
-  /// 店家設定的資料有問題，賣家修正後由平台重新處理，不能自己重新送出。
-  static const PayUniState PAY_UNI_STATE_FIX_VIA_SUPPORT =
-      PayUniState._(4, _omitEnumNames ? '' : 'PAY_UNI_STATE_FIX_VIA_SUPPORT');
-
-  /// 沒有賣家能修正的資料，賣家要聯絡客服，不能自己重新送出。
-  static const PayUniState PAY_UNI_STATE_CONTACT_SUPPORT =
-      PayUniState._(5, _omitEnumNames ? '' : 'PAY_UNI_STATE_CONTACT_SUPPORT');
-
-  /// PayUni 暫時無法處理，等平台重新送出。
-  static const PayUniState PAY_UNI_STATE_RETRY_LATER =
-      PayUniState._(6, _omitEnumNames ? '' : 'PAY_UNI_STATE_RETRY_LATER');
-
-  /// PayUni 端的商店已是終止狀態，同一個店家無法再綁定。
-  static const PayUniState PAY_UNI_STATE_TERMINATED =
-      PayUniState._(7, _omitEnumNames ? '' : 'PAY_UNI_STATE_TERMINATED');
-
-  /// 可以收款。
-  static const PayUniState PAY_UNI_STATE_APPROVED =
-      PayUniState._(8, _omitEnumNames ? '' : 'PAY_UNI_STATE_APPROVED');
-
-  static const $core.List<PayUniState> values = <PayUniState>[
-    PAY_UNI_STATE_UNSPECIFIED,
-    PAY_UNI_STATE_REVIEWING,
-    PAY_UNI_STATE_PENDING_INFO,
-    PAY_UNI_STATE_FIXABLE,
-    PAY_UNI_STATE_FIX_VIA_SUPPORT,
-    PAY_UNI_STATE_CONTACT_SUPPORT,
-    PAY_UNI_STATE_RETRY_LATER,
-    PAY_UNI_STATE_TERMINATED,
-    PAY_UNI_STATE_APPROVED,
-  ];
-
-  static final $core.List<PayUniState?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 8);
-  static PayUniState? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const PayUniState._(super.value, super.name);
-}
-
-/// KYCResubmitUnavailableReason 是 SaveKYCDraft 與 SubmitKYC 此刻不能做的原因（KYCResubmitUnavailability.reason）。
-class KYCResubmitUnavailableReason extends $pb.ProtobufEnum {
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_UNSPECIFIED =
-      KYCResubmitUnavailableReason._(0,
-          _omitEnumNames ? '' : 'KYC_RESUBMIT_UNAVAILABLE_REASON_UNSPECIFIED');
-
-  /// 申請送審中，可以先取消再修改。
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW_CANCELABLE =
-      KYCResubmitUnavailableReason._(
+  /// 網站賣家中心的認證頁：完成回到 ?payment=return，連結過期回到 ?payment=refresh。
+  static const OnboardingReturnDestination
+      ONBOARDING_RETURN_DESTINATION_WEBSITE_CERTIFICATION =
+      OnboardingReturnDestination._(
           1,
           _omitEnumNames
               ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW_CANCELABLE');
+              : 'ONBOARDING_RETURN_DESTINATION_WEBSITE_CERTIFICATION');
 
-  /// 申請送審中，PayUni 已收下店家，不能取消。
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW =
-      KYCResubmitUnavailableReason._(2,
-          _omitEnumNames ? '' : 'KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW');
+  /// 網站給賣家 App 的回跳頁（請回到賣家 App）：完成回到 ?state=done，連結過期回到 ?state=expired。
+  static const OnboardingReturnDestination
+      ONBOARDING_RETURN_DESTINATION_SELLER_APP = OnboardingReturnDestination._(
+          2, _omitEnumNames ? '' : 'ONBOARDING_RETURN_DESTINATION_SELLER_APP');
 
-  /// 以下對應 PayUniState 裡不能重送的值。
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_REVIEWING =
-      KYCResubmitUnavailableReason._(
-          3,
-          _omitEnumNames
-              ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_REVIEWING');
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_PENDING_INFO =
-      KYCResubmitUnavailableReason._(
-          4,
-          _omitEnumNames
-              ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_PENDING_INFO');
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_FIX_VIA_SUPPORT =
-      KYCResubmitUnavailableReason._(
-          5,
-          _omitEnumNames
-              ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_FIX_VIA_SUPPORT');
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_CONTACT_SUPPORT =
-      KYCResubmitUnavailableReason._(
-          6,
-          _omitEnumNames
-              ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_CONTACT_SUPPORT');
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_RETRY_LATER =
-      KYCResubmitUnavailableReason._(
-          7,
-          _omitEnumNames
-              ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_RETRY_LATER');
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_TERMINATED =
-      KYCResubmitUnavailableReason._(
-          8,
-          _omitEnumNames
-              ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_TERMINATED');
-  static const KYCResubmitUnavailableReason
-      KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_APPROVED =
-      KYCResubmitUnavailableReason._(
-          9,
-          _omitEnumNames
-              ? ''
-              : 'KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_APPROVED');
-
-  static const $core.List<KYCResubmitUnavailableReason> values =
-      <KYCResubmitUnavailableReason>[
-    KYC_RESUBMIT_UNAVAILABLE_REASON_UNSPECIFIED,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW_CANCELABLE,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_UNDER_REVIEW,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_REVIEWING,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_PENDING_INFO,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_FIX_VIA_SUPPORT,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_CONTACT_SUPPORT,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_RETRY_LATER,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_TERMINATED,
-    KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_APPROVED,
+  static const $core.List<OnboardingReturnDestination> values =
+      <OnboardingReturnDestination>[
+    ONBOARDING_RETURN_DESTINATION_UNSPECIFIED,
+    ONBOARDING_RETURN_DESTINATION_WEBSITE_CERTIFICATION,
+    ONBOARDING_RETURN_DESTINATION_SELLER_APP,
   ];
 
-  static final $core.List<KYCResubmitUnavailableReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 9);
-  static KYCResubmitUnavailableReason? valueOf($core.int value) =>
+  static final $core.List<OnboardingReturnDestination?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static OnboardingReturnDestination? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
-  const KYCResubmitUnavailableReason._(super.value, super.name);
+  const OnboardingReturnDestination._(super.value, super.name);
 }
 
 /// ViolationSeverity 是認定套用的嚴重度，也是案件的嚴重度（開案時決定，之後只經 ChangeCaseSeverity 修改）。
@@ -1245,7 +1120,7 @@ class TerminationGround extends $pb.ProtobufEnum {
       TerminationGround._(
           10, _omitEnumNames ? '' : 'TERMINATION_GROUND_OTHER_SERIOUS');
 
-  /// 與另一個帳號的終止（來源措施）使用同一個身分證明文件或統一編號，立即生效；來源措施撤銷時一併撤銷
+  /// 與另一個帳號的終止（來源措施）使用同一個統一編號，立即生效；來源措施撤銷時一併撤銷
   /// （RevokeReason.SOURCE_REVOKED）。賣家可對這筆單獨申覆。
   static const TerminationGround TERMINATION_GROUND_LINKED_ACCOUNT =
       TerminationGround._(

@@ -9,11 +9,6 @@
 			"kind": "KYC_PRIVACY_NOTICE",
 			"url": "/privacy#seller-kyc-notice",
 			"doc": "seller-kyc-notice.md"
-		},
-		{
-			"kind": "PAYUNI_TERMS",
-			"url": "https://www.payuni.com.tw/terms",
-			"version": "2026-10-07"
 		}
 	]
 }

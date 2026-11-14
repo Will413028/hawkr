@@ -140,7 +140,7 @@ export function storeAddressInputError(address: {
 	return undefined;
 }
 
-/** 已填的聯絡資料的格式錯誤；空白表示清掉，格式以契約為準（手機 09 開頭 10 碼、信箱、聯絡人最多 20 字）。 */
+/** 已填的聯絡資料的格式錯誤；空白表示清掉，格式以契約為準（手機 09 開頭 10 碼、信箱、聯絡人最多 50 字）。 */
 export function storeFormContactErrors(form: StoreForm): StoreContactErrors {
 	return storeContactErrors(form);
 }

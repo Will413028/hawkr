@@ -116,8 +116,7 @@ MONOLITH_DB_URL=$(db_url "$MONOLITH_DB")
 # 讀 seller 模組，不需要另外的服務位址。
 DEV_AUTH_KEY_FILE="${LOG_DIR}/dev-auth.pem"
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$DEV_AUTH_KEY_FILE" 2>/dev/null
-# KYC 的加密與比對金鑰是必填，每次執行產生新的（兩把必須不同）。
-KYC_ENCRYPTION_KEYS="t1:$(openssl rand -base64 32)"
+# KYC 的比對金鑰是必填，每次執行產生新的。
 KYC_HASH_KEYS="t1:$(openssl rand -base64 32)"
 start_bg monolith \
   DATABASE_URL="$MONOLITH_DB_URL" HTTP_ADDR="127.0.0.1:${MONOLITH_PORT}" LEGACY_GRPC_ADDR="127.0.0.1:${LEGACY_PORT}" \
@@ -125,7 +124,7 @@ start_bg monolith \
   GATEWAY_URL="http://127.0.0.1:${GATEWAY_PORT}" \
   PRODUCT_SERVICE_ADDR=127.0.0.1:1 ORDER_SERVICE_ADDR=127.0.0.1:1 CRM_SERVICE_ADDR=127.0.0.1:1 REVIEW_SERVICE_ADDR=127.0.0.1:1 \
   CORS_ALLOWED_ORIGINS=http://localhost:3000 \
-  DEV_AUTH_KEY_FILE="$DEV_AUTH_KEY_FILE" KYC_ENCRYPTION_KEYS="$KYC_ENCRYPTION_KEYS" KYC_HASH_KEYS="$KYC_HASH_KEYS" \
+  DEV_AUTH_KEY_FILE="$DEV_AUTH_KEY_FILE" KYC_HASH_KEYS="$KYC_HASH_KEYS" \
   "${LOG_DIR}/hawkr" serve
 
 # dev_token <參數…>：以 hawkr dev-token 簽一個 token，印出。

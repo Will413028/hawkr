@@ -1,11 +1,11 @@
 # 改完 queries/ 之後，在 backend/ 執行 `make sqlc`。
 #
-# 只讀依賴表允許的上游發布的 pub.sql（這個模組沒有自己的資料、沒有 schema.sql，讀 seller 的 pub_review_items）：
+# 只讀依賴表允許的上游發布的 pub.sql（這個模組沒有自己的資料、沒有 schema.sql，讀 seller 與 payment 的 pub_review_items）：
 # query 參照別的模組的內部表時，sqlc generate 就會失敗（ADR 2026-09-24-go-modular-monolith D3 的機械檢查；CI 重新生成並比對）。
 version: "2"
 sql:
   - engine: "postgresql"
-    schema: ["../../seller/db/pub.sql"]
+    schema: ["../../seller/db/pub.sql", "../../payment/db/pub.sql"]
     queries: "queries/"
     gen:
       go:

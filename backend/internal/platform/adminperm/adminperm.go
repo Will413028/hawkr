@@ -38,23 +38,23 @@ const (
 	IdentityAccountsGet               Permission = "identity.accounts.get"
 	IdentityAccountsDelete            Permission = "identity.accounts.delete"
 	LegacyGatewayForward              Permission = "legacy.gateway.forward"
+	PaymentAccountsGet                Permission = "payment.accounts.get"
+	PaymentAccountsRefresh            Permission = "payment.accounts.refresh"
+	PaymentAccountsRetryCreate        Permission = "payment.accounts.retry_create"
+	PaymentAccountsRetryPurge         Permission = "payment.accounts.retry_purge"
+	PaymentAccountsDeleteMapping      Permission = "payment.accounts.delete_mapping"
 	ReviewQueueItemsList              Permission = "reviewqueue.items.list"
 	SellerStoresList                  Permission = "seller.stores.list"
 	SellerStoresGet                   Permission = "seller.stores.get"
 	SellerStoreStatsGet               Permission = "seller.store_stats.get"
+	SellerStoreOnboardingGet          Permission = "seller.store_onboarding.get"
 	SellerKYCApplicationsList         Permission = "seller.kyc_applications.list"
 	SellerKYCApplicationsGet          Permission = "seller.kyc_applications.get"
 	SellerKYCApplicationsApprove      Permission = "seller.kyc_applications.approve"
 	SellerKYCApplicationsReject       Permission = "seller.kyc_applications.reject"
 	SellerKYCApplicationsRequery      Permission = "seller.kyc_applications.requery_registration"
-	SellerKYCRevealsList              Permission = "seller.kyc_reveals.list"
-	SellerKYCRevealsCreate            Permission = "seller.kyc_reveals.create"
 	SellerKYCDocumentAccessesList     Permission = "seller.kyc_document_accesses.list"
 	SellerKYCDocumentsGet             Permission = "seller.kyc_documents.get"
-	SellerPayUniRegistrationsGet      Permission = "seller.payuni_registrations.get"
-	SellerPayUniRegistrationsRebind   Permission = "seller.payuni_registrations.rebind"
-	SellerPayUniRegistrationsRefresh  Permission = "seller.payuni_registrations.refresh"
-	SellerPayUniObservationsList      Permission = "seller.payuni_observations.list"
 	SellerReportsList                 Permission = "seller.reports.list"
 	SellerReportsGet                  Permission = "seller.reports.get"
 	SellerReportsMarkSupplementsSeen  Permission = "seller.reports.mark_supplements_seen"
@@ -89,6 +89,7 @@ const (
 	SellerMeasuresEnd                 Permission = "seller.measures.end"
 	SellerMeasuresRevoke              Permission = "seller.measures.revoke"
 	SellerMeasuresScheduleReview      Permission = "seller.measures.schedule_review"
+	SellerMeasuresReviewLinkedAccount Permission = "seller.measures.review_linked_account"
 	SellerMeasuresDecideAppeal        Permission = "seller.measures.decide_appeal"
 	SellerMeasuresDecideRemediation   Permission = "seller.measures.decide_remediation"
 	SellerMeasureNotesCreate          Permission = "seller.measure_notes.create"
@@ -117,13 +118,13 @@ func Catalog() []Permission {
 		DelegationSessionsCreate,
 		IdentityAccountsList, IdentityAccountsGet, IdentityAccountsDelete,
 		LegacyGatewayForward,
+		PaymentAccountsGet, PaymentAccountsRefresh, PaymentAccountsRetryCreate, PaymentAccountsRetryPurge, PaymentAccountsDeleteMapping,
 		ReviewQueueItemsList,
 		SellerStoresList, SellerStoresGet,
-		SellerStoreStatsGet,
+		SellerStoreStatsGet, SellerStoreOnboardingGet,
 		SellerKYCApplicationsList, SellerKYCApplicationsGet, SellerKYCApplicationsApprove, SellerKYCApplicationsReject,
 		SellerKYCApplicationsRequery,
-		SellerKYCRevealsList, SellerKYCRevealsCreate, SellerKYCDocumentAccessesList, SellerKYCDocumentsGet,
-		SellerPayUniRegistrationsGet, SellerPayUniRegistrationsRebind, SellerPayUniRegistrationsRefresh, SellerPayUniObservationsList,
+		SellerKYCDocumentAccessesList, SellerKYCDocumentsGet,
 		SellerReportsList, SellerReportsGet, SellerReportsMarkSupplementsSeen, SellerReportsTriage, SellerReportsResolve, SellerReportsMove,
 		SellerCasesList, SellerCasesGet, SellerCasesDecide, SellerCasesChangeSeverity,
 		SellerCaseNotesCreate, SellerCaseNotesList, SellerReportEvidenceGet,
@@ -132,7 +133,7 @@ func Catalog() []Permission {
 		SellerAuthorityOrdersRecordNotice, SellerAuthorityOrdersRevoke,
 		SellerViolationsList, SellerViolationsGet,
 		SellerMeasuresList, SellerMeasuresGet, SellerMeasuresCreate, SellerMeasuresUpdate, SellerMeasuresEnd, SellerMeasuresRevoke,
-		SellerMeasuresScheduleReview, SellerMeasuresDecideAppeal, SellerMeasuresDecideRemediation, SellerMeasureNotesCreate, SellerMeasureNotesList,
+		SellerMeasuresScheduleReview, SellerMeasuresReviewLinkedAccount, SellerMeasuresDecideAppeal, SellerMeasuresDecideRemediation, SellerMeasureNotesCreate, SellerMeasureNotesList,
 		SellerMeasureRequestEvidenceGet,
 		SellerProspectsList, SellerProspectsGet, SellerProspectsCreate, SellerProspectsPreview, SellerProspectsUpdate,
 		SellerProspectsArchive, SellerProspectsRestore, SellerProspectsMerge, SellerProspectsConvert,

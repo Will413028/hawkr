@@ -1,5 +1,6 @@
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart';
@@ -9,7 +10,9 @@ import 'package:hawkr_seller/features/notification/data/notification_model.dart'
 import 'package:hawkr_seller/features/notification/data/notification_repository.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
 import 'package:hawkr_seller/features/seller/data/current_kyc.dart';
+import 'package:hawkr_seller/features/seller/data/onboarding_summary.dart';
 import 'package:hawkr_seller/features/seller/data/onboarding_tasks.dart';
+import 'package:hawkr_seller/features/seller/data/payment_account.dart';
 import 'package:hawkr_seller/features/seller/data/my_store_repository.dart';
 import 'package:hawkr_seller/features/seller/data/store_closing.dart';
 import 'package:hawkr_seller/features/seller/data/store_editor.dart';
@@ -22,8 +25,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../support/connect_errors.dart';
+import '../../../support/kyc_fixtures.dart';
 import '../../../support/fake_my_store.dart';
 import '../../../support/my_store_fixtures.dart';
+import '../../../support/onboarding_fixtures.dart';
 import '../../../support/default_error_text.dart';
 
 class _FakeKyc extends AccountKyc {
@@ -57,12 +62,12 @@ void main() {
 
   Future<ProviderContainer> pump(
     WidgetTester tester, {
-    bool identityLocked = false,
-    KYCFlowStatus kycStatus = KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
+    bool certified = false,
     GetMyStoreResponse? response,
     GoRouter? router,
     ValueGetter<int>? onInputsBuilt,
     ValueGetter<DateTime>? clock,
+    GetMyOnboardingResponse? summary,
   }) async {
     updates = [];
     closes = 0;
@@ -74,8 +79,45 @@ void main() {
         myStoreRepositoryProvider.overrideWithValue(server.repository),
         accountKycProvider('acc-1').overrideWith(
           () => _FakeKyc(
-            MyKyc(status: kycStatus, identityLocked: identityLocked),
+            MyKyc(
+              application: certified
+                  ? individualApplication(
+                      kycStatus: KYCStatus.KYC_STATUS_APPROVED,
+                    )
+                  : null,
+            ),
           ),
+        ),
+        accountPaymentAccountProvider('acc-1').overrideWith(
+          (ref) async => certified
+              ? PaymentAccount(
+                  status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED,
+                )
+              : null,
+        ),
+        accountOnboardingProvider('acc-1').overrideWith(
+          (ref) async =>
+              summary ??
+              (certified
+                  ? completedSummary()
+                  : onboardingSummary([
+                      serverTask(
+                        OnboardingTaskId.ONBOARDING_TASK_ID_PROFILE,
+                        OnboardingTaskState
+                            .ONBOARDING_TASK_STATE_ACTION_REQUIRED,
+                        status: '缺少：logo',
+                      ),
+                      serverTask(
+                        OnboardingTaskId.ONBOARDING_TASK_ID_PLATFORM_REVIEW,
+                        OnboardingTaskState
+                            .ONBOARDING_TASK_STATE_ACTION_REQUIRED,
+                        status: '未送出',
+                      ),
+                      serverTask(
+                        OnboardingTaskId.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT,
+                        OnboardingTaskState.ONBOARDING_TASK_STATE_LOCKED,
+                      ),
+                    ])),
         ),
         onboardingInputsProvider.overrideWith((ref) async {
           onInputsBuilt?.call();
@@ -160,17 +202,17 @@ void main() {
       response: myStoreResponse(
         publicListing: publicListingMissing([
           SellerRequirement.SELLER_REQUIREMENT_LOGO,
-          SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+          SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
         ]),
         shippingSetup: shippingSetupMissing([
-          SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+          SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
         ]),
       ),
     );
 
     expect(find.text('賣家開店任務'), findsOneWidget);
     expect(find.text('缺少：logo'), findsOneWidget);
-    expect(find.text('待認證'), findsOneWidget);
+    expect(find.text('未送出'), findsOneWidget);
     expect(find.text('店舖資料完整度'), findsNothing);
     expect(find.text('實名與收款認證'), findsNothing);
     expect(find.text('通過商家認證後才可設定配送'), findsOneWidget);
@@ -191,7 +233,7 @@ void main() {
     addTearDown(router.dispose);
     await pump(
       tester,
-      kycStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
+      certified: true,
       response: myStoreResponse(publicListing: publicListingMissing()),
       router: router,
       onInputsBuilt: () => inputsBuilds++,
@@ -214,7 +256,7 @@ void main() {
   testWidgets('SHIPPING_SETUP 啟用才開放營運設定的物流入口', (tester) async {
     await pump(
       tester,
-      kycStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
+      certified: true,
       response: myStoreResponse(publicListing: publicListingMissing()),
     );
 
@@ -223,26 +265,25 @@ void main() {
     expect(find.text('任務完成'), findsOneWidget);
   });
 
-  testWidgets('identity_locked：店名與商店介紹顯示鎖定說明且點不進編輯，其他欄位可編輯', (tester) async {
-    await pump(tester, identityLocked: true);
+  testWidgets('店名、商店介紹與得獎紀錄都可編輯，沒有鎖定說明', (tester) async {
+    await pump(tester);
 
-    expect(find.text(kPayuniLockedNotice), findsNWidgets(2));
+    expect(find.textContaining('PayUni'), findsNothing);
     await tester.tap(find.text('商店名稱'));
     await tester.pumpAndSettle();
-    expect(find.text('編輯商店名稱'), findsNothing);
+    expect(find.text('編輯商店名稱'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(ProfileEditableInfoRow, '商店介紹'));
+    await tester.pumpAndSettle();
+    expect(find.text('編輯商店介紹'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('得獎紀錄 / 店鋪亮點'));
     await tester.pumpAndSettle();
     expect(find.text('編輯得獎紀錄 / 店鋪亮點'), findsOneWidget);
-  });
-
-  testWidgets('沒有 identity_locked：店名可編輯，沒有鎖定說明', (tester) async {
-    await pump(tester);
-
-    expect(find.text(kPayuniLockedNotice), findsNothing);
-    await tester.tap(find.text('商店名稱'));
-    await tester.pumpAndSettle();
-    expect(find.text('編輯商店名稱'), findsOneWidget);
   });
 
   testWidgets('欄位與標籤：商店電話、聯絡人姓名、聯絡人手機、客服電子信箱、店家地址；沒有信箱列', (tester) async {

@@ -487,7 +487,7 @@ class CheckAppVersionRequest extends $pb.GeneratedMessage {
       createEmptyInstance: CheckAppVersionRequest.$_createMessage)
     ..aE<AppType>(1, _omitFieldNames ? '' : 'appType',
         enumValues: AppType.values)
-    ..aOS(3, _omitFieldNames ? '' : 'clientVersion')
+    ..aOS(2, _omitFieldNames ? '' : 'clientVersion')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -524,14 +524,14 @@ class CheckAppVersionRequest extends $pb.GeneratedMessage {
   void clearAppType() => $_clearField(1);
 
   /// App 的版本 x.y.z，不含 build number。格式不對時不要求更新。
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $core.String get clientVersion => $_getSZ(1);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   set clientVersion($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $core.bool hasClientVersion() => $_has(1);
-  @$pb.TagNumber(3)
-  void clearClientVersion() => $_clearField(3);
+  @$pb.TagNumber(2)
+  void clearClientVersion() => $_clearField(2);
 }
 
 class CheckAppVersionResponse extends $pb.GeneratedMessage {

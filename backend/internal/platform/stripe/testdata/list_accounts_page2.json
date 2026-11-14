@@ -1,0 +1,181 @@
+{
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "id": "acct_1UbYvoI5OYGDmlPA",
+        "object": "v2.core.account",
+        "applied_configurations": [
+          "recipient"
+        ],
+        "closed": false,
+        "configuration": null,
+        "contact_email": "<EMAIL-MASKED>",
+        "contact_phone": null,
+        "created": "2026-11-14T04:51:17.000Z",
+        "dashboard": "none",
+        "identity": null,
+        "defaults": {
+          "currency": "usd",
+          "locales": [],
+          "payout_methods": null,
+          "profile": {
+            "business_url": null,
+            "doing_business_as": null,
+            "product_description": "wwwwcsacscascasc"
+          },
+          "responsibilities": {
+            "fees_collector": "application",
+            "losses_collector": "application",
+            "requirements_collector": "application"
+          }
+        },
+        "display_name": null,
+        "future_requirements": null,
+        "metadata": {
+          "store_id": "10000"
+        },
+        "requirements": null,
+        "livemode": false
+      },
+      {
+        "id": "acct_1UZ4DKEnfXdf3rOf",
+        "object": "v2.core.account",
+        "applied_configurations": [
+          "recipient"
+        ],
+        "closed": false,
+        "configuration": null,
+        "contact_email": "<EMAIL-MASKED>",
+        "contact_phone": null,
+        "created": "2026-11-07T07:39:05.000Z",
+        "dashboard": "none",
+        "identity": null,
+        "defaults": {
+          "currency": "usd",
+          "locales": [],
+          "payout_methods": null,
+          "profile": {
+            "business_url": null,
+            "doing_business_as": null,
+            "product_description": "http://localhost:3000/seller-center/me/certifications"
+          },
+          "responsibilities": {
+            "fees_collector": "application",
+            "losses_collector": "application",
+            "requirements_collector": "application"
+          }
+        },
+        "display_name": null,
+        "future_requirements": null,
+        "metadata": {},
+        "requirements": null,
+        "livemode": false
+      },
+      {
+        "id": "acct_1UXnxNIa4EtBNaH0",
+        "object": "v2.core.account",
+        "applied_configurations": [
+          "recipient"
+        ],
+        "closed": false,
+        "configuration": null,
+        "contact_email": "<EMAIL-MASKED>",
+        "contact_phone": null,
+        "created": "2026-11-03T20:05:24.000Z",
+        "dashboard": "none",
+        "identity": null,
+        "defaults": {
+          "currency": "usd",
+          "locales": [],
+          "payout_methods": null,
+          "profile": {
+            "business_url": null,
+            "doing_business_as": null,
+            "product_description": "http://localhost:3000/seller-center/me/certifications"
+          },
+          "responsibilities": {
+            "fees_collector": "application",
+            "losses_collector": "application",
+            "requirements_collector": "application"
+          }
+        },
+        "display_name": null,
+        "future_requirements": null,
+        "metadata": {},
+        "requirements": null,
+        "livemode": false
+      },
+      {
+        "id": "acct_1UXdGKRRzdP06vGA",
+        "object": "v2.core.account",
+        "applied_configurations": [
+          "recipient"
+        ],
+        "closed": false,
+        "configuration": null,
+        "contact_email": "<EMAIL-MASKED>",
+        "contact_phone": null,
+        "created": "2026-11-03T08:40:15.000Z",
+        "dashboard": "none",
+        "identity": null,
+        "defaults": {
+          "currency": "usd",
+          "locales": [],
+          "payout_methods": null,
+          "profile": {
+            "business_url": null,
+            "doing_business_as": null,
+            "product_description": null
+          },
+          "responsibilities": {
+            "fees_collector": "application",
+            "losses_collector": "application",
+            "requirements_collector": "application"
+          }
+        },
+        "display_name": null,
+        "future_requirements": null,
+        "metadata": {},
+        "requirements": null,
+        "livemode": false
+      },
+      {
+        "id": "acct_1UXVfaID6WkY4CJw",
+        "object": "v2.core.account",
+        "applied_configurations": [
+          "recipient"
+        ],
+        "closed": false,
+        "configuration": null,
+        "contact_email": "<EMAIL-MASKED>",
+        "contact_phone": null,
+        "created": "2026-11-03T00:33:49.000Z",
+        "dashboard": "express",
+        "identity": null,
+        "defaults": {
+          "currency": "usd",
+          "locales": [],
+          "payout_methods": null,
+          "profile": {
+            "business_url": "https://accessible.stripe.com",
+            "doing_business_as": null,
+            "product_description": null
+          },
+          "responsibilities": {
+            "fees_collector": "application",
+            "losses_collector": "application",
+            "requirements_collector": "stripe"
+          }
+        },
+        "display_name": null,
+        "future_requirements": null,
+        "metadata": {},
+        "requirements": null,
+        "livemode": false
+      }
+    ],
+    "next_page_url": null,
+    "previous_page_url": "/v2/core/accounts?page=page_1t10YEGh1508A1mBjoDrI23r1rg35k8b295a4Ow29pBSFFP40k310Z0NOGEoAKN0OV7EV22qGFV1ctEaY2wg3347CO0L9D963rA5lV9yB4kkFPOCwc8PhGTs9d0EVU0Dz3p&limit=5"
+  }
+}

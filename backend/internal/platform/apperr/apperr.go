@@ -132,6 +132,9 @@ var ReasonIdentityAlreadyLinked = newReason("IDENTITY_ALREADY_LINKED")
 // ReasonReauthenticationRequired 表示這個操作要求最近重新驗證過，目前的 session 沒有；搭配 FailedPrecondition。
 var ReasonReauthenticationRequired = newReason("REAUTHENTICATION_REQUIRED")
 
+// ReasonContactEmailRequired 表示帳號沒有聯絡信箱（沒有已驗證的 email，也沒有自填的），不能送出 KYC 申請；搭配 FailedPrecondition。
+var ReasonContactEmailRequired = newReason("CONTACT_EMAIL_REQUIRED")
+
 // FieldViolation 是一個輸入欄位的錯誤。Field 是模組輸入的欄位名（Go 的欄位名，巢狀以 . 連接、
 // 索引寫成 [n]），例如 Title、Action.Target、Ingredients[2].Name；對應到請求的路徑是傳輸層的事
 // （ADR 2026-09-25-api-error-model D4）。Message 給使用者看。

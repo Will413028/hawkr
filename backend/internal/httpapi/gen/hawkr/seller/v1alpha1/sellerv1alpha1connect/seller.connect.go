@@ -3,7 +3,7 @@
 // Source: hawkr/seller/v1alpha1/seller.proto
 
 // seller 模組給前台的 API：賣家自己的店家（申請開店、店家資料、logo 與封面、新手引導、關店）、店家的粉絲、
-// 身分認證（KYC）與 PayUni 子商店、統一編號的登記資料查詢，以及措施與申覆（SellerAppService）；任何人都能讀的店面與
+// 身分認證（KYC）、統一編號的登記資料查詢，以及措施與申覆（SellerAppService）；任何人都能讀的店面與
 // 店家卡片，以及商品瀏覽的訪客打點（SellerPublicService）。後台的 API 在 hawkr.admin.seller.v1alpha1。
 //
 // ID 是不透明的字串；過渡期店家的 ID 是十進位整數字串，client 不解析、不轉數字
@@ -51,6 +51,12 @@ const (
 	// SellerAppServiceGetMyStoreProcedure is the fully-qualified name of the SellerAppService's
 	// GetMyStore RPC.
 	SellerAppServiceGetMyStoreProcedure = "/hawkr.seller.v1alpha1.SellerAppService/GetMyStore"
+	// SellerAppServiceGetMyOnboardingProcedure is the fully-qualified name of the SellerAppService's
+	// GetMyOnboarding RPC.
+	SellerAppServiceGetMyOnboardingProcedure = "/hawkr.seller.v1alpha1.SellerAppService/GetMyOnboarding"
+	// SellerAppServiceRefreshMyPaymentAccountProcedure is the fully-qualified name of the
+	// SellerAppService's RefreshMyPaymentAccount RPC.
+	SellerAppServiceRefreshMyPaymentAccountProcedure = "/hawkr.seller.v1alpha1.SellerAppService/RefreshMyPaymentAccount"
 	// SellerAppServiceUpdateMyStoreProcedure is the fully-qualified name of the SellerAppService's
 	// UpdateMyStore RPC.
 	SellerAppServiceUpdateMyStoreProcedure = "/hawkr.seller.v1alpha1.SellerAppService/UpdateMyStore"
@@ -78,6 +84,12 @@ const (
 	// SellerAppServiceCancelKYCProcedure is the fully-qualified name of the SellerAppService's
 	// CancelKYC RPC.
 	SellerAppServiceCancelKYCProcedure = "/hawkr.seller.v1alpha1.SellerAppService/CancelKYC"
+	// SellerAppServiceGetMyPaymentAccountProcedure is the fully-qualified name of the
+	// SellerAppService's GetMyPaymentAccount RPC.
+	SellerAppServiceGetMyPaymentAccountProcedure = "/hawkr.seller.v1alpha1.SellerAppService/GetMyPaymentAccount"
+	// SellerAppServiceCreatePaymentOnboardingSessionProcedure is the fully-qualified name of the
+	// SellerAppService's CreatePaymentOnboardingSession RPC.
+	SellerAppServiceCreatePaymentOnboardingSessionProcedure = "/hawkr.seller.v1alpha1.SellerAppService/CreatePaymentOnboardingSession"
 	// SellerAppServiceLookupBusinessRegistrationProcedure is the fully-qualified name of the
 	// SellerAppService's LookupBusinessRegistration RPC.
 	SellerAppServiceLookupBusinessRegistrationProcedure = "/hawkr.seller.v1alpha1.SellerAppService/LookupBusinessRegistration"
@@ -123,6 +135,18 @@ type SellerAppServiceClient interface {
 	GetMyStoreOpening(context.Context, *connect.Request[v1alpha1.GetMyStoreOpeningRequest]) (*connect.Response[v1alpha1.GetMyStoreOpeningResponse], error)
 	// GetMyStore 回傳呼叫者的店家，連同停權與每個能力的狀態（含缺的條件）。停權與等待刪除的店家照樣回傳。
 	GetMyStore(context.Context, *connect.Request[v1alpha1.GetMyStoreRequest]) (*connect.Response[v1alpha1.GetMyStoreResponse], error)
+	// GetMyOnboarding 回傳呼叫者店家的開通任務：依序的必要任務（商店資料、平台審核、收款帳戶）與開通閘門 complete。任務的狀態、下一步與文字
+	// 都由伺服器推導（client 只呈現，不組合 GetMyKYC、GetMyPaymentAccount、GetMyStore 推導）。平台審核與收款帳戶各自讀取自己的來源：單一來源讀不到
+	// 只讓該項是 UNKNOWN，方法本身不因此失敗。只讀本地的狀態，不呼叫金流商；要最新的收款帳戶狀態先呼叫 RefreshMyPaymentAccount 再讀。
+	// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀（client 以 GetMyStore 的停權狀態導向公告頁），已關閉的店家回 not_found。
+	GetMyOnboarding(context.Context, *connect.Request[v1alpha1.GetMyOnboardingRequest]) (*connect.Response[v1alpha1.GetMyOnboardingResponse], error)
+	// RefreshMyPaymentAccount 同步向金流商重讀呼叫者店家的收款帳戶並更新快取（之後讀 GetMyOnboarding）。client 自動呼叫：進入認證頁、從金流商的開通頁面回來、App 回到前景時，賣家沒有手動重新整理的按鈕。
+	// 同一帳戶上次讀取在 10 秒內就不呼叫金流商：快取已經涵蓋那次讀取就直接成功；那次讀取失敗或還在進行中就回 resource_exhausted，
+	// 帶 google.rpc.RetryInfo（窗的剩餘時間，至少 1 秒），client 照它重試，不會把失敗當成成功。還沒有外部帳戶時什麼都不做、回成功；
+	// 沒有設定收款開通回 failed_precondition。金流商暫時讀不到回 unavailable（client 可以重試）；金流商沒有這個帳戶回 failed_precondition。
+	// 需要賣家能力 CAP_STOREFRONT_WRITE（會呼叫金流商，是店面設定的一部分）：停權與等待刪除的店家回 permission_denied（SELLER_SUSPENDED）與 failed_precondition。
+	// 重複呼叫與一次的結果相同，所以是 IDEMPOTENT，可以自動重試。
+	RefreshMyPaymentAccount(context.Context, *connect.Request[v1alpha1.RefreshMyPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshMyPaymentAccountResponse], error)
 	// UpdateMyStore 修改店家資料的欄位（update_mask），含 logo 與封面（logo_staged_token、
 	// cover_staged_token）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
 	// 不寫入，etag 不變。
@@ -144,22 +168,30 @@ type SellerAppServiceClient interface {
 	// 店家還沒有申請時，不帶 etag 的呼叫建立它（subject 必須設定其中一支）；已經有申請時 etag 必填，沒帶 etag 回
 	// already_exists、與目前的版本不符回 aborted，兩者的 ErrorInfo.reason 都是 VERSION_CONFLICT（client 的處理相同：
 	// 保留輸入、顯示最新版本）。被退回的申請在這裡回到草稿重新編輯。全部欄位先驗證才寫入，任何一欄不合法都不會寫入。
-	// 送出（SubmitKYC）才檢查必填欄位與證件是否齊全。流程狀態 can_resubmit 為 false 時回 failed_precondition，訊息是
-	// KYCFlow.resubmit_unavailabilities 的第一句。
+	// 送出（SubmitKYC）才檢查必填欄位與證件是否齊全。只有草稿與被退回的申請能儲存；審核中與已核准的回 failed_precondition。
 	SaveKYCDraft(context.Context, *connect.Request[v1alpha1.SaveKYCDraftRequest]) (*connect.Response[v1alpha1.SaveKYCDraftResponse], error)
-	// GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）與流程狀態。還沒有申請（或申請已取消）
+	// GetMyKYC 回傳呼叫者店家目前的 KYC 申請。還沒有申請（或申請已取消）
 	// 時回 not_found。
 	GetMyKYC(context.Context, *connect.Request[v1alpha1.GetMyKYCRequest]) (*connect.Response[v1alpha1.GetMyKYCResponse], error)
-	// SubmitKYC 送出申請給管理員審核。草稿，以及流程狀態 can_resubmit 為 true 的申請（被退回的、PayUni 拒絕或綁定失敗而且賣家能自己修正的）都能直接送出，
-	// 不必先儲存；can_resubmit 為 false 的狀態回 failed_precondition，訊息是 KYCFlow.resubmit_unavailabilities 的第一句。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
-	// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（real_name、id_card_front、business.tax_id……，與 KYCField 一對一）。申請本身齊全之後，
-	// PayUni 綁定需要的店家資料（地址、聯絡人姓名與手機、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
-	// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。 身分比對沒有通過時回
+	// SubmitKYC 送出申請給管理員審核。草稿與被退回的申請都能直接送出，
+	// 不必先儲存；審核中與已核准的申請回 failed_precondition。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
+	// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（business.tax_id、business.company_documents……，與 KYCField 一對一）。申請本身齊全之後，
+	// 店家的必填資料（地址、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
+	// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。帳號沒有聯絡信箱（IdentityAppService.GetContactEmail 沒有回信箱）時回
+	// failed_precondition 與 ErrorReason CONTACT_EMAIL_REQUIRED，client 引導在 IdentityAppService.SetContactEmail 填一個再重送。 身分比對沒有通過時回
 	// failed_precondition，訊息固定，不透露是哪個欄位或哪個帳號。每個帳號每小時最多送出 5 次，超過回
 	// resource_exhausted（帶 RetryInfo）。
 	SubmitKYC(context.Context, *connect.Request[v1alpha1.SubmitKYCRequest]) (*connect.Response[v1alpha1.SubmitKYCResponse], error)
 	// CancelKYC 取消草稿或審核中的申請；取消之後可以重新建立。
 	CancelKYC(context.Context, *connect.Request[v1alpha1.CancelKYCRequest]) (*connect.Response[v1alpha1.CancelKYCResponse], error)
+	// GetMyPaymentAccount 回傳呼叫者店家的收款帳戶：中立的狀態（PaymentAccountStatus）、撥款能力是否啟用、最近一次讀取的時間。
+	// 店家還沒有收款帳戶（平台審核還沒核准，或沒有設定收款開通）時回 not_found。
+	GetMyPaymentAccount(context.Context, *connect.Request[v1alpha1.GetMyPaymentAccountRequest]) (*connect.Response[v1alpha1.GetMyPaymentAccountResponse], error)
+	// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session。回應是兩種互斥的 session 之一：託管連結（hosted，金流商的一次性、
+	// 短效連結，賣家開瀏覽器完成後回到 destination 與請求語系（Accept-Language）決定的頁面；連結過期時回到同一目的地的重新取得入口），或內嵌元件
+	// （embedded，初始化元件用的憑證）。只有帳戶的收款方式是平台收件、金流商支援、而且 embedded_runtimes 含對應的執行環境時才回內嵌，其餘一律回託管連結。
+	// 外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
+	CreatePaymentOnboardingSession(context.Context, *connect.Request[v1alpha1.CreatePaymentOnboardingSessionRequest]) (*connect.Response[v1alpha1.CreatePaymentOnboardingSessionResponse], error)
 	// LookupBusinessRegistration 以統一編號查經濟部商業司的公開登記資料，給 KYC 表單帶入公司資料。查無這個統編不是錯誤：
 	// 回應沒有 registration；資料來源暫時無法使用回 unavailable，畫面退回手動填寫。每個帳號每分鐘最多查 10 次，超過回
 	// resource_exhausted（帶 RetryInfo）。
@@ -213,6 +245,20 @@ func NewSellerAppServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			baseURL+SellerAppServiceGetMyStoreProcedure,
 			connect.WithSchema(sellerAppServiceMethods.ByName("GetMyStore")),
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		getMyOnboarding: connect.NewClient[v1alpha1.GetMyOnboardingRequest, v1alpha1.GetMyOnboardingResponse](
+			httpClient,
+			baseURL+SellerAppServiceGetMyOnboardingProcedure,
+			connect.WithSchema(sellerAppServiceMethods.ByName("GetMyOnboarding")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		refreshMyPaymentAccount: connect.NewClient[v1alpha1.RefreshMyPaymentAccountRequest, v1alpha1.RefreshMyPaymentAccountResponse](
+			httpClient,
+			baseURL+SellerAppServiceRefreshMyPaymentAccountProcedure,
+			connect.WithSchema(sellerAppServiceMethods.ByName("RefreshMyPaymentAccount")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
 		updateMyStore: connect.NewClient[v1alpha1.UpdateMyStoreRequest, v1alpha1.UpdateMyStoreResponse](
@@ -273,6 +319,19 @@ func NewSellerAppServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(sellerAppServiceMethods.ByName("CancelKYC")),
 			connect.WithClientOptions(opts...),
 		),
+		getMyPaymentAccount: connect.NewClient[v1alpha1.GetMyPaymentAccountRequest, v1alpha1.GetMyPaymentAccountResponse](
+			httpClient,
+			baseURL+SellerAppServiceGetMyPaymentAccountProcedure,
+			connect.WithSchema(sellerAppServiceMethods.ByName("GetMyPaymentAccount")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		createPaymentOnboardingSession: connect.NewClient[v1alpha1.CreatePaymentOnboardingSessionRequest, v1alpha1.CreatePaymentOnboardingSessionResponse](
+			httpClient,
+			baseURL+SellerAppServiceCreatePaymentOnboardingSessionProcedure,
+			connect.WithSchema(sellerAppServiceMethods.ByName("CreatePaymentOnboardingSession")),
+			connect.WithClientOptions(opts...),
+		),
 		lookupBusinessRegistration: connect.NewClient[v1alpha1.LookupBusinessRegistrationRequest, v1alpha1.LookupBusinessRegistrationResponse](
 			httpClient,
 			baseURL+SellerAppServiceLookupBusinessRegistrationProcedure,
@@ -310,23 +369,27 @@ func NewSellerAppServiceClient(httpClient connect.HTTPClient, baseURL string, op
 
 // sellerAppServiceClient implements SellerAppServiceClient.
 type sellerAppServiceClient struct {
-	applyStore                 *connect.Client[v1alpha1.ApplyStoreRequest, v1alpha1.ApplyStoreResponse]
-	getMyStoreOpening          *connect.Client[v1alpha1.GetMyStoreOpeningRequest, v1alpha1.GetMyStoreOpeningResponse]
-	getMyStore                 *connect.Client[v1alpha1.GetMyStoreRequest, v1alpha1.GetMyStoreResponse]
-	updateMyStore              *connect.Client[v1alpha1.UpdateMyStoreRequest, v1alpha1.UpdateMyStoreResponse]
-	completeMyStoreOnboarding  *connect.Client[v1alpha1.CompleteMyStoreOnboardingRequest, v1alpha1.CompleteMyStoreOnboardingResponse]
-	listMyFollowers            *connect.Client[v1alpha1.ListMyFollowersRequest, v1alpha1.ListMyFollowersResponse]
-	getMyDashboard             *connect.Client[v1alpha1.GetMyDashboardRequest, v1alpha1.GetMyDashboardResponse]
-	closeMyStore               *connect.Client[v1alpha1.CloseMyStoreRequest, v1alpha1.CloseMyStoreResponse]
-	saveKYCDraft               *connect.Client[v1alpha1.SaveKYCDraftRequest, v1alpha1.SaveKYCDraftResponse]
-	getMyKYC                   *connect.Client[v1alpha1.GetMyKYCRequest, v1alpha1.GetMyKYCResponse]
-	submitKYC                  *connect.Client[v1alpha1.SubmitKYCRequest, v1alpha1.SubmitKYCResponse]
-	cancelKYC                  *connect.Client[v1alpha1.CancelKYCRequest, v1alpha1.CancelKYCResponse]
-	lookupBusinessRegistration *connect.Client[v1alpha1.LookupBusinessRegistrationRequest, v1alpha1.LookupBusinessRegistrationResponse]
-	listMyMeasures             *connect.Client[v1alpha1.ListMyMeasuresRequest, v1alpha1.ListMyMeasuresResponse]
-	getMyMeasure               *connect.Client[v1alpha1.GetMyMeasureRequest, v1alpha1.GetMyMeasureResponse]
-	submitAppeal               *connect.Client[v1alpha1.SubmitAppealRequest, v1alpha1.SubmitAppealResponse]
-	requestRemediation         *connect.Client[v1alpha1.RequestRemediationRequest, v1alpha1.RequestRemediationResponse]
+	applyStore                     *connect.Client[v1alpha1.ApplyStoreRequest, v1alpha1.ApplyStoreResponse]
+	getMyStoreOpening              *connect.Client[v1alpha1.GetMyStoreOpeningRequest, v1alpha1.GetMyStoreOpeningResponse]
+	getMyStore                     *connect.Client[v1alpha1.GetMyStoreRequest, v1alpha1.GetMyStoreResponse]
+	getMyOnboarding                *connect.Client[v1alpha1.GetMyOnboardingRequest, v1alpha1.GetMyOnboardingResponse]
+	refreshMyPaymentAccount        *connect.Client[v1alpha1.RefreshMyPaymentAccountRequest, v1alpha1.RefreshMyPaymentAccountResponse]
+	updateMyStore                  *connect.Client[v1alpha1.UpdateMyStoreRequest, v1alpha1.UpdateMyStoreResponse]
+	completeMyStoreOnboarding      *connect.Client[v1alpha1.CompleteMyStoreOnboardingRequest, v1alpha1.CompleteMyStoreOnboardingResponse]
+	listMyFollowers                *connect.Client[v1alpha1.ListMyFollowersRequest, v1alpha1.ListMyFollowersResponse]
+	getMyDashboard                 *connect.Client[v1alpha1.GetMyDashboardRequest, v1alpha1.GetMyDashboardResponse]
+	closeMyStore                   *connect.Client[v1alpha1.CloseMyStoreRequest, v1alpha1.CloseMyStoreResponse]
+	saveKYCDraft                   *connect.Client[v1alpha1.SaveKYCDraftRequest, v1alpha1.SaveKYCDraftResponse]
+	getMyKYC                       *connect.Client[v1alpha1.GetMyKYCRequest, v1alpha1.GetMyKYCResponse]
+	submitKYC                      *connect.Client[v1alpha1.SubmitKYCRequest, v1alpha1.SubmitKYCResponse]
+	cancelKYC                      *connect.Client[v1alpha1.CancelKYCRequest, v1alpha1.CancelKYCResponse]
+	getMyPaymentAccount            *connect.Client[v1alpha1.GetMyPaymentAccountRequest, v1alpha1.GetMyPaymentAccountResponse]
+	createPaymentOnboardingSession *connect.Client[v1alpha1.CreatePaymentOnboardingSessionRequest, v1alpha1.CreatePaymentOnboardingSessionResponse]
+	lookupBusinessRegistration     *connect.Client[v1alpha1.LookupBusinessRegistrationRequest, v1alpha1.LookupBusinessRegistrationResponse]
+	listMyMeasures                 *connect.Client[v1alpha1.ListMyMeasuresRequest, v1alpha1.ListMyMeasuresResponse]
+	getMyMeasure                   *connect.Client[v1alpha1.GetMyMeasureRequest, v1alpha1.GetMyMeasureResponse]
+	submitAppeal                   *connect.Client[v1alpha1.SubmitAppealRequest, v1alpha1.SubmitAppealResponse]
+	requestRemediation             *connect.Client[v1alpha1.RequestRemediationRequest, v1alpha1.RequestRemediationResponse]
 }
 
 // ApplyStore calls hawkr.seller.v1alpha1.SellerAppService.ApplyStore.
@@ -342,6 +405,16 @@ func (c *sellerAppServiceClient) GetMyStoreOpening(ctx context.Context, req *con
 // GetMyStore calls hawkr.seller.v1alpha1.SellerAppService.GetMyStore.
 func (c *sellerAppServiceClient) GetMyStore(ctx context.Context, req *connect.Request[v1alpha1.GetMyStoreRequest]) (*connect.Response[v1alpha1.GetMyStoreResponse], error) {
 	return c.getMyStore.CallUnary(ctx, req)
+}
+
+// GetMyOnboarding calls hawkr.seller.v1alpha1.SellerAppService.GetMyOnboarding.
+func (c *sellerAppServiceClient) GetMyOnboarding(ctx context.Context, req *connect.Request[v1alpha1.GetMyOnboardingRequest]) (*connect.Response[v1alpha1.GetMyOnboardingResponse], error) {
+	return c.getMyOnboarding.CallUnary(ctx, req)
+}
+
+// RefreshMyPaymentAccount calls hawkr.seller.v1alpha1.SellerAppService.RefreshMyPaymentAccount.
+func (c *sellerAppServiceClient) RefreshMyPaymentAccount(ctx context.Context, req *connect.Request[v1alpha1.RefreshMyPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshMyPaymentAccountResponse], error) {
+	return c.refreshMyPaymentAccount.CallUnary(ctx, req)
 }
 
 // UpdateMyStore calls hawkr.seller.v1alpha1.SellerAppService.UpdateMyStore.
@@ -389,6 +462,17 @@ func (c *sellerAppServiceClient) CancelKYC(ctx context.Context, req *connect.Req
 	return c.cancelKYC.CallUnary(ctx, req)
 }
 
+// GetMyPaymentAccount calls hawkr.seller.v1alpha1.SellerAppService.GetMyPaymentAccount.
+func (c *sellerAppServiceClient) GetMyPaymentAccount(ctx context.Context, req *connect.Request[v1alpha1.GetMyPaymentAccountRequest]) (*connect.Response[v1alpha1.GetMyPaymentAccountResponse], error) {
+	return c.getMyPaymentAccount.CallUnary(ctx, req)
+}
+
+// CreatePaymentOnboardingSession calls
+// hawkr.seller.v1alpha1.SellerAppService.CreatePaymentOnboardingSession.
+func (c *sellerAppServiceClient) CreatePaymentOnboardingSession(ctx context.Context, req *connect.Request[v1alpha1.CreatePaymentOnboardingSessionRequest]) (*connect.Response[v1alpha1.CreatePaymentOnboardingSessionResponse], error) {
+	return c.createPaymentOnboardingSession.CallUnary(ctx, req)
+}
+
 // LookupBusinessRegistration calls
 // hawkr.seller.v1alpha1.SellerAppService.LookupBusinessRegistration.
 func (c *sellerAppServiceClient) LookupBusinessRegistration(ctx context.Context, req *connect.Request[v1alpha1.LookupBusinessRegistrationRequest]) (*connect.Response[v1alpha1.LookupBusinessRegistrationResponse], error) {
@@ -429,6 +513,18 @@ type SellerAppServiceHandler interface {
 	GetMyStoreOpening(context.Context, *connect.Request[v1alpha1.GetMyStoreOpeningRequest]) (*connect.Response[v1alpha1.GetMyStoreOpeningResponse], error)
 	// GetMyStore 回傳呼叫者的店家，連同停權與每個能力的狀態（含缺的條件）。停權與等待刪除的店家照樣回傳。
 	GetMyStore(context.Context, *connect.Request[v1alpha1.GetMyStoreRequest]) (*connect.Response[v1alpha1.GetMyStoreResponse], error)
+	// GetMyOnboarding 回傳呼叫者店家的開通任務：依序的必要任務（商店資料、平台審核、收款帳戶）與開通閘門 complete。任務的狀態、下一步與文字
+	// 都由伺服器推導（client 只呈現，不組合 GetMyKYC、GetMyPaymentAccount、GetMyStore 推導）。平台審核與收款帳戶各自讀取自己的來源：單一來源讀不到
+	// 只讓該項是 UNKNOWN，方法本身不因此失敗。只讀本地的狀態，不呼叫金流商；要最新的收款帳戶狀態先呼叫 RefreshMyPaymentAccount 再讀。
+	// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀（client 以 GetMyStore 的停權狀態導向公告頁），已關閉的店家回 not_found。
+	GetMyOnboarding(context.Context, *connect.Request[v1alpha1.GetMyOnboardingRequest]) (*connect.Response[v1alpha1.GetMyOnboardingResponse], error)
+	// RefreshMyPaymentAccount 同步向金流商重讀呼叫者店家的收款帳戶並更新快取（之後讀 GetMyOnboarding）。client 自動呼叫：進入認證頁、從金流商的開通頁面回來、App 回到前景時，賣家沒有手動重新整理的按鈕。
+	// 同一帳戶上次讀取在 10 秒內就不呼叫金流商：快取已經涵蓋那次讀取就直接成功；那次讀取失敗或還在進行中就回 resource_exhausted，
+	// 帶 google.rpc.RetryInfo（窗的剩餘時間，至少 1 秒），client 照它重試，不會把失敗當成成功。還沒有外部帳戶時什麼都不做、回成功；
+	// 沒有設定收款開通回 failed_precondition。金流商暫時讀不到回 unavailable（client 可以重試）；金流商沒有這個帳戶回 failed_precondition。
+	// 需要賣家能力 CAP_STOREFRONT_WRITE（會呼叫金流商，是店面設定的一部分）：停權與等待刪除的店家回 permission_denied（SELLER_SUSPENDED）與 failed_precondition。
+	// 重複呼叫與一次的結果相同，所以是 IDEMPOTENT，可以自動重試。
+	RefreshMyPaymentAccount(context.Context, *connect.Request[v1alpha1.RefreshMyPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshMyPaymentAccountResponse], error)
 	// UpdateMyStore 修改店家資料的欄位（update_mask），含 logo 與封面（logo_staged_token、
 	// cover_staged_token）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
 	// 不寫入，etag 不變。
@@ -450,22 +546,30 @@ type SellerAppServiceHandler interface {
 	// 店家還沒有申請時，不帶 etag 的呼叫建立它（subject 必須設定其中一支）；已經有申請時 etag 必填，沒帶 etag 回
 	// already_exists、與目前的版本不符回 aborted，兩者的 ErrorInfo.reason 都是 VERSION_CONFLICT（client 的處理相同：
 	// 保留輸入、顯示最新版本）。被退回的申請在這裡回到草稿重新編輯。全部欄位先驗證才寫入，任何一欄不合法都不會寫入。
-	// 送出（SubmitKYC）才檢查必填欄位與證件是否齊全。流程狀態 can_resubmit 為 false 時回 failed_precondition，訊息是
-	// KYCFlow.resubmit_unavailabilities 的第一句。
+	// 送出（SubmitKYC）才檢查必填欄位與證件是否齊全。只有草稿與被退回的申請能儲存；審核中與已核准的回 failed_precondition。
 	SaveKYCDraft(context.Context, *connect.Request[v1alpha1.SaveKYCDraftRequest]) (*connect.Response[v1alpha1.SaveKYCDraftResponse], error)
-	// GetMyKYC 回傳呼叫者店家目前的 KYC 申請（身分證號與銀行帳號只有遮蔽後的值）與流程狀態。還沒有申請（或申請已取消）
+	// GetMyKYC 回傳呼叫者店家目前的 KYC 申請。還沒有申請（或申請已取消）
 	// 時回 not_found。
 	GetMyKYC(context.Context, *connect.Request[v1alpha1.GetMyKYCRequest]) (*connect.Response[v1alpha1.GetMyKYCResponse], error)
-	// SubmitKYC 送出申請給管理員審核。草稿，以及流程狀態 can_resubmit 為 true 的申請（被退回的、PayUni 拒絕或綁定失敗而且賣家能自己修正的）都能直接送出，
-	// 不必先儲存；can_resubmit 為 false 的狀態回 failed_precondition，訊息是 KYCFlow.resubmit_unavailabilities 的第一句。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
-	// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（real_name、id_card_front、business.tax_id……，與 KYCField 一對一）。申請本身齊全之後，
-	// PayUni 綁定需要的店家資料（地址、聯絡人姓名與手機、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
-	// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。 身分比對沒有通過時回
+	// SubmitKYC 送出申請給管理員審核。草稿與被退回的申請都能直接送出，
+	// 不必先儲存；審核中與已核准的申請回 failed_precondition。必填欄位與證件齊全、身分沒有命中別的帳號生效中的處分。缺少的欄位回
+	// invalid_argument，BadRequest 的每個 field 是 KYCApplication 的欄位路徑（business.tax_id、business.company_documents……，與 KYCField 一對一）。申請本身齊全之後，
+	// 店家的必填資料（地址、客服電子信箱）還有缺漏時回 failed_precondition（店家的狀態不在請求裡），
+	// client 讀 GetMyKYC 的 missing_store_fields 取得缺哪些，以 UpdateMyStore 補齊。帳號沒有聯絡信箱（IdentityAppService.GetContactEmail 沒有回信箱）時回
+	// failed_precondition 與 ErrorReason CONTACT_EMAIL_REQUIRED，client 引導在 IdentityAppService.SetContactEmail 填一個再重送。 身分比對沒有通過時回
 	// failed_precondition，訊息固定，不透露是哪個欄位或哪個帳號。每個帳號每小時最多送出 5 次，超過回
 	// resource_exhausted（帶 RetryInfo）。
 	SubmitKYC(context.Context, *connect.Request[v1alpha1.SubmitKYCRequest]) (*connect.Response[v1alpha1.SubmitKYCResponse], error)
 	// CancelKYC 取消草稿或審核中的申請；取消之後可以重新建立。
 	CancelKYC(context.Context, *connect.Request[v1alpha1.CancelKYCRequest]) (*connect.Response[v1alpha1.CancelKYCResponse], error)
+	// GetMyPaymentAccount 回傳呼叫者店家的收款帳戶：中立的狀態（PaymentAccountStatus）、撥款能力是否啟用、最近一次讀取的時間。
+	// 店家還沒有收款帳戶（平台審核還沒核准，或沒有設定收款開通）時回 not_found。
+	GetMyPaymentAccount(context.Context, *connect.Request[v1alpha1.GetMyPaymentAccountRequest]) (*connect.Response[v1alpha1.GetMyPaymentAccountResponse], error)
+	// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session。回應是兩種互斥的 session 之一：託管連結（hosted，金流商的一次性、
+	// 短效連結，賣家開瀏覽器完成後回到 destination 與請求語系（Accept-Language）決定的頁面；連結過期時回到同一目的地的重新取得入口），或內嵌元件
+	// （embedded，初始化元件用的憑證）。只有帳戶的收款方式是平台收件、金流商支援、而且 embedded_runtimes 含對應的執行環境時才回內嵌，其餘一律回託管連結。
+	// 外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
+	CreatePaymentOnboardingSession(context.Context, *connect.Request[v1alpha1.CreatePaymentOnboardingSessionRequest]) (*connect.Response[v1alpha1.CreatePaymentOnboardingSessionResponse], error)
 	// LookupBusinessRegistration 以統一編號查經濟部商業司的公開登記資料，給 KYC 表單帶入公司資料。查無這個統編不是錯誤：
 	// 回應沒有 registration；資料來源暫時無法使用回 unavailable，畫面退回手動填寫。每個帳號每分鐘最多查 10 次，超過回
 	// resource_exhausted（帶 RetryInfo）。
@@ -515,6 +619,20 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 		svc.GetMyStore,
 		connect.WithSchema(sellerAppServiceMethods.ByName("GetMyStore")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	sellerAppServiceGetMyOnboardingHandler := connect.NewUnaryHandler(
+		SellerAppServiceGetMyOnboardingProcedure,
+		svc.GetMyOnboarding,
+		connect.WithSchema(sellerAppServiceMethods.ByName("GetMyOnboarding")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	sellerAppServiceRefreshMyPaymentAccountHandler := connect.NewUnaryHandler(
+		SellerAppServiceRefreshMyPaymentAccountProcedure,
+		svc.RefreshMyPaymentAccount,
+		connect.WithSchema(sellerAppServiceMethods.ByName("RefreshMyPaymentAccount")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
 	sellerAppServiceUpdateMyStoreHandler := connect.NewUnaryHandler(
@@ -575,6 +693,19 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 		connect.WithSchema(sellerAppServiceMethods.ByName("CancelKYC")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sellerAppServiceGetMyPaymentAccountHandler := connect.NewUnaryHandler(
+		SellerAppServiceGetMyPaymentAccountProcedure,
+		svc.GetMyPaymentAccount,
+		connect.WithSchema(sellerAppServiceMethods.ByName("GetMyPaymentAccount")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	sellerAppServiceCreatePaymentOnboardingSessionHandler := connect.NewUnaryHandler(
+		SellerAppServiceCreatePaymentOnboardingSessionProcedure,
+		svc.CreatePaymentOnboardingSession,
+		connect.WithSchema(sellerAppServiceMethods.ByName("CreatePaymentOnboardingSession")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sellerAppServiceLookupBusinessRegistrationHandler := connect.NewUnaryHandler(
 		SellerAppServiceLookupBusinessRegistrationProcedure,
 		svc.LookupBusinessRegistration,
@@ -615,6 +746,10 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 			sellerAppServiceGetMyStoreOpeningHandler.ServeHTTP(w, r)
 		case SellerAppServiceGetMyStoreProcedure:
 			sellerAppServiceGetMyStoreHandler.ServeHTTP(w, r)
+		case SellerAppServiceGetMyOnboardingProcedure:
+			sellerAppServiceGetMyOnboardingHandler.ServeHTTP(w, r)
+		case SellerAppServiceRefreshMyPaymentAccountProcedure:
+			sellerAppServiceRefreshMyPaymentAccountHandler.ServeHTTP(w, r)
 		case SellerAppServiceUpdateMyStoreProcedure:
 			sellerAppServiceUpdateMyStoreHandler.ServeHTTP(w, r)
 		case SellerAppServiceCompleteMyStoreOnboardingProcedure:
@@ -633,6 +768,10 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 			sellerAppServiceSubmitKYCHandler.ServeHTTP(w, r)
 		case SellerAppServiceCancelKYCProcedure:
 			sellerAppServiceCancelKYCHandler.ServeHTTP(w, r)
+		case SellerAppServiceGetMyPaymentAccountProcedure:
+			sellerAppServiceGetMyPaymentAccountHandler.ServeHTTP(w, r)
+		case SellerAppServiceCreatePaymentOnboardingSessionProcedure:
+			sellerAppServiceCreatePaymentOnboardingSessionHandler.ServeHTTP(w, r)
 		case SellerAppServiceLookupBusinessRegistrationProcedure:
 			sellerAppServiceLookupBusinessRegistrationHandler.ServeHTTP(w, r)
 		case SellerAppServiceListMyMeasuresProcedure:
@@ -662,6 +801,14 @@ func (UnimplementedSellerAppServiceHandler) GetMyStoreOpening(context.Context, *
 
 func (UnimplementedSellerAppServiceHandler) GetMyStore(context.Context, *connect.Request[v1alpha1.GetMyStoreRequest]) (*connect.Response[v1alpha1.GetMyStoreResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.GetMyStore is not implemented"))
+}
+
+func (UnimplementedSellerAppServiceHandler) GetMyOnboarding(context.Context, *connect.Request[v1alpha1.GetMyOnboardingRequest]) (*connect.Response[v1alpha1.GetMyOnboardingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.GetMyOnboarding is not implemented"))
+}
+
+func (UnimplementedSellerAppServiceHandler) RefreshMyPaymentAccount(context.Context, *connect.Request[v1alpha1.RefreshMyPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshMyPaymentAccountResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.RefreshMyPaymentAccount is not implemented"))
 }
 
 func (UnimplementedSellerAppServiceHandler) UpdateMyStore(context.Context, *connect.Request[v1alpha1.UpdateMyStoreRequest]) (*connect.Response[v1alpha1.UpdateMyStoreResponse], error) {
@@ -698,6 +845,14 @@ func (UnimplementedSellerAppServiceHandler) SubmitKYC(context.Context, *connect.
 
 func (UnimplementedSellerAppServiceHandler) CancelKYC(context.Context, *connect.Request[v1alpha1.CancelKYCRequest]) (*connect.Response[v1alpha1.CancelKYCResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.CancelKYC is not implemented"))
+}
+
+func (UnimplementedSellerAppServiceHandler) GetMyPaymentAccount(context.Context, *connect.Request[v1alpha1.GetMyPaymentAccountRequest]) (*connect.Response[v1alpha1.GetMyPaymentAccountResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.GetMyPaymentAccount is not implemented"))
+}
+
+func (UnimplementedSellerAppServiceHandler) CreatePaymentOnboardingSession(context.Context, *connect.Request[v1alpha1.CreatePaymentOnboardingSessionRequest]) (*connect.Response[v1alpha1.CreatePaymentOnboardingSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.CreatePaymentOnboardingSession is not implemented"))
 }
 
 func (UnimplementedSellerAppServiceHandler) LookupBusinessRegistration(context.Context, *connect.Request[v1alpha1.LookupBusinessRegistrationRequest]) (*connect.Response[v1alpha1.LookupBusinessRegistrationResponse], error) {

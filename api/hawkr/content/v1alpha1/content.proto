@@ -79,7 +79,7 @@ enum AppType {
 message CheckAppVersionRequest {
   AppType app_type = 1 [(google.api.field_behavior) = REQUIRED];
   // App 的版本 x.y.z，不含 build number。格式不對時不要求更新。
-  string client_version = 3 [(google.api.field_behavior) = REQUIRED];
+  string client_version = 2 [(google.api.field_behavior) = REQUIRED];
 }
 
 message CheckAppVersionResponse {

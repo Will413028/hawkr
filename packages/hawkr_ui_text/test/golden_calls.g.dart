@@ -7,6 +7,7 @@ import 'package:connectrpc/connect.dart' show Code;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
@@ -19,41 +20,21 @@ const _enumNumber = <String, int>{
 	'GENDER_MALE': 1,
 	'GENDER_OTHER': 3,
 	'GENDER_UNSPECIFIED': 0,
-	'KYC_FIELD_BANK_ACCOUNT': 9,
-	'KYC_FIELD_BANK_BOOK': 17,
-	'KYC_FIELD_BANK_CODE': 8,
-	'KYC_FIELD_BANK_NAME': 7,
-	'KYC_FIELD_BIRTH_DATE': 2,
-	'KYC_FIELD_BUSINESS_COMPANY_ADDRESS': 28,
-	'KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS': 27,
-	'KYC_FIELD_BUSINESS_COMPANY_NAME': 20,
-	'KYC_FIELD_BUSINESS_COMPANY_PHONE': 25,
-	'KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE': 22,
-	'KYC_FIELD_BUSINESS_REP_ID_CARD_NO': 26,
-	'KYC_FIELD_BUSINESS_TAX_ID': 21,
-	'KYC_FIELD_ENGLISH_NAME': 6,
-	'KYC_FIELD_ID_CARD_BACK': 16,
-	'KYC_FIELD_ID_CARD_FRONT': 15,
-	'KYC_FIELD_ID_CARD_ISSUE_DATE': 3,
-	'KYC_FIELD_ID_CARD_ISSUE_LOCATION': 5,
-	'KYC_FIELD_ID_CARD_ISSUE_TYPE': 4,
-	'KYC_FIELD_INDIVIDUAL_ID_CARD_NO': 18,
-	'KYC_FIELD_PRODUCT_TYPE': 10,
-	'KYC_FIELD_REAL_NAME': 1,
+	'KYC_FIELD_BUSINESS_COMPANY_ADDRESS': 8,
+	'KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS': 7,
+	'KYC_FIELD_BUSINESS_COMPANY_NAME': 3,
+	'KYC_FIELD_BUSINESS_COMPANY_PHONE': 6,
+	'KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE': 5,
+	'KYC_FIELD_BUSINESS_TAX_ID': 4,
+	'KYC_FIELD_PRODUCT_TYPE': 1,
 	'KYC_FIELD_UNSPECIFIED': 0,
-	'KYC_FIELD_WEBSITE_URL': 12,
-	'KYC_FLOW_STATUS_APPROVED': 10,
-	'KYC_FLOW_STATUS_BINDING': 5,
-	'KYC_FLOW_STATUS_BIND_FAILED': 6,
-	'KYC_FLOW_STATUS_DRAFT': 2,
-	'KYC_FLOW_STATUS_FORWARDED': 7,
-	'KYC_FLOW_STATUS_NOT_STARTED': 1,
-	'KYC_FLOW_STATUS_PAYUNI_REJECTED': 11,
-	'KYC_FLOW_STATUS_PENDING_INFO': 9,
-	'KYC_FLOW_STATUS_REJECTED': 4,
-	'KYC_FLOW_STATUS_SUBMITTED': 3,
-	'KYC_FLOW_STATUS_UNDER_REVIEW': 8,
-	'KYC_FLOW_STATUS_UNSPECIFIED': 0,
+	'KYC_FIELD_WEBSITE_URL': 2,
+	'KYC_STATUS_APPROVED': 3,
+	'KYC_STATUS_CANCELLED': 5,
+	'KYC_STATUS_DRAFT': 1,
+	'KYC_STATUS_REJECTED': 4,
+	'KYC_STATUS_SUBMITTED': 2,
+	'KYC_STATUS_UNSPECIFIED': 0,
 	'MEASURE_BASIS_CONTRACT': 3,
 	'MEASURE_BASIS_RISK': 2,
 	'MEASURE_BASIS_UNSPECIFIED': 0,
@@ -77,15 +58,22 @@ const _enumNumber = <String, int>{
 	'MEASURE_STATE_REVOKED': 4,
 	'MEASURE_STATE_SCHEDULED': 5,
 	'MEASURE_STATE_UNSPECIFIED': 0,
-	'PAY_UNI_STATE_APPROVED': 8,
-	'PAY_UNI_STATE_CONTACT_SUPPORT': 5,
-	'PAY_UNI_STATE_FIXABLE': 3,
-	'PAY_UNI_STATE_FIX_VIA_SUPPORT': 4,
-	'PAY_UNI_STATE_PENDING_INFO': 2,
-	'PAY_UNI_STATE_RETRY_LATER': 6,
-	'PAY_UNI_STATE_REVIEWING': 1,
-	'PAY_UNI_STATE_TERMINATED': 7,
-	'PAY_UNI_STATE_UNSPECIFIED': 0,
+	'ONBOARDING_ACTION_CONTACT_SUPPORT': 5,
+	'ONBOARDING_ACTION_EDIT_PROFILE': 2,
+	'ONBOARDING_ACTION_NONE': 1,
+	'ONBOARDING_ACTION_START_PAYMENT_ONBOARDING': 4,
+	'ONBOARDING_ACTION_SUBMIT_CERTIFICATION': 3,
+	'ONBOARDING_ACTION_UNSPECIFIED': 0,
+	'ONBOARDING_TASK_ID_PAYMENT_ACCOUNT': 3,
+	'ONBOARDING_TASK_ID_PLATFORM_REVIEW': 2,
+	'ONBOARDING_TASK_ID_PROFILE': 1,
+	'ONBOARDING_TASK_ID_UNSPECIFIED': 0,
+	'PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED': 3,
+	'PAYMENT_ACCOUNT_STATUS_DISABLED': 5,
+	'PAYMENT_ACCOUNT_STATUS_ENABLED': 4,
+	'PAYMENT_ACCOUNT_STATUS_NOT_CREATED': 1,
+	'PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW': 2,
+	'PAYMENT_ACCOUNT_STATUS_UNSPECIFIED': 0,
 	'POLICY_CATEGORY_COUNTERFEIT': 6,
 	'POLICY_CATEGORY_FAKE_CERTIFICATION': 5,
 	'POLICY_CATEGORY_FOOD_SAFETY': 1,
@@ -103,6 +91,9 @@ const _enumNumber = <String, int>{
 	'POLICY_CATEGORY_SPAM': 14,
 	'POLICY_CATEGORY_UNLICENSED_SALE': 3,
 	'POLICY_CATEGORY_UNSPECIFIED': 0,
+	'REQUIREMENT_COLLECTION_PLATFORM': 2,
+	'REQUIREMENT_COLLECTION_PROVIDER': 1,
+	'REQUIREMENT_COLLECTION_UNSPECIFIED': 0,
 	'REVOKE_REASON_ADMIN_CORRECTION': 2,
 	'REVOKE_REASON_APPEAL_ACCEPTED': 1,
 	'REVOKE_REASON_EXTERNAL_DECISION': 3,
@@ -119,10 +110,10 @@ const _enumNumber = <String, int>{
 	'RISK_GROUND_SECURITY': 6,
 	'RISK_GROUND_TRANSACTION': 1,
 	'RISK_GROUND_UNSPECIFIED': 0,
-	'SELLER_REQUIREMENT_KYC_APPROVED': 3,
 	'SELLER_REQUIREMENT_LOGO': 5,
 	'SELLER_REQUIREMENT_NOT_PENDING_DELETION': 7,
 	'SELLER_REQUIREMENT_NOT_SUSPENDED': 2,
+	'SELLER_REQUIREMENT_ONBOARDING_COMPLETE': 3,
 	'SELLER_REQUIREMENT_STORE_ACTIVE': 1,
 	'SELLER_REQUIREMENT_STORE_NAME': 4,
 	'SELLER_REQUIREMENT_TOWN_CODE': 6,
@@ -193,22 +184,20 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return commonErrorText(_codes[value]!, l);
     case 'common.unknown':
       return commonUnknown(l);
+    case 'payment.PaymentAccountStatus':
+      return hawkr_payment_v1alpha1_payment.PaymentAccountStatus.valueOf(_n(value))!.uiText(l);
+    case 'payment.RequirementCollection':
+      return hawkr_payment_v1alpha1_payment.RequirementCollection.valueOf(_n(value))!.uiText(l);
     case 'seller.ContentKind':
       return hawkr_seller_v1alpha1_seller.ContentKind.valueOf(_n(value))!.uiText(l);
+    case 'seller.KYCApplication.decide_time':
+      return sellerKYCApplicationDecideTime(l, time: params['time']! as String);
+    case 'seller.KYCApplication.submit_time':
+      return sellerKYCApplicationSubmitTime(l, time: params['time']! as String);
     case 'seller.KYCField':
       return hawkr_seller_v1alpha1_seller.KYCField.valueOf(_n(value))!.uiText(l);
-    case 'seller.KYCFlowStatus':
-      return hawkr_seller_v1alpha1_seller.KYCFlowStatus.valueOf(_n(value))!.uiText(l);
-    case 'seller.KYCFlowStatus.action':
-      return hawkr_seller_v1alpha1_seller.KYCFlowStatus.valueOf(_n(value))!.action(l);
-    case 'seller.KYCFlowStatus.banner_description':
-      return hawkr_seller_v1alpha1_seller.KYCFlowStatus.valueOf(_n(value))!.bannerDescription(l);
-    case 'seller.KYCFlowStatus.banner_title':
-      return hawkr_seller_v1alpha1_seller.KYCFlowStatus.valueOf(_n(value))!.bannerTitle(l);
-    case 'seller.KYCFlowStatus.gate_heading':
-      return hawkr_seller_v1alpha1_seller.KYCFlowStatus.valueOf(_n(value))!.gateHeading(l);
-    case 'seller.KYCFlowStatus.gate_message':
-      return hawkr_seller_v1alpha1_seller.KYCFlowStatus.valueOf(_n(value))!.gateMessage(l, subject: params['subject']! as String);
+    case 'seller.KYCStatus':
+      return hawkr_seller_v1alpha1_seller.KYCStatus.valueOf(_n(value))!.uiText(l);
     case 'seller.Measure.appeal_deadline':
       return sellerMeasureAppealDeadline(l, deadline: params['deadline']! as String);
     case 'seller.Measure.meta_kind':
@@ -253,16 +242,20 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_seller_v1alpha1_seller.MeasureRequestState.valueOf(_n(value))!.withKind(l, kind: hawkr_seller_v1alpha1_seller.MeasureRequestKind.valueOf(_n(params['kind']))!);
     case 'seller.MeasureState':
       return hawkr_seller_v1alpha1_seller.MeasureState.valueOf(_n(value))!.uiText(l, kind: hawkr_seller_v1alpha1_seller.MeasureKind.valueOf(_n(params['kind']))!);
-    case 'seller.PayUniState':
-      return hawkr_seller_v1alpha1_seller.PayUniState.valueOf(_n(value))!.uiText(l);
+    case 'seller.OnboardingAction.button':
+      return hawkr_seller_v1alpha1_seller.OnboardingAction.valueOf(_n(value))!.button(l);
+    case 'seller.OnboardingTaskId.description':
+      return hawkr_seller_v1alpha1_seller.OnboardingTaskId.valueOf(_n(value))!.description(l);
+    case 'seller.OnboardingTaskId.panel_description':
+      return hawkr_seller_v1alpha1_seller.OnboardingTaskId.valueOf(_n(value))!.panelDescription(l);
+    case 'seller.OnboardingTaskId.panel_title':
+      return hawkr_seller_v1alpha1_seller.OnboardingTaskId.valueOf(_n(value))!.panelTitle(l);
+    case 'seller.PaymentAccount.payouts_inactive_note':
+      return sellerPaymentAccountPayoutsInactiveNote(l);
     case 'seller.RevokeReason':
       return hawkr_seller_v1alpha1_seller.RevokeReason.valueOf(_n(value))!.uiText(l);
     case 'seller.RiskGround':
       return hawkr_seller_v1alpha1_seller.RiskGround.valueOf(_n(value))!.uiText(l);
-    case 'seller.SellerPayUni.fix_fields_heading':
-      return sellerSellerPayUniFixFieldsHeading(l);
-    case 'seller.SellerPayUni.reason_heading':
-      return sellerSellerPayUniReasonHeading(l);
     case 'seller.SellerRequirement':
       return hawkr_seller_v1alpha1_seller.SellerRequirement.valueOf(_n(value))!.uiText(l);
     case 'seller.StoreField':

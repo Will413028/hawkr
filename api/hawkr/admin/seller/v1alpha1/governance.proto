@@ -178,6 +178,13 @@ service SellerGovernanceAdminService {
   // 必填）。只限生效中的 RISK 停權。後台的 etag 改變、賣家的 etag 不變。
   rpc ScheduleMeasureReview(ScheduleMeasureReviewRequest) returns (ScheduleMeasureReviewResponse);
 
+  // MarkLinkedAccountReviewed 把措施詳情上的一個關聯帳號標為已檢視（處置「共用銀行帳號」待辦）：這一對（措施、帳號）此後不再出現在待辦（SHARED_BANK_ACCOUNT）。
+  // 這一對必須是銀行帳號 fingerprint 命中的關聯帳號，措施或命中不存在回 not_found。冪等：已標過回成功、不改原來的時間與管理員。不改 measures，所以不帶 etag，
+  // 措施的 etag 不變。權限是獨立的 seller.measures.review_linked_account（adminauth 一支方法一個權限）。
+  rpc MarkLinkedAccountReviewed(MarkLinkedAccountReviewedRequest) returns (MarkLinkedAccountReviewedResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
   // DecideAppeal 裁定措施的申覆：ACCEPTED 在同一個 transaction 撤銷措施並解除效果（revoke_findings 為 true 時一併撤銷認定；終止合作的
   // 恢復店家與關聯終止的連帶撤銷同 RevokeMeasure）；終止合作期滿前提出的申覆，期滿後仍可裁定；
   // REJECTED 措施不變。兩者都必須附理由，賣家看得到。只有待處理的申覆可以。etag 必填；etag 不符（包含裁定已經生效後再帶舊
@@ -287,80 +294,74 @@ message ReporterContact {
 
 // Report 是後台看到的通報：一位檢舉人的一次送出（含之後併入的補充），有自己的結果；可以掛在案件裡，也可以不開案件直接設定結果。
 message Report {
-  reserved 10 to 15, 19, 21;
-  reserved "status", "severity", "acknowledge_due_time", "acknowledge_time", "acknowledged_by_admin_id", "investigate_time", "fda_referral", "cooperation_requests";
-  reserved 30;
-  reserved "triage_due_time";
 
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   string store_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 店名；個資清理之後沒有店名時是空字串，client 顯示店家 ID。
-  string store_name = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string store_name = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 空字串表示沒有提供。
-  string product_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string product_id = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 空字串表示沒有提供。
-  string order_no = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string order_no = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 檢舉人選的類別：政策分類中檢舉人可選的值（不含 PLATFORM_ABUSE）。
-  hawkr.common.v1alpha1.PolicyCategory category = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
-  string description = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.PolicyCategory category = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string description = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 登入的檢舉人（買家 id）；匿名檢舉是空字串。
-  string reporter_buyer_id = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string reporter_buyer_id = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 匿名檢舉人的聯絡方式；登入的檢舉人、聯絡方式已清除時不設。只有 GetReport 帶（ListReports 不帶個資）。
-  ReporterContact contact = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  ReporterContact contact = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 匿名檢舉人的聯絡方式被清除的時間；沒有清除時不設。
-  google.protobuf.Timestamp contact_erase_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp contact_erase_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 此刻的處理狀態。
-  ReportState state = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
+  ReportState state = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 所在的案件；沒有案件時是空字串。
-  string case_id = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string case_id = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 平台判定類別，等於案件的類別；沒有案件時是 UNSPECIFIED。
-  hawkr.common.v1alpha1.PolicyCategory assessed_category = 27 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.PolicyCategory assessed_category = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 第一次分案的時間，移動不改；沒有分案過時不設。
-  google.protobuf.Timestamp triage_time = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
-  string triaged_by_admin_id = 29 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp triage_time = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string triaged_by_admin_id = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 結果；還沒有結果時是 UNSPECIFIED。
-  hawkr.seller.v1alpha1.ReportOutcome outcome = 31 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.seller.v1alpha1.ReportOutcome outcome = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 結果設定的時間；還沒有結果時不設。
-  google.protobuf.Timestamp resolve_time = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
-  string resolved_by_admin_id = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp resolve_time = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string resolved_by_admin_id = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 給檢舉人的結果說明；沒有時是空字串。
-  string resolution_note = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string resolution_note = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 佐證，原通報與補充的都在這裡（依位置）；只有 GetReport 帶。
   repeated Evidence evidence = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 補充，舊到新；只有 GetReport 帶。
-  repeated ReportSupplement supplements = 32 [(google.api.field_behavior) = OUTPUT_ONLY];
-  int32 supplement_count = 33 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated ReportSupplement supplements = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 supplement_count = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 最新一則補充的時間；沒有補充時不設。
-  google.protobuf.Timestamp latest_supplement_time = 34 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp latest_supplement_time = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 補充已達上限、內容沒有存下的匿名送出次數。
-  int32 discarded_submission_count = 35 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 discarded_submission_count = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 通報的版本；補充、分案、設定結果與移動都讓它前進。
-  string etag = 36;
+  string etag = 25;
   // 此刻可以分案。
-  bool can_triage = 37 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_triage = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 此刻可以設定結果；等於 available_outcomes 不為空。
-  bool can_resolve = 38 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_resolve = 27 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 此刻可以設定的結果，順序固定：已採取措施、未違規、內容不足、重複、濫報；每個結果帶設定之後會不會否定這筆通報（client 不自己對應）。
-  repeated OutcomeOption available_outcomes = 39 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated OutcomeOption available_outcomes = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 此刻可以移到其他案件。
-  bool can_move = 40 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_move = 29 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 此刻可以當認定的來源（結果不是未違規、內容不足或濫報，而且店家沒有關閉）。建立措施的來源通報選項看它，client 不自己看狀態。
-  bool can_cite_as_source = 41 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_cite_as_source = 30 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 生效的類別：在案件裡的是平台判定類別（assessed_category），其他是檢舉人選的類別（category）。ListReports 的 category 篩選用的就是它。
-  hawkr.common.v1alpha1.PolicyCategory effective_category = 42 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.PolicyCategory effective_category = 31 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 有補充是管理員還沒看過的：這筆通報還沒有結果，而且存在編號比「管理員看過的最新補充」更大的補充（分案、移動與 MarkReportSupplementsSeen 會記下看過的編號；
   // 比編號不比時間，不依賴時鐘）。有了結果的通報不再提醒。補充不改案件的 etag，所以案件頁與通報頁都看這個標示提醒。
   // 讀取（GetReport）、設定結果、結案時帶入的預設結果、改案件嚴重度都不記。
-  bool has_unseen_supplements = 43 [(google.api.field_behavior) = OUTPUT_ONLY];
-  reserved 44;
-  reserved "supplements_seen_time";
+  bool has_unseen_supplements = 32 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 分案與移動時每個平台判定類別的去處，只有 GetReport 帶，而且只在 can_triage 或 can_move 時有值：每個可判定的類別一筆（移動時不含目前的類別），
   // 順序同政策分類。client 依它顯示「加入案件（嚴重度）」或「開新案件」，並把選的去處原樣放進請求（TriageReportRequest.target、MoveReportRequest.target）。
-  repeated TriageTarget triage_targets = 45 [(google.api.field_behavior) = OUTPUT_ONLY];
-  google.protobuf.Timestamp create_time = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
-  google.protobuf.Timestamp update_time = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated TriageTarget triage_targets = 33 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 34 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 35 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 分案的期限，只在待分案時設：開始時間是通報的建立時間，期限依審閱政策（檢舉人選了食安的 4 小時，其他類別 72 小時）。
-  hawkr.common.v1alpha1.Deadline triage_deadline = 46 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.Deadline triage_deadline = 36 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // ReportSupplement 是同一位檢舉人在去重期間內再次送出、併入原通報的內容；只新增，每筆通報最多 10 則。
@@ -377,10 +378,6 @@ message ReportSupplement {
 // Case 是後台的案件：同一家店、同一個平台判定類別，同時最多一個進行中的案件。嚴重度在開案時設定，之後只經 ChangeCaseSeverity 修改；
 // 決定即結案；通報都移走時以 NO_REPORTS 自動關閉。
 message Case {
-  reserved 19;
-  reserved "has_new_supplements";
-  reserved 16, 26, 27, 32 to 34, 36;
-  reserved "fda_referral", "can_record_fda_referral", "can_export_fda", "fda_referral_waiver", "can_waive_fda_referral", "can_record_fda_referral_reply", "fda_referral_deadline";
 
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   string store_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -404,32 +401,32 @@ message Case {
   // 還沒有結果的通報數：結案時會帶入預設結果的筆數。
   int32 unresolved_report_count = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 移入與移出這個案件的移動，舊到新；只有 GetCase 帶。
-  repeated ReportMove moves = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated ReportMove moves = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 上一次處理的時間：成員進出、成員有了結果、改嚴重度、詢問的建立與回覆與撤回、結案。補充、註記與措施的建立或撤銷不改它（它不再用來判斷補充有沒有看過）。
-  google.protobuf.Timestamp update_time = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 案件的版本；成員進出、成員有了結果、改嚴重度、決定、自動關閉與詢問的建立、記下回覆、撤回都讓它前進，補充、註記與措施不會。
-  string etag = 20;
+  string etag = 18;
   // 此刻可以決定；等於 decision_options 不為空。進行中的案件一定是 true（每個進行中的案件至少有一個可以選的決定）。
-  bool can_decide = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_decide = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 此刻可以選的決定，順序固定：採取措施、不採取措施。
-  repeated DecisionOption decision_options = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
-  bool can_change_severity = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated DecisionOption decision_options = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_change_severity = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 案件進行中：新的措施可以記它為來源案件（終止合作的入口另看 GetStore.can_create_termination）。
-  bool can_link_measure = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_link_measure = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
   // can_link_measure 而且店家沒有關閉（警告、停權與風險措施要開著的店）。
-  bool can_create_measure = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_create_measure = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 成員裡有補充還沒被管理員看過的通報數（該成員的 Report.has_unseen_supplements 為 true 的筆數）。補充不改案件的 etag，改由這個數字提醒結案前先看過；
   // 要知道是哪幾筆看成員通報的 has_unseen_supplements。
-  int32 unseen_supplement_report_count = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 unseen_supplement_report_count = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 有還沒結束的詢問（等賣家，推導）；這時案件不在「待決定」。結案會撤回它。
-  bool awaiting_seller = 29 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool awaiting_seller = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
   // awaiting_seller 時那一筆詢問的 ID；否則是空字串。
-  string open_inquiry_id = 30 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string open_inquiry_id = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 此刻可以對賣家發詢問：案件進行中、店家的個資還沒清除、沒有還沒結束的詢問。
-  bool can_create_inquiry = 31 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_create_inquiry = 27 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 決定的期限，只在待決定時設（進行中而且沒有還沒結束的詢問）：開始時間是開案，或最後一筆詢問被回覆或被管理員撤回的時間，期限依嚴重度
   // （嚴重 24 小時、高 72 小時、中 7 天、低 14 天）。
-  hawkr.common.v1alpha1.Deadline decide_deadline = 35 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.Deadline decide_deadline = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // OutcomeOption 是一個可以設定的結果；形狀同 DecisionOption：伺服器帶出結果對這筆通報的影響，client 不自己對應。
@@ -491,22 +488,20 @@ message ReportMove {
 }
 
 message ListReportsRequest {
-  reserved 3;
-  reserved "status";
 
   // 每頁筆數：0 用預設值 20，上限 100。
   int32 page_size = 1;
   string page_token = 2;
   // 只列這個生效的類別的通報：在案件裡的是平台判定類別，其他是檢舉人選的類別；UNSPECIFIED 不篩選。
-  hawkr.common.v1alpha1.PolicyCategory category = 4;
+  hawkr.common.v1alpha1.PolicyCategory category = 3;
   // 只列這家店的通報；空字串不篩選。
-  string store_id = 5;
+  string store_id = 4;
   // 只列這個處理狀態的通報；UNSPECIFIED 不篩選。
-  ReportState state = 6;
+  ReportState state = 5;
   // 只列這個案件的通報；空字串不篩選。排序：state 是 AWAITING_TRIAGE 或設了 case_id 時依建立時間舊到新（兩者都設時一樣，結果是交集），其他新到舊。
-  string case_id = 7;
+  string case_id = 6;
   // true 時只列此刻可以當認定的來源的通報（Report.can_cite_as_source 為 true）；false 不篩選。建立措施預填來源通報用。
-  bool citable_as_source = 8;
+  bool citable_as_source = 7;
 }
 
 message ListReportsResponse {
@@ -534,14 +529,12 @@ message MarkReportSupplementsSeenResponse {
 }
 
 message TriageReportRequest {
-  reserved 3;
-  reserved "severity";
 
   string id = 1 [(google.api.field_behavior) = REQUIRED];
   // 平台判定類別：政策分類中平台判定與認定可用的值，OTHER 不行（OTHER 只給檢舉人選）；UNSPECIFIED 與 OTHER 回 invalid_argument。
   hawkr.common.v1alpha1.PolicyCategory assessed_category = 2 [(google.api.field_behavior) = REQUIRED];
   // 去處：取自 Report.triage_targets 對應類別的那一筆（有 case_id 就 join，沒有就 open_new 並選嚴重度）。必填；嚴重度以案件為準，要改請用 ChangeCaseSeverity。
-  CaseTarget target = 5 [(google.api.field_behavior) = REQUIRED];
+  CaseTarget target = 3 [(google.api.field_behavior) = REQUIRED];
   // 讀到的通報的 etag。
   string etag = 4 [(google.api.field_behavior) = REQUIRED];
 }
@@ -565,14 +558,12 @@ message ResolveReportResponse {
 }
 
 message MoveReportRequest {
-  reserved 3;
-  reserved "severity";
 
   string id = 1 [(google.api.field_behavior) = REQUIRED];
   // 新的平台判定類別，必須和目前的不同；子集同 TriageReportRequest.assessed_category。
   hawkr.common.v1alpha1.PolicyCategory assessed_category = 2 [(google.api.field_behavior) = REQUIRED];
   // 規則同 TriageReportRequest.target。
-  CaseTarget target = 5 [(google.api.field_behavior) = REQUIRED];
+  CaseTarget target = 3 [(google.api.field_behavior) = REQUIRED];
   // 讀到的通報的 etag。
   string etag = 4 [(google.api.field_behavior) = REQUIRED];
 }
@@ -698,30 +689,28 @@ message WithdrawCaseInquiryResponse {
 }
 
 message CreateMeasureRequest {
-  reserved 3, 5, 6, 8, 9, 10;
-  reserved "kind", "end_time", "review_by", "violation", "risk";
 
   // 選填，UUIDv4：同一位管理員的重送用它辨識。同樣的 request_id 與同樣的內容回傳原本的措施（目前的狀態與 etag）；內容不同回
   // invalid_argument。請求的內容在措施建立之後不論店家、認定、期限怎麼變，重送都先於這些檢查。
   string request_id = 1 [(google.api.field_info).format = UUID4];
   string store_id = 2 [(google.api.field_behavior) = REQUIRED];
   // 給賣家的理由，1 到 2000 字。
-  string statement = 4 [(google.api.field_behavior) = REQUIRED];
+  string statement = 3 [(google.api.field_behavior) = REQUIRED];
   // 第一則內部註記，1 到 2000 字。
-  string note = 7 [(google.api.field_behavior) = REQUIRED];
+  string note = 4 [(google.api.field_behavior) = REQUIRED];
   // 措施的種類：設定的是哪一支就是哪一種，必須設定其中一支。各種類專屬的欄位在那一支裡面，所以不會有跨欄位的種類對應。
   oneof measure {
-    WarningInput warning = 11;
-    SuspensionInput suspension = 12;
-    TerminationInput termination = 13;
-    ContentTakedownInput content_takedown = 16;
+    WarningInput warning = 5;
+    SuspensionInput suspension = 6;
+    TerminationInput termination = 7;
+    ContentTakedownInput content_takedown = 8;
   }
   // 選填：從案件建立時帶案件 id。任何種類與依據都可以帶；措施的店家必須是案件的店家（invalid_argument），案件必須進行中（failed_precondition）。
   // 之後這個措施算是案件導出的措施（ListMeasuresRequest.source_case_id）。同一個 request_id 帶不同的案件是不同的請求。
-  string source_case_id = 14;
+  string source_case_id = 9;
   // 選填：從主管機關來函建立時帶來函 id。任何種類與依據都可以帶；來函必須指名這個措施的帳號（invalid_argument；指名店家時只算那一家）。
   // 來函已完成也可以。之後這個措施算是來函導出的措施（ListMeasuresRequest.source_authority_order_id）。同一個 request_id 帶不同的來函是不同的請求。
-  string source_authority_order_id = 15;
+  string source_authority_order_id = 10;
 }
 
 // WarningInput 是警告：依據違規的認定，沒有結束時間。
@@ -808,22 +797,20 @@ message ListMeasuresRequest {
   hawkr.seller.v1alpha1.MeasureState state = 5;
   // 只列這個依據的措施；UNSPECIFIED 不篩選。
   hawkr.seller.v1alpha1.MeasureBasis basis = 6;
-  reserved 7, 9;
-  reserved "appeal_state", "remediation_state";
   // true 只列複審中的措施：RISK、生效中、現在不早於 review_by 前 24 小時（與 Measure.review_deadline 同一個定義，review_by 過了之後仍在），依 review_by 舊到新；false 與不設不篩選。
-  bool review_due = 8;
+  bool review_due = 7;
   // 只列有任一筆請求（申覆或解除請求，一個措施可以有多筆不同狀態的）是這個狀態的措施，狀態是伺服器推導的 MeasureRequest.state：措施已不在
   // 生效中而仍待處理的解除請求算 CLOSED，不算 PENDING。PENDING 是待處理請求的收件匣，依請求提出時間舊到新（優先序在 review_due 之後）；
   // UNSPECIFIED 不篩選。
-  hawkr.seller.v1alpha1.MeasureRequestState request_state = 10;
+  hawkr.seller.v1alpha1.MeasureRequestState request_state = 8;
   // 只列有任一筆這個種類且（有 request_state 時）符合該狀態的請求的措施；UNSPECIFIED 不篩選種類。
-  hawkr.seller.v1alpha1.MeasureRequestKind request_kind = 11;
+  hawkr.seller.v1alpha1.MeasureRequestKind request_kind = 9;
   // 只列這個案件導出的措施：source_case_id 是這個案件，或依據的認定（含引用的既有認定）以這個案件的通報為來源；空字串不篩選。
-  string source_case_id = 12;
+  string source_case_id = 10;
   // 只列依據的認定（含引用的既有認定）以這筆通報為來源的措施；空字串不篩選。設定結果的對話框用它提示「這筆通報已是措施的依據來源」。
-  string source_report_id = 13;
+  string source_report_id = 11;
   // 只列這份來函導出的措施：source_authority_order_id 是它，或依據的認定（含引用的既有認定）引用了它；空字串不篩選。
-  string source_authority_order_id = 14;
+  string source_authority_order_id = 12;
 }
 
 message ListMeasuresResponse {
@@ -879,6 +866,15 @@ message ScheduleMeasureReviewRequest {
 message ScheduleMeasureReviewResponse {
   Measure measure = 1;
 }
+
+message MarkLinkedAccountReviewedRequest {
+  // 措施的 id。
+  string measure_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 關聯帳號的 id（LinkedAccount.account_id）。
+  string account_id = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message MarkLinkedAccountReviewedResponse {}
 
 message DecideAppealRequest {
   // 措施的 id。

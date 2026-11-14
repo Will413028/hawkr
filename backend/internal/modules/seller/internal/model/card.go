@@ -6,7 +6,7 @@ type CardStatus string
 const (
 	// CardOpen 營業中：此刻可以公開曝光（Exposable），所以有公開的店面頁、可以被追蹤。
 	CardOpen CardStatus = "OPEN"
-	// CardPaused 暫停：沒有關閉，但此刻不可公開曝光（停權、等待刪除、PayUni 被拒絕、身分認證改回草稿、缺店名、logo 或所在地）。
+	// CardPaused 暫停：沒有關閉，但此刻不可公開曝光（停權、等待刪除、申請未核准、收款帳戶未啟用、缺店名、logo 或所在地）。
 	CardPaused CardStatus = "PAUSED"
 	// CardClosed 已關閉。
 	CardClosed CardStatus = "CLOSED"

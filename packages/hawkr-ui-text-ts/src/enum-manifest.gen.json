@@ -169,13 +169,6 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.admin.seller.v1alpha1.PayUniObservationSource",
-      "tsName": "PayUniObservationSource",
-      "tsModule": "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
       "name": "hawkr.admin.seller.v1alpha1.ProspectMatchReason",
       "tsName": "ProspectMatchReason",
       "tsModule": "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/prospect_pb",
@@ -295,6 +288,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.identity.v1alpha1.ContactEmailSource",
+      "tsName": "ContactEmailSource",
+      "tsModule": "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState",
       "tsName": "DeleteAccountResponse_DeletionState",
       "tsModule": "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb",
@@ -313,6 +313,27 @@
       "tsName": "Role",
       "tsModule": "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb",
       "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime",
+      "tsName": "EmbeddedOnboardingRuntime",
+      "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentAccountStatus",
+      "tsName": "PaymentAccountStatus",
+      "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.RequirementCollection",
+      "tsName": "RequirementCollection",
+      "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
+      "inCatalog": true,
       "serverOwned": false
     },
     {
@@ -344,13 +365,6 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.seller.v1alpha1.KYCFlowStatus",
-      "tsName": "KYCFlowStatus",
-      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
-      "inCatalog": true,
-      "serverOwned": false
-    },
-    {
       "name": "hawkr.seller.v1alpha1.KYCIssueCode",
       "tsName": "KYCIssueCode",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
@@ -358,17 +372,10 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.seller.v1alpha1.KYCResubmitUnavailableReason",
-      "tsName": "KYCResubmitUnavailableReason",
-      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
-      "inCatalog": false,
-      "serverOwned": true
-    },
-    {
       "name": "hawkr.seller.v1alpha1.KYCStatus",
       "tsName": "KYCStatus",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
@@ -414,17 +421,31 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.seller.v1alpha1.PayUniBindStatus",
-      "tsName": "PayUniBindStatus",
+      "name": "hawkr.seller.v1alpha1.OnboardingAction",
+      "tsName": "OnboardingAction",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
       "inCatalog": false,
       "serverOwned": false
     },
     {
-      "name": "hawkr.seller.v1alpha1.PayUniState",
-      "tsName": "PayUniState",
+      "name": "hawkr.seller.v1alpha1.OnboardingReturnDestination",
+      "tsName": "OnboardingReturnDestination",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
-      "inCatalog": true,
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.OnboardingTaskId",
+      "tsName": "OnboardingTaskId",
+      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.OnboardingTaskState",
+      "tsName": "OnboardingTaskState",
+      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
+      "inCatalog": false,
       "serverOwned": false
     },
     {

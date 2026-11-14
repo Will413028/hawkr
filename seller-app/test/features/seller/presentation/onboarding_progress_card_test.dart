@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart';
+import 'package:hawkr_seller/core/l10n/ui_locale.dart';
 import 'package:hawkr_seller/core/networking/connect_provider.dart';
 import 'package:hawkr_seller/core/refresh/refresh_clock.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
@@ -16,12 +19,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../support/fake_my_store.dart';
+import '../../../support/onboarding_fixtures.dart';
 import '../../../support/my_store_fixtures.dart';
 
-const _name = SellerRequirement.SELLER_REQUIREMENT_STORE_NAME;
+const _kyc = SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE;
 const _logo = SellerRequirement.SELLER_REQUIREMENT_LOGO;
-const _kyc = SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED;
-const _notSuspended = SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED;
+
+const _profile = OnboardingTaskId.ONBOARDING_TASK_ID_PROFILE;
+const _review = OnboardingTaskId.ONBOARDING_TASK_ID_PLATFORM_REVIEW;
+const _payment = OnboardingTaskId.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT;
+const _completed = OnboardingTaskState.ONBOARDING_TASK_STATE_COMPLETED;
+const _actionRequired =
+    OnboardingTaskState.ONBOARDING_TASK_STATE_ACTION_REQUIRED;
+const _inProgress = OnboardingTaskState.ONBOARDING_TASK_STATE_IN_PROGRESS;
+const _locked = OnboardingTaskState.ONBOARDING_TASK_STATE_LOCKED;
+
+const _internalText = '內部錯誤（測試句）';
 
 class _LoggedIn extends Session {
   @override
@@ -33,7 +46,10 @@ Future<GoRouter> _pump(
   WidgetTester tester, {
   required List<SellerRequirement> missing,
   List<SellerRequirement> shippingMissing = const [],
-  Object? kyc,
+  Object? summary,
+  Object? refresh,
+  Completer<void>? summaryGate,
+  List<String>? calls,
   OnboardingInputs inputs = const OnboardingInputs(),
   String description = '',
 }) async {
@@ -47,15 +63,28 @@ Future<GoRouter> _pump(
   final container = ProviderContainer(
     overrides: [
       sessionProvider.overrideWith(_LoggedIn.new),
+      defaultErrorTextProvider.overrideWithValue(
+        (code) => code == Code.internal ? _internalText : '其他錯誤',
+      ),
       myStoreRepositoryProvider.overrideWithValue(server.repository),
       onboardingInputsProvider.overrideWith((ref) async => inputs),
       sellerClientProvider.overrideWithValue(
         SellerAppServiceClient(
-          FakeTransportBuilder().unary(SellerAppService.getMyKYC, (_, _) {
-            final answer = kyc;
-            if (answer is ConnectException) throw answer;
-            return answer as GetMyKYCResponse;
-          }).build(),
+          FakeTransportBuilder()
+              .unary(SellerAppService.getMyOnboarding, (_, _) async {
+                calls?.add('getMyOnboarding');
+                await summaryGate?.future;
+                final answer = summary;
+                if (answer is ConnectException) throw answer;
+                return answer as GetMyOnboardingResponse;
+              })
+              .unary(SellerAppService.refreshMyPaymentAccount, (_, _) {
+                calls?.add('refreshMyPaymentAccount');
+                final answer = refresh;
+                if (answer is ConnectException) throw answer;
+                return RefreshMyPaymentAccountResponse();
+              })
+              .build(),
         ),
       ),
     ],
@@ -85,10 +114,8 @@ Future<GoRouter> _pump(
           body: Column(children: [const Text('認證頁'), Text('uri:${state.uri}')]),
         ),
       ),
-      GoRoute(
-        path: '/seller/suspension-notice',
-        builder: (_, _) => page('停權說明頁'),
-      ),
+      GoRoute(path: '/settings/help', builder: (_, _) => page('說明頁')),
+      GoRoute(path: '/main/settings', builder: (_, _) => page('商店設定頁')),
       GoRoute(path: '/settings/shipping', builder: (_, _) => page('物流設定頁')),
     ],
   );
@@ -103,52 +130,90 @@ Future<GoRouter> _pump(
   return router;
 }
 
-GetMyKYCResponse _flow(KYCFlowStatus status) => GetMyKYCResponse(
-  application: KYCApplication(flow: KYCFlow(status: status)),
-);
-
 void main() {
-  testWidgets('兩組任務：公開前必須與建議完成，文字照 website', (tester) async {
+  testWidgets('兩組任務：公開前必須的標題、狀態句、按鈕取自伺服器與目錄，建議完成由 client 組', (tester) async {
     await _pump(
       tester,
       missing: [_logo, _kyc],
       shippingMissing: [_kyc],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED),
+      summary: onboardingSummary([
+        serverTask(
+          _profile,
+          _actionRequired,
+          action: OnboardingAction.ONBOARDING_ACTION_EDIT_PROFILE,
+          title: '商店資料',
+          status: '缺少：logo',
+        ),
+        serverTask(
+          _review,
+          _inProgress,
+          action: OnboardingAction.ONBOARDING_ACTION_NONE,
+          title: '平台審核',
+          status: '審核中',
+        ),
+        serverTask(_payment, _locked, title: '收款帳戶', status: '平台審核通過後開放設定'),
+      ]),
     );
 
     expect(find.text('賣家開店任務'), findsOneWidget);
     expect(find.text('開店進度'), findsOneWidget);
-    expect(find.text('0/2'), findsOneWidget);
+    expect(find.text('0/3'), findsOneWidget);
     expect(find.text('公開前必須'), findsOneWidget);
     expect(find.text('建議完成'), findsOneWidget);
     expect(find.text('缺少：logo'), findsOneWidget);
-    expect(find.text('平台審核中'), findsOneWidget);
-    expect(find.text('查看進度'), findsOneWidget);
+    expect(find.text('店名、logo 與所在地。'), findsOneWidget);
+    expect(find.text('商家資料與統編的平台審核。'), findsOneWidget);
+    expect(find.text('向金流商設定身分與銀行資料。'), findsOneWidget);
+    expect(find.text('審核中'), findsWidgets);
+    expect(find.text('平台審核通過後開放設定'), findsOneWidget);
     expect(find.text('需先通過認證'), findsOneWidget);
-    expect(find.text('停權處分'), findsNothing);
     expect(find.text('收合'), findsOneWidget);
+    expect(
+      find.text('前往商家認證'),
+      findsNothing,
+      reason: 'IN_PROGRESS 且 action 是 NONE 沒有按鈕',
+    );
   });
 
-  testWidgets('缺停權條件時多一列停權處分，導向停權說明', (tester) async {
+  testWidgets('沒有摘要（讀取失敗）：沒有必要任務，也不自己推導；顯示預設錯誤句，不顯示 0/0 與任務完成', (tester) async {
     await _pump(
       tester,
-      missing: [_notSuspended],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_APPROVED),
+      missing: [_logo, _kyc],
+      summary: ConnectException(Code.unavailable, 'later'),
     );
 
-    expect(find.text('停權處分'), findsOneWidget);
-    expect(find.text('停權中'), findsOneWidget);
-    await tester.tap(find.text('查看停權說明'));
-    await tester.pumpAndSettle();
-    expect(find.text('停權說明頁'), findsOneWidget);
+    expect(find.text('公開前必須'), findsOneWidget);
+    expect(find.text(_internalText), findsOneWidget);
+    expect(find.text('載入中…'), findsNothing);
+    expect(find.text('平台審核'), findsNothing);
+    expect(find.text('建議完成'), findsOneWidget);
+    expect(find.text('0/0'), findsNothing);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text('任務完成'), findsNothing);
+  });
+
+  testWidgets('摘要讀取中：顯示「載入中…」，不顯示 0/0、進度條與任務完成', (tester) async {
+    final gate = Completer<void>();
+    addTearDown(() {
+      if (!gate.isCompleted) gate.complete();
+    });
+    await _pump(
+      tester,
+      missing: [_logo, _kyc],
+      summaryGate: gate,
+      summary: completedSummary(),
+    );
+
+    expect(find.text('公開前必須'), findsOneWidget);
+    expect(find.text('載入中…'), findsOneWidget);
+    expect(find.text(_internalText), findsNothing);
+    expect(find.text('0/0'), findsNothing);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text('任務完成'), findsNothing);
   });
 
   testWidgets('公開前必須全部完成時預設收合，可以展開', (tester) async {
-    await _pump(
-      tester,
-      missing: const [],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_APPROVED),
-    );
+    await _pump(tester, missing: const [], summary: completedSummary());
 
     expect(find.text('任務完成'), findsOneWidget);
     expect(find.text('展開任務'), findsOneWidget);
@@ -161,12 +226,26 @@ void main() {
     expect(find.text('收合'), findsOneWidget);
   });
 
+  testWidgets('摘要是 UNKNOWN 的任務不算完成', (tester) async {
+    await _pump(
+      tester,
+      missing: const [],
+      summary: onboardingSummary([
+        serverTask(_profile, OnboardingTaskState.ONBOARDING_TASK_STATE_UNKNOWN),
+        serverTask(_review, _completed),
+      ]),
+    );
+
+    expect(find.text('任務完成'), findsNothing);
+    expect(find.text('1/2'), findsOneWidget);
+  });
+
   testWidgets('SHIPPING_SETUP 沒有啟用時物流設定鎖定，按鈕點不了', (tester) async {
     await _pump(
       tester,
       missing: [_kyc],
       shippingMissing: [_kyc],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_DRAFT),
+      summary: reviewPendingSummary(),
     );
 
     final button = tester.widget<TextButton>(
@@ -178,11 +257,7 @@ void main() {
   testWidgets('PUBLIC_LISTING 還缺 KYC 但 SHIPPING_SETUP 啟用：物流設定可以進入', (
     tester,
   ) async {
-    await _pump(
-      tester,
-      missing: [_kyc],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_DRAFT),
-    );
+    await _pump(tester, missing: [_kyc], summary: reviewPendingSummary());
     final button = tester.widget<TextButton>(
       find.widgetWithText(TextButton, '設定物流'),
     );
@@ -190,11 +265,7 @@ void main() {
   });
 
   testWidgets('SHIPPING_SETUP 啟用時物流設定可以進入', (tester) async {
-    await _pump(
-      tester,
-      missing: const [],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_APPROVED),
-    );
+    await _pump(tester, missing: const [], summary: completedSummary());
     await tester.tap(find.text('展開任務'));
     await tester.pumpAndSettle();
 
@@ -205,50 +276,78 @@ void main() {
   });
 
   testWidgets('還沒通過認證也能新增商品，不經過認證流程', (tester) async {
-    await _pump(
-      tester,
-      missing: [_kyc],
-      kyc: ConnectException(Code.notFound, 'none'),
-    );
+    await _pump(tester, missing: [_kyc], summary: reviewPendingSummary());
 
-    expect(find.text('待認證'), findsOneWidget);
     await tester.tap(find.text('新增商品'));
     await tester.pumpAndSettle();
     expect(find.text('商品選擇頁'), findsOneWidget);
     expect(find.text('認證頁'), findsNothing);
   });
 
-  testWidgets('認證列的按鈕依流程狀態，進入認證頁', (tester) async {
-    await _pump(
-      tester,
-      missing: [_name, _kyc],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO),
-    );
+  testWidgets('SUBMIT_CERTIFICATION 的按鈕進入認證頁；鎖定的收款帳戶沒有按鈕', (tester) async {
+    await _pump(tester, missing: [_kyc], summary: reviewPendingSummary());
 
-    expect(find.text('需補件'), findsOneWidget);
-    expect(find.text('前往補件'), findsOneWidget);
-    await tester.tap(find.text('前往補件').first);
+    expect(find.text('前往設定收款帳戶'), findsNothing);
+    await tester.tap(find.text('前往商家認證'));
     await tester.pumpAndSettle();
     expect(find.text('認證頁'), findsOneWidget);
   });
 
-  testWidgets('讀不到認證狀態時顯示「未知」，不顯示成待認證', (tester) async {
+  testWidgets('START_PAYMENT_ONBOARDING 的按鈕進入認證頁；已完成的平台審核沒有按鈕', (tester) async {
+    await _pump(tester, missing: [_kyc], summary: paymentPendingSummary());
+
+    expect(find.text('前往商家認證'), findsNothing);
+    await tester.tap(find.text('前往設定收款帳戶'));
+    await tester.pumpAndSettle();
+    expect(find.text('認證頁'), findsOneWidget);
+  });
+
+  testWidgets('EDIT_PROFILE 的按鈕去商店設定頁；CONTACT_SUPPORT 的按鈕去說明頁', (tester) async {
+    await _pump(
+      tester,
+      missing: [_logo],
+      summary: onboardingSummary([
+        serverTask(
+          _profile,
+          _actionRequired,
+          action: OnboardingAction.ONBOARDING_ACTION_EDIT_PROFILE,
+        ),
+        serverTask(
+          _review,
+          _actionRequired,
+          action: OnboardingAction.ONBOARDING_ACTION_CONTACT_SUPPORT,
+        ),
+      ]),
+    );
+
+    await tester.tap(find.text('聯絡客服'));
+    await tester.pumpAndSettle();
+    expect(find.text('說明頁'), findsOneWidget);
+  });
+
+  testWidgets('進行中的收款帳戶任務（NONE）沒有任何按鈕，也沒有「重新整理」', (tester) async {
+    final calls = <String>[];
     await _pump(
       tester,
       missing: [_kyc],
-      kyc: ConnectException(Code.unavailable, 'later'),
+      calls: calls,
+      summary: onboardingSummary([
+        serverTask(_profile, _completed),
+        serverTask(_review, _completed),
+        serverTask(_payment, _inProgress),
+      ]),
     );
 
-    expect(find.text('待認證'), findsNothing);
-    expect(find.text('未知'), findsOneWidget);
-    expect(find.text('開始認證'), findsWidgets);
+    expect(find.text('重新整理'), findsNothing);
+    expect(find.byType(FilledButton), findsNothing);
+    expect(calls, isNot(contains('refreshMyPaymentAccount')));
   });
 
   testWidgets('商品數與商店介紹讓建議項目完成', (tester) async {
     await _pump(
       tester,
       missing: const [],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_APPROVED),
+      summary: completedSummary(),
       inputs: const OnboardingInputs(productCount: 2),
       description: '產地直送',
     );
@@ -257,7 +356,6 @@ void main() {
 
     expect(find.text('已上架'), findsOneWidget);
     expect(find.text('待完成'), findsNothing);
-    expect(find.text('已完成'), findsNWidgets(2));
   });
 
   testWidgets('點任務去錢包：離開時不重讀，回到儀表板（成為可見）時重讀一次', (tester) async {
@@ -280,9 +378,17 @@ void main() {
         }),
         sellerClientProvider.overrideWithValue(
           SellerAppServiceClient(
-            FakeTransportBuilder().unary(SellerAppService.getMyKYC, (_, _) {
-              return _flow(KYCFlowStatus.KYC_FLOW_STATUS_DRAFT);
-            }).build(),
+            FakeTransportBuilder()
+                .unary(SellerAppService.getMyKYC, (_, _) {
+                  throw ConnectException(Code.notFound, 'none');
+                })
+                .unary(SellerAppService.getMyPaymentAccount, (_, _) {
+                  throw ConnectException(Code.notFound, 'none');
+                })
+                .unary(SellerAppService.getMyOnboarding, (_, _) {
+                  return reviewPendingSummary();
+                })
+                .build(),
           ),
         ),
       ],
@@ -336,7 +442,7 @@ void main() {
     final storeBefore = server.calls;
     final inputsBefore = inputsBuilds;
 
-    await tester.tap(find.text('開始認證').first);
+    await tester.tap(find.text('前往商家認證').first);
     await tester.pumpAndSettle();
     expect(find.text('錢包頁'), findsOneWidget);
     expect(server.calls, storeBefore, reason: '離開時不重讀');
@@ -347,7 +453,7 @@ void main() {
     expect(server.calls, storeBefore + 1, reason: '回來重讀一次');
     expect(inputsBuilds, inputsBefore + 1);
 
-    await tester.tap(find.text('開始認證').first);
+    await tester.tap(find.text('前往商家認證').first);
     await tester.pumpAndSettle();
     now = now.add(const Duration(seconds: 29));
     router.go('/main/dashboard');
@@ -355,7 +461,7 @@ void main() {
     expect(server.calls, storeBefore + 1, reason: '店家與認證 30 秒內讀過，不再讀');
     expect(inputsBuilds, inputsBefore + 2, reason: '物流與商品數每次回來都重讀');
 
-    await tester.tap(find.text('開始認證').first);
+    await tester.tap(find.text('前往商家認證').first);
     await tester.pumpAndSettle();
     now = now.add(const Duration(seconds: 2));
     router.go('/main/dashboard');

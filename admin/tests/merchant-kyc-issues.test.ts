@@ -2,12 +2,10 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test from "node:test";
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
-import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
 	type KYCApplication,
 	KYCApplicationSchema,
 	KYCReviewAction,
-	RevealKYCSensitiveResponseSchema,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
 import {
 	KYCField,
@@ -30,7 +28,6 @@ import {
 	kycIssueCodeLabel,
 	REJECT_TEXT_MAX,
 	type ReviewDraft,
-	revealFrom,
 	serverIssueView,
 	validateIssueDraft,
 	validateRejectDraft,
@@ -67,23 +64,15 @@ const noop = () => {};
 const COMPANY = KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS;
 
 /** 伺服器給的可指出問題的欄位（model.IssuableFields，依 KYCField 數字順序）；測試只模擬它的輸出，不自己推規則。 */
-const SHARED_FIELDS = [
-	KYCField.KYC_FIELD_REAL_NAME,
-	KYCField.KYC_FIELD_BIRTH_DATE,
-	KYCField.KYC_FIELD_ID_CARD_FRONT,
-	KYCField.KYC_FIELD_ID_CARD_BACK,
-	KYCField.KYC_FIELD_BANK_BOOK,
-	KYCField.KYC_FIELD_PRODUCT_TYPE,
-];
 const INDIVIDUAL_ISSUABLE = [
-	...SHARED_FIELDS,
-	KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO,
+	KYCField.KYC_FIELD_PRODUCT_TYPE,
+	KYCField.KYC_FIELD_WEBSITE_URL,
 ];
 const BUSINESS_ISSUABLE = [
-	...SHARED_FIELDS,
+	KYCField.KYC_FIELD_PRODUCT_TYPE,
 	KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME,
 	KYCField.KYC_FIELD_BUSINESS_TAX_ID,
-	KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO,
+	KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE,
 	KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
 ];
 
@@ -94,8 +83,7 @@ function individual(
 		id: "app1",
 		status: KYCStatus.KYC_STATUS_SUBMITTED,
 		etag: "etag-1",
-		realName: "王小明",
-		subject: { case: "individual", value: { idCardNoMasked: "A12****789" } },
+		subject: { case: "individual", value: {} },
 		issuableFields: INDIVIDUAL_ISSUABLE,
 		...patch,
 	});
@@ -114,30 +102,14 @@ function business(
 	});
 }
 
-const EXPIRE = new Date("2026-10-11T05:00:00Z");
-
-function reveal(
-	documents: MessageInitShape<
-		typeof RevealKYCSensitiveResponseSchema
-	>["documents"],
-) {
-	return revealFrom(
-		"app1",
-		create(RevealKYCSensitiveResponseSchema, {
-			expireTime: timestampFromDate(EXPIRE),
-			documents,
-		}),
-	);
-}
-
 function issue(patch: Partial<KycIssueDraft> = {}): KycIssueDraft {
 	return {
 		key: "issue-1",
-		field: KYCField.KYC_FIELD_REAL_NAME,
+		field: KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME,
 		documentAssetId: "",
 		documentLabel: "",
 		code: KYCIssueCode.KYC_ISSUE_CODE_MISMATCH,
-		message: "姓名與證件不符",
+		message: "公司名稱與登記不符",
 		...patch,
 	};
 }
@@ -177,7 +149,7 @@ test("可以指出問題的欄位由伺服器給（issuable_fields）：選項�
 	assert.deepEqual(fields(ind), INDIVIDUAL_ISSUABLE);
 	assert.deepEqual(fields(biz), BUSINESS_ISSUABLE);
 	assert.ok(ind.every((o) => o.label !== "-" && o.label !== ""));
-	// 沒有寫死的型態對欄位表：伺服器給什麼就是什麼（個人的清單裡沒有統編、企業的沒有個人身分證字號只是伺服器的輸出）。
+	// 沒有寫死的型態對欄位表：伺服器給什麼就是什麼（個人的清單裡沒有統編只是伺服器的輸出）。
 	assert.deepEqual(
 		fields(
 			issuableFieldOptions(
@@ -195,56 +167,31 @@ test("可以指出問題的欄位由伺服器給（issuable_fields）：選項�
 		issuableFieldOptions(individual({ issuableFields: [] })),
 		[],
 	);
-	// 文件類欄位只有四個，其餘都不是文件。
+	// 文件類欄位只有補充文件，其餘都不是文件。
 	assert.deepEqual(
 		biz.filter((o) => o.document).map((o) => o.field),
-		[
-			KYCField.KYC_FIELD_ID_CARD_FRONT,
-			KYCField.KYC_FIELD_ID_CARD_BACK,
-			KYCField.KYC_FIELD_BANK_BOOK,
-			KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
-		],
+		[KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS],
 	);
 });
 
 // ---------------------------------------------------------------------------
 // 指定文件
 
-test("只有顯示全文之後才能指定某一張文件：asset_id 來自顯示全文的回應，沒有 asset_id 的不列，補充文件依順序編號", () => {
-	assert.deepEqual(documentChoices(undefined), [], "沒有顯示全文：不能指定");
+test("可以指定的文件取自申請上的文件：asset_id 來自 KYCDocument，沒有 asset_id 的不列，補充文件依順序編號", () => {
+	assert.deepEqual(documentChoices(individual()), [], "沒有文件：不能指定");
 	const choices = documentChoices(
-		reveal([
-			{
-				field: KYCField.KYC_FIELD_ID_CARD_FRONT,
-				position: 0,
-				assetId: "a-front",
-			},
-			{ field: COMPANY, position: 0, assetId: "a-c0" },
-			{ field: COMPANY, position: 1, assetId: "a-c1" },
-			{ field: COMPANY, position: 2, assetId: "" },
-			{
-				field: KYCField.KYC_FIELD_UNSPECIFIED,
-				position: 0,
-				assetId: "a-x",
-			},
-		]),
+		business({
+			documents: [
+				{ field: COMPANY, position: 0, assetId: "a-c0" },
+				{ field: COMPANY, position: 1, assetId: "a-c1" },
+				{ field: COMPANY, position: 2, assetId: "" },
+				{ field: KYCField.KYC_FIELD_UNSPECIFIED, position: 0, assetId: "a-x" },
+			],
+		}),
 	);
 	assert.deepEqual(choices, [
-		{
-			field: KYCField.KYC_FIELD_ID_CARD_FRONT,
-			assetId: "a-front",
-			label: "身分證正面照",
-		},
-		{
-			field: KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
-			assetId: "a-c0",
-			label: "補充文件 1",
-		},
-		{
-			field: KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
-			assetId: "a-c1",
-			label: "補充文件 2",
-		},
+		{ field: COMPANY, assetId: "a-c0", label: "補充文件 1" },
+		{ field: COMPANY, assetId: "a-c1", label: "補充文件 2" },
 	]);
 });
 
@@ -266,10 +213,10 @@ const CHOICES: DocumentChoice[] = [
 ];
 
 const base = {
-	field: KYCField.KYC_FIELD_REAL_NAME,
+	field: KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME,
 	documentAssetId: "",
 	code: KYCIssueCode.KYC_ISSUE_CODE_MISMATCH,
-	message: "姓名與證件不符",
+	message: "公司名稱與登記不符",
 };
 
 test("加入一項問題：欄位、原因、說明都要有效；原因碼是 UNSPECIFIED 一律擋下", () => {
@@ -295,7 +242,7 @@ test("加入一項問題：欄位、原因、說明都要有效；原因碼是 U
 	// 不是這份申請的欄位（個人欄位出現在企業申請）也擋下。
 	assert.equal(
 		validateIssueDraft(
-			{ ...base, field: KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO },
+			{ ...base, field: KYCField.KYC_FIELD_WEBSITE_URL },
 			BIZ_OPTIONS,
 			CHOICES,
 			[],
@@ -369,9 +316,15 @@ test("文件：只有文件類欄位能指定一張，而且那一張要屬於�
 	);
 	assert.equal(
 		validateIssueDraft(
-			{ ...base, field: KYCField.KYC_FIELD_BANK_BOOK, documentAssetId: "a-c0" },
+			{ ...withAsset, documentAssetId: "a-other" },
 			BIZ_OPTIONS,
-			CHOICES,
+			[
+				{
+					field: KYCField.KYC_FIELD_PRODUCT_TYPE,
+					assetId: "a-other",
+					label: "別的欄位",
+				},
+			],
 			[],
 		),
 		"找不到指定的文件，請重新選擇。",
@@ -427,15 +380,15 @@ test("文件類欄位依原因碼（與伺服器同一條規則）：看不清�
 			`${KYCIssueCode[code]} 帶 asset 可以`,
 		);
 	}
-	// 還沒顯示全文（沒有可選的文件）：同一個錯誤再說明怎麼辦。
-	assert.match(
+	// 申請上沒有文件可選：同一個錯誤，不另寫說明怎麼辦。
+	assert.equal(
 		validateIssueDraft(
 			{ ...base, field: docField, code: required[0] },
 			BIZ_OPTIONS,
 			[],
 			[],
-		) ?? "",
-		/請先在頁面上「顯示全文」/u,
+		),
+		ISSUE_ASSET_REQUIRED_TEXT,
 	);
 	// 缺少：不可以帶 asset；不帶可以。
 	assert.equal(
@@ -542,8 +495,8 @@ test("RejectKYC 的請求：帶讀到的 etag、依加入順序的 issues（欄�
 			issues: [
 				issue({
 					key: "issue-1",
-					field: KYCField.KYC_FIELD_BIRTH_DATE,
-					message: "  生日不對 ",
+					field: KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE,
+					message: "  設立日期不對 ",
 				}),
 				issue({
 					key: "issue-2",
@@ -555,7 +508,7 @@ test("RejectKYC 的請求：帶讀到的 etag、依加入順序的 issues（欄�
 				}),
 				issue({
 					key: "issue-3",
-					field: KYCField.KYC_FIELD_ID_CARD_FRONT,
+					field: KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
 					code: KYCIssueCode.KYC_ISSUE_CODE_MISSING,
 					message: "缺少正面",
 				}),
@@ -570,10 +523,10 @@ test("RejectKYC 的請求：帶讀到的 etag、依加入順序的 issues（欄�
 		reason: "證件要重傳",
 		issues: [
 			{
-				field: KYCField.KYC_FIELD_BIRTH_DATE,
+				field: KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE,
 				documentAssetId: "",
 				code: KYCIssueCode.KYC_ISSUE_CODE_MISMATCH,
-				message: "生日不對",
+				message: "設立日期不對",
 			},
 			{
 				field: KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
@@ -582,7 +535,7 @@ test("RejectKYC 的請求：帶讀到的 etag、依加入順序的 issues（欄�
 				message: "看不清楚",
 			},
 			{
-				field: KYCField.KYC_FIELD_ID_CARD_FRONT,
+				field: KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
 				documentAssetId: "",
 				code: KYCIssueCode.KYC_ISSUE_CODE_MISSING,
 				message: "缺少正面",
@@ -627,8 +580,8 @@ test("退回對話框：原因下拉只有六個有效原因（加一個「請�
 		),
 	]);
 	assert.match(html, /已指出的問題/u);
-	assert.match(html, /姓名/u);
-	assert.match(html, /姓名與證件不符/u);
+	assert.match(html, /公司名稱/u);
+	assert.match(html, /公司名稱與登記不符/u);
 	assert.match(html, /移除/u);
 	assert.match(html, /退回原因（必填，賣家看得到）/u);
 	assert.match(html, /證件需要重新上傳/u);
@@ -640,7 +593,7 @@ test("退回對話框：原因下拉只有六個有效原因（加一個「請�
 	);
 });
 
-test("退回對話框：沒有問題時說還沒有；沒顯示全文時不能指定文件並說明原因的路（選到文件欄位才出現）；不能退回時保留輸入並禁用送出", () => {
+test("退回對話框：沒有問題時說還沒有；沒有可指定的文件時說明（選到文件欄位才出現）；不能退回時保留輸入並禁用送出", () => {
 	const empty = renderDialog({ draft: draft({ issues: [] }) });
 	assert.match(empty, /還沒有/u);
 	const serverText =
@@ -667,13 +620,13 @@ test("退回對話框：沒有問題時說還沒有；沒顯示全文時不能�
 
 const SERVER_ISSUES = [
 	{
-		field: KYCField.KYC_FIELD_REAL_NAME,
+		field: KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME,
 		code: KYCIssueCode.KYC_ISSUE_CODE_MISMATCH,
-		message: "姓名與證件不符",
+		message: "公司名稱與登記不符",
 		documentAssetId: "",
 	},
 	{
-		field: KYCField.KYC_FIELD_ID_CARD_BACK,
+		field: KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
 		code: KYCIssueCode.KYC_ISSUE_CODE_UNREADABLE,
 		message: "反面反光",
 		documentAssetId: "a-back",
@@ -686,13 +639,13 @@ test("伺服器的問題清單轉成文字：欄位、原因碼、說明，指�
 	);
 	assert.deepEqual(views, [
 		{
-			field: "真實姓名",
+			field: "公司名稱",
 			code: "與其他資料不一致",
-			message: "姓名與證件不符",
+			message: "公司名稱與登記不符",
 			document: undefined,
 		},
 		{
-			field: "身分證反面照",
+			field: "補充文件",
 			code: "看不清楚",
 			message: "反面反光",
 			document: "指定的文件",
@@ -716,7 +669,7 @@ test("被退回的申請顯示總理由，加上賣家尚未處理的問題（�
 	const html = render(cards.KycRejectionNotice, { application: rejected });
 	assert.match(html, /失敗原因：證件要重傳/u);
 	assert.match(html, /賣家尚未處理的問題/u);
-	assert.match(html, /姓名與證件不符/u);
+	assert.match(html, /公司名稱與登記不符/u);
 	assert.match(html, /反面反光/u);
 	assert.match(html, /與其他資料不一致/u);
 	assert.match(html, /看不清楚/u);
@@ -764,7 +717,7 @@ test("審核紀錄：退回的逐項問題與內部備註（只有後台看得�
 	});
 	assert.match(html, /管理員 9/u);
 	assert.match(html, /賣家/u);
-	assert.match(html, /姓名與證件不符/u);
+	assert.match(html, /公司名稱與登記不符/u);
 	assert.match(html, /看不清楚/u);
 	assert.match(html, /內部備註：電話確認過/u);
 	assert.doesNotMatch(html, /要補件：/u, "舊的欄位清單已經不存在");

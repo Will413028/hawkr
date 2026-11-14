@@ -2,6 +2,7 @@ package seller
 
 import (
 	"context"
+	"log/slog"
 	"strconv"
 	"uuid"
 
@@ -26,29 +27,29 @@ type AdminModule interface {
 	StoreWithActiveMeasures(ctx context.Context, storeID int64) (model.StoreMeasures, error)
 	AdminKYCApplications(context.Context, model.KYCListInput) (model.KYCPage, error)
 	AdminKYCApplication(ctx context.Context, applicationID uuid.UUID) (model.KYCAdminApplication, error)
-	ListKYCReveals(context.Context, model.KYCAuditListInput) (model.KYCRevealPage, error)
 	ListKYCDocumentAccesses(context.Context, model.KYCAuditListInput) (model.KYCDocumentAccessPage, error)
 	ApproveKYC(context.Context, model.ApproveKYCInput) (model.KYCAdminApplication, error)
 	RejectKYC(context.Context, model.RejectKYCInput) (model.KYCAdminApplication, error)
-	RevealKYCSensitive(context.Context, model.RevealKYCInput) (model.KYCSensitive, error)
-	PayUniRegistrationOf(ctx context.Context, storeID int64) (model.AdminPayUniRegistration, error)
-	RebindPayUni(context.Context, model.RebindPayUniInput) (model.AdminPayUniRegistration, error)
-	PayUniObservations(context.Context, model.PayUniObservationListInput) (model.PayUniObservationPage, error)
-	RefreshPayUniStatus(ctx context.Context, storeID int64) error
 	RequeryKYCRegistration(context.Context, model.RequeryKYCRegistrationInput) (model.RegistrationCheck, error)
 }
 
 // Admin 是 SellerAdminService 的 handler。授權（只有管理員）由 rpc 的 interceptor 依 service 名稱檢查。
 type Admin struct {
-	m      AdminModule
-	images rpc.Images
+	m        AdminModule
+	images   rpc.Images
+	payments PaymentReader
+	log      *slog.Logger
 }
 
 var _ sellerv1alpha1connect.SellerAdminServiceHandler = (*Admin)(nil)
 
 // NewAdmin 建立後台的 handler。措施此刻的狀態由模組算好（Measure.State），handler 沒有時鐘。
-func NewAdmin(m AdminModule, images rpc.Images) *Admin {
-	return &Admin{m: m, images: images}
+// payments 是開通任務讀收款帳戶的來源（GetStoreOnboarding），log 記錄讀不到的來源（nil 時不記錄）。
+func NewAdmin(m AdminModule, images rpc.Images, payments PaymentReader, log *slog.Logger) *Admin {
+	if log == nil {
+		log = slog.New(slog.DiscardHandler)
+	}
+	return &Admin{m: m, images: images, payments: payments, log: log}
 }
 
 // 模組輸入的欄位對應到請求的路徑。
@@ -127,9 +128,6 @@ func (h *Admin) ListStores(ctx context.Context, req *connect.Request[adminpb.Lis
 		}
 		in.AccountID = &accountID
 	}
-	if bind := rpc.EnumFromProto[model.PayUniBindStatus](msg.GetPayuniBindStatus()); bind != "" {
-		in.PayUniBindStatus = &bind
-	}
 	if msg.Suspended != nil {
 		suspended := msg.GetSuspended()
 		in.Suspended = &suspended
@@ -141,7 +139,7 @@ func (h *Admin) ListStores(ctx context.Context, req *connect.Request[adminpb.Lis
 		in.KYCStatus = &kyc
 	}
 	// page token 只能用在同一組篩選：換了篩選就從第一頁開始。
-	scope := rpc.FilterScope(sellerv1alpha1connect.SellerAdminServiceListStoresProcedure, in.Query, string(rpc.EnumFromProto[model.Status](msg.GetStatus())), msg.GetKycStatus().String(), msg.GetAccountId(), msg.GetPayuniBindStatus().String(), suspendedScope(msg.Suspended), strconv.FormatBool(msg.GetKycAwaitingReview()))
+	scope := rpc.FilterScope(sellerv1alpha1connect.SellerAdminServiceListStoresProcedure, in.Query, string(rpc.EnumFromProto[model.Status](msg.GetStatus())), msg.GetKycStatus().String(), msg.GetAccountId(), suspendedScope(msg.Suspended), strconv.FormatBool(msg.GetKycAwaitingReview()))
 	after, err := rpc.ValidCursor[model.StoreCursor](scope, msg.GetPageToken())
 	if err != nil {
 		return nil, err
@@ -163,7 +161,10 @@ func (h *Admin) ListStores(ctx context.Context, req *connect.Request[adminpb.Lis
 		out.Stores[i] = &adminpb.StoreListItem{
 			Store: store, Suspended: item.Store.Suspended(),
 			DelegationUnavailabilities: toStoreActionUnavailabilities(item.Store.ActionUnavailableReasons(model.StoreActionDelegate), model.StoreActionDelegate),
-			KycFlowStatus:              rpc.EnumToProto[pb.KYCFlowStatus](item.KYCFlow),
+		}
+		if item.KYCStatus != nil {
+			status := rpc.EnumToProto[pb.KYCStatus](*item.KYCStatus)
+			out.Stores[i].KycStatus = &status
 		}
 	}
 	return connect.NewResponse(out), nil
@@ -211,9 +212,6 @@ func (h *Admin) GetStore(ctx context.Context, req *connect.Request[adminpb.GetSt
 		out.Kyc = &adminpb.KYCSummary{
 			ApplicationId: application.ID.String(), Status: rpc.EnumToProto[pb.KYCStatus](application.Status),
 		}
-		if application.Flow != nil {
-			out.Kyc.FlowStatus = rpc.EnumToProto[pb.KYCFlowStatus](application.Flow.Status)
-		}
 		if application.SubmittedAt != nil {
 			out.Kyc.SubmitTime = timestamppb.New(*application.SubmittedAt)
 		}
@@ -226,7 +224,7 @@ func (h *Admin) GetStore(ctx context.Context, req *connect.Request[adminpb.GetSt
 }
 
 // toStoreActionUnavailabilities 轉出 admin 不能對店家做 action 的每個原因與它的文字（model.StoreActionUnavailableText，與方法被拒絕時錯誤的
-// LocalizedMessage 同一個函式）。idempotent 的原因（PAYUNI_BIND_IN_PROGRESS）不是失敗，沒有句子，message 不設。
+// LocalizedMessage 同一個函式）。
 func toStoreActionUnavailabilities(reasons []model.StoreActionUnavailableReason, action model.StoreAction) []*adminpb.StoreActionUnavailability {
 	var out []*adminpb.StoreActionUnavailability
 	for _, r := range reasons {

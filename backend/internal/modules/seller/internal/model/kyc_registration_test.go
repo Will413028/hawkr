@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+func str(s string) *string { return &s }
+
 func day(y int, m time.Month, d int) *time.Time {
 	t := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 	return &t

@@ -18,7 +18,7 @@ const (
 	CapStorefrontWrite Capability = "CAP_STOREFRONT_WRITE"
 	// CapProductManage 商品的建立、編輯、上下架、價格。
 	CapProductManage Capability = "CAP_PRODUCT_MANAGE"
-	// CapOrderFulfill 出貨、物流、售後、訂單查詢、PayUni 狀態。
+	// CapOrderFulfill 出貨、物流、售後、訂單查詢。
 	CapOrderFulfill Capability = "CAP_ORDER_FULFILL"
 	// CapOrderContract 收縮型的訂單動作（取消出貨與退款受理）。
 	CapOrderContract Capability = "CAP_ORDER_CONTRACT"
@@ -38,7 +38,7 @@ const (
 	CapInvoiceManage Capability = "CAP_INVOICE_MANAGE"
 	// CapInvoiceTaxRemedy 稅務身分的申請、補件與延長（救濟管道）。
 	CapInvoiceTaxRemedy Capability = "CAP_INVOICE_TAX_REMEDY"
-	// CapShippingSetup 物流建店、啟用與關閉配送方式；前置條件是 KYC 流程核准（含 PayUni 核准）。
+	// CapShippingSetup 物流建店、啟用與關閉配送方式；前置條件是開通閘門 ONBOARDING_COMPLETE（平台審核核准且收款帳戶的轉帳能力啟用）。
 	CapShippingSetup Capability = "CAP_SHIPPING_SETUP"
 	// CapPublicListing 店家的狀態：買家看得到店面、可以結帳。缺的條件就是 MissingExposure。它是狀態不是動作：只出現在
 	// CapabilitiesOf 的結果，不在 Capabilities()，方法不能宣告它，也不進 gateway 的能力 header。
@@ -63,7 +63,7 @@ func AllCapabilities() []Capability { return append(Capabilities(), CapPublicLis
 //   - STORE_ACTIVE：每個能力都需要，關閉的店家沒有任何能力；
 //   - NOT_SUSPENDED：經營類能力需要。停權時仍授予的能力（能力檢查 ADR 的白名單）就是表裡沒有它的那些；
 //   - NOT_PENDING_DELETION：經營類能力與關店需要，等待刪除時只剩履約類；
-//   - KYC_APPROVED：物流建店需要（PayUni 以已成立的子商店建店）；
+//   - ONBOARDING_COMPLETE：物流建店需要（平台審核核准且收款帳戶的轉帳能力啟用）；
 //   - 店家狀態 CapPublicListing 需要全部條件，缺的就是 MissingExposure。
 var needs = map[Capability][]Requirement{
 	CapAccountSelfRead:  {RequirementActive},
@@ -79,9 +79,9 @@ var needs = map[Capability][]Requirement{
 	CapProductManage:    {RequirementActive, RequirementNotSuspended, RequirementNotPendingDeletion},
 	CapMarketing:        {RequirementActive, RequirementNotSuspended, RequirementNotPendingDeletion},
 	CapInvoiceManage:    {RequirementActive, RequirementNotSuspended, RequirementNotPendingDeletion},
-	CapShippingSetup:    {RequirementActive, RequirementNotSuspended, RequirementKYCApproved, RequirementNotPendingDeletion},
+	CapShippingSetup:    {RequirementActive, RequirementNotSuspended, RequirementOnboardingComplete, RequirementNotPendingDeletion},
 	CapPublicListing: {
-		RequirementActive, RequirementNotSuspended, RequirementKYCApproved, RequirementStoreName, RequirementLogo,
+		RequirementActive, RequirementNotSuspended, RequirementOnboardingComplete, RequirementStoreName, RequirementLogo,
 		RequirementTownCode, RequirementNotPendingDeletion,
 	},
 }
@@ -127,10 +127,10 @@ func missingFor(c Capability, s Store) []Requirement {
 	return missing
 }
 
-// CapabilitiesOf 是店家能力唯一的推導點：由讀店家時帶上的條件（Conditions：生命週期、KYC 流程核准、公開曝光看的店名、logo、鄉鎮市區，
+// CapabilitiesOf 是店家能力唯一的推導點：由讀店家時帶上的條件（Conditions：生命週期、平台審核核准、收款帳戶轉帳能力、公開曝光看的店名、logo、鄉鎮市區，
 // 由 seller.store_requirement_flags 讀出）與停權（Sanctions，由 seller.effective_measures 讀出）決定，回傳 AllCapabilities() 的每一項
 // （依 proto 的數字順序）的狀態與缺的條件；Go 只做能力對條件的對應（needs），不重算條件。關閉的店家沒有任何能力；等待刪除的店家
-// 不能做經營類的事，也不能自己關店（關閉由刪除帳號的流程負責）；停權時只剩白名單；物流建店還要 KYC 流程核准。
+// 不能做經營類的事，也不能自己關店（關閉由刪除帳號的流程負責）；停權時只剩白名單；物流建店還要開通閘門（平台審核核准且收款帳戶轉帳能力啟用）。
 func CapabilitiesOf(s Store) []CapabilityStatus {
 	all := AllCapabilities()
 	out := make([]CapabilityStatus, 0, len(all))
@@ -163,7 +163,7 @@ func (s Store) Can(c Capability) bool {
 }
 
 // Authorize 在店家沒有能力 c 時回錯誤：已關閉回 NotFound；停權造成的回 PermissionDenied，帶 ReasonSellerSuspended；
-// 其他前置條件沒有滿足（等待刪除、KYC 流程未核准）回 FailedPrecondition，帶 ReasonSellerRequirementMissing，缺的條件在
+// 其他前置條件沒有滿足（等待刪除、開通閘門未通過）回 FailedPrecondition，帶 ReasonSellerRequirementMissing，缺的條件在
 // metadata 的 MissingRequirementsMetadataKey。c 不是動作類能力（CapPublicListing 或未知）、或店家的條件沒有推導過（沒有經
 // stint 讀出）一律拒絕。
 func Authorize(s Store, c Capability) error {

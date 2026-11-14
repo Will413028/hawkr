@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payuni"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -36,10 +35,8 @@ type Deps struct {
 	Media  media.Media
 	// Exposure 是可曝光規則的套用與公告（classify 與每個寫入的公告都經它）；必填。
 	Exposure *exposure.Service
-	// StorefrontBaseURL 是店家頁的網站根網址（PayUni 綁定的資料完整性要用它；空字串表示沒有）。
-	StorefrontBaseURL string
-	Now               func() time.Time
-	Logger            *slog.Logger
+	Now      func() time.Time
+	Logger   *slog.Logger
 }
 
 // Service 是 profile 的 use case。
@@ -269,8 +266,8 @@ func (s *Service) exposedRows(ctx context.Context, q *store.Queries, rows []stor
 // StoreCards 從 storeIDs 中挑出「曾經公開過」的店家，回傳卡片資料（店名、logo、封面、營運狀態），依輸入順序、重複的 ID
 // 只算一次；不存在與從沒公開過的略過（store_id 在過渡期連號、可列舉，沒公開過的店名不能被逐號讀出）。曾經公開過是
 // first_exposed_at 有值（公告函式寫入），或此刻可以公開曝光（涵蓋 job 還沒追上的空窗）；曝光規則仍只有 exposedRows。
-// 營運狀態由 model.CardStatusOf 推導：OPEN 是此刻可以公開曝光，已關閉是 CLOSED，其餘（停權、等待刪除、PayUni 被拒絕、身分認證
-// 改回草稿、缺店名／logo／所在地）是 PAUSED。任何一次讀取失敗都回錯誤，不回部分結果。
+// 營運狀態由 model.CardStatusOf 推導：OPEN 是此刻可以公開曝光，已關閉是 CLOSED，其餘（停權、等待刪除、申請未核准、收款帳戶未啟用、
+// 缺店名／logo／所在地）是 PAUSED。任何一次讀取失敗都回錯誤，不回部分結果。
 func (s *Service) StoreCards(ctx context.Context, storeIDs []int64) ([]model.StoreCard, error) {
 	if err := model.BatchIDs(storeIDs); err != nil {
 		return nil, err
@@ -350,7 +347,7 @@ type imageChange struct {
 	asset media.Asset
 }
 
-// preflight 在轉正圖片之前做所有不需要寫入就能判斷的拒絕（能力、版本、合併後的文字驗證、PayUni 的店名鎖）：被拒絕的請求
+// preflight 在轉正圖片之前做所有不需要寫入就能判斷的拒絕（能力、版本、合併後的文字驗證）：被拒絕的請求
 // 不消耗 staged token，client 修正之後可以用同一個 token 重送。transaction 內會再判斷一次（以列鎖內的資料為準）。
 func (s *Service) preflight(ctx context.Context, in model.UpdateProfileInput) error {
 	current, err := s.Store(ctx, in.StoreID)
@@ -367,7 +364,7 @@ func (s *Service) preflight(ctx context.Context, in model.UpdateProfileInput) er
 	return err
 }
 
-// mergeChecked 把輸入疊到 before 的 profile 並驗證；店名或介紹改變時要 PayUni 沒有持有它們（盤點 D17）。
+// mergeChecked 把輸入疊到 before 的 profile 並驗證；店名與介紹沒有鎖，審核中與核准之後都能改。
 func (s *Service) mergeChecked(ctx context.Context, q *store.Queries, before model.Store, in model.UpdateProfileInput) (model.Profile, error) {
 	merged := merge(before.Profile, in)
 	if err := model.Normalize(&merged); err != nil {
@@ -376,36 +373,32 @@ func (s *Service) mergeChecked(ctx context.Context, q *store.Queries, before mod
 	if err := checkRequiredNotCleared(ctx, q, before, merged); err != nil {
 		return model.Profile{}, err
 	}
-	// PayUni 持有的店名與介紹不會跟著 update_merchant 改變：KYC 審核中或 PayUni 已收下註冊時鎖住（盤點 D17）。
-	if merged.StoreName != before.StoreName || !equalText(merged.Description, before.Description) {
-		if err := payuni.CheckNameUnlocked(ctx, q, in.StoreID); err != nil {
-			return model.Profile{}, err
-		}
-	}
 	return merged, nil
 }
 
-// requiredFieldNames 是 PayUni 必填的店家欄位被清掉時回報的輸入欄位名與說明（地址依缺的是鄉鎮市區還是明細）。
+// requiredFieldMessages 是審核中或已核准時必填的店家欄位被清掉時回報的說明。
 var requiredFieldMessages = map[string]string{
-	model.StoreFieldContactName:   "聯絡人姓名必填",
-	model.StoreFieldContactMobile: "聯絡人手機必填",
-	model.StoreFieldSupportEmail:  "客服電子信箱必填",
-	model.StoreFieldAddress:       "店家地址必填",
+	model.StoreFieldSupportEmail: "申請審核中或已核准時，客服電子信箱不能清除",
+	model.StoreFieldAddress:      "申請審核中或已核准時，店家地址不能清除",
 }
 
-// checkRequiredNotCleared：店家有 PayUni 註冊之後，PayUni 必填的店家欄位（地址、聯絡人姓名與手機、客服信箱）不能清掉：清掉之後 PayUni
-// 仍是舊值，卻會被記成同步成功。還沒有註冊時可以清（送出 KYC 之前會再檢查完整性）。原本就缺的欄位不算，不相干的修改照常通過。
+// checkRequiredNotCleared：店家目前的 KYC 申請在審核中或已核准時，必填的店家欄位（地址、客服信箱）不能清掉（規則在 model.ClearedLockedFields）。
+// 沒有申請或其他狀態可以清（送出 KYC 之前會再檢查完整性）。原本就缺的欄位不算，不相干的修改照常通過。
 func checkRequiredNotCleared(ctx context.Context, q *store.Queries, before model.Store, merged model.Profile) error {
-	cleared := payuni.NewlyMissing(before.Profile, merged)
+	if len(model.NewlyMissing(before.Profile, merged)) == 0 {
+		return nil
+	}
+	var status model.KYCStatus
+	if app, err := q.CurrentKYCApplication(ctx, before.StoreID); err == nil {
+		status = model.KYCStatus(app.Status)
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	cleared := model.ClearedLockedFields(before.Profile, merged, status)
 	if len(cleared) == 0 {
 		return nil
 	}
-	if _, err := q.PayUniRegistrationByStore(ctx, before.StoreID); errors.Is(err, pgx.ErrNoRows) {
-		return nil
-	} else if err != nil {
-		return err
-	}
-	field := map[string]string{model.StoreFieldContactName: "ContactName", model.StoreFieldContactMobile: "ContactMobile", model.StoreFieldSupportEmail: "SupportEmail"}[cleared[0]]
+	field := "SupportEmail"
 	if cleared[0] == model.StoreFieldAddress {
 		field = "AddressDetail"
 		if merged.TownCode == nil {
@@ -482,12 +475,6 @@ func (s *Service) writeProfile(ctx context.Context, in model.UpdateProfileInput,
 				return err
 			}
 			version = row.Version
-			// 地址與聯絡資料是送給 PayUni 的資料：改了就登記同步（同一個 transaction 排入以 store_id 為唯一鍵的 job，PENDING 期間也送）。
-			if payuni.SyncedFieldsChanged(before.Profile, merged) {
-				if err := payuni.RequestSync(ctx, q, s.d.Jobs, s.d.StorefrontBaseURL, in.StoreID, now); err != nil {
-					return err
-				}
-			}
 		}
 		for _, c := range changes {
 			ref := mediaref.StoreRef(c.kind.refType, in.StoreID)
@@ -521,13 +508,6 @@ func (s *Service) writeProfile(ctx context.Context, in model.UpdateProfileInput,
 		return err
 	})
 	return updated, err
-}
-
-func equalText(a, b *string) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	return *a == *b
 }
 
 // merge 把輸入疊到目前的 profile：nil 保留原值，空字串清成沒有值。

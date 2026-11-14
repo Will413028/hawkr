@@ -1,15 +1,22 @@
 "use client";
 
 import type {
+	GetMyOnboardingResponse,
 	KYCApplication,
-	KYCFlow,
+	PaymentAccount,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import * as React from "react";
 import { accountQueryPending } from "@/lib/auth/account-query";
 import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import { fetchMyKyc } from "@/lib/seller/kyc";
-import { flowOf } from "@/lib/seller/kyc-flow";
+import {
+	fetchMyOnboarding,
+	refreshMyPaymentAccount,
+} from "@/lib/seller/onboarding-summary";
+import { fetchMyPaymentAccount } from "@/lib/seller/payment-account";
+import { confirmPaymentReturn } from "@/lib/seller/payment-onboarding";
 import { isStoreMissing, type MyStore } from "@/lib/seller/store";
 import { useSellerDataScope } from "@/lib/seller-data/scope";
 import { useQueryIdentity } from "./useQueryIdentity";
@@ -62,7 +69,7 @@ export function useSellerSelf(): UseSellerSelfResult {
 }
 
 /**
- * Returns a callback that invalidates the store and KYC-flow queries so all
+ * Returns a callback that invalidates the store, KYC-flow and onboarding-summary queries so all
  * consumers refetch — call it after a profile / cert / logo / cover mutation.
  */
 export function useInvalidateSellerSelf(): () => Promise<void> {
@@ -74,6 +81,9 @@ export function useInvalidateSellerSelf(): () => Promise<void> {
 			queryClient.invalidateQueries({ queryKey: scope.keys.storefront() }),
 			queryClient.invalidateQueries({
 				queryKey: queryKeys.seller.kyc(identity),
+			}),
+			queryClient.invalidateQueries({
+				queryKey: queryKeys.seller.onboarding(identity),
 			}),
 		]);
 	};
@@ -99,7 +109,7 @@ function useMyKycQuery<T>(
 		select,
 		enabled: scope.mode === "seller" && hasSeller && (enabledOption ?? true),
 		staleTime: 30_000,
-		// PayUni 的審核結果由伺服器的背景程序與 PayUni 通知更新，沒有賣家端的刷新動作：回到分頁時重新讀一次。
+		// 審核結果由伺服器更新，沒有賣家端的刷新動作：回到分頁時重新讀一次。
 		refetchOnWindowFocus: true,
 	});
 }
@@ -117,29 +127,105 @@ export function useMyKyc(options?: { enabled?: boolean }): UseMyKycResult {
 	};
 }
 
-interface UseMyKycFlowResult {
-	flow: KYCFlow | null;
-	loading: boolean;
-	error: Error | null;
-}
-
-/** 申請的流程狀態；沒有申請是 NOT_STARTED。與 `useMyKyc` 共用同一份快取。 */
-export function useMyKycFlow(options?: {
-	enabled?: boolean;
-}): UseMyKycFlowResult {
-	const query = useMyKycQuery(flowOf, options?.enabled);
-	return {
-		flow: query.data ?? null,
-		loading: query.isLoading,
-		error: query.error,
-	};
-}
-
-/** 把伺服器剛回的申請寫進快取（存檔、送出、取消的回應就是最新的申請）。 */
+/**
+ * 把伺服器剛回的申請寫進快取（存檔、送出、取消的回應就是最新的申請），並讓開通摘要重讀
+ * （平台審核任務的狀態由申請推導，摘要由伺服器算）。
+ */
 export function useSetMyKyc(): (application: KYCApplication | null) => void {
 	const queryClient = useQueryClient();
 	const identity = useQueryIdentity();
 	return (application) => {
 		queryClient.setQueryData(queryKeys.seller.kyc(identity), application);
+		void queryClient.invalidateQueries({
+			queryKey: queryKeys.seller.onboarding(identity),
+		});
 	};
+}
+
+interface UseMyPaymentAccountResult {
+	/** 還沒有收款帳戶（平台審核還沒核准）是 null。 */
+	account: PaymentAccount | null;
+	loading: boolean;
+	error: Error | null;
+	refetch: () => Promise<unknown>;
+}
+
+/** 收款帳戶（`GetMyPaymentAccount`）。代行工作區沒有這個資料來源，不發查詢。 */
+export function useMyPaymentAccount(options?: {
+	enabled?: boolean;
+}): UseMyPaymentAccountResult {
+	const { hasSeller } = useAuth();
+	const scope = useSellerDataScope();
+	const identity = useQueryIdentity();
+	const query = useQuery({
+		queryKey: queryKeys.seller.paymentAccount(identity),
+		queryFn: () => fetchMyPaymentAccount(),
+		enabled: scope.mode === "seller" && hasSeller && (options?.enabled ?? true),
+		staleTime: 30_000,
+		refetchOnWindowFocus: true,
+	});
+	return {
+		account: query.data ?? null,
+		loading: query.isLoading,
+		error: query.error,
+		refetch: query.refetch,
+	};
+}
+
+interface UseMyOnboardingResult {
+	/** 開通任務摘要；還沒讀到或讀取失敗是 null。 */
+	onboarding: GetMyOnboardingResponse | null;
+	loading: boolean;
+	error: Error | null;
+	refetch: () => Promise<unknown>;
+}
+
+/**
+ * 開通任務摘要（`GetMyOnboarding`）：必要任務的狀態、下一步與句子都是伺服器的答案。停權與等待刪除的店家照樣
+ * 讀得到；代行工作區沒有這個資料來源，不發查詢。
+ */
+export function useMyOnboarding(options?: {
+	enabled?: boolean;
+}): UseMyOnboardingResult {
+	const { hasSeller } = useAuth();
+	const scope = useSellerDataScope();
+	const identity = useQueryIdentity();
+	const query = useQuery({
+		queryKey: queryKeys.seller.onboarding(identity),
+		queryFn: () => fetchMyOnboarding(),
+		enabled: scope.mode === "seller" && hasSeller && (options?.enabled ?? true),
+		staleTime: 30_000,
+		refetchOnWindowFocus: true,
+	});
+	return {
+		onboarding: query.data ?? null,
+		loading: query.isLoading,
+		error: query.error,
+		refetch: query.refetch,
+	};
+}
+
+/**
+ * 同步重讀收款帳戶（`RefreshMyPaymentAccount`）再重新讀開通摘要與收款帳戶（`confirmPaymentReturn`）：
+ * 進入認證頁與回跳共用的一條路徑。重讀失敗不丟出，照常讀。
+ */
+export function useRefreshPaymentAccount(): () => Promise<void> {
+	const queryClient = useQueryClient();
+	const identity = useQueryIdentity();
+	return React.useCallback(
+		() =>
+			confirmPaymentReturn({
+				refreshAccount: () => refreshMyPaymentAccount(),
+				readAccount: () =>
+					Promise.all([
+						queryClient.invalidateQueries({
+							queryKey: queryKeys.seller.onboarding(identity),
+						}),
+						queryClient.invalidateQueries({
+							queryKey: queryKeys.seller.paymentAccount(identity),
+						}),
+					]),
+			}),
+		[queryClient, identity],
+	);
 }

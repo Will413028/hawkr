@@ -67,7 +67,7 @@ const RecommendedSeller$json = {
     },
     {
       '1': 'follower_count',
-      '3': 4,
+      '3': 2,
       '4': 1,
       '5': 5,
       '9': 0,
@@ -78,19 +78,13 @@ const RecommendedSeller$json = {
   '8': [
     {'1': '_follower_count'},
   ],
-  '9': [
-    {'1': 2, '2': 3},
-    {'1': 3, '2': 4},
-  ],
-  '10': ['review_count', 'rating_average'],
 };
 
 /// Descriptor for `RecommendedSeller`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List recommendedSellerDescriptor = $convert.base64Decode(
     'ChFSZWNvbW1lbmRlZFNlbGxlchI2CgVzdG9yZRgBIAEoCzIgLmhhd2tyLmNvbW1vbi52MWFscG'
-    'hhMS5TdG9yZUNhcmRSBXN0b3JlEioKDmZvbGxvd2VyX2NvdW50GAQgASgFSABSDWZvbGxvd2Vy'
-    'Q291bnSIAQFCEQoPX2ZvbGxvd2VyX2NvdW50SgQIAhADSgQIAxAEUgxyZXZpZXdfY291bnRSDn'
-    'JhdGluZ19hdmVyYWdl');
+    'hhMS5TdG9yZUNhcmRSBXN0b3JlEioKDmZvbGxvd2VyX2NvdW50GAIgASgFSABSDWZvbGxvd2Vy'
+    'Q291bnSIAQFCEQoPX2ZvbGxvd2VyX2NvdW50');
 
 const $core.Map<$core.String, $core.dynamic> DiscoveryPublicServiceBase$json = {
   '1': 'DiscoveryPublicService',

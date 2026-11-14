@@ -26,7 +26,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/identity/v1alpha1/identity.proto.
  */
 export const file_hawkr_identity_v1alpha1_identity: GenFile = /*@__PURE__*/
-  fileDesc("CiZoYXdrci9pZGVudGl0eS92MWFscGhhMS9pZGVudGl0eS5wcm90bxIXaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEieQoHQWNjb3VudBIPCgJpZBgBIAEoCUID4EEIEjEKBXJvbGVzGAIgAygOMh0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuUm9sZUID4EEDSgQIAxAESgQIBBAFSgQIBRAGUgthY3RpdmVfcm9sZVILcGVyc3BlY3RpdmUiGwoZSXNzdWVBcHBMb2dpbk5vbmNlUmVxdWVzdCJmChpJc3N1ZUFwcExvZ2luTm9uY2VSZXNwb25zZRISCgVub25jZRgBIAEoCUID4EEDEjQKC2V4cGlyZV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDIoIBChZFeGNoYW5nZUlkVG9rZW5SZXF1ZXN0Ej0KCHByb3ZpZGVyGAEgASgOMiYuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTG9naW5Qcm92aWRlckID4EECEhUKCGlkX3Rva2VuGAIgASgJQgPgQQISEgoFbm9uY2UYAyABKAlCA+BBAiKqAQoXRXhjaGFuZ2VJZFRva2VuUmVzcG9uc2USGgoNc2Vzc2lvbl90b2tlbhgBIAEoCUID4EEDEj0KFGFic29sdXRlX2V4cGlyZV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjQKDGlkbGVfdGltZW91dBgDIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkID4EEDIhAKDlNpZ25PdXRSZXF1ZXN0IhEKD1NpZ25PdXRSZXNwb25zZSJ/ChNMaW5rSWRlbnRpdHlSZXF1ZXN0Ej0KCHByb3ZpZGVyGAEgASgOMiYuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTG9naW5Qcm92aWRlckID4EECEhUKCGlkX3Rva2VuGAIgASgJQgPgQQISEgoFbm9uY2UYAyABKAlCA+BBAiIWChRMaW5rSWRlbnRpdHlSZXNwb25zZSI8ChNMaXN0U2Vzc2lvbnNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJImgKFExpc3RTZXNzaW9uc1Jlc3BvbnNlEjcKCHNlc3Npb25zGAEgAygLMiUuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTG9naW5TZXNzaW9uEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSIdChtMaXN0TGlua2VkSWRlbnRpdGllc1JlcXVlc3QiWwocTGlzdExpbmtlZElkZW50aXRpZXNSZXNwb25zZRI7CgppZGVudGl0aWVzGAEgAygLMicuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlua2VkSWRlbnRpdHkigwEKDkxpbmtlZElkZW50aXR5Ej0KCHByb3ZpZGVyGAEgASgOMiYuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTG9naW5Qcm92aWRlckID4EEDEjIKCWxpbmtfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAyIvChRSZXZva2VTZXNzaW9uUmVxdWVzdBIXCgpzZXNzaW9uX2lkGAEgASgJQgPgQQIiFwoVUmV2b2tlU2Vzc2lvblJlc3BvbnNlIuIBCgxMb2dpblNlc3Npb24SDwoCaWQYASABKAlCA+BBCBI9CgtjbGllbnRfa2luZBgCIAEoDjIjLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkNsaWVudEtpbmRCA+BBAxI0CgtjcmVhdGVfdGltZRgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxI2Cg1sYXN0X3VzZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEhQKB2N1cnJlbnQYBSABKAhCA+BBAyITChFHZXRTZXNzaW9uUmVxdWVzdCLZAQoSR2V0U2Vzc2lvblJlc3BvbnNlEjEKB2FjY291bnQYAiABKAsyIC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5BY2NvdW50EjwKCnN1c3BlbnNpb24YAyABKAsyIy5oYXdrci5pZGVudGl0eS52MWFscGhhMS5TdXNwZW5zaW9uQgPgQQMSGQoMZGlzcGxheV9uYW1lGAQgASgJQgPgQQMSMQoGYXZhdGFyGAUgASgLMhwuaGF3a3IuY29tbW9uLnYxYWxwaGExLkltYWdlQgPgQQNKBAgBEAIiQwoKU3VzcGVuc2lvbhI1CgxzdXNwZW5kZWRfYXQYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMiFgoURGVsZXRlQWNjb3VudFJlcXVlc3Qi1AEKFURlbGV0ZUFjY291bnRSZXNwb25zZRJLCgVzdGF0ZRgBIAEoDjI8Lmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkRlbGV0ZUFjY291bnRSZXNwb25zZS5EZWxldGlvblN0YXRlIm4KDURlbGV0aW9uU3RhdGUSHgoaREVMRVRJT05fU1RBVEVfVU5TUEVDSUZJRUQQABIaChZERUxFVElPTl9TVEFURV9ERUxFVEVEEAESIQodREVMRVRJT05fU1RBVEVfUEVORElOR19PUkRFUlMQAio/CgRSb2xlEhQKEFJPTEVfVU5TUEVDSUZJRUQQABIPCgtST0xFX1NFTExFUhACIgQIARABKgpST0xFX0JVWUVSKmMKDUxvZ2luUHJvdmlkZXISHgoaTE9HSU5fUFJPVklERVJfVU5TUEVDSUZJRUQQABIZChVMT0dJTl9QUk9WSURFUl9HT09HTEUQARIXChNMT0dJTl9QUk9WSURFUl9MSU5FEAIqUwoKQ2xpZW50S2luZBIbChdDTElFTlRfS0lORF9VTlNQRUNJRklFRBAAEhMKD0NMSUVOVF9LSU5EX1dFQhABEhMKD0NMSUVOVF9LSU5EX0FQUBACMowCChVJZGVudGl0eVB1YmxpY1NlcnZpY2USfQoSSXNzdWVBcHBMb2dpbk5vbmNlEjIuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuSXNzdWVBcHBMb2dpbk5vbmNlUmVxdWVzdBozLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLklzc3VlQXBwTG9naW5Ob25jZVJlc3BvbnNlEnQKD0V4Y2hhbmdlSWRUb2tlbhIvLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkV4Y2hhbmdlSWRUb2tlblJlcXVlc3QaMC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5FeGNoYW5nZUlkVG9rZW5SZXNwb25zZTKoBgoSSWRlbnRpdHlBcHBTZXJ2aWNlEmoKCkdldFNlc3Npb24SKi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5HZXRTZXNzaW9uUmVxdWVzdBorLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkdldFNlc3Npb25SZXNwb25zZSIDkAIBElwKB1NpZ25PdXQSJy5oYXdrci5pZGVudGl0eS52MWFscGhhMS5TaWduT3V0UmVxdWVzdBooLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLlNpZ25PdXRSZXNwb25zZRJrCgxMaW5rSWRlbnRpdHkSLC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaW5rSWRlbnRpdHlSZXF1ZXN0Gi0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlua0lkZW50aXR5UmVzcG9uc2UScAoMTGlzdFNlc3Npb25zEiwuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlzdFNlc3Npb25zUmVxdWVzdBotLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxpc3RTZXNzaW9uc1Jlc3BvbnNlIgOQAgESiAEKFExpc3RMaW5rZWRJZGVudGl0aWVzEjQuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlzdExpbmtlZElkZW50aXRpZXNSZXF1ZXN0GjUuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlzdExpbmtlZElkZW50aXRpZXNSZXNwb25zZSIDkAIBEm4KDVJldm9rZVNlc3Npb24SLS5oYXdrci5pZGVudGl0eS52MWFscGhhMS5SZXZva2VTZXNzaW9uUmVxdWVzdBouLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLlJldm9rZVNlc3Npb25SZXNwb25zZRJuCg1EZWxldGVBY2NvdW50Ei0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuRGVsZXRlQWNjb3VudFJlcXVlc3QaLi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVzcG9uc2ViBnByb3RvMw", [file_google_api_field_behavior, file_google_protobuf_duration, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_image]);
+  fileDesc("CiZoYXdrci9pZGVudGl0eS92MWFscGhhMS9pZGVudGl0eS5wcm90bxIXaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEiTQoHQWNjb3VudBIPCgJpZBgBIAEoCUID4EEIEjEKBXJvbGVzGAIgAygOMh0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuUm9sZUID4EEDIhsKGUlzc3VlQXBwTG9naW5Ob25jZVJlcXVlc3QiZgoaSXNzdWVBcHBMb2dpbk5vbmNlUmVzcG9uc2USEgoFbm9uY2UYASABKAlCA+BBAxI0CgtleHBpcmVfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAyKCAQoWRXhjaGFuZ2VJZFRva2VuUmVxdWVzdBI9Cghwcm92aWRlchgBIAEoDjImLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxvZ2luUHJvdmlkZXJCA+BBAhIVCghpZF90b2tlbhgCIAEoCUID4EECEhIKBW5vbmNlGAMgASgJQgPgQQIiqgEKF0V4Y2hhbmdlSWRUb2tlblJlc3BvbnNlEhoKDXNlc3Npb25fdG9rZW4YASABKAlCA+BBAxI9ChRhYnNvbHV0ZV9leHBpcmVfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxI0CgxpZGxlX3RpbWVvdXQYAyABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CA+BBAyIQCg5TaWduT3V0UmVxdWVzdCIRCg9TaWduT3V0UmVzcG9uc2UifwoTTGlua0lkZW50aXR5UmVxdWVzdBI9Cghwcm92aWRlchgBIAEoDjImLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxvZ2luUHJvdmlkZXJCA+BBAhIVCghpZF90b2tlbhgCIAEoCUID4EECEhIKBW5vbmNlGAMgASgJQgPgQQIiFgoUTGlua0lkZW50aXR5UmVzcG9uc2UiPAoTTGlzdFNlc3Npb25zUmVxdWVzdBIRCglwYWdlX3NpemUYASABKAUSEgoKcGFnZV90b2tlbhgCIAEoCSJoChRMaXN0U2Vzc2lvbnNSZXNwb25zZRI3CghzZXNzaW9ucxgBIAMoCzIlLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxvZ2luU2Vzc2lvbhIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkiHQobTGlzdExpbmtlZElkZW50aXRpZXNSZXF1ZXN0IlsKHExpc3RMaW5rZWRJZGVudGl0aWVzUmVzcG9uc2USOwoKaWRlbnRpdGllcxgBIAMoCzInLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxpbmtlZElkZW50aXR5IoMBCg5MaW5rZWRJZGVudGl0eRI9Cghwcm92aWRlchgBIAEoDjImLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxvZ2luUHJvdmlkZXJCA+BBAxIyCglsaW5rX3RpbWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMiLwoUUmV2b2tlU2Vzc2lvblJlcXVlc3QSFwoKc2Vzc2lvbl9pZBgBIAEoCUID4EECIhcKFVJldm9rZVNlc3Npb25SZXNwb25zZSLiAQoMTG9naW5TZXNzaW9uEg8KAmlkGAEgASgJQgPgQQgSPQoLY2xpZW50X2tpbmQYAiABKA4yIy5oYXdrci5pZGVudGl0eS52MWFscGhhMS5DbGllbnRLaW5kQgPgQQMSNAoLY3JlYXRlX3RpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSNgoNbGFzdF91c2VfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxIUCgdjdXJyZW50GAUgASgIQgPgQQMiEwoRR2V0U2Vzc2lvblJlcXVlc3Qi0wEKEkdldFNlc3Npb25SZXNwb25zZRIxCgdhY2NvdW50GAEgASgLMiAuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuQWNjb3VudBI8CgpzdXNwZW5zaW9uGAIgASgLMiMuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuU3VzcGVuc2lvbkID4EEDEhkKDGRpc3BsYXlfbmFtZRgDIAEoCUID4EEDEjEKBmF2YXRhchgEIAEoCzIcLmhhd2tyLmNvbW1vbi52MWFscGhhMS5JbWFnZUID4EEDIkMKClN1c3BlbnNpb24SNQoMc3VzcGVuZGVkX2F0GAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDIhYKFERlbGV0ZUFjY291bnRSZXF1ZXN0ItQBChVEZWxldGVBY2NvdW50UmVzcG9uc2USSwoFc3RhdGUYASABKA4yPC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVzcG9uc2UuRGVsZXRpb25TdGF0ZSJuCg1EZWxldGlvblN0YXRlEh4KGkRFTEVUSU9OX1NUQVRFX1VOU1BFQ0lGSUVEEAASGgoWREVMRVRJT05fU1RBVEVfREVMRVRFRBABEiEKHURFTEVUSU9OX1NUQVRFX1BFTkRJTkdfT1JERVJTEAIiZAoMQ29udGFjdEVtYWlsEhIKBWVtYWlsGAEgASgJQgPgQQMSQAoGc291cmNlGAIgASgOMisuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuQ29udGFjdEVtYWlsU291cmNlQgPgQQMiGAoWR2V0Q29udGFjdEVtYWlsUmVxdWVzdCJXChdHZXRDb250YWN0RW1haWxSZXNwb25zZRI8Cg1jb250YWN0X2VtYWlsGAEgASgLMiUuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuQ29udGFjdEVtYWlsIiwKFlNldENvbnRhY3RFbWFpbFJlcXVlc3QSEgoFZW1haWwYASABKAlCA+BBAiJXChdTZXRDb250YWN0RW1haWxSZXNwb25zZRI8Cg1jb250YWN0X2VtYWlsGAEgASgLMiUuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuQ29udGFjdEVtYWlsKi0KBFJvbGUSFAoQUk9MRV9VTlNQRUNJRklFRBAAEg8KC1JPTEVfU0VMTEVSEAEqYwoNTG9naW5Qcm92aWRlchIeChpMT0dJTl9QUk9WSURFUl9VTlNQRUNJRklFRBAAEhkKFUxPR0lOX1BST1ZJREVSX0dPT0dMRRABEhcKE0xPR0lOX1BST1ZJREVSX0xJTkUQAipTCgpDbGllbnRLaW5kEhsKF0NMSUVOVF9LSU5EX1VOU1BFQ0lGSUVEEAASEwoPQ0xJRU5UX0tJTkRfV0VCEAESEwoPQ0xJRU5UX0tJTkRfQVBQEAIqhAEKEkNvbnRhY3RFbWFpbFNvdXJjZRIkCiBDT05UQUNUX0VNQUlMX1NPVVJDRV9VTlNQRUNJRklFRBAAEiEKHUNPTlRBQ1RfRU1BSUxfU09VUkNFX1ZFUklGSUVEEAESJQohQ09OVEFDVF9FTUFJTF9TT1VSQ0VfU0VMRl9FTlRFUkVEEAIyjAIKFUlkZW50aXR5UHVibGljU2VydmljZRJ9ChJJc3N1ZUFwcExvZ2luTm9uY2USMi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5Jc3N1ZUFwcExvZ2luTm9uY2VSZXF1ZXN0GjMuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuSXNzdWVBcHBMb2dpbk5vbmNlUmVzcG9uc2USdAoPRXhjaGFuZ2VJZFRva2VuEi8uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuRXhjaGFuZ2VJZFRva2VuUmVxdWVzdBowLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkV4Y2hhbmdlSWRUb2tlblJlc3BvbnNlMp4IChJJZGVudGl0eUFwcFNlcnZpY2USagoKR2V0U2Vzc2lvbhIqLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkdldFNlc3Npb25SZXF1ZXN0GisuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuR2V0U2Vzc2lvblJlc3BvbnNlIgOQAgESXAoHU2lnbk91dBInLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLlNpZ25PdXRSZXF1ZXN0GiguaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuU2lnbk91dFJlc3BvbnNlEmsKDExpbmtJZGVudGl0eRIsLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxpbmtJZGVudGl0eVJlcXVlc3QaLS5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaW5rSWRlbnRpdHlSZXNwb25zZRJwCgxMaXN0U2Vzc2lvbnMSLC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaXN0U2Vzc2lvbnNSZXF1ZXN0Gi0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlzdFNlc3Npb25zUmVzcG9uc2UiA5ACARKIAQoUTGlzdExpbmtlZElkZW50aXRpZXMSNC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaXN0TGlua2VkSWRlbnRpdGllc1JlcXVlc3QaNS5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaXN0TGlua2VkSWRlbnRpdGllc1Jlc3BvbnNlIgOQAgESbgoNUmV2b2tlU2Vzc2lvbhItLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLlJldm9rZVNlc3Npb25SZXF1ZXN0Gi4uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuUmV2b2tlU2Vzc2lvblJlc3BvbnNlEm4KDURlbGV0ZUFjY291bnQSLS5oYXdrci5pZGVudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVxdWVzdBouLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkRlbGV0ZUFjY291bnRSZXNwb25zZRJ5Cg9HZXRDb250YWN0RW1haWwSLy5oYXdrci5pZGVudGl0eS52MWFscGhhMS5HZXRDb250YWN0RW1haWxSZXF1ZXN0GjAuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuR2V0Q29udGFjdEVtYWlsUmVzcG9uc2UiA5ACARJ5Cg9TZXRDb250YWN0RW1haWwSLy5oYXdrci5pZGVudGl0eS52MWFscGhhMS5TZXRDb250YWN0RW1haWxSZXF1ZXN0GjAuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuU2V0Q29udGFjdEVtYWlsUmVzcG9uc2UiA5ACAmIGcHJvdG8z", [file_google_api_field_behavior, file_google_protobuf_duration, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_image]);
 
 /**
  * Account 是登入的帳號。
@@ -416,7 +416,7 @@ export const GetSessionRequestSchema: GenMessage<GetSessionRequest> = /*@__PURE_
  */
 export type GetSessionResponse = Message<"hawkr.identity.v1alpha1.GetSessionResponse"> & {
   /**
-   * @generated from field: hawkr.identity.v1alpha1.Account account = 2;
+   * @generated from field: hawkr.identity.v1alpha1.Account account = 1;
    */
   account?: Account | undefined;
 
@@ -424,7 +424,7 @@ export type GetSessionResponse = Message<"hawkr.identity.v1alpha1.GetSessionResp
    * 帳號被停權時的狀態；沒有停權時不設。停權的帳號仍能登入、讀取與刪除帳號，寫入回 permission_denied 與
    * hawkr.common.v1alpha1.ErrorReason.ACCOUNT_SUSPENDED。
    *
-   * @generated from field: hawkr.identity.v1alpha1.Suspension suspension = 3;
+   * @generated from field: hawkr.identity.v1alpha1.Suspension suspension = 2;
    */
   suspension?: Suspension | undefined;
 
@@ -432,14 +432,14 @@ export type GetSessionResponse = Message<"hawkr.identity.v1alpha1.GetSessionResp
    * 買家的顯示名稱（頁首與帳號選單用），與 BuyerAppService 的 Profile.display_name 同一份。讀取買家資料失敗時不設；
    * 登入狀態不受影響，client 不可把沒有這個欄位當成未登入。
    *
-   * @generated from field: string display_name = 4;
+   * @generated from field: string display_name = 3;
    */
   displayName: string;
 
   /**
    * 買家的頭像，與 Profile.avatar 同一份。沒有頭像、或讀取買家資料失敗時不設。
    *
-   * @generated from field: hawkr.common.v1alpha1.Image avatar = 5;
+   * @generated from field: hawkr.common.v1alpha1.Image avatar = 4;
    */
   avatar?: Image | undefined;
 };
@@ -535,6 +535,100 @@ export const DeleteAccountResponse_DeletionStateSchema: GenEnum<DeleteAccountRes
   enumDesc(file_hawkr_identity_v1alpha1_identity, 21, 0);
 
 /**
+ * ContactEmail 是帳號的聯絡信箱：賣家的收款帳戶聯絡人用它。
+ *
+ * @generated from message hawkr.identity.v1alpha1.ContactEmail
+ */
+export type ContactEmail = Message<"hawkr.identity.v1alpha1.ContactEmail"> & {
+  /**
+   * @generated from field: string email = 1;
+   */
+  email: string;
+
+  /**
+   * @generated from field: hawkr.identity.v1alpha1.ContactEmailSource source = 2;
+   */
+  source: ContactEmailSource;
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.ContactEmail.
+ * Use `create(ContactEmailSchema)` to create a new message.
+ */
+export const ContactEmailSchema: GenMessage<ContactEmail> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 22);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.GetContactEmailRequest
+ */
+export type GetContactEmailRequest = Message<"hawkr.identity.v1alpha1.GetContactEmailRequest"> & {
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.GetContactEmailRequest.
+ * Use `create(GetContactEmailRequestSchema)` to create a new message.
+ */
+export const GetContactEmailRequestSchema: GenMessage<GetContactEmailRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 23);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.GetContactEmailResponse
+ */
+export type GetContactEmailResponse = Message<"hawkr.identity.v1alpha1.GetContactEmailResponse"> & {
+  /**
+   * 帳號沒有任何聯絡信箱時不設。
+   *
+   * @generated from field: hawkr.identity.v1alpha1.ContactEmail contact_email = 1;
+   */
+  contactEmail?: ContactEmail | undefined;
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.GetContactEmailResponse.
+ * Use `create(GetContactEmailResponseSchema)` to create a new message.
+ */
+export const GetContactEmailResponseSchema: GenMessage<GetContactEmailResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 24);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.SetContactEmailRequest
+ */
+export type SetContactEmailRequest = Message<"hawkr.identity.v1alpha1.SetContactEmailRequest"> & {
+  /**
+   * 去前後空白、轉小寫後至多 254 字，格式為 local@domain，網域要有點。
+   *
+   * @generated from field: string email = 1;
+   */
+  email: string;
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.SetContactEmailRequest.
+ * Use `create(SetContactEmailRequestSchema)` to create a new message.
+ */
+export const SetContactEmailRequestSchema: GenMessage<SetContactEmailRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 25);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.SetContactEmailResponse
+ */
+export type SetContactEmailResponse = Message<"hawkr.identity.v1alpha1.SetContactEmailResponse"> & {
+  /**
+   * 設定之後的聯絡信箱（來源是 CONTACT_EMAIL_SOURCE_SELF_ENTERED）。
+   *
+   * @generated from field: hawkr.identity.v1alpha1.ContactEmail contact_email = 1;
+   */
+  contactEmail?: ContactEmail | undefined;
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.SetContactEmailResponse.
+ * Use `create(SetContactEmailResponseSchema)` to create a new message.
+ */
+export const SetContactEmailResponseSchema: GenMessage<SetContactEmailResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 26);
+
+/**
  * Role 是帳號另外申請的角色。買家不是角色：每個帳號都是買家。
  *
  * @generated from enum hawkr.identity.v1alpha1.Role
@@ -546,9 +640,9 @@ export enum Role {
   UNSPECIFIED = 0,
 
   /**
-   * @generated from enum value: ROLE_SELLER = 2;
+   * @generated from enum value: ROLE_SELLER = 1;
    */
-  SELLER = 2,
+  SELLER = 1,
 }
 
 /**
@@ -612,6 +706,38 @@ export enum ClientKind {
  */
 export const ClientKindSchema: GenEnum<ClientKind> = /*@__PURE__*/
   enumDesc(file_hawkr_identity_v1alpha1_identity, 2);
+
+/**
+ * ContactEmailSource 是聯絡信箱的來源。
+ *
+ * @generated from enum hawkr.identity.v1alpha1.ContactEmailSource
+ */
+export enum ContactEmailSource {
+  /**
+   * @generated from enum value: CONTACT_EMAIL_SOURCE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * provider 回報、已驗證的 email：唯讀，隨登入更新。
+   *
+   * @generated from enum value: CONTACT_EMAIL_SOURCE_VERIFIED = 1;
+   */
+  VERIFIED = 1,
+
+  /**
+   * 帳號自己填的信箱：未驗證。
+   *
+   * @generated from enum value: CONTACT_EMAIL_SOURCE_SELF_ENTERED = 2;
+   */
+  SELF_ENTERED = 2,
+}
+
+/**
+ * Describes the enum hawkr.identity.v1alpha1.ContactEmailSource.
+ */
+export const ContactEmailSourceSchema: GenEnum<ContactEmailSource> = /*@__PURE__*/
+  enumDesc(file_hawkr_identity_v1alpha1_identity, 3);
 
 /**
  * IdentityPublicService 是登入之前的方法：App 把原生 SDK 取得的 ID token 換成 session。兩個方法都是 POST，回應一律不可快取。
@@ -730,6 +856,28 @@ export const IdentityAppService: GenService<{
     methodKind: "unary";
     input: typeof DeleteAccountRequestSchema;
     output: typeof DeleteAccountResponseSchema;
+  },
+  /**
+   * GetContactEmail 回傳呼叫者的帳號聯絡信箱（正規化後的值）與來源：provider 驗證過、而且格式可用的 email 優先，沒有（含格式不合）
+   * 才用 SetContactEmail 填的自填信箱。兩者都沒有可用的值時回應不帶 contact_email（賣家送出 KYC 申請前要先有，ErrorReason CONTACT_EMAIL_REQUIRED）。停權的帳號也能呼叫。
+   *
+   * @generated from rpc hawkr.identity.v1alpha1.IdentityAppService.GetContactEmail
+   */
+  getContactEmail: {
+    methodKind: "unary";
+    input: typeof GetContactEmailRequestSchema;
+    output: typeof GetContactEmailResponseSchema;
+  },
+  /**
+   * SetContactEmail 設定呼叫者自填的聯絡信箱（未驗證，不是通知的寄件地址）。只在帳號沒有可用的 provider 驗證 email 時可設，
+   * 有可用（格式正確）的驗證信箱時回 failed_precondition，什麼都不改；驗證信箱格式不合視為沒有，可以設；信箱格式不合回 invalid_argument 與欄位 email。以同一個值重送成功。
+   *
+   * @generated from rpc hawkr.identity.v1alpha1.IdentityAppService.SetContactEmail
+   */
+  setContactEmail: {
+    methodKind: "unary";
+    input: typeof SetContactEmailRequestSchema;
+    output: typeof SetContactEmailResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_hawkr_identity_v1alpha1_identity, 1);

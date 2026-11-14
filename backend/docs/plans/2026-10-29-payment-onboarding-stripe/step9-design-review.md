@@ -1,0 +1,91 @@
+# 步驟 9a：完成前的設計審查帳本
+
+審查對象：`cfcfeca1..6f066b08`（719 檔）。兩位沒有參與撰寫的唯讀審查者，各審一半：後端（`backend/internal`、`backend/cmd`）與對外契約加 client（`api`、website、admin、seller-app、packages）。只看設計（照搬、將就、只記待決），不找正確性 bug。
+
+第 1 輪：findings 21 (blocking 0)：修 16（排進 9b–9d）、記錄 5、交 Will 11（全部選「改」，D48–D54，已併入「修」）、駁回 0。
+
+狀態欄：open＝排進子步驟、還沒做；fixed＝做完並寫出證明它的檢查；recorded＝寫進所列位置並附觸發條件。子步驟完成時回來改這一欄。
+
+## 後端
+
+| # | 位置 | 嚴重度 | 發現 | 處置 | 狀態 |
+|---|---|---|---|---|---|
+| B1 | `internal/platform/stripe/client.go`、`webhook.go` | should | 手寫 Stripe HTTP client 與驗簽，沒用官方 stripe-go，也沒寫理由 | 改（D51，9b）：先確認 SDK 支援 Accounts v2 與釘住的 preview 版本 | fixed（`fa8ad019`、`6d681a2e`）：`internal/platform/stripe` 建在 stripe-go v87.1.0 上，contract 測試重放 `2026-10-28.endive` 的錄製；`git grep -n 'Stripe-Version' -- backend/internal backend/cmd` 只剩註解與測試的斷言 |
+| B2 | 分支新增的 migration 24 支（seller 19 支） | should | 建了又刪的表與欄位全留成 migration；只在本分支與 `diag/*` 套用過 | 改（D48，9d）：壓成淨差異 | fixed（`47438c57`、`bd226d9e`、`c83dc30a`、`9a5d2b7d`）：CI 診斷 run 43567659142，壓平前後 `pg_dump --schema-only` 的差異只有 `accounts_poll` 2 行；`TestPaymentOnboardingSquashedMigrationDeletesRetiredRowsAndKeepsTheRest`（8 個 mutation 各自讓它失敗） |
+| B3 | `payment/internal/account/service.go` 的 `Purge` | should | 個資清理刪掉本地對應，外部帳戶永遠開著、之後找不到 | 改（D52，9b）：關閉成功才刪對應 | fixed（`603bc2b8`、`6d681a2e`、`9fa7d985`、`ab467882`）：`TestForgetOwnersClosesTheExternalAccountThenDeletesTheRow`、`TestAFailedCloseKeepsTheRowMarkedExcludedFromPollingAndRetriedByTheSweep`、`TestPurgeOfARowWithoutExternalIDStoresTheResolvedIDBeforeClosing`（CI run 43471966103） |
+| B4 | `cmd/hawkr/payment.go` 的 `PAYMENT_PROVIDER=fake` | should | fake provider 讓所有帳戶直接啟用，沒有 dev 環境保護；repo 已有 `requireDevEnvironment` | 改（9b） | fixed（`95343fc8`）：`TestFakePaymentProviderOnlyInDevEnvironment` |
+| B5 | `.github/workflows/backend-db-proto-checks.yml` | should | `internal/platform/inbox/db` 的 migration 不在 CI 的 atlas 檢查內 | 改（9d） | fixed（`80759b94`）：run 43567659702 驗了 `internal/platform/inbox/db`；改壞 `atlas.sum` 的 run 43563920293 失敗 |
+| B6 | `payment.accounts.contact_email` | should | 信箱快照是帳戶還在 seller 時的決定，搬家後多一條已知限制 | 改（D50，9b）：建立外部帳戶當下經 `Owners` 讀 | fixed（`603bc2b8`、`8d2f34e7`，D55）：`contact_email` 欄刪除；`TestEnsureReadsTheOwnersContactEmailAtCreationTime`、`TestARetriedCreateWithAChangedEmailKeepsOneExternalAccount`（CI run 43471966103） |
+| B7 | `account/jobs.go` 的 `Sweep` | nit | 每 15 分鐘輪詢所有未啟用帳戶，沒有年齡上限或退避 | 記：payment `CARRYOVER.md`，觸發：上線前定上限（9b 寫入） | recorded（`95343fc8`）：payment `CARRYOVER.md`「輪詢補漏」列，觸發：上線前 |
+| B8 | `payment/db/schema.sql` 的 `accounts_poll` | nit | 索引前導欄位 `fetched_at` 沒有查詢用到 | 改（9d，隨壓平） | fixed（`80759b94`）：索引是 `(store_id)`；唯一用到的查詢 `PollablePaymentAccountStoreIDs` 以 `store_id` 篩選與排序 |
+| B9 | `docs/modules/payment.md` §8 第 2 點 | nit | 已關閉店家的建立失敗待辦要管理員手動清 | 記：同處補觸發條件「上線前，或後台待辦出現已關閉店家時」（9b 寫入） | recorded（`95343fc8`）：`docs/modules/payment.md` §8 補觸發條件 |
+| B10 | `account/sync.go`、`service.go` 的 provider 分支 | nit | provider 不符就靜默略過，換 provider 後舊列沒有去向 | 記：payment `CARRYOVER.md`，觸發：接第二家金流商（9b 寫入） | recorded（`95343fc8`）：payment `CARRYOVER.md`「`provider` 欄位」列，觸發：接第二家金流商 |
+| B11 | `internal/platform/inbox/inbox.go` 的 `Purge`、`Sweep` | nit | 未處理事件永不刪、沒有終局狀態，每個新 handler 要自己補掃 | 記：payment `CARRYOVER.md`，觸發：第二個 handler 接上 inbox 時（9b 寫入） | recorded（`95343fc8`）：payment `CARRYOVER.md`「`inbox.events`」列，觸發：第二個 handler 接上 inbox 時 |
+| B12 | `internal/platform/emailaddr` | nit | `agent/internal/model/email.go`、`seller/internal/governance/report.go` 仍各寫一份信箱規則 | 改（9b，待 Will 確認兩個行為改變；不同意就改成記錄） | fixed（`7305492a`，Will 2026-11-13、11-14 同意五項行為改變）：`git grep -n 'mail\.ParseAddress' -- backend/internal backend/cmd` 只剩 `emailaddr`；`TestValidateSubmitAnonymousEmailRule` |
+| B13 | `payment/CARRYOVER.md` | nit | 漏列 Stripe client、不倒退條件、重讀名額、fake provider、`Owners`、`provider` 欄位 | 改（9b） | fixed（`95343fc8`、`8d2f34e7`）：payment `CARRYOVER.md` 補列 Stripe client、不倒退條件、重讀名額、`requirements`、fake provider、`Owners`、`provider` 欄位、兩步建立的延後項 |
+
+## 契約與 client
+
+| # | 位置 | 嚴重度 | 發現 | 處置 | 狀態 |
+|---|---|---|---|---|---|
+| C1 | `website/lib/seller/payment-account.ts`、`PaymentAccountSection.tsx`、seller-app `payment_account_action.dart` | should | 兩個 client 仍從 `PaymentAccount.status` 推導下一步，與 `OnboardingTask.action` 重複；目錄有兩套按鈕文字 | 改（D49，9c） | fixed（D56；`0c953d3a`、`4c631f1c`）：`git grep -n -E 'paymentAccountCanOnboard|paymentAccountLink|PaymentAccountActionKind|REFRESH_PAYMENT_ACCOUNT' -- backend/internal backend/cmd api/hawkr admin website seller-app packages` 0 筆；`TestOnboardingTaskStatesAndActions`、`TestPlanSessionKeepsThePreconditionsOnTheCannotEmbedPath`、seller-app `wallet_screen_test.dart` 的「收款帳戶狀態面板」群組（三個 mutation 各自讓它們失敗） |
+| C2 | `CreatePaymentOnboardingSessionRequest.return_url`／`refresh_url`、seller-app `HAWKR_WEB_ORIGIN` | should | 回跳網址由 client 組，伺服器接受任何 https 網址；後端已有 `PUBLIC_WEB_ORIGIN` | 改（D49，9c） | fixed（`cb3b91ae`、`8a33414b`）：`TestOnboardingReturnPagesExistInTheWebsiteRoutes`、`TestWebLocalesMatchTheWebsiteRouting`；`git grep -n -E 'return_url|refresh_url|HAWKR_WEB_ORIGIN|onboardingUrls'` 在程式 0 筆 |
+| C3 | admin payment 的 `RefreshPaymentAccount` 與 admin 的輪詢 | should | 後台重讀是排 job 加 client 輪詢，賣家端已有同步重讀 | 改（D49，9c） | fixed（`fdaab813`）：`TestAdminRefreshRereadsSynchronouslyThroughTheSellerPath`（CI mutation run 43541657688 失敗）；`git grep -n REFRESH_REREAD -- admin` 0 筆 |
+| C4 | seller `PaymentAccount` 的 `requirement_collection`、`transfers_active`、`requirements`，session 的 `expire_time` | should | 賣家端沒有消費端；`requirements` 是金流商原始 JSON | 改（D49，9c） | fixed（`9f807664`）：seller `PaymentAccount` 只剩 `status`、`onboarding_surface`、`payouts_active`、`fetch_time`，session 回應沒有 `expire_time` |
+| C5 | `api/hawkr/admin/payment/v1alpha1/payment.proto` import seller | should | 收款帳戶的 enum 還在 seller 的 package，方向與模組擁有者相反 | 改（D49，9c） | fixed（`a78c016f`）：`git grep -n 'hawkr/seller/v1alpha1/seller.proto' -- api/hawkr/admin/payment` 0 筆；enum 定義在 `api/hawkr/payment/v1alpha1/payment.proto` |
+| C6 | `EmbeddedPaymentOnboarding.tsx`、`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | should | 中立的 `EMBEDDED` 在 website 一律當成 Stripe，公開金鑰要與後端人工對齊 | 改（D53，9c） | fixed（`63d3c7e1`）：`TestStripePaymentConfig`；website 不認得的 provider 顯示錯誤狀態的兩個 unit 測試；`git grep -n NEXT_PUBLIC_STRIPE -- website` 0 筆 |
+| C7 | `api/hawkr/**` 新增的 48 行 `reserved` | nit | 系統未上線，不需要保留編號與名稱 | 改（D54，9c） | fixed（`96c6c0ef`、`ac7fe9a0`）：`git grep -n -E '^[[:space:]]*reserved ' -- api/hawkr` 0 筆；`check_inventory.py` 對加回的 `reserved` 失敗 |
+| C8 | `website/lib/seller/contact-email.ts`、seller-app `contact_email.dart` | nit | 聯絡信箱的格式規則在 TS 與 Dart 各一份，與客服信箱的 regex 也不同 | 記：延後，觸發：下一次改聯絡信箱規則時（計畫「延後」） | recorded |
+
+## 審查者沒有涵蓋的範圍
+
+- 後端：httpapi 各 handler 的本體；seller 的 `kyc`、`measure`、`purge` 與 8d、8e SQL 函式的 body；`stripe/client.go` 的重試與分頁；`adminperm`、uitext；測試檔與生成檔。
+- client：`CertificationsClient.tsx`、`kyc.ts`、seller-app 的 KYC 精靈與錢包畫面、admin 的 `KycApplicationCards.tsx`、CSS、法務文件、測試；`governance.proto`、`measure.proto` 只看前段；三個子專案的 `AGENTS.md` 與兩份 ADR 全文沒有讀。
+
+這些範圍各自在 7、8 的子步驟有 diff 審查（進度表），沒有設計視角的審查。
+
+## 第 2 輪（9e，2026-11-14）
+
+審查對象：`e542bed1..938bbe7f`，兩位沒有參與撰寫的唯讀審查者（後端；契約加 client），只審 9b–9d 的修改。findings 9 (blocking 0)：修 1、記錄 2、交 Will 4（D58、D59）、駁回 0；兩位重複 2（語系欄位、`CARRYOVER.md` 漏列）。第 1 輪的 B1–B13、C1–C8 在 `938bbe7f` 逐列核對，無回退（列上的 CI run 與 mutation 沒有重跑）。
+
+| # | 位置 | 嚴重度 | 發現 | 處置 | 狀態 |
+|---|---|---|---|---|---|
+| R1 | `seller.proto` 的 `CreatePaymentOnboardingSessionRequest.locale`、`rpc.ValidWebLocale` | should | 語系 ADR 定的通道是 `Accept-Language`；`uitext.WithLocale` 在正式程式沒有呼叫者，欄位是通道沒做的替代品 | 交 Will：改（D58，9f）：做協商 interceptor、刪欄位 | fixed（9f）：`rg -n 'ValidWebLocale|string locale' backend/internal api/hawkr/seller` 0 筆；`TestAcceptLanguageDecidesTheRequestLocale`、`TestCreatePaymentOnboardingSessionBuildsTheReturnUrlsFromTheRequestLocale` |
+| R2 | `PaymentAccount.onboarding_surface`、website `startOnboarding` | should | 欄位只剩預先分支在用，與 session 的介面來源不同，切換收件方式後會擋下賣家 | 交 Will：改（D58，9f） | fixed（9f）：`git grep -n -i 'onboarding_surface\|onboardingSurface' -- api backend/internal website seller-app` 0 筆；`TestOpenSessionReadsTheStoredCollectionNotTheCurrentConfiguration` |
+| R3 | `CreatePaymentOnboardingSessionResponse` | should | 型態欄位加攤平欄位，有第三種組合；規範要求互斥型態用 `oneof` | 交 Will：改（D58，9f） | fixed（9f）：回應是 `oneof session`；`TestChooseSessionIsEmbeddedOnlyForStripePlatformRowsWhenTheCallerCanEmbed`、`TestOpenSessionRejectsAShapeThatDiffersFromTheRequestedKind` |
+| R4 | `payment/internal/account/service.go` 的 `planPurge` | should | 沒有外部 ID 又問不到 provider 的列直接刪，丟掉冪等鍵；`CARRYOVER.md` 的敘述與行為相反 | 交 Will：改（D59，9g） | fixed（9g，本步驟的 commit）：`TestPurgeDeletesNeverCalledRowsWithoutAProviderAndKeepsCalledRows`（從沒呼叫過的列沒有 provider 也刪、呼叫過的不刪）、`TestPurgeAfterTheIdempotencyKeyExpiredReconcilesByListingNotByReplay`（超過 30 天列出對帳，整份列完才刪，列出失敗不刪）、`TestTheFirstStepIDIsKeptWhenTheSecondStepFailsAndAHalfCreatedRowIsNotOnboardable`；`CARRYOVER.md` 的敘述已與行為一致 |
+| R5 | `seller.proto` 的 `locale` 註解 | nit | 註解寫「不影響網址」，App 加內嵌介面時會影響 | 改：隨 R1 刪欄位 | fixed（9f）：`locale` 欄位與註解已刪 |
+| R6 | payment `CARRYOVER.md` 傳輸層表（兩位都提） | nit | 9b–9d 的新機制沒有列 | 記：9f、9g 各自補列改完後還在的機制 | 9f 的部分 fixed（payment `CARRYOVER.md` 傳輸層表補四列）；9g 的部分 fixed（9g，本步驟的 commit）：沿用盤點表補三列（建立事實與約束、`ResolveAccount` 只找不建、清理終局與紀錄表） |
+| R7 | payment `CARRYOVER.md` 四列「上線前」的延後項 | nit | repo 沒有上線前的彙整處 | 記：9g 關掉其中三列，剩下的隨 9e 的延後項搬回主清單 | 9g 的部分：關掉兩列（冪等鍵超過保存期、清理的永久失敗沒有終局狀態）；「同步讀到已關閉的外部帳戶」一列已由 D61(3) 補進 9g 並關掉（見第 3 輪 N1，`CARRYOVER.md` 該列已處理）；「輪詢補漏」仍開著；剩下兩列隨 9e 搬回主清單。open（9e） |
+| 附註 | 帳本 C2、B1 的檢查（核對時的附註，不計入發現） | nit | C2 的 `git grep` 沒寫路徑；B1 的 grep 另命中兩個文件 | 記：檢查的範圍是 `backend/internal backend/cmd api/hawkr admin website seller-app packages` 的程式，命中都是 Stripe 自己的欄位名與文件 | recorded |
+
+## 第 3 輪（9g diff 審查後的修正，2026-11-14）
+
+來源：9g 的累積 diff 審查（`08a1ac51...d7819b82`）與 Will 的決定 D61。修正在 `8a05a888`；第 1、2 輪各列不得回退（修正後 `go test ./...`、`go vet -tags integration ./...` 與 admin 測試全過，整合測試交 CI）。
+
+| # | 位置 | 嚴重度 | 發現 | 處置 | 狀態 |
+|---|---|---|---|---|---|
+| D1 | `payment/internal/account/jobs.go` 的 `Sweep` | blocking | 沒有 provider 時整個提早回傳，呼叫過而標成等待清理的列永遠不被重排，7 天後也到不了終局；`CARRYOVER.md` 的敘述與行為相反，測試直接呼叫 `PurgeAccount` 繞過了 `Sweep` | 改：沒有 provider 時仍重排清理（同步與建立照舊略過） | fixed（`8a05a888`）：`TestSweepWithoutAProviderRequeuesPurgeAndTheRowReachesTheTerminalStateAfterTheDeadline`（經 `SweepAccounts` 排入、跑排入的清理，逾期後進終局與後台待辦；整合測試，CI 跑） |
+| D2 | `account/stripe.go` 的 `ResolveAccount`、`service.go` 的清理與建立對帳 | should | 多個符合的未關閉帳戶只處理第一個 | 改（D61(1)）：清理全部關閉才刪列，建立採用最新的並關閉其餘；port 回傳全部 | fixed（`8a05a888`）：`TestPurgeAfterTheIdempotencyKeyExpiredClosesEveryMatchingAccountBeforeDeletingTheRow`、`TestEnsureAfterTheIdempotencyKeyExpiredAdoptsTheNewestMatchAndClosesTheRest`（整合）；`TestStripeResolveAccountReturnsEveryMatchNewestFirstAndOnlyInItsNamespace`、`TestFakeResolveOnlyFindsAndKeyExpiryCreatesANewAccount`（單元） |
+| D3 | admin `PaymentAccountCard.tsx` | should | 用外部帳戶 ID 判斷「已建立」，半建立的列顯示重新整理 | 改：看契約的狀態（`status` 不是 `NOT_CREATED`） | fixed（`8a05a888`）：`tests/merchant-payment-account-card.test.ts` 的半建立案例與 `paymentAccountCreated` |
+| D4 | `platform/stripe/client.go`、`cmd/hawkr/payment.go` | should | 只比 `metadata.store_id` 會關到共用 Stripe 帳號的另一個環境的帳戶 | 改（D61(1)）：必填 `STRIPE_ACCOUNT_NAMESPACE`（設了金鑰沒有它或格式不合啟動失敗），建立寫 `metadata.hawkr_namespace`，列出比對兩者 | fixed（`8a05a888`）：`TestStripePaymentConfig`、`TestValidateNamespace`、`TestNewRejectsMissingSecretsAndBadBaseURL`、`TestCreateAccountShellSendsOnlyTheStoreIDAndNamespaceMetadata`（請求本文含命名空間）、`TestListAccountIDsByStoreMatchesBothStoreIDAndNamespaceAcrossPages`、`TestListAccountIDsByStoreMatchesRecordedAccountsOnlyInTheirNamespace`（錄製的帳戶沒有命名空間，不被比對；待重錄後改正向） |
+| D5 | admin 新文字 | nit | 文字待 Will 核准 | Will 已核准現有三句（D61(2)），不改文字 | fixed（`8a05a888`）：卡片終局說明由 `merchant-payment-account-card.test.ts` 的 `provider_refused` 案例、確認框標題與說明由 `merchant-payment-account-section.test.ts`（補上說明句的斷言）涵蓋 |
+| D6 | `payment/db/pub.sql`、`seller/db/pub.sql` 的註解 | nit | 只提一種待辦 | 改：兩處都列 `PAYMENT_ACCOUNT_CREATE_FAILED`、`PAYMENT_ACCOUNT_PURGE_STUCK` | fixed（`8a05a888`）：`git grep -n PURGE_STUCK -- backend/internal/modules/payment/db/pub.sql backend/internal/modules/seller/db/pub.sql` 兩筆 |
+| D7 | `platform/stripe/client.go` 的 `CloseAccount` | nit | 讀與關閉之間並行的設定讓 400 `configs_must_match_to_close` 被當成永久失敗 | 改：重讀一次、用新的設定重送一次，第二次仍不符才回錯誤 | fixed（`8a05a888`）：`TestCloseAccountRereadsAndRetriesOnceWhenAConfigurationAppearedBetweenReadAndClose`、`TestCloseAccountConfigsMustMatchTwiceIsAPermanentError`、`TestCloseAccountConfigsMustMatchThenAlreadyClosedSucceeds` |
+| N1 | `RetrieveAccount`、`FetchAccount`、`StatusOf`、輪詢 SQL | should | 同步讀到在 provider 關閉的帳戶一直重試（原 R7 第三列） | 改（D61(3)）：adapter 先看 `closed`（不讀銀行帳號），`Snapshot.Closed` 推導成 `DISABLED`、原因碼 `closed`，輪詢視為終局；原因碼只給後台，沒有新的列舉值或賣家文字 | fixed（`8a05a888`）：`TestRetrieveAccountOnAClosedAccountReturnsClosedWithoutCapabilities`、`TestStripeFetchAccountOfAClosedAccountReturnsClosedWithoutReadingBankAccounts`、`TestSyncOfAnAccountClosedAtTheProviderIsDisabledWithTheClosedReasonAndNeverPolledAgain`（整合）、`TestSweepQueuesSyncForOpenAndLiftableStatusesOnly` 加入 `closed` 列 |
+| N-a | `platform/stripe/client.go` 的 `ListAccountIDsByStore` | nit | 「新的在前」靠 Stripe 的列表順序，錄製的 fixture 顯示它不嚴格依建立時間 | 改：依帳戶 `created` 由新到舊穩定排序，同時間維持列表順序 | fixed：`TestListAccountIDsByStoreOrdersMatchesByCreatedNewestFirst` |
+| N-b | 同上 | nit | 翻頁中列表位移會讓同一個 ID 出現兩次，呼叫方的 `ids[1:]` 含 `ids[0]`，建立會關掉剛採用的帳戶 | 改：回傳前以 ID 去重 | fixed：`TestListAccountIDsByStoreReturnsAnIDListedOnTwoPagesOnce` |
+| N-c | `account/service.go`、`account/AGENTS.md`、`payment.go`、整合測試的註解 | nit | 對帳敘述只寫 `metadata.store_id` | 改：補上 `metadata.hawkr_namespace` 與全部符合者都處理 | fixed：`rg -n "metadata.store_id" backend/internal backend/docs/modules backend/docs/adr` 的剩餘行都已含命名空間或是欄位說明 |
+
+## /code-review (9g)
+
+來源：9g 修正後的 `/code-review`，C1–C6。第 1–3 輪各列不得回退。整合測試交 CI（本機只跑 unit、`go vet -tags integration`）。
+
+| # | 位置 | 嚴重度 | 發現 | 處置 | 狀態 |
+|---|---|---|---|---|---|
+| C1 | `platform/stripe/client.go` 的 `APIError.Permanent`、`account/service.go` 的 `purgeFailed` | blocking | 任何 4xx（408、409、429 除外）都算永久，401、403（金鑰填錯或輪替）被當成 provider 拒絕關閉而直接進終局，7 天期限（D60）形同虛設 | 改：401、403 不算永久，清理維持可重試到期限；建立路徑共用同一分類，401、403 改為重試到最後一次嘗試才記建立失敗（沒有同樣的缺陷，不另改） | fixed：`TestAPIErrorPermanence`、`TestClassifyTreatsAuthenticationAndPermissionFailuresAsRetryable`、`TestStripeFetchFillsBankFingerprintsAndFailsWholeWhenTheListFails` |
+| C2 | `account/events.go` 的 `handleEvent` | should | 半建立的列（已有外部 ID）收到事件時排同步、同步提早返回，事件永遠不被標記；與 `docs/modules/payment.md` 不符 | 改：`create_completed_at` 為 NULL 時與對不到帳戶相同，標記已處理 | fixed：`TestAnEventForAHalfCreatedRowEnqueuesNoSyncAndIsMarkedProcessed` |
+| C3 | `account/service.go` 清理的對帳分支 | should | 空列表立刻刪列；標記前剛送出的建立呼叫可能還沒出現在列表 | 改：標記滿 `purgeListMargin`（1 小時）才信空列表，之前留著由掃描重跑 | fixed：`TestPurgeListingThatIsEmptyOnlyDeletesTheRowAfterTheSafetyMargin`（`TestPurgeAfterTheIdempotencyKeyExpiredReconcilesByListingNotByReplay` 同步調整） |
+| C4 | `account/service.go` 的 `jobTimeout`、`purgeFailed` | should | 60 秒只夠一次呼叫，清理與建立會串多次；job 自己逾時還可能被記成 `deadline_exceeded` | 改：一次最多關 3 個多餘帳戶（`maxExtrasPerRun`），時間上限由最多呼叫數推出；job 的 ctx 已取消時不進終局 | fixed：`TestJobTimeoutCoversTheMostProviderCallsAJobCanMake`、`TestPurgeClosesAtMostAFewExtraAccountsPerRunAndOnlyDeletesTheRowWhenAllAreClosed`、`TestAJobCancelledPastTheDeadlineIsNotRecordedAsDeadlineExceeded` |
+| C5 | `account/service.go` 的 `Purge` | nit | 內嵌重寫了 `closeExtra` | 改：與建立共用 `closeExtras`（呼叫 `closeExtra`） | fixed：`TestPurgeAfterTheIdempotencyKeyExpiredClosesEveryMatchingAccountBeforeDeletingTheRow` |
+| C6 | `account/service.go` 的 `MappingDeletions` | nit | 缺其他入口都有的 `model.Positive` | 改 | fixed：`TestAccountMappingDeletionsRejectsANonPositiveStoreID` |

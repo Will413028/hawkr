@@ -27,8 +27,8 @@ const DefaultLocale = ZhTW
 
 type localeKey struct{}
 
-// WithLocale 與 LocaleFrom 是請求語系的縫：L′ 沒有人呼叫 WithLocale，LocaleFrom 一律回 DefaultLocale；
-// I-server 的 interceptor 依 Accept-Language 協商後寫入。模組只能經這裡取語系，不讀 header。
+// WithLocale 與 LocaleFrom 是請求語系的縫：`rpc.NewInterceptor` 依 Accept-Language 協商後寫入（admin 的 service
+// 固定 zh-TW），沒有經過它的 ctx 讀到 DefaultLocale。模組只能經這裡取語系，不讀 header。
 func WithLocale(ctx context.Context, l Locale) context.Context {
 	return context.WithValue(ctx, localeKey{}, l)
 }

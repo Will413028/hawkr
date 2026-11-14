@@ -31,7 +31,7 @@ func TestMountedAdminServicesMatchTheDeclarations(t *testing.T) {
 	for _, d := range descriptors {
 		methods += d.Methods().Len()
 	}
-	if len(descriptors) != 7 || methods != len(adminauth.Procedures()) {
+	if len(descriptors) != 8 || methods != len(adminauth.Procedures()) {
 		t.Fatalf("掛載 %d 個 admin service、%d 支方法；宣告 %d 支", len(descriptors), methods, len(adminauth.Procedures()))
 	}
 }

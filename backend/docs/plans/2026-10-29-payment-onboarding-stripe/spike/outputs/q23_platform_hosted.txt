@@ -1,0 +1,14 @@
+# q23: 平台收件（dashboard=none）的 v2 recipient 帳戶走 Stripe 託管開通頁；正式 adapter 對 sandbox hawkr-dev，2026-11-14，SDK 釘的 2026-10-28.endive
+$ q22_adapter create none
+account: acct_1UbbRjIZcq7hbx3V
+link: https://connect.stripe.com/setup/c/acct_1UbbRjIZcq7hbx3V/[scrubbed]
+# 瀏覽器（Chrome）走完託管頁：測試電話與驗證碼 -> 姓名與網站（Stripe 的測試值）-> 測試銀行（Test (Non-OAuth)，選一個帳戶）-> Review and submit -> 導回 https://example.com/return
+# 頁面沒有問生日、SSN 後四碼與地址
+$ q22_adapter status acct_1UbbRjIZcq7hbx3V   # 開通後，間隔 20 秒讀兩次，結果相同
+transfers: {Status:active Details:[]}
+payouts: {Status:active Details:[]}
+requirements 的 description（都是 eventually_due、只影響 stripe_balance.payouts）: identity.individual.date_of_birth.day, identity.individual.date_of_birth.month, identity.individual.date_of_birth.year, identity.individual.id_numbers.us_ssn_last_4
+$ q22_adapter close acct_1UbbRjIZcq7hbx3V
+close #1: ok
+close #2: ok
+retrieve after close: stripe：帳戶 acct_1UbbRjIZcq7hbx3V 的回應沒有 stripe_transfers 能力

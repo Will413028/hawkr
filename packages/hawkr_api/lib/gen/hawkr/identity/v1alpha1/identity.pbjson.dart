@@ -27,18 +27,13 @@ const Role$json = {
   '1': 'Role',
   '2': [
     {'1': 'ROLE_UNSPECIFIED', '2': 0},
-    {'1': 'ROLE_SELLER', '2': 2},
+    {'1': 'ROLE_SELLER', '2': 1},
   ],
-  '4': [
-    {'1': 1, '2': 1},
-  ],
-  '5': ['ROLE_BUYER'],
 };
 
 /// Descriptor for `Role`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List roleDescriptor = $convert.base64Decode(
-    'CgRSb2xlEhQKEFJPTEVfVU5TUEVDSUZJRUQQABIPCgtST0xFX1NFTExFUhACIgQIARABKgpST0'
-    'xFX0JVWUVS');
+    'CgRSb2xlEhQKEFJPTEVfVU5TUEVDSUZJRUQQABIPCgtST0xFX1NFTExFUhAB');
 
 @$core.Deprecated('Use loginProviderDescriptor instead')
 const LoginProvider$json = {
@@ -70,6 +65,22 @@ final $typed_data.Uint8List clientKindDescriptor = $convert.base64Decode(
     'CgpDbGllbnRLaW5kEhsKF0NMSUVOVF9LSU5EX1VOU1BFQ0lGSUVEEAASEwoPQ0xJRU5UX0tJTk'
     'RfV0VCEAESEwoPQ0xJRU5UX0tJTkRfQVBQEAI=');
 
+@$core.Deprecated('Use contactEmailSourceDescriptor instead')
+const ContactEmailSource$json = {
+  '1': 'ContactEmailSource',
+  '2': [
+    {'1': 'CONTACT_EMAIL_SOURCE_UNSPECIFIED', '2': 0},
+    {'1': 'CONTACT_EMAIL_SOURCE_VERIFIED', '2': 1},
+    {'1': 'CONTACT_EMAIL_SOURCE_SELF_ENTERED', '2': 2},
+  ],
+};
+
+/// Descriptor for `ContactEmailSource`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List contactEmailSourceDescriptor = $convert.base64Decode(
+    'ChJDb250YWN0RW1haWxTb3VyY2USJAogQ09OVEFDVF9FTUFJTF9TT1VSQ0VfVU5TUEVDSUZJRU'
+    'QQABIhCh1DT05UQUNUX0VNQUlMX1NPVVJDRV9WRVJJRklFRBABEiUKIUNPTlRBQ1RfRU1BSUxf'
+    'U09VUkNFX1NFTEZfRU5URVJFRBAC');
+
 @$core.Deprecated('Use accountDescriptor instead')
 const Account$json = {
   '1': 'Account',
@@ -85,19 +96,12 @@ const Account$json = {
       '10': 'roles'
     },
   ],
-  '9': [
-    {'1': 3, '2': 4},
-    {'1': 4, '2': 5},
-    {'1': 5, '2': 6},
-  ],
-  '10': ['active_role', 'perspective'],
 };
 
 /// Descriptor for `Account`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List accountDescriptor = $convert.base64Decode(
     'CgdBY2NvdW50EhMKAmlkGAEgASgJQgPgQQhSAmlkEjgKBXJvbGVzGAIgAygOMh0uaGF3a3IuaW'
-    'RlbnRpdHkudjFhbHBoYTEuUm9sZUID4EEDUgVyb2xlc0oECAMQBEoECAQQBUoECAUQBlILYWN0'
-    'aXZlX3JvbGVSC3BlcnNwZWN0aXZl');
+    'RlbnRpdHkudjFhbHBoYTEuUm9sZUID4EEDUgVyb2xlcw==');
 
 @$core.Deprecated('Use issueAppLoginNonceRequestDescriptor instead')
 const IssueAppLoginNonceRequest$json = {
@@ -425,7 +429,7 @@ const GetSessionResponse$json = {
   '2': [
     {
       '1': 'account',
-      '3': 2,
+      '3': 1,
       '4': 1,
       '5': 11,
       '6': '.hawkr.identity.v1alpha1.Account',
@@ -433,17 +437,17 @@ const GetSessionResponse$json = {
     },
     {
       '1': 'suspension',
-      '3': 3,
+      '3': 2,
       '4': 1,
       '5': 11,
       '6': '.hawkr.identity.v1alpha1.Suspension',
       '8': {},
       '10': 'suspension'
     },
-    {'1': 'display_name', '3': 4, '4': 1, '5': 9, '8': {}, '10': 'displayName'},
+    {'1': 'display_name', '3': 3, '4': 1, '5': 9, '8': {}, '10': 'displayName'},
     {
       '1': 'avatar',
-      '3': 5,
+      '3': 4,
       '4': 1,
       '5': 11,
       '6': '.hawkr.common.v1alpha1.Image',
@@ -451,18 +455,15 @@ const GetSessionResponse$json = {
       '10': 'avatar'
     },
   ],
-  '9': [
-    {'1': 1, '2': 2},
-  ],
 };
 
 /// Descriptor for `GetSessionResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List getSessionResponseDescriptor = $convert.base64Decode(
-    'ChJHZXRTZXNzaW9uUmVzcG9uc2USOgoHYWNjb3VudBgCIAEoCzIgLmhhd2tyLmlkZW50aXR5Ln'
-    'YxYWxwaGExLkFjY291bnRSB2FjY291bnQSSAoKc3VzcGVuc2lvbhgDIAEoCzIjLmhhd2tyLmlk'
+    'ChJHZXRTZXNzaW9uUmVzcG9uc2USOgoHYWNjb3VudBgBIAEoCzIgLmhhd2tyLmlkZW50aXR5Ln'
+    'YxYWxwaGExLkFjY291bnRSB2FjY291bnQSSAoKc3VzcGVuc2lvbhgCIAEoCzIjLmhhd2tyLmlk'
     'ZW50aXR5LnYxYWxwaGExLlN1c3BlbnNpb25CA+BBA1IKc3VzcGVuc2lvbhImCgxkaXNwbGF5X2'
-    '5hbWUYBCABKAlCA+BBA1ILZGlzcGxheU5hbWUSOQoGYXZhdGFyGAUgASgLMhwuaGF3a3IuY29t'
-    'bW9uLnYxYWxwaGExLkltYWdlQgPgQQNSBmF2YXRhckoECAEQAg==');
+    '5hbWUYAyABKAlCA+BBA1ILZGlzcGxheU5hbWUSOQoGYXZhdGFyGAQgASgLMhwuaGF3a3IuY29t'
+    'bW9uLnYxYWxwaGExLkltYWdlQgPgQQNSBmF2YXRhcg==');
 
 @$core.Deprecated('Use suspensionDescriptor instead')
 const Suspension$json = {
@@ -526,6 +527,93 @@ final $typed_data.Uint8List deleteAccountResponseDescriptor = $convert.base64Dec
     '52MWFscGhhMS5EZWxldGVBY2NvdW50UmVzcG9uc2UuRGVsZXRpb25TdGF0ZVIFc3RhdGUibgoN'
     'RGVsZXRpb25TdGF0ZRIeChpERUxFVElPTl9TVEFURV9VTlNQRUNJRklFRBAAEhoKFkRFTEVUSU'
     '9OX1NUQVRFX0RFTEVURUQQARIhCh1ERUxFVElPTl9TVEFURV9QRU5ESU5HX09SREVSUxAC');
+
+@$core.Deprecated('Use contactEmailDescriptor instead')
+const ContactEmail$json = {
+  '1': 'ContactEmail',
+  '2': [
+    {'1': 'email', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'email'},
+    {
+      '1': 'source',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.identity.v1alpha1.ContactEmailSource',
+      '8': {},
+      '10': 'source'
+    },
+  ],
+};
+
+/// Descriptor for `ContactEmail`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List contactEmailDescriptor = $convert.base64Decode(
+    'CgxDb250YWN0RW1haWwSGQoFZW1haWwYASABKAlCA+BBA1IFZW1haWwSSAoGc291cmNlGAIgAS'
+    'gOMisuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuQ29udGFjdEVtYWlsU291cmNlQgPgQQNSBnNv'
+    'dXJjZQ==');
+
+@$core.Deprecated('Use getContactEmailRequestDescriptor instead')
+const GetContactEmailRequest$json = {
+  '1': 'GetContactEmailRequest',
+};
+
+/// Descriptor for `GetContactEmailRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getContactEmailRequestDescriptor =
+    $convert.base64Decode('ChZHZXRDb250YWN0RW1haWxSZXF1ZXN0');
+
+@$core.Deprecated('Use getContactEmailResponseDescriptor instead')
+const GetContactEmailResponse$json = {
+  '1': 'GetContactEmailResponse',
+  '2': [
+    {
+      '1': 'contact_email',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.identity.v1alpha1.ContactEmail',
+      '10': 'contactEmail'
+    },
+  ],
+};
+
+/// Descriptor for `GetContactEmailResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getContactEmailResponseDescriptor =
+    $convert.base64Decode(
+        'ChdHZXRDb250YWN0RW1haWxSZXNwb25zZRJKCg1jb250YWN0X2VtYWlsGAEgASgLMiUuaGF3a3'
+        'IuaWRlbnRpdHkudjFhbHBoYTEuQ29udGFjdEVtYWlsUgxjb250YWN0RW1haWw=');
+
+@$core.Deprecated('Use setContactEmailRequestDescriptor instead')
+const SetContactEmailRequest$json = {
+  '1': 'SetContactEmailRequest',
+  '2': [
+    {'1': 'email', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'email'},
+  ],
+};
+
+/// Descriptor for `SetContactEmailRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List setContactEmailRequestDescriptor =
+    $convert.base64Decode(
+        'ChZTZXRDb250YWN0RW1haWxSZXF1ZXN0EhkKBWVtYWlsGAEgASgJQgPgQQJSBWVtYWls');
+
+@$core.Deprecated('Use setContactEmailResponseDescriptor instead')
+const SetContactEmailResponse$json = {
+  '1': 'SetContactEmailResponse',
+  '2': [
+    {
+      '1': 'contact_email',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.identity.v1alpha1.ContactEmail',
+      '10': 'contactEmail'
+    },
+  ],
+};
+
+/// Descriptor for `SetContactEmailResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List setContactEmailResponseDescriptor =
+    $convert.base64Decode(
+        'ChdTZXRDb250YWN0RW1haWxSZXNwb25zZRJKCg1jb250YWN0X2VtYWlsGAEgASgLMiUuaGF3a3'
+        'IuaWRlbnRpdHkudjFhbHBoYTEuQ29udGFjdEVtYWlsUgxjb250YWN0RW1haWw=');
 
 const $core.Map<$core.String, $core.dynamic> IdentityPublicServiceBase$json = {
   '1': 'IdentityPublicService',
@@ -607,6 +695,18 @@ const $core.Map<$core.String, $core.dynamic> IdentityAppServiceBase$json = {
       '2': '.hawkr.identity.v1alpha1.DeleteAccountRequest',
       '3': '.hawkr.identity.v1alpha1.DeleteAccountResponse'
     },
+    {
+      '1': 'GetContactEmail',
+      '2': '.hawkr.identity.v1alpha1.GetContactEmailRequest',
+      '3': '.hawkr.identity.v1alpha1.GetContactEmailResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'SetContactEmail',
+      '2': '.hawkr.identity.v1alpha1.SetContactEmailRequest',
+      '3': '.hawkr.identity.v1alpha1.SetContactEmailResponse',
+      '4': {'34': 2},
+    },
   ],
 };
 
@@ -635,6 +735,15 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.identity.v1alpha1.RevokeSessionResponse': RevokeSessionResponse$json,
   '.hawkr.identity.v1alpha1.DeleteAccountRequest': DeleteAccountRequest$json,
   '.hawkr.identity.v1alpha1.DeleteAccountResponse': DeleteAccountResponse$json,
+  '.hawkr.identity.v1alpha1.GetContactEmailRequest':
+      GetContactEmailRequest$json,
+  '.hawkr.identity.v1alpha1.GetContactEmailResponse':
+      GetContactEmailResponse$json,
+  '.hawkr.identity.v1alpha1.ContactEmail': ContactEmail$json,
+  '.hawkr.identity.v1alpha1.SetContactEmailRequest':
+      SetContactEmailRequest$json,
+  '.hawkr.identity.v1alpha1.SetContactEmailResponse':
+      SetContactEmailResponse$json,
 };
 
 /// Descriptor for `IdentityAppService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
@@ -653,4 +762,9 @@ final $typed_data.Uint8List identityAppServiceDescriptor = $convert.base64Decode
     'lkZW50aXR5LnYxYWxwaGExLlJldm9rZVNlc3Npb25SZXF1ZXN0Gi4uaGF3a3IuaWRlbnRpdHku'
     'djFhbHBoYTEuUmV2b2tlU2Vzc2lvblJlc3BvbnNlEm4KDURlbGV0ZUFjY291bnQSLS5oYXdrci'
     '5pZGVudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVxdWVzdBouLmhhd2tyLmlkZW50aXR5'
-    'LnYxYWxwaGExLkRlbGV0ZUFjY291bnRSZXNwb25zZQ==');
+    'LnYxYWxwaGExLkRlbGV0ZUFjY291bnRSZXNwb25zZRJ5Cg9HZXRDb250YWN0RW1haWwSLy5oYX'
+    'drci5pZGVudGl0eS52MWFscGhhMS5HZXRDb250YWN0RW1haWxSZXF1ZXN0GjAuaGF3a3IuaWRl'
+    'bnRpdHkudjFhbHBoYTEuR2V0Q29udGFjdEVtYWlsUmVzcG9uc2UiA5ACARJ5Cg9TZXRDb250YW'
+    'N0RW1haWwSLy5oYXdrci5pZGVudGl0eS52MWFscGhhMS5TZXRDb250YWN0RW1haWxSZXF1ZXN0'
+    'GjAuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuU2V0Q29udGFjdEVtYWlsUmVzcG9uc2UiA5ACAg'
+    '==');

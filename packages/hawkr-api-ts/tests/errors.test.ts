@@ -307,8 +307,8 @@ describe("metadata", () => {
 	});
 
 	it("splits list values and treats missing or empty as an empty list", () => {
-		expect(metadataList("KYC_APPROVED,NOT_PENDING_DELETION")).toEqual([
-			"KYC_APPROVED",
+		expect(metadataList("ONBOARDING_COMPLETE,NOT_PENDING_DELETION")).toEqual([
+			"ONBOARDING_COMPLETE",
 			"NOT_PENDING_DELETION",
 		]);
 		expect(metadataList("7")).toEqual(["7"]);

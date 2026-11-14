@@ -1,6 +1,6 @@
-// Package kyc 是賣家的 KYC 認證：賣家填寫草稿、送出與取消，管理員審核（核准、退回、顯示全文），以及身分比對
-// （ADR 2026-10-19-seller-kyc-payuni-consolidated）。申請以 store_id 為鍵；個資加密、以 blind index 比對；人工決定
-// 與稽核紀錄在寫入的同一個 transaction，證件圖片的 media 引用由收斂 job 維護。
+// Package kyc 是賣家的 KYC 認證：賣家填寫草稿、送出與取消，管理員審核（核准、退回、讀公司補充文件），以及統編的身分比對
+// （ADR 2026-11-13-seller-platform-review-and-identity-matching「申請、草稿與審核」）。申請以 store_id 為鍵；平台不收身分證號、銀行帳號與證件影像（Stripe 計畫 D22），統編以 blind index 比對；
+// 人工決定與稽核紀錄在寫入的同一個 transaction，補充文件的 media 引用由收斂 job 維護。
 package kyc
 
 import (
@@ -14,12 +14,12 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/agreement"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payuni"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -28,22 +28,37 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// Deps 外部依賴；clock 由組裝點注入。Keys 與 MAC 必填（seller.New 檢查）：個資不能在沒有加密的情況下寫入。
+// Identity 是 KYC 需要的 identity 公開 API：帳號的聯絡信箱（送出時要有，核准時快照到收款帳戶）。
+type Identity interface {
+	ContactEmail(ctx context.Context, accountID int64) (identity.ContactEmail, bool, error)
+}
+
+// Deps 外部依賴；clock 由組裝點注入。MAC 必填（seller.New 檢查）：統編的 blind index 要有金鑰。
 type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
 	Jobs   jobs.ReportingEnqueuer
 	Media  media.Media
-	// Exposure 是可曝光的公告：申請的狀態是 KYC 流程的輸入，每個改變它的寫入在 transaction 的最後呼叫。
+	// Exposure 是可曝光的公告：申請的狀態是開通閘門（平台審核核准）的輸入，每個改變它的寫入在 transaction 的最後呼叫。
 	Exposure *exposure.Service
-	Keys     *seal.Keyring
+	// Payment 是收款帳戶的擁有者（payment 模組）：核准的 transaction 內寫「建立中」的列並排入建立 job（Stripe 計畫 D16、D28）。
+	Payment  Payment
+	Identity Identity
 	MAC      *seal.MAC
 	// Registry 是登記資料來源（公司型申請送件時的查詢快照）；必填：公開資料，沒有「沒有設定」的情形。
 	Registry Registry
 	Now      func() time.Time
 	Logger   *slog.Logger
+}
+
+// Payment 是 payment 模組的公開 API 中核准用到的部分。RequestAccount 在呼叫方的 transaction 內只 INSERT 帳戶列（既有的列不改）並排入建立 job，
+// 不鎖 payment 的既有列（全域鎖順序 payment 先於 seller，核准已鎖住店家與申請列）。
+type Payment interface {
+	Configured() bool
+	RequestAccount(ctx context.Context, storeID int64, now time.Time) error
 }
 
 // Service 是 KYC 的 use case。
@@ -54,10 +69,43 @@ type Service struct {
 
 // New 建立服務。
 func New(d Deps) *Service {
-	if d.Registry == nil {
-		panic("kyc: Registry is required")
+	if d.Registry == nil || d.Payment == nil || d.Identity == nil {
+		panic("kyc: Registry, Payment and Identity are required")
 	}
-	return &Service{d: d, p: protector{keys: d.Keys, mac: d.MAC}}
+	return &Service{d: d, p: protector{mac: d.MAC}}
+}
+
+// contactEmail 回傳帳號的聯絡信箱，identity 已依它的規則正規化並略過格式不合的值；帳號沒有可用的信箱時 ok 是 false。在呼叫方的 transaction 內讀取。
+func (s *Service) contactEmail(ctx context.Context, accountID int64) (string, bool, error) {
+	c, ok, err := s.d.Identity.ContactEmail(ctx, accountID)
+	if err != nil || !ok {
+		return "", false, err
+	}
+	return c.Address, true, nil
+}
+
+// OwnerContactEmail 回傳店家所屬帳號目前的聯絡信箱（與送審檢查同一個解析：contactEmail）；店家不存在或帳號沒有可用的信箱時 ok 是 false。
+func (s *Service) OwnerContactEmail(ctx context.Context, storeID int64) (string, bool, error) {
+	owner, err := store.New(s.d.DB.Conn(ctx)).StoreByID(ctx, storeID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return s.contactEmail(ctx, owner.AccountID)
+}
+
+// requireContactEmail 是送審的檢查：帳號沒有聯絡信箱回 failed_precondition 與 CONTACT_EMAIL_REQUIRED。
+func (s *Service) requireContactEmail(ctx context.Context, accountID int64) (string, error) {
+	email, ok, err := s.contactEmail(ctx, accountID)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", apperr.FailedPrecondition("請先填寫聯絡信箱").WithReason(apperr.ReasonContactEmailRequired)
+	}
+	return email, nil
 }
 
 func errVersionConflict() error { return apperr.VersionConflict("申請資料已被修改") }
@@ -82,8 +130,8 @@ func (s *Service) actingStore(ctx context.Context, q *store.Queries, accountID i
 }
 
 // SaveDraft 部分更新草稿（店家還沒有申請時建立，ExpectedVersion 為 0）：被退回的申請在這裡回到 DRAFT 重新編輯。
-// 授權由模組做（申請以帳號目前的店家為準，不接受別人的申請 ID，盤點 D22）；需要 CapStorefrontWrite。全部輸入先驗證、
-// 個資加密之後才寫入；證件圖片在 transaction 外轉正（不建立引用），寫入的 transaction 內把被換掉的證件記成退場並排入引用的同步。必須在 transaction 外呼叫。
+// 授權由模組做（申請以帳號目前的店家為準，不接受別人的申請 ID，盤點 D22）；需要 CapStorefrontWrite。全部輸入先驗證才寫入；
+// 補充文件在 transaction 外轉正（不建立引用），寫入的 transaction 內把被換掉的文件記成退場並排入引用的同步。必須在 transaction 外呼叫。
 func (s *Service) SaveDraft(ctx context.Context, in model.KYCDraftInput) (model.KYCApplication, error) {
 	if err := model.Positive(in.AccountID); err != nil {
 		return model.KYCApplication{}, err
@@ -107,7 +155,7 @@ func (s *Service) SaveDraft(ctx context.Context, in model.KYCDraftInput) (model.
 	if err != nil {
 		return model.KYCApplication{}, err
 	}
-	next, diff, err := s.p.applyDraft(base, in, create, now)
+	next, diff, err := applyDraft(base, in, create, now)
 	if err != nil {
 		return model.KYCApplication{}, err
 	}
@@ -129,21 +177,9 @@ func (s *Service) SaveDraft(ctx context.Context, in model.KYCDraftInput) (model.
 		if err != nil {
 			return err
 		}
-		if current != nil {
-			// 鎖住 PayUni 註冊列（鎖順序：店家、申請、註冊）：已核准的申請要回到草稿時再確認一次它仍是 PayUni 拒絕的狀態，
-			// 註冊已有 MerID 時身分欄位不能改。
-			if _, err := q.LockPayUniRegistration(ctx, locked.StoreID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		if current != nil && !create && current.ApplicationID == next.ApplicationID && current.Version == in.ExpectedVersion {
+			if err := requireEditable(ctx, *current); err != nil {
 				return err
-			}
-			if current.Status == string(model.KYCStatusApproved) {
-				if err := payuni.CheckResubmit(ctx, q, *current); err != nil {
-					return err
-				}
-			}
-			if !create && current.ApplicationID == next.ApplicationID && current.Version == in.ExpectedVersion {
-				if err := checkIdentityUnchanged(ctx, q, current.StoreID, diff); err != nil {
-					return err
-				}
 			}
 		}
 		var row store.SellerKycApplication
@@ -167,7 +203,7 @@ func (s *Service) SaveDraft(ctx context.Context, in model.KYCDraftInput) (model.
 			return err
 		}
 		if current != nil && current.Status != row.Status {
-			// 已核准的申請回到草稿：KYC 流程不再是 APPROVED，店面頁隨之不公開，可曝光重新公告。
+			// 申請的狀態變了（被退回的申請回到草稿）：重新判斷可曝光並公告，店家頁的快取失效。
 			if err := s.d.Exposure.Announce(ctx, q, now, locked.StoreID); err != nil {
 				return err
 			}
@@ -219,29 +255,19 @@ func (s *Service) draftBase(ctx context.Context, q *store.Queries, storeID, expe
 	case current.Version != expectedVersion:
 		return row, false, errVersionConflict()
 	}
-	if err := payuni.CheckResubmit(ctx, q, current); err != nil {
+	if err := requireEditable(ctx, current); err != nil {
 		return row, false, err
 	}
 	return current, false, nil
 }
 
-// checkIdentityUnchanged 在註冊已有 MerID（PayUni 已收下）時，拒絕改動 bind_merchant 送出的身分欄位：update_merchant 只能改聯絡
-// 方式與地址（PayUni 代理商專用 API 總覽 §8），改了我們的紀錄就和 PayUni 分歧。對照 payuni.bindRequest：Name／UBN（姓名或
-// 公司名稱、身分證號或統編，所以賣家型態也鎖）、MCName／MCID（負責人姓名與身分證號）、MerEngName、MerURL（官網）、MerDesc
-// 的後備（商品類型）。可改的是聯絡信箱、聯絡手機、公司電話（update_merchant 的聯絡欄位）與不送給 PayUni 的資料（生日、證件
-// 資訊、銀行、公司地址、證件圖片）。哪些欄位變了由寫入路徑回報（draftDiff，比明文）。
-func checkIdentityUnchanged(ctx context.Context, q *store.Queries, storeID int64, diff draftDiff) error {
-	if !diff.identity() {
+// requireEditable 確認申請的狀態能儲存草稿與送出（model.CanEditKYC）；不能時回 model.ErrKYCNotEditable，語系取自 ctx。
+func requireEditable(ctx context.Context, row store.SellerKycApplication) error {
+	status := model.KYCStatus(row.Status)
+	if model.CanEditKYC(status) {
 		return nil
 	}
-	locked, err := payuni.IdentityLocked(ctx, q, storeID)
-	if err != nil {
-		return err
-	}
-	if locked {
-		return apperr.FailedPrecondition("商店已送交金流審核，身分資料不能修改；只能更正聯絡資料與地址，身分的錯誤要關閉商店後重新入駐")
-	}
-	return nil
+	return model.ErrKYCNotEditable(status, uitext.LocaleFrom(ctx))
 }
 
 // lockCurrent 鎖住店家目前的申請（呼叫方已鎖住店家列：鎖順序店家列先於申請列）；沒有申請時回 nil。
@@ -260,7 +286,7 @@ func (s *Service) lockCurrent(ctx context.Context, q *store.Queries, storeID int
 	return &locked, nil
 }
 
-// Mine 回傳帳號目前店家的申請（遮蔽的檢視，帶證件圖片與最近一次退回的理由）；沒有申請時回 NotFound。
+// Mine 回傳帳號目前店家的申請（帶補充文件與最近一次退回的理由）；沒有申請時回 NotFound。
 func (s *Service) Mine(ctx context.Context, accountID int64) (model.KYCApplication, error) {
 	if err := model.Positive(accountID); err != nil {
 		return model.KYCApplication{}, err
@@ -280,22 +306,12 @@ func (s *Service) Mine(ctx context.Context, accountID int64) (model.KYCApplicati
 	return s.sellerView(ctx, q, row, storeRow.AccountID)
 }
 
-// sellerView 是賣家讀自己的申請：view 加上賣家看到的 PayUni 狀態與不能重新送出的原因（後台的檢視不帶，admin 的 PayUni 呈現在註冊）。
-// 流程、PayUni 狀態與原因出自同一次 payuni.SellerViewOf。
+// sellerView 是賣家讀自己的申請（view）。
 func (s *Service) sellerView(ctx context.Context, q *store.Queries, row store.SellerKycApplication, accountID int64) (model.KYCApplication, error) {
-	pv, err := payuni.SellerViewOf(ctx, q, row)
-	if err != nil {
-		return model.KYCApplication{}, err
-	}
-	out, _, err := s.viewWith(ctx, q, row, accountID, pv)
-	if err != nil {
-		return out, err
-	}
-	out.PayUni, out.ResubmitReasons = pv.PayUni, pv.Reasons
-	return out, nil
+	return s.view(ctx, q, row, accountID)
 }
 
-// view 轉成遮蔽檢視並帶上證件圖片與最近一次退回。
+// view 轉成檢視並帶上補充文件與最近一次退回。
 func (s *Service) view(ctx context.Context, q *store.Queries, row store.SellerKycApplication, accountID int64) (model.KYCApplication, error) {
 	out, _, err := s.viewWithReviews(ctx, q, row, accountID)
 	return out, err
@@ -303,19 +319,7 @@ func (s *Service) view(ctx context.Context, q *store.Queries, row store.SellerKy
 
 // viewWithReviews 是 view，另外回傳讀到的審核紀錄（含逐項問題；後台的檢視要它，不必再讀一次）。
 func (s *Service) viewWithReviews(ctx context.Context, q *store.Queries, row store.SellerKycApplication, accountID int64) (model.KYCApplication, []model.KYCReview, error) {
-	pv, err := payuni.SellerViewOf(ctx, q, row)
-	if err != nil {
-		return model.KYCApplication{}, nil, err
-	}
-	return s.viewWith(ctx, q, row, accountID, pv)
-}
-
-// viewWith 是 viewWithReviews，流程取自呼叫方已推導的 pv（同一份註冊）。
-func (s *Service) viewWith(ctx context.Context, q *store.Queries, row store.SellerKycApplication, accountID int64, pv payuni.SellerView) (model.KYCApplication, []model.KYCReview, error) {
-	out, err := s.p.toApplication(row, accountID)
-	if err != nil {
-		return out, nil, err
-	}
+	out := toApplication(row, accountID)
 	docs, err := q.KYCDocuments(ctx, row.ApplicationID)
 	if err != nil {
 		return out, nil, err
@@ -329,10 +333,9 @@ func (s *Service) viewWith(ctx context.Context, q *store.Queries, row store.Sell
 		return out, nil, err
 	}
 	issues := issuesByReview(issueRows)
-	flow := pv.Flow
-	out.Documents, out.LastRejection, out.Flow = toDocuments(docs), lastRejection(reviews, issues), &flow
+	out.Documents, out.LastRejection = toDocuments(docs), lastRejection(reviews, issues)
 	out.OutstandingIssues = outstandingIssues(reviews, issueRows)
-	out.MissingFields = missingFields(row, docs)
+	out.MissingFields = missingFields(row)
 	if out.MissingStoreFields, err = s.missingStoreFields(ctx, q, row.StoreID); err != nil {
 		return out, nil, err
 	}
@@ -343,8 +346,7 @@ func (s *Service) viewWith(ctx context.Context, q *store.Queries, row store.Sell
 	return out, views, nil
 }
 
-// Submit 送出申請：草稿，以及流程允許重新送出（CanResubmit）的申請——被退回的、已核准但 PayUni 拒絕而且還能重新綁定的——
-// 都能直接送出，不必先回到草稿。必填欄位與三張證件齊全才能送出，並先比對身分（命中別的帳號生效中的處分時失敗，回泛用錯誤；權威的
+// Submit 送出申請：草稿與被退回的申請都能直接送出，不必先回到草稿；審核中與已核准的不能送出（model.CanEditKYC）。必填欄位齊全才能送出，並先比對身分（命中別的帳號生效中的處分時失敗，回泛用錯誤；權威的
 // 比對在核准時）。同意的文件（AcceptedAgreements）先於一切業務檢查驗證（種類不對回 InvalidInput，版本不是現行版本回
 // FailedPrecondition 的 AGREEMENT_OUTDATED）。寫入、同意紀錄、審核紀錄（SUBMIT）與 KYCSubmitted 在同一個 transaction。
 func (s *Service) Submit(ctx context.Context, in model.SubmitKYCInput) (model.KYCApplication, error) {
@@ -373,17 +375,13 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitKYCInput) (model.KY
 		if err != nil {
 			return err
 		}
-		if _, err := q.LockPayUniRegistration(ctx, locked.StoreID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		if err := requireEditable(ctx, row); err != nil {
 			return err
 		}
-		if err := payuni.CheckResubmit(ctx, q, row); err != nil {
+		if err := complete(row); err != nil {
 			return err
 		}
-		docs, err := q.KYCDocuments(ctx, row.ApplicationID)
-		if err != nil {
-			return err
-		}
-		if err := complete(row, docs); err != nil {
+		if _, err := s.requireContactEmail(ctx, locked.AccountID); err != nil {
 			return err
 		}
 		missingStore, err := s.missingStoreFields(ctx, q, row.StoreID)
@@ -394,7 +392,7 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitKYCInput) (model.KY
 			return storeIncomplete(missingStore)
 		}
 		now := s.d.Now().UTC()
-		if blocked, _, err := s.match(ctx, q, row, locked.AccountID, now); err != nil {
+		if blocked, err := s.match(ctx, q, row, locked.AccountID, now); err != nil {
 			return err
 		} else if blocked {
 			return model.ErrIdentityNotEligible()
@@ -460,17 +458,6 @@ func (s *Service) Cancel(ctx context.Context, in model.CancelKYCInput) (model.KY
 		row, err := s.lockOwn(ctx, q, locked.StoreID, in.ExpectedVersion, model.KYCStatusDraft, model.KYCStatusSubmitted)
 		if err != nil {
 			return err
-		}
-		// 鎖順序：店家、申請、註冊。身分已鎖定時取消會讓店家以新申請繞過身分鎖。
-		if _, err := q.LockPayUniRegistration(ctx, locked.StoreID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		identityLocked, err := payuni.IdentityLocked(ctx, q, locked.StoreID)
-		if err != nil {
-			return err
-		}
-		if identityLocked {
-			return apperr.FailedPrecondition("金流服務商已收下您的商店資料，申請不能取消。身分資料有誤，請關閉商店後重新入駐。")
 		}
 		now := s.d.Now().UTC()
 		updated, err := s.transition(ctx, q, row, model.KYCStatusCancelled, now)
@@ -538,59 +525,38 @@ func (s *Service) transition(ctx context.Context, q *store.Queries, row store.Se
 	if err != nil {
 		return updated, err
 	}
-	// 申請的狀態是「可公開曝光」的輸入（KYC 流程的 APPROVED 由它決定）：送出、取消、核准、退回都在同一個 transaction 內排入
-	// website 店家頁的快取失效；可曝光的公告由各個呼叫方在 transaction 的最後做（Announce 是最後一個鎖，transition 之後
-	// 核准還要鎖 PayUni 註冊列）。
+	// 申請的狀態是「可公開曝光」的輸入（申請核准是開通的條件之一）：送出、取消、核准、退回都在同一個 transaction 內排入
+	// website 店家頁的快取失效；可曝光的公告由各個呼叫方在 transaction 的最後做（Announce 是最後一個鎖）。
 	return updated, stint.InvalidateByID(ctx, q, s.d.Jobs, row.StoreID)
 }
 
-// complete 檢查送出必填的欄位與三張證件（DB 的 kyc_applications_complete_check 是保底）；一次列出全部缺的欄位。
+// complete 檢查送出必填的欄位（DB 的 kyc_applications_complete_check 是保底）；一次列出全部缺的欄位。
 type requirement struct {
 	field, message string
-	absent         func(row store.SellerKycApplication, have map[string]bool) bool
+	absent         func(row store.SellerKycApplication) bool
 }
 
 // requirements 是送出之前必填的項目（欄位路徑與缺少時的說明）；完整性的規則只有這一份：送出（complete）與申請檢視的
-// missing_fields（missingFields）都由它推導。個人與企業各自專屬的項目依 model.FieldAppliesTo 過濾。
+// missing_fields（missingFields）都由它推導。企業專屬的項目依 model.FieldAppliesTo 過濾。
 var requirements = []requirement{
-	{"real_name", "請填寫姓名", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.RealName == nil }},
-	{"english_name", "請填寫商店英文名稱", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.EnglishName == nil }},
-	{"bank_name", "請填寫銀行名稱", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.BankName == nil }},
-	{"bank_code", "請填寫銀行代碼", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.BankCode == nil }},
-	{"bank_account", "請填寫銀行帳號", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.BankAccountEnc == nil }},
-	{"id_card_front", "請上傳身分證正面照片", func(_ store.SellerKycApplication, have map[string]bool) bool {
-		return !have[string(model.SlotIDCardFront)]
-	}},
-	{"id_card_back", "請上傳身分證反面照片", func(_ store.SellerKycApplication, have map[string]bool) bool {
-		return !have[string(model.SlotIDCardBack)]
-	}},
-	{"bank_book", "請上傳存摺封面照片", func(_ store.SellerKycApplication, have map[string]bool) bool {
-		return !have[string(model.SlotBankBook)]
-	}},
-	{"individual.id_card_no", "請填寫身分證字號", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.IDCardNoEnc == nil }},
-	{"business.company_name", "請填寫公司名稱", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.CompanyName == nil }},
-	{"business.tax_id", "請填寫統一編號", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.TaxID == nil }},
-	{"business.rep_id_card_no", "請填寫負責人身分證字號", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.RepIDCardNoEnc == nil }},
+	{"business.company_name", "請填寫公司名稱", func(r store.SellerKycApplication) bool { return r.CompanyName == nil }},
+	{"business.tax_id", "請填寫統一編號", func(r store.SellerKycApplication) bool { return r.TaxID == nil }},
 }
 
 // missingFields 回傳還缺的欄位路徑（依 requirements 的順序）。
-func missingFields(row store.SellerKycApplication, docs []store.SellerKycDocument) []string {
-	have := map[string]bool{}
-	for _, d := range docs {
-		have[d.Slot] = true
-	}
+func missingFields(row store.SellerKycApplication) []string {
 	out := []string{}
 	for _, r := range requirements {
-		if model.FieldAppliesTo(r.field, model.KYCSellerType(row.SellerType)) && r.absent(row, have) {
+		if model.FieldAppliesTo(r.field, model.KYCSellerType(row.SellerType)) && r.absent(row) {
 			out = append(out, r.field)
 		}
 	}
 	return out
 }
 
-// complete 在送出時確認必填的項目與證件齊全：缺的每一項都是一個欄位違規（欄位是 KYCFieldNames 的路徑）。
-func complete(row store.SellerKycApplication, docs []store.SellerKycDocument) error {
-	missing := missingFields(row, docs)
+// complete 在送出時確認必填的項目齊全：缺的每一項都是一個欄位違規（欄位是 KYCFieldNames 的路徑）。
+func complete(row store.SellerKycApplication) error {
+	missing := missingFields(row)
 	if len(missing) == 0 {
 		return nil
 	}
@@ -604,13 +570,11 @@ func complete(row store.SellerKycApplication, docs []store.SellerKycDocument) er
 
 // storeFieldLabels 是送出時缺少店家欄位的名稱。
 var storeFieldLabels = map[string]string{
-	model.StoreFieldAddress:       "店家地址",
-	model.StoreFieldContactName:   "聯絡人姓名",
-	model.StoreFieldContactMobile: "聯絡人手機",
-	model.StoreFieldSupportEmail:  "客服電子信箱",
+	model.StoreFieldAddress:      "店家地址",
+	model.StoreFieldSupportEmail: "客服電子信箱",
 }
 
-// storeIncomplete 是送出時店家的 PayUni 綁定資料還有缺：店家的狀態不在請求裡，所以是 failed_precondition（不是欄位違規）；
+// storeIncomplete 是送出時店家的必填資料（地址與客服信箱）還有缺：店家的狀態不在請求裡，所以是 failed_precondition（不是欄位違規）；
 // 缺哪些由申請檢視的 missing_store_fields 取得。
 func storeIncomplete(missing []string) error {
 	labels := make([]string, 0, len(missing))
@@ -626,7 +590,7 @@ func (s *Service) missingStoreFields(ctx context.Context, q *store.Queries, stor
 	if err != nil {
 		return nil, model.Error(err)
 	}
-	return payuni.MissingStoreFields(stint.ToStore(row).Profile), nil
+	return model.MissingStoreFields(stint.ToStore(row).Profile), nil
 }
 
 // reviewParams 組審核紀錄的寫入參數。admin 是管理員的 ID（賣家自己的動作是 nil）；text 是理由或 comment，已經由呼叫方依

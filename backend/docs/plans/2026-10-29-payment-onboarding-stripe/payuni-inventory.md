@@ -1,7 +1,7 @@
 # PayUni 依賴盤點（Stripe Connect 換掉 PayUni 的遷移計畫輸入）
 
 快照 commit：`e865c68`（`git -C <repo> rev-parse --short HEAD`），repo `/Users/will/second-brain/.projects/personal/hawkr`。唯讀盤點，沒跑 e2e、沒打任何 API。
-「去向」欄一律 `TBD`（規劃者填），「建議」欄是盤點者的建議。
+「去向」欄由步驟 8c 填（2026-11-13，依計畫的決定 D1–D47；`check_inventory.py` 檢查沒有空格），「建議」欄是盤點者當時的建議，沒有改寫。
 
 ## 0. 先讀這幾點
 
@@ -79,7 +79,7 @@
 | 測試 | 單體 31 個測試檔（`payuni_integration_test.go`、`payuni_state_integration_test.go`、`internal/payuni/*_test.go`、`internal/model/payuni*_test.go`、`platform/payuni/client_test.go`）、`internal/legacy/sellerserver/server_integration_test.go`（`approvingPayUni` 替身）、`cmd/hawkr/payuni_config_test.go`、`httpapi/seller/admin_kyc_test.go`、`httpapi/reviewqueue/review_queue_test.go` |
 | 文件 | `backend/docs/modules/seller.md` §13–14（69 處）、ADR `2026-10-19-seller-kyc-payuni-consolidated.md`、`2026-10-02-seller-kyc-payuni-in-monolith.md`、seller `CARRYOVER.md`、`AGENTS.md` L40 |
 | 建議 | 這是替換的主戰場。Stripe Connect 對應物是 Connected Account（Express／Custom）＋ Account Link onboarding；MerID 規則（`HAWK`+store_code）、`bind_merchant` 的欄位組裝、2 QPS 限流、AGENT04017 認領流程都是 PayUni 特有，不要搬。保留的概念：一店一列的 provider 註冊、意圖序號（`intent_seq`）、觀測紀錄、sweep 對帳。表名改 provider-中性（上線前不受相容性約束）。要決定：KYC 資料是否還需要自己蒐集後轉送（Stripe Express 由 Stripe 蒐集）— 這會影響 `seller.kyc_*` 的 PII 範圍與 ADR `2026-07-20-seller-kyc-pii-encryption-scope` |
-| 去向 | TBD |
+| 去向 | 刪除並改寫（步驟 4–5、8a；D1、D6、D13）：單體的 PayUni 開通整個刪除（`internal/platform/payuni`、`seller/internal/payuni`、`payuni_*` 表、4 支 admin RPC 與權限、River job、`PayUni*` 事件、`cmd/hawkr` 的設定），改寫成 payment 模組的中立收款帳戶（payment port 加 Stripe Connect adapter）。開通閘門改看平台核准與收款帳戶的轉帳能力（D10、D20）。`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 回空值（D44），B2 以 port 的外部帳戶 ID 取代。Go 舊 `seller-service` 的同功能舊版不在本計畫，B 階段隨舊服務刪除。 |
 
 ### G2 KYC 資料轉送（KYC data forwarded）
 
@@ -92,7 +92,7 @@
 | 鎖 | 身分欄位鎖：註冊有 MerID 且 PayUni 已收下後，店名、介紹、KYC 身分欄位不能改（`IdentityLocked`／`CheckNameUnlocked`；seller.md §14），原因是 PayUni 規格 `update_merchant` 不可改核心身分 |
 | 測試 | `kyc_*_integration_test.go`、`storedata_test.go`、website `payuni-locked-fields.unit.test.ts`、seller-app 對應 test |
 | 建議 | 若 Stripe 自己蒐集身分文件，`bindRequest`、身分鎖、`StoreData` 必填欄位檢查（PayUni 必填的地址／聯絡人）都可退場；店家聯絡欄位（contact_name 等）只在 PayUni 才強制，需重新評估是否保留為必填 |
-| 去向 | TBD |
+| 去向 | 刪除（8a、8b；D17、D22、D37）：`bindRequest` 與送給 PayUni 的欄位組裝、身分欄位鎖（`IdentityLocked`、`CheckNameUnlocked`）、平台自收的身分證號、銀行帳號、證件影像與個人姓名欄位。保留並改寫：店家聯絡欄位改成平台自己的規則與長度上限（D39）；統編仍由平台收並計算雜湊（D9、D42）。 |
 
 ### G3 狀態同步與 remedy（status sync / remedy）
 
@@ -107,7 +107,7 @@
 | 客戶端 remedy | website `lib/seller/payuni.ts`、`kyc-flow.ts`、`payuni-locked-fields.ts`、`features/seller-center/components/PayuniStatusBody.tsx`、`wallet/WalletClient.tsx`（錢包頁內嵌 PayUni 狀態，獨立的 `/seller-center/me/payuni` 頁已退役）、`profile/certifications/CertificationsClient.tsx`、`dashboard/DashboardPage.tsx`（onboarding 任務）；seller-app `features/seller/data/{payuni,kyc_flow,kyc_wizard,onboarding_tasks,seller_status_refresh}.dart`、`presentation/widgets/payuni_status_body.dart`、`seller_certification_gate.dart`；admin `src/app/admin/merchants/[id]/{PayUniCards.tsx,page.tsx,kyc-application.ts,use-store-detail.ts}`、`src/lib/unavailability.ts` |
 | 測試 | website `lib/seller/payuni.unit.test.ts`（49 處）、`kyc-flow.unit.test.ts`、`CertificationsClient.unit.test.ts`（51）、`WalletClient.unit.test.ts`；admin `tests/merchant-kyc-application.test.ts`（79）、`unavailability.test.ts`；seller-app `test/features/seller/*`（13 檔）、`test/features/wallet/*`；e2e（mock，不跑）`website/tests/e2e/helpers/mock-gateway.ts`、`seller-dashboard-onboarding-actions.spec.ts` |
 | 建議 | 狀態機是 PayUni 特有（MerStatus／MemberStatus 兩軸、「會員層要賣家自己去 PayUni 後台驗 email」）。Stripe 是 `charges_enabled`／`payouts_enabled`／`requirements.currently_due`／`disabled_reason`，改成 provider-中性的「收款資格」狀態，remedy 由 Account Link 導向。`PayUniState` 8 態、uitext 目錄、三個 client 的 remedy UI 全部要重寫；shared catalog 與 enum manifest 守門（`check-enum-text`）會擋掉遺漏 |
-| 去向 | TBD |
+| 去向 | 刪除並改寫（步驟 4–7、8a；D15、D18、D35）：PayUni 的狀態對映、錯誤碼目錄、`PayUniState`、`KYCFlowStatus`、sweep／poll／observe／sync job、`internal/legacy/sellerconsumer` 的審核通知、共用文案目錄的 PayUni 文案、三個 client 的 remedy 畫面全部刪除。改寫成收款帳戶狀態 `PaymentAccount.status`：由 Stripe 的 `account.updated` webhook（先寫 inbox）與同步 job 更新，補件由金流商的頁面或內嵌元件處理。 |
 
 ### G4 付款建立與方式（payment creation & methods）
 
@@ -123,7 +123,7 @@
 | 客戶端 | website `features/checkout/screens/{CheckoutClient,CheckoutFailClient}.tsx`（「PayUni 安全付款」文案）、`features/payments/screens/{PaymentLandingClient,PaymentReturnClient}.tsx`、`lib/payments/{status,usePaymentResolution}.ts`、`lib/checkout/repo.ts`、`lib/orders/{repo,types}.ts`（`paymentMerId`）、`lib/payment/*`、Apple domain association（`lib/payment/applePayDomainAssociation.ts`）、`tests/native-pay-apple-routing.test.ts`；buyer-app `core/payment/pay_token_service.dart`、`features/order/*`（14 檔）、`config/flavor.dart`（測試／正式環境各綁不同 PayUni）|
 | 測試 | Java：`payment-service` 測試 + `payuni-java-client` `PaymentClientRequiredFieldsTest`、`PayUniCryptoServiceTest`；gateway `payuni_redirect_test.go`（34）；website 見上 |
 | 建議 | 這是 Stripe 取代的第二戰場，但**現況不在單體，也未排進近期階段**。規劃要先決定：是在 Java 內加 Stripe adapter（違反 B2 要改寫的方向），還是等 B2 payment 搬進單體時直接寫 Go 的 payment port。建議把「payment port」介面寫在 B2，PayUni 實作留在 Java 到 B8 為止或直接不搬。Apple Pay／Google Pay 的 gateway merchant id 流程（`gatewayMerchantId` = PayUni MerID，每賣家動態）在 Stripe 是 PaymentRequest／PaymentElement，client 要重寫；ATM 虛擬帳號在 Stripe 台灣沒有等價（需確認 bank_transfer／OXXO 之類支援；這是 Stripe 產品問題，未驗證）|
-| 去向 | TBD |
+| 去向 | 保留，不在本計畫（D5）：買家付款只在 Java 舊服務。B2 payment 搬進單體時以 payment port 重寫，需求寫在單體計畫 B2；Java 的 PayUni 付款程式到時刪除，不在 Java 加 Stripe adapter。 |
 
 ### G5 通知／webhook 驗證（notify / webhook verify）
 
@@ -137,7 +137,7 @@
 | 設計 | ADR `2026-09-18-webhook-two-phase-transaction.md`、`2026-09-12-inbound-payload-raw-bytes.md`、設計書 10、11 |
 | 測試 | `payuni-webhook-service` 的 `WebhookInboxDedupIntegrationTest`、`EventKeyBuilderTest`、`OutboxPublisher*Test`；`payuni-java-client` `PayUniWebhookParserTest`；`common-core` `PayUniWebhookEnvelopeTest` |
 | 建議 | Stripe 簽章驗證（`Stripe-Signature`）、事件型別、冪等（event.id）都不同；單體規則 5 已規定「webhook 先寫 inbox」，Stripe 版直接用單體的 inbox 模式。`payuni-webhook-service` 同時承載物流 webhook，只要物流還在 PayUni，這個服務就不能整個退場 |
-| 去向 | TBD |
+| 去向 | 保留，不在本計畫（D5）：`payuni-webhook-service` 同時承載物流 webhook，留到 B2、B3。單體這一側：`seller.review.result` 的 consumer 已刪（8a，D18）；Stripe 的 webhook 走單體的 inbox（步驟 4）。 |
 
 ### G6 退款（refund）
 
@@ -151,7 +151,7 @@
 | 客戶端 | website `lib/after-sales/{status,types,buyer-repo,return-failure-guidance}.ts`、`lib/orders/repo.ts`；buyer-app／seller-app `features/order/*`、`features/report`；CodeMeta `RefundStatus`、`AtmRefund...` 值域 |
 | 測試 | aftersales／payment 的 Java 測試；website `after-sales-return-failure-guidance.test.ts`、`after-sales-repo.test.ts` |
 | 建議 | 計畫 B9 重寫時以 payment port 的 `Refund(paymentID, amount, idempotencyKey)` 為界；Stripe refund 是同步＋webhook 非同步結果，沒有「買家要去託管頁」這步，`need_refund_page` 路徑與 `AwaitingBuyerRefundPagePayload`、通知模板 `awaiting_buyer_page` 全部可退場（要確認 Stripe 台灣支援的付款方式）|
-| 去向 | TBD |
+| 去向 | 保留，不在本計畫（D5）：退款在 Java 的 payment、aftersales、order 三個服務。B9 以 payment port 重寫，需求寫在單體計畫 B9；ATM 退款頁的路徑到時退場。 |
 
 ### G7 撥款／代理商費／託管（payout / grant / escrow）
 
@@ -164,7 +164,7 @@
 | 費用 | `AGENT_FEE_*` env（RATE_NUMERATOR／DENOMINATOR、MIN、MAX、ROUNDING、POLICY_VERSION）；ADR `2026-09-11-payuni-channel-fee-bearer`、`channel-fee-grossup-in-adapter`、`ledger-carrier-model-compatibility`；`website/docs/transaction-policy.md`（36 處）|
 | 客戶端 | website `features/seller-center/wallet/*`、`lib/seller/wallet-transactions.ts`、seller-app `features/wallet/*` 與 `test/features/wallet/*`（90 處；錢包頁顯示撥款與物流費）|
 | 建議 | PayUni 是**代理商先收款→按訂單完成撥款給子商店（平台掌握撥款時點，30 秒內撥）**的託管模型；Stripe Connect 對應是 destination charge／separate charges and transfers＋手動 payout schedule 或 `transfer_group`。GrantPaymentWorker 的資格閘門、hold 邏輯、`PROVIDER_TOOK_OVER` 收斂是業務邏輯，應保留在 port 之上（B10 finance）；`agentFee` 反推（gross-up）是 PayUni 費率模型，Stripe 手續費不同，ADR channel-fee-bearer 需重審。**此為最大的語意差異，需要設計決策（premise 問題）**|
-| 去向 | TBD |
+| 去向 | 保留，不在本計畫（D5）：撥款、代理商費與物流財務在 Java。B10 以 payment port 重寫，需求寫在單體計畫 B10；撥款模型與手續費（ADR `payuni-channel-fee-bearer`）的重審列在本計畫的延後項。單體送 `EscrowType` 的綁定參數隨 G1 刪除。 |
 
 ### G8 對帳／輪詢 job（reconciliation / polling）
 
@@ -175,7 +175,7 @@
 | 單體 | `seller.payuni_sweep`（15 分鐘）、`seller.payuni_poll`、手動 `RefreshPayUniStatus` |
 | 監控 | `backend/monitoring/prometheus/rules`（2 檔）、`grafana/provisioning`（2 檔）、`sql-exporter/sql_exporter.yml`（payuni 相關表／指標）、`monitoring/README.md`；`seller-service` metrics.go |
 | 建議 | Stripe 有 webhook＋`/events` 重播，對帳以 `Balance`／`PayoutReconciliation` report；PayUni 輪詢程式不搬。單體的 sweep 概念（補排遺失的 sync）可保留為通用模式 |
-| 去向 | TBD |
+| 去向 | 單體：刪除（8a）——賣家狀態的 sweep、poll 與手動 `RefreshPayUniStatus` 隨 G3 刪除，收款帳戶的同步 job 取代。Java 的付款與撥款對帳、監控規則：保留，不在本計畫（D5）：B2、B10 重寫時刪除。 |
 
 ### G9 物流貨態耦合（ship-status coupling）
 
@@ -188,7 +188,7 @@
 | 單體關聯 | `CapShippingSetup` 前置條件 = KYC 流程核准（含 PayUni 核准）：「物流商以 PayUni 已成立的子商店建店」（`model/capability.go:41,66`、`seller.proto` L254、L268）|
 | 設計 | 設計書 06、65、70、21、22、23；ADR `2026-09-11-logistics-*`、`responsibility-based-cost-attribution`、`return-leg-classifier-canonical` |
 | 建議 | 這是金流替換計畫的邊界問題：若物流繼續用 PayUni，則 `payuni_mer_id` 仍是物流的必要輸入，單體需要保留「PayUni 物流子商店」的註冊（至少 MerID 與物流建店狀態），不能把 `seller.payuni_registrations` 整張退場。要選：(a) 保留 PayUni 作為純物流 provider，把註冊改名成 logistics-provider 註冊；(b) 物流也換掉（超出本次範圍）。另外「訂單完成→撥款」是物流狀態推進的，需要 payment port 與 fulfillment 之間的事件契約 |
-| 去向 | TBD |
+| 去向 | 保留，不在本計畫（D5）：物流留在 Java，B3 換供應商，需求寫在單體計畫 B3。單體這一側：`CapShippingSetup` 的前置條件改成開通閘門（平台核准且收款帳戶的轉帳能力啟用，步驟 4）；`GetSellerShippingProfile` 的商店代號回空值，本機的物流建店與出貨到 B3 完成前不通（D44，已接受）。 |
 
 ### G10 同意書／條款（agreements / terms）與法務文件
 
@@ -199,19 +199,19 @@
 | 契約 | `AgreementKind` enum：`SELLER_TERMS`／`KYC_PRIVACY_NOTICE`／`PAYUNI_TERMS`；SubmitKYC 時同意 `PAYUNI_TERMS` |
 | 待辦 | `go-modular-monolith.md` L318–322：律師確認三份條文；依代理商契約更正 PAYUNI_TERMS（取得條款正本存 `website/docs/legal/`，manifest 改 `doc`）— 這項因換 provider 可能整個作廢 |
 | 建議 | 換成 Stripe Connected Account Agreement（由 Stripe 在 onboarding 流程內收，不必自己存）；`PAYUNI_TERMS` 值、DB CHECK、proto enum、manifest 與 website 條文可一起退場（上線前不受相容性約束）|
-| 去向 | TBD |
+| 去向 | 刪除（8a；D11）：同意種類 `PAYUNI_TERMS` 連同 proto enum 值（留 `reserved`）、DB CHECK、manifest 與 website 條文一起刪除，舊的同意紀錄不轉換。金流商的服務協議由 Stripe 在開通流程內收，平台不存。`SELLER_TERMS` 與 `KYC_PRIVACY_NOTICE` 保留。「依代理商契約更正 PAYUNI_TERMS」的待辦隨之作廢。 |
 
 ### G11 其他附帶（不歸上面各群）
 
 | 項 | 內容 | 建議 | 去向 |
 |---|---|---|---|
-| 代理商受託代銷（procurement agent） | ai-service `procurement/orderprovisioning/worker.go` 提到 `PAYUNI_AGENT_MER_ID`（2026-09-21 起 EXTERNAL lane 不再用）；`docs 64-Hawkr Agent 商務線` | 確認 `rg -n PAYUNI_AGENT ai-service` 是否仍有實際使用（註解） | TBD |
-| 買家會員帳務週期 | ADR `2026-08-29-membership-billing-payuni-period.md`；payment V5–V8 建表、**V17 已 drop**（`drop_membership_billing_tables`），`payuni.payment.recurring` routing key 仍在 `events.csv` | 已退場，只剩文件與事件目錄殘留，清掉 | TBD |
-| 發票 | invoice-service 用 `provider_paid_at` 決定開立期間，從 payment_transactions 讀（`internal/client/payment/client.go`）| 換 provider 後欄位語意（付款時間）要由 port 提供 | TBD |
-| 通知模板 | notification-service migrations（`merchant.verification.*`、`aftersale awaiting_buyer_page` 模板，文案寫 PayUni）| 文案中性化；ATM 頁模板隨 G6 退場 | TBD |
-| 7-11 門市地圖 | gateway `handler/store_map.go`、`PAYUNI_STORE_MAP_*` env、website `app/(commerce)/store-map/return/route.ts`、`lib/checkout/store-pickups.ts`、seller-app `store_map_webview_screen.dart` | 屬 PayUni 物流（G9），不隨金流替換 | TBD |
-| 錯誤收斂規範 | `backend/docs/開發規範/PayUni 錯誤回應收斂規範.md` + gateway `response/bizhttp.go`、codemeta `registry.go`／`labels.go`、`pkg/errors/bizcode`（錯誤碼 9700 系列為 PayUni；commit `099967a` 剛補回仍在用的 9700）| payment port 要定義自己的錯誤分類；規範改寫 | TBD |
-| 設計 token／其他 | `website/styles/features/seller-center.css`、`admin/src/styles/pages/MerchantCertificationDetail.css` 的 class 名含 payuni | 純命名 | TBD |
+| 代理商受託代銷（procurement agent） | ai-service `procurement/orderprovisioning/worker.go` 提到 `PAYUNI_AGENT_MER_ID`（2026-09-21 起 EXTERNAL lane 不再用）；`docs 64-Hawkr Agent 商務線` | 確認 `rg -n PAYUNI_AGENT ai-service` 是否仍有實際使用（註解） | 保留，不在本計畫（D5）：ai-service 是 Go 舊服務，本計畫沒有改到；B 階段隨舊服務處理。 |
+| 買家會員帳務週期 | ADR `2026-08-29-membership-billing-payuni-period.md`；payment V5–V8 建表、**V17 已 drop**（`drop_membership_billing_tables`），`payuni.payment.recurring` routing key 仍在 `events.csv` | 已退場，只剩文件與事件目錄殘留，清掉 | 保留，不在本計畫（D5）：功能已退場，只剩 ADR 與事件目錄 `events.csv` 的 `payuni.payment.recurring` 一列；B2 刪 `payuni-webhook-service` 與 payment-service 時一併清掉。 |
+| 發票 | invoice-service 用 `provider_paid_at` 決定開立期間，從 payment_transactions 讀（`internal/client/payment/client.go`）| 換 provider 後欄位語意（付款時間）要由 port 提供 | 保留，不在本計畫（D5）：invoice-service 是 Go 舊服務；付款時間由 B2 的 payment port 提供。 |
+| 通知模板 | notification-service migrations（`merchant.verification.*`、`aftersale awaiting_buyer_page` 模板，文案寫 PayUni）| 文案中性化；ATM 頁模板隨 G6 退場 | 單體不再發 `merchant.verification.*`（8a；D18、D43），notification-service 的模板隨舊服務在 B 階段刪除；賣家收款開通結果的通知列入 A8 的需求（步驟 9）。ATM 退款頁模板隨 G6 在 B9 退場。 |
+| 7-11 門市地圖 | gateway `handler/store_map.go`、`PAYUNI_STORE_MAP_*` env、website `app/(commerce)/store-map/return/route.ts`、`lib/checkout/store-pickups.ts`、seller-app `store_map_webview_screen.dart` | 屬 PayUni 物流（G9），不隨金流替換 | 保留，不在本計畫（D5）：屬 PayUni 物流（G9），B3 換物流供應商時處理。 |
+| 錯誤收斂規範 | `backend/docs/開發規範/PayUni 錯誤回應收斂規範.md` + gateway `response/bizhttp.go`、codemeta `registry.go`／`labels.go`、`pkg/errors/bizcode`（錯誤碼 9700 系列為 PayUni；commit `099967a` 剛補回仍在用的 9700）| payment port 要定義自己的錯誤分類；規範改寫 | 保留，不在本計畫（D5）：規範與 9700 系列錯誤碼服務 gateway 與 Java，B2 隨它們退場；單體的收款帳戶不沿用這套錯誤碼。 |
+| 設計 token／其他 | `website/styles/features/seller-center.css`、`admin/src/styles/pages/MerchantCertificationDetail.css` 的 class 名含 payuni | 純命名 | 已處理（8a）：隨 PayUni 卡與狀態元件刪除，`git grep -c -i payuni -- website/styles admin/src/styles` 只剩 `website/styles/components/sheet.css` 一處（非開通畫面，B 階段）。 |
 
 ## 3. Connect protos 與 REST／gRPC 中 provider 專屬的欄位與 enum（契約清單）
 

@@ -1949,7 +1949,7 @@ body .page-content:has(.seller-shell) {
 	border-color: color-mix(in srgb, var(--hkui-divider) 70%, transparent);
 }
 
-/* Banner inside main (e.g. PayUni warning) */
+/* Banner inside main (e.g. a warning) */
 .seller-banner {
 	display: flex;
 	align-items: center;
@@ -11889,7 +11889,7 @@ html[data-theme="dark"] body .seller-shell .seller-sidebar {
  *  Seller wallet & certification gateway (`/seller-center/wallet`).
  *  Mirrors the App's wallet_screen.dart: step indicator on top,
  *  individual / business chooser card, then status panel that swaps
- *  based on cert + PayUni state.
+ *  based on cert + payment account state.
  * ============================================================ */
 
 /* Fill the seller-shell main column, matching `.seller-orders` /
@@ -12109,7 +12109,7 @@ html[data-theme="dark"] body .seller-shell .seller-sidebar {
 }
 
 /* Status panel — used for every state after the picker (審核中 /
- * 補件 / 已通過 / PayUni 建店中). Fills the seller-main column to
+ * 補件 / 已通過 / 收款帳戶開通中). Fills the seller-main column to
  * align with the page header above. */
 .seller-wallet__panel {
 	width: 100%;
@@ -12339,37 +12339,6 @@ html[data-theme="dark"] body .seller-shell .seller-sidebar {
 .seller-wallet__acct-expand .seller-cert__checkbox {
 	color: var(--color-ink-800);
 }
-/* PayUni 聯絡資訊編輯卡片（issue #2806 Phase 2） */
-.seller-wallet__diff-intro {
-	font-size: var(--text-sm);
-	color: var(--hkui-default-500);
-	margin: 4px 0 12px;
-}
-.seller-wallet__diff-actions {
-	display: flex;
-	gap: 10px;
-	padding-top: 12px;
-}
-.seller-wallet__diff-table {
-	width: 100%;
-	border-collapse: collapse;
-	font-size: var(--text-sm);
-}
-.seller-wallet__diff-table tbody th,
-.seller-wallet__diff-table tbody td {
-	padding: 8px 10px;
-	border-bottom: 1px solid var(--hkui-border);
-	text-align: left;
-	vertical-align: top;
-}
-.seller-wallet__diff-table tbody th {
-	font-weight: 600;
-	color: var(--hkui-default-700);
-	white-space: nowrap;
-}
-.seller-wallet__diff-table tbody td {
-	color: var(--hkui-default-500);
-}
 .seller-wallet__cert-passed-meta {
 	display: flex;
 	flex-direction: column;
@@ -12527,7 +12496,7 @@ html[data-theme="dark"] body .seller-shell .seller-sidebar {
 
 /* ============================================================
  * 交易明細 — 已完成訂單清單（每筆交易成功的訂單）。
- * Rendered below the status row once PayUni is approved. Each row
+ * Rendered below the status row once the payment account is active. Each row
  * links to /seller-center/orders/{orderNo}.
  * ============================================================ */
 .seller-wallet__txns {

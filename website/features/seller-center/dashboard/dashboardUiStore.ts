@@ -4,11 +4,13 @@ import { createLocalPrivateStore } from "@/lib/state/createLocalPrivateStore";
 
 export type SellerOnboardingTaskId =
 	| "profile"
-	| "cert"
-	| "other_requirement"
+	| "platform_review"
+	| "payment_account"
 	| "shipping"
 	| "product"
-	| "description";
+	| "description"
+	/** 伺服器新增、這個版本的網頁還沒有專屬呈現的必要任務（`required_<OnboardingTaskId 數值>`）。 */
+	| `required_${number}`;
 
 type SellerDashboardUiPersistedState = {
 	onboardingActiveTaskId: SellerOnboardingTaskId | null;

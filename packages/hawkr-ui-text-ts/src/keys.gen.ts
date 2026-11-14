@@ -3,7 +3,8 @@ import { Code } from "@connectrpc/connect";
 import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
-import type { ContentKind, KYCField, KYCFlowStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, PayUniState, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import type { PaymentAccountStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+import type { ContentKind, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { UiMessage } from "./message";
 
 export type { DefaultErrorText, UiMessage } from "./message";
@@ -49,72 +50,31 @@ export type UiTextKey =
 	| "common.error.UNIMPLEMENTED"
 	| "common.error.UNKNOWN"
 	| "common.unknown"
+	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
+	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED"
+	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED"
+	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED"
+	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
+	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM"
+	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER"
 	| "seller.ContentKind.CONTENT_KIND_COMMENT"
 	| "seller.ContentKind.CONTENT_KIND_FORUM_ENTRY"
 	| "seller.ContentKind.CONTENT_KIND_POST"
-	| "seller.KYCField.KYC_FIELD_BANK_ACCOUNT"
-	| "seller.KYCField.KYC_FIELD_BANK_BOOK"
-	| "seller.KYCField.KYC_FIELD_BANK_CODE"
-	| "seller.KYCField.KYC_FIELD_BANK_NAME"
-	| "seller.KYCField.KYC_FIELD_BIRTH_DATE"
+	| "seller.KYCApplication.decide_time"
+	| "seller.KYCApplication.submit_time"
 	| "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_ADDRESS"
 	| "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS"
 	| "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME"
 	| "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_PHONE"
 	| "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE"
-	| "seller.KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO"
 	| "seller.KYCField.KYC_FIELD_BUSINESS_TAX_ID"
-	| "seller.KYCField.KYC_FIELD_ENGLISH_NAME"
-	| "seller.KYCField.KYC_FIELD_ID_CARD_BACK"
-	| "seller.KYCField.KYC_FIELD_ID_CARD_FRONT"
-	| "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_DATE"
-	| "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_LOCATION"
-	| "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_TYPE"
-	| "seller.KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO"
 	| "seller.KYCField.KYC_FIELD_PRODUCT_TYPE"
-	| "seller.KYCField.KYC_FIELD_REAL_NAME"
 	| "seller.KYCField.KYC_FIELD_WEBSITE_URL"
-	| "seller.KYCFlowStatus.KYC_FLOW_STATUS_APPROVED"
-	| "seller.KYCFlowStatus.KYC_FLOW_STATUS_BINDING"
-	| "seller.KYCFlowStatus.KYC_FLOW_STATUS_BIND_FAILED"
-	| "seller.KYCFlowStatus.KYC_FLOW_STATUS_DRAFT"
-	| "seller.KYCFlowStatus.KYC_FLOW_STATUS_FORWARDED"
-	| "seller.KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED"
-	| "seller.KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED"
-	| "seller.KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO"
-	| "seller.KYCFlowStatus.KYC_FLOW_STATUS_REJECTED"
-	| "seller.KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED"
-	| "seller.KYCFlowStatus.KYC_FLOW_STATUS_UNDER_REVIEW"
-	| "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_BINDING"
-	| "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_BIND_FAILED"
-	| "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_DRAFT"
-	| "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_FORWARDED"
-	| "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_NOT_STARTED"
-	| "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_PAYUNI_REJECTED"
-	| "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_PENDING_INFO"
-	| "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_REJECTED"
-	| "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_SUBMITTED"
-	| "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_UNDER_REVIEW"
-	| "seller.KYCFlowStatus.banner_description.KYC_FLOW_STATUS_APPROVED"
-	| "seller.KYCFlowStatus.banner_description.KYC_FLOW_STATUS_DRAFT"
-	| "seller.KYCFlowStatus.banner_description.KYC_FLOW_STATUS_NOT_STARTED"
-	| "seller.KYCFlowStatus.banner_description.KYC_FLOW_STATUS_REJECTED"
-	| "seller.KYCFlowStatus.banner_description.KYC_FLOW_STATUS_SUBMITTED"
-	| "seller.KYCFlowStatus.banner_title.KYC_FLOW_STATUS_APPROVED"
-	| "seller.KYCFlowStatus.banner_title.KYC_FLOW_STATUS_DRAFT"
-	| "seller.KYCFlowStatus.banner_title.KYC_FLOW_STATUS_NOT_STARTED"
-	| "seller.KYCFlowStatus.banner_title.KYC_FLOW_STATUS_REJECTED"
-	| "seller.KYCFlowStatus.banner_title.KYC_FLOW_STATUS_SUBMITTED"
-	| "seller.KYCFlowStatus.gate_heading.KYC_FLOW_STATUS_APPROVED"
-	| "seller.KYCFlowStatus.gate_heading.KYC_FLOW_STATUS_DRAFT"
-	| "seller.KYCFlowStatus.gate_heading.KYC_FLOW_STATUS_NOT_STARTED"
-	| "seller.KYCFlowStatus.gate_heading.KYC_FLOW_STATUS_REJECTED"
-	| "seller.KYCFlowStatus.gate_heading.KYC_FLOW_STATUS_SUBMITTED"
-	| "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_APPROVED"
-	| "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_DRAFT"
-	| "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_NOT_STARTED"
-	| "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_REJECTED"
-	| "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_SUBMITTED"
+	| "seller.KYCStatus.KYC_STATUS_APPROVED"
+	| "seller.KYCStatus.KYC_STATUS_CANCELLED"
+	| "seller.KYCStatus.KYC_STATUS_DRAFT"
+	| "seller.KYCStatus.KYC_STATUS_REJECTED"
+	| "seller.KYCStatus.KYC_STATUS_SUBMITTED"
 	| "seller.Measure.appeal_deadline"
 	| "seller.Measure.meta_kind"
 	| "seller.Measure.meta_severity"
@@ -154,14 +114,20 @@ export type UiTextKey =
 	| "seller.MeasureState.MEASURE_STATE_ISSUED"
 	| "seller.MeasureState.MEASURE_STATE_REVOKED"
 	| "seller.MeasureState.MEASURE_STATE_SCHEDULED"
-	| "seller.PayUniState.PAY_UNI_STATE_APPROVED"
-	| "seller.PayUniState.PAY_UNI_STATE_CONTACT_SUPPORT"
-	| "seller.PayUniState.PAY_UNI_STATE_FIXABLE"
-	| "seller.PayUniState.PAY_UNI_STATE_FIX_VIA_SUPPORT"
-	| "seller.PayUniState.PAY_UNI_STATE_PENDING_INFO"
-	| "seller.PayUniState.PAY_UNI_STATE_RETRY_LATER"
-	| "seller.PayUniState.PAY_UNI_STATE_REVIEWING"
-	| "seller.PayUniState.PAY_UNI_STATE_TERMINATED"
+	| "seller.OnboardingAction.button.ONBOARDING_ACTION_CONTACT_SUPPORT"
+	| "seller.OnboardingAction.button.ONBOARDING_ACTION_EDIT_PROFILE"
+	| "seller.OnboardingAction.button.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING"
+	| "seller.OnboardingAction.button.ONBOARDING_ACTION_SUBMIT_CERTIFICATION"
+	| "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT"
+	| "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PLATFORM_REVIEW"
+	| "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PROFILE"
+	| "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT"
+	| "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PLATFORM_REVIEW"
+	| "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PROFILE"
+	| "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT"
+	| "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PLATFORM_REVIEW"
+	| "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PROFILE"
+	| "seller.PaymentAccount.payouts_inactive_note"
 	| "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION"
 	| "seller.RevokeReason.REVOKE_REASON_APPEAL_ACCEPTED"
 	| "seller.RevokeReason.REVOKE_REASON_EXTERNAL_DECISION"
@@ -176,12 +142,10 @@ export type UiTextKey =
 	| "seller.RiskGround.RISK_GROUND_PERSONAL_DATA"
 	| "seller.RiskGround.RISK_GROUND_SECURITY"
 	| "seller.RiskGround.RISK_GROUND_TRANSACTION"
-	| "seller.SellerPayUni.fix_fields_heading"
-	| "seller.SellerPayUni.reason_heading"
-	| "seller.SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_LOGO"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_NOT_PENDING_DELETION"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED"
+	| "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_NAME"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_TOWN_CODE"
@@ -312,6 +276,33 @@ export function commonUnknown(): UiMessage {
 	return { key: "common.unknown" };
 }
 
+const PAYMENT_PAYMENT_ACCOUNT_STATUS: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED",
+	2: "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW",
+	3: "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED",
+	4: "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED",
+	5: "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED",
+};
+
+/** payment.PaymentAccountStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function paymentPaymentAccountStatus(v: PaymentAccountStatus): UiMessage | undefined {
+	const key = PAYMENT_PAYMENT_ACCOUNT_STATUS[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PAYMENT_REQUIREMENT_COLLECTION: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER",
+	2: "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM",
+};
+
+/** payment.RequirementCollection 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function paymentRequirementCollection(v: RequirementCollection): UiMessage | undefined {
+	const key = PAYMENT_REQUIREMENT_COLLECTION[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
 const SELLER_CONTENT_KIND: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "seller.ContentKind.CONTENT_KIND_POST",
 	2: "seller.ContentKind.CONTENT_KIND_COMMENT",
@@ -325,29 +316,25 @@ export function sellerContentKind(v: ContentKind): UiMessage | undefined {
 	return { key };
 }
 
+/** seller.KYCApplication.decide_time */
+export function sellerKYCApplicationDecideTime(a: { time: string }): UiMessage {
+	return { key: "seller.KYCApplication.decide_time", values: { time: a.time } };
+}
+
+/** seller.KYCApplication.submit_time */
+export function sellerKYCApplicationSubmitTime(a: { time: string }): UiMessage {
+	return { key: "seller.KYCApplication.submit_time", values: { time: a.time } };
+}
+
 const SELLER_KYCFIELD: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "seller.KYCField.KYC_FIELD_REAL_NAME",
-	2: "seller.KYCField.KYC_FIELD_BIRTH_DATE",
-	3: "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_DATE",
-	4: "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_TYPE",
-	5: "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_LOCATION",
-	6: "seller.KYCField.KYC_FIELD_ENGLISH_NAME",
-	7: "seller.KYCField.KYC_FIELD_BANK_NAME",
-	8: "seller.KYCField.KYC_FIELD_BANK_CODE",
-	9: "seller.KYCField.KYC_FIELD_BANK_ACCOUNT",
-	10: "seller.KYCField.KYC_FIELD_PRODUCT_TYPE",
-	12: "seller.KYCField.KYC_FIELD_WEBSITE_URL",
-	15: "seller.KYCField.KYC_FIELD_ID_CARD_FRONT",
-	16: "seller.KYCField.KYC_FIELD_ID_CARD_BACK",
-	17: "seller.KYCField.KYC_FIELD_BANK_BOOK",
-	18: "seller.KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO",
-	20: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME",
-	21: "seller.KYCField.KYC_FIELD_BUSINESS_TAX_ID",
-	22: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE",
-	25: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_PHONE",
-	26: "seller.KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO",
-	27: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS",
-	28: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_ADDRESS",
+	1: "seller.KYCField.KYC_FIELD_PRODUCT_TYPE",
+	2: "seller.KYCField.KYC_FIELD_WEBSITE_URL",
+	3: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME",
+	4: "seller.KYCField.KYC_FIELD_BUSINESS_TAX_ID",
+	5: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE",
+	6: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_PHONE",
+	7: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS",
+	8: "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_ADDRESS",
 };
 
 /** seller.KYCField 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
@@ -357,105 +344,19 @@ export function sellerKYCField(v: KYCField): UiMessage | undefined {
 	return { key };
 }
 
-const SELLER_KYCFLOW_STATUS: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "seller.KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED",
-	2: "seller.KYCFlowStatus.KYC_FLOW_STATUS_DRAFT",
-	3: "seller.KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED",
-	4: "seller.KYCFlowStatus.KYC_FLOW_STATUS_REJECTED",
-	5: "seller.KYCFlowStatus.KYC_FLOW_STATUS_BINDING",
-	6: "seller.KYCFlowStatus.KYC_FLOW_STATUS_BIND_FAILED",
-	7: "seller.KYCFlowStatus.KYC_FLOW_STATUS_FORWARDED",
-	8: "seller.KYCFlowStatus.KYC_FLOW_STATUS_UNDER_REVIEW",
-	9: "seller.KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO",
-	10: "seller.KYCFlowStatus.KYC_FLOW_STATUS_APPROVED",
-	11: "seller.KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED",
+const SELLER_KYCSTATUS: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.KYCStatus.KYC_STATUS_DRAFT",
+	2: "seller.KYCStatus.KYC_STATUS_SUBMITTED",
+	3: "seller.KYCStatus.KYC_STATUS_APPROVED",
+	4: "seller.KYCStatus.KYC_STATUS_REJECTED",
+	5: "seller.KYCStatus.KYC_STATUS_CANCELLED",
 };
 
-/** seller.KYCFlowStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
-export function sellerKYCFlowStatus(v: KYCFlowStatus): UiMessage | undefined {
-	const key = SELLER_KYCFLOW_STATUS[v];
+/** seller.KYCStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function sellerKYCStatus(v: KYCStatus): UiMessage | undefined {
+	const key = SELLER_KYCSTATUS[v];
 	if (key === undefined) return undefined;
 	return { key };
-}
-
-const SELLER_KYCFLOW_STATUS_ACTION: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_NOT_STARTED",
-	2: "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_DRAFT",
-	3: "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_SUBMITTED",
-	4: "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_REJECTED",
-	5: "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_BINDING",
-	6: "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_BIND_FAILED",
-	7: "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_FORWARDED",
-	8: "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_UNDER_REVIEW",
-	9: "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_PENDING_INFO",
-	11: "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_PAYUNI_REJECTED",
-};
-
-/** seller.KYCFlowStatus.action；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
-export function sellerKYCFlowStatusAction(v: KYCFlowStatus): UiMessage | undefined {
-	const key = SELLER_KYCFLOW_STATUS_ACTION[v];
-	if (key === undefined) return undefined;
-	return { key };
-}
-
-const SELLER_KYCFLOW_STATUS_BANNER_DESCRIPTION: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "seller.KYCFlowStatus.banner_description.KYC_FLOW_STATUS_NOT_STARTED",
-	2: "seller.KYCFlowStatus.banner_description.KYC_FLOW_STATUS_DRAFT",
-	3: "seller.KYCFlowStatus.banner_description.KYC_FLOW_STATUS_SUBMITTED",
-	4: "seller.KYCFlowStatus.banner_description.KYC_FLOW_STATUS_REJECTED",
-	10: "seller.KYCFlowStatus.banner_description.KYC_FLOW_STATUS_APPROVED",
-};
-
-/** seller.KYCFlowStatus.banner_description；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
-export function sellerKYCFlowStatusBannerDescription(v: KYCFlowStatus): UiMessage | undefined {
-	const key = SELLER_KYCFLOW_STATUS_BANNER_DESCRIPTION[v];
-	if (key === undefined) return undefined;
-	return { key };
-}
-
-const SELLER_KYCFLOW_STATUS_BANNER_TITLE: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "seller.KYCFlowStatus.banner_title.KYC_FLOW_STATUS_NOT_STARTED",
-	2: "seller.KYCFlowStatus.banner_title.KYC_FLOW_STATUS_DRAFT",
-	3: "seller.KYCFlowStatus.banner_title.KYC_FLOW_STATUS_SUBMITTED",
-	4: "seller.KYCFlowStatus.banner_title.KYC_FLOW_STATUS_REJECTED",
-	10: "seller.KYCFlowStatus.banner_title.KYC_FLOW_STATUS_APPROVED",
-};
-
-/** seller.KYCFlowStatus.banner_title；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
-export function sellerKYCFlowStatusBannerTitle(v: KYCFlowStatus): UiMessage | undefined {
-	const key = SELLER_KYCFLOW_STATUS_BANNER_TITLE[v];
-	if (key === undefined) return undefined;
-	return { key };
-}
-
-const SELLER_KYCFLOW_STATUS_GATE_HEADING: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "seller.KYCFlowStatus.gate_heading.KYC_FLOW_STATUS_NOT_STARTED",
-	2: "seller.KYCFlowStatus.gate_heading.KYC_FLOW_STATUS_DRAFT",
-	3: "seller.KYCFlowStatus.gate_heading.KYC_FLOW_STATUS_SUBMITTED",
-	4: "seller.KYCFlowStatus.gate_heading.KYC_FLOW_STATUS_REJECTED",
-	10: "seller.KYCFlowStatus.gate_heading.KYC_FLOW_STATUS_APPROVED",
-};
-
-/** seller.KYCFlowStatus.gate_heading；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
-export function sellerKYCFlowStatusGateHeading(v: KYCFlowStatus): UiMessage | undefined {
-	const key = SELLER_KYCFLOW_STATUS_GATE_HEADING[v];
-	if (key === undefined) return undefined;
-	return { key };
-}
-
-const SELLER_KYCFLOW_STATUS_GATE_MESSAGE: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_NOT_STARTED",
-	2: "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_DRAFT",
-	3: "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_SUBMITTED",
-	4: "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_REJECTED",
-	10: "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_APPROVED",
-};
-
-/** seller.KYCFlowStatus.gate_message；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
-export function sellerKYCFlowStatusGateMessage(v: KYCFlowStatus, a: { subject: string }): UiMessage | undefined {
-	const key = SELLER_KYCFLOW_STATUS_GATE_MESSAGE[v];
-	if (key === undefined) return undefined;
-	return { key, values: { subject: a.subject } };
 }
 
 /** seller.Measure.appeal_deadline */
@@ -634,22 +535,62 @@ export function sellerMeasureState(v: MeasureState, a: { kind: MeasureKind }): U
 	return { key, values: { kind: SELLER_MEASURE_KIND_NAME[a.kind] ?? "" } };
 }
 
-const SELLER_PAY_UNI_STATE: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "seller.PayUniState.PAY_UNI_STATE_REVIEWING",
-	2: "seller.PayUniState.PAY_UNI_STATE_PENDING_INFO",
-	3: "seller.PayUniState.PAY_UNI_STATE_FIXABLE",
-	4: "seller.PayUniState.PAY_UNI_STATE_FIX_VIA_SUPPORT",
-	5: "seller.PayUniState.PAY_UNI_STATE_CONTACT_SUPPORT",
-	6: "seller.PayUniState.PAY_UNI_STATE_RETRY_LATER",
-	7: "seller.PayUniState.PAY_UNI_STATE_TERMINATED",
-	8: "seller.PayUniState.PAY_UNI_STATE_APPROVED",
+const SELLER_ONBOARDING_ACTION_BUTTON: Readonly<Partial<Record<number, UiTextKey>>> = {
+	2: "seller.OnboardingAction.button.ONBOARDING_ACTION_EDIT_PROFILE",
+	3: "seller.OnboardingAction.button.ONBOARDING_ACTION_SUBMIT_CERTIFICATION",
+	4: "seller.OnboardingAction.button.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING",
+	5: "seller.OnboardingAction.button.ONBOARDING_ACTION_CONTACT_SUPPORT",
 };
 
-/** seller.PayUniState 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
-export function sellerPayUniState(v: PayUniState): UiMessage | undefined {
-	const key = SELLER_PAY_UNI_STATE[v];
+/** seller.OnboardingAction.button；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
+export function sellerOnboardingActionButton(v: OnboardingAction): UiMessage | undefined {
+	const key = SELLER_ONBOARDING_ACTION_BUTTON[v];
 	if (key === undefined) return undefined;
 	return { key };
+}
+
+const SELLER_ONBOARDING_TASK_ID_DESCRIPTION: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PROFILE",
+	2: "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PLATFORM_REVIEW",
+	3: "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT",
+};
+
+/** seller.OnboardingTaskId.description；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
+export function sellerOnboardingTaskIdDescription(v: OnboardingTaskId): UiMessage | undefined {
+	const key = SELLER_ONBOARDING_TASK_ID_DESCRIPTION[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SELLER_ONBOARDING_TASK_ID_PANEL_DESCRIPTION: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PROFILE",
+	2: "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PLATFORM_REVIEW",
+	3: "seller.OnboardingTaskId.panel_description.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT",
+};
+
+/** seller.OnboardingTaskId.panel_description；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
+export function sellerOnboardingTaskIdPanelDescription(v: OnboardingTaskId): UiMessage | undefined {
+	const key = SELLER_ONBOARDING_TASK_ID_PANEL_DESCRIPTION[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SELLER_ONBOARDING_TASK_ID_PANEL_TITLE: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PROFILE",
+	2: "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PLATFORM_REVIEW",
+	3: "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT",
+};
+
+/** seller.OnboardingTaskId.panel_title；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
+export function sellerOnboardingTaskIdPanelTitle(v: OnboardingTaskId): UiMessage | undefined {
+	const key = SELLER_ONBOARDING_TASK_ID_PANEL_TITLE[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+/** seller.PaymentAccount.payouts_inactive_note */
+export function sellerPaymentAccountPayoutsInactiveNote(): UiMessage {
+	return { key: "seller.PaymentAccount.payouts_inactive_note" };
 }
 
 const SELLER_REVOKE_REASON: Readonly<Partial<Record<number, UiTextKey>>> = {
@@ -686,20 +627,10 @@ export function sellerRiskGround(v: RiskGround): UiMessage | undefined {
 	return { key };
 }
 
-/** seller.SellerPayUni.fix_fields_heading */
-export function sellerSellerPayUniFixFieldsHeading(): UiMessage {
-	return { key: "seller.SellerPayUni.fix_fields_heading" };
-}
-
-/** seller.SellerPayUni.reason_heading */
-export function sellerSellerPayUniReasonHeading(): UiMessage {
-	return { key: "seller.SellerPayUni.reason_heading" };
-}
-
 const SELLER_SELLER_REQUIREMENT: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE",
 	2: "seller.SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED",
-	3: "seller.SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED",
+	3: "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE",
 	4: "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_NAME",
 	5: "seller.SellerRequirement.SELLER_REQUIREMENT_LOGO",
 	6: "seller.SellerRequirement.SELLER_REQUIREMENT_TOWN_CODE",

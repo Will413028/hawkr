@@ -163,7 +163,7 @@ func TestApplyWithWrongAgreementKindsIsInvalidInput(t *testing.T) {
 	for name, in := range map[string][]AgreementAcceptance{
 		"沒有":          nil,
 		"KYC 的種類":     CurrentKYCAcceptances(),
-		"多出一種":        append(CurrentApplyAcceptances(), current(AgreementPayUniTerms)),
+		"多出一種":        append(CurrentApplyAcceptances(), current(AgreementKYCPrivacyNotice)),
 		"同一種兩次":       {current(AgreementSellerTerms), current(AgreementSellerTerms)},
 		"UNSPECIFIED": {{Kind: "", Version: CurrentAgreementsOrFail(t, AgreementSellerTerms).Version}},
 	} {
@@ -203,25 +203,25 @@ func (f *fixture) kycSubmit(accountID, version int64, agreements []AgreementAcce
 	})
 }
 
-// 送出 KYC 記下兩份同意，與送出同一個 transaction。
-func TestSubmitKYCRecordsBothAcceptances(t *testing.T) {
+// 送出 KYC 記下一份同意（KYC_PRIVACY_NOTICE），與送出同一個 transaction。
+func TestSubmitKYCRecordsTheAcceptance(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	accountID, s := f.open(t)
 	before := f.acceptances(t, s.StoreID)
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	d := f.savedDraft(t, kycDraft(accountID))
 	f.now = f.now.Add(time.Hour)
 	_, err := f.kycSubmit(accountID, d.Version, CurrentKYCAcceptances(), "2001:db8::7", "hk-app/2.0")
 	must(t, err)
 	got := f.acceptances(t, s.StoreID)
-	if len(before) != 1 || len(got) != 3 {
+	if len(before) != 1 || len(got) != 2 {
 		t.Fatalf("開店後 %d 筆，送出後 %d 筆", len(before), len(got))
 	}
 	byKind := map[string]acceptanceRow{}
 	for _, r := range got {
 		byKind[r.Kind] = r
 	}
-	for _, k := range []AgreementKind{AgreementKYCPrivacyNotice, AgreementPayUniTerms} {
+	for _, k := range []AgreementKind{AgreementKYCPrivacyNotice} {
 		r, ok := byKind[string(k)]
 		if !ok || r.Version != CurrentAgreementsOrFail(t, k).Version || r.AccountID != accountID || !r.AcceptedAt.Equal(f.now) ||
 			!equalText(r.ClientIP, "2001:db8::7") || !equalText(r.UserAgent, "hk-app/2.0") {
@@ -232,7 +232,7 @@ func TestSubmitKYCRecordsBothAcceptances(t *testing.T) {
 		t.Errorf("開店當時的紀錄被改動或帶了送出：%+v", r)
 	}
 	reviews := f.submitReviewIDs(t, s.StoreID)
-	for _, k := range []string{"KYC_PRIVACY_NOTICE", "PAYUNI_TERMS"} {
+	for _, k := range []string{"KYC_PRIVACY_NOTICE"} {
 		if r := byKind[k]; len(reviews) != 1 || r.SubmissionReviewID == nil || *r.SubmissionReviewID != reviews[0] {
 			t.Errorf("%s 沒有綁定這次送出的審核紀錄 %v：%+v", k, reviews, r)
 		}
@@ -244,18 +244,18 @@ func TestSubmitKYCWithBadAgreementsDoesNotSubmit(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	accountID, s := f.open(t)
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
-	outdated := []AgreementAcceptance{{Kind: AgreementKYCPrivacyNotice, Version: "2026-01-01"}, {Kind: AgreementPayUniTerms, Version: CurrentAgreementsOrFail(t, AgreementPayUniTerms).Version}}
+	d := f.savedDraft(t, kycDraft(accountID))
+	outdated := []AgreementAcceptance{{Kind: AgreementKYCPrivacyNotice, Version: "2026-01-01"}}
 	_, err := f.kycSubmit(accountID, d.Version, outdated, "", "")
 	if ae := apperrOf(t, err); ae.Kind() != apperr.KindFailedPrecondition || ae.Reason != apperr.ReasonAgreementOutdated {
 		t.Fatalf("outdated err=%v", err)
 	}
 	for name, in := range map[string][]AgreementAcceptance{
-		"沒有":      nil,
-		"缺一種":     CurrentKYCAcceptances()[:1],
-		"開店的種類":   CurrentApplyAcceptances(),
-		"同一種兩次":   {CurrentKYCAcceptances()[0], CurrentKYCAcceptances()[0]},
-		"多出開店的種類": append(CurrentKYCAcceptances(), CurrentApplyAcceptances()...),
+		"沒有":                  nil,
+		"開店的種類":               CurrentApplyAcceptances(),
+		"同一種兩次":               {CurrentKYCAcceptances()[0], CurrentKYCAcceptances()[0]},
+		"多出開店的種類":             append(CurrentKYCAcceptances(), CurrentApplyAcceptances()...),
+		"已下架的種類 PAYUNI_TERMS": append(CurrentKYCAcceptances(), AgreementAcceptance{Kind: "PAYUNI_TERMS", Version: "2026-10-07"}),
 	} {
 		_, err := f.kycSubmit(accountID, d.Version, in, "", "")
 		if ae := apperrOf(t, err); ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != "AcceptedAgreements" {
@@ -272,13 +272,13 @@ func TestSubmitKYCWithBadAgreementsDoesNotSubmit(t *testing.T) {
 	}
 }
 
-// 被退回後重送：每次送出各寫兩列新的紀錄，各自綁定那一次的送出（換了申請主體也留下新的同意）；第一次的紀錄不動。
+// 被退回後重送：每次送出各寫一列新的紀錄，各自綁定那一次的送出（換了申請主體也留下新的同意）；第一次的紀錄不動。
 func TestResubmittingKYCAddsNewAcceptancesBoundToTheNewSubmission(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	accountID, s, sub := f.submitted(t, idA, bankAcct)
+	accountID, s, sub := f.submitted(t)
 	first := f.acceptances(t, s.StoreID)
-	if len(first) != 3 {
+	if len(first) != 2 {
 		t.Fatalf("rows=%+v", first)
 	}
 	_, err := f.module.RejectKYC(context.Background(), RejectKYCInput{ApplicationID: sub.ID, ExpectedVersion: sub.Version, AdminID: 9, Issues: anIssue(), Reason: "照片不清楚"})
@@ -289,8 +289,8 @@ func TestResubmittingKYCAddsNewAcceptancesBoundToTheNewSubmission(t *testing.T) 
 	_, err = f.kycSubmit(accountID, rejected.Version, CurrentKYCAcceptances(), "203.0.113.50", "other-ua")
 	must(t, err)
 	second := f.acceptances(t, s.StoreID)
-	if len(second) != 5 {
-		t.Fatalf("重送之後有 %d 筆，預期 5 筆", len(second))
+	if len(second) != 3 {
+		t.Fatalf("重送之後有 %d 筆，預期 3 筆", len(second))
 	}
 	for i := range first {
 		if !reflect.DeepEqual(first[i], second[i]) {
@@ -317,7 +317,7 @@ func TestResubmittingKYCAddsNewAcceptancesBoundToTheNewSubmission(t *testing.T) 
 func TestAgreementAcceptanceTableConstraints(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	accountID, s, _ := f.submitted(t, idA, bankAcct)
+	accountID, s, _ := f.submitted(t)
 	ctx := context.Background()
 	reviews := f.submitReviewIDs(t, s.StoreID)
 	insert := func(kind, version string, review *string, ua *string) error {
@@ -329,16 +329,17 @@ func TestAgreementAcceptanceTableConstraints(t *testing.T) {
 	for name, err := range map[string]error{
 		"開店的同意重複":      insert("SELLER_TERMS", "2025-01-01", nil, nil),
 		"開店的同意帶了送出":    insert("SELLER_TERMS", "2025-01-01", &reviews[0], nil),
-		"KYC 的同意沒有帶送出": insert("PAYUNI_TERMS", "2025-01-01", nil, nil),
+		"KYC 的同意沒有帶送出": insert("KYC_PRIVACY_NOTICE", "2025-01-01", nil, nil),
 		"不認得的 kind":    insert("NO_SUCH", "v", &reviews[0], nil),
-		"空版本":          insert("PAYUNI_TERMS", "", &reviews[0], nil),
-		"空的 UA":        insert("PAYUNI_TERMS", "v", &reviews[0], &empty),
+		"已下架的 kind":    insert("PAYUNI_TERMS", "v", &reviews[0], nil),
+		"空版本":          insert("KYC_PRIVACY_NOTICE", "", &reviews[0], nil),
+		"空的 UA":        insert("KYC_PRIVACY_NOTICE", "v", &reviews[0], &empty),
 	} {
 		if err == nil {
 			t.Errorf("%s：CHECK 或索引沒有擋下", name)
 		}
 	}
-	if err := insert("PAYUNI_TERMS", "2025-01-01", &reviews[0], nil); err != nil {
+	if err := insert("KYC_PRIVACY_NOTICE", "2025-01-01", &reviews[0], nil); err != nil {
 		t.Fatalf("同一次送出可以有不同版本的列：%v", err)
 	}
 }
@@ -352,11 +353,11 @@ func TestPurgeClearsAgreementSourcesAndKeepsTheRest(t *testing.T) {
 	s, err := f.applyWith(accountID, CurrentApplyAcceptances(), "203.0.113.9", "hk-test/1.0")
 	must(t, err)
 	f.setContact(t, s.StoreID)
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	d := f.savedDraft(t, kycDraft(accountID))
 	_, err = f.kycSubmit(accountID, d.Version, CurrentKYCAcceptances(), "2001:db8::7", "hk-app/2.0")
 	must(t, err)
 	before := f.acceptances(t, s.StoreID)
-	if len(before) != 3 {
+	if len(before) != 2 {
 		t.Fatalf("rows=%+v", before)
 	}
 	for _, r := range before {
@@ -393,7 +394,7 @@ func TestSubmitKYCRollsTheAcceptanceBackWithTheSubmission(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	accountID, s := f.open(t)
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	d := f.savedDraft(t, kycDraft(accountID))
 	before := f.acceptances(t, s.StoreID)
 	boom := errors.New("subscriber failed")
 	events.Subscribe(f.bus, func(context.Context, KYCSubmitted) error { return boom })
@@ -432,15 +433,15 @@ func TestApplyWithAnEmptyVersionIsInvalidInput(t *testing.T) {
 	}
 }
 
-// agreement_acceptances_source_check：每種 kind 只綁定剛好一種來源。開店的同意（SELLER_TERMS）不帶送出，KYC 的兩份同意
-// （KYC_PRIVACY_NOTICE、PAYUNI_TERMS）一定帶送出。被拒的語句以 wantViolates 斷言是這一條擋下，而且拿掉它就成功（沒有被別的約束遮住）。
+// agreement_acceptances_source_check：每種 kind 只綁定剛好一種來源。開店的同意（SELLER_TERMS）不帶送出，KYC 的同意
+// （KYC_PRIVACY_NOTICE）一定帶送出。被拒的語句以 wantViolates 斷言是這一條擋下，而且拿掉它就成功（沒有被別的約束遮住）。
 // 開店時已寫下的那列 SELLER_TERMS 先刪掉，否則每店一列的唯一索引會遮住「開店的同意帶了送出」。
 // mutation：在測試資料庫 ALTER TABLE seller.agreement_acceptances DROP CONSTRAINT agreement_acceptances_source_check，
-// 三個被拒的情況都改成寫入成功，本測試失敗。
+// 兩個被拒的情況都改成寫入成功，本測試失敗。
 func TestAgreementAcceptancesBindExactlyOneSourceByKind(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	accountID, s, _ := f.submitted(t, idA, bankAcct)
+	accountID, s, _ := f.submitted(t)
 	ctx := context.Background()
 	review := f.submitReviewIDs(t, s.StoreID)[0]
 	_, err := f.db.Conn(ctx).Exec(ctx, "DELETE FROM seller.agreement_acceptances WHERE store_id = $1 AND kind = 'SELLER_TERMS'", s.StoreID)
@@ -453,7 +454,6 @@ func TestAgreementAcceptancesBindExactlyOneSourceByKind(t *testing.T) {
 	}{
 		{"開店的同意帶了送出", "SELLER_TERMS", &review},
 		{"KYC 告知沒有送出", "KYC_PRIVACY_NOTICE", nil},
-		{"PayUni 條款沒有送出", "PAYUNI_TERMS", nil},
 	} {
 		f.wantViolates(t, c.name, "agreement_acceptances_source_check", insert, s.StoreID, c.kind, accountID, c.review)
 	}
@@ -463,7 +463,6 @@ func TestAgreementAcceptancesBindExactlyOneSourceByKind(t *testing.T) {
 	}{
 		{"SELLER_TERMS", nil},
 		{"KYC_PRIVACY_NOTICE", &review},
-		{"PAYUNI_TERMS", &review},
 	} {
 		if _, err := f.db.Conn(ctx).Exec(ctx, insert, s.StoreID, c.kind, accountID, c.review); err != nil {
 			t.Errorf("%s 綁正確來源卻寫不進去：%v", c.kind, err)

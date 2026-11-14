@@ -1,0 +1,16 @@
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+create 200
+update 200
+{"recv": "00:16:23", "event": "evt_test_65VglrbeWzBPuM3lvwR16VglrVQRSQUBk3Agk8gM0AKRGa", "type": "v1.capability.updated", "created": "2026-11-02T16:16:22.306Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["context", "created", "id", "livemode", "object", "reason", "related_object", "type"], "related_object": {"id": "transfers", "type": "capability", "url": "<MASKED>"}, "context": "acct_1UXNu9EWUjX7nRJT", "sig_header_parts": ["t", "v1"]}
+{"recv": "00:16:29", "event": "evt_test_65VglrhpJZ4Lozs4vmp16VglrVQRSQUBk3Agk8gM0AKWSu", "type": "v1.person.created", "created": "2026-11-02T16:16:28.590Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["context", "created", "id", "livemode", "object", "reason", "related_object", "type"], "related_object": {"id": "person_<MASKED:5486>", "type": "person", "url": "<MASKED>"}, "context": "acct_1UXNu9EWUjX7nRJT", "sig_header_parts": ["t", "v1"]}
+{"recv": "00:16:30", "event": "evt_test_65Vglri4Kbq7F87sR0e16VglrVQRSQUBk3Agk8gM0AK9Y0", "type": "v1.account.updated", "created": "2026-11-02T16:16:28.590Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["context", "created", "id", "livemode", "object", "reason", "related_object", "type"], "related_object": {"id": "acct_1UXNu9EWUjX7nRJT", "type": "account", "url": "<MASKED>"}, "context": "acct_1UXNu9EWUjX7nRJT", "sig_header_parts": ["t", "v1"]}
+--- retrieve first event (HTTP 404)
+{
+  "object": null,
+  "type": null,
+  "related_object": null,
+  "data": null,
+  "changes": null,
+  "context": null
+}
+delete 200

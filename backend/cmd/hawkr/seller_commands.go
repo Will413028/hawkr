@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/legacy/mediaservice"
@@ -12,6 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -24,8 +26,12 @@ import (
 type sellerCommand struct {
 	DB       *db.DB
 	Bus      *events.Bus
+	Jobs     jobs.Enqueuer
 	Identity *identity.Module
 	Seller   *seller.Module
+	// Owners 是 payment 的擁有者查詢（已 bind 到 Seller），給種子另外組的 payment 模組用。
+	Owners *sellerOwners
+	Logger *slog.Logger
 }
 
 // openSeller 組裝 sellerCommand，需要完整 seller 模組的子命令（reannounce-exposures、dev-seed）走這裡。子命令不呼叫 media、order、product 的服務
@@ -44,8 +50,8 @@ func openSeller(ctx context.Context, prepare func(*config.Env) error) (*sellerCo
 	orderAddr := e.String("ORDER_SERVICE_ADDR")
 	productAddr := e.String("PRODUCT_SERVICE_ADDR")
 	log := newLogger()
-	kyc := readKYCKeys(e)
-	pay := readPayUni(e, log)
+	kycMAC := readKYCHashKeys(e)
+	paymentProvider := readPayment(e, log)
 	registry := readGCIS(e)
 	if err := e.Err(); err != nil {
 		return nil, err
@@ -76,9 +82,12 @@ func openSeller(ctx context.Context, prepare func(*config.Env) error) (*sellerCo
 	}
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
-	module := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kyc, pay, registry, log)
+	payments, owners := newPayment(d, bus, jc, newInbox(d, jc, log), paymentProvider, log)
+	module := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
+	owners.bind(module)
+	subscribeSellerPayout(bus, module)
 	subscribeSellerRelay(bus, jc)
-	return &sellerCommand{DB: d, Bus: bus, Identity: id, Seller: module}, nil
+	return &sellerCommand{DB: d, Bus: bus, Jobs: jc, Identity: id, Seller: module, Owners: owners, Logger: log}, nil
 }
 
 // Close 關閉資料庫連線。
@@ -165,6 +174,15 @@ func runDevSeed(ctx context.Context, args []string, out io.Writer) error {
 		return err
 	}
 	if err := module.SeedDevStores(ctx, stores, devSeedRebuiltAccounts); err != nil {
+		return err
+	}
+	ids := make([]int64, 0, len(stores))
+	for _, st := range stores {
+		ids = append(ids, st.StoreID)
+	}
+	seedFake := payment.NewFake()
+	seedFake.AutoActive = true
+	if err := seedPaymentAccounts(ctx, c, seedFake, ids, out); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(out, "已寫入 %d 家種子店家（接著執行 reannounce-exposures）\n", len(stores))

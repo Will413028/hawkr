@@ -187,10 +187,10 @@ const (
 	// MaterialBreachCure 是第 21.3 條第 1 款（重大違約經通知後七日內未改善）的改善期：引用的認定至少要存在這麼久。
 	MaterialBreachCure = 7 * 24 * time.Hour
 	// StoreRetireAfter 是關店後的第一段清理（退場）：一般關店（賣家自己、隨帳號刪除）後 30 天，店家的公開內容（說明、獎項、網站、logo 與封面）清掉、
-	// 發 StoreRetired 讓下游刪除（商品、貼文、聊天的個資等），之後不能恢復營業；終止合作關店不早於申覆期限（ADR 2026-10-19-seller-kyc-payuni-consolidated
-	// 的 2026-10-20 修訂，Will 改選 Q2 (b)）。時數只從這一個常數來。
+	// 發 StoreRetired 讓下游刪除（商品、貼文、聊天的個資等），之後不能恢復營業；終止合作關店不早於申覆期限（ADR 2026-11-13-seller-platform-review-and-identity-matching
+	// 「關店與個資保留」）。時數只從這一個常數來。
 	StoreRetireAfter = 720 * time.Hour
-	// StoreRetention 是關店後的第二段清理：關店後 184 天清註冊、身分與連線資料（店名、聯絡、地址、KYC、PayUni 的自由文字、食品登錄字號、同意紀錄的
+	// StoreRetention 是關店後的第二段清理：關店後 184 天清註冊、身分與連線資料（店名、聯絡、地址、KYC、食品登錄字號、同意紀錄的
 	// IP 與 User-Agent）。184 天是任何連續六個曆月的最大長度，所以不論關店日都不短於詐欺犯罪危害防制條例第 37 條第 1 項的「六個月」。時數只從這一個常數來。
 	StoreRetention = 4416 * time.Hour
 	// IdentityHashRetention 是防詐保存的身分 blind index（account_identity_hashes）的保存期：來源 stint 目前這次關店滿 5 年才刪（Stripe 計畫 D3，Will 2026-10-29；
@@ -482,23 +482,19 @@ type Measure struct {
 type LinkedIdentity string
 
 const (
-	// LinkedNationalID 賣家本人的身分證號相同。
-	LinkedNationalID LinkedIdentity = "NATIONAL_ID"
 	// LinkedUBN 統一編號相同。
 	LinkedUBN LinkedIdentity = "UBN"
-	// LinkedResponsiblePersonID 企業負責人的身分證號相同。
-	LinkedResponsiblePersonID LinkedIdentity = "RESPONSIBLE_PERSON_ID"
-	// LinkedBankAccount 銀行帳號（連同銀行代碼）相同。只列出、不能據以建立關聯終止（Stripe 計畫 D4：家人或配偶共用帳戶是常態，與 ADR
-	// 2026-10-19-seller-kyc-payuni-consolidated「銀行帳號命中只標記，不擋」同一個判斷）。
+	// LinkedBankAccount 金流商回報的銀行帳號 fingerprint 相同。只列出、不能據以建立關聯終止（Stripe 計畫 D4：家人或配偶共用帳戶是常態，與 ADR
+	// 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」同一個判斷）。
 	LinkedBankAccount LinkedIdentity = "BANK_ACCOUNT"
 )
 
 // LinkedIdentityValues 回傳全部命中的身分類別，依同時命中多種時的取用順序。
 func LinkedIdentityValues() []LinkedIdentity {
-	return []LinkedIdentity{LinkedNationalID, LinkedUBN, LinkedResponsiblePersonID, LinkedBankAccount}
+	return []LinkedIdentity{LinkedUBN, LinkedBankAccount}
 }
 
-// CountsAsGround 回報這種命中能不能當作建立關聯終止（LINKED_ACCOUNT）的依據：身分證號與統編可以，銀行帳號只列出。列出關聯帳號（linkedAccounts）與
+// CountsAsGround 回報這種命中能不能當作建立關聯終止（LINKED_ACCOUNT）的依據：統編可以，銀行帳號只列出。列出關聯帳號（linkedAccounts）與
 // 建立時的再驗證（CreateMeasure）都只問它，所以「只列出、不能建立」只有這一個判斷點。
 func (i LinkedIdentity) CountsAsGround() bool { return i != LinkedBankAccount }
 
@@ -518,6 +514,17 @@ type LinkedAccount struct {
 	CanCreateLinkedTermination    bool
 	// TerminationEffect 是 CanCreateLinkedTermination 為 true 時建立這筆關聯終止的效果；false 時是 nil。
 	TerminationEffect *TerminationEffect
+	// SharedBankAccountPending 是這一對（措施、帳號）此刻在後台待辦 SHARED_BANK_ACCOUNT（成員的定義只有 SQL 的 review_shared_bank_account）；
+	// ReviewedAt 是管理員標為已檢視的時間（還沒有時是 nil）。
+	SharedBankAccountPending bool
+	ReviewedAt               *time.Time
+}
+
+// MarkLinkedAccountReviewedInput 是把措施的一個關聯帳號標為已檢視的輸入。
+type MarkLinkedAccountReviewedInput struct {
+	MeasureID uuid.UUID
+	AccountID int64
+	AdminID   int64
 }
 
 // TerminationTarget 是建立終止合作時目標店家（stint）的狀態：Closed 是 stint 已關閉；LatestOfAccount 是它為帳號最近的一個 stint。

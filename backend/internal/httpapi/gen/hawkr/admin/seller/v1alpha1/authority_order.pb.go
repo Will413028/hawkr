@@ -446,33 +446,33 @@ type AuthorityOrder struct {
 	// 來函內容摘要，1 到 4000 字。
 	Summary            string                  `protobuf:"bytes,6,opt,name=summary,proto3" json:"summary,omitempty"`
 	Targets            []*AuthorityOrderTarget `protobuf:"bytes,7,rep,name=targets,proto3" json:"targets,omitempty"`
-	State              AuthorityOrderState     `protobuf:"varint,9,opt,name=state,proto3,enum=hawkr.admin.seller.v1alpha1.AuthorityOrderState" json:"state,omitempty"`
-	CompleteTime       *timestamppb.Timestamp  `protobuf:"bytes,10,opt,name=complete_time,json=completeTime,proto3" json:"complete_time,omitempty"`
-	CompletedByAdminId string                  `protobuf:"bytes,11,opt,name=completed_by_admin_id,json=completedByAdminId,proto3" json:"completed_by_admin_id,omitempty"`
+	State              AuthorityOrderState     `protobuf:"varint,8,opt,name=state,proto3,enum=hawkr.admin.seller.v1alpha1.AuthorityOrderState" json:"state,omitempty"`
+	CompleteTime       *timestamppb.Timestamp  `protobuf:"bytes,9,opt,name=complete_time,json=completeTime,proto3" json:"complete_time,omitempty"`
+	CompletedByAdminId string                  `protobuf:"bytes,10,opt,name=completed_by_admin_id,json=completedByAdminId,proto3" json:"completed_by_admin_id,omitempty"`
 	// 處理摘要，1 到 4000 字。
-	ResolutionSummary string `protobuf:"bytes,12,opt,name=resolution_summary,json=resolutionSummary,proto3" json:"resolution_summary,omitempty"`
+	ResolutionSummary string `protobuf:"bytes,11,opt,name=resolution_summary,json=resolutionSummary,proto3" json:"resolution_summary,omitempty"`
 	// 保存期限：被指名者在 seller 的個資到這時之前不清理（預設收文後 184 天；只能延長）。
-	HoldUntil *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=hold_until,json=holdUntil,proto3" json:"hold_until,omitempty"`
+	HoldUntil *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=hold_until,json=holdUntil,proto3" json:"hold_until,omitempty"`
 	// 現在早於 hold_until。
-	HoldActive          bool                   `protobuf:"varint,14,opt,name=hold_active,json=holdActive,proto3" json:"hold_active,omitempty"`
-	RegisteredByAdminId string                 `protobuf:"bytes,15,opt,name=registered_by_admin_id,json=registeredByAdminId,proto3" json:"registered_by_admin_id,omitempty"`
-	CreateTime          *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	HoldActive          bool                   `protobuf:"varint,13,opt,name=hold_active,json=holdActive,proto3" json:"hold_active,omitempty"`
+	RegisteredByAdminId string                 `protobuf:"bytes,14,opt,name=registered_by_admin_id,json=registeredByAdminId,proto3" json:"registered_by_admin_id,omitempty"`
+	CreateTime          *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// 來函的版本；完成、延長保存與記下告知都讓它前進。
-	Etag          string `protobuf:"bytes,17,opt,name=etag,proto3" json:"etag,omitempty"`
-	CanComplete   bool   `protobuf:"varint,18,opt,name=can_complete,json=canComplete,proto3" json:"can_complete,omitempty"`
-	CanExtendHold bool   `protobuf:"varint,19,opt,name=can_extend_hold,json=canExtendHold,proto3" json:"can_extend_hold,omitempty"`
+	Etag          string `protobuf:"bytes,16,opt,name=etag,proto3" json:"etag,omitempty"`
+	CanComplete   bool   `protobuf:"varint,17,opt,name=can_complete,json=canComplete,proto3" json:"can_complete,omitempty"`
+	CanExtendHold bool   `protobuf:"varint,18,opt,name=can_extend_hold,json=canExtendHold,proto3" json:"can_extend_hold,omitempty"`
 	// 保存期限的延長歷史，舊到新；只有 GetAuthorityOrder 帶。
-	HoldExtensions []*AuthorityHoldExtension `protobuf:"bytes,20,rep,name=hold_extensions,json=holdExtensions,proto3" json:"hold_extensions,omitempty"`
+	HoldExtensions []*AuthorityHoldExtension `protobuf:"bytes,19,rep,name=hold_extensions,json=holdExtensions,proto3" json:"hold_extensions,omitempty"`
 	// 只在 REVOKED：撤銷登記的時間、管理員與原因（1 到 2000 字）。
-	RevokeTime       *timestamppb.Timestamp `protobuf:"bytes,21,opt,name=revoke_time,json=revokeTime,proto3" json:"revoke_time,omitempty"`
-	RevokedByAdminId string                 `protobuf:"bytes,22,opt,name=revoked_by_admin_id,json=revokedByAdminId,proto3" json:"revoked_by_admin_id,omitempty"`
-	RevokeReason     string                 `protobuf:"bytes,23,opt,name=revoke_reason,json=revokeReason,proto3" json:"revoke_reason,omitempty"`
+	RevokeTime       *timestamppb.Timestamp `protobuf:"bytes,20,opt,name=revoke_time,json=revokeTime,proto3" json:"revoke_time,omitempty"`
+	RevokedByAdminId string                 `protobuf:"bytes,21,opt,name=revoked_by_admin_id,json=revokedByAdminId,proto3" json:"revoked_by_admin_id,omitempty"`
+	RevokeReason     string                 `protobuf:"bytes,22,opt,name=revoke_reason,json=revokeReason,proto3" json:"revoke_reason,omitempty"`
 	// 此刻能不能撤銷登記（還沒完成、還沒撤銷）；等於 revoke_unavailabilities 是空的。
-	CanRevoke bool `protobuf:"varint,24,opt,name=can_revoke,json=canRevoke,proto3" json:"can_revoke,omitempty"`
+	CanRevoke bool `protobuf:"varint,23,opt,name=can_revoke,json=canRevoke,proto3" json:"can_revoke,omitempty"`
 	// 不能撤銷登記的原因，依優先序；第一個的句子就是 RevokeAuthorityOrder 被拒絕時的訊息。
-	RevokeUnavailabilities []*AuthorityOrderUnavailability `protobuf:"bytes,25,rep,name=revoke_unavailabilities,json=revokeUnavailabilities,proto3" json:"revoke_unavailabilities,omitempty"`
+	RevokeUnavailabilities []*AuthorityOrderUnavailability `protobuf:"bytes,24,rep,name=revoke_unavailabilities,json=revokeUnavailabilities,proto3" json:"revoke_unavailabilities,omitempty"`
 	// 處理來函的期限，只在 OPEN 時設（義務還在時才輸出）：開始時間是 receive_time，期限是登記時存下的 due_at。
-	Deadline      *v1alpha1.Deadline `protobuf:"bytes,26,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	Deadline      *v1alpha1.Deadline `protobuf:"bytes,25,opt,name=deadline,proto3" json:"deadline,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1946,7 +1946,7 @@ const file_hawkr_admin_seller_v1alpha1_authority_order_proto_rawDesc = "" +
 	"1hawkr/admin/seller/v1alpha1/authority_order.proto\x12\x1bhawkr.admin.seller.v1alpha1\x1a$hawkr/common/v1alpha1/deadline.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/rpc/error_details.proto\x1a\x16google/type/date.proto\"\xb6\x01\n" +
 	"\x1cAuthorityOrderUnavailability\x12Y\n" +
 	"\x06reason\x18\x01 \x01(\x0e2<.hawkr.admin.seller.v1alpha1.AuthorityOrderUnavailableReasonB\x03\xe0A\x03R\x06reason\x12;\n" +
-	"\amessage\x18\x02 \x01(\v2\x1c.google.rpc.LocalizedMessageB\x03\xe0A\x03R\amessage\"\xa3\v\n" +
+	"\amessage\x18\x02 \x01(\v2\x1c.google.rpc.LocalizedMessageB\x03\xe0A\x03R\amessage\"\x93\v\n" +
 	"\x0eAuthorityOrder\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1b\n" +
 	"\x06agency\x18\x02 \x01(\tB\x03\xe0A\x03R\x06agency\x12$\n" +
@@ -1956,30 +1956,30 @@ const file_hawkr_admin_seller_v1alpha1_authority_order_proto_rawDesc = "" +
 	"\x04kind\x18\x05 \x01(\x0e2/.hawkr.admin.seller.v1alpha1.AuthorityOrderKindB\x03\xe0A\x03R\x04kind\x12\x1d\n" +
 	"\asummary\x18\x06 \x01(\tB\x03\xe0A\x03R\asummary\x12P\n" +
 	"\atargets\x18\a \x03(\v21.hawkr.admin.seller.v1alpha1.AuthorityOrderTargetB\x03\xe0A\x03R\atargets\x12K\n" +
-	"\x05state\x18\t \x01(\x0e20.hawkr.admin.seller.v1alpha1.AuthorityOrderStateB\x03\xe0A\x03R\x05state\x12D\n" +
-	"\rcomplete_time\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\fcompleteTime\x126\n" +
-	"\x15completed_by_admin_id\x18\v \x01(\tB\x03\xe0A\x03R\x12completedByAdminId\x122\n" +
-	"\x12resolution_summary\x18\f \x01(\tB\x03\xe0A\x03R\x11resolutionSummary\x12>\n" +
+	"\x05state\x18\b \x01(\x0e20.hawkr.admin.seller.v1alpha1.AuthorityOrderStateB\x03\xe0A\x03R\x05state\x12D\n" +
+	"\rcomplete_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\fcompleteTime\x126\n" +
+	"\x15completed_by_admin_id\x18\n" +
+	" \x01(\tB\x03\xe0A\x03R\x12completedByAdminId\x122\n" +
+	"\x12resolution_summary\x18\v \x01(\tB\x03\xe0A\x03R\x11resolutionSummary\x12>\n" +
 	"\n" +
-	"hold_until\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\tholdUntil\x12$\n" +
-	"\vhold_active\x18\x0e \x01(\bB\x03\xe0A\x03R\n" +
+	"hold_until\x18\f \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\tholdUntil\x12$\n" +
+	"\vhold_active\x18\r \x01(\bB\x03\xe0A\x03R\n" +
 	"holdActive\x128\n" +
-	"\x16registered_by_admin_id\x18\x0f \x01(\tB\x03\xe0A\x03R\x13registeredByAdminId\x12@\n" +
-	"\vcreate_time\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\x16registered_by_admin_id\x18\x0e \x01(\tB\x03\xe0A\x03R\x13registeredByAdminId\x12@\n" +
+	"\vcreate_time\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12\x12\n" +
-	"\x04etag\x18\x11 \x01(\tR\x04etag\x12&\n" +
-	"\fcan_complete\x18\x12 \x01(\bB\x03\xe0A\x03R\vcanComplete\x12+\n" +
-	"\x0fcan_extend_hold\x18\x13 \x01(\bB\x03\xe0A\x03R\rcanExtendHold\x12a\n" +
-	"\x0fhold_extensions\x18\x14 \x03(\v23.hawkr.admin.seller.v1alpha1.AuthorityHoldExtensionB\x03\xe0A\x03R\x0eholdExtensions\x12@\n" +
-	"\vrevoke_time\x18\x15 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\x04etag\x18\x10 \x01(\tR\x04etag\x12&\n" +
+	"\fcan_complete\x18\x11 \x01(\bB\x03\xe0A\x03R\vcanComplete\x12+\n" +
+	"\x0fcan_extend_hold\x18\x12 \x01(\bB\x03\xe0A\x03R\rcanExtendHold\x12a\n" +
+	"\x0fhold_extensions\x18\x13 \x03(\v23.hawkr.admin.seller.v1alpha1.AuthorityHoldExtensionB\x03\xe0A\x03R\x0eholdExtensions\x12@\n" +
+	"\vrevoke_time\x18\x14 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"revokeTime\x122\n" +
-	"\x13revoked_by_admin_id\x18\x16 \x01(\tB\x03\xe0A\x03R\x10revokedByAdminId\x12(\n" +
-	"\rrevoke_reason\x18\x17 \x01(\tB\x03\xe0A\x03R\frevokeReason\x12\"\n" +
+	"\x13revoked_by_admin_id\x18\x15 \x01(\tB\x03\xe0A\x03R\x10revokedByAdminId\x12(\n" +
+	"\rrevoke_reason\x18\x16 \x01(\tB\x03\xe0A\x03R\frevokeReason\x12\"\n" +
 	"\n" +
-	"can_revoke\x18\x18 \x01(\bB\x03\xe0A\x03R\tcanRevoke\x12w\n" +
-	"\x17revoke_unavailabilities\x18\x19 \x03(\v29.hawkr.admin.seller.v1alpha1.AuthorityOrderUnavailabilityB\x03\xe0A\x03R\x16revokeUnavailabilities\x12@\n" +
-	"\bdeadline\x18\x1a \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\bdeadlineJ\x04\b\b\x10\tR\bdue_time\"\xa8\x04\n" +
+	"can_revoke\x18\x17 \x01(\bB\x03\xe0A\x03R\tcanRevoke\x12w\n" +
+	"\x17revoke_unavailabilities\x18\x18 \x03(\v29.hawkr.admin.seller.v1alpha1.AuthorityOrderUnavailabilityB\x03\xe0A\x03R\x16revokeUnavailabilities\x12@\n" +
+	"\bdeadline\x18\x19 \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\bdeadline\"\xa8\x04\n" +
 	"\x14AuthorityOrderTarget\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +

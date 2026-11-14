@@ -33,7 +33,7 @@ export function publicListingStatus(
 
 /**
  * 一整組能力狀態：`granted` 啟用，其餘的能力都沒啟用並缺 `missing`（伺服器的契約：沒啟用的能力至少缺一項）。
- * `extraMissing` 可以替個別能力指定不同的缺項（例如物流建店缺 KYC_APPROVED）。
+ * `extraMissing` 可以替個別能力指定不同的缺項（例如物流建店缺 ONBOARDING_COMPLETE）。
  */
 export function capabilityStatuses(
 	granted: readonly SellerCapability[],

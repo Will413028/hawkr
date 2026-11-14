@@ -1,11 +1,11 @@
-// Package purge 是關店之後的兩段清理（ADR 2026-10-19-seller-kyc-payuni-consolidated「關店與個資保留」與 2026-10-20 修訂）：
+// Package purge 是關店之後的兩段清理（ADR 2026-11-13-seller-platform-review-and-identity-matching「關店與個資保留」）：
 //
 //   - 第一段（退場，retire）：stint 關閉之後過了 model.StoreRetireAfter（一般關店 30 天；因終止合作而關閉的到終止的申覆期限，且不早於這 30 天），
 //     店家的公開內容（說明、獎項、網站）清掉，logo 與封面在這時才釋放，並發出 StoreRetired（relay 轉成 seller.deleted，商品、貼文、聊天的個資等下游
 //     在這時刪除）：關店可逆，不可逆的下游動作都在這裡，之後不能恢復營業。
 //   - 第二段（個資清理，purge）：已退場而且關店之後過了 model.StoreRetention（184 天，詐欺犯罪危害防制條例第 37 條第 1 項的六個月），註冊、身分與連線資料
-//     在同一個 transaction 內一併清掉：店名、聯絡與地址、KYC 申請的個人欄位與證件、登記資料查詢、PayUni 註冊與觀測的自由文字、
-//     同意紀錄的 IP 與 User-Agent。審核的事實、PayUni 的狀態碼與措施的身分快照（措施擁有，隨措施撤銷才刪）保留。
+//     在同一個 transaction 內一併清掉：店名、聯絡與地址、KYC 申請的個人欄位與證件、登記資料查詢、
+//     同意紀錄的 IP 與 User-Agent；收款帳戶由 payment 擁有，同一個 transaction 排入它的刪除。審核的事實與措施的身分快照（措施擁有，隨措施撤銷才刪）保留。
 //   - 防詐保存的過期刪除（第三項，不是清理的一段）：account_identity_hashes（身分的 blind index，沒有明文，D3）不隨第二段刪除；來源 stint 目前這次關店
 //     滿 model.IdentityHashRetention（5 年）後刪，被主管機關來函的保存或申覆的 legal hold 擋下的略過（StoreHolds）。
 //
@@ -43,7 +43,14 @@ type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
 	Jobs   jobs.Enqueuer
-	Now    func() time.Time
+	// Payment 是收款帳戶的擁有者（payment 模組）：清理的 transaction 內排入刪除店家收款帳戶列的 job。
+	Payment Payment
+	Now     func() time.Time
+}
+
+// Payment 是 payment 模組的公開 API 中清理用到的部分。
+type Payment interface {
+	ForgetOwners(ctx context.Context, storeIDs []int64) error
 }
 
 // Service 執行個資清理。
@@ -180,6 +187,7 @@ func (s *Service) retireBatch(ctx context.Context, after *int64) (int, int, *int
 func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int64, error) {
 	purgedCount, candidateCount := 0, 0
 	var last *int64
+	s.hooks.beforePurgeBatch()
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
 		now := s.d.Now().UTC()
@@ -240,9 +248,6 @@ func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int6
 		if err != nil {
 			return err
 		}
-		if err := q.PurgeKYCIdentityHashes(ctx, applications); err != nil {
-			return err
-		}
 		// 登記資料的查詢快照含公司名稱與地址，與申請的個資同時清除；審核紀錄的引用由外鍵（ON DELETE SET NULL）置 NULL。
 		if _, err := q.PurgeKYCRegistrationChecks(ctx, applications); err != nil {
 			return err
@@ -263,15 +268,13 @@ func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int6
 				return err
 			}
 		}
-		if _, err := q.PurgePayUniRegistrations(ctx, store.PurgePayUniRegistrationsParams{StoreIds: purged, Now: &now}); err != nil {
-			return err
-		}
 		// 入駐同意紀錄的來源 IP 與 User-Agent 是連線紀錄，清掉；種類、版本、時間、帳號與送出保留（審核的事實）。
 		if _, err := q.PurgeAgreementSources(ctx, store.PurgeAgreementSourcesParams{StoreIds: purged, Now: &now}); err != nil {
 			return err
 		}
-		_, err = q.PurgePayUniObservations(ctx, purged)
-		return err
+		// 收款帳戶（聯絡信箱、外部帳戶 ID、requirements）由 payment 擁有：同一個 transaction 只排入它的刪除 job，不在鎖住店家列之後等下層的列
+		// （platform/lockorder）。收款事件的 inbox 列由 platform 依保存期清理。
+		return s.d.Payment.ForgetOwners(ctx, purged)
 	})
 	return purgedCount, candidateCount, last, err
 }

@@ -69,6 +69,11 @@ export const GET_SESSION_URL = identityMethod(
 	"GetSession",
 );
 
+export const GET_CONTACT_EMAIL_URL = identityMethod(
+	"IdentityAppService",
+	"GetContactEmail",
+);
+
 export const LIST_LINKED_IDENTITIES_URL = identityMethod(
 	"IdentityAppService",
 	"ListLinkedIdentities",
@@ -90,6 +95,11 @@ function sellerMethod(method: string): RegExp {
 }
 export const GET_MY_STORE_URL = sellerMethod("GetMyStore");
 export const GET_MY_KYC_URL = sellerMethod("GetMyKYC");
+export const GET_MY_PAYMENT_ACCOUNT_URL = sellerMethod("GetMyPaymentAccount");
+export const GET_MY_ONBOARDING_URL = sellerMethod("GetMyOnboarding");
+export const REFRESH_MY_PAYMENT_ACCOUNT_URL = sellerMethod(
+	"RefreshMyPaymentAccount",
+);
 export const UPDATE_MY_STORE_URL = sellerMethod("UpdateMyStore");
 export const GET_MY_DASHBOARD_URL = sellerMethod("GetMyDashboard");
 export const LIST_MY_MEASURES_URL = sellerMethod("ListMyMeasures");
@@ -143,7 +153,7 @@ export const PENDING_DELETION_SELLER_CAPABILITIES: readonly MockSellerCapability
 export type MockSellerRequirement =
 	| "STORE_ACTIVE"
 	| "NOT_SUSPENDED"
-	| "KYC_APPROVED"
+	| "ONBOARDING_COMPLETE"
 	| "STORE_NAME"
 	| "LOGO"
 	| "TOWN_CODE"
@@ -153,7 +163,7 @@ export type MockSellerRequirement =
 const SELLER_REQUIREMENT_ORDER: readonly MockSellerRequirement[] = [
 	"STORE_ACTIVE",
 	"NOT_SUSPENDED",
-	"KYC_APPROVED",
+	"ONBOARDING_COMPLETE",
 	"STORE_NAME",
 	"LOGO",
 	"TOWN_CODE",
@@ -189,7 +199,7 @@ export interface MockStore {
 	logoUriTemplate?: string;
 	/** 有生效中的停權措施（`GetMyStoreResponse.suspended`）；原因與期間看 `ListMyMeasures`。 */
 	suspended?: boolean;
-	/** 啟用的能力；預設是全部（物流建店在缺 KYC_APPROVED 時不啟用）。 */
+	/** 啟用的能力；預設是全部（物流建店在缺 ONBOARDING_COMPLETE 時不啟用）。 */
 	capabilities?: readonly MockSellerCapability[];
 	/** 店家狀態 PUBLIC_LISTING 還沒滿足的條件；預設沒有缺。 */
 	missingRequirements?: readonly MockSellerRequirement[];
@@ -197,7 +207,7 @@ export interface MockStore {
 
 /**
  * 沒有啟用的能力缺的條件，照伺服器的規則（backend `model.CapabilitiesOf`）：停權缺 NOT_SUSPENDED，物流建店
- * 缺 KYC_APPROVED，等待刪除缺 NOT_PENDING_DELETION；測試單獨拿掉某個能力、其他狀態都正常時，缺 NOT_SUSPENDED
+ * 缺 ONBOARDING_COMPLETE，等待刪除缺 NOT_PENDING_DELETION；測試單獨拿掉某個能力、其他狀態都正常時，缺 NOT_SUSPENDED
  * 當作代表（契約要求沒有啟用的能力至少缺一項）。
  */
 function missingOfInactive(
@@ -209,9 +219,9 @@ function missingOfInactive(
 	if (store.suspended) missing.push("NOT_SUSPENDED");
 	if (
 		capability === "SHIPPING_SETUP" &&
-		publicListingMissing.includes("KYC_APPROVED")
+		publicListingMissing.includes("ONBOARDING_COMPLETE")
 	) {
-		missing.push("KYC_APPROVED");
+		missing.push("ONBOARDING_COMPLETE");
 	}
 	if (store.status === "PENDING_DELETION") missing.push("NOT_PENDING_DELETION");
 	return inRequirementOrder(missing.length > 0 ? missing : ["NOT_SUSPENDED"]);
@@ -221,7 +231,7 @@ function missingOfInactive(
 export function myStoreJson(store: MockStore) {
 	const missing = inRequirementOrder(store.missingRequirements ?? []);
 	const granted = new Set(store.capabilities ?? ALL_SELLER_CAPABILITIES);
-	if (missing.includes("KYC_APPROVED")) granted.delete("SHIPPING_SETUP");
+	if (missing.includes("ONBOARDING_COMPLETE")) granted.delete("SHIPPING_SETUP");
 	return {
 		store: {
 			id: store.id,
@@ -453,50 +463,258 @@ export function measureJson(measure: MockMeasure) {
 	};
 }
 
-export type MockKycFlowStatus =
+export type MockKycStatus =
 	| "NOT_STARTED"
 	| "DRAFT"
 	| "SUBMITTED"
 	| "REJECTED"
-	| "BINDING"
-	| "BIND_FAILED"
-	| "FORWARDED"
-	| "UNDER_REVIEW"
-	| "PENDING_INFO"
-	| "APPROVED"
-	| "PAYUNI_REJECTED";
+	| "APPROVED";
 
-/**
- * proto3 JSON 的 GetMyKYCResponse：只放流程狀態（`application.flow`）。NOT_STARTED 在真實契約上是
- * not_found，這裡用同樣的錯誤回應（client 把它讀成「還沒開始」）。
- */
-export interface MockSellerPayUni {
-	state:
-		| "REVIEWING"
-		| "PENDING_INFO"
-		| "FIXABLE"
-		| "FIX_VIA_SUPPORT"
-		| "CONTACT_SUPPORT"
-		| "RETRY_LATER"
-		| "TERMINATED"
-		| "APPROVED";
-	/** 伺服器的狀態說明（APPROVED 沒有）。 */
-	explanation?: string;
-	reason?: string;
-	fixFields?: string[];
-	fixStoreFields?: string[];
+export type MockOnboardingState =
+	| "COMPLETED"
+	| "ACTION_REQUIRED"
+	| "IN_PROGRESS"
+	| "LOCKED"
+	| "UNKNOWN";
+
+export type MockOnboardingAction =
+	| "NONE"
+	| "EDIT_PROFILE"
+	| "SUBMIT_CERTIFICATION"
+	| "START_PAYMENT_ONBOARDING"
+	| "CONTACT_SUPPORT";
+
+/** 伺服器回的一個必要任務（`OnboardingTask`）：標題與狀態句是伺服器的 `LocalizedMessage`。 */
+export interface MockOnboardingTask {
+	id: "PROFILE" | "PLATFORM_REVIEW" | "PAYMENT_ACCOUNT";
+	state: MockOnboardingState;
+	action: MockOnboardingAction;
+	title: string;
+	status: string;
 }
 
+export type MockPaymentAccountStatus =
+	| "NOT_CREATED"
+	| "UNDER_REVIEW"
+	| "ACTION_REQUIRED"
+	| "ENABLED"
+	| "DISABLED";
+
+const ONBOARDING_TITLE = {
+	PROFILE: "商店資料",
+	PLATFORM_REVIEW: "平台審核",
+	PAYMENT_ACCOUNT: "收款帳戶",
+} as const;
+
+function task(
+	id: MockOnboardingTask["id"],
+	state: MockOnboardingState,
+	action: MockOnboardingAction,
+	status: string,
+): MockOnboardingTask {
+	return { id, state, action, title: ONBOARDING_TITLE[id], status };
+}
+
+/**
+ * 預設的 GetMyOnboarding：伺服器的任務推導（onboarding.go）在 mock 這一側的對照，只供沒有特別指定摘要的 spec。
+ * 商店資料一律已完成（要缺項的 spec 指定 `onboarding`）。
+ */
+export function onboardingOf(flow: {
+	status: MockKycStatus;
+	paymentAccount?: { status: MockPaymentAccountStatus };
+}): MockOnboardingTask[] {
+	const profile = task(
+		"PROFILE",
+		"COMPLETED",
+		"NONE",
+		"店名、logo 與所在地都已填寫。",
+	);
+	const locked = task(
+		"PAYMENT_ACCOUNT",
+		"LOCKED",
+		"NONE",
+		"平台審核通過後才能設定收款帳戶。",
+	);
+	switch (flow.status) {
+		case "NOT_STARTED":
+			return [
+				profile,
+				task(
+					"PLATFORM_REVIEW",
+					"ACTION_REQUIRED",
+					"SUBMIT_CERTIFICATION",
+					"還沒有送出商家認證申請。",
+				),
+				locked,
+			];
+		case "DRAFT":
+			return [
+				profile,
+				task(
+					"PLATFORM_REVIEW",
+					"ACTION_REQUIRED",
+					"SUBMIT_CERTIFICATION",
+					"商家認證申請還是草稿，尚未送出。",
+				),
+				locked,
+			];
+		case "REJECTED":
+			return [
+				profile,
+				task(
+					"PLATFORM_REVIEW",
+					"ACTION_REQUIRED",
+					"SUBMIT_CERTIFICATION",
+					"商家認證申請需要修改，修改後請重新送出。",
+				),
+				locked,
+			];
+		case "SUBMITTED":
+			return [
+				profile,
+				task(
+					"PLATFORM_REVIEW",
+					"IN_PROGRESS",
+					"NONE",
+					"商家認證申請審核中，你不需要做任何事。",
+				),
+				locked,
+			];
+		case "APPROVED": {
+			const review = task(
+				"PLATFORM_REVIEW",
+				"COMPLETED",
+				"NONE",
+				"商家認證已通過。",
+			);
+			switch (flow.paymentAccount?.status ?? "ENABLED") {
+				case "ENABLED":
+					return [
+						profile,
+						review,
+						task("PAYMENT_ACCOUNT", "COMPLETED", "NONE", "收款帳戶已啟用。"),
+					];
+				case "ACTION_REQUIRED":
+					return [
+						profile,
+						review,
+						task(
+							"PAYMENT_ACCOUNT",
+							"ACTION_REQUIRED",
+							"START_PAYMENT_ONBOARDING",
+							"提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。",
+						),
+					];
+				case "UNDER_REVIEW":
+					return [
+						profile,
+						review,
+						task(
+							"PAYMENT_ACCOUNT",
+							"IN_PROGRESS",
+							"NONE",
+							"金流商審核中，你不需要做任何事。",
+						),
+					];
+				case "DISABLED":
+					return [
+						profile,
+						review,
+						task(
+							"PAYMENT_ACCOUNT",
+							"ACTION_REQUIRED",
+							"CONTACT_SUPPORT",
+							"金流商目前無法啟用你的收款帳戶，請聯絡客服。",
+						),
+					];
+				default:
+					return [
+						profile,
+						review,
+						task(
+							"PAYMENT_ACCOUNT",
+							"IN_PROGRESS",
+							"NONE",
+							"正在建立收款帳戶，通常幾分鐘內完成。",
+						),
+					];
+			}
+		}
+	}
+}
+
+/** proto3 JSON 的 GetMyOnboardingResponse；`complete` 只看 PLATFORM_REVIEW 與 PAYMENT_ACCOUNT 兩項（契約上 `complete` 不含 PROFILE，與閘門 ONBOARDING_COMPLETE 同義）。 */
+export async function mockMyOnboarding(
+	page: Page,
+	tasks: MockOnboardingTask[] | "error",
+): Promise<void> {
+	await page.route(GET_MY_ONBOARDING_URL, (route) => {
+		if (tasks === "error") {
+			void fulfillConnectError(route, "internal", "mock onboarding failure");
+			return;
+		}
+		void fulfillConnect(route, {
+			tasks: tasks.map((t) => ({
+				id: `ONBOARDING_TASK_ID_${t.id}`,
+				state: `ONBOARDING_TASK_STATE_${t.state}`,
+				action: `ONBOARDING_ACTION_${t.action}`,
+				title: { locale: "zh-TW", message: t.title },
+				status: { locale: "zh-TW", message: t.status },
+			})),
+			complete: tasks
+				.filter((t) => t.id !== "PROFILE")
+				.every((t) => t.state === "COMPLETED"),
+		});
+	});
+}
+
+/**
+ * proto3 JSON 的 GetMyKYCResponse：申請的 `status`（平台審核）。NOT_STARTED 在真實
+ * 契約上是 not_found，這裡用同樣的錯誤回應（client 把它讀成「還沒開始」）。
+ *
+ * 收款帳戶（GetMyPaymentAccount）：申請 APPROVED 時預設是 ENABLED，其餘是 not_found（平台審核還沒核准）；
+ * `paymentAccount` 可以指定狀態。
+ *
+ * 帳號的聯絡信箱（identity 的 GetContactEmail，認證頁的收款區與送審前的檢查讀它）：預設是 provider 驗證過的信箱；
+ * `contactEmail: null` 是帳號還沒有聯絡信箱（回應沒有 `contactEmail`）。
+ */
 export async function mockMyKyc(
 	page: Page,
 	flow: {
-		status: MockKycFlowStatus;
-		identityLocked?: boolean;
-		canResubmit?: boolean;
-		payuni?: MockSellerPayUni;
-		resubmitUnavailabilities?: { reason: string; message: string }[];
+		status: MockKycStatus;
+		paymentAccount?: {
+			status: MockPaymentAccountStatus;
+			payoutsActive?: boolean;
+		};
+		contactEmail?: {
+			email: string;
+			source: "VERIFIED" | "SELF_ENTERED";
+		} | null;
+		/**
+		 * GetMyOnboarding 的回應（必要任務依序）。沒給時由 `onboardingOf` 依申請與收款帳戶狀態產生，
+		 * 句子與狀態取自伺服器的對照（`backend/internal/modules/seller/internal/model/onboarding.go`）；
+		 * 要驗證「畫面跟摘要、不跟申請」的 spec 自己給。`"error"` 是 GetMyOnboarding 失敗。
+		 */
+		onboarding?: MockOnboardingTask[] | "error";
 	},
 ): Promise<void> {
+	await page.route(GET_CONTACT_EMAIL_URL, (route) => {
+		const contact =
+			flow.contactEmail === undefined
+				? { email: "seller@example.com", source: "VERIFIED" as const }
+				: flow.contactEmail;
+		void fulfillConnect(
+			route,
+			contact
+				? {
+						contactEmail: {
+							email: contact.email,
+							source: `CONTACT_EMAIL_SOURCE_${contact.source}`,
+						},
+					}
+				: {},
+		);
+	});
 	await page.route(GET_MY_KYC_URL, (route) => {
 		if (flow.status === "NOT_STARTED") {
 			void fulfillConnectError(route, "not_found", "尚未申請");
@@ -505,38 +723,26 @@ export async function mockMyKyc(
 		void fulfillConnect(route, {
 			application: {
 				id: "1",
-				flow: {
-					status: `KYC_FLOW_STATUS_${flow.status}`,
-					identityLocked: flow.identityLocked ?? false,
-					// 伺服器的值：草稿與被退回一律能重送。
-					canResubmit:
-						flow.canResubmit ??
-						(flow.status === "DRAFT" || flow.status === "REJECTED"),
-					...(flow.payuni
-						? {
-								payuni: {
-									state: `PAY_UNI_STATE_${flow.payuni.state}`,
-									...(flow.payuni.explanation
-										? {
-												explanation: {
-													locale: "zh-TW",
-													message: flow.payuni.explanation,
-												},
-											}
-										: {}),
-									reason: flow.payuni.reason ?? "",
-									fixFields: flow.payuni.fixFields ?? [],
-									fixStoreFields: flow.payuni.fixStoreFields ?? [],
-								},
-							}
-						: {}),
-					resubmitUnavailabilities: (flow.resubmitUnavailabilities ?? []).map(
-						(u) => ({
-							reason: `KYC_RESUBMIT_UNAVAILABLE_REASON_${u.reason}`,
-							message: { locale: "zh-TW", message: u.message },
-						}),
-					),
-				},
+				status: `KYC_STATUS_${flow.status}`,
+			},
+		});
+	});
+	await mockMyOnboarding(page, flow.onboarding ?? onboardingOf(flow));
+	await page.route(REFRESH_MY_PAYMENT_ACCOUNT_URL, (route) => {
+		void fulfillConnect(route, {});
+	});
+	await page.route(GET_MY_PAYMENT_ACCOUNT_URL, (route) => {
+		const account =
+			flow.paymentAccount ??
+			(flow.status === "APPROVED" ? { status: "ENABLED" as const } : null);
+		if (!account) {
+			void fulfillConnectError(route, "not_found", "尚無收款帳戶");
+			return;
+		}
+		void fulfillConnect(route, {
+			account: {
+				status: `PAYMENT_ACCOUNT_STATUS_${account.status}`,
+				payoutsActive: account.payoutsActive ?? account.status === "ENABLED",
 			},
 		});
 	});

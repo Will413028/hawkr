@@ -16,7 +16,7 @@ var Dependencies = map[string][]string{
 	"media":             {},
 	"payment":           {},
 	"buyer":             {"identity", "media"},
-	"seller":            {"identity", "media"},
+	"seller":            {"identity", "media", "payment"},
 	"content":           {"media"},
 	"fulfillment":       {"buyer", "seller", "media"},
 	"catalog":           {"seller", "buyer", "media", "fulfillment"},
@@ -35,7 +35,7 @@ var Dependencies = map[string][]string{
 	"delegation":        {"identity", "seller", "ordering", "catalog", "social", "media"}, // 授權、session、稽核與編排全由 delegation 擁有。
 	"accountdeletion":   {"identity", "buyer", "seller"},                                  // 刪除帳號的流程管理者。
 	"accountsuspension": {"identity", "seller"},                                           // 停權與解除的唯一入口：鎖帳號、確認沒有店家、再呼叫 identity。
-	"reviewqueue":       {"seller"},                                                       // 後台待辦：讀各來源發布的 pub_*_review_items 排序分頁。
+	"reviewqueue":       {"seller", "payment"},                                            // 後台待辦：讀各來源發布的 pub_*_review_items 排序分頁。
 	"agent":             {"ordering", "catalog", "buyer", "seller", "media"},
 	"notification": {
 		"identity", "buyer", "seller", "catalog", "ordering", "fulfillment", "payment", "invoice",
@@ -50,6 +50,7 @@ type InternalGraph struct {
 
 // InternalDependencies 是已建立模組的內部 package 依賴圖。
 var InternalDependencies = map[string]InternalGraph{
+	"payment": {Packages: map[string][]string{"account": {"model", "store"}, "model": {}, "store": {}}},
 	"social": {Packages: map[string][]string{
 		"actor":      {"model", "text", "visibility"},
 		"comment":    {"actor", "model", "reads", "store", "text", "textcheck", "visibility"},
@@ -104,20 +105,20 @@ var InternalDependencies = map[string]InternalGraph{
 	"seller": {Packages: map[string][]string{
 		"onboarding": {"agreement", "model", "store", "stint"},
 		"agreement":  {"model", "store"},
-		"profile":    {"exposure", "mediaref", "model", "payuni", "store", "stint"},
+		"profile":    {"exposure", "mediaref", "model", "store", "stint"},
 		"suspension": {"exposure", "model", "store", "stint"},
 		"governance": {"mediaref", "model", "store", "stint", "text"}, // text：指令被擋下時的伺服器句子（ADR 2026-10-17 多語系）
 		"measure":    {"closing", "exposure", "mediaref", "model", "store", "stint", "suspension", "text"},
-		"closing":    {"exposure", "model", "payuni", "store", "stint", "suspension"},
+		"closing":    {"exposure", "model", "store", "stint", "suspension"},
 		"mediaref":   {"model", "store"},
-		"kyc":        {"agreement", "exposure", "mediaref", "model", "payuni", "store", "stint"},
-		"payuni":     {"exposure", "model", "store", "stint"},
+		"kyc":        {"agreement", "exposure", "mediaref", "model", "store", "stint"},
+		"payout":     {"exposure", "store", "stint"},
 		"exposure":   {"model", "store", "stint"},
 		"purge":      {"mediaref", "model", "store"},
 		"prospect":   {"mediaref", "model", "store"},
 		"views":      {"model", "store"},
 		"block":      {"model", "store"},
-		"devseed":    {"agreement", "kyc", "mediaref", "model", "payuni", "stint", "store"},
+		"devseed":    {"agreement", "kyc", "mediaref", "model", "stint", "store"},
 		"stint":      {"model", "store"},
 		"model":      {"text"}, "store": {}, "text": {},
 	}},

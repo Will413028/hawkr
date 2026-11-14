@@ -16,7 +16,7 @@ var ErrFileNotSynced = model.ErrFileNotSynced
 // 要人處理。
 var ErrFileMissing = model.ErrFileMissing
 
-// KYC 認證（ADR 2026-10-19-seller-kyc-payuni-consolidated）的公開型別與方法。賣家的方法以帳號為身分，授權由模組做
+// KYC 認證（ADR 2026-11-13-seller-platform-review-and-identity-matching「申請、草稿與審核」）的公開型別與方法。賣家的方法以帳號為身分，授權由模組做
 // （申請以帳號目前的店家為準）；管理員的方法由呼叫方（admin 的 Connect 方法）先確認是管理員。
 
 // KYCStatus 是申請的狀態：只記人工決定。
@@ -25,16 +25,13 @@ type KYCStatus = model.KYCStatus
 // KYCSellerType 是賣家型態（個人或企業）。
 type KYCSellerType = model.KYCSellerType
 
-// KYCDocumentSlot 是證件與文件圖片的位置。
-type KYCDocumentSlot = model.KYCDocumentSlot
-
-// KYCDocument 是申請上的一張證件圖片。
+// KYCDocument 是申請上的一張公司補充文件。
 type KYCDocument = model.KYCDocument
 
-// KYCDocumentRef 是草稿裡一張證件圖片的指定（保留現有的或換上新上傳的）。
+// KYCDocumentRef 是草稿裡一張公司文件的指定（保留現有的或換上新上傳的）。
 type KYCDocumentRef = model.KYCDocumentRef
 
-// KYCApplication 是申請的遮蔽檢視：身分證號與銀行帳號只有遮蔽後的值。
+// KYCApplication 是申請的檢視（平台不收身分證號、銀行帳號與證件影像，Stripe 計畫 D22）。
 type KYCApplication = model.KYCApplication
 
 // KYCRejection 是最近一次退回的內容。
@@ -46,7 +43,7 @@ type KYCIssue = model.KYCIssue
 // KYCIssueCode 是退回時一個問題的原因類別。
 type KYCIssueCode = model.KYCIssueCode
 
-// KYCAdminApplication 是後台的申請檢視（審核紀錄、顯示全文的稽核紀錄、銀行帳號的比對標記）。
+// KYCAdminApplication 是後台的申請檢視（審核紀錄）。
 type KYCAdminApplication = model.KYCAdminApplication
 
 // KYCReview 是一筆審核紀錄（不含欄位值）。
@@ -55,35 +52,20 @@ type KYCReview = model.KYCReview
 // ReviewAction 是審核紀錄的動作。
 type ReviewAction = model.ReviewAction
 
-// KYCReveal 是一筆顯示全文的稽核紀錄（不含值）。
-type KYCReveal = model.KYCReveal
-
-// KYCAuditCursor 是稽核紀錄的 keyset 位置。
+// KYCAuditCursor 是補充文件讀取紀錄的 keyset 位置。
 type KYCAuditCursor = model.KYCAuditCursor
 
-// KYCAuditListInput 是稽核紀錄的分頁輸入。
+// KYCAuditListInput 是補充文件讀取紀錄的分頁輸入。
 type KYCAuditListInput = model.KYCAuditListInput
 
-// KYCRevealPage 是一頁顯示全文的紀錄。
-type KYCRevealPage = model.KYCRevealPage
-
-// KYCDocumentAccessPage 是一頁證件讀取紀錄。
+// KYCDocumentAccessPage 是一頁補充文件讀取紀錄。
 type KYCDocumentAccessPage = model.KYCDocumentAccessPage
 
-// KYCDocumentAccess 是一筆證件圖片的讀取紀錄（不含圖片的 ID 與內容）。
+// KYCDocumentAccess 是一筆補充文件的讀取紀錄（誰、哪一張、何時；不含內容）。
 type KYCDocumentAccess = model.KYCDocumentAccess
 
-// KYCDocumentLocator 是證件圖片在申請裡的位置。
-type KYCDocumentLocator = model.KYCDocumentLocator
-
-// ReadKYCDocumentInput 是讀一張證件圖片的輸入。
+// ReadKYCDocumentInput 是讀一張補充文件的輸入。
 type ReadKYCDocumentInput = model.ReadKYCDocumentInput
-
-// RevealGrantTTL 是顯示全文的授權的有效時間。
-const RevealGrantTTL = model.RevealGrantTTL
-
-// KYCSensitive 是顯示全文的結果。
-type KYCSensitive = model.KYCSensitive
 
 // KYCDraftInput 是草稿的部分更新。
 type KYCDraftInput = model.KYCDraftInput
@@ -136,9 +118,6 @@ type ApproveKYCInput = model.ApproveKYCInput
 // RejectKYCInput 是退回的輸入。
 type RejectKYCInput = model.RejectKYCInput
 
-// RevealKYCInput 是顯示全文的輸入。
-type RevealKYCInput = model.RevealKYCInput
-
 // KYCCursor 是 admin 清單的 keyset 位置。
 type KYCCursor = model.KYCCursor
 
@@ -149,17 +128,13 @@ type KYCListInput = model.KYCListInput
 type KYCPage = model.KYCPage
 
 const (
-	KYCStatusDraft      = model.KYCStatusDraft
-	KYCStatusSubmitted  = model.KYCStatusSubmitted
-	KYCStatusApproved   = model.KYCStatusApproved
-	KYCStatusRejected   = model.KYCStatusRejected
-	KYCStatusCancelled  = model.KYCStatusCancelled
-	KYCIndividual       = model.KYCIndividual
-	KYCCompany          = model.KYCCompany
-	SlotIDCardFront     = model.SlotIDCardFront
-	SlotIDCardBack      = model.SlotIDCardBack
-	SlotBankBook        = model.SlotBankBook
-	SlotCompanyDocument = model.SlotCompanyDocument
+	KYCStatusDraft     = model.KYCStatusDraft
+	KYCStatusSubmitted = model.KYCStatusSubmitted
+	KYCStatusApproved  = model.KYCStatusApproved
+	KYCStatusRejected  = model.KYCStatusRejected
+	KYCStatusCancelled = model.KYCStatusCancelled
+	KYCIndividual      = model.KYCIndividual
+	KYCCompany         = model.KYCCompany
 
 	IssueUnreadable = model.IssueUnreadable
 	IssueMismatch   = model.IssueMismatch
@@ -172,7 +147,6 @@ const (
 	ReviewApprove = model.ReviewApprove
 	ReviewReject  = model.ReviewReject
 	ReviewCancel  = model.ReviewCancel
-	ReviewRebind  = model.ReviewRebind
 )
 
 // KYCIssueCodeValues 回傳全部退回問題的原因碼。
@@ -191,22 +165,19 @@ func KYCStatusValues() []KYCStatus { return model.KYCStatusValues() }
 // KYCSellerTypeValues 回傳全部賣家型態。
 func KYCSellerTypeValues() []KYCSellerType { return model.KYCSellerTypeValues() }
 
-// KYCDocumentSlotValues 回傳全部證件位置。
-func KYCDocumentSlotValues() []KYCDocumentSlot { return model.KYCDocumentSlotValues() }
-
 // KYCDocumentFieldNames 回傳文件類的欄位路徑（退回的問題可以指到某一張文件的欄位）。
 func KYCDocumentFieldNames() []string { return model.KYCDocumentFieldNames() }
 
-// KYCFieldNames 回傳申請上可以指出「有問題」的欄位路徑（與對外 KYCApplication 的欄位路徑一對一）：退回的問題、PayUni 問題、缺項共用。
+// KYCFieldNames 回傳申請上可以指出「有問題」的欄位路徑（與對外 KYCApplication 的欄位路徑一對一）：退回的問題與缺項共用。
 func KYCFieldNames() []string { return model.KYCFieldNames() }
 
-// KYCSlotField 回傳證件位置所屬的欄位路徑（後台契約用欄位表示文件）；不認得的位置回 false。
-func KYCSlotField(slot KYCDocumentSlot) (string, bool) { return model.KYCSlotField(slot) }
+// CompanyDocumentsField 是文件類的欄位路徑（後台契約的文件所屬的欄位）。
+const CompanyDocumentsField = model.CompanyDocumentsField
 
 // IssuableFields 回傳申請可以在退回時指出問題的欄位路徑（RejectKYC 的驗證與後台退回表單共用的同一份規則）。
 func IssuableFields(t KYCSellerType) []string { return model.IssuableFields(t) }
 
-// StoreFieldNames 回傳店家上可以指出「有問題」的欄位路徑（與對外 Store 的欄位一對一）：送出前缺的店家欄位與 PayUni 問題共用。
+// StoreFieldNames 回傳店家上可以指出「有問題」的欄位路徑（與對外 Store 的欄位一對一）：送出前缺的店家欄位用這一套。
 func StoreFieldNames() []string { return model.StoreFieldNames() }
 
 // SaveKYCDraft 部分更新帳號目前店家的 KYC 草稿（還沒有申請時建立，ExpectedVersion 為 0；被退回的申請在這裡回到 DRAFT）。
@@ -235,6 +206,11 @@ func (m *Module) AdminKYCApplications(ctx context.Context, in KYCListInput) (KYC
 	return m.kyc.AdminList(ctx, in)
 }
 
+// OwnerContactEmail 回傳店家所屬帳號目前的聯絡信箱（已正規化；與送審檢查是同一個解析）；店家不存在或帳號沒有可用的信箱時 ok 是 false。
+func (m *Module) OwnerContactEmail(ctx context.Context, storeID int64) (string, bool, error) {
+	return m.kyc.OwnerContactEmail(ctx, storeID)
+}
+
 // StoreKYC 以店家讀它目前那一筆還沒取消的申請（遮蔽的檢視，帶流程狀態與證件）。草稿是賣家自己的，後台讀不到：沒有申請、
 // 已取消或只有草稿時 ok 為 false；店家不存在回 NotFound。
 func (m *Module) StoreKYC(ctx context.Context, storeID int64) (application KYCApplication, ok bool, err error) {
@@ -246,7 +222,7 @@ type CertHolderMatch = model.CertHolderMatch
 
 // MatchCertificateHolder 只為 legacy 的 SellerService.MatchCertificateHolder 存在（product-service 的有機與產銷履歷證書自動核准，
 // 退場：product 搬進單體、直接呼叫本方法，主計畫 B4）：holderName 是政府證書查驗回的業者名稱，是否屬於店家目前已人工核准的 KYC 的
-// 姓名或公司名稱（只回判定與相符的欄位，名字不出模組；不要求 PayUni 核准）。沒有基準（店家不存在、已關閉、沒有核准的申請、
+// 姓名或公司名稱（只回判定與相符的欄位，名字不出模組；不要求收款帳戶啟用）。沒有基準（店家不存在、已關閉、沒有核准的申請、
 // 名稱都是空的）時 HasReference 為 false；讀取失敗回錯誤。
 func (m *Module) MatchCertificateHolder(ctx context.Context, storeID int64, holderName string) (CertHolderMatch, error) {
 	return m.kyc.MatchCertHolder(ctx, storeID, holderName)
@@ -257,24 +233,13 @@ func (m *Module) AdminKYCApplication(ctx context.Context, applicationID uuid.UUI
 	return m.kyc.AdminGet(ctx, applicationID)
 }
 
-// RevealKYCSensitive 回傳身分證號、負責人身分證號與銀行帳號的全文，同時寫入 append-only 的稽核紀錄（不含值）。
-func (m *Module) RevealKYCSensitive(ctx context.Context, in RevealKYCInput) (KYCSensitive, error) {
-	return m.kyc.RevealSensitive(ctx, in)
-}
-
-// ReadKYCDocument 讀一張證件圖片（管理員）：要有這位管理員對這筆申請未到期的授權（RevealKYCSensitive 建立，15 分鐘），否則
-// PermissionDenied（不區分申請存在與否）；個資已清除或位置沒有圖片回 NotFound。在讀取圖片之前先寫一列 append-only 的讀取紀錄
-// （寫不進去就不讀、不回傳）；圖片經 media 的機敏讀取取得。
+// ReadKYCDocument 讀一張公司補充文件（管理員）：授權是後台的 KYC 讀取權限（路由的 adminperm 檢查，不在模組裡）；個資已清除、已取消或位置沒有文件回 NotFound。
+// 在讀取圖片之前先寫一列 append-only 的讀取紀錄（誰、哪一張、何時；寫不進去就不讀、不回傳）；圖片經 media 的機敏讀取取得。
 func (m *Module) ReadKYCDocument(ctx context.Context, in ReadKYCDocumentInput) (FileContent, error) {
 	return m.kyc.ReadDocument(ctx, in)
 }
 
-// ListKYCReveals 列出一筆申請的顯示全文紀錄（新到舊的 keyset）；申請不存在或是草稿回 NotFound。
-func (m *Module) ListKYCReveals(ctx context.Context, in KYCAuditListInput) (KYCRevealPage, error) {
-	return m.kyc.ListReveals(ctx, in)
-}
-
-// ListKYCDocumentAccesses 列出一筆申請的證件讀取紀錄（新到舊的 keyset）；申請不存在或是草稿回 NotFound。
+// ListKYCDocumentAccesses 列出一筆申請的補充文件讀取紀錄（新到舊的 keyset）；申請不存在或是草稿回 NotFound。
 func (m *Module) ListKYCDocumentAccesses(ctx context.Context, in KYCAuditListInput) (KYCDocumentAccessPage, error) {
 	return m.kyc.ListDocumentAccesses(ctx, in)
 }
@@ -318,15 +283,14 @@ func (m *Module) RejectKYC(ctx context.Context, in RejectKYCInput) (KYCAdminAppl
 	return m.kyc.Reject(ctx, in)
 }
 
-// RehashKYCIdentities 補算身分比對用的 hash：金鑰輪替（金鑰環新增金鑰）之後，既有的 KYC 申請還沒有新金鑰算的 blind index，關聯帳號的比對
-// 才找得到輪替後寫入的快照；只解密缺列的申請，沒有輪替時什麼都不做。serve 與 worker 啟動時在 CheckKYCKeys 之後呼叫，可重複執行；回傳補算的申請數。
+// RehashKYCIdentities 補算統編比對用的 hash：金鑰輪替（金鑰環新增金鑰）之後，既有的 KYC 申請還沒有新金鑰算的 blind index，關聯帳號的比對
+// 才找得到輪替後寫入的快照；只處理缺列的申請（統編取自申請的明文欄位），沒有輪替時什麼都不做。serve 與 worker 啟動時在 CheckKYCKeys 之後呼叫，可重複執行；回傳補算的申請數。
 func (m *Module) RehashKYCIdentities(ctx context.Context) (int, error) {
 	return m.kyc.RehashIdentities(ctx)
 }
 
-// CheckKYCKeys 是啟動檢查：資料庫裡被參照的每一把金鑰（KYC 密文開頭的金鑰 ID、blind index 與處分身分快照的金鑰 ID）
-// 都要在設定的金鑰環裡，缺了就回錯誤（serve 與 worker 啟動時呼叫，失敗就不啟動）。否則金鑰被誤拿掉時，要到有人讀到那一列
-// 才發現解不開、比對漏掉。
+// CheckKYCKeys 是啟動檢查：資料庫裡被參照的每一把金鑰（防詐保存的 blind index 與處分身分快照的金鑰 ID）
+// 都要在設定的金鑰環裡，缺了就回錯誤（serve 與 worker 啟動時呼叫，失敗就不啟動）。否則金鑰被誤拿掉時，比對會漏掉。
 func (m *Module) CheckKYCKeys(ctx context.Context) error {
 	return m.kyc.CheckKeys(ctx)
 }

@@ -4,7 +4,6 @@ package seller_test
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"slices"
 	"strings"
@@ -21,7 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
-	"github.com/Will413028/hawkr/backend/internal/platform/seal"
 )
 
 // terminated 開店、建立 21.3 終止並關店（沒有未結訂單）；回傳帳號、店家與措施。
@@ -313,12 +311,12 @@ func TestRevokingATerminationOfASuspendedAccountDoesNotReopen(t *testing.T) {
 }
 
 // 申覆期間內撤銷（或接受申覆）：同一個 store_id、店號、商品與 KYC 欄位仍在、SELLER 重新授予、store_closures 有一列、可曝光恢復、沒有
-// seller.deleted（StoreRetired）、PayUni 的綁定補排回去。
+// seller.deleted（StoreRetired）。
 // mutation：Reopen 不重新授予 SELLER。
 func TestRevokingATerminationInsideTheAppealWindowReopensTheSameStore(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	reopened, retired, announcements := record[StoreReopened](f), record[StoreRetired](f), record[StoreExposureChanged](f)
+	reopened, retired := record[StoreReopened](f), record[StoreRetired](f)
 	accountID, s := f.exposable(t)
 	before := f.storeRow(t, s.StoreID)
 	f.jobs.args = nil
@@ -331,7 +329,6 @@ func TestRevokingATerminationInsideTheAppealWindowReopensTheSameStore(t *testing
 		t.Fatal("關店之後不可曝光")
 	}
 	kycBefore := f.row(t, "kyc_applications", "store_id", s.StoreID)
-	syncBefore := countKind(f.jobs.kinds(), "seller.payuni_sync")
 	f.now = f.now.Add(40 * 24 * time.Hour)
 	f.revoke(t, m)
 	back := f.storeRow(t, s.StoreID)
@@ -339,7 +336,7 @@ func TestRevokingATerminationInsideTheAppealWindowReopensTheSameStore(t *testing
 		back.LogoKey == nil || !f.isSeller(t, accountID) {
 		t.Fatalf("back=%+v", back)
 	}
-	if kycAfter := f.row(t, "kyc_applications", "store_id", s.StoreID); kycAfter["real_name"] != kycBefore["real_name"] || kycAfter["id_card_hash"] == nil {
+	if kycAfter := f.row(t, "kyc_applications", "store_id", s.StoreID); kycAfter["product_type"] != kycBefore["product_type"] || kycAfter["product_type"] == nil {
 		t.Fatal("KYC 欄位仍在")
 	}
 	if exposable, _ := f.announced(t, s.StoreID); !exposable {
@@ -357,52 +354,6 @@ func TestRevokingATerminationInsideTheAppealWindowReopensTheSameStore(t *testing
 	if f.isSuspended(t, s.StoreID) {
 		t.Fatal("撤銷之後帳號恢復")
 	}
-	if got := countKind(f.jobs.kinds(), "seller.payuni_sync"); got < syncBefore {
-		t.Fatalf("sync=%d", got)
-	}
-	_ = announcements
-}
-
-func countKind(kinds []string, kind string) int {
-	n := 0
-	for _, k := range kinds {
-		if k == kind {
-			n++
-		}
-	}
-	return n
-}
-
-// 恢復營業時補排 PayUni 的綁定：關店期間 sync job 對已關閉的店不做事、綁定意圖留在 PENDING，恢復後要重新排入。
-func TestReopenRequeuesThePayUniBindThatWasDroppedWhileClosed(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	_, s := f.approvedWith(t, idA, bankAcct)
-	if reg := f.payuniStatus(t, s.StoreID); reg != "PENDING" {
-		t.Fatalf("bind_status=%s，應該是等綁定", reg)
-	}
-	m := f.terminate(t, s.StoreID, GroundCeasedBusiness)
-	f.effect(t, m)
-	f.sync(t, s.StoreID)
-	if reg := f.payuniStatus(t, s.StoreID); reg != "PENDING" {
-		t.Fatalf("已關閉的店不做 sync，綁定仍在等：%s", reg)
-	}
-	f.jobs.args = nil
-	f.revoke(t, m)
-	if countKind(f.jobs.kinds(), "seller.payuni_sync") != 1 {
-		t.Fatalf("恢復營業後要補排一次 sync：%v", f.jobs.kinds())
-	}
-	f.sync(t, s.StoreID)
-	if reg := f.payuniStatus(t, s.StoreID); reg != "BOUND" {
-		t.Fatalf("恢復之後的 sync 要真的綁定：%s", reg)
-	}
-}
-
-func (f *fixture) payuniStatus(t *testing.T, storeID int64) string {
-	t.Helper()
-	var status string
-	must(t, f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT bind_status FROM seller.payuni_registrations WHERE store_id=$1", storeID).Scan(&status))
-	return status
 }
 
 // 帳號已開新店（21.2 允許）時撤銷：只撤銷、不重開；帳號在等待刪除時也不重開。
@@ -433,7 +384,7 @@ func TestRevokeDoesNotReopenWhenTheAccountHasANewStoreOrIsLeaving(t *testing.T) 
 func TestRevokingTheTerminationAfterThePurgeLetsTheAccountOpenANewStore(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	accountID, s, _ := f.submitted(t, idA, bankAcct)
+	accountID, s, _ := f.submittedCompany(t, taxIDOne)
 	m := f.terminate(t, s.StoreID, GroundFraud)
 	f.effect(t, m)
 	if f.storeRow(t, s.StoreID).Status != Closed || f.count(t, "SELECT count(*) FROM seller.measure_identities WHERE measure_id=$1", m.ID) == 0 {
@@ -445,8 +396,8 @@ func TestRevokingTheTerminationAfterThePurgeLetsTheAccountOpenANewStore(t *testi
 	if n != 1 {
 		t.Fatalf("purged=%d", n)
 	}
-	if f.count(t, "SELECT count(*) FROM seller.kyc_applications WHERE store_id=$1 AND id_card_hash IS NOT NULL", s.StoreID) != 0 {
-		t.Fatal("KYC 的 hash 隨個資清理")
+	if f.count(t, "SELECT count(*) FROM seller.kyc_applications WHERE store_id=$1 AND tax_id IS NOT NULL", s.StoreID) != 0 {
+		t.Fatal("KYC 的統編隨個資清理")
 	}
 	if f.count(t, "SELECT count(*) FROM seller.measure_identities WHERE measure_id=$1", m.ID) == 0 {
 		t.Fatal("個資清理之後身分快照仍在")
@@ -472,9 +423,9 @@ func TestLinkedAccountsListCreateAndCascade(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountA, sA, _ := f.submitted(t, idA, bankAcct)
-	accountB, sB, _ := f.submitted(t, idA, "999888777666")
-	_, sC, _ := f.submitted(t, idC, "555444333222")
+	accountA, sA, _ := f.submittedCompany(t, taxIDOne)
+	accountB, sB, _ := f.submittedCompany(t, taxIDOne)
+	_, sC, _ := f.submittedCompany(t, taxIDTwo)
 	source := f.terminate(t, sA.StoreID, GroundFraud)
 
 	detail := f.measureOf(t, source.ID)
@@ -482,7 +433,7 @@ func TestLinkedAccountsListCreateAndCascade(t *testing.T) {
 		t.Fatalf("linked=%+v", detail.LinkedAccounts)
 	}
 	l := detail.LinkedAccounts[0]
-	if l.AccountID != accountB || l.StoreID != sB.StoreID || l.StoreCode != sB.StoreCode || l.Matched != LinkedNationalID || l.LinkedMeasureID != nil {
+	if l.AccountID != accountB || l.StoreID != sB.StoreID || l.StoreCode != sB.StoreCode || l.Matched != LinkedUBN || l.LinkedMeasureID != nil {
 		t.Fatalf("linked=%+v", l)
 	}
 	for _, other := range detail.LinkedAccounts {
@@ -549,8 +500,8 @@ func TestSourceRevocationCascadesInTheSameTransactionOnEveryPath(t *testing.T) {
 			f := setup(t)
 			ctx := context.Background()
 			revoked := record[MeasureRevoked](f)
-			accountA, sA, _ := f.submitted(t, idA, bankAcct)
-			accountB, sB, _ := f.submitted(t, idA, "999888777666")
+			accountA, sA, _ := f.submittedCompany(t, taxIDOne)
+			accountB, sB, _ := f.submittedCompany(t, taxIDOne)
 			var source Measure
 			var finding Measure
 			switch path {
@@ -618,8 +569,8 @@ func TestLinkedAccountStoresAreHeldWhileTheSourceHasAPendingAppeal(t *testing.T)
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountA, sA, _ := f.submitted(t, idA, bankAcct)
-	accountB, sB, _ := f.submitted(t, idA, "999888777666")
+	accountA, sA, _ := f.submittedCompany(t, taxIDOne)
+	accountB, sB, _ := f.submittedCompany(t, taxIDOne)
 	source := f.terminate(t, sA.StoreID, GroundFraud)
 	res, err := f.createTermination(sB.StoreID, GroundLinkedAccount, func(in *CreateMeasureInput) { in.Termination.SourceMeasureID = &source.ID })
 	must(t, err)
@@ -646,8 +597,8 @@ func TestConcurrentSourceRevokeAndLinkedCreateNeverDeadlock(t *testing.T) {
 	ctx := context.Background()
 	deadlocks := 0
 	for i := 0; i < rounds; i++ {
-		_, sA, _ := f.submitted(t, idA, bankAcct)
-		_, sB, _ := f.submitted(t, idA, "999888777666")
+		_, sA, _ := f.submittedCompany(t, taxIDOne)
+		_, sB, _ := f.submittedCompany(t, taxIDOne)
 		source := f.terminate(t, sA.StoreID, GroundFraud)
 		cur := f.measureOf(t, source.ID)
 		done := make(chan error, 2)
@@ -874,52 +825,34 @@ func TestTerminationShapesAgreeAcrossStateOfAndTheStateQueries(t *testing.T) {
 	f.assertCurrentValuesMatchHistory(t)
 }
 
-// 關聯帳號的比對用金鑰環的每一把金鑰重算，不比申請上已存的 hash：HMAC 輪替之後（新的金鑰在前、舊的留著），不論快照或對方的申請是哪一把金鑰寫的，
-// 同身分的帳號都列得出來、都能建立關聯終止。mutation：LinkedAccountHits 只用第一把金鑰（s.p.hashes(input)[:1]）或回到比對存的 hash → 兩個方向都失敗。
+// 關聯帳號的比對用金鑰環的每一把金鑰重算，不比申請上已存的 hash：HMAC 輪替之後（新的金鑰在前、舊的留著），不論快照或對方的保存列是哪一把金鑰寫的，
+// 同統編的帳號都列得出來、都能建立關聯終止。mutation：LinkedAccountHits 只用第一把金鑰（s.p.hashes(input)[:1]）或回到比對存的 hash → 兩個方向都失敗。
 func TestLinkedAccountsAreFoundAcrossHMACKeyRotation(t *testing.T) {
 	t.Parallel()
-	b64 := func(s string) string { return base64.StdEncoding.EncodeToString([]byte(s)) }
-	oldEnc, oldMAC := "test1:"+b64("test-kyc-encryption-key-00000001"), "test1:"+b64("test-kyc-hash-hmac-key-000000001")
-	newEnc, newMAC := "rot2:"+b64("rotated-kyc-encryption-key-00002"), "rot2:"+b64("rotated-kyc-hash-hmac-key-0000002")
-	for name, sourceFirst := range map[string]bool{"快照用舊金鑰、對方的申請用新金鑰": true, "快照用新金鑰、對方的申請用舊金鑰": false} {
+	for name, sourceFirst := range map[string]bool{"快照用舊金鑰、對方的保存列用新金鑰": true, "快照用新金鑰、對方的保存列用舊金鑰": false} {
 		t.Run(name, func(t *testing.T) {
 			f := setup(t)
-			rotate := func() {
-				enc, err := seal.Parse(newEnc + "," + oldEnc)
-				must(t, err)
-				mac, err := seal.ParseMAC(newMAC + "," + oldMAC)
-				must(t, err)
-				f.module = f.newModuleWithKeys(t, f.payuni, f.jobs, enc, mac)
-			}
+			rotate := func() { f.module = f.newModuleWithKeys(t, f.jobs, rotatedMAC(t)) }
 			var sA, sB Store
 			var accountB int64
 			if sourceFirst {
-				_, sA, _ = f.submitted(t, idA, bankAcct)
+				_, sA, _ = f.submittedCompany(t, taxIDOne)
 				rotate()
-				accountB, sB, _ = f.submitted(t, idA, "999888777666")
+				accountB, sB, _ = f.submittedCompany(t, taxIDOne)
 			} else {
-				_, sB0, _ := f.submitted(t, idA, "999888777666")
+				_, sB0, _ := f.submittedCompany(t, taxIDOne)
 				sB = sB0
 				rotate()
-				_, sA, _ = f.submitted(t, idA, bankAcct)
+				_, sA, _ = f.submittedCompany(t, taxIDOne)
 				accountB = sB.AccountID
 			}
-			var hashKeys []string
-			rows, err := f.db.Conn(context.Background()).Query(context.Background(), "SELECT DISTINCT id_card_hash_key FROM seller.kyc_applications ORDER BY 1")
-			must(t, err)
-			for rows.Next() {
-				var k string
-				must(t, rows.Scan(&k))
-				hashKeys = append(hashKeys, k)
-			}
-			must(t, rows.Err())
-			if len(hashKeys) != 2 {
-				t.Fatalf("兩筆申請要由不同的金鑰寫入：%v", hashKeys)
+			if n := f.count(t, "SELECT count(DISTINCT key_id) FROM seller.account_identity_hashes WHERE field = 'TAX_ID'"); n != 2 {
+				t.Fatalf("兩個 stint 要由不同的金鑰寫入：%d", n)
 			}
 			source := f.terminate(t, sA.StoreID, GroundFraud)
 			linked := f.measureOf(t, source.ID).LinkedAccounts
-			if len(linked) != 1 || linked[0].AccountID != accountB || linked[0].Matched != LinkedNationalID {
-				t.Fatalf("輪替後仍要列出同身分的帳號：%+v", linked)
+			if len(linked) != 1 || linked[0].AccountID != accountB || linked[0].Matched != LinkedUBN {
+				t.Fatalf("輪替後仍要列出同統編的帳號：%+v", linked)
 			}
 			if _, err := f.createTermination(sB.StoreID, GroundLinkedAccount, func(in *CreateMeasureInput) { in.Termination.SourceMeasureID = &source.ID }); err != nil {
 				t.Fatalf("輪替後建立關聯終止：%v", err)
@@ -933,8 +866,8 @@ func TestLinkedAccountsAreFoundAcrossHMACKeyRotation(t *testing.T) {
 func TestLinkedTerminationRejectsARevokedSource(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	_, sA, _ := f.submitted(t, idA, bankAcct)
-	_, sB, _ := f.submitted(t, idA, "999888777666")
+	_, sA, _ := f.submittedCompany(t, taxIDOne)
+	_, sB, _ := f.submittedCompany(t, taxIDOne)
 	source := f.terminate(t, sA.StoreID, GroundFraud)
 	f.revoke(t, source)
 	_, err := f.createTermination(sB.StoreID, GroundLinkedAccount, func(in *CreateMeasureInput) { in.Termination.SourceMeasureID = &source.ID })
@@ -951,8 +884,8 @@ func TestSourceRevocationRollsBackTogetherWithTheCascade(t *testing.T) {
 		t.Run(path, func(t *testing.T) {
 			f := setup(t)
 			ctx := context.Background()
-			accountA, sA, _ := f.submitted(t, idA, bankAcct)
-			accountB, sB, _ := f.submitted(t, idA, "999888777666")
+			accountA, sA, _ := f.submittedCompany(t, taxIDOne)
+			accountB, sB, _ := f.submittedCompany(t, taxIDOne)
 			source := f.terminate(t, sA.StoreID, GroundFraud)
 			res, err := f.createTermination(sB.StoreID, GroundLinkedAccount, func(in *CreateMeasureInput) { in.Termination.SourceMeasureID = &source.ID })
 			must(t, err)
@@ -1008,8 +941,8 @@ func TestRevokedLinkedTerminationDoesNotHoldThePurge(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountA, sA, _ := f.submitted(t, idA, bankAcct)
-	accountB, sB, _ := f.submitted(t, idA, "999888777666")
+	accountA, sA, _ := f.submittedCompany(t, taxIDOne)
+	accountB, sB, _ := f.submittedCompany(t, taxIDOne)
 	source := f.terminate(t, sA.StoreID, GroundFraud)
 	res, err := f.createTermination(sB.StoreID, GroundLinkedAccount, func(in *CreateMeasureInput) { in.Termination.SourceMeasureID = &source.ID })
 	must(t, err)

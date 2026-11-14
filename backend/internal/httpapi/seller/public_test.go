@@ -348,7 +348,7 @@ func TestGetStoreStatsAreReadInParallelEachUnderItsOwnBudget(t *testing.T) {
 	}
 }
 
-// 四份入駐文件都回傳，依契約的數字順序，版本就是模組常數表的現行值，網址一律是絕對網址（站內路徑接在網站網域後面，本來就是絕對的原樣）；不需要登入（ctx 沒有呼叫者），也不讀店家。
+// 兩份入駐文件都回傳，依契約的數字順序，版本就是模組常數表的現行值，網址一律是絕對網址（站內路徑接在網站網域後面，本來就是絕對的原樣）；不需要登入（ctx 沒有呼叫者），也不讀店家。
 func TestGetSellerAgreementsReturnsTheCurrentVersionsInProtoOrder(t *testing.T) {
 	h, err := NewPublic(&fakePublic{}, testStats(fakeFollowerCounts{}, fakeRatings{}), rpc.Images{}, mustWebOrigin(t))
 	if err != nil {
@@ -362,7 +362,6 @@ func TestGetSellerAgreementsReturnsTheCurrentVersionsInProtoOrder(t *testing.T) 
 	wantKinds := []pb.AgreementKind{
 		pb.AgreementKind_AGREEMENT_KIND_SELLER_TERMS,
 		pb.AgreementKind_AGREEMENT_KIND_KYC_PRIVACY_NOTICE,
-		pb.AgreementKind_AGREEMENT_KIND_PAYUNI_TERMS,
 	}
 	if len(got) != len(wantKinds) {
 		t.Fatalf("agreements=%v", got)
@@ -380,8 +379,8 @@ func TestGetSellerAgreementsReturnsTheCurrentVersionsInProtoOrder(t *testing.T) 
 		}
 	}
 	want := map[pb.AgreementKind]string{
-		pb.AgreementKind_AGREEMENT_KIND_SELLER_TERMS: testWebOrigin + "/seller-terms",
-		pb.AgreementKind_AGREEMENT_KIND_PAYUNI_TERMS: "https://www.payuni.com.tw/terms",
+		pb.AgreementKind_AGREEMENT_KIND_SELLER_TERMS:       testWebOrigin + "/seller-terms",
+		pb.AgreementKind_AGREEMENT_KIND_KYC_PRIVACY_NOTICE: testWebOrigin + "/privacy#seller-kyc-notice",
 	}
 	for _, a := range got {
 		if w, ok := want[a.GetKind()]; ok && a.GetUrl() != w {

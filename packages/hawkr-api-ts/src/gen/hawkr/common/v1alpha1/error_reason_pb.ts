@@ -9,7 +9,7 @@ import { enumDesc, fileDesc } from "@bufbuild/protobuf/codegenv2";
  * Describes the file hawkr/common/v1alpha1/error_reason.proto.
  */
 export const file_hawkr_common_v1alpha1_error_reason: GenFile = /*@__PURE__*/
-  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqoAMKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAMSGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQBBIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAKEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAGEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAcSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQCBIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCRIVChFBQ0NPVU5UX0hBU19TVE9SRRALEhUKEUFDQ09VTlRfU1VTUEVOREVEEAwSGwoXSURFTlRJVFlfQUxSRUFEWV9MSU5LRUQQDRIdChlSRUFVVEhFTlRJQ0FUSU9OX1JFUVVJUkVEEA4iBAgCEAIiBAgFEAUqElBIT05FX0NPREVfRVhQSVJFRCoWQUNDT1VOVF9IQVNfT1BFTl9TVE9SRWIGcHJvdG8z");
+  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqhAMKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAISGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQAxIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAEEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAFEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAYSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQBxIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCBIVChFBQ0NPVU5UX0hBU19TVE9SRRAJEhUKEUFDQ09VTlRfU1VTUEVOREVEEAoSGwoXSURFTlRJVFlfQUxSRUFEWV9MSU5LRUQQCxIdChlSRUFVVEhFTlRJQ0FUSU9OX1JFUVVJUkVEEAwSGgoWQ09OVEFDVF9FTUFJTF9SRVFVSVJFRBANYgZwcm90bzM");
 
 /**
  * ErrorReason 是錯誤 details 裡 google.rpc.ErrorInfo.reason 可以用的值，domain 是 hawkr
@@ -42,18 +42,18 @@ export enum ErrorReason {
    * 賣家帳號停權中，這個操作不在停權時仍可做的範圍（搭配 permission_denied）。client 轉成賣家的停權狀態：
    * 顯示停權通知，並以 GetMyStore 讀停權的來源與原因。
    *
-   * @generated from enum value: SELLER_SUSPENDED = 3;
+   * @generated from enum value: SELLER_SUSPENDED = 2;
    */
-  SELLER_SUSPENDED = 3,
+  SELLER_SUSPENDED = 2,
 
   /**
    * 商家名單的聯絡方式與其他未封存（進行中或已入駐）的業者相同、而且沒有標記為不是同一家（搭配 failed_precondition）。ErrorInfo.metadata 的
    * prospectIds 是相符的業者 ID（十進位，由小到大以逗號連接）。client 顯示相符的業者，讓管理員選擇合併，或確認不是同一家後
    * 在請求帶上 confirmed_distinct_prospect_ids 再送一次（ADR 2026-10-04-prospect-contact-points-and-matching）。
    *
-   * @generated from enum value: PROSPECT_MATCH_FOUND = 4;
+   * @generated from enum value: PROSPECT_MATCH_FOUND = 3;
    */
-  PROSPECT_MATCH_FOUND = 4,
+  PROSPECT_MATCH_FOUND = 3,
 
   /**
    * 商家名單的統一編號已由另一筆未封存（進行中或已入駐）的業者持有：建立搭配 already_exists，修改與還原搭配
@@ -61,78 +61,86 @@ export enum ErrorReason {
    * PROSPECT_MATCH_FOUND）。修改時持有者是進行中的，client 可以讓管理員與它合併；還原時是同一家就不需要還原
    * （ADR 2026-10-04-prospect-contact-points-and-matching）。
    *
-   * @generated from enum value: PROSPECT_TAX_ID_HELD = 10;
+   * @generated from enum value: PROSPECT_TAX_ID_HELD = 4;
    */
-  PROSPECT_TAX_ID_HELD = 10,
+  PROSPECT_TAX_ID_HELD = 4,
 
   /**
    * 賣家同意的入駐文件版本不是現行版本（搭配 failed_precondition）。client 重讀
    * seller.v1alpha1.SellerPublicService.GetSellerAgreements，顯示新版本，請賣家重新勾選後再送出。
    *
-   * @generated from enum value: AGREEMENT_OUTDATED = 6;
+   * @generated from enum value: AGREEMENT_OUTDATED = 5;
    */
-  AGREEMENT_OUTDATED = 6,
+  AGREEMENT_OUTDATED = 5,
 
   /**
    * 賣家做這個操作需要的前置條件沒有滿足（搭配 failed_precondition）：身分認證未核准，或店家正在隨帳號刪除。停權不用它，
    * 停權是 SELLER_SUSPENDED。ErrorInfo.metadata 的 missingRequirements 是缺的條件，值是
-   * seller.v1alpha1.SellerRequirement 的值名（不加 SELLER_REQUIREMENT_ 前綴，例如 KYC_APPROVED），依列舉的數字由小到大以逗號連接。client 先看 GetMyStore 的能力狀態，這個 reason 只是
+   * seller.v1alpha1.SellerRequirement 的值名（不加 SELLER_REQUIREMENT_ 前綴，例如 ONBOARDING_COMPLETE），依列舉的數字由小到大以逗號連接。client 先看 GetMyStore 的能力狀態，這個 reason 只是
    * 伺服器逐方法檢查的後備：重讀 GetMyStore，依缺的條件顯示。
    *
-   * @generated from enum value: SELLER_REQUIREMENT_MISSING = 7;
+   * @generated from enum value: SELLER_REQUIREMENT_MISSING = 6;
    */
-  SELLER_REQUIREMENT_MISSING = 7,
+  SELLER_REQUIREMENT_MISSING = 6,
 
   /**
    * 帳號停權中，不能申請開店（搭配 failed_precondition）；解除停權後可以再申請。client 顯示 LocalizedMessage，並導向措施與申覆。帳號同時有生效中的終止合作時是
    * STORE_OPENING_TERMINATED。
    *
-   * @generated from enum value: STORE_OPENING_SUSPENDED = 8;
+   * @generated from enum value: STORE_OPENING_SUSPENDED = 7;
    */
-  STORE_OPENING_SUSPENDED = 8,
+  STORE_OPENING_SUSPENDED = 7,
 
   /**
    * 帳號有生效中的終止合作（條款第 21.3 條；終止撤銷之前同一個帳號不能再開店），不能申請開店（搭配 failed_precondition）。client 顯示 LocalizedMessage，
    * 並導向措施與申覆。換身分認證被另一個帳號的終止擋下的情形不用它（隱私：不透露命中的帳號或欄位），那條路徑維持通用的 failed_precondition 與文字。
    *
-   * @generated from enum value: STORE_OPENING_TERMINATED = 9;
+   * @generated from enum value: STORE_OPENING_TERMINATED = 8;
    */
-  STORE_OPENING_TERMINATED = 9,
+  STORE_OPENING_TERMINATED = 8,
 
   /**
    * 帳號擁有商店，不能被停權（搭配 failed_precondition）：停權對店家、未結訂單與撥款的效果由賣家條款決定，條款定出之前有店的帳號不停權。
    * 只出現在後台與內部的處分路徑；client 顯示 LocalizedMessage，請營運先處理店家（措施或關店），再停權帳號。
    *
-   * @generated from enum value: ACCOUNT_HAS_STORE = 11;
+   * @generated from enum value: ACCOUNT_HAS_STORE = 9;
    */
-  ACCOUNT_HAS_STORE = 11,
+  ACCOUNT_HAS_STORE = 9,
 
   /**
    * 帳號停權中，這個操作是寫入，不在停權時仍可做的範圍（搭配 permission_denied）。停權的帳號仍能登入、讀取與刪除帳號：
    * client 轉成帳號的受限狀態，顯示停權通知，並以 identity.v1alpha1.IdentityAppService.GetSession 的 suspension 讀停權的狀態。
    * 舊 gateway 的 REST 路徑（/api/v1）沒有 ErrorInfo，停權的非 GET／HEAD 請求只回 403。
    *
-   * @generated from enum value: ACCOUNT_SUSPENDED = 12;
+   * @generated from enum value: ACCOUNT_SUSPENDED = 10;
    */
-  ACCOUNT_SUSPENDED = 12,
+  ACCOUNT_SUSPENDED = 10,
 
   /**
    * 要連結的登入方式（Google、LINE 的身分）已經連結到另一個帳號，包含已刪除帳號留下的身分（搭配 already_exists）；什麼都沒有改。
    * client 顯示 LocalizedMessage，請使用者改用那個帳號登入，或換一個登入方式。
    * IdentityAppService.LinkIdentity（web 的連結走 /api/auth，不在 Connect）。
    *
-   * @generated from enum value: IDENTITY_ALREADY_LINKED = 13;
+   * @generated from enum value: IDENTITY_ALREADY_LINKED = 11;
    */
-  IDENTITY_ALREADY_LINKED = 13,
+  IDENTITY_ALREADY_LINKED = 11,
 
   /**
    * 這個操作要求最近重新驗證過，而目前的 session 沒有（搭配 failed_precondition）：IdentityAppService.RevokeSession 要求目前的 session
    * 在 15 分鐘內以 provider 驗證過。client 引導使用者重新走一次登入（web 的 /api/auth/{provider}/start、App 的 ExchangeIdToken，
    * 登入會換發新 session），再重送。
    *
-   * @generated from enum value: REAUTHENTICATION_REQUIRED = 14;
+   * @generated from enum value: REAUTHENTICATION_REQUIRED = 12;
    */
-  REAUTHENTICATION_REQUIRED = 14,
+  REAUTHENTICATION_REQUIRED = 12,
+
+  /**
+   * 帳號沒有聯絡信箱（沒有 provider 驗證過的 email，也沒有自填的），不能送出 KYC 申請（搭配 failed_precondition）：SellerAppService.SubmitKYC。
+   * client 引導使用者在 IdentityAppService.SetContactEmail 填一個，再重送。
+   *
+   * @generated from enum value: CONTACT_EMAIL_REQUIRED = 13;
+   */
+  CONTACT_EMAIL_REQUIRED = 13,
 }
 
 /**

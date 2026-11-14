@@ -41,18 +41,18 @@ type Role int32
 
 const (
 	Role_ROLE_UNSPECIFIED Role = 0
-	Role_ROLE_SELLER      Role = 2
+	Role_ROLE_SELLER      Role = 1
 )
 
 // Enum value maps for Role.
 var (
 	Role_name = map[int32]string{
 		0: "ROLE_UNSPECIFIED",
-		2: "ROLE_SELLER",
+		1: "ROLE_SELLER",
 	}
 	Role_value = map[string]int32{
 		"ROLE_UNSPECIFIED": 0,
-		"ROLE_SELLER":      2,
+		"ROLE_SELLER":      1,
 	}
 )
 
@@ -183,6 +183,58 @@ func (ClientKind) EnumDescriptor() ([]byte, []int) {
 	return file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP(), []int{2}
 }
 
+// ContactEmailSource 是聯絡信箱的來源。
+type ContactEmailSource int32
+
+const (
+	ContactEmailSource_CONTACT_EMAIL_SOURCE_UNSPECIFIED ContactEmailSource = 0
+	// provider 回報、已驗證的 email：唯讀，隨登入更新。
+	ContactEmailSource_CONTACT_EMAIL_SOURCE_VERIFIED ContactEmailSource = 1
+	// 帳號自己填的信箱：未驗證。
+	ContactEmailSource_CONTACT_EMAIL_SOURCE_SELF_ENTERED ContactEmailSource = 2
+)
+
+// Enum value maps for ContactEmailSource.
+var (
+	ContactEmailSource_name = map[int32]string{
+		0: "CONTACT_EMAIL_SOURCE_UNSPECIFIED",
+		1: "CONTACT_EMAIL_SOURCE_VERIFIED",
+		2: "CONTACT_EMAIL_SOURCE_SELF_ENTERED",
+	}
+	ContactEmailSource_value = map[string]int32{
+		"CONTACT_EMAIL_SOURCE_UNSPECIFIED":  0,
+		"CONTACT_EMAIL_SOURCE_VERIFIED":     1,
+		"CONTACT_EMAIL_SOURCE_SELF_ENTERED": 2,
+	}
+)
+
+func (x ContactEmailSource) Enum() *ContactEmailSource {
+	p := new(ContactEmailSource)
+	*p = x
+	return p
+}
+
+func (x ContactEmailSource) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ContactEmailSource) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_identity_v1alpha1_identity_proto_enumTypes[3].Descriptor()
+}
+
+func (ContactEmailSource) Type() protoreflect.EnumType {
+	return &file_hawkr_identity_v1alpha1_identity_proto_enumTypes[3]
+}
+
+func (x ContactEmailSource) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ContactEmailSource.Descriptor instead.
+func (ContactEmailSource) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP(), []int{3}
+}
+
 // DeletionState 是申請之後帳號的狀態。
 type DeleteAccountResponse_DeletionState int32
 
@@ -219,11 +271,11 @@ func (x DeleteAccountResponse_DeletionState) String() string {
 }
 
 func (DeleteAccountResponse_DeletionState) Descriptor() protoreflect.EnumDescriptor {
-	return file_hawkr_identity_v1alpha1_identity_proto_enumTypes[3].Descriptor()
+	return file_hawkr_identity_v1alpha1_identity_proto_enumTypes[4].Descriptor()
 }
 
 func (DeleteAccountResponse_DeletionState) Type() protoreflect.EnumType {
-	return &file_hawkr_identity_v1alpha1_identity_proto_enumTypes[3]
+	return &file_hawkr_identity_v1alpha1_identity_proto_enumTypes[4]
 }
 
 func (x DeleteAccountResponse_DeletionState) Number() protoreflect.EnumNumber {
@@ -1108,15 +1160,15 @@ func (*GetSessionRequest) Descriptor() ([]byte, []int) {
 
 type GetSessionResponse struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
-	Account *Account               `protobuf:"bytes,2,opt,name=account,proto3" json:"account,omitempty"`
+	Account *Account               `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
 	// 帳號被停權時的狀態；沒有停權時不設。停權的帳號仍能登入、讀取與刪除帳號，寫入回 permission_denied 與
 	// hawkr.common.v1alpha1.ErrorReason.ACCOUNT_SUSPENDED。
-	Suspension *Suspension `protobuf:"bytes,3,opt,name=suspension,proto3" json:"suspension,omitempty"`
+	Suspension *Suspension `protobuf:"bytes,2,opt,name=suspension,proto3" json:"suspension,omitempty"`
 	// 買家的顯示名稱（頁首與帳號選單用），與 BuyerAppService 的 Profile.display_name 同一份。讀取買家資料失敗時不設；
 	// 登入狀態不受影響，client 不可把沒有這個欄位當成未登入。
-	DisplayName string `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	DisplayName string `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	// 買家的頭像，與 Profile.avatar 同一份。沒有頭像、或讀取買家資料失敗時不設。
-	Avatar        *v1alpha1.Image `protobuf:"bytes,5,opt,name=avatar,proto3" json:"avatar,omitempty"`
+	Avatar        *v1alpha1.Image `protobuf:"bytes,4,opt,name=avatar,proto3" json:"avatar,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1305,14 +1357,238 @@ func (x *DeleteAccountResponse) GetState() DeleteAccountResponse_DeletionState {
 	return DeleteAccountResponse_DELETION_STATE_UNSPECIFIED
 }
 
+// ContactEmail 是帳號的聯絡信箱：賣家的收款帳戶聯絡人用它。
+type ContactEmail struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	Source        ContactEmailSource     `protobuf:"varint,2,opt,name=source,proto3,enum=hawkr.identity.v1alpha1.ContactEmailSource" json:"source,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ContactEmail) Reset() {
+	*x = ContactEmail{}
+	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ContactEmail) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ContactEmail) ProtoMessage() {}
+
+func (x *ContactEmail) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ContactEmail.ProtoReflect.Descriptor instead.
+func (*ContactEmail) Descriptor() ([]byte, []int) {
+	return file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *ContactEmail) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *ContactEmail) GetSource() ContactEmailSource {
+	if x != nil {
+		return x.Source
+	}
+	return ContactEmailSource_CONTACT_EMAIL_SOURCE_UNSPECIFIED
+}
+
+type GetContactEmailRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetContactEmailRequest) Reset() {
+	*x = GetContactEmailRequest{}
+	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetContactEmailRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetContactEmailRequest) ProtoMessage() {}
+
+func (x *GetContactEmailRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetContactEmailRequest.ProtoReflect.Descriptor instead.
+func (*GetContactEmailRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP(), []int{23}
+}
+
+type GetContactEmailResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 帳號沒有任何聯絡信箱時不設。
+	ContactEmail  *ContactEmail `protobuf:"bytes,1,opt,name=contact_email,json=contactEmail,proto3" json:"contact_email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetContactEmailResponse) Reset() {
+	*x = GetContactEmailResponse{}
+	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetContactEmailResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetContactEmailResponse) ProtoMessage() {}
+
+func (x *GetContactEmailResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetContactEmailResponse.ProtoReflect.Descriptor instead.
+func (*GetContactEmailResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *GetContactEmailResponse) GetContactEmail() *ContactEmail {
+	if x != nil {
+		return x.ContactEmail
+	}
+	return nil
+}
+
+type SetContactEmailRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 去前後空白、轉小寫後至多 254 字，格式為 local@domain，網域要有點。
+	Email         string `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetContactEmailRequest) Reset() {
+	*x = SetContactEmailRequest{}
+	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetContactEmailRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetContactEmailRequest) ProtoMessage() {}
+
+func (x *SetContactEmailRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetContactEmailRequest.ProtoReflect.Descriptor instead.
+func (*SetContactEmailRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *SetContactEmailRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+type SetContactEmailResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 設定之後的聯絡信箱（來源是 CONTACT_EMAIL_SOURCE_SELF_ENTERED）。
+	ContactEmail  *ContactEmail `protobuf:"bytes,1,opt,name=contact_email,json=contactEmail,proto3" json:"contact_email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetContactEmailResponse) Reset() {
+	*x = SetContactEmailResponse{}
+	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetContactEmailResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetContactEmailResponse) ProtoMessage() {}
+
+func (x *SetContactEmailResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetContactEmailResponse.ProtoReflect.Descriptor instead.
+func (*SetContactEmailResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *SetContactEmailResponse) GetContactEmail() *ContactEmail {
+	if x != nil {
+		return x.ContactEmail
+	}
+	return nil
+}
+
 var File_hawkr_identity_v1alpha1_identity_proto protoreflect.FileDescriptor
 
 const file_hawkr_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"\n" +
-	"&hawkr/identity/v1alpha1/identity.proto\x12\x17hawkr.identity.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\"\x84\x01\n" +
+	"&hawkr/identity/v1alpha1/identity.proto\x12\x17hawkr.identity.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\"X\n" +
 	"\aAccount\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x128\n" +
-	"\x05roles\x18\x02 \x03(\x0e2\x1d.hawkr.identity.v1alpha1.RoleB\x03\xe0A\x03R\x05rolesJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\vactive_roleR\vperspective\"\x1b\n" +
+	"\x05roles\x18\x02 \x03(\x0e2\x1d.hawkr.identity.v1alpha1.RoleB\x03\xe0A\x03R\x05roles\"\x1b\n" +
 	"\x19IssueAppLoginNonceRequest\"y\n" +
 	"\x1aIssueAppLoginNonceResponse\x12\x19\n" +
 	"\x05nonce\x18\x01 \x01(\tB\x03\xe0A\x03R\x05nonce\x12@\n" +
@@ -1360,14 +1636,14 @@ const file_hawkr_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"createTime\x12C\n" +
 	"\rlast_use_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\vlastUseTime\x12\x1d\n" +
 	"\acurrent\x18\x05 \x01(\bB\x03\xe0A\x03R\acurrent\"\x13\n" +
-	"\x11GetSessionRequest\"\x83\x02\n" +
+	"\x11GetSessionRequest\"\xfd\x01\n" +
 	"\x12GetSessionResponse\x12:\n" +
-	"\aaccount\x18\x02 \x01(\v2 .hawkr.identity.v1alpha1.AccountR\aaccount\x12H\n" +
+	"\aaccount\x18\x01 \x01(\v2 .hawkr.identity.v1alpha1.AccountR\aaccount\x12H\n" +
 	"\n" +
-	"suspension\x18\x03 \x01(\v2#.hawkr.identity.v1alpha1.SuspensionB\x03\xe0A\x03R\n" +
+	"suspension\x18\x02 \x01(\v2#.hawkr.identity.v1alpha1.SuspensionB\x03\xe0A\x03R\n" +
 	"suspension\x12&\n" +
-	"\fdisplay_name\x18\x04 \x01(\tB\x03\xe0A\x03R\vdisplayName\x129\n" +
-	"\x06avatar\x18\x05 \x01(\v2\x1c.hawkr.common.v1alpha1.ImageB\x03\xe0A\x03R\x06avatarJ\x04\b\x01\x10\x02\"P\n" +
+	"\fdisplay_name\x18\x03 \x01(\tB\x03\xe0A\x03R\vdisplayName\x129\n" +
+	"\x06avatar\x18\x04 \x01(\v2\x1c.hawkr.common.v1alpha1.ImageB\x03\xe0A\x03R\x06avatar\"P\n" +
 	"\n" +
 	"Suspension\x12B\n" +
 	"\fsuspended_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\vsuspendedAt\"\x16\n" +
@@ -1377,11 +1653,20 @@ const file_hawkr_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"\rDeletionState\x12\x1e\n" +
 	"\x1aDELETION_STATE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16DELETION_STATE_DELETED\x10\x01\x12!\n" +
-	"\x1dDELETION_STATE_PENDING_ORDERS\x10\x02*?\n" +
+	"\x1dDELETION_STATE_PENDING_ORDERS\x10\x02\"s\n" +
+	"\fContactEmail\x12\x19\n" +
+	"\x05email\x18\x01 \x01(\tB\x03\xe0A\x03R\x05email\x12H\n" +
+	"\x06source\x18\x02 \x01(\x0e2+.hawkr.identity.v1alpha1.ContactEmailSourceB\x03\xe0A\x03R\x06source\"\x18\n" +
+	"\x16GetContactEmailRequest\"e\n" +
+	"\x17GetContactEmailResponse\x12J\n" +
+	"\rcontact_email\x18\x01 \x01(\v2%.hawkr.identity.v1alpha1.ContactEmailR\fcontactEmail\"3\n" +
+	"\x16SetContactEmailRequest\x12\x19\n" +
+	"\x05email\x18\x01 \x01(\tB\x03\xe0A\x02R\x05email\"e\n" +
+	"\x17SetContactEmailResponse\x12J\n" +
+	"\rcontact_email\x18\x01 \x01(\v2%.hawkr.identity.v1alpha1.ContactEmailR\fcontactEmail*-\n" +
 	"\x04Role\x12\x14\n" +
 	"\x10ROLE_UNSPECIFIED\x10\x00\x12\x0f\n" +
-	"\vROLE_SELLER\x10\x02\"\x04\b\x01\x10\x01*\n" +
-	"ROLE_BUYER*c\n" +
+	"\vROLE_SELLER\x10\x01*c\n" +
 	"\rLoginProvider\x12\x1e\n" +
 	"\x1aLOGIN_PROVIDER_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15LOGIN_PROVIDER_GOOGLE\x10\x01\x12\x17\n" +
@@ -1390,10 +1675,14 @@ const file_hawkr_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"ClientKind\x12\x1b\n" +
 	"\x17CLIENT_KIND_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fCLIENT_KIND_WEB\x10\x01\x12\x13\n" +
-	"\x0fCLIENT_KIND_APP\x10\x022\x8c\x02\n" +
+	"\x0fCLIENT_KIND_APP\x10\x02*\x84\x01\n" +
+	"\x12ContactEmailSource\x12$\n" +
+	" CONTACT_EMAIL_SOURCE_UNSPECIFIED\x10\x00\x12!\n" +
+	"\x1dCONTACT_EMAIL_SOURCE_VERIFIED\x10\x01\x12%\n" +
+	"!CONTACT_EMAIL_SOURCE_SELF_ENTERED\x10\x022\x8c\x02\n" +
 	"\x15IdentityPublicService\x12}\n" +
 	"\x12IssueAppLoginNonce\x122.hawkr.identity.v1alpha1.IssueAppLoginNonceRequest\x1a3.hawkr.identity.v1alpha1.IssueAppLoginNonceResponse\x12t\n" +
-	"\x0fExchangeIdToken\x12/.hawkr.identity.v1alpha1.ExchangeIdTokenRequest\x1a0.hawkr.identity.v1alpha1.ExchangeIdTokenResponse2\xa8\x06\n" +
+	"\x0fExchangeIdToken\x12/.hawkr.identity.v1alpha1.ExchangeIdTokenRequest\x1a0.hawkr.identity.v1alpha1.ExchangeIdTokenResponse2\x9e\b\n" +
 	"\x12IdentityAppService\x12j\n" +
 	"\n" +
 	"GetSession\x12*.hawkr.identity.v1alpha1.GetSessionRequest\x1a+.hawkr.identity.v1alpha1.GetSessionResponse\"\x03\x90\x02\x01\x12\\\n" +
@@ -1402,7 +1691,9 @@ const file_hawkr_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"\fListSessions\x12,.hawkr.identity.v1alpha1.ListSessionsRequest\x1a-.hawkr.identity.v1alpha1.ListSessionsResponse\"\x03\x90\x02\x01\x12\x88\x01\n" +
 	"\x14ListLinkedIdentities\x124.hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest\x1a5.hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse\"\x03\x90\x02\x01\x12n\n" +
 	"\rRevokeSession\x12-.hawkr.identity.v1alpha1.RevokeSessionRequest\x1a..hawkr.identity.v1alpha1.RevokeSessionResponse\x12n\n" +
-	"\rDeleteAccount\x12-.hawkr.identity.v1alpha1.DeleteAccountRequest\x1a..hawkr.identity.v1alpha1.DeleteAccountResponseB\x8d\x02\n" +
+	"\rDeleteAccount\x12-.hawkr.identity.v1alpha1.DeleteAccountRequest\x1a..hawkr.identity.v1alpha1.DeleteAccountResponse\x12y\n" +
+	"\x0fGetContactEmail\x12/.hawkr.identity.v1alpha1.GetContactEmailRequest\x1a0.hawkr.identity.v1alpha1.GetContactEmailResponse\"\x03\x90\x02\x01\x12y\n" +
+	"\x0fSetContactEmail\x12/.hawkr.identity.v1alpha1.SetContactEmailRequest\x1a0.hawkr.identity.v1alpha1.SetContactEmailResponse\"\x03\x90\x02\x02B\x8d\x02\n" +
 	"\x1bcom.hawkr.identity.v1alpha1B\rIdentityProtoP\x01Zagithub.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1;identityv1alpha1\xa2\x02\x03HIX\xaa\x02\x17Hawkr.Identity.V1alpha1\xca\x02\x17Hawkr\\Identity\\V1alpha1\xe2\x02#Hawkr\\Identity\\V1alpha1\\GPBMetadata\xea\x02\x19Hawkr::Identity::V1alpha1b\x06proto3"
 
 var (
@@ -1417,81 +1708,94 @@ func file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP() []byte {
 	return file_hawkr_identity_v1alpha1_identity_proto_rawDescData
 }
 
-var file_hawkr_identity_v1alpha1_identity_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_hawkr_identity_v1alpha1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_hawkr_identity_v1alpha1_identity_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_hawkr_identity_v1alpha1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_hawkr_identity_v1alpha1_identity_proto_goTypes = []any{
 	(Role)(0),                                // 0: hawkr.identity.v1alpha1.Role
 	(LoginProvider)(0),                       // 1: hawkr.identity.v1alpha1.LoginProvider
 	(ClientKind)(0),                          // 2: hawkr.identity.v1alpha1.ClientKind
-	(DeleteAccountResponse_DeletionState)(0), // 3: hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState
-	(*Account)(nil),                          // 4: hawkr.identity.v1alpha1.Account
-	(*IssueAppLoginNonceRequest)(nil),        // 5: hawkr.identity.v1alpha1.IssueAppLoginNonceRequest
-	(*IssueAppLoginNonceResponse)(nil),       // 6: hawkr.identity.v1alpha1.IssueAppLoginNonceResponse
-	(*ExchangeIdTokenRequest)(nil),           // 7: hawkr.identity.v1alpha1.ExchangeIdTokenRequest
-	(*ExchangeIdTokenResponse)(nil),          // 8: hawkr.identity.v1alpha1.ExchangeIdTokenResponse
-	(*SignOutRequest)(nil),                   // 9: hawkr.identity.v1alpha1.SignOutRequest
-	(*SignOutResponse)(nil),                  // 10: hawkr.identity.v1alpha1.SignOutResponse
-	(*LinkIdentityRequest)(nil),              // 11: hawkr.identity.v1alpha1.LinkIdentityRequest
-	(*LinkIdentityResponse)(nil),             // 12: hawkr.identity.v1alpha1.LinkIdentityResponse
-	(*ListSessionsRequest)(nil),              // 13: hawkr.identity.v1alpha1.ListSessionsRequest
-	(*ListSessionsResponse)(nil),             // 14: hawkr.identity.v1alpha1.ListSessionsResponse
-	(*ListLinkedIdentitiesRequest)(nil),      // 15: hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest
-	(*ListLinkedIdentitiesResponse)(nil),     // 16: hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse
-	(*LinkedIdentity)(nil),                   // 17: hawkr.identity.v1alpha1.LinkedIdentity
-	(*RevokeSessionRequest)(nil),             // 18: hawkr.identity.v1alpha1.RevokeSessionRequest
-	(*RevokeSessionResponse)(nil),            // 19: hawkr.identity.v1alpha1.RevokeSessionResponse
-	(*LoginSession)(nil),                     // 20: hawkr.identity.v1alpha1.LoginSession
-	(*GetSessionRequest)(nil),                // 21: hawkr.identity.v1alpha1.GetSessionRequest
-	(*GetSessionResponse)(nil),               // 22: hawkr.identity.v1alpha1.GetSessionResponse
-	(*Suspension)(nil),                       // 23: hawkr.identity.v1alpha1.Suspension
-	(*DeleteAccountRequest)(nil),             // 24: hawkr.identity.v1alpha1.DeleteAccountRequest
-	(*DeleteAccountResponse)(nil),            // 25: hawkr.identity.v1alpha1.DeleteAccountResponse
-	(*timestamppb.Timestamp)(nil),            // 26: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),              // 27: google.protobuf.Duration
-	(*v1alpha1.Image)(nil),                   // 28: hawkr.common.v1alpha1.Image
+	(ContactEmailSource)(0),                  // 3: hawkr.identity.v1alpha1.ContactEmailSource
+	(DeleteAccountResponse_DeletionState)(0), // 4: hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState
+	(*Account)(nil),                          // 5: hawkr.identity.v1alpha1.Account
+	(*IssueAppLoginNonceRequest)(nil),        // 6: hawkr.identity.v1alpha1.IssueAppLoginNonceRequest
+	(*IssueAppLoginNonceResponse)(nil),       // 7: hawkr.identity.v1alpha1.IssueAppLoginNonceResponse
+	(*ExchangeIdTokenRequest)(nil),           // 8: hawkr.identity.v1alpha1.ExchangeIdTokenRequest
+	(*ExchangeIdTokenResponse)(nil),          // 9: hawkr.identity.v1alpha1.ExchangeIdTokenResponse
+	(*SignOutRequest)(nil),                   // 10: hawkr.identity.v1alpha1.SignOutRequest
+	(*SignOutResponse)(nil),                  // 11: hawkr.identity.v1alpha1.SignOutResponse
+	(*LinkIdentityRequest)(nil),              // 12: hawkr.identity.v1alpha1.LinkIdentityRequest
+	(*LinkIdentityResponse)(nil),             // 13: hawkr.identity.v1alpha1.LinkIdentityResponse
+	(*ListSessionsRequest)(nil),              // 14: hawkr.identity.v1alpha1.ListSessionsRequest
+	(*ListSessionsResponse)(nil),             // 15: hawkr.identity.v1alpha1.ListSessionsResponse
+	(*ListLinkedIdentitiesRequest)(nil),      // 16: hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest
+	(*ListLinkedIdentitiesResponse)(nil),     // 17: hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse
+	(*LinkedIdentity)(nil),                   // 18: hawkr.identity.v1alpha1.LinkedIdentity
+	(*RevokeSessionRequest)(nil),             // 19: hawkr.identity.v1alpha1.RevokeSessionRequest
+	(*RevokeSessionResponse)(nil),            // 20: hawkr.identity.v1alpha1.RevokeSessionResponse
+	(*LoginSession)(nil),                     // 21: hawkr.identity.v1alpha1.LoginSession
+	(*GetSessionRequest)(nil),                // 22: hawkr.identity.v1alpha1.GetSessionRequest
+	(*GetSessionResponse)(nil),               // 23: hawkr.identity.v1alpha1.GetSessionResponse
+	(*Suspension)(nil),                       // 24: hawkr.identity.v1alpha1.Suspension
+	(*DeleteAccountRequest)(nil),             // 25: hawkr.identity.v1alpha1.DeleteAccountRequest
+	(*DeleteAccountResponse)(nil),            // 26: hawkr.identity.v1alpha1.DeleteAccountResponse
+	(*ContactEmail)(nil),                     // 27: hawkr.identity.v1alpha1.ContactEmail
+	(*GetContactEmailRequest)(nil),           // 28: hawkr.identity.v1alpha1.GetContactEmailRequest
+	(*GetContactEmailResponse)(nil),          // 29: hawkr.identity.v1alpha1.GetContactEmailResponse
+	(*SetContactEmailRequest)(nil),           // 30: hawkr.identity.v1alpha1.SetContactEmailRequest
+	(*SetContactEmailResponse)(nil),          // 31: hawkr.identity.v1alpha1.SetContactEmailResponse
+	(*timestamppb.Timestamp)(nil),            // 32: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),              // 33: google.protobuf.Duration
+	(*v1alpha1.Image)(nil),                   // 34: hawkr.common.v1alpha1.Image
 }
 var file_hawkr_identity_v1alpha1_identity_proto_depIdxs = []int32{
 	0,  // 0: hawkr.identity.v1alpha1.Account.roles:type_name -> hawkr.identity.v1alpha1.Role
-	26, // 1: hawkr.identity.v1alpha1.IssueAppLoginNonceResponse.expire_time:type_name -> google.protobuf.Timestamp
+	32, // 1: hawkr.identity.v1alpha1.IssueAppLoginNonceResponse.expire_time:type_name -> google.protobuf.Timestamp
 	1,  // 2: hawkr.identity.v1alpha1.ExchangeIdTokenRequest.provider:type_name -> hawkr.identity.v1alpha1.LoginProvider
-	26, // 3: hawkr.identity.v1alpha1.ExchangeIdTokenResponse.absolute_expire_time:type_name -> google.protobuf.Timestamp
-	27, // 4: hawkr.identity.v1alpha1.ExchangeIdTokenResponse.idle_timeout:type_name -> google.protobuf.Duration
+	32, // 3: hawkr.identity.v1alpha1.ExchangeIdTokenResponse.absolute_expire_time:type_name -> google.protobuf.Timestamp
+	33, // 4: hawkr.identity.v1alpha1.ExchangeIdTokenResponse.idle_timeout:type_name -> google.protobuf.Duration
 	1,  // 5: hawkr.identity.v1alpha1.LinkIdentityRequest.provider:type_name -> hawkr.identity.v1alpha1.LoginProvider
-	20, // 6: hawkr.identity.v1alpha1.ListSessionsResponse.sessions:type_name -> hawkr.identity.v1alpha1.LoginSession
-	17, // 7: hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse.identities:type_name -> hawkr.identity.v1alpha1.LinkedIdentity
+	21, // 6: hawkr.identity.v1alpha1.ListSessionsResponse.sessions:type_name -> hawkr.identity.v1alpha1.LoginSession
+	18, // 7: hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse.identities:type_name -> hawkr.identity.v1alpha1.LinkedIdentity
 	1,  // 8: hawkr.identity.v1alpha1.LinkedIdentity.provider:type_name -> hawkr.identity.v1alpha1.LoginProvider
-	26, // 9: hawkr.identity.v1alpha1.LinkedIdentity.link_time:type_name -> google.protobuf.Timestamp
+	32, // 9: hawkr.identity.v1alpha1.LinkedIdentity.link_time:type_name -> google.protobuf.Timestamp
 	2,  // 10: hawkr.identity.v1alpha1.LoginSession.client_kind:type_name -> hawkr.identity.v1alpha1.ClientKind
-	26, // 11: hawkr.identity.v1alpha1.LoginSession.create_time:type_name -> google.protobuf.Timestamp
-	26, // 12: hawkr.identity.v1alpha1.LoginSession.last_use_time:type_name -> google.protobuf.Timestamp
-	4,  // 13: hawkr.identity.v1alpha1.GetSessionResponse.account:type_name -> hawkr.identity.v1alpha1.Account
-	23, // 14: hawkr.identity.v1alpha1.GetSessionResponse.suspension:type_name -> hawkr.identity.v1alpha1.Suspension
-	28, // 15: hawkr.identity.v1alpha1.GetSessionResponse.avatar:type_name -> hawkr.common.v1alpha1.Image
-	26, // 16: hawkr.identity.v1alpha1.Suspension.suspended_at:type_name -> google.protobuf.Timestamp
-	3,  // 17: hawkr.identity.v1alpha1.DeleteAccountResponse.state:type_name -> hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState
-	5,  // 18: hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce:input_type -> hawkr.identity.v1alpha1.IssueAppLoginNonceRequest
-	7,  // 19: hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken:input_type -> hawkr.identity.v1alpha1.ExchangeIdTokenRequest
-	21, // 20: hawkr.identity.v1alpha1.IdentityAppService.GetSession:input_type -> hawkr.identity.v1alpha1.GetSessionRequest
-	9,  // 21: hawkr.identity.v1alpha1.IdentityAppService.SignOut:input_type -> hawkr.identity.v1alpha1.SignOutRequest
-	11, // 22: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:input_type -> hawkr.identity.v1alpha1.LinkIdentityRequest
-	13, // 23: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:input_type -> hawkr.identity.v1alpha1.ListSessionsRequest
-	15, // 24: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:input_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest
-	18, // 25: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:input_type -> hawkr.identity.v1alpha1.RevokeSessionRequest
-	24, // 26: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:input_type -> hawkr.identity.v1alpha1.DeleteAccountRequest
-	6,  // 27: hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce:output_type -> hawkr.identity.v1alpha1.IssueAppLoginNonceResponse
-	8,  // 28: hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken:output_type -> hawkr.identity.v1alpha1.ExchangeIdTokenResponse
-	22, // 29: hawkr.identity.v1alpha1.IdentityAppService.GetSession:output_type -> hawkr.identity.v1alpha1.GetSessionResponse
-	10, // 30: hawkr.identity.v1alpha1.IdentityAppService.SignOut:output_type -> hawkr.identity.v1alpha1.SignOutResponse
-	12, // 31: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:output_type -> hawkr.identity.v1alpha1.LinkIdentityResponse
-	14, // 32: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:output_type -> hawkr.identity.v1alpha1.ListSessionsResponse
-	16, // 33: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:output_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse
-	19, // 34: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:output_type -> hawkr.identity.v1alpha1.RevokeSessionResponse
-	25, // 35: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:output_type -> hawkr.identity.v1alpha1.DeleteAccountResponse
-	27, // [27:36] is the sub-list for method output_type
-	18, // [18:27] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	32, // 11: hawkr.identity.v1alpha1.LoginSession.create_time:type_name -> google.protobuf.Timestamp
+	32, // 12: hawkr.identity.v1alpha1.LoginSession.last_use_time:type_name -> google.protobuf.Timestamp
+	5,  // 13: hawkr.identity.v1alpha1.GetSessionResponse.account:type_name -> hawkr.identity.v1alpha1.Account
+	24, // 14: hawkr.identity.v1alpha1.GetSessionResponse.suspension:type_name -> hawkr.identity.v1alpha1.Suspension
+	34, // 15: hawkr.identity.v1alpha1.GetSessionResponse.avatar:type_name -> hawkr.common.v1alpha1.Image
+	32, // 16: hawkr.identity.v1alpha1.Suspension.suspended_at:type_name -> google.protobuf.Timestamp
+	4,  // 17: hawkr.identity.v1alpha1.DeleteAccountResponse.state:type_name -> hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState
+	3,  // 18: hawkr.identity.v1alpha1.ContactEmail.source:type_name -> hawkr.identity.v1alpha1.ContactEmailSource
+	27, // 19: hawkr.identity.v1alpha1.GetContactEmailResponse.contact_email:type_name -> hawkr.identity.v1alpha1.ContactEmail
+	27, // 20: hawkr.identity.v1alpha1.SetContactEmailResponse.contact_email:type_name -> hawkr.identity.v1alpha1.ContactEmail
+	6,  // 21: hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce:input_type -> hawkr.identity.v1alpha1.IssueAppLoginNonceRequest
+	8,  // 22: hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken:input_type -> hawkr.identity.v1alpha1.ExchangeIdTokenRequest
+	22, // 23: hawkr.identity.v1alpha1.IdentityAppService.GetSession:input_type -> hawkr.identity.v1alpha1.GetSessionRequest
+	10, // 24: hawkr.identity.v1alpha1.IdentityAppService.SignOut:input_type -> hawkr.identity.v1alpha1.SignOutRequest
+	12, // 25: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:input_type -> hawkr.identity.v1alpha1.LinkIdentityRequest
+	14, // 26: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:input_type -> hawkr.identity.v1alpha1.ListSessionsRequest
+	16, // 27: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:input_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest
+	19, // 28: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:input_type -> hawkr.identity.v1alpha1.RevokeSessionRequest
+	25, // 29: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:input_type -> hawkr.identity.v1alpha1.DeleteAccountRequest
+	28, // 30: hawkr.identity.v1alpha1.IdentityAppService.GetContactEmail:input_type -> hawkr.identity.v1alpha1.GetContactEmailRequest
+	30, // 31: hawkr.identity.v1alpha1.IdentityAppService.SetContactEmail:input_type -> hawkr.identity.v1alpha1.SetContactEmailRequest
+	7,  // 32: hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce:output_type -> hawkr.identity.v1alpha1.IssueAppLoginNonceResponse
+	9,  // 33: hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken:output_type -> hawkr.identity.v1alpha1.ExchangeIdTokenResponse
+	23, // 34: hawkr.identity.v1alpha1.IdentityAppService.GetSession:output_type -> hawkr.identity.v1alpha1.GetSessionResponse
+	11, // 35: hawkr.identity.v1alpha1.IdentityAppService.SignOut:output_type -> hawkr.identity.v1alpha1.SignOutResponse
+	13, // 36: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:output_type -> hawkr.identity.v1alpha1.LinkIdentityResponse
+	15, // 37: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:output_type -> hawkr.identity.v1alpha1.ListSessionsResponse
+	17, // 38: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:output_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse
+	20, // 39: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:output_type -> hawkr.identity.v1alpha1.RevokeSessionResponse
+	26, // 40: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:output_type -> hawkr.identity.v1alpha1.DeleteAccountResponse
+	29, // 41: hawkr.identity.v1alpha1.IdentityAppService.GetContactEmail:output_type -> hawkr.identity.v1alpha1.GetContactEmailResponse
+	31, // 42: hawkr.identity.v1alpha1.IdentityAppService.SetContactEmail:output_type -> hawkr.identity.v1alpha1.SetContactEmailResponse
+	32, // [32:43] is the sub-list for method output_type
+	21, // [21:32] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_identity_v1alpha1_identity_proto_init() }
@@ -1504,8 +1808,8 @@ func file_hawkr_identity_v1alpha1_identity_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_identity_v1alpha1_identity_proto_rawDesc), len(file_hawkr_identity_v1alpha1_identity_proto_rawDesc)),
-			NumEnums:      4,
-			NumMessages:   22,
+			NumEnums:      5,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

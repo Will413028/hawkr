@@ -101,7 +101,7 @@ Last updated: 2026-05-12
 
 | 頁面 | 目前內容 / 文案 | 建議文案設計 |
 | --- | --- | --- |
-| `/seller-center/dashboard` | H1 `賣家總覽`；今日待辦、快速操作、待處理訂單、認證/PayUni banner | Dashboard 文案要像工作台：今天要處理什麼、哪裡有風險、下一步 |
+| `/seller-center/dashboard` | H1 `賣家總覽`；今日待辦、快速操作、待處理訂單、認證/收款狀態 banner | Dashboard 文案要像工作台：今天要處理什麼、哪裡有風險、下一步 |
 | `/seller-center/products` | H1 `商品管理`；tabs：全部、上架中、下架、庫存不足、草稿；新增商品 | 商品管理要強化批次操作、狀態、缺資料提醒 |
 | `/seller-center/products/new`, `/edit` | H1 新增/編輯商品；區塊：基本資訊、商品標籤、圖片、SKU、配送與產地、認證、進階、上架狀態 | 商品表單文案應引導賣家寫好 PDP：品名、規格、產地、保存、配送、故事、特價 |
 | `/seller-center/inventory` | H1 `庫存管理`；監控庫存、安全預警、匯出 | 庫存頁要給「低於安全庫存」的下一步 |
@@ -117,8 +117,7 @@ Last updated: 2026-05-12
 | `/seller-center/coupons` | H1 `優惠券`；建立活動券、補償券、狀態、領取數 | 優惠券文案要明確：折多少、門檻、期限、適用商品 |
 | `/seller-center/coupons/new`, `/edit` | 建立/編輯優惠券；名稱、類型、金額/百分比、最低消費、上限、起訖時間 | 表單 hint 要防止誤設：百分比 1-99、時間、發行上限 |
 | `/seller-center/me` | H1 `商店設定`；商店資訊、進階設定 | 商店文案要變成公開商家頁的資料來源，欄位提示要說明會顯示在哪 |
-| `/seller-center/me/certifications` | H1 `商家認證`；公司資訊、身分證明、銀行帳戶、其他資訊、補充文件 | 認證頁文案要降低焦慮：為何需要、會如何保護、審核多久、哪裡會公開 |
-| `/seller-center/me/payuni` | H1 `PayUni 收款設定`；KYC 後才能收款、申請資料、已啟用狀態 | PayUni 文案要區分「Hawkr 認證」與「金流審核」 |
+| `/seller-center/me/certifications` | H1 `商家認證`；公司資訊、商家營運資訊、補充文件、收款帳戶 | 認證頁文案要降低焦慮：為何需要、會如何保護、審核多久、哪裡會公開 |
 | `/seller-center/me/shipping` | H1 `物流與退貨`；黑貓宅急便、7-11 店到店、認證 gate | 物流設定要清楚說明每種溫層、費用、適用商品、何時可用 |
 | `/seller-center/ai` | H1 `AI 工具`；即將推出；AI 商品文案、圖片美化、客服建議、行銷文案 | AI 頁目前是 roadmap，可保留但應標示 beta/可用功能入口 |
 

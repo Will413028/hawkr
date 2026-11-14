@@ -8,8 +8,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 )
 
@@ -28,8 +30,18 @@ func modules() []migrate.Module {
 		{Name: "agent", Dir: agent.Migrations()},
 		{Name: "discovery", Dir: discovery.Migrations()},
 		{Name: "social", Dir: social.Migrations()},
+		{Name: "payment", Dir: payment.Migrations()},
 	}
 }
+
+// platformData 是 platform 擁有 schema 的套件（Stripe 計畫 D29 的 webhook inbox）：不是模組，desired state 與 migration 在套件的 db/
+// （platformDirs），migrate 時先於模組套用。
+func platformData() []migrate.Module {
+	return []migrate.Module{{Name: inbox.Schema, Dir: inbox.Migrations()}}
+}
+
+// migrations 是 migrate 套用的全部：platform 的 schema 先，模組依 modules() 的順序。
+func migrations() []migrate.Module { return append(platformData(), modules()...) }
 
 // apiOnly 是只有公開 API、實作還在舊服務的模組：由 internal/legacy 的暫時實作在組裝點
 // 接線，沒有自己的 schema。實作搬進單體時，從這裡移到 modules()。
@@ -40,6 +52,6 @@ var apiOnly = []string{
 // withoutData 是已在單體裡、但沒有自己資料的模組：不建 schema、沒有 migration（backend/AGENTS.md 規則 6），
 // sqlc 只讀依賴表允許的 pub.sql。第一次要存自己的資料時，建 schema 與 migration，從這裡移到 modules()。
 var withoutData = []string{
-	"reviewqueue",       // 待辦由各來源模組的資料推導，讀 seller 發布的 pub_review_items
+	"reviewqueue",       // 待辦由各來源模組的資料推導，讀 seller 與 payment 發布的 pub_review_items
 	"accountsuspension", // 停權紀錄在 identity，這個模組只編排：鎖帳號、確認沒有店家、呼叫 identity、發事件
 }

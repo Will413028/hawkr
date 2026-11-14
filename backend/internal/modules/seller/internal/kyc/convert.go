@@ -16,48 +16,24 @@ func dateText(d *time.Time) *string {
 	return &s
 }
 
-// toApplication 把儲存的列轉成遮蔽檢視：解密身分證號與銀行帳號只為了遮蔽，明文不離開這個函式，回傳的型別也沒有欄位
-// 可以放它（盤點 D2、D3 的回歸：遮蔽發生在型別轉換，不靠逐欄記得遮）。
-func (p protector) toApplication(row store.SellerKycApplication, accountID int64) (model.KYCApplication, error) {
-	out := model.KYCApplication{
+// toApplication 把儲存的列轉成檢視：型別沒有欄位能放身分證號、銀行帳號與個人姓名（Stripe 計畫 D22、D37），申請的列也沒有這些欄位。
+func toApplication(row store.SellerKycApplication, accountID int64) model.KYCApplication {
+	return model.KYCApplication{
 		ID: row.ApplicationID, StoreID: row.StoreID, AccountID: accountID, Status: model.KYCStatus(row.Status),
 		Version: row.Version, SellerType: model.KYCSellerType(row.SellerType),
-		RealName: row.RealName, BirthDate: dateText(row.BirthDate), IDCardIssueDate: dateText(row.IDCardIssueDate),
-		IDCardIssueType: row.IDCardIssueType, IDCardIssueLocation: row.IDCardIssueLocation, EnglishName: row.EnglishName,
-		BankName: row.BankName, BankCode: row.BankCode, ProductType: row.ProductType,
-		WebsiteURL:  row.WebsiteUrl,
+		ProductType: row.ProductType, WebsiteURL: row.WebsiteUrl,
 		CompanyName: row.CompanyName, TaxID: row.TaxID,
 		CompanyRegisterDate: dateText(row.CompanyRegisterDate), CompanyTownCode: row.CompanyTownCode,
 		CompanyAddressDetail: row.CompanyAddressDetail, CompanyPhone: row.CompanyPhone,
 		SubmittedAt: row.SubmittedAt, DecidedAt: row.DecidedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}
-	for _, field := range []struct {
-		column string
-		enc    []byte
-		mask   func(string) string
-		dst    **string
-	}{
-		{colIDCardNo, row.IDCardNoEnc, model.MaskIDCardNo, &out.IDCardNoMasked},
-		{colRepIDCardNo, row.RepIDCardNoEnc, model.MaskIDCardNo, &out.RepIDCardNoMasked},
-		{colBankAccount, row.BankAccountEnc, model.MaskBankAccount, &out.BankAccountMasked},
-	} {
-		plain, err := p.open(row.ApplicationID, field.column, field.enc)
-		if err != nil {
-			return model.KYCApplication{}, err
-		}
-		if plain != nil {
-			masked := field.mask(*plain)
-			*field.dst = &masked
-		}
-	}
-	return out, nil
 }
 
 func toDocuments(rows []store.SellerKycDocument) []model.KYCDocument {
 	out := make([]model.KYCDocument, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, model.KYCDocument{
-			Slot: model.KYCDocumentSlot(row.Slot), Position: int(row.Position), AssetID: row.AssetID, ObjectKey: row.ObjectKey,
+			Position: int(row.Position), AssetID: row.AssetID, ObjectKey: row.ObjectKey,
 		})
 	}
 	return out
@@ -84,17 +60,9 @@ func lastRejection(reviews []store.SellerKycReview, issues map[uuid.UUID][]model
 func insertParams(r store.SellerKycApplication, now time.Time) store.InsertKYCApplicationParams {
 	return store.InsertKYCApplicationParams{
 		ApplicationID: r.ApplicationID, StoreID: r.StoreID, SellerType: r.SellerType,
-		RealName: r.RealName, BirthDate: r.BirthDate,
-		IDCardNoEnc: r.IDCardNoEnc, IDCardHash: r.IDCardHash, IDCardHashKey: r.IDCardHashKey,
-		IDCardIssueDate: r.IDCardIssueDate, IDCardIssueType: r.IDCardIssueType, IDCardIssueLocation: r.IDCardIssueLocation,
-		EnglishName: r.EnglishName, BankName: r.BankName, BankCode: r.BankCode,
-		BankAccountEnc: r.BankAccountEnc, BankAccountHash: r.BankAccountHash, BankAccountHashKey: r.BankAccountHashKey,
-		ProductType: r.ProductType,
-		WebsiteUrl:  r.WebsiteUrl,
-		CompanyName: r.CompanyName, TaxID: r.TaxID, TaxIDHash: r.TaxIDHash,
-		TaxIDHashKey: r.TaxIDHashKey, CompanyRegisterDate: r.CompanyRegisterDate, CompanyTownCode: r.CompanyTownCode,
+		ProductType: r.ProductType, WebsiteUrl: r.WebsiteUrl,
+		CompanyName: r.CompanyName, TaxID: r.TaxID, CompanyRegisterDate: r.CompanyRegisterDate, CompanyTownCode: r.CompanyTownCode,
 		CompanyAddressDetail: r.CompanyAddressDetail, CompanyPhone: r.CompanyPhone,
-		RepIDCardNoEnc: r.RepIDCardNoEnc, RepIDCardHash: r.RepIDCardHash, RepIDCardHashKey: r.RepIDCardHashKey,
 		Now: now,
 	}
 }
@@ -102,17 +70,9 @@ func insertParams(r store.SellerKycApplication, now time.Time) store.InsertKYCAp
 func updateParams(r store.SellerKycApplication, expectedVersion int64, now time.Time) store.UpdateKYCDraftParams {
 	return store.UpdateKYCDraftParams{
 		ApplicationID: r.ApplicationID, ExpectedVersion: expectedVersion, SellerType: r.SellerType,
-		RealName: r.RealName, BirthDate: r.BirthDate,
-		IDCardNoEnc: r.IDCardNoEnc, IDCardHash: r.IDCardHash, IDCardHashKey: r.IDCardHashKey,
-		IDCardIssueDate: r.IDCardIssueDate, IDCardIssueType: r.IDCardIssueType, IDCardIssueLocation: r.IDCardIssueLocation,
-		EnglishName: r.EnglishName, BankName: r.BankName, BankCode: r.BankCode,
-		BankAccountEnc: r.BankAccountEnc, BankAccountHash: r.BankAccountHash, BankAccountHashKey: r.BankAccountHashKey,
-		ProductType: r.ProductType,
-		WebsiteUrl:  r.WebsiteUrl,
-		CompanyName: r.CompanyName, TaxID: r.TaxID, TaxIDHash: r.TaxIDHash,
-		TaxIDHashKey: r.TaxIDHashKey, CompanyRegisterDate: r.CompanyRegisterDate, CompanyTownCode: r.CompanyTownCode,
+		ProductType: r.ProductType, WebsiteUrl: r.WebsiteUrl,
+		CompanyName: r.CompanyName, TaxID: r.TaxID, CompanyRegisterDate: r.CompanyRegisterDate, CompanyTownCode: r.CompanyTownCode,
 		CompanyAddressDetail: r.CompanyAddressDetail, CompanyPhone: r.CompanyPhone,
-		RepIDCardNoEnc: r.RepIDCardNoEnc, RepIDCardHash: r.RepIDCardHash, RepIDCardHashKey: r.RepIDCardHashKey,
 		Now: now,
 	}
 }
