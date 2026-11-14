@@ -30,7 +30,6 @@ import '../../seller/data/onboarding_summary.dart';
 import '../../seller/data/payment_account.dart';
 import '../../seller/data/payment_onboarding.dart';
 import '../../seller/data/seller_status_refresh.dart';
-import '../../seller/presentation/payment_account_action.dart';
 import '../../seller/presentation/seller_certification_gate.dart'
     show
         certificationGateConfirmText,
@@ -264,10 +263,10 @@ class _CertificationGate extends ConsumerWidget {
   }
 }
 
-/// 收款帳戶的狀態面板（唯讀）：標題是共用文案目錄（`payment.PaymentAccountStatus`）的狀態徽章文字，說明句與按鈕只讀開通摘要的
-/// 收款帳戶任務（[task]）：開始開通在外部瀏覽器開連結，聯絡客服去客服頁，沒有下一步或不認得的動作沒有按鈕。不顯示金流商的
+/// 收款帳戶的狀態面板（唯讀）：標題是共用文案目錄（`payment.PaymentAccountStatus`）的狀態徽章文字，說明句是開通摘要的
+/// 收款帳戶任務（[task]）的句子。與 website 的錢包面板相同，不讀任務的動作，只導向認證畫面，下一步在那裡。不顯示金流商的
 /// 待補條件細項（金流商自己的頁面會列出要補什麼）。
-class _PaymentAccountPanel extends HookConsumerWidget {
+class _PaymentAccountPanel extends ConsumerWidget {
   const _PaymentAccountPanel({required this.account, required this.task});
 
   final PaymentAccount account;
@@ -275,8 +274,6 @@ class _PaymentAccountPanel extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // hook 要在任何提早 return 之前呼叫，狀態在認得與不認得之間變動時進行中的動作才不會被重置。
-    final actions = usePaymentAccountActions(context, ref);
     final l = context.uiLocale;
     final tone = paymentAccountTone(account.status);
     final title = account.status.uiText(l);
@@ -291,8 +288,6 @@ class _PaymentAccountPanel extends HookConsumerWidget {
     }
     final alert = tone == HkStatusTone.warning || tone == HkStatusTone.danger;
     final sentence = task?.status.message ?? '';
-    final action = task?.action;
-    final label = action?.button(l);
     return HkContentCard(
       key: const ValueKey('wallet-payment-panel'),
       elevated: true,
@@ -317,15 +312,11 @@ class _PaymentAccountPanel extends HookConsumerWidget {
               ),
             ),
           ],
-          if (action != null &&
-              label != null &&
-              paymentAccountActionHasButton(action)) ...[
-            const SizedBox(height: HkSpace.md),
-            OutlinedButton(
-              onPressed: actions.busy ? null : () => actions.run(action),
-              child: HkButtonLabel(label),
-            ),
-          ],
+          const SizedBox(height: HkSpace.md),
+          OutlinedButton(
+            onPressed: () => _openKycWizard(context, ref),
+            child: const HkButtonLabel(certificationGateConfirmText),
+          ),
         ],
       ),
     );

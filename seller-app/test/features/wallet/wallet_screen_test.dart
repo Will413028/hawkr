@@ -66,7 +66,6 @@ class _Server {
   late final FakeMyStoreServer store;
   Completer<void>? kycGate;
   Completer<void>? summaryGate;
-  Completer<void>? launchGate;
 
   /// `GetMyOnboarding` 的回應：[GetMyOnboardingResponse] 或例外；null 時照目前的申請與收款帳戶推出一份同義的摘要
   /// （核准且收款帳戶 ENABLED 是全部完成，核准但帳戶還沒啟用是收款帳戶待開通，其餘是平台審核還沒完成）。
@@ -189,8 +188,6 @@ List<Override> _overrides(_Server server) => [
   couponListControllerProvider.overrideWith(_CouponFixture.new),
   externalBrowserLauncherProvider.overrideWithValue((uri) async {
     server.launched.add(uri);
-    final gate = server.launchGate;
-    if (gate != null) await gate.future;
     return true;
   }),
 ];
@@ -646,7 +643,7 @@ void main() {
   });
 
   group('收款帳戶狀態面板', () {
-    testWidgets('待設定：徽章讀帳戶狀態，說明句與按鈕讀任務；新帳戶不說逾期或停用，按鈕開始開通（與認證狀態畫面同一個動作）', (
+    testWidgets('待設定：徽章讀帳戶狀態，說明句讀任務；新帳戶不說逾期或停用，任務的動作是開始開通時面板也只導向認證畫面', (
       tester,
     ) async {
       final server = _Server(
@@ -672,12 +669,10 @@ void main() {
       expect(find.textContaining('停用'), findsNothing);
       expect(find.text('尚未通過商家認證'), findsNothing);
 
-      await _tap(tester, find.text('前往設定收款帳戶'));
-      expect(find.text('wizard:null'), findsNothing);
-      expect(
-        server.launched.single.toString(),
-        'https://connect.example.test/setup',
-      );
+      expect(find.text('前往設定收款帳戶'), findsNothing);
+      await _tap(tester, find.widgetWithText(OutlinedButton, '前往商家認證'));
+      expect(find.text('wizard:null'), findsOneWidget);
+      expect(server.launched, isEmpty);
     });
 
     testWidgets('平台審核完成、讀不到收款帳戶（not_found）：照 website 顯示認證閘門，不自己當成「準備中」', (
@@ -690,7 +685,7 @@ void main() {
       expect(find.byKey(const Key('wallet-payment-panel')), findsNothing);
     });
 
-    testWidgets('進行中的帳戶（任務 NONE）：沒有任何按鈕，也沒有「重新整理」', (tester) async {
+    testWidgets('進行中的帳戶（任務 NONE）：只有前往商家認證，沒有「重新整理」', (tester) async {
       final server = _Server(
         certified: false,
         payment: _account(
@@ -705,10 +700,11 @@ void main() {
       );
       expect(find.text('審核中'), findsOneWidget);
       expect(find.text('重新整理'), findsNothing);
-      expect(find.byType(OutlinedButton), findsNothing);
+      expect(find.widgetWithText(OutlinedButton, '前往商家認證'), findsOneWidget);
+      expect(find.byType(OutlinedButton), findsOneWidget);
     });
 
-    testWidgets('帳戶狀態與任務不一致：帳戶 ACTION_REQUIRED 但任務 NONE，沒有按鈕', (tester) async {
+    testWidgets('帳戶狀態與任務不一致：帳戶 ACTION_REQUIRED 但任務 NONE，按鈕不變', (tester) async {
       final server =
           _Server(
               certified: false,
@@ -732,7 +728,8 @@ void main() {
 
       expect(find.text('待設定'), findsOneWidget);
       expect(find.text('前往設定收款帳戶'), findsNothing);
-      expect(find.byType(OutlinedButton), findsNothing);
+      expect(find.widgetWithText(OutlinedButton, '前往商家認證'), findsOneWidget);
+      expect(find.byType(OutlinedButton), findsOneWidget);
     });
 
     testWidgets('審核中：說明句是任務的', (tester) async {
@@ -747,15 +744,17 @@ void main() {
       expect(find.text('伺服器說審核中'), findsOneWidget);
     });
 
-    testWidgets('無法啟用：動作是聯絡客服，進幫助中心', (tester) async {
+    testWidgets('無法啟用：任務的動作是聯絡客服時面板也只導向認證畫面', (tester) async {
       final server = _Server(
         payment: _account(PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED),
         certified: false,
       );
       await _pump(tester, server);
       expect(find.text('無法啟用'), findsOneWidget);
-      await _tap(tester, find.text('聯絡客服'));
-      expect(find.text('help'), findsOneWidget);
+      expect(find.text('聯絡客服'), findsNothing);
+      await _tap(tester, find.widgetWithText(OutlinedButton, '前往商家認證'));
+      expect(find.text('wizard:null'), findsOneWidget);
+      expect(find.text('help'), findsNothing);
     });
 
     testWidgets('不認得的狀態（UNSPECIFIED）：顯示重試，不當成任何有效狀態', (tester) async {
@@ -765,18 +764,15 @@ void main() {
       expect(find.byKey(const ValueKey('wallet-payment-panel')), findsNothing);
     });
 
-    testWidgets('同一個面板經過不認得的狀態再回到認得的狀態：不丟例外，進行中的動作仍停用按鈕', (tester) async {
+    testWidgets('同一個面板經過不認得的狀態再回到認得的狀態：不丟例外，按鈕回來', (tester) async {
       final recognised = PaymentAccount(
         status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED,
         onboardingSurface: OnboardingSurface.ONBOARDING_SURFACE_HOSTED,
       );
-      final server = _Server(payment: recognised, certified: false)
-        ..launchGate = Completer<void>();
+      final server = _Server(payment: recognised, certified: false);
       await _pump(tester, server);
-      final button = find.widgetWithText(OutlinedButton, '前往設定收款帳戶');
-      await tester.tap(button);
-      await _settle(tester);
-      expect(tester.widget<OutlinedButton>(button).onPressed, isNull);
+      final button = find.widgetWithText(OutlinedButton, '前往商家認證');
+      expect(button, findsOneWidget);
 
       Future<void> resumeWith(PaymentAccount next) async {
         server.payment = next;
@@ -788,12 +784,10 @@ void main() {
 
       await resumeWith(PaymentAccount());
       expect(find.text('無法載入認證狀態'), findsOneWidget);
+      expect(button, findsNothing);
       await resumeWith(recognised);
       expect(tester.takeException(), isNull);
-      expect(tester.widget<OutlinedButton>(button).onPressed, isNull);
-      server.launchGate!.complete();
-      await _settle(tester);
-      expect(tester.widget<OutlinedButton>(button).onPressed, isNotNull);
+      expect(button, findsOneWidget);
     });
 
     testWidgets('已啟用：沒有面板，也沒有 PayUni 的前往提領', (tester) async {
