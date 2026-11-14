@@ -33,6 +33,54 @@
     "common.StoreCardStatus.STORE_CARD_STATUS_PAUSED": {
       "message": "Temporarily closed"
     },
+    "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
+      "message": "Setup needed"
+    },
+    "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED": {
+      "message": "Unavailable"
+    },
+    "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED": {
+      "message": "Active"
+    },
+    "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
+      "message": "Preparing"
+    },
+    "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
+      "message": "Under review"
+    },
+    "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
+      "message": "Go to payout account setup"
+    },
+    "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED": {
+      "message": "Contact support"
+    },
+    "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
+      "message": "Refresh"
+    },
+    "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
+      "message": "Refresh"
+    },
+    "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
+      "message": "Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it."
+    },
+    "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_DISABLED": {
+      "message": "The payment provider cannot enable your payout account right now. Please contact support."
+    },
+    "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED": {
+      "message": "Payments are enabled."
+    },
+    "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
+      "message": "We are setting up your payout account. This usually takes a few minutes."
+    },
+    "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
+      "message": "The payment provider is reviewing your information. No action is needed."
+    },
+    "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM": {
+      "message": "Embedded on platform"
+    },
+    "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": {
+      "message": "Provider-hosted"
+    },
     "seller.KYCApplication.decide_time": {
       "message": "Approved at: {time}"
     },
@@ -107,54 +155,6 @@
     },
     "seller.PaymentAccount.payouts_inactive_note": {
       "message": "Payouts to your bank account are not enabled yet. The payment provider may ask you for more information."
-    },
-    "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
-      "message": "Setup needed"
-    },
-    "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED": {
-      "message": "Unavailable"
-    },
-    "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED": {
-      "message": "Active"
-    },
-    "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
-      "message": "Preparing"
-    },
-    "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
-      "message": "Under review"
-    },
-    "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
-      "message": "Go to payout account setup"
-    },
-    "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED": {
-      "message": "Contact support"
-    },
-    "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
-      "message": "Refresh"
-    },
-    "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
-      "message": "Refresh"
-    },
-    "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
-      "message": "Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it."
-    },
-    "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_DISABLED": {
-      "message": "The payment provider cannot enable your payout account right now. Please contact support."
-    },
-    "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED": {
-      "message": "Payments are enabled."
-    },
-    "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
-      "message": "We are setting up your payout account. This usually takes a few minutes."
-    },
-    "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
-      "message": "The payment provider is reviewing your information. No action is needed."
-    },
-    "seller.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM": {
-      "message": "Embedded on platform"
-    },
-    "seller.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": {
-      "message": "Provider-hosted"
     },
     "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE": {
       "message": "Platform review and payout account both completed"

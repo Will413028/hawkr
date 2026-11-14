@@ -1,23 +1,25 @@
 /**
  * 收款帳戶（`GetMyPaymentAccount`、`CreatePaymentOnboardingSession`）的資料層與呈現。
  *
- * 狀態、說明與動作的文字全部取自共用文案目錄（`seller.PaymentAccountStatus`），這裡只有版面：色調與「哪個狀態
+ * 狀態、說明與動作的文字全部取自共用文案目錄（`payment.PaymentAccountStatus`），這裡只有版面：色調與「哪個狀態
  * 能開始開通」。沒有「值 → 文字」的表。沒有帳戶（平台審核還沒核准）時 `GetMyPaymentAccount` 回 not_found，
  * 那是 null，不是錯誤。
  */
 
 import { Code, ConnectError } from "@connectrpc/connect";
 import {
-	type GetMyOnboardingResponse,
 	OnboardingSurface,
-	type PaymentAccount,
 	PaymentAccountStatus,
+} from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+import type {
+	GetMyOnboardingResponse,
+	PaymentAccount,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import {
+	paymentPaymentAccountStatus,
+	paymentPaymentAccountStatusAction,
+	paymentPaymentAccountStatusDescription,
 	sellerPaymentAccountPayoutsInactiveNote,
-	sellerPaymentAccountStatus,
-	sellerPaymentAccountStatusAction,
-	sellerPaymentAccountStatusDescription,
 } from "@hawkr/ui-text/keys";
 import { sellerAppClient } from "../connect/seller";
 import { optionalText, type UiText } from "../i18n/ui-text";
@@ -107,12 +109,12 @@ export function paymentAccountCopy(
 	account: PaymentAccount,
 ): PaymentAccountCopy {
 	return {
-		badge: optionalText(ut, sellerPaymentAccountStatus(account.status)),
+		badge: optionalText(ut, paymentPaymentAccountStatus(account.status)),
 		description: optionalText(
 			ut,
-			sellerPaymentAccountStatusDescription(account.status),
+			paymentPaymentAccountStatusDescription(account.status),
 		),
-		action: optionalText(ut, sellerPaymentAccountStatusAction(account.status)),
+		action: optionalText(ut, paymentPaymentAccountStatusAction(account.status)),
 		payoutsNote:
 			account.status === PaymentAccountStatus.ENABLED && !account.payoutsActive
 				? ut(sellerPaymentAccountPayoutsInactiveNote())

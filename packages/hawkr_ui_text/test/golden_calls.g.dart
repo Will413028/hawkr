@@ -7,6 +7,7 @@ import 'package:connectrpc/connect.dart' show Code;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
@@ -184,6 +185,14 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return commonErrorText(_codes[value]!, l);
     case 'common.unknown':
       return commonUnknown(l);
+    case 'payment.PaymentAccountStatus':
+      return hawkr_payment_v1alpha1_payment.PaymentAccountStatus.valueOf(_n(value))!.uiText(l);
+    case 'payment.PaymentAccountStatus.action':
+      return hawkr_payment_v1alpha1_payment.PaymentAccountStatus.valueOf(_n(value))!.action(l);
+    case 'payment.PaymentAccountStatus.description':
+      return hawkr_payment_v1alpha1_payment.PaymentAccountStatus.valueOf(_n(value))!.description(l);
+    case 'payment.RequirementCollection':
+      return hawkr_payment_v1alpha1_payment.RequirementCollection.valueOf(_n(value))!.uiText(l);
     case 'seller.ContentKind':
       return hawkr_seller_v1alpha1_seller.ContentKind.valueOf(_n(value))!.uiText(l);
     case 'seller.KYCApplication.decide_time':
@@ -248,14 +257,6 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_seller_v1alpha1_seller.OnboardingTaskId.valueOf(_n(value))!.panelTitle(l);
     case 'seller.PaymentAccount.payouts_inactive_note':
       return sellerPaymentAccountPayoutsInactiveNote(l);
-    case 'seller.PaymentAccountStatus':
-      return hawkr_seller_v1alpha1_seller.PaymentAccountStatus.valueOf(_n(value))!.uiText(l);
-    case 'seller.PaymentAccountStatus.action':
-      return hawkr_seller_v1alpha1_seller.PaymentAccountStatus.valueOf(_n(value))!.action(l);
-    case 'seller.PaymentAccountStatus.description':
-      return hawkr_seller_v1alpha1_seller.PaymentAccountStatus.valueOf(_n(value))!.description(l);
-    case 'seller.RequirementCollection':
-      return hawkr_seller_v1alpha1_seller.RequirementCollection.valueOf(_n(value))!.uiText(l);
     case 'seller.RevokeReason':
       return hawkr_seller_v1alpha1_seller.RevokeReason.valueOf(_n(value))!.uiText(l);
     case 'seller.RiskGround':

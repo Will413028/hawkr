@@ -8,7 +8,7 @@ import { PaymentAccountSchema } from "@hawkr/api/gen/hawkr/admin/payment/v1alpha
 import {
 	PaymentAccountStatus,
 	RequirementCollection,
-} from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+} from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 
 /**
  * 商家詳情的收款帳戶卡（PaymentAccountCard）實際渲染出來的 HTML。

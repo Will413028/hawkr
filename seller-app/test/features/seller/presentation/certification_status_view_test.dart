@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart';

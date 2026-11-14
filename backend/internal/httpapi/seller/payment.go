@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	paymentpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	httppayment "github.com/Will413028/hawkr/backend/internal/httpapi/payment"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -68,13 +69,13 @@ func (h *App) GetMyPaymentAccount(ctx context.Context, _ *connect.Request[pb.Get
 		return nil, err
 	}
 	out := &pb.PaymentAccount{
-		Status:                rpc.EnumToProto[pb.PaymentAccountStatus](acct.Status),
-		RequirementCollection: rpc.EnumToProto[pb.RequirementCollection](acct.RequirementCollection),
+		Status:                rpc.EnumToProto[paymentpb.PaymentAccountStatus](acct.Status),
+		RequirementCollection: rpc.EnumToProto[paymentpb.RequirementCollection](acct.RequirementCollection),
 		TransfersActive:       acct.TransfersActive, PayoutsActive: acct.PayoutsActive,
 		Requirements: httppayment.Requirements(acct.Requirements), FetchTime: optTimestamp(acct.FetchedAt),
 	}
 	if caps, ok := h.payments.Capabilities(); ok {
-		out.OnboardingSurface = rpc.EnumToProto[pb.OnboardingSurface](caps.OnboardingSurface)
+		out.OnboardingSurface = rpc.EnumToProto[paymentpb.OnboardingSurface](caps.OnboardingSurface)
 	}
 	return connect.NewResponse(&pb.GetMyPaymentAccountResponse{Account: out}), nil
 }
@@ -96,7 +97,7 @@ func (h *App) CreatePaymentOnboardingSession(ctx context.Context, req *connect.R
 		return nil, err
 	}
 	return connect.NewResponse(&pb.CreatePaymentOnboardingSessionResponse{
-		Surface: rpc.EnumToProto[pb.OnboardingSurface](session.Surface), Url: session.URL, ClientSecret: session.ClientSecret,
+		Surface: rpc.EnumToProto[paymentpb.OnboardingSurface](session.Surface), Url: session.URL, ClientSecret: session.ClientSecret,
 		ExpireTime: optTimestamp(session.ExpiresAt),
 	}), nil
 }

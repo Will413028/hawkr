@@ -13,6 +13,7 @@ import "hawkr/common/v1alpha1/image.proto";
 import "hawkr/common/v1alpha1/policy_category.proto";
 import "hawkr/common/v1alpha1/postal_address.proto";
 import "hawkr/common/v1alpha1/store_card.proto";
+import "hawkr/payment/v1alpha1/payment.proto";
 import "google/api/field_behavior.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/field_mask.proto";
@@ -840,45 +841,12 @@ message SaveKYCDraftResponse {
   KYCApplication application = 1;
 }
 
-// PaymentAccountStatus 是收款帳戶的中立狀態，由金流商的轉帳能力推導（不是金流商自己的狀態名）。
-enum PaymentAccountStatus {
-  PAYMENT_ACCOUNT_STATUS_UNSPECIFIED = 0;
-  // 平台已核准，外部帳戶還在建立（背景程序處理，失敗時進後台待辦）。
-  PAYMENT_ACCOUNT_STATUS_NOT_CREATED = 1;
-  // 轉帳能力還沒啟用，等金流商審核，賣家沒有要做的事。
-  PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW = 2;
-  // 賣家要補資料（包含新帳戶尚未開通）：重新取得開通 session 完成。
-  PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED = 3;
-  // 轉帳能力已啟用；平台審核同時核准時，店家通過開通閘門（SELLER_REQUIREMENT_ONBOARDING_COMPLETE）。
-  PAYMENT_ACCOUNT_STATUS_ENABLED = 4;
-  // 被金流商拒絕、不支援或限制，賣家補件解不開，要由平台或金流商處理。
-  PAYMENT_ACCOUNT_STATUS_DISABLED = 5;
-}
-
-// RequirementCollection 是誰向賣家收身分與銀行資料。
-enum RequirementCollection {
-  REQUIREMENT_COLLECTION_UNSPECIFIED = 0;
-  // 金流商收件（託管頁面為預設）：平台不經手身分與銀行資料。
-  REQUIREMENT_COLLECTION_PROVIDER = 1;
-  // 平台收件（金流商的內嵌元件）：資料在網頁上由元件直接送給金流商。
-  REQUIREMENT_COLLECTION_PLATFORM = 2;
-}
-
-// OnboardingSurface 是開通用的介面。
-enum OnboardingSurface {
-  ONBOARDING_SURFACE_UNSPECIFIED = 0;
-  // 金流商託管的頁面（連結）。
-  ONBOARDING_SURFACE_HOSTED = 1;
-  // 嵌在網頁上的元件（client secret）。
-  ONBOARDING_SURFACE_EMBEDDED = 2;
-}
-
 // PaymentAccount 是賣家看到的收款帳戶。
 message PaymentAccount {
-  PaymentAccountStatus status = 1;
-  RequirementCollection requirement_collection = 2;
+  hawkr.payment.v1alpha1.PaymentAccountStatus status = 1;
+  hawkr.payment.v1alpha1.RequirementCollection requirement_collection = 2;
   // 目前設定的 provider 用哪種介面開通；沒有設定收款開通時是 UNSPECIFIED。
-  OnboardingSurface onboarding_surface = 3;
+  hawkr.payment.v1alpha1.OnboardingSurface onboarding_surface = 3;
   // 轉帳能力是否啟用（開通閘門的輸入）。
   bool transfers_active = 4;
   // 撥款能力是否啟用。
@@ -903,7 +871,7 @@ message CreatePaymentOnboardingSessionRequest {
 }
 
 message CreatePaymentOnboardingSessionResponse {
-  OnboardingSurface surface = 1;
+  hawkr.payment.v1alpha1.OnboardingSurface surface = 1;
   // surface 是 HOSTED 時的開通連結（一次性、短效）。
   string url = 2;
   // surface 是 EMBEDDED 時，初始化內嵌元件用的 client secret；只給這個賣家的瀏覽器，不記錄。

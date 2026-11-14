@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
-import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart';
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:url_launcher/url_launcher.dart';
 

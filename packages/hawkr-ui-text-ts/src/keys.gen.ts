@@ -3,7 +3,8 @@ import { Code } from "@connectrpc/connect";
 import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
-import type { ContentKind, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, PaymentAccountStatus, RequirementCollection, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import type { PaymentAccountStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+import type { ContentKind, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { UiMessage } from "./message";
 
 export type { DefaultErrorText, UiMessage } from "./message";
@@ -49,6 +50,22 @@ export type UiTextKey =
 	| "common.error.UNIMPLEMENTED"
 	| "common.error.UNKNOWN"
 	| "common.unknown"
+	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
+	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED"
+	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED"
+	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED"
+	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
+	| "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
+	| "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED"
+	| "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_NOT_CREATED"
+	| "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
+	| "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
+	| "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_DISABLED"
+	| "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED"
+	| "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_NOT_CREATED"
+	| "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
+	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM"
+	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER"
 	| "seller.ContentKind.CONTENT_KIND_COMMENT"
 	| "seller.ContentKind.CONTENT_KIND_FORUM_ENTRY"
 	| "seller.ContentKind.CONTENT_KIND_POST"
@@ -121,22 +138,6 @@ export type UiTextKey =
 	| "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PLATFORM_REVIEW"
 	| "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PROFILE"
 	| "seller.PaymentAccount.payouts_inactive_note"
-	| "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
-	| "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED"
-	| "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED"
-	| "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED"
-	| "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
-	| "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
-	| "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED"
-	| "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_NOT_CREATED"
-	| "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
-	| "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
-	| "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_DISABLED"
-	| "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED"
-	| "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_NOT_CREATED"
-	| "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
-	| "seller.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM"
-	| "seller.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER"
 	| "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION"
 	| "seller.RevokeReason.REVOKE_REASON_APPEAL_ACCEPTED"
 	| "seller.RevokeReason.REVOKE_REASON_EXTERNAL_DECISION"
@@ -283,6 +284,62 @@ export function commonError(code: Code): UiMessage | undefined {
 /** 不認得的值與 UNSPECIFIED 一律顯示的文字。 */
 export function commonUnknown(): UiMessage {
 	return { key: "common.unknown" };
+}
+
+const PAYMENT_PAYMENT_ACCOUNT_STATUS: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED",
+	2: "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW",
+	3: "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED",
+	4: "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED",
+	5: "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED",
+};
+
+/** payment.PaymentAccountStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function paymentPaymentAccountStatus(v: PaymentAccountStatus): UiMessage | undefined {
+	const key = PAYMENT_PAYMENT_ACCOUNT_STATUS[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PAYMENT_PAYMENT_ACCOUNT_STATUS_ACTION: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_NOT_CREATED",
+	2: "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW",
+	3: "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED",
+	5: "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED",
+};
+
+/** payment.PaymentAccountStatus.action；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
+export function paymentPaymentAccountStatusAction(v: PaymentAccountStatus): UiMessage | undefined {
+	const key = PAYMENT_PAYMENT_ACCOUNT_STATUS_ACTION[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PAYMENT_PAYMENT_ACCOUNT_STATUS_DESCRIPTION: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_NOT_CREATED",
+	2: "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW",
+	3: "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED",
+	4: "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED",
+	5: "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_DISABLED",
+};
+
+/** payment.PaymentAccountStatus.description；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
+export function paymentPaymentAccountStatusDescription(v: PaymentAccountStatus): UiMessage | undefined {
+	const key = PAYMENT_PAYMENT_ACCOUNT_STATUS_DESCRIPTION[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PAYMENT_REQUIREMENT_COLLECTION: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER",
+	2: "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM",
+};
+
+/** payment.RequirementCollection 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function paymentRequirementCollection(v: RequirementCollection): UiMessage | undefined {
+	const key = PAYMENT_REQUIREMENT_COLLECTION[v];
+	if (key === undefined) return undefined;
+	return { key };
 }
 
 const SELLER_CONTENT_KIND: Readonly<Partial<Record<number, UiTextKey>>> = {
@@ -574,62 +631,6 @@ export function sellerOnboardingTaskIdPanelTitle(v: OnboardingTaskId): UiMessage
 /** seller.PaymentAccount.payouts_inactive_note */
 export function sellerPaymentAccountPayoutsInactiveNote(): UiMessage {
 	return { key: "seller.PaymentAccount.payouts_inactive_note" };
-}
-
-const SELLER_PAYMENT_ACCOUNT_STATUS: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED",
-	2: "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW",
-	3: "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED",
-	4: "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED",
-	5: "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED",
-};
-
-/** seller.PaymentAccountStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
-export function sellerPaymentAccountStatus(v: PaymentAccountStatus): UiMessage | undefined {
-	const key = SELLER_PAYMENT_ACCOUNT_STATUS[v];
-	if (key === undefined) return undefined;
-	return { key };
-}
-
-const SELLER_PAYMENT_ACCOUNT_STATUS_ACTION: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_NOT_CREATED",
-	2: "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW",
-	3: "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED",
-	5: "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED",
-};
-
-/** seller.PaymentAccountStatus.action；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
-export function sellerPaymentAccountStatusAction(v: PaymentAccountStatus): UiMessage | undefined {
-	const key = SELLER_PAYMENT_ACCOUNT_STATUS_ACTION[v];
-	if (key === undefined) return undefined;
-	return { key };
-}
-
-const SELLER_PAYMENT_ACCOUNT_STATUS_DESCRIPTION: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_NOT_CREATED",
-	2: "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW",
-	3: "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED",
-	4: "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED",
-	5: "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_DISABLED",
-};
-
-/** seller.PaymentAccountStatus.description；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
-export function sellerPaymentAccountStatusDescription(v: PaymentAccountStatus): UiMessage | undefined {
-	const key = SELLER_PAYMENT_ACCOUNT_STATUS_DESCRIPTION[v];
-	if (key === undefined) return undefined;
-	return { key };
-}
-
-const SELLER_REQUIREMENT_COLLECTION: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "seller.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER",
-	2: "seller.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM",
-};
-
-/** seller.RequirementCollection 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
-export function sellerRequirementCollection(v: RequirementCollection): UiMessage | undefined {
-	const key = SELLER_REQUIREMENT_COLLECTION[v];
-	if (key === undefined) return undefined;
-	return { key };
 }
 
 const SELLER_REVOKE_REASON: Readonly<Partial<Record<number, UiTextKey>>> = {

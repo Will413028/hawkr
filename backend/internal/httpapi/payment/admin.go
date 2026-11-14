@@ -11,7 +11,7 @@ import (
 
 	adminpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
-	sellerpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
+	paymentpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 )
@@ -57,8 +57,8 @@ func deref(s *string) string {
 func toAdminAccount(a payment.Account) *adminpb.PaymentAccount {
 	return &adminpb.PaymentAccount{
 		StoreId: rpc.FormatID(a.StoreID), Provider: a.Provider, ExternalAccountId: deref(a.ExternalAccountID),
-		Status:                rpc.EnumToProto[sellerpb.PaymentAccountStatus](a.Status),
-		RequirementCollection: rpc.EnumToProto[sellerpb.RequirementCollection](a.RequirementCollection),
+		Status:                rpc.EnumToProto[paymentpb.PaymentAccountStatus](a.Status),
+		RequirementCollection: rpc.EnumToProto[paymentpb.RequirementCollection](a.RequirementCollection),
 		TransfersActive:       a.TransfersActive, PayoutsActive: a.PayoutsActive, Requirements: Requirements(a.Requirements),
 		StatusReason: deref(a.StatusReason), FetchTime: optTimestamp(a.FetchedAt), CreateFailedTime: optTimestamp(a.CreateFailedAt),
 		CreateTime: timestamppb.New(a.CreatedAt), UpdateTime: timestamppb.New(a.UpdatedAt),

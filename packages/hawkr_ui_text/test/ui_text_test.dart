@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:connectrpc/connect.dart' show Code;
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:intl/intl.dart';

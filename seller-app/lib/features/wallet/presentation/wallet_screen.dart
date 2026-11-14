@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:flutter/material.dart';
@@ -261,7 +262,7 @@ class _CertificationGate extends ConsumerWidget {
   }
 }
 
-/// 收款帳戶的狀態面板（唯讀）：標題、說明與動作文字都是共用文案目錄（`seller.PaymentAccountStatus`）的文字；不顯示金流商的
+/// 收款帳戶的狀態面板（唯讀）：標題、說明與動作文字都是共用文案目錄（`payment.PaymentAccountStatus`）的文字；不顯示金流商的
 /// 待補條件細項（金流商自己的頁面會列出要補什麼）。動作與認證狀態畫面共用 [paymentAccountActionKind]：無法啟用去聯絡客服，
 /// 需要開通開始開通，其他重新讀取。
 class _PaymentAccountPanel extends HookConsumerWidget {

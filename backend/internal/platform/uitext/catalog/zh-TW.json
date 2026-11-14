@@ -160,6 +160,70 @@
       "message": "未知",
       "description": "不認得的值與 UNSPECIFIED 一律顯示這個字。"
     },
+    "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
+      "message": "待設定",
+      "description": "賣家要補資料（包含新帳戶尚未開通）：重新取得開通 session 完成。"
+    },
+    "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED": {
+      "message": "無法啟用",
+      "description": "被金流商拒絕、不支援或限制，賣家補件解不開，要由平台或金流商處理。"
+    },
+    "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED": {
+      "message": "已啟用",
+      "description": "轉帳能力已啟用；平台審核同時核准時，店家通過開通閘門（SELLER_REQUIREMENT_ONBOARDING_COMPLETE）。"
+    },
+    "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
+      "message": "準備中",
+      "description": "平台已核准，外部帳戶還在建立（背景程序處理，失敗時進後台待辦）。"
+    },
+    "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
+      "message": "審核中",
+      "description": "轉帳能力還沒啟用，等金流商審核，賣家沒有要做的事。"
+    },
+    "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
+      "message": "前往設定收款帳戶",
+      "description": "收款帳戶區引導賣家做哪一步；已啟用沒有動作。（值 PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED）"
+    },
+    "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED": {
+      "message": "聯絡客服",
+      "description": "收款帳戶區引導賣家做哪一步；已啟用沒有動作。（值 PAYMENT_ACCOUNT_STATUS_DISABLED）"
+    },
+    "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
+      "message": "重新整理",
+      "description": "收款帳戶區引導賣家做哪一步；已啟用沒有動作。（值 PAYMENT_ACCOUNT_STATUS_NOT_CREATED）"
+    },
+    "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
+      "message": "重新整理",
+      "description": "收款帳戶區引導賣家做哪一步；已啟用沒有動作。（值 PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW）"
+    },
+    "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
+      "message": "提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。",
+      "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED）"
+    },
+    "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_DISABLED": {
+      "message": "金流商目前無法啟用你的收款帳戶，請聯絡客服。",
+      "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_DISABLED）"
+    },
+    "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED": {
+      "message": "收款已啟用。",
+      "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_ENABLED）"
+    },
+    "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
+      "message": "正在建立收款帳戶，通常幾分鐘內完成。",
+      "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_NOT_CREATED）"
+    },
+    "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
+      "message": "金流商正在審核你的資料，不需要額外操作。",
+      "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW）"
+    },
+    "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM": {
+      "message": "平台收件（內嵌元件）",
+      "description": "平台收件（金流商的內嵌元件）：資料在網頁上由元件直接送給金流商。"
+    },
+    "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": {
+      "message": "金流商收件（託管頁面）",
+      "description": "金流商收件（託管頁面為預設）：平台不經手身分與銀行資料。"
+    },
     "seller.ContentKind.CONTENT_KIND_COMMENT": {
       "message": "留言",
       "description": "貼文底下的留言。"
@@ -538,70 +602,6 @@
       "message": "撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。",
       "description": "收款已啟用但撥款（payouts_active 為 false）尚未啟用時，接在收款帳戶說明後的一行。"
     },
-    "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
-      "message": "待設定",
-      "description": "賣家要補資料（包含新帳戶尚未開通）：重新取得開通 session 完成。"
-    },
-    "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED": {
-      "message": "無法啟用",
-      "description": "被金流商拒絕、不支援或限制，賣家補件解不開，要由平台或金流商處理。"
-    },
-    "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED": {
-      "message": "已啟用",
-      "description": "轉帳能力已啟用；平台審核同時核准時，店家通過開通閘門（SELLER_REQUIREMENT_ONBOARDING_COMPLETE）。"
-    },
-    "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
-      "message": "準備中",
-      "description": "平台已核准，外部帳戶還在建立（背景程序處理，失敗時進後台待辦）。"
-    },
-    "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
-      "message": "審核中",
-      "description": "轉帳能力還沒啟用，等金流商審核，賣家沒有要做的事。"
-    },
-    "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
-      "message": "前往設定收款帳戶",
-      "description": "收款帳戶區引導賣家做哪一步；已啟用沒有動作。（值 PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED）"
-    },
-    "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED": {
-      "message": "聯絡客服",
-      "description": "收款帳戶區引導賣家做哪一步；已啟用沒有動作。（值 PAYMENT_ACCOUNT_STATUS_DISABLED）"
-    },
-    "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
-      "message": "重新整理",
-      "description": "收款帳戶區引導賣家做哪一步；已啟用沒有動作。（值 PAYMENT_ACCOUNT_STATUS_NOT_CREATED）"
-    },
-    "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
-      "message": "重新整理",
-      "description": "收款帳戶區引導賣家做哪一步；已啟用沒有動作。（值 PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW）"
-    },
-    "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
-      "message": "提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。",
-      "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED）"
-    },
-    "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_DISABLED": {
-      "message": "金流商目前無法啟用你的收款帳戶，請聯絡客服。",
-      "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_DISABLED）"
-    },
-    "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED": {
-      "message": "收款已啟用。",
-      "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_ENABLED）"
-    },
-    "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
-      "message": "正在建立收款帳戶，通常幾分鐘內完成。",
-      "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_NOT_CREATED）"
-    },
-    "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
-      "message": "金流商正在審核你的資料，不需要額外操作。",
-      "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW）"
-    },
-    "seller.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM": {
-      "message": "平台收件（內嵌元件）",
-      "description": "平台收件（金流商的內嵌元件）：資料在網頁上由元件直接送給金流商。"
-    },
-    "seller.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": {
-      "message": "金流商收件（託管頁面）",
-      "description": "金流商收件（託管頁面為預設）：平台不經手身分與銀行資料。"
-    },
     "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION": {
       "message": "平台更正",
       "description": "平台更正誤判。"
@@ -827,6 +827,17 @@
     }
   },
   "variants": {
+    "payment.PaymentAccountStatus.action": {
+      "omit": {
+        "default": [
+          "PAYMENT_ACCOUNT_STATUS_ENABLED"
+        ]
+      },
+      "description": "收款帳戶區引導賣家做哪一步；已啟用沒有動作。"
+    },
+    "payment.PaymentAccountStatus.description": {
+      "description": "收款帳戶區的狀態說明。"
+    },
     "seller.MeasureRequestKind.submitted_note": {
       "description": "請求已提交、等候平台複核的說明行。"
     },
@@ -855,17 +866,6 @@
     },
     "seller.OnboardingTaskId.panel_title": {
       "description": "網頁開通任務面板的標題，只由任務種類決定。"
-    },
-    "seller.PaymentAccountStatus.action": {
-      "omit": {
-        "default": [
-          "PAYMENT_ACCOUNT_STATUS_ENABLED"
-        ]
-      },
-      "description": "收款帳戶區引導賣家做哪一步；已啟用沒有動作。"
-    },
-    "seller.PaymentAccountStatus.description": {
-      "description": "收款帳戶區的狀態說明。"
     }
   }
 }

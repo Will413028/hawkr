@@ -1,4 +1,4 @@
-import { OnboardingSurface } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import { OnboardingSurface } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import { describe, expect, it, vi } from "vitest";
 import type { OnboardingSession } from "./payment-account";
 import {

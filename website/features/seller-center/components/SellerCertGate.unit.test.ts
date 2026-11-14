@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 
 import { create } from "@bufbuild/protobuf";
+import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import {
 	KYCApplicationSchema,
 	KYCStatus,
 	PaymentAccountSchema,
-	PaymentAccountStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import {
 	cleanup,

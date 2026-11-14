@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/transport.dart' show Code;

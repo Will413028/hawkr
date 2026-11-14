@@ -7,6 +7,7 @@ import 'package:connectrpc/connect.dart' show Code;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
 
 import '../hawkr_ui_text.dart' show UiLocale;
@@ -73,6 +74,78 @@ _ => null,
 extension CommonStoreCardStatusUiText on hawkr_common_v1alpha1_store_card.StoreCardStatus {
   /// common.StoreCardStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
   String? uiText(UiLocale l) => _commonStoreCardStatus(l, value);
+}
+
+String? _paymentPaymentAccountStatus(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '準備中',
+(UiLocale.en, 1) => 'Preparing',
+(UiLocale.zhTW, 2) => '審核中',
+(UiLocale.en, 2) => 'Under review',
+(UiLocale.zhTW, 3) => '待設定',
+(UiLocale.en, 3) => 'Setup needed',
+(UiLocale.zhTW, 4) => '已啟用',
+(UiLocale.en, 4) => 'Active',
+(UiLocale.zhTW, 5) => '無法啟用',
+(UiLocale.en, 5) => 'Unavailable',
+_ => null,
+};
+}
+
+String? _paymentPaymentAccountStatusAction(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '重新整理',
+(UiLocale.en, 1) => 'Refresh',
+(UiLocale.zhTW, 2) => '重新整理',
+(UiLocale.en, 2) => 'Refresh',
+(UiLocale.zhTW, 3) => '前往設定收款帳戶',
+(UiLocale.en, 3) => 'Go to payout account setup',
+(UiLocale.zhTW, 5) => '聯絡客服',
+(UiLocale.en, 5) => 'Contact support',
+_ => null,
+};
+}
+
+String? _paymentPaymentAccountStatusDescription(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '正在建立收款帳戶，通常幾分鐘內完成。',
+(UiLocale.en, 1) => 'We are setting up your payout account. This usually takes a few minutes.',
+(UiLocale.zhTW, 2) => '金流商正在審核你的資料，不需要額外操作。',
+(UiLocale.en, 2) => 'The payment provider is reviewing your information. No action is needed.',
+(UiLocale.zhTW, 3) => '提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。',
+(UiLocale.en, 3) => 'Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it.',
+(UiLocale.zhTW, 4) => '收款已啟用。',
+(UiLocale.en, 4) => 'Payments are enabled.',
+(UiLocale.zhTW, 5) => '金流商目前無法啟用你的收款帳戶，請聯絡客服。',
+(UiLocale.en, 5) => 'The payment provider cannot enable your payout account right now. Please contact support.',
+_ => null,
+};
+}
+
+extension PaymentPaymentAccountStatusUiText on hawkr_payment_v1alpha1_payment.PaymentAccountStatus {
+  /// payment.PaymentAccountStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _paymentPaymentAccountStatus(l, value);
+
+  /// payment.PaymentAccountStatus.action；沒有文字的值回 null。
+  String? action(UiLocale l) => _paymentPaymentAccountStatusAction(l, value);
+
+  /// payment.PaymentAccountStatus.description；沒有文字的值回 null。
+  String? description(UiLocale l) => _paymentPaymentAccountStatusDescription(l, value);
+}
+
+String? _paymentRequirementCollection(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '金流商收件（託管頁面）',
+(UiLocale.en, 1) => 'Provider-hosted',
+(UiLocale.zhTW, 2) => '平台收件（內嵌元件）',
+(UiLocale.en, 2) => 'Embedded on platform',
+_ => null,
+};
+}
+
+extension PaymentRequirementCollectionUiText on hawkr_payment_v1alpha1_payment.RequirementCollection {
+  /// payment.RequirementCollection 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _paymentRequirementCollection(l, value);
 }
 
 String? _sellerContentKind(UiLocale l, int value) {
@@ -291,78 +364,6 @@ extension SellerOnboardingTaskIdUiText on hawkr_seller_v1alpha1_seller.Onboardin
 
   /// seller.OnboardingTaskId.panel_title；沒有文字的值回 null。
   String? panelTitle(UiLocale l) => _sellerOnboardingTaskIdPanelTitle(l, value);
-}
-
-String? _sellerPaymentAccountStatus(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW, 1) => '準備中',
-(UiLocale.en, 1) => 'Preparing',
-(UiLocale.zhTW, 2) => '審核中',
-(UiLocale.en, 2) => 'Under review',
-(UiLocale.zhTW, 3) => '待設定',
-(UiLocale.en, 3) => 'Setup needed',
-(UiLocale.zhTW, 4) => '已啟用',
-(UiLocale.en, 4) => 'Active',
-(UiLocale.zhTW, 5) => '無法啟用',
-(UiLocale.en, 5) => 'Unavailable',
-_ => null,
-};
-}
-
-String? _sellerPaymentAccountStatusAction(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW, 1) => '重新整理',
-(UiLocale.en, 1) => 'Refresh',
-(UiLocale.zhTW, 2) => '重新整理',
-(UiLocale.en, 2) => 'Refresh',
-(UiLocale.zhTW, 3) => '前往設定收款帳戶',
-(UiLocale.en, 3) => 'Go to payout account setup',
-(UiLocale.zhTW, 5) => '聯絡客服',
-(UiLocale.en, 5) => 'Contact support',
-_ => null,
-};
-}
-
-String? _sellerPaymentAccountStatusDescription(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW, 1) => '正在建立收款帳戶，通常幾分鐘內完成。',
-(UiLocale.en, 1) => 'We are setting up your payout account. This usually takes a few minutes.',
-(UiLocale.zhTW, 2) => '金流商正在審核你的資料，不需要額外操作。',
-(UiLocale.en, 2) => 'The payment provider is reviewing your information. No action is needed.',
-(UiLocale.zhTW, 3) => '提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。',
-(UiLocale.en, 3) => 'Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it.',
-(UiLocale.zhTW, 4) => '收款已啟用。',
-(UiLocale.en, 4) => 'Payments are enabled.',
-(UiLocale.zhTW, 5) => '金流商目前無法啟用你的收款帳戶，請聯絡客服。',
-(UiLocale.en, 5) => 'The payment provider cannot enable your payout account right now. Please contact support.',
-_ => null,
-};
-}
-
-extension SellerPaymentAccountStatusUiText on hawkr_seller_v1alpha1_seller.PaymentAccountStatus {
-  /// seller.PaymentAccountStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
-  String? uiText(UiLocale l) => _sellerPaymentAccountStatus(l, value);
-
-  /// seller.PaymentAccountStatus.action；沒有文字的值回 null。
-  String? action(UiLocale l) => _sellerPaymentAccountStatusAction(l, value);
-
-  /// seller.PaymentAccountStatus.description；沒有文字的值回 null。
-  String? description(UiLocale l) => _sellerPaymentAccountStatusDescription(l, value);
-}
-
-String? _sellerRequirementCollection(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW, 1) => '金流商收件（託管頁面）',
-(UiLocale.en, 1) => 'Provider-hosted',
-(UiLocale.zhTW, 2) => '平台收件（內嵌元件）',
-(UiLocale.en, 2) => 'Embedded on platform',
-_ => null,
-};
-}
-
-extension SellerRequirementCollectionUiText on hawkr_seller_v1alpha1_seller.RequirementCollection {
-  /// seller.RequirementCollection 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
-  String? uiText(UiLocale l) => _sellerRequirementCollection(l, value);
 }
 
 String? _sellerRevokeReason(UiLocale l, int value) {

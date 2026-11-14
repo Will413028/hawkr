@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_api/transport.dart' show Code;

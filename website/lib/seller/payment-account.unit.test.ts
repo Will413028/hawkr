@@ -2,9 +2,11 @@ import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import {
 	OnboardingSurface,
+	PaymentAccountStatus,
+} from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+import {
 	OnboardingTaskState,
 	PaymentAccountSchema,
-	PaymentAccountStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { describe, expect, it, vi } from "vitest";
 import { uiTextFor } from "@/lib/i18n/ui-text";

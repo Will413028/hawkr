@@ -8,7 +8,7 @@ import (
 )
 
 // pascal 把點與底線分隔的 key 路徑接成 PascalCase：每段只把第一個字母大寫，其餘不動。
-// seller.PaymentAccountStatus.description → SellerPaymentAccountStatusDescription。
+// payment.PaymentAccountStatus.description → PaymentPaymentAccountStatusDescription。
 func pascal(path string) string {
 	var b strings.Builder
 	for _, seg := range strings.FieldsFunc(path, func(r rune) bool { return r == '.' || r == '_' }) {

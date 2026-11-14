@@ -147,10 +147,10 @@ func TestEveryPolicyCategoryHasACatalogName(t *testing.T) {
 
 // 變體依受眾 omit：ENABLED 沒有 action；CLOSED 的請求狀態標籤只有 staff 有。
 func TestOmitByAudience(t *testing.T) {
-	if got, ok := For(ZhTW).SellerPaymentAccountStatusAction("ENABLED"); ok {
+	if got, ok := For(ZhTW).PaymentPaymentAccountStatusAction("ENABLED"); ok {
 		t.Errorf("ENABLED 沒有 action，得到 %q", got)
 	}
-	if got, ok := For(ZhTW).SellerPaymentAccountStatusAction("DISABLED"); !ok || got != "聯絡客服" {
+	if got, ok := For(ZhTW).PaymentPaymentAccountStatusAction("DISABLED"); !ok || got != "聯絡客服" {
 		t.Errorf("DISABLED action = %q, %v", got, ok)
 	}
 	if got, ok := For(ZhTW).SellerMeasureRequestStateWithKind("CLOSED", "APPEAL"); ok {

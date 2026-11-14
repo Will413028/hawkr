@@ -353,59 +353,6 @@ final $typed_data.Uint8List kYCIssueCodeDescriptor = $convert.base64Decode(
     'WUNfSVNTVUVfQ09ERV9FWFBJUkVEEAMSGgoWS1lDX0lTU1VFX0NPREVfTUlTU0lORxAEEhoKFk'
     'tZQ19JU1NVRV9DT0RFX0lOVkFMSUQQBRIYChRLWUNfSVNTVUVfQ09ERV9PVEhFUhAG');
 
-@$core.Deprecated('Use paymentAccountStatusDescriptor instead')
-const PaymentAccountStatus$json = {
-  '1': 'PaymentAccountStatus',
-  '2': [
-    {'1': 'PAYMENT_ACCOUNT_STATUS_UNSPECIFIED', '2': 0},
-    {'1': 'PAYMENT_ACCOUNT_STATUS_NOT_CREATED', '2': 1},
-    {'1': 'PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW', '2': 2},
-    {'1': 'PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED', '2': 3},
-    {'1': 'PAYMENT_ACCOUNT_STATUS_ENABLED', '2': 4},
-    {'1': 'PAYMENT_ACCOUNT_STATUS_DISABLED', '2': 5},
-  ],
-};
-
-/// Descriptor for `PaymentAccountStatus`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List paymentAccountStatusDescriptor = $convert.base64Decode(
-    'ChRQYXltZW50QWNjb3VudFN0YXR1cxImCiJQQVlNRU5UX0FDQ09VTlRfU1RBVFVTX1VOU1BFQ0'
-    'lGSUVEEAASJgoiUEFZTUVOVF9BQ0NPVU5UX1NUQVRVU19OT1RfQ1JFQVRFRBABEicKI1BBWU1F'
-    'TlRfQUNDT1VOVF9TVEFUVVNfVU5ERVJfUkVWSUVXEAISKgomUEFZTUVOVF9BQ0NPVU5UX1NUQV'
-    'RVU19BQ1RJT05fUkVRVUlSRUQQAxIiCh5QQVlNRU5UX0FDQ09VTlRfU1RBVFVTX0VOQUJMRUQQ'
-    'BBIjCh9QQVlNRU5UX0FDQ09VTlRfU1RBVFVTX0RJU0FCTEVEEAU=');
-
-@$core.Deprecated('Use requirementCollectionDescriptor instead')
-const RequirementCollection$json = {
-  '1': 'RequirementCollection',
-  '2': [
-    {'1': 'REQUIREMENT_COLLECTION_UNSPECIFIED', '2': 0},
-    {'1': 'REQUIREMENT_COLLECTION_PROVIDER', '2': 1},
-    {'1': 'REQUIREMENT_COLLECTION_PLATFORM', '2': 2},
-  ],
-};
-
-/// Descriptor for `RequirementCollection`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List requirementCollectionDescriptor = $convert.base64Decode(
-    'ChVSZXF1aXJlbWVudENvbGxlY3Rpb24SJgoiUkVRVUlSRU1FTlRfQ09MTEVDVElPTl9VTlNQRU'
-    'NJRklFRBAAEiMKH1JFUVVJUkVNRU5UX0NPTExFQ1RJT05fUFJPVklERVIQARIjCh9SRVFVSVJF'
-    'TUVOVF9DT0xMRUNUSU9OX1BMQVRGT1JNEAI=');
-
-@$core.Deprecated('Use onboardingSurfaceDescriptor instead')
-const OnboardingSurface$json = {
-  '1': 'OnboardingSurface',
-  '2': [
-    {'1': 'ONBOARDING_SURFACE_UNSPECIFIED', '2': 0},
-    {'1': 'ONBOARDING_SURFACE_HOSTED', '2': 1},
-    {'1': 'ONBOARDING_SURFACE_EMBEDDED', '2': 2},
-  ],
-};
-
-/// Descriptor for `OnboardingSurface`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List onboardingSurfaceDescriptor = $convert.base64Decode(
-    'ChFPbmJvYXJkaW5nU3VyZmFjZRIiCh5PTkJPQVJESU5HX1NVUkZBQ0VfVU5TUEVDSUZJRUQQAB'
-    'IdChlPTkJPQVJESU5HX1NVUkZBQ0VfSE9TVEVEEAESHwobT05CT0FSRElOR19TVVJGQUNFX0VN'
-    'QkVEREVEEAI=');
-
 @$core.Deprecated('Use violationSeverityDescriptor instead')
 const ViolationSeverity$json = {
   '1': 'ViolationSeverity',
@@ -2031,7 +1978,7 @@ const PaymentAccount$json = {
       '3': 1,
       '4': 1,
       '5': 14,
-      '6': '.hawkr.seller.v1alpha1.PaymentAccountStatus',
+      '6': '.hawkr.payment.v1alpha1.PaymentAccountStatus',
       '10': 'status'
     },
     {
@@ -2039,7 +1986,7 @@ const PaymentAccount$json = {
       '3': 2,
       '4': 1,
       '5': 14,
-      '6': '.hawkr.seller.v1alpha1.RequirementCollection',
+      '6': '.hawkr.payment.v1alpha1.RequirementCollection',
       '10': 'requirementCollection'
     },
     {
@@ -2047,7 +1994,7 @@ const PaymentAccount$json = {
       '3': 3,
       '4': 1,
       '5': 14,
-      '6': '.hawkr.seller.v1alpha1.OnboardingSurface',
+      '6': '.hawkr.payment.v1alpha1.OnboardingSurface',
       '10': 'onboardingSurface'
     },
     {'1': 'transfers_active', '3': 4, '4': 1, '5': 8, '10': 'transfersActive'},
@@ -2073,15 +2020,15 @@ const PaymentAccount$json = {
 
 /// Descriptor for `PaymentAccount`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List paymentAccountDescriptor = $convert.base64Decode(
-    'Cg5QYXltZW50QWNjb3VudBJDCgZzdGF0dXMYASABKA4yKy5oYXdrci5zZWxsZXIudjFhbHBoYT'
-    'EuUGF5bWVudEFjY291bnRTdGF0dXNSBnN0YXR1cxJjChZyZXF1aXJlbWVudF9jb2xsZWN0aW9u'
-    'GAIgASgOMiwuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcXVpcmVtZW50Q29sbGVjdGlvblIVcm'
-    'VxdWlyZW1lbnRDb2xsZWN0aW9uElcKEm9uYm9hcmRpbmdfc3VyZmFjZRgDIAEoDjIoLmhhd2ty'
-    'LnNlbGxlci52MWFscGhhMS5PbmJvYXJkaW5nU3VyZmFjZVIRb25ib2FyZGluZ1N1cmZhY2USKQ'
-    'oQdHJhbnNmZXJzX2FjdGl2ZRgEIAEoCFIPdHJhbnNmZXJzQWN0aXZlEiUKDnBheW91dHNfYWN0'
-    'aXZlGAUgASgIUg1wYXlvdXRzQWN0aXZlEjsKDHJlcXVpcmVtZW50cxgGIAEoCzIXLmdvb2dsZS'
-    '5wcm90b2J1Zi5TdHJ1Y3RSDHJlcXVpcmVtZW50cxI5CgpmZXRjaF90aW1lGAcgASgLMhouZ29v'
-    'Z2xlLnByb3RvYnVmLlRpbWVzdGFtcFIJZmV0Y2hUaW1l');
+    'Cg5QYXltZW50QWNjb3VudBJECgZzdGF0dXMYASABKA4yLC5oYXdrci5wYXltZW50LnYxYWxwaG'
+    'ExLlBheW1lbnRBY2NvdW50U3RhdHVzUgZzdGF0dXMSZAoWcmVxdWlyZW1lbnRfY29sbGVjdGlv'
+    'bhgCIAEoDjItLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuUmVxdWlyZW1lbnRDb2xsZWN0aW9uUh'
+    'VyZXF1aXJlbWVudENvbGxlY3Rpb24SWAoSb25ib2FyZGluZ19zdXJmYWNlGAMgASgOMikuaGF3'
+    'a3IucGF5bWVudC52MWFscGhhMS5PbmJvYXJkaW5nU3VyZmFjZVIRb25ib2FyZGluZ1N1cmZhY2'
+    'USKQoQdHJhbnNmZXJzX2FjdGl2ZRgEIAEoCFIPdHJhbnNmZXJzQWN0aXZlEiUKDnBheW91dHNf'
+    'YWN0aXZlGAUgASgIUg1wYXlvdXRzQWN0aXZlEjsKDHJlcXVpcmVtZW50cxgGIAEoCzIXLmdvb2'
+    'dsZS5wcm90b2J1Zi5TdHJ1Y3RSDHJlcXVpcmVtZW50cxI5CgpmZXRjaF90aW1lGAcgASgLMhou'
+    'Z29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcFIJZmV0Y2hUaW1l');
 
 @$core.Deprecated('Use getMyPaymentAccountRequestDescriptor instead')
 const GetMyPaymentAccountRequest$json = {
@@ -2139,7 +2086,7 @@ const CreatePaymentOnboardingSessionResponse$json = {
       '3': 1,
       '4': 1,
       '5': 14,
-      '6': '.hawkr.seller.v1alpha1.OnboardingSurface',
+      '6': '.hawkr.payment.v1alpha1.OnboardingSurface',
       '10': 'surface'
     },
     {'1': 'url', '3': 2, '4': 1, '5': 9, '10': 'url'},
@@ -2158,11 +2105,11 @@ const CreatePaymentOnboardingSessionResponse$json = {
 /// Descriptor for `CreatePaymentOnboardingSessionResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List createPaymentOnboardingSessionResponseDescriptor =
     $convert.base64Decode(
-        'CiZDcmVhdGVQYXltZW50T25ib2FyZGluZ1Nlc3Npb25SZXNwb25zZRJCCgdzdXJmYWNlGAEgAS'
-        'gOMiguaGF3a3Iuc2VsbGVyLnYxYWxwaGExLk9uYm9hcmRpbmdTdXJmYWNlUgdzdXJmYWNlEhAK'
-        'A3VybBgCIAEoCVIDdXJsEiMKDWNsaWVudF9zZWNyZXQYAyABKAlSDGNsaWVudFNlY3JldBI7Cg'
-        'tleHBpcmVfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBSCmV4cGlyZVRp'
-        'bWU=');
+        'CiZDcmVhdGVQYXltZW50T25ib2FyZGluZ1Nlc3Npb25SZXNwb25zZRJDCgdzdXJmYWNlGAEgAS'
+        'gOMikuaGF3a3IucGF5bWVudC52MWFscGhhMS5PbmJvYXJkaW5nU3VyZmFjZVIHc3VyZmFjZRIQ'
+        'CgN1cmwYAiABKAlSA3VybBIjCg1jbGllbnRfc2VjcmV0GAMgASgJUgxjbGllbnRTZWNyZXQSOw'
+        'oLZXhwaXJlX3RpbWUYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wUgpleHBpcmVU'
+        'aW1l');
 
 @$core.Deprecated('Use getMyKYCRequestDescriptor instead')
 const GetMyKYCRequest$json = {

@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerPaymentAccountStatus, sellerPaymentAccountStatusAction, sellerPaymentAccountStatusDescription, sellerRequirementCollection, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
+import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, paymentPaymentAccountStatus, paymentPaymentAccountStatusAction, paymentPaymentAccountStatusDescription, paymentRequirementCollection, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -200,6 +200,18 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	case "common.unknown": {
 		return commonUnknown();
 	}
+	case "payment.PaymentAccountStatus": {
+		return paymentPaymentAccountStatus(num(c.value));
+	}
+	case "payment.PaymentAccountStatus.action": {
+		return paymentPaymentAccountStatusAction(num(c.value));
+	}
+	case "payment.PaymentAccountStatus.description": {
+		return paymentPaymentAccountStatusDescription(num(c.value));
+	}
+	case "payment.RequirementCollection": {
+		return paymentRequirementCollection(num(c.value));
+	}
 	case "seller.ContentKind": {
 		return sellerContentKind(num(c.value));
 	}
@@ -296,18 +308,6 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "seller.PaymentAccount.payouts_inactive_note": {
 		return sellerPaymentAccountPayoutsInactiveNote();
-	}
-	case "seller.PaymentAccountStatus": {
-		return sellerPaymentAccountStatus(num(c.value));
-	}
-	case "seller.PaymentAccountStatus.action": {
-		return sellerPaymentAccountStatusAction(num(c.value));
-	}
-	case "seller.PaymentAccountStatus.description": {
-		return sellerPaymentAccountStatusDescription(num(c.value));
-	}
-	case "seller.RequirementCollection": {
-		return sellerRequirementCollection(num(c.value));
 	}
 	case "seller.RevokeReason": {
 		return sellerRevokeReason(num(c.value));

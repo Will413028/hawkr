@@ -7,7 +7,7 @@
  * - EMBEDDED：不在這裡建立 session；內嵌元件自己呼叫 `fetchClientSecret`（每次都是新的 session）。
  */
 
-import { OnboardingSurface } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import { OnboardingSurface } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import type { OnboardingSession } from "./payment-account";
 
 /** 開通完成與離開都回到認證頁，用 query 區分。 */

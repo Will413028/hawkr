@@ -52,6 +52,14 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return m.Text, ok
 	case "common.unknown":
 		return t.CommonUnknown(), true
+	case "payment.PaymentAccountStatus":
+		return t.PaymentPaymentAccountStatus(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
+	case "payment.PaymentAccountStatus.action":
+		return t.PaymentPaymentAccountStatusAction(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
+	case "payment.PaymentAccountStatus.description":
+		return t.PaymentPaymentAccountStatusDescription(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
+	case "payment.RequirementCollection":
+		return t.PaymentRequirementCollection(goldenEnum(c.Value, "REQUIREMENT_COLLECTION_"))
 	case "seller.ContentKind":
 		return t.SellerContentKind(goldenEnum(c.Value, "CONTENT_KIND_"))
 	case "seller.KYCApplication.decide_time":
@@ -116,14 +124,6 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerOnboardingTaskIdPanelTitle(goldenEnum(c.Value, "ONBOARDING_TASK_ID_"))
 	case "seller.PaymentAccount.payouts_inactive_note":
 		return t.SellerPaymentAccountPayoutsInactiveNote(), true
-	case "seller.PaymentAccountStatus":
-		return t.SellerPaymentAccountStatus(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
-	case "seller.PaymentAccountStatus.action":
-		return t.SellerPaymentAccountStatusAction(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
-	case "seller.PaymentAccountStatus.description":
-		return t.SellerPaymentAccountStatusDescription(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
-	case "seller.RequirementCollection":
-		return t.SellerRequirementCollection(goldenEnum(c.Value, "REQUIREMENT_COLLECTION_"))
 	case "seller.RevokeReason":
 		return t.SellerRevokeReason(goldenEnum(c.Value, "REVOKE_REASON_"))
 	case "seller.RiskGround":

@@ -2,12 +2,12 @@
 
 import { create } from "@bufbuild/protobuf";
 import { PostalAddressSchema } from "@hawkr/api/gen/hawkr/common/v1alpha1/postal_address_pb";
+import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import {
 	GetMyStoreResponseSchema,
 	KYCApplicationSchema,
 	KYCStatus,
 	PaymentAccountSchema,
-	PaymentAccountStatus,
 	StoreSchema,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import {

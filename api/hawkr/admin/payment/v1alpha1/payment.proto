@@ -2,10 +2,10 @@ syntax = "proto3";
 
 // payment 模組給後台的 API（Stripe 計畫 D28、D30）：收款帳戶的讀取、重新整理與重試建立。收款帳戶由 payment 模組擁有，擁有者現階段是店家
 // （store_id）；賣家自己的收款帳戶讀取與開通 session 留在 SellerAppService（seller 確認店家擁有者之後呼叫 payment）。狀態與收件方式的列舉沿用
-// hawkr.seller.v1alpha1 的定義（賣家與後台看到同一組值）。
+// hawkr.payment.v1alpha1 的定義（賣家與後台看到同一組值）。
 package hawkr.admin.payment.v1alpha1;
 
-import "hawkr/seller/v1alpha1/seller.proto";
+import "hawkr/payment/v1alpha1/payment.proto";
 import "google/api/field_behavior.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
@@ -34,8 +34,8 @@ message PaymentAccount {
   string provider = 2;
   // 外部帳戶 ID；還沒有建立時是空字串。
   string external_account_id = 3;
-  hawkr.seller.v1alpha1.PaymentAccountStatus status = 4;
-  hawkr.seller.v1alpha1.RequirementCollection requirement_collection = 5;
+  hawkr.payment.v1alpha1.PaymentAccountStatus status = 4;
+  hawkr.payment.v1alpha1.RequirementCollection requirement_collection = 5;
   bool transfers_active = 6;
   bool payouts_active = 7;
   // 金流商回報的待補條件原始內容（物件）。

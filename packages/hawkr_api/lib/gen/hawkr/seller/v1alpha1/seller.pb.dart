@@ -26,9 +26,10 @@ import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
 import '../../../google/rpc/error_details.pb.dart' as $3;
 import '../../../google/type/date.pb.dart' as $5;
 import '../../common/v1alpha1/image.pb.dart' as $0;
-import '../../common/v1alpha1/policy_category.pbenum.dart' as $9;
+import '../../common/v1alpha1/policy_category.pbenum.dart' as $10;
 import '../../common/v1alpha1/postal_address.pb.dart' as $2;
 import '../../common/v1alpha1/store_card.pb.dart' as $8;
+import '../../payment/v1alpha1/payment.pbenum.dart' as $9;
 import 'seller.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -3759,9 +3760,9 @@ class SaveKYCDraftResponse extends $pb.GeneratedMessage {
 /// PaymentAccount 是賣家看到的收款帳戶。
 class PaymentAccount extends $pb.GeneratedMessage {
   factory PaymentAccount({
-    PaymentAccountStatus? status,
-    RequirementCollection? requirementCollection,
-    OnboardingSurface? onboardingSurface,
+    $9.PaymentAccountStatus? status,
+    $9.RequirementCollection? requirementCollection,
+    $9.OnboardingSurface? onboardingSurface,
     $core.bool? transfersActive,
     $core.bool? payoutsActive,
     $6.Struct? requirements,
@@ -3793,13 +3794,13 @@ class PaymentAccount extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: PaymentAccount.$_createMessage)
-    ..aE<PaymentAccountStatus>(1, _omitFieldNames ? '' : 'status',
-        enumValues: PaymentAccountStatus.values)
-    ..aE<RequirementCollection>(
+    ..aE<$9.PaymentAccountStatus>(1, _omitFieldNames ? '' : 'status',
+        enumValues: $9.PaymentAccountStatus.values)
+    ..aE<$9.RequirementCollection>(
         2, _omitFieldNames ? '' : 'requirementCollection',
-        enumValues: RequirementCollection.values)
-    ..aE<OnboardingSurface>(3, _omitFieldNames ? '' : 'onboardingSurface',
-        enumValues: OnboardingSurface.values)
+        enumValues: $9.RequirementCollection.values)
+    ..aE<$9.OnboardingSurface>(3, _omitFieldNames ? '' : 'onboardingSurface',
+        enumValues: $9.OnboardingSurface.values)
     ..aOB(4, _omitFieldNames ? '' : 'transfersActive')
     ..aOB(5, _omitFieldNames ? '' : 'payoutsActive')
     ..aOM<$6.Struct>(6, _omitFieldNames ? '' : 'requirements',
@@ -3831,18 +3832,18 @@ class PaymentAccount extends $pb.GeneratedMessage {
   static PaymentAccount? _defaultInstance;
 
   @$pb.TagNumber(1)
-  PaymentAccountStatus get status => $_getN(0);
+  $9.PaymentAccountStatus get status => $_getN(0);
   @$pb.TagNumber(1)
-  set status(PaymentAccountStatus value) => $_setField(1, value);
+  set status($9.PaymentAccountStatus value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasStatus() => $_has(0);
   @$pb.TagNumber(1)
   void clearStatus() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  RequirementCollection get requirementCollection => $_getN(1);
+  $9.RequirementCollection get requirementCollection => $_getN(1);
   @$pb.TagNumber(2)
-  set requirementCollection(RequirementCollection value) =>
+  set requirementCollection($9.RequirementCollection value) =>
       $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasRequirementCollection() => $_has(1);
@@ -3851,9 +3852,9 @@ class PaymentAccount extends $pb.GeneratedMessage {
 
   /// 目前設定的 provider 用哪種介面開通；沒有設定收款開通時是 UNSPECIFIED。
   @$pb.TagNumber(3)
-  OnboardingSurface get onboardingSurface => $_getN(2);
+  $9.OnboardingSurface get onboardingSurface => $_getN(2);
   @$pb.TagNumber(3)
-  set onboardingSurface(OnboardingSurface value) => $_setField(3, value);
+  set onboardingSurface($9.OnboardingSurface value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasOnboardingSurface() => $_has(2);
   @$pb.TagNumber(3)
@@ -4101,7 +4102,7 @@ class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
 
 class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
   factory CreatePaymentOnboardingSessionResponse({
-    OnboardingSurface? surface,
+    $9.OnboardingSurface? surface,
     $core.String? url,
     $core.String? clientSecret,
     $1.Timestamp? expireTime,
@@ -4130,8 +4131,8 @@ class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance:
           CreatePaymentOnboardingSessionResponse.$_createMessage)
-    ..aE<OnboardingSurface>(1, _omitFieldNames ? '' : 'surface',
-        enumValues: OnboardingSurface.values)
+    ..aE<$9.OnboardingSurface>(1, _omitFieldNames ? '' : 'surface',
+        enumValues: $9.OnboardingSurface.values)
     ..aOS(2, _omitFieldNames ? '' : 'url')
     ..aOS(3, _omitFieldNames ? '' : 'clientSecret')
     ..aOM<$1.Timestamp>(4, _omitFieldNames ? '' : 'expireTime',
@@ -4168,9 +4169,9 @@ class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
   static CreatePaymentOnboardingSessionResponse? _defaultInstance;
 
   @$pb.TagNumber(1)
-  OnboardingSurface get surface => $_getN(0);
+  $9.OnboardingSurface get surface => $_getN(0);
   @$pb.TagNumber(1)
-  set surface(OnboardingSurface value) => $_setField(1, value);
+  set surface($9.OnboardingSurface value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasSurface() => $_has(0);
   @$pb.TagNumber(1)
@@ -5077,7 +5078,7 @@ class AppealUnavailability extends $pb.GeneratedMessage {
 class MeasureFinding extends $pb.GeneratedMessage {
   factory MeasureFinding({
     $core.String? id,
-    $9.PolicyCategory? category,
+    $10.PolicyCategory? category,
     ViolationSeverity? severity,
     $1.Timestamp? createTime,
   }) {
@@ -5104,8 +5105,8 @@ class MeasureFinding extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: MeasureFinding.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'id')
-    ..aE<$9.PolicyCategory>(2, _omitFieldNames ? '' : 'category',
-        enumValues: $9.PolicyCategory.values)
+    ..aE<$10.PolicyCategory>(2, _omitFieldNames ? '' : 'category',
+        enumValues: $10.PolicyCategory.values)
     ..aE<ViolationSeverity>(3, _omitFieldNames ? '' : 'severity',
         enumValues: ViolationSeverity.values)
     ..aOM<$1.Timestamp>(4, _omitFieldNames ? '' : 'createTime',
@@ -5145,9 +5146,9 @@ class MeasureFinding extends $pb.GeneratedMessage {
 
   /// 認定的類別：政策分類中平台判定與認定可用的值（不含 OTHER）。
   @$pb.TagNumber(2)
-  $9.PolicyCategory get category => $_getN(1);
+  $10.PolicyCategory get category => $_getN(1);
   @$pb.TagNumber(2)
-  set category($9.PolicyCategory value) => $_setField(2, value);
+  set category($10.PolicyCategory value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasCategory() => $_has(1);
   @$pb.TagNumber(2)

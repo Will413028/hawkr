@@ -9,11 +9,11 @@ import manifest from "../src/enum-manifest.gen.json";
 import { createUiText, formatUiMessage, type Translate } from "../src/format";
 import {
 	commonUnknown,
+	paymentPaymentAccountStatusAction,
 	sellerMeasureKind,
 	sellerMeasureRejectionCooldownWarning,
 	sellerMeasureState,
 	sellerMeasureTitleRisk,
-	sellerPaymentAccountStatusAction,
 } from "../src/keys.gen";
 import type { UiMessage } from "../src/message";
 import en from "../src/messages/en.gen.json";
@@ -90,10 +90,10 @@ describe("建構函式", () => {
 
 	it("變體：omit 的值回 undefined", () => {
 		const enabled = 4;
-		expect(sellerPaymentAccountStatusAction(enabled)).toBeUndefined();
-		expect(sellerPaymentAccountStatusAction(0)).toBeUndefined();
-		expect(sellerPaymentAccountStatusAction(5)).toEqual({
-			key: "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED",
+		expect(paymentPaymentAccountStatusAction(enabled)).toBeUndefined();
+		expect(paymentPaymentAccountStatusAction(0)).toBeUndefined();
+		expect(paymentPaymentAccountStatusAction(5)).toEqual({
+			key: "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED",
 		});
 	});
 

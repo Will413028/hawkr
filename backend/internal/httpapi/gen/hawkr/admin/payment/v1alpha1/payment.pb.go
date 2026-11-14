@@ -6,12 +6,12 @@
 
 // payment 模組給後台的 API（Stripe 計畫 D28、D30）：收款帳戶的讀取、重新整理與重試建立。收款帳戶由 payment 模組擁有，擁有者現階段是店家
 // （store_id）；賣家自己的收款帳戶讀取與開通 session 留在 SellerAppService（seller 確認店家擁有者之後呼叫 payment）。狀態與收件方式的列舉沿用
-// hawkr.seller.v1alpha1 的定義（賣家與後台看到同一組值）。
+// hawkr.payment.v1alpha1 的定義（賣家與後台看到同一組值）。
 
 package paymentv1alpha1
 
 import (
-	v1alpha1 "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
+	v1alpha1 "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -37,8 +37,8 @@ type PaymentAccount struct {
 	Provider string `protobuf:"bytes,2,opt,name=provider,proto3" json:"provider,omitempty"`
 	// 外部帳戶 ID；還沒有建立時是空字串。
 	ExternalAccountId     string                         `protobuf:"bytes,3,opt,name=external_account_id,json=externalAccountId,proto3" json:"external_account_id,omitempty"`
-	Status                v1alpha1.PaymentAccountStatus  `protobuf:"varint,4,opt,name=status,proto3,enum=hawkr.seller.v1alpha1.PaymentAccountStatus" json:"status,omitempty"`
-	RequirementCollection v1alpha1.RequirementCollection `protobuf:"varint,5,opt,name=requirement_collection,json=requirementCollection,proto3,enum=hawkr.seller.v1alpha1.RequirementCollection" json:"requirement_collection,omitempty"`
+	Status                v1alpha1.PaymentAccountStatus  `protobuf:"varint,4,opt,name=status,proto3,enum=hawkr.payment.v1alpha1.PaymentAccountStatus" json:"status,omitempty"`
+	RequirementCollection v1alpha1.RequirementCollection `protobuf:"varint,5,opt,name=requirement_collection,json=requirementCollection,proto3,enum=hawkr.payment.v1alpha1.RequirementCollection" json:"requirement_collection,omitempty"`
 	TransfersActive       bool                           `protobuf:"varint,6,opt,name=transfers_active,json=transfersActive,proto3" json:"transfers_active,omitempty"`
 	PayoutsActive         bool                           `protobuf:"varint,7,opt,name=payouts_active,json=payoutsActive,proto3" json:"payouts_active,omitempty"`
 	// 金流商回報的待補條件原始內容（物件）。
@@ -436,13 +436,13 @@ var File_hawkr_admin_payment_v1alpha1_payment_proto protoreflect.FileDescriptor
 
 const file_hawkr_admin_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"\n" +
-	"*hawkr/admin/payment/v1alpha1/payment.proto\x12\x1chawkr.admin.payment.v1alpha1\x1a\"hawkr/seller/v1alpha1/seller.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd4\x05\n" +
+	"*hawkr/admin/payment/v1alpha1/payment.proto\x12\x1chawkr.admin.payment.v1alpha1\x1a$hawkr/payment/v1alpha1/payment.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd6\x05\n" +
 	"\x0ePaymentAccount\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12\x1a\n" +
 	"\bprovider\x18\x02 \x01(\tR\bprovider\x12.\n" +
-	"\x13external_account_id\x18\x03 \x01(\tR\x11externalAccountId\x12C\n" +
-	"\x06status\x18\x04 \x01(\x0e2+.hawkr.seller.v1alpha1.PaymentAccountStatusR\x06status\x12c\n" +
-	"\x16requirement_collection\x18\x05 \x01(\x0e2,.hawkr.seller.v1alpha1.RequirementCollectionR\x15requirementCollection\x12)\n" +
+	"\x13external_account_id\x18\x03 \x01(\tR\x11externalAccountId\x12D\n" +
+	"\x06status\x18\x04 \x01(\x0e2,.hawkr.payment.v1alpha1.PaymentAccountStatusR\x06status\x12d\n" +
+	"\x16requirement_collection\x18\x05 \x01(\x0e2-.hawkr.payment.v1alpha1.RequirementCollectionR\x15requirementCollection\x12)\n" +
 	"\x10transfers_active\x18\x06 \x01(\bR\x0ftransfersActive\x12%\n" +
 	"\x0epayouts_active\x18\a \x01(\bR\rpayoutsActive\x12;\n" +
 	"\frequirements\x18\b \x01(\v2\x17.google.protobuf.StructR\frequirements\x12#\n" +
@@ -493,14 +493,14 @@ var file_hawkr_admin_payment_v1alpha1_payment_proto_goTypes = []any{
 	(*RefreshPaymentAccountResponse)(nil),     // 4: hawkr.admin.payment.v1alpha1.RefreshPaymentAccountResponse
 	(*RetryPaymentAccountCreateRequest)(nil),  // 5: hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateRequest
 	(*RetryPaymentAccountCreateResponse)(nil), // 6: hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateResponse
-	(v1alpha1.PaymentAccountStatus)(0),        // 7: hawkr.seller.v1alpha1.PaymentAccountStatus
-	(v1alpha1.RequirementCollection)(0),       // 8: hawkr.seller.v1alpha1.RequirementCollection
+	(v1alpha1.PaymentAccountStatus)(0),        // 7: hawkr.payment.v1alpha1.PaymentAccountStatus
+	(v1alpha1.RequirementCollection)(0),       // 8: hawkr.payment.v1alpha1.RequirementCollection
 	(*structpb.Struct)(nil),                   // 9: google.protobuf.Struct
 	(*timestamppb.Timestamp)(nil),             // 10: google.protobuf.Timestamp
 }
 var file_hawkr_admin_payment_v1alpha1_payment_proto_depIdxs = []int32{
-	7,  // 0: hawkr.admin.payment.v1alpha1.PaymentAccount.status:type_name -> hawkr.seller.v1alpha1.PaymentAccountStatus
-	8,  // 1: hawkr.admin.payment.v1alpha1.PaymentAccount.requirement_collection:type_name -> hawkr.seller.v1alpha1.RequirementCollection
+	7,  // 0: hawkr.admin.payment.v1alpha1.PaymentAccount.status:type_name -> hawkr.payment.v1alpha1.PaymentAccountStatus
+	8,  // 1: hawkr.admin.payment.v1alpha1.PaymentAccount.requirement_collection:type_name -> hawkr.payment.v1alpha1.RequirementCollection
 	9,  // 2: hawkr.admin.payment.v1alpha1.PaymentAccount.requirements:type_name -> google.protobuf.Struct
 	10, // 3: hawkr.admin.payment.v1alpha1.PaymentAccount.fetch_time:type_name -> google.protobuf.Timestamp
 	10, // 4: hawkr.admin.payment.v1alpha1.PaymentAccount.create_failed_time:type_name -> google.protobuf.Timestamp

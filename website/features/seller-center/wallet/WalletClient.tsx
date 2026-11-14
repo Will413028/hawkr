@@ -1,9 +1,7 @@
 "use client";
 
-import {
-	type PaymentAccount,
-	PaymentAccountStatus,
-} from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+import type { PaymentAccount } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { useQuery } from "@tanstack/react-query";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";

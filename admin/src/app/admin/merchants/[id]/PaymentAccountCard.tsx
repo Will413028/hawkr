@@ -9,10 +9,10 @@ import {
 import { PaymentAdminService } from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1/payment_pb";
 import { ReviewQueueAdminService } from "@hawkr/api/gen/hawkr/admin/reviewqueue/v1alpha1/review_queue_pb";
 import { SellerAdminService } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
-import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import {
-	sellerPaymentAccountStatus,
-	sellerRequirementCollection,
+	paymentPaymentAccountStatus,
+	paymentRequirementCollection,
 } from "@hawkr/ui-text/keys";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
@@ -128,7 +128,7 @@ export function PaymentAccountCard({
 	}
 	const account = state.account;
 	const badge = {
-		label: staffTextOrUnknown(sellerPaymentAccountStatus(account.status)),
+		label: staffTextOrUnknown(paymentPaymentAccountStatus(account.status)),
 		variant: STATUS_VARIANT[account.status] ?? "gray",
 	};
 	const failedTime = account.createFailedTime;
@@ -152,7 +152,7 @@ export function PaymentAccountCard({
 				</Field>
 				<Field label="收件方式">
 					{staffTextOrUnknown(
-						sellerRequirementCollection(account.requirementCollection),
+						paymentRequirementCollection(account.requirementCollection),
 					)}
 				</Field>
 				<Field label="轉帳能力">

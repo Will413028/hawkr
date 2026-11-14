@@ -8,7 +8,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1"
-	sellerpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
+	paymentpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
@@ -48,7 +48,7 @@ func TestAdminPaymentAccountHandlersMapTheAccountAndPassTheStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := got.Msg.GetAccount()
-	if a.GetStoreId() != "11" || a.GetProvider() != "stripe" || a.GetExternalAccountId() != "acct_1" || a.GetStatus() != sellerpb.PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_DISABLED ||
+	if a.GetStoreId() != "11" || a.GetProvider() != "stripe" || a.GetExternalAccountId() != "acct_1" || a.GetStatus() != paymentpb.PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_DISABLED ||
 		a.GetStatusReason() != reason || a.GetCreateFailedTime() == nil || a.GetFetchTime() != nil {
 		t.Fatalf("account=%v", a)
 	}

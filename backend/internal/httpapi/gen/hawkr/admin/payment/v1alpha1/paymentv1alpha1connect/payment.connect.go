@@ -4,7 +4,7 @@
 
 // payment 模組給後台的 API（Stripe 計畫 D28、D30）：收款帳戶的讀取、重新整理與重試建立。收款帳戶由 payment 模組擁有，擁有者現階段是店家
 // （store_id）；賣家自己的收款帳戶讀取與開通 session 留在 SellerAppService（seller 確認店家擁有者之後呼叫 payment）。狀態與收件方式的列舉沿用
-// hawkr.seller.v1alpha1 的定義（賣家與後台看到同一組值）。
+// hawkr.payment.v1alpha1 的定義（賣家與後台看到同一組值）。
 package paymentv1alpha1connect
 
 import (

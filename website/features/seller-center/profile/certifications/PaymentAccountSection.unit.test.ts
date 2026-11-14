@@ -5,9 +5,11 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { LocalizedMessageSchema } from "@hawkr/api/gen/google/rpc/error_details_pb";
 import {
 	OnboardingSurface,
+	PaymentAccountStatus,
+} from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+import {
 	type PaymentAccount,
 	PaymentAccountSchema,
-	PaymentAccountStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import {
 	act,

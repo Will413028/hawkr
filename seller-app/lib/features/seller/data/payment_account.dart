@@ -1,4 +1,5 @@
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -12,7 +13,7 @@ import 'account_scope.dart';
 part 'payment_account.g.dart';
 
 /// 收款帳戶卡的色調（版面，留在 client）；文字（狀態、說明、動作）全部取自共用文案目錄
-/// （`seller.PaymentAccountStatus`），這裡沒有「值 → 文字」的表。`UNSPECIFIED` 與不認得的值沒有色調（null）。
+/// （`payment.PaymentAccountStatus`），這裡沒有「值 → 文字」的表。`UNSPECIFIED` 與不認得的值沒有色調（null）。
 HkStatusTone? paymentAccountTone(
   PaymentAccountStatus status,
 ) => switch (status) {

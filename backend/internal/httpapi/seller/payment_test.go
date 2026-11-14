@@ -9,6 +9,7 @@ import (
 
 	"connectrpc.com/connect"
 
+	paymentpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
@@ -49,9 +50,9 @@ func (m *paymentModule) CreateOnboardingSession(_ context.Context, storeID int64
 
 func TestPaymentEnumsMatchTheModule(t *testing.T) {
 	for name, got := range map[string][]string{
-		"PaymentAccountStatus":  rpc.EnumMismatches[pb.PaymentAccountStatus](payment.AccountStatusValues()),
-		"RequirementCollection": rpc.EnumMismatches[pb.RequirementCollection](payment.RequirementCollectionValues()),
-		"OnboardingSurface":     rpc.EnumMismatches[pb.OnboardingSurface]([]payment.OnboardingSurface{payment.SurfaceHosted, payment.SurfaceEmbedded}),
+		"PaymentAccountStatus":  rpc.EnumMismatches[paymentpb.PaymentAccountStatus](payment.AccountStatusValues()),
+		"RequirementCollection": rpc.EnumMismatches[paymentpb.RequirementCollection](payment.RequirementCollectionValues()),
+		"OnboardingSurface":     rpc.EnumMismatches[paymentpb.OnboardingSurface]([]payment.OnboardingSurface{payment.SurfaceHosted, payment.SurfaceEmbedded}),
 	} {
 		if len(got) != 0 {
 			t.Errorf("%s：%v", name, got)
@@ -99,8 +100,8 @@ func TestGetMyPaymentAccountReturnsTheNeutralStatusAndTheProviderSurface(t *test
 		t.Fatal(err)
 	}
 	a := got.Msg.GetAccount()
-	if a.GetStatus() != pb.PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED || a.GetRequirementCollection() != pb.RequirementCollection_REQUIREMENT_COLLECTION_PLATFORM ||
-		a.GetOnboardingSurface() != pb.OnboardingSurface_ONBOARDING_SURFACE_EMBEDDED || a.GetTransfersActive() || !a.GetFetchTime().AsTime().Equal(fetched) {
+	if a.GetStatus() != paymentpb.PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED || a.GetRequirementCollection() != paymentpb.RequirementCollection_REQUIREMENT_COLLECTION_PLATFORM ||
+		a.GetOnboardingSurface() != paymentpb.OnboardingSurface_ONBOARDING_SURFACE_EMBEDDED || a.GetTransfersActive() || !a.GetFetchTime().AsTime().Equal(fetched) {
 		t.Fatalf("account=%v", a)
 	}
 	if due := a.GetRequirements().AsMap()["currently_due"]; due == nil {
@@ -108,7 +109,7 @@ func TestGetMyPaymentAccountReturnsTheNeutralStatusAndTheProviderSurface(t *test
 	}
 	m.configured = false
 	got, err = app.GetMyPaymentAccount(ctxWithStore(currentStore()), connect.NewRequest(&pb.GetMyPaymentAccountRequest{}))
-	if err != nil || got.Msg.GetAccount().GetOnboardingSurface() != pb.OnboardingSurface_ONBOARDING_SURFACE_UNSPECIFIED {
+	if err != nil || got.Msg.GetAccount().GetOnboardingSurface() != paymentpb.OnboardingSurface_ONBOARDING_SURFACE_UNSPECIFIED {
 		t.Fatalf("沒有設定收款開通：%v %v", got, err)
 	}
 }
@@ -137,7 +138,7 @@ func TestCreatePaymentOnboardingSessionValidatesTheUrlsBeforeCallingTheModule(t 
 	if m.sessionFor != 11 || m.returnURL != "https://web.example.test/ok" || m.refreshURL != "https://web.example.test/again" {
 		t.Fatalf("模組收到 store=%d return=%q refresh=%q", m.sessionFor, m.returnURL, m.refreshURL)
 	}
-	if got.Msg.GetSurface() != pb.OnboardingSurface_ONBOARDING_SURFACE_HOSTED || got.Msg.GetUrl() == "" || got.Msg.GetClientSecret() != "" || got.Msg.GetExpireTime() == nil {
+	if got.Msg.GetSurface() != paymentpb.OnboardingSurface_ONBOARDING_SURFACE_HOSTED || got.Msg.GetUrl() == "" || got.Msg.GetClientSecret() != "" || got.Msg.GetExpireTime() == nil {
 		t.Fatalf("response=%v", got.Msg)
 	}
 }

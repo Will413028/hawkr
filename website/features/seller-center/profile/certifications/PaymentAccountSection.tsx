@@ -5,9 +5,9 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { errorText } from "@hawkr/api/connect/errors";
 import {
 	OnboardingSurface,
-	type PaymentAccount,
 	PaymentAccountStatus,
-} from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+} from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+import type { PaymentAccount } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import * as React from "react";

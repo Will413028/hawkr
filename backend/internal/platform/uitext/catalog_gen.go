@@ -162,6 +162,118 @@ func (t Text) CommonUnknown() string {
 	return "未知"
 }
 
+// PaymentPaymentAccountStatus 是 payment.PaymentAccountStatus 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentPaymentAccountStatus(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "NOT_CREATED":
+			return "Preparing", true
+		case "UNDER_REVIEW":
+			return "Under review", true
+		case "ACTION_REQUIRED":
+			return "Setup needed", true
+		case "ENABLED":
+			return "Active", true
+		case "DISABLED":
+			return "Unavailable", true
+		}
+	}
+	switch v {
+	case "NOT_CREATED":
+		return "準備中", true
+	case "UNDER_REVIEW":
+		return "審核中", true
+	case "ACTION_REQUIRED":
+		return "待設定", true
+	case "ENABLED":
+		return "已啟用", true
+	case "DISABLED":
+		return "無法啟用", true
+	}
+	return "", false
+}
+
+// PaymentPaymentAccountStatusAction 是 payment.PaymentAccountStatus.action 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentPaymentAccountStatusAction(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "NOT_CREATED":
+			return "Refresh", true
+		case "UNDER_REVIEW":
+			return "Refresh", true
+		case "ACTION_REQUIRED":
+			return "Go to payout account setup", true
+		case "DISABLED":
+			return "Contact support", true
+		}
+	}
+	switch v {
+	case "NOT_CREATED":
+		return "重新整理", true
+	case "UNDER_REVIEW":
+		return "重新整理", true
+	case "ACTION_REQUIRED":
+		return "前往設定收款帳戶", true
+	case "DISABLED":
+		return "聯絡客服", true
+	}
+	return "", false
+}
+
+// PaymentPaymentAccountStatusDescription 是 payment.PaymentAccountStatus.description 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentPaymentAccountStatusDescription(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "NOT_CREATED":
+			return "We are setting up your payout account. This usually takes a few minutes.", true
+		case "UNDER_REVIEW":
+			return "The payment provider is reviewing your information. No action is needed.", true
+		case "ACTION_REQUIRED":
+			return "Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it.", true
+		case "ENABLED":
+			return "Payments are enabled.", true
+		case "DISABLED":
+			return "The payment provider cannot enable your payout account right now. Please contact support.", true
+		}
+	}
+	switch v {
+	case "NOT_CREATED":
+		return "正在建立收款帳戶，通常幾分鐘內完成。", true
+	case "UNDER_REVIEW":
+		return "金流商正在審核你的資料，不需要額外操作。", true
+	case "ACTION_REQUIRED":
+		return "提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。", true
+	case "ENABLED":
+		return "收款已啟用。", true
+	case "DISABLED":
+		return "金流商目前無法啟用你的收款帳戶，請聯絡客服。", true
+	}
+	return "", false
+}
+
+// PaymentRequirementCollection 是 payment.RequirementCollection 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentRequirementCollection(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PROVIDER":
+			return "Provider-hosted", true
+		case "PLATFORM":
+			return "Embedded on platform", true
+		}
+	}
+	switch v {
+	case "PROVIDER":
+		return "金流商收件（託管頁面）", true
+	case "PLATFORM":
+		return "平台收件（內嵌元件）", true
+	}
+	return "", false
+}
+
 // SellerContentKind 是 seller.ContentKind 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerContentKind(v string) (string, bool) {
@@ -677,118 +789,6 @@ func (t Text) SellerPaymentAccountPayoutsInactiveNote() string {
 		return "Payouts to your bank account are not enabled yet. The payment provider may ask you for more information."
 	}
 	return "撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。"
-}
-
-// SellerPaymentAccountStatus 是 seller.PaymentAccountStatus 的文案。
-// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
-func (t Text) SellerPaymentAccountStatus(v string) (string, bool) {
-	if t.Locale() == EN {
-		switch v {
-		case "NOT_CREATED":
-			return "Preparing", true
-		case "UNDER_REVIEW":
-			return "Under review", true
-		case "ACTION_REQUIRED":
-			return "Setup needed", true
-		case "ENABLED":
-			return "Active", true
-		case "DISABLED":
-			return "Unavailable", true
-		}
-	}
-	switch v {
-	case "NOT_CREATED":
-		return "準備中", true
-	case "UNDER_REVIEW":
-		return "審核中", true
-	case "ACTION_REQUIRED":
-		return "待設定", true
-	case "ENABLED":
-		return "已啟用", true
-	case "DISABLED":
-		return "無法啟用", true
-	}
-	return "", false
-}
-
-// SellerPaymentAccountStatusAction 是 seller.PaymentAccountStatus.action 的文案。
-// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
-func (t Text) SellerPaymentAccountStatusAction(v string) (string, bool) {
-	if t.Locale() == EN {
-		switch v {
-		case "NOT_CREATED":
-			return "Refresh", true
-		case "UNDER_REVIEW":
-			return "Refresh", true
-		case "ACTION_REQUIRED":
-			return "Go to payout account setup", true
-		case "DISABLED":
-			return "Contact support", true
-		}
-	}
-	switch v {
-	case "NOT_CREATED":
-		return "重新整理", true
-	case "UNDER_REVIEW":
-		return "重新整理", true
-	case "ACTION_REQUIRED":
-		return "前往設定收款帳戶", true
-	case "DISABLED":
-		return "聯絡客服", true
-	}
-	return "", false
-}
-
-// SellerPaymentAccountStatusDescription 是 seller.PaymentAccountStatus.description 的文案。
-// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
-func (t Text) SellerPaymentAccountStatusDescription(v string) (string, bool) {
-	if t.Locale() == EN {
-		switch v {
-		case "NOT_CREATED":
-			return "We are setting up your payout account. This usually takes a few minutes.", true
-		case "UNDER_REVIEW":
-			return "The payment provider is reviewing your information. No action is needed.", true
-		case "ACTION_REQUIRED":
-			return "Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it.", true
-		case "ENABLED":
-			return "Payments are enabled.", true
-		case "DISABLED":
-			return "The payment provider cannot enable your payout account right now. Please contact support.", true
-		}
-	}
-	switch v {
-	case "NOT_CREATED":
-		return "正在建立收款帳戶，通常幾分鐘內完成。", true
-	case "UNDER_REVIEW":
-		return "金流商正在審核你的資料，不需要額外操作。", true
-	case "ACTION_REQUIRED":
-		return "提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。", true
-	case "ENABLED":
-		return "收款已啟用。", true
-	case "DISABLED":
-		return "金流商目前無法啟用你的收款帳戶，請聯絡客服。", true
-	}
-	return "", false
-}
-
-// SellerRequirementCollection 是 seller.RequirementCollection 的文案。
-// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
-func (t Text) SellerRequirementCollection(v string) (string, bool) {
-	if t.Locale() == EN {
-		switch v {
-		case "PROVIDER":
-			return "Provider-hosted", true
-		case "PLATFORM":
-			return "Embedded on platform", true
-		}
-	}
-	switch v {
-	case "PROVIDER":
-		return "金流商收件（託管頁面）", true
-	case "PLATFORM":
-		return "平台收件（內嵌元件）", true
-	}
-	return "", false
 }
 
 // SellerRevokeReason 是 seller.RevokeReason 的文案。

@@ -9,6 +9,7 @@ payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monoli
 - 公開 API（根套件 `payment`）：
   - 擁有者用（seller 呼叫）：`RequestAccount`（擁有者核准的 transaction 內）、`Account`、`CreateOnboardingSession`、`SyncAccountUnlessFresh`（賣家觸發的 transaction 外同步重讀，§2）、`Capabilities`、`Configured`、`ForgetOwners`（擁有者個資清理的 transaction 內）。呼叫方先確認呼叫者是擁有者（Stripe 計畫 D30：賣家端的 `GetMyPaymentAccount`、`CreatePaymentOnboardingSession` 留在 `SellerAppService`）。
   - 後台：`RefreshAccount`、`RetryAccountCreate`，對外是 `hawkr.admin.payment.v1alpha1.PaymentAdminService`（`GetPaymentAccount`、`RefreshPaymentAccount`、`RetryPaymentAccountCreate`；權限 `payment.accounts.get`、`.refresh`、`.retry_create`）。
+  - 對外契約的收款帳戶列舉（`PaymentAccountStatus`、`RequirementCollection`、`OnboardingSurface`）由 payment 擁有，在 `hawkr.payment.v1alpha1`（`api/hawkr/payment/v1alpha1/payment.proto`）；seller 與 admin payment 的 proto 都 import 它，共用文案目錄的 key 是 `payment.PaymentAccountStatus.*`、`payment.RequirementCollection.*`。
   - webhook：`ReceiveEvent`（HTTP 入口 `POST /webhooks/stripe`，`internal/httpapi/payment`）。
   - 事件：`PayoutAccountChanged`（§5）。
 - 擁有者鍵是 `store_id`（seller 的店家；不建跨 schema FK）。出現第二種擁有者時再通用化（D28）。payment 是葉節點，不讀 seller：擁有者是否營運中經組裝點注入的 `Owners`（cmd/hawkr 以 `seller.Module.Store` 實作）。
