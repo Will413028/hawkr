@@ -98,7 +98,7 @@ final class ConnectTransportProvider
   }
 }
 
-String _$connectTransportHash() => r'f455e4d38b76be2661bbcbf11df9ed3362e04f48';
+String _$connectTransportHash() => r'd6c54218de03a7416f91a265e611afce7bef6c03';
 
 @ProviderFor(contentClient)
 final contentClientProvider = ContentClientProvider._();
@@ -350,7 +350,7 @@ final class SessionIdentityClientProvider
 }
 
 String _$sessionIdentityClientHash() =>
-    r'fe12a260e10877ee7a238127ea604118a2282126';
+    r'f7c8ded2ead753e4ca37959fdae594005b348fb5';
 
 /// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（帶 identity 的 session token；
 /// unauthenticated 時登出）。
@@ -400,4 +400,4 @@ final class ConnectAuthTransportProvider
 }
 
 String _$connectAuthTransportHash() =>
-    r'3e1ef2122e560205a197c2dfb0d264f753d5bc68';
+    r'bed9087048725f6db03c953192e7828d69226fef';

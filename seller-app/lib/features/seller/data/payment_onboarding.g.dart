@@ -160,7 +160,7 @@ final class PaymentOnboardingProvider
   }
 }
 
-String _$paymentOnboardingHash() => r'719555cb6445efa17d4b49fe68b95798345adceb';
+String _$paymentOnboardingHash() => r'eb75960199758b06f775986a6822e280b6becbe4';
 
 /// 收款帳戶的開通與自動重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
 /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面
