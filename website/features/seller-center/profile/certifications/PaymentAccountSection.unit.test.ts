@@ -145,7 +145,6 @@ beforeEach(() => {
 	mocks.summaryRefetch.mockReset();
 	mocks.refreshAndReload.mockReset();
 	mocks.refreshAndReload.mockResolvedValue(undefined);
-	vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "pk_test_dummy");
 	window.history.replaceState(null, "", "/seller-center/me/certifications");
 });
 
@@ -338,8 +337,16 @@ describe("HOSTED：導頁", () => {
 	});
 });
 
+const embeddedSession = (provider = "stripe") => ({
+	surface: "embedded",
+	clientSecret: "cs_1",
+	provider,
+	publishableKey: "pk_from_server",
+});
+
 describe("EMBEDDED：內嵌元件", () => {
-	it("展開元件、帶公開金鑰；不導頁、不在這裡建立 session", async () => {
+	it("建立 session，依伺服器給的金流商展開元件、帶伺服器給的公開金鑰；不導頁", async () => {
+		mocks.createSession.mockResolvedValue(embeddedSession());
 		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED, {
 			surface: OnboardingSurface.EMBEDDED,
 		});
@@ -347,12 +354,13 @@ describe("EMBEDDED：內嵌元件", () => {
 		await act(async () => {
 			fireEvent.click(screen.getByText("前往設定收款帳戶"));
 		});
-		expect(screen.getByTestId("embedded").dataset.key).toBe("pk_test_dummy");
+		expect(screen.getByTestId("embedded").dataset.key).toBe("pk_from_server");
 		expect(mocks.navigate).not.toHaveBeenCalled();
-		expect(mocks.createSession).not.toHaveBeenCalled();
+		expect(mocks.createSession).toHaveBeenCalledTimes(1);
 	});
 
 	it("元件的 onExit：收起元件，走共用的重讀路徑（hook）一次", async () => {
+		mocks.createSession.mockResolvedValue(embeddedSession());
 		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED, {
 			surface: OnboardingSurface.EMBEDDED,
 		});
@@ -368,8 +376,8 @@ describe("EMBEDDED：內嵌元件", () => {
 		expect(screen.queryByTestId("embedded")).toBeNull();
 	});
 
-	it("沒有公開金鑰：一般的錯誤，不展開元件、不當掉", async () => {
-		vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "");
+	it("金流商不是這個網站有元件的：顯示既有的錯誤狀態，不展開元件", async () => {
+		mocks.createSession.mockResolvedValue(embeddedSession("acme"));
 		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED, {
 			surface: OnboardingSurface.EMBEDDED,
 		});

@@ -163,9 +163,9 @@ const FakeName = account.FakeName
 // EventRetention 是收款事件原始 payload 在 inbox 的保存期。
 const EventRetention = account.EventRetention
 
-// NewStripe 建立 Stripe 的收款 provider（Accounts v2）；collection 是 CollectionProvider（託管頁面）或 CollectionPlatform（內嵌元件）。
-func NewStripe(client *stripe.Client, collection RequirementCollection) (Provider, error) {
-	p, err := account.NewStripe(client, collection)
+// NewStripe 建立 Stripe 的收款 provider（Accounts v2）；collection 是 CollectionProvider（託管頁面）或 CollectionPlatform（內嵌元件，publishableKey 必填）。
+func NewStripe(client *stripe.Client, collection RequirementCollection, publishableKey string) (Provider, error) {
+	p, err := account.NewStripe(client, collection, publishableKey)
 	if err != nil {
 		return nil, err
 	}

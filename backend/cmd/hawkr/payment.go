@@ -23,7 +23,8 @@ import (
 // readPayment 讀收款開通的 provider：PAYMENT_PROVIDER 為空表示沒有設定（核准不建立收款帳戶，開通相關的方法回 failed_precondition），
 // fake 是記憶體內的 provider（所有帳戶都回轉帳能力已啟用，只能在 requireDevEnvironment 成立的 dev 環境選到，否則啟動失敗），stripe 是 Stripe Connect（Accounts v2）；其他值讓啟動失敗。
 // stripe 讀 STRIPE_SECRET_KEY（沒有設定時等於沒有 provider，serve 照常啟動）、STRIPE_WEBHOOK_SECRET（有金鑰卻沒有它，啟動失敗）與
-// STRIPE_REQUIREMENT_COLLECTION（provider 是 Stripe 收件、託管頁面，預設；platform 是平台收件、內嵌元件；其他值啟動失敗）。
+// STRIPE_REQUIREMENT_COLLECTION（provider 是 Stripe 收件、託管頁面，預設；platform 是平台收件、內嵌元件；其他值啟動失敗）與
+// STRIPE_PUBLISHABLE_KEY（內嵌元件的公開金鑰，不是 secret；有金鑰而且是平台收件卻沒有它，啟動失敗）。
 func readPayment(e *config.Env, log *slog.Logger) payment.Provider {
 	switch name := e.StringOr("PAYMENT_PROVIDER", ""); name {
 	case "":
@@ -66,12 +67,17 @@ func readStripe(e *config.Env, log *slog.Logger) payment.Provider {
 		e.Fail("STRIPE_WEBHOOK_SECRET：設了 STRIPE_SECRET_KEY 就必填")
 		return nil
 	}
+	pubkey := e.StringOr("STRIPE_PUBLISHABLE_KEY", "")
+	if collection == payment.CollectionPlatform && pubkey == "" {
+		e.Fail("STRIPE_PUBLISHABLE_KEY：設了 STRIPE_SECRET_KEY 而且 STRIPE_REQUIREMENT_COLLECTION=platform 就必填")
+		return nil
+	}
 	client, err := stripe.New(stripe.Config{SecretKey: key, WebhookSecret: whsecret})
 	if err != nil {
 		e.Fail("Stripe：%v", err)
 		return nil
 	}
-	provider, err := payment.NewStripe(client, collection)
+	provider, err := payment.NewStripe(client, collection, pubkey)
 	if err != nil {
 		e.Fail("Stripe：%v", err)
 		return nil

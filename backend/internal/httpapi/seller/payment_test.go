@@ -23,6 +23,7 @@ type paymentModule struct {
 	returnURL  string
 	refreshURL string
 	err        error
+	session    *payment.OnboardingSession
 	// syncedFor 記下 SyncAccountUnlessFresh 被呼叫的店家；syncErr 非 nil 時同步失敗。
 	syncedFor []int64
 	syncErr   error
@@ -43,6 +44,9 @@ func (m *paymentModule) SyncAccountUnlessFresh(_ context.Context, storeID int64)
 
 func (m *paymentModule) CreateOnboardingSession(_ context.Context, storeID int64, returnURL, refreshURL string) (payment.OnboardingSession, error) {
 	m.sessionFor, m.returnURL, m.refreshURL = storeID, returnURL, refreshURL
+	if m.session != nil {
+		return *m.session, m.err
+	}
 	exp := time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)
 	return payment.OnboardingSession{Surface: payment.SurfaceHosted, URL: "https://onboarding.example.test/x", ExpiresAt: &exp}, m.err
 }
@@ -127,5 +131,26 @@ func TestCreatePaymentOnboardingSessionBuildsTheReturnUrlsOnTheServer(t *testing
 		if got.Msg.GetSurface() != paymentpb.OnboardingSurface_ONBOARDING_SURFACE_HOSTED || got.Msg.GetUrl() == "" || got.Msg.GetClientSecret() != "" {
 			t.Errorf("%s：response=%v", name, got.Msg)
 		}
+	}
+}
+
+func TestCreatePaymentOnboardingSessionCarriesTheProviderAndPublishableKeyOnlyWhenEmbedded(t *testing.T) {
+	m := &paymentModule{session: &payment.OnboardingSession{Surface: payment.SurfaceEmbedded, ClientSecret: "cs_1", Provider: "stripe", PublishableKey: "pk_test_x"}}
+	app := &App{payments: m, web: mustWebOrigin(t)}
+	req := connect.NewRequest(&pb.CreatePaymentOnboardingSessionRequest{Destination: pb.OnboardingReturnDestination_ONBOARDING_RETURN_DESTINATION_WEBSITE_CERTIFICATION, Locale: "zh-TW"})
+	got, err := app.CreatePaymentOnboardingSession(ctxWithStore(currentStore()), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Msg.GetClientSecret() != "cs_1" || got.Msg.GetProvider() != "stripe" || got.Msg.GetPublishableKey() != "pk_test_x" || got.Msg.GetUrl() != "" {
+		t.Fatalf("內嵌：%v", got.Msg)
+	}
+	m.session = nil
+	got, err = app.CreatePaymentOnboardingSession(ctxWithStore(currentStore()), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Msg.GetProvider() != "" || got.Msg.GetPublishableKey() != "" || got.Msg.GetUrl() == "" {
+		t.Fatalf("託管：%v", got.Msg)
 	}
 }

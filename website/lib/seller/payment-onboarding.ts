@@ -4,7 +4,8 @@
  * - HOSTED：呼叫 `CreatePaymentOnboardingSession`，整頁導到金流商的連結；回到 `?payment=return` 時先呼叫
  *   `RefreshMyPaymentAccount`（伺服器同步向金流商重讀，D33）再讀帳戶與開通摘要（`confirmPaymentReturn`），不輪詢；`resource_exhausted`
  *   帶 RetryInfo 由 transport 的 retryInterceptor 重試；回到 `?payment=refresh`（連結過期）時重新取得連結再導。
- * - EMBEDDED：不在這裡建立 session；內嵌元件自己呼叫 `fetchClientSecret`（每次都是新的 session）。
+ * - EMBEDDED：先建立 session 取得金流商代碼與公開金鑰（元件要它們才能初始化），依代碼選元件；第一次 `fetchClientSecret`
+ *   用這個 session 的 client secret，之後每次都是新的 session。
  */
 
 import { OnboardingSurface } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
@@ -18,9 +19,21 @@ export function paymentParamOf(value: string | null): PaymentParam | null {
 	return value === "return" || value === "refresh" ? value : null;
 }
 
+/** 這個網站有內嵌元件的金流商；伺服器回其他代碼是不能開通。 */
+export type EmbeddedProvider = "stripe";
+
+export function embeddedProviderOf(provider: string): EmbeddedProvider | null {
+	return provider === "stripe" ? "stripe" : null;
+}
+
 export type OnboardingStart =
 	| { kind: "redirect"; url: string }
-	| { kind: "embedded" };
+	| {
+			kind: "embedded";
+			provider: EmbeddedProvider;
+			publishableKey: string;
+			fetchClientSecret: () => Promise<string>;
+	  };
 
 interface StartDeps {
 	createSession: () => Promise<OnboardingSession>;
@@ -42,8 +55,28 @@ export async function startOnboarding(
 			}
 			return { kind: "redirect", url: session.url };
 		}
-		case OnboardingSurface.EMBEDDED:
-			return { kind: "embedded" };
+		case OnboardingSurface.EMBEDDED: {
+			const session = await deps.createSession();
+			if (session.surface !== "embedded") {
+				throw new Error("開通介面與伺服器告知的不一致");
+			}
+			const provider = embeddedProviderOf(session.provider);
+			if (!provider) throw new Error("不認得的金流商");
+			let first: string | null = session.clientSecret;
+			return {
+				kind: "embedded",
+				provider,
+				publishableKey: session.publishableKey,
+				fetchClientSecret: () => {
+					if (first !== null) {
+						const secret = first;
+						first = null;
+						return Promise.resolve(secret);
+					}
+					return embeddedClientSecret(deps.createSession);
+				},
+			};
+		}
 		default:
 			throw new Error("不認得的開通介面");
 	}

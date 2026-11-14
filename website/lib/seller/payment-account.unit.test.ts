@@ -92,16 +92,42 @@ describe("createPaymentOnboardingSession", () => {
 		await expect(
 			createPaymentOnboardingSession(
 				"zh-TW",
-				client({ surface: OnboardingSurface.EMBEDDED, clientSecret: "cs_1" })
-					.factory,
+				client({
+					surface: OnboardingSurface.EMBEDDED,
+					clientSecret: "cs_1",
+					provider: "stripe",
+					publishableKey: "pk_1",
+				}).factory,
 			),
-		).resolves.toEqual({ surface: "embedded", clientSecret: "cs_1" });
+		).resolves.toEqual({
+			surface: "embedded",
+			clientSecret: "cs_1",
+			provider: "stripe",
+			publishableKey: "pk_1",
+		});
 	});
 
 	it("缺對應欄位或介面未知：丟錯，不當成有效的 session", async () => {
 		for (const res of [
 			{ surface: OnboardingSurface.HOSTED, url: "" },
-			{ surface: OnboardingSurface.EMBEDDED, clientSecret: "" },
+			{
+				surface: OnboardingSurface.EMBEDDED,
+				clientSecret: "",
+				provider: "stripe",
+				publishableKey: "pk_1",
+			},
+			{
+				surface: OnboardingSurface.EMBEDDED,
+				clientSecret: "cs_1",
+				provider: "",
+				publishableKey: "pk_1",
+			},
+			{
+				surface: OnboardingSurface.EMBEDDED,
+				clientSecret: "cs_1",
+				provider: "stripe",
+				publishableKey: "",
+			},
 			{ surface: OnboardingSurface.UNSPECIFIED, url: "https://x.test" },
 		]) {
 			await expect(

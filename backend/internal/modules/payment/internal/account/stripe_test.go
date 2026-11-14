@@ -86,7 +86,7 @@ func stripeProvider(t *testing.T, collection model.RequirementCollection, h http
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := NewStripe(c, collection)
+	p, err := NewStripe(c, collection, "pk_test_x")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,15 +99,21 @@ func TestStripeCapabilitiesFollowTheCollectionMode(t *testing.T) {
 		model.CollectionProvider: {RequirementCollection: model.CollectionProvider, OnboardingSurface: model.SurfaceHosted},
 		model.CollectionPlatform: {RequirementCollection: model.CollectionPlatform, OnboardingSurface: model.SurfaceEmbedded},
 	} {
-		p, err := NewStripe(c, mode)
+		p, err := NewStripe(c, mode, "pk_test_x")
 		if err != nil || p.Capabilities() != want || p.Name() != "stripe" {
 			t.Errorf("%s：%+v %v", mode, p, err)
 		}
 	}
-	if _, err := NewStripe(c, ""); err == nil {
+	if _, err := NewStripe(c, "", "pk_test_x"); err == nil {
 		t.Error("空的收件方式通過了")
 	}
-	if _, err := NewStripe(nil, model.CollectionProvider); err == nil {
+	if _, err := NewStripe(c, model.CollectionPlatform, ""); err == nil {
+		t.Error("平台收件沒有公開金鑰通過了")
+	}
+	if _, err := NewStripe(c, model.CollectionProvider, ""); err != nil {
+		t.Errorf("託管頁面不需要公開金鑰：%v", err)
+	}
+	if _, err := NewStripe(nil, model.CollectionProvider, ""); err == nil {
 		t.Error("沒有 client 通過了")
 	}
 }
@@ -222,7 +228,7 @@ func TestStripeEnsureAccountClassifiesErrors(t *testing.T) {
 	url := srv.URL
 	srv.Close()
 	c, _ := stripe.New(stripe.Config{BaseURL: url, SecretKey: "k", WebhookSecret: "w"})
-	p, _ := NewStripe(c, model.CollectionProvider)
+	p, _ := NewStripe(c, model.CollectionProvider, "")
 	if _, err := p.EnsureAccount(context.Background(), EnsureInput{IdempotencyKey: "5", ContactEmail: "seller@example.com", Collection: model.CollectionProvider}); err == nil || errors.Is(err, ErrPermanent) {
 		t.Errorf("傳輸錯誤：%v，預期一般錯誤", err)
 	}
@@ -351,12 +357,12 @@ func TestStripeOnboardingSessionByCollectionMode(t *testing.T) {
 	// 介面取自帳戶列的收件方式；adapter 設定成相反的值，結果仍跟著列走。
 	in.Collection = model.CollectionProvider
 	hosted, err := stripeProvider(t, model.CollectionPlatform, handler).CreateOnboardingSession(context.Background(), in)
-	if err != nil || hosted.Surface != model.SurfaceHosted || hosted.URL != "https://connect.stripe.com/x" || hosted.ClientSecret != "" || hosted.ExpiresAt == nil {
+	if err != nil || hosted.Surface != model.SurfaceHosted || hosted.URL != "https://connect.stripe.com/x" || hosted.ClientSecret != "" || hosted.Provider != "" || hosted.PublishableKey != "" || hosted.ExpiresAt == nil {
 		t.Errorf("託管 %+v err=%v", hosted, err)
 	}
 	in.Collection = model.CollectionPlatform
 	embedded, err := stripeProvider(t, model.CollectionProvider, handler).CreateOnboardingSession(context.Background(), in)
-	if err != nil || embedded.Surface != model.SurfaceEmbedded || embedded.ClientSecret == "" || embedded.URL != "" || embedded.ExpiresAt == nil {
+	if err != nil || embedded.Surface != model.SurfaceEmbedded || embedded.ClientSecret == "" || embedded.URL != "" || embedded.Provider != "stripe" || embedded.PublishableKey != "pk_test_x" || embedded.ExpiresAt == nil {
 		t.Errorf("內嵌 %+v err=%v", embedded, err)
 	}
 	if fmt.Sprint(paths) != "[/v2/core/account_links /v1/account_sessions]" {

@@ -49,7 +49,7 @@ func TestFakePaymentProviderOnlyInDevEnvironment(t *testing.T) {
 }
 
 func TestStripePaymentConfig(t *testing.T) {
-	full := map[string]string{"PAYMENT_PROVIDER": "stripe", "STRIPE_SECRET_KEY": "sk_test_x", "STRIPE_WEBHOOK_SECRET": "whsec_x"}
+	full := map[string]string{"PAYMENT_PROVIDER": "stripe", "STRIPE_SECRET_KEY": "sk_test_x", "STRIPE_WEBHOOK_SECRET": "whsec_x", "STRIPE_PUBLISHABLE_KEY": "pk_test_x"}
 	with := func(kv ...string) map[string]string {
 		m := map[string]string{}
 		for k, v := range full {
@@ -74,6 +74,12 @@ func TestStripePaymentConfig(t *testing.T) {
 	}
 	if c := p.Capabilities(); c.RequirementCollection != payment.CollectionPlatform || c.OnboardingSurface != payment.SurfaceEmbedded {
 		t.Errorf("platform 要是平台收件加內嵌元件：%+v", c)
+	}
+	if _, err := readPaymentWith(with("STRIPE_REQUIREMENT_COLLECTION", "platform", "STRIPE_PUBLISHABLE_KEY", "")); err == nil || !strings.Contains(err.Error(), "STRIPE_PUBLISHABLE_KEY") {
+		t.Errorf("平台收件沒有公開金鑰：%v", err)
+	}
+	if p, err := readPaymentWith(with("STRIPE_PUBLISHABLE_KEY", "")); p == nil || err != nil {
+		t.Errorf("託管頁面不需要公開金鑰：%v %v", p, err)
 	}
 	if _, err := readPaymentWith(with("STRIPE_REQUIREMENT_COLLECTION", "both")); err == nil || !strings.Contains(err.Error(), "STRIPE_REQUIREMENT_COLLECTION") {
 		t.Errorf("不認得的收件方式：%v", err)

@@ -4061,11 +4061,15 @@ class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
     $8.OnboardingSurface? surface,
     $core.String? url,
     $core.String? clientSecret,
+    $core.String? provider,
+    $core.String? publishableKey,
   }) {
     final result = CreatePaymentOnboardingSessionResponse._();
     if (surface != null) result.surface = surface;
     if (url != null) result.url = url;
     if (clientSecret != null) result.clientSecret = clientSecret;
+    if (provider != null) result.provider = provider;
+    if (publishableKey != null) result.publishableKey = publishableKey;
     return result;
   }
 
@@ -4089,6 +4093,8 @@ class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
         enumValues: $8.OnboardingSurface.values)
     ..aOS(2, _omitFieldNames ? '' : 'url')
     ..aOS(3, _omitFieldNames ? '' : 'clientSecret')
+    ..aOS(4, _omitFieldNames ? '' : 'provider')
+    ..aOS(5, _omitFieldNames ? '' : 'publishableKey')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4148,6 +4154,26 @@ class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
   $core.bool hasClientSecret() => $_has(2);
   @$pb.TagNumber(3)
   void clearClientSecret() => $_clearField(3);
+
+  /// surface 是 EMBEDDED 時，金流商的代碼（例如 stripe），client 依它選內嵌元件；其他情況是空字串。client 不認得的值視為不能開通。
+  @$pb.TagNumber(4)
+  $core.String get provider => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set provider($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasProvider() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearProvider() => $_clearField(4);
+
+  /// surface 是 EMBEDDED 時，內嵌元件初始化用的公開金鑰（不是 secret）；其他情況是空字串。
+  @$pb.TagNumber(5)
+  $core.String get publishableKey => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set publishableKey($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPublishableKey() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPublishableKey() => $_clearField(5);
 }
 
 class GetMyKYCRequest extends $pb.GeneratedMessage {

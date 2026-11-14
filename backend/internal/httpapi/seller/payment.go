@@ -90,6 +90,7 @@ func (h *App) CreatePaymentOnboardingSession(ctx context.Context, req *connect.R
 	}
 	return connect.NewResponse(&pb.CreatePaymentOnboardingSessionResponse{
 		Surface: rpc.EnumToProto[paymentpb.OnboardingSurface](session.Surface), Url: session.URL, ClientSecret: session.ClientSecret,
+		Provider: session.Provider, PublishableKey: session.PublishableKey,
 	}), nil
 }
 

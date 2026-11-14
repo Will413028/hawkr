@@ -76,12 +76,15 @@ type PaymentAccount struct {
 	UpdatedAt      time.Time
 }
 
-// OnboardingSession 是開通用的 session：託管用 URL，內嵌用 ClientSecret。
+// OnboardingSession 是開通用的 session：託管用 URL，內嵌用 ClientSecret、Provider（金流商代碼，client 依它選元件）與
+// PublishableKey（初始化元件用的公開金鑰，不是 secret）；託管的 session 兩者都是空字串。
 type OnboardingSession struct {
-	Surface      OnboardingSurface
-	URL          string
-	ClientSecret string
-	ExpiresAt    *time.Time
+	Surface        OnboardingSurface
+	URL            string
+	ClientSecret   string
+	Provider       string
+	PublishableKey string
+	ExpiresAt      *time.Time
 }
 
 // PayoutAccountChanged 是同步 job 寫入帳戶快照的 transaction 內發布的事件（Stripe 計畫 D28）：seller 以同 transaction 的訂閱者更新開通閘門讀的

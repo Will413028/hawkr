@@ -4656,9 +4656,13 @@ type CreatePaymentOnboardingSessionResponse struct {
 	// surface 是 HOSTED 時的開通連結（一次性、短效）。
 	Url string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
 	// surface 是 EMBEDDED 時，初始化內嵌元件用的 client secret；只給這個賣家的瀏覽器，不記錄。
-	ClientSecret  string `protobuf:"bytes,3,opt,name=client_secret,json=clientSecret,proto3" json:"client_secret,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ClientSecret string `protobuf:"bytes,3,opt,name=client_secret,json=clientSecret,proto3" json:"client_secret,omitempty"`
+	// surface 是 EMBEDDED 時，金流商的代碼（例如 stripe），client 依它選內嵌元件；其他情況是空字串。client 不認得的值視為不能開通。
+	Provider string `protobuf:"bytes,4,opt,name=provider,proto3" json:"provider,omitempty"`
+	// surface 是 EMBEDDED 時，內嵌元件初始化用的公開金鑰（不是 secret）；其他情況是空字串。
+	PublishableKey string `protobuf:"bytes,5,opt,name=publishable_key,json=publishableKey,proto3" json:"publishable_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreatePaymentOnboardingSessionResponse) Reset() {
@@ -4708,6 +4712,20 @@ func (x *CreatePaymentOnboardingSessionResponse) GetUrl() string {
 func (x *CreatePaymentOnboardingSessionResponse) GetClientSecret() string {
 	if x != nil {
 		return x.ClientSecret
+	}
+	return ""
+}
+
+func (x *CreatePaymentOnboardingSessionResponse) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *CreatePaymentOnboardingSessionResponse) GetPublishableKey() string {
+	if x != nil {
+		return x.PublishableKey
 	}
 	return ""
 }
@@ -7084,11 +7102,13 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\aaccount\x18\x01 \x01(\v2%.hawkr.seller.v1alpha1.PaymentAccountR\aaccount\"\x9f\x01\n" +
 	"%CreatePaymentOnboardingSessionRequest\x12Y\n" +
 	"\vdestination\x18\x03 \x01(\x0e22.hawkr.seller.v1alpha1.OnboardingReturnDestinationB\x03\xe0A\x02R\vdestination\x12\x1b\n" +
-	"\x06locale\x18\x04 \x01(\tB\x03\xe0A\x02R\x06locale\"\xa4\x01\n" +
+	"\x06locale\x18\x04 \x01(\tB\x03\xe0A\x02R\x06locale\"\xe9\x01\n" +
 	"&CreatePaymentOnboardingSessionResponse\x12C\n" +
 	"\asurface\x18\x01 \x01(\x0e2).hawkr.payment.v1alpha1.OnboardingSurfaceR\asurface\x12\x10\n" +
 	"\x03url\x18\x02 \x01(\tR\x03url\x12#\n" +
-	"\rclient_secret\x18\x03 \x01(\tR\fclientSecret\"\x11\n" +
+	"\rclient_secret\x18\x03 \x01(\tR\fclientSecret\x12\x1a\n" +
+	"\bprovider\x18\x04 \x01(\tR\bprovider\x12'\n" +
+	"\x0fpublishable_key\x18\x05 \x01(\tR\x0epublishableKey\"\x11\n" +
 	"\x0fGetMyKYCRequest\"[\n" +
 	"\x10GetMyKYCResponse\x12G\n" +
 	"\vapplication\x18\x01 \x01(\v2%.hawkr.seller.v1alpha1.KYCApplicationR\vapplication\"\x8d\x01\n" +

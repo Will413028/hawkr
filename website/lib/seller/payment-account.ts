@@ -44,10 +44,18 @@ export async function fetchMyPaymentAccount(
 	}
 }
 
-/** 開通 session：託管頁面是 `url`，內嵌元件是 `clientSecret`；缺對應欄位的回應是契約被違反。 */
+/**
+ * 開通 session：託管頁面是 `url`，內嵌元件是 `clientSecret` 加金流商代碼 `provider` 與初始化元件用的公開金鑰
+ * `publishableKey`；缺對應欄位的回應是契約被違反。
+ */
 export type OnboardingSession =
 	| { surface: "hosted"; url: string }
-	| { surface: "embedded"; clientSecret: string };
+	| {
+			surface: "embedded";
+			clientSecret: string;
+			provider: string;
+			publishableKey: string;
+	  };
 
 /** 回跳網址由伺服器依目的地與語系組；網站頁面的回跳目的地是認證頁。 */
 export async function createPaymentOnboardingSession(
@@ -64,7 +72,14 @@ export async function createPaymentOnboardingSession(
 			return { surface: "hosted", url: res.url };
 		case OnboardingSurface.EMBEDDED:
 			if (!res.clientSecret) throw new Error("開通 client secret 為空");
-			return { surface: "embedded", clientSecret: res.clientSecret };
+			if (!res.provider) throw new Error("開通的金流商為空");
+			if (!res.publishableKey) throw new Error("開通的公開金鑰為空");
+			return {
+				surface: "embedded",
+				clientSecret: res.clientSecret,
+				provider: res.provider,
+				publishableKey: res.publishableKey,
+			};
 		default:
 			throw new Error("不認得的開通介面");
 	}

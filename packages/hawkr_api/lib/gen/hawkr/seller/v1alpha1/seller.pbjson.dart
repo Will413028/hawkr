@@ -2093,6 +2093,8 @@ const CreatePaymentOnboardingSessionResponse$json = {
     },
     {'1': 'url', '3': 2, '4': 1, '5': 9, '10': 'url'},
     {'1': 'client_secret', '3': 3, '4': 1, '5': 9, '10': 'clientSecret'},
+    {'1': 'provider', '3': 4, '4': 1, '5': 9, '10': 'provider'},
+    {'1': 'publishable_key', '3': 5, '4': 1, '5': 9, '10': 'publishableKey'},
   ],
 };
 
@@ -2101,7 +2103,9 @@ final $typed_data.Uint8List createPaymentOnboardingSessionResponseDescriptor =
     $convert.base64Decode(
         'CiZDcmVhdGVQYXltZW50T25ib2FyZGluZ1Nlc3Npb25SZXNwb25zZRJDCgdzdXJmYWNlGAEgAS'
         'gOMikuaGF3a3IucGF5bWVudC52MWFscGhhMS5PbmJvYXJkaW5nU3VyZmFjZVIHc3VyZmFjZRIQ'
-        'CgN1cmwYAiABKAlSA3VybBIjCg1jbGllbnRfc2VjcmV0GAMgASgJUgxjbGllbnRTZWNyZXQ=');
+        'CgN1cmwYAiABKAlSA3VybBIjCg1jbGllbnRfc2VjcmV0GAMgASgJUgxjbGllbnRTZWNyZXQSGg'
+        'oIcHJvdmlkZXIYBCABKAlSCHByb3ZpZGVyEicKD3B1Ymxpc2hhYmxlX2tleRgFIAEoCVIOcHVi'
+        'bGlzaGFibGVLZXk=');
 
 @$core.Deprecated('Use getMyKYCRequestDescriptor instead')
 const GetMyKYCRequest$json = {

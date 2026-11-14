@@ -28,7 +28,7 @@ import {
 	paymentAccountTone,
 } from "@/lib/seller/payment-account";
 import {
-	embeddedClientSecret,
+	type OnboardingStart,
 	PAYMENT_PARAM,
 	paymentParamOf,
 	startOnboarding,
@@ -75,7 +75,10 @@ export function PaymentAccountSection({
 	const locale = useRoutedLocale();
 	const [busy, setBusy] = React.useState(false);
 	const [confirming, setConfirming] = React.useState(false);
-	const [embeddedOpen, setEmbeddedOpen] = React.useState(false);
+	const [embedded, setEmbedded] = React.useState<Extract<
+		OnboardingStart,
+		{ kind: "embedded" }
+	> | null>(null);
 	const [failure, setFailure] = React.useState<{ error: unknown } | null>(null);
 	const accountRef = React.useRef(account);
 	accountRef.current = account;
@@ -97,7 +100,7 @@ export function PaymentAccountSection({
 					commitDocumentNavigation(started.url);
 					return;
 				}
-				setEmbeddedOpen(true);
+				setEmbedded(started);
 			} catch (error) {
 				setFailure({ error });
 			} finally {
@@ -133,7 +136,6 @@ export function PaymentAccountSection({
 		}
 	}, [platformApproved, param, account, confirm, begin]);
 
-	const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
 	const copy = account ? paymentAccountCopy(ut, account) : null;
 	const tone = account ? paymentAccountTone(account.status) : undefined;
 	const genericError = defaults(Code.Internal);
@@ -184,10 +186,6 @@ export function PaymentAccountSection({
 
 	const canOnboard = account ? paymentAccountCanOnboard(account) : false;
 	const disabled = account?.status === PaymentAccountStatus.DISABLED;
-	const missingKey =
-		embeddedOpen &&
-		account?.onboardingSurface === OnboardingSurface.EMBEDDED &&
-		publishableKey === "";
 
 	return (
 		<section
@@ -228,7 +226,7 @@ export function PaymentAccountSection({
 								size="sm"
 								isLoading={busy}
 								loadingLabel="開啟設定中…"
-								disabled={busy || embeddedOpen}
+								disabled={busy || embedded !== null}
 								onClick={() =>
 									void begin(
 										account?.onboardingSurface ?? OnboardingSurface.UNSPECIFIED,
@@ -254,17 +252,17 @@ export function PaymentAccountSection({
 					) : null}
 				</>
 			)}
-			{failure || missingKey ? (
+			{failure ? (
 				<p className="seller-cert__error" role="alert">
-					{failure ? errorText(failure.error, defaults) : genericError}
+					{errorText(failure.error, defaults)}
 				</p>
 			) : null}
-			{embeddedOpen && !missingKey && publishableKey !== "" ? (
+			{embedded?.provider === "stripe" ? (
 				<EmbeddedPaymentOnboarding
-					publishableKey={publishableKey}
-					fetchClientSecret={() => embeddedClientSecret(createSession)}
+					publishableKey={embedded.publishableKey}
+					fetchClientSecret={embedded.fetchClientSecret}
 					onExit={() => {
-						setEmbeddedOpen(false);
+						setEmbedded(null);
 						void confirm();
 					}}
 					onLoadError={() =>

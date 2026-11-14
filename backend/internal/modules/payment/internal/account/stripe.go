@@ -18,19 +18,24 @@ const StripeName = "stripe"
 // 用 none 加內嵌的 Account Session（計畫 D2、D7，spike Q9）。每次呼叫的收件方式取自帳戶列保存的值（EnsureInput、SessionInput 的 Collection），
 // 行程設定的 collection 只決定新列寫入的值（Capabilities）。
 type Stripe struct {
-	client     *stripe.Client
-	collection model.RequirementCollection
+	client         *stripe.Client
+	collection     model.RequirementCollection
+	publishableKey string
 }
 
-// NewStripe 建立 Stripe adapter；collection 只接受 CollectionProvider 與 CollectionPlatform。
-func NewStripe(client *stripe.Client, collection model.RequirementCollection) (*Stripe, error) {
+// NewStripe 建立 Stripe adapter；collection 只接受 CollectionProvider 與 CollectionPlatform。publishableKey 是內嵌元件初始化用的公開金鑰，
+// 平台收件（內嵌元件）必填，託管頁面不用。
+func NewStripe(client *stripe.Client, collection model.RequirementCollection, publishableKey string) (*Stripe, error) {
 	if client == nil {
 		return nil, errors.New("payment：Stripe client 必填")
 	}
 	if collection != model.CollectionProvider && collection != model.CollectionPlatform {
 		return nil, fmt.Errorf("payment：Stripe 不支援收件方式 %q", collection)
 	}
-	return &Stripe{client: client, collection: collection}, nil
+	if collection == model.CollectionPlatform && publishableKey == "" {
+		return nil, errors.New("payment：Stripe 平台收件需要公開金鑰")
+	}
+	return &Stripe{client: client, collection: collection, publishableKey: publishableKey}, nil
 }
 
 // Name 實作 Provider。
@@ -85,7 +90,7 @@ func (s *Stripe) CreateOnboardingSession(ctx context.Context, in SessionInput) (
 		if err != nil {
 			return model.OnboardingSession{}, classify(err)
 		}
-		return model.OnboardingSession{Surface: model.SurfaceEmbedded, ClientSecret: sess.ClientSecret, ExpiresAt: sess.ExpiresAt}, nil
+		return model.OnboardingSession{Surface: model.SurfaceEmbedded, ClientSecret: sess.ClientSecret, Provider: StripeName, PublishableKey: s.publishableKey, ExpiresAt: sess.ExpiresAt}, nil
 	case model.CollectionProvider:
 		link, err := s.client.CreateAccountLink(ctx, in.ExternalAccountID, in.ReturnURL, in.RefreshURL)
 		if err != nil {

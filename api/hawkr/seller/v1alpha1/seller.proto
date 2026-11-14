@@ -880,6 +880,10 @@ message CreatePaymentOnboardingSessionResponse {
   string url = 2;
   // surface 是 EMBEDDED 時，初始化內嵌元件用的 client secret；只給這個賣家的瀏覽器，不記錄。
   string client_secret = 3;
+  // surface 是 EMBEDDED 時，金流商的代碼（例如 stripe），client 依它選內嵌元件；其他情況是空字串。client 不認得的值視為不能開通。
+  string provider = 4;
+  // surface 是 EMBEDDED 時，內嵌元件初始化用的公開金鑰（不是 secret）；其他情況是空字串。
+  string publishable_key = 5;
 }
 
 message GetMyKYCRequest {}
