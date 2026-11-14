@@ -59,8 +59,9 @@ func EmbeddedRuntimeValues() []EmbeddedRuntime { return []EmbeddedRuntime{Runtim
 
 // PaymentAccount 是擁有者（店家）的收款帳戶：外部帳戶的本地快取（聯絡信箱不對外）。
 type PaymentAccount struct {
-	StoreID               int64
-	Provider              string
+	StoreID  int64
+	Provider string
+	// ExternalAccountID 第一步拿到就有，不代表已建立完成（看 Status：NOT_CREATED 就是還沒完成，D59）。
 	ExternalAccountID     *string
 	RequirementCollection RequirementCollection
 	Status                PaymentAccountStatus
@@ -71,10 +72,13 @@ type PaymentAccount struct {
 	// StatusReason 是導出目前狀態的金流商原因碼（只給後台）。
 	StatusReason *string
 	FetchedAt    *time.Time
-	// CreateFailedAt 是建立重試用完的時刻；只有還沒有外部帳戶的列才有。
+	// CreateFailedAt 是建立重試用完的時刻；只有還沒完成建立的列才有。
 	CreateFailedAt *time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	// PurgeBlockedAt 與 PurgeBlockedReason 是清理進終局的時刻與原因（D59）；沒有進終局時是 nil。
+	PurgeBlockedAt     *time.Time
+	PurgeBlockedReason *string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 // OnboardingSession 是開通用的 session，只有兩種形狀：HostedSession（託管連結）與各金流商的內嵌 session（目前只有 StripeEmbeddedSession）。
@@ -117,4 +121,13 @@ func Positive(ids ...int64) error {
 		}
 	}
 	return nil
+}
+
+// MappingDeletion 是管理員「已在金流商處理，刪除對應」的一筆紀錄（只增不改；帳戶列刪了之後仍在，D60）。
+type MappingDeletion struct {
+	StoreID           int64
+	Provider          string
+	ExternalAccountID *string
+	AdminID           int64
+	DeletedAt         time.Time
 }

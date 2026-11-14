@@ -1,0 +1,12 @@
+{
+  "synthetic": true,
+  "status": 400,
+  "body": {
+    "error": {
+      "type": "invalid_request_error",
+      "code": "configs_must_match_to_close",
+      "message": "All applied configurations on the account must be passed in to close it.",
+      "request_log_url": "https://dashboard.stripe.com/test/logs/req_<MASKED>"
+    }
+  }
+}

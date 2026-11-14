@@ -2,6 +2,7 @@ package payment
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -9,6 +10,8 @@ import (
 
 	adminpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1"
 	paymentpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
@@ -19,7 +22,19 @@ type paymentAdminModule struct {
 	refreshedAccount payment.Account
 	refreshed        int64
 	retried          int64
+	purgeRetried     int64
+	mappingDeleted   [2]int64
 	err              error
+}
+
+func (m *paymentAdminModule) RetryAccountPurge(_ context.Context, id int64) (payment.Account, error) {
+	m.purgeRetried = id
+	return m.account, m.err
+}
+
+func (m *paymentAdminModule) DeleteAccountMapping(_ context.Context, id, adminID int64) error {
+	m.mappingDeleted = [2]int64{id, adminID}
+	return m.err
 }
 
 func (m *paymentAdminModule) Account(context.Context, int64) (payment.Account, error) {
@@ -83,5 +98,26 @@ func TestAdminPaymentAccountHandlersMapTheAccountAndPassTheStore(t *testing.T) {
 		if apperr.KindOf(call()) != apperr.KindInvalidInput {
 			t.Errorf("%s：壞的 store_id 不是 invalid argument", name)
 		}
+	}
+}
+
+func TestAdminPurgeHandlersPassTheStoreAndTheCallingAdmin(t *testing.T) {
+	blocked := time.Date(2026, 11, 14, 1, 0, 0, 0, time.UTC)
+	reason := "provider_refused：no"
+	m := &paymentAdminModule{account: payment.Account{StoreID: 11, Provider: "stripe", PurgeBlockedAt: &blocked, PurgeBlockedReason: &reason, CreatedAt: blocked, UpdatedAt: blocked}}
+	h := NewAdmin(m)
+	got, err := h.RetryPaymentAccountPurge(context.Background(), connect.NewRequest(&adminpb.RetryPaymentAccountPurgeRequest{StoreId: "11"}))
+	if err != nil || m.purgeRetried != 11 || got.Msg.GetAccount().GetPurgeBlockedReason() != reason || got.Msg.GetAccount().GetPurgeBlockedTime() == nil {
+		t.Fatalf("retry purge: %v %d %v", err, m.purgeRetried, got)
+	}
+	ctx := rpc.WithPrincipal(context.Background(), identity.Principal{Kind: identity.PrincipalAdmin, ID: 77})
+	if _, err := h.DeletePaymentAccountMapping(ctx, connect.NewRequest(&adminpb.DeletePaymentAccountMappingRequest{StoreId: "11"})); err != nil || m.mappingDeleted != [2]int64{11, 77} {
+		t.Fatalf("delete mapping: %v %v", err, m.mappingDeleted)
+	}
+	if _, err := h.DeletePaymentAccountMapping(context.Background(), connect.NewRequest(&adminpb.DeletePaymentAccountMappingRequest{StoreId: "11"})); !errors.Is(err, errNoPrincipal) {
+		t.Fatalf("沒有管理員 principal 時預期 errNoPrincipal：%v", err)
+	}
+	if _, err := h.DeletePaymentAccountMapping(ctx, connect.NewRequest(&adminpb.DeletePaymentAccountMappingRequest{StoreId: "0"})); apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("壞的 store_id 不是 invalid argument：%v", err)
 	}
 }

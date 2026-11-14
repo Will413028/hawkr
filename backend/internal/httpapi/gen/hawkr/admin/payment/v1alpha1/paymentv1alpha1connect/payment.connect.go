@@ -2,7 +2,7 @@
 //
 // Source: hawkr/admin/payment/v1alpha1/payment.proto
 
-// payment 模組給後台的 API（Stripe 計畫 D28、D30）：收款帳戶的讀取、重新整理與重試建立。收款帳戶由 payment 模組擁有，擁有者現階段是店家
+// payment 模組給後台的 API（Stripe 計畫 D28、D30）：收款帳戶的讀取、重新整理、重試建立，以及清理無法完成時的重試關閉與刪除對應。收款帳戶由 payment 模組擁有，擁有者現階段是店家
 // （store_id）；賣家自己的收款帳戶讀取與開通 session 留在 SellerAppService（seller 確認店家擁有者之後呼叫 payment）。狀態與收件方式的列舉沿用
 // hawkr.payment.v1alpha1 的定義（賣家與後台看到同一組值）。
 package paymentv1alpha1connect
@@ -45,6 +45,12 @@ const (
 	// PaymentAdminServiceRetryPaymentAccountCreateProcedure is the fully-qualified name of the
 	// PaymentAdminService's RetryPaymentAccountCreate RPC.
 	PaymentAdminServiceRetryPaymentAccountCreateProcedure = "/hawkr.admin.payment.v1alpha1.PaymentAdminService/RetryPaymentAccountCreate"
+	// PaymentAdminServiceRetryPaymentAccountPurgeProcedure is the fully-qualified name of the
+	// PaymentAdminService's RetryPaymentAccountPurge RPC.
+	PaymentAdminServiceRetryPaymentAccountPurgeProcedure = "/hawkr.admin.payment.v1alpha1.PaymentAdminService/RetryPaymentAccountPurge"
+	// PaymentAdminServiceDeletePaymentAccountMappingProcedure is the fully-qualified name of the
+	// PaymentAdminService's DeletePaymentAccountMapping RPC.
+	PaymentAdminServiceDeletePaymentAccountMappingProcedure = "/hawkr.admin.payment.v1alpha1.PaymentAdminService/DeletePaymentAccountMapping"
 )
 
 // PaymentAdminServiceClient is a client for the hawkr.admin.payment.v1alpha1.PaymentAdminService
@@ -60,6 +66,13 @@ type PaymentAdminServiceClient interface {
 	// RetryPaymentAccountCreate 對建立失敗（重試用完，後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED）的收款帳戶重新排入建立。沒有 etag，由狀態檢查保護：
 	// 帳戶不是建立失敗的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。
 	RetryPaymentAccountCreate(context.Context, *connect.Request[v1alpha1.RetryPaymentAccountCreateRequest]) (*connect.Response[v1alpha1.RetryPaymentAccountCreateResponse], error)
+	// RetryPaymentAccountPurge 對清理進了終局（後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK：金流商拒絕關閉，或等待清理超過 7 天仍關不掉）的收款帳戶重試關閉：
+	// 清除終局、期限從現在重新計算，並重新排入清理。帳戶不是終局的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。
+	RetryPaymentAccountPurge(context.Context, *connect.Request[v1alpha1.RetryPaymentAccountPurgeRequest]) (*connect.Response[v1alpha1.RetryPaymentAccountPurgeResponse], error)
+	// DeletePaymentAccountMapping 是「已在金流商處理，刪除對應」：只有清理進了終局的收款帳戶可以做，管理員確認金流商那邊的帳戶已另行處理。
+	// 不呼叫金流商；同一個交易寫一筆只增不改的紀錄（店家、金流商、外部帳戶 ID、操作的管理員與時間）並刪除帳戶列。帳戶不是終局的狀態回 failed_precondition，
+	// 店家沒有收款帳戶回 not_found。需要權限 payment.accounts.delete_mapping。
+	DeletePaymentAccountMapping(context.Context, *connect.Request[v1alpha1.DeletePaymentAccountMappingRequest]) (*connect.Response[v1alpha1.DeletePaymentAccountMappingResponse], error)
 }
 
 // NewPaymentAdminServiceClient constructs a client for the
@@ -93,14 +106,28 @@ func NewPaymentAdminServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(paymentAdminServiceMethods.ByName("RetryPaymentAccountCreate")),
 			connect.WithClientOptions(opts...),
 		),
+		retryPaymentAccountPurge: connect.NewClient[v1alpha1.RetryPaymentAccountPurgeRequest, v1alpha1.RetryPaymentAccountPurgeResponse](
+			httpClient,
+			baseURL+PaymentAdminServiceRetryPaymentAccountPurgeProcedure,
+			connect.WithSchema(paymentAdminServiceMethods.ByName("RetryPaymentAccountPurge")),
+			connect.WithClientOptions(opts...),
+		),
+		deletePaymentAccountMapping: connect.NewClient[v1alpha1.DeletePaymentAccountMappingRequest, v1alpha1.DeletePaymentAccountMappingResponse](
+			httpClient,
+			baseURL+PaymentAdminServiceDeletePaymentAccountMappingProcedure,
+			connect.WithSchema(paymentAdminServiceMethods.ByName("DeletePaymentAccountMapping")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // paymentAdminServiceClient implements PaymentAdminServiceClient.
 type paymentAdminServiceClient struct {
-	getPaymentAccount         *connect.Client[v1alpha1.GetPaymentAccountRequest, v1alpha1.GetPaymentAccountResponse]
-	refreshPaymentAccount     *connect.Client[v1alpha1.RefreshPaymentAccountRequest, v1alpha1.RefreshPaymentAccountResponse]
-	retryPaymentAccountCreate *connect.Client[v1alpha1.RetryPaymentAccountCreateRequest, v1alpha1.RetryPaymentAccountCreateResponse]
+	getPaymentAccount           *connect.Client[v1alpha1.GetPaymentAccountRequest, v1alpha1.GetPaymentAccountResponse]
+	refreshPaymentAccount       *connect.Client[v1alpha1.RefreshPaymentAccountRequest, v1alpha1.RefreshPaymentAccountResponse]
+	retryPaymentAccountCreate   *connect.Client[v1alpha1.RetryPaymentAccountCreateRequest, v1alpha1.RetryPaymentAccountCreateResponse]
+	retryPaymentAccountPurge    *connect.Client[v1alpha1.RetryPaymentAccountPurgeRequest, v1alpha1.RetryPaymentAccountPurgeResponse]
+	deletePaymentAccountMapping *connect.Client[v1alpha1.DeletePaymentAccountMappingRequest, v1alpha1.DeletePaymentAccountMappingResponse]
 }
 
 // GetPaymentAccount calls hawkr.admin.payment.v1alpha1.PaymentAdminService.GetPaymentAccount.
@@ -120,6 +147,18 @@ func (c *paymentAdminServiceClient) RetryPaymentAccountCreate(ctx context.Contex
 	return c.retryPaymentAccountCreate.CallUnary(ctx, req)
 }
 
+// RetryPaymentAccountPurge calls
+// hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountPurge.
+func (c *paymentAdminServiceClient) RetryPaymentAccountPurge(ctx context.Context, req *connect.Request[v1alpha1.RetryPaymentAccountPurgeRequest]) (*connect.Response[v1alpha1.RetryPaymentAccountPurgeResponse], error) {
+	return c.retryPaymentAccountPurge.CallUnary(ctx, req)
+}
+
+// DeletePaymentAccountMapping calls
+// hawkr.admin.payment.v1alpha1.PaymentAdminService.DeletePaymentAccountMapping.
+func (c *paymentAdminServiceClient) DeletePaymentAccountMapping(ctx context.Context, req *connect.Request[v1alpha1.DeletePaymentAccountMappingRequest]) (*connect.Response[v1alpha1.DeletePaymentAccountMappingResponse], error) {
+	return c.deletePaymentAccountMapping.CallUnary(ctx, req)
+}
+
 // PaymentAdminServiceHandler is an implementation of the
 // hawkr.admin.payment.v1alpha1.PaymentAdminService service.
 type PaymentAdminServiceHandler interface {
@@ -133,6 +172,13 @@ type PaymentAdminServiceHandler interface {
 	// RetryPaymentAccountCreate 對建立失敗（重試用完，後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED）的收款帳戶重新排入建立。沒有 etag，由狀態檢查保護：
 	// 帳戶不是建立失敗的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。
 	RetryPaymentAccountCreate(context.Context, *connect.Request[v1alpha1.RetryPaymentAccountCreateRequest]) (*connect.Response[v1alpha1.RetryPaymentAccountCreateResponse], error)
+	// RetryPaymentAccountPurge 對清理進了終局（後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK：金流商拒絕關閉，或等待清理超過 7 天仍關不掉）的收款帳戶重試關閉：
+	// 清除終局、期限從現在重新計算，並重新排入清理。帳戶不是終局的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。
+	RetryPaymentAccountPurge(context.Context, *connect.Request[v1alpha1.RetryPaymentAccountPurgeRequest]) (*connect.Response[v1alpha1.RetryPaymentAccountPurgeResponse], error)
+	// DeletePaymentAccountMapping 是「已在金流商處理，刪除對應」：只有清理進了終局的收款帳戶可以做，管理員確認金流商那邊的帳戶已另行處理。
+	// 不呼叫金流商；同一個交易寫一筆只增不改的紀錄（店家、金流商、外部帳戶 ID、操作的管理員與時間）並刪除帳戶列。帳戶不是終局的狀態回 failed_precondition，
+	// 店家沒有收款帳戶回 not_found。需要權限 payment.accounts.delete_mapping。
+	DeletePaymentAccountMapping(context.Context, *connect.Request[v1alpha1.DeletePaymentAccountMappingRequest]) (*connect.Response[v1alpha1.DeletePaymentAccountMappingResponse], error)
 }
 
 // NewPaymentAdminServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -161,6 +207,18 @@ func NewPaymentAdminServiceHandler(svc PaymentAdminServiceHandler, opts ...conne
 		connect.WithSchema(paymentAdminServiceMethods.ByName("RetryPaymentAccountCreate")),
 		connect.WithHandlerOptions(opts...),
 	)
+	paymentAdminServiceRetryPaymentAccountPurgeHandler := connect.NewUnaryHandler(
+		PaymentAdminServiceRetryPaymentAccountPurgeProcedure,
+		svc.RetryPaymentAccountPurge,
+		connect.WithSchema(paymentAdminServiceMethods.ByName("RetryPaymentAccountPurge")),
+		connect.WithHandlerOptions(opts...),
+	)
+	paymentAdminServiceDeletePaymentAccountMappingHandler := connect.NewUnaryHandler(
+		PaymentAdminServiceDeletePaymentAccountMappingProcedure,
+		svc.DeletePaymentAccountMapping,
+		connect.WithSchema(paymentAdminServiceMethods.ByName("DeletePaymentAccountMapping")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hawkr.admin.payment.v1alpha1.PaymentAdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case PaymentAdminServiceGetPaymentAccountProcedure:
@@ -169,6 +227,10 @@ func NewPaymentAdminServiceHandler(svc PaymentAdminServiceHandler, opts ...conne
 			paymentAdminServiceRefreshPaymentAccountHandler.ServeHTTP(w, r)
 		case PaymentAdminServiceRetryPaymentAccountCreateProcedure:
 			paymentAdminServiceRetryPaymentAccountCreateHandler.ServeHTTP(w, r)
+		case PaymentAdminServiceRetryPaymentAccountPurgeProcedure:
+			paymentAdminServiceRetryPaymentAccountPurgeHandler.ServeHTTP(w, r)
+		case PaymentAdminServiceDeletePaymentAccountMappingProcedure:
+			paymentAdminServiceDeletePaymentAccountMappingHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -188,4 +250,12 @@ func (UnimplementedPaymentAdminServiceHandler) RefreshPaymentAccount(context.Con
 
 func (UnimplementedPaymentAdminServiceHandler) RetryPaymentAccountCreate(context.Context, *connect.Request[v1alpha1.RetryPaymentAccountCreateRequest]) (*connect.Response[v1alpha1.RetryPaymentAccountCreateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountCreate is not implemented"))
+}
+
+func (UnimplementedPaymentAdminServiceHandler) RetryPaymentAccountPurge(context.Context, *connect.Request[v1alpha1.RetryPaymentAccountPurgeRequest]) (*connect.Response[v1alpha1.RetryPaymentAccountPurgeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountPurge is not implemented"))
+}
+
+func (UnimplementedPaymentAdminServiceHandler) DeletePaymentAccountMapping(context.Context, *connect.Request[v1alpha1.DeletePaymentAccountMappingRequest]) (*connect.Response[v1alpha1.DeletePaymentAccountMappingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.payment.v1alpha1.PaymentAdminService.DeletePaymentAccountMapping is not implemented"))
 }

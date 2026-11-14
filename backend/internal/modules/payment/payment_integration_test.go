@@ -242,7 +242,7 @@ func (f *fixture) ensure(t *testing.T, storeID int64) string {
 func (f *fixture) set(t *testing.T, storeID int64, s Snapshot) {
 	t.Helper()
 	external := ""
-	if a := f.account(t, storeID); a.ExternalAccountID != nil {
+	if a := f.account(t, storeID); a.Status != StatusNotCreated {
 		external = *a.ExternalAccountID
 	} else {
 		external = f.ensure(t, storeID)
@@ -301,12 +301,12 @@ func TestRequestQueuesOneAccountCreationAndAReplayedCreateKeepsOneExternalAccoun
 		t.Fatalf("建立後排入的同步 job=%v", got)
 	}
 	must(t, f.module.EnsureAccount(ctx, s, false))
-	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET external_account_id = NULL, status = 'NOT_CREATED' WHERE store_id = $1", s)
+	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET external_account_id = NULL, create_completed_at = NULL, status = 'NOT_CREATED' WHERE store_id = $1", s)
 	must(t, err)
 	second := f.ensure(t, s)
 	var stored string
 	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT create_idempotency_key::text FROM payment.accounts WHERE store_id = $1", s).Scan(&stored))
-	if keys := f.fake.EnsureKeys(); len(keys) != 2 || keys[0] != stored || keys[1] != stored || len(stored) != 36 || stored[14] != '4' {
+	if keys := f.fake.AcquireKeys(); len(keys) != 2 || keys[0] != stored || keys[1] != stored || len(stored) != 36 || stored[14] != '4' {
 		t.Fatalf("兩次建立送出的冪等鍵=%v，列上保存的 v4 UUID=%q", keys, stored)
 	}
 	if second != first || f.fake.Accounts() != 1 {
@@ -344,7 +344,7 @@ func TestRequestKeepsAnExistingRow(t *testing.T) {
 	if got := f.jobs.storeIDs(t, kindEnsure); len(got) != 2 {
 		t.Fatalf("已建立的帳戶又排了建立 job：%v", got)
 	}
-	if got := f.fake.EnsureEmails(); !slices.Equal(got, []string{"second@example.com"}) {
+	if got := f.fake.ConfigureEmails(); !slices.Equal(got, []string{"second@example.com"}) {
 		t.Fatalf("provider 收到的信箱=%v，預期建立當下擁有者的信箱", got)
 	}
 }
@@ -357,7 +357,7 @@ func TestEnsureReadsTheOwnersContactEmailAtCreationTime(t *testing.T) {
 	s := f.newStore(t)
 	f.owners.setEmail(s, "new@example.com")
 	f.ensure(t, s)
-	if got := f.fake.EnsureEmails(); !slices.Equal(got, []string{"new@example.com"}) {
+	if got := f.fake.ConfigureEmails(); !slices.Equal(got, []string{"new@example.com"}) {
 		t.Fatalf("provider 收到的信箱=%v", got)
 	}
 	if f.count(t, "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'payment' AND table_name = 'accounts' AND column_name = 'contact_email'") != 0 {
@@ -384,7 +384,7 @@ func TestEnsureWithoutAContactEmailRecordsACreateFailureAndNeverCallsTheProvider
 	_, err := f.module.RetryAccountCreate(ctx, s)
 	must(t, err)
 	f.ensure(t, s)
-	if got := f.fake.EnsureEmails(); !slices.Equal(got, []string{"late@example.com"}) {
+	if got := f.fake.ConfigureEmails(); !slices.Equal(got, []string{"late@example.com"}) {
 		t.Fatalf("重試時 provider 收到的信箱=%v", got)
 	}
 }
@@ -727,7 +727,7 @@ func TestEachOwnerGetsItsOwnCreateIdempotencyKey(t *testing.T) {
 	f := setup(t)
 	a, b := f.newStore(t), f.newStore(t)
 	ea, eb := f.ensure(t, a), f.ensure(t, b)
-	keys := f.fake.EnsureKeys()
+	keys := f.fake.AcquireKeys()
 	if len(keys) != 2 || keys[0] == keys[1] || ea == eb {
 		t.Fatalf("keys=%v accounts=%s %s", keys, ea, eb)
 	}
@@ -780,7 +780,7 @@ func TestCreateFailureAfterTheLastAttemptQueuesAReviewItemAndRetryClearsIt(t *te
 	f := setup(t)
 	s := f.newStore(t)
 	boom := errors.New("provider 暫時無法使用")
-	f.fake.FailEnsure(boom, boom)
+	f.fake.FailAcquire(boom, boom)
 	if err := f.module.EnsureAccount(ctx, s, false); !errors.Is(err, boom) {
 		t.Fatalf("中途的失敗 err=%v", err)
 	}
@@ -812,7 +812,7 @@ func TestCreateFailureAfterTheLastAttemptQueuesAReviewItemAndRetryClearsIt(t *te
 	if _, err := f.module.RetryAccountCreate(ctx, s+1000); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("沒有帳戶的擁有者重試 err=%v", err)
 	}
-	f.fake.FailEnsure(ErrPermanent)
+	f.fake.FailAcquire(ErrPermanent)
 	must(t, f.module.EnsureAccount(ctx, s, false))
 	if a := f.account(t, s); a.CreateFailedAt == nil {
 		t.Fatalf("永久失敗沒有記成建立失敗：%+v", a)
@@ -1007,7 +1007,7 @@ func TestPurgeOfAnAlreadyClosedAccountStillDeletesTheRow(t *testing.T) {
 	external := f.ensure(t, s)
 	must(t, f.module.PurgeAccount(ctx, s, false))
 	f.request(t, s, "again@example.com")
-	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET external_account_id = $2, status = 'ACTION_REQUIRED' WHERE store_id = $1", s, external)
+	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET external_account_id = $2, create_called_at = $3, create_completed_at = $3, status = 'ACTION_REQUIRED' WHERE store_id = $1", s, external, f.now)
 	must(t, err)
 	must(t, f.module.PurgeAccount(ctx, s, false))
 	if got := f.fake.Closes(); !slices.Equal(got, []string{external, external}) || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 {
@@ -1076,33 +1076,141 @@ func TestAFailedCloseKeepsTheRowMarkedExcludedFromPollingAndRetriedByTheSweep(t 
 	}
 }
 
-// 關閉的失敗是永久的（金流商沒有這個帳戶，重試不會成功）：第一次嘗試就把列標成等待清理，不等重試用完。
-// mutation：永久失敗也回傳錯誤等重試 → 列沒有被標記，失敗。
-func TestAPermanentCloseFailureMarksTheRowOnTheFirstAttempt(t *testing.T) {
+// 關閉被金流商永久拒絕（例如沒有這個帳戶，重試不會成功）：第一次嘗試就進終局（D59）：列留著、記下進終局的時刻與原因，進後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK，
+// 週期掃描不再重排清理，清理 job 再跑也不動它。
+// mutation：永久失敗只回傳錯誤等重試／只標記不進終局（不呼叫 BlockPaymentAccountPurge）→ purge_blocked_at 是 NULL，失敗；Sweep 的清理查詢不排除終局的列 → 掃描重排了它，失敗。
+func TestAPermanentCloseRefusalPutsTheRowInTheTerminalStateAndTheSweepStops(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
 	s := f.newStore(t)
-	f.ensure(t, s)
+	external := f.ensure(t, s)
 	f.fake.FailClose(fmt.Errorf("%w：沒有這個帳戶", ErrPermanent))
 	must(t, f.module.PurgeAccount(ctx, s, false))
-	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_pending_at IS NOT NULL", s) != 1 {
-		t.Fatal("永久失敗後列應該留著並標成等待清理")
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_pending_at IS NOT NULL AND purge_blocked_at = $2 AND purge_blocked_reason LIKE 'provider_refused%'", s, f.now) != 1 {
+		t.Fatal("永久拒絕後列應該留著並進終局（時刻是現在、原因以 provider_refused 開頭）")
+	}
+	a := f.account(t, s)
+	if a.PurgeBlockedAt == nil || a.PurgeBlockedReason == nil || a.ExternalAccountID == nil || *a.ExternalAccountID != external {
+		t.Fatalf("帳戶 %+v，預期帶終局的時刻與原因、外部 ID 仍在", a)
+	}
+	if n := f.count(t, "SELECT count(*) FROM payment.pub_review_items($1) WHERE store_id = $2 AND kind = 'PAYMENT_ACCOUNT_PURGE_STUCK' AND start_at = $3", f.now.Add(time.Hour), s, f.now); n != 1 {
+		t.Fatalf("終局的列在後台待辦的項目數=%d，預期 1（開始時間是進終局的時刻）", n)
+	}
+	closes, purges := len(f.fake.Closes()), f.jobs.count(kindPurge)
+	synced, _, err := f.module.SweepAccounts(ctx)
+	must(t, err)
+	if synced != 0 || f.jobs.count(kindPurge) != purges {
+		t.Fatalf("週期掃描重排了終局的列：synced=%d 清理 job %d→%d", synced, purges, f.jobs.count(kindPurge))
+	}
+	f.now = f.now.Add(30 * 24 * time.Hour)
+	must(t, f.module.PurgeAccount(ctx, s, true))
+	if len(f.fake.Closes()) != closes || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 1 {
+		t.Fatalf("終局的列又被清理 job 處理：關閉 %d→%d", closes, len(f.fake.Closes()))
 	}
 }
 
-// 沒有外部 ID 的列（D55）：以列上的冪等鍵取得外部帳戶、關閉它、再刪列；provider 與目前設定不同的列不關也不刪，記警示 log 並標成等待清理，等設定回來再清理
-// （刪掉就永遠找不到外部帳戶）。
-// mutation 1：沒有外部 ID 直接刪列（m2）→ 沒有取得也沒有關閉，失敗。mutation 2：provider 不符也刪列 → 列不見，失敗。
-func TestPurgeDeletesRowsWithoutAnExternalAccountAndKeepsRowsOfAnotherProvider(t *testing.T) {
+// 逾期（D60：標成等待清理 7 天）：仍然問不到 provider（沒有設定）或暫時性的失敗一直沒好，列進終局，原因是 provider_unconfigured 或 deadline_exceeded；期限內不進。
+// mutation：不檢查期限（expired 恆為 false）→ 兩個逾期案例失敗；期限改成 8 天 → 邊界（7 天又 1 秒）失敗。
+func TestAPurgeThatCannotReachTheProviderForSevenDaysEntersTheTerminalState(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
-	fresh := f.newStore(t)
-	must(t, f.module.PurgeAccount(ctx, fresh, false))
-	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", fresh) != 0 || len(f.fake.Closes()) != 1 || len(f.fake.Resolves()) != 1 {
-		t.Fatalf("沒有外部 ID 的列應該以冪等鍵取得外部帳戶、關閉、再刪：關閉=%v 取得=%v", f.fake.Closes(), f.fake.Resolves())
+	noProvider := New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()})
+
+	// 呼叫過、沒有外部 ID、沒有設定 provider：期限內留著，7 天後進終局。
+	called := f.newStore(t)
+	f.fake.FailAcquire(errors.New("down"))
+	_ = f.module.EnsureAccount(ctx, called, false)
+	must(t, noProvider.PurgeAccount(ctx, called, true))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_pending_at IS NOT NULL AND purge_blocked_at IS NULL", called) != 1 {
+		t.Fatal("期限內應該留著並標成等待清理、不進終局")
 	}
+	f.now = f.now.Add(PurgeDeadline).Add(time.Second)
+	must(t, noProvider.PurgeAccount(ctx, called, true))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_blocked_at = $2 AND purge_blocked_reason LIKE 'provider_unconfigured%'", called, f.now) != 1 {
+		t.Fatal("逾期仍問不到 provider，應該進終局（provider_unconfigured）")
+	}
+
+	// 有外部 ID、provider 可用但關閉一直暫時性失敗：期限內回傳錯誤重試，逾期進終局。
+	flaky := f.newStore(t)
+	f.ensure(t, flaky)
+	boom := errors.New("provider down")
+	f.fake.FailClose(boom, boom)
+	if err := f.module.PurgeAccount(ctx, flaky, false); !errors.Is(err, boom) {
+		t.Fatalf("期限內的暫時性失敗要回傳給 River 重試：%v", err)
+	}
+	f.now = f.now.Add(PurgeDeadline).Add(time.Second)
+	must(t, f.module.PurgeAccount(ctx, flaky, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_blocked_at = $2 AND purge_blocked_reason LIKE 'deadline_exceeded%'", flaky, f.now) != 1 {
+		t.Fatal("逾期的暫時性失敗應該進終局（deadline_exceeded）")
+	}
+}
+
+// calledRow 回傳一家「呼叫過 provider、沒有外部 ID」的店家：建立的第一次呼叫在 provider 那邊建好帳戶但回應遺失（結果不明），列上有「已呼叫」的時刻、沒有外部 ID。
+// provider 那邊的帳戶 ID 一併回傳。
+func (f *fixture) calledRow(t *testing.T) (storeID int64, providerID string) {
+	t.Helper()
+	storeID = f.newStore(t)
+	f.fake.FailAcquireAfterCreate(errors.New("timeout"))
+	if err := f.module.EnsureAccount(context.Background(), storeID, false); err == nil {
+		t.Fatal("回應遺失的建立應回錯誤")
+	}
+	a := f.account(t, storeID)
+	if a.ExternalAccountID != nil || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND create_called_at IS NOT NULL", storeID) != 1 {
+		t.Fatalf("呼叫過的列應該有已呼叫時刻、沒有外部 ID：%+v", a)
+	}
+	id, found, err := f.fake.ResolveAccount(deadlineCtx(t), ResolveInput{StoreID: storeID})
+	if err != nil || !found {
+		t.Fatalf("provider 那邊應該已有帳戶：found=%v err=%v", found, err)
+	}
+	return storeID, id
+}
+
+func deadlineCtx(t *testing.T) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	t.Cleanup(cancel)
+	return ctx
+}
+
+// 從沒呼叫過 provider 的列（建立 job 還沒跑、沒有「已呼叫」時刻）清理時直接刪，不需要 provider（D59）：有設定 provider 與沒有設定都不呼叫它；呼叫過的列（結果不明）不直接刪，
+// 沒有 provider 可用時留著。
+// mutation 1：建立不寫「已呼叫」時刻（markCalled 不寫）→ 呼叫過的列也被直接刪，「呼叫過的不被刪」失敗；mutation 2：從沒呼叫過的列也走 provider（planPurge 只看外部 ID）→
+// 從沒呼叫過的列在沒有 provider 時留著，失敗。
+func TestPurgeDeletesNeverCalledRowsWithoutAProviderAndKeepsCalledRows(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	noProvider := New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()})
+
+	never := f.newStore(t)
+	must(t, noProvider.PurgeAccount(ctx, never, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", never) != 0 {
+		t.Fatal("從沒呼叫過的列在沒有 provider 時應該直接刪")
+	}
+	neverConfigured := f.newStore(t)
+	must(t, f.module.PurgeAccount(ctx, neverConfigured, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", neverConfigured) != 0 {
+		t.Fatal("從沒呼叫過的列有 provider 時也應該直接刪")
+	}
+	if ensures, _, _ := f.fake.Calls(); ensures != 0 || len(f.fake.Closes()) != 0 || len(f.fake.Resolves()) != 0 {
+		t.Fatalf("直接刪的列不該呼叫 provider：取得 %d 關閉 %v 列出 %v", ensures, f.fake.Closes(), f.fake.Resolves())
+	}
+
+	called, _ := f.calledRow(t)
+	must(t, noProvider.PurgeAccount(ctx, called, true))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_pending_at IS NOT NULL", called) != 1 {
+		t.Fatal("呼叫過的列在沒有 provider 時不能刪，要留著並標成等待清理")
+	}
+}
+
+// 別的 provider 的列（呼叫過）不關也不刪，記警示 log 並標成等待清理，等設定回來再清理（刪掉就永遠找不到外部帳戶）；沒有設定 provider 時同樣不刪。
+// mutation：provider 不符也關閉或刪列 → 關閉紀錄多一筆或列不見，失敗。
+func TestPurgeKeepsRowsOfAnotherProviderAndWithoutAConfiguredProvider(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
 	other := f.newStore(t)
 	f.ensure(t, other)
 	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET provider = 'stripe' WHERE store_id = $1", other)
@@ -1112,8 +1220,8 @@ func TestPurgeDeletesRowsWithoutAnExternalAccountAndKeepsRowsOfAnotherProvider(t
 	if got := f.fake.Closes(); !slices.Equal(got, closedBefore) {
 		t.Fatalf("別的 provider 的帳戶被關閉：之前=%v 之後=%v", closedBefore, got)
 	}
-	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_pending_at IS NOT NULL", other) != 1 {
-		t.Fatal("別的 provider 的列應該留著並標成等待清理")
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_pending_at IS NOT NULL AND purge_blocked_at IS NULL", other) != 1 {
+		t.Fatal("別的 provider 的列應該留著並標成等待清理（期限內不進終局）")
 	}
 	if !bytes.Contains(f.logs.Bytes(), []byte("level=WARN")) || !bytes.Contains(f.logs.Bytes(), []byte("store_id="+fmt.Sprint(other))) {
 		t.Fatalf("沒有警示 log：%s", f.logs.String())
@@ -1125,13 +1233,14 @@ func TestPurgeDeletesRowsWithoutAnExternalAccountAndKeepsRowsOfAnotherProvider(t
 	}
 }
 
-// 沒有外部 ID 的列清理：取得外部帳戶之後先把 ID 存回已標記的列、才關閉；關閉成功但刪列失敗時，重試走有外部 ID 的路，不再取得（已關閉帳戶的同一把鍵重放是永久失敗），列最後被刪除。
-// mutation：關閉放在存 ID 之前 → 刪列失敗後列上沒有外部 ID，重試取得已關閉的帳戶失敗，列留著，失敗（尚未本機執行，需要資料庫）。
-func TestPurgeRetryAfterCloseSucceededButDeleteFailedDoesNotResolveAClosedAccount(t *testing.T) {
+// 呼叫過、沒有外部 ID、冪等鍵 30 天內：以同一把鍵取得 ID（同一個帳戶）、先存回標記的列、才關閉；關閉成功但刪列失敗時，重試走有外部 ID 的路，不再取得
+// （已關閉帳戶的同一把鍵重放是永久失敗），列最後被刪除。
+// mutation：關閉放在存 ID 之前 → 刪列失敗後列上沒有外部 ID，重試重放已關閉帳戶的鍵失敗而進終局，列留著，失敗。
+func TestPurgeRetryAfterCloseSucceededButDeleteFailedDoesNotReplayAClosedAccountsKey(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
-	s := f.newStore(t)
+	s, providerID := f.calledRow(t)
 	_, err := f.db.Conn(ctx).Exec(ctx, `CREATE OR REPLACE FUNCTION payment.test_block_delete() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'delete blocked'; END $$`)
 	must(t, err)
 	_, err = f.db.Conn(ctx).Exec(ctx, `CREATE TRIGGER test_block_delete BEFORE DELETE ON payment.accounts FOR EACH ROW WHEN (OLD.store_id = `+fmt.Sprint(s)+`) EXECUTE FUNCTION payment.test_block_delete()`)
@@ -1139,31 +1248,35 @@ func TestPurgeRetryAfterCloseSucceededButDeleteFailedDoesNotResolveAClosedAccoun
 	if err := f.module.PurgeAccount(ctx, s, false); err == nil {
 		t.Fatal("刪列被擋，清理應回錯誤")
 	}
-	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND external_account_id IS NOT NULL AND purge_pending_at IS NOT NULL", s) != 1 || len(f.fake.Closes()) != 1 {
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND external_account_id = $2 AND purge_pending_at IS NOT NULL", s, providerID) != 1 || !slices.Equal(f.fake.Closes(), []string{providerID}) {
 		t.Fatalf("關閉之前應該已把外部 ID 存回標記的列：關閉=%v", f.fake.Closes())
 	}
 	_, err = f.db.Conn(ctx).Exec(ctx, `DROP TRIGGER test_block_delete ON payment.accounts`)
 	must(t, err)
+	acquires := len(f.fake.AcquireKeys())
 	must(t, f.module.PurgeAccount(ctx, s, false))
-	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 || len(f.fake.Resolves()) != 1 {
-		t.Fatalf("重試應該刪列且不再取得帳戶：取得=%v", f.fake.Resolves())
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 || len(f.fake.AcquireKeys()) != acquires {
+		t.Fatalf("重試應該刪列且不再取得帳戶：取得 %d→%d", acquires, len(f.fake.AcquireKeys()))
 	}
 }
 
-// 沒有外部 ID 的列取得帳戶失敗：清理 job 在呼叫 provider 之前已標記，最後一次失敗後列留著，週期掃描重排清理；標記的列不被建立、不被管理員重試建立、不被閒置建立的補排；重排的清理成功後刪列。
-// mutation 0：沒有外部 ID 的列不標記 → 失敗後沒有標記，失敗（尚未本機執行，需要資料庫）。mutation 1：閒置建立的查詢不排除 purge_pending_at → 標記的列被補排建立，失敗。
-func TestAFailedResolveKeepsTheMarkedRowWithoutExternalIDAndTheSweepRetriesIt(t *testing.T) {
+// 呼叫過、沒有外部 ID 的列取得帳戶失敗：清理 job 在呼叫 provider 之前已標記，最後一次失敗後列留著（期限內不進終局），週期掃描重排清理；標記的列不被建立、
+// 不被管理員重試建立、不被閒置建立的補排；重排的清理成功後刪列。
+// mutation 0：沒有外部 ID 的列不標記 → 失敗後沒有標記，失敗。mutation 1：閒置建立的查詢不排除 purge_pending_at → 標記的列被補排建立，失敗。
+func TestAFailedAcquireKeepsTheMarkedRowWithoutExternalIDAndTheSweepRetriesIt(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
 	s := f.newStore(t)
+	f.fake.FailAcquire(errors.New("down"))
+	_ = f.module.EnsureAccount(ctx, s, false)
 	boom := errors.New("provider down")
-	f.fake.FailResolve(boom, boom)
+	f.fake.FailAcquire(boom, boom)
 	if err := f.module.PurgeAccount(ctx, s, false); !errors.Is(err, boom) {
 		t.Fatalf("暫時性的失敗要回傳給 River 重試：%v", err)
 	}
 	must(t, f.module.PurgeAccount(ctx, s, true))
-	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND external_account_id IS NULL AND purge_pending_at IS NOT NULL", s) != 1 {
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND external_account_id IS NULL AND purge_pending_at IS NOT NULL AND purge_blocked_at IS NULL", s) != 1 {
 		t.Fatal("最後一次失敗後沒有外部 ID 的列應該留著並標成等待清理")
 	}
 	before := f.jobs.count(kindEnsure)
@@ -1190,41 +1303,252 @@ func TestAFailedResolveKeepsTheMarkedRowWithoutExternalIDAndTheSweepRetriesIt(t 
 	}
 }
 
-// 建立的第一次呼叫結果未知、信箱又改了：重試沿用同一把鍵，provider 回同一個帳戶，帶的是這次的信箱（D55）；不會多出第二個帳戶。
-// mutation：Fake 的建立不以鍵回同一個帳戶 → 出現第二個帳戶，失敗。
+// 建立的第一次呼叫結果未知、信箱又改了：重試沿用同一把鍵，provider 回同一個帳戶，完成設定帶的是這次的信箱（D55）；不會多出第二個帳戶。
+// mutation：Fake 的取得不以鍵回同一個帳戶 → 出現第二個帳戶，失敗。
 func TestARetriedCreateWithAChangedEmailKeepsOneExternalAccount(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	s := f.newStore(t)
 	f.owners.setEmail(s, "old@example.com")
-	f.fake.FailEnsureAfterCreate(errors.New("timeout"))
+	f.fake.FailAcquireAfterCreate(errors.New("timeout"))
 	_ = f.module.EnsureAccount(context.Background(), s, false)
 	f.owners.setEmail(s, "new@example.com")
 	f.ensure(t, s)
-	if got := f.fake.EnsureEmails(); !slices.Equal(got, []string{"old@example.com", "new@example.com"}) || f.fake.Accounts() != 1 {
+	if got := f.fake.ConfigureEmails(); !slices.Equal(got, []string{"new@example.com"}) || f.fake.Accounts() != 1 {
 		t.Fatalf("信箱=%v 帳戶數=%d", got, f.fake.Accounts())
 	}
-	if a := f.account(t, s); a.ExternalAccountID == nil {
+	if a := f.account(t, s); a.ExternalAccountID == nil || a.Status != StatusActionRequired {
 		t.Fatalf("帳戶=%+v", a)
 	}
 }
 
-// 清理遇到沒有外部 ID 但 provider 那邊已經建好帳戶的列（建立成功、ID 還沒寫入前程序被殺）：取得到的是同一個帳戶，關閉它再刪列，不留下沒人關的帳戶。
+// 清理遇到呼叫過、沒有外部 ID、但 provider 那邊已經建好帳戶的列（建立成功、ID 還沒寫入前程序被殺；冪等鍵 30 天內）：重送同一把鍵取得的是同一個帳戶，關閉它再刪列，
+// 不留下沒人關的帳戶。
 // mutation：沒有外部 ID 直接刪列 → 沒有關閉，失敗。
 func TestPurgeOfARowWhoseAccountWasCreatedButNeverStoredClosesThatAccount(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
-	s := f.newStore(t)
-	key := f.key(t, s)
-	id, err := f.fake.ResolveAccount(ctx, account.ResolveInput{StoreID: s, IdempotencyKey: key})
-	must(t, err)
+	s, id := f.calledRow(t)
 	must(t, f.module.PurgeAccount(ctx, s, false))
-	if got := f.fake.Closes(); !slices.Equal(got, []string{id}) || f.fake.Accounts() != 1 {
-		t.Fatalf("關閉=%v 帳戶數=%d，預期關閉 %s", got, f.fake.Accounts(), id)
+	if got := f.fake.Closes(); !slices.Equal(got, []string{id}) || f.fake.Accounts() != 1 || len(f.fake.AcquireKeys()) != 2 {
+		t.Fatalf("關閉=%v 帳戶數=%d，預期重送同一把鍵（取得 2 次）並關閉 %s", got, f.fake.Accounts(), id)
 	}
 	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 {
 		t.Fatal("列應該已刪除")
+	}
+}
+
+// 冪等鍵超過 30 天：清理走列出對帳（metadata.store_id），不重送同一把鍵（過期之後重送會建出新帳戶）：找到就關閉再刪，整份列完都沒有才刪列；列出失敗不刪。
+// mutation：一律重送（planPurge 不看 30 天）→ Fake 在鍵過期後建出第二個帳戶，關閉的不是原帳戶，列出次數 0，失敗；列出失敗仍刪列 → 失敗案例的列不見。
+func TestPurgeAfterTheIdempotencyKeyExpiredReconcilesByListingNotByReplay(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s, id := f.calledRow(t)
+	f.fake.ExpireKeys()
+	f.now = f.now.Add(IdempotencyRetention).Add(time.Hour)
+	acquires := len(f.fake.AcquireKeys())
+	must(t, f.module.PurgeAccount(ctx, s, false))
+	if got := f.fake.Closes(); !slices.Equal(got, []string{id}) || len(f.fake.AcquireKeys()) != acquires || f.fake.Accounts() != 1 {
+		t.Fatalf("關閉=%v 取得 %d→%d 帳戶數=%d，預期列出找到並關閉 %s、沒有重送", got, acquires, len(f.fake.AcquireKeys()), f.fake.Accounts(), id)
+	}
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 {
+		t.Fatal("關閉成功後列應該刪除")
+	}
+
+	// 整份列完都沒有（provider 那邊沒有帳戶）：不關閉、直接刪列。
+	none := f.newStore(t)
+	f.fake.FailAcquire(errors.New("down"))
+	_ = f.module.EnsureAccount(ctx, none, false)
+	f.now = f.now.Add(IdempotencyRetention).Add(time.Hour)
+	closes := len(f.fake.Closes())
+	must(t, f.module.PurgeAccount(ctx, none, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", none) != 0 || len(f.fake.Closes()) != closes {
+		t.Fatal("整份列完都沒有帳戶時應該不關閉、直接刪列")
+	}
+
+	// 列出失敗：不能當成沒有帳戶，列留著。
+	broken := f.newStore(t)
+	f.fake.FailAcquire(errors.New("down"))
+	_ = f.module.EnsureAccount(ctx, broken, false)
+	f.now = f.now.Add(IdempotencyRetention).Add(time.Hour)
+	boom := errors.New("list failed")
+	f.fake.FailResolve(boom)
+	if err := f.module.PurgeAccount(ctx, broken, false); !errors.Is(err, boom) {
+		t.Fatalf("列出失敗要回傳給 River 重試：%v", err)
+	}
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", broken) != 1 {
+		t.Fatal("列出失敗不得刪列")
+	}
+}
+
+// 建立路徑同一套規則：冪等鍵超過 30 天，建立先列出對帳：找到（結果不明但帳戶已建好）就用它、不建第二個；整份列完都沒有才換新鍵，已呼叫的時刻改成現在。
+// mutation：建立一律重送舊鍵 → 鍵過期後 Fake 建出第二個帳戶；不換鍵就重送 → 新帳戶沿用舊鍵與舊的已呼叫時刻，兩個斷言失敗。
+func TestEnsureAfterTheIdempotencyKeyExpiredReconcilesByListingAndOnlyThenRotatesTheKey(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s, id := f.calledRow(t)
+	oldKey := f.key(t, s)
+	f.fake.ExpireKeys()
+	f.now = f.now.Add(IdempotencyRetention).Add(time.Hour)
+	must(t, f.module.EnsureAccount(ctx, s, false))
+	if a := f.account(t, s); a.ExternalAccountID == nil || *a.ExternalAccountID != id || f.fake.Accounts() != 1 || f.key(t, s) != oldKey {
+		t.Fatalf("鍵過期後建立應該列出找到原帳戶 %s、不建第二個、不換鍵：%+v 帳戶數=%d", id, a, f.fake.Accounts())
+	}
+
+	// 沒有帳戶（第一次呼叫在 provider 那邊沒有建出來）：換新鍵再取得。
+	fresh := f.newStore(t)
+	f.fake.FailAcquire(errors.New("down"))
+	_ = f.module.EnsureAccount(ctx, fresh, false)
+	oldFreshKey := f.key(t, fresh)
+	f.now = f.now.Add(IdempotencyRetention).Add(time.Hour)
+	must(t, f.module.EnsureAccount(ctx, fresh, false))
+	if f.key(t, fresh) == oldFreshKey || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND create_called_at = $2 AND external_account_id IS NOT NULL AND create_completed_at IS NOT NULL", fresh, f.now) != 1 {
+		t.Fatal("整份列完都沒有帳戶時應該換新鍵、已呼叫的時刻改成現在，並完成建立")
+	}
+}
+
+// 建立的第一步拿到外部 ID 就寫進列，不等第二步（D59）：第二步失敗時列上已有外部 ID、已呼叫時刻，但還沒完成建立：對外仍是未建立（狀態 NOT_CREATED），不可開通、不輪詢、
+// 不同步、不重新整理、收款事件也不排同步；重試從第二步接續，不再取得 ID（同一個帳戶），第二步成功才完成。
+// mutation：改回兩步都成功才寫 ID（SetPaymentAccountExternal 移到第二步之後）→ 第二步失敗後列上沒有外部 ID，失敗；半建立的列改回看外部 ID 判斷已建立（sessionTarget、syncRow、
+// 輪詢）→ 可開通／被同步，失敗。
+func TestTheFirstStepIDIsKeptWhenTheSecondStepFailsAndAHalfCreatedRowIsNotOnboardable(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	boom := errors.New("configure failed")
+	f.fake.FailConfigure(boom)
+	if err := f.module.EnsureAccount(ctx, s, false); !errors.Is(err, boom) {
+		t.Fatalf("第二步暫時性失敗要回傳給 River 重試：%v", err)
+	}
+	a := f.account(t, s)
+	if a.ExternalAccountID == nil || a.Status != StatusNotCreated || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND create_called_at IS NOT NULL AND create_completed_at IS NULL", s) != 1 {
+		t.Fatalf("第二步失敗後列上應該已有外部 ID、已呼叫時刻、沒有完成時刻：%+v", a)
+	}
+	external := *a.ExternalAccountID
+	if got := f.jobs.storeIDs(t, kindSync); slices.Contains(got, s) {
+		t.Fatalf("半建立的列排了同步：%v", got)
+	}
+	if _, err := f.module.CreateOnboardingSession(ctx, s, "https://r", "https://f", nil); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("半建立的列開通 err=%v，預期 failed_precondition", err)
+	}
+	if _, err := f.module.RefreshAccount(ctx, s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("半建立的列重新整理 err=%v，預期 failed_precondition", err)
+	}
+	if err := f.module.SyncAccountUnlessFresh(ctx, s); err != nil {
+		t.Fatalf("賣家重新整理 err=%v，預期成功且不讀 provider", err)
+	}
+	if again, err := f.module.SyncAccount(ctx, s); err != nil || again {
+		t.Fatalf("同步 job again=%v err=%v", again, err)
+	}
+	f.fake.Set(external, needsSellerSnapshot)
+	f.receive(t, "evt_half", external)
+	if again, err := f.module.SyncAccount(ctx, s); err != nil || again {
+		t.Fatalf("收事件之後同步 job again=%v err=%v", again, err)
+	}
+	synced, _, err := f.module.SweepAccounts(ctx)
+	must(t, err)
+	if _, fetches, sessions := f.fake.Calls(); fetches != 0 || sessions != 0 || synced != 0 || f.jobs.count(kindSync) != 0 {
+		t.Fatalf("半建立的列被讀或被輪詢：讀取 %d 開通 %d 掃描排入 %d 同步 job %d", fetches, sessions, synced, f.jobs.count(kindSync))
+	}
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND status = 'NOT_CREATED' AND fetched_at IS NULL", s) != 1 {
+		t.Fatal("半建立的列被同步改寫")
+	}
+
+	// 重試從第二步接續：不再取得 ID，同一個帳戶，完成之後才可以開通與同步。
+	acquires := len(f.fake.AcquireKeys())
+	must(t, f.module.EnsureAccount(ctx, s, false))
+	done := f.account(t, s)
+	if len(f.fake.AcquireKeys()) != acquires || done.ExternalAccountID == nil || *done.ExternalAccountID != external || done.Status != StatusActionRequired || f.fake.Accounts() != 1 {
+		t.Fatalf("重試應該沿用已寫入的外部 ID 直接完成第二步：取得 %d→%d %+v", acquires, len(f.fake.AcquireKeys()), done)
+	}
+	if got := f.jobs.storeIDs(t, kindSync); !slices.Equal(got, []int64{s}) {
+		t.Fatalf("完成建立後排入的同步 job=%v", got)
+	}
+}
+
+// 第二步用完重試仍失敗：外部 ID 留在列上，記下建立失敗的時刻進後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED；管理員重試建立之後從第二步接續。
+// mutation：失敗路徑清掉外部 ID → 重試重新取得 ID（取得次數增加），失敗。
+func TestAFinalSecondStepFailureKeepsTheIDAndRetryResumesAtTheSecondStep(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	f.fake.FailConfigure(fmt.Errorf("%w：拒絕", ErrPermanent))
+	must(t, f.module.EnsureAccount(ctx, s, false))
+	a := f.account(t, s)
+	if a.ExternalAccountID == nil || a.CreateFailedAt == nil || a.Status != StatusNotCreated {
+		t.Fatalf("帳戶=%+v，預期外部 ID 仍在、記下建立失敗", a)
+	}
+	if n := f.count(t, "SELECT count(*) FROM payment.pub_review_items($1) WHERE store_id = $2 AND kind = 'PAYMENT_ACCOUNT_CREATE_FAILED'", f.now, s); n != 1 {
+		t.Fatalf("建立失敗的待辦項目數=%d", n)
+	}
+	acquires := len(f.fake.AcquireKeys())
+	_, err := f.module.RetryAccountCreate(ctx, s)
+	must(t, err)
+	must(t, f.module.EnsureAccount(ctx, s, false))
+	if len(f.fake.AcquireKeys()) != acquires || f.account(t, s).Status != StatusActionRequired || f.fake.Accounts() != 1 {
+		t.Fatalf("管理員重試之後應該從第二步接續：取得 %d→%d", acquires, len(f.fake.AcquireKeys()))
+	}
+}
+
+// 管理員「重試關閉」：只有終局的列可以（清除終局、等待清理的時刻重設成現在、重新排入清理）；「已在金流商處理，刪除對應」：只有終局的列可以，寫一筆只增不改的紀錄
+// （店家、provider、外部 ID、操作的管理員與時間）並刪列、不呼叫 provider，紀錄在列刪了之後仍可讀回。權限（payment.accounts.delete_mapping）由 adminauth 的宣告表擋，見 adminauth 的測試。
+// mutation 1：DeleteMapping 不寫紀錄 → 讀回 0 筆，失敗；mutation 2：DeleteMapping 不檢查終局 → 非終局的列也被刪，失敗；mutation 3：RetryPurge 不重設等待清理的時刻 → 重試後立刻又逾期，失敗。
+func TestAdminRetryPurgeAndDeleteMappingActOnlyOnTheTerminalStateAndLeaveARecord(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	f.ensure(t, s)
+	if _, err := f.module.RetryAccountPurge(ctx, s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("非終局的重試關閉 err=%v，預期 failed_precondition", err)
+	}
+	if err := f.module.DeleteAccountMapping(ctx, s, 7); apperr.KindOf(err) != apperr.KindFailedPrecondition || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 1 {
+		t.Fatalf("非終局的刪除對應 err=%v，預期 failed_precondition 且列還在", err)
+	}
+	f.fake.FailClose(fmt.Errorf("%w：拒絕", ErrPermanent))
+	must(t, f.module.PurgeAccount(ctx, s, false))
+	if f.account(t, s).PurgeBlockedAt == nil {
+		t.Fatal("應該進終局")
+	}
+
+	f.now = f.now.Add(3 * 24 * time.Hour)
+	purges := f.jobs.count(kindPurge)
+	a, err := f.module.RetryAccountPurge(ctx, s)
+	must(t, err)
+	if a.PurgeBlockedAt != nil || f.jobs.count(kindPurge) != purges+1 || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_pending_at = $2", s, f.now) != 1 {
+		t.Fatalf("重試關閉應清除終局、重設等待清理的時刻、排入清理：%+v", a)
+	}
+	must(t, f.module.PurgeAccount(ctx, s, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 {
+		t.Fatal("重試關閉成功後應該刪列")
+	}
+
+	// 刪除對應：再做一次終局，再由管理員確認已在金流商處理。
+	s2 := f.newStore(t)
+	external2 := f.ensure(t, s2)
+	f.fake.FailClose(fmt.Errorf("%w：拒絕", ErrPermanent))
+	must(t, f.module.PurgeAccount(ctx, s2, false))
+	closes := len(f.fake.Closes())
+	f.now = f.now.Add(time.Hour)
+	must(t, f.module.DeleteAccountMapping(ctx, s2, 7))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s2) != 0 || len(f.fake.Closes()) != closes {
+		t.Fatalf("刪除對應應該刪列且不呼叫 provider：關閉 %d→%d", closes, len(f.fake.Closes()))
+	}
+	got, err := f.module.AccountMappingDeletions(ctx, s2)
+	must(t, err)
+	if len(got) != 1 || got[0].StoreID != s2 || got[0].Provider != FakeName || got[0].ExternalAccountID == nil || *got[0].ExternalAccountID != external2 || got[0].AdminID != 7 || !got[0].DeletedAt.Equal(f.now) {
+		t.Fatalf("紀錄=%+v，預期店家、provider、外部 ID %s、管理員 7、時間 %s", got, external2, f.now)
+	}
+	if other, _ := f.module.AccountMappingDeletions(ctx, s); len(other) != 0 {
+		t.Fatalf("別家店的紀錄不該出現：%+v", other)
+	}
+	if err := f.module.DeleteAccountMapping(ctx, s2, 7); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("列已刪的再刪除對應 err=%v，預期 not_found", err)
 	}
 }
 

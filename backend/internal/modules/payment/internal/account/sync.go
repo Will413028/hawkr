@@ -19,7 +19,7 @@ import (
 // 更新開通閘門的副本、把 fingerprint 寫成防詐 hash、閘門的輸入有變時重新公告；全域鎖順序 payment 先於 seller），並經 platform inbox 把這個外部帳戶在
 // 讀取開始前收到的事件整批標為已處理（D29：收款事件只是「重讀帳戶」的訊號，handler 不標記，由涵蓋它的同步標記）。同步可能和別的同步並行（job 與
 // seller 的同步重讀）：寫入只在這次的讀取開始時間不早於已存的 fetched_at 時進行（D32），被擋下的這次不寫、不標記、不發布，但仍以唯讀的 RoutePending
-// 回答 again（較晚開始的那次標記了在它開始之前收到的事件，之後收到的還在，由這個 again 讓呼叫方再跑一輪）。沒有帳戶列、還沒有外部 ID 的什麼都不做。
+// 回答 again（較晚開始的那次標記了在它開始之前收到的事件，之後收到的還在，由這個 again 讓呼叫方再跑一輪）。沒有帳戶列、還沒完成建立的什麼都不做。
 // again 為 true 表示還有未處理的事件（唯一鍵排除了新 job）：呼叫方稍後再跑一輪。重讀失敗回傳錯誤，由 River 重試；外部帳戶不存在是
 // 永久失敗（ErrPermanent），回傳給 job 取消。
 func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err error) {
@@ -39,7 +39,7 @@ func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err erro
 // syncRow 是 Sync 的本體，row 是呼叫方剛讀到的帳戶列（只用它的外部 ID 與 provider，寫入在 transaction 內重新鎖列）。
 func (s *Service) syncRow(ctx context.Context, row store.PaymentAccount) (again bool, err error) {
 	p := s.d.Provider
-	if row.ExternalAccountID == nil || row.Provider != p.Name() || row.PurgePendingAt != nil {
+	if row.ExternalAccountID == nil || row.CreateCompletedAt == nil || row.Provider != p.Name() || row.PurgePendingAt != nil {
 		return false, nil
 	}
 	storeID := row.StoreID
@@ -62,7 +62,7 @@ func (s *Service) syncRow(ctx context.Context, row store.PaymentAccount) (again 
 		if err != nil {
 			return err
 		}
-		if before.ExternalAccountID == nil || *before.ExternalAccountID != external {
+		if before.ExternalAccountID == nil || before.CreateCompletedAt == nil || *before.ExternalAccountID != external {
 			return nil
 		}
 		now := s.d.Now().UTC()
@@ -132,7 +132,7 @@ func busyOutcome(claimedAt, fetchedAt *time.Time, now time.Time) error {
 // SyncUnlessFresh 是賣家與管理員觸發的同步重讀（RefreshMyPaymentAccount、後台的 RefreshPaymentAccount）：先以單一條件式 UPDATE 搶讀取名額（ClaimPaymentAccountSellerRead）；搶到才讀
 // （同一列沿用，不重讀）。搶不到時不呼叫 provider，依列上的時間回答（busyRetryAfter）：快取已涵蓋占名額的讀取就成功，否則（那次讀取失敗或還在進行中）
 // 回 ResourceExhausted 並帶窗的剩餘秒數，client 照它重試，失敗不會被快取蓋掉。這個限制的成立條件是外部讀取由賣家或管理員觸發、頻率不受 job 的唯一鍵約束，
-// 拿掉這些觸發的呼叫時一起拿掉。沒有設定 provider 回 FailedPrecondition；沒有帳戶列或還沒有外部 ID 時什麼都不做（快取就是現況）。
+// 拿掉這些觸發的呼叫時一起拿掉。沒有設定 provider 回 FailedPrecondition；沒有帳戶列或還沒完成建立時什麼都不做（快取就是現況）。
 // 讀完仍有未處理的事件（again，例如被 D32 擋下而事件是在較晚的讀取之後到的）就在自己的 transaction 內排同步 job（唯一鍵合併），
 // 這個寫入不隨呼叫者取消。重讀失敗是明確動作的失敗：暫時性的回 Unavailable，外部帳戶不存在這類永久失敗回 FailedPrecondition；呼叫者自己取消的原樣回傳。
 func (s *Service) SyncUnlessFresh(ctx context.Context, storeID int64) error {
@@ -153,7 +153,7 @@ func (s *Service) SyncUnlessFresh(ctx context.Context, storeID int64) error {
 		if err != nil {
 			return err
 		}
-		if cur.ExternalAccountID == nil {
+		if cur.CreateCompletedAt == nil {
 			return nil
 		}
 		return busyOutcome(cur.SellerReadClaimedAt, cur.FetchedAt, now)
@@ -194,7 +194,7 @@ func (s *Service) Refresh(ctx context.Context, storeID int64) (model.PaymentAcco
 	if err != nil {
 		return model.PaymentAccount{}, err
 	}
-	if row.ExternalAccountID == nil {
+	if row.CreateCompletedAt == nil {
 		return model.PaymentAccount{}, apperr.FailedPrecondition("收款帳戶還沒有建立")
 	}
 	if row.PurgePendingAt != nil {
@@ -224,7 +224,7 @@ func (s *Service) RetryCreate(ctx context.Context, storeID int64) (model.Payment
 		if err != nil {
 			return err
 		}
-		if locked.ExternalAccountID != nil || locked.CreateFailedAt == nil {
+		if locked.CreateCompletedAt != nil || locked.CreateFailedAt == nil {
 			return apperr.FailedPrecondition("收款帳戶不是建立失敗的狀態")
 		}
 		if locked.PurgePendingAt != nil {
@@ -245,7 +245,7 @@ func (s *Service) RetryCreate(ctx context.Context, storeID int64) (model.Payment
 	return ToModel(out), nil
 }
 
-// CreateOnboardingSession 為店家的帳戶產生開通 session（託管連結或內嵌元件）。外部呼叫在 transaction 外。帳戶還沒有外部 ID 回 FailedPrecondition。
+// CreateOnboardingSession 為店家的帳戶產生開通 session（託管連結或內嵌元件）。外部呼叫在 transaction 外。帳戶還沒完成建立（含只有外部 ID、第二步沒成功的半建立列）回 FailedPrecondition。
 // session 的形狀由 ChooseSession 決定：只看帳戶列保存的 provider 與收件方式，加上呼叫端宣告的內嵌執行環境（runtimes，空表示不能內嵌）。
 func (s *Service) CreateOnboardingSession(ctx context.Context, storeID int64, returnURL, refreshURL string, runtimes []model.EmbeddedRuntime) (model.OnboardingSession, error) {
 	if s.d.Provider == nil {
@@ -305,7 +305,7 @@ func sessionTarget(row store.PaymentAccount, providerName string) (model.Payment
 		return model.PaymentAccount{}, apperr.FailedPrecondition("收款帳戶正在關閉")
 	}
 	acct := ToModel(row)
-	if acct.ExternalAccountID == nil || acct.Provider != providerName {
+	if row.CreateCompletedAt == nil || acct.ExternalAccountID == nil || acct.Provider != providerName {
 		return model.PaymentAccount{}, apperr.FailedPrecondition("收款帳戶還沒有建立")
 	}
 	if acct.Status == model.PaymentDisabled {

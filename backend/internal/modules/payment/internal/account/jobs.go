@@ -181,7 +181,7 @@ func (w *purgeWorker) Timeout(*river.Job[PurgeArgs]) time.Duration { return jobT
 // Sweep 是 payment 自己的輪詢補漏（D29 的補掃分工：platform 只重派沒有派送成功的 inbox 列），各自分批、各批一個 transaction：
 //   - 狀態：UNDER_REVIEW、ACTION_REQUIRED、原因碼不是 rejected*／unsupported* 的 DISABLED 帳戶排同步（掉了 webhook 時的保底，DISABLED 可能被解除）；
 //   - 事件：inbox 有超過 eventGrace 還沒處理的事件的帳戶排同步（任何狀態）；
-//   - 清理：等待清理的帳戶（purge_pending_at，不進上面兩種同步）重排「關閉後刪除」job；沒有人工處理可做，所以不進後台待辦，警示在 job 的 log；
+//   - 清理：等待清理的帳戶（purge_pending_at，不進上面兩種同步）重排「關閉後刪除」job（進了終局 purge_blocked_at 的不重排，它們在後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK 等管理員處理）；
 //   - 建立：閒置的建立列，擁有者營運中時排建立 job。
 //
 // 回傳排入同步與建立的帳戶數（唯一鍵合併掉的也算；兩種同步的帳戶重複時算兩次）。沒有設定 provider 時什麼都不做。

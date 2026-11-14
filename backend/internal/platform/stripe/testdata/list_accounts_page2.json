@@ -1,0 +1,38 @@
+{
+  "synthetic": true,
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "id": "acct_1UbSynthC",
+        "object": "v2.core.account",
+        "applied_configurations": [],
+        "closed": false,
+        "configuration": null,
+        "contact_email": null,
+        "created": "2026-11-14T02:00:00.000Z",
+        "dashboard": null,
+        "identity": null,
+        "metadata": {
+          "store_id": "7"
+        },
+        "livemode": false
+      },
+      {
+        "id": "acct_1UbSynthD",
+        "object": "v2.core.account",
+        "applied_configurations": [],
+        "closed": false,
+        "configuration": null,
+        "contact_email": null,
+        "created": "2026-11-14T02:00:00.000Z",
+        "dashboard": null,
+        "identity": null,
+        "metadata": null,
+        "livemode": false
+      }
+    ],
+    "next_page_url": null,
+    "previous_page_url": "/v2/core/accounts?limit=20&page=SYNTH_PAGE_1"
+  }
+}

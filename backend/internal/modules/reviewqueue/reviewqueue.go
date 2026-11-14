@@ -37,7 +37,7 @@ type (
 	Cursor = model.Cursor
 )
 
-// 待辦的種類：seller 發布的 10 種與 payment 發布的 1 種（PaymentAccountCreateFailed）。
+// 待辦的種類：seller 發布的 10 種與 payment 發布的 2 種（PaymentAccountCreateFailed、PaymentAccountPurgeStuck）。
 const (
 	ReportTriage               = model.ReportTriage
 	CaseDecision               = model.CaseDecision
@@ -49,6 +49,7 @@ const (
 	MeasureReview              = model.MeasureReview
 	KYCApplication             = model.KYCApplication
 	PaymentAccountCreateFailed = model.PaymentAccountCreateFailed
+	PaymentAccountPurgeStuck   = model.PaymentAccountPurgeStuck
 	SharedBankAccount          = model.SharedBankAccount
 )
 

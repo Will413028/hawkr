@@ -104,8 +104,17 @@ type Capabilities = account.Capabilities
 // Event 是驗過簽章的 provider 事件。
 type Event = account.Event
 
-// EnsureInput 是建立外部帳戶的輸入。
-type EnsureInput = account.EnsureInput
+// AcquireInput 是建立的第一步（取得外部帳戶 ID）的輸入。
+type AcquireInput = account.AcquireInput
+
+// ConfigureInput 是建立的第二步（完成設定）的輸入。
+type ConfigureInput = account.ConfigureInput
+
+// ResolveInput 是以店家對帳（列出 provider 上沒有關閉的帳戶）的輸入。
+type ResolveInput = account.ResolveInput
+
+// MappingDeletion 是管理員「已在金流商處理，刪除對應」的一筆紀錄。
+type MappingDeletion = model.MappingDeletion
 
 // SessionInput 是開通 session 的輸入。
 type SessionInput = account.SessionInput
@@ -168,6 +177,12 @@ const FakeName = account.FakeName
 // EventRetention 是收款事件原始 payload 在 inbox 的保存期。
 const EventRetention = account.EventRetention
 
+// IdempotencyRetention 是金流商保存冪等鍵結果的時間（30 天）：超過之後建立與清理改以 metadata.store_id 列出對帳。
+const IdempotencyRetention = account.IdempotencyRetention
+
+// PurgeDeadline 是列被標成等待清理後，仍關不掉或問不到金流商的最長時間（7 天，D60），超過進終局。
+const PurgeDeadline = account.PurgeDeadline
+
 // NewStripe 建立 Stripe 的收款 provider（Accounts v2）；collection 是新帳戶列的收件方式（CollectionProvider 或 CollectionPlatform）；publishableKey 必填（既有的平台收件帳戶仍會開內嵌 session）。
 func NewStripe(client *stripe.Client, collection RequirementCollection, publishableKey string) (Provider, error) {
 	p, err := account.NewStripe(client, collection, publishableKey)
@@ -220,6 +235,21 @@ func (m *Module) RefreshAccount(ctx context.Context, storeID int64) (Account, er
 // RetryAccountCreate 管理員的「重試建立」：只有建立失敗的帳戶可以重試。
 func (m *Module) RetryAccountCreate(ctx context.Context, storeID int64) (Account, error) {
 	return m.accounts.RetryCreate(ctx, storeID)
+}
+
+// RetryAccountPurge 管理員的「重試關閉」：只有清理進了終局的帳戶可以重試（清除終局、期限從現在重算並重新排入清理 job）。
+func (m *Module) RetryAccountPurge(ctx context.Context, storeID int64) (Account, error) {
+	return m.accounts.RetryPurge(ctx, storeID)
+}
+
+// DeleteAccountMapping 管理員的「已在金流商處理，刪除對應」：只有清理進了終局的帳戶可以做；寫一筆只增不改的紀錄（操作的管理員與時間）並刪列，不呼叫金流商。
+func (m *Module) DeleteAccountMapping(ctx context.Context, storeID, adminID int64) error {
+	return m.accounts.DeleteMapping(ctx, storeID, adminID)
+}
+
+// AccountMappingDeletions 讀回店家的「刪除對應」紀錄（新的在前）。
+func (m *Module) AccountMappingDeletions(ctx context.Context, storeID int64) ([]MappingDeletion, error) {
+	return m.accounts.MappingDeletions(ctx, storeID)
 }
 
 // ReceiveEvent 接收 provider 的 webhook：驗簽，同一個 transaction 寫進 platform inbox 並排入派送 job。

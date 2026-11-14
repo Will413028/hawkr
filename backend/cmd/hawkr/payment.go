@@ -157,7 +157,7 @@ func seedPaymentAccounts(ctx context.Context, c *sellerCommand, fake *payment.Fa
 			}
 			continue
 		}
-		if acct.ExternalAccountID != nil {
+		if acct.Status != payment.StatusNotCreated {
 			continue
 		}
 		if active, err := c.Owners.OwnerActive(ctx, id); err != nil {

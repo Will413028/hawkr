@@ -169,8 +169,8 @@ func TestKindsAreOneToOneWithTheContract(t *testing.T) {
 	if !slices.Equal(fromProto, all) {
 		t.Errorf("proto %v，模組 %v", fromProto, all)
 	}
-	if len(all) != 11 {
-		t.Errorf("種類 %d 個，預期 11 個", len(all))
+	if len(all) != 12 {
+		t.Errorf("種類 %d 個，預期 12 個", len(all))
 	}
 	// 權限表：逐種類寫死期望的來源讀取權限（E13），每個權限都在目錄裡。
 	wantPerm := map[rq.Kind]adminperm.Permission{
@@ -185,6 +185,7 @@ func TestKindsAreOneToOneWithTheContract(t *testing.T) {
 		rq.KYCApplication:        adminperm.SellerKYCApplicationsList,
 		// 收款帳戶的讀取權（沒有 list RPC）。
 		rq.PaymentAccountCreateFailed: adminperm.PaymentAccountsGet,
+		rq.PaymentAccountPurgeStuck:   adminperm.PaymentAccountsGet,
 		// 共用銀行帳號提醒的來源是措施：看得到它的是措施的讀取權（處分頁的關聯帳號列）。
 		rq.SharedBankAccount: adminperm.SellerMeasuresList,
 	}
@@ -411,7 +412,7 @@ func TestKindsAreIntersectedWithThePermissionsOfTheCaller(t *testing.T) {
 	}
 	// OWNER 是全部。
 	f.calls = nil
-	if _, err := list(t, newAdmin(f), asOwner, kinds()); err != nil || len(f.calls[0].kinds) != 11 {
+	if _, err := list(t, newAdmin(f), asOwner, kinds()); err != nil || len(f.calls[0].kinds) != 12 {
 		t.Errorf("OWNER：%v %v", err, f.calls)
 	}
 	// 呼叫者不是管理員、或沒有認證：interceptor 在 handler 之前擋下，不呼叫模組。
@@ -470,6 +471,7 @@ func TestToProtoBuildsTheSubjectOfEachKind(t *testing.T) {
 			return p.GetSharedBankAccount().GetMeasureId() + "/" + p.GetSharedBankAccount().GetAccountId()
 		}, "shared_bank_account"},
 		{rq.Item{Kind: rq.PaymentAccountCreateFailed}, func(p *adminpb.ReviewQueueItem) string { return p.GetPaymentAccount().GetStoreId() }, "payment_account_create_failed"},
+		{rq.Item{Kind: rq.PaymentAccountPurgeStuck}, func(p *adminpb.ReviewQueueItem) string { return p.GetPaymentAccount().GetStoreId() }, "payment_account_purge_stuck"},
 	} {
 		it := tt.item
 		it.ItemID, it.Start, it.Due = "x", start, due

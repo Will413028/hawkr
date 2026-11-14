@@ -3,7 +3,7 @@
 //
 // 結構（backend AGENTS.md 規則 4、5）：
 //   - seller 核准的 transaction 內只 INSERT「建立中」的列（沒有外部 ID；既有的列不改）並排入以 store_id 為唯一鍵的建立 job；job 在
-//     transaction 外呼叫 provider，再於自己的 transaction 填上外部 ID 並排入同步 job。
+//     transaction 外分兩步呼叫 provider（取得 ID、完成設定），拿到 ID 立刻在自己的 transaction 寫進列，第二步成功才記建立完成並排入同步 job。
 //   - 同步 job 在 transaction 外重讀外部帳戶，在 transaction 內整列覆寫快取、發 PayoutAccountChanged（seller 的同 transaction 訂閱者更新開通閘門的
 //     副本與防詐 hash），並把讀取開始前收到的收款事件標為已處理；webhook、輪詢與管理員的重新整理都只排這個 job。
 package account
@@ -92,19 +92,24 @@ type Snapshot struct {
 	BankFingerprints []string
 }
 
-// EnsureInput 是建立外部帳戶的輸入。IdempotencyKey 是「建立中」的列寫入時產生並保存的隨機 UUID：同一家店的每次重試都用它，得到同一個帳戶；
-// 兩個資料庫共用同一個 provider 帳號時不會撞鍵。Collection 是帳戶列保存的收件方式（D2），不是行程設定。ContactEmail 是建立當下向擁有者讀到的聯絡信箱（D50），金流商要求有收款設定的帳戶必須有。
-type EnsureInput struct {
+// AcquireInput 是建立的第一步（取得外部帳戶 ID）的輸入。IdempotencyKey 是帳戶列上保存的隨機 UUID：同一家店的每次重送都用它，30 天內得到同一個帳戶；
+// 兩個資料庫共用同一個 provider 帳號時不會撞鍵。本文固定、帳戶上沒有任何擁有者個資，帳戶上帶 StoreID 讓之後能以它對帳（D59）。
+type AcquireInput struct {
 	StoreID        int64
 	IdempotencyKey string
-	ContactEmail   string
-	Collection     model.RequirementCollection
 }
 
-// ResolveInput 是以冪等鍵取得外部帳戶的輸入：StoreID 與 IdempotencyKey 是帳戶列上的值。
+// ConfigureInput 是建立的第二步（完成設定）的輸入。ExternalID 是第一步取得並已寫進列的外部帳戶 ID；Collection 是帳戶列保存的收件方式（D2），
+// 不是行程設定；ContactEmail 是完成設定當下向擁有者讀到的聯絡信箱（D50），金流商要求有收款設定的帳戶必須有。
+type ConfigureInput struct {
+	ExternalID   string
+	ContactEmail string
+	Collection   model.RequirementCollection
+}
+
+// ResolveInput 是以店家對帳的輸入：在 provider 那邊找這家店還沒有關閉的外部帳戶。
 type ResolveInput struct {
-	StoreID        int64
-	IdempotencyKey string
+	StoreID int64
 }
 
 // SessionInput 是開通 session 的輸入；Kind 是 ChooseSession 的結果；ReturnURL 是賣家完成或離開後回到的頁面，RefreshURL 是連結過期時重新取得的頁面。
@@ -127,16 +132,20 @@ type Provider interface {
 	// Name 是 provider 的代碼（小寫英數與底線），存在帳戶列的 provider 欄。
 	Name() string
 	Capabilities() Capabilities
-	// EnsureAccount 建立外部帳戶，以 IdempotencyKey 冪等，收件方式取 in.Collection。回傳外部帳戶 ID。實作可以分多步，同一把鍵的重試（信箱可能已經不同）
-	// 得到同一個帳戶（D55）；所有步驟都成功才回傳 ID。
-	EnsureAccount(ctx context.Context, in EnsureInput) (externalID string, err error)
-	// ResolveAccount 以 IdempotencyKey 取得外部帳戶：已建立過就回那一個，沒有就建一個不含擁有者個資的空帳戶（清理沒有外部 ID 的列時用，D55）。
-	ResolveAccount(ctx context.Context, in ResolveInput) (externalID string, err error)
+	// AcquireAccount 是建立的第一步：以 IdempotencyKey 冪等地取得外部帳戶 ID（沒有就建一個不含擁有者個資的空帳戶，帶 StoreID 對帳用）。
+	// 同一把鍵 30 天內重送得到同一個帳戶，超過之後會建出新的帳戶，所以呼叫方在 30 天後先 ResolveAccount。回傳的 ID 呼叫方立刻寫進列（D59）。
+	AcquireAccount(ctx context.Context, in AcquireInput) (externalID string, err error)
+	// ConfigureAccount 是建立的第二步：寫入聯絡信箱、收款設定與收件方式（D55）；可重複送出，同一個帳戶的重送（信箱可能已經不同）安全。成功才算建立完成。
+	ConfigureAccount(ctx context.Context, in ConfigureInput) error
+	// ResolveAccount 只找不建：列出 provider 上沒有關閉的帳戶（要整份列完；翻頁中途失敗回錯誤，不回部分結果），回傳 StoreID 對應的帳戶；
+	// 整份列完都沒有時 found 為 false。已關閉的帳戶不會被找到（金流商關閉時清掉它的對應資料）。
+	ResolveAccount(ctx context.Context, in ResolveInput) (externalID string, found bool, err error)
 	// CreateOnboardingSession 依 in.Kind 產生開通的連結（SessionHosted）或內嵌元件的 session（SessionEmbedded）；回傳的形狀必須與 Kind 一致。
 	CreateOnboardingSession(ctx context.Context, in SessionInput) (model.OnboardingSession, error)
 	// FetchAccount 讀外部帳戶目前的狀態與掛著的外部銀行帳號識別碼；任何一項讀取失敗整個呼叫失敗。
 	FetchAccount(ctx context.Context, externalID string) (Snapshot, error)
-	// CloseAccount 關閉外部帳戶（擁有者個資清理，D52）；冪等：帳戶已經關閉視為成功。不存在的帳戶是永久失敗（ErrPermanent）。
+	// CloseAccount 關閉外部帳戶（擁有者個資清理，D52）：照帳戶目前實際的設定關閉（空帳戶與已完成設定的帳戶傳的不同，D60）；冪等：帳戶已經關閉視為成功。
+	// 不存在的帳戶與金流商明確拒絕關閉是永久失敗（ErrPermanent）。
 	CloseAccount(ctx context.Context, externalID string) error
 	// ParseEvent 驗簽並取出事件 ID 與外部帳戶 ID；簽章不符或格式不合回 ErrInvalidEvent，驗過簽章但不是本平台要處理的事件回 ErrIgnoredEvent。
 	ParseEvent(header http.Header, body []byte) (Event, error)

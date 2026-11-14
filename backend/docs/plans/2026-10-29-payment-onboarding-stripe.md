@@ -38,15 +38,16 @@
 | 店家能否曝光、收單由開通閘門推導 | view `seller.store_requirement_flags.kyc_approved`（現行：KYC 核准且 PayUni `outcome = 'APPROVED'`；步驟 4 起：平台核准且 `payment_accounts.transfers_active`）、`model.CapabilitiesOf`、`seller.pub_exposable_*`、discovery 與 `store_card.proto` 的「營業中」、`cmd/hawkr/dev_seed.go` 的種子店家 |
 | 外部呼叫不在 transaction 內，一個帳戶一個 sync job（D49：後台重讀改成同步呼叫後，job 以外的同步呼叫方有賣家端與後台兩個，都受 D32 的時間條件保護） | payment 模組的同步 job（唯一鍵 `store_id`）；PayUni 的 sync job 已在 8a 刪除 |
 | 收款帳戶快取不倒退：較早開始的讀取不覆蓋較晚開始的（D32） | `payment/db/queries` 的 `ApplyPaymentSnapshot`（`fetched_at` 條件）、`payment/internal/account/sync.go` 的 `Sync`（被擋下時不標記 inbox、不發 `PayoutAccountChanged`）、seller 的 `GetMyOnboarding` 同步重讀 |
+| 收款帳戶「已建立」是第二步成功（`create_completed_at`），不是「有外部 ID」：第一步拿到 ID 就寫進列，呼叫前先記 `create_called_at`（D59，9g） | `payment/db/schema.sql` 的 `accounts_created_check`、`accounts_snapshot_check`、`accounts_create_failed_check`、`accounts_completed_check`、`accounts_called_check`；`accounts.sql` 的 `ApplyPaymentSnapshot`、`ClaimPaymentAccountSellerRead`、`PaymentAccountStoreIDsByExternal`、`StalePaymentAccountCreateStoreIDs`；`account/service.go` 的 `Ensure`、`createWanted`；`account/sync.go` 的 `syncRow`、`SyncUnlessFresh`、`Refresh`、`RetryCreate`、`sessionTarget` |
 | 外部事件先寫 inbox 再處理 | `backend/AGENTS.md` 單體規則 5；單體目前沒有 webhook inbox（PayUni webhook 由舊服務收），步驟 4 新建 `seller.payment_provider_events` |
 | 平台不收身分證號、銀行帳號、證件影像與個人姓名（D22、D37）；統編與銀行 fingerprint 的比對只用 HMAC blind index，存在防詐保存表（D42） | `seller/internal/kyc`、`account_identity_hashes`、`measure_identities`、`CheckKYCKeys`、`TestKYCHasNoPersonalIdentityOrBankColumnsOrFields` |
-| 關店兩段清理（30 天、184 天） | `seller/internal/purge`、`model.StoreRetireAfter`、`model.StoreRetention`、`stores_pii_purged_check`、`kyc_applications_purged_check`、`agreement_acceptances_purged_check`、payment 的 `ForgetOwners`（D52：先關閉外部帳戶、成功才刪本地列，關閉失敗的列會留到下一輪） |
+| 關店兩段清理（30 天、184 天） | `seller/internal/purge`、`model.StoreRetireAfter`、`model.StoreRetention`、`stores_pii_purged_check`、`kyc_applications_purged_check`、`agreement_acceptances_purged_check`、payment 的 `ForgetOwners`（D52：先關閉外部帳戶、成功才刪本地列，關閉失敗的列會留到下一輪；9g：永久拒絕或 7 天仍關不掉進終局與後台待辦，D59、D60） |
 | 入駐同意的現行版本只有一個來源 | `internal/model/agreement_gen.go` 的 `CurrentAgreements`（`website/scripts/generate-legal.ts` 從 `website/docs/legal/` 產生）、`agreement_acceptances_kind_check`、已接受的紀錄；同意種類只有 `SELLER_TERMS`、`KYC_PRIVACY_NOTICE`（proto enum、DB CHECK、manifest，8a 起） |
-| 後台權限字串在宣告表登記，缺漏時單體不啟動 | `internal/platform/adminperm/adminperm.go`、`internal/httpapi/adminauth` 的宣告表（8a 起 80 支，8b 刪 `RevealKYCSensitive`、`ListKYCReveals` 後 78 支） |
+| 後台權限字串在宣告表登記，缺漏時單體不啟動 | `internal/platform/adminperm/adminperm.go`、`internal/httpapi/adminauth` 的宣告表（8a 起 80 支，8b 刪 `RevealKYCSensitive`、`ListKYCReveals` 後 78 支；9g 加 `RetryPaymentAccountPurge`、`DeletePaymentAccountMapping` 與權限 `payment.accounts.retry_purge`、`.delete_mapping`，宣告表 81 支） |
 | 模組依賴圖的唯一來源 | `internal/arch/modules.go` |
 | `pub_*` 與 migration 一致 | `TestPubContractsMatchMigrations`（`cmd/hawkr`） |
 | 共用文案與法務生成物無 drift | `make uitext`、`ui-text-generated-diff.yml`、`generate-legal.ts` 的生成物 |
-| 審核待辦種類 | `review_queue.proto` 的 `ReviewQueueItemKind`、seller 的 `review_*` 函式（8a 起 9 支） |
+| 審核待辦種類 | `review_queue.proto` 的 `ReviewQueueItemKind`、seller 的 `review_*` 函式（8a 起 9 支）、payment 的 `pub_review_items`（9g 起兩種：`PAYMENT_ACCOUNT_CREATE_FAILED`、`PAYMENT_ACCOUNT_PURGE_STUCK`） |
 
 ## 規模
 

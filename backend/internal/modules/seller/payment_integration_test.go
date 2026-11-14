@@ -116,7 +116,7 @@ func TestCreateReadsTheAccountContactEmailAtCreationTimeVerifiedFirst(t *testing
 	must(t, approve(f, sub))
 	f.setContactEmails(t, accountID, ptr("Changed@example.com"), nil)
 	f.ensureAccount(t, s.StoreID)
-	if got := f.payment.EnsureEmails(); !slices.Equal(got, []string{"changed@example.com"}) {
+	if got := f.payment.ConfigureEmails(); !slices.Equal(got, []string{"changed@example.com"}) {
 		t.Fatalf("provider 收到的信箱=%v，預期建立當下已驗證的 email（小寫）", got)
 	}
 }
@@ -159,7 +159,7 @@ func TestCreateUsesTheSelfEnteredEmailWhenThereIsNoVerifiedOne(t *testing.T) {
 	must(t, err)
 	must(t, approve(f, sub))
 	f.ensureAccount(t, s.StoreID)
-	if got := f.payment.EnsureEmails(); !slices.Equal(got, []string{"self@example.com"}) {
+	if got := f.payment.ConfigureEmails(); !slices.Equal(got, []string{"self@example.com"}) {
 		t.Fatalf("provider 收到的信箱=%v", got)
 	}
 }
@@ -211,7 +211,7 @@ func TestReapprovalQueuesCreationAgainAndCreationUsesTheCurrentContactEmail(t *t
 		t.Fatalf("兩次核准排入的建立 job=%v", got)
 	}
 	f.ensureAccount(t, s.StoreID)
-	if got := f.payment.EnsureEmails(); !slices.Equal(got, []string{"new.owner@example.com"}) {
+	if got := f.payment.ConfigureEmails(); !slices.Equal(got, []string{"new.owner@example.com"}) {
 		t.Fatalf("provider 收到的信箱=%v，預期建立當下帳號的信箱", got)
 	}
 }

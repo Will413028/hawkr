@@ -36,14 +36,17 @@ type Fake struct {
 	accounts     map[string]Snapshot
 	ensureErrs   []error
 	lostErrs     []error
+	configErrs   []error
 	resolveErrs  []error
-	resolves     []string
+	resolves     []int64
+	byStore      map[int64][]string
 	fetchErrs    []error
 	closeErrs    []error
 	closed       []string
 	closedIDs    map[string]bool
 	ensures      int
 	ensureKeys   []string
+	configures   int
 	ensureEmails []string
 	fetches      int
 	sessions     int
@@ -55,6 +58,7 @@ func NewFake() *Fake {
 	return &Fake{
 		caps:      Capabilities{RequirementCollection: model.CollectionProvider},
 		byKey:     map[string]string{},
+		byStore:   map[int64][]string{},
 		accounts:  map[string]Snapshot{},
 		closedIDs: map[string]bool{},
 	}
@@ -75,32 +79,46 @@ func (f *Fake) Set(externalID string, s Snapshot) {
 	f.accounts[externalID] = s
 }
 
-// FailEnsure 讓接下來的建立依序回這些錯誤（排完就成功）；FailFetch 同理。
-func (f *Fake) FailEnsure(errs ...error) {
+// FailAcquire 讓接下來的「取得 ID」（建立的第一步）依序回這些錯誤（排完就成功）；FailFetch 同理。
+func (f *Fake) FailAcquire(errs ...error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.ensureErrs = append(f.ensureErrs, errs...)
 }
 
-// FailEnsureAfterCreate 讓接下來的建立依序在帳戶已建立之後回這些錯誤（回應遺失；排完就成功）。
-func (f *Fake) FailEnsureAfterCreate(errs ...error) {
+// FailAcquireAfterCreate 讓接下來的「取得 ID」依序在帳戶已建立之後回這些錯誤（回應遺失，列上沒有拿到 ID；排完就成功）。
+func (f *Fake) FailAcquireAfterCreate(errs ...error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.lostErrs = append(f.lostErrs, errs...)
 }
 
-// FailResolve 讓接下來的取得依序回這些錯誤（排完就成功）。
+// FailConfigure 讓接下來的「完成設定」（建立的第二步）依序回這些錯誤（排完就成功）；此時帳戶與它的 ID 已經存在。
+func (f *Fake) FailConfigure(errs ...error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.configErrs = append(f.configErrs, errs...)
+}
+
+// ExpireKeys 模擬冪等鍵過期（金流商只保存 30 天）：之後同一把鍵取得 ID 會建出新的帳戶；已建立的帳戶不受影響。
+func (f *Fake) ExpireKeys() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.byKey = map[string]string{}
+}
+
+// FailResolve 讓接下來的「列出對帳」依序回這些錯誤（排完就成功）。
 func (f *Fake) FailResolve(errs ...error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.resolveErrs = append(f.resolveErrs, errs...)
 }
 
-// Resolves 回傳每次 ResolveAccount 收到的冪等鍵（依呼叫順序，失敗的呼叫也算）。
-func (f *Fake) Resolves() []string {
+// Resolves 回傳每次 ResolveAccount 收到的店家 ID（依呼叫順序，失敗的呼叫也算）。
+func (f *Fake) Resolves() []int64 {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return append([]string(nil), f.resolves...)
+	return append([]int64(nil), f.resolves...)
 }
 
 // FailFetch 讓接下來的重讀依序回這些錯誤（排完就成功）。
@@ -124,22 +142,22 @@ func (f *Fake) Closes() []string {
 	return append([]string(nil), f.closed...)
 }
 
-// Calls 回傳建立、重讀、開通 session 的呼叫次數。
+// Calls 回傳取得 ID（建立的第一步）、重讀、開通 session 的呼叫次數。
 func (f *Fake) Calls() (ensures, fetches, sessions int) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.ensures, f.fetches, f.sessions
 }
 
-// EnsureEmails 回傳每次 EnsureAccount 收到的聯絡信箱（依呼叫順序，失敗的呼叫也算）。
-func (f *Fake) EnsureEmails() []string {
+// ConfigureEmails 回傳每次 ConfigureAccount 收到的聯絡信箱（依呼叫順序，失敗的呼叫也算）。
+func (f *Fake) ConfigureEmails() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]string(nil), f.ensureEmails...)
 }
 
-// EnsureKeys 回傳每次 EnsureAccount 收到的冪等鍵（依呼叫順序，失敗的呼叫也算）。
-func (f *Fake) EnsureKeys() []string {
+// AcquireKeys 回傳每次 AcquireAccount 收到的冪等鍵（依呼叫順序，失敗的呼叫也算）。
+func (f *Fake) AcquireKeys() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]string(nil), f.ensureKeys...)
@@ -152,11 +170,15 @@ func (f *Fake) Violations() []string {
 	return append([]string(nil), f.violations...)
 }
 
-// Accounts 回傳目前建立過的外部帳戶數。
+// Accounts 回傳目前建立過的外部帳戶數（含已關閉的）。
 func (f *Fake) Accounts() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return len(f.byKey)
+	n := 0
+	for _, ids := range f.byStore {
+		n += len(ids)
+	}
+	return n
 }
 
 // check 要持有 f.mu。
@@ -188,14 +210,15 @@ func (f *Fake) Capabilities() Capabilities {
 	return f.caps
 }
 
-// accountFor 要持有 f.mu：回傳冪等鍵對應的帳戶，沒有就建立。
-func (f *Fake) accountFor(key string) string {
+// accountFor 要持有 f.mu：回傳冪等鍵對應的帳戶，沒有就為 storeID 建立（帳戶記著它的 store_id，列出對帳用）。
+func (f *Fake) accountFor(key string, storeID int64) string {
 	if id, ok := f.byKey[key]; ok {
 		return id
 	}
 	f.next++
 	id := fmt.Sprintf("fake_acct_%d", f.next)
 	f.byKey[key] = id
+	f.byStore[storeID] = append(f.byStore[storeID], id)
 	f.accounts[id] = Snapshot{
 		Transfers:    CapabilityRestricted,
 		Details:      []StatusDetail{{Resolution: ResolutionSellerAction, Reason: "routine_onboarding"}},
@@ -204,37 +227,58 @@ func (f *Fake) accountFor(key string) string {
 	return id
 }
 
-// EnsureAccount 實作 Provider：一步完成，同一個冪等鍵回同一個帳戶（信箱不同也一樣）。
-func (f *Fake) EnsureAccount(ctx context.Context, in EnsureInput) (string, error) {
+// AcquireAccount 實作 Provider：同一個冪等鍵回同一個帳戶；帳戶已關閉之後重放同一把鍵是永久失敗（measured：409 idempotency_error）。
+func (f *Fake) AcquireAccount(ctx context.Context, in AcquireInput) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.check(ctx, "EnsureAccount")
+	f.check(ctx, "AcquireAccount")
 	f.ensures++
 	f.ensureKeys = append(f.ensureKeys, in.IdempotencyKey)
-	f.ensureEmails = append(f.ensureEmails, in.ContactEmail)
 	if err := pop(&f.ensureErrs); err != nil {
 		return "", err
 	}
-	id := f.accountFor(in.IdempotencyKey)
+	if id, ok := f.byKey[in.IdempotencyKey]; ok && f.closedIDs[id] {
+		return "", fmt.Errorf("%w：冪等鍵對應的帳戶已關閉（金流商回 409 idempotency_error）", ErrPermanent)
+	}
+	id := f.accountFor(in.IdempotencyKey, in.StoreID)
 	if err := pop(&f.lostErrs); err != nil {
 		return "", err
 	}
 	return id, nil
 }
 
-// ResolveAccount 實作 Provider：同一個冪等鍵回同一個帳戶，沒有就建立；帳戶已關閉之後重放同一把鍵是永久失敗（measured）。
-func (f *Fake) ResolveAccount(ctx context.Context, in ResolveInput) (string, error) {
+// ConfigureAccount 實作 Provider：可重複送出；帳戶不存在是永久失敗。
+func (f *Fake) ConfigureAccount(ctx context.Context, in ConfigureInput) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.check(ctx, "ConfigureAccount")
+	f.configures++
+	f.ensureEmails = append(f.ensureEmails, in.ContactEmail)
+	if err := pop(&f.configErrs); err != nil {
+		return err
+	}
+	if _, ok := f.accounts[in.ExternalID]; !ok && !f.AutoActive {
+		return fmt.Errorf("%w：沒有外部帳戶 %s", ErrPermanent, in.ExternalID)
+	}
+	return nil
+}
+
+// ResolveAccount 實作 Provider：只找不建。列出沒有關閉的帳戶，回傳 store_id 相符的第一個（新的在前）。
+func (f *Fake) ResolveAccount(ctx context.Context, in ResolveInput) (string, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.check(ctx, "ResolveAccount")
-	f.resolves = append(f.resolves, in.IdempotencyKey)
+	f.resolves = append(f.resolves, in.StoreID)
 	if err := pop(&f.resolveErrs); err != nil {
-		return "", err
+		return "", false, err
 	}
-	if id, ok := f.byKey[in.IdempotencyKey]; ok && f.closedIDs[id] {
-		return "", fmt.Errorf("%w：冪等鍵對應的帳戶已關閉（金流商回 409 idempotency_error）", ErrPermanent)
+	ids := f.byStore[in.StoreID]
+	for i := len(ids) - 1; i >= 0; i-- {
+		if !f.closedIDs[ids[i]] {
+			return ids[i], true, nil
+		}
 	}
-	return f.accountFor(in.IdempotencyKey), nil
+	return "", false, nil
 }
 
 // CreateOnboardingSession 實作 Provider。

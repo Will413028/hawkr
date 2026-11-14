@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -601,59 +602,118 @@ func TestListBankAccountFingerprintsPropagatesErrorsAndRejectsAnUnfollowablePage
 	}
 }
 
-func closeFixtureBody(closed bool) string {
-	if closed {
-		return `{"id":"acct_1","object":"v2.core.account","closed":true,"applied_configurations":["recipient"]}`
-	}
-	return `{"id":"acct_1","object":"v2.core.account","closed":false,"applied_configurations":["recipient"]}`
+func accountBody(closed bool, applied string) string {
+	return fmt.Sprintf(`{"id":"acct_1","object":"v2.core.account","closed":%t,"applied_configurations":%s}`, closed, applied)
 }
 
 const forbiddenBody = `{"error":{"code":"forbidden","message":"closed"}}`
 
-func TestCloseAccountPostsTheRecipientConfiguration(t *testing.T) {
-	s := &stub{resp: func(int) (int, string, http.Header) { return 200, closeFixtureBody(true), nil }}
+// 關閉先讀回帳戶，applied_configurations 取自讀回的值：有 recipient 設定的帳戶傳 ["recipient"]。
+func TestCloseAccountPostsTheAppliedConfigurationsReadBack(t *testing.T) {
+	s := &stub{resp: func(n int) (int, string, http.Header) {
+		if n == 1 {
+			return 200, accountBody(false, `["recipient"]`), nil
+		}
+		return 200, accountBody(true, `["recipient"]`), nil
+	}}
 	if err := newTestClient(t, s).CloseAccount(context.Background(), "acct_1"); err != nil {
 		t.Fatal(err)
 	}
 	reqs := s.requests()
-	if len(reqs) != 1 || reqs[0].Method != "POST" || reqs[0].URI != "/v2/core/accounts/acct_1/close" || !strings.HasPrefix(reqs[0].ContentType, "application/json") ||
-		!jsonEqual(decode(t, reqs[0].Body), map[string]any{"applied_configurations": []any{"recipient"}}) {
+	if len(reqs) != 2 || reqs[0].Method != "GET" || reqs[1].Method != "POST" || reqs[1].URI != "/v2/core/accounts/acct_1/close" || !strings.HasPrefix(reqs[1].ContentType, "application/json") ||
+		!jsonEqual(decode(t, reqs[1].Body), map[string]any{"applied_configurations": []any{"recipient"}}) {
 		t.Fatalf("請求 %+v", reqs)
 	}
 }
 
-// 已關閉的帳戶再關回 403：讀帳戶，closed 為真才算成功。
-func TestCloseAccountOnAnAlreadyClosedAccountSucceedsOnlyWhenTheAccountIsClosed(t *testing.T) {
+// 只做完第一步的空帳戶：applied_configurations 是 []，關閉本文必須帶空陣列（省略或 ["recipient"] 都是 400 configs_must_match_to_close，spike Q25）。
+// fixture 是合成的（orchestrator 在 sandbox 重錄）。
+func TestCloseAccountOnABareAccountPostsAnEmptyConfigurationList(t *testing.T) {
+	bare, closed := loadFixture(t, "create_shell_provider"), loadFixture(t, "close_bare_account")
 	s := &stub{resp: func(n int) (int, string, http.Header) {
 		if n == 1 {
+			return bare.Status, string(bare.Body), nil
+		}
+		return closed.Status, string(closed.Body), nil
+	}}
+	if err := newTestClient(t, s).CloseAccount(context.Background(), "acct_1UbNalEexkZnFrCF"); err != nil {
+		t.Fatal(err)
+	}
+	reqs := s.requests()
+	if len(reqs) != 2 || reqs[1].Method != "POST" || !strings.HasSuffix(reqs[1].URI, "/close") {
+		t.Fatalf("請求 %+v", reqs)
+	}
+	body := decode(t, reqs[1].Body)
+	got, present := body["applied_configurations"].([]any)
+	if !present || len(got) != 0 {
+		t.Fatalf("關閉本文 %s，預期 applied_configurations 為空陣列", reqs[1].Body)
+	}
+}
+
+// 帳戶設定與關閉請求不符的 400 是永久錯誤（照 fixture 的形狀）。
+func TestCloseAccountConfigsMustMatchIsAPermanentError(t *testing.T) {
+	bare, refuse := loadFixture(t, "create_shell_provider"), loadFixture(t, "close_configs_must_match")
+	s := &stub{resp: func(n int) (int, string, http.Header) {
+		if n == 1 {
+			return bare.Status, string(bare.Body), nil
+		}
+		return refuse.Status, string(refuse.Body), nil
+	}}
+	err := newTestClient(t, s).CloseAccount(context.Background(), "acct_1UbNalEexkZnFrCF")
+	var api *APIError
+	if !errors.As(err, &api) || api.Status != 400 || api.Code != "configs_must_match_to_close" || !api.Permanent() {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+// 帳戶已經關閉：讀回 closed 為真就成功，不再送關閉。
+func TestCloseAccountOnAnAlreadyClosedAccountSucceedsWithoutClosing(t *testing.T) {
+	s := &stub{resp: func(int) (int, string, http.Header) { return 200, accountBody(true, `["recipient"]`), nil }}
+	if err := newTestClient(t, s).CloseAccount(context.Background(), "acct_1"); err != nil {
+		t.Fatalf("err=%v", err)
+	}
+	if reqs := s.requests(); len(reqs) != 1 || reqs[0].Method != "GET" {
+		t.Fatalf("請求 %+v", reqs)
+	}
+}
+
+// 關閉回 403（並行的關閉剛完成）：再讀一次，closed 為真才算成功。
+func TestCloseAccountForbiddenSucceedsOnlyWhenTheAccountIsThenClosed(t *testing.T) {
+	s := &stub{resp: func(n int) (int, string, http.Header) {
+		switch n {
+		case 1:
+			return 200, accountBody(false, `["recipient"]`), nil
+		case 2:
 			return 403, forbiddenBody, nil
 		}
-		return 200, closeFixtureBody(true), nil
+		return 200, accountBody(true, `["recipient"]`), nil
 	}}
 	if err := newTestClient(t, s).CloseAccount(context.Background(), "acct_1"); err != nil {
 		t.Fatalf("err=%v", err)
 	}
-	reqs := s.requests()
-	if len(reqs) != 2 || reqs[1].Method != "GET" || !strings.HasPrefix(reqs[1].URI, "/v2/core/accounts/acct_1") || strings.HasSuffix(reqs[1].URI, "/close") {
+	if reqs := s.requests(); len(reqs) != 3 || reqs[2].Method != "GET" {
 		t.Fatalf("請求 %+v", reqs)
 	}
 }
 
 func TestCloseAccountForbiddenOnAnOpenAccountReturnsTheOriginalError(t *testing.T) {
-	for name, second := range map[string]func() (int, string){
-		"帳戶沒關":        func() (int, string) { return 200, closeFixtureBody(false) },
+	for name, third := range map[string]func() (int, string){
+		"帳戶沒關":        func() (int, string) { return 200, accountBody(false, `["recipient"]`) },
 		"回應沒有 closed": func() (int, string) { return 200, `{"id":"acct_1"}` },
 	} {
 		s := &stub{resp: func(n int) (int, string, http.Header) {
-			if n == 1 {
+			switch n {
+			case 1:
+				return 200, accountBody(false, `["recipient"]`), nil
+			case 2:
 				return 403, forbiddenBody, nil
 			}
-			status, body := second()
+			status, body := third()
 			return status, body, nil
 		}}
 		err := newTestClient(t, s).CloseAccount(context.Background(), "acct_1")
 		var api *APIError
-		if !errors.As(err, &api) || api.Status != 403 || api.Code != "forbidden" || len(s.requests()) != 2 {
+		if !errors.As(err, &api) || api.Status != 403 || api.Code != "forbidden" || len(s.requests()) != 3 {
 			t.Errorf("%s：err=%v 請求=%d", name, err, len(s.requests()))
 		}
 	}
@@ -662,14 +722,17 @@ func TestCloseAccountForbiddenOnAnOpenAccountReturnsTheOriginalError(t *testing.
 // 403 之後讀帳戶本身失敗：不知道帳戶是不是已關閉，回讀取的錯誤（暫時性的讀取失敗由呼叫方重試），不回永久的 403。
 func TestCloseAccountForbiddenThenFailedLookupReturnsTheLookupError(t *testing.T) {
 	s := &stub{resp: func(n int) (int, string, http.Header) {
-		if n == 1 {
+		switch n {
+		case 1:
+			return 200, accountBody(false, `["recipient"]`), nil
+		case 2:
 			return 403, forbiddenBody, nil
 		}
 		return 503, `{"error":{"message":"down"}}`, nil
 	}}
 	err := newTestClient(t, s).CloseAccount(context.Background(), "acct_1")
 	var api *APIError
-	if !errors.As(err, &api) || api.Status != 503 || api.Permanent() || len(s.requests()) != 2 {
+	if !errors.As(err, &api) || api.Status != 503 || api.Permanent() || len(s.requests()) != 3 {
 		t.Fatalf("err=%v 請求=%d，預期讀取的 503 且不是永久錯誤", err, len(s.requests()))
 	}
 }
@@ -680,5 +743,44 @@ func TestCloseAccountUnknownIDIsAPermanentErrorWithoutALookup(t *testing.T) {
 	var api *APIError
 	if !errors.As(err, &api) || api.Status != 400 || !api.Permanent() || len(s.requests()) != 1 {
 		t.Fatalf("err=%v 請求=%d", err, len(s.requests()))
+	}
+}
+
+// 列出帳戶：整份翻頁列完，只回 metadata.store_id 相符的（含空帳戶；metadata 是 null 的略過）。fixture 是合成的（orchestrator 在 sandbox 重錄）。
+func TestListAccountIDsByStorePagesThroughTheWholeListAndMatchesMetadata(t *testing.T) {
+	p1, p2 := loadFixture(t, "list_accounts_page1"), loadFixture(t, "list_accounts_page2")
+	s := &stub{resp: func(n int) (int, string, http.Header) {
+		if n == 1 {
+			return p1.Status, string(p1.Body), nil
+		}
+		return p2.Status, string(p2.Body), nil
+	}}
+	ids, err := newTestClient(t, s).ListAccountIDsByStore(context.Background(), 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 2 || ids[0] != "acct_1UbSynthB" || ids[1] != "acct_1UbSynthC" {
+		t.Fatalf("ids=%v", ids)
+	}
+	reqs := s.requests()
+	if len(reqs) != 2 || reqs[0].Method != "GET" || !strings.HasPrefix(reqs[0].URI, "/v2/core/accounts") || !strings.Contains(reqs[0].URI, "limit=20") ||
+		strings.Contains(reqs[0].URI, "closed") || !strings.Contains(reqs[1].URI, "SYNTH_PAGE_2") {
+		t.Fatalf("請求 %+v", reqs)
+	}
+}
+
+// 翻頁中途失敗不回部分結果：呼叫方只在整份列完都沒有時才刪列。
+func TestListAccountIDsByStoreReturnsAnErrorNotAPartialListWhenAPageFails(t *testing.T) {
+	p1 := loadFixture(t, "list_accounts_page1")
+	s := &stub{resp: func(n int) (int, string, http.Header) {
+		if n == 1 {
+			return p1.Status, string(p1.Body), nil
+		}
+		return 503, `{"error":{"message":"down"}}`, nil
+	}}
+	ids, err := newTestClient(t, s).ListAccountIDsByStore(context.Background(), 7)
+	var api *APIError
+	if !errors.As(err, &api) || api.Status != 503 || ids != nil {
+		t.Fatalf("ids=%v err=%v", ids, err)
 	}
 }

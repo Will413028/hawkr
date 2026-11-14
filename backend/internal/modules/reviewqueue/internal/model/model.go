@@ -24,6 +24,8 @@ const (
 	KYCApplication        Kind = "KYC_APPLICATION"
 	// PaymentAccountCreateFailed 是建立重試用完的收款帳戶（subject 是店家）。
 	PaymentAccountCreateFailed Kind = "PAYMENT_ACCOUNT_CREATE_FAILED"
+	// PaymentAccountPurgeStuck 是清理進了終局、無法自動關閉的收款帳戶（subject 是店家）。
+	PaymentAccountPurgeStuck Kind = "PAYMENT_ACCOUNT_PURGE_STUCK"
 	// SharedBankAccount 是處分建立之後才與被處分帳號共用銀行帳號 fingerprint 的關聯帳號（subject 是處分與命中的帳號），由 seller 發布。
 	SharedBankAccount Kind = "SHARED_BANK_ACCOUNT"
 )
@@ -31,7 +33,7 @@ const (
 // Kinds 是全部有效的種類。
 var Kinds = []Kind{
 	ReportTriage, CaseDecision, CaseInquiryOverdue, AuthorityOrder, AuthorityTargetNotice,
-	MeasureAppeal, MeasureLiftRequest, MeasureReview, KYCApplication, PaymentAccountCreateFailed, SharedBankAccount,
+	MeasureAppeal, MeasureLiftRequest, MeasureReview, KYCApplication, PaymentAccountCreateFailed, PaymentAccountPurgeStuck, SharedBankAccount,
 }
 
 // Valid 回傳 k 是不是有效的種類。

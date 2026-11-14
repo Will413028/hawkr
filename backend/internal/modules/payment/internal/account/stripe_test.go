@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -119,74 +120,52 @@ func TestStripeCapabilitiesFollowTheCollectionMode(t *testing.T) {
 	}
 }
 
-// 收件方式取自帳戶列（EnsureInput.Collection），不是行程設定：adapter 設定成相反的值，建立的 dashboard 仍跟著列走。
-func TestStripeEnsureAccountUsesTheDashboardOfTheStoredCollection(t *testing.T) {
+// 收件方式取自帳戶列（ConfigureInput.Collection），不是行程設定：adapter 設定成相反的值，完成設定的 dashboard 仍跟著列走。
+func TestStripeConfigureAccountUsesTheDashboardOfTheStoredCollection(t *testing.T) {
 	for stored, dash := range map[model.RequirementCollection]string{model.CollectionProvider: "express", model.CollectionPlatform: "none"} {
 		configured := model.CollectionProvider
 		if stored == model.CollectionProvider {
 			configured = model.CollectionPlatform
 		}
 		var got map[string]any
+		var path string
 		replay := twoStepResponder(t)
-		want := fixtureID(t, "create_shell_provider")
 		p := stripeProvider(t, configured, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			b, _ := io.ReadAll(r.Body)
-			if r.URL.Path != "/v2/core/accounts" {
-				_ = json.Unmarshal(b, &got)
-			}
+			path = r.URL.Path
+			_ = json.Unmarshal(b, &got)
 			r.Body = io.NopCloser(bytes.NewReader(b))
 			replay(w, r)
 		}))
-		id, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "k", ContactEmail: "seller@example.com", Collection: stored})
-		if err != nil || id != want || got["dashboard"] != dash || got["contact_email"] != "seller@example.com" {
-			t.Errorf("列 %s：id=%q err=%v dashboard=%v contact_email=%v", stored, id, err, got["dashboard"], got["contact_email"])
+		err := p.ConfigureAccount(context.Background(), ConfigureInput{ExternalID: "acct_1", ContactEmail: "seller@example.com", Collection: stored})
+		if err != nil || path != "/v2/core/accounts/acct_1" || got["dashboard"] != dash || got["contact_email"] != "seller@example.com" {
+			t.Errorf("列 %s：err=%v path=%s dashboard=%v contact_email=%v", stored, err, path, got["dashboard"], got["contact_email"])
 		}
 	}
 	p := stripeProvider(t, model.CollectionProvider, http.NotFoundHandler())
-	if _, err := p.EnsureAccount(context.Background(), EnsureInput{IdempotencyKey: "k"}); !errors.Is(err, ErrPermanent) {
+	if err := p.ConfigureAccount(context.Background(), ConfigureInput{ExternalID: "acct_1", ContactEmail: "a@example.com"}); !errors.Is(err, ErrPermanent) {
 		t.Errorf("空的收件方式：%v，預期 ErrPermanent", err)
+	}
+	if err := p.ConfigureAccount(context.Background(), ConfigureInput{ContactEmail: "a@example.com", Collection: model.CollectionProvider}); !errors.Is(err, ErrPermanent) {
+		t.Errorf("沒有外部帳戶 ID：%v，預期 ErrPermanent", err)
 	}
 }
 
 // 沒有聯絡信箱時不呼叫 Stripe：有收款設定的帳戶沒有信箱一定被拒，重試也不會成功。
-func TestStripeEnsureAccountWithoutContactEmailIsPermanentAndSendsNothing(t *testing.T) {
+func TestStripeConfigureAccountWithoutContactEmailIsPermanentAndSendsNothing(t *testing.T) {
 	called := false
 	replay := twoStepResponder(t)
 	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		replay(w, r)
 	}))
-	if _, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "k", Collection: model.CollectionProvider}); !errors.Is(err, ErrPermanent) || called {
+	if err := p.ConfigureAccount(context.Background(), ConfigureInput{ExternalID: "acct_1", Collection: model.CollectionProvider}); !errors.Is(err, ErrPermanent) || called {
 		t.Errorf("err=%v called=%v，預期 ErrPermanent 且沒有送出請求", err, called)
 	}
 }
 
-// 重試沿用同一把鍵：adapter 原樣把 EnsureInput 的鍵送成建立請求的 Idempotency-Key，建立請求的本文只有 metadata.store_id，信箱換了也不變。
-func TestStripeEnsureAccountSendsTheGivenKeyAndAFixedCreateBodyOnEveryAttempt(t *testing.T) {
-	var keys, bodies []string
-	replay := twoStepResponder(t)
-	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v2/core/accounts" {
-			keys = append(keys, r.Header.Get("Idempotency-Key"))
-			b, _ := io.ReadAll(r.Body)
-			bodies = append(bodies, string(b))
-		}
-		replay(w, r)
-	}))
-	for _, email := range []string{"a@example.com", "b@example.com"} {
-		if _, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "6f1c0a52-0000-4000-8000-000000000001", ContactEmail: email, Collection: model.CollectionProvider}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if fmt.Sprint(keys) != "[6f1c0a52-0000-4000-8000-000000000001 6f1c0a52-0000-4000-8000-000000000001]" {
-		t.Errorf("Idempotency-Key %v", keys)
-	}
-	if len(bodies) != 2 || bodies[0] != bodies[1] || bodies[0] != `{"metadata":{"store_id":"5"}}` {
-		t.Errorf("建立本文 %q", bodies)
-	}
-}
-
-func TestStripeResolveAccountReplaysTheCreateStepWithTheStoredKeyAndSendsNoOwnerData(t *testing.T) {
+// 取得 ID 重送沿用同一把鍵：adapter 原樣把 AcquireInput 的鍵送成建立請求的 Idempotency-Key，本文只有 metadata.store_id，沒有任何擁有者個資。
+func TestStripeAcquireAccountSendsTheGivenKeyAndAFixedBodyOnEveryAttempt(t *testing.T) {
 	var reqs []string
 	replay := twoStepResponder(t)
 	want := fixtureID(t, "create_shell_provider")
@@ -195,18 +174,62 @@ func TestStripeResolveAccountReplaysTheCreateStepWithTheStoredKeyAndSendsNoOwner
 		reqs = append(reqs, r.Method+" "+r.URL.Path+" "+r.Header.Get("Idempotency-Key")+" "+string(b))
 		replay(w, r)
 	}))
-	id, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 5, IdempotencyKey: "k"})
-	if err != nil || id != want || fmt.Sprint(reqs) != `[POST /v2/core/accounts k {"metadata":{"store_id":"5"}}]` {
-		t.Errorf("id=%q err=%v 請求=%v", id, err, reqs)
+	for range 2 {
+		id, err := p.AcquireAccount(context.Background(), AcquireInput{StoreID: 5, IdempotencyKey: "6f1c0a52-0000-4000-8000-000000000001"})
+		if err != nil || id != want {
+			t.Fatalf("id=%q err=%v", id, err)
+		}
 	}
-	if _, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 5}); !errors.Is(err, ErrPermanent) {
+	line := `POST /v2/core/accounts 6f1c0a52-0000-4000-8000-000000000001 {"metadata":{"store_id":"5"}}`
+	if fmt.Sprint(reqs) != "["+line+" "+line+"]" {
+		t.Errorf("請求 %v", reqs)
+	}
+	if _, err := p.AcquireAccount(context.Background(), AcquireInput{StoreID: 5}); !errors.Is(err, ErrPermanent) {
 		t.Errorf("缺冪等鍵：%v，預期 ErrPermanent", err)
 	}
 }
 
-func TestStripeEnsureAccountClassifiesErrors(t *testing.T) {
+// ResolveAccount 只找不建：列出帳戶（GET，不 POST），以 metadata.store_id 比對；沒有符合的回 found=false，不送出任何建立請求。fixture 是合成的（orchestrator 在 sandbox 重錄）。
+func TestStripeResolveAccountOnlyListsAndMatchesByStoreID(t *testing.T) {
+	var methods []string
+	p1, p2 := fixtureResponder(t, "list_accounts_page1"), fixtureResponder(t, "list_accounts_page2")
+	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		methods = append(methods, r.Method)
+		if strings.Contains(r.URL.RawQuery, "SYNTH_PAGE_2") {
+			p2(w, r)
+			return
+		}
+		p1(w, r)
+	}))
+	id, found, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 7})
+	if err != nil || !found || id != "acct_1UbSynthB" {
+		t.Fatalf("id=%q found=%v err=%v", id, found, err)
+	}
+	if _, found, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 8}); err != nil || found {
+		t.Fatalf("沒有符合的店家：found=%v err=%v", found, err)
+	}
+	for _, m := range methods {
+		if m != http.MethodGet {
+			t.Fatalf("ResolveAccount 送出了 %s，只能列出", m)
+		}
+	}
+}
+
+// 列表失敗不得被當成「沒有找到」：呼叫方只在整份列完都沒有時才刪列。
+func TestStripeResolveAccountListFailureIsAnErrorNotNotFound(t *testing.T) {
+	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":{"message":"down"}}`))
+	}))
+	id, found, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 7})
+	if err == nil || found || id != "" || errors.Is(err, ErrPermanent) {
+		t.Fatalf("id=%q found=%v err=%v，預期一般錯誤", id, found, err)
+	}
+}
+
+func TestStripeAcquireAccountClassifiesErrors(t *testing.T) {
 	create := func(h http.HandlerFunc) error {
-		_, err := stripeProvider(t, model.CollectionProvider, h).EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "5", ContactEmail: "seller@example.com", Collection: model.CollectionProvider})
+		_, err := stripeProvider(t, model.CollectionProvider, h).AcquireAccount(context.Background(), AcquireInput{StoreID: 5, IdempotencyKey: "5"})
 		return err
 	}
 	if err := create(fixtureResponder(t, "create_provider_idem_conflict")); !errors.Is(err, ErrPermanent) {
@@ -230,11 +253,8 @@ func TestStripeEnsureAccountClassifiesErrors(t *testing.T) {
 	srv.Close()
 	c, _ := stripe.New(stripe.Config{BaseURL: url, SecretKey: "k", WebhookSecret: "w"})
 	p, _ := NewStripe(c, model.CollectionProvider, "pk_test_x")
-	if _, err := p.EnsureAccount(context.Background(), EnsureInput{IdempotencyKey: "5", ContactEmail: "seller@example.com", Collection: model.CollectionProvider}); err == nil || errors.Is(err, ErrPermanent) {
+	if _, err := p.AcquireAccount(context.Background(), AcquireInput{IdempotencyKey: "5"}); err == nil || errors.Is(err, ErrPermanent) {
 		t.Errorf("傳輸錯誤：%v，預期一般錯誤", err)
-	}
-	if _, err := p.EnsureAccount(context.Background(), EnsureInput{}); !errors.Is(err, ErrPermanent) {
-		t.Errorf("沒有冪等鍵：%v", err)
 	}
 }
 

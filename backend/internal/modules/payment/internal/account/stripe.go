@@ -50,10 +50,19 @@ func (s *Stripe) Capabilities() Capabilities {
 	return Capabilities{RequirementCollection: model.CollectionProvider, EmbeddedRuntimes: embedded}
 }
 
-// EnsureAccount 實作 Provider。
-func (s *Stripe) EnsureAccount(ctx context.Context, in EnsureInput) (string, error) {
+// AcquireAccount 實作 Provider：建立的第一步（本文固定，同一把鍵 30 天內回同一個帳戶）。
+func (s *Stripe) AcquireAccount(ctx context.Context, in AcquireInput) (string, error) {
 	if in.IdempotencyKey == "" {
 		return "", fmt.Errorf("%w：缺少冪等鍵", ErrPermanent)
+	}
+	id, err := s.client.CreateAccountShell(ctx, in.IdempotencyKey, in.StoreID)
+	return id, classify(err)
+}
+
+// ConfigureAccount 實作 Provider：建立的第二步，收件方式決定 dashboard。
+func (s *Stripe) ConfigureAccount(ctx context.Context, in ConfigureInput) error {
+	if in.ExternalID == "" {
+		return fmt.Errorf("%w：缺少外部帳戶 ID", ErrPermanent)
 	}
 	var dashboard stripe.Dashboard
 	switch in.Collection {
@@ -62,22 +71,25 @@ func (s *Stripe) EnsureAccount(ctx context.Context, in EnsureInput) (string, err
 	case model.CollectionPlatform:
 		dashboard = stripe.DashboardNone
 	default:
-		return "", fmt.Errorf("%w：不支援的收件方式 %q", ErrPermanent, in.Collection)
+		return fmt.Errorf("%w：不支援的收件方式 %q", ErrPermanent, in.Collection)
 	}
 	if in.ContactEmail == "" {
-		return "", fmt.Errorf("%w：缺少聯絡信箱", ErrPermanent)
+		return fmt.Errorf("%w：缺少聯絡信箱", ErrPermanent)
 	}
-	id, err := s.client.CreateAccount(ctx, in.IdempotencyKey, in.StoreID, dashboard, in.ContactEmail)
-	return id, classify(err)
+	return classify(s.client.UpdateAccount(ctx, in.ExternalID, dashboard, in.ContactEmail))
 }
 
-// ResolveAccount 實作 Provider：重送建立的第一步（本文固定，同一把鍵回同一個帳戶）。
-func (s *Stripe) ResolveAccount(ctx context.Context, in ResolveInput) (string, error) {
-	if in.IdempotencyKey == "" {
-		return "", fmt.Errorf("%w：缺少冪等鍵", ErrPermanent)
+// ResolveAccount 實作 Provider：列出沒有關閉的帳戶，以 metadata.store_id 比對（第一步已經寫入）。同一家店有多個符合時（不該發生）回第一個，
+// 其餘留在金流商那邊；沒有符合的才回 found 為 false。
+func (s *Stripe) ResolveAccount(ctx context.Context, in ResolveInput) (string, bool, error) {
+	ids, err := s.client.ListAccountIDsByStore(ctx, in.StoreID)
+	if err != nil {
+		return "", false, classify(err)
 	}
-	id, err := s.client.CreateAccountShell(ctx, in.IdempotencyKey, in.StoreID)
-	return id, classify(err)
+	if len(ids) == 0 {
+		return "", false, nil
+	}
+	return ids[0], true, nil
 }
 
 // CreateOnboardingSession 實作 Provider。

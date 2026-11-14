@@ -316,12 +316,27 @@ func TestKindsMatchTheSource(t *testing.T) {
 	for _, fn := range fns {
 		var def string
 		must(t, d.Conn(ctx).QueryRow(ctx, `SELECT pg_get_functiondef(($1||'(timestamptz)')::regprocedure)`, fn).Scan(&def))
-		i := strings.Index(def, "SELECT '")
-		j := strings.Index(def[i+8:], "'")
-		if i < 0 || j < 0 {
+		// seller 的函式各發布一種；payment.pub_review_items 以 UNION ALL 發布兩種（PAYMENT_ACCOUNT_CREATE_FAILED、PAYMENT_ACCOUNT_PURGE_STUCK），每個 SELECT 一個字面值。
+		rest, found := def, 0
+		for {
+			i := strings.Index(rest, "SELECT '")
+			if i < 0 {
+				break
+			}
+			j := strings.Index(rest[i+8:], "'")
+			if j < 0 {
+				t.Fatalf("%s：讀不到 kind 字面值", fn)
+			}
+			sourceKinds = append(sourceKinds, rest[i+8:i+8+j])
+			found++
+			rest = rest[i+8+j:]
+			if fn != "payment.pub_review_items" {
+				break
+			}
+		}
+		if found == 0 {
 			t.Fatalf("%s：讀不到 kind 字面值", fn)
 		}
-		sourceKinds = append(sourceKinds, def[i+8:i+8+j])
 	}
 	slices.Sort(sourceKinds)
 	var known []string
@@ -330,7 +345,7 @@ func TestKindsMatchTheSource(t *testing.T) {
 	}
 	slices.Sort(known)
 	if !slices.Equal(sourceKinds, known) {
-		t.Errorf("seller 的 11 支函式發布的 kind %v，模組認得的 %v", sourceKinds, known)
+		t.Errorf("seller 的 10 支函式與 payment 的函式發布的 kind %v，模組認得的 %v", sourceKinds, known)
 	}
 }
 
@@ -426,6 +441,23 @@ func TestPaymentItemsAreMergedIntoTheQueue(t *testing.T) {
 	must(t, err)
 	if len(items) != 1 || items[0].Kind != reviewqueue.PaymentAccountCreateFailed || items[0].ItemID != "42" || items[0].StoreID == nil || *items[0].StoreID != 42 ||
 		items[0].StoreName != "" || !items[0].Due.Equal(base.Add(24*time.Hour)) {
+		t.Fatalf("items=%+v", items)
+	}
+}
+
+// 清理進了終局的收款帳戶（purge_blocked_at 有值）也出現在待辦，種類是 PAYMENT_ACCOUNT_PURGE_STUCK，開始時間是進終局的時刻、期限 24 小時；建立失敗的種類不受影響。
+// mutation：payment.pub_review_items 拿掉 PURGE_STUCK 分支 → 沒有這一列，失敗。
+func TestPaymentPurgeStuckItemsAreMergedIntoTheQueue(t *testing.T) {
+	t.Parallel()
+	d, m := setup(t)
+	ctx := context.Background()
+	_, err := d.Conn(ctx).Exec(ctx, `INSERT INTO payment.accounts (store_id, provider, requirement_collection, create_called_at, purge_pending_at, purge_blocked_at, purge_blocked_reason, created_at, updated_at)
+		VALUES (43, 'fake', 'PROVIDER', $1, $1, $1, 'provider_refused：test', $1, $1)`, base)
+	must(t, err)
+	items, err := m.List(ctx, base.Add(time.Hour), reviewqueue.Kinds(), nil, 10)
+	must(t, err)
+	if len(items) != 1 || items[0].Kind != reviewqueue.PaymentAccountPurgeStuck || items[0].ItemID != "43" || items[0].StoreID == nil || *items[0].StoreID != 43 ||
+		!items[0].Start.Equal(base) || !items[0].Due.Equal(base.Add(24*time.Hour)) {
 		t.Fatalf("items=%+v", items)
 	}
 }

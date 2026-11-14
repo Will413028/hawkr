@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/store"
@@ -35,7 +36,8 @@ func (c *callCounter) handler(t *testing.T) http.HandlerFunc {
 // 經 Service 的開通入口（只差讀列）：平台收件的 Stripe 帳戶，呼叫端不宣告內嵌就只建 Account Link，不建 Account Session；宣告了才建 Account Session。
 func TestOpenSessionNeverCreatesAnAccountSessionForACallerThatDoesNotDeclareEmbedding(t *testing.T) {
 	ext := "acct_1"
-	row := store.PaymentAccount{StoreID: 1, Provider: StripeName, ExternalAccountID: &ext, RequirementCollection: string(model.CollectionPlatform), Status: string(model.PaymentActionRequired)}
+	done := time.Now()
+	row := store.PaymentAccount{StoreID: 1, Provider: StripeName, ExternalAccountID: &ext, CreateCompletedAt: &done, RequirementCollection: string(model.CollectionPlatform), Status: string(model.PaymentActionRequired)}
 	for name, tc := range map[string]struct {
 		runtimes                []model.EmbeddedRuntime
 		wantSessions, wantLinks int
@@ -61,7 +63,8 @@ func TestOpenSessionNeverCreatesAnAccountSessionForACallerThatDoesNotDeclareEmbe
 // 形狀只看帳戶列保存的收件方式，不看 provider 目前的設定：adapter 設定成金流商收件，平台收件的列仍開內嵌 session。
 func TestOpenSessionReadsTheStoredCollectionNotTheCurrentConfiguration(t *testing.T) {
 	ext := "acct_1"
-	row := store.PaymentAccount{StoreID: 1, Provider: StripeName, ExternalAccountID: &ext, RequirementCollection: string(model.CollectionPlatform), Status: string(model.PaymentActionRequired)}
+	done := time.Now()
+	row := store.PaymentAccount{StoreID: 1, Provider: StripeName, ExternalAccountID: &ext, CreateCompletedAt: &done, RequirementCollection: string(model.CollectionPlatform), Status: string(model.PaymentActionRequired)}
 	var calls callCounter
 	svc := &Service{d: Deps{Provider: stripeProvider(t, model.CollectionProvider, calls.handler(t))}}
 	got, err := svc.openSession(context.Background(), row, "https://a.test/r", "https://a.test/f", []model.EmbeddedRuntime{model.RuntimeStripeConnectJS})
@@ -94,7 +97,8 @@ func (p shapeProvider) CreateOnboardingSession(context.Context, SessionInput) (m
 func TestOpenSessionRejectsAShapeThatDiffersFromTheRequestedKind(t *testing.T) {
 	ext := "acct_1"
 	fake := NewFake()
-	row := store.PaymentAccount{StoreID: 1, Provider: fake.Name(), ExternalAccountID: &ext, RequirementCollection: string(model.CollectionPlatform), Status: string(model.PaymentActionRequired)}
+	done := time.Now()
+	row := store.PaymentAccount{StoreID: 1, Provider: fake.Name(), ExternalAccountID: &ext, CreateCompletedAt: &done, RequirementCollection: string(model.CollectionPlatform), Status: string(model.PaymentActionRequired)}
 	embedded := model.StripeEmbeddedSession{ClientSecret: "cs_secret", PublishableKey: "pk"}
 	for name, tc := range map[string]struct {
 		shape    model.OnboardingSession

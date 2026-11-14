@@ -19,9 +19,9 @@ SET status = $1,
     status_reason = $5,
     fetched_at = $6,
     updated_at = $7
-WHERE store_id = $8 AND external_account_id IS NOT NULL
+WHERE store_id = $8 AND create_completed_at IS NOT NULL
   AND (fetched_at IS NULL OR fetched_at <= $6)
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
 `
 
 type ApplyPaymentSnapshotParams struct {
@@ -35,7 +35,7 @@ type ApplyPaymentSnapshotParams struct {
 	StoreID         int64
 }
 
-// 同步重讀外部帳戶之後整列覆寫快取；沒有外部 ID 的列不寫。讀取開始時間早於已存的 fetched_at 的不寫（較晚開始的讀取已經先寫入，較早開始的不能蓋掉
+// 同步重讀外部帳戶之後整列覆寫快取；還沒完成建立（含半建立）的列不寫。讀取開始時間早於已存的 fetched_at 的不寫（較晚開始的讀取已經先寫入，較早開始的不能蓋掉
 // 較新的快取，D32）：沒有回傳列時呼叫方不標記 inbox 事件、不發布 PayoutAccountChanged。fetched_at 是 NULL（還沒有同步過）一律寫。
 func (q *Queries) ApplyPaymentSnapshot(ctx context.Context, arg ApplyPaymentSnapshotParams) (PaymentAccount, error) {
 	row := q.db.QueryRow(ctx, applyPaymentSnapshot,
@@ -61,22 +61,49 @@ func (q *Queries) ApplyPaymentSnapshot(ctx context.Context, arg ApplyPaymentSnap
 		&i.StatusReason,
 		&i.FetchedAt,
 		&i.CreateFailedAt,
+		&i.CreateCalledAt,
+		&i.CreateCompletedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SellerReadClaimedAt,
 		&i.PurgePendingAt,
+		&i.PurgeBlockedAt,
+		&i.PurgeBlockedReason,
 	)
 	return i, err
+}
+
+const blockPaymentAccountPurge = `-- name: BlockPaymentAccountPurge :execrows
+UPDATE payment.accounts
+SET purge_blocked_at = $1::timestamptz,
+    purge_blocked_reason = $2::text,
+    updated_at = $1
+WHERE store_id = $3 AND purge_pending_at IS NOT NULL AND purge_blocked_at IS NULL
+`
+
+type BlockPaymentAccountPurgeParams struct {
+	Now     time.Time
+	Reason  string
+	StoreID int64
+}
+
+// 清理進終局（D59）：記下進終局的時刻與原因（已在終局的保留最早的），週期掃描不再重排，進後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK。只有已標記等待清理的列才能進。
+func (q *Queries) BlockPaymentAccountPurge(ctx context.Context, arg BlockPaymentAccountPurgeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, blockPaymentAccountPurge, arg.Now, arg.Reason, arg.StoreID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const claimPaymentAccountSellerRead = `-- name: ClaimPaymentAccountSellerRead :one
 UPDATE payment.accounts
 SET seller_read_claimed_at = $1
-WHERE store_id = $2 AND external_account_id IS NOT NULL AND purge_pending_at IS NULL
+WHERE store_id = $2 AND create_completed_at IS NOT NULL AND purge_pending_at IS NULL
   AND (seller_read_claimed_at IS NULL OR seller_read_claimed_at <= $3)
   AND (fetched_at IS NULL OR fetched_at <= $3)
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
 `
 
 type ClaimPaymentAccountSellerReadParams struct {
@@ -85,7 +112,7 @@ type ClaimPaymentAccountSellerReadParams struct {
 	StaleBefore *time.Time
 }
 
-// 賣家觸發的重讀先搶讀取名額再呼叫 provider（D33）：已經有外部 ID、上次賣家觸發的讀取（seller_read_claimed_at，含失敗的與並行的）和上次寫入的讀取
+// 賣家觸發的重讀先搶讀取名額再呼叫 provider（D33）：已經完成建立、上次賣家觸發的讀取（seller_read_claimed_at，含失敗的與並行的）和上次寫入的讀取
 // （fetched_at）都早於 stale_before 才寫入 seller_read_claimed_at 並回傳列；沒有回傳列就是名額被占走（呼叫方不讀 provider，依 seller_read_claimed_at 與 fetched_at 回答成功或 resource_exhausted）。單一條件式 UPDATE，
 // 並行的呼叫由列鎖序列化，後到的重新檢查條件而拿不到。同步 job 不經過這裡。
 func (q *Queries) ClaimPaymentAccountSellerRead(ctx context.Context, arg ClaimPaymentAccountSellerReadParams) (PaymentAccount, error) {
@@ -103,11 +130,15 @@ func (q *Queries) ClaimPaymentAccountSellerRead(ctx context.Context, arg ClaimPa
 		&i.StatusReason,
 		&i.FetchedAt,
 		&i.CreateFailedAt,
+		&i.CreateCalledAt,
+		&i.CreateCompletedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SellerReadClaimedAt,
 		&i.PurgePendingAt,
+		&i.PurgeBlockedAt,
+		&i.PurgeBlockedReason,
 	)
 	return i, err
 }
@@ -116,7 +147,7 @@ const clearPaymentAccountCreateFailed = `-- name: ClearPaymentAccountCreateFaile
 UPDATE payment.accounts
 SET create_failed_at = NULL,
     updated_at = $1
-WHERE store_id = $2 AND external_account_id IS NULL AND create_failed_at IS NOT NULL
+WHERE store_id = $2 AND create_completed_at IS NULL AND create_failed_at IS NOT NULL
 `
 
 type ClearPaymentAccountCreateFailedParams struct {
@@ -131,6 +162,51 @@ func (q *Queries) ClearPaymentAccountCreateFailed(ctx context.Context, arg Clear
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const completePaymentAccountCreate = `-- name: CompletePaymentAccountCreate :one
+UPDATE payment.accounts
+SET create_completed_at = $1::timestamptz,
+    status = 'ACTION_REQUIRED',
+    create_failed_at = NULL,
+    updated_at = $1
+WHERE store_id = $2 AND external_account_id IS NOT NULL AND create_completed_at IS NULL AND purge_pending_at IS NULL
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
+`
+
+type CompletePaymentAccountCreateParams struct {
+	Now     time.Time
+	StoreID int64
+}
+
+// 建立的第二步成功：記下完成的時刻，狀態從 NOT_CREATED 進 ACTION_REQUIRED（新帳戶要賣家補資料，同步 job 重讀後覆寫）；「可以開通」「同步」「輪詢」都看這個時刻。
+// 只在有外部 ID、還沒完成、沒有等待清理時寫。
+func (q *Queries) CompletePaymentAccountCreate(ctx context.Context, arg CompletePaymentAccountCreateParams) (PaymentAccount, error) {
+	row := q.db.QueryRow(ctx, completePaymentAccountCreate, arg.Now, arg.StoreID)
+	var i PaymentAccount
+	err := row.Scan(
+		&i.StoreID,
+		&i.Provider,
+		&i.ExternalAccountID,
+		&i.RequirementCollection,
+		&i.Status,
+		&i.TransfersActive,
+		&i.PayoutsActive,
+		&i.Requirements,
+		&i.StatusReason,
+		&i.FetchedAt,
+		&i.CreateFailedAt,
+		&i.CreateCalledAt,
+		&i.CreateCompletedAt,
+		&i.CreateIdempotencyKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SellerReadClaimedAt,
+		&i.PurgePendingAt,
+		&i.PurgeBlockedAt,
+		&i.PurgeBlockedReason,
+	)
+	return i, err
 }
 
 const deletePaymentAccounts = `-- name: DeletePaymentAccounts :many
@@ -195,8 +271,33 @@ func (q *Queries) InsertPaymentAccount(ctx context.Context, arg InsertPaymentAcc
 	return result.RowsAffected(), nil
 }
 
+const insertPaymentMappingDeletion = `-- name: InsertPaymentMappingDeletion :exec
+INSERT INTO payment.account_mapping_deletions (store_id, provider, external_account_id, admin_id, deleted_at)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type InsertPaymentMappingDeletionParams struct {
+	StoreID           int64
+	Provider          string
+	ExternalAccountID *string
+	AdminID           int64
+	Now               time.Time
+}
+
+// 管理員「已在金流商處理，刪除對應」的紀錄（只增不改；列隨後被刪，紀錄留下，D60）。
+func (q *Queries) InsertPaymentMappingDeletion(ctx context.Context, arg InsertPaymentMappingDeletionParams) error {
+	_, err := q.db.Exec(ctx, insertPaymentMappingDeletion,
+		arg.StoreID,
+		arg.Provider,
+		arg.ExternalAccountID,
+		arg.AdminID,
+		arg.Now,
+	)
+	return err
+}
+
 const lockPaymentAccount = `-- name: LockPaymentAccount :one
-SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at
+SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
 FROM payment.accounts
 WHERE store_id = $1
 FOR UPDATE
@@ -218,11 +319,57 @@ func (q *Queries) LockPaymentAccount(ctx context.Context, storeID int64) (Paymen
 		&i.StatusReason,
 		&i.FetchedAt,
 		&i.CreateFailedAt,
+		&i.CreateCalledAt,
+		&i.CreateCompletedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SellerReadClaimedAt,
 		&i.PurgePendingAt,
+		&i.PurgeBlockedAt,
+		&i.PurgeBlockedReason,
+	)
+	return i, err
+}
+
+const markPaymentAccountCreateCalled = `-- name: MarkPaymentAccountCreateCalled :one
+UPDATE payment.accounts
+SET create_called_at = COALESCE(create_called_at, $1::timestamptz),
+    updated_at = $1
+WHERE store_id = $2 AND create_completed_at IS NULL AND purge_pending_at IS NULL
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
+`
+
+type MarkPaymentAccountCreateCalledParams struct {
+	Now     time.Time
+	StoreID int64
+}
+
+// 呼叫金流商之前先記「已呼叫」的時刻（已記過的保留最早的）：之後列上就分得出「從沒呼叫」與「呼叫過、結果不明」（D59）。已完成建立與等待清理的列不寫。
+func (q *Queries) MarkPaymentAccountCreateCalled(ctx context.Context, arg MarkPaymentAccountCreateCalledParams) (PaymentAccount, error) {
+	row := q.db.QueryRow(ctx, markPaymentAccountCreateCalled, arg.Now, arg.StoreID)
+	var i PaymentAccount
+	err := row.Scan(
+		&i.StoreID,
+		&i.Provider,
+		&i.ExternalAccountID,
+		&i.RequirementCollection,
+		&i.Status,
+		&i.TransfersActive,
+		&i.PayoutsActive,
+		&i.Requirements,
+		&i.StatusReason,
+		&i.FetchedAt,
+		&i.CreateFailedAt,
+		&i.CreateCalledAt,
+		&i.CreateCompletedAt,
+		&i.CreateIdempotencyKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SellerReadClaimedAt,
+		&i.PurgePendingAt,
+		&i.PurgeBlockedAt,
+		&i.PurgeBlockedReason,
 	)
 	return i, err
 }
@@ -231,7 +378,7 @@ const markPaymentAccountCreateFailed = `-- name: MarkPaymentAccountCreateFailed 
 UPDATE payment.accounts
 SET create_failed_at = $1,
     updated_at = $1
-WHERE store_id = $2 AND external_account_id IS NULL AND create_failed_at IS NULL AND purge_pending_at IS NULL
+WHERE store_id = $2 AND create_completed_at IS NULL AND create_failed_at IS NULL AND purge_pending_at IS NULL
 `
 
 type MarkPaymentAccountCreateFailedParams struct {
@@ -239,7 +386,7 @@ type MarkPaymentAccountCreateFailedParams struct {
 	StoreID int64
 }
 
-// 建立重試用完：記下失敗的時刻（進後台待辦）；已經有外部 ID 的列不寫。
+// 建立重試用完：記下失敗的時刻（進後台待辦）；已完成建立的列不寫（有外部 ID 但第二步沒成功的半建立列照寫）。
 func (q *Queries) MarkPaymentAccountCreateFailed(ctx context.Context, arg MarkPaymentAccountCreateFailedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markPaymentAccountCreateFailed, arg.Now, arg.StoreID)
 	if err != nil {
@@ -270,7 +417,7 @@ func (q *Queries) MarkPaymentAccountPurgePending(ctx context.Context, arg MarkPa
 }
 
 const paymentAccountByExternal = `-- name: PaymentAccountByExternal :one
-SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at
+SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
 FROM payment.accounts
 WHERE provider = $1 AND external_account_id = $2
 `
@@ -295,17 +442,21 @@ func (q *Queries) PaymentAccountByExternal(ctx context.Context, arg PaymentAccou
 		&i.StatusReason,
 		&i.FetchedAt,
 		&i.CreateFailedAt,
+		&i.CreateCalledAt,
+		&i.CreateCompletedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SellerReadClaimedAt,
 		&i.PurgePendingAt,
+		&i.PurgeBlockedAt,
+		&i.PurgeBlockedReason,
 	)
 	return i, err
 }
 
 const paymentAccountByStore = `-- name: PaymentAccountByStore :one
-SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at
+SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
 FROM payment.accounts
 WHERE store_id = $1
 `
@@ -325,11 +476,15 @@ func (q *Queries) PaymentAccountByStore(ctx context.Context, storeID int64) (Pay
 		&i.StatusReason,
 		&i.FetchedAt,
 		&i.CreateFailedAt,
+		&i.CreateCalledAt,
+		&i.CreateCompletedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SellerReadClaimedAt,
 		&i.PurgePendingAt,
+		&i.PurgeBlockedAt,
+		&i.PurgeBlockedReason,
 	)
 	return i, err
 }
@@ -337,7 +492,7 @@ func (q *Queries) PaymentAccountByStore(ctx context.Context, storeID int64) (Pay
 const paymentAccountStoreIDsByExternal = `-- name: PaymentAccountStoreIDsByExternal :many
 SELECT store_id
 FROM payment.accounts
-WHERE provider = $1 AND external_account_id = ANY($2::text[]) AND purge_pending_at IS NULL
+WHERE provider = $1 AND external_account_id = ANY($2::text[]) AND create_completed_at IS NOT NULL AND purge_pending_at IS NULL
 ORDER BY store_id
 `
 
@@ -346,7 +501,7 @@ type PaymentAccountStoreIDsByExternalParams struct {
 	ExternalAccountIds []string
 }
 
-// 外部帳戶 ID 對應的擁有者（inbox 的路由鍵是外部帳戶 ID）；等待清理的帳戶不排同步。
+// 外部帳戶 ID 對應的擁有者（inbox 的路由鍵是外部帳戶 ID）；半建立與等待清理的帳戶不排同步。
 func (q *Queries) PaymentAccountStoreIDsByExternal(ctx context.Context, arg PaymentAccountStoreIDsByExternalParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, paymentAccountStoreIDsByExternal, arg.Provider, arg.ExternalAccountIds)
 	if err != nil {
@@ -360,6 +515,41 @@ func (q *Queries) PaymentAccountStoreIDsByExternal(ctx context.Context, arg Paym
 			return nil, err
 		}
 		items = append(items, store_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const paymentMappingDeletionsByStore = `-- name: PaymentMappingDeletionsByStore :many
+SELECT id, store_id, provider, external_account_id, admin_id, deleted_at
+FROM payment.account_mapping_deletions
+WHERE store_id = $1
+ORDER BY deleted_at DESC, id DESC
+`
+
+// 讀回某店家的「刪除對應」紀錄（操作者與時間），新的在前。
+func (q *Queries) PaymentMappingDeletionsByStore(ctx context.Context, storeID int64) ([]PaymentAccountMappingDeletion, error) {
+	rows, err := q.db.Query(ctx, paymentMappingDeletionsByStore, storeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PaymentAccountMappingDeletion{}
+	for rows.Next() {
+		var i PaymentAccountMappingDeletion
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoreID,
+			&i.Provider,
+			&i.ExternalAccountID,
+			&i.AdminID,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -411,7 +601,7 @@ func (q *Queries) PollablePaymentAccountStoreIDs(ctx context.Context, arg Pollab
 const purgePendingPaymentAccountStoreIDs = `-- name: PurgePendingPaymentAccountStoreIDs :many
 SELECT store_id
 FROM payment.accounts
-WHERE purge_pending_at IS NOT NULL AND store_id > $1
+WHERE purge_pending_at IS NOT NULL AND purge_blocked_at IS NULL AND store_id > $1
 ORDER BY store_id
 LIMIT $2
 `
@@ -421,7 +611,7 @@ type PurgePendingPaymentAccountStoreIDsParams struct {
 	Batch        int32
 }
 
-// 週期掃描重排「關閉後刪除」用：等待清理的帳戶，依 store_id 分批。
+// 週期掃描重排「關閉後刪除」用：等待清理而且沒有進終局的帳戶，依 store_id 分批。
 func (q *Queries) PurgePendingPaymentAccountStoreIDs(ctx context.Context, arg PurgePendingPaymentAccountStoreIDsParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, purgePendingPaymentAccountStoreIDs, arg.AfterStoreID, arg.Batch)
 	if err != nil {
@@ -442,14 +632,100 @@ func (q *Queries) PurgePendingPaymentAccountStoreIDs(ctx context.Context, arg Pu
 	return items, nil
 }
 
+const restartPaymentAccountPurge = `-- name: RestartPaymentAccountPurge :one
+UPDATE payment.accounts
+SET purge_blocked_at = NULL,
+    purge_blocked_reason = NULL,
+    purge_pending_at = $1::timestamptz,
+    updated_at = $1
+WHERE store_id = $2 AND purge_blocked_at IS NOT NULL
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
+`
+
+type RestartPaymentAccountPurgeParams struct {
+	Now     time.Time
+	StoreID int64
+}
+
+// 管理員「重試關閉」：只有終局的列清除終局，等待清理的時刻重設成現在（期限從重試起重新算，否則第一次暫時性的失敗就又進終局），由呼叫方同一個 transaction 重新排入清理 job。
+func (q *Queries) RestartPaymentAccountPurge(ctx context.Context, arg RestartPaymentAccountPurgeParams) (PaymentAccount, error) {
+	row := q.db.QueryRow(ctx, restartPaymentAccountPurge, arg.Now, arg.StoreID)
+	var i PaymentAccount
+	err := row.Scan(
+		&i.StoreID,
+		&i.Provider,
+		&i.ExternalAccountID,
+		&i.RequirementCollection,
+		&i.Status,
+		&i.TransfersActive,
+		&i.PayoutsActive,
+		&i.Requirements,
+		&i.StatusReason,
+		&i.FetchedAt,
+		&i.CreateFailedAt,
+		&i.CreateCalledAt,
+		&i.CreateCompletedAt,
+		&i.CreateIdempotencyKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SellerReadClaimedAt,
+		&i.PurgePendingAt,
+		&i.PurgeBlockedAt,
+		&i.PurgeBlockedReason,
+	)
+	return i, err
+}
+
+const rotatePaymentAccountIdempotencyKey = `-- name: RotatePaymentAccountIdempotencyKey :one
+UPDATE payment.accounts
+SET create_idempotency_key = gen_random_uuid(),
+    create_called_at = $1::timestamptz,
+    updated_at = $1
+WHERE store_id = $2 AND external_account_id IS NULL AND create_completed_at IS NULL AND purge_pending_at IS NULL
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
+`
+
+type RotatePaymentAccountIdempotencyKeyParams struct {
+	Now     time.Time
+	StoreID int64
+}
+
+// 舊冪等鍵超過 30 天（金流商不再保證同一把鍵回同一個帳戶）、而且列出對帳沒有找到帳戶時換新鍵，已呼叫的時刻改成新鍵第一次呼叫之前的時刻。
+// 只在還沒有外部 ID、還沒完成、沒有等待清理時寫。
+func (q *Queries) RotatePaymentAccountIdempotencyKey(ctx context.Context, arg RotatePaymentAccountIdempotencyKeyParams) (PaymentAccount, error) {
+	row := q.db.QueryRow(ctx, rotatePaymentAccountIdempotencyKey, arg.Now, arg.StoreID)
+	var i PaymentAccount
+	err := row.Scan(
+		&i.StoreID,
+		&i.Provider,
+		&i.ExternalAccountID,
+		&i.RequirementCollection,
+		&i.Status,
+		&i.TransfersActive,
+		&i.PayoutsActive,
+		&i.Requirements,
+		&i.StatusReason,
+		&i.FetchedAt,
+		&i.CreateFailedAt,
+		&i.CreateCalledAt,
+		&i.CreateCompletedAt,
+		&i.CreateIdempotencyKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SellerReadClaimedAt,
+		&i.PurgePendingAt,
+		&i.PurgeBlockedAt,
+		&i.PurgeBlockedReason,
+	)
+	return i, err
+}
+
 const setPaymentAccountExternal = `-- name: SetPaymentAccountExternal :one
 UPDATE payment.accounts
 SET external_account_id = $1,
-    status = 'ACTION_REQUIRED',
-    create_failed_at = NULL,
     updated_at = $2
-WHERE store_id = $3 AND external_account_id IS NULL AND purge_pending_at IS NULL
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at
+WHERE store_id = $3 AND external_account_id IS NULL AND create_completed_at IS NULL AND purge_pending_at IS NULL
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
 `
 
 type SetPaymentAccountExternalParams struct {
@@ -458,7 +734,8 @@ type SetPaymentAccountExternalParams struct {
 	StoreID           int64
 }
 
-// 外部帳戶建立後填上外部 ID，狀態從 NOT_CREATED 進 ACTION_REQUIRED（新帳戶要賣家補資料，同步 job 重讀後覆寫）；只在還沒有外部 ID 時寫（重送安全），等待清理的列不寫（清理以冪等鍵取得同一個帳戶）。
+// 建立的第一步拿到外部 ID 就寫進列（不等第二步，D59）；狀態仍是 NOT_CREATED，第二步成功才算已建立。只在還沒有外部 ID 時寫（重送安全），等待清理的列不寫
+// （清理走 SetPaymentAccountExternalForPurge）。已呼叫的時刻必須先寫（約束 accounts_called_check）。
 func (q *Queries) SetPaymentAccountExternal(ctx context.Context, arg SetPaymentAccountExternalParams) (PaymentAccount, error) {
 	row := q.db.QueryRow(ctx, setPaymentAccountExternal, arg.ExternalAccountID, arg.Now, arg.StoreID)
 	var i PaymentAccount
@@ -474,11 +751,15 @@ func (q *Queries) SetPaymentAccountExternal(ctx context.Context, arg SetPaymentA
 		&i.StatusReason,
 		&i.FetchedAt,
 		&i.CreateFailedAt,
+		&i.CreateCalledAt,
+		&i.CreateCompletedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SellerReadClaimedAt,
 		&i.PurgePendingAt,
+		&i.PurgeBlockedAt,
+		&i.PurgeBlockedReason,
 	)
 	return i, err
 }
@@ -486,11 +767,9 @@ func (q *Queries) SetPaymentAccountExternal(ctx context.Context, arg SetPaymentA
 const setPaymentAccountExternalForPurge = `-- name: SetPaymentAccountExternalForPurge :one
 UPDATE payment.accounts
 SET external_account_id = $1,
-    status = 'ACTION_REQUIRED',
-    create_failed_at = NULL,
     updated_at = $2
 WHERE store_id = $3 AND external_account_id IS NULL AND purge_pending_at IS NOT NULL
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
 `
 
 type SetPaymentAccountExternalForPurgeParams struct {
@@ -499,7 +778,7 @@ type SetPaymentAccountExternalForPurgeParams struct {
 	StoreID           int64
 }
 
-// 清理把冪等鍵取得的外部帳戶 ID 寫回已標記等待清理的列，讓之後的關閉與刪除走有外部 ID 的路（重試不必再取得已關閉的帳戶）；只在還沒有外部 ID 時寫，欄位與 SetPaymentAccountExternal 相同。
+// 清理把冪等鍵重送或列出對帳取得的外部帳戶 ID 寫回已標記等待清理的列，讓之後的關閉與刪除走有外部 ID 的路；只在還沒有外部 ID 時寫，列保持未建立。
 func (q *Queries) SetPaymentAccountExternalForPurge(ctx context.Context, arg SetPaymentAccountExternalForPurgeParams) (PaymentAccount, error) {
 	row := q.db.QueryRow(ctx, setPaymentAccountExternalForPurge, arg.ExternalAccountID, arg.Now, arg.StoreID)
 	var i PaymentAccount
@@ -515,11 +794,15 @@ func (q *Queries) SetPaymentAccountExternalForPurge(ctx context.Context, arg Set
 		&i.StatusReason,
 		&i.FetchedAt,
 		&i.CreateFailedAt,
+		&i.CreateCalledAt,
+		&i.CreateCompletedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SellerReadClaimedAt,
 		&i.PurgePendingAt,
+		&i.PurgeBlockedAt,
+		&i.PurgeBlockedReason,
 	)
 	return i, err
 }
@@ -527,7 +810,7 @@ func (q *Queries) SetPaymentAccountExternalForPurge(ctx context.Context, arg Set
 const stalePaymentAccountCreateStoreIDs = `-- name: StalePaymentAccountCreateStoreIDs :many
 SELECT store_id
 FROM payment.accounts
-WHERE external_account_id IS NULL AND create_failed_at IS NULL AND purge_pending_at IS NULL
+WHERE create_completed_at IS NULL AND create_failed_at IS NULL AND purge_pending_at IS NULL
   AND updated_at < $1 AND store_id > $2
 ORDER BY store_id
 LIMIT $3

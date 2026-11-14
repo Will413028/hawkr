@@ -4,15 +4,15 @@
 
 ## 職責
 
-收款與付款。現階段只擁有收款帳戶（Stripe 計畫 D28）：外部帳戶的本地快取、建立與同步 job、輪詢、provider 的 port 與 Stripe／fake adapter、收款事件的 inbox handler、後台的讀取、重新整理與重試建立。給 seller（核准、開通 session、個資清理）與後台用。行為規格的唯一來源是 `docs/modules/payment.md`。
+收款與付款。現階段只擁有收款帳戶（Stripe 計畫 D28）：外部帳戶的本地快取、建立與同步 job、輪詢、provider 的 port 與 Stripe／fake adapter、收款事件的 inbox handler、後台的讀取、重新整理、重試建立、重試關閉與刪除對應。給 seller（核准、開通 session、個資清理）與後台用。行為規格的唯一來源是 `docs/modules/payment.md`。
 
 ## 擁有的資料
 
-schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵 `store_id`，不建跨 schema FK）。view 與函式在 `db/objects.sql`。webhook inbox 不在這裡：`inbox.events` 由 platform 擁有（`internal/platform/inbox`，D29）。讀取模型：無。
+schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵 `store_id`，不建跨 schema FK）、`account_mapping_deletions`（管理員「刪除對應」的紀錄，只增不改）。view 與函式在 `db/objects.sql`。webhook inbox 不在這裡：`inbox.events` 由 platform 擁有（`internal/platform/inbox`，D29）。讀取模型：無。
 
 ## 發布的讀取介面
 
-- `payment.pub_review_items(at)`：後台待辦的 payment 部分（現在只有 `PAYMENT_ACCOUNT_CREATE_FAILED`），只有店家 ID，給 reviewqueue（契約在 `db/pub.sql`）。規格 §6。
+- `payment.pub_review_items(at)`：後台待辦的 payment 部分（`PAYMENT_ACCOUNT_CREATE_FAILED`、`PAYMENT_ACCOUNT_PURGE_STUCK`），只有店家 ID，給 reviewqueue（契約在 `db/pub.sql`）。規格 §6。
 
 ## 模組內部結構
 
@@ -24,7 +24,8 @@ schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵
 
 - 外部呼叫不在 transaction 內（單體規則 5）。守門：fake provider 的 `Violations`（integration 測試）。規格 §2。
 - 擁有者的 transaction 對 payment 只 INSERT 帳戶列（`ON CONFLICT DO NOTHING`）與排 job，不鎖、不改既有列；既有列只由本模組的 job 與後台指令寫（全域鎖順序 payment 先於 seller）。守門：integration 的 `lockorder` 檢查、`TestRequestKeepsAnExistingRow`。規格 §2、§7。
-- 擁有者個資清理時先關閉外部帳戶、成功才刪本地列（沒有外部 ID 的列以冪等鍵取得帳戶再關閉，D55）；job 先標每一列的 `purge_pending_at`（呼叫 provider 之前，與外部 ID 無關），失敗留列，不被建立、不進同步輪詢，由週期掃描重排；ForgetOwners 的 transaction 仍只排 job。守門：`TestForgetOwnersClosesTheExternalAccountThenDeletesTheRow`、`TestAFailedCloseKeepsTheRowMarkedExcludedFromPollingAndRetriedByTheSweep`。規格 §2。
+- 擁有者個資清理時先關閉外部帳戶、成功才刪本地列（從沒呼叫過 provider 的列直接刪；呼叫過沒有外部 ID 的列 30 天內重送冪等鍵、超過列出對帳，D55、D59）；job 先標每一列的 `purge_pending_at`，失敗留列，不被建立、不進同步輪詢，由週期掃描重排；永久拒絕或 7 天仍不成進終局（`purge_blocked_at`，後台待辦 `PAYMENT_ACCOUNT_PURGE_STUCK`，掃描不再重排）；ForgetOwners 的 transaction 仍只排 job。守門：`TestForgetOwnersClosesTheExternalAccountThenDeletesTheRow`、`TestAFailedCloseKeepsTheRowMarkedExcludedFromPollingAndRetriedByTheSweep`、`TestAPermanentCloseRefusalPutsTheRowInTheTerminalStateAndTheSweepStops`。規格 §2。
+- 「已建立」是第二步成功（`create_completed_at`），不是有外部 ID：半建立的列不可開通、不輪詢、不同步（D59）。守門：`TestTheFirstStepIDIsKeptWhenTheSecondStepFailsAndAHalfCreatedRowIsNotOnboardable`。規格 §2。
 - 同步在寫快照的 transaction 內發 `PayoutAccountChanged`；payload 與明文 fingerprint 不寫 log、不保存。守門：`TestSyncPublishesPayoutAccountChangedInsideTheWrite`、`TestDuplicateProviderEventIsRecordedOnceAndDispatchedOnce`。規格 §3、§5。
 - 收款事件的 handler 只排同步、不標記已處理；同步只把讀取開始前收到的事件標為已處理。守門：`TestAnEventArrivingWhileTheAccountIsBeingReadIsNotLostWhenItsSyncIsCoalesced`。規格 §3。
 

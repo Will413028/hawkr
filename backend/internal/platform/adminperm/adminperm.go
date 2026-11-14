@@ -41,6 +41,8 @@ const (
 	PaymentAccountsGet                Permission = "payment.accounts.get"
 	PaymentAccountsRefresh            Permission = "payment.accounts.refresh"
 	PaymentAccountsRetryCreate        Permission = "payment.accounts.retry_create"
+	PaymentAccountsRetryPurge         Permission = "payment.accounts.retry_purge"
+	PaymentAccountsDeleteMapping      Permission = "payment.accounts.delete_mapping"
 	ReviewQueueItemsList              Permission = "reviewqueue.items.list"
 	SellerStoresList                  Permission = "seller.stores.list"
 	SellerStoresGet                   Permission = "seller.stores.get"
@@ -116,7 +118,7 @@ func Catalog() []Permission {
 		DelegationSessionsCreate,
 		IdentityAccountsList, IdentityAccountsGet, IdentityAccountsDelete,
 		LegacyGatewayForward,
-		PaymentAccountsGet, PaymentAccountsRefresh, PaymentAccountsRetryCreate,
+		PaymentAccountsGet, PaymentAccountsRefresh, PaymentAccountsRetryCreate, PaymentAccountsRetryPurge, PaymentAccountsDeleteMapping,
 		ReviewQueueItemsList,
 		SellerStoresList, SellerStoresGet,
 		SellerStoreStatsGet, SellerStoreOnboardingGet,

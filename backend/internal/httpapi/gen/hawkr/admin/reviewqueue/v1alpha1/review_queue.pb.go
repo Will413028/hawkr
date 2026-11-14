@@ -55,6 +55,8 @@ const (
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED ReviewQueueItemKind = 10
 	// 處分建立之後，又有別的帳號同步了與被處分帳號相同的銀行帳號 fingerprint，等管理員在處分頁檢視這個關聯帳號（subject 是 shared_bank_account）。
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT ReviewQueueItemKind = 11
+	// 收款帳戶的清理無法完成（金流商拒絕關閉，或等待清理超過 7 天仍關不掉），等管理員重試關閉或確認已在金流商處理後刪除對應（subject 是 payment_account）。
+	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_PURGE_STUCK ReviewQueueItemKind = 12
 )
 
 // Enum value maps for ReviewQueueItemKind.
@@ -72,6 +74,7 @@ var (
 		9:  "REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION",
 		10: "REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED",
 		11: "REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT",
+		12: "REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_PURGE_STUCK",
 	}
 	ReviewQueueItemKind_value = map[string]int32{
 		"REVIEW_QUEUE_ITEM_KIND_UNSPECIFIED":                   0,
@@ -86,6 +89,7 @@ var (
 		"REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION":               9,
 		"REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED": 10,
 		"REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT":           11,
+		"REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_PURGE_STUCK":   12,
 	}
 )
 
@@ -855,7 +859,7 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"account_id\x18\x02 \x01(\tR\taccountId\"U\n" +
 	"\x11KYCApplicationRef\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12%\n" +
-	"\x0eapplication_id\x18\x02 \x01(\tR\rapplicationId*\xbf\x04\n" +
+	"\x0eapplication_id\x18\x02 \x01(\tR\rapplicationId*\xf7\x04\n" +
 	"\x13ReviewQueueItemKind\x12&\n" +
 	"\"REVIEW_QUEUE_ITEM_KIND_UNSPECIFIED\x10\x00\x12(\n" +
 	"$REVIEW_QUEUE_ITEM_KIND_REPORT_TRIAGE\x10\x01\x12(\n" +
@@ -869,7 +873,8 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"&REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION\x10\t\x128\n" +
 	"4REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED\x10\n" +
 	"\x12.\n" +
-	"*REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT\x10\v2\xa7\x01\n" +
+	"*REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT\x10\v\x126\n" +
+	"2REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_PURGE_STUCK\x10\f2\xa7\x01\n" +
 	"\x17ReviewQueueAdminService\x12\x8b\x01\n" +
 	"\x0fListReviewQueue\x128.hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueRequest\x1a9.hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueResponse\"\x03\x90\x02\x01B\xca\x02\n" +
 	"$com.hawkr.admin.reviewqueue.v1alpha1B\x10ReviewQueueProtoP\x01Zmgithub.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/reviewqueue/v1alpha1;reviewqueuev1alpha1\xa2\x02\x03HAR\xaa\x02 Hawkr.Admin.Reviewqueue.V1alpha1\xca\x02 Hawkr\\Admin\\Reviewqueue\\V1alpha1\xe2\x02,Hawkr\\Admin\\Reviewqueue\\V1alpha1\\GPBMetadata\xea\x02#Hawkr::Admin::Reviewqueue::V1alpha1b\x06proto3"

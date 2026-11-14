@@ -44,6 +44,7 @@ var kindPermissions = map[rq.Kind]adminperm.Permission{
 	rq.MeasureReview:              adminperm.SellerMeasuresList,
 	rq.KYCApplication:             adminperm.SellerKYCApplicationsList,
 	rq.PaymentAccountCreateFailed: adminperm.PaymentAccountsGet,
+	rq.PaymentAccountPurgeStuck:   adminperm.PaymentAccountsGet,
 	rq.SharedBankAccount:          adminperm.SellerMeasuresList,
 }
 
@@ -250,7 +251,7 @@ func toProto(item rq.Item) (*adminpb.ReviewQueueItem, error) {
 			return nil, missing("kyc_application_id 或 store_id")
 		}
 		out.Subject = &adminpb.ReviewQueueItem_KycApplication{KycApplication: &adminpb.KYCApplicationRef{StoreId: rpc.FormatID(*item.StoreID), ApplicationId: item.KYCApplicationID.String()}}
-	case rq.PaymentAccountCreateFailed:
+	case rq.PaymentAccountCreateFailed, rq.PaymentAccountPurgeStuck:
 		if item.StoreID == nil {
 			return nil, missing("store_id")
 		}

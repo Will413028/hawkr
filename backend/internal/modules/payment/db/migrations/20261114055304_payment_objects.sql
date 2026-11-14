@@ -14,5 +14,9 @@ LANGUAGE sql STABLE
 BEGIN ATOMIC
     SELECT 'PAYMENT_ACCOUNT_CREATE_FAILED'::text, a.store_id::text, a.store_id, a.create_failed_at, a.create_failed_at + INTERVAL '24 hours'
     FROM payment.accounts a
-    WHERE a.create_failed_at IS NOT NULL;
+    WHERE a.create_failed_at IS NOT NULL
+    UNION ALL
+    SELECT 'PAYMENT_ACCOUNT_PURGE_STUCK'::text, a.store_id::text, a.store_id, a.purge_blocked_at, a.purge_blocked_at + INTERVAL '24 hours'
+    FROM payment.accounts a
+    WHERE a.purge_blocked_at IS NOT NULL;
 END;

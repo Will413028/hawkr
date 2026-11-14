@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -423,29 +424,96 @@ func rawRequirements(res *sdk.APIResponse) json.RawMessage {
 	return env.Requirements
 }
 
-// CloseAccount 關閉 v2 帳戶的 recipient 設定。已關閉的帳戶再關會回 403：此時讀帳戶，closed 為真就視為成功；讀取成功但帳戶沒關時回原本的 403；
-// 讀取本身失敗時回讀取的錯誤（不知道帳戶是否已關閉，暫時性的讀取失敗讓呼叫方重試，不被永久的 403 蓋掉）。
+// CloseAccount 關閉 v2 帳戶。先讀回帳戶：已關閉就視為成功；否則 applied_configurations 取自讀回的帳戶（關閉要求傳帳戶實際的全部設定：
+// 第一步之後還沒完成設定的空帳戶是 []，傳 ["recipient"] 或省略都是 400 configs_must_match_to_close，D60、spike Q25）。讀取失敗直接回讀取的錯誤；
+// 關閉回 403（並行的關閉剛完成）時再讀一次，closed 為真就視為成功，否則回原本的 403。
 func (c *Client) CloseAccount(ctx context.Context, accountID string) error {
-	params := &sdk.V2CoreAccountCloseParams{AppliedConfigurations: sdk.StringSlice([]string{"recipient"})}
-	err := c.call(ctx, func(ctx context.Context) error {
-		_, err := c.sdk.V2CoreAccounts.Close(ctx, accountID, params)
+	acct, err := c.retrieveRaw(ctx, accountID)
+	if err != nil {
 		return err
+	}
+	if acct.Closed {
+		return nil
+	}
+	applied := make([]string, 0, len(acct.AppliedConfigurations))
+	for _, cfg := range acct.AppliedConfigurations {
+		applied = append(applied, string(cfg))
+	}
+	err = c.call(ctx, func(ctx context.Context) error {
+		svc := c.sdk.V2CoreAccounts
+		params := &closeParams{AppliedConfigurations: applied}
+		params.Context = ctx
+		return svc.B.Call(http.MethodPost, sdk.FormatURLPath("/v2/core/accounts/%s/close", accountID), svc.Key, params, &sdk.V2CoreAccount{})
 	})
 	var api *APIError
 	if err == nil || !errors.As(err, &api) || api.Status != http.StatusForbidden {
 		return err
 	}
-	var acct *sdk.V2CoreAccount
-	if rerr := c.call(ctx, func(ctx context.Context) (err error) {
-		acct, err = c.sdk.V2CoreAccounts.Retrieve(ctx, accountID, &sdk.V2CoreAccountRetrieveParams{})
-		return err
-	}); rerr != nil {
+	again, rerr := c.retrieveRaw(ctx, accountID)
+	if rerr != nil {
 		return rerr
 	}
-	if acct != nil && acct.Closed {
+	if again.Closed {
 		return nil
 	}
 	return err
+}
+
+// closeParams 是關閉請求的本文：SDK 的 V2CoreAccountCloseParams 對 applied_configurations 用 omitempty，空陣列會被省略（Stripe 回 400 configs_must_match_to_close），
+// 所以這裡自己定義，空陣列照送。
+type closeParams struct {
+	sdk.Params            `json:"-"`
+	AppliedConfigurations []string `json:"applied_configurations"`
+}
+
+func (c *Client) retrieveRaw(ctx context.Context, accountID string) (*sdk.V2CoreAccount, error) {
+	var acct *sdk.V2CoreAccount
+	if err := c.call(ctx, func(ctx context.Context) (err error) {
+		acct, err = c.sdk.V2CoreAccounts.Retrieve(ctx, accountID, &sdk.V2CoreAccountRetrieveParams{})
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	if acct == nil || acct.ID == "" {
+		return nil, errors.New("stripe：讀取帳戶的回應沒有 id")
+	}
+	return acct, nil
+}
+
+const (
+	// accountsPageLimit 是列出帳戶每頁的上限（Stripe v2 上限 20，spike Q24）。
+	accountsPageLimit = 20
+	// maxAccountPages 是以 metadata.store_id 對帳時最多翻的頁數（整個列表在一次呼叫的總上限內讀完）；超過回錯誤，呼叫方不得把它當成「沒有找到」。
+	maxAccountPages = 100
+)
+
+// ListAccountIDsByStore 列出沒有關閉的 v2 帳戶（預設不含已關閉的；已關閉的帳戶 metadata 被清成 null，所以比對不到同一家店先前關閉的帳戶，spike Q24），
+// 回傳 metadata.store_id 等於 storeID 的帳戶 ID（Stripe 的順序，新的在前）。含只做完第一步的空帳戶。整份列完才回傳；翻頁到上限或任何一頁失敗回錯誤，
+// 不回部分結果（呼叫方只在「整份列完都沒有」時才刪列）。
+func (c *Client) ListAccountIDsByStore(ctx context.Context, storeID int64) ([]string, error) {
+	want := strconv.FormatInt(storeID, 10)
+	var ids []string
+	err := c.call(ctx, func(ctx context.Context) error {
+		ids = ids[:0]
+		params := &sdk.V2CoreAccountListParams{Limit: sdk.Int64(accountsPageLimit)}
+		seen := 0
+		for a, err := range c.sdk.V2CoreAccounts.List(ctx, params).All(ctx) {
+			if err != nil {
+				return err
+			}
+			if seen++; seen > maxAccountPages*accountsPageLimit {
+				return fmt.Errorf("stripe：帳戶列表超過 %d 頁", maxAccountPages)
+			}
+			if a != nil && a.ID != "" && a.Metadata["store_id"] == want {
+				ids = append(ids, a.ID)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return slices.Clone(ids), nil
 }
 
 const (

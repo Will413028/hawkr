@@ -2,7 +2,7 @@
 // @generated from file hawkr/admin/payment/v1alpha1/payment.proto (package hawkr.admin.payment.v1alpha1, syntax proto3)
 /* eslint-disable */
 
-// payment 模組給後台的 API（Stripe 計畫 D28、D30）：收款帳戶的讀取、重新整理與重試建立。收款帳戶由 payment 模組擁有，擁有者現階段是店家
+// payment 模組給後台的 API（Stripe 計畫 D28、D30）：收款帳戶的讀取、重新整理、重試建立，以及清理無法完成時的重試關閉與刪除對應。收款帳戶由 payment 模組擁有，擁有者現階段是店家
 // （store_id）；賣家自己的收款帳戶讀取與開通 session 留在 SellerAppService（seller 確認店家擁有者之後呼叫 payment）。狀態與收件方式的列舉沿用
 // hawkr.payment.v1alpha1 的定義（賣家與後台看到同一組值）。
 
@@ -19,7 +19,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/admin/payment/v1alpha1/payment.proto.
  */
 export const file_hawkr_admin_payment_v1alpha1_payment: GenFile = /*@__PURE__*/
-  fileDesc("CipoYXdrci9hZG1pbi9wYXltZW50L3YxYWxwaGExL3BheW1lbnQucHJvdG8SHGhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEioAQKDlBheW1lbnRBY2NvdW50EhAKCHN0b3JlX2lkGAEgASgJEhAKCHByb3ZpZGVyGAIgASgJEhsKE2V4dGVybmFsX2FjY291bnRfaWQYAyABKAkSPAoGc3RhdHVzGAQgASgOMiwuaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50QWNjb3VudFN0YXR1cxJNChZyZXF1aXJlbWVudF9jb2xsZWN0aW9uGAUgASgOMi0uaGF3a3IucGF5bWVudC52MWFscGhhMS5SZXF1aXJlbWVudENvbGxlY3Rpb24SGAoQdHJhbnNmZXJzX2FjdGl2ZRgGIAEoCBIWCg5wYXlvdXRzX2FjdGl2ZRgHIAEoCBItCgxyZXF1aXJlbWVudHMYCCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EhUKDXN0YXR1c19yZWFzb24YCSABKAkSLgoKZmV0Y2hfdGltZRgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNgoSY3JlYXRlX2ZhaWxlZF90aW1lGAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgtjcmVhdGVfdGltZRgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLdXBkYXRlX3RpbWUYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIjEKGEdldFBheW1lbnRBY2NvdW50UmVxdWVzdBIVCghzdG9yZV9pZBgBIAEoCUID4EECIloKGUdldFBheW1lbnRBY2NvdW50UmVzcG9uc2USPQoHYWNjb3VudBgBIAEoCzIsLmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudEFjY291bnQiNQocUmVmcmVzaFBheW1lbnRBY2NvdW50UmVxdWVzdBIVCghzdG9yZV9pZBgBIAEoCUID4EECIl4KHVJlZnJlc2hQYXltZW50QWNjb3VudFJlc3BvbnNlEj0KB2FjY291bnQYASABKAsyLC5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlBheW1lbnRBY2NvdW50IjkKIFJldHJ5UGF5bWVudEFjY291bnRDcmVhdGVSZXF1ZXN0EhUKCHN0b3JlX2lkGAEgASgJQgPgQQIiYgohUmV0cnlQYXltZW50QWNjb3VudENyZWF0ZVJlc3BvbnNlEj0KB2FjY291bnQYASABKAsyLC5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlBheW1lbnRBY2NvdW50MtMDChNQYXltZW50QWRtaW5TZXJ2aWNlEokBChFHZXRQYXltZW50QWNjb3VudBI2Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuR2V0UGF5bWVudEFjY291bnRSZXF1ZXN0GjcuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5HZXRQYXltZW50QWNjb3VudFJlc3BvbnNlIgOQAgESkAEKFVJlZnJlc2hQYXltZW50QWNjb3VudBI6Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUmVmcmVzaFBheW1lbnRBY2NvdW50UmVxdWVzdBo7Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUmVmcmVzaFBheW1lbnRBY2NvdW50UmVzcG9uc2USnAEKGVJldHJ5UGF5bWVudEFjY291bnRDcmVhdGUSPi5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJldHJ5UGF5bWVudEFjY291bnRDcmVhdGVSZXF1ZXN0Gj8uaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5SZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlUmVzcG9uc2ViBnByb3RvMw", [file_hawkr_payment_v1alpha1_payment, file_google_api_field_behavior, file_google_protobuf_struct, file_google_protobuf_timestamp]);
+  fileDesc("CipoYXdrci9hZG1pbi9wYXltZW50L3YxYWxwaGExL3BheW1lbnQucHJvdG8SHGhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEi9gQKDlBheW1lbnRBY2NvdW50EhAKCHN0b3JlX2lkGAEgASgJEhAKCHByb3ZpZGVyGAIgASgJEhsKE2V4dGVybmFsX2FjY291bnRfaWQYAyABKAkSPAoGc3RhdHVzGAQgASgOMiwuaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50QWNjb3VudFN0YXR1cxJNChZyZXF1aXJlbWVudF9jb2xsZWN0aW9uGAUgASgOMi0uaGF3a3IucGF5bWVudC52MWFscGhhMS5SZXF1aXJlbWVudENvbGxlY3Rpb24SGAoQdHJhbnNmZXJzX2FjdGl2ZRgGIAEoCBIWCg5wYXlvdXRzX2FjdGl2ZRgHIAEoCBItCgxyZXF1aXJlbWVudHMYCCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EhUKDXN0YXR1c19yZWFzb24YCSABKAkSLgoKZmV0Y2hfdGltZRgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNgoSY3JlYXRlX2ZhaWxlZF90aW1lGAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgtjcmVhdGVfdGltZRgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLdXBkYXRlX3RpbWUYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjYKEnB1cmdlX2Jsb2NrZWRfdGltZRgOIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHAoUcHVyZ2VfYmxvY2tlZF9yZWFzb24YDyABKAkiMQoYR2V0UGF5bWVudEFjY291bnRSZXF1ZXN0EhUKCHN0b3JlX2lkGAEgASgJQgPgQQIiWgoZR2V0UGF5bWVudEFjY291bnRSZXNwb25zZRI9CgdhY2NvdW50GAEgASgLMiwuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5QYXltZW50QWNjb3VudCI1ChxSZWZyZXNoUGF5bWVudEFjY291bnRSZXF1ZXN0EhUKCHN0b3JlX2lkGAEgASgJQgPgQQIiXgodUmVmcmVzaFBheW1lbnRBY2NvdW50UmVzcG9uc2USPQoHYWNjb3VudBgBIAEoCzIsLmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudEFjY291bnQiOQogUmV0cnlQYXltZW50QWNjb3VudENyZWF0ZVJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiJiCiFSZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlUmVzcG9uc2USPQoHYWNjb3VudBgBIAEoCzIsLmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudEFjY291bnQiOAofUmV0cnlQYXltZW50QWNjb3VudFB1cmdlUmVxdWVzdBIVCghzdG9yZV9pZBgBIAEoCUID4EECImEKIFJldHJ5UGF5bWVudEFjY291bnRQdXJnZVJlc3BvbnNlEj0KB2FjY291bnQYASABKAsyLC5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlBheW1lbnRBY2NvdW50IjsKIkRlbGV0ZVBheW1lbnRBY2NvdW50TWFwcGluZ1JlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiIlCiNEZWxldGVQYXltZW50QWNjb3VudE1hcHBpbmdSZXNwb25zZTKUBgoTUGF5bWVudEFkbWluU2VydmljZRKJAQoRR2V0UGF5bWVudEFjY291bnQSNi5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkdldFBheW1lbnRBY2NvdW50UmVxdWVzdBo3Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuR2V0UGF5bWVudEFjY291bnRSZXNwb25zZSIDkAIBEpABChVSZWZyZXNoUGF5bWVudEFjY291bnQSOi5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJlZnJlc2hQYXltZW50QWNjb3VudFJlcXVlc3QaOy5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJlZnJlc2hQYXltZW50QWNjb3VudFJlc3BvbnNlEpwBChlSZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlEj4uaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5SZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlUmVxdWVzdBo/Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUmV0cnlQYXltZW50QWNjb3VudENyZWF0ZVJlc3BvbnNlEpkBChhSZXRyeVBheW1lbnRBY2NvdW50UHVyZ2USPS5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJldHJ5UGF5bWVudEFjY291bnRQdXJnZVJlcXVlc3QaPi5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJldHJ5UGF5bWVudEFjY291bnRQdXJnZVJlc3BvbnNlEqIBChtEZWxldGVQYXltZW50QWNjb3VudE1hcHBpbmcSQC5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkRlbGV0ZVBheW1lbnRBY2NvdW50TWFwcGluZ1JlcXVlc3QaQS5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkRlbGV0ZVBheW1lbnRBY2NvdW50TWFwcGluZ1Jlc3BvbnNlYgZwcm90bzM", [file_hawkr_payment_v1alpha1_payment, file_google_api_field_behavior, file_google_protobuf_struct, file_google_protobuf_timestamp]);
 
 /**
  * PaymentAccount 是後台看到的店家收款帳戶（payment 模組擁有，擁有者是店家）。
@@ -103,6 +103,20 @@ export type PaymentAccount = Message<"hawkr.admin.payment.v1alpha1.PaymentAccoun
    * @generated from field: google.protobuf.Timestamp update_time = 13;
    */
   updateTime?: Timestamp | undefined;
+
+  /**
+   * 清理進終局的時間（待辦 PAYMENT_ACCOUNT_PURGE_STUCK 的開始時間）；沒有進終局時不設。
+   *
+   * @generated from field: google.protobuf.Timestamp purge_blocked_time = 14;
+   */
+  purgeBlockedTime?: Timestamp | undefined;
+
+  /**
+   * 清理被擋下的原因（原因代碼，冒號之後是金流商的說明；只給後台）；沒有進終局時是空字串。
+   *
+   * @generated from field: string purge_blocked_reason = 15;
+   */
+  purgeBlockedReason: string;
 };
 
 /**
@@ -215,6 +229,70 @@ export const RetryPaymentAccountCreateResponseSchema: GenMessage<RetryPaymentAcc
   messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 6);
 
 /**
+ * @generated from message hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeRequest
+ */
+export type RetryPaymentAccountPurgeRequest = Message<"hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeRequest"> & {
+  /**
+   * @generated from field: string store_id = 1;
+   */
+  storeId: string;
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeRequest.
+ * Use `create(RetryPaymentAccountPurgeRequestSchema)` to create a new message.
+ */
+export const RetryPaymentAccountPurgeRequestSchema: GenMessage<RetryPaymentAccountPurgeRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 7);
+
+/**
+ * @generated from message hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeResponse
+ */
+export type RetryPaymentAccountPurgeResponse = Message<"hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeResponse"> & {
+  /**
+   * @generated from field: hawkr.admin.payment.v1alpha1.PaymentAccount account = 1;
+   */
+  account?: PaymentAccount | undefined;
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeResponse.
+ * Use `create(RetryPaymentAccountPurgeResponseSchema)` to create a new message.
+ */
+export const RetryPaymentAccountPurgeResponseSchema: GenMessage<RetryPaymentAccountPurgeResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 8);
+
+/**
+ * @generated from message hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingRequest
+ */
+export type DeletePaymentAccountMappingRequest = Message<"hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingRequest"> & {
+  /**
+   * @generated from field: string store_id = 1;
+   */
+  storeId: string;
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingRequest.
+ * Use `create(DeletePaymentAccountMappingRequestSchema)` to create a new message.
+ */
+export const DeletePaymentAccountMappingRequestSchema: GenMessage<DeletePaymentAccountMappingRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 9);
+
+/**
+ * @generated from message hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingResponse
+ */
+export type DeletePaymentAccountMappingResponse = Message<"hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingResponse"> & {
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingResponse.
+ * Use `create(DeletePaymentAccountMappingResponseSchema)` to create a new message.
+ */
+export const DeletePaymentAccountMappingResponseSchema: GenMessage<DeletePaymentAccountMappingResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 10);
+
+/**
  * PaymentAdminService 只有管理員能呼叫。
  *
  * @generated from service hawkr.admin.payment.v1alpha1.PaymentAdminService
@@ -253,6 +331,29 @@ export const PaymentAdminService: GenService<{
     methodKind: "unary";
     input: typeof RetryPaymentAccountCreateRequestSchema;
     output: typeof RetryPaymentAccountCreateResponseSchema;
+  },
+  /**
+   * RetryPaymentAccountPurge 對清理進了終局（後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK：金流商拒絕關閉，或等待清理超過 7 天仍關不掉）的收款帳戶重試關閉：
+   * 清除終局、期限從現在重新計算，並重新排入清理。帳戶不是終局的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。
+   *
+   * @generated from rpc hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountPurge
+   */
+  retryPaymentAccountPurge: {
+    methodKind: "unary";
+    input: typeof RetryPaymentAccountPurgeRequestSchema;
+    output: typeof RetryPaymentAccountPurgeResponseSchema;
+  },
+  /**
+   * DeletePaymentAccountMapping 是「已在金流商處理，刪除對應」：只有清理進了終局的收款帳戶可以做，管理員確認金流商那邊的帳戶已另行處理。
+   * 不呼叫金流商；同一個交易寫一筆只增不改的紀錄（店家、金流商、外部帳戶 ID、操作的管理員與時間）並刪除帳戶列。帳戶不是終局的狀態回 failed_precondition，
+   * 店家沒有收款帳戶回 not_found。需要權限 payment.accounts.delete_mapping。
+   *
+   * @generated from rpc hawkr.admin.payment.v1alpha1.PaymentAdminService.DeletePaymentAccountMapping
+   */
+  deletePaymentAccountMapping: {
+    methodKind: "unary";
+    input: typeof DeletePaymentAccountMappingRequestSchema;
+    output: typeof DeletePaymentAccountMappingResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_hawkr_admin_payment_v1alpha1_payment, 0);
