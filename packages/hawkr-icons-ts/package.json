@@ -17,7 +17,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "catalog:",
-		"@material-symbols/svg-400": "0.48.1",
+		"@material-symbols/svg-400": "0.48.3",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",
