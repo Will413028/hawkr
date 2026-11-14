@@ -161,6 +161,169 @@ void main() {
     expect(find.text('商品詳情已開啟'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('continues to the next page and stops after the last page', (
+    tester,
+  ) async {
+    await _setViewport(tester, const Size(390, 844));
+    final dio = _searchDio();
+    final repository = _MockCategoryRepository();
+    final pages = <int>[];
+    when(
+      () => repository.searchProducts(
+        keyword: any(named: 'keyword'),
+        page: any(named: 'page'),
+        pageSize: any(named: 'pageSize'),
+      ),
+    ).thenAnswer((invocation) async {
+      final page = invocation.namedArguments[#page] as int;
+      pages.add(page);
+      return ProductListResult(
+        records: [_item('第$page頁商品')],
+        total: 2,
+        page: page,
+        pageSize: 1,
+      );
+    });
+    final router = _router();
+    addTearDown(dio.close);
+    addTearDown(router.dispose);
+
+    await _pumpSearchResults(
+      tester,
+      dio: dio,
+      router: router,
+      categoryRepository: repository,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('第1頁商品'), findsOneWidget);
+    expect(find.text('第2頁商品'), findsOneWidget);
+    expect(find.byType(Divider), findsOneWidget);
+    expect(pages, [1, 2]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('shows the empty state when the search has no products', (
+    tester,
+  ) async {
+    await _setViewport(tester, const Size(390, 844));
+    final dio = _searchDio();
+    final repository = _MockCategoryRepository();
+    when(
+      () => repository.searchProducts(
+        keyword: any(named: 'keyword'),
+        page: any(named: 'page'),
+        pageSize: any(named: 'pageSize'),
+      ),
+    ).thenAnswer(
+      (_) async =>
+          const ProductListResult(records: [], total: 0, page: 1, pageSize: 20),
+    );
+    final router = _router();
+    addTearDown(dio.close);
+    addTearDown(router.dispose);
+
+    await _pumpSearchResults(
+      tester,
+      dio: dio,
+      router: router,
+      categoryRepository: repository,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('search-results-empty-state')), findsOne);
+    expect(find.text('沒有找到相關商品'), findsOneWidget);
+  });
+
+  testWidgets('first page failure shows retry and retry reloads page 1', (
+    tester,
+  ) async {
+    await _setViewport(tester, const Size(390, 844));
+    final dio = _searchDio();
+    final repository = _MockCategoryRepository();
+    var calls = 0;
+    when(
+      () => repository.searchProducts(
+        keyword: any(named: 'keyword'),
+        page: any(named: 'page'),
+        pageSize: any(named: 'pageSize'),
+      ),
+    ).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) throw Exception('boom');
+      return ProductListResult(
+        records: [_item('重試後商品')],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+      );
+    });
+    final router = _router();
+    addTearDown(dio.close);
+    addTearDown(router.dispose);
+
+    await _pumpSearchResults(
+      tester,
+      dio: dio,
+      router: router,
+      categoryRepository: repository,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('搜尋失敗'), findsOneWidget);
+    await tester.tap(find.widgetWithText(ElevatedButton, '重試'));
+    await tester.pumpAndSettle();
+
+    expect(calls, 2);
+    expect(find.text('搜尋失敗'), findsNothing);
+    expect(find.text('重試後商品'), findsOneWidget);
+  });
+
+  testWidgets('next page failure shows inline retry that loads the page', (
+    tester,
+  ) async {
+    await _setViewport(tester, const Size(390, 844));
+    final dio = _searchDio();
+    final repository = _MockCategoryRepository();
+    var page2Calls = 0;
+    when(
+      () => repository.searchProducts(
+        keyword: any(named: 'keyword'),
+        page: any(named: 'page'),
+        pageSize: any(named: 'pageSize'),
+      ),
+    ).thenAnswer((invocation) async {
+      final page = invocation.namedArguments[#page] as int;
+      if (page == 2 && ++page2Calls == 1) throw Exception('boom');
+      return ProductListResult(
+        records: [_item('第$page頁商品')],
+        total: 2,
+        page: page,
+        pageSize: 1,
+      );
+    });
+    final router = _router();
+    addTearDown(dio.close);
+    addTearDown(router.dispose);
+
+    await _pumpSearchResults(
+      tester,
+      dio: dio,
+      router: router,
+      categoryRepository: repository,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('第1頁商品'), findsOneWidget);
+    expect(find.text('載入失敗，點擊重試'), findsOneWidget);
+    await tester.tap(find.text('載入失敗，點擊重試'));
+    await tester.pumpAndSettle();
+
+    expect(page2Calls, 2);
+    expect(find.text('第2頁商品'), findsOneWidget);
+    expect(find.text('載入失敗，點擊重試'), findsNothing);
+  });
 }
 
 Future<void> _pumpSearchResults(
@@ -313,3 +476,12 @@ Future<void> _setViewport(WidgetTester tester, Size size) async {
   addTearDown(tester.view.resetDevicePixelRatio);
   addTearDown(tester.view.resetPhysicalSize);
 }
+
+ProductItem _item(String name) => ProductItem(
+  id: name,
+  name: name,
+  priceMin: '100',
+  priceMax: '100',
+  sellerName: '測試商家',
+  stockQty: 1,
+);

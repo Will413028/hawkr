@@ -52,23 +52,22 @@ class SearchResultsScreen extends HookConsumerWidget {
     final debounce = useRef<Timer?>(null);
     final currentKeyword = useRef(query);
 
+    // Next page key after each fetched page key; null marks the last page.
+    final nextKeyAfter = useRef(<int, int?>{});
+
     // Paging controller for infinite scroll
     final pagingController = useMemoized(
-      () => PagingController<int, ProductItem>(firstPageKey: 1),
-    );
-
-    useEffect(() {
-      void listener(int pageKey) async {
-        try {
+      () => PagingController<int, ProductItem>(
+        getNextPageKey: (state) {
+          final lastKey = state.keys?.last;
+          return lastKey == null ? 1 : nextKeyAfter.value[lastKey];
+        },
+        fetchPage: (pageKey) async {
           final page = await ref
               .read(ctrl.searchControllerProvider.notifier)
               .fetchSearchPage(currentKeyword.value, pageKey);
           final items = page.records;
-          if (page.isLastPage) {
-            pagingController.appendLastPage(items);
-          } else {
-            pagingController.appendPage(items, page.page + 1);
-          }
+          nextKeyAfter.value[pageKey] = page.isLastPage ? null : page.page + 1;
           // GA4: view_item_list — fired once per loaded page, not on every rebuild
           if (items.isNotEmpty) {
             final startIndex = (pageKey - 1) * ctrl.SearchController.pageSize;
@@ -86,17 +85,12 @@ class SearchResultsScreen extends HookConsumerWidget {
                   listName: '搜尋結果',
                 );
           }
-        } catch (e) {
-          pagingController.error = e;
-        }
-      }
+          return items;
+        },
+      ),
+    );
 
-      pagingController.addPageRequestListener(listener);
-      return () {
-        pagingController.removePageRequestListener(listener);
-        pagingController.dispose();
-      };
-    }, []);
+    useEffect(() => pagingController.dispose, []);
 
     void onSearchChanged(String text) {
       final kw = text.trim();
@@ -265,91 +259,102 @@ class SearchResultsScreen extends HookConsumerWidget {
             ),
             buildSuggestionsList(),
             Expanded(
-              child: PagedListView<int, ProductItem>.separated(
-                pagingController: pagingController,
-                padding: EdgeInsets.only(bottom: 16.h),
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                builderDelegate: PagedChildBuilderDelegate<ProductItem>(
-                  itemBuilder: (context, product, index) {
-                    final productId = product.id.trim();
-                    final heroTag = productId.isEmpty
-                        ? null
-                        : 'product-card:search:$productId';
-                    return _ProductTile(
-                      product: product,
-                      heroTag: heroTag,
-                      onOpen: () {
-                        ref
-                            .read(analyticsEventsProvider)
-                            .trackSelectItem(
-                              _searchProductToGa4Item(product, index: index),
-                              listId: 'search',
-                              listName: '搜尋結果',
-                            );
-                        context.push(
-                          '/merchant-product',
-                          extra: MerchantItemDetailScreen(
-                            title: product.name,
-                            imageUrl: product.displayImage.isEmpty
-                                ? null
-                                : product.displayImage,
-                            price: PriceDisplay.parseMoney(product.priceMin),
-                            skuId: product.id,
-                            merchantName: product.sellerName,
-                            merchantId: product.storeId,
+              child: PagingListener<int, ProductItem>(
+                controller: pagingController,
+                builder: (context, state, fetchNextPage) =>
+                    PagedListView<int, ProductItem>.separated(
+                      state: state,
+                      fetchNextPage: fetchNextPage,
+                      padding: EdgeInsets.only(bottom: 16.h),
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      builderDelegate: PagedChildBuilderDelegate<ProductItem>(
+                        itemBuilder: (context, product, index) {
+                          final productId = product.id.trim();
+                          final heroTag = productId.isEmpty
+                              ? null
+                              : 'product-card:search:$productId';
+                          return _ProductTile(
+                            product: product,
                             heroTag: heroTag,
+                            onOpen: () {
+                              ref
+                                  .read(analyticsEventsProvider)
+                                  .trackSelectItem(
+                                    _searchProductToGa4Item(
+                                      product,
+                                      index: index,
+                                    ),
+                                    listId: 'search',
+                                    listName: '搜尋結果',
+                                  );
+                              context.push(
+                                '/merchant-product',
+                                extra: MerchantItemDetailScreen(
+                                  title: product.name,
+                                  imageUrl: product.displayImage.isEmpty
+                                      ? null
+                                      : product.displayImage,
+                                  price: PriceDisplay.parseMoney(
+                                    product.priceMin,
+                                  ),
+                                  skuId: product.id,
+                                  merchantName: product.sellerName,
+                                  merchantId: product.storeId,
+                                  heroTag: heroTag,
+                                ),
+                              );
+                            },
+                            onAddToCart: () => showProductAddToCartSheet(
+                              context,
+                              ref,
+                              skuId: product.id,
+                              productName: product.name,
+                              imageUrl: product.displayImage,
+                              initialPrice: PriceDisplay.parseMoney(
+                                product.priceMin,
+                              )?.toDouble(),
+                            ),
+                          );
+                        },
+                        firstPageProgressIndicatorBuilder: (_) =>
+                            const TruckLoadingOverlay(message: '載入中...'),
+                        newPageProgressIndicatorBuilder: (_) => Padding(
+                          padding: EdgeInsets.all(16.w),
+                          child: const TruckLoadingOverlay(message: '載入中...'),
+                        ),
+                        noItemsFoundIndicatorBuilder: (_) => const HkEmptyState(
+                          key: ValueKey('search-results-empty-state'),
+                          iconKey: ValueKey('search-results-empty-state-icon'),
+                          icon: HkIconName.emptySearch,
+                          message: '沒有找到相關商品',
+                        ),
+                        firstPageErrorIndicatorBuilder: (context) => Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '搜尋失敗',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              SizedBox(height: 8.h),
+                              ElevatedButton(
+                                onPressed: () =>
+                                    pagingController.fetchNextPage(),
+                                child: const HkButtonLabel('重試'),
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                      onAddToCart: () => showProductAddToCartSheet(
-                        context,
-                        ref,
-                        skuId: product.id,
-                        productName: product.name,
-                        imageUrl: product.displayImage,
-                        initialPrice: PriceDisplay.parseMoney(
-                          product.priceMin,
-                        )?.toDouble(),
+                        ),
+                        newPageErrorIndicatorBuilder: (context) => Center(
+                          child: TextButton(
+                            onPressed: () => pagingController.fetchNextPage(),
+                            child: const HkButtonLabel('載入失敗，點擊重試'),
+                          ),
+                        ),
                       ),
-                    );
-                  },
-                  firstPageProgressIndicatorBuilder: (_) =>
-                      const TruckLoadingOverlay(message: '載入中...'),
-                  newPageProgressIndicatorBuilder: (_) => Padding(
-                    padding: EdgeInsets.all(16.w),
-                    child: const TruckLoadingOverlay(message: '載入中...'),
-                  ),
-                  noItemsFoundIndicatorBuilder: (_) => const HkEmptyState(
-                    key: ValueKey('search-results-empty-state'),
-                    iconKey: ValueKey('search-results-empty-state-icon'),
-                    icon: HkIconName.emptySearch,
-                    message: '沒有找到相關商品',
-                  ),
-                  firstPageErrorIndicatorBuilder: (context) => Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '搜尋失敗',
-                          style: TextStyle(color: AppColors.textSecondary),
-                        ),
-                        SizedBox(height: 8.h),
-                        ElevatedButton(
-                          onPressed: () =>
-                              pagingController.retryLastFailedRequest(),
-                          child: const HkButtonLabel('重試'),
-                        ),
-                      ],
                     ),
-                  ),
-                  newPageErrorIndicatorBuilder: (context) => Center(
-                    child: TextButton(
-                      onPressed: () =>
-                          pagingController.retryLastFailedRequest(),
-                      child: const HkButtonLabel('載入失敗，點擊重試'),
-                    ),
-                  ),
-                ),
               ),
             ),
           ],
