@@ -187,8 +187,8 @@ const (
 	// MaterialBreachCure 是第 21.3 條第 1 款（重大違約經通知後七日內未改善）的改善期：引用的認定至少要存在這麼久。
 	MaterialBreachCure = 7 * 24 * time.Hour
 	// StoreRetireAfter 是關店後的第一段清理（退場）：一般關店（賣家自己、隨帳號刪除）後 30 天，店家的公開內容（說明、獎項、網站、logo 與封面）清掉、
-	// 發 StoreRetired 讓下游刪除（商品、貼文、聊天的個資等），之後不能恢復營業；終止合作關店不早於申覆期限（ADR 2026-10-19-seller-kyc-payuni-consolidated
-	// 的 2026-10-20 修訂，Will 改選 Q2 (b)）。時數只從這一個常數來。
+	// 發 StoreRetired 讓下游刪除（商品、貼文、聊天的個資等），之後不能恢復營業；終止合作關店不早於申覆期限（ADR 2026-11-13-seller-platform-review-and-identity-matching
+	// 「關店與個資保留」）。時數只從這一個常數來。
 	StoreRetireAfter = 720 * time.Hour
 	// StoreRetention 是關店後的第二段清理：關店後 184 天清註冊、身分與連線資料（店名、聯絡、地址、KYC、食品登錄字號、同意紀錄的
 	// IP 與 User-Agent）。184 天是任何連續六個曆月的最大長度，所以不論關店日都不短於詐欺犯罪危害防制條例第 37 條第 1 項的「六個月」。時數只從這一個常數來。
@@ -485,7 +485,7 @@ const (
 	// LinkedUBN 統一編號相同。
 	LinkedUBN LinkedIdentity = "UBN"
 	// LinkedBankAccount 金流商回報的銀行帳號 fingerprint 相同。只列出、不能據以建立關聯終止（Stripe 計畫 D4：家人或配偶共用帳戶是常態，與 ADR
-	// 2026-10-19-seller-kyc-payuni-consolidated「銀行帳號命中只標記，不擋」同一個判斷）。
+	// 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」同一個判斷）。
 	LinkedBankAccount LinkedIdentity = "BANK_ACCOUNT"
 )
 

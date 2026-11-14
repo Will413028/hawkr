@@ -1,5 +1,5 @@
 // Package kyc 是賣家的 KYC 認證：賣家填寫草稿、送出與取消，管理員審核（核准、退回、讀公司補充文件），以及統編的身分比對
-// （ADR 2026-10-19-seller-kyc-payuni-consolidated）。申請以 store_id 為鍵；平台不收身分證號、銀行帳號與證件影像（Stripe 計畫 D22），統編以 blind index 比對；
+// （ADR 2026-11-13-seller-platform-review-and-identity-matching「申請、草稿與審核」）。申請以 store_id 為鍵；平台不收身分證號、銀行帳號與證件影像（Stripe 計畫 D22），統編以 blind index 比對；
 // 人工決定與稽核紀錄在寫入的同一個 transaction，補充文件的 media 引用由收斂 job 維護。
 package kyc
 

@@ -19,7 +19,7 @@
 - 外部：金流商的身分驗證與法定的金流 KYC 保存由金流商負責；開立發票的稅務紀錄由 invoice 模組自己保存快照。
 - 外部：防詐雜湊保存 5 年的法源未確認（Will 的產品決定，參考金流業「關係結束後 5 年」的慣例，推測），上線前與條款一起核對。
 - 繼承：停權以帳號為單位、由措施在讀取時推導（`2026-10-18-seller-governance-consolidated.md`）；身分比對用同一個推導。仍成立。
-- 繼承：系統從未上線（根目錄 `AGENTS.md`「上線前不受相容性約束」）：沒有正式資料，migration 不回填、不轉換舊的同意紀錄。已套用的 migration 不得修改（`backend/AGENTS.md` 單體規則 6）。
+- 繼承：系統從未上線（根目錄 `AGENTS.md`「上線前不受相容性約束」）：沒有正式資料，migration 不回填、不轉換舊的同意紀錄。已套用的 migration 不得修改；只在分支新增、尚未併入 `dev` 的可在合併前壓平（`backend/AGENTS.md` 單體規則 6）。
 - 繼承：外部呼叫不在 transaction 內、寫入意圖與排入 job 在同一個 transaction（`backend/AGENTS.md` 單體規則 5）。仍成立，登記資料查詢與核准後建立收款帳戶都照此。
 - 不再成立：PayUni 子商店 API 的限制（MerID 一次性、`update_merchant` 只能改聯絡方式、會員 Email 綁定後不能改）：沒有 PayUni 註冊了，聯絡欄位上限、身分欄位鎖與店名鎖都是它的衍生物，一併拿掉。
 - 不再成立：ADR 2026-07-20 的加密範圍（身分證號、銀行帳號加密、姓名生日明文）與「沿用 `pkg/crypto`、單一 master key」：沒有要加密的個資。`internal/platform/seal` 只剩 HMAC 金鑰環。
@@ -38,8 +38,8 @@
 | 後台讀公司補充文件 | 一般審核附件以後台角色權限控管，理由必填加限時授權用在遮蔽的個資欄位（出處未核，推測）。✓ 有 KYC 讀取權限即可讀，每次讀取留紀錄，形狀同佐證的 `evidence_accesses` | 保留顯示全文與 15 分鐘授權只服務公司文件（每次審核都要填理由才看得到必看的文件）✗；連讀取紀錄也不留（被質疑誰看過時無從查）✗ |
 | 核准與開通 | 人工決定與外部整合是兩件事；外部帳戶在核准後由獨立的 payment 模組建立，狀態以單一來源推導（Stripe，https://docs.stripe.com/connect/accounts-v2）。✓ | 核准同步呼叫外部服務、cert 狀態混整合結果、流程狀態 `KYCFlow` 把兩條軸合成一個 enum（三端各自推導）✗；管理員重新綁定（缺件由賣家經新的開通連結補）✗ |
 | 店家聯絡欄位 | 必填由實際使用它的流程決定；信箱上限 254（RFC 5321 第 4.5.3.1 節）。✓ | 四個欄位規則照舊、只把理由改成平台（兩個沒有流程在讀的欄位擋住送出，上限是別家公司的欄寬）✗；聯絡人姓名與手機整個刪掉（後台聯絡賣家只剩信箱）✗ |
-| 入駐同意 | 金流商的服務協議由金流商頁面收（Stripe 託管與內嵌流程收服務協議，https://docs.stripe.com/connect/hosted-onboarding）；平台只記自己的條款，記時間、IP、User-Agent（Stripe `tos_acceptance` 的做法）。✓ | 新增 provider 中立的 `PAYMENT_PROVIDER_TERMS`（沒有代收的需要）✗；每個 provider 一個種類（加 provider 就改 enum 與 CHECK）✗ |
-| 個資保留期 | 目的結束後保留一段處理爭議的期間再刪，有法定義務的類別依法定年限；停用與刪除分開（Google Cloud soft deletion、Shopify 終止後保留、eBay 以限制處理代替刪除）。✓ 公開內容與下游資料 30 天，註冊、身分與連線資料 184 天 | 單一保留期 30 天（短於第 37 條的六個月）✗；整個 stint 一起 184 天（下游的聊天、商品刪除跟著晚 5 個月）✗；依資料類別分級加 `retention_until`（沒有法定年限可填）✗；關店當下立即清（售後、申訴、爭議看不到當事人）✗；crypto-shred 每店一把 DEK（要 KMS）✗ |
+| 入駐同意 | 金流商的服務協議由金流商頁面收（Stripe 託管與內嵌流程收服務協議，https://docs.stripe.com/connect/hosted-onboarding）；平台只記自己的條款，記時間、IP、User-Agent（Stripe `tos_acceptance` 的做法）。✓ | 新增 provider 中立的收款服務同意種類（沒有代收的需要）✗；每個 provider 一個種類（加 provider 就改 enum 與 CHECK）✗ |
+| 個資保留期 | 目的結束後保留一段處理爭議的期間再刪，有法定義務的類別依法定年限；停用與刪除分開（Google Cloud soft deletion、Shopify 終止後保留、eBay 以限制處理代替刪除）。✓ 公開內容與下游資料 30 天，註冊、身分與連線資料 184 天 | 單一保留期 30 天（短於第 37 條的六個月）✗；整個 stint 一起 184 天（下游的聊天、商品刪除跟著晚 5 個月）✗；依資料類別分級、每列存保留截止時間（沒有法定年限可填）✗；關店當下立即清（售後、申訴、爭議看不到當事人）✗；crypto-shred 每店一把 DEK（要 KMS）✗ |
 | 退回的表達 | 伺服器算「還要補什麼」，每項有欄位、原因碼與說明（Stripe `requirements.errors[]`、Sumsub `rejectLabels`、AIP-193 `FieldViolation`，https://google.aip.dev/193）。✓ | 一段理由加 `required_fields`（只回答哪個欄位，兩個 client 各自推導）✗ |
 | 審核對照的登記資料 | 送件時自動查詢公司登記、存下結果並標出不一致，審核員看比對結果（Stripe Connect、Middesk、Persona 的 KYB）；查詢是有期限的資源，終態由伺服器負責（AIP-151，https://google.aip.dev/151）。✓ | 審核員開詳情時即時查、不存（核准依據沒有留存）✗；任意統編查詢的 admin RPC ✗；server-streaming（觸發：多位審核員或佇列頁要即時更新多筆）✗ |
 | 舊的審核與開通事件 | 通知是獨立模組，依自己的設計消費領域事件（`2026-10-05-notification-module.md`；推測）。✓ 舊 `merchant.verification.*` 停發 | 保留舊事件為沒有部署的 Java 通知服務留接縫（開通結果與審核結果的通知由通知模組搬遷時重做）✗ |
@@ -61,8 +61,8 @@
 
 - 申請以 `store_id` 為鍵，重新入駐要重做；`status` 只記人工決定（`DRAFT`、`SUBMITTED`、`APPROVED`、`REJECTED`、`CANCELLED`），沒有 `forwarded` 類的整合狀態。沒有申請以欄位不帶值表示，不另造狀態值（2026-11-12，Will）；`KYCFlow` 與 `KYCFlowStatus` 整個刪除。可否編輯只看申請狀態（`model.CanEditKYC`）：草稿與被退回的可編輯與送出，審核中只能取消，已核准的不能編輯、不能重送、不能取消；核准之後改登記資料另議（觸發：賣家要求）。
 - 草稿與送出共用同一組具型別的欄位，必填由 `requirements` 與 CHECK `kyc_applications_complete_check` 表達；不收任意 JSON。申請只有市集登記資料（商品類型、網站、公司名稱、統編、公司登記日期、公司地址與電話）與公司補充文件；申請人不填組織型態（登記機關提供，存在快照）。送出另要求帳號有聯絡信箱（`CONTACT_EMAIL_REQUIRED`，來源屬收款帳戶 ADR）。後台審核佇列的列名是店名，搜尋涵蓋店名、公司名稱與統編。
-- 退回帶逐項問題（2026-10-12，Will）：`KYCIssue{field, document_asset_id, code, message}`，`code` 是封閉的 `KYCIssueCode`（UNREADABLE、MISMATCH、EXPIRED、MISSING、INVALID、OTHER），`message` 必填 1 到 500 字，另有只給後台的 `internal_note`（至多 1000 字），總理由 `reason` 必填。不做 FINAL 退件，永久拒絕由停權處理。文件類欄位的原因碼規則與「哪個賣家型態可以對哪些欄位提問」（`model.IssuableFields`）各只有一處；`document_asset_id` 必須是該申請在那個欄位目前的文件。審核紀錄不存欄位值（`kyc_review_issues`）。
-- 「目前還要補什麼」由伺服器算（2026-10-12，Will）：`outstanding_issues` 是最近一次退回裡賣家還沒處理的問題，已處理在寫入申請的同一個 transaction 判定（欄位值被改過，或指到的文件被移除或替換，記在 `kyc_review_issues.resolved_at`），讀取不推導；`last_rejection` 在重送、核准或取消之前都在。兩個 client 不自己推導。
+- 退回帶逐項問題（2026-10-12，Will）：`KYCIssue`（`field`、`document_asset_id`、`code`、`message`），`code` 是封閉的 `KYCIssueCode`（UNREADABLE、MISMATCH、EXPIRED、MISSING、INVALID、OTHER），`message` 必填 1 到 500 字，另有只給後台的 `internal_note`（至多 1000 字），總理由 `reason` 必填。不做 FINAL 退件，永久拒絕由停權處理。文件類欄位的原因碼規則與「哪個賣家型態可以對哪些欄位提問」（`model.IssuableFields`）各只有一處；`document_asset_id` 必須是該申請在那個欄位目前的文件。審核紀錄不存欄位值（`kyc_review_issues`）。
+- 「目前還要補什麼」由伺服器算（2026-10-12，Will）：`outstanding_issues` 是最近一次退回裡賣家還沒處理的問題，已處理在寫入申請的同一個 transaction 判定（欄位值被改過，或指到的文件被移除或替換，記在 `kyc_review_issues` 的 `resolved_at`），讀取不推導；`last_rejection` 在重送、核准或取消之前都在。兩個 client 不自己推導。
 - 審核的鎖順序：店家列（帳號全部的 stint）先於申請列，鎖內重新確認版本與狀態再寫決定、審核紀錄與事件；etag 的版本檢查先於狀態檢查。核准還要求店家營業中、申請人帳號沒有停權、身分沒有命中生效中的處分。事件（`KYCSubmitted`、`KYCApproved`、`KYCRejected`、`KYCCancelled`）在寫入的 transaction 內發出，`EventID` 是審核紀錄的 UUIDv7。
 
 ### 後台讀公司補充文件（2026-11-12，Will）
@@ -78,7 +78,7 @@
 
 ### 核准與收款開通分開（2026-11-02，Will）
 
-- 核准只寫人工決定、審核紀錄與事件；同一個 transaction 呼叫 payment 的 `RequestAccount` 寫「建立中」的收款帳戶列並排入建立 job，外部呼叫不在 transaction 內。收款帳戶、provider、開通狀態與閘門副本 `payout_capabilities` 的決策見 `2026-11-13-payment-onboarding-provider-port-stripe.md`，本檔不重複。
+- 核准只寫人工決定、審核紀錄與事件；同一個 transaction 呼叫 payment 的 `RequestAccount` 寫「建立中」的收款帳戶列並排入建立 job，外部呼叫不在 transaction 內。核准不檢查聯絡信箱：送審已要求帳號有聯絡信箱，建立外部帳戶的 job 在呼叫金流商的當下才向帳號讀取目前的信箱，所以核准之後賣家改信箱，建立時用的是新的。收款帳戶、provider、開通狀態與閘門副本 `payout_capabilities` 的決策見 `2026-11-13-payment-onboarding-provider-port-stripe.md`，本檔不重複。
 - 刪除：PayUni 註冊列與綁定 job、重新綁定、webhook 的觀測與 `payuni_sweep`、`KYCFlow`／`KYCFlowStatus` 與 `can_resubmit`、身分欄位鎖與店名鎖（`IdentityLocked`、`CheckNameUnlocked`）、`PAYUNI_BIND_RETRY` 待辦與管理員的 PayUni RPC。店名是平台自己的欄位，不同步給金流商。
 - 舊事件 `merchant.verification.*` 與舊的 PayUni 審核通知停發（`internal/legacy/sellerrelay` 只轉店家生命週期、停權、資料與曝光五種事件）；開通結果與平台審核結果（核准、退回）的通知，留給通知模組搬遷時依新的設計重做。物流用的商店代號與舊契約的 `payuni_mer_id` 回空字串，本機的物流與付款端到端在對應模組搬進單體前不通（`TestMerchantIDFieldsAreEmpty`）。
 
@@ -98,8 +98,8 @@
 ### 關店與個資保留（2026-10-15，2026-10-19、2026-10-20 改保留期，Will）
 
 - 關店可逆，不可逆的點在清理：關店只記為什麼關的（`store_closures`，每次關店一列，`reopened_at` 為 NULL 的是目前這次，稽核永久保留；`closed_by` 是 `ACCOUNT_OWNER`、`TERMINATION`、`ACCOUNT_DELETION`，終止另記 `closed_by_measure_id`）、結束預告終止、移除 SELLER、發 `StoreClosed`；所有關店走同一條路徑 `closing.close()`。logo 與封面留在店家列到第一段才釋放。relay 不轉 `StoreClosed`，第一段的 `StoreRetired` 才轉成 `seller.deleted`（下游的刪除因此晚到第一段）。
-- 兩段清理，不是一個保留期（2026-10-20，Will）：**第一段（退場）**在關店後 `model.StoreRetireAfter`（720 小時，30 天）清公開內容（說明、獎項、網站）、釋放 logo 與封面、發 `StoreRetired`，記 `stores.retired_at`；退場之後不能恢復營業。**第二段（個資清理）**在已退場、關店後 `model.StoreRetention`（4416 小時，184 天，任何連續六個曆月的最大長度，所以不論哪天關店都不短於第 37 條的六個月；用固定時數，因 timestamptz 加日數依 session 時區）清店名、店家聯絡與地址、KYC 申請的個人欄位與證件（media 引用經 `seller.media_sync` 解除）、登記資料查詢、同意紀錄的 IP 與 User-Agent，記 `pii_purged_at`；收款帳戶由 payment 擁有，清理的 transaction 只呼叫 `ForgetOwners` 排入它的刪除。保留：審核的事實（誰、何時、決定）、`seller_type`／`product_type`、措施的身分快照、防詐保存表（5 年）、管理員的稽核文字。沒有密文、證件影像與金流商註冊列要清。
-- `TERMINATION` 關閉的，兩段都取 `greatest(關店後的時數, 帳號上未撤銷終止中最晚的申覆期限)`（申覆期限是終止生效後 `AppealWindow`，4416 小時，不短於條款與 DSA 的六個月；已撤銷的終止不延長）。保住條款 21.6「終止後三十日內請求資料」。時間條件只有 `RetireDueStores` 一支查詢（兩段與恢復營業共用，`second_stage` 選段），時數由 Go 常數傳入；資料庫只保證結構（`stores_retired_check`、`stores_closed_images_check`、`stores_pii_purged_check`、`kyc_applications_purged_check`）。
+- 兩段清理，不是一個保留期（2026-10-20，Will）：**第一段（退場）**在關店後 `model.StoreRetireAfter`（720 小時，30 天）清公開內容（說明、獎項、網站）、釋放 logo 與封面、發 `StoreRetired`，記 `stores.retired_at`；退場之後不能恢復營業。**第二段（個資清理）**在已退場、關店後 `model.StoreRetention`（4416 小時，184 天，任何連續六個曆月的最大長度，所以不論哪天關店都不短於第 37 條的六個月；用固定時數，因 timestamptz 加日數依 session 時區）清店名、店家聯絡與地址、KYC 申請的個人欄位與證件（media 引用經 `seller.media_sync` 解除）、登記資料查詢、同意紀錄的 IP 與 User-Agent，記 `pii_purged_at`；收款帳戶由 payment 擁有，清理的 transaction 只呼叫 `ForgetOwners` 排入它的「關閉後刪除」：金流商那邊的外部帳戶先關閉、成功才刪本地列，細節見收款開通 ADR。保留：審核的事實（誰、何時、決定）、`seller_type`／`product_type`、措施的身分快照、防詐保存表（5 年）、管理員的稽核文字。沒有密文、證件影像與金流商註冊列要清。
+- `TERMINATION` 關閉的，兩段都取「關店後的時數」與「帳號上未撤銷終止中最晚的申覆期限」兩者較晚的（申覆期限是終止生效後 `AppealWindow`，4416 小時，不短於條款與 DSA 的六個月；已撤銷的終止不延長）。保住條款 21.6「終止後三十日內請求資料」。時間條件只有 `RetireDueStores` 一支查詢（兩段與恢復營業共用，`second_stage` 選段），時數由 Go 常數傳入；資料庫只保證結構（`stores_retired_check`、`stores_closed_images_check`、`stores_pii_purged_check`、`kyc_applications_purged_check`）。
 - legal hold（2026-10-15，2026-10-19）：帳號上未撤銷的終止合作有待處理的申覆（或關聯終止的來源措施有待處理的申覆）時兩段都不清、也不恢復營業（eBay 的 restrict the processing、GDPR 17(3)(e)）；主管機關來函的保存（`hold_until`）擋兩段，不影響恢復營業。兩種保存只有 `StoreHolds` 一支查詢定義；清理在鎖住候選之後再判斷時間並問保存，寫入保存的一方先鎖店家列（競態證明見治理 ADR）。
 - 清理是每小時的 River periodic job（`seller.purge_pii`，啟動即執行），每批一個 transaction、迴圈到取不滿，重跑是 no-op；第三項是刪過期的防詐保存列。清理後撤銷終止只撤銷紀錄與禁止入駐（快照刪除，可開新店，新的 `store_id`），不恢復店家。
 
@@ -112,5 +112,5 @@
 - live mode 的銀行帳號 fingerprint 範圍（同一個銀行帳號在不同帳戶是否一致）只在測試模式實測；上線前核對，範圍不同則共用銀行帳號的比對要重評。
 - 快照到措施結束之前，對應的舊 HMAC 金鑰不能從金鑰環移除（啟動檢查擋下）；保存表的舊金鑰列要留到來源 stint 關店滿 5 年。
 - 保留期、申覆期間與來函保存期同值（4416 小時）只靠設計決定，沒有程式強制（model 的 unit test 釘住數值），三者法律依據不同所以是三個常數。主管機關來函的涵蓋狀態只看第二段，已退場而個資還在的店顯示「保存中」，下游資料已刪不另標（觸發：機關第一次要求調取聊天或商品資料而店家已退場）。
-- 已核准後不能改登記資料，也沒有 `pending_agreements`：已入駐的賣家在條款版本更新後重新同意、換主體的處理，在系統上線之前或文件版本第一次在有真實賣家之後改版時加。同時有多位審核員或佇列頁要即時更新多筆時，登記資料查詢改用 server-streaming。
-- 重新評估：法務給出 seller 範圍內其他類別的法定保存年限時，改為依資料類別分級（`retention_until`）；補充文件的規格改成收自然人證件時，加回限時授權。
+- 已核准後不能改登記資料，也沒有「待重新同意」的欄位或回應：已入駐的賣家在條款版本更新後重新同意、換主體的處理，在系統上線之前或文件版本第一次在有真實賣家之後改版時加。同時有多位審核員或佇列頁要即時更新多筆時，登記資料查詢改用 server-streaming。
+- 重新評估：法務給出 seller 範圍內其他類別的法定保存年限時，改為依資料類別分級、每列存保留截止時間；補充文件的規格改成收自然人證件時，加回限時授權。

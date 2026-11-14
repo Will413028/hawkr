@@ -189,7 +189,7 @@ WHERE d.application_id = $1 AND a.status <> 'CANCELLED';
 
 -- name: SnapshotMeasureIdentities :exec
 -- 措施建立時，若它帶身分效果（seller.identity_effect_measures 那一份定義：停權與非預告的終止合作），複製被處分帳號全部 stint 的身分 blind index 到措施擁有的快照：每個識別欄位金鑰環裡每一把金鑰算的 hash 各一筆，之後換鑰也查得到；
--- 同一個 hash 只留一筆。來源是 account_identity_hashes（防詐保存，ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-30 修訂）：
+-- 同一個 hash 只留一筆。來源是 account_identity_hashes（防詐保存，ADR 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」）：
 -- 申請的統編在 stint 的個資清理之後仍在這裡，所以舊 stint 清理之後才建立的處分取得到它。統編（TAX_ID）的種類是 TAX_ID；provider 回報的銀行帳號
 -- fingerprint（BANK_FINGERPRINT）的種類是 BANK_ACCOUNT（Stripe 計畫 D38：身分證號、負責人身分證號與平台自收的銀行帳號已不存在）。
 -- 不帶身分效果的措施（預告終止、其他種類）一列都不寫；呼叫方不判斷。

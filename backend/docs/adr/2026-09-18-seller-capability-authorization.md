@@ -131,7 +131,7 @@ D8（賣家 pricebook 市場行情端點的歸屬）作廢：這些端點隨 pri
 
 原決策段與 2026-10-08 修訂保留歷史。
 
-**脈絡。** 2026-10-08 的前置條件 `KYC_APPROVED` 是「KYC 流程核准」，而流程的後半段是 PayUni 子商店。PayUni 的開通與代理商 API 已刪除，收款開通改走 provider 中立的 payment port（收款開通 ADR D1、D7）；店家能不能收款，現在看收款帳戶的轉帳能力，不再看流程。
+**脈絡。** 2026-10-08 的前置條件 `KYC_APPROVED` 是「KYC 流程核准」，而流程的後半段是 PayUni 子商店。PayUni 的開通與代理商 API 已刪除，收款開通改走 provider 中立的 payment port（見收款開通 ADR：作品集的 adapter 是 Stripe、閘門看轉帳能力）；店家能不能收款，現在看收款帳戶的轉帳能力，不再看流程。
 
 **決策。**
 

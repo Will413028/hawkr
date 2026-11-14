@@ -677,7 +677,7 @@ func (m *Module) ReannounceExposures(ctx context.Context) (int, error) {
 	return m.profile.ReannounceExposures(ctx)
 }
 
-// PurgePII 跑關店之後的兩段清理（ADR 2026-10-19-seller-kyc-payuni-consolidated「關店與個資保留」與 2026-10-20 修訂）：第一段（退場）在一般關店 30 天
+// PurgePII 跑關店之後的兩段清理（ADR 2026-11-13-seller-platform-review-and-identity-matching「關店與個資保留」）：第一段（退場）在一般關店 30 天
 // （StoreRetireAfter；終止合作關店不早於申覆期限）後清公開內容、釋放 logo 與封面並發 StoreRetired；第二段在關店 184 天（StoreRetention）後清註冊、身分與連線資料
 // （店家聯絡、KYC、同意紀錄的來源）。申覆的 legal hold 與主管機關來函的保存擋兩段。分批處理到沒有候選為止，回傳第二段清理了個資的店家數（退場看 retired_at）；
 // 重跑是 no-op。它是 seller.purge_pii job 的內容，給 worker 與測試呼叫。

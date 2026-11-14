@@ -16,7 +16,7 @@ var ErrFileNotSynced = model.ErrFileNotSynced
 // 要人處理。
 var ErrFileMissing = model.ErrFileMissing
 
-// KYC 認證（ADR 2026-10-19-seller-kyc-payuni-consolidated）的公開型別與方法。賣家的方法以帳號為身分，授權由模組做
+// KYC 認證（ADR 2026-11-13-seller-platform-review-and-identity-matching「申請、草稿與審核」）的公開型別與方法。賣家的方法以帳號為身分，授權由模組做
 // （申請以帳號目前的店家為準）；管理員的方法由呼叫方（admin 的 Connect 方法）先確認是管理員。
 
 // KYCStatus 是申請的狀態：只記人工決定。

@@ -37,4 +37,4 @@ schema `seller`（`db/schema.sql`；view 與函式在 `db/objects.sql`），依�
 
 ## 決策紀錄
 
-從 seller-service 沿用的每個機制、當時的決定與理由，以及與 seller-service 的差異在同目錄的 `CARRYOVER.md`；改動或移除沿用的機制前，先讀那一列。相關 ADR：`docs/adr/` 的 `2026-10-18-seller-governance-consolidated.md`、`2026-10-19-seller-kyc-payuni-consolidated.md`、`2026-10-03-public-store-identity-and-visibility.md`、`2026-10-04-prospect-contact-points-and-matching.md`。
+從 seller-service 沿用的每個機制、當時的決定與理由，以及與 seller-service 的差異在同目錄的 `CARRYOVER.md`；改動或移除沿用的機制前，先讀那一列。相關 ADR：`docs/adr/` 的 `2026-10-18-seller-governance-consolidated.md`、`2026-11-13-seller-platform-review-and-identity-matching.md`、`2026-10-03-public-store-identity-and-visibility.md`、`2026-10-04-prospect-contact-points-and-matching.md`。

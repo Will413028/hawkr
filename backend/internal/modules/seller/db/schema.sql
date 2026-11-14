@@ -22,7 +22,7 @@ CREATE SCHEMA seller;
 -- 與「考慮過的方案」的「停權狀態」）；文字欄位不存空字串，沒有值就是 NULL。
 -- town_code 是內政部的鄉鎮市區代碼（8 碼，前 5 碼是縣市；表在 platform/twaddr，寫入端檢查是現行的代碼）。
 -- logo、封面存 object key 與 media 的 asset ID：asset ID 是同步 job 登記引用時業務列目前指著的資產。
--- 個資清理（ADR 2026-10-19-seller-kyc-payuni-consolidated「關店與個資保留」）：stint 關閉之後過了保留期（一般關店 184 天，model.StoreRetention；
+-- 個資清理（ADR 2026-11-13-seller-platform-review-and-identity-matching「關店與個資保留」）：stint 關閉之後過了保留期（一般關店 184 天，model.StoreRetention；
 -- 因終止合作而關閉的，到帳號上未撤銷終止中最晚的申覆期限，且不早於關閉後 184 天；帳號上有終止的待處理申覆時暫停）才由 purge 套件清掉
 -- store_name、description、contact_phone、contact_name、contact_mobile、support_email、地址、prize、website_url，並釋放 logo 與封面，記下 pii_purged_at；
 -- store_name 因此可以是 NULL（只有清理過的列），呈現層對已清理的店家顯示墓碑。保留期的判斷只有一處（RetireDueStores 那支查詢，清理與恢復共用）；
@@ -57,7 +57,7 @@ CREATE TABLE seller.stores (
     current_closed_at    TIMESTAMPTZ,
     retired_at           TIMESTAMPTZ,
     CONSTRAINT stores_status_check CHECK (status IN ('ACTIVE', 'PENDING_DELETION', 'CLOSED')),
-    -- 關店後的兩段清理（ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-20 修訂）：retired_at 是第一段（關店後 30 天：公開內容與圖片清掉、
+    -- 關店後的兩段清理（ADR 2026-11-13-seller-platform-review-and-identity-matching「關店與個資保留」）：retired_at 是第一段（關店後 30 天：公開內容與圖片清掉、
     -- 發 StoreRetired 讓下游刪除，之後不能恢復營業），pii_purged_at 是第二段（關店後 184 天：註冊、身分與連線資料）。第二段一定在第一段之後。
     CONSTRAINT stores_closed_images_check CHECK (retired_at IS NULL OR (logo_key IS NULL AND cover_key IS NULL)),
     CONSTRAINT stores_retired_check CHECK (
@@ -890,7 +890,7 @@ CREATE TABLE seller.suspension_periods (
 );
 CREATE UNIQUE INDEX suspension_periods_open ON seller.suspension_periods (store_id) WHERE ended_at IS NULL;
 
--- 措施的身分快照（ADR 2026-10-19-seller-kyc-payuni-consolidated「身分比對與比對 hash」）：帶身分效果的措施（identity_effect_measures）建立時，把被處分帳號全部
+-- 措施的身分快照（ADR 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」）：帶身分效果的措施（identity_effect_measures）建立時，把被處分帳號全部
 -- KYC 申請（跨 stint）的身分 blind index 複製過來，措施結束或撤銷時刪除；KYC 列的個資照常清理，這裡是措施擁有的、
 -- 唯一保留的比對依據。kind 是比對的種類（統編 TAX_ID；金流商回報的銀行帳號指紋 BANK_ACCOUNT，Stripe 計畫 D38：平台不再收身分證號與銀行帳號），
 -- key_id 是算出 hash 的 HMAC 金鑰：快照沒有明文可以重算，所以這把金鑰要留在金鑰環直到措施結束。比對讀 measure_identity_sources(at)：
@@ -919,7 +919,7 @@ CREATE TABLE seller.measure_linked_reviews (
     CONSTRAINT measure_linked_reviews_admin_check CHECK (reviewed_by_admin_id > 0)
 );
 
--- KYC 認證申請（ADR 2026-10-19-seller-kyc-payuni-consolidated）：以 store_id 為鍵，一個店家同時最多一筆還沒取消的申請
+-- KYC 認證申請（ADR 2026-11-13-seller-platform-review-and-identity-matching「申請、草稿與審核」）：以 store_id 為鍵，一個店家同時最多一筆還沒取消的申請
 -- （kyc_applications_open；被退回的重送沿用原列，狀態回到 DRAFT）。草稿與送出共用同一組具型別的欄位（沒有自由格式的
 -- JSON），草稿時除了身分以外都可以是 NULL，送出之後必填由 kyc_applications_complete_check 表達。status 只記人工決定
 -- （草稿、送出、核准、退回、取消）；收款帳戶的狀態由 payment 模組擁有，不混進這條軸。ID 是 UUIDv7（應用層產生）：申請
@@ -997,7 +997,7 @@ CREATE INDEX kyc_applications_status_submitted ON seller.kyc_applications (statu
 CREATE INDEX kyc_applications_submitted ON seller.kyc_applications (submitted_at, application_id)
     WHERE status <> 'DRAFT' AND submitted_at IS NOT NULL;
 
--- 防詐用的身分比對索引（ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-30 修訂，Stripe 計畫 D3）：與 KYC 個資分開保存，只有 blind index、沒有明文。
+-- 防詐用的身分比對索引（ADR 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」，Stripe 計畫 D3）：與 KYC 個資分開保存，只有 blind index、沒有明文。
 -- 來源有兩種：申請的統編（同一個 transaction、同一支 writeHashes 寫入；統編被改掉時同步修剪；Stripe 計畫 D42：申請沒有自己的 hash 表），以及 provider 回報的外部銀行帳號
 -- fingerprint（BANK_FINGERPRINT，收款帳戶同步在寫快取的同一個 transaction 寫入，kyc.Fingerprints；不是草稿的值，不修剪，只由過期刪除）。兩種都不隨 184 天的個資清理刪除：
 -- 帶身分效果的措施建立時 SnapshotMeasureIdentities 從這裡取，被處分帳號目前還在這裡的列也是措施的身分（measure_identity_hits），所以舊 stint 的 KYC 清掉之後，之後才建立的處分仍取得到它的身分。
@@ -1033,7 +1033,7 @@ CREATE TABLE seller.kyc_documents (
     CONSTRAINT kyc_documents_asset_check CHECK (asset_id <> '' AND object_key <> '')
 );
 
--- 公司型申請送件時對經濟部商業司公開資料的查詢快照（ADR 2026-10-19-seller-kyc-payuni-consolidated「登記資料快照」）：審核時對照的
+-- 公司型申請送件時對經濟部商業司公開資料的查詢快照（ADR 2026-11-13-seller-platform-review-and-identity-matching「登記資料快照」）：審核時對照的
 -- 是送件當時查到的登記資料，不是審核當下才查（審核紀錄引用這一列，事後才追得到依據）。一次查詢一列：送件與後台的重新查詢
 -- 都新增一列 PENDING，job 查完寫入結果；結果寫入後不再改（寫入的查詢以仍是 PENDING 為條件；舊的查詢比新的晚完成也照樣寫入）。
 -- submission_seq 是查詢所屬的那一輪送件（申請的 submission_seq：每次 SubmitKYC 加一；退回後重送沿用同一筆申請，所以要有輪次）：
@@ -1379,7 +1379,7 @@ CREATE INDEX retired_assets_retired_at ON seller.retired_assets (retired_at);
 -- 只有 INSERT 的查詢，agreement_queries_test.go 檢查；唯一的例外是個資清理把來源欄位清成 NULL（PurgeAgreementSources），以及 dev
 -- seed 的重設（internal/devseed 的 clearChildrenSQL 刪掉種子店家的紀錄再依 fixture 重寫）。
 -- client_ip 是 inet（取不到是 NULL），user_agent 取不到是 NULL（空字串存成 NULL），上限 512 字是儲存成本。IP 與 User-Agent 是欄位值，
--- 依 ADR 2026-10-19-seller-kyc-payuni-consolidated「關店與個資保留」只保留審核的事實：店家關閉滿保留期由 purge 套件清成 NULL 並記下
+-- 依 ADR 2026-11-13-seller-platform-review-and-identity-matching「關店與個資保留」只保留審核的事實：店家關閉滿保留期由 purge 套件清成 NULL 並記下
 -- pii_purged_at（agreement_acceptances_purged_check），種類、版本、時間、帳號與送出的紀錄保留。外鍵不設 ON DELETE（店家列與審核紀錄都不刪）。
 CREATE TABLE seller.agreement_acceptances (
     acceptance_id        BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

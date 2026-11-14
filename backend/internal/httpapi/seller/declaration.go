@@ -68,7 +68,7 @@ var declarations = map[string]declaration{
 	sellerv1alpha1connect.SellerAppServiceGetMyPaymentAccountProcedure:            requires(model.CapAccountSelfRead),
 	sellerv1alpha1connect.SellerAppServiceCreatePaymentOnboardingSessionProcedure: requires(model.CapStorefrontWrite),
 	sellerv1alpha1connect.SellerAppServiceRefreshMyPaymentAccountProcedure:        requires(model.CapStorefrontWrite),
-	// 身分比對是統編存在與否的探測面（ADR 2026-10-19-seller-kyc-payuni-consolidated）：每個帳號每小時最多 5 次。
+	// 身分比對是統編存在與否的探測面（ADR 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」）：每個帳號每小時最多 5 次。
 	// 一次正常的申請是填完才送出，被退回後修改重送，一個小時內不會超過；額度以帳號計，計數在這個程序的記憶體內：多個
 	// instance 各自計數，monolith 跑超過一個 instance 之前要換成共用的計數（docs/modules/seller.md §23；入口的 IP 限流不是它的補償）。
 	sellerv1alpha1connect.SellerAppServiceSubmitKYCProcedure: requires(model.CapStorefrontWrite).limitedTo(5, time.Hour),

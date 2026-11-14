@@ -10,7 +10,7 @@ import (
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// 關店後的兩段清理（ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-20 修訂）：
+// 關店後的兩段清理（ADR 2026-11-13-seller-platform-review-and-identity-matching「關店與個資保留」）：
 // 第一段（退場）在關店後 StoreRetireAfter（30 天）：說明、獎項、網站、logo 與封面清掉，發 StoreRetired（relay 轉成 seller.deleted，下游刪除），
 // 店名、聯絡、地址與 KYC 留著；第二段在關店後 StoreRetention（184 天）清註冊、身分與連線資料。兩段的邊界都是「嚴格晚於」。
 // mutation：RetireStores 多清 store_name 或 contact_*（或 StoreRetireAfter 改成 4416 小時）→ 第一段的斷言失敗；

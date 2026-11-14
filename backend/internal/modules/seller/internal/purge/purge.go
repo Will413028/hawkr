@@ -1,4 +1,4 @@
-// Package purge 是關店之後的兩段清理（ADR 2026-10-19-seller-kyc-payuni-consolidated「關店與個資保留」與 2026-10-20 修訂）：
+// Package purge 是關店之後的兩段清理（ADR 2026-11-13-seller-platform-review-and-identity-matching「關店與個資保留」）：
 //
 //   - 第一段（退場，retire）：stint 關閉之後過了 model.StoreRetireAfter（一般關店 30 天；因終止合作而關閉的到終止的申覆期限，且不早於這 30 天），
 //     店家的公開內容（說明、獎項、網站）清掉，logo 與封面在這時才釋放，並發出 StoreRetired（relay 轉成 seller.deleted，商品、貼文、聊天的個資等下游

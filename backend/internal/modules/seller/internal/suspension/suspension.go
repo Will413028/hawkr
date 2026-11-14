@@ -56,7 +56,7 @@ func (s *Service) ActingStore(ctx context.Context, accountID int64, c model.Capa
 }
 
 // RecordIdentities 在限制效果的措施建立的 transaction 內，帶身分效果的措施（SQL 的 identity_effect_measures；不帶的什麼都不寫）把被處分帳號全部 KYC 申請（跨 stint）的身分 blind index 快照到措施
-// 擁有的 measure_identities（ADR 2026-10-19-seller-kyc-payuni-consolidated）：之後別的帳號以同一個身分申請認證時，
+// 擁有的 measure_identities（ADR 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」）：之後別的帳號以同一個身分申請認證時，
 // 由快照加上帳號目前的 hash 比對。措施結束或撤銷時由 Recompute 刪除。呼叫方已鎖住帳號。
 func RecordIdentities(ctx context.Context, q *store.Queries, measureID uuid.UUID, accountID int64) error {
 	return q.SnapshotMeasureIdentities(ctx, store.SnapshotMeasureIdentitiesParams{MeasureID: measureID, AccountID: accountID})

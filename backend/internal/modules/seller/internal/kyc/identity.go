@@ -10,7 +10,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 )
 
-// match 比對申請的統編與「別的帳號、在 now 生效而且帶身分效果的措施」的身分（ADR 2026-10-19-seller-kyc-payuni-consolidated）：命中就是 blocked，不能通過認證。
+// match 比對申請的統編與「別的帳號、在 now 生效而且帶身分效果的措施」的身分（ADR 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」）：命中就是 blocked，不能通過認證。
 //
 // 比對用金鑰環的每一把金鑰重算（輪替前寫入的快照才找得到）。措施的身分是快照加上被處分帳號目前的 hash；「措施生效」與「帶身分效果」都只由 SQL 的
 // seller.measure_identity_sources 決定（與處分頁的關聯帳號同一份定義），這裡不再判斷：回來的列都屬於在 now 生效的措施。

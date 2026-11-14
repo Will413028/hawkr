@@ -36,4 +36,4 @@ schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵
 
 ## 決策紀錄
 
-沿用機制的判斷在同目錄的 `CARRYOVER.md`。相關 ADR：`docs/adr/2026-09-24-go-modular-monolith.md`（文末修訂「payment 模組先只擁有收款帳戶」：payment 先只有收款帳戶、seller 依賴 payment、規則 5 的 inbox 由 platform 提供）、`docs/adr/2026-10-19-seller-kyc-payuni-consolidated.md`（收款帳戶的擁有者）。計畫：`docs/plans/2026-10-29-payment-onboarding-stripe.md` D28–D30。
+沿用機制的判斷在同目錄的 `CARRYOVER.md`。相關 ADR：`docs/adr/2026-09-24-go-modular-monolith.md`（文末修訂「payment 模組先只擁有收款帳戶」：payment 先只有收款帳戶、seller 依賴 payment、規則 5 的 inbox 由 platform 提供）、`docs/adr/2026-11-13-payment-onboarding-provider-port-stripe.md`（收款帳戶的擁有者、port 與 Stripe）。計畫：`docs/plans/2026-10-29-payment-onboarding-stripe.md` D28–D30。

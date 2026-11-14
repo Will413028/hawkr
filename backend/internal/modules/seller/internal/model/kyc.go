@@ -13,7 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-// KYCStatus 是 KYC 申請的狀態：只記人工決定（ADR 2026-10-19-seller-kyc-payuni-consolidated）。
+// KYCStatus 是 KYC 申請的狀態：只記人工決定（ADR 2026-11-13-seller-platform-review-and-identity-matching「申請、草稿與審核」）。
 type KYCStatus string
 
 const (

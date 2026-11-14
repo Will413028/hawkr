@@ -20,7 +20,6 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 GREP_PATHS = ["backend/internal", "backend/cmd", "api/hawkr"]
-ADR_NAME = "2026-10-19-seller-kyc-payuni-consolidated"
 EXPECTED_GROUP_ROWS = 10  # G1-G10, one "| 去向 |" row each
 EXPECTED_G11_ROWS = 7
 
@@ -80,10 +79,6 @@ class Ctx:
         self.root = root
 
 
-def r_adr_name_only(ctx, path, no, text):
-    return ADR_NAME in text and "payuni" not in text.replace(ADR_NAME, "").lower()
-
-
 # Each entry: (id, path pattern, kind "glob"|"regex", line regex or None / callable, source).
 # A callable gets (ctx, path, lineno, text) and decides on its own; path must still match.
 ALLOWLIST = [
@@ -95,8 +90,6 @@ ALLOWLIST = [
      "applied migrations and the step-8 drop migrations"),
     (3, "backend/internal/modules/*/db/migrations/atlas.sum", "glob", None,
      "atlas.sum hashes the migration file names"),
-    (4, "**", "glob", r_adr_name_only,
-     "comment cites the ADR file name; nothing else on the line mentions payuni"),
     (5, r"backend/internal/modules/(seller|discovery|buyer|content)/CARRYOVER\.md", "regex", None,
      "carry-over records and rows pointing at phase B"),
     (6, "backend/internal/platform/codemeta/**", "glob", None,
