@@ -108,14 +108,14 @@ Interceptor authInterceptor({
 }
 
 /// App 的 interceptor，順序固定：整個呼叫的逾時（涵蓋重試）→ 上報重試之後的結果 → 重試 → 賣家停權 → 身分 → 每次送出都
-/// 帶的 header（[headers]）→ `Accept-Language`（[acceptLanguage]，App 目前的 UI 語系）→ log（每次送出一行）。[auth] 只給登入後的
+/// 帶的 header（[headers]）→ `Accept-Language`（[acceptLanguage]，必填：每個 client 都送，App 目前的 UI 語系）→ log（每次送出一行）。[auth] 只給登入後的
 /// service。[onSellerSuspended] 只有賣家的 App 給：分類器認得 `SELLER_SUSPENDED`（D10）時呼叫，錯誤原樣丟出。
 List<Interceptor> appInterceptors({
   required Duration timeout,
   required void Function(ConnectException error, FailureContext context) report,
   required Map<String, String> Function() headers,
   Interceptor? auth,
-  String Function()? acceptLanguage,
+  required String Function() acceptLanguage,
   void Function()? onSellerSuspended,
   void Function(String line)? log,
 }) => [
@@ -125,7 +125,7 @@ List<Interceptor> appInterceptors({
   if (onSellerSuspended != null) sellerSuspendedInterceptor(onSellerSuspended),
   ?auth,
   headersInterceptor(headers),
-  if (acceptLanguage != null) acceptLanguageInterceptor(acceptLanguage),
+  acceptLanguageInterceptor(acceptLanguage),
   if (log != null) logInterceptor(log),
 ];
 

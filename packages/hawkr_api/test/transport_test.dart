@@ -120,30 +120,24 @@ void main() {
       }
     });
 
-    test('appInterceptors 給了 acceptLanguage 才帶這個 header', () async {
+    test('appInterceptors 每次送出都帶 acceptLanguage 給的 tag', () async {
       Headers? seen;
-      Future<void> call(String Function()? acceptLanguage) async {
-        final client = _client(
-          (req, ctx) {
-            seen = ctx.requestHeaders;
-            return CheckAppVersionResponse();
-          },
-          appInterceptors(
-            timeout: const Duration(seconds: 5),
-            report: (error, context) {},
-            headers: () => const {},
-            acceptLanguage: acceptLanguage,
-          ),
-        );
-        await client.checkAppVersion(
-          CheckAppVersionRequest(clientVersion: '1.0.0'),
-        );
-      }
-
-      await call(() => 'en');
+      final client = _client(
+        (req, ctx) {
+          seen = ctx.requestHeaders;
+          return CheckAppVersionResponse();
+        },
+        appInterceptors(
+          timeout: const Duration(seconds: 5),
+          report: (error, context) {},
+          headers: () => const {},
+          acceptLanguage: () => 'en',
+        ),
+      );
+      await client.checkAppVersion(
+        CheckAppVersionRequest(clientVersion: '1.0.0'),
+      );
       expect(seen!['accept-language'], 'en');
-      await call(null);
-      expect(seen!.contains('accept-language'), isFalse);
     });
   });
 
@@ -260,6 +254,7 @@ void main() {
             return CheckAppVersionResponse();
           },
           appInterceptors(
+            acceptLanguage: () => 'zh-TW',
             timeout: const Duration(seconds: 1),
             headers: () => {},
             report: (_, _) => reports++,
@@ -439,6 +434,7 @@ void main() {
           );
         },
         appInterceptors(
+          acceptLanguage: () => 'zh-TW',
           timeout: const Duration(seconds: 5),
           report: (_, __) {},
           headers: () => const {'X-App-Type': 'SELLER'},
@@ -470,6 +466,7 @@ void main() {
           return CheckAppVersionResponse();
         },
         appInterceptors(
+          acceptLanguage: () => 'zh-TW',
           timeout: const Duration(seconds: 5),
           report: (_, __) {},
           headers: () => const {},
@@ -507,6 +504,7 @@ void main() {
       final client = _client(
         (req, ctx) => throw error,
         appInterceptors(
+          acceptLanguage: () => 'zh-TW',
           timeout: const Duration(seconds: 5),
           report: (_, __) {},
           headers: () => const {},
@@ -535,6 +533,7 @@ void main() {
         final client = _client(
           (req, ctx) => throw error,
           appInterceptors(
+            acceptLanguage: () => 'zh-TW',
             timeout: const Duration(seconds: 5),
             report: (_, __) {},
             headers: () => const {},
@@ -555,6 +554,7 @@ void main() {
       final client = _client(
         (req, ctx) => throw denied('SELLER_SUSPENDED'),
         appInterceptors(
+          acceptLanguage: () => 'zh-TW',
           timeout: const Duration(seconds: 5),
           report: (_, __) {},
           headers: () => const {},
