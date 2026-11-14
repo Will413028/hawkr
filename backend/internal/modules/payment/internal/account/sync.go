@@ -249,7 +249,7 @@ func (s *Service) RetryCreate(ctx context.Context, actor adminaudit.Actor, store
 			}
 			rotated = true
 		}
-		if err := s.audit(ctx, actor, storeID, map[string]any{"outcome": "requested", "acknowledged_no_provider_account": acknowledgeNoProviderAccount, "key_rotated": rotated, "replayed_same_key": replay}); err != nil {
+		if err := s.audit(ctx, actor, storeID, map[string]any{"outcome": "requested", "acknowledged_no_provider_account": rotated, "key_rotated": rotated, "replayed_same_key": replay}); err != nil {
 			return err
 		}
 		if replay {

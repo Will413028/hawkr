@@ -55,6 +55,7 @@ UPDATE payment.accounts
 SET create_completed_at = sqlc.arg(now)::timestamptz,
     status = 'ACTION_REQUIRED',
     create_failed_at = NULL,
+    create_refused_at = NULL,
     updated_at = sqlc.arg(now)
 WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NOT NULL AND create_completed_at IS NULL AND purge_pending_at IS NULL
 RETURNING *;
@@ -70,9 +71,11 @@ WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NULL AND create_c
 RETURNING *;
 
 -- name: MarkPaymentAccountCreateFailed :execrows
--- 建立重試用完：記下失敗的時刻（進後台待辦）；已完成建立的列不寫（有外部 ID 但第二步沒成功的半建立列照寫）。
+-- 建立失敗：記下失敗的時刻（進後台待辦）；已完成建立的列不寫（有外部 ID 但第二步沒成功的半建立列照寫）。refused 為真（金流商明確拒絕）時同時記 create_refused_at，
+-- 週期掃描不再為這列重送。
 UPDATE payment.accounts
 SET create_failed_at = sqlc.arg(now),
+    create_refused_at = CASE WHEN sqlc.arg(refused)::boolean THEN sqlc.arg(now)::timestamptz END,
     updated_at = sqlc.arg(now)
 WHERE store_id = sqlc.arg(store_id) AND create_completed_at IS NULL AND create_failed_at IS NULL AND purge_pending_at IS NULL;
 
@@ -80,6 +83,7 @@ WHERE store_id = sqlc.arg(store_id) AND create_completed_at IS NULL AND create_f
 -- 管理員重試建立：只有建立失敗的列清空失敗時刻，由呼叫方同一個 transaction 重新排入建立 job。
 UPDATE payment.accounts
 SET create_failed_at = NULL,
+    create_refused_at = NULL,
     updated_at = sqlc.arg(now)
 WHERE store_id = sqlc.arg(store_id) AND create_completed_at IS NULL AND create_failed_at IS NOT NULL;
 
@@ -141,11 +145,11 @@ ORDER BY store_id
 LIMIT sqlc.arg(batch);
 
 -- name: UnresolvedPaymentAccountStoreIDs :many
--- 週期掃描了結「呼叫過、沒有外部 ID」的列用（D63），不論擁有者是否營運中、是否已記建立失敗；等待清理的列由清理 job 處理，不在這裡。called_before 是「已呼叫」的時刻要早於它
+-- 週期掃描了結「呼叫過、沒有外部 ID」的列用（D63），不論擁有者是否營運中、是否已記建立失敗（金流商明確拒絕的列除外：create_refused_at，重送只會再被拒絕，等管理員重試）；等待清理的列由清理 job 處理，不在這裡。called_before 是「已呼叫」的時刻要早於它
 -- （剛呼叫的建立 job 還在跑，不重複送）；expired_before 是 UnresolvedDeadline 的界線：早於它而且已進建立失敗的列已是終局，不再選；早於它但還沒進建立失敗的列要被選到，由 Resolve 標成終局。
 SELECT store_id
 FROM payment.accounts
-WHERE external_account_id IS NULL AND create_called_at IS NOT NULL AND create_completed_at IS NULL AND purge_pending_at IS NULL
+WHERE external_account_id IS NULL AND create_called_at IS NOT NULL AND create_completed_at IS NULL AND purge_pending_at IS NULL AND create_refused_at IS NULL
   AND create_called_at <= sqlc.arg(called_before)::timestamptz
   AND NOT (create_failed_at IS NOT NULL AND create_called_at <= sqlc.arg(expired_before)::timestamptz)
   AND store_id > sqlc.arg(after_store_id)

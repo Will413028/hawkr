@@ -24,6 +24,7 @@ import (
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -203,7 +204,7 @@ func setup(t *testing.T) *fixture {
 	f.identity = identity.New(identity.Deps{DB: d, Events: f.bus, Now: func() time.Time { return f.now }, Logger: log})
 	clock := func() time.Time { return f.now }
 	f.payments = payment.New(payment.Deps{
-		DB: d, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: d, Jobs: f.jobs, Now: clock, Logger: log}), Provider: f.payment,
+		DB: d, Audit: adminaudit.New(d, time.Now), Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: d, Jobs: f.jobs, Now: clock, Logger: log}), Provider: f.payment,
 		Owners: fixtureOwners{f}, Now: clock, Logger: log,
 	})
 	f.module = f.newModule(t, f.jobs)

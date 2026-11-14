@@ -14,6 +14,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
 
 	"connectrpc.com/connect"
@@ -139,7 +140,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	var m *seller.Module
 	clock := func() time.Time { return now }
 	payments := payment.New(payment.Deps{
-		DB: d, Events: bus, Jobs: noJobs{}, Inbox: inbox.New(inbox.Deps{DB: d, Jobs: noJobs{}, Now: clock, Logger: log}), Provider: provider,
+		DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: noJobs{}, Inbox: inbox.New(inbox.Deps{DB: d, Jobs: noJobs{}, Now: clock, Logger: log}), Provider: provider,
 		Owners: ownerFunc(func(ctx context.Context, storeID int64) (bool, error) {
 			s, err := m.Store(ctx, storeID)
 			return err == nil && s.Status != seller.Closed, err

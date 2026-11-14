@@ -121,6 +121,8 @@ export type PaymentAccount = Message<"hawkr.admin.payment.v1alpha1.PaymentAccoun
   /**
    * 建立結果不明（呼叫過、沒有外部 ID）的建立失敗帳戶（待辦 PAYMENT_ACCOUNT_CREATE_FAILED）已超過金流商保存冪等鍵的期間（30 天）時為真：重試建立前要先請管理員確認
    * 金流商那邊沒有這家店的收款帳戶（RetryPaymentAccountCreateRequest.acknowledge_no_provider_account）。保存期內為假，即使已超過自動重送的 7 天，重試只是以同一把鍵重送。
+   * 清理終局的原因是 unresolved_creation（待辦 PAYMENT_ACCOUNT_PURGE_STUCK）而且已超過保存期時同樣為真：同一把鍵不能再重送，重試關閉不會有結果（RetryPaymentAccountPurge
+   * 回 failed_precondition），後台隱藏「重試關閉」，只剩刪除對應。
    *
    * @generated from field: bool create_unresolved = 16;
    */
@@ -358,7 +360,9 @@ export const PaymentAdminService: GenService<{
   },
   /**
    * RetryPaymentAccountPurge 對清理進了終局（後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK：金流商拒絕關閉，或等待清理超過 7 天仍關不掉）的收款帳戶重試關閉：
-   * 清除終局、期限從現在重新計算，並重新排入清理。帳戶不是終局的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。
+   * 清除終局、期限從現在重新計算，並重新排入清理。終局原因是 unresolved_creation（建立結果不明、沒有外部 ID）時看金流商保存冪等鍵的期間（30 天）：保存期內以同一把鍵重送取回
+   * 外部 ID，取回後清除終局並關閉；帳戶的 create_unresolved 為真（超過保存期）時回 failed_precondition，只能刪除對應。同一個交易寫一筆後台紀錄。
+   * 帳戶不是終局的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。
    *
    * @generated from rpc hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountPurge
    */

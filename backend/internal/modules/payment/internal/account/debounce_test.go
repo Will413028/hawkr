@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -77,7 +78,7 @@ func TestBusyOutcomeCarriesTheRetryDelay(t *testing.T) {
 // mutation：沒有 provider 時回 nil → 失敗。
 func TestSyncUnlessFreshWithoutProviderIsFailedPrecondition(t *testing.T) {
 	t.Parallel()
-	s := New(Deps{DB: &db.DB{}, Events: events.NewBus(), Jobs: noopJobs{}, Now: time.Now, Logger: slog.Default()})
+	s := New(Deps{DB: &db.DB{}, Audit: adminaudit.New(&db.DB{}, time.Now), Events: events.NewBus(), Jobs: noopJobs{}, Now: time.Now, Logger: slog.Default()})
 	if err := s.SyncUnlessFresh(context.Background(), 1); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("沒有 provider 的重讀是 %v，要 FailedPrecondition", err)
 	}

@@ -18,10 +18,13 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
 
 	"connectrpc.com/connect"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
+
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
@@ -50,7 +53,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
-	"uuid"
 )
 
 // adminOrders 是買家側與店家側未結訂單 port 的替身（同一個實作，與正式組裝相同）。
@@ -150,7 +152,7 @@ func setupAdmin(t *testing.T) *adminFixture {
 	m := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: id, Media: mediaFake, Orders: orders, KYCMAC: kycMAC,
 		ProductStores: noProducts{}, Registry: f.registry, Now: f.now, Logger: log,
-		Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: f.now, Logger: log}),
+		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: f.now, Logger: log}),
 	})
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: m, Orders: orders, Now: time.Now, Logger: log})
 	socialModule := social.New(social.Deps{

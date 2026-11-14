@@ -8,7 +8,7 @@
 
 ## 擁有的資料
 
-schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵 `store_id`，不建跨 schema FK）。管理員的三個寫入（重試建立、重試關閉、刪除對應）在領域變更的同一個 transaction 內寫 platform 的 `adminaudit` 一筆（D62；沒有 `Deps.Audit` 時回錯誤）。守門：`TestRetryCreateAndRetryPurgeRecordOneRequestedEntryAndRollBackWithTheDomainChange`、httpapi 的 `TestEveryAuditedPaymentProcedureWritesOneRecordForTheCaller`。view 與函式在 `db/objects.sql`。webhook inbox 不在這裡：`inbox.events` 由 platform 擁有（`internal/platform/inbox`，D29）。讀取模型：無。
+schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵 `store_id`，不建跨 schema FK）。管理員的三個寫入（重試建立、重試關閉、刪除對應）在領域變更的同一個 transaction 內寫 platform 的 `adminaudit` 一筆（D62；`Deps.Audit` 必填）。守門：`TestRetryCreateAndRetryPurgeRecordOneRequestedEntryAndRollBackWithTheDomainChange`、httpapi 的 `TestEveryAuditedPaymentProcedureWritesOneRecordForTheCaller`。view 與函式在 `db/objects.sql`。webhook inbox 不在這裡：`inbox.events` 由 platform 擁有（`internal/platform/inbox`，D29）。讀取模型：無。
 
 ## 發布的讀取介面
 

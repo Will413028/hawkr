@@ -38,6 +38,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -159,7 +160,7 @@ func setup(t *testing.T) *fixture {
 	m := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: id, Media: stagedMedia{}, Orders: o, KYCMAC: kycMAC,
 		ProductStores: noProducts{}, Registry: registry, Now: time.Now, Logger: log,
-		Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log}),
+		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: time.Now, Logger: log}),
 	})
 	images, err := rpc.NewImages("https://media.example.test")
 	if err != nil {

@@ -29,6 +29,7 @@ import type { GovernanceNotice } from "./GovernanceNotice";
 import PaymentMappingDeleteDialog from "./PaymentMappingDeleteDialog";
 import PaymentRetryCreateConfirmDialog from "./PaymentRetryCreateConfirmDialog";
 import {
+	canRetryPurge,
 	type PaymentAccountState,
 	paymentAccountCreated,
 	paymentAccountQueryOptions,
@@ -232,14 +233,16 @@ export function PaymentAccountCard({
 				)}
 				{blockedTime && (
 					<>
-						<Button
-							variant="primary"
-							onClick={onRetryPurge}
-							loading={purging}
-							disabled={purging}
-						>
-							重試關閉
-						</Button>
+						{canRetryPurge(account) && (
+							<Button
+								variant="primary"
+								onClick={onRetryPurge}
+								loading={purging}
+								disabled={purging}
+							>
+								重試關閉
+							</Button>
+						)}
 						<Button
 							variant="danger"
 							onClick={onDeleteMapping}

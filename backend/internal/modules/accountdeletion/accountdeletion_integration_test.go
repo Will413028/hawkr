@@ -13,6 +13,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
 
 	"github.com/riverqueue/river"
@@ -125,7 +126,7 @@ func setupWith(t *testing.T, extra ...migrate.Module) *fixture {
 	b := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
 	kycMAC := sealtest.MAC(t)
 	orders := &testOrders{}
-	sl := seller.New(seller.Deps{KYCMAC: kycMAC, DB: d, Events: bus, Jobs: queue, Identity: id, Media: testMedia{}, Orders: orders, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})})
+	sl := seller.New(seller.Deps{KYCMAC: kycMAC, DB: d, Events: bus, Jobs: queue, Identity: id, Media: testMedia{}, Orders: orders, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: time.Now, Logger: log})})
 	m := New(Deps{DB: d, Identity: id, Buyer: b, Seller: sl, Orders: orders, Now: time.Now})
 	return &fixture{db: d, identity: id, buyer: b, seller: sl, orders: orders, module: m, queue: queue, bus: bus}
 }

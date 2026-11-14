@@ -13,6 +13,7 @@ CREATE TABLE "payment"."accounts" (
   "status_reason" text NULL,
   "fetched_at" timestamptz NULL,
   "create_failed_at" timestamptz NULL,
+  "create_refused_at" timestamptz NULL,
   "create_called_at" timestamptz NULL,
   "create_completed_at" timestamptz NULL,
   "create_idempotency_key" uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -26,6 +27,7 @@ CREATE TABLE "payment"."accounts" (
   CONSTRAINT "accounts_called_check" CHECK ((external_account_id IS NULL) OR (create_called_at IS NOT NULL)),
   CONSTRAINT "accounts_collection_check" CHECK (requirement_collection = ANY (ARRAY['PROVIDER'::text, 'PLATFORM'::text])),
   CONSTRAINT "accounts_completed_check" CHECK ((create_completed_at IS NULL) OR (external_account_id IS NOT NULL)),
+  CONSTRAINT "accounts_create_refused_check" CHECK ((create_refused_at IS NULL) OR (create_failed_at IS NOT NULL)),
   CONSTRAINT "accounts_create_failed_check" CHECK ((create_failed_at IS NULL) OR (create_completed_at IS NULL)),
   CONSTRAINT "accounts_created_check" CHECK ((status = 'NOT_CREATED'::text) = (create_completed_at IS NULL)),
   CONSTRAINT "accounts_enabled_check" CHECK ((status = 'ENABLED'::text) = transfers_active),
@@ -49,3 +51,5 @@ CREATE INDEX "accounts_poll" ON "payment"."accounts" ("store_id") WHERE (status 
 CREATE INDEX "accounts_purge_blocked" ON "payment"."accounts" ("purge_blocked_at") WHERE (purge_blocked_at IS NOT NULL);
 -- Create index "accounts_purge_pending" to table: "accounts"
 CREATE INDEX "accounts_purge_pending" ON "payment"."accounts" ("store_id") WHERE ((purge_pending_at IS NOT NULL) AND (purge_blocked_at IS NULL));
+-- Create index "accounts_unresolved" to table: "accounts"
+CREATE INDEX "accounts_unresolved" ON "payment"."accounts" ("store_id") WHERE ((external_account_id IS NULL) AND (create_called_at IS NOT NULL) AND (create_completed_at IS NULL) AND (purge_pending_at IS NULL) AND (create_refused_at IS NULL));

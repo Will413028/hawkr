@@ -118,6 +118,31 @@ func TestRecordRejectsInvalidEntriesAndTheSchemaChecksBackThemUp(t *testing.T) {
 	}
 }
 
+// detail 的大小只有一種量法：jsonb 的文字輸出（octet_length(detail::text)，records_detail_check）。{"x": "<n 個 a>"} 的文字輸出是 9+n 位元組，所以 MaxDetailBytes-9 個 a 剛好過、
+// 多一個被約束擋下，Record 把它對映成 invalid_input（不是原始的約束錯誤）；剛好過的那筆確實寫進去。
+// mutation：約束改回 pg_column_size(detail) → 邊界的行為不同（壓縮與標頭使位元組數不等於文字長度），邊界案例失敗；Record 不對映約束錯誤 → 超過的案例回的不是 invalid_input，失敗。
+func TestDetailSizeIsMeasuredByTheJSONBTextOutputAtTheBoundary(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	at := func(n int) adminaudit.Entry {
+		return adminaudit.Entry{Actor: adminaudit.Actor{AdminID: 1, Action: "/x/Y"}, TargetType: "payment_account", TargetID: "5", Detail: map[string]any{"x": strings.Repeat("a", n)}}
+	}
+	fits := adminaudit.MaxDetailBytes - 9
+	if err := f.db.InTx(ctx, func(ctx context.Context) error { return f.log.Record(ctx, at(fits)) }); err != nil {
+		t.Fatalf("剛好 %d 位元組的 detail 應該寫入：%v", adminaudit.MaxDetailBytes, err)
+	}
+	err := f.db.InTx(ctx, func(ctx context.Context) error { return f.log.Record(ctx, at(fits+1)) })
+	if apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("多一個位元組 err=%v，預期 invalid_input", err)
+	}
+	var n int
+	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM adminaudit.records WHERE octet_length(detail::text) = $1", adminaudit.MaxDetailBytes).Scan(&n))
+	if n != 1 {
+		t.Fatalf("剛好上限的紀錄筆數=%d，預期 1", n)
+	}
+}
+
 // List 依管理員、動作、對象與時間範圍（Since 含、Until 不含）篩選，新的在前。
 // mutation：Until 改成含 → 時間範圍案例多一筆，失敗；篩選條件互相 OR → 筆數不對，失敗。
 func TestListFiltersByAdminActionTargetAndTimeRangeNewestFirst(t *testing.T) {

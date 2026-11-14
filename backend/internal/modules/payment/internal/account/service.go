@@ -73,7 +73,7 @@ type Deps struct {
 	Jobs   jobs.Enqueuer
 	Inbox  *inbox.Inbox
 	// Audit 是 platform 的後台動作紀錄（D62）：管理員的寫入（重試建立、重試關閉、刪除對應）在領域變更的同一個 transaction 內寫一筆。
-	// 只有後台寫入需要它：組裝點（cmd/hawkr）一律傳入；沒有傳入時這三個寫入回錯誤、不做領域變更（沒有紀錄的後台寫入不成立）。
+	// 必填：沒有紀錄的後台寫入不成立，缺了在建構時 panic，不等到第一次後台寫入才發現。
 	Audit    *adminaudit.Log
 	Provider Provider
 	Owners   Owners
@@ -86,7 +86,7 @@ type Service struct{ d Deps }
 
 // New 建立服務；設定了 provider 時把它的事件處理登記到 inbox。
 func New(d Deps) *Service {
-	if d.DB == nil || d.Events == nil || d.Jobs == nil || d.Now == nil || d.Logger == nil {
+	if d.DB == nil || d.Events == nil || d.Jobs == nil || d.Audit == nil || d.Now == nil || d.Logger == nil {
 		panic("payment/account: missing dependency")
 	}
 	if d.Provider != nil && (d.Inbox == nil || d.Owners == nil) {
@@ -144,13 +144,30 @@ func requestOutcome(row store.PaymentAccount) (enqueue bool, err error) {
 // ToModel 轉成對外的型別。
 func ToModel(r store.PaymentAccount, now time.Time) model.PaymentAccount {
 	return model.PaymentAccount{
-		PurgePendingAt: r.PurgePendingAt, CreateUnresolved: r.PurgePendingAt == nil && r.CreateFailedAt != nil && keyExpired(r, now),
+		PurgePendingAt: r.PurgePendingAt, CreateUnresolved: createUnresolved(r, now),
 		StoreID: r.StoreID, Provider: r.Provider, ExternalAccountID: r.ExternalAccountID,
 		RequirementCollection: model.RequirementCollection(r.RequirementCollection), Status: model.PaymentAccountStatus(r.Status),
 		TransfersActive: r.TransfersActive, PayoutsActive: r.PayoutsActive, Requirements: r.Requirements, StatusReason: r.StatusReason,
 		FetchedAt: r.FetchedAt, CreateFailedAt: r.CreateFailedAt, PurgeBlockedAt: r.PurgeBlockedAt, PurgeBlockedReason: r.PurgeBlockedReason,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
+}
+
+// createUnresolved 回傳列的建立結果不明而且冪等鍵已過保存期（keyExpired），並且列停在一個等管理員處理的終局：建立失敗（沒有等待清理），或清理的終局（unresolved_creation）。
+// 後台依它決定「重試建立」要不要先確認金流商那邊沒有帳戶、「重試關閉」要不要隱藏（過了保存期同一把鍵不能再重送，只剩刪除對應）。
+func createUnresolved(r store.PaymentAccount, now time.Time) bool {
+	if !keyExpired(r, now) {
+		return false
+	}
+	if r.PurgePendingAt != nil {
+		return r.PurgeBlockedAt != nil && blockedAsUnresolved(r)
+	}
+	return r.CreateFailedAt != nil
+}
+
+// blockedAsUnresolved 回傳清理的終局原因是否為 unresolved_creation（建立結果不明）；那個原因只在沒有外部 ID 時成立。
+func blockedAsUnresolved(r store.PaymentAccount) bool {
+	return r.PurgeBlockedReason != nil && strings.HasPrefix(*r.PurgeBlockedReason, blockUnresolvedCreation)
 }
 
 // Account 讀擁有者的收款帳戶；還沒有（沒有核准過）回 NotFound。
@@ -274,15 +291,36 @@ func (s *Service) markCalled(ctx context.Context, storeID int64) (row store.Paym
 }
 
 // acquire 是建立的第一步：以列的冪等鍵取得外部 ID 並立刻寫進列。呼叫方已確認列還在 UnresolvedDeadline 內（超過的不重送，D63）。
-// stored 為 false 表示列已不需要建立（被並行的清理標記或已刪），ID 沒有寫入（清理會以冪等鍵找回它）。
+// stored 為 false 表示列已不需要建立（被並行的清理標記或已刪），ID 沒有寫入（清理會以冪等鍵找回它）；列上已是同一個 ID（並行的了結先寫入）時 stored 為 true。
 func (s *Service) acquire(ctx context.Context, row store.PaymentAccount) (id string, stored bool, err error) {
-	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
-	defer cancel()
-	if id, err = s.d.Provider.AcquireAccount(callCtx, AcquireInput{StoreID: row.StoreID, IdempotencyKey: row.CreateIdempotencyKey.String()}); err != nil {
+	if id, err = s.callAcquire(ctx, row); err != nil {
 		return "", false, err
 	}
-	stored, err = s.storeExternal(ctx, row.StoreID, id, false)
+	if stored, err = s.storeExternal(ctx, row.StoreID, id, false); err != nil || stored {
+		return id, stored, err
+	}
+	stored, err = s.holdsExternal(ctx, row.StoreID, id)
 	return id, stored, err
+}
+
+// callAcquire 以列的冪等鍵呼叫 provider 取得外部 ID（不寫列）。
+func (s *Service) callAcquire(ctx context.Context, row store.PaymentAccount) (string, error) {
+	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
+	defer cancel()
+	return s.d.Provider.AcquireAccount(callCtx, AcquireInput{StoreID: row.StoreID, IdempotencyKey: row.CreateIdempotencyKey.String()})
+}
+
+// holdsExternal 回傳列上已經存著的外部 ID 是否就是 id 而且列仍需要建立（沒有完成、沒有等待清理）：並行的了結（Resolve）先把同一把鍵取回的 ID 寫進列時，
+// 建立不能因為「寫入被擋下」就停手：同一把鍵得到同一個帳戶，所以繼續做第二步。列已不需要建立或存的是別的 ID 時回 false。
+func (s *Service) holdsExternal(ctx context.Context, storeID int64, id string) (bool, error) {
+	row, err := store.New(s.d.DB.Conn(ctx)).PaymentAccountByStore(ctx, storeID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return row.ExternalAccountID != nil && *row.ExternalAccountID == id && row.CreateCompletedAt == nil && row.PurgePendingAt == nil, nil
 }
 
 // calledWithoutID 回傳列是否「呼叫過、沒有外部 ID、還沒完成建立」：建立結果不明的列。
@@ -348,7 +386,7 @@ func (s *Service) createFailed(ctx context.Context, storeID int64, callErr error
 		}
 		s.d.Logger.WarnContext(ctx, "payment：建立收款帳戶失敗", "store_id", storeID, "permanent", permanent, "error", callErr)
 		now := s.d.Now().UTC()
-		_, err := q.MarkPaymentAccountCreateFailed(ctx, store.MarkPaymentAccountCreateFailedParams{StoreID: storeID, Now: &now})
+		_, err := q.MarkPaymentAccountCreateFailed(ctx, store.MarkPaymentAccountCreateFailedParams{StoreID: storeID, Now: &now, Refused: permanent})
 		return err
 	})
 }
@@ -368,13 +406,14 @@ func (s *Service) Resolve(ctx context.Context, storeID int64, final bool) error 
 	if err != nil {
 		return err
 	}
-	if row.Provider != p.Name() || row.PurgePendingAt != nil || row.CreateCalledAt == nil || row.ExternalAccountID != nil || row.CreateCompletedAt != nil {
+	if row.Provider != p.Name() || row.PurgePendingAt != nil || row.CreateCalledAt == nil || row.ExternalAccountID != nil || row.CreateCompletedAt != nil || row.CreateRefusedAt != nil {
 		return nil
 	}
 	if unresolvedExpired(row, s.d.Now().UTC()) {
 		return s.createFailed(ctx, storeID, fmt.Errorf("%w：建立結果不明，超過 %s 仍沒有取回外部 ID", ErrPermanent, UnresolvedDeadline), final)
 	}
-	if _, _, err := s.acquire(ctx, row); err != nil {
+	id, err := s.callAcquire(ctx, row)
+	if err != nil {
 		switch {
 		case errors.Is(err, ErrPermanent):
 			return s.createFailed(ctx, storeID, err, final)
@@ -382,11 +421,38 @@ func (s *Service) Resolve(ctx context.Context, storeID int64, final bool) error 
 			return err
 		}
 		s.d.Logger.WarnContext(ctx, "payment：取回建立結果不明的外部帳戶失敗，等下一次掃描重排", "store_id", storeID, "error", err)
+		return nil
+	}
+	wctx, cancelWrite := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
+	defer cancelWrite()
+	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
+		return s.storeResolved(ctx, storeID, id)
+	})
+}
+
+// storeResolved 在 transaction 內鎖住列，把重送取回的外部 ID 寫進去：呼叫期間列被標成等待清理就走 replayIntoPurge（ID 寫回、清理接手關閉，D52），
+// 否則寫進沒有等待清理的列；列已不在或已有外部 ID 時什麼都不做。
+func (s *Service) storeResolved(ctx context.Context, storeID int64, id string) error {
+	q := store.New(s.d.DB.Conn(ctx))
+	locked, err := q.LockPaymentAccount(ctx, storeID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	now := s.d.Now().UTC()
+	if locked.PurgePendingAt != nil {
+		return s.replayIntoPurge(ctx, q, locked, id, now)
+	}
+	if _, err := q.SetPaymentAccountExternal(ctx, store.SetPaymentAccountExternalParams{StoreID: storeID, ExternalAccountID: &id, Now: now}); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return err
 	}
 	return nil
 }
 
-// Replay 是管理員在冪等鍵保存期內重試「結果不明、已超過 UnresolvedDeadline」的建立失敗列（D63）：列保持建立失敗（週期掃描因此不會再把它標成終局），
+// Replay 是管理員在冪等鍵保存期內重試「結果不明、已超過 UnresolvedDeadline」的列（D63）：建立失敗的列，或清理終局（unresolved_creation）的列（RetryPurge）；
+// 清理終局的列取回 ID 之後走 replayIntoPurge（清除終局、重設等待清理的時刻、重新排入清理，由清理關閉帳戶，D52）。以下說的是建立失敗的列：列保持建立失敗（週期掃描因此不會再把它標成終局），
 // 以列上同一把鍵重送 AcquireAccount；取回 ID 就在同一個 transaction 寫進列、清空建立失敗並排入建立 job 接續第二步。已呼叫的時刻與鍵都不變。
 // 超過 IdempotencyRetention、列已不是這個狀態時什麼都不做。永久失敗或最後一次嘗試仍失敗只記警示 log，列留在建立失敗，管理員可再重試。
 func (s *Service) Replay(ctx context.Context, storeID int64, final bool) error {
@@ -401,7 +467,7 @@ func (s *Service) Replay(ctx context.Context, storeID int64, final bool) error {
 	if err != nil {
 		return err
 	}
-	if row.Provider != p.Name() || row.PurgePendingAt != nil || row.CreateFailedAt == nil || !calledWithoutID(row) || keyExpired(row, s.d.Now().UTC()) {
+	if row.Provider != p.Name() || !replayable(row) || !calledWithoutID(row) || keyExpired(row, s.d.Now().UTC()) {
 		return nil
 	}
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
@@ -442,6 +508,14 @@ func (s *Service) Replay(ctx context.Context, storeID int64, final bool) error {
 	})
 }
 
+// replayable 回傳列是否停在管理員可以要求以同一把鍵重送的終局：建立失敗（沒有等待清理），或清理的終局且原因是 unresolved_creation。
+func replayable(row store.PaymentAccount) bool {
+	if row.PurgePendingAt != nil {
+		return row.PurgeBlockedAt != nil && blockedAsUnresolved(row)
+	}
+	return row.CreateFailedAt != nil
+}
+
 // replayIntoPurge 處理重送期間列被標成等待清理的情況：取回的 ID 寫回列（SetPaymentAccountExternalForPurge），讓清理走有外部 ID 的路關閉帳戶（D52）；
 // 列已進終局且原因是 unresolved_creation（那個原因只在沒有 ID 時成立）就清除終局、重設等待清理的時刻並重新排入清理，其他原因的終局保持不動。
 func (s *Service) replayIntoPurge(ctx context.Context, q *store.Queries, locked store.PaymentAccount, id string, now time.Time) error {
@@ -452,7 +526,7 @@ func (s *Service) replayIntoPurge(ctx context.Context, q *store.Queries, locked 
 		return err
 	}
 	if locked.PurgeBlockedAt != nil {
-		if reason := locked.PurgeBlockedReason; reason == nil || !strings.HasPrefix(*reason, blockUnresolvedCreation) {
+		if !blockedAsUnresolved(locked) {
 			return nil
 		}
 		if _, err := q.RestartPaymentAccountPurge(ctx, store.RestartPaymentAccountPurgeParams{StoreID: locked.StoreID, Now: now}); err != nil {
@@ -654,8 +728,10 @@ func (s *Service) blockPurge(ctx context.Context, storeID int64, reason string) 
 	return err
 }
 
-// RetryPurge 是管理員的「重試關閉」：只有終局的列可以重試（清除終局、等待清理的時刻重設成現在，並在同一個 transaction 重新排入清理 job、寫一筆後台紀錄，
-// 紀錄說的是「已要求重試」：關閉本身由之後的清理 job 呼叫 provider）。
+// RetryPurge 是管理員的「重試關閉」：只有終局的列可以重試。一般的終局清除終局、等待清理的時刻重設成現在，並在同一個 transaction 重新排入清理 job、寫一筆後台紀錄，
+// 紀錄說的是「已要求重試」：關閉本身由之後的清理 job 呼叫 provider。原因是 unresolved_creation（建立結果不明、沒有外部 ID）的終局看冪等鍵保存期（與 RetryCreate 一致，D63）：
+// 還在保存期內，同一把鍵重送一定回同一個帳戶，列保持終局（掃描不會再把它標成終局），同一個 transaction 排入 Replay job，取回 ID 才清除終局並由清理關閉（見 Replay）；
+// 超過 IdempotencyRetention 同一把鍵不再保證回同一個帳戶，不重送，只能刪除對應。
 func (s *Service) RetryPurge(ctx context.Context, actor adminaudit.Actor, storeID int64) (model.PaymentAccount, error) {
 	if err := model.Positive(storeID); err != nil {
 		return model.PaymentAccount{}, err
@@ -673,13 +749,22 @@ func (s *Service) RetryPurge(ctx context.Context, actor adminaudit.Actor, storeI
 		if locked.PurgeBlockedAt == nil {
 			return apperr.FailedPrecondition("收款帳戶的清理不在無法關閉的狀態")
 		}
-		if reason := locked.PurgeBlockedReason; reason != nil && strings.HasPrefix(*reason, blockUnresolvedCreation) {
-			return apperr.FailedPrecondition("建立結果不明且已超過可向金流商查回的期限，重試關閉不會有結果；請先到金流商後台確認，再刪除對應")
+		now := s.d.Now().UTC()
+		replay := blockedAsUnresolved(locked) && calledWithoutID(locked)
+		if replay && keyExpired(locked, now) {
+			return apperr.FailedPrecondition("建立結果不明且已超過金流商保存冪等鍵的期限（30 天），無法再以同一把鍵向金流商查回；請先到金流商後台確認，再刪除對應")
 		}
-		if out, err = q.RestartPaymentAccountPurge(ctx, store.RestartPaymentAccountPurgeParams{StoreID: storeID, Now: s.d.Now().UTC()}); err != nil {
+		if err := s.audit(ctx, actor, storeID, map[string]any{"outcome": "requested", "blocked_reason": codeOf(locked.PurgeBlockedReason), "replayed_same_key": replay}); err != nil {
 			return err
 		}
-		if err := s.audit(ctx, actor, storeID, map[string]any{"outcome": "requested", "blocked_reason": codeOf(locked.PurgeBlockedReason)}); err != nil {
+		if replay {
+			if err := enqueueReplay(ctx, s.d.Jobs, storeID); err != nil {
+				return err
+			}
+			out = locked
+			return nil
+		}
+		if out, err = q.RestartPaymentAccountPurge(ctx, store.RestartPaymentAccountPurgeParams{StoreID: storeID, Now: now}); err != nil {
 			return err
 		}
 		return enqueuePurge(ctx, s.d.Jobs, storeID)
@@ -722,14 +807,8 @@ func (s *Service) DeleteMapping(ctx context.Context, actor adminaudit.Actor, sto
 // auditTargetType 是後台紀錄裡收款帳戶的對象種類；對象 ID 是店家 ID（擁有者）。
 const auditTargetType = "payment_account"
 
-// errAuditNotConfigured 表示組裝漏了 Deps.Audit：後台寫入沒有紀錄就不成立。
-var errAuditNotConfigured = errors.New("payment：沒有設定後台動作紀錄（Deps.Audit）")
-
 // audit 在呼叫方的 transaction 內寫一筆後台紀錄。
 func (s *Service) audit(ctx context.Context, actor adminaudit.Actor, storeID int64, detail map[string]any) error {
-	if s.d.Audit == nil {
-		return errAuditNotConfigured
-	}
 	return s.d.Audit.Record(ctx, adminaudit.Entry{Actor: actor, TargetType: auditTargetType, TargetID: strconv.FormatInt(storeID, 10), Detail: detail})
 }
 

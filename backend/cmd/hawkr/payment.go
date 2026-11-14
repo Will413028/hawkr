@@ -148,7 +148,7 @@ func (discardJobs) Enqueue(context.Context, river.JobArgs, *river.InsertOpts) er
 // 接過 Stripe sandbox）時 fake 不碰它，只印出提醒，那家店的閘門照該帳戶的狀態。
 func seedPaymentAccounts(ctx context.Context, c *sellerCommand, fake *payment.Fake, storeIDs []int64, out io.Writer) error {
 	jc := discardJobs{}
-	m := payment.New(payment.Deps{DB: c.DB, Events: c.Bus, Jobs: jc, Inbox: newInbox(c.DB, jc, c.Logger), Provider: fake, Owners: c.Owners, Now: time.Now, Logger: c.Logger})
+	m := payment.New(payment.Deps{DB: c.DB, Audit: adminaudit.New(c.DB, time.Now), Events: c.Bus, Jobs: jc, Inbox: newInbox(c.DB, jc, c.Logger), Provider: fake, Owners: c.Owners, Now: time.Now, Logger: c.Logger})
 	for _, id := range storeIDs {
 		if err := c.DB.InTx(ctx, func(ctx context.Context) error { return m.RequestAccount(ctx, id, time.Now().UTC()) }); err != nil {
 			return fmt.Errorf("種子店家 %d 的收款帳戶：%w", id, err)

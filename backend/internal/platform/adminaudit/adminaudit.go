@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -36,8 +37,11 @@ func Migrations() fs.FS {
 	return sub
 }
 
-// MaxDetailBytes 是 detail 序列化後的大小上限（與 schema 的 records_detail_check 一致）。
+// MaxDetailBytes 是 detail 的大小上限，量法只有一種：資料庫存的 jsonb 的文字輸出（octet_length(detail::text)，schema 的 records_detail_check）。
+// jsonb 的文字輸出（鍵排序、冒號與逗號後有空白）與 Go 的 json.Marshal 不同長，Go 端無法精確預測，所以大小只由約束把關，Record 把違反它的錯誤對映成 InvalidInput。
 const MaxDetailBytes = 2048
+
+const detailCheckConstraint = "records_detail_check"
 
 // ErrNoTransaction 表示 Record 在 transaction 外呼叫：紀錄與領域變更必須同一個 transaction。
 var ErrNoTransaction = errors.New("adminaudit: Record must run inside a transaction")
@@ -86,7 +90,7 @@ func New(d *db.DB, now func() time.Time) *Log {
 const insertSQL = `INSERT INTO adminaudit.records (occurred_at, admin_id, action, target_type, target_id, detail)
 VALUES ($1, $2, $3, $4, $5, $6)`
 
-// Record 在呼叫方的 transaction 內寫一筆紀錄；不在 transaction 內回 ErrNoTransaction。欄位不合（管理員 ID 非正、沒有動作、對象種類或 ID 不合、detail 過大）回 InvalidInput，
+// Record 在呼叫方的 transaction 內寫一筆紀錄；不在 transaction 內回 ErrNoTransaction。欄位不合（管理員 ID 非正、沒有動作、對象種類或 ID 不合、detail 超過 MaxDetailBytes）回 InvalidInput，
 // 呼叫方的 transaction 隨之失敗：沒有紀錄的後台寫入不成立。
 func (l *Log) Record(ctx context.Context, e Entry) error {
 	if _, ok := db.TxFrom(ctx); !ok {
@@ -102,10 +106,11 @@ func (l *Log) Record(ctx context.Context, e Entry) error {
 			return apperr.InvalidInput("後台紀錄的 detail 不是有效的 JSON")
 		}
 	}
-	if len(detail) > MaxDetailBytes {
+	_, err := l.db.Conn(ctx).Exec(ctx, insertSQL, l.now().UTC(), e.Actor.AdminID, e.Actor.Action, e.TargetType, e.TargetID, detail)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23514" && pgErr.ConstraintName == detailCheckConstraint {
 		return apperr.InvalidInput("後台紀錄的 detail 超過 %d 位元組", MaxDetailBytes)
 	}
-	_, err := l.db.Conn(ctx).Exec(ctx, insertSQL, l.now().UTC(), e.Actor.AdminID, e.Actor.Action, e.TargetType, e.TargetID, detail)
 	return err
 }
 

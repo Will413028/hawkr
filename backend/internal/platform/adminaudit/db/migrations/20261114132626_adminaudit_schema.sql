@@ -12,7 +12,7 @@ CREATE TABLE "adminaudit"."records" (
   PRIMARY KEY ("id"),
   CONSTRAINT "records_action_check" CHECK ((char_length(action) >= 1) AND (char_length(action) <= 200)),
   CONSTRAINT "records_admin_id_check" CHECK (admin_id > 0),
-  CONSTRAINT "records_detail_check" CHECK ((jsonb_typeof(detail) = 'object'::text) AND (pg_column_size(detail) <= 2048)),
+  CONSTRAINT "records_detail_check" CHECK ((jsonb_typeof(detail) = 'object'::text) AND (octet_length((detail)::text) <= 2048)),
   CONSTRAINT "records_target_id_check" CHECK ((char_length(target_id) >= 1) AND (char_length(target_id) <= 255)),
   CONSTRAINT "records_target_type_check" CHECK (target_type ~ '^[a-z][a-z0-9_]{0,39}$'::text)
 );

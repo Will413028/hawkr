@@ -411,7 +411,7 @@ func TestUnconfiguredProviderWritesNothing(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
-	m := New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: time.Now, Logger: slog.Default()}), Owners: f.owners, Now: time.Now, Logger: slog.Default()})
+	m := New(Deps{DB: f.db, Audit: f.audit, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: time.Now, Logger: slog.Default()}), Owners: f.owners, Now: time.Now, Logger: slog.Default()})
 	must(t, f.db.InTx(ctx, func(ctx context.Context) error { return m.RequestAccount(ctx, 1, f.now) }))
 	if m.Configured() || f.count(t, "SELECT count(*) FROM payment.accounts") != 0 || len(f.jobs.args) != 0 {
 		t.Fatal("沒有 provider 仍寫了列或排了 job")
@@ -967,7 +967,7 @@ func TestOnboardingSessionShapeComesFromTheAccountRowNotTheCurrentConfiguration(
 	client, paths := stripeSessionCalls(t)
 	configured, err := NewStripe(client, CollectionProvider, "pk_test_x")
 	must(t, err)
-	f.module = New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()}), Provider: configured, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.New(slog.NewTextHandler(&f.logs, nil))})
+	f.module = New(Deps{DB: f.db, Audit: f.audit, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()}), Provider: configured, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.New(slog.NewTextHandler(&f.logs, nil))})
 	got, err := f.module.CreateOnboardingSession(ctx, platformRow, "https://web.example.test/ok", "https://web.example.test/again", embedded)
 	must(t, err)
 	if e, ok := got.(StripeEmbeddedSession); !ok || e.ClientSecret == "" || e.PublishableKey != "pk_test_x" {
@@ -975,7 +975,7 @@ func TestOnboardingSessionShapeComesFromTheAccountRowNotTheCurrentConfiguration(
 	}
 	configured, err = NewStripe(client, CollectionPlatform, "pk_test_x")
 	must(t, err)
-	f.module = New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()}), Provider: configured, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.New(slog.NewTextHandler(&f.logs, nil))})
+	f.module = New(Deps{DB: f.db, Audit: f.audit, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()}), Provider: configured, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.New(slog.NewTextHandler(&f.logs, nil))})
 	got, err = f.module.CreateOnboardingSession(ctx, providerRow, "https://web.example.test/ok", "https://web.example.test/again", embedded)
 	must(t, err)
 	if h, ok := got.(HostedSession); !ok || h.URL == "" {
@@ -1134,7 +1134,7 @@ func TestAPurgeThatCannotReachTheProviderForSevenDaysEntersTheTerminalState(t *t
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
-	noProvider := New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()})
+	noProvider := New(Deps{DB: f.db, Audit: f.audit, Events: f.bus, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()})
 
 	// 呼叫過、沒有外部 ID、沒有設定 provider：期限內留著，7 天後進終局。
 	called := f.newStore(t)
@@ -1193,7 +1193,7 @@ func TestPurgeDeletesNeverCalledRowsWithoutAProviderAndKeepsCalledRows(t *testin
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
-	noProvider := New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()})
+	noProvider := New(Deps{DB: f.db, Audit: f.audit, Events: f.bus, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()})
 
 	never := f.newStore(t)
 	must(t, noProvider.PurgeAccount(ctx, never, false))
@@ -1237,7 +1237,7 @@ func TestPurgeKeepsRowsOfAnotherProviderAndWithoutAConfiguredProvider(t *testing
 	if !bytes.Contains(f.logs.Bytes(), []byte("level=WARN")) || !bytes.Contains(f.logs.Bytes(), []byte("store_id="+fmt.Sprint(other))) {
 		t.Fatalf("沒有警示 log：%s", f.logs.String())
 	}
-	noProvider := New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()})
+	noProvider := New(Deps{DB: f.db, Audit: f.audit, Events: f.bus, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()})
 	must(t, noProvider.PurgeAccount(ctx, other, true))
 	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", other) != 1 {
 		t.Fatal("沒有設定 provider 時不該刪列")
@@ -1834,7 +1834,7 @@ func TestSweepWithoutAProviderRequeuesPurgeAndTheRowReachesTheTerminalStateAfter
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
-	noProvider := New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.Default()})
+	noProvider := New(Deps{DB: f.db, Audit: f.audit, Events: f.bus, Jobs: f.jobs, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.Default()})
 
 	called := f.newStore(t)
 	f.fake.FailAcquire(errors.New("down"))
@@ -1968,7 +1968,7 @@ func TestAJobCancelledPastTheDeadlineIsNotRecordedAsDeadlineExceeded(t *testing.
 	log := slog.New(slog.NewTextHandler(&f.logs, nil))
 	clock := func() time.Time { return f.now }
 	// 第二個模組實例要有自己的 inbox：同一個 inbox 登記同一個 provider 的路由兩次會 panic（platform/inbox）。
-	m := New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: clock, Logger: log}), Provider: &cancelOnClose{Fake: f.fake, cancel: cancel}, Owners: f.owners, Now: clock, Logger: log})
+	m := New(Deps{DB: f.db, Audit: f.audit, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: clock, Logger: log}), Provider: &cancelOnClose{Fake: f.fake, cancel: cancel}, Owners: f.owners, Now: clock, Logger: log})
 	if err := m.PurgeAccount(jobCtx, s, false); !errors.Is(err, context.Canceled) {
 		t.Fatalf("err=%v，預期回傳取消的錯誤給 River 重試", err)
 	}
@@ -2284,7 +2284,7 @@ func TestRetryCreateAndRetryPurgeRecordOneRequestedEntryAndRollBackWithTheDomain
 		t.Fatal("重試關閉成功應該恰好一筆紀錄")
 	}
 	// 沒有設定後台紀錄的模組：後台寫入回錯誤、不做領域變更。
-	bare := New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: time.Now, Logger: slog.Default()}), Provider: f.fake, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.Default()})
+	bare := New(Deps{DB: f.db, Audit: f.audit, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: time.Now, Logger: slog.Default()}), Provider: f.fake, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.Default()})
 	stuck := f.newStore(t)
 	f.fake.FailAcquire(ErrPermanent)
 	must(t, f.module.EnsureAccount(ctx, stuck, false))
@@ -2386,5 +2386,152 @@ func TestAReplayThatFindsTheRowMarkedForPurgeKeepsTheIDAndPurgeClosesTheAccount(
 		if !slices.Contains(f.fake.Closes(), id) || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 {
 			t.Fatalf("%s：清理應關閉 %s 並刪列，關閉=%v", c.name, id, f.fake.Closes())
 		}
+	}
+}
+
+// 管理員在冪等鍵保存期內「重試關閉」結果不明的清理終局（K1，D63，與 RetryCreate 一致）：以同一把鍵重送取回 ID，取回後清除終局並由清理關閉帳戶、刪列；
+// 超過保存期不重送，重試關閉被拒絕（只剩刪除對應），create_unresolved 為真讓後台隱藏「重試關閉」。
+// mutation：RetryPurge 對 unresolved_creation 一律拒絕（舊的檢查）→ 期限內的重試回 failed_precondition，失敗；replayable 不認清理終局 → Replay 不取回 ID，列仍 blocked，失敗；
+// RetryPurge 不看 keyExpired → 超過保存期仍排入重送、AcquireKeys 增加，失敗；createUnresolved 不含清理終局 → 超過保存期的 create_unresolved 為假，失敗。
+func TestRetryPurgeOfAnUnresolvedTerminalRowReplaysTheSameKeyWithinTheRetentionAndIsRejectedAfter(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	within, id := f.calledRow(t)
+	past, _ := f.calledRow(t)
+	key := f.key(t, within)
+	f.now = f.now.Add(UnresolvedDeadline).Add(time.Hour)
+	must(t, f.module.PurgeAccount(ctx, within, false))
+	must(t, f.module.PurgeAccount(ctx, past, false))
+	blocked := func(s int64) bool {
+		return f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_blocked_at IS NOT NULL AND purge_blocked_reason LIKE 'unresolved_creation%'", s) == 1
+	}
+	if !blocked(within) || !blocked(past) || f.account(t, within).CreateUnresolved {
+		t.Fatal("7 天後兩列都應該進 unresolved_creation 終局，且還在保存期內 create_unresolved 為假")
+	}
+	a, err := f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), within)
+	must(t, err)
+	if !blocked(within) || a.PurgeBlockedAt == nil {
+		t.Fatal("取回 ID 之前列保持終局（掃描不會再標成終局）")
+	}
+	recs, err := f.audit.List(ctx, adminaudit.Filter{Action: actionRetryPurge, TargetID: fmt.Sprint(within)})
+	must(t, err)
+	if len(recs) != 1 || !strings.Contains(string(recs[0].Detail), `"replayed_same_key": true`) {
+		t.Fatalf("紀錄=%+v，預期一筆 replayed_same_key", recs)
+	}
+	must(t, f.module.ReplayUnresolvedAccount(ctx, within, false))
+	if blocked(within) || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND external_account_id = $2 AND purge_blocked_at IS NULL AND purge_pending_at IS NOT NULL", within, id) != 1 {
+		t.Fatal("取回 ID 後應清除終局、寫入 ID、保持等待清理")
+	}
+	if keys := f.fake.AcquireKeys(); keys[len(keys)-1] != key {
+		t.Fatalf("重送的鍵=%v，預期 %s", keys, key)
+	}
+	must(t, f.module.PurgeAccount(ctx, within, false))
+	if !slices.Contains(f.fake.Closes(), id) || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", within) != 0 {
+		t.Fatalf("清理應關閉 %s 並刪列，關閉=%v", id, f.fake.Closes())
+	}
+	// 超過保存期：拒絕、不重送、不留紀錄、create_unresolved 為真。
+	f.now = f.now.Add(IdempotencyRetention)
+	acquires := len(f.fake.AcquireKeys())
+	if !f.account(t, past).CreateUnresolved {
+		t.Fatal("超過保存期的清理終局 create_unresolved 應為真")
+	}
+	if _, err := f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), past); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("超過保存期 err=%v，預期 failed_precondition", err)
+	}
+	must(t, f.module.ReplayUnresolvedAccount(ctx, past, false))
+	if len(f.fake.AcquireKeys()) != acquires || f.auditCount(t, actionRetryPurge) != 1 {
+		t.Fatal("超過保存期不得重送，被拒絕的重試不留紀錄")
+	}
+}
+
+// 建立（Ensure）取得 ID 時，並行的了結（Resolve，掃描排的）先用同一把鍵取回並寫進同一個 ID：Ensure 的寫入被擋下，但同一把鍵同一個帳戶，要繼續第二步（K3）。
+// mutation：acquire 在寫入被擋下時不看列上是不是同一個 ID（拿掉 holdsExternal）→ Ensure 提早結束，列沒有完成建立，失敗。
+func TestEnsureContinuesToTheSecondStepWhenAConcurrentResolveStoredTheSameID(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s, id := f.calledRow(t)
+	f.fake.OnAcquire = func() { must(t, f.module.ResolveUnresolvedAccount(ctx, s, false)) }
+	must(t, f.module.EnsureAccount(ctx, s, false))
+	a := f.account(t, s)
+	if a.ExternalAccountID == nil || *a.ExternalAccountID != id || a.Status == StatusNotCreated || f.fake.Accounts() != 1 {
+		t.Fatalf("交錯之後=%+v 帳戶數=%d，預期完成建立、同一個帳戶 %s", a, f.fake.Accounts(), id)
+	}
+}
+
+// 了結取回 ID 的呼叫期間列被標成等待清理：ID 不能丟掉，走 replayIntoPurge 寫回並排入清理，清理關閉帳戶（K5，D52）。
+// mutation：Resolve 寫入時不看等待清理（一律 SetPaymentAccountExternal）→ ID 沒寫進列，失敗。
+func TestResolveThatFindsTheRowMarkedForPurgeKeepsTheIDAndPurgeClosesTheAccount(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s, id := f.calledRow(t)
+	f.fake.OnAcquire = func() {
+		_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET purge_pending_at = $2 WHERE store_id = $1", s, f.now)
+		must(t, err)
+	}
+	purges := f.jobs.count(kindPurge)
+	must(t, f.module.ResolveUnresolvedAccount(ctx, s, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND external_account_id = $2", s, id) != 1 || f.jobs.count(kindPurge) != purges+1 {
+		t.Fatalf("取回的 ID 被丟掉或沒有排入清理：清理 job %d→%d", purges, f.jobs.count(kindPurge))
+	}
+	must(t, f.module.PurgeAccount(ctx, s, false))
+	if !slices.Contains(f.fake.Closes(), id) || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 {
+		t.Fatalf("清理應關閉 %s 並刪列，關閉=%v", id, f.fake.Closes())
+	}
+}
+
+// 了結被金流商永久拒絕之後，週期掃描不再為這列重送（K4）；已排入的了結 job 也不送；管理員重試建立照常清除標記、之後掃描又可以了結。
+// mutation：Resolve 的永久失敗不寫 create_refused_at（Refused 固定 false）→ 下一次掃描又排了結 job，失敗；Resolve 不看 create_refused_at → 直接重跑仍送出呼叫，失敗；
+// ClearPaymentAccountCreateFailed 不清 create_refused_at → 重試後掃描仍不選它，失敗（或違反 accounts_create_refused_check）。
+func TestAPermanentRefusalOfAResolveStopsTheSweepReplaysUntilAnAdminRetries(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s, _ := f.calledRow(t)
+	f.now = f.now.Add(createIdleForTest)
+	f.fake.FailAcquire(ErrPermanent)
+	must(t, f.module.ResolveUnresolvedAccount(ctx, s, false))
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND create_failed_at IS NOT NULL AND create_refused_at IS NOT NULL", s) != 1 {
+		t.Fatal("永久拒絕應記建立失敗與 create_refused_at")
+	}
+	acquires, resolves := len(f.fake.AcquireKeys()), f.jobs.count(kindResolve)
+	if _, _, err := f.module.SweepAccounts(ctx); err != nil {
+		t.Fatal(err)
+	}
+	must(t, f.module.ResolveUnresolvedAccount(ctx, s, false))
+	if f.jobs.count(kindResolve) != resolves || len(f.fake.AcquireKeys()) != acquires {
+		t.Fatalf("被拒絕的列又被重送：了結 job %d→%d 取得 %d→%d", resolves, f.jobs.count(kindResolve), acquires, len(f.fake.AcquireKeys()))
+	}
+	if _, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, false); err != nil {
+		t.Fatal(err)
+	}
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND create_failed_at IS NULL AND create_refused_at IS NULL", s) != 1 {
+		t.Fatal("管理員重試建立應清除失敗與拒絕標記")
+	}
+	if _, _, err := f.module.SweepAccounts(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if f.jobs.count(kindResolve) != resolves+1 {
+		t.Fatal("重試之後掃描應該又能了結這列")
+	}
+}
+
+// 重試建立的後台紀錄只在「需要確認而且照做」（換了新鍵）時記 acknowledged_no_provider_account；不需要確認的重試即使帶了旗標也記 false（K9）。
+// mutation：紀錄直接寫呼叫端傳入的旗標 → 這裡記成 true，失敗。
+func TestRetryCreateAuditRecordsTheAcknowledgementOnlyWhenItWasRequiredAndActedOn(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s, _ := f.calledRow(t)
+	f.fake.FailAcquire(ErrPermanent)
+	must(t, f.module.EnsureAccount(ctx, s, true))
+	_, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, true)
+	must(t, err)
+	recs, err := f.audit.List(ctx, adminaudit.Filter{Action: actionRetryCreate, TargetID: fmt.Sprint(s)})
+	must(t, err)
+	if len(recs) != 1 || !strings.Contains(string(recs[0].Detail), `"acknowledged_no_provider_account": false`) || !strings.Contains(string(recs[0].Detail), `"key_rotated": false`) {
+		t.Fatalf("紀錄=%+v", recs)
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -93,7 +94,7 @@ func setup(t *testing.T) *fixture {
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	b := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: q, Now: time.Now, Logger: log})
 	kycMAC := sealtest.MAC(t)
-	sl := seller.New(seller.Deps{KYCMAC: kycMAC, DB: d, Events: bus, Jobs: q, Identity: id, Media: testMedia{}, Orders: noOrders{}, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: q, Now: time.Now, Logger: log})})
+	sl := seller.New(seller.Deps{KYCMAC: kycMAC, DB: d, Events: bus, Jobs: q, Identity: id, Media: testMedia{}, Orders: noOrders{}, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: q, Now: time.Now, Logger: log})})
 	f := &fixture{
 		db: d, identity: id, buyer: b, seller: sl,
 		deletion: accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: b, Seller: sl, Orders: noOrders{}, Now: time.Now}),

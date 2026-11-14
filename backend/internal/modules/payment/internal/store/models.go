@@ -22,6 +22,7 @@ type PaymentAccount struct {
 	StatusReason          *string
 	FetchedAt             *time.Time
 	CreateFailedAt        *time.Time
+	CreateRefusedAt       *time.Time
 	CreateCalledAt        *time.Time
 	CreateCompletedAt     *time.Time
 	CreateIdempotencyKey  uuid.UUID

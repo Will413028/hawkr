@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
@@ -88,7 +89,7 @@ func TestLoggedInProductViewSucceedsWithoutProductServiceAndIsRolledUpLater(t *t
 	sellers := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: accounts, Media: noMedia{}, Orders: noOrders{}, ProductStores: products, Registry: noRegistry{},
 		KYCMAC: kycMAC, Now: clock, Logger: logger,
-		Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger}),
+		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: clock, Logger: logger}),
 	})
 	subscribeSellerViews(bus, sellers)
 

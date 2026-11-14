@@ -23,7 +23,7 @@ CREATE TABLE adminaudit.records (
     CONSTRAINT records_action_check CHECK (char_length(action) BETWEEN 1 AND 200),
     CONSTRAINT records_target_type_check CHECK (target_type ~ '^[a-z][a-z0-9_]{0,39}$'),
     CONSTRAINT records_target_id_check CHECK (char_length(target_id) BETWEEN 1 AND 255),
-    CONSTRAINT records_detail_check CHECK (jsonb_typeof(detail) = 'object' AND pg_column_size(detail) <= 2048)
+    CONSTRAINT records_detail_check CHECK (jsonb_typeof(detail) = 'object' AND octet_length(detail::text) <= 2048)
 );
 CREATE INDEX records_by_admin ON adminaudit.records (admin_id, occurred_at);
 CREATE INDEX records_by_action ON adminaudit.records (action, occurred_at);

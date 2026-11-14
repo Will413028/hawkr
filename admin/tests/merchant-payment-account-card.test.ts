@@ -168,6 +168,24 @@ test("purge_pending_time 與 purge_blocked_time 同時有（進終局）：只�
 	assert.match(html, /重試關閉/);
 });
 
+test("清理終局是 unresolved_creation：冪等鍵保存期內給「重試關閉」，超過保存期（create_unresolved）隱藏它，刪除對應仍在；其他原因的終局不受 create_unresolved 影響", () => {
+	const blocked = (reason: string, createUnresolved: boolean) =>
+		render({
+			state: "ready",
+			account: account({
+				purgeBlockedTime: timestampFromDate(new Date("2026-11-14T02:00:00Z")),
+				purgeBlockedReason: reason,
+				createUnresolved,
+			}),
+		});
+	const within = blocked("unresolved_creation：建立結果不明", false);
+	assert.match(within, /重試關閉/);
+	const past = blocked("unresolved_creation：建立結果不明", true);
+	assert.doesNotMatch(past, /重試關閉/);
+	assert.match(past, /已在金流商處理，刪除對應/);
+	assert.match(blocked("provider_refused：no", true), /重試關閉/);
+});
+
 test("轉帳與撥款能力分別顯示", () => {
 	const html = render({
 		state: "ready",

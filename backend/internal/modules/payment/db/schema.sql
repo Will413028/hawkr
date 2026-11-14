@@ -22,11 +22,13 @@ CREATE SCHEMA payment;
 -- status 是中立的五個狀態，由轉帳能力的狀態與 status_details 推導；transfers_active 與 payouts_active 是外部帳戶的能力是否啟用（seller 的開通閘門讀
 -- 經 PayoutAccountChanged 複製的 transfers_active；ENABLED 等於 transfers_active）。requirements 是快照的原始內容，status_reason 是導出目前狀態的金流商原因碼（只給後台；外部帳戶已在金流商關閉時是 closed，終局，不再輪詢，D61）。
 -- create_failed_at 是建立重試用完的時刻（只有還沒完成建立的列才有；後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED 的開始時間，重試建立時清空）。
+-- create_refused_at 是建立失敗是「金流商明確拒絕（永久失敗）」時的標記（與 create_failed_at 同時寫、同時清；重試用完的暫時性失敗沒有它）：呼叫過、沒有外部 ID 的列有它時，週期掃描不再以同一把鍵重送
+-- （重送只會再被拒絕），管理員重試建立與重試關閉不看它。
 -- seller_read_claimed_at 是上次賣家觸發的讀取被受理的時刻（含失敗與並行的；條件式 UPDATE 搶名額），同步 job 不讀寫。
 -- purge_pending_at 是擁有者的清理已要求、還沒完成的時刻，與有沒有外部 ID 無關（清理 job 呼叫 provider 之前先標；刪列之前一直在）：本地列留著（保住 store_id 與外部 ID 或冪等鍵的對應），
 -- 不被建立、不進同步輪詢、不被賣家／管理員的重新整理讀，由 payment 的週期掃描重排「關閉後刪除」，關閉（沒有外部 ID 的列先以冪等鍵取得外部帳戶）成功才刪列。
 -- purge_blocked_at 與 purge_blocked_reason 是清理的終局（D59、D60）：關閉被金流商拒絕、或標成等待清理後 7 天仍然關不掉或問不到金流商；列留著，不再被週期掃描重排，
--- 出現在後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK，由管理員「重試關閉」（清除終局並重新計算期限；原因是 unresolved_creation 的不能重試）或「已在金流商處理，刪除對應」（同一個 transaction 寫一筆 adminaudit 的後台紀錄並刪列，D62）。
+-- 出現在後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK，由管理員「重試關閉」（清除終局並重新計算期限；原因是 unresolved_creation 的，冪等鍵保存期內以同一把鍵重送取回 ID 再關閉，超過保存期不能重試）或「已在金流商處理，刪除對應」（同一個 transaction 寫一筆 adminaudit 的後台紀錄並刪列，D62）。
 -- create_idempotency_key 是寫入「建立中」的列時產生的隨機 UUID（v4），建立外部帳戶的每次重試都用它當冪等鍵（Stripe 建議每個邏輯請求用隨機 UUID；
 -- 不用 store_id，兩個資料庫共用同一個 Stripe 帳號時才不會撞到別人的帳戶）。同一個理由，建立外部帳戶時除了 metadata.store_id 還寫 metadata.hawkr_namespace
 -- （設定 STRIPE_ACCOUNT_NAMESPACE，每個環境不同，D61）；程式不以 metadata 列出對帳（D63），寫它是為了之後要做全平台孤兒帳戶稽核時不必回填。
@@ -42,6 +44,7 @@ CREATE TABLE payment.accounts (
     status_reason          TEXT,
     fetched_at             TIMESTAMPTZ,
     create_failed_at       TIMESTAMPTZ,
+    create_refused_at      TIMESTAMPTZ,
     create_called_at       TIMESTAMPTZ,
     create_completed_at    TIMESTAMPTZ,
     create_idempotency_key UUID        NOT NULL DEFAULT gen_random_uuid(),
@@ -62,6 +65,7 @@ CREATE TABLE payment.accounts (
     CONSTRAINT accounts_requirements_check CHECK (jsonb_typeof(requirements) = 'object'),
     CONSTRAINT accounts_status_reason_check CHECK (status_reason IS NULL OR char_length(status_reason) BETWEEN 1 AND 200),
     CONSTRAINT accounts_create_failed_check CHECK (create_failed_at IS NULL OR create_completed_at IS NULL),
+    CONSTRAINT accounts_create_refused_check CHECK (create_refused_at IS NULL OR create_failed_at IS NOT NULL),
     CONSTRAINT accounts_completed_check CHECK (create_completed_at IS NULL OR external_account_id IS NOT NULL),
     CONSTRAINT accounts_called_check CHECK (external_account_id IS NULL OR create_called_at IS NOT NULL),
     CONSTRAINT accounts_purge_blocked_check CHECK ((purge_blocked_at IS NULL) = (purge_blocked_reason IS NULL) AND (purge_blocked_at IS NULL OR purge_pending_at IS NOT NULL)),
@@ -71,4 +75,5 @@ CREATE UNIQUE INDEX accounts_external ON payment.accounts (provider, external_ac
 CREATE INDEX accounts_poll ON payment.accounts (store_id) WHERE status IN ('UNDER_REVIEW', 'ACTION_REQUIRED', 'DISABLED');
 CREATE INDEX accounts_create_failed ON payment.accounts (create_failed_at) WHERE create_failed_at IS NOT NULL;
 CREATE INDEX accounts_purge_pending ON payment.accounts (store_id) WHERE purge_pending_at IS NOT NULL AND purge_blocked_at IS NULL;
+CREATE INDEX accounts_unresolved ON payment.accounts (store_id) WHERE external_account_id IS NULL AND create_called_at IS NOT NULL AND create_completed_at IS NULL AND purge_pending_at IS NULL AND create_refused_at IS NULL;
 CREATE INDEX accounts_purge_blocked ON payment.accounts (purge_blocked_at) WHERE purge_blocked_at IS NOT NULL;

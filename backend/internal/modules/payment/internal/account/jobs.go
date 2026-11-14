@@ -223,7 +223,7 @@ func (w *purgeWorker) Work(ctx context.Context, job *river.Job[PurgeArgs]) error
 // Timeout 是一次清理的時間上限：一次關閉呼叫加資料庫。
 func (w *purgeWorker) Timeout(*river.Job[PurgeArgs]) time.Duration { return jobTimeout }
 
-// Sweep 是 payment 自己的輪詢補漏（D29 的補掃分工：platform 只重派沒有派送成功的 inbox 列），各自分批、各批一個 transaction：
+// Sweep 是 payment 自己的輪詢補漏（D29 的補掃分工：platform 只重派沒有派送成功的 inbox 列），各自分批（排入 job 時每個帳戶一個 transaction）：
 //   - 狀態：UNDER_REVIEW、ACTION_REQUIRED、原因碼不是 rejected*／unsupported* 的 DISABLED 帳戶排同步（掉了 webhook 時的保底，DISABLED 可能被解除）；
 //   - 事件：inbox 有超過 eventGrace 還沒處理的事件的帳戶排同步（任何狀態）；
 //   - 清理：等待清理的帳戶（purge_pending_at，不進上面兩種同步）重排「關閉後刪除」job（進了終局 purge_blocked_at 的不重排，它們在後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK 等管理員處理）；
@@ -306,37 +306,28 @@ func (s *Service) Sweep(ctx context.Context) (synced, ensured int, err error) {
 	}
 }
 
-// sweepUnresolved 為「呼叫過、沒有外部 ID」的非清理列排入了結 job（D63），不看擁有者是否營運中，分批、各批一個 transaction。
+// sweepUnresolved 為「呼叫過、沒有外部 ID」的非清理列排入了結 job（D63），不看擁有者是否營運中。
 func (s *Service) sweepUnresolved(ctx context.Context) error {
-	var after int64
-	for {
-		ids, err := s.unresolved(ctx, after)
-		if err != nil {
-			return err
-		}
-		for _, id := range ids {
-			after = id
-			if err := s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueueResolve(ctx, s.d.Jobs, id) }); err != nil {
-				return err
-			}
-		}
-		if len(ids) < sweepBatch {
-			return nil
-		}
-	}
+	return s.enqueueAll(ctx, s.unresolved, enqueueResolve)
 }
 
-// sweepPurge 為等待清理、沒有進終局的帳戶重排「關閉後刪除」job，分批、各批一個 transaction。
+// sweepPurge 為等待清理、沒有進終局的帳戶重排「關閉後刪除」job。
 func (s *Service) sweepPurge(ctx context.Context) error {
+	return s.enqueueAll(ctx, s.purgePending, enqueuePurge)
+}
+
+// enqueueAll 依 store_id 分批讀出 list 選到的帳戶，每個帳戶在自己的 transaction 內排入一個 job（每個 ID 一個 transaction，不是每批一個：
+// 一個 ID 排入失敗不會回滾同批已排入的，已排入的由 job 的唯一鍵保護，下一次掃描對沒排成的再來一次）。
+func (s *Service) enqueueAll(ctx context.Context, list func(ctx context.Context, after int64) ([]int64, error), enqueue func(context.Context, jobs.Enqueuer, int64) error) error {
 	var after int64
 	for {
-		ids, err := s.purgePending(ctx, after)
+		ids, err := list(ctx, after)
 		if err != nil {
 			return err
 		}
 		for _, id := range ids {
 			after = id
-			if err := s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueuePurge(ctx, s.d.Jobs, id) }); err != nil {
+			if err := s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueue(ctx, s.d.Jobs, id) }); err != nil {
 				return err
 			}
 		}
