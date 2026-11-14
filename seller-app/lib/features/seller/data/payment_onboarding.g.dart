@@ -111,7 +111,8 @@ String _$externalBrowserLauncherHash() =>
 
 /// 收款帳戶的開通與自動重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
 /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面
-/// 還在都會以 `fresh: true` 重讀一次（畫面各自的回前景重讀走 [onResumed]，不會重複消耗記號）。
+/// 還在都會以 `fresh: true` 重讀一次。回前景的觸發只有這裡一個：畫面用 [watchForeground] 登記「我在前景時要重讀」，
+/// 一次回前景最多呼叫一次 [onResumed]。
 ///
 /// `RefreshMyPaymentAccount` 是背景動作：失敗（含 `resource_exhausted`、停權的 `permission_denied`）不顯示，也不擋讀開通摘要。
 
@@ -120,14 +121,16 @@ final paymentOnboardingProvider = PaymentOnboardingProvider._();
 
 /// 收款帳戶的開通與自動重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
 /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面
-/// 還在都會以 `fresh: true` 重讀一次（畫面各自的回前景重讀走 [onResumed]，不會重複消耗記號）。
+/// 還在都會以 `fresh: true` 重讀一次。回前景的觸發只有這裡一個：畫面用 [watchForeground] 登記「我在前景時要重讀」，
+/// 一次回前景最多呼叫一次 [onResumed]。
 ///
 /// `RefreshMyPaymentAccount` 是背景動作：失敗（含 `resource_exhausted`、停權的 `permission_denied`）不顯示，也不擋讀開通摘要。
 final class PaymentOnboardingProvider
     extends $NotifierProvider<PaymentOnboarding, void> {
   /// 收款帳戶的開通與自動重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
   /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面
-  /// 還在都會以 `fresh: true` 重讀一次（畫面各自的回前景重讀走 [onResumed]，不會重複消耗記號）。
+  /// 還在都會以 `fresh: true` 重讀一次。回前景的觸發只有這裡一個：畫面用 [watchForeground] 登記「我在前景時要重讀」，
+  /// 一次回前景最多呼叫一次 [onResumed]。
   ///
   /// `RefreshMyPaymentAccount` 是背景動作：失敗（含 `resource_exhausted`、停權的 `permission_denied`）不顯示，也不擋讀開通摘要。
   PaymentOnboardingProvider._()
@@ -157,11 +160,12 @@ final class PaymentOnboardingProvider
   }
 }
 
-String _$paymentOnboardingHash() => r'7d2effc3901245fdb2c0199356ffb7e191d94904';
+String _$paymentOnboardingHash() => r'719555cb6445efa17d4b49fe68b95798345adceb';
 
 /// 收款帳戶的開通與自動重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
 /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面
-/// 還在都會以 `fresh: true` 重讀一次（畫面各自的回前景重讀走 [onResumed]，不會重複消耗記號）。
+/// 還在都會以 `fresh: true` 重讀一次。回前景的觸發只有這裡一個：畫面用 [watchForeground] 登記「我在前景時要重讀」，
+/// 一次回前景最多呼叫一次 [onResumed]。
 ///
 /// `RefreshMyPaymentAccount` 是背景動作：失敗（含 `resource_exhausted`、停權的 `permission_denied`）不顯示，也不擋讀開通摘要。
 
