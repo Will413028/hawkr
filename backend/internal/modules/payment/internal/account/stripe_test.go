@@ -188,30 +188,6 @@ func TestStripeAcquireAccountSendsTheGivenKeyAndAFixedBodyOnEveryAttempt(t *test
 	}
 }
 
-// fixtureStoreIDs 讀 fixture 裡每個帳戶 metadata.store_id（整數的）。
-func fixtureStoreIDs(t *testing.T, names ...string) []int64 {
-	t.Helper()
-	var out []int64
-	for _, name := range names {
-		rec := httptest.NewRecorder()
-		fixtureResponder(t, name)(rec, nil)
-		var b struct {
-			Data []struct {
-				Metadata map[string]string `json:"metadata"`
-			} `json:"data"`
-		}
-		if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil {
-			t.Fatal(err)
-		}
-		for _, a := range b.Data {
-			if id, err := strconv.ParseInt(a.Metadata["store_id"], 10, 64); err == nil {
-				out = append(out, id)
-			}
-		}
-	}
-	return out
-}
-
 // 已在 Stripe 關閉的帳戶：FetchAccount 回 Closed 的快照，只讀帳戶一次，不讀銀行帳號、不當成錯誤。
 func TestStripeFetchAccountOfAClosedAccountReturnsClosedWithoutReadingBankAccounts(t *testing.T) {
 	var paths []string

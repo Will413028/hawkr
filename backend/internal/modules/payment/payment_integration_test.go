@@ -1185,13 +1185,6 @@ func (f *fixture) calledRow(t *testing.T) (storeID int64, providerID string) {
 	return storeID, ids[0]
 }
 
-func deadlineCtx(t *testing.T) context.Context {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	t.Cleanup(cancel)
-	return ctx
-}
-
 // 從沒呼叫過 provider 的列（建立 job 還沒跑、沒有「已呼叫」時刻）清理時直接刪，不需要 provider（D59）：有設定 provider 與沒有設定都不呼叫它；呼叫過的列（結果不明）不直接刪，
 // 沒有 provider 可用時留著。
 // mutation 1：建立不寫「已呼叫」時刻（markCalled 不寫）→ 呼叫過的列也被直接刪，「呼叫過的不被刪」失敗；mutation 2：從沒呼叫過的列也走 provider（planPurge 只看外部 ID）→
