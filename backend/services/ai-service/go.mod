@@ -1,6 +1,6 @@
 module github.com/Will413028/hawkr/ai-service
 
-go 1.27.1
+go 1.27.4
 
 require (
 	github.com/Will413028/hawkr/go-pkg v0.0.0

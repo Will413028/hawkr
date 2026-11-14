@@ -1,6 +1,6 @@
 module github.com/Will413028/hawkr/notification-service
 
-go 1.27.1
+go 1.27.4
 
 require (
 	firebase.google.com/go/v4 v4.19.0

@@ -1,6 +1,6 @@
 module github.com/Will413028/hawkr/go-pkg
 
-go 1.27.1
+go 1.27.4
 
 require (
 	github.com/alicebob/miniredis/v2 v2.38.0
