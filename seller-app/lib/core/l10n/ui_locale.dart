@@ -15,6 +15,10 @@ final uiLocaleProvider = Provider<UiLocale>(
   ),
 );
 
+/// Connect 的 `Accept-Language` 值：App 目前的 UI 語系標籤，每次送出時讀。
+String Function() uiLocaleTag(Ref ref) =>
+    () => ref.read(uiLocaleProvider).tag;
+
 /// widget 取目前的 UI 語系；repository 與 controller 沒有 [BuildContext]，用 `ref.read(uiLocaleProvider)`。
 extension UiLocaleOf on BuildContext {
   UiLocale get uiLocale =>

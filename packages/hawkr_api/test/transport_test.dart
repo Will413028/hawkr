@@ -96,6 +96,57 @@ void main() {
     });
   });
 
+  group('acceptLanguageInterceptor', () {
+    test('送出的 Accept-Language 等於目前語系，單一值、沒有 q 值，語系改變後下一次送出跟著變', () async {
+      var tag = 'zh-TW';
+      final seen = <String?>[];
+      final client = _client((req, ctx) {
+        seen.add(ctx.requestHeaders['accept-language']);
+        return CheckAppVersionResponse();
+      }, [acceptLanguageInterceptor(() => tag)]);
+
+      await client.checkAppVersion(
+        CheckAppVersionRequest(clientVersion: '1.0.0'),
+      );
+      tag = 'en';
+      await client.checkAppVersion(
+        CheckAppVersionRequest(clientVersion: '1.0.0'),
+      );
+
+      expect(seen, ['zh-TW', 'en']);
+      for (final v in seen) {
+        expect(v, isNot(contains(',')));
+        expect(v, isNot(contains(';')));
+      }
+    });
+
+    test('appInterceptors 給了 acceptLanguage 才帶這個 header', () async {
+      Headers? seen;
+      Future<void> call(String Function()? acceptLanguage) async {
+        final client = _client(
+          (req, ctx) {
+            seen = ctx.requestHeaders;
+            return CheckAppVersionResponse();
+          },
+          appInterceptors(
+            timeout: const Duration(seconds: 5),
+            report: (error, context) {},
+            headers: () => const {},
+            acceptLanguage: acceptLanguage,
+          ),
+        );
+        await client.checkAppVersion(
+          CheckAppVersionRequest(clientVersion: '1.0.0'),
+        );
+      }
+
+      await call(() => 'en');
+      expect(seen!['accept-language'], 'en');
+      await call(null);
+      expect(seen!.contains('accept-language'), isFalse);
+    });
+  });
+
   group('timeoutInterceptor', () {
     // fake transport 不會因為 signal 中止，handler 自己等 signal，模擬真的 transport。
     Future<CheckAppVersionResponse> hang(

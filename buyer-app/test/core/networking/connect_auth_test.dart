@@ -18,6 +18,8 @@ import 'package:hawkr_buyer/core/session/force_logout_provider.dart';
 import 'package:hawkr_buyer/core/session/session_model.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
+import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -95,6 +97,35 @@ Future<({List<Headers> seen, ProviderContainer c})> _call(
 }
 
 void main() {
+  test('實際 provider 接線：Connect 請求帶 App 目前的 UI 語系，單一值', () async {
+    if (!F.isInitialized) F.init(Flavor.dev);
+    Future<String?> sent(UiLocale locale) async {
+      String? header;
+      final c = ProviderContainer(
+        overrides: [
+          uiLocaleProvider.overrideWithValue(locale),
+          connectHttpClientProvider.overrideWithValue((request) async {
+            header = request.header['accept-language'];
+            return HttpResponse(
+              200,
+              Headers()..['content-type'] = 'application/json',
+              Stream.value(Uint8List.fromList(utf8.encode('{}'))),
+              Headers(),
+            );
+          }),
+        ],
+      );
+      addTearDown(c.dispose);
+      await ContentPublicServiceClient(
+        c.read(connectTransportProvider),
+      ).checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0'));
+      return header;
+    }
+
+    expect(await sent(UiLocale.zhTW), 'zh-TW');
+    expect(await sent(UiLocale.en), 'en');
+  });
+
   test('實際 provider 接線：bootstrap 可取帳號，其餘未恢復請求不帶 Bearer', () async {
     if (!F.isInitialized) F.init(Flavor.dev);
     final seen = <String?>[];
@@ -270,7 +301,8 @@ void main() {
 
       final r = await _call(
         _session,
-        interceptors: (auth) => connectInterceptors(auth: auth),
+        interceptors: (auth) =>
+            connectInterceptors(acceptLanguage: () => 'zh-TW', auth: auth),
       );
 
       expect(r.seen.single['x-active-role'], isNull);
