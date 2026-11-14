@@ -235,6 +235,6 @@ KYC 認證與 PayUni 子商店從 seller-service 搬進 seller 模組。舊實�
 - **身分比對 hash（W8）**不變：措施擁有的快照不受清理影響，保留到終止撤銷為止。
 - **還沒做、列為上線的阻擋條件**（計畫書 `2026-09-29-a3-buyer-seller.md` 的 I-legal 項）：(1) 四份法律文字（隱私權政策、賣家身分認證告知事項、食品業者登錄告知事項、賣家合作條款附件）仍寫「關店後 30 天」，依 rb §4 法律文字在 I-legal 改，本刀不改；現在程式保存 6 個月而公告寫 30 天，系統未上線所以沒有讀者受影響；(2) identity（註冊與登入資料、連線紀錄）與買家的保存期（Q4 (a)）是獨立的上線前步驟，本刀不碰：帳號刪除現在立刻清 identity 資料；(3) 新資料類別（詢問的說明與回覆、主管機關對轉報的回覆、來函的摘要與對象）的保存期（設計 B31）。
 
-## 修訂：pricebook 刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D1；計畫 `plans/2026-10-27-ecommerce-scope-cut.md` 步驟 6）
+## 修訂：pricebook 刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D1；計畫 `2026-10-27-ecommerce-scope-cut` 步驟 6，計畫已刪除，見 `2026-10-27-general-ecommerce-scope-cut` 文末修訂）
 
 relay 轉 `seller.deleted` 的消費者不再包含 pricebook（`pricebook.seller.deleted` queue 已從 topology 刪除）。

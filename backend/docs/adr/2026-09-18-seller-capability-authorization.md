@@ -123,7 +123,7 @@ Gateway 零顯式入口的 5 條 ai-service HTTP 端點（recommend×3、chat×2
 
 **觸發。** PayUni sandbox 確認 C2C 與宅配可在審核中建店時，`SHIPPING_SETUP` 的條件放寬成「PayUni 已註冊」（只改伺服器）；優惠券、金流若有前置條件同樣加進能力。
 
-## 修訂：pricebook 刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D1；計畫 `plans/2026-10-27-ecommerce-scope-cut.md` 步驟 6）
+## 修訂：pricebook 刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D1；計畫 `2026-10-27-ecommerce-scope-cut` 步驟 6，計畫已刪除，見 `2026-10-27-general-ecommerce-scope-cut` 文末修訂）
 
 D8（賣家 pricebook 市場行情端點的歸屬）作廢：這些端點隨 pricebook 刪除，`CAP_MARKETING` 的其餘宣告不變。
 

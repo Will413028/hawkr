@@ -695,7 +695,7 @@
 	);
 	/* Neutral blue-grey surface ladder around brand-ink (#1f2933), lightest last:
 	   page < muted < card < panel < elevated. Opaque so text contrast is
-	   deterministic (scripts: backend/docs/plans/2026-10-24-portfolio-public/contrast.py). */
+	   deterministic (scripts: website/scripts/contrast.py). */
 	--theme-surface-muted: var(--color-dark-muted);
 	--theme-surface-card: var(--color-ink-850);
 	--theme-surface-panel: var(--color-dark-panel);

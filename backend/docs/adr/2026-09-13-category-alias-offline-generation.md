@@ -84,6 +84,6 @@
 
 來源：`backend/docs/superpowers/specs/2026-09-13-category-alias-generation-design.md`（私人封存）、`backend/docs/superpowers/plans/2026-09-13-category-alias-generation.md`（私人封存）。
 
-## 修訂：pricebook 刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D1；計畫 `plans/2026-10-27-ecommerce-scope-cut.md` 步驟 6）
+## 修訂：pricebook 刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D1；計畫 `2026-10-27-ecommerce-scope-cut` 步驟 6，計畫已刪除，見 `2026-10-27-general-ecommerce-scope-cut` 文末修訂）
 
 繼承與比較表裡的 pricebook（`reference/README.md`、crop 映射、`MAPPING_SEED_CSV_PATH`）已隨 `services/pricebook-service` 刪除。分類別名的離線生成只服務分類樹檢索，不受影響。

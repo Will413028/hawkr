@@ -25,7 +25,6 @@
 - `backend/gateway/`
 - `backend/pkg/`
 - `backend/docs/詳細設計書/`
-- `backend/docs/plans/2026-10-24-portfolio-public.md`、`backend/docs/plans/2026-10-24-portfolio-public/`（已完成的計畫，引用已刪的腳本；計畫步驟 1b 刪除）
 
 ## 過渡基準
 

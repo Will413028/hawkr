@@ -5,7 +5,7 @@
 | 狀態 | accepted |
 | 日期 | 2026-10-27（Will 決定） |
 | 影響範圍 | pricebook-service、ai-service（採購的價格依據）、seller 模組（食品業者登錄、FDA 轉報）、content 模組（食譜）、Java shipping 的 Uber、website、admin、兩支 App |
-| 執行計畫 | `docs/plans/2026-10-27-ecommerce-scope-cut.md` |
+| 執行計畫 | `2026-10-27-ecommerce-scope-cut`（計畫已刪除，見文末修訂） |
 
 ## 脈絡
 
@@ -57,3 +57,14 @@
 | `2026-10-02-seller-kyc-payuni-in-monolith`、`2026-09-24-go-modular-monolith`、`2026-09-18-seller-capability-authorization`、`2026-09-29-seller-suspension-and-business-identity-in-monolith`、`2026-10-03-vendor-portal-invite-scoped-access`、`2026-09-13-category-alias-offline-generation` | 修訂段（pricebook 刪除） | D1 |
 | `2026-09-06-fulfillment-docs-split-into-six`、`2026-09-11-logistics-finance-domain-ownership`、`2026-09-11-logistics-amount-semantics-separation`、`2026-09-11-channel-fee-grossup-in-adapter`、`2026-09-12-inbound-payload-raw-bytes`、`2026-09-12-return-leg-classifier-canonical`、`2026-09-11-uber-logistics-fee-charge-trigger`、`2026-09-14-uber-create-idempotency-precommit-key` | 註記（設計書 66 的 Uber 決定刪除） | D4 |
 | `2026-09-11-uber-commerce-model-seller-direct`、`2026-09-11-uber-logistics-fee-charge-trigger`、`2026-09-14-uber-create-idempotency-precommit-key`、`2026-09-06-uber-webhook-slice-in-payuni-webhook-service` | 待標 superseded：Java 的 Uber 程式還在，等主計畫 B3 刪除時一起標（`docs/plans/2026-09-24-go-modular-monolith.md` B3） | D4、D5 |
+
+## 修訂：計畫的後續決定併入、計畫已刪除（2026-11-15，原決定日期與決定者見各項）
+
+執行計畫 `2026-10-27-ecommerce-scope-cut` 與附件 `inventory.sh` 依「完成的計畫不留在 repo」的決定在 2026-11-15 刪除，git 歷史是紀錄。D1–D5 已在本檔；計畫的 D6–D9 在計畫裡才有，以下照計畫轉記（計畫未記的不補）。D1–D5 的結論不變；D9 改的是 D5 過渡期做法的承接位置（見該項）。延後項的位置與觸發條件已在 `2026-09-24-go-modular-monolith` 計畫的 A4、A9、B1、B3、B4、B6 與階段 C；ADR 取代與修訂的對照見上表。
+
+- **D6 步驟 5 不量改動前的基線**（Will 2026-10-28）：採購品項解析改用分類樹召回後，不量改動前的解析品質；離線評測用本機種子分類樹（33 節點），golden set 依新行為重寫。理由：完整分類樹只在舊公司資料庫，本機與 repo 沒有（`category_tree_snapshot.json` 沒有父子關係），pricebook 也沒有本機資料，量不到基線；改成一般電商後生鮮大分類樹沒有保留價值。計畫的停止條件：離線評測上解析不出任何分類的查詢超過全部的三分之一，表示分類樹不夠當品項來源，回報 Will 再決定。完成時離線評測 precision@1 為 0.939（31/33）。未選方案：計畫未記。
+- **D7 下游快照與核准表的行情欄位一起刪**（Will 2026-10-28，2026-10-29 修訂）：確認快照與發布核准表的行情欄位與發布阻擋一起刪，是 D2「報價只看供應商報的價」的直接結果。`quality_knowledge_state` 原決定保留；設計審查發現所有寫入點都寫死 `BUYER_QUALITY_UNKNOWN`、拿掉 pricebook 後沒有程式會產生第二個值，Will 在 2026-10-29 改成一起刪（migration `20261028164119_drop_quality_knowledge_state`）。
+- **D8 買家端結帳原樣回傳 `deliveryTemp`**（Will 2026-10-28）：步驟 7 的買家端結帳不送固定常溫值，原樣回傳伺服器配送選項的 `deliveryTemp`。理由：Java 以它查運費、材積上限、免運與運費負擔，且不檢查它是否屬於商品自己的配送方式，寫死常溫會讓冷藏、冷凍商品算錯。Java 組好的配送選項名稱含溫層字樣（例如「黑貓宅急便（常溫）」），client 不改寫，隨主計畫 B4 處理；購物車與結帳契約裡的溫層欄位隨 B6 處理。未選：D5 原寫的固定常溫值（會算錯運費）。
+- **D9 賣家端的溫層舊要求由 gateway 雙向承接**（Will 2026-10-29）：賣家端請求的 `temperature`、超商 `goodsType` 由 gateway 一律補常溫（`backend/gateway/internal/handler/shipping_ambient.go`）；賣家端回應（運費試算選項、物流開通與配送方式清單）只回常溫列且不帶溫層欄位；匯入預覽只拿掉溫層欄位、不過濾列。CSV 匯入的溫層欄位由 Java 解析（`CsvParseService.java:478-499`），賣家仍可能存進冷藏或冷凍，隨 B4 決定。這取代 D5 寫的「client 在過渡期送固定的常溫值」：改由 gateway 承接，client 不再有常溫常數。理由：gateway 是我們擁有的轉接層，client 契約一開始就是最終形狀，B4 只刪 gateway 一處，App 不必發版。買家結帳仍照 D8。未選：每個 client 一個常溫常數（計畫原步驟 7 的做法，website 與 seller-app 的常數檔已刪）。
+
+計畫的規模、步驟、各步驗收與審查紀錄不再保存。

@@ -40,7 +40,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-DEFAULT_ROOT = Path(__file__).resolve().parents[4]
+DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def tracked_files(root: Path, directory: str, pattern: str = "*") -> list[Path]:
