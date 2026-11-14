@@ -22,6 +22,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # msw 3 mocks at the socket layer, below website's hermetic network guard; needs a guard redesign first.
+      - dependency-name: "msw"
+        update-types: ["version-update:semver-major"]
     cooldown:
       default-days: 14
       semver-major-days: 30
