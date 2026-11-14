@@ -144,7 +144,7 @@ func requestOutcome(row store.PaymentAccount) (enqueue bool, err error) {
 // ToModel 轉成對外的型別。
 func ToModel(r store.PaymentAccount, now time.Time) model.PaymentAccount {
 	return model.PaymentAccount{
-		PurgePendingAt: r.PurgePendingAt, CreateUnresolved: r.PurgePendingAt == nil && r.CreateFailedAt != nil && unresolvedExpired(r, now),
+		PurgePendingAt: r.PurgePendingAt, CreateUnresolved: r.PurgePendingAt == nil && r.CreateFailedAt != nil && keyExpired(r, now),
 		StoreID: r.StoreID, Provider: r.Provider, ExternalAccountID: r.ExternalAccountID,
 		RequirementCollection: model.RequirementCollection(r.RequirementCollection), Status: model.PaymentAccountStatus(r.Status),
 		TransfersActive: r.TransfersActive, PayoutsActive: r.PayoutsActive, Requirements: r.Requirements, StatusReason: r.StatusReason,
@@ -285,9 +285,21 @@ func (s *Service) acquire(ctx context.Context, row store.PaymentAccount) (id str
 	return id, stored, err
 }
 
-// unresolvedExpired 回傳列是否「呼叫過、沒有外部 ID、還沒完成建立」而且已超過 UnresolvedDeadline：這種列不再重送（終局，D63）。
+// calledWithoutID 回傳列是否「呼叫過、沒有外部 ID、還沒完成建立」：建立結果不明的列。
+func calledWithoutID(row store.PaymentAccount) bool {
+	return row.ExternalAccountID == nil && row.CreateCompletedAt == nil && row.CreateCalledAt != nil
+}
+
+// unresolvedExpired 回傳列是否為結果不明而且已超過 UnresolvedDeadline：自動的路徑（建立 job、週期掃描、清理）不再重送（終局，D63）。
+// 管理員重試可以在冪等鍵保存期內（keyExpired 為假）以同一把鍵重送。
 func unresolvedExpired(row store.PaymentAccount, now time.Time) bool {
-	return row.ExternalAccountID == nil && row.CreateCompletedAt == nil && row.CreateCalledAt != nil && now.Sub(*row.CreateCalledAt) > UnresolvedDeadline
+	return calledWithoutID(row) && now.Sub(*row.CreateCalledAt) > UnresolvedDeadline
+}
+
+// keyExpired 回傳列是否為結果不明而且已超過 IdempotencyRetention：同一把鍵不再保證回同一個帳戶，任何路徑都不重送；
+// 只有管理員確認金流商沒有這家店的帳戶之後才換新鍵（D63）。
+func keyExpired(row store.PaymentAccount, now time.Time) bool {
+	return calledWithoutID(row) && now.Sub(*row.CreateCalledAt) > IdempotencyRetention
 }
 
 // storeExternal 在 transaction 內把取得的外部 ID 寫進列（第一步拿到就寫）；列不需要它了（等待清理、已完成、已刪、已有外部 ID）時 stored 為 false。
@@ -372,6 +384,58 @@ func (s *Service) Resolve(ctx context.Context, storeID int64, final bool) error 
 		s.d.Logger.WarnContext(ctx, "payment：取回建立結果不明的外部帳戶失敗，等下一次掃描重排", "store_id", storeID, "error", err)
 	}
 	return nil
+}
+
+// Replay 是管理員在冪等鍵保存期內重試「結果不明、已超過 UnresolvedDeadline」的建立失敗列（D63）：列保持建立失敗（週期掃描因此不會再把它標成終局），
+// 以列上同一把鍵重送 AcquireAccount；取回 ID 就在同一個 transaction 寫進列、清空建立失敗並排入建立 job 接續第二步。已呼叫的時刻與鍵都不變。
+// 超過 IdempotencyRetention、列已不是這個狀態時什麼都不做。永久失敗或最後一次嘗試仍失敗只記警示 log，列留在建立失敗，管理員可再重試。
+func (s *Service) Replay(ctx context.Context, storeID int64, final bool) error {
+	p := s.d.Provider
+	if p == nil {
+		return nil
+	}
+	row, err := store.New(s.d.DB.Conn(ctx)).PaymentAccountByStore(ctx, storeID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if row.Provider != p.Name() || row.PurgePendingAt != nil || row.CreateFailedAt == nil || !calledWithoutID(row) || keyExpired(row, s.d.Now().UTC()) {
+		return nil
+	}
+	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
+	defer cancel()
+	id, err := p.AcquireAccount(callCtx, AcquireInput{StoreID: row.StoreID, IdempotencyKey: row.CreateIdempotencyKey.String()})
+	if err != nil {
+		if errors.Is(err, ErrPermanent) || final {
+			s.d.Logger.WarnContext(ctx, "payment：管理員重試以同一把鍵取回外部帳戶失敗，列留在建立失敗", "store_id", storeID, "error", err)
+			return nil
+		}
+		return err
+	}
+	wctx, cancelWrite := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
+	defer cancelWrite()
+	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
+		q := store.New(s.d.DB.Conn(ctx))
+		if _, err := q.LockPaymentAccount(ctx, storeID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			return err
+		}
+		now := s.d.Now().UTC()
+		if _, err := q.SetPaymentAccountExternal(ctx, store.SetPaymentAccountExternalParams{StoreID: storeID, ExternalAccountID: &id, Now: now}); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			return err
+		}
+		if _, err := q.ClearPaymentAccountCreateFailed(ctx, store.ClearPaymentAccountCreateFailedParams{StoreID: storeID, Now: now}); err != nil {
+			return err
+		}
+		return enqueueEnsure(ctx, s.d.Jobs, storeID)
+	})
 }
 
 // ForgetOwners 在呼叫方（擁有者個資清理）的 transaction 內，為每個擁有者排入「關閉外部帳戶後刪除帳戶列」的 job（唯一鍵 store_id）：呼叫方已鎖住上層的列，

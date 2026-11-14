@@ -314,7 +314,7 @@ test("開通任務：重試建立成功讓開通任務查詢重讀", async () =>
 	);
 });
 
-test("重試建立（建立結果不明且逾期，create_unresolved）：先開確認框、確認前不送出；確認後帶 acknowledge_no_provider_account 送出", async () => {
+test("重試建立（建立結果不明且超過冪等鍵保存期，create_unresolved）：先開確認框、確認前不送出；確認後帶 acknowledge_no_provider_account 送出", async () => {
 	const { calls, notices, view, retryAcks } = setup({
 		get: () =>
 			account({
@@ -355,6 +355,34 @@ test("重試建立（一般的建立失敗）：直接送出、不帶確認", as
 				createFailedTime: at(1),
 			}),
 		retry: () => account({ externalAccountId: "acct_new" }),
+	});
+	await view.render();
+	await click("重試建立");
+	await until(() => calls.retry === 1, "送出一次");
+	assert.deepEqual(retryAcks, [false]);
+	assert.doesNotMatch(bodyText(), /確定金流商那邊沒有這家店/);
+});
+
+// create_unresolved 的意思是「超過金流商保存冪等鍵的期間」：建立失敗而且結果不明、已過 7 天但還在保存期內的帳戶，伺服器回 false，重試只是以同一把鍵重送，
+// 卡片顯示一般的建立失敗與「重試建立」，不出現確認框、不帶 acknowledge_no_provider_account。
+// mutation：卡片改成看建立失敗的時間（或任何不是 createUnresolved 的條件）決定開確認框 → 這裡出現確認框，失敗。
+test("重試建立（建立結果不明、已過 7 天但還在保存期內，create_unresolved 為 false）：不開確認框、直接送出、不帶確認", async () => {
+	const { calls, view, retryAcks } = setup({
+		get: () =>
+			account({
+				externalAccountId: "",
+				status: PaymentAccountStatus.NOT_CREATED,
+				createFailedTime: timestampFromDate(
+					new Date(Date.UTC(2026, 9, 20, 6, 0)),
+				),
+				createUnresolved: false,
+			}),
+		retry: () =>
+			account({
+				externalAccountId: "",
+				status: PaymentAccountStatus.NOT_CREATED,
+				createFailedTime: at(1),
+			}),
 	});
 	await view.render();
 	await click("重試建立");

@@ -39,9 +39,11 @@ func enqueueEnsure(ctx context.Context, jc jobs.Enqueuer, storeID int64) error {
 	return jc.Enqueue(ctx, args, &opts)
 }
 
-// ResolveArgs 是了結「呼叫過、沒有外部 ID」的列的 job（D63），以 store_id 為唯一鍵；只由週期掃描排入。
+// ResolveArgs 是了結「呼叫過、沒有外部 ID」的列的 job（D63），以 store_id 為唯一鍵；由週期掃描排入，或由管理員在冪等鍵保存期內重試時排入（Replay 為真，
+// 不屬於唯一鍵）。
 type ResolveArgs struct {
 	StoreID int64 `json:"store_id" river:"unique"`
+	Replay  bool  `json:"replay,omitempty"`
 }
 
 // Kind 是 River 的 job 種類。
@@ -54,6 +56,12 @@ func (ResolveArgs) InsertOpts() river.InsertOpts {
 
 func enqueueResolve(ctx context.Context, jc jobs.Enqueuer, storeID int64) error {
 	args := ResolveArgs{StoreID: storeID}
+	opts := args.InsertOpts()
+	return jc.Enqueue(ctx, args, &opts)
+}
+
+func enqueueReplay(ctx context.Context, jc jobs.Enqueuer, storeID int64) error {
+	args := ResolveArgs{StoreID: storeID, Replay: true}
 	opts := args.InsertOpts()
 	return jc.Enqueue(ctx, args, &opts)
 }
@@ -121,7 +129,11 @@ type resolveWorker struct {
 
 // Work 執行一次了結；最後一次嘗試仍暫時失敗時留著給下一次掃描。
 func (w *resolveWorker) Work(ctx context.Context, job *river.Job[ResolveArgs]) error {
-	return w.service.Resolve(ctx, job.Args.StoreID, job.Attempt >= job.MaxAttempts)
+	final := job.Attempt >= job.MaxAttempts
+	if job.Args.Replay {
+		return w.service.Replay(ctx, job.Args.StoreID, final)
+	}
+	return w.service.Resolve(ctx, job.Args.StoreID, final)
 }
 
 // Timeout 是一次了結的時間上限：一次取得呼叫加資料庫。

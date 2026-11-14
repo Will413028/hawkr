@@ -64,8 +64,8 @@ type PaymentAdminServiceClient interface {
 	// 沒有設定收款開通、外部帳戶還沒有建立或帳戶在等待關閉時回 failed_precondition，店家沒有收款帳戶回 not_found。
 	RefreshPaymentAccount(context.Context, *connect.Request[v1alpha1.RefreshPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshPaymentAccountResponse], error)
 	// RetryPaymentAccountCreate 對建立失敗（重試用完，後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED）的收款帳戶重新排入建立。沒有 etag，由狀態檢查保護：
-	// 帳戶不是建立失敗的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。帳戶的 create_unresolved 為真時（建立結果不明，超過可向金流商查回的期限），
-	// 重試會換新的冪等鍵、建立新的收款帳戶，請求必須帶 acknowledge_no_provider_account = true（管理員聲明金流商那邊沒有這家店的帳戶），否則回 failed_precondition。
+	// 帳戶不是建立失敗的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。建立結果不明（呼叫過、沒有外部 ID）時，金流商保存冪等鍵的期間（30 天）內重試以同一把鍵重送，
+	// 不會多出帳戶，不需要確認；帳戶的 create_unresolved 為真時（超過保存期），重試會換新的冪等鍵、建立新的收款帳戶，請求必須帶 acknowledge_no_provider_account = true（管理員聲明金流商那邊沒有這家店的帳戶），否則回 failed_precondition。
 	// 同一個交易寫一筆後台紀錄（platform admin audit log，動作是這支 RPC 的程序名）。
 	RetryPaymentAccountCreate(context.Context, *connect.Request[v1alpha1.RetryPaymentAccountCreateRequest]) (*connect.Response[v1alpha1.RetryPaymentAccountCreateResponse], error)
 	// RetryPaymentAccountPurge 對清理進了終局（後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK：金流商拒絕關閉，或等待清理超過 7 天仍關不掉）的收款帳戶重試關閉：
@@ -172,8 +172,8 @@ type PaymentAdminServiceHandler interface {
 	// 沒有設定收款開通、外部帳戶還沒有建立或帳戶在等待關閉時回 failed_precondition，店家沒有收款帳戶回 not_found。
 	RefreshPaymentAccount(context.Context, *connect.Request[v1alpha1.RefreshPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshPaymentAccountResponse], error)
 	// RetryPaymentAccountCreate 對建立失敗（重試用完，後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED）的收款帳戶重新排入建立。沒有 etag，由狀態檢查保護：
-	// 帳戶不是建立失敗的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。帳戶的 create_unresolved 為真時（建立結果不明，超過可向金流商查回的期限），
-	// 重試會換新的冪等鍵、建立新的收款帳戶，請求必須帶 acknowledge_no_provider_account = true（管理員聲明金流商那邊沒有這家店的帳戶），否則回 failed_precondition。
+	// 帳戶不是建立失敗的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。建立結果不明（呼叫過、沒有外部 ID）時，金流商保存冪等鍵的期間（30 天）內重試以同一把鍵重送，
+	// 不會多出帳戶，不需要確認；帳戶的 create_unresolved 為真時（超過保存期），重試會換新的冪等鍵、建立新的收款帳戶，請求必須帶 acknowledge_no_provider_account = true（管理員聲明金流商那邊沒有這家店的帳戶），否則回 failed_precondition。
 	// 同一個交易寫一筆後台紀錄（platform admin audit log，動作是這支 RPC 的程序名）。
 	RetryPaymentAccountCreate(context.Context, *connect.Request[v1alpha1.RetryPaymentAccountCreateRequest]) (*connect.Response[v1alpha1.RetryPaymentAccountCreateResponse], error)
 	// RetryPaymentAccountPurge 對清理進了終局（後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK：金流商拒絕關閉，或等待清理超過 7 天仍關不掉）的收款帳戶重試關閉：

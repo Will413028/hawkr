@@ -79,7 +79,8 @@ type PaymentAccount struct {
 	PurgeBlockedReason *string
 	// PurgePendingAt 是清理已要求、還沒完成的時刻（D63：後台顯示「關閉中」）；沒有等待清理時是 nil。
 	PurgePendingAt *time.Time
-	// CreateUnresolved 表示建立結果不明、超過期限仍取不回外部 ID（建立失敗的終局，D63）：管理員重試建立等於聲明金流商那邊沒有這家店的帳戶，需要明確確認。
+	// CreateUnresolved 表示建立結果不明（呼叫過、沒有外部 ID）的建立失敗列已超過金流商保存冪等鍵的期限（30 天，D63）：同一把鍵不再保證回同一個帳戶，
+	// 管理員重試建立會換新鍵並建立新的帳戶，等於聲明金流商那邊沒有這家店的帳戶，需要明確確認。保存期內（含已超過 7 天自動重送期限的）為假：重試以同一把鍵重送，不需要確認。
 	CreateUnresolved bool
 	CreatedAt        time.Time
 	UpdatedAt        time.Time

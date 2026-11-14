@@ -207,9 +207,14 @@ func (s *Service) Refresh(ctx context.Context, storeID int64) (model.PaymentAcco
 	return s.Account(ctx, storeID)
 }
 
-// RetryCreate 是管理員的「重試建立」：只有建立失敗的列可以重試（清空失敗時刻並在同一個 transaction 重新排入建立 job）。列處於建立結果不明的終局
-// （呼叫過、沒有外部 ID、超過 UnresolvedDeadline，D63）時，重試等於管理員聲明金流商那邊沒有這家店的帳戶：要求 acknowledgeNoProviderAccount，沒有就回
-// FailedPrecondition；確認後在同一個 transaction 換新的冪等鍵並把已呼叫的時刻重設成現在。同一個 transaction 寫一筆後台紀錄（「已要求重試」；建立本身由之後的建立 job 呼叫 provider，D62）。其他建立失敗的列（同一把鍵仍可重送）不換鍵，忽略這個旗標。
+// RetryCreate 是管理員的「重試建立」：只有建立失敗的列可以重試。列是結果不明（呼叫過、沒有外部 ID）時看冪等鍵保存期（D63）：
+//   - 還在保存期內（含已超過 UnresolvedDeadline）：同一把鍵重送一定回同一個帳戶，不需要確認、不換鍵、已呼叫的時刻不變；列保持建立失敗，同一個 transaction 排入 Replay
+//     job（取回 ID 之後才清空失敗並接續建立，見 Replay）；
+//   - 超過 IdempotencyRetention：重試會建立新的帳戶，等於管理員聲明金流商那邊沒有這家店的帳戶，要求 acknowledgeNoProviderAccount，沒有就回 FailedPrecondition；
+//     確認後在同一個 transaction 換新的冪等鍵、把已呼叫的時刻重設成現在、清空失敗並排入建立 job。
+//
+// 其他建立失敗的列（同一把鍵仍在 UnresolvedDeadline 內，或已有外部 ID）清空失敗時刻並排入建立 job，忽略確認旗標。同一個 transaction 寫一筆後台紀錄
+// （「已要求重試」；呼叫 provider 由之後的 job 做，D62）。
 func (s *Service) RetryCreate(ctx context.Context, actor adminaudit.Actor, storeID int64, acknowledgeNoProviderAccount bool) (model.PaymentAccount, error) {
 	if s.d.Provider == nil {
 		return model.PaymentAccount{}, apperr.FailedPrecondition("尚未設定收款開通")
@@ -233,24 +238,31 @@ func (s *Service) RetryCreate(ctx context.Context, actor adminaudit.Actor, store
 		if locked.PurgePendingAt != nil {
 			return apperr.FailedPrecondition("收款帳戶正在關閉")
 		}
-		rotated := false
-		if unresolvedExpired(locked, s.d.Now().UTC()) {
+		now := s.d.Now().UTC()
+		rotated, replay := false, unresolvedExpired(locked, now) && !keyExpired(locked, now)
+		if keyExpired(locked, now) {
 			if !acknowledgeNoProviderAccount {
-				return apperr.FailedPrecondition("建立結果不明且已超過可向金流商查回的期限；重試會建立新的收款帳戶，需要先確認金流商那邊沒有這家店的帳戶")
+				return apperr.FailedPrecondition("建立結果不明且已超過金流商保存冪等鍵的期限；重試會建立新的收款帳戶，需要先確認金流商那邊沒有這家店的帳戶")
 			}
-			if _, err := q.RotatePaymentAccountIdempotencyKey(ctx, store.RotatePaymentAccountIdempotencyKeyParams{StoreID: storeID, Now: s.d.Now().UTC()}); err != nil {
+			if _, err := q.RotatePaymentAccountIdempotencyKey(ctx, store.RotatePaymentAccountIdempotencyKeyParams{StoreID: storeID, Now: now}); err != nil {
 				return err
 			}
 			rotated = true
 		}
-		if err := s.audit(ctx, actor, storeID, map[string]any{"outcome": "requested", "acknowledged_no_provider_account": acknowledgeNoProviderAccount, "key_rotated": rotated}); err != nil {
+		if err := s.audit(ctx, actor, storeID, map[string]any{"outcome": "requested", "acknowledged_no_provider_account": acknowledgeNoProviderAccount, "key_rotated": rotated, "replayed_same_key": replay}); err != nil {
 			return err
 		}
-		if _, err := q.ClearPaymentAccountCreateFailed(ctx, store.ClearPaymentAccountCreateFailedParams{StoreID: storeID, Now: s.d.Now().UTC()}); err != nil {
-			return err
-		}
-		if err := enqueueEnsure(ctx, s.d.Jobs, storeID); err != nil {
-			return err
+		if replay {
+			if err := enqueueReplay(ctx, s.d.Jobs, storeID); err != nil {
+				return err
+			}
+		} else {
+			if _, err := q.ClearPaymentAccountCreateFailed(ctx, store.ClearPaymentAccountCreateFailedParams{StoreID: storeID, Now: now}); err != nil {
+				return err
+			}
+			if err := enqueueEnsure(ctx, s.d.Jobs, storeID); err != nil {
+				return err
+			}
 		}
 		out, err = q.PaymentAccountByStore(ctx, storeID)
 		return err

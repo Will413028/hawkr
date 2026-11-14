@@ -630,7 +630,7 @@ type RotatePaymentAccountIdempotencyKeyParams struct {
 	StoreID int64
 }
 
-// 建立結果不明、超過 UnresolvedDeadline 的列，管理員確認金流商那邊沒有這家店的帳戶之後換新鍵（D63），已呼叫的時刻改成新鍵第一次呼叫之前的時刻。
+// 建立結果不明、超過 IdempotencyRetention（冪等鍵保存期）的列，管理員確認金流商那邊沒有這家店的帳戶之後換新鍵（D63），已呼叫的時刻改成新鍵第一次呼叫之前的時刻。
 // 只在還沒有外部 ID、還沒完成、沒有等待清理時寫。
 func (q *Queries) RotatePaymentAccountIdempotencyKey(ctx context.Context, arg RotatePaymentAccountIdempotencyKeyParams) (PaymentAccount, error) {
 	row := q.db.QueryRow(ctx, rotatePaymentAccountIdempotencyKey, arg.Now, arg.StoreID)

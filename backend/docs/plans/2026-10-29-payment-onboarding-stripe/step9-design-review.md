@@ -104,3 +104,17 @@
 | E6 | `api/hawkr/admin/payment` 的帳戶、admin `PaymentAccountCard`（`/code-review` 第 4 項） | should | 等待清理、還沒進終局的帳戶卡片仍顯示重新整理與重試建立，後台看不出它正在關閉 | 改（D63）：帳戶加 `purge_pending_time`，等待清理而未進終局時顯示「收款帳戶關閉中（〈時間〉起）」並隱藏重新整理、重試建立與其他動作 | fixed：`tests/merchant-payment-account-card.test.ts` 的 `purge_pending_time` 兩個案例；`TestAdminPurgeHandlersPassTheStoreAndTheCallingAdmin`（對應欄位） |
 | E7 | `account/service.go` 的清理計畫 switch（CI golangci-lint exhaustive，run 25a3a698） | blocking | switch 漏了 `purgeList` | 改：`purgeList` 隨 D63 刪除，所有 `purgePlan` 的 switch 都列滿五個值（`purgeUnresolved` 取代它） | fixed：`golangci-lint run -c .golangci.monolith.yml`（含與不含 `--build-tags=integration`）0 issues |
 | E8 | `TestAJobCancelledPastTheDeadlineIsNotRecordedAsDeadlineExceeded`（CI panic，`platform/inbox/inbox.go:114`） | blocking | 第二個模組實例與第一個共用同一個 inbox，同一個 provider 的路由登記兩次 panic，整個 payment 整合套件因此沒跑完 | 改：第二個實例用自己的 inbox（同其他測試的做法）；保留的整合測試逐一對照新行為重讀（編譯：`go vet -tags integration ./...`；邏輯：刪除列出對帳與多餘帳戶的測試，其餘未依賴它們） | fixed：同名測試（整合，CI 跑；本機不跑整合） |
+
+## D62/D63 第 1 輪（2026-11-14）
+
+來源：`/code-review` 對 D62、D63 實作的 R1–R6，加 CI 的 R7。前幾輪未被取代的列不得回退。整合測試交 CI（本機只跑 unit、`go vet -tags integration`）。
+
+| # | 位置 | 嚴重度 | 發現 | 處置 | 狀態 |
+|---|---|---|---|---|---|
+| R1 | `adr/2026-10-02-seller-governance-in-monolith.md`（已 superseded） | blocking | D62 的修訂段寫進被取代的 ADR，`adr/README.md` 規定修訂寫在 accepted 的那份 | 改：修訂段搬到 `2026-10-18-seller-governance-consolidated.md` 文末，並把它的「沒有對外的列表方法」兩處（讀取紀錄）改指向 `2026-11-14-platform-admin-audit-log.md`；舊檔移除該段；計畫 D62 的檔名參照改成整合版 | fixed：`git diff` 舊檔只剩刪除該段；`rg "2026-10-02-seller" plans/2026-10-29-payment-onboarding-stripe.md` 無結果 |
+| R2 | `payment/internal/account/AGENTS.md` | should | 10 個仍存在的守門測試名被刪 | 改：逐一還回各規則旁，並在同一把鍵重送的規則下引用新的掃描重送與管理員重送測試；敘事縮短以符合 agentfile-lint 上限 | fixed：`pre-commit run agentfile-lint --all-files` 無 error；10 個名稱 `rg "func <名稱>"` 皆存在 |
+| R3 | `backend/AGENTS.md` | should | 單體規則 6「只參照自己的表」被改成「只讀」，規則 2 刪了錨點「發布的讀取介面」等 | 改：整檔還原到 `d1cfe5f3`，只保留 `audited` 一句，並以不改語意的縮寫讓檔案在 10000 bytes 內 | fixed：`git diff d1cfe5f3 -- backend/AGENTS.md` 只剩 httpapi 一行與同義縮寫；agentfile-lint 通過 |
+| R4 | `httpapi/adminauth` | should | 沒有東西阻止新的後台寫入 RPC 宣告 `auditPending` | 改：`frozenAuditPending` 凍結現有 41 支，清單只能縮小 | fixed：`TestAuditPendingIsFrozenAndOnlyShrinks` |
+| R5 | `account/sync.go` 的 `RetryCreate`、`Replay` | blocking | 超過 7 天就換鍵，而舊鍵在 30 天內仍有效，可能建出第二個帳戶 | 改（D63）：保存期內以同一把鍵重送（列保持建立失敗，排 `account_resolve` 的 replay，取回 ID 後清空失敗並接續建立），超過保存期才要確認並換鍵；`create_unresolved` 改成「超過保存期」 | fixed：`TestRetryCreateWithinTheKeyRetentionReplaysTheSameKeyWithoutAcknowledgement`、`TestRetryCreateOfAnUnresolvedTerminalRowNeedsAcknowledgementAndRotatesTheKey`（整合）、`TestUnresolvedExpiredOnlyForCalledRowsWithoutAnIDPastTheDeadline`、admin 的「還在保存期內，create_unresolved 為 false」 |
+| R6 | `backend/AGENTS.md` 規則 2 | nit | 刪了錨點「發布的讀取介面」 | 同 R3，還回 | fixed：同 R3 |
+| R7 | `TestSweepQueuesSyncForOpenAndLiftableStatusesOnly`（CI，`accounts_called_check`） | blocking | 測試的手寫 INSERT 給了外部 ID 卻沒有 `create_called_at`；約束正確（有外部 ID 必先記已呼叫），fixture 錯 | 改：fixture 有外部 ID 時同時寫 `create_called_at`、`create_completed_at`；其餘手寫 `payment.accounts` 的測試（payment、httpapi/payment、reviewqueue、cmd/hawkr）逐一檢查，沒有外部 ID 或已寫已呼叫時刻，不違反 | fixed：整合（CI 跑）；本機 `go vet -tags integration` |

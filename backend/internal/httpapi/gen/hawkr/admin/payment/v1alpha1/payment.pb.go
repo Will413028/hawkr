@@ -55,8 +55,8 @@ type PaymentAccount struct {
 	PurgeBlockedTime *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=purge_blocked_time,json=purgeBlockedTime,proto3" json:"purge_blocked_time,omitempty"`
 	// 清理被擋下的原因（原因代碼，冒號之後是金流商的說明；只給後台）；沒有進終局時是空字串。
 	PurgeBlockedReason string `protobuf:"bytes,15,opt,name=purge_blocked_reason,json=purgeBlockedReason,proto3" json:"purge_blocked_reason,omitempty"`
-	// 建立結果不明、超過可向金流商查回的期限仍取不回外部 ID（建立失敗的終局，待辦 PAYMENT_ACCOUNT_CREATE_FAILED）時為真：重試建立前要先請管理員確認金流商那邊沒有
-	// 這家店的收款帳戶（RetryPaymentAccountCreateRequest.acknowledge_no_provider_account）。
+	// 建立結果不明（呼叫過、沒有外部 ID）的建立失敗帳戶（待辦 PAYMENT_ACCOUNT_CREATE_FAILED）已超過金流商保存冪等鍵的期間（30 天）時為真：重試建立前要先請管理員確認
+	// 金流商那邊沒有這家店的收款帳戶（RetryPaymentAccountCreateRequest.acknowledge_no_provider_account）。保存期內為假，即使已超過自動重送的 7 天，重試只是以同一把鍵重送。
 	CreateUnresolved bool `protobuf:"varint,16,opt,name=create_unresolved,json=createUnresolved,proto3" json:"create_unresolved,omitempty"`
 	// 清理已要求、還沒完成（等待關閉）的時間（D63）；沒有等待清理時不設。等待清理而還沒進終局時，卡片顯示「關閉中」並隱藏其他動作；進了終局（purge_blocked_time）改顯示被擋下的原因。
 	PurgePendingTime *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=purge_pending_time,json=purgePendingTime,proto3" json:"purge_pending_time,omitempty"`

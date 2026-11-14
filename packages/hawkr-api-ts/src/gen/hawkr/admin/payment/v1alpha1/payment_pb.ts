@@ -119,8 +119,8 @@ export type PaymentAccount = Message<"hawkr.admin.payment.v1alpha1.PaymentAccoun
   purgeBlockedReason: string;
 
   /**
-   * 建立結果不明、超過可向金流商查回的期限仍取不回外部 ID（建立失敗的終局，待辦 PAYMENT_ACCOUNT_CREATE_FAILED）時為真：重試建立前要先請管理員確認金流商那邊沒有
-   * 這家店的收款帳戶（RetryPaymentAccountCreateRequest.acknowledge_no_provider_account）。
+   * 建立結果不明（呼叫過、沒有外部 ID）的建立失敗帳戶（待辦 PAYMENT_ACCOUNT_CREATE_FAILED）已超過金流商保存冪等鍵的期間（30 天）時為真：重試建立前要先請管理員確認
+   * 金流商那邊沒有這家店的收款帳戶（RetryPaymentAccountCreateRequest.acknowledge_no_provider_account）。保存期內為假，即使已超過自動重送的 7 天，重試只是以同一把鍵重送。
    *
    * @generated from field: bool create_unresolved = 16;
    */
@@ -345,8 +345,8 @@ export const PaymentAdminService: GenService<{
   },
   /**
    * RetryPaymentAccountCreate 對建立失敗（重試用完，後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED）的收款帳戶重新排入建立。沒有 etag，由狀態檢查保護：
-   * 帳戶不是建立失敗的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。帳戶的 create_unresolved 為真時（建立結果不明，超過可向金流商查回的期限），
-   * 重試會換新的冪等鍵、建立新的收款帳戶，請求必須帶 acknowledge_no_provider_account = true（管理員聲明金流商那邊沒有這家店的帳戶），否則回 failed_precondition。
+   * 帳戶不是建立失敗的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。建立結果不明（呼叫過、沒有外部 ID）時，金流商保存冪等鍵的期間（30 天）內重試以同一把鍵重送，
+   * 不會多出帳戶，不需要確認；帳戶的 create_unresolved 為真時（超過保存期），重試會換新的冪等鍵、建立新的收款帳戶，請求必須帶 acknowledge_no_provider_account = true（管理員聲明金流商那邊沒有這家店的帳戶），否則回 failed_precondition。
    * 同一個交易寫一筆後台紀錄（platform admin audit log，動作是這支 RPC 的程序名）。
    *
    * @generated from rpc hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountCreate

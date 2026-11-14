@@ -238,7 +238,7 @@ func (m *Module) RefreshAccount(ctx context.Context, storeID int64) (Account, er
 // AdminActor 是後台動作的操作者與動作（platform adminaudit，D62）：handler 以管理員 ID 與 RPC 的 procedure 名稱組成。
 type AdminActor = adminaudit.Actor
 
-// RetryAccountCreate 管理員的「重試建立」：只有建立失敗的帳戶可以重試；建立結果不明且超過期限的帳戶要 acknowledgeNoProviderAccount（D63）。
+// RetryAccountCreate 管理員的「重試建立」：只有建立失敗的帳戶可以重試；建立結果不明的帳戶在冪等鍵保存期（IdempotencyRetention）內以同一把鍵重送、不需要確認；超過保存期要 acknowledgeNoProviderAccount 才換新鍵（D63）。
 // 呼叫方的 ctx 不得已在 transaction 內；本方法在自己的 transaction 內寫領域變更與一筆後台紀錄。
 func (m *Module) RetryAccountCreate(ctx context.Context, actor AdminActor, storeID int64, acknowledgeNoProviderAccount bool) (Account, error) {
 	return m.accounts.RetryCreate(ctx, actor, storeID, acknowledgeNoProviderAccount)
@@ -290,6 +290,11 @@ func (m *Module) SweepAccounts(ctx context.Context) (synced, ensured int, err er
 // ResolveUnresolvedAccount 是了結 job（payment.account_resolve）的內容，給 worker 與測試呼叫（D63）；finalAttempt 為 true 時暫時性失敗只記警示 log，留給下一次掃描。
 func (m *Module) ResolveUnresolvedAccount(ctx context.Context, storeID int64, finalAttempt bool) error {
 	return m.accounts.Resolve(ctx, storeID, finalAttempt)
+}
+
+// ReplayUnresolvedAccount 是管理員重試結果不明的建立失敗列時排入的 job（payment.account_resolve，Replay 為真）的內容，給 worker 與測試呼叫（D63）。
+func (m *Module) ReplayUnresolvedAccount(ctx context.Context, storeID int64, finalAttempt bool) error {
+	return m.accounts.Replay(ctx, storeID, finalAttempt)
 }
 
 // PurgeAccount 是「關閉後刪除」job（payment.account_purge）的內容，給 worker 與測試呼叫；finalAttempt 為 true 時關閉失敗只記警示 log，本地列（已標成等待清理）留著給週期掃描。

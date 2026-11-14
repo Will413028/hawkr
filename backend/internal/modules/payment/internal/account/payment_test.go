@@ -275,9 +275,9 @@ func TestRequestOutcomeRejectsAMarkedRow(t *testing.T) {
 	}
 }
 
-// 結果不明的列「呼叫過、沒有外部 ID、還沒完成建立」超過 UnresolvedDeadline 才算逾期（D63）：恰在期限上不算；有外部 ID、已完成建立、從沒呼叫的列都不算。
-// 對外的 CreateUnresolved 另外要求已記建立失敗而且沒有等待清理。
-// mutation：把 > 改成 >= → 「恰在期限上」案例失敗；不看外部 ID → 「有外部 ID」案例失敗；CreateUnresolved 不看建立失敗 → 「還沒記失敗」案例失敗。
+// 結果不明的列「呼叫過、沒有外部 ID、還沒完成建立」超過 UnresolvedDeadline 才算逾期（D63，自動的路徑不再重送）：恰在期限上不算；有外部 ID、已完成建立、從沒呼叫的列都不算。
+// 對外的 CreateUnresolved 看冪等鍵保存期（IdempotencyRetention）：必須已記建立失敗、沒有等待清理、而且超過保存期；7 天到 30 天之間為假（管理員重試以同一把鍵重送，不需要確認）。
+// mutation：把 > 改成 >= → 「恰在期限上」案例失敗；不看外部 ID → 「有外部 ID」案例失敗；CreateUnresolved 改看 UnresolvedDeadline → 「超過 7 天、保存期內」案例失敗；不看建立失敗 → 「還沒記失敗」案例失敗。
 func TestUnresolvedExpiredOnlyForCalledRowsWithoutAnIDPastTheDeadline(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 11, 14, 0, 0, 0, 0, time.UTC)
@@ -287,14 +287,17 @@ func TestUnresolvedExpiredOnlyForCalledRowsWithoutAnIDPastTheDeadline(t *testing
 		row                    store.PaymentAccount
 		wantExpired, wantModel bool
 	}{
-		"從沒呼叫":      {store.PaymentAccount{}, false, false},
-		"期限內":       {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline - time.Second), CreateFailedAt: &now}, false, false},
-		"恰在期限上":     {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline), CreateFailedAt: &now}, false, false},
-		"超過、還沒記失敗":  {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline + time.Second)}, true, false},
-		"超過、已記失敗":   {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline + time.Second), CreateFailedAt: &now}, true, true},
-		"超過、有外部 ID": {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline + time.Second), ExternalAccountID: &id, CreateFailedAt: &now}, false, false},
-		"超過、已完成建立":  {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline + time.Second), ExternalAccountID: &id, CreateCompletedAt: &now}, false, false},
-		"超過、等待清理":   {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline + time.Second), CreateFailedAt: &now, PurgePendingAt: &now}, true, false},
+		"從沒呼叫":        {store.PaymentAccount{}, false, false},
+		"期限內":         {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline - time.Second), CreateFailedAt: &now}, false, false},
+		"恰在期限上":       {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline), CreateFailedAt: &now}, false, false},
+		"超過、還沒記失敗":    {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline + time.Second)}, true, false},
+		"超過 7 天、保存期內": {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline + time.Second), CreateFailedAt: &now}, true, false},
+		"恰在保存期上":      {store.PaymentAccount{CreateCalledAt: at(IdempotencyRetention), CreateFailedAt: &now}, true, false},
+		"超過保存期、已記失敗":  {store.PaymentAccount{CreateCalledAt: at(IdempotencyRetention + time.Second), CreateFailedAt: &now}, true, true},
+		"超過保存期、還沒記失敗": {store.PaymentAccount{CreateCalledAt: at(IdempotencyRetention + time.Second)}, true, false},
+		"超過、有外部 ID":   {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline + time.Second), ExternalAccountID: &id, CreateFailedAt: &now}, false, false},
+		"超過、已完成建立":    {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline + time.Second), ExternalAccountID: &id, CreateCompletedAt: &now}, false, false},
+		"超過保存期、等待清理":  {store.PaymentAccount{CreateCalledAt: at(IdempotencyRetention + time.Second), CreateFailedAt: &now, PurgePendingAt: &now}, true, false},
 	} {
 		if got := unresolvedExpired(tc.row, now); got != tc.wantExpired {
 			t.Errorf("%s：unresolvedExpired=%v，want %v", name, got, tc.wantExpired)

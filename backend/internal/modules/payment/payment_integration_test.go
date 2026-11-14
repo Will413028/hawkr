@@ -677,8 +677,8 @@ func TestSweepQueuesSyncForOpenAndLiftableStatusesOnly(t *testing.T) {
 	f := setup(t)
 	insert := func(storeID int64, status, external, reason any) {
 		_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.accounts
-			(store_id, provider, external_account_id, requirement_collection, status, transfers_active, status_reason, created_at, updated_at)
-			VALUES ($1, 'fake', $2, 'PROVIDER', $3, $3 = 'ENABLED', $4, $5, $5)`, storeID, external, status, reason, f.now.Add(-time.Hour))
+			(store_id, provider, external_account_id, requirement_collection, status, transfers_active, status_reason, create_called_at, create_completed_at, created_at, updated_at)
+			VALUES ($1, 'fake', $2, 'PROVIDER', $3, $3 = 'ENABLED', $4, CASE WHEN $2::text IS NULL THEN NULL ELSE $5::timestamptz END, CASE WHEN $2::text IS NULL THEN NULL ELSE $5::timestamptz END, $5, $5)`, storeID, external, status, reason, f.now.Add(-time.Hour))
 		must(t, err)
 	}
 	byStatus := map[AccountStatus]int64{}
@@ -2129,24 +2129,80 @@ func TestAnUnresolvedCreatePast7DaysReachesTheTerminalStateAndNothingIsEverRepla
 	}
 }
 
-// 管理員重試建立結果不明的終局：沒有確認回 failed_precondition、列不變；帶確認才換新的冪等鍵、已呼叫的時刻重設成現在、清空建立失敗並重新排入建立，建立出新的帳戶（D63）。
-// 還在期限內的建立失敗（同一把鍵仍可重送）不需要確認也不換鍵。
-// mutation：RetryCreate 不檢查確認 → 無確認的呼叫成功，失敗；確認後不換鍵 → 鍵不變，失敗；不重設已呼叫時刻 → 建立立刻又進終局，失敗；期限內也要求確認 → 期限內重試失敗。
+// 管理員重試建立結果不明的列，冪等鍵還在保存期（30 天）內（含已超過自動重送的 7 天）：以同一把鍵重送，不需要確認、不換鍵、已呼叫的時刻不變（D63，Stripe：保存期內重送同一把鍵回同一個結果）。
+// 列在取回 ID 之前保持建立失敗（週期掃描不會把它再標成終局），取回後同一個 transaction 清空失敗並排入建立；全程只有一個外部帳戶。
+// mutation：RetryCreate 在超過 UnresolvedDeadline 時要求確認或換新鍵 → 無確認的呼叫失敗，或鍵變了、帳戶數 2，失敗；RetryCreate 清空失敗而不排 replay → 掃描把列再標成終局，列沒有取回 ID，失敗；
+// Replay 不以列上的鍵重送 → AcquireKeys 不同，失敗；重設已呼叫的時刻 → called 變了，失敗。
+func TestRetryCreateWithinTheKeyRetentionReplaysTheSameKeyWithoutAcknowledgement(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s, id := f.calledRow(t)
+	key := f.key(t, s)
+	var called time.Time
+	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT create_called_at FROM payment.accounts WHERE store_id = $1", s).Scan(&called))
+	f.now = f.now.Add(UnresolvedDeadline).Add(time.Hour)
+	must(t, f.module.ResolveUnresolvedAccount(ctx, s, false))
+	if a := f.account(t, s); a.CreateFailedAt == nil || a.CreateUnresolved {
+		t.Fatalf("7 天後=%+v，預期建立失敗、還在冪等鍵保存期內所以不是 create_unresolved", a)
+	}
+	resolves, ensures := f.jobs.count(kindResolve), f.jobs.count(kindEnsure)
+	retried, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, false)
+	must(t, err)
+	if f.key(t, s) != key || retried.CreateFailedAt == nil || f.jobs.count(kindResolve) != resolves+1 || f.jobs.count(kindEnsure) != ensures {
+		t.Fatalf("重試後=%+v 鍵變了=%v：預期同一把鍵、仍是建立失敗、只排了重送 job", retried, f.key(t, s) != key)
+	}
+	// 週期掃描在重送完成前不會把列再標成終局，也不會自己重送。
+	f.now = f.now.Add(createIdleForTest)
+	if _, _, err := f.module.SweepAccounts(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if a := f.account(t, s); a.ExternalAccountID != nil || a.CreateFailedAt == nil || f.fake.Accounts() != 1 {
+		t.Fatalf("掃描之後=%+v", a)
+	}
+	must(t, f.module.ReplayUnresolvedAccount(ctx, s, false))
+	a := f.account(t, s)
+	if a.ExternalAccountID == nil || *a.ExternalAccountID != id || a.CreateFailedAt != nil || f.fake.Accounts() != 1 || f.jobs.count(kindEnsure) != ensures+1 {
+		t.Fatalf("重送後=%+v 帳戶數=%d，預期取回 %s、清空失敗、排入建立", a, f.fake.Accounts(), id)
+	}
+	if keys := f.fake.AcquireKeys(); len(keys) != 2 || keys[0] != key || keys[1] != key || f.key(t, s) != key {
+		t.Fatalf("重送的冪等鍵=%v，預期兩次都是 %s", keys, key)
+	}
+	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND create_called_at = $2", s, called) != 1 {
+		t.Fatal("已呼叫的時刻不得改變")
+	}
+	recs, err := f.audit.List(ctx, adminaudit.Filter{Action: actionRetryCreate, TargetID: fmt.Sprint(s)})
+	must(t, err)
+	if len(recs) != 1 || !strings.Contains(string(recs[0].Detail), `"replayed_same_key": true`) || !strings.Contains(string(recs[0].Detail), `"key_rotated": false`) {
+		t.Fatalf("紀錄=%+v，預期一筆同一把鍵重送、沒有換鍵", recs)
+	}
+	must(t, f.module.EnsureAccount(ctx, s, false))
+	if a := f.account(t, s); a.Status == StatusNotCreated || f.fake.Accounts() != 1 {
+		t.Fatalf("接續建立後=%+v 帳戶數=%d", a, f.fake.Accounts())
+	}
+}
+
+// 超過冪等鍵保存期（30 天）仍結果不明：沒有確認回 failed_precondition、列不變；帶確認才換新的冪等鍵、已呼叫的時刻重設成現在、清空建立失敗並重新排入建立，建立出新的帳戶，
+// 並留下已確認、已換鍵的後台紀錄（D63）。create_unresolved 只在這個條件為真。
+// mutation：RetryCreate 不檢查確認 → 無確認的呼叫成功，失敗；確認後不換鍵 → 鍵不變，失敗；不重設已呼叫時刻 → 建立立刻又進終局，失敗；保存期內也要求確認 → 上一個測試失敗。
 func TestRetryCreateOfAnUnresolvedTerminalRowNeedsAcknowledgementAndRotatesTheKey(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
 	s, _ := f.calledRow(t)
 	key := f.key(t, s)
-	// 期限內：記建立失敗之後重試，不需要確認、沿用同一把鍵。
+	// 期限內：記建立失敗之後重試，不需要確認、沿用同一把鍵（排入建立 job）。
 	f.fake.FailAcquire(ErrPermanent)
 	must(t, f.module.EnsureAccount(ctx, s, true))
 	if a, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, false); err != nil || f.key(t, s) != key || a.CreateUnresolved {
 		t.Fatalf("期限內重試 err=%v key 變了=%v", err, f.key(t, s) != key)
 	}
-	// 超過期限：進終局。
-	f.now = f.now.Add(UnresolvedDeadline).Add(time.Hour)
+	// 超過冪等鍵保存期：進終局，create_unresolved 為真。
+	f.now = f.now.Add(IdempotencyRetention).Add(time.Hour)
 	must(t, f.module.ResolveUnresolvedAccount(ctx, s, false))
+	if !f.account(t, s).CreateUnresolved {
+		t.Fatal("超過保存期的建立失敗應該標成結果不明")
+	}
 	var failedAt time.Time
 	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT create_failed_at FROM payment.accounts WHERE store_id = $1", s).Scan(&failedAt))
 	ensures := f.jobs.count(kindEnsure)
