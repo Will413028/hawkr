@@ -62,8 +62,9 @@ FDA 轉報與食品業者登錄刪除，待辦少了 `CASE_FDA_REFERRAL`（待�
 
 **決策。**
 
-- 種類現況（`ReviewQueueItemKind`）：刪除 PayUni 重新綁定的種類；新增 `PAYMENT_ACCOUNT_CREATE_FAILED`（值 10，由 payment 發布，subject 是 `PaymentAccountRef`）與 `SHARED_BANK_ACCOUNT`（值 11，由 seller 發布，subject 是 `SharedBankAccountRef`）。刪掉的種類不留 `reserved`（`v1alpha1` 的規則見收款開通 ADR），其後的值連續重編。seller 發布 10 種（含 `SHARED_BANK_ACCOUNT`）、payment 發布 1 種。第二個來源 payment 依決策 2 的方式加入：`payment.pub_review_items(at)` 與 seller 的 `pub_review_items` 在同一支查詢 `UNION ALL`，`reviewqueue` 依賴 payment，不 import 它的 Go 套件；payment 的列只有店家 ID，店名由 `internal/httpapi/reviewqueue` 經 seller 的店家卡片補上。
+- 種類現況（`ReviewQueueItemKind`）：刪除 PayUni 重新綁定的種類；新增 `PAYMENT_ACCOUNT_CREATE_FAILED`（值 10，由 payment 發布，subject 是 `PaymentAccountRef`）與 `SHARED_BANK_ACCOUNT`（值 11，由 seller 發布，subject 是 `SharedBankAccountRef`）。刪掉的種類不留 `reserved`（`v1alpha1` 的規則見收款開通 ADR），其後的值連續重編。seller 發布 10 種（含 `SHARED_BANK_ACCOUNT`）、payment 發布 2 種（`PAYMENT_ACCOUNT_CREATE_FAILED`、`PAYMENT_ACCOUNT_PURGE_STUCK`）。第二個來源 payment 依決策 2 的方式加入：`payment.pub_review_items(at)` 與 seller 的 `pub_review_items` 在同一支查詢 `UNION ALL`，`reviewqueue` 依賴 payment，不 import 它的 Go 套件；payment 的列只有店家 ID，店名由 `internal/httpapi/reviewqueue` 經 seller 的店家卡片補上。
 - `PAYMENT_ACCOUNT_CREATE_FAILED`：`payment.accounts` 的 `create_failed_at` 有值的帳戶，建立 job 的重試用完才進來；期限 24 小時（上線前的起始值）；管理員只有「重試建立」。
+- `PAYMENT_ACCOUNT_PURGE_STUCK`（值 12，由 payment 發布，subject 是 `PaymentAccountRef`）：`payment.accounts` 的 `purge_blocked_at` 有值的帳戶，清理進了終局、無法自動關閉外部帳戶；期限 24 小時（上線前的起始值）；標題「處理無法關閉的收款帳戶」；管理員「重試關閉」或「已在金流商處理，刪除對應」（規則見 `2026-11-13-payment-onboarding-provider-port-stripe.md`）。
 - `SHARED_BANK_ACCOUNT` 的成員仍是推導的，由 `seller.review_shared_bank_account(at)` 從處分與命中的雜湊算出，沒有待辦列。唯一存下來的是處置：表 `seller.measure_linked_reviews`（處分、帳號、時間、管理員），管理員把處分頁的一個關聯帳號標為「已檢視」，這一對就離開待辦。
 - 這不違反決策 1「待辦不儲存」：存的是管理員做過的處置，不是待辦列；成員資格、開始與期限仍在讀取時推導，處置只是推導條件的一項（「這一對還沒有已檢視」）。沒有處置，項目永遠離不開待辦，所以處置不能省。
 - 未採：另存提醒列（業界做法是保留歷史，但歷史現在沒有讀者）：要由同步的 transaction 寫入，手寫開啟與關閉的開關正是本 ADR 拒絕的形狀；純推導並限時消失：營運有沒有看過沒有紀錄（推測）。

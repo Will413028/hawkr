@@ -111,6 +111,6 @@ website 從 Cloudflare Workers（OpenNext）搬到 Vercel（函式區域 `hnd1`�
 
 D4 不變：`accounts.email` 仍是 provider 回報、已驗證的 email，登入時更新，是通知的寄件地址；自動連結仍只看符合資格的 Google 身分。補充如下（Stripe 收款計畫 D23 的 2026-11-03 修訂，步驟 7a′）：
 
-- **賣家送審前帳號要有聯絡信箱**：Stripe 的收款帳戶必須帶聯絡信箱，而 LINE 使用者可以不給 email。帳號沒有已驗證的 email 時，賣家在送出 KYC 申請前自己填一個（`IdentityAppService.SetContactEmail`），存在 `accounts.self_entered_email`；`SubmitKYC` 要求帳號有其中之一，沒有回 `failed_precondition` 與 `CONTACT_EMAIL_REQUIRED`。核准時把聯絡信箱（已驗證的優先）快照到 `payment_accounts.contact_email`。
+- **賣家送審前帳號要有聯絡信箱**：Stripe 的收款帳戶必須帶聯絡信箱，而 LINE 使用者可以不給 email。帳號沒有已驗證的 email 時，賣家在送出 KYC 申請前自己填一個（`IdentityAppService.SetContactEmail`），存在 `accounts.self_entered_email`；`SubmitKYC` 要求帳號有其中之一，沒有回 `failed_precondition` 與 `CONTACT_EMAIL_REQUIRED`。payment 建立外部帳戶當下讀取聯絡信箱（已驗證的優先），不另存快照（`2026-11-13-payment-onboarding-provider-port-stripe.md` 的「聯絡信箱」）。
 - **買家不變**：買家沒有這個要求，不必填聯絡信箱。
 - **自填的信箱未驗證，也不是寄件地址**：它不寫進 `account_identities`，不成為自動連結的依據；有已驗證 email 的帳號不能設定自填信箱。通知 A8 只寄已驗證的信箱（通知 ADR `2026-10-05-notification-module.md` 決策 8 不變）；自填信箱以驗證碼驗證延後到 A8 的 email 管道上線。

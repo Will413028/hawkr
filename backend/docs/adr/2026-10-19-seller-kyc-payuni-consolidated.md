@@ -166,4 +166,4 @@ KYC 認證與 PayUni 子商店從 seller-service 搬進 seller 模組。舊實�
 ## 修訂：收款帳戶的擁有者改成 payment 模組（2026-11-06，Will 決定 D28、D30；計畫 `plans/2026-10-29-payment-onboarding-stripe.md` 步驟 7d′）
 
 - 收款帳戶（`payment.accounts`）、它的建立與同步 job、webhook 的處理與後台的 3 支收款帳戶 RPC（`PaymentAdminService`）由 payment 模組擁有；seller 不再有 `payment_accounts` 與 `payment_provider_events`。
-- seller 保留平台審核、開通閘門（讀自存的副本 `seller.payout_capabilities.transfers_active`，由 payment 的 `PayoutAccountChanged` 經同 transaction 的訂閱者寫入）、曝光公告與 fingerprint 防詐 hash（同一個訂閱者寫入，D12 不變）。核准時 seller 呼叫 payment 的 `RequestAccount`（聯絡信箱由 seller 傳入，D23 不變；只 INSERT，同一家店再次核准不改既有列的信箱）；賣家端的 `GetMyPaymentAccount`、`CreatePaymentOnboardingSession` 留在 seller，確認店家擁有者後呼叫 payment（D30）。
+- seller 保留平台審核、開通閘門（讀自存的副本 `seller.payout_capabilities.transfers_active`，由 payment 的 `PayoutAccountChanged` 經同 transaction 的訂閱者寫入）、曝光公告與 fingerprint 防詐 hash（同一個訂閱者寫入，D12 不變）。核准時 seller 呼叫 payment 的 `RequestAccount`（只 INSERT；聯絡信箱不在 payment 保存，建立外部帳戶當下經 seller 的 `OwnerContactEmail` 讀取，見 `2026-11-13-payment-onboarding-provider-port-stripe.md`）；賣家端的 `GetMyPaymentAccount`、`CreatePaymentOnboardingSession` 留在 seller，確認店家擁有者後呼叫 payment（D30）。

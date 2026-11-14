@@ -5,7 +5,7 @@
 | 狀態 | accepted（Will，2026-11-14；Stripe 開通計畫 D62） |
 | 日期 | 2026-11-14 |
 | 影響範圍 | `internal/platform/adminaudit`（新）、`internal/httpapi/adminauth`（宣告表加紀錄模式）、`internal/modules/payment`（三個後台寫入接上、刪除自有紀錄表）、`cmd/hawkr`（`admin-audit` 營運子命令） |
-| 相關 | 「決策的稽核是領域列本身」與「讀取紀錄與修改紀錄目前沒有對外的列表方法」兩句的修訂寫在 `2026-10-02-seller-governance-in-monolith.md` 文末；後台權限與宣告表見 `2026-10-04-admin-roles.md`；payment 的後台動作見 `2026-11-13-payment-onboarding-provider-port-stripe.md`；計畫 `docs/plans/2026-10-29-payment-onboarding-stripe.md` D60、D62 |
+| 相關 | 「決策的稽核是領域列本身」與「讀取紀錄與修改紀錄目前沒有對外的列表方法」兩句的修訂寫在 `2026-10-18-seller-governance-consolidated.md` 文末；後台權限與宣告表見 `2026-10-04-admin-roles.md`；payment 的後台動作見 `2026-11-13-payment-onboarding-provider-port-stripe.md`；計畫 `docs/plans/2026-10-29-payment-onboarding-stripe.md` D60、D62 |
 
 ## 脈絡
 

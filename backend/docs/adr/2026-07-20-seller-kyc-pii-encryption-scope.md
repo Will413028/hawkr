@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted；A3（2026-09-29，Will 決定）核對：範圍維持（後台仍需以姓名模糊搜尋）。「不拆表」「停機回填」的限制在新 schema 不成立但不改變結論；PayUni 的 `raw_request` 存了明文身分證號、PII 清理不完整，在 A3b 修正。A3b 7c（2026-10-02）：範圍不變，加密實作改用 `internal/platform/seal` 的金鑰環、密文存 `bytea`，見 `2026-10-19-seller-kyc-payuni-consolidated.md`（取代 `2026-10-02-seller-kyc-payuni-in-monolith.md`） |
+| 狀態 | superseded by `2026-11-13-seller-platform-review-and-identity-matching.md`（平台不再保存身分證號與銀行帳號，沒有要加密的個資）；原為 accepted；A3（2026-09-29，Will 決定）核對：範圍維持（後台仍需以姓名模糊搜尋）。「不拆表」「停機回填」的限制在新 schema 不成立但不改變結論；PayUni 的 `raw_request` 存了明文身分證號、PII 清理不完整，在 A3b 修正。A3b 7c（2026-10-02）：範圍不變，加密實作改用 `internal/platform/seal` 的金鑰環、密文存 `bytea`，見 `2026-10-19-seller-kyc-payuni-consolidated.md`（取代 `2026-10-02-seller-kyc-payuni-in-monolith.md`） |
 | 日期 | 2026-07-20 |
 | 影響範圍 | seller-service `certification_applications`；`docs/modules/seller.md` §13（KYC 個資） |
 
