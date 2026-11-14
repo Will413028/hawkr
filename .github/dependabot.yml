@@ -282,9 +282,11 @@ updates:
     directory: "/backend/services/java"
     schedule:
       interval: "weekly"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     cooldown:
       default-days: 7
-      semver-major-days: 30
     groups:
       maven-minor-patch:
         update-types:
