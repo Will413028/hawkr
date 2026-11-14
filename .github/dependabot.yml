@@ -87,6 +87,10 @@ updates:
     directory: "/packages/hawkr_auth"
     schedule:
       interval: "weekly"
+    ignore:
+      # test 1.32.0 needs test_api 0.7.14; flutter_test in Flutter 3.47.7 pins 0.7.12.
+      - dependency-name: "test"
+        versions: [">=1.32.0"]
     cooldown:
       default-days: 14
       semver-major-days: 30
