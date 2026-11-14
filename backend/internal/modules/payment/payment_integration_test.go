@@ -399,7 +399,7 @@ func TestUnconfiguredProviderWritesNothing(t *testing.T) {
 	if err := m.ReceiveEvent(ctx, h, body); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("webhook err=%v", err)
 	}
-	if err := m.RefreshAccount(ctx, 1); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := m.RefreshAccount(ctx, 1); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("refresh err=%v", err)
 	}
 }
@@ -425,7 +425,6 @@ func TestJobsAreUniquePerOwnerInRiver(t *testing.T) {
 	}
 	external := f.ensure(t, 1)
 	for i := range 3 {
-		must(t, f.module.RefreshAccount(ctx, 1))
 		h, body := event(fmt.Sprintf("evt_%d", i), external)
 		must(t, f.module.ReceiveEvent(ctx, h, body))
 		must(t, f.module.ReceiveEvent(ctx, h, body))
@@ -450,7 +449,9 @@ func TestJobsAreUniquePerOwnerInRiver(t *testing.T) {
 	}
 	_, err = f.db.Conn(ctx).Exec(ctx, "UPDATE river.river_job SET state='running', attempted_at=now() WHERE kind=$1 AND args->>'store_id'='1'", kindSync)
 	must(t, err)
-	must(t, f.module.RefreshAccount(ctx, 1))
+	h, body := event("evt_while_running", external)
+	must(t, f.module.ReceiveEvent(ctx, h, body))
+	must(t, f.inbox.Dispatch(ctx, FakeName, "evt_while_running"))
 	if n := jobCount(kindSync, 1); n != 1 {
 		t.Fatalf("執行中又排了新的同步 job：%d", n)
 	}
@@ -936,7 +937,7 @@ func TestAFailedCloseKeepsTheRowMarkedExcludedFromPollingAndRetriedByTheSweep(t 
 	if _, fetches, _ := f.fake.Calls(); fetches != 0 {
 		t.Fatalf("等待清理的列被讀了 provider：%d 次", fetches)
 	}
-	if err := f.module.RefreshAccount(ctx, s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.RefreshAccount(ctx, s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("管理員重新整理 err=%v，預期 failed_precondition", err)
 	}
 	if err := f.module.SyncAccountUnlessFresh(ctx, s); err != nil {
@@ -1282,6 +1283,70 @@ func TestSellerTriggeredRereadIsDebouncedAndFailsLoudly(t *testing.T) {
 
 	// 還沒有外部帳戶的列：什麼都不做、不算失敗。
 	must(t, f.module.SyncAccountUnlessFresh(ctx, f.newStore(t)))
+}
+
+// 管理員的重新整理走賣家同一條同步重讀（D49-3）：同步向 provider 讀、回傳寫入後的帳戶；與賣家共用名額（任一方的受理都占住窗，窗內另一方不讀 provider）；
+// 失敗與窗內重試的結果與賣家相同；沒有外部帳戶回 FailedPrecondition，沒有列回 NotFound。時間用注入的 f.now，不睡眠。待 CI（integration）。
+// mutation：RefreshAccount 只排同步 job 不同步重讀 → 第一段 fetch 次數是 0、回傳的帳戶不是 ENABLED，失敗；RefreshAccount 繞過名額直接 Sync → 賣家剛讀完窗內又多一次 fetch，失敗。
+func TestAdminRefreshRereadsSynchronouslyThroughTheSellerPath(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	f.set(t, s, needsSellerSnapshot)
+	_, base, _ := f.fake.Calls()
+	external := *f.account(t, s).ExternalAccountID
+	fetches := func() int { _, n, _ := f.fake.Calls(); return n - base }
+
+	f.now = f.now.Add(account.ReadDebounce)
+	f.fake.Set(external, enabledSnapshot)
+	got, err := f.module.RefreshAccount(ctx, s)
+	must(t, err)
+	if n := fetches(); n != 1 {
+		t.Fatalf("管理員重新整理向 provider 讀了 %d 次，要 1 次", n)
+	}
+	if got.Status != StatusEnabled || got.FetchedAt == nil || !got.FetchedAt.Equal(f.now) {
+		t.Fatalf("回傳的不是重讀後的帳戶：status=%s fetched=%v", got.Status, got.FetchedAt)
+	}
+	if cached := f.account(t, s); cached.Status != got.Status {
+		t.Fatalf("回傳的帳戶與快取不一致：%s / %s", got.Status, cached.Status)
+	}
+
+	must(t, f.module.SyncAccountUnlessFresh(ctx, s))
+	if n := fetches(); n != 1 {
+		t.Fatalf("管理員剛讀完，窗內賣家重讀又讀了 provider，共 %d 次", n)
+	}
+
+	f.now = f.now.Add(account.ReadDebounce)
+	must(t, f.module.SyncAccountUnlessFresh(ctx, s))
+	if _, err := f.module.RefreshAccount(ctx, s); err != nil {
+		t.Fatalf("賣家剛讀完，窗內管理員重新整理 err=%v，預期成功", err)
+	}
+	if n := fetches(); n != 2 {
+		t.Fatalf("賣家剛讀完，窗內管理員重新整理又讀了 provider，共 %d 次", n)
+	}
+
+	f.now = f.now.Add(account.ReadDebounce)
+	f.fake.FailFetch(errors.New("provider 逾時"))
+	if _, err := f.module.RefreshAccount(ctx, s); apperr.KindOf(err) != apperr.KindUnavailable {
+		t.Fatalf("暫時性失敗是 %v，要 Unavailable", err)
+	}
+	f.now = f.now.Add(4 * time.Second)
+	_, err = f.module.RefreshAccount(ctx, s)
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Kind() != apperr.KindResourceExhausted || ae.RetryAfter != account.ReadDebounce-4*time.Second {
+		t.Fatalf("失敗後窗內的重試是 %v，要帶剩餘 %v 的 ResourceExhausted", err, account.ReadDebounce-4*time.Second)
+	}
+	if n := fetches(); n != 3 {
+		t.Fatalf("失敗的那次沒有占名額：窗內又讀了，共 %d 次", n)
+	}
+
+	if _, err := f.module.RefreshAccount(ctx, f.newStore(t)); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("還沒有外部帳戶：%v，要 FailedPrecondition", err)
+	}
+	if _, err := f.module.RefreshAccount(ctx, s+100000); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("沒有帳戶列：%v，要 NotFound", err)
+	}
 }
 
 // 並行的賣家重讀只有一個讀 provider（D33，搶名額）：第一個讀取進行中、同一時刻（注入的時鐘）又來一個，第二個搶不到、不呼叫 provider，

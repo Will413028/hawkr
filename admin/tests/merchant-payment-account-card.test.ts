@@ -162,25 +162,6 @@ test("paymentAccountOf：規則同 payUniOf（有錯誤就是錯誤，成功卻�
 	assert.match(denied, /收款帳戶讀取失敗：/);
 });
 
-test("rereadFinished：fetch_time 與按下時不同才算完成", () => {
-	const t0 = timestampFromDate(new Date("2026-11-03T06:20:00Z"));
-	const t1 = timestampFromDate(new Date("2026-11-03T06:21:00Z"));
-	const base = accountModule.fetchTimeMs(account({ fetchTime: t0 }));
-	assert.equal(
-		accountModule.rereadFinished(base, account({ fetchTime: t0 })),
-		false,
-	);
-	assert.equal(
-		accountModule.rereadFinished(base, account({ fetchTime: t1 })),
-		true,
-	);
-	assert.equal(accountModule.rereadFinished(base, undefined), false);
-	assert.equal(
-		accountModule.rereadFinished(undefined, account({ fetchTime: t1 })),
-		true,
-	);
-});
-
 test("接線：頁面的 invalidateKyc 一併重讀收款帳戶；收款帳戶的資料來自 use-store-detail 的 hook", async () => {
 	const { readFile } = await import("node:fs/promises");
 	const page = await readFile("src/app/admin/merchants/[id]/page.tsx", "utf8");

@@ -1,4 +1,3 @@
-import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError, type Transport } from "@connectrpc/connect";
 import { createQueryOptions } from "@connectrpc/connect-query";
 import {
@@ -7,7 +6,7 @@ import {
 } from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1/payment_pb";
 import { skipToken } from "@tanstack/react-query";
 
-// 商家詳情收款帳戶卡的純邏輯（讀取狀態、快取 key、重新整理後的重讀判斷）；元件在 PaymentAccountCard.tsx，查詢 hook 在 use-store-detail.ts。
+// 商家詳情收款帳戶卡的純邏輯（讀取狀態、快取 key）；元件在 PaymentAccountCard.tsx，查詢 hook 在 use-store-detail.ts。
 
 export type PaymentAccountState =
 	| { state: "loading" }
@@ -41,25 +40,4 @@ export function paymentAccountQueryOptions(
 		storeId ? { storeId } : skipToken,
 		{ transport },
 	);
-}
-
-/** 排入重新讀取後再讀的間隔：RefreshPaymentAccount 不等結果。 */
-export const REFRESH_REREAD_MS = 5000;
-/** 最多再讀幾次（間隔 × 次數是上限，約 30 秒）：背景工作沒在這段時間完成就停，操作者可以再按一次。 */
-export const REFRESH_REREAD_MAX_ATTEMPTS = 6;
-
-/** 帳戶的 fetch_time（毫秒）；沒有時是 undefined。 */
-export function fetchTimeMs(account: PaymentAccount | undefined) {
-	return account?.fetchTime
-		? timestampDate(account.fetchTime).getTime()
-		: undefined;
-}
-
-/** 重新整理的重讀是否可以停：fetch_time 與按下時不同（背景工作寫回了）。 */
-export function rereadFinished(
-	baselineMs: number | undefined,
-	account: PaymentAccount | undefined,
-): boolean {
-	const now = fetchTimeMs(account);
-	return now !== undefined && now !== baselineMs;
 }

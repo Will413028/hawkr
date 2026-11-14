@@ -128,10 +128,10 @@ func busyOutcome(claimedAt, fetchedAt *time.Time, now time.Time) error {
 	return nil
 }
 
-// SyncUnlessFresh 是賣家觸發的同步重讀（RefreshMyPaymentAccount）：先以單一條件式 UPDATE 搶讀取名額（ClaimPaymentAccountSellerRead）；搶到才讀
+// SyncUnlessFresh 是賣家與管理員觸發的同步重讀（RefreshMyPaymentAccount、後台的 RefreshPaymentAccount）：先以單一條件式 UPDATE 搶讀取名額（ClaimPaymentAccountSellerRead）；搶到才讀
 // （同一列沿用，不重讀）。搶不到時不呼叫 provider，依列上的時間回答（busyRetryAfter）：快取已涵蓋占名額的讀取就成功，否則（那次讀取失敗或還在進行中）
-// 回 ResourceExhausted 並帶窗的剩餘秒數，client 照它重試，失敗不會被快取蓋掉。這個限制的成立條件是外部讀取由賣家觸發、頻率不受 job 的唯一鍵約束，
-// 拿掉賣家觸發的呼叫時一起拿掉。沒有設定 provider 回 FailedPrecondition；沒有帳戶列或還沒有外部 ID 時什麼都不做（快取就是現況）。
+// 回 ResourceExhausted 並帶窗的剩餘秒數，client 照它重試，失敗不會被快取蓋掉。這個限制的成立條件是外部讀取由賣家或管理員觸發、頻率不受 job 的唯一鍵約束，
+// 拿掉這些觸發的呼叫時一起拿掉。沒有設定 provider 回 FailedPrecondition；沒有帳戶列或還沒有外部 ID 時什麼都不做（快取就是現況）。
 // 讀完仍有未處理的事件（again，例如被 D32 擋下而事件是在較晚的讀取之後到的）就在自己的 transaction 內排同步 job（唯一鍵合併），
 // 這個寫入不隨呼叫者取消。重讀失敗是明確動作的失敗：暫時性的回 Unavailable，外部帳戶不存在這類永久失敗回 FailedPrecondition；呼叫者自己取消的原樣回傳。
 func (s *Service) SyncUnlessFresh(ctx context.Context, storeID int64) error {
@@ -180,26 +180,29 @@ func (s *Service) SyncUnlessFresh(ctx context.Context, storeID int64) error {
 	return nil
 }
 
-// Refresh 是管理員的「重新整理狀態」：只排同步 job（以 store_id 為唯一鍵，已經有排隊的就合併）。沒有設定 provider、店家還沒有外部帳戶時回
-// FailedPrecondition，沒有這個店家的帳戶回 NotFound。
-func (s *Service) Refresh(ctx context.Context, storeID int64) error {
+// Refresh 是管理員的「重新整理狀態」：先檢查（沒有設定 provider、店家還沒有外部帳戶、帳戶在等待關閉回 FailedPrecondition，沒有這個店家的帳戶回 NotFound），
+// 再走賣家同一條同步重讀（SyncUnlessFresh：D32 的時間條件、D33 的名額與錯誤），回傳重讀後的帳戶。
+func (s *Service) Refresh(ctx context.Context, storeID int64) (model.PaymentAccount, error) {
 	if s.d.Provider == nil {
-		return apperr.FailedPrecondition("尚未設定收款開通")
+		return model.PaymentAccount{}, apperr.FailedPrecondition("尚未設定收款開通")
 	}
 	row, err := store.New(s.d.DB.Conn(ctx)).PaymentAccountByStore(ctx, storeID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return apperr.NotFound("店家還沒有收款帳戶")
+		return model.PaymentAccount{}, apperr.NotFound("店家還沒有收款帳戶")
 	}
 	if err != nil {
-		return err
+		return model.PaymentAccount{}, err
 	}
 	if row.ExternalAccountID == nil {
-		return apperr.FailedPrecondition("收款帳戶還沒有建立")
+		return model.PaymentAccount{}, apperr.FailedPrecondition("收款帳戶還沒有建立")
 	}
 	if row.PurgePendingAt != nil {
-		return apperr.FailedPrecondition("收款帳戶正在關閉")
+		return model.PaymentAccount{}, apperr.FailedPrecondition("收款帳戶正在關閉")
 	}
-	return s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueueSync(ctx, s.d.Jobs, storeID) })
+	if err := s.SyncUnlessFresh(ctx, storeID); err != nil {
+		return model.PaymentAccount{}, err
+	}
+	return s.Account(ctx, storeID)
 }
 
 // RetryCreate 是管理員的「重試建立」：只有建立失敗的列可以重試（清空失敗時刻並在同一個 transaction 重新排入建立 job）。

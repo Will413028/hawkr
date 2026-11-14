@@ -19,7 +19,7 @@ import (
 // AdminModule 是後台 handler 需要的模組方法。
 type AdminModule interface {
 	Account(ctx context.Context, storeID int64) (payment.Account, error)
-	RefreshAccount(ctx context.Context, storeID int64) error
+	RefreshAccount(ctx context.Context, storeID int64) (payment.Account, error)
 	RetryAccountCreate(ctx context.Context, storeID int64) (payment.Account, error)
 }
 
@@ -78,16 +78,17 @@ func (h *Admin) GetPaymentAccount(ctx context.Context, req *connect.Request[admi
 	return connect.NewResponse(&adminpb.GetPaymentAccountResponse{Account: toAdminAccount(acct)}), nil
 }
 
-// RefreshPaymentAccount 排入一次重讀外部帳戶的背景工作。
+// RefreshPaymentAccount 同步向金流商重讀外部帳戶並回最新帳戶；間隔與名額在 payment 的公開 API（與賣家的重讀同一條路徑），這裡不重複。
 func (h *Admin) RefreshPaymentAccount(ctx context.Context, req *connect.Request[adminpb.RefreshPaymentAccountRequest]) (*connect.Response[adminpb.RefreshPaymentAccountResponse], error) {
 	storeID, err := rpc.ParseID("store_id", req.Msg.GetStoreId())
 	if err != nil {
 		return nil, err
 	}
-	if err := h.m.RefreshAccount(ctx, storeID); err != nil {
+	acct, err := h.m.RefreshAccount(ctx, storeID)
+	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&adminpb.RefreshPaymentAccountResponse{}), nil
+	return connect.NewResponse(&adminpb.RefreshPaymentAccountResponse{Account: toAdminAccount(acct)}), nil
 }
 
 // RetryPaymentAccountCreate 對建立失敗的收款帳戶重新排入建立：沒有 etag 也不要理由，狀態檢查在模組，重送時第二次回 failed_precondition。

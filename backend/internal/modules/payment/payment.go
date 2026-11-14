@@ -205,8 +205,9 @@ func (m *Module) CreateOnboardingSession(ctx context.Context, storeID int64, ret
 	return m.accounts.CreateOnboardingSession(ctx, storeID, returnURL, refreshURL)
 }
 
-// RefreshAccount 管理員的「重新整理狀態」：排入同步 job。
-func (m *Module) RefreshAccount(ctx context.Context, storeID int64) error {
+// RefreshAccount 管理員的「重新整理狀態」：與賣家的 SyncAccountUnlessFresh 同一條同步重讀（同一個名額與間隔，D33），回傳重讀後的帳戶；
+// 沒有設定 provider、還沒有外部帳戶或帳戶在等待關閉回 FailedPrecondition，沒有帳戶列回 NotFound。呼叫方先確認呼叫者是管理員，且不能在 transaction 內呼叫。
+func (m *Module) RefreshAccount(ctx context.Context, storeID int64) (Account, error) {
 	return m.accounts.Refresh(ctx, storeID)
 }
 
@@ -237,7 +238,7 @@ func (m *Module) SyncAccount(ctx context.Context, storeID int64) (again bool, er
 	return m.accounts.Sync(ctx, storeID)
 }
 
-// SyncAccountUnlessFresh 是賣家觸發的同步重讀（seller 的 RefreshMyPaymentAccount）：間隔（10 秒）內已有讀取（含失敗的與並行的，以條件式 UPDATE 搶名額）就不向金流商讀、依列上的時間回成功或 ResourceExhausted（帶剩餘秒數，D33）；
+// SyncAccountUnlessFresh 是賣家觸發的同步重讀（seller 的 RefreshMyPaymentAccount；管理員的 RefreshAccount 也走它）：間隔（10 秒）內已有讀取（含失敗的與並行的，以條件式 UPDATE 搶名額）就不向金流商讀、依列上的時間回成功或 ResourceExhausted（帶剩餘秒數，D33）；
 // 搶到才同步重讀並寫入快取，讀完仍有未處理事件時排同步 job。沒有設定 provider 或帳戶列的 provider 不符回 FailedPrecondition；重讀失敗回 Unavailable（暫時性）或 FailedPrecondition（金流商沒有這個帳戶）。呼叫方先確認呼叫者是擁有者，且不能在 transaction 內呼叫。
 func (m *Module) SyncAccountUnlessFresh(ctx context.Context, storeID int64) error {
 	return m.accounts.SyncUnlessFresh(ctx, storeID)

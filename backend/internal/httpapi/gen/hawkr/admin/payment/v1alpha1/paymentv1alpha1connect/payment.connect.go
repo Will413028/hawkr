@@ -53,8 +53,9 @@ type PaymentAdminServiceClient interface {
 	// GetPaymentAccount 讀店家的收款帳戶（外部帳戶的本地快取：狀態、轉帳與撥款能力、待補條件的原始內容、停用原因）。店家還沒有收款帳戶
 	// （平台審核還沒核准，或沒有設定收款開通）時回 not_found。
 	GetPaymentAccount(context.Context, *connect.Request[v1alpha1.GetPaymentAccountRequest]) (*connect.Response[v1alpha1.GetPaymentAccountResponse], error)
-	// RefreshPaymentAccount 排入一次重讀外部帳戶的背景工作（營運工具；同一家店已有排隊的就合併，回應不等結果，結果從 GetPaymentAccount 看）。
-	// 沒有設定收款開通、外部帳戶還沒有建立時回 failed_precondition，店家沒有收款帳戶回 not_found。
+	// RefreshPaymentAccount 同步向金流商重讀外部帳戶並回最新帳戶（營運工具；與賣家端的重讀同一條路徑、同一個名額：同一帳戶上次讀取在 10 秒內就不向金流商讀，
+	// 快取已涵蓋該次讀取時回成功，否則回 resource_exhausted 並帶剩餘秒數（RetryInfo）；重讀失敗原樣回 unavailable）。
+	// 沒有設定收款開通、外部帳戶還沒有建立或帳戶在等待關閉時回 failed_precondition，店家沒有收款帳戶回 not_found。
 	RefreshPaymentAccount(context.Context, *connect.Request[v1alpha1.RefreshPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshPaymentAccountResponse], error)
 	// RetryPaymentAccountCreate 對建立失敗（重試用完，後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED）的收款帳戶重新排入建立。沒有 etag，由狀態檢查保護：
 	// 帳戶不是建立失敗的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。
@@ -125,8 +126,9 @@ type PaymentAdminServiceHandler interface {
 	// GetPaymentAccount 讀店家的收款帳戶（外部帳戶的本地快取：狀態、轉帳與撥款能力、待補條件的原始內容、停用原因）。店家還沒有收款帳戶
 	// （平台審核還沒核准，或沒有設定收款開通）時回 not_found。
 	GetPaymentAccount(context.Context, *connect.Request[v1alpha1.GetPaymentAccountRequest]) (*connect.Response[v1alpha1.GetPaymentAccountResponse], error)
-	// RefreshPaymentAccount 排入一次重讀外部帳戶的背景工作（營運工具；同一家店已有排隊的就合併，回應不等結果，結果從 GetPaymentAccount 看）。
-	// 沒有設定收款開通、外部帳戶還沒有建立時回 failed_precondition，店家沒有收款帳戶回 not_found。
+	// RefreshPaymentAccount 同步向金流商重讀外部帳戶並回最新帳戶（營運工具；與賣家端的重讀同一條路徑、同一個名額：同一帳戶上次讀取在 10 秒內就不向金流商讀，
+	// 快取已涵蓋該次讀取時回成功，否則回 resource_exhausted 並帶剩餘秒數（RetryInfo）；重讀失敗原樣回 unavailable）。
+	// 沒有設定收款開通、外部帳戶還沒有建立或帳戶在等待關閉時回 failed_precondition，店家沒有收款帳戶回 not_found。
 	RefreshPaymentAccount(context.Context, *connect.Request[v1alpha1.RefreshPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshPaymentAccountResponse], error)
 	// RetryPaymentAccountCreate 對建立失敗（重試用完，後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED）的收款帳戶重新排入建立。沒有 etag，由狀態檢查保護：
 	// 帳戶不是建立失敗的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。

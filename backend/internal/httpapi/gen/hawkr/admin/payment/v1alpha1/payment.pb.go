@@ -310,6 +310,7 @@ func (x *RefreshPaymentAccountRequest) GetStoreId() string {
 
 type RefreshPaymentAccountResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Account       *PaymentAccount        `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -342,6 +343,13 @@ func (x *RefreshPaymentAccountResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use RefreshPaymentAccountResponse.ProtoReflect.Descriptor instead.
 func (*RefreshPaymentAccountResponse) Descriptor() ([]byte, []int) {
 	return file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *RefreshPaymentAccountResponse) GetAccount() *PaymentAccount {
+	if x != nil {
+		return x.Account
+	}
+	return nil
 }
 
 type RetryPaymentAccountCreateRequest struct {
@@ -460,8 +468,9 @@ const file_hawkr_admin_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"\x19GetPaymentAccountResponse\x12F\n" +
 	"\aaccount\x18\x01 \x01(\v2,.hawkr.admin.payment.v1alpha1.PaymentAccountR\aaccount\">\n" +
 	"\x1cRefreshPaymentAccountRequest\x12\x1e\n" +
-	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\"\x1f\n" +
-	"\x1dRefreshPaymentAccountResponse\"B\n" +
+	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\"g\n" +
+	"\x1dRefreshPaymentAccountResponse\x12F\n" +
+	"\aaccount\x18\x01 \x01(\v2,.hawkr.admin.payment.v1alpha1.PaymentAccountR\aaccount\"B\n" +
 	" RetryPaymentAccountCreateRequest\x12\x1e\n" +
 	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\"k\n" +
 	"!RetryPaymentAccountCreateResponse\x12F\n" +
@@ -507,18 +516,19 @@ var file_hawkr_admin_payment_v1alpha1_payment_proto_depIdxs = []int32{
 	10, // 5: hawkr.admin.payment.v1alpha1.PaymentAccount.create_time:type_name -> google.protobuf.Timestamp
 	10, // 6: hawkr.admin.payment.v1alpha1.PaymentAccount.update_time:type_name -> google.protobuf.Timestamp
 	0,  // 7: hawkr.admin.payment.v1alpha1.GetPaymentAccountResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
-	0,  // 8: hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
-	1,  // 9: hawkr.admin.payment.v1alpha1.PaymentAdminService.GetPaymentAccount:input_type -> hawkr.admin.payment.v1alpha1.GetPaymentAccountRequest
-	3,  // 10: hawkr.admin.payment.v1alpha1.PaymentAdminService.RefreshPaymentAccount:input_type -> hawkr.admin.payment.v1alpha1.RefreshPaymentAccountRequest
-	5,  // 11: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountCreate:input_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateRequest
-	2,  // 12: hawkr.admin.payment.v1alpha1.PaymentAdminService.GetPaymentAccount:output_type -> hawkr.admin.payment.v1alpha1.GetPaymentAccountResponse
-	4,  // 13: hawkr.admin.payment.v1alpha1.PaymentAdminService.RefreshPaymentAccount:output_type -> hawkr.admin.payment.v1alpha1.RefreshPaymentAccountResponse
-	6,  // 14: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountCreate:output_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateResponse
-	12, // [12:15] is the sub-list for method output_type
-	9,  // [9:12] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	0,  // 8: hawkr.admin.payment.v1alpha1.RefreshPaymentAccountResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
+	0,  // 9: hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
+	1,  // 10: hawkr.admin.payment.v1alpha1.PaymentAdminService.GetPaymentAccount:input_type -> hawkr.admin.payment.v1alpha1.GetPaymentAccountRequest
+	3,  // 11: hawkr.admin.payment.v1alpha1.PaymentAdminService.RefreshPaymentAccount:input_type -> hawkr.admin.payment.v1alpha1.RefreshPaymentAccountRequest
+	5,  // 12: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountCreate:input_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateRequest
+	2,  // 13: hawkr.admin.payment.v1alpha1.PaymentAdminService.GetPaymentAccount:output_type -> hawkr.admin.payment.v1alpha1.GetPaymentAccountResponse
+	4,  // 14: hawkr.admin.payment.v1alpha1.PaymentAdminService.RefreshPaymentAccount:output_type -> hawkr.admin.payment.v1alpha1.RefreshPaymentAccountResponse
+	6,  // 15: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountCreate:output_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateResponse
+	13, // [13:16] is the sub-list for method output_type
+	10, // [10:13] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_admin_payment_v1alpha1_payment_proto_init() }

@@ -6,7 +6,10 @@ import {
 	useMutation as useConnectMutation,
 	useTransport,
 } from "@connectrpc/connect-query";
-import { PaymentAdminService } from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1/payment_pb";
+import {
+	type PaymentAccount,
+	PaymentAdminService,
+} from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1/payment_pb";
 import { ReviewQueueAdminService } from "@hawkr/api/gen/hawkr/admin/reviewqueue/v1alpha1/review_queue_pb";
 import { SellerAdminService } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
 import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
@@ -15,7 +18,6 @@ import {
 	paymentRequirementCollection,
 } from "@hawkr/ui-text/keys";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
 import { type BadgeVariant, Button } from "@/components/UI";
 import CopyIconButton from "@/features/delegated-operations/components/CopyIconButton";
 import { connectErrorText, errorMessage } from "@/lib/error-text";
@@ -24,12 +26,8 @@ import { staffTextOrUnknown } from "@/lib/ui-text";
 import { DetailCardShell } from "./DetailCardShell";
 import type { GovernanceNotice } from "./GovernanceNotice";
 import {
-	fetchTimeMs,
 	type PaymentAccountState,
 	paymentAccountQueryOptions,
-	REFRESH_REREAD_MAX_ATTEMPTS,
-	REFRESH_REREAD_MS,
-	rereadFinished,
 } from "./payment-account";
 import type { usePaymentAccount } from "./use-store-detail";
 
@@ -208,18 +206,16 @@ export function PaymentAccountCard({
 
 /**
  * 商家詳情放的收款帳戶區塊：資料來自頁面的 usePaymentAccount，動作的結果走頁面的 notice（onNotice，與重新綁定同一個結果區）。
- * 重新整理後每隔 rereadMs 重讀，直到 fetch_time 變了或到次數上限；重試建立的回應直接寫進快取。
+ * 重新整理與重試建立的回應都直接寫進快取（重新整理是同步重讀，回應帶最新帳戶）。
  */
 export function PaymentAccountSection({
 	storeId,
 	payment,
 	onNotice,
-	rereadMs = REFRESH_REREAD_MS,
 }: {
 	storeId: string;
 	payment: ReturnType<typeof usePaymentAccount>;
 	onNotice: (notice: GovernanceNotice | null) => void;
-	rereadMs?: number;
 }) {
 	const queryClient = useQueryClient();
 	const transport = useTransport();
@@ -229,26 +225,7 @@ export function PaymentAccountSection({
 	const retryMutation = useConnectMutation(
 		PaymentAdminService.method.retryPaymentAccountCreate,
 	);
-	const rereadTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
-		undefined,
-	);
-	// 每次重新排程或卸載就換一代，上一代還在等的重讀結果不再排下一輪。
-	const generation = useRef(0);
-	const stopReread = () => {
-		generation.current += 1;
-		clearTimeout(rereadTimer.current);
-	};
-	// 卸載後才回來的重新整理回應不可再排計時器（cleanup 的 stopReread 已經跑過了）。
-	const mounted = useRef(false);
-	useEffect(() => {
-		mounted.current = true;
-		return () => {
-			mounted.current = false;
-			stopReread();
-		};
-	}, []);
-
-	// 處理過的待辦（建立失敗）依帳戶狀態出入佇列：重新整理排入、重讀完成、重試建立成功都重讀。
+	// 處理過的待辦（建立失敗）依帳戶狀態出入佇列：重新整理完成、重試建立成功都重讀。
 	const invalidateQueue = () => {
 		void queryClient.invalidateQueries({
 			queryKey: createConnectQueryKey({
@@ -257,7 +234,7 @@ export function PaymentAccountSection({
 			}),
 		});
 	};
-	// 開通任務的收款帳戶項跟著帳戶結果走：只在重讀完成與重試建立成功時重讀（重新整理剛排入時帳戶還沒變）。
+	// 開通任務的收款帳戶項跟著帳戶結果走：重新整理完成與重試建立成功時重讀。
 	const invalidateOnboarding = () => {
 		void queryClient.invalidateQueries({
 			queryKey: createConnectQueryKey({
@@ -267,35 +244,21 @@ export function PaymentAccountSection({
 		});
 	};
 
-	const startReread = (baselineMs: number | undefined) => {
-		stopReread();
-		const mine = generation.current;
-		let attempt = 0;
-		const schedule = () => {
-			rereadTimer.current = setTimeout(async () => {
-				attempt += 1;
-				const result = await payment.query.refetch();
-				// 帳戶快取已更新：即使已卸載或被新一輪取代，頁面層的開通任務查詢也要重讀；世代只管要不要排下一輪。
-				if (rereadFinished(baselineMs, result.data?.account)) {
-					invalidateQueue();
-					invalidateOnboarding();
-					return;
-				}
-				if (generation.current !== mine) return;
-				if (attempt < REFRESH_REREAD_MAX_ATTEMPTS) schedule();
-			}, rereadMs);
-		};
-		schedule();
+	const writeAccount = (account: PaymentAccount | undefined) => {
+		queryClient.setQueryData(
+			paymentAccountQueryOptions(transport, storeId).queryKey,
+			{ account },
+		);
 	};
 
 	const handleRefresh = async () => {
 		onNotice(null);
-		const baselineMs = fetchTimeMs(payment.query.data?.account);
 		try {
-			await refreshMutation.mutateAsync({ storeId });
+			const res = await refreshMutation.mutateAsync({ storeId });
+			writeAccount(res.account);
 			onNotice({ tone: "success", text: REFRESH_QUEUED_TEXT });
 			invalidateQueue();
-			if (mounted.current) startReread(baselineMs);
+			invalidateOnboarding();
 		} catch (caught) {
 			onNotice({
 				tone: "error",
@@ -307,10 +270,7 @@ export function PaymentAccountSection({
 		onNotice(null);
 		try {
 			const res = await retryMutation.mutateAsync({ storeId });
-			queryClient.setQueryData(
-				paymentAccountQueryOptions(transport, storeId).queryKey,
-				{ account: res.account },
-			);
+			writeAccount(res.account);
 			onNotice({ tone: "success", text: RETRY_QUEUED_TEXT });
 			invalidateQueue();
 			invalidateOnboarding();
