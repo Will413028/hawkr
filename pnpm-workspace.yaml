@@ -89,11 +89,12 @@ overrides:
   # second advisory is the incomplete-fix follow-up; patched >=8.5.23.
   # next 16.3.2 now pins the safe version 8.5.23 exactly. Other requesters still
   # admit older vulnerable releases, so this workspace-wide security floor stays.
-  # `^8.5.23` is broader than Next's exact pin even though both stay in the
-  # patched 8.5.x line, so the deliberate range overshoot remains explicit.
-  # EXCEEDS-UPSTREAM: next — the override range is broader than its exact 8.5.23 pin
+  # Pinned to 8.5.32: vite declares `^8.5.30`, and 8.5.32 is the newest release
+  # at least two weeks old. It is above Next's exact 8.5.23 pin, so the overshoot
+  # stays explicit.
+  # EXCEEDS-UPSTREAM: next — the override pin is above its exact 8.5.23 pin
   # REMOVE-WHEN: requesters-demand >=8.5.23
-  postcss: ^8.5.23
+  postcss: 8.5.32
   # GHSA-rgw5-rvv9-x895 (supersedes GHSA-mh99-v99m-4gvg / GHSA-3jxr-9vmj-r5cp):
   # DoS via unbounded intermediate arrays. Only the 5.x line is affected, and
   # minimatch 3.x/8.x still legitimately sit on 1.x/2.x — so this is scoped to
@@ -122,10 +123,10 @@ overrides:
   # REMOVE-WHEN: requesters-demand >=3.1.8
   fast-uri: ^3.1.8
   # GHSA-2v37-7h3g-55p8: custom generators loop indefinitely when size is
-  # zero. postcss declares `^3.3.16`, so the patched release remains inside the
-  # declared range and no EXCEEDS-UPSTREAM marker is needed.
+  # zero. Pinned to 3.3.20, which postcss now declares as its floor (`^3.3.20`),
+  # so it stays inside the declared range.
   # REMOVE-WHEN: requesters-demand >=3.3.18
-  nanoid: ^3.3.18
+  nanoid: 3.3.20
   # GHSA-73wf-gq98-2v4g: `normalizeStats` writes through to Object.prototype and
   # crashes uncaught on an untrusted `browserslist-stats.json`. Patched >=4.28.7;
   # the tree resolved 4.28.2 through three @sentry/nextjs paths (bundler-plugin-core
@@ -164,12 +165,12 @@ overrides:
   # package.json `pnpm.overrides`, now bounded and with an exit condition.
   # REMOVE-WHEN: requesters-demand >=4.0.6
   form-data@^4.0.0: ^4.0.6
-  # miniflare pins exactly 8.21.0 (the patched release); the range only admits
-  # newer 8.x patch releases. The floor is 8.21.1 because storybook declares
-  # `^8.21.1` and the override must stay inside that range.
-  # EXCEEDS-UPSTREAM: miniflare — the range is broader than its exact pin
+  # miniflare pins exactly 8.21.0 (the patched release). Pinned to 8.22.1:
+  # @vitest/browser declares `^8.22.0`, and 8.22.1 is the newest release at
+  # least two weeks old.
+  # EXCEEDS-UPSTREAM: miniflare — the override pin is above its exact pin
   # REMOVE-WHEN: requesters-demand >=8.21.0
-  ws@^8.0.0: ^8.21.1
+  ws@^8.0.0: 8.22.1
 
 # pnpm 11+ requires explicit approval for dependencies that run install
 # scripts. 只列目前依賴樹裡實際存在、且跑 install script 的套件；
