@@ -1249,7 +1249,7 @@ func TestPaymentOnboardingSquashedMigrationDeletesRetiredRowsAndKeepsTheRest(t *
 		) AS k(kind, review_id) WHERE store_code = 2600000710`)
 	exec(`INSERT INTO seller.agreement_acceptances (store_id, kind, version, account_id, accepted_at, submission_review_id)
 		SELECT store_id, 'KYC_PRIVACY_NOTICE', 'v1', account_id, now(), '0199dddd-0000-7000-8000-000000000011' FROM seller.stores WHERE store_code = 2600000710`)
-	for _, field := range []string{"ID_CARD_NO", "REP_ID_CARD_NO", "BANK_ACCOUNT", "TAX_ID", "BANK_FINGERPRINT"} {
+	for _, field := range []string{"ID_CARD_NO", "REP_ID_CARD_NO", "BANK_ACCOUNT", "TAX_ID"} {
 		exec(`INSERT INTO seller.account_identity_hashes (source_store_id, field, key_id, hash, account_id, created_at)
 			SELECT store_id, $1, 'k1', sha256(convert_to($1::text, 'UTF8')), account_id, now() FROM seller.stores WHERE store_code = 2600000710`, field)
 	}
@@ -1308,8 +1308,8 @@ func TestPaymentOnboardingSquashedMigrationDeletesRetiredRowsAndKeepsTheRest(t *
 	if got := column(`SELECT kind FROM seller.agreement_acceptances ORDER BY kind`); !slices.Equal(got, []string{"KYC_PRIVACY_NOTICE", "SELLER_TERMS"}) {
 		t.Errorf("收款商條款的同意與掛在重新綁定審核上的同意刪掉，其餘留下：%v", got)
 	}
-	if got := column(`SELECT field FROM seller.account_identity_hashes ORDER BY field`); !slices.Equal(got, []string{"BANK_FINGERPRINT", "TAX_ID"}) {
-		t.Errorf("防詐保存只留統編與銀行 fingerprint：%v", got)
+	if got := column(`SELECT field FROM seller.account_identity_hashes ORDER BY field`); !slices.Equal(got, []string{"TAX_ID"}) {
+		t.Errorf("防詐保存在舊欄位裡只留統編：%v", got)
 	}
 	if got := column(`SELECT kind FROM seller.measure_identities ORDER BY kind`); !slices.Equal(got, []string{"BANK_ACCOUNT", "TAX_ID"}) {
 		t.Errorf("措施的身分快照刪掉 ID_CARD，留下統編與銀行帳號：%v", got)
