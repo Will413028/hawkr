@@ -16,7 +16,7 @@ func dateText(d *time.Time) *string {
 	return &s
 }
 
-// toApplication 把儲存的列轉成檢視：型別沒有欄位能放身分證號、銀行帳號與個人姓名（Stripe 計畫 D22、D37），申請的列也沒有這些欄位。
+// toApplication 把儲存的列轉成檢視：型別沒有欄位能放身分證號、銀行帳號與個人姓名（收款開通 ADR D22、D37），申請的列也沒有這些欄位。
 func toApplication(row store.SellerKycApplication, accountID int64) model.KYCApplication {
 	return model.KYCApplication{
 		ID: row.ApplicationID, StoreID: row.StoreID, AccountID: accountID, Status: model.KYCStatus(row.Status),

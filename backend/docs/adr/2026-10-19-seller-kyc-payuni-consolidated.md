@@ -151,7 +151,7 @@ KYC 認證與 PayUni 子商店從 seller-service 搬進 seller 模組。舊實�
 
 `seller.deleted` 的消費者不再包含 pricebook（`pricebook.seller.deleted` queue 已從 topology 刪除）。
 
-## 修訂：防詐身分雜湊獨立保存 5 年，關聯帳號納入銀行帳號（2026-10-30，Will 2026-10-29 決定 D3、D4；計畫 `plans/2026-10-29-payment-onboarding-stripe.md` 步驟 3）
+## 修訂：防詐身分雜湊獨立保存 5 年，關聯帳號納入銀行帳號（2026-10-30，Will 2026-10-29 決定 D3、D4；計畫已刪；決定見 `2026-11-13-payment-onboarding-provider-port-stripe.md` 的「決定編號」）
 
 脈絡：本檔「比對 hash 的保留」寫「KYC 列的 hash 隨 KYC 個資一起清理」，快照只能取到處分當下還沒清理的 hash，關店 184 天後才被處分的舊 stint 用過的身分是接受的缺口（W8）。Will 決定把防詐用的身分比對索引與 KYC 個資分開保存。原決策段保留歷史，下列取代它們的對應部分。
 
@@ -163,7 +163,7 @@ KYC 認證與 PayUni 子商店從 seller-service 搬進 seller 模組。舊實�
 - 條款 21.3、賣家身分認證告知事項第 4 項與隱私政策的保存目的與期間要寫入這個 5 年的 blind index（草稿待 Will 核可，不在本次 commit）。
 - 系統未上線，migration 不回填既有申請。
 
-## 修訂：收款帳戶的擁有者改成 payment 模組（2026-11-06，Will 決定 D28、D30；計畫 `plans/2026-10-29-payment-onboarding-stripe.md` 步驟 7d′）
+## 修訂：收款帳戶的擁有者改成 payment 模組（2026-11-06，Will 決定 D28、D30；計畫已刪；決定見 `2026-11-13-payment-onboarding-provider-port-stripe.md` 的「決定編號」）
 
 - 收款帳戶（`payment.accounts`）、它的建立與同步 job、webhook 的處理與後台的 3 支收款帳戶 RPC（`PaymentAdminService`）由 payment 模組擁有；seller 不再有 `payment_accounts` 與 `payment_provider_events`。
 - seller 保留平台審核、開通閘門（讀自存的副本 `seller.payout_capabilities.transfers_active`，由 payment 的 `PayoutAccountChanged` 經同 transaction 的訂閱者寫入）、曝光公告與 fingerprint 防詐 hash（同一個訂閱者寫入，D12 不變）。核准時 seller 呼叫 payment 的 `RequestAccount`（只 INSERT；聯絡信箱不在 payment 保存，建立外部帳戶當下經 seller 的 `OwnerContactEmail` 讀取，見 `2026-11-13-payment-onboarding-provider-port-stripe.md`）；賣家端的 `GetMyPaymentAccount`、`CreatePaymentOnboardingSession` 留在 seller，確認店家擁有者後呼叫 payment（D30）。

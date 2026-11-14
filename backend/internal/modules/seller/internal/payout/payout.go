@@ -1,6 +1,6 @@
 // Package payout 是 seller 對收款帳戶（payment 模組擁有）的訂閱者：payment 的同步 job 在寫帳戶快照的 transaction 內發 PayoutAccountChanged，
 // 這裡在同一個 transaction 內把轉帳能力複製到開通閘門讀的副本（payout_capabilities）、把外部銀行帳號 fingerprint 寫成防詐比對 hash（D12），
-// 閘門的輸入有變時重新公告可曝光（Stripe 計畫 D28）。全域鎖順序 payment 先於 seller：payment 的帳戶列已先鎖住，這裡依序鎖副本列、公告列。
+// 閘門的輸入有變時重新公告可曝光（收款開通 ADR D28）。全域鎖順序 payment 先於 seller：payment 的帳戶列已先鎖住，這裡依序鎖副本列、公告列。
 package payout
 
 import (

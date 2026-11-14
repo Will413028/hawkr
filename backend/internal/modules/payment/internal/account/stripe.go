@@ -15,7 +15,7 @@ import (
 const StripeName = "stripe"
 
 // Stripe 是 Provider 的 Stripe 實作（Accounts v2）。收件方式決定外部帳戶的 dashboard：provider 收件用 express，平台收件
-// 用 none（計畫 D2、D7，spike Q9）；兩種都可以開託管的 Account Link，平台收件的帳戶在呼叫端宣告內嵌時另可開內嵌的 Account Session。建立外部帳戶的收件方式取自帳戶列保存的值（EnsureInput 的 Collection），
+// 用 none（收款開通 ADR D2、D7，sandbox 實測）；兩種都可以開託管的 Account Link，平台收件的帳戶在呼叫端宣告內嵌時另可開內嵌的 Account Session。建立外部帳戶的收件方式取自帳戶列保存的值（EnsureInput 的 Collection），
 // 開通 session 的形狀由 ChooseSession 決定（SessionInput 的 Kind），行程設定的 collection 只決定新列寫入的值（Capabilities）。
 type Stripe struct {
 	client         *stripe.Client

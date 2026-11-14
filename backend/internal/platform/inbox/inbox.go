@@ -1,4 +1,4 @@
-// Package inbox 是外部 provider 事件的 webhook inbox（Stripe 計畫 D29；backend/AGENTS.md 單體規則 5）：platform 擁有 schema
+// Package inbox 是外部 provider 事件的 webhook inbox（收款開通 ADR D29；backend/AGENTS.md 單體規則 5）：platform 擁有 schema
 // inbox（db/schema.sql），模組只經這裡的 API 讀寫。
 //
 // 流程：入口驗過簽章後在一個 transaction 內呼叫 Record（寫一列並排入派送 job），commit 之後才回 2xx；派送 job 在一個 transaction 內呼叫

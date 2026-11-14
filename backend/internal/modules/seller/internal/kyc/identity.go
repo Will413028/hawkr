@@ -14,7 +14,7 @@ import (
 //
 // 比對用金鑰環的每一把金鑰重算（輪替前寫入的快照才找得到）。措施的身分是快照加上被處分帳號目前的 hash；「措施生效」與「帶身分效果」都只由 SQL 的
 // seller.measure_identity_sources 決定（與處分頁的關聯帳號同一份定義），這裡不再判斷：回來的列都屬於在 now 生效的措施。
-// 平台不再收銀行帳號與身分證號（Stripe 計畫 D22、D45），所以沒有「銀行帳號相同」的標記。
+// 平台不再收銀行帳號與身分證號（收款開通 ADR D22、D45），所以沒有「銀行帳號相同」的標記。
 func (s *Service) match(ctx context.Context, q *store.Queries, row store.SellerKycApplication, accountID int64, now time.Time) (blocked bool, err error) {
 	if row.TaxID == nil {
 		return false, nil

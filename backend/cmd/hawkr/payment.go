@@ -125,14 +125,14 @@ func newInbox(d *db.DB, jc jobs.Enqueuer, log *slog.Logger) *inbox.Inbox {
 	return inbox.New(inbox.Deps{DB: d, Jobs: jc, Now: time.Now, Logger: log})
 }
 
-// newPayment 組裝 payment 模組（Stripe 計畫 D28）。回傳的 sellerOwners 要在 seller 組裝之後 bind；PayoutAccountChanged 的訂閱者由
+// newPayment 組裝 payment 模組（收款開通 ADR D28）。回傳的 sellerOwners 要在 seller 組裝之後 bind；PayoutAccountChanged 的訂閱者由
 // subscribeSellerPayout 接上（serve 與 worker 都要：同步 job 在 worker 發布，seller 的種子在子命令發布）。
 func newPayment(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, box *inbox.Inbox, provider payment.Provider, log *slog.Logger) (*payment.Module, *sellerOwners) {
 	owners := &sellerOwners{}
 	return payment.New(payment.Deps{DB: d, Events: bus, Jobs: jc, Inbox: box, Audit: adminaudit.New(d, time.Now), Provider: provider, Owners: owners, Now: time.Now, Logger: log}), owners
 }
 
-// subscribeSellerPayout 讓 seller 在 payment 同步的 transaction 內更新開通閘門的副本與防詐 hash（Stripe 計畫 D12、D28）。seller 依賴 payment，
+// subscribeSellerPayout 讓 seller 在 payment 同步的 transaction 內更新開通閘門的副本與防詐 hash（收款開通 ADR D12、D28）。seller 依賴 payment，
 // 下層通知上層的接線只在這裡。
 func subscribeSellerPayout(bus *events.Bus, module *seller.Module) {
 	events.Subscribe(bus, module.OnPayoutAccountChanged)
@@ -143,7 +143,7 @@ type discardJobs struct{}
 
 func (discardJobs) Enqueue(context.Context, river.JobArgs, *river.InsertOpts) error { return nil }
 
-// seedPaymentAccounts 讓種子店家有「可以收款」的收款帳戶（Stripe 計畫 7d′）：以 payment 的 fake provider（AutoActive）走正式的核准寫入、建立與同步，
+// seedPaymentAccounts 讓種子店家有「可以收款」的收款帳戶（收款開通 ADR D28）：以 payment 的 fake provider（AutoActive）走正式的核准寫入、建立與同步，
 // 同步發的 PayoutAccountChanged 經 seller 的訂閱者寫入開通閘門的副本。聯絡信箱由建立時向店家所屬帳號讀（種子帳號的 identity 信箱，D50）。已有帳戶列的店家沿用（D19）；帳戶是別的 provider 的（例如本機
 // 接過 Stripe sandbox）時 fake 不碰它，只印出提醒，那家店的閘門照該帳戶的狀態。
 func seedPaymentAccounts(ctx context.Context, c *sellerCommand, fake *payment.Fake, storeIDs []int64, out io.Writer) error {

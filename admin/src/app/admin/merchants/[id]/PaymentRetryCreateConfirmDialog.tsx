@@ -8,7 +8,7 @@ import {
 } from "./GovernanceNotice";
 
 /**
- * 建立結果不明、超過可向金流商查回的期限之後的「重試建立」確認（PaymentAdminService.RetryPaymentAccountCreate 的 acknowledge_no_provider_account，Stripe 計畫 D63）。
+ * 建立結果不明、超過可向金流商查回的期限之後的「重試建立」確認（PaymentAdminService.RetryPaymentAccountCreate 的 acknowledge_no_provider_account，收款開通 ADR D63）。
  *
  * 重試會換新的冪等鍵並建立新的收款帳戶：管理員按確認等於聲明金流商那邊沒有這家店的帳戶。只有帳戶的 create_unresolved 為真時才出現；
  * 其他建立失敗的重試不需要確認。

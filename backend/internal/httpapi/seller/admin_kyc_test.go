@@ -96,7 +96,7 @@ func adminApplication() model.KYCAdminApplication {
 	}
 }
 
-// GetKYCApplication 直接回公司補充文件的檢視網址與 asset_id（Stripe 計畫 D36），不回 object key；讀取不寫稽核（稽核在檔案端點，每次讀圖才寫）。
+// GetKYCApplication 直接回公司補充文件的檢視網址與 asset_id（收款開通 ADR D36），不回 object key；讀取不寫稽核（稽核在檔案端點，每次讀圖才寫）。
 func TestGetKYCApplicationReturnsDocumentViewURIsAndAssetIDs(t *testing.T) {
 	m := &adminKYCModule{got: adminApplication()}
 	resp, err := newTestAdmin(m).GetKYCApplication(adminCtx(1), connect.NewRequest(&adminpb.GetKYCApplicationRequest{Id: m.got.ID.String()}))

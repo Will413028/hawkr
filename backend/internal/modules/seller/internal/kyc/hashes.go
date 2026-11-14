@@ -9,7 +9,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 )
 
-// 防詐保存的比對 hash 的欄位名（account_identity_hashes.field）：申請的統編（Stripe 計畫 D42：申請沒有自己的 hash 表，身分證號、負責人身分證號與
+// 防詐保存的比對 hash 的欄位名（account_identity_hashes.field）：申請的統編（收款開通 ADR D42：申請沒有自己的 hash 表，身分證號、負責人身分證號與
 // 平台自收的銀行帳號三個舊種類已刪，D38）。
 const fieldTaxID = "TAX_ID"
 

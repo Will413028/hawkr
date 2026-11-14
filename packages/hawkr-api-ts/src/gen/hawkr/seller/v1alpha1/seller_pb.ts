@@ -1185,7 +1185,7 @@ export const KYCRejectionSchema: GenMessage<KYCRejection> = /*@__PURE__*/
   messageDesc(file_hawkr_seller_v1alpha1_seller, 37);
 
 /**
- * IndividualKYC 是個人賣家專屬的欄位；目前沒有欄位（平台不收身分證號，Stripe 計畫 D22），設定它表示賣家型態是個人。
+ * IndividualKYC 是個人賣家專屬的欄位；目前沒有欄位（平台不收身分證號，收款開通 ADR D22），設定它表示賣家型態是個人。
  *
  * @generated from message hawkr.seller.v1alpha1.IndividualKYC
  */
@@ -1255,7 +1255,7 @@ export const BusinessKYCSchema: GenMessage<BusinessKYC> = /*@__PURE__*/
  * 欄位在那一支裡面。update_mask 的路徑可以下到那一支（business.tax_id），列 individual 或 business
  * 本身是那一支全部可寫的欄位，"*" 是所有最上層欄位加上設定的那一支。建立時 subject 必須設定其中一支；後來設定另一支並且
  * update_mask 列到它的欄位，就是切換型態，原本那一支專屬的欄位（企業的公司資料與公司文件）一併清掉。
- * 平台不收身分證號、銀行帳號、證件影像與個人姓名（Stripe 計畫 D22、D37）；統編是市集登記資料。日期是日曆日。
+ * 平台不收身分證號、銀行帳號、證件影像與個人姓名（收款開通 ADR D22、D37）；統編是市集登記資料。日期是日曆日。
  * 公司文件是狀態：company_documents 整個換成請求的清單，每個元素是現有的圖片（asset_id，保留）或新上傳的圖片（staged_token），
  * 同一張圖片不能放進兩個位置。
  *

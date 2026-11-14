@@ -31,7 +31,7 @@ type KYCDocument = model.KYCDocument
 // KYCDocumentRef 是草稿裡一張公司文件的指定（保留現有的或換上新上傳的）。
 type KYCDocumentRef = model.KYCDocumentRef
 
-// KYCApplication 是申請的檢視（平台不收身分證號、銀行帳號與證件影像，Stripe 計畫 D22）。
+// KYCApplication 是申請的檢視（平台不收身分證號、銀行帳號與證件影像，收款開通 ADR D22）。
 type KYCApplication = model.KYCApplication
 
 // KYCRejection 是最近一次退回的內容。

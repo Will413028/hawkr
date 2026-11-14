@@ -19,7 +19,7 @@ const (
 
 // ChooseSession 是開通 session 形狀的唯一決定處：帳戶列保存的收件方式是平台收件、而且 provider 支援的內嵌執行環境
 // （Capabilities.EmbeddedRuntimes）與呼叫端宣告的有交集才內嵌，其餘一律託管連結。只看帳戶列、provider 的能力與呼叫端的宣告，
-// 不看行程設定，也不比 provider 名稱；平台收件的帳戶走託管連結是可行的（spike Q23）。
+// 不看行程設定，也不比 provider 名稱；平台收件的帳戶走託管連結是可行的（sandbox 實測）。
 func ChooseSession(collection model.RequirementCollection, supported, declared []model.EmbeddedRuntime) SessionKind {
 	if collection != model.CollectionPlatform {
 		return SessionHosted

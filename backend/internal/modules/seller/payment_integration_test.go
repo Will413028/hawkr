@@ -14,7 +14,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 收款帳戶由 payment 模組擁有（Stripe 計畫 D28）：這裡測 seller 這一側——核准經 payment 的公開 API 寫帳戶列、PayoutAccountChanged 的訂閱者更新
+// 收款帳戶由 payment 模組擁有（收款開通 ADR D28）：這裡測 seller 這一側——核准經 payment 的公開 API 寫帳戶列、PayoutAccountChanged 的訂閱者更新
 // 開通閘門的副本。payment 自己的 job、inbox 與輪詢在 payment 模組的 integration 測試。
 
 const kindPaymentEnsure = "payment.account_ensure"
@@ -200,7 +200,7 @@ func TestSubmitKYCRequiresAContactEmail(t *testing.T) {
 }
 
 // 再次核准時帳戶列已存在：核准的 transaction 只 INSERT 帳戶列（ON CONFLICT DO NOTHING），不鎖、不改 payment 的既有列（全域鎖順序 payment 先於
-// seller，Stripe 計畫 7d′）；還沒有外部帳戶的列重新排入建立 job，建立時送的是帳號當下的信箱（payment 不存信箱）。
+// seller，收款開通 ADR D28）；還沒有外部帳戶的列重新排入建立 job，建立時送的是帳號當下的信箱（payment 不存信箱）。
 // mutation：RequestAccount 改成 ON CONFLICT DO UPDATE → integration 的 lockorder 檢查報核准鎖了下層的既有列，失敗。
 func TestReapprovalQueuesCreationAgainAndCreationUsesTheCurrentContactEmail(t *testing.T) {
 	t.Parallel()

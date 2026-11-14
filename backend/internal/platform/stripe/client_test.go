@@ -645,7 +645,7 @@ func TestCloseAccountPostsTheAppliedConfigurationsReadBack(t *testing.T) {
 	}
 }
 
-// 只做完第一步的空帳戶：applied_configurations 是 []，關閉本文必須帶空陣列（省略或 ["recipient"] 都是 400 configs_must_match_to_close，spike Q25）。
+// 只做完第一步的空帳戶：applied_configurations 是 []，關閉本文必須帶空陣列（省略或 ["recipient"] 都是 400 configs_must_match_to_close，sandbox 實測）。
 func TestCloseAccountOnABareAccountPostsAnEmptyConfigurationList(t *testing.T) {
 	bare, closed := loadFixture(t, "create_shell_provider"), loadFixture(t, "close_bare_account")
 	s := &stub{resp: func(n int) (int, string, http.Header) {

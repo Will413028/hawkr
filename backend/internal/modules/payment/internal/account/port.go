@@ -1,5 +1,5 @@
 // Package account 是收款帳戶：provider 中立的 port（建立外部帳戶、開通 session、讀帳戶快照、驗事件）、帳戶的本地快取、
-// 同步與建立的 River job，以及 platform inbox 的收款事件處理（Stripe 計畫 D28、D29）。
+// 同步與建立的 River job，以及 platform inbox 的收款事件處理（收款開通 ADR D28、D29）。
 //
 // 結構（backend AGENTS.md 規則 4、5）：
 //   - seller 核准的 transaction 內只 INSERT「建立中」的列（沒有外部 ID；既有的列不改）並排入以 store_id 為唯一鍵的建立 job；job 在
@@ -175,7 +175,7 @@ const (
 	NoteUnknownState StatusNote = "unknown_state"
 )
 
-// StatusOf 由快照推導中立的狀態、要存的原因碼與註記（Stripe 計畫 D13）。純函式，不記 log。順序：外部帳戶已關閉 → DISABLED（原因碼 ReasonClosed）；轉帳能力已啟用 → ENABLED；被拒絕或不支援 → DISABLED；
+// StatusOf 由快照推導中立的狀態、要存的原因碼與註記（收款開通 ADR D13）。純函式，不記 log。順序：外部帳戶已關閉 → DISABLED（原因碼 ReasonClosed）；轉帳能力已啟用 → ENABLED；被拒絕或不支援 → DISABLED；
 // 任何一筆細節要賣家行動（含 pending）→ ACTION_REQUIRED；pending → UNDER_REVIEW；restricted 而且有細節要平台處理或沒有解法 → DISABLED；
 // 其餘（不認得的狀態、restricted 但沒有可判讀的細節）→ UNDER_REVIEW 並帶註記，由呼叫方記警示。細節有多筆時取最嚴重的：賣家能行動的優先，其次是 DISABLED。
 // 原因碼是導出狀態的那一筆細節的 Reason（rejected、unsupported 沒有細節時用狀態名）；ENABLED 與沒有原因碼時是空字串。

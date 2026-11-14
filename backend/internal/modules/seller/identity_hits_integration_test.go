@@ -14,7 +14,7 @@ import (
 	"uuid"
 )
 
-// 命中的定義涵蓋受處分帳號目前的雜湊（Stripe 計畫 D46、D47、步驟 8e）：措施在 at 生效而且帶身分效果時，身分來源是快照加上被處分帳號
+// 命中的定義涵蓋受處分帳號目前的雜湊（收款開通 ADR D46、D47）：措施在 at 生效而且帶身分效果時，身分來源是快照加上被處分帳號
 // 目前的 account_identity_hashes；處分頁的關聯帳號、待辦 SHARED_BANK_ACCOUNT 與申請送出、核准的比對讀同一份定義。
 
 // hitAccounts 是措施在 at 的命中帳號（不含被處分帳號本身），直接讀 SQL 函式 seller.measure_identity_hits。

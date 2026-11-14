@@ -1,4 +1,4 @@
--- platform 的 webhook inbox（Stripe 計畫 D29；單體規則 5）的 desired state。外部 provider 的事件在入口驗簽後先寫這裡，同一個
+-- platform 的 webhook inbox（收款開通 ADR D29；單體規則 5）的 desired state。外部 provider 的事件在入口驗簽後先寫這裡，同一個
 -- transaction 排入派送 job，commit 之後才回 2xx；模組的 handler 由派送 job 呼叫，在自己的 transaction 寫業務列，並經 platform 的 API
 -- 標記已處理。補掃與清理是 platform 的週期 job。這裡只放表、約束與索引；改完以 atlas migrate diff 產生 migration（見 atlas.hcl）。
 --

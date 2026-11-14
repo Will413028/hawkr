@@ -31,7 +31,7 @@ func date(get func(store.SellerKycApplication) *time.Time) fieldDiff {
 }
 
 // fieldDiffs 是寫入路徑能回報的欄位：每個非文件類的 KYCField 一項（TestFieldDiffsCoverEveryNonDocumentField 守著，新增欄位沒接上就紅）。
-// 統編直接比明文（Stripe 計畫 D42）。
+// 統編直接比明文（收款開通 ADR D42）。
 var fieldDiffs = map[string]fieldDiff{
 	"product_type": plain(func(r store.SellerKycApplication) *string { return r.ProductType }),
 	"website_url":  plain(func(r store.SellerKycApplication) *string { return r.WebsiteUrl }),

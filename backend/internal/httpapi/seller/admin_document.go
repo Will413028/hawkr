@@ -10,7 +10,7 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// 後台讀 KYC 公司補充文件的端點（Stripe 計畫 D36：補充文件不是證件，有後台的 KYC 讀取權限就能讀，不要理由與限時授權）。
+// 後台讀 KYC 公司補充文件的端點（收款開通 ADR D36：補充文件不是證件，有後台的 KYC 讀取權限就能讀，不要理由與限時授權）。
 //
 // 為什麼是普通的 HTTP GET，不是 Connect：回應是圖片本身（瀏覽器的 <img> 與下載直接顯示），Connect 的 unary 只能回訊息、要自己
 // 包 bytes 欄位（base64 膨脹約三分之一，也進不了瀏覽器的圖片快取與串流）。API 設計規範（Connect）§「檔案回應」規則：

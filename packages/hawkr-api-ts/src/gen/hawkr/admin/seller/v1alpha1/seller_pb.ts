@@ -682,7 +682,7 @@ export const KYCDocumentAccessSchema: GenMessage<KYCDocumentAccess> = /*@__PURE_
   messageDesc(file_hawkr_admin_seller_v1alpha1_seller, 14);
 
 /**
- * IndividualKYC 是個人賣家專屬的欄位；目前沒有欄位（平台不收身分證號，Stripe 計畫 D22），設定它表示賣家型態是個人。
+ * IndividualKYC 是個人賣家專屬的欄位；目前沒有欄位（平台不收身分證號，收款開通 ADR D22），設定它表示賣家型態是個人。
  *
  * @generated from message hawkr.admin.seller.v1alpha1.IndividualKYC
  */
@@ -964,7 +964,7 @@ export const KYCRegistrationCheckSchema: GenMessage<KYCRegistrationCheck> = /*@_
   messageDesc(file_hawkr_admin_seller_v1alpha1_seller, 19);
 
 /**
- * KYCApplication 是後台看到的身分認證申請：沒有任何寫入用的欄位（平台不收身分證號、銀行帳號與證件影像，Stripe 計畫 D22）。
+ * KYCApplication 是後台看到的身分認證申請：沒有任何寫入用的欄位（平台不收身分證號、銀行帳號與證件影像，收款開通 ADR D22）。
  *
  * @generated from message hawkr.admin.seller.v1alpha1.KYCApplication
  */

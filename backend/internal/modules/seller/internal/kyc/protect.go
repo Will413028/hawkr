@@ -10,7 +10,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
 )
 
-// protector 計算統編的 blind index（防詐保存與處分比對；平台不加密保存個資，Stripe 計畫 D22）。
+// protector 計算統編的 blind index（防詐保存與處分比對；平台不加密保存個資，收款開通 ADR D22）。
 type protector struct {
 	mac *seal.MAC
 }

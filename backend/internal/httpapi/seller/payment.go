@@ -33,7 +33,7 @@ type PaymentReader interface {
 	Configured() bool
 }
 
-// Payments 是賣家收款帳戶的來源（payment 模組，Stripe 計畫 D30）：handler 先由能力檢查取得呼叫者的店家（擁有者），再以店家呼叫。
+// Payments 是賣家收款帳戶的來源（payment 模組，收款開通 ADR D30）：handler 先由能力檢查取得呼叫者的店家（擁有者），再以店家呼叫。
 // SyncAccountUnlessFresh 是 RefreshMyPaymentAccount 的同步重讀（transaction 外的外部呼叫，可以與同步 job 並行，D32；上次讀取在 10 秒內不呼叫金流商，D33）。
 type Payments interface {
 	PaymentReader

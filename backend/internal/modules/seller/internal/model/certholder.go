@@ -94,7 +94,7 @@ func stripHolderSuffixes(s string) string {
 	}
 }
 
-// MatchCertHolder 回報 holderName 是否屬於 KYC 的公司名稱 companyName（正規化後完全相同）。基準只有公司名稱（Stripe 計畫 D37：平台不再收個人姓名，
+// MatchCertHolder 回報 holderName 是否屬於 KYC 的公司名稱 companyName（正規化後完全相同）。基準只有公司名稱（收款開通 ADR D37：平台不再收個人姓名，
 // 個人賣家沒有基準）。公司名稱正規化後是空字串（個人賣家，或沒有公司名稱）時沒有基準（HasReference=false），要轉人工，不是放行也不是拒絕；
 // holderName 正規化後是空字串一律不相符。
 func MatchCertHolder(holderName string, companyName *string) CertHolderMatch {

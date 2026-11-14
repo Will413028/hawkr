@@ -7,7 +7,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// PaymentAccountStatus 是收款帳戶的中立狀態（Stripe 計畫 D13），由外部帳戶的快照推導。
+// PaymentAccountStatus 是收款帳戶的中立狀態（收款開通 ADR D13），由外部帳戶的快照推導。
 type PaymentAccountStatus string
 
 // 收款帳戶的狀態。
@@ -109,7 +109,7 @@ type StripeEmbeddedSession struct {
 func (HostedSession) onboardingSession()         {}
 func (StripeEmbeddedSession) onboardingSession() {}
 
-// PayoutAccountChanged 是同步 job 寫入帳戶快照的 transaction 內發布的事件（Stripe 計畫 D28）：seller 以同 transaction 的訂閱者更新開通閘門讀的
+// PayoutAccountChanged 是同步 job 寫入帳戶快照的 transaction 內發布的事件（收款開通 ADR D28）：seller 以同 transaction 的訂閱者更新開通閘門讀的
 // transfers_active 副本，並把 BankFingerprints 寫成防詐比對 hash（D12）。每次同步都發布（fingerprint 可能在轉帳能力不變時改變）。
 // BankFingerprints 是 provider 的外部銀行帳號識別碼明文：發布方與訂閱者都不保存、不寫 log。
 type PayoutAccountChanged struct {

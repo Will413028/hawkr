@@ -35,7 +35,7 @@ func modules() []migrate.Module {
 	}
 }
 
-// platformData 是 platform 擁有 schema 的套件（Stripe 計畫 D29 的 webhook inbox、D62 的後台動作紀錄 adminaudit）：不是模組，desired state 與 migration 在套件的 db/
+// platformData 是 platform 擁有 schema 的套件（收款開通 ADR D29 的 webhook inbox、D62 的後台動作紀錄 adminaudit）：不是模組，desired state 與 migration 在套件的 db/
 // （platformDirs），migrate 時先於模組套用。
 func platformData() []migrate.Module {
 	return []migrate.Module{{Name: inbox.Schema, Dir: inbox.Migrations()}, {Name: adminaudit.Schema, Dir: adminaudit.Migrations()}}

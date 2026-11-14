@@ -1,4 +1,4 @@
-// Package payment 是 payment 模組的公開 API：現階段只擁有收款帳戶（Stripe 計畫 D28）。
+// Package payment 是 payment 模組的公開 API：現階段只擁有收款帳戶（收款開通 ADR D28）。
 //
 // 職責、擁有的資料與不變量見同目錄的 AGENTS.md；行為規格在 docs/modules/payment.md。
 package payment

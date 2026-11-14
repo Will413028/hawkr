@@ -1544,7 +1544,7 @@ func (x *KYCDocumentAccess) GetAssetId() string {
 	return ""
 }
 
-// IndividualKYC 是個人賣家專屬的欄位；目前沒有欄位（平台不收身分證號，Stripe 計畫 D22），設定它表示賣家型態是個人。
+// IndividualKYC 是個人賣家專屬的欄位；目前沒有欄位（平台不收身分證號，收款開通 ADR D22），設定它表示賣家型態是個人。
 type IndividualKYC struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -2019,7 +2019,7 @@ func (x *KYCRegistrationCheck) GetDeadlineTime() *timestamppb.Timestamp {
 	return nil
 }
 
-// KYCApplication 是後台看到的身分認證申請：沒有任何寫入用的欄位（平台不收身分證號、銀行帳號與證件影像，Stripe 計畫 D22）。
+// KYCApplication 是後台看到的身分認證申請：沒有任何寫入用的欄位（平台不收身分證號、銀行帳號與證件影像，收款開通 ADR D22）。
 type KYCApplication struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`

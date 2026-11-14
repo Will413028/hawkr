@@ -381,7 +381,7 @@
 
 「不搬」清單裡的 `recurring-service` 對應的設計書 67（定期配送訂閱）已刪除，不做。
 
-## 修訂：payment 模組先只擁有收款帳戶、webhook inbox 由 platform 提供（2026-11-06，Will 決定 D28、D29、D30；計畫 `plans/2026-10-29-payment-onboarding-stripe.md` 步驟 7d′）
+## 修訂：payment 模組先只擁有收款帳戶、webhook inbox 由 platform 提供（2026-11-06，Will 決定 D28、D29、D30；計畫已刪；決定見 `2026-11-13-payment-onboarding-provider-port-stripe.md` 的「決定編號」）
 
 脈絡：Stripe 收款開通（步驟 4–7d）把收款帳戶與 webhook inbox 寫在 seller 的 `internal/payment`。D2 的分開判準（跟著 provider 改的不放 seller）與依賴表的 `payment` 葉節點都指向 payment；B2、B10 都要讀收款帳戶，規則 1 不准它們 import seller 的內部套件。
 

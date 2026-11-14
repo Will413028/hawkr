@@ -193,7 +193,7 @@ const (
 	// StoreRetention 是關店後的第二段清理：關店後 184 天清註冊、身分與連線資料（店名、聯絡、地址、KYC、食品登錄字號、同意紀錄的
 	// IP 與 User-Agent）。184 天是任何連續六個曆月的最大長度，所以不論關店日都不短於詐欺犯罪危害防制條例第 37 條第 1 項的「六個月」。時數只從這一個常數來。
 	StoreRetention = 4416 * time.Hour
-	// IdentityHashRetention 是防詐保存的身分 blind index（account_identity_hashes）的保存期：來源 stint 目前這次關店滿 5 年才刪（Stripe 計畫 D3，Will 2026-10-29；
+	// IdentityHashRetention 是防詐保存的身分 blind index（account_identity_hashes）的保存期：來源 stint 目前這次關店滿 5 年才刪（收款開通 ADR D3，Will 2026-10-29；
 	// 參考金流業「關係結束後 5 年」的紀錄保存慣例，法源未確認，上線前與條款一起核對）。用固定時數：1826 天不短於任何連續五個曆年（最多含兩個閏日，1826 天）的長度，
 	// 與 StoreRetention 同一個做法。與 StoreRetention 是不同的常數：理由不同（個資清理對比防詐比對），一個改了另一個不必跟著改。時數只從這一個常數來。
 	IdentityHashRetention = 43824 * time.Hour
@@ -484,7 +484,7 @@ type LinkedIdentity string
 const (
 	// LinkedUBN 統一編號相同。
 	LinkedUBN LinkedIdentity = "UBN"
-	// LinkedBankAccount 金流商回報的銀行帳號 fingerprint 相同。只列出、不能據以建立關聯終止（Stripe 計畫 D4：家人或配偶共用帳戶是常態，與 ADR
+	// LinkedBankAccount 金流商回報的銀行帳號 fingerprint 相同。只列出、不能據以建立關聯終止（收款開通 ADR D4：家人或配偶共用帳戶是常態，與 ADR
 	// 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」同一個判斷）。
 	LinkedBankAccount LinkedIdentity = "BANK_ACCOUNT"
 )

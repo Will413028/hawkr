@@ -60,7 +60,7 @@
 - 未採：PayUni adapter 留在 port 後面當第二個 adapter：沒有測試帳號無法驗證，會隨 port 演進失真；git 找得回。
 - 未採：簽 PayUni：測試帳號要簽約，作品集要展示國際標準。
 
-**port 的能力描述與 session 的形狀**（Will 2026-10-29、2026-11-02；2026-11-14 改為 D58）：port 的能力描述有 `requirement_collection`（`provider` 金流商收件、`platform` 平台收件，帳戶列上也存；行程設定只決定新列寫入的值）與 `embedded_runtimes`（provider 能開內嵌 session 的執行環境，Stripe 是 `STRIPE_CONNECT_JS`，fake 沒有）。開通 session 的形狀不是 port 的第二個收件軸：由 `account.ChooseSession` 唯一決定，條件是列保存的收件方式是平台收件，而且 provider 支援的與呼叫端宣告的內嵌執行環境有交集才回內嵌（Account Session），其餘一律回託管連結（Account Link；平台收件的帳戶走託管連結可行，`spike/README.md` Q23）。預設是金流商收件加託管頁面。port（`Provider`）的方法是 `Name`、`Capabilities`、`AcquireAccount`、`ConfigureAccount`、`CreateOnboardingSession`、`FetchAccount`、`CloseAccount`、`ParseEvent`，沒有 `SubmitKYC`，平台不自建 KYC 表單，也不再收身分證號、銀行帳號與證件；統編是市集登記資料，仍由平台收。這修訂了先前的「介面由收件方式決定」（D2）。
+**port 的能力描述與 session 的形狀**（Will 2026-10-29、2026-11-02；2026-11-14 改為 D58）：port 的能力描述有 `requirement_collection`（`provider` 金流商收件、`platform` 平台收件，帳戶列上也存；行程設定只決定新列寫入的值）與 `embedded_runtimes`（provider 能開內嵌 session 的執行環境，Stripe 是 `STRIPE_CONNECT_JS`，fake 沒有）。開通 session 的形狀不是 port 的第二個收件軸：由 `account.ChooseSession` 唯一決定，條件是列保存的收件方式是平台收件，而且 provider 支援的與呼叫端宣告的內嵌執行環境有交集才回內嵌（Account Session），其餘一律回託管連結（Account Link；平台收件的帳戶走託管連結可行，sandbox 實測）。預設是金流商收件加託管頁面。port（`Provider`）的方法是 `Name`、`Capabilities`、`AcquireAccount`、`ConfigureAccount`、`CreateOnboardingSession`、`FetchAccount`、`CloseAccount`、`ParseEvent`，沒有 `SubmitKYC`，平台不自建 KYC 表單，也不再收身分證號、銀行帳號與證件；統編是市集登記資料，仍由平台收。這修訂了先前的「介面由收件方式決定」（D2）。
 - 未採：預設平台收件：沿用舊畫面最多，但平台持有的個資最多。
 - 未採：兩種收件都由平台自建表單再送出：兩邊重複收個資。
 - 防詐訊號改用銀行帳號 fingerprint 與統編的雜湊，細節在平台審核 ADR。觸發重建：決定接台灣金流商。
@@ -99,7 +99,7 @@
 - 未採：管理員重新綁定或補件：管理員沒有可補的資料。
 - 未採：把冪等鍵與這次用的信箱一起存在列上、結果未知時原樣重送：信箱副本會留到管理員處理，還要定義哪些錯誤算明確拒絕。
 - 未採：後台重試時換鍵：第一次已建成時留下沒人知道的帳戶。
-- 對帳（D59）：結果未知的請求放超過 Stripe v2 冪等鍵的保存期（30 天）不再重送，建立與清理都先列出沒有關閉的帳戶以 `metadata.store_id` 與 `metadata.hawkr_namespace` 對帳（sandbox 實測 2026-11-14，spike Q24：列表含只做完第一步的空帳戶並帶 `metadata`，`limit` 上限 20 以 `next_page_url` 翻頁，預設不列已關閉的帳戶、已關閉的帳戶 `metadata` 被清成 null，所以同一家店先前關閉的帳戶不會被比對到）；比對要兩者都相符（D61：兩個資料庫可能共用同一個 Stripe 帳號，只比 `store_id` 會關到另一個環境的帳戶；未採：規定每個環境用自己的 Stripe 帳號，那是靠人守）；符合的帳戶有多個時，清理全部關閉才刪列，建立採用最新的一個並關閉其餘；整份列完才算「沒有」，列出失敗不是「沒有」。推翻條件：列出不含空帳戶或不帶 `metadata`（則超過 30 天的那一列直接進終局交人處理）。未採：只把直接刪改成留列（列永遠留著、沒有終局）；維持直接刪（丟掉唯一的鍵）。
+- 結果不明的列只用持有的冪等鍵了結（D63，取代 D59 的列出對帳）：Stripe v2 的帳戶列表不能依 `metadata` 篩選、最終一致，列出全平台帳戶在約 1000 個帳戶以上失效，所以不列出帳戶、不換新鍵。週期掃描對每一筆「呼叫過、沒有外部 ID」的列在保存期內以同一把鍵重送取回 ID；標成結果不明後 7 天（小於保存期 30 天）仍了結不了就進終局。管理員「重試建立」：保存期內以同一把鍵重送；超過保存期等於聲明金流商那邊沒有這家店的帳戶，要明確確認（`acknowledge_no_provider_account`）才換新鍵，並寫後台紀錄（D62）。`metadata.store_id` 與 `metadata.hawkr_namespace` 照寫，之後做全平台孤兒帳戶稽核不必回填（D61：兩個資料庫可能共用同一個 Stripe 帳號，所以命名空間每個環境不同）。推翻條件：Stripe 為 v2 帳戶提供 `metadata` 篩選，或同鍵重送拿不回原帳戶。未採：維持逐列掃描加列出對帳；排程的全平台對帳（觸發：出現第一筆因逾期進終局的列，或上線前要做孤兒帳戶稽核）；靠 `v2.core.account.created` 事件認領 ID（與同鍵重送重複，事件會遺失）。
 
 **聯絡信箱在建立外部帳戶的當下讀取**（Will 2026-11-03；改為建立當下讀取 2026-11-13）：信箱在帳號層級：provider 驗證過的 `email` 優先，沒有才用自填的聯絡信箱（`api/hawkr/identity` 的 `GetContactEmail`、`SetContactEmail`；自填的未驗證，只在沒有可用的已驗證信箱時可設）。賣家送審要求帳號有其中之一（`CONTACT_EMAIL_REQUIRED`）；核准不再檢查信箱。payment 不存信箱：建立 job 在呼叫金流商的當下經 `Owners` 的 `OwnerContactEmail` 讀取（由組裝點以 seller 與 identity 的公開 API 實作），讀不到時不呼叫金流商、記成建立失敗。核准之後賣家改了信箱，建立時用新的。快照到收款帳戶列是帳戶還在 seller 時的形狀；payment 成為獨立模組之後建立 job 已能向上讀，下層不存上層個資的副本。
 - 未採：直接用登入信箱：LINE 可能沒有信箱，賣家也改不了。
@@ -132,8 +132,8 @@
 **回跳網址由伺服器組**（Will 2026-11-13；語系改走 `Accept-Language` 2026-11-14）：`CreatePaymentOnboardingSessionRequest` 的 client 不傳網址，只傳回跳目的地的 enum（`OnboardingReturnDestination`：網站的認證頁、App 的回跳頁）；語系不再是請求欄位，伺服器取 rpc interceptor 協商 `Accept-Language` 的結果（`uitext.LocaleFrom(ctx)`），修訂了先前的 `locale` 欄位（D49-2：它是語系 ADR 之外的第二條通道）。伺服器以 `PUBLIC_WEB_ORIGIN` 組成完成與過期兩個網址，網站路徑與語系前綴只在 `internal/httpapi/rpc/web_origin.go` 一處，測試確認每個目的地的路徑在 website 的路由存在（`TestOnboardingReturnPagesExistInTheWebsiteRoutes`）。seller-app 與 website 刪掉各自的網站來源設定。
 - 未採：維持 client 傳完整網址：網站路徑與語系前綴要在 website 與 seller-app 各寫一份；搬到伺服器後只在一處。
 
-**開通 session 的契約是兩支 `oneof`**（Will 2026-11-14，D58）：第 2 輪設計審查指出回應是型態欄位加攤平欄位，會出現「內嵌介面但網址是網站認證頁」的第三種組合，賣家端帳戶上的開通介面欄位與 session 的介面來源不同，`locale` 是語系 ADR 之外的第二條通道。與業界做法比較（Stripe、Adyen 都是託管回網址、內嵌回 token 兩種資源；Stripe 的內嵌元件不能放 App 的 web view，沒有原生元件時連到瀏覽器）後決定：請求分開帶回跳目的地與呼叫端能承載的內嵌執行環境清單（`embedded_runtimes`，空表示不能內嵌；enum `EmbeddedOnboardingRuntime` 目前只有 `STRIPE_CONNECT_JS`），回應是 `oneof session`（`hosted` 託管連結、`embedded` 內嵌，內嵌再以 `oneof provider` 分金流商），賣家端帳戶上的開通介面欄位與那個介面列舉刪除。伺服器的決定表只在 `account.ChooseSession`（只看帳戶列保存的收件方式、provider 經 port 宣告支援的內嵌執行環境與呼叫端宣告，不比 provider 名稱），fake provider 不支援任何內嵌執行環境，一律回託管連結。語系走 `Accept-Language`（rpc interceptor 協商）。修訂：D2「介面由收件方式決定」、D53 的回應形狀、D56 第 2 項「到網站完成」、D49-2 的 `locale`。推翻條件：平台收件的帳戶在託管頁面走不完開通（2026-11-14 在 sandbox 實測走得完，`spike/README.md` Q23）。
-- 未採：三支 `oneof`（保留 App 到網站再登入；是 spike 不成立時的退路）；記錄並延後（留著違反 API 設計規範的型態欄位加攤平欄位）。
+**開通 session 的契約是兩支 `oneof`**（Will 2026-11-14，D58）：第 2 輪設計審查指出回應是型態欄位加攤平欄位，會出現「內嵌介面但網址是網站認證頁」的第三種組合，賣家端帳戶上的開通介面欄位與 session 的介面來源不同，`locale` 是語系 ADR 之外的第二條通道。與業界做法比較（Stripe、Adyen 都是託管回網址、內嵌回 token 兩種資源；Stripe 的內嵌元件不能放 App 的 web view，沒有原生元件時連到瀏覽器）後決定：請求分開帶回跳目的地與呼叫端能承載的內嵌執行環境清單（`embedded_runtimes`，空表示不能內嵌；enum `EmbeddedOnboardingRuntime` 目前只有 `STRIPE_CONNECT_JS`），回應是 `oneof session`（`hosted` 託管連結、`embedded` 內嵌，內嵌再以 `oneof provider` 分金流商），賣家端帳戶上的開通介面欄位與那個介面列舉刪除。伺服器的決定表只在 `account.ChooseSession`（只看帳戶列保存的收件方式、provider 經 port 宣告支援的內嵌執行環境與呼叫端宣告，不比 provider 名稱），fake provider 不支援任何內嵌執行環境，一律回託管連結。語系走 `Accept-Language`（rpc interceptor 協商）。修訂：D2「介面由收件方式決定」、D53 的回應形狀、D56 第 2 項「到網站完成」、D49-2 的 `locale`。推翻條件：平台收件的帳戶在託管頁面走不完開通（2026-11-14 在 sandbox 實測走得完，sandbox 實測）。
+- 未採：三支 `oneof`（保留 App 到網站再登入；是實測不成立時的退路）；記錄並延後（留著違反 API 設計規範的型態欄位加攤平欄位）。
 
 **賣家端移除沒有消費端的欄位，列舉搬到擁有者**（Will 2026-11-13）：賣家端 `PaymentAccount` 刪除 `requirement_collection`、`transfers_active`、`requirements`，`CreatePaymentOnboardingSessionResponse` 刪除 `expire_time`（沒有 client 讀；後台的 message 不動），`PaymentAccount` 也刪除開通介面欄位（D58）。`PaymentAccountStatus`、`RequirementCollection` 與呼叫端宣告用的 `EmbeddedOnboardingRuntime` 定義在 payment 擁有的 proto package `hawkr.payment.v1alpha1`，seller 與 admin payment 的 message 都 import 它；共用文案目錄的鍵跟著搬到 `payment.PaymentAccountStatus.*`、`payment.RequirementCollection.*`。
 - 未採：只刪欄位、列舉搬家留到付款模組搬進來時；全部延後（計畫沒有寫理由）。
@@ -153,7 +153,7 @@
 - 未採：App 內嵌 SDK：要新增依賴與原生設定；deep link：要新增 App 端的路由與平台設定。
 - 觸發：App 的開通完成率偏低，或平台收件成為主要模式。
 
-**個資清理時關閉外部帳戶**（Will 2026-11-13）：身分與銀行資料在金流商的帳戶上，只刪本地對應等於清理只做一半。擁有者個資清理時，seller 的清理 transaction 呼叫 payment 的 `ForgetOwners`，只排「關閉後刪除」的 job（唯一鍵 `store_id`，外部呼叫在 transaction 外）：先標 `purge_pending_at`（呼叫金流商之前，之後任何錯誤都有週期掃描接手），關閉成功才刪本地列。關閉冪等：Stripe 對已關閉的帳戶再關回 403，adapter 讀取帳戶，已關閉才視為成功；關閉要帶帳戶實際的 `applied_configurations`（先讀回：已完成設定的是 `recipient`，只做完第一步的空帳戶是 `[]`，傳錯是 400 `configs_must_match_to_close`，spike Q25，D60）；不存在的帳戶是永久錯誤。從沒呼叫過 provider 的列直接刪；呼叫過、沒有外部 ID 的列（建立請求可能其實已成功）7 天內以同一把冪等鍵取得外部帳戶、超過進終局（D63，不列出帳戶），先把 ID 存回列、再關閉刪除。關閉失敗用完重試時本地列留著（保住 `store_id` 與外部 ID 的對應），排除在建立與同步輪詢之外，由週期掃描重排。列的 provider 與目前設定不同、或沒有設定 provider 時不關也不刪，記警示 log，等設定回來再處理（刪掉就永遠找不到外部帳戶）。**清理有終局（D59、D60，2026-11-14 修訂「只記警示 log」）**：金流商明確拒絕關閉，或標成等待清理 7 天仍關不掉、問不到 provider，列標 `purge_blocked_at` 與原因進終局，掃描不再重排，進後台待辦 `PAYMENT_ACCOUNT_PURGE_STUCK`（標題「處理無法關閉的收款帳戶」）；管理員「重試關閉」（清除終局、期限重算）或「已在金流商處理，刪除對應」（需要權限 `payment.accounts.delete_mapping`，同一個 transaction 寫一筆 platform 的後台紀錄（D62，2026-11-14 改：原本是 payment 自有的 `payment.account_mapping_deletions`，改成 `adminaudit.records`，見 `2026-11-14-platform-admin-audit-log.md`）並刪列，不呼叫金流商）。7 天：既有重試是單一 job 8 次約 80 分鐘、掃描每 15 分鐘，7 天涵蓋金流商故障與金鑰設定修正。紀錄用新表而不沿用 seller 的 `decided_by_admin_id`：那個欄位寫在被審的列上，列刪了就不見。未採：列不刪、改標「已人工處理」（推翻 D52、列永遠留著）。Q26（有餘額時關閉的錯誤形狀）沒有量到（未完成開通的帳戶收不到轉帳）：照文件處理，非預期的拒絕進終局。
+**個資清理時關閉外部帳戶**（Will 2026-11-13）：身分與銀行資料在金流商的帳戶上，只刪本地對應等於清理只做一半。擁有者個資清理時，seller 的清理 transaction 呼叫 payment 的 `ForgetOwners`，只排「關閉後刪除」的 job（唯一鍵 `store_id`，外部呼叫在 transaction 外）：先標 `purge_pending_at`（呼叫金流商之前，之後任何錯誤都有週期掃描接手），關閉成功才刪本地列。關閉冪等：Stripe 對已關閉的帳戶再關回 403，adapter 讀取帳戶，已關閉才視為成功；關閉要帶帳戶實際的 `applied_configurations`（先讀回：已完成設定的是 `recipient`，只做完第一步的空帳戶是 `[]`，傳錯是 400 `configs_must_match_to_close`，sandbox 實測，D60）；不存在的帳戶是永久錯誤。從沒呼叫過 provider 的列直接刪；呼叫過、沒有外部 ID 的列（建立請求可能其實已成功）7 天內以同一把冪等鍵取得外部帳戶、超過進終局（D63，不列出帳戶），先把 ID 存回列、再關閉刪除。關閉失敗用完重試時本地列留著（保住 `store_id` 與外部 ID 的對應），排除在建立與同步輪詢之外，由週期掃描重排。列的 provider 與目前設定不同、或沒有設定 provider 時不關也不刪，記警示 log，等設定回來再處理（刪掉就永遠找不到外部帳戶）。**清理有終局（D59、D60，2026-11-14 修訂「只記警示 log」）**：金流商明確拒絕關閉，或標成等待清理 7 天仍關不掉、問不到 provider，列標 `purge_blocked_at` 與原因進終局，掃描不再重排，進後台待辦 `PAYMENT_ACCOUNT_PURGE_STUCK`（標題「處理無法關閉的收款帳戶」）；管理員「重試關閉」（清除終局、期限重算）或「已在金流商處理，刪除對應」（需要權限 `payment.accounts.delete_mapping`，同一個 transaction 寫一筆 platform 的後台紀錄（D62，2026-11-14 改：原本是 payment 自有的 `payment.account_mapping_deletions`，改成 `adminaudit.records`，見 `2026-11-14-platform-admin-audit-log.md`）並刪列，不呼叫金流商）。7 天：既有重試是單一 job 8 次約 80 分鐘、掃描每 15 分鐘，7 天涵蓋金流商故障與金鑰設定修正。紀錄用新表而不沿用 seller 的 `decided_by_admin_id`：那個欄位寫在被審的列上，列刪了就不見。未採：列不刪、改標「已人工處理」（推翻 D52、列永遠留著）。有餘額時關閉的錯誤形狀沒有量到（未完成開通的帳戶收不到轉帳）：照文件處理，非預期的拒絕進終局。
 - 未採：延後到上線前：現在只有測試模式的帳戶。
 
 **fake provider 只在 dev 環境**（Will 2026-11-13）：`PAYMENT_PROVIDER=fake` 只在 `requireDevEnvironment` 成立時選得到（有 `DEV_AUTH_KEY_FILE` 而且沒有 Cloudflare Access 設定），不成立就啟動失敗，`readPayment` 的每個呼叫點都適用。fake 回報所有帳戶轉帳能力已啟用，在非 dev 環境選到等於不經金流商就通過開通閘門。
@@ -174,3 +174,74 @@
 - 自填聯絡信箱未驗證；觸發：A8 的 email 管道上線時加驗證碼，並把帳號信箱變更同步到 Stripe。A8 只寄已驗證的信箱。
 - 平台承擔負餘額；要上線且改變損失歸屬時重新評估內嵌元件關掉使用者驗證的決定。
 - 沿用機制與延後項的觸發條件（輪詢沒有上限、inbox 沒有終局狀態（同步讀到已關閉的帳戶已在 9g 處理：列標 `DISABLED`、原因碼 `closed`，不再輪詢，D61）、`provider` 欄位在換 provider 時舊列的去向；清理的終局已在 9g 處理）寫在 `internal/modules/payment/CARRYOVER.md` 與 `docs/modules/payment.md` §8。
+
+## 決定編號（D1–D63）
+
+其他文件與程式註解引用的 `收款開通 ADR Dn` 指這裡的編號。表列的是目前狀態；被後來的決定推翻的部分已註明。
+
+| 編號 | 一句結論 | 所在 ADR 與章節 |
+|---|---|---|
+| D1 | 作品集的金流 adapter 是 Stripe Connect 測試模式，不簽 PayUni | 本檔「收款 adapter」 |
+| D2 | port 支援金流商收件與平台收件；「介面由收件方式決定」被 D58 推翻，介面由 `account.ChooseSession` 決定 | 本檔「port 的能力描述與 session 的形狀」 |
+| D3 | 防詐身分雜湊與 KYC 個資分開保存 5 年（來源 stint 關閉起算），明文 184 天清；種類後來縮成統編與銀行 fingerprint（D38） | `2026-11-13-seller-platform-review-and-identity-matching.md`「身分比對與比對 hash」；`2026-10-19-seller-kyc-payuni-consolidated.md`「修訂：防詐身分雜湊獨立保存 5 年，關聯帳號納入銀行帳號」 |
+| D4 | 共用銀行帳號列入關聯帳號，只列出、不自動處分；提醒的形式後來由 D45 決定 | `2026-10-18-seller-governance-consolidated.md`「修訂：關聯帳號納入銀行帳號命中，只列出」 |
+| D5 | 只做單體的收款開通；付款、退款、撥款、物流留給 B2、B3、B8–B10 | 本檔「收款 adapter」與「後果」 |
+| D6 | 單體的 PayUni adapter 刪除（git 可找回） | 本檔「收款 adapter」 |
+| D7 | Stripe 預設金流商收件加託管頁面，平台收件用內嵌元件示範 | 本檔「port 的能力描述與 session 的形狀」 |
+| D8 | 測試平台帳號是 US，沿用不改 | 本檔「測試平台帳號是 US」 |
+| D9 | 平台審核只管市集政策與統編，身分與銀行帳號由金流商驗證；送給金流商的欄位清單作廢（D22） | `2026-11-13-seller-platform-review-and-identity-matching.md`「身分比對與比對 hash」「核准與收款開通分開」 |
+| D10 | 開通閘門是平台審核核准且 `stripe_transfers` active；不看 `charges_enabled` | 本檔「開通閘門與收款模式」 |
+| D11 | `PAYUNI_TERMS` 刪除、不轉換舊紀錄；入駐只記 `SELLER_TERMS` 與 `KYC_PRIVACY_NOTICE` | `2026-11-13-seller-platform-review-and-identity-matching.md`「入駐同意紀錄」 |
+| D12 | 防詐訊號只用銀行帳號 fingerprint 與統編的雜湊 | `2026-11-13-seller-platform-review-and-identity-matching.md`「身分比對與比對 hash」 |
+| D13 | 狀態模型 5 值（無 `ONBOARDING`），由 `account.StatusOf` 從轉帳能力快照推導 | 本檔「收款帳戶的狀態模型」 |
+| D14 | 刪重新綁定與補件；管理員只有「重新整理」與「重試建立」，建立失敗用完重試進待辦 `PAYMENT_ACCOUNT_CREATE_FAILED` | 本檔「建立外部帳戶的時點、冪等與分兩步建立」 |
+| D15 | 賣家端狀態拆成平台審核與收款帳戶兩條；`NOT_STARTED` 值被 D35 推翻 | `2026-11-13-seller-platform-review-and-identity-matching.md`「核准與收款開通分開」「申請、草稿與審核」 |
+| D16 | 平台審核核准後才建立外部帳戶 | 本檔「建立外部帳戶的時點、冪等與分兩步建立」 |
+| D17 | 身分欄位鎖與店名鎖刪除，店名不同步給金流商 | `2026-11-13-seller-platform-review-and-identity-matching.md`「核准與收款開通分開」 |
+| D18 | 舊事件 `merchant.verification.*` 與 PayUni 審核通知停發；通知留給通知模組 | `2026-11-13-seller-platform-review-and-identity-matching.md`「核准與收款開通分開」 |
+| D19 | 一店一個外部帳戶，關店再開沿用；冪等鍵是寫列時產生並保存的 UUID | 本檔「建立外部帳戶的時點、冪等與分兩步建立」 |
+| D20 | 收款模式是 destination charges，閘門看 `stripe_transfers`；代理收付法規前提未確認 | 本檔「開通閘門與收款模式」 |
+| D21 | 分支內完成才進 `main`、不留新舊並存：開發流程決定，已執行，沒有持續規則 | 無（已合併的流程決定；migration 部分見 D48） |
+| D22 | 平台自建 KYC 個資管線退場，不收身分證號、銀行帳號與證件；統編仍由平台收；觸發重建：接台灣金流商 | `2026-11-13-seller-platform-review-and-identity-matching.md`「身分比對與比對 hash」；本檔「port 的能力描述與 session 的形狀」 |
+| D23 | 聯絡信箱在帳號層級：provider 驗證過的優先，否則自填；送審要求有信箱（`CONTACT_EMAIL_REQUIRED`） | 本檔「聯絡信箱在建立外部帳戶的當下讀取」 |
+| D24 | App 一律開外部瀏覽器、回跳到 website 免登入靜態頁；內嵌元件只在 website（`@stripe/connect-js`）；App 內不做 Stripe 內嵌 | 本檔「App 內不做 Stripe 內嵌開通」 |
+| D25 | 平台收件的 Account Session 帶 `disable_stripe_user_authentication`，代價是平台承擔負餘額 | 本檔「內嵌元件關掉 Stripe 使用者驗證」 |
+| D26 | 開通狀態由伺服器推導：`GetMyOnboarding` 回任務清單、`action` 與伺服器產生的句子；「同一個 Go 函式」被 D31 改為同一組來源欄位加 integration 測試 | 本檔「開通狀態與下一步由伺服器推導」 |
+| D27 | 任務標題與狀態句由 seller 的 `internal/text` 產生，欄位標籤進共用文案目錄，純畫面文字留 client | 本檔「文案歸屬」 |
+| D28 | 新建 payment 模組擁有收款帳戶；seller 依賴 payment，以 `PayoutAccountChanged` 更新閘門副本 | 本檔「模組歸屬」；`2026-09-24-go-modular-monolith.md`「修訂：payment 模組先只擁有收款帳戶、webhook inbox 由 platform 提供」 |
+| D29 | webhook inbox 由 platform 提供，入口驗簽後先寫 inbox 再回 2xx | `2026-09-24-go-modular-monolith.md`「修訂：payment 模組先只擁有收款帳戶、webhook inbox 由 platform 提供」 |
+| D30 | 賣家端三支收款帳戶 RPC 留在 seller（驗證擁有者後呼叫 payment），後台 3 支在 `PaymentAdminService` | 本檔「模組歸屬」 |
+| D31 | `GetMyOnboarding` 只回必要任務（`PROFILE`、`PLATFORM_REVIEW`、`PAYMENT_ACCOUNT`）；閘門與任務讀同一組來源欄位，一致由 integration 測試鎖住 | 本檔「開通狀態與下一步由伺服器推導」 |
+| D32 | 同步寫快取只有讀取開始時間不早於已存的 `fetched_at` 才寫 | 本檔「快取不倒退」 |
+| D33 | `GetMyOnboarding` 唯讀，重讀是獨立的 `RefreshMyPaymentAccount`（同帳戶 10 秒內不重打 Stripe）；拿掉 `OTHER_REQUIREMENT` | 本檔「開通狀態與下一步由伺服器推導」 |
+| E1 | 帳戶用 Stripe Accounts v2，webhook 只收 thin events 並一律重讀；API 版本釘在 SDK 的 `2026-10-28.endive`（原 preview 版本已被取代） | 本檔「Stripe API 與官方 SDK」 |
+| D34 | 任務說明、面板標題與說明進共用文案目錄（`seller.OnboardingTaskId.*`），兩端讀目錄 | 本檔「文案歸屬」 |
+| D35 | `KYCFlow` 與 `KYCFlowStatus` 刪除，沒有申請以欄位不帶值表示；已核准的申請不能重送 | `2026-11-13-seller-platform-review-and-identity-matching.md`「申請、草稿與審核」 |
+| D36 | 有 KYC 讀取權限就能讀公司補充文件，每次讀取留 `kyc_document_accesses`；刪顯示全文與限時授權 | `2026-11-13-seller-platform-review-and-identity-matching.md`「後台讀公司補充文件」 |
+| D37 | 個人身分欄位全刪；個人賣家的證書持有人比對留給 B4 | `2026-11-13-seller-platform-review-and-identity-matching.md`「身分比對與比對 hash」 |
+| D38 | 身分證號、負責人身分證號、平台自收銀行帳號三種雜湊刪除，保存只剩統編與銀行 fingerprint | `2026-11-13-seller-platform-review-and-identity-matching.md`「身分比對與比對 hash」 |
+| D39 | 店家聯絡欄位：地址與客服信箱必填、審核中與已核准時不能清掉，聯絡人姓名與手機選填 | `2026-11-13-seller-platform-review-and-identity-matching.md`「店家聯絡欄位」 |
+| D40 | 步驟 8 的文案與版面對照：實作層決定，沒有獨立的決策段，結果在各 client 的文案資源與共用文案目錄 | 本檔「文案歸屬」（分界） |
+| D41 | `reserved` 的允許清單補列；被 D54 取代（`v1alpha1` 不留 `reserved`） | 本檔「`v1alpha1` 不留 `reserved`」 |
+| D42 | 關聯帳號的雜湊比對只連防詐保存表（`account_identity_hashes`） | `2026-11-13-seller-platform-review-and-identity-matching.md`「身分比對與比對 hash」 |
+| D43 | 平台審核退回與核准的通知事件一起停發，留給通知模組重做 | `2026-11-13-seller-platform-review-and-identity-matching.md`「核准與收款開通分開」 |
+| D44 | 物流用的商店代號與 `payuni_mer_id` 回空字串，本機付款與物流端到端暫不通 | `2026-11-13-seller-platform-review-and-identity-matching.md`「核准與收款開通分開」；本檔「後果」 |
+| D45 | 共用銀行帳號提醒是 seller 的 SQL 推導出的後台待辦，不儲存，只存「已檢視」的處置 | `2026-11-13-seller-platform-review-and-identity-matching.md`「身分比對與比對 hash」；`2026-10-18-seller-governance-consolidated.md`「修訂：身分命中的定義與共用銀行帳號提醒」 |
+| D46 | 命中在讀取端併入受處分帳號目前的雜湊，處分之後才同步進來的 fingerprint 與統編仍命中 | `2026-11-13-seller-platform-review-and-identity-matching.md`「身分比對與比對 hash」；`2026-10-18-seller-governance-consolidated.md`「修訂：身分命中的定義與共用銀行帳號提醒」 |
+| D47 | 「帶身分效果的處分」的規則只寫在 SQL（`identity_effect_measures`），快照寫入也讀它，Go 不判斷 | `2026-11-13-seller-platform-review-and-identity-matching.md`「身分比對與比對 hash」；`2026-10-18-seller-governance-consolidated.md`「修訂：身分命中的定義與共用銀行帳號提醒」 |
+| D48 | 分支內的 migration 在併入 `dev` 之前壓平，`dev` 已有的 migration 不動 | 本檔「分支內的 migration 在合併前壓平」 |
+| D49 | 五項修正：下一步只讀 `OnboardingTask.action`；回跳網址由伺服器組；後台重讀與賣家端共用；刪賣家端無消費端的欄位；收款帳戶 enum 搬到 payment 的 proto package（第 2 項的 `locale` 被 D58 推翻） | 本檔「開通狀態與下一步由伺服器推導」「回跳網址由伺服器組」「賣家端移除沒有消費端的欄位，列舉搬到擁有者」 |
+| D50 | 聯絡信箱在建立外部帳戶的當下經 `Owners` 讀取，payment 不存信箱副本 | 本檔「聯絡信箱在建立外部帳戶的當下讀取」 |
+| D51 | Stripe 改用官方 `stripe-go/v87` v87.1.0 | 本檔「Stripe API 與官方 SDK」 |
+| D52 | 個資清理時先關閉外部帳戶、成功才刪本地對應 | 本檔「個資清理時關閉外部帳戶」 |
+| D53 | 開通 session 帶金流商與公開金鑰（`STRIPE_PUBLISHABLE_KEY`）；回應形狀被 D58 改為 `oneof` | 本檔「開通 session 帶金流商與公開金鑰」 |
+| D54 | `v1alpha1` 刪欄位或 enum 值不留 `reserved`，編號連續重編，改名 `v1` 之後才留 | 本檔「`v1alpha1` 不留 `reserved`」；`API 設計規範（Connect）.md` |
+| D55 | 外部帳戶分兩步建立（只帶 `metadata` 建立，再更新寫入設定）；「兩步都成功才寫外部 ID」被 D59 推翻 | 本檔「建立外部帳戶的時點、冪等與分兩步建立」 |
+| D56 | 進行中的收款任務 `action` 是 `NONE`，`OnboardingAction` 沒有重新整理；`RefreshMyPaymentAccount` 由 client 自動呼叫；第 2 項「到網頁完成」被 D58 推翻 | 本檔「收款帳戶的下一步」 |
+| D57 | 壓平後的 migration 對 `dev` 的任何合法資料都能套用，並有 `dev` schema 狀態的 migration 測試；`atlas migrate diff` 可在本機跑 | 本檔「分支內的 migration 在合併前壓平」 |
+| D58 | 開通 session 契約是兩支 `oneof`（託管連結或內嵌），App 一律拿託管連結，語系走 `Accept-Language` | 本檔「開通 session 的契約是兩支 `oneof`」 |
+| D59 | 第一步拿到外部 ID 就寫、呼叫前先記 `create_called_at`；清理有終局；列出對帳被 D63 推翻 | 本檔「建立外部帳戶的時點、冪等與分兩步建立」「個資清理時關閉外部帳戶」 |
+| D60 | 清理期限 7 天、終局進待辦 `PAYMENT_ACCOUNT_PURGE_STUCK`；「刪除對應」的專用紀錄表被 D62 取代 | 本檔「個資清理時關閉外部帳戶」 |
+| D61 | `STRIPE_ACCOUNT_NAMESPACE` 必填並寫 `metadata.hawkr_namespace`；同步讀到已關閉的帳戶標 `DISABLED`、原因 `closed`；多帳戶關閉被 D63 推翻 | 本檔「建立外部帳戶的時點、冪等與分兩步建立」「後果」 |
+| D62 | 後台動作的紀錄放平台層 `internal/platform/adminaudit`，同一個 transaction 內寫一筆 | `2026-11-14-platform-admin-audit-log.md`；`2026-10-18-seller-governance-consolidated.md`「修訂：後台動作的紀錄放在平台層」 |
+| D63 | 結果不明的列只用同一把冪等鍵在 7 天內重送了結，不列出帳戶、不換新鍵（超過保存期的重試要確認） | 本檔「建立外部帳戶的時點、冪等與分兩步建立」 |

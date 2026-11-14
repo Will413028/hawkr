@@ -158,7 +158,7 @@
 - **對象不可變**：見第一項；`UpdateMeasure` 沒有對象欄位。
 - **social 以 D-sync 複本取代讀取時 join**：原設計是 social 的讀取 join `seller.pub_content_takedowns(at)`。改成 social 的同 transaction 訂閱者維護自己的 `content_takedowns`（建立插入、撤銷刪除、同則內容被多個措施下架時只刪該措施的列），旗標與讀取只看自己的表；`seller.pub_content_takedowns()` 不收 `at`，只給每日對帳核對。理由：social 的旗標與 `reevaluate_*` 是資料庫函式，不能參照 seller 的表，而 join 會讓每個公開讀取多一次跨 schema 探測；撤銷要立即生效（SD13）。與買家刪帳的 `inactive_authors` 同形，差別是可刪除。
 
-## 修訂：關聯帳號納入銀行帳號命中，只列出（2026-10-30，Will 2026-10-29 決定 D4；計畫 `plans/2026-10-29-payment-onboarding-stripe.md` 步驟 3）
+## 修訂：關聯帳號納入銀行帳號命中，只列出（2026-10-30，Will 2026-10-29 決定 D4；計畫已刪；決定見 `2026-11-13-payment-onboarding-provider-port-stripe.md` 的「決定編號」）
 
 「終止合作」的關聯帳號（`LINKED_ACCOUNT`）一條原本只反查身分證號與統編。現在 `linked_accounts` 也列出銀行帳號相同的其他帳號，命中種類標成銀行帳號；這種命中只列出，不能當建立關聯終止的依據：該列的 `can_create_linked_termination` 是 false，`CreateMeasure` 的再驗證要求至少一種身分證號或統編的命中，伺服器不自動建立任何措施。理由：家人或配偶共用帳戶是常態，銀行帳號相同是線索不是同一個人的證據（`2026-10-19-seller-kyc-payuni-consolidated.md` 對送件阻擋的判斷相同）。快照的來源改為防詐保存的身分雜湊，見該 ADR 同日修訂。原決策段保留歷史。
 
@@ -179,7 +179,7 @@
 - 未採：「帶身分效果」在 SQL 再寫一份、以資料集測試鎖住和 Go 一致：兩份規則靠測試對齊，違反「命中只有一個定義」。
 - 未採：提醒另存成列，或純推導並限時消失：業界做法是另存提醒列並保留歷史，但歷史現在沒有讀者，手寫開關是 `2026-10-20-admin-review-queue.md` 拒絕的形狀；純推導並限時消失：項目到期就離開待辦，營運有沒有看過沒有紀錄（理由為推測，未見原決策簡報明寫）。也未採不做提醒：處分之後才共用的銀行帳號，只有營運主動打開處分頁才看得到（推測）。
 
-## 修訂：後台動作的紀錄放在平台層（2026-11-14，Will 決定，Stripe 開通計畫 D62）
+## 修訂：後台動作的紀錄放在平台層（2026-11-14，Will 決定，收款開通 ADR D62）
 
 原決策段保留歷史。原 ADR `2026-10-02-seller-governance-in-monolith.md` 的兩句話（本檔整合時沿用其意）與新決定衝突，改成：
 

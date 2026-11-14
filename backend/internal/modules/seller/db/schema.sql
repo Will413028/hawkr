@@ -892,7 +892,7 @@ CREATE UNIQUE INDEX suspension_periods_open ON seller.suspension_periods (store_
 
 -- 措施的身分快照（ADR 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」）：帶身分效果的措施（identity_effect_measures）建立時，把被處分帳號全部
 -- KYC 申請（跨 stint）的身分 blind index 複製過來，措施結束或撤銷時刪除；KYC 列的個資照常清理，這裡是措施擁有的、
--- 唯一保留的比對依據。kind 是比對的種類（統編 TAX_ID；金流商回報的銀行帳號指紋 BANK_ACCOUNT，Stripe 計畫 D38：平台不再收身分證號與銀行帳號），
+-- 唯一保留的比對依據。kind 是比對的種類（統編 TAX_ID；金流商回報的銀行帳號指紋 BANK_ACCOUNT，收款開通 ADR D38：平台不再收身分證號與銀行帳號），
 -- key_id 是算出 hash 的 HMAC 金鑰：快照沒有明文可以重算，所以這把金鑰要留在金鑰環直到措施結束。比對讀 measure_identity_sources(at)：
 -- 措施在 at 生效而且帶身分效果時，這張表加上被處分帳號目前的 account_identity_hashes 是它的身分；「生效中」只由 effective_measures 決定。
 CREATE TABLE seller.measure_identities (
@@ -907,7 +907,7 @@ CREATE TABLE seller.measure_identities (
 );
 CREATE INDEX measure_identities_hash ON seller.measure_identities (hash);
 
--- 共用銀行帳號提醒的處置（Stripe 計畫 D45、步驟 8d）：管理員對處分頁的一個關聯帳號標為已檢視，這一對（措施、帳號）就離開後台待辦
+-- 共用銀行帳號提醒的處置（收款開通 ADR D45）：管理員對處分頁的一個關聯帳號標為已檢視，這一對（措施、帳號）就離開後台待辦
 -- （seller.review_shared_bank_account）。待辦本身是推導的、不儲存（ADR 2026-10-20-admin-review-queue），只有這個處置存下來；沒有處置，項目永遠離不開待辦。
 -- 一對最多一列（主鍵），重複標記不改原來的時間與管理員。
 CREATE TABLE seller.measure_linked_reviews (
@@ -924,7 +924,7 @@ CREATE TABLE seller.measure_linked_reviews (
 -- JSON），草稿時除了身分以外都可以是 NULL，送出之後必填由 kyc_applications_complete_check 表達。status 只記人工決定
 -- （草稿、送出、核准、退回、取消）；收款帳戶的狀態由 payment 模組擁有，不混進這條軸。ID 是 UUIDv7（應用層產生）：申請
 -- 是 media 引用、事件與稽核指稱的實體，Java 不存它（row-identity ADR）。
--- 個資：平台不收身分證號、銀行帳號、證件影像與個人姓名（Stripe 計畫 D22、D37）；統編 tax_id 是市集登記資料（明文），它的 blind index
+-- 個資：平台不收身分證號、銀行帳號、證件影像與個人姓名（收款開通 ADR D22、D37）；統編 tax_id 是市集登記資料（明文），它的 blind index
 -- 只在防詐保存的 account_identity_hashes（D42），草稿的「欄位有沒有改」直接比明文。聯絡資料（聯絡人、聯絡手機、
 -- 客服信箱）是店家的欄位（stores），不在申請上。收款聯絡信箱不在申請上：它是帳號的聯絡信箱（identity，D23 2026-11-03 修訂），送出時要求帳號有，核准時傳給 payment 模組快照到收款帳戶列（payment.accounts.contact_email）。公司地址以內政部的鄉鎮市區代碼表示（同 stores）。
 -- version 是樂觀鎖（etag 的來源）：所有寫入者必帶讀到的版本。
@@ -997,8 +997,8 @@ CREATE INDEX kyc_applications_status_submitted ON seller.kyc_applications (statu
 CREATE INDEX kyc_applications_submitted ON seller.kyc_applications (submitted_at, application_id)
     WHERE status <> 'DRAFT' AND submitted_at IS NOT NULL;
 
--- 防詐用的身分比對索引（ADR 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」，Stripe 計畫 D3）：與 KYC 個資分開保存，只有 blind index、沒有明文。
--- 來源有兩種：申請的統編（同一個 transaction、同一支 writeHashes 寫入；統編被改掉時同步修剪；Stripe 計畫 D42：申請沒有自己的 hash 表），以及 provider 回報的外部銀行帳號
+-- 防詐用的身分比對索引（ADR 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」，收款開通 ADR D3）：與 KYC 個資分開保存，只有 blind index、沒有明文。
+-- 來源有兩種：申請的統編（同一個 transaction、同一支 writeHashes 寫入；統編被改掉時同步修剪；收款開通 ADR D42：申請沒有自己的 hash 表），以及 provider 回報的外部銀行帳號
 -- fingerprint（BANK_FINGERPRINT，收款帳戶同步在寫快取的同一個 transaction 寫入，kyc.Fingerprints；不是草稿的值，不修剪，只由過期刪除）。兩種都不隨 184 天的個資清理刪除：
 -- 帶身分效果的措施建立時 SnapshotMeasureIdentities 從這裡取，被處分帳號目前還在這裡的列也是措施的身分（measure_identity_hits），所以舊 stint 的 KYC 清掉之後，之後才建立的處分仍取得到它的身分。
 -- 一列是（來源 stint，種類，金鑰，hash）：field 是 TAX_ID 或 BANK_FINGERPRINT（身分證號、負責人身分證號與平台自收的銀行帳號三個舊種類已刪，D38；
@@ -1170,7 +1170,7 @@ CREATE TABLE seller.kyc_review_issues (
     )
 );
 
--- 補充文件的讀取紀錄（形狀同 evidence_accesses：誰、哪一張、何時；不掛授權，Stripe 計畫 D36）：每次後台讀一張公司補充文件寫一列，在送出內容之前寫入
+-- 補充文件的讀取紀錄（形狀同 evidence_accesses：誰、哪一張、何時；不掛授權，收款開通 ADR D36）：每次後台讀一張公司補充文件寫一列，在送出內容之前寫入
 -- （寫不進去就不送）。append-only，記實際送出的那張圖片的 asset_id（資產 ID 不是個資；文件換過圖之後還查得出當時看的是哪一張），不含內容。
 CREATE TABLE seller.kyc_document_accesses (
     access_id      UUID PRIMARY KEY,
@@ -1418,7 +1418,7 @@ CREATE TABLE seller.store_blocks (
 );
 CREATE INDEX store_blocks_buyer ON seller.store_blocks (buyer_id, store_id);
 
--- 收款帳戶的開通閘門副本（Stripe 計畫 D28）：收款帳戶由 payment 模組擁有，同步 job 在寫快取的 transaction 內發 PayoutAccountChanged，
+-- 收款帳戶的開通閘門副本（收款開通 ADR D28）：收款帳戶由 payment 模組擁有，同步 job 在寫快取的 transaction 內發 PayoutAccountChanged，
 -- seller 以同 transaction 的訂閱者把轉帳能力是否啟用複製到這裡（開通閘門 store_requirement_flags.onboarding_complete 只讀這一欄，不讀 payment）。
 -- 沒有列等於轉帳能力未啟用。provider 是發布事件的 provider 代碼。列隨店家保留（不含個資）。
 CREATE TABLE seller.payout_capabilities (

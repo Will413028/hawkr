@@ -38,7 +38,7 @@ import {
 import type { usePaymentAccount } from "./use-store-detail";
 
 // 商家詳情的收款帳戶卡（PaymentAdminService 的 GetPaymentAccount、RefreshPaymentAccount、RetryPaymentAccountCreate、RetryPaymentAccountPurge、DeletePaymentAccountMapping；
-// 附件 step7-screen-drafts.md 第 3 節；清理終局的文字與位置見 Stripe 計畫 D60）。
+// 附件 step7-screen-drafts.md 第 3 節；清理終局的文字與位置見 收款開通 ADR D60）。
 // 徽章文字與賣家共用目錄（D24 Q6），細節看原始的 status_reason 與待補條件。
 
 /** 錨點：審核待辦 PAYMENT_ACCOUNT_CREATE_FAILED 與 PAYMENT_ACCOUNT_PURGE_STUCK 的連結帶這個 hash（queue-item.ts）。 */

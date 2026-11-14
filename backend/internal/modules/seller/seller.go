@@ -58,7 +58,7 @@ type Orders interface {
 }
 
 // Deps 是模組需要的外部依賴；clock 由組裝點注入。StoreCode 是 store_code 的產生器，測試以外不給（預設是
-// 年份加密碼學亂數）。KYCMAC 是統編比對用的 HMAC 金鑰環（Stripe 計畫 D22：平台不再加密保存個資），必填。
+// 年份加密碼學亂數）。KYCMAC 是統編比對用的 HMAC 金鑰環（收款開通 ADR D22：平台不再加密保存個資），必填。
 type Deps struct {
 	DB       *db.DB
 	Events   *events.Bus
@@ -67,7 +67,7 @@ type Deps struct {
 	Media    media.Media
 	Orders   Orders
 	KYCMAC   *seal.MAC
-	// Payment 是收款帳戶的擁有者（payment 模組，Stripe 計畫 D28），必填：核准的 transaction 內請它寫「建立中」的帳戶列並排入建立 job，個資清理時請它
+	// Payment 是收款帳戶的擁有者（payment 模組，收款開通 ADR D28），必填：核准的 transaction 內請它寫「建立中」的帳戶列並排入建立 job，個資清理時請它
 	// 刪除帳戶列。沒有設定 provider 的 payment 模組讓核准不建立收款帳戶。
 	Payment *payment.Module
 	// Registry 是登記資料來源（公司型申請送件時查詢並存快照；serve 與 worker 都需要，serve 排入、worker 執行），必填。

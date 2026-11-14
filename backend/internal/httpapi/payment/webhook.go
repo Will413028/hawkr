@@ -1,4 +1,4 @@
-// Package payment 是 payment 模組的對外入口：後台的 PaymentAdminService 與收款 provider 的 webhook（Stripe 計畫 D29、D30）。
+// Package payment 是 payment 模組的對外入口：後台的 PaymentAdminService 與收款 provider 的 webhook（收款開通 ADR D29、D30）。
 package payment
 
 import (

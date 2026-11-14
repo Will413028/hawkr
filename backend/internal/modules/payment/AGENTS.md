@@ -4,7 +4,7 @@
 
 ## 職責
 
-收款與付款。現階段只擁有收款帳戶（Stripe 計畫 D28）：外部帳戶的本地快取、建立與同步 job、輪詢、provider 的 port 與 Stripe／fake adapter、收款事件的 inbox handler、後台的讀取、重新整理、重試建立、重試關閉與刪除對應。給 seller（核准、開通 session、個資清理）與後台用。行為規格的唯一來源是 `docs/modules/payment.md`。
+收款與付款。現階段只擁有收款帳戶（收款開通 ADR D28）：外部帳戶的本地快取、建立與同步 job、輪詢、provider 的 port 與 Stripe／fake adapter、收款事件的 inbox handler、後台的讀取、重新整理、重試建立、重試關閉與刪除對應。給 seller（核准、開通 session、個資清理）與後台用。行為規格的唯一來源是 `docs/modules/payment.md`。
 
 ## 擁有的資料
 
@@ -38,4 +38,4 @@ schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵
 
 ## 決策紀錄
 
-沿用機制的判斷在同目錄的 `CARRYOVER.md`。相關 ADR：`docs/adr/2026-09-24-go-modular-monolith.md`（文末修訂「payment 模組先只擁有收款帳戶」：payment 先只有收款帳戶、seller 依賴 payment、規則 5 的 inbox 由 platform 提供）、`docs/adr/2026-11-13-payment-onboarding-provider-port-stripe.md`（收款帳戶的擁有者、port 與 Stripe）。計畫：`docs/plans/2026-10-29-payment-onboarding-stripe.md` D28–D30。
+沿用機制的判斷在同目錄的 `CARRYOVER.md`。相關 ADR：`docs/adr/2026-09-24-go-modular-monolith.md`（文末修訂「payment 模組先只擁有收款帳戶」：payment 先只有收款帳戶、seller 依賴 payment、規則 5 的 inbox 由 platform 提供）、`docs/adr/2026-11-13-payment-onboarding-provider-port-stripe.md`（收款帳戶的擁有者、port 與 Stripe；Dn 編號見「決定編號」表）。

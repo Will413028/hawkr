@@ -818,7 +818,7 @@ type LinkedAccountHitsRow struct {
 }
 
 // 與這筆措施的身分相同的其他帳號（W9）：防詐保存的 account_identity_hashes（跨 stint，個資清理之後仍在）裡，統編（TAX_ID）對措施的 TAX_ID、
-// provider 回報的銀行帳號 fingerprint（BANK_FINGERPRINT）對措施的 BANK_ACCOUNT；措施的身分是快照加上被處分帳號目前的 hash，措施在 at 不生效或不帶身分效果時沒有命中（Stripe 計畫 D4、D42：銀行帳號命中只列出；能不能據以建立關聯終止由
+// provider 回報的銀行帳號 fingerprint（BANK_FINGERPRINT）對措施的 BANK_ACCOUNT；措施的身分是快照加上被處分帳號目前的 hash，措施在 at 不生效或不帶身分效果時沒有命中（收款開通 ADR D4、D42：銀行帳號命中只列出；能不能據以建立關聯終止由
 // model.LinkedIdentity.CountsAsGround 決定，不在這裡）。命中的定義只有 seller.measure_identity_hits(at) 那一份（以 (key_id, hash) 索引等值連接，不解密）；帳號取自來源 stint。
 // account_id 不為 NULL 時只看那個帳號。
 func (q *Queries) LinkedAccountHits(ctx context.Context, arg LinkedAccountHitsParams) ([]LinkedAccountHitsRow, error) {
@@ -1206,7 +1206,7 @@ type SnapshotMeasureIdentitiesParams struct {
 // 措施建立時，若它帶身分效果（seller.identity_effect_measures 那一份定義：停權與非預告的終止合作），複製被處分帳號全部 stint 的身分 blind index 到措施擁有的快照：每個識別欄位金鑰環裡每一把金鑰算的 hash 各一筆，之後換鑰也查得到；
 // 同一個 hash 只留一筆。來源是 account_identity_hashes（防詐保存，ADR 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」）：
 // 申請的統編在 stint 的個資清理之後仍在這裡，所以舊 stint 清理之後才建立的處分取得到它。統編（TAX_ID）的種類是 TAX_ID；provider 回報的銀行帳號
-// fingerprint（BANK_FINGERPRINT）的種類是 BANK_ACCOUNT（Stripe 計畫 D38：身分證號、負責人身分證號與平台自收的銀行帳號已不存在）。
+// fingerprint（BANK_FINGERPRINT）的種類是 BANK_ACCOUNT（收款開通 ADR D38：身分證號、負責人身分證號與平台自收的銀行帳號已不存在）。
 // 不帶身分效果的措施（預告終止、其他種類）一列都不寫；呼叫方不判斷。
 func (q *Queries) SnapshotMeasureIdentities(ctx context.Context, arg SnapshotMeasureIdentitiesParams) error {
 	_, err := q.db.Exec(ctx, snapshotMeasureIdentities, arg.MeasureID, arg.AccountID)

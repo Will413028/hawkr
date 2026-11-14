@@ -221,7 +221,7 @@ func TestKYCSubmitsDirectlyFromRejectedWithoutASave(t *testing.T) {
 	}
 }
 
-// 平台不收身分證號、負責人身分證號、銀行代碼與帳號、存摺與身分證影像、本名、英文姓名、生日與證件發證資料（Stripe 計畫 D22、D37）：KYC 的表
+// 平台不收身分證號、負責人身分證號、銀行代碼與帳號、存摺與身分證影像、本名、英文姓名、生日與證件發證資料（收款開通 ADR D22、D37）：KYC 的表
 // （information_schema.columns）與申請的輸入、檢視型別都沒有這些欄位，儲存這些資料的表（kyc_reveals、kyc_identity_hashes）也不存在，申請也不再有自己的統編 hash 欄位（D42，防詐保存只在 account_identity_hashes）。
 // mutation：在 kyc_applications 加回任何一個被刪的欄位（例如 real_name）、或在 KYCDraftInput 加回欄位 → 本測試失敗（只在 CI 的 integration 驗證）。
 func TestKYCHasNoPersonalIdentityOrBankColumnsOrFields(t *testing.T) {

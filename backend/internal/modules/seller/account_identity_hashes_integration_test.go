@@ -13,7 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
 )
 
-// 防詐保存（Stripe 計畫 D3、D42）：統編的 hash 寫進 account_identity_hashes，不隨 184 天的個資清理刪除；
+// 防詐保存（收款開通 ADR D3、D42）：統編的 hash 寫進 account_identity_hashes，不隨 184 天的個資清理刪除；
 // 之後才建立的處分，快照取得到已清理的舊 stint 的統編，同一個統編仍然不能在別的帳號通過認證。
 // mutation：SnapshotMeasureIdentities 改成從申請的明文統編取 → 清理後快照列數是 0、新帳號通過認證；writeHashes 不寫保存表 → 清理前就沒有列；
 // 清理連保存表一起刪 → 清理後沒有列。

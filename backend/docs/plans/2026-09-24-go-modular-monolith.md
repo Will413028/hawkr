@@ -197,7 +197,7 @@
 - [ ] **A3 buyer、seller**：seller 不含推薦排行；buyer 往上的補資料移到 http。步驟、決定與進度在 `2026-09-29-a3-buyer-seller.md`（盤點在同名目錄）；下面兩個子項已併入該檔的步驟 7。
   - seller 第一個 `*AppService`：實作錯誤模型 ADR `2026-09-25-api-error-model.md` D10 的賣家停權（`permission_denied` 加 `ErrorInfo.reason` `SELLER_SUSPENDED`，取代 9240 加 HTTP 409），在同一個變更加入 `ErrorReason` 的值、單體裡能力檢查的產生、client 把它轉成賣家身分的停權狀態，並端到端驗證（Connect 試點的通過條件 7）。能力檢查的做法（逐方法宣告、Redis 快取、fail-open）依模組完成的定義重新評估 ADR `2026-09-18-seller-capability-authorization.md`。
   - 申請成為商家：舊 gateway 的 `POST /app/sellers` 在 seller-service 建店並授予 SELLER 之後，才驗證城市代碼，驗證失敗回 400 而商店與角色已經寫入（A2 的 compose 驗收，2026-09-29）。搬進 seller 模組時，輸入驗證放在建店之前，建店與授予角色同一個 transaction。
-  - 收款開通改走 payment port（PayUni 換 Stripe Connect，作品集為主）：步驟、決定與進度在 `2026-10-29-payment-onboarding-stripe.md`。改的是 A3b 已完成的 7c、8b、8f（KYC、PayUni 綁定、後台審核）；付款、退款、撥款與物流的部分寫在 B2、B3、B8–B10。
+  - 收款開通改走 payment port（PayUni 換 Stripe Connect，作品集為主）：決定在 ADR `2026-11-13-payment-onboarding-provider-port-stripe.md` 的「決定編號」。改的是 A3b 已完成的 7c、8b、8f（KYC、PayUni 綁定、後台審核）；付款、退款、撥款與物流的部分寫在 B2、B3、B8–B10。
 
 A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主鍵照 ID 策略的過渡規則暫用 `bigint GENERATED ALWAYS AS IDENTITY`，不用 TSID；最後一個 Java 消費者改寫後，以一個 migration 換成 uuid。
 - [x] **A4 pricebook**：取消，不搬。pricebook 整個刪除（ADR `2026-10-27-general-ecommerce-scope-cut.md` D1），執行在 `2026-10-27-ecommerce-scope-cut.md` 步驟 5、6；完成時勾掉這一項。
@@ -263,9 +263,9 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - 延後項（`2026-10-27-ecommerce-scope-cut`「延後」，2026-10-29）：CodeMeta `AssetReferenceType` 的食譜值（content 的食譜已刪）還被 Java media-service 使用，也鏡像在 Go 的 `media/ref_type.go`、`pkg/media/ref_type.go` 與 `media/finalize_args.go`。觸發：B1 把 media 改成不認識業務（拿掉 `(ref_type, ref_id)`）時，連同 CodeMeta 值與生成物一起刪。
 - [ ] **B2 payment**：物流財務與責任判定先留在 Java，B10 再處理。
   - `createRefund` 依 D5 修正。
-  - 換金流（計畫 `2026-10-29-payment-onboarding-stripe` D1、D5）：付款不再走 PayUni，改經 payment port，作品集的 adapter 是 Stripe Connect 測試模式；付款建立、webhook（先寫 inbox、event id 去重）都走 port。`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 改由 port 的外部帳戶 ID 取代；Java 與 Go 舊服務的 PayUni 程式隨本步刪除。
+  - 換金流（收款開通 ADR D1、D5）：付款不再走 PayUni，改經 payment port，作品集的 adapter 是 Stripe Connect 測試模式；付款建立、webhook（先寫 inbox、event id 去重）都走 port。`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 改由 port 的外部帳戶 ID 取代；Java 與 Go 舊服務的 PayUni 程式隨本步刪除。
 - [ ] **B3 fulfillment**
-  - 物流供應商改綠界（`2026-10-24-portfolio-public.md` 前提；計畫 `2026-10-29-payment-onboarding-stripe` D5）：超商與宅配的建單、列印、貨態 webhook 不再走 PayUni 的 MerID 與 `payuni-webhook-service`；開工前先查綠界測試帳號與平台條件（daily 2026-10-29 2350 的 Followup）。
+  - 物流供應商改綠界（`2026-10-24-portfolio-public.md` 前提；收款開通 ADR D5）：超商與宅配的建單、列印、貨態 webhook 不再走 PayUni 的 MerID 與 `payuni-webhook-service`；開工前先查綠界測試帳號與平台條件（daily 2026-10-29 2350 的 Followup）。
   - 刪除 Uber 即時配送（ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：Java shipping 的 Uber 程式、payuni-webhook-service 的 Uber webhook、只服務它們的 proto RPC 與生成物、CodeMeta 的 Uber 值域、`.env.template` 與 `docker-compose-local.yml` 的 Uber 設定、`docs/runbooks/uber-quote-retention/`，4 份 Uber ADR 標 superseded；設計書 03、06、09、58 描述 3003（Uber）的段落與 `docs/runbooks/uber-quote-retention.md` 一併刪除；清單見 `docs/plans/2026-10-27-ecommerce-scope-cut.md`「延後」（Will 2026-10-29）。
   - 上一項的清單與觸發條件的來源是 `2026-10-27-ecommerce-scope-cut`「延後」；補充範圍：CodeMeta 的 Uber 值域是 `ShippingMethod` 3003、`UberDeliveryOutcome`、`ShipmentAnomalyType` 的 4 個 UBER 值與錯誤碼 9024（`pkg/errors/bizcode`），Java 仍實作的 proto（order、shipping、product_import）裡的 Uber 欄位與 RPC 隨之刪除，client 裡斷言「3003 一律 unsupported」的回歸測試（website `lib/checkout/shipping-requirements.unit.test.ts`、`lib/seller/shipment-provider.unit.test.ts`，buyer-app `test/core/codemeta/shipping_presentation_test.dart`）在值域刪除時一起改。
   - 4 份 Uber ADR 在 B3 刪 Java 程式時標 superseded（指向 ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：`2026-09-11-uber-commerce-model-seller-direct`、`2026-09-11-uber-logistics-fee-charge-trigger`、`2026-09-14-uber-create-idempotency-precommit-key`、`2026-09-06-uber-webhook-slice-in-payuni-webhook-service`。
@@ -290,17 +290,17 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - checkout 在單一 transaction 內完成：鎖購物車、扣庫存、建單、鎖定優惠券。
   - 發票快照移交給 invoice。
   - 訂單上的物流投影欄與付款副本刪除。
-  - 訂單的付款經 payment port（計畫 `2026-10-29-payment-onboarding-stripe`）；`order.proto` 的 `shipping_status` 不再是 PayUni 狀態碼字串。
+  - 訂單的付款經 payment port（收款開通 ADR `2026-11-13-payment-onboarding-provider-port-stripe.md`）；`order.proto` 的 `shipping_status` 不再是 PayUni 狀態碼字串。
   - 訂單號重新設計，不照搬 `OrderNoGenerator`：`"O" + TSID % 10^9` 加上 `UNIQUE(order_no)`，約 3.7 萬筆訂單就有一半機率撞號（生日界）。訂單號是給人看的編號，另開 `UNIQUE` 欄，不由 ID 截斷或取模（PostgreSQL 設計規範 §二）。
   - agent 的「接受報價 → 建單」改在同一個 transaction 內完成，並標記 RFQ ADR 為 superseded。
 - [ ] **B9 aftersales**
   - 取消、退款任務、優惠券補償在同一個 transaction 內完成。
   - 設定「進行中售後」旗標。
   - `refund_tasks`、`auto_refund_tasks`、`payment_refunds` 收斂成一張退款命令表。
-  - 退款經 payment port（計畫 `2026-10-29-payment-onboarding-stripe`）；PayUni 的超商與 ATM 轉帳退款不再適用，非原路退款依 port 的能力描述處理。
+  - 退款經 payment port（收款開通 ADR `2026-11-13-payment-onboarding-provider-port-stripe.md`）；PayUni 的超商與 ATM 轉帳退款不再適用，非原路退款依 port 的能力描述處理。
 - [ ] **B10 finance**
   - 賣家撥款從 ordering 移入。
-  - 撥款與對帳經 payment port（計畫 `2026-10-29-payment-onboarding-stripe`）：PayUni 的「代理商先收、訂單完成後撥款」改對應 Stripe Connect 的 separate charges and transfers；代理商費反推與 ADR `payuni-channel-fee-bearer` 在本步重審。
+  - 撥款與對帳經 payment port（收款開通 ADR `2026-11-13-payment-onboarding-provider-port-stripe.md`）：PayUni 的「代理商先收、訂單完成後撥款」改對應 Stripe Connect 的 separate charges and transfers；代理商費反推與 ADR `payuni-channel-fee-bearer` 在本步重審。
   - 物流財務與責任判定從 Java payment-service 移入，Java payment-service 就此退場。
 
 **階段驗收**
@@ -348,7 +348,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 | 階段 | 狀態 | 備註 |
 |---|---|---|
 | 0 地基 | 進行中 | 已完成：0.1；0.2 的核心機制；0.3 的依賴方向、migration 與 query 隔離檢查；0.4 的 migration 套用器與 Atlas 開發設定；0.6 的 OpenAPI 規格與生成工具（2026-09-26 由 Connect 取代，規格改為現有 API 清單）；0.7 的 D9 gate；0.8 的盤點 gate；0.9 的本機環境；0.10 的指令檔；0.11 的 `backend-monolith` workflow（含 integration 測試）；0.5 的模組模板與 scaffold（2026-09-27，從 content 抽出）。單體統一使用 Postgres 18。前置修正：CodeMeta 的 Go 輸出從 `docs/` 移到 `internal/platform/codemeta`，因為中文目錄名不是合法的 import path，會讓根 module 無法建置 |
-| A Go 併入 | 進行中 | A0、A1、A2 完成；A4 取消（pricebook 刪除）。A3：步驟 1–9、10a、10b、10c、10e 完成，剩 10d 公開讀取（部分併進 A7）與 10f 信任與安全上線前（`2026-09-29-a3-buyer-seller.md`）；收款開通換 Stripe 在 `2026-10-29-payment-onboarding-stripe.md`（步驟 2 完成，步驟 1 待 Stripe 測試帳號，步驟 3 可先做）。A7：1a、1b 完成，下一步 A7-1c（`2026-10-18-a7-social.md`）。其餘 A5、A6、A8–A11 未開始 |
+| A Go 併入 | 進行中 | A0、A1、A2 完成；A4 取消（pricebook 刪除）。A3：步驟 1–9、10a、10b、10c、10e 完成，剩 10d 公開讀取（部分併進 A7）與 10f 信任與安全上線前（`2026-09-29-a3-buyer-seller.md`）；收款開通換 Stripe 已完成，決定在 `adr/2026-11-13-payment-onboarding-provider-port-stripe.md`。A7：1a、1b 完成，下一步 A7-1c（`2026-10-18-a7-social.md`）。其餘 A5、A6、A8–A11 未開始 |
 | B Java 改寫 | 未開始 | |
 | C 收尾 | 未開始 | |
 | D 前端 client | 取消（2026-09-26） | 併進模組完成的定義，收尾在階段 C |

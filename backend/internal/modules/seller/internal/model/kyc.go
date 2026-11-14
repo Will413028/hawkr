@@ -75,7 +75,7 @@ type SanctionIdentityKind string
 const (
 	// IdentityTaxID 統編。
 	IdentityTaxID SanctionIdentityKind = "TAX_ID"
-	// IdentityBankAccount 金流商回報的銀行帳號 fingerprint（Stripe 計畫 D38：平台不再收身分證號與銀行帳號）。
+	// IdentityBankAccount 金流商回報的銀行帳號 fingerprint（收款開通 ADR D38：平台不再收身分證號與銀行帳號）。
 	IdentityBankAccount SanctionIdentityKind = "BANK_ACCOUNT"
 )
 
@@ -177,7 +177,7 @@ type KYCRejection struct {
 }
 
 // KYCApplication 是申請的檢視（賣家自查與後台各自的回應都是它）：平台不收身分證號、銀行帳號、證件影像與個人姓名
-// （Stripe 計畫 D22、D37），這個型別沒有欄位能放它們。日期是 ISO 8601 的日曆日（YYYY-MM-DD）。
+// （收款開通 ADR D22、D37），這個型別沒有欄位能放它們。日期是 ISO 8601 的日曆日（YYYY-MM-DD）。
 type KYCApplication struct {
 	ID                 uuid.UUID
 	StoreID, AccountID int64
@@ -442,7 +442,7 @@ func NormalizeTaxID(raw string) (string, bool) {
 }
 
 // IdentityInput 是統編 blind index 的輸入：標籤做 domain separation，與銀行帳號 fingerprint 的標籤（BankFingerprintInput）是不同的 hash 空間。
-// 平台不再收身分證號與銀行帳號（Stripe 計畫 D22、D38），只有統編一種申請持有的識別值；其他種類 panic。
+// 平台不再收身分證號與銀行帳號（收款開通 ADR D22、D38），只有統編一種申請持有的識別值；其他種類 panic。
 func IdentityInput(kind SanctionIdentityKind, value string) []byte {
 	if kind == IdentityTaxID {
 		return []byte("kyc:ubn:v1|" + value)

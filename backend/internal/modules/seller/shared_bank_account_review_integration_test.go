@@ -14,7 +14,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 共用銀行帳號提醒（Stripe 計畫 D45、步驟 8d）：待辦 SHARED_BANK_ACCOUNT 由 seller.review_shared_bank_account(at) 推導，成員是處分生效中、
+// 共用銀行帳號提醒（收款開通 ADR D45）：待辦 SHARED_BANK_ACCOUNT 由 seller.review_shared_bank_account(at) 推導，成員是處分生效中、
 // 處分建立之後才同步進來的同一個 fingerprint 命中的別的帳號；只存「已檢視」的處置（measure_linked_reviews）。
 
 const sharedBankKind = "SHARED_BANK_ACCOUNT"

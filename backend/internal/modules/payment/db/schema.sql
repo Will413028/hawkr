@@ -9,7 +9,7 @@ CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA payment;
 
--- 收款帳戶：擁有者在金流商那邊的外部帳戶的本地快取（Stripe 計畫 D13、D19、D28）。擁有者鍵現階段是 store_id（seller 的店家；不建跨 schema 的 FK，
+-- 收款帳戶：擁有者在金流商那邊的外部帳戶的本地快取（收款開通 ADR D13、D19、D28）。擁有者鍵現階段是 store_id（seller 的店家；不建跨 schema 的 FK，
 -- 出現第二種擁有者時再通用化）。一個擁有者一列，關店再開沿用；只存狀態與能力快照，不存聯絡信箱（D23）。
 -- seller 核准的 transaction 只 INSERT「建立中」的列（external_account_id 是 NULL、status 是 NOT_CREATED；ON CONFLICT DO NOTHING，既有的列不改）
 -- 並排入建立 job；之後的寫入都由本模組的 job 與管理員的指令做：建立 job 在 transaction 外分兩步建立外部帳戶（取得 ID、完成設定，D55），第一步拿到外部 ID 就填上，

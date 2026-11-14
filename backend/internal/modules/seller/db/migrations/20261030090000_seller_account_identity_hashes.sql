@@ -1,4 +1,4 @@
--- 防詐用的身分比對索引：與 KYC 個資分開保存，不隨 184 天的個資清理刪除（Stripe 計畫 D3，ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-30 修訂）。
+-- 防詐用的身分比對索引：與 KYC 個資分開保存，不隨 184 天的個資清理刪除（收款開通 ADR D3，ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-30 修訂）。
 -- 系統未上線，不回填既有申請的 kyc_identity_hashes（開發資料以 dev-seed 重建）。
 -- Create "account_identity_hashes" table
 CREATE TABLE "seller"."account_identity_hashes" (

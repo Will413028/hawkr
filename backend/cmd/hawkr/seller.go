@@ -23,7 +23,7 @@ import (
 
 // readKYCHashKeys 讀統編比對（blind index）的 HMAC 金鑰 KYC_HASH_KEYS：逗號分隔的 id:base64，每把至少 32 bytes，第一把計算、全部可以查詢；
 // 處分的身分快照沒有明文可以重算，所以舊的金鑰要留到用它算的快照所屬的處分都結束，也要留到防詐保存的 hash 過期被刪。
-// 必填（沒設定、空的或太短都會讓啟動失敗）。平台不再加密保存個資（Stripe 計畫 D22），沒有加密金鑰。
+// 必填（沒設定、空的或太短都會讓啟動失敗）。平台不再加密保存個資（收款開通 ADR D22），沒有加密金鑰。
 func readKYCHashKeys(e *config.Env) *seal.MAC {
 	mac, err := parseKYCHashKeys(e.String("KYC_HASH_KEYS"))
 	if err != nil {

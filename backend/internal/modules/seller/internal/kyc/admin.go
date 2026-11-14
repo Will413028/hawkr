@@ -22,7 +22,7 @@ import (
 
 // AdminList 是 admin 的審核佇列：只列送出過的申請（不含草稿，也不含沒送出就取消的），依狀態與關鍵字（店名、公司名稱、統編的
 // 子字串，ILIKE）篩選，keyset，預設 20、上限 100。排序鍵是送出時間，方向由 model.KYCListInput.OldestFirst 決定：篩選審核中時
-// 舊到新，其他新到舊。列名是店名（Stripe 計畫 D37）；清單的項目不帶補充文件。
+// 舊到新，其他新到舊。列名是店名（收款開通 ADR D37）；清單的項目不帶補充文件。
 func (s *Service) AdminList(ctx context.Context, in model.KYCListInput) (model.KYCPage, error) {
 	size, err := pagination.PageSize(in.PageSize, 20, 100)
 	if err != nil {
@@ -441,7 +441,7 @@ func (s *Service) Reject(ctx context.Context, in model.RejectKYCInput) (model.KY
 	return out, err
 }
 
-// ReadDocument 讀一張公司補充文件。授權是後台的 KYC 讀取權限（路由的 adminperm.SellerKYCDocumentsGet，由 httpapi 檢查；Stripe 計畫 D36：補充文件不是證件，
+// ReadDocument 讀一張公司補充文件。授權是後台的 KYC 讀取權限（路由的 adminperm.SellerKYCDocumentsGet，由 httpapi 檢查；收款開通 ADR D36：補充文件不是證件，
 // 不要理由與限時授權），這裡不再問授權；個資已清除、草稿與已取消的申請或位置沒有文件是 NotFound。
 // 順序是安全性質：（1）在 transaction 內確認文件並寫一列 append-only 的讀取紀錄（誰、哪個位置、實際送出的 asset ID、
 // 何時；不含內容），commit 之後才（2）向 media 讀圖片。紀錄寫不進去就不讀（fail closed）；讀取失敗時紀錄仍在（嘗試也是紀錄）。
@@ -488,7 +488,7 @@ func (s *Service) ReadDocument(ctx context.Context, in model.ReadKYCDocumentInpu
 
 // MatchCertHolder 回報 holderName（政府證書查驗回的業者名稱）是否屬於店家目前已核准的 KYC 的公司名稱（規則在
 // model.MatchCertHolder，名字不出這個函式）。基準只有目前的 stint 上人工核准（KYC APPROVED）的申請的公司名稱（`docs/modules/seller.md` §1.3；
-// 收款帳戶啟用是金流開通，不是身分驗證，所以不是條件）：店家不存在、已關閉、沒有申請、申請不是 APPROVED、個人賣家（沒有公司名稱；Stripe 計畫 D37：平台不再收
+// 收款帳戶啟用是金流開通，不是身分驗證，所以不是條件）：店家不存在、已關閉、沒有申請、申請不是 APPROVED、個人賣家（沒有公司名稱；收款開通 ADR D37：平台不再收
 // 個人姓名）都是沒有基準（HasReference=false，呼叫方轉人工），不是錯誤；讀取失敗回錯誤，呼叫方必須 fail-closed。
 func (s *Service) MatchCertHolder(ctx context.Context, storeID int64, holderName string) (model.CertHolderMatch, error) {
 	if err := model.Positive(storeID); err != nil {

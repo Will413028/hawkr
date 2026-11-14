@@ -255,7 +255,7 @@ func backoff(attempt int, retryAfter string) time.Duration {
 	return min(baseBackoff<<(attempt-1), maxBackoff)
 }
 
-// Dashboard 是連線帳戶的 dashboard 種類，決定誰向賣家收件：express 由 Stripe 收，none 由平台收（spike Q9）。
+// Dashboard 是連線帳戶的 dashboard 種類，決定誰向賣家收件：express 由 Stripe 收，none 由平台收（sandbox 實測）。
 type Dashboard string
 
 // Dashboard 的值。
@@ -471,7 +471,7 @@ func rawRequirements(res *sdk.APIResponse) json.RawMessage {
 }
 
 // CloseAccount 關閉 v2 帳戶。先讀回帳戶：已關閉就視為成功；否則 applied_configurations 取自讀回的帳戶（關閉要求傳帳戶實際的全部設定：
-// 第一步之後還沒完成設定的空帳戶是 []，傳 ["recipient"] 或省略都是 400 configs_must_match_to_close，D60、spike Q25）。讀取失敗直接回讀取的錯誤；
+// 第一步之後還沒完成設定的空帳戶是 []，傳 ["recipient"] 或省略都是 400 configs_must_match_to_close，D60、sandbox 實測）。讀取失敗直接回讀取的錯誤；
 // 關閉回 403（並行的關閉剛完成）時再讀一次，closed 為真就視為成功，否則回原本的 403。
 // 關閉回 400 configs_must_match_to_close 時（讀與關閉之間並行的設定讓帳戶的設定變了）再讀一次、用新讀到的設定重送一次關閉；第二次仍不符就回那個錯誤。
 func (c *Client) CloseAccount(ctx context.Context, accountID string) error {

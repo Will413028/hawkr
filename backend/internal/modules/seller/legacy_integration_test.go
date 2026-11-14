@@ -175,7 +175,7 @@ func (f *fixture) approvedCompanyStore(t *testing.T, taxID string) Store {
 	return s
 }
 
-// 比對基準是核准的公司名稱（Stripe 計畫 D37：平台不收本名）；個人賣家沒有基準，回「沒有 reference」交人工判斷。
+// 比對基準是核准的公司名稱（收款開通 ADR D37：平台不收本名）；個人賣家沒有基準，回「沒有 reference」交人工判斷。
 func TestMatchCertificateHolder(t *testing.T) {
 	t.Parallel()
 	f := setup(t)

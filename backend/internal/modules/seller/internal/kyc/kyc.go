@@ -1,5 +1,5 @@
 // Package kyc 是賣家的 KYC 認證：賣家填寫草稿、送出與取消，管理員審核（核准、退回、讀公司補充文件），以及統編的身分比對
-// （ADR 2026-11-13-seller-platform-review-and-identity-matching「申請、草稿與審核」）。申請以 store_id 為鍵；平台不收身分證號、銀行帳號與證件影像（Stripe 計畫 D22），統編以 blind index 比對；
+// （ADR 2026-11-13-seller-platform-review-and-identity-matching「申請、草稿與審核」）。申請以 store_id 為鍵；平台不收身分證號、銀行帳號與證件影像（收款開通 ADR D22），統編以 blind index 比對；
 // 人工決定與稽核紀錄在寫入的同一個 transaction，補充文件的 media 引用由收斂 job 維護。
 package kyc
 
@@ -44,7 +44,7 @@ type Deps struct {
 	Media  media.Media
 	// Exposure 是可曝光的公告：申請的狀態是開通閘門（平台審核核准）的輸入，每個改變它的寫入在 transaction 的最後呼叫。
 	Exposure *exposure.Service
-	// Payment 是收款帳戶的擁有者（payment 模組）：核准的 transaction 內寫「建立中」的列並排入建立 job（Stripe 計畫 D16、D28）。
+	// Payment 是收款帳戶的擁有者（payment 模組）：核准的 transaction 內寫「建立中」的列並排入建立 job（收款開通 ADR D16、D28）。
 	Payment  Payment
 	Identity Identity
 	MAC      *seal.MAC
