@@ -22,7 +22,7 @@ import (
 type AdminModule interface {
 	Account(ctx context.Context, storeID int64) (payment.Account, error)
 	RefreshAccount(ctx context.Context, storeID int64) (payment.Account, error)
-	RetryAccountCreate(ctx context.Context, storeID int64) (payment.Account, error)
+	RetryAccountCreate(ctx context.Context, storeID int64, acknowledgeNoProviderAccount bool) (payment.Account, error)
 	RetryAccountPurge(ctx context.Context, storeID int64) (payment.Account, error)
 	DeleteAccountMapping(ctx context.Context, storeID, adminID int64) error
 }
@@ -77,7 +77,7 @@ func toAdminAccount(a payment.Account) *adminpb.PaymentAccount {
 		RequirementCollection: rpc.EnumToProto[paymentpb.RequirementCollection](a.RequirementCollection),
 		TransfersActive:       a.TransfersActive, PayoutsActive: a.PayoutsActive, Requirements: requirements(a.Requirements),
 		StatusReason: deref(a.StatusReason), FetchTime: optTimestamp(a.FetchedAt), CreateFailedTime: optTimestamp(a.CreateFailedAt),
-		PurgeBlockedTime: optTimestamp(a.PurgeBlockedAt), PurgeBlockedReason: deref(a.PurgeBlockedReason),
+		PurgeBlockedTime: optTimestamp(a.PurgeBlockedAt), PurgeBlockedReason: deref(a.PurgeBlockedReason), CreateUnresolved: a.CreateUnresolved,
 		CreateTime: timestamppb.New(a.CreatedAt), UpdateTime: timestamppb.New(a.UpdatedAt),
 	}
 }
@@ -114,7 +114,7 @@ func (h *Admin) RetryPaymentAccountCreate(ctx context.Context, req *connect.Requ
 	if err != nil {
 		return nil, err
 	}
-	acct, err := h.m.RetryAccountCreate(ctx, storeID)
+	acct, err := h.m.RetryAccountCreate(ctx, storeID, req.Msg.GetAcknowledgeNoProviderAccount())
 	if err != nil {
 		return nil, err
 	}

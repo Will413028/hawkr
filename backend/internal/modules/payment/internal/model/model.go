@@ -77,8 +77,12 @@ type PaymentAccount struct {
 	// PurgeBlockedAt 與 PurgeBlockedReason 是清理進終局的時刻與原因（D59）；沒有進終局時是 nil。
 	PurgeBlockedAt     *time.Time
 	PurgeBlockedReason *string
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	// PurgePendingAt 是清理已要求、還沒完成的時刻（D63：後台顯示「關閉中」）；沒有等待清理時是 nil。
+	PurgePendingAt *time.Time
+	// CreateUnresolved 表示建立結果不明、超過期限仍取不回外部 ID（建立失敗的終局，D63）：管理員重試建立等於聲明金流商那邊沒有這家店的帳戶，需要明確確認。
+	CreateUnresolved bool
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 // OnboardingSession 是開通用的 session，只有兩種形狀：HostedSession（託管連結）與各金流商的內嵌 session（目前只有 StripeEmbeddedSession）。

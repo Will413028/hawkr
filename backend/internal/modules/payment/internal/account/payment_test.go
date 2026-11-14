@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -171,28 +170,28 @@ func TestNewRequiresOwnersAndRegistersTheProviderWithTheInbox(t *testing.T) {
 }
 
 // 清理一列的處理方式（D59）：從沒呼叫過 provider 的列（沒有「已呼叫」時刻）直接刪，不需要 provider；呼叫過的列問不到 provider（不同或沒有設定）時不動它；
-// 有外部 ID 且 provider 相同就關閉；沒有外部 ID 時冪等鍵 30 天內重送、超過 30 天列出對帳。
-// mutation：不看「已呼叫」時刻、沒有外部 ID 一律直接刪 → 「呼叫過、沒有外部 ID」的案例失敗；30 天內也走列出 → 重送案例失敗；provider 不符也走關閉 → defer 案例失敗。
-func TestPlanPurgeDeletesNeverCalledRowsAndOtherwiseClosesReplaysListsOrDefers(t *testing.T) {
+// 有外部 ID 且 provider 相同就關閉；沒有外部 ID 時 UnresolvedDeadline（7 天）內以同一把鍵重送，超過進終局（D63，不列出）。
+// mutation：不看「已呼叫」時刻、沒有外部 ID 一律直接刪 → 「呼叫過、沒有外部 ID」的案例失敗；超過 7 天仍重送 → 逾期案例失敗；provider 不符也走關閉 → defer 案例失敗。
+func TestPlanPurgeDeletesNeverCalledRowsAndOtherwiseClosesReplaysBlocksOrDefers(t *testing.T) {
 	external := "acct_1"
 	now := time.Date(2026, 11, 14, 0, 0, 0, 0, time.UTC)
-	fresh := now.Add(-IdempotencyRetention + time.Hour)
-	old := now.Add(-IdempotencyRetention - time.Hour)
+	fresh := now.Add(-UnresolvedDeadline + time.Hour)
+	old := now.Add(-UnresolvedDeadline - time.Hour)
 	for name, tc := range map[string]struct {
 		row      store.PaymentAccount
 		provider string
 		want     purgePlan
 	}{
-		"從沒呼叫、provider 相同":              {store.PaymentAccount{Provider: "fake"}, "fake", purgeDelete},
-		"從沒呼叫、沒有設定 provider":            {store.PaymentAccount{Provider: "stripe"}, "", purgeDelete},
-		"從沒呼叫、provider 不同":              {store.PaymentAccount{Provider: "stripe"}, "fake", purgeDelete},
-		"呼叫過、沒有 ID、30 天內、provider 相同":   {store.PaymentAccount{Provider: "fake", CreateCalledAt: &fresh}, "fake", purgeReplay},
-		"呼叫過、沒有 ID、超過 30 天、provider 相同": {store.PaymentAccount{Provider: "fake", CreateCalledAt: &old}, "fake", purgeList},
-		"呼叫過、沒有 ID、沒有設定 provider":       {store.PaymentAccount{Provider: "stripe", CreateCalledAt: &fresh}, "", purgeDefer},
-		"呼叫過、沒有 ID、provider 不同":         {store.PaymentAccount{Provider: "stripe", CreateCalledAt: &old}, "fake", purgeDefer},
-		"有外部 ID、provider 相同":            {store.PaymentAccount{Provider: "fake", ExternalAccountID: &external, CreateCalledAt: &old}, "fake", purgeClose},
-		"有外部 ID、provider 不同":            {store.PaymentAccount{Provider: "stripe", ExternalAccountID: &external, CreateCalledAt: &fresh}, "fake", purgeDefer},
-		"有外部 ID、沒有設定 provider":          {store.PaymentAccount{Provider: "stripe", ExternalAccountID: &external, CreateCalledAt: &fresh}, "", purgeDefer},
+		"從沒呼叫、provider 相同":             {store.PaymentAccount{Provider: "fake"}, "fake", purgeDelete},
+		"從沒呼叫、沒有設定 provider":           {store.PaymentAccount{Provider: "stripe"}, "", purgeDelete},
+		"從沒呼叫、provider 不同":             {store.PaymentAccount{Provider: "stripe"}, "fake", purgeDelete},
+		"呼叫過、沒有 ID、7 天內、provider 相同":   {store.PaymentAccount{Provider: "fake", CreateCalledAt: &fresh}, "fake", purgeReplay},
+		"呼叫過、沒有 ID、超過 7 天、provider 相同": {store.PaymentAccount{Provider: "fake", CreateCalledAt: &old}, "fake", purgeUnresolved},
+		"呼叫過、沒有 ID、沒有設定 provider":      {store.PaymentAccount{Provider: "stripe", CreateCalledAt: &fresh}, "", purgeDefer},
+		"呼叫過、沒有 ID、provider 不同":        {store.PaymentAccount{Provider: "stripe", CreateCalledAt: &old}, "fake", purgeDefer},
+		"有外部 ID、provider 相同":           {store.PaymentAccount{Provider: "fake", ExternalAccountID: &external, CreateCalledAt: &old}, "fake", purgeClose},
+		"有外部 ID、provider 不同":           {store.PaymentAccount{Provider: "stripe", ExternalAccountID: &external, CreateCalledAt: &fresh}, "fake", purgeDefer},
+		"有外部 ID、沒有設定 provider":         {store.PaymentAccount{Provider: "stripe", ExternalAccountID: &external, CreateCalledAt: &fresh}, "", purgeDefer},
 	} {
 		if got := planPurge(tc.row, tc.provider, now); got != tc.want {
 			t.Errorf("%s：planPurge=%d，want %d", name, got, tc.want)
@@ -251,43 +250,6 @@ func TestCreateIsWantedUntilTheSecondStepSucceeds(t *testing.T) {
 	}
 }
 
-// Fake 的取得 ID 與列出對帳（只找不建）：取得之後列出找得到；關閉之後重放同一把鍵是永久失敗（measured：409 idempotency_error），列出也找不到已關閉的帳戶；
-// 冪等鍵過期（ExpireKeys）之後同一把鍵建出新的帳戶，列出回新的那一個。
-func TestFakeResolveOnlyFindsAndKeyExpiryCreatesANewAccount(t *testing.T) {
-	f := NewFake()
-	ctx := deadlineCtx(t)
-	if ids, err := f.ResolveAccount(ctx, ResolveInput{StoreID: 1}); err != nil || len(ids) != 0 || f.Accounts() != 0 {
-		t.Fatalf("沒有帳戶時 ResolveAccount 不得建立：ids=%v err=%v 帳戶數=%d", ids, err, f.Accounts())
-	}
-	first, err := f.AcquireAccount(ctx, AcquireInput{StoreID: 1, IdempotencyKey: "k"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ids, err := f.ResolveAccount(ctx, ResolveInput{StoreID: 1}); err != nil || !slices.Equal(ids, []string{first}) {
-		t.Fatalf("ids=%v err=%v", ids, err)
-	}
-	f.ExpireKeys()
-	second, err := f.AcquireAccount(ctx, AcquireInput{StoreID: 1, IdempotencyKey: "k"})
-	if err != nil || second == first {
-		t.Fatalf("鍵過期後應建出新帳戶：%q %q err=%v", first, second, err)
-	}
-	if ids, _ := f.ResolveAccount(ctx, ResolveInput{StoreID: 1}); !slices.Equal(ids, []string{second, first}) {
-		t.Fatalf("列出應回全部未關閉的帳戶、新的在前：%v", ids)
-	}
-	if err := f.CloseAccount(ctx, second); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.AcquireAccount(ctx, AcquireInput{StoreID: 1, IdempotencyKey: "k"}); !errors.Is(err, ErrPermanent) {
-		t.Fatalf("關閉之後重放同一把鍵應是永久失敗：%v", err)
-	}
-	if ids, _ := f.ResolveAccount(ctx, ResolveInput{StoreID: 1}); !slices.Equal(ids, []string{first}) {
-		t.Fatalf("關閉新帳戶後列出應只剩舊的未關閉帳戶：%v", ids)
-	}
-	if snap, err := f.FetchAccount(ctx, second); err != nil || !snap.Closed {
-		t.Fatalf("讀已關閉的帳戶要回 Closed：%+v err=%v", snap, err)
-	}
-}
-
 // RequestAccount 讀到已標記等待清理的列回 FailedPrecondition 且不排建立 job；其餘列依 createWanted 決定。
 // mutation：已標記時回 nil → 已標記的案例失敗。
 func TestRequestOutcomeRejectsAMarkedRow(t *testing.T) {
@@ -309,6 +271,36 @@ func TestRequestOutcomeRejectsAMarkedRow(t *testing.T) {
 		enqueue, err := requestOutcome(tc.row)
 		if tc.fail != (apperr.KindOf(err) == apperr.KindFailedPrecondition) || (!tc.fail && err != nil) || enqueue != tc.enqueue {
 			t.Errorf("%s：enqueue=%v err=%v", name, enqueue, err)
+		}
+	}
+}
+
+// 結果不明的列「呼叫過、沒有外部 ID、還沒完成建立」超過 UnresolvedDeadline 才算逾期（D63）：恰在期限上不算；有外部 ID、已完成建立、從沒呼叫的列都不算。
+// 對外的 CreateUnresolved 另外要求已記建立失敗而且沒有等待清理。
+// mutation：把 > 改成 >= → 「恰在期限上」案例失敗；不看外部 ID → 「有外部 ID」案例失敗；CreateUnresolved 不看建立失敗 → 「還沒記失敗」案例失敗。
+func TestUnresolvedExpiredOnlyForCalledRowsWithoutAnIDPastTheDeadline(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 14, 0, 0, 0, 0, time.UTC)
+	at := func(d time.Duration) *time.Time { v := now.Add(-d); return &v }
+	id := "acct_1"
+	for name, tc := range map[string]struct {
+		row                    store.PaymentAccount
+		wantExpired, wantModel bool
+	}{
+		"從沒呼叫":      {store.PaymentAccount{}, false, false},
+		"期限內":       {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline - time.Second), CreateFailedAt: &now}, false, false},
+		"恰在期限上":     {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline), CreateFailedAt: &now}, false, false},
+		"超過、還沒記失敗":  {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline + time.Second)}, true, false},
+		"超過、已記失敗":   {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline + time.Second), CreateFailedAt: &now}, true, true},
+		"超過、有外部 ID": {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline + time.Second), ExternalAccountID: &id, CreateFailedAt: &now}, false, false},
+		"超過、已完成建立":  {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline + time.Second), ExternalAccountID: &id, CreateCompletedAt: &now}, false, false},
+		"超過、等待清理":   {store.PaymentAccount{CreateCalledAt: at(UnresolvedDeadline + time.Second), CreateFailedAt: &now, PurgePendingAt: &now}, true, false},
+	} {
+		if got := unresolvedExpired(tc.row, now); got != tc.wantExpired {
+			t.Errorf("%s：unresolvedExpired=%v，want %v", name, got, tc.wantExpired)
+		}
+		if got := ToModel(tc.row, now).CreateUnresolved; got != tc.wantModel {
+			t.Errorf("%s：CreateUnresolved=%v，want %v", name, got, tc.wantModel)
 		}
 	}
 }

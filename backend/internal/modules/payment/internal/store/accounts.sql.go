@@ -690,7 +690,7 @@ type RotatePaymentAccountIdempotencyKeyParams struct {
 	StoreID int64
 }
 
-// 舊冪等鍵超過 30 天（金流商不再保證同一把鍵回同一個帳戶）、而且列出對帳沒有找到帳戶時換新鍵，已呼叫的時刻改成新鍵第一次呼叫之前的時刻。
+// 建立結果不明、超過 UnresolvedDeadline 的列，管理員確認金流商那邊沒有這家店的帳戶之後換新鍵（D63），已呼叫的時刻改成新鍵第一次呼叫之前的時刻。
 // 只在還沒有外部 ID、還沒完成、沒有等待清理時寫。
 func (q *Queries) RotatePaymentAccountIdempotencyKey(ctx context.Context, arg RotatePaymentAccountIdempotencyKeyParams) (PaymentAccount, error) {
 	row := q.db.QueryRow(ctx, rotatePaymentAccountIdempotencyKey, arg.Now, arg.StoreID)
@@ -825,6 +825,51 @@ type StalePaymentAccountCreateStoreIDsParams struct {
 // 保底：核准後建立 job 沒有跑成（例如擁有者關閉期間被略過）而且沒有進入失敗的帳戶（等待清理的除外）；擁有者是否營運中由呼叫方經 Owners 確認後才補排建立。
 func (q *Queries) StalePaymentAccountCreateStoreIDs(ctx context.Context, arg StalePaymentAccountCreateStoreIDsParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, stalePaymentAccountCreateStoreIDs, arg.IdleBefore, arg.AfterStoreID, arg.Batch)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var store_id int64
+		if err := rows.Scan(&store_id); err != nil {
+			return nil, err
+		}
+		items = append(items, store_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const unresolvedPaymentAccountStoreIDs = `-- name: UnresolvedPaymentAccountStoreIDs :many
+SELECT store_id
+FROM payment.accounts
+WHERE external_account_id IS NULL AND create_called_at IS NOT NULL AND create_completed_at IS NULL AND purge_pending_at IS NULL
+  AND create_called_at <= $1::timestamptz
+  AND NOT (create_failed_at IS NOT NULL AND create_called_at <= $2::timestamptz)
+  AND store_id > $3
+ORDER BY store_id
+LIMIT $4
+`
+
+type UnresolvedPaymentAccountStoreIDsParams struct {
+	CalledBefore  time.Time
+	ExpiredBefore time.Time
+	AfterStoreID  int64
+	Batch         int32
+}
+
+// 週期掃描了結「呼叫過、沒有外部 ID」的列用（D63），不論擁有者是否營運中、是否已記建立失敗；等待清理的列由清理 job 處理，不在這裡。called_before 是「已呼叫」的時刻要早於它
+// （剛呼叫的建立 job 還在跑，不重複送）；expired_before 是 UnresolvedDeadline 的界線：早於它而且已進建立失敗的列已是終局，不再選；早於它但還沒進建立失敗的列要被選到，由 Resolve 標成終局。
+func (q *Queries) UnresolvedPaymentAccountStoreIDs(ctx context.Context, arg UnresolvedPaymentAccountStoreIDsParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, unresolvedPaymentAccountStoreIDs,
+		arg.CalledBefore,
+		arg.ExpiredBefore,
+		arg.AfterStoreID,
+		arg.Batch,
+	)
 	if err != nil {
 		return nil, err
 	}

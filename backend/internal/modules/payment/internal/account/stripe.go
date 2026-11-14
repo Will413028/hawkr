@@ -79,16 +79,6 @@ func (s *Stripe) ConfigureAccount(ctx context.Context, in ConfigureInput) error 
 	return classify(s.client.UpdateAccount(ctx, in.ExternalID, dashboard, in.ContactEmail))
 }
 
-// ResolveAccount 實作 Provider：列出沒有關閉的帳戶，以 metadata.store_id 與 metadata.hawkr_namespace 比對（第一步已經寫入，D61），
-// 回傳全部符合的帳戶（Stripe 的順序，新的在前）；呼叫方決定怎麼處理多個。
-func (s *Stripe) ResolveAccount(ctx context.Context, in ResolveInput) ([]string, error) {
-	ids, err := s.client.ListAccountIDsByStore(ctx, in.StoreID)
-	if err != nil {
-		return nil, classify(err)
-	}
-	return ids, nil
-}
-
 // CreateOnboardingSession 實作 Provider。
 func (s *Stripe) CreateOnboardingSession(ctx context.Context, in SessionInput) (model.OnboardingSession, error) {
 	if in.ExternalAccountID == "" {

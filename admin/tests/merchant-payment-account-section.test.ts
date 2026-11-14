@@ -77,6 +77,7 @@ function setup(handlers: {
 		retryPurge: 0,
 		deleteMapping: 0,
 	};
+	const retryAcks: boolean[] = [];
 	const transport = createRouterTransport(({ service }) => {
 		service(PaymentAdminService, {
 			getPaymentAccount: () => {
@@ -91,8 +92,9 @@ function setup(handlers: {
 				if (r instanceof ConnectError) throw r;
 				return { account: r };
 			},
-			retryPaymentAccountCreate: () => {
+			retryPaymentAccountCreate: (req) => {
 				calls.retry += 1;
+				retryAcks.push(req.acknowledgeNoProviderAccount);
 				return { account: handlers.retry?.() };
 			},
 			retryPaymentAccountPurge: () => {
@@ -114,7 +116,7 @@ function setup(handlers: {
 	view.queryClient.setQueryData(queueKey, { items: [] });
 	const queueInvalidated = () =>
 		view.queryClient.getQueryState(queueKey)?.isInvalidated === true;
-	return { calls, notices, view, queueInvalidated };
+	return { calls, notices, view, queueInvalidated, retryAcks };
 }
 
 test("重新整理：回應的帳戶直接寫進快取（不再讀一次）、notice 先清空再成功、待辦與開通任務重讀", async () => {
@@ -310,4 +312,53 @@ test("開通任務：重試建立成功讓開通任務查詢重讀", async () =>
 		view.queryClient.getQueryState(onboardingKey)?.isInvalidated,
 		true,
 	);
+});
+
+test("重試建立（建立結果不明且逾期，create_unresolved）：先開確認框、確認前不送出；確認後帶 acknowledge_no_provider_account 送出", async () => {
+	const { calls, notices, view, retryAcks } = setup({
+		get: () =>
+			account({
+				externalAccountId: "",
+				status: PaymentAccountStatus.NOT_CREATED,
+				createFailedTime: at(1),
+				createUnresolved: true,
+			}),
+		retry: () => account({ externalAccountId: "acct_new" }),
+	});
+	await view.render();
+	await click("重試建立");
+	assert.match(bodyText(), /確定金流商那邊沒有這家店的收款帳戶嗎？/);
+	assert.match(
+		bodyText(),
+		/上一次建立的結果不明，而且已經超過可以向金流商查回的期限。重試會建立新的收款帳戶；如果金流商那邊其實已經有一個，平台不會知道，請先到金流商後台確認。/,
+	);
+	assert.equal(calls.retry, 0, "確認前不得送出");
+	await click("返回");
+	assert.equal(calls.retry, 0);
+	assert.doesNotMatch(bodyText(), /確定金流商那邊沒有這家店/);
+	await click("重試建立");
+	await click("確認，重試建立");
+	await until(() => bodyText().includes("acct_new"), "快取已寫入");
+	assert.deepEqual(retryAcks, [true]);
+	assert.doesNotMatch(bodyText(), /確定金流商那邊沒有這家店/);
+	assert.deepEqual(notices, [
+		{ tone: "success", text: sectionModule.RETRY_QUEUED_TEXT },
+	]);
+});
+
+test("重試建立（一般的建立失敗）：直接送出、不帶確認", async () => {
+	const { calls, view, retryAcks } = setup({
+		get: () =>
+			account({
+				externalAccountId: "",
+				status: PaymentAccountStatus.NOT_CREATED,
+				createFailedTime: at(1),
+			}),
+		retry: () => account({ externalAccountId: "acct_new" }),
+	});
+	await view.render();
+	await click("重試建立");
+	await until(() => calls.retry === 1, "送出一次");
+	assert.deepEqual(retryAcks, [false]);
+	assert.doesNotMatch(bodyText(), /確定金流商那邊沒有這家店/);
 });

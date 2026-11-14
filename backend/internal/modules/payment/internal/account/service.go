@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -21,14 +22,10 @@ import (
 const (
 	// callTimeout 是單次呼叫 provider 的上限。
 	callTimeout = 20 * time.Second
-	// maxExtrasPerRun 是一次 job 最多關閉的多餘帳戶數（對帳找到的、除了採用或最後關閉的那一個之外）；超過的留給下一輪，沒關完不刪列、不採用 ID。
-	maxExtrasPerRun = 3
-	// maxProviderCallsPerJob 是一次 job 最多的 provider 呼叫數：建立是列出、多餘帳戶、取得、設定；清理是列出、多餘帳戶、關閉（建立較多）。
-	maxProviderCallsPerJob = maxExtrasPerRun + 3
+	// maxProviderCallsPerJob 是一次 job 最多的 provider 呼叫數：建立是取得、設定；清理是取得（重送）、關閉。
+	maxProviderCallsPerJob = 2
 	// jobTimeout 是一次 job 的上限：最多的 provider 呼叫各佔 callTimeout，加上幾次寫結果的 transaction（writeTimeout 內）。
 	jobTimeout = maxProviderCallsPerJob*callTimeout + 4*writeTimeout
-	// purgeListMargin 是清理列出對帳時，空的列表要等標記之後多久才可信：標記前剛送出的建立呼叫可能還沒出現在列表。
-	purgeListMargin = time.Hour
 	// writeTimeout 是寫結果的 transaction 的上限（job 的 ctx 逾時被取消後仍要能寫入）。
 	writeTimeout = 15 * time.Second
 	// maxAttempts 是 job 暫時性失敗時 River 重試的上限（退避是 River 預設的 attempt^4 秒，約 80 分鐘內用完）。
@@ -39,8 +36,11 @@ const (
 	eventGrace = time.Minute
 	// createIdle 是建立列閒置多久之後由掃描補排建立 job（保底，平常 job 一定存在）。
 	createIdle = 10 * time.Minute
-	// IdempotencyRetention 是金流商保證同一把冪等鍵回同一個結果的時間（Stripe 保存 30 天）；超過之後重送同一把鍵可能建出新的帳戶，所以改以 metadata.store_id 加 metadata.hawkr_namespace 列出對帳。
+	// IdempotencyRetention 是金流商保證同一把冪等鍵回同一個結果的時間（Stripe 保存 30 天）；超過之後重送同一把鍵可能建出新的帳戶，所以從不對超過它的鍵重送。
 	IdempotencyRetention = 30 * 24 * time.Hour
+	// UnresolvedDeadline 是「呼叫過、沒有外部 ID」的列從 create_called_at 起最久等多久（D63）：期限內週期掃描以同一把鍵重送取回 ID；到了仍了結不了就進終局
+	// （清理的列進 purge_blocked，其餘進建立失敗），不再重送、不換新鍵、不列出。必須小於 IdempotencyRetention，所以任何重送都在保存期內。
+	UnresolvedDeadline = 7 * 24 * time.Hour
 	// PurgeDeadline 是列被標成等待清理之後，仍然關不掉或問不到 provider 的最長時間，超過進終局（D60：既有重試是單一 job 8 次約 80 分鐘、掃描每 15 分鐘，
 	// 7 天涵蓋金流商故障與金鑰設定修正）。
 	PurgeDeadline = 7 * 24 * time.Hour
@@ -51,6 +51,9 @@ const (
 	eventProcessor = "payment.account_event"
 	purgeProcessor = "payment.account_purge"
 )
+
+// UnresolvedDeadline 必須小於冪等鍵保存期：差值為負時這行無法編譯。
+const _ = uint64(IdempotencyRetention - UnresolvedDeadline - 1)
 
 // Owners 是擁有者（店家）的查詢，由組裝點以 seller 與 identity 的公開 API 實作（payment 是葉節點，不讀上層）。建立 job 與補排建立只為營運中的擁有者
 // 建立外部帳戶；聯絡信箱在建立外部帳戶的當下讀（D50），payment 不保存它的副本。
@@ -134,8 +137,9 @@ func requestOutcome(row store.PaymentAccount) (enqueue bool, err error) {
 }
 
 // ToModel 轉成對外的型別。
-func ToModel(r store.PaymentAccount) model.PaymentAccount {
+func ToModel(r store.PaymentAccount, now time.Time) model.PaymentAccount {
 	return model.PaymentAccount{
+		PurgePendingAt: r.PurgePendingAt, CreateUnresolved: r.PurgePendingAt == nil && r.CreateFailedAt != nil && unresolvedExpired(r, now),
 		StoreID: r.StoreID, Provider: r.Provider, ExternalAccountID: r.ExternalAccountID,
 		RequirementCollection: model.RequirementCollection(r.RequirementCollection), Status: model.PaymentAccountStatus(r.Status),
 		TransfersActive: r.TransfersActive, PayoutsActive: r.PayoutsActive, Requirements: r.Requirements, StatusReason: r.StatusReason,
@@ -156,12 +160,12 @@ func (s *Service) Account(ctx context.Context, storeID int64) (model.PaymentAcco
 	if err != nil {
 		return model.PaymentAccount{}, err
 	}
-	return ToModel(row), nil
+	return ToModel(row, s.d.Now().UTC()), nil
 }
 
 // Ensure 是建立 job 的內容：先讀本地列，確認擁有者營運中（Owners），在 transaction 外讀擁有者目前的聯絡信箱（D50），分兩步建立外部帳戶（D55、D59）：
 //  0. 呼叫 provider 之前先在 transaction 內記「已呼叫」的時刻（create_called_at；之後列上分得出「從沒呼叫」與「結果不明」）；
-//  1. 取得外部 ID（冪等鍵 30 天內重送得到同一個帳戶；超過 30 天先列出 provider 的帳戶以 metadata.store_id 加 metadata.hawkr_namespace 對帳，找到就用最新的並關閉其餘，整份列完都沒有才換新鍵），
+//  1. 取得外部 ID（同一把冪等鍵重送得到同一個帳戶；結果不明超過 UnresolvedDeadline 的列不重送，進建立失敗，D63），
 //     拿到 ID 立刻在 transaction 內寫進列（不等第二步）；
 //  2. 完成設定（寫入信箱與收款設定），成功才在 transaction 內記 create_completed_at 並排入同步 job：從這一刻起帳戶才算已建立，可以開通、輪詢、同步。
 //
@@ -182,6 +186,9 @@ func (s *Service) Ensure(ctx context.Context, storeID int64, final bool) error {
 	}
 	if !createWanted(row) || row.Provider != p.Name() {
 		return nil
+	}
+	if unresolvedExpired(row, s.d.Now().UTC()) {
+		return s.createFailed(ctx, storeID, fmt.Errorf("%w：建立結果不明，超過 %s 仍沒有取回外部 ID", ErrPermanent, UnresolvedDeadline), final)
 	}
 	active, err := s.d.Owners.OwnerActive(ctx, storeID)
 	if err != nil {
@@ -261,88 +268,21 @@ func (s *Service) markCalled(ctx context.Context, storeID int64) (row store.Paym
 	return row, ok && err == nil, err
 }
 
-// acquire 是建立的第一步：取得外部 ID 並立刻寫進列。冪等鍵保存期（30 天，從「已呼叫」起算）內重送同一把鍵；超過之後金流商不再保證同一把鍵回同一個帳戶，
-// 先 ResolveAccount（列出帳戶以 metadata.store_id 與命名空間對帳）：找到就用最新的一個並關閉其餘，整份列完都沒有才換新鍵（已呼叫的時刻改成新鍵第一次呼叫之前的時刻）。
-// stored 為 false 表示列已不需要建立（被並行的清理標記或已刪），ID 沒有寫入（清理會以冪等鍵或對帳找回它）。
+// acquire 是建立的第一步：以列的冪等鍵取得外部 ID 並立刻寫進列。呼叫方已確認列還在 UnresolvedDeadline 內（超過的不重送，D63）。
+// stored 為 false 表示列已不需要建立（被並行的清理標記或已刪），ID 沒有寫入（清理會以冪等鍵找回它）。
 func (s *Service) acquire(ctx context.Context, row store.PaymentAccount) (id string, stored bool, err error) {
-	p := s.d.Provider
-	found := false
-	if row.CreateCalledAt != nil && s.d.Now().Sub(*row.CreateCalledAt) > IdempotencyRetention {
-		callCtx, cancel := context.WithTimeout(ctx, callTimeout)
-		ids, err := p.ResolveAccount(callCtx, ResolveInput{StoreID: row.StoreID})
-		cancel()
-		if err != nil {
-			return "", false, err
-		}
-		found = len(ids) > 0
-		if found {
-			id = ids[0]
-			// 採用最新的一個，其餘關閉（D61）；先關再寫進列：寫進列之後這條路不會再列出，沒關掉的多餘帳戶就沒有人處理了。
-			if _, err := s.closeExtras(ctx, ids[1:]); err != nil {
-				return "", false, err
-			}
-		} else {
-			var rotated bool
-			if row, rotated, err = s.rotateKey(ctx, row.StoreID); err != nil || !rotated {
-				return "", false, err
-			}
-		}
-	}
-	if !found {
-		callCtx, cancel := context.WithTimeout(ctx, callTimeout)
-		defer cancel()
-		if id, err = p.AcquireAccount(callCtx, AcquireInput{StoreID: row.StoreID, IdempotencyKey: row.CreateIdempotencyKey.String()}); err != nil {
-			return "", false, err
-		}
+	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
+	defer cancel()
+	if id, err = s.d.Provider.AcquireAccount(callCtx, AcquireInput{StoreID: row.StoreID, IdempotencyKey: row.CreateIdempotencyKey.String()}); err != nil {
+		return "", false, err
 	}
 	stored, err = s.storeExternal(ctx, row.StoreID, id, false)
 	return id, stored, err
 }
 
-// errExtrasRemain 表示一次 job 關不完多餘的帳戶，剩下的下一輪處理（暫時性）。
-var errExtrasRemain = errors.New("payment：還有多餘的外部帳戶沒關閉，留給下一輪")
-
-// closeExtras 關閉多餘的帳戶，一次最多 maxExtrasPerRun 個（已關閉的下一輪列不出來）；沒關完回 errExtrasRemain，呼叫方不得刪列或採用 ID。
-// failed 是關閉失敗的那一個帳戶（沒有失敗時為 nil）。
-func (s *Service) closeExtras(ctx context.Context, extras []string) (failed *string, err error) {
-	for i, extra := range extras {
-		if i == maxExtrasPerRun {
-			return nil, errExtrasRemain
-		}
-		if err := s.closeExtra(ctx, extra); err != nil {
-			return &extras[i], err
-		}
-	}
-	return nil, nil
-}
-
-// closeExtra 關閉建立時對帳多找到的帳戶（冪等：已關閉視為成功）。
-func (s *Service) closeExtra(ctx context.Context, external string) error {
-	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
-	defer cancel()
-	return s.d.Provider.CloseAccount(callCtx, external)
-}
-
-// rotateKey 換新的冪等鍵並把已呼叫的時刻改成現在（在呼叫新鍵之前），回傳最新的列；列已不需要建立時 ok 為 false。
-func (s *Service) rotateKey(ctx context.Context, storeID int64) (row store.PaymentAccount, ok bool, err error) {
-	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
-	defer cancel()
-	err = s.d.DB.InTx(wctx, func(ctx context.Context) error {
-		q := store.New(s.d.DB.Conn(ctx))
-		if _, err := q.LockPaymentAccount(ctx, storeID); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return nil
-			}
-			return err
-		}
-		r, err := q.RotatePaymentAccountIdempotencyKey(ctx, store.RotatePaymentAccountIdempotencyKeyParams{StoreID: storeID, Now: s.d.Now().UTC()})
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
-		}
-		row, ok = r, err == nil
-		return err
-	})
-	return row, ok && err == nil, err
+// unresolvedExpired 回傳列是否「呼叫過、沒有外部 ID、還沒完成建立」而且已超過 UnresolvedDeadline：這種列不再重送（終局，D63）。
+func unresolvedExpired(row store.PaymentAccount, now time.Time) bool {
+	return row.ExternalAccountID == nil && row.CreateCompletedAt == nil && row.CreateCalledAt != nil && now.Sub(*row.CreateCalledAt) > UnresolvedDeadline
 }
 
 // storeExternal 在 transaction 內把取得的外部 ID 寫進列（第一步拿到就寫）；列不需要它了（等待清理、已完成、已刪、已有外部 ID）時 stored 為 false。
@@ -396,6 +336,39 @@ func (s *Service) createFailed(ctx context.Context, storeID int64, callErr error
 	})
 }
 
+// Resolve 是「呼叫過、沒有外部 ID」的非清理列的了結（D63）：期限內以列的同一把冪等鍵重送 AcquireAccount 取回 ID 寫進列（不論擁有者是否營運中、是否已記建立失敗；
+// 取回之後列是半建立：擁有者營運中時由建立的保底補排接續第二步，建立失敗的列等管理員重試）；超過 UnresolvedDeadline 仍沒有 ID 就進建立失敗（後台待辦），不重送、不換新鍵。
+// 等待清理的列不在這裡：清理 job 對它做同樣的重送與終局（purgeReplay、purgeUnresolved）。暫時性失敗回傳錯誤由 River 重試，最後一次嘗試仍失敗就留著給下一次掃描。
+func (s *Service) Resolve(ctx context.Context, storeID int64, final bool) error {
+	p := s.d.Provider
+	if p == nil {
+		return nil
+	}
+	row, err := store.New(s.d.DB.Conn(ctx)).PaymentAccountByStore(ctx, storeID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if row.Provider != p.Name() || row.PurgePendingAt != nil || row.CreateCalledAt == nil || row.ExternalAccountID != nil || row.CreateCompletedAt != nil {
+		return nil
+	}
+	if unresolvedExpired(row, s.d.Now().UTC()) {
+		return s.createFailed(ctx, storeID, fmt.Errorf("%w：建立結果不明，超過 %s 仍沒有取回外部 ID", ErrPermanent, UnresolvedDeadline), final)
+	}
+	if _, _, err := s.acquire(ctx, row); err != nil {
+		switch {
+		case errors.Is(err, ErrPermanent):
+			return s.createFailed(ctx, storeID, err, final)
+		case !final:
+			return err
+		}
+		s.d.Logger.WarnContext(ctx, "payment：取回建立結果不明的外部帳戶失敗，等下一次掃描重排", "store_id", storeID, "error", err)
+	}
+	return nil
+}
+
 // ForgetOwners 在呼叫方（擁有者個資清理）的 transaction 內，為每個擁有者排入「關閉外部帳戶後刪除帳戶列」的 job（唯一鍵 store_id）：呼叫方已鎖住上層的列，
 // 不在同一個 transaction 等下層 payment 的列（platform/lockorder），關閉與刪除由本模組的 job 做。沒有 ID 時什麼都不做。
 func (s *Service) ForgetOwners(ctx context.Context, storeIDs []int64) error {
@@ -421,10 +394,10 @@ const (
 	purgeDelete purgePlan = iota
 	// purgeClose 是有外部 ID、provider 可用：先讀帳戶、照它實際的設定關閉，成功才刪列。
 	purgeClose
-	// purgeReplay 是呼叫過、沒有外部 ID、冪等鍵還在保存期（30 天）內：以同一把鍵取得 ID 寫回，再關閉（D55）。
+	// purgeReplay 是呼叫過、沒有外部 ID、還在 UnresolvedDeadline（7 天，小於冪等鍵保存期）內：以同一把鍵取得 ID 寫回，再關閉（D55）。
 	purgeReplay
-	// purgeList 是呼叫過、沒有外部 ID、冪等鍵已過期：列出 provider 的帳戶以 metadata.store_id 加 metadata.hawkr_namespace 對帳，找到的全部都要關閉（其中一個寫回列），，整份列完都沒有才刪列（D59）。
-	purgeList
+	// purgeUnresolved 是呼叫過、沒有外部 ID、超過 UnresolvedDeadline：不再重送也不列出，進終局（原因 blockUnresolvedCreation），等管理員（D63）。
+	purgeUnresolved
 	// purgeDefer 是呼叫過、但問不到 provider（沒有設定，或列的 provider 與目前設定不同）：列留著，超過期限進終局。
 	purgeDefer
 )
@@ -438,10 +411,10 @@ func planPurge(row store.PaymentAccount, provider string, now time.Time) purgePl
 		return purgeDefer
 	case row.ExternalAccountID != nil:
 		return purgeClose
-	case now.Sub(*row.CreateCalledAt) <= IdempotencyRetention:
+	case now.Sub(*row.CreateCalledAt) <= UnresolvedDeadline:
 		return purgeReplay
 	default:
-		return purgeList
+		return purgeUnresolved
 	}
 }
 
@@ -450,14 +423,14 @@ const (
 	blockProviderRefused     = "provider_refused"
 	blockProviderUnreachable = "provider_unconfigured"
 	blockDeadlineExceeded    = "deadline_exceeded"
+	blockUnresolvedCreation  = "unresolved_creation"
 )
 
 // Purge 是「關閉後刪除」job 的內容（D52、D59）：第一步，每一列先在自己的 transaction 標成等待清理（purge_pending_at，之後任何錯誤、逾時或程序被殺都有週期掃描接手），
 // 標好之後重讀列，依 planPurge 處理：
 //   - 從沒呼叫過 provider 的列直接刪，不需要 provider；
 //   - 有外部 ID 而 provider 可用：在 transaction 外先讀帳戶、照它實際的設定關閉（冪等：已關閉視為成功），成功才刪列並把它外部帳戶在 inbox 的未處理事件標為已處理；
-//   - 呼叫過、沒有外部 ID、provider 可用：冪等鍵 30 天內以同一把鍵取得 ID 寫回再關閉；超過 30 天列出 provider 的帳戶以 metadata.store_id 與命名空間比對，找到的全部都要關閉（其中一個寫回列），
-//     整份列完都沒有才刪；
+//   - 呼叫過、沒有外部 ID、provider 可用：UnresolvedDeadline（7 天）內以同一把鍵取得 ID 寫回再關閉；超過進終局（unresolved_creation），不重送、不列出（D63）；
 //   - 呼叫過、問不到 provider（沒有設定或不同）：列留著。
 //
 // 終局：provider 明確拒絕（永久失敗），或標成等待清理已超過 purgeDeadline（7 天，D60）而仍然關不掉或問不到 provider，列標成 purge_blocked_at（原因 purge_blocked_reason），
@@ -510,26 +483,10 @@ func (s *Service) Purge(ctx context.Context, storeID int64, final bool) error {
 			return s.purgeFailed(ctx, row, nil, err, final, expired)
 		}
 		return s.storeThenClose(ctx, row, external, final, expired)
-	default:
-		callCtx, cancel := context.WithTimeout(ctx, callTimeout)
-		ids, err := s.d.Provider.ResolveAccount(callCtx, ResolveInput{StoreID: storeID})
-		cancel()
-		if err != nil {
-			return s.purgeFailed(ctx, row, nil, err, final, expired)
-		}
-		if len(ids) == 0 {
-			// 標記前剛送出的建立呼叫可能還沒出現在列表：標記滿 purgeListMargin 才信空列表，之前留著由掃描重跑。
-			if row.PurgePendingAt == nil || now.Sub(*row.PurgePendingAt) < purgeListMargin {
-				return nil
-			}
-			return s.deleteRow(ctx, row, nil)
-		}
-		// 全部符合的都要關閉才刪列（D61）：先關多餘的，任何一個失敗照既有的失敗路徑處理、列留著；已關閉的下一輪列不出來，重試只剩沒關掉的。
-		if failed, err := s.closeExtras(ctx, ids[1:]); err != nil {
-			return s.purgeFailed(ctx, row, failed, err, final, expired)
-		}
-		return s.storeThenClose(ctx, row, ids[0], final, expired)
+	case purgeUnresolved:
+		return s.blockPurge(ctx, storeID, blockUnresolvedCreation+"：建立結果不明，超過 "+UnresolvedDeadline.String()+" 仍沒有取回外部 ID，不再重送")
 	}
+	return nil
 }
 
 // storeThenClose 把取得的外部 ID 寫回已標記等待清理的列，再走和有外部 ID 的列相同的關閉後刪除。順序是關鍵：關閉之後同一把鍵的重放會被金流商拒絕（measured：409
@@ -622,6 +579,9 @@ func (s *Service) RetryPurge(ctx context.Context, storeID int64) (model.PaymentA
 		if locked.PurgeBlockedAt == nil {
 			return apperr.FailedPrecondition("收款帳戶的清理不在無法關閉的狀態")
 		}
+		if reason := locked.PurgeBlockedReason; reason != nil && strings.HasPrefix(*reason, blockUnresolvedCreation) {
+			return apperr.FailedPrecondition("建立結果不明且已超過可向金流商查回的期限，重試關閉不會有結果；請先到金流商後台確認，再刪除對應")
+		}
 		if out, err = q.RestartPaymentAccountPurge(ctx, store.RestartPaymentAccountPurgeParams{StoreID: storeID, Now: s.d.Now().UTC()}); err != nil {
 			return err
 		}
@@ -630,7 +590,7 @@ func (s *Service) RetryPurge(ctx context.Context, storeID int64) (model.PaymentA
 	if err != nil {
 		return model.PaymentAccount{}, err
 	}
-	return ToModel(out), nil
+	return ToModel(out, s.d.Now().UTC()), nil
 }
 
 // DeleteMapping 是管理員的「已在金流商處理，刪除對應」：只有終局的列可以做；同一個 transaction 寫一筆只增不改的紀錄（店家、provider、外部 ID、操作的管理員與時間，D60）

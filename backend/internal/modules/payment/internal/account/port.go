@@ -112,11 +112,6 @@ type ConfigureInput struct {
 	Collection   model.RequirementCollection
 }
 
-// ResolveInput 是以店家對帳的輸入：在 provider 那邊找這家店還沒有關閉的外部帳戶。
-type ResolveInput struct {
-	StoreID int64
-}
-
 // SessionInput 是開通 session 的輸入；Kind 是 ChooseSession 的結果；ReturnURL 是賣家完成或離開後回到的頁面，RefreshURL 是連結過期時重新取得的頁面。
 type SessionInput struct {
 	ExternalAccountID string
@@ -138,13 +133,10 @@ type Provider interface {
 	Name() string
 	Capabilities() Capabilities
 	// AcquireAccount 是建立的第一步：以 IdempotencyKey 冪等地取得外部帳戶 ID（沒有就建一個不含擁有者個資的空帳戶，帶 StoreID 對帳用）。
-	// 同一把鍵 30 天內重送得到同一個帳戶，超過之後會建出新的帳戶，所以呼叫方在 30 天後先 ResolveAccount。回傳的 ID 呼叫方立刻寫進列（D59）。
+	// 同一把鍵 30 天內重送得到同一個帳戶，超過之後會建出新的帳戶，所以呼叫方在 UnresolvedDeadline（7 天，D63）之後不再重送。回傳的 ID 呼叫方立刻寫進列（D59）。
 	AcquireAccount(ctx context.Context, in AcquireInput) (externalID string, err error)
 	// ConfigureAccount 是建立的第二步：寫入聯絡信箱、收款設定與收件方式（D55）；可重複送出，同一個帳戶的重送（信箱可能已經不同）安全。成功才算建立完成。
 	ConfigureAccount(ctx context.Context, in ConfigureInput) error
-	// ResolveAccount 只找不建：列出 provider 上沒有關閉的帳戶（要整份列完；翻頁中途失敗回錯誤，不回部分結果），回傳 StoreID 對應的全部帳戶 ID，新的在前
-	// （D61：同一家店可能有多個；對應的條件包含這個環境的命名空間，別的環境的帳戶不會出現）；整份列完都沒有時回空。已關閉的帳戶不會被找到（金流商關閉時清掉它的對應資料）。
-	ResolveAccount(ctx context.Context, in ResolveInput) (externalIDs []string, err error)
 	// CreateOnboardingSession 依 in.Kind 產生開通的連結（SessionHosted）或內嵌元件的 session（SessionEmbedded）；回傳的形狀必須與 Kind 一致。
 	CreateOnboardingSession(ctx context.Context, in SessionInput) (model.OnboardingSession, error)
 	// FetchAccount 讀外部帳戶目前的狀態與掛著的外部銀行帳號識別碼；任何一項讀取失敗整個呼叫失敗。

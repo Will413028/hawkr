@@ -15,9 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"slices"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -190,39 +188,6 @@ func TestStripeAcquireAccountSendsTheGivenKeyAndAFixedBodyOnEveryAttempt(t *test
 	}
 }
 
-// ResolveAccount 只找不建：列出帳戶（GET，不 POST），以 metadata.store_id 與 metadata.hawkr_namespace 比對。fixture（sandbox 錄的）裡的帳戶不是沒有
-// hawkr_namespace 就是別的命名空間，所以一個都不符；預期的店家 ID 讀自 fixture。
-func TestStripeResolveAccountOnlyListsAndDoesNotMatchRecordedAccountsOutsideItsNamespace(t *testing.T) {
-	var methods []string
-	p1, p2 := fixtureResponder(t, "list_accounts_page1"), fixtureResponder(t, "list_accounts_page2")
-	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		methods = append(methods, r.Method)
-		if strings.Contains(r.URL.RawQuery, "page=") {
-			p2(w, r)
-			return
-		}
-		p1(w, r)
-	}))
-	stores := fixtureStoreIDs(t, "list_accounts_page1", "list_accounts_page2")
-	if len(stores) == 0 {
-		t.Fatal("fixture 沒有帶 store_id 的帳戶")
-	}
-	for _, store := range stores {
-		ids, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: store})
-		if err != nil || len(ids) != 0 {
-			t.Fatalf("店家 %d：ids=%v err=%v，命名空間不符的帳戶不得符合", store, ids, err)
-		}
-	}
-	if len(methods) == 0 {
-		t.Fatal("沒有送出任何請求")
-	}
-	for _, m := range methods {
-		if m != http.MethodGet {
-			t.Fatalf("ResolveAccount 送出了 %s，只能列出", m)
-		}
-	}
-}
-
 // fixtureStoreIDs 讀 fixture 裡每個帳戶 metadata.store_id（整數的）。
 func fixtureStoreIDs(t *testing.T, names ...string) []int64 {
 	t.Helper()
@@ -247,29 +212,6 @@ func fixtureStoreIDs(t *testing.T, names ...string) []int64 {
 	return out
 }
 
-// 全部符合的都回，新的在前；別的環境（命名空間不同）與沒有命名空間的帳戶不在其中。
-func TestStripeResolveAccountReturnsEveryMatchNewestFirstAndOnlyInItsNamespace(t *testing.T) {
-	acct := func(id, store, ns string) string {
-		md := `{"store_id":"` + store + `"`
-		if ns != "" {
-			md += `,"hawkr_namespace":"` + ns + `"`
-		}
-		return `{"id":"` + id + `","object":"v2.core.account","closed":false,"applied_configurations":[],"metadata":` + md + `}}`
-	}
-	body := `{"data":[` + acct("acct_new", "5", "env-a") + `,` + acct("acct_other_env", "5", "env-b") + `,` + acct("acct_no_ns", "5", "") + `,` +
-		acct("acct_old", "5", "env-a") + `,` + acct("acct_other_store", "6", "env-a") + `],"next_page_url":null}`
-	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(body))
-	}))
-	ids, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 5})
-	if err != nil || !slices.Equal(ids, []string{"acct_new", "acct_old"}) {
-		t.Fatalf("ids=%v err=%v", ids, err)
-	}
-	if ids, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 8}); err != nil || len(ids) != 0 {
-		t.Fatalf("沒有符合的店家：ids=%v err=%v", ids, err)
-	}
-}
-
 // 已在 Stripe 關閉的帳戶：FetchAccount 回 Closed 的快照，只讀帳戶一次，不讀銀行帳號、不當成錯誤。
 func TestStripeFetchAccountOfAClosedAccountReturnsClosedWithoutReadingBankAccounts(t *testing.T) {
 	var paths []string
@@ -286,18 +228,6 @@ func TestStripeFetchAccountOfAClosedAccountReturnsClosedWithoutReadingBankAccoun
 	}
 	if status, reason, _ := StatusOf(snap); status != model.PaymentDisabled || reason != ReasonClosed {
 		t.Fatalf("StatusOf=%s %q", status, reason)
-	}
-}
-
-// 列表失敗不得被當成「沒有找到」：呼叫方只在整份列完都沒有時才刪列。
-func TestStripeResolveAccountListFailureIsAnErrorNotNotFound(t *testing.T) {
-	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		_, _ = w.Write([]byte(`{"error":{"message":"down"}}`))
-	}))
-	ids, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 7})
-	if err == nil || len(ids) != 0 || errors.Is(err, ErrPermanent) {
-		t.Fatalf("ids=%v err=%v，預期一般錯誤", ids, err)
 	}
 }
 
@@ -578,7 +508,7 @@ func TestJobTimeoutCoversTheMostProviderCallsAJobCanMake(t *testing.T) {
 	if jobTimeout < time.Duration(maxProviderCallsPerJob)*callTimeout {
 		t.Fatalf("jobTimeout %v 小於 %d 次呼叫各 %v", jobTimeout, maxProviderCallsPerJob, callTimeout)
 	}
-	if maxProviderCallsPerJob < maxExtrasPerRun+3 {
-		t.Fatalf("呼叫數 %d 少於多餘帳戶 %d 加上列出、取得、設定", maxProviderCallsPerJob, maxExtrasPerRun)
+	if maxProviderCallsPerJob < 2 {
+		t.Fatalf("呼叫數 %d 少於建立的取得與設定（清理的重送與關閉）", maxProviderCallsPerJob)
 	}
 }

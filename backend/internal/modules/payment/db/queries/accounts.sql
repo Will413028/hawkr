@@ -60,7 +60,7 @@ WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NOT NULL AND crea
 RETURNING *;
 
 -- name: RotatePaymentAccountIdempotencyKey :one
--- 舊冪等鍵超過 30 天（金流商不再保證同一把鍵回同一個帳戶）、而且列出對帳沒有找到帳戶時換新鍵，已呼叫的時刻改成新鍵第一次呼叫之前的時刻。
+-- 建立結果不明、超過 UnresolvedDeadline 的列，管理員確認金流商那邊沒有這家店的帳戶之後換新鍵（D63），已呼叫的時刻改成新鍵第一次呼叫之前的時刻。
 -- 只在還沒有外部 ID、還沒完成、沒有等待清理時寫。
 UPDATE payment.accounts
 SET create_idempotency_key = gen_random_uuid(),
@@ -137,6 +137,18 @@ SELECT store_id
 FROM payment.accounts
 WHERE create_completed_at IS NULL AND create_failed_at IS NULL AND purge_pending_at IS NULL
   AND updated_at < sqlc.arg(idle_before) AND store_id > sqlc.arg(after_store_id)
+ORDER BY store_id
+LIMIT sqlc.arg(batch);
+
+-- name: UnresolvedPaymentAccountStoreIDs :many
+-- 週期掃描了結「呼叫過、沒有外部 ID」的列用（D63），不論擁有者是否營運中、是否已記建立失敗；等待清理的列由清理 job 處理，不在這裡。called_before 是「已呼叫」的時刻要早於它
+-- （剛呼叫的建立 job 還在跑，不重複送）；expired_before 是 UnresolvedDeadline 的界線：早於它而且已進建立失敗的列已是終局，不再選；早於它但還沒進建立失敗的列要被選到，由 Resolve 標成終局。
+SELECT store_id
+FROM payment.accounts
+WHERE external_account_id IS NULL AND create_called_at IS NOT NULL AND create_completed_at IS NULL AND purge_pending_at IS NULL
+  AND create_called_at <= sqlc.arg(called_before)::timestamptz
+  AND NOT (create_failed_at IS NOT NULL AND create_called_at <= sqlc.arg(expired_before)::timestamptz)
+  AND store_id > sqlc.arg(after_store_id)
 ORDER BY store_id
 LIMIT sqlc.arg(batch);
 

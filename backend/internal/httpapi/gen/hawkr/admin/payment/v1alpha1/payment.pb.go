@@ -55,8 +55,11 @@ type PaymentAccount struct {
 	PurgeBlockedTime *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=purge_blocked_time,json=purgeBlockedTime,proto3" json:"purge_blocked_time,omitempty"`
 	// 清理被擋下的原因（原因代碼，冒號之後是金流商的說明；只給後台）；沒有進終局時是空字串。
 	PurgeBlockedReason string `protobuf:"bytes,15,opt,name=purge_blocked_reason,json=purgeBlockedReason,proto3" json:"purge_blocked_reason,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// 建立結果不明、超過可向金流商查回的期限仍取不回外部 ID（建立失敗的終局，待辦 PAYMENT_ACCOUNT_CREATE_FAILED）時為真：重試建立前要先請管理員確認金流商那邊沒有
+	// 這家店的收款帳戶（RetryPaymentAccountCreateRequest.acknowledge_no_provider_account）。
+	CreateUnresolved bool `protobuf:"varint,16,opt,name=create_unresolved,json=createUnresolved,proto3" json:"create_unresolved,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *PaymentAccount) Reset() {
@@ -192,6 +195,13 @@ func (x *PaymentAccount) GetPurgeBlockedReason() string {
 		return x.PurgeBlockedReason
 	}
 	return ""
+}
+
+func (x *PaymentAccount) GetCreateUnresolved() bool {
+	if x != nil {
+		return x.CreateUnresolved
+	}
+	return false
 }
 
 type GetPaymentAccountRequest struct {
@@ -371,10 +381,12 @@ func (x *RefreshPaymentAccountResponse) GetAccount() *PaymentAccount {
 }
 
 type RetryPaymentAccountCreateRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	StoreId       string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	StoreId string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	// 管理員聲明金流商那邊沒有這家店的收款帳戶；只有帳戶的 create_unresolved 為真時才需要（見 RetryPaymentAccountCreate），其餘狀態忽略。
+	AcknowledgeNoProviderAccount bool `protobuf:"varint,2,opt,name=acknowledge_no_provider_account,json=acknowledgeNoProviderAccount,proto3" json:"acknowledge_no_provider_account,omitempty"`
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
 }
 
 func (x *RetryPaymentAccountCreateRequest) Reset() {
@@ -412,6 +424,13 @@ func (x *RetryPaymentAccountCreateRequest) GetStoreId() string {
 		return x.StoreId
 	}
 	return ""
+}
+
+func (x *RetryPaymentAccountCreateRequest) GetAcknowledgeNoProviderAccount() bool {
+	if x != nil {
+		return x.AcknowledgeNoProviderAccount
+	}
+	return false
 }
 
 type RetryPaymentAccountCreateResponse struct {
@@ -630,7 +649,7 @@ var File_hawkr_admin_payment_v1alpha1_payment_proto protoreflect.FileDescriptor
 
 const file_hawkr_admin_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"\n" +
-	"*hawkr/admin/payment/v1alpha1/payment.proto\x12\x1chawkr.admin.payment.v1alpha1\x1a$hawkr/payment/v1alpha1/payment.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd2\x06\n" +
+	"*hawkr/admin/payment/v1alpha1/payment.proto\x12\x1chawkr.admin.payment.v1alpha1\x1a$hawkr/payment/v1alpha1/payment.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xff\x06\n" +
 	"\x0ePaymentAccount\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12\x1a\n" +
 	"\bprovider\x18\x02 \x01(\tR\bprovider\x12.\n" +
@@ -650,7 +669,8 @@ const file_hawkr_admin_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"\vupdate_time\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"updateTime\x12H\n" +
 	"\x12purge_blocked_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x10purgeBlockedTime\x120\n" +
-	"\x14purge_blocked_reason\x18\x0f \x01(\tR\x12purgeBlockedReason\":\n" +
+	"\x14purge_blocked_reason\x18\x0f \x01(\tR\x12purgeBlockedReason\x12+\n" +
+	"\x11create_unresolved\x18\x10 \x01(\bR\x10createUnresolved\":\n" +
 	"\x18GetPaymentAccountRequest\x12\x1e\n" +
 	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\"c\n" +
 	"\x19GetPaymentAccountResponse\x12F\n" +
@@ -658,9 +678,10 @@ const file_hawkr_admin_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"\x1cRefreshPaymentAccountRequest\x12\x1e\n" +
 	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\"g\n" +
 	"\x1dRefreshPaymentAccountResponse\x12F\n" +
-	"\aaccount\x18\x01 \x01(\v2,.hawkr.admin.payment.v1alpha1.PaymentAccountR\aaccount\"B\n" +
+	"\aaccount\x18\x01 \x01(\v2,.hawkr.admin.payment.v1alpha1.PaymentAccountR\aaccount\"\x8e\x01\n" +
 	" RetryPaymentAccountCreateRequest\x12\x1e\n" +
-	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\"k\n" +
+	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\x12J\n" +
+	"\x1facknowledge_no_provider_account\x18\x02 \x01(\bB\x03\xe0A\x01R\x1cacknowledgeNoProviderAccount\"k\n" +
 	"!RetryPaymentAccountCreateResponse\x12F\n" +
 	"\aaccount\x18\x01 \x01(\v2,.hawkr.admin.payment.v1alpha1.PaymentAccountR\aaccount\"A\n" +
 	"\x1fRetryPaymentAccountPurgeRequest\x12\x1e\n" +

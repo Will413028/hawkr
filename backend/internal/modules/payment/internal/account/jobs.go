@@ -39,6 +39,25 @@ func enqueueEnsure(ctx context.Context, jc jobs.Enqueuer, storeID int64) error {
 	return jc.Enqueue(ctx, args, &opts)
 }
 
+// ResolveArgs 是了結「呼叫過、沒有外部 ID」的列的 job（D63），以 store_id 為唯一鍵；只由週期掃描排入。
+type ResolveArgs struct {
+	StoreID int64 `json:"store_id" river:"unique"`
+}
+
+// Kind 是 River 的 job 種類。
+func (ResolveArgs) Kind() string { return "payment.account_resolve" }
+
+// InsertOpts 是了結 job 的排入選項：以 store_id 去重（不含已完成的），暫時性的失敗最多重試 maxAttempts 次。
+func (ResolveArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: maxAttempts, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: openStates()}}
+}
+
+func enqueueResolve(ctx context.Context, jc jobs.Enqueuer, storeID int64) error {
+	args := ResolveArgs{StoreID: storeID}
+	opts := args.InsertOpts()
+	return jc.Enqueue(ctx, args, &opts)
+}
+
 // SyncArgs 是重讀外部帳戶並覆寫快取的 job，以 store_id 為唯一鍵：webhook、輪詢與管理員的重新整理都只排這個 job，連續的請求合併成一次。
 type SyncArgs struct {
 	StoreID int64 `json:"store_id" river:"unique"`
@@ -95,6 +114,19 @@ func (w *ensureWorker) Work(ctx context.Context, job *river.Job[EnsureArgs]) err
 // Timeout 是一次建立的時間上限。
 func (w *ensureWorker) Timeout(*river.Job[EnsureArgs]) time.Duration { return jobTimeout }
 
+type resolveWorker struct {
+	river.WorkerDefaults[ResolveArgs]
+	service *Service
+}
+
+// Work 執行一次了結；最後一次嘗試仍暫時失敗時留著給下一次掃描。
+func (w *resolveWorker) Work(ctx context.Context, job *river.Job[ResolveArgs]) error {
+	return w.service.Resolve(ctx, job.Args.StoreID, job.Attempt >= job.MaxAttempts)
+}
+
+// Timeout 是一次了結的時間上限：一次取得呼叫加資料庫。
+func (w *resolveWorker) Timeout(*river.Job[ResolveArgs]) time.Duration { return jobTimeout }
+
 type syncWorker struct {
 	river.WorkerDefaults[SyncArgs]
 	service *Service
@@ -132,6 +164,7 @@ func (w *sweepWorker) Timeout(*river.Job[SweepArgs]) time.Duration { return 5 * 
 // AddWorkers 登記 River worker。
 func (s *Service) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &ensureWorker{service: s})
+	river.AddWorker(workers, &resolveWorker{service: s})
 	river.AddWorker(workers, &syncWorker{service: s})
 	river.AddWorker(workers, &sweepWorker{service: s})
 	river.AddWorker(workers, &purgeWorker{service: s})
@@ -182,6 +215,7 @@ func (w *purgeWorker) Timeout(*river.Job[PurgeArgs]) time.Duration { return jobT
 //   - 狀態：UNDER_REVIEW、ACTION_REQUIRED、原因碼不是 rejected*／unsupported* 的 DISABLED 帳戶排同步（掉了 webhook 時的保底，DISABLED 可能被解除）；
 //   - 事件：inbox 有超過 eventGrace 還沒處理的事件的帳戶排同步（任何狀態）；
 //   - 清理：等待清理的帳戶（purge_pending_at，不進上面兩種同步）重排「關閉後刪除」job（進了終局 purge_blocked_at 的不重排，它們在後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK 等管理員處理）；
+//   - 了結（D63）：呼叫過、沒有外部 ID 的非清理列排了結 job（不論擁有者是否營運中、是否已記建立失敗），期限內以同一把鍵重送取回 ID，超過 UnresolvedDeadline 進終局；
 //   - 建立：閒置的建立列，擁有者營運中時排建立 job。
 //
 // 回傳排入同步與建立的帳戶數（唯一鍵合併掉的也算；兩種同步的帳戶重複時算兩次）。沒有設定 provider 時只重排清理（同步與建立都要 provider）：
@@ -231,6 +265,9 @@ func (s *Service) Sweep(ctx context.Context) (synced, ensured int, err error) {
 	if err := s.sweepPurge(ctx); err != nil {
 		return synced, ensured, err
 	}
+	if err := s.sweepUnresolved(ctx); err != nil {
+		return synced, ensured, err
+	}
 	after = 0
 	for {
 		ids, err := s.stale(ctx, after)
@@ -253,6 +290,26 @@ func (s *Service) Sweep(ctx context.Context) (synced, ensured int, err error) {
 		}
 		if len(ids) < sweepBatch {
 			return synced, ensured, nil
+		}
+	}
+}
+
+// sweepUnresolved 為「呼叫過、沒有外部 ID」的非清理列排入了結 job（D63），不看擁有者是否營運中，分批、各批一個 transaction。
+func (s *Service) sweepUnresolved(ctx context.Context) error {
+	var after int64
+	for {
+		ids, err := s.unresolved(ctx, after)
+		if err != nil {
+			return err
+		}
+		for _, id := range ids {
+			after = id
+			if err := s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueueResolve(ctx, s.d.Jobs, id) }); err != nil {
+				return err
+			}
+		}
+		if len(ids) < sweepBatch {
+			return nil
 		}
 	}
 }

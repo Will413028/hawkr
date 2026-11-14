@@ -20,6 +20,13 @@ func (s *Service) purgePending(ctx context.Context, after int64) ([]int64, error
 	return store.New(s.d.DB.Conn(ctx)).PurgePendingPaymentAccountStoreIDs(ctx, store.PurgePendingPaymentAccountStoreIDsParams{AfterStoreID: after, Batch: sweepBatch})
 }
 
+func (s *Service) unresolved(ctx context.Context, after int64) ([]int64, error) {
+	now := s.d.Now().UTC()
+	return store.New(s.d.DB.Conn(ctx)).UnresolvedPaymentAccountStoreIDs(ctx, store.UnresolvedPaymentAccountStoreIDsParams{
+		CalledBefore: now.Add(-createIdle), ExpiredBefore: now.Add(-UnresolvedDeadline), AfterStoreID: after, Batch: sweepBatch,
+	})
+}
+
 func (s *Service) stale(ctx context.Context, after int64) ([]int64, error) {
 	return store.New(s.d.DB.Conn(ctx)).StalePaymentAccountCreateStoreIDs(ctx, store.StalePaymentAccountCreateStoreIDsParams{
 		IdleBefore: s.d.Now().UTC().Add(-createIdle), AfterStoreID: after, Batch: sweepBatch,

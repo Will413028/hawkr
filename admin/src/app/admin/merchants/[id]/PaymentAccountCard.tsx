@@ -27,6 +27,7 @@ import { staffTextOrUnknown } from "@/lib/ui-text";
 import { DetailCardShell } from "./DetailCardShell";
 import type { GovernanceNotice } from "./GovernanceNotice";
 import PaymentMappingDeleteDialog from "./PaymentMappingDeleteDialog";
+import PaymentRetryCreateConfirmDialog from "./PaymentRetryCreateConfirmDialog";
 import {
 	type PaymentAccountState,
 	paymentAccountCreated,
@@ -273,6 +274,7 @@ export function PaymentAccountSection({
 		PaymentAdminService.method.deletePaymentAccountMapping,
 	);
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
+	const [confirmingRetryCreate, setConfirmingRetryCreate] = useState(false);
 	// 處理過的待辦（建立失敗）依帳戶狀態出入佇列：重新整理完成、重試建立成功都重讀。
 	const invalidateQueue = () => {
 		void queryClient.invalidateQueries({
@@ -314,10 +316,13 @@ export function PaymentAccountSection({
 			});
 		}
 	};
-	const handleRetryCreate = async () => {
+	const handleRetryCreate = async (acknowledgeNoProviderAccount = false) => {
 		onNotice(null);
 		try {
-			const res = await retryMutation.mutateAsync({ storeId });
+			const res = await retryMutation.mutateAsync({
+				storeId,
+				acknowledgeNoProviderAccount,
+			});
 			writeAccount(res.account);
 			onNotice({ tone: "success", text: RETRY_QUEUED_TEXT });
 			invalidateQueue();
@@ -328,6 +333,19 @@ export function PaymentAccountSection({
 				text: connectErrorText(caught, "重試建立失敗，請稍後再試一次。"),
 			});
 		}
+	};
+
+	// 建立結果不明且逾期（create_unresolved）：確認框裡按下確認才帶 acknowledge_no_provider_account；失敗由對話框就地顯示。
+	const handleConfirmRetryCreate = async () => {
+		const res = await retryMutation.mutateAsync({
+			storeId,
+			acknowledgeNoProviderAccount: true,
+		});
+		setConfirmingRetryCreate(false);
+		writeAccount(res.account);
+		onNotice({ tone: "success", text: RETRY_QUEUED_TEXT });
+		invalidateQueue();
+		invalidateOnboarding();
 	};
 
 	const handleRetryPurge = async () => {
@@ -366,11 +384,23 @@ export function PaymentAccountSection({
 				retrying={retryMutation.isPending}
 				purging={purgeMutation.isPending}
 				onRefresh={() => void handleRefresh()}
-				onRetryCreate={() => void handleRetryCreate()}
+				onRetryCreate={() =>
+					account?.createUnresolved
+						? setConfirmingRetryCreate(true)
+						: void handleRetryCreate()
+				}
 				onRetryPurge={() => void handleRetryPurge()}
 				onDeleteMapping={() => setConfirmingDelete(true)}
 				onReload={() => void payment.query.refetch()}
 			/>
+			{confirmingRetryCreate && (
+				<PaymentRetryCreateConfirmDialog
+					storeId={storeId}
+					provider={account?.provider ?? ""}
+					onClose={() => setConfirmingRetryCreate(false)}
+					onConfirm={handleConfirmRetryCreate}
+				/>
+			)}
 			{confirmingDelete && (
 				<PaymentMappingDeleteDialog
 					storeId={storeId}

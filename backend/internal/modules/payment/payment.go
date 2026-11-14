@@ -113,9 +113,6 @@ type AcquireInput = account.AcquireInput
 // ConfigureInput 是建立的第二步（完成設定）的輸入。
 type ConfigureInput = account.ConfigureInput
 
-// ResolveInput 是以店家對帳（列出 provider 上沒有關閉的帳戶）的輸入。
-type ResolveInput = account.ResolveInput
-
 // MappingDeletion 是管理員「已在金流商處理，刪除對應」的一筆紀錄。
 type MappingDeletion = model.MappingDeletion
 
@@ -180,8 +177,11 @@ const FakeName = account.FakeName
 // EventRetention 是收款事件原始 payload 在 inbox 的保存期。
 const EventRetention = account.EventRetention
 
-// IdempotencyRetention 是金流商保存冪等鍵結果的時間（30 天）：超過之後建立與清理改以 metadata.store_id 加 metadata.hawkr_namespace 列出對帳。
+// IdempotencyRetention 是金流商保存冪等鍵結果的時間（30 天）：任何重送都在它之內（UnresolvedDeadline 小於它），超過的鍵從不重送。
 const IdempotencyRetention = account.IdempotencyRetention
+
+// UnresolvedDeadline 是「呼叫過、沒有外部 ID」的列最久等多久（7 天，D63）：期限內以同一把鍵重送取回 ID，超過進終局（建立失敗或清理終局）。
+const UnresolvedDeadline = account.UnresolvedDeadline
 
 // PurgeDeadline 是列被標成等待清理後，仍關不掉或問不到金流商的最長時間（7 天，D60），超過進終局。
 const PurgeDeadline = account.PurgeDeadline
@@ -235,9 +235,9 @@ func (m *Module) RefreshAccount(ctx context.Context, storeID int64) (Account, er
 	return m.accounts.Refresh(ctx, storeID)
 }
 
-// RetryAccountCreate 管理員的「重試建立」：只有建立失敗的帳戶可以重試。
-func (m *Module) RetryAccountCreate(ctx context.Context, storeID int64) (Account, error) {
-	return m.accounts.RetryCreate(ctx, storeID)
+// RetryAccountCreate 管理員的「重試建立」：只有建立失敗的帳戶可以重試；建立結果不明且超過期限的帳戶要 acknowledgeNoProviderAccount（D63）。
+func (m *Module) RetryAccountCreate(ctx context.Context, storeID int64, acknowledgeNoProviderAccount bool) (Account, error) {
+	return m.accounts.RetryCreate(ctx, storeID, acknowledgeNoProviderAccount)
 }
 
 // RetryAccountPurge 管理員的「重試關閉」：只有清理進了終局的帳戶可以重試（清除終局、期限從現在重算並重新排入清理 job）。
@@ -286,6 +286,11 @@ func (m *Module) SyncAccountUnlessFresh(ctx context.Context, storeID int64) erro
 // SweepAccounts 是定期掃描（payment.account_sweep）的內容，給 worker 與測試呼叫；回傳排入同步與建立的帳戶數。
 func (m *Module) SweepAccounts(ctx context.Context) (synced, ensured int, err error) {
 	return m.accounts.Sweep(ctx)
+}
+
+// ResolveUnresolvedAccount 是了結 job（payment.account_resolve）的內容，給 worker 與測試呼叫（D63）；finalAttempt 為 true 時暫時性失敗只記警示 log，留給下一次掃描。
+func (m *Module) ResolveUnresolvedAccount(ctx context.Context, storeID int64, finalAttempt bool) error {
+	return m.accounts.Resolve(ctx, storeID, finalAttempt)
 }
 
 // PurgeAccount 是「關閉後刪除」job（payment.account_purge）的內容，給 worker 與測試呼叫；finalAttempt 為 true 時關閉失敗只記警示 log，本地列（已標成等待清理）留著給週期掃描。

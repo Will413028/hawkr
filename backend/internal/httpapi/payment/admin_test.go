@@ -22,6 +22,7 @@ type paymentAdminModule struct {
 	refreshedAccount payment.Account
 	refreshed        int64
 	retried          int64
+	retriedAck       bool
 	purgeRetried     int64
 	mappingDeleted   [2]int64
 	err              error
@@ -46,8 +47,8 @@ func (m *paymentAdminModule) RefreshAccount(_ context.Context, id int64) (paymen
 	return m.refreshedAccount, m.err
 }
 
-func (m *paymentAdminModule) RetryAccountCreate(_ context.Context, id int64) (payment.Account, error) {
-	m.retried = id
+func (m *paymentAdminModule) RetryAccountCreate(_ context.Context, id int64, ack bool) (payment.Account, error) {
+	m.retried, m.retriedAck = id, ack
 	return m.account, m.err
 }
 
@@ -78,8 +79,11 @@ func TestAdminPaymentAccountHandlersMapTheAccountAndPassTheStore(t *testing.T) {
 	if ra := refreshed.Msg.GetAccount(); ra.GetStoreId() != "11" || ra.GetStatus() != paymentpb.PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_ENABLED {
 		t.Fatalf("refresh 的回應沒有帶重讀後的帳戶：%v", ra)
 	}
-	if _, err := h.RetryPaymentAccountCreate(context.Background(), connect.NewRequest(&adminpb.RetryPaymentAccountCreateRequest{StoreId: "11"})); err != nil || m.retried != 11 {
-		t.Fatalf("retry: %v %d", err, m.retried)
+	if _, err := h.RetryPaymentAccountCreate(context.Background(), connect.NewRequest(&adminpb.RetryPaymentAccountCreateRequest{StoreId: "11"})); err != nil || m.retried != 11 || m.retriedAck {
+		t.Fatalf("retry: %v %d ack=%v", err, m.retried, m.retriedAck)
+	}
+	if _, err := h.RetryPaymentAccountCreate(context.Background(), connect.NewRequest(&adminpb.RetryPaymentAccountCreateRequest{StoreId: "11", AcknowledgeNoProviderAccount: true})); err != nil || !m.retriedAck {
+		t.Fatalf("retry 帶確認：%v ack=%v", err, m.retriedAck)
 	}
 	for name, call := range map[string]func() error{
 		"Get": func() error {

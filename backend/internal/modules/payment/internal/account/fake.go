@@ -37,8 +37,6 @@ type Fake struct {
 	ensureErrs   []error
 	lostErrs     []error
 	configErrs   []error
-	resolveErrs  []error
-	resolves     []int64
 	byStore      map[int64][]string
 	fetchErrs    []error
 	closeErrs    []error
@@ -100,27 +98,6 @@ func (f *Fake) FailConfigure(errs ...error) {
 	f.configErrs = append(f.configErrs, errs...)
 }
 
-// ExpireKeys 模擬冪等鍵過期（金流商只保存 30 天）：之後同一把鍵取得 ID 會建出新的帳戶；已建立的帳戶不受影響。
-func (f *Fake) ExpireKeys() {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.byKey = map[string]string{}
-}
-
-// FailResolve 讓接下來的「列出對帳」依序回這些錯誤（排完就成功）。
-func (f *Fake) FailResolve(errs ...error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.resolveErrs = append(f.resolveErrs, errs...)
-}
-
-// Resolves 回傳每次 ResolveAccount 收到的店家 ID（依呼叫順序，失敗的呼叫也算）。
-func (f *Fake) Resolves() []int64 {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return append([]int64(nil), f.resolves...)
-}
-
 // FailFetch 讓接下來的重讀依序回這些錯誤（排完就成功）。
 func (f *Fake) FailFetch(errs ...error) {
 	f.mu.Lock()
@@ -179,6 +156,13 @@ func (f *Fake) Accounts() int {
 		n += len(ids)
 	}
 	return n
+}
+
+// StoreAccounts 回傳 provider 那邊為這家店建立過的外部帳戶 ID（含已關閉的，依建立順序），測試用。
+func (f *Fake) StoreAccounts(storeID int64) []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.byStore[storeID]...)
 }
 
 // check 要持有 f.mu。
@@ -261,25 +245,6 @@ func (f *Fake) ConfigureAccount(ctx context.Context, in ConfigureInput) error {
 		return fmt.Errorf("%w：沒有外部帳戶 %s", ErrPermanent, in.ExternalID)
 	}
 	return nil
-}
-
-// ResolveAccount 實作 Provider：只找不建。列出沒有關閉的帳戶，回傳 store_id 相符的全部（新的在前）。
-func (f *Fake) ResolveAccount(ctx context.Context, in ResolveInput) ([]string, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.check(ctx, "ResolveAccount")
-	f.resolves = append(f.resolves, in.StoreID)
-	if err := pop(&f.resolveErrs); err != nil {
-		return nil, err
-	}
-	ids := f.byStore[in.StoreID]
-	var open []string
-	for i := len(ids) - 1; i >= 0; i-- {
-		if !f.closedIDs[ids[i]] {
-			open = append(open, ids[i])
-		}
-	}
-	return open, nil
 }
 
 // CreateOnboardingSession 實作 Provider。
