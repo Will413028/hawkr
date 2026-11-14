@@ -260,11 +260,6 @@ ignoreUntil = 2027-01-28
 reason = "基準：PyPI fonttools@4.56.0（CVSS 6.3，MEDIUM）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-9v8h-qqgm-4m35"
-ignoreUntil = 2026-11-06
-reason = "基準：PyPI brotli@1.2.0（CVSS 9.2，CRITICAL）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-2j26-frm8-cmj9"
 ignoreUntil = 2027-01-28
 reason = "基準：RubyGems activesupport@7.2.2.2（CVSS 6.6，MEDIUM）；升級待核准"
