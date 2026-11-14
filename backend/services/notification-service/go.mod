@@ -77,13 +77,13 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.24 // indirect
 	github.com/googleapis/gax-go/v2 v2.27.0 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.7 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.3 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.20.3 // indirect
-	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
+	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20260330125221-c963978e514e // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
@@ -109,7 +109,7 @@ require (
 	github.com/prometheus/procfs v0.22.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.0 // indirect
-	github.com/rabbitmq/amqp091-go v1.14.0 // indirect
+	github.com/rabbitmq/amqp091-go v1.16.0 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.6 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.8.1 // indirect
@@ -120,20 +120,20 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.5.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/contrib/bridges/prometheus v0.69.0 // indirect
+	go.opentelemetry.io/contrib/bridges/prometheus v0.72.0 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.44.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/runtime v0.67.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.72.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.70.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/runtime v0.72.0 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.40.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.40.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.40.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.47.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.47.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.47.0 // indirect
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
-	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
+	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
