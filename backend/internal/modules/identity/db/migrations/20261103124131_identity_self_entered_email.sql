@@ -1,2 +1,0 @@
--- Modify "accounts" table
-ALTER TABLE "identity"."accounts" DROP CONSTRAINT "accounts_deleted_check", ADD CONSTRAINT "accounts_deleted_check" CHECK ((deleted_at IS NULL) OR ((email IS NULL) AND (self_entered_email IS NULL) AND (suspended_at IS NULL))), ADD CONSTRAINT "accounts_self_entered_email_check" CHECK ((self_entered_email = lower(self_entered_email)) AND (char_length(self_entered_email) <= 254) AND (self_entered_email ~ '^[^@[:space:]]+@[^@[:space:]]+$'::text)), ADD COLUMN "self_entered_email" text NULL;

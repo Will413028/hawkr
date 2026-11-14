@@ -1,2 +1,0 @@
--- Modify "kyc_applications" table
-ALTER TABLE "seller"."kyc_applications" DROP CONSTRAINT "kyc_applications_complete_check", ADD CONSTRAINT "kyc_applications_complete_check" CHECK ((status <> ALL (ARRAY['SUBMITTED'::text, 'APPROVED'::text, 'REJECTED'::text])) OR ((submitted_at IS NOT NULL) AND ((pii_purged_at IS NOT NULL) OR ((payout_contact_email IS NOT NULL) AND ((seller_type = 'INDIVIDUAL'::text) OR ((seller_type = 'COMPANY'::text) AND (company_name IS NOT NULL) AND (tax_id IS NOT NULL)))))));
