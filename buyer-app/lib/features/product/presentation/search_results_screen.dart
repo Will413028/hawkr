@@ -53,6 +53,8 @@ class SearchResultsScreen extends HookConsumerWidget {
     final currentKeyword = useRef(query);
 
     // Next page key after each fetched page key; null marks the last page.
+    // Replaced on every refresh so a request started before it writes into the
+    // discarded map.
     final nextKeyAfter = useRef(<int, int?>{});
 
     // Paging controller for infinite scroll
@@ -63,11 +65,12 @@ class SearchResultsScreen extends HookConsumerWidget {
           return lastKey == null ? 1 : nextKeyAfter.value[lastKey];
         },
         fetchPage: (pageKey) async {
+          final nextKeys = nextKeyAfter.value;
           final page = await ref
               .read(ctrl.searchControllerProvider.notifier)
               .fetchSearchPage(currentKeyword.value, pageKey);
           final items = page.records;
-          nextKeyAfter.value[pageKey] = page.isLastPage ? null : page.page + 1;
+          nextKeys[pageKey] = page.isLastPage ? null : page.page + 1;
           // GA4: view_item_list — fired once per loaded page, not on every rebuild
           if (items.isNotEmpty) {
             final startIndex = (pageKey - 1) * ctrl.SearchController.pageSize;
@@ -117,6 +120,7 @@ class SearchResultsScreen extends HookConsumerWidget {
       if (kw.isEmpty) return;
       showSuggestions.value = false;
       currentKeyword.value = kw;
+      nextKeyAfter.value = {};
       pagingController.refresh();
     }
 
@@ -198,6 +202,7 @@ class SearchResultsScreen extends HookConsumerWidget {
                 showSuggestions.value = false;
                 FocusScope.of(context).unfocus();
                 currentKeyword.value = label;
+                nextKeyAfter.value = {};
                 pagingController.refresh();
               },
               child: Padding(
