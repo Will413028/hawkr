@@ -1,4 +1,4 @@
-// 從 src/presets.ts 生成各 client 的 preset 名稱（ADR backend/docs/adr/2026-09-25-api-image-uri-template.md D4）：
+// 從 src/presets.ts 生成各 client 的 preset 名稱（ADR docs/adr/2026-09-25-api-image-uri-template.md D4）：
 // presets.ts 是唯一來源，client 不手寫清單。CI（api-contract.yml）重新生成並檢查 drift。
 //
 // 在 repo 任何位置執行：node backend/workers/image-gateway/scripts/gen-client-presets.mjs

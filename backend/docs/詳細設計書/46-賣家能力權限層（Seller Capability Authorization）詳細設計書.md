@@ -10,7 +10,7 @@
 |---|---|
 | 維護者 | 維護團隊 |
 | 對應程式碼 | gateway 解析：`gateway/internal/middleware/auth.go`；gateway 檢查：`gateway/internal/authz/*`（capability／registry）、`gateway/internal/router/seller_capability.go`（`requireSeller(cap)` 掛載）、`gateway/internal/router/seller_route_assert.go`（boot 斷言） |
-| 相關 ADR | [2026-09-18-seller-capability-authorization](../adr/2026-09-18-seller-capability-authorization.md)、[2026-09-29-seller-suspension-and-business-identity-in-monolith](../adr/2026-09-29-seller-suspension-and-business-identity-in-monolith.md) |
+| 相關 ADR | [2026-09-18-seller-capability-authorization](/docs/adr/2026-09-18-seller-capability-authorization.md)、[2026-09-29-seller-suspension-and-business-identity-in-monolith](/docs/adr/2026-09-29-seller-suspension-and-business-identity-in-monolith.md) |
 | 相關 doc | 02（product 收斂點 backstop）、03（order 結帳收斂點）、20（結帳模組）、14（IM 訂單關聯細分）、36（MQ 事件）、44（gateway 身份解析與守衛）、56（ADM 代行營運，`AdminCapability` 的 owner）、58（發票 capability）、65（物流履約，`CAP_ORDER_FULFILL`／`CAP_PRODUCT_MANAGE` 的下游語意）、開發規範《賣家能力權限層規範》 |
 
 ---
@@ -99,7 +99,7 @@ flowchart LR
 
 **掛載點的權威清冊住在 code**：`requireSeller(cap)` 的掛載集中於 `gateway/internal/router/seller_capability.go`，boot 斷言在 `seller_route_assert.go`。設計書不複述掛載點清單——它會腐化，而 boot 斷言不會。
 
-**宣告＝掛載合一**：capability 是 `requireSeller` 的**必填參數**，一個 middleware 同時做角色檢查 ＋ 能力檢查。**編譯期強制**：凡有 `requireSeller` 必有 capability 宣告。被否決的替代方案見[相關 ADR](../adr/2026-09-18-seller-capability-authorization.md) D1。
+**宣告＝掛載合一**：capability 是 `requireSeller` 的**必填參數**，一個 middleware 同時做角色檢查 ＋ 能力檢查。**編譯期強制**：凡有 `requireSeller` 必有 capability 宣告。被否決的替代方案見[相關 ADR](/docs/adr/2026-09-18-seller-capability-authorization.md) D1。
 
 **掛載規則（確定性，三條窮盡）**：
 
@@ -303,7 +303,7 @@ CodeMeta SSOT 對象是「跨服務/前端可見的共享代碼值」。
 
 ## 10. 設計理由
 
-能力層的方案比較、被否決的選項與取捨理由見 [2026-09-18-seller-capability-authorization](../adr/2026-09-18-seller-capability-authorization.md)（收斂點、capability 粒度、wildcard 處置、pricebook 歸屬、admin/seller 兩型分離）與 [2026-09-29-seller-suspension-and-business-identity-in-monolith](../adr/2026-09-29-seller-suspension-and-business-identity-in-monolith.md)（停權檢查移進單體、狀態傳播、fail 策略）。本節不複述理由。
+能力層的方案比較、被否決的選項與取捨理由見 [2026-09-18-seller-capability-authorization](/docs/adr/2026-09-18-seller-capability-authorization.md)（收斂點、capability 粒度、wildcard 處置、pricebook 歸屬、admin/seller 兩型分離）與 [2026-09-29-seller-suspension-and-business-identity-in-monolith](/docs/adr/2026-09-29-seller-suspension-and-business-identity-in-monolith.md)（停權檢查移進單體、狀態傳播、fail 策略）。本節不複述理由。
 
 ---
 

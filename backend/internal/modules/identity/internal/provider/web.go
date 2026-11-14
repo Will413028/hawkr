@@ -56,7 +56,7 @@ type WebLogin struct {
 }
 
 // NewWebLogin 建立 Google 或 LINE 的 web 登入。Google 的 ID token 以 JWKS 驗（RS256）；LINE web 的以 channel secret 驗（HS256，
-// ADR backend/docs/adr/2026-10-30-identity-self-hosted-federated-login.md 的約束）；aud 都是 ClientID。
+// ADR docs/adr/2026-10-30-identity-self-hosted-federated-login.md 的約束）；aud 都是 ClientID。
 func NewWebLogin(cfg WebLoginConfig) (*WebLogin, error) {
 	if cfg.ClientID == "" || cfg.ClientSecret == "" || cfg.RedirectURL == "" {
 		return nil, errors.New("identity：web 登入需要 client ID、client secret 與 redirect URL")
@@ -117,7 +117,7 @@ func (w *WebLogin) CheckIssuer(iss string) bool {
 }
 
 // RequiresIssuer 回報這家 provider 的授權回應一定帶 iss：Google 的 discovery 宣告 authorization_response_iss_parameter_supported，
-// LINE 沒有（ADR backend/docs/adr/2026-10-30-identity-self-hosted-federated-login.md 的約束；RFC 9207 §2.4）。
+// LINE 沒有（ADR docs/adr/2026-10-30-identity-self-hosted-federated-login.md 的約束；RFC 9207 §2.4）。
 func (w *WebLogin) RequiresIssuer() bool { return w.provider == model.ProviderGoogle }
 
 // Exchange 以 authorization code（帶 PKCE verifier）換 token，驗證 ID token（簽章、iss、aud、exp，nonce 必須等於 wantNonce），

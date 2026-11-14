@@ -28,7 +28,7 @@ class CheckDocPathsTest(unittest.TestCase):
         subprocess.run(["git", "init", "-q", str(self.root)], check=True)
         self.write("docs/README.md", README)
         self.write("docs/adr/a.md", "# a\n")
-        self.write("backend/docs/adr/b.md", "# b\n")
+        self.write("backend/docs/plans/b.md", "# b\n")
         self.write("backend/docs/plans/p.md", "# p\n")
         self.write("backend/services/keep.go", "package x\n")
 
@@ -53,7 +53,7 @@ class CheckDocPathsTest(unittest.TestCase):
         self.assertEqual(len(self.errors()), 1)
 
     def test_transitional_file_falls_back_to_backend(self):
-        self.write("backend/AGENTS.md", "see `docs/adr/b.md`\n")
+        self.write("backend/AGENTS.md", "see `docs/plans/b.md`\n")
         self.assertEqual(self.errors(), [])
 
     def test_transitional_file_missing_everywhere_fails(self):
@@ -61,7 +61,7 @@ class CheckDocPathsTest(unittest.TestCase):
         self.assertEqual(len(self.errors()), 1)
 
     def test_root_file_does_not_fall_back_to_backend(self):
-        self.write("website/x.ts", "// docs/adr/b.md\n")
+        self.write("website/x.ts", "// docs/plans/b.md\n")
         self.assertEqual(len(self.errors()), 1)
 
     def test_legacy_files_are_skipped(self):
@@ -73,9 +73,9 @@ class CheckDocPathsTest(unittest.TestCase):
         self.assertEqual(self.errors(), [])
 
     def test_markdown_relative_link(self):
-        self.write("backend/docs/adr/d.md", "[b](b.md) [x](../plans/p.md)\n")
+        self.write("docs/adr/d.md", "[a](a.md) [x](../../backend/docs/plans/p.md)\n")
         self.assertEqual(self.errors(), [])
-        self.write("backend/docs/adr/e.md", "[gone](gone.md)\n")
+        self.write("docs/adr/e.md", "[gone](gone.md)\n")
         self.assertEqual(len(self.errors()), 1)
 
     def test_markdown_root_link_is_url_decoded(self):

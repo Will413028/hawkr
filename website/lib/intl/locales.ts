@@ -1,7 +1,7 @@
 /**
  * 網站的語系清單：有哪些語系、哪些已發佈、這個部署會路由哪些。
  *
- * 決策：backend/docs/adr/2026-10-17-multi-locale-architecture.md D1。
+ * 決策：docs/adr/2026-10-17-multi-locale-architecture.md D1。
  *
  * 「已發佈」和「會路由」是兩件事：
  *   - 已發佈（`publishedLocales`）：對外承諾存在的語系。hreflang、sitemap、`/en` 的索引規則只看這份。

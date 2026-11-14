@@ -22,7 +22,7 @@
 
 ### 現況（已逐一查證）
 
-- ADR `backend/docs/adr/2026-09-25-codemeta-retirement.md:60`（D5）文字在各 client 呈現層、TS `Record<Enum,string>`；`:61`（D6）proto 註解只寫語意；`:48-49` 否決 C（custom option）與 D（以值名為 key 的 label 目錄，「漂移成為實際問題時的後備」）。
+- ADR `docs/adr/2026-09-25-codemeta-retirement.md:60`（D5）文字在各 client 呈現層、TS `Record<Enum,string>`；`:61`（D6）proto 註解只寫語意；`:48-49` 否決 C（custom option）與 D（以值名為 key 的 label 目錄，「漂移成為實際問題時的後備」）。
 - 實際做法違反 D6：`rg -c '標籤「' api/` → `seller.proto` 60、`measure.proto` 10、`error_reason.proto` 2，共 72。`error_reason.proto:35-40` 甚至把**整句錯誤文字**也稱「標籤」，與 `model/model.go:120,122`、seller-app `seller_onboarding.dart:28-33` 三處同一句手抄。
 - 綁定只有 3 個 enum〔VERIFIED〕：`model/measure_test.go:378` `TestRiskGroundLabelsEqualTheProtoLabels`（RiskGround）、`admin/tests/violation-label-proto.test.ts`（3a 新檔，ViolationCategory／Severity，以 regex 解析註解排版）。`TerminationGround.Label()`（`model/measure.go:95`）在伺服器有手寫表但沒有測試綁住。
 - website 的對照是 `Partial<Record<…>>`〔VERIFIED，`website/features/seller/measures/measureDisplay.ts:30,40,48,55,60,80,86,197,211`〕，關掉了 D5 的窮舉；admin 的正確寫法是 `Record<Exclude<E, E.UNSPECIFIED>, string>`（`admin/src/app/admin/measures/measure-actions.ts:41-47`）。

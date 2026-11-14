@@ -1,6 +1,6 @@
 # 多語系路由
 
-website 的語系路由、導覽層與 API 語系的現行規則。決策與理由在 ADR `backend/docs/adr/2026-10-17-multi-locale-architecture.md` D1；admin 與 staff 介面不在內。
+website 的語系路由、導覽層與 API 語系的現行規則。決策與理由在 ADR `docs/adr/2026-10-17-multi-locale-architecture.md` D1；admin 與 staff 介面不在內。
 
 - **網址**：zh-TW 在 `/…`、en 在 `/en/…`（next-intl `as-needed`，設定在 `i18n/routing.ts`）。URL 是唯一的語系來源：不依 `Accept-Language` 或 cookie 導向（`localeDetection:false`、`localeCookie:false`），不輸出 next-intl 的 `Link` header（`alternateLinks:false`，hreflang 由 metadata 產生）。明寫的 `/zh-TW/…` 導向 `/…`。
 - **語系清單在 `lib/intl/locales.ts`**：`supportedLocales`；每個介面一份已發佈清單 `publishedLocales`。介面由 `surfaceOfPath`（`lib/intl/paths.ts`）依去掉前綴的路徑分：`seller` 是 `/seller`（含公開的招募頁 `/seller/pricing`，受眾是想開店的賣家）、`/seller-center`、`/seller-product-import-preview`、`/seller-app`（賣家 App 開通收款後回跳的免登入頁）；其餘都是 `buyer`（買家看的賣家資訊 `/sellers/*`、`/seller-guide`、`/seller-terms` 也是）。「已發佈」和「會路由」分開：prod flavor 只路由已發佈的（`/en` 回 404，連 `/en/…` 前綴都不認），dev flavor 路由全部支援的語系，未發佈的 `en` 才能在開發與 preview 測。hreflang、sitemap、`/en` 的索引規則只看已發佈清單。把 `en` 加進某個介面的清單，條件是該介面在英文下看不到任何未翻譯的文字（ADR 發佈門檻），而且 `LAUNCH_BLOCKERS`（同一個檔案）已經清空：`tests/locale-launch-gate.test.ts` 擋；發佈前要補的項目在計畫 `backend/docs/plans/2026-09-29-a3-buyer-seller.md` 的 I-web-0 條目。測試換清單用 `__setPublishedLocalesForTest`。

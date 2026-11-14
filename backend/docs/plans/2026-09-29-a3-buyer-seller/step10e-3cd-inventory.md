@@ -147,7 +147,7 @@
   - `backend/docs/runbooks/food-safety-incident-runbook.md`：K16，`:10-45`、`:63-290` 整段重寫。v1 列在 3c，K18 的 SLA 數字留到 3d。
 - `backend/internal/modules/seller/CARRYOVER.md`：沿用盤點加 `assessed_category`、通報註記、`can_*`。
 - `backend/internal/modules/seller/AGENTS.md`：權限表。
-- ADR `backend/docs/adr/2026-10-18-seller-governance-consolidated.md`：D9 的修訂段 [推論：要不要寫照慣例由實作者判斷]。
+- ADR `docs/adr/2026-10-18-seller-governance-consolidated.md`：D9 的修訂段 [推論：要不要寫照慣例由實作者判斷]。
 - 計畫 `backend/docs/plans/2026-09-29-a3-buyer-seller.md` 的 10e 完成紀錄。
 - 簡報加「實作時的修訂（3c）」。
 

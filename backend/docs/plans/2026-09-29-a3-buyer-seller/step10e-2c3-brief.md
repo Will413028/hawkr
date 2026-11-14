@@ -29,7 +29,7 @@
 | R3 | D §1「`effective_at` 只給終止」、§5 `Measure.effective_time` → **所有措施**加不可變的 `starts_at`，契約沿用既有 `MeasurePeriod.start_time` | D:51、:65、:352 | 生效判斷只有一個式子（T2c） |
 | R4 | `MeasureBasis` 加 `CONTRACT`（只配 TERMINATION） | D §3 enum | 21.2 無過錯、21.3 部分事由與關聯帳號不是 RISK（T2a） |
 | R5 | 21.3 第 1 款「重大違約」要引用一筆**至少 7 天前**、未撤銷的認定 | G15「21.3 立即」 | 條款本身要求「經通知後七日內未改善」（T5c） |
-| R6 | ADR「個資保留」（`backend/docs/adr/2026-10-02-seller-kyc-payuni-in-monolith.md`）與 seller `AGENTS.md`：保留期依關閉原因（`TERMINATION` 為申覆期間，其他 30 天）、legal hold、`seller.deleted` 與 logo／封面釋放改在清理時（`StoreRetired`）、關店紀錄移到歷史表、21.3 身分快照保留到撤銷 | `relay.go:316-320`、`closing.go:242-281`、`purge.sql`、seller `AGENTS.md`:13、:31、:45、:48、:66 | T1；實作項，本簡報不改這兩份 |
+| R6 | ADR「個資保留」（`docs/adr/2026-10-02-seller-kyc-payuni-in-monolith.md`）與 seller `AGENTS.md`：保留期依關閉原因（`TERMINATION` 為申覆期間，其他 30 天）、legal hold、`seller.deleted` 與 logo／封面釋放改在清理時（`StoreRetired`）、關店紀錄移到歷史表、21.3 身分快照保留到撤銷 | `relay.go:316-320`、`closing.go:242-281`、`purge.sql`、seller `AGENTS.md`:13、:31、:45、:48、:66 | T1；實作項，本簡報不改這兩份 |
 
 ### 不需決定（基準直接定案，理由在各節）
 T2 模型（`TerminationGround` 必填、終止永不為 RISK、`starts_at`、申覆期限常數、「待關閉」不存、`source_measure_id`）；T3 操作表、`StateOf` 順序（ENDED 先於 SCHEDULED）與申覆不可用原因；T4 身分快照逐措施在建立時取（21.2 不取）、21.2 在**單一關店路徑**結束；關店改用 `LockAccountStores` 鎖順序；T5 各邊界；devseed 改讀 `EffectiveMeasures`；`closed_by=TERMINATION`、系統作者用 `system_cause`。

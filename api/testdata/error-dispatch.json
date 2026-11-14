@@ -1,5 +1,5 @@
 {
-  "_說明": "Connect 錯誤的分派情境表（ADR backend/docs/adr/2026-09-25-api-error-model.md 的 D7）。四個 client 的分類器都以這份表測試，結果必須相同。input.method.idempotency 是 proto 的 idempotency_level（NO_SIDE_EFFECTS、IDEMPOTENT、UNKNOWN），requestId 表示請求帶了 AIP-155 的 request_id。input.error.noResponse 表示沒有收到伺服器的回應（連線失敗、斷線），由各平台的轉接層判斷。expected.action：ignore、retry、reauthenticate、reason、fields、message；message 為 null 表示顯示該 code 的預設文字。",
+  "_說明": "Connect 錯誤的分派情境表（ADR docs/adr/2026-09-25-api-error-model.md 的 D7）。四個 client 的分類器都以這份表測試，結果必須相同。input.method.idempotency 是 proto 的 idempotency_level（NO_SIDE_EFFECTS、IDEMPOTENT、UNKNOWN），requestId 表示請求帶了 AIP-155 的 request_id。input.error.noResponse 表示沒有收到伺服器的回應（連線失敗、斷線），由各平台的轉接層判斷。expected.action：ignore、retry、reauthenticate、reason、fields、message；message 為 null 表示顯示該 code 的預設文字。",
   "scenarios": [
     {
       "name": "canceled 不處理",

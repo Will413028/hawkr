@@ -59,7 +59,7 @@
 
    ⛔ **client 不得自行推導色帶或機率**，不得用 candidate score 或 Pricebook 區間補值；`UNKNOWN` 時**仍不得**顯示 0%、百分比或色帶。溫度不產獨立 artifact，身分由 `procurement_price_previews` 的 `price_preview_id` ＋ `version` 承擔。
 
-   > outcome 定義、色帶依據與 reason code 命名的取捨見 ADR [`docs/adr/2026-09-18-deal-temperature-outcome-definition.md`](../adr/2026-09-18-deal-temperature-outcome-definition.md)。
+   > outcome 定義、色帶依據與 reason code 命名的取捨見 ADR [`docs/adr/2026-09-18-deal-temperature-outcome-definition.md`](/docs/adr/2026-09-18-deal-temperature-outcome-definition.md)。
 
 6. **publication 的 side effect 只有一個入口。** approval → execute，execute 是冪等的。⛔ 不得有第二條「順手也建一下 invites」的路徑。
 
@@ -71,7 +71,7 @@
 
 🔴 **`payload_hash` 的 preimage 涵蓋賣家實際看到的完整內容**（11 欄），不是只有 pricing mode 與價格區間。
 少了這一點，兩張品項、數量、城市全不同的詢價單會算出同一個 hash，CAS 形同虛設。
-取捨見 ADR [`docs/adr/2026-09-18-rfq-snapshot-hash-preimage.md`](../adr/2026-09-18-rfq-snapshot-hash-preimage.md)。
+取捨見 ADR [`docs/adr/2026-09-18-rfq-snapshot-hash-preimage.md`](/docs/adr/2026-09-18-rfq-snapshot-hash-preimage.md)。
 
 `canonical_payload_json` **自帶** `item`／`itemResolution`／`quantity`／`unit`／`packaging`／`deliveryCity`／`deliveryDate`。
 ⇒ `domain.CompileSellerFacingPayload` **只讀這一份 JSON**，⛔ 不得 join `procurement_requests` 或 revision 表
@@ -106,7 +106,7 @@
 ⛔ **不得另立 `sellerFacingPayloadHash` 與既有 `payloadHash` 並存**：`payload_hash` 這個名字
 在這條線上已經有過兩種語意，第三種只會讓下一個人再選錯一次。
 
-> 取捨見 ADR [`docs/adr/2026-09-18-rfq-snapshot-hash-preimage.md`](../adr/2026-09-18-rfq-snapshot-hash-preimage.md)。
+> 取捨見 ADR [`docs/adr/2026-09-18-rfq-snapshot-hash-preimage.md`](/docs/adr/2026-09-18-rfq-snapshot-hash-preimage.md)。
 
 ### 3.2 決策 D2：識別鏈上每一跳要帶什麼
 
@@ -286,7 +286,7 @@ flowchart TD
 ⛔ **不得改由 order-service 主導**：acceptance 要 CAS 的對象（publication、seller response、
 RFQ snapshot）全都住在 ai-service 的 DB，那會讓 §3 的 CAS 變成跨服務讀取。
 
-> 取捨與被否決的方案見 ADR [`docs/adr/2026-09-18-rfq-acceptance-order-atomicity.md`](../adr/2026-09-18-rfq-acceptance-order-atomicity.md)。
+> 取捨與被否決的方案見 ADR [`docs/adr/2026-09-18-rfq-acceptance-order-atomicity.md`](/docs/adr/2026-09-18-rfq-acceptance-order-atomicity.md)。
 
 ### 6.3 migration 順序約束
 

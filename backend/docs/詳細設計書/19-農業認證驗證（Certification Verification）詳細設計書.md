@@ -428,7 +428,7 @@ CREATE INDEX idx_pcre_application ON product_certification_review_event (applica
 | `ProductEventType` | [內部技術碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/內部技術碼.md) | MQ 事件型別（本書使用 4 個，見 §12） |
 
 **流程強制**：先改 `docs/代碼管理（CodeMeta）/*.md` → `cd docs/代碼管理（CodeMeta）/scripts && ./generate.sh --go --go-media --web --admin --flutter`（CI 的 drift 步驟用同一組旗標；生成物直寫進 monorepo，不需複製）
-→ 生成物與 `.md` 同一個 commit，`git status` 乾淨。Java 輸出（`--java`）不在 CI 檢查內，需要時另跑並用 `git rm` 清掉被刪 enum 的舊檔。**禁止直接改生成檔**。CodeMeta 已凍結、只服務未搬進單體的舊契約（[ADR](../adr/2026-09-25-codemeta-retirement.md)）。
+→ 生成物與 `.md` 同一個 commit，`git status` 乾淨。Java 輸出（`--java`）不在 CI 檢查內，需要時另跑並用 `git rm` 清掉被刪 enum 的舊檔。**禁止直接改生成檔**。CodeMeta 已凍結、只服務未搬進單體的舊契約（[ADR](/docs/adr/2026-09-25-codemeta-retirement.md)）。
 ADM 需先把新 enum 加進 `generate.sh` 的 `ADMIN_ENUMS`（舊的 `codemeta-generated-sync.test.ts` count／digest 同步已不存在）。
 
 ---

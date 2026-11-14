@@ -127,7 +127,7 @@ def path_tokens(line: str) -> list[str]:
 
 def check_file(tree: Tree, rel: str, text: str, transitional: bool) -> list[str]:
     bases = [""]
-    if rel.startswith(("docs/adr/", "backend/docs/adr/")):
+    if rel.startswith("docs/adr/"):
         m = BASE_ROW.search("\n".join(text.splitlines()[:HEADER_LINES]))
         if m:
             bases.insert(0, m.group(1).strip("/") + "/")

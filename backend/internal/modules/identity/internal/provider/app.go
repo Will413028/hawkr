@@ -17,7 +17,7 @@ import (
 type AppLoginConfig struct {
 	Provider model.Provider
 	// ClientID 是 ID token 的 aud：Google 是 web client ID（Android 的 requestIdToken、iOS 的 serverClientID 都設成它，aud 因此統一，
-	// ADR backend/docs/adr/2026-10-30-identity-self-hosted-federated-login.md D2）；LINE 是 channel ID。
+	// ADR docs/adr/2026-10-30-identity-self-hosted-federated-login.md D2）；LINE 是 channel ID。
 	ClientID string
 	// AuthorizedParties 是 Google ID token 的 azp 允許清單（取得 token 的 Android、iOS client ID）；Google 必填，LINE 不能設。
 	AuthorizedParties []string
@@ -37,7 +37,7 @@ type AppLogin struct {
 }
 
 // NewAppLogin 建立 Google 或 LINE 的 App 登入驗證：Google 的 ID token 以 JWKS 驗（RS256），iss 接受 https://accounts.google.com 與
-// accounts.google.com，aud 是 web client ID，azp 必須在允許清單；LINE 原生 SDK 的以 JWKS 驗（ES256，ADR backend/docs/adr/2026-10-30-identity-self-hosted-federated-login.md 的約束），aud 是 channel ID。
+// accounts.google.com，aud 是 web client ID，azp 必須在允許清單；LINE 原生 SDK 的以 JWKS 驗（ES256，ADR docs/adr/2026-10-30-identity-self-hosted-federated-login.md 的約束），aud 是 channel ID。
 func NewAppLogin(cfg AppLoginConfig) (*AppLogin, error) {
 	if cfg.ClientID == "" {
 		return nil, errors.New("identity：App 登入需要 client ID")

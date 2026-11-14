@@ -27,7 +27,7 @@
 | 雙向訊息（聊天、typing、presence） | IM WebSocket（14 號） |
 | App 背景／殺死狀態推播 | FCM（12／13 號） |
 
-選型理由與被否決的方案見 [ADR：Realtime 推播平台](../adr/2026-09-18-sse-push-platform-architecture.md)。
+選型理由與被否決的方案見 [ADR：Realtime 推播平台](/docs/adr/2026-09-18-sse-push-platform-architecture.md)。
 
 ### 1.3 設計目標
 
@@ -290,7 +290,7 @@ ResolveTopic(routingKey, payload) → "comment:post:" + payload.postId
 
 **notification channel 僅 web 訂閱**。Buyer / Seller App 不開本 channel，行動端通知走 FCM
 （visible banner ＋ silent data 雙通道，涵蓋背景與前景）。理由見
-[ADR：Realtime 推播平台](../adr/2026-09-18-sse-push-platform-architecture.md)。
+[ADR：Realtime 推播平台](/docs/adr/2026-09-18-sse-push-platform-architecture.md)。
 
 ### 4.1 業務目的（僅 web）
 
@@ -352,7 +352,7 @@ notification.unread_changed  → "notification:user:" + payload.userId
 ### 4.7 與既有 polling 的取代策略（僅 web）
 
 **web 通知沒有 polling 路徑**：不得存在 `useUnreadPolling` 這類輪詢，也不得把它當 fallback 加回來
-（理由見 [ADR：Realtime 推播平台](../adr/2026-09-18-sse-push-platform-architecture.md)）。
+（理由見 [ADR：Realtime 推播平台](/docs/adr/2026-09-18-sse-push-platform-architecture.md)）。
 
 **唯一推送路徑 = SSE**。失敗模式僅兩種：
 
@@ -1069,14 +1069,14 @@ SSE 是純 HTTP GET、不像 WebSocket 需要 Origin 防護（CSWSH 主要針對
 | 連續重連失敗達 30s 仍未連上 / 收到 429 cap / 收到 503 | UI 顯示「即時同步暫時不可用，請重新整理頁面」；不在背景持續打 REST |
 | `navigator.onLine === false` | UI 顯示「離線中」；網路恢復後 EventSource 自然重連 |
 
-🔴 **不得在 client 加 polling 兜底**（含「只在 SSE 斷線時 poll」這種條件式）：判準與被否決的理由見 [ADR：Realtime 推播平台](../adr/2026-09-18-sse-push-platform-architecture.md)。
+🔴 **不得在 client 加 polling 兜底**（含「只在 SSE 斷線時 poll」這種條件式）：判準與被否決的理由見 [ADR：Realtime 推播平台](/docs/adr/2026-09-18-sse-push-platform-architecture.md)。
 
 ---
 
 ## 十一、新增 Channel 的 SOP（可擴充契約）
 
 > 本平台的邊界、為什麼內嵌 gateway、以及重新評估獨立 sse-service 的觸發條件，見
-> [ADR：Realtime 推播平台](../adr/2026-09-18-sse-push-platform-architecture.md)。
+> [ADR：Realtime 推播平台](/docs/adr/2026-09-18-sse-push-platform-architecture.md)。
 
 ### 11.1 設計檢核清單（規劃階段）
 

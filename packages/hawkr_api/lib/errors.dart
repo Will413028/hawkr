@@ -1,4 +1,4 @@
-/// Connect 錯誤的分派與重試（ADR backend/docs/adr/2026-09-25-api-error-model.md 的 D7）。
+/// Connect 錯誤的分派與重試（ADR docs/adr/2026-09-25-api-error-model.md 的 D7）。
 ///
 /// [classifyError] 是純函式，以 `api/testdata/error-dispatch.json` 的情境表測試，四個 client 的結果必須相同。
 /// [ErrorFacts.fromException] 是 Dart 的轉接層：從 [ConnectException] 取出 details 與「沒收到回應」。

@@ -7,7 +7,7 @@
 | 路徑 | 內容 |
 |---|---|
 | `src/gen/` | `buf generate` 的輸出（protoc-gen-es，`target=ts`，含 `google/rpc/error_details`）。**不得手改** |
-| `src/connect/errors.ts` | 錯誤分類器 `classifyError`、轉接層 `factsFromError`、`userMessage`、一定有字的 `errorText`（取消當 internal，與 `submitError`、Dart 的 `errorText` 同一條規則；預設文字由呼叫端注入的 `DefaultErrorText`，型別只在本套件定義，文字在 `@hawkr/ui-text`）、`metadataList`（逗號連接的清單值）；`ErrorFacts.metadata` 與 reason 分支的 `ErrorDecision.metadata` 帶 `ErrorInfo.metadata`（ADR `backend/docs/adr/2026-09-25-api-error-model.md` D7） |
+| `src/connect/errors.ts` | 錯誤分類器 `classifyError`、轉接層 `factsFromError`、`userMessage`、一定有字的 `errorText`（取消當 internal，與 `submitError`、Dart 的 `errorText` 同一條規則；預設文字由呼叫端注入的 `DefaultErrorText`，型別只在本套件定義，文字在 `@hawkr/ui-text`）、`metadataList`（逗號連接的清單值）；`ErrorFacts.metadata` 與 reason 分支的 `ErrorDecision.metadata` 帶 `ErrorInfo.metadata`（ADR `docs/adr/2026-09-25-api-error-model.md` D7） |
 | `src/connect/submit.ts` | 寫入失敗的呈現分類 `submitError`（版本衝突、欄位錯誤、文字）與 `fieldMessage` |
 | `src/connect/retry.ts` | `retryInterceptor`：瀏覽器預設退避重試最多兩次；`{ server: true }` 只立即重試一次、不 sleep |
 | `src/proto/date.ts` | `parseDate`（只收存在的 `YYYY-MM-DD`）、`formatDate`；同 Dart `packages/hawkr_api/lib/dates.dart` |

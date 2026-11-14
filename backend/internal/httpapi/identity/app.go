@@ -308,7 +308,7 @@ func contactEmail(c identity.ContactEmail) (*pb.ContactEmail, error) {
 	return &pb.ContactEmail{Email: c.Address, Source: source}, nil
 }
 
-// requireRecentAuthentication 要求最近一次以 provider 驗證的時間 authTime 不早於 now 之前的 ReauthWindow（ASVS；ADR backend/docs/adr/2026-10-30-identity-self-hosted-federated-login.md D7）：不符回 failed_precondition 與 REAUTHENTICATION_REQUIRED。
+// requireRecentAuthentication 要求最近一次以 provider 驗證的時間 authTime 不早於 now 之前的 ReauthWindow（ASVS；ADR docs/adr/2026-10-30-identity-self-hosted-federated-login.md D7）：不符回 failed_precondition 與 REAUTHENTICATION_REQUIRED。
 func requireRecentAuthentication(authTime, now time.Time) error {
 	if now.Sub(authTime) > identity.ReauthWindow {
 		return apperr.FailedPrecondition("這個操作需要重新登入確認身分").WithReason(apperr.ReasonReauthenticationRequired)

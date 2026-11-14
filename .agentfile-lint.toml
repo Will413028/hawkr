@@ -1,4 +1,4 @@
-# AGENTS.md 的規則與上限（ADR backend/docs/adr/2026-10-31-agents-md-layering-consolidated.md）。
+# AGENTS.md 的規則與上限（ADR docs/adr/2026-10-31-agents-md-layering-consolidated.md）。
 # 本機 hook（.pre-commit-config.yaml）與 CI（.github/workflows/repo-hygiene.yml）跑同一份。
 # 模組 AGENTS.md 的七節以 R2 shape 為唯一來源；CI 用 new-module 產生一個模組再跑檢查（repo-hygiene）。
 # preset:strict 保留 0.4.0 預設開著的啟發式規則（R3b、R4a、R4b、R5b、R6、C1 為 warn，重複比對任兩檔）；

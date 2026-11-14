@@ -6,7 +6,7 @@
 |---|---|
 | 維護者 | Will |
 | 對應程式碼 | `services/social-service/internal/{usecase,grpc,domain}/`、`services/social-service/db/schema/schema.sql`、`gateway/internal/handler/post.go`、`gateway/internal/router/routes_{moderation,admin}.go` |
-| 相關 ADR | [2026-09-18-content-moderation-consolidation](../adr/2026-09-18-content-moderation-consolidation.md) |
+| 相關 ADR | [2026-09-18-content-moderation-consolidation](/docs/adr/2026-09-18-content-moderation-consolidation.md) |
 | 相關 doc | 32 號（商家治理與食安通報，姊妹但獨立 bounded context）、43 號（Review Service，跨服務隱藏）、14 號（IM，跨服務隱藏）、41 號（SSE，未用於本模組） |
 
 ---
@@ -34,7 +34,7 @@
 | **Non-Goal** | **不**發「審核結案」事件通知檢舉者；WARN_USER 不發站內信 |
 
 ### 1.4 與其他設計書／服務的關係
-- **32 號（商家治理與食安通報）**：獨立 `violation_reports` schema。分工——本模組治理「**誰貼了違規內容**」（隱藏內容 / 停權作者，Apple 1.2 合規驅動）；32 號治理「**商家資格**」（法遵 / 食安 / 證照，影響上架資格，法規驅動）。兩者刻意**不合併**（對象、驅動法規、生命週期、reason 詞彙皆異）；理由見[相關 ADR](../adr/2026-09-18-content-moderation-consolidation.md) D2。
+- **32 號（商家治理與食安通報）**：獨立 `violation_reports` schema。分工——本模組治理「**誰貼了違規內容**」（隱藏內容 / 停權作者，Apple 1.2 合規驅動）；32 號治理「**商家資格**」（法遵 / 食安 / 證照，影響上架資格，法規驅動）。兩者刻意**不合併**（對象、驅動法規、生命週期、reason 詞彙皆異）；理由見[相關 ADR](/docs/adr/2026-09-18-content-moderation-consolidation.md) D2。
 - **跨服務隱藏**：HIDE_TARGET 對 REVIEW / CHAT_MESSAGE 需呼叫 review-service（43 號）/ im-service（14 號）的 Hide RPC；POST / POST_COMMENT / SELLER_FORUM 為 social-service 本地。
 - **停權**：BAN_USER 呼叫單體 identity 模組的 `SuspendAccount`（經 legacy gRPC 入口；durable 停權，下一個請求起回 PermissionDenied，見 `docs/modules/identity.md` §4）。
 
@@ -368,7 +368,7 @@ UGC 檢舉量級低，單 replica social-service 足夠；rate limit 20/日/人�
 
 ## 10. 設計理由
 
-架構收斂的方案比較、被否決的選項與理由見 [2026-09-18-content-moderation-consolidation](../adr/2026-09-18-content-moderation-consolidation.md)（收斂方式、與商家治理的邊界、BAN_USER 真停權、admin-direct 的 reason 驗證強度）。本節不複述理由。
+架構收斂的方案比較、被否決的選項與理由見 [2026-09-18-content-moderation-consolidation](/docs/adr/2026-09-18-content-moderation-consolidation.md)（收斂方式、與商家治理的邊界、BAN_USER 真停權、admin-direct 的 reason 驗證強度）。本節不複述理由。
 
 ---
 

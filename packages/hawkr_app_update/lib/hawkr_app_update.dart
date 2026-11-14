@@ -1,5 +1,5 @@
 /// App 版本門檻的檢查邏輯（規格見 `docs/spec.md`），buyer-app 與 seller-app 共用（ADR
-/// `backend/docs/adr/2026-09-27-app-version-gate-shared-package.md`）。強制更新的畫面、路由的攔截與
+/// `docs/adr/2026-09-27-app-version-gate-shared-package.md`）。強制更新的畫面、路由的攔截與
 /// provider 留在各自的 App。
 ///
 /// 版本比較只在後端（ContentPublicService 的 CheckAppVersion），App 只讀 `updateRequired`：

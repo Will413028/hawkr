@@ -88,7 +88,7 @@ flowchart LR
 1. **WS 終止於 Gateway，gRPC stream 連到 IM**：browser/app 無法直接承擔 internal service auth；Gateway 用 ws-ticket 鑄/驗身份後，保留 public WebSocket wire，並為每條連線建立一條帶 service JWT 的 typed bidirectional `ChatStream`。IM final 不提供 HTTP/WS listener。
 2. **發訊走 Gateway HTTP→IM unary（保證持久化）、stream 只收與 sync**：App 一律 HTTP `POST /messages`；Gateway 呼叫 IM `SendMessage`；Gateway↔IM stream 用於即時接收、sync 補發、typing/presence/已讀回執。
 3. **in-memory hub，每 user 多連線**：`map[userID]map[*Client]struct{}`，支援同帳號 buyer+seller 同時連線；無跨 replica backplane（擴容前置條件見 §9.2）。
-4. **雙送 + 前端去重**：每則訊息同時 `hub.SendToUser`（WS best-effort）與 publish MQ event（→ FCM），前端用 `(roomId, seqId)` 去重（決策理由見 [ADR：IM 即時通訊投遞策略與連線架構](../adr/2026-09-18-im-websocket-delivery-architecture.md)）。
+4. **雙送 + 前端去重**：每則訊息同時 `hub.SendToUser`（WS best-effort）與 publish MQ event（→ FCM），前端用 `(roomId, seqId)` 去重（決策理由見 [ADR：IM 即時通訊投遞策略與連線架構](/docs/adr/2026-09-18-im-websocket-delivery-architecture.md)）。
 
 ### 4.2 元件視圖 (C4 Component)
 
@@ -495,7 +495,7 @@ env var 見 §12.1。secret（DB/Redis/RabbitMQ）由 k8s secret 注入；per-en
 ## 10. 設計決策
 
 設計理由、考慮過的替代方案與否決理由見
-[ADR：IM 即時通訊投遞策略與連線架構](../adr/2026-09-18-im-websocket-delivery-architecture.md)。
+[ADR：IM 即時通訊投遞策略與連線架構](/docs/adr/2026-09-18-im-websocket-delivery-architecture.md)。
 
 ---
 

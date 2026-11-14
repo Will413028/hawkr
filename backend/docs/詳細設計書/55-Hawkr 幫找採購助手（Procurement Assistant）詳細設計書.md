@@ -7,7 +7,7 @@
 | 維護者 | Will |
 | 對應程式碼 | `services/ai-service/internal/procurement/`、`services/ai-service/db/schema/procurement.sql`、`gateway/internal/handler/ai.go`、`gateway/internal/router/routes_ai.go`、`hawkr-website/features/procurement-assistant/` |
 | 相關 doc | [15 AI 微服務](15-AI%20微服務%EF%BC%88AI%20Service%EF%BC%89詳細設計書.md)（本模組寄生於此服務）、[44 帳號與賣家買家身份模型](44-帳號與賣家買家身份模型%EF%BC%88Account%20&%20Seller-Buyer%20Identity%EF%BC%89詳細設計書.md)（`buyer_id` 語意來源）、[02 產品微服務](02-產品微服務%EF%BC%88Product%20Service%EF%BC%89詳細設計書.md)（平台候選來源）、[41 Realtime SSE 推播平台](41-Realtime%20SSE%20推播平台%EF%BC%88Realtime%20SSE%20Push%20Platform%EF%BC%89詳細設計書.md)（既有 SSE 分工）、產品端《Hawkr 幫找 Agent 詳細設計書 v3.0》（2026-08-04，產品定義正本） |
-| 相關 ADR | [檢索用盡後的大品項／小品項選擇](../adr/2026-09-13-procurement-category-fallback.md)（LLM 使用條件、分類與行情 ID 邊界、多階段續答、snapshot 的 `openConfirmation.question` 還原契約）<br/>[MVP-A 的六項架構決策](../adr/2026-09-18-procurement-assistant-mvp-a-decisions.md)<br/>[LLM 抽取的重試與逾時](../adr/2026-09-18-procurement-llm-extract-retry-and-timeout.md) |
+| 相關 ADR | [檢索用盡後的大品項／小品項選擇](/docs/adr/2026-09-13-procurement-category-fallback.md)（LLM 使用條件、分類與行情 ID 邊界、多階段續答、snapshot 的 `openConfirmation.question` 還原契約）<br/>[MVP-A 的六項架構決策](/docs/adr/2026-09-18-procurement-assistant-mvp-a-decisions.md)<br/>[LLM 抽取的重試與逾時](/docs/adr/2026-09-18-procurement-llm-extract-retry-and-timeout.md) |
 
 ---
 
@@ -38,14 +38,14 @@
 | **Non-Goal** | **不**做價格引擎與 85% 外部目標邀價 |
 | **Non-Goal** | **不**做外部業者 Email 邀價、secure link、入駐與 KYC；EXTERNAL／EMAIL 在本次不建立 seller notification |
 | **Non-Goal** | **不**做付款、訂單、售後與撥款 |
-| **Non-Goal** | **不**做逐事件重播（event ledger + cursor replay）——理由見 [ADR D3](../adr/2026-09-18-procurement-assistant-mvp-a-decisions.md) |
+| **Non-Goal** | **不**做逐事件重播（event ledger + cursor replay）——理由見 [ADR D3](/docs/adr/2026-09-18-procurement-assistant-mvp-a-decisions.md) |
 | **Non-Goal** | **不**做行動 App 端；本次僅網頁 |
 | **Non-Goal** | Agent **不**代買家勾選候選、**不**自動送出、**不**代為承諾任何交易條件 |
 
 ### 1.4 與其他設計書／服務的關係
 
 - **寄生於 ai-service**（見 15 號）：本模組是 `services/ai-service/internal/procurement/` 下的獨立 package 與獨立 schema 檔，**與既有 AI 表無外鍵**，具備日後抽成獨立服務的條件。
-- **身份語意依 44 號**：需求擁有者一律 `buyer_id`（現任買家 stint surrogate），非 `account_id`。理由見 [ADR D4](../adr/2026-09-18-procurement-assistant-mvp-a-decisions.md)。
+- **身份語意依 44 號**：需求擁有者一律 `buyer_id`（現任買家 stint surrogate），非 `account_id`。理由見 [ADR D4](/docs/adr/2026-09-18-procurement-assistant-mvp-a-decisions.md)。
 - **平台候選來源為 product-service**（見 02 號）：透過既有 `GetProductList` gRPC，本次不新增 Java 端 RPC。
 - **與 41 號 SSE 平台正交**：本模組的長任務進度走自身的 run 訂閱，不接入通用 SSE Hub；MVP-A 的長任務僅候選搜尋一種。
 
@@ -94,7 +94,7 @@ flowchart LR
 | 技術約束 | 識別碼命名誠實：登入 principal 才叫 `account_id`，買家語意一律 `buyer_id`（見 44 號） |
 | 技術約束 | LLM 輸出一律走 structured output（`ResponseSchema`），不解析自由文字 |
 | 組織約束 | 遇擋路問題選治本不選繞過 |
-| 既有系統約束 | ai-service 以 adk-go 實作買賣家小幫手；本模組**不共用其 session 作為狀態來源**（理由見 [ADR D2](../adr/2026-09-18-procurement-assistant-mvp-a-decisions.md)） |
+| 既有系統約束 | ai-service 以 adk-go 實作買賣家小幫手；本模組**不共用其 session 作為狀態來源**（理由見 [ADR D2](/docs/adr/2026-09-18-procurement-assistant-mvp-a-decisions.md)） |
 | 既有系統約束 | 平台商品檢索無「可否配送至指定城市」與「庫存量是否足夠」兩個維度（見 §11） |
 | **假設** | MVP-A 面向受邀買家，並發量低（< 50 同時對話）→ 單 replica 足夠；**失真則觸發 §9.2** |
 | **容量契約** | 外部候選來源 `candidate_leads` 為離線匯入，在 **5000 筆以內**時全量掃描後於應用層排序可接受；**超過 5000 筆即須改 SQL 端排序與分頁**（見 §9.2） |
@@ -427,7 +427,7 @@ sequenceDiagram
 
 > **重試判準**：只有 `aidomain.ProviderUnavailableError`（逾時／連線失敗／5xx／429／回應無法解析）才重試，**最多一次**；4xx 等「請求本身有問題」一律不重試。實作在 `internal/procurement/usecase/extractor_provider.go` 的 `retryingExtractor`，錯誤分類沿用 `callGeminiWithRetry` 同一條判準。
 >
-> 🔴 **`ExtractTimeout` / `RetryTimeout` 各 30s 是與 gateway deadline 綁定的值**：兩者相加（60s）必須 ≤ gateway `streamTurnDeadline`（120s）的一半。改動任一個之前先確認這個不等式仍成立，否則會把「最壞情況超過 gateway 上限」這條風險重新打開。取捨與量測依據見 ADR [`docs/adr/2026-09-18-procurement-llm-extract-retry-and-timeout.md`](../adr/2026-09-18-procurement-llm-extract-retry-and-timeout.md)。
+> 🔴 **`ExtractTimeout` / `RetryTimeout` 各 30s 是與 gateway deadline 綁定的值**：兩者相加（60s）必須 ≤ gateway `streamTurnDeadline`（120s）的一半。改動任一個之前先確認這個不等式仍成立，否則會把「最壞情況超過 gateway 上限」這條風險重新打開。取捨與量測依據見 ADR [`docs/adr/2026-09-18-procurement-llm-extract-retry-and-timeout.md`](/docs/adr/2026-09-18-procurement-llm-extract-retry-and-timeout.md)。
 
 ### 7.4 並發與順序
 

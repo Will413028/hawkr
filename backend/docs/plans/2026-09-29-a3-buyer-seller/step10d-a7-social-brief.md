@@ -48,7 +48,7 @@ v4 由沒寫過 v1–v3 的 subagent 審查 v3 之後改寫。下面的 worktree
 
 ### 白話
 
-3a-①、3a-①b、身分第 1 刀這三刀都做在舊 social 上，後面還排了 3a-②、第 2 刀，以及 v2 的 D3、D4。這些在 A7 全部要重寫。ADR 自己也寫了「舊程式碼的改動在 A7 照本 ADR 重寫，不照搬」（`backend/docs/adr/2026-10-17-social-actor-identity.md`〈後果〉）【量】。遷移計畫也規定「gateway 不再加功能」（`P/2026-09-24-go-modular-monolith.md` A0）【量】。
+3a-①、3a-①b、身分第 1 刀這三刀都做在舊 social 上，後面還排了 3a-②、第 2 刀，以及 v2 的 D3、D4。這些在 A7 全部要重寫。ADR 自己也寫了「舊程式碼的改動在 A7 照本 ADR 重寫，不照搬」（`docs/adr/2026-10-17-social-actor-identity.md`〈後果〉）【量】。遷移計畫也規定「gateway 不再加功能」（`P/2026-09-24-go-modular-monolith.md` A0）【量】。
 
 ### 量測【量】
 

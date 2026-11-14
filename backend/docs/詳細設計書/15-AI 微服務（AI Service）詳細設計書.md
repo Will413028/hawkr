@@ -15,7 +15,7 @@
 
 ### 1.1 文件定位
 
-本文件描述 **ai-service 這個宿主服務本身**：它承載哪些 AI 能力、程序內的拓撲怎麼組、身分與授權怎麼進來、資料與額度怎麼治理。目標讀者是後端、Gateway 與 SRE。選型理由與被否決的方案見 [ADR：ai-service 架構決策集](../adr/2026-09-18-ai-service-architecture-decisions.md)。
+本文件描述 **ai-service 這個宿主服務本身**：它承載哪些 AI 能力、程序內的拓撲怎麼組、身分與授權怎麼進來、資料與額度怎麼治理。目標讀者是後端、Gateway 與 SRE。選型理由與被否決的方案見 [ADR：ai-service 架構決策集](/docs/adr/2026-09-18-ai-service-architecture-decisions.md)。
 
 **不涵蓋**：
 
@@ -380,13 +380,13 @@ HTTP 面收斂到只剩探活與指標，是三階段遷移（additive → cutov
 流程裡出現兩個不同答案。一般化的規則是身份鍵與業務鍵的分層——`account_id` 是身份鍵，
 `store_id`／`buyer_id` 是業務鍵，**業務表一律用業務鍵**（§2.3 的三個值分層與兩條明示例外由此推出）。
 
-選型過程與被否決的版本見 [ADR D2](../adr/2026-09-18-ai-service-architecture-decisions.md)。
+選型過程與被否決的版本見 [ADR D2](/docs/adr/2026-09-18-ai-service-architecture-decisions.md)。
 
 #### 三段式 ＋ advisory lock
 
 🔴 **不得改成單句原子 UPSERT increment**（「用量 +1 且 `WHERE` 用量 < 上限」）：模型呼叫可能
 耗時到逼近呼叫端的 deadline，期間行程若被滾動更新 SIGKILL，**已 commit 的 increment 永遠沒機會
-退回**，賣家額度悄悄卡死——而滾動更新是常態。取捨全文見 [ADR D1](../adr/2026-09-18-ai-service-architecture-decisions.md)。
+退回**，賣家額度悄悄卡死——而滾動更新是常態。取捨全文見 [ADR D1](/docs/adr/2026-09-18-ai-service-architecture-decisions.md)。
 
 額度走預約三段式，一筆預約的生命週期只有這幾種結局：
 
@@ -624,7 +624,7 @@ sequenceDiagram
 這張圖要記住的是一句話：**額度不是被「退回」的，是被「不再計入」的。** 沒有補償動作、沒有清理 job，也沒有任何 pod 需要活著把事情做完；正確性只依賴查詢當下的過濾條件。三個推論：
 
 1. **那句順手刪除失敗不影響正確性，但不是沒有後果。** 它跑在 reserve 的**交易之內**，不是一支清理排程（本服務唯一的清理排程是 session 那一支，見 §7.5），純屬儲存衛生：就算它從來沒刪成功，額度也不會超發或洩漏。但它失敗會讓**整筆交易中止、該次預約隨之失敗**——使用者看到的是一次失敗的請求，而不是一個錯誤的額度（§5.3 保證 2）。
-2. **這正是單句原子 `UPSERT … WHERE 用量 < 上限` 做不到的事**（§5.3 的禁令）：increment 一旦 commit，process 死了就沒有任何東西會退回它，賣家額度悄悄卡死到下一週。⚠️ 它的問題從來不是「不夠原子」，而是「行程被砍時會洩漏」——[ADR D1](../adr/2026-09-18-ai-service-architecture-decisions.md)。
+2. **這正是單句原子 `UPSERT … WHERE 用量 < 上限` 做不到的事**（§5.3 的禁令）：increment 一旦 commit，process 死了就沒有任何東西會退回它，賣家額度悄悄卡死到下一週。⚠️ 它的問題從來不是「不夠原子」，而是「行程被砍時會洩漏」——[ADR D1](/docs/adr/2026-09-18-ai-service-architecture-decisions.md)。
 3. **預約有效期必須大於呼叫端的 deadline。** 反過來會開出一個超發窗口：呼叫還活著、名額已經被別人拿走，之後那次 confirm 仍然會加一，總數就越過上限。數值與餘裕見 §9。
 
 #### 7.2.3 賣家／買家助手的一輪對話
@@ -907,7 +907,7 @@ Gateway 的 body guard 是**分級**的：一般路由 2 MiB 配 30s 讀取期�
 ## 10. 架構決策
 
 本服務的架構決策、被否決的替代方案與其代價，見
-[ADR：ai-service 架構決策集](../adr/2026-09-18-ai-service-architecture-decisions.md)（D1–D15）。本文件只寫結果，不複述 rationale。
+[ADR：ai-service 架構決策集](/docs/adr/2026-09-18-ai-service-architecture-decisions.md)（D1–D15）。本文件只寫結果，不複述 rationale。
 
 ---
 

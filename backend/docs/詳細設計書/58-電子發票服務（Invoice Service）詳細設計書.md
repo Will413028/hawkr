@@ -477,7 +477,7 @@ flowchart TD
 | **E3** | 數字欄位對外一律 string、時間一律 ISO 8601 UTC 帶 `Z`；金額以「元」的整數表示，禁浮點 | 全部 ID、金額、版本號對外皆為 string。⚠️ 事件宣告若把金額欄寫成 `"amount": "decimal"` 即與此牴觸，不得沿用那種形狀 | `docs/開發規範/Java 微服務開發規範.md` §2 |
 | **E4** | `invoice` 是 Gateway 代行路由的 **boot-time 禁字**（10 個之一：`shipment/fulfillment/payment/payout/grant/refund/invoice/bank/identity/certification`，子字串比對）；代行 storefront allow-list 也明文排除發票 | 任何 `delegatedHandle(..., "/sellers/:store_id/invoices", ...)` ⇒ Gateway 啟動 panic、部署即炸。ADM 發票端點只能走一般 `admin.GET("/invoices", ...)`。另一半義務：**「發票與稅籍」必須登記進 `hawkr-website/features/delegated-operations/nav-policy.ts` 的 `DELEGATED_HIDDEN_HREFS`**——那是排除清單、其餘一律渲染，漏登記不會編譯錯、不會測試紅 | `gateway/internal/router/seller_route_assert.go:66-79`；`gateway/internal/handler/admin_delegated_storefront.go:18-24` |
 | **E5** | 未登記於 `envelopeCodeToGRPC` 的業務碼一律塌縮成 HTTP 409；要帶結構化 data 必須進 `envelopeCodePreserveData` | 「查無發票」回 404、「AMEGO 上游不可用」回 503、「作廢失敗要帶 AMEGO 原始回覆」三者都需**逐碼登記**，而這兩張表不是 CodeMeta 生成的、最容易漏。不要擴充 `response/bizhttp.go` 的登錄表（那是代行專用且有機械測試守著） | `gateway/internal/grpc/envelope_guard_interceptor.go:27-49,56-60` |
-| **E6** | CodeMeta 是共享代碼值的 SSOT：先改 `.md` 再 `generate.sh`，生成檔禁手改（`backend-monolith.yml` 的 drift 步驟會重跑 `generate.sh --go --go-media --web --admin --flutter` 再檢查 `git status`；CodeMeta 已凍結，只服務未搬進單體的舊契約，見 [ADR：CodeMeta 凍結](../adr/2026-09-25-codemeta-retirement.md)）；禁止預先登記沒有 emitter 的碼 | 每個發票碼都要在同一波實作裡指得出 emitter 的 `檔案:行號`。三張 allowlist（`GO_LABEL_ENUMS`／`GO_REGISTRY_ENUMS`／`ADMIN_ENUMS`）打錯或漏名不會報錯、只會靜默少生成，且前兩者必須互斥。前端與 App 的生成物由 `generate.sh` 直寫進 monorepo，沒有手動複製，守門只有上述 CI drift 步驟 | `docs/代碼管理（CodeMeta）/README.md` |
+| **E6** | CodeMeta 是共享代碼值的 SSOT：先改 `.md` 再 `generate.sh`，生成檔禁手改（`backend-monolith.yml` 的 drift 步驟會重跑 `generate.sh --go --go-media --web --admin --flutter` 再檢查 `git status`；CodeMeta 已凍結，只服務未搬進單體的舊契約，見 [ADR：CodeMeta 凍結](/docs/adr/2026-09-25-codemeta-retirement.md)）；禁止預先登記沒有 emitter 的碼 | 每個發票碼都要在同一波實作裡指得出 emitter 的 `檔案:行號`。三張 allowlist（`GO_LABEL_ENUMS`／`GO_REGISTRY_ENUMS`／`ADMIN_ENUMS`）打錯或漏名不會報錯、只會靜默少生成，且前兩者必須互斥。前端與 App 的生成物由 `generate.sh` 直寫進 monorepo，沒有手動複製，守門只有上述 CI drift 步驟 | `docs/代碼管理（CodeMeta）/README.md` |
 | **E7** | Proto 只改 `api/proto/*`；改完必跑 `scripts/gen-go-proto.sh`（只需 docker）＋ rsync 到 java-proto ＋ `mvn clean install`；CI 有 `proto-generated-diff.yml` 對拍 | 新增 `api/proto/invoice/invoice.proto`，五件套 `syntax`／`package hawkr.invoice`／`go_package`／`java_package`／`java_multiple_files`。**不要抄 `payment.proto` 的 `io.github.will413028.hawkr.payment.grpc`**，那是全 repo 唯一的歷史偏差 | `docs/開發規範/Proto 管理規範.md`；`api/proto/review/review.proto:1-8`（正確範本） |
 | **E8** | TSID 用於對外暴露的業務表，BIGSERIAL 用於內部表；Go 服務用 `pkg/tsid.NewGenerator`（無 Node ID Base 概念，不需申請） | 對外表 9 張（開票主體／賣家稅務資格／provider 憑證／買家發票偏好／發票文件／調整／更正請求／申訴／operation）→ TSID；內部表 8 張（品項行／折讓明細／申訴時間軸／入向 inbox／出向 outbox／provider 稽核／狀態歷程／ADM 稽核）→ BIGSERIAL；`invoice_business_day_mirror` 用自然鍵 `holiday_date`。合計 §5.1 的 **18 張** | `pkg/tsid/tsid.go` |
 | **E9** | Go 走 Atlas declarative：改 `db/schema/schema.sql` → `atlas migrate diff` → `atlas migrate hash`；禁止 SSH 手跑 DDL。部署自動涵蓋：有 `db/atlas.hcl` 就自動 migrate | migration 時間戳的順序是**跨分支的**：拿自己的最大值與**遠端已套用的最大值**比，不是與 repo 內的比——`added out of order` 會擋掉全部服務部署 | `docs/開發規範/PostgreSQL 設計規範與最佳實踐.md`；`.github/workflows/deploy-k8s.yml` |
@@ -11945,7 +11945,7 @@ comm -12 \
 
 ### C.6 前端生成物（直寫 monorepo，CI drift 檢查）
 
-前端與 App 的 CodeMeta 檔**不是拷貝**：`generate.sh` 的 `--web`／`--admin`／`--flutter` 直接寫進同一個 monorepo 的目錄，沒有複製步驟，也沒有 fixture 同步測試。守門只有 `.github/workflows/backend-monolith.yml` 的「CodeMeta 生成物 drift」步驟：跑 `generate.sh --go --go-media --web --admin --flutter` 後，對受管路徑 `git status --porcelain` 非空即紅（受管路徑見該 workflow）。凍結範圍與替代做法見 [ADR：CodeMeta 凍結](../adr/2026-09-25-codemeta-retirement.md)。
+前端與 App 的 CodeMeta 檔**不是拷貝**：`generate.sh` 的 `--web`／`--admin`／`--flutter` 直接寫進同一個 monorepo 的目錄，沒有複製步驟，也沒有 fixture 同步測試。守門只有 `.github/workflows/backend-monolith.yml` 的「CodeMeta 生成物 drift」步驟：跑 `generate.sh --go --go-media --web --admin --flutter` 後，對受管路徑 `git status --porcelain` 非空即紅（受管路徑見該 workflow）。凍結範圍與替代做法見 [ADR：CodeMeta 凍結](/docs/adr/2026-09-25-codemeta-retirement.md)。
 
 | 生成目標（monorepo 根目錄起算） | 來源旗標 |
 |---|---|
@@ -12241,7 +12241,7 @@ A08 的建議卡「依建議建立措施」與右欄「建立措施」在同一�
 
 **ADM 一律不寫 `src/services/*.ts`**：`api.get/post/...` 直接在 `queryFn` 內呼叫（既有慣例）。上面兩個檔是**型別與格式化**不是 service 層，不違反這一條。
 
-**CodeMeta 是 backend、website、admin、兩支 App 之間的共享代碼 SSOT，生成物直寫進 monorepo，由 CI drift 檢查守著**（凍結狀態與新值的去處見 [ADR：CodeMeta 凍結](../adr/2026-09-25-codemeta-retirement.md)）。前端這一側要做的事見附錄 C；本附錄只補三條硬規則：
+**CodeMeta 是 backend、website、admin、兩支 App 之間的共享代碼 SSOT，生成物直寫進 monorepo，由 CI drift 檢查守著**（凍結狀態與新值的去處見 [ADR：CodeMeta 凍結](/docs/adr/2026-09-25-codemeta-retirement.md)）。前端這一側要做的事見附錄 C；本附錄只補三條硬規則：
 
 | 硬規則 | 說明 |
 |---|---|

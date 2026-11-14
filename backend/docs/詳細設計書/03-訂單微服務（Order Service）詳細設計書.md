@@ -910,7 +910,7 @@ WHERE 條件均要求 task 處於 `PROCESSING(10)`，避免：
 
 ⚠️ **這些事件的前置寫入都是永久的**（`order.delivered` 的 CAS allowed-from 不含 `DELIVERED` 自己；`order.sales.accumulated` 由 `payment_event_dedup` 擋住重投）⇒ 一旦 publish 失敗且無訊號，就是**永久遺失且零告警**。`OrderEventPublisher.publish` 吞掉所有例外，因此它**不可作為可靠投遞的載體**。
 
-> 選型理由與被否決的替代方案（「補一支會傳遞失敗的 publish 變體」）見 [ADR 2026-09-18 order-outbox-over-failing-publish-variant](../adr/2026-09-18-order-outbox-over-failing-publish-variant.md)。
+> 選型理由與被否決的替代方案（「補一支會傳遞失敗的 publish 變體」）見 [ADR 2026-09-18 order-outbox-over-failing-publish-variant](/docs/adr/2026-09-18-order-outbox-over-failing-publish-variant.md)。
 
 | 欄位 | 型態 | 必填 | 說明 |
 |---|---|---|---|

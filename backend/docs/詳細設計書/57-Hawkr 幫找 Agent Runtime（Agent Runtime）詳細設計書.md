@@ -5,7 +5,7 @@
 | 範圍 | Hawkr 幫找採購 Agent 的 runtime：命令、run ledger、SSE 契約、公開 DTO、持久化、配額、executor、前端 adapter |
 | 不在範圍 | 採購的產品行為與 slot engine（見 55 號）、交易／付款／結算／發票／KYC／售後（見各自設計書） |
 
-檢索用盡後的大品項／小品項選擇（LLM 使用條件、分類與行情 ID 邊界、多階段續答、snapshot 的 `openConfirmation.question` 還原契約）見 [ADR 2026-09-13](../adr/2026-09-13-procurement-category-fallback.md)。
+檢索用盡後的大品項／小品項選擇（LLM 使用條件、分類與行情 ID 邊界、多階段續答、snapshot 的 `openConfirmation.question` 還原契約）見 [ADR 2026-09-13](/docs/adr/2026-09-13-procurement-category-fallback.md)。
 
 ---
 
@@ -21,7 +21,7 @@
 |---|---|
 | `docs/開發規範/*`、`api/proto/`、CodeMeta、MQ catalog、DB schema | **高於本文件**。本文件不重述其內容，只引用 |
 | issue #2549（Hawkr Agent V6，P0） | **本文件的敘述層 SSOT**。§D／§E／§F／§G 全文有效 |
-| 外部文件《Hawkr 幫找 Agent — LLM Agent 開發規格》（HK-PA-SPEC-007 v6.0 摘錄） | **參考來源，不可直接實作**：它提出的 SSE envelope 送到現行前端會驗證失敗、它指涉的多個既有物件錯位、且缺少敘述層。逐項差異見 [ADR 2026-08-22](../adr/2026-08-22-agent-runtime-v6-divergence.md) |
+| 外部文件《Hawkr 幫找 Agent — LLM Agent 開發規格》（HK-PA-SPEC-007 v6.0 摘錄） | **參考來源，不可直接實作**：它提出的 SSE envelope 送到現行前端會驗證失敗、它指涉的多個既有物件錯位、且缺少敘述層。逐項差異見 [ADR 2026-08-22](/docs/adr/2026-08-22-agent-runtime-v6-divergence.md) |
 | ADR：AG-UI 採用（2026-08-17）、對照官方套件的四項調整（2026-08-21） | 有效，本文件承接 |
 
 ---
@@ -301,7 +301,7 @@ Public transport 必須使用具名 allowlist DTO，**不得**直接序列化 do
 | `PublicAgentArtifactV1` | ✅ 本文件 §4.1.3 | generic unconstrained data、private contact |
 | `PublicCandidateV1` | ✅ 本文件 §4.1.4 | email、phone、social、聯絡人、BD notes |
 
-> 下列四張欄位表的來源優先序：**已上線的既有 wire 型別**（`PublicCandidateV1` 直接對齊 gateway `ProcurementCandidateItemDTO`）＞**本文件其他章節已凍結的值域**（§4.2 ledger event、§4.3 狀態、§4.5 artifact type）＞外部參考文件（必須先按 [ADR 2026-08-22](../adr/2026-08-22-agent-runtime-v6-divergence.md) 校正，不可直接照抄）。對應 Go 型別定義：`services/ai-service/internal/procurement/domain/artifact.go`。
+> 下列四張欄位表的來源優先序：**已上線的既有 wire 型別**（`PublicCandidateV1` 直接對齊 gateway `ProcurementCandidateItemDTO`）＞**本文件其他章節已凍結的值域**（§4.2 ledger event、§4.3 狀態、§4.5 artifact type）＞外部參考文件（必須先按 [ADR 2026-08-22](/docs/adr/2026-08-22-agent-runtime-v6-divergence.md) 校正，不可直接照抄）。對應 Go 型別定義：`services/ai-service/internal/procurement/domain/artifact.go`。
 
 #### 4.1.1 `PublicAgentRunV1`
 
@@ -853,7 +853,7 @@ flag 關閉時的少數情境；失敗時買家只收到裸 gRPC error，在那�
 
 五項交付裁決（訊息採 `blocks[]`、row identity、registry 凍結版本、assistant-ui 選型、executor
 Track 2 的 gating）的理由、被否決方案與兩項已被推翻的裁決，見
-[ADR 2026-08-22 交付裁決](../adr/2026-08-22-agent-runtime-delivery-decisions.md)。
+[ADR 2026-08-22 交付裁決](/docs/adr/2026-08-22-agent-runtime-delivery-decisions.md)。
 
 與外部 v6.0 規格摘錄的逐項分歧見
-[ADR 2026-08-22 v6 分歧](../adr/2026-08-22-agent-runtime-v6-divergence.md)。
+[ADR 2026-08-22 v6 分歧](/docs/adr/2026-08-22-agent-runtime-v6-divergence.md)。

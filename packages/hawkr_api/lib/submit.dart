@@ -1,4 +1,4 @@
-/// 表單送出失敗時要做的事（ADR backend/docs/adr/2026-09-25-api-error-model.md 的 D7）。
+/// 表單送出失敗時要做的事（ADR docs/adr/2026-09-25-api-error-model.md 的 D7）。
 ///
 /// 與 `packages/hawkr-api-ts/src/connect/submit.ts` 同形：分類沿用 [classifyError]，這裡只把結果收斂成
 /// 表單要處理的三種情況。

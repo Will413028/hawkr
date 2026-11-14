@@ -1,6 +1,6 @@
 # Web 前端契約同步規範
 
-> **適用範圍（2026-09-26 起）**：對外契約改為根目錄 `api/` 的 Protobuf＋Connect（ADR `backend/docs/adr/2026-09-26-external-contract-protobuf-connect.md`），TS client 由共用套件 `@hawkr/api` 的 `pnpm --filter @hawkr/api gen:api` 生成（website、admin 共用），慣例在〈API 設計規範（Connect）〉。§四的工具選型與 §五的遷移策略由該 ADR 與遷移計畫「模組完成的定義」取代。還沒搬進單體的模組仍用手寫的 client，§六的開發者守則對它們仍然適用，查 wire 形狀時看現有 API 清單 `backend/api/openapi/openapi.yaml`。
+> **適用範圍（2026-09-26 起）**：對外契約改為根目錄 `api/` 的 Protobuf＋Connect（ADR `docs/adr/2026-09-26-external-contract-protobuf-connect.md`），TS client 由共用套件 `@hawkr/api` 的 `pnpm --filter @hawkr/api gen:api` 生成（website、admin 共用），慣例在〈API 設計規範（Connect）〉。§四的工具選型與 §五的遷移策略由該 ADR 與遷移計畫「模組完成的定義」取代。還沒搬進單體的模組仍用手寫的 client，§六的開發者守則對它們仍然適用，查 wire 形狀時看現有 API 清單 `backend/api/openapi/openapi.yaml`。
 
 > 對應 `hawkr-website` (Next.js + TS) 與 backend-payuni gateway 之間 OpenAPI / 型別契約的同步機制。**目標**：讓後端 swagger 變動 → web 端 TS 型別自動跟隨；杜絕「後端改了，web 沒同步，跑起來才壞」。
 

@@ -28,7 +28,7 @@
 | 類型 | 項目 |
 |---|---|
 | **Goal** | 單人雙角色下，「不能對自己下單 / 發券 / 加購 / 私訊 / 封鎖」守衛仍正確 |
-| **Non-Goal** | **不**引入 `store` 實體（一人多店 / 店鋪轉讓 / 多人共管）——見 [ADR 2026-06-29](../adr/2026-06-29-identity-defer-store-entity.md) |
+| **Non-Goal** | **不**引入 `store` 實體（一人多店 / 店鋪轉讓 / 多人共管）——見 [ADR 2026-06-29](/docs/adr/2026-06-29-identity-defer-store-entity.md) |
 
 ### 1.3 與其他設計書／服務的關係
 
@@ -72,7 +72,7 @@ flowchart LR
 
 | 類型 | 項目 |
 |---|---|
-| **假設 (Assumptions)** | (1) 一個 account 同時至多一個目前的 stint（**1:1**，非多店）→ 失真則觸發 store 實體拆分（見 [ADR 2026-06-29](../adr/2026-06-29-identity-defer-store-entity.md)）。(2) `ResolvePrincipals` 與 `buyerid.Resolver`／`storeid.Resolver` 都在做**真實解析**：`buyer_id`／`store_id` 與 `account_id` 全面分離，任何依賴「兩值相等」的推導（含守衛比對、測試 fixture）都是錯的 |
+| **假設 (Assumptions)** | (1) 一個 account 同時至多一個目前的 stint（**1:1**，非多店）→ 失真則觸發 store 實體拆分（見 [ADR 2026-06-29](/docs/adr/2026-06-29-identity-defer-store-entity.md)）。(2) `ResolvePrincipals` 與 `buyerid.Resolver`／`storeid.Resolver` 都在做**真實解析**：`buyer_id`／`store_id` 與 `account_id` 全面分離，任何依賴「兩值相等」的推導（含守衛比對、測試 fixture）都是錯的 |
 
 ---
 
@@ -80,7 +80,7 @@ flowchart LR
 
 ### 4.1 解法總綱 (Solution Strategy)
 
-採 **distributed principal + per-role aggregate**（見 [ADR 2026-07-07](../adr/2026-07-07-identity-distributed-principal.md)）：
+採 **distributed principal + per-role aggregate**（見 [ADR 2026-07-07](/docs/adr/2026-07-07-identity-distributed-principal.md)）：
 
 1. **登入身份維持純 principal**：`account_id` 語意不退化為「某角色下的人」。
 2. **各角色模組自己持有 aggregate id**：賣家用 `store_id`（`docs/modules/seller.md` §2.1），以 `account_id` 錨回 principal。

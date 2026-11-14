@@ -7,7 +7,7 @@
 | 維護者 | Will |
 | 對應程式碼 | `website/lib/seo/`、`website/app/robots.ts`、`website/app/sitemap.ts`、`backend/internal/platform/revalidate`、`backend/services/java/product-service/.../domain/text/DescriptionTextExtractor.java` |
 | 相關 doc | §02 產品微服務（`pure_description`/`searchable_text` 欄位定義）、§47 GA4 分析追蹤（姊妹主題：本文管「被搜尋引擎發現」，47 管「被追蹤成效」） |
-| 相關 ADR | [structured data 缺資料省略欄位、canonical 由 route param 重建](../adr/2026-09-18-seo-structured-data-and-canonical-source.md)、[店家頁的 SEO 由平台從可見資料生成](../adr/2026-10-09-store-seo-platform-generated.md) |
+| 相關 ADR | [structured data 缺資料省略欄位、canonical 由 route param 重建](/docs/adr/2026-09-18-seo-structured-data-and-canonical-source.md)、[店家頁的 SEO 由平台從可見資料生成](/docs/adr/2026-10-09-store-seo-platform-generated.md) |
 
 ---
 
@@ -109,7 +109,7 @@ flowchart TB
 |---|---|---|
 | `lib/seo/metadata.ts` | 產生 root/per-page `<title>`/`<meta description>`/OG/Twitter card | `urls.ts` |
 | `lib/seo/jsonld.ts` | 產生 Organization/WebSite/Product/Breadcrumb/Seller/FAQ structured data（`schema-dts` 型別檢查，缺資料時省略欄位不捏造） | `urls.ts` |
-| `lib/seo/urls.ts` | canonical/OG url 建構。**一律由 route param 重建，不得從 request URL 取**（追蹤參數會污染 canonical，理由見 [ADR](../adr/2026-09-18-seo-structured-data-and-canonical-source.md)） | — |
+| `lib/seo/urls.ts` | canonical/OG url 建構。**一律由 route param 重建，不得從 request URL 取**（追蹤參數會污染 canonical，理由見 [ADR](/docs/adr/2026-09-18-seo-structured-data-and-canonical-source.md)） | — |
 | `lib/seo/indexability.ts` | `INDEXABLE_STATIC_ROUTES`（sitemap 用）、`PRIVATE_PREFIXES`（noindex 但可爬，讓連結權重流動） | — |
 | `lib/seo/summary-rules.ts` | 商品頁與店家頁共用的 description 規則：門檻、長度上限、截斷、title 片段去重 | — |
 | `lib/seo/product-summary.ts`、`lib/seo/store-summary.ts` | 從商品或店家頁看得到的資料生成 title／description（meta 與 og 是同一個值） | `summary-rules.ts` |
@@ -210,7 +210,7 @@ sequenceDiagram
 | 外部呼叫 | 逾時/重試 | 冪等 | 降級行為 |
 |---|---|---|---|
 | revalidate job → `/api/revalidate` | 逾時與重試次數見 `docs/modules/seller.md` §12.1 | 冪等（bust 同一 tag 重複執行無副作用） | Webhook 未設定或重試用盡 → 前端維持舊快取直到 `cacheLife("seller")` TTL 到期，非阻斷性降級 |
-| JSON-LD 缺資料欄位 | N/A | N/A | `productSchema()`/`sellerSchema()` 缺 price/rating 等資料時直接省略該欄位，不捏造假值（理由見 [ADR](../adr/2026-09-18-seo-structured-data-and-canonical-source.md)） |
+| JSON-LD 缺資料欄位 | N/A | N/A | `productSchema()`/`sellerSchema()` 缺 price/rating 等資料時直接省略該欄位，不捏造假值（理由見 [ADR](/docs/adr/2026-09-18-seo-structured-data-and-canonical-source.md)） |
 
 ### 7.4 並發與順序
 

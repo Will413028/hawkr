@@ -9,7 +9,7 @@ import {
 } from "../gen/google/rpc/error_details_pb";
 import { ErrorReason } from "../gen/hawkr/common/v1alpha1/error_reason_pb";
 
-// Connect 錯誤的分派（ADR backend/docs/adr/2026-09-25-api-error-model.md 的 D7）。classifyError 是純函式，
+// Connect 錯誤的分派（ADR docs/adr/2026-09-25-api-error-model.md 的 D7）。classifyError 是純函式，
 // 以 api/testdata/error-dispatch.json 的情境表測試，四個 client 的結果必須相同（website 與 admin 共用這一份，Dart 在
 // packages/hawkr_api/lib/errors.dart）。factsFromError 是 connect-es 的轉接層。
 

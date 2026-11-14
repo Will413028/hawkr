@@ -1,4 +1,4 @@
-/// API 回的圖片（`Image.uri_template`）的網址（ADR backend/docs/adr/2026-09-25-api-image-uri-template.md D3）。
+/// API 回的圖片（`Image.uri_template`）的網址（ADR docs/adr/2026-09-25-api-image-uri-template.md D3）。
 library;
 
 import 'gen/hawkr/common/v1alpha1/image.pb.dart';

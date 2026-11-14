@@ -4,7 +4,7 @@
 > **平台對 provider 的月結對帳**（線 C）在系統裡長什麼樣。
 >
 > **業務敘述在 [70 基本設計書](../基本設計書/70-物流財務結算（Logistics%20Settlement%20%26%20Receivable）基本設計書.md)**（本書的外部設計）；
-> 決策依據是 [`ADR-003`](../adr/2026-09-11-uber-logistics-fee-charge-trigger.md)～[`ADR-014`](../adr/2026-09-14-uber-create-idempotency-precommit-key.md)（`docs/adr/`）。
+> 決策依據是 [`ADR-003`](/docs/adr/2026-09-11-uber-logistics-fee-charge-trigger.md)～[`ADR-014`](/docs/adr/2026-09-14-uber-create-idempotency-precommit-key.md)（`docs/adr/`）。
 > **本書不重述業務規則，只落成施工契約。**
 
 > ⚠️ **provider 中立**：本書的對象是「平台代賣家安排的物流，其成本如何向賣家收取與對帳」。
@@ -19,7 +19,7 @@
 >
 > 🔴 **併入同一個服務不等於併入同一個 domain**：
 > **business payment hot path 與 logistics reconciliation 不得彼此直接耦合**
-> ——拆成兩個服務時網路邊界會替你擋住，合併之後只剩 package 邊界與 gate（[`ADR-009`](../adr/2026-09-11-logistics-finance-domain-ownership.md) 驗證二）。
+> ——拆成兩個服務時網路邊界會替你擋住，合併之後只剩 package 邊界與 gate（[`ADR-009`](/docs/adr/2026-09-11-logistics-finance-domain-ownership.md) 驗證二）。
 
 ---
 
@@ -41,7 +41,7 @@
 
 ---
 
-## 1. Domain Ownership（承 [`ADR-009`](../adr/2026-09-11-logistics-finance-domain-ownership.md)）
+## 1. Domain Ownership（承 [`ADR-009`](/docs/adr/2026-09-11-logistics-finance-domain-ownership.md)）
 
 ```mermaid
 flowchart LR
@@ -77,22 +77,22 @@ flowchart LR
 
 ---
 
-## 2. 十個金額維度的落點（承 [`ADR-006`](../adr/2026-09-11-logistics-amount-semantics-separation.md)）
+## 2. 十個金額維度的落點（承 [`ADR-006`](/docs/adr/2026-09-11-logistics-amount-semantics-separation.md)）
 
 ⚠️ **本表以落點為軸。**
 🔴 **跨書對讀一律以「語意名稱」為錨，不要用編號**，而
 本書 §3.1 的欄位註解引用的是**本表**的編號。
 
 🔴 **不要求十個 DB column**，要求的是**無歧義保存十種業務語意**。
-下表是**唯一的對照表**——任何一格找不到落點，就是 [`ADR-006`](../adr/2026-09-11-logistics-amount-semantics-separation.md) 沒有落地。
+下表是**唯一的對照表**——任何一格找不到落點，就是 [`ADR-006`](/docs/adr/2026-09-11-logistics-amount-semantics-separation.md) 沒有落地。
 
 | # | 金額語意 | 落點 | 誰寫 |
 |---|---|---|---|
 | 1 | 買家配送費 | `orders.shipping_fee`〔既有〕 | order-service |
 | 2 | **估計 provider 成本** | `logistics_receivables.estimated_cost` | Logistics Finance（收 shipping 事件） |
 | 3 | **實際 provider 成本** | `logistics_receivables.actual_cost`（NULL＝尚未對帳）＋ `provider_settlement_lines.amount`〔既有表〕 | Logistics Finance（ADM 匯入後） |
-| 4 | **賣家物流服務費** | `logistics_receivables.target_net`（Collection Target Net）。🔴 **送出給通道的 `gross_amount` 不在 domain 表裡**——它在 `logistics_collection_attempts`，由 adapter 依費率反推（[`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md)） | Logistics Finance |
-| 5 | **收款通道實際手續費** | `logistics_collection_attempts.actual_fee`（來自 `agent_fee_query` 的 `Fee`）。🔴 **正常路徑不進帳本**——手續費由賣家負擔（[`ADR-005`](../adr/2026-09-11-payuni-channel-fee-bearer.md)）⇒ 對平台不是費用，而是「應收未收足的原因」，未收足的部分自然留在 `SELLER_LOGISTICS_RECEIVABLE` 餘額裡（§3.8）。科目 `PLATFORM_COLLECTION_FEE_EXPENSE` **僅限 `PLATFORM_CAUSED` 例外** | Logistics Finance（查詢後） |
+| 4 | **賣家物流服務費** | `logistics_receivables.target_net`（Collection Target Net）。🔴 **送出給通道的 `gross_amount` 不在 domain 表裡**——它在 `logistics_collection_attempts`，由 adapter 依費率反推（[`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md)） | Logistics Finance |
+| 5 | **收款通道實際手續費** | `logistics_collection_attempts.actual_fee`（來自 `agent_fee_query` 的 `Fee`）。🔴 **正常路徑不進帳本**——手續費由賣家負擔（[`ADR-005`](/docs/adr/2026-09-11-payuni-channel-fee-bearer.md)）⇒ 對平台不是費用，而是「應收未收足的原因」，未收足的部分自然留在 `SELLER_LOGISTICS_RECEIVABLE` 餘額裡（§3.8）。科目 `PLATFORM_COLLECTION_FEE_EXPENSE` **僅限 `PLATFORM_CAUSED` 例外** | Logistics Finance（查詢後） |
 | 6 | 賣家補貼 | 🔴 **尚不存在**——`orders` 側須新增 `seller_subsidy`（**本書不擁有**，屬結帳波次） | order-service |
 | 7 | 平台補貼 | `logistics_receivables.platform_subsidy` | Logistics Finance |
 | 8 | **責任歸屬（重分類）調整** | `logistics_adjustments{kind=RESPONSIBILITY, responsibility_cause}`。🔴 **只用於「已成立之後改判」**——首次成立的 provider 成本一律走維度 2／3 ＋ `logistics_receivables`（觸發見 §3.1.1、界線見 §3.5.1） | Logistics Finance |
@@ -137,8 +137,8 @@ flowchart LR
 | `estimated_cost` | BIGINT NOT NULL | 維度 2 |
 | `actual_cost` | BIGINT NULL | 維度 3；🔴 **NULL ＝ 尚未對帳，不是 0** |
 | `platform_subsidy` | BIGINT NOT NULL DEFAULT 0 | 維度 7 |
-| `target_net` | BIGINT NOT NULL | 🔴 **Collection Target Net**＝這次要讓平台**淨收**多少（＝賣家本金 ＋ `carried_residual`）。**不是送給通道的金額**——那個由 adapter 依費率反推（[`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md)） |
-| `carried_residual` | BIGINT NOT NULL DEFAULT 0 | 🔴 本筆 `target_net` 內含的**前期收款殘差**（[`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md)；可負）。⚠️ **它不是「上期的手續費」**——是「上期預估與實際的差」，費率估準時為 **0** |
+| `target_net` | BIGINT NOT NULL | 🔴 **Collection Target Net**＝這次要讓平台**淨收**多少（＝賣家本金 ＋ `carried_residual`）。**不是送給通道的金額**——那個由 adapter 依費率反推（[`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md)） |
+| `carried_residual` | BIGINT NOT NULL DEFAULT 0 | 🔴 本筆 `target_net` 內含的**前期收款殘差**（[`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md)；可負）。⚠️ **它不是「上期的手續費」**——是「上期預估與實際的差」，費率估準時為 **0** |
 | `status` | VARCHAR(16) NOT NULL | §3.2 |
 | `charge_basis_frozen_at` | TIMESTAMPTZ NOT NULL | 🔴 **immutable charge basis**：凍結當下的計費依據時間 |
 | `responsibility_cause` | VARCHAR(20) NULL | 建立 receivable 當下的 **resolved responsibility audit snapshot**；`chk_logrecv_responsibility_cause` 只允許 **4 個 resolved 值**（§3.6.2 的值域分工）。<br/>⚠️ 寫入者 ＝ `LogisticsCostFactJoinService.converge`——🔴 **它是兩個 consumer 共用的唯一收斂點**（§3.1.4），「兩個事實齊備 ⇒ 建立應收」**不得有第二個實作**，兩個實作就是兩份真相。<br/>⚠️ 寫入是**一次性**的：mapper 的述詞帶 `AND responsibility_cause IS NULL` ⇒ 重投 `rows=0`，呼叫端讀回比對，值相同 ＝ 重投、值不同 ＝ **衝突且不得覆蓋** |
@@ -188,7 +188,7 @@ flowchart LR
 （成本側載體 `logistics_cost_facts`／**V16**；責任側沿用 `fulfillment_exception_cases`）。
 
 ⚠️ **觸發時點不是 `delivered`-only**（見上表條件 ①）。
-[`ADR-003`](../adr/2026-09-11-uber-logistics-fee-charge-trigger.md) 要守的那一條是 🔴 **不得從買家那筆錢裡扣**
+[`ADR-003`](/docs/adr/2026-09-11-uber-logistics-fee-charge-trigger.md) 要守的那一條是 🔴 **不得從買家那筆錢裡扣**
 （§5「不得做的三件事」第 ③ 條、§6.2 的回寫禁令都是它的機械形式），本節不影響它。
 
 #### 3.1.2 🔴 identity 不變式：**one provider fulfillment leg ＝ one logistics receivable**
@@ -422,14 +422,14 @@ N16 不帶金額，憑空造一個 `estimated_cost` 正是 §14.1 禁止的那�
 🔴 **送出前必須先落地這一列**（pre-commit），才呼叫 PayUni。
 順序顛倒的後果：HTTP 逾時 ⇒ 我方沒有紀錄 ⇒ 重試產生第二個 `TradeNo` ⇒ **重複扣款且事後查不出來**。
 
-### 3.4 `seller_logistics_accounts`｜賣家物流費帳戶（[`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md)／[`ADR-008`](../adr/2026-09-11-logistics-cost-true-up.md) 的載體）
+### 3.4 `seller_logistics_accounts`｜賣家物流費帳戶（[`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md)／[`ADR-008`](/docs/adr/2026-09-11-logistics-cost-true-up.md) 的載體）
 
 `store_id` PK｜`receivable_balance` BIGINT（賣家欠平台，含前期結轉殘差）｜
 `credit_balance` BIGINT（**平台欠賣家**）｜`last_activity_at`。
 
 🔴 **兩個餘額是兩個欄位，不是一個欄位的正負**：它們可以同時存在（這期欠、上期多收），
-合成淨額之後 [`ADR-008`](../adr/2026-09-11-logistics-cost-true-up.md) 第 1 條保證（永久可追蹤）就失效了。
-🔴 **`credit_balance` 永不過期、不因賣家無後續交易而清零**（[`ADR-008`](../adr/2026-09-11-logistics-cost-true-up.md) 第 2、3 條）
+合成淨額之後 [`ADR-008`](/docs/adr/2026-09-11-logistics-cost-true-up.md) 第 1 條保證（永久可追蹤）就失效了。
+🔴 **`credit_balance` 永不過期、不因賣家無後續交易而清零**（[`ADR-008`](/docs/adr/2026-09-11-logistics-cost-true-up.md) 第 2、3 條）
 ⇒ **不得有任何排程會把它歸零**；§8 有一條「credit 帳齡」指標，它的用途是**催付平台自己**，不是清理。
 
 ### 3.5 `logistics_adjustments`｜責任重分類與對帳調整
@@ -480,7 +480,7 @@ N16 不帶金額，憑空造一個 `estimated_cost` 正是 §14.1 禁止的那�
 ⚠️ 既有 migration **不得修改**（Flyway append-only）⇒ 註解要改一律走後續 migration 的
 `COMMENT ON COLUMN` 覆蓋。
 
-### 3.6 `ResponsibilityCause`（新 CodeMeta 碼表，承 [`ADR-004`](../adr/2026-09-11-responsibility-based-cost-attribution.md)）
+### 3.6 `ResponsibilityCause`（新 CodeMeta 碼表，承 [`ADR-004`](/docs/adr/2026-09-11-responsibility-based-cost-attribution.md)）
 
 > 🔴 **值域 ＝ 四個 resolved 值。** 碼值清單的 SSOT 是 CodeMeta 的 `ResponsibilityCause` 碼表
 > （`docs/代碼管理（CodeMeta）/業務類型碼.md`）；**本節不複製完整碼表**，只定義三軸分工。
@@ -584,8 +584,8 @@ classification 本身是 **5 值**，而本欄的 DB CHECK **只允許 4 個 res
 
 | 表 | 動作 |
 |---|---|
-| `ledger_transactions` | 🔴 `chk_ledgtxn_model` 放寬 ＋ 新增 `chk_ledgtxn_model_type` 相容性 CHECK（[`ADR-010`](../adr/2026-09-11-ledger-carrier-model-compatibility.md) 全文） |
-| `LedgerAccountCode` | ＋**5** 值（[`ADR-010`](../adr/2026-09-11-ledger-carrier-model-compatibility.md)）：`SELLER_LOGISTICS_RECEIVABLE`／`PLATFORM_LOGISTICS_SERVICE_INCOME`／`PLATFORM_COLLECTION_FEE_EXPENSE`（🔴 **僅限 `PLATFORM_CAUSED` 例外，正常路徑不 post**）／`SELLER_LOGISTICS_CREDIT`／🔴 `PLATFORM_OPERATING_CASH`（平台自有現金——`SELLER_DIRECT` 下 `PLATFORM_COLLECTED_CASH` 無語意，見 §3.8） |
+| `ledger_transactions` | 🔴 `chk_ledgtxn_model` 放寬 ＋ 新增 `chk_ledgtxn_model_type` 相容性 CHECK（[`ADR-010`](/docs/adr/2026-09-11-ledger-carrier-model-compatibility.md) 全文） |
+| `LedgerAccountCode` | ＋**5** 值（[`ADR-010`](/docs/adr/2026-09-11-ledger-carrier-model-compatibility.md)）：`SELLER_LOGISTICS_RECEIVABLE`／`PLATFORM_LOGISTICS_SERVICE_INCOME`／`PLATFORM_COLLECTION_FEE_EXPENSE`（🔴 **僅限 `PLATFORM_CAUSED` 例外，正常路徑不 post**）／`SELLER_LOGISTICS_CREDIT`／🔴 `PLATFORM_OPERATING_CASH`（平台自有現金——`SELLER_DIRECT` 下 `PLATFORM_COLLECTED_CASH` 無語意，見 §3.8） |
 | `LedgerTxnType` | ＋**6** 值（🔴 其中 `COLLECTION_FEE_ACCRUAL` **只用於平台負擔手續費的例外**，正常路徑不 post，見 §3.8）：`LOGISTICS_RECEIVABLE_ACCRUAL`／`LOGISTICS_COLLECTION_SETTLED`／`LOGISTICS_TRUE_UP`／`LOGISTICS_CREDIT_ISSUE`／`LOGISTICS_CREDIT_APPLY`／`COLLECTION_FEE_ACCRUAL`（＋既有 `LOGISTICS_COST_ACCRUAL`／`PROVIDER_SETTLEMENT` 沿用） |
 | `provider_settlement_lines`〔既有〕 | **不改結構**——它無 `commerce_model` 限制，可直接用。缺的只是寫入端點（§6.1） |
 
@@ -612,7 +612,7 @@ classification 本身是 **5 值**，而本欄的 DB CHECK **只允許 4 個 res
 🔴 **`PROVIDER_SETTLEMENT` 的 CREDIT 與舊商流不同，這一格最容易抄錯**：
 `PLATFORM_CONSIGNMENT` 商流的 `PROVIDER_SETTLEMENT` CREDIT 是 `PLATFORM_COLLECTED_CASH`（平台**代理商戶收到買家款**），
 而 **`SELLER_DIRECT` 下平台沒有代收** ⇒ 該科目在新商流裡沒有語意
-⇒ 對手科目是 **`PLATFORM_OPERATING_CASH`**（平台自有現金，[`ADR-010`](../adr/2026-09-11-ledger-carrier-model-compatibility.md) 新增）。
+⇒ 對手科目是 **`PLATFORM_OPERATING_CASH`**（平台自有現金，[`ADR-010`](/docs/adr/2026-09-11-ledger-carrier-model-compatibility.md) 新增）。
 ⚠️ **同一個 `txn_type` 在兩個商流下是同名的兩種分錄**，科目對由
 `ledger_transactions.commerce_model` 決定 —— 不是由 `txn_type` 單獨決定。
 
@@ -624,27 +624,27 @@ classification 本身是 **5 值**，而本欄的 DB CHECK **只允許 4 個 res
 ⚠️ **手續費是 PayUni「從撥款裡扣掉的」，平台從來沒收到那筆錢** ——
 所以 `LOGISTICS_COLLECTION_SETTLED` 的金額是**實收**（`Amt − Fee`）而不是 `Amt`。
 🔴 **未收足的那一塊不需要任何分錄**：它自然留在 `SELLER_LOGISTICS_RECEIVABLE` 的餘額裡，
-**那就是 [`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md) 要結轉、下一期併收的東西**（逐步驗算見本節末）。
+**那就是 [`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md) 要結轉、下一期併收的東西**（逐步驗算見本節末）。
 
 🔴 **手續費不沖減應收（本表最容易做錯的一格）**
 
-[`ADR-005`](../adr/2026-09-11-payuni-channel-fee-bearer.md) 定案手續費**由賣家負擔** ⇒ 對平台而言它**不是費用**，而是「**應收未收足的原因**」。
+[`ADR-005`](/docs/adr/2026-09-11-payuni-channel-fee-bearer.md) 定案手續費**由賣家負擔** ⇒ 對平台而言它**不是費用**，而是「**應收未收足的原因**」。
 若照直覺 post 一筆 `DEBIT PLATFORM_COLLECTION_FEE_EXPENSE / CREDIT SELLER_LOGISTICS_RECEIVABLE`：
 
 | | 帶那筆分錄 | 不帶（正確） |
 |---|---|---|
 | 期末 `SELLER_LOGISTICS_RECEIVABLE` | **0**（被沖平） | **＝ `residual`** |
 | 可結轉到下期的缺口 | **0** | ＝ `residual` ✅（費率估準時為 **0**） |
-| 結果 | 🔴 **[`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md) 的結轉機制在帳上失效** —— 缺口消失，下期收不回來 | 機制成立 |
+| 結果 | 🔴 **[`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md) 的結轉機制在帳上失效** —— 缺口消失，下期收不回來 | 機制成立 |
 
-⚠️ 而且它同時**違反 [`ADR-005`](../adr/2026-09-11-payuni-channel-fee-bearer.md)**：把賣家該負擔的手續費認列成平台自己的費用，
+⚠️ 而且它同時**違反 [`ADR-005`](/docs/adr/2026-09-11-payuni-channel-fee-bearer.md)**：把賣家該負擔的手續費認列成平台自己的費用，
 損益表上會出現一筆不存在的平台支出。
 
 ⇒ **正常路徑不 post `COLLECTION_FEE_ACCRUAL`**；實際手續費金額記在
 `logistics_collection_attempts.actual_fee`（§3.3，供對帳與賣家帳單逐項顯示），
-**未收足的部分自然留在應收餘額裡**，那就是 [`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md) 要結轉的東西。
+**未收足的部分自然留在應收餘額裡**，那就是 [`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md) 要結轉的東西。
 🔴 `PLATFORM_COLLECTION_FEE_EXPENSE` 這個科目**保留但只用於例外**：
-平台原因（`PLATFORM_CAUSED`）造成的反向沖銷，其手續費依 [`ADR-004`](../adr/2026-09-11-responsibility-based-cost-attribution.md) 由平台負擔，那一筆才用它。
+平台原因（`PLATFORM_CAUSED`）造成的反向沖銷，其手續費依 [`ADR-004`](/docs/adr/2026-09-11-responsibility-based-cost-attribution.md) 由平台負擔，那一筆才用它。
 
 **守恆自檢（可寫成測試，四條缺一不可）**：
 
@@ -655,7 +655,7 @@ classification 本身是 **5 值**，而本欄的 DB CHECK **只允許 4 個 res
 | 3 | `PLATFORM_COLLECTION_FEE_EXPENSE` ＝ 0（正常路徑） | 有沒有把賣家的成本記成平台費用 |
 | 4 | 🔴 **Order 終態 `DELIVERY_FAILED_NO_REFUND` 本身不產生本書的任何一筆分錄** | 有沒有人把「原訂單款撥給賣家」那條線誤寫成本書的沖回／二次收款／退款分錄（§3.8.1） |
 
-⚠️ **第 4 條與 1～3 是不同的軸**：1～3 守的是收款金額鏈（[`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md)），
+⚠️ **第 4 條與 1～3 是不同的軸**：1～3 守的是收款金額鏈（[`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md)），
 第 4 條守的是**兩條資金線沒有被混寫**（§3.8.1）⇒ 🔴 **它必須是獨立的一支測試**，
 不得併進金額鏈那三條裡（併進去就會被金額全對的情境蓋過去）。
 
@@ -669,10 +669,10 @@ classification 本身是 **5 值**，而本欄的 DB CHECK **只允許 4 個 res
 |---|---|---|
 | `C1` 期末應收 ＝ `residual`（估準時 0） | 收款有沒有記全 | 以**沖減應收**那一式 post 手續費 |
 | `C2` 收入只認列本期 | 不重複認列收入 | 帳本認列含前期結轉 |
-| `C3` 平台零費用且現金不短列 | 🔴 **[`ADR-005`](../adr/2026-09-11-payuni-channel-fee-bearer.md)（賣家負擔）** | 以**任一式** post 手續費分錄 |
+| `C3` 平台零費用且現金不短列 | 🔴 **[`ADR-005`](/docs/adr/2026-09-11-payuni-channel-fee-bearer.md)（賣家負擔）** | 以**任一式** post 手續費分錄 |
 
 🔴 **`C3` 補的洞很具體**：把 `DEBIT PLATFORM_COLLECTION_FEE_EXPENSE / CREDIT PLATFORM_OPERATING_CASH` **加回正常路徑**時，
-**[`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md) 的結轉完全不受影響** ⇒ `C1`／`C2` 照樣 PASS，
+**[`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md) 的結轉完全不受影響** ⇒ `C1`／`C2` 照樣 PASS，
 而平台每期憑空多一筆支出、現金短列（`C=120` 時 cash 120→119）。
 ⚠️ **「這條軸沒被破壞」不等於「設計沒被破壞」**——一條軸一條斷言。
 🔴 **三條缺一不可，且不得互相取代。**
@@ -813,14 +813,14 @@ payment-service 端的實作 impact 清單（migration／entity／factory／writ
 | 官方事實 | 對設計的強制後果 |
 |---|---|
 | `FeeType=4` ＝**物流**（8 值，文件未賦予任何行為差異 ⇒ 只是分類標籤） | 直接採用 |
-| `BalType=1` 正向＝「扣合作商店款項，**扣 1% 手續費後**撥款給代理商」；`2` 負向＝「扣代理商款項**含該金額 1% 手續費**，足額撥款給合作商店」 | 🔴 **兩個方向的現金負擔都落在平台** ⇒ 正向用 **adapter 層 gross-up** 讓賣家承擔（[`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md)）；負向見 §4.5（賣家足額收到，通道成本另行歸屬） |
+| `BalType=1` 正向＝「扣合作商店款項，**扣 1% 手續費後**撥款給代理商」；`2` 負向＝「扣代理商款項**含該金額 1% 手續費**，足額撥款給合作商店」 | 🔴 **兩個方向的現金負擔都落在平台** ⇒ 正向用 **adapter 層 gross-up** 讓賣家承擔（[`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md)）；負向見 §4.5（賣家足額收到，通道成本另行歸屬） |
 | `Amt` 值域 **1~9999999**，**不接受 0 或負數** | 正負號**只能**由 `BalType` 表達；金額欄永遠是正整數 |
 | EncryptInfo 的 `MerID`（被扣款賣家）＋選填 `AgentMerID`（收款平台商店） | 🔴 **兩個 merchant 識別，不得混用**；`MerID` ＝ `'HAWK' ‖ store_id` |
 | **request accepted ≠ money settled**：「實際交易**於次日執行**」；回傳**只有 `Status`／`Message` 兩欄**（無單號、無受理序號） | ⇒ `SUBMITTED` 是一個真實存在的狀態，不是實作細節 |
 | `agent_fee_query` 存在，key ＝ `(MerID, TradeNo, Amt)`；回傳含 **`FundDate`**（`0000-00-00`＝未撥款）與 **`Fee`**（實際手續費） | ⇒ 維度 5 的唯一來源 |
 | 🔴 **無冪等鍵**：`TradeNo` 三處逐字標「**可重複**」；查詢回**單筆結構非陣列** | ⇒ §3.3 `trade_no` UNIQUE 由**我方**保證；⇒ `UNCONFIRMED` **不自動重送** |
 | 🔴 **無 status lifecycle**：查詢無逐筆狀態欄，唯一訊號是 `FundDate` 二元 | ⇒ 🔴 **「還沒到次日」與「次日執行失敗」長得一模一樣** ⇒ 必須用 `expected_fund_date` ＋ 寬限期把兩者分開 |
-| 🔴 **無 reversal API**：唯一機制是反向 `agent_fee`，**且不對稱**（負向「含該金額 1% 手續費」⇒ 收了再退，平台兩邊各付一次） | ⇒ 貸記**優先抵扣**、現金返還為後備（但 🔴 **不得因成本而拒絕返還**，[`ADR-008`](../adr/2026-09-11-logistics-cost-true-up.md) 第 4 條） |
+| 🔴 **無 reversal API**：唯一機制是反向 `agent_fee`，**且不對稱**（負向「含該金額 1% 手續費」⇒ 收了再退，平台兩邊各付一次） | ⇒ 貸記**優先抵扣**、現金返還為後備（但 🔴 **不得因成本而拒絕返還**，[`ADR-008`](/docs/adr/2026-09-11-logistics-cost-true-up.md) 第 4 條） |
 | 🔴 **餘額不足／負餘額行為完全未載** | ⇒ §5 的 fail-safe 設計；⇒ **EV-P1**（§10） |
 
 🔴 **必須沿用既有通道**：`PayUniHttpClient.callAgentApi(agentId, path, ...)`（`grant` 已在用），
@@ -873,7 +873,7 @@ sequenceDiagram
 🔴 **衝突一律用 `ON CONFLICT DO NOTHING`，不是 catch `DuplicateKeyException`**
 （PostgreSQL 交易內任一句失敗即整個交易 aborted，catch 得到例外但下一句 SELECT 會炸成 500）。
 
-### 4.4 手續費的結轉（[`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md) 的實作形式）
+### 4.4 手續費的結轉（[`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md) 的實作形式）
 
 ```
 domain（本服務）
@@ -899,11 +899,11 @@ payment adapter（PayUni 專屬）
 
 🔴 **`residual` 不是「上期的手續費」**——是「**預估與實際的差**」。
 費率估準時它恆為 **0**；估不準時它併入下一期的 `target_net` 後**整體再 gross-up 一次**，
-**不是**對 fee 本身再收一次 fee（[`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md) 逐期驗算：residual 每期乘以 `(r_act−r_est)/(1−r_est)`）。
+**不是**對 fee 本身再收一次 fee（[`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md) 逐期驗算：residual 每期乘以 `(r_act−r_est)/(1−r_est)`）。
 
 ⚠️ 賣家帳單要逐項列 `carried_residual`——否則賣家看到的扣款額與我方帳上的收入對不起來。
 
-🔴 **穩態下賣家負擔 `C/(1−r)`，與 gross-up 等價，而全程不出現費率常數**（推導見 [`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md)）。
+🔴 **穩態下賣家負擔 `C/(1−r)`，與 gross-up 等價，而全程不出現費率常數**（推導見 [`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md)）。
 ⚠️ **代價**：賣家某一期的扣款金額**不等於**該期物流成本 ⇒ **帳單必須逐項列**
 （本期物流成本／減平台補貼／加前期收款殘差／＝應收淨額／**＋通道手續費**／＝實際扣款）。
 🔴 **最後一列才是賣家銀行帳上看到的數字**；不分開列的話賣家對不起帳，而那會變成客服量。
@@ -920,20 +920,20 @@ payment adapter（PayUni 專屬）
 平台額外承擔的通道成本           C_credit × r
 ```
 
-🔴 **賣家收到的是足額 ⇒ credit principal 不被侵蝕**（[`ADR-008`](../adr/2026-09-11-logistics-cost-true-up.md) 第 1、4 條保證的機械形式）。
+🔴 **賣家收到的是足額 ⇒ credit principal 不被侵蝕**（[`ADR-008`](/docs/adr/2026-09-11-logistics-cost-true-up.md) 第 1、4 條保證的機械形式）。
 
 🔴 **那筆通道成本不得從 credit 裡扣**，也不得默默記成「賣家少拿」：
 - 它是**平台履行退還義務的執行成本**，預設由**平台**承擔
-- ⚠️ **若未來要轉嫁賣家，需要業務裁決**——[`ADR-005`](../adr/2026-09-11-payuni-channel-fee-bearer.md) 講的是「平台**向賣家收款**」的手續費，
+- ⚠️ **若未來要轉嫁賣家，需要業務裁決**——[`ADR-005`](/docs/adr/2026-09-11-payuni-channel-fee-bearer.md) 講的是「平台**向賣家收款**」的手續費，
   不當然涵蓋「平台**退還賣家**」的手續費。**兩者的當事人與觸發原因都不同。**
-- 🔴 **例外**：若該筆退還的起因是**賣家原因**（[`ADR-004`](../adr/2026-09-11-responsibility-based-cost-attribution.md) 的 `SELLER_CAUSED`），
+- 🔴 **例外**：若該筆退還的起因是**賣家原因**（[`ADR-004`](/docs/adr/2026-09-11-responsibility-based-cost-attribution.md) 的 `SELLER_CAUSED`），
   成本歸屬依 §3.6.1 的三軸表判定，而**不是**依方向判定
 
 ⚠️ **不對稱是刻意標明的，不是筆誤**：正向要 gross-up（讓賣家多付），負向不 gross-up（讓平台多付）。
 兩者的共同點是「**通道成本永遠先落在平台**」，差別在後續歸屬。
 
 **因此「貸記優先抵扣、現金返還為後備」有成本理由**（抵扣不經通道 ⇒ 零通道成本），
-🔴 **但不得因成本而拒絕返還**（[`ADR-008`](../adr/2026-09-11-logistics-cost-true-up.md) 第 4 條）。
+🔴 **但不得因成本而拒絕返還**（[`ADR-008`](/docs/adr/2026-09-11-logistics-cost-true-up.md) 第 4 條）。
 
 ## 5. F-2｜賣家餘額不足與收款失敗的生命週期
 
@@ -948,7 +948,7 @@ payment adapter（PayUni 專屬）
 **賣家層級的處置階梯**
 
 🔴 **觸發條件不是「餘額為正」**：費率估準時 `residual = 0`、餘額會歸零；
-但**估不準或取整**時會留下小額殘差（[`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md)：預估 1%／實際 1.5% ⇒ 穩態 `residual ≈ 0.61`）。
+但**估不準或取整**時會留下小額殘差（[`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md)：預估 1%／實際 1.5% ⇒ 穩態 `residual ≈ 0.61`）。
 ⇒ **小額殘差是機制的正常產物，不是欠款訊號**。用「餘額為正 ＋ 帳齡」當條件，
 會把每一個費率估不準的正常賣家判成逾期。
 
@@ -961,7 +961,7 @@ payment adapter（PayUni 專屬）
 | ② | `now − last_activity_at > 門檻天數`（**無新交易**） | 只有它 ⇒ 賣家單純沒出貨也被停用 |
 
 **殘差容許上限**：`max(該賣家近 N 期的 |residual|) × 安全係數`，下限為**取整容差**（1 元）。
-🔴 **不得寫成固定金額常數**——那等於用另一種形式寫死費率（[`ADR-005`](../adr/2026-09-11-payuni-channel-fee-bearer.md) 禁止）。
+🔴 **不得寫成固定金額常數**——那等於用另一種形式寫死費率（[`ADR-005`](/docs/adr/2026-09-11-payuni-channel-fee-bearer.md) 禁止）。
 ⚠️ **尺規錨在 residual 不是 actual_fee**：新模型的殘差是「預估與實際的差」，量級遠小於手續費本身（估準時為 0）；用手續費當尺規會讓門檻過寬。
 
 | 帳齡（自 `last_activity_at` 起算，且滿足 ①） | 動作 |
@@ -981,11 +981,11 @@ payment adapter（PayUni 專屬）
 
 🔴 **不得做的三件事**：① 從賣家的**其他**款項自動扣抵（平台在 `SELLER_DIRECT` 下沒有代收，沒有可扣的款）
 ② 自動沖銷 `receivable_balance`（等於平台單方免除賣家債務）
-③ 向**買家**追討（[`ADR-004`](../adr/2026-09-11-responsibility-based-cost-attribution.md)：買家不是線 B 的當事人）
+③ 向**買家**追討（[`ADR-004`](/docs/adr/2026-09-11-responsibility-based-cost-attribution.md)：買家不是線 B 的當事人）
 
 ---
 
-## 6. 對帳與 true-up（線 C，承 [`ADR-008`](../adr/2026-09-11-logistics-cost-true-up.md)）
+## 6. 對帳與 true-up（線 C，承 [`ADR-008`](/docs/adr/2026-09-11-logistics-cost-true-up.md)）
 
 ### 6.1 provider 帳單匯入
 
@@ -1013,7 +1013,7 @@ payment adapter（PayUni 專屬）
 🔴 同一 leg 的 waiting／cancellation／surcharge 等 component **一律先聚合成 `actual_cost`** 再走本表，
 **不得逐項各開一筆**。
 
-🔴 **對帳一律不得回寫買家端**（[`ADR-008`](../adr/2026-09-11-logistics-cost-true-up.md) 最硬的一條）：
+🔴 **對帳一律不得回寫買家端**（[`ADR-008`](/docs/adr/2026-09-11-logistics-cost-true-up.md) 最硬的一條）：
 `orders.shipping_fee`／訂單總額／商品本金**三者皆不得被本書的任何路徑寫入**。
 **可機械執行的 gate**：`io.github.will413028.hawkr.payment.logistics.**` **不得**持有 order-service 的寫入型 gRPC client。
 🔴 **這條 gate 的粒度必須是 package，不是服務。**
@@ -1316,7 +1316,7 @@ sequenceDiagram
 | `logistics_receivable_stuck_rows{status}` | `SUBMITTED` 超過 `expected_fund_date`＋寬限 ＝ 收款卡住 |
 | `logistics_receivable_unconfirmed_rows` | 🔴 **本書最重要的一條**——它代表「錢可能收了也可能沒收」 |
 | `logistics_collection_failed_total{reason}` | `FAILED` 的原因分布 |
-| `seller_logistics_credit_age_days` | 🔴 **催付平台自己**（[`ADR-008`](../adr/2026-09-11-logistics-cost-true-up.md) 第 4 條）——不是用來清理 credit |
+| `seller_logistics_credit_age_days` | 🔴 **催付平台自己**（[`ADR-008`](/docs/adr/2026-09-11-logistics-cost-true-up.md) 第 4 條）——不是用來清理 credit |
 | `seller_logistics_receivable_age_days` | §5 的階梯錨 |
 | `provider_statement_unmatched_rows{provider}` | 對帳缺口 |
 | `logistics_cost_chain_diff_rows{provider,stage}` | 🔴 **成本鏈差額超過門檻的筆數**（期望恆 **0**）。`stage` ∈ `quote_create`／`create_accrual`／`accrual_statement` |
@@ -1387,7 +1387,7 @@ sequenceDiagram
 |---|---|---|
 | **EV-A1** | 平台對賣家收物流服務費的**正式會計科目** | 開票的業務關係已確定（58 方向二）⇒ 🔴 **不自動開立憑證**，以人工處理 |
 | **EV-A2** | **正式稅務科目** | 同上 |
-| **EV-A3** | 補收／退還的**正式憑證形式** | 商業義務已定（[`ADR-008`](../adr/2026-09-11-logistics-cost-true-up.md)）⇒ 以案件人工處理，🔴 **不自動產生憑證** |
+| **EV-A3** | 補收／退還的**正式憑證形式** | 商業義務已定（[`ADR-008`](/docs/adr/2026-09-11-logistics-cost-true-up.md)）⇒ 以案件人工處理，🔴 **不自動產生憑證** |
 | **EV-A4** | 發票品項**是否拆**「物流服務費／代收手續費」 | 🔴 資料層一律分帳（兩個科目）⇒ 拆不拆只影響**列印呈現**，不影響帳務 |
 
 ### 10.2 Uber
@@ -1433,7 +1433,7 @@ sequenceDiagram
 
 🔴 **`EV-P6` 擋的是 enablement（自動收款開關），不是 implementation。**
 ⚠️ **不得以「不做 gross-up」為由把它降級**：那個模型有 fee-on-fee 遞迴
-（現金流證明見 [`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md)），會讓平台每期永久短收。
+（現金流證明見 [`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md)），會讓平台每期永久短收。
 
 ---
 
@@ -1441,12 +1441,12 @@ sequenceDiagram
 
 | 層 | 內容 |
 |---|---|
-| unit | 狀態機 allowed-from（**每一條邊各一支**）；[`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md) 結轉算式（含**穩態收斂**斷言） |
+| unit | 狀態機 allowed-from（**每一條邊各一支**）；[`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md) 結轉算式（含**穩態收斂**斷言） |
 | 契約 | 🔴 `agent_fee` payload **從 PayUni 文件的欄位表生 fixture**，不得手寫；MQ payload 走 `mq-wire-contract` 三方對拍 |
 | integration | `PENDING→SUBMITTED→SETTLED` 全鏈（真 DB）；🔴 **必須從 `logistics.cost.incurred` 進**，不得直接把狀態 fixture 成 `SUBMITTED`（否則前置條件不會被執行到） |
 | **變異** | ① 拿掉 `idempotency_key` UNIQUE ⇒ 重放測試必須轉紅；🔴 **再單獨拿掉 `provider_delivery_ref` 的 partial UNIQUE 各驗一次**——兩者錨在同一個 identity（§3.1.2），只拿掉其中一個時**另一個會接住**，那正是「變異無鑑別力」的情形，必須分開驗才知道兩道各自守得住 ② 把 `target_net` 改成讀 `orders.shipping_fee` ⇒ §2 的變異測試必須轉紅 ③ 讓 `UNCONFIRMED` 自動重送 ⇒ 必須轉紅 ④ 🔴 把 `net_proceeds = gross_amount − actual_fee` 改成 `= gross_amount` ⇒ **必須轉紅** ⑤ 🔴 把 `residual ≠ 0` 的收款直接標 `CLOSED` ⇒ **必須轉紅** ⑥ 🔴 **在責任判定尚未 financially final 時仍建立 Seller logistics receivable ⇒ 必須轉紅**（兩種變異各驗一次：`fulfillment.responsibility.finalized` 尚未抵達／抵達但 payload `financiallyFinal` 非 `true`）——§3.1.1 的前置若沒有一支測試**直接斷言那個欄位**，它就沒有人守，consumer 會退回「這個 routing key 應該只在 final 時發」的紀律保證，而那不是機械保證 |
 
-### 11.1 🔴 收款金額鏈的四個必測案例（[`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md)）
+### 11.1 🔴 收款金額鏈的四個必測案例（[`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md)）
 
 | Case | 場景 | 斷言 |
 |---|---|---|
@@ -1517,8 +1517,8 @@ sequenceDiagram
 | # | 風險 |
 |---|---|
 | R1 | 🔴 **`UNCONFIRMED` 的人工負擔未知**：它的發生率取決於 EV-P1（餘額不足行為），而那是未載的。若發生率高，ADM 會被淹沒 ⇒ 上線後以 `logistics_receivable_unconfirmed_rows` 校準寬限期 |
-| R2 | [`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md) 的結轉讓賣家每期扣款 ≠ 該期成本 ⇒ **客服解釋成本**；§9 的逐項顯示是唯一緩解 |
-| R3 | 🔴 **沒有網路邊界隔開 business payment hot path**：結帳／退款與物流對帳同一個 JVM、同一個 DB、同一組 pod ⇒ **一次 Logistics Finance 的長交易或 scheduler 失控，打到的是金流 hot path。** 緩解三項：§6.2 的 **package 粒度** gate（🔴 **在它實測轉紅過之前不得算進這一格**）＋ 65 [`ADR-009`](../adr/2026-09-11-logistics-finance-domain-ownership.md) 驗證二（禁跨 domain JOIN／import）＋ scheduler 走 §29 的 lease claim，不得裸迴圈 |
+| R2 | [`ADR-011`](/docs/adr/2026-09-11-channel-fee-grossup-in-adapter.md) 的結轉讓賣家每期扣款 ≠ 該期成本 ⇒ **客服解釋成本**；§9 的逐項顯示是唯一緩解 |
+| R3 | 🔴 **沒有網路邊界隔開 business payment hot path**：結帳／退款與物流對帳同一個 JVM、同一個 DB、同一組 pod ⇒ **一次 Logistics Finance 的長交易或 scheduler 失控，打到的是金流 hot path。** 緩解三項：§6.2 的 **package 粒度** gate（🔴 **在它實測轉紅過之前不得算進這一格**）＋ 65 [`ADR-009`](/docs/adr/2026-09-11-logistics-finance-domain-ownership.md) 驗證二（禁跨 domain JOIN／import）＋ scheduler 走 §29 的 lease claim，不得裸迴圈 |
 | R4 | provider 帳單人工匯入 ⇒ **匯入頻率決定 true-up 延遲**；月結一次代表賣家最久要等一個月才知道最終金額 |
 | R5 | 🔴 `chk_ledgtxn_model` 放寬後，**舊商流的 dormant 帳本與新商流共用一張表** ⇒ 稽核查詢必須帶 `commerce_model` 條件，否則兩套帳會被混算 |
 

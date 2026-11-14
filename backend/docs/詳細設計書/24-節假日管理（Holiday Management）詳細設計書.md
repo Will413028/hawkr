@@ -5,7 +5,7 @@
 | 項目 | 值 |
 |---|---|
 | 對應程式碼 | `services/java/shipping-service/.../service/HolidayService.java`、`.../service/ShippingService.java`（日期驗證呼叫點）、`monitoring/sql-exporter/`、`monitoring/prometheus/rules/business-alerts.yml` |
-| 相關 ADR | [2026-09-18-holiday-cache-and-coverage-monitoring](../adr/2026-09-18-holiday-cache-and-coverage-monitoring.md) |
+| 相關 ADR | [2026-09-18-holiday-cache-and-coverage-monitoring](/docs/adr/2026-09-18-holiday-cache-and-coverage-monitoring.md) |
 | 相關 doc | [06-物流微服務](./06-物流微服務（Shipping%20Service）詳細設計書.md) |
 
 ---
@@ -65,7 +65,7 @@
 
 ### 3.1 記憶體快取（首選）
 
-holidays 資料特性：**量少（每年約 120 筆）、變動極低（每年匯入一次）**，採服務內記憶體快取，**不放 Redis**（選型理由見[相關 ADR](../adr/2026-09-18-holiday-cache-and-coverage-monitoring.md) D1）。
+holidays 資料特性：**量少（每年約 120 筆）、變動極低（每年匯入一次）**，採服務內記憶體快取，**不放 Redis**（選型理由見[相關 ADR](/docs/adr/2026-09-18-holiday-cache-and-coverage-monitoring.md) D1）。
 
 | 項目 | 說明 |
 |------|------|
@@ -438,7 +438,7 @@ Subject,Start Date,Start Time,End Date,End Time,All Day Event,Description,Locati
 | `HolidayDataCoverageLow` | `< 60 且 >= 7` | warning | 與 Critical 互斥 |
 | `HolidayDataCoverageCritical` | `< 7` | critical | repeat 依 Alertmanager 各環境週期（dev 2h／prod 30m），非固定 24h |
 
-門檻分級的選型理由見[相關 ADR](../adr/2026-09-18-holiday-cache-and-coverage-monitoring.md) D3。
+門檻分級的選型理由見[相關 ADR](/docs/adr/2026-09-18-holiday-cache-and-coverage-monitoring.md) D3。
 
 ### 8.3 推播目的地與路由
 

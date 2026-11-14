@@ -1,6 +1,6 @@
 # @hawkr/twaddr
 
-內政部 8 碼鄉鎮市區代碼表與查詢（縣市 5 碼、鄉鎮市區 8 碼、郵遞區號），website 與 admin 共用。對應 Dart 版是 `packages/hawkr_twaddr`，Go 版是 `backend/internal/platform/twaddr`（ADR `backend/docs/adr/2026-10-04-address-town-code.md`）。
+內政部 8 碼鄉鎮市區代碼表與查詢（縣市 5 碼、鄉鎮市區 8 碼、郵遞區號），website 與 admin 共用。對應 Dart 版是 `packages/hawkr_twaddr`，Go 版是 `backend/internal/platform/twaddr`（ADR `docs/adr/2026-10-04-address-town-code.md`）。
 
 ## 內容
 

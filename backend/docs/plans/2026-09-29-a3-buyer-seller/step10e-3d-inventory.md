@@ -141,7 +141,7 @@
 - 未決：violation runbook (seller-violation-management-runbook.md) 的 7 工作天我沒有開檔核對 [未確認]。
 
 ## 十二、ADR / D′1 [量測]
-ADR `backend/docs/adr/2026-09-24-go-modular-monolith.md`（355 行）：
+ADR `docs/adr/2026-09-24-go-modular-monolith.md`（355 行）：
 - :124 `## D3`；:130-135 原「跨模組讀取的判斷順序」，第 3 點 :133-135（「必須拿下層模組的資料來篩選或分頁：在自己的 schema 維護讀取模型…」，原文保留作歷史）。
 - :304 `## 修訂：跨模組讀取改用擁有者發布的 pub_*、D4 收窄（2026-10-18，Will）`，:306 說明本段「取代 D3 的判斷順序第 3 點」。新順序 :308-318：1 擁有者對嗎；2 依 ID 取資料；**:314「3. 各來源都擁有全部篩選與排序鍵：在 httpapi 依同一個全序做 keyset composition。」**；4 join `pub_*`；5 讀取模型只在量測觸發才建。:355 文末另有 2026-10-19 修訂（A′(i) 審查）。
 - backend/AGENTS.md:28（規則 2）同步含「各來源都擁有全部篩選與排序鍵就在 httpapi 做 keyset composition」[量測]。A7 計畫 docs/plans/2026-10-18-a7-social.md:540-542 已寫「ADR 2026-09-24 的修訂段已寫（D3 判斷順序第 3 步 keyset composition 取代 10e D′1 的例外文字）」。

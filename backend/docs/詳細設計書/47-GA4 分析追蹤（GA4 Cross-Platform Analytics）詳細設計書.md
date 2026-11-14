@@ -8,7 +8,7 @@
 |---|---|
 | 維護者 | Will |
 | 對應程式碼 | `hawkr-website/lib/analytics/`（gtag）、`hawkr_buyer/lib/core/analytics/`（Firebase）、`hawkr_seller/lib/core/analytics/`（Firebase）、`backend-payuni/services/java/order-service/`（MP backstop，設計見 §6.3、§12.1） |
-| 相關 doc | [ADR：GA4 跨平台分析](../adr/2026-09-18-ga4-cross-platform-analytics.md)、website ADR `decisions/2026-06-07-ga4-client-side-server-mp-deferred.md`、`36-MQ 與事件總覽` §`order.paid` |
+| 相關 doc | [ADR：GA4 跨平台分析](/docs/adr/2026-09-18-ga4-cross-platform-analytics.md)、website ADR `decisions/2026-06-07-ga4-client-side-server-mp-deferred.md`、`36-MQ 與事件總覽` §`order.paid` |
 
 ---
 
@@ -414,7 +414,7 @@ sequenceDiagram
 ## 10. 設計決策
 
 設計理由、考慮過的替代方案與否決理由見
-[ADR：GA4 跨平台分析——蒐集面與 property 結構](../adr/2026-09-18-ga4-cross-platform-analytics.md)。
+[ADR：GA4 跨平台分析——蒐集面與 property 結構](/docs/adr/2026-09-18-ga4-cross-platform-analytics.md)。
 
 ---
 

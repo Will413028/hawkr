@@ -6,7 +6,7 @@ import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 /// 措施列表的顯示文字與分組。
 ///
-/// 契約只給列舉（CodeMeta 已凍結，ADR `backend/docs/adr/2026-09-25-codemeta-retirement.md`），名詞與固定句型取自共用文案目錄
+/// 契約只給列舉（CodeMeta 已凍結，ADR `docs/adr/2026-09-25-codemeta-retirement.md`），名詞與固定句型取自共用文案目錄
 /// （`hawkr_ui_text`），純函式的 `l` 是 UI 語系；`UNSPECIFIED` 與不認得的值（目錄回「未知」）不是有效值，回 null，由呼叫端
 /// 決定不顯示或用通用文字。能不能申覆讀 `can_appeal`、措施
 /// 此刻的狀態讀 `state`（都由伺服器判斷），這裡不自己從時間或其他欄位推導。

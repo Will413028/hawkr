@@ -41,7 +41,7 @@ docs/                       # 技術文件
 - **SEO**: 結構化資料用 `lib/seo/jsonld.ts`，metadata 在 page/layout 定義。URL 一律經 `lib/seo/urls.ts` 的 builder 並帶 locale（不手拼）；`generateMetadata` 用 `pageMetadata({ title, description, path })`（`lib/seo/metadata.ts`，讀 `params.locale`，頁面仍是靜態）。
 
 ## 多語系路由
-細節見 `docs/i18n-routing.md`；決策在 ADR `backend/docs/adr/2026-10-17-multi-locale-architecture.md` D1；admin 與 staff 介面不在內。
+細節見 `docs/i18n-routing.md`；決策在 ADR `docs/adr/2026-10-17-multi-locale-architecture.md` D1；admin 與 staff 介面不在內。
 - **網址**：zh-TW 在 `/…`、en 在 `/en/…`；URL 是唯一的語系來源，不看 `Accept-Language` 或 cookie。語系清單與各介面的已發佈清單在 `lib/intl/locales.ts`；把 `en` 加進已發佈清單前 `LAUNCH_BLOCKERS` 要清空（`tests/locale-launch-gate.test.ts`）。
 - **寫新頁面**：放在 `app/[locale]/`；RSC 從 `params.locale`（`localeFromParam`）讀語系、文字用 `uiTextFor(locale)`，不用 `getLocale()`。
 - **不本地化的路徑**：不在 `app/[locale]` 又沒副檔名的 route 要加進 `lib/intl/paths.ts` 的 `NON_LOCALIZED_PREFIXES`／`NON_LOCALIZED_EXACT`，否則被改寫成 `/zh-TW/…` 而 404；`public/` 新增頂層目錄要同步 middleware 的 matcher（`tests/middleware-matcher.test.ts`）；`next.config.ts` 路徑規則照 `withLocalizedRedirects`、`privateRouteSource` 寫。

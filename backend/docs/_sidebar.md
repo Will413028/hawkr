@@ -61,8 +61,8 @@
   - [70 物流財務結算（Logistics Settlement & Receivable）](詳細設計書/70-物流財務結算%EF%BC%88Logistics%20Settlement%20%26%20Receivable%EF%BC%89詳細設計書.md)
 
 - ADR（架構決策記錄）
-  - [00 總覽](adr/README.md)
-  - [2026-09-13 採購品項檢索用盡後的分類選擇](adr/2026-09-13-procurement-category-fallback.md)
+  - [00 總覽](/docs/adr/README.md)
+  - [2026-09-13 採購品項檢索用盡後的分類選擇](/docs/adr/2026-09-13-procurement-category-fallback.md)
 
 - 開發規範
   - [★ API 設計規範](開發規範/API%20設計規範.md)

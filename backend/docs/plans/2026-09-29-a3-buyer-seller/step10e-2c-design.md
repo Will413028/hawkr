@@ -1,7 +1,7 @@
 # 10e 第 2c 刀：可申訴的措施，實作設計規格 v2
 
 讀取的是 `local/10e`（HEAD `35d937156`）。
-SSOT：plan `backend/docs/plans/2026-09-29-a3-buyer-seller.md:295-302`（10e「可申訴的措施（Will 2026-10-12…」）；brief `…/step10e-measure-brief.md`（下稱 brief）；ADR `backend/docs/adr/2026-10-18-seller-governance-consolidated.md`（下稱 gov ADR；撰寫時依的是整合前的 `2026-10-02-seller-governance-in-monolith.md` 與當時的三次修訂）；錯誤模型 ADR `2026-09-25-api-error-model.md` D7；API 設計規範（Connect）；盤點 `2c-inventory.md`（下稱 inv）。路徑縮寫沿用 inv：`W`、`S`=`W/backend/internal/modules/seller`、`H`=`W/backend/internal/httpapi`。
+SSOT：plan `backend/docs/plans/2026-09-29-a3-buyer-seller.md:295-302`（10e「可申訴的措施（Will 2026-10-12…」）；brief `…/step10e-measure-brief.md`（下稱 brief）；ADR `docs/adr/2026-10-18-seller-governance-consolidated.md`（下稱 gov ADR；撰寫時依的是整合前的 `2026-10-02-seller-governance-in-monolith.md` 與當時的三次修訂）；錯誤模型 ADR `2026-09-25-api-error-model.md` D7；API 設計規範（Connect）；盤點 `2c-inventory.md`（下稱 inv）。路徑縮寫沿用 inv：`W`、`S`=`W/backend/internal/modules/seller`、`H`=`W/backend/internal/httpapi`。
 判定原則（Will 2026-10-12）：每個取捨都以業界從零的做法定案，「和現有程式一致」不是理由，上線前沒有相容性約束。只有基準無法定案的產品或法務選擇才列給 Will（§9）。
 
 本版重新核對過的外部基準：

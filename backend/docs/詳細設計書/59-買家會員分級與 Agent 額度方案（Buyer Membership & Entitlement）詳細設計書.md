@@ -8,7 +8,7 @@
 |---|---|
 | 維護者 | Will |
 | 對應程式碼 | `backend/internal/modules/buyer/internal/membership/membership.go`（單體 buyer 模組）、`backend/internal/httpapi/buyer/admin.go`（後台 Connect）、`backend/internal/legacy/buyerserver/server.go`（給 ai-service 的 `GetBuyerEntitlement`）、`services/ai-service/internal/client/buyer/adapter.go`、`services/ai-service/internal/procurement/usecase/turn.go` |
-| 相關 ADR | [2026-09-18-buyer-membership-entitlement-model](../adr/2026-09-18-buyer-membership-entitlement-model.md) |
+| 相關 ADR | [2026-09-18-buyer-membership-entitlement-model](/docs/adr/2026-09-18-buyer-membership-entitlement-model.md) |
 | 相關 doc | [57-Hawkr 幫找 Agent Runtime（Agent Runtime）詳細設計書](./57-Hawkr%20幫找%20Agent%20Runtime（Agent%20Runtime）詳細設計書.md) §7（本設計的消費端） |
 
 ---
@@ -80,7 +80,7 @@ flowchart LR
 | 類型 | 項目 |
 |---|---|
 | 技術約束 | `membership_plans` 以 `plan_code` 為自然鍵、`memberships` 以 UUID 為 PK；schema 走單體模組的 Atlas desired state；後台 API 是 Connect；金額以新台幣整數元表示，禁止浮點。 |
-| 既有系統約束 | `ai_usage_reservations`／§7 reserve-commit-release 是 57 號的機制，本書**不修改它**，只提供 limit／period 來源；`account_id` 是登入 principal，`buyer_id` 是業務身份，兩者不可互換（沿用 57 號 §2 慣例）。會員分級／額度計量軸是 **`buyer_id`**。一個帳號一生只有一個買家（建帳的 transaction 內建立，只隨帳號刪除關閉，見 [ADR 2026-09-30-account-created-provisions-buyer](../adr/2026-09-30-account-created-provisions-buyer.md)），所以權益實際上跟著帳號；刪除帳號後重新註冊是新帳號、新買家，從 free 重新起算。 |
+| 既有系統約束 | `ai_usage_reservations`／§7 reserve-commit-release 是 57 號的機制，本書**不修改它**，只提供 limit／period 來源；`account_id` 是登入 principal，`buyer_id` 是業務身份，兩者不可互換（沿用 57 號 §2 慣例）。會員分級／額度計量軸是 **`buyer_id`**。一個帳號一生只有一個買家（建帳的 transaction 內建立，只隨帳號刪除關閉，見 [ADR 2026-09-30-account-created-provisions-buyer](/docs/adr/2026-09-30-account-created-provisions-buyer.md)），所以權益實際上跟著帳號；刪除帳號後重新註冊是新帳號、新買家，從 free 重新起算。 |
 | 契約約束 | 本模組的對外契約不提供跨版本相容窗口；契約異動一律直接替換，不保留舊欄位／舊語意。 |
 | **假設 (Assumptions)** | `ai-service` 對 `GetBuyerEntitlement` 的呼叫頻率＝每次 agent turn 一次，量級與 `/procurement/turns` 相同 → **QPS 上升到需要快取時才觸發 §9.2 重新評估**，不預先加快取。 |
 
@@ -92,7 +92,7 @@ flowchart LR
 
 切成三層職責：(1) buyer 模組持有方案目錄與買家生效方案，是低頻寫、低頻讀的 control plane；(2) `ai-service` 持有用量 ledger，是高頻讀寫路徑；(3) 兩者透過 legacy gRPC `GetBuyerEntitlement`（單體的 `internal/legacy/buyerserver`）橋接——`ai-service` 在 57 號 §7.5 reserve 步驟之前，同步呼叫它取得「目前方案的額度上限＋週期起訖」，以該值執行 reserve 判斷。
 
-「這個買家是什麼會員方案」是買家的屬性；因為一個帳號一生只有一個買家，兩者一一對應。選型理由見[相關 ADR](../adr/2026-09-18-buyer-membership-entitlement-model.md)。
+「這個買家是什麼會員方案」是買家的屬性；因為一個帳號一生只有一個買家，兩者一一對應。選型理由見[相關 ADR](/docs/adr/2026-09-18-buyer-membership-entitlement-model.md)。
 
 ### 4.2 元件視圖 (C4 Component)
 
@@ -333,7 +333,7 @@ N/A——無 WS/長連線/工作流；`memberships` 的狀態是資料列狀態�
 
 ## 10. 設計理由
 
-方案比較、被否決的選項與取捨理由見 [2026-09-18-buyer-membership-entitlement-model](../adr/2026-09-18-buyer-membership-entitlement-model.md)（資料歸屬服務、週期公式、fail-closed、計量軸、admin CRUD 範圍）。本節不複述理由。
+方案比較、被否決的選項與取捨理由見 [2026-09-18-buyer-membership-entitlement-model](/docs/adr/2026-09-18-buyer-membership-entitlement-model.md)（資料歸屬服務、週期公式、fail-closed、計量軸、admin CRUD 範圍）。本節不複述理由。
 
 ---
 

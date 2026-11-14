@@ -283,7 +283,7 @@ COMMENT ON COLUMN shipping_fee_tiers.updated_at IS '記錄最後更新時間';
 - **首次請求觸發 cold load**：pod 啟動後第一個請求承擔一次 gRPC RTT；後續 5 分鐘走 cache。
 - **Circuit Breaker fail-open 用 stale cache**：shipping-service 連續失敗 → CB 開路 → 拒絕新 gRPC 嘗試 → 用既有 cache 回傳（資料可能 stale 5～30 秒）；**cache 完全為空時才**回 `SHIPPING_SERVICE_UNAVAILABLE`。
 
-> 取捨與被否決的方案見 ADR [`docs/adr/2026-09-18-shipping-fee-cache-no-warmup-no-scheduler.md`](../adr/2026-09-18-shipping-fee-cache-no-warmup-no-scheduler.md)。
+> 取捨與被否決的方案見 ADR [`docs/adr/2026-09-18-shipping-fee-cache-no-warmup-no-scheduler.md`](/docs/adr/2026-09-18-shipping-fee-cache-no-warmup-no-scheduler.md)。
 
 ### 3.3 快取結構
 

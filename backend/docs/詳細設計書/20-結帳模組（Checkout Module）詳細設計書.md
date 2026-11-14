@@ -733,7 +733,7 @@ totalWeightGram   = Σ (weight_gram × quantity)
 
 **規則**：`feePayer=SELLER` 且 `freeThreshold <= 0`（賣家上架勾「我負擔運費」但未設免運門檻，App 預設送 `freeThreshold='0'`）時，代表賣家**無條件負擔該 SKU 的運費**。買家運費固定為 0，**不依賴 `freeThreshold > 0`、不受優惠券或折扣後小計影響**。
 
-理由見 [ADR：結帳免運判定與降級策略](../adr/2026-09-18-checkout-free-shipping-and-degradation.md)。
+理由見 [ADR：結帳免運判定與降級策略](/docs/adr/2026-09-18-checkout-free-shipping-and-degradation.md)。
 
 **與 ZERO_AMOUNT 流程的關係**：賣家負擔運費的商品，買家以全額優惠券折抵商品金額後，整筆 `total_actual_amount` 可為 0，自然觸發 ZERO_AMOUNT 流程（05 §2A.1，amount==0 直接 PAID）。無條件免運不受折扣後小計影響，因此不會有「折扣後小計 < 門檻」重新加回運費、阻斷 0 元訂單的情況。
 
@@ -743,7 +743,7 @@ totalWeightGram   = Σ (weight_gram × quantity)
 
 **規則**：`feePayer=SELLER` 且 `freeThreshold > 0` 時，免運門檻判定基於「**優惠券分攤後**」的單品實付金額，而非優惠券前的小計。**此決策不受 §4.7.0-A 影響、維持不變**。
 
-業界先例、被否決的「折扣前判定」與接受的權衡，見 [ADR：結帳免運判定與降級策略](../adr/2026-09-18-checkout-free-shipping-and-degradation.md)。
+業界先例、被否決的「折扣前判定」與接受的權衡，見 [ADR：結帳免運判定與降級策略](/docs/adr/2026-09-18-checkout-free-shipping-and-degradation.md)。
 ⚠️ 買家使用優惠券可能因此失去免運資格 ⇒ 由 §4.7.2 的兩段判定（tentative ↔ final）讓前端在套用前提示。
 
 #### 4.7.1 計算公式
@@ -845,7 +845,7 @@ if ("SELLER".equals(opt.feePayer()) && opt.freeThreshold() > 0) { ... }
 | API | `getConfig(method, temp)`、`lookupFee(method, temp, zone, dimensionSum)` |
 | 失敗場景 | cache 為空 + CB open / gRPC fail → 拋 `SHIPPING_SERVICE_UNAVAILABLE` |
 
-🔴 **不得改成 `@PostConstruct` 預熱或 `@Scheduled` 定期 refresh**：order-service 啟動快於 shipping-service，rolling update 期間 warm-up 會失敗，而重試窗口內買家結帳會拿到**誤導性**的 `ALL_SHIPPING_EXCEEDED`——一個指向「沒有可用配送方式」的錯誤，真因卻是依賴還沒起來。取捨見 [ADR：結帳免運判定與降級策略](../adr/2026-09-18-checkout-free-shipping-and-degradation.md)。
+🔴 **不得改成 `@PostConstruct` 預熱或 `@Scheduled` 定期 refresh**：order-service 啟動快於 shipping-service，rolling update 期間 warm-up 會失敗，而重試窗口內買家結帳會拿到**誤導性**的 `ALL_SHIPPING_EXCEEDED`——一個指向「沒有可用配送方式」的錯誤，真因卻是依賴還沒起來。取捨見 [ADR：結帳免運判定與降級策略](/docs/adr/2026-09-18-checkout-free-shipping-and-degradation.md)。
 
 詳細策略與時序圖見 `21-運費計算模組（Shipping Fee Module）詳細設計書.md §3.2、§8.3`。
 
@@ -930,7 +930,7 @@ TTL:   30 分鐘
 - `ShippingFeeCacheClient` 採 Resilience4j `@CircuitBreaker(name="shipping-fee-service")`
 - CB 連續失敗 ≥ 50%（sliding window 20、最小樣本 5）→ 開路 30 秒
 - CB 開路期間：若本機 cache 非空 → 回傳 stale + log warn；cache 為空 → 拋 `SHIPPING_SERVICE_UNAVAILABLE`
-- ⚠️ fail-open ＋ stale **只適用於運費查詢**；決定「能不能買」的判定（商品可購買狀態、賣家接單能力、庫存）一律 fail-closed，兩者不可互相類比。理由見 [ADR：結帳免運判定與降級策略](../adr/2026-09-18-checkout-free-shipping-and-degradation.md)
+- ⚠️ fail-open ＋ stale **只適用於運費查詢**；決定「能不能買」的判定（商品可購買狀態、賣家接單能力、庫存）一律 fail-closed，兩者不可互相類比。理由見 [ADR：結帳免運判定與降級策略](/docs/adr/2026-09-18-checkout-free-shipping-and-degradation.md)
 
 ### 4.13 和單與 paymentMerId 決策（Web/Mobile Google Pay 動態 gatewayMerchantId 支援）
 

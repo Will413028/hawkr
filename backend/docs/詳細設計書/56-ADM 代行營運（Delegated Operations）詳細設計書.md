@@ -36,7 +36,7 @@
 
 1. **前端已實作的部分，改動有成本，本書逐條記錄取捨。** 端點路徑、envelope 形狀、時間戳格式、capability 的封閉列舉、`status` 的三個小寫值、TTL 的 900 秒上限（**本案已定版改成 1800，是全書唯一一條要求前端改值的硬約束**，§3.4 D1）、`caseReference` 必須是 string 或顯式 `null` —— 這些全部已經被前端程式碼與測試寫死。本書逐條收錄於 §3.1，並在 §6.1 展開成欄位級規格。要偏離其中任何一條，代價不是「請前端配合」，而是**同一波修改 admin repo 的指定檔案並重跑指定測試**（清單見 §4.5），因此偏離必須有明確理由。
 
-   **已實作不等於已定版。** 前端程式碼是**現況**與**改動成本**，不是**權威**。哪些項目跟隨前端、哪些由本書定版、各自的理由與誰要動手，逐條裁決見 §3.1.5 與 [ADR：規則權威歸屬的判定程序](../adr/2026-09-18-adm-delegation-authority-test.md)。
+   **已實作不等於已定版。** 前端程式碼是**現況**與**改動成本**，不是**權威**。哪些項目跟隨前端、哪些由本書定版、各自的理由與誰要動手，逐條裁決見 §3.1.5 與 [ADR：規則權威歸屬的判定程序](/docs/adr/2026-09-18-adm-delegation-authority-test.md)。
 
 2. **前端是 fail-closed 的，而失效是靜默的。** 違反契約時，前端會拒絕進入工作區或鎖死寫入，但**後端自己看起來是 HTTP 200 成功**——沒有 5xx、沒有錯誤 log、沒有 Sentry 事件。因此「後端測試全綠」「dev 部署成功」都不能證明本功能可用；驗收必須走真實 ADM 瀏覽器路徑（見 §13）。§3.1 逐條標出所有屬於這一類的地雷。
 
@@ -173,7 +173,7 @@ flowchart LR
 | 10 | Seller **App**（Flutter 雙端）的任何改動 | 賣家自身路徑不受本案影響 | — |
 | 10-1 | **in-scope（限動態管理）**：賣家看得到自己貼文的 `publishStatus`，並可自行發布／下架 | **賣家對 `publish_status` 的檢視與操作是本案的必要配套，不是範圍外**——`publish_status` 這個狀態**正是本案引進的**（§5.1.5 F6／F7）：代行者按「儲存草稿」建出 `4401`、按 `/unpublish` 轉出 `4403`，兩者都掛在賣家名下。不納入的後果不是「賣家行為不變」，是**賣家帳上出現一批他看不見、也改不回來的貼文**——列表上草稿與已發布長得一樣（§6.1.9 對代行端列表的同一段論證，對賣家端一字不差），而賣家端沒有任何發布入口。<br/>**因此同波納入三項（`backend-payuni` 側）**：① `GET /app/sellers/me/posts` 回應加 `publishStatus`（碼值字串，與 §6.1.9 代行列表同口徑）② 該端點的 `status=published` 篩選改問 `publish_status`（見下方「賣家自己的貼文管理」列）③ 新增 `POST /app/sellers/posts/{id}/publish`／`/unpublish` 兩支，複用 `UpdateSellerPostStatus`（`delegation` 欄留空即賣家本人路徑）。<br/>**capability 歸屬（46 §3.3 分類原則）**：`publish` ＝ 把內容推向買家的擴張型 ⇒ `CapMarketing`（BLOCK）；`unpublish` ＝ 只減不增的收縮型 ⇒ `CapContentContract`（白名單，停權賣家仍可自清，與同組的 `DELETE .../posts/{id}` 同級）。<br/>**仍然不做**：`expectedVersion`（賣家對自己的貼文沒有第二個寫入者要防，強收版本號只是多一次詳情往返）、`scheduledPublishAt`（排程靠 `scheduled_by_session_id` 重建授權，賣家路徑沒有 session 可指）、回到草稿 `4401`（`UpdateSellerPostStatusRequest.target_status` 的封閉值域只有 `4402`／`4403`，見 §6.1.9） | `backend-payuni`；前端 `hawkr-website` 的渲染早已就緒（缺值不畫），零改動 |
 | 10a | **Seller Center 元件的「行為」改變**（＝賣家本人看到的畫面與發出的請求） | 代行工作區在 `hawkr-website` 實作並**直接 import `features/seller-center/**` 的同一份元件**（§4.5），因此 Seller Center 的**程式碼**必然被動到——賣家資料層要由「直接 import `authedFetch`」改為可注入 fetcher 的工廠形狀。<br/>**不變的是行為**：賣家本人走原路徑的每一個畫面與每一次請求都必須逐位元相同，這是 §13 bounded regression 的驗收條件，也是本案在 website 側最大的一筆回歸風險。<br/>⚠️ **唯一的例外是動態管理，且它是刻意的**：`publishStatus` 的顯示與發布／下架入口見 #10-1——那三項**不是**回歸，是本案引進 `publish_status` 的必要配套。bounded regression 因此要分兩類讀：動態管理以外的模組**逐位元相同**；動態管理只要求「賣家原有的建立／編輯／刪除／列表四個動作行為不變」，新增的狀態欄與兩支發布端點不列入回歸差異 | `hawkr-website`；後端 `backend-payuni`（#10-1） |
-| 11 | 三個 repo 的 UI 實作細節（版面像素、動畫、狀態管理選型） | 本書只列同波修改清單與後端必須滿足的義務。⚠️ **「前端已上 dev」不是本列的理由**——改動成本要看那份實作有多少行、有沒有消費者、鎖住的是契約還是佔位（[ADR：規則權威歸屬的判定程序](../adr/2026-09-18-adm-delegation-authority-test.md)） | `hawkr-admin`／`hawkr-website` |
+| 11 | 三個 repo 的 UI 實作細節（版面像素、動畫、狀態管理選型） | 本書只列同波修改清單與後端必須滿足的義務。⚠️ **「前端已上 dev」不是本列的理由**——改動成本要看那份實作有多少行、有沒有消費者、鎖住的是契約還是佔位（[ADR：規則權威歸屬的判定程序](/docs/adr/2026-09-18-adm-delegation-authority-test.md)） | `hawkr-admin`／`hawkr-website` |
 | 12 | admin 其他既有路由的 capability 收斂 | 本期只有代行路由宣告 admin capability；機制對全部 admin 路由開放但不強制 | 另案 |
 | 13 | 代行工作區的「店面外觀預覽／商品預覽／動態預覽」（買家視角） | 屬**前端權威**（畫面上渲染什麼）：**以本書各代行 GET 端點回傳的 DTO 自繪，不新增預覽端點、且不得改打 `/api/v1/public/*`**。⚠️ 改打公開 API 是最省事、也最錯的做法——草稿與未發布內容在 public 路徑上**根本查不到**（§5.1.5 的 `publish_status = 4402` 過濾），預覽會**靜默空白**而不是報錯。**產品需求的商店預覽視窗畫的正是這個形狀**——視窗上緣的網址列寫著 `example.com/sellers/s9001`（＝嵌入公開店面頁），照它做即命中本列禁令。若既有 DTO 不足以渲染買家視角，那是 §6.1.7／§6.1.8／§6.1.9 的**欄位補充（契約變更）**，走本書流程。<br/>**工作區在 `hawkr-website`，這一列的禁令因此更容易違反、也更容易守。**「更容易違反」是因為那個 repo 裡本來就有買家視角的元件與 `app/(public)` 的店面頁，順手 import 一個就等於改打公開資料源；「更容易守」是因為 `authedFetch` 在代行執行期會 throw（§4.5），而公開頁走的是 `apiClient.public` ⇒ **要再加一條**：`app/(delegated)/**` 之下同樣禁止 import `apiClient.public`，違反即 CI 紅。既有的 `features/seller-center/preview/**`（賣家自己的預覽）**不得**在代行工作區重用，理由同上——它讀的是公開路徑 | `hawkr-website` |
 | 14 | 代行使用**商品批次匯入**工具 | `gateway/internal/router/routes_product_import.go` 起的 `registerProductImportRoutes` 全部掛 `sellerHandle` ＋ `authz.CapProductManage` 且註冊在 `/app` group ＝ **賣家側工具**；代行 capability 是封閉九值、不含任何 import 能力，§6.1.1 端點總表也沒有任何 import 路徑。要做 ＝ 新增第 10 個 capability ＋ 新增代行端點，須同時動封閉九值、`seller_delegation_authorizations_capabilities_check`、跨 repo 白名單，並與 admin repo 白名單同波發布 —— **是另一張票，不是 TTL 題** | 另案 |
@@ -223,7 +223,7 @@ flowchart TD
 
 本章分四組：**3.1 前端已寫死的契約約束**（違反即靜默失效）、**3.2 本專案工程約束**、**3.3 假設**（失真即必須重新評估本書的對應決策）、**3.4 由本書定版的決策**（不是假設——它不會「失真」，只會被重新決策）。
 
-各項取值的權威歸屬判準（規則的**值**由誰決定、前端現況與改動成本為何不構成權威）見 [ADR：代行營運規則權威歸屬的判定程序](../adr/2026-09-18-adm-delegation-authority-test.md)。
+各項取值的權威歸屬判準（規則的**值**由誰決定、前端現況與改動成本為何不構成權威）見 [ADR：代行營運規則權威歸屬的判定程序](/docs/adr/2026-09-18-adm-delegation-authority-test.md)。
 
 ### 3.1 前端已寫死的契約約束
 
@@ -299,13 +299,13 @@ flowchart TD
 | ✅ 終態 | HTTP `404`／`410` 且 body `code` 為**字串**且 ∈ `{DELEGATED_OPERATION_ENDED, DELEGATED_OPERATION_EXPIRED, DELEGATED_OPERATION_REVOKED, DELEGATED_OPERATION_NOT_FOUND}` —— **本設計不使用**（字串 code 與 envelope `int32 code` 衝突） |
 | ❌ 結果不明 | `202`、`200 {ended:false}`、`200 {}`、裸 `404`／`410`、5xx、逾時 |
 
-> 註：因為本設計選了「不使用字串 code」的路徑，`GET current` 對**終態 session** 必須回 `200 {code:0, data:{..., status:"expired"|"revoked"}}`，由前端自行轉 410 並清 cookie。這反過來要求 **session 記錄永不硬刪**（否則查不到就只能回 404，落進「結果不明」）。詳見 §7.5 與 [ADR：工作階段與稽核的服務歸屬、落庫形狀與保留期](../adr/2026-09-18-adm-delegation-service-ownership.md)。
+> 註：因為本設計選了「不使用字串 code」的路徑，`GET current` 對**終態 session** 必須回 `200 {code:0, data:{..., status:"expired"|"revoked"}}`，由前端自行轉 410 並清 cookie。這反過來要求 **session 記錄永不硬刪**（否則查不到就只能回 404，落進「結果不明」）。詳見 §7.5 與 [ADR：工作階段與稽核的服務歸屬、落庫形狀與保留期](/docs/adr/2026-09-18-adm-delegation-service-ownership.md)。
 
 #### 3.1.5 產品需求與前端現況不一致時的定版值
 
 同一件事有三個來源：**產品需求（ADM 代行營運 v2.0 及其 UI mockup）**、**已上 dev 的前端程式碼**、**本書**。
 三者不一致時由本書定版；權威歸屬的判定程序、各項的裁決理由與被否決的選項見
-[ADR：代行營運規則權威歸屬的判定程序](../adr/2026-09-18-adm-delegation-authority-test.md)。
+[ADR：代行營運規則權威歸屬的判定程序](/docs/adr/2026-09-18-adm-delegation-authority-test.md)。
 
 **本節只列定版值。** 規格全文在各自的落點，本表是索引。
 
@@ -332,7 +332,7 @@ flowchart TD
 | E5 | **禁止硬編碼；共享代碼值先改 CodeMeta `.md` 再 `generate.sh`，嚴禁直接改生成檔** | 新增的代行錯誤碼、EventType、稽核 action／actor 碼一律走 `docs/代碼管理（CodeMeta）/` → `generate.sh`。**capability token 不進 CodeMeta**（Gateway 內部概念，比照 46 號既有裁決） | `docs/代碼管理（CodeMeta）/README.md` |
 | E6 | **Gateway 未登錄的業務碼一律塌縮成 HTTP 409** | 本功能需要 401/403/409/410/422/424/429 分流 ⇒ 必須在 `gateway/internal/response` 建立**業務碼→HTTP status 的統一映射表**（新增獨立檔 `bizhttp.go`，見 §4.5）並登錄本功能全部碼，而不是為單一情境加 helper | `gateway/internal/response/response.go`；memory `reference_gateway_bizcode_collapses_to_409` |
 | E7 | **Proto 只改 `api/proto/*`**；改完必跑 `scripts/gen-go-proto.sh` ＋ rsync 到 java-proto ＋ `mvn clean install`，CI 有 `proto-generated-diff.yml` 對拍 | `DelegationContext` 新增於 `api/proto/common/delegation.proto`；**所有被代行觸及的既有賣家 RPC（含讀取）**統一用**欄位號 100** 加同一個 optional 欄位 | `docs/開發規範/Proto 管理規範.md` |
-| E8 | **gRPC 角色分離**：不同角色必須獨立 RPC，禁止 boolean flag 分流 | 本設計**不新增** `*ForDelegation` RPC，而是在既有賣家讀寫 RPC 加 `DelegationContext`——這不是「flag 分流」，而是「同一個賣家讀寫動作，多帶一份授權語境」，語意仍是賣家資源讀寫。代行讀取**不改走 `*ForAdmin`**：後者是平台跨賣家視角，DTO 與語意都不同，走雙軌會產生兩套讀取路徑。此取捨的理由見 [ADR：授權如何穿過微服務牆](../adr/2026-09-18-adm-delegation-authz-propagation.md) | `docs/開發規範/Java 微服務開發規範.md` §4 |
+| E8 | **gRPC 角色分離**：不同角色必須獨立 RPC，禁止 boolean flag 分流 | 本設計**不新增** `*ForDelegation` RPC，而是在既有賣家讀寫 RPC 加 `DelegationContext`——這不是「flag 分流」，而是「同一個賣家讀寫動作，多帶一份授權語境」，語意仍是賣家資源讀寫。代行讀取**不改走 `*ForAdmin`**：後者是平台跨賣家視角，DTO 與語意都不同，走雙軌會產生兩套讀取路徑。此取捨的理由見 [ADR：授權如何穿過微服務牆](/docs/adr/2026-09-18-adm-delegation-authz-propagation.md) | `docs/開發規範/Java 微服務開發規範.md` §4 |
 | E9 | **微服務間內部授權走 HMAC**（52 號）；canonical 為 `serviceName\nts\nnonce\naccountIdOrEmpty` | `DelegationContext` **不在簽章覆蓋範圍內**，其可信度來自「呼叫方已被證明是內部服務」＋「Gateway 是唯一產生者」。此信任邊界與前提必須在 §8.1 明寫；canonical **不變**，零破壞性遷移 | `services/java/shared/common-core/.../grpc/GrpcAuthClientInterceptor.java` |
 | E10 | **API 同步責任**：新增／修改 gRPC RPC 必須同步 `api/proto` 與 Gateway 路由，嚴禁孤兒 RPC | 每支新增 RPC 都必須有對應的 `/admin/...` 入口 | `docs/開發規範/Java 微服務開發規範.md` §4 |
 | E11 | **賣家能力層規約**：宣告＝掛載合一、boot 斷言、`/app` 下禁 wildcard | 代行沿用同一 registry 與掛載慣例；`/admin` 下同樣禁 wildcard（本案新增四條 boot 斷言的第 ③ 條，四條全文見 §4.1.2） | `docs/開發規範/賣家能力權限層規範.md` |
@@ -364,7 +364,7 @@ flowchart TD
 
 | # | 決策 | 理由 | 要改動它必須做什麼 |
 |---|---|---|---|
-| **D1** | **工作階段 TTL 上限為 1800 秒；前端的 60 秒時鐘容差不動**（admin repo `model.ts` 的 `DELEGATED_OPERATION_MAX_TTL_SECONDS` 與 `CLOCK_SKEW_SECONDS`） | TTL 是風險曝險窗口，窗口愈長、撤銷之外的兜底就愈依賴人；曝險窗口的長度由**閒置逾時**（900 秒）承擔另一半——無人操作時 15 分鐘即結束。<br/>60 秒時鐘容差是**安全檢查**而非效能參數，放寬它等於放寬「後端時鐘被推到未來」的偵測門檻；它與 TTL 正交。<br/>兩者的取值依據見 [ADR：工作階段的到期機制、併發範圍與識別碼](../adr/2026-09-18-adm-delegation-session-lifecycle.md) | **TTL 上限**：三處必須同波——admin repo `model.ts` 的常數、`tests/delegated-operations-contract.test.ts` 的邊界斷言、`delegated_operation_sessions` 的 `delegated_operation_sessions_lifetime_check`（`docs/modules/delegation.md` §2、§3）。**三處缺一即產生「前端擋下／DB 擋下／後端放行」的不一致。**<br/>**60 秒時鐘容差**：同波修改 `model.ts` 的常數與對應斷言 |
+| **D1** | **工作階段 TTL 上限為 1800 秒；前端的 60 秒時鐘容差不動**（admin repo `model.ts` 的 `DELEGATED_OPERATION_MAX_TTL_SECONDS` 與 `CLOCK_SKEW_SECONDS`） | TTL 是風險曝險窗口，窗口愈長、撤銷之外的兜底就愈依賴人；曝險窗口的長度由**閒置逾時**（900 秒）承擔另一半——無人操作時 15 分鐘即結束。<br/>60 秒時鐘容差是**安全檢查**而非效能參數，放寬它等於放寬「後端時鐘被推到未來」的偵測門檻；它與 TTL 正交。<br/>兩者的取值依據見 [ADR：工作階段的到期機制、併發範圍與識別碼](/docs/adr/2026-09-18-adm-delegation-session-lifecycle.md) | **TTL 上限**：三處必須同波——admin repo `model.ts` 的常數、`tests/delegated-operations-contract.test.ts` 的邊界斷言、`delegated_operation_sessions` 的 `delegated_operation_sessions_lifetime_check`（`docs/modules/delegation.md` §2、§3）。**三處缺一即產生「前端擋下／DB 擋下／後端放行」的不一致。**<br/>**60 秒時鐘容差**：同波修改 `model.ts` 的常數與對應斷言 |
 
 ---
 
@@ -378,7 +378,7 @@ ADM 代行營運要解的問題是：**平台管理員需要替某一家店維�
 
 **定版形狀**：**管理員全程只帶自己的 ADM 憑證，走 `/api/v1/admin/**`；「代行誰」由伺服器持有的 Operation Session 回答，「能做什麼」由 Gateway 的 admin capability 層回答，「是不是真的被授權」由微服務讀 proto 的 `DelegationContext` 再驗一次。** 管理員的請求從頭到尾沒有一刻長得像賣家。
 
-⚠️ **不得以「換一枚賣家 JWT 給管理員用」（impersonation）實作**——它會同時破壞兩件事：**(a) 能力面**：賣家 JWT 承載 `accountType ∈ {2,3}`，`gateway/internal/authz` 的 `allCapabilities` 會**全授予**賣家 capability（含出貨／物流／售後與取消出貨＋退款受理），代行的封閉禁區在這條路徑上**沒有任何機械手段可以縮回來**，只剩「前端不要點」；**(b) 稽核面**：下游一切寫入的 `x-account-id` 都變成賣家，`created_by`／`updated_by`／MQ event 的 actor 全部指向賣家本人，「誰做的」在資料層永久無解。否決過程與被否決的其他選項見 [ADR：授權如何穿過微服務牆](../adr/2026-09-18-adm-delegation-authz-propagation.md)。
+⚠️ **不得以「換一枚賣家 JWT 給管理員用」（impersonation）實作**——它會同時破壞兩件事：**(a) 能力面**：賣家 JWT 承載 `accountType ∈ {2,3}`，`gateway/internal/authz` 的 `allCapabilities` 會**全授予**賣家 capability（含出貨／物流／售後與取消出貨＋退款受理），代行的封閉禁區在這條路徑上**沒有任何機械手段可以縮回來**，只剩「前端不要點」；**(b) 稽核面**：下游一切寫入的 `x-account-id` 都變成賣家，`created_by`／`updated_by`／MQ event 的 actor 全部指向賣家本人，「誰做的」在資料層永久無解。否決過程與被否決的其他選項見 [ADR：授權如何穿過微服務牆](/docs/adr/2026-09-18-adm-delegation-authz-propagation.md)。
 
 定版形狀避開了 ADMIN 打賣家路徑會撞上的三道牆，而不是繞過它們：
 
@@ -516,7 +516,7 @@ flowchart TB
 本案的 9 個 admin capability 用**小寫點號式** `{area}.{verb}`（`storefront.read` / `storefront.write` / `products.read` / `products.write` / `products.publish` / `posts.read` / `posts.write` / `posts.publish` / `orders.read`），與既有 12 個賣家 capability 的 SHOUTY 形式（`CAP_PRODUCT_MANAGE`，`gateway/internal/authz/capability.go`）**刻意不同**：
 
 - 賣家 capability 是**純 Gateway 內部**概念，值長什麼樣只影響 log 可讀性。
-- 代行 capability 是**前端契約的一部分**——preflight 把它下發給 admin BFF，BFF 又把它當封閉列舉驗證（未知值＝整份契約作廢，不是忽略）。值域一旦定版就是跨 repo 的硬契約（**值域屬後端權威**——它決定哪些動作可做，判準 Q1）；**形式**則是同一組概念的兩種寫法（`storefront.read` 與 `CAP_STOREFRONT_READ` 可互相機械轉換），**此項屬編碼細節，前端有權威**（裁決與理由見 §3.1.5 `K7` 與 [ADR：規則權威歸屬的判定程序](../adr/2026-09-18-adm-delegation-authority-test.md)），因此沿用前端已寫死的那份（admin repo `policy.ts` 的 `KNOWN_DELEGATED_OPERATION_CAPABILITIES`）。⚠️ **沿用的是「形式」不是「內容」**：該陣列施工前有 **11** 個值，其中 `products.bulk` 與 `audit.read` 後端永不核發（封閉九值不含它們），必須刪除而非保留（§4.5）。
+- 代行 capability 是**前端契約的一部分**——preflight 把它下發給 admin BFF，BFF 又把它當封閉列舉驗證（未知值＝整份契約作廢，不是忽略）。值域一旦定版就是跨 repo 的硬契約（**值域屬後端權威**——它決定哪些動作可做，判準 Q1）；**形式**則是同一組概念的兩種寫法（`storefront.read` 與 `CAP_STOREFRONT_READ` 可互相機械轉換），**此項屬編碼細節，前端有權威**（裁決與理由見 §3.1.5 `K7` 與 [ADR：規則權威歸屬的判定程序](/docs/adr/2026-09-18-adm-delegation-authority-test.md)），因此沿用前端已寫死的那份（admin repo `policy.ts` 的 `KNOWN_DELEGATED_OPERATION_CAPABILITIES`）。⚠️ **沿用的是「形式」不是「內容」**：該陣列施工前有 **11** 個值，其中 `products.bulk` 與 `audit.read` 後端永不核發（封閉九值不含它們），必須刪除而非保留（§4.5）。
 
 Go 端因此是兩個不同型別、兩份不同的 registry：`authz.Capability`（既有）與 `authz.AdminCapability`，`Register` / `RegisterAdmin` 各驗各的已知集合。**不合併成一個型別**——合併之後「賣家路由誤宣告了一個 admin token」就不再 panic，46 號建立的 deny-by-default 保證會被靜默削弱。
 
@@ -571,7 +571,7 @@ hawkr.common.DelegationContext delegation = 100;
 
 > 路徑與符號名為施工落點的指標；**行號一律以現行程式碼為準**，不要照抄本表的行號。
 >
-> **代行工作區的實作位置是 `hawkr-website`；三 repo 的職責劃分如下**（推導與被否決的選項見 [ADR：工作區落在哪個 repo、憑證怎麼跨 host、身分由什麼承擔](../adr/2026-09-18-adm-delegation-workspace-host.md)；跨 host 的憑證傳遞見本節「憑證跨 host 傳遞」小節）：
+> **代行工作區的實作位置是 `hawkr-website`；三 repo 的職責劃分如下**（推導與被否決的選項見 [ADR：工作區落在哪個 repo、憑證怎麼跨 host、身分由什麼承擔](/docs/adr/2026-09-18-adm-delegation-workspace-host.md)；跨 host 的憑證傳遞見本節「憑證跨 host 傳遞」小節）：
 >
 > | repo | 本案負責什麼 | 明確不負責什麼 |
 > |---|---|---|
@@ -1651,7 +1651,7 @@ Content-Type: application/json
 
 **`reasonCode` 不在 `reasonOptions` 內** 與 **`caseReferenceRequired` 為 true 卻沒給 `caseReference`** 這兩種情況，BFF 自己就會擋掉（403 / 400），根本不會打到後端 —— 但後端**仍必須自己再驗一次**（`plan:14`：client 隱藏按鈕不是授權）。
 
-**`caseReference` 到底該填什麼、由誰負責（理由見 [ADR：停權即時失效、通知通道與 PII 揭露](../adr/2026-09-18-adm-delegation-suspension-and-notification.md)）**：本平台**沒有工單系統**，`case_reference` 因此是**操作者自填的參考字串，平台未驗證其指向**，責任歸屬即該次代行的 `actor_admin_id`。三個 reason 各自的填法：
+**`caseReference` 到底該填什麼、由誰負責（理由見 [ADR：停權即時失效、通知通道與 PII 揭露](/docs/adr/2026-09-18-adm-delegation-suspension-and-notification.md)）**：本平台**沒有工單系統**，`case_reference` 因此是**操作者自填的參考字串，平台未驗證其指向**，責任歸屬即該次代行的 `actor_admin_id`。三個 reason 各自的填法：
 
 | `reasonCode` | 必填 | 該填什麼 |
 |---|---|---|
@@ -1939,7 +1939,7 @@ X-HK-Operation-Session: dops_9tJ0mQx7Kd2ZfVb3Rn8sYuC1Ea6Ph4Lw5Ti0Og2NkJ8
 |---|---|---|---|
 | 後端內部錯誤／逾時 | 9280 | **424** | 重試 DELETE |
 
-🔴 **本表沒有 9281（`actor_admin_id` ≠ 當前 ADM session 的 admin）**——本端點由 www host 的 BFF 發出，請求裡沒有第二個身分可以拿來比對（§8.1.3「第 1 項的兩種身分來源」）。⚠️ **少掉的保護要看清楚**：有第二個身分可比時，擋得住「憑一把撞到的 credential 結束他人的代行，而且不留任何治理痕跡」（結束不是撤銷，沒有 `revoked_by_admin_id`）。跨 host 之後**持有 credential 即被視為該工作階段的操作者**，這條路徑不再被攔——但它的前提也升高了：對方得先取得 www host 上那個 `HttpOnly`／`Path=/adm` 的 cookie，而那已經等同取得一份完整的工作階段憑證。代價與承接它的三道既有機制見 [ADR：工作區落在哪個 repo、憑證怎麼跨 host、身分由什麼承擔](../adr/2026-09-18-adm-delegation-workspace-host.md)。
+🔴 **本表沒有 9281（`actor_admin_id` ≠ 當前 ADM session 的 admin）**——本端點由 www host 的 BFF 發出，請求裡沒有第二個身分可以拿來比對（§8.1.3「第 1 項的兩種身分來源」）。⚠️ **少掉的保護要看清楚**：有第二個身分可比時，擋得住「憑一把撞到的 credential 結束他人的代行，而且不留任何治理痕跡」（結束不是撤銷，沒有 `revoked_by_admin_id`）。跨 host 之後**持有 credential 即被視為該工作階段的操作者**，這條路徑不再被攔——但它的前提也升高了：對方得先取得 www host 上那個 `HttpOnly`／`Path=/adm` 的 cookie，而那已經等同取得一份完整的工作階段憑證。代價與承接它的三道既有機制見 [ADR：工作區落在哪個 repo、憑證怎麼跨 host、身分由什麼承擔](/docs/adr/2026-09-18-adm-delegation-workspace-host.md)。
 
 **寫入路徑由兩跳收成一跳**：Gateway 直接送 `EndSession(operation_credential, request_id)`，不先打 `GetCurrentSession`：取回 `actor` 供比對的往返不參與任何判定。`EndSessionRequest` 仍然只有 `operation_credential` 與 `request_id`、不帶 actor，也仍然不會為此加欄位（§6.2 訊息定義）。
 
@@ -2256,7 +2256,7 @@ PATCH body ＝ POST 的欄位集合 ＋ `expectedVersion`（必填）＋ `operat
 - 回應為統一 mutation 形狀，`resource` 含 `status`／`statusLabel`／`version`
 
 **本端點沿用 product-service 既有的上架規則，不新增任何治理狀態的特判**：判定只有 capability ＋ 樂觀鎖 ＋ 既有的 `validateSellerStatusTransition` 與 `requireSellerAcceptingOrdersForActivation`。既有規則擋得住就擋得住，既有規則沒擋，代行也不額外加擋——在代行這一側單獨加一條「治理下架不可代行上架」，會造出「代行者不能上架、賣家本人可以」的反轉。
-**架構事實（可驗證，不是安慰話）**：日後若為治理下架引入狀態表達（例如 `governance_takedown_at` ＋ 原因 ＋ 案件編號），**代行路徑會自動繼承，本節一行都不用改**——因為本設計選了「既有 RPC 加 `DelegationContext`」而否決「開 `*ForDelegation` 變體」（[ADR：授權如何穿過微服務牆](../adr/2026-09-18-adm-delegation-authz-propagation.md)），業務規則只有一份實作，新規則補在 `updateSellerProductStatus` 附近即同時對賣家與代行生效。
+**架構事實（可驗證，不是安慰話）**：日後若為治理下架引入狀態表達（例如 `governance_takedown_at` ＋ 原因 ＋ 案件編號），**代行路徑會自動繼承，本節一行都不用改**——因為本設計選了「既有 RPC 加 `DelegationContext`」而否決「開 `*ForDelegation` 變體」（[ADR：授權如何穿過微服務牆](/docs/adr/2026-09-18-adm-delegation-authz-propagation.md)），業務規則只有一份實作，新規則補在 `updateSellerProductStatus` 附近即同時對賣家與代行生效。
 
 **`POST .../products/batch-unpublish`** — **`products.publish`**
 
@@ -2539,7 +2539,7 @@ GET /api/v1/admin/sellers/2685914682/orders/HK260728001/recipient-contact?operat
 - capability 就是 `orders.read`，**沒有第二層獨立的揭露授權**：不足即 9262，不存在「揭露被拒」的專屬碼（原規劃的 9278 已刪，見 §6.5.3）
 - `before_snapshot` / `after_snapshot` **一律不存 PII 值**，只存 `{"revealedFields":["phone","fullAddress"]}`
 - 揭露的欄位集合是白名單，不得順手多回 email、身分證、付款資訊
-- **不通知賣家**：稽核列的 `notify_seller` **顯式寫入 `false`**，因此 §8.4 W5 不為它建立 完成事件、不發 MQ 事件、`notifiedAt` 為 `null`。⚠️ **不得依賴 DB 的 `DEFAULT true`**——本端點沒有「通知賣家」勾選框，落到預設就會靜默通知。業務理由（查看訂單是高頻讀取、通知是低頻推播，逐次推播會稀釋通知本身的鑑別力）見 §7.2.6 與 [ADR：停權即時失效、通知通道與 PII 揭露](../adr/2026-09-18-adm-delegation-suspension-and-notification.md)。**已知代價**：本列 `risk_level='high'` 雖計入 UI 的「風險操作 N 項」並出現在結束摘要與 §6.1.11 的稽核查詢，但那三個面**都在平台側**（§6.1.11 掛 `requireAdmin()`）⇒ **賣家本期看不到自己的買家收件資訊被誰看過**，不得把它表述成「賣家的知情權由稽核保障」
+- **不通知賣家**：稽核列的 `notify_seller` **顯式寫入 `false`**，因此 §8.4 W5 不為它建立 完成事件、不發 MQ 事件、`notifiedAt` 為 `null`。⚠️ **不得依賴 DB 的 `DEFAULT true`**——本端點沒有「通知賣家」勾選框，落到預設就會靜默通知。業務理由（查看訂單是高頻讀取、通知是低頻推播，逐次推播會稀釋通知本身的鑑別力）見 §7.2.6 與 [ADR：停權即時失效、通知通道與 PII 揭露](/docs/adr/2026-09-18-adm-delegation-suspension-and-notification.md)。**已知代價**：本列 `risk_level='high'` 雖計入 UI 的「風險操作 N 項」並出現在結束摘要與 §6.1.11 的稽核查詢，但那三個面**都在平台側**（§6.1.11 掛 `requireAdmin()`）⇒ **賣家本期看不到自己的買家收件資訊被誰看過**，不得把它表述成「賣家的知情權由稽核保障」
 
 ---
 
@@ -3559,7 +3559,7 @@ notification-service 建立 `notifications` 列時填：
 
 ⚠️ **9281 本期沒有 emitter，這是定版結果，不是漏寫。** 「9281（存在，但不是你的）與 9274（不存在）刻意分開」這條論證的前提是**請求裡有兩個身分可以比對**；跨 host 之後代行執行期只帶 operation credential，「不是你的」判定不出來，因此 §6.1.4 與 §6.1.5 的失敗情境表、20 支資源端點的 `deniedCode` 都沒有「不是你的」這一列。
 
-⇒ 兩件事一併明令：**不得**把 9274 的語意悄悄擴大成「也涵蓋不是你的」——那會讓一件**判定不出來**的事看起來像已經被涵蓋；**不得**把 9281 的碼位挪作他用。這道防線少掉了什麼、由哪三道既有機制承接、各自的邊界在哪，逐條寫在 [ADR：工作區落在哪個 repo、憑證怎麼跨 host、身分由什麼承擔](../adr/2026-09-18-adm-delegation-workspace-host.md)。
+⇒ 兩件事一併明令：**不得**把 9274 的語意悄悄擴大成「也涵蓋不是你的」——那會讓一件**判定不出來**的事看起來像已經被涵蓋；**不得**把 9281 的碼位挪作他用。這道防線少掉了什麼、由哪三道既有機制承接、各自的邊界在哪，逐條寫在 [ADR：工作區落在哪個 repo、憑證怎麼跨 host、身分由什麼承擔](/docs/adr/2026-09-18-adm-delegation-workspace-host.md)。
 
 **9279 刻意不用 503**（C12）。為避免同一組碼在不同端點有兩種語意，稽核前置失敗統一走 409（本專案業務拒絕的預設值）。
 
@@ -4351,7 +4351,7 @@ sequenceDiagram
 4. **揭露欄位是白名單**：`name`／`phone`／`fullAddress`／`zipCode`，不得順手多回 email、身分證、付款資訊（§8.1.5）。
 
 > ✅ **已定版：不通知賣家，但必落稽核。** `ORDER_PII_REVEAL` 的稽核列 `notify_seller` **顯式寫入 `false`**，揭露不發完成事件、不通知賣家；揭露本身則**完整落庫**（actor／時刻／訂單／`revealedFields`／`operation_reason`／UA），`risk_level='high'` 計入 UI 的「風險操作 N 項」。
-> **必須說清楚這些稽核面都在平台側**：稽核 API（§6.1.11）掛 `requireAdmin()`、結束摘要是給操作者的查詢、§6.3.2 全書**只有一個** MQ 事件而 `notify_seller=false` 就不發 ⇒ **賣家在本期對「有人看了我的買家收件資訊」是完全不可見的**。這是本定版接受的**已知代價**（兩條出路見 [ADR：停權即時失效、通知通道與 PII 揭露](../adr/2026-09-18-adm-delegation-suspension-and-notification.md)）；**不得**把它表述成「賣家的知情權由稽核保障」——被保障的是**平台的可稽核性**。
+> **必須說清楚這些稽核面都在平台側**：稽核 API（§6.1.11）掛 `requireAdmin()`、結束摘要是給操作者的查詢、§6.3.2 全書**只有一個** MQ 事件而 `notify_seller=false` 就不發 ⇒ **賣家在本期對「有人看了我的買家收件資訊」是完全不可見的**。這是本定版接受的**已知代價**（兩條出路見 [ADR：停權即時失效、通知通道與 PII 揭露](/docs/adr/2026-09-18-adm-delegation-suspension-and-notification.md)）；**不得**把它表述成「賣家的知情權由稽核保障」——被保障的是**平台的可稽核性**。
 > **業務理由**：查看訂單是**高頻讀取**，通知是**低頻推播**，兩者的節奏差一個數量級。每揭露一次就推一則「管理員完成了一次操作」，賣家一天內會收到數十則語意相同的訊息，**被稀釋的是通知本身的鑑別力**——真正需要他立刻反應的那幾則（代行改了商品價格、代行發了貼文）會淹沒在噪音裡。⇒ 不通知不是少做一件事，是把賣家的注意力留給真的需要他的事件；知情權沒有被放棄，只是換成**可查**而不是**被推播**。
 > **不得依賴 DB 的 `DEFAULT true`**：`docs/modules/delegation.md` §6 的 DEFAULT 之所以是 `true`，是為了寫入類操作（改商品、發貼文）——揭露路徑**沒有**「通知賣家」勾選框，落到預設就會**靜默地**通知。這一處必須顯式寫 `false`，且它是 intent 階段寫入（confirm 只讀不寫）。
 > **方向改變的成本刻意留得很低**（這是附帶好處，不是理由）：稽核事實已完整保留，日後若裁決為「要通知」，可依 `action='ORDER_PII_REVEAL'` 的稽核列由維運補發（§12.4 的「補通知」SQL）；反過來，已經發出去的通知收不回。
@@ -5076,7 +5076,7 @@ flowchart TD
 
 ⚠️ **編號一律不重排。** 全書數十處以「第 5 項」「第 8 項」指名本流程圖的判定，重排會讓每一處同時指錯。第 4 項保留為空號，不得拿去掛任何新判定。
 
-**這條防線是真的少了，不是換了一種方式達成**：舊設計的 9281 擋得住「同一台電腦上 ADM 的登入者換了人，而 operation cookie 沒清」。跨 host 之後那個錯配仍然可能發生，只是再也沒有第二個事實可以察覺它。接手的三道既有機制（ADM 登出連動撤銷／idle 900 與 hard 1800／S5 撤銷）**都不是即時攔截**，逐條邊界與代價見 [ADR：工作區落在哪個 repo、憑證怎麼跨 host、身分由什麼承擔](../adr/2026-09-18-adm-delegation-workspace-host.md)，**不得**寫成「有別的機制所以更安全」。
+**這條防線是真的少了，不是換了一種方式達成**：舊設計的 9281 擋得住「同一台電腦上 ADM 的登入者換了人，而 operation cookie 沒清」。跨 host 之後那個錯配仍然可能發生，只是再也沒有第二個事實可以察覺它。接手的三道既有機制（ADM 登出連動撤銷／idle 900 與 hard 1800／S5 撤銷）**都不是即時攔截**，逐條邊界與代價見 [ADR：工作區落在哪個 repo、憑證怎麼跨 host、身分由什麼承擔](/docs/adr/2026-09-18-adm-delegation-workspace-host.md)，**不得**寫成「有別的機制所以更安全」。
 
 **配套的機械保證（落點在 §8.1.2 boot 斷言第 4 條＝§4.5 的 (g)）**：`/api/v1/admin/**` 這個前綴從此**不再蘊含 `requireAdmin`**。⇒ 該前綴下凡不經 `requireAdmin()` 的路由，必須逐條列在具名白名單內（26 支：20 資源 ＋ S3 ＋ S4 ＋ `current/summary` ＋ 兩支媒體 ＋ S6），不在名單內即 boot panic。少了它，日後把一支治理端點掛到 credential-only 群組上，就是一支**沒有任何身分要求的治理端點**，而它在 review 時看起來與其他 `/admin/` 路由毫無差別。
 
@@ -5142,7 +5142,7 @@ flowchart TD
 **第二與第三個連帶都只在「代行者又送了至少一次代行資源請求」時才觸發**——轉態發生在第 8 項命中的那一刻，而第 8 項只掛在資源路由上（作用域見下方）。因此：
 
 - **第三個連帶**：操作者若在停權發生後就沒有再動作，工作階段不會被轉態，排程到點時照樣通過 `RecordAuditIntent(origin=scheduled)`（該呼叫只檢查 session 狀態，§7.6.3）。
-- **第二個連帶**：同理，`GET current` 會持續讀到 `active`，**工作區不會自動切成阻擋畫面**；上表那個「≤30 秒」的計時起點是**第 8 項命中的那一次請求**，不是店家被停權的那一刻。這一項**沒有**對應的獨立防線，而且是**刻意接受的**：未轉態期間寫入面已由第 8 項 fail-closed 完全擋住（代行者一動作就撞上），缺的只是「操作者停手不動時 UI 早一點知道」。要補齊的正解是事件驅動撤銷（消費既有 `seller.suspended`／`seller.deleted`），本期不做，選項與否決理由見 [ADR：停權即時失效、通知通道與 PII 揭露](../adr/2026-09-18-adm-delegation-suspension-and-notification.md)。
+- **第二個連帶**：同理，`GET current` 會持續讀到 `active`，**工作區不會自動切成阻擋畫面**；上表那個「≤30 秒」的計時起點是**第 8 項命中的那一次請求**，不是店家被停權的那一刻。這一項**沒有**對應的獨立防線，而且是**刻意接受的**：未轉態期間寫入面已由第 8 項 fail-closed 完全擋住（代行者一動作就撞上），缺的只是「操作者停手不動時 UI 早一點知道」。要補齊的正解是事件驅動撤銷（消費既有 `seller.suspended`／`seller.deleted`），本期不做，選項與否決理由見 [ADR：停權即時失效、通知通道與 PII 揭露](/docs/adr/2026-09-18-adm-delegation-suspension-and-notification.md)。
 
 **`RevokeSession` 呼叫本身失敗不改變本次請求的結果**：拒絕在第 8 項判定成立的那一刻就已成立，撤銷只是為了讓 UI 與排程跟上。失敗時記 warn 並照常回 9272／9265，下一次請求會再撞一次同一個判定、再試一次撤銷。**不得**因為撤銷失敗而把請求改判成 5xx——那會把一個已經正確拒絕的請求，變成一個看起來像後端壞掉的請求。
 

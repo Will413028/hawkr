@@ -7,7 +7,7 @@
 | 維護者 | 維護團隊 |
 | 對應程式碼 | `services/java/shared/common-core/.../grpc/InternalAuth{Config,Signer,Verifier}.java`、`GrpcAuth{ClientInterceptor,ServerInterceptor,Context,AutoConfiguration}.java`、`services/java/shared/observability-common/.../obs/grpc/GrpcChannelRegistry.java`、`pkg/middleware/grpc/interceptor/internal_auth.go`、各 Go 服務 `internal/grpc/di.go` server 組裝、`k8s/external-services/networkpolicy.yaml`、`k8s/values/*.yaml`、`docker-compose-local.yml` |
 | 相關 doc | 44（身份模型，account_id vs 營運鍵）、46（賣家能力權限層，Gateway 端授權）、開發規範《Java 微服務開發規範》§4.2/§5、《API 設計規範》§五、36（MQ 事件不受本層影響）、《後端服務責任邊界規範》 |
-| 相關 ADR | [單一共享 HMAC 密鑰](../adr/2026-09-18-internal-auth-single-shared-hmac-secret.md) |
+| 相關 ADR | [單一共享 HMAC 密鑰](/docs/adr/2026-09-18-internal-auth-single-shared-hmac-secret.md) |
 
 ---
 
@@ -31,7 +31,7 @@
 **Gateway 不得轉發外部 `x-internal-service`**：`gateway/internal/grpc/metadata_interceptor.go` 從零建立 outgoing metadata，外部帶進來的同名 header 不會被傳遞。這是現行契約，任何重構不得繞過——它是「外部使用者無法經 Gateway 取得 internal 身分」的唯一保證。
 
 方案取捨（為什麼不採 mTLS／per-service key／Redis nonce）見
-[ADR：單一共享 HMAC 密鑰](../adr/2026-09-18-internal-auth-single-shared-hmac-secret.md)。
+[ADR：單一共享 HMAC 密鑰](/docs/adr/2026-09-18-internal-auth-single-shared-hmac-secret.md)。
 
 ### 1.3 設計目標與非目標
 
@@ -96,7 +96,7 @@ flowchart LR
 
 Gateway **不**持有該密鑰、**不**參與內部簽章（見 §3.6）。
 
-選型理由見 [ADR](../adr/2026-09-18-internal-auth-single-shared-hmac-secret.md)。
+選型理由見 [ADR](/docs/adr/2026-09-18-internal-auth-single-shared-hmac-secret.md)。
 
 ### 3.2 簽章內容與 header
 
@@ -128,7 +128,7 @@ replay 防護**只有時間窗**（stateless、無 Redis 依賴）：
 - server 檢查 `|now - ts| <= INTERNAL_AUTH_TS_WINDOW_SECONDS`（預設 300s，用以容忍 pod 之間的時鐘偏移）。超窗即視為驗證失敗。
 - `x-internal-nonce` **必帶但不校驗唯一性**。它是為日後接上唯一性校驗預留的欄位，接上時協議不需改。
 
-取捨見 [ADR](../adr/2026-09-18-internal-auth-single-shared-hmac-secret.md)。
+取捨見 [ADR](/docs/adr/2026-09-18-internal-auth-single-shared-hmac-secret.md)。
 
 ### 3.5 server 驗證流程
 

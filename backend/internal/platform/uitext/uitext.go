@@ -1,7 +1,7 @@
 // Package uitext 是共用文案目錄（契約值到使用者面文字）的 Go 執行期。
 //
 // 目錄的唯一來源是 catalog/{config,zh-TW,en}.json，catalog_gen.go 由 backend/cmd/uitext-gen 生成，不得手改。
-// 決策：ADR backend/docs/adr/2026-10-17-multi-locale-architecture.md；設計：
+// 決策：ADR docs/adr/2026-10-17-multi-locale-architecture.md；設計：
 // backend/docs/plans/2026-09-29-a3-buyer-seller/step10e-Lprime-design.md。
 package uitext
 

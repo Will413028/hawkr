@@ -62,7 +62,7 @@ src/
 - 完成 UI 後至少執行 `pnpm lint`、`pnpm test`、`pnpm build`（與 CI 相同），並做 desktop、mobile 與 keyboard smoke。Local mock／截圖不是 DEV、CI、部署或 production proof。
 
 ## 關鍵機制
-- **認證 (Auth)**: 後台網域由 Cloudflare Access 保護（Google 登入、email 白名單；ADR `backend/docs/adr/2026-10-30-identity-self-hosted-federated-login.md`「沿用與作廢」）。`CF_ACCESS_TEAM_DOMAIN` 與 `CF_ACCESS_ADMIN_AUD` 只在單體部署設定；workers.dev 與 preview 也須受保護或關閉。
+- **認證 (Auth)**: 後台網域由 Cloudflare Access 保護（Google 登入、email 白名單；ADR `docs/adr/2026-10-30-identity-self-hosted-federated-login.md`「沿用與作廢」）。`CF_ACCESS_TEAM_DOMAIN` 與 `CF_ACCESS_ADMIN_AUD` 只在單體部署設定；workers.dev 與 preview 也須受保護或關閉。
   - 登入：Access 是登入畫面；`/` 進 `/admin`，layout 以 `IdentityAdminService.GetSession` 讀管理員資料，無法連線時顯示錯誤與重試。後端第一次看到 Access `sub` 建立管理員，email 僅供顯示；Access 白名單是唯一開通來源。
   - 呼叫後端：瀏覽器只打同源 `/api/*`。BFF 與代行專用 route 的 `adminSession.token(request)` 優先讀 Access 加上的 `Cf-Access-Jwt-Assertion`，沒有時才用 `ADMIN_DEV_TOKEN`，帶 `Authorization: Bearer` 給單體；不照抄瀏覽器的 header 或 cookie，BFF 不判斷身分。兩者皆無時 route 回 401。單體拒絕顧客的 session token 呼叫 `*AdminService`，也拒絕管理員 Access token 呼叫 `*AppService`。
   - 本機：以 `backend` 的 `make dev-token args='-admin -user dev_ops'` 產生 token，放進 `admin/.env.local` 的 `ADMIN_DEV_TOKEN`；後端的 `make serve` 使用同一把 dev key。部署時不設定 dev key 或 dev token；單體的 dev key 與 Access 設定互斥。

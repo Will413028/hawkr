@@ -961,7 +961,7 @@ generic path 不得含任何 payment 業務 metric。
 >
 > **撤銷條件**：若計數器改回同事務維護，這支收斂工作立刻變成多餘，照 §八 前例刪除。
 >
-> 選型理由與被否決的方案見 [ADR 2026-09-18-mq-social-counter-async-delta](../adr/2026-09-18-mq-social-counter-async-delta.md)。
+> 選型理由與被否決的方案見 [ADR 2026-09-18-mq-social-counter-async-delta](/docs/adr/2026-09-18-mq-social-counter-async-delta.md)。
 
 **Go 對應常數**：`pkg/mq/exchanges.go` 新增 `RoutingKeyCommentUpdated` / `RoutingKeyCommentDeleted` / `RoutingKeyCommentLikeChanged` / `RoutingKeyCounterDelta`；payload struct 寫於 `pkg/mq/events.go`。
 
@@ -1141,7 +1141,7 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 **payload 邊界**：禁止放入 credential / token / cookie / `before`／`after` 快照原文 / 任何未遮罩 PII。模板實際渲染的顯示值恰為三項：`action_label`／`resource_name`／`actor_display_name`。
 
 **設計參考**：
-- **為何開自己的 exchange**：見 [ADR 2026-09-18-mq-dedicated-exchange-per-domain](../adr/2026-09-18-mq-dedicated-exchange-per-domain.md)。
+- **為何開自己的 exchange**：見 [ADR 2026-09-18-mq-dedicated-exchange-per-domain](/docs/adr/2026-09-18-mq-dedicated-exchange-per-domain.md)。
 - **為何與稽核列轉 `SUCCEEDED` 在同一個 tx 發出**：代行寫入成功後的賣家通知屬「**一定要發出去**」的語意（賣家有權知道平台動過他的商店），事件發不出去時 confirm 整個回滾，稽核列停在 `PENDING`（`docs/modules/delegation.md` §6）。模組只搬運已確認的稽核事實，不修正任何業務資料、不回填、不比對。
 - ⚠️ **模板列缺席是本鏈路最靜默的失敗**：`template_handler.go` 找不到模板時走 `logger.Debug` ＋ `return nil`（ack）⇒ 訊息**不進 DLQ、不重試、直接消失**，「查 DLQ 再 re-drive」對此情境完全無效（DLQ 是空的，稽核列卻顯示 `notified_at` 有值）。驗收不得只看 `consumers ≥ 1`，必須端到端斷言 `notifications` 出現對應列。
 - ⚠️ **模板的 `target_user_field` 是 `target_seller_account_id` 不是 `target_store_id`**：payload 兩欄都在，而賣家收件匣讀取端對 `user_type != 'buyer'` 直接拿 `X-Account-Id` 當 `user_id`（不解析 store surrogate）⇒ **填錯不報錯**，首任店家（`store_id == account_id`）測起來全綠、re-key 過的店家永遠收不到且無告警。契約 gate 也擋不住（`target_store_id` 同樣在 `emitted_keys` 內）。日後 44 號 re-key ② 若把賣家收件匣改成以 `store_id` 讀取，本欄與該 resolver 必須同波修改。
@@ -1175,7 +1175,7 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 禁止放入 AMEGO AppKey 或任何 provider credential。
 
 **設計參考**：
-- **為何開自己的 exchange**：見 [ADR 2026-09-18-mq-dedicated-exchange-per-domain](../adr/2026-09-18-mq-dedicated-exchange-per-domain.md)。
+- **為何開自己的 exchange**：見 [ADR 2026-09-18-mq-dedicated-exchange-per-domain](/docs/adr/2026-09-18-mq-dedicated-exchange-per-domain.md)。
   🔴 **接線三項缺一則發票通知永遠不會送出**（notification map 一列 ＋ `topology.yaml` 一條 queue ＋ 一次服務重啟），
   唯一訊號是 notification-service 啟動時一行 ERROR log。
   ⚠️ 出向才適用：兩條入向 queue（`invoice.order.paid` / `invoice.order.refund.finalized`）綁的是

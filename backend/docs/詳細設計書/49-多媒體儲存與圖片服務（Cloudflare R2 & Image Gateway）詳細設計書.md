@@ -6,7 +6,7 @@
 |---|---|
 | 維護者 | 維護團隊 |
 | 對應程式碼 | `services/java/media-service/`（storage 層）、`services/java/product-import-service/.../storage/`、`workers/image-gateway/`、`services/java/shared/common-core/.../config/`、`pkg/mediaurl/` |
-| 相關 doc | 08 多媒體微服務（媒體資產生命週期）、40 商品匯入、`docs/開發規範/多媒體與圖片 URL 規範.md`、`docs/基礎建設/系統架構與資料流向.md`、[ADR：多媒體儲存與圖片出口](../adr/2026-09-18-media-storage-r2-image-gateway.md) |
+| 相關 doc | 08 多媒體微服務（媒體資產生命週期）、40 商品匯入、`docs/開發規範/多媒體與圖片 URL 規範.md`、`docs/基礎建設/系統架構與資料流向.md`、[ADR：多媒體儲存與圖片出口](/docs/adr/2026-09-18-media-storage-r2-image-gateway.md) |
 
 ---
 
@@ -17,7 +17,7 @@
 URL 規範與全平台圖片欄位契約。目標讀者：後端／前端／維運。
 不涵蓋：媒體資產生命週期（upload session／finalize／引用計數／GC，見 08 號）。
 
-設計理由與被否決的方案見 [ADR：多媒體儲存與圖片出口](../adr/2026-09-18-media-storage-r2-image-gateway.md)。
+設計理由與被否決的方案見 [ADR：多媒體儲存與圖片出口](/docs/adr/2026-09-18-media-storage-r2-image-gateway.md)。
 
 ### 1.2 服務一句話定位
 以 Cloudflare R2 為唯一物件儲存、以 `media.example.com` 上的 Image Gateway Worker 為唯一公開圖片出口，全平台圖片欄位以 objectKey 為唯一真實來源。
@@ -220,7 +220,7 @@ Flyway `V{N+1}`（media：DROP url；shipping：DROP label_url；order：review 
 
 ### 6.1 對外 REST（經 Gateway）— 扁平成對欄位（全平台強制契約）
 
-> **Connect 契約（單體）不適用本節**：回 `hawkr.common.v1alpha1.Image{uri_template}`（`{MEDIA_ORIGIN}/i/{preset}/{key}`），client 只替換 `{preset}`，key 不對外，寫入只帶新圖的 staged token（ADR [`2026-09-25-api-image-uri-template.md`](../adr/2026-09-25-api-image-uri-template.md)，取代 media ADR 的 ADR-08）。本節的 `imageKey`＋`imageUrl` 只適用還沒搬進單體的 REST 路由，隨各模組搬遷退場。
+> **Connect 契約（單體）不適用本節**：回 `hawkr.common.v1alpha1.Image{uri_template}`（`{MEDIA_ORIGIN}/i/{preset}/{key}`），client 只替換 `{preset}`，key 不對外，寫入只帶新圖的 staged token（ADR [`2026-09-25-api-image-uri-template.md`](/docs/adr/2026-09-25-api-image-uri-template.md)，取代 media ADR 的 ADR-08）。本節的 `imageKey`＋`imageUrl` 只適用還沒搬進單體的 REST 路由，隨各模組搬遷退場。
 - 媒體上傳三段式路由**不變**（`/app/media/upload_sessions` 等），回應中 `uploadUrl` 改為 R2 presigned PUT URL（S3 SigV4，https 強制由 S3 SDK endpoint 配置保證）。
 - 業務 API 圖片欄位契約統一為**扁平成對雙欄位**（破壞性變更，前端同步改造）：
 
@@ -230,7 +230,7 @@ Flyway `V{N+1}`（media：DROP url；shipping：DROP label_url；order：review 
 ```
   - `imageKey`＝SSOT，值＝裸 objectKey；前端 `buildImageUrl(imageKey, preset)` 組顯示 URL。
   - `imageUrl`＝原圖基底 URL（`/i/original/{key}`），由 **Gateway 組裝**，供不需壓圖的消費者（分享、匯出）直接使用。
-  - **欄位命名一律 `{語意}Key`＋`{語意}Url` 成對**（`logoKey/logoUrl`、`avatarKey/avatarUrl`、`coverKey/coverUrl`、陣列 `imageKeys/imageUrls`）；舊有單欄位名不保留——未上線一次統一，不做「舊名存新語意」的兼容、不做巢狀 `MediaRef{object_key,cdn_url}`（形狀取捨見 [ADR：多媒體儲存與圖片出口](../adr/2026-09-18-media-storage-r2-image-gateway.md)）。**逐服務欄位落地清單見 §6.6，特例處置見 §6.7**（此即 §231/§6.2 承諾之「逐 proto 清單」，收斂進本設計書而非散於實作 PR）。
+  - **欄位命名一律 `{語意}Key`＋`{語意}Url` 成對**（`logoKey/logoUrl`、`avatarKey/avatarUrl`、`coverKey/coverUrl`、陣列 `imageKeys/imageUrls`）；舊有單欄位名不保留——未上線一次統一，不做「舊名存新語意」的兼容、不做巢狀 `MediaRef{object_key,cdn_url}`（形狀取捨見 [ADR：多媒體儲存與圖片出口](/docs/adr/2026-09-18-media-storage-r2-image-gateway.md)）。**逐服務欄位落地清單見 §6.6，特例處置見 §6.7**（此即 §231/§6.2 承諾之「逐 proto 清單」，收斂進本設計書而非散於實作 PR）。
   - **組裝點唯一＝Gateway**：業務微服務回傳的 proto 只帶 `xxx_key`（objectKey），Gateway 在 HTTP JSON 回應層組出成對 `xxxKey`＋`xxxUrl`（`xxxUrl` 經 Go `pkg/mediaurl.BuildURL` 組）。**服務側禁止 `BuildURL`**（Java `MediaUrlProperties.buildUrl`／Go `pkg/mediaurl.BuildURL` 不得在業務微服務回應路徑呼叫）——現行各服務內組 URL 回扁平單欄的實作捷徑一律移除。不經 Gateway 的通道（MQ payload／WS/SSE／FCM）為特例，各自組裝點於 §6.7 明定。
   - **層次界定**：本條約束 **API/DTO 回應層**。DB 欄位命名依 §5.3 規則——「名帶 url 實存 key」者必 rename，語意中性名（`cms_post.image`、`messages.content`、`user_avatar`）**維持原名不動**；兩層規則不互相覆蓋。
 - 機敏檔 API 不變。
@@ -547,7 +547,7 @@ R2 不可用：讀取面全掛（無 fallback，接受——與現況 OSS 掛等
 ## 10. 設計決策
 
 設計理由、考慮過的替代方案與否決理由見
-[ADR：多媒體儲存與圖片出口](../adr/2026-09-18-media-storage-r2-image-gateway.md)。
+[ADR：多媒體儲存與圖片出口](/docs/adr/2026-09-18-media-storage-r2-image-gateway.md)。
 
 ---
 

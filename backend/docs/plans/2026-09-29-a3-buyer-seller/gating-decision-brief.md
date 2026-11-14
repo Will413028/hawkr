@@ -30,7 +30,7 @@
 - 被拿掉的能力**不帶原因**；原因只有在呼叫被拒時以錯誤碼出現（停權 PermissionDenied＋`ReasonSellerSuspended`，等待刪除 FailedPrecondition，`capability.go:89-101`）。
 - `Exposure`：「店家公開曝光的狀態」，`exposable`＋`missing_requirements`（`seller.proto:239-256,322-328`），唯一規則 `model.MissingExposure`（`model/exposure.go:54-91`）。這是目前**唯一**「帶缺少條件」的結構，所以 client 借它來判斷「已認證」。
 - `KYCFlow.status`：給顯示用的細分流程狀態（`model/payuni.go:410-437`），APPROVED＝PayUni 核准。
-- 沒有「每個能力的前置條件」這個概念。能力 ADR 當初就預留了第二個維度（tier）：`GrantedCapabilities(SellerContext)` 的簽章要能加維度，「能力層架構零改動」（`backend/docs/adr/2026-09-18-seller-capability-authorization.md:82-85`）。
+- 沒有「每個能力的前置條件」這個概念。能力 ADR 當初就預留了第二個維度（tier）：`GrantedCapabilities(SellerContext)` 的簽章要能加維度，「能力層架構零改動」（`docs/adr/2026-09-18-seller-capability-authorization.md:82-85`）。
 
 ## 3. 業界基準（從零設計會怎麼做）
 
