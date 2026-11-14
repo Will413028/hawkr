@@ -1,0 +1,63 @@
+name: diag step9d squash
+
+on:
+  push:
+    branches: [diag/stripe-step9d-squash]
+
+permissions:
+  contents: read
+
+env:
+  GOWORK: 'off'
+  BEFORE_REF: e01c01a9995ba567f377a3cf7fbb1f9be896a1ff
+
+jobs:
+  schema-diff:
+    name: pg_dump before vs after the squash
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: backend/go.sum
+      - name: start postgres
+        run: |
+          set -euo pipefail
+          docker run -d --name pg -e POSTGRES_PASSWORD=pg -p 5432:5432 postgres:18-alpine
+          for i in $(seq 1 30); do
+            if docker exec pg pg_isready -U postgres >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          docker exec pg psql -U postgres -c 'CREATE DATABASE before_db' -c 'CREATE DATABASE after_db'
+      - name: apply the pre-squash migrations
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/before" "$BEFORE_REF"
+          cd "$RUNNER_TEMP/before/backend"
+          DATABASE_URL='postgres://postgres:pg@localhost:5432/before_db?sslmode=disable' go run ./cmd/hawkr migrate
+      - name: apply the squashed migrations
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          DATABASE_URL='postgres://postgres:pg@localhost:5432/after_db?sslmode=disable' go run ./cmd/hawkr migrate
+      - name: diff the schemas
+        run: |
+          set -uo pipefail
+          docker exec pg pg_dump -U postgres --schema-only --no-owner --restrict-key=diag before_db > "$RUNNER_TEMP/before.sql"
+          docker exec pg pg_dump -U postgres --schema-only --no-owner --restrict-key=diag after_db > "$RUNNER_TEMP/after.sql"
+          wc -l "$RUNNER_TEMP/before.sql" "$RUNNER_TEMP/after.sql"
+          echo "=== diff before after ==="
+          diff -u "$RUNNER_TEMP/before.sql" "$RUNNER_TEMP/after.sql" > "$RUNNER_TEMP/schema.diff"
+          rc=$?
+          cat "$RUNNER_TEMP/schema.diff"
+          echo "diff exit: $rc"
+          echo "changed lines: $(grep -c -E '^[+-][^+-]' "$RUNNER_TEMP/schema.diff")"
+          echo "=== changed lines that are not the accounts_poll index ==="
+          grep -E '^[+-][^+-]' "$RUNNER_TEMP/schema.diff" | grep -v 'accounts_poll' && exit 1
+          echo "none"
+          test "$(grep -c -E '^[+-][^+-]' "$RUNNER_TEMP/schema.diff")" -eq 2
