@@ -28,7 +28,7 @@
 | ~~hawkr-router~~ | 已退役（2026-07-28）——/sitemap* 為網頁遷 Workers 前殘留（網頁 Worker 原生服務 sitemap，此 route 反攔截）、/s/* 為死功能零引用；源碼存證於 git 歷史 `workers/hawkr-router/` | — |
 | hawkr-apple-pay-domain | backend `workers/hawkr-apple-pay-domain/` | backend `deploy-worker.yml`（#1907 納管；單一 script，僅 main 部署。實測為 .well-known 的實際服務者且涵蓋 api./test-api. host，判定保留） |
 
-- 新增 / 退役 Worker 時**必須同步更新本表**與 `docs/基礎建設/系統架構與資料流向.md` 的 Worker 表。
+- 新增 / 退役 Worker 時**必須同步更新本表**與 `backend/docs/基礎建設/系統架構與資料流向.md` 的 Worker 表。
 - **2026-08-04 稽核**（`/workers/scripts` 實查）：帳號線上共 11 支 script，與本表**逐支對得上、零缺口**——`api-first-party-proxy`、`hawkr-admin-dev`/`-prod`、`hawkr-apple-pay-domain`、`hawkr-website-canary-dev`/`-prod`、`hawkr-website-dev`/`-prod`、`hawkr-website-tail-alerts`、`image-gateway-dev`/`-production`。同日修正本表一處**重複列**（canary 曾被寫成兩列，同名同源碼；canary 只有 **1 份源碼 × 2 個 wrangler env**，不是兩支獨立 worker——重複會讓「表列數 vs 線上數」的稽核永遠對不上）。
 - **CF Pages projects**（2026-07-28 #1907 治理後終態）：`hawkr-docs`（manual.example.com，源碼 `<org>/Hawkrmanual`，該 repo GitHub Actions wrangler 部署——合規）；`eureka-frontend`（使用者個人專案，非 hawkr 資產，移出治理範圍）。殘留三項（hawkr-admin / hawkr-website 舊 Pages、hawkr-seller-web 實驗）已刪除，刪除前完整存證見 #1907。新增 Pages 同受本規範約束。
 - GCP serverless（`serverless/egress-proxy/`，Cloud Run）：源碼版控＋CI 部署（`.github/workflows/deploy-egress-proxy.yml`，push main path-filter＋dispatch；重用 deploy.sh 為單一真相，deployer SA=egress-proxy-deployer）。tgos-proxy 已於 2026-07-28 收編退役（TGOS 轉發併入 egress-proxy 白名單；backend#1914，服務快照存證於票內、源碼存證於 git 歷史 `serverless/tgos-proxy/`）。

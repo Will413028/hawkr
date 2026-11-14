@@ -108,7 +108,7 @@ schema `identity`（`db/schema.sql`）：
 - Google 自動連結信任 `hd`：Workspace 管理員刪除使用者後，同一個地址的新 `sub` 會自動連到舊帳號（ADR 自建登入「已知限制」）。
 - 賣家 CRM 以手機找顧客（legacy 的 `GetAccountByPhone`）一律回「找不到」：帳號沒有手機。
 - 外部 Access 登出不會自動撤銷代行。
-- 代行資格與撤回時的工作階段撤銷由 delegation 管理（`docs/modules/delegation.md` §7）。
+- 代行資格與撤回時的工作階段撤銷由 delegation 管理（`backend/docs/modules/delegation.md` §7）。
 
 ## 11. 模組內部結構
 

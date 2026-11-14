@@ -2,7 +2,7 @@
 
 ## 職責
 
-推薦賣家排行（`GetRecommendedSellers` 的後端）：排程重算每家合格店家的分數並存成快照，讀取時依分數取出、再即時檢查曝光資格。目前只有排行，沒有其他探索功能。行為規格的唯一來源是 `docs/modules/discovery.md`。
+推薦賣家排行（`GetRecommendedSellers` 的後端）：排程重算每家合格店家的分數並存成快照，讀取時依分數取出、再即時檢查曝光資格。目前只有排行，沒有其他探索功能。行為規格的唯一來源是 `backend/docs/modules/discovery.md`。
 
 ## 擁有的資料
 
@@ -10,7 +10,7 @@ schema `discovery`（`db/schema.sql`）：`seller_scores`（一家合格店家�
 
 ## 發布的讀取介面
 
-無。沒有 `pub_*`。對外是 Go 公開 API `RecommendedSellers(ctx, limit)`，回傳 `Recommendation`（每列店家 ID 與近 30 天成立訂單數，加快照的 `ComputedAt`），形狀見 `docs/modules/discovery.md` §5。
+無。沒有 `pub_*`。對外是 Go 公開 API `RecommendedSellers(ctx, limit)`，回傳 `Recommendation`（每列店家 ID 與近 30 天成立訂單數，加快照的 `ComputedAt`），形狀見 `backend/docs/modules/discovery.md` §5。
 
 ## 模組內部結構
 
@@ -20,7 +20,7 @@ schema `discovery`（`db/schema.sql`）：`seller_scores`（一家合格店家�
 
 ## 不變量
 
-- 快照整批取代，且只有開始時間晚於目前快照那次的重算能寫入。守門：`TestAnOlderRunFinishingLaterDoesNotOverwriteANewerSnapshot`。規格：`docs/modules/discovery.md` §3。
+- 快照整批取代，且只有開始時間晚於目前快照那次的重算能寫入。守門：`TestAnOlderRunFinishingLaterDoesNotOverwriteANewerSnapshot`。規格：`backend/docs/modules/discovery.md` §3。
 - 任何上游失敗都不進入取代，上一份快照不變。守門：`TestUpstreamFailureKeepsThePreviousSnapshot`。規格：§6。
 - 沒有靜默預設值：失敗的評價不會變成 0；上游給不合法的數值或沒被問的店家，整次重算失敗。守門：`TestFailedRatingIsNeverTurnedIntoZero`、`TestReviewReturningAnUnaskedStoreFailsTheRun`、`TestComputeRejectsBadUpstreamData`。規格：§6。
 - 讀取是同一份快照，重算在分頁之間提交也不重複、不漏。守門：`TestReadSeesOneSnapshotEvenWhenARecomputeCommitsBetweenPages`。規格：§5。

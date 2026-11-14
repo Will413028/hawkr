@@ -78,7 +78,7 @@ curl -X POST "https://test-api.example.com/api/v1/app/product_import_jobs" \
   -H "Cookie: __Host-hk_session=$TOKEN" \
   -H "Origin: https://web-dev.example.com" \
   -H "X-Requested-With: XMLHttpRequest" \
-  -F "file=@docs/補充資料/product_import_e2e_sample.csv" \
+  -F "file=@backend/docs/補充資料/product_import_e2e_sample.csv" \
   -F "filename=shopee-$(date +%s).csv" \
   -F "idempotency_key=manual-$(date +%s)" \
   -F "target_status=ACTIVE"

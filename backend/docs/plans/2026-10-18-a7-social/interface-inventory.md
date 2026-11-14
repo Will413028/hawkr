@@ -140,7 +140,7 @@ python3 -I <script>   # PyYAML 載入 backend/api/openapi/openapi.yaml；
                       # AdminModeration,AdminPost,PostHashtag,Hashtag,CommentRealtime}  → 42
                       # 其中 tag=Hashtag 2 條 handler 呼叫 h.Product（hashtag.go:47,101）→ social 實際 40
 ```
-各 tag：Post 13、Comment 7、Forum 6、Moderation 5、AdminModeration 4、AdminPost 2、PostHashtag 2、Hashtag 2（product）、CommentRealtime 1。腳本：同目錄的 `count-rest-ops.py`（在 `backend/` 執行：`python3 -I docs/plans/2026-10-18-a7-social/count-rest-ops.py`）。
+各 tag：Post 13、Comment 7、Forum 6、Moderation 5、AdminModeration 4、AdminPost 2、PostHashtag 2、Hashtag 2（product）、CommentRealtime 1。腳本：同目錄的 `count-rest-ops.py`（在 repo 根目錄執行：`python3 -I backend/docs/plans/2026-10-18-a7-social/count-rest-ops.py`）。
 
 共通中介層：public 群組 `OptionalJWTAuth`；app 群組 `JWTAuth`；admin 群組 `PrivateNoStore + JWTAuth + requireAdmin`（`G/router/routes.go:31`）。`injectSellerSuspension()`（`G/router/seller_capability.go:74-87`）只在 token 是賣家且停權時設 `X-Seller-Suspended` header 與 context，**不拒絕**；social 以 gRPC metadata 讀（`S/grpc/handler.go:30-33`）。`sellerHandle`（`seller_capability.go:101-105`）＝登記能力＋`requireSeller(cap)`（`:18-44`）。單體取代：能力由 seller 模組推導（`M/modules/seller/internal/model/capability.go:26,28`），不再靠 header。
 

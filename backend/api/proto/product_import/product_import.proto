@@ -10,15 +10,15 @@ option java_outer_classname = "ProductImportProto";
 // ============================================================================
 // 商品匯入精靈服務（Product Import Service）gRPC 契約
 //
-// 對應設計書：docs/詳細設計書/40-商品匯入精靈服務（Product Import Service）詳細設計書.md
+// 對應設計書：backend/docs/詳細設計書/40-商品匯入精靈服務（Product Import Service）詳細設計書.md
 //   - §4.2 gRPC Proto 凍結定義
 //   - §4.6 錯誤碼定義
 //   - §8.1 RPC 重驗證在 DB tx 外 pattern
 //
 // 規範：
-//   - 所有數字欄位用 string（docs/開發規範/Java 微服務開發規範.md §2）
-//   - 所有時間用 ISO 8601 UTC 字串（docs/開發規範/Java 微服務開發規範.md §2）
-//   - store_id 例外：Request message 內由 Gateway 從 JWT 注入 resolver 解析後的 store surrogate，allowed int64（docs/開發規範/Java 微服務開發規範.md §2）
+//   - 所有數字欄位用 string（backend/docs/開發規範/Java 微服務開發規範.md §2）
+//   - 所有時間用 ISO 8601 UTC 字串（backend/docs/開發規範/Java 微服務開發規範.md §2）
+//   - store_id 例外：Request message 內由 Gateway 從 JWT 注入 resolver 解析後的 store surrogate，allowed int64（backend/docs/開發規範/Java 微服務開發規範.md §2）
 //   - Internal-only RPC（GetCategoryConfirmationToken 為 Gateway 對外）
 // ============================================================================
 

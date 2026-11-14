@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "App 版本分佈（見 docs/runbooks/app-version-gate.md）。資料源＝Gateway access log 的 app_version / app_type 兩欄（Loki）。App 只發 iOS，不分平台（2026-09-26）。用途：破壞性契約變更前，判斷舊版 App 是否已退場到可放行的水位（放行判準見 docs/runbooks/app-version-gate.md §3）。⚠️ Loki 保留期 7 天（monitoring/loki/local-config.yaml retention_period: 168h），時間範圍不可拉超過 7 天，拉超過只會得到被截斷的假象。",
+  "description": "App 版本分佈（見 backend/docs/runbooks/app-version-gate.md）。資料源＝Gateway access log 的 app_version / app_type 兩欄（Loki）。App 只發 iOS，不分平台（2026-09-26）。用途：破壞性契約變更前，判斷舊版 App 是否已退場到可放行的水位（放行判準見 backend/docs/runbooks/app-version-gate.md §3）。⚠️ Loki 保留期 7 天（monitoring/loki/local-config.yaml retention_period: 168h），時間範圍不可拉超過 7 天，拉超過只會得到被截斷的假象。",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,

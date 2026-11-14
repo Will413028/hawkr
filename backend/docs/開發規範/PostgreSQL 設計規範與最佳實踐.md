@@ -126,7 +126,7 @@ CREATE TRIGGER update_product_updated_at
 
 理由：
 
-- 碼值要跨 Java / Go / Flutter / Web / proto / MQ 共享，**SSOT 在 `docs/代碼管理（CodeMeta）/`**，由 `docs/代碼管理（CodeMeta）/scripts/generate.sh` 生成各語言常數；DB type 若也持有一份定義就變成第二份真實來源，必然漂移。
+- 碼值要跨 Java / Go / Flutter / Web / proto / MQ 共享，**SSOT 在 `backend/docs/代碼管理（CodeMeta）/`**，由 `backend/docs/代碼管理（CodeMeta）/scripts/generate.sh` 生成各語言常數；DB type 若也持有一份定義就變成第二份真實來源，必然漂移。
 - PG native enum 新增值要跑 DDL（`ALTER TYPE ... ADD VALUE`），且無法在同一交易內立即使用；碼值增修應該只改 Markdown + 重新生成，不該綁 migration。
 - 合法值在**寫入前**由應用層守：Java `CodeMetaValidator.requireValidValue(XxxEnum.class, value, "field")`（選填欄位用 `validateValueIfPresent`；`services/java/shared/common-core/src/main/java/io/github/will413028/hawkr/common/utils/code/CodeMetaValidator.java`），詳見 [Java 微服務開發規範](Java%20微服務開發規範.md) §6。
 
@@ -153,7 +153,7 @@ status VARCHAR(4) NOT NULL
 COMMENT ON COLUMN category.status IS '分類狀態 - CommonStatus（9003=軟刪除, 9004=啟用）';
 ```
 
-**碼表本身不在本文件複製**——Enum 名與完整碼值一律查 `docs/代碼管理（CodeMeta）/`：[業務狀態碼.md](../代碼管理（CodeMeta）/業務狀態碼.md)、[業務類型碼.md](../代碼管理（CodeMeta）/業務類型碼.md)、[內部技術碼.md](../代碼管理（CodeMeta）/內部技術碼.md)，維護流程見 [README.md](../代碼管理（CodeMeta）/README.md)。
+**碼表本身不在本文件複製**——Enum 名與完整碼值一律查 `backend/docs/代碼管理（CodeMeta）/`：[業務狀態碼.md](../代碼管理（CodeMeta）/業務狀態碼.md)、[業務類型碼.md](../代碼管理（CodeMeta）/業務類型碼.md)、[內部技術碼.md](../代碼管理（CodeMeta）/內部技術碼.md)，維護流程見 [README.md](../代碼管理（CodeMeta）/README.md)。
 
 **純服務內部、不跨服務也不對前端暴露的狀態**（例：`buyers.status`、outbox 的 `pending`/`done`）可不進 CodeMeta，但仍為 `VARCHAR`，並以 `CHECK` 約束把合法值釘在 DB：
 
@@ -324,5 +324,5 @@ catch `23505` 本身不違規，**在同一個交易裡繼續下 SQL 才違規**
 - 禁止金額用 float
 - 禁止時間用 timestamp（無時區）
 - 禁止在 JSON 中塞可正規化的資料
-- 舊服務：禁止在 API / 程式碼自行定義碼值而未登記到 `docs/代碼管理（CodeMeta）/`（單體的碼值由擁有的模組定義，見第五章）
+- 舊服務：禁止在 API / 程式碼自行定義碼值而未登記到 `backend/docs/代碼管理（CodeMeta）/`（單體的碼值由擁有的模組定義，見第五章）
 - 禁止以「讓 DB 拋唯一鍵違反再 catch」實作冪等分流，禁止在 catch 到 `23505` 之後於同一交易內繼續下 SQL，見第十二章

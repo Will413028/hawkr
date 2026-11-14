@@ -186,7 +186,7 @@ Go 服務可用 `NewBusiness` 回傳細粒度業務碼，HTTP 回應格式對齊
 
 **使用流程**：
 
-1. 在 `docs/代碼管理（CodeMeta）/錯誤碼.md` 新增業務碼條目
+1. 在 `backend/docs/代碼管理（CodeMeta）/錯誤碼.md` 新增業務碼條目
 2. 執行 `./docs/代碼管理（CodeMeta）/scripts/generate.sh --go-errors` 重新生成 `pkg/errors/bizcode/bizcode.go`
 3. 在服務 usecase 使用常數：
 

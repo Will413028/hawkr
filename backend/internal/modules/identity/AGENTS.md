@@ -2,7 +2,7 @@
 
 ## 職責
 
-誰在使用系統：登入的帳號（每個帳號都是買家，賣家是另外申請的角色）與管理員、帳號的角色與狀態。顧客以 Google、LINE 聯合登入，OAuth 流程與 session 由本模組自己做（憑證是存在 Postgres 的 opaque session：web 的 httpOnly `__Host-hk_session` cookie、App 的 Bearer），後台由 Cloudflare Access 保護（ADR `docs/adr/2026-10-30-identity-self-hosted-federated-login.md`、`docs/adr/2026-09-27-identity-opaque-sessions.md`）。代行的授權、工作階段、稽核與編排由 delegation 擁有。行為規格的唯一來源是 `docs/modules/identity.md`。
+誰在使用系統：登入的帳號（每個帳號都是買家，賣家是另外申請的角色）與管理員、帳號的角色與狀態。顧客以 Google、LINE 聯合登入，OAuth 流程與 session 由本模組自己做（憑證是存在 Postgres 的 opaque session：web 的 httpOnly `__Host-hk_session` cookie、App 的 Bearer），後台由 Cloudflare Access 保護（ADR `docs/adr/2026-10-30-identity-self-hosted-federated-login.md`、`docs/adr/2026-09-27-identity-opaque-sessions.md`）。代行的授權、工作階段、稽核與編排由 delegation 擁有。行為規格的唯一來源是 `backend/docs/modules/identity.md`。
 
 ## 擁有的資料
 
@@ -16,13 +16,13 @@ schema `identity`（`db/schema.sql`，欄位說明見規格 §9）。讀取模�
 
 - 根套件組裝 `Module`，保留公開型別別名、事件、錯誤、provider 建構函式與轉呼叫方法。根套件不得 import `store`。
 - 根套件的 `Deps` 是組裝 API；`internal/model` 定義公開型別、事件與 provider 介面；各子領域宣告最小 `Deps`。
-- 子領域套件與 `internal/provider`、`internal/store` 的分工在 `docs/modules/identity.md` §11。
+- 子領域套件與 `internal/provider`、`internal/store` 的分工在 `backend/docs/modules/identity.md` §11。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 
 ## 不變量
 
-- 後台 Access/dev admin token（JWT，以 `iss` 精確比對）只認證成管理員；其餘 token 一律當顧客的 opaque session，只認證成帳號。規格：`docs/modules/identity.md` §1。
-- 子領域的守門測試與約束在 `internal/<子領域>/AGENTS.md`；`docs/modules/identity.md` §12 是同一份的對照表。
+- 後台 Access/dev admin token（JWT，以 `iss` 精確比對）只認證成管理員；其餘 token 一律當顧客的 opaque session，只認證成帳號。規格：`backend/docs/modules/identity.md` §1。
+- 子領域的守門測試與約束在 `internal/<子領域>/AGENTS.md`；`backend/docs/modules/identity.md` §12 是同一份的對照表。
 - 單一子領域的不變量在 `internal/<子領域>/AGENTS.md`（碰該目錄時才載入）；跨子領域的才放這裡。
 
 ## 不負責

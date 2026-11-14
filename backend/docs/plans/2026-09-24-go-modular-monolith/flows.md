@@ -149,7 +149,7 @@
 ## E. 其他跨服務一致性點（主 agent 讀碼）
 
 ### E1 媒體引用 `asset_reference`
-- 12 個 owner 服務（product、seller、buyer、social、content、im、invoice、review、order、shipping、ai、product-import）以 media gRPC `FinalizeImages`→`LinkImages`（commit 前、失敗須致命）→ 業務寫入 → `ReleaseReferences`（best-effort、只送一次）維持「有引用集合 ⊇ 業務列指向集合」不變式（`docs/詳細設計書/08-多媒體微服務（Media Service）詳細設計書.md` §4.6.2）。失敗一律倒向洩漏；殘留引用與資產互相保護，GC 永遠清不到，只能維運 SQL（`scripts/audit_media_reference_precheck.py`）。
+- 12 個 owner 服務（product、seller、buyer、social、content、im、invoice、review、order、shipping、ai、product-import）以 media gRPC `FinalizeImages`→`LinkImages`（commit 前、失敗須致命）→ 業務寫入 → `ReleaseReferences`（best-effort、只送一次）維持「有引用集合 ⊇ 業務列指向集合」不變式（`backend/docs/詳細設計書/08-多媒體微服務（Media Service）詳細設計書.md` §4.6.2）。失敗一律倒向洩漏；殘留引用與資產互相保護，GC 永遠清不到，只能維運 SQL（`scripts/audit_media_reference_precheck.py`）。
 - 單一 tx：**partly**。Link／Release 與業務寫入同 tx（`asset_reference` 可加 FK 甚至改由 owner 表反查），洩漏類缺口消失；R2 物件刪除與孤兒 GC 仍非同步。
 
 ### E2 gateway 協調的複本寫入

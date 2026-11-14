@@ -3,10 +3,9 @@
 
 Rules (docs/README.md is the source of truth):
 - Paths are resolved from the repo root. Checked prefixes are CHECKED_DIRS,
-  either at the repo root or under backend/.
+  either at the repo root or under backend/; docs/modules/ exists only under
+  backend/, so a backend-relative docs/modules/... fails.
 - Files under a "遺留基準" entry in docs/README.md are not scanned.
-- Files under a "過渡基準" entry fall back to backend/ when the repo-root
-  resolution fails.
 - A file whose header table has a "路徑基準" row resolves against that base
   first, then the repo root.
 - Markdown links: relative links resolve against the file's directory,
@@ -25,7 +24,7 @@ import sys
 from pathlib import Path
 from urllib.parse import unquote
 
-CHECKED_DIRS = ("docs/adr/", "docs/共通規範/", "docs/plans/")
+CHECKED_DIRS = ("docs/adr/", "docs/共通規範/", "docs/plans/", "docs/modules/")
 README = "docs/README.md"
 # This checker and its tests hold sample paths that intentionally do not exist.
 SELF = {"scripts/check-doc-paths.py", "scripts/test_check_doc_paths.py"}
@@ -39,7 +38,7 @@ CODE = re.compile(r"`([^`\n]+)`")
 CODE_PATH = re.compile(rf"^{_path}")
 LINK = re.compile(r"\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 BASE_ROW = re.compile(r"^\|\s*路徑基準\s*\|\s*`?([^`|\s]+)`?\s*\|", re.M)
-PLACEHOLDER = re.compile(r"YYYY|<|\{|\*|\.\.\.|…")
+PLACEHOLDER = re.compile(r"YYYY|<|\{|\*|\.\.\.|…|%[sdvq]")
 TEMPLATE_NEXT = set("<{*")
 HEADER_LINES = 20
 
@@ -68,11 +67,11 @@ def tracked_files(root: Path) -> list[str]:
     return [p for p in out.decode("utf-8").split("\0") if p]
 
 
-def readme_lists(root: Path, tree: Tree) -> tuple[list[str], list[str]]:
-    """Return (legacy, transitional) path prefixes from docs/README.md; fail closed."""
+def readme_legacy(root: Path, tree: Tree) -> list[str]:
+    """Return the 遺留基準 path prefixes from docs/README.md; fail closed."""
     path = root / README
     if not path.exists():
-        raise SystemExit(f"{README} is missing; it defines the 遺留基準 and 過渡基準 lists")
+        raise SystemExit(f"{README} is missing; it defines the 遺留基準 list")
     sections: dict[str, list[str]] = {}
     current = None
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -82,15 +81,13 @@ def readme_lists(root: Path, tree: Tree) -> tuple[list[str], list[str]]:
             continue
         if current and line.startswith("- "):
             sections[current].extend(CODE.findall(line))
-    lists = []
-    for name in ("遺留基準", "過渡基準"):
-        if name not in sections:
-            raise SystemExit(f"{README}: heading '## {name}' not found")
-        for entry in sections[name]:
-            if not tree.has(entry.rstrip("/")):
-                raise SystemExit(f"{README}: {name} entry `{entry}` is not a tracked path")
-        lists.append(sections[name])
-    return lists[0], lists[1]
+    name = "遺留基準"
+    if name not in sections:
+        raise SystemExit(f"{README}: heading '## {name}' not found")
+    for entry in sections[name]:
+        if not tree.has(entry.rstrip("/")):
+            raise SystemExit(f"{README}: {name} entry `{entry}` is not a tracked path")
+    return sections[name]
 
 
 def under(path: str, prefixes: list[str]) -> bool:
@@ -103,8 +100,12 @@ def clean(token: str) -> str:
     return token.rstrip(".,:;*")
 
 
+_NESTED = re.compile(rf"(?:^|/)docs/(?:{_dirs})/")
+
+
 def is_checked(repo_path: str) -> bool:
-    return any(repo_path.startswith(p) or repo_path.startswith("backend/" + p) for p in CHECKED_DIRS)
+    """Any resolved path with a checked docs/ segment, e.g. a doubled backend/backend/docs/."""
+    return bool(_NESTED.search(repo_path))
 
 
 def path_tokens(line: str) -> list[str]:
@@ -125,14 +126,12 @@ def path_tokens(line: str) -> list[str]:
     return tokens
 
 
-def check_file(tree: Tree, rel: str, text: str, transitional: bool) -> list[str]:
+def check_file(tree: Tree, rel: str, text: str) -> list[str]:
     bases = [""]
     if rel.startswith("docs/adr/"):
         m = BASE_ROW.search("\n".join(text.splitlines()[:HEADER_LINES]))
         if m:
             bases.insert(0, m.group(1).strip("/") + "/")
-    if transitional:
-        bases.append("backend/")
     errors = []
     for lineno, line in enumerate(text.splitlines(), 1):
         for tok in path_tokens(line):
@@ -159,7 +158,7 @@ def check_file(tree: Tree, rel: str, text: str, transitional: bool) -> list[str]
 def run(root: Path) -> list[str]:
     files = tracked_files(root)
     tree = Tree(files)
-    legacy, transitional = readme_lists(root, tree)
+    legacy = readme_legacy(root, tree)
     errors = []
     for rel in files:
         if rel in SELF or under(rel, legacy):
@@ -177,7 +176,7 @@ def run(root: Path) -> list[str]:
             text = data.decode("utf-8")
         except UnicodeDecodeError:
             continue
-        errors += check_file(tree, rel, text, under(rel, transitional))
+        errors += check_file(tree, rel, text)
     return errors
 
 

@@ -1,4 +1,4 @@
-# Loki ruler 告警：App 版本 header 出現非法值（見 docs/runbooks/app-version-gate.md）
+# Loki ruler 告警：App 版本 header 出現非法值（見 backend/docs/runbooks/app-version-gate.md）
 #
 # X-App-Version 是**匿名可控輸入**（Gateway 只截斷不驗證，logger.go truncateHeaderValue
 # 限 32 字元），任何人 curl 一個亂數就會在 Loki 多出一條 app_version series，

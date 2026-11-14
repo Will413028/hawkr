@@ -33,11 +33,11 @@
 docker --context desktop-linux run -d --name a7-1a-perf -e POSTGRES_PASSWORD=perf -e POSTGRES_DB=perf -p 127.0.0.1:55477:5432 postgres:18-alpine
 GOWORK=off go build -o /tmp/hawkr-perf ./cmd/hawkr
 env -i PATH="$PATH" HOME="$HOME" DATABASE_URL='postgres://postgres:perf@127.0.0.1:55477/perf?sslmode=disable' /tmp/hawkr-perf migrate
-docker --context desktop-linux exec -i a7-1a-perf psql -U postgres -d perf < docs/plans/2026-10-18-a7-social/step-1a-perf/seed.sql   # 約 5 分鐘，結尾 VACUUM (ANALYZE)
+docker --context desktop-linux exec -i a7-1a-perf psql -U postgres -d perf < backend/docs/plans/2026-10-18-a7-social/step-1a-perf/seed.sql   # 約 5 分鐘，結尾 VACUUM (ANALYZE)
 GOWORK=off go run ./internal/modules/social/perf/measure.go \
   -dsn 'postgres://postgres:perf@127.0.0.1:55477/perf?sslmode=disable' -reps 200 -out /tmp/a7-1a-perf-out
 # -only '建議|熱門標籤' 只跑標籤符合的情境；超過 300 ms 的情境讓指令以 2 結束
-docker --context desktop-linux exec -i a7-1a-perf psql -U postgres -d perf -v ON_ERROR_STOP=1 < docs/plans/2026-10-18-a7-social/step-1a-perf/spike-trgm.sql
+docker --context desktop-linux exec -i a7-1a-perf psql -U postgres -d perf -v ON_ERROR_STOP=1 < backend/docs/plans/2026-10-18-a7-social/step-1a-perf/spike-trgm.sql
 ```
 
 `seed.sql` 的參數：`-v stores=… -v buyers=… -v posts=… -v comments_per_post=… -v likes_per_post=…`。用完 `docker rm -f a7-1a-perf`。

@@ -1,6 +1,6 @@
 // Package accountsuspension 是 accountsuspension 模組的公開 API：帳號停權與解除停權的唯一入口。
 //
-// 職責、不變量與鎖順序見同目錄的 AGENTS.md；行為規格見 docs/modules/accountsuspension.md。
+// 職責、不變量與鎖順序見同目錄的 AGENTS.md；行為規格見 backend/docs/modules/accountsuspension.md。
 package accountsuspension
 
 import (

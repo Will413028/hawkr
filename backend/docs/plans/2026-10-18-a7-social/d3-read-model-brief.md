@@ -2,7 +2,7 @@
 
 > 快照：monorepo `06b158957`。cwd 為 `backend/`，除非另註。
 > 標記：【量】附指令或實驗、【推】推論、【猜】猜測、【外】外部來源已查證（附 URL）、【外?】外部來源沒有查證到。
-> 取代 v1（`docs/plans/2026-10-18-a7-social/d3-read-model-brief.md`）與 v2。v2 的對抗式審查（2 HIGH、5 MED、4 LOW）逐條處理，見文末「審查處理」。
+> 取代 v1（`backend/docs/plans/2026-10-18-a7-social/d3-read-model-brief.md`）與 v2。v2 的對抗式審查（2 HIGH、5 MED、4 LOW）逐條處理，見文末「審查處理」。
 > 本版的實驗都在 scratchpad 內做：暫時的 Postgres 18.6（`initdb`，port 54999）、sqlc 1.31.1、Atlas v1.1.3 canary。指令與 SQL 摘要在附錄 B，暫存檔已刪。
 
 ## 結論（先讀這段）
@@ -55,7 +55,7 @@
 ### 拆服務是不是目標？
 
 - ADR D1 否決微服務，理由是「多個團隊要各自部署」的組織問題在這裡不存在【量】ADR:29。重評條件是獨立擴展、開發人數增加、co-change 偏高（ADR:287-291），今天都不成立【量】根目錄 `AGENTS.md`。
-- 計畫與 ADR 裡提到「單獨搬移」的只有 ADR:155 一處【量】`rg -n -i "獨立部署|單獨搬移|拆出服務" docs/adr docs/plans`。
+- 計畫與 ADR 裡提到「單獨搬移」的只有 ADR:155 一處【量】`rg -n -i "獨立部署|單獨搬移|拆出服務" docs/adr backend/docs/plans`。
 - Grzybek 的 README 只寫「Module data could be moved into separate databases if desired」【外】https://github.com/kgrzybek/modular-monolith-with-ddd 。把他的全非同步設計歸因於「保留拆庫能力」是我的推論【推】。
 - 【推】D3 裡「為了將來能拆」的理由前提不成立；「為了改動隔離、資料擁有權、不變量只有一個家」的理由和拆不拆無關，仍然成立。
 
@@ -184,7 +184,7 @@ A7-1c 找到的三個問題都是**正確性**問題：`create.go` 的 `InReadSn
 
 - D4 否決「各開 transaction 再串 saga」，理由是四個實際缺口（ADR:175-180）。這是正確性證據，對「由上往下、不變量跨模組」的寫入成立。
 - `InTx` 已經可以重入：ctx 有 transaction 就直接加入【量】`platform/db/db.go:112-114`。`InReadSnapshot` 在 transaction 內回 `ErrSnapshotInTx`【量】`db.go:149-151`，失敗是大聲的。
-- PostgreSQL 設計規範 §十二已經規定冪等寫入用 `INSERT … ON CONFLICT`，撞 23505 之後不得在同一個 transaction 繼續下 SQL【量】`sed -n 287,310p "docs/開發規範/PostgreSQL 設計規範與最佳實踐.md"`。
+- PostgreSQL 設計規範 §十二已經規定冪等寫入用 `INSERT … ON CONFLICT`，撞 23505 之後不得在同一個 transaction 繼續下 SQL【量】`sed -n 287,310p "backend/docs/開發規範/PostgreSQL 設計規範與最佳實踐.md"`。
 
 ### 暴露面逐一判定
 
@@ -344,8 +344,8 @@ social 的公開可讀述詞是多個 `pub_*` 的組合：買家與店家的刪�
 |---|---|---|---|
 | ADR 修訂段：D3 判斷順序、撤回否決 view 的理由並說明、更正強制機制的措辭、D4 收窄與三條規則、規則 6 的 `pub_*` 例外 | `docs/adr/2026-09-24-go-modular-monolith.md` | 現在 | 這一列加下面四列共 0.5 session |
 | 單體規則 2、3、4、6 | `backend/AGENTS.md` | 現在 | 同上 |
-| A7 計畫：:71、:177-178、A7-1a 驗收（EXPLAIN）、A7-1c (b) 改為上面的鎖順序條文、(c) 定為推導、A7-1c 驗收的「social 訂閱」與 mutation 測試改寫、A7-1d 的 `MeasureRevoked` 訂閱改為推導；`interface-inventory.md` 第 11、13、14 列 | `docs/plans/2026-10-18-a7-social.md`、`interface-inventory.md` | 現在 | 同上 |
-| 遷移計畫 B4：刪掉 `store_state` 讀取模型 | `docs/plans/2026-09-24-go-modular-monolith.md:257` | 現在 | 同上 |
+| A7 計畫：:71、:177-178、A7-1a 驗收（EXPLAIN）、A7-1c (b) 改為上面的鎖順序條文、(c) 定為推導、A7-1c 驗收的「social 訂閱」與 mutation 測試改寫、A7-1d 的 `MeasureRevoked` 訂閱改為推導；`interface-inventory.md` 第 11、13、14 列 | `backend/docs/plans/2026-10-18-a7-social.md`、`interface-inventory.md` | 現在 | 同上 |
+| 遷移計畫 B4：刪掉 `store_state` 讀取模型 | `backend/docs/plans/2026-09-24-go-modular-monolith.md:257` | 現在 | 同上 |
 | v1 簡報標記被取代；10e D′1 的例外文字由第 3 步取代 | `d3-read-model-brief.md`、`step10e-3cd-brief.md` | 現在 | 同上 |
 | **曝光規則搬進 seller 的 SQL（§4.1 (i)）** | `seller/db/{schema.sql,pub.sql,migrations/*,queries/*}`、`seller/internal/{exposure,model,stint}/*`、資料集測試 | 10e 落地後、A7-1a 前 | 1–1.5 session【猜】，seller 擁有者 |
 | `pub.sql` 機制：`gen-monolith-sqlc.sh` 改成先全部 stage；arch 測試（sqlc 清單 × 依賴表、`pub.sql` 只放 `pub_*`）；契約測試 helper | `scripts/gen-monolith-sqlc.sh`、`internal/arch/*`、`internal/platform/testdb` 或 `migrate` | A7-1a 開工時 | 0.5 session【猜】 |

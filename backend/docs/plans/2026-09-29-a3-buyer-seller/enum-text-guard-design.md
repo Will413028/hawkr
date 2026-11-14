@@ -223,7 +223,7 @@ admin 關聯帳號終止的說明句不進目錄（§2 #6），所以 v1.2 的 `
 > **修訂：目錄分界（2026-10-22，Will）**
 > - D2「分界不變」改成：只由契約值決定，而且（兩個以上 client 用到，**或**只在某個目錄 enum 成員成立時才出現）的文字進目錄，加上 Connect code 的預設錯誤文字；其他文字在各 client 的資源。
 > - 「只在某個目錄 enum 成員成立時才出現」：client 程式裡，某段文字所在的分支或資料，必須先確定某個欄位等於目錄 enum 的某個成員才會到達（`if (state == ACTIVE)`、`case ACTIVE`、`{ACTIVE: …}`、`{value: ACTIVE, label: …}`）。這種句子即使只有一個 client 用，也不放 client 資源：它是那個值的說法，放在 client 就和目錄的名詞成為兩個來源。補集（「不是 ACTIVE 時」）不算。
-> - 理由：依條件判斷的守門（`docs/plans/2026-09-29-a3-buyer-seller/enum-text-guard-design.md`）在 I-app-0 之後連 client 資源查詢也算成文字，這類句子在 client 沒有合法的地方放。
+> - 理由：依條件判斷的守門（`backend/docs/plans/2026-09-29-a3-buyer-seller/enum-text-guard-design.md`）在 I-app-0 之後連 client 資源查詢也算成文字，這類句子在 client 沒有合法的地方放。
 > - 第一批：seller-app 停權效果句三句（`seller.Measure.suspension_*`）。website 的停權期間句不屬於這一類（終止合作提早 return 之後的補集），照 L′ §7(d) 留在 client。
 
 L′ 文末加修訂：「§7(d)：seller-app 的三句（停權中（至 {end}）等）自本刀起由目錄提供（ADR D2 修訂）；website 的期間句不變。§5.2 的 R1／R2／D1／D2 由規則 `E` 取代（本文）；R6 的三元式漏網已補。」

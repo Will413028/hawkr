@@ -86,7 +86,7 @@
 
 ### 11. 審核商家認證（KYC，SUBMITTED）
 - 沒有獨立「審核中」狀態 [量測]：`KYCStatusSubmitted` MODEL/kyc.go:26 = 審核中；列表篩選 `OldestFirst` kyc.go:488-490（status==SUBMITTED）。成員 = `status='SUBMITTED'`（AdminKYCApplicationsOldestFirst kyc.sql:215-232：`status<>'DRAFT' AND submitted_at IS NOT NULL AND status=...`）。
-- 開始 `submitted_at`；期限：Go 無（D8：7 天，rg `docs/runbooks` 無 KYC 期限）。
+- 開始 `submitted_at`；期限：Go 無（D8：7 天，rg `backend/docs/runbooks` 無 KYC 期限）。
 - proto [量測]：`KYCApplication.submit_time` seller.proto:521、`KYCApplicationSummary.submit_time` :554；無 due 欄位。
 - 索引 [量測]：`kyc_applications_status_submitted ON seller.kyc_applications (status, submitted_at, application_id) WHERE status<>'DRAFT' AND submitted_at IS NOT NULL` SCHEMA:1128-1129（status 是首欄 -> `status='SUBMITTED'` 等值後 (submitted_at, application_id) 有序）。另 `kyc_applications_submitted` :1130。
 - key 變動 [量測]：SUBMITTED 期間不能編輯（kyc.go:234-243 一律 FailedPrecondition，只能先取消），`TransitionKYCApplication` 只有 DRAFT->SUBMITTED 才寫新 submitted_at（kyc.sql:83-93；kyc.go:543-546）。所以在佇列期間穩定；重送是「離開(REJECTED/DRAFT)後再進入」，不是佇列中換 key [推論]。
@@ -144,7 +144,7 @@
 ADR `docs/adr/2026-09-24-go-modular-monolith.md`（355 行）：
 - :124 `## D3`；:130-135 原「跨模組讀取的判斷順序」，第 3 點 :133-135（「必須拿下層模組的資料來篩選或分頁：在自己的 schema 維護讀取模型…」，原文保留作歷史）。
 - :304 `## 修訂：跨模組讀取改用擁有者發布的 pub_*、D4 收窄（2026-10-18，Will）`，:306 說明本段「取代 D3 的判斷順序第 3 點」。新順序 :308-318：1 擁有者對嗎；2 依 ID 取資料；**:314「3. 各來源都擁有全部篩選與排序鍵：在 httpapi 依同一個全序做 keyset composition。」**；4 join `pub_*`；5 讀取模型只在量測觸發才建。:355 文末另有 2026-10-19 修訂（A′(i) 審查）。
-- backend/AGENTS.md:28（規則 2）同步含「各來源都擁有全部篩選與排序鍵就在 httpapi 做 keyset composition」[量測]。A7 計畫 docs/plans/2026-10-18-a7-social.md:540-542 已寫「ADR 2026-09-24 的修訂段已寫（D3 判斷順序第 3 步 keyset composition 取代 10e D′1 的例外文字）」。
+- backend/AGENTS.md:28（規則 2）同步含「各來源都擁有全部篩選與排序鍵就在 httpapi 做 keyset composition」[量測]。A7 計畫 backend/docs/plans/2026-10-18-a7-social.md:540-542 已寫「ADR 2026-09-24 的修訂段已寫（D3 判斷順序第 3 步 keyset composition 取代 10e D′1 的例外文字）」。
 - ADR 修訂段**沒有**寫 brief 的細節：不變式（單一比較函式、rank 整數、一個 now、snapshot）、終局與觸發條件（來源算不出的鍵、指派/認領/暫停、p95>300ms）。這些目前只在 3cd-brief D′1。
 
 3cd-brief `backend/docs/plans/2026-09-29-a3-buyer-seller/step10e-3cd-brief.md`（614 行）需要改的位置（因為 ADR 已有修訂段，brief 仍寫成「待 Will 決定的偏離」）：

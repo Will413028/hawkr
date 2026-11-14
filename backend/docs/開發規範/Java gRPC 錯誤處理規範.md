@@ -95,10 +95,10 @@
 
 ### 2.5 新增錯誤碼流程
 
-> 依 [CodeMeta 體系總覽](../代碼管理（CodeMeta）/README.md)（最高優先）：錯誤碼唯一真實來源為 [`docs/代碼管理（CodeMeta）/錯誤碼.md`](../代碼管理（CodeMeta）/錯誤碼.md)，**禁止**直接修改生成檔 `GrpcResponseCode.java`（手動新增的列舉值會被下次 `generate.sh` 覆蓋遺失）。
+> 依 [CodeMeta 體系總覽](../代碼管理（CodeMeta）/README.md)（最高優先）：錯誤碼唯一真實來源為 [`backend/docs/代碼管理（CodeMeta）/錯誤碼.md`](../代碼管理（CodeMeta）/錯誤碼.md)，**禁止**直接修改生成檔 `GrpcResponseCode.java`（手動新增的列舉值會被下次 `generate.sh` 覆蓋遺失）。
 
 1. 確認通用碼無法表達此語意
-2. 在 `docs/代碼管理（CodeMeta）/錯誤碼.md` 對應服務區塊新增條目（Name + code + message）
+2. 在 `backend/docs/代碼管理（CodeMeta）/錯誤碼.md` 對應服務區塊新增條目（Name + code + message）
 3. 執行 `cd docs/代碼管理（CodeMeta）/scripts && ./generate.sh --java` 生成 `GrpcResponseCode.java`
 4. 編譯受影響模組（`common-core` + `observability-common` + 受影響微服務）驗證
 

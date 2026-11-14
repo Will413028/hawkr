@@ -2,7 +2,7 @@
 
 ## 職責
 
-店家業務身分與 profile 的擁有者：開店、KYC、開通閘門（收款帳戶本身由 payment 模組擁有，seller 存轉帳能力的副本，`internal/payout`）、措施與停權、治理（通報、案件、申訴）、關店與清理、商家名單、商品瀏覽數、刪帳參與者。行為規格的唯一來源是 `docs/modules/seller.md`。
+店家業務身分與 profile 的擁有者：開店、KYC、開通閘門（收款帳戶本身由 payment 模組擁有，seller 存轉帳能力的副本，`internal/payout`）、措施與停權、治理（通報、案件、申訴）、關店與清理、商家名單、商品瀏覽數、刪帳參與者。行為規格的唯一來源是 `backend/docs/modules/seller.md`。
 
 ## 擁有的資料
 

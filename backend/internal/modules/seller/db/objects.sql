@@ -4,7 +4,7 @@
 -- schema.sql 與這個檔，兩者合起來才是 migration 套用後的完整結果。這裡只能有 view、函式與複合型別（internal/arch 的測試）。
 
 -- 曝光規則唯一的家（ADR 2026-09-24-go-modular-monolith 文末修訂「跨模組讀取改用擁有者發布的 pub_*」的曝光規則段；簡報
--- docs/plans/2026-10-18-a7-social/d3-read-model-brief.md §4.1 (i)）。下面的物件一律以 `atlas migrate new` 手寫 migration
+-- backend/docs/plans/2026-10-18-a7-social/d3-read-model-brief.md §4.1 (i)）。下面的物件一律以 `atlas migrate new` 手寫 migration
 -- （單體規則 6，見檔頭），漏建由 TestSchemaFileMatchesMigrations 擋；函式一律 BEGIN ATOMIC，
 -- 底層欄位改型別或刪除時 Postgres 拒絕（依賴追蹤），要在同一份 migration 內 drop 再建。時間一律由呼叫方以參數傳入（請求的 clock），不用 now()。
 

@@ -1,8 +1,8 @@
 # 事件 payload golden 契約（issue #1176）
 
 本目錄是 notification template ↔ publisher payload-key 契約 guardrail 的 golden 來源。
-設計背景見 `docs/詳細設計書/13-通知模板引擎與收件箱（Notification Template）詳細設計書.md §14`
-與 `docs/詳細設計書/36-MQ 與事件總覽（MQ & Event Catalog）.md §7.6.4`。
+設計背景見 `backend/docs/詳細設計書/13-通知模板引擎與收件箱（Notification Template）詳細設計書.md §14`
+與 `backend/docs/詳細設計書/36-MQ 與事件總覽（MQ & Event Catalog）.md §7.6.4`。
 
 ## 檔案
 

@@ -33,7 +33,7 @@ processors:
 
 connectors:
   # 從 span 自動算 RED metrics（calls/duration），取代逐 service 手刻 metrics
-  # instrumentation。詳見 docs/superpowers/specs/2026-08-20-grpc-observability-
+  # instrumentation。詳見 backend/docs/superpowers/specs/2026-08-20-grpc-observability-
   # spanmetrics-consolidation-design.md。本地沒有 Prometheus，用 debug exporter
   # 驗證 pipeline 有沒有正確產生資料。
   spanmetrics:

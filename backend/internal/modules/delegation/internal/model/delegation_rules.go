@@ -123,7 +123,7 @@ const (
 	DelegationRevoked DelegationStatus = "REVOKED"
 )
 
-// 撤銷的理由裡由系統寫入的固定值（設計書 56 §12.4 ①、docs/modules/delegation.md §3）：稽核以這一欄機械地區分撤銷的來源，不是自由文字。
+// 撤銷的理由裡由系統寫入的固定值（設計書 56 §12.4 ①、backend/docs/modules/delegation.md §3）：稽核以這一欄機械地區分撤銷的來源，不是自由文字。
 const (
 	// RevokeReasonAdminLogout：管理員登出時撤銷他進行中的代行，revoked_by_admin_id 是他自己。
 	RevokeReasonAdminLogout        = "admin_logout"
@@ -359,7 +359,7 @@ func SameCapabilitySet(a, b []Capability) bool {
 	return slices.Equal(x, y)
 }
 
-// ---- credential 與 handoff code（docs/modules/delegation.md §3） ----
+// ---- credential 與 handoff code（backend/docs/modules/delegation.md §3） ----
 
 const (
 	HandoffPrefix    = "dhof_"

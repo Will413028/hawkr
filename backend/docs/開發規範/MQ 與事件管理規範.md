@@ -5,11 +5,11 @@
 > **適用範圍（2026-09-24 起）**：只適用遷移期間仍在運作的舊服務。單體不使用 RabbitMQ：需要原子性的狀態變更用同一個 transaction 內的 in-process 事件，其餘改用 River job（`docs/adr/2026-09-24-go-modular-monolith.md` D4、D6）。RabbitMQ 在遷移計畫階段 C 移除，本規範隨之退場。
 
 
-> **本規範為 MQ / Event 設計流程規範**，與 `docs/詳細設計書/36-MQ 與事件總覽（MQ & Event Catalog）.md`（內容 SSOT）配合使用。
+> **本規範為 MQ / Event 設計流程規範**，與 `backend/docs/詳細設計書/36-MQ 與事件總覽（MQ & Event Catalog）.md`（內容 SSOT）配合使用。
 >
 > - **本文件回答**：如何新增 / 修改 / 查詢 MQ 與事件？流程是什麼？審查重點？
 > - **總覽文件回答**：目前有哪些 MQ / Event？對應什麼 service？payload 是什麼？
-> - **topology 佈建回答**（exchange / queue / binding 由誰建立、怎麼改、怎麼刪）：`docs/基礎建設/MQ Topology 管理（Terraform）.md`（權威），操作速查 `infra/mq/README.md`
+> - **topology 佈建回答**（exchange / queue / binding 由誰建立、怎麼改、怎麼刪）：`backend/docs/基礎建設/MQ Topology 管理（Terraform）.md`（權威），操作速查 `infra/mq/README.md`
 
 > ⚠️ **2026-07-24 起 broker 資源改由 Terraform 集中管理**：dev / prod 的服務啟動時走 **passive declare**（Go `MQ_PASSIVE_DECLARE=true`、Java `SPRING_RABBITMQ_DYNAMIC=false`），**應用程式不再能建立任何 exchange / queue / binding**，唯一 owner 是 `infra/mq/topology/topology.yaml`。queue 沒登記 → 服務照常啟動、pod 不重啟、**該筆訂閱失效且幾乎無聲**（Go 端只在啟動當下印一行 `[MQ][ERROR] skipping queue ...`，之後全無跡象；Java 端行為待坐實，見 §7.2）。本規範中涉及 queue 生命週期的章節（§1.3 / §2.1 / §3.1 / §3.3 / §四 / §6.1 / §7.2）皆以此為前提。local（OrbStack）不設 passive flag，仍由 app 自建 topology，不受影響。
 
@@ -21,7 +21,7 @@
 
 | 規則 | 說明 |
 |------|------|
-| **唯一 SSOT** | `docs/詳細設計書/36-MQ 與事件總覽（MQ & Event Catalog）.md` 是所有 MQ / Event 的唯一真實來源 |
+| **唯一 SSOT** | `backend/docs/詳細設計書/36-MQ 與事件總覽（MQ & Event Catalog）.md` 是所有 MQ / Event 的唯一真實來源 |
 | **禁止分散管理** | 不得僅在各服務設計書中描述 MQ 設計，必須同步更新 36 號設計書 |
 | **新增前查 SSOT** | 新增 MQ / Event 前，必須先閱讀 36 號設計書確認無重複 |
 | **修改先改 SSOT** | 修改 routing key / payload / queue 前，必須先更新 36 號設計書 |
@@ -46,13 +46,13 @@
 
 | 規則 | 違規後果 |
 |------|---------|
-| Java Publisher 必須用 `obsRabbitPublisher.publish(...)` | trace / correlation 遺失，違反 `docs/開發規範/Java 微服務開發規範.md` §8.2 |
+| Java Publisher 必須用 `obsRabbitPublisher.publish(...)` | trace / correlation 遺失，違反 `backend/docs/開發規範/Java 微服務開發規範.md` §8.2 |
 | Outbox 排程器投遞必須用 `obsRabbitPublisher.publishConfirmed(...)`（等 broker ack 才標 SENT） | broker 未收下卻誤標 SENT → 事件遺失（issue #1349，見 §8.2） |
-| Java Consumer 必須用 `@RabbitListener` + `manualAckContainerFactory` | 訊息可能遺失，違反 `docs/開發規範/Java 微服務開發規範.md` §10.2（Manual ACK 由 `RabbitMqAutoConfiguration` 提供） |
+| Java Consumer 必須用 `@RabbitListener` + `manualAckContainerFactory` | 訊息可能遺失，違反 `backend/docs/開發規範/Java 微服務開發規範.md` §10.2（Manual ACK 由 `RabbitMqAutoConfiguration` 提供） |
 | Exchange / Queue / Routing Key 必須走 `MqConstants` 常數 | 修改易遺漏，命名漂移 |
 | `RabbitMqConfig` 必須宣告對應 `@Bean Queue` + `@Bean Binding`（**意圖宣告**：passive declare 下 `SPRING_RABBITMQ_DYNAMIC=false`，Spring 不再實際佈建，僅表達「本服務需要這條 queue」並供 review 與 topology 對照） | 讀者無從得知該 listener 依賴哪條 queue，topology 對照失去依據 |
 | Consumer 監聽的 queue 必須登記於 `infra/mq/topology/topology.yaml`（唯一佈建來源） | **該訂閱失效且幾乎無聲**（**Go 端；Java 待坐實**）——服務正常啟動、pod 不重啟、不進 DLQ（queue 根本不存在），發給它的訊息直接丟棄；Go 端僅啟動時印一行 `skipping queue`（issue #1795） |
-| 禁止 `Jackson2JsonMessageConverter` 全域 Bean | byte[] 雙重序列化，違反 `docs/開發規範/Java 微服務開發規範.md` §8.6 |
+| 禁止 `Jackson2JsonMessageConverter` 全域 Bean | byte[] 雙重序列化，違反 `backend/docs/開發規範/Java 微服務開發規範.md` §8.6 |
 | 跨語言（Java ↔ Go）同邏輯領域必須用同名 exchange | 訊息漏路由 |
 
 ---
@@ -61,13 +61,13 @@
 
 ### 2.1 完整流程（強制順序）
 
-依 `docs/開發規範/開發工作流程.md` §1 強制順序（設計書 → Code Gen → DB → 程式碼 → 測試），新增 MQ 事件具體展開：
+依 `backend/docs/開發規範/開發工作流程.md` §1 強制順序（設計書 → Code Gen → DB → 程式碼 → 測試），新增 MQ 事件具體展開：
 
 | 步驟 | 操作 | 禁止事項 |
 |------|------|---------|
 | 1 | 在 36 號設計書 §三 對應領域新增事件條目（含 routing key / payload / producer / consumer / DLQ / idempotency） | 禁止跳過設計書 |
 | 2 | 同步更新對應服務的詳細設計書（例：訂單事件 → 03 號訂單設計書 §事件章節） | 禁止只改 36 而不改服務設計書 |
-| 3 | 更新 `docs/代碼管理（CodeMeta）/內部技術碼.md` 對應 EventType enum（若新增 routing key） | 禁止直接改 Java Enum |
+| 3 | 更新 `backend/docs/代碼管理（CodeMeta）/內部技術碼.md` 對應 EventType enum（若新增 routing key） | 禁止直接改 Java Enum |
 | 4 | 執行 `cd docs/代碼管理（CodeMeta）/scripts && ./generate.sh --java` | 嚴禁手動修改生成檔案 |
 | 5 | 更新 `MqConstants.java` 加入新的 Exchange / Queue / Routing Key 常數（若 generate.sh 未涵蓋） | 禁止字面值硬編碼 |
 | 6 | Publisher 服務實作 `Publisher` 方法，使用 `obsRabbitPublisher.publish(EXCHANGE, ROUTING_KEY, payloadBytes, eventType)` | 禁止用 `RabbitTemplate.convertAndSend` 直接寫 |
@@ -77,7 +77,7 @@
 | 10 | 關鍵路徑（金流 / 訂單核心）加 idempotency 保護（dedup 表或 DB 樂觀鎖） | — |
 | 11 | 本地測試（含模擬重複訊息 + 失敗重投） | 禁止只驗 happy path |
 
-> 步驟 8 的 topology 條目怎麼寫（五種 queue 形狀、policy 展開規則、`#` 綁定注意事項）見 `infra/mq/README.md`；展開規則的權威出處是 `docs/基礎建設/MQ Topology 管理（Terraform）.md`「展開規則」段。
+> 步驟 8 的 topology 條目怎麼寫（五種 queue 形狀、policy 展開規則、`#` 綁定注意事項）見 `infra/mq/README.md`；展開規則的權威出處是 `backend/docs/基礎建設/MQ Topology 管理（Terraform）.md`「展開規則」段。
 
 ### 2.2 是否為「跨團隊契約事件」判定
 
@@ -186,7 +186,7 @@ RabbitMQ 不支援 in-place 修改 queue arguments。Terraform 因此把 `argume
 
    再抽樣 publish 一則測試訊息，確認 routing → consume → ack 路徑完整。**consumer 數才是判準**——queue 存在但 `consumers=0` 代表服務側沒接上（passive declare 不會為此報錯）。
 
-   > ⚠️ **apply 成功不代表訂閱恢復**：`pkg/mq/resilient.go` 只在啟動／reconnect 時 declare，開機時被 skip 的 subscription **不會自癒**，而純 topology 的 PR 也不會重啟任何 pod。`consumers=0` 時執行 `kubectl rollout restart deployment/<service>` 讓它重新接上。這屬於「讓已部署的配置生效」的維運動作（後端工程師戴維運帽子主動做，見 `docs/開發規範/後端服務責任邊界規範.md`），**不是**用 restart 取代 code 的 CI/CD 部署——沒有 rebuild image 的假部署仍然禁止。
+   > ⚠️ **apply 成功不代表訂閱恢復**：`pkg/mq/resilient.go` 只在啟動／reconnect 時 declare，開機時被 skip 的 subscription **不會自癒**，而純 topology 的 PR 也不會重啟任何 pod。`consumers=0` 時執行 `kubectl rollout restart deployment/<service>` 讓它重新接上。這屬於「讓已部署的配置生效」的維運動作（後端工程師戴維運帽子主動做，見 `backend/docs/開發規範/後端服務責任邊界規範.md`），**不是**用 restart 取代 code 的 CI/CD 部署——沒有 rebuild image 的假部署仍然禁止。
 
 #### 3.3.4 跨環境順序
 
@@ -240,7 +240,7 @@ destroy → destructive gate `exit 1`），**那是預期行為**，它在等你
 | 3 | RabbitMQ console 確認對應 queue 已無訊息積壓 |
 | 4 | 從 36 號設計書移除條目 |
 | 5 | 從對應服務設計書移除引用 |
-| 6 | 從 `docs/代碼管理（CodeMeta）/內部技術碼.md` 對應 EventType 移除 |
+| 6 | 從 `backend/docs/代碼管理（CodeMeta）/內部技術碼.md` 對應 EventType 移除 |
 | 7 | 執行 `generate.sh --java` 重生 Enum |
 | 8 | 從 `MqConstants` 移除常數（若 generate.sh 未涵蓋） |
 | 9 | 刪除 Publisher / Consumer / Payload Class 程式碼 |
@@ -255,7 +255,7 @@ destroy → destructive gate `exit 1`），**那是預期行為**，它在等你
 
 ### 5.1 「我需要消費 X 事件，怎麼找？」
 
-1. 打開 `docs/詳細設計書/36-MQ 與事件總覽（MQ & Event Catalog）.md`
+1. 打開 `backend/docs/詳細設計書/36-MQ 與事件總覽（MQ & Event Catalog）.md`
 2. 在 §三「完整事件清單」找對應領域
 3. 確認 Routing Key / Exchange / Payload Class
 4. 在 §五「Consumer 完整清單」確認是否已有其他 Consumer 監聽（避免衝突）
@@ -352,7 +352,7 @@ destroy → destructive gate `exit 1`），**那是預期行為**，它在等你
 
 **症狀**：訊息 byte[] 雙重序列化，consumer 反序列化失敗。
 
-**防護**：`docs/開發規範/Java 微服務開發規範.md` §8.6 禁止全域宣告 `Jackson2JsonMessageConverter` Bean。
+**防護**：`backend/docs/開發規範/Java 微服務開發規範.md` §8.6 禁止全域宣告 `Jackson2JsonMessageConverter` Bean。
 
 **曾發生過的違規形狀**：`services/java/payuni-webhook-service/.../config/RabbitMqConfig.java` 曾宣告過此 Bean（現已移除，該檔目前只剩兩個 `TopicExchange`；紀錄見 36 號設計書 §9.5）。
 
@@ -472,12 +472,12 @@ PayUni 是外部 webhook 來源，特殊處理：
 
 | 相關規範 | 關係 |
 |---------|------|
-| `docs/代碼管理（CodeMeta）/README.md` | CodeMeta SSOT 流程（含 EventType enum 生成） |
-| `docs/開發規範/開發工作流程.md` | 開發工作流程（設計書 → Code Gen → DB → 程式碼 → 測試） |
-| `docs/開發規範/Java 微服務開發規範.md` | Java 微服務通用規範；MQ 相關條款在 §8（Observability / `ObsRabbitPublisher` / 禁 `Jackson2JsonMessageConverter` 全域 Bean）與 §10.2（RabbitMQ Manual ACK） |
-| `docs/開發規範/PostgreSQL 設計規範與最佳實踐.md` | Inbox/Outbox/Dedup 表設計 |
-| `docs/詳細設計書/36-MQ 與事件總覽（MQ & Event Catalog）.md` | 內容 SSOT |
-| `docs/基礎建設/MQ Topology 管理（Terraform）.md` | **topology 佈建權威**：passive declare、policy 展開規則、CI/CD 與 destructive gate |
+| `backend/docs/代碼管理（CodeMeta）/README.md` | CodeMeta SSOT 流程（含 EventType enum 生成） |
+| `backend/docs/開發規範/開發工作流程.md` | 開發工作流程（設計書 → Code Gen → DB → 程式碼 → 測試） |
+| `backend/docs/開發規範/Java 微服務開發規範.md` | Java 微服務通用規範；MQ 相關條款在 §8（Observability / `ObsRabbitPublisher` / 禁 `Jackson2JsonMessageConverter` 全域 Bean）與 §10.2（RabbitMQ Manual ACK） |
+| `backend/docs/開發規範/PostgreSQL 設計規範與最佳實踐.md` | Inbox/Outbox/Dedup 表設計 |
+| `backend/docs/詳細設計書/36-MQ 與事件總覽（MQ & Event Catalog）.md` | 內容 SSOT |
+| `backend/docs/基礎建設/MQ Topology 管理（Terraform）.md` | **topology 佈建權威**：passive declare、policy 展開規則、CI/CD 與 destructive gate |
 | `infra/mq/README.md` | 操作速查：`topology.yaml` 五種 queue 形狀、本機驗證三道閘門、plan 判讀 |
 
 ---

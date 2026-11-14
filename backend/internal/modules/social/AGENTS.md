@@ -2,7 +2,7 @@
 
 ## 職責
 
-貼文、留言、讚、店家討論區、hashtag、計數、瀏覽與分享，以及買家的社群處分（`sanctions`）與隱藏紀錄（`hides`）。行為規格的唯一來源是 `docs/modules/social.md`。
+貼文、留言、讚、店家討論區、hashtag、計數、瀏覽與分享，以及買家的社群處分（`sanctions`）與隱藏紀錄（`hides`）。行為規格的唯一來源是 `backend/docs/modules/social.md`。
 
 ## 擁有的資料
 
@@ -10,7 +10,7 @@ schema `social`（`db/schema.sql`；函式與 trigger 在 `db/objects.sql`，沒
 
 ## 發布的讀取介面
 
-無。沒有 `db/pub.sql`，不發布 `pub_*`（`internal/pubsql` 是讀 buyer、seller 的 `pub_*` 的包裝）。對外是 Go 公開 API 與模組事件，形狀見 `docs/modules/social.md` §1。
+無。沒有 `db/pub.sql`，不發布 `pub_*`（`internal/pubsql` 是讀 buyer、seller 的 `pub_*` 的包裝）。對外是 Go 公開 API 與模組事件，形狀見 `backend/docs/modules/social.md` §1。
 
 ## 模組內部結構
 
@@ -29,7 +29,7 @@ schema `social`（`db/schema.sql`；函式與 trigger 在 `db/objects.sql`，沒
 ## 不負責
 
 - 檢舉、案件與處置：moderation；social 只存隱藏與警告的紀錄，案件以不透明的 `source_ref` 參照。
-- 排程發布、Connect 與 handler、推播 relay：尚未在本模組（見 `docs/plans/2026-10-18-a7-social.md`）。
+- 排程發布、Connect 與 handler、推播 relay：尚未在本模組（見 `backend/docs/plans/2026-10-18-a7-social.md`）。
 - 店家與買家的名稱、頭像：讀取時由 seller、buyer 批次補，social 不存快照。
 
 ## 決策紀錄

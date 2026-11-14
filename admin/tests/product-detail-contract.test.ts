@@ -66,7 +66,7 @@ const PRODUCT_DETAIL_FIXTURE: ProductDetail = {
 			skuName: "1台斤裝",
 			weight: "1.000",
 			// CodeMeta WeightUnit Value：3301=公斤、3302=台斤、3303=公克
-			// （backend-payuni `docs/代碼管理（CodeMeta）/業務類型碼.md` WeightUnit）。
+			// （backend-payuni `backend/docs/代碼管理（CodeMeta）/業務類型碼.md` WeightUnit）。
 			// wire 送的是數字碼，不是中文標籤 —— dev product_sku 280 筆全為 3301/3302/3303。
 			unit: "3302",
 			price: "89",

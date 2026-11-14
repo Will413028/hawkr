@@ -1,7 +1,7 @@
 # A7-0 盤點（領域、資料、機制切片）：`backend/services/social-service` → social／moderation 模組
 
 唯讀盤點，快照 `172260d31`，2026-10-18。路徑相對於 `backend/`，`S=services/social-service`、`SI=services/social-service/internal`、`G=gateway/internal`。
-決策來源：`docs/plans/2026-09-29-a3-buyer-seller/step10d-a7-social-brief.md`（P、D1、D2、D3、D4、D5′，Will 2026-10-17 全照建議）、ADR `2026-10-17-social-actor-identity`。
+決策來源：`backend/docs/plans/2026-09-29-a3-buyer-seller/step10d-a7-social-brief.md`（P、D1、D2、D3、D4、D5′，Will 2026-10-17 全照建議）、ADR `2026-10-17-social-actor-identity`。
 標記：【量】＝打開檔案或跑過指令；【推】＝讀程式推論；【猜】＝估計。本檔只盤「領域、資料、機制」；RPC／REST／client 呼叫點是別的切片。
 
 ---

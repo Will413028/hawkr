@@ -257,8 +257,9 @@ func TestGeneratedAgentsPointsToTheSpec(t *testing.T) {
 		t.Fatal(err)
 	}
 	agents := string(b)
-	if !strings.Contains(agents, "`docs/modules/invoice.md`") {
-		t.Error("AGENTS.md 要指向模組規格 docs/modules/invoice.md")
+	spec := "backend/docs/modules/" + "invoice.md"
+	if !strings.Contains(agents, "`"+spec+"`") {
+		t.Errorf("AGENTS.md 要指向模組規格 %s", spec)
 	}
 	// 子領域的 AGENTS.md 是選用的（同一份 ADR 的決策 4）：模板說明規則，但骨架不產生它。
 	if !strings.Contains(agents, "`internal/<子領域>/AGENTS.md`（選用") {

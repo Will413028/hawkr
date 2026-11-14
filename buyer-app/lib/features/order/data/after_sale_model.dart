@@ -201,7 +201,7 @@ extension AfterSale711CodeX on AfterSaleCase {
   String get formatted711Code => '$partnerId $odno $validationNo';
 }
 
-/// 售後狀態碼（對齊 backend docs/代碼管理（CodeMeta）/業務狀態碼.md#AfterSaleCaseStatus）
+/// 售後狀態碼（對齊 backend/docs/代碼管理（CodeMeta）/業務狀態碼.md#AfterSaleCaseStatus）
 class AfterSaleStatus {
   static const String pending = '0';
   static const String awaitingReturn = '20'; // RETURN_PENDING 待退貨

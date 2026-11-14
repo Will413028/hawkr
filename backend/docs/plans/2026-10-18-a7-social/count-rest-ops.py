@@ -1,9 +1,10 @@
 """數 openapi.yaml 裡的社群 operation：brief 口徑、social 實際服務、A7-4 可刪三個數字。
 
-在 backend/ 執行：python3 -I docs/plans/2026-10-18-a7-social/count-rest-ops.py
+在 repo 根目錄執行：python3 -I backend/docs/plans/2026-10-18-a7-social/count-rest-ops.py
 """
 
 import collections
+import pathlib
 
 import yaml
 
@@ -11,7 +12,7 @@ BRIEF_TAGS = {"Post", "Comment", "Forum", "Moderation", "AdminModeration", "Admi
 PRODUCT_TAGS = {"Hashtag"}  # /public/hashtags、/public/hashtags/popular：handler 呼叫 product-service
 KEEP_UNTIL_A6 = set()  # S3（2026-10-18）之後 /app/blocks* 也在 A7-4e 刪除；舊口徑是這兩條路徑（3 個 operation）
 
-spec = yaml.safe_load(open("api/openapi/openapi.yaml", encoding="utf-8"))
+spec = yaml.safe_load(open(pathlib.Path(__file__).resolve().parents[3] / "api/openapi/openapi.yaml", encoding="utf-8"))
 rows = []
 for path, item in spec["paths"].items():
     for method, op in item.items():

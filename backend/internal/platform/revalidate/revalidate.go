@@ -1,4 +1,4 @@
-// Package revalidate 通知 website 讓 Next.js 的快取失效（docs/開發規範/後端服務責任邊界規範.md §9）。
+// Package revalidate 通知 website 讓 Next.js 的快取失效（backend/docs/開發規範/後端服務責任邊界規範.md §9）。
 //
 // 單體裡以 River job 送出（ADR 2026-09-24-go-modular-monolith D6）：修改資料的 use case
 // 在自己的 transaction 內用 jobs.Enqueue 排入 Args，commit 之後 job 才看得到，所以不會有

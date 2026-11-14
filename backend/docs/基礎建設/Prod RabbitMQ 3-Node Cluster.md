@@ -7,7 +7,7 @@
 Prod RabbitMQ 原本單機跑在 Prod-infra VM（192.0.2.115），已標記 🔴 SPOF。
 該台已整台停機除役（Zeabur `vmStatus: STOPPED`）。
 2026-07-21 起改為 Prod MQ1/2/3 三節點 cluster。設計理由見
-`docs/superpowers/specs/2026-07-20-prod-rabbitmq-cluster-design.md`
+`backend/docs/superpowers/specs/2026-07-20-prod-rabbitmq-cluster-design.md`
 （gitignored，僅本機）。
 
 ## 節點
@@ -46,7 +46,7 @@ Prod RabbitMQ 原本單機跑在 Prod-infra VM（192.0.2.115），已標記 🔴
 5. iptables 私網鎖定（比照 Prod-infra 既有模式，DOCKER-USER + INPUT chain，僅放行
    `172.17.0.0/18` + loopback，涵蓋 4369/5672/15672/25672/15692）。⚠️ 這些規則是
    runtime 狀態、未持久化，VM 重開機會消失（跟 Prod-infra 既有的已知 gap 一樣，見
-   `docs/基礎建設/Tailscale VPN 連線 Prod 機器指南.md` 風險表）：
+   `backend/docs/基礎建設/Tailscale VPN 連線 Prod 機器指南.md` 風險表）：
    ```bash
    for PORT in 4369 5672 15672 25672 15692; do
      iptables -I DOCKER-USER -p tcp --dport $PORT -j DROP

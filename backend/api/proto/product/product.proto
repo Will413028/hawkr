@@ -973,7 +973,7 @@ message BatchChangeProductCategoryForAdminResponse {
 message HashtagItem {
     string name = 1;             // canonical 名稱（lower），查詢與比對基準
     string display_name = 2;     // 顯示名稱（保留原大小寫）；auto-complete 場景填空字串
-    string product_count = 3;    // 引用數量（hashtag.product_count 即時值，字串型別，docs/開發規範/Java 微服務開發規範.md §2.1；見 33 §5.4）
+    string product_count = 3;    // 引用數量（hashtag.product_count 即時值，字串型別，backend/docs/開發規範/Java 微服務開發規範.md §2.1；見 33 §5.4）
 }
 
 // Hashtag 列表篩選的多值匹配模式
@@ -1017,7 +1017,7 @@ message GetPopularHashtagsResponse {
 // Popular hashtag 條目（與 HashtagItem 不同：count 為區間內 distinct ACTIVE 商品數，非全歷史）
 message PopularHashtagItem {
     string hashtag = 1;          // 區間內最多 ACTIVE 商品使用的原始大小寫版本（33 §5.2.3）
-    string count = 2;            // 區間內掛上此 hashtag 的 distinct ACTIVE 商品數（字串型別，docs/開發規範/Java 微服務開發規範.md §2.1）
+    string count = 2;            // 區間內掛上此 hashtag 的 distinct ACTIVE 商品數（字串型別，backend/docs/開發規範/Java 微服務開發規範.md §2.1）
 }
 
 // ========== 公開產地聚合（02 §5.13） ==========
@@ -1035,7 +1035,7 @@ message GetPublicOriginsSummaryResponse {
 
 message OriginSummaryItem {
     string origin = 1;         // 產地字串（如「台灣」「日本」），永不為空（origin IS NULL / '' 不回）
-    string product_count = 2;  // 該產地下 ACTIVE 商品數（數字字串，docs/開發規範/Java 微服務開發規範.md §2.1）
+    string product_count = 2;  // 該產地下 ACTIVE 商品數（數字字串，backend/docs/開發規範/Java 微服務開發規範.md §2.1）
 }
 
 message GetPublicSellerCitiesSummaryRequest {}

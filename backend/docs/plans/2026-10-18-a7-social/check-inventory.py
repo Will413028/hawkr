@@ -1,6 +1,6 @@
 """A7 盤點與計畫的一次性檢查：去向、處置欄不得留空，盤點的每個缺陷都在計畫裡有處置。
 
-在 backend/ 執行：python3 -I docs/plans/2026-10-18-a7-social/check-inventory.py
+在 repo 根目錄執行：python3 -I backend/docs/plans/2026-10-18-a7-social/check-inventory.py
 有問題時逐項列出並回 1。
 """
 

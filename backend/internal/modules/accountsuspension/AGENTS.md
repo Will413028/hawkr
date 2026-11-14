@@ -2,7 +2,7 @@
 
 ## 職責
 
-帳號停權與解除停權的唯一入口（A7-D15）：鎖帳號列、確認帳號沒有店家、呼叫 identity 的停權或解除入口、在同一個 transaction 發事件。moderation 與 legacy `AccountService.SuspendAccount` 都經它。行為規格的唯一來源是 `docs/modules/accountsuspension.md`。
+帳號停權與解除停權的唯一入口（A7-D15）：鎖帳號列、確認帳號沒有店家、呼叫 identity 的停權或解除入口、在同一個 transaction 發事件。moderation 與 legacy `AccountService.SuspendAccount` 都經它。行為規格的唯一來源是 `backend/docs/modules/accountsuspension.md`。
 
 ## 擁有的資料
 

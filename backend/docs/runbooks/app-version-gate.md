@@ -1,6 +1,6 @@
 # App 版本門檻 Runbook
 
-行為規格：後端 `docs/modules/content.md` §5，App 端 `packages/hawkr_app_update/docs/spec.md`。本文只放出事時的排查，以及版本分佈的讀法與舊版 App 的放行判準。
+行為規格：後端 `backend/docs/modules/content.md` §5，App 端 `packages/hawkr_app_update/docs/spec.md`。本文只放出事時的排查，以及版本分佈的讀法與舊版 App 的放行判準。
 
 ## 1. 排查
 

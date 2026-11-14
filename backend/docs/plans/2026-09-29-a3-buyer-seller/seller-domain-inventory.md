@@ -26,7 +26,7 @@ One-off binaries not to migrate: `cmd/backfill-seller-deleted`, `cmd/backfillsto
 
 ## 1. Subdomains and D8 wiring
 
-Wiring evidence: inventory `docs/plans/2026-09-24-go-modular-monolith/rpc-calls.csv` (callee=seller-service) cross-checked against current gateway routes (`gateway/internal/router/routes_*.go`) and client code (`rg` over `website`, `admin`, `seller-app`, `buyer-app`, excluding `node_modules`, `gen`, tests).
+Wiring evidence: inventory `backend/docs/plans/2026-09-24-go-modular-monolith/rpc-calls.csv` (callee=seller-service) cross-checked against current gateway routes (`gateway/internal/router/routes_*.go`) and client code (`rg` over `website`, `admin`, `seller-app`, `buyer-app`, excluding `node_modules`, `gen`, tests).
 
 | Subdomain | Tables | Reached by | Verdict |
 |---|---|---|---|

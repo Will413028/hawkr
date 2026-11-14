@@ -81,7 +81,7 @@ func (c *Client) HasOpenOrders(ctx context.Context, buyerID int64) (bool, error)
 
 // openStatuses 是舊契約的訂單狀態（CodeMeta〈業務狀態碼〉的 OrderStatus，擁有者是 ordering）是否算未結：
 // 付款前到送達都算，完成、退款、取消與配送失敗結案不算。不在表內的狀態一律當成錯誤，不推定為已結。買家與店家兩側共用
-// 這張表。來源：docs/代碼管理（CodeMeta）/業務狀態碼.md 的 OrderStatus（Java 的 OrderStatus.java 同值）；
+// 這張表。來源：backend/docs/代碼管理（CodeMeta）/業務狀態碼.md 的 OrderStatus（Java 的 OrderStatus.java 同值）；
 // TestOpenStatusesCoverCodeMetaOrderStatus 比對兩邊。
 //
 //	未結：0 待付款、10 已付款、20 待出貨、30 配送中、32 待取貨、35 物流異常、40 已送達（買家還沒確認收貨）

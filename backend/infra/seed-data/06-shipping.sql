@@ -4,7 +4,7 @@
 -- 賣家配送設定：store_id 1009（store_code 9，mer_id HAWK9）、store_id 1004（store_code 4，mer_id HAWK4）；mer_id 是 HAWK 加 store_code，
 -- 店家在單體的 seller schema，由 backend 的 make dev-seed 寫入
 -- shipping_type: CodeMeta ShippingType（3651=CVS_C2C 超商店到店 / 3652=HOME_DELIVERY 宅配到府；
---   見 docs/代碼管理（CodeMeta）/業務類型碼.md）
+--   見 backend/docs/代碼管理（CodeMeta）/業務類型碼.md）
 -- 欄位名為 store_id（非 seller_account_id；schema 已於 shipping-service migration 完成 rename）
 -- onboarding_status: value（3602=ACTIVE）
 -- ============================================================================

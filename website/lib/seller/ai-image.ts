@@ -47,7 +47,7 @@ export interface AiEnhanceResult {
 }
 
 /**
- * AI 修圖業務碼。SSOT 是後端的 `docs/代碼管理（CodeMeta）/錯誤碼.md`
+ * AI 修圖業務碼。SSOT 是後端的 `backend/docs/代碼管理（CodeMeta）/錯誤碼.md`
  * 「AI 修圖業務碼（9250~9259）」；這裡只鏡射需要分流的碼值，**文案一律用後端
  * 回傳的 message，不在前端複製一份**，否則兩邊會各改各的。
  */

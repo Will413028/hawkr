@@ -148,7 +148,7 @@ SELECT count(*) FROM invoice_inbox_events r
 COMMIT;
 ```
 
-⚠️ **`disposition` 的值域是 CodeMeta `InvoiceInboxDisposition`**（`docs/代碼管理（CodeMeta）/內部技術碼.md`），不要直接寫字面值進 DB。
+⚠️ **`disposition` 的值域是 CodeMeta `InvoiceInboxDisposition`**（`backend/docs/代碼管理（CodeMeta）/內部技術碼.md`），不要直接寫字面值進 DB。
 本節用的 `IGNORED_PRE_CUTOVER` 就在那張表裡。
 ⚠️ 該區塊**在 #3073 之前並不存在**，而這句話當時就已經寫著「要先在 CodeMeta 登記」
 —— 照它施工的人會找不到地方登記，然後直接寫字面值。訂規範時要同時把它指向的東西做出來。

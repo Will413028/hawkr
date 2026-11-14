@@ -5915,7 +5915,7 @@ type SellerMeta struct {
 	// 賣家可以在可曝光之前先準備商品；ADR 2026-10-05-store-exposure-to-legacy 決策 3）。給 product-service 的上架閘（9240）。
 	CanManageProducts bool `protobuf:"varint,13,opt,name=can_manage_products,json=canManageProducts,proto3" json:"can_manage_products,omitempty"`
 	// 店家是否曾經公開過、有公開的店家卡片：first_exposed_at 有值，或此刻可以公開曝光（與單體 seller.StoreCards 的同一條規則；
-	// 暫停中與已關閉的店只要曾經公開過就是 true）。給 social 與 gateway 判斷聊天對象（決策簡報 docs/plans/2026-09-29-a3-buyer-seller/step10d-decision-brief.md D2）；公開內容的可見性看店家此刻是否可公開曝光，不看它。
+	// 暫停中與已關閉的店只要曾經公開過就是 true）。給 social 與 gateway 判斷聊天對象（決策簡報 backend/docs/plans/2026-09-29-a3-buyer-seller/step10d-decision-brief.md D2）；公開內容的可見性看店家此刻是否可公開曝光，不看它。
 	HasPublicCard bool `protobuf:"varint,14,opt,name=has_public_card,json=hasPublicCard,proto3" json:"has_public_card,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

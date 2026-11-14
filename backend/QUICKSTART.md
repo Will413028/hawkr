@@ -271,7 +271,7 @@ kubectl rollout restart deploy/<service> -n hawkr
 
 ## 🎯 下一步
 
-- 完整文件總覽：[docs/index.md](docs/index.md)
-- 開發規範（最高優先級）：[docs/開發規範/API 設計規範.md](docs/開發規範/API%20設計規範.md)、[docs/開發規範/開發工作流程.md](docs/開發規範/開發工作流程.md)
+- 完整文件總覽：[backend/docs/index.md](docs/index.md)
+- 開發規範（最高優先級）：[backend/docs/開發規範/API 設計規範.md](docs/開發規範/API%20設計規範.md)、[backend/docs/開發規範/開發工作流程.md](docs/開發規範/開發工作流程.md)
 - 本機腳本（smoke test、資料同步等）：[scripts/README.md](scripts/README.md)
-- Gateway swagger：契約 SSOT 是 handler 註解；生成物 `gateway/docs/` **不入版控**，本地要看就 `cd gateway && make swagger`（唯一消費者是 Apidog，由 CI 同步）。見 [docs/開發規範/Gateway Swagger 註解規範.md](docs/開發規範/Gateway%20Swagger%20註解規範.md)
+- Gateway swagger：契約 SSOT 是 handler 註解；生成物 `gateway/docs/` **不入版控**，本地要看就 `cd gateway && make swagger`（唯一消費者是 Apidog，由 CI 同步）。見 [backend/docs/開發規範/Gateway Swagger 註解規範.md](docs/開發規範/Gateway%20Swagger%20註解規範.md)

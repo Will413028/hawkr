@@ -34522,7 +34522,7 @@ components:
           description: 產地字串（如「台灣」「日本」）
         productCount:
           type: string
-          description: 該產地下 ACTIVE 商品數（對外數字一律 string，見 docs/開發規範/Java 微服務開發規範.md §2）
+          description: 該產地下 ACTIVE 商品數（對外數字一律 string，見 backend/docs/開發規範/Java 微服務開發規範.md §2）
     OriginsSummaryResponse:
       type: object
       properties:
@@ -34629,7 +34629,7 @@ components:
       properties:
         count:
           type: string
-          description: 區間內 distinct ACTIVE 商品數（對外數字一律 string，見 docs/開發規範/Java 微服務開發規範.md §2）
+          description: 區間內 distinct ACTIVE 商品數（對外數字一律 string，見 backend/docs/開發規範/Java 微服務開發規範.md §2）
         hashtag:
           type: string
           description: 區間內最多 ACTIVE 商品使用的原始大小寫版本

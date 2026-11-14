@@ -381,7 +381,7 @@ cmd_rebuild() {
   echo ""
 
   # 用 mvnw reactor 一次編完所有變更服務的 jar（shared 自動帶上 -am）。
-  # 詳細設計：docs/基礎建設/CI_CD 自動化部署（K8s + Helm）.md §4.3 / §9.2。
+  # 詳細設計：backend/docs/基礎建設/CI_CD 自動化部署（K8s + Helm）.md §4.3 / §9.2。
   # thin Dockerfile 純 COPY 預編 jar，必須先在 host 跑 mvnw 產出 services/java/*/target/*.jar。
   # -Dmaven.test.skip=true：跳過 test 編譯與執行（對齊舊 Dockerfile 行為，.dockerignore
   # 排除了 **/*Test.java；測試由獨立 CI step 負責，不阻擋 build artifact）。

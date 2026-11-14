@@ -35,8 +35,8 @@ admin「商家通報」→「待分案」分頁（每 30 秒自動更新）。�
   轉報在系統外完成，不必等結案；之後在案件詳情 [記錄已轉報主管機關]（只能記一次，不能修改）
 
 事件結束後（案件結案後 7 天內）：
-  7. 寫 postmortem → docs/postmortems/food-safety/YYYY-MM-DD-{case-id}.md
-       模板見 docs/postmortems/food-safety/_template.md
+  7. 寫 postmortem → backend/docs/postmortems/food-safety/YYYY-MM-DD-{case-id}.md
+       模板見 backend/docs/postmortems/food-safety/_template.md
 
 > 完整流程往下翻
 > 轉報 → Ch3
@@ -242,8 +242,8 @@ url: https://consumer.fda.gov.tw/
 **何時**：「立即轉報」類別且事件涉及單一縣市群聚 → 通報該縣市衛生局更快觸發稽查。
 
 ```
-1. 衛生局傳真表單：填寫格式參考 docs/templates/fda-fax-template.pdf（待補）
-2. 傳真至該縣市衛生局食安科（號碼依地區，常用列表見 docs/runbooks/food-safety/contacts.md，待補）
+1. 衛生局傳真表單：填寫格式參考 backend/docs/templates/fda-fax-template.pdf（待補）
+2. 傳真至該縣市衛生局食安科（號碼依地區，常用列表見 backend/docs/runbooks/food-safety/contacts.md，待補）
 3. email subject 格式：「[食安通報] {case_id} {seller_name} {date}」；副本寄 fda-incident@hawkr.example
 ```
 
@@ -324,8 +324,8 @@ url: https://consumer.fda.gov.tw/
 ### 5.2 位置與流程
 
 ```
-位置：docs/postmortems/food-safety/YYYY-MM-DD-{case-id}.md
-模板：docs/postmortems/food-safety/_template.md
+位置：backend/docs/postmortems/food-safety/YYYY-MM-DD-{case-id}.md
+模板：backend/docs/postmortems/food-safety/_template.md
 流程：單人營運時直接 commit 到 main（repo 只有 main 一條分支），不需要 PR review；有第二位營運人員時走 PR，由另一位 review 後 merge
 時限：結案後 7 天內提交
 ```
@@ -360,7 +360,7 @@ postmortem 必含以下 8 章節（內容空時填「無」/「N/A」也要保�
 8. **Lesson learned**（1-2 段）
    學到什麼？下次會做不一樣？是否有 wiki/tech 等級的踩坑值得抽出？回答「organizational memory」。
 
-完整空白模板見：[`docs/postmortems/food-safety/_template.md`](../postmortems/food-safety/_template.md)（待建立首版）。
+完整空白模板見：[`backend/docs/postmortems/food-safety/_template.md`](../postmortems/food-safety/_template.md)（待建立首版）。
 
 ---
 
@@ -409,6 +409,6 @@ postmortem 必含以下 8 章節（內容空時填「無」/「N/A」也要保�
   - [seller-governance-shared.md](./seller-governance-shared.md) — penalty matrix、欄位字典、共用名詞
   - 設計書 32：商家治理與食安通報
   - 決策簡報：`plans/2026-09-29-a3-buyer-seller/step10e-reports-brief.md`（R3 期限、R5 主管機關通道）
-  - Postmortem 模板（待建）：[`docs/postmortems/food-safety/_template.md`](../postmortems/food-safety/_template.md)
+  - Postmortem 模板（待建）：[`backend/docs/postmortems/food-safety/_template.md`](../postmortems/food-safety/_template.md)
 
 > 本 runbook 為主要操作手冊，遇實務狀況與 runbook 衝突 → 以「保守原則」處理，事後修訂 runbook，不要當下硬套不適用流程。

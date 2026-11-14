@@ -57,7 +57,7 @@ connectors:
   # 從 span 自動算 RED metrics（calls/duration），取代逐 service 手刻 metrics
   # instrumentation。Phase 1：新增管線與現有直接 scrape 的 metrics 並存，
   # 待 dev 驗證資料正確後才切換 dashboard 並移除舊 interceptor（Phase 2/3）。
-  # 詳見 docs/superpowers/specs/2026-08-20-grpc-observability-spanmetrics-
+  # 詳見 backend/docs/superpowers/specs/2026-08-20-grpc-observability-spanmetrics-
   # consolidation-design.md。
   #
   # deployment.environment 維度（2026-08-24 補）：Go（pkg/otel/tracer.go）

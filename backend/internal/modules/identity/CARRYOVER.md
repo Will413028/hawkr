@@ -1,6 +1,6 @@
 # identity 模組的沿用盤點
 
-從 account-service 沿用的每個機制重新判斷的結論（遷移計畫「模組完成的定義」），以及與 account-service 的差異。模組現行的職責、資料與不變量在同目錄的 `AGENTS.md`，行為規格在 `docs/modules/identity.md`。
+從 account-service 沿用的每個機制重新判斷的結論（遷移計畫「模組完成的定義」），以及與 account-service 的差異。模組現行的職責、資料與不變量在同目錄的 `AGENTS.md`，行為規格在 `backend/docs/modules/identity.md`。
 
 ## 沿用盤點
 
@@ -22,7 +22,7 @@ account-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | session、稽核、outbox 與 refresh family 用 TSID | 單一 replica | 不成立：serve 多個 replica 加上 worker | UUIDv7 | 身分 session 等由 Clerk 管理，不建這些表；代行的 ID 決定見 delegation 的 `CARRYOVER.md` |
 | 角色 bitmask `accounts.account_type` 與 `account_roles` 並存（#1544 Phase 1），bitmask 烘進 JWT、gRPC 回應與 admin 的 SQL 篩選 | 舊的 wire 契約讀 bitmask | 新契約不需要；舊服務（buyer、seller、social、crm、coupon、gateway）搬遷前仍讀 | 角色是集合，存成關聯表 | 新 schema 只有 `account_roles`；bitmask 只在 `internal/legacy/accounttype` 投影給舊呼叫方（買家位元由「帳號活著」合成，W5），隨它們退場。#1544 的 Phase 2 到 4 就此完成 |
 | `account_roles` 是 append-only 的授予歷史（`granted_at` 在主鍵、`revoked_at`） | 有人要查誰在什麼時候被授予或撤銷 | 不成立：`ListAccountRoleHistory` 沒有呼叫端 | 現況表；需要稽核時另外記事件 | 現況表 `(account_id, role)`，保留 `granted_at` 與 `source_id` |
-| `source_id` 柵欄：移除角色時帶來源（`store_id`、`buyer_id`），目前的授予屬於較新的來源就不移除（#3189） | seller-service、buyer-service 以 outbox 非同步呼叫 `RemoveRole`，可能晚於重新入駐 | 成立到 A3 | 在同一個 transaction 內直接呼叫就不會亂序 | 沿用到 A3b：買家不再是角色（W5），柵欄只剩 seller-service 非同步移除 SELLER 需要；現行行為記在 `docs/modules/identity.md` §3，A3b 步驟 11 拿掉欄位與柵欄 |
+| `source_id` 柵欄：移除角色時帶來源（`store_id`、`buyer_id`），目前的授予屬於較新的來源就不移除（#3189） | seller-service、buyer-service 以 outbox 非同步呼叫 `RemoveRole`，可能晚於重新入駐 | 成立到 A3 | 在同一個 transaction 內直接呼叫就不會亂序 | 沿用到 A3b：買家不再是角色（W5），柵欄只剩 seller-service 非同步移除 SELLER 需要；現行行為記在 `backend/docs/modules/identity.md` §3，A3b 步驟 11 拿掉欄位與柵欄 |
 | 角色字串刻意不加 CHECK（「多一個角色不該要 migration」） | 角色常常增加 | 不成立：只有賣家（買家不是角色，W5），多一個角色本來就要改程式 | 儲存的碼由模組的 Go 型別與 CHECK 定義（ADR `2026-09-25-codemeta-retirement.md` D3） | 加 CHECK，值等於 Go 常數（`SELLER`） |
 | 買家存成角色（`BUYER`，建帳時授予、刪帳時移除；最後一個角色移除時刪帳號） | 買家與賣家都是可以單獨加入、單獨退出的身分 | 不成立：建帳就是買家（W1），後台不再只刪買家（W3），帳號活著 ⇔ 買家活著；存成角色只多一個會與帳號狀態漂移的來源 | 由不變量推導的屬性不另外儲存 | 刪除（Will 2026-10-01 W5）：角色只剩要另外申請的 SELLER；last-role cascade、`RoleState`、BUYER 的授予與移除都刪除，移除 SELLER 永遠不刪帳號。舊契約需要的買家位元（`account_type`、`X-Login-Role`、`X-Account-Type`）由 `internal/legacy/accounttype` 在邊界合成。migration `buyer_is_not_a_role` 刪掉既有的 BUYER 列並收緊 CHECK |
 | 管理員是另一張表、ID 與帳號同格式；Redis 的 `auth:epoch:<id>` 不分類型、legacy refresh 對管理員查錯表（盤點 G8） | 管理員的登入與權限不同於帳號 | 分表成立；ID 混用不成立 | principal 帶類型 | 沿用分表；principal 帶類型。顧客由 Clerk、後台由 Access 簽 token，認證以 issuer 區分，兩邊同號時不互相認證成對方（測試） |

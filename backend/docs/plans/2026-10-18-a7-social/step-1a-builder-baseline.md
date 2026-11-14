@@ -181,7 +181,7 @@ Unchanged from the prior report: a time-ranged takedown changes membership witho
 | Planner rules: container once on the parent key; split block NOT EXISTS; SRF must return the row | REAL | prior report [measured]; here [measured] | The builder follows the first two by construction; the third is moot |
 | jet QRM needs `database/sql` | REAL (library) | `qrm/db.go` [read-source] | Do not use QRM: `.Sql()` + `db.Conn(ctx)` + pgx `RowToStructByName` + Describe test |
 | jet and bob generators need a live, migrated DB | REAL (tools) | [measured] | The generate step needs Postgres (the repo already runs sqlc in docker and testcontainers in tests) |
-| Perf target p95 ≤ 300 ms @ 50 on 10^5 posts | SELF-IMPOSED target | `docs/plans/2026-10-18-a7-social/step-1a-design.md:243`, `d3-read-model-brief.md:326` | Not binding: measured p95 2–25 ms |
+| Perf target p95 ≤ 300 ms @ 50 on 10^5 posts | SELF-IMPOSED target | `backend/docs/plans/2026-10-18-a7-social/step-1a-design.md:243`, `d3-read-model-brief.md:326` | Not binding: measured p95 2–25 ms |
 | Owner wants logic visible to humans and AI | SELF-IMPOSED preference (Will) | brief | Favors Go predicates plus golden SQL snapshots over DB objects |
 
 ## 4. Recommendation

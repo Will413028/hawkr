@@ -2,7 +2,7 @@
 
 ## 職責
 
-沒有帳號的供應商從採購詢價（RFQ）邀請信進來查看詢價、寫草稿、正式送出時的存取模型：邀請、兌換、session、撤銷與清理。給對外入口（`internal/httpapi/agent`）、notification 的邀請信與採購使用。行為規格的唯一來源是 `docs/modules/agent.md`。
+沒有帳號的供應商從採購詢價（RFQ）邀請信進來查看詢價、寫草稿、正式送出時的存取模型：邀請、兌換、session、撤銷與清理。給對外入口（`internal/httpapi/agent`）、notification 的邀請信與採購使用。行為規格的唯一來源是 `backend/docs/modules/agent.md`。
 
 ## 擁有的資料
 

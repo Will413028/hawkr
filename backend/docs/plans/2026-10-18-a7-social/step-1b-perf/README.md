@@ -16,9 +16,9 @@
 - 重現（在 `backend/`，其餘步驟同 A7-1a 的「重現」）：
 
 ```sh
-docker --context desktop-linux exec -i a7-1b-perf psql -U postgres -d perf < docs/plans/2026-10-18-a7-social/step-1a-perf/seed.sql
-docker --context desktop-linux exec -i a7-1b-perf psql -U postgres -d perf < docs/plans/2026-10-18-a7-social/step-1b-perf/seed-blocks.sql
-docker --context desktop-linux exec -i a7-1b-perf psql -U postgres -d perf < docs/plans/2026-10-18-a7-social/step-1b-perf/seed-heavy-viewer.sql
+docker --context desktop-linux exec -i a7-1b-perf psql -U postgres -d perf < backend/docs/plans/2026-10-18-a7-social/step-1a-perf/seed.sql
+docker --context desktop-linux exec -i a7-1b-perf psql -U postgres -d perf < backend/docs/plans/2026-10-18-a7-social/step-1b-perf/seed-blocks.sql
+docker --context desktop-linux exec -i a7-1b-perf psql -U postgres -d perf < backend/docs/plans/2026-10-18-a7-social/step-1b-perf/seed-heavy-viewer.sql
 GOWORK=off go run ./internal/modules/social/perf/measure.go -dsn '…' -reps 200 -viewer 12345 -out /tmp/a7-1b-perf-out   # 或 -viewer 12346 -only '^觀看者'
 ```
 

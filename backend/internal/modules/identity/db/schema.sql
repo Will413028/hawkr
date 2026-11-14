@@ -9,7 +9,7 @@ CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA identity;
 
--- 帳號：登入的 principal（`docs/modules/identity.md`）。買家、賣家是同一個帳號的角色（account_roles）；業務身分
+-- 帳號：登入的 principal（`backend/docs/modules/identity.md`）。買家、賣家是同一個帳號的角色（account_roles）；業務身分
 -- （buyer_id、store_id）屬於 buyer、seller 模組。
 --
 -- 登入由自建的聯合登入處理（ADR 2026-10-30-identity-self-hosted-federated-login）：帳號由 account_identities 的 provider 身分識別，

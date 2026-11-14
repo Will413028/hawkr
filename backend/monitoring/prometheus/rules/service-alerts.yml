@@ -430,7 +430,7 @@ groups:
           severity: warning
         annotations:
           summary: "env={{ $labels.env }}：疑似被 PayUni 擋下，本地速率上限已自動砍半"
-          description: "looksRateLimited 判定收到的錯誤像是被上游擋（429／503／連線被拒或重置），限速器已把自訂 QPS 砍半並會在 5 分鐘內線性回升。🔴 PayUni **沒有公開任何速率限制**，所以這個計數器就是我們唯一的實測來源：它從 0 開始跳代表目前的 QPS 設定已經踩到對方的線。處置：(1) 撈當時的錯誤原文，把實際形狀補進 services/seller-service/internal/client/payuni/ratelimit.go 的 looksRateLimited 與 docs/第三方整合/；(2) 調降 maxQPS 或放長 payuniPollMinInterval，並同步更新容量帳。⚠️ 不要用調高上限的方式處理——那是把自訂上限當成可有可無（規範 §7 禁止事項）。"
+          description: "looksRateLimited 判定收到的錯誤像是被上游擋（429／503／連線被拒或重置），限速器已把自訂 QPS 砍半並會在 5 分鐘內線性回升。🔴 PayUni **沒有公開任何速率限制**，所以這個計數器就是我們唯一的實測來源：它從 0 開始跳代表目前的 QPS 設定已經踩到對方的線。處置：(1) 撈當時的錯誤原文，把實際形狀補進 services/seller-service/internal/client/payuni/ratelimit.go 的 looksRateLimited 與 backend/docs/第三方整合/；(2) 調降 maxQPS 或放長 payuniPollMinInterval，並同步更新容量帳。⚠️ 不要用調高上限的方式處理——那是把自訂上限當成可有可無（規範 §7 禁止事項）。"
 
       - alert: PayuniReconciliationQueueSaturated
         expr: max by (env) (payuni_pending_registrations) >= 100

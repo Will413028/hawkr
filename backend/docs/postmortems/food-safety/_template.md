@@ -1,6 +1,6 @@
 # 食安事件 Postmortem — {YYYY-MM-DD} / {ticket-id}
 
-> **用法**：複製本檔到 `docs/postmortems/food-safety/YYYY-MM-DD-{ticket-id}.md`，逐節填寫。
+> **用法**：複製本檔到 `backend/docs/postmortems/food-safety/YYYY-MM-DD-{ticket-id}.md`，逐節填寫。
 > **時限**：事件 `status='resolved'` 後 **7 天內** PR 開出（不必 merged）。
 > **流程**：`git branch postmortem/{ticket-id}` → PR → governance lead review → merge。
 > 🔴 **八個章節一節都不能刪**——內容空時填「無」／「N/A」也要保留標題。

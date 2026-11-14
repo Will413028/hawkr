@@ -685,7 +685,7 @@ collectors:
       # 🔴 **同一個錯我在同一天犯了兩次**（前一次是 `invoice_track_exhausted_sellers`／M21）。
       # 第一次之後我把判準寫進了下面那段註解，然後照樣再犯 —— **寫下判準不等於執行判準**。
       # 可機械執行的版本：**在本檔新增任何 `metric_name` 之前，先 grep
-      # `docs/詳細設計書/58-…md` 的 §8.2.3 M 表確認那個名字沒有主人**，
+      # `backend/docs/詳細設計書/58-…md` 的 §8.2.3 M 表確認那個名字沒有主人**，
       # 命中就不要寫在這裡。
 
       # ⚠️ `invoice_track_exhausted_sellers` **不在本檔**，這是結論不是遺漏。
@@ -776,7 +776,7 @@ collectors:
       #    7 天取自 58 §7.2.5 與 §14 C-1 已載明（而從未被實作）的那條告警門檻。
       #
       # ⚠️ SKIPPED 與 PROCESSED 是終態，不列入：前者是「已決定不處理並留下 disposition」。
-      #    cutover 當下的歷史積壓要走 SKIPPED（見 docs/runbooks 的 inbox cutover 節），
+      #    cutover 當下的歷史積壓要走 SKIPPED（見 backend/docs/runbooks 的 inbox cutover 節），
       #    不是靠放寬本述詞讓它消失。
       # 折讓／作廢卡住（#3073，2026-09-03 補）。
       #

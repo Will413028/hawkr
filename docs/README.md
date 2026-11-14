@@ -15,7 +15,7 @@
 - markdown 連結用 `/` 開頭的 repo 根目錄路徑，或相對所在檔案的路徑。
 - 程式在某個目錄執行時讀的路徑字串（執行路徑）不受此限。
 - 搬到根目錄的舊 ADR 表頭有「路徑基準｜`backend/`」時，該份 ADR 裡的路徑以 `backend/` 起算；新 ADR 不加這列。
-- `scripts/check-doc-paths.py` 檢查指向 `docs/adr/`、`docs/共通規範/`、`docs/plans/`（根目錄與 `backend/` 兩處）的引用都存在，CI 在 repo-hygiene 執行。
+- `scripts/check-doc-paths.py` 檢查指向 `docs/adr/`、`docs/共通規範/`、`docs/plans/`（根目錄與 `backend/` 兩處），以及 `backend/docs/modules/` 的引用都存在；相對 backend 寫成 `docs/modules/…` 會失敗，CI 在 repo-hygiene 執行。
 
 ## 遺留基準
 
@@ -25,9 +25,3 @@
 - `backend/gateway/`
 - `backend/pkg/`
 - `backend/docs/詳細設計書/`
-
-## 過渡基準
-
-搬遷進行中，以下檔案的路徑從根目錄解析不到時退回以 `backend/` 起算。搬遷完成時清單清空。
-
-- `backend/`

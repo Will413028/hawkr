@@ -30,7 +30,7 @@
 - 更新以 SQL 條件式版本比對；profile、地址與會員方案各自持有版本。
 - profile 在買家列鎖內合併：nil 保留，`DisplayName` 空字串拒絕，Phone、Gender、City、Job 空字串與 BirthDate 零值清為 NULL。並行的 profile 更新不遺失任何欄位。
 - gender、買家與會員狀態、會員 source 有 CHECK；寫入驗證與受限轉移由純函式驗證涵蓋。會員 source 的唯一儲存值是 ADMIN，SYSTEM_DEFAULT 只在記憶體合成權益。
-- 頭像引用只由 `buyer.media_sync` 同步 job 寫入（`internal/mediaref`，演算法是 `media.Sync`，規格見 `docs/modules/media.md` §5）。
+- 頭像引用只由 `buyer.media_sync` 同步 job 寫入（`internal/mediaref`，演算法是 `media.Sync`，規格見 `backend/docs/modules/media.md` §5）。
 - transaction 外才呼叫 media，而且只有 `Finalize`（轉正，不建立引用）。換圖禁止在呼叫者 transaction 內開始。
 - 換頭像在版本條件的 transaction 內寫 object key 與 asset ID（`buyers_avatar_asset_check` 要求成對），把被換掉的頭像記成退場（`retired_assets`），遞增 `media_ref_sync.seq` 並排入同步。
 - 已退場的頭像不能寫回：同一個 staged token 重新轉正會回到同一個資產，回 InvalidInput。

@@ -38,7 +38,7 @@ groups:
           channel: business
         annotations:
           summary: "有 {{ $value }} 筆 ATM 退款卡在 AWAITING_WEBHOOK 超過 5 天（§6.7 疑遺失）"
-          description: "env={{ $labels.env }}：refund_task 停在 AWAITING_WEBHOOK(15) 逾門檻，PayUni 退款轉匯結果 webhook(§6.7) 疑未送達。處置見 runbook：docs/基礎建設/ATM 退款結果 Webhook 遺失維運處置.md"
+          description: "env={{ $labels.env }}：refund_task 停在 AWAITING_WEBHOOK(15) 逾門檻，PayUni 退款轉匯結果 webhook(§6.7) 疑未送達。處置見 runbook：backend/docs/基礎建設/ATM 退款結果 Webhook 遺失維運處置.md"
 
   # ── 假日資料覆蓋度（issue #898）─────────────────────────────────
   # shipping-service HolidayService 依賴 holidays 表（admin 人工從政府 CSV 匯入）。下年度資料未上傳時
@@ -497,7 +497,7 @@ groups:
           channel: business
         annotations:
           summary: "env={{ $labels.env }}：invoice inbox 有 {{ $value }} 列 {{ $labels.event_type }}／{{ $labels.status }} 超過 7 天沒有推進"
-          description: "env={{ $labels.env }}：這些列**沒有任何自動執行者**——不是「還在重試」。先看 event_type：① ORDER_PAID ⇒ INV.dl 兜底掃描應該要在動，查 invoice_inbox_events 的 next_attempt_at 與 last_error，以及該 pod 的 invoice.dl.* log ② ORDER_REFUND_FINALIZED ⇒ 58 §7.2.2 的作廢／折讓 usecase 尚未落地，INV.dl 刻意不掃它（AdjustmentApplier 是 Unimplemented），這些列要等該 usecase 上線後重放；cutover 之前的歷史積壓（對應訂單的 ORDER_PAID 從未進過本服務 inbox）走一次性維運 SQL 標 SKIPPED，禁止寫 backfill CLI ③ ORDER_CANCELLED ⇒ **這一格結構上不該出現任何列**：該 handler 全程單交易（58 §6.3.2.4），失敗時 inbox 列與業務寫入一起 rollback ⇒ 它只會是 PROCESSED 或根本不存在。看到它代表那個不變式破了（有人把 handler 拆成兩個交易，或有人手動插了列），先讀 code 再處置，**不要當成一般積壓去重放**。處置全文見 docs/runbooks/invoice-inbox-stranded-runbook.md。"
+          description: "env={{ $labels.env }}：這些列**沒有任何自動執行者**——不是「還在重試」。先看 event_type：① ORDER_PAID ⇒ INV.dl 兜底掃描應該要在動，查 invoice_inbox_events 的 next_attempt_at 與 last_error，以及該 pod 的 invoice.dl.* log ② ORDER_REFUND_FINALIZED ⇒ 58 §7.2.2 的作廢／折讓 usecase 尚未落地，INV.dl 刻意不掃它（AdjustmentApplier 是 Unimplemented），這些列要等該 usecase 上線後重放；cutover 之前的歷史積壓（對應訂單的 ORDER_PAID 從未進過本服務 inbox）走一次性維運 SQL 標 SKIPPED，禁止寫 backfill CLI ③ ORDER_CANCELLED ⇒ **這一格結構上不該出現任何列**：該 handler 全程單交易（58 §6.3.2.4），失敗時 inbox 列與業務寫入一起 rollback ⇒ 它只會是 PROCESSED 或根本不存在。看到它代表那個不變式破了（有人把 handler 拆成兩個交易，或有人手動插了列），先讀 code 再處置，**不要當成一般積壓去重放**。處置全文見 backend/docs/runbooks/invoice-inbox-stranded-runbook.md。"
 
       # I8｜作廢後沒有重開後繼（58 §7 不變式表 I8，2026-08-31 補）。
       #
@@ -856,7 +856,7 @@ groups:
           cadence: daily
         annotations:
           summary: "env={{ $labels.env }}：手機條碼載具的存在性驗證沒有掛上"
-          description: "env={{ $labels.env }}：`AMEGO_PLATFORM_INVOICE` 與 `AMEGO_PLATFORM_APP_KEY` **兩者都沒設** ⇒ 平台 issuer 未啟用 ⇒ `platformBarcodeVerifier` 沒有掛載（`usecase/di.go` 的第二個 case）。後果：買家在常用發票資料或結帳時送出一個**無效的手機條碼**，入口層不會驗它存在不存在 ⇒ HTTP 200 建立成功、零錯誤、零 log，錯誤要到開票前那一層才會被擋下——而平台尚未開票時那一層也不會執行 ⇒ 永遠不會被發現。⚠️ **這不是「平台開票停了」**：平台自身開票用的 AppKey 來自 DB（`usecase/submit.go` 的 `accounts.GetByIssuer` ＋ `WithDecryptedCredential`），本條為 0 時平台開票可能完全正常。⚠️ 與 `InvoicePlatformCredentialIncomplete` **互斥**：那條管「只設了一半」（配置錯誤），本條管「兩半都沒設」（尚未開通）。處置：要啟用時把 `AMEGO_PLATFORM_INVOICE`（走 `overlays/<env>/invoice-service.yaml`，**不得寫在 base**）與 `AMEGO_PLATFORM_APP_KEY`（走 `hawkr-amego` secret，見 backend#3269）**同批補齊** —— 只補一半會從本條掉進 `InvoicePlatformCredentialIncomplete`。🔴 **這兩個值都不在我方手上**：正式公司的 App Key 官方文件寫的是「請與客服聯絡」（`docs/第三方整合/AMEGO 電子發票 API 總覽.md` §1.1 的正式公司欄），統編那一半要填平台自身 issuer 的**真實統編**。⇒ 本條的處置起點是**向光貿申請**，不是改任何配置檔。⚠️ **不得拿測試公司的憑證（`12345678` / `sHeq7t8G1wiQvhAuIM27`）填 prod 來讓它變綠**：`AMEGO_ALLOW_REAL_INVOICE=true` 配測試統編會被 `config.Validate()` 的雙向檢查擋成 CrashLoop，而那條檢查是刻意的——它防的是在 prod 靜默開出不進任何公司帳的發票（不可逆）。⚠️ 因為它等的是外部申請、會持續紅數週，投遞節奏已由 `cadence: daily` label 降到一天一則（見 labels 區塊註解）；那是降頻不是靜音。"
+          description: "env={{ $labels.env }}：`AMEGO_PLATFORM_INVOICE` 與 `AMEGO_PLATFORM_APP_KEY` **兩者都沒設** ⇒ 平台 issuer 未啟用 ⇒ `platformBarcodeVerifier` 沒有掛載（`usecase/di.go` 的第二個 case）。後果：買家在常用發票資料或結帳時送出一個**無效的手機條碼**，入口層不會驗它存在不存在 ⇒ HTTP 200 建立成功、零錯誤、零 log，錯誤要到開票前那一層才會被擋下——而平台尚未開票時那一層也不會執行 ⇒ 永遠不會被發現。⚠️ **這不是「平台開票停了」**：平台自身開票用的 AppKey 來自 DB（`usecase/submit.go` 的 `accounts.GetByIssuer` ＋ `WithDecryptedCredential`），本條為 0 時平台開票可能完全正常。⚠️ 與 `InvoicePlatformCredentialIncomplete` **互斥**：那條管「只設了一半」（配置錯誤），本條管「兩半都沒設」（尚未開通）。處置：要啟用時把 `AMEGO_PLATFORM_INVOICE`（走 `overlays/<env>/invoice-service.yaml`，**不得寫在 base**）與 `AMEGO_PLATFORM_APP_KEY`（走 `hawkr-amego` secret，見 backend#3269）**同批補齊** —— 只補一半會從本條掉進 `InvoicePlatformCredentialIncomplete`。🔴 **這兩個值都不在我方手上**：正式公司的 App Key 官方文件寫的是「請與客服聯絡」（`backend/docs/第三方整合/AMEGO 電子發票 API 總覽.md` §1.1 的正式公司欄），統編那一半要填平台自身 issuer 的**真實統編**。⇒ 本條的處置起點是**向光貿申請**，不是改任何配置檔。⚠️ **不得拿測試公司的憑證（`12345678` / `sHeq7t8G1wiQvhAuIM27`）填 prod 來讓它變綠**：`AMEGO_ALLOW_REAL_INVOICE=true` 配測試統編會被 `config.Validate()` 的雙向檢查擋成 CrashLoop，而那條檢查是刻意的——它防的是在 prod 靜默開出不進任何公司帳的發票（不可逆）。⚠️ 因為它等的是外部申請、會持續紅數週，投遞節奏已由 `cadence: daily` label 降到一天一則（見 labels 區塊註解）；那是降頻不是靜音。"
 
       - alert: InvoiceComplaintUnresolvedAging
         expr: sum by (env, status) (invoice_complaints_unresolved{age_bucket="gt7d"}) > 0

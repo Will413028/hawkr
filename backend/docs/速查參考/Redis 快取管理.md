@@ -186,7 +186,7 @@ curl http://localhost:9900/api/v1/public/caches/flush/product
 
 ## 5. 容量與失效模型（容量契約）
 
-> 本節是 `docs/開發規範/硬上限依賴接入治理規範（配額與容量）.md` §5 登記表 R1 / R2 所指的「預算數字」。
+> 本節是 `backend/docs/開發規範/硬上限依賴接入治理規範（配額與容量）.md` §5 登記表 R1 / R2 所指的「預算數字」。
 > 所有數字為 **2026-07-30 實測**：dev 走 Infra VM `docker exec hawkr-redis redis-cli INFO / MEMORY USAGE / TTL`；prod 走 dev-infra Prometheus API（`redis_*` 指標，env label 區分）。**修改本節數字前必須重測，不得沿用。**
 
 ### 5.1 供給（硬上限）
@@ -265,7 +265,7 @@ curl http://localhost:9900/api/v1/public/caches/flush/product
 
 ### 5.6 維運待辦（**不進 codebase**，由後端工程師戴維運帽子執行）
 
-按 `docs/開發規範/後端服務責任邊界規範.md`（§22），以下屬一次性維運動作，禁止寫成 application code（backfill / 巡檢 job 一律拒絕）：
+按 `backend/docs/開發規範/後端服務責任邊界規範.md`（§22），以下屬一次性維運動作，禁止寫成 application code（backfill / 巡檢 job 一律拒絕）：
 
 | # | 動作 | 誰做 | 何時 |
 |---|---|---|---|

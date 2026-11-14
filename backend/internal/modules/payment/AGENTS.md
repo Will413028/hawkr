@@ -1,10 +1,10 @@
 # payment 模組
 
-<!-- 只放改這個模組前必須知道的規則，上限 6,000 bytes（根目錄 `.agentfile-lint.toml`）。行為規格與已知限制寫在 `docs/modules/payment.md`，理由寫在 ADR，這裡只指過去。 -->
+<!-- 只放改這個模組前必須知道的規則，上限 6,000 bytes（根目錄 `.agentfile-lint.toml`）。行為規格與已知限制寫在模組規格（見職責段），理由寫在 ADR。 -->
 
 ## 職責
 
-收款與付款。現階段只擁有收款帳戶（收款開通 ADR D28）：外部帳戶的本地快取、建立與同步 job、輪詢、provider 的 port 與 Stripe／fake adapter、收款事件的 inbox handler、後台的讀取、重新整理、重試建立、重試關閉與刪除對應。給 seller（核准、開通 session、個資清理）與後台用。行為規格的唯一來源是 `docs/modules/payment.md`。
+收款與付款。現階段只擁有收款帳戶（收款開通 ADR D28）：外部帳戶的本地快取、建立與同步 job、輪詢、provider 的 port 與 Stripe／fake adapter、收款事件的 inbox handler、後台的讀取、重新整理、重試建立、重試關閉與刪除對應。給 seller（核准、開通 session、個資清理）與後台用。行為規格的唯一來源是 `backend/docs/modules/payment.md`。
 
 ## 擁有的資料
 

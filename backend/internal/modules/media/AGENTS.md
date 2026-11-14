@@ -2,7 +2,7 @@
 
 ## 職責
 
-圖片等靜態資產的轉正、引用登記與解除、機敏資產的讀取，以及擁有媒體的模組（buyer、seller、content）共用的引用同步演算法。實作還是 Java 的 media-service（Java media-service 的規格見設計書 08）。行為規格的唯一來源是 `docs/modules/media.md`。
+圖片等靜態資產的轉正、引用登記與解除、機敏資產的讀取，以及擁有媒體的模組（buyer、seller、content）共用的引用同步演算法。實作還是 Java 的 media-service（Java media-service 的規格見設計書 08）。行為規格的唯一來源是 `backend/docs/modules/media.md`。
 
 ## 擁有的資料
 
@@ -10,7 +10,7 @@
 
 ## 發布的讀取介面
 
-無。沒有 schema，所以沒有 `pub_*`。對外是 Go 公開 API：`Media` interface（`Finalize`、`Link`、`Unlink`、`ReadSecure`）與引用同步（`media.RefSyncer`、`media.SyncChanged`、`media.SyncReject`、`media.SyncWork`），形狀見 `docs/modules/media.md` §1。
+無。沒有 schema，所以沒有 `pub_*`。對外是 Go 公開 API：`Media` interface（`Finalize`、`Link`、`Unlink`、`ReadSecure`）與引用同步（`media.RefSyncer`、`media.SyncChanged`、`media.SyncReject`、`media.SyncWork`），形狀見 `backend/docs/modules/media.md` §1。
 
 ## 模組內部結構
 
@@ -21,7 +21,7 @@
 
 ## 不變量
 
-- 轉正的上傳者由呼叫方傳入，media 不自己反查登入者；Finalize 不建立引用。守門：`TestFinalizeSignsCarriesTheUploaderAndCreatesNoReference`、`TestFinalizeCallerBugsAreCaughtLocally`。規格：`docs/modules/media.md` §2。
+- 轉正的上傳者由呼叫方傳入，media 不自己反查登入者；Finalize 不建立引用。守門：`TestFinalizeSignsCarriesTheUploaderAndCreatesNoReference`、`TestFinalizeCallerBugsAreCaughtLocally`。規格：`backend/docs/modules/media.md` §2。
 - Unlink 只解除精確列出的資產，沒有「保留名單以外全刪」。守門：`TestLinkAndUnlinkAreSignedWithoutAnAccountAndCarryExactAssets`、`TestSyncNeverUnlinksAnythingButRetiredAssets`（seller）。規格：§3。
 - `Media` 的四個呼叫都在 DB transaction 之外。守門：無（只有規格）。規格：§3。
 - ReadSecure 要 `object_key`、`ref_type`、`ref_id` 全等才讀得到，非機敏資產回 `ErrNotSecure`；呼叫方先授權並記稽核。守門：`TestReadSecureSendsTheTripleAndSeparatesNotSecureFromNotFound`。規格：§4。

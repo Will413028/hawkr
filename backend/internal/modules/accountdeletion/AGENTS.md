@@ -2,7 +2,7 @@
 
 ## 職責
 
-帳號刪除的流程管理者：解析帳號、買家與店家，協調等待未結訂單、關閉參與者與刪除帳號；App、後台與訂單完成 consumer 共用公開 API。行為規格的唯一來源是 `docs/modules/accountdeletion.md`。
+帳號刪除的流程管理者：解析帳號、買家與店家，協調等待未結訂單、關閉參與者與刪除帳號；App、後台與訂單完成 consumer 共用公開 API。行為規格的唯一來源是 `backend/docs/modules/accountdeletion.md`。
 
 ## 擁有的資料
 
@@ -10,7 +10,7 @@ schema `accountdeletion`（`db/schema.sql`）：`deletion_requests`（流程狀�
 
 ## 發布的讀取介面
 
-無。沒有 `db/pub.sql`，所以沒有 `pub_*`。唯一的讀取是 Go 的 `Reader.AccountsWithOpenRequest`（只需 `*db.DB`），形狀見 `docs/modules/accountdeletion.md` §1。
+無。沒有 `db/pub.sql`，所以沒有 `pub_*`。唯一的讀取是 Go 的 `Reader.AccountsWithOpenRequest`（只需 `*db.DB`），形狀見 `backend/docs/modules/accountdeletion.md` §1。
 
 ## 模組內部結構
 

@@ -1,10 +1,10 @@
 # content 模組
 
-<!-- 只放改這個模組前必須知道的規則，上限 6,000 bytes（根目錄 `.agentfile-lint.toml`）。行為規格與已知限制寫在 `docs/modules/content.md`，理由寫在 ADR，這裡只指過去。 -->
+<!-- 只放改這個模組前必須知道的規則，上限 6,000 bytes（根目錄 `.agentfile-lint.toml`）。行為規格與已知限制寫在 `backend/docs/modules/content.md`，理由寫在 ADR，這裡只指過去。 -->
 
 ## 職責
 
-營運維護、給前台顯示的內容：首頁 banner 與 App 版本門檻。banner 由後台維護，前台只看得到啟用中、在顯示期間內的；版本門檻每種 App（買家、賣家）一組，版本比較只在這裡做。行為規格的唯一來源是 `docs/modules/content.md`。
+營運維護、給前台顯示的內容：首頁 banner 與 App 版本門檻。banner 由後台維護，前台只看得到啟用中、在顯示期間內的；版本門檻每種 App（買家、賣家）一組，版本比較只在這裡做。行為規格的唯一來源是 `backend/docs/modules/content.md`。
 
 ## 擁有的資料
 
@@ -23,7 +23,7 @@ schema `content`（`db/schema.sql`）：`banners`、`app_version_gates`，以及
 
 ## 不變量
 
-- banner 的點擊行為一定完整，url 只接受 http、https。守門：`TestBannerActionMustBeComplete`、DB 約束 `banners_action_check`。規格：`docs/modules/content.md` §2。
+- banner 的點擊行為一定完整，url 只接受 http、https。守門：`TestBannerActionMustBeComplete`、DB 約束 `banners_action_check`。規格：`backend/docs/modules/content.md` §2。
 - banner 的排程是 [開始, 結束)，結束必須晚於開始。守門：`TestBannerScheduleCheckMatchesTheGoRule`、DB 約束 `banners_schedule_check`。規格：§2。
 - 啟用中的 banner 最多 20 則。守門：`TestBannersCanOnlyBeActivatedUpToTheLimit`。規格：§2。
 - 圖片只在 transaction 外 `Finalize`，不建立引用；key 與 asset ID 成對且必填。守門：`TestCreateBannerFinalizesBothImagesAndTheSyncJobLinksThem`（不建立引用）、`TestImageKeysAndAssetIDsArePaired`、DB 的 `NOT NULL`；transaction 外這一點無守門（只有規格）。規格：§3。

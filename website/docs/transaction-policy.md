@@ -239,14 +239,14 @@
 ## 附錄：資料來源檔案（backend-payuni @ main）
 
 **設計書**
-- `docs/詳細設計書/03-訂單微服務（Order Service）詳細設計書.md`——訂單狀態機、付款期限、自動完成、撥款觸發
-- `docs/詳細設計書/05-支付服務（Payment Service）詳細設計書.md`——撥款、退款、發票（未實作）
-- `docs/詳細設計書/09-售後微服務（AfterSales Service）詳細設計書.md`——出貨期限、售後全時效、退款金流
-- `docs/詳細設計書/20-結帳模組（Checkout Module）詳細設計書.md`——運費收款主體、fee_payer、免運
-- `docs/詳細設計書/21-運費計算模組（Shipping Fee Module）詳細設計書.md`——三維運費費率、代收手續費
-- `docs/詳細設計書/24-節假日管理（Holiday Management）詳細設計書.md`——宅配出貨期限工作日順延
-- `docs/詳細設計書/36-MQ 與事件總覽（MQ & Event Catalog）.md`——結算/撥款完成事件（待規劃）
-- `docs/第三方整合/PayUni 費用一覽.md`——金流手續費、撥款入帳天期
+- `backend/docs/詳細設計書/03-訂單微服務（Order Service）詳細設計書.md`——訂單狀態機、付款期限、自動完成、撥款觸發
+- `backend/docs/詳細設計書/05-支付服務（Payment Service）詳細設計書.md`——撥款、退款、發票（未實作）
+- `backend/docs/詳細設計書/09-售後微服務（AfterSales Service）詳細設計書.md`——出貨期限、售後全時效、退款金流
+- `backend/docs/詳細設計書/20-結帳模組（Checkout Module）詳細設計書.md`——運費收款主體、fee_payer、免運
+- `backend/docs/詳細設計書/21-運費計算模組（Shipping Fee Module）詳細設計書.md`——三維運費費率、代收手續費
+- `backend/docs/詳細設計書/24-節假日管理（Holiday Management）詳細設計書.md`——宅配出貨期限工作日順延
+- `backend/docs/詳細設計書/36-MQ 與事件總覽（MQ & Event Catalog）.md`——結算/撥款完成事件（待規劃）
+- `backend/docs/第三方整合/PayUni 費用一覽.md`——金流手續費、撥款入帳天期
 
 **程式碼 / 設定**
 - `services/java/order-service/.../config/OrderConfig.java`、`application.yml`——付款 24h、自動完成 60h、建單兜底

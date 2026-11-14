@@ -1,7 +1,7 @@
 # MQ Topology（Terraform）
 
 RabbitMQ topology（exchange/queue/binding）唯一入口。
-完整說明：`docs/基礎建設/MQ Topology 管理（Terraform）.md`。
+完整說明：`backend/docs/基礎建設/MQ Topology 管理（Terraform）.md`。
 ADR：wiki backend-payuni decisions/2026-07-24-mq-topology-terraform-centralization。
 
 ## 範圍
@@ -150,7 +150,7 @@ queue，見下方形狀 ①。）
 `topology/main.tf` 的 `locals`（Terraform 真正拿去佈建的那份）。這是刻意的重複——讓 Terraform 去吃
 Python 的產物會多一個「忘記重跑 generator」的失效面。兩份的一致性由容器 e2e（plan 必須 no-op）與
 `test_expand.py` 的資源數 pin 守著。**兩邊不一致時以
-`docs/基礎建設/MQ Topology 管理（Terraform）.md` 的「展開規則」段為準**，那是權威出處。
+`backend/docs/基礎建設/MQ Topology 管理（Terraform）.md` 的「展開規則」段為準**，那是權威出處。
 
 ### `exchanges:` 條目
 

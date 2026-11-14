@@ -209,7 +209,7 @@ func TestMatchCertificateHolder(t *testing.T) {
 	}
 }
 
-// 比對基準是人工核准的 KYC（`docs/modules/seller.md` §1.3「已通過實名認證」）：收款帳戶還沒啟用、甚至被停用，基準都還在；申請還沒核准則沒有基準。
+// 比對基準是人工核准的 KYC（`backend/docs/modules/seller.md` §1.3「已通過實名認證」）：收款帳戶還沒啟用、甚至被停用，基準都還在；申請還沒核准則沒有基準。
 func TestMatchCertificateHolderDoesNotNeedAnEnabledPaymentAccount(t *testing.T) {
 	t.Parallel()
 	f := setup(t)

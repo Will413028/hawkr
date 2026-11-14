@@ -1,13 +1,13 @@
 # A3 buyer 盤點：`backend/services/buyer-service` → `internal/modules/buyer`
 
 唯讀盤點，2026-09-29。以下路徑相對於 `backend/`，另有標註的除外。
-參考：`AGENTS.md`、計畫「模組完成的定義」（`docs/plans/2026-09-24-go-modular-monolith.md` L24-46）、`internal/modules/identity/AGENTS.md`、ADR D8/D9、arch 依賴表 `internal/arch/modules.go`。
+參考：`AGENTS.md`、計畫「模組完成的定義」（`backend/docs/plans/2026-09-24-go-modular-monolith.md` L24-46）、`internal/modules/identity/AGENTS.md`、ADR D8/D9、arch 依賴表 `internal/arch/modules.go`。
 
 ---
 
 ## 0. 摘要（先看這段）
 
-- 12 張表（`rg -c 'CREATE TABLE' services/buyer-service/db/schema/schema.sql` = 12），48 支 RPC（`awk -F, '$3=="buyer-service"' docs/plans/.../rpc-servers.csv | wc -l` = 48，proto 裡也是 48）。沒有 extension、沒有樂觀鎖。
+- 12 張表（`rg -c 'CREATE TABLE' services/buyer-service/db/schema/schema.sql` = 12），48 支 RPC（`awk -F, '$3=="buyer-service"' backend/docs/plans/.../rpc-servers.csv | wc -l` = 48，proto 裡也是 48）。沒有 extension、沒有樂觀鎖。
 - **依賴方向衝突是最大的設計題**：arch 表只准 `buyer → identity, media`，但 buyer-service 同步呼叫 product（catalog）、seller、order（ordering）、crm 來補顯示欄位、檢查刪除條件、組事件 payload。這就是計畫寫的「buyer 往上的補資料移到 http」。反過來，seller-service 也呼叫 buyer（粉絲數、`HasActiveBuyer`），可是 arch 表不准 `seller → buyer`。
 - **A3 之後還要有 legacy gRPC server 的呼叫方**不只有 Java：Go 的 ai（A9）、crm/im/review（A6）、invoice（A5）、notification（A8）、social（A7）都比 A3 晚搬。另外 gateway 的 `buyerid.Resolver`（Redis `buyer:current`）替大約 20 個 handler 檔（cart、order、checkout、coupon、aftersales、shipping、payment、notification…）解析 buyer_id，也還在呼叫 `GetBuyerProfile`。
 - 事件：發出 6 種 routing key，消費 3 種（`account.deleted` 現在由單體的 identity 經 legacy RabbitMQ 發出）。外部 consumer 包含 Java（coupon、product），所以 buyer 的事件 A3 之後仍然要經 `internal/legacy/rabbitmq` 送出。

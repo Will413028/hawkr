@@ -14,10 +14,6 @@ README = """# 文件
 ## 遺留基準
 
 - `backend/services/`
-
-## 過渡基準
-
-- `backend/`
 """
 
 
@@ -52,11 +48,33 @@ class CheckDocPathsTest(unittest.TestCase):
         self.write("AGENTS.md", "see `docs/adr/missing.md`\n")
         self.assertEqual(len(self.errors()), 1)
 
-    def test_transitional_file_falls_back_to_backend(self):
+    def test_backend_file_does_not_fall_back_to_backend(self):
         self.write("backend/AGENTS.md", "see `docs/plans/b.md`\n")
+        self.assertEqual(len(self.errors()), 1)
+
+    def test_backend_relative_module_spec_fails(self):
+        self.write("backend/docs/modules/seller.md", "# seller\n")
+        self.write("backend/x.go", "// docs/modules/seller.md\n")
+        self.assertEqual(len(self.errors()), 1)
+
+    def test_repo_root_module_spec_passes(self):
+        self.write("backend/docs/modules/seller.md", "# seller\n")
+        self.write("backend/x.go", "// backend/docs/modules/seller.md\n")
         self.assertEqual(self.errors(), [])
 
-    def test_transitional_file_missing_everywhere_fails(self):
+    def test_link_resolving_under_a_doubled_prefix_fails(self):
+        self.write("backend/AGENTS.md", "[p](backend/docs/plans/p.md) [q](docs/plans/p.md)\n")
+        self.assertEqual(len(self.errors()), 1)
+
+    def test_url_encoded_code_path_is_still_checked(self):
+        self.write("AGENTS.md", "`docs/adr/no%20such.md`\n")
+        self.assertEqual(len(self.errors()), 1)
+
+    def test_printf_template_is_skipped(self):
+        self.write("backend/x.go", '// "backend/docs/modules/%s.md"\n')
+        self.assertEqual(self.errors(), [])
+
+    def test_backend_file_missing_everywhere_fails(self):
         self.write("backend/x.go", "// docs/adr/missing.md\n")
         self.assertEqual(len(self.errors()), 1)
 
@@ -84,7 +102,7 @@ class CheckDocPathsTest(unittest.TestCase):
         self.assertEqual(len(self.errors()), 1)
 
     def test_unchecked_prefixes_and_placeholders_are_ignored(self):
-        self.write("AGENTS.md", "`docs/modules/x.md` `docs/adr/YYYY-MM-DD-<slug>.md` `docs/adr/` `docs/plans/a/rpc-*.csv`\n")
+        self.write("AGENTS.md", "`docs/runbooks/x.md` `docs/modules/{1}.md` `docs/adr/YYYY-MM-DD-<slug>.md` `docs/adr/` `docs/plans/a/rpc-*.csv`\n")
         self.assertEqual(self.errors(), [])
 
     def test_line_suffixes_are_stripped(self):
@@ -101,9 +119,10 @@ class CheckDocPathsTest(unittest.TestCase):
         self.assertEqual(len(self.errors()), 1)
 
     def test_relative_link_to_docs_is_not_read_from_root(self):
+        self.write("docs/adr/中.md", "# 中\n")
         self.write("website/docs/plans/x.md", "# x\n")
         self.write("website/AGENTS.md", "[g](docs/plans/x.md) [e](docs/adr/%E4%B8%AD.md)\n")
-        self.assertEqual(self.errors(), [])
+        self.assertEqual(self.errors(), ["website/AGENTS.md:1: ](docs/adr/中.md)"])
 
     def test_bare_template_paths_are_skipped(self):
         self.write("AGENTS.md", "docs/adr/2026-10-30-<slug>.md docs/plans/{step}.md\n")
@@ -123,8 +142,8 @@ class CheckDocPathsTest(unittest.TestCase):
         self.write("website/n.md", "| 路徑基準 | `backend/` |\n\ndocs/plans/q.md\n")
         self.assertEqual(len(self.errors()), 1)
 
-    def test_readme_must_define_both_lists(self):
-        self.write("docs/README.md", "# 文件\n\n## 遺留基準\n\n- `backend/services/`\n")
+    def test_readme_must_define_legacy_list(self):
+        self.write("docs/README.md", "# 文件\n\n## 其他\n\n- `backend/services/`\n")
         with self.assertRaises(SystemExit):
             self.errors()
 

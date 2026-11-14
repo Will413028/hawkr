@@ -43,7 +43,7 @@
 - 固定代碼（`PUBLISHED`、`BUYER`）是 SQL 常數，不是 bind 參數：generic plan 無法用 `$1` 證明 partial index 的述詞。
 - 時間一律是請求的 clock（`now` 參數），不用 `now()`。
 - **keyset 的游標條件是單一列比較，沒有布林開關**：`(a, id) < (sqlc.arg(after_a), sqlc.arg(after_id))`；第一頁由 `model.*Cursor.Key()`（nil 回 `DescStart`／`AscStart` 的極值）給參數，所有頁同一個 prepared statement。`NOT has_cursor OR (…)` 在 generic plan 下是 Filter。
-- **回覆的 partial index 的述詞是旗標**：`comments_replies`、`forum_entries_replies` 是 `WHERE counted`。讀取只看 `counted`，planner 無法從它證明 `deleted_at IS NULL`，述詞寫成後者索引就用不上。改讀取的述詞時重量效能（`docs/plans/2026-10-18-a7-social/step-1a-perf/README.md`）。
+- **回覆的 partial index 的述詞是旗標**：`comments_replies`、`forum_entries_replies` 是 `WHERE counted`。讀取只看 `counted`，planner 無法從它證明 `deleted_at IS NULL`，述詞寫成後者索引就用不上。改讀取的述詞時重量效能（`backend/docs/plans/2026-10-18-a7-social/step-1a-perf/README.md`）。
 
 ## 5. 個人封鎖與店家封鎖
 
@@ -55,7 +55,7 @@
 - 寫入端的讀取類前置檢查（貼文公開可讀、回覆目標可讀、讚的對象可讀、討論區可讀）帶呼叫者本人的觀看者，讀不到就不能寫。
 - 店家封鎖（`seller.StoreBlocksBuyer`，單向，不發布 `seller.pub_*`）併在寫入的身分解析：買家身分的寫入一律經 `actor.Resolver` 的 `ForWrite`（留言、討論區發言、留言讚）、`ForAuthor`（編輯自己的留言與發言）、`ForBuyerWrite`（貼文讚）。這三個入口先確認買家營運中，再檢查這家店有沒有封鎖他（PermissionDenied）。
 - 不檢查店家封鎖的路徑：`ForSelfService`（分享）、刪除自己的內容、取消讚（不解析買家身分）；瀏覽不經身分解析。被店家封鎖的買家仍讀得到店家的公開內容。
-- 封鎖檢查的來源是 `Deps.StoreBlocks`：必要依賴，`New` 缺它就 panic；型別是只含 `StoreBlocksBuyer` 的介面，正式組裝傳 `seller.Module`（`seller.Reader` 不提供它）。封鎖查詢的量測在 `docs/plans/2026-10-18-a7-social/step-1b-perf/README.md`。
+- 封鎖檢查的來源是 `Deps.StoreBlocks`：必要依賴，`New` 缺它就 panic；型別是只含 `StoreBlocksBuyer` 的介面，正式組裝傳 `seller.Module`（`seller.Reader` 不提供它）。封鎖查詢的量測在 `backend/docs/plans/2026-10-18-a7-social/step-1b-perf/README.md`。
 
 ## 6. 計數
 
@@ -90,5 +90,5 @@
 ## 9. 已知限制
 
 - 標籤的「包含」搜尋沒有索引（子字串 `LIKE`）：10⁵ 貼文下完整的建議 query p95 ≤ 146 ms。量測結果在 `CARRYOVER.md`「pg_trgm spike 與效能量測」。包含搜尋的 p95 超過 300 ms 時要重新評估。
-- `ListHiddenContentOf` 的游標條件是 join 上的 Filter：作者自己被隱藏的內容是有界集合，成本與游標深度無關。其餘 keyset query 都是 Index Cond，包含 `ListHashtagPosts`（排序鍵複製在 `post_hashtags.published_at`，由 trigger 維護）。實測 p95 超過 300 ms 時要重新評估；量測在 `docs/plans/2026-10-18-a7-social/step-1a-perf/README.md`。
+- `ListHiddenContentOf` 的游標條件是 join 上的 Filter：作者自己被隱藏的內容是有界集合，成本與游標深度無關。其餘 keyset query 都是 Index Cond，包含 `ListHashtagPosts`（排序鍵複製在 `post_hashtags.published_at`，由 trigger 維護）。實測 p95 超過 300 ms 時要重新評估；量測在 `backend/docs/plans/2026-10-18-a7-social/step-1a-perf/README.md`。
 - 商品驗證經 port 呼叫舊的 product-service（跨行程），在 transaction 之前呼叫。

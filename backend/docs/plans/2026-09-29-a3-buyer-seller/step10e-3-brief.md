@@ -192,7 +192,7 @@ v1 的 K1–K14 都保留。以下只列異動或新增，不同意哪一項就�
 | 申訴裁定 | 14 天 | `food-safety-incident-runbook.md:196` | 同一個 commit，2026-05-07。在舊 seller-service 的流程章節裡（同節還有已刪除的 `partial` 裁定與 `seller_violation_appeals` 表） | **過時**，不是有效的 SSOT |
 | 補正裁定 | 7 個**日曆天** | `seller-violation-management-runbook.md:135` | `00fa6b1318`，2026-10-15，Will 的 2c-2 D2。理由：「取日曆天免去假日曆」 | 現行，最新的決定 |
 | 食品業者登錄 | 7 個日曆天 | `seller-food-registration-runbook.md:24`（「比照措施補正」） | 10d | 現行 |
-| KYC 審核 | 沒有 | rg 整個 `docs/runbooks` 都沒有 | — | 缺 |
+| KYC 審核 | 沒有 | rg 整個 `backend/docs/runbooks` 都沒有 | — | 缺 |
 | RISK 複審 | 每筆的 `review_by` | `measure.proto` | 現行 | 期限 = `review_by` 本身 |
 | 查證屬實後轉報主管機關 | 24 小時 | `seller-violation-management-runbook.md:166` | 公司時期 | 契約沒有追蹤 |
 

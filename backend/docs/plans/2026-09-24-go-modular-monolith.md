@@ -155,7 +155,7 @@
   - 指令檔一律是 `AGENTS.md`，所有 `CLAUDE.md` 移除（2026-09-25 使用者決定）：backend、admin、website 的內容併入各自的 `AGENTS.md`；兩支 App 的 `CLAUDE.md` 改名為 `AGENTS.md`。website 保留 Next.js 管理的規則區塊，`next dev` 因此只更新 `AGENTS.md`、不會再建立 `CLAUDE.md`（已用 Next.js 自己的函式驗證）。
   - 根目錄 `AGENTS.md`：monorepo 地圖、與 CI 相同的檢查、跨專案契約、共通規則。原本分散在各子專案「跨 Repo 共識」裡仍然有效的規則集中到這裡；`dev` 分支、promote、跨 repo session 這些公司時期的流程移除。
   - `backend/AGENTS.md` 改寫：單體的結構與規則、指令、仍然有效的契約規則。舊程式註解引用的「`CLAUDE.md` §N」指向私人封存的 `backend/CLAUDE.md`。
-  - `docs/開發規範/` 裡只適用舊服務或已不再適用的 9 份規範，檔頭加上適用範圍與退場時間；責任邊界規範 §七 加註單體內 saga 與 outbox 的例外已不成立。
+  - `backend/docs/開發規範/` 裡只適用舊服務或已不再適用的 9 份規範，檔頭加上適用範圍與退場時間；責任邊界規範 §七 加註單體內 saga 與 outbox 的例外已不成立。
 - [x] **0.11 CI**：新增 `backend-monolith` workflow，涵蓋 build、vet、`test -race`、arch、SQL、Atlas、Connect 生成物 drift、D9 gate、盤點 gate、integration 測試（OpenAPI drift 於 2026-09-26 隨 Connect 定案移除）。
 
 **驗收**
@@ -219,7 +219,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 - [ ] **A8 notification**：依 ADR `2026-10-05-notification-module.md`：通知型別定義在程式碼、逐一明確訂閱，不照搬 wildcard。
   - 發票寄送的買家 email 來源：單體 buyer 沒有 email，email 只在 identity（`accounts.email`）；A8 定 identity 的 email 同步時，一併決定發票（invoice-service）寄送地址取自 identity 的哪個欄位與介面（設計書 58 U5，Will 2026-10-28）。
   - 通知的維運重送：舊的 outbox 手動補列已隨 outbox 刪除，設計書 56 的 runbook 已無重送步驟；A8 設計投遞紀錄時一併定義重送手段（例如重排永久失敗的投遞紀錄）與 runbook（Will 2026-10-28）。
-  - identity 接 Clerk 的 `user.updated` webhook（驗證簽章）同步已驗證的主要 email，作為 email 渠道的寄件地址；不在寄信時呼叫 Clerk Backend API（ADR `2026-09-27-identity-clerk.md` 文末〈修訂：email 作為通知的寄件地址〉）。完成時 `docs/modules/identity.md` 的 email 從「建帳時的快照」改成同步後的規格。
+  - identity 接 Clerk 的 `user.updated` webhook（驗證簽章）同步已驗證的主要 email，作為 email 渠道的寄件地址；不在寄信時呼叫 Clerk Backend API（ADR `2026-09-27-identity-clerk.md` 文末〈修訂：email 作為通知的寄件地址〉）。完成時 `backend/docs/modules/identity.md` 的 email 從「建帳時的快照」改成同步後的規格。
   - `notifications/stream` 的 SSE 依 D7 改成 server streaming，續傳用游標欄位取代 `Last-Event-ID`，保留每個帳號的串流上限。
   - 治理的通知（A3b `step10e-reports-brief.md` R4、R7、R9，Will 2026-10-18）：訂閱 seller 的 `ReportReceived`、`ReportResolved`（通報人：登入的用站內通知、匿名但留了 email 的用 email，確認信依收件 email 節流），以及在 seller 加上詢問的事件並訂閱（賣家；3c-b 預先發出的 `CaseInquiryCreated` 因沒有消費者已刪除，A8 依「消費者出現時再加事件」在這一刀加）；食安事件通知某個商品過去 6 個月的購買者，前提是查得到購買者（B8）。
   - **確認信地址不得留在 job 參數裡**（A3b 3c-a 設計審查 #10，Will 2026-10-18）：`ReportReceived.ConfirmationEmail`（匿名送出留的 email）只在事件與 A8 同一個 transaction 排入的 job 參數裡，seller 不落表（`seller/events.go` 的註解寫同一條）。River v0.47.0（`backend/go.mod`）預設保留完成的 job 24 小時、丟棄（寄送失敗用盡重試）的 job 7 天（`rivershared/riversharedmaintenance/river_shared_maintenance.go:35-37`；專案沒有覆寫 `*JobRetentionPeriod`），參數裡的地址會跟著留那麼久。所以寄送 job 必須在完成或丟棄時清掉參數裡的地址，或參數只放 report／supplement 的參照、執行時再讀（地址就落在 seller，回到 365 天的聯絡方式保留規則管得到的範圍）。觸發：A8 訂閱 `ReportReceived` 的那一刀；驗收要有測試證明 job 完成與丟棄之後參數不含地址。
@@ -266,11 +266,11 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - 換金流（收款開通 ADR D1、D5）：付款不再走 PayUni，改經 payment port，作品集的 adapter 是 Stripe Connect 測試模式；付款建立、webhook（先寫 inbox、event id 去重）都走 port。`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 改由 port 的外部帳戶 ID 取代；Java 與 Go 舊服務的 PayUni 程式隨本步刪除。
 - [ ] **B3 fulfillment**
   - 物流供應商改綠界（`2026-10-24-portfolio-public`（計畫已刪除，見該 ADR 文末修訂）前提；收款開通 ADR D5）：超商與宅配的建單、列印、貨態 webhook 不再走 PayUni 的 MerID 與 `payuni-webhook-service`；開工前先查綠界測試帳號與平台條件（daily 2026-10-29 2350 的 Followup）。
-  - 刪除 Uber 即時配送（ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：Java shipping 的 Uber 程式、payuni-webhook-service 的 Uber webhook、只服務它們的 proto RPC 與生成物、CodeMeta 的 Uber 值域、`.env.template` 與 `docker-compose-local.yml` 的 Uber 設定、`docs/runbooks/uber-quote-retention/`，4 份 Uber ADR 標 superseded；設計書 03、06、09、58 描述 3003（Uber）的段落與 `docs/runbooks/uber-quote-retention.md` 一併刪除；清單見原執行計畫 `2026-10-27-ecommerce-scope-cut` 的「延後」（計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂；Will 2026-10-29）。
+  - 刪除 Uber 即時配送（ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：Java shipping 的 Uber 程式、payuni-webhook-service 的 Uber webhook、只服務它們的 proto RPC 與生成物、CodeMeta 的 Uber 值域、`.env.template` 與 `docker-compose-local.yml` 的 Uber 設定、`backend/docs/runbooks/uber-quote-retention/`，4 份 Uber ADR 標 superseded；設計書 03、06、09、58 描述 3003（Uber）的段落與 `backend/docs/runbooks/uber-quote-retention.md` 一併刪除；清單見原執行計畫 `2026-10-27-ecommerce-scope-cut` 的「延後」（計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂；Will 2026-10-29）。
   - 上一項的清單與觸發條件的來源是原執行計畫 `2026-10-27-ecommerce-scope-cut` 的「延後」（計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂）；補充範圍：CodeMeta 的 Uber 值域是 `ShippingMethod` 3003、`UberDeliveryOutcome`、`ShipmentAnomalyType` 的 4 個 UBER 值與錯誤碼 9024（`pkg/errors/bizcode`），Java 仍實作的 proto（order、shipping、product_import）裡的 Uber 欄位與 RPC 隨之刪除，client 裡斷言「3003 一律 unsupported」的回歸測試（website `lib/checkout/shipping-requirements.unit.test.ts`、`lib/seller/shipment-provider.unit.test.ts`，buyer-app `test/core/codemeta/shipping_presentation_test.dart`）在值域刪除時一起改。
   - 4 份 Uber ADR 在 B3 刪 Java 程式時標 superseded（指向 ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：`2026-09-11-uber-commerce-model-seller-direct`、`2026-09-11-uber-logistics-fee-charge-trigger`、`2026-09-14-uber-create-idempotency-precommit-key`、`2026-09-06-uber-webhook-slice-in-payuni-webhook-service`。
 - [ ] **B4 catalog**
-  - 不建 `store_state` 讀取模型：catalog 的列表在 SQL 內 join `seller.pub_exposable_stores(at)`（時間用請求的 clock），取代停權快照（ADR 2026-09-24 修訂段，2026-10-18；簡報 `docs/plans/2026-10-18-a7-social/d3-read-model-brief.md` §4.2）。
+  - 不建 `store_state` 讀取模型：catalog 的列表在 SQL 內 join `seller.pub_exposable_stores(at)`（時間用請求的 clock），取代停權快照（ADR 2026-09-24 修訂段，2026-10-18；簡報 `backend/docs/plans/2026-10-18-a7-social/d3-read-model-brief.md` §4.2）。
     - 2026-10-19：`seller.pub_exposable_stores(at)` 已建（A′(i)）。B4 把 product 搬進單體、`rg -n "OnStoreExposureChanged" cmd` 歸零時一起刪除 `seller.store_exposures`、`StoreExposureChanged`、`seller.reconcile_exposure` 與 `make reannounce-exposures`，`ListPublicStores` 改以 `pub_exposable_stores($now)` 做 keyset，`first_exposed_at` 改由週期 job 讀 `pub_exposable_stores(now)` 寫入（seller `CARRYOVER.md`「A′(i)」）。
   - 銷量、評分、收藏數歸 catalog，由事實發生的模組呼叫 API 更新。
   - content 的 banner 點擊行為（`product`）改成經 catalog 的公開 API 確認商品存在，ID 格式同時換成 UUID：依賴表的 content 加上 catalog，並更新 ADR D2 的表（同上）。
@@ -320,8 +320,8 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 - [ ] 對外 API 的 package 從 `v1alpha1` 一次改名成 `v1`（ADR `2026-09-26-external-contract-protobuf-connect.md` D2）：proto 的 package 與目錄、單體的 `connectServices`、四端的生成物與引用；改名之後 `buf breaking`（`WIRE_JSON`）才開始擋破壞性變更。必須在後端 CD（第 4 步）第一次部署之前完成：上線後改名本身就是破壞性變更，也會換掉 CDN 的快取鍵。
 - [ ] 各模組上線前累積的 migration 壓成一個 baseline（Will 2026-09-25 決定）：系統還沒上線，已套用的只有本機與測試的 database，壓掉沒有成本；第一次部署之後才開始累積。必須在後端 CD（第 4 步）第一次部署之前完成。
   - identity 的 `20260927071536_clerk_identity.sql` 為了既有列把 `accounts.clerk_user_id` 與 `admins.clerk_user_id`（之後改名為 `access_subject`）填成 `unlinked:<id>`：壓成 baseline 時這兩句一起消失，兩個欄位直接是 NOT NULL，沒有佔位值（A2 C9 的 design-review）。
-- [ ] CodeMeta 生成器（`docs/代碼管理（CodeMeta）/scripts/generate.sh`）的 Go 輸出改成先寫出、再交給 `gofmt`，不再自己計算對齊（Will 2026-09-25 決定）：自算對齊是為了在沒有 Go 的 runner 上重跑生成比對，monorepo 的 CI 跑生成器時都有 Go。
-- [ ] 刪除 CodeMeta：沒有任何值域的擁有者是 CodeMeta、也沒有舊的消費端時，刪除 `docs/代碼管理（CodeMeta）/`、生成器、`internal/platform/codemeta`、`pkg/codemeta`、`pkg/errors/bizcode`、gateway 的鏡像與各 client 的 CodeMeta 生成物（ADR `2026-09-25-codemeta-retirement.md` 過渡第 4 步）。
+- [ ] CodeMeta 生成器（`backend/docs/代碼管理（CodeMeta）/scripts/generate.sh`）的 Go 輸出改成先寫出、再交給 `gofmt`，不再自己計算對齊（Will 2026-09-25 決定）：自算對齊是為了在沒有 Go 的 runner 上重跑生成比對，monorepo 的 CI 跑生成器時都有 Go。
+- [ ] 刪除 CodeMeta：沒有任何值域的擁有者是 CodeMeta、也沒有舊的消費端時，刪除 `backend/docs/代碼管理（CodeMeta）/`、生成器、`internal/platform/codemeta`、`pkg/codemeta`、`pkg/errors/bizcode`、gateway 的鏡像與各 client 的 CodeMeta 生成物（ADR `2026-09-25-codemeta-retirement.md` 過渡第 4 步）。
   - 延後項（原執行計畫 `2026-10-27-ecommerce-scope-cut`「延後」，計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂，2026-10-29）：CodeMeta 裡同時被 Java 用到、所以沒在該計畫刪的值域（`AssetReferenceType` 的食譜值、`ShippingTemperature`、`ProductCertification*`、Uber 的 `ShippingMethod` 3003 等；清單見上面 B1、B3、B4）。觸發：各值域隨最後一個 Java 消費者退場時刪；剩下沒有擁有者的值域，隨本項刪除 CodeMeta 一起消失。
 - [ ] 賣家入駐文件改版時的重新同意（`pending_agreements`、`AcceptSellerAgreements`）：上線之前，或版本第一次在有真實賣家之後改版時加上，處理已入駐的賣家與換申請主體的情況（ADR `2026-10-19-seller-kyc-payuni-consolidated.md`「入駐同意紀錄」）。
 - [ ] 賣家入駐文件上線前的條文工作（ADR `2026-10-19-seller-kyc-payuni-consolidated.md`「入駐同意紀錄」）：

@@ -6,7 +6,7 @@
 
 - 根套件公開 `Module`：`Suspend(ctx, accountID, Record) (Suspension, error)`、`Unsuspend(ctx, accountID, reason) (released bool, error)`；輸入 `Record{Category, Reason, SourceRef}`；事件 `Suspended`、`Unsuspended`（`events.go`）。`Suspension` 是 `identity.AccountSuspension` 的別名。
 - 依賴 identity、seller，沒有模組依賴它（目前只有 `internal/legacy/accountservice` 與之後的 moderation 呼叫）；依賴圖的唯一來源是 `internal/arch/modules.go`。
-- 沒有自己的資料：停權紀錄在 `identity.account_suspensions`（規格見 `docs/modules/identity.md` §4）。登記在 `cmd/hawkr/modules.go` 的 `withoutData`。
+- 沒有自己的資料：停權紀錄在 `identity.account_suspensions`（規格見 `backend/docs/modules/identity.md` §4）。登記在 `cmd/hawkr/modules.go` 的 `withoutData`。
 - identity 的 `SuspendAccount`、`UnsuspendAccount` 只允許本模組呼叫，`internal/arch` 的 `TestSuspensionEntriesAreOnlyCalledByAccountsuspension` 掃非測試程式的呼叫者；新增呼叫者要改 `arch.SuspensionEntries`，那等於改架構。
 
 ## 2. Suspend

@@ -105,7 +105,7 @@ groups:
       # maxmemory-policy=allkeys-lru 不區分 session 與快取：記憶體壓到上限時被逐出的
       # 可能正是 session ＝ 靜默的大規模登出（RedisMemoryHigh 的 85% 閾值只是預警，
       # 逐出已經是「資料真的丟了」）。任何非零逐出都要看，不設數量閾值。
-      # 容量契約與現況數字見 docs/速查參考/Redis 快取管理.md §5。
+      # 容量契約與現況數字見 backend/docs/速查參考/Redis 快取管理.md §5。
       - alert: RedisKeysEvicted
         expr: increase(redis_evicted_keys_total[10m]) > 0
         for: 5m
@@ -113,7 +113,7 @@ groups:
           severity: critical
         annotations:
           summary: "Redis 正在逐出 key (instance={{ $labels.instance }} env={{ $labels.env }})"
-          description: '10 分鐘內逐出 {{ printf "%.0f" $value }} 個 key：記憶體已達 maxmemory，allkeys-lru 可能正在丟 session（使用者被登出）。查 docs/速查參考/Redis 快取管理.md §5 找成長來源。'
+          description: '10 分鐘內逐出 {{ printf "%.0f" $value }} 個 key：記憶體已達 maxmemory，allkeys-lru 可能正在丟 session（使用者被登出）。查 backend/docs/速查參考/Redis 快取管理.md §5 找成長來源。'
 
       # 記憶體用量趨勢外推：用近 6 小時斜率預測 24 小時後是否越過 85%。
       # RedisMemoryHigh 只在「已經高」時響，這條讓「正在往上長」提前一天出手，

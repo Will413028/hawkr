@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """遷移盤點 gate：舊服務刪除時，屬於它的 RPC、事件、副本都必須已經決定去向。
 
-盤點資料：docs/plans/2026-09-24-go-modular-monolith/（計畫的「模組完成的定義」）。
+盤點資料：backend/docs/plans/2026-09-24-go-modular-monolith/（計畫的「模組完成的定義」）。
 每一列的 disposition 欄寫成「<種類>: <說明>」：
 
   rpc-servers.csv  api（模組 API）、http（對外 endpoint）、removed（刪除）

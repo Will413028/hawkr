@@ -7,7 +7,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| [docs/index.md](docs/index.md) | **完整技術文件**：詳細設計書（29 份）、開發規範、CodeMeta、基礎建設、踩坑紀錄、decisions、postmortems、runbooks |
+| [backend/docs/index.md](docs/index.md) | **完整技術文件**：詳細設計書（29 份）、開發規範、CodeMeta、基礎建設、踩坑紀錄、decisions、postmortems、runbooks |
 | [QUICKSTART.md](QUICKSTART.md) | 新機器 git clone 後的環境設定、部署、常用指令 |
 | [rules.md](rules.md) | Go API stack 規範（由維護者本機 hook 自動同步，來源不在本 repo） |
 | [scripts/README.md](scripts/README.md) | 開發、smoke test、資料同步等本機腳本 |
@@ -18,7 +18,7 @@
 - **Go 服務**（`services/`）：account / buyer / seller / im / ai / content / crm / social / review / notification — 使用 **Atlas declarative** schema migration
 - **Java 服務**（`services/`, Spring Boot）：product / order / media / aftersales / payment / cart / shipping / coupon / payuni-webhook / product-import — 使用 **Flyway** migration
 
-各服務 port、API、資料模型詳見 [docs/詳細設計書/](docs/詳細設計書/)。
+各服務 port、API、資料模型詳見 [backend/docs/詳細設計書/](docs/詳細設計書/)。
 
 ## 開發規範（最高優先級）
 
@@ -27,4 +27,4 @@
 - [Java 微服務開發規範](docs/開發規範/Java%20微服務開發規範.md)
 - [Proto 管理規範](docs/開發規範/Proto%20管理規範.md)
 
-其餘規範與設計書見 [docs/index.md](docs/index.md)。
+其餘規範與設計書見 [backend/docs/index.md](docs/index.md)。

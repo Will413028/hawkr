@@ -2,11 +2,11 @@
 
 ## 職責
 
-代行營運的授權、工作階段、操作稽核與管理員代行資格。舊 gateway 仍編排跨服務寫入，經 `internal/legacy/delegationservice` 呼叫本模組的公開 API。行為規格的唯一來源是 `docs/modules/delegation.md`（業務依據：設計書 56）。
+代行營運的授權、工作階段、操作稽核與管理員代行資格。舊 gateway 仍編排跨服務寫入，經 `internal/legacy/delegationservice` 呼叫本模組的公開 API。行為規格的唯一來源是 `backend/docs/modules/delegation.md`（業務依據：設計書 56）。
 
 ## 擁有的資料
 
-schema `delegation`（`db/schema.sql`）五張表：`admin_eligibilities`（代行資格）、`delegated_operation_sessions`（工作階段，主鍵是 bigint IDENTITY）、`seller_delegation_authorizations`（每店一列的授權）、`delegation_authorization_audit_logs`（授權治理歷史，只追加）、`admin_operation_audit_logs`（兩階段操作稽核）。欄位與語意見 `docs/modules/delegation.md` §2。只存其他模組的 ID，不下跨 schema FK。讀取模型：無。
+schema `delegation`（`db/schema.sql`）五張表：`admin_eligibilities`（代行資格）、`delegated_operation_sessions`（工作階段，主鍵是 bigint IDENTITY）、`seller_delegation_authorizations`（每店一列的授權）、`delegation_authorization_audit_logs`（授權治理歷史，只追加）、`admin_operation_audit_logs`（兩階段操作稽核）。欄位與語意見 `backend/docs/modules/delegation.md` §2。只存其他模組的 ID，不下跨 schema FK。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -21,7 +21,7 @@ schema `delegation`（`db/schema.sql`）五張表：`admin_eligibilities`（代�
 
 ## 不變量
 
-- credential 與 handoff code 只以 SHA-256 存，handoff 以一條 CAS 兌換一次，兩者不進 log。守門：`TestHandoffAndOperationCredentialsUseIndependentRandomTokens`、`TestStartDelegationReplay`。規格：`docs/modules/delegation.md` §3。
+- credential 與 handoff code 只以 SHA-256 存，handoff 以一條 CAS 兌換一次，兩者不進 log。守門：`TestHandoffAndOperationCredentialsUseIndependentRandomTokens`、`TestStartDelegationReplay`。規格：`backend/docs/modules/delegation.md` §3。
 - 管理員同時只代行一家、店家同時只被一位管理員代行。守門：DB 約束 `uidx_delegated_operation_sessions_active_actor`、`uidx_delegated_operation_sessions_active_store`。規格：§3。
 - 狀態只儲存 ACTIVE、REVOKED（儲存的代碼一律 UPPER_SNAKE，ADR 2026-09-25-codemeta-retirement D3；舊 gRPC 與事件仍傳小寫，轉換在 `internal/legacy/delegationservice/wire.go`；守門：`TestStoredCodesInChecksAreUpperSnake`），到期在讀取時推導；輪詢不延長閒置期限。守門：`TestDelegationStatusFollowsTheOrderedRules`、`TestIdleTimeout`。規格：§3。
 - 能力是封閉的九項，拒絕履約、退款與金流。守門：`TestCapabilitiesAreTheClosedNine`、DB CHECK `delegated_operation_sessions_capabilities_check`。規格：§3。
