@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:hawkr_buyer/core/analytics/analytics_events.dart';
+import 'package:hawkr_buyer/shared/widgets/truck_loading_overlay.dart';
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/analytics/analytics_providers.dart';
@@ -324,6 +327,147 @@ void main() {
     expect(find.text('第2頁商品'), findsOneWidget);
     expect(find.text('載入失敗，點擊重試'), findsNothing);
   });
+
+  testWidgets('last page completes at once: no bottom loader, no extra fetch', (
+    tester,
+  ) async {
+    await _setViewport(tester, const Size(390, 844));
+    final dio = _searchDio();
+    final repository = _MockCategoryRepository();
+    final pages = <int>[];
+    when(
+      () => repository.searchProducts(
+        keyword: any(named: 'keyword'),
+        page: any(named: 'page'),
+        pageSize: any(named: 'pageSize'),
+      ),
+    ).thenAnswer((invocation) async {
+      pages.add(invocation.namedArguments[#page] as int);
+      return ProductListResult(
+        records: [_item('唯一商品')],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+      );
+    });
+    final router = _router();
+    addTearDown(dio.close);
+    addTearDown(router.dispose);
+
+    await _pumpSearchResults(
+      tester,
+      dio: dio,
+      router: router,
+      categoryRepository: repository,
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.text('唯一商品'), findsOneWidget);
+    expect(find.byType(TruckLoadingOverlay), findsNothing);
+    await tester.pumpAndSettle();
+    expect(pages, [1]);
+  });
+
+  testWidgets('a non-Exception fetch error shows retry, nothing escapes', (
+    tester,
+  ) async {
+    await _setViewport(tester, const Size(390, 844));
+    final dio = _searchDio();
+    final repository = _MockCategoryRepository();
+    when(
+      () => repository.searchProducts(
+        keyword: any(named: 'keyword'),
+        page: any(named: 'page'),
+        pageSize: any(named: 'pageSize'),
+      ),
+    ).thenAnswer((_) async => throw StateError('not an Exception'));
+    final router = _router();
+    addTearDown(dio.close);
+    addTearDown(router.dispose);
+
+    await _pumpSearchResults(
+      tester,
+      dio: dio,
+      router: router,
+      categoryRepository: repository,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('搜尋失敗'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, '重試'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a stale request neither alters paging nor fires tracking', (
+    tester,
+  ) async {
+    await _setViewport(tester, const Size(390, 844));
+    final dio = _searchDio();
+    final repository = _MockCategoryRepository();
+    final analytics = _MockAnalyticsEvents();
+    final pending = <String, Completer<ProductListResult>>{};
+    final calls = <String>[];
+    when(
+      () => repository.searchProducts(
+        keyword: any(named: 'keyword'),
+        page: any(named: 'page'),
+        pageSize: any(named: 'pageSize'),
+      ),
+    ).thenAnswer((invocation) {
+      final keyword = invocation.namedArguments[#keyword] as String;
+      final page = invocation.namedArguments[#page] as int;
+      calls.add('$keyword:$page');
+      return (pending[keyword] = Completer<ProductListResult>()).future;
+    });
+    final router = _router();
+    addTearDown(dio.close);
+    addTearDown(router.dispose);
+
+    await _pumpSearchResults(
+      tester,
+      dio: dio,
+      router: router,
+      categoryRepository: repository,
+      analyticsEvents: analytics,
+    );
+    await tester.enterText(find.byType(TextField).first, '蘋果');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+    expect(calls, ['高麗菜:1', '蘋果:1']);
+
+    pending['蘋果']!.complete(
+      ProductListResult(
+        records: [_item('蘋果商品')],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+    // The stale request is not the last page; if it leaked it would change
+    // paging and trigger a page-2 request.
+    pending['高麗菜']!.complete(
+      ProductListResult(
+        records: [_item('高麗菜商品')],
+        total: 40,
+        page: 1,
+        pageSize: 20,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('蘋果商品'), findsOneWidget);
+    expect(find.text('高麗菜商品'), findsNothing);
+    expect(calls, ['高麗菜:1', '蘋果:1']);
+    verify(
+      () => analytics.trackViewItemList(
+        any(),
+        listId: any(named: 'listId'),
+        listName: any(named: 'listName'),
+      ),
+    ).called(1);
+  });
 }
 
 Future<void> _pumpSearchResults(
@@ -331,8 +475,9 @@ Future<void> _pumpSearchResults(
   required Dio dio,
   required GoRouter router,
   CategoryRepository? categoryRepository,
+  AnalyticsEvents? analyticsEvents,
 }) async {
-  final analytics = _MockAnalyticsEvents();
+  final analytics = analyticsEvents ?? _MockAnalyticsEvents();
   when(
     () => analytics.trackViewItemList(
       any(),

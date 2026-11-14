@@ -40,6 +40,11 @@ GA4Item _searchProductToGa4Item(ProductItem product, {int? index}) => GA4Item(
   index: index,
 );
 
+class _SearchFetchFailure implements Exception {
+  const _SearchFetchFailure(this.cause);
+  final Object cause;
+}
+
 class SearchResultsScreen extends HookConsumerWidget {
   const SearchResultsScreen({super.key, required this.query});
   final String query;
@@ -52,47 +57,69 @@ class SearchResultsScreen extends HookConsumerWidget {
     final debounce = useRef<Timer?>(null);
     final currentKeyword = useRef(query);
 
-    // Next page key after each fetched page key; null marks the last page.
-    // Replaced on every refresh so a request started before it writes into the
-    // discarded map.
-    final nextKeyAfter = useRef(<int, int?>{});
+    // Bumped on every restart and on dispose; a request that started under an
+    // older value is stale and must not alter paging or fire tracking.
+    final generation = useRef(0);
+    final controllerRef = useRef<PagingController<int, ProductItem>?>(null);
 
-    // Paging controller for infinite scroll
-    final pagingController = useMemoized(
-      () => PagingController<int, ProductItem>(
+    Future<List<ProductItem>> fetchPage(int pageKey) async {
+      final started = generation.value;
+      try {
+        final page = await ref
+            .read(ctrl.searchControllerProvider.notifier)
+            .fetchSearchPage(currentKeyword.value, pageKey);
+        final items = page.records;
+        if (started != generation.value) return items;
+        if (page.isLastPage) {
+          final c = controllerRef.value!;
+          c.value = c.value.copyWith(hasNextPage: false);
+        }
+        // GA4: view_item_list — fired once per displayed page, not on every rebuild
+        if (items.isNotEmpty) {
+          final startIndex = (pageKey - 1) * ctrl.SearchController.pageSize;
+          final ga4Items = items.indexed
+              .map(
+                (e) => _searchProductToGa4Item(e.$2, index: startIndex + e.$1),
+              )
+              .toList();
+          ref
+              .read(analyticsEventsProvider)
+              .trackViewItemList(ga4Items, listId: 'search', listName: '搜尋結果');
+        }
+        return items;
+      } on Exception {
+        rethrow;
+      } catch (e) {
+        // The controller rethrows non-Exception errors; keep them in the
+        // error state instead of escaping to the zone.
+        throw _SearchFetchFailure(e);
+      }
+    }
+
+    final pagingController = useMemoized(() {
+      final c = PagingController<int, ProductItem>(
         getNextPageKey: (state) {
           final lastKey = state.keys?.last;
-          return lastKey == null ? 1 : nextKeyAfter.value[lastKey];
+          return lastKey == null ? 1 : lastKey + 1;
         },
-        fetchPage: (pageKey) async {
-          final nextKeys = nextKeyAfter.value;
-          final page = await ref
-              .read(ctrl.searchControllerProvider.notifier)
-              .fetchSearchPage(currentKeyword.value, pageKey);
-          final items = page.records;
-          nextKeys[pageKey] = page.isLastPage ? null : page.page + 1;
-          // GA4: view_item_list — fired once per loaded page, not on every rebuild
-          if (items.isNotEmpty) {
-            final startIndex = (pageKey - 1) * ctrl.SearchController.pageSize;
-            final ga4Items = items.indexed
-                .map(
-                  (e) =>
-                      _searchProductToGa4Item(e.$2, index: startIndex + e.$1),
-                )
-                .toList();
-            ref
-                .read(analyticsEventsProvider)
-                .trackViewItemList(
-                  ga4Items,
-                  listId: 'search',
-                  listName: '搜尋結果',
-                );
-          }
-          return items;
-        },
-      ),
-    );
+        fetchPage: fetchPage,
+      );
+      controllerRef.value = c;
+      return c;
+    });
 
+    void restartSearch(String keyword) {
+      currentKeyword.value = keyword;
+      generation.value++;
+      pagingController.refresh();
+    }
+
+    useEffect(
+      () => () {
+        generation.value++;
+      },
+      [],
+    );
     useEffect(() => pagingController.dispose, []);
 
     void onSearchChanged(String text) {
@@ -119,9 +146,7 @@ class SearchResultsScreen extends HookConsumerWidget {
       final kw = keyword.trim();
       if (kw.isEmpty) return;
       showSuggestions.value = false;
-      currentKeyword.value = kw;
-      nextKeyAfter.value = {};
-      pagingController.refresh();
+      restartSearch(kw);
     }
 
     TextSpan buildHighlightedSpan(String text, String keyword) {
@@ -201,9 +226,7 @@ class SearchResultsScreen extends HookConsumerWidget {
                 searchCtrl.text = label;
                 showSuggestions.value = false;
                 FocusScope.of(context).unfocus();
-                currentKeyword.value = label;
-                nextKeyAfter.value = {};
-                pagingController.refresh();
+                restartSearch(label);
               },
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
