@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -627,7 +629,6 @@ func TestCloseAccountPostsTheAppliedConfigurationsReadBack(t *testing.T) {
 }
 
 // 只做完第一步的空帳戶：applied_configurations 是 []，關閉本文必須帶空陣列（省略或 ["recipient"] 都是 400 configs_must_match_to_close，spike Q25）。
-// fixture 是合成的（orchestrator 在 sandbox 重錄）。
 func TestCloseAccountOnABareAccountPostsAnEmptyConfigurationList(t *testing.T) {
 	bare, closed := loadFixture(t, "create_shell_provider"), loadFixture(t, "close_bare_account")
 	s := &stub{resp: func(n int) (int, string, http.Header) {
@@ -746,26 +747,66 @@ func TestCloseAccountUnknownIDIsAPermanentErrorWithoutALookup(t *testing.T) {
 	}
 }
 
-// 列出帳戶：整份翻頁列完，只回 metadata.store_id 相符的（含空帳戶；metadata 是 null 的略過）。fixture 是合成的（orchestrator 在 sandbox 重錄）。
+// 列出帳戶：整份翻頁列完，只回 metadata.store_id 相符的（含空帳戶；metadata 是空的略過）。預期值讀自 fixture（sandbox 錄的兩頁）。
 func TestListAccountIDsByStorePagesThroughTheWholeListAndMatchesMetadata(t *testing.T) {
 	p1, p2 := loadFixture(t, "list_accounts_page1"), loadFixture(t, "list_accounts_page2")
-	s := &stub{resp: func(n int) (int, string, http.Header) {
-		if n == 1 {
-			return p1.Status, string(p1.Body), nil
-		}
-		return p2.Status, string(p2.Body), nil
-	}}
-	ids, err := newTestClient(t, s).ListAccountIDsByStore(context.Background(), 7)
-	if err != nil {
+	type page struct {
+		Data []struct {
+			ID                    string            `json:"id"`
+			AppliedConfigurations []string          `json:"applied_configurations"`
+			Metadata              map[string]string `json:"metadata"`
+		} `json:"data"`
+		NextPageURL *string `json:"next_page_url"`
+	}
+	var first, second page
+	if err := json.Unmarshal(p1.Body, &first); err != nil {
 		t.Fatal(err)
 	}
-	if len(ids) != 2 || ids[0] != "acct_1UbSynthB" || ids[1] != "acct_1UbSynthC" {
-		t.Fatalf("ids=%v", ids)
+	if err := json.Unmarshal(p2.Body, &second); err != nil {
+		t.Fatal(err)
 	}
-	reqs := s.requests()
-	if len(reqs) != 2 || reqs[0].Method != "GET" || !strings.HasPrefix(reqs[0].URI, "/v2/core/accounts") || !strings.Contains(reqs[0].URI, "limit=20") ||
-		strings.Contains(reqs[0].URI, "closed") || !strings.Contains(reqs[1].URI, "SYNTH_PAGE_2") {
-		t.Fatalf("請求 %+v", reqs)
+	if first.NextPageURL == nil || second.NextPageURL != nil {
+		t.Fatalf("fixture 不是剛好兩頁")
+	}
+	want := map[string][]string{}
+	bare := ""
+	for _, pg := range []page{first, second} {
+		for _, a := range pg.Data {
+			if id := a.Metadata["store_id"]; id != "" {
+				want[id] = append(want[id], a.ID)
+				if len(a.AppliedConfigurations) == 0 {
+					bare = id
+				}
+			}
+		}
+	}
+	onSecond := second.Data[0].Metadata["store_id"]
+	if bare == "" || len(want[bare]) < 2 || onSecond == "" || onSecond == bare {
+		t.Fatalf("fixture 需要第一頁有同一家店的兩個帳戶（含空帳戶）、第二頁有另一家店：%v", want)
+	}
+	for _, store := range []string{bare, onSecond} {
+		s := &stub{resp: func(n int) (int, string, http.Header) {
+			if n == 1 {
+				return p1.Status, string(p1.Body), nil
+			}
+			return p2.Status, string(p2.Body), nil
+		}}
+		storeID, err := strconv.ParseInt(store, 10, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids, err := newTestClient(t, s).ListAccountIDsByStore(context.Background(), storeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(ids, want[store]) {
+			t.Fatalf("store %s ids=%v，預期 %v", store, ids, want[store])
+		}
+		reqs := s.requests()
+		if len(reqs) != 2 || reqs[0].Method != "GET" || !strings.HasPrefix(reqs[0].URI, "/v2/core/accounts") || !strings.Contains(reqs[0].URI, "limit=20") ||
+			strings.Contains(reqs[0].URI, "closed") || reqs[1].URI != *first.NextPageURL {
+			t.Fatalf("請求 %+v", reqs)
+		}
 	}
 }
 
@@ -778,7 +819,7 @@ func TestListAccountIDsByStoreReturnsAnErrorNotAPartialListWhenAPageFails(t *tes
 		}
 		return 503, `{"error":{"message":"down"}}`, nil
 	}}
-	ids, err := newTestClient(t, s).ListAccountIDsByStore(context.Background(), 7)
+	ids, err := newTestClient(t, s).ListAccountIDsByStore(context.Background(), 990025)
 	var api *APIError
 	if !errors.As(err, &api) || api.Status != 503 || ids != nil {
 		t.Fatalf("ids=%v err=%v", ids, err)

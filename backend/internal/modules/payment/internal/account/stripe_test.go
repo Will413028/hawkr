@@ -189,20 +189,20 @@ func TestStripeAcquireAccountSendsTheGivenKeyAndAFixedBodyOnEveryAttempt(t *test
 	}
 }
 
-// ResolveAccount 只找不建：列出帳戶（GET，不 POST），以 metadata.store_id 比對；沒有符合的回 found=false，不送出任何建立請求。fixture 是合成的（orchestrator 在 sandbox 重錄）。
+// ResolveAccount 只找不建：列出帳戶（GET，不 POST），以 metadata.store_id 比對；沒有符合的回 found=false，不送出任何建立請求。
 func TestStripeResolveAccountOnlyListsAndMatchesByStoreID(t *testing.T) {
 	var methods []string
 	p1, p2 := fixtureResponder(t, "list_accounts_page1"), fixtureResponder(t, "list_accounts_page2")
 	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		methods = append(methods, r.Method)
-		if strings.Contains(r.URL.RawQuery, "SYNTH_PAGE_2") {
+		if strings.Contains(r.URL.RawQuery, "page=") {
 			p2(w, r)
 			return
 		}
 		p1(w, r)
 	}))
-	id, found, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 7})
-	if err != nil || !found || id != "acct_1UbSynthB" {
+	id, found, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 10000})
+	if err != nil || !found || id != "acct_1UbYvoI5OYGDmlPA" {
 		t.Fatalf("id=%q found=%v err=%v", id, found, err)
 	}
 	if _, found, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: 8}); err != nil || found {

@@ -1,8 +1,8 @@
 //go:build spike
 
 // q22_adapter 用正式的 adapter（internal/platform/stripe）對 Stripe sandbox 走一次：
-// create（兩步建立＋開通連結）、status（讀帳戶）、close（關閉，連關兩次確認冪等）。
-// 用法：go run -tags spike ./docs/plans/2026-10-29-payment-onboarding-stripe/spike/q22_adapter <create [none]|link|status|close> [account id]
+// create（兩步建立＋開通連結）、shell（只做第一步的空帳戶）、find（以 metadata.store_id 列出比對）、status（讀帳戶）、close（關閉，連關兩次確認冪等）。
+// 用法：go run -tags spike ./docs/plans/2026-10-29-payment-onboarding-stripe/spike/q22_adapter <create [none]|shell|find|link|status|close> [account id]
 // create 後面加 none 是平台收件（dashboard=none，Q23），不加是 Stripe 收件（express，Q22）。
 // 金鑰從環境變數 STRIPE_SECRET_KEY 讀。
 package main
@@ -61,6 +61,22 @@ func run() error {
 			return fmt.Errorf("CreateAccountLink: %w", err)
 		}
 		fmt.Println("link:", link.URL)
+	case "shell":
+		raw := make([]byte, 16)
+		if _, err := rand.Read(raw); err != nil {
+			return err
+		}
+		id, err := c.CreateAccountShell(ctx, "q22-"+hex.EncodeToString(raw), 990027)
+		if err != nil {
+			return fmt.Errorf("CreateAccountShell: %w", err)
+		}
+		fmt.Println("account:", id)
+	case "find":
+		ids, err := c.ListAccountIDsByStore(ctx, 990027)
+		if err != nil {
+			return fmt.Errorf("ListAccountIDsByStore: %w", err)
+		}
+		fmt.Println("found:", ids)
 	case "status":
 		a, err := c.RetrieveAccount(ctx, os.Args[2])
 		if err != nil {

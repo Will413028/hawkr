@@ -1,12 +1,13 @@
 {
-  "synthetic": true,
   "status": 400,
   "body": {
     "error": {
-      "type": "invalid_request_error",
       "code": "configs_must_match_to_close",
-      "message": "All applied configurations on the account must be passed in to close it.",
-      "request_log_url": "https://dashboard.stripe.com/test/logs/req_<MASKED>"
+      "message": "You must correctly specify the applied configurations on the account in order to close it. ",
+      "user_message": "You must correctly specify the applied configurations on the account in order to close it.",
+      "param": "applied_configurations",
+      "request_log_url": "https://dashboard.stripe.com/acct_1UXPj9RPCx5baPmE/test/logs/req_<MASKED:d18e>",
+      "applied_configurations": []
     }
   }
 }
