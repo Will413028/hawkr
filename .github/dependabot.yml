@@ -26,6 +26,12 @@ updates:
       # msw 3 mocks at the socket layer, below website's hermetic network guard; needs a guard redesign first.
       - dependency-name: "msw"
         update-types: ["version-update:semver-major"]
+      # Patched in patches/ (pnpm patchedDependencies): upgrade by hand and regenerate the patch,
+      # following patches/UPSTREAM-WATCH.md, instead of inside a grouped update.
+      - dependency-name: "@editorjs/editorjs"
+      - dependency-name: "@opennextjs/cloudflare"
+      - dependency-name: "@storybook/nextjs-vite"
+      - dependency-name: "next"
     cooldown:
       default-days: 14
       semver-major-days: 30
