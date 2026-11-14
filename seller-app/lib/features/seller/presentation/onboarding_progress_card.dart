@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hawkr_api/transport.dart' show Code;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../core/l10n/ui_locale.dart';
@@ -15,15 +16,15 @@ import '../../../shared/widgets/hk_button_label.dart';
 import '../../../shared/widgets/hk_content_card.dart';
 import '../../../shared/widgets/hk_icon.dart';
 import '../../../shared/widgets/hk_status_badge.dart';
-import '../data/current_kyc.dart';
 import '../data/current_store.dart';
+import '../data/onboarding_summary.dart';
 import '../data/onboarding_tasks.dart';
 import '../data/seller_status_refresh.dart';
 
-/// 開店進度卡（B8）：項目、分組與文字和 website 的 `OnboardingProgressCard` 同一套，資料來自
-/// `GetMyStore.capabilities` 的 `PUBLIC_LISTING`、`GetMyKYC.flow`、物流開通與商品數。
+/// 開店進度卡（B8）：項目、分組與文字和 website 的 `OnboardingProgressCard` 同一套。「公開前必須」是伺服器開通摘要
+/// （`GetMyOnboarding`）的任務依序呈現；「建議完成」由 `GetMyStore` 的店家資料、物流開通與商品數組成。
 ///
-/// 「公開前必須」全部完成時預設收合。[onOpenProfile] 是「商店資料」「商店介紹」的去處；沒給時回商店設定頁。
+/// 「公開前必須」全部完成時預設收合。按鈕的去處依伺服器的 `OnboardingAction`，沒有下一步沒有按鈕（收款帳戶的重讀是自動的，沒有手動按鈕）。[onOpenProfile] 是「商店資料」「商店介紹」的去處；沒給時回商店設定頁。
 class OnboardingProgressCard extends HookConsumerWidget {
   const OnboardingProgressCard({super.key, this.onOpenProfile});
 
@@ -32,13 +33,16 @@ class OnboardingProgressCard extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final my = ref.watch(myStoreSnapshotProvider);
-    final kyc = ref.watch(currentKycProvider)?.value;
+    final summaryRead = ref.watch(currentOnboardingProvider);
+    final summary = summaryRead?.value;
+    final summaryLoading =
+        summaryRead == null || (summaryRead.isLoading && !summaryRead.hasValue);
     final inputs =
         ref.watch(onboardingInputsProvider).value ?? const OnboardingInputs();
-    final tasks = buildOnboardingTasks(
+    final tasks = buildOnboardingSteps(
       l: context.uiLocale,
       my: my,
-      flowStatus: kyc?.status,
+      summary: summary,
       shipping: inputs.shipping,
       productCount: inputs.productCount,
     );
@@ -50,6 +54,14 @@ class OnboardingProgressCard extends HookConsumerWidget {
         required.isNotEmpty && completedRequired == required.length;
     final collapsedOverride = useState<bool?>(null);
     final collapsed = collapsedOverride.value ?? allRequiredComplete;
+    // 「公開前必須」沒有任務時：讀取中顯示「載入中…」，讀取失敗顯示預設錯誤句（不自己推導，也不顯示 0/0）。
+    final requiredPlaceholder = required.isNotEmpty
+        ? null
+        : summaryLoading
+        ? '載入中…'
+        : summary == null
+        ? ref.watch(defaultErrorTextProvider)(Code.internal)
+        : null;
 
     // 進度卡常駐在主導航的分頁裡：去別的頁面辦事回來（成為可見）才重讀，離開時不讀。物流與商品數是辦事的結果，每次回來都重讀；
     // 店家與認證流程 30 秒內讀過就不再讀。
@@ -62,23 +74,20 @@ class OnboardingProgressCard extends HookConsumerWidget {
       );
     });
 
-    void open(OnboardingTask task) {
-      switch (task.id) {
-        case OnboardingTaskId.profile:
-        case OnboardingTaskId.description:
-          _openProfile(context);
-        case OnboardingTaskId.cert:
-          context.go(MainRoutes.wallet);
-        case OnboardingTaskId.notSuspended:
-          unawaited(context.push<void>(SellerRoutes.suspensionNotice));
-        case OnboardingTaskId.storeActive:
-          unawaited(context.push<void>(SellerRoutes.suspensionNotice));
-        case OnboardingTaskId.shipping:
-          unawaited(context.push<void>(SettingsRoutes.shipping));
-        case OnboardingTaskId.product:
-          unawaited(context.push<void>(ProductRoutes.picker));
-        case OnboardingTaskId.otherRequirement:
+    void open(OnboardingStep task) {
+      switch (task.target) {
+        case OnboardingStepTarget.none:
           break;
+        case OnboardingStepTarget.editProfile:
+          _openProfile(context);
+        case OnboardingStepTarget.certification:
+          context.go(MainRoutes.wallet);
+        case OnboardingStepTarget.support:
+          unawaited(context.push<void>(SettingsRoutes.help));
+        case OnboardingStepTarget.shipping:
+          unawaited(context.push<void>(SettingsRoutes.shipping));
+        case OnboardingStepTarget.product:
+          unawaited(context.push<void>(ProductRoutes.picker));
       }
     }
 
@@ -95,7 +104,9 @@ class OnboardingProgressCard extends HookConsumerWidget {
           ),
           if (!collapsed)
             for (final group in OnboardingTaskGroup.values)
-              if (tasks.any((task) => task.group == group)) ...[
+              if (tasks.any((task) => task.group == group) ||
+                  (group == OnboardingTaskGroup.beforePublish &&
+                      requiredPlaceholder != null)) ...[
                 const SizedBox(height: HkSpace.lg),
                 Semantics(
                   header: true,
@@ -108,6 +119,21 @@ class OnboardingProgressCard extends HookConsumerWidget {
                     ),
                   ),
                 ),
+                if (group == OnboardingTaskGroup.beforePublish &&
+                    requiredPlaceholder != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: HkSpace.md),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        requiredPlaceholder,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
                 for (final task in tasks.where((task) => task.group == group))
                   _TaskRow(task: task, onOpen: () => open(task)),
               ],
@@ -143,6 +169,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showProgress = totalRequired > 0 && !allRequiredComplete;
     final progress = totalRequired == 0
         ? 0.0
         : completedRequired / totalRequired;
@@ -188,7 +215,7 @@ class _Header extends StatelessWidget {
                 ],
               ),
             ),
-            if (!allRequiredComplete)
+            if (showProgress)
               Text(
                 '$completedRequired/$totalRequired',
                 style: const TextStyle(
@@ -199,7 +226,7 @@ class _Header extends StatelessWidget {
               ),
           ],
         ),
-        if (!allRequiredComplete) ...[
+        if (showProgress) ...[
           const SizedBox(height: HkSpace.md),
           Semantics(
             label: '開店進度',
@@ -235,7 +262,7 @@ class _Header extends StatelessWidget {
 class _TaskRow extends StatelessWidget {
   const _TaskRow({required this.task, required this.onOpen});
 
-  final OnboardingTask task;
+  final OnboardingStep task;
   final VoidCallback onOpen;
 
   @override
@@ -249,6 +276,7 @@ class _TaskRow extends StatelessWidget {
         ? AppIconColors.success
         : AppIconColors.muted;
     final cta = task.cta;
+    final description = task.description;
     return Semantics(
       container: true,
       label: '${task.title}，${task.statusLabel}',
@@ -274,14 +302,16 @@ class _TaskRow extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: HkSpace.xs),
-                  Text(
-                    task.description,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
+                  if (description != null) ...[
+                    const SizedBox(height: HkSpace.xs),
+                    Text(
+                      description,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: HkSpace.sm),
                   HkStatusBadge(label: task.statusLabel, tone: task.tone),
                 ],

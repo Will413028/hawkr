@@ -20,7 +20,7 @@ const (
 )
 
 // NewInterceptor 回傳每個 Connect handler 都要掛的 interceptor。一個 interceptor 依序做完：
-// 授權（依 service 的使用者類別；呼叫者由入口的認證中介層放進 ctx）→ 逾時 → 呼叫 handler → 錯誤轉換 →
+// 語系協商（Accept-Language，寫進 ctx 並標 Vary；admin 固定 zh-TW）→ 授權（依 service 的使用者類別；呼叫者由入口的認證中介層放進 ctx）→ 逾時 → 呼叫 handler → 錯誤轉換 →
 // log，所以 log 看得到最後回給 client 的錯誤碼，授權失敗也會被記錄。
 func NewInterceptor(log *slog.Logger) connect.Interceptor {
 	return &interceptor{log: log}
@@ -34,6 +34,7 @@ func (i *interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		start := time.Now()
 		procedure := req.Spec().Procedure
+		ctx, varies := withRequestLocale(ctx, procedure, req.Header())
 		ctx, cancel := bounded(ctx)
 		defer cancel()
 		err := authorize(ctx, procedure)
@@ -41,7 +42,15 @@ func (i *interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		if err == nil {
 			resp, err = next(ctx, req)
 		}
-		return resp, i.finish(ctx, procedure, start, err)
+		err = i.finish(ctx, procedure, start, err)
+		if varies {
+			if err != nil {
+				markErrVary(err)
+			} else if resp != nil {
+				markVary(resp.Header())
+			}
+		}
+		return resp, err
 	}
 }
 
@@ -53,6 +62,10 @@ func (i *interceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) co
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
 		start := time.Now()
 		procedure := conn.Spec().Procedure
+		ctx, varies := withRequestLocale(ctx, procedure, conn.RequestHeader())
+		if varies {
+			markVary(conn.ResponseHeader())
+		}
 		err := authorize(ctx, procedure)
 		if err == nil {
 			err = next(ctx, conn)

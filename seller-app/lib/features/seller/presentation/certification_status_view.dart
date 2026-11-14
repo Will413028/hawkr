@@ -1,0 +1,287 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
+import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_api/transport.dart' show Code;
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+import '../../../core/l10n/ui_locale.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/hk_tokens.dart';
+import '../../../shared/widgets/hk_button_label.dart';
+import '../../../shared/widgets/hk_frosted_card_surface.dart';
+import '../../../shared/widgets/hk_status_badge.dart';
+import '../data/onboarding_summary.dart';
+import '../data/payment_account.dart';
+import '../data/payment_onboarding.dart';
+import '../data/seller_status_refresh.dart';
+import 'payment_account_action.dart';
+import 'widgets/certification_journey_stepper.dart';
+
+/// 平台審核的色調（版面，留在 client）；文字取自共用文案目錄（`seller.KYCStatus`）。`UNSPECIFIED` 與不認得的值沒有色調。
+HkStatusTone? kycStatusTone(KYCStatus status) => switch (status) {
+  KYCStatus.KYC_STATUS_DRAFT => HkStatusTone.neutral,
+  KYCStatus.KYC_STATUS_SUBMITTED => HkStatusTone.info,
+  KYCStatus.KYC_STATUS_APPROVED => HkStatusTone.success,
+  KYCStatus.KYC_STATUS_REJECTED => HkStatusTone.danger,
+  _ => null,
+};
+
+/// 平台審核區顯示哪一個時間：已通過看核准時間，審核中看送出時間。
+enum KycStampKind { decide, submit }
+
+/// 這個狀態要顯示的時間（已格式化成台北時間）；其他狀態、或伺服器沒有給時間時是 null。只決定「哪一個時間」，不產生文字（文字取決於 [KycStampKind]，
+/// 狀態名詞在共用目錄）。
+({KycStampKind kind, String time})? kycStampOf(
+  KYCApplication application,
+  KYCStatus status,
+) {
+  if (status == KYCStatus.KYC_STATUS_APPROVED && application.hasDecideTime()) {
+    return (
+      kind: KycStampKind.decide,
+      time: formatTaipeiTimestamp(application.decideTime),
+    );
+  }
+  if (status == KYCStatus.KYC_STATUS_SUBMITTED && application.hasSubmitTime()) {
+    return (
+      kind: KycStampKind.submit,
+      time: formatTaipeiTimestamp(application.submitTime),
+    );
+  }
+  return null;
+}
+
+/// 已送出審核 / 已完成審核的唯讀狀態畫面（D15）：兩區，平台審核區顯示申請（`KYCApplication.status`）的狀態與時間，收款帳戶區
+/// 是否開放由開通摘要（`GetMyOnboarding`）的平台審核任務決定，內容讀 `GetMyPaymentAccount`。
+///
+/// 進入畫面與 App 回前景時自動重讀（[PaymentOnboarding.autoRefresh]、[PaymentOnboarding.watchForeground]）：先 `RefreshMyPaymentAccount`
+/// 再重讀開通摘要，重讀失敗不顯示。
+class CertificationStatusView extends HookConsumerWidget {
+  const CertificationStatusView({super.key, required this.application});
+
+  final KYCApplication application;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final onboarding = ref.read(paymentOnboardingProvider.notifier);
+    useEffect(() {
+      unawaited(onboarding.autoRefresh(onEntry: true));
+      return null;
+    }, const []);
+    useEffect(onboarding.watchForeground, const []);
+
+    final status = application.status;
+    return Center(
+      child: SingleChildScrollView(
+        key: const Key('kyc_locked'),
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CertificationJourneyStepper(
+                currentStep: CertificationJourneyStepper.lastStep,
+              ),
+              const SizedBox(height: HkSpace.lg),
+              _PlatformReviewSection(application: application, status: status),
+              const SizedBox(height: HkSpace.lg),
+              const _PaymentAccountSection(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({
+    required this.cardKey,
+    required this.title,
+    required this.children,
+  });
+
+  final Key cardKey;
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: HkFrostedCardSurface(
+        radius: HkRadius.xl,
+        shadows: HkShadows.lg,
+        child: Padding(
+          key: cardKey,
+          padding: const EdgeInsets.all(HkSpace.xl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textEmphasis,
+                ),
+              ),
+              const SizedBox(height: HkSpace.md),
+              ...children,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+const _bodyStyle = TextStyle(fontSize: 14, color: AppColors.gray1, height: 1.5);
+
+/// 「平台審核」區：徽章文字是目錄的 `KYCStatus` 名詞；審核中顯示送出時間，已通過顯示核准時間。
+class _PlatformReviewSection extends StatelessWidget {
+  const _PlatformReviewSection({
+    required this.application,
+    required this.status,
+  });
+
+  final KYCApplication application;
+  final KYCStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.uiLocale;
+    final tone = kycStatusTone(status);
+    final stamp = kycStampOf(application, status);
+    return _SectionCard(
+      cardKey: const Key('kyc_platform_review'),
+      title: '平台審核',
+      children: [
+        HkStatusBadge(
+          label: status.uiText(l) ?? commonUnknown(l),
+          tone: tone ?? HkStatusTone.neutral,
+        ),
+        if (stamp != null) ...[
+          const SizedBox(height: HkSpace.sm),
+          Text(switch (stamp.kind) {
+            KycStampKind.decide => '核准時間：${stamp.time}',
+            KycStampKind.submit => '送出時間：${stamp.time}',
+          }, style: _bodyStyle),
+        ],
+      ],
+    );
+  }
+}
+
+/// 「收款帳戶」區：開通摘要說平台審核還沒完成之前是灰色的提示；完成之後徽章讀 `GetMyPaymentAccount` 的狀態，說明句與按鈕只讀開通摘要的
+/// 收款帳戶任務。摘要或收款帳戶讀不到時顯示錯誤與重新讀取，不當成「尚未開放」。不顯示金流商的待補條件細項（金流商自己的頁面會列出要補什麼）。
+class _PaymentAccountSection extends HookConsumerWidget {
+  const _PaymentAccountSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = context.uiLocale;
+    final actions = usePaymentAccountActions(context, ref);
+
+    Widget loadingCard() => const _SectionCard(
+      cardKey: Key('kyc_payment_account'),
+      title: '收款帳戶',
+      children: [Text('載入中…', style: _bodyStyle)],
+    );
+    Widget errorCard() => _SectionCard(
+      cardKey: const Key('kyc_payment_account'),
+      title: '收款帳戶',
+      children: [
+        Text(
+          ref.watch(defaultErrorTextProvider)(Code.internal),
+          style: _bodyStyle,
+        ),
+        const SizedBox(height: HkSpace.md),
+        OutlinedButton(
+          onPressed: () => unawaited(
+            ref.read(sellerStatusRefreshProvider.notifier).refresh(fresh: true),
+          ),
+          child: const HkButtonLabel('重新整理'),
+        ),
+      ],
+    );
+
+    final summary = ref.watch(currentOnboardingProvider);
+    if (summary == null || (summary.isLoading && !summary.hasValue)) {
+      return loadingCard();
+    }
+    if (!summary.hasValue) return errorCard();
+    if (!platformReviewCompleted(summary.requireValue)) {
+      return const _SectionCard(
+        cardKey: Key('kyc_payment_account'),
+        title: '收款帳戶',
+        children: [Text(paymentAccountNotYetOpenNotice, style: _bodyStyle)],
+      );
+    }
+
+    final read = ref.watch(currentPaymentAccountProvider);
+    if (read == null || (read.isLoading && !read.hasValue)) {
+      return loadingCard();
+    }
+    final account = read.hasValue ? read.requireValue : null;
+    final tone = account == null ? null : paymentAccountTone(account.status);
+    final badge = account?.status.uiText(l);
+    if (account == null || tone == null || badge == null) return errorCard();
+
+    final task = paymentAccountTask(summary.requireValue);
+    final sentence = task?.status.message ?? '';
+    final action = task?.action;
+    final label = action?.button(l);
+    final enabled =
+        account.status == PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED;
+    final fetched = account.hasFetchTime()
+        ? formatTaipeiTimestamp(account.fetchTime)
+        : null;
+    final Widget? button =
+        action == null ||
+            label == null ||
+            !paymentAccountActionHasButton(action)
+        ? null
+        : action == OnboardingAction.ONBOARDING_ACTION_CONTACT_SUPPORT
+        ? OutlinedButton(
+            onPressed: () => actions.run(action),
+            child: HkButtonLabel(label),
+          )
+        : FilledButton(
+            key: const Key('payment_account_onboard'),
+            onPressed: actions.busy ? null : () => actions.run(action),
+            child: HkButtonLabel(label),
+          );
+    return _SectionCard(
+      cardKey: const Key('kyc_payment_account'),
+      title: '收款帳戶',
+      children: [
+        HkStatusBadge(label: badge, tone: tone),
+        if (sentence.isNotEmpty) ...[
+          const SizedBox(height: HkSpace.sm),
+          Text(sentence, style: _bodyStyle),
+        ],
+        if (enabled && !account.payoutsActive) ...[
+          const SizedBox(height: HkSpace.xs),
+          Text(sellerPaymentAccountPayoutsInactiveNote(l), style: _bodyStyle),
+        ],
+        if (button != null) ...[const SizedBox(height: HkSpace.md), button],
+        if (fetched != null) ...[
+          const SizedBox(height: HkSpace.sm),
+          Text(
+            '上次更新 $fetched',
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}

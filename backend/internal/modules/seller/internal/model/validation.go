@@ -8,6 +8,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/emailaddr"
 	"github.com/Will413028/hawkr/backend/internal/platform/phone"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 	"github.com/Will413028/hawkr/backend/internal/platform/twaddr"
@@ -114,14 +115,13 @@ func Normalize(p *Profile) error {
 	return nil
 }
 
-// 店家聯絡欄位的長度上限就是 PayUni 的上限（代理商文件 §7.3：ContactName 20 字、MerEmail 50 字）：PayUni 是這些欄位唯一的去處，
-// 再接第二家金流商時重新評估（見 CARRYOVER）。
+// 店家聯絡欄位的長度上限：聯絡人姓名 50 字（rune），客服信箱 254（RFC 5321 的路徑上限，與 emailaddr 同一個值）。
 const (
-	ContactNameMaxRunes  = 20
-	SupportEmailMaxRunes = 50
+	ContactNameMaxRunes  = 50
+	SupportEmailMaxRunes = emailaddr.MaxLen
 )
 
-// normalizeContact 驗證並正規化送給 PayUni 的聯絡資料：聯絡人姓名至多 20 字、聯絡人手機是 09 開頭的 10 碼、客服信箱格式正確。
+// normalizeContact 驗證並正規化店家的聯絡資料：聯絡人姓名至多 50 字、聯絡人手機是 09 開頭的 10 碼、客服信箱格式正確（長度由 emailaddr 檢查）。
 func normalizeContact(p *Profile) error {
 	if p.ContactName != nil {
 		name := trimtext.Trim(*p.ContactName)
@@ -138,8 +138,8 @@ func normalizeContact(p *Profile) error {
 		p.ContactMobile = &mobile
 	}
 	if p.SupportEmail != nil {
-		email, ok := NormalizeEmail(*p.SupportEmail)
-		if !ok || utf8.RuneCountInString(email) > SupportEmailMaxRunes {
+		email, ok := emailaddr.Normalize(*p.SupportEmail)
+		if !ok {
 			return apperr.InvalidInputOn([]string{"SupportEmail"}, "客服電子信箱格式不正確，至多 %d 字", SupportEmailMaxRunes)
 		}
 		p.SupportEmail = &email

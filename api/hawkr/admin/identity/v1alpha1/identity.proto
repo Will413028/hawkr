@@ -42,8 +42,6 @@ message GetSessionRequest {}
 
 message GetSessionResponse {
   Admin admin = 1;
-  // 2 是刪掉的 expire_time（沒有讀取端）。
-  reserved 2;
 }
 
 // Admin 是管理員。
@@ -51,8 +49,6 @@ message Admin {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   // Access JWT 的 email，供後台顯示。
   string email = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-  reserved 3, 4;
-  reserved "name", "picture_uri";
 }
 
 message ListAccountsRequest {
@@ -88,12 +84,10 @@ message Account {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   // 最近一次登入時 provider 回報的已驗證 email（也是寄件地址）；沒有時是空字串（例如 LINE 沒有給 email）。
   string email = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 3 是刪掉的 phone（新帳號不驗證手機）。
-  reserved 3;
   // 另外申請的角色（目前只有 ROLE_SELLER）；每個帳號都是買家，不列出。
-  repeated hawkr.identity.v1alpha1.Role roles = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-  bool suspended = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
-  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated hawkr.identity.v1alpha1.Role roles = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool suspended = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message SignOutRequest {}

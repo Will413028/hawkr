@@ -7,15 +7,6 @@ import '../../../shared/widgets/hk_content_card.dart';
 import '../../../shared/widgets/hk_icon.dart';
 import '../../../shared/widgets/hk_page_section.dart';
 
-/// 資料已送到 PayUni 之後的鎖定說明。這時我們這邊誰都改不了，連客服代行也不行。
-///
-/// 與 website 的 PAYUNI_LOCKED_NOTICE 逐字相同，兩邊改動要一起改。
-const kPayuniLockedNotice = '資料已送至 PayUni，店名與商店介紹無法修改，如需變更請聯繫 PayUni';
-
-/// 送審確認畫面的提醒：鎖定發生在 PayUni 收下資料之後，送出前是賣家最後有選擇權的時點。與 website 的
-/// PAYUNI_LOCK_ON_SUBMIT_NOTICE 逐字相同，兩邊改動要一起改。身分欄位已鎖住（`identity_locked`）後不再顯示。
-const kPayuniLockOnSubmitNotice = '送出後商店名稱與商店介紹將無法修改，請先確認無誤';
-
 /// 設定頁基本資料區。保留原本 rows API，讓資料與儲存流程不受 UI 重做影響。
 class ProfileInfoSection extends StatelessWidget {
   const ProfileInfoSection({
@@ -65,7 +56,6 @@ class ProfileEditableInfoRow extends StatelessWidget {
     this.editable = true,
     this.maxLines = 1,
     this.showTrailingIcon = true,
-    this.lockedNotice,
     this.onTap,
   });
 
@@ -77,12 +67,6 @@ class ProfileEditableInfoRow extends StatelessWidget {
   final int maxLines;
   final bool showTrailingIcon;
 
-  /// 非 null 時在值下方顯示這行說明，**並且**讓整列不可點。
-  ///
-  /// 刻意綁在同一個參數上，而不是要呼叫端同時傳 `editable: false` 與說明文字：
-  /// 分成兩個參數就有「顯示了鎖定說明卻仍然點得進去」這種半對的狀態，而那正是
-  /// 賣家會回報成 bug 的樣子。
-  final String? lockedNotice;
   final VoidCallback? onTap;
 
   @override
@@ -91,7 +75,7 @@ class ProfileEditableInfoRow extends StatelessWidget {
         value ?? (controllers.isNotEmpty ? controllers.first.text.trim() : '');
     final isEmpty = rawValue.isEmpty;
     final displayValue = isEmpty ? (placeholder ?? '尚未設定') : rawValue;
-    final enabled = editable && lockedNotice == null && onTap != null;
+    final enabled = editable && onTap != null;
 
     return Semantics(
       button: enabled,
@@ -140,16 +124,6 @@ class ProfileEditableInfoRow extends StatelessWidget {
                         maxLines: maxLines,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (lockedNotice != null) ...[
-                        const SizedBox(height: HkSpace.xs),
-                        Text(
-                          lockedNotice!,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),

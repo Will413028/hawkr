@@ -32,9 +32,9 @@ type Identity interface {
 	LockAccount(context.Context, int64) error
 }
 
-// LinkedIdentities 是關聯帳號的身分反查（kyc 持有金鑰環，所以比對在 kyc）：與措施的身分快照相同、屬於 exceptAccountID 以外的帳號；accountID 不為 nil 時只看那個帳號。
+// LinkedIdentities 是關聯帳號的身分反查（kyc 持有金鑰環，所以比對在 kyc）：與措施在 at 的身分（快照加上帳號目前的 hash）相同、屬於 exceptAccountID 以外的帳號；accountID 不為 nil 時只看那個帳號。
 type LinkedIdentities interface {
-	LinkedAccountHits(ctx context.Context, q *store.Queries, measureID uuid.UUID, exceptAccountID int64, accountID *int64) ([]model.LinkedHit, error)
+	LinkedAccountHits(ctx context.Context, q *store.Queries, at time.Time, measureID uuid.UUID, exceptAccountID int64, accountID *int64) ([]model.LinkedHit, error)
 }
 
 // Deps 外部依賴；clock 由組裝點注入。Closing 是關店與恢復營業（撤銷終止合作時恢復它關閉的店家）。

@@ -17,7 +17,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/discovery/v1alpha1/discovery.proto.
  */
 export const file_hawkr_discovery_v1alpha1_discovery: GenFile = /*@__PURE__*/
-  fileDesc("CihoYXdrci9kaXNjb3ZlcnkvdjFhbHBoYTEvZGlzY292ZXJ5LnByb3RvEhhoYXdrci5kaXNjb3ZlcnkudjFhbHBoYTEiNwogU3VnZ2VzdFJlY29tbWVuZGVkU2VsbGVyc1JlcXVlc3QSEwoLbWF4X3Jlc3VsdHMYASABKAUiYQohU3VnZ2VzdFJlY29tbWVuZGVkU2VsbGVyc1Jlc3BvbnNlEjwKB3NlbGxlcnMYASADKAsyKy5oYXdrci5kaXNjb3ZlcnkudjFhbHBoYTEuUmVjb21tZW5kZWRTZWxsZXIingEKEVJlY29tbWVuZGVkU2VsbGVyEi8KBXN0b3JlGAEgASgLMiAuaGF3a3IuY29tbW9uLnYxYWxwaGExLlN0b3JlQ2FyZBIbCg5mb2xsb3dlcl9jb3VudBgEIAEoBUgAiAEBQhEKD19mb2xsb3dlcl9jb3VudEoECAIQA0oECAMQBFIMcmV2aWV3X2NvdW50Ug5yYXRpbmdfYXZlcmFnZTK0AQoWRGlzY292ZXJ5UHVibGljU2VydmljZRKZAQoZU3VnZ2VzdFJlY29tbWVuZGVkU2VsbGVycxI6Lmhhd2tyLmRpc2NvdmVyeS52MWFscGhhMS5TdWdnZXN0UmVjb21tZW5kZWRTZWxsZXJzUmVxdWVzdBo7Lmhhd2tyLmRpc2NvdmVyeS52MWFscGhhMS5TdWdnZXN0UmVjb21tZW5kZWRTZWxsZXJzUmVzcG9uc2UiA5ACAWIGcHJvdG8z", [file_hawkr_common_v1alpha1_store_card]);
+  fileDesc("CihoYXdrci9kaXNjb3ZlcnkvdjFhbHBoYTEvZGlzY292ZXJ5LnByb3RvEhhoYXdrci5kaXNjb3ZlcnkudjFhbHBoYTEiNwogU3VnZ2VzdFJlY29tbWVuZGVkU2VsbGVyc1JlcXVlc3QSEwoLbWF4X3Jlc3VsdHMYASABKAUiYQohU3VnZ2VzdFJlY29tbWVuZGVkU2VsbGVyc1Jlc3BvbnNlEjwKB3NlbGxlcnMYASADKAsyKy5oYXdrci5kaXNjb3ZlcnkudjFhbHBoYTEuUmVjb21tZW5kZWRTZWxsZXIidAoRUmVjb21tZW5kZWRTZWxsZXISLwoFc3RvcmUYASABKAsyIC5oYXdrci5jb21tb24udjFhbHBoYTEuU3RvcmVDYXJkEhsKDmZvbGxvd2VyX2NvdW50GAIgASgFSACIAQFCEQoPX2ZvbGxvd2VyX2NvdW50MrQBChZEaXNjb3ZlcnlQdWJsaWNTZXJ2aWNlEpkBChlTdWdnZXN0UmVjb21tZW5kZWRTZWxsZXJzEjouaGF3a3IuZGlzY292ZXJ5LnYxYWxwaGExLlN1Z2dlc3RSZWNvbW1lbmRlZFNlbGxlcnNSZXF1ZXN0GjsuaGF3a3IuZGlzY292ZXJ5LnYxYWxwaGExLlN1Z2dlc3RSZWNvbW1lbmRlZFNlbGxlcnNSZXNwb25zZSIDkAIBYgZwcm90bzM", [file_hawkr_common_v1alpha1_store_card]);
 
 /**
  * @generated from message hawkr.discovery.v1alpha1.SuggestRecommendedSellersRequest
@@ -69,9 +69,10 @@ export type RecommendedSeller = Message<"hawkr.discovery.v1alpha1.RecommendedSel
   store?: StoreCard | undefined;
 
   /**
+   * 評價數與平均評分由卡片提供（store.review_count、store.rating_average）；排名用的評價只留在快照內。
    * 粉絲數；0 是確實沒有粉絲，讀取失敗時不設。
    *
-   * @generated from field: optional int32 follower_count = 4;
+   * @generated from field: optional int32 follower_count = 2;
    */
   followerCount?: number | undefined;
 };
@@ -91,8 +92,8 @@ export const RecommendedSellerSchema: GenMessage<RecommendedSeller> = /*@__PURE_
 export const DiscoveryPublicService: GenService<{
   /**
    * SuggestRecommendedSellers 依推薦分數由高到低回傳前幾家可以公開曝光的店家：沒有分頁（排行只取前面幾筆），數量由
-   * max_results 決定。分數是排程每 15 分鐘重算的快照；曝光資格是 seller 的「可公開曝光」規則（營運中、沒有停權、身分認證與
-   * PayUni 審核通過、店名與 logo 與所在地齊全），每次讀取即時檢查，停權立刻生效。店家卡片上的評價統計（review_count、
+   * max_results 決定。分數是排程每 15 分鐘重算的快照；曝光資格是 seller 的「可公開曝光」規則（營運中、沒有停權、身分認證核准且
+   * 收款帳戶可收款、店名與 logo 與所在地齊全），每次讀取即時檢查，停權立刻生效。店家卡片上的評價統計（review_count、
    * rating_average）與其他清單上同一家店的卡片一致，是讀取時批次查詢評價的結果，不是排名用的快照；評價讀取失敗時卡片不設
    * 評價欄位。沒有任何合格的店家時回空清單；排行上的店家若此刻沒有營業中的卡片（資料不一致，或剛好在兩次讀取之間不再可
    * 曝光）會被略過，所以回傳的家數可能少於 max_results。粉絲數來自別的模組：讀取失敗時該欄位不設，不會是 0。

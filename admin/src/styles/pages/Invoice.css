@@ -423,27 +423,6 @@
 	word-break: break-all;
 }
 
-/*
- * JSON 原文（訂單快照、AMEGO 送件內容）。
- *
- * ⚠️ `overflow-x: auto` 是必要的：不讓長 JSON 把整個 document 撐到橫捲。
- */
-.invoice-pre {
-	max-height: 360px;
-	margin: 8px 0 0;
-	padding: 12px;
-	overflow: auto;
-	background: var(--admin-control);
-	border: 1px solid var(--admin-border);
-	border-radius: var(--admin-radius-control);
-	color: var(--admin-body);
-	font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-	font-size: 12px;
-	line-height: 1.6;
-	white-space: pre-wrap;
-	word-break: break-all;
-}
-
 .invoice-details > summary {
 	cursor: pointer;
 	color: var(--admin-body);

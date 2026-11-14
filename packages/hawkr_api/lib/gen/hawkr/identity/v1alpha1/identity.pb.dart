@@ -1222,12 +1222,12 @@ class GetSessionResponse extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.identity.v1alpha1'),
       createEmptyInstance: GetSessionResponse.$_createMessage)
-    ..aOM<Account>(2, _omitFieldNames ? '' : 'account',
+    ..aOM<Account>(1, _omitFieldNames ? '' : 'account',
         subBuilder: Account.$_createMessage)
-    ..aOM<Suspension>(3, _omitFieldNames ? '' : 'suspension',
+    ..aOM<Suspension>(2, _omitFieldNames ? '' : 'suspension',
         subBuilder: Suspension.$_createMessage)
-    ..aOS(4, _omitFieldNames ? '' : 'displayName')
-    ..aOM<$2.Image>(5, _omitFieldNames ? '' : 'avatar',
+    ..aOS(3, _omitFieldNames ? '' : 'displayName')
+    ..aOM<$2.Image>(4, _omitFieldNames ? '' : 'avatar',
         subBuilder: $2.Image.$_createMessage)
     ..hasRequiredFields = false;
 
@@ -1253,51 +1253,51 @@ class GetSessionResponse extends $pb.GeneratedMessage {
           GetSessionResponse.$_createMessage);
   static GetSessionResponse? _defaultInstance;
 
-  @$pb.TagNumber(2)
+  @$pb.TagNumber(1)
   Account get account => $_getN(0);
-  @$pb.TagNumber(2)
-  set account(Account value) => $_setField(2, value);
-  @$pb.TagNumber(2)
+  @$pb.TagNumber(1)
+  set account(Account value) => $_setField(1, value);
+  @$pb.TagNumber(1)
   $core.bool hasAccount() => $_has(0);
-  @$pb.TagNumber(2)
-  void clearAccount() => $_clearField(2);
-  @$pb.TagNumber(2)
+  @$pb.TagNumber(1)
+  void clearAccount() => $_clearField(1);
+  @$pb.TagNumber(1)
   Account ensureAccount() => $_ensure(0);
 
   /// 帳號被停權時的狀態；沒有停權時不設。停權的帳號仍能登入、讀取與刪除帳號，寫入回 permission_denied 與
   /// hawkr.common.v1alpha1.ErrorReason.ACCOUNT_SUSPENDED。
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   Suspension get suspension => $_getN(1);
-  @$pb.TagNumber(3)
-  set suspension(Suspension value) => $_setField(3, value);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
+  set suspension(Suspension value) => $_setField(2, value);
+  @$pb.TagNumber(2)
   $core.bool hasSuspension() => $_has(1);
-  @$pb.TagNumber(3)
-  void clearSuspension() => $_clearField(3);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
+  void clearSuspension() => $_clearField(2);
+  @$pb.TagNumber(2)
   Suspension ensureSuspension() => $_ensure(1);
 
   /// 買家的顯示名稱（頁首與帳號選單用），與 BuyerAppService 的 Profile.display_name 同一份。讀取買家資料失敗時不設；
   /// 登入狀態不受影響，client 不可把沒有這個欄位當成未登入。
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   $core.String get displayName => $_getSZ(2);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   set displayName($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   $core.bool hasDisplayName() => $_has(2);
-  @$pb.TagNumber(4)
-  void clearDisplayName() => $_clearField(4);
+  @$pb.TagNumber(3)
+  void clearDisplayName() => $_clearField(3);
 
   /// 買家的頭像，與 Profile.avatar 同一份。沒有頭像、或讀取買家資料失敗時不設。
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
   $2.Image get avatar => $_getN(3);
-  @$pb.TagNumber(5)
-  set avatar($2.Image value) => $_setField(5, value);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
+  set avatar($2.Image value) => $_setField(4, value);
+  @$pb.TagNumber(4)
   $core.bool hasAvatar() => $_has(3);
-  @$pb.TagNumber(5)
-  void clearAvatar() => $_clearField(5);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
+  void clearAvatar() => $_clearField(4);
+  @$pb.TagNumber(4)
   $2.Image ensureAvatar() => $_ensure(3);
 }
 
@@ -1466,6 +1466,311 @@ class DeleteAccountResponse extends $pb.GeneratedMessage {
   void clearState() => $_clearField(1);
 }
 
+/// ContactEmail 是帳號的聯絡信箱：賣家的收款帳戶聯絡人用它。
+class ContactEmail extends $pb.GeneratedMessage {
+  factory ContactEmail({
+    $core.String? email,
+    ContactEmailSource? source,
+  }) {
+    final result = ContactEmail._();
+    if (email != null) result.email = email;
+    if (source != null) result.source = source;
+    return result;
+  }
+
+  ContactEmail._();
+
+  factory ContactEmail.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ContactEmail()..mergeFromBuffer(data, registry);
+  factory ContactEmail.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ContactEmail()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ContactEmail',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.identity.v1alpha1'),
+      createEmptyInstance: ContactEmail.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'email')
+    ..aE<ContactEmailSource>(2, _omitFieldNames ? '' : 'source',
+        enumValues: ContactEmailSource.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ContactEmail clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ContactEmail copyWith(void Function(ContactEmail) updates) =>
+      super.copyWith((message) => updates(message as ContactEmail))
+          as ContactEmail;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ContactEmail() / ContactEmail.new instead')
+  static ContactEmail create() => ContactEmail._();
+  static $pb.GeneratedMessage $_createMessage() => ContactEmail._();
+  @$core.override
+  ContactEmail createEmptyInstance() => ContactEmail._();
+  @$core.pragma('dart2js:noInline')
+  static ContactEmail getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ContactEmail>(
+          ContactEmail.$_createMessage);
+  static ContactEmail? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get email => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set email($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEmail() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEmail() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  ContactEmailSource get source => $_getN(1);
+  @$pb.TagNumber(2)
+  set source(ContactEmailSource value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSource() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSource() => $_clearField(2);
+}
+
+class GetContactEmailRequest extends $pb.GeneratedMessage {
+  factory GetContactEmailRequest() => GetContactEmailRequest._();
+
+  GetContactEmailRequest._();
+
+  factory GetContactEmailRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetContactEmailRequest()..mergeFromBuffer(data, registry);
+  factory GetContactEmailRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetContactEmailRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetContactEmailRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.identity.v1alpha1'),
+      createEmptyInstance: GetContactEmailRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetContactEmailRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetContactEmailRequest copyWith(
+          void Function(GetContactEmailRequest) updates) =>
+      super.copyWith((message) => updates(message as GetContactEmailRequest))
+          as GetContactEmailRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetContactEmailRequest() / GetContactEmailRequest.new instead')
+  static GetContactEmailRequest create() => GetContactEmailRequest._();
+  static $pb.GeneratedMessage $_createMessage() => GetContactEmailRequest._();
+  @$core.override
+  GetContactEmailRequest createEmptyInstance() => GetContactEmailRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GetContactEmailRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetContactEmailRequest>(
+          GetContactEmailRequest.$_createMessage);
+  static GetContactEmailRequest? _defaultInstance;
+}
+
+class GetContactEmailResponse extends $pb.GeneratedMessage {
+  factory GetContactEmailResponse({
+    ContactEmail? contactEmail,
+  }) {
+    final result = GetContactEmailResponse._();
+    if (contactEmail != null) result.contactEmail = contactEmail;
+    return result;
+  }
+
+  GetContactEmailResponse._();
+
+  factory GetContactEmailResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetContactEmailResponse()..mergeFromBuffer(data, registry);
+  factory GetContactEmailResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetContactEmailResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetContactEmailResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.identity.v1alpha1'),
+      createEmptyInstance: GetContactEmailResponse.$_createMessage)
+    ..aOM<ContactEmail>(1, _omitFieldNames ? '' : 'contactEmail',
+        subBuilder: ContactEmail.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetContactEmailResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetContactEmailResponse copyWith(
+          void Function(GetContactEmailResponse) updates) =>
+      super.copyWith((message) => updates(message as GetContactEmailResponse))
+          as GetContactEmailResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetContactEmailResponse() / GetContactEmailResponse.new instead')
+  static GetContactEmailResponse create() => GetContactEmailResponse._();
+  static $pb.GeneratedMessage $_createMessage() => GetContactEmailResponse._();
+  @$core.override
+  GetContactEmailResponse createEmptyInstance() => GetContactEmailResponse._();
+  @$core.pragma('dart2js:noInline')
+  static GetContactEmailResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetContactEmailResponse>(
+          GetContactEmailResponse.$_createMessage);
+  static GetContactEmailResponse? _defaultInstance;
+
+  /// 帳號沒有任何聯絡信箱時不設。
+  @$pb.TagNumber(1)
+  ContactEmail get contactEmail => $_getN(0);
+  @$pb.TagNumber(1)
+  set contactEmail(ContactEmail value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasContactEmail() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearContactEmail() => $_clearField(1);
+  @$pb.TagNumber(1)
+  ContactEmail ensureContactEmail() => $_ensure(0);
+}
+
+class SetContactEmailRequest extends $pb.GeneratedMessage {
+  factory SetContactEmailRequest({
+    $core.String? email,
+  }) {
+    final result = SetContactEmailRequest._();
+    if (email != null) result.email = email;
+    return result;
+  }
+
+  SetContactEmailRequest._();
+
+  factory SetContactEmailRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetContactEmailRequest()..mergeFromBuffer(data, registry);
+  factory SetContactEmailRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetContactEmailRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SetContactEmailRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.identity.v1alpha1'),
+      createEmptyInstance: SetContactEmailRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'email')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetContactEmailRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetContactEmailRequest copyWith(
+          void Function(SetContactEmailRequest) updates) =>
+      super.copyWith((message) => updates(message as SetContactEmailRequest))
+          as SetContactEmailRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SetContactEmailRequest() / SetContactEmailRequest.new instead')
+  static SetContactEmailRequest create() => SetContactEmailRequest._();
+  static $pb.GeneratedMessage $_createMessage() => SetContactEmailRequest._();
+  @$core.override
+  SetContactEmailRequest createEmptyInstance() => SetContactEmailRequest._();
+  @$core.pragma('dart2js:noInline')
+  static SetContactEmailRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SetContactEmailRequest>(
+          SetContactEmailRequest.$_createMessage);
+  static SetContactEmailRequest? _defaultInstance;
+
+  /// 去前後空白、轉小寫後至多 254 字，格式為 local@domain，網域要有點。
+  @$pb.TagNumber(1)
+  $core.String get email => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set email($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEmail() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEmail() => $_clearField(1);
+}
+
+class SetContactEmailResponse extends $pb.GeneratedMessage {
+  factory SetContactEmailResponse({
+    ContactEmail? contactEmail,
+  }) {
+    final result = SetContactEmailResponse._();
+    if (contactEmail != null) result.contactEmail = contactEmail;
+    return result;
+  }
+
+  SetContactEmailResponse._();
+
+  factory SetContactEmailResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetContactEmailResponse()..mergeFromBuffer(data, registry);
+  factory SetContactEmailResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetContactEmailResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SetContactEmailResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.identity.v1alpha1'),
+      createEmptyInstance: SetContactEmailResponse.$_createMessage)
+    ..aOM<ContactEmail>(1, _omitFieldNames ? '' : 'contactEmail',
+        subBuilder: ContactEmail.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetContactEmailResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetContactEmailResponse copyWith(
+          void Function(SetContactEmailResponse) updates) =>
+      super.copyWith((message) => updates(message as SetContactEmailResponse))
+          as SetContactEmailResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SetContactEmailResponse() / SetContactEmailResponse.new instead')
+  static SetContactEmailResponse create() => SetContactEmailResponse._();
+  static $pb.GeneratedMessage $_createMessage() => SetContactEmailResponse._();
+  @$core.override
+  SetContactEmailResponse createEmptyInstance() => SetContactEmailResponse._();
+  @$core.pragma('dart2js:noInline')
+  static SetContactEmailResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SetContactEmailResponse>(
+          SetContactEmailResponse.$_createMessage);
+  static SetContactEmailResponse? _defaultInstance;
+
+  /// 設定之後的聯絡信箱（來源是 CONTACT_EMAIL_SOURCE_SELF_ENTERED）。
+  @$pb.TagNumber(1)
+  ContactEmail get contactEmail => $_getN(0);
+  @$pb.TagNumber(1)
+  set contactEmail(ContactEmail value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasContactEmail() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearContactEmail() => $_clearField(1);
+  @$pb.TagNumber(1)
+  ContactEmail ensureContactEmail() => $_ensure(0);
+}
+
 /// IdentityPublicService 是登入之前的方法：App 把原生 SDK 取得的 ID token 換成 session。兩個方法都是 POST，回應一律不可快取。
 /// 每個來源 IP 有額度，超過回 resource_exhausted（帶 RetryInfo）。
 class IdentityPublicServiceApi {
@@ -1545,6 +1850,20 @@ class IdentityAppServiceApi {
           $pb.ClientContext? ctx, DeleteAccountRequest request) =>
       _client.invoke<DeleteAccountResponse>(ctx, 'IdentityAppService',
           'DeleteAccount', request, DeleteAccountResponse());
+
+  /// GetContactEmail 回傳呼叫者的帳號聯絡信箱（正規化後的值）與來源：provider 驗證過、而且格式可用的 email 優先，沒有（含格式不合）
+  /// 才用 SetContactEmail 填的自填信箱。兩者都沒有可用的值時回應不帶 contact_email（賣家送出 KYC 申請前要先有，ErrorReason CONTACT_EMAIL_REQUIRED）。停權的帳號也能呼叫。
+  $async.Future<GetContactEmailResponse> getContactEmail(
+          $pb.ClientContext? ctx, GetContactEmailRequest request) =>
+      _client.invoke<GetContactEmailResponse>(ctx, 'IdentityAppService',
+          'GetContactEmail', request, GetContactEmailResponse());
+
+  /// SetContactEmail 設定呼叫者自填的聯絡信箱（未驗證，不是通知的寄件地址）。只在帳號沒有可用的 provider 驗證 email 時可設，
+  /// 有可用（格式正確）的驗證信箱時回 failed_precondition，什麼都不改；驗證信箱格式不合視為沒有，可以設；信箱格式不合回 invalid_argument 與欄位 email。以同一個值重送成功。
+  $async.Future<SetContactEmailResponse> setContactEmail(
+          $pb.ClientContext? ctx, SetContactEmailRequest request) =>
+      _client.invoke<SetContactEmailResponse>(ctx, 'IdentityAppService',
+          'SetContactEmail', request, SetContactEmailResponse());
 }
 
 const $core.bool _omitFieldNames =

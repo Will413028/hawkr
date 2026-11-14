@@ -1,5 +1,5 @@
 -- name: InsertAgreementAcceptance :exec
--- 每次同意事件寫一列（沒有 ON CONFLICT）：開店的 SELLER_TERMS 每家店一列（agreement_acceptances_seller_terms），KYC 的兩份帶
+-- 每次同意事件寫一列（沒有 ON CONFLICT）：開店的 SELLER_TERMS 每家店一列（agreement_acceptances_seller_terms），KYC 的隱私告知帶
 -- 那次送出的 SUBMIT 審核紀錄（agreement_acceptances_source_check：依種類綁定來源）。
 INSERT INTO seller.agreement_acceptances (store_id, kind, version, account_id, accepted_at, submission_review_id, client_ip, user_agent)
 VALUES (sqlc.arg(store_id), sqlc.arg(kind), sqlc.arg(version), sqlc.arg(account_id), sqlc.arg(accepted_at), sqlc.narg(submission_review_id),

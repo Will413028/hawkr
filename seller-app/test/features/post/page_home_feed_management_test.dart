@@ -207,7 +207,7 @@ void main() {
             id: '7',
             storeCode: 'FRESH88',
             publicListing: publicListingMissing([
-              SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+              SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
             ]),
           ),
         ),
@@ -226,7 +226,7 @@ void main() {
             id: '7',
             storeCode: 'FRESH88',
             publicListing: publicListingMissing([
-              SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+              SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
             ]),
           ),
         ),

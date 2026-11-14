@@ -75,12 +75,12 @@ class MyReport extends $pb.GeneratedMessage {
     ..aE<$2.PolicyCategory>(5, _omitFieldNames ? '' : 'category',
         enumValues: $2.PolicyCategory.values)
     ..aOS(6, _omitFieldNames ? '' : 'description')
-    ..aOS(8, _omitFieldNames ? '' : 'resolutionNote')
-    ..aOM<$0.Timestamp>(9, _omitFieldNames ? '' : 'createTime',
+    ..aOS(7, _omitFieldNames ? '' : 'resolutionNote')
+    ..aOM<$0.Timestamp>(8, _omitFieldNames ? '' : 'createTime',
         subBuilder: $0.Timestamp.$_createMessage)
-    ..aOM<$0.Timestamp>(10, _omitFieldNames ? '' : 'resolveTime',
+    ..aOM<$0.Timestamp>(9, _omitFieldNames ? '' : 'resolveTime',
         subBuilder: $0.Timestamp.$_createMessage)
-    ..aE<ReportOutcome>(11, _omitFieldNames ? '' : 'outcome',
+    ..aE<ReportOutcome>(10, _omitFieldNames ? '' : 'outcome',
         enumValues: ReportOutcome.values)
     ..hasRequiredFields = false;
 
@@ -162,47 +162,47 @@ class MyReport extends $pb.GeneratedMessage {
   void clearDescription() => $_clearField(6);
 
   /// 平台給檢舉人的結果說明；還沒有結果或結果沒有說明時是空字串。
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(7)
   $core.String get resolutionNote => $_getSZ(6);
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(7)
   set resolutionNote($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(7)
   $core.bool hasResolutionNote() => $_has(6);
-  @$pb.TagNumber(8)
-  void clearResolutionNote() => $_clearField(8);
+  @$pb.TagNumber(7)
+  void clearResolutionNote() => $_clearField(7);
 
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(8)
   $0.Timestamp get createTime => $_getN(7);
-  @$pb.TagNumber(9)
-  set createTime($0.Timestamp value) => $_setField(9, value);
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(8)
+  set createTime($0.Timestamp value) => $_setField(8, value);
+  @$pb.TagNumber(8)
   $core.bool hasCreateTime() => $_has(7);
-  @$pb.TagNumber(9)
-  void clearCreateTime() => $_clearField(9);
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(8)
+  void clearCreateTime() => $_clearField(8);
+  @$pb.TagNumber(8)
   $0.Timestamp ensureCreateTime() => $_ensure(7);
 
   /// 結果設定的時間；還沒有結果時不設。
-  @$pb.TagNumber(10)
+  @$pb.TagNumber(9)
   $0.Timestamp get resolveTime => $_getN(8);
-  @$pb.TagNumber(10)
-  set resolveTime($0.Timestamp value) => $_setField(10, value);
-  @$pb.TagNumber(10)
+  @$pb.TagNumber(9)
+  set resolveTime($0.Timestamp value) => $_setField(9, value);
+  @$pb.TagNumber(9)
   $core.bool hasResolveTime() => $_has(8);
-  @$pb.TagNumber(10)
-  void clearResolveTime() => $_clearField(10);
-  @$pb.TagNumber(10)
+  @$pb.TagNumber(9)
+  void clearResolveTime() => $_clearField(9);
+  @$pb.TagNumber(9)
   $0.Timestamp ensureResolveTime() => $_ensure(8);
 
   /// 結果；還沒有結果時是 UNSPECIFIED（處理中）。
-  @$pb.TagNumber(11)
+  @$pb.TagNumber(10)
   ReportOutcome get outcome => $_getN(9);
-  @$pb.TagNumber(11)
-  set outcome(ReportOutcome value) => $_setField(11, value);
-  @$pb.TagNumber(11)
+  @$pb.TagNumber(10)
+  set outcome(ReportOutcome value) => $_setField(10, value);
+  @$pb.TagNumber(10)
   $core.bool hasOutcome() => $_has(9);
-  @$pb.TagNumber(11)
-  void clearOutcome() => $_clearField(11);
+  @$pb.TagNumber(10)
+  void clearOutcome() => $_clearField(10);
 }
 
 class CreateReportRequest extends $pb.GeneratedMessage {

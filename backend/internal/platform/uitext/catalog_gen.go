@@ -162,6 +162,58 @@ func (t Text) CommonUnknown() string {
 	return "未知"
 }
 
+// PaymentPaymentAccountStatus 是 payment.PaymentAccountStatus 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentPaymentAccountStatus(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "NOT_CREATED":
+			return "Preparing", true
+		case "UNDER_REVIEW":
+			return "Under review", true
+		case "ACTION_REQUIRED":
+			return "Setup needed", true
+		case "ENABLED":
+			return "Active", true
+		case "DISABLED":
+			return "Unavailable", true
+		}
+	}
+	switch v {
+	case "NOT_CREATED":
+		return "準備中", true
+	case "UNDER_REVIEW":
+		return "審核中", true
+	case "ACTION_REQUIRED":
+		return "待設定", true
+	case "ENABLED":
+		return "已啟用", true
+	case "DISABLED":
+		return "無法啟用", true
+	}
+	return "", false
+}
+
+// PaymentRequirementCollection 是 payment.RequirementCollection 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentRequirementCollection(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PROVIDER":
+			return "Provider-hosted", true
+		case "PLATFORM":
+			return "Embedded on platform", true
+		}
+	}
+	switch v {
+	case "PROVIDER":
+		return "金流商收件（託管頁面）", true
+	case "PLATFORM":
+		return "平台收件（內嵌元件）", true
+	}
+	return "", false
+}
+
 // SellerContentKind 是 seller.ContentKind 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerContentKind(v string) (string, bool) {
@@ -176,40 +228,30 @@ func (t Text) SellerContentKind(v string) (string, bool) {
 	return "", false
 }
 
+// SellerKYCApplicationDecideTime 是 seller.KYCApplication.decide_time 的文案。
+func (t Text) SellerKYCApplicationDecideTime(time string) string {
+	if t.Locale() == EN {
+		return "Approved at: " + time
+	}
+	return "核准時間：" + time
+}
+
+// SellerKYCApplicationSubmitTime 是 seller.KYCApplication.submit_time 的文案。
+func (t Text) SellerKYCApplicationSubmitTime(time string) string {
+	if t.Locale() == EN {
+		return "Submitted at: " + time
+	}
+	return "送出時間：" + time
+}
+
 // SellerKYCField 是 seller.KYCField 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerKYCField(v string) (string, bool) {
 	switch v {
-	case "REAL_NAME":
-		return "真實姓名", true
-	case "BIRTH_DATE":
-		return "出生日期", true
-	case "ID_CARD_ISSUE_DATE":
-		return "發證日期", true
-	case "ID_CARD_ISSUE_TYPE":
-		return "發證類型", true
-	case "ID_CARD_ISSUE_LOCATION":
-		return "發證地點", true
-	case "ENGLISH_NAME":
-		return "英文姓名", true
-	case "BANK_NAME":
-		return "銀行名稱", true
-	case "BANK_CODE":
-		return "銀行代碼", true
-	case "BANK_ACCOUNT":
-		return "銀行帳號", true
 	case "PRODUCT_TYPE":
 		return "主要商品類型", true
 	case "WEBSITE_URL":
 		return "官方網站", true
-	case "ID_CARD_FRONT":
-		return "身分證正面照", true
-	case "ID_CARD_BACK":
-		return "身分證反面照", true
-	case "BANK_BOOK":
-		return "存摺封面", true
-	case "INDIVIDUAL_ID_CARD_NO":
-		return "身分證字號", true
 	case "BUSINESS_COMPANY_NAME":
 		return "公司名稱", true
 	case "BUSINESS_TAX_ID":
@@ -218,8 +260,6 @@ func (t Text) SellerKYCField(v string) (string, bool) {
 		return "設立日期", true
 	case "BUSINESS_COMPANY_PHONE":
 		return "公司電話", true
-	case "BUSINESS_REP_ID_CARD_NO":
-		return "負責人身分證字號", true
 	case "BUSINESS_COMPANY_DOCUMENTS":
 		return "補充文件", true
 	case "BUSINESS_COMPANY_ADDRESS":
@@ -228,159 +268,49 @@ func (t Text) SellerKYCField(v string) (string, bool) {
 	return "", false
 }
 
-// SellerKYCFlowStatus 是 seller.KYCFlowStatus 的文案。
+// SellerKYCStatus 是 seller.KYCStatus 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
-func (t Text) SellerKYCFlowStatus(v string) (string, bool) {
+func (t Text) SellerKYCStatus(v string) (string, bool) {
 	if t.staff {
 		switch v {
-		case "NOT_STARTED":
-			return "尚未申請", true
 		case "DRAFT":
 			return "填寫中", true
 		case "SUBMITTED":
 			return "待審核", true
-		case "REJECTED":
-			return "已退回", true
-		case "BINDING":
-			return "PayUni 綁定中", true
-		case "BIND_FAILED":
-			return "待重新綁定", true
-		case "FORWARDED":
-			return "PayUni 審核中", true
-		case "UNDER_REVIEW":
-			return "PayUni 審核中", true
-		case "PENDING_INFO":
-			return "PayUni 待補件", true
 		case "APPROVED":
 			return "已核准", true
-		case "PAYUNI_REJECTED":
-			return "PayUni 審核未通過", true
+		case "REJECTED":
+			return "已退回", true
+		case "CANCELLED":
+			return "已取消", true
 		}
 		return "", false
 	}
+	if t.Locale() == EN {
+		switch v {
+		case "DRAFT":
+			return "Draft", true
+		case "SUBMITTED":
+			return "Under review", true
+		case "APPROVED":
+			return "Approved", true
+		case "REJECTED":
+			return "Needs changes", true
+		case "CANCELLED":
+			return "Cancelled", true
+		}
+	}
 	switch v {
-	case "NOT_STARTED":
-		return "待認證", true
 	case "DRAFT":
-		return "填寫中", true
+		return "草稿", true
 	case "SUBMITTED":
-		return "平台審核中", true
-	case "REJECTED":
-		return "未通過", true
-	case "BINDING":
-		return "PayUni 審核中", true
-	case "BIND_FAILED":
-		return "PayUni 建檔失敗，處理中", true
-	case "FORWARDED":
-		return "PayUni 審核中", true
-	case "UNDER_REVIEW":
-		return "PayUni 審核中", true
-	case "PENDING_INFO":
-		return "需補件", true
+		return "審核中", true
 	case "APPROVED":
 		return "已通過", true
-	case "PAYUNI_REJECTED":
-		return "PayUni 審核未通過", true
-	}
-	return "", false
-}
-
-// SellerKYCFlowStatusAction 是 seller.KYCFlowStatus.action 的文案。
-// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
-func (t Text) SellerKYCFlowStatusAction(v string) (string, bool) {
-	switch v {
-	case "NOT_STARTED":
-		return "開始認證", true
-	case "DRAFT":
-		return "開始認證", true
-	case "SUBMITTED":
-		return "查看進度", true
 	case "REJECTED":
-		return "前往補件", true
-	case "BINDING":
-		return "查看進度", true
-	case "BIND_FAILED":
-		return "查看進度", true
-	case "FORWARDED":
-		return "查看進度", true
-	case "UNDER_REVIEW":
-		return "查看進度", true
-	case "PENDING_INFO":
-		return "前往補件", true
-	case "PAYUNI_REJECTED":
-		return "前往補件", true
-	}
-	return "", false
-}
-
-// SellerKYCFlowStatusBannerDescription 是 seller.KYCFlowStatus.banner_description 的文案。
-// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
-func (t Text) SellerKYCFlowStatusBannerDescription(v string) (string, bool) {
-	switch v {
-	case "NOT_STARTED":
-		return "完成認證後才能正式收款、提領與配送設定。", true
-	case "DRAFT":
-		return "完成認證後才能正式收款、提領與配送設定。", true
-	case "SUBMITTED":
-		return "審核通過後將自動送出至 PayUni 進行金流審核。", true
-	case "REJECTED":
-		return "請查看退件原因並編輯後重新送出。", true
-	case "APPROVED":
-		return "可開始正式收款、提領與配送設定。", true
-	}
-	return "", false
-}
-
-// SellerKYCFlowStatusBannerTitle 是 seller.KYCFlowStatus.banner_title 的文案。
-// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
-func (t Text) SellerKYCFlowStatusBannerTitle(v string) (string, bool) {
-	switch v {
-	case "NOT_STARTED":
-		return "尚未開始商家認證", true
-	case "DRAFT":
-		return "尚未開始商家認證", true
-	case "SUBMITTED":
-		return "平台審核中", true
-	case "REJECTED":
-		return "認證未通過", true
-	case "APPROVED":
-		return "商家認證已通過", true
-	}
-	return "", false
-}
-
-// SellerKYCFlowStatusGateHeading 是 seller.KYCFlowStatus.gate_heading 的文案。
-// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
-func (t Text) SellerKYCFlowStatusGateHeading(v string) (string, bool) {
-	switch v {
-	case "NOT_STARTED":
-		return "尚未通過商家認證", true
-	case "DRAFT":
-		return "尚未通過商家認證", true
-	case "SUBMITTED":
-		return "商家認證審核中", true
-	case "REJECTED":
-		return "商家認證需要補件", true
-	case "APPROVED":
-		return "尚未通過商家認證", true
-	}
-	return "", false
-}
-
-// SellerKYCFlowStatusGateMessage 是 seller.KYCFlowStatus.gate_message 的文案。
-// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
-func (t Text) SellerKYCFlowStatusGateMessage(v string, subject string) (string, bool) {
-	switch v {
-	case "NOT_STARTED":
-		return "請先完成商家認證，才能" + subject + "。", true
-	case "DRAFT":
-		return "請先完成商家認證，才能" + subject + "。", true
-	case "SUBMITTED":
-		return "你的商家認證平台審核中，通過後將自動送出至 PayUni 進行金流審核，完成後就能" + subject + "。", true
-	case "REJECTED":
-		return "認證未通過，請修改資料後重新送審。", true
-	case "APPROVED":
-		return "請先完成商家認證，才能" + subject + "。", true
+		return "需修改", true
+	case "CANCELLED":
+		return "已取消", true
 	}
 	return "", false
 }
@@ -689,28 +619,112 @@ func (t Text) SellerMeasureState(v string, kind string) (string, bool) {
 	return "", false
 }
 
-// SellerPayUniState 是 seller.PayUniState 的文案。
+// SellerOnboardingActionButton 是 seller.OnboardingAction.button 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
-func (t Text) SellerPayUniState(v string) (string, bool) {
+func (t Text) SellerOnboardingActionButton(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "EDIT_PROFILE":
+			return "Go to settings", true
+		case "SUBMIT_CERTIFICATION":
+			return "Go to seller verification", true
+		case "START_PAYMENT_ONBOARDING":
+			return "Go to payout account setup", true
+		case "CONTACT_SUPPORT":
+			return "Contact support", true
+		}
+	}
 	switch v {
-	case "REVIEWING":
-		return "PayUni 審核中", true
-	case "PENDING_INFO":
-		return "PayUni 需要補件", true
-	case "FIXABLE":
-		return "PayUni 需要補件", true
-	case "FIX_VIA_SUPPORT":
-		return "PayUni 需要補件", true
+	case "EDIT_PROFILE":
+		return "去設定", true
+	case "SUBMIT_CERTIFICATION":
+		return "前往商家認證", true
+	case "START_PAYMENT_ONBOARDING":
+		return "前往設定收款帳戶", true
 	case "CONTACT_SUPPORT":
-		return "PayUni 申請未通過", true
-	case "RETRY_LATER":
-		return "PayUni 暫時無法處理", true
-	case "TERMINATED":
-		return "PayUni 收款帳戶已終止", true
-	case "APPROVED":
-		return "PayUni 收款已啟用", true
+		return "聯絡客服", true
 	}
 	return "", false
+}
+
+// SellerOnboardingTaskIdDescription 是 seller.OnboardingTaskId.description 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerOnboardingTaskIdDescription(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PROFILE":
+			return "Store name, logo and location.", true
+		case "PLATFORM_REVIEW":
+			return "Platform review of your business details and tax ID.", true
+		case "PAYMENT_ACCOUNT":
+			return "Set up your identity and bank details with the payment provider.", true
+		}
+	}
+	switch v {
+	case "PROFILE":
+		return "店名、logo 與所在地。", true
+	case "PLATFORM_REVIEW":
+		return "商家資料與統編的平台審核。", true
+	case "PAYMENT_ACCOUNT":
+		return "向金流商設定身分與銀行資料。", true
+	}
+	return "", false
+}
+
+// SellerOnboardingTaskIdPanelDescription 是 seller.OnboardingTaskId.panel_description 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerOnboardingTaskIdPanelDescription(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PROFILE":
+			return "To be found by buyers, your store needs a name, a logo and a location.", true
+		case "PLATFORM_REVIEW":
+			return "Once the platform review is approved, your store can go public and you can set up a payout account.", true
+		case "PAYMENT_ACCOUNT":
+			return "Your identity and bank details are collected by the payment provider, not the platform; you can only receive payments once the payout account is enabled.", true
+		}
+	}
+	switch v {
+	case "PROFILE":
+		return "買家要看得到你的店，需要有店名、logo 與所在地。", true
+	case "PLATFORM_REVIEW":
+		return "平台審核通過後，店面才能公開，並開放設定收款帳戶。", true
+	case "PAYMENT_ACCOUNT":
+		return "身分與銀行資料由金流商收集，平台不經手；收款帳戶啟用後才能正式收款。", true
+	}
+	return "", false
+}
+
+// SellerOnboardingTaskIdPanelTitle 是 seller.OnboardingTaskId.panel_title 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerOnboardingTaskIdPanelTitle(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PROFILE":
+			return "Complete your store profile", true
+		case "PLATFORM_REVIEW":
+			return "Complete the platform review", true
+		case "PAYMENT_ACCOUNT":
+			return "Set up your payout account", true
+		}
+	}
+	switch v {
+	case "PROFILE":
+		return "完成商店資料", true
+	case "PLATFORM_REVIEW":
+		return "完成平台審核", true
+	case "PAYMENT_ACCOUNT":
+		return "設定收款帳戶", true
+	}
+	return "", false
+}
+
+// SellerPaymentAccountPayoutsInactiveNote 是 seller.PaymentAccount.payouts_inactive_note 的文案。
+func (t Text) SellerPaymentAccountPayoutsInactiveNote() string {
+	if t.Locale() == EN {
+		return "Payouts to your bank account are not enabled yet. The payment provider may ask you for more information."
+	}
+	return "撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。"
 }
 
 // SellerRevokeReason 是 seller.RevokeReason 的文案。
@@ -757,26 +771,22 @@ func (t Text) SellerRiskGround(v string) (string, bool) {
 	return "", false
 }
 
-// SellerSellerPayUniFixFieldsHeading 是 seller.SellerPayUni.fix_fields_heading 的文案。
-func (t Text) SellerSellerPayUniFixFieldsHeading() string {
-	return "請修正以下資料"
-}
-
-// SellerSellerPayUniReasonHeading 是 seller.SellerPayUni.reason_heading 的文案。
-func (t Text) SellerSellerPayUniReasonHeading() string {
-	return "PayUni 的審核意見"
-}
-
 // SellerSellerRequirement 是 seller.SellerRequirement 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerSellerRequirement(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "ONBOARDING_COMPLETE":
+			return "Platform review and payout account both completed", true
+		}
+	}
 	switch v {
 	case "STORE_ACTIVE":
 		return "店家未關閉", true
 	case "NOT_SUSPENDED":
 		return "帳號未停權", true
-	case "KYC_APPROVED":
-		return "商家認證已通過", true
+	case "ONBOARDING_COMPLETE":
+		return "平台審核與收款帳戶都完成", true
 	case "STORE_NAME":
 		return "店名", true
 	case "LOGO":

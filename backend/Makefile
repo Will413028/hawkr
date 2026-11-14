@@ -166,7 +166,7 @@ lint-fix-all:
 # Catches: a migration .sql file added/edited without re-running `atlas migrate hash`
 # — passes `go build`/`go test` silently but fails when `hawkr migrate` applies it.
 atlas-validate-all:
-	@for hcl in internal/modules/*/db/atlas.hcl $(addsuffix /db/atlas.hcl,$(ATLAS_SERVICES)); do \
+	@for hcl in internal/modules/*/db/atlas.hcl internal/platform/*/db/atlas.hcl $(addsuffix /db/atlas.hcl,$(ATLAS_SERVICES)); do \
 		dir=$$(dirname $$hcl); \
 		echo "=== Validating $$dir migrations ==="; \
 		(cd $$dir && atlas migrate validate --dir "file://migrations") || exit 1; \
@@ -240,27 +240,18 @@ LEGACY_GRPC_ADDR = :9941
 RABBITMQ_URL = amqp://guest:guest@localhost:5672/
 # 瀏覽器直接呼叫單體的 origin（website 的 next dev）。admin 的瀏覽器只打自己的 BFF，由 BFF 以伺服器身分呼叫，不在這裡
 CORS_ALLOWED_ORIGINS = http://localhost:3000
-# KYC 個資的金鑰（身分證號、銀行帳號的加密，與身分比對用的 HMAC；只給本機開發用，兩者必須不同，格式 id:base64，詳見
-# cmd/hawkr/seller.go 的 readKYCKeys）。正式環境放部署設定，不進版控。
-KYC_ENCRYPTION_KEYS ?= dev1:ZGV2LW9ubHkta3ljLWVuY3J5cHRpb24ta2V5LTAwMDE=
+# 統編比對用的 HMAC 金鑰（只給本機開發用，格式 id:base64，詳見 cmd/hawkr/seller.go 的 readKYCHashKeys）。正式環境放部署設定，不進版控。
 KYC_HASH_KEYS ?= dev1:ZGV2LW9ubHkta3ljLWhhc2gtaG1hYy1rZXktMDAwMDE=
-# PayUni 代理商 API（子商店的綁定、同步與狀態查詢）：本機不設定，所以核准後的綁定會記為 PAYUNI_NOT_CONFIGURED（沒有 sandbox 金鑰，
-# 也沒有預設網址）。要連 sandbox 時在指令列給，例如 make worker PAYUNI_BASE_URL=… PAYUNI_AGENT_ID=… PAYUNI_HASH_KEY=…
-# PAYUNI_HASH_IV=…（四個一起設定，詳見 cmd/hawkr/seller.go 的 readPayUni）。
-PAYUNI_BASE_URL ?=
-PAYUNI_AGENT_ID ?=
-PAYUNI_HASH_KEY ?=
-PAYUNI_HASH_IV ?=
-PAYUNI_STOREFRONT_BASE_URL ?=
+# 收款開通的 provider（詳見 cmd/hawkr/seller.go 的 readPayment）：本機用 fake（記憶體內，所有帳戶都回轉帳能力已啟用），空字串表示沒有設定。
+PAYMENT_PROVIDER ?= fake
 # 本機開發的 dev token 的金鑰（make dev-key 產生，不進版控）。與 Access 正式設定互斥。
 DEV_AUTH_KEY_FILE ?= $(CURDIR)/.dev/dev-auth.pem
 MONOLITH_ENV = GOWORK=off DATABASE_URL='$(DATABASE_URL)' MEDIA_SERVICE_ADDR='$(MEDIA_SERVICE_ADDR)' MEDIA_ORIGIN='$(MEDIA_ORIGIN)' PUBLIC_WEB_ORIGIN='$(PUBLIC_WEB_ORIGIN)' \
 	GATEWAY_URL='$(GATEWAY_URL)' \
 	CORS_ALLOWED_ORIGINS='$(CORS_ALLOWED_ORIGINS)' \
 	DEV_AUTH_KEY_FILE='$(DEV_AUTH_KEY_FILE)' LEGACY_GRPC_ADDR='$(LEGACY_GRPC_ADDR)' \
-	KYC_ENCRYPTION_KEYS='$(KYC_ENCRYPTION_KEYS)' KYC_HASH_KEYS='$(KYC_HASH_KEYS)' \
-	PAYUNI_BASE_URL='$(PAYUNI_BASE_URL)' PAYUNI_AGENT_ID='$(PAYUNI_AGENT_ID)' PAYUNI_HASH_KEY='$(PAYUNI_HASH_KEY)' \
-	PAYUNI_HASH_IV='$(PAYUNI_HASH_IV)' PAYUNI_STOREFRONT_BASE_URL='$(PAYUNI_STOREFRONT_BASE_URL)' \
+	KYC_HASH_KEYS='$(KYC_HASH_KEYS)' \
+	PAYMENT_PROVIDER='$(PAYMENT_PROVIDER)' \
 	RABBITMQ_URL='$(RABBITMQ_URL)' \
 	PRODUCT_SERVICE_ADDR='$(PRODUCT_SERVICE_ADDR)' ORDER_SERVICE_ADDR='$(ORDER_SERVICE_ADDR)' CRM_SERVICE_ADDR='$(CRM_SERVICE_ADDR)' \
 	REVIEW_SERVICE_ADDR='$(REVIEW_SERVICE_ADDR)'

@@ -2,8 +2,7 @@ import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 
 import 'store_form.dart';
 
-/// 認證頁編輯、寫進店家（`UpdateMyStore`）的資料：聯絡人姓名、聯絡人手機、客服電子信箱與店家地址。PayUni 綁定與同步都
-/// 讀店家的值，KYC 申請上沒有它們的副本。
+/// 認證頁編輯、寫進店家（`UpdateMyStore`）的資料：聯絡人姓名、聯絡人手機、客服電子信箱與店家地址。KYC 申請上沒有它們的副本。
 final class StoreContactDraft {
   const StoreContactDraft({
     this.contactName = '',

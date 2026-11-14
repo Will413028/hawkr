@@ -10,11 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
@@ -82,11 +84,12 @@ func TestLoggedInProductViewSucceedsWithoutProductServiceAndIsRolledUpLater(t *t
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	accounts := identity.New(identity.Deps{DB: d, Events: bus, Now: clock, Logger: logger})
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger})
-	kycKeys, kycMAC := sealtest.Keys(t)
+	kycMAC := sealtest.MAC(t)
 	products := &productStoresStub{err: errors.New("product service down")}
 	sellers := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: accounts, Media: noMedia{}, Orders: noOrders{}, ProductStores: products, Registry: noRegistry{},
-		KYCKeys: kycKeys, KYCMAC: kycMAC, Now: clock, Logger: logger,
+		KYCMAC: kycMAC, Now: clock, Logger: logger,
+		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: clock, Logger: logger}),
 	})
 	subscribeSellerViews(bus, sellers)
 

@@ -1,4 +1,4 @@
-h1:VRI+rFHO3SVtLn0qApAG2UN7/olAYvYgSsWnq4EP08c=
+h1:zYC6CcIkEmgxBGVsA6sMe0gOy+lbDlQb0mo/nIczLUg=
 20261001160141_seller_core.sql h1:hVkQ8Wo6S5BLgzr4nFSGS/1EZpRX9mHqRwpxmIP3Yeg=
 20261002120004_seller_governance.sql h1:Dj/zGg4clK5U8YBsKn+TWnE5ZizigjU9/s7EXXHuc+g=
 20261002133159_seller_kyc.sql h1:QiN6KkqvCU/lwdw0B66YQniBEGnAhojvTYHQJ8lOqlc=
@@ -62,3 +62,6 @@ h1:VRI+rFHO3SVtLn0qApAG2UN7/olAYvYgSsWnq4EP08c=
 20261029112449_seller_content_takedown.sql h1:HNF+ykOB1RahqKs02sHLl7qFr0oMleBMaaLaekqLm6M=
 20261029112501_seller_pub_content_takedowns.sql h1:LrOn0oiVdE4pXo5ABwqly6adEAxlXecitGhVn/vrffE=
 20261030090000_seller_account_identity_hashes.sql h1:O8GPikvLoQEd0TZBJmy5nlN/JvaoG3k1zJM/sHeJXxE=
+20261114054941_seller_payment_onboarding_drop_objects.sql h1:tdcuz6nZMwuAOzOqJppjsGH28sJZSbqsku8TRmc6/S0=
+20261114055147_seller_payment_onboarding_schema.sql h1:+ubUNRNftR8iTwFYQQqf7RXXGNdrBIeXEx0BJR9kiQ0=
+20261114055304_seller_payment_onboarding_objects.sql h1:OwQlxV1NGJtbdW9AObe/26TORKlBrS5j5mKgVDP9zLg=

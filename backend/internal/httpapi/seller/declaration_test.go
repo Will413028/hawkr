@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"maps"
+	"net/http"
 	"slices"
 	"strings"
 	"testing"
@@ -85,6 +86,9 @@ type fakeRequest struct {
 }
 
 func (r fakeRequest) Spec() connect.Spec { return connect.Spec{Procedure: r.procedure} }
+
+// Header 回空的 header：interceptor 讀 Accept-Language 協商語系。
+func (r fakeRequest) Header() http.Header { return http.Header{} }
 
 func accountContext(id int64) context.Context {
 	return rpc.WithPrincipal(context.Background(), identity.Principal{Kind: identity.PrincipalAccount, ID: id})

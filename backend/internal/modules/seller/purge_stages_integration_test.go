@@ -10,9 +10,9 @@ import (
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// 關店後的兩段清理（ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-20 修訂）：
+// 關店後的兩段清理（ADR 2026-11-13-seller-platform-review-and-identity-matching「關店與個資保留」）：
 // 第一段（退場）在關店後 StoreRetireAfter（30 天）：說明、獎項、網站、logo 與封面清掉，發 StoreRetired（relay 轉成 seller.deleted，下游刪除），
-// 店名、聯絡、地址、KYC 與 PayUni 留著；第二段在關店後 StoreRetention（184 天）清註冊、身分與連線資料。兩段的邊界都是「嚴格晚於」。
+// 店名、聯絡、地址與 KYC 留著；第二段在關店後 StoreRetention（184 天）清註冊、身分與連線資料。兩段的邊界都是「嚴格晚於」。
 // mutation：RetireStores 多清 store_name 或 contact_*（或 StoreRetireAfter 改成 4416 小時）→ 第一段的斷言失敗；
 // 第二段的 hours 改傳 StoreRetireAfterHours → 31 天就清個資，斷言失敗。
 func TestRetirementAtThirtyDaysAndPersonalDataPurgeAtOneHundredEightyFourDays(t *testing.T) {
@@ -20,8 +20,10 @@ func TestRetirementAtThirtyDaysAndPersonalDataPurgeAtOneHundredEightyFourDays(t 
 	f := setup(t)
 	ctx := context.Background()
 	accountID, s := f.exposable(t)
-	// 公開內容直接寫進 fixture（PayUni 已收下店名與介紹，UpdateProfile 會鎖住它們）。
+	// 公開內容直接寫進 fixture。
 	_, err := f.db.Conn(ctx).Exec(ctx, `UPDATE seller.stores SET description='自家種的蔬果', prize='優良農民', website_url='https://farm.example.invalid' WHERE store_id=$1`, s.StoreID)
+	must(t, err)
+	_, err = f.db.Conn(ctx).Exec(ctx, `UPDATE seller.kyc_applications SET website_url='https://farm.example.invalid' WHERE store_id=$1`, s.StoreID)
 	must(t, err)
 	retired := record[StoreRetired](f)
 	_, err = f.module.CloseCurrent(ctx, accountID)
@@ -49,7 +51,7 @@ func TestRetirementAtThirtyDaysAndPersonalDataPurgeAtOneHundredEightyFourDays(t 
 			t.Errorf("退場不清註冊資料 %s", c)
 		}
 	}
-	if f.row(t, "kyc_applications", "store_id", s.StoreID)["real_name"] == nil {
+	if f.row(t, "kyc_applications", "store_id", s.StoreID)["website_url"] == nil {
 		t.Error("退場不清 KYC")
 	}
 	if events := retired.all(); len(events) != 1 || events[0].StoreID != s.StoreID || !events[0].OccurredAt.Equal(f.now) {
@@ -70,7 +72,7 @@ func TestRetirementAtThirtyDaysAndPersonalDataPurgeAtOneHundredEightyFourDays(t 
 			t.Errorf("第二段要清掉 %s", c)
 		}
 	}
-	if f.row(t, "kyc_applications", "store_id", s.StoreID)["real_name"] != nil {
+	if f.row(t, "kyc_applications", "store_id", s.StoreID)["website_url"] != nil {
 		t.Error("第二段要清 KYC")
 	}
 	if len(retired.all()) != 1 {

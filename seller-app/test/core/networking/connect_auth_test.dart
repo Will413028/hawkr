@@ -17,6 +17,8 @@ import 'package:hawkr_seller/core/networking/connect_provider.dart';
 import 'package:hawkr_seller/core/session/auth_session_provider.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
+import 'package:hawkr_seller/core/l10n/ui_locale.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/fake_auth_session.dart';
@@ -84,6 +86,7 @@ _call({required String valid}) async {
       })
       .build(
         interceptors: connectInterceptors(
+          acceptLanguage: () => 'zh-TW',
           auth: container.read(_authInterceptor),
         ),
       );
@@ -98,6 +101,35 @@ _call({required String valid}) async {
 }
 
 void main() {
+  test('實際 provider 接線：Connect 請求帶 App 目前的 UI 語系，單一值', () async {
+    if (!F.isInitialized) F.init(Flavor.dev);
+    Future<String?> sent(UiLocale locale) async {
+      String? header;
+      final c = ProviderContainer(
+        overrides: [
+          uiLocaleProvider.overrideWithValue(locale),
+          connectHttpClientProvider.overrideWithValue((request) async {
+            header = request.header['accept-language'];
+            return HttpResponse(
+              200,
+              Headers()..['content-type'] = 'application/json',
+              Stream.value(Uint8List.fromList(utf8.encode('{}'))),
+              Headers(),
+            );
+          }),
+        ],
+      );
+      addTearDown(c.dispose);
+      await ContentPublicServiceClient(
+        c.read(connectTransportProvider),
+      ).checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0'));
+      return header;
+    }
+
+    expect(await sent(UiLocale.zhTW), 'zh-TW');
+    expect(await sent(UiLocale.en), 'en');
+  });
+
   test('實際 provider 接線：SELLER_SUSPENDED 轉成停權訊號，其他 reason 不轉', () async {
     if (!F.isInitialized) F.init(Flavor.dev);
     Future<(int, Object?)> call(String reason) async {

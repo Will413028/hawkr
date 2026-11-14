@@ -174,8 +174,8 @@ func sellerInfo(s seller.Store, rating float64) (*pb.SellerInfo, error) {
 }
 
 // sellerMeta 逐欄位建立 SellerMeta（舊契約的欄位全部填）：can_accept_orders 是 Exposable（結帳閘），can_manage_products 是店家
-// 的 CapProductManage（上架閘，營運中且沒有停權，不要求 KYC 或 PayUni 核准）；payuni_mer_id 由 store_code 組成（與舊 server 相同，
-// 不看註冊有沒有成立）；has_public_card 是 seller.HasPublicCard 的結果（曾經公開過或此刻可曝光，StoreCards 的可見性規則）。
+// 的 CapProductManage（上架閘，營運中且沒有停權，不要求 KYC 或收款帳戶）；舊契約的 payuni_mer_id 與物流的 mer_id 一律空字串（單體不產生商店
+// 代號）；has_public_card 是 seller.HasPublicCard 的結果（曾經公開過或此刻可曝光，StoreCards 的可見性規則）。
 func sellerMeta(e seller.StoreExposure) *pb.SellerMeta {
 	s := e.Store
 	cityName, district, postal := location(s.TownCode)
@@ -184,7 +184,6 @@ func sellerMeta(e seller.StoreExposure) *pb.SellerMeta {
 		SellerName:        s.StoreName,
 		LogoKey:           deref(s.LogoKey),
 		ZipCode:           postal,
-		PayuniMerId:       seller.FormatPayUniMerID(s.StoreCode),
 		CanAcceptOrders:   e.Exposable,
 		CanManageProducts: s.Can(seller.CapProductManage),
 		HasPublicCard:     e.HasPublicCard,
@@ -425,8 +424,12 @@ func (s *Server) GetSellerShippingProfile(ctx context.Context, req *connect.Requ
 		}
 		return connect.NewResponse(&pb.GetSellerShippingProfileResponse{Code: code, Message: msg}), nil
 	}
+	return connect.NewResponse(&pb.GetSellerShippingProfileResponse{Data: shippingProfile(st)}), nil
+}
+
+func shippingProfile(st seller.Store) *pb.SellerShippingProfile {
 	cityName, district, postal := location(st.TownCode)
-	return connect.NewResponse(&pb.GetSellerShippingProfileResponse{Data: &pb.SellerShippingProfile{
+	return &pb.SellerShippingProfile{
 		StoreId:       format(st.StoreID),
 		SenderName:    st.StoreName,
 		SenderPhone:   deref(st.ContactPhone),
@@ -434,9 +437,8 @@ func (s *Server) GetSellerShippingProfile(ctx context.Context, req *connect.Requ
 		District:      district,
 		AddressDetail: deref(st.AddressDetail),
 		ZipCode:       postal,
-		MerId:         seller.FormatPayUniMerID(st.StoreCode),
 		ContactEmail:  deref(st.SupportEmail),
-	}}), nil
+	}
 }
 
 func (s *Server) MatchCertificateHolder(ctx context.Context, req *connect.Request[pb.MatchCertificateHolderRequest]) (*connect.Response[pb.MatchCertificateHolderResponse], error) {

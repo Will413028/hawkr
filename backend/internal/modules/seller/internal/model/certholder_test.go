@@ -64,27 +64,22 @@ func TestMatch(t *testing.T) {
 	cases := []struct {
 		name             string
 		holder           string
-		realName         string
 		companyName      string
 		wantMatched      bool
 		wantField        CertHolderField
 		wantHasReference bool
 	}{
 		{
-			name: "完全相同（real_name）", holder: "陳大明", realName: "陳大明",
-			wantMatched: true, wantField: CertHolderRealName, wantHasReference: true,
-		},
-		{
-			name: "完全相同（company_name）", holder: "範例生鮮嚴選", companyName: "範例生鮮嚴選",
+			name: "完全相同", holder: "範例生鮮嚴選", companyName: "範例生鮮嚴選",
 			wantMatched: true, wantField: CertHolderCompanyName, wantHasReference: true,
 		},
 		{
-			name: "只差半形空白", holder: "陳 大 明", realName: "陳大明",
-			wantMatched: true, wantField: CertHolderRealName, wantHasReference: true,
+			name: "只差半形空白", holder: "範例 生鮮 嚴選", companyName: "範例生鮮嚴選",
+			wantMatched: true, wantField: CertHolderCompanyName, wantHasReference: true,
 		},
 		{
-			name: "只差全形空白", holder: "陳　大明", realName: "陳大明",
-			wantMatched: true, wantField: CertHolderRealName, wantHasReference: true,
+			name: "只差全形空白", holder: "範例　生鮮嚴選", companyName: "範例生鮮嚴選",
+			wantMatched: true, wantField: CertHolderCompanyName, wantHasReference: true,
 		},
 		{
 			name: "只差全半形英數", holder: "ＡｃｍｅＲｏａｄ２", companyName: "AcmeRoad2",
@@ -106,80 +101,64 @@ func TestMatch(t *testing.T) {
 			// 2026-08-27 實測：真實存在的有機編號 1-009-300022 持有人是 Acme Road LLC，
 			// 被填到別的賣家的文旦禮盒上而自動核准。這一列就是那個缺口。
 			name:   "真實案例 1-009-300022：他人證書不得相符",
-			holder: "Acme Road LLC", realName: "陳大明", companyName: "範例生鮮優選有限公司",
+			holder: "Acme Road LLC", companyName: "範例生鮮優選有限公司",
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: true,
 		},
 		{
 			name:   "真實案例反向：持有人確為本賣家時仍要相符",
-			holder: "Acme Road LLC", realName: "陳大明", companyName: "acme road, llc.",
+			holder: "Acme Road LLC", companyName: "acme road, llc.",
 			wantMatched: true, wantField: CertHolderCompanyName, wantHasReference: true,
 		},
 		{
-			name:   "兩個名稱皆空 ⇒ 無可比對基準",
-			holder: "Acme Road LLC", realName: "", companyName: "",
+			name:   "公司名稱為空（個人賣家）⇒ 無可比對基準",
+			holder: "Acme Road LLC", companyName: "",
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: false,
 		},
 		{
 			name:   "名稱只有空白 ⇒ 無可比對基準",
-			holder: "Acme Road LLC", realName: "  　", companyName: "",
+			holder: "Acme Road LLC", companyName: "  　",
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: false,
 		},
 		{
 			// company_name 只填了公司型態 ⇒ 正規化後為空，不得與任何東西相符，
 			// 也不算 reference（否則「無從判斷」會被誤報成「有比過、不符」）。
 			name:   "company_name 只有「有限公司」⇒ 不相符且不算 reference",
-			holder: "有限公司", realName: "", companyName: "有限公司",
+			holder: "有限公司", companyName: "有限公司",
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: false,
-		},
-		{
-			name:   "company_name 只有「有限公司」但 real_name 有值 ⇒ 仍有 reference",
-			holder: "有限公司", realName: "陳大明", companyName: "有限公司",
-			wantMatched: false, wantField: CertHolderNone, wantHasReference: true,
 		},
 		{
 			// 政府回空字串時不得因為「雙方都空」而判成相符。
 			name:   "holder 為空 ⇒ 不相符",
-			holder: "", realName: "陳大明", companyName: "",
+			holder: "", companyName: "範例生鮮",
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: true,
 		},
 		{
 			name:   "holder 正規化後為空 ⇒ 不相符",
-			holder: "股份有限公司", realName: "陳大明", companyName: "",
+			holder: "股份有限公司", companyName: "範例生鮮",
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: true,
 		},
 		{
 			// 明令禁止子字串包含比對。
 			name:   "子字串不得相符",
-			holder: "甲乙丙", realName: "甲", companyName: "",
+			holder: "甲乙丙", companyName: "甲",
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: true,
 		},
 		{
 			name:   "反向子字串不得相符",
-			holder: "甲", realName: "甲乙丙農場", companyName: "",
+			holder: "甲", companyName: "甲乙丙農場",
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: true,
 		},
 		{
 			// 明令禁止編輯距離模糊比對。
 			name:   "一字之差不得相符",
-			holder: "陳大明", realName: "陳大民", companyName: "",
+			holder: "範例生鮮", companyName: "範例生先",
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: true,
-		},
-		{
-			name:   "real_name 不符但 company_name 相符 ⇒ COMPANY_NAME",
-			holder: "範例生鮮嚴選", realName: "陳大明", companyName: "範例生鮮嚴選有限公司",
-			wantMatched: true, wantField: CertHolderCompanyName, wantHasReference: true,
-		},
-		{
-			// 兩者皆相符時的優先序：REAL_NAME（dev 實查覆蓋率 97.7% vs 27.3%）。
-			name:   "兩欄皆相符 ⇒ REAL_NAME 優先",
-			holder: "陳大明", realName: "陳大明", companyName: "陳大明工作室",
-			wantMatched: true, wantField: CertHolderRealName, wantHasReference: true,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := MatchCertHolder(c.holder, &c.realName, &c.companyName)
+			got := MatchCertHolder(c.holder, &c.companyName)
 			matched, field, hasReference := got.Matched, got.Field, got.HasReference
 			if matched != c.wantMatched {
 				t.Errorf("matched = %v, want %v", matched, c.wantMatched)
@@ -194,6 +173,14 @@ func TestMatch(t *testing.T) {
 	}
 }
 
+// TestMatchWithoutCompanyNameHasNoReference pins D37: a nil company name (an individual seller) is "no reference", never a match.
+func TestMatchWithoutCompanyNameHasNoReference(t *testing.T) {
+	got := MatchCertHolder("陳大明", nil)
+	if got.Matched || got.Field != CertHolderNone || got.HasReference {
+		t.Errorf("MatchCertHolder(nil company) = %+v, want no match and no reference", got)
+	}
+}
+
 // TestCertHolderField_PinWireValues pins the constants against the strings
 // MatchCertificateHolderResponse.matched_field carries; a rename here would
 // silently change what the audit trail records.
@@ -202,7 +189,6 @@ func TestCertHolderField_PinWireValues(t *testing.T) {
 		got  CertHolderField
 		want string
 	}{
-		{CertHolderRealName, "REAL_NAME"},
 		{CertHolderCompanyName, "COMPANY_NAME"},
 		{CertHolderNone, "NONE"},
 	}

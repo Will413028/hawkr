@@ -3,8 +3,11 @@
 import { create } from "@bufbuild/protobuf";
 import {
 	CapabilityStatusSchema,
+	type GetMyOnboardingResponse,
 	GetMyStoreResponseSchema,
-	KYCFlowStatus,
+	OnboardingAction,
+	OnboardingTaskId,
+	OnboardingTaskState,
 	SellerCapability,
 	SellerRequirement,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -16,8 +19,12 @@ import {
 	within,
 } from "@testing-library/react";
 import * as React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { publicListingStatus } from "@/lib/seller/capability-fixtures";
+import {
+	onboardingFixture,
+	requiredFixture,
+} from "@/lib/seller/onboarding-fixtures";
 
 // 真的 store 以 localStorage 持久化；這裡只要它的狀態與動作，用不持久化的同形 store 取代。
 vi.mock("./dashboardUiStore", async () => {
@@ -51,16 +58,24 @@ vi.mock("@/components/ui/Button", () => ({
 		href,
 		children,
 		disabled,
+		onClick,
 	}: {
 		href?: string;
 		children: React.ReactNode;
 		disabled?: boolean;
+		onClick?: () => void;
 	}) =>
-		React.createElement(
-			"a",
-			{ href, "aria-disabled": disabled ? "true" : "false" },
-			children,
-		),
+		href !== undefined
+			? React.createElement(
+					"a",
+					{ href, "aria-disabled": disabled ? "true" : "false" },
+					children,
+				)
+			: React.createElement(
+					"button",
+					{ type: "button", disabled, onClick },
+					children,
+				),
 }));
 
 import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
@@ -72,27 +87,36 @@ const render = (
 ) => renderWithoutIntl(ui, { ...options, wrapper: IntlTestWrapper });
 
 const R = SellerRequirement;
+const S = OnboardingTaskState;
+const A = OnboardingAction;
+const ID = OnboardingTaskId;
 
-function renderCard(
-	missing: SellerRequirement[],
-	flowStatus = KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
-) {
+const PENDING = { state: S.ACTION_REQUIRED, action: A.NONE } as const;
+
+function renderCard({
+	onboarding,
+	loading = false,
+	missing = [],
+}: {
+	onboarding: GetMyOnboardingResponse | null;
+	loading?: boolean;
+	missing?: SellerRequirement[];
+}) {
 	const my = create(GetMyStoreResponseSchema, {
 		store: { id: "1", description: "介紹" },
 		capabilities: [
 			publicListingStatus(missing),
-			// 照伺服器：物流建店缺認證時才缺 KYC_APPROVED。
 			create(CapabilityStatusSchema, {
 				capability: SellerCapability.SHIPPING_SETUP,
-				active: !missing.includes(R.KYC_APPROVED),
-				missing: missing.includes(R.KYC_APPROVED) ? [R.KYC_APPROVED] : [],
+				active: true,
 			}),
 		],
 	});
 	render(
 		React.createElement(OnboardingProgressCard, {
 			self: my,
-			flowStatus,
+			onboarding,
+			onboardingLoading: loading,
 			shippingRows: [],
 			productCount: 0,
 		}),
@@ -104,21 +128,28 @@ function expand() {
 	if (toggle) fireEvent.click(toggle);
 }
 
+beforeEach(() => {});
+
 afterEach(() => {
 	cleanup();
 });
 
 describe("OnboardingProgressCard", () => {
 	it("splits the steps into 公開前必須 and 建議完成", () => {
-		renderCard([R.KYC_APPROVED]);
+		renderCard({ onboarding: requiredFixture(PENDING, PENDING, PENDING) });
 		expand();
 
 		const lists = screen.getAllByRole("list");
 		expect(lists).toHaveLength(2);
 		const required = within(lists[0] as HTMLElement);
 		const recommended = within(lists[1] as HTMLElement);
-		expect(required.getByRole("button", { name: /^商店資料，/ })).toBeTruthy();
-		expect(required.getByRole("button", { name: /^商家認證，/ })).toBeTruthy();
+		for (const id of [ID.PROFILE, ID.PLATFORM_REVIEW, ID.PAYMENT_ACCOUNT]) {
+			expect(
+				required.getByRole("button", {
+					name: new RegExp(`^伺服器標題${id}，`),
+				}),
+			).toBeTruthy();
+		}
 		for (const title of ["物流設定", "上架商品", "商店介紹"]) {
 			expect(
 				recommended.getByRole("button", { name: new RegExp(`^${title}，`) }),
@@ -128,34 +159,119 @@ describe("OnboardingProgressCard", () => {
 		expect(screen.getByText("建議完成")).toBeTruthy();
 	});
 
-	it("progress only counts the required group", () => {
-		renderCard([R.KYC_APPROVED]);
-		// 兩個必須項目完成一個；建議完成的四項不進分母。
-		expect(screen.getByText("1/2")).toBeTruthy();
+	it("progress counts the server's COMPLETED tasks in the required group only", () => {
+		renderCard({
+			onboarding: requiredFixture(
+				{ state: S.COMPLETED, action: A.NONE },
+				PENDING,
+				{ state: S.LOCKED, action: A.NONE },
+			),
+		});
+		expect(screen.getByText("1/3")).toBeTruthy();
 	});
 
-	it("is collapsed with the completion mark once nothing is missing", () => {
-		renderCard([]);
+	it("follows the summary, not the store's capabilities", () => {
+		// 能力說沒有缺任何條件，摘要說三項都沒完成：不顯示「任務完成」。
+		renderCard({
+			onboarding: requiredFixture(PENDING, PENDING, PENDING),
+			missing: [],
+		});
+		expect(screen.queryByText("任務完成")).toBeNull();
+		expect(screen.getByText("0/3")).toBeTruthy();
+	});
+
+	it("is collapsed with the completion mark once the server says every task is COMPLETED", () => {
+		const done = { state: S.COMPLETED, action: A.NONE } as const;
+		renderCard({
+			onboarding: requiredFixture(done, done, done, true),
+			missing: [R.ONBOARDING_COMPLETE],
+		});
 		expect(screen.getByText("任務完成")).toBeTruthy();
 		expect(screen.queryByRole("list")).toBeNull();
 	});
 
-	it("selecting a required step shows its status and action", () => {
-		renderCard([R.KYC_APPROVED], KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO);
+	it("shows the server status sentence and the catalog button for the selected task", () => {
+		renderCard({
+			onboarding: onboardingFixture([
+				{ id: ID.PROFILE, state: S.COMPLETED },
+				{
+					id: ID.PLATFORM_REVIEW,
+					state: S.ACTION_REQUIRED,
+					action: A.SUBMIT_CERTIFICATION,
+					status: "伺服器說尚未送出",
+				},
+				{ id: ID.PAYMENT_ACCOUNT, state: S.LOCKED },
+			]),
+		});
 		expand();
-
-		fireEvent.click(screen.getByRole("button", { name: /^商家認證，/ }));
-		expect(screen.getAllByText("需補件").length).toBeGreaterThan(0);
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: `伺服器標題${ID.PLATFORM_REVIEW}，伺服器說尚未送出`,
+			}),
+		);
+		expect(screen.getAllByText("伺服器說尚未送出").length).toBeGreaterThan(0);
 		expect(
-			screen.getByRole("link", { name: "前往補件" }).getAttribute("href"),
+			screen.getByRole("link", { name: "前往商家認證" }).getAttribute("href"),
 		).toBe("/seller-center/me/certifications");
 	});
 
-	it("names what the profile step still lacks", () => {
-		renderCard([R.LOGO, R.TOWN_CODE]);
+	it("a task with action NONE has no button", () => {
+		renderCard({
+			onboarding: onboardingFixture([
+				{ id: ID.PLATFORM_REVIEW, state: S.IN_PROGRESS, action: A.NONE },
+			]),
+		});
 		expand();
-		expect(
-			screen.getByRole("button", { name: /^商店資料，缺少：logo、所在地/ }),
-		).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: /^伺服器標題2，/ }));
+		const detail = document.querySelector(
+			".seller-onboarding-progress__detail",
+		) as HTMLElement;
+		expect(within(detail).queryByRole("link")).toBeNull();
+		expect(within(detail).queryByRole("button")).toBeNull();
+	});
+
+	it("an in-progress payment account task has no button at all, refresh or otherwise", () => {
+		renderCard({
+			onboarding: onboardingFixture([
+				{ id: ID.PROFILE, state: S.COMPLETED },
+				{ id: ID.PLATFORM_REVIEW, state: S.COMPLETED },
+				{ id: ID.PAYMENT_ACCOUNT, state: S.IN_PROGRESS, action: A.NONE },
+			]),
+		});
+		expand();
+		fireEvent.click(screen.getByRole("button", { name: /^伺服器標題3，/ }));
+		const detail = document.querySelector(
+			".seller-onboarding-progress__detail",
+		) as HTMLElement;
+		expect(within(detail).queryByRole("link")).toBeNull();
+		expect(within(detail).queryByRole("button")).toBeNull();
+		expect(screen.queryByText("重新整理")).toBeNull();
+	});
+
+	it("GetMyOnboarding failed: the required group is one load-failure state, recommended stay", () => {
+		renderCard({ onboarding: null });
+		expand();
+		const alert = screen.getByRole("alert");
+		expect(alert.textContent).toBe("系統錯誤");
+		expect(screen.getByText("公開前必須")).toBeTruthy();
+		// 沒有必要任務可數：不顯示進度，也不是「任務完成」。
+		expect(screen.queryByText(/\/\d/)).toBeNull();
+		expect(screen.queryByText("任務完成")).toBeNull();
+		const lists = screen.getAllByRole("list");
+		expect(lists).toHaveLength(1);
+		for (const title of ["物流設定", "上架商品", "商店介紹"]) {
+			expect(
+				within(lists[0] as HTMLElement).getByRole("button", {
+					name: new RegExp(`^${title}，`),
+				}),
+			).toBeTruthy();
+		}
+	});
+
+	it("while GetMyOnboarding loads the required group shows the loading text, not an error", () => {
+		renderCard({ onboarding: null, loading: true });
+		expand();
+		expect(screen.getByText("載入中…")).toBeTruthy();
+		expect(screen.queryByRole("alert")).toBeNull();
 	});
 });

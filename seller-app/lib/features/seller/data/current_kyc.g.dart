@@ -8,17 +8,17 @@ part of 'current_kyc.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// [accountId] 這個帳號的認證流程狀態（`GetMyKYC`）。not_found 是 [MyKyc.notStarted]；其他失敗是 error 狀態，
+/// [accountId] 這個帳號的認證申請（`GetMyKYC`）。not_found 是 [MyKyc.notStarted]；其他失敗是 error 狀態，
 /// 不當成沒開始認證。以帳號為鍵，換帳號不會看到上一個帳號的結果。申請的唯一來源：寫入的回應用 [adopt] 直接寫進來。
 
 @ProviderFor(AccountKyc)
 final accountKycProvider = AccountKycFamily._();
 
-/// [accountId] 這個帳號的認證流程狀態（`GetMyKYC`）。not_found 是 [MyKyc.notStarted]；其他失敗是 error 狀態，
+/// [accountId] 這個帳號的認證申請（`GetMyKYC`）。not_found 是 [MyKyc.notStarted]；其他失敗是 error 狀態，
 /// 不當成沒開始認證。以帳號為鍵，換帳號不會看到上一個帳號的結果。申請的唯一來源：寫入的回應用 [adopt] 直接寫進來。
 final class AccountKycProvider
     extends $AsyncNotifierProvider<AccountKyc, MyKyc> {
-  /// [accountId] 這個帳號的認證流程狀態（`GetMyKYC`）。not_found 是 [MyKyc.notStarted]；其他失敗是 error 狀態，
+  /// [accountId] 這個帳號的認證申請（`GetMyKYC`）。not_found 是 [MyKyc.notStarted]；其他失敗是 error 狀態，
   /// 不當成沒開始認證。以帳號為鍵，換帳號不會看到上一個帳號的結果。申請的唯一來源：寫入的回應用 [adopt] 直接寫進來。
   AccountKycProvider._({
     required AccountKycFamily super.from,
@@ -58,7 +58,7 @@ final class AccountKycProvider
 
 String _$accountKycHash() => r'f253aa70597d9f975931f77aff467902cf7a419e';
 
-/// [accountId] 這個帳號的認證流程狀態（`GetMyKYC`）。not_found 是 [MyKyc.notStarted]；其他失敗是 error 狀態，
+/// [accountId] 這個帳號的認證申請（`GetMyKYC`）。not_found 是 [MyKyc.notStarted]；其他失敗是 error 狀態，
 /// 不當成沒開始認證。以帳號為鍵，換帳號不會看到上一個帳號的結果。申請的唯一來源：寫入的回應用 [adopt] 直接寫進來。
 
 final class AccountKycFamily extends $Family
@@ -79,7 +79,7 @@ final class AccountKycFamily extends $Family
         isAutoDispose: false,
       );
 
-  /// [accountId] 這個帳號的認證流程狀態（`GetMyKYC`）。not_found 是 [MyKyc.notStarted]；其他失敗是 error 狀態，
+  /// [accountId] 這個帳號的認證申請（`GetMyKYC`）。not_found 是 [MyKyc.notStarted]；其他失敗是 error 狀態，
   /// 不當成沒開始認證。以帳號為鍵，換帳號不會看到上一個帳號的結果。申請的唯一來源：寫入的回應用 [adopt] 直接寫進來。
 
   AccountKycProvider call(String accountId) =>
@@ -89,7 +89,7 @@ final class AccountKycFamily extends $Family
   String toString() => r'accountKycProvider';
 }
 
-/// [accountId] 這個帳號的認證流程狀態（`GetMyKYC`）。not_found 是 [MyKyc.notStarted]；其他失敗是 error 狀態，
+/// [accountId] 這個帳號的認證申請（`GetMyKYC`）。not_found 是 [MyKyc.notStarted]；其他失敗是 error 狀態，
 /// 不當成沒開始認證。以帳號為鍵，換帳號不會看到上一個帳號的結果。申請的唯一來源：寫入的回應用 [adopt] 直接寫進來。
 
 abstract class _$AccountKyc extends $AsyncNotifier<MyKyc> {
@@ -113,12 +113,12 @@ abstract class _$AccountKyc extends $AsyncNotifier<MyKyc> {
   }
 }
 
-/// 目前登入帳號的認證流程狀態；沒有登入時是 null。
+/// 目前登入帳號的認證申請；沒有登入時是 null。
 
 @ProviderFor(currentKyc)
 final currentKycProvider = CurrentKycProvider._();
 
-/// 目前登入帳號的認證流程狀態；沒有登入時是 null。
+/// 目前登入帳號的認證申請；沒有登入時是 null。
 
 final class CurrentKycProvider
     extends
@@ -128,7 +128,7 @@ final class CurrentKycProvider
           AsyncValue<MyKyc>?
         >
     with $Provider<AsyncValue<MyKyc>?> {
-  /// 目前登入帳號的認證流程狀態；沒有登入時是 null。
+  /// 目前登入帳號的認證申請；沒有登入時是 null。
   CurrentKycProvider._()
     : super(
         from: null,
@@ -165,14 +165,14 @@ final class CurrentKycProvider
 
 String _$currentKycHash() => r'5736ddedccbf7484c3ba159cb1e89bd27f9b138e';
 
-/// 重讀目前帳號的認證流程狀態（`GetMyKYC`）。
+/// 重讀目前帳號的認證申請（`GetMyKYC`）。
 
 @ProviderFor(KycReader)
 final kycReaderProvider = KycReaderProvider._();
 
-/// 重讀目前帳號的認證流程狀態（`GetMyKYC`）。
+/// 重讀目前帳號的認證申請（`GetMyKYC`）。
 final class KycReaderProvider extends $NotifierProvider<KycReader, void> {
-  /// 重讀目前帳號的認證流程狀態（`GetMyKYC`）。
+  /// 重讀目前帳號的認證申請（`GetMyKYC`）。
   KycReaderProvider._()
     : super(
         from: null,
@@ -202,7 +202,7 @@ final class KycReaderProvider extends $NotifierProvider<KycReader, void> {
 
 String _$kycReaderHash() => r'c060b6696210a7f3a9ee1c8167f8de490fd1d371';
 
-/// 重讀目前帳號的認證流程狀態（`GetMyKYC`）。
+/// 重讀目前帳號的認證申請（`GetMyKYC`）。
 
 abstract class _$KycReader extends $Notifier<void> {
   void build();

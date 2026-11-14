@@ -19,6 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/agent"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	discoverymod "github.com/Will413028/hawkr/backend/internal/modules/discovery"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -202,7 +203,7 @@ func TestNewHandlerRequiresBuyer(t *testing.T) {
 	deps := Deps{
 		Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
 		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: struct{ httpseller.DashboardOrders }{}, Discovery: &discoverymod.Module{}, Agent: &agent.Module{},
-		ReviewQueue: &reviewqueue.Module{}, Social: &social.Module{},
+		ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Social: &social.Module{},
 	}
 	if _, err := NewHandler(deps); err == nil || !strings.Contains(err.Error(), "Buyer") {
 		t.Fatalf("沒有 Buyer：err=%v", err)

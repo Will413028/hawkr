@@ -11,10 +11,7 @@ import (
 
 // 舊 publisher 的 struct 在另一個 Go module（pkg、seller-service），單體不能 import：這裡讀它們的原始碼，逐欄位比對 json tag
 // （欄位名、omitempty、,string）與 Go 型別，relay 的 payload struct 只要和舊的有一個欄位不同就失敗。
-const (
-	mqEvents  = "../../../pkg/mq/events.go"
-	merchants = "../../../services/seller-service/internal/domain/merchant_verification_outbox.go"
-)
+const mqEvents = "../../../pkg/mq/events.go"
 
 type wireField struct{ typ, tag string }
 
@@ -98,11 +95,10 @@ func TestPayloadsMatchTheLegacyStructs(t *testing.T) {
 		path, old string
 		mine      reflect.Type
 	}{
-		"seller.deleted":          {mqEvents, "SellerDeletedEvent", reflect.TypeOf(sellerDeleted{})},
-		"seller.suspended":        {mqEvents, "SellerSuspendedEvent", reflect.TypeOf(sellerSuspended{})},
-		"seller.unsuspended":      {mqEvents, "SellerUnsuspendedEvent", reflect.TypeOf(sellerUnsuspended{})},
-		"seller.profile.changed":  {mqEvents, "SellerProfileChangedEvent", reflect.TypeOf(sellerProfileChanged{})},
-		"merchant.verification.*": {merchants, "MerchantVerificationCompletedEvent", reflect.TypeOf(merchantVerification{})},
+		"seller.deleted":         {mqEvents, "SellerDeletedEvent", reflect.TypeOf(sellerDeleted{})},
+		"seller.suspended":       {mqEvents, "SellerSuspendedEvent", reflect.TypeOf(sellerSuspended{})},
+		"seller.unsuspended":     {mqEvents, "SellerUnsuspendedEvent", reflect.TypeOf(sellerUnsuspended{})},
+		"seller.profile.changed": {mqEvents, "SellerProfileChangedEvent", reflect.TypeOf(sellerProfileChanged{})},
 	} {
 		want, got := oldFields(t, c.path, c.old), newFields(c.mine)
 		// 舊 BaseEvent 的 correlation_id、metadata 是 omitempty 的空值，從不出現在 wire 上（下面的測試守住這個前提）。

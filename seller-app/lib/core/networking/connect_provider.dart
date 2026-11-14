@@ -11,6 +11,7 @@ import 'package:sentry_flutter/sentry_flutter.dart' show Sentry;
 
 import '../../config/flavor.dart';
 import '../../shared/utils/hk_log.dart';
+import '../l10n/ui_locale.dart';
 import '../session/auth_session_provider.dart';
 import '../session/session_provider.dart';
 import 'app_version_headers.dart';
@@ -30,7 +31,7 @@ HttpClient connectHttpClient(Ref ref) => apiHttpClient();
 Transport connectTransport(Ref ref) => apiTransport(
   baseUrl: F.appFlavor.gatewayHost,
   httpClient: ref.watch(connectHttpClientProvider),
-  interceptors: connectInterceptors(),
+  interceptors: connectInterceptors(acceptLanguage: uiLocaleTag(ref)),
 );
 
 @Riverpod(keepAlive: true)
@@ -59,6 +60,7 @@ IdentityAppServiceClient sessionIdentityClient(Ref ref) =>
         baseUrl: F.appFlavor.gatewayHost,
         httpClient: ref.watch(connectHttpClientProvider),
         interceptors: connectInterceptors(
+          acceptLanguage: uiLocaleTag(ref),
           auth: sessionBootstrapInterceptor(ref),
         ),
       ),
@@ -71,6 +73,7 @@ Transport connectAuthTransport(Ref ref) => apiTransport(
   baseUrl: F.appFlavor.gatewayHost,
   httpClient: ref.watch(connectHttpClientProvider),
   interceptors: connectInterceptors(
+    acceptLanguage: uiLocaleTag(ref),
     auth: sessionAuthInterceptor(ref),
     onSellerSuspended: () =>
         ref.read(sessionProvider.notifier).onSellerSuspendedSignal(),
@@ -81,12 +84,14 @@ Transport connectAuthTransport(Ref ref) => apiTransport(
 /// log。登入後的 service 另外帶 [onSellerSuspended]（D10 的即時訊號）。
 List<Interceptor> connectInterceptors({
   Interceptor? auth,
+  required String Function() acceptLanguage,
   void Function()? onSellerSuspended,
 }) => appInterceptors(
   timeout: Duration(milliseconds: F.appFlavor.apiTimeout),
   report: _captureWithSentry,
   headers: appConnectHeaders,
   auth: auth,
+  acceptLanguage: acceptLanguage,
   onSellerSuspended: onSellerSuspended,
   log: kDebugMode || F.appFlavor.enableApiLogging ? HKLog.logD : null,
 );

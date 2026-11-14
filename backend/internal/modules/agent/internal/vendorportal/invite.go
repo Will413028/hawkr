@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/agent/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/agent/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
-	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
 // EnsureInvite 建立或重取一個 RFQ 收件人的邀請，整段在一個 transaction 內。先讀 prospect（Contacts 在這個 transaction 內對
@@ -121,12 +120,14 @@ func (s *Service) rotate(ctx context.Context, q *store.Queries, row store.AgentV
 	return nil
 }
 
-// deliverableEmail 取 prospect 的 email（去前後空白後儲存）；沒有或收不到信回 ErrNoDeliverableEmail。
+// deliverableEmail 取 prospect 的 email（儲存正規化後的值）；沒有或收不到信回 ErrNoDeliverableEmail。
 func deliverableEmail(c Contact) (string, error) {
-	if c.Email == nil || !model.IsDeliverableEmail(*c.Email) {
-		return "", model.ErrNoDeliverableEmail
+	if c.Email != nil {
+		if email, ok := model.DeliverableEmail(*c.Email); ok {
+			return email, nil
+		}
 	}
-	return trimtext.Trim(*c.Email), nil
+	return "", model.ErrNoDeliverableEmail
 }
 
 // MarkDelivered 記下邀請的 secret 已經寄出。secret 是寄出的那一把明文：一個條件 UPDATE，只有它的 SHA-256 等於目前的

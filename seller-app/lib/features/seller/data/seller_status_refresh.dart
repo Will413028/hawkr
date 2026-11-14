@@ -8,13 +8,16 @@ import '../../../core/session/session_provider.dart';
 import 'account_scope.dart';
 import 'current_kyc.dart';
 import 'current_store.dart';
+import 'onboarding_summary.dart';
+import 'payment_account.dart';
 
 part 'seller_status_refresh.g.dart';
 
 /// 畫面因為成為可見而重讀時，這段時間內讀過就不再讀（website 的 react-query `staleTime: 30_000`）。
 const statusStaleTime = Duration(seconds: 30);
 
-/// 重讀賣家的伺服器狀態：店家（`GetMyStore`）與認證流程（`GetMyKYC`）一起，兩者不會一個新一個舊（PayUni 狀態是認證流程的一部分，隨 `GetMyKYC` 一起讀）。
+/// 重讀賣家的伺服器狀態：店家（`GetMyStore`）、認證流程（`GetMyKYC`）、收款帳戶（`GetMyPaymentAccount`）與開通摘要
+/// （`GetMyOnboarding`）一起，四者不會一個新一個舊。
 @Riverpod(keepAlive: true)
 class SellerStatusRefresh extends _$SellerStatusRefresh {
   @override
@@ -25,10 +28,10 @@ class SellerStatusRefresh extends _$SellerStatusRefresh {
     round: _round,
   );
 
-  /// 最近一次成功的一輪（店家與認證流程都讀成功）已經超過 [maxAge]，或還沒有成功過。
+  /// 最近一次成功的一輪（店家、認證流程、收款帳戶與開通摘要都讀成功）已經超過 [maxAge]，或還沒有成功過。
   bool isStale(Duration maxAge) => _refresher.isStale(maxAge);
 
-  /// 一輪重讀：店家、認證流程一起讀完才回傳，回傳店家有沒有讀成功（任何一個讀取失敗不影響另一個）。
+  /// 一輪重讀：店家、認證流程、收款帳戶、開通摘要一起讀完才回傳，回傳店家有沒有讀成功（任何一個讀取失敗不影響其他）。
   ///
   /// 進行中的一輪共用、[fresh] 的後續一輪、[maxAge] 的略過規則見 [CoalescingRefresher]。預設共用進行中的那一輪（回前景、
   /// 切回分頁、下拉重整、進度卡回來）；[fresh] 給推播、從認證流程回來；[maxAge] 只給「因為成為可見而重讀」的呼叫，
@@ -54,6 +57,14 @@ class SellerStatusRefresh extends _$SellerStatusRefresh {
         settledOnly &&
         accountId != null &&
         ref.read(accountKycProvider(accountId)).isLoading;
+    final paymentReading =
+        settledOnly &&
+        accountId != null &&
+        ref.read(accountPaymentAccountProvider(accountId)).isLoading;
+    final onboardingReading =
+        settledOnly &&
+        accountId != null &&
+        ref.read(accountOnboardingProvider(accountId)).isLoading;
     final results = await Future.wait<bool>([
       storeReading
           ? ref
@@ -65,6 +76,16 @@ class SellerStatusRefresh extends _$SellerStatusRefresh {
                 .read(accountKycProvider(accountId).future)
                 .then((_) => true, onError: (_) => false)
           : ref.read(kycReaderProvider.notifier).refresh(),
+      paymentReading
+          ? ref
+                .read(accountPaymentAccountProvider(accountId).future)
+                .then((_) => true, onError: (_) => false)
+          : ref.read(paymentAccountReaderProvider.notifier).refresh(),
+      onboardingReading
+          ? ref
+                .read(accountOnboardingProvider(accountId).future)
+                .then((_) => true, onError: (_) => false)
+          : ref.read(onboardingSummaryReaderProvider.notifier).refresh(),
     ]);
     if (results.every((ok) => ok)) {
       _refresher.markSucceeded();

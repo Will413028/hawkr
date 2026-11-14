@@ -15,14 +15,16 @@ class CertificationJourneyStepper extends StatelessWidget {
   const CertificationJourneyStepper({super.key, required this.currentStep})
     : assert(currentStep >= 0 && currentStep < stepCount);
 
-  static const int stepCount = 4;
+  static const int stepCount = 3;
+
+  /// 最後一格（送審開通）：確認送出與送出之後的狀態畫面。
+  static const int lastStep = stepCount - 1;
 
   final int currentStep;
 
   static const _steps = <({String label, HkIconName icon})>[
     (label: '賣家類型', icon: HkIconName.store),
-    (label: '身分資料', icon: HkIconName.shield),
-    (label: '收款資料', icon: HkIconName.wallet),
+    (label: '商家資料', icon: HkIconName.shield),
     (label: '送審開通', icon: HkIconName.check),
   ];
 

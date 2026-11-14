@@ -647,7 +647,7 @@ export default function InvoiceJobDetailPage() {
 							>
 								<details className="invoice-details">
 									<summary>展開訂單快照 JSON</summary>
-									<pre className="invoice-pre">
+									<pre className="adm-json-pre">
 										{detail.orderSnapshotJson || "（沒有快照內容）"}
 									</pre>
 								</details>
@@ -702,7 +702,7 @@ export default function InvoiceJobDetailPage() {
 											</div>
 											<details className="invoice-details">
 												<summary>展開請求與回應內容（已遮罩）</summary>
-												<pre className="invoice-pre">
+												<pre className="adm-json-pre">
 													{`── 請求 ──\n${ex.maskedRequestBody || "（無）"}\n\n── 回應 ──\n${ex.maskedResponseBody || "（無）"}`}
 												</pre>
 											</details>

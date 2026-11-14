@@ -2,7 +2,7 @@
 
 /**
  * 賣家入駐文件的產生器。來源只有 docs/legal/ 的兩份 Markdown 正本與 seller-agreements.json（manifest）；
- * 版本是正本版本行的生效日，沒有正本的文件（PAYUNI_TERMS）的版本寫在 manifest。輸出：
+ * 版本是正本版本行的生效日。輸出：
  *   - features/legal/documents/<正本檔名>.gen.ts：正本的 TS 投影（頁面渲染用）
  *   - features/legal/documents/sellerAgreements.gen.ts：kind → { version, url }（web 送出同意用）
  *   - backend/internal/modules/seller/internal/model/agreement_gen.go：CurrentAgreements
@@ -14,14 +14,13 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseLegalMarkdown } from "./legal-markdown";
 
-const KINDS = ["SELLER_TERMS", "KYC_PRIVACY_NOTICE", "PAYUNI_TERMS"] as const;
+const KINDS = ["SELLER_TERMS", "KYC_PRIVACY_NOTICE"] as const;
 type Kind = (typeof KINDS)[number];
 
 interface ManifestEntry {
 	kind: Kind;
 	url: string;
-	doc?: string;
-	version?: string;
+	doc: string;
 }
 
 const GENERATOR = "website/scripts/generate-legal.ts";
@@ -63,11 +62,7 @@ function readManifest(root: string): ManifestEntry[] {
 		if (!entry.url.startsWith("/") && !entry.url.startsWith("https://")) {
 			throw new Error(`${entry.kind} 的 url 必須是站內路徑或 https 網址`);
 		}
-		if (Boolean(entry.doc) === Boolean(entry.version)) {
-			throw new Error(
-				`${entry.kind} 要嘛有 doc、要嘛有 version，不能兩者都有或都沒有`,
-			);
-		}
+		if (!entry.doc) throw new Error(`${entry.kind} 缺少 doc`);
 	}
 	for (const kind of KINDS) {
 		if (!seen.has(kind)) throw new Error(`manifest 缺少 ${kind}`);
@@ -81,13 +76,6 @@ export function buildOutputs(root: string): Map<string, string> {
 	const versions = new Map<Kind, { version: string; url: string }>();
 
 	for (const entry of readManifest(root)) {
-		if (!entry.doc) {
-			versions.set(entry.kind, {
-				version: entry.version as string,
-				url: entry.url,
-			});
-			continue;
-		}
 		const docPath = `website/docs/legal/${entry.doc}`;
 		const parsed = parseLegalMarkdown(
 			readFileSync(join(root, docPath), "utf8"),

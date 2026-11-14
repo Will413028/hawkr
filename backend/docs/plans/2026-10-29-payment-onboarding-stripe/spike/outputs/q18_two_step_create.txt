@@ -1,0 +1,20 @@
+[none] create bare: identity+defaults+dashboard+metadata: 400 {'code': 'unsupported_field_for_configs', 'message': 'You cannot set `dashboard` unless the account is configured as a merchant or a recipient with the stripe_balance.stripe_transfers capability.'}
+[none] create bare without defaults: 400 {'code': 'unsupported_field_for_configs', 'message': 'You cannot set `dashboard` unless the account is configured as a merchant or a recipient with the stripe_balance.stripe_transfers capability.'}
+[none] create metadata only: 200 {'dashboard': None, 'metadata': {'store_id': '1009'}, 'applied': []}
+   link before update: 400 {'code': 'invalid_fields', 'message': "Some fields in the request were invalid: 'account: The account acct_1UbNPBEmryKit1vb must either be on Connect or the Global Payouts Public Preview to create an account link.'"}
+   update email+recipient: 200 {'caps': {'payouts': 'restricted', 'stripe_transfers': 'restricted'}, 'applied': ['recipient'], 'dashboard': 'none', 'resp': {'fees_collector': 'application', 'losses_collector': 'application', 'requirements_collector': 'application'}}
+   same update again: 200 ok
+   link after update: 200 ok
+   close ['recipient'] 200 
+[express] create bare: identity+defaults+dashboard+metadata: 400 {'code': 'unsupported_field_for_configs', 'message': 'You cannot set `dashboard` unless the account is configured as a merchant or a recipient with the stripe_balance.stripe_transfers capability.'}
+[express] create bare without defaults: 400 {'code': 'unsupported_field_for_configs', 'message': 'You cannot set `dashboard` unless the account is configured as a merchant or a recipient with the stripe_balance.stripe_transfers capability.'}
+[express] create metadata only: 200 {'dashboard': None, 'metadata': {'store_id': '1009'}, 'applied': []}
+   link before update: 400 {'code': 'invalid_fields', 'message': "Some fields in the request were invalid: 'account: The account acct_1UbNPNIoz4wTGqax must either be on Connect or the Global Payouts Public Preview to create an account link.'"}
+   update email+recipient: 200 {'caps': {'payouts': 'restricted', 'stripe_transfers': 'restricted'}, 'applied': ['recipient'], 'dashboard': 'express', 'resp': {'fees_collector': 'application', 'losses_collector': 'application', 'requirements_collector': 'stripe'}}
+   same update again: 200 ok
+   link after update: 200 ok
+   close ['recipient'] 200 
+v2 failing create #1 same key: 400 invalid_fields Idempotent-Replayed= None
+v2 failing create #2 same key: 400 invalid_fields Idempotent-Replayed= None
+v2 same key after the 400, corrected body: 200 created
+   close 200

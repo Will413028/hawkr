@@ -108,12 +108,12 @@ type MyReport struct {
 	Category    v1alpha1.PolicyCategory `protobuf:"varint,5,opt,name=category,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"category,omitempty"`
 	Description string                  `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
 	// 平台給檢舉人的結果說明；還沒有結果或結果沒有說明時是空字串。
-	ResolutionNote string                 `protobuf:"bytes,8,opt,name=resolution_note,json=resolutionNote,proto3" json:"resolution_note,omitempty"`
-	CreateTime     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	ResolutionNote string                 `protobuf:"bytes,7,opt,name=resolution_note,json=resolutionNote,proto3" json:"resolution_note,omitempty"`
+	CreateTime     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// 結果設定的時間；還沒有結果時不設。
-	ResolveTime *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=resolve_time,json=resolveTime,proto3" json:"resolve_time,omitempty"`
+	ResolveTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=resolve_time,json=resolveTime,proto3" json:"resolve_time,omitempty"`
 	// 結果；還沒有結果時是 UNSPECIFIED（處理中）。
-	Outcome       ReportOutcome `protobuf:"varint,11,opt,name=outcome,proto3,enum=hawkr.seller.v1alpha1.ReportOutcome" json:"outcome,omitempty"`
+	Outcome       ReportOutcome `protobuf:"varint,10,opt,name=outcome,proto3,enum=hawkr.seller.v1alpha1.ReportOutcome" json:"outcome,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -616,7 +616,7 @@ var File_hawkr_seller_v1alpha1_report_proto protoreflect.FileDescriptor
 
 const file_hawkr_seller_v1alpha1_report_proto_rawDesc = "" +
 	"\n" +
-	"\"hawkr/seller/v1alpha1/report.proto\x12\x15hawkr.seller.v1alpha1\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/rpc/error_details.proto\"\xd1\x03\n" +
+	"\"hawkr/seller/v1alpha1/report.proto\x12\x15hawkr.seller.v1alpha1\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/rpc/error_details.proto\"\xc3\x03\n" +
 	"\bMyReport\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x19\n" +
 	"\bstore_id\x18\x02 \x01(\tR\astoreId\x12\x1d\n" +
@@ -625,12 +625,12 @@ const file_hawkr_seller_v1alpha1_report_proto_rawDesc = "" +
 	"\border_no\x18\x04 \x01(\tR\aorderNo\x12A\n" +
 	"\bcategory\x18\x05 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryR\bcategory\x12 \n" +
 	"\vdescription\x18\x06 \x01(\tR\vdescription\x12'\n" +
-	"\x0fresolution_note\x18\b \x01(\tR\x0eresolutionNote\x12;\n" +
-	"\vcreate_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"\x0fresolution_note\x18\a \x01(\tR\x0eresolutionNote\x12;\n" +
+	"\vcreate_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"createTime\x12=\n" +
-	"\fresolve_time\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\vresolveTime\x12C\n" +
-	"\aoutcome\x18\v \x01(\x0e2$.hawkr.seller.v1alpha1.ReportOutcomeB\x03\xe0A\x03R\aoutcomeJ\x04\b\a\x10\bR\x06status\"\x94\x02\n" +
+	"\fresolve_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\vresolveTime\x12C\n" +
+	"\aoutcome\x18\n" +
+	" \x01(\x0e2$.hawkr.seller.v1alpha1.ReportOutcomeB\x03\xe0A\x03R\aoutcome\"\x94\x02\n" +
 	"\x13CreateReportRequest\x12\x1e\n" +
 	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\x12F\n" +
 	"\bcategory\x18\x02 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x02R\bcategory\x12%\n" +

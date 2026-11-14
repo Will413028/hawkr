@@ -77,7 +77,7 @@ type Caller struct {
 	BuyerID         int64
 	StoreID         int64
 	SellerSuspended string
-	// SellerCapabilities 是現任店家目前啟用的動作類能力（seller 模組推導，含 KYC 流程的前置條件）。
+	// SellerCapabilities 是現任店家目前啟用的動作類能力（seller 模組推導，含開通閘門的前置條件）。
 	SellerCapabilities []seller.Capability
 }
 

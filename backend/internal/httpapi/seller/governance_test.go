@@ -36,37 +36,39 @@ import (
 // governanceModule 記下每個指令收到的輸入，回傳設定好的通報、案件與措施。
 type governanceModule struct {
 	GovernanceModule
-	report      model.AdminReport
-	cases       model.AdminCase
-	measure     model.Measure
-	violation   model.Violation
-	reportList  model.ReportListInput
-	reportPage  model.AdminReportPage
-	caseList    model.CaseListInput
-	casePage    model.AdminCasePage
-	measureList model.AdminMeasureListInput
-	violList    model.ViolationListInput
-	noteList    model.MeasureNoteListInput
-	caseNotes   model.CaseNoteListInput
-	notePage    model.NotePage
-	triage      model.TriageReportInput
-	resolve     model.ResolveReportInput
-	markSeen    model.MarkSupplementsSeenInput
-	move        model.MoveReportInput
-	moveResult  model.MoveReportResult
-	decideCase  model.DecideCaseInput
-	severity    model.ChangeCaseSeverityInput
-	caseNote    model.CreateCaseNoteInput
-	create      model.CreateMeasureInput
-	update      model.UpdateMeasureInput
-	end         model.EndMeasureInput
-	note        model.CreateMeasureNoteInput
-	revoke      model.RevokeMeasureInput
-	review      model.ScheduleReviewInput
-	decide      model.DecideAppealInput
-	remediate   model.DecideRemediationInput
-	createErr   error
-	calls       int
+	report            model.AdminReport
+	cases             model.AdminCase
+	measure           model.Measure
+	violation         model.Violation
+	reportList        model.ReportListInput
+	reportPage        model.AdminReportPage
+	caseList          model.CaseListInput
+	casePage          model.AdminCasePage
+	measureList       model.AdminMeasureListInput
+	violList          model.ViolationListInput
+	noteList          model.MeasureNoteListInput
+	caseNotes         model.CaseNoteListInput
+	notePage          model.NotePage
+	triage            model.TriageReportInput
+	resolve           model.ResolveReportInput
+	markSeen          model.MarkSupplementsSeenInput
+	linkedReviewed    model.MarkLinkedAccountReviewedInput
+	linkedReviewedErr error
+	move              model.MoveReportInput
+	moveResult        model.MoveReportResult
+	decideCase        model.DecideCaseInput
+	severity          model.ChangeCaseSeverityInput
+	caseNote          model.CreateCaseNoteInput
+	create            model.CreateMeasureInput
+	update            model.UpdateMeasureInput
+	end               model.EndMeasureInput
+	note              model.CreateMeasureNoteInput
+	revoke            model.RevokeMeasureInput
+	review            model.ScheduleReviewInput
+	decide            model.DecideAppealInput
+	remediate         model.DecideRemediationInput
+	createErr         error
+	calls             int
 }
 
 func (m *governanceModule) AdminReports(_ context.Context, in model.ReportListInput) (model.AdminReportPage, error) {
@@ -176,6 +178,11 @@ func (m *governanceModule) RevokeMeasure(_ context.Context, in model.RevokeMeasu
 func (m *governanceModule) ScheduleMeasureReview(_ context.Context, in model.ScheduleReviewInput) (model.Measure, error) {
 	m.review, m.calls = in, m.calls+1
 	return m.measure, nil
+}
+
+func (m *governanceModule) MarkLinkedAccountReviewed(_ context.Context, in model.MarkLinkedAccountReviewedInput) error {
+	m.linkedReviewed, m.calls = in, m.calls+1
+	return m.linkedReviewedErr
 }
 
 func (m *governanceModule) DecideAppeal(_ context.Context, in model.DecideAppealInput) (model.Measure, error) {
@@ -1127,5 +1134,48 @@ func TestCreateContentTakedownMapsTheOwnershipErrorToTheOffendingItem(t *testing
 	_, err := wrapped(adminCtx(42), fakeRequest{procedure: sellerv1alpha1connect.SellerGovernanceAdminServiceCreateMeasureProcedure})
 	if got := reportErrFields(t, err); connect.CodeOf(err) != connect.CodeInvalidArgument || !slices.Equal(got, []string{"content_takedown.contents[1]"}) {
 		t.Fatalf("err=%v fields=%v", err, got)
+	}
+}
+
+// 標為已檢視：帶措施 id、帳號 id 與管理員 id 照轉；id 格式不對不呼叫模組；模組回 NotFound 原樣回傳。
+func TestMarkLinkedAccountReviewedForwardsTheIdentifiers(t *testing.T) {
+	measure := uuid.NewV7()
+	m := &governanceModule{}
+	h := NewGovernance(m, rpc.Images{})
+	if _, err := h.MarkLinkedAccountReviewed(adminCtx(42), connect.NewRequest(&adminpb.MarkLinkedAccountReviewedRequest{MeasureId: measure.String(), AccountId: "77"})); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.linkedReviewed; got.MeasureID != measure || got.AccountID != 77 || got.AdminID != 42 {
+		t.Fatalf("in=%+v", got)
+	}
+	m.calls = 0
+	for name, req := range map[string]*adminpb.MarkLinkedAccountReviewedRequest{
+		"措施 id 不是 UUID": {MeasureId: "x", AccountId: "77"},
+		"帳號 id 不是正整數":   {MeasureId: measure.String(), AccountId: "0"},
+		"帳號 id 空的":      {MeasureId: measure.String()},
+	} {
+		if _, err := h.MarkLinkedAccountReviewed(adminCtx(42), connect.NewRequest(req)); apperr.KindOf(err) != apperr.KindInvalidInput {
+			t.Errorf("%s：%v", name, err)
+		}
+	}
+	if m.calls != 0 {
+		t.Errorf("格式錯誤仍呼叫模組 %d 次", m.calls)
+	}
+	m.linkedReviewedErr = apperr.NotFound("沒有")
+	if _, err := h.MarkLinkedAccountReviewed(adminCtx(42), connect.NewRequest(&adminpb.MarkLinkedAccountReviewedRequest{MeasureId: measure.String(), AccountId: "77"})); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Errorf("NotFound 沒有原樣回傳：%v", err)
+	}
+}
+
+// 關聯帳號列帶「在待辦」與已檢視時間（按鈕只看 shared_bank_account_pending）。
+func TestToLinkedAccountCarriesTheSharedBankAccountFields(t *testing.T) {
+	reviewed := governanceNow
+	got := toLinkedAccount(model.LinkedAccount{AccountID: 5, StoreID: 21, Matched: model.LinkedBankAccount, SharedBankAccountPending: true})
+	if !got.GetSharedBankAccountPending() || got.GetReviewedTime() != nil {
+		t.Errorf("待辦中：%v", got)
+	}
+	got = toLinkedAccount(model.LinkedAccount{AccountID: 5, StoreID: 21, Matched: model.LinkedBankAccount, ReviewedAt: &reviewed})
+	if got.GetSharedBankAccountPending() || !got.GetReviewedTime().AsTime().Equal(reviewed) {
+		t.Errorf("已檢視：%v", got)
 	}
 }

@@ -179,19 +179,17 @@ message Profile {
 
 // Address 是收貨地址。
 message Address {
-  reserved 2, 5, 6, 7;
-  reserved "label", "city", "district", "detail_address";
 
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
-  string receiver_name = 3 [(google.api.field_behavior) = REQUIRED];
-  string receiver_phone = 4 [(google.api.field_behavior) = REQUIRED];
+  string receiver_name = 2 [(google.api.field_behavior) = REQUIRED];
+  string receiver_phone = 3 [(google.api.field_behavior) = REQUIRED];
   // 收貨的地點；明細必填（1–255 字）。update_mask 列 postal_address 時整個換成請求的地址。
-  hawkr.common.v1alpha1.PostalAddress postal_address = 12 [(google.api.field_behavior) = REQUIRED];
+  hawkr.common.v1alpha1.PostalAddress postal_address = 4 [(google.api.field_behavior) = REQUIRED];
   // 是否為預設地址。
-  bool default_address = 8;
-  google.protobuf.Timestamp create_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
-  google.protobuf.Timestamp update_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
-  string etag = 11;
+  bool default_address = 5;
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string etag = 8;
 }
 
 // ProductCard 是清單上的商品卡片。
@@ -210,9 +208,9 @@ message ProductCard {
   bool available = 8;
   // 呼叫者已訂閱這個商品的補貨通知。
   bool restock_subscribed = 9;
-  string store_id = 11;
+  string store_id = 10;
   // 商品所屬店家的卡片；不設表示這家店不顯示（從沒公開過或不存在）。
-  hawkr.common.v1alpha1.StoreCard store = 10;
+  hawkr.common.v1alpha1.StoreCard store = 11;
 }
 
 // Favorite 是收藏的商品。
@@ -223,10 +221,10 @@ message Favorite {
 
 // Follow 是追蹤的店家。
 message Follow {
-  string store_id = 3;
+  string store_id = 1;
   // 不設表示這家店不顯示（從沒公開過或不存在）。
-  hawkr.common.v1alpha1.StoreCard store = 1;
-  google.protobuf.Timestamp create_time = 2;
+  hawkr.common.v1alpha1.StoreCard store = 2;
+  google.protobuf.Timestamp create_time = 3;
 }
 
 // Visit 是瀏覽過的商品。
@@ -243,13 +241,13 @@ message RestockSubscription {
 
 // MemberCard 是買家在一個店家的會員卡。
 message MemberCard {
-  string store_id = 4;
+  string store_id = 1;
   // 不設表示這家店不顯示（從沒公開過或不存在）。
-  hawkr.common.v1alpha1.StoreCard store = 1;
+  hawkr.common.v1alpha1.StoreCard store = 2;
   // 累計消費額（扣除退款），新台幣元。
-  int64 total_spent = 2;
+  int64 total_spent = 3;
   // 買家是這個店家的 VIP。
-  bool vip = 3;
+  bool vip = 4;
 }
 
 // SpendingRecord 是一筆訂單的消費紀錄。

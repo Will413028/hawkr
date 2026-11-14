@@ -19,16 +19,17 @@ class Role extends $pb.ProtobufEnum {
   static const Role ROLE_UNSPECIFIED =
       Role._(0, _omitEnumNames ? '' : 'ROLE_UNSPECIFIED');
   static const Role ROLE_SELLER =
-      Role._(2, _omitEnumNames ? '' : 'ROLE_SELLER');
+      Role._(1, _omitEnumNames ? '' : 'ROLE_SELLER');
 
   static const $core.List<Role> values = <Role>[
     ROLE_UNSPECIFIED,
     ROLE_SELLER,
   ];
 
-  static final $core.Map<$core.int, Role> _byValue =
-      $pb.ProtobufEnum.initByValue(values);
-  static Role? valueOf($core.int value) => _byValue[value];
+  static final $core.List<Role?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 1);
+  static Role? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const Role._(super.value, super.name);
 }
@@ -77,6 +78,36 @@ class ClientKind extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const ClientKind._(super.value, super.name);
+}
+
+/// ContactEmailSource 是聯絡信箱的來源。
+class ContactEmailSource extends $pb.ProtobufEnum {
+  static const ContactEmailSource CONTACT_EMAIL_SOURCE_UNSPECIFIED =
+      ContactEmailSource._(
+          0, _omitEnumNames ? '' : 'CONTACT_EMAIL_SOURCE_UNSPECIFIED');
+
+  /// provider 回報、已驗證的 email：唯讀，隨登入更新。
+  static const ContactEmailSource CONTACT_EMAIL_SOURCE_VERIFIED =
+      ContactEmailSource._(
+          1, _omitEnumNames ? '' : 'CONTACT_EMAIL_SOURCE_VERIFIED');
+
+  /// 帳號自己填的信箱：未驗證。
+  static const ContactEmailSource CONTACT_EMAIL_SOURCE_SELF_ENTERED =
+      ContactEmailSource._(
+          2, _omitEnumNames ? '' : 'CONTACT_EMAIL_SOURCE_SELF_ENTERED');
+
+  static const $core.List<ContactEmailSource> values = <ContactEmailSource>[
+    CONTACT_EMAIL_SOURCE_UNSPECIFIED,
+    CONTACT_EMAIL_SOURCE_VERIFIED,
+    CONTACT_EMAIL_SOURCE_SELF_ENTERED,
+  ];
+
+  static final $core.List<ContactEmailSource?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static ContactEmailSource? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ContactEmailSource._(super.value, super.name);
 }
 
 /// DeletionState 是申請之後帳號的狀態。

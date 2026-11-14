@@ -34,7 +34,7 @@ func adminCtx(id int64) context.Context {
 	return rpc.WithPrincipal(context.Background(), identity.Principal{Kind: identity.PrincipalAdmin, ID: id})
 }
 
-func newTestAdmin(m AdminModule) *Admin { return NewAdmin(m, rpc.Images{}) }
+func newTestAdmin(m AdminModule) *Admin { return NewAdmin(m, rpc.Images{}, nil, nil) }
 
 // wantInvalidArgument 確認請求被當成 client 的錯拒絕：handler 回的是模組的 invalid_input，或傳輸層的 invalid_argument（interceptor
 // 之後都是 invalid_argument）；沒帶或讀不懂的 etag 是 etag 的規則（API 設計規範（Connect）§七），傳輸層以 version_conflict 回。
@@ -88,7 +88,6 @@ func TestListStoresPageTokenIsBoundToItsFilters(t *testing.T) {
 		"other status":  {Query: "小農", Status: pb.StoreStatus_STORE_STATUS_CLOSED, PageToken: token},
 		"other kyc":     {Query: "小農", KycStatus: pb.KYCStatus_KYC_STATUS_APPROVED, PageToken: token},
 		"other account": {Query: "小農", AccountId: "7", PageToken: token},
-		"other bind":    {Query: "小農", PayuniBindStatus: pb.PayUniBindStatus_PAY_UNI_BIND_STATUS_FAILED, PageToken: token},
 		"suspended":     {Query: "小農", Suspended: ptr(false), PageToken: token},
 	} {
 		_, err := h.ListStores(adminCtx(1), connect.NewRequest(req))
@@ -120,15 +119,15 @@ func TestListStoresMapsFiltersAndLeavesUnspecifiedUnfiltered(t *testing.T) {
 	if len(m.list.Statuses) != 1 || m.list.Statuses[0] != model.Closed || m.list.KYCStatus == nil || *m.list.KYCStatus != model.KYCStatusSubmitted {
 		t.Fatalf("list=%+v", m.list)
 	}
-	if m.list.AccountID != nil || m.list.PayUniBindStatus != nil || m.list.Suspended != nil {
+	if m.list.AccountID != nil || m.list.Suspended != nil {
 		t.Fatalf("沒有設定的篩選不能出現在模組的輸入：%+v", m.list)
 	}
 	if _, err := h.ListStores(adminCtx(1), connect.NewRequest(&adminpb.ListStoresRequest{
-		AccountId: "7", PayuniBindStatus: pb.PayUniBindStatus_PAY_UNI_BIND_STATUS_FAILED, Suspended: ptr(false),
+		AccountId: "7", Suspended: ptr(false),
 	})); err != nil {
 		t.Fatal(err)
 	}
-	if m.list.AccountID == nil || *m.list.AccountID != 7 || m.list.PayUniBindStatus == nil || *m.list.PayUniBindStatus != model.BindStatusFailed ||
+	if m.list.AccountID == nil || *m.list.AccountID != 7 ||
 		m.list.Suspended == nil || *m.list.Suspended {
 		t.Fatalf("list=%+v", m.list)
 	}

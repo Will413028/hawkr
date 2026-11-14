@@ -78,7 +78,9 @@ extension FlavorExtension on Flavor {
   String get gatewayHost => resolveGatewayHost(this, _gatewayHostDefine);
 
   /// 啟動前檢查必要設定；缺少時拋出 [StateError]，訊息指出缺的 define。
-  void requireCoreConfig() => resolveGatewayHost(this, _gatewayHostDefine);
+  void requireCoreConfig() {
+    resolveGatewayHost(this, _gatewayHostDefine);
+  }
 
   /// API Base URL (帶 /api/v1 前綴)
   String get apiBaseUrl => '$gatewayHost/api/v1';

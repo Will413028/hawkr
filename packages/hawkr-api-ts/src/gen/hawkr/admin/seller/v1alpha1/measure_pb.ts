@@ -25,7 +25,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/admin/seller/v1alpha1/measure.proto.
  */
 export const file_hawkr_admin_seller_v1alpha1_measure: GenFile = /*@__PURE__*/
-  fileDesc("CiloYXdrci9hZG1pbi9zZWxsZXIvdjFhbHBoYTEvbWVhc3VyZS5wcm90bxIbaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExIi4KCEV2aWRlbmNlEhAKCHBvc2l0aW9uGAEgASgFEhAKCHZpZXdfdXJpGAIgASgJIrwECglWaW9sYXRpb24SDwoCaWQYASABKAlCA+BBCBIVCghzdG9yZV9pZBgCIAEoCUID4EEDEhcKCmFjY291bnRfaWQYAyABKAlCA+BBAxIeChFzb3VyY2VfcmVwb3J0X2lkcxgEIAMoCUID4EEDEjwKCGNhdGVnb3J5GAUgASgOMiUuaGF3a3IuY29tbW9uLnYxYWxwaGExLlBvbGljeUNhdGVnb3J5QgPgQQMSPwoIc2V2ZXJpdHkYBiABKA4yKC5oYXdrci5zZWxsZXIudjFhbHBoYTEuVmlvbGF0aW9uU2V2ZXJpdHlCA+BBAxJFCg5lc2NhbGF0ZWRfZnJvbRgHIAEoDjIoLmhhd2tyLnNlbGxlci52MWFscGhhMS5WaW9sYXRpb25TZXZlcml0eUID4EEDEjsKBnN0YXR1cxgIIAEoDjImLmhhd2tyLnNlbGxlci52MWFscGhhMS5WaW9sYXRpb25TdGF0dXNCA+BBAxI/Cg1yZXZva2VfcmVhc29uGAkgASgOMiMuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJldm9rZVJlYXNvbkID4EEDEjQKC3Jldm9rZV90aW1lGAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEh4KEW9yaWdpbl9tZWFzdXJlX2lkGAsgASgJQgPgQQMSNAoLY3JlYXRlX3RpbWUYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMihgIKD01lYXN1cmVSZXZpc2lvbhIQCghyZXZpc2lvbhgBIAEoBRIRCglzdGF0ZW1lbnQYAiABKAkSLAoIZW5kX3RpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhsKE2NyZWF0ZWRfYnlfYWRtaW5faWQYBCABKAkSLwoLY3JlYXRlX3RpbWUYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wElIKDHN5c3RlbV9jYXVzZRgGIAEoDjI3Lmhhd2tyLmFkbWluLnNlbGxlci52MWFscGhhMS5NZWFzdXJlUmV2aXNpb25TeXN0ZW1DYXVzZUID4EEDIpcECg5NZWFzdXJlUmVxdWVzdBIPCgJpZBgBIAEoCUID4EEIEjkKBXN0YXRlGAIgASgOMiouaGF3a3Iuc2VsbGVyLnYxYWxwaGExLk1lYXN1cmVSZXF1ZXN0U3RhdGUSDgoGcmVhc29uGAMgASgJEi8KC3N1Ym1pdF90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIXCg9kZWNpc2lvbl9yZWFzb24YBSABKAkSGwoTZGVjaWRlZF9ieV9hZG1pbl9pZBgGIAEoCRIvCgtkZWNpZGVfdGltZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNwoIZXZpZGVuY2UYCCADKAsyJS5oYXdrci5hZG1pbi5zZWxsZXIudjFhbHBoYTEuRXZpZGVuY2USEAoIcmV2aXNpb24YCSABKAUSSQoLY2xvc2VfY2F1c2UYCiABKA4yLy5oYXdrci5zZWxsZXIudjFhbHBoYTEuTWVhc3VyZVJlcXVlc3RDbG9zZUNhdXNlQgPgQQMSPAoEa2luZBgLIAEoDjIpLmhhd2tyLnNlbGxlci52MWFscGhhMS5NZWFzdXJlUmVxdWVzdEtpbmRCA+BBAxI9Cg9kZWNpZGVfZGVhZGxpbmUYDCABKAsyHy5oYXdrci5jb21tb24udjFhbHBoYTEuRGVhZGxpbmVCA+BBAyLjEQoHTWVhc3VyZRIPCgJpZBgBIAEoCUID4EEIEhUKCHN0b3JlX2lkGAIgASgJQgPgQQMSFwoKYWNjb3VudF9pZBgDIAEoCUID4EEDEjUKBGtpbmQYBCABKA4yIi5oYXdrci5zZWxsZXIudjFhbHBoYTEuTWVhc3VyZUtpbmRCA+BBAxI3CgViYXNpcxgFIAEoDjIjLmhhd2tyLnNlbGxlci52MWFscGhhMS5NZWFzdXJlQmFzaXNCA+BBAxI9CghmaW5kaW5ncxgGIAMoCzImLmhhd2tyLmFkbWluLnNlbGxlci52MWFscGhhMS5WaW9sYXRpb25CA+BBAxI7CgtyaXNrX2dyb3VuZBgHIAEoDjIhLmhhd2tyLnNlbGxlci52MWFscGhhMS5SaXNrR3JvdW5kQgPgQQMSEQoJc3RhdGVtZW50GAggASgJEiwKCGVuZF90aW1lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIyCglyZXZpZXdfYnkYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSNwoFc3RhdGUYCyABKA4yIy5oYXdrci5zZWxsZXIudjFhbHBoYTEuTWVhc3VyZVN0YXRlQgPgQQMSPwoNcmV2b2tlX3JlYXNvbhgMIAEoDjIjLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXZva2VSZWFzb25CA+BBAxIgChNyZXZva2VkX2J5X2FkbWluX2lkGA0gASgJQgPgQQMSNAoLcmV2b2tlX3RpbWUYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSOQoGcGVyaW9kGA8gASgLMiQuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLk1lYXN1cmVQZXJpb2RCA+BBAxIgChNjcmVhdGVkX2J5X2FkbWluX2lkGBEgASgJQgPgQQMSNAoLY3JlYXRlX3RpbWUYEiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSNAoLdXBkYXRlX3RpbWUYEyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSDAoEZXRhZxgUIAEoCRIdChBjdXJyZW50X3JldmlzaW9uGBUgASgFQgPgQQMSRAoJcmV2aXNpb25zGBYgAygLMiwuaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLk1lYXN1cmVSZXZpc2lvbkID4EEDEiEKFGNhbl91cGRhdGVfc3RhdGVtZW50GBcgASgIQgPgQQMSFwoKY2FuX2V4dGVuZBgYIAEoCEID4EEDEhgKC2Nhbl9zaG9ydGVuGBkgASgIQgPgQQMSFAoHY2FuX2VuZBgaIAEoCEID4EEDEhcKCmNhbl9yZXZva2UYGyABKAhCA+BBAxIgChNjYW5fc2NoZWR1bGVfcmV2aWV3GBwgASgIQgPgQQMSHgoRY2FuX2RlY2lkZV9hcHBlYWwYHSABKAhCA+BBAxIjChZjYW5fZGVjaWRlX3JlbWVkaWF0aW9uGB8gASgIQgPgQQMSPgoVbmV4dF9yZW1lZGlhdGlvbl90aW1lGCAgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEkIKCHJlcXVlc3RzGCEgAygLMisuaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLk1lYXN1cmVSZXF1ZXN0QgPgQQMSSQoSdGVybWluYXRpb25fZ3JvdW5kGCIgASgOMiguaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlRlcm1pbmF0aW9uR3JvdW5kQgPgQQMSHgoRc291cmNlX21lYXN1cmVfaWQYIyABKAlCA+BBAxI9ChRhcHBlYWxfZGVhZGxpbmVfdGltZRgkIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxJICg9saW5rZWRfYWNjb3VudHMYJSADKAsyKi5oYXdrci5hZG1pbi5zZWxsZXIudjFhbHBoYTEuTGlua2VkQWNjb3VudEID4EEDEhcKCnN0b3JlX25hbWUYJiABKAlCA+BBAxJoCiF1cGRhdGVfc3RhdGVtZW50X3VuYXZhaWxhYmlsaXRpZXMYJyADKAsyOC5oYXdrci5hZG1pbi5zZWxsZXIudjFhbHBoYTEuTWVhc3VyZUFjdGlvblVuYXZhaWxhYmlsaXR5QgPgQQMSXgoXZXh0ZW5kX3VuYXZhaWxhYmlsaXRpZXMYKCADKAsyOC5oYXdrci5hZG1pbi5zZWxsZXIudjFhbHBoYTEuTWVhc3VyZUFjdGlvblVuYXZhaWxhYmlsaXR5QgPgQQMSXwoYc2hvcnRlbl91bmF2YWlsYWJpbGl0aWVzGCkgAygLMjguaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLk1lYXN1cmVBY3Rpb25VbmF2YWlsYWJpbGl0eUID4EEDEl4KF3Jldm9rZV91bmF2YWlsYWJpbGl0aWVzGCogAygLMjguaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLk1lYXN1cmVBY3Rpb25VbmF2YWlsYWJpbGl0eUID4EEDElsKFGVuZF91bmF2YWlsYWJpbGl0aWVzGC0gAygLMjguaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLk1lYXN1cmVBY3Rpb25VbmF2YWlsYWJpbGl0eUID4EEDEiAKE2Nhbl9yZXZva2VfZmluZGluZ3MYKyABKAhCA+BBAxI9Cg9yZXZpZXdfZGVhZGxpbmUYLCABKAsyHy5oYXdrci5jb21tb24udjFhbHBoYTEuRGVhZGxpbmVCA+BBAxI4Cghjb250ZW50cxguIAMoCzIhLmhhd2tyLnNlbGxlci52MWFscGhhMS5Db250ZW50UmVmQgPgQQNKBAgQEBFKBAgeEB9SBmFwcGVhbFIUcmVtZWRpYXRpb25fcmVxdWVzdHMiowEKG01lYXN1cmVBY3Rpb25VbmF2YWlsYWJpbGl0eRJQCgZyZWFzb24YASABKA4yOy5oYXdrci5hZG1pbi5zZWxsZXIudjFhbHBoYTEuTWVhc3VyZUFjdGlvblVuYXZhaWxhYmxlUmVhc29uQgPgQQMSMgoHbWVzc2FnZRgCIAEoCzIcLmdvb2dsZS5ycGMuTG9jYWxpemVkTWVzc2FnZUID4EEDIqMCCg1MaW5rZWRBY2NvdW50EhIKCmFjY291bnRfaWQYASABKAkSEAoIc3RvcmVfaWQYAiABKAkSEgoKc3RvcmVfY29kZRgDIAEoCRJFChBtYXRjaGVkX2lkZW50aXR5GAQgASgOMisuaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLkxpbmtlZElkZW50aXR5EhkKEWxpbmtlZF9tZWFzdXJlX2lkGAUgASgJEiUKHWNhbl9jcmVhdGVfbGlua2VkX3Rlcm1pbmF0aW9uGAYgASgIEk8KEnRlcm1pbmF0aW9uX29wdGlvbhgHIAEoCzIuLmhhd2tyLmFkbWluLnNlbGxlci52MWFscGhhMS5UZXJtaW5hdGlvbk9wdGlvbkID4EEDIqUCChFUZXJtaW5hdGlvbk9wdGlvbhI9CgZncm91bmQYASABKA4yKC5oYXdrci5zZWxsZXIudjFhbHBoYTEuVGVybWluYXRpb25Hcm91bmRCA+BBAxI3Cg5lZmZlY3RpdmVfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxI2CgtleHBsYW5hdGlvbhgDIAEoCzIcLmdvb2dsZS5ycGMuTG9jYWxpemVkTWVzc2FnZUID4EEDEmAKFXZpb2xhdGlvbl9yZXF1aXJlbWVudBgEIAEoDjI8Lmhhd2tyLmFkbWluLnNlbGxlci52MWFscGhhMS5UZXJtaW5hdGlvblZpb2xhdGlvblJlcXVpcmVtZW50QgPgQQMqewoaTWVhc3VyZVJldmlzaW9uU3lzdGVtQ2F1c2USLQopTUVBU1VSRV9SRVZJU0lPTl9TWVNURU1fQ0FVU0VfVU5TUEVDSUZJRUQQABIuCipNRUFTVVJFX1JFVklTSU9OX1NZU1RFTV9DQVVTRV9TVE9SRV9DTE9TRUQQASrWBAoeTWVhc3VyZUFjdGlvblVuYXZhaWxhYmxlUmVhc29uEjEKLU1FQVNVUkVfQUNUSU9OX1VOQVZBSUxBQkxFX1JFQVNPTl9VTlNQRUNJRklFRBAAEi0KKU1FQVNVUkVfQUNUSU9OX1VOQVZBSUxBQkxFX1JFQVNPTl9SRVZPS0VEEAESMAosTUVBU1VSRV9BQ1RJT05fVU5BVkFJTEFCTEVfUkVBU09OX05PVF9BQ1RJVkUQAhI6CjZNRUFTVVJFX0FDVElPTl9VTkFWQUlMQUJMRV9SRUFTT05fS0lORF9IQVNfTk9fRU5EX1RJTUUQAxI6CjZNRUFTVVJFX0FDVElPTl9VTkFWQUlMQUJMRV9SRUFTT05fVEVSTUlOQVRJT05fUkVDUkVBVEUQBBI8CjhNRUFTVVJFX0FDVElPTl9VTkFWQUlMQUJMRV9SRUFTT05fUkVRVUVTVF9QRU5ESU5HX0ZST1pFThAFEjQKME1FQVNVUkVfQUNUSU9OX1VOQVZBSUxBQkxFX1JFQVNPTl9BUFBFQUxfUEVORElORxAGEjUKMU1FQVNVUkVfQUNUSU9OX1VOQVZBSUxBQkxFX1JFQVNPTl9WSU9MQVRJT05fQkFTSVMQBxI5CjVNRUFTVVJFX0FDVElPTl9VTkFWQUlMQUJMRV9SRUFTT05fUkVNRURJQVRJT05fUEVORElORxAIEkIKPk1FQVNVUkVfQUNUSU9OX1VOQVZBSUxBQkxFX1JFQVNPTl9DT05URU5UX1RBS0VET1dOX1JFVk9LRV9PTkxZEAkquAEKDkxpbmtlZElkZW50aXR5Eh8KG0xJTktFRF9JREVOVElUWV9VTlNQRUNJRklFRBAAEh8KG0xJTktFRF9JREVOVElUWV9OQVRJT05BTF9JRBABEhcKE0xJTktFRF9JREVOVElUWV9VQk4QAhIpCiVMSU5LRURfSURFTlRJVFlfUkVTUE9OU0lCTEVfUEVSU09OX0lEEAMSIAocTElOS0VEX0lERU5USVRZX0JBTktfQUNDT1VOVBAEKuUBCh9UZXJtaW5hdGlvblZpb2xhdGlvblJlcXVpcmVtZW50EjEKLVRFUk1JTkFUSU9OX1ZJT0xBVElPTl9SRVFVSVJFTUVOVF9VTlNQRUNJRklFRBAAEi4KKlRFUk1JTkFUSU9OX1ZJT0xBVElPTl9SRVFVSVJFTUVOVF9SRVFVSVJFRBABEi4KKlRFUk1JTkFUSU9OX1ZJT0xBVElPTl9SRVFVSVJFTUVOVF9PUFRJT05BTBACEi8KK1RFUk1JTkFUSU9OX1ZJT0xBVElPTl9SRVFVSVJFTUVOVF9GT1JCSURERU4QA2IGcHJvdG8z", [file_hawkr_common_v1alpha1_deadline, file_hawkr_common_v1alpha1_policy_category, file_hawkr_seller_v1alpha1_seller, file_google_api_field_behavior, file_google_protobuf_timestamp, file_google_rpc_error_details]);
+  fileDesc("CiloYXdrci9hZG1pbi9zZWxsZXIvdjFhbHBoYTEvbWVhc3VyZS5wcm90bxIbaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExIi4KCEV2aWRlbmNlEhAKCHBvc2l0aW9uGAEgASgFEhAKCHZpZXdfdXJpGAIgASgJIrwECglWaW9sYXRpb24SDwoCaWQYASABKAlCA+BBCBIVCghzdG9yZV9pZBgCIAEoCUID4EEDEhcKCmFjY291bnRfaWQYAyABKAlCA+BBAxIeChFzb3VyY2VfcmVwb3J0X2lkcxgEIAMoCUID4EEDEjwKCGNhdGVnb3J5GAUgASgOMiUuaGF3a3IuY29tbW9uLnYxYWxwaGExLlBvbGljeUNhdGVnb3J5QgPgQQMSPwoIc2V2ZXJpdHkYBiABKA4yKC5oYXdrci5zZWxsZXIudjFhbHBoYTEuVmlvbGF0aW9uU2V2ZXJpdHlCA+BBAxJFCg5lc2NhbGF0ZWRfZnJvbRgHIAEoDjIoLmhhd2tyLnNlbGxlci52MWFscGhhMS5WaW9sYXRpb25TZXZlcml0eUID4EEDEjsKBnN0YXR1cxgIIAEoDjImLmhhd2tyLnNlbGxlci52MWFscGhhMS5WaW9sYXRpb25TdGF0dXNCA+BBAxI/Cg1yZXZva2VfcmVhc29uGAkgASgOMiMuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJldm9rZVJlYXNvbkID4EEDEjQKC3Jldm9rZV90aW1lGAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEh4KEW9yaWdpbl9tZWFzdXJlX2lkGAsgASgJQgPgQQMSNAoLY3JlYXRlX3RpbWUYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMihgIKD01lYXN1cmVSZXZpc2lvbhIQCghyZXZpc2lvbhgBIAEoBRIRCglzdGF0ZW1lbnQYAiABKAkSLAoIZW5kX3RpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhsKE2NyZWF0ZWRfYnlfYWRtaW5faWQYBCABKAkSLwoLY3JlYXRlX3RpbWUYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wElIKDHN5c3RlbV9jYXVzZRgGIAEoDjI3Lmhhd2tyLmFkbWluLnNlbGxlci52MWFscGhhMS5NZWFzdXJlUmV2aXNpb25TeXN0ZW1DYXVzZUID4EEDIpcECg5NZWFzdXJlUmVxdWVzdBIPCgJpZBgBIAEoCUID4EEIEjkKBXN0YXRlGAIgASgOMiouaGF3a3Iuc2VsbGVyLnYxYWxwaGExLk1lYXN1cmVSZXF1ZXN0U3RhdGUSDgoGcmVhc29uGAMgASgJEi8KC3N1Ym1pdF90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIXCg9kZWNpc2lvbl9yZWFzb24YBSABKAkSGwoTZGVjaWRlZF9ieV9hZG1pbl9pZBgGIAEoCRIvCgtkZWNpZGVfdGltZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNwoIZXZpZGVuY2UYCCADKAsyJS5oYXdrci5hZG1pbi5zZWxsZXIudjFhbHBoYTEuRXZpZGVuY2USEAoIcmV2aXNpb24YCSABKAUSSQoLY2xvc2VfY2F1c2UYCiABKA4yLy5oYXdrci5zZWxsZXIudjFhbHBoYTEuTWVhc3VyZVJlcXVlc3RDbG9zZUNhdXNlQgPgQQMSPAoEa2luZBgLIAEoDjIpLmhhd2tyLnNlbGxlci52MWFscGhhMS5NZWFzdXJlUmVxdWVzdEtpbmRCA+BBAxI9Cg9kZWNpZGVfZGVhZGxpbmUYDCABKAsyHy5oYXdrci5jb21tb24udjFhbHBoYTEuRGVhZGxpbmVCA+BBAyK5EQoHTWVhc3VyZRIPCgJpZBgBIAEoCUID4EEIEhUKCHN0b3JlX2lkGAIgASgJQgPgQQMSFwoKYWNjb3VudF9pZBgDIAEoCUID4EEDEjUKBGtpbmQYBCABKA4yIi5oYXdrci5zZWxsZXIudjFhbHBoYTEuTWVhc3VyZUtpbmRCA+BBAxI3CgViYXNpcxgFIAEoDjIjLmhhd2tyLnNlbGxlci52MWFscGhhMS5NZWFzdXJlQmFzaXNCA+BBAxI9CghmaW5kaW5ncxgGIAMoCzImLmhhd2tyLmFkbWluLnNlbGxlci52MWFscGhhMS5WaW9sYXRpb25CA+BBAxI7CgtyaXNrX2dyb3VuZBgHIAEoDjIhLmhhd2tyLnNlbGxlci52MWFscGhhMS5SaXNrR3JvdW5kQgPgQQMSEQoJc3RhdGVtZW50GAggASgJEiwKCGVuZF90aW1lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIyCglyZXZpZXdfYnkYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSNwoFc3RhdGUYCyABKA4yIy5oYXdrci5zZWxsZXIudjFhbHBoYTEuTWVhc3VyZVN0YXRlQgPgQQMSPwoNcmV2b2tlX3JlYXNvbhgMIAEoDjIjLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXZva2VSZWFzb25CA+BBAxIgChNyZXZva2VkX2J5X2FkbWluX2lkGA0gASgJQgPgQQMSNAoLcmV2b2tlX3RpbWUYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSOQoGcGVyaW9kGA8gASgLMiQuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLk1lYXN1cmVQZXJpb2RCA+BBAxIgChNjcmVhdGVkX2J5X2FkbWluX2lkGBAgASgJQgPgQQMSNAoLY3JlYXRlX3RpbWUYESABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSNAoLdXBkYXRlX3RpbWUYEiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSDAoEZXRhZxgTIAEoCRIdChBjdXJyZW50X3JldmlzaW9uGBQgASgFQgPgQQMSRAoJcmV2aXNpb25zGBUgAygLMiwuaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLk1lYXN1cmVSZXZpc2lvbkID4EEDEiEKFGNhbl91cGRhdGVfc3RhdGVtZW50GBYgASgIQgPgQQMSFwoKY2FuX2V4dGVuZBgXIAEoCEID4EEDEhgKC2Nhbl9zaG9ydGVuGBggASgIQgPgQQMSFAoHY2FuX2VuZBgZIAEoCEID4EEDEhcKCmNhbl9yZXZva2UYGiABKAhCA+BBAxIgChNjYW5fc2NoZWR1bGVfcmV2aWV3GBsgASgIQgPgQQMSHgoRY2FuX2RlY2lkZV9hcHBlYWwYHCABKAhCA+BBAxIjChZjYW5fZGVjaWRlX3JlbWVkaWF0aW9uGB0gASgIQgPgQQMSPgoVbmV4dF9yZW1lZGlhdGlvbl90aW1lGB4gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEkIKCHJlcXVlc3RzGB8gAygLMisuaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLk1lYXN1cmVSZXF1ZXN0QgPgQQMSSQoSdGVybWluYXRpb25fZ3JvdW5kGCAgASgOMiguaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlRlcm1pbmF0aW9uR3JvdW5kQgPgQQMSHgoRc291cmNlX21lYXN1cmVfaWQYISABKAlCA+BBAxI9ChRhcHBlYWxfZGVhZGxpbmVfdGltZRgiIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxJICg9saW5rZWRfYWNjb3VudHMYIyADKAsyKi5oYXdrci5hZG1pbi5zZWxsZXIudjFhbHBoYTEuTGlua2VkQWNjb3VudEID4EEDEhcKCnN0b3JlX25hbWUYJCABKAlCA+BBAxJoCiF1cGRhdGVfc3RhdGVtZW50X3VuYXZhaWxhYmlsaXRpZXMYJSADKAsyOC5oYXdrci5hZG1pbi5zZWxsZXIudjFhbHBoYTEuTWVhc3VyZUFjdGlvblVuYXZhaWxhYmlsaXR5QgPgQQMSXgoXZXh0ZW5kX3VuYXZhaWxhYmlsaXRpZXMYJiADKAsyOC5oYXdrci5hZG1pbi5zZWxsZXIudjFhbHBoYTEuTWVhc3VyZUFjdGlvblVuYXZhaWxhYmlsaXR5QgPgQQMSXwoYc2hvcnRlbl91bmF2YWlsYWJpbGl0aWVzGCcgAygLMjguaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLk1lYXN1cmVBY3Rpb25VbmF2YWlsYWJpbGl0eUID4EEDEl4KF3Jldm9rZV91bmF2YWlsYWJpbGl0aWVzGCggAygLMjguaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLk1lYXN1cmVBY3Rpb25VbmF2YWlsYWJpbGl0eUID4EEDElsKFGVuZF91bmF2YWlsYWJpbGl0aWVzGCkgAygLMjguaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLk1lYXN1cmVBY3Rpb25VbmF2YWlsYWJpbGl0eUID4EEDEiAKE2Nhbl9yZXZva2VfZmluZGluZ3MYKiABKAhCA+BBAxI9Cg9yZXZpZXdfZGVhZGxpbmUYKyABKAsyHy5oYXdrci5jb21tb24udjFhbHBoYTEuRGVhZGxpbmVCA+BBAxI4Cghjb250ZW50cxgsIAMoCzIhLmhhd2tyLnNlbGxlci52MWFscGhhMS5Db250ZW50UmVmQgPgQQMiowEKG01lYXN1cmVBY3Rpb25VbmF2YWlsYWJpbGl0eRJQCgZyZWFzb24YASABKA4yOy5oYXdrci5hZG1pbi5zZWxsZXIudjFhbHBoYTEuTWVhc3VyZUFjdGlvblVuYXZhaWxhYmxlUmVhc29uQgPgQQMSMgoHbWVzc2FnZRgCIAEoCzIcLmdvb2dsZS5ycGMuTG9jYWxpemVkTWVzc2FnZUID4EEDIoUDCg1MaW5rZWRBY2NvdW50EhIKCmFjY291bnRfaWQYASABKAkSEAoIc3RvcmVfaWQYAiABKAkSEgoKc3RvcmVfY29kZRgDIAEoCRJFChBtYXRjaGVkX2lkZW50aXR5GAQgASgOMisuaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLkxpbmtlZElkZW50aXR5EhkKEWxpbmtlZF9tZWFzdXJlX2lkGAUgASgJEiUKHWNhbl9jcmVhdGVfbGlua2VkX3Rlcm1pbmF0aW9uGAYgASgIEk8KEnRlcm1pbmF0aW9uX29wdGlvbhgHIAEoCzIuLmhhd2tyLmFkbWluLnNlbGxlci52MWFscGhhMS5UZXJtaW5hdGlvbk9wdGlvbkID4EEDEigKG3NoYXJlZF9iYW5rX2FjY291bnRfcGVuZGluZxgIIAEoCEID4EEDEjYKDXJldmlld2VkX3RpbWUYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMipQIKEVRlcm1pbmF0aW9uT3B0aW9uEj0KBmdyb3VuZBgBIAEoDjIoLmhhd2tyLnNlbGxlci52MWFscGhhMS5UZXJtaW5hdGlvbkdyb3VuZEID4EEDEjcKDmVmZmVjdGl2ZV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjYKC2V4cGxhbmF0aW9uGAMgASgLMhwuZ29vZ2xlLnJwYy5Mb2NhbGl6ZWRNZXNzYWdlQgPgQQMSYAoVdmlvbGF0aW9uX3JlcXVpcmVtZW50GAQgASgOMjwuaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLlRlcm1pbmF0aW9uVmlvbGF0aW9uUmVxdWlyZW1lbnRCA+BBAyp7ChpNZWFzdXJlUmV2aXNpb25TeXN0ZW1DYXVzZRItCilNRUFTVVJFX1JFVklTSU9OX1NZU1RFTV9DQVVTRV9VTlNQRUNJRklFRBAAEi4KKk1FQVNVUkVfUkVWSVNJT05fU1lTVEVNX0NBVVNFX1NUT1JFX0NMT1NFRBABKtYECh5NZWFzdXJlQWN0aW9uVW5hdmFpbGFibGVSZWFzb24SMQotTUVBU1VSRV9BQ1RJT05fVU5BVkFJTEFCTEVfUkVBU09OX1VOU1BFQ0lGSUVEEAASLQopTUVBU1VSRV9BQ1RJT05fVU5BVkFJTEFCTEVfUkVBU09OX1JFVk9LRUQQARIwCixNRUFTVVJFX0FDVElPTl9VTkFWQUlMQUJMRV9SRUFTT05fTk9UX0FDVElWRRACEjoKNk1FQVNVUkVfQUNUSU9OX1VOQVZBSUxBQkxFX1JFQVNPTl9LSU5EX0hBU19OT19FTkRfVElNRRADEjoKNk1FQVNVUkVfQUNUSU9OX1VOQVZBSUxBQkxFX1JFQVNPTl9URVJNSU5BVElPTl9SRUNSRUFURRAEEjwKOE1FQVNVUkVfQUNUSU9OX1VOQVZBSUxBQkxFX1JFQVNPTl9SRVFVRVNUX1BFTkRJTkdfRlJPWkVOEAUSNAowTUVBU1VSRV9BQ1RJT05fVU5BVkFJTEFCTEVfUkVBU09OX0FQUEVBTF9QRU5ESU5HEAYSNQoxTUVBU1VSRV9BQ1RJT05fVU5BVkFJTEFCTEVfUkVBU09OX1ZJT0xBVElPTl9CQVNJUxAHEjkKNU1FQVNVUkVfQUNUSU9OX1VOQVZBSUxBQkxFX1JFQVNPTl9SRU1FRElBVElPTl9QRU5ESU5HEAgSQgo+TUVBU1VSRV9BQ1RJT05fVU5BVkFJTEFCTEVfUkVBU09OX0NPTlRFTlRfVEFLRURPV05fUkVWT0tFX09OTFkQCSpsCg5MaW5rZWRJZGVudGl0eRIfChtMSU5LRURfSURFTlRJVFlfVU5TUEVDSUZJRUQQABIXChNMSU5LRURfSURFTlRJVFlfVUJOEAESIAocTElOS0VEX0lERU5USVRZX0JBTktfQUNDT1VOVBACKuUBCh9UZXJtaW5hdGlvblZpb2xhdGlvblJlcXVpcmVtZW50EjEKLVRFUk1JTkFUSU9OX1ZJT0xBVElPTl9SRVFVSVJFTUVOVF9VTlNQRUNJRklFRBAAEi4KKlRFUk1JTkFUSU9OX1ZJT0xBVElPTl9SRVFVSVJFTUVOVF9SRVFVSVJFRBABEi4KKlRFUk1JTkFUSU9OX1ZJT0xBVElPTl9SRVFVSVJFTUVOVF9PUFRJT05BTBACEi8KK1RFUk1JTkFUSU9OX1ZJT0xBVElPTl9SRVFVSVJFTUVOVF9GT1JCSURERU4QA2IGcHJvdG8z", [file_hawkr_common_v1alpha1_deadline, file_hawkr_common_v1alpha1_policy_category, file_hawkr_seller_v1alpha1_seller, file_google_api_field_behavior, file_google_protobuf_timestamp, file_google_rpc_error_details]);
 
 /**
  * Evidence 是一張佐證（圖片或 PDF；詢問回覆的附件也是）。佐證是機敏檔：沒有圖片的 ID 與公開網址，只經 view_uri 讀，每次讀取都記錄。
@@ -391,91 +391,91 @@ export type Measure = Message<"hawkr.admin.seller.v1alpha1.Measure"> & {
   period?: MeasurePeriod | undefined;
 
   /**
-   * @generated from field: string created_by_admin_id = 17;
+   * @generated from field: string created_by_admin_id = 16;
    */
   createdByAdminId: string;
 
   /**
-   * @generated from field: google.protobuf.Timestamp create_time = 18;
+   * @generated from field: google.protobuf.Timestamp create_time = 17;
    */
   createTime?: Timestamp | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp update_time = 19;
+   * @generated from field: google.protobuf.Timestamp update_time = 18;
    */
   updateTime?: Timestamp | undefined;
 
   /**
    * 由 version 產生：版本、狀態、複審期限、請求狀態改變時變；寫內部註記不變。
    *
-   * @generated from field: string etag = 20;
+   * @generated from field: string etag = 19;
    */
   etag: string;
 
   /**
    * 目前的版本，是 revisions 裡最後一版的 revision。
    *
-   * @generated from field: int32 current_revision = 21;
+   * @generated from field: int32 current_revision = 20;
    */
   currentRevision: number;
 
   /**
    * 全部版本，舊到新；只有單筆讀取與寫入的回應帶，清單不設。
    *
-   * @generated from field: repeated hawkr.admin.seller.v1alpha1.MeasureRevision revisions = 22;
+   * @generated from field: repeated hawkr.admin.seller.v1alpha1.MeasureRevision revisions = 21;
    */
   revisions: MeasureRevision[];
 
   /**
    * 以下 can_* 由伺服器判斷，與對應方法的前置檢查是同一個規則（model/measure.go）。
    *
-   * @generated from field: bool can_update_statement = 23;
+   * @generated from field: bool can_update_statement = 22;
    */
   canUpdateStatement: boolean;
 
   /**
-   * @generated from field: bool can_extend = 24;
+   * @generated from field: bool can_extend = 23;
    */
   canExtend: boolean;
 
   /**
-   * @generated from field: bool can_shorten = 25;
+   * @generated from field: bool can_shorten = 24;
    */
   canShorten: boolean;
 
   /**
    * 不看店家是否關閉（措施以帳號為範圍）。
    *
-   * @generated from field: bool can_end = 26;
+   * @generated from field: bool can_end = 25;
    */
   canEnd: boolean;
 
   /**
-   * @generated from field: bool can_revoke = 27;
+   * @generated from field: bool can_revoke = 26;
    */
   canRevoke: boolean;
 
   /**
-   * @generated from field: bool can_schedule_review = 28;
+   * @generated from field: bool can_schedule_review = 27;
    */
   canScheduleReview: boolean;
 
   /**
-   * @generated from field: bool can_decide_appeal = 29;
+   * @generated from field: bool can_decide_appeal = 28;
    */
   canDecideAppeal: boolean;
 
   /**
    * 有待處理的解除請求而且措施生效中（DecideRemediation 的前置條件）。措施已結束而仍待處理的解除請求不能裁定（它的 state 已是 CLOSED）。
    *
-   * @generated from field: bool can_decide_remediation = 31;
+   * @generated from field: bool can_decide_remediation = 29;
    */
   canDecideRemediation: boolean;
 
   /**
    * 賣家的解除請求冷卻期的結束時間；只在 RISK 依據、措施生效中而且在冷卻期內設。
    *
-   * @generated from field: google.protobuf.Timestamp next_remediation_time = 32;
+   * @generated from field: google.protobuf.Timestamp next_remediation_time = 30;
    */
   nextRemediationTime?: Timestamp | undefined;
 
@@ -483,28 +483,28 @@ export type Measure = Message<"hawkr.admin.seller.v1alpha1.Measure"> & {
    * 措施上賣家的請求（申覆與解除請求，看 MeasureRequest.kind），新到舊，含佐證（單筆讀取與寫入的回應）；清單也帶（佐證除外）。每一筆的 state 由
    * 伺服器推導（見 MeasureRequest），ListMeasures 的 request_state 篩選用同一個推導。
    *
-   * @generated from field: repeated hawkr.admin.seller.v1alpha1.MeasureRequest requests = 33;
+   * @generated from field: repeated hawkr.admin.seller.v1alpha1.MeasureRequest requests = 31;
    */
   requests: MeasureRequest[];
 
   /**
    * 終止合作（kind 是 TERMINATION）的事由；其他種類是 UNSPECIFIED。
    *
-   * @generated from field: hawkr.seller.v1alpha1.TerminationGround termination_ground = 34;
+   * @generated from field: hawkr.seller.v1alpha1.TerminationGround termination_ground = 32;
    */
   terminationGround: TerminationGround;
 
   /**
    * 關聯帳號的終止（termination_ground 是 LINKED_ACCOUNT）的來源措施 id：來源撤銷時這筆一併撤銷（revoke_reason 是 SOURCE_REVOKED）；其他是空字串。
    *
-   * @generated from field: string source_measure_id = 35;
+   * @generated from field: string source_measure_id = 33;
    */
   sourceMeasureId: string;
 
   /**
    * 終止合作的申覆期限（生效後 184 天，見 hawkr.seller.v1alpha1.Measure.appeal_deadline_time）；其他種類不設。
    *
-   * @generated from field: google.protobuf.Timestamp appeal_deadline_time = 36;
+   * @generated from field: google.protobuf.Timestamp appeal_deadline_time = 34;
    */
   appealDeadlineTime?: Timestamp | undefined;
 
@@ -512,49 +512,49 @@ export type Measure = Message<"hawkr.admin.seller.v1alpha1.Measure"> & {
    * 與這筆措施的帳號使用同一個身分證明文件或統一編號的其他帳號（由本措施建立時的身分快照反查）；只有單筆讀取（GetMeasure）帶，清單與寫入的回應
    * 不設。只有留有身分快照的措施有：停權，以及非預告（NOTICE）的終止合作；快照在措施撤銷時刪除，個資清理之後也取不到新的命中。
    *
-   * @generated from field: repeated hawkr.admin.seller.v1alpha1.LinkedAccount linked_accounts = 37;
+   * @generated from field: repeated hawkr.admin.seller.v1alpha1.LinkedAccount linked_accounts = 35;
    */
   linkedAccounts: LinkedAccount[];
 
   /**
    * 店名；空字串表示沒有（個資清理之後也是：一般關店滿保留期（6 個月），終止合作關店要等申覆期滿）。清單與單筆都帶。
    *
-   * @generated from field: string store_name = 38;
+   * @generated from field: string store_name = 36;
    */
   storeName: string;
 
   /**
    * 不能改給賣家的理由的原因，依優先序排列（結構性的在前）；空表示可以改（can_update_statement 是 true）。
    *
-   * @generated from field: repeated hawkr.admin.seller.v1alpha1.MeasureActionUnavailability update_statement_unavailabilities = 39;
+   * @generated from field: repeated hawkr.admin.seller.v1alpha1.MeasureActionUnavailability update_statement_unavailabilities = 37;
    */
   updateStatementUnavailabilities: MeasureActionUnavailability[];
 
   /**
    * 不能延長結束時間的原因；空表示可以延長（can_extend 是 true）。
    *
-   * @generated from field: repeated hawkr.admin.seller.v1alpha1.MeasureActionUnavailability extend_unavailabilities = 40;
+   * @generated from field: repeated hawkr.admin.seller.v1alpha1.MeasureActionUnavailability extend_unavailabilities = 38;
    */
   extendUnavailabilities: MeasureActionUnavailability[];
 
   /**
    * 不能縮短結束時間的原因；空表示可以縮短（can_shorten 是 true）。
    *
-   * @generated from field: repeated hawkr.admin.seller.v1alpha1.MeasureActionUnavailability shorten_unavailabilities = 41;
+   * @generated from field: repeated hawkr.admin.seller.v1alpha1.MeasureActionUnavailability shorten_unavailabilities = 39;
    */
   shortenUnavailabilities: MeasureActionUnavailability[];
 
   /**
    * 不能撤銷的原因；空表示可以撤銷（can_revoke 是 true）。
    *
-   * @generated from field: repeated hawkr.admin.seller.v1alpha1.MeasureActionUnavailability revoke_unavailabilities = 42;
+   * @generated from field: repeated hawkr.admin.seller.v1alpha1.MeasureActionUnavailability revoke_unavailabilities = 40;
    */
   revokeUnavailabilities: MeasureActionUnavailability[];
 
   /**
    * 不能結束的原因；空表示可以結束（can_end 是 true）。依據違規認定的停權沒有結束入口，原因是 VIOLATION_BASIS，client 直接顯示它的句子。
    *
-   * @generated from field: repeated hawkr.admin.seller.v1alpha1.MeasureActionUnavailability end_unavailabilities = 45;
+   * @generated from field: repeated hawkr.admin.seller.v1alpha1.MeasureActionUnavailability end_unavailabilities = 41;
    */
   endUnavailabilities: MeasureActionUnavailability[];
 
@@ -562,7 +562,7 @@ export type Measure = Message<"hawkr.admin.seller.v1alpha1.Measure"> & {
    * 撤銷或接受申覆時能不能一併撤銷認定（RevokeMeasureRequest、DecideAppealRequest 的 revoke_findings）：依據是 VIOLATION，而且這個措施自己建立了至少一筆
    * 尚未撤銷的認定；只引用別的措施建立的認定時是 false。與兩個方法對 revoke_findings 的檢查是同一個規則（model/measure.go）。
    *
-   * @generated from field: bool can_revoke_findings = 43;
+   * @generated from field: bool can_revoke_findings = 42;
    */
   canRevokeFindings: boolean;
 
@@ -570,14 +570,14 @@ export type Measure = Message<"hawkr.admin.seller.v1alpha1.Measure"> & {
    * 複審的期限，只在風險類型（RISK）的措施、生效中、而且已進入 review_by 前 24 小時時設：開始時間是 review_by 前 24 小時，期限是 review_by；
    * review_by 過了之後仍在，直到措施結束或撤銷。review_by 本身是事實欄位，撤銷後仍輸出。
    *
-   * @generated from field: hawkr.common.v1alpha1.Deadline review_deadline = 44;
+   * @generated from field: hawkr.common.v1alpha1.Deadline review_deadline = 43;
    */
   reviewDeadline?: Deadline | undefined;
 
   /**
    * 內容下架（kind 是 CONTENT_TAKEDOWN）的對象，依種類、id 排序；其他種類沒有。建立後不能改（UpdateMeasure 不收），要改就撤銷再建立。
    *
-   * @generated from field: repeated hawkr.seller.v1alpha1.ContentRef contents = 46;
+   * @generated from field: repeated hawkr.seller.v1alpha1.ContentRef contents = 44;
    */
   contents: ContentRef[];
 };
@@ -642,7 +642,7 @@ export type LinkedAccount = Message<"hawkr.admin.seller.v1alpha1.LinkedAccount">
   storeCode: string;
 
   /**
-   * 命中的身分類別；同時命中多種時依 NATIONAL_ID、UBN、RESPONSIBLE_PERSON_ID、BANK_ACCOUNT 的順序取第一種。
+   * 命中的身分類別；同時命中多種時依 UBN、BANK_ACCOUNT 的順序取第一種。
    *
    * @generated from field: hawkr.admin.seller.v1alpha1.LinkedIdentity matched_identity = 4;
    */
@@ -670,6 +670,21 @@ export type LinkedAccount = Message<"hawkr.admin.seller.v1alpha1.LinkedAccount">
    * @generated from field: hawkr.admin.seller.v1alpha1.TerminationOption termination_option = 7;
    */
   terminationOption?: TerminationOption | undefined;
+
+  /**
+   * 這一對（本措施、這個帳號）此刻在後台待辦（SHARED_BANK_ACCOUNT）：措施建立之後，這個帳號才同步了相同的銀行帳號 fingerprint，而且還沒有人標為已檢視。
+   * 由伺服器推導（待辦的成員定義 seller.review_shared_bank_account）；true 時 client 顯示「標為已檢視」。
+   *
+   * @generated from field: bool shared_bank_account_pending = 8;
+   */
+  sharedBankAccountPending: boolean;
+
+  /**
+   * 管理員標為已檢視的時間；還沒有時不設。
+   *
+   * @generated from field: google.protobuf.Timestamp reviewed_time = 9;
+   */
+  reviewedTime?: Timestamp | undefined;
 };
 
 /**
@@ -840,32 +855,18 @@ export enum LinkedIdentity {
   UNSPECIFIED = 0,
 
   /**
-   * 賣家本人的身分證號相同。
-   *
-   * @generated from enum value: LINKED_IDENTITY_NATIONAL_ID = 1;
-   */
-  NATIONAL_ID = 1,
-
-  /**
    * 統一編號相同。
    *
-   * @generated from enum value: LINKED_IDENTITY_UBN = 2;
+   * @generated from enum value: LINKED_IDENTITY_UBN = 1;
    */
-  UBN = 2,
+  UBN = 1,
 
   /**
-   * 企業負責人的身分證號相同。
+   * 金流商回報的銀行帳號指紋相同。只列出，不能據以建立關聯終止（can_create_linked_termination 為 false，除非同時命中統一編號）。
    *
-   * @generated from enum value: LINKED_IDENTITY_RESPONSIBLE_PERSON_ID = 3;
+   * @generated from enum value: LINKED_IDENTITY_BANK_ACCOUNT = 2;
    */
-  RESPONSIBLE_PERSON_ID = 3,
-
-  /**
-   * 銀行帳號（連同銀行代碼）相同。只列出，不能據以建立關聯終止（can_create_linked_termination 為 false，除非同時命中上面的身分）。
-   *
-   * @generated from enum value: LINKED_IDENTITY_BANK_ACCOUNT = 4;
-   */
-  BANK_ACCOUNT = 4,
+  BANK_ACCOUNT = 2,
 }
 
 /**

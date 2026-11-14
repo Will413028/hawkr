@@ -9,6 +9,7 @@ import {
 	useTransport,
 } from "@connectrpc/connect-query";
 import { IdentityAdminService } from "@hawkr/api/gen/hawkr/admin/identity/v1alpha1/identity_pb";
+import { PaymentAdminService } from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1/payment_pb";
 import {
 	type CreateMeasureRequestSchema,
 	SellerGovernanceAdminService,
@@ -18,7 +19,6 @@ import { SellerAdminService } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/s
 import { DeleteAccountResponse_DeletionState } from "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb";
 import {
 	KYCStatus,
-	PayUniBindStatus,
 	StoreStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -38,6 +38,7 @@ import {
 import { type ActionResult, runAction } from "@/lib/connect-action";
 import { connectErrorText } from "@/lib/error-text";
 import { formatDateTimeShort } from "@/lib/format";
+import { isKycApproved } from "@/lib/kyc-status";
 import { formatProductPriceRange } from "@/lib/product-price";
 import { getStatusMeta } from "@/lib/product-status";
 import { unavailableLabels } from "@/lib/unavailability";
@@ -46,7 +47,7 @@ import { useScrollToHash } from "@/lib/use-scroll-to-hash";
 import { api } from "@/services/api";
 import { imageUri } from "@/utils/image";
 import { buildImageUrl } from "@/utils/media";
-import { flowBadge } from "../store-row";
+import { kycBadge } from "../store-row";
 import {
 	ActiveMeasureCards,
 	ScheduledTerminationNotice,
@@ -62,26 +63,23 @@ import {
 import {
 	KycBasicInfoCard,
 	KycDocumentsCard,
-	KycIdentityCard,
 	KycOtherInfoCard,
 	KycRejectionNotice,
-	KycRevealBar,
 	KycReviewHistoryCard,
 } from "./KycApplicationCards";
 import {
+	APPROVE_HINT_TEXT,
 	APPROVE_SUCCESS_TEXT,
-	activeReveal,
 	buildRejectRequest,
 	documentChoices,
 	draftAfter,
 	EMPTY_REVIEW_DRAFT,
 	issuableFieldOptions,
 	KYC_CONFLICT_TEXT,
-	REBIND_SUCCESS_TEXT,
+	type PreviewImage,
 	REJECT_SUCCESS_TEXT,
 	REQUERY_SUCCESS_TEXT,
 	type ReviewDraft,
-	revealFrom,
 	reviewActions,
 	reviewBlockedLabel,
 	writeRequeryResult,
@@ -92,20 +90,10 @@ import {
 	terminationAvailability,
 	terminationCreatedText,
 } from "./measure";
-import { PayUniContactCard, PayUniStatusCard } from "./PayUniCards";
+import { OnboardingSummaryCard } from "./OnboardingSummaryCard";
+import { PaymentAccountSection } from "./PaymentAccountCard";
 import ProductForceUnpublishDialog from "./ProductForceUnpublishDialog";
 import RejectKycDialog from "./RejectKycDialog";
-import RevealKycDialog from "./RevealKycDialog";
-import {
-	closePreview as closePreviewState,
-	EMPTY_REVEAL_STATE,
-	expireReveal,
-	hideReveal,
-	openPreview as openPreviewState,
-	type RevealState,
-	scheduleRevealExpiry,
-	showReveal,
-} from "./reveal-state";
 import SellerAccountDeleteDialog from "./SellerAccountDeleteDialog";
 import {
 	closerLabel,
@@ -119,8 +107,9 @@ import {
 	useAccountEmail,
 	useKycApplication,
 	useNowUntil,
-	usePayUniRegistration,
+	usePaymentAccount,
 	useStoreDetail,
+	useStoreOnboarding,
 	useStoreRating,
 } from "./use-store-detail";
 import "@/styles/pages/DelegatedOperations.css";
@@ -217,10 +206,9 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 	// 審核員正在填的內容（退回的逐項問題、總理由與內部備註）。送出失敗（含版本衝突）時整份保留，成功才清空（draftAfter）。
 	const [draft, setDraft] = useState<ReviewDraft>(EMPTY_REVIEW_DRAFT);
 	const [showRejectModal, setShowRejectModal] = useState(false);
-	const [showRevealDialog, setShowRevealDialog] = useState(false);
-	// 顯示全文的結果與放大中的證件影像只在這裡（瀏覽器記憶體）：到期、收起或離開頁面就一起沒了（reveal-state.ts），不寫進任何儲存。
-	const [secret, setSecret] = useState<RevealState>(EMPTY_REVEAL_STATE);
-	// 建立風險措施、建立終止合作、措施詳情、結束措施、刪除帳號、退回、顯示全文的對話框各自在獨立元件（它們的 a11y 三件套與輸入狀態在那裡）。
+	// 放大中的補充文件影像只在這裡（瀏覽器記憶體），不寫進任何儲存。
+	const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
+	// 建立風險措施、建立終止合作、措施詳情、結束措施、刪除帳號、退回的對話框各自在獨立元件（它們的 a11y 三件套與輸入狀態在那裡）。
 	// 結束措施記要結束的措施 id，不記整個措施：對話框每次都顯示最新讀到的那一筆（etag 也是），重讀之後不會拿舊的 etag 送出。
 	const [showCreateMeasureModal, setShowCreateMeasureModal] = useState(false);
 	const [showCreateViolationMeasure, setShowCreateViolationMeasure] =
@@ -251,17 +239,17 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 	// 商家認證的申請內容（GetKYCApplication；申請 ID 來自 GetStore.kyc）。它失敗不擋整頁：KYC 區塊各自顯示錯誤與重試。
 	// 沒有送出過的申請（GetStore 沒有 kyc 摘要）時不發請求，也不顯示 KYC 區塊。
 	const kycSummary = detail?.kyc;
-	// 「已通過」看 KYC 的人工決定（KYCStatus.APPROVED，與清單的「已核准」同義）；PayUni 的結果另看 PayUni 卡。
-	const isApproved = kycSummary?.status === KYCStatus.KYC_STATUS_APPROVED;
+	// 「已通過」看 KYC 的人工決定（KYCStatus.APPROVED，與清單的「已核准」同義）。
+	const isApproved = isKycApproved(kycSummary?.status);
 	// 評分統計卡：與買家看到的店面同一個來源（公開 GetStore 的 StoreStats）；讀不到（含已關閉、未公開）就沒有值，那張卡不渲染。
 	const rating = useStoreRating(store?.storeCode, isApproved);
 	const kycQuery = useKycApplication(kycSummary?.applicationId);
 	const application =
 		kycQuery.value.state === "ready" ? kycQuery.value.application : undefined;
-	// PayUni 子商店註冊（GetPayUniRegistration）：第一次核准前是 not_found（尚未註冊）。
-	const payUni = usePayUniRegistration(store?.id);
-	const payUniRegistration =
-		payUni.value.state === "ready" ? payUni.value.registration : undefined;
+	// 收款帳戶（GetPaymentAccount）：核准前是 not_found（尚未建立）；核准、退回後與待辦一起重讀。
+	const paymentAccount = usePaymentAccount(store?.id);
+	// 開通任務（GetStoreOnboarding）：平台審核與收款帳戶都會改變它，核准、退回與收款帳戶的動作後重讀。
+	const onboarding = useStoreOnboarding(store?.id);
 	// 核准、退回與重新查詢的可用性只讀伺服器（申請的 can_approve、can_reject、can_requery_registration；前提 2026-10-15）。
 	// 核准不能做而且第一個原因不是結構性的（店家已關閉、等待刪除、帳號停權）時，不顯示按鈕，改顯示伺服器的第一個原因（blockedLabel）；
 	// 伺服器列出全部原因，畫面只顯示第一個。
@@ -275,19 +263,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 			? timestampDate(pendingCheck.deadlineTime)
 			: undefined,
 	);
-	// 綁定從 PENDING 走到終態時，GetStore 的流程狀態（kyc.flow_status，頁首的徽章）也要重讀。
-	const bindStatus = payUniRegistration?.bindStatus;
-	const previousBindStatus = useRef(bindStatus);
-	useEffect(() => {
-		if (
-			previousBindStatus.current === PayUniBindStatus.PENDING &&
-			bindStatus !== PayUniBindStatus.PENDING
-		) {
-			void storeQuery.refetch();
-		}
-		previousBindStatus.current = bindStatus;
-	}, [bindStatus, storeQuery.refetch]);
-
 	// 商品 / 訂單分頁懶載：用 enabled 取代「切到該 tab 才 fetch」的手刻 effect。
 	// owner_id 是 admin_product.go SearchAdminProducts 自己解析的 filter：後端拿到
 	// 這個值後呼叫 CurrentSellerAccountID(ownerID) 把「帳號」解析成現任 store
@@ -431,18 +406,24 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		{ onSuccess: invalidateStore },
 	);
 
-	// 商家認證（K1、K3、K7）：核准與退回帶讀到的 etag；成功後店家（KYC 摘要）、申請、PayUni 註冊與列表一起重讀。
+	// 商家認證（K1、K3、K7）：核准與退回帶讀到的 etag；成功後店家（KYC 摘要）、申請與列表一起重讀。
 	const invalidateKyc = () => {
 		invalidateStore();
 		queryClient.invalidateQueries({
 			queryKey: createConnectQueryKey({
-				schema: SellerAdminService.method.getKYCApplication,
+				schema: PaymentAdminService.method.getPaymentAccount,
 				cardinality: undefined,
 			}),
 		});
 		queryClient.invalidateQueries({
 			queryKey: createConnectQueryKey({
-				schema: SellerAdminService.method.getPayUniRegistration,
+				schema: SellerAdminService.method.getStoreOnboarding,
+				cardinality: undefined,
+			}),
+		});
+		queryClient.invalidateQueries({
+			queryKey: createConnectQueryKey({
+				schema: SellerAdminService.method.getKYCApplication,
 				cardinality: undefined,
 			}),
 		});
@@ -455,18 +436,9 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		SellerAdminService.method.rejectKYC,
 		{ onSuccess: invalidateKyc },
 	);
-	// 回應含明文：不讓它留在 mutation cache（gcTime 0），到期、收起時另外 reset()。
-	const revealMutation = useConnectMutation(
-		SellerAdminService.method.revealKYCSensitive,
-		{ gcTime: 0 },
-	);
 	// 重新查詢成功不整筆重讀申請：回應就是那筆進行中的查詢（帶期限），直接寫進申請的快取（handleRequery），輪詢隨後接手。
 	const requeryMutation = useConnectMutation(
 		SellerAdminService.method.requeryKYCRegistration,
-	);
-	const rebindMutation = useConnectMutation(
-		SellerAdminService.method.rebindPayUni,
-		{ onSuccess: invalidateKyc },
 	);
 	const submitting = approveMutation.isPending || rejectMutation.isPending;
 
@@ -477,42 +449,8 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 	);
 
 	const openPreview = (src: string, alt: string) =>
-		setSecret((cur) => openPreviewState(cur, { src, alt }));
-	const closePreview = () => setSecret((cur) => closePreviewState(cur));
-	// 收起全文：明文、放大圖一起清掉，mutation 的回應資料也一起清（明文不留在 mutation data）。
-	const hideSecret = () => {
-		setSecret(hideReveal());
-		revealMutation.reset();
-	};
-
-	// 顯示全文到期就收回成遮蔽值（K15、D4 第 5 點）：明文與已打開的放大圖一起清掉。計時器可能提早觸發或在背景分頁被延後，
-	// 所以觸發時還沒到期就重排（scheduleRevealExpiry），回到前景時也再檢查一次。換店時整頁以 key 重新掛載，狀態一起沒了。
-	const revealMutationReset = revealMutation.reset;
-	useEffect(() => {
-		const reveal = secret.reveal;
-		if (!reveal) return;
-		const schedule = scheduleRevealExpiry(
-			reveal,
-			() => {
-				setSecret((cur) => expireReveal(cur, new Date()));
-				revealMutationReset();
-			},
-			{
-				now: () => new Date(),
-				setTimer: (callback, ms) => setTimeout(callback, ms),
-				clearTimer: (handle) =>
-					clearTimeout(handle as ReturnType<typeof setTimeout>),
-			},
-		);
-		const onVisible = () => {
-			if (document.visibilityState === "visible") schedule.recheck();
-		};
-		document.addEventListener("visibilitychange", onVisible);
-		return () => {
-			schedule.cancel();
-			document.removeEventListener("visibilitychange", onVisible);
-		};
-	}, [secret.reveal, revealMutationReset]);
+		setPreviewImage({ src, alt });
+	const closePreview = () => setPreviewImage(null);
 
 	// 強制下架的按鈕在商品分頁的表格裡，而結果提示掛在頁首下方——不捲進來的話,
 	// 使用者會在一個看不到任何回饋的位置以為操作沒有發生。`block: "nearest"` 讓
@@ -682,25 +620,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		return result;
 	};
 
-	// 顯示全文：寫稽核、授權 15 分鐘。失敗交回對話框顯示；成功才存下結果。
-	const handleReveal = async (reason: string) => {
-		if (!application) {
-			throw new Error("申請內容還沒載入，請稍後再試。");
-		}
-		const res = await revealMutation.mutateAsync({
-			id: application.id,
-			reason,
-		});
-		const next = revealFrom(application.id, res);
-		if (!next) {
-			throw new Error(
-				"伺服器沒有回傳全文的有效期限，所以不顯示全文；請稍後再試。",
-			);
-		}
-		setSecret(showReveal(next));
-		setShowRevealDialog(false);
-	};
-
 	const handleRequery = async () => {
 		if (!application) return;
 		setNotice(null);
@@ -717,20 +636,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 			setNotice({
 				tone: "error",
 				text: connectErrorText(caught, "重新查詢失敗，請稍後再試一次。"),
-			});
-		}
-	};
-
-	const handleRebind = async () => {
-		if (!store?.id) return;
-		setNotice(null);
-		try {
-			await rebindMutation.mutateAsync({ storeId: store.id });
-			setNotice({ tone: "success", text: REBIND_SUCCESS_TEXT });
-		} catch (caught) {
-			setNotice({
-				tone: "error",
-				text: connectErrorText(caught, "重新綁定失敗，請稍後再試一次。"),
 			});
 		}
 	};
@@ -794,15 +699,11 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 	const termination = terminationAvailability(detail);
 	const lifecycle = lifecycleBadge(store.status);
 	const logo = imageUri(store.logo, "avatar");
-	// 商家認證與 PayUni：沒有送出過的申請（GetStore 沒有 kyc 摘要）時沒有狀態徽章與 KYC 區塊。
-	const statusBadge = kycSummary ? flowBadge(kycSummary.flowStatus) : undefined;
-	// 顯示全文：過期的（或別份申請的）一律當作沒有；放大圖只在授權還在時顯示。
-	const liveReveal = activeReveal(secret.reveal, application?.id, new Date());
-	const previewImage = liveReveal ? secret.preview : null;
+	// 商家認證：沒有送出過的申請（GetStore 沒有 kyc 摘要）時徽章是「尚未申請」，沒有 KYC 區塊。
+	const statusBadge = kycBadge(kycSummary?.status);
 	const isRejected = application?.status === KYCStatus.KYC_STATUS_REJECTED;
 	const anyDialogOpen =
 		showRejectModal ||
-		showRevealDialog ||
 		showCreateMeasureModal ||
 		showCreateViolationMeasure ||
 		endTarget !== undefined ||
@@ -859,13 +760,9 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 						<div className="header-info">
 							<div className="header-title-row">
 								<h1 className="merchant-name">{store.storeName}</h1>
-								{kycSummary ? (
-									<StatusBadge variant={statusBadge?.variant ?? "gray"}>
-										{statusBadge?.label ?? "狀態不明"}
-									</StatusBadge>
-								) : (
-									<StatusBadge variant="gray">未申請認證</StatusBadge>
-								)}
+								<StatusBadge variant={statusBadge.variant}>
+									{statusBadge.label}
+								</StatusBadge>
 								{lifecycle && (
 									<StatusBadge variant={lifecycle.variant}>
 										{lifecycle.label}
@@ -954,15 +851,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 										</span>
 									</>
 								)}
-								{payUniRegistration?.merId && (
-									<>
-										<span className="meta-separator">·</span>
-										{/* `merId` 是 PayUni 的金流商家編號（`HAWK<store_id>`），與上面
-											那個「商店代號」（`storeCode`）不是同一個東西 —— 兩者共用
-											同一個標籤時，同一列會出現兩個「商店代號：」而值不同。 */}
-										<span>金流商家編號：{payUniRegistration.merId}</span>
-									</>
-								)}
 							</div>
 						</div>
 					</div>
@@ -1004,7 +892,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 							}}
 						>
 							<span style={{ fontSize: "12px", color: "#8a8a8a" }}>
-								核准後系統會向 PayUni 註冊
+								{APPROVE_HINT_TEXT}
 							</span>
 							<button
 								type="button"
@@ -1175,10 +1063,8 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 					<div className="audit-notice-content">
 						<div className="audit-notice-title">審核備註</div>
 						<div className="audit-notice-text">
-							重點核對「<span className="highlight">營業登記證</span>」與「
-							<span className="highlight">負責人身分證</span>」、「
-							<span className="highlight">統一編號</span>
-							」是否一致，並確認所有證件皆在有效期內。
+							重點核對<span className="highlight">營業登記資料</span>與
+							<span className="highlight">統一編號</span>是否一致
 						</div>
 					</div>
 				</div>
@@ -1187,28 +1073,20 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				<KycRejectionNotice application={application} />
 			)}
 
-			{/* PayUni 狀態卡 — 獨立於 Hawkr KYC 核准狀態，approved 後仍顯示；比照本區其他區塊只在 basic tab 顯示。 */}
+			{/* 開通摘要卡（GetStoreOnboarding）— 只讀，與賣家看到的同一份任務；在收款帳戶卡之上。 */}
 			{(!isApproved || activeTab === "basic") && (
-				<PayUniStatusCard
-					state={payUni.value}
-					hasApplication={kycSummary !== undefined}
-					rebinding={rebindMutation.isPending}
-					onRebind={() => void handleRebind()}
-					onRetry={() => void payUni.query.refetch()}
+				<OnboardingSummaryCard
+					state={onboarding.value}
+					onReload={() => void onboarding.query.refetch()}
 				/>
 			)}
 
-			{/* PayUni 聯絡資訊 — 店家自己的聯絡欄位（K9）；全空或還沒有註冊時整張卡不渲染。 */}
+			{/* 收款帳戶卡（GetPaymentAccount）— 獨立於平台審核狀態，核准後仍顯示；錨點 #payment-account。 */}
 			{(!isApproved || activeTab === "basic") && (
-				<PayUniContactCard store={store} registration={payUniRegistration} />
-			)}
-
-			{/* 商家認證：顯示全文列。沒有送出過的申請時不顯示。 */}
-			{(!isApproved || activeTab === "basic") && application && (
-				<KycRevealBar
-					reveal={liveReveal}
-					onReveal={() => openDialog(() => setShowRevealDialog(true))}
-					onHide={hideSecret}
+				<PaymentAccountSection
+					storeId={store.id}
+					payment={paymentAccount}
+					onNotice={setNotice}
 				/>
 			)}
 
@@ -1218,21 +1096,14 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 					{/* Left Column */}
 					<div className="detail-left-column">
 						{application ? (
-							<>
-								<KycBasicInfoCard
-									store={store}
-									application={application}
-									now={now}
-									canRequery={reviewable.canRequery}
-									requerying={requeryMutation.isPending}
-									onRequery={() => void handleRequery()}
-								/>
-								<KycIdentityCard
-									application={application}
-									reveal={liveReveal}
-									onPreview={openPreview}
-								/>
-							</>
+							<KycBasicInfoCard
+								store={store}
+								application={application}
+								now={now}
+								canRequery={reviewable.canRequery}
+								requerying={requeryMutation.isPending}
+								onRequery={() => void handleRequery()}
+							/>
 						) : (
 							<div
 								style={{
@@ -1276,7 +1147,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 						<div className="detail-right-column">
 							<KycDocumentsCard
 								application={application}
-								reveal={liveReveal}
 								onPreview={openPreview}
 							/>
 							<KycOtherInfoCard store={store} application={application} />
@@ -1507,7 +1377,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 					draft={draft}
 					onDraftChange={setDraft}
 					options={issuableFieldOptions(application)}
-					choices={documentChoices(liveReveal)}
+					choices={documentChoices(application)}
 					blockedReason={
 						reviewable.canReject
 							? undefined
@@ -1515,15 +1385,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 					}
 					onClose={() => setShowRejectModal(false)}
 					onConfirm={handleReject}
-				/>
-			)}
-
-			{/* 顯示全文（RevealKYCSensitive）：理由必填，授權 15 分鐘。 */}
-			{showRevealDialog && (
-				<RevealKycDialog
-					storeName={store.storeName}
-					onClose={() => setShowRevealDialog(false)}
-					onConfirm={handleReveal}
 				/>
 			)}
 

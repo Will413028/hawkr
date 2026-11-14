@@ -220,3 +220,26 @@ func TestAppLoginProceduresShareTheirOwnTier(t *testing.T) {
 		t.Error("tierAppLogin 要有自己的計數器名稱")
 	}
 }
+
+func TestRateLimitDenialNegotiatesTheLocale(t *testing.T) {
+	path := sellerconnect.SellerReportPublicServiceSubmitFoodSafetyReportProcedure
+	svcPath, _, _ := strings.Cut(strings.TrimPrefix(path, "/"), "/")
+	h, err := assemble(Deps{
+		Now: func() time.Time { return entryNow }, Origins: []string{testOrigin},
+		OriginAuth: OriginAuth{Main: []byte("main-secret"), CI: []byte("ci-secret")}, Logger: slog.New(slog.DiscardHandler),
+	}, []service{{"/" + svcPath + "/", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec *httptest.ResponseRecorder
+	for range 6 {
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, strings.NewReader("{}"))
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("Accept-Language", "en")
+		r.RemoteAddr = "192.0.2.9:4000"
+		rec = do(h, r)
+	}
+	if rec.Code != http.StatusTooManyRequests || !slices.Contains(rec.Header().Values("Vary"), "Accept-Language") {
+		t.Fatalf("429 = %d，Vary = %v", rec.Code, rec.Header().Values("Vary"))
+	}
+}

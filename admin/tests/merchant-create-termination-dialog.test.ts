@@ -660,7 +660,7 @@ function linkedRows(canCreateFirst: boolean) {
 			accountId: "acc-3",
 			storeId: "300",
 			storeCode: "S300",
-			matchedIdentity: LinkedIdentity.NATIONAL_ID,
+			matchedIdentity: LinkedIdentity.BANK_ACCOUNT,
 			linkedMeasureId: "m77",
 		}),
 	];
@@ -681,7 +681,7 @@ test("措施詳情頁：有命中時列出相同身分的其他帳號（店號�
 	await d.mount();
 	assert.match(bodyText(), /相同身分的其他帳號/u);
 	assert.match(bodyText(), /統編/u);
-	assert.match(bodyText(), /身分證號/u);
+	assert.match(bodyText(), /銀行帳號/u);
 	assert.match(bodyText(), /已建立關聯終止（措施 m77）/u);
 	assert.match(bodyText(), /申覆期限2027\/05\/18 10:00/u);
 	const links = [...dom.window.document.querySelectorAll("a")].map((a) =>

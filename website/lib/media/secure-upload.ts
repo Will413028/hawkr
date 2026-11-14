@@ -19,8 +19,8 @@
  *   - No public `previewUrl` is exposed; the caller only gets a token to
  *     pass into the certification submit body.
  *
- * Caller passes the token into `submitCertification({ idCardFrontStagedToken,
- * bankBookStagedToken, … })` etc. Backend resolves the token to the
+ * Caller passes the token as a `staged_token` of the certification request
+ * (company supplementary documents). Backend resolves the token to the
  * encrypted asset at submit time.
  */
 

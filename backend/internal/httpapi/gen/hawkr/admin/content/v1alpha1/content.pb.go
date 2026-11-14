@@ -223,16 +223,16 @@ type AppVersionGate struct {
 	// 識別一組門檻。
 	AppType v1alpha11.AppType `protobuf:"varint,1,opt,name=app_type,json=appType,proto3,enum=hawkr.content.v1alpha1.AppType" json:"app_type,omitempty"`
 	// 最低可用版本，x.y.z 三段數字；低於它的 App 必須更新。
-	MinimumVersion string `protobuf:"bytes,3,opt,name=minimum_version,json=minimumVersion,proto3" json:"minimum_version,omitempty"`
+	MinimumVersion string `protobuf:"bytes,2,opt,name=minimum_version,json=minimumVersion,proto3" json:"minimum_version,omitempty"`
 	// 前往更新的商店網址，只接受 https://、itms-apps:// 開頭；空字串表示還沒設定。
-	StoreUrl string `protobuf:"bytes,4,opt,name=store_url,json=storeUrl,proto3" json:"store_url,omitempty"`
+	StoreUrl string `protobuf:"bytes,3,opt,name=store_url,json=storeUrl,proto3" json:"store_url,omitempty"`
 	// 強制更新畫面的標題。
-	NoticeTitle string `protobuf:"bytes,5,opt,name=notice_title,json=noticeTitle,proto3" json:"notice_title,omitempty"`
+	NoticeTitle string `protobuf:"bytes,4,opt,name=notice_title,json=noticeTitle,proto3" json:"notice_title,omitempty"`
 	// 強制更新畫面的內文。
-	NoticeBody string                 `protobuf:"bytes,6,opt,name=notice_body,json=noticeBody,proto3" json:"notice_body,omitempty"`
-	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	NoticeBody string                 `protobuf:"bytes,5,opt,name=notice_body,json=noticeBody,proto3" json:"notice_body,omitempty"`
+	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	// 目前的版本，client 當成不透明的字串。修改時帶讀到的值。
-	Etag          string `protobuf:"bytes,8,opt,name=etag,proto3" json:"etag,omitempty"`
+	Etag          string `protobuf:"bytes,7,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1084,14 +1084,14 @@ const file_hawkr_admin_content_v1alpha1_content_proto_rawDesc = "" +
 	"\x04etag\x18\x10 \x01(\tR\x04etag\"\xb9\x02\n" +
 	"\x0eAppVersionGate\x12B\n" +
 	"\bapp_type\x18\x01 \x01(\x0e2\x1f.hawkr.content.v1alpha1.AppTypeB\x06\xe0A\x02\xe0A\x05R\aappType\x12,\n" +
-	"\x0fminimum_version\x18\x03 \x01(\tB\x03\xe0A\x02R\x0eminimumVersion\x12\x1b\n" +
-	"\tstore_url\x18\x04 \x01(\tR\bstoreUrl\x12!\n" +
-	"\fnotice_title\x18\x05 \x01(\tR\vnoticeTitle\x12\x1f\n" +
-	"\vnotice_body\x18\x06 \x01(\tR\n" +
+	"\x0fminimum_version\x18\x02 \x01(\tB\x03\xe0A\x02R\x0eminimumVersion\x12\x1b\n" +
+	"\tstore_url\x18\x03 \x01(\tR\bstoreUrl\x12!\n" +
+	"\fnotice_title\x18\x04 \x01(\tR\vnoticeTitle\x12\x1f\n" +
+	"\vnotice_body\x18\x05 \x01(\tR\n" +
 	"noticeBody\x12@\n" +
-	"\vupdate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\vupdate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x12\n" +
-	"\x04etag\x18\b \x01(\tR\x04etag\"P\n" +
+	"\x04etag\x18\a \x01(\tR\x04etag\"P\n" +
 	"\x12ListBannersRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +

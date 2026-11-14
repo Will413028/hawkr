@@ -16,45 +16,114 @@
       "message": "終止合作的申覆期限已過",
       "description": "申覆不可用：終止合作的申覆期間已結束（APPEAL_WINDOW_ENDED）；期限本身另以「申覆期限」顯示。"
     },
-    "kyc.resubmit_unavailable.payuni_approved": {
+    "kyc.edit_unavailable.approved": {
       "message": "商家認證已通過，不需要修改或重新送出。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：已核准、PayUni 也核准（PAYUNI_APPROVED）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
+      "description": "SaveKYCDraft 與 SubmitKYC 不能做：申請已核准。"
     },
-    "kyc.resubmit_unavailable.payuni_contact_support": {
-      "message": "這個問題無法以修改資料解決，請聯繫客服了解原因。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：已核准、問題無法由賣家修正（PAYUNI_CONTACT_SUPPORT）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
-    },
-    "kyc.resubmit_unavailable.payuni_fix_via_support": {
-      "message": "要修正的是店家設定裡的資料，修正後請聯繫客服重新處理，商家認證不需要重新送出。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：已核准、PayUni 指出的是店家欄位（PAYUNI_FIX_VIA_SUPPORT）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
-    },
-    "kyc.resubmit_unavailable.payuni_pending_info": {
-      "message": "PayUni 要求補件，請依 PayUni 通知信的指示處理，商家認證不需要在這裡修改或重新送出。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：已核准、PayUni 要求補件（PAYUNI_PENDING_INFO）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
-    },
-    "kyc.resubmit_unavailable.payuni_retry_later": {
-      "message": "PayUni 暫時無法處理，平台會協助重新送出，你不需要修改或重新送出。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：已核准、PayUni 暫時無法處理（PAYUNI_RETRY_LATER）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
-    },
-    "kyc.resubmit_unavailable.payuni_reviewing": {
-      "message": "PayUni 正在審查你的資料，審查期間不能修改或重新送出商家認證。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：已核准、PayUni 綁定中或審核中（PAYUNI_REVIEWING）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
-    },
-    "kyc.resubmit_unavailable.payuni_terminated": {
-      "message": "PayUni 收款帳戶已終止，無法修改或重新送出，請聯繫客服。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：已核准、PayUni 端的商店已終止（PAYUNI_TERMINATED）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
-    },
-    "kyc.resubmit_unavailable.under_review": {
-      "message": "申請審核中，請等待審核結果。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：申請送審中，PayUni 已收下店家，不能取消（UNDER_REVIEW）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
-    },
-    "kyc.resubmit_unavailable.under_review_cancelable": {
+    "kyc.edit_unavailable.under_review": {
       "message": "申請審核中，要修改請先取消申請。",
-      "description": "SaveKYCDraft 與 SubmitKYC 不能做：申請送審中，PayUni 還沒收下店家，可以先取消再修改（UNDER_REVIEW_CANCELABLE）。兩個 RPC 被擋下時錯誤的訊息與 KYCFlow.resubmit_unavailabilities 的 message 是同一句。"
+      "description": "SaveKYCDraft 與 SubmitKYC 不能做：申請審核中（SUBMITTED），要修改先 CancelKYC。"
     },
     "measure.retry_exhausted": {
       "message": "措施剛剛有變動，請重試。",
       "description": "撤銷（後台）或申覆、解除請求（賣家）要鎖的帳號範圍在預讀與鎖住之間反覆變動（剛好有新的關聯終止或引用），重跑次數用完（Unavailable，可重送）。沿用撤銷原本寫死的句子。"
+    },
+    "onboarding.payment_account.action_required": {
+      "message": "提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。",
+      "description": "開通任務收款帳戶的狀態句：賣家要補資料（ACTION_REQUIRED，可以開通 session）。"
+    },
+    "onboarding.payment_account.completed": {
+      "message": "收款帳戶已啟用。",
+      "description": "開通任務收款帳戶的狀態句：已啟用（COMPLETED，依 seller 自存的轉帳能力副本）。"
+    },
+    "onboarding.payment_account.create_failed": {
+      "message": "收款帳戶建立失敗，請聯絡客服。",
+      "description": "開通任務收款帳戶的狀態句：建立收款帳戶的重試用完、進入後台待辦等營運重試（有帳戶列、沒有外部帳戶、有 create_failed_at；ACTION_REQUIRED，下一步聯絡客服）。"
+    },
+    "onboarding.payment_account.disabled": {
+      "message": "金流商目前無法啟用你的收款帳戶，請聯絡客服。",
+      "description": "開通任務收款帳戶的狀態句：被金流商拒絕、不支援或限制（DISABLED，ACTION_REQUIRED）。"
+    },
+    "onboarding.payment_account.locked": {
+      "message": "平台審核通過後才能設定收款帳戶。",
+      "description": "開通任務收款帳戶的狀態句：平台審核還沒完成（LOCKED）。"
+    },
+    "onboarding.payment_account.not_available": {
+      "message": "目前還沒有開放收款設定，開放後你就能繼續。",
+      "description": "開通任務收款帳戶的狀態句：這個環境沒有設定收款開通，帳戶不會被建立（IN_PROGRESS，沒有下一步）。"
+    },
+    "onboarding.payment_account.preparing": {
+      "message": "正在建立收款帳戶，通常幾分鐘內完成。",
+      "description": "開通任務收款帳戶的狀態句：帳戶還沒有建立完成（NOT_CREATED，或還沒有帳戶列；IN_PROGRESS）。"
+    },
+    "onboarding.payment_account.syncing": {
+      "message": "收款帳戶的狀態正在更新，請稍後再查看。",
+      "description": "開通任務收款帳戶的狀態句：帳戶讀到已啟用，但 seller 的副本還沒有更新（IN_PROGRESS）。"
+    },
+    "onboarding.payment_account.under_review": {
+      "message": "金流商審核中，你不需要做任何事。",
+      "description": "開通任務收款帳戶的狀態句：金流商審核中（UNDER_REVIEW，IN_PROGRESS）。"
+    },
+    "onboarding.payment_account.unknown": {
+      "message": "目前讀不到收款帳戶的狀態，請稍後再試。",
+      "description": "開通任務收款帳戶的狀態句：讀取失敗（UNKNOWN）。"
+    },
+    "onboarding.platform_review.cancelled": {
+      "message": "商家認證申請已取消，可以重新送出。",
+      "description": "開通任務平台審核的狀態句：已取消（CANCELLED，ACTION_REQUIRED）。"
+    },
+    "onboarding.platform_review.completed": {
+      "message": "商家認證已通過。",
+      "description": "開通任務平台審核的狀態句：已通過（COMPLETED）。"
+    },
+    "onboarding.platform_review.draft": {
+      "message": "商家認證申請還是草稿，尚未送出。",
+      "description": "開通任務平台審核的狀態句：草稿（DRAFT，ACTION_REQUIRED）。"
+    },
+    "onboarding.platform_review.not_submitted": {
+      "message": "還沒有送出商家認證申請。",
+      "description": "開通任務平台審核的狀態句：沒有申請（ACTION_REQUIRED）。"
+    },
+    "onboarding.platform_review.rejected": {
+      "message": "商家認證申請需要修改，修改後請重新送出。",
+      "description": "開通任務平台審核的狀態句：被退回（REJECTED，ACTION_REQUIRED）。"
+    },
+    "onboarding.platform_review.submitted": {
+      "message": "商家認證申請審核中，你不需要做任何事。",
+      "description": "開通任務平台審核的狀態句：審核中（SUBMITTED，IN_PROGRESS）。"
+    },
+    "onboarding.platform_review.unknown": {
+      "message": "目前讀不到商家認證的狀態，請稍後再試。",
+      "description": "開通任務平台審核的狀態句：讀取失敗（UNKNOWN）。"
+    },
+    "onboarding.profile.completed": {
+      "message": "店名、logo 與所在地都已填寫。",
+      "description": "開通任務商店資料的狀態句：已完成（COMPLETED）。"
+    },
+    "onboarding.profile.list_separator": {
+      "message": "、",
+      "description": "開通任務商店資料缺少多項時，名詞之間的分隔詞（zh-TW 頓號，en 逗號加空格）。"
+    },
+    "onboarding.profile.missing": {
+      "message": "還缺少：{items}。",
+      "params": {
+        "items": {
+          "type": "string"
+        }
+      },
+      "description": "開通任務商店資料的狀態句：缺少的項目（ACTION_REQUIRED）；items 是目錄名詞（SellerRequirement 的店名、logo、所在地）以語系的分隔詞連接。"
+    },
+    "onboarding.title.payment_account": {
+      "message": "收款帳戶",
+      "description": "開通任務標題：收款帳戶（PAYMENT_ACCOUNT）。"
+    },
+    "onboarding.title.platform_review": {
+      "message": "平台審核",
+      "description": "開通任務標題：平台審核（PLATFORM_REVIEW，商家認證核准）。"
+    },
+    "onboarding.title.profile": {
+      "message": "商店資料",
+      "description": "開通任務標題：商店資料（OnboardingTaskId.PROFILE）。"
     },
     "opening.unavailable.account_deleting": {
       "message": "帳號正在刪除，不能申請開店",
@@ -71,34 +140,6 @@
     "opening.unavailable.terminated": {
       "message": "此帳號因終止合作（第 21.3 條）不能重新開店。如有異議，可對該終止提出申覆。",
       "description": "開店不可用：帳號有生效中的終止合作（StoreOpeningUnavailableReason.TERMINATED）。ApplyStore 被擋下時錯誤的訊息與 GetMyStoreOpeningResponse.unavailabilities 的 message 是同一句。"
-    },
-    "payuni.state.contact_support": {
-      "message": "請聯繫客服了解原因，無法自行重新送出。",
-      "description": "賣家的 PayUni 狀態說明，只由狀態決定（PayUniState.CONTACT_SUPPORT）。沒有賣家能修正的資料。"
-    },
-    "payuni.state.fix_via_support": {
-      "message": "修正後請聯繫客服重新處理，無法自行重新送出。",
-      "description": "賣家的 PayUni 狀態說明，只由狀態決定（PayUniState.FIX_VIA_SUPPORT）。店家設定的資料有問題，修正後由平台重新處理。"
-    },
-    "payuni.state.fixable": {
-      "message": "請修正資料後重新送出，送出後平台會重新審核。",
-      "description": "賣家的 PayUni 狀態說明，只由狀態決定（PayUniState.FIXABLE）。申請的資料有問題，賣家修正後自己重新送出（PayUni 拒絕或綁定失敗）。"
-    },
-    "payuni.state.pending_info": {
-      "message": "請至信箱查看 PayUni 補件通知信件，依指示補齊資料後再次送出審核。",
-      "description": "賣家的 PayUni 狀態說明，只由狀態決定（PayUniState.PENDING_INFO）。PayUni 要求補件。"
-    },
-    "payuni.state.retry_later": {
-      "message": "PayUni 暫時無法處理這筆申請，平台會協助重新送出，你不需要重新送出。",
-      "description": "賣家的 PayUni 狀態說明，只由狀態決定（PayUniState.RETRY_LATER）。綁定的暫時性失敗重試用完，進後台待辦等管理員重新綁定。"
-    },
-    "payuni.state.reviewing": {
-      "message": "平台審核已通過，PayUni 正在審查金流資料。",
-      "description": "賣家的 PayUni 狀態說明，只由狀態決定（PayUniState.REVIEWING）。綁定中或 PayUni 審核中。"
-    },
-    "payuni.state.terminated": {
-      "message": "請聯繫客服了解原因。",
-      "description": "賣家的 PayUni 狀態說明，只由狀態決定（PayUniState.TERMINATED）。PayUni 端的商店已是終止狀態。"
     },
     "remediation.unavailable.appeal_pending": {
       "message": "這筆措施的申覆審核中，審核完成前不能請求解除",
@@ -496,10 +537,6 @@
       "message": "帳號停權中，無法代行。",
       "description": "admin 不能代行營運：帳號有生效中的停權措施（ACCOUNT_SUSPENDED，動作是代行）。"
     },
-    "store_action.unavailable.kyc_not_approved.rebind_payuni": {
-      "message": "賣家正在修改商家認證，重新核准後會自動重新綁定。",
-      "description": "admin 不能重新綁定 PayUni：註冊所根據的申請已被賣家改回草稿，不是已核准（KYC_NOT_APPROVED，動作是重新綁定）。PayUniRegistration.rebind_unavailabilities 與 RebindPayUni 被擋下時錯誤的訊息是同一句。"
-    },
     "store_action.unavailable.kyc_not_business.requery_kyc": {
       "message": "只有公司型的申請有登記資料可以查詢。",
       "description": "admin 不能重新查詢登記資料：不是公司型的申請（KYC_NOT_BUSINESS，動作是重新查詢）。"
@@ -512,14 +549,6 @@
       "message": "只有審核中的申請能核准或退回。",
       "description": "admin 不能核准或退回商家認證：申請不在審核中（KYC_NOT_SUBMITTED，動作是核准、退回，同一句）。"
     },
-    "store_action.unavailable.payuni_bound.rebind_payuni": {
-      "message": "只有綁定失敗的註冊能重新綁定。",
-      "description": "admin 不能重新綁定 PayUni：註冊已綁定（PAYUNI_BOUND，動作是重新綁定）。"
-    },
-    "store_action.unavailable.payuni_merchant_terminal.rebind_payuni": {
-      "message": "PayUni 端的商店已是終止狀態，這家店無法再綁定；賣家要重新入駐才能收款。",
-      "description": "admin 不能重新綁定 PayUni：PayUni 端的商店已是終止狀態（PAYUNI_MERCHANT_TERMINAL，動作是重新綁定）。不叫賣家關店：已關閉的店家也成立。"
-    },
     "store_action.unavailable.store_closed.create_measure": {
       "message": "店家已關閉，不能建立警告、停權或風險措施。",
       "description": "admin 不能建立警告、停權或風險措施：店家已關閉（STORE_CLOSED，動作是建立措施）。GetStoreResponse.create_measure_unavailabilities、CreateMeasure 被擋下時錯誤的訊息、案件與通報的原因（CaseBlockStoreClosed、ReportBlockStoreClosed）是同一句（StoreActionUnavailableText）。"
@@ -528,10 +557,6 @@
       "message": "店家已關閉，無法代行。",
       "description": "admin 不能代行營運：店家已關閉（STORE_CLOSED，動作是代行）。清單的 delegation_unavailabilities 與代行 preflight 被拒絕時的訊息是同一句。"
     },
-    "store_action.unavailable.store_closed.rebind_payuni": {
-      "message": "店家已關閉，不能重新綁定 PayUni。",
-      "description": "admin 不能重新綁定 PayUni：店家已關閉（STORE_CLOSED，動作是重新綁定）。"
-    },
     "store_action.unavailable.store_closed.review_kyc": {
       "message": "店家已關閉，這份商家認證申請暫停審核，店家恢復營業後才能審核或重新查詢。",
       "description": "admin 不能核准、退回或重新查詢商家認證：店家已關閉（STORE_CLOSED，動作是核准、退回、重新查詢，同一句）；申請維持審核中，不在後台待辦，店家恢復營業後回到待辦。"
@@ -539,10 +564,6 @@
     "store_action.unavailable.store_pending_deletion.delegate": {
       "message": "店家等待刪除，無法代行。",
       "description": "admin 不能代行營運：店家等待刪除（STORE_PENDING_DELETION，動作是代行）。"
-    },
-    "store_action.unavailable.store_pending_deletion.rebind_payuni": {
-      "message": "店家等待刪除，不能重新綁定 PayUni。",
-      "description": "admin 不能重新綁定 PayUni：店家等待刪除（STORE_PENDING_DELETION，動作是重新綁定）。"
     },
     "store_action.unavailable.store_pending_deletion.review_kyc": {
       "message": "店家等待刪除，這份商家認證申請不再審核。",

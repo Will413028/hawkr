@@ -39,10 +39,6 @@ const NO_ENTRY: Record<StoreActionUnavailableReason, boolean> = {
 	[StoreActionUnavailableReason.UNSPECIFIED]: false,
 	[StoreActionUnavailableReason.KYC_NOT_SUBMITTED]: true,
 	[StoreActionUnavailableReason.KYC_NOT_BUSINESS]: true,
-	[StoreActionUnavailableReason.PAYUNI_MERCHANT_TERMINAL]: false,
-	[StoreActionUnavailableReason.PAYUNI_BIND_IN_PROGRESS]: true,
-	[StoreActionUnavailableReason.PAYUNI_BOUND]: true,
-	[StoreActionUnavailableReason.KYC_NOT_APPROVED]: false,
 	[StoreActionUnavailableReason.STORE_CLOSED]: false,
 	[StoreActionUnavailableReason.STORE_PENDING_DELETION]: false,
 	[StoreActionUnavailableReason.ACCOUNT_SUSPENDED]: false,
@@ -64,7 +60,7 @@ export function firstIsStructural(
 }
 
 /**
- * 店家動作不能做時要顯示的那一句：伺服器列出全部原因（依先後），畫面只顯示第一個，與 PayUni 卡、代行清單一致。清單空（可以做）或第一個原因是結構性的
+ * 店家動作不能做時要顯示的那一句：伺服器列出全部原因（依先後），畫面只顯示第一個，與代行清單一致。清單空（可以做）或第一個原因是結構性的
  * （沒有入口）時沒有句子（undefined）；其餘是第一個原因的伺服器句子，沒有 message 才是通用文字。
  */
 export function firstVisibleLabel(

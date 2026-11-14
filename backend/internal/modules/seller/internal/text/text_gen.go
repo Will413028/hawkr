@@ -324,48 +324,13 @@ func InquiryUnavailableWithdrawn() uitext.Message {
 	return uitext.Message{Text: "這筆詢問已撤回。", Locale: uitext.ZhTW}
 }
 
-// KycResubmitUnavailablePayuniApproved 是模組句子 kyc.resubmit_unavailable.payuni_approved；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailablePayuniApproved(l uitext.Locale) uitext.Message {
+// KycEditUnavailableApproved 是模組句子 kyc.edit_unavailable.approved；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func KycEditUnavailableApproved(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "商家認證已通過，不需要修改或重新送出。", Locale: uitext.ZhTW}
 }
 
-// KycResubmitUnavailablePayuniContactSupport 是模組句子 kyc.resubmit_unavailable.payuni_contact_support；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailablePayuniContactSupport(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "這個問題無法以修改資料解決，請聯繫客服了解原因。", Locale: uitext.ZhTW}
-}
-
-// KycResubmitUnavailablePayuniFixViaSupport 是模組句子 kyc.resubmit_unavailable.payuni_fix_via_support；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailablePayuniFixViaSupport(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "要修正的是店家設定裡的資料，修正後請聯繫客服重新處理，商家認證不需要重新送出。", Locale: uitext.ZhTW}
-}
-
-// KycResubmitUnavailablePayuniPendingInfo 是模組句子 kyc.resubmit_unavailable.payuni_pending_info；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailablePayuniPendingInfo(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "PayUni 要求補件，請依 PayUni 通知信的指示處理，商家認證不需要在這裡修改或重新送出。", Locale: uitext.ZhTW}
-}
-
-// KycResubmitUnavailablePayuniRetryLater 是模組句子 kyc.resubmit_unavailable.payuni_retry_later；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailablePayuniRetryLater(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "PayUni 暫時無法處理，平台會協助重新送出，你不需要修改或重新送出。", Locale: uitext.ZhTW}
-}
-
-// KycResubmitUnavailablePayuniReviewing 是模組句子 kyc.resubmit_unavailable.payuni_reviewing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailablePayuniReviewing(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "PayUni 正在審查你的資料，審查期間不能修改或重新送出商家認證。", Locale: uitext.ZhTW}
-}
-
-// KycResubmitUnavailablePayuniTerminated 是模組句子 kyc.resubmit_unavailable.payuni_terminated；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailablePayuniTerminated(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "PayUni 收款帳戶已終止，無法修改或重新送出，請聯繫客服。", Locale: uitext.ZhTW}
-}
-
-// KycResubmitUnavailableUnderReview 是模組句子 kyc.resubmit_unavailable.under_review；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailableUnderReview(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "申請審核中，請等待審核結果。", Locale: uitext.ZhTW}
-}
-
-// KycResubmitUnavailableUnderReviewCancelable 是模組句子 kyc.resubmit_unavailable.under_review_cancelable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func KycResubmitUnavailableUnderReviewCancelable(l uitext.Locale) uitext.Message {
+// KycEditUnavailableUnderReview 是模組句子 kyc.edit_unavailable.under_review；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func KycEditUnavailableUnderReview(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "申請審核中，要修改請先取消申請。", Locale: uitext.ZhTW}
 }
 
@@ -424,6 +389,218 @@ func NoteBodyLength() uitext.Message {
 	return uitext.Message{Text: "內部註記必須是 1 到 2000 字。", Locale: uitext.ZhTW}
 }
 
+// OnboardingPaymentAccountActionRequired 是模組句子 onboarding.payment_account.action_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountActionRequired(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountCompleted 是模組句子 onboarding.payment_account.completed；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountCompleted(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your payout account is active.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收款帳戶已啟用。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountCreateFailed 是模組句子 onboarding.payment_account.create_failed；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountCreateFailed(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "We could not create your payout account. Please contact support.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收款帳戶建立失敗，請聯絡客服。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountDisabled 是模組句子 onboarding.payment_account.disabled；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountDisabled(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The payment provider cannot activate your payout account right now. Please contact support.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "金流商目前無法啟用你的收款帳戶，請聯絡客服。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountLocked 是模組句子 onboarding.payment_account.locked；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountLocked(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "You can set up your payout account after the platform review is approved.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "平台審核通過後才能設定收款帳戶。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountNotAvailable 是模組句子 onboarding.payment_account.not_available；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountNotAvailable(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Payout setup is not open yet. You can continue once it opens.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "目前還沒有開放收款設定，開放後你就能繼續。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountPreparing 是模組句子 onboarding.payment_account.preparing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountPreparing(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "We are creating your payout account. This usually takes a few minutes.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "正在建立收款帳戶，通常幾分鐘內完成。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountSyncing 是模組句子 onboarding.payment_account.syncing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountSyncing(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your payout account status is being updated. Please check back later.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收款帳戶的狀態正在更新，請稍後再查看。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountUnderReview 是模組句子 onboarding.payment_account.under_review；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountUnderReview(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The payment provider is reviewing your account. You do not need to do anything.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "金流商審核中，你不需要做任何事。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPaymentAccountUnknown 是模組句子 onboarding.payment_account.unknown；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPaymentAccountUnknown(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "We cannot read your payout account status right now. Please try again later.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "目前讀不到收款帳戶的狀態，請稍後再試。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPlatformReviewCancelled 是模組句子 onboarding.platform_review.cancelled；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPlatformReviewCancelled(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your seller verification was cancelled. You can submit it again.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "商家認證申請已取消，可以重新送出。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPlatformReviewCompleted 是模組句子 onboarding.platform_review.completed；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPlatformReviewCompleted(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your seller verification is approved.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "商家認證已通過。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPlatformReviewDraft 是模組句子 onboarding.platform_review.draft；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPlatformReviewDraft(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your seller verification is still a draft and has not been submitted.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "商家認證申請還是草稿，尚未送出。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPlatformReviewNotSubmitted 是模組句子 onboarding.platform_review.not_submitted；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPlatformReviewNotSubmitted(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "You have not submitted a seller verification yet.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "還沒有送出商家認證申請。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPlatformReviewRejected 是模組句子 onboarding.platform_review.rejected；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPlatformReviewRejected(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your seller verification needs changes. Update it and submit again.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "商家認證申請需要修改，修改後請重新送出。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPlatformReviewSubmitted 是模組句子 onboarding.platform_review.submitted；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPlatformReviewSubmitted(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your seller verification is under review. You do not need to do anything.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "商家認證申請審核中，你不需要做任何事。", Locale: uitext.ZhTW}
+}
+
+// OnboardingPlatformReviewUnknown 是模組句子 onboarding.platform_review.unknown；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingPlatformReviewUnknown(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "We cannot read your seller verification status right now. Please try again later.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "目前讀不到商家認證的狀態，請稍後再試。", Locale: uitext.ZhTW}
+}
+
+// OnboardingProfileCompleted 是模組句子 onboarding.profile.completed；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingProfileCompleted(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your store name, logo and location are all set.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店名、logo 與所在地都已填寫。", Locale: uitext.ZhTW}
+}
+
+// OnboardingProfileListSeparator 是模組句子 onboarding.profile.list_separator；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingProfileListSeparator(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: ", ", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "、", Locale: uitext.ZhTW}
+}
+
+// OnboardingProfileMissingArgs 是 OnboardingProfileMissing 的參數。
+type OnboardingProfileMissingArgs struct {
+	Items string
+}
+
+// OnboardingProfileMissing 是模組句子 onboarding.profile.missing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingProfileMissing(l uitext.Locale, a OnboardingProfileMissingArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Still missing: " + a.Items + ".", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "還缺少：" + a.Items + "。", Locale: uitext.ZhTW}
+}
+
+// OnboardingTitlePaymentAccount 是模組句子 onboarding.title.payment_account；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingTitlePaymentAccount(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Payout account", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收款帳戶", Locale: uitext.ZhTW}
+}
+
+// OnboardingTitlePlatformReview 是模組句子 onboarding.title.platform_review；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingTitlePlatformReview(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Platform review", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "平台審核", Locale: uitext.ZhTW}
+}
+
+// OnboardingTitleProfile 是模組句子 onboarding.title.profile；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func OnboardingTitleProfile(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Store profile", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "商店資料", Locale: uitext.ZhTW}
+}
+
 // OpeningUnavailableAccountDeleting 是模組句子 opening.unavailable.account_deleting；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func OpeningUnavailableAccountDeleting(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "帳號正在刪除，不能申請開店", Locale: uitext.ZhTW}
@@ -442,41 +619,6 @@ func OpeningUnavailableSuspended(l uitext.Locale) uitext.Message {
 // OpeningUnavailableTerminated 是模組句子 opening.unavailable.terminated；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func OpeningUnavailableTerminated(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "此帳號因終止合作（第 21.3 條）不能重新開店。如有異議，可對該終止提出申覆。", Locale: uitext.ZhTW}
-}
-
-// PayuniStateContactSupport 是模組句子 payuni.state.contact_support；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func PayuniStateContactSupport(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "請聯繫客服了解原因，無法自行重新送出。", Locale: uitext.ZhTW}
-}
-
-// PayuniStateFixViaSupport 是模組句子 payuni.state.fix_via_support；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func PayuniStateFixViaSupport(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "修正後請聯繫客服重新處理，無法自行重新送出。", Locale: uitext.ZhTW}
-}
-
-// PayuniStateFixable 是模組句子 payuni.state.fixable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func PayuniStateFixable(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "請修正資料後重新送出，送出後平台會重新審核。", Locale: uitext.ZhTW}
-}
-
-// PayuniStatePendingInfo 是模組句子 payuni.state.pending_info；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func PayuniStatePendingInfo(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "請至信箱查看 PayUni 補件通知信件，依指示補齊資料後再次送出審核。", Locale: uitext.ZhTW}
-}
-
-// PayuniStateRetryLater 是模組句子 payuni.state.retry_later；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func PayuniStateRetryLater(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "PayUni 暫時無法處理這筆申請，平台會協助重新送出，你不需要重新送出。", Locale: uitext.ZhTW}
-}
-
-// PayuniStateReviewing 是模組句子 payuni.state.reviewing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func PayuniStateReviewing(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "平台審核已通過，PayUni 正在審查金流資料。", Locale: uitext.ZhTW}
-}
-
-// PayuniStateTerminated 是模組句子 payuni.state.terminated；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func PayuniStateTerminated(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "請聯繫客服了解原因。", Locale: uitext.ZhTW}
 }
 
 // RemediationUnavailableAppealPending 是模組句子 remediation.unavailable.appeal_pending；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
@@ -624,11 +766,6 @@ func StoreActionUnavailableAccountSuspendedDelegate() uitext.Message {
 	return uitext.Message{Text: "帳號停權中，無法代行。", Locale: uitext.ZhTW}
 }
 
-// StoreActionUnavailableKycNotApprovedRebindPayuni 是後台員工受眾的模組句子 store_action.unavailable.kyc_not_approved.rebind_payuni（只有 zh-TW）。
-func StoreActionUnavailableKycNotApprovedRebindPayuni() uitext.Message {
-	return uitext.Message{Text: "賣家正在修改商家認證，重新核准後會自動重新綁定。", Locale: uitext.ZhTW}
-}
-
 // StoreActionUnavailableKycNotBusinessRequeryKyc 是後台員工受眾的模組句子 store_action.unavailable.kyc_not_business.requery_kyc（只有 zh-TW）。
 func StoreActionUnavailableKycNotBusinessRequeryKyc() uitext.Message {
 	return uitext.Message{Text: "只有公司型的申請有登記資料可以查詢。", Locale: uitext.ZhTW}
@@ -644,16 +781,6 @@ func StoreActionUnavailableKycNotSubmittedReviewKyc() uitext.Message {
 	return uitext.Message{Text: "只有審核中的申請能核准或退回。", Locale: uitext.ZhTW}
 }
 
-// StoreActionUnavailablePayuniBoundRebindPayuni 是後台員工受眾的模組句子 store_action.unavailable.payuni_bound.rebind_payuni（只有 zh-TW）。
-func StoreActionUnavailablePayuniBoundRebindPayuni() uitext.Message {
-	return uitext.Message{Text: "只有綁定失敗的註冊能重新綁定。", Locale: uitext.ZhTW}
-}
-
-// StoreActionUnavailablePayuniMerchantTerminalRebindPayuni 是後台員工受眾的模組句子 store_action.unavailable.payuni_merchant_terminal.rebind_payuni（只有 zh-TW）。
-func StoreActionUnavailablePayuniMerchantTerminalRebindPayuni() uitext.Message {
-	return uitext.Message{Text: "PayUni 端的商店已是終止狀態，這家店無法再綁定；賣家要重新入駐才能收款。", Locale: uitext.ZhTW}
-}
-
 // StoreActionUnavailableStoreClosedCreateMeasure 是後台員工受眾的模組句子 store_action.unavailable.store_closed.create_measure（只有 zh-TW）。
 func StoreActionUnavailableStoreClosedCreateMeasure() uitext.Message {
 	return uitext.Message{Text: "店家已關閉，不能建立警告、停權或風險措施。", Locale: uitext.ZhTW}
@@ -664,11 +791,6 @@ func StoreActionUnavailableStoreClosedDelegate() uitext.Message {
 	return uitext.Message{Text: "店家已關閉，無法代行。", Locale: uitext.ZhTW}
 }
 
-// StoreActionUnavailableStoreClosedRebindPayuni 是後台員工受眾的模組句子 store_action.unavailable.store_closed.rebind_payuni（只有 zh-TW）。
-func StoreActionUnavailableStoreClosedRebindPayuni() uitext.Message {
-	return uitext.Message{Text: "店家已關閉，不能重新綁定 PayUni。", Locale: uitext.ZhTW}
-}
-
 // StoreActionUnavailableStoreClosedReviewKyc 是後台員工受眾的模組句子 store_action.unavailable.store_closed.review_kyc（只有 zh-TW）。
 func StoreActionUnavailableStoreClosedReviewKyc() uitext.Message {
 	return uitext.Message{Text: "店家已關閉，這份商家認證申請暫停審核，店家恢復營業後才能審核或重新查詢。", Locale: uitext.ZhTW}
@@ -677,11 +799,6 @@ func StoreActionUnavailableStoreClosedReviewKyc() uitext.Message {
 // StoreActionUnavailableStorePendingDeletionDelegate 是後台員工受眾的模組句子 store_action.unavailable.store_pending_deletion.delegate（只有 zh-TW）。
 func StoreActionUnavailableStorePendingDeletionDelegate() uitext.Message {
 	return uitext.Message{Text: "店家等待刪除，無法代行。", Locale: uitext.ZhTW}
-}
-
-// StoreActionUnavailableStorePendingDeletionRebindPayuni 是後台員工受眾的模組句子 store_action.unavailable.store_pending_deletion.rebind_payuni（只有 zh-TW）。
-func StoreActionUnavailableStorePendingDeletionRebindPayuni() uitext.Message {
-	return uitext.Message{Text: "店家等待刪除，不能重新綁定 PayUni。", Locale: uitext.ZhTW}
 }
 
 // StoreActionUnavailableStorePendingDeletionReviewKyc 是後台員工受眾的模組句子 store_action.unavailable.store_pending_deletion.review_kyc（只有 zh-TW）。

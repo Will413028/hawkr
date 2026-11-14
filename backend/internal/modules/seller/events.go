@@ -64,32 +64,14 @@ type MeasureRequestClosed = model.MeasureRequestClosed
 // KYCSubmitted 在賣家送出 KYC 申請的 transaction 內發出。
 type KYCSubmitted = model.KYCSubmitted
 
-// KYCApproved 在管理員核准 KYC 申請的 transaction 內發出（人工決定；PayUni 的綁定結果是後續階段的事件）。
+// KYCApproved 在管理員核准 KYC 申請的 transaction 內發出（人工決定）。
 type KYCApproved = model.KYCApproved
 
-// KYCRejected 在管理員退回 KYC 申請的 transaction 內發出，對應舊的 merchant.verification.rejected。
+// KYCRejected 在管理員退回 KYC 申請的 transaction 內發出。
 type KYCRejected = model.KYCRejected
 
 // KYCCancelled 在賣家取消 KYC 申請的 transaction 內發出。
 type KYCCancelled = model.KYCCancelled
-
-// PayUniForwarded 在 PayUni 收下註冊（綁定成功）的 transaction 內發出，對應舊的 merchant.verification.forwarded。
-type PayUniForwarded = model.PayUniForwarded
-
-// PayUniApproved 在 PayUni 審核通過（套用觀測）的 transaction 內發出，對應 merchant.verification.approved。
-type PayUniApproved = model.PayUniApproved
-
-// PayUniPendingInfo 在 PayUni 要求補件的 transaction 內發出，對應 merchant.verification.pending_info。
-type PayUniPendingInfo = model.PayUniPendingInfo
-
-// PayUniUnderReview 在 PayUni 從待補件回到審核中的 transaction 內發出，對應 merchant.verification.under_review。
-type PayUniUnderReview = model.PayUniUnderReview
-
-// PayUniRejected 在 PayUni 拒絕或關閉的 transaction 內發出，對應 merchant.verification.rejected。
-type PayUniRejected = model.PayUniRejected
-
-// PayUniBindFailed 在綁定失敗的 transaction 內發出（與 bind_status 同一個 transaction；舊系統沒有這個事件）。
-type PayUniBindFailed = model.PayUniBindFailed
 
 // ProspectArchived 在業者由進行中封存的 transaction 內發出；重送、還原與合併造成的封存都不發這個事件。
 type ProspectArchived = model.ProspectArchived

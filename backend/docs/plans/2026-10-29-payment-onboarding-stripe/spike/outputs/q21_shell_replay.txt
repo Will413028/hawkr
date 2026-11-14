@@ -1,0 +1,8 @@
+create shell 200 replayed= None
+replay immediately (open, bare) 200 same id=True replayed= None
+replay after 5s (open, bare) 200 same id=True replayed= None
+update 200
+replay after update (open, configured) 200 same id=True replayed= None
+close 200
+replay after close 409 {'code': 'idempotency_error', 'message': 'Idempotency keys can only be reused with the same parameters they were first used with. Try using a different key than spike-d8399c64b59649d5aa6ac9960663fb01 if you want to execute a new request.'} replayed= None
+replay after close +5s 409 {'code': 'idempotency_error', 'message': 'Idempotency keys can only be reused with the same parameters they were first used with. Try using a different key than spike-d8399c64b59649d5aa6ac9960663fb01 if you want to execute a new request.'} replayed= None

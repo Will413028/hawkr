@@ -13,6 +13,7 @@ import (
 type IdentityAccount struct {
 	ID                int64
 	Email             *string
+	SelfEnteredEmail  *string
 	SuspendedAt       *time.Time
 	DeletedAt         *time.Time
 	DeletionPendingAt *time.Time

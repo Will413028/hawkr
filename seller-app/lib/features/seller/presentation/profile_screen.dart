@@ -25,7 +25,6 @@ import '../../media/data/media_repository.dart';
 import '../../notification/data/notification_repository.dart';
 import '../../post/presentation/widgets/page_header.dart';
 import '../data/current_store.dart';
-import '../data/current_kyc.dart';
 import '../data/onboarding_tasks.dart';
 import '../data/seller_status_refresh.dart';
 import '../data/store_editor.dart';
@@ -64,8 +63,6 @@ class ProfileScreen extends HookConsumerWidget {
         mine?.can(SellerCapability.SELLER_CAPABILITY_STOREFRONT_WRITE) ?? false;
     final canClose =
         mine?.can(SellerCapability.SELLER_CAPABILITY_ACCOUNT_CLOSE) ?? false;
-    final kyc = ref.watch(currentKycProvider)?.value;
-    final payuniLocked = kyc?.identityLocked ?? false;
     final shippingGate = mine?.shippingGate ?? ShippingGate.unknown;
     final profileInfoKey = useMemoized(GlobalKey.new);
 
@@ -423,17 +420,14 @@ class ProfileScreen extends HookConsumerWidget {
 
     String valueOf(StoreTextField field) => field.valueOf(store);
 
-    ProfileEditableInfoRow textRow(
-      StoreTextField field, {
-      bool locked = false,
-    }) => ProfileEditableInfoRow(
-      label: field.label,
-      value: valueOf(field),
-      placeholder: field.placeholder,
-      maxLines: field.maxLines > 1 ? field.maxLines.clamp(1, 4) : 1,
-      lockedNotice: locked && payuniLocked ? kPayuniLockedNotice : null,
-      onTap: canWrite ? () => editText(field) : null,
-    );
+    ProfileEditableInfoRow textRow(StoreTextField field) =>
+        ProfileEditableInfoRow(
+          label: field.label,
+          value: valueOf(field),
+          placeholder: field.placeholder,
+          maxLines: field.maxLines > 1 ? field.maxLines.clamp(1, 4) : 1,
+          onTap: canWrite ? () => editText(field) : null,
+        );
 
     final address = mine?.addressText ?? '';
     final location = mine?.locationText ?? '';
@@ -517,14 +511,8 @@ class ProfileScreen extends HookConsumerWidget {
                                       ? '店舖名稱、所在地與商家介紹會同步到買家店舖頁。'
                                       : _readOnlyNotice,
                                   rows: [
-                                    textRow(
-                                      StoreTextField.storeName,
-                                      locked: true,
-                                    ),
-                                    textRow(
-                                      StoreTextField.description,
-                                      locked: true,
-                                    ),
+                                    textRow(StoreTextField.storeName),
+                                    textRow(StoreTextField.description),
                                     ProfileAddressRow(
                                       value: address,
                                       onTap: canWrite ? editAddress : null,

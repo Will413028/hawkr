@@ -18,7 +18,7 @@ enum StoreTextField {
     placeholder: '一段話告訴買家你是誰、種了什麼、為什麼買你的',
   ),
   contactPhone(path: 'contact_phone', label: '商店電話', maxLength: 20),
-  contactName(path: 'contact_name', label: '聯絡人姓名', maxLength: 20),
+  contactName(path: 'contact_name', label: '聯絡人姓名', maxLength: 50),
   contactMobile(
     path: 'contact_mobile',
     label: '聯絡人手機',
@@ -29,7 +29,6 @@ enum StoreTextField {
     path: 'support_email',
     label: '客服電子信箱',
     maxLength: supportEmailMaxLength,
-    hint: 'PayUni 會寄金流相關通知到這個信箱',
   ),
   websiteUrl(
     path: 'website_url',
@@ -66,10 +65,6 @@ enum StoreTextField {
   /// UpdateMyStore 的欄位錯誤路徑（`store.` 加 `Store` 的欄位名）。
   String get errorPath => 'store.$path';
 
-  /// 店名與商店介紹在 PayUni 綁定後鎖定（`GetMyKYC.flow.identity_locked`）。
-  bool get lockedByPayuni =>
-      this == StoreTextField.storeName || this == StoreTextField.description;
-
   /// 店家目前的值。
   String valueOf(Store? store) {
     if (store == null) return '';
@@ -99,7 +94,7 @@ enum StoreTextField {
   String? validate(String value) {
     if (value.isEmpty) return null;
     return switch (this) {
-      contactName => value.runes.length > 20 ? '聯絡人姓名最多 20 字' : null,
+      contactName => value.runes.length > 50 ? '聯絡人姓名最多 50 字' : null,
       contactMobile =>
         RegExp(r'^09\d{8}$').hasMatch(value) ? null : '請輸入 09 開頭的 10 碼手機號碼',
       supportEmail => _validateSupportEmail(value),
@@ -113,7 +108,7 @@ enum StoreTextField {
   StoreChanges changes(String value) => StoreChanges(text: {this: value});
 }
 
-const supportEmailMaxLength = 50;
+const supportEmailMaxLength = 254;
 
 final _emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 

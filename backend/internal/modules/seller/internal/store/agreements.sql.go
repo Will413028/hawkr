@@ -30,7 +30,7 @@ type InsertAgreementAcceptanceParams struct {
 	UserAgent          *string
 }
 
-// 每次同意事件寫一列（沒有 ON CONFLICT）：開店的 SELLER_TERMS 每家店一列（agreement_acceptances_seller_terms），KYC 的兩份帶
+// 每次同意事件寫一列（沒有 ON CONFLICT）：開店的 SELLER_TERMS 每家店一列（agreement_acceptances_seller_terms），KYC 的隱私告知帶
 // 那次送出的 SUBMIT 審核紀錄（agreement_acceptances_source_check：依種類綁定來源）。
 func (q *Queries) InsertAgreementAcceptance(ctx context.Context, arg InsertAgreementAcceptanceParams) error {
 	_, err := q.db.Exec(ctx, insertAgreementAcceptance,

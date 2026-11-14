@@ -10,10 +10,9 @@ import (
 	"testing"
 	"time"
 
-	pu "github.com/Will413028/hawkr/backend/internal/platform/payuni"
-
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 // 清理之後可以留下值的欄位（其餘一律必須是 NULL）。新增欄位時這份清單逼人決定：留下的要有理由（事實、狀態碼、時間），不是個資。
@@ -26,19 +25,10 @@ var (
 		"application_id", "store_id", "status", "version", "seller_type", "product_type",
 		"submitted_at", "submission_seq", "decided_at", "created_at", "updated_at", "pii_purged_at",
 	}
-	registrationKept = []string{
-		"store_id", "mer_id", "application_id", "bind_status", "bind_error_code", "bind_attempts", "bound_at", "intent_seq",
-		"synced_seq", "sync_error_code", "resubmitted_at", "mer_status", "member_status", "credit_status", "applepay_status",
-		"googlepay_status", "atm_status", "outcome", "status_observed_at", "status_checked_at", "created_at", "updated_at", "pii_purged_at",
-	}
-	observationKept = []string{
-		"observation_id", "store_id", "source", "event_key", "mer_status", "member_status", "credit_status", "applepay_status",
-		"googlepay_status", "atm_status", "executed_at", "received_at",
-	}
 )
 
-// loadedStore 建一間把每個個資欄位都填滿的店：profile、KYC（個人或企業，含證件）、核准、PayUni 綁定、輪詢與 webhook 的觀測。
-func (f *fixture) loadedStore(t *testing.T, company bool, idCard, bank string) (int64, Store) {
+// loadedStore 建一間把每個個資欄位都填滿的店：profile、KYC（個人或企業，含證件）、核准。
+func (f *fixture) loadedStore(t *testing.T, company bool) (int64, Store) {
 	t.Helper()
 	ctx := context.Background()
 	accountID, s := f.open(t)
@@ -47,9 +37,11 @@ func (f *fixture) loadedStore(t *testing.T, company bool, idCard, bank string) (
 		TownCode: ptr("63000050"), AddressDetail: ptr("光復路一段 1 號"), Prize: ptr("優良農民"), WebsiteURL: ptr("https://farm.example.invalid"),
 	})
 	must(t, err)
-	draft := kycDraft(accountID, idCard, bank)
+	draft := kycDraft(accountID)
+	draft.WebsiteURL = ptr("https://farm.example.invalid")
 	if company {
-		draft = companyDraft(accountID, idRep, taxIDOne, bank)
+		draft = companyDraft(accountID, taxIDOne)
+		draft.WebsiteURL = ptr("https://farm.example.invalid")
 		draft.CompanyPhone, draft.CompanyTownCode, draft.CompanyAddressDetail = ptr("0229010572"), ptr("63000050"), ptr("中山路 2 號")
 		draft.CompanyRegisterDate = ptr("2015-03-04")
 		draft.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "co1"}}
@@ -58,12 +50,6 @@ func (f *fixture) loadedStore(t *testing.T, company bool, idCard, bank string) (
 	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
 	must(t, approve(f, sub))
-	f.sync(t, s.StoreID)
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "5", Reason: "補件：身分證影本模糊", Credit: "1"}
-	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourcePoll))
-	n := notification(FormatPayUniMerID(s.StoreCode), "9", t1300)
-	n.MerStatusNote = "備註：負責人電話有誤"
-	must(t, f.deliver(t, n))
 	return accountID, s
 }
 
@@ -107,7 +93,7 @@ func (f *fixture) retired(t *testing.T, storeID int64) bool {
 	return f.count(t, "SELECT count(*) FROM seller.stores WHERE store_id=$1 AND retired_at IS NOT NULL", storeID) == 1
 }
 
-// 清理涵蓋每一個個資欄位：店家、KYC（個人與企業各一）、PayUni 註冊與觀測、證件列。清理之前先確認這些欄位真的有值，免得
+// 清理涵蓋每一個個資欄位：店家、KYC（個人與企業各一）、證件列。清理之前先確認這些欄位真的有值，免得
 // 測試空轉。拿掉任何一個欄位的清理，對應的 NULL 斷言與資料庫的 *_purged_check 都會失敗。
 func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 	t.Parallel()
@@ -117,15 +103,12 @@ func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 		account int64
 		store   Store
 		app     string
+		company bool
 	}
 	var stints []stint
 	for _, company := range []bool{false, true} {
-		bank := bankAcct
-		if company {
-			bank = "999888777666"
-		}
-		account, s := f.loadedStore(t, company, idA, bank)
-		stints = append(stints, stint{account, s, f.applicationID(t, s.StoreID)})
+		account, s := f.loadedStore(t, company)
+		stints = append(stints, stint{account, s, f.applicationID(t, s.StoreID), company})
 	}
 	for _, st := range stints {
 		store := f.row(t, "stores", "store_id", st.store.StoreID)
@@ -135,22 +118,19 @@ func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 			}
 		}
 		app := f.row(t, "kyc_applications", "application_id", st.app)
-		if app["real_name"] == nil || app["bank_account_enc"] == nil || app["id_card_hash"] == nil && app["rep_id_card_hash"] == nil {
+		if app["website_url"] == nil || st.company && (app["company_name"] == nil || app["tax_id"] == nil) {
 			t.Fatalf("KYC 沒有填滿：%v", nonNull(app, kycKept))
 		}
-		reg := f.row(t, "payuni_registrations", "store_id", st.store.StoreID)
-		if reg["reason"] == nil {
-			t.Fatalf("PayUni 註冊沒有填滿：%v", nonNull(reg, registrationKept))
+		wantDocs := int64(0)
+		if st.company {
+			wantDocs = 1
 		}
-		if f.count(t, "SELECT count(*) FROM seller.payuni_observations WHERE store_id=$1 AND reason IS NOT NULL", st.store.StoreID) == 0 {
-			t.Fatal("沒有帶 reason 的觀測")
-		}
-		if f.count(t, "SELECT count(*) FROM seller.kyc_documents WHERE application_id=$1::uuid", st.app) < 3 {
-			t.Fatal("沒有證件")
+		if f.count(t, "SELECT count(*) FROM seller.kyc_documents WHERE application_id=$1::uuid", st.app) != wantDocs {
+			t.Fatal("公司文件的數量不對")
 		}
 		certRef := media.Ref{Type: media.RefTypeCertification, ID: st.app}
 		f.syncMedia(t, certRef)
-		if len(f.media.Referenced(certRef)) < 3 {
+		if int64(len(f.media.Referenced(certRef))) != wantDocs {
 			t.Fatalf("清理之前證件的引用應該已登記：%v", f.media.Referenced(certRef))
 		}
 		_, err := f.module.CloseCurrent(ctx, st.account)
@@ -169,25 +149,10 @@ func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 		if cols := nonNull(f.row(t, "kyc_applications", "application_id", st.app), kycKept); len(cols) != 0 {
 			t.Errorf("kyc_applications 沒清：%v", cols)
 		}
-		if cols := nonNull(f.row(t, "payuni_registrations", "store_id", st.store.StoreID), registrationKept); len(cols) != 0 {
-			t.Errorf("payuni_registrations 沒清：%v", cols)
-		}
-		if f.count(t, "SELECT count(*) FROM seller.payuni_observations WHERE store_id=$1", st.store.StoreID) == 0 {
-			t.Error("觀測紀錄不該被刪（狀態碼與時間是事實）")
-		}
-		for _, o := range f.observations(t, st.store.StoreID) {
-			if cols := nonNull(o, observationKept); len(cols) != 0 {
-				t.Errorf("payuni_observations 沒清：%v", cols)
-			}
-		}
 		if f.count(t, "SELECT count(*) FROM seller.kyc_documents WHERE application_id=$1::uuid", st.app) != 0 {
-			t.Error("證件列沒刪")
+			t.Error("公司文件列沒刪")
 		}
-		// 保留的事實：狀態碼與流程狀態、審核紀錄。
-		reg := f.row(t, "payuni_registrations", "store_id", st.store.StoreID)
-		if reg["mer_status"] == nil || reg["outcome"] == "NONE" || reg["bind_status"] != "BOUND" {
-			t.Errorf("PayUni 的狀態碼被清掉：%v", reg)
-		}
+		// 保留的事實：審核紀錄。
 		if f.count(t, "SELECT count(*) FROM seller.kyc_reviews WHERE application_id=$1::uuid", st.app) < 2 {
 			t.Error("審核紀錄被清掉")
 		}
@@ -211,39 +176,22 @@ func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 	}
 }
 
-func (f *fixture) observations(t *testing.T, storeID int64) []map[string]any {
-	t.Helper()
-	rows, err := f.db.Conn(context.Background()).Query(context.Background(), "SELECT to_jsonb(o) FROM seller.payuni_observations o WHERE store_id=$1", storeID)
-	must(t, err)
-	defer rows.Close()
-	var out []map[string]any
-	for rows.Next() {
-		var raw []byte
-		must(t, rows.Scan(&raw))
-		var m map[string]any
-		must(t, json.Unmarshal(raw, &m))
-		out = append(out, m)
-	}
-	must(t, rows.Err())
-	return out
-}
-
 // 只清已關閉、關閉嚴格超過保留期（StoreRetention）的 stint：營業中的、還沒滿保留期的、剛好滿保留期的都不動；差一秒不動、晚一秒才清。
 // 拿掉候選查詢的期限條件，這個測試的「保留期前一秒」與「剛好保留期」會被清掉；資料庫的 stores_pii_purged_check 另外擋下直接寫入。
 func TestPurgeOnlyTouchesStintsClosedForMoreThanTheStoreRetention(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	_, openStore := f.loadedStore(t, false, idA, bankAcct)
-	oldAccount, oldStore := f.loadedStore(t, false, idB, "111222333444")
+	_, openStore := f.loadedStore(t, false)
+	oldAccount, oldStore := f.loadedStore(t, false)
 	_, err := f.module.CloseCurrent(ctx, oldAccount)
 	must(t, err)
 	closedAt := f.now
-	midAccount, midStore := f.loadedStore(t, false, idC, "555666777888")
+	midAccount, midStore := f.loadedStore(t, false)
 	f.now = closedAt.Add(11 * 24 * time.Hour)
 	_, err = f.module.CloseCurrent(ctx, midAccount)
 	must(t, err)
-	recentAccount, recentStore := f.loadedStore(t, false, idRep, "123123123123")
+	recentAccount, recentStore := f.loadedStore(t, false)
 	f.now = closedAt.Add(StoreRetention - 24*time.Hour)
 	_, err = f.module.CloseCurrent(ctx, recentAccount)
 	must(t, err)
@@ -267,7 +215,7 @@ func TestPurgeOnlyTouchesStintsClosedForMoreThanTheStoreRetention(t *testing.T) 
 		if f.purged(t, id) {
 			t.Errorf("%s的店被清了", name)
 		}
-		if f.row(t, "stores", "store_id", id)["store_name"] == nil || f.row(t, "kyc_applications", "store_id", id)["real_name"] == nil ||
+		if f.row(t, "stores", "store_id", id)["store_name"] == nil || f.row(t, "kyc_applications", "store_id", id)["website_url"] == nil ||
 			f.row(t, "stores", "store_id", id)["contact_name"] == nil || f.row(t, "stores", "store_id", id)["support_email"] == nil {
 			t.Errorf("%s的店個資被動到", name)
 		}
@@ -285,9 +233,6 @@ func TestPurgeOnlyTouchesStintsClosedForMoreThanTheStoreRetention(t *testing.T) 
 	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.kyc_applications SET pii_purged_at=$1 WHERE store_id=$2", f.now, openStore.StoreID); err == nil {
 		t.Error("KYC 標記清理卻沒有清欄位")
 	}
-	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.payuni_registrations SET pii_purged_at=$1 WHERE store_id=$2", f.now, openStore.StoreID); err == nil {
-		t.Error("PayUni 標記清理卻沒有清欄位")
-	}
 }
 
 // 措施的身分快照屬於措施：來源的 KYC 被清理之後它還在，同一個身分仍然不能在別的帳號通過認證；處分結束才刪。
@@ -295,7 +240,7 @@ func TestSanctionSnapshotSurvivesThePurgeOfItsSourceKYC(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	account, s := f.loadedStore(t, false, idA, bankAcct)
+	account, s := f.loadedStore(t, true)
 	sanction := f.suspend(t, s.StoreID)
 	before := f.count(t, "SELECT count(*) FROM seller.measure_identities")
 	if before == 0 {
@@ -307,19 +252,16 @@ func TestSanctionSnapshotSurvivesThePurgeOfItsSourceKYC(t *testing.T) {
 	if n, err := f.module.PurgePII(ctx); err != nil || n != 1 {
 		t.Fatalf("n=%d err=%v", n, err)
 	}
-	if f.row(t, "kyc_applications", "store_id", s.StoreID)["id_card_hash"] != nil {
-		t.Fatal("KYC 的 hash 沒清")
-	}
-	if n := f.count(t, "SELECT count(*) FROM seller.kyc_identity_hashes"); n != 0 {
-		t.Fatalf("申請的比對 hash 要隨個資清理刪除：%d", n)
+	if f.row(t, "kyc_applications", "store_id", s.StoreID)["tax_id"] != nil {
+		t.Fatal("KYC 的統編沒清")
 	}
 	if after := f.count(t, "SELECT count(*) FROM seller.measure_identities"); after != before {
 		t.Fatalf("快照被清理動到：%d → %d", before, after)
 	}
 	other, _ := f.open(t)
-	d := f.savedDraft(t, kycDraft(other, idA, "444555666777"))
+	d := f.savedDraft(t, companyDraft(other, taxIDOne))
 	if _, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: other, ExpectedVersion: d.Version}); err == nil {
-		t.Fatal("清理之後同一個身分證號不該通過認證")
+		t.Fatal("清理之後同一個統編不該通過認證")
 	}
 	// 措施結束才刪快照。
 	_, err = f.lift(ctx, sanction)
@@ -329,12 +271,12 @@ func TestSanctionSnapshotSurvivesThePurgeOfItsSourceKYC(t *testing.T) {
 	}
 }
 
-// 重跑是 no-op：已清理的列不再是候選，清理時間不變；關店之後才到的 PayUni 通知不會把 reason 寫回去。
-func TestPurgeIsIdempotentAndLateNotificationsStayClean(t *testing.T) {
+// 重跑是 no-op：已清理的列不再是候選，清理時間不變。
+func TestPurgeIsIdempotent(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	account, s := f.loadedStore(t, false, idA, bankAcct)
+	account, s := f.loadedStore(t, false)
 	_, err := f.module.CloseCurrent(ctx, account)
 	must(t, err)
 	f.now = f.now.Add(StoreRetention + time.Second)
@@ -348,17 +290,6 @@ func TestPurgeIsIdempotentAndLateNotificationsStayClean(t *testing.T) {
 	}
 	if f.row(t, "stores", "store_id", s.StoreID)["pii_purged_at"] != stamp {
 		t.Fatal("重跑改了清理時間")
-	}
-	late := notification(FormatPayUniMerID(s.StoreCode), "1", t1500)
-	late.MerStatusNote = "關店之後的備註"
-	must(t, f.deliver(t, late))
-	if f.row(t, "payuni_registrations", "store_id", s.StoreID)["reason"] != nil {
-		t.Fatal("關店之後的通知把 reason 寫回註冊列")
-	}
-	for _, o := range f.observations(t, s.StoreID) {
-		if o["reason"] != nil {
-			t.Fatalf("關店之後的觀測帶著 reason：%v", o)
-		}
 	}
 }
 
@@ -386,4 +317,51 @@ func TestPurgeIsNotCappedAtOneBatch(t *testing.T) {
 	if left := f.count(t, "SELECT count(*) FROM seller.stores WHERE status='CLOSED' AND pii_purged_at IS NULL"); left != 3 {
 		t.Fatalf("沒清的=%d（應該只剩關閉 10 天的 3 間）", left)
 	}
+}
+
+// 關店滿保留期的最終清理請 payment 刪掉店家的收款帳戶列：清理的 transaction 只排入 payment 的刪除 job（不鎖下層 payment 的列，platform/lockorder），
+// job 只刪被清理的店家；別的店家的帳戶不動。
+// mutation：purge.go 拿掉 ForgetOwners 的呼叫 → 沒有刪除 job，失敗。
+func TestPurgeAsksPaymentToForgetThePurgedStoreOnly(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	gone, goneStore := f.approvedStore(t)
+	_, keptStore := f.approvedStore(t)
+	for _, s := range []Store{goneStore, keptStore} {
+		f.setPayment(t, s.StoreID, enabledSnapshot)
+	}
+	_, err := f.module.CloseCurrent(ctx, gone)
+	must(t, err)
+	f.now = f.now.Add(StoreRetention + time.Second)
+	n, err := f.module.PurgePII(ctx)
+	must(t, err)
+	if n != 1 {
+		t.Fatalf("purged=%d", n)
+	}
+	var forgotten []int64
+	f.jobs.mu.Lock()
+	for _, a := range f.jobs.args {
+		if a.Kind() != "payment.account_purge" {
+			continue
+		}
+		raw, err := json.Marshal(a)
+		must(t, err)
+		var v struct {
+			StoreID int64 `json:"store_id"`
+		}
+		must(t, json.Unmarshal(raw, &v))
+		forgotten = append(forgotten, v.StoreID)
+	}
+	f.jobs.mu.Unlock()
+	if !slices.Equal(forgotten, []int64{goneStore.StoreID}) {
+		t.Fatalf("排入刪除的店家=%v", forgotten)
+	}
+	for _, id := range forgotten {
+		must(t, f.payments.PurgeAccount(ctx, id, false))
+	}
+	if _, err := f.payments.Account(ctx, goneStore.StoreID); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("清理之後帳戶列還在：%v", err)
+	}
+	f.paymentAccount(t, keptStore.StoreID)
 }

@@ -1083,8 +1083,8 @@ func TestTaxIDMatchesAreKeyedByStoreID(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	insertApplication := func(storeID int64, taxID string, status string) {
-		_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO seller.kyc_applications (application_id, store_id, status, submission_seq, seller_type, company_name, tax_id, tax_id_hash, tax_id_hash_key, created_at, updated_at)
-			VALUES (gen_random_uuid(), $1, $2::text, CASE WHEN $2::text IN ('DRAFT', 'CANCELLED') THEN 0 ELSE 1 END, 'COMPANY', '測試公司', $3, decode(repeat('ab', 32), 'hex'), 'test', $4, $4)`, storeID, status, taxID, f.now)
+		_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO seller.kyc_applications (application_id, store_id, status, submission_seq, seller_type, company_name, tax_id, created_at, updated_at)
+			VALUES (gen_random_uuid(), $1, $2::text, CASE WHEN $2::text IN ('DRAFT', 'CANCELLED') THEN 0 ELSE 1 END, 'COMPANY', '測試公司', $3, $4, $4)`, storeID, status, taxID, f.now)
 		must(t, err)
 	}
 	accountID, oldStint := f.open(t)
@@ -1141,8 +1141,8 @@ func TestTaxIDMatchesExcludeStoresClaimedByAnotherProspect(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	_, s := f.open(t)
-	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, company_name, tax_id, tax_id_hash, tax_id_hash_key, created_at, updated_at)
-		VALUES (gen_random_uuid(), $1, 'DRAFT', 'COMPANY', '測試公司', '55555555', decode(repeat('ab', 32), 'hex'), 'test', $2, $2)`, s.StoreID, f.now)
+	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, company_name, tax_id, created_at, updated_at)
+		VALUES (gen_random_uuid(), $1, 'DRAFT', 'COMPANY', '測試公司', '55555555', $2, $2)`, s.StoreID, f.now)
 	must(t, err)
 	byTaxID := f.newProspect(t, "統編對得上", func(in *CreateProspectInput) { in.Fields.TaxID = text("55555555") })
 	claimer := f.newProspect(t, "手動認領的", nil)

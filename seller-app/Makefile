@@ -89,8 +89,8 @@ build-ios-ipa-prod: require-gateway
 	@echo "Building iOS IPA (prod)..."
 	$(FLUTTER) build ipa --flavor prod -t lib/main.dart --dart-define=FLUTTER_FLAVOR=prod $(DEFINES_FLAG)
 
-# stage 與 prod 必須有 GATEWAY_HOST（API 主機是必要設定，沒有預設值）；缺少時拒絕建置。
-# 檔案裡只看 GATEWAY_HOST 一行是否有非空值。
+# stage 與 prod 必須有 GATEWAY_HOST（API 主機是必要設定，沒有預設值，
+# 缺少時 App 啟動即丟 StateError）；缺少時拒絕建置。檔案裡只看這一行是否有非空值。
 require-gateway:
 	@if [ -z "$(GATEWAY_HOST)" ] && ! grep -Eq '"GATEWAY_HOST"[[:space:]]*:[[:space:]]*"[^"]+"' "$(DEFINES_FILE)" 2>/dev/null; then \
 		echo "error: stage 與 prod 必須提供 GATEWAY_HOST：在 $(DEFINES_FILE) 填入，或 make <target> GATEWAY_HOST=<API 主機>" >&2; \

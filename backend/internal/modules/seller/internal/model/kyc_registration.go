@@ -14,7 +14,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-// 公司型申請送件時對經濟部商業司公開資料的查詢快照（ADR 2026-10-19-seller-kyc-payuni-consolidated「登記資料快照」）：審核的依據
+// 公司型申請送件時對經濟部商業司公開資料的查詢快照（ADR 2026-11-13-seller-platform-review-and-identity-matching「登記資料快照」）：審核的依據
 // 是送件當時查到的登記資料與比對結果，不是審核當下才查。
 
 // RegistrationOutcome 是一次登記資料查詢的結果，與 DB 的 kyc_registration_checks_outcome_check 一致。

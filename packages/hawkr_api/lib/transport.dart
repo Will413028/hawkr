@@ -60,6 +60,11 @@ Interceptor headersInterceptor(Map<String, String> Function() headers) {
   };
 }
 
+/// 每次送出帶 `Accept-Language: <tag>`：單一值、沒有 q 值（與 website 的 `acceptLanguageInterceptor` 相同），
+/// 值是 App 當下的 UI 語系，伺服器依它協商回應文字的語系。[tag] 每次送出時讀取；空字串不送。
+Interceptor acceptLanguageInterceptor(String Function() tag) =>
+    headersInterceptor(() => {'accept-language': tag()});
+
 /// 每次送出時帶當下的 session token。沒有 session 或 token 換發失敗時不送出，也不進 RPC 重試與錯誤上報。
 /// [isTokenRefused] 判定換發遭拒時，以及伺服器回 unauthenticated 時，呼叫 [onSessionInvalid]。
 Interceptor authInterceptor({
@@ -103,13 +108,14 @@ Interceptor authInterceptor({
 }
 
 /// App 的 interceptor，順序固定：整個呼叫的逾時（涵蓋重試）→ 上報重試之後的結果 → 重試 → 賣家停權 → 身分 → 每次送出都
-/// 帶的 header（[headers]）→ log（每次送出一行）。[auth] 只給登入後的
+/// 帶的 header（[headers]）→ `Accept-Language`（[acceptLanguage]，必填：每個 client 都送，App 目前的 UI 語系）→ log（每次送出一行）。[auth] 只給登入後的
 /// service。[onSellerSuspended] 只有賣家的 App 給：分類器認得 `SELLER_SUSPENDED`（D10）時呼叫，錯誤原樣丟出。
 List<Interceptor> appInterceptors({
   required Duration timeout,
   required void Function(ConnectException error, FailureContext context) report,
   required Map<String, String> Function() headers,
   Interceptor? auth,
+  required String Function() acceptLanguage,
   void Function()? onSellerSuspended,
   void Function(String line)? log,
 }) => [
@@ -119,6 +125,7 @@ List<Interceptor> appInterceptors({
   if (onSellerSuspended != null) sellerSuspendedInterceptor(onSellerSuspended),
   ?auth,
   headersInterceptor(headers),
+  acceptLanguageInterceptor(acceptLanguage),
   if (log != null) logInterceptor(log),
 ];
 

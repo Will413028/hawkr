@@ -185,7 +185,7 @@ FOR UPDATE;
 
 -- name: AdminStores :many
 -- 後台的店家清單：生命週期（呼叫方一定給至少一個）、名稱或電話（ILIKE，呼叫方已跳脫 % _ \）或 store_code 相同、帳號、
--- 目前那一筆還沒取消的 KYC 申請的狀態、PayUni 註冊的綁定狀態（儲存的事實），新到舊的 keyset。停權不在這裡判斷：它的定義
+-- 目前那一筆還沒取消的 KYC 申請的狀態，新到舊的 keyset。停權不在這裡判斷：它的定義
 -- 只有 EffectiveMeasures 一處，呼叫方先以它取得生效中停權措施的帳號（suspended_accounts），suspended 為 true 只列這些帳號的
 -- 店家、false 只列不在其中的。
 SELECT st.*
@@ -208,13 +208,6 @@ WHERE st.status = ANY(sqlc.arg(statuses)::text[])
   AND (
     NOT sqlc.arg(kyc_awaiting_review)::bool OR
     EXISTS (SELECT 1 FROM seller.review_kyc_application(sqlc.arg(now)::timestamptz) r WHERE r.store_id = st.store_id)
-  )
-  AND (
-    sqlc.narg(bind_status)::text IS NULL OR
-    EXISTS (
-      SELECT 1 FROM seller.payuni_registrations r
-      WHERE r.store_id = st.store_id AND r.bind_status = sqlc.narg(bind_status)::text
-    )
   )
   AND (
     sqlc.narg(suspended)::bool IS NULL OR

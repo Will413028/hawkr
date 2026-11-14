@@ -255,20 +255,20 @@ type CaseInquiry struct {
 	Message          string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
 	CreateTime       *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	CreatedByAdminId string                 `protobuf:"bytes,7,opt,name=created_by_admin_id,json=createdByAdminId,proto3" json:"created_by_admin_id,omitempty"`
-	State            CaseInquiryState       `protobuf:"varint,9,opt,name=state,proto3,enum=hawkr.admin.seller.v1alpha1.CaseInquiryState" json:"state,omitempty"`
+	State            CaseInquiryState       `protobuf:"varint,8,opt,name=state,proto3,enum=hawkr.admin.seller.v1alpha1.CaseInquiryState" json:"state,omitempty"`
 	// 只在 REPLIED 時設。
-	Reply *CaseInquiryReply `protobuf:"bytes,10,opt,name=reply,proto3" json:"reply,omitempty"`
+	Reply *CaseInquiryReply `protobuf:"bytes,9,opt,name=reply,proto3" json:"reply,omitempty"`
 	// 只在 WITHDRAWN 時設。
-	WithdrawCause CaseInquiryWithdrawCause `protobuf:"varint,11,opt,name=withdraw_cause,json=withdrawCause,proto3,enum=hawkr.admin.seller.v1alpha1.CaseInquiryWithdrawCause" json:"withdraw_cause,omitempty"`
-	WithdrawTime  *timestamppb.Timestamp   `protobuf:"bytes,12,opt,name=withdraw_time,json=withdrawTime,proto3" json:"withdraw_time,omitempty"`
+	WithdrawCause CaseInquiryWithdrawCause `protobuf:"varint,10,opt,name=withdraw_cause,json=withdrawCause,proto3,enum=hawkr.admin.seller.v1alpha1.CaseInquiryWithdrawCause" json:"withdraw_cause,omitempty"`
+	WithdrawTime  *timestamppb.Timestamp   `protobuf:"bytes,11,opt,name=withdraw_time,json=withdrawTime,proto3" json:"withdraw_time,omitempty"`
 	// 系統撤回（案件結案）時是結案的管理員。
-	WithdrawnByAdminId string `protobuf:"bytes,13,opt,name=withdrawn_by_admin_id,json=withdrawnByAdminId,proto3" json:"withdrawn_by_admin_id,omitempty"`
-	CanRecordReply     bool   `protobuf:"varint,14,opt,name=can_record_reply,json=canRecordReply,proto3" json:"can_record_reply,omitempty"`
-	CanWithdraw        bool   `protobuf:"varint,15,opt,name=can_withdraw,json=canWithdraw,proto3" json:"can_withdraw,omitempty"`
+	WithdrawnByAdminId string `protobuf:"bytes,12,opt,name=withdrawn_by_admin_id,json=withdrawnByAdminId,proto3" json:"withdrawn_by_admin_id,omitempty"`
+	CanRecordReply     bool   `protobuf:"varint,13,opt,name=can_record_reply,json=canRecordReply,proto3" json:"can_record_reply,omitempty"`
+	CanWithdraw        bool   `protobuf:"varint,14,opt,name=can_withdraw,json=canWithdraw,proto3" json:"can_withdraw,omitempty"`
 	// 記下回覆時最多可以帶的附件數（伺服器的上限，RecordCaseInquiryReply 的 evidence_tokens 超過就回 invalid_argument）；client 以它在上傳之前擋下超過的檔。
-	ReplyEvidenceMax int32 `protobuf:"varint,16,opt,name=reply_evidence_max,json=replyEvidenceMax,proto3" json:"reply_evidence_max,omitempty"`
+	ReplyEvidenceMax int32 `protobuf:"varint,15,opt,name=reply_evidence_max,json=replyEvidenceMax,proto3" json:"reply_evidence_max,omitempty"`
 	// 賣家回覆的期限，只在 OPEN 時設（義務還在時才輸出）：開始時間是 create_time，期限是建立時存下的 due_at。
-	ReplyDeadline *v1alpha1.Deadline `protobuf:"bytes,17,opt,name=reply_deadline,json=replyDeadline,proto3" json:"reply_deadline,omitempty"`
+	ReplyDeadline *v1alpha1.Deadline `protobuf:"bytes,16,opt,name=reply_deadline,json=replyDeadline,proto3" json:"reply_deadline,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -508,7 +508,7 @@ var File_hawkr_admin_seller_v1alpha1_case_inquiry_proto protoreflect.FileDescrip
 
 const file_hawkr_admin_seller_v1alpha1_case_inquiry_proto_rawDesc = "" +
 	"\n" +
-	".hawkr/admin/seller/v1alpha1/case_inquiry.proto\x12\x1bhawkr.admin.seller.v1alpha1\x1a)hawkr/admin/seller/v1alpha1/measure.proto\x1a$hawkr/common/v1alpha1/deadline.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x98\a\n" +
+	".hawkr/admin/seller/v1alpha1/case_inquiry.proto\x12\x1bhawkr.admin.seller.v1alpha1\x1a)hawkr/admin/seller/v1alpha1/measure.proto\x1a$hawkr/common/v1alpha1/deadline.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x88\a\n" +
 	"\vCaseInquiry\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1c\n" +
 	"\acase_id\x18\x02 \x01(\tB\x03\xe0A\x03R\x06caseId\x12\x1e\n" +
@@ -518,16 +518,16 @@ const file_hawkr_admin_seller_v1alpha1_case_inquiry_proto_rawDesc = "" +
 	"\vcreate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x122\n" +
 	"\x13created_by_admin_id\x18\a \x01(\tB\x03\xe0A\x03R\x10createdByAdminId\x12H\n" +
-	"\x05state\x18\t \x01(\x0e2-.hawkr.admin.seller.v1alpha1.CaseInquiryStateB\x03\xe0A\x03R\x05state\x12H\n" +
-	"\x05reply\x18\n" +
-	" \x01(\v2-.hawkr.admin.seller.v1alpha1.CaseInquiryReplyB\x03\xe0A\x03R\x05reply\x12a\n" +
-	"\x0ewithdraw_cause\x18\v \x01(\x0e25.hawkr.admin.seller.v1alpha1.CaseInquiryWithdrawCauseB\x03\xe0A\x03R\rwithdrawCause\x12D\n" +
-	"\rwithdraw_time\x18\f \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\fwithdrawTime\x126\n" +
-	"\x15withdrawn_by_admin_id\x18\r \x01(\tB\x03\xe0A\x03R\x12withdrawnByAdminId\x12-\n" +
-	"\x10can_record_reply\x18\x0e \x01(\bB\x03\xe0A\x03R\x0ecanRecordReply\x12&\n" +
-	"\fcan_withdraw\x18\x0f \x01(\bB\x03\xe0A\x03R\vcanWithdraw\x121\n" +
-	"\x12reply_evidence_max\x18\x10 \x01(\x05B\x03\xe0A\x03R\x10replyEvidenceMax\x12K\n" +
-	"\x0ereply_deadline\x18\x11 \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\rreplyDeadlineJ\x04\b\b\x10\tR\bdue_time\"\xe6\x02\n" +
+	"\x05state\x18\b \x01(\x0e2-.hawkr.admin.seller.v1alpha1.CaseInquiryStateB\x03\xe0A\x03R\x05state\x12H\n" +
+	"\x05reply\x18\t \x01(\v2-.hawkr.admin.seller.v1alpha1.CaseInquiryReplyB\x03\xe0A\x03R\x05reply\x12a\n" +
+	"\x0ewithdraw_cause\x18\n" +
+	" \x01(\x0e25.hawkr.admin.seller.v1alpha1.CaseInquiryWithdrawCauseB\x03\xe0A\x03R\rwithdrawCause\x12D\n" +
+	"\rwithdraw_time\x18\v \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\fwithdrawTime\x126\n" +
+	"\x15withdrawn_by_admin_id\x18\f \x01(\tB\x03\xe0A\x03R\x12withdrawnByAdminId\x12-\n" +
+	"\x10can_record_reply\x18\r \x01(\bB\x03\xe0A\x03R\x0ecanRecordReply\x12&\n" +
+	"\fcan_withdraw\x18\x0e \x01(\bB\x03\xe0A\x03R\vcanWithdraw\x121\n" +
+	"\x12reply_evidence_max\x18\x0f \x01(\x05B\x03\xe0A\x03R\x10replyEvidenceMax\x12K\n" +
+	"\x0ereply_deadline\x18\x10 \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\rreplyDeadline\"\xe6\x02\n" +
 	"\x10CaseInquiryReply\x12\x12\n" +
 	"\x04body\x18\x01 \x01(\tR\x04body\x12A\n" +
 	"\bevidence\x18\x02 \x03(\v2%.hawkr.admin.seller.v1alpha1.EvidenceR\bevidence\x12N\n" +

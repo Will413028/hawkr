@@ -4,7 +4,6 @@ import test from "node:test";
 import { Role } from "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb";
 import {
 	KYCStatus,
-	PayUniBindStatus,
 	StoreStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import {
@@ -32,7 +31,6 @@ test("篩選分頁對應的請求欄位（D4 第 1 點）", () => {
 		approved: { kycStatus: KYCStatus.KYC_STATUS_APPROVED },
 		pending: { kycAwaitingReview: true },
 		rejected: { kycStatus: KYCStatus.KYC_STATUS_REJECTED },
-		rebind: { payuniBindStatus: PayUniBindStatus.FAILED },
 		suspended: { suspended: true },
 		closed: { status: StoreStatus.CLOSED },
 	};
@@ -86,11 +84,14 @@ test("沒有值的 query、accountId、pageToken 不放進請求", () => {
 	);
 });
 
-test("網址的 filter：不認得的值（含舊版的 active、forwarded）回到全部", () => {
+test("網址的 filter：不認得的值（含舊版的 active、forwarded、rebind）回到全部，沒有「待重新綁定」分頁", () => {
+	assert.equal(parseFilterTab("rebind"), "all");
+	assert.equal((FILTER_TABS as readonly string[]).includes("rebind"), false);
 	assert.equal(parseFilterTab("suspended"), "suspended");
 	assert.equal(parseFilterTab("pending"), "pending");
 	for (const legacy of [
 		"active",
+		"rebind",
 		"forwarded",
 		"forward_failed",
 		"monthly",

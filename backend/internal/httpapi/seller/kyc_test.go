@@ -12,7 +12,6 @@ import (
 
 	"connectrpc.com/connect"
 	"google.golang.org/genproto/googleapis/api/annotations"
-	"google.golang.org/genproto/googleapis/type/date"
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -24,7 +23,6 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
-	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // kycModule 記下收到的輸入，回傳設定好的結果。
@@ -97,43 +95,48 @@ func saveKYC(t *testing.T, m *kycModule, app *pb.KYCApplication, paths ...string
 	return resp.Msg.GetApplication(), nil
 }
 
-func individualOf(idNo string) *pb.KYCApplication_Individual {
-	return &pb.KYCApplication_Individual{Individual: &pb.IndividualKYC{IdCardNo: idNo}}
+func individualOf() *pb.KYCApplication_Individual {
+	return &pb.KYCApplication_Individual{Individual: &pb.IndividualKYC{}}
 }
 
 func businessOf(b *pb.BusinessKYC) *pb.KYCApplication_Business {
 	return &pb.KYCApplication_Business{Business: b}
 }
 
-// 只有 update_mask 選到的欄位送給模組（沒選到的是 nil，保留原值）；日期轉成 YYYY-MM-DD，etag 是版本，帳號來自店家；
-// 賣家型態只在 mask 列到那一支的欄位時才送（更新沒列到就不切換）。
+// 只有 update_mask 選到的欄位送給模組（沒選到的是 nil，保留原值）；etag 是版本，帳號來自店家；
+// 賣家型態只在 mask 列到那一支（它的欄位，或直接列 business／individual）時才送（更新沒列到就不切換）。
 func TestSaveKYCDraftSendsOnlyTheFieldsInTheMask(t *testing.T) {
 	m := &kycModule{}
 	_, err := saveKYC(t, m, &pb.KYCApplication{
-		Etag: "4", RealName: "王小明", BirthDate: &date.Date{Year: 1990, Month: 5, Day: 6}, EnglishName: "不在 mask 內",
-		Subject:     individualOf("A123456789"),
-		IdCardFront: &pb.KYCDocument{StagedToken: "front"}, BankBook: &pb.KYCDocument{AssetId: "not-in-mask"},
-	}, "real_name", "birth_date", "individual.id_card_no", "id_card_front")
+		Etag: "4", ProductType: "有機蔬果", WebsiteUrl: "https://不在-mask.example.com",
+		Subject: businessOf(&pb.BusinessKYC{TaxId: "33330333", CompanyName: "不在 mask 內"}),
+	}, "product_type", "business.tax_id")
 	if err != nil {
 		t.Fatal(err)
 	}
 	in := m.draft
-	if in.AccountID != 7 || in.ExpectedVersion != 4 || *in.RealName != "王小明" || *in.BirthDate != "1990-05-06" || *in.IDCardNo != "A123456789" {
+	if in.AccountID != 7 || in.ExpectedVersion != 4 || *in.ProductType != "有機蔬果" || *in.TaxID != "33330333" {
 		t.Fatalf("input=%+v", in)
 	}
-	if in.EnglishName != nil || in.BankBook != nil || in.IDCardBack != nil || in.CompanyDocuments != nil {
+	if in.WebsiteURL != nil || in.CompanyName != nil || in.CompanyDocuments != nil {
 		t.Fatalf("沒選到的欄位被送給模組：%+v", in)
 	}
-	if in.SellerType == nil || *in.SellerType != model.KYCIndividual {
-		t.Fatalf("mask 列到 individual 的欄位，賣家型態就是 individual：%v", in.SellerType)
+	if in.SellerType == nil || *in.SellerType != model.KYCCompany {
+		t.Fatalf("mask 列到 business 的欄位，賣家型態就是 company：%v", in.SellerType)
 	}
-	if in.IDCardFront == nil || *in.IDCardFront != (model.KYCDocumentRef{StagedToken: "front"}) {
-		t.Fatalf("front=%+v", in.IDCardFront)
-	}
-	// 更新時 mask 沒有列到那一支的欄位：不送賣家型態。
+	// 更新時 mask 沒有列到那一支：不送賣家型態。
 	m = &kycModule{}
-	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "4", RealName: "改", Subject: individualOf("")}, "real_name"); err != nil || m.draft.SellerType != nil {
+	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "4", ProductType: "改", Subject: individualOf()}, "product_type"); err != nil || m.draft.SellerType != nil {
 		t.Fatalf("err=%v type=%v", err, m.draft.SellerType)
+	}
+	// individual 沒有欄位（D22）：型態的切換靠 mask 直接列 individual 或 business。
+	m = &kycModule{}
+	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "4", Subject: individualOf()}, "individual"); err != nil || m.draft.SellerType == nil || *m.draft.SellerType != model.KYCIndividual {
+		t.Fatalf("mask 直接列 individual：err=%v type=%v", err, m.draft.SellerType)
+	}
+	m = &kycModule{}
+	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "4", Subject: businessOf(&pb.BusinessKYC{})}, "business"); err != nil || m.draft.SellerType == nil || *m.draft.SellerType != model.KYCCompany {
+		t.Fatalf("mask 直接列 business：err=%v type=%v", err, m.draft.SellerType)
 	}
 }
 
@@ -141,21 +144,21 @@ func TestSaveKYCDraftSendsOnlyTheFieldsInTheMask(t *testing.T) {
 // 設定 individual 或 business 其中一支，賣家型態就是那一支。
 func TestSaveKYCDraftClearsSelectedEmptyFieldsAndIgnoresOutputOnlyOnes(t *testing.T) {
 	m := &kycModule{}
-	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1"}, "birth_date", "real_name", "individual.id_card_no_masked", "status", "flow", "etag", "id", "missing_fields"); err != nil {
+	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1"}, "website_url", "product_type", "status", "last_rejection", "etag", "id", "missing_fields"); err != nil {
 		t.Fatal(err)
 	}
-	if in := m.draft; *in.BirthDate != "" || *in.RealName != "" || in.IDCardNo != nil || in.BankAccount != nil || in.SellerType != nil {
+	if in := m.draft; *in.WebsiteURL != "" || *in.ProductType != "" || in.TaxID != nil || in.SellerType != nil {
 		t.Fatalf("input=%+v", in)
 	}
 	m = &kycModule{}
-	if _, err := saveKYC(t, m, &pb.KYCApplication{Subject: businessOf(&pb.BusinessKYC{TaxId: "33330333", RepIdCardNoMasked: "H2******10"})}); err != nil {
+	if _, err := saveKYC(t, m, &pb.KYCApplication{Subject: businessOf(&pb.BusinessKYC{TaxId: "33330333"})}); err != nil {
 		t.Fatal(err)
 	}
 	in := m.draft
-	if *in.SellerType != model.KYCCompany || *in.TaxID != "33330333" || in.ExpectedVersion != 0 || in.RealName != nil || in.RepIDCardNo != nil {
+	if *in.SellerType != model.KYCCompany || *in.TaxID != "33330333" || in.ExpectedVersion != 0 || in.ProductType != nil {
 		t.Fatalf("input=%+v", in)
 	}
-	if _, err := saveKYC(t, m, &pb.KYCApplication{RealName: "沒有選型態"}); apperr.KindOf(err) != apperr.KindInvalidInput {
+	if _, err := saveKYC(t, m, &pb.KYCApplication{ProductType: "沒有選型態"}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("建立時沒有設定 individual 或 business：err=%v", err)
 	}
 	// 沒有 mask 的建立：subject 設定的那一支就是型態（空的 individual 也算）。
@@ -195,26 +198,35 @@ func TestSaveKYCDraftRejectsTheRemovedFoodBusinessPath(t *testing.T) {
 	}
 }
 
-// 證件是狀態：單張的位置列進 mask 時整個換掉（沒有值是清掉），公司文件整個換成請求的清單，每個元素是現有的圖片或新的
-// staged token；沒列進 mask 的位置不動。
+// 公司文件是狀態：整個換成請求的清單，每個元素是現有的圖片或新的 staged token；沒列進 mask 時不動。
 func TestSaveKYCDraftTreatsDocumentsAsState(t *testing.T) {
 	m := &kycModule{}
 	app := &pb.KYCApplication{
-		Etag: "2", IdCardFront: &pb.KYCDocument{AssetId: "keep-front"},
-		Subject: businessOf(&pb.BusinessKYC{CompanyDocuments: []*pb.KYCDocument{{AssetId: "keep-co"}, {StagedToken: "new-co"}}}),
+		Etag: "2", Subject: businessOf(&pb.BusinessKYC{CompanyDocuments: []*pb.KYCDocument{{AssetId: "keep-co"}, {StagedToken: "new-co"}}}),
 	}
-	if _, err := saveKYC(t, m, app, "id_card_front", "id_card_back", "business.company_documents"); err != nil {
+	if _, err := saveKYC(t, m, app, "business.company_documents"); err != nil {
 		t.Fatal(err)
 	}
 	in := m.draft
-	if *in.IDCardFront != (model.KYCDocumentRef{AssetID: "keep-front"}) || *in.IDCardBack != (model.KYCDocumentRef{}) || in.BankBook != nil {
-		t.Fatalf("input=%+v", in)
-	}
 	if want := []model.KYCDocumentRef{{AssetID: "keep-co"}, {StagedToken: "new-co"}}; in.CompanyDocuments == nil || !slices.Equal(*in.CompanyDocuments, want) {
 		t.Fatalf("company=%+v", in.CompanyDocuments)
 	}
 	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "2", Subject: businessOf(&pb.BusinessKYC{})}, "business.company_documents"); err != nil || m.draft.CompanyDocuments == nil || len(*m.draft.CompanyDocuments) != 0 {
 		t.Fatalf("空清單是清掉全部：err=%v company=%+v", err, m.draft.CompanyDocuments)
+	}
+	m = &kycModule{}
+	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "2", ProductType: "x"}, "product_type"); err != nil || m.draft.CompanyDocuments != nil {
+		t.Fatalf("沒列進 mask 的文件被送給模組：err=%v company=%+v", err, m.draft.CompanyDocuments)
+	}
+}
+
+// 已刪除的欄位（D22、D37）不是可寫的路徑：列進 update_mask 是 invalid_argument，不會到模組。
+func TestSaveKYCDraftRejectsTheRemovedPIIPaths(t *testing.T) {
+	for _, path := range []string{"real_name", "birth_date", "english_name", "bank_name", "bank_code", "bank_account", "id_card_front", "id_card_back", "bank_book", "individual.id_card_no", "business.rep_id_card_no"} {
+		m := &kycModule{}
+		if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1"}, path); err == nil || !strings.HasPrefix(err.Error(), "invalid_argument") {
+			t.Errorf("%s：err=%v", path, err)
+		}
 	}
 }
 
@@ -234,27 +246,37 @@ func TestSaveKYCDraftRejectsTheRetiredCompanyTypePath(t *testing.T) {
 // 列到的欄位在另一支底下是請求自相矛盾。
 func TestSaveKYCDraftWildcardMaskCoversTheSetBranch(t *testing.T) {
 	m := &kycModule{}
-	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1", RealName: "王小明", Subject: individualOf("A123456789")}, "*"); err != nil {
+	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1", ProductType: "有機蔬果", Subject: individualOf()}, "*"); err != nil {
 		t.Fatal(err)
 	}
 	in := m.draft
-	if *in.SellerType != model.KYCIndividual || in.IDCardNo == nil || in.RealName == nil || in.BankName == nil || *in.BankName != "" ||
-		in.CompanyName != nil || in.TaxID != nil || in.RepIDCardNo != nil || in.CompanyDocuments != nil || in.CompanyPhone != nil {
+	if *in.SellerType != model.KYCIndividual || in.ProductType == nil || in.WebsiteURL == nil || *in.WebsiteURL != "" ||
+		in.CompanyName != nil || in.TaxID != nil || in.CompanyDocuments != nil || in.CompanyPhone != nil {
 		t.Fatalf("個人賣家：%+v", in)
 	}
-	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1", Subject: businessOf(&pb.BusinessKYC{CompanyName: "某某公司", TaxId: "33330333", RepIdCardNo: "X223456789"})}, "*"); err != nil {
+	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1", Subject: businessOf(&pb.BusinessKYC{CompanyName: "某某公司", TaxId: "33330333"})}, "*"); err != nil {
 		t.Fatal(err)
 	}
 	in = m.draft
-	if *in.SellerType != model.KYCCompany || in.IDCardNo != nil || in.CompanyName == nil || *in.CompanyName != "某某公司" || in.TaxID == nil || in.RepIDCardNo == nil ||
-		in.CompanyDocuments == nil {
+	if *in.SellerType != model.KYCCompany || in.CompanyName == nil || *in.CompanyName != "某某公司" || in.TaxID == nil || in.CompanyDocuments == nil {
 		t.Fatalf("企業賣家：%+v", in)
 	}
-	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1", Subject: individualOf("A123456789")}, "business.company_name"); err == nil || !strings.Contains(err.Error(), "不一致") {
+	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1", Subject: individualOf()}, "business.company_name"); err == nil || !strings.Contains(err.Error(), "不一致") {
 		t.Fatalf("mask 與設定的那一支不一致：err=%v", err)
 	}
-	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1"}, "individual.id_card_no", "business.tax_id"); err == nil {
+	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1", Subject: businessOf(&pb.BusinessKYC{})}, "individual"); err == nil || !strings.Contains(err.Error(), "不一致") {
+		t.Fatalf("直接列 individual 但設定的是 business：err=%v", err)
+	}
+	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1"}, "individual", "business.tax_id"); err == nil {
 		t.Fatal("同時列到兩支的欄位通過了")
+	}
+	// mask 列了某一支、subject 卻沒設：不是靜默成功，是 invalid_argument。
+	for _, branch := range []string{"individual", "business", "business.tax_id"} {
+		before := m.draft
+		_, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1"}, branch)
+		if err == nil || !strings.HasPrefix(err.Error(), "invalid_argument:") || !strings.Contains(err.Error(), "沒有設定") || !reflect.DeepEqual(before, m.draft) {
+			t.Fatalf("mask 列了 %s 但 subject 沒設：err=%v", branch, err)
+		}
 	}
 }
 
@@ -267,7 +289,7 @@ func TestSaveKYCDraftRejectsBadRequests(t *testing.T) {
 	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1"}, "no_such_field"); err == nil || !strings.Contains(err.Error(), "invalid_argument") {
 		t.Fatalf("不認得的路徑：err=%v", err)
 	}
-	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "abc"}, "real_name"); apperr.KindOf(err) != apperr.KindVersionConflict {
+	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "abc"}, "product_type"); apperr.KindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("etag 不合法：err=%v", err)
 	}
 	if _, err := h.SaveKYCDraft(context.Background(), connect.NewRequest(&pb.SaveKYCDraftRequest{Application: &pb.KYCApplication{}})); apperr.KindOf(err) != apperr.KindInternal {
@@ -320,24 +342,20 @@ func withoutKeys(p rpc.FieldPaths, keys ...string) rpc.FieldPaths {
 
 func fullKYC(t model.KYCSellerType) model.KYCApplication {
 	text := func(s string) *string { return &s }
-	flow := model.KYCFlow{Status: model.FlowBindFailed, CanResubmit: true, IdentityLocked: true}
 	now := time.Date(2026, 10, 3, 0, 0, 0, 0, time.UTC)
 	return model.KYCApplication{
 		ID: uuid.MustParse("0192f1c0-0000-7000-8000-000000000001"), Status: model.KYCStatusRejected, Version: 3, SellerType: t,
-		RealName: text("王小明"), BirthDate: text("1990-05-06"), IDCardNoMasked: text("A1******89"),
-		BankAccountMasked: text("********8901"), RepIDCardNoMasked: text("H2******10"), CompanyRegisterDate: text("2015-07-13"), TaxID: text("33330333"),
+		CompanyRegisterDate: text("2015-07-13"), TaxID: text("33330333"),
 		Documents: []model.KYCDocument{
-			{Slot: model.SlotIDCardFront, Position: 0, AssetID: "asset front", ObjectKey: "certification/secret-key"},
-			{Slot: model.SlotCompanyDocument, Position: 0, AssetID: "co-1"}, {Slot: model.SlotCompanyDocument, Position: 1, AssetID: "co-2"},
+			{Position: 0, AssetID: "co-1", ObjectKey: "certification/secret-key"}, {Position: 1, AssetID: "co-2"},
 		},
-		MissingFields: []string{"business.tax_id", "individual.id_card_no", "real_name"},
-		Flow:          &flow,
+		MissingFields: []string{"business.company_name", "business.tax_id"},
 		LastRejection: &model.KYCRejection{Reason: "模糊", DecidedAt: now, Issues: []model.KYCIssue{
-			{Field: "real_name", Code: model.IssueMismatch, Message: "與證件上的姓名不同"},
-			{Field: "id_card_front", DocumentAssetID: "asset front", Code: model.IssueUnreadable, Message: "反光看不清楚"},
+			{Field: "business.tax_id", Code: model.IssueMismatch, Message: "與登記的統編不同"},
+			{Field: "business.company_documents", DocumentAssetID: "co-1", Code: model.IssueUnreadable, Message: "反光看不清楚"},
 			{Field: "business.company_documents", DocumentAssetID: "co-2", Code: model.IssueExpired, Message: "登記文件已過期"},
 		}},
-		OutstandingIssues: []model.KYCIssue{{Field: "id_card_front", DocumentAssetID: "asset front", Code: model.IssueUnreadable, Message: "反光看不清楚"}},
+		OutstandingIssues: []model.KYCIssue{{Field: "business.company_documents", DocumentAssetID: "co-1", Code: model.IssueUnreadable, Message: "反光看不清楚"}},
 		CreatedAt:         now, UpdatedAt: now, SubmittedAt: &now,
 	}
 }
@@ -362,15 +380,15 @@ func inputOnlyFieldsSet(m protoreflect.Message, prefix string) (out []string) {
 	return out
 }
 
-// 回應只有遮蔽後的值：INPUT_ONLY 的欄位（身分證號、銀行帳號、staged token，含 individual 與 business 裡的）一律不填；證件只有
-// asset ID 與有授權的下載網址，沒有 object key；賣家型態是 subject 設定的那一支；缺的欄位依列舉的數字順序。
-func TestKYCResponseCarriesOnlyMaskedValuesAndNoDocumentImages(t *testing.T) {
+// 回應不帶 INPUT_ONLY 的欄位（staged token，含 business 裡的）；補充文件只有 asset ID 與有授權的下載網址，沒有 object key；
+// 賣家型態是 subject 設定的那一支；缺的欄位依列舉的數字順序。
+func TestKYCResponseCarriesNoInputOnlyFieldsAndNoObjectKeys(t *testing.T) {
 	ind := toKYC(context.Background(), fullKYC(model.KYCIndividual))
-	if ind.GetIndividual().GetIdCardNoMasked() != "A1******89" || ind.GetBusiness() != nil || ind.GetBankAccountMasked() != "********8901" {
+	if ind.GetIndividual() == nil || ind.GetBusiness() != nil {
 		t.Fatalf("individual=%v", ind)
 	}
 	out := toKYC(context.Background(), fullKYC(model.KYCCompany))
-	if out.GetBusiness().GetRepIdCardNoMasked() != "H2******10" || out.GetIndividual() != nil || out.GetBusiness().GetTaxId() != "33330333" {
+	if out.GetIndividual() != nil || out.GetBusiness().GetTaxId() != "33330333" {
 		t.Fatalf("business=%v", out)
 	}
 	for name, a := range map[string]*pb.KYCApplication{"individual": ind, "business": out} {
@@ -378,20 +396,20 @@ func TestKYCResponseCarriesOnlyMaskedValuesAndNoDocumentImages(t *testing.T) {
 			t.Errorf("%s：INPUT_ONLY 的欄位出現在回應：%v", name, got)
 		}
 	}
-	if out.GetIdCardFront().GetAssetId() != "asset front" || out.GetIdCardFront().GetDownloadUri() != "/api/v1/app/media/secure_download/asset%20front" ||
-		out.GetIdCardBack() != nil || out.GetBankBook() != nil || len(out.GetBusiness().GetCompanyDocuments()) != 2 || out.GetBusiness().GetCompanyDocuments()[1].GetAssetId() != "co-2" {
+	if docs := out.GetBusiness().GetCompanyDocuments(); len(docs) != 2 || docs[0].GetAssetId() != "co-1" || docs[1].GetAssetId() != "co-2" ||
+		docs[0].GetDownloadUri() != "/api/v1/app/media/secure_download/co-1" {
 		t.Fatalf("documents=%v", out)
 	}
 	if text := out.String() + prototext.Format(out); strings.Contains(text, "secret-key") {
-		t.Fatalf("證件的 object key 出現在回應：%s", text)
+		t.Fatalf("文件的 object key 出現在回應：%s", text)
 	}
 	if d := out.GetBusiness().GetCompanyRegisterDate(); d.GetYear() != 2015 || d.GetMonth() != 7 || d.GetDay() != 13 || out.GetEtag() != "3" {
 		t.Fatalf("out=%v", out)
 	}
 	rej := out.GetLastRejection()
 	wantIssues := []*pb.KYCIssue{
-		{Field: pb.KYCField_KYC_FIELD_REAL_NAME, Code: pb.KYCIssueCode_KYC_ISSUE_CODE_MISMATCH, Message: "與證件上的姓名不同"},
-		{Field: pb.KYCField_KYC_FIELD_ID_CARD_FRONT, DocumentAssetId: "asset front", Code: pb.KYCIssueCode_KYC_ISSUE_CODE_UNREADABLE, Message: "反光看不清楚"},
+		{Field: pb.KYCField_KYC_FIELD_BUSINESS_TAX_ID, Code: pb.KYCIssueCode_KYC_ISSUE_CODE_MISMATCH, Message: "與登記的統編不同"},
+		{Field: pb.KYCField_KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS, DocumentAssetId: "co-1", Code: pb.KYCIssueCode_KYC_ISSUE_CODE_UNREADABLE, Message: "反光看不清楚"},
 		{Field: pb.KYCField_KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS, DocumentAssetId: "co-2", Code: pb.KYCIssueCode_KYC_ISSUE_CODE_EXPIRED, Message: "登記文件已過期"},
 	}
 	if len(rej.GetIssues()) != 3 || rej.GetReason() != "模糊" {
@@ -405,12 +423,8 @@ func TestKYCResponseCarriesOnlyMaskedValuesAndNoDocumentImages(t *testing.T) {
 	if got := out.GetOutstandingIssues(); len(got) != 1 || !proto.Equal(got[0], wantIssues[1]) {
 		t.Fatalf("outstanding_issues=%v", got)
 	}
-	if want := []pb.KYCField{pb.KYCField_KYC_FIELD_REAL_NAME, pb.KYCField_KYC_FIELD_INDIVIDUAL_ID_CARD_NO, pb.KYCField_KYC_FIELD_BUSINESS_TAX_ID}; !slices.Equal(out.GetMissingFields(), want) {
+	if want := []pb.KYCField{pb.KYCField_KYC_FIELD_BUSINESS_COMPANY_NAME, pb.KYCField_KYC_FIELD_BUSINESS_TAX_ID}; !slices.Equal(out.GetMissingFields(), want) {
 		t.Fatalf("missing_fields=%v", out.GetMissingFields())
-	}
-	flow := out.GetFlow()
-	if flow.GetStatus() != pb.KYCFlowStatus_KYC_FLOW_STATUS_BIND_FAILED || !flow.GetCanResubmit() || !flow.GetIdentityLocked() {
-		t.Fatalf("flow=%v", flow)
 	}
 }
 
@@ -421,7 +435,6 @@ func TestSubmitKYCPassesTheGenericIdentityErrorThroughUnchanged(t *testing.T) {
 	h := mustApp(t, m, nil, rpc.Images{}, Dashboard{}, testStats(fakeFollowerCounts{}, fakeRatings{}))
 	req := connect.NewRequest(&pb.SubmitKYCRequest{Etag: "2", AcceptedAgreements: []*pb.AgreementAcceptance{
 		{Kind: pb.AgreementKind_AGREEMENT_KIND_KYC_PRIVACY_NOTICE, Version: "2026-10-07"},
-		{Kind: pb.AgreementKind_AGREEMENT_KIND_PAYUNI_TERMS, Version: "2026-10-07"},
 	}})
 	req.Header().Set("User-Agent", "hk-test/1.0")
 	_, err := h.SubmitKYC(rpc.WithClientIP(ctxWithStore(currentStore()), "203.0.113.9"), req)
@@ -432,7 +445,6 @@ func TestSubmitKYCPassesTheGenericIdentityErrorThroughUnchanged(t *testing.T) {
 		AccountID: 7, ExpectedVersion: 2, ClientIP: "203.0.113.9", UserAgent: "hk-test/1.0",
 		AcceptedAgreements: []model.AgreementAcceptance{
 			{Kind: model.AgreementKYCPrivacyNotice, Version: "2026-10-07"},
-			{Kind: model.AgreementPayUniTerms, Version: "2026-10-07"},
 		},
 	}
 	if !reflect.DeepEqual(m.submit, wantSubmit) {
@@ -461,78 +473,22 @@ func TestKYCAndGovernanceEnumsMatchTheModule(t *testing.T) {
 		fields = append(fields, strings.ToUpper(strings.ReplaceAll(name, ".", "_")))
 	}
 	for name, mismatches := range map[string][]string{
-		"KYCStatus":                    rpc.EnumMismatches[pb.KYCStatus](model.KYCStatusValues()),
-		"KYCField":                     rpc.EnumMismatches[pb.KYCField](fields),
-		"KYCFlowStatus":                rpc.EnumMismatches[pb.KYCFlowStatus](model.KYCFlowStatusValues()),
-		"PayUniBindStatus":             rpc.EnumMismatches[pb.PayUniBindStatus](model.PayUniBindStatusValues()),
-		"PayUniState":                  rpc.EnumMismatches[pb.PayUniState](model.PayUniStateValues()),
-		"KYCResubmitUnavailableReason": rpc.EnumMismatches[pb.KYCResubmitUnavailableReason](model.KYCResubmitUnavailableReasonValues()),
-		"PolicyCategory":               rpc.EnumMismatches[commonpb.PolicyCategory](policy.Values()),
-		"ViolationSeverity":            rpc.EnumMismatches[pb.ViolationSeverity](model.SeverityValues()),
-		"ViolationStatus":              rpc.EnumMismatches[pb.ViolationStatus](model.ViolationStatusValues()),
-		"RevokeReason":                 rpc.EnumMismatches[pb.RevokeReason](model.RevokeReasonValues()),
-		"MeasureKind":                  rpc.EnumMismatches[pb.MeasureKind](model.MeasureKindValues()),
-		"MeasureBasis":                 rpc.EnumMismatches[pb.MeasureBasis](model.BasisValues()),
-		"RiskGround":                   rpc.EnumMismatches[pb.RiskGround](model.RiskGroundValues()),
-		"MeasureState":                 rpc.EnumMismatches[pb.MeasureState](model.MeasureStateValues()),
-		"MeasureRequestState":          rpc.EnumMismatches[pb.MeasureRequestState](model.RequestStateValues()),
-		"MeasureRequestCloseCause":     rpc.EnumMismatches[pb.MeasureRequestCloseCause](model.RequestCloseCauseValues()),
+		"KYCStatus":                rpc.EnumMismatches[pb.KYCStatus](model.KYCStatusValues()),
+		"KYCField":                 rpc.EnumMismatches[pb.KYCField](fields),
+		"PolicyCategory":           rpc.EnumMismatches[commonpb.PolicyCategory](policy.Values()),
+		"ViolationSeverity":        rpc.EnumMismatches[pb.ViolationSeverity](model.SeverityValues()),
+		"ViolationStatus":          rpc.EnumMismatches[pb.ViolationStatus](model.ViolationStatusValues()),
+		"RevokeReason":             rpc.EnumMismatches[pb.RevokeReason](model.RevokeReasonValues()),
+		"MeasureKind":              rpc.EnumMismatches[pb.MeasureKind](model.MeasureKindValues()),
+		"MeasureBasis":             rpc.EnumMismatches[pb.MeasureBasis](model.BasisValues()),
+		"RiskGround":               rpc.EnumMismatches[pb.RiskGround](model.RiskGroundValues()),
+		"MeasureState":             rpc.EnumMismatches[pb.MeasureState](model.MeasureStateValues()),
+		"MeasureRequestState":      rpc.EnumMismatches[pb.MeasureRequestState](model.RequestStateValues()),
+		"MeasureRequestCloseCause": rpc.EnumMismatches[pb.MeasureRequestCloseCause](model.RequestCloseCauseValues()),
 	} {
 		if len(mismatches) > 0 {
 			t.Errorf("%s：%v", name, mismatches)
 		}
-	}
-}
-
-// 後台看的 PayUni 問題：碼、審核意見與欄位；處置類別不在契約裡（賣家看的是 KYCFlow.payuni）。
-func TestToProblemMapsCodeReasonAndFields(t *testing.T) {
-	text := func(s string) *string { return &s }
-	reg := model.PayUniRegistration{
-		StoreID: 11, BindStatus: model.BindStatusBound,
-		Status: model.PayUniStatus{MerStatus: text("8"), MemberStatus: text("0"), Reason: text("  請補上店面照片\n"), Outcome: model.PayUniOutcomeRejected},
-	}
-	want := model.PayUniProblemOf(reg)
-	got := toProblem(want)
-	if got.GetCode() != want.Code || got.GetReason() != "請補上店面照片" || len(got.GetFields()) != len(want.Fields) || len(want.Fields) == 0 {
-		t.Fatalf("problem=%v want=%+v", got, want)
-	}
-	if p := toProblem(model.PayUniProblemOf(model.PayUniRegistration{BindStatus: model.BindStatusPending})); p != nil {
-		t.Fatalf("綁定中不該有問題：%v", p)
-	}
-}
-
-// 賣家讀自己的申請：流程帶 PayUni 狀態（標題以外的事實與句子：說明的語系與內容、審核意見、能修正的欄位）與不能重新送出的原因；
-// 後台的 KYCApplication.flow 兩者都不設（後台的 PayUni 呈現在 PayUniRegistration）。
-func TestSellerFlowCarriesPayUniAndResubmitUnavailabilitiesButAdminFlowDoesNot(t *testing.T) {
-	flow := model.KYCFlow{Status: model.FlowPayUniRejected}
-	app := model.KYCApplication{
-		Flow: &flow,
-		PayUni: &model.SellerPayUni{
-			State: model.PayUniState("FIX_VIA_SUPPORT"), Reason: "地址不完整", FixStoreFields: []string{"address", "contact_phone"},
-		},
-		ResubmitReasons: []model.KYCResubmitUnavailableReason{model.KYCResubmitUnavailableReason("PAYUNI_FIX_VIA_SUPPORT")},
-	}
-	got := toKYC(context.Background(), app).GetFlow()
-	explanation, _ := app.PayUni.State.Explanation(uitext.ZhTW)
-	p := got.GetPayuni()
-	if p.GetState() != pb.PayUniState_PAY_UNI_STATE_FIX_VIA_SUPPORT || p.GetExplanation().GetLocale() != "zh-TW" || p.GetExplanation().GetMessage() != explanation.Text ||
-		explanation.Text == "" || p.GetReason() != "地址不完整" || len(p.GetFixFields()) != 0 ||
-		!slices.Equal(p.GetFixStoreFields(), []pb.StoreField{pb.StoreField_STORE_FIELD_ADDRESS, pb.StoreField_STORE_FIELD_CONTACT_PHONE}) {
-		t.Fatalf("payuni=%v", p)
-	}
-	reason := model.KYCResubmitUnavailableReason("PAYUNI_FIX_VIA_SUPPORT")
-	u := got.GetResubmitUnavailabilities()
-	if len(u) != 1 || u[0].GetReason() != pb.KYCResubmitUnavailableReason_KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_FIX_VIA_SUPPORT ||
-		u[0].GetMessage().GetMessage() != reason.Text(uitext.ZhTW).Text || u[0].GetMessage().GetMessage() == "" {
-		t.Fatalf("resubmit_unavailabilities=%v", u)
-	}
-	// 沒有 PayUni 狀態（申請不在 PayUni 階段）時不設。
-	if f := toKYC(context.Background(), model.KYCApplication{Flow: &flow}).GetFlow(); f.GetPayuni() != nil || len(f.GetResubmitUnavailabilities()) != 0 {
-		t.Fatalf("flow=%v", f)
-	}
-	admin := toAdminKYC(model.KYCAdminApplication{KYCApplication: app}).GetFlow()
-	if admin.GetPayuni() != nil || len(admin.GetResubmitUnavailabilities()) != 0 || admin.GetStatus() != pb.KYCFlowStatus_KYC_FLOW_STATUS_PAYUNI_REJECTED {
-		t.Fatalf("admin flow=%v", admin)
 	}
 }
 
@@ -606,8 +562,8 @@ func TestLookupBusinessRegistrationMapsTheRegistrationAndValidatesTheTaxID(t *te
 	}
 }
 
-// KYCField 與 KYCApplication 的欄位路徑一對一：退回、PayUni 問題、缺項與送出的 BadRequest 用同一套語彙。可寫的欄位（"*" 展開，
-// 兩支都算）去掉 etag 就是 KYCFieldNames；每個 KYCField 對到真的存在的路徑；PayUni 的欄位群組都在裡面。
+// KYCField 與 KYCApplication 的欄位路徑一對一：退回、缺項與送出的 BadRequest 用同一套語彙。可寫的欄位（"*" 展開，
+// 兩支都算）去掉 etag 就是 KYCFieldNames；每個 KYCField 對到真的存在的路徑。
 func TestKYCFieldIsOneToOneWithTheWritableApplicationFields(t *testing.T) {
 	var writableLeaves []string
 	for _, subject := range []*pb.KYCApplication{
@@ -656,14 +612,10 @@ func TestKYCFieldIsOneToOneWithTheWritableApplicationFields(t *testing.T) {
 	}
 }
 
-func TestStoreFieldsAreMappedOnTheKYCViewAndTheProblem(t *testing.T) {
+func TestStoreFieldsAreMappedOnTheKYCView(t *testing.T) {
 	out := toKYC(context.Background(), model.KYCApplication{MissingStoreFields: []string{"support_email", "address", "contact_name"}})
 	want := []pb.StoreField{pb.StoreField_STORE_FIELD_ADDRESS, pb.StoreField_STORE_FIELD_CONTACT_NAME, pb.StoreField_STORE_FIELD_SUPPORT_EMAIL}
 	if !slices.Equal(out.GetMissingStoreFields(), want) {
 		t.Fatalf("missing_store_fields=%v", out.GetMissingStoreFields())
-	}
-	p := toProblem(&model.PayUniProblem{Code: "AGENT06006", Remedy: model.RemedySellerFix, StoreFields: []string{"contact_mobile", "contact_phone"}})
-	if !slices.Equal(p.GetStoreFields(), []pb.StoreField{pb.StoreField_STORE_FIELD_CONTACT_MOBILE, pb.StoreField_STORE_FIELD_CONTACT_PHONE}) || len(p.GetFields()) != 0 {
-		t.Fatalf("problem=%v", p)
 	}
 }

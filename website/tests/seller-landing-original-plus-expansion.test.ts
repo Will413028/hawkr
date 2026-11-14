@@ -264,7 +264,7 @@ test("seller feature overview is a transparent nine-category icon directory", ()
 		"只供補貨判斷參考",
 		"已結束",
 		"站內訊息",
-		"PayUni",
+		"金流商",
 		"不提供提款操作",
 	]) {
 		assert.match(publicCopy, new RegExp(transparentLimit));

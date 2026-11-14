@@ -32,6 +32,13 @@ test("enforced CSP carries the required hardening directives", () => {
 	}
 });
 
+test("CSP img-src allows blob: for KYC document previews", () => {
+	const config = readFileSync(join(projectRoot, "next.config.ts"), "utf8");
+	const imgSrc = config.match(/"(img-src [^"]*)"/)?.[1];
+	assert.ok(imgSrc);
+	assert.match(imgSrc, /\bblob:/);
+});
+
 test("csp-report endpoint accepts a violation report and responds 204", async () => {
 	const res = await POST(
 		new Request("https://admin.example.com/api/csp-report", {

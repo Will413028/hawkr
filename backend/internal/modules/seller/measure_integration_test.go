@@ -1463,7 +1463,7 @@ func TestEndingAnOpenRiskMeasureEndsTheEffectAndDeletesItsIdentitySnapshot(t *te
 	unsuspended := record[StoreUnsuspended](f)
 	ended := record[MeasureEnded](f)
 	accountID, s := f.open(t)
-	f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	f.savedDraft(t, companyDraft(accountID, taxIDOne))
 	risk := f.riskSuspend(t, s.StoreID)
 	if n := f.count(t, "SELECT count(*) FROM seller.measure_identities WHERE measure_id = $1", risk.ID); n == 0 {
 		t.Fatal("停權措施要快照身分")

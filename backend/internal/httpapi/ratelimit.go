@@ -196,7 +196,7 @@ func withRateLimit(l *rateLimiter, next http.Handler) http.Handler {
 			reqs[i] = rateRequest{key: tier.name + "|" + subject, limit: tier.limit(subject), window: tier.span()}
 		}
 		if ok, wait := l.allowAll(reqs...); !ok {
-			_ = connect.NewErrorWriter().Write(w, r, rpc.RetryLater(r.Context(), wait))
+			_ = connect.NewErrorWriter().Write(w, r, rpc.NegotiatedRetryLater(w, r, wait))
 			return
 		}
 		next.ServeHTTP(w, r)

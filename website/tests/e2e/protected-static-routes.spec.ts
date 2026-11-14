@@ -98,7 +98,7 @@ async function prepareAuthenticatedPage(
 	await mockMyStore(page, {
 		id: SELLER_FIXTURE_ID,
 		storeName: "路由測試商店",
-		missingRequirements: ["KYC_APPROVED"],
+		missingRequirements: ["ONBOARDING_COMPLETE"],
 	});
 	await mockMyKyc(page, { status: "NOT_STARTED" });
 	await page.route("**/api/v1/app/product_import_jobs**", (route) => {

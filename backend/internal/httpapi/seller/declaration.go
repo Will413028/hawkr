@@ -52,18 +52,23 @@ var declarations = map[string]declaration{
 	sellerv1alpha1connect.SellerAppServiceApplyStoreProcedure:                exempt("申請開店時帳號還沒有店家，也還不是賣家"),
 	sellerv1alpha1connect.SellerAppServiceGetMyStoreOpeningProcedure:         exempt("開店入口在送出之前讀取，帳號還沒有店家，也還不是賣家；帳號的措施與生命週期由模組以 account ID 判斷"),
 	sellerv1alpha1connect.SellerAppServiceGetMyStoreProcedure:                requires(model.CapAccountSelfRead),
+	sellerv1alpha1connect.SellerAppServiceGetMyOnboardingProcedure:           requires(model.CapAccountSelfRead),
 	sellerv1alpha1connect.SellerAppServiceUpdateMyStoreProcedure:             requires(model.CapStorefrontWrite),
 	sellerv1alpha1connect.SellerAppServiceCompleteMyStoreOnboardingProcedure: requires(model.CapStorefrontWrite),
 	sellerv1alpha1connect.SellerAppServiceListMyFollowersProcedure:           requires(model.CapMarketing),
 	sellerv1alpha1connect.SellerAppServiceGetMyDashboardProcedure:            requires(model.CapMarketing),
 	sellerv1alpha1connect.SellerAppServiceCloseMyStoreProcedure:              requires(model.CapAccountClose),
 
-	// KYC 與 PayUni：模組對同一個能力再檢查一次（深度防禦）。草稿、送出與取消是店面設定的一部分，停權與等待刪除時不能做；
-	// 讀取自己的申請（含 PayUni 狀態）停權時仍可以。
+	// KYC：模組對同一個能力再檢查一次（深度防禦）。草稿、送出與取消是店面設定的一部分，停權與等待刪除時不能做；
+	// 讀取自己的申請停權時仍可以。
 	sellerv1alpha1connect.SellerAppServiceSaveKYCDraftProcedure: requires(model.CapStorefrontWrite),
 	sellerv1alpha1connect.SellerAppServiceGetMyKYCProcedure:     requires(model.CapAccountSelfRead),
 	sellerv1alpha1connect.SellerAppServiceCancelKYCProcedure:    requires(model.CapStorefrontWrite),
-	// 身分比對是身分證號與統編存在與否的探測面（ADR 2026-10-19-seller-kyc-payuni-consolidated）：每個帳號每小時最多 5 次。
+	// 收款帳戶：讀取自己的帳戶停權時仍可以；取得開通 session 與重讀帳戶（RefreshMyPaymentAccount）會呼叫金流商，是店面設定的一部分，停權與等待刪除時不能做；開通任務（GetMyOnboarding）只讀，停權時仍可以。
+	sellerv1alpha1connect.SellerAppServiceGetMyPaymentAccountProcedure:            requires(model.CapAccountSelfRead),
+	sellerv1alpha1connect.SellerAppServiceCreatePaymentOnboardingSessionProcedure: requires(model.CapStorefrontWrite),
+	sellerv1alpha1connect.SellerAppServiceRefreshMyPaymentAccountProcedure:        requires(model.CapStorefrontWrite),
+	// 身分比對是統編存在與否的探測面（ADR 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」）：每個帳號每小時最多 5 次。
 	// 一次正常的申請是填完才送出，被退回後修改重送，一個小時內不會超過；額度以帳號計，計數在這個程序的記憶體內：多個
 	// instance 各自計數，monolith 跑超過一個 instance 之前要換成共用的計數（docs/modules/seller.md §23；入口的 IP 限流不是它的補償）。
 	sellerv1alpha1connect.SellerAppServiceSubmitKYCProcedure: requires(model.CapStorefrontWrite).limitedTo(5, time.Hour),

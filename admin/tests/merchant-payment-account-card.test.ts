@@ -1,0 +1,290 @@
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+import test from "node:test";
+import { create, type MessageInitShape } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
+import { Code, ConnectError } from "@connectrpc/connect";
+import { PaymentAccountSchema } from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1/payment_pb";
+import {
+	PaymentAccountStatus,
+	RequirementCollection,
+} from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+
+/**
+ * 商家詳情的收款帳戶卡（PaymentAccountCard）實際渲染出來的 HTML。
+ *
+ * 守的是：「重試建立」只在有 create_failed_time 時出現；not_found 是「尚未建立」而不是讀取失敗；
+ * 徽章與收件方式的文字來自共用文案目錄；待補條件原文放在折疊的 <pre>。寫法同 merchant-active-measures-card.test.ts。
+ */
+
+const requireFromTest = createRequire(__filename);
+requireFromTest.extensions[".css"] = () => {};
+
+const { createElement } = requireFromTest("react") as {
+	createElement: (type: unknown, props?: unknown) => unknown;
+};
+const { renderToStaticMarkup } = requireFromTest("react-dom/server") as {
+	renderToStaticMarkup: (element: unknown) => string;
+};
+const cardModule = requireFromTest(
+	"../src/app/admin/merchants/[id]/PaymentAccountCard",
+) as typeof import("../src/app/admin/merchants/[id]/PaymentAccountCard");
+
+const accountModule = requireFromTest(
+	"../src/app/admin/merchants/[id]/payment-account",
+) as typeof import("../src/app/admin/merchants/[id]/payment-account");
+
+type State = Parameters<typeof cardModule.PaymentAccountCard>[0]["state"];
+
+function render(state: State): string {
+	return renderToStaticMarkup(
+		createElement(cardModule.PaymentAccountCard, {
+			state,
+			refreshing: false,
+			retrying: false,
+			purging: false,
+			onRefresh: () => {},
+			onRetryCreate: () => {},
+			onRetryPurge: () => {},
+			onDeleteMapping: () => {},
+			onReload: () => {},
+		}),
+	);
+}
+
+function account(init: MessageInitShape<typeof PaymentAccountSchema> = {}) {
+	return create(PaymentAccountSchema, {
+		storeId: "57",
+		provider: "stripe",
+		externalAccountId: "acct_1UXVfaID6WkY4CJw",
+		status: PaymentAccountStatus.ACTION_REQUIRED,
+		requirementCollection: RequirementCollection.PROVIDER,
+		statusReason: "requirements_past_due",
+		fetchTime: timestampFromDate(new Date("2026-11-03T06:20:00Z")),
+		...init,
+	});
+}
+
+test("ready：顯示目錄的徽章與收件方式、外部帳戶、原因碼與上次讀取，沒有建立失敗時只有重新整理", () => {
+	const html = render({ state: "ready", account: account() });
+	assert.match(html, /id="payment-account"/);
+	assert.match(html, /待設定/);
+	assert.match(html, /金流商收件（託管頁面）/);
+	assert.match(html, /acct_1UXVfaID6WkY4CJw/);
+	assert.match(html, /requirements_past_due/);
+	assert.match(html, /2026\/11\/03 14:20/);
+	assert.match(html, /重新整理/);
+	assert.doesNotMatch(html, /重試建立/);
+	assert.doesNotMatch(html, /建立失敗於/);
+});
+
+test("有 create_failed_time：顯示建立失敗時間與重試建立", () => {
+	const html = render({
+		state: "ready",
+		account: account({
+			externalAccountId: "",
+			status: PaymentAccountStatus.NOT_CREATED,
+			createFailedTime: timestampFromDate(new Date("2026-11-03T06:20:00Z")),
+		}),
+	});
+	assert.match(html, /建立失敗於 2026\/11\/03 14:20/);
+	assert.match(html, /重試建立/);
+	// 還沒有外部帳戶：RefreshPaymentAccount 會回 failed_precondition，不給重新整理。
+	assert.doesNotMatch(html, /重新整理/);
+	assert.match(html, /準備中/);
+});
+
+// 半建立的列（第一步成功、第二步還沒成功）已有外部 ID，但對外狀態仍是 NOT_CREATED：RefreshPaymentAccount 回 failed_precondition，不給重新整理。
+test("半建立（有外部 ID、狀態 NOT_CREATED）：看狀態判斷尚未建立，不給重新整理；外部 ID 照常顯示", () => {
+	const half = account({ status: PaymentAccountStatus.NOT_CREATED });
+	assert.equal(half.externalAccountId, "acct_1UXVfaID6WkY4CJw");
+	assert.equal(accountModule.paymentAccountCreated(half), false);
+	const html = render({ state: "ready", account: half });
+	assert.doesNotMatch(html, /重新整理/);
+	assert.match(html, /acct_1UXVfaID6WkY4CJw/);
+	for (const status of [
+		PaymentAccountStatus.ACTION_REQUIRED,
+		PaymentAccountStatus.UNDER_REVIEW,
+		PaymentAccountStatus.ENABLED,
+		PaymentAccountStatus.DISABLED,
+	]) {
+		assert.equal(
+			accountModule.paymentAccountCreated(account({ status })),
+			true,
+			PaymentAccountStatus[status],
+		);
+	}
+});
+
+test("有 purge_blocked_time：在重試建立的位置顯示原因與時間、重試關閉與已在金流商處理，刪除對應；不給重新整理與重試建立", () => {
+	const html = render({
+		state: "ready",
+		account: account({
+			createFailedTime: timestampFromDate(new Date("2026-11-03T06:20:00Z")),
+			purgeBlockedTime: timestampFromDate(new Date("2026-11-14T06:20:00Z")),
+			purgeBlockedReason: "provider_refused：no such account",
+		}),
+	});
+	assert.match(html, /收款帳戶無法關閉：provider_refused：no such account/);
+	assert.match(html, /2026\/11\/14 14:20/);
+	assert.match(html, /重試關閉/);
+	assert.match(html, /已在金流商處理，刪除對應/);
+	assert.doesNotMatch(html, /重試建立/);
+	assert.doesNotMatch(html, /建立失敗於/);
+	// 等待清理的帳戶 RefreshPaymentAccount 回 failed_precondition，不給重新整理。
+	assert.doesNotMatch(html, /重新整理/);
+	const plain = render({ state: "ready", account: account() });
+	assert.doesNotMatch(plain, /重試關閉|刪除對應|無法關閉/);
+});
+
+test("有 purge_pending_time、還沒進終局：顯示「收款帳戶關閉中（時間 起）」，隱藏重新整理、重試建立與其他動作；建立失敗的說明也不顯示", () => {
+	const html = render({
+		state: "ready",
+		account: account({
+			purgePendingTime: timestampFromDate(new Date("2026-11-14T01:00:00Z")),
+			createFailedTime: timestampFromDate(new Date("2026-11-13T01:00:00Z")),
+		}),
+	});
+	assert.match(html, /收款帳戶關閉中（2026\/11\/14 09:00 起）/);
+	assert.doesNotMatch(html, /重新整理/);
+	assert.doesNotMatch(html, /重試建立/);
+	assert.doesNotMatch(html, /重試關閉/);
+	assert.doesNotMatch(html, /刪除對應/);
+	assert.doesNotMatch(html, /建立失敗於/);
+	assert.doesNotMatch(html, /收款帳戶無法關閉/);
+});
+
+test("purge_pending_time 與 purge_blocked_time 同時有（進終局）：只顯示被擋下的原因與終局的動作，不顯示關閉中", () => {
+	const html = render({
+		state: "ready",
+		account: account({
+			purgePendingTime: timestampFromDate(new Date("2026-11-14T01:00:00Z")),
+			purgeBlockedTime: timestampFromDate(new Date("2026-11-14T02:00:00Z")),
+			purgeBlockedReason: "provider_refused：no",
+		}),
+	});
+	assert.doesNotMatch(html, /收款帳戶關閉中/);
+	assert.match(html, /收款帳戶無法關閉：provider_refused：no/);
+	assert.match(html, /重試關閉/);
+});
+
+test("清理終局是 unresolved_creation：冪等鍵保存期內給「重試關閉」，超過保存期（create_unresolved）隱藏它，刪除對應仍在；其他原因的終局不受 create_unresolved 影響", () => {
+	const blocked = (reason: string, createUnresolved: boolean) =>
+		render({
+			state: "ready",
+			account: account({
+				purgeBlockedTime: timestampFromDate(new Date("2026-11-14T02:00:00Z")),
+				purgeBlockedReason: reason,
+				createUnresolved,
+			}),
+		});
+	const within = blocked("unresolved_creation：建立結果不明", false);
+	assert.match(within, /重試關閉/);
+	const past = blocked("unresolved_creation：建立結果不明", true);
+	assert.doesNotMatch(past, /重試關閉/);
+	assert.match(past, /已在金流商處理，刪除對應/);
+	assert.match(blocked("provider_refused：no", true), /重試關閉/);
+});
+
+test("purge_replay_pending（重送取回外部 ID 進行中）：終局卡片同時隱藏「重試關閉」與「已在金流商處理，刪除對應」，沒有重送時兩個都在", () => {
+	const blocked = (purgeReplayPending: boolean) =>
+		render({
+			state: "ready",
+			account: account({
+				purgeBlockedTime: timestampFromDate(new Date("2026-11-14T02:00:00Z")),
+				purgeBlockedReason: "unresolved_creation：建立結果不明",
+				purgeReplayPending,
+			}),
+		});
+	const idle = blocked(false);
+	assert.match(idle, /重試關閉/);
+	assert.match(idle, /已在金流商處理，刪除對應/);
+	const replaying = blocked(true);
+	assert.doesNotMatch(replaying, /重試關閉/);
+	assert.doesNotMatch(replaying, /已在金流商處理，刪除對應/);
+});
+
+test("轉帳與撥款能力分別顯示", () => {
+	const html = render({
+		state: "ready",
+		account: account({
+			status: PaymentAccountStatus.ENABLED,
+			transfersActive: true,
+			payoutsActive: false,
+		}),
+	});
+	assert.match(html, /轉帳能力<\/div><div class="field-value">已啟用/);
+	assert.match(html, /撥款能力<\/div><div class="field-value">未啟用/);
+});
+
+test("待補條件原文放在折疊的 pre；空物件不畫", () => {
+	const withReq = render({
+		state: "ready",
+		account: account({ requirements: { entries: [{ code: "x" }] } }),
+	});
+	assert.match(
+		withReq,
+		/<details[^>]*>[\s\S]*待補條件（原始內容）[\s\S]*<pre[^>]*>/,
+	);
+	assert.match(withReq, /&quot;entries&quot;/);
+	const empty = render({
+		state: "ready",
+		account: account({ requirements: {} }),
+	});
+	assert.doesNotMatch(empty, /待補條件/);
+});
+
+test("paymentAccountOf：not_found 是尚未建立，其他錯誤是讀取失敗", () => {
+	const notFound = accountModule.paymentAccountOf({
+		error: new ConnectError("no", Code.NotFound),
+		data: undefined,
+	});
+	assert.deepEqual(notFound, { state: "notFound" });
+	assert.match(render(notFound), /尚未建立（平台審核核准後自動建立）/);
+	assert.doesNotMatch(render(notFound), /讀取失敗/);
+
+	const failed = accountModule.paymentAccountOf({
+		error: new ConnectError("boom", Code.Unavailable),
+		data: undefined,
+	});
+	assert.equal(failed.state, "error");
+	assert.match(render(failed), /收款帳戶讀取失敗/);
+	assert.deepEqual(
+		accountModule.paymentAccountOf({ error: null, data: undefined }),
+		{ state: "loading" },
+	);
+});
+
+test("paymentAccountOf：規則同 payUniOf（有錯誤就是錯誤，成功卻沒有帳戶是讀取錯誤）；錯誤畫面帶伺服器的錯誤文字", () => {
+	assert.equal(
+		accountModule.paymentAccountOf({
+			error: new ConnectError("boom", Code.Unavailable),
+			data: { account: account() },
+		}).state,
+		"error",
+	);
+	assert.deepEqual(accountModule.paymentAccountOf({ error: null, data: {} }), {
+		state: "error",
+	});
+	const denied = render(
+		accountModule.paymentAccountOf({
+			error: new ConnectError("no", Code.PermissionDenied),
+			data: undefined,
+		}),
+	);
+	assert.match(denied, /收款帳戶讀取失敗：/);
+});
+
+test("接線：頁面的 invalidateKyc 一併重讀收款帳戶；收款帳戶的資料來自 use-store-detail 的 hook", async () => {
+	const { readFile } = await import("node:fs/promises");
+	const page = await readFile("src/app/admin/merchants/[id]/page.tsx", "utf8");
+	const body = page.slice(page.indexOf("const invalidateKyc"));
+	const fn = body.slice(0, body.indexOf("const approveMutation"));
+	assert.match(fn, /PaymentAdminService\.method\.getPaymentAccount/u);
+	assert.match(page, /usePaymentAccount\(/u);
+	const card = await readFile(
+		"src/app/admin/merchants/[id]/PaymentAccountCard.tsx",
+		"utf8",
+	);
+	assert.doesNotMatch(card, /useConnectQuery|useToast/u);
+});

@@ -1,0 +1,17 @@
+create_platform 200
+create_platform_idem_conflict 409
+retrieve_platform_new 200
+account_link_platform 200
+account_session_platform 200
+create_provider 200
+create_provider_idem_conflict 409
+retrieve_provider_new 200
+account_link_provider 200
+account_session_provider 200
+retrieve_not_found 400
+update_platform_identity 200
+bank 200 None
+poll active
+retrieve_platform_after_submit 200
+delete 200
+delete 200

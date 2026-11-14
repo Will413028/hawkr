@@ -16,9 +16,6 @@ import {
 	KYCRegistrationCheckSchema,
 	KYCRegistrationOutcome,
 	KYCRegistrationStatus,
-	type PayUniRegistration,
-	PayUniRegistrationSchema,
-	RevealKYCSensitiveResponseSchema,
 	SellerAdminService,
 	StoreActionUnavailabilitySchema,
 	StoreActionUnavailableReason,
@@ -26,48 +23,39 @@ import {
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
 import {
 	KYCField,
-	KYCFlowStatus,
 	KYCIssueCode,
 	KYCStatus,
-	PayUniBindStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { QueryClient } from "@tanstack/react-query";
 import {
-	activeReveal,
+	APPROVE_HINT_TEXT,
+	APPROVE_SUCCESS_TEXT,
 	applyRequeryResult,
+	documentChoices,
 	documentSrc,
 	draftAfter,
 	EMPTY_REVIEW_DRAFT,
 	gcisView,
-	idCardNoField,
 	isDocumentField,
 	KYC_CONFLICT_TEXT,
 	kycApplicationOf,
 	kycApplicationQueryKey,
 	kycFieldLabel,
-	payUniOf,
-	payUniPollInterval,
 	type ReviewDraft,
 	ratingText,
-	rebindPresentation,
 	registrationOverdue,
 	registrationPollInterval,
 	registrationWarning,
-	revealFrom,
-	revealRemainingMs,
-	revealUntilText,
 	reviewActions,
 	reviewBlockedLabel,
-	sensitiveValue,
 	writeRequeryResult,
 } from "../src/app/admin/merchants/[id]/kyc-application";
 import { runAction } from "../src/lib/connect-action";
 
 /**
- * 商家詳情的商家認證（KYC）審核與 PayUni：顯示判斷（kyc-application.ts）與實際渲染出來的 HTML。
- * 釘的是：核准與退回只在審核中、版本衝突時輸入不丟、顯示全文前後與到期收回、綁定失敗時是「重新綁定」而不是核准、
- * GCIS 並列的不一致與無法比對標記、背景工作（登記資料查詢、PayUni 綁定）的退避輪詢。退回的逐項問題在 merchant-kyc-issues.test.ts，
- * 顯示全文的到期與放大圖在 merchant-reveal-state.test.ts。所有時間都是固定的值（不讀系統時鐘）。
+ * 商家詳情的商家認證（KYC）審核：顯示判斷（kyc-application.ts）與實際渲染出來的 HTML。
+ * 釘的是：核准與退回只在審核中、版本衝突時輸入不丟、公司補充文件的檢視網址、
+ * GCIS 並列的不一致與無法比對標記、背景工作（登記資料查詢）的退避輪詢。退回的逐項問題在 merchant-kyc-issues.test.ts。所有時間都是固定的值（不讀系統時鐘）。
  */
 
 const requireFromTest = createRequire(__filename);
@@ -87,9 +75,6 @@ const { renderToStaticMarkup } = requireFromTest("react-dom/server") as {
 const cards = requireFromTest(
 	"../src/app/admin/merchants/[id]/KycApplicationCards",
 ) as Record<string, unknown>;
-const payuniCards = requireFromTest(
-	"../src/app/admin/merchants/[id]/PayUniCards",
-) as Record<string, unknown>;
 
 const render = (component: unknown, props: Record<string, unknown>): string =>
 	renderToStaticMarkup(createElement(component, props));
@@ -108,19 +93,8 @@ function application(
 		accountId: "7",
 		status: KYCStatus.KYC_STATUS_SUBMITTED,
 		etag: "etag-1",
-		realName: "王小明",
-		bankName: "測試銀行",
-		bankCode: "004",
-		bankAccountMasked: "****5678",
-		subject: {
-			case: "individual",
-			value: { idCardNoMasked: "A12****789" },
-		},
-		documents: [
-			{ field: KYCField.KYC_FIELD_ID_CARD_FRONT, position: 0 },
-			{ field: KYCField.KYC_FIELD_ID_CARD_BACK, position: 0 },
-			{ field: KYCField.KYC_FIELD_BANK_BOOK, position: 0 },
-		],
+		subject: { case: "individual", value: {} },
+		documents: [],
 		...patch,
 	});
 }
@@ -134,13 +108,22 @@ function businessApplication(
 			value: {
 				companyName: "範例生鮮有限公司",
 				taxId: "12345678",
-				repIdCardNoMasked: "B22****456",
 				companyRegisterDate: { year: 2020, month: 3, day: 5 },
 			},
 		},
 		documents: [
-			{ field: COMPANY, position: 0 },
-			{ field: COMPANY, position: 1 },
+			{
+				field: COMPANY,
+				position: 0,
+				assetId: "asset-0",
+				viewUri: "/api/files/admin/seller/kyc_applications/app1/documents/0",
+			},
+			{
+				field: COMPANY,
+				position: 1,
+				assetId: "asset-1",
+				viewUri: "/api/files/admin/seller/kyc_applications/app1/documents/1",
+			},
 		],
 		...patch,
 	});
@@ -169,50 +152,6 @@ function foundCheck(
 		...base,
 		...patch,
 	} as MessageInitShape<typeof KYCRegistrationCheckSchema>);
-}
-
-const EXPIRE = new Date("2026-10-11T05:00:00Z"); // 台北 13:00
-const BEFORE_EXPIRE = new Date("2026-10-11T04:59:59Z");
-
-function revealResponse() {
-	return create(RevealKYCSensitiveResponseSchema, {
-		idCardNo: "A123456789",
-		repIdCardNo: "B223456789",
-		bankAccount: "0012345678",
-		expireTime: timestampFromDate(EXPIRE),
-		documents: [
-			{
-				field: KYCField.KYC_FIELD_ID_CARD_FRONT,
-				position: 0,
-				viewUri:
-					"/api/files/admin/seller/kyc_applications/1/documents/id_card_front/0",
-			},
-			{
-				field: KYCField.KYC_FIELD_ID_CARD_BACK,
-				position: 0,
-				viewUri:
-					"/api/files/admin/seller/kyc_applications/1/documents/id_card_back/0",
-			},
-			{
-				field: KYCField.KYC_FIELD_BANK_BOOK,
-				position: 0,
-				viewUri:
-					"/api/files/admin/seller/kyc_applications/1/documents/bank_book/0",
-			},
-			{
-				field: COMPANY,
-				position: 0,
-				viewUri:
-					"/api/files/admin/seller/kyc_applications/1/documents/company_document/0",
-			},
-			{
-				field: COMPANY,
-				position: 1,
-				viewUri:
-					"/api/files/admin/seller/kyc_applications/1/documents/company_document/1",
-			},
-		],
-	});
 }
 
 const noop = () => {};
@@ -379,14 +318,14 @@ function aDraft(): ReviewDraft {
 		issues: [
 			{
 				key: "issue-1",
-				field: KYCField.KYC_FIELD_REAL_NAME,
+				field: KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME,
 				documentAssetId: "",
 				documentLabel: "",
 				code: KYCIssueCode.KYC_ISSUE_CODE_MISMATCH,
-				message: "姓名與證件不符",
+				message: "公司名稱與登記不符",
 			},
 		],
-		rejectReason: "身分證已過期",
+		rejectReason: "文件已過期",
 		internalNote: "備註",
 	};
 }
@@ -420,11 +359,11 @@ test("VERSION_CONFLICT：重讀申請一次、回 conflict 的說明；草稿（
 
 	const draft = aDraft();
 	assert.equal(draftAfter(draft, result), draft, "同一個物件：沒有被重設");
-	assert.equal(draftAfter(draft, result).rejectReason, "身分證已過期");
+	assert.equal(draftAfter(draft, result).rejectReason, "文件已過期");
 	assert.equal(draftAfter(draft, result).internalNote, "備註");
 	assert.deepEqual(
 		draftAfter(draft, result).issues.map((i) => i.field),
-		[KYCField.KYC_FIELD_REAL_NAME],
+		[KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME],
 		"逐項問題也保留",
 	);
 });
@@ -507,7 +446,7 @@ test("退回欄位的文字窮舉 KYCField：每個非 UNSPECIFIED 的值都有�
 		(v): v is KYCField => typeof v === "number",
 	);
 	const expected = fields.filter((f) => f !== KYCField.KYC_FIELD_UNSPECIFIED);
-	assert.ok(expected.length > 10, "enum 讀不到值，測試對象已改變");
+	assert.ok(expected.length >= 8, "enum 讀不到值，測試對象已改變");
 	for (const field of expected) {
 		const text = kycFieldLabel(field);
 		assert.ok(
@@ -518,205 +457,80 @@ test("退回欄位的文字窮舉 KYCField：每個非 UNSPECIFIED 的值都有�
 	assert.equal(kycFieldLabel(KYCField.KYC_FIELD_UNSPECIFIED), "未知");
 	assert.equal(kycFieldLabel(9999 as KYCField), "未知");
 	// 與賣家端同一組名詞（L0 A1 收斂字）。
-	assert.equal(kycFieldLabel(KYCField.KYC_FIELD_REAL_NAME), "真實姓名");
-	assert.equal(kycFieldLabel(KYCField.KYC_FIELD_BIRTH_DATE), "出生日期");
 	assert.equal(kycFieldLabel(KYCField.KYC_FIELD_WEBSITE_URL), "官方網站");
-	assert.equal(kycFieldLabel(KYCField.KYC_FIELD_ID_CARD_FRONT), "身分證正面照");
 	assert.equal(
 		kycFieldLabel(KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS),
 		"補充文件",
 	);
 });
 
-test("文件類的欄位只有四個（證件正反面、存摺、補充文件）：申請上的文件與退回的問題用同一套欄位表示，沒有另一套證件位置", () => {
+test("文件類的欄位只有補充文件：申請上的文件與退回的問題用同一套欄位表示，沒有另一套文件位置", () => {
 	const documentFields = Object.values(KYCField)
 		.filter((v): v is KYCField => typeof v === "number")
 		.filter(isDocumentField);
 	assert.deepEqual(
 		documentFields.sort((x, y) => x - y),
-		[
-			KYCField.KYC_FIELD_ID_CARD_FRONT,
-			KYCField.KYC_FIELD_ID_CARD_BACK,
-			KYCField.KYC_FIELD_BANK_BOOK,
-			KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
-		],
+		[KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS],
 	);
-	assert.equal(isDocumentField(KYCField.KYC_FIELD_REAL_NAME), false);
+	assert.equal(isDocumentField(KYCField.KYC_FIELD_BUSINESS_TAX_ID), false);
 	assert.equal(isDocumentField(KYCField.KYC_FIELD_UNSPECIFIED), false);
 });
 
-test("身分證字號的退回欄位：個人是 INDIVIDUAL_ID_CARD_NO，企業是負責人的 BUSINESS_REP_ID_CARD_NO", () => {
-	assert.equal(
-		idCardNoField(application()),
-		KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO,
-	);
-	assert.equal(
-		idCardNoField(businessApplication()),
-		KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO,
-	);
-});
-
 // ---------------------------------------------------------------------------
-// 顯示全文：前後、到期收回
+// 公司補充文件：檢視網址與 asset_id 直接來自申請
 
-test("顯示全文前：身分證字號與銀行帳號是遮蔽值，證件位置是「需先顯示全文」，沒有任何影像網址", () => {
-	const html =
-		render(cards.KycIdentityCard as never, {
-			application: application(),
-			reveal: undefined,
-			onPreview: noop,
-		}) +
-		render(cards.KycDocumentsCard as never, {
-			application: application(),
-			reveal: undefined,
-			onPreview: noop,
-		});
-	assert.match(html, /A12\*\*\*\*789/u);
-	assert.match(html, /\*\*\*\*5678/u);
-	assert.doesNotMatch(html, /A123456789|0012345678/u, "不得出現明文");
-	assert.equal(
-		(html.match(/需先顯示全文/gu) ?? []).length,
-		3,
-		"身分證正反面與存摺各一處",
-	);
-	assert.doesNotMatch(html, /\/api\/bff|<img/u, "沒有顯示全文前不載入任何影像");
-});
-
-test("顯示全文後：明文與影像（同源 /api/bff 加上伺服器給的 view_uri），沒有直連後端", () => {
-	const reveal = revealFrom("app1", revealResponse());
-	assert.ok(reveal);
-	const html =
-		render(cards.KycIdentityCard as never, {
-			application: application(),
-			reveal,
-			onPreview: noop,
-		}) +
-		render(cards.KycDocumentsCard as never, {
-			application: application(),
-			reveal,
-			onPreview: noop,
-		});
-	assert.match(html, /A123456789/u, "個人的身分證字號用 id_card_no");
-	assert.doesNotMatch(html, /B223456789/u, "個人申請不顯示負責人的號碼");
-	assert.match(html, /0012345678/u);
-	assert.doesNotMatch(html, /A12\*\*\*\*789/u);
-	assert.doesNotMatch(html, /需先顯示全文/u);
-	assert.match(
-		html,
-		/src="[^"]*api%2Fbff[^"]*documents%2Fid_card_front%2F0|\/api\/bff\/api\/files\/admin\/seller\/kyc_applications\/1\/documents\/id_card_front\/0/u,
-	);
-	for (const src of html.match(/src="[^"]*"/gu) ?? []) {
-		assert.doesNotMatch(src, /^src="https?:/u, `不得直連：${src}`);
-	}
-});
-
-test("證件標籤取自目錄（個人與企業同一組字）：身分證正面照、身分證反面照；企業的「負責人」由區塊標題表達", () => {
-	for (const [app, title] of [
-		[application(), "賣家身分資訊"],
-		[businessApplication(), "公司負責人身分資訊"],
-	] as const) {
-		const html = render(cards.KycIdentityCard as never, {
-			application: app,
-			reveal: undefined,
-			onPreview: noop,
-		});
-		assert.match(html, /身分證正面照/u);
-		assert.match(html, /身分證反面照/u);
-		assert.doesNotMatch(html, /身分證\(正\)|身分證\(反\)/u);
-		assert.match(html, new RegExp(title, "u"));
-	}
-});
-
-test("企業申請顯示全文：身分證字號欄是負責人的 rep_id_card_no", () => {
-	const reveal = revealFrom("app1", revealResponse());
-	const html = render(cards.KycIdentityCard as never, {
-		application: businessApplication(),
-		reveal,
+test("補充文件：初次 render 只列文件與「查看原圖」按鈕，不含任何 view_uri 的網址或 <img>（讀取才會留紀錄）", () => {
+	const app = businessApplication();
+	const html = render(cards.KycDocumentsCard as never, {
+		application: app,
 		onPreview: noop,
 	});
-	assert.match(html, /B223456789/u);
-	assert.doesNotMatch(html, /A123456789/u);
+	assert.doesNotMatch(html, /\/api\/files\/|\/api\/bff|<img|src=|href=/u);
+	assert.match(html, /補充文件 1/u);
+	assert.match(html, /補充文件 2/u);
+	assert.equal((html.match(/查看原圖/gu) ?? []).length, 2);
+	assert.doesNotMatch(
+		html,
+		/需先顯示全文|身分證|存摺|銀行|顯示全文/u,
+		"不再有顯示全文與身分、銀行的區塊",
+	);
 });
 
-test("到期收回：到期前仍有效，到期那一刻起回到遮蔽值與「需先顯示全文」", () => {
-	const reveal = revealFrom("app1", revealResponse());
-	assert.ok(reveal);
-	assert.ok(activeReveal(reveal, "app1", BEFORE_EXPIRE), "到期前還在");
-	assert.equal(
-		activeReveal(reveal, "app1", EXPIRE),
-		undefined,
-		"剛好到期就收回",
-	);
-	assert.equal(
-		activeReveal(reveal, "app1", new Date(EXPIRE.getTime() + 1)),
-		undefined,
-	);
-	assert.equal(revealRemainingMs(reveal, BEFORE_EXPIRE), 1000);
-	assert.equal(revealRemainingMs(reveal, new Date(EXPIRE.getTime() + 5000)), 0);
-
-	const render1 = (now: Date) =>
-		render(cards.KycIdentityCard as never, {
-			application: application(),
-			reveal: activeReveal(reveal, "app1", now),
-			onPreview: noop,
-		});
-	assert.match(render1(BEFORE_EXPIRE), /A123456789/u);
-	const expired = render1(EXPIRE);
-	assert.doesNotMatch(expired, /A123456789/u);
-	assert.match(expired, /A12\*\*\*\*789/u);
-	assert.match(expired, /需先顯示全文/u);
-});
-
-test("別份申請的顯示全文不套用；回應沒有到期時間不當成可顯示", () => {
-	const reveal = revealFrom("app1", revealResponse());
-	assert.equal(activeReveal(reveal, "app2", BEFORE_EXPIRE), undefined);
-	assert.equal(activeReveal(reveal, undefined, BEFORE_EXPIRE), undefined);
-	assert.equal(activeReveal(null, "app1", BEFORE_EXPIRE), undefined);
-	assert.equal(
-		revealFrom(
-			"app1",
-			create(RevealKYCSensitiveResponseSchema, { idCardNo: "X" }),
-		),
-		undefined,
-		"沒有期限的明文不存在",
-	);
-	assert.equal(revealFrom("", revealResponse()), undefined, "沒有申請 ID");
-});
-
-test("「全文顯示到 HH:mm」是台北時間", () => {
-	const reveal = revealFrom("app1", revealResponse());
-	assert.ok(reveal);
-	assert.equal(revealUntilText(reveal), "全文顯示到 13:00");
-	const html = render(cards.KycRevealBar as never, {
-		reveal,
-		onReveal: noop,
-		onHide: noop,
+test("沒有補充文件（個人申請）：顯示「暫無檢附文件」", () => {
+	const html = render(cards.KycDocumentsCard as never, {
+		application: application(),
+		onPreview: noop,
 	});
-	assert.match(html, /全文顯示到 13:00/u);
-	assert.match(html, /重新顯示全文/u);
-	assert.match(html, /收起全文/u, "顯示中可以提早收起");
-	const before = render(cards.KycRevealBar as never, {
-		reveal: undefined,
-		onReveal: noop,
-		onHide: noop,
-	});
-	assert.match(before, /顯示全文/u);
-	assert.doesNotMatch(before, /全文顯示到|重新顯示全文|收起全文/u);
+	assert.match(html, /暫無檢附文件/u);
+	assert.doesNotMatch(html, /<img/u);
 });
 
-test("敏感值：明文是空字串時退回遮蔽值，兩者都沒有回 -", () => {
-	assert.equal(sensitiveValue("A12****789", "A123456789", true), "A123456789");
-	assert.equal(sensitiveValue("A12****789", "A123456789", false), "A12****789");
-	assert.equal(sensitiveValue("A12****789", "", true), "A12****789");
-	assert.equal(sensitiveValue("", "", true), "-");
+test("身分資訊卡與顯示全文列已刪除：卡片模組沒有 KycIdentityCard、KycRevealBar", () => {
+	assert.equal(cards.KycIdentityCard, undefined);
+	assert.equal(cards.KycRevealBar, undefined);
 });
 
-test("證件影像網址只收伺服器的相對路徑，經同源 /api/bff；絕對網址、協定相對、.. 都不收", () => {
+test("退回時可指定的文件取自申請上的文件（asset_id 與依順序編號的名稱），沒有 asset_id 的不列", () => {
+	const choices = documentChoices(
+		businessApplication({
+			documents: [
+				{ field: COMPANY, position: 0, assetId: "asset-0" },
+				{ field: COMPANY, position: 1, assetId: "asset-1" },
+				{ field: COMPANY, position: 2, assetId: "" },
+			],
+		}),
+	);
+	assert.deepEqual(choices, [
+		{ field: COMPANY, assetId: "asset-0", label: "補充文件 1" },
+		{ field: COMPANY, assetId: "asset-1", label: "補充文件 2" },
+	]);
+	assert.deepEqual(documentChoices(application()), []);
+});
+
+test("補充文件網址只收伺服器的相對路徑，經同源 /api/bff；絕對網址、協定相對、.. 都不收", () => {
 	assert.equal(
-		documentSrc(
-			"/api/files/admin/seller/kyc_applications/1/documents/bank_book/0",
-		),
-		"/api/bff/api/files/admin/seller/kyc_applications/1/documents/bank_book/0",
+		documentSrc("/api/files/admin/seller/kyc_applications/1/documents/0"),
+		"/api/bff/api/files/admin/seller/kyc_applications/1/documents/0",
 	);
 	for (const bad of [
 		"",
@@ -731,21 +545,18 @@ test("證件影像網址只收伺服器的相對路徑，經同源 /api/bff；�
 	}
 });
 
-test("顯示全文後影像的 view_uri 不合法：該位置顯示「無法檢視」，不猜網址", () => {
-	const res = create(RevealKYCSensitiveResponseSchema, {
-		idCardNo: "A123456789",
-		expireTime: timestampFromDate(EXPIRE),
-		documents: [
-			{
-				field: KYCField.KYC_FIELD_ID_CARD_FRONT,
-				position: 0,
-				viewUri: "https://gateway.example.com/x",
-			},
-		],
-	});
-	const html = render(cards.KycIdentityCard as never, {
-		application: application(),
-		reveal: revealFrom("app1", res),
+test("補充文件的 view_uri 不合法：該位置顯示「無法檢視」，不猜網址", () => {
+	const html = render(cards.KycDocumentsCard as never, {
+		application: businessApplication({
+			documents: [
+				{
+					field: COMPANY,
+					position: 0,
+					assetId: "asset-0",
+					viewUri: "https://gateway.example.com/x",
+				},
+			],
+		}),
 		onPreview: noop,
 	});
 	assert.doesNotMatch(html, /gateway\.example\.com|<img/u);
@@ -1085,305 +896,6 @@ test("進行中的查詢依伺服器的期限退避輪詢：間隔隨已等待�
 });
 
 // ---------------------------------------------------------------------------
-// PayUni
-
-// 伺服器真的會送的重新綁定句子（model.StoreActionUnavailableText）。
-const TERMINAL_TEXT =
-	"PayUni 端的商店已是終止狀態，這家店無法再綁定；賣家要重新入駐才能收款。";
-const REBIND_CLOSED_TEXT = "店家已關閉，不能重新綁定 PayUni。";
-const REBIND_PENDING_DELETION_TEXT = "店家等待刪除，不能重新綁定 PayUni。";
-const SELLER_EDITING_TEXT = "賣家正在修改商家認證，重新核准後會自動重新綁定。";
-const BOUND_TEXT = "只有綁定失敗的註冊能重新綁定。";
-
-/** 伺服器對一筆綁定失敗、可以重新綁定的註冊送出的形狀（階段與可用性來自伺服器，client 不推導）。 */
-function registration(
-	patch: MessageInitShape<typeof PayUniRegistrationSchema> = {},
-): PayUniRegistration {
-	return create(PayUniRegistrationSchema, {
-		storeId: "100",
-		merId: "HAWK100",
-		bindStatus: PayUniBindStatus.BOUND,
-		flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_UNDER_REVIEW,
-		canRebind: false,
-		rebindUnavailabilities: [why(U.PAYUNI_BOUND, BOUND_TEXT)],
-		...patch,
-	});
-}
-
-function failedRegistration(
-	patch: MessageInitShape<typeof PayUniRegistrationSchema> = {},
-): PayUniRegistration {
-	return registration({
-		bindStatus: PayUniBindStatus.FAILED,
-		flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_BIND_FAILED,
-		canRebind: true,
-		rebindUnavailabilities: [],
-		...patch,
-	});
-}
-
-const NOT_FOUND_RESULT = {
-	error: new ConnectError("未註冊", Code.NotFound),
-	data: undefined,
-};
-
-function renderPayUni(reg: PayUniRegistration): string {
-	return render(payuniCards.PayUniStatusCard as never, {
-		state: payUniOf({ error: null, data: { registration: reg } }),
-		hasApplication: true,
-		rebinding: false,
-		onRebind: noop,
-		onRetry: noop,
-	});
-}
-
-test("綁定失敗而且伺服器說能重新綁定：卡片顯示「重新綁定」；綁定中、已綁定沒有鍵也沒有句子", () => {
-	const failed = failedRegistration({
-		bindErrorCode: "AGENT01001",
-		bindAttempts: 3,
-	});
-	assert.deepEqual(rebindPresentation(failed), {
-		canRebind: true,
-		reason: undefined,
-	});
-	const html = renderPayUni(failed);
-	assert.match(html, /重新綁定/u);
-	assert.match(html, /待重新綁定/u, "徽章與清單同一組文字");
-	assert.match(html, /AGENT01001/u);
-	assert.match(html, /已嘗試 3 次/u);
-
-	// 已綁定（BOUND）：第一個原因是結構性的，伺服器雖然附了句子也不顯示。
-	const bound = renderPayUni(registration());
-	assert.doesNotMatch(bound, /重新綁定/u);
-	assert.ok(!bound.includes(BOUND_TEXT), "結構性的原因不顯示句子");
-	// 綁定中（PENDING）：PAYUNI_BIND_IN_PROGRESS 沒有 message（不是失敗原因），也沒有任何句子，不顯示通用文字。
-	const pending = registration({
-		bindStatus: PayUniBindStatus.PENDING,
-		flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_BINDING,
-		rebindUnavailabilities: [why(U.PAYUNI_BIND_IN_PROGRESS)],
-	});
-	assert.deepEqual(rebindPresentation(pending), {
-		canRebind: false,
-		reason: undefined,
-	});
-	const pendingHtml = renderPayUni(pending);
-	assert.doesNotMatch(pendingHtml, /重新綁定|目前不能操作/u);
-});
-
-test("不能重新綁定而且不是結構性的原因：不顯示「重新綁定」，顯示伺服器的第一句（終止、已關閉、等待刪除、賣家正在修改）", () => {
-	for (const [reason, text] of [
-		[U.PAYUNI_MERCHANT_TERMINAL, TERMINAL_TEXT],
-		[U.STORE_CLOSED, REBIND_CLOSED_TEXT],
-		[U.STORE_PENDING_DELETION, REBIND_PENDING_DELETION_TEXT],
-		[U.KYC_NOT_APPROVED, SELLER_EDITING_TEXT],
-	] as const) {
-		const reg = failedRegistration({
-			canRebind: false,
-			rebindUnavailabilities: [why(reason, text)],
-		});
-		assert.deepEqual(rebindPresentation(reg), {
-			canRebind: false,
-			reason: text,
-		});
-		const html = renderPayUni(reg);
-		assert.doesNotMatch(html, /hk-btn__text">重新綁定</u, "沒有重新綁定的按鈕");
-		assert.ok(html.includes(text), text);
-	}
-});
-
-test("PayUni 端已終止而且 BOUND 的註冊：第一個原因是終止，仍顯示終止的句子（不被後面的結構性原因吃掉）；只顯示第一句", () => {
-	const reg = registration({
-		rebindUnavailabilities: [
-			why(U.PAYUNI_MERCHANT_TERMINAL, TERMINAL_TEXT),
-			why(U.STORE_CLOSED, REBIND_CLOSED_TEXT),
-			why(U.PAYUNI_BOUND, BOUND_TEXT),
-		],
-	});
-	assert.equal(rebindPresentation(reg).reason, TERMINAL_TEXT);
-	const html = renderPayUni(reg);
-	assert.ok(html.includes(TERMINAL_TEXT));
-	assert.ok(!html.includes(REBIND_CLOSED_TEXT), "只顯示第一個原因");
-});
-
-test("PayUni 綁定中（PENDING）以退避輪詢到終態：間隔隨距離上次更新的時間成長、上限 60 秒、沒有次數上限；BOUND、FAILED 與沒有註冊都不輪詢", () => {
-	const updated = new Date("2026-10-11T04:31:00Z");
-	const pending = registration({
-		bindStatus: PayUniBindStatus.PENDING,
-		updateTime: timestampFromDate(updated),
-	});
-	const at = (seconds: number) =>
-		payUniPollInterval(pending, new Date(updated.getTime() + seconds * 1000));
-	assert.equal(at(0), 5000, "最短 5 秒");
-	assert.equal(at(100), 25_000);
-	assert.equal(at(10_000), 60_000, "上限 60 秒");
-	assert.equal(at(86_400), 60_000, "沒有次數上限：一天之後仍在輪詢");
-	for (const bindStatus of [
-		PayUniBindStatus.BOUND,
-		PayUniBindStatus.FAILED,
-		PayUniBindStatus.UNSPECIFIED,
-	]) {
-		assert.equal(
-			payUniPollInterval(registration({ bindStatus }), updated),
-			false,
-			PayUniBindStatus[bindStatus],
-		);
-	}
-	assert.equal(payUniPollInterval(undefined, updated), false);
-});
-
-test("綁定失敗時卡片沒有「核准」入口：只有重新綁定（核准是申請的事，不在 PayUni 卡）", () => {
-	const html = renderPayUni(failedRegistration());
-	assert.doesNotMatch(html, /通過審核|核准/u);
-	assert.match(html, /重新綁定/u);
-});
-
-test("PayUni 徽章只讀伺服器給的階段（flow_status），與清單同一組文字；不從 bind_status、status_codes 推導", () => {
-	const expected: [KYCFlowStatus, string][] = [
-		[KYCFlowStatus.KYC_FLOW_STATUS_BINDING, "PayUni 綁定中"],
-		[KYCFlowStatus.KYC_FLOW_STATUS_BIND_FAILED, "待重新綁定"],
-		[KYCFlowStatus.KYC_FLOW_STATUS_APPROVED, "已核准"],
-		[KYCFlowStatus.KYC_FLOW_STATUS_UNDER_REVIEW, "PayUni 審核中"],
-		[KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO, "PayUni 待補件"],
-		[KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED, "PayUni 審核未通過"],
-	];
-	for (const [flowStatus, label] of expected) {
-		// bindStatus 故意放一個與階段矛盾的值：徽章不得看它。
-		const html = renderPayUni(
-			registration({ flowStatus, bindStatus: PayUniBindStatus.UNSPECIFIED }),
-		);
-		assert.ok(html.includes(label), `${KYCFlowStatus[flowStatus]} → ${label}`);
-	}
-	// UNSPECIFIED 與不認得的值是「未知」（灰色），不當成核准。
-	for (const flowStatus of [KYCFlowStatus.KYC_FLOW_STATUS_UNSPECIFIED, 99]) {
-		const html = renderPayUni(registration({ flowStatus }));
-		assert.ok(html.includes("未知"), String(flowStatus));
-		assert.doesNotMatch(html, />已核准</u);
-	}
-});
-
-test("PayUni 卡：最後同步是 status_time、審核意見直接顯示 status_codes.reason、要補的欄位、沒有 freshness 與原碼徽章", () => {
-	const html = renderPayUni(
-		registration({
-			flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO,
-			statusTime: timestampFromDate(new Date("2026-10-11T04:30:00Z")),
-			problem: {
-				code: "MER_92",
-				fields: [KYCField.KYC_FIELD_BANK_BOOK, KYCField.KYC_FIELD_UNSPECIFIED],
-				reason: "存摺影像不清楚",
-			},
-			statusCodes: {
-				merStatus: "91",
-				memberStatus: "5",
-				reason: "存摺影像不清楚",
-			},
-		}),
-	);
-	assert.match(html, /最後同步：2026\/10\/11 12:30/u);
-	assert.match(html, /存摺影像不清楚/u);
-	assert.match(html, /需補資料：存摺封面/u, "UNSPECIFIED 不顯示成欄位");
-	assert.doesNotMatch(
-		html,
-		/狀態碼|商店 91|會員 5/u,
-		"K9：原碼不顯示，狀態看流程狀態",
-	);
-	assert.match(html, /HAWK100/u);
-	assert.doesNotMatch(html, /剛同步|資料較舊|資料可能延遲/u);
-	// 沒有審核意見時不畫那一行。
-	assert.doesNotMatch(
-		renderPayUni(registration({ statusCodes: { reason: "" } })),
-		/payuni-reason-text/u,
-	);
-});
-
-test("第一次核准前（not_found）：有申請時顯示尚未註冊，沒有申請時整張卡不畫；讀取失敗可重試", () => {
-	const state = payUniOf(NOT_FOUND_RESULT);
-	assert.deepEqual(state, { state: "notFound" });
-	const props = {
-		state,
-		rebinding: false,
-		onRebind: noop,
-		onRetry: noop,
-	};
-	assert.match(
-		render(payuniCards.PayUniStatusCard as never, {
-			...props,
-			hasApplication: true,
-		}),
-		/尚未向 PayUni 註冊/u,
-	);
-	assert.equal(
-		render(payuniCards.PayUniStatusCard as never, {
-			...props,
-			hasApplication: false,
-		}),
-		"",
-	);
-	const error = payUniOf({
-		error: new ConnectError("壞了", Code.Unavailable),
-		data: undefined,
-	});
-	assert.deepEqual(error, { state: "error" });
-	const html = render(payuniCards.PayUniStatusCard as never, {
-		...props,
-		state: error,
-		hasApplication: true,
-	});
-	assert.match(html, /PayUni 狀態讀取失敗/u);
-	assert.match(html, /重試/u);
-	assert.deepEqual(payUniOf({ error: null, data: undefined }), {
-		state: "loading",
-	});
-	assert.deepEqual(
-		payUniOf({ error: null, data: {} }),
-		{ state: "error" },
-		"成功卻沒有註冊不當成尚未註冊",
-	);
-});
-
-test("聯絡資訊卡標題表明是店家目前的聯絡資料（不是 PayUni 收到的值）；讀店家自己的欄位；沒有註冊或全空時不畫", () => {
-	const store = create(StoreSchema, {
-		id: "100",
-		contactName: "王小明",
-		contactMobile: "0912345678",
-		contactPhone: "02-12345678",
-		supportEmail: "seller@example.com",
-	});
-	const html = render(payuniCards.PayUniContactCard as never, {
-		store,
-		registration: registration(),
-	});
-	for (const text of [
-		"王小明",
-		"0912345678",
-		"02-12345678",
-		"seller@example.com",
-	]) {
-		assert.match(html, new RegExp(text, "u"));
-	}
-	assert.match(html, /店家目前的聯絡資料/u);
-	assert.match(html, /不一定是 PayUni 已經收到的值/u);
-	assert.doesNotMatch(
-		html,
-		/PayUni 聯絡資訊/u,
-		"舊標題暗示這是送給 PayUni 的值",
-	);
-	assert.equal(
-		render(payuniCards.PayUniContactCard as never, {
-			store,
-			registration: undefined,
-		}),
-		"",
-	);
-	assert.equal(
-		render(payuniCards.PayUniContactCard as never, {
-			store: create(StoreSchema, { id: "100" }),
-			registration: registration(),
-		}),
-		"",
-	);
-});
-
-// ---------------------------------------------------------------------------
 // 申請的讀取狀態與評分
 
 test("申請的讀取狀態：沒有摘要不發請求；not_found 是沒有申請；成功卻沒有申請是錯誤", () => {
@@ -1433,9 +945,61 @@ test("評分卡：只顯示讀到且大於 0 的平均分；讀不到、沒有�
 });
 
 // ---------------------------------------------------------------------------
+// 核准的提示、審核備註與聯絡資料
+
+test("核准鈕上方的小字與核准成功的提示是同一句新文案，不再提 PayUni", async () => {
+	const copy = "核准後系統會建立收款帳戶，賣家再到金流商完成收款設定";
+	assert.equal(APPROVE_HINT_TEXT, copy);
+	assert.equal(APPROVE_SUCCESS_TEXT, copy);
+	const { readFile } = await import("node:fs/promises");
+	const page = await readFile("src/app/admin/merchants/[id]/page.tsx", "utf8");
+	assert.match(page, /\{APPROVE_HINT_TEXT\}/u, "核准鈕上方顯示這句");
+	assert.match(page, /text: APPROVE_SUCCESS_TEXT/u, "核准成功的提示用這句");
+	assert.doesNotMatch(page, /向 PayUni 註冊/u);
+});
+
+test("審核備註只叫審核員核對營業登記資料與統一編號，不再提身分證與證件有效期", async () => {
+	const { readFile } = await import("node:fs/promises");
+	const page = await readFile("src/app/admin/merchants/[id]/page.tsx", "utf8");
+	const note = page.slice(page.indexOf('className="audit-notice-text"'));
+	const text = note
+		.slice(0, note.indexOf("</div>"))
+		.replace(/<[^>]*>/gu, "")
+		.replace(/\s+/gu, "");
+	assert.match(text, /重點核對營業登記資料與統一編號是否一致$/u);
+	assert.doesNotMatch(note.slice(0, note.indexOf("</div>")), /身分證|有效期/u);
+});
+
+test("聯絡人姓名與手機顯示在基本資料卡；沒有值時照卡片既有的空值顯示 -", () => {
+	const filled = render(cards.KycBasicInfoCard as never, {
+		store: create(StoreSchema, {
+			id: "100",
+			storeName: "範例鮮果",
+			contactName: "王小明",
+			contactMobile: "0912345678",
+		}),
+		application: application(),
+		now: NOW,
+		canRequery: false,
+		requerying: false,
+		onRequery: noop,
+	});
+	assert.match(filled, /聯絡人姓名<\/div><div class="field-value">王小明</u);
+	assert.match(filled, /聯絡手機<\/div><div class="field-value">0912345678</u);
+	const html = renderBasicInfo(application());
+	assert.match(html, /聯絡人姓名<\/div><div class="field-value">-</u);
+	assert.match(html, /聯絡手機<\/div><div class="field-value">-</u);
+	assert.equal(
+		(html.match(/class="detail-card"/gu) ?? []).length,
+		1,
+		"併進基本資料卡，沒有另外的卡片",
+	);
+});
+
+// ---------------------------------------------------------------------------
 // 接線（頁面與 hook 讀的是契約的哪個方法）
 
-test("接線：核准與退回帶 etag；顯示全文、重新查詢、重新綁定各走自己的方法；評分讀公開的 GetStore", async () => {
+test("接線：核准與退回帶 etag；重新查詢走自己的方法；評分讀公開的 GetStore", async () => {
 	const { readFile } = await import("node:fs/promises");
 	const [page, hooks] = await Promise.all([
 		readFile("src/app/admin/merchants/[id]/page.tsx", "utf8"),
@@ -1451,18 +1015,12 @@ test("接線：核准與退回帶 etag；顯示全文、重新查詢、重新綁
 		"退回帶讀到的 etag 與逐項問題（buildRejectRequest）",
 	);
 	assert.doesNotMatch(page, /requiredFields/u, "退回不再送勾選的欄位");
-	assert.match(
+	assert.doesNotMatch(
 		page,
-		/SellerAdminService\.method\.revealKYCSensitive,\s*\{ gcTime: 0 \}/u,
-		"顯示全文的回應含明文：不留在 mutation cache",
+		/revealKYCSensitive|RevealKyc|listKYCReveals/u,
+		"顯示全文與讀取清單已刪除",
 	);
-	for (const method of [
-		"approveKYC",
-		"rejectKYC",
-		"revealKYCSensitive",
-		"requeryKYCRegistration",
-		"rebindPayUni",
-	]) {
+	for (const method of ["approveKYC", "rejectKYC", "requeryKYCRegistration"]) {
 		assert.match(
 			page,
 			new RegExp(`SellerAdminService\\.method\\.${method}`, "u"),
@@ -1475,13 +1033,16 @@ test("接線：核准與退回帶 etag；顯示全文、重新查詢、重新綁
 		/registrationPollInterval\(/u,
 		"登記資料查詢依期限退避輪詢",
 	);
-	assert.match(hooks, /payUniPollInterval\(/u, "PayUni 綁定中退避輪詢");
 	assert.doesNotMatch(
 		hooks,
 		/REGISTRATION_POLL_MS|registrationCheckPending/u,
 		"寫死的 5 秒輪詢已刪除",
 	);
-	assert.match(hooks, /SellerAdminService\.method\.getPayUniRegistration/u);
+	assert.doesNotMatch(
+		page + hooks,
+		/PayUni|payUni|rebind/u,
+		"詳情頁沒有 PayUni 註冊、重新綁定的讀取與呼叫",
+	);
 	assert.match(hooks, /SellerPublicService\.method\.getStore/u);
 	assert.match(
 		hooks,

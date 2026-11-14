@@ -6,30 +6,23 @@ import '../../../core/networking/connect_provider.dart';
 
 part 'seller_agreements_repository.g.dart';
 
-/// 送出 KYC（`SubmitKYC`）要確認的兩份文件的現行版本與網址。
+/// 送出 KYC（`SubmitKYC`）要確認的文件的現行版本與網址。
 final class KycAgreements {
-  const KycAgreements({required this.privacyNotice, required this.payuniTerms});
+  const KycAgreements({required this.privacyNotice});
 
   /// 個資蒐集告知：確認已閱讀。
   final SellerAgreement privacyNotice;
 
-  /// PayUni 服務條款：同意。
-  final SellerAgreement payuniTerms;
-
-  /// 要帶回 `SubmitKYC.accepted_agreements` 的同意，剛好這兩份。
+  /// 要帶回 `SubmitKYC.accepted_agreements` 的同意，剛好這一份。
   List<AgreementAcceptance> get acceptances => [
     AgreementAcceptance(
       kind: AgreementKind.AGREEMENT_KIND_KYC_PRIVACY_NOTICE,
       version: privacyNotice.version,
     ),
-    AgreementAcceptance(
-      kind: AgreementKind.AGREEMENT_KIND_PAYUNI_TERMS,
-      version: payuniTerms.version,
-    ),
   ];
 }
 
-/// 賣家入駐文件（賣家契約、KYC 個資告知、PayUni 條款）的一次讀取：`SellerPublicService.GetSellerAgreements`。
+/// 賣家入駐文件（賣家契約、KYC 個資告知）的一次讀取：`SellerPublicService.GetSellerAgreements`。
 /// 取用某一種時缺少、版本或網址是空的，丟 [StateError]。
 final class SellerAgreementSet {
   const SellerAgreementSet(this.agreements);
@@ -52,7 +45,6 @@ final class SellerAgreementSet {
 
   KycAgreements kycAgreements() => KycAgreements(
     privacyNotice: _of(AgreementKind.AGREEMENT_KIND_KYC_PRIVACY_NOTICE),
-    payuniTerms: _of(AgreementKind.AGREEMENT_KIND_PAYUNI_TERMS),
   );
 }
 
@@ -83,7 +75,7 @@ Future<SellerAgreementSet> sellerAgreements(Ref ref) =>
 Future<SellerAgreement> sellerTerms(Ref ref) async =>
     (await ref.watch(sellerAgreementsProvider.future)).sellerTerms();
 
-/// 送出 KYC 要確認的兩份文件；取自 [sellerAgreementsProvider]。
+/// 送出 KYC 要確認的文件；取自 [sellerAgreementsProvider]。
 @riverpod
 Future<KycAgreements> kycAgreements(Ref ref) async =>
     (await ref.watch(sellerAgreementsProvider.future)).kycAgreements();

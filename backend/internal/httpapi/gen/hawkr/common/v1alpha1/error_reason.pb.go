@@ -39,45 +39,48 @@ const (
 	ErrorReason_VERSION_CONFLICT ErrorReason = 1
 	// 賣家帳號停權中，這個操作不在停權時仍可做的範圍（搭配 permission_denied）。client 轉成賣家的停權狀態：
 	// 顯示停權通知，並以 GetMyStore 讀停權的來源與原因。
-	ErrorReason_SELLER_SUSPENDED ErrorReason = 3
+	ErrorReason_SELLER_SUSPENDED ErrorReason = 2
 	// 商家名單的聯絡方式與其他未封存（進行中或已入駐）的業者相同、而且沒有標記為不是同一家（搭配 failed_precondition）。ErrorInfo.metadata 的
 	// prospectIds 是相符的業者 ID（十進位，由小到大以逗號連接）。client 顯示相符的業者，讓管理員選擇合併，或確認不是同一家後
 	// 在請求帶上 confirmed_distinct_prospect_ids 再送一次（ADR 2026-10-04-prospect-contact-points-and-matching）。
-	ErrorReason_PROSPECT_MATCH_FOUND ErrorReason = 4
+	ErrorReason_PROSPECT_MATCH_FOUND ErrorReason = 3
 	// 商家名單的統一編號已由另一筆未封存（進行中或已入駐）的業者持有：建立搭配 already_exists，修改與還原搭配
 	// failed_precondition。ErrorInfo.metadata 的 prospectIds 是持有者的 ID（十進位，只有一筆，格式同
 	// PROSPECT_MATCH_FOUND）。修改時持有者是進行中的，client 可以讓管理員與它合併；還原時是同一家就不需要還原
 	// （ADR 2026-10-04-prospect-contact-points-and-matching）。
-	ErrorReason_PROSPECT_TAX_ID_HELD ErrorReason = 10
+	ErrorReason_PROSPECT_TAX_ID_HELD ErrorReason = 4
 	// 賣家同意的入駐文件版本不是現行版本（搭配 failed_precondition）。client 重讀
 	// seller.v1alpha1.SellerPublicService.GetSellerAgreements，顯示新版本，請賣家重新勾選後再送出。
-	ErrorReason_AGREEMENT_OUTDATED ErrorReason = 6
+	ErrorReason_AGREEMENT_OUTDATED ErrorReason = 5
 	// 賣家做這個操作需要的前置條件沒有滿足（搭配 failed_precondition）：身分認證未核准，或店家正在隨帳號刪除。停權不用它，
 	// 停權是 SELLER_SUSPENDED。ErrorInfo.metadata 的 missingRequirements 是缺的條件，值是
-	// seller.v1alpha1.SellerRequirement 的值名（不加 SELLER_REQUIREMENT_ 前綴，例如 KYC_APPROVED），依列舉的數字由小到大以逗號連接。client 先看 GetMyStore 的能力狀態，這個 reason 只是
+	// seller.v1alpha1.SellerRequirement 的值名（不加 SELLER_REQUIREMENT_ 前綴，例如 ONBOARDING_COMPLETE），依列舉的數字由小到大以逗號連接。client 先看 GetMyStore 的能力狀態，這個 reason 只是
 	// 伺服器逐方法檢查的後備：重讀 GetMyStore，依缺的條件顯示。
-	ErrorReason_SELLER_REQUIREMENT_MISSING ErrorReason = 7
+	ErrorReason_SELLER_REQUIREMENT_MISSING ErrorReason = 6
 	// 帳號停權中，不能申請開店（搭配 failed_precondition）；解除停權後可以再申請。client 顯示 LocalizedMessage，並導向措施與申覆。帳號同時有生效中的終止合作時是
 	// STORE_OPENING_TERMINATED。
-	ErrorReason_STORE_OPENING_SUSPENDED ErrorReason = 8
+	ErrorReason_STORE_OPENING_SUSPENDED ErrorReason = 7
 	// 帳號有生效中的終止合作（條款第 21.3 條；終止撤銷之前同一個帳號不能再開店），不能申請開店（搭配 failed_precondition）。client 顯示 LocalizedMessage，
 	// 並導向措施與申覆。換身分認證被另一個帳號的終止擋下的情形不用它（隱私：不透露命中的帳號或欄位），那條路徑維持通用的 failed_precondition 與文字。
-	ErrorReason_STORE_OPENING_TERMINATED ErrorReason = 9
+	ErrorReason_STORE_OPENING_TERMINATED ErrorReason = 8
 	// 帳號擁有商店，不能被停權（搭配 failed_precondition）：停權對店家、未結訂單與撥款的效果由賣家條款決定，條款定出之前有店的帳號不停權。
 	// 只出現在後台與內部的處分路徑；client 顯示 LocalizedMessage，請營運先處理店家（措施或關店），再停權帳號。
-	ErrorReason_ACCOUNT_HAS_STORE ErrorReason = 11
+	ErrorReason_ACCOUNT_HAS_STORE ErrorReason = 9
 	// 帳號停權中，這個操作是寫入，不在停權時仍可做的範圍（搭配 permission_denied）。停權的帳號仍能登入、讀取與刪除帳號：
 	// client 轉成帳號的受限狀態，顯示停權通知，並以 identity.v1alpha1.IdentityAppService.GetSession 的 suspension 讀停權的狀態。
 	// 舊 gateway 的 REST 路徑（/api/v1）沒有 ErrorInfo，停權的非 GET／HEAD 請求只回 403。
-	ErrorReason_ACCOUNT_SUSPENDED ErrorReason = 12
+	ErrorReason_ACCOUNT_SUSPENDED ErrorReason = 10
 	// 要連結的登入方式（Google、LINE 的身分）已經連結到另一個帳號，包含已刪除帳號留下的身分（搭配 already_exists）；什麼都沒有改。
 	// client 顯示 LocalizedMessage，請使用者改用那個帳號登入，或換一個登入方式。
 	// IdentityAppService.LinkIdentity（web 的連結走 /api/auth，不在 Connect）。
-	ErrorReason_IDENTITY_ALREADY_LINKED ErrorReason = 13
+	ErrorReason_IDENTITY_ALREADY_LINKED ErrorReason = 11
 	// 這個操作要求最近重新驗證過，而目前的 session 沒有（搭配 failed_precondition）：IdentityAppService.RevokeSession 要求目前的 session
 	// 在 15 分鐘內以 provider 驗證過。client 引導使用者重新走一次登入（web 的 /api/auth/{provider}/start、App 的 ExchangeIdToken，
 	// 登入會換發新 session），再重送。
-	ErrorReason_REAUTHENTICATION_REQUIRED ErrorReason = 14
+	ErrorReason_REAUTHENTICATION_REQUIRED ErrorReason = 12
+	// 帳號沒有聯絡信箱（沒有 provider 驗證過的 email，也沒有自填的），不能送出 KYC 申請（搭配 failed_precondition）：SellerAppService.SubmitKYC。
+	// client 引導使用者在 IdentityAppService.SetContactEmail 填一個，再重送。
+	ErrorReason_CONTACT_EMAIL_REQUIRED ErrorReason = 13
 )
 
 // Enum value maps for ErrorReason.
@@ -85,32 +88,34 @@ var (
 	ErrorReason_name = map[int32]string{
 		0:  "ERROR_REASON_UNSPECIFIED",
 		1:  "VERSION_CONFLICT",
-		3:  "SELLER_SUSPENDED",
-		4:  "PROSPECT_MATCH_FOUND",
-		10: "PROSPECT_TAX_ID_HELD",
-		6:  "AGREEMENT_OUTDATED",
-		7:  "SELLER_REQUIREMENT_MISSING",
-		8:  "STORE_OPENING_SUSPENDED",
-		9:  "STORE_OPENING_TERMINATED",
-		11: "ACCOUNT_HAS_STORE",
-		12: "ACCOUNT_SUSPENDED",
-		13: "IDENTITY_ALREADY_LINKED",
-		14: "REAUTHENTICATION_REQUIRED",
+		2:  "SELLER_SUSPENDED",
+		3:  "PROSPECT_MATCH_FOUND",
+		4:  "PROSPECT_TAX_ID_HELD",
+		5:  "AGREEMENT_OUTDATED",
+		6:  "SELLER_REQUIREMENT_MISSING",
+		7:  "STORE_OPENING_SUSPENDED",
+		8:  "STORE_OPENING_TERMINATED",
+		9:  "ACCOUNT_HAS_STORE",
+		10: "ACCOUNT_SUSPENDED",
+		11: "IDENTITY_ALREADY_LINKED",
+		12: "REAUTHENTICATION_REQUIRED",
+		13: "CONTACT_EMAIL_REQUIRED",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":   0,
 		"VERSION_CONFLICT":           1,
-		"SELLER_SUSPENDED":           3,
-		"PROSPECT_MATCH_FOUND":       4,
-		"PROSPECT_TAX_ID_HELD":       10,
-		"AGREEMENT_OUTDATED":         6,
-		"SELLER_REQUIREMENT_MISSING": 7,
-		"STORE_OPENING_SUSPENDED":    8,
-		"STORE_OPENING_TERMINATED":   9,
-		"ACCOUNT_HAS_STORE":          11,
-		"ACCOUNT_SUSPENDED":          12,
-		"IDENTITY_ALREADY_LINKED":    13,
-		"REAUTHENTICATION_REQUIRED":  14,
+		"SELLER_SUSPENDED":           2,
+		"PROSPECT_MATCH_FOUND":       3,
+		"PROSPECT_TAX_ID_HELD":       4,
+		"AGREEMENT_OUTDATED":         5,
+		"SELLER_REQUIREMENT_MISSING": 6,
+		"STORE_OPENING_SUSPENDED":    7,
+		"STORE_OPENING_TERMINATED":   8,
+		"ACCOUNT_HAS_STORE":          9,
+		"ACCOUNT_SUSPENDED":          10,
+		"IDENTITY_ALREADY_LINKED":    11,
+		"REAUTHENTICATION_REQUIRED":  12,
+		"CONTACT_EMAIL_REQUIRED":     13,
 	}
 )
 
@@ -145,22 +150,23 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xa0\x03\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\x84\x03\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10VERSION_CONFLICT\x10\x01\x12\x14\n" +
-	"\x10SELLER_SUSPENDED\x10\x03\x12\x18\n" +
-	"\x14PROSPECT_MATCH_FOUND\x10\x04\x12\x18\n" +
-	"\x14PROSPECT_TAX_ID_HELD\x10\n" +
-	"\x12\x16\n" +
-	"\x12AGREEMENT_OUTDATED\x10\x06\x12\x1e\n" +
-	"\x1aSELLER_REQUIREMENT_MISSING\x10\a\x12\x1b\n" +
-	"\x17STORE_OPENING_SUSPENDED\x10\b\x12\x1c\n" +
-	"\x18STORE_OPENING_TERMINATED\x10\t\x12\x15\n" +
-	"\x11ACCOUNT_HAS_STORE\x10\v\x12\x15\n" +
-	"\x11ACCOUNT_SUSPENDED\x10\f\x12\x1b\n" +
-	"\x17IDENTITY_ALREADY_LINKED\x10\r\x12\x1d\n" +
-	"\x19REAUTHENTICATION_REQUIRED\x10\x0e\"\x04\b\x02\x10\x02\"\x04\b\x05\x10\x05*\x12PHONE_CODE_EXPIRED*\x16ACCOUNT_HAS_OPEN_STOREB\x82\x02\n" +
+	"\x10SELLER_SUSPENDED\x10\x02\x12\x18\n" +
+	"\x14PROSPECT_MATCH_FOUND\x10\x03\x12\x18\n" +
+	"\x14PROSPECT_TAX_ID_HELD\x10\x04\x12\x16\n" +
+	"\x12AGREEMENT_OUTDATED\x10\x05\x12\x1e\n" +
+	"\x1aSELLER_REQUIREMENT_MISSING\x10\x06\x12\x1b\n" +
+	"\x17STORE_OPENING_SUSPENDED\x10\a\x12\x1c\n" +
+	"\x18STORE_OPENING_TERMINATED\x10\b\x12\x15\n" +
+	"\x11ACCOUNT_HAS_STORE\x10\t\x12\x15\n" +
+	"\x11ACCOUNT_SUSPENDED\x10\n" +
+	"\x12\x1b\n" +
+	"\x17IDENTITY_ALREADY_LINKED\x10\v\x12\x1d\n" +
+	"\x19REAUTHENTICATION_REQUIRED\x10\f\x12\x1a\n" +
+	"\x16CONTACT_EMAIL_REQUIRED\x10\rB\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (

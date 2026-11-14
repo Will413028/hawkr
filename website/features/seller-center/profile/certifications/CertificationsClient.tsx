@@ -6,15 +6,16 @@
  *
  *   1. 載入時讀 GetMyKYC：沒有申請（not_found）→ 「個人賣家 / 企業用戶」二選一卡片，
  *      按一下以 SaveKYCDraft（不帶 etag）建立申請
- *   2. 有申請且可編輯（草稿、被退回、PayUni 拒絕但能重送）→ 整頁長表單，分區塊：
+ *   2. 有申請且可編輯（草稿、被退回）→ 整頁長表單，分區塊：
  *        - 公司資訊（僅企業用戶）
- *        - 身分證正反面 + 個人欄位
- *        - 銀行存摺
- *        - 其他資訊（聯絡方式、英文名、店家地址）
- *        - 補充文件（僅企業用戶）
+ *        - 商家營運資訊（聯絡方式、店家地址）
+ *        - 補充文件（僅企業用戶，選填）
+ *        - 確認送出（個人資料告知）
+ *      平台只收市集審核的資料；身分與銀行資料在審核通過後由金流商收集。
  *      Sticky 底部列：捨棄草稿 + 送出認證；Sticky 左側錨點導覽，跳到對應區塊。
  *      續填的位置由伺服器的 `missing_fields` 推導（第一個還有缺項的區塊）。
- *   3. 已通過 / 審核中 → 只顯示狀態頁，不再開放編輯
+ *   3. 審核中 / 已通過 → 兩區狀態頁：「平台審核」讀 `KYCApplication.status`，「收款帳戶」讀 `GetMyPaymentAccount`，
+ *      不再開放編輯
  *
  * 申請是店家的單例資源（沒有申請 ID）；每次寫入帶讀到的 etag，版本衝突時保留使用者的輸入並載入最新版本。
  * 文件上傳一律走 uploadSecureDocument()（私密上傳，bytes 不會落公開 OSS），存檔時以 staged token 寫入。
@@ -26,15 +27,16 @@ import {
 	submitError as classifySubmitError,
 	type SubmitError,
 } from "@hawkr/api/connect/submit";
+import { IdentityAppService } from "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb";
 import {
 	AgreementKind,
 	KYCField,
-	KYCFlowStatus,
 	KYCStatus,
 	SellerAppService,
 	type StoreField,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { countyCodeOfTownCode } from "@hawkr/twaddr/lookup";
+import { sellerKYCStatus } from "@hawkr/ui-text/keys";
 import { useSearchParams } from "next/navigation";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
@@ -44,17 +46,17 @@ import BrandLogoLoader from "@/components/shared/BrandLogoLoader";
 import Link from "@/components/shared/Link";
 import Button from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
-import { Dropdown } from "@/components/ui/Dropdown";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import { Input } from "@/components/ui/Input";
 import { TownFields } from "@/features/account/screens/addresses/TownFields";
 import { AgreementCheckbox } from "@/features/seller/components/AgreementCheckbox";
-import { PayuniStatusBody } from "@/features/seller-center/components/PayuniStatusBody";
 import { useAuth } from "@/lib/auth/context";
+import { useContactEmail } from "@/lib/hooks/useContactEmail";
 import { useResettableError } from "@/lib/hooks/useResettableError";
 import {
 	useInvalidateSellerSelf,
 	useMyKyc,
+	useMyOnboarding,
 	useSellerSelf,
 	useSetMyKyc,
 } from "@/lib/hooks/useSellerSelf";
@@ -63,7 +65,7 @@ import {
 	versionConflictNotice,
 } from "@/lib/hooks/useVersionConflict";
 import {
-	type UiText,
+	optionalText,
 	useDefaultErrorText,
 	useUiText,
 } from "@/lib/i18n/ui-text";
@@ -76,11 +78,11 @@ import {
 	isAgreementOutdated,
 } from "@/lib/seller/agreements";
 import {
-	getBankCodeForValue,
-	getBankOptionsForValue,
-	normaliseBankName,
-	TAIWAN_CITY_OPTIONS,
-} from "@/lib/seller/certification-options";
+	type AccountContactEmail,
+	isContactEmailRequired,
+	setContactEmail,
+	validateContactEmail,
+} from "@/lib/seller/contact-email";
 import {
 	adoptExistingApplication,
 	adoptSavedDocs,
@@ -93,18 +95,17 @@ import {
 	EMPTY_KYC_FORM,
 	fetchMyKyc,
 	type KycDoc,
-	type KycDocSlot,
 	type KycDocs,
 	type KycForm,
 	type KycIssueMessages,
 	kycDocsOf,
 	kycDocumentNotice,
+	kycDraftDiscardable,
 	kycEditable,
 	kycFieldLabel,
 	kycFieldOfPath,
 	kycFormKeyOfDraftPath,
 	kycFormOf,
-	kycInputErrors,
 	kycIssueMessages,
 	kycTypeOf,
 	lookupBusinessRegistration,
@@ -117,13 +118,10 @@ import {
 	saveKycDraft,
 	submitKyc,
 } from "@/lib/seller/kyc";
-import { flowOf, kycFlowBanner, shownFlowStatus } from "@/lib/seller/kyc-flow";
 import {
-	payuniHasState,
-	payuniStateAlert,
-	payuniStateTitle,
-} from "@/lib/seller/payuni";
-import { PAYUNI_LOCK_ON_SUBMIT_NOTICE } from "@/lib/seller/payuni-locked-fields";
+	paymentAccountTask,
+	platformReviewCompleted,
+} from "@/lib/seller/onboarding-summary";
 import { fetchMyStore, updateMyStore } from "@/lib/seller/repo";
 import { isStoreCertified, type MyStore } from "@/lib/seller/store";
 import {
@@ -142,6 +140,8 @@ import {
 	storeDraftOf,
 } from "@/lib/seller/store-contact-saver";
 import { storeAddressInputError } from "@/lib/seller/store-form";
+import { PaymentAccountSection } from "./PaymentAccountSection";
+import { PlatformReviewSection } from "./PlatformReviewSection";
 
 /* ============================================================
  *               Client-held, non-data wizard state
@@ -162,14 +162,13 @@ interface SectionAnchor {
 	requiredFor: SellerType | "both";
 }
 
-type DiscardDraftInitiator = "type-switch" | "action-bar";
+type DiscardDraftInitiator = "type-switch" | "action-bar" | "withdraw";
 
 const SECTIONS: SectionAnchor[] = [
 	{ id: "company", label: "1. 公司資訊", requiredFor: "business" },
-	{ id: "identity", label: "2. 身分證明", requiredFor: "both" },
-	{ id: "bank", label: "3. 銀行帳戶", requiredFor: "both" },
-	{ id: "other", label: "4. 其他資訊", requiredFor: "both" },
-	{ id: "documents", label: "5. 補充文件", requiredFor: "business" },
+	{ id: "other", label: "2. 商家營運資訊", requiredFor: "both" },
+	{ id: "documents", label: "3. 補充文件", requiredFor: "business" },
+	{ id: "confirm", label: "4. 確認送出", requiredFor: "both" },
 ];
 
 function visibleSections(t: SellerType) {
@@ -179,15 +178,6 @@ function visibleSections(t: SellerType) {
 		...s,
 		label: `${i + 1}. ${s.label.replace(/^\d+\.\s/, "")}`,
 	}));
-}
-
-function withCurrentOption(
-	options: readonly string[],
-	current: string | undefined,
-): string[] {
-	const value = (current ?? "").trim();
-	if (!value || options.includes(value)) return [...options];
-	return [value, ...options];
 }
 
 /** 從店家帶入的預設值：只在對應欄位還是空的時候補上。 */
@@ -221,10 +211,10 @@ interface ServerFieldError {
 	message: string;
 }
 
-const KYC_AGREEMENT_KINDS = [
-	AgreementKind.KYC_PRIVACY_NOTICE,
-	AgreementKind.PAYUNI_TERMS,
-] as const;
+const CONTACT_EMAIL_LABEL = "金流商聯絡信箱";
+const CONTACT_EMAIL_HINT = "金流商會用這個信箱聯絡你收款事宜";
+
+const KYC_AGREEMENT_KINDS = [AgreementKind.KYC_PRIVACY_NOTICE] as const;
 
 const VERSION_CONFLICT_NOTICE = versionConflictNotice("申請資料");
 const STORE_VERSION_CONFLICT_NOTICE = versionConflictNotice("店家資料");
@@ -242,8 +232,34 @@ export default function CertificationsClient() {
 	const { status: authStatus } = useAuth();
 	const { data: seller, loading: sellerLoading } = useSellerSelf();
 	const { application, loading: kycLoading, error: kycLoadError } = useMyKyc();
+	const {
+		onboarding,
+		loading: onboardingLoading,
+		error: onboardingError,
+		refetch: refetchOnboarding,
+	} = useMyOnboarding();
 	const [hydrated, setHydrated] = React.useState(false);
 	const [error, setError] = useResettableError();
+	const {
+		contact: accountContact,
+		loading: contactLoading,
+		error: contactLoadError,
+		refetch: refetchContact,
+	} = useContactEmail();
+	const [contactEmailDraft, setContactEmailDraft] = React.useState<
+		string | null
+	>(null);
+	const contactVerified = accountContact?.source === "verified";
+	const contactEmailValue = contactEmailDraft ?? accountContact?.email ?? "";
+	const contactEmailInvalid = contactVerified
+		? null
+		: contactLoading || contactLoadError
+			? "載入中"
+			: validateContactEmail(contactEmailValue);
+	const contactEmailError =
+		contactEmailDraft !== null && !contactVerified
+			? validateContactEmail(contactEmailValue)
+			: null;
 
 	const [form, setForm] = React.useState<KycForm>(EMPTY_KYC_FORM);
 	const [docs, setDocs] = React.useState<KycDocs>(EMPTY_KYC_DOCS);
@@ -277,7 +293,6 @@ export default function CertificationsClient() {
 	const [banReg, setBanReg] = React.useState<BusinessLookup | null>(null);
 	const [submitError, setSubmitError] = useResettableError();
 	const [noticeRead, setNoticeRead] = React.useState(false);
-	const [payuniAccepted, setPayuniAccepted] = React.useState(false);
 	const [submitOk, setSubmitOk] = React.useState(false);
 	const [lastSavedAt, setLastSavedAt] = React.useState<number | null>(null);
 	const [saving, setSaving] = React.useState(false);
@@ -322,7 +337,8 @@ export default function CertificationsClient() {
 		storeSaverRef.current.adopt(seller?.store);
 		if (application) {
 			adoptApplication(application);
-			setForm(kycFormOf(application));
+			const loaded = kycFormOf(application);
+			setForm(loaded);
 			setDocs(kycDocsOf(application));
 			resumeRef.current = resumeSectionOf(application.missingFields);
 		} else {
@@ -347,13 +363,12 @@ export default function CertificationsClient() {
 		adoptApplication,
 	]);
 
-	const flow = flowOf(application);
 	const certified = isStoreCertified(seller);
-	const shownStatus = shownFlowStatus(certified, flow.status);
+	// 店家已認證（平台審核核准且收款帳戶啟用）時一律是已通過。
+	const shownStatus = certified
+		? KYCStatus.KYC_STATUS_APPROVED
+		: application?.status;
 	const editable = kycEditable(application);
-	const identityLocked = flow.identityLocked;
-
-	const payuni = payuniHasState(flow.payuni) ? flow.payuni : null;
 
 	// 已通過認證的賣家不需要這頁 — 認證狀態已移到「錢包與認證」頁的
 	// 展開式 row。任何已通過的賣家（剛通過或事後造訪）
@@ -394,11 +409,7 @@ export default function CertificationsClient() {
 			const previous = baselineRef.current;
 			const previousDocs = baselineDocsRef.current;
 			etagRef.current = latest.etag;
-			baselineRef.current = {
-				...kycFormOf(latest),
-				idCardNo: previous.idCardNo,
-				bankAccount: previous.bankAccount,
-			};
+			baselineRef.current = kycFormOf(latest);
 			baselineDocsRef.current = kycDocsOf(latest);
 			setForm((current) =>
 				mergeLatestForm(current, previous, kycFormOf(latest)),
@@ -779,31 +790,6 @@ export default function CertificationsClient() {
 		return () => window.clearTimeout(timer);
 	}, [form.sellerType, form.taxId, handleBanLookup]);
 
-	const handleSecureUpload = async (
-		slot: KycDocSlot,
-		file: File,
-		docType: string,
-	) => {
-		setBusy(`upload-${slot}`);
-		setError(null);
-		try {
-			const local = URL.createObjectURL(file);
-			const result = await uploadSecureDocument(file, docType);
-			setDocs((prev) => ({
-				...prev,
-				[slot]: {
-					assetId: "",
-					stagedToken: result.stagedToken,
-					preview: local,
-				},
-			}));
-		} catch (e) {
-			setError(e instanceof Error ? e.message : "上傳失敗");
-		} finally {
-			setBusy(null);
-		}
-	};
-
 	const handleAddDocument = async (file: File) => {
 		setBusy("upload-doc");
 		setError(null);
@@ -831,13 +817,8 @@ export default function CertificationsClient() {
 		}));
 	};
 
-	const clearDocument = (slot: KycDocSlot) => {
-		setDocs((prev) => ({ ...prev, [slot]: null }));
-	};
-
 	/* ===== Submit gate — the server decides what is still missing ===== */
 
-	const { idErr, acctErr } = kycInputErrors(form);
 	const localContactErrors = storeContactErrors(storeContact);
 	const contactErrors: StoreContactErrors =
 		storeServerErrors && storeServerErrors.contact === storeContact
@@ -863,11 +844,43 @@ export default function CertificationsClient() {
 		() => [
 			...missingItemsOf(ut, application?.missingFields ?? []),
 			...storeMissingItemsOf(ut, application?.missingStoreFields ?? []),
+			...(contactEmailInvalid === null
+				? []
+				: [{ sectionId: "confirm" as const, label: CONTACT_EMAIL_LABEL }]),
 		],
-		[ut, application],
+		[ut, application, contactEmailInvalid],
 	);
 
-	const agreementsAccepted = noticeRead && payuniAccepted;
+	const saveContactEmail = async (): Promise<boolean> => {
+		if (contactVerified) return true;
+		const email = contactEmailValue.trim().toLowerCase();
+		if (
+			accountContact?.source === "self-entered" &&
+			accountContact.email === email
+		) {
+			return true;
+		}
+		try {
+			await setContactEmail(email);
+			await refetchContact();
+			return true;
+		} catch (e) {
+			const failure = classifySubmitError(
+				e,
+				defaults,
+				IdentityAppService.method.setContactEmail,
+			);
+			setSubmitError(
+				failure.kind === "fields"
+					? (Object.values(failure.fields)[0] ?? defaults(Code.InvalidArgument))
+					: failure.kind === "message"
+						? failure.message
+						: defaults(Code.Aborted),
+			);
+			void refetchContact();
+			return false;
+		}
+	};
 
 	const finishSubmit = React.useCallback(async () => {
 		setSubmitOk(true);
@@ -876,7 +889,7 @@ export default function CertificationsClient() {
 	}, [invalidateSelf, router]);
 
 	const handleSubmit = async () => {
-		if (!application || !editable || !agreementsAccepted) return;
+		if (!application || !editable || !noticeRead) return;
 		setBusy("submit");
 		setSubmitError(null);
 		try {
@@ -892,6 +905,13 @@ export default function CertificationsClient() {
 				setSubmitError("認證資料尚未儲存完成，請稍後再試。");
 				return;
 			}
+			if (contactEmailInvalid !== null) {
+				setSubmitError(
+					contactEmailError ?? `下列欄位尚未填寫：${CONTACT_EMAIL_LABEL}`,
+				);
+				return;
+			}
+			if (!(await saveContactEmail())) return;
 			const current = latestAppRef.current;
 			const stillMissing = [
 				...missingItemsOf(ut, current?.missingFields ?? []),
@@ -923,8 +943,14 @@ export default function CertificationsClient() {
 			);
 			if (isAgreementOutdated(e)) {
 				setNoticeRead(false);
-				setPayuniAccepted(false);
 				setSubmitError(AGREEMENT_OUTDATED_NOTICE);
+			} else if (isContactEmailRequired(e)) {
+				void refetchContact();
+				setSubmitError(
+					failure.kind === "message"
+						? failure.message
+						: defaults(Code.FailedPrecondition),
+				);
 			} else if (failure.kind === "conflict") {
 				await resolveConflict();
 				setSubmitError(VERSION_CONFLICT_NOTICE);
@@ -963,12 +989,17 @@ export default function CertificationsClient() {
 
 	const handleCancel = async (initiator: DiscardDraftInitiator) => {
 		if (!application || discardPendingRef.current) return;
-		if (!window.confirm("確定要捨棄目前的認證草稿？已上傳資料會清除。")) return;
+		const confirmText =
+			initiator === "withdraw"
+				? "確定要取消審核中的申請？取消後可以重新填寫並送出。"
+				: "確定要捨棄目前的認證草稿？已上傳資料會清除。";
+		if (!window.confirm(confirmText)) return;
 		discardPendingRef.current = true;
 		setDiscardInitiator(initiator);
 		setError(null);
 		try {
 			await cancelKyc(etagRef.current);
+			void invalidateSelf();
 			latestAppRef.current = null;
 			setServerFieldErrors([]);
 			setMyKyc(null);
@@ -1029,16 +1060,10 @@ export default function CertificationsClient() {
 		);
 	}
 
-	const banner = kycFlowBanner(ut, shownStatus);
-	const isApproved = certified;
+	// 平台審核是否完成是開通摘要（伺服器）的答案；`shownStatus` 只用來顯示申請本身。
+	const platformApproved = platformReviewCompleted(onboarding);
 
-	if (isApproved || (application !== null && !editable) || submitOk) {
-		const lockedPayuni = !isApproved && !submitOk ? payuni : null;
-		const lockedTone = lockedPayuni
-			? payuniStateAlert(lockedPayuni.state)
-				? "warning"
-				: "info"
-			: (banner?.tone ?? "neutral");
+	if (certified || (application !== null && !editable) || submitOk) {
 		return (
 			<div className="seller-cert">
 				<header className="seller-cert__head">
@@ -1051,25 +1076,23 @@ export default function CertificationsClient() {
 					</BackLink>
 					<h1>商家認證</h1>
 				</header>
-				<section className={`seller-cert__status is-${lockedTone}`}>
-					{submitOk ? (
-						<>
-							<strong>已送出申請</strong>
-							<p>審核完成後會以通知告知你結果。</p>
-						</>
-					) : lockedPayuni ? (
-						<>
-							<strong>{payuniStateTitle(ut, lockedPayuni.state)}</strong>
-							<PayuniStatusBody payuni={lockedPayuni} />
-						</>
-					) : banner ? (
-						<>
-							<strong>{banner.title}</strong>
-							<p>{banner.description}</p>
-						</>
-					) : null}
-				</section>
-				{isApproved && (
+				<PlatformReviewSection
+					application={application}
+					status={shownStatus}
+					submitted={submitOk}
+					cancelling={discardInitiator === "withdraw"}
+					onCancel={() => void handleCancel("withdraw")}
+				/>
+				<PaymentAccountSection
+					platformApproved={platformApproved}
+					task={paymentAccountTask(onboarding)}
+					summary={{
+						loading: onboardingLoading,
+						error: onboarding ? null : onboardingError,
+						refetch: refetchOnboarding,
+					}}
+				/>
+				{certified && (
 					<section className="seller-card">
 						<header className="seller-card__head">
 							<h2>下一步</h2>
@@ -1135,12 +1158,11 @@ export default function CertificationsClient() {
 	const rejection = application.lastRejection;
 	const outstandingIssues = application.outstandingIssues;
 	const needsResubmit = rejection !== undefined;
-	const rejectedBanner = kycFlowBanner(
+	const rejectedTitle = optionalText(
 		ut,
-		KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
+		sellerKYCStatus(KYCStatus.KYC_STATUS_REJECTED),
 	);
-	const canDiscard =
-		application.status === KYCStatus.KYC_STATUS_DRAFT && !identityLocked;
+	const canDiscard = kycDraftDiscardable(application);
 
 	return (
 		<div className="seller-cert seller-cert--shell seller-cert--form-shell">
@@ -1245,12 +1267,10 @@ export default function CertificationsClient() {
 				className="seller-cert__main seller-cert__main--form"
 			>
 				<div className="seller-cert__form-scroll">
-					{needsResubmit && rejectedBanner && (
-						<section
-							className={`seller-cert__status is-${rejectedBanner.tone} is-rejected`}
-						>
-							<strong>{rejectedBanner.title}</strong>
-							<p>{rejectedBanner.description}</p>
+					{needsResubmit && rejectedTitle && (
+						<section className="seller-cert__status is-danger is-rejected">
+							<strong>{rejectedTitle}</strong>
+							<p>請查看退件原因並編輯後重新送出。</p>
 							{rejection && (
 								<p>{rejection.reason || "請重新確認並提交完整資料。"}</p>
 							)}
@@ -1261,13 +1281,6 @@ export default function CertificationsClient() {
 							))}
 						</section>
 					)}
-					{payuni && (
-						<section className="seller-cert__status is-warning is-pending_info">
-							<strong>{payuniStateTitle(ut, payuni.state)}</strong>
-							<PayuniStatusBody payuni={payuni} />
-						</section>
-					)}
-
 					{error && (
 						<p className="seller-cert__error" role="alert">
 							{error}
@@ -1288,47 +1301,16 @@ export default function CertificationsClient() {
 								onLookupBan={() => void handleBanLookup()}
 								banReg={banReg}
 								banLooking={busy === "ban-lookup"}
-								locked={identityLocked}
 								errorOf={errorOf}
 							/>
 						)}
-						<SectionIdentity
-							form={form}
-							setForm={setForm}
-							sellerType={sellerType}
-							docs={docs}
-							issues={issues}
-							idErr={idErr}
-							errorOf={errorOf}
-							idMasked={maskedIdOf(application)}
-							busy={busy}
-							locked={identityLocked}
-							onUpload={handleSecureUpload}
-							onClearDocument={clearDocument}
-						/>
-						<SectionBank
-							form={form}
-							setForm={setForm}
-							docs={docs}
-							issues={issues}
-							acctErr={acctErr}
-							errorOf={errorOf}
-							acctMasked={application.bankAccountMasked}
-							busy={busy}
-							onUpload={handleSecureUpload}
-							onClearDocument={clearDocument}
-						/>
 						<SectionOther
-							form={form}
-							setForm={setForm}
 							contactErrors={contactErrors}
 							addressErr={storeAddressErr}
 							storeContact={storeContact}
 							setStoreContact={setStoreContact}
-							errorOf={errorOf}
 							storeAddress={storeAddress}
 							setStoreAddress={setStoreAddress}
-							locked={identityLocked}
 						/>
 
 						{sellerType === "business" && (
@@ -1341,25 +1323,35 @@ export default function CertificationsClient() {
 							/>
 						)}
 
-						<div className="flex flex-col gap-2">
-							<AgreementCheckbox
-								checked={noticeRead}
+						<section
+							className="seller-card seller-cert__form-section"
+							id="cert-confirm"
+						>
+							<header>
+								<h2>確認送出</h2>
+								<p>身分與銀行帳號會在審核通過後，由金流商收集，平台不經手。</p>
+							</header>
+							<ContactEmailField
+								contact={accountContact}
+								loading={contactLoading}
+								loadFailed={contactLoadError !== null}
+								value={contactEmailValue}
+								error={contactEmailError}
 								disabled={busy === "submit"}
-								onChange={setNoticeRead}
-								before="我已閱讀"
-								linkText="賣家身分認證個人資料蒐集告知事項"
-								href={agreementUrl(AgreementKind.KYC_PRIVACY_NOTICE)}
+								onChange={setContactEmailDraft}
+								onRetry={() => void refetchContact()}
 							/>
-							<AgreementCheckbox
-								checked={payuniAccepted}
-								disabled={busy === "submit"}
-								onChange={setPayuniAccepted}
-								before="我同意"
-								linkText="PAYUNi 服務條款"
-								href={agreementUrl(AgreementKind.PAYUNI_TERMS)}
-								after="，並了解平台會為我向 PAYUNi 申請子商店與會員"
-							/>
-						</div>
+							<div className="flex flex-col gap-2">
+								<AgreementCheckbox
+									checked={noticeRead}
+									disabled={busy === "submit"}
+									onChange={setNoticeRead}
+									before="我已閱讀"
+									linkText="賣家身分認證個人資料蒐集告知事項"
+									href={agreementUrl(AgreementKind.KYC_PRIVACY_NOTICE)}
+								/>
+							</div>
+						</section>
 
 						{submitError && (
 							<p className="seller-cert__error" role="alert">
@@ -1387,28 +1379,10 @@ export default function CertificationsClient() {
 								</span>
 							</>
 						) : (
-							<>
-								<strong>
-									所有必填欄位已完成
-									<AppIcon name="check" size={14} fill />
-								</strong>
-								<span>
-									送出後 PayUni 預設密碼為你的
-									{kycFieldLabel(
-										ut,
-										sellerType === "business"
-											? KYCField.KYC_FIELD_BUSINESS_TAX_ID
-											: KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO,
-									)}
-								</span>
-								{/*
-								 * 商店名稱與商店介紹住在「商店資訊」頁，這個流程原本一個字
-								 * 都沒提到它們——但送出那一刻它們就鎖了，而鎖定生效的時點
-								 * （admin 核准）不在賣家的控制範圍內，也不會有人通知他。
-								 * 送出前是他最後有選擇權的時點。
-								 */}
-								<span>{PAYUNI_LOCK_ON_SUBMIT_NOTICE}</span>
-							</>
+							<strong>
+								所有必填欄位已完成
+								<AppIcon name="check" size={14} fill />
+							</strong>
 						)}
 					</div>
 					<div className="seller-cert__bar-actions">
@@ -1430,7 +1404,7 @@ export default function CertificationsClient() {
 								busy === "submit" ||
 								discardPending ||
 								missingItems.length > 0 ||
-								!agreementsAccepted ||
+								!noticeRead ||
 								storeAddressErr !== undefined ||
 								(hasUnsaved && !saveFailed) ||
 								saving
@@ -1445,18 +1419,6 @@ export default function CertificationsClient() {
 			</section>
 		</div>
 	);
-}
-
-function maskedIdOf(app: {
-	subject: { case?: string; value?: unknown };
-}): string {
-	const subject = app.subject as
-		| { case: "individual"; value: { idCardNoMasked: string } }
-		| { case: "business"; value: { repIdCardNoMasked: string } }
-		| { case: undefined };
-	if (subject.case === "individual") return subject.value.idCardNoMasked;
-	if (subject.case === "business") return subject.value.repIdCardNoMasked;
-	return "";
 }
 
 /* ============================================================
@@ -1487,7 +1449,6 @@ function TypePicker({
 					<TypePickerIndividualIcon />
 					<strong>個人賣家</strong>
 					<small>以個人名義販售農產品 / 自家產品</small>
-					<small>需身分證 + 存摺</small>
 				</button>
 				<button
 					type="button"
@@ -1497,7 +1458,7 @@ function TypePicker({
 					<TypePickerBusinessIcon />
 					<strong>企業用戶</strong>
 					<small>以行號或公司名義販售（需統一編號）</small>
-					<small>需公司資訊 + 負責人身分證 + 公司帳戶存摺</small>
+					<small>需公司資訊與統一編號</small>
 				</button>
 			</div>
 			<footer>
@@ -1562,7 +1523,6 @@ function SectionCompany({
 	onLookupBan,
 	banReg,
 	banLooking,
-	locked,
 	errorOf,
 }: {
 	form: KycForm;
@@ -1570,7 +1530,6 @@ function SectionCompany({
 	onLookupBan: () => void;
 	banReg: BusinessLookup | null;
 	banLooking: boolean;
-	locked: boolean;
 	errorOf: ErrorOf;
 }) {
 	const fieldLabel = useKycFieldLabel();
@@ -1598,14 +1557,13 @@ function SectionCompany({
 						hint="輸入 8 位數字會自動查詢，也可按「查詢」重試"
 						error={errorOf("taxId")}
 						required
-						readOnly={locked}
 					/>
 					<div className="seller-cert__ban-action">
 						<Button
 							variant="bordered"
 							color="default"
 							onClick={onLookupBan}
-							disabled={banLooking || form.taxId.length !== 8 || locked}
+							disabled={banLooking || form.taxId.length !== 8}
 							isLoading={banLooking}
 							loadingLabel="查詢公司資料中…"
 						>
@@ -1625,7 +1583,6 @@ function SectionCompany({
 					onChange={(v) => setForm((p) => ({ ...p, companyName: v }))}
 					error={errorOf("companyName")}
 					required
-					readOnly={locked}
 				/>
 				<DatePicker
 					label={fieldLabel(KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE)}
@@ -1664,7 +1621,6 @@ function SectionCompany({
 					onChange={(v) => setForm((p) => ({ ...p, productType: v }))}
 					hint="例如：水果 / 蔬菜 / 海鮮 / 加工食品"
 					error={errorOf("productType")}
-					readOnly={locked}
 				/>
 			</div>
 			{banLooking && (
@@ -1690,276 +1646,34 @@ function SectionCompany({
 	);
 }
 
-function SectionIdentity({
-	form,
-	setForm,
-	sellerType,
-	docs,
-	issues,
-	idErr,
-	errorOf,
-	idMasked,
-	busy,
-	locked,
-	onUpload,
-	onClearDocument,
-}: {
-	form: KycForm;
-	setForm: React.Dispatch<React.SetStateAction<KycForm>>;
-	sellerType: SellerType;
-	docs: KycDocs;
-	issues: KycIssueMessages;
-	idErr: string | null;
-	errorOf: ErrorOf;
-	idMasked: string;
-	busy: string | null;
-	locked: boolean;
-	onUpload: (slot: KycDocSlot, file: File, docType: string) => void;
-	onClearDocument: (slot: KycDocSlot) => void;
-}) {
-	const fieldLabel = useKycFieldLabel();
-	return (
-		<section
-			className="seller-card seller-cert__form-section"
-			id="cert-identity"
-		>
-			<header>
-				<h2>身分證明</h2>
-				<p>
-					{sellerType === "business"
-						? "公司負責人或聯絡窗口的身分證正反面照，姓名與字號需可辨識。"
-						: "請上傳清晰、無反光的身分證正反面照，姓名與字號需可辨識。"}
-				</p>
-			</header>
-			<div className="seller-cert__field-notes">
-				<span>身分證照片僅供認證使用，會於伺服器端加密儲存。</span>
-			</div>
-			<div className="seller-cert__upload-pair">
-				<UploadCard
-					label={fieldLabel(KYCField.KYC_FIELD_ID_CARD_FRONT)}
-					required
-					hint={null}
-					preview={docs.idCardFront?.preview ?? ""}
-					error={issues.slots.idCardFront}
-					uploading={busy === "upload-idCardFront"}
-					onPick={(file) => onUpload("idCardFront", file, "id_card_front")}
-					onClear={() => onClearDocument("idCardFront")}
-				/>
-				<UploadCard
-					label={fieldLabel(KYCField.KYC_FIELD_ID_CARD_BACK)}
-					required
-					hint={null}
-					preview={docs.idCardBack?.preview ?? ""}
-					error={issues.slots.idCardBack}
-					uploading={busy === "upload-idCardBack"}
-					onPick={(file) => onUpload("idCardBack", file, "id_card_back")}
-					onClear={() => onClearDocument("idCardBack")}
-				/>
-			</div>
-			<div className="seller-cert__grid">
-				<TextField
-					label={fieldLabel(KYCField.KYC_FIELD_REAL_NAME)}
-					value={form.realName}
-					onChange={(v) => setForm((p) => ({ ...p, realName: v }))}
-					error={errorOf("realName")}
-					required
-					readOnly={locked}
-				/>
-				<TextField
-					label={fieldLabel(
-						sellerType === "business"
-							? KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO
-							: KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO,
-					)}
-					value={form.idCardNo}
-					onChange={(v) =>
-						setForm((p) => ({ ...p, idCardNo: v.toUpperCase() }))
-					}
-					error={idErr ?? errorOf("idCardNo")}
-					hint={
-						idMasked && !form.idCardNo
-							? `已填寫（${idMasked}），如需修改請重新輸入`
-							: undefined
-					}
-					required
-					readOnly={locked}
-				/>
-				<DatePicker
-					label={fieldLabel(KYCField.KYC_FIELD_BIRTH_DATE)}
-					variant="bordered"
-					size="lg"
-					value={form.birthDate}
-					errorMessage={errorOf("birthDate")}
-					onChange={(v) => setForm((p) => ({ ...p, birthDate: v }))}
-					maxDate={new Date().toISOString().slice(0, 10)}
-				/>
-				<DatePicker
-					label={fieldLabel(KYCField.KYC_FIELD_ID_CARD_ISSUE_DATE)}
-					variant="bordered"
-					size="lg"
-					yearMode="minguo"
-					value={form.idCardIssueDate}
-					errorMessage={errorOf("idCardIssueDate")}
-					onChange={(v) => setForm((p) => ({ ...p, idCardIssueDate: v }))}
-					maxDate={new Date().toISOString().slice(0, 10)}
-				/>
-				<Dropdown
-					label={fieldLabel(KYCField.KYC_FIELD_ID_CARD_ISSUE_TYPE)}
-					placeholder="選擇發證類型"
-					variant="bordered"
-					size="lg"
-					floatingLabel
-					value={form.idCardIssueType || undefined}
-					errorMessage={errorOf("idCardIssueType")}
-					onChange={(v) => setForm((p) => ({ ...p, idCardIssueType: v }))}
-					items={["初發", "補發", "換發"]}
-				/>
-				<Dropdown
-					label={fieldLabel(KYCField.KYC_FIELD_ID_CARD_ISSUE_LOCATION)}
-					placeholder="選擇發證縣市"
-					variant="bordered"
-					size="lg"
-					floatingLabel
-					value={form.idCardIssueLocation || undefined}
-					errorMessage={errorOf("idCardIssueLocation")}
-					onChange={(v) => setForm((p) => ({ ...p, idCardIssueLocation: v }))}
-					items={withCurrentOption(
-						TAIWAN_CITY_OPTIONS,
-						form.idCardIssueLocation,
-					)}
-					searchable
-					noResultsLabel="找不到符合的縣市"
-				/>
-			</div>
-		</section>
-	);
-}
-
-function SectionBank({
-	form,
-	setForm,
-	docs,
-	issues,
-	acctErr,
-	errorOf,
-	acctMasked,
-	busy,
-	onUpload,
-	onClearDocument,
-}: {
-	form: KycForm;
-	setForm: React.Dispatch<React.SetStateAction<KycForm>>;
-	docs: KycDocs;
-	issues: KycIssueMessages;
-	acctErr: string | null;
-	errorOf: ErrorOf;
-	acctMasked: string;
-	busy: string | null;
-	onUpload: (slot: KycDocSlot, file: File, docType: string) => void;
-	onClearDocument: (slot: KycDocSlot) => void;
-}) {
-	const fieldLabel = useKycFieldLabel();
-	return (
-		<section className="seller-card seller-cert__form-section" id="cert-bank">
-			<header>
-				<h2>銀行帳戶</h2>
-				<p>提領貨款使用，請確認帳戶名稱與認證主體一致。</p>
-			</header>
-			<UploadCard
-				label={fieldLabel(KYCField.KYC_FIELD_BANK_BOOK)}
-				required
-				preview={docs.bankBook?.preview ?? ""}
-				error={issues.slots.bankBook}
-				uploading={busy === "upload-bankBook"}
-				onPick={(file) => onUpload("bankBook", file, "bank_book")}
-				onClear={() => onClearDocument("bankBook")}
-			/>
-			<div className="seller-cert__grid">
-				<Dropdown
-					label={fieldLabel(KYCField.KYC_FIELD_BANK_NAME)}
-					placeholder="選擇銀行或金融機構"
-					variant="bordered"
-					size="lg"
-					floatingLabel
-					isRequired
-					value={
-						form.bankCode || getBankCodeForValue(form.bankName) || undefined
-					}
-					onChange={(v) => {
-						const bankName = normaliseBankName(v);
-						setForm((p) => ({
-							...p,
-							bankCode: getBankCodeForValue(v),
-							bankName,
-						}));
-					}}
-					items={getBankOptionsForValue(form.bankCode, form.bankName)}
-					errorMessage={errorOf("bankCode")}
-					searchable
-					description="支援銀行、郵局、信用合作社；送審會保留代碼與名稱。"
-					noResultsLabel="找不到符合的金融機構"
-				/>
-				<TextField
-					label={fieldLabel(KYCField.KYC_FIELD_BANK_ACCOUNT)}
-					value={form.bankAccount}
-					onChange={(v) =>
-						setForm((p) => ({
-							...p,
-							bankAccount: v.replace(/\D/g, ""),
-						}))
-					}
-					hint={
-						acctErr ??
-						(acctMasked && !form.bankAccount
-							? `已填寫（${acctMasked}），如需修改請重新輸入`
-							: "只能輸入數字（8–16 碼）")
-					}
-					error={acctErr ?? errorOf("bankAccount")}
-					required
-				/>
-			</div>
-		</section>
-	);
-}
-
 function SectionOther({
-	form,
-	setForm,
 	contactErrors,
 	addressErr,
 	storeContact,
 	setStoreContact,
-	errorOf,
 	storeAddress,
 	setStoreAddress,
-	locked,
 }: {
-	form: KycForm;
-	setForm: React.Dispatch<React.SetStateAction<KycForm>>;
 	contactErrors: StoreContactErrors;
 	addressErr: string | undefined;
 	storeContact: StoreContact;
 	setStoreContact: React.Dispatch<React.SetStateAction<StoreContact>>;
-	errorOf: ErrorOf;
 	storeAddress: StoreAddressState;
 	setStoreAddress: React.Dispatch<React.SetStateAction<StoreAddressState>>;
-	locked: boolean;
 }) {
-	const fieldLabel = useKycFieldLabel();
 	return (
 		<section className="seller-card seller-cert__form-section" id="cert-other">
 			<header>
-				<h2>其他資訊</h2>
-				<p>店家地址會同步到你的店鋪頁；其他欄位幫助 PayUni 加速審核。</p>
+				<h2>商家營運資訊</h2>
+				<p>店家地址會同步到你的店鋪頁。</p>
 			</header>
 			<div className="seller-cert__grid">
 				<TextField
 					label="聯絡人姓名"
 					value={storeContact.contactName}
 					onChange={(v) => setStoreContact((p) => ({ ...p, contactName: v }))}
-					hint={contactErrors.nameErr ?? "最多 20 字，會寫入商店設定"}
+					hint={contactErrors.nameErr ?? "最多 50 字，會寫入商店設定"}
 					error={contactErrors.nameErr}
-					required
 				/>
 				<TextField
 					label="聯絡人手機"
@@ -1972,25 +1686,15 @@ function SectionOther({
 					}
 					hint={contactErrors.mobileErr ?? "09 開頭的 10 碼手機號碼"}
 					error={contactErrors.mobileErr}
-					required
 				/>
 				<TextField
 					label="客服電子信箱"
 					type="email"
 					value={storeContact.supportEmail}
 					onChange={(v) => setStoreContact((p) => ({ ...p, supportEmail: v }))}
-					hint={contactErrors.emailErr ?? "PayUni 會寄金流相關通知到這個信箱"}
+					hint={contactErrors.emailErr ?? "買家與平台的客服聯絡會寄到這個信箱"}
 					error={contactErrors.emailErr}
 					required
-				/>
-				<TextField
-					label={fieldLabel(KYCField.KYC_FIELD_ENGLISH_NAME)}
-					value={form.englishName}
-					onChange={(v) => setForm((p) => ({ ...p, englishName: v }))}
-					hint="PayUni 金流註冊必填，請與護照英文姓名一致"
-					error={errorOf("englishName")}
-					required
-					readOnly={locked}
 				/>
 				<TownFields
 					countyLabel="商家所在縣市"
@@ -2072,6 +1776,61 @@ function SectionDocuments({
  *                       Atoms
  * ============================================================ */
 
+function ContactEmailField({
+	contact,
+	loading,
+	loadFailed,
+	value,
+	error,
+	disabled,
+	onChange,
+	onRetry,
+}: {
+	contact: AccountContactEmail | null;
+	loading: boolean;
+	loadFailed: boolean;
+	value: string;
+	error: string | null;
+	disabled: boolean;
+	onChange: (v: string) => void;
+	onRetry: () => void;
+}) {
+	const defaults = useDefaultErrorText();
+	if (loading) return null;
+	if (loadFailed) {
+		return (
+			<div className="seller-cert__field" role="alert">
+				<span>{CONTACT_EMAIL_LABEL}</span>
+				<small>{defaults(Code.Internal)}</small>
+				<Button variant="bordered" size="sm" onClick={onRetry}>
+					重新載入
+				</Button>
+			</div>
+		);
+	}
+	if (contact?.source === "verified") {
+		return (
+			<div className="seller-cert__field">
+				<span>{CONTACT_EMAIL_LABEL}</span>
+				<strong>{contact.email}</strong>
+				<small>{CONTACT_EMAIL_HINT}</small>
+			</div>
+		);
+	}
+	return (
+		<TextField
+			label={CONTACT_EMAIL_LABEL}
+			type="email"
+			value={value}
+			onChange={onChange}
+			hint={CONTACT_EMAIL_HINT}
+			error={error}
+			required
+			disabled={disabled}
+		/>
+	);
+}
+
 function TextField({
 	label,
 	value,
@@ -2081,6 +1840,7 @@ function TextField({
 	error,
 	required,
 	readOnly,
+	disabled,
 }: {
 	label: string;
 	value: string;
@@ -2090,6 +1850,7 @@ function TextField({
 	error?: string | null;
 	required?: boolean;
 	readOnly?: boolean;
+	disabled?: boolean;
 }) {
 	return (
 		<Input
@@ -2102,47 +1863,10 @@ function TextField({
 			onChange={(e) => onChange(e.target.value)}
 			isRequired={required}
 			readOnly={readOnly}
+			disabled={disabled}
 			isInvalid={Boolean(error)}
 			errorMessage={error || undefined}
 			description={hint && !error ? hint : undefined}
-		/>
-	);
-}
-
-function UploadCard({
-	label,
-	hint = "伺服器端加密儲存",
-	required,
-	preview,
-	error,
-	uploading,
-	onPick,
-	onClear,
-}: {
-	label: string;
-	required?: boolean;
-	hint?: string | null;
-	preview: string;
-	error?: string;
-	uploading: boolean;
-	onPick: (file: File) => void;
-	onClear: () => void;
-}) {
-	return (
-		<ImageUploader
-			variant="card"
-			size="md"
-			label={label}
-			required={required}
-			hint={hint ?? undefined}
-			error={error}
-			value={preview}
-			uploading={uploading}
-			crop="photo"
-			onPick={onPick}
-			onClear={onClear}
-			aspect="4 / 3"
-			previewFit="contain"
 		/>
 	);
 }

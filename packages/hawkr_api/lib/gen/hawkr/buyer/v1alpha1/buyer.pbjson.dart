@@ -155,7 +155,7 @@ const Address$json = {
     {'1': 'id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'id'},
     {
       '1': 'receiver_name',
-      '3': 3,
+      '3': 2,
       '4': 1,
       '5': 9,
       '8': {},
@@ -163,7 +163,7 @@ const Address$json = {
     },
     {
       '1': 'receiver_phone',
-      '3': 4,
+      '3': 3,
       '4': 1,
       '5': 9,
       '8': {},
@@ -171,17 +171,17 @@ const Address$json = {
     },
     {
       '1': 'postal_address',
-      '3': 12,
+      '3': 4,
       '4': 1,
       '5': 11,
       '6': '.hawkr.common.v1alpha1.PostalAddress',
       '8': {},
       '10': 'postalAddress'
     },
-    {'1': 'default_address', '3': 8, '4': 1, '5': 8, '10': 'defaultAddress'},
+    {'1': 'default_address', '3': 5, '4': 1, '5': 8, '10': 'defaultAddress'},
     {
       '1': 'create_time',
-      '3': 9,
+      '3': 6,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
@@ -190,35 +190,27 @@ const Address$json = {
     },
     {
       '1': 'update_time',
-      '3': 10,
+      '3': 7,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
       '8': {},
       '10': 'updateTime'
     },
-    {'1': 'etag', '3': 11, '4': 1, '5': 9, '10': 'etag'},
+    {'1': 'etag', '3': 8, '4': 1, '5': 9, '10': 'etag'},
   ],
-  '9': [
-    {'1': 2, '2': 3},
-    {'1': 5, '2': 6},
-    {'1': 6, '2': 7},
-    {'1': 7, '2': 8},
-  ],
-  '10': ['label', 'city', 'district', 'detail_address'],
 };
 
 /// Descriptor for `Address`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List addressDescriptor = $convert.base64Decode(
-    'CgdBZGRyZXNzEhMKAmlkGAEgASgJQgPgQQhSAmlkEigKDXJlY2VpdmVyX25hbWUYAyABKAlCA+'
-    'BBAlIMcmVjZWl2ZXJOYW1lEioKDnJlY2VpdmVyX3Bob25lGAQgASgJQgPgQQJSDXJlY2VpdmVy'
-    'UGhvbmUSUAoOcG9zdGFsX2FkZHJlc3MYDCABKAsyJC5oYXdrci5jb21tb24udjFhbHBoYTEuUG'
-    '9zdGFsQWRkcmVzc0ID4EECUg1wb3N0YWxBZGRyZXNzEicKD2RlZmF1bHRfYWRkcmVzcxgIIAEo'
-    'CFIOZGVmYXVsdEFkZHJlc3MSQAoLY3JlYXRlX3RpbWUYCSABKAsyGi5nb29nbGUucHJvdG9idW'
-    'YuVGltZXN0YW1wQgPgQQNSCmNyZWF0ZVRpbWUSQAoLdXBkYXRlX3RpbWUYCiABKAsyGi5nb29n'
-    'bGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCnVwZGF0ZVRpbWUSEgoEZXRhZxgLIAEoCVIEZX'
-    'RhZ0oECAIQA0oECAUQBkoECAYQB0oECAcQCFIFbGFiZWxSBGNpdHlSCGRpc3RyaWN0Ug5kZXRh'
-    'aWxfYWRkcmVzcw==');
+    'CgdBZGRyZXNzEhMKAmlkGAEgASgJQgPgQQhSAmlkEigKDXJlY2VpdmVyX25hbWUYAiABKAlCA+'
+    'BBAlIMcmVjZWl2ZXJOYW1lEioKDnJlY2VpdmVyX3Bob25lGAMgASgJQgPgQQJSDXJlY2VpdmVy'
+    'UGhvbmUSUAoOcG9zdGFsX2FkZHJlc3MYBCABKAsyJC5oYXdrci5jb21tb24udjFhbHBoYTEuUG'
+    '9zdGFsQWRkcmVzc0ID4EECUg1wb3N0YWxBZGRyZXNzEicKD2RlZmF1bHRfYWRkcmVzcxgFIAEo'
+    'CFIOZGVmYXVsdEFkZHJlc3MSQAoLY3JlYXRlX3RpbWUYBiABKAsyGi5nb29nbGUucHJvdG9idW'
+    'YuVGltZXN0YW1wQgPgQQNSCmNyZWF0ZVRpbWUSQAoLdXBkYXRlX3RpbWUYByABKAsyGi5nb29n'
+    'bGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCnVwZGF0ZVRpbWUSEgoEZXRhZxgIIAEoCVIEZX'
+    'RhZw==');
 
 @$core.Deprecated('Use productCardDescriptor instead')
 const ProductCard$json = {
@@ -246,10 +238,10 @@ const ProductCard$json = {
       '5': 8,
       '10': 'restockSubscribed'
     },
-    {'1': 'store_id', '3': 11, '4': 1, '5': 9, '10': 'storeId'},
+    {'1': 'store_id', '3': 10, '4': 1, '5': 9, '10': 'storeId'},
     {
       '1': 'store',
-      '3': 10,
+      '3': 11,
       '4': 1,
       '5': 11,
       '6': '.hawkr.common.v1alpha1.StoreCard',
@@ -268,7 +260,7 @@ final $typed_data.Uint8List productCardDescriptor = $convert.base64Decode(
     'aGExLkltYWdlUgVpbWFnZRIbCgltaW5fcHJpY2UYBSABKANSCG1pblByaWNlEhsKCW1heF9wcm'
     'ljZRgGIAEoA1IIbWF4UHJpY2USGwoGcmF0aW5nGAcgASgCSABSBnJhdGluZ4gBARIcCglhdmFp'
     'bGFibGUYCCABKAhSCWF2YWlsYWJsZRItChJyZXN0b2NrX3N1YnNjcmliZWQYCSABKAhSEXJlc3'
-    'RvY2tTdWJzY3JpYmVkEhkKCHN0b3JlX2lkGAsgASgJUgdzdG9yZUlkEjYKBXN0b3JlGAogASgL'
+    'RvY2tTdWJzY3JpYmVkEhkKCHN0b3JlX2lkGAogASgJUgdzdG9yZUlkEjYKBXN0b3JlGAsgASgL'
     'MiAuaGF3a3IuY29tbW9uLnYxYWxwaGExLlN0b3JlQ2FyZFIFc3RvcmVCCQoHX3JhdGluZw==');
 
 @$core.Deprecated('Use favoriteDescriptor instead')
@@ -304,10 +296,10 @@ final $typed_data.Uint8List favoriteDescriptor = $convert.base64Decode(
 const Follow$json = {
   '1': 'Follow',
   '2': [
-    {'1': 'store_id', '3': 3, '4': 1, '5': 9, '10': 'storeId'},
+    {'1': 'store_id', '3': 1, '4': 1, '5': 9, '10': 'storeId'},
     {
       '1': 'store',
-      '3': 1,
+      '3': 2,
       '4': 1,
       '5': 11,
       '6': '.hawkr.common.v1alpha1.StoreCard',
@@ -315,7 +307,7 @@ const Follow$json = {
     },
     {
       '1': 'create_time',
-      '3': 2,
+      '3': 3,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
@@ -326,8 +318,8 @@ const Follow$json = {
 
 /// Descriptor for `Follow`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List followDescriptor = $convert.base64Decode(
-    'CgZGb2xsb3cSGQoIc3RvcmVfaWQYAyABKAlSB3N0b3JlSWQSNgoFc3RvcmUYASABKAsyIC5oYX'
-    'drci5jb21tb24udjFhbHBoYTEuU3RvcmVDYXJkUgVzdG9yZRI7CgtjcmVhdGVfdGltZRgCIAEo'
+    'CgZGb2xsb3cSGQoIc3RvcmVfaWQYASABKAlSB3N0b3JlSWQSNgoFc3RvcmUYAiABKAsyIC5oYX'
+    'drci5jb21tb24udjFhbHBoYTEuU3RvcmVDYXJkUgVzdG9yZRI7CgtjcmVhdGVfdGltZRgDIAEo'
     'CzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBSCmNyZWF0ZVRpbWU=');
 
 @$core.Deprecated('Use visitDescriptor instead')
@@ -392,25 +384,25 @@ final $typed_data.Uint8List restockSubscriptionDescriptor = $convert.base64Decod
 const MemberCard$json = {
   '1': 'MemberCard',
   '2': [
-    {'1': 'store_id', '3': 4, '4': 1, '5': 9, '10': 'storeId'},
+    {'1': 'store_id', '3': 1, '4': 1, '5': 9, '10': 'storeId'},
     {
       '1': 'store',
-      '3': 1,
+      '3': 2,
       '4': 1,
       '5': 11,
       '6': '.hawkr.common.v1alpha1.StoreCard',
       '10': 'store'
     },
-    {'1': 'total_spent', '3': 2, '4': 1, '5': 3, '10': 'totalSpent'},
-    {'1': 'vip', '3': 3, '4': 1, '5': 8, '10': 'vip'},
+    {'1': 'total_spent', '3': 3, '4': 1, '5': 3, '10': 'totalSpent'},
+    {'1': 'vip', '3': 4, '4': 1, '5': 8, '10': 'vip'},
   ],
 };
 
 /// Descriptor for `MemberCard`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List memberCardDescriptor = $convert.base64Decode(
-    'CgpNZW1iZXJDYXJkEhkKCHN0b3JlX2lkGAQgASgJUgdzdG9yZUlkEjYKBXN0b3JlGAEgASgLMi'
+    'CgpNZW1iZXJDYXJkEhkKCHN0b3JlX2lkGAEgASgJUgdzdG9yZUlkEjYKBXN0b3JlGAIgASgLMi'
     'AuaGF3a3IuY29tbW9uLnYxYWxwaGExLlN0b3JlQ2FyZFIFc3RvcmUSHwoLdG90YWxfc3BlbnQY'
-    'AiABKANSCnRvdGFsU3BlbnQSEAoDdmlwGAMgASgIUgN2aXA=');
+    'AyABKANSCnRvdGFsU3BlbnQSEAoDdmlwGAQgASgIUgN2aXA=');
 
 @$core.Deprecated('Use spendingRecordDescriptor instead')
 const SpendingRecord$json = {

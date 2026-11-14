@@ -180,39 +180,25 @@ type SellerGovernanceNote struct {
 	CreatedAt    time.Time
 }
 
+type SellerIdentityEffectMeasure struct {
+	ID        uuid.UUID
+	AccountID int64
+}
+
 type SellerKycApplication struct {
 	ApplicationID        uuid.UUID
 	StoreID              int64
 	Status               string
 	Version              int64
 	SellerType           string
-	RealName             *string
-	BirthDate            *time.Time
-	IDCardNoEnc          []byte
-	IDCardHash           []byte
-	IDCardHashKey        *string
-	IDCardIssueDate      *time.Time
-	IDCardIssueType      *string
-	IDCardIssueLocation  *string
-	EnglishName          *string
-	BankName             *string
-	BankCode             *string
-	BankAccountEnc       []byte
-	BankAccountHash      []byte
-	BankAccountHashKey   *string
 	ProductType          *string
 	WebsiteUrl           *string
 	CompanyName          *string
 	TaxID                *string
-	TaxIDHash            []byte
-	TaxIDHashKey         *string
 	CompanyRegisterDate  *time.Time
 	CompanyTownCode      *string
 	CompanyAddressDetail *string
 	CompanyPhone         *string
-	RepIDCardNoEnc       []byte
-	RepIDCardHash        []byte
-	RepIDCardHashKey     *string
 	SubmittedAt          *time.Time
 	SubmissionSeq        int64
 	DecidedAt            *time.Time
@@ -223,7 +209,6 @@ type SellerKycApplication struct {
 
 type SellerKycDocument struct {
 	ApplicationID uuid.UUID
-	Slot          string
 	Position      int32
 	AssetID       string
 	ObjectKey     string
@@ -232,18 +217,10 @@ type SellerKycDocument struct {
 type SellerKycDocumentAccess struct {
 	AccessID      uuid.UUID
 	ApplicationID uuid.UUID
-	RevealID      uuid.UUID
-	Slot          string
 	Position      int32
 	AssetID       string
+	AdminID       int64
 	AccessedAt    time.Time
-}
-
-type SellerKycIdentityHash struct {
-	ApplicationID uuid.UUID
-	Field         string
-	KeyID         string
-	Hash          []byte
 }
 
 type SellerKycRegistrationCheck struct {
@@ -270,15 +247,6 @@ type SellerKycRegistrationCheck struct {
 	SuspendedUntil     *time.Time
 	MismatchedFields   []string
 	UnverifiableFields []string
-}
-
-type SellerKycReveal struct {
-	RevealID      uuid.UUID
-	ApplicationID uuid.UUID
-	AdminID       int64
-	Reason        string
-	RevealedAt    time.Time
-	ExpiresAt     time.Time
 }
 
 type SellerKycReview struct {
@@ -350,6 +318,13 @@ type SellerMeasureIdentity struct {
 	Hash      []byte
 }
 
+type SellerMeasureLinkedReview struct {
+	MeasureID         uuid.UUID
+	AccountID         int64
+	ReviewedAt        time.Time
+	ReviewedByAdminID int64
+}
+
 type SellerMeasureRequest struct {
 	ID               uuid.UUID
 	MeasureID        uuid.UUID
@@ -390,48 +365,11 @@ type SellerMediaRefSync struct {
 	UpdatedAt time.Time
 }
 
-type SellerPayuniObservation struct {
-	ObservationID   uuid.UUID
+type SellerPayoutCapability struct {
 	StoreID         int64
-	Source          string
-	EventKey        *string
-	MerStatus       *string
-	MemberStatus    *string
-	CreditStatus    *string
-	ApplepayStatus  *string
-	GooglepayStatus *string
-	AtmStatus       *string
-	Reason          *string
-	ExecutedAt      time.Time
-	ReceivedAt      time.Time
-}
-
-type SellerPayuniRegistration struct {
-	StoreID          int64
-	MerID            string
-	ApplicationID    uuid.UUID
-	BindStatus       string
-	BindErrorCode    *string
-	BindFailedAt     *time.Time
-	BindAttempts     int32
-	BoundAt          *time.Time
-	IntentSeq        int64
-	SyncedSeq        int64
-	SyncErrorCode    *string
-	ResubmittedAt    *time.Time
-	MerStatus        *string
-	MemberStatus     *string
-	CreditStatus     *string
-	ApplepayStatus   *string
-	GooglepayStatus  *string
-	AtmStatus        *string
-	Reason           *string
-	Outcome          string
-	StatusObservedAt *time.Time
-	StatusCheckedAt  *time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	PiiPurgedAt      *time.Time
+	Provider        string
+	TransfersActive bool
+	UpdatedAt       time.Time
 }
 
 type SellerProductViewEvent struct {
@@ -621,10 +559,12 @@ type SellerStoreRequirementFlag struct {
 	AccountID          int64
 	Active             bool
 	NotPendingDeletion bool
-	KycApproved        bool
+	OnboardingComplete *bool
 	HasStoreName       bool
 	HasLogo            bool
 	HasTownCode        bool
+	KycApproved        bool
+	TransfersActive    bool
 }
 
 type SellerSuspensionPeriod struct {

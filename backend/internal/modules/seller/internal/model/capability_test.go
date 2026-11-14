@@ -21,19 +21,19 @@ var (
 // status 決定，KYC 由 kyc 決定，店名、logo 與鄉鎮市區都有。
 func conditionsOf(status Status, kyc bool) Conditions {
 	return Conditions{
-		Derived: true, Active: status != Closed, NotPendingDeletion: status != PendingDeletion, KYCApproved: kyc,
+		Derived: true, Active: status != Closed, NotPendingDeletion: status != PendingDeletion, KYCApproved: kyc, TransfersActive: kyc,
 		StoreName: true, Logo: true, TownCode: true,
 	}
 }
 
-// fullStore 是公開曝光條件除了生命週期與停權之外都滿足（含 KYC 核准）的店家。
+// fullStore 是公開曝光條件除了生命週期與停權之外都滿足（含開通閘門）的店家。
 func fullStore(status Status, suspended bool) Store {
 	return Store{Status: status, Sanctions: sanctionsOf(suspended), Conditions: conditionsOf(status, true)}
 }
 
-// withoutKYC 是同一個店家、KYC 流程沒有核准。
+// withoutKYC 是同一個店家、收款帳戶的轉帳能力沒有啟用（開通閘門未通過）。
 func withoutKYC(s Store) Store {
-	s.Conditions.KYCApproved = false
+	s.Conditions.TransfersActive = false
 	return s
 }
 
@@ -76,7 +76,7 @@ func TestCapabilitiesOfReportsEveryCapabilityConsistently(t *testing.T) {
 }
 
 // 店家營運中：動作類能力都啟用，物流建店要 KYC 核准。
-func TestCapabilitiesOfShippingSetupNeedsAnApprovedKYCFlow(t *testing.T) {
+func TestCapabilitiesOfShippingSetupNeedsAnApprovedKYC(t *testing.T) {
 	for _, kyc := range []bool{true, false} {
 		s := fullStore(Active, false)
 		if !kyc {
@@ -86,7 +86,7 @@ func TestCapabilitiesOfShippingSetupNeedsAnApprovedKYCFlow(t *testing.T) {
 		for _, c := range Capabilities() {
 			st := statusOf(t, got, c)
 			if c == CapShippingSetup && !kyc {
-				if st.Active || !slices.Equal(st.Missing, []Requirement{RequirementKYCApproved}) {
+				if st.Active || !slices.Equal(st.Missing, []Requirement{RequirementOnboardingComplete}) {
 					t.Fatalf("shipping setup without KYC = %+v", st)
 				}
 				continue
@@ -115,7 +115,7 @@ func TestCapabilitiesOfSuspendedKeepsOnlyTheWhitelist(t *testing.T) {
 				t.Fatalf("%s missing=%v", c, st.Missing)
 			}
 		}
-		if st := statusOf(t, CapabilitiesOf(withoutKYC(s)), CapShippingSetup); !slices.Equal(st.Missing, []Requirement{RequirementNotSuspended, RequirementKYCApproved}) {
+		if st := statusOf(t, CapabilitiesOf(withoutKYC(s)), CapShippingSetup); !slices.Equal(st.Missing, []Requirement{RequirementNotSuspended, RequirementOnboardingComplete}) {
 			t.Fatalf("unapproved shipping setup missing=%v", st.Missing)
 		}
 	}
@@ -135,7 +135,7 @@ func TestCapabilitiesOfPendingDeletionWithholdsBusinessCapabilitiesAndClose(t *t
 			t.Fatalf("%s = %+v", c, st)
 		}
 	}
-	if st := statusOf(t, CapabilitiesOf(withoutKYC(s)), CapShippingSetup); !slices.Equal(st.Missing, []Requirement{RequirementKYCApproved, RequirementNotPendingDeletion}) {
+	if st := statusOf(t, CapabilitiesOf(withoutKYC(s)), CapShippingSetup); !slices.Equal(st.Missing, []Requirement{RequirementOnboardingComplete, RequirementNotPendingDeletion}) {
 		t.Fatalf("unapproved shipping setup missing=%v", st.Missing)
 	}
 	both := ActiveCapabilities(CapabilitiesOf(fullStore(PendingDeletion, true)))
@@ -240,8 +240,8 @@ func TestAuthorizeDenialsCarryTheirReason(t *testing.T) {
 	}{
 		{"pending deletion", fullStore(PendingDeletion, false), CapStorefrontWrite, "NOT_PENDING_DELETION"},
 		{"pending deletion close", fullStore(PendingDeletion, false), CapAccountClose, "NOT_PENDING_DELETION"},
-		{"shipping without KYC", withoutKYC(fullStore(Active, false)), CapShippingSetup, "KYC_APPROVED"},
-		{"shipping, pending deletion, without KYC", withoutKYC(fullStore(PendingDeletion, false)), CapShippingSetup, "KYC_APPROVED,NOT_PENDING_DELETION"},
+		{"shipping without KYC", withoutKYC(fullStore(Active, false)), CapShippingSetup, "ONBOARDING_COMPLETE"},
+		{"shipping, pending deletion, without KYC", withoutKYC(fullStore(PendingDeletion, false)), CapShippingSetup, "ONBOARDING_COMPLETE,NOT_PENDING_DELETION"},
 		{"shipping, pending deletion, with KYC", fullStore(PendingDeletion, false), CapShippingSetup, "NOT_PENDING_DELETION"},
 	}
 	for _, tc := range cases {
@@ -286,8 +286,8 @@ func TestNeedsTableDerivesTheWhitelistAndKYCDependency(t *testing.T) {
 		t.Fatalf("whitelist=%v want %v", got, want)
 	}
 	for _, c := range AllCapabilities() {
-		if want, got := c == CapShippingSetup || c == CapPublicListing, slices.Contains(Needs(c), RequirementKYCApproved); got != want {
-			t.Errorf("%s needs KYC_APPROVED=%v", c, got)
+		if want, got := c == CapShippingSetup || c == CapPublicListing, slices.Contains(Needs(c), RequirementOnboardingComplete); got != want {
+			t.Errorf("%s needs ONBOARDING_COMPLETE=%v", c, got)
 		}
 		if len(Needs(c)) == 0 || Needs(c)[0] != RequirementActive {
 			t.Errorf("%s needs %v: every capability needs STORE_ACTIVE", c, Needs(c))

@@ -1,155 +1,85 @@
 package kyc
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"time"
-	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 )
 
-// 比對 hash 的欄位名（kyc_identity_hashes.field）：身分證號、企業負責人身分證號、統編、銀行帳號。
-const (
-	fieldIDCard    = "ID_CARD_NO"
-	fieldRepIDCard = "REP_ID_CARD_NO"
-	fieldTaxID     = "TAX_ID"
-	fieldBank      = "BANK_ACCOUNT"
-)
+// 防詐保存的比對 hash 的欄位名（account_identity_hashes.field）：申請的統編（Stripe 計畫 D42：申請沒有自己的 hash 表，身分證號、負責人身分證號與
+// 平台自收的銀行帳號三個舊種類已刪，D38）。
+const fieldTaxID = "TAX_ID"
 
-var hashFields = []string{fieldIDCard, fieldRepIDCard, fieldTaxID, fieldBank}
+// fieldBankFingerprint 是 provider 回報的外部銀行帳號 fingerprint 的 blind index（來源是 provider 不是申請）。
+// 申請的草稿同步、修剪與補算都只處理統編，不能動到它。
+const fieldBankFingerprint = "BANK_FINGERPRINT"
 
-// LinkedField 把比對 hash 的欄位對到關聯帳號命中的身分種類。
+// linkedIdentityOf 把防詐保存的欄位對到關聯帳號命中的身分種類。
 func linkedIdentityOf(field string) (model.LinkedIdentity, bool) {
 	switch field {
-	case fieldIDCard:
-		return model.LinkedNationalID, true
-	case fieldRepIDCard:
-		return model.LinkedResponsiblePersonID, true
 	case fieldTaxID:
 		return model.LinkedUBN, true
-	case fieldBank:
+	case fieldBankFingerprint:
 		return model.LinkedBankAccount, true
 	}
 	return "", false
 }
 
-// storedHash 是申請上這個欄位寫入當下第一把金鑰的 hash 與金鑰 ID，沒有值時是 nil。
-func storedHash(row store.SellerKycApplication, field string) ([]byte, *string) {
-	switch field {
-	case fieldIDCard:
-		return row.IDCardHash, row.IDCardHashKey
-	case fieldRepIDCard:
-		return row.RepIDCardHash, row.RepIDCardHashKey
-	case fieldTaxID:
-		return row.TaxIDHash, row.TaxIDHashKey
-	default:
-		return row.BankAccountHash, row.BankAccountHashKey
+// writeHashes 把申請的統編以金鑰環每一把金鑰算的 blind index 寫進防詐保存的 account_identity_hashes（已存在的略過）：寫入只有這一個呼叫點。
+// account_identity_hashes 不隨個資清理刪除（過期由清理 job 刪，ADR 的 2026-10-30 修訂）。申請沒有統編時什麼都不寫。
+func (p protector) writeHashes(ctx context.Context, q *store.Queries, row store.SellerKycApplication, now time.Time) error {
+	if row.TaxID == nil {
+		return nil
 	}
+	for _, h := range p.mac.SumAll(taxInput(*row.TaxID)) {
+		if err := q.InsertAccountIdentityHash(ctx, store.InsertAccountIdentityHashParams{
+			StoreID: row.StoreID, Field: fieldTaxID, KeyID: h.KeyID, Hash: h.Sum, CreatedAt: now,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func sameStoredHash(a, b store.SellerKycApplication, field string) bool {
-	ha, ka := storedHash(a, field)
-	hb, kb := storedHash(b, field)
-	if (ka == nil) != (kb == nil) {
-		return false
+// syncHashes 在寫入申請的同一個 transaction 內讓防詐保存的統編 hash 與申請一致：跟寫入前的列（before，新建時是 nil）比，統編的明文有變才修剪並重寫
+// （修剪只刪這個 stint 已沒有任何申請持有的值，草稿裡改掉的值不是送出的事實，不保存），沒動就什麼都不做。
+func (p protector) syncHashes(ctx context.Context, q *store.Queries, before *store.SellerKycApplication, after store.SellerKycApplication, now time.Time) error {
+	if before != nil && model.Deref(before.TaxID) == model.Deref(after.TaxID) {
+		return nil
 	}
-	return bytes.Equal(ha, hb) && (ka == nil || *ka == *kb)
-}
-
-// hashInput 是這個欄位的 blind index 輸入（需要解密的欄位在這裡解密）；欄位沒有值時 ok 為 false。
-func (p protector) hashInput(row store.SellerKycApplication, field string) (input []byte, ok bool, err error) {
-	switch field {
-	case fieldIDCard:
-		id, err := p.open(row.ApplicationID, colIDCardNo, row.IDCardNoEnc)
-		if err != nil || id == nil {
-			return nil, false, err
-		}
-		return idInput(*id), true, nil
-	case fieldRepIDCard:
-		id, err := p.open(row.ApplicationID, colRepIDCardNo, row.RepIDCardNoEnc)
-		if err != nil || id == nil {
-			return nil, false, err
-		}
-		return idInput(*id), true, nil
-	case fieldTaxID:
-		if row.TaxID == nil {
-			return nil, false, nil
-		}
-		return taxInput(*row.TaxID), true, nil
-	default:
-		if row.BankCode == nil {
-			return nil, false, nil
-		}
-		account, err := p.open(row.ApplicationID, colBankAccount, row.BankAccountEnc)
-		if err != nil || account == nil {
-			return nil, false, err
-		}
-		return bankInput(*row.BankCode, *account), true, nil
-	}
-}
-
-// writeHashes 把這個欄位金鑰環每一把金鑰算的 blind index 寫進 kyc_identity_hashes 與防詐保存的 account_identity_hashes（同一個 transaction、已存在的略過）：
-// 兩張表的寫入只有這一個呼叫點，所以不會只寫一邊。account_identity_hashes 不隨個資清理刪除（過期由清理 job 刪，ADR 的 2026-10-30 修訂）。
-func (p protector) writeHashes(ctx context.Context, q *store.Queries, row store.SellerKycApplication, field string, now time.Time) error {
-	input, ok, err := p.hashInput(row, field)
-	if err != nil || !ok {
+	held, err := q.StoreKYCTaxIDs(ctx, after.StoreID)
+	if err != nil {
 		return err
 	}
-	for _, h := range p.mac.SumAll(input) {
-		if err := q.InsertKYCIdentityHash(ctx, store.InsertKYCIdentityHashParams{
-			ApplicationID: row.ApplicationID, Field: field, KeyID: h.KeyID, Hash: h.Sum,
-		}); err != nil {
-			return err
-		}
-		if err := q.InsertAccountIdentityHash(ctx, store.InsertAccountIdentityHashParams{
-			StoreID: row.StoreID, Field: field, KeyID: h.KeyID, Hash: h.Sum, CreatedAt: now,
-		}); err != nil {
-			return err
-		}
+	keep := [][]byte{}
+	for _, taxID := range held {
+		keep = append(keep, p.hashes(taxInput(taxID))...)
 	}
-	return nil
-}
-
-// syncHashes 在寫入申請的同一個 transaction 內讓 kyc_identity_hashes 與申請的識別欄位一致：跟寫入前的列（before，新建時是 nil）比，
-// 欄位的值有變（hash 不同）才刪掉重寫，沒動的欄位不解密也不寫。
-func (p protector) syncHashes(ctx context.Context, q *store.Queries, before *store.SellerKycApplication, after store.SellerKycApplication, now time.Time) error {
-	for _, field := range hashFields {
-		if before != nil && sameStoredHash(*before, after, field) {
-			continue
-		}
-		if err := q.DeleteKYCIdentityHashes(ctx, store.DeleteKYCIdentityHashesParams{ApplicationID: after.ApplicationID, Field: field}); err != nil {
-			return err
-		}
-		// 防詐保存的列同步修剪：只刪這個 stint 已沒有任何申請持有的值，再寫入新值。
-		if err := q.PruneAccountIdentityHashes(ctx, store.PruneAccountIdentityHashesParams{StoreID: after.StoreID, Field: field}); err != nil {
-			return err
-		}
-		if err := p.writeHashes(ctx, q, after, field, now); err != nil {
-			return err
-		}
+	if err := q.PruneAccountIdentityHashes(ctx, store.PruneAccountIdentityHashesParams{StoreID: after.StoreID, Keep: keep}); err != nil {
+		return err
 	}
-	return nil
+	return p.writeHashes(ctx, q, after, now)
 }
 
 // rehashBatch 是補算一批的申請數。
 const rehashBatch = 100
 
-// RehashIdentities 補算金鑰環每一把金鑰的比對 hash（輪替之後新增的金鑰，既有申請還沒有它的列）：只解密缺列的申請，鎖住申請列（與草稿寫入互斥，
+// RehashIdentities 補算金鑰環每一把金鑰的統編比對 hash（輪替之後新增的金鑰，既有申請還沒有它的列）：只讀缺列的店家的申請（統編取自申請的明文欄位，同一店家的申請在同一個 transaction 內補完），鎖住申請列（與草稿寫入互斥，
 // 不會把剛被改掉的欄位的舊值寫回去）。已經齊全的申請不會被讀到，所以沒有輪替時什麼都不做。回傳補算的申請數；啟動時呼叫，可重複執行。
 func (s *Service) RehashIdentities(ctx context.Context) (int, error) {
 	total := 0
 	for _, keyID := range s.p.mac.IDs() {
-		var after *uuid.UUID
+		var after *int64
 		for {
-			n, last, err := s.rehashBatchFor(ctx, keyID, after)
+			n, stores, last, err := s.rehashBatchFor(ctx, keyID, after)
 			if err != nil {
 				return total, err
 			}
 			total += n
-			if n < rehashBatch {
+			if stores < rehashBatch {
 				break
 			}
 			after = &last
@@ -158,27 +88,25 @@ func (s *Service) RehashIdentities(ctx context.Context) (int, error) {
 	return total, nil
 }
 
-func (s *Service) rehashBatchFor(ctx context.Context, keyID string, after *uuid.UUID) (int, uuid.UUID, error) {
-	var count int
-	var last uuid.UUID
-	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+// rehashBatchFor 補一批店家（至多 rehashBatch 個）：店家的申請在同一個 transaction 內全部補完，回傳補算的申請數、店家數與最後一個店家。
+func (s *Service) rehashBatchFor(ctx context.Context, keyID string, after *int64) (applications, stores int, last int64, err error) {
+	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		now := s.d.Now().UTC()
 		q := store.New(s.d.DB.Conn(ctx))
-		params := store.KYCApplicationsMissingHashKeyParams{KeyID: keyID, AfterID: after, BatchLimit: rehashBatch}
-		rows, err := q.KYCApplicationsMissingHashKey(ctx, params)
+		rows, err := q.KYCApplicationsMissingHashKey(ctx, store.KYCApplicationsMissingHashKeyParams{KeyID: keyID, AfterStoreID: after, BatchLimit: rehashBatch})
 		if err != nil {
 			return err
 		}
+		seen := map[int64]bool{}
 		for _, row := range rows {
-			for _, field := range hashFields {
-				if err := s.p.writeHashes(ctx, q, row, field, now); err != nil {
-					return fmt.Errorf("seller：補算申請 %s 的 %s 比對 hash：%w", row.ApplicationID, field, err)
-				}
+			if err := s.p.writeHashes(ctx, q, row, now); err != nil {
+				return fmt.Errorf("seller：補算申請 %s 的統編比對 hash：%w", row.ApplicationID, err)
 			}
-			last = row.ApplicationID
+			seen[row.StoreID] = true
+			last = max(last, row.StoreID)
 		}
-		count = len(rows)
+		applications, stores = len(rows), len(seen)
 		return nil
 	})
-	return count, last, err
+	return applications, stores, last, err
 }

@@ -100,7 +100,7 @@ func (s *Service) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &reconcileWorker{service: s})
 }
 
-// PeriodicJobs 回傳啟動即執行、每 15 分鐘的排程。放在 profile 而不是處分的對帳：可曝光的輸入不只處分（KYC、PayUni、店名、logo
+// PeriodicJobs 回傳啟動即執行、每 15 分鐘的排程。放在 profile 而不是處分的對帳：可曝光的輸入不只處分（KYC、收款帳戶、店名、logo
 // 都是），對帳要掃全部未關閉的店；15 分鐘讓處分到期與下游隱藏商品之間的空窗很短。
 func (s *Service) PeriodicJobs() []*river.PeriodicJob {
 	return []*river.PeriodicJob{

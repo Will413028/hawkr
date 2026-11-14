@@ -54,6 +54,7 @@ const SELLER_SURFACE_PREFIXES = [
 	"/seller",
 	"/seller-center",
 	"/seller-product-import-preview",
+	"/seller-app",
 ] as const;
 
 function underPrefix(pathname: string, prefix: string): boolean {

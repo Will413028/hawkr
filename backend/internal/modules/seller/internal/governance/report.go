@@ -3,7 +3,6 @@ package governance
 import (
 	"context"
 	"errors"
-	"net/mail"
 	"slices"
 	"strings"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/emailaddr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/phone"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
@@ -70,8 +70,8 @@ func validateSubmit(in *model.SubmitReportInput) (store.InsertReportParams, erro
 		params.ReporterPhone = &normalized
 	}
 	if e := model.Text(in.Email); e != nil {
-		normalized := strings.ToLower(*e)
-		if address, err := mail.ParseAddress(normalized); err != nil || address.Address != normalized || len(normalized) > 254 {
+		normalized, ok := emailaddr.Normalize(*e)
+		if !ok {
 			return params, apperr.InvalidInputOn([]string{"Email"}, "email 格式不正確")
 		}
 		params.ReporterEmail = &normalized

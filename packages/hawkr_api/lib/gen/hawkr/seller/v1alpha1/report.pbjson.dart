@@ -57,10 +57,10 @@ const MyReport$json = {
       '10': 'category'
     },
     {'1': 'description', '3': 6, '4': 1, '5': 9, '10': 'description'},
-    {'1': 'resolution_note', '3': 8, '4': 1, '5': 9, '10': 'resolutionNote'},
+    {'1': 'resolution_note', '3': 7, '4': 1, '5': 9, '10': 'resolutionNote'},
     {
       '1': 'create_time',
-      '3': 9,
+      '3': 8,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
@@ -68,7 +68,7 @@ const MyReport$json = {
     },
     {
       '1': 'resolve_time',
-      '3': 10,
+      '3': 9,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
@@ -76,7 +76,7 @@ const MyReport$json = {
     },
     {
       '1': 'outcome',
-      '3': 11,
+      '3': 10,
       '4': 1,
       '5': 14,
       '6': '.hawkr.seller.v1alpha1.ReportOutcome',
@@ -84,10 +84,6 @@ const MyReport$json = {
       '10': 'outcome'
     },
   ],
-  '9': [
-    {'1': 7, '2': 8},
-  ],
-  '10': ['status'],
 };
 
 /// Descriptor for `MyReport`. Decode as a `google.protobuf.DescriptorProto`.
@@ -96,11 +92,11 @@ final $typed_data.Uint8List myReportDescriptor = $convert.base64Decode(
     'VJZBIdCgpwcm9kdWN0X2lkGAMgASgJUglwcm9kdWN0SWQSGQoIb3JkZXJfbm8YBCABKAlSB29y'
     'ZGVyTm8SQQoIY2F0ZWdvcnkYBSABKA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2'
     'F0ZWdvcnlSCGNhdGVnb3J5EiAKC2Rlc2NyaXB0aW9uGAYgASgJUgtkZXNjcmlwdGlvbhInCg9y'
-    'ZXNvbHV0aW9uX25vdGUYCCABKAlSDnJlc29sdXRpb25Ob3RlEjsKC2NyZWF0ZV90aW1lGAkgAS'
+    'ZXNvbHV0aW9uX25vdGUYByABKAlSDnJlc29sdXRpb25Ob3RlEjsKC2NyZWF0ZV90aW1lGAggAS'
     'gLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcFIKY3JlYXRlVGltZRI9CgxyZXNvbHZlX3Rp'
-    'bWUYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wUgtyZXNvbHZlVGltZRJDCgdvdX'
-    'Rjb21lGAsgASgOMiQuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcG9ydE91dGNvbWVCA+BBA1IH'
-    'b3V0Y29tZUoECAcQCFIGc3RhdHVz');
+    'bWUYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wUgtyZXNvbHZlVGltZRJDCgdvdX'
+    'Rjb21lGAogASgOMiQuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcG9ydE91dGNvbWVCA+BBA1IH'
+    'b3V0Y29tZQ==');
 
 @$core.Deprecated('Use createReportRequestDescriptor instead')
 const CreateReportRequest$json = {

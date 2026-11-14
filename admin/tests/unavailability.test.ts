@@ -38,12 +38,7 @@ test("結構性集合恰好是契約註解標明「表示沒有入口」的值�
 	}
 	assert.deepEqual(
 		fromContract.sort(),
-		[
-			"KYC_NOT_BUSINESS",
-			"KYC_NOT_SUBMITTED",
-			"PAYUNI_BIND_IN_PROGRESS",
-			"PAYUNI_BOUND",
-		],
+		["KYC_NOT_BUSINESS", "KYC_NOT_SUBMITTED"],
 		"契約的註解變了：先決定新值是否有入口",
 	);
 	assert.deepEqual(
@@ -55,19 +50,19 @@ test("結構性集合恰好是契約註解標明「表示沒有入口」的值�
 
 test("第一個原因是結構性的才是沒有入口：依先後判斷，後面的結構性原因不算", () => {
 	assert.equal(firstIsStructural([]), false);
-	assert.equal(firstIsStructural([why(U.PAYUNI_BOUND)]), true);
+	assert.equal(firstIsStructural([why(U.KYC_NOT_SUBMITTED)]), true);
 	assert.equal(
 		firstIsStructural([
 			why(U.STORE_CLOSED, "店家已關閉。"),
-			why(U.PAYUNI_BOUND),
+			why(U.KYC_NOT_SUBMITTED),
 		]),
 		false,
 	);
 	assert.equal(firstIsStructural([why(U.UNSPECIFIED)]), false);
 });
 
-test("結構性原因不顯示任何句子，也不顯示通用文字（PAYUNI_BIND_IN_PROGRESS 沒有 message）", () => {
-	assert.equal(firstVisibleLabel([why(U.PAYUNI_BIND_IN_PROGRESS)]), undefined);
+test("結構性原因不顯示任何句子，也不顯示通用文字（KYC_NOT_SUBMITTED 沒有入口）", () => {
+	assert.equal(firstVisibleLabel([why(U.KYC_NOT_SUBMITTED)]), undefined);
 	assert.equal(
 		firstVisibleLabel([
 			why(U.KYC_NOT_SUBMITTED, "只有審核中的申請能核准或退回。"),

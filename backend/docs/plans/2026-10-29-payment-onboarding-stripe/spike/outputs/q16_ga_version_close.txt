@@ -1,0 +1,23 @@
+=== dashboard=express version=2026-10-28.endive
+create 200 {'payouts': 'restricted', 'stripe_transfers': 'restricted'}
+account_link 200 ['account', 'created', 'expires_at', 'livemode', 'object', 'url', 'use_case']
+retrieve 200 {'caps': {'payouts': 'restricted', 'stripe_transfers': 'restricted'}, 'requirements_keys': ['alternatives', 'entries', 'summary'], 'closed': False}
+v1 account_sessions 200 ['account', 'client_secret', 'components', 'expires_at', 'livemode', 'object', 'read_only']
+v1 external_accounts 200 {'object': 'list', 'count': 0}
+close without applied_configurations 400 {'code': 'configs_must_match_to_close', 'message': 'You must correctly specify the applied configurations on the account in order to close it. '}
+close 200 {'closed': True, 'applied_configurations': ['recipient']}
+close again 403 {'code': 'forbidden', 'message': 'Permission denied. API Key does not have permission to access account acct_1U**********JBEf. To make an authorized request, make sure that the API Key making the request has the correct permissions for the resource in the API call. In some cases, you may also need to supply an Account ID in the Stripe-Context header.'}
+retrieve after close 200 {'closed': True, 'caps': {}}
+account_link after close 403 {'code': 'forbidden', 'message': 'Permission denied. API Key does not have permission to access account acct_1U**********JBEf. To make an authorized request, make sure that the API Key making the request has the correct permissions for the resource in the API call. In some cases, you may also need to supply an Account ID in the Stripe-Context header.'}
+=== dashboard=none version=2026-10-28.endive
+create 200 {'payouts': 'restricted', 'stripe_transfers': 'restricted'}
+account_link 200 ['account', 'created', 'expires_at', 'livemode', 'object', 'url', 'use_case']
+retrieve 200 {'caps': {'payouts': 'restricted', 'stripe_transfers': 'restricted'}, 'requirements_keys': ['alternatives', 'entries', 'summary'], 'closed': False}
+v1 account_sessions 200 ['account', 'client_secret', 'components', 'expires_at', 'livemode', 'object', 'read_only']
+v1 external_accounts 200 {'object': 'list', 'count': 0}
+close without applied_configurations 400 {'code': 'configs_must_match_to_close', 'message': 'You must correctly specify the applied configurations on the account in order to close it. '}
+close 200 {'closed': True, 'applied_configurations': ['recipient']}
+close again 403 {'code': 'forbidden', 'message': 'Permission denied. API Key does not have permission to access account acct_1U**********nMGL. To make an authorized request, make sure that the API Key making the request has the correct permissions for the resource in the API call. In some cases, you may also need to supply an Account ID in the Stripe-Context header.'}
+retrieve after close 200 {'closed': True, 'caps': {}}
+account_link after close 403 {'code': 'forbidden', 'message': 'Permission denied. API Key does not have permission to access account acct_1U**********nMGL. To make an authorized request, make sure that the API Key making the request has the correct permissions for the resource in the API call. In some cases, you may also need to supply an Account ID in the Stripe-Context header.'}
+close unknown id 400 {'code': 'invalid_fields', 'message': "Some fields in the request were invalid: 'id: Provided account id acct_doesnotexist000 must be valid.'"}

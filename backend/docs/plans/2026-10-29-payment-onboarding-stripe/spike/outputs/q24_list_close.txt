@@ -1,0 +1,16 @@
+Q24 create shell 200 applied= []
+Q24 second shell same store_id 200
+close second shell [] 200 True
+list (default) pages=1 {"shell": {"metadata": {"store_id": "q24-d1c688a1"}, "closed": false, "applied": [], "keys": ["applied_configurations", "closed", "configuration", "contact_email", "contact_phone", "created", "dashboard", "defaults", "display_name", "future_requirements", "id", "identity", "livemode", "metadata", "object", "requirements"]}}
+list&closed=true pages=2 {"closed": {"metadata": null, "closed": true, "applied": [], "keys": ["applied_configurations", "closed", "configuration", "contact_email", "contact_phone", "created", "dashboard", "defaults", "display_name", "future_requirements", "id", "identity", "livemode", "metadata", "object", "requirements"]}}
+list&applied_configurations=recipient pages=1 {}
+Q25 close shell ['recipient']
+  400 {'type': None, 'code': 'configs_must_match_to_close', 'message': 'You must correctly specify the applied configurations on the account in order to close it. '}
+  retrieve applied= []
+  close {} (omitted) 400 {'type': None, 'code': 'configs_must_match_to_close', 'message': 'You must correctly specify the applied configurations on the account in order to close it. '}
+  close [] 200 True
+Q26 balance then close
+ create recipient 200 
+ platform charge 400 None
+ transfer 400 insufficient_capabilities_for_transfer Your destination account needs to have at least one of the following capabilities enabled: transfers, crypto_transfers, or legacy_payments. Or, if you use the /v2/core/accounts API, your destination account needs to have the configurations.recipient.capabilities.stripe_balance.stripe_transfers capability enabled.
+ close with balance 200 True

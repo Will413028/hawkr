@@ -16,6 +16,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/auditreason"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/emailaddr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
@@ -63,6 +64,73 @@ func (m *Service) Accounts(ctx context.Context, ids []int64) ([]model.Account, e
 		}
 	}
 	return out, nil
+}
+
+// ContactEmail 回傳帳號的聯絡信箱（正規化後的值）：通過 emailaddr.Normalize 的已驗證 email 優先，沒有（不存在或格式不合）才用自填的；
+// 兩者都沒有（含已刪除的墓碑）時 ok 是 false。
+// 帳號不存在回 NotFound。在呼叫方的 transaction 內呼叫時讀同一個 transaction 的狀態。
+func (m *Service) ContactEmail(ctx context.Context, accountID int64) (model.ContactEmail, bool, error) {
+	r, err := m.q(ctx).GetAccount(ctx, accountID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.ContactEmail{}, false, errAccountNotFound(accountID)
+	}
+	if err != nil {
+		return model.ContactEmail{}, false, fmt.Errorf("identity：讀取帳號 %d：%w", accountID, err)
+	}
+	c, ok := contactEmail(r)
+	return c, ok, nil
+}
+
+func contactEmail(r store.IdentityAccount) (model.ContactEmail, bool) {
+	if r.DeletedAt != nil {
+		return model.ContactEmail{}, false
+	}
+	if email, ok := validEmail(r.Email); ok {
+		return model.ContactEmail{Address: email, Source: model.ContactEmailVerified}, true
+	}
+	if email, ok := validEmail(r.SelfEnteredEmail); ok {
+		return model.ContactEmail{Address: email, Source: model.ContactEmailSelfEntered}, true
+	}
+	return model.ContactEmail{}, false
+}
+
+// validEmail 回傳通過 emailaddr.Normalize 的正規化信箱；沒有值或格式不合都視為沒有。聯絡信箱與設定自填信箱共用這一條規則。
+func validEmail(raw *string) (string, bool) {
+	if raw == nil {
+		return "", false
+	}
+	return emailaddr.Normalize(*raw)
+}
+
+// SetSelfEnteredEmail 設定帳號自填的聯絡信箱（正規化後存）。只在帳號沒有可用的已驗證 email（不存在或格式不合）時可設，有的話回 FailedPrecondition；
+// 信箱格式不合回 InvalidInput（欄位 Email）；帳號不存在或已刪除回 NotFound。回傳設定之後的聯絡信箱。
+func (m *Service) SetSelfEnteredEmail(ctx context.Context, accountID int64, raw string) (model.ContactEmail, error) {
+	email, ok := emailaddr.Normalize(raw)
+	if !ok {
+		return model.ContactEmail{}, apperr.InvalidInputOn([]string{"Email"}, "電子信箱格式不正確，至多 %d 字", emailaddr.MaxLen)
+	}
+	var out model.ContactEmail
+	err := m.d.DB.InTx(ctx, func(ctx context.Context) error {
+		q := m.q(ctx)
+		// 鎖住帳號列：與登入時更新 email 的 UPDATE 互斥，驗證與寫入之間 email 不會變。
+		r, err := lockLiveAccount(ctx, q, accountID)
+		if err != nil {
+			return err
+		}
+		if _, verified := validEmail(r.Email); verified {
+			return apperr.FailedPrecondition("帳號已有登入方式驗證過的信箱，不能另外填寫")
+		}
+		n, err := q.SetSelfEnteredEmail(ctx, store.SetSelfEnteredEmailParams{ID: accountID, SelfEnteredEmail: &email, Now: m.d.Now()})
+		if err != nil {
+			return fmt.Errorf("identity：設定帳號 %d 的聯絡信箱：%w", accountID, err)
+		}
+		if n != 1 {
+			return fmt.Errorf("identity：設定帳號 %d 的聯絡信箱：更新了 %d 列，預期 1", accountID, n)
+		}
+		out = model.ContactEmail{Address: email, Source: model.ContactEmailSelfEntered}
+		return nil
+	})
+	return out, err
 }
 
 func lifecycle(r store.IdentityAccount) model.Lifecycle {

@@ -64,7 +64,7 @@ func NewPublic(m PublicModule, stats *StatsSource, images rpc.Images, web rpc.We
 	return &Public{m: m, stats: stats, images: images, web: web}, nil
 }
 
-// GetSellerAgreements 回傳三份入駐文件的現行版本，內容來自 seller 模組的常數表，不查資料庫；網址一律是絕對網址。
+// GetSellerAgreements 回傳兩份入駐文件的現行版本，內容來自 seller 模組的常數表，不查資料庫；網址一律是絕對網址。
 func (h *Public) GetSellerAgreements(context.Context, *connect.Request[pb.GetSellerAgreementsRequest]) (*connect.Response[pb.GetSellerAgreementsResponse], error) {
 	kinds := model.AgreementKinds()
 	out := make([]*pb.SellerAgreement, 0, len(kinds))

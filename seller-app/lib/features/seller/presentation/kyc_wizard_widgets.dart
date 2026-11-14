@@ -180,105 +180,6 @@ class _KycTextFieldState extends State<KycTextField> {
   }
 }
 
-/// 點一下開底部選單的欄位。
-class KycPickerField extends StatelessWidget {
-  const KycPickerField({
-    super.key,
-    required this.label,
-    required this.value,
-    required this.hint,
-    required this.options,
-    required this.onChanged,
-    this.error,
-    this.readOnly = false,
-  });
-
-  final String label;
-  final String value;
-  final String hint;
-  final List<String> options;
-  final ValueChanged<String> onChanged;
-  final String? error;
-  final bool readOnly;
-
-  /// 目前的值不在選項裡（伺服器上的舊值）時也要列出來，不讓它在畫面上消失。
-  List<String> get _shown =>
-      value.isEmpty || options.contains(value) ? options : [value, ...options];
-
-  Future<void> _open(BuildContext context) async {
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: AppColors.bgCard,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
-      ),
-      builder: (context) => SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: EdgeInsets.all(16.w),
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              for (final option in _shown)
-                ListTile(
-                  title: Text(option, textAlign: TextAlign.center),
-                  trailing: value == option
-                      ? const Icon(
-                          AppIcons.check,
-                          color: AppIconColors.secondary,
-                        )
-                      : null,
-                  onTap: () => Navigator.pop(context, option),
-                ),
-              SizedBox(height: 16.h),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (picked != null) onChanged(picked);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return KycFieldFrame(
-      label: label,
-      error: error,
-      child: GestureDetector(
-        onTap: readOnly ? null : () => _open(context),
-        child: _FieldBox(
-          hasError: error != null,
-          readOnly: readOnly,
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  value.isEmpty ? hint : value,
-                  style: TextStyle(
-                    fontSize: 16.sp,
-                    color: value.isEmpty
-                        ? AppColors.textSecondary
-                        : AppColors.textEmphasis,
-                  ),
-                ),
-              ),
-              const Icon(AppIcons.chevronRight, color: AppIconColors.muted),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _FieldBox extends StatelessWidget {
   const _FieldBox({
     required this.child,
@@ -739,13 +640,4 @@ class KycUploadBox extends StatelessWidget {
       ],
     );
   }
-}
-
-/// 英文字母轉大寫的輸入格式。
-class UpperCaseTextFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) => newValue.copyWith(text: newValue.text.toUpperCase());
 }

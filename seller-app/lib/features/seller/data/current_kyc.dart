@@ -6,71 +6,39 @@ import '../../../core/networking/connect_provider.dart';
 import '../../../core/session/session_provider.dart';
 import '../../../shared/utils/hk_log.dart';
 import 'account_scope.dart';
-import 'kyc_flow.dart';
 
 part 'current_kyc.g.dart';
 
-/// 一次 `GetMyKYC` 讀取的結果：整份申請（[application]）與它的流程狀態（`flow`）。沒有申請（或申請已取消）時是 [MyKyc.notStarted]。
+/// 一次 `GetMyKYC` 讀取的結果：整份申請（[application]）。沒有申請（或申請已取消）時是 [MyKyc.notStarted]。
 final class MyKyc {
-  const MyKyc({
-    required this.status,
-    this.identityLocked = false,
-    this.application,
-  });
+  const MyKyc({this.application});
 
   /// 沒有申請：伺服器回 not_found。
-  const MyKyc.notStarted()
-    : status = KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
-      identityLocked = false,
-      application = null;
+  const MyKyc.notStarted() : application = null;
 
-  /// 伺服器回的申請；沒有流程狀態、或狀態不是有效值（`UNSPECIFIED`、不認得）時丟 [FormatException]。
+  /// 伺服器回的申請；狀態不是有效值（`UNSPECIFIED`、不認得）時丟 [FormatException]。
   factory MyKyc.fromApplication(KYCApplication application) {
-    final flow = application.hasFlow() ? application.flow : null;
-    if (flow == null || !isValidKycFlowStatus(flow.status)) {
-      throw FormatException('GetMyKYC 回了無效的流程狀態：${flow?.status}');
+    if (application.status == KYCStatus.KYC_STATUS_UNSPECIFIED) {
+      throw FormatException('GetMyKYC 回了無效的申請狀態：${application.status}');
     }
-    return MyKyc(
-      status: flow.status,
-      identityLocked: flow.identityLocked,
-      application: application,
-    );
+    return MyKyc(application: application);
   }
-
-  final KYCFlowStatus status;
-
-  /// 店名與商店介紹是否已鎖定（`flow.identity_locked`，PayUni 已建檔）；只是提示，最終防線在 `UpdateMyStore`。
-  final bool identityLocked;
 
   /// 伺服器回的整份申請（etag、欄位、缺項、退回、證件）；沒有申請時是 null。
   final KYCApplication? application;
 
-  /// 賣家看到的 PayUni 狀態（`flow.payuni`）；申請不在 PayUni 階段時是 null。
-  SellerPayUni? get payuni =>
-      application != null &&
-          application!.hasFlow() &&
-          application!.flow.hasPayuni()
-      ? application!.flow.payuni
-      : null;
-
-  /// 賣家能不能自己修正後重新送出（`flow.can_resubmit`）；沒有申請時是 false。
-  bool get canResubmit =>
-      application != null &&
-      application!.hasFlow() &&
-      application!.flow.canResubmit;
+  /// 平台審核的狀態（`KYCApplication.status`）；沒有申請是 null。
+  KYCStatus? get reviewStatus => application?.status;
 
   @override
   bool operator ==(Object other) =>
-      other is MyKyc &&
-      other.status == status &&
-      other.identityLocked == identityLocked &&
-      other.application == application;
+      other is MyKyc && other.application == application;
 
   @override
-  int get hashCode => Object.hash(status, identityLocked, application);
+  int get hashCode => application.hashCode;
 }
 
-/// [accountId] 這個帳號的認證流程狀態（`GetMyKYC`）。not_found 是 [MyKyc.notStarted]；其他失敗是 error 狀態，
+/// [accountId] 這個帳號的認證申請（`GetMyKYC`）。not_found 是 [MyKyc.notStarted]；其他失敗是 error 狀態，
 /// 不當成沒開始認證。以帳號為鍵，換帳號不會看到上一個帳號的結果。申請的唯一來源：寫入的回應用 [adopt] 直接寫進來。
 @Riverpod(keepAlive: true, retry: noRetry)
 class AccountKyc extends _$AccountKyc {
@@ -105,7 +73,7 @@ class AccountKyc extends _$AccountKyc {
   }
 
   /// 寫入（SaveKYCDraft、SubmitKYC、CancelKYC）回的申請直接成為目前的狀態，不必再讀一次；[application] 是 null 表示申請已取消。
-  /// 回應沒有有效的流程狀態時退回重讀。
+  /// 回應沒有有效的申請狀態時退回重讀。
   void adopt(KYCApplication? application) {
     if (application == null) {
       _adopt(const MyKyc.notStarted());
@@ -125,7 +93,7 @@ class AccountKyc extends _$AccountKyc {
   }
 }
 
-/// 目前登入帳號的認證流程狀態；沒有登入時是 null。
+/// 目前登入帳號的認證申請；沒有登入時是 null。
 @Riverpod(keepAlive: true)
 AsyncValue<MyKyc>? currentKyc(Ref ref) {
   final accountId = signedInAccountId(ref.watch(sessionProvider));
@@ -133,7 +101,7 @@ AsyncValue<MyKyc>? currentKyc(Ref ref) {
   return ref.watch(accountKycProvider(accountId));
 }
 
-/// 重讀目前帳號的認證流程狀態（`GetMyKYC`）。
+/// 重讀目前帳號的認證申請（`GetMyKYC`）。
 @Riverpod(keepAlive: true)
 class KycReader extends _$KycReader {
   @override

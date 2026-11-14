@@ -27,7 +27,7 @@ test("certification discard entries share an immediate guard and retain initiato
 
 	assert.match(
 		certifications,
-		/type DiscardDraftInitiator = "type-switch" \| "action-bar"/,
+		/type DiscardDraftInitiator =\s*(?:\|\s*)?"type-switch"\s*\|\s*"action-bar"\s*\|\s*"withdraw"/,
 	);
 	assert.match(
 		certifications,

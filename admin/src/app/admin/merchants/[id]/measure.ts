@@ -177,9 +177,7 @@ export const LINKED_IDENTITY_LABEL: Record<
 	Exclude<LinkedIdentity, LinkedIdentity.UNSPECIFIED>,
 	string
 > = {
-	[LinkedIdentity.NATIONAL_ID]: "身分證號",
 	[LinkedIdentity.UBN]: "統編",
-	[LinkedIdentity.RESPONSIBLE_PERSON_ID]: "負責人身分證號",
 	[LinkedIdentity.BANK_ACCOUNT]: "銀行帳號",
 };
 

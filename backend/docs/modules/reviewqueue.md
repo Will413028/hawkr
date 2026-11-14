@@ -5,15 +5,15 @@
 ## 1. 範圍與公開介面
 
 - 公開介面是 `Module.List(ctx, now, kinds, after, limit)`，與對外型別別名 `Kind`、`Item`、`Cursor`。
-- 模組讀各來源發布的 `pub_*_review_items(at)`；現在只有 `seller.pub_review_items`。待辦的成員、開始與期限的規則在擁有者的 SQL（seller 的 `review_<種類>(at)`），這個模組只排序與分頁。
-- 待辦是各模組的領域狀態推導出來的，不另存：模組沒有 schema、`db/schema.sql` 與 migration，登記在 `cmd/hawkr/modules.go` 的 `withoutData`，不在 `modules()`。`db/sqlc.yaml` 的 schema 只有 seller 的 `pub.sql`。
-- 依賴圖的唯一來源是 `internal/arch/modules.go`：模組依賴 `seller`（讀它的 `pub.sql`），不 import seller 的 Go 套件。
+- 模組讀各來源發布的 `pub_*_review_items(at)`：`seller.pub_review_items` 與 `payment.pub_review_items`（Stripe 計畫 D28），一支查詢 `UNION ALL`。待辦的成員、開始與期限的規則在擁有者的 SQL（seller 的 `review_<種類>(at)`、payment 的 `pub_review_items(at)`），這個模組只排序與分頁。payment 的列只有店家 ID：店名由 `internal/httpapi/reviewqueue` 一頁一次經 seller 的店家卡片補上（店名已清理或店家不存在時是空字串）。
+- 待辦是各模組的領域狀態推導出來的，不另存：模組沒有 schema、`db/schema.sql` 與 migration，登記在 `cmd/hawkr/modules.go` 的 `withoutData`，不在 `modules()`。`db/sqlc.yaml` 的 schema 只有 seller 與 payment 的 `pub.sql`。
+- 依賴圖的唯一來源是 `internal/arch/modules.go`：模組依賴 `seller` 與 `payment`（讀它們的 `pub.sql`），不 import 它們的 Go 套件。
 - 加來源的做法：依賴表加一行、`sqlc.yaml` 加對方的 `pub.sql`、`ListItems` 的 `FROM` 加一支 `UNION ALL`、`model.Kinds` 加種類。
 
 ## 2. 種類
 
-- `Kind` 是 UPPER_SNAKE，與來源 `kind` 欄、契約的 `ReviewQueueItemKind` 一一對應。seller 發布 10 種：`REPORT_TRIAGE`、`CASE_DECISION`、`CASE_INQUIRY_OVERDUE`、`AUTHORITY_ORDER`、`AUTHORITY_TARGET_NOTICE`、`MEASURE_APPEAL`、`MEASURE_LIFT_REQUEST`、`MEASURE_REVIEW`、`KYC_APPLICATION`、`PAYUNI_BIND_RETRY`。
-- 查詢以模組認得的 `Kinds` 篩選：來源多出的種類不會出現在結果裡，執行期不報錯。seller 的 10 支 `review_<種類>(at)` 的 kind 字面值集合等於 `Kinds`，由測試鎖住。
+- `Kind` 是 UPPER_SNAKE，與來源 `kind` 欄、契約的 `ReviewQueueItemKind` 一一對應。seller 發布 10 種、payment 發布 2 種（`PAYMENT_ACCOUNT_CREATE_FAILED`、`PAYMENT_ACCOUNT_PURGE_STUCK`：收款帳戶的清理進了終局、無法自動關閉，Stripe 計畫 D59、D60；subject 同樣是 `payment_account`，連到商家詳情的收款帳戶卡，讀取權是 `payment.accounts.get`，動作是 `payment.accounts.retry_purge` 與 `payment.accounts.delete_mapping`）。seller 的 10 種：`REPORT_TRIAGE`、`CASE_DECISION`、`CASE_INQUIRY_OVERDUE`、`AUTHORITY_ORDER`、`AUTHORITY_TARGET_NOTICE`、`MEASURE_APPEAL`、`MEASURE_LIFT_REQUEST`、`MEASURE_REVIEW`、`KYC_APPLICATION`、`SHARED_BANK_ACCOUNT`（共用銀行帳號：subject 是 `SharedBankAccountRef`（處分、命中的帳號），看得到它的是措施的讀取權 `seller.measures.list`，連到處分頁的關聯帳號列 `#linked-account-<帳號>`）。
+- 查詢以模組認得的 `Kinds` 篩選：來源多出的種類不會出現在結果裡，執行期不報錯。seller 的 10 支 `review_<種類>(at)` 與 payment 的 `pub_review_items(at)`（兩個 SELECT、兩個 kind）的 kind 字面值集合等於 `Kinds`，由測試鎖住（`TestKindsMatchTheSource`）。
 - 空字串與不在 `Kinds` 裡的值都不是有效的種類。
 
 ## 3. 排序與游標

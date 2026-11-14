@@ -29,7 +29,7 @@ class H(BaseHTTPRequestHandler):
                "api_version": ev.get("api_version"), "request_id": (ev.get("request") or {}).get("id"),
                "account": ev.get("account"), "livemode": ev.get("livemode"), "pending_webhooks": ev.get("pending_webhooks"), "verify": ok, "why": why,
                "altered_body_verify": ok2, "altered_why": why2, "stale_ts_verify": ok3, "stale_why": why3,
-               "sig_header_parts": sorted(k for k in dict(p.split("=", 1) for p in hdr.split(",")))}
+               "top_keys": sorted(ev.keys()), "related_object": ev.get("related_object"), "context": ev.get("context"), "sig_header_parts": sorted(k for k in dict(p.split("=", 1) for p in hdr.split(",")))}
         with open(LOG, "a") as f: f.write(json.dumps(rec) + "\n")
         self.send_response(200 if ok else 400); self.end_headers()
     def log_message(self, *a): pass

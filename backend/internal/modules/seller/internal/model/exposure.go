@@ -36,8 +36,8 @@ const (
 	RequirementActive Requirement = "STORE_ACTIVE"
 	// RequirementNotSuspended 帳號沒有生效中的停權。
 	RequirementNotSuspended Requirement = "NOT_SUSPENDED"
-	// RequirementKYCApproved KYC 流程已核准（含 PayUni 核准）。
-	RequirementKYCApproved Requirement = "KYC_APPROVED"
+	// RequirementOnboardingComplete 平台審核已核准，而且收款帳戶的轉帳能力已啟用。
+	RequirementOnboardingComplete Requirement = "ONBOARDING_COMPLETE"
 	// RequirementStoreName 有店名。
 	RequirementStoreName Requirement = "STORE_NAME"
 	// RequirementLogo 有 logo。
@@ -51,7 +51,7 @@ const (
 // Requirements 回傳全部條件，順序固定（與 proto 的 SellerRequirement 數字一致）：MissingExposure 與 CapabilitiesOf 依這個順序回報。
 func Requirements() []Requirement {
 	return []Requirement{
-		RequirementActive, RequirementNotSuspended, RequirementKYCApproved, RequirementStoreName, RequirementLogo, RequirementTownCode,
+		RequirementActive, RequirementNotSuspended, RequirementOnboardingComplete, RequirementStoreName, RequirementLogo, RequirementTownCode,
 		RequirementNotPendingDeletion,
 	}
 }
@@ -80,7 +80,7 @@ func NewRequirementMissing(missing []Requirement) *apperr.Error {
 // （TestExposureRuleAgreesBetweenSQLAndGoOnADataset）鎖住。條件：
 //   - 店家沒有關閉、沒有正在隨帳號刪除（生命週期是營運中 ACTIVE）；
 //   - 帳號沒有生效中的停權；
-//   - KYC 流程已核准（含 PayUni 核准）；
+//   - 平台審核已核准（KYC 申請 APPROVED）而且收款帳戶的轉帳能力已啟用（seller 自存的副本，開通閘門 ONBOARDING_COMPLETE）；
 //   - 店名、logo 與鄉鎮市區代碼都有值。
 //
 // 「至少一個上架商品」不在這裡：它由曝光端檢查。
@@ -108,8 +108,8 @@ func met(r Requirement, s Store) bool {
 		return c.Active
 	case RequirementNotPendingDeletion:
 		return c.NotPendingDeletion
-	case RequirementKYCApproved:
-		return c.KYCApproved
+	case RequirementOnboardingComplete:
+		return c.OnboardingComplete()
 	case RequirementStoreName:
 		return c.StoreName
 	case RequirementLogo:

@@ -173,7 +173,7 @@ class RecommendedSeller extends $pb.GeneratedMessage {
       createEmptyInstance: RecommendedSeller.$_createMessage)
     ..aOM<$0.StoreCard>(1, _omitFieldNames ? '' : 'store',
         subBuilder: $0.StoreCard.$_createMessage)
-    ..aI(4, _omitFieldNames ? '' : 'followerCount')
+    ..aI(2, _omitFieldNames ? '' : 'followerCount')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -210,15 +210,16 @@ class RecommendedSeller extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   $0.StoreCard ensureStore() => $_ensure(0);
 
+  /// 評價數與平均評分由卡片提供（store.review_count、store.rating_average）；排名用的評價只留在快照內。
   /// 粉絲數；0 是確實沒有粉絲，讀取失敗時不設。
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(2)
   $core.int get followerCount => $_getIZ(1);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(2)
   set followerCount($core.int value) => $_setSignedInt32(1, value);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(2)
   $core.bool hasFollowerCount() => $_has(1);
-  @$pb.TagNumber(4)
-  void clearFollowerCount() => $_clearField(4);
+  @$pb.TagNumber(2)
+  void clearFollowerCount() => $_clearField(2);
 }
 
 /// DiscoveryPublicService 是任何人都能讀的探索資料，不需要登入。
@@ -228,8 +229,8 @@ class DiscoveryPublicServiceApi {
   DiscoveryPublicServiceApi(this._client);
 
   /// SuggestRecommendedSellers 依推薦分數由高到低回傳前幾家可以公開曝光的店家：沒有分頁（排行只取前面幾筆），數量由
-  /// max_results 決定。分數是排程每 15 分鐘重算的快照；曝光資格是 seller 的「可公開曝光」規則（營運中、沒有停權、身分認證與
-  /// PayUni 審核通過、店名與 logo 與所在地齊全），每次讀取即時檢查，停權立刻生效。店家卡片上的評價統計（review_count、
+  /// max_results 決定。分數是排程每 15 分鐘重算的快照；曝光資格是 seller 的「可公開曝光」規則（營運中、沒有停權、身分認證核准且
+  /// 收款帳戶可收款、店名與 logo 與所在地齊全），每次讀取即時檢查，停權立刻生效。店家卡片上的評價統計（review_count、
   /// rating_average）與其他清單上同一家店的卡片一致，是讀取時批次查詢評價的結果，不是排名用的快照；評價讀取失敗時卡片不設
   /// 評價欄位。沒有任何合格的店家時回空清單；排行上的店家若此刻沒有營業中的卡片（資料不一致，或剛好在兩次讀取之間不再可
   /// 曝光）會被略過，所以回傳的家數可能少於 max_results。粉絲數來自別的模組：讀取失敗時該欄位不設，不會是 0。

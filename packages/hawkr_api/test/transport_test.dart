@@ -96,6 +96,51 @@ void main() {
     });
   });
 
+  group('acceptLanguageInterceptor', () {
+    test('送出的 Accept-Language 等於目前語系，單一值、沒有 q 值，語系改變後下一次送出跟著變', () async {
+      var tag = 'zh-TW';
+      final seen = <String?>[];
+      final client = _client((req, ctx) {
+        seen.add(ctx.requestHeaders['accept-language']);
+        return CheckAppVersionResponse();
+      }, [acceptLanguageInterceptor(() => tag)]);
+
+      await client.checkAppVersion(
+        CheckAppVersionRequest(clientVersion: '1.0.0'),
+      );
+      tag = 'en';
+      await client.checkAppVersion(
+        CheckAppVersionRequest(clientVersion: '1.0.0'),
+      );
+
+      expect(seen, ['zh-TW', 'en']);
+      for (final v in seen) {
+        expect(v, isNot(contains(',')));
+        expect(v, isNot(contains(';')));
+      }
+    });
+
+    test('appInterceptors 每次送出都帶 acceptLanguage 給的 tag', () async {
+      Headers? seen;
+      final client = _client(
+        (req, ctx) {
+          seen = ctx.requestHeaders;
+          return CheckAppVersionResponse();
+        },
+        appInterceptors(
+          timeout: const Duration(seconds: 5),
+          report: (error, context) {},
+          headers: () => const {},
+          acceptLanguage: () => 'en',
+        ),
+      );
+      await client.checkAppVersion(
+        CheckAppVersionRequest(clientVersion: '1.0.0'),
+      );
+      expect(seen!['accept-language'], 'en');
+    });
+  });
+
   group('timeoutInterceptor', () {
     // fake transport 不會因為 signal 中止，handler 自己等 signal，模擬真的 transport。
     Future<CheckAppVersionResponse> hang(
@@ -209,6 +254,7 @@ void main() {
             return CheckAppVersionResponse();
           },
           appInterceptors(
+            acceptLanguage: () => 'zh-TW',
             timeout: const Duration(seconds: 1),
             headers: () => {},
             report: (_, _) => reports++,
@@ -388,6 +434,7 @@ void main() {
           );
         },
         appInterceptors(
+          acceptLanguage: () => 'zh-TW',
           timeout: const Duration(seconds: 5),
           report: (_, __) {},
           headers: () => const {'X-App-Type': 'SELLER'},
@@ -419,6 +466,7 @@ void main() {
           return CheckAppVersionResponse();
         },
         appInterceptors(
+          acceptLanguage: () => 'zh-TW',
           timeout: const Duration(seconds: 5),
           report: (_, __) {},
           headers: () => const {},
@@ -456,6 +504,7 @@ void main() {
       final client = _client(
         (req, ctx) => throw error,
         appInterceptors(
+          acceptLanguage: () => 'zh-TW',
           timeout: const Duration(seconds: 5),
           report: (_, __) {},
           headers: () => const {},
@@ -484,6 +533,7 @@ void main() {
         final client = _client(
           (req, ctx) => throw error,
           appInterceptors(
+            acceptLanguage: () => 'zh-TW',
             timeout: const Duration(seconds: 5),
             report: (_, __) {},
             headers: () => const {},
@@ -504,6 +554,7 @@ void main() {
       final client = _client(
         (req, ctx) => throw denied('SELLER_SUSPENDED'),
         appInterceptors(
+          acceptLanguage: () => 'zh-TW',
           timeout: const Duration(seconds: 5),
           report: (_, __) {},
           headers: () => const {},

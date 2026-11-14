@@ -2,7 +2,7 @@
 //
 // Source: hawkr/admin/seller/v1alpha1/seller.proto
 
-// seller 模組給後台的 API：店家的清單與統計、身分認證（KYC）的審核與 PayUni 子商店。停權是措施
+// seller 模組給後台的 API：店家的清單與統計、身分認證（KYC）的審核。停權是措施
 // （警告與停權），建立、結束與撤銷在 hawkr.admin.seller.v1alpha1 的 SellerGovernanceAdminService。
 // 前台的 API 在 hawkr.seller.v1alpha1。
 // 後台刪整個帳號在 hawkr.admin.identity.v1alpha1 的 DeleteAccount。
@@ -51,15 +51,15 @@ const (
 	// SellerAdminServiceGetStoreProcedure is the fully-qualified name of the SellerAdminService's
 	// GetStore RPC.
 	SellerAdminServiceGetStoreProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/GetStore"
+	// SellerAdminServiceGetStoreOnboardingProcedure is the fully-qualified name of the
+	// SellerAdminService's GetStoreOnboarding RPC.
+	SellerAdminServiceGetStoreOnboardingProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/GetStoreOnboarding"
 	// SellerAdminServiceListKYCApplicationsProcedure is the fully-qualified name of the
 	// SellerAdminService's ListKYCApplications RPC.
 	SellerAdminServiceListKYCApplicationsProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/ListKYCApplications"
 	// SellerAdminServiceGetKYCApplicationProcedure is the fully-qualified name of the
 	// SellerAdminService's GetKYCApplication RPC.
 	SellerAdminServiceGetKYCApplicationProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/GetKYCApplication"
-	// SellerAdminServiceListKYCRevealsProcedure is the fully-qualified name of the SellerAdminService's
-	// ListKYCReveals RPC.
-	SellerAdminServiceListKYCRevealsProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/ListKYCReveals"
 	// SellerAdminServiceListKYCDocumentAccessesProcedure is the fully-qualified name of the
 	// SellerAdminService's ListKYCDocumentAccesses RPC.
 	SellerAdminServiceListKYCDocumentAccessesProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/ListKYCDocumentAccesses"
@@ -69,21 +69,6 @@ const (
 	// SellerAdminServiceRejectKYCProcedure is the fully-qualified name of the SellerAdminService's
 	// RejectKYC RPC.
 	SellerAdminServiceRejectKYCProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RejectKYC"
-	// SellerAdminServiceRevealKYCSensitiveProcedure is the fully-qualified name of the
-	// SellerAdminService's RevealKYCSensitive RPC.
-	SellerAdminServiceRevealKYCSensitiveProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RevealKYCSensitive"
-	// SellerAdminServiceGetPayUniRegistrationProcedure is the fully-qualified name of the
-	// SellerAdminService's GetPayUniRegistration RPC.
-	SellerAdminServiceGetPayUniRegistrationProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/GetPayUniRegistration"
-	// SellerAdminServiceRebindPayUniProcedure is the fully-qualified name of the SellerAdminService's
-	// RebindPayUni RPC.
-	SellerAdminServiceRebindPayUniProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RebindPayUni"
-	// SellerAdminServiceListPayUniObservationsProcedure is the fully-qualified name of the
-	// SellerAdminService's ListPayUniObservations RPC.
-	SellerAdminServiceListPayUniObservationsProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/ListPayUniObservations"
-	// SellerAdminServiceRefreshPayUniStatusProcedure is the fully-qualified name of the
-	// SellerAdminService's RefreshPayUniStatus RPC.
-	SellerAdminServiceRefreshPayUniStatusProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RefreshPayUniStatus"
 	// SellerAdminServiceRequeryKYCRegistrationProcedure is the fully-qualified name of the
 	// SellerAdminService's RequeryKYCRegistration RPC.
 	SellerAdminServiceRequeryKYCRegistrationProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RequeryKYCRegistration"
@@ -98,46 +83,31 @@ type SellerAdminServiceClient interface {
 	GetStoreStats(context.Context, *connect.Request[v1alpha1.GetStoreStatsRequest]) (*connect.Response[v1alpha1.GetStoreStatsResponse], error)
 	// GetStore 回傳一家店，連同帳號此刻生效中的措施（active_measures）與身分認證（KYC）的摘要。已關閉的店照樣回傳。
 	GetStore(context.Context, *connect.Request[v1alpha1.GetStoreRequest]) (*connect.Response[v1alpha1.GetStoreResponse], error)
+	// GetStoreOnboarding 回傳一家店的開通任務（與賣家自己看到的 GetMyOnboarding 同一份推導：同一個函式、同一組來源欄位），後台只讀取，不重讀金流商。
+	// 平台審核與收款帳戶各自讀取：單一來源讀不到只讓該項是 UNKNOWN。文字是賣家受眾的句子，語系依請求。賣家的草稿與沒送出就取消的申請對後台不可見（草稿是賣家私有的），所以後台的平台審核項把它們當成還沒送出，句子與賣家看到的不同。已關閉的店照樣回傳。
+	GetStoreOnboarding(context.Context, *connect.Request[v1alpha1.GetStoreOnboardingRequest]) (*connect.Response[v1alpha1.GetStoreOnboardingResponse], error)
 	// ListKYCApplications 是身分認證的審核佇列：只列送出過的申請（不含賣家的草稿，也不含沒送出就取消的）。依送出時間排序：
 	// status 是 SUBMITTED（待審核）時舊到新，等最久的在最前面；其他（含沒有指定）新到舊。DRAFT 回 invalid_argument。
 	ListKYCApplications(context.Context, *connect.Request[v1alpha1.ListKYCApplicationsRequest]) (*connect.Response[v1alpha1.ListKYCApplicationsResponse], error)
-	// GetKYCApplication 讀一筆申請：身分證號與銀行帳號只有遮蔽後的值，連同審核紀錄與銀行帳號命中的標記。顯示全文與證件讀取的
-	// 稽核紀錄用 ListKYCReveals、ListKYCDocumentAccesses。
-	// 賣家的草稿讀不到（not_found）。要看全文用 RevealKYCSensitive。
+	// GetKYCApplication 讀一筆申請：登記資料、審核紀錄與公司補充文件（每張帶檢視網址與 asset_id；有後台的 KYC 讀取權限就能讀，
+	// 每次讀取寫一列稽核）。讀取紀錄用 ListKYCDocumentAccesses。
+	// 賣家的草稿讀不到（not_found）。
 	GetKYCApplication(context.Context, *connect.Request[v1alpha1.GetKYCApplicationRequest]) (*connect.Response[v1alpha1.GetKYCApplicationResponse], error)
-	// ListKYCReveals 列出一筆申請的顯示全文紀錄（誰、何時、理由、授權到期），新到舊。申請不存在或是賣家的草稿回 not_found。
-	ListKYCReveals(context.Context, *connect.Request[v1alpha1.ListKYCRevealsRequest]) (*connect.Response[v1alpha1.ListKYCRevealsResponse], error)
-	// ListKYCDocumentAccesses 列出一筆申請的證件圖片讀取紀錄（誰、依據哪次顯示、哪個位置、何時），新到舊。申請不存在或是賣家的
+	// ListKYCDocumentAccesses 列出一筆申請的補充文件讀取紀錄（誰、哪一張、何時），新到舊。申請不存在或是賣家的
 	// 草稿回 not_found。
 	ListKYCDocumentAccesses(context.Context, *connect.Request[v1alpha1.ListKYCDocumentAccessesRequest]) (*connect.Response[v1alpha1.ListKYCDocumentAccessesResponse], error)
-	// ApproveKYC 核准審核中的申請，並在同一個 transaction 寫入 PayUni 的綁定意圖（綁定由背景程序完成）。etag 必填。身分命中
+	// ApproveKYC 核准審核中的申請，並在同一個 transaction 排入收款帳戶的建立（建立由背景程序完成）。etag 必填。身分命中
 	// 別的帳號生效中的處分回 failed_precondition，文案不透露欄位或帳號。申請不能核准（不在審核中、店家已關閉或等待刪除、
-	// 帳號停權中）時回 failed_precondition，訊息是 KYCApplication.approve_unavailabilities 的第一句。帳號停權時不能核准、可以退回；
+	// 帳號停權中）時回 failed_precondition，訊息是 KYCApplication.approve_unavailabilities 的第一句。
+	// 帳號停權時不能核准、可以退回；
 	// 店家不是營運中或帳號停權的這段期間，申請不在後台待辦、沒有審核期限，恢復之後自動回到待辦。
+	// 收款已設定時，賣家帳號沒有可用的聯絡信箱（登入信箱與自填信箱都沒有或格式不合）也回 failed_precondition，訊息說明這點，請賣家先填寫。
 	// etag 與目前的版本不符（包含核准已經生效後再帶舊 etag 送一次）一律回 aborted（VERSION_CONFLICT），不寫入。
 	ApproveKYC(context.Context, *connect.Request[v1alpha1.ApproveKYCRequest]) (*connect.Response[v1alpha1.ApproveKYCResponse], error)
 	// RejectKYC 退回審核中的申請，賣家修改後可以重送。etag 必填；reason 必填；etag 不符回 aborted（VERSION_CONFLICT），不寫入。
 	// 申請不能退回（不在審核中、店家已關閉或等待刪除）時回 failed_precondition，訊息是 KYCApplication.reject_unavailabilities 的第一句；
 	// 帳號停權中仍可退回。
 	RejectKYC(context.Context, *connect.Request[v1alpha1.RejectKYCRequest]) (*connect.Response[v1alpha1.RejectKYCResponse], error)
-	// RevealKYCSensitive 顯示一筆申請的身分證號、負責人身分證號與銀行帳號全文，並授權這位管理員在 15 分鐘內讀這筆申請的證件
-	// 圖片（回應的每張證件有一個 view_uri，是 GET，要帶同一位管理員的登入）。這是寫入稽核紀錄的動作（誰、哪筆申請、何時、
-	// 理由、授權到期的時間，不含值），所以是 POST，不是讀取；稽核寫入失敗就不回傳明文。回應不可快取。到期之後、或別的
-	// 管理員讀證件圖片都是 403，要再看就再顯示一次（再寫一列稽核）。
-	RevealKYCSensitive(context.Context, *connect.Request[v1alpha1.RevealKYCSensitiveRequest]) (*connect.Response[v1alpha1.RevealKYCSensitiveResponse], error)
-	// GetPayUniRegistration 讀店家的 PayUni 子商店註冊（綁定意圖、PayUni 的審核狀態碼與要處理的問題）。店家還沒有核准過
-	// 申請時 not_found。
-	GetPayUniRegistration(context.Context, *connect.Request[v1alpha1.GetPayUniRegistrationRequest]) (*connect.Response[v1alpha1.GetPayUniRegistrationResponse], error)
-	// RebindPayUni 對綁定失敗的註冊重新綁定（回到 PENDING 並排入新的背景工作），留下一筆審核紀錄。沒有 etag，由狀態檢查保護：
-	// 只有綁定失敗的能重綁。已經在重新綁定（PAYUNI_BIND_IN_PROGRESS）時呼叫不回錯誤、回傳目前的註冊（重送安全）；其餘原因回
-	// failed_precondition，訊息是 PayUniRegistration.rebind_unavailabilities 的第一句：PayUni 端已是終止狀態、店家已關閉或等待刪除、
-	// 已綁定、註冊所根據的申請不是已核准（例如賣家正在修改）。
-	RebindPayUni(context.Context, *connect.Request[v1alpha1.RebindPayUniRequest]) (*connect.Response[v1alpha1.RebindPayUniResponse], error)
-	// ListPayUniObservations 列出店家的 PayUni 狀態觀測紀錄（webhook、輪詢、手動刷新與綁定），依 PayUni 的事件時間新到舊。
-	ListPayUniObservations(context.Context, *connect.Request[v1alpha1.ListPayUniObservationsRequest]) (*connect.Response[v1alpha1.ListPayUniObservationsResponse], error)
-	// RefreshPayUniStatus 排入一次向 PayUni 查詢審核狀態的背景工作（營運工具；回應不等結果，結果從 GetPayUniRegistration
-	// 與 ListPayUniObservations 看）。PayUni 沒有設定、註冊還沒有綁定時回 failed_precondition。
-	RefreshPayUniStatus(context.Context, *connect.Request[v1alpha1.RefreshPayUniStatusRequest]) (*connect.Response[v1alpha1.RefreshPayUniStatusResponse], error)
 	// RequeryKYCRegistration 對審核中（SUBMITTED）的公司型申請重新查一次經濟部商業司的登記資料（送件時已查過一次，這是
 	// 手動補查：例如當時來源不可用或查無）。回應不等結果：排入背景工作，回傳這筆進行中的查詢（含期限），結果從 GetKYCApplication 的
 	// registration_check 看（查詢中時 pending_registration_check 有值）。伺服器保證這筆查詢在 deadline_time 之前到終態（查到、查無或
@@ -180,6 +150,13 @@ func NewSellerAdminServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		getStoreOnboarding: connect.NewClient[v1alpha1.GetStoreOnboardingRequest, v1alpha1.GetStoreOnboardingResponse](
+			httpClient,
+			baseURL+SellerAdminServiceGetStoreOnboardingProcedure,
+			connect.WithSchema(sellerAdminServiceMethods.ByName("GetStoreOnboarding")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 		listKYCApplications: connect.NewClient[v1alpha1.ListKYCApplicationsRequest, v1alpha1.ListKYCApplicationsResponse](
 			httpClient,
 			baseURL+SellerAdminServiceListKYCApplicationsProcedure,
@@ -191,13 +168,6 @@ func NewSellerAdminServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			httpClient,
 			baseURL+SellerAdminServiceGetKYCApplicationProcedure,
 			connect.WithSchema(sellerAdminServiceMethods.ByName("GetKYCApplication")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		listKYCReveals: connect.NewClient[v1alpha1.ListKYCRevealsRequest, v1alpha1.ListKYCRevealsResponse](
-			httpClient,
-			baseURL+SellerAdminServiceListKYCRevealsProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("ListKYCReveals")),
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
@@ -220,38 +190,6 @@ func NewSellerAdminServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			connect.WithSchema(sellerAdminServiceMethods.ByName("RejectKYC")),
 			connect.WithClientOptions(opts...),
 		),
-		revealKYCSensitive: connect.NewClient[v1alpha1.RevealKYCSensitiveRequest, v1alpha1.RevealKYCSensitiveResponse](
-			httpClient,
-			baseURL+SellerAdminServiceRevealKYCSensitiveProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("RevealKYCSensitive")),
-			connect.WithClientOptions(opts...),
-		),
-		getPayUniRegistration: connect.NewClient[v1alpha1.GetPayUniRegistrationRequest, v1alpha1.GetPayUniRegistrationResponse](
-			httpClient,
-			baseURL+SellerAdminServiceGetPayUniRegistrationProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("GetPayUniRegistration")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		rebindPayUni: connect.NewClient[v1alpha1.RebindPayUniRequest, v1alpha1.RebindPayUniResponse](
-			httpClient,
-			baseURL+SellerAdminServiceRebindPayUniProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("RebindPayUni")),
-			connect.WithClientOptions(opts...),
-		),
-		listPayUniObservations: connect.NewClient[v1alpha1.ListPayUniObservationsRequest, v1alpha1.ListPayUniObservationsResponse](
-			httpClient,
-			baseURL+SellerAdminServiceListPayUniObservationsProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("ListPayUniObservations")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		refreshPayUniStatus: connect.NewClient[v1alpha1.RefreshPayUniStatusRequest, v1alpha1.RefreshPayUniStatusResponse](
-			httpClient,
-			baseURL+SellerAdminServiceRefreshPayUniStatusProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("RefreshPayUniStatus")),
-			connect.WithClientOptions(opts...),
-		),
 		requeryKYCRegistration: connect.NewClient[v1alpha1.RequeryKYCRegistrationRequest, v1alpha1.RequeryKYCRegistrationResponse](
 			httpClient,
 			baseURL+SellerAdminServiceRequeryKYCRegistrationProcedure,
@@ -266,17 +204,12 @@ type sellerAdminServiceClient struct {
 	listStores              *connect.Client[v1alpha1.ListStoresRequest, v1alpha1.ListStoresResponse]
 	getStoreStats           *connect.Client[v1alpha1.GetStoreStatsRequest, v1alpha1.GetStoreStatsResponse]
 	getStore                *connect.Client[v1alpha1.GetStoreRequest, v1alpha1.GetStoreResponse]
+	getStoreOnboarding      *connect.Client[v1alpha1.GetStoreOnboardingRequest, v1alpha1.GetStoreOnboardingResponse]
 	listKYCApplications     *connect.Client[v1alpha1.ListKYCApplicationsRequest, v1alpha1.ListKYCApplicationsResponse]
 	getKYCApplication       *connect.Client[v1alpha1.GetKYCApplicationRequest, v1alpha1.GetKYCApplicationResponse]
-	listKYCReveals          *connect.Client[v1alpha1.ListKYCRevealsRequest, v1alpha1.ListKYCRevealsResponse]
 	listKYCDocumentAccesses *connect.Client[v1alpha1.ListKYCDocumentAccessesRequest, v1alpha1.ListKYCDocumentAccessesResponse]
 	approveKYC              *connect.Client[v1alpha1.ApproveKYCRequest, v1alpha1.ApproveKYCResponse]
 	rejectKYC               *connect.Client[v1alpha1.RejectKYCRequest, v1alpha1.RejectKYCResponse]
-	revealKYCSensitive      *connect.Client[v1alpha1.RevealKYCSensitiveRequest, v1alpha1.RevealKYCSensitiveResponse]
-	getPayUniRegistration   *connect.Client[v1alpha1.GetPayUniRegistrationRequest, v1alpha1.GetPayUniRegistrationResponse]
-	rebindPayUni            *connect.Client[v1alpha1.RebindPayUniRequest, v1alpha1.RebindPayUniResponse]
-	listPayUniObservations  *connect.Client[v1alpha1.ListPayUniObservationsRequest, v1alpha1.ListPayUniObservationsResponse]
-	refreshPayUniStatus     *connect.Client[v1alpha1.RefreshPayUniStatusRequest, v1alpha1.RefreshPayUniStatusResponse]
 	requeryKYCRegistration  *connect.Client[v1alpha1.RequeryKYCRegistrationRequest, v1alpha1.RequeryKYCRegistrationResponse]
 }
 
@@ -295,6 +228,11 @@ func (c *sellerAdminServiceClient) GetStore(ctx context.Context, req *connect.Re
 	return c.getStore.CallUnary(ctx, req)
 }
 
+// GetStoreOnboarding calls hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreOnboarding.
+func (c *sellerAdminServiceClient) GetStoreOnboarding(ctx context.Context, req *connect.Request[v1alpha1.GetStoreOnboardingRequest]) (*connect.Response[v1alpha1.GetStoreOnboardingResponse], error) {
+	return c.getStoreOnboarding.CallUnary(ctx, req)
+}
+
 // ListKYCApplications calls hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCApplications.
 func (c *sellerAdminServiceClient) ListKYCApplications(ctx context.Context, req *connect.Request[v1alpha1.ListKYCApplicationsRequest]) (*connect.Response[v1alpha1.ListKYCApplicationsResponse], error) {
 	return c.listKYCApplications.CallUnary(ctx, req)
@@ -303,11 +241,6 @@ func (c *sellerAdminServiceClient) ListKYCApplications(ctx context.Context, req 
 // GetKYCApplication calls hawkr.admin.seller.v1alpha1.SellerAdminService.GetKYCApplication.
 func (c *sellerAdminServiceClient) GetKYCApplication(ctx context.Context, req *connect.Request[v1alpha1.GetKYCApplicationRequest]) (*connect.Response[v1alpha1.GetKYCApplicationResponse], error) {
 	return c.getKYCApplication.CallUnary(ctx, req)
-}
-
-// ListKYCReveals calls hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCReveals.
-func (c *sellerAdminServiceClient) ListKYCReveals(ctx context.Context, req *connect.Request[v1alpha1.ListKYCRevealsRequest]) (*connect.Response[v1alpha1.ListKYCRevealsResponse], error) {
-	return c.listKYCReveals.CallUnary(ctx, req)
 }
 
 // ListKYCDocumentAccesses calls
@@ -326,32 +259,6 @@ func (c *sellerAdminServiceClient) RejectKYC(ctx context.Context, req *connect.R
 	return c.rejectKYC.CallUnary(ctx, req)
 }
 
-// RevealKYCSensitive calls hawkr.admin.seller.v1alpha1.SellerAdminService.RevealKYCSensitive.
-func (c *sellerAdminServiceClient) RevealKYCSensitive(ctx context.Context, req *connect.Request[v1alpha1.RevealKYCSensitiveRequest]) (*connect.Response[v1alpha1.RevealKYCSensitiveResponse], error) {
-	return c.revealKYCSensitive.CallUnary(ctx, req)
-}
-
-// GetPayUniRegistration calls hawkr.admin.seller.v1alpha1.SellerAdminService.GetPayUniRegistration.
-func (c *sellerAdminServiceClient) GetPayUniRegistration(ctx context.Context, req *connect.Request[v1alpha1.GetPayUniRegistrationRequest]) (*connect.Response[v1alpha1.GetPayUniRegistrationResponse], error) {
-	return c.getPayUniRegistration.CallUnary(ctx, req)
-}
-
-// RebindPayUni calls hawkr.admin.seller.v1alpha1.SellerAdminService.RebindPayUni.
-func (c *sellerAdminServiceClient) RebindPayUni(ctx context.Context, req *connect.Request[v1alpha1.RebindPayUniRequest]) (*connect.Response[v1alpha1.RebindPayUniResponse], error) {
-	return c.rebindPayUni.CallUnary(ctx, req)
-}
-
-// ListPayUniObservations calls
-// hawkr.admin.seller.v1alpha1.SellerAdminService.ListPayUniObservations.
-func (c *sellerAdminServiceClient) ListPayUniObservations(ctx context.Context, req *connect.Request[v1alpha1.ListPayUniObservationsRequest]) (*connect.Response[v1alpha1.ListPayUniObservationsResponse], error) {
-	return c.listPayUniObservations.CallUnary(ctx, req)
-}
-
-// RefreshPayUniStatus calls hawkr.admin.seller.v1alpha1.SellerAdminService.RefreshPayUniStatus.
-func (c *sellerAdminServiceClient) RefreshPayUniStatus(ctx context.Context, req *connect.Request[v1alpha1.RefreshPayUniStatusRequest]) (*connect.Response[v1alpha1.RefreshPayUniStatusResponse], error) {
-	return c.refreshPayUniStatus.CallUnary(ctx, req)
-}
-
 // RequeryKYCRegistration calls
 // hawkr.admin.seller.v1alpha1.SellerAdminService.RequeryKYCRegistration.
 func (c *sellerAdminServiceClient) RequeryKYCRegistration(ctx context.Context, req *connect.Request[v1alpha1.RequeryKYCRegistrationRequest]) (*connect.Response[v1alpha1.RequeryKYCRegistrationResponse], error) {
@@ -367,46 +274,31 @@ type SellerAdminServiceHandler interface {
 	GetStoreStats(context.Context, *connect.Request[v1alpha1.GetStoreStatsRequest]) (*connect.Response[v1alpha1.GetStoreStatsResponse], error)
 	// GetStore 回傳一家店，連同帳號此刻生效中的措施（active_measures）與身分認證（KYC）的摘要。已關閉的店照樣回傳。
 	GetStore(context.Context, *connect.Request[v1alpha1.GetStoreRequest]) (*connect.Response[v1alpha1.GetStoreResponse], error)
+	// GetStoreOnboarding 回傳一家店的開通任務（與賣家自己看到的 GetMyOnboarding 同一份推導：同一個函式、同一組來源欄位），後台只讀取，不重讀金流商。
+	// 平台審核與收款帳戶各自讀取：單一來源讀不到只讓該項是 UNKNOWN。文字是賣家受眾的句子，語系依請求。賣家的草稿與沒送出就取消的申請對後台不可見（草稿是賣家私有的），所以後台的平台審核項把它們當成還沒送出，句子與賣家看到的不同。已關閉的店照樣回傳。
+	GetStoreOnboarding(context.Context, *connect.Request[v1alpha1.GetStoreOnboardingRequest]) (*connect.Response[v1alpha1.GetStoreOnboardingResponse], error)
 	// ListKYCApplications 是身分認證的審核佇列：只列送出過的申請（不含賣家的草稿，也不含沒送出就取消的）。依送出時間排序：
 	// status 是 SUBMITTED（待審核）時舊到新，等最久的在最前面；其他（含沒有指定）新到舊。DRAFT 回 invalid_argument。
 	ListKYCApplications(context.Context, *connect.Request[v1alpha1.ListKYCApplicationsRequest]) (*connect.Response[v1alpha1.ListKYCApplicationsResponse], error)
-	// GetKYCApplication 讀一筆申請：身分證號與銀行帳號只有遮蔽後的值，連同審核紀錄與銀行帳號命中的標記。顯示全文與證件讀取的
-	// 稽核紀錄用 ListKYCReveals、ListKYCDocumentAccesses。
-	// 賣家的草稿讀不到（not_found）。要看全文用 RevealKYCSensitive。
+	// GetKYCApplication 讀一筆申請：登記資料、審核紀錄與公司補充文件（每張帶檢視網址與 asset_id；有後台的 KYC 讀取權限就能讀，
+	// 每次讀取寫一列稽核）。讀取紀錄用 ListKYCDocumentAccesses。
+	// 賣家的草稿讀不到（not_found）。
 	GetKYCApplication(context.Context, *connect.Request[v1alpha1.GetKYCApplicationRequest]) (*connect.Response[v1alpha1.GetKYCApplicationResponse], error)
-	// ListKYCReveals 列出一筆申請的顯示全文紀錄（誰、何時、理由、授權到期），新到舊。申請不存在或是賣家的草稿回 not_found。
-	ListKYCReveals(context.Context, *connect.Request[v1alpha1.ListKYCRevealsRequest]) (*connect.Response[v1alpha1.ListKYCRevealsResponse], error)
-	// ListKYCDocumentAccesses 列出一筆申請的證件圖片讀取紀錄（誰、依據哪次顯示、哪個位置、何時），新到舊。申請不存在或是賣家的
+	// ListKYCDocumentAccesses 列出一筆申請的補充文件讀取紀錄（誰、哪一張、何時），新到舊。申請不存在或是賣家的
 	// 草稿回 not_found。
 	ListKYCDocumentAccesses(context.Context, *connect.Request[v1alpha1.ListKYCDocumentAccessesRequest]) (*connect.Response[v1alpha1.ListKYCDocumentAccessesResponse], error)
-	// ApproveKYC 核准審核中的申請，並在同一個 transaction 寫入 PayUni 的綁定意圖（綁定由背景程序完成）。etag 必填。身分命中
+	// ApproveKYC 核准審核中的申請，並在同一個 transaction 排入收款帳戶的建立（建立由背景程序完成）。etag 必填。身分命中
 	// 別的帳號生效中的處分回 failed_precondition，文案不透露欄位或帳號。申請不能核准（不在審核中、店家已關閉或等待刪除、
-	// 帳號停權中）時回 failed_precondition，訊息是 KYCApplication.approve_unavailabilities 的第一句。帳號停權時不能核准、可以退回；
+	// 帳號停權中）時回 failed_precondition，訊息是 KYCApplication.approve_unavailabilities 的第一句。
+	// 帳號停權時不能核准、可以退回；
 	// 店家不是營運中或帳號停權的這段期間，申請不在後台待辦、沒有審核期限，恢復之後自動回到待辦。
+	// 收款已設定時，賣家帳號沒有可用的聯絡信箱（登入信箱與自填信箱都沒有或格式不合）也回 failed_precondition，訊息說明這點，請賣家先填寫。
 	// etag 與目前的版本不符（包含核准已經生效後再帶舊 etag 送一次）一律回 aborted（VERSION_CONFLICT），不寫入。
 	ApproveKYC(context.Context, *connect.Request[v1alpha1.ApproveKYCRequest]) (*connect.Response[v1alpha1.ApproveKYCResponse], error)
 	// RejectKYC 退回審核中的申請，賣家修改後可以重送。etag 必填；reason 必填；etag 不符回 aborted（VERSION_CONFLICT），不寫入。
 	// 申請不能退回（不在審核中、店家已關閉或等待刪除）時回 failed_precondition，訊息是 KYCApplication.reject_unavailabilities 的第一句；
 	// 帳號停權中仍可退回。
 	RejectKYC(context.Context, *connect.Request[v1alpha1.RejectKYCRequest]) (*connect.Response[v1alpha1.RejectKYCResponse], error)
-	// RevealKYCSensitive 顯示一筆申請的身分證號、負責人身分證號與銀行帳號全文，並授權這位管理員在 15 分鐘內讀這筆申請的證件
-	// 圖片（回應的每張證件有一個 view_uri，是 GET，要帶同一位管理員的登入）。這是寫入稽核紀錄的動作（誰、哪筆申請、何時、
-	// 理由、授權到期的時間，不含值），所以是 POST，不是讀取；稽核寫入失敗就不回傳明文。回應不可快取。到期之後、或別的
-	// 管理員讀證件圖片都是 403，要再看就再顯示一次（再寫一列稽核）。
-	RevealKYCSensitive(context.Context, *connect.Request[v1alpha1.RevealKYCSensitiveRequest]) (*connect.Response[v1alpha1.RevealKYCSensitiveResponse], error)
-	// GetPayUniRegistration 讀店家的 PayUni 子商店註冊（綁定意圖、PayUni 的審核狀態碼與要處理的問題）。店家還沒有核准過
-	// 申請時 not_found。
-	GetPayUniRegistration(context.Context, *connect.Request[v1alpha1.GetPayUniRegistrationRequest]) (*connect.Response[v1alpha1.GetPayUniRegistrationResponse], error)
-	// RebindPayUni 對綁定失敗的註冊重新綁定（回到 PENDING 並排入新的背景工作），留下一筆審核紀錄。沒有 etag，由狀態檢查保護：
-	// 只有綁定失敗的能重綁。已經在重新綁定（PAYUNI_BIND_IN_PROGRESS）時呼叫不回錯誤、回傳目前的註冊（重送安全）；其餘原因回
-	// failed_precondition，訊息是 PayUniRegistration.rebind_unavailabilities 的第一句：PayUni 端已是終止狀態、店家已關閉或等待刪除、
-	// 已綁定、註冊所根據的申請不是已核准（例如賣家正在修改）。
-	RebindPayUni(context.Context, *connect.Request[v1alpha1.RebindPayUniRequest]) (*connect.Response[v1alpha1.RebindPayUniResponse], error)
-	// ListPayUniObservations 列出店家的 PayUni 狀態觀測紀錄（webhook、輪詢、手動刷新與綁定），依 PayUni 的事件時間新到舊。
-	ListPayUniObservations(context.Context, *connect.Request[v1alpha1.ListPayUniObservationsRequest]) (*connect.Response[v1alpha1.ListPayUniObservationsResponse], error)
-	// RefreshPayUniStatus 排入一次向 PayUni 查詢審核狀態的背景工作（營運工具；回應不等結果，結果從 GetPayUniRegistration
-	// 與 ListPayUniObservations 看）。PayUni 沒有設定、註冊還沒有綁定時回 failed_precondition。
-	RefreshPayUniStatus(context.Context, *connect.Request[v1alpha1.RefreshPayUniStatusRequest]) (*connect.Response[v1alpha1.RefreshPayUniStatusResponse], error)
 	// RequeryKYCRegistration 對審核中（SUBMITTED）的公司型申請重新查一次經濟部商業司的登記資料（送件時已查過一次，這是
 	// 手動補查：例如當時來源不可用或查無）。回應不等結果：排入背景工作，回傳這筆進行中的查詢（含期限），結果從 GetKYCApplication 的
 	// registration_check 看（查詢中時 pending_registration_check 有值）。伺服器保證這筆查詢在 deadline_time 之前到終態（查到、查無或
@@ -444,6 +336,13 @@ func NewSellerAdminServiceHandler(svc SellerAdminServiceHandler, opts ...connect
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
+	sellerAdminServiceGetStoreOnboardingHandler := connect.NewUnaryHandler(
+		SellerAdminServiceGetStoreOnboardingProcedure,
+		svc.GetStoreOnboarding,
+		connect.WithSchema(sellerAdminServiceMethods.ByName("GetStoreOnboarding")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	sellerAdminServiceListKYCApplicationsHandler := connect.NewUnaryHandler(
 		SellerAdminServiceListKYCApplicationsProcedure,
 		svc.ListKYCApplications,
@@ -455,13 +354,6 @@ func NewSellerAdminServiceHandler(svc SellerAdminServiceHandler, opts ...connect
 		SellerAdminServiceGetKYCApplicationProcedure,
 		svc.GetKYCApplication,
 		connect.WithSchema(sellerAdminServiceMethods.ByName("GetKYCApplication")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerAdminServiceListKYCRevealsHandler := connect.NewUnaryHandler(
-		SellerAdminServiceListKYCRevealsProcedure,
-		svc.ListKYCReveals,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("ListKYCReveals")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
@@ -484,38 +376,6 @@ func NewSellerAdminServiceHandler(svc SellerAdminServiceHandler, opts ...connect
 		connect.WithSchema(sellerAdminServiceMethods.ByName("RejectKYC")),
 		connect.WithHandlerOptions(opts...),
 	)
-	sellerAdminServiceRevealKYCSensitiveHandler := connect.NewUnaryHandler(
-		SellerAdminServiceRevealKYCSensitiveProcedure,
-		svc.RevealKYCSensitive,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("RevealKYCSensitive")),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerAdminServiceGetPayUniRegistrationHandler := connect.NewUnaryHandler(
-		SellerAdminServiceGetPayUniRegistrationProcedure,
-		svc.GetPayUniRegistration,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("GetPayUniRegistration")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerAdminServiceRebindPayUniHandler := connect.NewUnaryHandler(
-		SellerAdminServiceRebindPayUniProcedure,
-		svc.RebindPayUni,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("RebindPayUni")),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerAdminServiceListPayUniObservationsHandler := connect.NewUnaryHandler(
-		SellerAdminServiceListPayUniObservationsProcedure,
-		svc.ListPayUniObservations,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("ListPayUniObservations")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerAdminServiceRefreshPayUniStatusHandler := connect.NewUnaryHandler(
-		SellerAdminServiceRefreshPayUniStatusProcedure,
-		svc.RefreshPayUniStatus,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("RefreshPayUniStatus")),
-		connect.WithHandlerOptions(opts...),
-	)
 	sellerAdminServiceRequeryKYCRegistrationHandler := connect.NewUnaryHandler(
 		SellerAdminServiceRequeryKYCRegistrationProcedure,
 		svc.RequeryKYCRegistration,
@@ -530,28 +390,18 @@ func NewSellerAdminServiceHandler(svc SellerAdminServiceHandler, opts ...connect
 			sellerAdminServiceGetStoreStatsHandler.ServeHTTP(w, r)
 		case SellerAdminServiceGetStoreProcedure:
 			sellerAdminServiceGetStoreHandler.ServeHTTP(w, r)
+		case SellerAdminServiceGetStoreOnboardingProcedure:
+			sellerAdminServiceGetStoreOnboardingHandler.ServeHTTP(w, r)
 		case SellerAdminServiceListKYCApplicationsProcedure:
 			sellerAdminServiceListKYCApplicationsHandler.ServeHTTP(w, r)
 		case SellerAdminServiceGetKYCApplicationProcedure:
 			sellerAdminServiceGetKYCApplicationHandler.ServeHTTP(w, r)
-		case SellerAdminServiceListKYCRevealsProcedure:
-			sellerAdminServiceListKYCRevealsHandler.ServeHTTP(w, r)
 		case SellerAdminServiceListKYCDocumentAccessesProcedure:
 			sellerAdminServiceListKYCDocumentAccessesHandler.ServeHTTP(w, r)
 		case SellerAdminServiceApproveKYCProcedure:
 			sellerAdminServiceApproveKYCHandler.ServeHTTP(w, r)
 		case SellerAdminServiceRejectKYCProcedure:
 			sellerAdminServiceRejectKYCHandler.ServeHTTP(w, r)
-		case SellerAdminServiceRevealKYCSensitiveProcedure:
-			sellerAdminServiceRevealKYCSensitiveHandler.ServeHTTP(w, r)
-		case SellerAdminServiceGetPayUniRegistrationProcedure:
-			sellerAdminServiceGetPayUniRegistrationHandler.ServeHTTP(w, r)
-		case SellerAdminServiceRebindPayUniProcedure:
-			sellerAdminServiceRebindPayUniHandler.ServeHTTP(w, r)
-		case SellerAdminServiceListPayUniObservationsProcedure:
-			sellerAdminServiceListPayUniObservationsHandler.ServeHTTP(w, r)
-		case SellerAdminServiceRefreshPayUniStatusProcedure:
-			sellerAdminServiceRefreshPayUniStatusHandler.ServeHTTP(w, r)
 		case SellerAdminServiceRequeryKYCRegistrationProcedure:
 			sellerAdminServiceRequeryKYCRegistrationHandler.ServeHTTP(w, r)
 		default:
@@ -575,16 +425,16 @@ func (UnimplementedSellerAdminServiceHandler) GetStore(context.Context, *connect
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.GetStore is not implemented"))
 }
 
+func (UnimplementedSellerAdminServiceHandler) GetStoreOnboarding(context.Context, *connect.Request[v1alpha1.GetStoreOnboardingRequest]) (*connect.Response[v1alpha1.GetStoreOnboardingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.GetStoreOnboarding is not implemented"))
+}
+
 func (UnimplementedSellerAdminServiceHandler) ListKYCApplications(context.Context, *connect.Request[v1alpha1.ListKYCApplicationsRequest]) (*connect.Response[v1alpha1.ListKYCApplicationsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCApplications is not implemented"))
 }
 
 func (UnimplementedSellerAdminServiceHandler) GetKYCApplication(context.Context, *connect.Request[v1alpha1.GetKYCApplicationRequest]) (*connect.Response[v1alpha1.GetKYCApplicationResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.GetKYCApplication is not implemented"))
-}
-
-func (UnimplementedSellerAdminServiceHandler) ListKYCReveals(context.Context, *connect.Request[v1alpha1.ListKYCRevealsRequest]) (*connect.Response[v1alpha1.ListKYCRevealsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.ListKYCReveals is not implemented"))
 }
 
 func (UnimplementedSellerAdminServiceHandler) ListKYCDocumentAccesses(context.Context, *connect.Request[v1alpha1.ListKYCDocumentAccessesRequest]) (*connect.Response[v1alpha1.ListKYCDocumentAccessesResponse], error) {
@@ -597,26 +447,6 @@ func (UnimplementedSellerAdminServiceHandler) ApproveKYC(context.Context, *conne
 
 func (UnimplementedSellerAdminServiceHandler) RejectKYC(context.Context, *connect.Request[v1alpha1.RejectKYCRequest]) (*connect.Response[v1alpha1.RejectKYCResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.RejectKYC is not implemented"))
-}
-
-func (UnimplementedSellerAdminServiceHandler) RevealKYCSensitive(context.Context, *connect.Request[v1alpha1.RevealKYCSensitiveRequest]) (*connect.Response[v1alpha1.RevealKYCSensitiveResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.RevealKYCSensitive is not implemented"))
-}
-
-func (UnimplementedSellerAdminServiceHandler) GetPayUniRegistration(context.Context, *connect.Request[v1alpha1.GetPayUniRegistrationRequest]) (*connect.Response[v1alpha1.GetPayUniRegistrationResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.GetPayUniRegistration is not implemented"))
-}
-
-func (UnimplementedSellerAdminServiceHandler) RebindPayUni(context.Context, *connect.Request[v1alpha1.RebindPayUniRequest]) (*connect.Response[v1alpha1.RebindPayUniResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.RebindPayUni is not implemented"))
-}
-
-func (UnimplementedSellerAdminServiceHandler) ListPayUniObservations(context.Context, *connect.Request[v1alpha1.ListPayUniObservationsRequest]) (*connect.Response[v1alpha1.ListPayUniObservationsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.ListPayUniObservations is not implemented"))
-}
-
-func (UnimplementedSellerAdminServiceHandler) RefreshPayUniStatus(context.Context, *connect.Request[v1alpha1.RefreshPayUniStatusRequest]) (*connect.Response[v1alpha1.RefreshPayUniStatusResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.RefreshPayUniStatus is not implemented"))
 }
 
 func (UnimplementedSellerAdminServiceHandler) RequeryKYCRegistration(context.Context, *connect.Request[v1alpha1.RequeryKYCRegistrationRequest]) (*connect.Response[v1alpha1.RequeryKYCRegistrationResponse], error) {

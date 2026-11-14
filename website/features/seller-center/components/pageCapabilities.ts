@@ -112,7 +112,7 @@ const NOTICE_REQUIREMENTS: readonly SellerRequirement[] = [
 
 /**
  * 這一頁現在該不該把賣家導去公告頁：只看這一頁宣告的主要讀取能力，它沒有啟用、而且缺的條件含
- * `NOT_SUSPENDED`、`NOT_PENDING_DELETION` 或 `STORE_ACTIVE` 時才導。缺其他條件（例如 `KYC_APPROVED`）
+ * `NOT_SUSPENDED`、`NOT_PENDING_DELETION` 或 `STORE_ACTIVE` 時才導。缺其他條件（例如 `ONBOARDING_COMPLETE`）
  * 的頁面留在原地，由頁內依相關能力的缺項顯示閘門。還沒讀到店家、伺服器沒回報這個能力、或這一頁
  * 沒有宣告能力時不擋，交給伺服器判斷。client 不自己推前置條件。
  */

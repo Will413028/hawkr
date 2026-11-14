@@ -115,6 +115,22 @@ type Account struct {
 	CreatedAt time.Time
 }
 
+// ContactEmailSource 是帳號聯絡信箱的來源。
+type ContactEmailSource string
+
+const (
+	// ContactEmailVerified 是 provider 回報的已驗證 email（accounts.email）；它是寄件地址。
+	ContactEmailVerified ContactEmailSource = "VERIFIED"
+	// ContactEmailSelfEntered 是帳號自己填的信箱（accounts.self_entered_email），未驗證，不是寄件地址。
+	ContactEmailSelfEntered ContactEmailSource = "SELF_ENTERED"
+)
+
+// ContactEmail 是帳號的聯絡信箱與它的來源。
+type ContactEmail struct {
+	Address string
+	Source  ContactEmailSource
+}
+
 // Lifecycle 是帳號的生命週期：ACTIVE → PENDING_DELETION → DELETED。
 type Lifecycle string
 

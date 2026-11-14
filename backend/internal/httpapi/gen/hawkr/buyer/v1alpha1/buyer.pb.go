@@ -287,15 +287,15 @@ func (x *Profile) GetAvatarStagedToken() string {
 type Address struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	ReceiverName  string                 `protobuf:"bytes,3,opt,name=receiver_name,json=receiverName,proto3" json:"receiver_name,omitempty"`
-	ReceiverPhone string                 `protobuf:"bytes,4,opt,name=receiver_phone,json=receiverPhone,proto3" json:"receiver_phone,omitempty"`
+	ReceiverName  string                 `protobuf:"bytes,2,opt,name=receiver_name,json=receiverName,proto3" json:"receiver_name,omitempty"`
+	ReceiverPhone string                 `protobuf:"bytes,3,opt,name=receiver_phone,json=receiverPhone,proto3" json:"receiver_phone,omitempty"`
 	// 收貨的地點；明細必填（1–255 字）。update_mask 列 postal_address 時整個換成請求的地址。
-	PostalAddress *v1alpha1.PostalAddress `protobuf:"bytes,12,opt,name=postal_address,json=postalAddress,proto3" json:"postal_address,omitempty"`
+	PostalAddress *v1alpha1.PostalAddress `protobuf:"bytes,4,opt,name=postal_address,json=postalAddress,proto3" json:"postal_address,omitempty"`
 	// 是否為預設地址。
-	DefaultAddress bool                   `protobuf:"varint,8,opt,name=default_address,json=defaultAddress,proto3" json:"default_address,omitempty"`
-	CreateTime     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
-	UpdateTime     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
-	Etag           string                 `protobuf:"bytes,11,opt,name=etag,proto3" json:"etag,omitempty"`
+	DefaultAddress bool                   `protobuf:"varint,5,opt,name=default_address,json=defaultAddress,proto3" json:"default_address,omitempty"`
+	CreateTime     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	UpdateTime     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	Etag           string                 `protobuf:"bytes,8,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -403,9 +403,9 @@ type ProductCard struct {
 	Available bool `protobuf:"varint,8,opt,name=available,proto3" json:"available,omitempty"`
 	// 呼叫者已訂閱這個商品的補貨通知。
 	RestockSubscribed bool   `protobuf:"varint,9,opt,name=restock_subscribed,json=restockSubscribed,proto3" json:"restock_subscribed,omitempty"`
-	StoreId           string `protobuf:"bytes,11,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	StoreId           string `protobuf:"bytes,10,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
 	// 商品所屬店家的卡片；不設表示這家店不顯示（從沒公開過或不存在）。
-	Store         *v1alpha1.StoreCard `protobuf:"bytes,10,opt,name=store,proto3" json:"store,omitempty"`
+	Store         *v1alpha1.StoreCard `protobuf:"bytes,11,opt,name=store,proto3" json:"store,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -573,10 +573,10 @@ func (x *Favorite) GetCreateTime() *timestamppb.Timestamp {
 // Follow 是追蹤的店家。
 type Follow struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
-	StoreId string                 `protobuf:"bytes,3,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	StoreId string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
 	// 不設表示這家店不顯示（從沒公開過或不存在）。
-	Store         *v1alpha1.StoreCard    `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
-	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	Store         *v1alpha1.StoreCard    `protobuf:"bytes,2,opt,name=store,proto3" json:"store,omitempty"`
+	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -741,13 +741,13 @@ func (x *RestockSubscription) GetCreateTime() *timestamppb.Timestamp {
 // MemberCard 是買家在一個店家的會員卡。
 type MemberCard struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
-	StoreId string                 `protobuf:"bytes,4,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	StoreId string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
 	// 不設表示這家店不顯示（從沒公開過或不存在）。
-	Store *v1alpha1.StoreCard `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
+	Store *v1alpha1.StoreCard `protobuf:"bytes,2,opt,name=store,proto3" json:"store,omitempty"`
 	// 累計消費額（扣除退款），新台幣元。
-	TotalSpent int64 `protobuf:"varint,2,opt,name=total_spent,json=totalSpent,proto3" json:"total_spent,omitempty"`
+	TotalSpent int64 `protobuf:"varint,3,opt,name=total_spent,json=totalSpent,proto3" json:"total_spent,omitempty"`
 	// 買家是這個店家的 VIP。
-	Vip           bool `protobuf:"varint,3,opt,name=vip,proto3" json:"vip,omitempty"`
+	Vip           bool `protobuf:"varint,4,opt,name=vip,proto3" json:"vip,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3216,19 +3216,18 @@ const file_hawkr_buyer_v1alpha1_buyer_proto_rawDesc = "" +
 	"updateTime\x12\x12\n" +
 	"\x04etag\x18\f \x01(\tR\x04etag\x123\n" +
 	"\x13avatar_staged_token\x18\r \x01(\tB\x03\xe0A\x04R\x11avatarStagedTokenB\t\n" +
-	"\a_gender\"\xc6\x03\n" +
+	"\a_gender\"\x87\x03\n" +
 	"\aAddress\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12(\n" +
-	"\rreceiver_name\x18\x03 \x01(\tB\x03\xe0A\x02R\freceiverName\x12*\n" +
-	"\x0ereceiver_phone\x18\x04 \x01(\tB\x03\xe0A\x02R\rreceiverPhone\x12P\n" +
-	"\x0epostal_address\x18\f \x01(\v2$.hawkr.common.v1alpha1.PostalAddressB\x03\xe0A\x02R\rpostalAddress\x12'\n" +
-	"\x0fdefault_address\x18\b \x01(\bR\x0edefaultAddress\x12@\n" +
-	"\vcreate_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\rreceiver_name\x18\x02 \x01(\tB\x03\xe0A\x02R\freceiverName\x12*\n" +
+	"\x0ereceiver_phone\x18\x03 \x01(\tB\x03\xe0A\x02R\rreceiverPhone\x12P\n" +
+	"\x0epostal_address\x18\x04 \x01(\v2$.hawkr.common.v1alpha1.PostalAddressB\x03\xe0A\x02R\rpostalAddress\x12'\n" +
+	"\x0fdefault_address\x18\x05 \x01(\bR\x0edefaultAddress\x12@\n" +
+	"\vcreate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12@\n" +
-	"\vupdate_time\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\vupdate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x12\n" +
-	"\x04etag\x18\v \x01(\tR\x04etagJ\x04\b\x02\x10\x03J\x04\b\x05\x10\x06J\x04\b\x06\x10\aJ\x04\b\a\x10\bR\x05labelR\x04cityR\bdistrictR\x0edetail_address\"\x81\x03\n" +
+	"\x04etag\x18\b \x01(\tR\x04etag\"\x81\x03\n" +
 	"\vProductCard\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\adeleted\x18\x02 \x01(\bR\adeleted\x12\x12\n" +
@@ -3239,18 +3238,18 @@ const file_hawkr_buyer_v1alpha1_buyer_proto_rawDesc = "" +
 	"\x06rating\x18\a \x01(\x02H\x00R\x06rating\x88\x01\x01\x12\x1c\n" +
 	"\tavailable\x18\b \x01(\bR\tavailable\x12-\n" +
 	"\x12restock_subscribed\x18\t \x01(\bR\x11restockSubscribed\x12\x19\n" +
-	"\bstore_id\x18\v \x01(\tR\astoreId\x126\n" +
-	"\x05store\x18\n" +
-	" \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05storeB\t\n" +
+	"\bstore_id\x18\n" +
+	" \x01(\tR\astoreId\x126\n" +
+	"\x05store\x18\v \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05storeB\t\n" +
 	"\a_rating\"\x84\x01\n" +
 	"\bFavorite\x12;\n" +
 	"\aproduct\x18\x01 \x01(\v2!.hawkr.buyer.v1alpha1.ProductCardR\aproduct\x12;\n" +
 	"\vcreate_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"createTime\"\x98\x01\n" +
 	"\x06Follow\x12\x19\n" +
-	"\bstore_id\x18\x03 \x01(\tR\astoreId\x126\n" +
-	"\x05store\x18\x01 \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05store\x12;\n" +
-	"\vcreate_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"\bstore_id\x18\x01 \x01(\tR\astoreId\x126\n" +
+	"\x05store\x18\x02 \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05store\x12;\n" +
+	"\vcreate_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"createTime\"\x7f\n" +
 	"\x05Visit\x12;\n" +
 	"\aproduct\x18\x01 \x01(\v2!.hawkr.buyer.v1alpha1.ProductCardR\aproduct\x129\n" +
@@ -3262,11 +3261,11 @@ const file_hawkr_buyer_v1alpha1_buyer_proto_rawDesc = "" +
 	"createTime\"\x92\x01\n" +
 	"\n" +
 	"MemberCard\x12\x19\n" +
-	"\bstore_id\x18\x04 \x01(\tR\astoreId\x126\n" +
-	"\x05store\x18\x01 \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05store\x12\x1f\n" +
-	"\vtotal_spent\x18\x02 \x01(\x03R\n" +
+	"\bstore_id\x18\x01 \x01(\tR\astoreId\x126\n" +
+	"\x05store\x18\x02 \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05store\x12\x1f\n" +
+	"\vtotal_spent\x18\x03 \x01(\x03R\n" +
 	"totalSpent\x12\x10\n" +
-	"\x03vip\x18\x03 \x01(\bR\x03vip\"\xd6\x01\n" +
+	"\x03vip\x18\x04 \x01(\bR\x03vip\"\xd6\x01\n" +
 	"\x0eSpendingRecord\x12!\n" +
 	"\forder_number\x18\x01 \x01(\tR\vorderNumber\x12\x16\n" +
 	"\x06amount\x18\x02 \x01(\x03R\x06amount\x12'\n" +

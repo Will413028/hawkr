@@ -70,7 +70,7 @@ export const STORE_STATE_UNKNOWN_MESSAGE =
 
 /**
  * 物流設定（`SHIPPING_SETUP`）的閘門，只由伺服器回報的啟用與缺的條件決定，優先序固定：
- * 等待刪除 > 停權 > 認證。啟用就開放；缺 `KYC_APPROVED` 是認證閘門；店家還沒讀到、伺服器沒回報
+ * 等待刪除 > 停權 > 認證。啟用就開放；缺 `ONBOARDING_COMPLETE` 是認證閘門；店家還沒讀到、伺服器沒回報
  * 這個能力、缺 `STORE_ACTIVE` 或缺項不認得，都是 `unknown`（不退回認證閘門）。
  */
 export type ShippingGate =
@@ -90,18 +90,20 @@ export function shippingGateOf(my: MyStore | null | undefined): ShippingGate {
 	}
 	if (missing.includes(SellerRequirement.NOT_SUSPENDED)) return "suspended";
 	if (missing.includes(SellerRequirement.STORE_ACTIVE)) return "unknown";
-	if (missing.includes(SellerRequirement.KYC_APPROVED)) return "certification";
+	if (missing.includes(SellerRequirement.ONBOARDING_COMPLETE))
+		return "certification";
 	return "unknown";
 }
 
 /**
- * 商家認證（含 PayUni 審核）已核准：`PUBLIC_LISTING` 缺的條件不含 `KYC_APPROVED`。
+ * 商家認證與收款開通已完成：`PUBLIC_LISTING` 缺的條件不含 `ONBOARDING_COMPLETE`。
  * 沒有回報 `PUBLIC_LISTING`（代行的店面、尚未載入）不算已認證。
  */
 export function isStoreCertified(my: MyStore | null | undefined): boolean {
 	const missing = missingRequirements(my);
 	return (
-		missing !== undefined && !missing.includes(SellerRequirement.KYC_APPROVED)
+		missing !== undefined &&
+		!missing.includes(SellerRequirement.ONBOARDING_COMPLETE)
 	);
 }
 

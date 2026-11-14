@@ -1,6 +1,6 @@
 /**
  * 店家的聯絡資料（聯絡人姓名、聯絡人手機、客服電子信箱）與送出 KYC 之前還缺的店家欄位。
- * 這些欄位屬於店家（`UpdateMyStore`）：PayUni 綁定與同步都讀店家的值，KYC 申請上沒有它們的副本。
+ * 這些欄位屬於店家（`UpdateMyStore`），KYC 申請上沒有它們的副本。
  */
 
 import type { StoreField } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";

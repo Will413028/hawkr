@@ -3,7 +3,6 @@ import type { ListStoresRequestSchema } from "@hawkr/api/gen/hawkr/admin/seller/
 import { Role } from "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb";
 import {
 	KYCStatus,
-	PayUniBindStatus,
 	StoreStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 
@@ -16,7 +15,6 @@ export const FILTER_TABS = [
 	"approved",
 	"pending",
 	"rejected",
-	"rebind",
 	"suspended",
 	"closed",
 ] as const;
@@ -28,12 +26,11 @@ export const FILTER_TAB_LABEL: Record<FilterTab, string> = {
 	approved: "已核准",
 	pending: "待審核",
 	rejected: "已退回",
-	rebind: "待重新綁定",
 	suspended: "停權中",
 	closed: "已關閉",
 };
 
-/** 網址的 `?filter=`：不認得的值（含舊版的 active、forwarded）回到「全部」。 */
+/** 網址的 `?filter=`：不認得的值（含舊版的 active、forwarded、rebind）回到「全部」。 */
 export function parseFilterTab(raw: string | null | undefined): FilterTab {
 	return (FILTER_TABS as readonly string[]).includes(raw ?? "")
 		? (raw as FilterTab)
@@ -50,11 +47,7 @@ export function filterFields(
 	tab: FilterTab,
 ): Pick<
 	ListStoresInit,
-	| "status"
-	| "kycStatus"
-	| "kycAwaitingReview"
-	| "payuniBindStatus"
-	| "suspended"
+	"status" | "kycStatus" | "kycAwaitingReview" | "suspended"
 > {
 	switch (tab) {
 		case "all":
@@ -66,8 +59,6 @@ export function filterFields(
 			return { kycAwaitingReview: true };
 		case "rejected":
 			return { kycStatus: KYCStatus.KYC_STATUS_REJECTED };
-		case "rebind":
-			return { payuniBindStatus: PayUniBindStatus.FAILED };
 		case "suspended":
 			return { suspended: true };
 		case "closed":

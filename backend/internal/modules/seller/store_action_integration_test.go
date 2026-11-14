@@ -11,7 +11,6 @@ import (
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
-	pu "github.com/Will413028/hawkr/backend/internal/platform/payuni"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
@@ -117,7 +116,7 @@ func TestKYCReviewPausesWhileTheStoreIsClosedAndResumesFromTheReopening(t *testi
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	_, s, sub := f.submitted(t, idA, bankAcct)
+	_, s, sub := f.submitted(t)
 	submittedAt := f.now
 	if got := f.kycReviewStarts(t, f.now); !got[s.StoreID].Equal(submittedAt) {
 		t.Fatalf("營運中：開始是送出時間：%v", got)
@@ -184,7 +183,7 @@ func TestKYCReviewStartsFromTheReopeningWhenItIsTheLatest(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountID, s, _ := f.submitted(t, idA, bankAcct)
+	accountID, s, _ := f.submitted(t)
 	submittedAt := f.now
 	m := f.terminate(t, s.StoreID, GroundFraud)
 	f.effect(t, m)
@@ -213,7 +212,7 @@ func TestKYCReviewStartsFromTheReopeningWhenItIsTheLatest(t *testing.T) {
 func TestKYCReviewPausesWhileTheStoreIsPendingDeletion(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	accountID, s, sub := f.submitted(t, idA, bankAcct)
+	accountID, s, sub := f.submitted(t)
 	f.beginDeletion(t, accountID, s.StoreID)
 	text := "店家等待刪除，這份商家認證申請不再審核。"
 	pending := []StoreActionUnavailableReason{StoreReasonStorePendingDeletion}
@@ -240,7 +239,7 @@ func TestKYCReviewPausesDuringSuspensionAndResumesWhenItEnds(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountID, s, sub := f.submitted(t, idA, bankAcct)
+	accountID, s, sub := f.submitted(t)
 	submittedAt := f.now
 	f.tick(time.Hour)
 	ends := f.now.Add(24 * time.Hour)
@@ -272,7 +271,7 @@ func TestKYCReviewPausesDuringSuspensionAndResumesWhenItEnds(t *testing.T) {
 		t.Fatalf("到期之後開始是停權結束的時間 %v：%v", ends, got)
 	}
 	// 撤銷也是一種結束：另一家店，停權再撤銷。
-	account2, s2, _ := f.submitted(t, idB, "012345678902")
+	account2, s2, _ := f.submitted(t)
 	f.tick(time.Hour)
 	risk := f.suspend(t, s2.StoreID)
 	if len(f.kycReviewStarts(t, f.now)) != 0 || f.liftedAt(t, account2, f.now) != nil {
@@ -293,7 +292,7 @@ func TestKYCReviewPausesDuringSuspensionAndResumesWhenItEnds(t *testing.T) {
 func TestRejectingDuringSuspensionStillWorks(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	_, s, sub := f.submitted(t, idA, bankAcct)
+	_, s, sub := f.submitted(t)
 	f.suspend(t, s.StoreID)
 	rej := f.reject(t, sub, anIssue()...)
 	if rej.Status != KYCStatusRejected {
@@ -310,7 +309,7 @@ func TestASuspensionThatEndedBeforeSubmittingDoesNotMoveTheStart(t *testing.T) {
 	f.tick(time.Hour)
 	f.revoke(t, risk)
 	f.tick(time.Hour)
-	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
+	d := f.savedDraft(t, kycDraft(accountID))
 	_, err := f.module.SubmitKYC(context.Background(), SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
 	// 較早結束的停權讓 greatest 取它，但送出時間更晚，所以開始是送出時間。
@@ -328,7 +327,7 @@ func TestAwaitingReviewIsOneDefinitionAcrossTheQueueTheListAndTheStats(t *testin
 	ctx := context.Background()
 	sub := func(serial int) (int64, Store, KYCApplication) {
 		accountID, store := f.open(t)
-		return accountID, store, f.submitKYCFor(t, accountID, serial)
+		return accountID, store, f.submitKYCFor(t, accountID)
 	}
 	_, operating, _ := sub(1)
 	_, closedStore, _ := sub(2)
@@ -345,10 +344,10 @@ func TestAwaitingReviewIsOneDefinitionAcrossTheQueueTheListAndTheStats(t *testin
 	f.revoke(t, reopenTerm)
 	_, _, toApprove := sub(6)
 	must(t, approve(f, toApprove))
-	// 身分命中：別的帳號以同一個身分證號入駐過、之後被停權，這一份在送出時還沒有處分；核准會失敗，但仍留在待辦讓員工退回。
+	// 身分命中：別的帳號以同一個統編入駐過、之後被停權，這一份在送出時還沒有處分；核准會失敗，但仍留在待辦讓員工退回。
 	otherAccount, otherStore := f.open(t)
-	f.savedDraft(t, kycDraft(otherAccount, taiwanID(7), "999888777666"))
-	_, hitStore, hitSub := sub(7)
+	f.savedDraft(t, companyDraft(otherAccount, taxIDOne))
+	_, hitStore, hitSub := f.submittedCompany(t, taxIDOne)
 	f.suspend(t, otherStore.StoreID)
 	if err := approve(f, hitSub); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("身分命中核准要失敗：%v", err)
@@ -394,126 +393,4 @@ func TestAwaitingReviewIsOneDefinitionAcrossTheQueueTheListAndTheStats(t *testin
 	if int(stats.KYCAwaitingReview) != len(want) {
 		t.Errorf("統計卡 %d，預期 %d", stats.KYCAwaitingReview, len(want))
 	}
-}
-
-// 重新綁定：可用性與方法是同一個函式。已關閉、等待刪除 → failed_precondition 與各自的句子（不再是 not_found）；終止（needs_reonboarding）而且已關閉 →
-// 第一句是終止；BOUND → failed_precondition；PENDING → 回目前的註冊、不排 job，原因第一個是 PAYUNI_BIND_IN_PROGRESS、can_rebind 為 false。
-// mutation：RebindUnavailableReasons 把 STORE_CLOSED 拿掉 → 已關閉的店可以重新綁定。
-func TestRebindReasonsAndErrorsAreTheSameFunction(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	failed := func(t *testing.T) (*fixture, int64, Store) {
-		f := setup(t)
-		accountID, s := f.approvedStore(t)
-		f.payuni.bindErr = []error{apiErr("AGENT04003")}
-		f.sync(t, s.StoreID)
-		if f.registration(t, s.StoreID).BindStatus != BindStatusFailed {
-			t.Fatal("not failed")
-		}
-		return f, accountID, s
-	}
-	t.Run("已關閉", func(t *testing.T) {
-		t.Parallel()
-		f, accountID, s := failed(t)
-		_, err := f.module.CloseCurrent(ctx, accountID)
-		must(t, err)
-		view, err := f.module.PayUniRegistrationOf(ctx, s.StoreID)
-		must(t, err)
-		if !slices.Equal(view.RebindUnavailable, []StoreActionUnavailableReason{StoreReasonStoreClosed}) {
-			t.Fatalf("reasons=%v", view.RebindUnavailable)
-		}
-		_, err = f.module.RebindPayUni(ctx, RebindPayUniInput{StoreID: s.StoreID, AdminID: 9})
-		if apperr.KindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "店家已關閉，不能重新綁定 PayUni。") {
-			t.Fatalf("rebind：%v", err)
-		}
-	})
-	t.Run("等待刪除", func(t *testing.T) {
-		t.Parallel()
-		f, accountID, s := failed(t)
-		f.beginDeletion(t, accountID, s.StoreID)
-		view, err := f.module.PayUniRegistrationOf(ctx, s.StoreID)
-		must(t, err)
-		if !slices.Equal(view.RebindUnavailable, []StoreActionUnavailableReason{StoreReasonStorePendingDeletion}) {
-			t.Fatalf("reasons=%v", view.RebindUnavailable)
-		}
-		_, err = f.module.RebindPayUni(ctx, RebindPayUniInput{StoreID: s.StoreID, AdminID: 9})
-		if apperr.KindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "店家等待刪除，不能重新綁定 PayUni。") {
-			t.Fatalf("rebind：%v", err)
-		}
-	})
-	t.Run("PayUni 端已終止而且已關閉", func(t *testing.T) {
-		t.Parallel()
-		f := setup(t)
-		accountID, s := f.approvedStore(t)
-		f.payuni.bindErr = []error{apiErr("AGENT04017")}
-		f.payuni.status = pu.MerchantStatus{MerStatus: "92", Reason: "文件不符"}
-		f.sync(t, s.StoreID)
-		_, err := f.module.CloseCurrent(ctx, accountID)
-		must(t, err)
-		view, err := f.module.PayUniRegistrationOf(ctx, s.StoreID)
-		must(t, err)
-		if len(view.RebindUnavailable) < 2 || view.RebindUnavailable[0] != StoreReasonPayUniMerchantTerminal || view.RebindUnavailable[1] != StoreReasonStoreClosed {
-			t.Fatalf("reasons=%v", view.RebindUnavailable)
-		}
-		_, err = f.module.RebindPayUni(ctx, RebindPayUniInput{StoreID: s.StoreID, AdminID: 9})
-		if apperr.KindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "PayUni 端的商店已是終止狀態，這家店無法再綁定；賣家要重新入駐才能收款。") {
-			t.Fatalf("rebind：%v", err)
-		}
-	})
-	t.Run("已綁定", func(t *testing.T) {
-		t.Parallel()
-		f := setup(t)
-		_, s := f.boundStore(t)
-		view, err := f.module.PayUniRegistrationOf(ctx, s.StoreID)
-		must(t, err)
-		if len(view.RebindUnavailable) == 0 || view.RebindUnavailable[0] != StoreReasonPayUniBound {
-			t.Fatalf("reasons=%v", view.RebindUnavailable)
-		}
-		if _, err := f.module.RebindPayUni(ctx, RebindPayUniInput{StoreID: s.StoreID, AdminID: 9}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
-			t.Fatalf("rebind：%v", err)
-		}
-	})
-	t.Run("綁定失敗而賣家改回草稿", func(t *testing.T) {
-		t.Parallel()
-		f, accountID, s := failed(t)
-		mine, err := f.module.MyKYC(ctx, accountID)
-		must(t, err)
-		_, err = f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: mine.Version, RealName: ptr("王大明")})
-		must(t, err)
-		view, err := f.module.PayUniRegistrationOf(ctx, s.StoreID)
-		must(t, err)
-		if !slices.Equal(view.RebindUnavailable, []StoreActionUnavailableReason{StoreReasonKYCNotApproved}) {
-			t.Fatalf("reasons=%v", view.RebindUnavailable)
-		}
-		// 同一句：卡片上的原因句與 RebindPayUni 的錯誤（5a #38）。
-		want := StoreActionUnavailableText(StoreReasonKYCNotApproved, StoreActionRebindPayUni).Text
-		_, err = f.module.RebindPayUni(ctx, RebindPayUniInput{StoreID: s.StoreID, AdminID: 9})
-		if want != "賣家正在修改商家認證，重新核准後會自動重新綁定。" || apperr.KindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), want) {
-			t.Fatalf("rebind：%q %v", want, err)
-		}
-	})
-	t.Run("綁定失敗：可以重新綁定", func(t *testing.T) {
-		t.Parallel()
-		f, _, s := failed(t)
-		view, err := f.module.PayUniRegistrationOf(ctx, s.StoreID)
-		must(t, err)
-		if len(view.RebindUnavailable) != 0 || view.FlowStatus != FlowBindFailed {
-			t.Fatalf("reasons=%v flow=%v", view.RebindUnavailable, view.FlowStatus)
-		}
-		jobs := f.jobs.count(kindSync)
-		after, err := f.module.RebindPayUni(ctx, RebindPayUniInput{StoreID: s.StoreID, AdminID: 9})
-		must(t, err)
-		if after.BindStatus != BindStatusPending || after.FlowStatus != FlowBinding || f.jobs.count(kindSync) != jobs+1 ||
-			!slices.Equal(after.RebindUnavailable, []StoreActionUnavailableReason{StoreReasonPayUniBindInProgress}) {
-			t.Fatalf("after=%+v", after)
-		}
-		// 綁定中：不是失敗原因、沒有句子；再送一次回目前的註冊、不另排 job。
-		if StoreActionUnavailableText(StoreReasonPayUniBindInProgress, StoreActionRebindPayUni).Text != "" {
-			t.Fatal("PAYUNI_BIND_IN_PROGRESS 沒有句子")
-		}
-		again, err := f.module.RebindPayUni(ctx, RebindPayUniInput{StoreID: s.StoreID, AdminID: 9})
-		if err != nil || again.BindStatus != BindStatusPending || f.jobs.count(kindSync) != jobs+1 {
-			t.Fatalf("again=%+v err=%v", again, err)
-		}
-	})
 }

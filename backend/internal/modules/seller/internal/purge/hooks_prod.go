@@ -8,3 +8,5 @@ type hooks struct{}
 func (hooks) afterCandidates() {}
 
 func (hooks) afterPurgeCandidates() {}
+
+func (hooks) beforePurgeBatch() {}

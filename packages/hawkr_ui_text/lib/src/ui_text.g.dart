@@ -7,6 +7,7 @@ import 'package:connectrpc/connect.dart' show Code;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
 
 import '../hawkr_ui_text.dart' show UiLocale;
@@ -75,6 +76,42 @@ extension CommonStoreCardStatusUiText on hawkr_common_v1alpha1_store_card.StoreC
   String? uiText(UiLocale l) => _commonStoreCardStatus(l, value);
 }
 
+String? _paymentPaymentAccountStatus(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '準備中',
+(UiLocale.en, 1) => 'Preparing',
+(UiLocale.zhTW, 2) => '審核中',
+(UiLocale.en, 2) => 'Under review',
+(UiLocale.zhTW, 3) => '待設定',
+(UiLocale.en, 3) => 'Setup needed',
+(UiLocale.zhTW, 4) => '已啟用',
+(UiLocale.en, 4) => 'Active',
+(UiLocale.zhTW, 5) => '無法啟用',
+(UiLocale.en, 5) => 'Unavailable',
+_ => null,
+};
+}
+
+extension PaymentPaymentAccountStatusUiText on hawkr_payment_v1alpha1_payment.PaymentAccountStatus {
+  /// payment.PaymentAccountStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _paymentPaymentAccountStatus(l, value);
+}
+
+String? _paymentRequirementCollection(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '金流商收件（託管頁面）',
+(UiLocale.en, 1) => 'Provider-hosted',
+(UiLocale.zhTW, 2) => '平台收件（內嵌元件）',
+(UiLocale.en, 2) => 'Embedded on platform',
+_ => null,
+};
+}
+
+extension PaymentRequirementCollectionUiText on hawkr_payment_v1alpha1_payment.RequirementCollection {
+  /// payment.RequirementCollection 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _paymentRequirementCollection(l, value);
+}
+
 String? _sellerContentKind(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '貼文',
@@ -91,28 +128,14 @@ extension SellerContentKindUiText on hawkr_seller_v1alpha1_seller.ContentKind {
 
 String? _sellerKYCField(UiLocale l, int value) {
 return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => '真實姓名',
-(UiLocale.zhTW || UiLocale.en, 2) => '出生日期',
-(UiLocale.zhTW || UiLocale.en, 3) => '發證日期',
-(UiLocale.zhTW || UiLocale.en, 4) => '發證類型',
-(UiLocale.zhTW || UiLocale.en, 5) => '發證地點',
-(UiLocale.zhTW || UiLocale.en, 6) => '英文姓名',
-(UiLocale.zhTW || UiLocale.en, 7) => '銀行名稱',
-(UiLocale.zhTW || UiLocale.en, 8) => '銀行代碼',
-(UiLocale.zhTW || UiLocale.en, 9) => '銀行帳號',
-(UiLocale.zhTW || UiLocale.en, 10) => '主要商品類型',
-(UiLocale.zhTW || UiLocale.en, 12) => '官方網站',
-(UiLocale.zhTW || UiLocale.en, 15) => '身分證正面照',
-(UiLocale.zhTW || UiLocale.en, 16) => '身分證反面照',
-(UiLocale.zhTW || UiLocale.en, 17) => '存摺封面',
-(UiLocale.zhTW || UiLocale.en, 18) => '身分證字號',
-(UiLocale.zhTW || UiLocale.en, 20) => '公司名稱',
-(UiLocale.zhTW || UiLocale.en, 21) => '統一編號',
-(UiLocale.zhTW || UiLocale.en, 22) => '設立日期',
-(UiLocale.zhTW || UiLocale.en, 25) => '公司電話',
-(UiLocale.zhTW || UiLocale.en, 26) => '負責人身分證字號',
-(UiLocale.zhTW || UiLocale.en, 27) => '補充文件',
-(UiLocale.zhTW || UiLocale.en, 28) => '公司地址',
+(UiLocale.zhTW || UiLocale.en, 1) => '主要商品類型',
+(UiLocale.zhTW || UiLocale.en, 2) => '官方網站',
+(UiLocale.zhTW || UiLocale.en, 3) => '公司名稱',
+(UiLocale.zhTW || UiLocale.en, 4) => '統一編號',
+(UiLocale.zhTW || UiLocale.en, 5) => '設立日期',
+(UiLocale.zhTW || UiLocale.en, 6) => '公司電話',
+(UiLocale.zhTW || UiLocale.en, 7) => '補充文件',
+(UiLocale.zhTW || UiLocale.en, 8) => '公司地址',
 _ => null,
 };
 }
@@ -122,101 +145,25 @@ extension SellerKYCFieldUiText on hawkr_seller_v1alpha1_seller.KYCField {
   String? uiText(UiLocale l) => _sellerKYCField(l, value);
 }
 
-String? _sellerKYCFlowStatus(UiLocale l, int value) {
+String? _sellerKYCStatus(UiLocale l, int value) {
 return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => '待認證',
-(UiLocale.zhTW || UiLocale.en, 2) => '填寫中',
-(UiLocale.zhTW || UiLocale.en, 3) => '平台審核中',
-(UiLocale.zhTW || UiLocale.en, 4) => '未通過',
-(UiLocale.zhTW || UiLocale.en, 5) => 'PayUni 審核中',
-(UiLocale.zhTW || UiLocale.en, 6) => 'PayUni 建檔失敗，處理中',
-(UiLocale.zhTW || UiLocale.en, 7) => 'PayUni 審核中',
-(UiLocale.zhTW || UiLocale.en, 8) => 'PayUni 審核中',
-(UiLocale.zhTW || UiLocale.en, 9) => '需補件',
-(UiLocale.zhTW || UiLocale.en, 10) => '已通過',
-(UiLocale.zhTW || UiLocale.en, 11) => 'PayUni 審核未通過',
+(UiLocale.zhTW, 1) => '草稿',
+(UiLocale.en, 1) => 'Draft',
+(UiLocale.zhTW, 2) => '審核中',
+(UiLocale.en, 2) => 'Under review',
+(UiLocale.zhTW, 3) => '已通過',
+(UiLocale.en, 3) => 'Approved',
+(UiLocale.zhTW, 4) => '需修改',
+(UiLocale.en, 4) => 'Needs changes',
+(UiLocale.zhTW, 5) => '已取消',
+(UiLocale.en, 5) => 'Cancelled',
 _ => null,
 };
 }
 
-String? _sellerKYCFlowStatusAction(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => '開始認證',
-(UiLocale.zhTW || UiLocale.en, 2) => '開始認證',
-(UiLocale.zhTW || UiLocale.en, 3) => '查看進度',
-(UiLocale.zhTW || UiLocale.en, 4) => '前往補件',
-(UiLocale.zhTW || UiLocale.en, 5) => '查看進度',
-(UiLocale.zhTW || UiLocale.en, 6) => '查看進度',
-(UiLocale.zhTW || UiLocale.en, 7) => '查看進度',
-(UiLocale.zhTW || UiLocale.en, 8) => '查看進度',
-(UiLocale.zhTW || UiLocale.en, 9) => '前往補件',
-(UiLocale.zhTW || UiLocale.en, 11) => '前往補件',
-_ => null,
-};
-}
-
-String? _sellerKYCFlowStatusBannerDescription(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => '完成認證後才能正式收款、提領與配送設定。',
-(UiLocale.zhTW || UiLocale.en, 2) => '完成認證後才能正式收款、提領與配送設定。',
-(UiLocale.zhTW || UiLocale.en, 3) => '審核通過後將自動送出至 PayUni 進行金流審核。',
-(UiLocale.zhTW || UiLocale.en, 4) => '請查看退件原因並編輯後重新送出。',
-(UiLocale.zhTW || UiLocale.en, 10) => '可開始正式收款、提領與配送設定。',
-_ => null,
-};
-}
-
-String? _sellerKYCFlowStatusBannerTitle(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => '尚未開始商家認證',
-(UiLocale.zhTW || UiLocale.en, 2) => '尚未開始商家認證',
-(UiLocale.zhTW || UiLocale.en, 3) => '平台審核中',
-(UiLocale.zhTW || UiLocale.en, 4) => '認證未通過',
-(UiLocale.zhTW || UiLocale.en, 10) => '商家認證已通過',
-_ => null,
-};
-}
-
-String? _sellerKYCFlowStatusGateHeading(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => '尚未通過商家認證',
-(UiLocale.zhTW || UiLocale.en, 2) => '尚未通過商家認證',
-(UiLocale.zhTW || UiLocale.en, 3) => '商家認證審核中',
-(UiLocale.zhTW || UiLocale.en, 4) => '商家認證需要補件',
-(UiLocale.zhTW || UiLocale.en, 10) => '尚未通過商家認證',
-_ => null,
-};
-}
-
-String? _sellerKYCFlowStatusGateMessage(UiLocale l, int value, String subject) {
-return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => '請先完成商家認證，才能' + subject + '。',
-(UiLocale.zhTW || UiLocale.en, 2) => '請先完成商家認證，才能' + subject + '。',
-(UiLocale.zhTW || UiLocale.en, 3) => '你的商家認證平台審核中，通過後將自動送出至 PayUni 進行金流審核，完成後就能' + subject + '。',
-(UiLocale.zhTW || UiLocale.en, 4) => '認證未通過，請修改資料後重新送審。',
-(UiLocale.zhTW || UiLocale.en, 10) => '請先完成商家認證，才能' + subject + '。',
-_ => null,
-};
-}
-
-extension SellerKYCFlowStatusUiText on hawkr_seller_v1alpha1_seller.KYCFlowStatus {
-  /// seller.KYCFlowStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
-  String? uiText(UiLocale l) => _sellerKYCFlowStatus(l, value);
-
-  /// seller.KYCFlowStatus.action；沒有文字的值回 null。
-  String? action(UiLocale l) => _sellerKYCFlowStatusAction(l, value);
-
-  /// seller.KYCFlowStatus.banner_description；沒有文字的值回 null。
-  String? bannerDescription(UiLocale l) => _sellerKYCFlowStatusBannerDescription(l, value);
-
-  /// seller.KYCFlowStatus.banner_title；沒有文字的值回 null。
-  String? bannerTitle(UiLocale l) => _sellerKYCFlowStatusBannerTitle(l, value);
-
-  /// seller.KYCFlowStatus.gate_heading；沒有文字的值回 null。
-  String? gateHeading(UiLocale l) => _sellerKYCFlowStatusGateHeading(l, value);
-
-  /// seller.KYCFlowStatus.gate_message；沒有文字的值回 null。
-  String? gateMessage(UiLocale l, {required String subject}) => _sellerKYCFlowStatusGateMessage(l, value, subject);
+extension SellerKYCStatusUiText on hawkr_seller_v1alpha1_seller.KYCStatus {
+  /// seller.KYCStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _sellerKYCStatus(l, value);
 }
 
 String? _sellerMeasureBasis(UiLocale l, int value) {
@@ -315,23 +262,70 @@ extension SellerMeasureStateUiText on hawkr_seller_v1alpha1_seller.MeasureState 
   String? uiText(UiLocale l, {required hawkr_seller_v1alpha1_seller.MeasureKind kind}) => _sellerMeasureState(l, value, kind);
 }
 
-String? _sellerPayUniState(UiLocale l, int value) {
+String? _sellerOnboardingActionButton(UiLocale l, int value) {
 return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => 'PayUni 審核中',
-(UiLocale.zhTW || UiLocale.en, 2) => 'PayUni 需要補件',
-(UiLocale.zhTW || UiLocale.en, 3) => 'PayUni 需要補件',
-(UiLocale.zhTW || UiLocale.en, 4) => 'PayUni 需要補件',
-(UiLocale.zhTW || UiLocale.en, 5) => 'PayUni 申請未通過',
-(UiLocale.zhTW || UiLocale.en, 6) => 'PayUni 暫時無法處理',
-(UiLocale.zhTW || UiLocale.en, 7) => 'PayUni 收款帳戶已終止',
-(UiLocale.zhTW || UiLocale.en, 8) => 'PayUni 收款已啟用',
+(UiLocale.zhTW, 2) => '去設定',
+(UiLocale.en, 2) => 'Go to settings',
+(UiLocale.zhTW, 3) => '前往商家認證',
+(UiLocale.en, 3) => 'Go to seller verification',
+(UiLocale.zhTW, 4) => '前往設定收款帳戶',
+(UiLocale.en, 4) => 'Go to payout account setup',
+(UiLocale.zhTW, 5) => '聯絡客服',
+(UiLocale.en, 5) => 'Contact support',
 _ => null,
 };
 }
 
-extension SellerPayUniStateUiText on hawkr_seller_v1alpha1_seller.PayUniState {
-  /// seller.PayUniState 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
-  String? uiText(UiLocale l) => _sellerPayUniState(l, value);
+extension SellerOnboardingActionUiText on hawkr_seller_v1alpha1_seller.OnboardingAction {
+  /// seller.OnboardingAction.button；沒有文字的值回 null。
+  String? button(UiLocale l) => _sellerOnboardingActionButton(l, value);
+}
+
+String? _sellerOnboardingTaskIdDescription(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '店名、logo 與所在地。',
+(UiLocale.en, 1) => 'Store name, logo and location.',
+(UiLocale.zhTW, 2) => '商家資料與統編的平台審核。',
+(UiLocale.en, 2) => 'Platform review of your business details and tax ID.',
+(UiLocale.zhTW, 3) => '向金流商設定身分與銀行資料。',
+(UiLocale.en, 3) => 'Set up your identity and bank details with the payment provider.',
+_ => null,
+};
+}
+
+String? _sellerOnboardingTaskIdPanelDescription(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '買家要看得到你的店，需要有店名、logo 與所在地。',
+(UiLocale.en, 1) => 'To be found by buyers, your store needs a name, a logo and a location.',
+(UiLocale.zhTW, 2) => '平台審核通過後，店面才能公開，並開放設定收款帳戶。',
+(UiLocale.en, 2) => 'Once the platform review is approved, your store can go public and you can set up a payout account.',
+(UiLocale.zhTW, 3) => '身分與銀行資料由金流商收集，平台不經手；收款帳戶啟用後才能正式收款。',
+(UiLocale.en, 3) => 'Your identity and bank details are collected by the payment provider, not the platform; you can only receive payments once the payout account is enabled.',
+_ => null,
+};
+}
+
+String? _sellerOnboardingTaskIdPanelTitle(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '完成商店資料',
+(UiLocale.en, 1) => 'Complete your store profile',
+(UiLocale.zhTW, 2) => '完成平台審核',
+(UiLocale.en, 2) => 'Complete the platform review',
+(UiLocale.zhTW, 3) => '設定收款帳戶',
+(UiLocale.en, 3) => 'Set up your payout account',
+_ => null,
+};
+}
+
+extension SellerOnboardingTaskIdUiText on hawkr_seller_v1alpha1_seller.OnboardingTaskId {
+  /// seller.OnboardingTaskId.description；沒有文字的值回 null。
+  String? description(UiLocale l) => _sellerOnboardingTaskIdDescription(l, value);
+
+  /// seller.OnboardingTaskId.panel_description；沒有文字的值回 null。
+  String? panelDescription(UiLocale l) => _sellerOnboardingTaskIdPanelDescription(l, value);
+
+  /// seller.OnboardingTaskId.panel_title；沒有文字的值回 null。
+  String? panelTitle(UiLocale l) => _sellerOnboardingTaskIdPanelTitle(l, value);
 }
 
 String? _sellerRevokeReason(UiLocale l, int value) {
@@ -374,7 +368,8 @@ String? _sellerSellerRequirement(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '店家未關閉',
 (UiLocale.zhTW || UiLocale.en, 2) => '帳號未停權',
-(UiLocale.zhTW || UiLocale.en, 3) => '商家認證已通過',
+(UiLocale.zhTW, 3) => '平台審核與收款帳戶都完成',
+(UiLocale.en, 3) => 'Platform review and payout account both completed',
 (UiLocale.zhTW || UiLocale.en, 4) => '店名',
 (UiLocale.zhTW || UiLocale.en, 5) => 'logo',
 (UiLocale.zhTW || UiLocale.en, 6) => '所在地',
@@ -481,6 +476,22 @@ _ => null,
 String commonUnknown(UiLocale l) => switch (l) {
 UiLocale.zhTW || UiLocale.en => '未知',
 };
+
+/// seller.KYCApplication.decide_time
+String sellerKYCApplicationDecideTime(UiLocale l, {required String time}) {
+return switch (l) {
+UiLocale.zhTW => '核准時間：' + time,
+UiLocale.en => 'Approved at: ' + time,
+};
+}
+
+/// seller.KYCApplication.submit_time
+String sellerKYCApplicationSubmitTime(UiLocale l, {required String time}) {
+return switch (l) {
+UiLocale.zhTW => '送出時間：' + time,
+UiLocale.en => 'Submitted at: ' + time,
+};
+}
 
 /// seller.Measure.appeal_deadline
 String sellerMeasureAppealDeadline(UiLocale l, {required String deadline}) {
@@ -598,17 +609,11 @@ UiLocale.zhTW || UiLocale.en => '平台回覆：' + reason,
 };
 }
 
-/// seller.SellerPayUni.fix_fields_heading
-String sellerSellerPayUniFixFieldsHeading(UiLocale l) {
+/// seller.PaymentAccount.payouts_inactive_note
+String sellerPaymentAccountPayoutsInactiveNote(UiLocale l) {
 return switch (l) {
-UiLocale.zhTW || UiLocale.en => '請修正以下資料',
-};
-}
-
-/// seller.SellerPayUni.reason_heading
-String sellerSellerPayUniReasonHeading(UiLocale l) {
-return switch (l) {
-UiLocale.zhTW || UiLocale.en => 'PayUni 的審核意見',
+UiLocale.zhTW => '撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。',
+UiLocale.en => 'Payouts to your bank account are not enabled yet. The payment provider may ask you for more information.',
 };
 }
 

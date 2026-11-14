@@ -10,8 +10,8 @@ void main() {
   });
 
   test('巢狀訊息欄位用點串接', () {
-    final mask = fieldMask(KYCApplication(), ['business.rep_id_card_no']);
-    expect(mask.paths, ['business.rep_id_card_no']);
+    final mask = fieldMask(KYCApplication(), ['business.company_phone']);
+    expect(mask.paths, ['business.company_phone']);
   });
 
   test('空的路徑清單得到空 mask', () {
@@ -44,14 +44,14 @@ void main() {
     );
   });
 
-  test('oneof 的子訊息可以往下一層（個人賣家）', () {
-    expect(fieldMask(KYCApplication(), ['individual.id_card_no']).paths, [
-      'individual.id_card_no',
+  test('oneof 的子訊息可以往下一層（企業賣家）', () {
+    expect(fieldMask(KYCApplication(), ['business.tax_id']).paths, [
+      'business.tax_id',
     ]);
   });
 
   test('非 oneof 的子訊息後面不能再接子路徑', () {
-    for (final path in ['bank_book.asset_id', 'birth_date.year']) {
+    for (final path in ['last_rejection.reason', 'submit_time.seconds']) {
       expect(
         () => fieldMask(KYCApplication(), [path]),
         throwsA(

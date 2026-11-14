@@ -22,7 +22,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/admin/seller/v1alpha1/case_inquiry.proto.
  */
 export const file_hawkr_admin_seller_v1alpha1_case_inquiry: GenFile = /*@__PURE__*/
-  fileDesc("Ci5oYXdrci9hZG1pbi9zZWxsZXIvdjFhbHBoYTEvY2FzZV9pbnF1aXJ5LnByb3RvEhtoYXdrci5hZG1pbi5zZWxsZXIudjFhbHBoYTEi2QUKC0Nhc2VJbnF1aXJ5Eg8KAmlkGAEgASgJQgPgQQgSFAoHY2FzZV9pZBgCIAEoCUID4EEDEhUKCHN0b3JlX2lkGAMgASgJQgPgQQMSPwoEa2luZBgEIAEoDjIsLmhhd2tyLmFkbWluLnNlbGxlci52MWFscGhhMS5DYXNlSW5xdWlyeUtpbmRCA+BBAxIUCgdtZXNzYWdlGAUgASgJQgPgQQMSNAoLY3JlYXRlX3RpbWUYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSIAoTY3JlYXRlZF9ieV9hZG1pbl9pZBgHIAEoCUID4EEDEkEKBXN0YXRlGAkgASgOMi0uaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLkNhc2VJbnF1aXJ5U3RhdGVCA+BBAxJBCgVyZXBseRgKIAEoCzItLmhhd2tyLmFkbWluLnNlbGxlci52MWFscGhhMS5DYXNlSW5xdWlyeVJlcGx5QgPgQQMSUgoOd2l0aGRyYXdfY2F1c2UYCyABKA4yNS5oYXdrci5hZG1pbi5zZWxsZXIudjFhbHBoYTEuQ2FzZUlucXVpcnlXaXRoZHJhd0NhdXNlQgPgQQMSNgoNd2l0aGRyYXdfdGltZRgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxIiChV3aXRoZHJhd25fYnlfYWRtaW5faWQYDSABKAlCA+BBAxIdChBjYW5fcmVjb3JkX3JlcGx5GA4gASgIQgPgQQMSGQoMY2FuX3dpdGhkcmF3GA8gASgIQgPgQQMSHwoScmVwbHlfZXZpZGVuY2VfbWF4GBAgASgFQgPgQQMSPAoOcmVwbHlfZGVhZGxpbmUYESABKAsyHy5oYXdrci5jb21tb24udjFhbHBoYTEuRGVhZGxpbmVCA+BBA0oECAgQCVIIZHVlX3RpbWUioQIKEENhc2VJbnF1aXJ5UmVwbHkSDAoEYm9keRgBIAEoCRI3CghldmlkZW5jZRgCIAMoCzIlLmhhd2tyLmFkbWluLnNlbGxlci52MWFscGhhMS5FdmlkZW5jZRJFCgdjaGFubmVsGAMgASgOMjQuaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLkNhc2VJbnF1aXJ5UmVwbHlDaGFubmVsEjAKDHJlY2VpdmVfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLcmVjb3JkX3RpbWUYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhwKFHJlY29yZGVkX2J5X2FkbWluX2lkGAYgASgJKnYKD0Nhc2VJbnF1aXJ5S2luZBIhCh1DQVNFX0lOUVVJUllfS0lORF9VTlNQRUNJRklFRBAAEh0KGUNBU0VfSU5RVUlSWV9LSU5EX1JFQ09SRFMQARIhCh1DQVNFX0lOUVVJUllfS0lORF9FWFBMQU5BVElPThACKpUBChBDYXNlSW5xdWlyeVN0YXRlEiIKHkNBU0VfSU5RVUlSWV9TVEFURV9VTlNQRUNJRklFRBAAEhsKF0NBU0VfSU5RVUlSWV9TVEFURV9PUEVOEAESHgoaQ0FTRV9JTlFVSVJZX1NUQVRFX1JFUExJRUQQAhIgChxDQVNFX0lOUVVJUllfU1RBVEVfV0lUSERSQVdOEAMq4QEKF0Nhc2VJbnF1aXJ5UmVwbHlDaGFubmVsEioKJkNBU0VfSU5RVUlSWV9SRVBMWV9DSEFOTkVMX1VOU1BFQ0lGSUVEEAASJAogQ0FTRV9JTlFVSVJZX1JFUExZX0NIQU5ORUxfUEhPTkUQARIkCiBDQVNFX0lOUVVJUllfUkVQTFlfQ0hBTk5FTF9FTUFJTBACEigKJENBU0VfSU5RVUlSWV9SRVBMWV9DSEFOTkVMX01FU1NBR0lORxADEiQKIENBU0VfSU5RVUlSWV9SRVBMWV9DSEFOTkVMX09USEVSEAQqmwEKGENhc2VJbnF1aXJ5V2l0aGRyYXdDYXVzZRIrCidDQVNFX0lOUVVJUllfV0lUSERSQVdfQ0FVU0VfVU5TUEVDSUZJRUQQABIlCiFDQVNFX0lOUVVJUllfV0lUSERSQVdfQ0FVU0VfQURNSU4QARIrCidDQVNFX0lOUVVJUllfV0lUSERSQVdfQ0FVU0VfQ0FTRV9DTE9TRUQQAmIGcHJvdG8z", [file_hawkr_admin_seller_v1alpha1_measure, file_hawkr_common_v1alpha1_deadline, file_google_api_field_behavior, file_google_protobuf_timestamp]);
+  fileDesc("Ci5oYXdrci9hZG1pbi9zZWxsZXIvdjFhbHBoYTEvY2FzZV9pbnF1aXJ5LnByb3RvEhtoYXdrci5hZG1pbi5zZWxsZXIudjFhbHBoYTEiyQUKC0Nhc2VJbnF1aXJ5Eg8KAmlkGAEgASgJQgPgQQgSFAoHY2FzZV9pZBgCIAEoCUID4EEDEhUKCHN0b3JlX2lkGAMgASgJQgPgQQMSPwoEa2luZBgEIAEoDjIsLmhhd2tyLmFkbWluLnNlbGxlci52MWFscGhhMS5DYXNlSW5xdWlyeUtpbmRCA+BBAxIUCgdtZXNzYWdlGAUgASgJQgPgQQMSNAoLY3JlYXRlX3RpbWUYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSIAoTY3JlYXRlZF9ieV9hZG1pbl9pZBgHIAEoCUID4EEDEkEKBXN0YXRlGAggASgOMi0uaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLkNhc2VJbnF1aXJ5U3RhdGVCA+BBAxJBCgVyZXBseRgJIAEoCzItLmhhd2tyLmFkbWluLnNlbGxlci52MWFscGhhMS5DYXNlSW5xdWlyeVJlcGx5QgPgQQMSUgoOd2l0aGRyYXdfY2F1c2UYCiABKA4yNS5oYXdrci5hZG1pbi5zZWxsZXIudjFhbHBoYTEuQ2FzZUlucXVpcnlXaXRoZHJhd0NhdXNlQgPgQQMSNgoNd2l0aGRyYXdfdGltZRgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxIiChV3aXRoZHJhd25fYnlfYWRtaW5faWQYDCABKAlCA+BBAxIdChBjYW5fcmVjb3JkX3JlcGx5GA0gASgIQgPgQQMSGQoMY2FuX3dpdGhkcmF3GA4gASgIQgPgQQMSHwoScmVwbHlfZXZpZGVuY2VfbWF4GA8gASgFQgPgQQMSPAoOcmVwbHlfZGVhZGxpbmUYECABKAsyHy5oYXdrci5jb21tb24udjFhbHBoYTEuRGVhZGxpbmVCA+BBAyKhAgoQQ2FzZUlucXVpcnlSZXBseRIMCgRib2R5GAEgASgJEjcKCGV2aWRlbmNlGAIgAygLMiUuaGF3a3IuYWRtaW4uc2VsbGVyLnYxYWxwaGExLkV2aWRlbmNlEkUKB2NoYW5uZWwYAyABKA4yNC5oYXdrci5hZG1pbi5zZWxsZXIudjFhbHBoYTEuQ2FzZUlucXVpcnlSZXBseUNoYW5uZWwSMAoMcmVjZWl2ZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgtyZWNvcmRfdGltZRgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHAoUcmVjb3JkZWRfYnlfYWRtaW5faWQYBiABKAkqdgoPQ2FzZUlucXVpcnlLaW5kEiEKHUNBU0VfSU5RVUlSWV9LSU5EX1VOU1BFQ0lGSUVEEAASHQoZQ0FTRV9JTlFVSVJZX0tJTkRfUkVDT1JEUxABEiEKHUNBU0VfSU5RVUlSWV9LSU5EX0VYUExBTkFUSU9OEAIqlQEKEENhc2VJbnF1aXJ5U3RhdGUSIgoeQ0FTRV9JTlFVSVJZX1NUQVRFX1VOU1BFQ0lGSUVEEAASGwoXQ0FTRV9JTlFVSVJZX1NUQVRFX09QRU4QARIeChpDQVNFX0lOUVVJUllfU1RBVEVfUkVQTElFRBACEiAKHENBU0VfSU5RVUlSWV9TVEFURV9XSVRIRFJBV04QAyrhAQoXQ2FzZUlucXVpcnlSZXBseUNoYW5uZWwSKgomQ0FTRV9JTlFVSVJZX1JFUExZX0NIQU5ORUxfVU5TUEVDSUZJRUQQABIkCiBDQVNFX0lOUVVJUllfUkVQTFlfQ0hBTk5FTF9QSE9ORRABEiQKIENBU0VfSU5RVUlSWV9SRVBMWV9DSEFOTkVMX0VNQUlMEAISKAokQ0FTRV9JTlFVSVJZX1JFUExZX0NIQU5ORUxfTUVTU0FHSU5HEAMSJAogQ0FTRV9JTlFVSVJZX1JFUExZX0NIQU5ORUxfT1RIRVIQBCqbAQoYQ2FzZUlucXVpcnlXaXRoZHJhd0NhdXNlEisKJ0NBU0VfSU5RVUlSWV9XSVRIRFJBV19DQVVTRV9VTlNQRUNJRklFRBAAEiUKIUNBU0VfSU5RVUlSWV9XSVRIRFJBV19DQVVTRV9BRE1JThABEisKJ0NBU0VfSU5RVUlSWV9XSVRIRFJBV19DQVVTRV9DQVNFX0NMT1NFRBACYgZwcm90bzM", [file_hawkr_admin_seller_v1alpha1_measure, file_hawkr_common_v1alpha1_deadline, file_google_api_field_behavior, file_google_protobuf_timestamp]);
 
 /**
  * CaseInquiry 是案件上對賣家的一筆詢問。賣家端的畫面上線（10f）之前，系統不會通知賣家；期限從建立起算，10f 改成從出現在賣家中心起算。
@@ -68,57 +68,57 @@ export type CaseInquiry = Message<"hawkr.admin.seller.v1alpha1.CaseInquiry"> & {
   createdByAdminId: string;
 
   /**
-   * @generated from field: hawkr.admin.seller.v1alpha1.CaseInquiryState state = 9;
+   * @generated from field: hawkr.admin.seller.v1alpha1.CaseInquiryState state = 8;
    */
   state: CaseInquiryState;
 
   /**
    * 只在 REPLIED 時設。
    *
-   * @generated from field: hawkr.admin.seller.v1alpha1.CaseInquiryReply reply = 10;
+   * @generated from field: hawkr.admin.seller.v1alpha1.CaseInquiryReply reply = 9;
    */
   reply?: CaseInquiryReply | undefined;
 
   /**
    * 只在 WITHDRAWN 時設。
    *
-   * @generated from field: hawkr.admin.seller.v1alpha1.CaseInquiryWithdrawCause withdraw_cause = 11;
+   * @generated from field: hawkr.admin.seller.v1alpha1.CaseInquiryWithdrawCause withdraw_cause = 10;
    */
   withdrawCause: CaseInquiryWithdrawCause;
 
   /**
-   * @generated from field: google.protobuf.Timestamp withdraw_time = 12;
+   * @generated from field: google.protobuf.Timestamp withdraw_time = 11;
    */
   withdrawTime?: Timestamp | undefined;
 
   /**
    * 系統撤回（案件結案）時是結案的管理員。
    *
-   * @generated from field: string withdrawn_by_admin_id = 13;
+   * @generated from field: string withdrawn_by_admin_id = 12;
    */
   withdrawnByAdminId: string;
 
   /**
-   * @generated from field: bool can_record_reply = 14;
+   * @generated from field: bool can_record_reply = 13;
    */
   canRecordReply: boolean;
 
   /**
-   * @generated from field: bool can_withdraw = 15;
+   * @generated from field: bool can_withdraw = 14;
    */
   canWithdraw: boolean;
 
   /**
    * 記下回覆時最多可以帶的附件數（伺服器的上限，RecordCaseInquiryReply 的 evidence_tokens 超過就回 invalid_argument）；client 以它在上傳之前擋下超過的檔。
    *
-   * @generated from field: int32 reply_evidence_max = 16;
+   * @generated from field: int32 reply_evidence_max = 15;
    */
   replyEvidenceMax: number;
 
   /**
    * 賣家回覆的期限，只在 OPEN 時設（義務還在時才輸出）：開始時間是 create_time，期限是建立時存下的 due_at。
    *
-   * @generated from field: hawkr.common.v1alpha1.Deadline reply_deadline = 17;
+   * @generated from field: hawkr.common.v1alpha1.Deadline reply_deadline = 16;
    */
   replyDeadline?: Deadline | undefined;
 };

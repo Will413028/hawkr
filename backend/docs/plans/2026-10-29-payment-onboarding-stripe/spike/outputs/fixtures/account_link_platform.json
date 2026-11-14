@@ -1,0 +1,22 @@
+{
+  "status": 200,
+  "body": {
+    "object": "v2.core.account_link",
+    "account": "acct_1UbMbREpWhcqRxKs",
+    "created": "2026-11-13T15:41:31.000Z",
+    "expires_at": "2026-11-13T15:46:31.000Z",
+    "url": "<MASKED>",
+    "use_case": {
+      "account_onboarding": {
+        "collection_options": {
+          "fields": "currently_due",
+          "future_requirements": "omit"
+        },
+        "refresh_url": "https://accessible.stripe.com/f",
+        "return_url": "https://accessible.stripe.com/r"
+      },
+      "type": "account_onboarding"
+    },
+    "livemode": false
+  }
+}

@@ -15,6 +15,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/block"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/closing"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/devseed"
@@ -25,7 +26,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/onboarding"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payuni"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payout"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/profile"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/prospect"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/purge"
@@ -35,6 +36,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -56,9 +58,7 @@ type Orders interface {
 }
 
 // Deps 是模組需要的外部依賴；clock 由組裝點注入。StoreCode 是 store_code 的產生器，測試以外不給（預設是
-// 年份加密碼學亂數）。KYCKeys 是 KYC 個資的加密金鑰環，KYCMAC 是比對用的 HMAC 金鑰環（兩者必須是不同的金鑰，
-// seal.Distinct），都是必填。PayUni 是呼叫 PayUni 的 client（platform/payuni 實作），沒有設定時給 nil：綁定記為失敗
-// （PAYUNI_NOT_CONFIGURED），輪詢不排；StorefrontBaseURL 是店家頁的網站根網址（申請沒有填官網時，MerURL 由它組成）。
+// 年份加密碼學亂數）。KYCMAC 是統編比對用的 HMAC 金鑰環（Stripe 計畫 D22：平台不再加密保存個資），必填。
 type Deps struct {
 	DB       *db.DB
 	Events   *events.Bus
@@ -66,18 +66,17 @@ type Deps struct {
 	Identity *identity.Module
 	Media    media.Media
 	Orders   Orders
-	KYCKeys  *seal.Keyring
 	KYCMAC   *seal.MAC
-	PayUni   PayUniClient
+	// Payment 是收款帳戶的擁有者（payment 模組，Stripe 計畫 D28），必填：核准的 transaction 內請它寫「建立中」的帳戶列並排入建立 job，個資清理時請它
+	// 刪除帳戶列。沒有設定 provider 的 payment 模組讓核准不建立收款帳戶。
+	Payment *payment.Module
 	// Registry 是登記資料來源（公司型申請送件時查詢並存快照；serve 與 worker 都需要，serve 排入、worker 執行），必填。
 	Registry Registry
 	// ProductStores 是商品所屬店家的 port，彙總瀏覽事件的 job 用；必填。
 	ProductStores ProductStores
-	// StorefrontBaseURL 見上；空字串表示沒有。
-	StorefrontBaseURL string
-	Now               func() time.Time
-	StoreCode         func(now time.Time) (int64, error)
-	Logger            *slog.Logger
+	Now           func() time.Time
+	StoreCode     func(now time.Time) (int64, error)
+	Logger        *slog.Logger
 }
 
 // Module 是 seller 模組。
@@ -90,7 +89,7 @@ type Module struct {
 	governance *governance.Service
 	measure    *measure.Service
 	kyc        *kyc.Service
-	payuni     *payuni.Service
+	payout     *payout.Service
 	purge      *purge.Service
 	prospect   *prospect.Service
 	views      *views.Service
@@ -100,7 +99,7 @@ type Module struct {
 
 // New 建立模組。
 func New(d Deps) *Module {
-	if d.DB == nil || d.Events == nil || d.Jobs == nil || d.Identity == nil || d.Media == nil || d.Orders == nil || d.KYCKeys == nil || d.KYCMAC == nil || d.ProductStores == nil || d.Registry == nil {
+	if d.DB == nil || d.Events == nil || d.Jobs == nil || d.Identity == nil || d.Media == nil || d.Orders == nil || d.KYCMAC == nil || d.ProductStores == nil || d.Registry == nil || d.Payment == nil {
 		panic("seller: missing dependency")
 	}
 	if d.Now == nil {
@@ -109,23 +108,20 @@ func New(d Deps) *Module {
 	if d.Logger == nil {
 		d.Logger = slog.Default()
 	}
-	if err := seal.Distinct(d.KYCKeys, d.KYCMAC); err != nil {
-		panic("seller: " + err.Error())
-	}
 	exposures := exposure.New(exposure.Deps{Events: d.Events})
 	suspensions := suspension.New(suspension.Deps{DB: d.DB, Events: d.Events, Jobs: d.Jobs, Exposure: exposures, Now: d.Now})
 	closings := closing.New(closing.Deps{
 		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Identity: d.Identity, Orders: d.Orders, Exposure: exposures, Now: d.Now,
 	})
 	kycService := kyc.New(kyc.Deps{
-		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Exposure: exposures, Keys: d.KYCKeys, MAC: d.KYCMAC, Registry: d.Registry, Now: d.Now, Logger: d.Logger,
+		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Exposure: exposures, Payment: d.Payment, Identity: d.Identity, MAC: d.KYCMAC, Registry: d.Registry, Now: d.Now, Logger: d.Logger,
 	})
 	return &Module{
 		onboarding: onboarding.New(onboarding.Deps{
 			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Identity: d.Identity, Now: d.Now, StoreCode: d.StoreCode,
 		}),
 		profile: profile.New(profile.Deps{
-			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Exposure: exposures, StorefrontBaseURL: d.StorefrontBaseURL,
+			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Exposure: exposures,
 			Now: d.Now, Logger: d.Logger,
 		}),
 		suspension: suspensions,
@@ -137,12 +133,9 @@ func New(d Deps) *Module {
 		measure: measure.New(measure.Deps{
 			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Identity: d.Identity, Linked: kycService, Closing: closings, Exposure: exposures, Now: d.Now,
 		}),
-		kyc: kycService,
-		payuni: payuni.New(payuni.Deps{
-			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Client: d.PayUni, KYC: kycService, Exposure: exposures,
-			StorefrontBaseURL: d.StorefrontBaseURL, Now: d.Now, Logger: d.Logger,
-		}),
-		purge: purge.New(purge.Deps{DB: d.DB, Events: d.Events, Jobs: d.Jobs, Now: d.Now}),
+		kyc:    kycService,
+		payout: payout.New(payout.Deps{DB: d.DB, Jobs: d.Jobs, Exposure: exposures, Identities: kyc.NewFingerprints(d.KYCMAC)}),
+		purge:  purge.New(purge.Deps{DB: d.DB, Events: d.Events, Jobs: d.Jobs, Payment: d.Payment, Now: d.Now}),
 		prospect: prospect.New(prospect.Deps{
 			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Now: d.Now,
 		}),
@@ -152,7 +145,7 @@ func New(d Deps) *Module {
 	}
 }
 
-// Reader 是只讀店家的 seller：只需要資料庫，不需要事件、job、media、KYC 金鑰或 PayUni。給只讀店家狀態的組裝使用（運維子命令
+// Reader 是只讀店家的 seller：只需要資料庫，不需要事件、job、media 或 KYC 金鑰。給只讀店家狀態的組裝使用（運維子命令
 // admin-role、delegation-eligibility 的 delegation 依賴；characterization 測試的組裝），它們不該為了讀一列店家而備齊 serve 的 seller 設定。
 // 讀取的規則與 Module.Store 是同一份（同一支 profile.Service.Store）。
 type Reader struct{ profile *profile.Service }
@@ -229,8 +222,8 @@ const (
 	RequirementActive = model.RequirementActive
 	// RequirementNotSuspended 帳號沒有生效中的停權。
 	RequirementNotSuspended = model.RequirementNotSuspended
-	// RequirementKYCApproved KYC 流程已核准（含 PayUni 核准）。
-	RequirementKYCApproved = model.RequirementKYCApproved
+	// RequirementOnboardingComplete 平台審核已核准，而且收款帳戶的轉帳能力已啟用。
+	RequirementOnboardingComplete = model.RequirementOnboardingComplete
 	// RequirementStoreName 有店名。
 	RequirementStoreName = model.RequirementStoreName
 	// RequirementLogo 有 logo。
@@ -269,7 +262,6 @@ type AgreementAcceptance = model.AgreementAcceptance
 const (
 	AgreementSellerTerms      = model.AgreementSellerTerms
 	AgreementKYCPrivacyNotice = model.AgreementKYCPrivacyNotice
-	AgreementPayUniTerms      = model.AgreementPayUniTerms
 )
 
 // CurrentAgreement 回傳一種文件的現行版本與網址；不認得的種類回 false。
@@ -282,7 +274,7 @@ func CurrentAgreement(k AgreementKind) (Agreement, bool) {
 func AgreementKinds() []AgreementKind { return model.AgreementKinds() }
 
 // CurrentApplyAcceptances 是 Apply 要求的同意（SELLER_TERMS 的現行版本），CurrentKYCAcceptances 是 SubmitKYC 要求的同意
-// （KYC_PRIVACY_NOTICE 與 PAYUNI_TERMS 的現行版本）：給測試組出合法的輸入，不是 client 版本的來源（client 讀 GetSellerAgreements）。
+// （KYC_PRIVACY_NOTICE 的現行版本）：給測試組出合法的輸入，不是 client 版本的來源（client 讀 GetSellerAgreements）。
 func CurrentApplyAcceptances() []AgreementAcceptance {
 	return currentAcceptances(model.ApplyAgreements)
 }
@@ -331,6 +323,44 @@ const (
 
 // OpeningBlockerValues 回傳全部原因，依優先序。
 func OpeningBlockerValues() []OpeningBlocker { return model.OpeningBlockerValues() }
+
+// Onboarding 是店家的開通任務清單與開通閘門；OnboardingTask 是其中一個任務。
+type (
+	Onboarding            = model.Onboarding
+	OnboardingTask        = model.OnboardingTask
+	OnboardingInput       = model.OnboardingInput
+	OnboardingKYCRead     = model.OnboardingKYCRead
+	OnboardingPaymentRead = model.OnboardingPaymentRead
+	OnboardingTaskID      = model.OnboardingTaskID
+	OnboardingTaskState   = model.OnboardingTaskState
+	OnboardingAction      = model.OnboardingAction
+)
+
+const (
+	// OnboardingProfile 商店資料。
+	OnboardingProfile = model.OnboardingProfile
+	// OnboardingPlatformReview 平台審核。
+	OnboardingPlatformReview = model.OnboardingPlatformReview
+	// OnboardingPaymentAccount 收款帳戶。
+	OnboardingPaymentAccount = model.OnboardingPaymentAccount
+	// OnboardingCompleted 是任務狀態：已完成。
+	OnboardingCompleted = model.OnboardingCompleted
+)
+
+// OnboardingTasksOf 回報店家 s 的開通任務清單與開通閘門（語系 l，唯一的產生點）：完成與否由讀店家時帶上的條件決定（與 CapabilitiesOf 同一組欄位），
+// KYC 與收款帳戶的讀取結果只決定狀態句與下一步，讀取失敗只讓需要它的任務是 UNKNOWN。
+func OnboardingTasksOf(l uitext.Locale, in OnboardingInput) Onboarding {
+	return model.OnboardingTasksOf(l, in)
+}
+
+// OnboardingTaskIDValues、OnboardingTaskStateValues、OnboardingActionValues 回傳各值域（依顯示順序），給契約對照的測試用。
+func OnboardingTaskIDValues() []OnboardingTaskID { return model.OnboardingTaskIDValues() }
+
+// OnboardingTaskStateValues 回傳開通任務的全部狀態。
+func OnboardingTaskStateValues() []OnboardingTaskState { return model.OnboardingTaskStateValues() }
+
+// OnboardingActionValues 回傳開通任務的全部下一步。
+func OnboardingActionValues() []OnboardingAction { return model.OnboardingActionValues() }
 
 // StoreCursor 是後台店家清單的 keyset 位置。
 type StoreCursor = model.StoreCursor
@@ -393,7 +423,7 @@ func CapabilitiesOf(s Store) []CapabilityStatus {
 }
 
 // Authorize 在店家 s 沒有能力 c 時回錯誤：已關閉回 NotFound；停權造成的回 PermissionDenied（帶 ReasonSellerSuspended）；其他前置條件沒有滿足
-// （等待刪除、KYC 流程未核准）回 FailedPrecondition（帶 ReasonSellerRequirementMissing）。s 要是模組讀出的店家（CurrentStore、Store 或
+// （等待刪除、開通閘門未通過）回 FailedPrecondition（帶 ReasonSellerRequirementMissing）。s 要是模組讀出的店家（CurrentStore、Store 或
 // ActingStore 的結果），沒有推導過條件的一律拒絕。給已經拿到店家、需要依資源決定能力的呼叫方（例如 social 的店家身分寫入）。
 func Authorize(s Store, c Capability) error { return model.Authorize(s, c) }
 
@@ -440,8 +470,7 @@ func (m *Module) Store(ctx context.Context, storeID int64) (Store, error) {
 	return m.profile.Store(ctx, storeID)
 }
 
-// ExposableStores 從 storeIDs（最多 MaxBatchSize 個）挑出可以公開曝光的店家：營運中、沒有生效中的停權、KYC 流程已核准（含
-// PayUni）、店名、logo 與鄉鎮市區代碼齊全（規則只有 seller.pub_exposable_stores）。依輸入順序回傳，不存在或不可曝光的略過；「至少一個上架
+// ExposableStores 從 storeIDs（最多 MaxBatchSize 個）挑出可以公開曝光的店家：營運中、沒有生效中的停權、開通閘門已通過（平台審核核准且轉帳能力啟用）、店名、logo 與鄉鎮市區代碼齊全（規則只有 seller.pub_exposable_stores）。依輸入順序回傳，不存在或不可曝光的略過；「至少一個上架
 // 商品」由曝光端檢查。任何讀取失敗都回錯誤（fail-closed）。
 func (m *Module) ExposableStores(ctx context.Context, storeIDs []int64) ([]ExposableStore, error) {
 	return m.profile.ExposableStores(ctx, storeIDs)
@@ -548,7 +577,7 @@ func (m *Module) ReconcileTerminations(ctx context.Context) (int, error) {
 }
 
 // AdminStores 是後台的店家清單（預設只列目前的店家，店名、電話或 store_code 搜尋，依 KYC 申請狀態篩選，新到舊的 keyset）；
-// 每一列帶推導的停權狀態與 KYC 流程狀態。
+// 每一列帶推導的停權狀態與 KYC 申請狀態。
 func (m *Module) AdminStores(ctx context.Context, in StoreListInput) (StorePage, error) {
 	return m.profile.AdminList(ctx, in)
 }
@@ -594,7 +623,6 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 	m.closing.AddWorkers(workers)
 	m.measure.AddWorkers(workers)
 	m.governance.AddWorkers(workers)
-	m.payuni.AddWorkers(workers)
 	m.kyc.AddWorkers(workers)
 	m.purge.AddWorkers(workers)
 	m.profile.AddWorkers(workers)
@@ -602,8 +630,7 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 }
 
 // PeriodicJobs 回傳本模組的排程 job：第一次公開的記錄（每 15 分鐘）、措施的對帳、終止合作的對帳（每小時）、措施的結案掃描（每 5 分鐘）、匿名通報人聯絡欄位的清理、關店滿保留期的個資清理（啟動即執行、每小時
-// 補跑）、商品瀏覽事件的彙總（每 5 分鐘）與過期事件的清理（每小時），以及 media 引用的保底掃描（每 15 分鐘）與 PayUni 的掃描（補排遺失的 sync、排輪詢，啟動即執行、每 15
-// 分鐘），以及 KYC 登記資料查詢的掃描（補排遺失的查詢 job、把過期的 PENDING 收成終態，啟動即執行、每 1 分鐘）。
+// 補跑）、商品瀏覽事件的彙總（每 5 分鐘）與過期事件的清理（每小時），以及 media 引用的保底掃描（每 15 分鐘），以及 KYC 登記資料查詢的掃描（補排遺失的查詢 job、把過期的 PENDING 收成終態，啟動即執行、每 1 分鐘）。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	jobs := append(m.suspension.PeriodicJobs(), m.closing.PeriodicJobs()...)
 	jobs = append(jobs, m.measure.PeriodicJobs()...)
@@ -611,7 +638,6 @@ func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	jobs = append(jobs, m.purge.PeriodicJobs()...)
 	jobs = append(jobs, m.profile.PeriodicJobs()...)
 	jobs = append(jobs, m.views.PeriodicJobs()...)
-	jobs = append(jobs, m.payuni.PeriodicJobs()...)
 	jobs = append(jobs, m.kyc.PeriodicJobs()...)
 	return append(jobs, mediaref.PeriodicJobs()...)
 }
@@ -630,7 +656,7 @@ type DevSeedStore = devseed.Store
 type DevSeedAccountRange = devseed.AccountRange
 
 // SeedDevStores 在一個 transaction 內把本機開發的種子店家還原成 fixture（upsert，只動這幾家店與它們的子列，不碰別的店家）：固定的 store_id 與
-// store_code、已核准的 KYC（識別欄位以執行中的金鑰加密）、已綁定而且 PayUni 核准的註冊、logo；公告列保留，version 只增不減。只給本機開發的
+// store_code、已核准的 KYC（識別欄位以執行中的金鑰加密）、logo；公告列保留，version 只增不減。只給本機開發的
 // dev-seed 子命令使用：它直接寫列，繞過開店、送出、審核與綁定的狀態轉移；profile 有變時發 StoreProfileChanged，刪掉的證件與佐證經退場機制釋放
 // media 的引用；停權、關閉、等待刪除這些有下游消費者的生命週期狀態不還原，前提檢查發現就拒絕。寫完之後要 ReannounceExposures 讓下游知道可曝光。
 // rebuilt 是 01-account.sql 重建的帳號區間，區間內有種子以外的未關閉店家時整個拒絕（見 CheckDevSeed）。必須在 transaction 外呼叫。
@@ -651,9 +677,9 @@ func (m *Module) ReannounceExposures(ctx context.Context) (int, error) {
 	return m.profile.ReannounceExposures(ctx)
 }
 
-// PurgePII 跑關店之後的兩段清理（ADR 2026-10-19-seller-kyc-payuni-consolidated「關店與個資保留」與 2026-10-20 修訂）：第一段（退場）在一般關店 30 天
+// PurgePII 跑關店之後的兩段清理（ADR 2026-11-13-seller-platform-review-and-identity-matching「關店與個資保留」）：第一段（退場）在一般關店 30 天
 // （StoreRetireAfter；終止合作關店不早於申覆期限）後清公開內容、釋放 logo 與封面並發 StoreRetired；第二段在關店 184 天（StoreRetention）後清註冊、身分與連線資料
-// （店家聯絡、KYC、PayUni 的自由文字、同意紀錄的來源）。申覆的 legal hold 與主管機關來函的保存擋兩段。分批處理到沒有候選為止，回傳第二段清理了個資的店家數（退場看 retired_at）；
+// （店家聯絡、KYC、同意紀錄的來源）。申覆的 legal hold 與主管機關來函的保存擋兩段。分批處理到沒有候選為止，回傳第二段清理了個資的店家數（退場看 retired_at）；
 // 重跑是 no-op。它是 seller.purge_pii job 的內容，給 worker 與測試呼叫。
 func (m *Module) PurgePII(ctx context.Context) (int, error) {
 	return m.purge.Run(ctx)

@@ -10,7 +10,6 @@ import (
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
-	pu "github.com/Will413028/hawkr/backend/internal/platform/payuni"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
@@ -168,6 +167,15 @@ func TestExposableStoreIDsByCountyAppliesTheExposureRule(t *testing.T) {
 	}
 }
 
+// approvedCompanyStore 核准一家企業賣家（公司名稱是 matchingRegistration 的名稱）。
+func (f *fixture) approvedCompanyStore(t *testing.T, taxID string) Store {
+	t.Helper()
+	_, s, sub := f.submittedCompany(t, taxID)
+	must(t, approve(f, sub))
+	return s
+}
+
+// 比對基準是核准的公司名稱（Stripe 計畫 D37：平台不收本名）；個人賣家沒有基準，回「沒有 reference」交人工判斷。
 func TestMatchCertificateHolder(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -179,46 +187,46 @@ func TestMatchCertificateHolder(t *testing.T) {
 		must(t, err)
 		return got
 	}
-	if got := match(w.exposed.StoreID, "王小明"); !got.Matched || got.Field != "REAL_NAME" || !got.HasReference {
+	company := f.approvedCompanyStore(t, taxIDOne)
+	if got := match(company.StoreID, "範例小農有限公司"); !got.Matched || got.Field != "COMPANY_NAME" || !got.HasReference {
 		t.Fatalf("approved holder: %+v", got)
 	}
-	if got := match(w.exposed.StoreID, "陳大明"); got.Matched || got.Field != "NONE" || !got.HasReference {
+	if got := match(company.StoreID, "陳大明"); got.Matched || got.Field != "NONE" || !got.HasReference {
 		t.Fatalf("other holder: %+v", got)
 	}
-	// 沒有基準：沒有申請、已關閉的 stint、不存在的店。（停權的店仍有基準：核准的身分沒有變。）
-	for name, id := range map[string]int64{"no application": w.pending.StoreID, "closed": w.closed.StoreID, "reopened": w.reopened.StoreID, "unknown": 999999} {
-		if got := match(id, "王小明"); got.Matched || got.HasReference || got.Field != "NONE" {
+	// 沒有基準：個人賣家、沒有申請、已關閉的 stint、不存在的店。（停權的企業店仍有基準：核准的名稱沒有變。）
+	for name, id := range map[string]int64{"individual": w.exposed.StoreID, "no application": w.pending.StoreID, "closed": w.closed.StoreID, "reopened": w.reopened.StoreID, "unknown": 999999} {
+		if got := match(id, "範例小農有限公司"); got.Matched || got.HasReference || got.Field != "NONE" {
 			t.Errorf("%s: %+v", name, got)
 		}
 	}
-	if got := match(w.suspended.StoreID, "王小明"); !got.Matched {
+	f.suspend(t, company.StoreID)
+	if got := match(company.StoreID, "範例小農有限公司"); !got.Matched {
 		t.Errorf("suspended: %+v", got)
 	}
-	if _, err := f.module.MatchCertificateHolder(ctx, 0, "王小明"); apperr.KindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.MatchCertificateHolder(ctx, 0, "範例小農有限公司"); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("err=%v", err)
 	}
 }
 
-// 比對基準是人工核准的 KYC（`docs/modules/seller.md` §1.3「已通過實名認證」）：PayUni 還沒核准、甚至被拒絕，基準都還在；申請還沒核准則沒有基準。
-func TestMatchCertificateHolderDoesNotNeedThePayUniApproval(t *testing.T) {
+// 比對基準是人工核准的 KYC（`docs/modules/seller.md` §1.3「已通過實名認證」）：收款帳戶還沒啟用、甚至被停用，基準都還在；申請還沒核准則沒有基準。
+func TestMatchCertificateHolderDoesNotNeedAnEnabledPaymentAccount(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	_, s := f.boundStore(t) // KYC 核准、已綁定，PayUni 還沒有審核結果。
-	got, err := f.module.MatchCertificateHolder(ctx, s.StoreID, "王小明")
+	s := f.approvedCompanyStore(t, taxIDOne) // KYC 核准，收款帳戶還沒啟用。
+	got, err := f.module.MatchCertificateHolder(ctx, s.StoreID, "範例小農有限公司")
 	must(t, err)
-	if !got.Matched || got.Field != "REAL_NAME" || !got.HasReference {
-		t.Fatalf("PayUni 未核准：%+v", got)
+	if !got.Matched || got.Field != "COMPANY_NAME" || !got.HasReference {
+		t.Fatalf("收款帳戶未啟用：%+v", got)
 	}
-	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "8"}
-	f.now = f.now.Add(24 * time.Hour)
-	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourceRefresh))
-	if got, err = f.module.MatchCertificateHolder(ctx, s.StoreID, "王小明"); err != nil || !got.Matched || !got.HasReference {
-		t.Fatalf("PayUni 拒絕後：%+v %v", got, err)
+	f.setPayment(t, s.StoreID, rejectedSnapshot)
+	if got, err = f.module.MatchCertificateHolder(ctx, s.StoreID, "範例小農有限公司"); err != nil || !got.Matched || !got.HasReference {
+		t.Fatalf("收款帳戶停用後：%+v %v", got, err)
 	}
 	// 申請送出但還沒人工核准：賣家自己填的名稱不能當基準。
-	_, submittedStore, _ := f.submitted(t, idB, bankAcct)
-	if got, err = f.module.MatchCertificateHolder(ctx, submittedStore.StoreID, "王小明"); err != nil || got.Matched || got.HasReference {
+	_, submittedStore, _ := f.submittedCompany(t, taxIDTwo)
+	if got, err = f.module.MatchCertificateHolder(ctx, submittedStore.StoreID, "範例小農有限公司"); err != nil || got.Matched || got.HasReference {
 		t.Fatalf("未核准的申請：%+v %v", got, err)
 	}
 }

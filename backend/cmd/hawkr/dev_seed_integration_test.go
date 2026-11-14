@@ -9,14 +9,16 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
-	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
@@ -27,7 +29,6 @@ func setSellerEnv(t *testing.T) {
 	t.Setenv("MEDIA_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("ORDER_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("PRODUCT_SERVICE_ADDR", "127.0.0.1:1")
-	t.Setenv("KYC_ENCRYPTION_KEYS", "test1:dGVzdC1reWMtZW5jcnlwdGlvbi1rZXktMDAwMDAwMDE=")
 	t.Setenv("KYC_HASH_KEYS", "test1:dGVzdC1reWMtaGFzaC1obWFjLWtleS0wMDAwMDAwMDE=")
 }
 
@@ -60,6 +61,12 @@ func devSeedEnv(t *testing.T) *db.DB {
 		t.Fatal(err)
 	}
 	t.Cleanup(d.Close)
+	// 01-account.sql 建立的種子帳號（infra/seed-data）：帶登入信箱，建立收款帳戶時向它讀聯絡信箱。
+	for id, email := range map[int64]string{9: "seller1@hawkr.test", 4: "seller2@hawkr.test"} {
+		if _, err := d.Pool().Exec(ctx, `INSERT INTO identity.accounts (id, email) OVERRIDING SYSTEM VALUE VALUES ($1, $2)`, id, email); err != nil {
+			t.Fatal(err)
+		}
+	}
 	return d
 }
 
@@ -72,8 +79,7 @@ func count(t *testing.T, d *db.DB, query string, args ...any) int {
 	return n
 }
 
-// 種子的店家全部在 seller 模組的可曝光集合裡（模組自己的規則判斷，不是 SQL 重寫一份），後台揭露回的是 fixture 的明文，資料庫參照的金鑰
-// 都在執行中的金鑰環裡；全量重新公告之後每家店的公告是 version 1、可曝光。
+// 種子的店家全部在 seller 模組的可曝光集合裡（模組自己的規則判斷，不是 SQL 重寫一份），資料庫參照的金鑰都在執行中的金鑰環裡。種子以 payment 的 fake 同步收款帳戶時，seller 的訂閱者在轉帳能力啟用時公告一次（version 1），全量重新公告之後是 version 2、可曝光。
 func TestDevSeedWritesStoresThatTheModuleServesAsExposable(t *testing.T) {
 	ctx := context.Background()
 	d := devSeedEnv(t)
@@ -106,31 +112,25 @@ func TestDevSeedWritesStoresThatTheModuleServesAsExposable(t *testing.T) {
 		if !exposable[s.StoreID] {
 			t.Errorf("種子帳號名下的店家 %d 不在可曝光的集合裡（%v）", s.StoreID, got)
 		}
-		var applicationID uuid.UUID
-		if err := d.Pool().QueryRow(ctx, `SELECT application_id FROM seller.kyc_applications WHERE store_id = $1`, s.StoreID).Scan(&applicationID); err != nil {
-			t.Fatal(err)
-		}
-		revealed, err := module.RevealKYCSensitive(ctx, seller.RevealKYCInput{AdminID: 1, ApplicationID: applicationID, Reason: "驗證種子的明文"})
-		if err != nil {
-			t.Fatalf("店 %d 的揭露：%v", s.StoreID, err)
-		}
-		if revealed.IDCardNo == nil || *revealed.IDCardNo != *s.KYC.IDCardNo || revealed.BankAccount == nil || *revealed.BankAccount != *s.KYC.BankAccount {
-			t.Errorf("店 %d 的揭露 = %+v，want 身分證號 %s、銀行帳號 %s", s.StoreID, revealed, *s.KYC.IDCardNo, *s.KYC.BankAccount)
-		}
 		var version int64
 		var announced bool
 		if err := d.Pool().QueryRow(ctx, `SELECT version, exposable FROM seller.store_exposures WHERE store_id = $1`, s.StoreID).Scan(&version, &announced); err != nil {
 			t.Fatal(err)
 		}
-		if version != 1 || !announced {
-			t.Errorf("店 %d 的公告列 = (version %d, exposable %v)，want (1, true)", s.StoreID, version, announced)
+		if version != 2 || !announced {
+			t.Errorf("店 %d 的公告列 = (version %d, exposable %v)，want (2, true)", s.StoreID, version, announced)
 		}
-		var code string
-		if err := d.Pool().QueryRow(ctx, `SELECT mer_id FROM seller.payuni_registrations WHERE store_id = $1`, s.StoreID).Scan(&code); err != nil {
+		var provider, paymentStatus string
+		var transfers, copied bool
+		if err := d.Pool().QueryRow(ctx, `SELECT provider, status, transfers_active FROM payment.accounts WHERE store_id = $1`, s.StoreID).Scan(&provider, &paymentStatus, &transfers); err != nil {
 			t.Fatal(err)
 		}
-		if want := "HAWK" + strconv.FormatInt(s.StoreCode, 10); code != want {
-			t.Errorf("店 %d 的 mer_id = %s，want %s", s.StoreID, code, want)
+		if provider != "fake" || paymentStatus != "ENABLED" || !transfers {
+			t.Errorf("店 %d 的收款帳戶 = (%s, %s, transfers_active %v)，want (fake, ENABLED, true)", s.StoreID, provider, paymentStatus, transfers)
+		}
+		// 開通閘門的副本由 PayoutAccountChanged 的訂閱者寫入（種子不直接寫 seller 的表）。
+		if err := d.Pool().QueryRow(ctx, `SELECT transfers_active FROM seller.payout_capabilities WHERE store_id = $1`, s.StoreID).Scan(&copied); err != nil || !copied {
+			t.Errorf("店 %d 的閘門副本 = %v（%v），want true", s.StoreID, copied, err)
 		}
 	}
 	if err := module.CheckKYCKeys(ctx); err != nil {
@@ -138,9 +138,6 @@ func TestDevSeedWritesStoresThatTheModuleServesAsExposable(t *testing.T) {
 	}
 	if n := count(t, d, `SELECT count(*) FROM seller.stores WHERE store_id = ANY($1)`, ids); n != len(fixture) {
 		t.Errorf("seller.stores 有 %d 家種子店家，want %d", n, len(fixture))
-	}
-	if n := count(t, d, `SELECT count(*) FROM seller.kyc_applications WHERE id_card_no_enc IS NOT NULL AND position(convert_to('A123456789', 'UTF8') in id_card_no_enc) > 0`); n != 0 {
-		t.Errorf("身分證號的明文出現在密文欄位（%d 列）", n)
 	}
 	var next int64
 	if err := d.Pool().QueryRow(ctx, `SELECT nextval(pg_get_serial_sequence('seller.stores', 'store_id'))`).Scan(&next); err != nil {
@@ -151,20 +148,107 @@ func TestDevSeedWritesStoresThatTheModuleServesAsExposable(t *testing.T) {
 	}
 }
 
-// 種子店家都有入駐同意的紀錄（開店的 SELLER_TERMS 與已核准的 KYC 要求的兩份），版本是現行版本；重跑之後筆數相同，不重複。
+// 種子店家都有入駐同意的紀錄（開店的 SELLER_TERMS 與已核准的 KYC 要求的文件），版本是現行版本；重跑之後筆數相同，不重複。
+// 種子建立的收款帳戶帶店家所屬帳號的聯絡信箱（建立當下向 identity 讀，種子不再傳假信箱）。
+// mutation：種子回到傳固定的假信箱，或建立不讀擁有者的信箱 → provider 收到的不是帳號的信箱，失敗。
+func TestDevSeedPaymentAccountsAreCreatedWithTheOwnersContactEmail(t *testing.T) {
+	ctx := context.Background()
+	d := devSeedEnv(t)
+	var out bytes.Buffer
+	if err := runDevSeed(ctx, nil, &out); err != nil {
+		t.Fatalf("dev-seed：%v", err)
+	}
+	if _, err := d.Pool().Exec(ctx, `DELETE FROM payment.accounts`); err != nil {
+		t.Fatal(err)
+	}
+	c, err := openSeller(ctx, requireDevEnvironment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	fake := payment.NewFake()
+	fake.AutoActive = true
+	ids := []int64{devSeedStoreA, devSeedStoreB}
+	if err := seedPaymentAccounts(ctx, c, fake, ids, &out); err != nil {
+		t.Fatal(err)
+	}
+	got := fake.ConfigureEmails()
+	slices.Sort(got)
+	if want := []string{"seller1@hawkr.test", "seller2@hawkr.test"}; !slices.Equal(got, want) {
+		t.Fatalf("建立收款帳戶送給 provider 的信箱=%v，want %v", got, want)
+	}
+}
+
+// 種子店家所屬帳號沒有可用的聯絡信箱時，建立收款帳戶不會成功：種子要回錯誤並指名店家，不能印成功。
+// mutation：種子不檢查建立出的外部帳戶 ID → 回 nil，失敗。
+func TestDevSeedPaymentAccountsFailsWhenAnOwnerHasNoContactEmail(t *testing.T) {
+	ctx := context.Background()
+	d := devSeedEnv(t)
+	var out bytes.Buffer
+	if err := runDevSeed(ctx, nil, &out); err != nil {
+		t.Fatalf("dev-seed：%v", err)
+	}
+	if _, err := d.Pool().Exec(ctx, `DELETE FROM payment.accounts`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Pool().Exec(ctx, `UPDATE identity.accounts SET email = NULL, self_entered_email = NULL WHERE id = (SELECT account_id FROM seller.stores WHERE store_id = $1)`, devSeedStoreA); err != nil {
+		t.Fatal(err)
+	}
+	c, err := openSeller(ctx, requireDevEnvironment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	fake := payment.NewFake()
+	fake.AutoActive = true
+	err = seedPaymentAccounts(ctx, c, fake, []int64{devSeedStoreA}, &out)
+	if err == nil || !strings.Contains(err.Error(), fmt.Sprint(devSeedStoreA)) {
+		t.Fatalf("err=%v，want 指名店家 %d 的錯誤", err, devSeedStoreA)
+	}
+}
+
+// 種子店家的收款帳戶列屬於別的 provider 且還沒有外部 ID 時，fake 不碰它：種子印出提醒並繼續，不回「建立沒有完成」的錯誤。
+// mutation：沒有外部 ID 的檢查放在 provider 的檢查之前 → 回錯誤，失敗（尚未本機執行，需要資料庫）。
+func TestDevSeedPaymentAccountsKeepsAnotherProvidersRowWithoutExternalID(t *testing.T) {
+	ctx := context.Background()
+	d := devSeedEnv(t)
+	var out bytes.Buffer
+	if err := runDevSeed(ctx, nil, &out); err != nil {
+		t.Fatalf("dev-seed：%v", err)
+	}
+	if _, err := d.Pool().Exec(ctx, `UPDATE payment.accounts SET provider = 'stripe', external_account_id = NULL, create_completed_at = NULL, status = 'NOT_CREATED', transfers_active = false, payouts_active = false, fetched_at = NULL, status_reason = NULL WHERE store_id = $1`, devSeedStoreA); err != nil {
+		t.Fatal(err)
+	}
+	c, err := openSeller(ctx, requireDevEnvironment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	fake := payment.NewFake()
+	fake.AutoActive = true
+	out.Reset()
+	if err := seedPaymentAccounts(ctx, c, fake, []int64{devSeedStoreA}, &out); err != nil {
+		t.Fatalf("別的 provider 的列不該讓種子失敗：%v", err)
+	}
+	if !strings.Contains(out.String(), "提醒") {
+		t.Fatalf("沒有提醒：%q", out.String())
+	}
+}
+
 func TestDevSeedWritesTheAgreementAcceptancesTheInvariantRequires(t *testing.T) {
 	ctx := context.Background()
 	d := devSeedEnv(t)
+	want := append(seller.CurrentApplyAcceptances(), seller.CurrentKYCAcceptances()...)
 	for range 2 {
 		if err := runDevSeed(ctx, nil, new(bytes.Buffer)); err != nil {
 			t.Fatalf("dev-seed：%v", err)
 		}
 		for _, st := range devSeedStores() {
-			if n := count(t, d, `SELECT count(*) FROM seller.agreement_acceptances WHERE store_id = $1`, st.StoreID); n != 3 {
-				t.Fatalf("store %d 有 %d 筆同意紀錄，want 3", st.StoreID, n)
+			if n := count(t, d, `SELECT count(*) FROM seller.agreement_acceptances WHERE store_id = $1`, st.StoreID); n != len(want) {
+				t.Fatalf("store %d 有 %d 筆同意紀錄，want %d", st.StoreID, n, len(want))
 			}
-			for _, k := range seller.AgreementKinds() {
-				cur, _ := seller.CurrentAgreement(k)
+			for _, a := range want {
+				k, cur := a.Kind, a
 				if n := count(t, d, `SELECT count(*) FROM seller.agreement_acceptances WHERE store_id = $1 AND kind = $2 AND version = $3 AND account_id = $4`, st.StoreID, string(k), cur.Version, st.AccountID); n != 1 {
 					t.Fatalf("store %d 的 %s 紀錄 %d 筆，want 1", st.StoreID, k, n)
 				}
@@ -634,7 +718,7 @@ func TestDevSeedRetiresTheAssetsOfTheEvidenceItDeletes(t *testing.T) {
 	seedOK(t)
 	id := devSeedStores()[0].StoreID
 	app := rowJSON(t, d, `SELECT application_id::text FROM seller.kyc_applications WHERE store_id = $1`, id)
-	mustExec(t, d, `INSERT INTO seller.kyc_documents (application_id, slot, position, asset_id, object_key) VALUES ($1, 'ID_CARD_FRONT', 0, 'kyc-asset-1', 'secure/k1')`, app)
+	mustExec(t, d, `INSERT INTO seller.kyc_documents (application_id, position, asset_id, object_key) VALUES ($1, 0, 'kyc-asset-1', 'secure/k1')`, app)
 	mustExec(t, d, `INSERT INTO seller.reports (id, store_id, category, description, reporter_buyer_id, created_at, updated_at)
 		VALUES ('00000000-0000-7000-8000-0000000000a1', $1, 'OTHER', 'd', 7, now(), now())`, id)
 	mustExec(t, d, `INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('00000000-0000-7000-8000-0000000000a1', 0, 0, 'report-asset-1', 'secure/r1')`)
@@ -675,34 +759,6 @@ func TestDevSeedLogoNeverReusesARetiredAsset(t *testing.T) {
 	}
 	if n := count(t, d, `SELECT count(*) FROM seller.stores s JOIN seller.retired_assets r ON r.ref_type = $1 AND r.ref_id = s.store_id::text AND r.asset_id = s.logo_asset_id`, media.RefTypeSellerLogo); n != 0 {
 		t.Errorf("%d 家店的目前 logo 在退場名單裡", n)
-	}
-}
-
-// PayUni 的 intent_seq 重跑不重來、只增不減：在途的綁定 job 以舊的 seq 記結果，新的註冊的 seq 一定比它大，job 會再跑一輪，不會剛好對上。
-func TestDevSeedKeepsPayUniIntentSeqMonotonic(t *testing.T) {
-	d := devSeedEnv(t)
-	seedOK(t)
-	seq := func(id int64) int64 {
-		var n int64
-		if err := d.Pool().QueryRow(context.Background(), `SELECT intent_seq FROM seller.payuni_registrations WHERE store_id = $1`, id).Scan(&n); err != nil {
-			t.Fatal(err)
-		}
-		return n
-	}
-	for _, st := range devSeedStores() {
-		mustExec(t, d, `UPDATE seller.payuni_registrations SET intent_seq = 7 WHERE store_id = $1`, st.StoreID)
-		prev := int64(7)
-		for run := 0; run < 3; run++ {
-			seedOK(t)
-			got := seq(st.StoreID)
-			if got <= prev {
-				t.Fatalf("店 %d 第 %d 次重跑後 intent_seq = %d，want 大於 %d", st.StoreID, run+1, got, prev)
-			}
-			if synced := rowJSON(t, d, `SELECT synced_seq::text FROM seller.payuni_registrations WHERE store_id = $1`, st.StoreID); synced != strconv.FormatInt(got, 10) {
-				t.Errorf("店 %d 的 synced_seq = %s，want 等於 intent_seq %d（種子的註冊已綁定）", st.StoreID, synced, got)
-			}
-			prev = got
-		}
 	}
 }
 

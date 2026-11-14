@@ -41,7 +41,7 @@ func (q *Queries) CountAccounts(ctx context.Context, arg CountAccountsParams) (i
 
 const deleteAccount = `-- name: DeleteAccount :execrows
 UPDATE identity.accounts
-SET deleted_at = $1::timestamptz, email = NULL, suspended_at = NULL, deletion_pending_at = NULL,
+SET deleted_at = $1::timestamptz, email = NULL, self_entered_email = NULL, suspended_at = NULL, deletion_pending_at = NULL,
     updated_at = $1::timestamptz
 WHERE id = $2 AND deleted_at IS NULL
 `
@@ -61,7 +61,7 @@ func (q *Queries) DeleteAccount(ctx context.Context, arg DeleteAccountParams) (i
 }
 
 const getAccount = `-- name: GetAccount :one
-SELECT id, email, suspended_at, deleted_at, deletion_pending_at, created_at, updated_at FROM identity.accounts WHERE id = $1
+SELECT id, email, self_entered_email, suspended_at, deleted_at, deletion_pending_at, created_at, updated_at FROM identity.accounts WHERE id = $1
 `
 
 // 含已刪除的帳號（墓碑）：舊服務要查得到「已刪除」。
@@ -71,6 +71,7 @@ func (q *Queries) GetAccount(ctx context.Context, id int64) (IdentityAccount, er
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
+		&i.SelfEnteredEmail,
 		&i.SuspendedAt,
 		&i.DeletedAt,
 		&i.DeletionPendingAt,
@@ -81,7 +82,7 @@ func (q *Queries) GetAccount(ctx context.Context, id int64) (IdentityAccount, er
 }
 
 const getAccounts = `-- name: GetAccounts :many
-SELECT id, email, suspended_at, deleted_at, deletion_pending_at, created_at, updated_at FROM identity.accounts WHERE id = ANY($1::bigint[]) ORDER BY id
+SELECT id, email, self_entered_email, suspended_at, deleted_at, deletion_pending_at, created_at, updated_at FROM identity.accounts WHERE id = ANY($1::bigint[]) ORDER BY id
 `
 
 func (q *Queries) GetAccounts(ctx context.Context, ids []int64) ([]IdentityAccount, error) {
@@ -96,6 +97,7 @@ func (q *Queries) GetAccounts(ctx context.Context, ids []int64) ([]IdentityAccou
 		if err := rows.Scan(
 			&i.ID,
 			&i.Email,
+			&i.SelfEnteredEmail,
 			&i.SuspendedAt,
 			&i.DeletedAt,
 			&i.DeletionPendingAt,
@@ -132,7 +134,7 @@ func (q *Queries) InsertFederatedAccount(ctx context.Context, arg InsertFederate
 }
 
 const listAccounts = `-- name: ListAccounts :many
-SELECT a.id, a.email, a.suspended_at, a.deleted_at, a.deletion_pending_at, a.created_at, a.updated_at FROM identity.accounts a
+SELECT a.id, a.email, a.self_entered_email, a.suspended_at, a.deleted_at, a.deletion_pending_at, a.created_at, a.updated_at FROM identity.accounts a
 WHERE a.deleted_at IS NULL
   AND ($1::text = ''
        OR EXISTS (SELECT 1 FROM identity.account_roles r WHERE r.account_id = a.id AND r.role = $1::text))
@@ -180,6 +182,7 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]I
 		if err := rows.Scan(
 			&i.ID,
 			&i.Email,
+			&i.SelfEnteredEmail,
 			&i.SuspendedAt,
 			&i.DeletedAt,
 			&i.DeletionPendingAt,
@@ -197,7 +200,7 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]I
 }
 
 const lockLiveAccount = `-- name: LockLiveAccount :one
-SELECT id, email, suspended_at, deleted_at, deletion_pending_at, created_at, updated_at FROM identity.accounts WHERE id = $1 AND deleted_at IS NULL FOR UPDATE
+SELECT id, email, self_entered_email, suspended_at, deleted_at, deletion_pending_at, created_at, updated_at FROM identity.accounts WHERE id = $1 AND deleted_at IS NULL FOR UPDATE
 `
 
 // 鎖住存活的帳號，讓同一個帳號的角色變更、停權與刪除依序執行。
@@ -207,6 +210,7 @@ func (q *Queries) LockLiveAccount(ctx context.Context, id int64) (IdentityAccoun
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
+		&i.SelfEnteredEmail,
 		&i.SuspendedAt,
 		&i.DeletedAt,
 		&i.DeletionPendingAt,
@@ -230,6 +234,28 @@ type MarkDeletionPendingParams struct {
 // 帳號進入等待刪除；已經在等待時沒有列被更新（冪等）。
 func (q *Queries) MarkDeletionPending(ctx context.Context, arg MarkDeletionPendingParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markDeletionPending, arg.Now, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setSelfEnteredEmail = `-- name: SetSelfEnteredEmail :execrows
+UPDATE identity.accounts
+SET self_entered_email = $1, updated_at = $2::timestamptz
+WHERE id = $3 AND deleted_at IS NULL
+`
+
+type SetSelfEnteredEmailParams struct {
+	SelfEnteredEmail *string
+	Now              time.Time
+	ID               int64
+}
+
+// 自填聯絡信箱：呼叫方已在同一個 transaction 內鎖住帳號列（LockLiveAccount）並以 Go 的 validEmail 確認沒有可用的已驗證 email；
+// 「可用」的規則只在 Go（emailaddr.Normalize），SQL 不重述它。依 id 寫入存活的帳號，受影響列數必為 1（相同值也寫入，不是 no-op）。
+func (q *Queries) SetSelfEnteredEmail(ctx context.Context, arg SetSelfEnteredEmailParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setSelfEnteredEmail, arg.SelfEnteredEmail, arg.Now, arg.ID)
 	if err != nil {
 		return 0, err
 	}

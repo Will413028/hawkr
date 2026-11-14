@@ -12,6 +12,7 @@ import 'package:sentry_flutter/sentry_flutter.dart' show Sentry;
 
 import '../../config/flavor.dart';
 import '../../shared/utils/hk_log.dart';
+import '../l10n/ui_locale.dart';
 import '../session/auth_session_provider.dart';
 import '../session/force_logout_provider.dart';
 import '../session/session_provider.dart';
@@ -33,7 +34,7 @@ HttpClient connectHttpClient(Ref ref) => apiHttpClient();
 Transport connectTransport(Ref ref) => apiTransport(
   baseUrl: F.appFlavor.gatewayHost,
   httpClient: ref.watch(connectHttpClientProvider),
-  interceptors: connectInterceptors(),
+  interceptors: connectInterceptors(acceptLanguage: uiLocaleTag(ref)),
 );
 
 /// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（同 Dio 的 `AuthInterceptor`：帶 Bearer，
@@ -42,7 +43,10 @@ Transport connectTransport(Ref ref) => apiTransport(
 Transport connectAuthTransport(Ref ref) => apiTransport(
   baseUrl: F.appFlavor.gatewayHost,
   httpClient: ref.watch(connectHttpClientProvider),
-  interceptors: connectInterceptors(auth: sessionAuthInterceptor(ref)),
+  interceptors: connectInterceptors(
+    acceptLanguage: uiLocaleTag(ref),
+    auth: sessionAuthInterceptor(ref),
+  ),
 );
 
 /// 公開的 service 但伺服器依身分決定行為的呼叫（例如 RecordProductView）：有 session 就帶 Bearer，沒有（訪客）
@@ -51,7 +55,10 @@ Transport connectAuthTransport(Ref ref) => apiTransport(
 Transport connectOptionalAuthTransport(Ref ref) => apiTransport(
   baseUrl: F.appFlavor.gatewayHost,
   httpClient: ref.watch(connectHttpClientProvider),
-  interceptors: connectInterceptors(auth: optionalSessionInterceptor(ref)),
+  interceptors: connectInterceptors(
+    acceptLanguage: uiLocaleTag(ref),
+    auth: optionalSessionInterceptor(ref),
+  ),
 );
 
 @Riverpod(keepAlive: true)
@@ -77,16 +84,23 @@ IdentityAppServiceClient identityClient(Ref ref) => IdentityAppServiceClient(
   apiTransport(
     baseUrl: F.appFlavor.gatewayHost,
     httpClient: ref.watch(connectHttpClientProvider),
-    interceptors: connectInterceptors(auth: sessionBootstrapInterceptor(ref)),
+    interceptors: connectInterceptors(
+      acceptLanguage: uiLocaleTag(ref),
+      auth: sessionBootstrapInterceptor(ref),
+    ),
   ),
 );
 
 /// 套件的 [appInterceptors] 加上這支 App 的設定：逾時照 flavor、Sentry、X-App-* header、debug 時的 log。
-List<Interceptor> connectInterceptors({Interceptor? auth}) => appInterceptors(
+List<Interceptor> connectInterceptors({
+  Interceptor? auth,
+  required String Function() acceptLanguage,
+}) => appInterceptors(
   timeout: F.appFlavor.apiTimeout,
   report: _captureWithSentry,
   headers: () => AppVersionHeaders.headers,
   auth: auth,
+  acceptLanguage: acceptLanguage,
   log: kDebugMode || F.appFlavor.enableApiLogging ? HKLog.logD : null,
 );
 

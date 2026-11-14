@@ -1,9 +1,9 @@
-// Package devseed 寫入本機開發的種子店家：固定的 store_id 與 store_code、已核准的 KYC、已綁定而且 PayUni 核准的註冊、logo，以及
+// Package devseed 寫入本機開發的種子店家：固定的 store_id 與 store_code、已核准的 KYC、logo，以及
 // 開店時一併建立的公告列（version 0；由 ReannounceExposures 全量公告）。只給本機開發（cmd/hawkr 的 dev-seed）使用：它直接寫列，
-// 繞過開店、送出、審核與綁定的狀態轉移（不寫那些轉移的事件；審核紀錄只寫送出那一筆，入駐同意要綁定它）；還原 profile 時發 StoreProfileChanged（與模組自己寫 profile 同一個事件），
+// 繞過開店、送出與審核的狀態轉移（不寫那些轉移的事件；審核紀錄只寫送出那一筆，入駐同意要綁定它）；還原 profile 時發 StoreProfileChanged（與模組自己寫 profile 同一個事件），
 // 刪掉的證據與證件經模組的退場機制釋放 media 的引用。
 //
-// 明文的 fixture 是來源：KYC 的識別欄位經 kyc.Service.SeedApproved（SaveDraft 同一支加密與 hash）、以執行中的金鑰寫入，種子檔不含密文。
+// 明文的 fixture 是來源：KYC 的欄位經 kyc.Service.SeedApproved（SaveDraft 同一支驗證與統編 hash）、以執行中的金鑰寫入，種子檔不含 hash。
 package devseed
 
 import (
@@ -21,7 +21,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/kyc"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payuni"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -30,14 +29,13 @@ import (
 )
 
 // Store 是一家種子店家（明文）。StoreID 與 StoreCode 固定（Java 資料庫的 psql 種子寫死 store_id，MerID 是 HAWK 加 StoreCode）；
-// KYC 是核准的申請內容（含明文的識別欄位）；PayUniMerStatus、PayUniMemberStatus 是 PayUni 回報的原碼，推導出的結果必須是核准。
+// KYC 是核准的申請內容。
 type Store struct {
 	StoreID, StoreCode, AccountID                            int64
 	Name, Description, ContactPhone, TownCode, AddressDetail string
 	ContactName, ContactMobile, SupportEmail                 string
 	LogoKey, LogoAssetID                                     string
 	KYC                                                      model.KYCDraftInput
-	PayUniMerStatus, PayUniMemberStatus                      string
 }
 
 // Deps 外部依賴。
@@ -61,16 +59,16 @@ func New(d Deps) *Service {
 }
 
 // 種子的原則：idempotent，只還原自己擁有的資料，不繞過領域的副作用（像 Rails 的 seeds，不是 db:reset）。種子擁有的是這兩家店的 fixture 資料：
-// profile、KYC、PayUni 註冊與 logo；有下游消費者的生命週期狀態（停權措施、關店、等待刪除、刪帳申請）不是種子的資料，種子不悄悄還原它，
+// profile、KYC 與 logo；有下游消費者的生命週期狀態（停權措施、關店、等待刪除、刪帳申請）不是種子的資料，種子不悄悄還原它，
 // 前提檢查發現它們時拒絕執行（見 Check）。還原的方式：
 //   - 店家列 upsert：profile 與個資欄位、版本鎖回到 fixture；status 只因生命週期而變，upsert 不寫它們，只以 WHERE 保證列還在 fixture 的
 //     狀態（ACTIVE、沒有關閉紀錄），不是就整筆失敗；logo 與封面是 media 的 ref，不覆寫模組已登記的資產（見 upsertStoreSQL）；
 //   - profile 有變時發 StoreProfileChanged 並排入快取失效（與模組自己寫 profile 同一個事件、同一個 transaction），舊服務的快取才看得到；
 //     可曝光由最後的全量重新公告（ReannounceExposures）處理；
 //   - 公告列保留、不刪不重設：version 只增不減，全量重新公告把它加一，在途的舊事件版本較低，Java 正確丟棄；
-//   - KYC 申請、PayUni 註冊與觀測、通報與案件、違規、瀏覽彙總這些「只因使用而存在」的子列，只刪這幾家店的，再以 fixture 重寫；刪掉的證件與佐證圖片先經
-//     mediaref 記成退場（同一般的換圖與關店），media 的引用才會釋放；PayUni 的 intent_seq 不重來（取舊值加一、synced_seq 記到新值），在途的 job 結束時 payuni.finish 看到 synced_seq 比自己讀到的 seq 新，不寫入結果（compare-and-set）；
-//   - 先鎖店家列（與模組的寫入者同一個順序：店家、申請、註冊），才刪子列；
+//   - KYC 申請、通報與案件、違規、瀏覽彙總這些「只因使用而存在」的子列，只刪這幾家店的，再以 fixture 重寫；刪掉的證件與佐證圖片先經
+//     mediaref 記成退場（同一般的換圖與關店），media 的引用才會釋放；
+//   - 先鎖店家列（與模組的寫入者同一個順序：店家、申請），才刪子列；
 //   - media_ref_sync 與 retired_assets 不刪（ref 的列刪了再建會讓 seq 從頭算，見 schema.sql 的註解）。
 //
 // 它不碰別人的資料：不在種子的店家（含 SELLER 角色）原封不動。前提不成立時拒絕執行：01-account.sql 會刪除重建的帳號區間若擁有種子以外
@@ -80,6 +78,7 @@ var clearChildrenSQL = []string{
 	`DELETE FROM seller.evidence_accesses WHERE report_id IN (SELECT id FROM seller.reports WHERE store_id = ANY($1)) OR request_id IN (SELECT id FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))) OR inquiry_id IN (SELECT id FROM seller.case_inquiries WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.measure_request_evidence WHERE request_id IN (SELECT id FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1)))`,
 	`DELETE FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))`,
+	`DELETE FROM seller.measure_linked_reviews WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.measure_identities WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.governance_notes WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1)) OR case_id IN (SELECT id FROM seller.cases WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.measure_findings WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))`,
@@ -107,17 +106,14 @@ var clearChildrenSQL = []string{
 	`DELETE FROM seller.case_inquiry_reply_evidence WHERE inquiry_id IN (SELECT id FROM seller.case_inquiries WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.case_inquiries WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.cases WHERE store_id = ANY($1)`,
-	`DELETE FROM seller.payuni_observations WHERE store_id = ANY($1)`,
-	`DELETE FROM seller.payuni_registrations WHERE store_id = ANY($1)`,
+	`DELETE FROM seller.payout_capabilities WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.agreement_acceptances WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.kyc_document_accesses WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
-	`DELETE FROM seller.kyc_reveals WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.kyc_review_issues WHERE review_id IN (SELECT review_id FROM seller.kyc_reviews WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1)))`,
 	`DELETE FROM seller.kyc_reviews WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.kyc_registration_checks WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.kyc_documents WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.account_identity_hashes WHERE source_store_id = ANY($1)`,
-	`DELETE FROM seller.kyc_identity_hashes WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.kyc_applications WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.product_views_daily WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.product_view_events WHERE store_id = ANY($1)`,
@@ -135,12 +131,8 @@ const lockStoresSQL = `SELECT s.store_id, ` + profileExpr + ` FROM seller.stores
 
 const profileSnapshotSQL = `SELECT s.store_id, ` + profileExpr + ` FROM seller.stores s WHERE s.store_id = ANY($1)`
 
-// 申請列、註冊列接著鎖（店家、申請、註冊的順序，同模組的寫入者）；註冊列的 intent_seq 是重寫之後要延續的底。
-const (
-	lockApplicationsSQL  = `SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1) ORDER BY store_id, application_id FOR UPDATE`
-	lockRegistrationsSQL = `SELECT store_id, intent_seq FROM seller.payuni_registrations WHERE store_id = ANY($1) ORDER BY store_id FOR UPDATE`
-	setIntentSeqSQL      = `UPDATE seller.payuni_registrations SET intent_seq = $2 WHERE store_id = $1 RETURNING intent_seq`
-)
+// 申請列接著鎖（店家、申請的順序，同模組的寫入者）。
+const lockApplicationsSQL = `SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1) ORDER BY store_id, application_id FOR UPDATE`
 
 // 即將刪除的證件與佐證圖片（按 ref 分組）：'C' 是 KYC 證件（ref 是申請），'E' 是通報、措施上請求（申覆）與詢問回覆的佐證（ref 是通報、請求或詢問）。
 const evidenceAssetsSQL = `
@@ -416,9 +408,8 @@ func (s *Service) Seed(ctx context.Context, stores []Store, rebuilt []AccountRan
 		if err := check(ctx, conn, stores, rebuilt, now); err != nil {
 			return err
 		}
-		intentSeqs, err := lockPayUni(ctx, conn, ids)
-		if err != nil {
-			return fmt.Errorf("seller：鎖住種子店家的申請與註冊：%w", err)
+		if err := lockApplications(ctx, conn, ids); err != nil {
+			return fmt.Errorf("seller：鎖住種子店家的申請：%w", err)
 		}
 		q := store.New(conn)
 		if err := s.retireEvidence(ctx, conn, q, ids, now); err != nil {
@@ -430,7 +421,7 @@ func (s *Service) Seed(ctx context.Context, stores []Store, rebuilt []AccountRan
 			}
 		}
 		for _, st := range stores {
-			if err := s.seedOne(ctx, q, st, now, intentSeqs[st.StoreID]); err != nil {
+			if err := s.seedOne(ctx, q, st, now); err != nil {
 				return fmt.Errorf("seller：種子店家 %d：%w", st.StoreID, err)
 			}
 		}
@@ -461,30 +452,14 @@ func snapshots(ctx context.Context, conn db.DBTX, query string, ids []int64) (ma
 	return out, rows.Err()
 }
 
-// lockPayUni 依「店家、申請、註冊」的順序鎖住申請與註冊列，回傳註冊列目前的 intent_seq。
-func lockPayUni(ctx context.Context, conn db.DBTX, ids []int64) (map[int64]int64, error) {
+// lockApplications 鎖住種子店家的申請列（呼叫方已鎖住店家列）。
+func lockApplications(ctx context.Context, conn db.DBTX, ids []int64) error {
 	rows, err := conn.Query(ctx, lockApplicationsSQL, ids)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	rows, err = conn.Query(ctx, lockRegistrationsSQL, ids)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := map[int64]int64{}
-	for rows.Next() {
-		var id, seq int64
-		if err := rows.Scan(&id, &seq); err != nil {
-			return nil, err
-		}
-		out[id] = seq
-	}
-	return out, rows.Err()
+	return rows.Err()
 }
 
 // retireEvidence 在刪除之前，把種子店家的 KYC 證件與通報、申覆的佐證圖片記成退場並排入同步（mediaref.Changed，與一般的換圖、關店同一個機制），
@@ -577,14 +552,11 @@ func validate(stores []Store) error {
 		if st.Name == "" || st.TownCode == "" || st.LogoKey == "" || st.LogoAssetID == "" {
 			return fmt.Errorf("seller：種子店家 %d 缺少店名、鄉鎮市區代碼或 logo（可曝光的條件）", st.StoreID)
 		}
-		if model.PayUniOutcomeOf(st.PayUniMerStatus, st.PayUniMemberStatus) != model.OutcomeApproved {
-			return fmt.Errorf("seller：種子店家 %d 的 PayUni 狀態碼（%q、%q）不是核准", st.StoreID, st.PayUniMerStatus, st.PayUniMemberStatus)
-		}
 	}
 	return nil
 }
 
-func (s *Service) seedOne(ctx context.Context, q *store.Queries, st Store, now time.Time, prevIntentSeq int64) error {
+func (s *Service) seedOne(ctx context.Context, q *store.Queries, st Store, now time.Time) error {
 	conn := s.d.DB.Conn(ctx)
 	logoRef := mediaref.StoreRef(media.RefTypeSellerLogo, st.StoreID)
 	retired, err := retiredAssets(ctx, conn, logoRef)
@@ -603,7 +575,7 @@ func (s *Service) seedOne(ctx context.Context, q *store.Queries, st Store, now t
 	if _, err := conn.Exec(ctx, insertExposureSQL, st.StoreID); err != nil {
 		return err
 	}
-	app, submitID, err := s.d.KYC.SeedApproved(ctx, q, st.StoreID, st.KYC, now)
+	_, submitID, err := s.d.KYC.SeedApproved(ctx, q, st.StoreID, st.KYC, now)
 	if err != nil {
 		return err
 	}
@@ -613,29 +585,7 @@ func (s *Service) seedOne(ctx context.Context, q *store.Queries, st Store, now t
 	if err := agreement.Record(ctx, q, st.StoreID, st.AccountID, current(model.SubmitKYCAgreements), now, agreement.Subject{SubmissionReviewID: &submitID}, agreement.Source{}); err != nil {
 		return err
 	}
-	row, err := q.StoreByID(ctx, st.StoreID)
-	if err != nil {
-		return err
-	}
-	reg, err := q.UpsertPayUniIntent(ctx, payuni.IntentParams(payuni.BindIntent{Store: row, Application: app}, now))
-	if err != nil {
-		return err
-	}
-	// 註冊列是重建的，intent_seq 不重來：延續舊值加一，下面再把 synced_seq 記到新值。在途的 job（以舊的 seq 讀的資料）結束時，payuni.finish
-	// 在鎖內發現 synced_seq 比自己的 seq 新，不寫入、不再跑一輪：結果不會覆蓋重建的列。
-	if reg.IntentSeq <= prevIntentSeq {
-		if err := conn.QueryRow(ctx, setIntentSeqSQL, st.StoreID, prevIntentSeq+1).Scan(&reg.IntentSeq); err != nil {
-			return err
-		}
-	}
-	if _, err := q.MarkPayUniBound(ctx, store.MarkPayUniBoundParams{StoreID: st.StoreID, SyncedSeq: reg.IntentSeq, Now: &now}); err != nil {
-		return err
-	}
-	_, err = q.ApplyPayUniStatus(ctx, store.ApplyPayUniStatusParams{
-		StoreID: st.StoreID, MerStatus: &st.PayUniMerStatus, MemberStatus: &st.PayUniMemberStatus,
-		Outcome: string(model.PayUniOutcomeOf(st.PayUniMerStatus, st.PayUniMemberStatus)), ExecutedAt: &now, Now: now,
-	})
-	return err
+	return nil
 }
 
 func current(kinds []model.AgreementKind) []model.AgreementAcceptance {

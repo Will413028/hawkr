@@ -101,7 +101,7 @@ final class ConnectTransportProvider
   }
 }
 
-String _$connectTransportHash() => r'f455e4d38b76be2661bbcbf11df9ed3362e04f48';
+String _$connectTransportHash() => r'd6c54218de03a7416f91a265e611afce7bef6c03';
 
 /// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（同 Dio 的 `AuthInterceptor`：帶 Bearer，
 /// unauthenticated 時強制登出）。
@@ -151,7 +151,7 @@ final class ConnectAuthTransportProvider
 }
 
 String _$connectAuthTransportHash() =>
-    r'dd5e385653b66d1ea73b74316e75114c6fc7decf';
+    r'e73926b046b90dfcb11cca2a3e0abe701bffc486';
 
 /// 公開的 service 但伺服器依身分決定行為的呼叫（例如 RecordProductView）：有 session 就帶 Bearer，沒有（訪客）
 /// 或換發失敗就不帶，不中斷呼叫。
@@ -202,7 +202,7 @@ final class ConnectOptionalAuthTransportProvider
 }
 
 String _$connectOptionalAuthTransportHash() =>
-    r'10b70e08ac1d10a63dec7bef6d7c886063d98919';
+    r'8aa81aec0f4a5d528885da17664ad0d3c05fe648';
 
 @ProviderFor(contentClient)
 final contentClientProvider = ContentClientProvider._();
@@ -451,4 +451,4 @@ final class IdentityClientProvider
   }
 }
 
-String _$identityClientHash() => r'35c932995cdde039b931c7d5cde363a7591a814b';
+String _$identityClientHash() => r'1f4a491d57f25c25f6e2e5f1fed47371cd2a2ac1';

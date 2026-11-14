@@ -20,7 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payuni"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/suspension"
@@ -359,7 +358,7 @@ func (s *Service) ReopenPlan(ctx context.Context, q *store.Queries, accountID in
 }
 
 // Reopen 在撤銷終止合作的 transaction 內恢復 ReopenPlan 決定的店家：同一個店家（store_id、店號、商品、KYC、資料都在）CLOSED → ACTIVE，
-// 結束目前的關店紀錄（歷史留在 store_closures），重新授予 SELLER，重新公告可曝光，發 StoreReopened，並把關店期間被放棄的 PayUni 綁定補排回去。
+// 結束目前的關店紀錄（歷史留在 store_closures），重新授予 SELLER，重新公告可曝光，發 StoreReopened。
 // 措施已先撤銷（呼叫方先寫），所以公告的可曝光不含它的停權；停權期間由呼叫方稍後的 Recompute 對齊。呼叫方已鎖住帳號列與帳號全部的 stint。
 func (s *Service) Reopen(ctx context.Context, q *store.Queries, storeID int64, now time.Time) error {
 	ended, err := q.EndStoreClosure(ctx, store.EndStoreClosureParams{StoreID: storeID, Now: &now})
@@ -376,9 +375,6 @@ func (s *Service) Reopen(ctx context.Context, q *store.Queries, storeID int64, n
 	if err := s.d.Identity.GrantRole(ctx, identity.GrantRoleInput{
 		AccountID: reopened.AccountID, Role: identity.RoleSeller, SourceID: &reopened.StoreID,
 	}); err != nil {
-		return err
-	}
-	if err := payuni.Resume(ctx, q, s.d.Jobs, storeID); err != nil {
 		return err
 	}
 	if err := events.Publish(ctx, s.d.Events, model.StoreReopened{

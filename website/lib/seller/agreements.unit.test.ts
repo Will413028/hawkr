@@ -50,7 +50,6 @@ describe("acceptancesOf / agreementUrl", () => {
 			acceptancesOf([
 				AgreementKind.SELLER_TERMS,
 				AgreementKind.KYC_PRIVACY_NOTICE,
-				AgreementKind.PAYUNI_TERMS,
 			]),
 		).toEqual([
 			{
@@ -61,13 +60,9 @@ describe("acceptancesOf / agreementUrl", () => {
 				kind: AgreementKind.KYC_PRIVACY_NOTICE,
 				version: SELLER_AGREEMENTS.KYC_PRIVACY_NOTICE.version,
 			},
-			{
-				kind: AgreementKind.PAYUNI_TERMS,
-				version: SELLER_AGREEMENTS.PAYUNI_TERMS.version,
-			},
 		]);
-		expect(agreementUrl(AgreementKind.PAYUNI_TERMS)).toBe(
-			SELLER_AGREEMENTS.PAYUNI_TERMS.url,
+		expect(agreementUrl(AgreementKind.KYC_PRIVACY_NOTICE)).toBe(
+			SELLER_AGREEMENTS.KYC_PRIVACY_NOTICE.url,
 		);
 	});
 
@@ -123,7 +118,7 @@ describe("送出時帶上同意", () => {
 		]);
 	});
 
-	it("submitKyc 把兩份同意放進請求", async () => {
+	it("submitKyc 把同意放進請求", async () => {
 		const sent: SubmitKYCRequest[] = [];
 		const transport = createRouterTransport((router) =>
 			router.service(SellerAppService, {
@@ -135,17 +130,13 @@ describe("送出時帶上同意", () => {
 		);
 		await submitKyc(
 			"e1",
-			[
-				{ kind: AgreementKind.KYC_PRIVACY_NOTICE, version: "2031-01-03" },
-				{ kind: AgreementKind.PAYUNI_TERMS, version: "2031-01-04" },
-			],
+			[{ kind: AgreementKind.KYC_PRIVACY_NOTICE, version: "2031-01-03" }],
 			() => createClient(SellerAppService, transport),
 		);
 		expect(sent).toHaveLength(1);
 		expect(sent[0].etag).toBe("e1");
 		expect(sent[0].acceptedAgreements.map((a) => [a.kind, a.version])).toEqual([
 			[AgreementKind.KYC_PRIVACY_NOTICE, "2031-01-03"],
-			[AgreementKind.PAYUNI_TERMS, "2031-01-04"],
 		]);
 	});
 });

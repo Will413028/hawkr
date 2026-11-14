@@ -122,7 +122,7 @@ func registerInternalGraph(path string, d data) ([]byte, error) {
 			return "", fmt.Errorf("%s 裡找不到內部依賴圖", path)
 		}
 		pos += len(list)
-		if strings.Contains(src[pos:], fmt.Sprintf("\t%q:", d.Name)) {
+		if strings.Contains("\n"+src[pos:], fmt.Sprintf("\n\t%q:", d.Name)) {
 			return "", fmt.Errorf("%s 的內部依賴圖已有模組 %s", path, d.Name)
 		}
 		entry := fmt.Sprintf("\t%q: {Packages: map[string][]string{\"feature\": {}, \"model\": {}, \"store\": {}}},\n", d.Name)

@@ -1,0 +1,2 @@
+none no contact_email: 400 Some fields in the request were invalid: 'configuration.recipient: If configuration.recipient is supplied, the Account must have a contact email.'
+express no contact_email: 400 Some fields in the request were invalid: 'configuration.recipient: If configuration.recipient is supplied, the Account must have a contact email.'

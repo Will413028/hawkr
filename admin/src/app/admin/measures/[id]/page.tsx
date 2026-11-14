@@ -123,6 +123,9 @@ export default function MeasureDetailPage() {
 		onSuccess: invalidate,
 	});
 	const createMeasure = useMutation(G.createMeasure, { onSuccess: invalidate });
+	const markLinkedAccountReviewed = useMutation(G.markLinkedAccountReviewed, {
+		onSuccess: invalidate,
+	});
 
 	/**
 	 * 送出措施的操作。VERSION_CONFLICT（別人先改過這個措施）時 runAction 先重讀措施再回 conflict：這裡丟出錯誤讓對話框
@@ -311,6 +314,23 @@ export default function MeasureDetailPage() {
 				onCreateLinked={(sourceMeasureId, account) =>
 					setLinkedTarget({ sourceMeasureId, account })
 				}
+				onMarkReviewed={async (measureId, account) => {
+					try {
+						await markLinkedAccountReviewed.mutateAsync({
+							measureId,
+							accountId: account.accountId,
+						});
+						setNotice(null);
+					} catch (caught) {
+						setNotice({
+							tone: "error",
+							text: connectErrorText(
+								caught,
+								"標為已檢視失敗；請確認網路狀態後再試一次。",
+							),
+						});
+					}
+				}}
 			/>
 			<MeasureNotesSection measureId={measure.id} />
 

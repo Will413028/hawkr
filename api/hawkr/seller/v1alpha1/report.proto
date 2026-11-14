@@ -55,8 +55,6 @@ enum ReportOutcome {
 // MyReport 是檢舉人看到的自己的檢舉。平台內部的分案（案件、嚴重度、處理的管理員）與轉報主管機關的紀錄不在這裡；
 // 店名與 logo 由 client 以 store_id 呼叫 SellerPublicService.BatchGetStores。
 message MyReport {
-  reserved 7;
-  reserved "status";
 
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   string store_id = 2;
@@ -68,12 +66,12 @@ message MyReport {
   hawkr.common.v1alpha1.PolicyCategory category = 5;
   string description = 6;
   // 平台給檢舉人的結果說明；還沒有結果或結果沒有說明時是空字串。
-  string resolution_note = 8;
-  google.protobuf.Timestamp create_time = 9;
+  string resolution_note = 7;
+  google.protobuf.Timestamp create_time = 8;
   // 結果設定的時間；還沒有結果時不設。
-  google.protobuf.Timestamp resolve_time = 10;
+  google.protobuf.Timestamp resolve_time = 9;
   // 結果；還沒有結果時是 UNSPECIFIED（處理中）。
-  ReportOutcome outcome = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  ReportOutcome outcome = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message CreateReportRequest {

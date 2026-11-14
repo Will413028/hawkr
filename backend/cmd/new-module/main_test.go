@@ -12,7 +12,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/arch"
 )
 
-// scaffold 在暫存目錄裡模擬 backend/：放一份真的 cmd/hawkr/modules.go，產生 payment（依賴表裡有、還沒
+// scaffold 在暫存目錄裡模擬 backend/：放一份真的 cmd/hawkr/modules.go，產生 invoice（依賴表裡有、還沒
 // 搬進來的模組）的模組與特性測試骨架。
 func scaffold(t *testing.T, legacy string) string {
 	t.Helper()
@@ -37,7 +37,7 @@ func scaffold(t *testing.T, legacy string) string {
 	if err := os.WriteFile(filepath.Join(root, "internal", "arch", "modules.go"), archSource, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	d := data{Name: "payment", Legacy: legacy, Module: arch.ModulePath}
+	d := data{Name: "invoice", Legacy: legacy, Module: arch.ModulePath}
 	if err := newModule(root, d); err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestGeneratedFilesAreValid(t *testing.T) {
 				t.Errorf("%s 留著沒有渲染的模板語法", f)
 			}
 		}
-		chDir := filepath.Join(root, "internal", "httpapi", "payment", "characterization")
+		chDir := filepath.Join(root, "internal", "httpapi", "invoice", "characterization")
 		_, restErr := os.Stat(filepath.Join(chDir, "rest_test.go"))
 		if (restErr == nil) != (legacy != "") {
 			t.Errorf("legacy = %q：rest_test.go 存在 = %v", legacy, restErr == nil)
@@ -101,8 +101,8 @@ func TestGeneratedSkeletonCompiles(t *testing.T) {
 	files := map[string]string{
 		"go.mod":                     "module " + arch.ModulePath + "\n\ngo 1.27.1\n",
 		"internal/platform/db/db.go": "package db\ntype DB struct{}\n",
-		"internal/modules/payment/db/migrations/001.sql":   "-- migration\n",
-		"internal/modules/payment/db/migrations/atlas.sum": "h1:test\n",
+		"internal/modules/invoice/db/migrations/001.sql":   "-- migration\n",
+		"internal/modules/invoice/db/migrations/atlas.sum": "h1:test\n",
 		"internal/arch/check.go":                           string(archCheck),
 		"internal/arch/generated_test.go": `package arch
 
@@ -113,7 +113,7 @@ import (
 )
 
 func TestGeneratedGraph(t *testing.T) {
-	cmd := exec.Command("go", "list", "-f", "{{.ImportPath}}{{range .Imports}} {{.}}{{end}}{{range .TestImports}} {{.}}{{end}}{{range .XTestImports}} {{.}}{{end}}", "./internal/modules/payment/...")
+	cmd := exec.Command("go", "list", "-f", "{{.ImportPath}}{{range .Imports}} {{.}}{{end}}{{range .TestImports}} {{.}}{{end}}{{range .XTestImports}} {{.}}{{end}}", "./internal/modules/invoice/...")
 	cmd.Dir = "../.."
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -124,8 +124,8 @@ func TestGeneratedGraph(t *testing.T) {
 		fields := strings.Fields(line)
 		pkgs = append(pkgs, Package{ImportPath: fields[0], Imports: fields[1:]})
 	}
-	graph := map[string]InternalGraph{"payment": InternalDependencies["payment"]}
-	for _, v := range CheckInternal(pkgs, graph, []string{"payment"}) {
+	graph := map[string]InternalGraph{"invoice": InternalDependencies["invoice"]}
+	for _, v := range CheckInternal(pkgs, graph, []string{"invoice"}) {
 		t.Error(v)
 	}
 	for _, problem := range ValidateInternalGraphs(graph) {
@@ -144,7 +144,7 @@ func TestGeneratedGraph(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	cmd := exec.CommandContext(t.Context(), "go", "test", "./internal/arch", "./internal/modules/payment/...")
+	cmd := exec.CommandContext(t.Context(), "go", "test", "./internal/arch", "./internal/modules/invoice/...")
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "GOWORK=off", "GOCACHE="+t.TempDir())
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -203,7 +203,7 @@ func TestNewModulePreparesRegistrationsBeforeWriting(t *testing.T) {
 	if err := os.WriteFile(modulesPath, []byte("package main\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := newModule(root, data{Name: "payment", Module: arch.ModulePath}); err == nil {
+	if err := newModule(root, data{Name: "invoice", Module: arch.ModulePath}); err == nil {
 		t.Fatal("缺少登記清單時仍建立了模組")
 	}
 	got, err := os.ReadFile(graphPath)
@@ -213,7 +213,7 @@ func TestNewModulePreparesRegistrationsBeforeWriting(t *testing.T) {
 	if string(got) != string(graph) {
 		t.Error("登記失敗卻已改寫內部依賴圖")
 	}
-	if _, err := os.Stat(filepath.Join(root, "internal", "modules", "payment")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "internal", "modules", "invoice")); !os.IsNotExist(err) {
 		t.Errorf("登記失敗卻已產生模組：%v", err)
 	}
 }
@@ -221,7 +221,7 @@ func TestNewModulePreparesRegistrationsBeforeWriting(t *testing.T) {
 // CARRYOVER.md 要有兩張盤點表，而且留著空列：填好之前 TestEveryMovedModuleHasACarryOverAudit 失敗。
 // AGENTS.md 只留連結，盤點不進每次都載入的指令檔。
 func TestGeneratedAgentsLeavesTheAuditToFill(t *testing.T) {
-	dir := filepath.Join(scaffold(t, "account-service"), "internal", "modules", "payment")
+	dir := filepath.Join(scaffold(t, "account-service"), "internal", "modules", "invoice")
 	read := func(name string) string {
 		b, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
@@ -252,19 +252,19 @@ func TestGeneratedAgentsLeavesTheAuditToFill(t *testing.T) {
 
 // 模組 AGENTS.md 指向模組規格，並說明子領域 AGENTS.md 的規則；節的形狀由 agentfile-lint 的 R2 檢查（repo-hygiene）。
 func TestGeneratedAgentsPointsToTheSpec(t *testing.T) {
-	b, err := os.ReadFile(filepath.Join(scaffold(t, ""), "internal", "modules", "payment", "AGENTS.md"))
+	b, err := os.ReadFile(filepath.Join(scaffold(t, ""), "internal", "modules", "invoice", "AGENTS.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	agents := string(b)
-	if !strings.Contains(agents, "`docs/modules/payment.md`") {
-		t.Error("AGENTS.md 要指向模組規格 docs/modules/payment.md")
+	if !strings.Contains(agents, "`docs/modules/invoice.md`") {
+		t.Error("AGENTS.md 要指向模組規格 docs/modules/invoice.md")
 	}
 	// 子領域的 AGENTS.md 是選用的（同一份 ADR 的決策 4）：模板說明規則，但骨架不產生它。
 	if !strings.Contains(agents, "`internal/<子領域>/AGENTS.md`（選用") {
 		t.Error("不變量節的註解要說明子領域 AGENTS.md 的規則")
 	}
-	nested, err := filepath.Glob(filepath.Join(scaffold(t, ""), "internal", "modules", "payment", "internal", "*", "AGENTS.md"))
+	nested, err := filepath.Glob(filepath.Join(scaffold(t, ""), "internal", "modules", "invoice", "internal", "*", "AGENTS.md"))
 	if err != nil || len(nested) != 0 {
 		t.Errorf("骨架不該產生子領域的 AGENTS.md：%v %v", nested, err)
 	}
@@ -277,22 +277,22 @@ func TestRegisterAppendsTheModule(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := string(src)
-	if !strings.Contains(s, `"`+arch.ModulePath+`/internal/modules/payment"`) {
+	if !strings.Contains(s, `"`+arch.ModulePath+`/internal/modules/invoice"`) {
 		t.Error("沒有 import 新模組")
 	}
 	content := strings.Index(s, `{Name: "content"`)
-	payment := strings.Index(s, `{Name: "payment", Dir: payment.Migrations()}`)
-	if content < 0 || payment < content {
+	invoice := strings.Index(s, `{Name: "invoice", Dir: invoice.Migrations()}`)
+	if content < 0 || invoice < content {
 		t.Errorf("新模組要加在清單最後（migrate 依序套用）：\n%s", s)
 	}
 	graph, err := os.ReadFile(filepath.Join(root, "internal", "arch", "modules.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(graph), `"payment": {Packages: map[string][]string{"feature": {}, "model": {}, "store": {}}`) {
+	if !strings.Contains(string(graph), `"invoice": {Packages: map[string][]string{"feature": {}, "model": {}, "store": {}}`) {
 		t.Error("新模組沒有登記內部依賴圖")
 	}
-	deps, err := os.ReadFile(filepath.Join(root, "internal", "modules", "payment", "payment.go"))
+	deps, err := os.ReadFile(filepath.Join(root, "internal", "modules", "invoice", "invoice.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,14 +304,14 @@ func TestRegisterAppendsTheModule(t *testing.T) {
 	if !strings.Contains(string(deps), "type Deps struct{}") || strings.Contains(string(deps), "internal/platform/db") || strings.Contains(string(deps), "uuid") {
 		t.Error("空骨架不應預設資料庫、ID 或其他尚未使用的依賴")
 	}
-	model, err := os.ReadFile(filepath.Join(root, "internal", "modules", "payment", "internal", "model", "model.go"))
+	model, err := os.ReadFile(filepath.Join(root, "internal", "modules", "invoice", "internal", "model", "model.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(string(model), "type Deps") || strings.Contains(string(model), "internal/platform/db") {
 		t.Error("model 不得擁有組裝依賴")
 	}
-	feature, err := os.ReadFile(filepath.Join(root, "internal", "modules", "payment", "internal", "feature", "feature.go"))
+	feature, err := os.ReadFile(filepath.Join(root, "internal", "modules", "invoice", "internal", "feature", "feature.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,7 +322,7 @@ func TestRegisterAppendsTheModule(t *testing.T) {
 
 func TestRefusesUnknownOrExistingModules(t *testing.T) {
 	root := scaffold(t, "")
-	if err := newModule(root, data{Name: "payment", Module: arch.ModulePath}); err == nil {
+	if err := newModule(root, data{Name: "invoice", Module: arch.ModulePath}); err == nil {
 		t.Error("已經存在的模組被覆寫了")
 	}
 	if err := newModule(root, data{Name: "nosuchmodule", Module: arch.ModulePath}); err == nil {
@@ -334,7 +334,7 @@ func TestRefusesUnknownOrExistingModules(t *testing.T) {
 	if err := run([]string{"module", "Bad-Name"}); err == nil {
 		t.Error("不合法的名稱被接受了")
 	}
-	if _, err := registerInternalGraph(filepath.Join(root, "internal", "arch", "modules.go"), data{Name: "payment"}); err == nil {
+	if _, err := registerInternalGraph(filepath.Join(root, "internal", "arch", "modules.go"), data{Name: "invoice"}); err == nil {
 		t.Error("內部依賴圖接受了重複的模組 key")
 	}
 }

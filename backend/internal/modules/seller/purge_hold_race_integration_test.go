@@ -181,8 +181,8 @@ func TestAppealAfterTheRetirementLockedTheStoreSeesItRetired(t *testing.T) {
 	ctx := context.Background()
 	accountID, s, m := f.terminated(t, GroundCeasedBusiness)
 	deadline := m.StartsAt.Add(4416 * time.Hour)
-	keys, mac := sealtest.Keys(t)
-	early := f.newModuleClock(t, f.payuni, f.jobs, keys, mac, func() time.Time { return deadline.Add(-time.Hour) })
+	mac := sealtest.MAC(t)
+	early := f.newModuleClock(t, f.jobs, mac, func() time.Time { return deadline.Add(-time.Hour) })
 	f.now = deadline.Add(time.Millisecond) // A 的時鐘：申覆期限已過，清理到期
 
 	h := f.holdPurgeAfterCandidates(t)
@@ -290,15 +290,16 @@ func TestNoticeTerminationAppealStillWorksAfterTheSelfClosedStoreWasRetired(t *t
 }
 
 // 關聯終止的來源申覆要鎖被關聯帳號的店家列：A（被關聯帳號的舊 stint 的退場）鎖住候選之後，對來源措施的申覆被擋在被關聯帳號的店家列上，
-// 等退場 commit 才繼續（申覆太晚，被關聯帳號的舊 stint 已依期限退場，來源的申覆照常成功，§2.4 情形 3 與第三個窗的第 4 點）；申覆 commit 之後
-// legal hold 成立，同一次清理的第二段不清被關聯帳號的個資。
+// 等退場 commit 才繼續（申覆太晚，被關聯帳號的舊 stint 已依期限退場，來源的申覆照常成功，§2.4 情形 3 與第三個窗的第 4 點）。
+// 退場 commit 後，第二段與被擋的申覆搶 B 的新版本列的鎖，Postgres 不保證等鎖的一方先拿到（先清再申覆就是情形 3，設計接受），所以測試用
+// hook 把第二段擋在選候選之前，等申覆 commit 才放行；申覆 commit 之後 legal hold 成立，同一次清理的第二段不清被關聯帳號的個資。
 // mutation：申覆只鎖來源帳號 → 申覆沒被擋住，斷言失敗；StoreHolds 不看關聯終止的來源 → 第二段把個資清掉，斷言失敗。
 func TestLinkedSourceAppealBlocksThePurgeOfTheLinkedAccount(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountA, sA, _ := f.submitted(t, idA, bankAcct)
-	accountB, sB, _ := f.submitted(t, idA, "999888777666")
+	accountA, sA, _ := f.submittedCompany(t, taxIDOne)
+	accountB, sB, _ := f.submittedCompany(t, taxIDOne)
 	_, err := f.module.CloseCurrent(ctx, accountB)
 	must(t, err)
 	closedAt := f.now
@@ -309,10 +310,17 @@ func TestLinkedSourceAppealBlocksThePurgeOfTheLinkedAccount(t *testing.T) {
 	f.effect(t, source)
 	f.now = closedAt.Add(StoreRetention + time.Hour) // B 的舊 stint 關閉超過保留期；來源的申覆期限還沒到
 
+	done := make(chan struct{})
+	f.module.SetPurgeBeforePurgeBatch(func() {
+		select {
+		case <-done:
+		case <-time.After(20 * time.Second):
+		}
+	})
+	t.Cleanup(func() { f.module.SetPurgeBeforePurgeBatch(nil) })
 	h := f.holdPurgeAfterCandidates(t)
 	cur := f.measureOf(t, source.ID)
 	var appealErr error
-	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		_, appealErr = f.module.SubmitAppeal(ctx, SubmitAppealInput{AccountID: accountA, MeasureID: source.ID, ExpectedVersion: cur.SellerVersion(), Reason: "異議"})
@@ -339,8 +347,8 @@ func TestLinkedSourceAppealLockedFirstMakesThePurgeSkipTheLinkedAccount(t *testi
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountA, sA, _ := f.submitted(t, idA, bankAcct)
-	accountB, sB, _ := f.submitted(t, idA, "999888777666")
+	accountA, sA, _ := f.submittedCompany(t, taxIDOne)
+	accountB, sB, _ := f.submittedCompany(t, taxIDOne)
 	_, err := f.module.CloseCurrent(ctx, accountB)
 	must(t, err)
 	closedAt := f.now
@@ -415,8 +423,8 @@ func TestAppealRetriesWhenALinkedTerminationAppearsAfterThePreRead(t *testing.T)
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountA, sA, _ := f.submitted(t, idA, bankAcct)
-	_, sB, _ := f.submitted(t, idA, "999888777666")
+	accountA, sA, _ := f.submittedCompany(t, taxIDOne)
+	_, sB, _ := f.submittedCompany(t, taxIDOne)
 	source := f.terminate(t, sA.StoreID, GroundFraud)
 	f.effect(t, source)
 	f.now = f.now.Add(24 * time.Hour)

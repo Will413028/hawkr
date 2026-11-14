@@ -1,0 +1,16 @@
+# q22_adapter: 正式 adapter（internal/platform/stripe）對 sandbox hawkr-dev，2026-11-14，SDK 釘的 2026-10-28.endive
+$ q22_adapter create
+account: acct_1UbTrMIA55z8nbaY
+link: https://connect.stripe.com/setup/e/acct_1UbTrMIA55z8nbaY/[scrubbed]
+$ q22_adapter status acct_1UbTrMIA55z8nbaY   # 開通前
+transfers: {Status:restricted Details:[{Code:requirements_past_due Resolution:provide_info}]}
+payouts: {Status:restricted Details:[{Code:requirements_past_due Resolution:provide_info}]}
+# 瀏覽器走託管開通頁（測試手機與驗證碼、姓名、網站、測試銀行、Agree and submit），回跳 return_url
+$ q22_adapter status acct_1UbTrMIA55z8nbaY   # 送出後約 20 秒
+transfers: {Status:active Details:[]}
+payouts: {Status:active Details:[]}
+requirements（eventually_due）: identity.individual.date_of_birth.{day,month,year}、identity.individual.id_numbers.us_ssn_last_4
+$ q22_adapter close acct_1UbTrMIA55z8nbaY
+close #1: ok
+close #2: ok
+retrieve after close: stripe：帳戶 acct_1UbTrMIA55z8nbaY 的回應沒有 stripe_transfers 能力

@@ -15,10 +15,9 @@ import (
 )
 
 // AdminList 是後台的店家清單：預設只列目前的店家（營運中與等待刪除），已關閉的要在 Statuses 明列；店名或電話模糊搜尋，或
-// store_code 相同；帳號；依目前那一筆 KYC 申請的狀態、PayUni 註冊的綁定狀態（兩者都是儲存的事實）、帳號此刻是否停權篩選；
+// store_code 相同；帳號；依目前那一筆 KYC 申請的狀態（儲存的事實）、帳號此刻是否停權篩選；
 // 新到舊的 keyset，預設 20、上限 100。停權的篩選用 stint.SuspendedAccounts（和能力檢查同一支 EffectiveMeasures），
-// 不在清單的 SQL 再寫一份「生效中」的定義。每一頁的停權狀態經 stint.EffectiveMany、KYC 流程經 exposure.KYCFlows（顯示用的
-// model.DeriveKYCFlow）、條件經 stint.WithConditions，固定五次查詢，與頁面大小無關。
+// 不在清單的 SQL 再寫一份「生效中」的定義。每一頁的停權狀態經 stint.EffectiveMany、目前申請的狀態經 CurrentKYCStatuses、條件經 stint.WithConditions，固定五次查詢，與頁面大小無關。
 func (s *Service) AdminList(ctx context.Context, in model.StoreListInput) (model.StorePage, error) {
 	size, err := pagination.PageSize(in.PageSize, 20, 100)
 	if err != nil {
@@ -45,13 +44,6 @@ func (s *Service) AdminList(ctx context.Context, in model.StoreListInput) (model
 		}
 		status := string(*in.KYCStatus)
 		params.KycStatus = &status
-	}
-	if in.PayUniBindStatus != nil {
-		if !slices.Contains(model.PayUniBindStatusValues(), *in.PayUniBindStatus) {
-			return model.StorePage{}, apperr.InvalidInputOn([]string{"PayUniBindStatus"}, "綁定狀態不合法")
-		}
-		status := string(*in.PayUniBindStatus)
-		params.BindStatus = &status
 	}
 	if in.AccountID != nil {
 		if err := model.Positive(*in.AccountID); err != nil {
@@ -92,15 +84,19 @@ func (s *Service) AdminList(ctx context.Context, in model.StoreListInput) (model
 	if err != nil {
 		return model.StorePage{}, err
 	}
-	flows, err := s.d.Exposure.KYCFlows(ctx, q, storeIDs)
+	applications, err := q.CurrentKYCStatuses(ctx, storeIDs)
 	if err != nil {
 		return model.StorePage{}, err
 	}
+	kycStatuses := make(map[int64]model.KYCStatus, len(applications))
+	for _, a := range applications {
+		kycStatuses[a.StoreID] = model.KYCStatus(a.Status)
+	}
 	for _, row := range rows {
-		item := model.StoreListItem{Store: stint.ToStore(row), KYCFlow: model.FlowNotStarted}
+		item := model.StoreListItem{Store: stint.ToStore(row)}
 		item.Store.Sanctions = suspensions[row.AccountID]
-		if flow, ok := flows[row.StoreID]; ok {
-			item.KYCFlow = flow
+		if status, ok := kycStatuses[row.StoreID]; ok {
+			item.KYCStatus = &status
 		}
 		page.Items = append(page.Items, item)
 	}

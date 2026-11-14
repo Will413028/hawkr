@@ -10,6 +10,14 @@ import (
 	"uuid"
 )
 
+type PaymentPubReviewItem struct {
+	Kind    string
+	ItemID  string
+	StoreID int64
+	StartAt time.Time
+	DueAt   time.Time
+}
+
 type SellerPubContentTakedown struct {
 	MeasureID   uuid.UUID
 	ContentKind string

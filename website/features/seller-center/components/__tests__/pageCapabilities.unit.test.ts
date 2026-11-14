@@ -201,19 +201,19 @@ describe("isBlockedByCapabilities", () => {
 		suspended: true,
 		capabilities: capabilityStatuses(SUSPENDED, [R.NOT_SUSPENDED]),
 	});
-	// 營業中、沒停權，只是認證還沒核准：物流建店缺 KYC_APPROVED，其他能力都有。
+	// 營業中、沒停權，只是認證還沒核准：物流建店缺 ONBOARDING_COMPLETE，其他能力都有。
 	const kycPending = create(GetMyStoreResponseSchema, {
 		store: store(StoreStatus.ACTIVE),
 		capabilities: [
 			...capabilityStatuses(
 				ALL.filter((c) => c !== C.SHIPPING_SETUP),
 				[],
-				{ [C.SHIPPING_SETUP]: [R.KYC_APPROVED] },
+				{ [C.SHIPPING_SETUP]: [R.ONBOARDING_COMPLETE] },
 			),
-			publicListingStatus([R.KYC_APPROVED]),
+			publicListingStatus([R.ONBOARDING_COMPLETE]),
 		],
 	});
-	// 認證已核准但被停權：物流建店只缺 NOT_SUSPENDED（不再缺 KYC_APPROVED）。
+	// 認證已核准但被停權：物流建店只缺 NOT_SUSPENDED（不再缺 ONBOARDING_COMPLETE）。
 	const kycApprovedSuspended = create(GetMyStoreResponseSchema, {
 		store: store(StoreStatus.ACTIVE),
 		suspended: true,
@@ -238,7 +238,7 @@ describe("isBlockedByCapabilities", () => {
 			store: store(StoreStatus.ACTIVE),
 			capabilities: capabilityStatuses(
 				ALL.filter((c) => c !== C.MARKETING),
-				[R.KYC_APPROVED],
+				[R.ONBOARDING_COMPLETE],
 			),
 		});
 		expect(isBlockedByCapabilities(lacksOnlyKyc, "/seller-center/posts")).toBe(

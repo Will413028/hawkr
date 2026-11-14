@@ -98,18 +98,6 @@ func work(w *Worker, args river.JobArgs) error {
 		return w.storeProfileChanged(ctx, a)
 	case StoreExposureChangedArgs:
 		return w.storeExposureChanged(ctx, a)
-	case PayUniForwardedArgs:
-		return w.payUniForwarded(ctx, a)
-	case PayUniApprovedArgs:
-		return w.payUniApproved(ctx, a)
-	case PayUniPendingInfoArgs:
-		return w.payUniPendingInfo(ctx, a)
-	case PayUniUnderReviewArgs:
-		return w.payUniUnderReview(ctx, a)
-	case PayUniRejectedArgs:
-		return w.payUniRejected(ctx, a)
-	case KYCRejectedArgs:
-		return w.kycRejected(ctx, a)
 	}
 	panic("unknown relay job")
 }
@@ -125,7 +113,7 @@ func check(t *testing.T, name string, a rabbitmq.PublishArgs, payload map[string
 }
 
 // 每個 routing key 一個測試，斷言完整的 JSON（解成 map[string]any，所以 string 與 number 分得清楚），對照舊 publisher 的 struct
-// （pkg/mq/events.go、seller-service 的 merchant_verification_outbox；wire_test.go 另外逐欄位比對 struct 的 tag）。
+// （pkg/mq/events.go；wire_test.go 另外逐欄位比對 struct 的 tag）。
 func TestSellerDeletedWire(t *testing.T) {
 	a, got := run(t, &fakeStores{}, OnStoreRetired, seller.StoreRetired{OccurredAt: occurredAt, EventID: eventID, StoreID: 91, StoreCode: 26100000091, AccountID: 7})
 	check(t, "seller.deleted", a, got, "hawkr.seller", "seller.deleted", map[string]any{
@@ -212,76 +200,6 @@ func TestSellerExposureChangedWire(t *testing.T) {
 	}
 }
 
-func TestMerchantVerificationForwardedWire(t *testing.T) {
-	a, got := run(t, &fakeStores{}, OnPayUniForwarded, seller.PayUniForwarded{OccurredAt: occurredAt, EventID: eventID, StoreID: 91, AccountID: 7})
-	check(t, "forwarded", a, got, "hawkr.merchant", "merchant.verification.forwarded", map[string]any{
-		"event_id": eventID.String(), "status": "forwarded_to_payuni", "merchant_id": float64(7), "store_id": float64(91),
-	})
-}
-
-func TestMerchantVerificationApprovedWire(t *testing.T) {
-	a, got := run(t, &fakeStores{}, OnPayUniApproved, seller.PayUniApproved{OccurredAt: occurredAt, EventID: eventID, StoreID: 91, AccountID: 7, Reason: "審核通過"})
-	check(t, "approved", a, got, "hawkr.merchant", "merchant.verification.approved", map[string]any{
-		"event_id": eventID.String(), "status": "approved", "reason": "審核通過", "merchant_id": float64(7), "store_id": float64(91),
-	})
-	_, got = run(t, &fakeStores{}, OnPayUniApproved, seller.PayUniApproved{OccurredAt: occurredAt, EventID: eventID, StoreID: 91, AccountID: 7})
-	if _, has := got["reason"]; has {
-		t.Fatalf("a blank reason is omitted: %#v", got)
-	}
-}
-
-func TestMerchantVerificationPendingInfoWire(t *testing.T) {
-	a, got := run(t, &fakeStores{}, OnPayUniPendingInfo, seller.PayUniPendingInfo{OccurredAt: occurredAt, EventID: eventID, StoreID: 91, AccountID: 7, Reason: "請補身分證背面"})
-	check(t, "pending_info", a, got, "hawkr.merchant", "merchant.verification.pending_info", map[string]any{
-		"event_id": eventID.String(), "status": "pending_info", "reason": "請補身分證背面", "merchant_id": float64(7), "store_id": float64(91),
-	})
-	for _, blank := range []string{"", "  \n"} {
-		a, got = run(t, &fakeStores{}, OnPayUniPendingInfo, seller.PayUniPendingInfo{OccurredAt: occurredAt, EventID: eventID, StoreID: 91, AccountID: 7, Reason: blank})
-		check(t, "pending_info default", a, got, "hawkr.merchant", "merchant.verification.pending_info", map[string]any{
-			"event_id": eventID.String(), "status": "pending_info", "reason": "請查收 PayUni 寄送的通知信，並依指示至 PayUni 會員後台填寫會員資料",
-			"merchant_id": float64(7), "store_id": float64(91),
-		})
-	}
-}
-
-func TestMerchantVerificationUnderReviewWire(t *testing.T) {
-	a, got := run(t, &fakeStores{}, OnPayUniUnderReview, seller.PayUniUnderReview{OccurredAt: occurredAt, EventID: eventID, StoreID: 91, AccountID: 7})
-	check(t, "under_review", a, got, "hawkr.merchant", "merchant.verification.under_review", map[string]any{
-		"event_id": eventID.String(), "status": "under_review", "merchant_id": float64(7), "store_id": float64(91),
-	})
-}
-
-// PayUni 拒絕：非空白的審核意見（去掉前後空白）優先；沒有時依狀態碼取目錄的文案，目錄沒有的碼用通用文案，沒有狀態碼沒有文案。
-func TestMerchantVerificationRejectedByPayUniWire(t *testing.T) {
-	for name, c := range map[string]struct {
-		code, reason string
-		want         any
-	}{
-		"審核意見優先":    {"MER_8", "  資料不符  ", "資料不符"},
-		"MER_8":     {"MER_8", "", "金流申請未通過審核，請確認資料後重新提交"},
-		"MER_2":     {"MER_2", " ", "這家商店的金流服務已關閉，請聯繫客服協助確認"},
-		"MEMBER_92": {"MEMBER_92", "", "金流會員審核未通過，請確認個人或公司資料後重新提交"},
-		"MEMBER_99": {"MEMBER_99", "", "金流會員帳號已停權，請聯繫客服協助確認"},
-		"目錄沒有的碼":    {"MER_7", "", "申請未通過，請聯繫客服協助確認"},
-		"目錄沒有的碼加意見": {"MER_7", "停用", "停用"},
-		"沒有狀態碼":     {"", "停用", nil},
-	} {
-		a, got := run(t, &fakeStores{}, OnPayUniRejected, seller.PayUniRejected{OccurredAt: occurredAt, EventID: eventID, StoreID: 91, AccountID: 7, Reason: c.reason, StatusCode: c.code})
-		want := map[string]any{"event_id": eventID.String(), "status": "rejected", "merchant_id": float64(7), "store_id": float64(91)}
-		if c.want != nil {
-			want["reason"] = c.want
-		}
-		check(t, name, a, got, "hawkr.merchant", "merchant.verification.rejected", want)
-	}
-}
-
-func TestMerchantVerificationRejectedByAnAdminWire(t *testing.T) {
-	a, got := run(t, &fakeStores{}, OnKYCRejected, seller.KYCRejected{OccurredAt: occurredAt, EventID: eventID, StoreID: 91, AccountID: 7, Reason: "證件模糊"})
-	check(t, "kyc rejected", a, got, "hawkr.merchant", "merchant.verification.rejected", map[string]any{
-		"event_id": eventID.String(), "status": "rejected", "reason": "證件模糊", "merchant_id": float64(7), "store_id": float64(91),
-	})
-}
-
 // OnX 把事件交給 jobs.Enqueuer（呼叫方在發布的 transaction 內），失敗時回錯誤讓整筆回滾。
 func TestOnXReturnsTheEnqueueError(t *testing.T) {
 	q := failingJobs{}
@@ -300,14 +218,13 @@ func TestKindsAreDistinct(t *testing.T) {
 	seen := map[string]bool{}
 	for _, a := range []river.JobArgs{
 		StoreRetiredArgs{}, StoreSuspendedArgs{}, StoreUnsuspendedArgs{}, StoreProfileChangedArgs{}, StoreExposureChangedArgs{},
-		PayUniForwardedArgs{}, PayUniApprovedArgs{}, PayUniPendingInfoArgs{}, PayUniUnderReviewArgs{}, PayUniRejectedArgs{}, KYCRejectedArgs{},
 	} {
 		if seen[a.Kind()] {
 			t.Errorf("duplicate kind %s", a.Kind())
 		}
 		seen[a.Kind()] = true
 	}
-	if len(seen) != 11 {
+	if len(seen) != 5 {
 		t.Fatalf("kinds=%d", len(seen))
 	}
 }

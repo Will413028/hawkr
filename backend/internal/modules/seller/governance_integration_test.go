@@ -132,17 +132,6 @@ func (f *fixture) lift(ctx context.Context, m Measure) (Measure, error) {
 	return f.module.EndMeasure(ctx, EndMeasureInput{MeasureID: m.ID, AdminID: 7, ExpectedVersion: current.Version})
 }
 
-// activeRisk 回傳店家所屬帳號此刻生效中的那個措施。
-func (f *fixture) activeRisk(t *testing.T, storeID int64) Measure {
-	t.Helper()
-	s, err := f.module.Store(context.Background(), storeID)
-	must(t, err)
-	if len(s.EffectiveMeasures()) != 1 {
-		t.Fatalf("effective measures=%+v", s.EffectiveMeasures())
-	}
-	return f.measureOf(t, s.EffectiveMeasures()[0].MeasureID)
-}
-
 // insertEndedRisk 直接寫一筆已結束的 RISK 措施（結束時間在過去），withSnapshot 時帶一列身分快照：模擬結束 job 遺失、帳號沒有任何
 // 期間可掃的情形。
 func (f *fixture) insertEndedRisk(t *testing.T, storeID, accountID int64, withSnapshot bool) uuid.UUID {
@@ -161,7 +150,7 @@ func (f *fixture) insertEndedRisk(t *testing.T, storeID, accountID int64, withSn
 			return err
 		}
 		if withSnapshot {
-			_, err := conn.Exec(ctx, `INSERT INTO seller.measure_identities (measure_id, kind, key_id, hash) VALUES ($1, 'ID_CARD', 'x', decode(repeat('00', 32), 'hex'))`, id)
+			_, err := conn.Exec(ctx, `INSERT INTO seller.measure_identities (measure_id, kind, key_id, hash) VALUES ($1, 'TAX_ID', 'x', decode(repeat('00', 32), 'hex'))`, id)
 			return err
 		}
 		return nil

@@ -131,6 +131,9 @@ const (
 	// SellerGovernanceAdminServiceScheduleMeasureReviewProcedure is the fully-qualified name of the
 	// SellerGovernanceAdminService's ScheduleMeasureReview RPC.
 	SellerGovernanceAdminServiceScheduleMeasureReviewProcedure = "/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/ScheduleMeasureReview"
+	// SellerGovernanceAdminServiceMarkLinkedAccountReviewedProcedure is the fully-qualified name of the
+	// SellerGovernanceAdminService's MarkLinkedAccountReviewed RPC.
+	SellerGovernanceAdminServiceMarkLinkedAccountReviewedProcedure = "/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/MarkLinkedAccountReviewed"
 	// SellerGovernanceAdminServiceDecideAppealProcedure is the fully-qualified name of the
 	// SellerGovernanceAdminService's DecideAppeal RPC.
 	SellerGovernanceAdminServiceDecideAppealProcedure = "/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/DecideAppeal"
@@ -261,6 +264,10 @@ type SellerGovernanceAdminServiceClient interface {
 	// ScheduleMeasureReview 重新排定 RISK 措施的複審期限（落在現在之後、30 天以內），並在同一個 transaction 寫一則內部註記（note
 	// 必填）。只限生效中的 RISK 停權。後台的 etag 改變、賣家的 etag 不變。
 	ScheduleMeasureReview(context.Context, *connect.Request[v1alpha1.ScheduleMeasureReviewRequest]) (*connect.Response[v1alpha1.ScheduleMeasureReviewResponse], error)
+	// MarkLinkedAccountReviewed 把措施詳情上的一個關聯帳號標為已檢視（處置「共用銀行帳號」待辦）：這一對（措施、帳號）此後不再出現在待辦（SHARED_BANK_ACCOUNT）。
+	// 這一對必須是銀行帳號 fingerprint 命中的關聯帳號，措施或命中不存在回 not_found。冪等：已標過回成功、不改原來的時間與管理員。不改 measures，所以不帶 etag，
+	// 措施的 etag 不變。權限是獨立的 seller.measures.review_linked_account（adminauth 一支方法一個權限）。
+	MarkLinkedAccountReviewed(context.Context, *connect.Request[v1alpha1.MarkLinkedAccountReviewedRequest]) (*connect.Response[v1alpha1.MarkLinkedAccountReviewedResponse], error)
 	// DecideAppeal 裁定措施的申覆：ACCEPTED 在同一個 transaction 撤銷措施並解除效果（revoke_findings 為 true 時一併撤銷認定；終止合作的
 	// 恢復店家與關聯終止的連帶撤銷同 RevokeMeasure）；終止合作期滿前提出的申覆，期滿後仍可裁定；
 	// REJECTED 措施不變。兩者都必須附理由，賣家看得到。只有待處理的申覆可以。etag 必填；etag 不符（包含裁定已經生效後再帶舊
@@ -480,6 +487,13 @@ func NewSellerGovernanceAdminServiceClient(httpClient connect.HTTPClient, baseUR
 			connect.WithSchema(sellerGovernanceAdminServiceMethods.ByName("ScheduleMeasureReview")),
 			connect.WithClientOptions(opts...),
 		),
+		markLinkedAccountReviewed: connect.NewClient[v1alpha1.MarkLinkedAccountReviewedRequest, v1alpha1.MarkLinkedAccountReviewedResponse](
+			httpClient,
+			baseURL+SellerGovernanceAdminServiceMarkLinkedAccountReviewedProcedure,
+			connect.WithSchema(sellerGovernanceAdminServiceMethods.ByName("MarkLinkedAccountReviewed")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
 		decideAppeal: connect.NewClient[v1alpha1.DecideAppealRequest, v1alpha1.DecideAppealResponse](
 			httpClient,
 			baseURL+SellerGovernanceAdminServiceDecideAppealProcedure,
@@ -565,6 +579,7 @@ type sellerGovernanceAdminServiceClient struct {
 	endMeasure                  *connect.Client[v1alpha1.EndMeasureRequest, v1alpha1.EndMeasureResponse]
 	revokeMeasure               *connect.Client[v1alpha1.RevokeMeasureRequest, v1alpha1.RevokeMeasureResponse]
 	scheduleMeasureReview       *connect.Client[v1alpha1.ScheduleMeasureReviewRequest, v1alpha1.ScheduleMeasureReviewResponse]
+	markLinkedAccountReviewed   *connect.Client[v1alpha1.MarkLinkedAccountReviewedRequest, v1alpha1.MarkLinkedAccountReviewedResponse]
 	decideAppeal                *connect.Client[v1alpha1.DecideAppealRequest, v1alpha1.DecideAppealResponse]
 	decideRemediation           *connect.Client[v1alpha1.DecideRemediationRequest, v1alpha1.DecideRemediationResponse]
 	createMeasureNote           *connect.Client[v1alpha1.CreateMeasureNoteRequest, v1alpha1.CreateMeasureNoteResponse]
@@ -729,6 +744,12 @@ func (c *sellerGovernanceAdminServiceClient) ScheduleMeasureReview(ctx context.C
 	return c.scheduleMeasureReview.CallUnary(ctx, req)
 }
 
+// MarkLinkedAccountReviewed calls
+// hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.MarkLinkedAccountReviewed.
+func (c *sellerGovernanceAdminServiceClient) MarkLinkedAccountReviewed(ctx context.Context, req *connect.Request[v1alpha1.MarkLinkedAccountReviewedRequest]) (*connect.Response[v1alpha1.MarkLinkedAccountReviewedResponse], error) {
+	return c.markLinkedAccountReviewed.CallUnary(ctx, req)
+}
+
 // DecideAppeal calls hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.DecideAppeal.
 func (c *sellerGovernanceAdminServiceClient) DecideAppeal(ctx context.Context, req *connect.Request[v1alpha1.DecideAppealRequest]) (*connect.Response[v1alpha1.DecideAppealResponse], error) {
 	return c.decideAppeal.CallUnary(ctx, req)
@@ -875,6 +896,10 @@ type SellerGovernanceAdminServiceHandler interface {
 	// ScheduleMeasureReview 重新排定 RISK 措施的複審期限（落在現在之後、30 天以內），並在同一個 transaction 寫一則內部註記（note
 	// 必填）。只限生效中的 RISK 停權。後台的 etag 改變、賣家的 etag 不變。
 	ScheduleMeasureReview(context.Context, *connect.Request[v1alpha1.ScheduleMeasureReviewRequest]) (*connect.Response[v1alpha1.ScheduleMeasureReviewResponse], error)
+	// MarkLinkedAccountReviewed 把措施詳情上的一個關聯帳號標為已檢視（處置「共用銀行帳號」待辦）：這一對（措施、帳號）此後不再出現在待辦（SHARED_BANK_ACCOUNT）。
+	// 這一對必須是銀行帳號 fingerprint 命中的關聯帳號，措施或命中不存在回 not_found。冪等：已標過回成功、不改原來的時間與管理員。不改 measures，所以不帶 etag，
+	// 措施的 etag 不變。權限是獨立的 seller.measures.review_linked_account（adminauth 一支方法一個權限）。
+	MarkLinkedAccountReviewed(context.Context, *connect.Request[v1alpha1.MarkLinkedAccountReviewedRequest]) (*connect.Response[v1alpha1.MarkLinkedAccountReviewedResponse], error)
 	// DecideAppeal 裁定措施的申覆：ACCEPTED 在同一個 transaction 撤銷措施並解除效果（revoke_findings 為 true 時一併撤銷認定；終止合作的
 	// 恢復店家與關聯終止的連帶撤銷同 RevokeMeasure）；終止合作期滿前提出的申覆，期滿後仍可裁定；
 	// REJECTED 措施不變。兩者都必須附理由，賣家看得到。只有待處理的申覆可以。etag 必填；etag 不符（包含裁定已經生效後再帶舊
@@ -1089,6 +1114,13 @@ func NewSellerGovernanceAdminServiceHandler(svc SellerGovernanceAdminServiceHand
 		connect.WithSchema(sellerGovernanceAdminServiceMethods.ByName("ScheduleMeasureReview")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sellerGovernanceAdminServiceMarkLinkedAccountReviewedHandler := connect.NewUnaryHandler(
+		SellerGovernanceAdminServiceMarkLinkedAccountReviewedProcedure,
+		svc.MarkLinkedAccountReviewed,
+		connect.WithSchema(sellerGovernanceAdminServiceMethods.ByName("MarkLinkedAccountReviewed")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
 	sellerGovernanceAdminServiceDecideAppealHandler := connect.NewUnaryHandler(
 		SellerGovernanceAdminServiceDecideAppealProcedure,
 		svc.DecideAppeal,
@@ -1199,6 +1231,8 @@ func NewSellerGovernanceAdminServiceHandler(svc SellerGovernanceAdminServiceHand
 			sellerGovernanceAdminServiceRevokeMeasureHandler.ServeHTTP(w, r)
 		case SellerGovernanceAdminServiceScheduleMeasureReviewProcedure:
 			sellerGovernanceAdminServiceScheduleMeasureReviewHandler.ServeHTTP(w, r)
+		case SellerGovernanceAdminServiceMarkLinkedAccountReviewedProcedure:
+			sellerGovernanceAdminServiceMarkLinkedAccountReviewedHandler.ServeHTTP(w, r)
 		case SellerGovernanceAdminServiceDecideAppealProcedure:
 			sellerGovernanceAdminServiceDecideAppealHandler.ServeHTTP(w, r)
 		case SellerGovernanceAdminServiceDecideRemediationProcedure:
@@ -1334,6 +1368,10 @@ func (UnimplementedSellerGovernanceAdminServiceHandler) RevokeMeasure(context.Co
 
 func (UnimplementedSellerGovernanceAdminServiceHandler) ScheduleMeasureReview(context.Context, *connect.Request[v1alpha1.ScheduleMeasureReviewRequest]) (*connect.Response[v1alpha1.ScheduleMeasureReviewResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ScheduleMeasureReview is not implemented"))
+}
+
+func (UnimplementedSellerGovernanceAdminServiceHandler) MarkLinkedAccountReviewed(context.Context, *connect.Request[v1alpha1.MarkLinkedAccountReviewedRequest]) (*connect.Response[v1alpha1.MarkLinkedAccountReviewedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.MarkLinkedAccountReviewed is not implemented"))
 }
 
 func (UnimplementedSellerGovernanceAdminServiceHandler) DecideAppeal(context.Context, *connect.Request[v1alpha1.DecideAppealRequest]) (*connect.Response[v1alpha1.DecideAppealResponse], error) {

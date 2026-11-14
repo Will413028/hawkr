@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, sellerContentKind, sellerKYCField, sellerKYCFlowStatus, sellerKYCFlowStatusAction, sellerKYCFlowStatusBannerDescription, sellerKYCFlowStatusBannerTitle, sellerKYCFlowStatusGateHeading, sellerKYCFlowStatusGateMessage, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerPayUniState, sellerRevokeReason, sellerRiskGround, sellerSellerPayUniFixFieldsHeading, sellerSellerPayUniReasonHeading, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
+import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, paymentPaymentAccountStatus, paymentRequirementCollection, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -23,41 +23,21 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"GENDER_MALE": 1,
 	"GENDER_OTHER": 3,
 	"GENDER_UNSPECIFIED": 0,
-	"KYC_FIELD_BANK_ACCOUNT": 9,
-	"KYC_FIELD_BANK_BOOK": 17,
-	"KYC_FIELD_BANK_CODE": 8,
-	"KYC_FIELD_BANK_NAME": 7,
-	"KYC_FIELD_BIRTH_DATE": 2,
-	"KYC_FIELD_BUSINESS_COMPANY_ADDRESS": 28,
-	"KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS": 27,
-	"KYC_FIELD_BUSINESS_COMPANY_NAME": 20,
-	"KYC_FIELD_BUSINESS_COMPANY_PHONE": 25,
-	"KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE": 22,
-	"KYC_FIELD_BUSINESS_REP_ID_CARD_NO": 26,
-	"KYC_FIELD_BUSINESS_TAX_ID": 21,
-	"KYC_FIELD_ENGLISH_NAME": 6,
-	"KYC_FIELD_ID_CARD_BACK": 16,
-	"KYC_FIELD_ID_CARD_FRONT": 15,
-	"KYC_FIELD_ID_CARD_ISSUE_DATE": 3,
-	"KYC_FIELD_ID_CARD_ISSUE_LOCATION": 5,
-	"KYC_FIELD_ID_CARD_ISSUE_TYPE": 4,
-	"KYC_FIELD_INDIVIDUAL_ID_CARD_NO": 18,
-	"KYC_FIELD_PRODUCT_TYPE": 10,
-	"KYC_FIELD_REAL_NAME": 1,
+	"KYC_FIELD_BUSINESS_COMPANY_ADDRESS": 8,
+	"KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS": 7,
+	"KYC_FIELD_BUSINESS_COMPANY_NAME": 3,
+	"KYC_FIELD_BUSINESS_COMPANY_PHONE": 6,
+	"KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE": 5,
+	"KYC_FIELD_BUSINESS_TAX_ID": 4,
+	"KYC_FIELD_PRODUCT_TYPE": 1,
 	"KYC_FIELD_UNSPECIFIED": 0,
-	"KYC_FIELD_WEBSITE_URL": 12,
-	"KYC_FLOW_STATUS_APPROVED": 10,
-	"KYC_FLOW_STATUS_BINDING": 5,
-	"KYC_FLOW_STATUS_BIND_FAILED": 6,
-	"KYC_FLOW_STATUS_DRAFT": 2,
-	"KYC_FLOW_STATUS_FORWARDED": 7,
-	"KYC_FLOW_STATUS_NOT_STARTED": 1,
-	"KYC_FLOW_STATUS_PAYUNI_REJECTED": 11,
-	"KYC_FLOW_STATUS_PENDING_INFO": 9,
-	"KYC_FLOW_STATUS_REJECTED": 4,
-	"KYC_FLOW_STATUS_SUBMITTED": 3,
-	"KYC_FLOW_STATUS_UNDER_REVIEW": 8,
-	"KYC_FLOW_STATUS_UNSPECIFIED": 0,
+	"KYC_FIELD_WEBSITE_URL": 2,
+	"KYC_STATUS_APPROVED": 3,
+	"KYC_STATUS_CANCELLED": 5,
+	"KYC_STATUS_DRAFT": 1,
+	"KYC_STATUS_REJECTED": 4,
+	"KYC_STATUS_SUBMITTED": 2,
+	"KYC_STATUS_UNSPECIFIED": 0,
 	"MEASURE_BASIS_CONTRACT": 3,
 	"MEASURE_BASIS_RISK": 2,
 	"MEASURE_BASIS_UNSPECIFIED": 0,
@@ -81,15 +61,22 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"MEASURE_STATE_REVOKED": 4,
 	"MEASURE_STATE_SCHEDULED": 5,
 	"MEASURE_STATE_UNSPECIFIED": 0,
-	"PAY_UNI_STATE_APPROVED": 8,
-	"PAY_UNI_STATE_CONTACT_SUPPORT": 5,
-	"PAY_UNI_STATE_FIXABLE": 3,
-	"PAY_UNI_STATE_FIX_VIA_SUPPORT": 4,
-	"PAY_UNI_STATE_PENDING_INFO": 2,
-	"PAY_UNI_STATE_RETRY_LATER": 6,
-	"PAY_UNI_STATE_REVIEWING": 1,
-	"PAY_UNI_STATE_TERMINATED": 7,
-	"PAY_UNI_STATE_UNSPECIFIED": 0,
+	"ONBOARDING_ACTION_CONTACT_SUPPORT": 5,
+	"ONBOARDING_ACTION_EDIT_PROFILE": 2,
+	"ONBOARDING_ACTION_NONE": 1,
+	"ONBOARDING_ACTION_START_PAYMENT_ONBOARDING": 4,
+	"ONBOARDING_ACTION_SUBMIT_CERTIFICATION": 3,
+	"ONBOARDING_ACTION_UNSPECIFIED": 0,
+	"ONBOARDING_TASK_ID_PAYMENT_ACCOUNT": 3,
+	"ONBOARDING_TASK_ID_PLATFORM_REVIEW": 2,
+	"ONBOARDING_TASK_ID_PROFILE": 1,
+	"ONBOARDING_TASK_ID_UNSPECIFIED": 0,
+	"PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": 3,
+	"PAYMENT_ACCOUNT_STATUS_DISABLED": 5,
+	"PAYMENT_ACCOUNT_STATUS_ENABLED": 4,
+	"PAYMENT_ACCOUNT_STATUS_NOT_CREATED": 1,
+	"PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": 2,
+	"PAYMENT_ACCOUNT_STATUS_UNSPECIFIED": 0,
 	"POLICY_CATEGORY_COUNTERFEIT": 6,
 	"POLICY_CATEGORY_FAKE_CERTIFICATION": 5,
 	"POLICY_CATEGORY_FOOD_SAFETY": 1,
@@ -107,6 +94,9 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"POLICY_CATEGORY_SPAM": 14,
 	"POLICY_CATEGORY_UNLICENSED_SALE": 3,
 	"POLICY_CATEGORY_UNSPECIFIED": 0,
+	"REQUIREMENT_COLLECTION_PLATFORM": 2,
+	"REQUIREMENT_COLLECTION_PROVIDER": 1,
+	"REQUIREMENT_COLLECTION_UNSPECIFIED": 0,
 	"REVOKE_REASON_ADMIN_CORRECTION": 2,
 	"REVOKE_REASON_APPEAL_ACCEPTED": 1,
 	"REVOKE_REASON_EXTERNAL_DECISION": 3,
@@ -123,10 +113,10 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"RISK_GROUND_SECURITY": 6,
 	"RISK_GROUND_TRANSACTION": 1,
 	"RISK_GROUND_UNSPECIFIED": 0,
-	"SELLER_REQUIREMENT_KYC_APPROVED": 3,
 	"SELLER_REQUIREMENT_LOGO": 5,
 	"SELLER_REQUIREMENT_NOT_PENDING_DELETION": 7,
 	"SELLER_REQUIREMENT_NOT_SUSPENDED": 2,
+	"SELLER_REQUIREMENT_ONBOARDING_COMPLETE": 3,
 	"SELLER_REQUIREMENT_STORE_ACTIVE": 1,
 	"SELLER_REQUIREMENT_STORE_NAME": 4,
 	"SELLER_REQUIREMENT_TOWN_CODE": 6,
@@ -209,29 +199,26 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	case "common.unknown": {
 		return commonUnknown();
 	}
+	case "payment.PaymentAccountStatus": {
+		return paymentPaymentAccountStatus(num(c.value));
+	}
+	case "payment.RequirementCollection": {
+		return paymentRequirementCollection(num(c.value));
+	}
 	case "seller.ContentKind": {
 		return sellerContentKind(num(c.value));
+	}
+	case "seller.KYCApplication.decide_time": {
+		return sellerKYCApplicationDecideTime({ time: p.time as string });
+	}
+	case "seller.KYCApplication.submit_time": {
+		return sellerKYCApplicationSubmitTime({ time: p.time as string });
 	}
 	case "seller.KYCField": {
 		return sellerKYCField(num(c.value));
 	}
-	case "seller.KYCFlowStatus": {
-		return sellerKYCFlowStatus(num(c.value));
-	}
-	case "seller.KYCFlowStatus.action": {
-		return sellerKYCFlowStatusAction(num(c.value));
-	}
-	case "seller.KYCFlowStatus.banner_description": {
-		return sellerKYCFlowStatusBannerDescription(num(c.value));
-	}
-	case "seller.KYCFlowStatus.banner_title": {
-		return sellerKYCFlowStatusBannerTitle(num(c.value));
-	}
-	case "seller.KYCFlowStatus.gate_heading": {
-		return sellerKYCFlowStatusGateHeading(num(c.value));
-	}
-	case "seller.KYCFlowStatus.gate_message": {
-		return sellerKYCFlowStatusGateMessage(num(c.value), { subject: p.subject as string });
+	case "seller.KYCStatus": {
+		return sellerKYCStatus(num(c.value));
 	}
 	case "seller.Measure.appeal_deadline": {
 		return sellerMeasureAppealDeadline({ deadline: p.deadline as string });
@@ -300,20 +287,26 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	case "seller.MeasureState": {
 		return sellerMeasureState(num(c.value), { kind: num(p.kind) });
 	}
-	case "seller.PayUniState": {
-		return sellerPayUniState(num(c.value));
+	case "seller.OnboardingAction.button": {
+		return sellerOnboardingActionButton(num(c.value));
+	}
+	case "seller.OnboardingTaskId.description": {
+		return sellerOnboardingTaskIdDescription(num(c.value));
+	}
+	case "seller.OnboardingTaskId.panel_description": {
+		return sellerOnboardingTaskIdPanelDescription(num(c.value));
+	}
+	case "seller.OnboardingTaskId.panel_title": {
+		return sellerOnboardingTaskIdPanelTitle(num(c.value));
+	}
+	case "seller.PaymentAccount.payouts_inactive_note": {
+		return sellerPaymentAccountPayoutsInactiveNote();
 	}
 	case "seller.RevokeReason": {
 		return sellerRevokeReason(num(c.value));
 	}
 	case "seller.RiskGround": {
 		return sellerRiskGround(num(c.value));
-	}
-	case "seller.SellerPayUni.fix_fields_heading": {
-		return sellerSellerPayUniFixFieldsHeading();
-	}
-	case "seller.SellerPayUni.reason_heading": {
-		return sellerSellerPayUniReasonHeading();
 	}
 	case "seller.SellerRequirement": {
 		return sellerSellerRequirement(num(c.value));

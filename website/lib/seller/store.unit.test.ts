@@ -43,9 +43,9 @@ describe("shippingGateOf", () => {
 		expect(shippingGateOf(status(true, []))).toBe("open");
 	});
 
-	it("missing KYC_APPROVED gates on certification", () => {
+	it("missing ONBOARDING_COMPLETE gates on certification", () => {
 		expect(
-			shippingGateOf(status(false, [SellerRequirement.KYC_APPROVED])),
+			shippingGateOf(status(false, [SellerRequirement.ONBOARDING_COMPLETE])),
 		).toBe("certification");
 	});
 
@@ -54,7 +54,7 @@ describe("shippingGateOf", () => {
 			shippingGateOf(
 				status(false, [
 					SellerRequirement.NOT_SUSPENDED,
-					SellerRequirement.KYC_APPROVED,
+					SellerRequirement.ONBOARDING_COMPLETE,
 				]),
 			),
 		).toBe("suspended");
@@ -78,7 +78,7 @@ describe("shippingGateOf", () => {
 				status(false, [
 					SellerRequirement.NOT_PENDING_DELETION,
 					SellerRequirement.NOT_SUSPENDED,
-					SellerRequirement.KYC_APPROVED,
+					SellerRequirement.ONBOARDING_COMPLETE,
 				]),
 			),
 		).toBe("pending_deletion");
@@ -97,7 +97,7 @@ describe("shippingGateOf", () => {
 });
 
 describe("isStoreCertified", () => {
-	it("is certified when KYC_APPROVED is not among the missing requirements", () => {
+	it("is certified when ONBOARDING_COMPLETE is not among the missing requirements", () => {
 		expect(
 			isStoreCertified(
 				my({
@@ -107,13 +107,13 @@ describe("isStoreCertified", () => {
 		).toBe(true);
 	});
 
-	it("is not certified while KYC_APPROVED is missing", () => {
+	it("is not certified while ONBOARDING_COMPLETE is missing", () => {
 		expect(
 			isStoreCertified(
 				my({
 					capabilities: [
 						publicListingStatus([
-							SellerRequirement.KYC_APPROVED,
+							SellerRequirement.ONBOARDING_COMPLETE,
 							SellerRequirement.LOGO,
 						]),
 					],

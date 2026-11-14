@@ -7,14 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 	"uuid"
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
-	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
@@ -22,7 +21,7 @@ import (
 // 審閱政策（step10e-3d-design.md E10、§3.1）：每種待辦一支 seller.review_<種類>(at)，成員、開始與期限只寫在 SQL。
 // 這個檔的測試：逐種的表格（成員集合、開始、期限、邊界 ±1µs）、成員 ⇔ Go 判定式的資料集、依 ID 批次讀的計畫。
 
-// reviewKinds 是函式的種類與 SQL 函式名（設計 §1.3 的種類加 step10e-5a 的 PAYUNI_BIND_RETRY）。
+// reviewKinds 是函式的種類與 SQL 函式名。
 var reviewKinds = []struct{ kind, fn string }{
 	{"REPORT_TRIAGE", "review_report_triage"},
 	{"CASE_DECISION", "review_case_decision"},
@@ -33,7 +32,7 @@ var reviewKinds = []struct{ kind, fn string }{
 	{"MEASURE_LIFT_REQUEST", "review_measure_lift_request"},
 	{"MEASURE_REVIEW", "review_measure_review"},
 	{"KYC_APPLICATION", "review_kyc_application"},
-	{"PAYUNI_BIND_RETRY", "review_payuni_bind_retry"},
+	{"SHARED_BANK_ACCOUNT", "review_shared_bank_account"},
 }
 
 // reviewRow 是函式的一列（seller.review_item 的欄位）。
@@ -140,20 +139,10 @@ func fmtTime(t *time.Time) string {
 	return t.Format(time.RFC3339Nano)
 }
 
-// taiwanID 產生格式與檢查碼都正確的身分證號（A + 性別碼 1 + 7 位序號 + 檢查碼；不是真實的人）。
-func taiwanID(serial int) string {
-	body := fmt.Sprintf("1%07d", serial)
-	sum := 1 // 'A' = 10：十位數 1 權重 1、個位數 0 權重 9
-	for i, c := range body {
-		sum += int(c-'0') * (8 - i)
-	}
-	return "A" + body + fmt.Sprint((10-sum%10)%10)
-}
-
-// submitKYCFor 為帳號建立並送出一份個人賣家的申請（身分證號與銀行帳號各用序號換一個），回傳送出的申請。
-func (f *fixture) submitKYCFor(t *testing.T, accountID int64, serial int) KYCApplication {
+// submitKYCFor 為帳號建立並送出一份個人賣家的申請，回傳送出的申請。
+func (f *fixture) submitKYCFor(t *testing.T, accountID int64) KYCApplication {
 	t.Helper()
-	d := f.savedDraft(t, kycDraft(accountID, taiwanID(serial), fmt.Sprintf("0123456789%02d", serial%100)))
+	d := f.savedDraft(t, kycDraft(accountID))
 	a, err := f.module.SubmitKYC(context.Background(), SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
 	return a
@@ -189,10 +178,6 @@ type reviewWorld struct {
 	appealMeasure    uuid.UUID
 	liftMeasure      uuid.UUID
 	mootMeasure      uuid.UUID // 解除請求還是 PENDING、措施已結束
-
-	bindRetry           uuid.UUID // 綁定重試用完的待辦對象（申請 ID）
-	bindRetryStore      int64
-	bindRetryDraftStore int64 // 綁定重試用完、申請被改回草稿的店家：不是待辦
 }
 
 type riskMember struct {
@@ -337,49 +322,26 @@ func newReviewWorld(t *testing.T, f *fixture) *reviewWorld {
 	// 商家認證：審核中的；草稿、被退回、已核准的不是。
 	f.tick(hour)
 	accountK1, sK1 := f.open(t)
-	k1 := f.submitKYCFor(t, accountK1, 106)
+	k1 := f.submitKYCFor(t, accountK1)
 	add("KYC_APPLICATION", k1.ID.String(), sK1.StoreID, f.now, f.now.Add(7*day))
 	accountK2, _ := f.open(t)
-	k2 := f.submitKYCFor(t, accountK2, 107)
+	k2 := f.submitKYCFor(t, accountK2)
 	f.reject(t, k2, anIssue()...)
 	accountK3, _ := f.open(t)
-	f.savedDraft(t, kycDraft(accountK3, taiwanID(108), "012345678908"))
+	f.savedDraft(t, kycDraft(accountK3))
 
-	// 重新綁定 PayUni：綁定重試用完（PAYUNI_UNAVAILABLE）、店家營運中、申請已核准的；開始是綁定失敗的時刻，期限 24 小時。
-	// 其他碼（資料不完整、PayUni 永久拒絕）、申請被改回草稿、店家已關閉、還在綁定、已綁定的都不是。
-	bindFailed := func(serial int, errs ...error) (int64, int64, KYCApplication) {
-		accountID, s := f.open(t)
-		k := f.submitKYCFor(t, accountID, serial)
-		must(t, approve(f, k))
-		f.payuni.bindErr = errs
-		_, err := f.module.SyncPayUni(ctx, s.StoreID, true)
-		must(t, err)
-		return accountID, s.StoreID, k
-	}
+	// 共用銀行帳號：處分建立之後才同步同一個 fingerprint 的帳號 O 是成員（開始是它最早的 fingerprint 寫入時間，期限 168 小時）；
+	// 處分建立之前就已同步的 P、fingerprint 不同的 N 不是。
 	f.tick(hour)
-	_, sB1, kB1 := bindFailed(110, errNetwork)
-	w.bindRetry, w.bindRetryStore = kB1.ID, sB1
-	add("PAYUNI_BIND_RETRY", kB1.ID.String(), sB1, f.now, f.now.Add(24*hour))
+	_, sBankS := f.approvedWithFingerprints(t, fpShared)
+	f.approvedWithFingerprints(t, fpShared)
 	f.tick(hour)
-	bindFailed(111, apiErr("AGENT03005"))
+	bankMeasure := f.terminate(t, sBankS.StoreID, GroundFraud)
 	f.tick(hour)
-	_, sB3, kB3 := bindFailed(112, errNetwork)
-	_, err = f.db.Conn(ctx).Exec(ctx, `UPDATE seller.kyc_applications SET status = 'DRAFT', decided_at = NULL WHERE application_id = $1`, kB3.ID)
-	must(t, err)
-	w.bindRetryDraftStore = sB3
-	accountB4, _, _ := bindFailed(113, errNetwork)
-	_, err = f.module.CloseCurrent(ctx, accountB4)
-	must(t, err)
-	accountB5, sB5 := f.open(t)
-	kB5 := f.submitKYCFor(t, accountB5, 114)
-	must(t, approve(f, kB5))
-	_ = sB5
-	accountB6, sB6 := f.open(t)
-	kB6 := f.submitKYCFor(t, accountB6, 115)
-	must(t, approve(f, kB6))
-	f.payuni.bindErr = nil
-	_, err = f.module.SyncPayUni(ctx, sB6.StoreID, true)
-	must(t, err)
+	accountBankO, sBankO := f.approvedWithFingerprints(t, fpShared)
+	f.approvedWithFingerprints(t, fpOther)
+	bankStart := f.firstFingerprintAt(t, sBankO.StoreID)
+	add("SHARED_BANK_ACCOUNT", bankMeasure.ID.String()+"/"+strconv.FormatInt(accountBankO, 10), sBankO.StoreID, bankStart, bankStart.Add(168*hour))
 
 	f.tick(hour)
 	w.at = f.now
@@ -611,6 +573,23 @@ func (f *fixture) goReviewSets(t *testing.T) (sets map[string]map[string]bool, d
 		}
 		afterMeasure = page.Next
 	}
+	// 共用銀行帳號：處分頁關聯帳號列的「在待辦」旗標（sqlc 查詢路徑，與函式分開讀）。
+	afterMeasure = nil
+	for {
+		page, err := f.module.AdminMeasures(ctx, AdminMeasureListInput{PageSize: 3, After: afterMeasure})
+		must(t, err)
+		for _, m := range page.Items {
+			for _, l := range f.measureOf(t, m.ID).LinkedAccounts {
+				if l.SharedBankAccountPending {
+					sets["SHARED_BANK_ACCOUNT"][m.ID.String()+"/"+strconv.FormatInt(l.AccountID, 10)] = true
+				}
+			}
+		}
+		if page.Next == nil {
+			break
+		}
+		afterMeasure = page.Next
+	}
 	var afterKYC *KYCCursor
 	for {
 		page, err := f.module.AdminKYCApplications(ctx, KYCListInput{PageSize: 3, After: afterKYC})
@@ -625,109 +604,7 @@ func (f *fixture) goReviewSets(t *testing.T) (sets map[string]map[string]bool, d
 		}
 		afterKYC = page.Next
 	}
-	// 重新綁定 PayUni：賣家看到的 PayUni 狀態是「等平台重新送出」（RETRY_LATER）的店家，店家營運中、申請已核准。
-	afterKYC = nil
-	for {
-		page, err := f.module.AdminKYCApplications(ctx, KYCListInput{PageSize: 3, After: afterKYC})
-		must(t, err)
-		for _, a := range page.Items {
-			if a.Status != KYCStatusApproved {
-				continue
-			}
-			mine, err := f.module.MyKYC(ctx, a.AccountID)
-			if apperr.KindOf(err) == apperr.KindNotFound {
-				continue
-			}
-			must(t, err)
-			if mine.PayUni != nil && mine.PayUni.State == PayUniState("RETRY_LATER") {
-				sets["PAYUNI_BIND_RETRY"][a.ID.String()] = true
-			}
-		}
-		if page.Next == nil {
-			break
-		}
-		afterKYC = page.Next
-	}
 	return sets, decisionStarts
-}
-
-// 重新綁定 PayUni 待辦的生命週期：開始時間是綁定失敗的時刻（失敗期間店家改地址推後的是 updated_at，不是開始時間）；管理員重新綁定後待辦消失；
-// 申請被改回草稿的店家不在待辦裡，管理員重新綁定被擋下（綁定 job 會把還沒審核的草稿送給 PayUni）。
-// mutation：把開始時間改讀 updated_at，改地址之後開始時間會往後跑；拿掉 Rebind 的申請檢查，草稿的店家會被重新綁定。
-func TestPayUniBindRetryStartIsTheFailureTimeAndEndsWithRebind(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	w := newReviewWorld(t, f)
-	ctx := context.Background()
-	rows := f.reviewOf(t, "review_payuni_bind_retry", w.at)
-	var before *reviewRow
-	for i := range rows {
-		if rows[i].KYCID != nil && *rows[i].KYCID == w.bindRetry {
-			before = &rows[i]
-		}
-	}
-	if before == nil {
-		t.Fatalf("待辦不在結果裡：%+v", rows)
-	}
-	f.tick(3 * time.Hour)
-	setAddress(f, t, w.bindRetryStore, "改過的地址")
-	if r := f.registration(t, w.bindRetryStore); !r.UpdatedAt.After(*before.Start) {
-		t.Fatalf("改地址應該推後 updated_at：%+v", r)
-	}
-	for _, r := range f.reviewOf(t, "review_payuni_bind_retry", f.now) {
-		if r.KYCID != nil && *r.KYCID == w.bindRetry && (!r.Start.Equal(*before.Start) || !r.Due.Equal(*before.Due)) {
-			t.Fatalf("改地址之後開始 %v、期限 %v，要維持 %v、%v", fmtTime(r.Start), fmtTime(r.Due), fmtTime(before.Start), fmtTime(before.Due))
-		}
-	}
-
-	_, err := f.module.RebindPayUni(ctx, RebindPayUniInput{StoreID: w.bindRetryDraftStore, AdminID: 9})
-	if apperr.KindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "賣家正在修改商家認證，重新核准後會自動重新綁定。") {
-		t.Fatalf("申請被改回草稿時重新綁定要被擋下：%v", err)
-	}
-	if r := f.registration(t, w.bindRetryDraftStore); r.BindStatus != BindStatusFailed {
-		t.Fatalf("被擋下之後註冊不該改變：%+v", r)
-	}
-
-	if _, err := f.module.RebindPayUni(ctx, RebindPayUniInput{StoreID: w.bindRetryStore, AdminID: 9}); err != nil {
-		t.Fatal(err)
-	}
-	for _, r := range f.reviewOf(t, "review_payuni_bind_retry", f.now) {
-		if r.KYCID != nil && *r.KYCID == w.bindRetry {
-			t.Fatalf("重新綁定之後待辦要消失：%+v", r)
-		}
-	}
-}
-
-// 後台待辦 PAYUNI_BIND_RETRY 與重新綁定的可用性是單向關係：待辦有列的店家，重新綁定此刻一定可做（原因清單是空的）。反過來不成立：其他綁定失敗的碼刻意不進待辦
-// （5a F16，客服接手）。資料集裡有一家申請被改回草稿的店家（bindRetryDraftStore）：它的原因是 KYC_NOT_APPROVED，不能在待辦裡。
-// mutation：review_payuni_bind_retry 拿掉 k.status = 'APPROVED' → 草稿的店家進待辦，這裡失敗。
-func TestBindRetryQueueIsASubsetOfRebindableStores(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	w := newReviewWorld(t, f)
-	ctx := context.Background()
-	rows := f.reviewOf(t, "review_payuni_bind_retry", w.at)
-	if len(rows) == 0 {
-		t.Fatal("資料集沒有任何重新綁定的待辦，斷言沒有意義")
-	}
-	for _, r := range rows {
-		view, err := f.module.PayUniRegistrationOf(ctx, *r.StoreID)
-		must(t, err)
-		if len(view.RebindUnavailable) != 0 {
-			t.Errorf("店家 %d 在待辦裡，重新綁定卻不能做：%v", *r.StoreID, view.RebindUnavailable)
-		}
-	}
-	// 夾具：被改回草稿的店家不在待辦，原因是申請不是已核准。
-	view, err := f.module.PayUniRegistrationOf(ctx, w.bindRetryDraftStore)
-	must(t, err)
-	if !slices.Equal(view.RebindUnavailable, []StoreActionUnavailableReason{StoreReasonKYCNotApproved}) {
-		t.Fatalf("draft store reasons=%v", view.RebindUnavailable)
-	}
-	for _, r := range rows {
-		if *r.StoreID == w.bindRetryDraftStore {
-			t.Fatalf("申請被改回草稿的店家不該在待辦裡：%+v", r)
-		}
-	}
 }
 
 // 成員 ⇔ Go 判定式：同一份資料集，逐種比較函式與判定式的成員集合；世界建完的那一刻（at）與一週後（詢問逾期、告知、複審都進入）各比一次。
@@ -787,7 +664,6 @@ func TestReviewDeadlinePushdown(t *testing.T) {
 		{"review_measure_lift_request", "request_id", "measure_requests", "id"},
 		{"review_measure_review", "measure_id", "measures", "id"},
 		{"review_kyc_application", "kyc_application_id", "kyc_applications", "application_id"},
-		{"review_payuni_bind_retry", "kyc_application_id", "kyc_applications", "application_id"},
 	} {
 		var plan []byte
 		err := f.db.InTx(ctx, func(ctx context.Context) error {
@@ -957,7 +833,7 @@ func TestResourceDeadlinesExistWhileTheObligationDoes(t *testing.T) {
 	// 商家認證：審核中有期限（送出起算 7 天），核准後沒有。
 	f.tick(hour)
 	accountK, sK := f.open(t)
-	kyc := f.submitKYCFor(t, accountK, 301)
+	kyc := f.submitKYCFor(t, accountK)
 	submittedKYC := f.now
 	wantDeadline(t, "審核中的商家認證（送出的回應不帶，重讀）", mustStoreKYC(t, f, sK.StoreID).DecideDeadline, submittedKYC, submittedKYC.Add(7*24*hour))
 	f.tick(hour)

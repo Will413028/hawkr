@@ -44,7 +44,7 @@ MyStore _store({required bool listed}) => MyStore(
   myStoreResponse(
     id: '7',
     publicListing: publicListingMissing([
-      if (!listed) SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+      if (!listed) SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
     ]),
   ),
 );

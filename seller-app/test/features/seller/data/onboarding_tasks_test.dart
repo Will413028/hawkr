@@ -1,340 +1,307 @@
-import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart';
-import 'package:hawkr_seller/features/seller/data/onboarding_tasks.dart';
-import 'package:hawkr_ui_text/hawkr_ui_text.dart';
-import 'package:hawkr_seller/shared/widgets/hk_status_badge.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
+import 'package:hawkr_seller/features/seller/data/onboarding_tasks.dart';
+import 'package:hawkr_seller/shared/widgets/hk_status_badge.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 import '../../../support/my_store_fixtures.dart';
+import '../../../support/onboarding_fixtures.dart';
 
-const _name = SellerRequirement.SELLER_REQUIREMENT_STORE_NAME;
-const _logo = SellerRequirement.SELLER_REQUIREMENT_LOGO;
-const _town = SellerRequirement.SELLER_REQUIREMENT_TOWN_CODE;
-const _kyc = SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED;
-const _active = SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE;
+const _kyc = SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE;
 const _notSuspended = SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED;
 
-OnboardingTask _task(List<OnboardingTask> tasks, OnboardingTaskId id) =>
+const _profile = OnboardingTaskId.ONBOARDING_TASK_ID_PROFILE;
+const _review = OnboardingTaskId.ONBOARDING_TASK_ID_PLATFORM_REVIEW;
+const _payment = OnboardingTaskId.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT;
+const _completed = OnboardingTaskState.ONBOARDING_TASK_STATE_COMPLETED;
+const _actionRequired =
+    OnboardingTaskState.ONBOARDING_TASK_STATE_ACTION_REQUIRED;
+const _inProgress = OnboardingTaskState.ONBOARDING_TASK_STATE_IN_PROGRESS;
+const _locked = OnboardingTaskState.ONBOARDING_TASK_STATE_LOCKED;
+const _unknown = OnboardingTaskState.ONBOARDING_TASK_STATE_UNKNOWN;
+
+OnboardingStep _task(List<OnboardingStep> tasks, String id) =>
     tasks.singleWhere((task) => task.id == id);
 
-List<OnboardingTaskId> _ids(
-  List<OnboardingTask> tasks,
-  OnboardingTaskGroup group,
-) => [
+List<String> _ids(List<OnboardingStep> tasks, OnboardingTaskGroup group) => [
   for (final task in tasks)
     if (task.group == group) task.id,
 ];
 
+List<OnboardingStep> _required(GetMyOnboardingResponse? summary) =>
+    buildOnboardingSteps(
+      l: UiLocale.zhTW,
+      my: myStore(publicListing: publicListingMissing()),
+      summary: summary,
+    ).where((step) => step.group == OnboardingTaskGroup.beforePublish).toList();
+
 void main() {
-  group('公開前必須只由 exposure.missing_requirements 推導', () {
-    test('缺店名、logo、所在地：商店資料列出缺少項目，認證通過', () {
-      final tasks = buildOnboardingTasks(
-        l: UiLocale.zhTW,
-        my: myStore(publicListing: publicListingMissing([_name, _logo, _town])),
-        flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
+  group('公開前必須只由伺服器的開通摘要推導', () {
+    test('必要任務依摘要的順序，標題與狀態句是伺服器的句子，說明句取自共用文案目錄', () {
+      final steps = _required(
+        onboardingSummary([
+          serverTask(
+            _profile,
+            _actionRequired,
+            action: OnboardingAction.ONBOARDING_ACTION_EDIT_PROFILE,
+            title: '商店資料',
+            status: '缺少：logo',
+          ),
+          serverTask(_review, _inProgress, title: '平台審核', status: '審核中'),
+          serverTask(_payment, _locked, title: '收款帳戶', status: '審核通過後開放'),
+        ]),
       );
-      final profile = _task(tasks, OnboardingTaskId.profile);
-      expect(profile.completed, isFalse);
-      expect(profile.statusLabel, '缺少：店名、logo、所在地');
-      expect(profile.cta, '去設定');
-      expect(_task(tasks, OnboardingTaskId.cert).completed, isTrue);
-      expect(_task(tasks, OnboardingTaskId.cert).statusLabel, '已通過');
-      expect(_task(tasks, OnboardingTaskId.cert).cta, isNull);
+      expect(
+        [for (final s in steps) s.id],
+        [
+          requiredStepId(_profile),
+          requiredStepId(_review),
+          requiredStepId(_payment),
+        ],
+      );
+      expect([for (final s in steps) s.title], ['商店資料', '平台審核', '收款帳戶']);
+      expect(
+        [for (final s in steps) s.statusLabel],
+        ['缺少：logo', '審核中', '審核通過後開放'],
+      );
+      expect(
+        [for (final s in steps) s.description],
+        [
+          _profile.description(UiLocale.zhTW),
+          _review.description(UiLocale.zhTW),
+          _payment.description(UiLocale.zhTW),
+        ],
+      );
+      expect(steps.every((s) => s.description != null), isTrue);
     });
 
-    test('只缺 logo', () {
-      final tasks = buildOnboardingTasks(
-        l: UiLocale.zhTW,
-        my: myStore(publicListing: publicListingMissing([_logo, _kyc])),
-        flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
+    test('完成與鎖定只看 state：COMPLETED 完成、LOCKED 鎖定，其餘都不是', () {
+      final steps = _required(
+        onboardingSummary([
+          serverTask(_profile, _completed),
+          serverTask(_review, _actionRequired),
+          serverTask(_payment, _locked),
+        ]),
       );
-      expect(_task(tasks, OnboardingTaskId.profile).statusLabel, '缺少：logo');
+      expect([for (final s in steps) s.completed], [true, false, false]);
+      expect([for (final s in steps) s.locked], [false, false, true]);
+      expect(steps.first.tone, HkStatusTone.success);
+      expect(steps.last.tone, HkStatusTone.neutral);
     });
 
-    test('缺 KYC_APPROVED：狀態與動作來自流程狀態', () {
-      final tasks = buildOnboardingTasks(
-        l: UiLocale.zhTW,
-        my: myStore(publicListing: publicListingMissing([_kyc])),
-        flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO,
+    test('state 是 UNKNOWN（來源讀不到）不算完成、也不鎖定', () {
+      final steps = _required(
+        onboardingSummary([
+          serverTask(_profile, _unknown),
+          serverTask(_review, _unknown),
+          serverTask(_payment, _unknown),
+        ]),
       );
-      final cert = _task(tasks, OnboardingTaskId.cert);
-      expect(cert.completed, isFalse);
-      expect(cert.statusLabel, '需補件');
-      expect(cert.cta, '前往補件');
-      expect(_task(tasks, OnboardingTaskId.profile).completed, isTrue);
-      expect(_task(tasks, OnboardingTaskId.profile).statusLabel, '已完成');
+      expect(steps, hasLength(3));
+      expect(steps.any((s) => s.completed), isFalse);
+      expect(steps.any((s) => s.locked), isFalse);
     });
 
-    test('讀不到流程狀態時和尚未開始一樣引導開始認證', () {
-      final tasks = buildOnboardingTasks(
+    test('沒有摘要（沒讀到或失敗）：沒有必要任務，不用本地資料補', () {
+      expect(_required(null), isEmpty);
+      final steps = buildOnboardingSteps(
         l: UiLocale.zhTW,
-        my: myStore(publicListing: publicListingMissing([_kyc])),
-        flowStatus: null,
+        my: myStore(publicListing: publicListingMissing([_kyc, _notSuspended])),
       );
-      final cert = _task(tasks, OnboardingTaskId.cert);
-      expect(cert.statusLabel, '未知');
-      expect(cert.cta, '開始認證');
+      expect(_ids(steps, OnboardingTaskGroup.beforePublish), isEmpty);
     });
 
-    test('流程狀態是 UNSPECIFIED：狀態是目錄的「未知」，行動和尚未開始一樣', () {
-      final tasks = buildOnboardingTasks(
-        l: UiLocale.zhTW,
-        my: myStore(publicListing: publicListingMissing([_kyc])),
-        flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_UNSPECIFIED,
+    test('UNSPECIFIED 的任務略過', () {
+      final steps = _required(
+        onboardingSummary([
+          serverTask(
+            OnboardingTaskId.ONBOARDING_TASK_ID_UNSPECIFIED,
+            _completed,
+          ),
+          serverTask(_review, _completed),
+        ]),
       );
-      final cert = _task(tasks, OnboardingTaskId.cert);
-      expect(cert.statusLabel, '未知');
-      expect(cert.cta, '開始認證');
+      expect([for (final s in steps) s.id], [requiredStepId(_review)]);
     });
 
-    test('exposure 說已通過、流程狀態卻還沒讀到：以 exposure 為準', () {
-      final tasks = buildOnboardingTasks(
-        l: UiLocale.zhTW,
-        my: myStore(publicListing: publicListingMissing()),
-        flowStatus: null,
+    test('標題或狀態句是空的：用目錄的「未知」，不顯示空字串', () {
+      final steps = _required(
+        onboardingSummary([
+          OnboardingTask(id: _review, state: _actionRequired),
+        ]),
       );
-      expect(_task(tasks, OnboardingTaskId.cert).completed, isTrue);
+      expect(steps.single.title, commonUnknown(UiLocale.zhTW));
+      expect(steps.single.statusLabel, commonUnknown(UiLocale.zhTW));
     });
 
-    test('停權與商店狀態列只在缺那個條件時出現', () {
-      final none = buildOnboardingTasks(
-        l: UiLocale.zhTW,
-        my: myStore(publicListing: publicListingMissing([_kyc])),
-        flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
-      );
-      expect(_ids(none, OnboardingTaskGroup.beforePublish), [
-        OnboardingTaskId.profile,
-        OnboardingTaskId.cert,
-      ]);
-
-      final both = buildOnboardingTasks(
-        l: UiLocale.zhTW,
-        my: myStore(
-          publicListing: publicListingMissing([_active, _notSuspended]),
-        ),
-        flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
-      );
-      expect(_ids(both, OnboardingTaskGroup.beforePublish), [
-        OnboardingTaskId.profile,
-        OnboardingTaskId.cert,
-        OnboardingTaskId.notSuspended,
-        OnboardingTaskId.storeActive,
-      ]);
-      final suspended = _task(both, OnboardingTaskId.notSuspended);
-      expect(suspended.title, '停權處分');
-      expect(suspended.statusLabel, '停權中');
-      expect(suspended.cta, '查看停權說明');
-      final inactive = _task(both, OnboardingTaskId.storeActive);
-      expect(inactive.title, '商店狀態');
-      expect(inactive.statusLabel, '未營業');
-      expect(inactive.cta, '查看說明');
-      expect(suspended.completed, isFalse);
-    });
-
-    test('NOT_PENDING_DELETION 在顯示層併入「商店狀態／未營業」列，不出現其他公開條件', () {
-      final tasks = buildOnboardingTasks(
+    test('停權、關店與其他公開條件不再是任務列（由公告頁處理）', () {
+      final steps = buildOnboardingSteps(
         l: UiLocale.zhTW,
         my: myStore(
           publicListing: publicListingMissing([
+            _notSuspended,
+            SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE,
             SellerRequirement.SELLER_REQUIREMENT_NOT_PENDING_DELETION,
           ]),
         ),
-        flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
+        summary: completedSummary(),
       );
-      final ids = _ids(tasks, OnboardingTaskGroup.beforePublish);
-      expect(ids, contains(OnboardingTaskId.storeActive));
-      expect(ids, isNot(contains(OnboardingTaskId.otherRequirement)));
-      expect(_task(tasks, OnboardingTaskId.storeActive).statusLabel, '未營業');
+      expect(_ids(steps, OnboardingTaskGroup.beforePublish), [
+        requiredStepId(_profile),
+        requiredStepId(_review),
+        requiredStepId(_payment),
+      ]);
     });
 
-    test('物流設定未回報：鎖定並顯示未營業', () {
-      final shipping = _task(
-        buildOnboardingTasks(
-          l: UiLocale.zhTW,
-          my: myStore(reportCapabilities: false),
-          flowStatus: null,
-        ),
-        OnboardingTaskId.shipping,
-      );
-      expect(shipping.locked, isTrue);
-      expect(shipping.statusLabel, '未營業');
-    });
-
-    test('物流設定缺 STORE_ACTIVE：鎖定並顯示未營業', () {
-      final tasks = buildOnboardingTasks(
-        l: UiLocale.zhTW,
-        my: myStore(
-          shippingSetup: shippingSetupMissing([
-            SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE,
+    test('按鈕文字取自目錄、去處依 action；沒有文字的 action 沒有按鈕', () {
+      final expected = {
+        OnboardingAction.ONBOARDING_ACTION_EDIT_PROFILE:
+            OnboardingStepTarget.editProfile,
+        OnboardingAction.ONBOARDING_ACTION_SUBMIT_CERTIFICATION:
+            OnboardingStepTarget.certification,
+        OnboardingAction.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING:
+            OnboardingStepTarget.certification,
+        OnboardingAction.ONBOARDING_ACTION_CONTACT_SUPPORT:
+            OnboardingStepTarget.support,
+      };
+      for (final entry in expected.entries) {
+        final step = _required(
+          onboardingSummary([
+            serverTask(_review, _actionRequired, action: entry.key),
           ]),
-        ),
-        flowStatus: null,
-      );
-      final shipping = _task(tasks, OnboardingTaskId.shipping);
-      expect(shipping.locked, isTrue);
-      expect(shipping.statusLabel, '未營業');
-    });
-
-    test('沒有 exposure（還沒讀到）：每個條件都當成還缺', () {
-      final tasks = buildOnboardingTasks(
-        l: UiLocale.zhTW,
-        my: myStore(),
-        flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
-      );
-      expect(
-        _task(tasks, OnboardingTaskId.profile).statusLabel,
-        '缺少：店名、logo、所在地',
-      );
-      expect(_task(tasks, OnboardingTaskId.cert).completed, isFalse);
-      expect(
-        _ids(tasks, OnboardingTaskGroup.beforePublish),
-        isNot(contains(OnboardingTaskId.otherRequirement)),
-      );
-    });
-
-    test('完全沒有店家快照時也不當成已完成', () {
-      final tasks = buildOnboardingTasks(
-        l: UiLocale.zhTW,
-        my: null,
-        flowStatus: null,
-      );
-      for (final task in tasks.where(
-        (t) => t.group == OnboardingTaskGroup.beforePublish,
-      )) {
-        expect(task.completed, isFalse);
+        ).single;
+        expect(step.target, entry.value, reason: '${entry.key}');
+        expect(
+          step.cta,
+          entry.key.button(UiLocale.zhTW),
+          reason: '${entry.key}',
+        );
+        expect(step.cta, isNotNull, reason: '${entry.key}');
+      }
+      for (final action in [
+        OnboardingAction.ONBOARDING_ACTION_NONE,
+        OnboardingAction.ONBOARDING_ACTION_UNSPECIFIED,
+      ]) {
+        final step = _required(
+          onboardingSummary([serverTask(_review, _completed, action: action)]),
+        ).single;
+        expect(step.target, OnboardingStepTarget.none, reason: '$action');
+        expect(step.cta, isNull, reason: '$action');
       }
     });
 
-    test('全部滿足：公開前必須的列全部完成', () {
-      final tasks = buildOnboardingTasks(
-        l: UiLocale.zhTW,
-        my: myStore(publicListing: publicListingMissing()),
-        flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
-      );
-      final required = tasks.where(
-        (t) => t.group == OnboardingTaskGroup.beforePublish,
-      );
-      expect(required.map((t) => t.id), [
-        OnboardingTaskId.profile,
-        OnboardingTaskId.cert,
-      ]);
-      expect(required.every((t) => t.completed), isTrue);
+    test('COMPLETED 的任務 action 是 NONE，沒有按鈕', () {
+      final step = _required(
+        onboardingSummary([serverTask(_review, _completed)]),
+      ).single;
+      expect(step.cta, isNull);
     });
   });
 
   group('建議完成', () {
     test('分組與順序', () {
-      final tasks = buildOnboardingTasks(
+      final tasks = buildOnboardingSteps(
         l: UiLocale.zhTW,
         my: myStore(publicListing: publicListingMissing()),
-        flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
       );
       expect(_ids(tasks, OnboardingTaskGroup.recommended), [
-        OnboardingTaskId.shipping,
-        OnboardingTaskId.product,
-        OnboardingTaskId.description,
+        shippingStepId,
+        productStepId,
+        descriptionStepId,
       ]);
     });
 
-    test('物流設定在 SHIPPING_SETUP 缺 KYC_APPROVED 時鎖定，與流程狀態無關', () {
-      for (final status in [
-        ...KYCFlowStatus.values.where(
-          (s) => s != KYCFlowStatus.KYC_FLOW_STATUS_UNSPECIFIED,
-        ),
+    test('物流設定在 SHIPPING_SETUP 缺 ONBOARDING_COMPLETE 時鎖定，與流程狀態無關', () {
+      for (final summary in [
         null,
+        reviewPendingSummary(),
+        completedSummary(),
       ]) {
-        final tasks = buildOnboardingTasks(
+        final tasks = buildOnboardingSteps(
           l: UiLocale.zhTW,
           my: myStore(
             publicListing: publicListingMissing([_kyc]),
             shippingSetup: shippingSetupMissing([_kyc]),
           ),
-          flowStatus: status,
+          summary: summary,
         );
-        final shipping = _task(tasks, OnboardingTaskId.shipping);
-        expect(shipping.locked, isTrue, reason: '$status');
+        final shipping = _task(tasks, shippingStepId);
+        expect(shipping.locked, isTrue, reason: '$summary');
         expect(shipping.statusLabel, '需先通過認證');
       }
       expect(
         _task(
-          buildOnboardingTasks(l: UiLocale.zhTW, my: null, flowStatus: null),
-          OnboardingTaskId.shipping,
+          buildOnboardingSteps(l: UiLocale.zhTW, my: null),
+          shippingStepId,
         ).locked,
         isTrue,
       );
     });
 
     test('物流設定只看 SHIPPING_SETUP：PUBLIC_LISTING 缺 KYC 也照 SHIPPING_SETUP 開放', () {
-      final tasks = buildOnboardingTasks(
+      final tasks = buildOnboardingSteps(
         l: UiLocale.zhTW,
         my: myStore(publicListing: publicListingMissing([_kyc])),
-        flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
       );
-      expect(_task(tasks, OnboardingTaskId.shipping).locked, isFalse);
+      expect(_task(tasks, shippingStepId).locked, isFalse);
     });
 
     test('物流設定缺停權或等待刪除：鎖定並顯示對應的既有文字', () {
       final suspended = _task(
-        buildOnboardingTasks(
+        buildOnboardingSteps(
           l: UiLocale.zhTW,
           my: myStore(shippingSetup: shippingSetupMissing([_notSuspended])),
-          flowStatus: null,
         ),
-        OnboardingTaskId.shipping,
+        shippingStepId,
       );
       expect(suspended.locked, isTrue);
       expect(suspended.statusLabel, '未營業');
 
       final pending = _task(
-        buildOnboardingTasks(
+        buildOnboardingSteps(
           l: UiLocale.zhTW,
           my: myStore(
             shippingSetup: shippingSetupMissing([
               SellerRequirement.SELLER_REQUIREMENT_NOT_PENDING_DELETION,
             ]),
           ),
-          flowStatus: null,
         ),
-        OnboardingTaskId.shipping,
+        shippingStepId,
       );
       expect(pending.locked, isTrue);
       expect(pending.statusLabel, '未營業');
     });
 
-    test('exposure 已認證、GetMyKYC 讀不到：認證列已通過、物流解鎖，沒有矛盾', () {
-      final tasks = buildOnboardingTasks(
+    test('物流解鎖只看伺服器的 SHIPPING_SETUP，與認證列各讀各的', () {
+      final tasks = buildOnboardingSteps(
         l: UiLocale.zhTW,
         my: myStore(publicListing: publicListingMissing()),
-        flowStatus: null,
       );
-      expect(_task(tasks, OnboardingTaskId.cert).completed, isTrue);
-      expect(_task(tasks, OnboardingTaskId.cert).statusLabel, '已通過');
-      expect(_task(tasks, OnboardingTaskId.shipping).locked, isFalse);
+      expect(_task(tasks, shippingStepId).locked, isFalse);
     });
 
     test('列的語氣只分完成與未完成', () {
-      final tasks = buildOnboardingTasks(
+      final tasks = buildOnboardingSteps(
         l: UiLocale.zhTW,
         my: myStore(publicListing: publicListingMissing([_kyc, _notSuspended])),
-        flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED,
       );
       for (final task in tasks) {
         expect(
           task.tone,
           task.completed ? HkStatusTone.success : HkStatusTone.neutral,
-          reason: '${task.id}',
+          reason: task.id,
         );
       }
     });
 
     test('APPROVED 之後依物流開通狀態顯示', () {
-      OnboardingTask shippingOf(ShippingProgress progress) => _task(
-        buildOnboardingTasks(
+      OnboardingStep shippingOf(ShippingProgress progress) => _task(
+        buildOnboardingSteps(
           l: UiLocale.zhTW,
           my: myStore(publicListing: publicListingMissing()),
-          flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
           shipping: progress,
         ),
-        OnboardingTaskId.shipping,
+        shippingStepId,
       );
 
       final todo = shippingOf(const ShippingProgress());
@@ -376,52 +343,48 @@ void main() {
     });
 
     test('商品與商店介紹', () {
-      final empty = buildOnboardingTasks(
+      final empty = buildOnboardingSteps(
         l: UiLocale.zhTW,
         my: myStore(publicListing: publicListingMissing()),
-        flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
       );
-      expect(_task(empty, OnboardingTaskId.product).statusLabel, '待上架');
-      expect(_task(empty, OnboardingTaskId.product).cta, '新增商品');
-      expect(_task(empty, OnboardingTaskId.description).statusLabel, '待完成');
+      expect(_task(empty, productStepId).statusLabel, '待上架');
+      expect(_task(empty, productStepId).cta, '新增商品');
+      expect(_task(empty, descriptionStepId).statusLabel, '待完成');
 
-      final filled = buildOnboardingTasks(
+      final filled = buildOnboardingSteps(
         l: UiLocale.zhTW,
         my: myStore(
           publicListing: publicListingMissing(),
           description: '  產地直送  ',
         ),
-        flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
         productCount: 3,
       );
-      expect(_task(filled, OnboardingTaskId.product).completed, isTrue);
-      expect(_task(filled, OnboardingTaskId.product).statusLabel, '已上架');
-      expect(_task(filled, OnboardingTaskId.description).completed, isTrue);
-      expect(_task(filled, OnboardingTaskId.description).statusLabel, '已完成');
+      expect(_task(filled, productStepId).completed, isTrue);
+      expect(_task(filled, productStepId).statusLabel, '已上架');
+      expect(_task(filled, descriptionStepId).completed, isTrue);
+      expect(_task(filled, descriptionStepId).statusLabel, '已完成');
       expect(
         _task(
-          buildOnboardingTasks(
+          buildOnboardingSteps(
             l: UiLocale.zhTW,
             my: myStore(
               publicListing: publicListingMissing(),
               description: '   ',
             ),
-            flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
           ),
-          OnboardingTaskId.description,
+          descriptionStepId,
         ).completed,
         isFalse,
       );
     });
 
     test('商品數讀不到（null）當成還沒有商品', () {
-      final tasks = buildOnboardingTasks(
+      final tasks = buildOnboardingSteps(
         l: UiLocale.zhTW,
         my: myStore(publicListing: publicListingMissing()),
-        flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
         productCount: null,
       );
-      expect(_task(tasks, OnboardingTaskId.product).completed, isFalse);
+      expect(_task(tasks, productStepId).completed, isFalse);
     });
   });
 }
