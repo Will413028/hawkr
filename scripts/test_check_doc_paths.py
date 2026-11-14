@@ -30,6 +30,7 @@ class CheckDocPathsTest(unittest.TestCase):
         self.write("docs/adr/a.md", "# a\n")
         self.write("backend/docs/adr/b.md", "# b\n")
         self.write("backend/docs/plans/p.md", "# p\n")
+        self.write("backend/services/keep.go", "package x\n")
 
     def tearDown(self):
         self._tmp.cleanup()
@@ -93,6 +94,44 @@ class CheckDocPathsTest(unittest.TestCase):
     def test_urls_are_ignored(self):
         self.write("AGENTS.md", "https://github.com/o/r/blob/dev/docs/adr/zz.md\n")
         self.assertEqual(self.errors(), [])
+
+    def test_code_span_keeps_spaces_and_fullwidth_parens(self):
+        self.write("docs/共通規範/API 設計規範（Connect）.md", "# x\n")
+        self.write("AGENTS.md", "`docs/共通規範/API 設計規範（Connect）.md` `docs/共通規範/API 不在（X）.md`\n")
+        self.assertEqual(len(self.errors()), 1)
+
+    def test_relative_link_to_docs_is_not_read_from_root(self):
+        self.write("website/docs/plans/x.md", "# x\n")
+        self.write("website/AGENTS.md", "[g](docs/plans/x.md) [e](docs/adr/%E4%B8%AD.md)\n")
+        self.assertEqual(self.errors(), [])
+
+    def test_bare_template_paths_are_skipped(self):
+        self.write("AGENTS.md", "docs/adr/2026-10-30-<slug>.md docs/plans/{step}.md\n")
+        self.assertEqual(self.errors(), [])
+
+    def test_untracked_file_does_not_count(self):
+        (self.root / "docs/adr/local.md").write_text("x", encoding="utf-8")
+        self.write("AGENTS.md", "docs/adr/local.md\n")
+        self.assertEqual(len(self.errors()), 1)
+
+    def test_case_must_match(self):
+        self.write("AGENTS.md", "docs/adr/A.md\n")
+        self.assertEqual(len(self.errors()), 1)
+
+    def test_base_row_only_applies_to_adr_headers(self):
+        self.write("backend/docs/plans/q.md", "# q\n")
+        self.write("website/n.md", "| 路徑基準 | `backend/` |\n\ndocs/plans/q.md\n")
+        self.assertEqual(len(self.errors()), 1)
+
+    def test_readme_must_define_both_lists(self):
+        self.write("docs/README.md", "# 文件\n\n## 遺留基準\n\n- `backend/services/`\n")
+        with self.assertRaises(SystemExit):
+            self.errors()
+
+    def test_readme_entries_must_be_tracked(self):
+        self.write("docs/README.md", README + "- `backend/nowhere/`\n")
+        with self.assertRaises(SystemExit):
+            self.errors()
 
 
 if __name__ == "__main__":
