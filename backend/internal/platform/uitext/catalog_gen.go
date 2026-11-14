@@ -194,66 +194,6 @@ func (t Text) PaymentPaymentAccountStatus(v string) (string, bool) {
 	return "", false
 }
 
-// PaymentPaymentAccountStatusAction 是 payment.PaymentAccountStatus.action 的文案。
-// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
-func (t Text) PaymentPaymentAccountStatusAction(v string) (string, bool) {
-	if t.Locale() == EN {
-		switch v {
-		case "NOT_CREATED":
-			return "Refresh", true
-		case "UNDER_REVIEW":
-			return "Refresh", true
-		case "ACTION_REQUIRED":
-			return "Go to payout account setup", true
-		case "DISABLED":
-			return "Contact support", true
-		}
-	}
-	switch v {
-	case "NOT_CREATED":
-		return "重新整理", true
-	case "UNDER_REVIEW":
-		return "重新整理", true
-	case "ACTION_REQUIRED":
-		return "前往設定收款帳戶", true
-	case "DISABLED":
-		return "聯絡客服", true
-	}
-	return "", false
-}
-
-// PaymentPaymentAccountStatusDescription 是 payment.PaymentAccountStatus.description 的文案。
-// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
-func (t Text) PaymentPaymentAccountStatusDescription(v string) (string, bool) {
-	if t.Locale() == EN {
-		switch v {
-		case "NOT_CREATED":
-			return "We are setting up your payout account. This usually takes a few minutes.", true
-		case "UNDER_REVIEW":
-			return "The payment provider is reviewing your information. No action is needed.", true
-		case "ACTION_REQUIRED":
-			return "Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it.", true
-		case "ENABLED":
-			return "Payments are enabled.", true
-		case "DISABLED":
-			return "The payment provider cannot enable your payout account right now. Please contact support.", true
-		}
-	}
-	switch v {
-	case "NOT_CREATED":
-		return "正在建立收款帳戶，通常幾分鐘內完成。", true
-	case "UNDER_REVIEW":
-		return "金流商正在審核你的資料，不需要額外操作。", true
-	case "ACTION_REQUIRED":
-		return "提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。", true
-	case "ENABLED":
-		return "收款已啟用。", true
-	case "DISABLED":
-		return "金流商目前無法啟用你的收款帳戶，請聯絡客服。", true
-	}
-	return "", false
-}
-
 // PaymentRequirementCollection 是 payment.RequirementCollection 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) PaymentRequirementCollection(v string) (string, bool) {
@@ -690,8 +630,6 @@ func (t Text) SellerOnboardingActionButton(v string) (string, bool) {
 			return "Go to seller verification", true
 		case "START_PAYMENT_ONBOARDING":
 			return "Go to payout account setup", true
-		case "REFRESH_PAYMENT_ACCOUNT":
-			return "Refresh", true
 		case "CONTACT_SUPPORT":
 			return "Contact support", true
 		}
@@ -703,8 +641,6 @@ func (t Text) SellerOnboardingActionButton(v string) (string, bool) {
 		return "前往商家認證", true
 	case "START_PAYMENT_ONBOARDING":
 		return "前往設定收款帳戶", true
-	case "REFRESH_PAYMENT_ACCOUNT":
-		return "重新整理", true
 	case "CONTACT_SUPPORT":
 		return "聯絡客服", true
 	}

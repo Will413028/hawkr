@@ -2,8 +2,7 @@
  * 收款帳戶開通的流程（純邏輯，元件只負責接線）。
  *
  * - HOSTED：呼叫 `CreatePaymentOnboardingSession`，整頁導到金流商的連結；回到 `?payment=return` 時先呼叫
- *   `RefreshMyPaymentAccount`（伺服器同步向金流商重讀，D33）再讀帳戶與開通摘要（`confirmPaymentReturn`），不輪詢；`resource_exhausted`
- *   帶 RetryInfo 由 transport 的 retryInterceptor 重試；回到 `?payment=refresh`（連結過期）時重新取得連結再導。
+ *   `RefreshMyPaymentAccount`（伺服器同步向金流商重讀，D33）再讀帳戶與開通摘要（`confirmPaymentReturn`），不輪詢；重讀失敗不顯示；回到 `?payment=refresh`（連結過期）時重新取得連結再導。
  * - EMBEDDED：先建立 session 取得金流商代碼與公開金鑰（元件要它們才能初始化），依代碼選元件；第一次 `fetchClientSecret`
  *   用這個 session 的 client secret，之後每次都是新的 session。
  */
@@ -101,16 +100,14 @@ interface ConfirmDeps {
 }
 
 /**
- * 回到網頁後與狀態按鈕共用的一條路徑：先重讀（一次）再讀。重讀失敗也照樣讀（快取不能留在舊的），讀完再把重讀的
- * 錯誤丟出去，讓畫面顯示伺服器的句子。
+ * 進入認證頁與從金流商回來共用的一條路徑：先重讀（一次）再讀。重讀是背景動作：失敗（含 `resource_exhausted`、
+ * `permission_denied`）不顯示、不丟出，也不擋讀取，快取不能留在舊的。
  */
 export async function confirmPaymentReturn(deps: ConfirmDeps): Promise<void> {
-	let refreshFailure: { error: unknown } | null = null;
 	try {
 		await deps.refreshAccount();
-	} catch (error) {
-		refreshFailure = { error };
+	} catch {
+		// 重讀失敗不是賣家要處理的事：照常讀。
 	}
 	await deps.readAccount();
-	if (refreshFailure) throw refreshFailure.error;
 }

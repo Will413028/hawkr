@@ -74,13 +74,13 @@ describe("useRefreshPaymentAccount", () => {
 		expect(isStale()).toBe(true);
 	});
 
-	it("重讀失敗：仍讓開通摘要失效（快取不留舊的），之後丟出錯誤", async () => {
+	it("重讀失敗：不丟出，仍讓開通摘要失效（快取不留舊的）", async () => {
 		rpc.refresh.mockRejectedValue(new Error("refresh boom"));
 		const { wrapper, isStale } = setup();
 		const { result } = renderHook(() => useRefreshPaymentAccount(), {
 			wrapper,
 		});
-		await expect(result.current()).rejects.toThrow("refresh boom");
+		await expect(result.current()).resolves.toBeUndefined();
 		expect(isStale()).toBe(true);
 	});
 });

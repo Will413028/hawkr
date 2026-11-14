@@ -201,8 +201,9 @@ func (m *Module) Account(ctx context.Context, storeID int64) (Account, error) {
 }
 
 // CreateOnboardingSession 為擁有者的收款帳戶產生開通 session（託管連結或內嵌元件）；外部呼叫在 transaction 外。呼叫方先確認呼叫者是擁有者。
-func (m *Module) CreateOnboardingSession(ctx context.Context, storeID int64, returnURL, refreshURL string) (OnboardingSession, error) {
-	return m.accounts.CreateOnboardingSession(ctx, storeID, returnURL, refreshURL)
+// canEmbed 是呼叫端能否承載內嵌元件：帳戶是內嵌介面而呼叫端不能時，前置條件照常檢查、不呼叫 provider，回 CompleteOnWebsite 的 session。
+func (m *Module) CreateOnboardingSession(ctx context.Context, storeID int64, returnURL, refreshURL string, canEmbed bool) (OnboardingSession, error) {
+	return m.accounts.CreateOnboardingSession(ctx, storeID, returnURL, refreshURL, canEmbed)
 }
 
 // RefreshAccount 管理員的「重新整理狀態」：與賣家的 SyncAccountUnlessFresh 同一條同步重讀（同一個名額與間隔，D33），回傳重讀後的帳戶；

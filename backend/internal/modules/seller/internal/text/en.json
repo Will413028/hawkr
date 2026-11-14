@@ -25,7 +25,7 @@
       "message": "We are creating your payout account. This usually takes a few minutes."
     },
     "onboarding.payment_account.syncing": {
-      "message": "Your payout account status is being updated. Please refresh in a moment."
+      "message": "Your payout account status is being updated. Please check back later."
     },
     "onboarding.payment_account.under_review": {
       "message": "The payment provider is reviewing your account. You do not need to do anything."

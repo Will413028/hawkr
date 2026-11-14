@@ -7,6 +7,7 @@
 
 import {
 	type GetMyOnboardingResponse,
+	type OnboardingTask,
 	OnboardingTaskId,
 	OnboardingTaskState,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -36,6 +37,15 @@ export function onboardingTaskState(
 	id: OnboardingTaskId,
 ): OnboardingTaskState | undefined {
 	return onboarding?.tasks.find((task) => task.id === id)?.state;
+}
+
+/** 摘要裡的收款帳戶任務（下一步的按鈕與說明句只讀它）；沒有摘要或沒有這個任務是 undefined。 */
+export function paymentAccountTask(
+	onboarding: GetMyOnboardingResponse | null | undefined,
+): OnboardingTask | undefined {
+	return onboarding?.tasks.find(
+		(task) => task.id === OnboardingTaskId.PAYMENT_ACCOUNT,
+	);
 }
 
 /** 收款帳戶任務已完成（伺服器定義：轉帳能力啟用）；沒有摘要或沒有這個任務不是完成。 */

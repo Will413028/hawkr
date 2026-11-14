@@ -48,33 +48,6 @@
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
       "message": "Under review"
     },
-    "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
-      "message": "Go to payout account setup"
-    },
-    "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED": {
-      "message": "Contact support"
-    },
-    "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
-      "message": "Refresh"
-    },
-    "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
-      "message": "Refresh"
-    },
-    "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
-      "message": "Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it."
-    },
-    "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_DISABLED": {
-      "message": "The payment provider cannot enable your payout account right now. Please contact support."
-    },
-    "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED": {
-      "message": "Payments are enabled."
-    },
-    "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
-      "message": "We are setting up your payout account. This usually takes a few minutes."
-    },
-    "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
-      "message": "The payment provider is reviewing your information. No action is needed."
-    },
     "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM": {
       "message": "Embedded on platform"
     },
@@ -116,9 +89,6 @@
     },
     "seller.OnboardingAction.button.ONBOARDING_ACTION_EDIT_PROFILE": {
       "message": "Go to settings"
-    },
-    "seller.OnboardingAction.button.ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT": {
-      "message": "Refresh"
     },
     "seller.OnboardingAction.button.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING": {
       "message": "Go to payout account setup"

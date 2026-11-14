@@ -1,8 +1,6 @@
 // @vitest-environment jsdom
 
 import { create } from "@bufbuild/protobuf";
-import { Code, ConnectError } from "@connectrpc/connect";
-import { LocalizedMessageSchema } from "@hawkr/api/gen/google/rpc/error_details_pb";
 import {
 	CapabilityStatusSchema,
 	type GetMyOnboardingResponse,
@@ -79,10 +77,6 @@ vi.mock("@/components/ui/Button", () => ({
 					children,
 				),
 }));
-const refreshPaymentAccount = vi.fn(async () => {});
-vi.mock("@/lib/hooks/useSellerSelf", () => ({
-	useRefreshPaymentAccount: () => refreshPaymentAccount,
-}));
 
 import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import OnboardingProgressCard from "./OnboardingProgressCard";
@@ -134,9 +128,7 @@ function expand() {
 	if (toggle) fireEvent.click(toggle);
 }
 
-beforeEach(() => {
-	refreshPaymentAccount.mockClear();
-});
+beforeEach(() => {});
 
 afterEach(() => {
 	cleanup();
@@ -238,88 +230,22 @@ describe("OnboardingProgressCard", () => {
 		expect(within(detail).queryByRole("button")).toBeNull();
 	});
 
-	it("REFRESH_PAYMENT_ACCOUNT is an in-place button that calls the refresh once", async () => {
+	it("an in-progress payment account task has no button at all, refresh or otherwise", () => {
 		renderCard({
 			onboarding: onboardingFixture([
 				{ id: ID.PROFILE, state: S.COMPLETED },
 				{ id: ID.PLATFORM_REVIEW, state: S.COMPLETED },
-				{
-					id: ID.PAYMENT_ACCOUNT,
-					state: S.IN_PROGRESS,
-					action: A.REFRESH_PAYMENT_ACCOUNT,
-				},
+				{ id: ID.PAYMENT_ACCOUNT, state: S.IN_PROGRESS, action: A.NONE },
 			]),
 		});
 		expand();
 		fireEvent.click(screen.getByRole("button", { name: /^伺服器標題3，/ }));
-		const button = screen.getByRole("button", { name: "重新整理" });
-		expect(button.closest("a")).toBeNull();
-		fireEvent.click(button);
-		expect(refreshPaymentAccount).toHaveBeenCalledTimes(1);
-	});
-
-	it("a failed refresh shows the default error text", async () => {
-		refreshPaymentAccount.mockRejectedValueOnce(new Error("boom"));
-		renderCard({
-			onboarding: onboardingFixture([
-				{
-					id: ID.PAYMENT_ACCOUNT,
-					state: S.IN_PROGRESS,
-					action: A.REFRESH_PAYMENT_ACCOUNT,
-				},
-			]),
-		});
-		expand();
-		fireEvent.click(screen.getByRole("button", { name: /^伺服器標題3，/ }));
-		fireEvent.click(screen.getByRole("button", { name: "重新整理" }));
-		expect((await screen.findByRole("alert")).textContent).toBe("系統錯誤");
-	});
-
-	it("a failed refresh shows the server's sentence", async () => {
-		const err = new ConnectError("blocked", Code.FailedPrecondition);
-		err.details.push({
-			desc: LocalizedMessageSchema,
-			value: create(LocalizedMessageSchema, {
-				locale: "zh-TW",
-				message: "商店已暫停營業",
-			}),
-		});
-		refreshPaymentAccount.mockRejectedValueOnce(err);
-		renderCard({
-			onboarding: onboardingFixture([
-				{
-					id: ID.PAYMENT_ACCOUNT,
-					state: S.IN_PROGRESS,
-					action: A.REFRESH_PAYMENT_ACCOUNT,
-				},
-			]),
-		});
-		expand();
-		fireEvent.click(screen.getByRole("button", { name: /^伺服器標題3，/ }));
-		fireEvent.click(screen.getByRole("button", { name: "重新整理" }));
-		expect((await screen.findByRole("alert")).textContent).toBe(
-			"商店已暫停營業",
-		);
-	});
-
-	it("a refresh error is cleared when the active task changes", async () => {
-		refreshPaymentAccount.mockRejectedValueOnce(new Error("boom"));
-		renderCard({
-			onboarding: onboardingFixture([
-				{ id: ID.PROFILE, state: S.COMPLETED },
-				{
-					id: ID.PAYMENT_ACCOUNT,
-					state: S.IN_PROGRESS,
-					action: A.REFRESH_PAYMENT_ACCOUNT,
-				},
-			]),
-		});
-		expand();
-		fireEvent.click(screen.getByRole("button", { name: /^伺服器標題3，/ }));
-		fireEvent.click(screen.getByRole("button", { name: "重新整理" }));
-		await screen.findByRole("alert");
-		fireEvent.click(screen.getByRole("button", { name: /^伺服器標題1，/ }));
-		expect(screen.queryByRole("alert")).toBeNull();
+		const detail = document.querySelector(
+			".seller-onboarding-progress__detail",
+		) as HTMLElement;
+		expect(within(detail).queryByRole("link")).toBeNull();
+		expect(within(detail).queryByRole("button")).toBeNull();
+		expect(screen.queryByText("重新整理")).toBeNull();
 	});
 
 	it("GetMyOnboarding failed: the required group is one load-failure state, recommended stay", () => {

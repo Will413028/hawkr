@@ -482,7 +482,6 @@ export type MockOnboardingAction =
 	| "EDIT_PROFILE"
 	| "SUBMIT_CERTIFICATION"
 	| "START_PAYMENT_ONBOARDING"
-	| "REFRESH_PAYMENT_ACCOUNT"
 	| "CONTACT_SUPPORT";
 
 /** 伺服器回的一個必要任務（`OnboardingTask`）：標題與狀態句是伺服器的 `LocalizedMessage`。 */
@@ -613,7 +612,7 @@ export function onboardingOf(flow: {
 						task(
 							"PAYMENT_ACCOUNT",
 							"IN_PROGRESS",
-							"REFRESH_PAYMENT_ACCOUNT",
+							"NONE",
 							"金流商審核中，你不需要做任何事。",
 						),
 					];
@@ -635,7 +634,7 @@ export function onboardingOf(flow: {
 						task(
 							"PAYMENT_ACCOUNT",
 							"IN_PROGRESS",
-							"REFRESH_PAYMENT_ACCOUNT",
+							"NONE",
 							"正在建立收款帳戶，通常幾分鐘內完成。",
 						),
 					];

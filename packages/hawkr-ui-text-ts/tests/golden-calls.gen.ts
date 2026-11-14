@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, paymentPaymentAccountStatus, paymentPaymentAccountStatusAction, paymentPaymentAccountStatusDescription, paymentRequirementCollection, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
+import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, paymentPaymentAccountStatus, paymentRequirementCollection, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -61,10 +61,9 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"MEASURE_STATE_REVOKED": 4,
 	"MEASURE_STATE_SCHEDULED": 5,
 	"MEASURE_STATE_UNSPECIFIED": 0,
-	"ONBOARDING_ACTION_CONTACT_SUPPORT": 6,
+	"ONBOARDING_ACTION_CONTACT_SUPPORT": 5,
 	"ONBOARDING_ACTION_EDIT_PROFILE": 2,
 	"ONBOARDING_ACTION_NONE": 1,
-	"ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT": 5,
 	"ONBOARDING_ACTION_START_PAYMENT_ONBOARDING": 4,
 	"ONBOARDING_ACTION_SUBMIT_CERTIFICATION": 3,
 	"ONBOARDING_ACTION_UNSPECIFIED": 0,
@@ -202,12 +201,6 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "payment.PaymentAccountStatus": {
 		return paymentPaymentAccountStatus(num(c.value));
-	}
-	case "payment.PaymentAccountStatus.action": {
-		return paymentPaymentAccountStatusAction(num(c.value));
-	}
-	case "payment.PaymentAccountStatus.description": {
-		return paymentPaymentAccountStatusDescription(num(c.value));
 	}
 	case "payment.RequirementCollection": {
 		return paymentRequirementCollection(num(c.value));

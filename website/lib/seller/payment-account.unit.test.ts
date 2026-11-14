@@ -6,16 +6,16 @@ import {
 } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import {
 	OnboardingReturnDestination,
+	OnboardingTaskId,
 	OnboardingTaskState,
 	PaymentAccountSchema,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { describe, expect, it, vi } from "vitest";
 import { uiTextFor } from "@/lib/i18n/ui-text";
-import { requiredFixture } from "./onboarding-fixtures";
+import { onboardingFixture, requiredFixture } from "./onboarding-fixtures";
 import {
 	createPaymentOnboardingSession,
 	fetchMyPaymentAccount,
-	paymentAccountCanOnboard,
 	paymentAccountCopy,
 	paymentAccountTone,
 	paymentBannerCopy,
@@ -137,52 +137,21 @@ describe("createPaymentOnboardingSession", () => {
 	});
 });
 
-describe("paymentAccountCopy：文字只來自共用文案目錄", () => {
-	it("每個狀態的徽章、說明與動作", () => {
-		const table: [PaymentAccountStatus, string, string, string | undefined][] =
-			[
-				[
-					PaymentAccountStatus.NOT_CREATED,
-					"準備中",
-					"正在建立收款帳戶，通常幾分鐘內完成。",
-					"重新整理",
-				],
-				[
-					PaymentAccountStatus.ACTION_REQUIRED,
-					"待設定",
-					"提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。",
-					"前往設定收款帳戶",
-				],
-				[
-					PaymentAccountStatus.UNDER_REVIEW,
-					"審核中",
-					"金流商正在審核你的資料，不需要額外操作。",
-					"重新整理",
-				],
-				[PaymentAccountStatus.ENABLED, "已啟用", "收款已啟用。", undefined],
-				[
-					PaymentAccountStatus.DISABLED,
-					"無法啟用",
-					"金流商目前無法啟用你的收款帳戶，請聯絡客服。",
-					"聯絡客服",
-				],
-			];
-		for (const [status, badge, description, action] of table) {
-			const copy = paymentAccountCopy(ut, account(status));
-			expect(copy.badge, String(status)).toBe(badge);
-			expect(copy.description, String(status)).toBe(description);
-			expect(copy.action, String(status)).toBe(action);
+describe("paymentAccountCopy：徽章只來自共用文案目錄", () => {
+	it("每個狀態的徽章", () => {
+		const table: [PaymentAccountStatus, string][] = [
+			[PaymentAccountStatus.NOT_CREATED, "準備中"],
+			[PaymentAccountStatus.ACTION_REQUIRED, "待設定"],
+			[PaymentAccountStatus.UNDER_REVIEW, "審核中"],
+			[PaymentAccountStatus.ENABLED, "已啟用"],
+			[PaymentAccountStatus.DISABLED, "無法啟用"],
+		];
+		for (const [status, badge] of table) {
+			expect(
+				paymentAccountCopy(ut, account(status)).badge,
+				String(status),
+			).toBe(badge);
 		}
-	});
-
-	it("ACTION_REQUIRED 的文案不說逾期或停用（D13）", () => {
-		const copy = paymentAccountCopy(
-			ut,
-			account(PaymentAccountStatus.ACTION_REQUIRED),
-		);
-		expect(`${copy.badge}${copy.description}${copy.action}`).not.toMatch(
-			/逾期|停用|過期/,
-		);
 	});
 
 	it("已啟用而撥款尚未啟用：多一行說明；撥款已啟用或不是已啟用：沒有", () => {
@@ -208,15 +177,12 @@ describe("paymentAccountCopy：文字只來自共用文案目錄", () => {
 		]) {
 			const copy = paymentAccountCopy(ut, account(status));
 			expect(copy.badge).toBeUndefined();
-			expect(copy.description).toBeUndefined();
-			expect(copy.action).toBeUndefined();
 			expect(paymentAccountTone(status)).toBeUndefined();
-			expect(paymentAccountCanOnboard(account(status))).toBe(false);
 		}
 	});
 });
 
-describe("paymentAccountTone 與能否開通", () => {
+describe("paymentAccountTone", () => {
 	it("色調", () => {
 		expect(paymentAccountTone(PaymentAccountStatus.NOT_CREATED)).toBe("info");
 		expect(paymentAccountTone(PaymentAccountStatus.UNDER_REVIEW)).toBe("info");
@@ -225,34 +191,6 @@ describe("paymentAccountTone 與能否開通", () => {
 		);
 		expect(paymentAccountTone(PaymentAccountStatus.ENABLED)).toBe("success");
 		expect(paymentAccountTone(PaymentAccountStatus.DISABLED)).toBe("danger");
-	});
-
-	it("只有 ACTION_REQUIRED 而且伺服器告知介面時能開始開通", () => {
-		expect(
-			paymentAccountCanOnboard(account(PaymentAccountStatus.ACTION_REQUIRED)),
-		).toBe(true);
-		expect(
-			paymentAccountCanOnboard(
-				account(PaymentAccountStatus.ACTION_REQUIRED, {
-					surface: OnboardingSurface.EMBEDDED,
-				}),
-			),
-		).toBe(true);
-		expect(
-			paymentAccountCanOnboard(
-				account(PaymentAccountStatus.ACTION_REQUIRED, {
-					surface: OnboardingSurface.UNSPECIFIED,
-				}),
-			),
-		).toBe(false);
-		for (const status of [
-			PaymentAccountStatus.NOT_CREATED,
-			PaymentAccountStatus.UNDER_REVIEW,
-			PaymentAccountStatus.ENABLED,
-			PaymentAccountStatus.DISABLED,
-		]) {
-			expect(paymentAccountCanOnboard(account(status))).toBe(false);
-		}
 	});
 });
 
@@ -271,6 +209,22 @@ describe("paymentBannerCopy（儀表板的收款帳戶提示）", () => {
 			task(OnboardingTaskState.ACTION_REQUIRED),
 		);
 		expect(copy).not.toBeNull();
+	});
+
+	it("徽章讀帳戶狀態，說明句讀任務（兩者不一致時說明句仍是任務的）", () => {
+		const copy = paymentBannerCopy(
+			ut,
+			account(PaymentAccountStatus.ACTION_REQUIRED),
+			onboardingFixture([
+				{
+					id: OnboardingTaskId.PAYMENT_ACCOUNT,
+					state: OnboardingTaskState.IN_PROGRESS,
+					status: "伺服器的收款句",
+				},
+			]),
+		);
+		expect(copy?.badge).toBe("待設定");
+		expect(copy?.description).toBe("伺服器的收款句");
 	});
 
 	it("摘要說完成：即使帳戶 status 是 UNDER_REVIEW 也不顯示", () => {

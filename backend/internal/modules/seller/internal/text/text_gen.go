@@ -465,9 +465,9 @@ func OnboardingPaymentAccountPreparing(l uitext.Locale) uitext.Message {
 func OnboardingPaymentAccountSyncing(l uitext.Locale) uitext.Message {
 	switch l {
 	case uitext.EN:
-		return uitext.Message{Text: "Your payout account status is being updated. Please refresh in a moment.", Locale: uitext.EN}
+		return uitext.Message{Text: "Your payout account status is being updated. Please check back later.", Locale: uitext.EN}
 	}
-	return uitext.Message{Text: "收款帳戶的狀態正在更新，請稍後重新整理。", Locale: uitext.ZhTW}
+	return uitext.Message{Text: "收款帳戶的狀態正在更新，請稍後再查看。", Locale: uitext.ZhTW}
 }
 
 // OnboardingPaymentAccountUnderReview 是模組句子 onboarding.payment_account.under_review；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。

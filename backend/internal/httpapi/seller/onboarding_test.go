@@ -261,8 +261,8 @@ func paymentTask(t *testing.T, resp *pb.GetMyOnboardingResponse) *pb.OnboardingT
 	return nil
 }
 
-// 收款帳戶讀取結果的兩個旗標進任務：建立失敗（有帳戶列、沒有外部帳戶、有 create_failed_at）給聯絡客服；沒有設定收款開通且帳戶還沒建立時沒有重新整理。
-// mutation 1：readPaymentAccount 不填 CreateFailed → 建立失敗的列變成「建立中」與重新整理，失敗。
+// 收款帳戶讀取結果的兩個旗標進任務：建立失敗（有帳戶列、沒有外部帳戶、有 create_failed_at）給聯絡客服；設定好但還沒有帳戶列是進行中且沒有下一步。
+// mutation 1：readPaymentAccount 不填 CreateFailed → 建立失敗的列變成「建立中」，失敗。
 // mutation 2：不填 Configured → 設定好但還沒有帳戶列的列變成「尚未開放」，失敗。
 func TestGetMyOnboardingReadsCreateFailedAndConfiguredFromPayment(t *testing.T) {
 	failedAt := time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)
@@ -275,7 +275,7 @@ func TestGetMyOnboardingReadsCreateFailedAndConfiguredFromPayment(t *testing.T) 
 		{"建立失敗", &paymentModule{configured: true, account: payment.Account{Status: payment.StatusNotCreated, CreateFailedAt: &failedAt}},
 			pb.OnboardingTaskState_ONBOARDING_TASK_STATE_ACTION_REQUIRED, pb.OnboardingAction_ONBOARDING_ACTION_CONTACT_SUPPORT},
 		{"設定好、還沒有帳戶列", &paymentModule{configured: true, err: apperr.NotFound("沒有")},
-			pb.OnboardingTaskState_ONBOARDING_TASK_STATE_IN_PROGRESS, pb.OnboardingAction_ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT},
+			pb.OnboardingTaskState_ONBOARDING_TASK_STATE_IN_PROGRESS, pb.OnboardingAction_ONBOARDING_ACTION_NONE},
 		{"沒有設定收款開通、沒有帳戶列", &paymentModule{err: apperr.NotFound("沒有")},
 			pb.OnboardingTaskState_ONBOARDING_TASK_STATE_IN_PROGRESS, pb.OnboardingAction_ONBOARDING_ACTION_NONE},
 	}

@@ -58,10 +58,9 @@ const _enumNumber = <String, int>{
 	'MEASURE_STATE_REVOKED': 4,
 	'MEASURE_STATE_SCHEDULED': 5,
 	'MEASURE_STATE_UNSPECIFIED': 0,
-	'ONBOARDING_ACTION_CONTACT_SUPPORT': 6,
+	'ONBOARDING_ACTION_CONTACT_SUPPORT': 5,
 	'ONBOARDING_ACTION_EDIT_PROFILE': 2,
 	'ONBOARDING_ACTION_NONE': 1,
-	'ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT': 5,
 	'ONBOARDING_ACTION_START_PAYMENT_ONBOARDING': 4,
 	'ONBOARDING_ACTION_SUBMIT_CERTIFICATION': 3,
 	'ONBOARDING_ACTION_UNSPECIFIED': 0,
@@ -187,10 +186,6 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return commonUnknown(l);
     case 'payment.PaymentAccountStatus':
       return hawkr_payment_v1alpha1_payment.PaymentAccountStatus.valueOf(_n(value))!.uiText(l);
-    case 'payment.PaymentAccountStatus.action':
-      return hawkr_payment_v1alpha1_payment.PaymentAccountStatus.valueOf(_n(value))!.action(l);
-    case 'payment.PaymentAccountStatus.description':
-      return hawkr_payment_v1alpha1_payment.PaymentAccountStatus.valueOf(_n(value))!.description(l);
     case 'payment.RequirementCollection':
       return hawkr_payment_v1alpha1_payment.RequirementCollection.valueOf(_n(value))!.uiText(l);
     case 'seller.ContentKind':

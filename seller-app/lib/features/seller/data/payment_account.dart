@@ -12,7 +12,7 @@ import 'account_scope.dart';
 
 part 'payment_account.g.dart';
 
-/// 收款帳戶卡的色調（版面，留在 client）；文字（狀態、說明、動作）全部取自共用文案目錄
+/// 收款帳戶卡的色調（版面，留在 client）；文字（狀態徽章）取自共用文案目錄
 /// （`payment.PaymentAccountStatus`），這裡沒有「值 → 文字」的表。`UNSPECIFIED` 與不認得的值沒有色調（null）。
 HkStatusTone? paymentAccountTone(
   PaymentAccountStatus status,
@@ -26,24 +26,13 @@ HkStatusTone? paymentAccountTone(
   _ => null,
 };
 
-/// 賣家此刻能開始（或繼續）開通：只有 `ACTION_REQUIRED`，而且伺服器告知了介面（託管頁面或內嵌元件）。
-bool paymentAccountCanOnboard(PaymentAccount account) =>
-    account.status ==
-        PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED &&
-    (account.onboardingSurface == OnboardingSurface.ONBOARDING_SURFACE_HOSTED ||
-        account.onboardingSurface ==
-            OnboardingSurface.ONBOARDING_SURFACE_EMBEDDED);
-
 /// 平台審核還沒通過時，收款帳戶區的提示（沒有收款帳戶可看）。
 const paymentAccountNotYetOpenNotice = '平台審核通過後開放設定';
 
-/// 伺服器說這個帳戶用內嵌元件開通（平台收件）時 App 的提示：App 沒有內嵌元件。
-const paymentAccountEmbeddedNotice = '請到網頁版完成收款設定';
-
-/// 一次 `CreatePaymentOnboardingSession` 的結果：託管頁面是 [HostedSession.url]；內嵌元件的 client secret 只給網頁
-/// 的瀏覽器，App 不使用，所以 App 不呼叫它（見 `payment_onboarding.dart`）。
-final class HostedSession {
-  const HostedSession(this.url);
+/// 一次 `CreatePaymentOnboardingSession`（目的地是賣家 App）的結果：[OnboardingSession.url] 是要在外部瀏覽器開的連結，
+/// 託管頁面，或帳戶用內嵌元件時伺服器回的網站認證頁。內嵌元件的 client secret 只給網頁的瀏覽器，App 不使用。
+final class OnboardingSession {
+  const OnboardingSession(this.url);
 
   final Uri url;
 }
@@ -67,15 +56,15 @@ final class PaymentAccountRepository {
     }
   }
 
-  /// 同步向金流商重讀收款帳戶並更新伺服器的快取（從金流商的頁面回來、或賣家按「重新整理」時，先呼叫它再讀開通摘要）。失敗丟出該錯誤。
+  /// 同步向金流商重讀收款帳戶並更新伺服器的快取（進入認證頁、從金流商的頁面回來、App 回前景時，先呼叫它再讀開通摘要）。失敗丟出該錯誤，呼叫端不顯示。
   /// 方法是 IDEMPOTENT：`resource_exhausted` 帶 RetryInfo 與 `unavailable` 由 transport 的 `retryInterceptor` 重試，這裡不重試。
   Future<void> refresh() async {
     await _client.refreshMyPaymentAccount(RefreshMyPaymentAccountRequest());
   }
 
-  /// 託管頁面的開通連結（一次性、短效）；回跳到網站給 App 的回跳頁，網址由伺服器組；只收 https，[allowInsecureUrl]（只有 dev 的本機測試）才收 http。回應的介面不是 HOSTED 或沒有連結是契約被違反，丟 [FormatException]：
-  /// 不猜一個預設介面。
-  Future<HostedSession> createHostedSession({
+  /// 要在瀏覽器開啟的網址（託管頁面為一次性、短效，回跳到網站給 App 的回跳頁；帳戶用內嵌元件時是網站的認證頁），網址由伺服器組；只收 https，[allowInsecureUrl]（只有 dev 的本機測試）才收 http。
+  /// 不依介面分支：有網址就開。沒有網址或網址無效是契約被違反，丟 [FormatException]。
+  Future<OnboardingSession> createSession({
     required String locale,
     bool allowInsecureUrl = false,
   }) async {
@@ -86,15 +75,12 @@ final class PaymentAccountRepository {
         locale: locale,
       ),
     );
-    if (response.surface != OnboardingSurface.ONBOARDING_SURFACE_HOSTED) {
-      throw FormatException('開通介面不是託管頁面：${response.surface}');
-    }
     final url = Uri.tryParse(response.url);
     if (url == null ||
         !url.isScheme('https') && !(allowInsecureUrl && url.isScheme('http'))) {
       throw FormatException('開通連結無效：${response.url}');
     }
-    return HostedSession(url);
+    return OnboardingSession(url);
   }
 }
 

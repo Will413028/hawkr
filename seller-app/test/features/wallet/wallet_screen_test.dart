@@ -81,9 +81,35 @@ class _Server {
         answer.application.status == KYCStatus.KYC_STATUS_APPROVED;
     if (!approved) return reviewPendingSummary();
     final account = payment;
-    return account is PaymentAccount && account.status == _enabled
-        ? completedSummary()
-        : paymentPendingSummary();
+    if (account is! PaymentAccount) return paymentPendingSummary();
+    return switch (account.status) {
+      _enabled => completedSummary(),
+      PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED =>
+        paymentPendingSummary(),
+      PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED =>
+        onboardingSummary([
+          serverTask(
+            OnboardingTaskId.ONBOARDING_TASK_ID_PLATFORM_REVIEW,
+            OnboardingTaskState.ONBOARDING_TASK_STATE_COMPLETED,
+          ),
+          serverTask(
+            OnboardingTaskId.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT,
+            OnboardingTaskState.ONBOARDING_TASK_STATE_ACTION_REQUIRED,
+            action: OnboardingAction.ONBOARDING_ACTION_CONTACT_SUPPORT,
+          ),
+        ]),
+      _ => onboardingSummary([
+        serverTask(
+          OnboardingTaskId.ONBOARDING_TASK_ID_PLATFORM_REVIEW,
+          OnboardingTaskState.ONBOARDING_TASK_STATE_COMPLETED,
+        ),
+        serverTask(
+          OnboardingTaskId.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT,
+          OnboardingTaskState.ONBOARDING_TASK_STATE_IN_PROGRESS,
+          status: '伺服器說審核中',
+        ),
+      ]),
+    };
   }
 
   var now = DateTime(2026, 10, 9, 12);
@@ -620,7 +646,7 @@ void main() {
   });
 
   group('收款帳戶狀態面板', () {
-    testWidgets('待設定：目錄的標題、說明與動作；新帳戶不說逾期或停用，按鈕開始開通（與認證狀態畫面同一個動作）', (
+    testWidgets('待設定：徽章讀帳戶狀態，說明句與按鈕讀任務；新帳戶不說逾期或停用，按鈕開始開通（與認證狀態畫面同一個動作）', (
       tester,
     ) async {
       final server = _Server(
@@ -636,7 +662,12 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('待設定'), findsOneWidget);
-      expect(find.text('提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。'), findsOneWidget);
+      expect(
+        find.text(
+          '狀態 ONBOARDING_TASK_ID_PAYMENT_ACCOUNT ONBOARDING_TASK_STATE_ACTION_REQUIRED',
+        ),
+        findsOneWidget,
+      );
       expect(find.textContaining('逾期'), findsNothing);
       expect(find.textContaining('停用'), findsNothing);
       expect(find.text('尚未通過商家認證'), findsNothing);
@@ -659,9 +690,7 @@ void main() {
       expect(find.byKey(const Key('wallet-payment-panel')), findsNothing);
     });
 
-    testWidgets('面板的「重新整理」：先 RefreshMyPaymentAccount 再重讀收款帳戶與摘要', (
-      tester,
-    ) async {
+    testWidgets('進行中的帳戶（任務 NONE）：沒有任何按鈕，也沒有「重新整理」', (tester) async {
       final server = _Server(
         certified: false,
         payment: _account(
@@ -669,15 +698,44 @@ void main() {
         ),
       );
       await _pump(tester, server);
-      server.calls.clear();
 
-      await _tap(tester, find.text('重新整理'));
-
-      expect(server.calls.first, 'refreshMyPaymentAccount');
-      expect(server.calls, contains('getMyOnboarding'));
+      expect(
+        find.byKey(const ValueKey('wallet-payment-panel')),
+        findsOneWidget,
+      );
+      expect(find.text('審核中'), findsOneWidget);
+      expect(find.text('重新整理'), findsNothing);
+      expect(find.byType(OutlinedButton), findsNothing);
     });
 
-    testWidgets('審核中：沒有額外操作的說明', (tester) async {
+    testWidgets('帳戶狀態與任務不一致：帳戶 ACTION_REQUIRED 但任務 NONE，沒有按鈕', (tester) async {
+      final server =
+          _Server(
+              certified: false,
+              payment: PaymentAccount(
+                status:
+                    PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED,
+                onboardingSurface: OnboardingSurface.ONBOARDING_SURFACE_HOSTED,
+              ),
+            )
+            ..summary = onboardingSummary([
+              serverTask(
+                OnboardingTaskId.ONBOARDING_TASK_ID_PLATFORM_REVIEW,
+                OnboardingTaskState.ONBOARDING_TASK_STATE_COMPLETED,
+              ),
+              serverTask(
+                OnboardingTaskId.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT,
+                OnboardingTaskState.ONBOARDING_TASK_STATE_IN_PROGRESS,
+              ),
+            ]);
+      await _pump(tester, server);
+
+      expect(find.text('待設定'), findsOneWidget);
+      expect(find.text('前往設定收款帳戶'), findsNothing);
+      expect(find.byType(OutlinedButton), findsNothing);
+    });
+
+    testWidgets('審核中：說明句是任務的', (tester) async {
       final server = _Server(
         payment: _account(
           PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW,
@@ -686,7 +744,7 @@ void main() {
       );
       await _pump(tester, server);
       expect(find.text('審核中'), findsOneWidget);
-      expect(find.text('金流商正在審核你的資料，不需要額外操作。'), findsOneWidget);
+      expect(find.text('伺服器說審核中'), findsOneWidget);
     });
 
     testWidgets('無法啟用：動作是聯絡客服，進幫助中心', (tester) async {

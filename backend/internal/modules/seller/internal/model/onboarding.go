@@ -58,8 +58,6 @@ const (
 	OnboardingActionSubmitCertification OnboardingAction = "SUBMIT_CERTIFICATION"
 	// OnboardingActionStartPaymentOnboarding 開始或繼續金流商的收款帳戶設定。
 	OnboardingActionStartPaymentOnboarding OnboardingAction = "START_PAYMENT_ONBOARDING"
-	// OnboardingActionRefreshPaymentAccount 重新整理收款帳戶的狀態。
-	OnboardingActionRefreshPaymentAccount OnboardingAction = "REFRESH_PAYMENT_ACCOUNT"
 	// OnboardingActionContactSupport 聯絡客服。
 	OnboardingActionContactSupport OnboardingAction = "CONTACT_SUPPORT"
 )
@@ -68,7 +66,7 @@ const (
 func OnboardingActionValues() []OnboardingAction {
 	return []OnboardingAction{
 		OnboardingActionNone, OnboardingActionEditProfile, OnboardingActionSubmitCertification, OnboardingActionStartPaymentOnboarding,
-		OnboardingActionRefreshPaymentAccount, OnboardingActionContactSupport,
+		OnboardingActionContactSupport,
 	}
 }
 
@@ -241,7 +239,7 @@ func paymentAccountTask(l uitext.Locale, c Conditions, p OnboardingPaymentRead) 
 	case !p.Configured:
 		return set(OnboardingInProgress, OnboardingActionNone, text.OnboardingPaymentAccountNotAvailable(l))
 	case !p.Found:
-		return set(OnboardingInProgress, OnboardingActionRefreshPaymentAccount, text.OnboardingPaymentAccountPreparing(l))
+		return set(OnboardingInProgress, OnboardingActionNone, text.OnboardingPaymentAccountPreparing(l))
 	}
 	switch p.Status {
 	case "ACTION_REQUIRED":
@@ -252,10 +250,10 @@ func paymentAccountTask(l uitext.Locale, c Conditions, p OnboardingPaymentRead) 
 	case "DISABLED":
 		return set(OnboardingActionRequired, OnboardingActionContactSupport, text.OnboardingPaymentAccountDisabled(l))
 	case "ENABLED":
-		// 帳戶已啟用，seller 的副本還沒有跟上：進行中，重新整理。
-		return set(OnboardingInProgress, OnboardingActionRefreshPaymentAccount, text.OnboardingPaymentAccountSyncing(l))
+		// 帳戶已啟用，seller 的副本還沒有跟上：進行中，等待同步。
+		return set(OnboardingInProgress, OnboardingActionNone, text.OnboardingPaymentAccountSyncing(l))
 	case "UNDER_REVIEW":
-		return set(OnboardingInProgress, OnboardingActionRefreshPaymentAccount, text.OnboardingPaymentAccountUnderReview(l))
+		return set(OnboardingInProgress, OnboardingActionNone, text.OnboardingPaymentAccountUnderReview(l))
 	}
-	return set(OnboardingInProgress, OnboardingActionRefreshPaymentAccount, text.OnboardingPaymentAccountPreparing(l))
+	return set(OnboardingInProgress, OnboardingActionNone, text.OnboardingPaymentAccountPreparing(l))
 }

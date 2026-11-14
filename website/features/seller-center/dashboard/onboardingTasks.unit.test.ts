@@ -179,7 +179,6 @@ describe("公開前必須 comes from the server's GetMyOnboarding", () => {
 			[A.EDIT_PROFILE, "去設定"],
 			[A.SUBMIT_CERTIFICATION, "前往商家認證"],
 			[A.START_PAYMENT_ONBOARDING, "前往設定收款帳戶"],
-			[A.REFRESH_PAYMENT_ACCOUNT, "重新整理"],
 			[A.CONTACT_SUPPORT, "聯絡客服"],
 		]);
 		for (const [action, label] of labels) {
@@ -202,7 +201,7 @@ describe("公開前必須 comes from the server's GetMyOnboarding", () => {
 		}
 	});
 
-	it("action maps to the web destination; refresh stays in place", () => {
+	it("action maps to the web destination", () => {
 		const next = (action: OnboardingAction) =>
 			task(
 				build([], {
@@ -228,7 +227,6 @@ describe("公開前必須 comes from the server's GetMyOnboarding", () => {
 			kind: "link",
 			href: "/contact",
 		});
-		expect(next(A.REFRESH_PAYMENT_ACCOUNT)?.kind).toBe("refresh");
 	});
 
 	it("presentation fields depend on the task id only, not on the state", () => {

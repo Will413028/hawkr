@@ -207,7 +207,7 @@ export function useMyOnboarding(options?: {
 
 /**
  * 同步重讀收款帳戶（`RefreshMyPaymentAccount`）再重新讀開通摘要與收款帳戶（`confirmPaymentReturn`）：
- * 回跳與狀態按鈕共用的一條路徑。重讀失敗時仍會讀，之後丟出重讀的錯誤。
+ * 進入認證頁與回跳共用的一條路徑。重讀失敗不丟出，照常讀。
  */
 export function useRefreshPaymentAccount(): () => Promise<void> {
 	const queryClient = useQueryClient();

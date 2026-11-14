@@ -151,6 +151,39 @@ func TestOnboardingReturnPagesExistInTheWebsiteRoutes(t *testing.T) {
 	}
 }
 
+func TestCertificationURLExistsInTheWebsiteRoutes(t *testing.T) {
+	routes := websiteRoutes(t)
+	w, err := NewWebOrigin("https://www.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	supported, def := websiteLocales(t)
+	for _, locale := range supported {
+		raw, err := w.CertificationURL(uitext.Locale(locale))
+		if err != nil {
+			t.Fatalf("locale=%s：%v", locale, err)
+		}
+		u, err := url.Parse(raw)
+		if err != nil || u.Scheme+"://"+u.Host != w.Origin() {
+			t.Errorf("認證頁網址 %q 不在網站的 origin %q 之下", raw, w.Origin())
+			continue
+		}
+		path := u.Path
+		if locale != def {
+			if !strings.HasPrefix(path, "/"+locale+"/") {
+				t.Errorf("%q 沒有語系前綴 /%s", raw, locale)
+			}
+			path = strings.TrimPrefix(path, "/"+locale)
+		}
+		if !routes[path] {
+			t.Errorf("認證頁網址 %q 的路徑 %q 在 website/app/[locale] 沒有對應的 page.tsx", raw, path)
+		}
+	}
+	if _, err := w.CertificationURL("fr"); err == nil {
+		t.Error("不支援的語系被接受")
+	}
+}
+
 func TestWebLocalesMatchTheWebsiteRouting(t *testing.T) {
 	supported, def := websiteLocales(t)
 	for _, locale := range supported {

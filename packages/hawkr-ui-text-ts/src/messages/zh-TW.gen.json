@@ -61,20 +61,7 @@
       "PAYMENT_ACCOUNT_STATUS_DISABLED": "無法啟用",
       "PAYMENT_ACCOUNT_STATUS_ENABLED": "已啟用",
       "PAYMENT_ACCOUNT_STATUS_NOT_CREATED": "準備中",
-      "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "審核中",
-      "action": {
-        "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "前往設定收款帳戶",
-        "PAYMENT_ACCOUNT_STATUS_DISABLED": "聯絡客服",
-        "PAYMENT_ACCOUNT_STATUS_NOT_CREATED": "重新整理",
-        "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "重新整理"
-      },
-      "description": {
-        "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。",
-        "PAYMENT_ACCOUNT_STATUS_DISABLED": "金流商目前無法啟用你的收款帳戶，請聯絡客服。",
-        "PAYMENT_ACCOUNT_STATUS_ENABLED": "收款已啟用。",
-        "PAYMENT_ACCOUNT_STATUS_NOT_CREATED": "正在建立收款帳戶，通常幾分鐘內完成。",
-        "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "金流商正在審核你的資料，不需要額外操作。"
-      }
+      "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "審核中"
     },
     "RequirementCollection": {
       "REQUIREMENT_COLLECTION_PLATFORM": "平台收件（內嵌元件）",
@@ -168,7 +155,6 @@
       "button": {
         "ONBOARDING_ACTION_CONTACT_SUPPORT": "聯絡客服",
         "ONBOARDING_ACTION_EDIT_PROFILE": "去設定",
-        "ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT": "重新整理",
         "ONBOARDING_ACTION_START_PAYMENT_ONBOARDING": "前往設定收款帳戶",
         "ONBOARDING_ACTION_SUBMIT_CERTIFICATION": "前往商家認證"
       }

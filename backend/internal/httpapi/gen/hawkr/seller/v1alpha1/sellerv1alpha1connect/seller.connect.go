@@ -140,7 +140,7 @@ type SellerAppServiceClient interface {
 	// 只讓該項是 UNKNOWN，方法本身不因此失敗。只讀本地的狀態，不呼叫金流商；要最新的收款帳戶狀態先呼叫 RefreshMyPaymentAccount 再讀。
 	// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀（client 以 GetMyStore 的停權狀態導向公告頁），已關閉的店家回 not_found。
 	GetMyOnboarding(context.Context, *connect.Request[v1alpha1.GetMyOnboardingRequest]) (*connect.Response[v1alpha1.GetMyOnboardingResponse], error)
-	// RefreshMyPaymentAccount 同步向金流商重讀呼叫者店家的收款帳戶並更新快取（賣家從金流商的開通頁面回來時用，之後讀 GetMyOnboarding）。
+	// RefreshMyPaymentAccount 同步向金流商重讀呼叫者店家的收款帳戶並更新快取（之後讀 GetMyOnboarding）。client 自動呼叫：進入認證頁、從金流商的開通頁面回來、App 回到前景時，賣家沒有手動重新整理的按鈕。
 	// 同一帳戶上次讀取在 10 秒內就不呼叫金流商：快取已經涵蓋那次讀取就直接成功；那次讀取失敗或還在進行中就回 resource_exhausted，
 	// 帶 google.rpc.RetryInfo（窗的剩餘時間，至少 1 秒），client 照它重試，不會把失敗當成成功。還沒有外部帳戶時什麼都不做、回成功；
 	// 沒有設定收款開通回 failed_precondition。金流商暫時讀不到回 unavailable（client 可以重試）；金流商沒有這個帳戶回 failed_precondition。
@@ -188,7 +188,7 @@ type SellerAppServiceClient interface {
 	// 店家還沒有收款帳戶（平台審核還沒核准，或沒有設定收款開通）時回 not_found。
 	GetMyPaymentAccount(context.Context, *connect.Request[v1alpha1.GetMyPaymentAccountRequest]) (*connect.Response[v1alpha1.GetMyPaymentAccountResponse], error)
 	// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session：onboarding_surface 是 HOSTED 時回連結（賣家開外部瀏覽器完成後回到
-	// destination 與 locale 決定的頁面；連結過期時回到同一目的地的重新取得入口），是 EMBEDDED 時回內嵌元件的 client_secret。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
+	// destination 與 locale 決定的頁面；連結過期時回到同一目的地的重新取得入口），是 EMBEDDED 時回內嵌元件的 client_secret（destination 是 SELLER_APP 時不建立內嵌 session，回網站認證頁的連結，surface 仍是 EMBEDDED）。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
 	// 停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
 	CreatePaymentOnboardingSession(context.Context, *connect.Request[v1alpha1.CreatePaymentOnboardingSessionRequest]) (*connect.Response[v1alpha1.CreatePaymentOnboardingSessionResponse], error)
 	// LookupBusinessRegistration 以統一編號查經濟部商業司的公開登記資料，給 KYC 表單帶入公司資料。查無這個統編不是錯誤：
@@ -517,7 +517,7 @@ type SellerAppServiceHandler interface {
 	// 只讓該項是 UNKNOWN，方法本身不因此失敗。只讀本地的狀態，不呼叫金流商；要最新的收款帳戶狀態先呼叫 RefreshMyPaymentAccount 再讀。
 	// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀（client 以 GetMyStore 的停權狀態導向公告頁），已關閉的店家回 not_found。
 	GetMyOnboarding(context.Context, *connect.Request[v1alpha1.GetMyOnboardingRequest]) (*connect.Response[v1alpha1.GetMyOnboardingResponse], error)
-	// RefreshMyPaymentAccount 同步向金流商重讀呼叫者店家的收款帳戶並更新快取（賣家從金流商的開通頁面回來時用，之後讀 GetMyOnboarding）。
+	// RefreshMyPaymentAccount 同步向金流商重讀呼叫者店家的收款帳戶並更新快取（之後讀 GetMyOnboarding）。client 自動呼叫：進入認證頁、從金流商的開通頁面回來、App 回到前景時，賣家沒有手動重新整理的按鈕。
 	// 同一帳戶上次讀取在 10 秒內就不呼叫金流商：快取已經涵蓋那次讀取就直接成功；那次讀取失敗或還在進行中就回 resource_exhausted，
 	// 帶 google.rpc.RetryInfo（窗的剩餘時間，至少 1 秒），client 照它重試，不會把失敗當成成功。還沒有外部帳戶時什麼都不做、回成功；
 	// 沒有設定收款開通回 failed_precondition。金流商暫時讀不到回 unavailable（client 可以重試）；金流商沒有這個帳戶回 failed_precondition。
@@ -565,7 +565,7 @@ type SellerAppServiceHandler interface {
 	// 店家還沒有收款帳戶（平台審核還沒核准，或沒有設定收款開通）時回 not_found。
 	GetMyPaymentAccount(context.Context, *connect.Request[v1alpha1.GetMyPaymentAccountRequest]) (*connect.Response[v1alpha1.GetMyPaymentAccountResponse], error)
 	// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session：onboarding_surface 是 HOSTED 時回連結（賣家開外部瀏覽器完成後回到
-	// destination 與 locale 決定的頁面；連結過期時回到同一目的地的重新取得入口），是 EMBEDDED 時回內嵌元件的 client_secret。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
+	// destination 與 locale 決定的頁面；連結過期時回到同一目的地的重新取得入口），是 EMBEDDED 時回內嵌元件的 client_secret（destination 是 SELLER_APP 時不建立內嵌 session，回網站認證頁的連結，surface 仍是 EMBEDDED）。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
 	// 停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
 	CreatePaymentOnboardingSession(context.Context, *connect.Request[v1alpha1.CreatePaymentOnboardingSessionRequest]) (*connect.Response[v1alpha1.CreatePaymentOnboardingSessionResponse], error)
 	// LookupBusinessRegistration 以統一編號查經濟部商業司的公開登記資料，給 KYC 表單帶入公司資料。查無這個統編不是錯誤：

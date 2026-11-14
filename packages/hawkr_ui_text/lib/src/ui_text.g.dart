@@ -92,45 +92,9 @@ _ => null,
 };
 }
 
-String? _paymentPaymentAccountStatusAction(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW, 1) => '重新整理',
-(UiLocale.en, 1) => 'Refresh',
-(UiLocale.zhTW, 2) => '重新整理',
-(UiLocale.en, 2) => 'Refresh',
-(UiLocale.zhTW, 3) => '前往設定收款帳戶',
-(UiLocale.en, 3) => 'Go to payout account setup',
-(UiLocale.zhTW, 5) => '聯絡客服',
-(UiLocale.en, 5) => 'Contact support',
-_ => null,
-};
-}
-
-String? _paymentPaymentAccountStatusDescription(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW, 1) => '正在建立收款帳戶，通常幾分鐘內完成。',
-(UiLocale.en, 1) => 'We are setting up your payout account. This usually takes a few minutes.',
-(UiLocale.zhTW, 2) => '金流商正在審核你的資料，不需要額外操作。',
-(UiLocale.en, 2) => 'The payment provider is reviewing your information. No action is needed.',
-(UiLocale.zhTW, 3) => '提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。',
-(UiLocale.en, 3) => 'Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it.',
-(UiLocale.zhTW, 4) => '收款已啟用。',
-(UiLocale.en, 4) => 'Payments are enabled.',
-(UiLocale.zhTW, 5) => '金流商目前無法啟用你的收款帳戶，請聯絡客服。',
-(UiLocale.en, 5) => 'The payment provider cannot enable your payout account right now. Please contact support.',
-_ => null,
-};
-}
-
 extension PaymentPaymentAccountStatusUiText on hawkr_payment_v1alpha1_payment.PaymentAccountStatus {
   /// payment.PaymentAccountStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
   String? uiText(UiLocale l) => _paymentPaymentAccountStatus(l, value);
-
-  /// payment.PaymentAccountStatus.action；沒有文字的值回 null。
-  String? action(UiLocale l) => _paymentPaymentAccountStatusAction(l, value);
-
-  /// payment.PaymentAccountStatus.description；沒有文字的值回 null。
-  String? description(UiLocale l) => _paymentPaymentAccountStatusDescription(l, value);
 }
 
 String? _paymentRequirementCollection(UiLocale l, int value) {
@@ -306,10 +270,8 @@ return switch ((l, value)) {
 (UiLocale.en, 3) => 'Go to seller verification',
 (UiLocale.zhTW, 4) => '前往設定收款帳戶',
 (UiLocale.en, 4) => 'Go to payout account setup',
-(UiLocale.zhTW, 5) => '重新整理',
-(UiLocale.en, 5) => 'Refresh',
-(UiLocale.zhTW, 6) => '聯絡客服',
-(UiLocale.en, 6) => 'Contact support',
+(UiLocale.zhTW, 5) => '聯絡客服',
+(UiLocale.en, 5) => 'Contact support',
 _ => null,
 };
 }

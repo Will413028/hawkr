@@ -20,6 +20,7 @@ type paymentModule struct {
 	caps       payment.Capabilities
 	configured bool
 	sessionFor int64
+	canEmbed   bool
 	returnURL  string
 	refreshURL string
 	err        error
@@ -42,8 +43,8 @@ func (m *paymentModule) SyncAccountUnlessFresh(_ context.Context, storeID int64)
 	return m.syncErr
 }
 
-func (m *paymentModule) CreateOnboardingSession(_ context.Context, storeID int64, returnURL, refreshURL string) (payment.OnboardingSession, error) {
-	m.sessionFor, m.returnURL, m.refreshURL = storeID, returnURL, refreshURL
+func (m *paymentModule) CreateOnboardingSession(_ context.Context, storeID int64, returnURL, refreshURL string, canEmbed bool) (payment.OnboardingSession, error) {
+	m.sessionFor, m.returnURL, m.refreshURL, m.canEmbed = storeID, returnURL, refreshURL, canEmbed
 	if m.session != nil {
 		return *m.session, m.err
 	}
@@ -131,6 +132,45 @@ func TestCreatePaymentOnboardingSessionBuildsTheReturnUrlsOnTheServer(t *testing
 		if got.Msg.GetSurface() != paymentpb.OnboardingSurface_ONBOARDING_SURFACE_HOSTED || got.Msg.GetUrl() == "" || got.Msg.GetClientSecret() != "" {
 			t.Errorf("%s：response=%v", name, got.Msg)
 		}
+	}
+}
+
+// 是否到網站完成由 payment 依帳戶列的介面決定；handler 只告知呼叫端能否內嵌（App 不能），並在收到「到網站完成」時填網站認證頁。
+func TestCreatePaymentOnboardingSessionFillsTheWebsiteURLWhenPaymentSaysCompleteOnTheWebsite(t *testing.T) {
+	m := &paymentModule{session: &payment.OnboardingSession{Surface: payment.SurfaceEmbedded, CompleteOnWebsite: true}}
+	app := &App{payments: m, web: mustWebOrigin(t)}
+	origin := mustWebOrigin(t).Origin()
+	appDest := pb.OnboardingReturnDestination_ONBOARDING_RETURN_DESTINATION_SELLER_APP
+	for locale, want := range map[string]string{
+		"zh-TW": origin + "/seller-center/me/certifications",
+		"en":    origin + "/en/seller-center/me/certifications",
+	} {
+		m.sessionFor = 0
+		got, err := app.CreatePaymentOnboardingSession(ctxWithStore(currentStore()), connect.NewRequest(&pb.CreatePaymentOnboardingSessionRequest{Destination: appDest, Locale: locale}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m.sessionFor != 11 || m.canEmbed {
+			t.Fatalf("%s：App 目的地應以 canEmbed=false 交給 payment，sessionFor=%d canEmbed=%v", locale, m.sessionFor, m.canEmbed)
+		}
+		g := got.Msg
+		if g.GetUrl() != want || g.GetClientSecret() != "" || g.GetProvider() != "" || g.GetPublishableKey() != "" ||
+			g.GetSurface() != paymentpb.OnboardingSurface_ONBOARDING_SURFACE_EMBEDDED {
+			t.Errorf("%s：response=%v", locale, g)
+		}
+	}
+	// 網站目的地以 canEmbed=true 交給 payment，內嵌 session 原樣回。
+	m.session = &payment.OnboardingSession{Surface: payment.SurfaceEmbedded, ClientSecret: "cs_1", Provider: "stripe", PublishableKey: "pk_test_x"}
+	m.sessionFor = 0
+	got, err := app.CreatePaymentOnboardingSession(ctxWithStore(currentStore()), connect.NewRequest(&pb.CreatePaymentOnboardingSessionRequest{
+		Destination: pb.OnboardingReturnDestination_ONBOARDING_RETURN_DESTINATION_WEBSITE_CERTIFICATION, Locale: "zh-TW"}))
+	if err != nil || m.sessionFor != 11 || !m.canEmbed || got.Msg.GetClientSecret() != "cs_1" {
+		t.Fatalf("網站目的地：%v %v sessionFor=%d canEmbed=%v", got, err, m.sessionFor, m.canEmbed)
+	}
+	// payment 的前置條件失敗原樣回，不填網站網址。
+	m.session, m.err = nil, apperr.FailedPrecondition("收款帳戶還沒有建立")
+	if _, err := app.CreatePaymentOnboardingSession(ctxWithStore(currentStore()), connect.NewRequest(&pb.CreatePaymentOnboardingSessionRequest{Destination: appDest, Locale: "zh-TW"})); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("前置條件失敗 err=%v", err)
 	}
 }
 

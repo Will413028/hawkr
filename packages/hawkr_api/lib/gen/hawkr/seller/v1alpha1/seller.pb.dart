@@ -4135,7 +4135,9 @@ class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearSurface() => $_clearField(1);
 
-  /// surface 是 HOSTED 時的開通連結（一次性、短效）。
+  /// 要在瀏覽器開啟的網址：surface 是 HOSTED 時是金流商的一次性、短效開通連結；surface 是 EMBEDDED 而 destination 是 SELLER_APP 時是網站的認證頁
+  /// （賣家在網頁完成開通；伺服器仍照常檢查前置條件，但不建立內嵌 session，client_secret、provider、publishable_key 是空字串）。
+  /// surface 是 EMBEDDED 而 destination 是 WEBSITE_CERTIFICATION 時是空字串。surface 是帳戶實際的開通介面。
   @$pb.TagNumber(2)
   $core.String get url => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -4145,7 +4147,7 @@ class CreatePaymentOnboardingSessionResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearUrl() => $_clearField(2);
 
-  /// surface 是 EMBEDDED 時，初始化內嵌元件用的 client secret；只給這個賣家的瀏覽器，不記錄。
+  /// surface 是 EMBEDDED 時（只在 destination 是 WEBSITE_CERTIFICATION），初始化內嵌元件用的 client secret；只給這個賣家的瀏覽器，不記錄。
   @$pb.TagNumber(3)
   $core.String get clientSecret => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -7207,7 +7209,7 @@ class SellerAppServiceApi {
       _client.invoke<GetMyOnboardingResponse>(ctx, 'SellerAppService',
           'GetMyOnboarding', request, GetMyOnboardingResponse());
 
-  /// RefreshMyPaymentAccount 同步向金流商重讀呼叫者店家的收款帳戶並更新快取（賣家從金流商的開通頁面回來時用，之後讀 GetMyOnboarding）。
+  /// RefreshMyPaymentAccount 同步向金流商重讀呼叫者店家的收款帳戶並更新快取（之後讀 GetMyOnboarding）。client 自動呼叫：進入認證頁、從金流商的開通頁面回來、App 回到前景時，賣家沒有手動重新整理的按鈕。
   /// 同一帳戶上次讀取在 10 秒內就不呼叫金流商：快取已經涵蓋那次讀取就直接成功；那次讀取失敗或還在進行中就回 resource_exhausted，
   /// 帶 google.rpc.RetryInfo（窗的剩餘時間，至少 1 秒），client 照它重試，不會把失敗當成成功。還沒有外部帳戶時什麼都不做、回成功；
   /// 沒有設定收款開通回 failed_precondition。金流商暫時讀不到回 unavailable（client 可以重試）；金流商沒有這個帳戶回 failed_precondition。
@@ -7307,7 +7309,7 @@ class SellerAppServiceApi {
           'GetMyPaymentAccount', request, GetMyPaymentAccountResponse());
 
   /// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session：onboarding_surface 是 HOSTED 時回連結（賣家開外部瀏覽器完成後回到
-  /// destination 與 locale 決定的頁面；連結過期時回到同一目的地的重新取得入口），是 EMBEDDED 時回內嵌元件的 client_secret。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
+  /// destination 與 locale 決定的頁面；連結過期時回到同一目的地的重新取得入口），是 EMBEDDED 時回內嵌元件的 client_secret（destination 是 SELLER_APP 時不建立內嵌 session，回網站認證頁的連結，surface 仍是 EMBEDDED）。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
   /// 停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
   $async.Future<CreatePaymentOnboardingSessionResponse>
       createPaymentOnboardingSession($pb.ClientContext? ctx,

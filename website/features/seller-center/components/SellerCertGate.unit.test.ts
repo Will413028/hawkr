@@ -5,6 +5,9 @@ import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/payment/v1alpha1/paym
 import {
 	KYCApplicationSchema,
 	KYCStatus,
+	OnboardingAction,
+	OnboardingTaskId,
+	OnboardingTaskState,
 	PaymentAccountSchema,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import {
@@ -21,6 +24,7 @@ vi.mock("@/components/ui/Button", () => ({
 		React.createElement("a", { href }, children),
 }));
 
+import { onboardingFixture } from "@/lib/seller/onboarding-fixtures";
 import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import { SellerCertGate } from "./SellerCertGate";
 
@@ -51,55 +55,64 @@ describe("SellerCertGate", () => {
 		expect(screen.getByText("目前狀態：審核中")).toBeTruthy();
 	});
 
-	it("平台審核核准、收款帳戶待設定：說明與動作是收款帳戶的目錄文字", () => {
+	const approved = create(KYCApplicationSchema, {
+		status: KYCStatus.KYC_STATUS_APPROVED,
+	});
+	const onboardingWith = (action: OnboardingAction) =>
+		onboardingFixture([
+			{
+				id: OnboardingTaskId.PAYMENT_ACCOUNT,
+				state: OnboardingTaskState.ACTION_REQUIRED,
+				action,
+				status: "伺服器的收款句",
+			},
+		]);
+
+	it("平台審核核准、收款帳戶待設定：徽章讀帳戶狀態、說明句讀任務，動作固定去商家認證頁", () => {
 		render(
 			React.createElement(SellerCertGate, {
-				application: create(KYCApplicationSchema, {
-					status: KYCStatus.KYC_STATUS_APPROVED,
-				}),
+				application: approved,
 				platformReviewCompleted: true,
 				paymentAccount: create(PaymentAccountSchema, {
 					status: PaymentAccountStatus.ACTION_REQUIRED,
 				}),
+				onboarding: onboardingWith(OnboardingAction.START_PAYMENT_ONBOARDING),
 			}),
 		);
 		expect(screen.getByText("目前狀態：待設定")).toBeTruthy();
+		expect(screen.getByText("伺服器的收款句")).toBeTruthy();
 		expect(
-			screen.getByText(
-				"提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。",
-			),
-		).toBeTruthy();
-		expect(screen.getByText("前往設定收款帳戶")).toBeTruthy();
-		expect(document.body.textContent).not.toMatch(/逾期|停用/);
+			screen.getByText("前往商家認證").closest("a")?.getAttribute("href"),
+		).toBe("/seller-center/me/certifications");
+		expect(screen.queryByText("前往設定收款帳戶")).toBeNull();
 	});
 
-	it("收款帳戶無法啟用：動作是客服連結", () => {
+	it("動作不讀 action 也不讀狀態：任務是 CONTACT_SUPPORT、帳戶無法啟用，連結仍是商家認證頁", () => {
 		render(
 			React.createElement(SellerCertGate, {
-				application: create(KYCApplicationSchema, {
-					status: KYCStatus.KYC_STATUS_APPROVED,
-				}),
+				application: approved,
 				platformReviewCompleted: true,
 				paymentAccount: create(PaymentAccountSchema, {
 					status: PaymentAccountStatus.DISABLED,
 				}),
+				onboarding: onboardingWith(OnboardingAction.CONTACT_SUPPORT),
 			}),
 		);
+		expect(screen.queryByText("聯絡客服")).toBeNull();
 		expect(
-			screen.getByText("聯絡客服").closest("a")?.getAttribute("href"),
-		).toBe("/contact");
+			screen.getByText("前往商家認證").closest("a")?.getAttribute("href"),
+		).toBe("/seller-center/me/certifications");
 	});
 
 	it("收款帳戶準備中：不顯示「重新整理」，動作去商家認證頁", () => {
 		render(
 			React.createElement(SellerCertGate, {
-				application: create(KYCApplicationSchema, {
-					status: KYCStatus.KYC_STATUS_APPROVED,
-				}),
+				application: approved,
 				platformReviewCompleted: true,
 				paymentAccount: create(PaymentAccountSchema, {
 					status: PaymentAccountStatus.NOT_CREATED,
 				}),
+				onboarding: onboardingWith(OnboardingAction.NONE),
 			}),
 		);
 		expect(screen.queryByText("重新整理")).toBeNull();
@@ -136,6 +149,6 @@ describe("SellerCertGate", () => {
 				}),
 			}),
 		);
-		expect(screen.getByText("前往設定收款帳戶")).toBeTruthy();
+		expect(screen.getByText("前往商家認證")).toBeTruthy();
 	});
 });

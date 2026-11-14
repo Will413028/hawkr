@@ -35,7 +35,7 @@ type PaymentReader interface {
 // SyncAccountUnlessFresh 是 RefreshMyPaymentAccount 的同步重讀（transaction 外的外部呼叫，可以與同步 job 並行，D32；上次讀取在 10 秒內不呼叫金流商，D33）。
 type Payments interface {
 	PaymentReader
-	CreateOnboardingSession(ctx context.Context, storeID int64, returnURL, refreshURL string) (payment.OnboardingSession, error)
+	CreateOnboardingSession(ctx context.Context, storeID int64, returnURL, refreshURL string, canEmbed bool) (payment.OnboardingSession, error)
 	SyncAccountUnlessFresh(ctx context.Context, storeID int64) error
 }
 
@@ -84,9 +84,19 @@ func (h *App) CreatePaymentOnboardingSession(ctx context.Context, req *connect.R
 	if err != nil {
 		return nil, err
 	}
-	session, err := h.payments.CreateOnboardingSession(ctx, current.StoreID, returnURL, refreshURL)
+	// App 無法承載內嵌元件；帳戶是內嵌介面時由 payment 檢查前置條件後回「到網站完成」，這裡填網站的認證頁。
+	session, err := h.payments.CreateOnboardingSession(ctx, current.StoreID, returnURL, refreshURL, page != rpc.ReturnPageSellerApp)
 	if err != nil {
 		return nil, err
+	}
+	if session.CompleteOnWebsite {
+		u, err := h.web.CertificationURL(locale)
+		if err != nil {
+			return nil, err
+		}
+		return connect.NewResponse(&pb.CreatePaymentOnboardingSessionResponse{
+			Surface: rpc.EnumToProto[paymentpb.OnboardingSurface](session.Surface), Url: u,
+		}), nil
 	}
 	return connect.NewResponse(&pb.CreatePaymentOnboardingSessionResponse{
 		Surface: rpc.EnumToProto[paymentpb.OnboardingSurface](session.Surface), Url: session.URL, ClientSecret: session.ClientSecret,

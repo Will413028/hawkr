@@ -24,35 +24,44 @@ class _LoggedIn extends Session {
       const SessionModel(accountId: 'acc-1', isLoggedIn: true);
 }
 
-/// 用 [usePaymentAccountActions] 的最小消費者。
+/// 用 [usePaymentAccountActions] 的最小消費者：按下去執行 [action]。
 class _Probe extends HookConsumerWidget {
-  const _Probe(this.id);
+  const _Probe(this.action);
 
-  final int id;
+  final OnboardingAction action;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final actions = usePaymentAccountActions(context, ref);
     return TextButton(
-      key: Key('go-$id'),
-      onPressed: actions.refresh,
-      child: Text('go-$id'),
+      key: const Key('go'),
+      onPressed: actions.busy ? null : () => actions.run(action),
+      child: const Text('go'),
     );
   }
 }
 
+typedef _Harness = ({
+  ProviderContainer container,
+  List<Code> toasts,
+  List<Uri> launched,
+  List<CreatePaymentOnboardingSessionRequest> sessions,
+  int Function() refreshCalls,
+  int Function() summaryReads,
+});
+
 /// 失敗沒有伺服器句子，所以每次要顯示 toast 都會呼叫一次 defaultErrorText：呼叫次數就是 toast 次數。
-Future<
-  ({
-    ProviderContainer container,
-    ValueNotifier<int> probes,
-    List<Code> toasts,
-    void Function({required bool fails}) setRefreshFails,
-  })
->
-_pump(WidgetTester tester, {int probes = 2}) async {
+Future<_Harness> _pump(
+  WidgetTester tester, {
+  required OnboardingAction action,
+  Code? refreshFailsWith,
+  bool launchSucceeds = true,
+}) async {
   final toasts = <Code>[];
-  var refreshFails = true;
+  final launched = <Uri>[];
+  final sessions = <CreatePaymentOnboardingSessionRequest>[];
+  var refreshCalls = 0;
+  var summaryReads = 0;
   final container = ProviderContainer(
     overrides: [
       sessionProvider.overrideWith(_LoggedIn.new),
@@ -64,21 +73,32 @@ _pump(WidgetTester tester, {int probes = 2}) async {
         return '錯誤';
       }),
       allowInsecureOnboardingUrlProvider.overrideWithValue(false),
-      externalBrowserLauncherProvider.overrideWithValue((_) async => true),
+      externalBrowserLauncherProvider.overrideWithValue((url) async {
+        launched.add(url);
+        return launchSucceeds;
+      }),
       sellerClientProvider.overrideWithValue(
         SellerAppServiceClient(
           FakeTransportBuilder()
               .unary(SellerAppService.getMyOnboarding, (_, _) {
-                return reviewPendingSummary();
+                summaryReads++;
+                return paymentPendingSummary();
               })
               .unary(SellerAppService.refreshMyPaymentAccount, (_, _) {
-                if (refreshFails) throw reasonError(Code.unavailable, 'DOWN');
+                refreshCalls++;
+                final code = refreshFailsWith;
+                if (code != null) throw reasonError(code, 'DOWN');
                 return RefreshMyPaymentAccountResponse();
               })
-              .unary(SellerAppService.createPaymentOnboardingSession, (_, _) {
+              .unary(SellerAppService.createPaymentOnboardingSession, (
+                request,
+                _,
+              ) {
+                sessions.add(request);
                 return CreatePaymentOnboardingSessionResponse(
                   surface: OnboardingSurface.ONBOARDING_SURFACE_HOSTED,
-                  url: 'https://connect.example.test/setup/abc',
+                  url:
+                      'https://www.example.test/seller-center/me/certifications',
                 );
               })
               .build(),
@@ -87,143 +107,136 @@ _pump(WidgetTester tester, {int probes = 2}) async {
     ],
   );
   addTearDown(container.dispose);
-  final count = ValueNotifier<int>(probes);
-  addTearDown(count.dispose);
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp(
-        home: Scaffold(
-          body: ValueListenableBuilder<int>(
-            valueListenable: count,
-            builder: (_, n, _) =>
-                Column(children: [for (var i = 0; i < n; i++) _Probe(i)]),
-          ),
-        ),
-      ),
+      child: MaterialApp(home: Scaffold(body: _Probe(action))),
     ),
   );
   await tester.pumpAndSettle();
   return (
     container: container,
-    probes: count,
     toasts: toasts,
-    setRefreshFails: ({required fails}) => refreshFails = fails,
+    launched: launched,
+    sessions: sessions,
+    refreshCalls: () => refreshCalls,
+    summaryReads: () => summaryReads,
   );
 }
 
 void main() {
-  testWidgets('按鈕觸發的 refresh 失敗：兩個消費者同時掛載也只有發起的那個顯示一次', (tester) async {
-    final h = await _pump(tester);
-
-    await tester.tap(find.byKey(const Key('go-0')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(h.toasts, [Code.unavailable]);
-    await tester.pumpAndSettle(const Duration(seconds: 5));
+  test('只有開始開通與聯絡客服有按鈕，其他動作沒有', () {
+    expect(
+      paymentAccountActionHasButton(
+        OnboardingAction.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING,
+      ),
+      isTrue,
+    );
+    expect(
+      paymentAccountActionHasButton(
+        OnboardingAction.ONBOARDING_ACTION_CONTACT_SUPPORT,
+      ),
+      isTrue,
+    );
+    for (final action in [
+      OnboardingAction.ONBOARDING_ACTION_NONE,
+      OnboardingAction.ONBOARDING_ACTION_UNSPECIFIED,
+      OnboardingAction.ONBOARDING_ACTION_EDIT_PROFILE,
+      OnboardingAction.ONBOARDING_ACTION_SUBMIT_CERTIFICATION,
+      OnboardingAction.valueOf(99) ?? OnboardingAction.ONBOARDING_ACTION_NONE,
+    ]) {
+      expect(paymentAccountActionHasButton(action), isFalse, reason: '$action');
+    }
   });
 
-  testWidgets('失敗顯示過後，新掛載的消費者不再顯示舊錯誤，共享 state 也沒有殘留', (tester) async {
-    final h = await _pump(tester);
-    await tester.tap(find.byKey(const Key('go-0')));
-    await tester.pumpAndSettle(const Duration(seconds: 5));
-    expect(h.toasts, [Code.unavailable]);
-
-    h.probes.value = 3;
-    await tester.pumpAndSettle(const Duration(seconds: 5));
-    expect(h.toasts, [Code.unavailable]);
-    expect(h.container.read(paymentOnboardingProvider), isNull);
-
-    final notifier = h.container.read(paymentOnboardingProvider.notifier);
-    await notifier.start(OnboardingSurface.ONBOARDING_SURFACE_HOSTED);
-    await notifier.onResumed();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(h.toasts, [Code.unavailable, Code.unavailable]);
-    await tester.pumpAndSettle(const Duration(seconds: 5));
-  });
-
-  testWidgets('從瀏覽器回來的 refresh 失敗：沒有發起的 widget，兩個消費者只顯示一次，之後被消耗', (
+  testWidgets('開始開通：一律呼叫 session RPC（目的地是賣家 App）並開伺服器回的連結，不判斷介面', (
     tester,
   ) async {
-    final h = await _pump(tester);
-    final notifier = h.container.read(paymentOnboardingProvider.notifier);
-    await notifier.start(OnboardingSurface.ONBOARDING_SURFACE_HOSTED);
+    final h = await _pump(
+      tester,
+      action: OnboardingAction.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING,
+    );
 
-    await notifier.onResumed();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byKey(const Key('go')));
+    await tester.pumpAndSettle();
 
-    expect(h.toasts, [Code.unavailable]);
-    expect(h.container.read(paymentOnboardingProvider), isNull);
-    h.probes.value = 3;
-    await tester.pumpAndSettle(const Duration(seconds: 5));
-    expect(h.toasts, hasLength(1));
-  });
-
-  testWidgets('失敗時沒有消費者：之後成功的瀏覽器回來 refresh 清掉訊號，掛載的消費者不顯示舊錯誤', (tester) async {
-    final h = await _pump(tester, probes: 0);
-    final notifier = h.container.read(paymentOnboardingProvider.notifier);
-    await notifier.start(OnboardingSurface.ONBOARDING_SURFACE_HOSTED);
-    await notifier.onResumed();
-    expect(h.container.read(paymentOnboardingProvider), isNotNull);
-
-    h.setRefreshFails(fails: false);
-    await notifier.start(OnboardingSurface.ONBOARDING_SURFACE_HOSTED);
-    await notifier.onResumed();
-    expect(h.container.read(paymentOnboardingProvider), isNull);
-
-    h.probes.value = 2;
-    await tester.pumpAndSettle(const Duration(seconds: 5));
+    expect(h.sessions, hasLength(1));
+    expect(
+      h.sessions.single.destination,
+      OnboardingReturnDestination.ONBOARDING_RETURN_DESTINATION_SELLER_APP,
+    );
+    expect(h.launched, [
+      Uri.parse('https://www.example.test/seller-center/me/certifications'),
+    ]);
     expect(h.toasts, isEmpty);
   });
 
-  testWidgets('按鈕的成功 refresh 也清掉留著的訊號', (tester) async {
-    final h = await _pump(tester, probes: 0);
-    final notifier = h.container.read(paymentOnboardingProvider.notifier);
-    await notifier.start(OnboardingSurface.ONBOARDING_SURFACE_HOSTED);
-    await notifier.onResumed();
-    expect(h.container.read(paymentOnboardingProvider), isNotNull);
+  testWidgets('開始開通：瀏覽器開不起來顯示一般的錯誤', (tester) async {
+    final h = await _pump(
+      tester,
+      action: OnboardingAction.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING,
+      launchSucceeds: false,
+    );
 
-    h.setRefreshFails(fails: false);
-    final result = await notifier.confirmPaymentAccount();
-
-    expect(result.refreshError, isNull);
-    expect(h.container.read(paymentOnboardingProvider), isNull);
-  });
-
-  testWidgets('失敗時沒有消費者：之後掛載的消費者不顯示舊錯誤', (tester) async {
-    final h = await _pump(tester, probes: 0);
-    final notifier = h.container.read(paymentOnboardingProvider.notifier);
-    await notifier.start(OnboardingSurface.ONBOARDING_SURFACE_HOSTED);
-    await notifier.onResumed();
-
-    h.probes.value = 2;
+    await tester.tap(find.byKey(const Key('go')));
     await tester.pumpAndSettle(const Duration(seconds: 5));
 
+    expect(h.toasts, [Code.internal]);
+  });
+
+  testWidgets('沒有按鈕的動作：按下去什麼都不做', (tester) async {
+    final h = await _pump(
+      tester,
+      action: OnboardingAction.ONBOARDING_ACTION_NONE,
+    );
+
+    await tester.tap(find.byKey(const Key('go')));
+    await tester.pumpAndSettle();
+
+    expect(h.sessions, isEmpty);
+    expect(h.launched, isEmpty);
+  });
+
+  for (final code in [
+    Code.unavailable,
+    Code.resourceExhausted,
+    Code.permissionDenied,
+  ]) {
+    testWidgets('自動重讀失敗（$code）：不顯示，照常讀開通摘要', (tester) async {
+      final h = await _pump(
+        tester,
+        action: OnboardingAction.ONBOARDING_ACTION_NONE,
+        refreshFailsWith: code,
+      );
+      final notifier = h.container.read(paymentOnboardingProvider.notifier);
+      await notifier.start();
+      final before = h.summaryReads();
+
+      final read = await notifier.onResumed();
+      await tester.pumpAndSettle(const Duration(seconds: 5));
+
+      expect(h.refreshCalls(), 1);
+      expect(h.summaryReads(), greaterThan(before));
+      expect(read, isTrue);
+      expect(h.toasts, isEmpty);
+    });
+  }
+
+  testWidgets('不是從瀏覽器回來的回前景與進入畫面：重讀失敗同樣不顯示', (tester) async {
+    final h = await _pump(
+      tester,
+      action: OnboardingAction.ONBOARDING_ACTION_NONE,
+      refreshFailsWith: Code.resourceExhausted,
+    );
+    final notifier = h.container.read(paymentOnboardingProvider.notifier);
+
+    final entered = await notifier.autoRefresh();
+    final resumed = await notifier.onResumed();
+    await tester.pumpAndSettle(const Duration(seconds: 5));
+
+    expect(entered, isTrue);
+    expect(resumed, isTrue);
+    expect(h.refreshCalls(), 2);
     expect(h.toasts, isEmpty);
-  });
-
-  testWidgets('新的一次 refresh 一開始就清掉舊的失敗訊號', (tester) async {
-    final h = await _pump(tester, probes: 0);
-    final notifier = h.container.read(paymentOnboardingProvider.notifier);
-    await notifier.start(OnboardingSurface.ONBOARDING_SURFACE_HOSTED);
-    await notifier.onResumed();
-    expect(h.container.read(paymentOnboardingProvider), isNotNull);
-
-    final pending = notifier.confirmPaymentAccount();
-    expect(h.container.read(paymentOnboardingProvider), isNull);
-    await pending;
-  });
-
-  testWidgets('取走過的訊號不會再被取到', (tester) async {
-    final h = await _pump(tester, probes: 0);
-    final notifier = h.container.read(paymentOnboardingProvider.notifier);
-    await notifier.start(OnboardingSurface.ONBOARDING_SURFACE_HOSTED);
-    await notifier.onResumed();
-
-    expect(notifier.takeRefreshFailure(), isNotNull);
-    expect(notifier.takeRefreshFailure(), isNull);
   });
 }

@@ -208,14 +208,13 @@ void main() {
       expect(_in('kyc_payment_account', '待設定'), findsOneWidget);
     });
 
-    testWidgets('摘要讀取失敗：顯示錯誤與重新整理，不當成「尚未開放」也不讀收款帳戶', (tester) async {
+    testWidgets('摘要讀取失敗：顯示錯誤與重新整理，不當成「尚未開放」', (tester) async {
       final server = _Server()
         ..summaryFailure = ConnectException(Code.unavailable, 'down');
       await _pump(tester, server);
 
       expect(_in('kyc_payment_account', '重新整理'), findsOneWidget);
       expect(find.text('平台審核通過後開放設定'), findsNothing);
-      expect(server.paymentCalls, 0);
     });
 
     testWidgets('不認得的申請狀態（UNSPECIFIED）：徽章是目錄的「未知」', (tester) async {
@@ -224,8 +223,8 @@ void main() {
     });
   });
 
-  group('收款帳戶區：內容讀 GetMyPaymentAccount，文字取自目錄', () {
-    testWidgets('待設定：說明不說逾期或停用；HOSTED 的按鈕在外部瀏覽器開連結，回跳網址指向回跳頁', (tester) async {
+  group('收款帳戶區：徽章讀 GetMyPaymentAccount，說明句與按鈕只讀收款帳戶任務', () {
+    testWidgets('待設定：任務的句子與按鈕，不說逾期或停用；按鈕在外部瀏覽器開連結，回跳網址指向回跳頁', (tester) async {
       final server = _Server()
         ..payment = PaymentAccount(
           status: _actionRequired,
@@ -234,7 +233,13 @@ void main() {
       await _pump(tester, server);
 
       expect(_in('kyc_payment_account', '待設定'), findsOneWidget);
-      expect(find.text('提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。'), findsOneWidget);
+      expect(
+        _in(
+          'kyc_payment_account',
+          '狀態 ONBOARDING_TASK_ID_PAYMENT_ACCOUNT ONBOARDING_TASK_STATE_ACTION_REQUIRED',
+        ),
+        findsOneWidget,
+      );
       expect(find.textContaining('逾期'), findsNothing);
       expect(find.textContaining('停用'), findsNothing);
 
@@ -252,7 +257,9 @@ void main() {
       ]);
     });
 
-    testWidgets('EMBEDDED：顯示「請到網頁版完成收款設定」，沒有開通按鈕，不呼叫伺服器', (tester) async {
+    testWidgets('EMBEDDED 的帳戶：按鈕一樣呼叫 session RPC 並開伺服器回的連結，沒有「到網頁完成」的提示', (
+      tester,
+    ) async {
       final server = _Server()
         ..payment = PaymentAccount(
           status: _actionRequired,
@@ -260,22 +267,116 @@ void main() {
         );
       await _pump(tester, server);
 
-      expect(find.text('請到網頁版完成收款設定'), findsOneWidget);
-      expect(find.byKey(const Key('payment_account_onboard')), findsNothing);
-      expect(server.sessions, isEmpty);
+      expect(find.text('請到網頁版完成收款設定'), findsNothing);
+      await tester.tap(find.byKey(const Key('payment_account_onboard')));
+      await tester.pumpAndSettle();
+
+      expect(server.sessions, hasLength(1));
+      expect(server.launched, hasLength(1));
     });
 
-    testWidgets('待設定但沒有告知介面：沒有開通按鈕（不猜預設介面）', (tester) async {
+    testWidgets('帳戶狀態與任務不一致：帳戶 ACTION_REQUIRED 但任務 NONE，沒有按鈕', (tester) async {
       final server = _Server()
-        ..payment = PaymentAccount(status: _actionRequired);
+        ..summary = onboardingSummary([
+          serverTask(
+            OnboardingTaskId.ONBOARDING_TASK_ID_PLATFORM_REVIEW,
+            OnboardingTaskState.ONBOARDING_TASK_STATE_COMPLETED,
+          ),
+          serverTask(
+            OnboardingTaskId.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT,
+            OnboardingTaskState.ONBOARDING_TASK_STATE_IN_PROGRESS,
+            status: '伺服器說等一下',
+          ),
+        ])
+        ..payment = PaymentAccount(
+          status: _actionRequired,
+          onboardingSurface: _hosted,
+        );
+      await _pump(tester, server);
+
+      expect(_in('kyc_payment_account', '待設定'), findsOneWidget);
+      expect(_in('kyc_payment_account', '伺服器說等一下'), findsOneWidget);
+      expect(find.byKey(const Key('payment_account_onboard')), findsNothing);
+      expect(find.byType(FilledButton), findsNothing);
+      expect(find.byType(OutlinedButton), findsNothing);
+    });
+
+    testWidgets('帳戶狀態與任務不一致：帳戶 NOT_CREATED 但任務 CONTACT_SUPPORT，按鈕是聯絡客服', (
+      tester,
+    ) async {
+      final server = _Server()
+        ..summary = onboardingSummary([
+          serverTask(
+            OnboardingTaskId.ONBOARDING_TASK_ID_PLATFORM_REVIEW,
+            OnboardingTaskState.ONBOARDING_TASK_STATE_COMPLETED,
+          ),
+          serverTask(
+            OnboardingTaskId.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT,
+            OnboardingTaskState.ONBOARDING_TASK_STATE_ACTION_REQUIRED,
+            action: OnboardingAction.ONBOARDING_ACTION_CONTACT_SUPPORT,
+          ),
+        ])
+        ..payment = PaymentAccount(
+          status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED,
+        );
+      await _pump(tester, server);
+
+      expect(_in('kyc_payment_account', '準備中'), findsOneWidget);
+      expect(find.byKey(const Key('payment_account_onboard')), findsNothing);
+      await tester.tap(find.text('聯絡客服'));
+      await tester.pumpAndSettle();
+      expect(find.text('help'), findsOneWidget);
+    });
+
+    testWidgets('進行中的帳戶（準備中、審核中）任務是 NONE：沒有任何按鈕，也沒有「重新整理」', (tester) async {
+      for (final status in [
+        PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED,
+        PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW,
+      ]) {
+        final server = _Server()
+          ..summary = onboardingSummary([
+            serverTask(
+              OnboardingTaskId.ONBOARDING_TASK_ID_PLATFORM_REVIEW,
+              OnboardingTaskState.ONBOARDING_TASK_STATE_COMPLETED,
+            ),
+            serverTask(
+              OnboardingTaskId.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT,
+              OnboardingTaskState.ONBOARDING_TASK_STATE_IN_PROGRESS,
+            ),
+          ])
+          ..payment = PaymentAccount(status: status);
+        await _pump(tester, server);
+
+        expect(find.byType(FilledButton), findsNothing);
+        expect(find.byType(OutlinedButton), findsNothing);
+        expect(find.text('重新整理'), findsNothing);
+      }
+    });
+
+    testWidgets('不認得的任務動作（UNSPECIFIED）：沒有按鈕', (tester) async {
+      final server = _Server()
+        ..summary = onboardingSummary([
+          serverTask(
+            OnboardingTaskId.ONBOARDING_TASK_ID_PLATFORM_REVIEW,
+            OnboardingTaskState.ONBOARDING_TASK_STATE_COMPLETED,
+          ),
+          serverTask(
+            OnboardingTaskId.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT,
+            OnboardingTaskState.ONBOARDING_TASK_STATE_ACTION_REQUIRED,
+            action: OnboardingAction.ONBOARDING_ACTION_UNSPECIFIED,
+          ),
+        ])
+        ..payment = PaymentAccount(
+          status: _actionRequired,
+          onboardingSurface: _hosted,
+        );
       await _pump(tester, server);
 
       expect(find.byKey(const Key('payment_account_onboard')), findsNothing);
-      expect(find.text('請到網頁版完成收款設定'), findsNothing);
     });
 
     testWidgets(
-      '平台審核完成、讀不到收款帳戶（not_found）：顯示錯誤與重新整理，不自己當成「準備中」；重新整理先呼叫 RefreshMyPaymentAccount 再讀',
+      '平台審核完成、讀不到收款帳戶（not_found）：顯示錯誤與重新整理，不自己當成「準備中」；重新整理只重讀，不呼叫 RefreshMyPaymentAccount',
       (tester) async {
         final server = _Server();
         await _pump(tester, server);
@@ -285,7 +386,7 @@ void main() {
         server.calls.clear();
         await tester.tap(find.text('重新整理'));
         await tester.pumpAndSettle();
-        expect(server.calls.first, 'refreshMyPaymentAccount');
+        expect(server.calls, isNot(contains('refreshMyPaymentAccount')));
         expect(server.calls, contains('getMyOnboarding'));
         expect(server.calls, contains('getMyPaymentAccount'));
       },
@@ -293,6 +394,7 @@ void main() {
 
     testWidgets('已啟用但撥款還沒啟用：多一行撥款提醒', (tester) async {
       final server = _Server()
+        ..summary = completedSummary()
         ..payment = PaymentAccount(
           status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED,
           payoutsActive: false,
@@ -300,21 +402,7 @@ void main() {
       await _pump(tester, server);
 
       expect(_in('kyc_payment_account', '已啟用'), findsOneWidget);
-      expect(find.text('收款已啟用。'), findsOneWidget);
       expect(find.text('撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。'), findsOneWidget);
-    });
-
-    testWidgets('無法啟用：動作是聯絡客服，進幫助中心', (tester) async {
-      final server = _Server()
-        ..payment = PaymentAccount(
-          status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED,
-        );
-      await _pump(tester, server);
-
-      expect(_in('kyc_payment_account', '無法啟用'), findsOneWidget);
-      await tester.tap(find.text('聯絡客服'));
-      await tester.pumpAndSettle();
-      expect(find.text('help'), findsOneWidget);
     });
 
     testWidgets('讀取失敗或不認得的狀態：顯示錯誤與重新整理，不當成任何有效狀態', (tester) async {
@@ -333,30 +421,10 @@ void main() {
     });
   });
 
-  group('重新整理與回到前景', () {
-    testWidgets('「重新整理」重讀失敗：照樣讀，並顯示伺服器的句子', (tester) async {
-      final server = _Server()
-        ..payment = PaymentAccount(
-          status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW,
-        )
-        ..refreshFailure = reasonError(
-          Code.failedPrecondition,
-          'PAYMENT_NOT_CONFIGURED',
-          message: '尚未設定收款',
-        );
-      await _pump(tester, server);
-      server.calls.clear();
-
-      await tester.tap(find.byKey(const Key('payment_account_refresh')));
-      await tester.pumpAndSettle();
-
-      expect(server.calls.first, 'refreshMyPaymentAccount');
-      expect(server.calls, contains('getMyOnboarding'));
-      expect(find.text('尚未設定收款'), findsOneWidget);
-      await tester.pumpAndSettle(const Duration(seconds: 5));
-    });
-
-    testWidgets('一般回前景不呼叫 RefreshMyPaymentAccount', (tester) async {
+  group('自動重讀', () {
+    testWidgets('進入畫面：任務還沒完成就先 RefreshMyPaymentAccount 再讀摘要與帳戶，一次', (
+      tester,
+    ) async {
       final server = _Server()
         ..payment = PaymentAccount(
           status: _actionRequired,
@@ -364,10 +432,60 @@ void main() {
         );
       await _pump(tester, server);
 
+      expect(server.refreshCalls, 1);
+      expect(
+        server.calls.indexOf('refreshMyPaymentAccount'),
+        lessThan(server.calls.lastIndexOf('getMyOnboarding')),
+      );
+      expect(server.calls, contains('getMyPaymentAccount'));
+    });
+
+    testWidgets('進入畫面：任務已完成或鎖住不呼叫 RefreshMyPaymentAccount', (tester) async {
+      for (final summary in [completedSummary(), reviewPendingSummary()]) {
+        final server = _Server()
+          ..summary = summary
+          ..payment = PaymentAccount(
+            status: PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED,
+            payoutsActive: true,
+          );
+        await _pump(tester, server);
+        expect(server.refreshCalls, 0);
+      }
+    });
+
+    testWidgets('進入畫面的重讀失敗（resource_exhausted、permission_denied）：不顯示，照常讀', (
+      tester,
+    ) async {
+      for (final code in [Code.resourceExhausted, Code.permissionDenied]) {
+        final server = _Server()
+          ..payment = PaymentAccount(
+            status: _actionRequired,
+            onboardingSurface: _hosted,
+          )
+          ..refreshFailure = reasonError(code, 'X', message: '不該出現的句子');
+        await _pump(tester, server);
+
+        expect(server.refreshCalls, 1);
+        expect(find.text('不該出現的句子'), findsNothing);
+        expect(_in('kyc_payment_account', '待設定'), findsOneWidget);
+      }
+    });
+
+    testWidgets('回前景：任務還沒完成就 RefreshMyPaymentAccount 再讀', (tester) async {
+      final server = _Server()
+        ..payment = PaymentAccount(
+          status: _actionRequired,
+          onboardingSurface: _hosted,
+        );
+      await _pump(tester, server);
+      server.calls.clear();
+      final before = server.refreshCalls;
+
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
 
-      expect(server.refreshCalls, 0);
+      expect(server.refreshCalls, before + 1);
+      expect(server.calls.first, 'refreshMyPaymentAccount');
       expect(server.calls, contains('getMyOnboarding'));
     });
 
@@ -385,7 +503,6 @@ void main() {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
 
-      expect(server.refreshCalls, 1);
       expect(server.calls.first, 'refreshMyPaymentAccount');
       expect(
         server.calls.skip(1),
@@ -393,7 +510,7 @@ void main() {
       );
     });
 
-    testWidgets('從外部瀏覽器回來而重讀失敗：照樣讀，並顯示伺服器的句子', (tester) async {
+    testWidgets('從外部瀏覽器回來而重讀失敗：照樣讀，不顯示錯誤', (tester) async {
       final server = _Server()
         ..payment = PaymentAccount(
           status: _actionRequired,
@@ -414,25 +531,8 @@ void main() {
 
       expect(server.calls.first, 'refreshMyPaymentAccount');
       expect(server.calls, contains('getMyOnboarding'));
-      expect(find.text('尚未設定收款'), findsOneWidget);
+      expect(find.text('尚未設定收款'), findsNothing);
       await tester.pumpAndSettle(const Duration(seconds: 5));
-    });
-
-    testWidgets('AppLifecycleState.resumed 重讀收款帳戶（GetMyPaymentAccount）與開通摘要', (
-      tester,
-    ) async {
-      final server = _Server()
-        ..payment = PaymentAccount(
-          status: _actionRequired,
-          onboardingSurface: _hosted,
-        );
-      await _pump(tester, server);
-      final before = server.paymentCalls;
-
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pumpAndSettle();
-
-      expect(server.paymentCalls, greaterThan(before));
     });
 
     testWidgets('從外部瀏覽器回來後，畫面顯示重讀到的新狀態', (tester) async {

@@ -1,7 +1,9 @@
 "use client";
 
-import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
-import type { PaymentAccount } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import type {
+	GetMyOnboardingResponse,
+	PaymentAccount,
+} from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { useQuery } from "@tanstack/react-query";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
@@ -20,6 +22,7 @@ import { fetchOrders } from "@/lib/orders/repo";
 import type { Order } from "@/lib/orders/types";
 import { queryKeys } from "@/lib/query/keys";
 import { CERT_PAGE_HREF, useCertGate } from "@/lib/seller/cert-gate";
+import { paymentAccountTask } from "@/lib/seller/onboarding-summary";
 import {
 	paymentAccountCopy,
 	paymentAccountTone,
@@ -73,12 +76,16 @@ export default function WalletClient() {
 			) : (
 				<>
 					{cert.paymentAccountCompleted ? null : paymentAccount ? (
-						<StatusPanel account={paymentAccount} />
+						<StatusPanel
+							account={paymentAccount}
+							onboarding={cert.onboarding}
+						/>
 					) : (
 						<SellerCertGate
 							application={cert.application}
 							platformReviewCompleted={cert.platformReviewCompleted}
 							paymentAccount={paymentAccount}
+							onboarding={cert.onboarding}
 							subject="啟用錢包與收款"
 						/>
 					)}
@@ -108,22 +115,22 @@ function formatTwd(amount: number | undefined): string {
 	})}`;
 }
 
-const CONTACT_HREF = "/contact";
-
 /**
- * 平台審核已核准、收款帳戶還不能收款的賣家看到的狀態面板（唯讀）。標題、說明與動作文字都是共用文案目錄的文字；
- * 不顯示金流商的待補條件細項（金流商自己的頁面會列出要補什麼）。動作：能開通或補件的狀態去商家認證頁，
- * 無法啟用的狀態去聯絡客服，其餘（準備中、審核中）去商家認證頁重新整理。
+ * 平台審核已核准、收款帳戶還不能收款的賣家看到的狀態面板（唯讀）。標題是共用文案目錄的狀態徽章，說明句是開通摘要
+ * 收款帳戶任務的句子；不顯示金流商的待補條件細項（金流商自己的頁面會列出要補什麼）。只導向認證頁，下一步在那裡。
  */
-function StatusPanel({ account }: { account: PaymentAccount }) {
+function StatusPanel({
+	account,
+	onboarding,
+}: {
+	account: PaymentAccount;
+	onboarding: GetMyOnboardingResponse | null;
+}) {
 	const ut = useUiText();
 	const copy = paymentAccountCopy(ut, account);
+	const sentence = paymentAccountTask(onboarding)?.status?.message;
 	const tone = paymentAccountTone(account.status);
 	const alert = tone === "warning" || tone === "danger";
-	const actionHref =
-		account.status === PaymentAccountStatus.DISABLED
-			? CONTACT_HREF
-			: CERT_PAGE_HREF;
 	return (
 		<section
 			className={
@@ -136,12 +143,10 @@ function StatusPanel({ account }: { account: PaymentAccount }) {
 				{alert ? <StatusAlertIcon /> : <StatusClockIcon />}
 			</span>
 			{copy.badge ? <h2>{copy.badge}</h2> : null}
-			{copy.description ? <p>{copy.description}</p> : null}
-			{copy.action ? (
-				<Button href={actionHref} variant="bordered" size="sm">
-					{copy.action}
-				</Button>
-			) : null}
+			{sentence ? <p>{sentence}</p> : null}
+			<Button href={CERT_PAGE_HREF} variant="bordered" size="sm">
+				前往商家認證
+			</Button>
 		</section>
 	);
 }

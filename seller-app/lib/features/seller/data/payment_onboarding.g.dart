@@ -109,21 +109,27 @@ final class ExternalBrowserLauncherProvider
 String _$externalBrowserLauncherHash() =>
     r'6ab8c083515890c713d21dc29e6b84f60b96893c';
 
-/// 收款帳戶的開通與回到前景時的重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
+/// 收款帳戶的開通與自動重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
 /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面
 /// 還在都會以 `fresh: true` 重讀一次（畫面各自的回前景重讀走 [onResumed]，不會重複消耗記號）。
+///
+/// `RefreshMyPaymentAccount` 是背景動作：失敗（含 `resource_exhausted`、停權的 `permission_denied`）不顯示，也不擋讀開通摘要。
 
 @ProviderFor(PaymentOnboarding)
 final paymentOnboardingProvider = PaymentOnboardingProvider._();
 
-/// 收款帳戶的開通與回到前景時的重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
+/// 收款帳戶的開通與自動重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
 /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面
 /// 還在都會以 `fresh: true` 重讀一次（畫面各自的回前景重讀走 [onResumed]，不會重複消耗記號）。
+///
+/// `RefreshMyPaymentAccount` 是背景動作：失敗（含 `resource_exhausted`、停權的 `permission_denied`）不顯示，也不擋讀開通摘要。
 final class PaymentOnboardingProvider
-    extends $NotifierProvider<PaymentOnboarding, PaymentRefreshFailure?> {
-  /// 收款帳戶的開通與回到前景時的重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
+    extends $NotifierProvider<PaymentOnboarding, void> {
+  /// 收款帳戶的開通與自動重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
   /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面
   /// 還在都會以 `fresh: true` 重讀一次（畫面各自的回前景重讀走 [onResumed]，不會重複消耗記號）。
+  ///
+  /// `RefreshMyPaymentAccount` 是背景動作：失敗（含 `resource_exhausted`、停權的 `permission_denied`）不顯示，也不擋讀開通摘要。
   PaymentOnboardingProvider._()
     : super(
         from: null,
@@ -143,32 +149,33 @@ final class PaymentOnboardingProvider
   PaymentOnboarding create() => PaymentOnboarding();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(PaymentRefreshFailure? value) {
+  Override overrideWithValue(void value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<PaymentRefreshFailure?>(value),
+      providerOverride: $SyncValueProvider<void>(value),
     );
   }
 }
 
-String _$paymentOnboardingHash() => r'8381f9e8f9e03c5d3315ff012b05d129672468e7';
+String _$paymentOnboardingHash() => r'7d2effc3901245fdb2c0199356ffb7e191d94904';
 
-/// 收款帳戶的開通與回到前景時的重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
+/// 收款帳戶的開通與自動重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
 /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面
 /// 還在都會以 `fresh: true` 重讀一次（畫面各自的回前景重讀走 [onResumed]，不會重複消耗記號）。
+///
+/// `RefreshMyPaymentAccount` 是背景動作：失敗（含 `resource_exhausted`、停權的 `permission_denied`）不顯示，也不擋讀開通摘要。
 
-abstract class _$PaymentOnboarding extends $Notifier<PaymentRefreshFailure?> {
-  PaymentRefreshFailure? build();
+abstract class _$PaymentOnboarding extends $Notifier<void> {
+  void build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref =
-        this.ref as $Ref<PaymentRefreshFailure?, PaymentRefreshFailure?>;
+    final ref = this.ref as $Ref<void, void>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<PaymentRefreshFailure?, PaymentRefreshFailure?>,
-              PaymentRefreshFailure?,
+              AnyNotifier<void, void>,
+              void,
               Object?,
               Object?
             >;

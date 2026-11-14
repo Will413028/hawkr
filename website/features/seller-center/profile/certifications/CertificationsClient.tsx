@@ -118,7 +118,10 @@ import {
 	saveKycDraft,
 	submitKyc,
 } from "@/lib/seller/kyc";
-import { platformReviewCompleted } from "@/lib/seller/onboarding-summary";
+import {
+	paymentAccountTask,
+	platformReviewCompleted,
+} from "@/lib/seller/onboarding-summary";
 import { fetchMyStore, updateMyStore } from "@/lib/seller/repo";
 import { isStoreCertified, type MyStore } from "@/lib/seller/store";
 import {
@@ -1082,6 +1085,7 @@ export default function CertificationsClient() {
 				/>
 				<PaymentAccountSection
 					platformApproved={platformApproved}
+					task={paymentAccountTask(onboarding)}
 					summary={{
 						loading: onboardingLoading,
 						error: onboarding ? null : onboardingError,

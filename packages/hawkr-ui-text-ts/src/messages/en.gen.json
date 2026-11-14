@@ -61,20 +61,7 @@
       "PAYMENT_ACCOUNT_STATUS_DISABLED": "Unavailable",
       "PAYMENT_ACCOUNT_STATUS_ENABLED": "Active",
       "PAYMENT_ACCOUNT_STATUS_NOT_CREATED": "Preparing",
-      "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "Under review",
-      "action": {
-        "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "Go to payout account setup",
-        "PAYMENT_ACCOUNT_STATUS_DISABLED": "Contact support",
-        "PAYMENT_ACCOUNT_STATUS_NOT_CREATED": "Refresh",
-        "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "Refresh"
-      },
-      "description": {
-        "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it.",
-        "PAYMENT_ACCOUNT_STATUS_DISABLED": "The payment provider cannot enable your payout account right now. Please contact support.",
-        "PAYMENT_ACCOUNT_STATUS_ENABLED": "Payments are enabled.",
-        "PAYMENT_ACCOUNT_STATUS_NOT_CREATED": "We are setting up your payout account. This usually takes a few minutes.",
-        "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "The payment provider is reviewing your information. No action is needed."
-      }
+      "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "Under review"
     },
     "RequirementCollection": {
       "REQUIREMENT_COLLECTION_PLATFORM": "Embedded on platform",
@@ -168,7 +155,6 @@
       "button": {
         "ONBOARDING_ACTION_CONTACT_SUPPORT": "Contact support",
         "ONBOARDING_ACTION_EDIT_PROFILE": "Go to settings",
-        "ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT": "Refresh",
         "ONBOARDING_ACTION_START_PAYMENT_ONBOARDING": "Go to payout account setup",
         "ONBOARDING_ACTION_SUBMIT_CERTIFICATION": "Go to seller verification"
       }

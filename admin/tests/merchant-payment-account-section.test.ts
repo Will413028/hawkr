@@ -116,7 +116,7 @@ test("重新整理：回應的帳戶直接寫進快取（不再讀一次）、no
 	assert.doesNotMatch(bodyText(), /before_refresh/);
 	assert.deepEqual(notices, [
 		null,
-		{ tone: "success", text: sectionModule.REFRESH_QUEUED_TEXT },
+		{ tone: "success", text: sectionModule.REFRESHED_TEXT },
 	]);
 	assert.equal(queueInvalidated(), true);
 	assert.equal(

@@ -61,7 +61,7 @@
       "description": "開通任務收款帳戶的狀態句：帳戶還沒有建立完成（NOT_CREATED，或還沒有帳戶列；IN_PROGRESS）。"
     },
     "onboarding.payment_account.syncing": {
-      "message": "收款帳戶的狀態正在更新，請稍後重新整理。",
+      "message": "收款帳戶的狀態正在更新，請稍後再查看。",
       "description": "開通任務收款帳戶的狀態句：帳戶讀到已啟用，但 seller 的副本還沒有更新（IN_PROGRESS）。"
     },
     "onboarding.payment_account.under_review": {

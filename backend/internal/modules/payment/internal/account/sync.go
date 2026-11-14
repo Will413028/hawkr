@@ -245,7 +245,9 @@ func (s *Service) RetryCreate(ctx context.Context, storeID int64) (model.Payment
 }
 
 // CreateOnboardingSession 為店家的帳戶產生開通 session（託管連結或內嵌元件）。外部呼叫在 transaction 外。帳戶還沒有外部 ID 回 FailedPrecondition。
-func (s *Service) CreateOnboardingSession(ctx context.Context, storeID int64, returnURL, refreshURL string) (model.OnboardingSession, error) {
+// 介面由帳戶列的收件方式決定；列是內嵌介面而呼叫端無法內嵌（canEmbed 為 false）時，前置條件照常檢查、不呼叫 provider，
+// 回 CompleteOnWebsite 的 session（內嵌介面，其餘欄位空），由呼叫端引導到網站完成。
+func (s *Service) CreateOnboardingSession(ctx context.Context, storeID int64, returnURL, refreshURL string, canEmbed bool) (model.OnboardingSession, error) {
 	if s.d.Provider == nil {
 		return model.OnboardingSession{}, apperr.FailedPrecondition("尚未設定收款開通")
 	}
@@ -259,15 +261,12 @@ func (s *Service) CreateOnboardingSession(ctx context.Context, storeID int64, re
 	if err != nil {
 		return model.OnboardingSession{}, err
 	}
-	if row.PurgePendingAt != nil {
-		return model.OnboardingSession{}, apperr.FailedPrecondition("收款帳戶正在關閉")
+	acct, completeOnWebsite, err := planSession(row, s.d.Provider.Name(), canEmbed)
+	if err != nil {
+		return model.OnboardingSession{}, err
 	}
-	acct := ToModel(row)
-	if acct.ExternalAccountID == nil || acct.Provider != s.d.Provider.Name() {
-		return model.OnboardingSession{}, apperr.FailedPrecondition("收款帳戶還沒有建立")
-	}
-	if acct.Status == model.PaymentDisabled {
-		return model.OnboardingSession{}, apperr.FailedPrecondition("收款帳戶已被金流商停用")
+	if completeOnWebsite {
+		return model.OnboardingSession{Surface: model.SurfaceEmbedded, CompleteOnWebsite: true}, nil
 	}
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
@@ -276,4 +275,29 @@ func (s *Service) CreateOnboardingSession(ctx context.Context, storeID int64, re
 		return model.OnboardingSession{}, apperr.FailedPrecondition("目前無法開通收款帳戶")
 	}
 	return session, err
+}
+
+// planSession 決定開通 session 怎麼產生：前置條件一律先檢查；介面取自帳戶列的收件方式，列是內嵌介面而呼叫端不能內嵌時
+// completeOnWebsite 為 true（不呼叫 provider，由呼叫端引導到網站完成）。
+func planSession(row store.PaymentAccount, providerName string, canEmbed bool) (acct model.PaymentAccount, completeOnWebsite bool, err error) {
+	acct, err = sessionTarget(row, providerName)
+	if err != nil {
+		return model.PaymentAccount{}, false, err
+	}
+	return acct, !canEmbed && model.SurfaceOf(acct.RequirementCollection) == model.SurfaceEmbedded, nil
+}
+
+// sessionTarget 檢查帳戶列可以開通 session 的前置條件（沒有在關閉、已有同 provider 的外部帳戶、沒有被停用）。
+func sessionTarget(row store.PaymentAccount, providerName string) (model.PaymentAccount, error) {
+	if row.PurgePendingAt != nil {
+		return model.PaymentAccount{}, apperr.FailedPrecondition("收款帳戶正在關閉")
+	}
+	acct := ToModel(row)
+	if acct.ExternalAccountID == nil || acct.Provider != providerName {
+		return model.PaymentAccount{}, apperr.FailedPrecondition("收款帳戶還沒有建立")
+	}
+	if acct.Status == model.PaymentDisabled {
+		return model.PaymentAccount{}, apperr.FailedPrecondition("收款帳戶已被金流商停用")
+	}
+	return acct, nil
 }

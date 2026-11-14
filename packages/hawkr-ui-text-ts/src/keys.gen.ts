@@ -55,15 +55,6 @@ export type UiTextKey =
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
-	| "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
-	| "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED"
-	| "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_NOT_CREATED"
-	| "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
-	| "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
-	| "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_DISABLED"
-	| "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED"
-	| "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_NOT_CREATED"
-	| "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
 	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM"
 	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER"
 	| "seller.ContentKind.CONTENT_KIND_COMMENT"
@@ -125,7 +116,6 @@ export type UiTextKey =
 	| "seller.MeasureState.MEASURE_STATE_SCHEDULED"
 	| "seller.OnboardingAction.button.ONBOARDING_ACTION_CONTACT_SUPPORT"
 	| "seller.OnboardingAction.button.ONBOARDING_ACTION_EDIT_PROFILE"
-	| "seller.OnboardingAction.button.ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT"
 	| "seller.OnboardingAction.button.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING"
 	| "seller.OnboardingAction.button.ONBOARDING_ACTION_SUBMIT_CERTIFICATION"
 	| "seller.OnboardingTaskId.description.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT"
@@ -297,35 +287,6 @@ const PAYMENT_PAYMENT_ACCOUNT_STATUS: Readonly<Partial<Record<number, UiTextKey>
 /** payment.PaymentAccountStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
 export function paymentPaymentAccountStatus(v: PaymentAccountStatus): UiMessage | undefined {
 	const key = PAYMENT_PAYMENT_ACCOUNT_STATUS[v];
-	if (key === undefined) return undefined;
-	return { key };
-}
-
-const PAYMENT_PAYMENT_ACCOUNT_STATUS_ACTION: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_NOT_CREATED",
-	2: "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW",
-	3: "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED",
-	5: "payment.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED",
-};
-
-/** payment.PaymentAccountStatus.action；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
-export function paymentPaymentAccountStatusAction(v: PaymentAccountStatus): UiMessage | undefined {
-	const key = PAYMENT_PAYMENT_ACCOUNT_STATUS_ACTION[v];
-	if (key === undefined) return undefined;
-	return { key };
-}
-
-const PAYMENT_PAYMENT_ACCOUNT_STATUS_DESCRIPTION: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_NOT_CREATED",
-	2: "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW",
-	3: "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED",
-	4: "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED",
-	5: "payment.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_DISABLED",
-};
-
-/** payment.PaymentAccountStatus.description；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
-export function paymentPaymentAccountStatusDescription(v: PaymentAccountStatus): UiMessage | undefined {
-	const key = PAYMENT_PAYMENT_ACCOUNT_STATUS_DESCRIPTION[v];
 	if (key === undefined) return undefined;
 	return { key };
 }
@@ -578,8 +539,7 @@ const SELLER_ONBOARDING_ACTION_BUTTON: Readonly<Partial<Record<number, UiTextKey
 	2: "seller.OnboardingAction.button.ONBOARDING_ACTION_EDIT_PROFILE",
 	3: "seller.OnboardingAction.button.ONBOARDING_ACTION_SUBMIT_CERTIFICATION",
 	4: "seller.OnboardingAction.button.ONBOARDING_ACTION_START_PAYMENT_ONBOARDING",
-	5: "seller.OnboardingAction.button.ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT",
-	6: "seller.OnboardingAction.button.ONBOARDING_ACTION_CONTACT_SUPPORT",
+	5: "seller.OnboardingAction.button.ONBOARDING_ACTION_CONTACT_SUPPORT",
 };
 
 /** seller.OnboardingAction.button；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */

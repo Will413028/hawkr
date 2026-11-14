@@ -25,10 +25,8 @@ import type { SellerOnboardingTaskId } from "./dashboardUiStore";
 
 export type OnboardingTaskGroup = "required" | "recommended";
 
-/** 任務的下一步：換頁，或在原地重讀收款帳戶（`RefreshMyPaymentAccount`）。 */
-export type OnboardingNext =
-	| { kind: "link"; href: string; label: string }
-	| { kind: "refresh"; label: string };
+/** 任務的下一步：換頁。 */
+export type OnboardingNext = { kind: "link"; href: string; label: string };
 
 export interface OnboardingTask {
 	id: SellerOnboardingTaskId;
@@ -78,8 +76,6 @@ function nextOf(
 			return { kind: "link", href: CERT_PAGE_HREF, label };
 		case OnboardingAction.CONTACT_SUPPORT:
 			return { kind: "link", href: CONTACT_HREF, label };
-		case OnboardingAction.REFRESH_PAYMENT_ACCOUNT:
-			return { kind: "refresh", label };
 		default:
 			return undefined;
 	}

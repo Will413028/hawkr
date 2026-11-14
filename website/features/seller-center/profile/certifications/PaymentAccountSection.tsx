@@ -3,11 +3,14 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { errorText } from "@hawkr/api/connect/errors";
+import { OnboardingSurface } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import {
-	OnboardingSurface,
-	PaymentAccountStatus,
-} from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
-import type { PaymentAccount } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+	OnboardingAction,
+	type OnboardingTask,
+	OnboardingTaskState,
+	type PaymentAccount,
+} from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import { sellerOnboardingActionButton } from "@hawkr/ui-text/keys";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import * as React from "react";
@@ -17,13 +20,16 @@ import {
 	useMyPaymentAccount,
 	useRefreshPaymentAccount,
 } from "@/lib/hooks/useSellerSelf";
-import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
+import {
+	optionalText,
+	useDefaultErrorText,
+	useUiText,
+} from "@/lib/i18n/ui-text";
 import { useRoutedLocale } from "@/lib/intl/routed-locale";
 import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 import {
 	CONTACT_HREF,
 	createPaymentOnboardingSession,
-	paymentAccountCanOnboard,
 	paymentAccountCopy,
 	paymentAccountTone,
 } from "@/lib/seller/payment-account";
@@ -46,14 +52,18 @@ function formatUpdated(account: PaymentAccount): string | null {
 
 /**
  * 「收款帳戶」區（D15）：平台審核核准（`platformApproved`）之前是灰色的提示；核准之後依 `GetMyPaymentAccount`
- * 顯示共用文案目錄的狀態、說明與動作，並開始開通（託管頁面導頁、內嵌元件展開）。
+ * 顯示共用文案目錄的狀態徽章；說明句與按鈕只讀開通摘要的收款帳戶任務（`task`），不由帳戶狀態推導。開始開通
+ * （託管頁面導頁、內嵌元件展開）。進入頁面時自動重讀一次收款帳戶（失敗不顯示）。
  * 不顯示金流商的待補條件細項：金流商自己的頁面或元件會列出要補什麼。
  */
 export function PaymentAccountSection({
 	platformApproved,
+	task,
 	summary,
 }: {
 	platformApproved: boolean;
+	/** 開通摘要的收款帳戶任務；還沒讀到是 undefined。 */
+	task: OnboardingTask | undefined;
 	/** 開通摘要（`useMyOnboarding`）的載入與錯誤狀態：讀失敗時不能判斷平台審核，顯示錯誤而不是「尚未開放」。 */
 	summary: {
 		loading: boolean;
@@ -110,14 +120,16 @@ export function PaymentAccountSection({
 		[createSession],
 	);
 
-	// 從金流商回來與狀態按鈕是同一條路徑：先同步重讀，再重新讀開通摘要與帳戶。
+	// 從金流商回來：先同步重讀（失敗不顯示），再重新讀開通摘要與帳戶。
+	const autoRefreshedRef = React.useRef(false);
 	const confirm = React.useCallback(async () => {
+		autoRefreshedRef.current = true;
 		setConfirming(true);
 		setFailure(null);
 		try {
 			await refreshPaymentAccount();
-		} catch (error) {
-			setFailure({ error });
+		} catch {
+			// 重讀失敗不顯示。
 		} finally {
 			setConfirming(false);
 		}
@@ -128,6 +140,7 @@ export function PaymentAccountSection({
 		if (!platformApproved || !param || handledRef.current) return;
 		if (param === "refresh" && !account) return;
 		handledRef.current = true;
+		autoRefreshedRef.current = true;
 		window.history.replaceState(null, "", window.location.pathname);
 		if (param === "return") {
 			void confirm();
@@ -135,6 +148,29 @@ export function PaymentAccountSection({
 			void begin(account.onboardingSurface);
 		}
 	}, [platformApproved, param, account, confirm, begin]);
+
+	// 進入頁面：任務還沒完成（也不是鎖住）時同步重讀一次，背景進行；沒有 query 的進入才做（回跳另有 confirm）。
+	const taskState = task?.state;
+	React.useEffect(() => {
+		if (!platformApproved || summary.loading || autoRefreshedRef.current) {
+			return;
+		}
+		if (
+			param ||
+			taskState === OnboardingTaskState.COMPLETED ||
+			taskState === OnboardingTaskState.LOCKED
+		) {
+			return;
+		}
+		autoRefreshedRef.current = true;
+		refreshPaymentAccount().catch(() => {});
+	}, [
+		platformApproved,
+		summary.loading,
+		param,
+		taskState,
+		refreshPaymentAccount,
+	]);
 
 	const copy = account ? paymentAccountCopy(ut, account) : null;
 	const tone = account ? paymentAccountTone(account.status) : undefined;
@@ -184,8 +220,9 @@ export function PaymentAccountSection({
 		);
 	}
 
-	const canOnboard = account ? paymentAccountCanOnboard(account) : false;
-	const disabled = account?.status === PaymentAccountStatus.DISABLED;
+	const actionLabel = task
+		? optionalText(ut, sellerOnboardingActionButton(task.action))
+		: undefined;
 
 	return (
 		<section
@@ -213,39 +250,28 @@ export function PaymentAccountSection({
 				<>
 					<div className={`seller-cert__status is-${tone ?? "neutral"}`}>
 						<strong>{copy.badge}</strong>
-						{copy.description ? <p>{copy.description}</p> : null}
+						{task?.status?.message ? <p>{task.status.message}</p> : null}
 						{copy.payoutsNote ? <p>{copy.payoutsNote}</p> : null}
 					</div>
-					{copy.action ? (
-						disabled ? (
-							<Button href={CONTACT_HREF} variant="bordered" size="sm">
-								{copy.action}
-							</Button>
-						) : canOnboard ? (
-							<Button
-								size="sm"
-								isLoading={busy}
-								loadingLabel="開啟設定中…"
-								disabled={busy || embedded !== null}
-								onClick={() =>
-									void begin(
-										account?.onboardingSurface ?? OnboardingSurface.UNSPECIFIED,
-									)
-								}
-							>
-								{copy.action}
-							</Button>
-						) : account?.status ===
-							PaymentAccountStatus.ACTION_REQUIRED ? null : (
-							<Button
-								variant="bordered"
-								size="sm"
-								disabled={confirming}
-								onClick={() => void confirm()}
-							>
-								{copy.action}
-							</Button>
-						)
+					{task?.action === OnboardingAction.CONTACT_SUPPORT && actionLabel ? (
+						<Button href={CONTACT_HREF} variant="bordered" size="sm">
+							{actionLabel}
+						</Button>
+					) : task?.action === OnboardingAction.START_PAYMENT_ONBOARDING &&
+						actionLabel ? (
+						<Button
+							size="sm"
+							isLoading={busy}
+							loadingLabel="開啟設定中…"
+							disabled={busy || embedded !== null}
+							onClick={() =>
+								void begin(
+									account?.onboardingSurface ?? OnboardingSurface.UNSPECIFIED,
+								)
+							}
+						>
+							{actionLabel}
+						</Button>
 					) : null}
 					{account && formatUpdated(account) ? (
 						<small>上次更新 {formatUpdated(account)}</small>

@@ -127,6 +127,7 @@ export default function ShippingClient() {
 					application={certGate.application}
 					platformReviewCompleted={certGate.platformReviewCompleted}
 					paymentAccount={certGate.paymentAccount}
+					onboarding={certGate.onboarding}
 					subject="設定物流與退貨"
 				/>
 			) : gate !== "open" ? (

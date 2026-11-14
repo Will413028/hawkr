@@ -514,7 +514,7 @@ const (
 	OnboardingTaskState_ONBOARDING_TASK_STATE_COMPLETED OnboardingTaskState = 1
 	// 需要賣家動作；action 說明下一步。
 	OnboardingTaskState_ONBOARDING_TASK_STATE_ACTION_REQUIRED OnboardingTaskState = 2
-	// 進行中，賣家沒有要做的事（等平台或金流商）；action 可能是重新整理。
+	// 進行中，賣家沒有要做的事（等平台或金流商）；action 是 NONE。
 	OnboardingTaskState_ONBOARDING_TASK_STATE_IN_PROGRESS OnboardingTaskState = 3
 	// 前一項還沒完成，這一項尚未開放。
 	OnboardingTaskState_ONBOARDING_TASK_STATE_LOCKED OnboardingTaskState = 4
@@ -582,10 +582,8 @@ const (
 	OnboardingAction_ONBOARDING_ACTION_SUBMIT_CERTIFICATION OnboardingAction = 3
 	// 開始（或繼續）金流商的收款帳戶設定：呼叫 CreatePaymentOnboardingSession。
 	OnboardingAction_ONBOARDING_ACTION_START_PAYMENT_ONBOARDING OnboardingAction = 4
-	// 重新整理收款帳戶的狀態：呼叫 RefreshMyPaymentAccount，再呼叫 GetMyOnboarding。
-	OnboardingAction_ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT OnboardingAction = 5
 	// 聯絡客服：問題無法由賣家自行解決。
-	OnboardingAction_ONBOARDING_ACTION_CONTACT_SUPPORT OnboardingAction = 6
+	OnboardingAction_ONBOARDING_ACTION_CONTACT_SUPPORT OnboardingAction = 5
 )
 
 // Enum value maps for OnboardingAction.
@@ -596,8 +594,7 @@ var (
 		2: "ONBOARDING_ACTION_EDIT_PROFILE",
 		3: "ONBOARDING_ACTION_SUBMIT_CERTIFICATION",
 		4: "ONBOARDING_ACTION_START_PAYMENT_ONBOARDING",
-		5: "ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT",
-		6: "ONBOARDING_ACTION_CONTACT_SUPPORT",
+		5: "ONBOARDING_ACTION_CONTACT_SUPPORT",
 	}
 	OnboardingAction_value = map[string]int32{
 		"ONBOARDING_ACTION_UNSPECIFIED":              0,
@@ -605,8 +602,7 @@ var (
 		"ONBOARDING_ACTION_EDIT_PROFILE":             2,
 		"ONBOARDING_ACTION_SUBMIT_CERTIFICATION":     3,
 		"ONBOARDING_ACTION_START_PAYMENT_ONBOARDING": 4,
-		"ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT":  5,
-		"ONBOARDING_ACTION_CONTACT_SUPPORT":          6,
+		"ONBOARDING_ACTION_CONTACT_SUPPORT":          5,
 	}
 )
 
@@ -4654,9 +4650,11 @@ func (x *CreatePaymentOnboardingSessionRequest) GetLocale() string {
 type CreatePaymentOnboardingSessionResponse struct {
 	state   protoimpl.MessageState      `protogen:"open.v1"`
 	Surface v1alpha11.OnboardingSurface `protobuf:"varint,1,opt,name=surface,proto3,enum=hawkr.payment.v1alpha1.OnboardingSurface" json:"surface,omitempty"`
-	// surface 是 HOSTED 時的開通連結（一次性、短效）。
+	// 要在瀏覽器開啟的網址：surface 是 HOSTED 時是金流商的一次性、短效開通連結；surface 是 EMBEDDED 而 destination 是 SELLER_APP 時是網站的認證頁
+	// （賣家在網頁完成開通；伺服器仍照常檢查前置條件，但不建立內嵌 session，client_secret、provider、publishable_key 是空字串）。
+	// surface 是 EMBEDDED 而 destination 是 WEBSITE_CERTIFICATION 時是空字串。surface 是帳戶實際的開通介面。
 	Url string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
-	// surface 是 EMBEDDED 時，初始化內嵌元件用的 client secret；只給這個賣家的瀏覽器，不記錄。
+	// surface 是 EMBEDDED 時（只在 destination 是 WEBSITE_CERTIFICATION），初始化內嵌元件用的 client secret；只給這個賣家的瀏覽器，不記錄。
 	ClientSecret string `protobuf:"bytes,3,opt,name=client_secret,json=clientSecret,proto3" json:"client_secret,omitempty"`
 	// surface 是 EMBEDDED 時，金流商的代碼（例如 stripe），client 依它選內嵌元件；其他情況是空字串。client 不認得的值視為不能開通。
 	Provider string `protobuf:"bytes,4,opt,name=provider,proto3" json:"provider,omitempty"`
@@ -7330,15 +7328,14 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"%ONBOARDING_TASK_STATE_ACTION_REQUIRED\x10\x02\x12%\n" +
 	"!ONBOARDING_TASK_STATE_IN_PROGRESS\x10\x03\x12 \n" +
 	"\x1cONBOARDING_TASK_STATE_LOCKED\x10\x04\x12!\n" +
-	"\x1dONBOARDING_TASK_STATE_UNKNOWN\x10\x05*\xa7\x02\n" +
+	"\x1dONBOARDING_TASK_STATE_UNKNOWN\x10\x05*\xf8\x01\n" +
 	"\x10OnboardingAction\x12!\n" +
 	"\x1dONBOARDING_ACTION_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16ONBOARDING_ACTION_NONE\x10\x01\x12\"\n" +
 	"\x1eONBOARDING_ACTION_EDIT_PROFILE\x10\x02\x12*\n" +
 	"&ONBOARDING_ACTION_SUBMIT_CERTIFICATION\x10\x03\x12.\n" +
-	"*ONBOARDING_ACTION_START_PAYMENT_ONBOARDING\x10\x04\x12-\n" +
-	")ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT\x10\x05\x12%\n" +
-	"!ONBOARDING_ACTION_CONTACT_SUPPORT\x10\x06*\xa3\x01\n" +
+	"*ONBOARDING_ACTION_START_PAYMENT_ONBOARDING\x10\x04\x12%\n" +
+	"!ONBOARDING_ACTION_CONTACT_SUPPORT\x10\x05*\xa3\x01\n" +
 	"\tKYCStatus\x12\x1a\n" +
 	"\x16KYC_STATUS_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10KYC_STATUS_DRAFT\x10\x01\x12\x18\n" +

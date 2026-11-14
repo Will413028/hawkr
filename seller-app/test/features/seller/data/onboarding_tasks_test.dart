@@ -47,13 +47,7 @@ void main() {
             title: '商店資料',
             status: '缺少：logo',
           ),
-          serverTask(
-            _review,
-            _inProgress,
-            action: OnboardingAction.ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT,
-            title: '平台審核',
-            status: '審核中',
-          ),
+          serverTask(_review, _inProgress, title: '平台審核', status: '審核中'),
           serverTask(_payment, _locked, title: '收款帳戶', status: '審核通過後開放'),
         ]),
       );
@@ -169,8 +163,6 @@ void main() {
             OnboardingStepTarget.certification,
         OnboardingAction.ONBOARDING_ACTION_CONTACT_SUPPORT:
             OnboardingStepTarget.support,
-        OnboardingAction.ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT:
-            OnboardingStepTarget.refreshPayment,
       };
       for (final entry in expected.entries) {
         final step = _required(

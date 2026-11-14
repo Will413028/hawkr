@@ -37,7 +37,7 @@ import type { usePaymentAccount } from "./use-store-detail";
 /** 錨點：審核待辦 PAYMENT_ACCOUNT_CREATE_FAILED 的連結帶這個 hash（queue-item.ts）。 */
 export const PAYMENT_ACCOUNT_ANCHOR = "payment-account";
 
-export const REFRESH_QUEUED_TEXT = "已排入重新讀取，稍後重新載入";
+export const REFRESHED_TEXT = "已重新整理";
 export const RETRY_QUEUED_TEXT = "已重新排入建立";
 
 const STATUS_VARIANT: Readonly<
@@ -256,7 +256,7 @@ export function PaymentAccountSection({
 		try {
 			const res = await refreshMutation.mutateAsync({ storeId });
 			writeAccount(res.account);
-			onNotice({ tone: "success", text: REFRESH_QUEUED_TEXT });
+			onNotice({ tone: "success", text: REFRESHED_TEXT });
 			invalidateQueue();
 			invalidateOnboarding();
 		} catch (caught) {

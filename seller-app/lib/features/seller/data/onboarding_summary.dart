@@ -20,6 +20,17 @@ OnboardingTaskState? onboardingTaskState(
   return null;
 }
 
+/// 摘要裡的收款帳戶任務（下一步的按鈕與說明句只讀它）；沒有摘要或沒有這個任務是 null。
+OnboardingTask? paymentAccountTask(GetMyOnboardingResponse? summary) {
+  if (summary == null) return null;
+  for (final task in summary.tasks) {
+    if (task.id == OnboardingTaskId.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT) {
+      return task;
+    }
+  }
+  return null;
+}
+
 /// 平台審核已完成（伺服器定義：商家認證核准）。沒有摘要或沒有這個任務是 false。
 bool platformReviewCompleted(GetMyOnboardingResponse? summary) =>
     onboardingTaskState(

@@ -389,7 +389,7 @@ class OnboardingTaskState extends $pb.ProtobufEnum {
       OnboardingTaskState._(
           2, _omitEnumNames ? '' : 'ONBOARDING_TASK_STATE_ACTION_REQUIRED');
 
-  /// 進行中，賣家沒有要做的事（等平台或金流商）；action 可能是重新整理。
+  /// 進行中，賣家沒有要做的事（等平台或金流商）；action 是 NONE。
   static const OnboardingTaskState ONBOARDING_TASK_STATE_IN_PROGRESS =
       OnboardingTaskState._(
           3, _omitEnumNames ? '' : 'ONBOARDING_TASK_STATE_IN_PROGRESS');
@@ -446,15 +446,10 @@ class OnboardingAction extends $pb.ProtobufEnum {
       OnboardingAction._(4,
           _omitEnumNames ? '' : 'ONBOARDING_ACTION_START_PAYMENT_ONBOARDING');
 
-  /// 重新整理收款帳戶的狀態：呼叫 RefreshMyPaymentAccount，再呼叫 GetMyOnboarding。
-  static const OnboardingAction ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT =
-      OnboardingAction._(
-          5, _omitEnumNames ? '' : 'ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT');
-
   /// 聯絡客服：問題無法由賣家自行解決。
   static const OnboardingAction ONBOARDING_ACTION_CONTACT_SUPPORT =
       OnboardingAction._(
-          6, _omitEnumNames ? '' : 'ONBOARDING_ACTION_CONTACT_SUPPORT');
+          5, _omitEnumNames ? '' : 'ONBOARDING_ACTION_CONTACT_SUPPORT');
 
   static const $core.List<OnboardingAction> values = <OnboardingAction>[
     ONBOARDING_ACTION_UNSPECIFIED,
@@ -462,12 +457,11 @@ class OnboardingAction extends $pb.ProtobufEnum {
     ONBOARDING_ACTION_EDIT_PROFILE,
     ONBOARDING_ACTION_SUBMIT_CERTIFICATION,
     ONBOARDING_ACTION_START_PAYMENT_ONBOARDING,
-    ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT,
     ONBOARDING_ACTION_CONTACT_SUPPORT,
   ];
 
   static final $core.List<OnboardingAction?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 6);
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
   static OnboardingAction? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

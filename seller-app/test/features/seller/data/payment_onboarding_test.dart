@@ -8,12 +8,13 @@ import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/testing.dart';
-import 'package:hawkr_api/transport.dart' show Code, ConnectException;
+import 'package:hawkr_api/transport.dart' show Code;
 import 'package:hawkr_seller/core/networking/connect_provider.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
 import 'package:hawkr_seller/features/seller/data/current_kyc.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
 import 'package:hawkr_seller/features/seller/data/my_store_repository.dart';
+import 'package:hawkr_seller/features/seller/data/onboarding_summary.dart';
 import 'package:hawkr_seller/features/seller/data/payment_account.dart';
 import 'package:hawkr_seller/features/seller/data/payment_onboarding.dart';
 import 'package:hawkr_seller/features/seller/data/seller_status_refresh.dart';
@@ -47,6 +48,9 @@ class _Server {
   final launched = <Uri>[];
   bool launchResult = true;
 
+  /// GetMyOnboarding 的回應。
+  GetMyOnboardingResponse summary = paymentPendingSummary();
+
   /// 第 n 次（從 1 起）GetMyPaymentAccount 要等的門。
   final gates = <int, Completer<void>>{};
   CreatePaymentOnboardingSessionResponse sessionResponse =
@@ -65,7 +69,7 @@ class _Server {
         .unary(SellerAppService.getMyOnboarding, (_, _) {
           summaryCalls++;
           calls.add('getMyOnboarding');
-          return paymentPendingSummary();
+          return summary;
         })
         .unary(SellerAppService.refreshMyPaymentAccount, (_, _) {
           refreshCalls++;
@@ -111,6 +115,7 @@ class _Server {
       container.listen(currentStoreProvider, (_, _) {}),
       container.listen(currentKycProvider, (_, _) {}),
       container.listen(currentPaymentAccountProvider, (_, _) {}),
+      container.listen(currentOnboardingProvider, (_, _) {}),
     ];
     for (final sub in subs) {
       addTearDown(sub.close);
@@ -137,7 +142,7 @@ void main() {
         );
       final container = server.container();
       expect(
-        await container.read(paymentOnboardingProvider.notifier).start(_hosted),
+        await container.read(paymentOnboardingProvider.notifier).start(),
         PaymentOnboardingOutcome.failed,
       );
       expect(server.launched, isEmpty);
@@ -151,7 +156,7 @@ void main() {
         );
       final container = server.container(allowInsecureUrl: true);
       expect(
-        await container.read(paymentOnboardingProvider.notifier).start(_hosted),
+        await container.read(paymentOnboardingProvider.notifier).start(),
         PaymentOnboardingOutcome.launched,
       );
       expect(server.launched.single.toString(), 'http://localhost:4242/setup');
@@ -165,7 +170,7 @@ void main() {
 
       final outcome = await container
           .read(paymentOnboardingProvider.notifier)
-          .start(_hosted);
+          .start();
 
       expect(outcome, PaymentOnboardingOutcome.launched);
       final request = server.sessions.single;
@@ -179,32 +184,26 @@ void main() {
       ]);
     });
 
-    test('EMBEDDED：App 沒有內嵌元件，不呼叫伺服器、不開瀏覽器，要到網頁版完成', () async {
-      final server = _Server();
+    test('帳戶用內嵌元件時伺服器回網站認證頁（介面是 EMBEDDED）：App 開那個連結，不依介面分支', () async {
+      final server = _Server()
+        ..sessionResponse = CreatePaymentOnboardingSessionResponse(
+          surface: _embedded,
+          url: 'https://www.example.test/seller-center/me/certifications',
+        );
       final container = server.container();
 
       final outcome = await container
           .read(paymentOnboardingProvider.notifier)
-          .start(_embedded);
+          .start();
 
-      expect(outcome, PaymentOnboardingOutcome.needsWeb);
-      expect(server.sessions, isEmpty);
-      expect(server.launched, isEmpty);
+      expect(outcome, PaymentOnboardingOutcome.launched);
+      expect(server.sessions, hasLength(1));
+      expect(server.launched, [
+        Uri.parse('https://www.example.test/seller-center/me/certifications'),
+      ]);
     });
 
-    test('沒有告知介面（UNSPECIFIED）：不猜預設介面，失敗', () async {
-      final server = _Server();
-      final container = server.container();
-
-      final outcome = await container
-          .read(paymentOnboardingProvider.notifier)
-          .start(OnboardingSurface.ONBOARDING_SURFACE_UNSPECIFIED);
-
-      expect(outcome, PaymentOnboardingOutcome.failed);
-      expect(server.sessions, isEmpty);
-    });
-
-    test('伺服器回的介面不是託管頁面或連結為空：失敗，不開瀏覽器', () async {
+    test('伺服器回的連結為空（不論介面）：失敗，不開瀏覽器', () async {
       final server = _Server()
         ..sessionResponse = CreatePaymentOnboardingSessionResponse(
           surface: _embedded,
@@ -212,7 +211,7 @@ void main() {
         );
       final container = server.container();
       expect(
-        await container.read(paymentOnboardingProvider.notifier).start(_hosted),
+        await container.read(paymentOnboardingProvider.notifier).start(),
         PaymentOnboardingOutcome.failed,
       );
 
@@ -220,19 +219,22 @@ void main() {
         surface: _hosted,
       );
       expect(
-        await container.read(paymentOnboardingProvider.notifier).start(_hosted),
+        await container.read(paymentOnboardingProvider.notifier).start(),
         PaymentOnboardingOutcome.failed,
       );
       expect(server.launched, isEmpty);
     });
 
     test('瀏覽器開不起來：失敗，之後回到前景不當成從瀏覽器回來', () async {
-      final server = _Server()..launchResult = false;
+      final server = _Server()
+        ..launchResult = false
+        ..summary = completedSummary();
       final container = server.container();
       await container.read(accountPaymentAccountProvider('acc-1').future);
+      await container.read(accountOnboardingProvider('acc-1').future);
       final notifier = container.read(paymentOnboardingProvider.notifier);
 
-      expect(await notifier.start(_hosted), PaymentOnboardingOutcome.failed);
+      expect(await notifier.start(), PaymentOnboardingOutcome.failed);
 
       final gate = Completer<void>();
       server.gates[server.paymentCalls + 1] = gate;
@@ -252,29 +254,53 @@ void main() {
   });
 
   group('onResumed：回到前景重讀', () {
-    test(
-      '重讀店家、認證流程、收款帳戶（GetMyPaymentAccount）與開通摘要，不呼叫 RefreshMyPaymentAccount',
-      () async {
-        final server = _Server();
+    test('一般回前景：任務還沒完成就先 RefreshMyPaymentAccount，再重讀收款帳戶與開通摘要', () async {
+      final server = _Server();
+      final container = server.container();
+      await container.read(accountPaymentAccountProvider('acc-1').future);
+      await container.read(accountOnboardingProvider('acc-1').future);
+      final before = server.paymentCalls;
+      final summaryBefore = server.summaryCalls;
+      server.calls.clear();
+
+      await container.read(paymentOnboardingProvider.notifier).onResumed();
+
+      expect(server.refreshCalls, 1);
+      expect(server.calls.first, 'refreshMyPaymentAccount');
+      expect(server.paymentCalls, before + 1);
+      expect(server.summaryCalls, summaryBefore + 1);
+    });
+
+    test('一般回前景：收款帳戶任務已完成或鎖住就不呼叫 RefreshMyPaymentAccount，只重讀', () async {
+      for (final summary in [completedSummary(), reviewPendingSummary()]) {
+        final server = _Server()..summary = summary;
         final container = server.container();
         await container.read(accountPaymentAccountProvider('acc-1').future);
+        await container.read(accountOnboardingProvider('acc-1').future);
         final before = server.paymentCalls;
-        final summaryBefore = server.summaryCalls;
 
         await container.read(paymentOnboardingProvider.notifier).onResumed();
 
-        expect(server.paymentCalls, before + 1);
-        expect(server.summaryCalls, summaryBefore + 1);
         expect(server.refreshCalls, 0);
-      },
-    );
+        expect(server.paymentCalls, before + 1);
+      }
+    });
+
+    test('還沒有開通摘要（手上沒有資訊）：照樣先 RefreshMyPaymentAccount', () async {
+      final server = _Server();
+      final container = server.container();
+
+      await container.read(paymentOnboardingProvider.notifier).autoRefresh();
+
+      expect(server.refreshCalls, 1);
+    });
 
     test('從外部瀏覽器回來：先 RefreshMyPaymentAccount，再讀收款帳戶與開通摘要（同一輪）', () async {
       final server = _Server();
       final container = server.container();
       await container.read(accountPaymentAccountProvider('acc-1').future);
       final notifier = container.read(paymentOnboardingProvider.notifier);
-      await notifier.start(_hosted);
+      await notifier.start();
       server.calls.clear();
 
       await notifier.onResumed();
@@ -285,10 +311,9 @@ void main() {
         server.calls.skip(1),
         containsAll(['getMyPaymentAccount', 'getMyOnboarding']),
       );
-      expect(container.read(paymentOnboardingProvider), isNull);
     });
 
-    test('從外部瀏覽器回來而 RefreshMyPaymentAccount 失敗：照樣讀，讀完把失敗放進 state', () async {
+    test('從外部瀏覽器回來而 RefreshMyPaymentAccount 失敗：照樣讀，失敗不顯示、不丟出', () async {
       final server = _Server()
         ..refreshFailure = reasonError(
           Code.resourceExhausted,
@@ -298,7 +323,7 @@ void main() {
       final container = server.container();
       await container.read(accountPaymentAccountProvider('acc-1').future);
       final notifier = container.read(paymentOnboardingProvider.notifier);
-      await notifier.start(_hosted);
+      await notifier.start();
       server.calls.clear();
 
       await notifier.onResumed();
@@ -308,58 +333,35 @@ void main() {
         server.calls,
         containsAll(['getMyPaymentAccount', 'getMyOnboarding']),
       );
-      final failure = container.read(paymentOnboardingProvider);
-      expect(failure, isNotNull);
-      expect(
-        ConnectException.from(failure!.error).code,
-        Code.resourceExhausted,
-      );
     });
 
-    test('confirmPaymentAccount 失敗：交給呼叫端，不放進共享 state', () async {
-      final server = _Server()
-        ..refreshFailure = reasonError(Code.unavailable, 'DOWN');
-      final container = server.container();
-      final notifier = container.read(paymentOnboardingProvider.notifier);
-      final seen = <PaymentRefreshFailure?>[];
-      container.listen(paymentOnboardingProvider, (_, next) => seen.add(next));
+    test(
+      'confirmPaymentAccount 失敗（含 resource_exhausted、permission_denied）：回傳讀取結果，不丟出',
+      () async {
+        for (final code in [
+          Code.unavailable,
+          Code.resourceExhausted,
+          Code.permissionDenied,
+        ]) {
+          final server = _Server()..refreshFailure = reasonError(code, 'DOWN');
+          final container = server.container();
+          final notifier = container.read(paymentOnboardingProvider.notifier);
 
-      final result = await notifier.confirmPaymentAccount();
+          final read = await notifier.confirmPaymentAccount();
 
-      expect(result.refreshError, isNotNull);
-      expect(result.read, isTrue);
-      expect(seen, isEmpty);
-      expect(container.read(paymentOnboardingProvider), isNull);
-    });
-
-    test('從瀏覽器回來連續兩次失敗：每次都是新的事件，取走後清空', () async {
-      final server = _Server()
-        ..refreshFailure = reasonError(Code.unavailable, 'DOWN');
-      final container = server.container();
-      final notifier = container.read(paymentOnboardingProvider.notifier);
-      final seen = <PaymentRefreshFailure>[];
-      container.listen(paymentOnboardingProvider, (_, next) {
-        if (next != null) seen.add(next);
-      });
-
-      await notifier.start(_hosted);
-      await notifier.onResumed();
-      await notifier.start(_hosted);
-      await notifier.onResumed();
-
-      expect(seen, hasLength(2));
-      expect(identical(seen.first, seen.last), isFalse);
-      expect(notifier.takeRefreshFailure(), isNotNull);
-      expect(notifier.takeRefreshFailure(), isNull);
-      expect(container.read(paymentOnboardingProvider), isNull);
-    });
+          expect(read, isTrue, reason: '$code');
+          expect(server.refreshCalls, 1);
+          expect(server.summaryCalls, greaterThan(0));
+        }
+      },
+    );
 
     test('從外部瀏覽器回來帶 fresh: true：進行中那一輪可能在狀態改變之前就開始讀了，之後再讀一輪', () async {
       final server = _Server();
       final container = server.container();
       await container.read(accountPaymentAccountProvider('acc-1').future);
       final notifier = container.read(paymentOnboardingProvider.notifier);
-      expect(await notifier.start(_hosted), PaymentOnboardingOutcome.launched);
+      expect(await notifier.start(), PaymentOnboardingOutcome.launched);
 
       // 賣家在瀏覽器裡的時候，已經有一輪重讀在進行（還沒讀完）。
       final gate = Completer<void>();
@@ -381,10 +383,11 @@ void main() {
       );
     });
 
-    test('不是從瀏覽器回來（一般回前景）共用進行中的一輪', () async {
-      final server = _Server();
+    test('不是從瀏覽器回來而且任務已完成（一般回前景）共用進行中的一輪', () async {
+      final server = _Server()..summary = completedSummary();
       final container = server.container();
       await container.read(accountPaymentAccountProvider('acc-1').future);
+      await container.read(accountOnboardingProvider('acc-1').future);
       final notifier = container.read(paymentOnboardingProvider.notifier);
 
       final gate = Completer<void>();
@@ -400,14 +403,16 @@ void main() {
       await Future.wait([inFlight, resumed]);
 
       expect(server.paymentCalls, callsDuringRound);
+      expect(server.refreshCalls, 0);
     });
 
     test('「從瀏覽器回來」只算一次：第二次回前景不再帶 fresh', () async {
-      final server = _Server();
+      final server = _Server()..summary = completedSummary();
       final container = server.container();
       await container.read(accountPaymentAccountProvider('acc-1').future);
+      await container.read(accountOnboardingProvider('acc-1').future);
       final notifier = container.read(paymentOnboardingProvider.notifier);
-      await notifier.start(_hosted);
+      await notifier.start();
       await notifier.onResumed();
 
       final gate = Completer<void>();
@@ -429,7 +434,7 @@ void main() {
       final container = server.container();
       await container.read(accountPaymentAccountProvider('acc-1').future);
       final notifier = container.read(paymentOnboardingProvider.notifier);
-      expect(await notifier.start(_hosted), PaymentOnboardingOutcome.launched);
+      expect(await notifier.start(), PaymentOnboardingOutcome.launched);
 
       Future<int> callsAfterResumeDuringRound() async {
         final gate = Completer<void>();
@@ -456,6 +461,39 @@ void main() {
         0,
         reason: '記號已消耗：第二次回前景不再帶 fresh（也不自己重讀）',
       );
+    });
+
+    test('一次回前景最多一次 RefreshMyPaymentAccount：有畫面登記且剛從瀏覽器回來，也只一次', () async {
+      final server = _Server();
+      final container = server.container();
+      await container.read(accountPaymentAccountProvider('acc-1').future);
+      final notifier = container.read(paymentOnboardingProvider.notifier);
+      final release = notifier.watchForeground();
+      final releaseAgain = notifier.watchForeground();
+
+      expect(await notifier.start(), PaymentOnboardingOutcome.launched);
+      server.refreshCalls = 0;
+      backgroundAndResume();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(server.refreshCalls, 1, reason: '從瀏覽器回來，兩個畫面登記');
+
+      server.refreshCalls = 0;
+      backgroundAndResume();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(server.refreshCalls, 1, reason: '一般回前景，兩個畫面登記');
+
+      release();
+      release();
+      server.refreshCalls = 0;
+      backgroundAndResume();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(server.refreshCalls, 1, reason: '還剩一個登記（重複取消無效）');
+
+      releaseAgain();
+      server.refreshCalls = 0;
+      backgroundAndResume();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(server.refreshCalls, 0, reason: '沒有畫面登記也不是從瀏覽器回來：不重讀');
     });
   });
 }

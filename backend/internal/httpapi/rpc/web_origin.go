@@ -113,3 +113,12 @@ func (w WebOrigin) OnboardingReturnURLs(page ReturnPage, locale uitext.Locale) (
 	}
 	return done, expired, nil
 }
+
+// CertificationURL 組出賣家中心認證頁的絕對網址（含語系前綴），給不能在自己畫面完成內嵌開通的 client 開網頁。
+func (w WebOrigin) CertificationURL(locale uitext.Locale) (string, error) {
+	prefix, err := sitePrefix(locale)
+	if err != nil {
+		return "", err
+	}
+	return w.URL(prefix + CertificationPath)
+}

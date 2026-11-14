@@ -18,7 +18,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../support/connect_errors.dart';
 import '../../../support/fake_my_store.dart';
 import '../../../support/onboarding_fixtures.dart';
 import '../../../support/my_store_fixtures.dart';
@@ -326,9 +325,7 @@ void main() {
     expect(find.text('說明頁'), findsOneWidget);
   });
 
-  testWidgets('REFRESH_PAYMENT_ACCOUNT：原地先呼叫 RefreshMyPaymentAccount 再重讀摘要', (
-    tester,
-  ) async {
+  testWidgets('進行中的收款帳戶任務（NONE）沒有任何按鈕，也沒有「重新整理」', (tester) async {
     final calls = <String>[];
     await _pump(
       tester,
@@ -337,52 +334,13 @@ void main() {
       summary: onboardingSummary([
         serverTask(_profile, _completed),
         serverTask(_review, _completed),
-        serverTask(
-          _payment,
-          _inProgress,
-          action: OnboardingAction.ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT,
-        ),
+        serverTask(_payment, _inProgress),
       ]),
     );
-    calls.clear();
 
-    await tester.tap(find.text('重新整理'));
-    await tester.pumpAndSettle();
-
-    expect(calls.first, 'refreshMyPaymentAccount');
-    expect(calls, contains('getMyOnboarding'));
-    expect(find.text('認證頁'), findsNothing, reason: '原地處理，不換頁');
-  });
-
-  testWidgets('REFRESH_PAYMENT_ACCOUNT 重讀失敗：照樣重讀摘要，並顯示伺服器的句子', (tester) async {
-    final calls = <String>[];
-    await _pump(
-      tester,
-      missing: [_kyc],
-      calls: calls,
-      refresh: reasonError(
-        Code.resourceExhausted,
-        'RATE_LIMITED',
-        message: '請稍後再試',
-      ),
-      summary: onboardingSummary([
-        serverTask(_review, _completed),
-        serverTask(
-          _payment,
-          _inProgress,
-          action: OnboardingAction.ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT,
-        ),
-      ]),
-    );
-    calls.clear();
-
-    await tester.tap(find.text('重新整理'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(calls, contains('getMyOnboarding'));
-    expect(find.text('請稍後再試'), findsOneWidget);
-    await tester.pumpAndSettle(const Duration(seconds: 5));
+    expect(find.text('重新整理'), findsNothing);
+    expect(find.byType(FilledButton), findsNothing);
+    expect(calls, isNot(contains('refreshMyPaymentAccount')));
   });
 
   testWidgets('商品數與商店介紹讓建議項目完成', (tester) async {

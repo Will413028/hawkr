@@ -35,9 +35,6 @@ enum OnboardingStepTarget {
   /// 聯絡客服（說明頁）。
   support,
 
-  /// 原地重新整理收款帳戶：先 `RefreshMyPaymentAccount` 再讀。
-  refreshPayment,
-
   /// 物流設定。
   shipping,
 
@@ -122,8 +119,6 @@ OnboardingStepTarget _targetOf(OnboardingAction action) => switch (action) {
     OnboardingStepTarget.certification,
   OnboardingAction.ONBOARDING_ACTION_CONTACT_SUPPORT =>
     OnboardingStepTarget.support,
-  OnboardingAction.ONBOARDING_ACTION_REFRESH_PAYMENT_ACCOUNT =>
-    OnboardingStepTarget.refreshPayment,
   _ => OnboardingStepTarget.none,
 };
 

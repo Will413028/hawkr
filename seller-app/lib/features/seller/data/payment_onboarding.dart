@@ -1,13 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
-import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/flavor.dart';
 import '../../../core/l10n/ui_locale.dart';
+import '../../../core/session/session_provider.dart';
 import '../../../shared/utils/hk_log.dart';
+import 'account_scope.dart';
+import 'onboarding_summary.dart';
 import 'payment_account.dart';
 import 'seller_status_refresh.dart';
 
@@ -28,10 +31,7 @@ enum PaymentOnboardingOutcome {
   /// 外部瀏覽器已開啟；賣家完成後切回 App。
   launched,
 
-  /// 伺服器說這個帳戶用內嵌元件開通（平台收件）：App 沒有，要到網頁版完成。
-  needsWeb,
-
-  /// 取得連結或開啟瀏覽器失敗，或伺服器沒有告知可用的介面。
+  /// 取得連結或開啟瀏覽器失敗。
   failed,
 }
 
@@ -47,52 +47,46 @@ final class _ResumeObserver with WidgetsBindingObserver {
   }
 }
 
-/// 從外部瀏覽器回來那一次「先重讀再讀」裡 `RefreshMyPaymentAccount` 的失敗：沒有發起的畫面，放進 [PaymentOnboarding] 的 state
-/// 當一次性訊號，由第一個顯示它的畫面用 [PaymentOnboarding.takeRefreshFailure] 取走（取走即清空），其餘畫面不會再顯示。
-/// 每次失敗是新的物件，連續兩次失敗畫面也都會收到。
-final class PaymentRefreshFailure {
-  PaymentRefreshFailure(this.error);
-
-  final Object error;
-}
-
-/// 一次「先重讀再讀」的結果：[read] 是重讀有沒有成功，[refreshError] 是 `RefreshMyPaymentAccount` 的失敗（成功為 null）。
-/// 使用者按按鈕觸發時，錯誤由發起的畫面直接從這個回傳值顯示。
-typedef PaymentConfirmation = ({bool read, Object? refreshError});
-
-/// 收款帳戶的開通與回到前景時的重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
+/// 收款帳戶的開通與自動重讀。keepAlive：從開啟瀏覽器到賣家切回來之間畫面可能已經被關掉，
 /// 「剛從瀏覽器回來」的記號放在這裡，不放在畫面上；而且自己監看 App 生命週期，從瀏覽器回來的那一次回前景不論哪個畫面
-/// 還在都會以 `fresh: true` 重讀一次（畫面各自的回前景重讀走 [onResumed]，不會重複消耗記號）。
+/// 還在都會以 `fresh: true` 重讀一次。回前景的觸發只有這裡一個：畫面用 [watchForeground] 登記「我在前景時要重讀」，
+/// 一次回前景最多呼叫一次 [onResumed]。
+///
+/// `RefreshMyPaymentAccount` 是背景動作：失敗（含 `resource_exhausted`、停權的 `permission_denied`）不顯示，也不擋讀開通摘要。
 @Riverpod(keepAlive: true)
 class PaymentOnboarding extends _$PaymentOnboarding {
   bool _awaitingReturn = false;
+  int _foregroundWatchers = 0;
 
   @override
-  PaymentRefreshFailure? build() {
+  void build() {
     final binding = WidgetsFlutterBinding.ensureInitialized();
     final observer = _ResumeObserver(() {
-      if (_awaitingReturn && ref.mounted) unawaited(onResumed());
+      if (!ref.mounted) return;
+      if (_awaitingReturn || _foregroundWatchers > 0) unawaited(onResumed());
     });
     binding.addObserver(observer);
     ref.onDispose(() => binding.removeObserver(observer));
-    return null;
   }
 
-  /// 依伺服器告知的 [surface] 開始開通。HOSTED：取得連結並在外部瀏覽器開啟；EMBEDDED：不呼叫伺服器，回 [needsWeb]；
-  /// 其他（沒有設定、不認得）不猜預設介面，回 [failed]。
-  Future<PaymentOnboardingOutcome> start(OnboardingSurface surface) async {
-    switch (surface) {
-      case OnboardingSurface.ONBOARDING_SURFACE_EMBEDDED:
-        return PaymentOnboardingOutcome.needsWeb;
-      case OnboardingSurface.ONBOARDING_SURFACE_HOSTED:
-        break;
-      default:
-        return PaymentOnboardingOutcome.failed;
-    }
+  /// 畫面登記「我在前景時，App 回前景要自動重讀」；回傳取消登記的函式（重複呼叫無效）。
+  void Function() watchForeground() {
+    _foregroundWatchers++;
+    var released = false;
+    return () {
+      if (released) return;
+      released = true;
+      _foregroundWatchers--;
+    };
+  }
+
+  /// 開始（或繼續）開通：目的地是賣家 App，取得連結並在外部瀏覽器開啟。連結是託管頁面，或帳戶用內嵌元件時伺服器回的網站認證頁
+  /// （App 不判斷介面）。
+  Future<PaymentOnboardingOutcome> start() async {
     try {
       final session = await ref
           .read(paymentAccountRepositoryProvider)
-          .createHostedSession(
+          .createSession(
             locale: ref.read(uiLocaleProvider).tag,
             allowInsecureUrl: ref.read(allowInsecureOnboardingUrlProvider),
           );
@@ -109,47 +103,51 @@ class PaymentOnboarding extends _$PaymentOnboarding {
     }
   }
 
-  /// App 回到前景。從外部瀏覽器回來時伺服器剛改變了狀態（金流商的事件可能已經到了），走 [confirmPaymentAccount]：先
-  /// `RefreshMyPaymentAccount` 再 `fresh: true` 重讀（進行中的那一輪可能在變更之前就開始讀了，不共用它）。其他回前景只重讀
-  /// 店家、認證、收款帳戶與開通摘要，不呼叫金流商。回傳重讀有沒有成功。
+  /// App 回到前景。從外部瀏覽器回來時伺服器剛改變了狀態（金流商的事件可能已經到了），走 [confirmPaymentAccount]（`fresh: true`：進行中
+  /// 的那一輪可能在變更之前就開始讀了，不共用它）；其他回前景走 [autoRefresh]。回傳重讀有沒有成功。
   Future<bool> onResumed() {
     final returnedFromBrowser = _awaitingReturn;
     _awaitingReturn = false;
-    if (returnedFromBrowser) return _confirmAfterBrowser();
-    return ref.read(sellerStatusRefreshProvider.notifier).refresh();
+    if (returnedFromBrowser) return confirmPaymentAccount();
+    return autoRefresh();
   }
 
-  /// 從金流商回來與「重新整理」共用的一條路徑：先 `RefreshMyPaymentAccount`（伺服器同步向金流商重讀）再 `fresh: true` 重讀
-  /// 全部狀態（含開通摘要）。重讀失敗也照樣讀（快取不能留在舊的）。失敗不經共享 state 廣播，回傳給呼叫端（發起的畫面）顯示。
-  /// 一次新的 refresh 開始就清掉留著的失敗訊號：狀態一旦重新確認，之前那次失敗不能再被顯示（成功時它也就保持清空）。
-  Future<PaymentConfirmation> confirmPaymentAccount() async {
-    if (state != null) state = null;
-    Object? failure;
+  /// 進入認證頁（[onEntry]）與回前景的自動重讀：收款帳戶任務已完成或鎖住（讀得到摘要而且這樣說）時不呼叫金流商，回前景只重讀狀態、
+  /// 進入畫面什麼都不讀（畫面剛讀過）；其他情況（含摘要讀不到）走 [confirmPaymentAccount]。不輪詢。
+  Future<bool> autoRefresh({bool onEntry = false}) async {
+    final state = await _paymentTaskState();
+    if (!ref.mounted) return false;
+    if (state == OnboardingTaskState.ONBOARDING_TASK_STATE_COMPLETED ||
+        state == OnboardingTaskState.ONBOARDING_TASK_STATE_LOCKED) {
+      if (onEntry) return true;
+      return ref.read(sellerStatusRefreshProvider.notifier).refresh();
+    }
+    return confirmPaymentAccount();
+  }
+
+  /// 手上的開通摘要裡收款帳戶任務的狀態（摘要還在讀就等它）；沒有登入或摘要讀不到是 null。
+  Future<OnboardingTaskState?> _paymentTaskState() async {
+    final accountId = signedInAccountId(ref.read(sessionProvider));
+    if (accountId == null) return null;
+    try {
+      final summary = await ref.read(
+        accountOnboardingProvider(accountId).future,
+      );
+      return paymentAccountTask(summary)?.state;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 先 `RefreshMyPaymentAccount`（伺服器同步向金流商重讀）再 `fresh: true` 重讀全部狀態（含開通摘要）。
+  /// 重讀失敗不顯示、不丟出，照樣讀（快取不能留在舊的）。回傳重讀有沒有成功。
+  Future<bool> confirmPaymentAccount() async {
     try {
       await ref.read(paymentAccountRepositoryProvider).refresh();
     } catch (error) {
       HKLog.logW('[PaymentOnboarding] RefreshMyPaymentAccount failed: $error');
-      failure = error;
     }
-    if (!ref.mounted) return (read: false, refreshError: failure);
-    final read = await ref
-        .read(sellerStatusRefreshProvider.notifier)
-        .refresh(fresh: true);
-    return (read: read, refreshError: failure);
-  }
-
-  /// 從外部瀏覽器回來：沒有發起的畫面，失敗放進 state 當一次性訊號。
-  Future<bool> _confirmAfterBrowser() async {
-    final result = await confirmPaymentAccount();
-    final failure = result.refreshError;
-    if (failure != null && ref.mounted) state = PaymentRefreshFailure(failure);
-    return result.read;
-  }
-
-  /// 取走 state 裡的一次性失敗訊號並清空；已被別的畫面取走時回 null。
-  Object? takeRefreshFailure() {
-    final failure = state?.error;
-    if (failure != null) state = null;
-    return failure;
+    if (!ref.mounted) return false;
+    return ref.read(sellerStatusRefreshProvider.notifier).refresh(fresh: true);
   }
 }

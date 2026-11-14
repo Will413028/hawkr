@@ -121,12 +121,12 @@ describe("confirmPaymentReturn", () => {
 		expect(readAccount).toHaveBeenCalledTimes(1);
 	});
 
-	it("重讀失敗：仍讀一次（快取不留舊的），之後丟出重讀的錯誤", async () => {
+	it("重讀失敗：不丟出，仍讀一次（快取不留舊的）", async () => {
 		const refreshAccount = vi.fn().mockRejectedValue(new Error("refresh boom"));
 		const readAccount = vi.fn(async () => {});
 		await expect(
 			confirmPaymentReturn({ refreshAccount, readAccount }),
-		).rejects.toThrow("refresh boom");
+		).resolves.toBeUndefined();
 		expect(readAccount).toHaveBeenCalledTimes(1);
 	});
 

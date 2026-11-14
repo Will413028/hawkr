@@ -56,6 +56,14 @@ const (
 	SurfaceEmbedded OnboardingSurface = "EMBEDDED"
 )
 
+// SurfaceOf 是收件方式對應的開通介面：平台收件用內嵌元件，金流商收件用託管頁面。
+func SurfaceOf(c RequirementCollection) OnboardingSurface {
+	if c == CollectionPlatform {
+		return SurfaceEmbedded
+	}
+	return SurfaceHosted
+}
+
 // PaymentAccount 是擁有者（店家）的收款帳戶：外部帳戶的本地快取（聯絡信箱不對外）。
 type PaymentAccount struct {
 	StoreID               int64
@@ -78,6 +86,7 @@ type PaymentAccount struct {
 
 // OnboardingSession 是開通用的 session：託管用 URL，內嵌用 ClientSecret、Provider（金流商代碼，client 依它選元件）與
 // PublishableKey（初始化元件用的公開金鑰，不是 secret）；託管的 session 兩者都是空字串。
+// CompleteOnWebsite 為 true 表示帳戶是內嵌介面而呼叫端無法內嵌：沒有呼叫金流商，其餘欄位都是空，由呼叫端引導到網站完成。
 type OnboardingSession struct {
 	Surface        OnboardingSurface
 	URL            string
@@ -85,6 +94,8 @@ type OnboardingSession struct {
 	Provider       string
 	PublishableKey string
 	ExpiresAt      *time.Time
+	// CompleteOnWebsite 見型別說明。
+	CompleteOnWebsite bool
 }
 
 // PayoutAccountChanged 是同步 job 寫入帳戶快照的 transaction 內發布的事件（Stripe 計畫 D28）：seller 以同 transaction 的訂閱者更新開通閘門讀的

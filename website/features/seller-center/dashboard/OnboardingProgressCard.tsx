@@ -1,12 +1,10 @@
 "use client";
 
 import { Code } from "@connectrpc/connect";
-import { errorText } from "@hawkr/api/connect/errors";
 import type { GetMyOnboardingResponse } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Button from "@/components/ui/Button";
-import { useRefreshPaymentAccount } from "@/lib/hooks/useSellerSelf";
 import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
 import type { ShippingOnboarding } from "@/lib/seller/shipping";
 import type { MyStore } from "@/lib/seller/store";
@@ -76,27 +74,6 @@ export default function OnboardingProgressCard({
 }) {
 	const ut = useUiText();
 	const defaults = useDefaultErrorText();
-	const refreshPaymentAccount = useRefreshPaymentAccount();
-	const [refreshing, setRefreshing] = React.useState(false);
-	// 錯誤屬於按下「重新整理」時的那個任務：換任務就不再顯示。
-	const [refreshFailure, setRefreshFailure] = React.useState<{
-		taskId: string;
-		error: unknown;
-	} | null>(null);
-	const refresh = React.useCallback(
-		async (taskId: string) => {
-			setRefreshing(true);
-			setRefreshFailure(null);
-			try {
-				await refreshPaymentAccount();
-			} catch (error) {
-				setRefreshFailure({ taskId, error });
-			} finally {
-				setRefreshing(false);
-			}
-		},
-		[refreshPaymentAccount],
-	);
 	const requiredFailed = onboarding === null && !onboardingLoading;
 	const tasks = React.useMemo(
 		() =>
@@ -268,7 +245,7 @@ export default function OnboardingProgressCard({
 							<p className="seller-onboarding-progress__description">
 								{activeTask.panelDescription}
 							</p>
-							{activeTask.next?.kind === "link" ? (
+							{activeTask.next ? (
 								<Button
 									href={activeTask.next.href}
 									size="lg"
@@ -277,20 +254,6 @@ export default function OnboardingProgressCard({
 								>
 									{activeTask.next.label}
 								</Button>
-							) : activeTask.next?.kind === "refresh" ? (
-								<Button
-									size="lg"
-									disabled={activeTask.locked || refreshing}
-									isLoading={refreshing}
-									loadingLabel="正在確認資料…"
-									onClick={() => void refresh(activeTask.id)}
-									className="seller-onboarding-progress__cta"
-								>
-									{activeTask.next.label}
-								</Button>
-							) : null}
-							{refreshFailure && refreshFailure.taskId === activeTask.id ? (
-								<p role="alert">{errorText(refreshFailure.error, defaults)}</p>
 							) : null}
 						</div>
 						<div

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:flutter/material.dart';
@@ -29,6 +28,7 @@ import '../../seller/data/current_kyc.dart';
 import '../../seller/data/current_store.dart';
 import '../../seller/data/onboarding_summary.dart';
 import '../../seller/data/payment_account.dart';
+import '../../seller/data/payment_onboarding.dart';
 import '../../seller/data/seller_status_refresh.dart';
 import '../../seller/presentation/payment_account_action.dart';
 import '../../seller/presentation/seller_certification_gate.dart'
@@ -65,12 +65,11 @@ class WalletScreen extends HookConsumerWidget {
       () => _reload(ref, settledOnly: true, maxAge: statusStaleTime),
       includeInitial: true,
     );
-    final visibleNow = useRef(visible)..value = visible;
-    useOnAppLifecycleStateChange((previous, current) {
-      if (current == AppLifecycleState.resumed && visibleNow.value) {
-        _reload(ref);
-      }
-    });
+    final onboardingNotifier = ref.read(paymentOnboardingProvider.notifier);
+    useEffect(() {
+      if (!visible) return null;
+      return onboardingNotifier.watchForeground();
+    }, [visible]);
 
     const statusBarStyle = SystemUiOverlayStyle.dark;
     return Scaffold(
@@ -133,7 +132,10 @@ class WalletScreen extends HookConsumerWidget {
         if (!approved || (!paymentDone && account == null))
           _CertificationGate(reviewStatus: reviewStatus)
         else if (account != null)
-          _PaymentAccountPanel(account: account),
+          _PaymentAccountPanel(
+            account: account,
+            task: paymentAccountTask(summary),
+          ),
         if (certified) const WalletAccountSection(),
       ],
     );
@@ -262,13 +264,14 @@ class _CertificationGate extends ConsumerWidget {
   }
 }
 
-/// 收款帳戶的狀態面板（唯讀）：標題、說明與動作文字都是共用文案目錄（`payment.PaymentAccountStatus`）的文字；不顯示金流商的
-/// 待補條件細項（金流商自己的頁面會列出要補什麼）。動作與認證狀態畫面共用 [paymentAccountActionKind]：無法啟用去聯絡客服，
-/// 需要開通開始開通，其他重新讀取。
+/// 收款帳戶的狀態面板（唯讀）：標題是共用文案目錄（`payment.PaymentAccountStatus`）的狀態徽章文字，說明句與按鈕只讀開通摘要的
+/// 收款帳戶任務（[task]）：開始開通在外部瀏覽器開連結，聯絡客服去客服頁，沒有下一步或不認得的動作沒有按鈕。不顯示金流商的
+/// 待補條件細項（金流商自己的頁面會列出要補什麼）。
 class _PaymentAccountPanel extends HookConsumerWidget {
-  const _PaymentAccountPanel({required this.account});
+  const _PaymentAccountPanel({required this.account, required this.task});
 
   final PaymentAccount account;
+  final OnboardingTask? task;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -287,15 +290,9 @@ class _PaymentAccountPanel extends HookConsumerWidget {
       );
     }
     final alert = tone == HkStatusTone.warning || tone == HkStatusTone.danger;
-    final description = account.status.description(l);
-    final action = account.status.action(l);
-    final kind = action == null
-        ? PaymentAccountActionKind.none
-        : paymentAccountActionKind(account);
-    final embedded =
-        paymentAccountCanOnboard(account) &&
-        account.onboardingSurface ==
-            OnboardingSurface.ONBOARDING_SURFACE_EMBEDDED;
+    final sentence = task?.status.message ?? '';
+    final action = task?.action;
+    final label = action?.button(l);
     return HkContentCard(
       key: const ValueKey('wallet-payment-panel'),
       elevated: true,
@@ -311,29 +308,22 @@ class _PaymentAccountPanel extends HookConsumerWidget {
           ),
           const SizedBox(height: HkSpace.sm),
           Text(title, style: AppTypography.bodyBold),
-          if (description != null) ...[
+          if (sentence.isNotEmpty) ...[
             const SizedBox(height: HkSpace.xs),
             Text(
-              description,
+              sentence,
               style: AppTypography.body.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
           ],
-          if (embedded) ...[
-            const SizedBox(height: HkSpace.xs),
-            Text(
-              paymentAccountEmbeddedNotice,
-              style: AppTypography.body.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-          if (action != null && kind != PaymentAccountActionKind.none) ...[
+          if (action != null &&
+              label != null &&
+              paymentAccountActionHasButton(action)) ...[
             const SizedBox(height: HkSpace.md),
             OutlinedButton(
-              onPressed: actions.busy ? null : () => actions.run(account, kind),
-              child: HkButtonLabel(action),
+              onPressed: actions.busy ? null : () => actions.run(action),
+              child: HkButtonLabel(label),
             ),
           ],
         ],

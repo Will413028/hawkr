@@ -824,11 +824,11 @@ func TestOnboardingSessionNeedsAnExternalAccountThatIsNotDisabled(t *testing.T) 
 	ctx := context.Background()
 	f := setup(t)
 	s := f.newStore(t)
-	if _, err := f.module.CreateOnboardingSession(ctx, s, "https://web.example.test/ok", "https://web.example.test/again"); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.CreateOnboardingSession(ctx, s, "https://web.example.test/ok", "https://web.example.test/again", true); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("還沒有外部帳戶 err=%v", err)
 	}
 	external := f.ensure(t, s)
-	session, err := f.module.CreateOnboardingSession(ctx, s, "https://web.example.test/ok", "https://web.example.test/again")
+	session, err := f.module.CreateOnboardingSession(ctx, s, "https://web.example.test/ok", "https://web.example.test/again", true)
 	must(t, err)
 	if session.Surface != SurfaceHosted || session.URL == "" || session.ClientSecret != "" {
 		t.Fatalf("session=%+v", session)
@@ -839,11 +839,84 @@ func TestOnboardingSessionNeedsAnExternalAccountThatIsNotDisabled(t *testing.T) 
 	if a := f.account(t, s); a.Status != StatusDisabled || a.StatusReason == nil || *a.StatusReason != "rejected.fraud" {
 		t.Fatalf("帳戶=%+v", a)
 	}
-	if _, err := f.module.CreateOnboardingSession(ctx, s, "https://web.example.test/ok", "https://web.example.test/again"); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.CreateOnboardingSession(ctx, s, "https://web.example.test/ok", "https://web.example.test/again", true); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("被停用的帳戶 err=%v", err)
 	}
 	if v := f.fake.Violations(); len(v) != 0 {
 		t.Fatalf("違反呼叫規則：%v", v)
+	}
+}
+
+// App 不能內嵌：帳戶列是內嵌介面時前置條件照常檢查（沒有帳戶、沒有外部帳戶、被停用、關閉中都是 failed_precondition 或 not_found）且不呼叫 provider；
+// 通過後回 CompleteOnWebsite 的內嵌 session，同樣不呼叫 provider。介面取自列的收件方式，不看目前的設定。
+// mutation：App 路徑略過前置條件 → 沒有外部帳戶與被停用的案例回成功，失敗。
+func TestOnboardingSessionForACallerThatCannotEmbedKeepsThePreconditionsAndNeverCallsTheProvider(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	f.fake.WithCapabilities(Capabilities{RequirementCollection: CollectionPlatform, OnboardingSurface: SurfaceEmbedded})
+	url := func(s int64) (OnboardingSession, error) {
+		return f.module.CreateOnboardingSession(ctx, s, "https://web.example.test/ok", "https://web.example.test/again", false)
+	}
+	if _, err := url(987654); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("沒有帳戶列 err=%v", err)
+	}
+	s := f.newStore(t)
+	if _, err := url(s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("還沒有外部帳戶 err=%v", err)
+	}
+	external := f.ensure(t, s)
+	session, err := url(s)
+	must(t, err)
+	if session.Surface != SurfaceEmbedded || !session.CompleteOnWebsite || session.URL != "" || session.ClientSecret != "" || session.Provider != "" || session.PublishableKey != "" {
+		t.Fatalf("session=%+v", session)
+	}
+	f.fake.Set(external, rejectedSnapshot)
+	_, err = f.module.SyncAccount(ctx, s)
+	must(t, err)
+	if _, err := url(s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("被停用 err=%v", err)
+	}
+	closing := f.newStore(t)
+	f.ensure(t, closing)
+	_, err = f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET purge_pending_at = now() WHERE store_id = $1", closing)
+	must(t, err)
+	if _, err := url(closing); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("關閉中 err=%v", err)
+	}
+	if _, _, sessions := f.fake.Calls(); sessions != 0 {
+		t.Fatalf("向 provider 建立了 %d 個 session", sessions)
+	}
+	if v := f.fake.Violations(); len(v) != 0 {
+		t.Fatalf("違反呼叫規則：%v", v)
+	}
+}
+
+// 介面取自帳戶列：列是內嵌（平台收件）而目前設定是託管時，App 仍回「到網站完成」；列是託管而設定是內嵌時，App 仍拿到 provider 的連結。
+func TestOnboardingSessionSurfaceComesFromTheAccountRowNotTheCurrentConfiguration(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	f.fake.WithCapabilities(Capabilities{RequirementCollection: CollectionPlatform, OnboardingSurface: SurfaceEmbedded})
+	embeddedRow := f.newStore(t)
+	f.ensure(t, embeddedRow)
+	f.fake.WithCapabilities(Capabilities{RequirementCollection: CollectionProvider, OnboardingSurface: SurfaceHosted})
+	hostedRow := f.newStore(t)
+	f.ensure(t, hostedRow)
+
+	got, err := f.module.CreateOnboardingSession(ctx, embeddedRow, "https://web.example.test/ok", "https://web.example.test/again", false)
+	must(t, err)
+	if !got.CompleteOnWebsite || got.Surface != SurfaceEmbedded {
+		t.Fatalf("內嵌列、設定是託管：%+v", got)
+	}
+	if _, _, sessions := f.fake.Calls(); sessions != 0 {
+		t.Fatalf("內嵌列向 provider 建立了 %d 個 session", sessions)
+	}
+	f.fake.WithCapabilities(Capabilities{RequirementCollection: CollectionPlatform, OnboardingSurface: SurfaceEmbedded})
+	got, err = f.module.CreateOnboardingSession(ctx, hostedRow, "https://web.example.test/ok", "https://web.example.test/again", false)
+	must(t, err)
+	if got.CompleteOnWebsite || got.Surface != SurfaceHosted || got.URL == "" {
+		t.Fatalf("託管列、設定是內嵌：%+v", got)
 	}
 }
 

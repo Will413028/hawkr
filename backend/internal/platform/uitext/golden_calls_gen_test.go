@@ -54,10 +54,6 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.CommonUnknown(), true
 	case "payment.PaymentAccountStatus":
 		return t.PaymentPaymentAccountStatus(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
-	case "payment.PaymentAccountStatus.action":
-		return t.PaymentPaymentAccountStatusAction(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
-	case "payment.PaymentAccountStatus.description":
-		return t.PaymentPaymentAccountStatusDescription(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
 	case "payment.RequirementCollection":
 		return t.PaymentRequirementCollection(goldenEnum(c.Value, "REQUIREMENT_COLLECTION_"))
 	case "seller.ContentKind":
