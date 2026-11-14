@@ -126,12 +126,3 @@ func Positive(ids ...int64) error {
 	}
 	return nil
 }
-
-// MappingDeletion 是管理員「已在金流商處理，刪除對應」的一筆紀錄（只增不改；帳戶列刪了之後仍在，D60）。
-type MappingDeletion struct {
-	StoreID           int64
-	Provider          string
-	ExternalAccountID *string
-	AdminID           int64
-	DeletedAt         time.Time
-}

@@ -65,7 +65,7 @@ import (
 // shutdownTimeout 是收到停止訊號後，給進行中請求收尾的時間。
 const shutdownTimeout = 30 * time.Second
 
-const usage = "可用的子命令：serve、worker、migrate、dev-token、dev-seed、reannounce-exposures、delegation-eligibility、admin-role、social-recount"
+const usage = "可用的子命令：serve、worker、migrate、dev-token、dev-seed、reannounce-exposures、delegation-eligibility、admin-role、admin-audit、social-recount"
 
 func main() {
 	if code := runMain(); code != 0 {
@@ -104,6 +104,8 @@ func run(ctx context.Context, args []string) error {
 		return runDelegationEligibility(ctx, args[1:])
 	case "admin-role":
 		return runAdminRole(ctx, args[1:], os.Stdout)
+	case "admin-audit":
+		return runAdminAudit(ctx, args[1:], os.Stdout)
 	case "social-recount":
 		return runSocialRecount(ctx, os.Stdout)
 	default:

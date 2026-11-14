@@ -11,6 +11,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 )
@@ -34,10 +35,10 @@ func modules() []migrate.Module {
 	}
 }
 
-// platformData 是 platform 擁有 schema 的套件（Stripe 計畫 D29 的 webhook inbox）：不是模組，desired state 與 migration 在套件的 db/
+// platformData 是 platform 擁有 schema 的套件（Stripe 計畫 D29 的 webhook inbox、D62 的後台動作紀錄 adminaudit）：不是模組，desired state 與 migration 在套件的 db/
 // （platformDirs），migrate 時先於模組套用。
 func platformData() []migrate.Module {
-	return []migrate.Module{{Name: inbox.Schema, Dir: inbox.Migrations()}}
+	return []migrate.Module{{Name: inbox.Schema, Dir: inbox.Migrations()}, {Name: adminaudit.Schema, Dir: adminaudit.Migrations()}}
 }
 
 // migrations 是 migrate 套用的全部：platform 的 schema 先，模組依 modules() 的順序。

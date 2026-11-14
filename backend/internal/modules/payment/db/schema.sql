@@ -26,7 +26,7 @@ CREATE SCHEMA payment;
 -- purge_pending_at 是擁有者的清理已要求、還沒完成的時刻，與有沒有外部 ID 無關（清理 job 呼叫 provider 之前先標；刪列之前一直在）：本地列留著（保住 store_id 與外部 ID 或冪等鍵的對應），
 -- 不被建立、不進同步輪詢、不被賣家／管理員的重新整理讀，由 payment 的週期掃描重排「關閉後刪除」，關閉（沒有外部 ID 的列先以冪等鍵取得外部帳戶）成功才刪列。
 -- purge_blocked_at 與 purge_blocked_reason 是清理的終局（D59、D60）：關閉被金流商拒絕、或標成等待清理後 7 天仍然關不掉或問不到金流商；列留著，不再被週期掃描重排，
--- 出現在後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK，由管理員「重試關閉」（清除終局並重新計算期限；原因是 unresolved_creation 的不能重試）或「已在金流商處理，刪除對應」（寫 account_mapping_deletions 並刪列）。
+-- 出現在後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK，由管理員「重試關閉」（清除終局並重新計算期限；原因是 unresolved_creation 的不能重試）或「已在金流商處理，刪除對應」（同一個 transaction 寫一筆 adminaudit 的後台紀錄並刪列，D62）。
 -- create_idempotency_key 是寫入「建立中」的列時產生的隨機 UUID（v4），建立外部帳戶的每次重試都用它當冪等鍵（Stripe 建議每個邏輯請求用隨機 UUID；
 -- 不用 store_id，兩個資料庫共用同一個 Stripe 帳號時才不會撞到別人的帳戶）。同一個理由，建立外部帳戶時除了 metadata.store_id 還寫 metadata.hawkr_namespace
 -- （設定 STRIPE_ACCOUNT_NAMESPACE，每個環境不同，D61）；程式不以 metadata 列出對帳（D63），寫它是為了之後要做全平台孤兒帳戶稽核時不必回填。
@@ -72,18 +72,3 @@ CREATE INDEX accounts_poll ON payment.accounts (store_id) WHERE status IN ('UNDE
 CREATE INDEX accounts_create_failed ON payment.accounts (create_failed_at) WHERE create_failed_at IS NOT NULL;
 CREATE INDEX accounts_purge_pending ON payment.accounts (store_id) WHERE purge_pending_at IS NOT NULL AND purge_blocked_at IS NULL;
 CREATE INDEX accounts_purge_blocked ON payment.accounts (purge_blocked_at) WHERE purge_blocked_at IS NOT NULL;
-
--- 管理員「已在金流商處理，刪除對應」的紀錄（D60）：只增不改，列被刪之後仍留著。external_account_id 是刪除當下列上的外部 ID（半建立之前沒有 ID 的列是 NULL）。
--- 不建跨 schema 的 FK，admin_id 是 identity 的管理員 ID。
-CREATE TABLE payment.account_mapping_deletions (
-    id                  BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    store_id            BIGINT      NOT NULL,
-    provider            TEXT        NOT NULL,
-    external_account_id TEXT,
-    admin_id            BIGINT      NOT NULL,
-    deleted_at          TIMESTAMPTZ NOT NULL,
-    CONSTRAINT account_mapping_deletions_store_id_check CHECK (store_id > 0),
-    CONSTRAINT account_mapping_deletions_admin_id_check CHECK (admin_id > 0),
-    CONSTRAINT account_mapping_deletions_external_id_check CHECK (external_account_id IS NULL OR char_length(external_account_id) BETWEEN 1 AND 255)
-);
-CREATE INDEX account_mapping_deletions_store ON payment.account_mapping_deletions (store_id, deleted_at);

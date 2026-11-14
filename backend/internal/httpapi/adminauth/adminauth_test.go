@@ -76,7 +76,7 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 	}
 
 	stale := maps.Clone(declarations)
-	stale["/hawkr.admin.identity.v1alpha1.IdentityAdminService/NoSuchMethod"] = requires(adminperm.IdentityAccountsList)
+	stale["/hawkr.admin.identity.v1alpha1.IdentityAdminService/NoSuchMethod"] = requires(adminperm.IdentityAccountsList, auditReadOnly)
 	if err := checkDeclarations(stale, svcs); err == nil || !strings.Contains(err.Error(), "NoSuchMethod 有宣告，但 service 沒有這個方法") {
 		t.Errorf("多出不存在的方法：err=%v", err)
 	}
@@ -84,10 +84,12 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 	const procedure = "/hawkr.admin.identity.v1alpha1.IdentityAdminService/ListAccounts"
 	for name, d := range map[string]declaration{
 		"空宣告":        {},
-		"權限又豁免":      {permission: adminperm.IdentityAccountsList, exemptReason: "理由"},
-		"不在目錄的權限":    requires("identity.no_such.list"),
-		"沒有理由的豁免":    exempt(""),
-		"權限的值是空字串後綴": requires(" "),
+		"權限又豁免":      {permission: adminperm.IdentityAccountsList, exemptReason: "理由", audit: auditReadOnly},
+		"不在目錄的權限":    requires("identity.no_such.list", auditReadOnly),
+		"沒有理由的豁免":    exempt("", auditReadOnly),
+		"權限的值是空字串後綴": requires(" ", auditReadOnly),
+		"沒有紀錄模式":     requires(adminperm.IdentityAccountsList, ""),
+		"不認得的紀錄模式":   requires(adminperm.IdentityAccountsList, "later"),
 	} {
 		table := maps.Clone(declarations)
 		table[procedure] = d
@@ -308,5 +310,58 @@ func TestPaymentPurgeActionsRequireTheirOwnPermissions(t *testing.T) {
 	}
 	if declarations[paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountPurgeProcedure].permission == declarations[paymentv1alpha1connect.PaymentAdminServiceDeletePaymentAccountMappingProcedure].permission {
 		t.Error("重試關閉與刪除對應共用同一個權限")
+	}
+}
+
+// 每支 admin 方法都明列後台動作紀錄的模式（D62）；沒有標的啟動失敗（Check）。
+// mutation：checkDeclarations 不檢查 audit → 「沒有紀錄模式」案例通過，TestDeclarationsMatchTheServiceDescriptors 失敗；把 payment 的寫入改成 auditPending → 下面的斷言失敗。
+func TestEveryDeclarationHasAnAuditModeAndPaymentWritesAreAudited(t *testing.T) {
+	svcs := declaredServices(t)
+	for procedure := range declarations {
+		table := maps.Clone(declarations)
+		d := table[procedure]
+		d.audit = ""
+		table[procedure] = d
+		if err := checkDeclarations(table, svcs); err == nil || !strings.Contains(err.Error(), procedure) {
+			t.Errorf("%s 沒有紀錄模式卻通過檢查：err=%v", procedure, err)
+		}
+	}
+	wantAudited := []string{
+		paymentv1alpha1connect.PaymentAdminServiceDeletePaymentAccountMappingProcedure,
+		paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountCreateProcedure,
+		paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountPurgeProcedure,
+	}
+	slices.Sort(wantAudited)
+	if got := AuditedProcedures(); !slices.Equal(got, wantAudited) {
+		t.Fatalf("audited = %v，預期 %v", got, wantAudited)
+	}
+	for _, p := range []string{paymentv1alpha1connect.PaymentAdminServiceGetPaymentAccountProcedure, paymentv1alpha1connect.PaymentAdminServiceRefreshPaymentAccountProcedure} {
+		if declarations[p].audit != auditReadOnly {
+			t.Errorf("%s 應該是 readOnly（只讀取或重讀 provider 刷新快取，不改領域決定）", p)
+		}
+	}
+	if pending := AuditPendingProcedures(); slices.ContainsFunc(pending, func(p string) bool { return strings.Contains(p, ".payment.") }) {
+		t.Errorf("payment 的後台方法不得是 auditPending：%v", pending)
+	}
+}
+
+// readOnly 只給讀取（Get、List、Preview）與明列的例外：新的寫入方法不能被標成 readOnly 躲過紀錄。
+// mutation：把 UpdateMembershipPlan 標成 readOnly → 這個測試失敗。
+func TestOnlyReadsAndNamedExceptionsAreReadOnly(t *testing.T) {
+	exceptions := map[string]string{
+		"RefreshPaymentAccount": "同步重讀 provider 並覆寫快取，結果由 provider 決定，不是管理員的決定",
+		"SignOut":               "結束管理員自己的 session，不是領域狀態",
+	}
+	for procedure, d := range declarations {
+		if d.audit != auditReadOnly {
+			continue
+		}
+		method := procedure[strings.LastIndex(procedure, "/")+1:]
+		if strings.HasPrefix(method, "Get") || strings.HasPrefix(method, "List") || method == "PreviewProspect" {
+			continue
+		}
+		if _, ok := exceptions[method]; !ok {
+			t.Errorf("%s 標成 readOnly 但不是讀取，也不在例外清單", procedure)
+		}
 	}
 }

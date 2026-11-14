@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -66,10 +68,13 @@ type Owners interface {
 // Deps 外部依賴；clock 由組裝點注入。Provider 為 nil 表示沒有設定收款開通：RequestAccount 什麼都不做，開通相關的呼叫回 FailedPrecondition，
 // 這時不需要 Inbox 與 Owners；設定了 Provider 時兩者必填。
 type Deps struct {
-	DB       *db.DB
-	Events   *events.Bus
-	Jobs     jobs.Enqueuer
-	Inbox    *inbox.Inbox
+	DB     *db.DB
+	Events *events.Bus
+	Jobs   jobs.Enqueuer
+	Inbox  *inbox.Inbox
+	// Audit 是 platform 的後台動作紀錄（D62）：管理員的寫入（重試建立、重試關閉、刪除對應）在領域變更的同一個 transaction 內寫一筆。
+	// 只有後台寫入需要它：組裝點（cmd/hawkr）一律傳入；沒有傳入時這三個寫入回錯誤、不做領域變更（沒有紀錄的後台寫入不成立）。
+	Audit    *adminaudit.Log
 	Provider Provider
 	Owners   Owners
 	Now      func() time.Time
@@ -561,8 +566,9 @@ func (s *Service) blockPurge(ctx context.Context, storeID int64, reason string) 
 	return err
 }
 
-// RetryPurge 是管理員的「重試關閉」：只有終局的列可以重試（清除終局、等待清理的時刻重設成現在，並在同一個 transaction 重新排入清理 job）。
-func (s *Service) RetryPurge(ctx context.Context, storeID int64) (model.PaymentAccount, error) {
+// RetryPurge 是管理員的「重試關閉」：只有終局的列可以重試（清除終局、等待清理的時刻重設成現在，並在同一個 transaction 重新排入清理 job、寫一筆後台紀錄，
+// 紀錄說的是「已要求重試」：關閉本身由之後的清理 job 呼叫 provider）。
+func (s *Service) RetryPurge(ctx context.Context, actor adminaudit.Actor, storeID int64) (model.PaymentAccount, error) {
 	if err := model.Positive(storeID); err != nil {
 		return model.PaymentAccount{}, err
 	}
@@ -585,6 +591,9 @@ func (s *Service) RetryPurge(ctx context.Context, storeID int64) (model.PaymentA
 		if out, err = q.RestartPaymentAccountPurge(ctx, store.RestartPaymentAccountPurgeParams{StoreID: storeID, Now: s.d.Now().UTC()}); err != nil {
 			return err
 		}
+		if err := s.audit(ctx, actor, storeID, map[string]any{"outcome": "requested", "blocked_reason": codeOf(locked.PurgeBlockedReason)}); err != nil {
+			return err
+		}
 		return enqueuePurge(ctx, s.d.Jobs, storeID)
 	})
 	if err != nil {
@@ -593,10 +602,10 @@ func (s *Service) RetryPurge(ctx context.Context, storeID int64) (model.PaymentA
 	return ToModel(out, s.d.Now().UTC()), nil
 }
 
-// DeleteMapping 是管理員的「已在金流商處理，刪除對應」：只有終局的列可以做；同一個 transaction 寫一筆只增不改的紀錄（店家、provider、外部 ID、操作的管理員與時間，D60）
-// 並刪列（外部帳戶在 inbox 的未處理事件標為已處理）。不呼叫 provider。紀錄比列活得久，可由 MappingDeletions 讀回。
-func (s *Service) DeleteMapping(ctx context.Context, storeID, adminID int64) error {
-	if err := model.Positive(storeID, adminID); err != nil {
+// DeleteMapping 是管理員的「已在金流商處理，刪除對應」：只有終局的列可以做；同一個 transaction 寫一筆後台紀錄（platform adminaudit：誰、何時、哪家店，detail 帶 provider 與
+// 外部 ID 與終局原因代碼，D62）並刪列（外部帳戶在 inbox 的未處理事件標為已處理）。不呼叫 provider。紀錄比列活得久，由 cmd/hawkr 的營運子命令讀回。
+func (s *Service) DeleteMapping(ctx context.Context, actor adminaudit.Actor, storeID int64) error {
+	if err := model.Positive(storeID); err != nil {
 		return err
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -611,29 +620,39 @@ func (s *Service) DeleteMapping(ctx context.Context, storeID, adminID int64) err
 		if locked.PurgeBlockedAt == nil {
 			return apperr.FailedPrecondition("收款帳戶的清理不在無法關閉的狀態")
 		}
-		if err := q.InsertPaymentMappingDeletion(ctx, store.InsertPaymentMappingDeletionParams{
-			StoreID: storeID, Provider: locked.Provider, ExternalAccountID: locked.ExternalAccountID, AdminID: adminID, Now: s.d.Now().UTC(),
-		}); err != nil {
+		detail := map[string]any{"provider": locked.Provider, "blocked_reason": codeOf(locked.PurgeBlockedReason)}
+		if locked.ExternalAccountID != nil {
+			detail["external_account_id"] = *locked.ExternalAccountID
+		}
+		if err := s.audit(ctx, actor, storeID, detail); err != nil {
 			return err
 		}
 		return s.deleteLocked(ctx, q, storeID)
 	})
 }
 
-// MappingDeletions 讀回店家的「刪除對應」紀錄（新的在前）。
-func (s *Service) MappingDeletions(ctx context.Context, storeID int64) ([]model.MappingDeletion, error) {
-	if err := model.Positive(storeID); err != nil {
-		return nil, err
+// auditTargetType 是後台紀錄裡收款帳戶的對象種類；對象 ID 是店家 ID（擁有者）。
+const auditTargetType = "payment_account"
+
+// errAuditNotConfigured 表示組裝漏了 Deps.Audit：後台寫入沒有紀錄就不成立。
+var errAuditNotConfigured = errors.New("payment：沒有設定後台動作紀錄（Deps.Audit）")
+
+// audit 在呼叫方的 transaction 內寫一筆後台紀錄。
+func (s *Service) audit(ctx context.Context, actor adminaudit.Actor, storeID int64, detail map[string]any) error {
+	if s.d.Audit == nil {
+		return errAuditNotConfigured
 	}
-	rows, err := store.New(s.d.DB.Conn(ctx)).PaymentMappingDeletionsByStore(ctx, storeID)
-	if err != nil {
-		return nil, err
+	return s.d.Audit.Record(ctx, adminaudit.Entry{Actor: actor, TargetType: auditTargetType, TargetID: strconv.FormatInt(storeID, 10), Detail: detail})
+}
+
+// codeOf 取終局原因的代碼（冒號之前的部分；後面是金流商的說明，可能含細節，不進後台紀錄）。
+func codeOf(reason *string) string {
+	if reason == nil {
+		return ""
 	}
-	out := make([]model.MappingDeletion, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, model.MappingDeletion{StoreID: r.StoreID, Provider: r.Provider, ExternalAccountID: r.ExternalAccountID, AdminID: r.AdminID, DeletedAt: r.DeletedAt})
-	}
-	return out, nil
+	code, _, _ := strings.Cut(*reason, ":")
+	code, _, _ = strings.Cut(code, "：")
+	return code
 }
 
 // createWanted 是列是否還需要建立外部帳戶：還沒完成建立（第二步成功）、沒有進入建立失敗、沒有等待清理（標記了就不建立）。

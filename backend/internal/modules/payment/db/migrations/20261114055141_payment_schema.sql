@@ -1,20 +1,5 @@
 -- Add new schema named "payment"
 CREATE SCHEMA "payment";
--- Create "account_mapping_deletions" table
-CREATE TABLE "payment"."account_mapping_deletions" (
-  "id" bigint NOT NULL GENERATED ALWAYS AS IDENTITY,
-  "store_id" bigint NOT NULL,
-  "provider" text NOT NULL,
-  "external_account_id" text NULL,
-  "admin_id" bigint NOT NULL,
-  "deleted_at" timestamptz NOT NULL,
-  PRIMARY KEY ("id"),
-  CONSTRAINT "account_mapping_deletions_admin_id_check" CHECK (admin_id > 0),
-  CONSTRAINT "account_mapping_deletions_external_id_check" CHECK ((external_account_id IS NULL) OR ((char_length(external_account_id) >= 1) AND (char_length(external_account_id) <= 255))),
-  CONSTRAINT "account_mapping_deletions_store_id_check" CHECK (store_id > 0)
-);
--- Create index "account_mapping_deletions_store" to table: "account_mapping_deletions"
-CREATE INDEX "account_mapping_deletions_store" ON "payment"."account_mapping_deletions" ("store_id", "deleted_at");
 -- Create "accounts" table
 CREATE TABLE "payment"."accounts" (
   "store_id" bigint NOT NULL,

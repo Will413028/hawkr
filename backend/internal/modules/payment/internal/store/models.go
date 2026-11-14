@@ -32,12 +32,3 @@ type PaymentAccount struct {
 	PurgeBlockedAt        *time.Time
 	PurgeBlockedReason    *string
 }
-
-type PaymentAccountMappingDeletion struct {
-	ID                int64
-	StoreID           int64
-	Provider          string
-	ExternalAccountID *string
-	AdminID           int64
-	DeletedAt         time.Time
-}

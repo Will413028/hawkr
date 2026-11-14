@@ -15,6 +15,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/account"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
@@ -40,10 +41,12 @@ type Owners = account.Owners
 // Deps 是模組需要的外部依賴；clock 由組裝點注入。Provider 為 nil 表示沒有設定收款開通（核准不建立帳戶，開通相關的呼叫回 FailedPrecondition）。
 // Inbox 是 platform 的 webhook inbox：設定了 provider 時 New 把收款事件的處理登記上去。Inbox 與 Owners 只在設定了 provider 時必填。
 type Deps struct {
-	DB       *db.DB
-	Events   *events.Bus
-	Jobs     jobs.Enqueuer
-	Inbox    *inbox.Inbox
+	DB     *db.DB
+	Events *events.Bus
+	Jobs   jobs.Enqueuer
+	Inbox  *inbox.Inbox
+	// Audit 是 platform 的後台動作紀錄（D62）：管理員的寫入在領域變更的同一個 transaction 內寫一筆；組裝點一律傳入，沒有傳入時後台寫入回錯誤。
+	Audit    *adminaudit.Log
 	Provider Provider
 	Owners   Owners
 	Now      func() time.Time
@@ -58,7 +61,7 @@ type Module struct {
 // New 建立模組。
 func New(d Deps) *Module {
 	return &Module{accounts: account.New(account.Deps{
-		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Inbox: d.Inbox, Provider: d.Provider, Owners: d.Owners, Now: d.Now, Logger: d.Logger,
+		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Inbox: d.Inbox, Audit: d.Audit, Provider: d.Provider, Owners: d.Owners, Now: d.Now, Logger: d.Logger,
 	})}
 }
 
@@ -112,9 +115,6 @@ type AcquireInput = account.AcquireInput
 
 // ConfigureInput 是建立的第二步（完成設定）的輸入。
 type ConfigureInput = account.ConfigureInput
-
-// MappingDeletion 是管理員「已在金流商處理，刪除對應」的一筆紀錄。
-type MappingDeletion = model.MappingDeletion
 
 // SessionInput 是開通 session 的輸入。
 type SessionInput = account.SessionInput
@@ -235,24 +235,23 @@ func (m *Module) RefreshAccount(ctx context.Context, storeID int64) (Account, er
 	return m.accounts.Refresh(ctx, storeID)
 }
 
+// AdminActor 是後台動作的操作者與動作（platform adminaudit，D62）：handler 以管理員 ID 與 RPC 的 procedure 名稱組成。
+type AdminActor = adminaudit.Actor
+
 // RetryAccountCreate 管理員的「重試建立」：只有建立失敗的帳戶可以重試；建立結果不明且超過期限的帳戶要 acknowledgeNoProviderAccount（D63）。
-func (m *Module) RetryAccountCreate(ctx context.Context, storeID int64, acknowledgeNoProviderAccount bool) (Account, error) {
-	return m.accounts.RetryCreate(ctx, storeID, acknowledgeNoProviderAccount)
+// 呼叫方的 ctx 不得已在 transaction 內；本方法在自己的 transaction 內寫領域變更與一筆後台紀錄。
+func (m *Module) RetryAccountCreate(ctx context.Context, actor AdminActor, storeID int64, acknowledgeNoProviderAccount bool) (Account, error) {
+	return m.accounts.RetryCreate(ctx, actor, storeID, acknowledgeNoProviderAccount)
 }
 
-// RetryAccountPurge 管理員的「重試關閉」：只有清理進了終局的帳戶可以重試（清除終局、期限從現在重算並重新排入清理 job）。
-func (m *Module) RetryAccountPurge(ctx context.Context, storeID int64) (Account, error) {
-	return m.accounts.RetryPurge(ctx, storeID)
+// RetryAccountPurge 管理員的「重試關閉」：只有清理進了終局的帳戶可以重試（清除終局、期限從現在重算並重新排入清理 job，同一個 transaction 寫後台紀錄）。
+func (m *Module) RetryAccountPurge(ctx context.Context, actor AdminActor, storeID int64) (Account, error) {
+	return m.accounts.RetryPurge(ctx, actor, storeID)
 }
 
-// DeleteAccountMapping 管理員的「已在金流商處理，刪除對應」：只有清理進了終局的帳戶可以做；寫一筆只增不改的紀錄（操作的管理員與時間）並刪列，不呼叫金流商。
-func (m *Module) DeleteAccountMapping(ctx context.Context, storeID, adminID int64) error {
-	return m.accounts.DeleteMapping(ctx, storeID, adminID)
-}
-
-// AccountMappingDeletions 讀回店家的「刪除對應」紀錄（新的在前）。
-func (m *Module) AccountMappingDeletions(ctx context.Context, storeID int64) ([]MappingDeletion, error) {
-	return m.accounts.MappingDeletions(ctx, storeID)
+// DeleteAccountMapping 管理員的「已在金流商處理，刪除對應」：只有清理進了終局的帳戶可以做；同一個 transaction 寫一筆後台紀錄並刪列，不呼叫金流商。
+func (m *Module) DeleteAccountMapping(ctx context.Context, actor AdminActor, storeID int64) error {
+	return m.accounts.DeleteMapping(ctx, actor, storeID)
 }
 
 // ReceiveEvent 接收 provider 的 webhook：驗簽，同一個 transaction 寫進 platform inbox 並排入派送 job。

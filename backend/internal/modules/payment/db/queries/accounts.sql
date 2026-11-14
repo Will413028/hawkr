@@ -191,15 +191,3 @@ SET purge_blocked_at = NULL,
     updated_at = sqlc.arg(now)
 WHERE store_id = sqlc.arg(store_id) AND purge_blocked_at IS NOT NULL
 RETURNING *;
-
--- name: InsertPaymentMappingDeletion :exec
--- 管理員「已在金流商處理，刪除對應」的紀錄（只增不改；列隨後被刪，紀錄留下，D60）。
-INSERT INTO payment.account_mapping_deletions (store_id, provider, external_account_id, admin_id, deleted_at)
-VALUES (sqlc.arg(store_id), sqlc.arg(provider), sqlc.narg(external_account_id), sqlc.arg(admin_id), sqlc.arg(now));
-
--- name: PaymentMappingDeletionsByStore :many
--- 讀回某店家的「刪除對應」紀錄（操作者與時間），新的在前。
-SELECT *
-FROM payment.account_mapping_deletions
-WHERE store_id = $1
-ORDER BY deleted_at DESC, id DESC;

@@ -22,13 +22,22 @@ import (
 type AdminModule interface {
 	Account(ctx context.Context, storeID int64) (payment.Account, error)
 	RefreshAccount(ctx context.Context, storeID int64) (payment.Account, error)
-	RetryAccountCreate(ctx context.Context, storeID int64, acknowledgeNoProviderAccount bool) (payment.Account, error)
-	RetryAccountPurge(ctx context.Context, storeID int64) (payment.Account, error)
-	DeleteAccountMapping(ctx context.Context, storeID, adminID int64) error
+	RetryAccountCreate(ctx context.Context, actor payment.AdminActor, storeID int64, acknowledgeNoProviderAccount bool) (payment.Account, error)
+	RetryAccountPurge(ctx context.Context, actor payment.AdminActor, storeID int64) (payment.Account, error)
+	DeleteAccountMapping(ctx context.Context, actor payment.AdminActor, storeID int64) error
 }
 
 // errNoPrincipal 是請求通過了 rpc 的授權卻沒有管理員呼叫者：授權鏈壞了，沒有分類（internal），不是使用者的錯。
 var errNoPrincipal = errors.New("httpapi/payment：ctx 裡沒有管理員")
+
+// actorFrom 是後台紀錄的操作者：呼叫的管理員 ID 與這個 RPC 的 procedure 名稱（D62）。
+func actorFrom(ctx context.Context, procedure string) (payment.AdminActor, error) {
+	id, err := adminFrom(ctx)
+	if err != nil {
+		return payment.AdminActor{}, err
+	}
+	return payment.AdminActor{AdminID: id, Action: procedure}, nil
+}
 
 // adminFrom 取出呼叫的管理員 ID（interceptor 已經依 service 名稱擋下非管理員）。
 func adminFrom(ctx context.Context) (int64, error) {
@@ -114,7 +123,11 @@ func (h *Admin) RetryPaymentAccountCreate(ctx context.Context, req *connect.Requ
 	if err != nil {
 		return nil, err
 	}
-	acct, err := h.m.RetryAccountCreate(ctx, storeID, req.Msg.GetAcknowledgeNoProviderAccount())
+	actor, err := actorFrom(ctx, req.Spec().Procedure)
+	if err != nil {
+		return nil, err
+	}
+	acct, err := h.m.RetryAccountCreate(ctx, actor, storeID, req.Msg.GetAcknowledgeNoProviderAccount())
 	if err != nil {
 		return nil, err
 	}
@@ -127,24 +140,28 @@ func (h *Admin) RetryPaymentAccountPurge(ctx context.Context, req *connect.Reque
 	if err != nil {
 		return nil, err
 	}
-	acct, err := h.m.RetryAccountPurge(ctx, storeID)
+	actor, err := actorFrom(ctx, req.Spec().Procedure)
+	if err != nil {
+		return nil, err
+	}
+	acct, err := h.m.RetryAccountPurge(ctx, actor, storeID)
 	if err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&adminpb.RetryPaymentAccountPurgeResponse{Account: toAdminAccount(acct)}), nil
 }
 
-// DeletePaymentAccountMapping 是「已在金流商處理，刪除對應」：操作的管理員從 ctx 取，紀錄與刪列在模組的同一個 transaction；不呼叫金流商。
+// DeletePaymentAccountMapping 是「已在金流商處理，刪除對應」：操作的管理員從 ctx 取、動作是 procedure 名稱，後台紀錄與刪列在模組的同一個 transaction；不呼叫金流商。
 func (h *Admin) DeletePaymentAccountMapping(ctx context.Context, req *connect.Request[adminpb.DeletePaymentAccountMappingRequest]) (*connect.Response[adminpb.DeletePaymentAccountMappingResponse], error) {
 	storeID, err := rpc.ParseID("store_id", req.Msg.GetStoreId())
 	if err != nil {
 		return nil, err
 	}
-	adminID, err := adminFrom(ctx)
+	actor, err := actorFrom(ctx, req.Spec().Procedure)
 	if err != nil {
 		return nil, err
 	}
-	if err := h.m.DeleteAccountMapping(ctx, storeID, adminID); err != nil {
+	if err := h.m.DeleteAccountMapping(ctx, actor, storeID); err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&adminpb.DeletePaymentAccountMappingResponse{}), nil

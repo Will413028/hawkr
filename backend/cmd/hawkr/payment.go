@@ -11,6 +11,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -128,7 +129,7 @@ func newInbox(d *db.DB, jc jobs.Enqueuer, log *slog.Logger) *inbox.Inbox {
 // subscribeSellerPayout 接上（serve 與 worker 都要：同步 job 在 worker 發布，seller 的種子在子命令發布）。
 func newPayment(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, box *inbox.Inbox, provider payment.Provider, log *slog.Logger) (*payment.Module, *sellerOwners) {
 	owners := &sellerOwners{}
-	return payment.New(payment.Deps{DB: d, Events: bus, Jobs: jc, Inbox: box, Provider: provider, Owners: owners, Now: time.Now, Logger: log}), owners
+	return payment.New(payment.Deps{DB: d, Events: bus, Jobs: jc, Inbox: box, Audit: adminaudit.New(d, time.Now), Provider: provider, Owners: owners, Now: time.Now, Logger: log}), owners
 }
 
 // subscribeSellerPayout 讓 seller 在 payment 同步的 transaction 內更新開通閘門的副本與防詐 hash（Stripe 計畫 D12、D28）。seller 依賴 payment，

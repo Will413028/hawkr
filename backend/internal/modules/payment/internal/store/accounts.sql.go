@@ -271,31 +271,6 @@ func (q *Queries) InsertPaymentAccount(ctx context.Context, arg InsertPaymentAcc
 	return result.RowsAffected(), nil
 }
 
-const insertPaymentMappingDeletion = `-- name: InsertPaymentMappingDeletion :exec
-INSERT INTO payment.account_mapping_deletions (store_id, provider, external_account_id, admin_id, deleted_at)
-VALUES ($1, $2, $3, $4, $5)
-`
-
-type InsertPaymentMappingDeletionParams struct {
-	StoreID           int64
-	Provider          string
-	ExternalAccountID *string
-	AdminID           int64
-	Now               time.Time
-}
-
-// 管理員「已在金流商處理，刪除對應」的紀錄（只增不改；列隨後被刪，紀錄留下，D60）。
-func (q *Queries) InsertPaymentMappingDeletion(ctx context.Context, arg InsertPaymentMappingDeletionParams) error {
-	_, err := q.db.Exec(ctx, insertPaymentMappingDeletion,
-		arg.StoreID,
-		arg.Provider,
-		arg.ExternalAccountID,
-		arg.AdminID,
-		arg.Now,
-	)
-	return err
-}
-
 const lockPaymentAccount = `-- name: LockPaymentAccount :one
 SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_called_at, create_completed_at, create_idempotency_key, created_at, updated_at, seller_read_claimed_at, purge_pending_at, purge_blocked_at, purge_blocked_reason
 FROM payment.accounts
@@ -515,41 +490,6 @@ func (q *Queries) PaymentAccountStoreIDsByExternal(ctx context.Context, arg Paym
 			return nil, err
 		}
 		items = append(items, store_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const paymentMappingDeletionsByStore = `-- name: PaymentMappingDeletionsByStore :many
-SELECT id, store_id, provider, external_account_id, admin_id, deleted_at
-FROM payment.account_mapping_deletions
-WHERE store_id = $1
-ORDER BY deleted_at DESC, id DESC
-`
-
-// 讀回某店家的「刪除對應」紀錄（操作者與時間），新的在前。
-func (q *Queries) PaymentMappingDeletionsByStore(ctx context.Context, storeID int64) ([]PaymentAccountMappingDeletion, error) {
-	rows, err := q.db.Query(ctx, paymentMappingDeletionsByStore, storeID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []PaymentAccountMappingDeletion{}
-	for rows.Next() {
-		var i PaymentAccountMappingDeletion
-		if err := rows.Scan(
-			&i.ID,
-			&i.StoreID,
-			&i.Provider,
-			&i.ExternalAccountID,
-			&i.AdminID,
-			&i.DeletedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

@@ -4,11 +4,11 @@
 
 ## 職責
 
-收款與付款。現階段只擁有收款帳戶（Stripe 計畫 D28）：外部帳戶的本地快取、建立與同步 job、輪詢、provider 的 port 與 Stripe／fake adapter、收款事件的 inbox handler、後台的讀取、重新整理、重試建立、重試關閉與刪除對應。給 seller（核准、開通 session、個資清理）與後台用。行為規格的唯一來源是 `docs/modules/payment.md`。
+收款與付款。現階段只擁有收款帳戶（Stripe 計畫 D28）：外部帳戶的本地快取、建立與同步 job、輪詢、provider 的 port 與 Stripe／fake adapter、收款事件的 inbox handler、後台的讀取、重新整理、重試建立、重試關閉與刪除對應（留紀錄）。給 seller（核准、開通 session、個資清理）與後台用。行為規格的唯一來源是 `docs/modules/payment.md`。
 
 ## 擁有的資料
 
-schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵 `store_id`，不建跨 schema FK）、`account_mapping_deletions`（管理員「刪除對應」的紀錄，只增不改）。view 與函式在 `db/objects.sql`。webhook inbox 不在這裡：`inbox.events` 由 platform 擁有（`internal/platform/inbox`，D29）。讀取模型：無。
+schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵 `store_id`，不建跨 schema FK）。管理員的三個寫入（重試建立、重試關閉、刪除對應）在領域變更的同一個 transaction 內寫 platform 的 `adminaudit` 一筆（D62；沒有 `Deps.Audit` 時回錯誤）。守門：`TestRetryCreateAndRetryPurgeRecordOneRequestedEntryAndRollBackWithTheDomainChange`、httpapi 的 `TestEveryAuditedPaymentProcedureWritesOneRecordForTheCaller`。view 與函式在 `db/objects.sql`。webhook inbox 不在這裡：`inbox.events` 由 platform 擁有（`internal/platform/inbox`，D29）。讀取模型：無。
 
 ## 發布的讀取介面
 

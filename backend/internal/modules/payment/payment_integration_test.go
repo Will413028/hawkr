@@ -24,6 +24,7 @@ import (
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/account"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -153,6 +154,7 @@ type fixture struct {
 	bus     *events.Bus
 	jobs    *queue
 	inbox   *inbox.Inbox
+	audit   *adminaudit.Log
 	fake    *Fake
 	owners  *owners
 	module  *Module
@@ -164,7 +166,7 @@ type fixture struct {
 
 func setup(t *testing.T, steps ...testdb.Step) *fixture {
 	t.Helper()
-	steps = append(steps, testdb.Migrations(migrate.Module{Name: inbox.Schema, Dir: inbox.Migrations()}, migrate.Module{Name: "payment", Dir: Migrations()}))
+	steps = append(steps, testdb.Migrations(migrate.Module{Name: inbox.Schema, Dir: inbox.Migrations()}, migrate.Module{Name: adminaudit.Schema, Dir: adminaudit.Migrations()}, migrate.Module{Name: "payment", Dir: Migrations()}))
 	f := &fixture{db: pg.NewDB(t, steps...), bus: events.NewBus(), jobs: &queue{}, fake: NewFake(), owners: &owners{closed: map[int64]bool{}, emails: map[int64]string{}}, now: time.Date(2026, 11, 6, 4, 0, 0, 0, time.UTC)}
 	f.build(t, f.jobs)
 	events.Subscribe(f.bus, func(ctx context.Context, e PayoutAccountChanged) error {
@@ -182,8 +184,18 @@ func (f *fixture) build(t *testing.T, jc jobs.Enqueuer) {
 	log := slog.New(slog.NewTextHandler(&f.logs, nil))
 	clock := func() time.Time { return f.now }
 	f.inbox = inbox.New(inbox.Deps{DB: f.db, Jobs: jc, Now: clock, Logger: log})
-	f.module = New(Deps{DB: f.db, Events: f.bus, Jobs: jc, Inbox: f.inbox, Provider: f.fake, Owners: f.owners, Now: clock, Logger: log})
+	f.audit = adminaudit.New(f.db, clock)
+	f.module = New(Deps{DB: f.db, Events: f.bus, Jobs: jc, Inbox: f.inbox, Audit: f.audit, Provider: f.fake, Owners: f.owners, Now: clock, Logger: log})
 }
+
+// 後台紀錄的動作名稱（真實的 procedure 名稱由 httpapi 的 handler 帶進來；這裡只要模組原樣寫進紀錄）。
+const (
+	actionRetryCreate   = "/hawkr.admin.payment.v1alpha1.PaymentAdminService/RetryPaymentAccountCreate"
+	actionRetryPurge    = "/hawkr.admin.payment.v1alpha1.PaymentAdminService/RetryPaymentAccountPurge"
+	actionDeleteMapping = "/hawkr.admin.payment.v1alpha1.PaymentAdminService/DeletePaymentAccountMapping"
+)
+
+func admin(action string) AdminActor { return AdminActor{AdminID: 7, Action: action} }
 
 func must(t *testing.T, err error) {
 	t.Helper()
@@ -386,7 +398,7 @@ func TestEnsureWithoutAContactEmailRecordsACreateFailureAndNeverCallsTheProvider
 		t.Fatalf("帳戶=%+v，預期沒有外部帳戶且記下建立失敗", a)
 	}
 	f.owners.setEmail(s, "late@example.com")
-	_, err := f.module.RetryAccountCreate(ctx, s, false)
+	_, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, false)
 	must(t, err)
 	f.ensure(t, s)
 	if got := f.fake.ConfigureEmails(); !slices.Equal(got, []string{"late@example.com"}) {
@@ -807,15 +819,15 @@ func TestCreateFailureAfterTheLastAttemptQueuesAReviewItemAndRetryClearsIt(t *te
 	if ensures, _, _ := f.fake.Calls(); ensures != 2 {
 		t.Fatalf("失敗之後 job 又呼叫了 provider：%d 次", ensures)
 	}
-	retried, err := f.module.RetryAccountCreate(ctx, s, false)
+	retried, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, false)
 	must(t, err)
 	if retried.CreateFailedAt != nil || len(f.jobs.storeIDs(t, kindEnsure)) != 2 || len(f.reviewItems(t, f.now)) != 0 {
 		t.Fatalf("重試後=%+v", retried)
 	}
-	if _, err := f.module.RetryAccountCreate(ctx, s, false); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, false); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("不是建立失敗的狀態重試 err=%v", err)
 	}
-	if _, err := f.module.RetryAccountCreate(ctx, s+1000, false); apperr.KindOf(err) != apperr.KindNotFound {
+	if _, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s+1000, false); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("沒有帳戶的擁有者重試 err=%v", err)
 	}
 	f.fake.FailAcquire(ErrPermanent)
@@ -823,7 +835,7 @@ func TestCreateFailureAfterTheLastAttemptQueuesAReviewItemAndRetryClearsIt(t *te
 	if a := f.account(t, s); a.CreateFailedAt == nil {
 		t.Fatalf("永久失敗沒有記成建立失敗：%+v", a)
 	}
-	_, err = f.module.RetryAccountCreate(ctx, s, false)
+	_, err = f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, false)
 	must(t, err)
 	f.ensure(t, s)
 }
@@ -1290,7 +1302,7 @@ func TestAFailedAcquireKeepsTheMarkedRowWithoutExternalIDAndTheSweepRetriesIt(t 
 	if got := f.fake.Accounts(); got != 0 || f.jobs.count(kindEnsure) != before {
 		t.Fatalf("標記的列被建立：帳戶數=%d", got)
 	}
-	if _, err := f.module.RetryAccountCreate(ctx, s, false); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, false); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("標記的列重試建立 err=%v，預期 failed_precondition", err)
 	}
 	f.now = f.now.Add(24 * time.Hour)
@@ -1422,7 +1434,7 @@ func TestAFinalSecondStepFailureKeepsTheIDAndRetryResumesAtTheSecondStep(t *test
 		t.Fatalf("建立失敗的待辦項目數=%d", n)
 	}
 	acquires := len(f.fake.AcquireKeys())
-	_, err := f.module.RetryAccountCreate(ctx, s, false)
+	_, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, false)
 	must(t, err)
 	must(t, f.module.EnsureAccount(ctx, s, false))
 	if len(f.fake.AcquireKeys()) != acquires || f.account(t, s).Status != StatusActionRequired || f.fake.Accounts() != 1 {
@@ -1430,19 +1442,19 @@ func TestAFinalSecondStepFailureKeepsTheIDAndRetryResumesAtTheSecondStep(t *test
 	}
 }
 
-// 管理員「重試關閉」：只有終局的列可以（清除終局、等待清理的時刻重設成現在、重新排入清理）；「已在金流商處理，刪除對應」：只有終局的列可以，寫一筆只增不改的紀錄
-// （店家、provider、外部 ID、操作的管理員與時間）並刪列、不呼叫 provider，紀錄在列刪了之後仍可讀回。權限（payment.accounts.delete_mapping）由 adminauth 的宣告表擋，見 adminauth 的測試。
-// mutation 1：DeleteMapping 不寫紀錄 → 讀回 0 筆，失敗；mutation 2：DeleteMapping 不檢查終局 → 非終局的列也被刪，失敗；mutation 3：RetryPurge 不重設等待清理的時刻 → 重試後立刻又逾期，失敗。
+// 管理員「重試關閉」：只有終局的列可以（清除終局、等待清理的時刻重設成現在、重新排入清理，寫一筆後台紀錄）；「已在金流商處理，刪除對應」：只有終局的列可以，同一個 transaction
+// 寫一筆 adminaudit 紀錄（對象 payment_account/店家、操作的管理員、時間、detail 帶 provider 與外部 ID）並刪列、不呼叫 provider，紀錄在列刪了之後仍可讀回。權限（payment.accounts.delete_mapping）由 adminauth 的宣告表擋，見 adminauth 的測試。
+// mutation 1：DeleteMapping 不呼叫 audit.Record → 讀回 0 筆，失敗；mutation 2：DeleteMapping 不檢查終局 → 非終局的列也被刪，失敗；mutation 3：RetryPurge 不重設等待清理的時刻 → 重試後立刻又逾期，失敗。
 func TestAdminRetryPurgeAndDeleteMappingActOnlyOnTheTerminalStateAndLeaveARecord(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
 	s := f.newStore(t)
 	f.ensure(t, s)
-	if _, err := f.module.RetryAccountPurge(ctx, s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("非終局的重試關閉 err=%v，預期 failed_precondition", err)
 	}
-	if err := f.module.DeleteAccountMapping(ctx, s, 7); apperr.KindOf(err) != apperr.KindFailedPrecondition || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 1 {
+	if err := f.module.DeleteAccountMapping(ctx, admin(actionDeleteMapping), s); apperr.KindOf(err) != apperr.KindFailedPrecondition || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 1 {
 		t.Fatalf("非終局的刪除對應 err=%v，預期 failed_precondition 且列還在", err)
 	}
 	f.fake.FailClose(fmt.Errorf("%w：拒絕", ErrPermanent))
@@ -1453,7 +1465,7 @@ func TestAdminRetryPurgeAndDeleteMappingActOnlyOnTheTerminalStateAndLeaveARecord
 
 	f.now = f.now.Add(3 * 24 * time.Hour)
 	purges := f.jobs.count(kindPurge)
-	a, err := f.module.RetryAccountPurge(ctx, s)
+	a, err := f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), s)
 	must(t, err)
 	if a.PurgeBlockedAt != nil || f.jobs.count(kindPurge) != purges+1 || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND purge_pending_at = $2", s, f.now) != 1 {
 		t.Fatalf("重試關閉應清除終局、重設等待清理的時刻、排入清理：%+v", a)
@@ -1470,19 +1482,24 @@ func TestAdminRetryPurgeAndDeleteMappingActOnlyOnTheTerminalStateAndLeaveARecord
 	must(t, f.module.PurgeAccount(ctx, s2, false))
 	closes := len(f.fake.Closes())
 	f.now = f.now.Add(time.Hour)
-	must(t, f.module.DeleteAccountMapping(ctx, s2, 7))
+	must(t, f.module.DeleteAccountMapping(ctx, admin(actionDeleteMapping), s2))
 	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s2) != 0 || len(f.fake.Closes()) != closes {
 		t.Fatalf("刪除對應應該刪列且不呼叫 provider：關閉 %d→%d", closes, len(f.fake.Closes()))
 	}
-	got, err := f.module.AccountMappingDeletions(ctx, s2)
+	got, err := f.audit.List(ctx, adminaudit.Filter{Action: actionDeleteMapping})
 	must(t, err)
-	if len(got) != 1 || got[0].StoreID != s2 || got[0].Provider != FakeName || got[0].ExternalAccountID == nil || *got[0].ExternalAccountID != external2 || got[0].AdminID != 7 || !got[0].DeletedAt.Equal(f.now) {
-		t.Fatalf("紀錄=%+v，預期店家、provider、外部 ID %s、管理員 7、時間 %s", got, external2, f.now)
+	if len(got) != 1 || got[0].TargetType != "payment_account" || got[0].TargetID != fmt.Sprint(s2) || got[0].AdminID != 7 || !got[0].OccurredAt.Equal(f.now) {
+		t.Fatalf("紀錄=%+v，預期對象 payment_account/%d、管理員 7、時間 %s", got, s2, f.now)
 	}
-	if other, _ := f.module.AccountMappingDeletions(ctx, s); len(other) != 0 {
+	var detail map[string]any
+	must(t, json.Unmarshal(got[0].Detail, &detail))
+	if detail["provider"] != FakeName || detail["external_account_id"] != external2 || detail["blocked_reason"] != "provider_refused" {
+		t.Fatalf("detail=%v，預期 provider、外部 ID %s、終局原因代碼（不含金流商的說明）", detail, external2)
+	}
+	if other, _ := f.audit.List(ctx, adminaudit.Filter{TargetType: "payment_account", TargetID: fmt.Sprint(s), Action: actionDeleteMapping}); len(other) != 0 {
 		t.Fatalf("別家店的紀錄不該出現：%+v", other)
 	}
-	if err := f.module.DeleteAccountMapping(ctx, s2, 7); apperr.KindOf(err) != apperr.KindNotFound {
+	if err := f.module.DeleteAccountMapping(ctx, admin(actionDeleteMapping), s2); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("列已刪的再刪除對應 err=%v，預期 not_found", err)
 	}
 }
@@ -1928,18 +1945,6 @@ func TestAnEventForAHalfCreatedRowEnqueuesNoSyncAndIsMarkedProcessed(t *testing.
 	}
 }
 
-// 管理員讀「刪除對應」紀錄的入口和其他入口一樣檢查店家 ID。
-// mutation：MappingDeletions 拿掉 model.Positive → 0 與負數回空清單而不是 invalid_input，失敗。
-func TestAccountMappingDeletionsRejectsANonPositiveStoreID(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	for _, id := range []int64{0, -1} {
-		if _, err := f.module.AccountMappingDeletions(context.Background(), id); apperr.KindOf(err) != apperr.KindInvalidInput {
-			t.Fatalf("store %d err=%v，預期 invalid_input", id, err)
-		}
-	}
-}
-
 // cancelOnClose 在關閉時取消 job 的 ctx 並回 ctx 的錯誤，模擬 job 自己逾時被取消。
 type cancelOnClose struct {
 	*Fake
@@ -2126,7 +2131,7 @@ func TestAnUnresolvedCreatePast7DaysReachesTheTerminalStateAndNothingIsEverRepla
 		t.Fatalf("逾期的列又取得了外部 ID：%+v", a)
 	}
 	// 結果不明的清理終局不能「重試關閉」（不會有結果），只能確認後刪除對應。
-	if _, err := f.module.RetryAccountPurge(ctx, purge); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), purge); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("結果不明的終局重試關閉 err=%v，預期 failed_precondition", err)
 	}
 }
@@ -2143,7 +2148,7 @@ func TestRetryCreateOfAnUnresolvedTerminalRowNeedsAcknowledgementAndRotatesTheKe
 	// 期限內：記建立失敗之後重試，不需要確認、沿用同一把鍵。
 	f.fake.FailAcquire(ErrPermanent)
 	must(t, f.module.EnsureAccount(ctx, s, true))
-	if a, err := f.module.RetryAccountCreate(ctx, s, false); err != nil || f.key(t, s) != key || a.CreateUnresolved {
+	if a, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, false); err != nil || f.key(t, s) != key || a.CreateUnresolved {
 		t.Fatalf("期限內重試 err=%v key 變了=%v", err, f.key(t, s) != key)
 	}
 	// 超過期限：進終局。
@@ -2152,7 +2157,7 @@ func TestRetryCreateOfAnUnresolvedTerminalRowNeedsAcknowledgementAndRotatesTheKe
 	var failedAt time.Time
 	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT create_failed_at FROM payment.accounts WHERE store_id = $1", s).Scan(&failedAt))
 	ensures := f.jobs.count(kindEnsure)
-	if _, err := f.module.RetryAccountCreate(ctx, s, false); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, false); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("沒有確認 err=%v，預期 failed_precondition", err)
 	}
 	var again time.Time
@@ -2160,7 +2165,7 @@ func TestRetryCreateOfAnUnresolvedTerminalRowNeedsAcknowledgementAndRotatesTheKe
 	if f.key(t, s) != key || !again.Equal(failedAt) || f.jobs.count(kindEnsure) != ensures {
 		t.Fatal("沒有確認的重試不得改列或排入建立")
 	}
-	retried, err := f.module.RetryAccountCreate(ctx, s, true)
+	retried, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, true)
 	must(t, err)
 	if f.key(t, s) == key || retried.CreateFailedAt != nil || retried.CreateUnresolved || f.jobs.count(kindEnsure) != ensures+1 {
 		t.Fatalf("確認後=%+v 鍵沒換=%v", retried, f.key(t, s) == key)
@@ -2168,8 +2173,73 @@ func TestRetryCreateOfAnUnresolvedTerminalRowNeedsAcknowledgementAndRotatesTheKe
 	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND create_called_at = $2", s, f.now) != 1 {
 		t.Fatal("已呼叫的時刻應該重設成現在")
 	}
+	recs, err := f.audit.List(ctx, adminaudit.Filter{Action: actionRetryCreate, TargetID: fmt.Sprint(s)})
+	must(t, err)
+	if len(recs) != 2 || !strings.Contains(string(recs[0].Detail), `"key_rotated": true`) || !strings.Contains(string(recs[0].Detail), `"acknowledged_no_provider_account": true`) {
+		t.Fatalf("確認後的重試要留下已確認與已換鍵的紀錄（沒有確認而被拒絕的不留）：%+v", recs)
+	}
 	must(t, f.module.EnsureAccount(ctx, s, false))
 	if a := f.account(t, s); a.ExternalAccountID == nil || f.fake.Accounts() != 2 || a.CreateFailedAt != nil {
 		t.Fatalf("確認重試後應建立新的帳戶：%+v 帳戶數=%d", a, f.fake.Accounts())
+	}
+}
+
+func (f *fixture) auditCount(t *testing.T, action string) int {
+	t.Helper()
+	got, err := f.audit.List(context.Background(), adminaudit.Filter{Action: action})
+	must(t, err)
+	return len(got)
+}
+
+// 重試建立與重試關閉在領域變更的同一個 transaction 內寫一筆「已要求」的後台紀錄：領域變更的後半（排入 job）失敗時整個 rollback，紀錄跟著消失、列不變；成功時恰好一筆，
+// 不論 provider 之後的呼叫（那在 job 裡）。
+// mutation：Record 放在 transaction 之外（用自己的連線）→ 失敗的呼叫之後紀錄仍在；RetryCreate 或 RetryPurge 不寫紀錄 → 成功之後 0 筆，失敗。
+func TestRetryCreateAndRetryPurgeRecordOneRequestedEntryAndRollBackWithTheDomainChange(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	boom := errors.New("enqueue failed")
+
+	create := f.newStore(t)
+	f.fake.FailAcquire(ErrPermanent)
+	must(t, f.module.EnsureAccount(ctx, create, false))
+	f.jobs.failKind, f.jobs.fail = kindEnsure, boom
+	if _, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), create, false); !errors.Is(err, boom) {
+		t.Fatalf("err=%v", err)
+	}
+	if f.auditCount(t, actionRetryCreate) != 0 || f.account(t, create).CreateFailedAt == nil {
+		t.Fatal("領域變更失敗時紀錄必須跟著 rollback、列必須不變")
+	}
+	_, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), create, false)
+	must(t, err)
+	recs, err := f.audit.List(ctx, adminaudit.Filter{Action: actionRetryCreate})
+	must(t, err)
+	if len(recs) != 1 || recs[0].AdminID != 7 || recs[0].TargetType != "payment_account" || recs[0].TargetID != fmt.Sprint(create) || !strings.Contains(string(recs[0].Detail), `"requested"`) {
+		t.Fatalf("重試建立的紀錄=%+v", recs)
+	}
+
+	purge := f.newStore(t)
+	f.ensure(t, purge)
+	f.fake.FailClose(fmt.Errorf("%w：拒絕", ErrPermanent))
+	must(t, f.module.PurgeAccount(ctx, purge, false))
+	f.jobs.failKind, f.jobs.fail = kindPurge, boom
+	if _, err := f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), purge); !errors.Is(err, boom) {
+		t.Fatalf("err=%v", err)
+	}
+	if f.auditCount(t, actionRetryPurge) != 0 || f.account(t, purge).PurgeBlockedAt == nil {
+		t.Fatal("領域變更失敗時紀錄必須跟著 rollback、終局必須不變")
+	}
+	_, err = f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), purge)
+	must(t, err)
+	if f.auditCount(t, actionRetryPurge) != 1 {
+		t.Fatal("重試關閉成功應該恰好一筆紀錄")
+	}
+	// 沒有設定後台紀錄的模組：後台寫入回錯誤、不做領域變更。
+	bare := New(Deps{DB: f.db, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: time.Now, Logger: slog.Default()}), Provider: f.fake, Owners: f.owners, Now: func() time.Time { return f.now }, Logger: slog.Default()})
+	stuck := f.newStore(t)
+	f.fake.FailAcquire(ErrPermanent)
+	must(t, f.module.EnsureAccount(ctx, stuck, false))
+	if _, err := bare.RetryAccountCreate(ctx, admin(actionRetryCreate), stuck, false); err == nil || f.account(t, stuck).CreateFailedAt == nil {
+		t.Fatalf("沒有 Audit 時後台寫入必須失敗且不改列：err=%v", err)
 	}
 }

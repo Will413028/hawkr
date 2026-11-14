@@ -12,7 +12,7 @@
 - `RequestAccount` 在擁有者的 transaction 內只 INSERT（`ON CONFLICT DO NOTHING`）並排 job，不鎖既有列。守門：`TestRequestKeepsAnExistingRow`。
 - 聯絡信箱不存：建立 job 在呼叫 provider 的當下才經 `Owners.OwnerContactEmail` 讀，沒有信箱不呼叫 provider、記建立失敗。守門：`TestEnsureWithoutAContactEmailRecordsACreateFailureAndNeverCallsTheProvider`。
 - 清理是「關閉後刪除」（唯一鍵 `store_id`，D52、D59）：每一列呼叫 provider 前先標 `purge_pending_at`；`planPurge`：從沒呼叫（無 `create_called_at`）直接刪、不需要 provider；有外部 ID 外呼叫關閉（照帳戶實際的設定），成功才刪；呼叫過沒有 ID：7 天（`UnresolvedDeadline`）內以同一把鍵重送取回 ID 再關閉，超過進終局（`unresolved_creation`，不重送、不列出，D63）；問不到 provider 留列。刪列前鎖列再檢查（`lockedRowMayBeDeleted`）。
-- 清理的終局（D59、D60）：永久拒絕、結果不明逾期（`unresolved_creation`，這種終局不能重試關閉）或標記後 7 天（`PurgeDeadline`）仍不成，列進 `purge_blocked_at`：掃描不再重排，進待辦 `PAYMENT_ACCOUNT_PURGE_STUCK`，管理員重試關閉或刪除對應（寫 `account_mapping_deletions`）。守門：`TestAnUnresolvedCreatePast7DaysReachesTheTerminalStateAndNothingIsEverReplayedPastTheRetention`。
+- 清理的終局（D59、D60）：永久拒絕、結果不明逾期（`unresolved_creation`，這種終局不能重試關閉）或標記後 7 天（`PurgeDeadline`）仍不成，列進 `purge_blocked_at`：掃描不再重排，進待辦 `PAYMENT_ACCOUNT_PURGE_STUCK`，管理員重試關閉或刪除對應（都寫 platform 的 `adminaudit` 紀錄，D62）。守門：`TestAnUnresolvedCreatePast7DaysReachesTheTerminalStateAndNothingIsEverReplayedPastTheRetention`。
 - 標記的列（`purge_pending_at`，有沒有外部 ID 都一樣）不被建立、不同步、不開通 session。守門：`TestCreateIsWantedUntilTheSecondStepSucceeds`。
 - 同步在寫快照的 transaction 內發 `PayoutAccountChanged` 並以 platform inbox 標記「讀取開始前」收到的事件；handler 只排同步、不標記（對不到帳戶的除外），被合併的同步靠 `RoutePending` 再跑一輪；輪詢對有超過寬限（`eventGrace`）未處理事件的帳戶補排同步。守門：`TestAnEventArrivingWhileTheAccountIsBeingReadIsNotLostWhenItsSyncIsCoalesced`。
 - 輪詢也排 DISABLED 但原因碼不是 `rejected*`、`unsupported*`、`closed`（已在 provider 關閉）的帳戶；沒有 provider 時只重排清理。守門：`TestSweepQueuesSyncForOpenAndLiftableStatusesOnly`。
