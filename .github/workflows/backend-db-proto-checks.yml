@@ -3,7 +3,7 @@ name: backend db proto checks
 # 刪除 backend lefthook 時沒有對應 CI 的兩項檢查：
 #   (1) Atlas migration 目錄完整性：每個 migration 目錄的 atlas.sum 要和 .sql 檔一致。
 #       改了或新增 .sql 卻沒重跑 `atlas migrate hash`，go build／go test 都不會發現，
-#       要到 `hawkr migrate` 套用時才失敗。涵蓋單體模組（internal/modules/*/db）與
+#       要到 `hawkr migrate` 套用時才失敗。涵蓋單體模組（internal/modules/*/db）、平台套件（internal/platform/*/db）與
 #       還沒退場的舊服務（services/*/db）。不連資料庫。
 #   (2) protonumericlint：舊 proto 樹（backend/api/proto，Proto 管理規範 §6）對外暴露的欄位
 #       不得是 int64／int32／double；既有違規由 backend/scripts/proto/numeric-allowlist.txt

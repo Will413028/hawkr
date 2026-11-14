@@ -5,8 +5,12 @@ DROP FUNCTION seller.pub_exposable_stores(timestamptz);
 DROP FUNCTION seller.review_payuni_bind_retry(timestamptz);
 DROP VIEW seller.store_requirement_flags;
 
--- dev 的種子資料會寫入的列，與後面收緊的約束衝突，所以先刪：
--- 種子的入駐同意含 PAYUNI_TERMS（SubmitKYCAgreements），agreement_acceptances_kind_check 不再收它。
-DELETE FROM "seller"."agreement_acceptances" WHERE kind = 'PAYUNI_TERMS';
--- 種子的 KYC 識別欄位經 syncHashes 寫入 ID_CARD_NO 與 BANK_ACCOUNT 的 hash，account_identity_hashes_field_check 只收 TAX_ID 與 BANK_FINGERPRINT。
+-- 後面收緊約束、改主鍵與加 NOT NULL 欄位的表，先刪掉會讓它們失敗的退役列（依外鍵順序：問題與同意先於審核紀錄）。
+DELETE FROM "seller"."kyc_review_issues" WHERE field NOT IN ('product_type', 'website_url', 'business.company_name', 'business.tax_id', 'business.company_register_date', 'business.company_address', 'business.company_phone', 'business.company_documents');
+DELETE FROM "seller"."kyc_review_issues" WHERE review_id IN (SELECT review_id FROM "seller"."kyc_reviews" WHERE action = 'REBIND');
+DELETE FROM "seller"."agreement_acceptances" WHERE kind = 'PAYUNI_TERMS' OR submission_review_id IN (SELECT review_id FROM "seller"."kyc_reviews" WHERE action = 'REBIND');
+DELETE FROM "seller"."kyc_reviews" WHERE action = 'REBIND';
 DELETE FROM "seller"."account_identity_hashes" WHERE field NOT IN ('TAX_ID', 'BANK_FINGERPRINT');
+DELETE FROM "seller"."measure_identities" WHERE kind NOT IN ('TAX_ID', 'BANK_ACCOUNT');
+DELETE FROM "seller"."kyc_documents" WHERE slot <> 'COMPANY_DOCUMENT';
+DELETE FROM "seller"."kyc_document_accesses";
