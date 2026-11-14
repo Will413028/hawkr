@@ -8,6 +8,7 @@ name: repo hygiene
 #   new-module 產生的模組 AGENTS.md 也交給檢查器驗。
 # - shell 變數緊接全形字元：`$var，` 會被 bash 吃成變數名（set -u 下直接中止），掃全 repo 的
 #   版控 shell 腳本，規則在 scripts/check-fullwidth-var-expansion.sh。
+# - PayUni 殘留：單體與 api/hawkr 的提及只減不增，基準在 scripts/payuni-residue-baseline.json。
 
 on:
   pull_request:
@@ -38,6 +39,9 @@ jobs:
       - name: shell 變數緊接全形字元
         if: always()
         run: bash scripts/check-fullwidth-var-expansion.sh
+      - name: PayUni 殘留不增加
+        if: always()
+        run: python3 scripts/check-payuni-residue.py
       - name: AGENTS.md 規則
         if: always()
         uses: Will413028/agentfile-lint@62bd0d4e43423e146bb258cb806ee3671ea4c9a0 # v0.9.0
