@@ -39,11 +39,11 @@ func enqueueEnsure(ctx context.Context, jc jobs.Enqueuer, storeID int64) error {
 	return jc.Enqueue(ctx, args, &opts)
 }
 
-// ResolveArgs 是了結「呼叫過、沒有外部 ID」的列的 job（D63），以 store_id 為唯一鍵；由週期掃描排入，或由管理員在冪等鍵保存期內重試時排入（Replay 為真，
-// 不屬於唯一鍵）。
+// ResolveArgs 是了結「呼叫過、沒有外部 ID」的列的 job（D63），以 store_id 與 Replay 為唯一鍵；由週期掃描排入，或由管理員在冪等鍵保存期內重試時排入（Replay 為真）。
+// Replay 必須在唯一鍵內：否則管理員的重送會被併進還在重試的掃描 job，那個 job 對超過 7 天的列只標建立失敗、不重送，後台紀錄卻寫「已重送」。
 type ResolveArgs struct {
 	StoreID int64 `json:"store_id" river:"unique"`
-	Replay  bool  `json:"replay,omitempty"`
+	Replay  bool  `json:"replay,omitempty" river:"unique"`
 }
 
 // Kind 是 River 的 job 種類。

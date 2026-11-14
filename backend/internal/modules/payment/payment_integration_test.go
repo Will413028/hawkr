@@ -2091,8 +2091,8 @@ func TestAnUnresolvedCreatePast7DaysReachesTheTerminalStateAndNothingIsEverRepla
 	must(t, f.module.ResolveUnresolvedAccount(ctx, create, false))
 	must(t, f.module.PurgeAccount(ctx, purge, false))
 	a := f.account(t, create)
-	if a.CreateFailedAt == nil || !a.CreateFailedAt.Equal(f.now) || !a.CreateUnresolved || a.ExternalAccountID != nil {
-		t.Fatalf("非清理的列=%+v，預期進建立失敗且標成結果不明", a)
+	if a.CreateFailedAt == nil || !a.CreateFailedAt.Equal(f.now) || a.CreateUnresolved || a.ExternalAccountID != nil {
+		t.Fatalf("非清理的列=%+v，預期進建立失敗；還在冪等鍵保存期內，所以 create_unresolved 為假", a)
 	}
 	var blocked bool
 	var reason string
@@ -2120,8 +2120,8 @@ func TestAnUnresolvedCreatePast7DaysReachesTheTerminalStateAndNothingIsEverRepla
 	if got := len(f.fake.AcquireKeys()); got != acquires || len(f.fake.Closes()) != closes {
 		t.Fatalf("逾期之後 provider 又被呼叫：取得 %d→%d 關閉 %d→%d", acquires, got, closes, len(f.fake.Closes()))
 	}
-	if a := f.account(t, create); a.ExternalAccountID != nil {
-		t.Fatalf("逾期的列又取得了外部 ID：%+v", a)
+	if a := f.account(t, create); a.ExternalAccountID != nil || !a.CreateUnresolved {
+		t.Fatalf("逾期的列=%+v，預期沒有外部 ID，且超過冪等鍵保存期後 create_unresolved 為真", a)
 	}
 	// 結果不明的清理終局不能「重試關閉」（不會有結果），只能確認後刪除對應。
 	if _, err := f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), purge); apperr.KindOf(err) != apperr.KindFailedPrecondition {
@@ -2290,5 +2290,101 @@ func TestRetryCreateAndRetryPurgeRecordOneRequestedEntryAndRollBackWithTheDomain
 	must(t, f.module.EnsureAccount(ctx, stuck, false))
 	if _, err := bare.RetryAccountCreate(ctx, admin(actionRetryCreate), stuck, false); err == nil || f.account(t, stuck).CreateFailedAt == nil {
 		t.Fatalf("沒有 Audit 時後台寫入必須失敗且不改列：err=%v", err)
+	}
+}
+
+// 管理員的重送不能被併進還在重試的掃描 job：掃描 job 對超過 7 天的列只標建立失敗、不重送，後台紀錄卻寫「已重送同一把鍵」（R8）。
+// 這裡用真的 River：先有一個排隊中的掃描了結 job，管理員在保存期內重試，必須另有一個 Replay job，跑它之後同一把鍵確實又送了一次。
+// mutation：ResolveArgs.Replay 拿掉 `river:"unique"` → 兩個 job 合併成一個（open 的了結 job=1、沒有 replay=true），失敗。
+func TestAnAdminReplayIsNotAbsorbedByAPendingSweepResolveJob(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t, testdb.Jobs())
+	jc, err := jobs.NewInsertOnly(f.db)
+	must(t, err)
+	f.build(t, jc)
+	s, id := f.calledRow(t)
+	key := f.key(t, s)
+	f.now = f.now.Add(createIdleForTest)
+	if _, _, err := f.module.SweepAccounts(ctx); err != nil {
+		t.Fatal(err)
+	}
+	open := []string{"available", "scheduled", "running", "retryable", "pending"}
+	resolveJobs := func(extra string) int64 {
+		return f.count(t, "SELECT count(*) FROM river.river_job WHERE kind=$1 AND args->>'store_id'=$2 AND state = ANY($3)"+extra, kindResolve, fmt.Sprint(s), open)
+	}
+	if n := resolveJobs(""); n != 1 {
+		t.Fatalf("掃描排入的了結 job=%d，預期 1", n)
+	}
+	f.now = f.now.Add(UnresolvedDeadline).Add(time.Hour)
+	must(t, f.module.ResolveUnresolvedAccount(ctx, s, false))
+	if _, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, false); err != nil {
+		t.Fatal(err)
+	}
+	if n := resolveJobs(" AND (args->>'replay')='true'"); n != 1 {
+		t.Fatalf("管理員的重送被併進掃描 job：replay job=%d，預期 1", n)
+	}
+	if n := resolveJobs(""); n != 2 {
+		t.Fatalf("了結 job=%d，預期掃描一個加重送一個", n)
+	}
+	must(t, f.module.ReplayUnresolvedAccount(ctx, s, false))
+	a := f.account(t, s)
+	if keys := f.fake.AcquireKeys(); len(keys) != 2 || keys[1] != key || a.ExternalAccountID == nil || *a.ExternalAccountID != id || a.CreateFailedAt != nil {
+		t.Fatalf("重送後=%+v 鍵=%v，預期同一把鍵取回 %s", a, f.fake.AcquireKeys(), id)
+	}
+}
+
+// 重送期間列被標成等待清理：取回的 ID 不能丟掉（D52）。沒進終局的列寫回 ID 並排入清理，清理走有外部 ID 的路關閉帳戶並刪列；
+// 已進終局、原因是 unresolved_creation 的列，有了 ID 之後原因不再成立：清除終局、重設等待清理、重新排入清理，不留在錯誤原因的終局。其他原因的終局不動。
+// mutation：Replay 不呼叫 replayIntoPurge（只走 SetPaymentAccountExternal）→ ID 沒寫進列、帳戶沒關，失敗；replayIntoPurge 不 Restart → 終局的列仍 blocked，失敗；
+// replayIntoPurge 對任何終局原因都 Restart → provider_refused 的列被清除終局，失敗。
+func TestAReplayThatFindsTheRowMarkedForPurgeKeepsTheIDAndPurgeClosesTheAccount(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	failedRow := func() (int64, string) {
+		s, id := f.calledRow(t)
+		_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET create_failed_at = $2 WHERE store_id = $1", s, f.now)
+		must(t, err)
+		return s, id
+	}
+	mark := func(s int64, blockedReason string) {
+		_, err := f.db.Conn(ctx).Exec(ctx, `UPDATE payment.accounts SET purge_pending_at = $2,
+			purge_blocked_at = CASE WHEN $3 = '' THEN NULL ELSE $2::timestamptz END, purge_blocked_reason = NULLIF($3, '') WHERE store_id = $1`, s, f.now, blockedReason)
+		must(t, err)
+	}
+	type tc struct {
+		name, reason string
+		restarts     bool
+	}
+	for _, c := range []tc{{"pending", "", false}, {"unresolved_terminal", "unresolved_creation：建立結果不明", true}, {"other_terminal", "provider_refused：拒絕", false}} {
+		s, id := failedRow()
+		f.fake.OnAcquire = func() { mark(s, c.reason) }
+		purges := f.jobs.count(kindPurge)
+		must(t, f.module.ReplayUnresolvedAccount(ctx, s, false))
+		var ext *string
+		var blocked bool
+		must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT external_account_id, purge_blocked_at IS NOT NULL FROM payment.accounts WHERE store_id = $1", s).Scan(&ext, &blocked))
+		if ext == nil || *ext != id {
+			t.Fatalf("%s：取回的 ID 被丟掉：%v，預期 %s", c.name, ext, id)
+		}
+		wantBlocked := c.reason != "" && !c.restarts
+		if blocked != wantBlocked {
+			t.Fatalf("%s：blocked=%v，預期 %v", c.name, blocked, wantBlocked)
+		}
+		wantPurges := purges
+		if !wantBlocked {
+			wantPurges++
+		}
+		if f.jobs.count(kindPurge) != wantPurges {
+			t.Fatalf("%s：清理 job %d→%d，預期 %d", c.name, purges, f.jobs.count(kindPurge), wantPurges)
+		}
+		if wantBlocked {
+			continue
+		}
+		must(t, f.module.PurgeAccount(ctx, s, false))
+		if !slices.Contains(f.fake.Closes(), id) || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", s) != 0 {
+			t.Fatalf("%s：清理應關閉 %s 並刪列，關閉=%v", c.name, id, f.fake.Closes())
+		}
 	}
 }

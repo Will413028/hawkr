@@ -28,6 +28,8 @@ type Fake struct {
 	AutoActive bool
 	// OnFetch 在 FetchAccount 進行中（讀取之前）執行一次，測試用來製造「讀取期間又收到事件」的交錯。
 	OnFetch func()
+	// OnAcquire 在 AcquireAccount 進行中（回應之前）執行一次，測試用來製造「呼叫期間列被標成等待清理」的交錯。
+	OnAcquire func()
 
 	mu           sync.Mutex
 	caps         Capabilities
@@ -213,6 +215,13 @@ func (f *Fake) accountFor(key string, storeID int64) string {
 
 // AcquireAccount 實作 Provider：同一個冪等鍵回同一個帳戶；帳戶已關閉之後重放同一把鍵是永久失敗（measured：409 idempotency_error）。
 func (f *Fake) AcquireAccount(ctx context.Context, in AcquireInput) (string, error) {
+	f.mu.Lock()
+	hook := f.OnAcquire
+	f.OnAcquire = nil
+	f.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.check(ctx, "AcquireAccount")

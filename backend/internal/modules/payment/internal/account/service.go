@@ -418,13 +418,17 @@ func (s *Service) Replay(ctx context.Context, storeID int64, final bool) error {
 	defer cancelWrite()
 	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
-		if _, err := q.LockPaymentAccount(ctx, storeID); err != nil {
+		locked, err := q.LockPaymentAccount(ctx, storeID)
+		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return nil
 			}
 			return err
 		}
 		now := s.d.Now().UTC()
+		if locked.PurgePendingAt != nil {
+			return s.replayIntoPurge(ctx, q, locked, id, now)
+		}
 		if _, err := q.SetPaymentAccountExternal(ctx, store.SetPaymentAccountExternalParams{StoreID: storeID, ExternalAccountID: &id, Now: now}); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return nil
@@ -436,6 +440,26 @@ func (s *Service) Replay(ctx context.Context, storeID int64, final bool) error {
 		}
 		return enqueueEnsure(ctx, s.d.Jobs, storeID)
 	})
+}
+
+// replayIntoPurge 處理重送期間列被標成等待清理的情況：取回的 ID 寫回列（SetPaymentAccountExternalForPurge），讓清理走有外部 ID 的路關閉帳戶（D52）；
+// 列已進終局且原因是 unresolved_creation（那個原因只在沒有 ID 時成立）就清除終局、重設等待清理的時刻並重新排入清理，其他原因的終局保持不動。
+func (s *Service) replayIntoPurge(ctx context.Context, q *store.Queries, locked store.PaymentAccount, id string, now time.Time) error {
+	if _, err := q.SetPaymentAccountExternalForPurge(ctx, store.SetPaymentAccountExternalForPurgeParams{StoreID: locked.StoreID, ExternalAccountID: &id, Now: now}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	if locked.PurgeBlockedAt != nil {
+		if reason := locked.PurgeBlockedReason; reason == nil || !strings.HasPrefix(*reason, blockUnresolvedCreation) {
+			return nil
+		}
+		if _, err := q.RestartPaymentAccountPurge(ctx, store.RestartPaymentAccountPurgeParams{StoreID: locked.StoreID, Now: now}); err != nil {
+			return err
+		}
+	}
+	return enqueuePurge(ctx, s.d.Jobs, locked.StoreID)
 }
 
 // ForgetOwners 在呼叫方（擁有者個資清理）的 transaction 內，為每個擁有者排入「關閉外部帳戶後刪除帳戶列」的 job（唯一鍵 store_id）：呼叫方已鎖住上層的列，
