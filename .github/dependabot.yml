@@ -285,18 +285,3 @@ updates:
         update-types:
           - "minor"
           - "patch"
-  - package-ecosystem: "maven"
-    target-branch: "dev"
-    directory: "/backend/services/java"
-    schedule:
-      interval: "weekly"
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-    cooldown:
-      default-days: 14
-    groups:
-      maven-minor-patch:
-        update-types:
-          - "minor"
-          - "patch"
