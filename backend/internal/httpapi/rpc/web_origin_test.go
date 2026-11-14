@@ -168,6 +168,16 @@ func TestWebLocalesMatchTheWebsiteRouting(t *testing.T) {
 			t.Errorf("語系 %q 的前綴 = %q（%v），website 的 as-needed 路由是 %q", locale, prefix, err, want)
 		}
 	}
+	// 反向：伺服器接受的語系網站都要有。sitePrefix 是 switch、列不出來，所以逐一探測候選語系。
+	site := map[string]bool{}
+	for _, locale := range supported {
+		site[locale] = true
+	}
+	for _, candidate := range []string{"zh-TW", "en", "zh-CN", "zh-HK", "ja", "ko", "fr", "de", "es", "th", "vi", "id", "en-US", "en-GB", "ja-JP"} {
+		if _, ok := ValidWebLocale(candidate); ok && !site[candidate] {
+			t.Errorf("伺服器接受語系 %q，但 website/lib/intl/locales.ts 的 supportedLocales 沒有它", candidate)
+		}
+	}
 	for _, bad := range []string{"", "fr", "EN", "zh", "zh-tw", "/en"} {
 		if _, ok := ValidWebLocale(bad); ok {
 			t.Errorf("ValidWebLocale(%q) 應該不通過", bad)
