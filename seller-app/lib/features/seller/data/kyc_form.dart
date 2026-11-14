@@ -157,7 +157,7 @@ KycDocs kycDocsOf(KYCApplication? app) {
   return KycDocs(
     companyDocuments: List.unmodifiable([
       for (final doc in business?.companyDocuments ?? const <KYCDocument>[])
-        if (_docOf(doc) case final converted?) converted,
+        ?_docOf(doc),
     ]),
   );
 }
@@ -394,14 +394,12 @@ KycDocs adoptSavedDocs(KycDocs current, KycDocs sent, KycDocs saved) {
     companyDocuments: identical(current.companyDocuments, sent.companyDocuments)
         ? List.unmodifiable([
             for (var i = 0; i < sent.companyDocuments.length; i++)
-              if (adopt(
-                    sent.companyDocuments[i],
-                    i < saved.companyDocuments.length
-                        ? saved.companyDocuments[i]
-                        : null,
-                  )
-                  case final doc?)
-                doc,
+              ?adopt(
+                sent.companyDocuments[i],
+                i < saved.companyDocuments.length
+                    ? saved.companyDocuments[i]
+                    : null,
+              ),
           ])
         : current.companyDocuments,
   );

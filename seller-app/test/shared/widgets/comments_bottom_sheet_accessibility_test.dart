@@ -49,7 +49,7 @@ void main() {
       ProviderScope(
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
-          builder: (_, __) => MaterialApp(
+          builder: (_, _) => MaterialApp(
             theme: AppTheme.light,
             home: Scaffold(
               body: CommentsBottomSheet(postId: 42, postRepository: repository),

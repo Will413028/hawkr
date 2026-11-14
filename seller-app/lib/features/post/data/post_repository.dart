@@ -289,10 +289,10 @@ class PostRepository with ApiRequestHelper {
     final body = <String, dynamic>{
       if (title.isNotEmpty) 'title': title,
       'content': content?.isNotEmpty == true ? content : title,
-      if (contentType != null) 'content_type': contentType,
+      'content_type': ?contentType,
       if (imageUrl != null && imageUrl.isNotEmpty) 'stagedToken': imageUrl,
       if (productId.isNotEmpty) 'productId': productId,
-      if (tags != null) 'tags': tags,
+      'tags': ?tags,
     };
     final result = await apiPost('$_app/sellers/posts', body: body);
     final data = result['code'] == 0 ? result['data'] : null;
@@ -528,7 +528,7 @@ class PostRepository with ApiRequestHelper {
       'keepAssetId': keepAssetId,
       'newStagedToken': newStagedToken,
       if (productId != null) 'productId': productId.toString(),
-      if (tags != null) 'tags': tags,
+      'tags': ?tags,
     };
     final result = await apiPut('$_app/sellers/posts/$postId', body: body);
     final data = result['code'] == 0 ? result['data'] : null;

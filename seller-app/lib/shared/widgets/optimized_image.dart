@@ -70,8 +70,8 @@ class OptimizedNetworkImage extends StatelessWidget {
         maxPixels: maxPixels,
       ),
       useOldImageOnUrlChange: gaplessPlayback,
-      placeholder: (_, __) => placeholder ?? _placeholder(),
-      errorWidget: (_, __, ___) => _error(),
+      placeholder: (_, _) => placeholder ?? _placeholder(),
+      errorWidget: (_, _, _) => _error(),
     );
 
     if (borderRadius != null) {

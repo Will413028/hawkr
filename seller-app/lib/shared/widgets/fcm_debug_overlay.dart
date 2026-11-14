@@ -178,7 +178,7 @@ class _FcmDebugPanelState extends State<FcmDebugPanel> {
                             controller: scrollController,
                             padding: const EdgeInsets.only(bottom: 24),
                             itemCount: records.length,
-                            separatorBuilder: (_, __) => const Divider(
+                            separatorBuilder: (_, _) => const Divider(
                               color: Color(0xFF2A2A2A),
                               height: 1,
                             ),

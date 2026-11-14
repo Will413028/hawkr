@@ -224,7 +224,7 @@ class ChatListScreen extends HookConsumerWidget {
           HkSpace.section,
         ),
         itemCount: allItems.length,
-        separatorBuilder: (_, __) => const SizedBox(height: HkSpace.sm),
+        separatorBuilder: (_, _) => const SizedBox(height: HkSpace.sm),
         itemBuilder: (context, index) {
           final item = allItems[index];
           final isService = item.isService;
@@ -760,8 +760,8 @@ class _ChatListLoadingSkeleton extends StatelessWidget {
         HkSpace.section,
       ),
       itemCount: 4,
-      separatorBuilder: (_, __) => const SizedBox(height: HkSpace.sm),
-      itemBuilder: (_, __) => const HkContentCard(
+      separatorBuilder: (_, _) => const SizedBox(height: HkSpace.sm),
+      itemBuilder: (_, _) => const HkContentCard(
         padding: EdgeInsets.all(HkSpace.md),
         child: SizedBox(
           height: 56,

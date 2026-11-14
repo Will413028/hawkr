@@ -18,7 +18,7 @@ void main() {
         designSize: const Size(393, 852),
         enableScaleWH: () => false,
         enableScaleText: () => false,
-        builder: (_, __) => MaterialApp(
+        builder: (_, _) => MaterialApp(
           home: Scaffold(
             body: ChatConversationTopBar(
               avatar: const ColoredBox(color: Colors.green),
@@ -60,7 +60,7 @@ void main() {
         designSize: const Size(393, 852),
         enableScaleWH: () => false,
         enableScaleText: () => false,
-        builder: (_, __) => MaterialApp(
+        builder: (_, _) => MaterialApp(
           home: MediaQuery(
             data: const MediaQueryData(textScaler: scaler),
             child: Scaffold(
@@ -117,7 +117,7 @@ void main() {
         designSize: const Size(393, 852),
         enableScaleWH: () => false,
         enableScaleText: () => false,
-        builder: (_, __) => MaterialApp(
+        builder: (_, _) => MaterialApp(
           home: Scaffold(
             body: ChatConversationHeaderContent(
               avatar: const ColoredBox(color: Colors.green),

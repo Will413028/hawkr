@@ -95,7 +95,7 @@ void main() {
         ],
         child: ScreenUtilInit(
           designSize: const Size(393, 852),
-          builder: (_, __) => const MaterialApp(home: SuspensionNoticeScreen()),
+          builder: (_, _) => const MaterialApp(home: SuspensionNoticeScreen()),
         ),
       ),
     );
@@ -208,7 +208,7 @@ void main() {
           ],
           child: ScreenUtilInit(
             designSize: const Size(393, 852),
-            builder: (_, __) =>
+            builder: (_, _) =>
                 const MaterialApp(home: SuspensionNoticeScreen()),
           ),
         ),

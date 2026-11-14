@@ -100,7 +100,7 @@ class PickerSubcatDrawer extends StatelessWidget {
                 ? ListView.builder(
                     padding: EdgeInsets.zero,
                     itemCount: 10,
-                    itemBuilder: (_, __) => PickerShimmer(
+                    itemBuilder: (_, _) => PickerShimmer(
                       child: Container(
                         height: 36.h,
                         color: AppColors.dividerLight,

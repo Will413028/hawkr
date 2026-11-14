@@ -44,7 +44,7 @@ class ChatInputBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (topSlot != null) topSlot!,
+            ?topSlot,
             _InputRow(
               controller: controller,
               focusNode: focusNode,

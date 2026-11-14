@@ -26,7 +26,7 @@ class ProductRepository with ApiRequestHelper {
         'view': 'manage',
         'page': '$page',
         'page_size': '$size',
-        if (status != null) 'status': status,
+        'status': ?status,
       },
     );
   }
@@ -63,10 +63,10 @@ class ProductRepository with ApiRequestHelper {
         'name': name,
         'categoryId': categoryId,
         if (origin != null && origin.isNotEmpty) 'origin': origin,
-        if (descriptionInput != null) 'description': descriptionInput,
+        'description': ?descriptionInput,
         if (images != null && images.isNotEmpty) 'images': images,
         if (skus != null && skus.isNotEmpty) 'skus': skus,
-        if (status != null) 'status': status,
+        'status': ?status,
       },
     );
   }
@@ -98,14 +98,14 @@ class ProductRepository with ApiRequestHelper {
     return apiPut(
       '/api/v1/app/products/$productId',
       body: {
-        if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
-        if (name != null) 'name': name,
-        if (categoryId != null) 'categoryId': categoryId,
-        if (origin != null) 'origin': origin,
-        if (descriptionInput != null) 'description': descriptionInput,
-        if (images != null) 'images': images,
-        if (skus != null) 'skus': skus,
-        if (status != null) 'status': status,
+        'idempotencyKey': ?idempotencyKey,
+        'name': ?name,
+        'categoryId': ?categoryId,
+        'origin': ?origin,
+        'description': ?descriptionInput,
+        'images': ?images,
+        'skus': ?skus,
+        'status': ?status,
       },
     );
   }
@@ -251,11 +251,7 @@ class ProductRepository with ApiRequestHelper {
   }) {
     return apiPost(
       '/api/v1/app/categories',
-      body: {
-        'name': name,
-        'parentId': parentId.toString(),
-        if (icon != null) 'icon_url': icon,
-      },
+      body: {'name': name, 'parentId': parentId.toString(), 'icon_url': ?icon},
     );
   }
 

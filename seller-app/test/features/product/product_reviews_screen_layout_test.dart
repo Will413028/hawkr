@@ -48,7 +48,7 @@ void main() {
           designSize: const Size(390, 844),
           enableScaleWH: () => false,
           enableScaleText: () => false,
-          builder: (_, __) => const MaterialApp(
+          builder: (_, _) => const MaterialApp(
             home: ProductReviewsScreen(
               sellerId: '123',
               skuId: 'sku-1',

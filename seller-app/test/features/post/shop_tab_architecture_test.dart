@@ -35,7 +35,7 @@ void main() {
       );
       addTearDown(container.dispose);
       final provider = shopTabControllerProvider('7');
-      final subscription = container.listen(provider, (_, __) {});
+      final subscription = container.listen(provider, (_, _) {});
       addTearDown(subscription.close);
       final controller = container.read(provider.notifier);
 

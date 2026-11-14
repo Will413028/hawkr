@@ -252,10 +252,7 @@ class _SellerAppHarness {
         myStoreRepositoryProvider.overrideWithValue(
           MyStoreRepository(
             SellerAppServiceClient(
-              FakeTransportBuilder().unary(SellerAppService.getMyStore, (
-                _,
-                __,
-              ) {
+              FakeTransportBuilder().unary(SellerAppService.getMyStore, (_, _) {
                 connectCalls.add(SellerAppService.getMyStore.procedure);
                 return myStoreResponse(
                   id: '42',
@@ -269,10 +266,7 @@ class _SellerAppHarness {
         ),
         sessionIdentityClientProvider.overrideWithValue(
           IdentityAppServiceClient(
-            FakeTransportBuilder().unary(IdentityAppService.getSession, (
-              _,
-              __,
-            ) {
+            FakeTransportBuilder().unary(IdentityAppService.getSession, (_, _) {
               connectCalls.add(IdentityAppService.getSession.procedure);
               return GetSessionResponse(account: Account(id: 'acc-42'));
             }).build(),
@@ -283,7 +277,7 @@ class _SellerAppHarness {
           SellerAppServiceClient(
             FakeTransportBuilder().unary(SellerAppService.getMyDashboard, (
               _,
-              __,
+              _,
             ) {
               dashboardCalls++;
               return GetMyDashboardResponse(dashboard: Dashboard());

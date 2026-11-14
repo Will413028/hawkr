@@ -85,7 +85,7 @@ void main() {
       container: c,
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
-        builder: (_, __) => const MaterialApp(home: AuthScreen()),
+        builder: (_, _) => const MaterialApp(home: AuthScreen()),
       ),
     );
     await tester.pumpWidget(screen());
@@ -140,7 +140,7 @@ void main() {
         designSize: const Size(390, 844),
         enableScaleWH: () => false,
         enableScaleText: () => false,
-        builder: (_, __) => ProviderScope(
+        builder: (_, _) => ProviderScope(
           child: MaterialApp(
             builder: (context, child) => MediaQuery(
               data: AppMediaQueryPolicy.apply(
@@ -182,7 +182,7 @@ void main() {
           designSize: const Size(414, 896),
           enableScaleWH: () => false,
           enableScaleText: () => false,
-          builder: (_, __) => ProviderScope(
+          builder: (_, _) => ProviderScope(
             child: MaterialApp(
               builder: (context, child) => MediaQuery(
                 data: MediaQuery.of(

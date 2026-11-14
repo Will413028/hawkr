@@ -34,7 +34,7 @@ void main() {
 
     test('failure keeps the mutation pending', () async {
       final coordinator = CvsShippingMutationCoordinator(
-        (_, __) => throw const ApiException(code: 9240, message: '開通失敗'),
+        (_, _) => throw const ApiException(code: 9240, message: '開通失敗'),
       );
 
       final outcome = await coordinator.apply([
@@ -51,7 +51,7 @@ void main() {
     test('double submit performs only one HTTP mutation', () async {
       final response = Completer<Map<String, dynamic>>();
       var requestCount = 0;
-      final coordinator = CvsShippingMutationCoordinator((_, __) {
+      final coordinator = CvsShippingMutationCoordinator((_, _) {
         requestCount++;
         return response.future;
       });
@@ -98,7 +98,7 @@ void main() {
       'disable without onboarding id fails instead of reporting success',
       () async {
         var requestCount = 0;
-        final coordinator = CvsShippingMutationCoordinator((_, __) async {
+        final coordinator = CvsShippingMutationCoordinator((_, _) async {
           requestCount++;
           return {'code': 0};
         });

@@ -1733,7 +1733,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
           ),
           child: AnimatedBuilder(
             animation: _ctrl,
-            builder: (_, __) {
+            builder: (_, _) {
               return Row(
                 mainAxisSize: MainAxisSize.min,
                 children: List.generate(3, (i) {
@@ -1923,8 +1923,8 @@ void _openImageViewer(BuildContext context, String content) {
         context,
         presentation: HkModalPresentation.photoZoom,
       ),
-      pageBuilder: (_, __, ___) => _ImageViewerPage(url: url!),
-      transitionsBuilder: (transitionContext, animation, __, child) =>
+      pageBuilder: (_, _, _) => _ImageViewerPage(url: url!),
+      transitionsBuilder: (transitionContext, animation, _, child) =>
           HkMotionTransitions.modal(
             context: transitionContext,
             animation: animation,

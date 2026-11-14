@@ -8,7 +8,7 @@ void main() {
     await tester.pumpWidget(
       ScreenUtilInit(
         designSize: const Size(393, 852),
-        builder: (_, __) =>
+        builder: (_, _) =>
             const MaterialApp(home: Scaffold(body: HiddenPostBadge())),
       ),
     );

@@ -976,7 +976,7 @@ Widget _buildAvatar(ImageProvider? avatar, double size) {
               width: size.w,
               height: size.w,
               gaplessPlayback: true,
-              errorBuilder: (_, __, ___) => Icon(
+              errorBuilder: (_, _, _) => Icon(
                 AppIcons.personOutline,
                 size: (size * 0.6).sp,
                 color: AppIconColors.onBrand,

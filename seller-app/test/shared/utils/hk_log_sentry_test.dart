@@ -41,7 +41,7 @@ void main() {
     Breadcrumb? captured;
     HKLog.sentryBreadcrumbSink = (crumb) => captured = crumb;
     var exceptionSinkCalled = false;
-    HKLog.sentryExceptionSink = (_, __) => exceptionSinkCalled = true;
+    HKLog.sentryExceptionSink = (_, _) => exceptionSinkCalled = true;
 
     HKLog.logW('validation failed, expected');
 
@@ -54,7 +54,7 @@ void main() {
     var breadcrumbCalled = false;
     var exceptionCalled = false;
     HKLog.sentryBreadcrumbSink = (_) => breadcrumbCalled = true;
-    HKLog.sentryExceptionSink = (_, __) => exceptionCalled = true;
+    HKLog.sentryExceptionSink = (_, _) => exceptionCalled = true;
 
     HKLog.logD('diagnostic-only');
 

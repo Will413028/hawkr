@@ -87,7 +87,7 @@ class _ProductPickerBody extends StatelessWidget {
                       vertical: 12.h,
                     ),
                     itemCount: products.length,
-                    separatorBuilder: (_, __) => SizedBox(height: 10.h),
+                    separatorBuilder: (_, _) => SizedBox(height: 10.h),
                     itemBuilder: (_, i) => _ProductPickerCard(
                       product: products[i],
                       onTap: () => Navigator.pop(ctx, products[i]),

@@ -79,7 +79,7 @@ class _TestApp extends StatelessWidget {
     return ProviderScope(
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
-        builder: (_, __) => MaterialApp(
+        builder: (_, _) => MaterialApp(
           home: SharedOrderDetailScreen(
             // 空 id 可避免 widget test 觸發後端；生產 route 會傳真實單號。
             orderId: '',

@@ -48,7 +48,7 @@ void main() {
     final container = ProviderContainer();
     addTearDown(container.dispose);
     final provider = aiEditHistoryControllerProvider;
-    final subscription = container.listen(provider, (_, __) {});
+    final subscription = container.listen(provider, (_, _) {});
     addTearDown(subscription.close);
     await container.read(provider.future);
 

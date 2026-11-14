@@ -313,7 +313,7 @@ class _CountdownBarState extends State<_CountdownBar>
       height: 3,
       child: AnimatedBuilder(
         animation: _ctrl,
-        builder: (_, __) => LayoutBuilder(
+        builder: (_, _) => LayoutBuilder(
           builder: (_, constraints) {
             final remaining = (1 - _ctrl.value).clamp(0.0, 1.0);
             return Row(

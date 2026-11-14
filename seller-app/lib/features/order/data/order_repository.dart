@@ -35,7 +35,7 @@ class OrderRepository with ApiRequestHelper {
         'view': 'seller',
         'page': '$page',
         'page_size': '$pageSize',
-        if (status != null) 'status': status,
+        'status': ?status,
       },
     );
     HKLog.logD(
@@ -55,7 +55,7 @@ class OrderRepository with ApiRequestHelper {
         'view': 'seller',
         'page': '$page',
         'page_size': '$pageSize',
-        if (status != null) 'status': status,
+        'status': ?status,
       },
     );
     return _parseOrderList(resp);

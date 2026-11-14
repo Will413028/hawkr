@@ -244,9 +244,10 @@ class _AfterSaleLookup extends SellerAfterSaleLookup {
   _AfterSaleLookup(this.afterSale);
   final AfterSaleCase? afterSale;
   @override
-  Future<Map<String, AfterSaleCase>> build() async => {
-    if (afterSale case final value?) value.orderNo: value,
-  };
+  Future<Map<String, AfterSaleCase>> build() async {
+    final value = afterSale;
+    return value == null ? {} : {value.orderNo: value};
+  }
 }
 
 const _order = OrderSummary(

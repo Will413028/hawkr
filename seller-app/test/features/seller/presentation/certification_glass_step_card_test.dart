@@ -14,7 +14,7 @@ void main() {
     await tester.pumpWidget(
       ScreenUtilInit(
         designSize: const Size(390, 844),
-        builder: (_, __) => const MaterialApp(
+        builder: (_, _) => const MaterialApp(
           home: Scaffold(
             body: Center(
               child: SizedBox(

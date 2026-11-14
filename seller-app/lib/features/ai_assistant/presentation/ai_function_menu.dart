@@ -46,10 +46,10 @@ Future<void> showAiFunctionMenu({
     barrierLabel: 'AI Function Menu',
     barrierColor: Colors.transparent,
     transitionDuration: HkMotionTransitions.durationOf(context),
-    pageBuilder: (ctx, _, __) {
+    pageBuilder: (ctx, _, _) {
       return _AiFunctionMenuOverlay(items: items, position: position);
     },
-    transitionBuilder: (ctx, anim, __, child) {
+    transitionBuilder: (ctx, anim, _, child) {
       return HkMotionTransitions.modal(
         context: ctx,
         animation: anim,

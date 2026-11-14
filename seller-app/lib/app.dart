@@ -330,7 +330,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           final keyboardDismissible = ValueListenableBuilder<int>(
             valueListenable:
                 KeyboardUnfocusController.overrideCounterListenable,
-            builder: (_, counter, __) {
+            builder: (_, counter, _) {
               final allowUnfocus = counter == 0;
               return Listener(
                 behavior: HitTestBehavior.deferToChild,

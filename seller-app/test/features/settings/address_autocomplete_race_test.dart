@@ -86,7 +86,7 @@ Widget _testApp(TgosAddressService service, Widget child) {
     overrides: [tgosAddressServiceProvider.overrideWithValue(service)],
     child: ScreenUtilInit(
       designSize: const Size(390, 844),
-      builder: (_, __) => MaterialApp(home: Scaffold(body: child)),
+      builder: (_, _) => MaterialApp(home: Scaffold(body: child)),
     ),
   );
 }

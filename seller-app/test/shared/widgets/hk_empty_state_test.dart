@@ -10,7 +10,7 @@ Widget _testApp(Widget child) => ScreenUtilInit(
   designSize: const Size(414, 896),
   minTextAdapt: true,
   splitScreenMode: true,
-  builder: (_, __) => MaterialApp(home: Scaffold(body: child)),
+  builder: (_, _) => MaterialApp(home: Scaffold(body: child)),
 );
 
 void main() {

@@ -24,11 +24,7 @@ void main() {
       overrides: [postRepositoryProvider.overrideWithValue(repository)],
     );
     provider = postListProvider;
-    subscription = container.listen(
-      provider,
-      (_, __) {},
-      fireImmediately: true,
-    );
+    subscription = container.listen(provider, (_, _) {}, fireImmediately: true);
     await container.read(provider.future);
   });
 

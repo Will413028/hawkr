@@ -293,7 +293,7 @@ class _ImageEditorTextTabState extends State<ImageEditorTextTab> {
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: _fontOptions.length,
-                      separatorBuilder: (_, __) => SizedBox(width: 8.w),
+                      separatorBuilder: (_, _) => SizedBox(width: 8.w),
                       itemBuilder: (context, index) {
                         final font = _fontOptions[index];
                         final isSelected = _selectedFontFamily == font['id'];

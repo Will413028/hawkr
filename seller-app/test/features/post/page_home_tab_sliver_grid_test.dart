@@ -43,7 +43,7 @@ void main() {
           overrides: [dioProvider.overrideWithValue(dio)],
           child: ScreenUtilInit(
             designSize: const Size(390, 844),
-            builder: (_, __) => MaterialApp(
+            builder: (_, _) => MaterialApp(
               home: Scaffold(
                 body: PageHomeTab(
                   sellerName: '測試店家',

@@ -525,7 +525,7 @@ class _AssistantReplyLoadingDotsState extends State<_AssistantReplyLoadingDots>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _ctrl,
-      builder: (_, __) => Row(
+      builder: (_, _) => Row(
         mainAxisSize: MainAxisSize.min,
         children: List.generate(3, (i) {
           final progress = _dotProgress(i);

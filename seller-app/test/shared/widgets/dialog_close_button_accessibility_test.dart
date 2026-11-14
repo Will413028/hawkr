@@ -21,7 +21,7 @@ void main() {
     await tester.pumpWidget(
       ScreenUtilInit(
         designSize: const Size(390, 844),
-        builder: (_, __) => MaterialApp(
+        builder: (_, _) => MaterialApp(
           home: Scaffold(
             body: Center(
               child: DialogCloseButton(
@@ -182,7 +182,7 @@ Future<void> _pumpCompactLargeText(WidgetTester tester, Widget child) async {
   await tester.pumpWidget(
     ScreenUtilInit(
       designSize: const Size(390, 844),
-      builder: (_, __) => MaterialApp(
+      builder: (_, _) => MaterialApp(
         builder: (context, appChild) => MediaQuery(
           data: MediaQuery.of(
             context,

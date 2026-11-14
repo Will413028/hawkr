@@ -296,11 +296,11 @@ GoRouter _routerWithShippingEntry({required StoreLoader loadStore}) {
       ),
       GoRoute(
         path: '/settings/shipping',
-        builder: (_, __) => const Scaffold(body: Text('配送頁')),
+        builder: (_, _) => const Scaffold(body: Text('配送頁')),
       ),
       GoRoute(
         path: '/main/wallet',
-        builder: (_, __) => const Scaffold(body: Text('實名認證流程')),
+        builder: (_, _) => const Scaffold(body: Text('實名認證流程')),
       ),
     ],
   );

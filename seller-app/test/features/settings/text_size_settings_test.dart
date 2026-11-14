@@ -34,7 +34,7 @@ void main() {
             enableScaleWH: () => false,
             enableScaleText: () => false,
             minTextAdapt: false,
-            builder: (_, __) => MaterialApp(
+            builder: (_, _) => MaterialApp(
               builder: (context, child) => Consumer(
                 builder: (context, ref, _) {
                   final preference = ref.watch(appTextSizeProvider);

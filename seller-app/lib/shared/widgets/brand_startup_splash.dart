@@ -106,7 +106,7 @@ class _BrandStartupGateState extends State<BrandStartupGate>
       textDirection: TextDirection.ltr,
       fit: StackFit.expand,
       children: [
-        if (_application != null) _application!,
+        ?_application,
         FadeTransition(
           opacity: ReverseAnimation(_fadeController),
           child: splash,

@@ -343,7 +343,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
           },
         );
       },
-      transitionBuilder: (transitionContext, animation, __, child) =>
+      transitionBuilder: (transitionContext, animation, _, child) =>
           HkMotionTransitions.modal(
             context: transitionContext,
             animation: animation,
@@ -389,7 +389,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    ref.listen<int>(pageTabRefreshProvider, (_, __) {
+    ref.listen<int>(pageTabRefreshProvider, (_, _) {
       _loadPosts();
     });
     return _homeWithFab();

@@ -350,7 +350,7 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
           // Listenable.merge 合併多個 Listenable，讓 AnimatedBuilder 同時響應兩者
           AnimatedBuilder(
             animation: Listenable.merge([_pullAnim, _spinCtrl]),
-            builder: (_, __) {
+            builder: (_, _) {
               // progress 為 0 時（完全收起）不渲染任何東西，節省繪製成本
               if (_pullAnim.value == 0) return const SizedBox.shrink();
               return _buildFruit(_pullAnim.value);

@@ -33,7 +33,7 @@ void main() {
           designSize: const Size(390, 844),
           enableScaleWH: () => false,
           enableScaleText: () => false,
-          builder: (_, __) => MaterialApp(
+          builder: (_, _) => MaterialApp(
             theme: AppTheme.light,
             builder: (context, child) => MediaQuery(
               data: AppMediaQueryPolicy.apply(
@@ -50,7 +50,7 @@ void main() {
                   order: _order,
                   isPending: false,
                   isLoading: false,
-                  onSetLoading: (_, __) {},
+                  onSetLoading: (_, _) {},
                   onReload: () {},
                   onReloadAndSwitchTab: (_) {},
                 ),
@@ -141,7 +141,7 @@ void main() {
         designSize: const Size(390, 844),
         enableScaleWH: () => false,
         enableScaleText: () => false,
-        builder: (_, __) => MaterialApp(
+        builder: (_, _) => MaterialApp(
           theme: AppTheme.light,
           home: Scaffold(
             body: Center(

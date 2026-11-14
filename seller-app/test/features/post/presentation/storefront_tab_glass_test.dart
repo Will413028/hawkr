@@ -13,7 +13,7 @@ void main() {
       ScreenUtilInit(
         designSize: const Size(393, 852),
         minTextAdapt: true,
-        builder: (_, __) => const MaterialApp(
+        builder: (_, _) => const MaterialApp(
           home: Scaffold(
             body: StorefrontTabCanvas(
               child: StorefrontGlassEmptyPanel(

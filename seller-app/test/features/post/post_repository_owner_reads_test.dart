@@ -81,7 +81,7 @@ Map<String, dynamic> _post(int id, {Map<String, dynamic>? product}) => {
   'sellerId': 7,
   'contentType': 'IMAGE',
   'content': '貼文$id',
-  if (product != null) 'product': product,
+  'product': ?product,
 };
 
 Map<String, dynamic> _page(

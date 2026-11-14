@@ -1333,7 +1333,7 @@ class _AiProcessingOverlayState extends State<_AiProcessingOverlay>
       child: Center(
         child: AnimatedBuilder(
           animation: Listenable.merge([_spinCtrl, _pulseCtrl]),
-          builder: (_, __) {
+          builder: (_, _) {
             final pulse = 0.9 + _pulseCtrl.value * 0.15;
             return Column(
               mainAxisSize: MainAxisSize.min,

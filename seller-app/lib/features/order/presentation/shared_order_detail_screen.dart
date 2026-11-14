@@ -1620,7 +1620,7 @@ class _OrderRatingCardState extends ConsumerState<_OrderRatingCard> {
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: data.images.length > 4 ? 4 : data.images.length,
-                    separatorBuilder: (_, __) => SizedBox(width: 8.w),
+                    separatorBuilder: (_, _) => SizedBox(width: 8.w),
                     itemBuilder: (context, index) {
                       final url = data.images[index];
                       return ClipRRect(

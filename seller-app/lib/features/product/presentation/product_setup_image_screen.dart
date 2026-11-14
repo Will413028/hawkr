@@ -839,7 +839,7 @@ class _ImageShimmerState extends State<_ImageShimmer>
 
         return AnimatedBuilder(
           animation: _controller,
-          builder: (_, __) {
+          builder: (_, _) {
             final double dx = start + (end - start) * _controller.value;
 
             return Stack(

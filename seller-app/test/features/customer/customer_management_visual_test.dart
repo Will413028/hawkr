@@ -17,7 +17,7 @@ void main() {
     await tester.pumpWidget(
       ScreenUtilInit(
         designSize: const Size(390, 844),
-        builder: (_, __) => ProviderScope(
+        builder: (_, _) => ProviderScope(
           overrides: [
             customerListProvider.overrideWith((ref) async => const []),
           ],

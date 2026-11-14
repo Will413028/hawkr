@@ -16,7 +16,7 @@ void main() {
       designSize: const Size(390, 844),
       enableScaleWH: () => false,
       enableScaleText: () => false,
-      builder: (_, __) => MaterialApp(
+      builder: (_, _) => MaterialApp(
         home: Scaffold(
           body: ReviewImageGallery(images: images, imageBuilder: imageBuilder),
         ),

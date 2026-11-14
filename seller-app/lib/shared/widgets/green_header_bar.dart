@@ -361,7 +361,7 @@ class GreenHeaderBar extends StatelessWidget {
         ),
 
         // 右側區域
-        if (trailing != null) ...trailing!,
+        ...?trailing,
       ],
     );
   }

@@ -440,7 +440,7 @@ class _OrdersTab extends HookWidget {
                     vertical: 16.h,
                   ),
                   itemCount: visibleOrders.length,
-                  separatorBuilder: (_, __) => SizedBox(height: 16.h),
+                  separatorBuilder: (_, _) => SizedBox(height: 16.h),
                   itemBuilder: (context, index) {
                     return CustomerOrderCardWidget(
                       order: visibleOrders[index],
@@ -480,7 +480,7 @@ class _CouponsTab extends StatelessWidget {
             : ListView.separated(
                 padding: EdgeInsets.fromLTRB(24.w, 16.h, 24.w, 80.h),
                 itemCount: coupons.length,
-                separatorBuilder: (_, __) => SizedBox(height: 16.h),
+                separatorBuilder: (_, _) => SizedBox(height: 16.h),
                 itemBuilder: (context, index) {
                   final coupon = coupons[index];
                   return CouponCardWidget(

@@ -238,7 +238,7 @@ class _ShareSheetState extends State<_ShareSheet>
                     SizedBox(width: 8.w),
                     AnimatedBuilder(
                       animation: _copyCtrl,
-                      builder: (_, __) {
+                      builder: (_, _) {
                         final t = _copyCtrl.value;
                         return Container(
                           padding: EdgeInsets.symmetric(

@@ -91,8 +91,8 @@ class PickerSkeletonList extends StatelessWidget {
     return ListView.separated(
       padding: EdgeInsets.symmetric(horizontal: 8.w),
       itemCount: count,
-      separatorBuilder: (_, __) => SizedBox(height: 12.h),
-      itemBuilder: (_, __) => const PickerSkeletonCard(),
+      separatorBuilder: (_, _) => SizedBox(height: 12.h),
+      itemBuilder: (_, _) => const PickerSkeletonCard(),
     );
   }
 }
@@ -225,7 +225,7 @@ class _PickerShimmerState extends State<PickerShimmer>
 
         return AnimatedBuilder(
           animation: _controller,
-          builder: (_, __) {
+          builder: (_, _) {
             final double dx = start + (end - start) * _controller.value;
             return Stack(
               children: [

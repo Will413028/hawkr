@@ -72,7 +72,7 @@ Future<void> _pumpScreen(
         designSize: const Size(390, 844),
         enableScaleWH: () => false,
         enableScaleText: () => false,
-        builder: (_, __) => MaterialApp(
+        builder: (_, _) => MaterialApp(
           theme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),

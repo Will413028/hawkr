@@ -60,7 +60,7 @@ class SellerAvatarWidget extends StatelessWidget {
       cacheWidth: (size * 3).toInt(),
       cacheHeight: (size * 3).toInt(),
       gaplessPlayback: true,
-      errorBuilder: (_, error, ___) {
+      errorBuilder: (_, error, _) {
         HKLog.logW('[SellerAvatarWidget] Avatar load failed: $error');
         return fallback;
       },

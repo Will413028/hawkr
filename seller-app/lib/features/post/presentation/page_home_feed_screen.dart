@@ -2171,7 +2171,7 @@ class _CommentAvatar extends StatelessWidget {
               width: size,
               height: size,
               gaplessPlayback: true,
-              errorBuilder: (_, __, ___) => defaultAvatar,
+              errorBuilder: (_, _, _) => defaultAvatar,
             )
           : defaultAvatar,
     );

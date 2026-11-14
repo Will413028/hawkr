@@ -14,8 +14,8 @@ void main() {
     'refType': 'DELEGATION',
     'refId': '2700000000000001',
     'resourceType': type,
-    if (id != null) 'resourceId': id,
-    if (name != null) 'resourceName': name,
+    'resourceId': ?id,
+    'resourceName': ?name,
   };
 
   group('order', () {

@@ -30,7 +30,7 @@ void main() {
     await tester.pumpWidget(
       ScreenUtilInit(
         designSize: const Size(390, 844),
-        builder: (_, __) => MaterialApp(
+        builder: (_, _) => MaterialApp(
           home: Scaffold(
             body: Align(
               alignment: Alignment.bottomCenter,

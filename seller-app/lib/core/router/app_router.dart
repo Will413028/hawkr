@@ -350,7 +350,7 @@ class _CustomerDetailRoute extends ConsumerWidget {
         .when(
           loading: () =>
               const Scaffold(body: Center(child: CircularProgressIndicator())),
-          error: (_, __) => _invalidRouteData('顧客'),
+          error: (_, _) => _invalidRouteData('顧客'),
           data: (customer) => customer == null
               ? _invalidRouteData('顧客')
               : CustomerDetailScreen(customer: customer),
@@ -374,7 +374,7 @@ class _CouponDetailRoute extends ConsumerWidget {
         .when(
           loading: () =>
               const Scaffold(body: Center(child: CircularProgressIndicator())),
-          error: (_, __) => _invalidRouteData('優惠券'),
+          error: (_, _) => _invalidRouteData('優惠券'),
           data: (coupon) => CouponDetailScreen(coupon: coupon),
         );
   }

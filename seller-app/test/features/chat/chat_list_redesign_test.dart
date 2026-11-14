@@ -35,7 +35,7 @@ void main() {
           child: ScreenUtilInit(
             designSize: const Size(390, 844),
             minTextAdapt: true,
-            builder: (_, __) => MaterialApp(
+            builder: (_, _) => MaterialApp(
               builder: (context, child) => MediaQuery(
                 data: MediaQuery.of(context).copyWith(
                   textScaler: const TextScaler.linear(1.3),
@@ -69,7 +69,7 @@ void main() {
     await tester.pumpWidget(
       ScreenUtilInit(
         designSize: const Size(390, 844),
-        builder: (_, __) => MaterialApp(
+        builder: (_, _) => MaterialApp(
           home: Scaffold(
             body: ChatEmptyState(
               isSearching: true,

@@ -40,7 +40,7 @@ void main() {
     await tester.pumpWidget(
       ScreenUtilInit(
         designSize: const Size(390, 844),
-        builder: (_, __) => ProviderScope(
+        builder: (_, _) => ProviderScope(
           child: MaterialApp(
             builder: (context, child) => MediaQuery(
               data: AppMediaQueryPolicy.apply(

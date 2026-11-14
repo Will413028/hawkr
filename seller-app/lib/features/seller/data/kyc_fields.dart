@@ -206,8 +206,7 @@ KycStep? resumeStepOf(
   Iterable<StoreField> missingStore,
 ) {
   final steps = {
-    for (final field in missing)
-      if (kycStepOfField(field) case final step?) step,
+    for (final field in missing) ?kycStepOfField(field),
     if (missingStore.any(isKnownStoreField)) KycStep.other,
   };
   for (final step in subject.steps) {

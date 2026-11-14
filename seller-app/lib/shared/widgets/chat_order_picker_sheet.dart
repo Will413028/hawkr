@@ -98,7 +98,7 @@ class _OrderPickerBody extends StatelessWidget {
                       vertical: 12.h,
                     ),
                     itemCount: orders.length,
-                    separatorBuilder: (_, __) => SizedBox(height: 10.h),
+                    separatorBuilder: (_, _) => SizedBox(height: 10.h),
                     itemBuilder: (_, i) => _OrderPickerCard(
                       order: orders[i],
                       isSeller: isSeller,

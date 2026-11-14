@@ -45,12 +45,12 @@ Future<void> showReviewImageViewer(
       context,
       presentation: HkModalPresentation.photoZoom,
     ),
-    pageBuilder: (_, __, ___) => ReviewImageViewerDialog(
+    pageBuilder: (_, _, _) => ReviewImageViewerDialog(
       images: images,
       initialIndex: safeIndex,
       imageBuilder: imageBuilder,
     ),
-    transitionBuilder: (_, animation, __, child) {
+    transitionBuilder: (_, animation, _, child) {
       return HkMotionTransitions.modal(
         context: context,
         animation: animation,
@@ -80,7 +80,7 @@ class ReviewImageGallery extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: images.length,
-        separatorBuilder: (_, __) => const SizedBox(width: HkSpace.sm),
+        separatorBuilder: (_, _) => const SizedBox(width: HkSpace.sm),
         itemBuilder: (context, index) {
           final source = images[index];
           return Semantics(
