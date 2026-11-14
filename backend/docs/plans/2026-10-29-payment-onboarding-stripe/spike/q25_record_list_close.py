@@ -23,7 +23,7 @@ def save(name, s, t):
 
 ids = []
 for store in ("990025", "990026", "990025"):
-    s, t = v2("POST", "/v2/core/accounts", {"metadata": {"store_id": store}}); ids.append(json.loads(t)["id"])
+    s, t = v2("POST", "/v2/core/accounts", {"metadata": {"store_id": store, "hawkr_namespace": "spike"}}); ids.append(json.loads(t)["id"])
 total, page = 0, "/v2/core/accounts?limit=20"
 while page:
     o = json.loads(v2("GET", page)[1]); total += len(o["data"]); page = o.get("next_page_url")

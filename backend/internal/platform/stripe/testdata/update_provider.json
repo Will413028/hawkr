@@ -1,7 +1,7 @@
 {
   "status": 200,
   "body": {
-    "id": "acct_1UbNalEexkZnFrCF",
+    "id": "acct_1UbfL5ILEcpar5qx",
     "object": "v2.core.account",
     "applied_configurations": [
       "recipient"
@@ -48,7 +48,7 @@
     },
     "contact_email": "<EMAIL-MASKED>",
     "contact_phone": null,
-    "created": "2026-11-13T16:44:47.000Z",
+    "created": "2026-11-14T11:41:47.000Z",
     "dashboard": "express",
     "identity": {
       "attestations": {
@@ -88,7 +88,8 @@
     "display_name": null,
     "future_requirements": null,
     "metadata": {
-      "store_id": "1009"
+      "store_id": "1009",
+      "hawkr_namespace": "spike"
     },
     "requirements": {
       "alternatives": [],

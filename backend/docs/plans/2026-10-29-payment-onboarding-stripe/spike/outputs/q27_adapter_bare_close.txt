@@ -1,6 +1,6 @@
-account: acct_1Ubf1KIShU43qN5p
-found: [acct_1Ubf1KIShU43qN5p]
+account: acct_1UbfM8IGmVX27b1O
+found: [acct_1UbfM8IGmVX27b1O]
 close #1: ok
 close #2: ok
-retrieve after close: stripe：帳戶 acct_1Ubf1KIShU43qN5p 的回應沒有 stripe_transfers 能力
+retrieve after close: <nil>
 found: []

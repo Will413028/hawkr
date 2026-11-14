@@ -830,9 +830,9 @@ func TestCloseAccountUnknownIDIsAPermanentErrorWithoutALookup(t *testing.T) {
 	}
 }
 
-// 列出帳戶：整份翻頁列完，只回 metadata.store_id 與 metadata.hawkr_namespace 都相符的。fixture（sandbox 錄的兩頁）錄在加入命名空間之前，
-// 帳戶 metadata 沒有 hawkr_namespace，所以一個都不符；預期的 store_id 讀自 fixture，證明比對確實是被命名空間擋下的。
-func TestListAccountIDsByStoreSkipsRecordedAccountsWithoutTheNamespace(t *testing.T) {
+// 列出帳戶：整份翻頁列完，只回 metadata.store_id 與 metadata.hawkr_namespace 都相符的。fixture 是 sandbox 錄的兩頁：有帶命名空間的空帳戶（同一家店兩個），
+// 也有加入命名空間之前建立、沒有 hawkr_namespace 的帳戶。預期值讀自 fixture：用 fixture 的命名空間只符合帶它的帳戶，用別的命名空間一個都不符。
+func TestListAccountIDsByStoreMatchesRecordedAccountsOnlyInTheirNamespace(t *testing.T) {
 	p1, p2 := loadFixture(t, "list_accounts_page1"), loadFixture(t, "list_accounts_page2")
 	type page struct {
 		Data []struct {
@@ -851,39 +851,61 @@ func TestListAccountIDsByStoreSkipsRecordedAccountsWithoutTheNamespace(t *testin
 	if first.NextPageURL == nil || second.NextPageURL != nil {
 		t.Fatalf("fixture 不是剛好兩頁")
 	}
+	namespace := ""
 	stores := map[string]bool{}
+	want := map[string][]string{}
 	for _, pg := range []page{first, second} {
 		for _, a := range pg.Data {
-			if id := a.Metadata["store_id"]; id != "" {
-				if a.Metadata["hawkr_namespace"] != "" {
-					t.Fatalf("fixture 已經帶命名空間，這個測試不再成立（重錄後改成正向比對）：%s", a.ID)
+			id := a.Metadata["store_id"]
+			if id == "" {
+				continue
+			}
+			stores[id] = true
+			if ns := a.Metadata["hawkr_namespace"]; ns != "" {
+				if namespace != "" && ns != namespace {
+					t.Fatalf("fixture 有兩個命名空間：%s、%s", namespace, ns)
 				}
-				stores[id] = true
+				namespace = ns
+				want[id] = append(want[id], a.ID)
 			}
 		}
 	}
-	if len(stores) == 0 {
-		t.Fatalf("fixture 沒有帶 store_id 的帳戶")
+	multi, bare := false, false
+	for id := range stores {
+		multi = multi || len(want[id]) > 1
+		bare = bare || len(want[id]) == 0
 	}
-	for store := range stores {
-		s := &stub{resp: func(n int) (int, string, http.Header) {
-			if n == 1 {
-				return p1.Status, string(p1.Body), nil
+	if namespace == "" || namespace == testNamespace || !multi || !bare {
+		t.Fatalf("fixture 需要同一家店帶命名空間的兩個帳戶，以及沒有命名空間的帳戶：%v", want)
+	}
+	for _, ns := range []string{namespace, testNamespace} {
+		for store := range stores {
+			s := &stub{resp: func(n int) (int, string, http.Header) {
+				if n == 1 {
+					return p1.Status, string(p1.Body), nil
+				}
+				return p2.Status, string(p2.Body), nil
+			}}
+			storeID, err := strconv.ParseInt(store, 10, 64)
+			if err != nil {
+				t.Fatal(err)
 			}
-			return p2.Status, string(p2.Body), nil
-		}}
-		storeID, err := strconv.ParseInt(store, 10, 64)
-		if err != nil {
-			t.Fatal(err)
-		}
-		ids, err := newTestClient(t, s).ListAccountIDsByStore(context.Background(), storeID)
-		if err != nil || len(ids) != 0 {
-			t.Fatalf("store %s ids=%v err=%v，沒有命名空間的帳戶不得符合", store, ids, err)
-		}
-		reqs := s.requests()
-		if len(reqs) != 2 || reqs[0].Method != "GET" || !strings.HasPrefix(reqs[0].URI, "/v2/core/accounts") || !strings.Contains(reqs[0].URI, "limit=20") ||
-			strings.Contains(reqs[0].URI, "closed") || reqs[1].URI != *first.NextPageURL {
-			t.Fatalf("請求 %+v", reqs)
+			ids, err := newTestClient(t, s, func(c *Config) { c.AccountNamespace = ns }).ListAccountIDsByStore(context.Background(), storeID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var expect []string
+			if ns == namespace {
+				expect = want[store]
+			}
+			if !slices.Equal(ids, expect) {
+				t.Fatalf("命名空間 %s 店家 %s ids=%v，預期 %v", ns, store, ids, expect)
+			}
+			reqs := s.requests()
+			if len(reqs) != 2 || reqs[0].Method != "GET" || !strings.HasPrefix(reqs[0].URI, "/v2/core/accounts") || !strings.Contains(reqs[0].URI, "limit=20") ||
+				strings.Contains(reqs[0].URI, "closed") || reqs[1].URI != *first.NextPageURL {
+				t.Fatalf("請求 %+v", reqs)
+			}
 		}
 	}
 }

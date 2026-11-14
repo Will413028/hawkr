@@ -3,14 +3,14 @@
   "body": {
     "data": [
       {
-        "id": "acct_1Ubf0NEUYvdsCkGj",
+        "id": "acct_1UbfLDITnavwPf9M",
         "object": "v2.core.account",
         "applied_configurations": [],
         "closed": false,
         "configuration": null,
         "contact_email": null,
         "contact_phone": null,
-        "created": "2026-11-14T11:20:23.000Z",
+        "created": "2026-11-14T11:41:56.000Z",
         "dashboard": null,
         "identity": null,
         "defaults": {
@@ -31,20 +31,21 @@
         "display_name": null,
         "future_requirements": null,
         "metadata": {
-          "store_id": "990025"
+          "store_id": "990025",
+          "hawkr_namespace": "spike"
         },
         "requirements": null,
         "livemode": false
       },
       {
-        "id": "acct_1Ubf0MRQTckHYvTH",
+        "id": "acct_1UbfLCILaRobr6gn",
         "object": "v2.core.account",
         "applied_configurations": [],
         "closed": false,
         "configuration": null,
         "contact_email": null,
         "contact_phone": null,
-        "created": "2026-11-14T11:20:22.000Z",
+        "created": "2026-11-14T11:41:54.000Z",
         "dashboard": null,
         "identity": null,
         "defaults": {
@@ -65,20 +66,21 @@
         "display_name": null,
         "future_requirements": null,
         "metadata": {
-          "store_id": "990026"
+          "store_id": "990025",
+          "hawkr_namespace": "spike"
         },
         "requirements": null,
         "livemode": false
       },
       {
-        "id": "acct_1Ubf0LEToB0Z2JVe",
+        "id": "acct_1UbfLCIBnW5sPYPC",
         "object": "v2.core.account",
         "applied_configurations": [],
         "closed": false,
         "configuration": null,
         "contact_email": null,
         "contact_phone": null,
-        "created": "2026-11-14T11:20:21.000Z",
+        "created": "2026-11-14T11:41:55.000Z",
         "dashboard": null,
         "identity": null,
         "defaults": {
@@ -99,7 +101,8 @@
         "display_name": null,
         "future_requirements": null,
         "metadata": {
-          "store_id": "990025"
+          "store_id": "990026",
+          "hawkr_namespace": "spike"
         },
         "requirements": null,
         "livemode": false
@@ -177,7 +180,7 @@
         "livemode": false
       }
     ],
-    "next_page_url": "/v2/core/accounts?page=page_0JLGBO6ht0OqBgdGlm80sD92DLy3JU2Jc4YqCx81QR63K4WPF7k6bZG2C4RU7414XJ3b58piEaeDn0C2N7JsGHFAcb0da7vm3Cc1dZ7ieAGXCwCB5sCNG5DF6Nn6GV02b0A&limit=5",
+    "next_page_url": "/v2/core/accounts?page=page_BYTA4A8DwBrW0cDDxq3rw8dcAWI6ZNB4E46y80NEyf22r5wZGQ0G3h3uFBww6zH5GH3bB1NLGSRD19EU0B6jB7vEDKAe0Dd95d5FW28B98ck0wr6WzFub8oS9u17NC2rO39&limit=5",
     "previous_page_url": null
   }
 }

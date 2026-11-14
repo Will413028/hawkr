@@ -1,21 +1,22 @@
 {
   "status": 200,
   "body": {
-    "id": "acct_1Ubf0LEToB0Z2JVe",
+    "id": "acct_1UbfLCILaRobr6gn",
     "object": "v2.core.account",
     "applied_configurations": [],
     "closed": true,
     "configuration": null,
     "contact_email": null,
     "contact_phone": null,
-    "created": "2026-11-14T11:20:21.000Z",
+    "created": "2026-11-14T11:41:54.000Z",
     "dashboard": null,
     "identity": null,
     "defaults": null,
     "display_name": null,
     "future_requirements": null,
     "metadata": {
-      "store_id": "990025"
+      "store_id": "990025",
+      "hawkr_namespace": "spike"
     },
     "requirements": null,
     "livemode": false

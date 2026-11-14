@@ -190,9 +190,9 @@ func TestStripeAcquireAccountSendsTheGivenKeyAndAFixedBodyOnEveryAttempt(t *test
 	}
 }
 
-// ResolveAccount 只找不建：列出帳戶（GET，不 POST），以 metadata.store_id 與 metadata.hawkr_namespace 比對。fixture（sandbox 錄的）錄在加入命名空間之前，
-// 帳戶沒有 hawkr_namespace，所以一個都不符；預期的店家 ID 讀自 fixture。
-func TestStripeResolveAccountOnlyListsAndDoesNotMatchRecordedAccountsWithoutTheNamespace(t *testing.T) {
+// ResolveAccount 只找不建：列出帳戶（GET，不 POST），以 metadata.store_id 與 metadata.hawkr_namespace 比對。fixture（sandbox 錄的）裡的帳戶不是沒有
+// hawkr_namespace 就是別的命名空間，所以一個都不符；預期的店家 ID 讀自 fixture。
+func TestStripeResolveAccountOnlyListsAndDoesNotMatchRecordedAccountsOutsideItsNamespace(t *testing.T) {
 	var methods []string
 	p1, p2 := fixtureResponder(t, "list_accounts_page1"), fixtureResponder(t, "list_accounts_page2")
 	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -210,7 +210,7 @@ func TestStripeResolveAccountOnlyListsAndDoesNotMatchRecordedAccountsWithoutTheN
 	for _, store := range stores {
 		ids, err := p.ResolveAccount(context.Background(), ResolveInput{StoreID: store})
 		if err != nil || len(ids) != 0 {
-			t.Fatalf("店家 %d：ids=%v err=%v，沒有命名空間的帳戶不得符合", store, ids, err)
+			t.Fatalf("店家 %d：ids=%v err=%v，命名空間不符的帳戶不得符合", store, ids, err)
 		}
 	}
 	if len(methods) == 0 {

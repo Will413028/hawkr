@@ -22,7 +22,7 @@ def save(name, s, t):
     print(name, s)
 
 for mode, dash in [("platform", "none"), ("provider", "express")]:
-    s, t = v2("/v2/core/accounts", {"metadata": {"store_id": "1009"}}, "spike-" + uuid.uuid4().hex); save(f"create_shell_{mode}", s, t)
+    s, t = v2("/v2/core/accounts", {"metadata": {"store_id": "1009", "hawkr_namespace": "spike"}}, "spike-" + uuid.uuid4().hex); save(f"create_shell_{mode}", s, t)
     aid = json.loads(t)["id"]
     s, t = v2(f"/v2/core/accounts/{aid}", {"contact_email": "spike@example.com", "identity": {"country": "us", "entity_type": "individual"},
         "configuration": {"recipient": {"capabilities": {"stripe_balance": {"stripe_transfers": {"requested": True}}}}},
