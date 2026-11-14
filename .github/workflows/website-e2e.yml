@@ -131,7 +131,7 @@ jobs:
         run: pnpm run test:e2e:hermetic --update-snapshots --shard="${SHARD}/8"
       - name: 上傳視覺基準
         if: steps.baseline.outputs.present != 'true' && always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: website-visual-baseline-${{ matrix.shard }}
           path: website/tests/**/*-snapshots/
@@ -139,7 +139,7 @@ jobs:
           retention-days: 30
       - name: 上傳 Playwright 報告
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: website-playwright-report-${{ matrix.shard }}
           path: |
