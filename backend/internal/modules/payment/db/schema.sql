@@ -52,6 +52,6 @@ CREATE TABLE payment.accounts (
     CONSTRAINT accounts_create_failed_check CHECK (create_failed_at IS NULL OR external_account_id IS NULL)
 );
 CREATE UNIQUE INDEX accounts_external ON payment.accounts (provider, external_account_id) WHERE external_account_id IS NOT NULL;
-CREATE INDEX accounts_poll ON payment.accounts (fetched_at NULLS FIRST, store_id) WHERE status IN ('UNDER_REVIEW', 'ACTION_REQUIRED', 'DISABLED');
+CREATE INDEX accounts_poll ON payment.accounts (store_id) WHERE status IN ('UNDER_REVIEW', 'ACTION_REQUIRED', 'DISABLED');
 CREATE INDEX accounts_create_failed ON payment.accounts (create_failed_at) WHERE create_failed_at IS NOT NULL;
 CREATE INDEX accounts_purge_pending ON payment.accounts (store_id) WHERE purge_pending_at IS NOT NULL;

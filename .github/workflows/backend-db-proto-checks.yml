@@ -18,6 +18,7 @@ on:
   pull_request:
     paths: &db_proto_paths
       - 'backend/internal/modules/*/db/**'
+      - 'backend/internal/platform/*/db/**'
       - 'backend/services/*/db/**'
       - 'backend/api/proto/**'
       - 'backend/scripts/proto/numeric-allowlist.txt'
@@ -61,7 +62,7 @@ jobs:
         run: |
           set -euo pipefail
           count=0
-          for hcl in internal/modules/*/db/atlas.hcl services/*/db/atlas.hcl; do
+          for hcl in internal/modules/*/db/atlas.hcl internal/platform/*/db/atlas.hcl services/*/db/atlas.hcl; do
             dir=$(dirname "$hcl")
             echo "=== $dir ==="
             (cd "$dir" && "$RUNNER_TEMP/atlas" migrate validate --dir file://migrations)
