@@ -356,7 +356,7 @@ func TestTakedownOfUnknownContentKindFailsTheCallersTransaction(t *testing.T) {
 	}
 }
 
-// 歸屬核對在訂閱者：買家寫的留言與討論區留言、別家店的內容、已刪除與不存在的內容都讓建立失敗，回 *TakedownContentError 指出是哪一則，措施回滾、旗標不動。
+// 歸屬核對在訂閱者：買家寫的留言與討論區留言、別家店的內容（含別家店已刪除的）、不存在的內容都讓建立失敗，回 *TakedownContentError 指出是哪一則，措施回滾、旗標不動。
 func TestTakedownRejectsContentThatIsNotTheMeasureStoresOwn(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -368,16 +368,13 @@ func TestTakedownRejectsContentThatIsNotTheMeasureStoresOwn(t *testing.T) {
 	buyer := f.asBuyer(f.newBuyer(t))
 	buyerComment := mustV[social.Comment](t)(f.module.CreateComment(ctx, buyer, social.CommentInput{PostID: w.post.ID, Body: "買家在店家貼文下的留言"}))
 	buyerEntry := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, buyer, social.ForumInput{StoreID: w.storeID, Body: "買家的討論"}))
-	deletedPost := f.publishedPost(t, w.storeID, "已刪除的貼文", "organic")
-	must(t, f.module.DeletePost(ctx, f.store(t, w.storeID), deletedPost.ID, deletedPost.Version))
-	deletedComment := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asStore(t, w.storeID), social.CommentInput{PostID: w.post.ID, Body: "待刪的留言"}))
-	must(t, f.module.DeleteComment(ctx, f.asStore(t, w.storeID), deletedComment.ID))
+	foreignDeleted := f.publishedPost(t, otherStore, "別家店已刪除的貼文", "organic")
+	must(t, f.module.DeletePost(ctx, f.store(t, otherStore), foreignDeleted.ID, foreignDeleted.Version))
 	for name, tc := range map[string]seller.ContentRef{
 		"別家店的貼文":    ref(seller.ContentPost, foreign.ID),
 		"買家的留言":     ref(seller.ContentComment, buyerComment.ID),
 		"買家的討論區留言":  ref(seller.ContentForumEntry, buyerEntry.ID),
-		"已刪除的貼文":    ref(seller.ContentPost, deletedPost.ID),
-		"已刪除的留言":    ref(seller.ContentComment, deletedComment.ID),
+		"別家店已刪除的貼文": ref(seller.ContentPost, foreignDeleted.ID),
 		"不存在的討論區留言": ref(seller.ContentForumEntry, uuid.NewV7()),
 	} {
 		err := f.db.InTx(ctx, func(ctx context.Context) error {
@@ -396,6 +393,37 @@ func TestTakedownRejectsContentThatIsNotTheMeasureStoresOwn(t *testing.T) {
 	}
 	if get, feed, _, _ := f.postVisible(t, w.post.ID); !get || !feed {
 		t.Fatal("被拒絕後貼文照常可讀")
+	}
+}
+
+// 內容在被檢舉之後被作者自己刪除：措施仍成立（計入升級），歸屬在措施自己的快照核對；訂閱者對已軟刪的內容不寫複本（沒有公開可見的東西要隱藏），其餘內容照常寫。
+func TestTakedownOfDeletedOwnContentSucceedsWithoutReplica(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	f.takedowns(t)
+	w := f.takedownWorld(t)
+	deletedPost := f.publishedPost(t, w.storeID, "已刪除的貼文", "organic")
+	must(t, f.module.DeletePost(ctx, f.store(t, w.storeID), deletedPost.ID, deletedPost.Version))
+	deletedComment := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asStore(t, w.storeID), social.CommentInput{PostID: w.post.ID, Body: "待刪的留言"}))
+	must(t, f.module.DeleteComment(ctx, f.asStore(t, w.storeID), deletedComment.ID))
+	must(t, f.db.InTx(ctx, func(ctx context.Context) error {
+		return events.Publish(ctx, f.bus, seller.MeasureCreated{
+			MeasureID: uuid.NewV7(), StoreID: w.storeID, OccurredAt: f.clock(),
+			Contents: []seller.ContentRef{ref(seller.ContentPost, deletedPost.ID), ref(seller.ContentComment, deletedComment.ID)},
+		})
+	}))
+	if n := f.scalar(t, "SELECT count(*) FROM social.content_takedowns"); n != 0 {
+		t.Fatalf("已刪除的內容不該有複本：%d", n)
+	}
+	must(t, f.db.InTx(ctx, func(ctx context.Context) error {
+		return events.Publish(ctx, f.bus, seller.MeasureCreated{
+			MeasureID: uuid.NewV7(), StoreID: w.storeID, OccurredAt: f.clock(),
+			Contents: []seller.ContentRef{ref(seller.ContentPost, deletedPost.ID), ref(seller.ContentPost, w.post.ID)},
+		})
+	}))
+	if n := f.scalar(t, "SELECT count(*) FROM social.content_takedowns"); n != 1 {
+		t.Fatalf("只有未刪除的貼文寫複本：%d", n)
 	}
 }
 
