@@ -1698,6 +1698,14 @@ export function DescriptionEditorCanvas({
 			]);
 			if (destroyed || !holderRef.current) return;
 
+			// @editorjs/list 2.x 實作了 merge()，Backspace 會把後面標題或段落的文字
+			// 併進清單最後一項而消掉原區塊；本編輯器要保留區塊邊界（story
+			// 「清單與標題交界 · Backspace 保留內容」），所以讓 core 判定清單不可合併。
+			class NonMergingListTool extends List {
+				// biome-ignore lint/suspicious/noExplicitAny: Editor.js tool types are loose
+				merge: any = undefined;
+			}
+
 			class AlignedTableTool extends Table {
 				static get sanitize() {
 					return {
@@ -1798,7 +1806,7 @@ export function DescriptionEditorCanvas({
 					},
 					list: {
 						// biome-ignore lint/suspicious/noExplicitAny: Editor.js tool types are loose
-						class: List as any,
+						class: NonMergingListTool as any,
 						// 項目支援行內樣式 / 連結（inline-run 模型）；外部貼上的 <ol>/<ul>
 						// 由 tool 的 pasteConfig（OL/UL/LI）自動轉為 list block
 						inlineToolbar: [...INLINE_TOOLS],

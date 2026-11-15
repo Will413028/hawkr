@@ -121,11 +121,6 @@ overrides:
   # 同樣抬高下限、仍在 ajv 宣告的 ^3.0.1 之內，不需要 EXCEEDS-UPSTREAM。
   # REMOVE-WHEN: requesters-demand >=3.1.8
   fast-uri: ^3.1.8
-  # GHSA-2v37-7h3g-55p8: custom generators loop indefinitely when size is
-  # zero. postcss declares `^3.3.16`, so the patched release remains inside the
-  # declared range and no EXCEEDS-UPSTREAM marker is needed.
-  # REMOVE-WHEN: requesters-demand >=3.3.18
-  nanoid: ^3.3.18
   # GHSA-73wf-gq98-2v4g: `normalizeStats` writes through to Object.prototype and
   # crashes uncaught on an untrusted `browserslist-stats.json`. Patched >=4.28.7;
   # the tree resolved 4.28.2 through three @sentry/nextjs paths (bundler-plugin-core
