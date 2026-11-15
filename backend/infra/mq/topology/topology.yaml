@@ -584,7 +584,7 @@ queues:
     routing_key: product.seller.exposure.changed.dlq
   bindings:
   - exchange: hawkr.seller
-    key: seller.exposure.changed
+    key: seller.exposure.changedx
 - name: shipping.order.paid
   dlq:
     via: shipping.webhook.dlx

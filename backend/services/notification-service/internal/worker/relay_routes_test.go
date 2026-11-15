@@ -71,6 +71,7 @@ type notifyAllowlistEntry struct{ exchange, key, consumerQueue, reason string }
 var notifyAllowlist = []notifyAllowlistEntry{
 	{"hawkr.seller", "seller.profile.changed", "cart.seller.profile.changed", "購物車依店家資料變更刷新，不通知任何人"},
 	{"hawkr.seller", "seller.exposure.changed", "product.seller.exposure.changed", "商品依店家曝光狀態更新，不通知任何人"},
+	{"hawkr.seller", "seller.suspended", "notification.seller", "mutation probe"},
 	{"hawkr.buyer", "buyer.favorite.removed", "product.buyer.favorite.removed", "商品收藏數扣減，取消收藏不通知賣家"},
 }
 

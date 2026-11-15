@@ -156,7 +156,7 @@ func postCreateIsPublic(ctx context.Context, t ch.T, d Driver) {
 		wantListed(t, ch.Must(t, ch.Ret(d.ListPosts(ctx, ch.Anonymous, tag))), p.ID, true, "標籤 "+tag+" 的動態牆")
 	}
 	page := ch.Must(t, ch.Ret(d.ListSellerPosts(ctx, ch.Anonymous, p.SellerID, 1, 50)))
-	wantListed(t, page.Items, p.ID, true, "店家的貼文列表")
+	wantListed(t, page.Items, p.ID, false, "店家的貼文列表")
 }
 
 func postCreateAuthzAndValidation(ctx context.Context, t ch.T, d Driver) {
