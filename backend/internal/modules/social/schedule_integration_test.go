@@ -734,7 +734,9 @@ func TestOwnerScheduleIsCanceledWhenTheStoreHasNoRightToPost(t *testing.T) {
 	storeID, _ := f.exposableStore(t)
 	p := f.draft(t, storeID)
 	s := f.schedule(t, storeID, p, time.Hour, f.owner())
-	f.exec(t, "UPDATE seller.stores SET status = 'CLOSED' WHERE store_id = $1", storeID)
+	f.exec(t, `WITH closure AS (
+		INSERT INTO seller.store_closures (store_id, closed_at, closed_by) VALUES ($1, $2, 'ACCOUNT_OWNER') RETURNING closed_at)
+		UPDATE seller.stores SET status = 'CLOSED', current_closed_at = (SELECT closed_at FROM closure) WHERE store_id = $1`, storeID, f.clock())
 	f.advance(time.Hour)
 	must(t, f.module.PublishScheduled(ctx, s.ID))
 	f.wantSchedule(t, s.ID, "CANCELED", "AUTHORITY_LOST")
