@@ -143,7 +143,7 @@ export function CartProductTile({
 	const atMax = typeof stock === "number" && item.quantity >= stock;
 	// 數量加減 / 數量輸入框 unavailable 時 disabled（沒理由改數量）
 	const inputDisabled =
-		isUnavailable || operationBlocked || pendingAction != null;
+		operationBlocked || pendingAction != null;
 	// 保留既有 unavailable 勾選相容行為；不可購買 row 不計入結帳，仍能逐項移除。
 	// 選取另一家店前，先用店頭「改選本店商品」切換。issue #1127 user feedback.
 	const checkboxDisabled =
