@@ -35,6 +35,7 @@ var Dependencies = map[string][]string{
 	"delegation":        {"identity", "seller", "ordering", "catalog", "social", "media"}, // 授權、session、稽核與編排全由 delegation 擁有。
 	"accountdeletion":   {"identity", "buyer", "seller"},                                  // 刪除帳號的流程管理者。
 	"accountsuspension": {"identity", "seller"},                                           // 停權與解除的唯一入口：鎖帳號、確認沒有店家、再呼叫 identity。
+	"moderation":        {"social", "seller", "buyer", "accountsuspension"},               // 社群檢舉與處置：案件、檢舉、內容快照；處分經各擁有者模組建立。
 	"reviewqueue":       {"seller", "payment"},                                            // 後台待辦：讀各來源發布的 pub_*_review_items 排序分頁。
 	"agent":             {"ordering", "catalog", "buyer", "seller", "media"},
 	"notification": {
@@ -50,6 +51,15 @@ type InternalGraph struct {
 
 // InternalDependencies 是已建立模組的內部 package 依賴圖。
 var InternalDependencies = map[string]InternalGraph{
+	"moderation": {Packages: map[string][]string{
+		"handle":    {"model", "store", "view"},
+		"model":     {},
+		"report":    {"model", "snapshot", "store", "view"},
+		"retention": {"model", "store"},
+		"snapshot":  {"model"},
+		"store":     {},
+		"view":      {"model", "store"},
+	}},
 	"payment": {Packages: map[string][]string{"account": {"model", "store"}, "model": {}, "store": {}}},
 	"social": {Packages: map[string][]string{
 		"actor":      {"model", "text", "visibility"},

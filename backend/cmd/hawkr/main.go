@@ -53,6 +53,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -420,6 +421,8 @@ func runWorker(ctx context.Context) error {
 		AdvanceStore: sellerModule.AdvanceTerminations,
 		Jobs:         jc,
 	}
+	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
+	moderationModule := moderation.New(moderation.Deps{DB: d, Social: socialModule, Seller: sellerModule, Buyer: buyerModule, Suspension: suspension, NewID: uuid.NewV7, Now: time.Now})
 	contentModule := content.New(content.Deps{DB: d, Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))
@@ -429,6 +432,7 @@ func runWorker(ctx context.Context) error {
 	payments.AddWorkers(workers)
 	box.AddWorkers(workers)
 	socialModule.AddWorkers(workers)
+	moderationModule.AddWorkers(workers)
 	discoveryModule.AddWorkers(workers)
 	agentModule.AddWorkers(workers)
 	deletion.AddWorkers(workers)
@@ -442,6 +446,7 @@ func runWorker(ctx context.Context) error {
 	periodic = append(periodic, payments.PeriodicJobs()...)
 	periodic = append(periodic, box.PeriodicJobs()...)
 	periodic = append(periodic, socialModule.PeriodicJobs()...)
+	periodic = append(periodic, moderationModule.PeriodicJobs()...)
 	periodic = append(periodic, discoveryModule.PeriodicJobs()...)
 	periodic = append(periodic, agentModule.PeriodicJobs()...)
 	periodic = append(periodic, contentModule.PeriodicJobs()...)

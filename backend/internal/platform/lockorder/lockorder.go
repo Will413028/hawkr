@@ -57,6 +57,7 @@ var Modules = []string{
 	"reviewqueue",
 	"delegation",
 	"accountsuspension",
+	"moderation",
 	"accountdeletion",
 	"notification",
 }
