@@ -1,0 +1,177 @@
+syntax = "proto3";
+
+// social 模組給前台的 API：店家貼文與留言的公開讀取。寫入與互動（讚、留言、瀏覽）在 SocialAppService 與 RecordPostView（A7-2b 起）。
+//
+// ID 是不透明的字串（貼文與留言是 UUID，店家是過渡期的十進位整數字串），client 不解析、不轉數字
+// （ADR 2026-09-25-row-identity-by-data-kind D5）。圖片是 hawkr.common.v1alpha1.Image，店家卡片是 hawkr.common.v1alpha1.StoreCard。
+//
+// 帶登入憑證的請求，回應可能依觀看者而定（viewer_* 欄位、被觀看者封鎖的買家的留言不出現），整個回應是 private, no-store；
+// 不帶憑證的請求才是可共享快取的版本（API 設計規範（Connect）第九節）。停權的帳號與無效的憑證以訪客讀取。
+package hawkr.social.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/image.proto";
+import "hawkr/common/v1alpha1/store_card.proto";
+
+// SocialPublicService 是任何人都能讀的貼文與留言，不需要登入。
+service SocialPublicService {
+  // GetPost 讀一篇觀看者可讀的貼文：已發布、沒有被下架或平台隱藏，而且店家不是被觀看者個人封鎖的。其他一律回 not_found，
+  // 不區分原因。店主讀自己店的貼文不套個人封鎖。這個方法不計瀏覽數，瀏覽由 RecordPostView 另外記錄。
+  rpc GetPost(GetPostRequest) returns (GetPostResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListPosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶 store_id 是全站動態牆，帶了是該店的貼文頁。
+  // 觀看者個人封鎖的店不出現在動態牆，過濾在分頁之前，所以一頁可以少於 page_size，結束只看 next_page_token。
+  rpc ListPosts(ListPostsRequest) returns (ListPostsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListComments 列出貼文的頂層留言，或某則頂層留言的回覆，依建立時間舊到新。刪除或隱藏而底下有可見回覆的頂層留言是佔位項目
+  // （只有 id、post_id、create_time、reply_count 與 state）；與觀看者任一方向有個人封鎖的買家的留言連同回覆整則不出現。
+  // 貼文讀不到時回 not_found。
+  rpc ListComments(ListCommentsRequest) returns (ListCommentsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // SuggestTrendingPosts 是「本週主題」：最近發布的 30 篇觀看者可讀的貼文中，瀏覽數最高的前 max_results 篇（同分以發布時間、ID 排序）。
+  // 沒有分頁，時間窗不是日期而是「最近 30 篇」，所以回傳的篇數不超過 30，也可能更少。
+  rpc SuggestTrendingPosts(SuggestTrendingPostsRequest) returns (SuggestTrendingPostsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+// ActorKind 是互動者的種類：買家或店家。
+enum ActorKind {
+  ACTOR_KIND_UNSPECIFIED = 0;
+  ACTOR_KIND_BUYER = 1;
+  ACTOR_KIND_STORE = 2;
+}
+
+// CommentState 是留言列表項目的狀態。
+enum CommentState {
+  COMMENT_STATE_UNSPECIFIED = 0;
+  // 有內文與作者。
+  COMMENT_STATE_VISIBLE = 1;
+  // 作者或店家刪除；只有底下有可見回覆時才以佔位項目出現。
+  COMMENT_STATE_DELETED = 2;
+  // 被平台隱藏或內容下架；只有底下有可見回覆時才以佔位項目出現。
+  COMMENT_STATE_HIDDEN = 3;
+}
+
+// Hashtag 是貼文的一個標籤。
+message Hashtag {
+  // 正規化後的名稱，用來比對與連結。
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 使用者輸入的樣子，用來顯示。
+  string display = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Post 是一篇公開的貼文。
+message Post {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 發文的店家。店家卡片讀不到時不設。
+  hawkr.common.v1alpha1.StoreCard store = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string body = 3;
+  // 貼文的圖片，沒有圖時不設。
+  hawkr.common.v1alpha1.Image image = 4;
+  // 貼文帶的商品 ID，沒有時不設。
+  optional string product_id = 5;
+  repeated Hashtag hashtags = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 第一次發布的時間；下架後再發布沿用。
+  google.protobuf.Timestamp publish_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 like_count = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 comment_count = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 view_count = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 share_count = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 這篇貼文的單篇網址（絕對網址，由伺服器組，分享用）；client 不自己拼。
+  string url = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者此刻能不能在這篇貼文留言：訪客是 false；買家在這家店沒有被封鎖時是 true；店主讀自己店的貼文是 true。
+  // 這是顯示用的提示，寫入時伺服器仍會檢查。
+  bool viewer_can_comment = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Actor 是留言的作者，名稱與頭像在讀取時由 buyer、seller 補。
+message Actor {
+  ActorKind kind = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 買家或店家的 ID（依 kind）；已刪除的買家仍有 ID，但沒有名稱與頭像。
+  string id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional string name = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.Image avatar = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Comment 是留言列表的一個項目（頂層留言或回覆）。
+message Comment {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string post_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 回覆所屬的頂層留言；頂層留言不設。
+  optional string parent_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 回覆針對的那一則留言；沒有時不設。
+  optional string reply_to_id = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  CommentState state = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 只有 VISIBLE 的項目有作者與內文。
+  Actor author = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string body = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 like_count = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 reply_count = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者是否讚過；訪客是 false。
+  bool viewer_liked = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 這則留言是不是觀看者自己的某個身分（買家或此刻的店）寫的。
+  bool is_mine = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者能不能編輯：只有 VISIBLE 而且是自己的。
+  bool viewer_can_edit = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者能不能刪除：VISIBLE 的自己的留言，或這篇貼文是自己的店的。
+  bool viewer_can_delete = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者能不能回覆：VISIBLE，而且觀看者能在這篇貼文留言（見 Post.viewer_can_comment）。
+  bool viewer_can_reply = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message GetPostRequest {
+  // 貼文 ID。
+  string post_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetPostResponse {
+  Post post = 1;
+}
+
+message ListPostsRequest {
+  // 預設 20，上限 50。
+  int32 page_size = 1;
+  string page_token = 2;
+  // 只列這家店的貼文；不設是全站動態牆。page_token 只能用在同一個 store_id。
+  optional string store_id = 3;
+}
+
+message ListPostsResponse {
+  repeated Post posts = 1;
+  string next_page_token = 2;
+}
+
+message ListCommentsRequest {
+  // 貼文 ID。
+  string post_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 預設 20，上限 50。
+  int32 page_size = 2;
+  string page_token = 3;
+  // 設了是該頂層留言的回覆；不設是貼文的頂層留言。page_token 只能用在同一組 post_id 與 parent_id。
+  optional string parent_id = 4;
+}
+
+message ListCommentsResponse {
+  repeated Comment comments = 1;
+  string next_page_token = 2;
+}
+
+message SuggestTrendingPostsRequest {
+  // 最多回傳幾篇，1 到 30；0 表示預設值 10，超過 30 以 30 計，負數回 invalid_argument。
+  int32 max_results = 1;
+}
+
+message SuggestTrendingPostsResponse {
+  repeated Post posts = 1;
+}
