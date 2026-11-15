@@ -84,7 +84,7 @@
 **決定：** 登出改為結束管理員所有進行中的 session（寫 `ended_at`，不寫 `REVOKED`）。
 - 防線要的是憑證立刻失效。推導狀態不看 `ended_at`（`model/rules.go:11-19`），結束能擋住憑證是因為 `EndDelegationSession` 把 `expires_at` 拉回現在（`delegation_sessions.sql:104-112`），之後 `SessionForAudit`（`query.go:51-55`）與 `ResolveDelegation`（`session.go:376-399`）都判為到期。新的「結束某管理員所有進行中 session」查詢必須用同一個 `expires_at` 夾值；只寫 `ended_at` 會讓第 5079 行的防線失效。邊界：夾值是 `GREATEST(issued_at + 1s, now)`，核發後 1 秒內登出時憑證最多再有效 1 秒，接受（比 REVOKED 弱的唯一差別）。
 - 第 4819 行的「排程被拒」是舊機制的連帶結果，不是設計目標；撤銷只保留給治理動作（不再信任這個人或授權）。
-- 成本：新增查詢「結束某管理員所有進行中 session」（現有 `EndDelegationSession` 只收單一 ID，`store/delegation_sessions.sql.go:95-105`）；改 `internal/modules/delegation/AGENTS.md` 的不變量與守門測試 `TestAdminSignOutRevokesItsDelegations`（改名並改斷言為結束）、`docs/modules/delegation.md:46,49`、設計書 56 第 2007、4819、5079 行與 §7.2.7、delegation ADR 修訂段；`RevokeReasonAdminLogout` 若再無使用處就刪除。
+- 成本：新增查詢「結束某管理員所有進行中 session」（現有 `EndDelegationSession` 只收單一 ID，`store/delegation_sessions.sql.go:95-105`）；改 `internal/modules/delegation/AGENTS.md` 的不變量與守門測試 `TestAdminSignOutRevokesItsDelegations`（改名並改斷言為結束）、`backend/docs/modules/delegation.md:46,49`、設計書 56 第 2007、4819、5079 行與 §7.2.7、delegation ADR 修訂段；`RevokeReasonAdminLogout` 若再無使用處就刪除。
 
 ## 4. 店主看得到並能取消
 
