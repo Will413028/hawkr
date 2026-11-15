@@ -396,8 +396,8 @@ function OverlayRoot({
 					data-hk-overlay-panel
 					role="dialog"
 					aria-modal="true"
-					aria-labelledby={ariaLabelledBy}
-					aria-label={ariaLabelledBy ? undefined : ariaLabel}
+					aria-labelledby={undefined}
+					aria-label={undefined}
 					aria-describedby={ariaDescribedBy}
 					tabIndex={-1}
 					className={cn(
