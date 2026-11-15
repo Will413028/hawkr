@@ -25,15 +25,15 @@ func TestContentAuthorForFollowsTheViewersReadRules(t *testing.T) {
 	ctx := context.Background()
 	f := setup(t)
 	storeID, _ := f.exposableStore(t)
-	a, x, y, z, w := f.newBuyer(t), f.newBuyer(t), f.newBuyer(t), f.newBuyer(t), f.newBuyer(t)
+	a, x, z, w := f.newBuyer(t), f.newBuyer(t), f.newBuyer(t), f.newBuyer(t)
 	p := f.publishedPost(t, storeID, "貼文")
 	store := f.asStore(t, storeID)
 	cX := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(x), social.CommentInput{PostID: p.ID, Body: "X"}))
-	rY := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(y), social.CommentInput{PostID: p.ID, Body: "Y 回 X", ParentID: &cX.ID}))
+	rX := mustV[social.Comment](t)(f.module.CreateComment(ctx, store, social.CommentInput{PostID: p.ID, Body: "店家回 X", ParentID: &cX.ID}))
 	cZ := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(z), social.CommentInput{PostID: p.ID, Body: "Z"}))
 	cS := mustV[social.Comment](t)(f.module.CreateComment(ctx, store, social.CommentInput{PostID: p.ID, Body: "店家"}))
 	cW := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(w), social.CommentInput{PostID: p.ID, Body: "W"}))
-	rW := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(y), social.CommentInput{PostID: p.ID, Body: "Y 回 W", ParentID: &cW.ID}))
+	rW := mustV[social.Comment](t)(f.module.CreateComment(ctx, store, social.CommentInput{PostID: p.ID, Body: "店家回 W", ParentID: &cW.ID}))
 
 	t.Run("讀得到的留言回作者與店家", func(t *testing.T) {
 		got := f.authorFor(t, f.asBuyer(a), social.TargetComment, cZ.ID)
@@ -65,9 +65,9 @@ func TestContentAuthorForFollowsTheViewersReadRules(t *testing.T) {
 			t.Fatalf("A 封鎖 X 之後：%+v", got)
 		}
 	})
-	t.Run("自己封鎖的頂層底下別人的回覆也讀得到（父列條件同樣略過自己的封鎖）", func(t *testing.T) {
-		if got := f.authorFor(t, f.asBuyer(a), social.TargetComment, rY.ID); !got.Found {
-			t.Fatalf("A 封鎖 X，Y 的回覆：%+v", got)
+	t.Run("自己封鎖的頂層底下店家的回覆也讀得到（父列條件同樣略過自己的封鎖）", func(t *testing.T) {
+		if got := f.authorFor(t, f.asBuyer(a), social.TargetComment, rX.ID); !got.Found || got.Author != (social.Actor{Kind: social.ActorStore, ID: storeID}) {
+			t.Fatalf("A 封鎖 X，店家的回覆：%+v", got)
 		}
 	})
 	t.Run("對方封鎖自己的買家的頂層讀不到（不洩漏被封鎖）", func(t *testing.T) {
@@ -75,9 +75,9 @@ func TestContentAuthorForFollowsTheViewersReadRules(t *testing.T) {
 			t.Fatalf("W 封鎖 A：%+v", got)
 		}
 	})
-	t.Run("對方封鎖自己的頂層底下別人的回覆也讀不到（父列條件）", func(t *testing.T) {
+	t.Run("對方封鎖自己的頂層底下店家的回覆也讀不到（父列條件）", func(t *testing.T) {
 		if got := f.authorFor(t, f.asBuyer(a), social.TargetComment, rW.ID); got.Found {
-			t.Fatalf("W 的頂層被排除，Y 的回覆也要讀不到：%+v", got)
+			t.Fatalf("W 的頂層被排除，店家的回覆也要讀不到：%+v", got)
 		}
 	})
 	t.Run("被封鎖者看不到封鎖者的留言（雙向）", func(t *testing.T) {
@@ -86,11 +86,14 @@ func TestContentAuthorForFollowsTheViewersReadRules(t *testing.T) {
 			t.Fatalf("雙向：%+v", got)
 		}
 	})
-	t.Run("第三人與匿名讀得到", func(t *testing.T) {
-		for name, c := range map[string]social.Caller{"第三人": f.asBuyer(z), "匿名": {}} {
-			if got := f.authorFor(t, c, social.TargetComment, rY.ID); !got.Found || got.Author.ID != y.BuyerID {
-				t.Fatalf("%s：%+v", name, got)
-			}
+	t.Run("第三人讀得到", func(t *testing.T) {
+		if got := f.authorFor(t, f.asBuyer(z), social.TargetComment, rX.ID); !got.Found || got.Author != (social.Actor{Kind: social.ActorStore, ID: storeID}) {
+			t.Fatalf("第三人：%+v", got)
+		}
+	})
+	t.Run("沒有身分的讀取者讀不到（只有買家或店家身分才解析，正式流程不會匿名呼叫）", func(t *testing.T) {
+		if got := f.authorFor(t, social.Caller{}, social.TargetComment, rX.ID); got.Found {
+			t.Fatalf("匿名：%+v", got)
 		}
 	})
 	t.Run("店主讀自己的店，不套個人封鎖", func(t *testing.T) {

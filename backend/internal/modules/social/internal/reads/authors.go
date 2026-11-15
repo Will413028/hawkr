@@ -37,7 +37,7 @@ func OwnerCommentAuthor(id uuid.UUID, storeID int64) SelectStatement {
 		WHERE(c.Where(c.T.ID.EQ(UUID(id)), c.Counted(), p.Where()))
 }
 
-// ReadableForumEntryAuthor 是觀看者讀得到的討論區留言的作者：入口的觀看者規則、計入、討論區可讀（店家可曝光、沒被觀看者封鎖）、父留言沒被排除。
+// ReadableForumEntryAuthor 是觀看者讀得到的討論區留言的作者：入口的觀看者規則、計入、討論區可讀（店家可曝光；觀看者自己發起的封鎖略過，對方發起的封鎖照樣排除，父列條件同樣套用）、父留言沒被排除。
 func ReadableForumEntryAuthor(id uuid.UUID, now time.Time, buyerID int64) SelectStatement {
 	v := visibility.Viewer{BuyerID: buyerID, SkipOwnBlocks: true}
 	e := visibility.ForumEntriesOf("e", v)
