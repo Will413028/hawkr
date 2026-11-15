@@ -5,8 +5,8 @@
 | 項目 | 值 |
 |---|---|
 | 維護者 | 維護團隊 |
-| 對應程式碼 | `services/java/media-service/`（storage 層）、`services/java/product-import-service/.../storage/`、`workers/image-gateway/`、`services/java/shared/common-core/.../config/`、`pkg/mediaurl/` |
-| 相關 doc | 08 多媒體微服務（媒體資產生命週期）、40 商品匯入、`docs/開發規範/多媒體與圖片 URL 規範.md`、`docs/基礎建設/系統架構與資料流向.md`、[ADR：多媒體儲存與圖片出口](/docs/adr/2026-09-18-media-storage-r2-image-gateway.md) |
+| 對應程式碼 | `services/java/media-service/`（storage 層）、`workers/image-gateway/`、`services/java/shared/common-core/.../config/`、`pkg/mediaurl/` |
+| 相關 doc | 08 多媒體微服務（媒體資產生命週期）、`docs/開發規範/多媒體與圖片 URL 規範.md`、`docs/基礎建設/系統架構與資料流向.md`、[ADR：多媒體儲存與圖片出口](/docs/adr/2026-09-18-media-storage-r2-image-gateway.md) |
 
 ---
 
@@ -38,7 +38,6 @@ URL 規範與全平台圖片欄位契約。目標讀者：後端／前端／維�
 
 ### 1.4 與其他設計書／服務的關係
 - **08 多媒體微服務**：資產生命週期 SSOT。本文件生效後，08 號 §6 的 `media.oss.*` 配置與 OSS SDK 描述以本文件 §4/§8.5 為準。
-- **40 商品匯入**：`ProductImportOssStorage` 為第二個 storage SDK 接入點，隨本案同步替換。
 - **各業務設計書（03 訂單／14 IM／43 評論／15 AI 等）**：其圖片欄位定義隨本案修正為 objectKey（§5.3 資料修正對照）。
 - **`docs/開發規範/多媒體與圖片 URL 規範.md`**：本案落地後的長期防回歸規範（隨本設計書同 PR 新增）。
 
@@ -57,7 +56,6 @@ flowchart LR
   Client -->|HTTPS| GW[Gateway]
   GW -->|gRPC| MEDIA[media-service]
   MEDIA -->|"S3 API（presign/copy/put/get/delete）"| R2
-  PIS[product-import-service] -->|S3 API| R2
   GW -->|"HTTP 代理（機敏檔上傳/下載，AES-GCM）"| MEDIA
 ```
 
@@ -95,7 +93,7 @@ flowchart LR
 1. **儲存**：單一 R2 bucket `hawkr-media`，key 結構原樣沿用（遷移 targetKey=sourceKey），bucket 不開任何公開存取——公開讀取唯一路徑是 Worker。
 2. **圖片出口**：`media.example.com/*` 全路由到 Image Gateway Worker。`/i/{preset}/{objectKey}` 查 preset 白名單→R2 binding 取原檔→Images binding 轉換→回應（immutable 快取）。`/i/original/{objectKey}` 直出原檔。其他路徑 404。
 3. **URL 組裝**：後端只組「原圖基底 URL」（`MEDIA_BASE_URL + /i/original/ + key`），統一走 Java `MediaUrlProperties.buildUrl`（common-core，由現行 `CdnProperties` 更名改造）與 Go `pkg/mediaurl.BuildURL`（由 `pkg/cdnutil` 更名改造）；前端統一 `buildImageUrl(imageKey, preset)`（web/admin 共用 TS 模組、兩 App 共用 Dart 類）。
-4. **上傳**：media-service 與 product-import-service 的 storage 層改用 AWS S3 SDK（Java v2）對 R2 endpoint：`generatePresignedUrl→S3Presigner`、`putObject/getObject/deleteObject/copyObject→同名 S3 API`。上傳三段式流程、staged token、finalize、GC 邏輯全部不動。
+4. **上傳**：media-service 的 storage 層改用 AWS S3 SDK（Java v2）對 R2 endpoint：`generatePresignedUrl→S3Presigner`、`putObject/getObject/deleteObject/copyObject→同名 S3 API`。上傳三段式流程、staged token、finalize、GC 邏輯全部不動。
 5. **防回歸**：規範層明定禁止完整 URL 落庫（§8.6）；Worker 白名單使「前端自由傳參」在機制上不可行。
 
 ### 4.2 元件視圖 (C4 Component)
@@ -118,7 +116,6 @@ flowchart TB
 | `workers/image-gateway/src/presets.ts` | preset → 轉換參數映射（**全平台唯一定義點**） | — |
 | `workers/image-gateway/src/index.ts` | 路由、取檔、transform、Cache-Control、錯誤語意 | R2 binding、Images binding |
 | `media-service .../storage/R2StorageService.java` | 實作與現行 `OssStorageService` 相同的方法面（presign/put/get/copy/delete），介面抽取為 `StorageService` | aws-sdk-java v2 s3 |
-| `product-import-service .../storage/ProductImportR2Storage.java` | CSV put/get/delete（同步替換） | 同上 |
 | `common-core .../config/MediaUrlProperties.java` | `buildUrl(objectKey)` → 原圖基底 URL（`CdnProperties` 更名改造，http passthrough 防呆**移除**——規範已禁 URL 落庫） | `MEDIA_BASE_URL` |
 | `pkg/mediaurl/` | Go 版 BuildURL（`pkg/cdnutil` 更名；social/review 的 ad-hoc 拼接一併收斂進來） | 同上 |
 | 前端 `buildImageUrl(key, preset)` | `${MEDIA_BASE}/i/${preset}/${key}`；web/admin 一份 TS、兩 App 一份 Dart | `MEDIA_BASE`（web env var；App dart-define） |
@@ -162,9 +159,8 @@ custom domain 部署時由 Cloudflare 自動建 DNS。微服務 port 不變。lo
 ## 5. 資料設計 (Data Design)
 
 ### 5.1 資料模型
-media-service 三表（upload_session／media_asset／asset_reference）與 import_asset 結構不變，除：
+media-service 三表（upload_session／media_asset／asset_reference）結構不變，除：
 - `media_asset` **無 `url` 欄位**：媒體資產只存 objectKey。
-  proto `FinalizeImportAssetResponse.url` 的值由 `MediaUrlProperties.buildUrl(objectKey)` 現場組出，不落庫。
 
 ### 5.2 索引與查詢模式
 無變更（storage 替換不影響查詢路徑）。
@@ -236,7 +232,6 @@ Flyway `V{N+1}`（media：DROP url；shipping：DROP label_url；order：review 
 - 機敏檔 API 不變。
 
 ### 6.2 gRPC（服務間）
-- media.proto：`FinalizeImportAssetResponse.url` 語意改為 Worker 原圖 URL（欄位名不變，值域改；服務間內部欄，media-service 自組原圖 URL 供匯入回填，屬 §6.7 特例）；其餘 RPC 面不變。
 - **業務 proto 圖片欄位（§231 落地，覆蓋原「欄位名沿用」暫定）**：承載 objectKey 的欄位一律採 snake_case `xxx_key`／`xxx_keys` 命名（proto 欄位語意誠實化，隨全平台一次切，無相容雙軌）；業務微服務只填 key、**移除服務側 `BuildURL`**；`xxxUrl` 由 Gateway 於對外回應層組出（§6.1）。**逐服務 proto 欄位落地清單見 §6.6**——此清單即 §231「逐 proto 清單於實作 PR 附」的兌現，改為在本設計書定版，實作 PR 依此執行。
 - 破壞性 proto 型別/命名變更走一次切（系統未上線，§3 組織約束）；proto 同步流程依開發規範 §3（`api/proto/*` → `gen-go-proto.sh` → rsync java-proto → `mvn clean install`）。
 
@@ -286,11 +281,6 @@ Flyway `V{N+1}`（media：DROP url；shipping：DROP label_url；order：review 
 
 `gallery[]` 與商品描述 image block 一併適用第 1 條（`imageKey`／`imageUrl`，見 §6.7 S6 修訂），
 `assetId` 維持 S6 例外。
-
-**匯入預覽（product_import）不適用本規則**：其值是 presigned `preview_url` 或原站 `source_url`，
-圖片落在 `tmp/product-import/` 前綴而 Worker 只服務 `public/`，**平台 objectKey 不存在**。
-欄名一律帶 `preview`（`firstImagePreviewUrl`／`imagePreviewUrl`／`gallery[].previewUrl`），
-讓前端一眼看出不能丟進 `buildImageUrl`。補一個空的或假的 `*Key` 比沒有更糟（§25：`_key` 欄不得承載 URL）。
 
 #### account（Go）
 | proto 欄位 | 現承載 | 新命名 | 處置 |
@@ -369,7 +359,7 @@ Flyway `V{N+1}`（media：DROP url；shipping：DROP label_url；order：review 
 | `SellerInfo.logo_url` | URL（SellerInfoAssembler:29 BuildURL） | `logo_key`(+GW組) | **S9+GW組**：enrich 自 seller，移除 Assembler BuildURL |
 | `image` | URL | `image_key`(+GW組) | GW組 |
 | `Simple/Internal.image_object_key` | KEY | 保留 | 已 key（internal 直傳） |
-| `ProductImage.object_key`／`staged_token`／`import_asset_id` | 輸入 | 不改 | **S8**：寫入路徑 |
+| `ProductImage.object_key`／`staged_token` | 輸入 | 不改 | **S8**：寫入路徑 |
 
 #### cart（Java）— 結帳 hot path
 | proto 欄位 | 現承載 | 新命名 | 處置 |
@@ -417,14 +407,9 @@ Flyway `V{N+1}`（media：DROP url；shipping：DROP label_url；order：review 
 | `NotificationTemplate.image_url_template`(DB/domain) | KEY 模板（worker template_handler.go 組進 FCM） | `image_key_template` | **S5**：FCM 只吃單一 URL，worker 續組（特例保留），模板存 objectKey 佔位 |
 | `schema_url`／`rendered_schema_url` | 非圖片 | — | 排除（data schema） |
 
-#### media（Go+Java）／product_import（Java）— 內部/基礎設施
+#### media（Go+Java）— 內部/基礎設施
 | proto 欄位 | 現承載 | 新命名 | 處置 |
 |---|---|---|---|
-| media `FinalizeImportAssetResponse.url` | URL | 名不變、值＝Worker 原圖 URL | **§6.2/S6**：服務間內部欄，media 自組原圖 URL 供匯入回填 |
-| media `ImportAsset preview_url`／`upload_url`／`object_key`／`source_url` | 混/輸入（presigned 具時效） | 不落庫 | 上傳/匯入基礎設施，presigned 不落庫（S8 邊界） |
-| product_import `first_image_url`／`image_url` | URL（匯入預覽，admin；值＝presigned `preview_url` 或外部 `source_url` 直通，非 objectKey） | 名不改（誠實 `*_url`） | **S8／S7**：匯入預覽物件在 `tmp/` 前綴（media `buildTmpObjectKey`），Worker 只服務 `public/` 前綴（fail-closed 404），故此欄無法走公開 Worker 組 URL——必為 presigned 預覽 URL（S8）或外部 CSV `source_url`（S7）直通；服務／Gateway 皆無 BuildURL（已合規），不 rename 為 `*_key`（避免 `_key` 欄承載 URL 反違 §25）。**對外 JSON 欄名一律帶 `preview`**：`firstImagePreviewUrl`／`imagePreviewUrl`／`gallery[].previewUrl`（§6.6.1），讓前端一眼看出不能丟進 `buildImageUrl` |
-| product_import `source_url` | 外部 URL（賣家 CSV） | 不改 | **S7**：外部來源 normalize，非我方媒體 |
-| product_import `preview_url` | presigned | 不落庫 | 基礎設施 |
 
 ### 6.7 特例處置（9 類，逐類定案）
 
@@ -436,8 +421,7 @@ Flyway `V{N+1}`（media：DROP url；shipping：DROP label_url；order：review 
 | S4 | **WS/SSE 即時通道** | im `Message.content`、im Conversation avatar、social realtime `user_avatar` | **不經 Gateway REST**：WS/SSE payload 只帶 objectKey（`*Key` 語意），**組裝點＝接收端前端**（四端 helper `buildImageUrl(key,preset)` 組），發送服務（im/social）**不組 URL**（維持服務側禁 BuildURL 一致）。同資源 REST（Gateway 組 url）與 WS（前端組）並存無 drift——objectKey 為單一 SSOT。⚠️ 同名欄位跨通道值型態不同（REST=URL、WS=objectKey），前端一律過 `buildImageUrl(keyOrUrl, preset)`（S2 dual-mode：http 開頭直用、否則當 key 組）吸收，禁止對 WS 值假設 URL 型態。 |
 | S5 | **FCM push** | notification worker `template_handler` | **不經 Gateway**：FCM 通知只吃單一 URL 字串，成對契約不適用；**組裝點＝notification worker**（worker 續組，特例明文保留），template 欄存 objectKey 佔位（`image_key_template`）。 |
 | S6 | **/i/original 原圖直出** | product `GalleryItem.url`／`DescriptionBlock.url`、media `Finalize.url`、social share 匯出 | 成對欄位的 `xxxUrl` 語意＝**原圖基底 URL**（`/i/original/{key}`），即供分享/匯出/畫質敏感場景直用（§6.1）；REST 路徑由 Gateway 組，非 REST 匯出（share 匯出、media Finalize）由該路徑自組 original URL。<br>`GalleryItem` 的 `assetId` 登記為例外：它是媒體資產 TSID，讓賣家編輯時 round-trip 保留既有圖，是與 key/url 並列的**第三種語意**，套不進 `{語意}Key`＋`{語意}Url` 的成對契約。適用賣家端與 admin 端；公開端 PDP 會再遮蔽其中部分欄位，遮蔽範圍以 02 號 §2.2.2 為準。<br>`GalleryItem` 與 `DescriptionBlock` 的圖片欄一律是 `imageKey`／`imageUrl`（與 §6.6.1 的商品圖規則一致）；**只有 `assetId` 是例外**，多一個欄位不妨礙另外兩個欄位成對。 |
-| S7 | **賣家 CSV 外部來源** | product_import `source_url` | 外部 URL 輸入（normalize 後下載），**非我方媒體，不套成對契約、不改**。 |
-| S8 | **上傳/寫入路徑 token** | 各 `staged_token`／`photo_tokens`／`inspection_photo_tokens`／`evidence_photo_tokens`／`import_asset_id`／`ProductImage.object_key`／media presigned `upload_url/preview_url` | 寫入路徑非顯示欄，**一律不改型別、不 rename**；避免誤把輸入欄當顯示欄改。presigned/簽名 URL 具時效，不落庫。<br>⚠️ **豁免範圍僅限 §6.1 的成對命名契約**：不要求這些欄位改成 `{語意}Key`＋`{語意}Url`，也不要求語意層改名（`photoTokens`／`evidencePhotoTokens`／`stagedTokens` 各自說明了那批照片是什麼）。<br>🔴 **不豁免對外 JSON body 的 camelCase**（10 檔 §2）——那管的是大小寫不是語意，故對外一律 `stagedToken`／`newStagedToken`／`stagedTokens`。 |
+| S8 | **上傳/寫入路徑 token** | 各 `staged_token`／`photo_tokens`／`inspection_photo_tokens`／`evidence_photo_tokens`／`ProductImage.object_key`／media presigned `upload_url/preview_url` | 寫入路徑非顯示欄，**一律不改型別、不 rename**；避免誤把輸入欄當顯示欄改。presigned/簽名 URL 具時效，不落庫。<br>⚠️ **豁免範圍僅限 §6.1 的成對命名契約**：不要求這些欄位改成 `{語意}Key`＋`{語意}Url`，也不要求語意層改名（`photoTokens`／`evidencePhotoTokens`／`stagedTokens` 各自說明了那批照片是什麼）。<br>🔴 **不豁免對外 JSON body 的 camelCase**（10 檔 §2）——那管的是大小寫不是語意，故對外一律 `stagedToken`／`newStagedToken`／`stagedTokens`。 |
 | S9 | **cascade enrich 鏈** | coupon←seller.logo、crm←buyer.avatar、buyer/product 卡片←seller_logo、order/aftersales avatar enrich | **成套改**：上游（seller/buyer）先改回 key，同批（批 2/批 3）改下游（crm/coupon/order-enrich/卡片）透傳 key，Gateway 於**最終對外回應**組 url。禁止上游改 key 而下游未同批（透傳 key 未組＝斷圖）。 |
 
 ---
@@ -491,7 +475,7 @@ Worker **必須檢查轉換輸出的長度**，長度為 0 一律視同失敗、
 - R2 bucket 零公開存取：無 r2.dev、無 custom domain 直綁——唯一公開讀取面是 Worker，且 key 前綴白名單（僅 `public/`）fail-closed。
 - 機敏檔（`secure/`）維持 AES-256-GCM 服務端加密＋代理下載，Worker 物理上讀得到密文但路徑規則直接 404。
 - 公開圖片寫入時剝除 metadata：寫進 `public/` 的圖片（JPEG、PNG、WebP、GIF），位元組在 `R2StorageService.copyObject`／`uploadStream` 先過 `ImageMetadataStripper`，丟掉 EXIF（含 GPS）、XMP、IPTC、縮圖、註解與文字區塊，只保留顯示方向（EXIF Orientation，重寫成只含這一欄的最小 EXIF）。原因：`/i/original/*` 直出儲存的位元組，不剝除就是把拍攝位置公開。做法是白名單逐段搬運，不重新編碼、無畫質損失；結構壞掉的圖片拒絕寫入（不退回原檔）。`secure/`（密文）與非圖片不處理。
-- R2 API Token 權限最小化：media-service／product-import-service 用 Object Read & Write 限定 bucket token；遷移工具用獨立臨時 token，遷移後作廢；憑證一律 k8s secret／`.env`（gitignored），**禁止如現行 OSS AK/SK 寫死於 application.yml fallback**（本案一併移除該明文，舊 OSS key 於 OSS 退役時作廢）。
+- R2 API Token 權限最小化：media-service 用 Object Read & Write 限定 bucket token；遷移工具用獨立臨時 token，遷移後作廢；憑證一律 k8s secret／`.env`（gitignored），**禁止如現行 OSS AK/SK 寫死於 application.yml fallback**（本案一併移除該明文，舊 OSS key 於 OSS 退役時作廢）。
 - 上傳驗證補強（隨本案實作，堵盤點缺口）：CreateUploadSession 增 MIME 白名單（image/jpeg,png,webp,gif＋pdf 限機敏/標籤場景）＋fileSize 上限宣告驗證（一般 10MB，與前端一致）；**強制點=finalize 時 HEAD 回查 R2 實際 size/Content-Type，超限或與宣告不符即 reject＋刪除 tmp 物件**；`getFileExtension` 消毒（拒含 `/`、`..`）。註：SigV4 presigned PUT 無法表達 size 範圍條件（`content-length-range` 為 S3 POST policy 專屬）——size 上限不依賴 presign 條件，一律由 finalize 回查兜底；presigned PUT 僅綁 Content-Type。
 
 ### 8.2 可觀測性 (Observability)
@@ -507,11 +491,11 @@ R2 不可用：讀取面全掛（無 fallback，接受——與現況 OSS 掛等
 
 | 變數 | 消費者 | 值（dev） |
 |---|---|---|
-| `STORAGE_BACKEND` | media-service／product-import-service | `r2`（唯一合法值） |
+| `STORAGE_BACKEND` | media-service | `r2`（唯一合法值） |
 | `R2_ACCOUNT_ID`／`R2_ACCESS_KEY_ID`／`R2_SECRET_ACCESS_KEY`／`R2_BUCKET_NAME` | 同上（S3 endpoint=`https://{account_id}.r2.cloudflarestorage.com`） | k8s secret `hawkr-r2` |
 | `MEDIA_BASE_URL` | 全服務（原 `CDN_BASE_URL` 更名）＋web/admin env＋App dart-define（**App 端改為 dart-define 注入，治編譯期常數**） | `https://media.example.com` |
 
-`hawkr-r2` secret 只掛 media-service 與 product-import-service 兩個真實消費者，不得撒播到其他服務；`MEDIA_BASE_URL` 走 configmap／common-core defaults。
+`hawkr-r2` secret 只掛 media-service 這個唯一真實消費者，不得撒播到其他服務；`MEDIA_BASE_URL` 走 configmap／common-core defaults。
 
 **R2 bucket browser CORS policy（切換必要設定，out-of-band）**：presigned PUT 由瀏覽器直傳 R2，需 bucket 具 browser CORS policy 才能通過 preflight。此設定不隨 media-service／`workers/`／k8s 部署走，只存在 bucket 上——SSOT＝`infra/r2-cors/`（`cors-dev.json`＋`cors-prod.json`＋冪等套用/比對腳本 `apply.sh`）。origin 白名單 deny-by-default（禁 `*`）、prod 排除 dev admin（dev presigned URL 只指向 dev bucket）。🔴 **遺漏症狀＝presigned PUT 的瀏覽器 preflight 回 403 且無 `Access-Control-Allow-Origin`**（上傳整個掛掉，而後端與 Worker 都沒有錯誤）。bucket 重建／環境遷移後必跑 `infra/r2-cors/apply.sh` 補回；`apply.sh --check` 可比對線上與版控檔 drift。
 
@@ -604,7 +588,7 @@ Cloudflare 邊緣快取與遞迴解析器的 DNS 快取會讓已刪除的網域�
 | Worker | wrangler 本地＋dev route curl | 7 preset×代表圖、400/404 語意、secure/ 前綴 404、非圖片檔直出、Cache-Control、輸出格式的 Accept 協商 |
 | 遷移 | dry-run→limit 10→全量 | manifest 對帳、failed-only 重試、冪等重跑、checksum |
 | 資料修正 | dry-run diff 逐欄位人工核 | 5 種值型態分類正確性、type=2 過濾、undo SQL 可逆性 |
-| e2e 回歸 | 四端，**受波及機能一律全路徑測試（上傳→儲存→DB 值核驗→API 回應→前端顯示→後續互動完整鏈），禁止以 smoke 或單點 curl 代替** | 逐機能：商品圖（上架/編輯/列表/詳情/購物車/訂單快照）、商品描述圖、banner（admin 上稿→web/App 顯示）、買家/賣家頭像（上傳→各處顯示）、聊天圖片（發送→對方收→會話預覽）、評論圖（發評→買賣家/web 顯示→訂單快照）、社群貼文圖、AI 風格縮圖、食譜圖、KYC 機敏文件（上傳→admin 預覽）、CSV 商品匯入（含圖片下載鏈）、物流標籤 PDF、售後憑證圖 |
+| e2e 回歸 | 四端，**受波及機能一律全路徑測試（上傳→儲存→DB 值核驗→API 回應→前端顯示→後續互動完整鏈），禁止以 smoke 或單點 curl 代替** | 逐機能：商品圖（上架/編輯/列表/詳情/購物車/訂單快照）、商品描述圖、banner（admin 上稿→web/App 顯示）、買家/賣家頭像（上傳→各處顯示）、聊天圖片（發送→對方收→會話預覽）、評論圖（發評→買賣家/web 顯示→訂單快照）、社群貼文圖、AI 風格縮圖、食譜圖、KYC 機敏文件（上傳→admin 預覽）、物流標籤 PDF、售後憑證圖 |
 
 註：`infra/smoke-checkout.sh` 仍為結帳 hot path 的 push 前最低門檻（[開發工作流程](../開發規範/開發工作流程.md) §6），但**不得作為本案受波及機能的驗證依據**——切換驗證以上表全路徑結果為準。
 

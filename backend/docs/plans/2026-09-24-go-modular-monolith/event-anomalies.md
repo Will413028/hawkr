@@ -5,7 +5,7 @@ Rule used for notification (catalog §5.2's own rule): consumed only if exchange
 
 ## 1. Published, no effective consumer (13 keys)
 - **`hawkr.governance` is not provisioned in topology** (not in `exchanges:`), not in the notification exchange map, and has no template. seller-service still publishes 5 keys there: `seller.governance.{violation_created,violation_revoked,appeal_decided,notify.assist_investigation,notify.temporary_takedown_self_check}` (violation.go, food_safety_report.go; fire-and-forget, errors only logged). Catalog §3.8/§4.2/§5.2 says notification-service consumes them. Unverified: runtime result (a publish to a missing exchange normally closes the channel with 404).
-- `job.parsed`, `job.commit_finished` (product-import-service → `hawkr.product.import`): no queue binds them, so they are unroutable. Catalog §3.6b/§3.7 says notification-service consumes them. Only their DLQs exist (`dlq.product.import.job.parsed`, `dlq.product.import.job.commit_finished`), and nothing dead-letters into those.
+- (removed 2026-11-15 with product import) `job.parsed`, `job.commit_finished` (product-import-service → `hawkr.product.import`): no queue binds them, so they are unroutable. Catalog §3.6b/§3.7 says notification-service consumes them. Only their DLQs exist (`dlq.product.import.job.parsed`, `dlq.product.import.job.commit_finished`), and nothing dead-letters into those.
 - `payment.membership.{buyer,seller}.{success,failed}` (payment-service): topology has `buyer.membership.payment.result` / `seller.membership.payment.result`, but no code consumes them. These are known pending work (`queue:consumer_impl_pending:info` in infra-alerts.yml). None of the 4 keys is in the catalog.
 - `order.delivered`: only reaches the notification `#` queue, which has no template, so it is dropped. Catalog §3.1 says "no effective consumer (#3486)" but §3.7 lists a delivery push. The catalog contradicts itself.
 - `fulfillment.responsibility.unresolved` (payment-service → `hawkr.shipping`): the catalog names notification-service as consumer. There is no template, so it is dropped.
@@ -25,7 +25,7 @@ These are harmless today, but when moving to an in-process queue, avoid fanning 
 ## 5. DLQs: none has a consumer
 - 96 DLQ queues: 43 `{q}.dlq` from `retry:` (Go ResilientConsumer), 40 own `{q}.dlq` from `dlq:` (Java), and 13 explicit (`aftersales.events.dlq`, `dlq.coupon.*` ×2, `dlq.product.import.*` ×6, `dlq.media.*` ×3, `payment.rescue.refund.dlq`).
 - 0 of 96 are consumed in code, and no redrive tool exists in repo. Handling is the `RabbitMQDLQMessages` alert plus manual work.
-- Orphan DLQs (no `dlq:` policy targets them): `dlq.product.import.job.parsed`, `dlq.product.import.job.commit_finished` (no primary queue at all), `dlq.media.import.asset.download.internal` (app publishes to it directly; comment says "manual handling").
+- Orphan DLQs (no `dlq:` policy targets them; the product-import and media import ones were removed 2026-11-15): `dlq.product.import.job.parsed`, `dlq.product.import.job.commit_finished` (no primary queue at all), `dlq.media.import.asset.download.internal` (app publishes to it directly; comment says "manual handling").
 - All own-DLQ routing keys match their `{q}.dlq` binding, and every explicit `dlq.queue` target exists and is bound. No broken DLX wiring was found.
 
 ## 6. Catalog (36) vs code

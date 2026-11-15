@@ -31,7 +31,7 @@
 
 ## 涵蓋的 §12 HTML 轉換場景（真實蝦皮描述風格）
 
-詳細設計書 [40-商品匯入精靈服務（Product Import Service）詳細設計書.md](../詳細設計書/40-商品匯入精靈服務（Product%20Import%20Service）詳細設計書.md) §12
+詳細設計書 40-商品匯入精靈服務詳細設計書（商品匯入已於 2026-11-15 移除，設計書已刪除） §12
 
 蝦皮後台給賣家的編輯器只支援「純文字段落 + 圖片插入」，沒有富文本 `<h>` / `<ul>` / `<strong>` 標籤。所以本樣本**真實反映蝦皮賣家描述的典型結構**：
 
@@ -133,7 +133,7 @@ GET  /api/v1/public/products/{formalProductId} → 完整 PDP 資料含 descript
 ## 對應 issue / PR
 
 - Issue 觸發點：hawkr-website 前端對接 product-import-service（#115 / #120 已合入）
-- 對應後端設計書：[40-商品匯入精靈服務（Product Import Service）詳細設計書](../詳細設計書/40-商品匯入精靈服務（Product%20Import%20Service）詳細設計書.md)
+- 對應後端設計書：40-商品匯入精靈服務詳細設計書（商品匯入已於 2026-11-15 移除，設計書已刪除）
 - 本 sample 由 2026-06-18 dev E2E 驗證產生，搭配真實蝦皮商品作 reference
 
 ## 蝦皮資料抓取方法（給後人參考）

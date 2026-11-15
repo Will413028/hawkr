@@ -125,7 +125,6 @@ product-service 對外 RPC `CreateProduct` / `UpdateProduct` 的 `hashtags: repe
 
 **分隔符切分責任由 caller 自負**，包括：
 - 賣家端（hawkr-website / hawkr_seller）UI 表單上 chip 元件本身就是分開的 input，自然每 chip = 1 token，送 list 即可
-- product-import-service 從 CSV 收到單欄字串（如 `#當季#在地小農#有機` 或 `當季,在地,有機`）→ 由其 `CsvParseService.parseHashtags` / `ItemMutationService` 切分後再送 RPC（規則見 40 號 §11.3）
 
 > 此契約保持 hashtag 模組長期 token 純粹性：normalize / validate / counter 邏輯都是 token 級別，引入 multi-token 字串會破壞此一致性。
 

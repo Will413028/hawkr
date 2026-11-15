@@ -17,7 +17,7 @@
 - 外部：單一 PostgreSQL 18、每個模組一個 schema、不建跨 schema FK（D3）；多個 process 同時寫入（D1）。
 - 外部：對外 JSON 的 ID 是字串（JavaScript 的 Number 只精確到 2^53）。
 - 繼承：B1 之前 media 仍是 Java 服務，業務列要先用自己的 ID 登記圖片引用，再寫入業務列，所以寫入前就要有 ID。來自 media 的順序契約（`internal/modules/media`）；B1 前仍成立，之後可以在同一個 transaction 完成，所以不是選型的主因。
-- 繼承：還在運作的 Java 服務把帳號等 ID 存成 `BIGINT`（例如 media、product-import、coupon 的 V1 migration）。來自 D8 的並存；到階段 B 改寫完為止仍成立。
+- 繼承：還在運作的 Java 服務把帳號等 ID 存成 `BIGINT`（例如 media、coupon 的 V1 migration）。來自 D8 的並存；到階段 B 改寫完為止仍成立。
 - 拿掉：規範 §二的三分法與「業務表禁用 uuid」。它的前提是每個 Java 服務有自己的資料庫、再加上依部署分配的 node 編號，單體兩者都沒有；系統也還沒上線，沒有相容的包袱。
 
 ## 考慮過的方案

@@ -52,7 +52,6 @@ flowchart LR
         Coupon[coupon-service]
         Webhook[payuni-webhook-service]
         Cart[cart-service]
-        Media[media-service]
     end
 
     subgraph "Gateway（Go，SSE consumer）"
@@ -261,9 +260,7 @@ docker exec hawkr-rabbitmq rabbitmqctl list_queues name messages \
 | `hawkr.seller` | Topic | 單體 seller 模組（`internal/legacy/sellerrelay`） | 賣家生命週期事件（退場 / 停權 / 解除停權 / 資料變更 / 可曝光變化） | `EXCHANGE_SELLER_BIZ` | `ExchangeSeller` |
 | `hawkr.notification` | Topic | notification-service（Go） | 通知派發內部 | `EXCHANGE_NOTIFICATION` | `ExchangeNotification` |
 | 🔶 `hawkr.delayed` | Topic | （無 publisher） | 延遲訊息。**未佈建於 `topology.yaml`**，兩端皆只有常數宣告 | `EXCHANGE_DELAYED` | `ExchangeDelayed` |
-| `hawkr.media` | Topic | media-service | 媒體事件（宣告但未實際使用） | `EXCHANGE_MEDIA` | `ExchangeMedia` |
 | `hawkr.im` | Topic | im-service（Go） | IM 事件（宣告但未驗證使用） | `EXCHANGE_IM` | — |
-| `hawkr.product.import` | Topic | product-import-service | 商品匯入精靈內部解耦 + 跨 Media GC 通知（見 [40 號設計書](40-商品匯入精靈服務（Product%20Import%20Service）詳細設計書.md)） | `EXCHANGE_PRODUCT_IMPORT` | — |
 | `hawkr.product` | Topic | product-service（Java，補貨事件 ＋ 商品認證事件 producer）+ 單體 buyer 模組（per-subscriber fan-out re-publish）| 商品領域事件：補貨 transition + 個別買家補貨通知 fan-out target（§3.6h）+ **商品認證審核**（§3.6h.1，19 號設計書；product-service 在此 exchange 上同時是 producer 與 consumer） | `EXCHANGE_PRODUCT` | `ExchangeProduct` |
 | `hawkr.seller_workspace` | Topic | order-service（Java）+ aftersales-service（Java）| 賣家工作區 realtime invalidation 事件（gateway SSE 唯一 consumer，§3.6i / 41 §四之二） | `EXCHANGE_SELLER_WORKSPACE` | `ExchangeSellerWorkspace` |
 | `hawkr.invoice` | Topic | invoice-service（Go） | 電子發票生命週期事件（開立 / 作廢 / 折讓 / 申訴 / 稅務身分，§3.6k / 58 號設計書） | — | `ExchangeInvoice` |
@@ -289,11 +286,9 @@ docker exec hawkr-rabbitmq rabbitmqctl list_queues name messages \
 | `hawkr.payment.dlx` | Topic | `hawkr.payment`（Go 端支付事件 consume side） |
 | `hawkr.shipping.dlx` | Topic | `hawkr.shipping` |
 | `hawkr.product.dlx` | Topic | product 服務 consume side |
-| `hawkr.product.import.dlx` | Topic | `hawkr.product.import` |
 | `aftersales.events.dlx` | Topic | `aftersales.events` |
 | `hawkr.coupon.dlx` | Topic | coupon-service consume side（`buyer.deleted` / `seller.suspended` / `seller.unsuspended` consumer） |
 | `hawkr.cart.dlx` | Topic | cart-service consume side |
-| `hawkr.media.dlx` | Topic | media-service consume side |
 | `hawkr.notification.dlx` | Topic | `hawkr.notification` |
 | `payment.webhook.dlx` | **Direct** | `payuni.events` 中 payment 相關事件 |
 | `shipping.webhook.dlx` | Topic | `payuni.events` 中 shipping 相關事件 |
@@ -855,7 +850,7 @@ generic path 不得含任何 payment 業務 metric。
 
 **設計參考**：
 - **Pricebook 追蹤清理**：同一 `SellerDeletedEvent.accountId` 由 `pricebook-service` 消費，queue `pricebook.seller.deleted` 綁定 `hawkr.seller` / `seller.deleted`。以 `account_id` 冪等刪除全部 `market_watch_target`；不得使用 `store_id` 或以 `account.deleted` 替代。無效 payload／DB 錯誤回傳 error，沿用 typed consumer `MaxRetries=3`，DLX `hawkr.seller.dlx`、DLQ `pricebook.seller.deleted.dlq`；queue 的 `retry: {max_attempts: 3}` 由 topology 展開，應用程式不另建 broker 資源。
-- **NetworkPolicy／監控**：Pricebook 目前僅 ingress policy；既有 egress default-deny 只選 media／product-import，不涵蓋 Pricebook，因此 AMQP 出向無需新增 allow。沿用共用 `mq_consume_total`，低頻失敗以 `increase(...{queue="pricebook.seller.deleted",result=~"retry|dlq|requeue"}[10m]) > 0` 告警；DLQ 使用帶 queue label 的 `rabbitmq_detailed_queue_messages_ready`，不得改用無 queue label 的 aggregated metric。
+- **NetworkPolicy／監控**：Pricebook 目前僅 ingress policy；既有 egress default-deny 不涵蓋 Pricebook，因此 AMQP 出向無需新增 allow。沿用共用 `mq_consume_total`，低頻失敗以 `increase(...{queue="pricebook.seller.deleted",result=~"retry|dlq|requeue"}[10m]) > 0` 告警；DLQ 使用帶 queue label 的 `rabbitmq_detailed_queue_messages_ready`，不得改用無 queue label 的 aggregated metric。
 - **部署順序**：Deploy (K8s) 呼叫共用 MQ Topology workflow，完成 schema／plan／destructive gate／apply 後才允許 consumer rollout。每次部署增加一次本環境 topology reconcile（與 image build 平行，僅 rollout 等待）；不再另由 push 重複 apply。PR 先審 dev + prod plan，**逐項確認沒有 replace／destroy**（改 queue arguments ＝ 先刪後建，未消費訊息一起消失）。
 
 - `seller.deleted` 在店家退場時發，與帳號是否刪除無關；下游（product、social、im、notification、pricebook）此時才刪店家資料，不得以 `account.deleted` 替代。
@@ -873,48 +868,6 @@ generic path 不得含任何 payment 業務 metric。
 |-------------|----------|----------|---------|-----|-------------|
 | `coupon.issued` | coupon-service `CouponEventPublisher.publishCouponIssued`（走 `CouponEventType.COUPON_ISSUED.value()`） | notification-service（Go，DB seed 動態 binding） | `CouponIssuedEvent`（含 eventId UUID） | ❌ 無 DLQ | eventId UUID |
 | `coupon.expiring` | coupon-service `CouponEventPublisher.publishCouponExpiring`（`CouponExpiringWarningJob` 每日掃描 fan-out，`CouponEventType.COUPON_EXPIRING.value()`） | notification-service（Go，動態 binding） | `CouponExpiringEvent`（snake_case wire，含 event_id UUID） | ❌ 無 DLQ | notification reference_id `expiring_{coupon_instance_id}_{date_key}`（UNIQUE，策略 3）|
-
----
-
-### 3.6b 商品匯入領域（Product Import Domain）
-
-**Exchange**：`hawkr.product.import`
-
-| Routing Key | Producer | Consumer | Payload Class | DLQ | Idempotency |
-|-------------|----------|----------|---------------|-----|-------------|
-| `csv.parse` | product-import-service `CreateImportJob` API | product-import-service `CsvParseListener` | `CsvParseEvent { importJobId, accountId }` | ✅ `dlq.product.import.csv.parse` | `WHERE job.status = '9101'（CREATED）` |
-| `html.fetch` | product-import-service csv.parse worker | product-import-service `HtmlFetchListener` | `HtmlFetchEvent { importItemId, importJobId, accountId, sourceUrl, commitRevision }` | ✅ `dlq.product.import.html.fetch` | `WHERE item.commit_revision = ?` |
-| `asset.download` | product-import-service（多入口：csv.parse / html.fetch / UpdateImportItem / RetryImportItemAssets） | product-import-service `AssetDownloadListener` | `AssetDownloadEvent { importItemId, importJobId, accountId, assetId, sourceUrl, usage, commitRevision }` | ✅ `dlq.product.import.asset.download` | `WHERE asset.status IN ('9301'（PENDING）, '9304'（FAILED）) AND retry_count < 3` |
-| `commit` | product-import-service `CommitImportJob` API | product-import-service `CommitItemListener` | `CommitItemEvent { importItemId, importJobId, accountId, commitRevision, targetStatus, idempotencyKey }` | ✅ `dlq.product.import.commit` | `product_import_commit_attempt.idempotency_key UNIQUE` |
-| `gc.expire_job` | product-import-service `ProductImportGcJob` | **media-service `MediaImportGcListener`（跨服務）** | `ExpireJobEvent { importJobId }` | ✅ `dlq.media.product.import.gc.expire_job` | Media `WHERE status NOT IN (FINALIZED, EXPIRED)` |
-| `job.parsed` | product-import-service `MediaCallbackListener` / `CallbackTimeoutGc`（最後一個 asset 完成時）| **notification-service（跨團隊）** | `ImportJobParsedEvent { eventId, importJobId, accountId, totalItems, readyItems, parseFailedItems, warningItems, parsedAt }` | ✅ `dlq.product.import.job.parsed` | Producer：`job.parsed_event_published_at` flag（DB 一旦寫入不再 publish）+ Consumer：eventId UUID |
-| `job.commit_finished` | product-import-service `CommitItemListener`（job 由 COMMITTING 轉出時） | **notification-service（跨團隊）** | `ImportJobCommitFinishedEvent { eventId, importJobId, accountId, finalJobStatus, committedItems, commitFailedItems, skippedItems, finishedAt }` | ✅ `dlq.product.import.job.commit_finished` | Producer：每輪 commit 後刷新 `commit_finished_event_published_at` + Consumer：eventId UUID |
-
-**Java consumer 對應 EventType**（內部技術碼）：`PRODUCT_IMPORT_CSV_PARSE` / `PRODUCT_IMPORT_HTML_FETCH` / `PRODUCT_IMPORT_ASSET_DOWNLOAD` / `PRODUCT_IMPORT_COMMIT` / `PRODUCT_IMPORT_GC_EXPIRE_JOB` / `PRODUCT_IMPORT_JOB_PARSED` / `PRODUCT_IMPORT_JOB_COMMIT_FINISHED`（本期新增，見 §8.1 與 [CodeMeta 內部技術碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/內部技術碼.md)）。
-
-**Retry 機制**：所有主 queue 採「failure → retry queue (x-message-ttl) → 回主 queue」模式（與既有 RabbitMQ classic delay pattern 一致）。
-
-| Queue | Retry Queue (TTL) | DLQ 上限 |
-|-------|------------------|---------|
-| `product.import.csv.parse` | `.retry`（30s） | 3 |
-| `product.import.html.fetch` | `.retry`（30s / 2min 兩階）| 3 |
-| `product.import.asset.download` | `.retry`（5s / 30s / 2min 三階）| 3 |
-| `product.import.commit` | `.retry`（10s） | 3 |
-| `product.import.media.callback` | `.retry`（10s / 1min / 5min 三階）| 3 |
-| `product.import.gc.expire_job` | 無 retry | 直入 DLQ |
-| `product.import.job.parsed` | 無 retry | 直入 DLQ |
-| `product.import.job.commit_finished` | 無 retry | 直入 DLQ |
-
-**跨服務 / 跨團隊消費標註**：
-
-| Routing Key | Producer | Consumer | 跨界類型 |
-|-------------|----------|----------|---------|
-| `gc.expire_job` | product-import | media | 跨服務內部（同團隊） |
-| `job.parsed` | product-import | notification | 跨團隊外發（§3.7 也列） |
-| `job.commit_finished` | product-import | notification | 跨團隊外發（§3.7 也列） |
-| `import.asset.downloaded`（在 `hawkr.media` exchange，非本領域） | media | product-import | 跨服務內部，§3.8 也列 |
-
-**設計參考**：[40 號設計書 §6](40-商品匯入精靈服務（Product%20Import%20Service）詳細設計書.md#6-訊息佇列設計) / [08 號設計書 §7.2a](08-多媒體微服務（Media%20Service）詳細設計書.md#72a-media-內部下載-worker-pool--callback-publisher)。
 
 ---
 
@@ -1269,8 +1222,6 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 | `aftersales.*` 各事件 | aftersales-service | notification-service | 售後相關推播 |
 | `payment.rescue.refund_completed` | payment-service | notification-service | 推播「重複付款已自動退款」（B-2） |
 | `coupon.issued` | coupon-service | notification-service | 推播「優惠券發放」 |
-| `product.import.job.parsed` | product-import-service | notification-service | 推播給賣家「商品匯入已解析完成 N 筆請預覽」（CSV 解析 + 圖片下載皆完成時觸發，每個 job 只發一次） |
-| `product.import.job.commit_finished` | product-import-service | notification-service | 推播給賣家「批次匯入完成 N 成功 M 失敗」（每輪 commit 完成都發） |
 | `seller.review.result` | payuni-webhook-service | 單體 seller 模組（`internal/legacy/sellerconsumer`） | PayUni 代收代付商家狀態變更（AGENT_NOTIFY 單通道）|
 | `payuni.refund.accepted` | payuni-webhook-service | payment-service `PayUniRefundAcceptedConsumer`（另見 §3.5） | — |
 
@@ -1285,7 +1236,6 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 | `hawkr.review` / `review.hidden` | review-service（Go） | product-service `ReviewStatsConsumer` | admin 隱藏評論後重算並覆寫商品聚合（排除 hidden 列） |
 | `seller.review.result` | payuni-webhook-service（AGENT_NOTIFY 單通道） | 單體 seller 模組（`internal/legacy/sellerconsumer`，queue `hawkr.monolith.seller.review.result`，由 consumer 自己宣告、不在 topology；形狀不合的訊息進 `.dead`） | 賣家審核結果 |
 | `hawkr.merchant` / `merchant.verification.*` | 單體 seller 模組（`internal/legacy/sellerrelay`） | notification-service（queue `notification.merchant`，`'#'` 綁定，模板驅動） | 商家認證結果 |
-| `hawkr.media` / `import.asset.downloaded` | media-service | product-import-service `MediaCallbackListener` | Media 完成 import_asset 下載（async 結果回推）；Payload `MediaImportAssetDownloadedEvent` 由 `common-core` `io.github.will413028.hawkr.common.mq.events` 集中定義，兩端共用 SSOT；`resultStatus` 對齊 `ImportAssetMediaStatus.value()`（9402=UPLOADED / 9404=FAILED）；Import 端 inbox dedup（`product_import_media_callback_inbox.event_id`）；詳見 [08 號 §7.2a](08-多媒體微服務（Media%20Service）詳細設計書.md#72a-media-內部下載-worker-pool--callback-publisher) |
 
 > **`review.created` payload 與快照語意**：payload 帶評論完整欄位（`review_id`、`order_no`、`order_item_id`、`buyer_id`、`store_id`（**2026-08-02 正名**：wire key 原為 `seller_account_id`，值從來就是 store surrogate 非登入 account_id；publisher `pkg/mq/events.go` + notification `reference_id_template` 同一 PR 原子改名。Java 側零消費此 key，不需 `@JsonAlias`）、`notify_seller_account_id`（**登入 account_id**，供 notification 推播定位收件人，與 `store_id` 為不同 id space）、`rating`、`content`、`image_keys`（objectKey 陣列，原 `imageUrls`，依 49 號設計書 §5.3）、`created_at`，以及既有的 seller 統計 `avg_rating`/`total_count` 與買家 `buyer_nickname`/`buyer_avatar_key`（原 `buyerAvatar`，49 §6.3/S3 批 4 收斂為 `*Key` 名帶 objectKey/外部 URL passthrough））。`orders.review` JSONB 快照欄位同步改為 `imageKeys`。評論記錄為 **order_item（商品）層級**（review-service `order_item_reviews`，一品項一筆，為 SSOT）；但前端訂單詳情「我的評價 / 商品評價」card 為**訂單層級單一**顯示，故 order-service 消費後取該訂單**最近一筆**商品評論，反正規化存於 `orders.review`（訂單層級，most-recent-wins：僅較新 `createdAt` 覆寫），訂單詳情 API 於**頂層 `review`** 直接回傳本地快照，讀取零跨服務耦合。因本平台評論**不可修改、不可刪除**（review.proto 無 `UpdateReview` / `DeleteReview` RPC），訂單層級快照欄位寫入後永不變更 → 為**凍結快照**，**不需** `review.updated` / `review.deleted` 事件維護（符合《後端服務責任邊界規範》單一寫入路徑、不引入補償基礎設施）。
 

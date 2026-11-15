@@ -69,3 +69,11 @@
 - **D9 賣家端的溫層舊要求由 gateway 雙向承接**（Will 2026-10-29）：賣家端請求的 `temperature`、超商 `goodsType` 由 gateway 一律補常溫（`backend/gateway/internal/handler/shipping_ambient.go`）；賣家端回應（運費試算選項、物流開通與配送方式清單）只回常溫列且不帶溫層欄位；匯入預覽只拿掉溫層欄位、不過濾列。CSV 匯入的溫層欄位由 Java 解析（`CsvParseService.java:478-499`），賣家仍可能存進冷藏或冷凍，隨 B4 決定。這取代 D5 寫的「client 在過渡期送固定的常溫值」：改由 gateway 承接，client 不再有常溫常數。理由：gateway 是我們擁有的轉接層，client 契約一開始就是最終形狀，B4 只刪 gateway 一處，App 不必發版。買家結帳仍照 D8。未選：每個 client 一個常溫常數（計畫原步驟 7 的做法，website 與 seller-app 的常數檔已刪）。
 
 計畫的規模、步驟、各步驗收與審查紀錄不再保存。
+
+## 修訂：商品匯入（批次匯入精靈）刪除，不改寫（2026-11-15，Will 決定）
+
+範圍再縮一項：商品批次匯入（CSV 匯入精靈，Java product-import-service，主計畫 B5 productimport）整個刪除，不改寫成 Go。被刪的規模：7 張表、18 個 gateway 端點、跨 product、media、shipping 的 RPC 與一組 MQ 拓撲。決定時沒有另記理由。上線前沒有相容性約束，直接刪除，不留相容層。
+
+- 刪除：`services/java/product-import-service`；gateway 的 `/api/v1/app/product_import_jobs` 全部 18 個端點與 OpenAPI operation；product-service 與 media-service 只服務匯入的 RPC（`ValidateLeafCategoryInternal`、`CreateProductFromImportInternal`、`BatchCheckSellerProductNames`、`ValidateProductDraft`、`GetProductsBriefInternal`、`ImportDownloadAsset`、`FinalizeImportAsset`、`BindStagedAsset`）、media 的 `import_asset` 表與下載 worker、`product.import_job_id`／`import_item_id` 與 `media_asset.import_store_id` 欄位；匯入專用的 MQ exchange 與 queue；CodeMeta 的匯入值域（`ImportJobStatus` 等）、錯誤碼 1100–1199、`AssetReferenceType` 的 7116、7117 與 `ProductCertificationSource` 的 `PRODUCT_IMPORT`。
+- D9 中與匯入有關的部分作廢：匯入預覽、CSV 匯入的溫層欄位都不再存在；B4 不必再決定匯入端的溫層處理。
+- 主計畫：B5 標為已移除；模組表的 `productimport` 列取消（見 `2026-09-24-go-modular-monolith` 的對應修訂）。
