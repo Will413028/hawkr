@@ -66,20 +66,16 @@ const CONTENT_SECURITY_POLICY = buildContentSecurityPolicy({
  * 每個違規 POST 到 /api/csp-report → Sentry，但什麼都不擋，所以漏了一條白名單也
  * 不會弄壞線上流程。enforce 時才真的攔截。
  *
- * 模式由 build 期環境變數 `CSP_MODE` 決定，`.github/workflows/deploy.yml` 的
- * 「Build & Deploy」step 依分支注入。**現況兩個環境都是 enforce**（dev 2026-07-29、
- * prod 2026-07-30 跟上），三元式的兩臂因此暫時相同——那不是死碼，是讓任一環境能
- * 單獨退回 report-only 的開關本身。
+ * 模式由 build 期環境變數 `CSP_MODE` 決定；repo 內沒有任何 workflow 或設定檔設定它，
+ * 只有部署平台（Vercel）專案的環境變數能設。
  * 之所以不用單一常數：常數會讓 dev→main 例行合併把 dev 的攔截決定直接帶上 prod，
- * 前端還沒準備好就炸（正是 07 月被迫回滾那次的形狀）。走 env 則兩環境獨立，
- * prod 何時攔截是 deploy.yml 一個字的決定，與程式碼合併脫鉤。
+ * 前端還沒準備好就炸。走 env 則各環境獨立，與程式碼合併脫鉤。
  *
  * **未設值一律 report-only**（fail-safe）：本機 `pnpm build`、CI 的 cacheComponents
  * gate 與 E2E harness 都不會意外進入攔截模式。
  *
- * **Kill switch（一行回滾）**：把 deploy.yml 該環境的 `CSP_MODE` 改回
- * `report-only`（同時把該環境的 post-deploy CSP smoke 參數改回 `report-only`），
- * 一次部署即恢復「只記錄不攔截」。
+ * **Kill switch（一行回滾）**：把該環境的 `CSP_MODE` 改回 `report-only`（或移除），
+ * 重新部署即恢復「只記錄不攔截」。
  *
  * `upgrade-insecure-requests` 只在 enforce 模式加上：report-only 政策裡瀏覽器會
  * 忽略該指令，還會為每個 document/iframe 印一行 console error，純噪音。

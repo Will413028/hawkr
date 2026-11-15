@@ -292,7 +292,7 @@ dev-token: dev-key
 dev-seed: dev-key
 	MONOLITH_DATABASE_URL='$(DATABASE_URL)' bash infra/seed-test-data.sh
 
-# 前提檢查（只給 infra/seed-test-data.sh 呼叫，在 01 之前）：01 重建的帳號區間若擁有種子以外的店家就失敗，不寫任何資料。
+# 前提檢查（只給 infra/seed-test-data.sh 呼叫，在 01 之前）：種子帳號擁有種子以外的未關閉店家、或有刪帳申請就失敗，不寫任何資料。
 dev-seed-check: dev-key
 	$(MONOLITH_ENV) go run ./cmd/hawkr dev-seed -check
 

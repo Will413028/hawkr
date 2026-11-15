@@ -15,6 +15,9 @@ on:
       - '.nvmrc'
       - 'patches/**'
       - 'scripts/check-dependency-overrides.ts'
+      - 'scripts/check-dependency-overrides.test.ts'
+      - 'backend/workers/image-gateway/package.json'
+      - 'backend/workers/image-gateway/package-lock.json'
       - '.github/actions/pnpm-install/**'
       - '.github/workflows/workspace-ci.yml'
   push:
@@ -30,10 +33,6 @@ concurrency:
 
 permissions:
   contents: read
-
-env:
-  # app 的 `prepare` 會跑 `lefthook install`，CI 不需要 git hooks。
-  LEFTHOOK: '0'
 
 jobs:
   deps:

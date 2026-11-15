@@ -127,7 +127,7 @@ const devSeedUsage = "用法：dev-seed [-check]（只給本機開發；-check �
 
 // runDevSeed 把本機開發的種子店家還原成 fixture（devSeedStores，明文 fixture；upsert，不碰種子以外的店家）：與 dev-token 同一個保護
 // （requireDevEnvironment），前提是 migrate 已套用。寫完不公告：接著跑 reannounce-exposures（infra/seed-test-data.sh 依序呼叫兩者）。
-// -check 在 01-account.sql 刪除重建帳號之前確認前提（見 seller.CheckDevSeed），不成立就失敗、不寫任何資料。
+// -check 在 01-account.sql 之前確認前提（見 seller.CheckDevSeed），不成立就失敗、不寫任何資料。
 func runDevSeed(ctx context.Context, args []string, out io.Writer) error {
 	checkOnly := false
 	switch {
@@ -144,22 +144,16 @@ func runDevSeed(ctx context.Context, args []string, out io.Writer) error {
 	defer c.Close()
 	module := c.Seller
 	stores := devSeedStores()
-	// 刪帳申請由 accountdeletion 擁有：進行中的申請會把還原的店家再關掉、或在每小時的對帳刪掉 01-account.sql 重建的帳號（重建把 identity 的
-	// PENDING_DELETION 悄悄重設，申請列還在），種子不繞過它（沒有取消申請的 API）。範圍是 01 重建的全部帳號，不只種子店家的擁有者；與店家的前提一起檢查、一起回報。
+	// 刪帳申請由 accountdeletion 擁有：進行中的申請會把還原的店家再關掉、或在每小時的對帳刪掉種子帳號，種子不繞過它（沒有取消申請的 API）。
+	// 範圍是 01-account.sql upsert 的全部帳號，不只種子店家的擁有者；與店家的前提一起檢查、一起回報。
 	checkAll := func() error {
-		err := module.CheckDevSeed(ctx, stores, devSeedRebuiltAccounts)
-		var accounts []int64
-		for _, r := range devSeedRebuiltAccounts {
-			for id := r.From; id <= r.To; id++ {
-				accounts = append(accounts, id)
-			}
-		}
-		open, derr := accountdeletion.NewReader(c.DB).AccountsWithOpenRequest(ctx, accounts)
+		err := module.CheckDevSeed(ctx, stores, devSeedAccountIDs)
+		open, derr := accountdeletion.NewReader(c.DB).AccountsWithOpenRequest(ctx, devSeedAccountIDs)
 		if derr != nil {
 			return errors.Join(err, derr)
 		}
 		if len(open) > 0 {
-			derr = fmt.Errorf("01-account.sql 重建的帳號 %v 有還沒完成的刪帳申請（accountdeletion）：種子不繞過它去還原或重建帳號，也沒有取消申請的 API；請重建本機資料庫", open)
+			derr = fmt.Errorf("01-account.sql 的種子帳號 %v 有還沒完成的刪帳申請（accountdeletion）：種子不繞過它去還原帳號，也沒有取消申請的 API；請重建本機資料庫", open)
 		}
 		return errors.Join(err, derr)
 	}
@@ -167,13 +161,13 @@ func runDevSeed(ctx context.Context, args []string, out io.Writer) error {
 		if err := checkAll(); err != nil {
 			return err
 		}
-		_, err = fmt.Fprintln(out, "種子的前提成立：重建的帳號區間沒有種子以外的未關閉店家，種子帳號沒有進行中的停權、關閉、等待刪除，重建的帳號沒有刪帳申請")
+		_, err = fmt.Fprintln(out, "種子的前提成立：種子帳號名下沒有種子以外的未關閉店家，種子帳號沒有進行中的停權、關閉、等待刪除，也沒有刪帳申請")
 		return err
 	}
 	if err := checkAll(); err != nil {
 		return err
 	}
-	if err := module.SeedDevStores(ctx, stores, devSeedRebuiltAccounts); err != nil {
+	if err := module.SeedDevStores(ctx, stores, devSeedAccountIDs); err != nil {
 		return err
 	}
 	ids := make([]int64, 0, len(stores))

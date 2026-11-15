@@ -1,5 +1,26 @@
 {
   "default": {
+    "appeal.unavailable.already_appealed": {
+      "message": "This action has already been appealed. Each action can be appealed only once."
+    },
+    "appeal.unavailable.request_pending": {
+      "message": "This action has a request to lift that is still pending. You can appeal after it is reviewed."
+    },
+    "appeal.unavailable.revoked": {
+      "message": "This action has been revoked, so there is nothing to appeal."
+    },
+    "appeal.unavailable.window_ended": {
+      "message": "The appeal period for this termination has ended."
+    },
+    "kyc.edit_unavailable.approved": {
+      "message": "Your seller verification is approved, so you do not need to edit or resubmit it."
+    },
+    "kyc.edit_unavailable.under_review": {
+      "message": "Your application is under review. Cancel it first if you want to make changes."
+    },
+    "measure.retry_exhausted": {
+      "message": "This action just changed. Please try again."
+    },
     "onboarding.payment_account.action_required": {
       "message": "Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it."
     },
@@ -68,6 +89,48 @@
     },
     "onboarding.title.profile": {
       "message": "Store profile"
+    },
+    "opening.unavailable.account_deleting": {
+      "message": "Your account is being deleted, so you cannot apply to open a store."
+    },
+    "opening.unavailable.store_exists": {
+      "message": "You are already a seller, so you do not need to apply again."
+    },
+    "opening.unavailable.suspended": {
+      "message": "Your account is suspended. You cannot open a store until the suspension is lifted."
+    },
+    "opening.unavailable.terminated": {
+      "message": "This account cannot open a store again because the partnership was terminated (Section 21.3). If you disagree, you can appeal the termination."
+    },
+    "remediation.unavailable.appeal_pending": {
+      "message": "The appeal for this action is under review. You cannot request to lift it until the review is complete."
+    },
+    "remediation.unavailable.cooldown": {
+      "message": "A request to lift this action is in its cooldown period. You can submit another after {time}."
+    },
+    "remediation.unavailable.not_active": {
+      "message": "This action is not currently in effect."
+    },
+    "remediation.unavailable.not_active_revoked": {
+      "message": "This action has been revoked."
+    },
+    "remediation.unavailable.not_risk": {
+      "message": "Only actions based on a risk type can be requested to be lifted."
+    },
+    "remediation.unavailable.remediation_pending": {
+      "message": "The request to lift this action is under review. You cannot submit another until the review is complete."
+    },
+    "report.duplicate_supplemented": {
+      "message": "You already reported this store in this category today. Your new details were added to the original report."
+    },
+    "report.own_store": {
+      "message": "You cannot report your own store."
+    },
+    "report.submit_conflict": {
+      "message": "A conflict occurred while submitting. Please try again shortly."
+    },
+    "report.supplement_limit": {
+      "message": "{max, plural, one {This report has already been supplemented {max} time and cannot be supplemented again.} other {This report has already been supplemented {max} times and cannot be supplemented again.}}"
     }
   }
 }

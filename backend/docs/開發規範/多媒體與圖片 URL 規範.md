@@ -39,7 +39,7 @@
    ```
 
    `curl -o /dev/null -w '%{http_code}' "$MEDIA_BASE_URL/i/<preset>/public/__probe-does-not-exist__.gif"`
-   hawkr-website 的部署前閘門即以此實作（`deploy.yml` 的 `Validate deploy configuration`：把 `ImagePreset` union 解出來逐一探測部署目標），新增 preset 自動納入。
+   目前沒有自動化的部署前閘門做這項探測，新增 preset 時手動執行上列探測。
 6. **`animated: true` 的 preset（動圖）本機驗不到，必須對已部署的 worker 實測。** Miniflare Images 模擬器對 `image/gif` 回 `IMAGES_TRANSFORM_ERROR 9520: GIF output is not supported in local mode`（於是 degrade 直出原檔，看起來「是動的」其實沒轉換）、對 `image/webp` 成功但靜默吐單幀。又因轉換失敗時 Worker 一律 degrade 直出原檔且 **HTTP 仍是 200**，只看狀態碼會把完全沒生效當成成功 ⇒ 用 `workers/image-gateway/scripts/verify-motion-preset.mjs` 驗**位元組數與幀數**，並以「位元組數與原檔相同」當作沒生效的指紋。
 
 ## 4. API 契約

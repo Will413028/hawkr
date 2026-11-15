@@ -56,6 +56,10 @@
  *    install-script approval forever. Every entry must still be in the tree
  *    (same `present` set as rule 3); otherwise delete it.
  *
+ * 7. The npm `overrides` of backend/workers/image-gateway get rules 1-5 too
+ *    (scoped under the requester, notes in `//overrides`; see the npm section
+ *    below), checked against its package-lock.json.
+ *
  * Rules 4 and 5 only ever fire when the tree has genuinely moved, which is
  * exactly when editing the entry is safe.
  */
@@ -64,8 +68,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // 根目錄的 workspace（pnpm-workspace.yaml 與 node_modules/.pnpm 都在這裡），
-// 由腳本位置推得，從任何 app 目錄呼叫結果相同。
-const root = join(import.meta.dirname, "..");
+// 由腳本位置推得，從任何 app 目錄呼叫結果相同；測試用 CHECK_OVERRIDES_ROOT 指向 fixture。
+const root = process.env.CHECK_OVERRIDES_ROOT ?? join(import.meta.dirname, "..");
 const failures: string[] = [];
 
 type Override = {
@@ -91,6 +95,28 @@ type Override = {
  * ------------------------------------------------------------------ */
 
 type Version = [number, number, number];
+
+/** Shared by the pnpm comments and the npm `//overrides` notes. */
+function parseNotes(text: string): {
+	removeWhen: string | null;
+	exceedsUpstream: string[] | null;
+} {
+	const removeWhen = text.match(
+		/REMOVE-WHEN:\s*requesters-demand\s*>=\s*([0-9][^\s.]*(?:\.[0-9][^\s.]*)*)/,
+	);
+	// Stop at the em dash so a trailing prose reason on the same line ("— the
+	// advisory covers the whole declared range") is not read as a package name.
+	const exceeds = text.match(/EXCEEDS-UPSTREAM:\s*([^—]*)/);
+	return {
+		removeWhen: removeWhen ? removeWhen[1] : null,
+		exceedsUpstream: exceeds
+			? exceeds[1]
+					.split(",")
+					.map((x) => x.trim())
+					.filter(Boolean)
+			: null,
+	};
+}
 
 function parseVersion(raw: string): Version | null {
 	const m = raw.match(/^(\d+)\.(\d+)\.(\d+)/);
@@ -208,25 +234,14 @@ for (let i = 0; i < workspaceLines.length; i++) {
 	const name = scoped ? rawKey.slice(0, at) : rawKey;
 	const selector = scoped ? rawKey.slice(at + 1) : null;
 
-	const joined = pendingComments.join(" ");
-	const removeWhenLine = joined.match(
-		/REMOVE-WHEN:\s*requesters-demand\s*>=\s*([0-9][^\s]*)/,
-	);
-	// Stop at the em dash so a trailing prose reason on the same line ("— the
-	// advisory covers the whole declared range") is not read as a package name.
-	const exceedsLine = joined.match(/EXCEEDS-UPSTREAM:\s*([^—]*)/);
+	const notes = parseNotes(pendingComments.join(" "));
 
 	overrides.push({
 		name,
 		selector,
 		value,
-		removeWhen: removeWhenLine ? removeWhenLine[1] : null,
-		exceedsUpstream: exceedsLine
-			? exceedsLine[1]
-					.split(",")
-					.map((s) => s.trim())
-					.filter(Boolean)
-			: null,
+		removeWhen: notes.removeWhen,
+		exceedsUpstream: notes.exceedsUpstream,
 		line: i + 1,
 	});
 	pendingComments = [];
@@ -327,8 +342,14 @@ for (const entry of storeEntries) {
  * Apply the rules
  * ------------------------------------------------------------------ */
 
-for (const o of overrides) {
-	const where = `pnpm-workspace.yaml:${o.line}  ${o.name}`;
+type Requester = { name: string; by: string; range: string };
+
+/**
+ * Rules 1-5 for one override. `all` is every declaration of the overridden
+ * package by the requesters the override applies to; `inTree` says whether the
+ * override still has anything to act on (rule 3).
+ */
+function checkOverride(o: Override, where: string, all: Requester[], inTree: boolean): void {
 
 	// Rule 1 — a stated exit condition.
 	if (!o.removeWhen) {
@@ -337,7 +358,7 @@ for (const o of overrides) {
 				"      # REMOVE-WHEN: requesters-demand >=<version>\n" +
 				"    An override with no exit condition never leaves.",
 		);
-		continue;
+		return;
 	}
 
 	const removeWhen = parseVersion(o.removeWhen);
@@ -345,7 +366,7 @@ for (const o of overrides) {
 		failures.push(
 			`${where}\n    REMOVE-WHEN version "${o.removeWhen}" is not a plain x.y.z version.`,
 		);
-		continue;
+		return;
 	}
 
 	// Rule 2 — bounded value.
@@ -356,20 +377,19 @@ for (const o of overrides) {
 				"    a major no upstream package declares — and inherit that major's\n" +
 				"    advisories. Use a bounded range (^x.y.z) or an exact pin.",
 		);
-		continue;
+		return;
 	}
 
 	// Rule 3 — still in the tree.
-	if (!present.has(o.name)) {
+	if (!inTree) {
 		failures.push(
 			`${where}\n    no longer present in the dependency tree — this override is dead\n` +
 				"    config. Delete the entry.",
 		);
-		continue;
+		return;
 	}
 
 	// Rule 4 — redundancy.
-	const all = requesters.get(o.name) ?? [];
 	const selectorMajor = o.selector ? rangeFloor(o.selector)?.[0] : undefined;
 
 	const relevant: {
@@ -451,6 +471,115 @@ for (const o of overrides) {
 	}
 }
 
+for (const o of overrides) {
+	checkOverride(
+		o,
+		`pnpm-workspace.yaml:${o.line}  ${o.name}`,
+		requesters.get(o.name) ?? [],
+		present.has(o.name),
+	);
+}
+
+/* ------------------------------------------------------------------ *
+ * Rules 1-5 for npm `overrides` (backend/workers/image-gateway)
+ *
+ * npm overrides are scoped under the requester they act on:
+ *   "overrides": { "<requester>": { "<dep>": "<value>" } }
+ * and each one carries its notes in `//overrides`, keyed "<requester> > <dep>",
+ * written in the same vocabulary as the pnpm comments:
+ *   "EXCEEDS-UPSTREAM: <requester> — <why>. REMOVE-WHEN: requesters-demand >=<version>"
+ * The lockfile keeps what each package declared (not the override), so the
+ * declared ranges come from package-lock.json.
+ * ------------------------------------------------------------------ */
+
+const npmDir = "backend/workers/image-gateway";
+let npmCount = 0;
+{
+	const pkgPath = join(root, npmDir, "package.json");
+	const lockPath = join(root, npmDir, "package-lock.json");
+	let pkg: { overrides?: Record<string, unknown>; [k: string]: unknown } | null = null;
+	try {
+		pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+	} catch {
+		// no npm project here (fixtures, or the worker was removed): nothing to check
+	}
+	let lockOk = true;
+	if (pkg?.overrides) {
+		let lock: { packages?: Record<string, { version?: string; dependencies?: Record<string, string>; optionalDependencies?: Record<string, string> }> } = {};
+		try {
+			lock = JSON.parse(readFileSync(lockPath, "utf8"));
+		} catch {
+			failures.push(`${npmDir}/package-lock.json missing or unreadable — run \`npm install\` there.`);
+			lockOk = false;
+		}
+		if (!lockOk) {
+			// one error is enough; the remaining npm checks all depend on the lockfile
+		} else {
+		const notes = (pkg["//overrides"] ?? {}) as Record<string, string>;
+		if (typeof pkg["//overrides"] !== "object" || pkg["//overrides"] === null) {
+			failures.push(
+				`${npmDir}/package.json  \`//overrides\` must be an object keyed "<requester> > <dep>" holding the\n` +
+					"    REMOVE-WHEN / EXCEEDS-UPSTREAM notes (same vocabulary as pnpm-workspace.yaml).",
+			);
+		}
+		const seenKeys = new Set<string>();
+		for (const [requester, scope] of Object.entries(pkg.overrides)) {
+			if (requester === "." || (requester.lastIndexOf("@") > 0)) {
+				failures.push(
+					`${npmDir}/package.json  overrides.${requester}\n    requester keys with a version selector (\`name@range\`) or the \`.\` self key are not supported by this gate;\n` +
+						"    scope the override under the plain package name.",
+				);
+				continue;
+			}
+			if (typeof scope !== "object" || scope === null) {
+				failures.push(
+					`${npmDir}/package.json  overrides.${requester}\n    must be scoped under the requester ({ "<requester>": { "<dep>": "<value>" } });\n` +
+						"    an unscoped override rewrites every package that depends on it.",
+				);
+				continue;
+			}
+			for (const [dep, value] of Object.entries(scope as Record<string, unknown>)) {
+				const where = `${npmDir}/package.json  ${requester} > ${dep}`;
+				if (typeof value !== "string") {
+					failures.push(`${where}\n    nested overrides are not supported by this gate; flatten to one level.`);
+					continue;
+				}
+				npmCount++;
+				seenKeys.add(`${requester} > ${dep}`);
+				const note = typeof notes[`${requester} > ${dep}`] === "string" ? notes[`${requester} > ${dep}`] : "";
+				const parsed = parseNotes(note);
+				const all: Requester[] = [];
+				for (const [key, entry] of Object.entries(lock.packages ?? {})) {
+					if (key.slice(key.lastIndexOf("node_modules/") + "node_modules/".length) !== requester) continue;
+					const range = { ...entry.dependencies, ...entry.optionalDependencies }[dep];
+					if (typeof range === "string") all.push({ name: requester, by: `${requester}@${entry.version ?? "?"}`, range });
+				}
+				checkOverride(
+					{
+						name: dep,
+						selector: null,
+						value,
+						removeWhen: parsed.removeWhen,
+						exceedsUpstream: parsed.exceedsUpstream,
+						line: 0,
+					},
+					where,
+					all,
+					all.length > 0,
+				);
+			}
+		}
+		for (const key of Object.keys(notes)) {
+			if (!seenKeys.has(key)) {
+				failures.push(
+					`${npmDir}/package.json  \`//overrides\` note "${key}" matches no override.\n    Delete it, or fix the key to "<requester> > <dep>".`,
+				);
+			}
+		}
+		}
+	}
+}
+
 // Rule 6 — every `allowBuilds` entry is still in the tree.
 const allowBuilds: { name: string; line: number }[] = [];
 let inAllowBuilds = false;
@@ -495,5 +624,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-	`check-dependency-overrides: ${overrides.length} override(s) and ${allowBuilds.length} allowBuilds entr(ies) still load-bearing.`,
+	`check-dependency-overrides: ${overrides.length} pnpm and ${npmCount} npm override(s) and ${allowBuilds.length} allowBuilds entr(ies) still load-bearing.`,
 );

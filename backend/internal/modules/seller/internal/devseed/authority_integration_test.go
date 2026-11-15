@@ -188,7 +188,7 @@ func TestCheckRefusesMixedAuthorityOrdersAndListsTheirIDs(t *testing.T) {
 	}
 
 	stores := []devseed.Store{{StoreID: seedStore, StoreCode: 1, AccountID: 100, Name: "店", TownCode: "x", LogoKey: "k", LogoAssetID: "a"}}
-	err = devseed.CheckForTest(ctx, d.Pool(), stores, nil, now)
+	err = devseed.CheckForTest(ctx, d.Pool(), stores, []int64{100}, now)
 	if err == nil {
 		t.Fatal("混合的來函必須讓前提檢查拒絕")
 	}

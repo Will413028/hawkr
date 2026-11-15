@@ -15,9 +15,7 @@ import { discoverLiveEntity } from "./seo/_helpers";
  *
  * ── 為什麼不再 `test.skip(!!process.env.CI)`（web#386）─────────────────────
  * 本檔原本整支跳過 CI，理由寫的是「CI only has an empty Postgres for Better
- * Auth」。那個理由**已經不成立**：`.github/workflows/deploy.yml` 的 E2E job 明寫
- * 「always runs against the dev/test backend」（`API_BASE_URL=
- * https://test-api.example.com/api/v1`），而 `discoverLiveEntity` 直接打
+ * Auth」。那個理由**已經不成立**：`discoverLiveEntity` 直接打
  * `API_BASE_URL`（預設 loopback）的 public endpoint，不經本地 proxy；後端不可達時該測試 skip。同一個 helper 已經被
  * `tests/e2e/public-dynamic-routes.spec.ts` 用在 CI 的 smoke 子集裡。
  *

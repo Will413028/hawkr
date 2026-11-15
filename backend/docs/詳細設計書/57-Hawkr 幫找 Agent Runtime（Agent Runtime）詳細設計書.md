@@ -777,7 +777,7 @@ Zod schema **必須對照 wire fixture 撰寫，不得由 swagger 衍生**——
 `llmprovider.Procurement`／`Assistant`，**自己不建、也不判**。兩個缺陷類別各出過一次事故，都源自手刻拷貝：
 **provider quirk 漂移**（漏掉 DeepSeek 的 `reasoning.effort=none` ⇒ 強制 tool_choice 一律 HTTP 400 ⇒ 敘述 100%
 退回模板，而測試與 CI 全綠）與**缺金鑰拖垮啟動**（建構期回 error ⇒ fx abort ⇒ 全服務 RPC 皆滅）。
-ADK 是外部套件、擋不住直接 import，那條殘餘的縫由 `scripts/check-llm-client-construction.py`（static-gates）守。
+ADK 是外部套件、擋不住直接 import，那條殘餘的縫沒有自動 gate，靠 review。
 
 **上述殘餘必須可量測**：`realizeOrFallback` 的 reject 與 error 兩條退場路徑各記一筆 `WARN`——reject 帶 `reason`、`act_code` 與**被擋下的 block 原文**（含模型自報的 claim codes；第一層的 `claim_violation` 只看 Text 判斷不出原因），error 帶 `act_code` 與 provider 錯誤。
 ⚠️ **只有 `procurement_surface_validation_reject_total{reason}` 這個計數不夠**：它回答得了「擋了多少」，回答不了「擋了什麼」，而收緊或放寬任一層都需要後者。

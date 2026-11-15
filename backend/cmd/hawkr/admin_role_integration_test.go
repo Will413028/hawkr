@@ -17,11 +17,8 @@ import (
 // 代行；授予與撤銷各留下 source 是 CLI 的事件。
 func TestAdminRoleCLIRevokeEndsRunningDelegations(t *testing.T) {
 	ctx := context.Background()
-	url := pg.NewURL(t)
+	url := migratedURL(t)
 	t.Setenv("DATABASE_URL", url)
-	if err := run(ctx, []string{"migrate"}); err != nil {
-		t.Fatalf("migrate：%v", err)
-	}
 	d, err := db.Open(ctx, db.Config{URL: url, MaxConns: 2})
 	if err != nil {
 		t.Fatal(err)
@@ -88,11 +85,8 @@ func TestAdminRoleCLIRevokeEndsRunningDelegations(t *testing.T) {
 // 本機 seed 的 dev 管理員是 OWNER，授予留下一筆事件，重跑 seed 不重複。
 func TestSeedGrantsTheDevAdminOwnerOnce(t *testing.T) {
 	ctx := context.Background()
-	url := pg.NewURL(t)
+	url := migratedURL(t)
 	t.Setenv("DATABASE_URL", url)
-	if err := run(ctx, []string{"migrate"}); err != nil {
-		t.Fatalf("migrate：%v", err)
-	}
 	d, err := db.Open(ctx, db.Config{URL: url, MaxConns: 2})
 	if err != nil {
 		t.Fatal(err)

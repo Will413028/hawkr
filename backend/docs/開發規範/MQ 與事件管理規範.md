@@ -165,7 +165,7 @@ RabbitMQ 不支援 in-place 修改 queue arguments。Terraform 因此把 `argume
 3. （建議）對 dev 跑**唯讀** plan 看清楚會動到什麼：`cd infra/mq/envs/dev` → `terraform plan -input=false -detailed-exitcode -refresh=false`（credentials 取得與 `-refresh=false` 的理由見 `infra/mq/README.md`「本機驗證 ③」）。⚠️ **本機對 dev / prod 執行 `apply` 一律禁止**——R2 state 沒有 locking，並行 apply 會互相覆蓋
 4. push → 開 PR。CI 兩處各司其職：
    - `mq-topology.yml`：schema validate → **對 dev + prod 各跑一次 plan**，貼進 step summary
-   - `static-gates.yml` 的「MQ consumer ↔ topology 登記一致性」step：雙向登記檢查（blocking，**只掃 Go**）
+   - consumer 登記與 `topology.yaml` 的一致性**沒有 CI gate**（Go 與 Java 都一樣），靠 review
 5. **人工讀兩份 plan**，搜 `must be replaced` 與 `destroy`。⚠️ 兩個陷阱：**(a)** step summary 貼的是 `tail -c 60000`（plan 的**最後 60KB**，長 plan 前段會被截掉）——以 plan 末尾那行 `Plan: X to add, Y to change, Z to destroy` 的數字為準，數字對不上你的預期就別 merge；**(b) PR 階段的 plan 含 destroy 不會讓 CI 變紅**（destructive gate 有 `if: mode == 'apply'`），綠燈不等於安全
 6. Review → merge 到 `dev`：
    - **非破壞性**（plan 只有 `create` / `update`）：push 觸發 CI 自動 apply dev；promote 到 `main` 後自動 apply prod
@@ -219,7 +219,7 @@ replace / destroy 會讓 queue 內未消費的訊息一起消失。若不可丟�
 
 - **2026-06-16 PR #989**（issue #1010）：notification-service 啟用 `MaxRetries=3` 後，framework 對 `notification.merchant.follower` queue assert 新 args 失敗 → 80+ 次 reconnect → dev notification 全鏈不通。**直接原因**：PR 描述未列受影響 queue 清單，部署時遺漏對應的 ops 動作。
 - **2026-07-23 issue #1625**：`pkg/mq` 啟用 DLX args 的版本上 prod 時 dev 有做 ops、prod 漏做 → prod 6 條 queue（crm/buyer/seller×3/social）406 斷線 5 天：crm 因單一 subscription 整服務 reconnect loop，其餘服務**靜默 skip**（僅啟動時 log 一行，外表正常）；同時 RabbitMQ prometheus plugin aggregated 模式無 per-queue label，`RabbitMQNoConsumers` 告警從未生效。修復＝零窗口重建 ＋ prometheus `/metrics/detailed` per-queue 告警（`RabbitMQQueueNoConsumersStalled`：業務 queue consumers=0 即告警，不要求有堆積）。教訓：**部分 queue 被 skip 的服務外表正常，必須靠 queue 級監控抓**。
-- **2026-07-25 issue #1795**（passive declare 上線後第一起）：`crm.aftersales.refund.completed` 這條新 queue 晚於 topology 匯出才 merge，broker 上根本不存在 → 該筆 subscription 失效（服務正常啟動、不進 DLQ，Go 端只有啟動時一行 `skipping queue` 沒人看到），退款事件在 dev 完全沒進 crm-service。防線＝§2.1 步驟 8 ＋ `static-gates.yml` 的「MQ consumer ↔ topology 登記一致性」step（**只掃 Go**）＋ notification-service 的 `TestNotificationQueuesExistInTerraformTopology`（單元測試，不同步就測試 fail）；**Java consumer 沒有自動攔截**，只能靠 §6.1 人工對照。
+- **2026-07-25 issue #1795**（passive declare 上線後第一起）：`crm.aftersales.refund.completed` 這條新 queue 晚於 topology 匯出才 merge，broker 上根本不存在 → 該筆 subscription 失效（服務正常啟動、不進 DLQ，Go 端只有啟動時一行 `skipping queue` 沒人看到），退款事件在 dev 完全沒進 crm-service。防線＝§2.1 步驟 8 ＋ notification-service 的 `TestNotificationQueuesExistInTerraformTopology`（單元測試，不同步就測試 fail）；**除該單元測試外沒有自動攔截**，只能靠 §6.1 人工對照。
 
 ---
 
@@ -296,7 +296,7 @@ destroy → destructive gate `exit 1`），**那是預期行為**，它在等你
 - [ ] **`infra/mq/topology/topology.yaml` 已加對應條目**，且本機 `validate.py` + `unittest` + `mq-consumer-registration-check.py` 三道全綠（漏登記 = 訂閱失效，Go 端只有啟動時一行 log，實務上等於沒人會發現）
 - [ ] **DLQ / retry 以 `retry:` / `dlq:` policy 宣告**，未手寫 policy 會展開的衍生資源（`{queue}.dlq`、`{queue}.retry`、鏡射 binding——手寫會重複產生）。**三類例外必須手寫**：① `{exchange}.dlx` exchange 本身（展開不產生它）② 共用 DLQ 目的地（`aftersales.events.dlq`、`payment.rescue.refund.dlq`，以裸 queue 條目自行存在）③ 自建的延遲重試 queue（6 條 product-import `*.retry`，帶 `x-message-ttl` 走 `dlq:`，非 `retry:` policy 產物）
 - [ ] **已讀過 PR 上 dev + prod 兩份 `terraform plan`**，確認沒有非預期的 `must be replaced` / `destroy`（⚠️ PR 階段含 destroy **不會**讓 CI 變紅，綠燈不等於安全）
-- [ ] **Java consumer 另需人工對照**——`static-gates.yml` 的「MQ consumer ↔ topology 登記一致性」step 只掃 Go（`**/*.go`），Java 端漏登記無自動攔截
+- [ ] **consumer 登記需人工對照**——登記一致性沒有 CI gate，Go 與 Java 端漏登記都無自動攔截
 - [ ] 關鍵路徑有 idempotency 保護（dedup 表或 DB 樂觀鎖）
 - [ ] 關鍵路徑有 DLQ 配置（`topology.yaml` 的 `dlq:` / `retry:` policy；Java 側另有 `@Bean DLQ` + DLX argument 作為意圖宣告）
 - [ ] Payload 為 typed class（避免 Map 動態 payload）
@@ -342,7 +342,7 @@ destroy → destructive gate `exit 1`），**那是預期行為**，它在等你
 | 5 | 確認 exchange → queue 的 binding 存在——exchange 有、queue 有、binding 沒有，訊息一樣被丟棄且無任何 log |
 | 6 | 補完 topology 並 apply 後，**記得 `kubectl rollout restart deployment/<service>`**——被 skip 的訂閱不會自癒（§3.3.3 步驟 7） |
 
-**防護**：§2.1 步驟 8（同 PR 登記 topology.yaml）＋ `static-gates.yml` 的「MQ consumer ↔ topology 登記一致性」step（blocking，**只掃 Go**）＋ notification-service `TestNotificationQueuesExistInTerraformTopology`（**單元測試**，直接讀 `topology.yaml` 核對，不同步就測試 fail）。**Java consumer 無自動攔截**，靠 §6.1 人工對照。
+**防護**：§2.1 步驟 8（同 PR 登記 topology.yaml）＋ notification-service `TestNotificationQueuesExistInTerraformTopology`（**單元測試**，直接讀 `topology.yaml` 核對，不同步就測試 fail）。**除該單元測試外，consumer 登記無自動攔截**，靠 §6.1 人工對照。
 
 **歷史教訓**：
 - `order.shipping.label` 缺少 `@Bean` 定義：auto-declare 時代症狀是「新環境啟動失敗」，直接把問題砸在臉上；passive declare 下同樣的漏登記**只剩啟動時一行 log**（Go 端）——症狀從「服務起不來」降級成「幾乎看不見」，這正是它現在更危險的原因。

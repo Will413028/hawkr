@@ -240,7 +240,7 @@ mac     = HMAC-SHA256(secret, "hkorigin1:" || base64url(payload))
 `chat_ws_ticket_hmac.go` 對空密鑰不特判，理由是 `JWT_SECRET` 在任何會做驗證的環境一定有設（`internal/config/config.go` 的 `Validate()` 確實只強制 `JWT_SECRET`）。**這個理由不能移植到新密鑰**：
 
 - **若沿用「不特判」**：空密鑰下 `HMAC("", ·)` 人人算得出來 ⇒ 任何人可簽任意 `p`、把請求算到任意 `v:<受害者 IP>` ⇒ **定向鎖死他人登入**（auth-failure 軸刻意保留 `SubjectVisitor`）；而且這些簽章的 metric 是 `result="ok"`，**告警不會響**。
-- **若改用 boot-time fail**：`k8s/scripts/create-secrets.sh` 在 CI 中**只被 `static-gates.yml` 的「SCRIPT_REVISION 必須遞增」step 做 gate 檢查**，**沒有任何 workflow 執行它**；secret 的實際建立是人工步驟（`k8s/SETUP.md` 的 scp ＋ ssh），dev 與 prod 各做一次。把 secret 變成啟動必要條件 ⇒ 沒先手動建好就部署＝**gateway CrashLoop**，而且會發生兩次：dev 一次，prod 一次由執行 `dev → main` 的同事觸發。
+- **若改用 boot-time fail**：`k8s/scripts/create-secrets.sh` **沒有任何 workflow 執行它**；secret 的實際建立是人工步驟（`k8s/SETUP.md` 的 scp ＋ ssh），dev 與 prod 各做一次。把 secret 變成啟動必要條件 ⇒ 沒先手動建好就部署＝**gateway CrashLoop**，而且會發生兩次：dev 一次，prod 一次由執行 `dev → main` 的同事觸發。
 
 **定版作法**（**每把密鑰各自獨立判定**）：
 
