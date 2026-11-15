@@ -1,6 +1,6 @@
 # 拆除 website Storybook
 
-**Goal：** website 不再依賴 Storybook：原本 31 個 story 檔的 139 個 play 都改寫成 Vitest browser mode 的 `*.browser.test.tsx` 並在 CI 執行，a11y 由 Playwright e2e 的 axe 掃描守，Storybook 的依賴、patch、設定、scripts 與 CI job 全部刪除（驗收見步驟 6）。
+**Goal：** website 不再依賴 Storybook：原本 31 個 story 檔的 139 個 play 都改寫成 Vitest browser mode 的 `*.browser.test.tsx` 並在 CI 執行，a11y 由 Playwright e2e 的 axe 掃描守，Storybook 的依賴、patch、設定、scripts 與 CI job 全部刪除（驗收見步驟 7）。
 
 **上層：** 主清單在 repo 外，見本機個人脈絡檔。
 
@@ -48,7 +48,7 @@ knip 基線（2026-11-15 重做）：附件 `knip-baseline.json` 是 d69bbbbc（
 
 - 做：play 改寫、browser 測試的 runner 與 CI job、axe 進 e2e、刪除 Storybook 與連帶的 Flutter 目錄 web 宿主、文件更新。
 - 不做：視覺回歸（Storybook 目前也沒有）；admin（沒有 Storybook）；Flutter 目錄的其他改動（D2 只刪 Storybook 宿主留下的嵌入模式與 base href）。
-- 延後：Flutter 元件目錄的 web 版發佈（觸發條件：Will 需要在瀏覽器分享 App 元件目錄時）。
+- 延後：Flutter 元件目錄的 web 版發佈（觸發條件：Will 需要在瀏覽器分享 App 元件目錄時）；屆時一併重新評估現在沒有消費端的 `?component=&textScale=` 深連結解析與 `component-catalog.sh build`（`CATALOG_BASE_HREF`），保留理由：本機手動開特定 section 仍可用。
 
 ## 步驟
 
@@ -76,7 +76,7 @@ knip 基線（2026-11-15 重做）：附件 `knip-baseline.json` 是 d69bbbbc（
   - 不能動：`.github/workflows/website-e2e.yml` 第 86 行描述的圖片網域判定（fixture 攔的網域不變）。
   - 驗收：同步驟 2 的對照表與 CI；mutation：`DescriptionEditorDeletion` 與 `Cart` 各破壞一個被斷言的行為，job 要失敗。
   - 實作發現（CI 實證）：vitest browser 預設視窗寬 414px，Editor.js 在 650px 以下視為手機版、不依滑鼠移動區塊工具列（`editorjs.mjs` 的 `be()` 與 `enableModuleBindings`），依賴 hover 的測試要先 `page.viewport(1280, 800)` 再掛載；`*Sync` matcher 只檢查一次，掛載或操作後的 DOM 斷言要包在 `waitFor`。
-  - 延後：`DescriptionEditorImage` 的 msw worker 啟動失敗時清理步驟丟 TypeError 蓋掉原錯誤、`Cart` 檔內手動 `cleanup()` 與 setup 重複並依賴 hook 順序（觸發條件：任一處造成難診斷的 CI 失敗，或步驟 5 整理 `tests/browser/` 時）；Cart 的 `--hk-text-scale` 斷言只驗到測試 helper 自己設的值（觸發條件：需要驗外層字級設定時，改由 app 的 layout 設定）。
+  - 延後：`DescriptionEditorImage` 的 msw worker 啟動失敗時清理步驟丟 TypeError 蓋掉原錯誤、`Cart` 檔內手動 `cleanup()` 與 setup 重複並依賴 hook 順序（觸發條件：任一處造成難診斷的 CI 失敗，或下次修改 `tests/browser/setup.ts` 或這兩個測試檔的清理流程時（步驟 5 沒有整理到，2026-11-15 改寫））；Cart 的 `--hk-text-scale` 斷言只驗到測試 helper 自己設的值（觸發條件：需要驗外層字級設定時，改由 app 的 layout 設定）。
 - [x] **4. a11y 改用 axe 進 Playwright e2e**（被擋於：步驟 1；D1 已決）
   - 範圍：依 D1 加入套件，在既有 e2e（`website/tests/e2e/`）的主要頁面加 axe 掃描，規則等級對齊 Storybook 的 `a11y.test: "error"`（違規即失敗）；涵蓋原 story 的元件出現的頁面清單寫在 spec 開頭註解之外的 PR 描述。
   - 消費端：`rg -ln 'test\(' website/tests/e2e`
@@ -88,7 +88,9 @@ knip 基線（2026-11-15 重做）：附件 `knip-baseline.json` 是 d69bbbbc（
   - 消費端：`rg -il 'storybook|stories/' --hidden -g '!**/node_modules/**' -g '!.git/**'`
   - 不能動：盤點表標「保留」的歷史紀錄。
   - 驗收：`pnpm install` 後 lockfile 無 `@storybook/`（`rg -c '@storybook/' pnpm-lock.yaml` 為 0）；本機 `pnpm lint`、`pnpm test`、`pnpm knip`、`pnpm design:check --apps-root ..`、`pnpm design:test`、根目錄 repo-hygiene 對應檢查通過；CI website-ci、website-e2e、supply-chain、buyer-ci、seller-ci（App 檔案改動觸發）每個 job 自己的結論綠；上面的消費端搜尋只剩保留項與本計畫。
-- [ ] **6. 收尾**：完成定義逐項核對；design-review skill 審整體 diff；延後項（Flutter 目錄 web 版）附觸發條件搬回主清單；合回 `dev`、推送前跑觸發到的檢查，移除 worktree 與分支。驗收：完成定義三項各附指令輸出；design-review 報告；`git worktree list` 不含 `remove-storybook`。
+- [ ] **6a. 公開頁 axe 進 CI**（來源：步驟 6 設計審查 blocking；Will 2026-11-15 選「本 PR 補 mock」）：`public-static-routes` 全標 `@live`、CI 不跑，公開頁沒有 axe。範圍：e2e 以 `page.route` mock 訪客外框的 4 個端點（`/public/categories/tree`、`/public/hashtags/popular`、`/public/tags/trending`、`/public/posts`），新增不帶 `@live` 的 spec 對 23 條公開靜態路由跑 `expectNoAxeViolations`；不改既有 `@live` 測試，日後 #369 的錄製 fixture 可替換這些 mock。被擋於：無。消費端：`rg -n 'expectNoAxeViolations|PUBLIC_STATIC_ROUTES' website/tests/e2e`。不能動：既有 `@live` spec、不變量「e2e 的 server 回應全由 `page.route` 攔截」。驗收：website-e2e 每個 shard 綠且新 spec 有執行（job log 看得到 23 條）；mutation：拿掉 `/faq`（或任一公開頁）某個表單或連結的可及名稱，新 spec 失敗，revert 後回綠。
+- [ ] **6b. 狀態層 axe 進 browser test**（來源：步驟 6 設計審查 should；Will 2026-11-15 選「補 axe」並同意 devDependencies 宣告 `axe-core` 4.14.0，與 lockfile 同版）：`tests/browser/` 加共用 helper 以 `axe-core` 對 `document` 跑並斷言零違規；在互動後才出現的狀態呼叫：Dialog、Dropdown、Sheet、DatePicker 展開，Input 錯誤狀態，DescriptionEditor 的錯誤與刪除狀態。被擋於：無。消費端：`rg -l 'browser.test.tsx' website`。不能動：既有斷言（只加不刪）。驗收：元件 browser job 綠；mutation：拿掉 Dialog 標題與 `aria-labelledby` 的關聯，對應 axe 斷言失敗，revert 後回綠；knip（`knip-diff.py`）new 0。
+- [ ] **7. 收尾**：完成定義逐項核對；design-review skill 審整體 diff；延後項（Flutter 目錄 web 版）附觸發條件搬回主清單；合回 `dev`、推送前跑觸發到的檢查，移除 worktree 與分支。驗收：完成定義三項各附指令輸出；design-review 報告；`git worktree list` 不含 `remove-storybook`。
 
 ## 決定
 
@@ -114,4 +116,6 @@ knip 基線（2026-11-15 重做）：附件 `knip-baseline.json` 是 d69bbbbc（
 | 3 Cart、DescriptionEditor | 完成 | lint、`test:unit`、knip（`knip-diff.py` new 0）本機；PR #377 在 44284b2e 全部檢查綠（website-e2e run 43688865121：元件 browser job 32 檔 151 測試、8 個 e2e shard）；mutation（run 43688094850）拿掉存檔失敗後的重試時只有「最後一次存檔失敗 · 補存後 onChange 跟上」失敗、不可購買商品數量不停用時只有「disables quantity for an unavailable item…」失敗，revert 後回綠；play 對照表在 PR 描述；`/code-review` 兩輪加 Will 同意的第三輪，契約對照審查 1 項 should 已修 | — | 831991d8..44284b2e |
 | 4 axe 進 e2e | 完成 | 掃描接在 protected／public static routes 與 `/cart`；首跑 51 頁違規（run 43696298022），Will 決定全部修；修正後 website-e2e 全綠（run 43709161412，元件 browser job、8 個 e2e shard，含 `/cart`）；mutation 拿掉 `/seller-center/coupons/new` 優惠券名稱的 label 時掃描報 `label`／`label-title-only` 失敗（run 43706283438），revert 後回綠；`label-content-name-mismatch` 的成因以診斷 commit 加 axe 4.14.0 原始碼證實（axe 以 `screenReader=false` 計算可見文字，`aria-hidden` 的可見文字也算）；`/code-review` 兩輪：第一輪 9 項全修，第二輪 10 項：修 7 項（live region 字串、表格 region class 合併附 red-proof；手機寬度空 region×3 改為只在溢出時成為可聚焦 region；sr-only 名稱元素不得為 span 的測試；ImageUploader 文字單一來源；AI 助手按鈕以 aria-describedby 補用途），Will 2026-11-15 決定；本機 lint、test、test:unit、knip 綠 | 上傳鈕名稱含檔案提示：已接受（Will 2026-11-15）；早退狀態 h1 收斂到共用外框：延後，觸發條件為新增早退狀態時；`public-static-routes` 標 `@live`，CI 不跑 | 519fe31e..dfe9696a |
 | 5 確認並刪除 Storybook | 完成 | 本機：lockfile `@storybook/` 0 筆、`pnpm lint`、`pnpm test`（2936）、`test:unit`、`design:check --apps-root ..`、`design:test`、knip（`knip-diff.py` new 0）、`check-doc-paths.py`、buyer `flutter test`（1499）、seller `flutter test`（2279）；PR #377 在 ad987139 全部 workflow 綠（website-e2e run 43716667299、website-ci 43716667534、supply-chain 43716667533、buyer 43716667377、seller 43716667411 等 12 個）；消費端搜尋只剩四個保留檔、本計畫與附件、測試圖檔 key `public/storybook/…svg`（測試資料，不依賴 Storybook）；`/code-review` 兩輪：第一輪 10 項（修 8、延後 1 後經 D2 改為修、駁回 1：元件層 a11y 由步驟 4 前提決定），第二輪 9 項依 Will 2026-11-15 指示一次修完，以 CI 為準不開第三輪 | — | 92b20f3c..ad987139 |
-| 6 收尾 | 未開始 | | | |
+| 6a 公開頁 axe 進 CI | 未開始 | | | |
+| 6b 狀態層 axe | 未開始 | | | |
+| 7 收尾 | 進行中 | 本機（a8bf4afe 併入 origin/dev 後）：lint、`pnpm test`（2936）、`design:check --apps-root ..`、knip new 0；`rg -il storybook` 只剩三份保留歷史檔與本計畫附件（測試 fixture 名稱改名 e838be8b）；design-review 第 1 輪：5 項（blocking 1、should 2、nit 2）→ 6a、6b、步驟 3 延後項改觸發條件、Flutter 深連結記延後項，pre-push 腳本一項駁回（`scripts/pre-push-commit-msg.sh` 在 merge-base 已存在，本分支只改範圍，c5c727d9） | CI on c5c727d9 待；6a、6b 完成後重跑完成定義 | e838be8b、c5c727d9 |
