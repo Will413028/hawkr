@@ -102,7 +102,9 @@ func (s *Service) Owner(ctx context.Context, t model.Target) (model.ContentOwner
 }
 
 // AuthorFor 回傳讀取者 c 讀得到的留言或討論區留言的作者（從內容封鎖作者用，A7-2e）：套用與列表相同的觀看者規則（入口的個人封鎖、
-// 父列沒被排除、容器可讀、內容計入）；c 的店擁有該內容所屬的貼文或討論區時，以店主身分讀（不必公開、不套個人封鎖）。讀不到回 Found 為假，不是錯誤。
+// 父列沒被排除、容器可讀、內容計入）；c 的店擁有該內容所屬的貼文或討論區時，以店主身分讀（不必公開、不套個人封鎖）。
+// 買家讀取者自己發起的封鎖（封鎖買家、封鎖店）不排除內容，重複封鎖才解析得到同一位作者；對方發起的封鎖照樣排除（不洩漏被封鎖）。
+// 只有店家身分（BuyerID 為 0）的讀取者只走店主查詢，不退成匿名讀取。讀不到回 Found 為假，不是錯誤。
 func (s *Service) AuthorFor(ctx context.Context, c model.Caller, t model.Target) (model.ContentAuthor, error) {
 	if t.Kind != model.TargetComment && t.Kind != model.TargetForumEntry {
 		return model.ContentAuthor{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())
@@ -110,19 +112,20 @@ func (s *Service) AuthorFor(ctx context.Context, c model.Caller, t model.Target)
 	now := s.d.Now().UTC()
 	conn := s.d.DB.Conn(ctx)
 	var queries []reads.Stmt
-	switch t.Kind {
-	case model.TargetComment:
-		if c.Store != nil {
+	comment := t.Kind == model.TargetComment
+	if c.Store != nil {
+		if comment {
 			queries = append(queries, reads.OwnerCommentAuthor(t.ID, c.Store.StoreID))
-		}
-		queries = append(queries, reads.ReadableCommentAuthor(t.ID, now, c.BuyerID))
-	case model.TargetForumEntry:
-		if c.Store != nil {
+		} else {
 			queries = append(queries, reads.OwnerForumEntryAuthor(t.ID, c.Store.StoreID))
 		}
-		queries = append(queries, reads.ReadableForumEntryAuthor(t.ID, now, c.BuyerID))
-	case model.TargetPost:
-		return model.ContentAuthor{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())
+	}
+	if c.BuyerID > 0 {
+		if comment {
+			queries = append(queries, reads.ReadableCommentAuthor(t.ID, now, c.BuyerID))
+		} else {
+			queries = append(queries, reads.ReadableForumEntryAuthor(t.ID, now, c.BuyerID))
+		}
 	}
 	for _, q := range queries {
 		r, err := reads.One[reads.AuthorRow](ctx, conn, q)

@@ -129,12 +129,14 @@ func (fakeBuyers) BatchDisplay(_ context.Context, ids []int64) ([]buyer.Display,
 }
 
 type fakeStores struct {
-	own      *seller.Store
-	blocking map[int64]bool
-	asked    [][]int64
+	own          *seller.Store
+	blocking     map[int64]bool
+	asked        [][]int64
+	storeLookups int
 }
 
 func (f *fakeStores) CurrentStore(context.Context, int64) (seller.Store, error) {
+	f.storeLookups++
 	if f.own == nil {
 		return seller.Store{}, apperr.NotFound("no store")
 	}

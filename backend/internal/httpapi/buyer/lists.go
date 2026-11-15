@@ -59,7 +59,7 @@ func encodeCursor(scope string, c *model.Cursor) string {
 func (h *App) storeCards(ctx context.Context, storeIDs []int64) (map[int64]*commonpb.StoreCard, error) {
 	cards, err := h.ports.Stores.StoreCards(ctx, storeIDs)
 	if err != nil {
-		return nil, apperr.Unavailable("暫時無法讀取店家")
+		return nil, apperr.WithCause(apperr.Unavailable("暫時無法讀取店家"), err)
 	}
 	out := make(map[int64]*commonpb.StoreCard, len(cards))
 	cardIDs := make([]int64, len(cards))

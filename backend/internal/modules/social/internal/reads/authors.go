@@ -16,10 +16,11 @@ type AuthorRow struct {
 	StoreID   int64  `db:"store_id"`
 }
 
-// ReadableCommentAuthor 是觀看者（買家 buyerID，0 是未登入）讀得到的留言的作者：入口的觀看者規則、計入（沒刪、沒隱藏）、貼文公開可讀、父留言沒被排除（同 ReadableCommentPost）；
+// ReadableCommentAuthor 是觀看者（買家 buyerID，0 是未登入）讀得到的留言的作者：入口的觀看者規則（觀看者自己發起的封鎖不排除，讓重複封鎖仍解析得到作者；
+// 對方發起的封鎖照樣排除，父列條件同樣套用）、計入（沒刪、沒隱藏）、貼文公開可讀、父留言沒被排除（同 ReadableCommentPost）；
 // 讀不到沒有列。
 func ReadableCommentAuthor(id uuid.UUID, now time.Time, buyerID int64) SelectStatement {
-	v := visibility.Viewer{BuyerID: buyerID}
+	v := visibility.Viewer{BuyerID: buyerID, SkipOwnBlocks: true}
 	c := visibility.CommentsOf("c", v)
 	p := visibility.ReadablePosts("p", now, v)
 	return SELECT(c.T.ActorKind.AS("actor_kind"), c.T.ActorID.AS("actor_id"), p.T.StoreID.AS("store_id")).
@@ -38,7 +39,7 @@ func OwnerCommentAuthor(id uuid.UUID, storeID int64) SelectStatement {
 
 // ReadableForumEntryAuthor 是觀看者讀得到的討論區留言的作者：入口的觀看者規則、計入、討論區可讀（店家可曝光、沒被觀看者封鎖）、父留言沒被排除。
 func ReadableForumEntryAuthor(id uuid.UUID, now time.Time, buyerID int64) SelectStatement {
-	v := visibility.Viewer{BuyerID: buyerID}
+	v := visibility.Viewer{BuyerID: buyerID, SkipOwnBlocks: true}
 	e := visibility.ForumEntriesOf("e", v)
 	return SELECT(e.T.ActorKind.AS("actor_kind"), e.T.ActorID.AS("actor_id"), e.T.StoreID.AS("store_id")).
 		FROM(e.T).

@@ -19,7 +19,6 @@ import (
 
 // Writes 是互動寫入的來源（*social.Module）：分享、讚、留言與討論區。
 type Writes interface {
-	Authored
 	RecordShare(ctx context.Context, buyerID int64, postID uuid.UUID) (bool, error)
 	LikePost(ctx context.Context, buyerID int64, postID uuid.UUID) (bool, error)
 	UnlikePost(ctx context.Context, buyerID int64, postID uuid.UUID) (bool, error)
@@ -36,27 +35,28 @@ type Writes interface {
 // App 實作 SocialAppService。
 type App struct {
 	*presenter
-	writes Writes
-	owner  Owner
+	writes   Writes
+	authored Authored
+	owner    Owner
 }
 
 var _ socialv1alpha1connect.SocialAppServiceHandler = (*App)(nil)
 
 // NewApp 建立登入者互動寫入與店主貼文管理的 handler；webOrigin 與 Public 共用，組回應裡貼文的單篇網址，不可是零值。
 // 能力宣告表（declarations）與 SocialAppService 的方法對不上時回錯誤，不能啟動。
-func NewApp(writes Writes, owner Owner, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin) (*App, error) {
-	return newApp(declarations, writes, owner, buyers, stores, images, webOrigin)
+func NewApp(writes Writes, authored Authored, owner Owner, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin) (*App, error) {
+	return newApp(declarations, writes, authored, owner, buyers, stores, images, webOrigin)
 }
 
 // newApp 的宣告表由參數給（測試用缺一列的表驗證啟動檢查）。
-func newApp(table map[string]declaration, writes Writes, owner Owner, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin) (*App, error) {
+func newApp(table map[string]declaration, writes Writes, authored Authored, owner Owner, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin) (*App, error) {
 	if webOrigin.IsZero() {
 		return nil, fmt.Errorf("httpapi/social：貼文的單篇網址需要 WebOrigin")
 	}
 	if err := checkDeclarations(table, serviceDescriptor()); err != nil {
 		return nil, err
 	}
-	return &App{presenter: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin}, writes: writes, owner: owner}, nil
+	return &App{presenter: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin}, writes: writes, authored: authored, owner: owner}, nil
 }
 
 var (
@@ -72,6 +72,19 @@ func (h *App) account(ctx context.Context) (social.Caller, error) {
 		return social.Caller{}, rpc.Error(connect.CodePermissionDenied, "%s", "需要買家身分")
 	}
 	return h.caller(ctx)
+}
+
+// buyerID 回傳呼叫者的買家 ID，不查店家身分；給只以買家身分讀寫的方法用。規則同 account。
+func (h *App) buyerID(ctx context.Context) (int64, error) {
+	p, ok := rpc.PrincipalFrom(ctx)
+	if !ok || p.Kind != identity.PrincipalAccount {
+		return 0, rpc.Error(connect.CodePermissionDenied, "%s", "需要買家身分")
+	}
+	id, err := h.buyers.CurrentBuyerID(ctx, p.ID)
+	if err != nil {
+		return 0, rpc.BuyerInvariant(p.ID, err)
+	}
+	return id, nil
 }
 
 // optionalUUID 解析選填的 ID；沒設是 nil。

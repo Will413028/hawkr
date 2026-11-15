@@ -295,7 +295,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(socialv1alpha1connect.NewSocialPublicServiceHandler(socialPublic, opts...))
-	socialApp, err := httpsocial.NewApp(deps.Social, deps.Social, deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin)
+	socialApp, err := httpsocial.NewApp(deps.Social, deps.Social, deps.Social, deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin)
 	if err != nil {
 		return nil, err
 	}

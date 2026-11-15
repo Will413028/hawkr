@@ -2,8 +2,6 @@ package social
 
 import (
 	"context"
-	"time"
-	"uuid"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -21,35 +19,17 @@ type Authored interface {
 	MyHiddenContent(ctx context.Context, buyerID int64, after *social.HiddenCursor, size int32) (social.HiddenPage, error)
 }
 
-type sanctionCursor struct {
-	CreatedAt time.Time `json:"c"`
-	ID        uuid.UUID `json:"i"`
-}
-
-func (c sanctionCursor) Valid() bool { return !c.CreatedAt.IsZero() && c.ID != uuid.UUID{} }
-
-type hiddenCursor struct {
-	HiddenAt time.Time `json:"h"`
-	ID       uuid.UUID `json:"i"`
-}
-
-func (c hiddenCursor) Valid() bool { return !c.HiddenAt.IsZero() && c.ID != uuid.UUID{} }
-
 func (h *App) ListMySanctions(ctx context.Context, req *connect.Request[pb.ListMySanctionsRequest]) (*connect.Response[pb.ListMySanctionsResponse], error) {
-	c, err := h.account(ctx)
+	buyerID, err := h.buyerID(ctx)
 	if err != nil {
 		return nil, err
 	}
-	scope := rpc.PageScope(socialv1alpha1connect.SocialAppServiceListMySanctionsProcedure, c.BuyerID)
-	after, err := rpc.ValidCursor[sanctionCursor](scope, req.Msg.GetPageToken())
+	scope := rpc.PageScope(socialv1alpha1connect.SocialAppServiceListMySanctionsProcedure, buyerID)
+	after, err := rpc.ValidCursor[social.SanctionCursor](scope, req.Msg.GetPageToken())
 	if err != nil {
 		return nil, err
 	}
-	var cur *social.SanctionCursor
-	if after != nil {
-		cur = &social.SanctionCursor{CreatedAt: after.CreatedAt, ID: after.ID}
-	}
-	page, err := h.writes.MySanctions(ctx, c.BuyerID, cur, req.Msg.GetPageSize())
+	page, err := h.authored.MySanctions(ctx, buyerID, after, req.Msg.GetPageSize())
 	if err != nil {
 		return nil, err
 	}
@@ -64,26 +44,22 @@ func (h *App) ListMySanctions(ctx context.Context, req *connect.Request[pb.ListM
 		}
 	}
 	if page.Next != nil {
-		out.NextPageToken = rpc.TokenFor(scope, sanctionCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
+		out.NextPageToken = rpc.TokenFor(scope, page.Next)
 	}
 	return connect.NewResponse(out), nil
 }
 
 func (h *App) ListMyHiddenContent(ctx context.Context, req *connect.Request[pb.ListMyHiddenContentRequest]) (*connect.Response[pb.ListMyHiddenContentResponse], error) {
-	c, err := h.account(ctx)
+	buyerID, err := h.buyerID(ctx)
 	if err != nil {
 		return nil, err
 	}
-	scope := rpc.PageScope(socialv1alpha1connect.SocialAppServiceListMyHiddenContentProcedure, c.BuyerID)
-	after, err := rpc.ValidCursor[hiddenCursor](scope, req.Msg.GetPageToken())
+	scope := rpc.PageScope(socialv1alpha1connect.SocialAppServiceListMyHiddenContentProcedure, buyerID)
+	after, err := rpc.ValidCursor[social.HiddenCursor](scope, req.Msg.GetPageToken())
 	if err != nil {
 		return nil, err
 	}
-	var cur *social.HiddenCursor
-	if after != nil {
-		cur = &social.HiddenCursor{HiddenAt: after.HiddenAt, HideID: after.ID}
-	}
-	page, err := h.writes.MyHiddenContent(ctx, c.BuyerID, cur, req.Msg.GetPageSize())
+	page, err := h.authored.MyHiddenContent(ctx, buyerID, after, req.Msg.GetPageSize())
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +86,7 @@ func (h *App) ListMyHiddenContent(ctx context.Context, req *connect.Request[pb.L
 		out.HiddenContents[i] = row
 	}
 	if page.Next != nil {
-		out.NextPageToken = rpc.TokenFor(scope, hiddenCursor{HiddenAt: page.Next.HiddenAt, ID: page.Next.HideID})
+		out.NextPageToken = rpc.TokenFor(scope, page.Next)
 	}
 	return connect.NewResponse(out), nil
 }

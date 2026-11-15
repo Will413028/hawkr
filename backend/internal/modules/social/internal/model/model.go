@@ -388,6 +388,9 @@ type SanctionCursor struct {
 	ID        uuid.UUID
 }
 
+// Valid 是 cursor 的內容合法（解自 client 回傳的 page token，不可信）。
+func (c SanctionCursor) Valid() bool { return !c.CreatedAt.IsZero() && c.ID != uuid.UUID{} }
+
 // SanctionPage 是一頁處分紀錄。
 type SanctionPage struct {
 	Sanctions []Sanction
@@ -412,6 +415,9 @@ type HiddenCursor struct {
 	HiddenAt time.Time
 	HideID   uuid.UUID
 }
+
+// Valid 是 cursor 的內容合法（解自 client 回傳的 page token，不可信）。
+func (c HiddenCursor) Valid() bool { return !c.HiddenAt.IsZero() && c.HideID != uuid.UUID{} }
 
 // HiddenPage 是一頁被隱藏的內容。
 type HiddenPage struct {

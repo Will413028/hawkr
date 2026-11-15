@@ -71,11 +71,11 @@ func (h *App) BlockStore(ctx context.Context, req *connect.Request[pb.BlockStore
 // blockStore 是買家封鎖店的唯一入口：店家要存在而且曾經公開過（buyer 不檢查店是否存在；沒有卡片的店不洩漏存在與否，一律 not_found），
 // 再經跨身分規則擋下封鎖自己的店。
 func (h *App) blockStore(ctx context.Context, buyerID, storeID int64) (bool, error) {
-	cards, err := h.ports.Stores.StoreCards(ctx, []int64{storeID})
+	cards, err := h.storeCards(ctx, []int64{storeID})
 	if err != nil {
-		return false, apperr.Unavailable("暫時無法查詢店家")
+		return false, err
 	}
-	if len(cards) == 0 {
+	if cards[storeID] == nil {
 		return false, apperr.NotFound("找不到店家")
 	}
 	if err := h.blocking.Identities.RejectSamePerson(ctx, buyerID, storeID); err != nil {

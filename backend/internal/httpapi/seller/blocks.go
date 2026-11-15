@@ -34,7 +34,7 @@ func (h *App) BlockBuyer(ctx context.Context, req *connect.Request[pb.BlockBuyer
 	if err != nil {
 		return nil, err
 	}
-	// 解析器在店主讀不到時退回匿名的公開讀取：別家店的內容不是這家店能封鎖的對象，與讀不到同一個答案。
+	// 深度防禦：解析器只以店主身分讀，這裡仍確認內容屬於這家店；別家店的內容與讀不到同一個答案。
 	if author.StoreID != current.StoreID {
 		return nil, apperr.NotFound("找不到這則內容")
 	}

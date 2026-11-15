@@ -58,7 +58,7 @@ type Sources struct {
 	Identities Identities
 }
 
-// Complete 回報四個來源都有（組裝點漏接時 NewApp 回錯誤，不讓請求才 nil panic）。
+// Complete 回報三個來源都有：內容作者解析（Authors）與跨身分規則的買家、店家身分來源（Identities.Buyers、Identities.Stores）（組裝點漏接時 NewApp 回錯誤，不讓請求才 nil panic）。
 func (s Sources) Complete() bool {
 	return s.Authors != nil && s.Identities.Buyers != nil && s.Identities.Stores != nil
 }

@@ -32,7 +32,12 @@ import (
 )
 
 // Viewer 是讀取的人：買家（BuyerID）；零值是未登入。有觀看者的讀取多出封鎖的 NOT EXISTS，語句文字不同於匿名讀取。
-type Viewer struct{ BuyerID int64 }
+type Viewer struct {
+	BuyerID int64
+	// SkipOwnBlocks 讓觀看者自己發起的封鎖（觀看者封鎖買家、觀看者封鎖店）不排除內容；對方發起的封鎖照樣排除。
+	// 只給「解析作者以便重複封鎖」這類讀取用（AuthorFor），其餘讀取不設。
+	SkipOwnBlocks bool
+}
 
 // Anonymous 是未登入的觀看者。
 var Anonymous = Viewer{}
@@ -77,7 +82,7 @@ func buyerBlocked(blocker IntegerExpression, blocked IntegerExpression) BoolExpr
 
 // storeNotBlocked 是觀看者沒有封鎖這家店；匿名是 nil（沒有這條規則）。
 func storeNotBlocked(v Viewer, storeID IntegerExpression) BoolExpression {
-	if v.anonymous() {
+	if v.anonymous() || v.SkipOwnBlocks {
 		return nil
 	}
 	return NOT(storeBlocked(Int64(v.BuyerID), storeID))
@@ -90,6 +95,9 @@ func authorAdmitted(v Viewer, kind ColumnString, id ColumnInteger) BoolExpressio
 		return nil
 	}
 	viewer := Int64(v.BuyerID)
+	if v.SkipOwnBlocks {
+		return kind.NOT_EQ(NewEnumValue("BUYER")).OR(NOT(buyerBlocked(id, viewer)))
+	}
 	return kind.NOT_EQ(NewEnumValue("BUYER")).OR(NOT(buyerBlocked(viewer, id)).AND(NOT(buyerBlocked(id, viewer))))
 }
 

@@ -280,3 +280,19 @@ func TestEveryBlockEntryPointRequiresTheBuyerIdentity(t *testing.T) {
 		}
 	}
 }
+
+// 重複封鎖同一位作者（重試）第二次成功且 changed 為假：解析不因為自己的封鎖而失敗。
+func TestBlockAuthorTwiceSucceedsAndTheSecondCallChangesNothing(t *testing.T) {
+	e := newBlockEnv(t)
+	e.authors.author = social.ContentAuthor{Found: true, Author: social.Actor{Kind: social.ActorBuyer, ID: 6}, StoreID: 20}
+	for i, want := range []bool{true, false} {
+		e.m.changed = want
+		resp, err := e.h.BlockAuthor(e.ctx, connect.NewRequest(commentRef()))
+		if err != nil || resp.Msg.GetChanged() != want {
+			t.Fatalf("第 %d 次：changed=%v resp=%v err=%v", i+1, want, resp, err)
+		}
+	}
+	if len(e.m.blockedBuyers) != 2 {
+		t.Fatalf("兩次都要走封鎖入口：%+v", e.m.blockedBuyers)
+	}
+}

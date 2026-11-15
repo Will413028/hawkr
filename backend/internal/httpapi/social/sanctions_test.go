@@ -11,6 +11,7 @@ import (
 	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
@@ -84,5 +85,29 @@ func TestSanctionReadsRequireTheBuyerIdentity(t *testing.T) {
 	}
 	if _, err := e.client.ListMyHiddenContent(context.Background(), connect.NewRequest(&pb.ListMyHiddenContentRequest{})); connect.CodeOf(err) != connect.CodeUnauthenticated {
 		t.Fatalf("未登入：%v", err)
+	}
+}
+
+// 作者讀自己的處分與被隱藏的內容只以買家身分，不查店家身分。
+func TestAuthoredListsDoNotLookUpTheStore(t *testing.T) {
+	s := &fakeStores{own: &seller.Store{StoreID: 5}}
+	e := newAppEnv(t, &fakeWrites{}, s)
+	if _, err := e.client.ListMySanctions(context.Background(), signedIn(&pb.ListMySanctionsRequest{})); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.client.ListMyHiddenContent(context.Background(), signedIn(&pb.ListMyHiddenContentRequest{})); err != nil {
+		t.Fatal(err)
+	}
+	if s.storeLookups != 0 {
+		t.Fatalf("查了店家身分 %d 次", s.storeLookups)
+	}
+}
+
+func TestSanctionAndHiddenContentEnumsMatchTheContract(t *testing.T) {
+	if got := rpc.EnumMismatches[pb.SanctionKind](social.SanctionKindValues()); len(got) != 0 {
+		t.Fatalf("SanctionKind：%v", got)
+	}
+	if got := rpc.EnumMismatches[pb.HiddenContentKind]([]social.TargetKind{social.TargetComment, social.TargetForumEntry}); len(got) != 0 {
+		t.Fatalf("HiddenContentKind：%v", got)
 	}
 }
