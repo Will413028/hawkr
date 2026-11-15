@@ -278,7 +278,7 @@ export default function HomeProcessCards() {
 								走進你的日常餐桌
 							</em>
 						</h2>
-						<div className="mt-[14px] font-[var(--font-body)] text-[0.8125rem] font-medium text-hk-home-ink/[55%] tracking-[0.04em] max-[640px]:text-[0.75rem] max-[640px]:leading-[1.5] max-[640px]:tracking-[0.02em]">
+						<div className="mt-[14px] font-[var(--font-body)] text-[0.8125rem] font-medium text-hk-home-ink/[70%] tracking-[0.04em] max-[640px]:text-[0.75rem] max-[640px]:leading-[1.5] max-[640px]:tracking-[0.02em]">
 							↓ 一份食材從採收、整理、包裝、配送到開箱 —— 每一步都不只是物流
 						</div>
 					</div>

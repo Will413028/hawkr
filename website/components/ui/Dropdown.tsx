@@ -406,6 +406,14 @@ export function Dropdown({
 		.filter(Boolean)
 		.join(" ");
 
+	// The trigger's visible text; an explicit aria-label must contain it
+	// (WCAG 2.5.3 label in name), so it is appended to the label below.
+	const valueText = shownItem
+		? shownItem.label
+		: floatingLabel && label && !(focused || open)
+			? ""
+			: placeholder;
+
 	return (
 		<div
 			data-slot="field"
@@ -441,7 +449,9 @@ export function Dropdown({
 					aria-expanded={open}
 					aria-controls={open ? `${fieldId}-listbox` : undefined}
 					aria-invalid={invalid || undefined}
-					aria-label={ariaLabel}
+					aria-label={
+						ariaLabel ? `${ariaLabel} ${valueText}`.trim() : undefined
+					}
 					aria-describedby={
 						description || errorMessage ? `${fieldId}-desc` : undefined
 					}
@@ -460,11 +470,7 @@ export function Dropdown({
 						data-slot="dropdown-value"
 						className={`hkui-dropdown__value${shownItem ? "" : " is-placeholder"}`}
 					>
-						{shownItem
-							? shownItem.label
-							: floatingLabel && label && !(focused || open)
-								? ""
-								: placeholder}
+						{valueText}
 					</span>
 					<span className="hkui-dropdown__chevron" aria-hidden="true">
 						<ChevronDown />

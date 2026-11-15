@@ -39,7 +39,7 @@ function Controlled(props: Partial<Props>) {
 	);
 }
 
-const trigger = () => page.getByRole("button", { name: "產地", exact: true });
+const trigger = () => page.getByRole("button", { name: /^產地/ });
 
 describe("Dropdown", () => {
 	it("selects the first item with Home and Enter and closes the menu", async () => {

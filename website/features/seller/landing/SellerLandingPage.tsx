@@ -386,7 +386,7 @@ export default function SellerLandingPage() {
 						<span>#加入 Hawkr</span>
 						<span>#一起開店</span>
 					</div>
-					<h2 className="seller-h" id="apply">
+					<h2 className="seller-h" id="apply" aria-label="準備好了? 一起 Hawkr">
 						<CharSplit text="準備好了?" />
 						<br />
 						<CharSplit text="一起" />
