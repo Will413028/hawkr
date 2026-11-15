@@ -282,11 +282,14 @@ func TestSocialAppRejectsMalformedInput(t *testing.T) {
 	_, cases["update_mask 沒列 body"] = e.client.UpdateComment(ctx, signedIn(&pb.UpdateCommentRequest{Comment: &pb.Comment{Id: uuid.New().String(), Etag: "1", Body: "a"}, UpdateMask: mask("etag")}))
 	_, cases["update_mask 不認得的路徑"] = e.client.UpdateComment(ctx, signedIn(&pb.UpdateCommentRequest{Comment: &pb.Comment{Id: uuid.New().String(), Etag: "1", Body: "a"}, UpdateMask: mask("nope")}))
 	_, cases["forum etag 缺"] = e.client.UpdateForumEntry(ctx, signedIn(&pb.UpdateForumEntryRequest{Entry: &pb.ForumEntry{Id: uuid.New().String(), Body: "a"}, UpdateMask: mask("body")}))
-	_, cases["delete etag 格式錯"] = e.client.DeleteComment(ctx, signedIn(&pb.DeleteCommentRequest{CommentId: uuid.New().String(), Etag: "x"}))
 	for name, err := range cases {
-		if code := connect.CodeOf(err); code != connect.CodeInvalidArgument && !(name == "delete etag 格式錯" && code == connect.CodeAborted) {
+		if code := connect.CodeOf(err); code != connect.CodeInvalidArgument {
 			t.Errorf("%s：err = %v，預期 invalid_argument", name, err)
 		}
+	}
+	_, err := e.client.DeleteComment(ctx, signedIn(&pb.DeleteCommentRequest{CommentId: uuid.New().String(), Etag: "x"}))
+	if code := connect.CodeOf(err); code != connect.CodeAborted {
+		t.Errorf("delete etag 格式錯：err = %v，預期 aborted", err)
 	}
 	if len(w.calls) != 0 {
 		t.Fatalf("格式錯誤不該到模組：%v", w.calls)
