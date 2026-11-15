@@ -8,7 +8,6 @@ const (
 	ExchangeNotification = "hawkr.notification"
 	ExchangeDelayed      = "hawkr.delayed"
 	ExchangeShipping     = "hawkr.shipping"
-	ExchangeMedia        = "hawkr.media"
 	ExchangeReview       = "hawkr.review"
 	ExchangeContent      = "hawkr.content"
 	ExchangeAccount      = "hawkr.account"

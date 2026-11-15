@@ -43,18 +43,18 @@ class TestValidate(unittest.TestCase):
 
     def test_accepts_dlq_via_empty_string_as_default_exchange(self):
         topo = {
-            "exchanges": [{"name": "hawkr.product.import", "type": "topic"}],
+            "exchanges": [{"name": "hawkr.sample", "type": "topic"}],
             "queues": [
-                {"name": "dlq.product.import.commit"},
+                {"name": "dlq.sample.job.run"},
                 {
-                    "name": "product.import.commit",
+                    "name": "sample.job.run",
                     "dlq": {
                         "via": "",
-                        "queue": "dlq.product.import.commit",
-                        "routing_key": "dlq.product.import.commit",
+                        "queue": "dlq.sample.job.run",
+                        "routing_key": "dlq.sample.job.run",
                     },
                     "bindings": [
-                        {"exchange": "hawkr.product.import", "key": "commit"}
+                        {"exchange": "hawkr.sample", "key": "commit"}
                     ],
                 },
             ],
