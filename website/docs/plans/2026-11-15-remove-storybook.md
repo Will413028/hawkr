@@ -25,7 +25,9 @@
 
 **驗收基線：** 快照 commit 上 CI 的 website-e2e 最近一次 dev run（`gh run list -w website-e2e.yml -b dev -L 1`，run 43667284291）開工時仍在跑，步驟 1 開工前讀它每個 job 的結論並記到進度表；有失敗的 job 以那份結果為既有失敗，不在本計畫修。本機可跑的 `pnpm lint`、`pnpm test`、`pnpm knip`、`pnpm design:check --apps-root ..` 在步驟 1 開工時跑一次記錄。
 
-步驟 1 開工時的結果（2026-11-15）：run 43667284291 每個 job 綠；`pnpm lint`、`pnpm test`、`pnpm design:check --apps-root ..` 通過；`pnpm knip` 在快照上就失敗（CI 不跑它），輸出存為附件 `knip-baseline.json`（`pnpm knip --reporter json`，不含行列位置），各步驟的 knip 驗收改為「與基線相比沒有新增 finding」；`pnpm architecture:check` 在快照上就失敗（`components/ui/Badge.tsx` 不存在）。
+步驟 1 開工時的結果（2026-11-15）：run 43667284291 每個 job 綠；`pnpm lint`、`pnpm test`、`pnpm design:check --apps-root ..` 通過；`pnpm knip` 在快照上就失敗（CI 不跑它），基線與比對方法見下一段；`pnpm architecture:check` 在快照上就失敗（`components/ui/Badge.tsx` 不存在）。
+
+knip 基線（2026-11-15 重做）：附件 `knip-baseline.json` 是 d69bbbbc（併入 origin/dev 後）的 `pnpm knip --reporter json` 經 `python3 knip-diff.py --normalize` 正規化，每筆以（分類、檔案、名稱）為鍵、不含行列位置。各步驟的 knip 驗收是在 `website/` 跑 `pnpm -s knip --reporter json | python3 docs/plans/2026-11-15-remove-storybook/knip-diff.py`，exit 0（沒有新增；消失的只計數）。換基線的理由：原基線只存名稱並去重，丟掉檔案，exports 475→434、types 447→427、unlisted 5→1，所以完整輸出和它比永遠多 65 筆；另 1 筆 types 與 15 筆 catalogReferences 是 d69bbbbc 併入的 dev 帶來的（922a4ccf→d69bbbbc 逐筆比對），不是本計畫的改動。8494f0fa、922a4ccf 的輸出逐筆相同，所以步驟 1 沒有新增；d69bbbbc 與 0e4b2b02 逐筆相同。腳本 mutation：在輸出加一筆假 export，exit 1。
 
 ## 本階段依賴的不變量
 
@@ -67,7 +69,7 @@
   - 驗收：每個 story 檔的 play 數與新測試的斷言對照表貼在 PR 描述（`plays.txt` 為來源）；CI 元件 browser job 綠；mutation：抽 3 個元件（含 `DatePicker`、`ProcurementClarifyQuestion`）各破壞一個被斷言的行為，job 要失敗。
   - 停止條件：某個 play 依賴 Storybook 專屬行為且無法等價改寫——回報，不刪弱斷言。
   - 延後：深色主題的測試只斷言 `data-theme=dark`（與原 play 相同，但該屬性由 render helper 設定，驗不到深色樣式；觸發條件：步驟 4 的 axe 或任何深色樣式回歸需要元件層證據時補樣式斷言）；只出現在 `*.browser.test.tsx` 的 Tailwind class 不會產生（`globals.css` 的 `@source not`；觸發條件：某個改寫需要 app 程式碼沒用過的外框 class，屆時讓 browser setup 掃描測試檔）。
-  - 待決（Will）：knip 基線。快照基線之後 exports/types/unlisted 多了 66 筆，步驟 2 未新增任何一筆；後續步驟的 knip 驗收要改以 c8f1cd39 的輸出為基線，還是先查清這 66 筆的來源。
+  - 已決（Will 2026-11-15 選查清來源）：knip 基線。66 筆中 65 筆是原基線格式去重造成的假差異，1 筆 types 來自併入的 dev；基線與比對方法已改，見驗收基線段。
 - [ ] **3. Cart、DescriptionEditor 系列**（被擋於：步驟 1；與步驟 2 都會改 `website/vitest.config.ts` 的 browser project 與 `website/tests/browser/`，兩步依序合併，不並行）
   - 範圍：`inventory.md` §1 標「步驟 3 改寫」的 7 檔、57 個 play；msw service worker 與 `description-image-fixtures.ts` 搬到 `website/tests/browser/`。
   - 消費端：`rg -n 'description-image-fixtures|mockServiceWorker' website .github`
@@ -101,8 +103,8 @@
 
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
-| 1 Browser runner 與試點 | 完成 | lint、test、knip（對基線無新增）本機；PR #377 新 job 8 測試綠（run 43672612523，含 8 個 e2e shard）；mutation 忽略 `disabled` 時只有 `is disabled when disabled is set` 失敗（run 43672321091），revert 後回綠 | — | 36649e77..a74318de |
-| 2 基礎元件改寫 | 完成 | lint、`test:unit` 本機；PR #377 在 dcd3f3bd 全部檢查綠（website-e2e run 43680495072：元件 browser job 25 檔 92 測試、8 個 e2e shard；website-ci run 43680495013）；mutation 各只有目標測試失敗後 revert 回綠：DatePicker 選日期不回報 onChange（run 43675932096）、ClarifyQuestionCard 描述不 trim（run 43679360536）、Tabs 非受控點擊不切換（run 43679556022）；play 對照表在 PR 描述；`/code-review` 2a 兩輪、2b 一輪，finding 全部修正或附理由駁回 | knip：dcd3f3bd 與 c8f1cd39 的 `pnpm knip --reporter json` 逐分類筆數完全相同（本步驟無新增）；但兩者都比 `knip-baseline.json` 多 exports 41、types 21、unlisted 4（逐筆比對），步驟 1 那列的「對基線無新增」只比了分類名稱，不成立，見步驟 2 的待決 | e83cd330..dcd3f3bd |
+| 1 Browser runner 與試點 | 完成 | lint、test、knip（對 8494f0fa 逐筆無新增，2026-11-15 重測）本機；PR #377 新 job 8 測試綠（run 43672612523，含 8 個 e2e shard）；mutation 忽略 `disabled` 時只有 `is disabled when disabled is set` 失敗（run 43672321091），revert 後回綠 | — | 36649e77..a74318de |
+| 2 基礎元件改寫 | 完成 | lint、`test:unit` 本機；PR #377 在 dcd3f3bd 全部檢查綠（website-e2e run 43680495072：元件 browser job 25 檔 92 測試、8 個 e2e shard；website-ci run 43680495013）；mutation 各只有目標測試失敗後 revert 回綠：DatePicker 選日期不回報 onChange（run 43675932096）、ClarifyQuestionCard 描述不 trim（run 43679360536）、Tabs 非受控點擊不切換（run 43679556022）；play 對照表在 PR 描述；`/code-review` 2a 兩輪、2b 一輪，finding 全部修正或附理由駁回 | knip：0e4b2b02 對新基線（d69bbbbc）`knip-diff.py` new 0；原「多 66 筆」已查清，見驗收基線段 | e83cd330..dcd3f3bd |
 | 3 Cart、DescriptionEditor | 未開始 | | | |
 | 4 axe 進 e2e | 未開始 | | | |
 | 5 確認並刪除 Storybook | 未開始 | | | |
