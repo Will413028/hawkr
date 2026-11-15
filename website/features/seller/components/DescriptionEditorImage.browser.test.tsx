@@ -5,7 +5,11 @@ import { getEnv } from "@/lib/config/env";
 import type { UploadedAsset } from "@/lib/media/upload";
 import type { ProductDescription } from "@/lib/products/seller-repo";
 import { expectNoAxeViolations } from "@/tests/browser/axe";
-import { mountEditor } from "@/tests/browser/description-editor";
+import {
+	clickRedo,
+	clickUndo,
+	mountEditor,
+} from "@/tests/browser/description-editor";
 import {
 	descriptionImageDataUrl,
 	descriptionImageSvg,
@@ -299,7 +303,7 @@ describe("DescriptionEditorImage", () => {
 			expect(image?.assetId).toBeUndefined();
 		});
 		await assertDecodedImage(dialog);
-		await userEvent.click(await ui.findByRole("button", { name: /^復原（/ }));
+		await clickUndo(ui);
 		await waitFor(() =>
 			expect(images(args.onChange.mock.lastCall?.[0])).toEqual([
 				expect.objectContaining({
@@ -310,7 +314,7 @@ describe("DescriptionEditorImage", () => {
 			]),
 		);
 		await assertDecodedImage(dialog, oldImage.alt);
-		await userEvent.click(await ui.findByRole("button", { name: /^重做（/ }));
+		await clickRedo(ui);
 		await waitFor(() => {
 			const image = images(args.onChange.mock.lastCall?.[0])[0];
 			expect(image?.imageKey).toBe(newImageKey);
@@ -330,7 +334,7 @@ describe("DescriptionEditorImage", () => {
 			expect(images(args.onChange.mock.lastCall?.[0])).toEqual([]);
 			expect(ui.queryByRole("img")).toBeNull();
 		});
-		await userEvent.click(await ui.findByRole("button", { name: /^復原（/ }));
+		await clickUndo(ui);
 		await waitFor(() =>
 			expect(images(args.onChange.mock.lastCall?.[0])).toEqual([
 				expect.objectContaining({

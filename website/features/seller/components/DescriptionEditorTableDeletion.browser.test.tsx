@@ -2,7 +2,7 @@ import { within } from "@testing-library/dom";
 import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import type { InlineRun, ProductDescription } from "@/lib/products/seller-repo";
-import { mountEditor } from "@/tests/browser/description-editor";
+import { clickUndo, mountEditor } from "@/tests/browser/description-editor";
 import { waitFor } from "@/tests/browser/dom";
 
 type NativeUserEvent = typeof import("vitest/browser").userEvent;
@@ -252,9 +252,7 @@ describe("DescriptionEditorTableDeletion", () => {
 					initialCellHtml,
 				),
 			);
-			await user.click(
-				await within(dialog).findByRole("button", { name: /^復原（/ }),
-			);
+			await clickUndo(dialog, user);
 			await waitFor(() =>
 				assertTableState(
 					dialog,
@@ -292,9 +290,7 @@ describe("DescriptionEditorTableDeletion", () => {
 					initialCellHtml,
 				),
 			);
-			await user.click(
-				await within(dialog).findByRole("button", { name: /^復原（/ }),
-			);
+			await clickUndo(dialog, user);
 			await waitFor(() =>
 				assertTableState(
 					dialog,

@@ -3,7 +3,11 @@ import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import type { ProductDescription } from "@/lib/products/seller-repo";
 import { expectNoAxeViolations } from "@/tests/browser/axe";
-import { mountEditor } from "@/tests/browser/description-editor";
+import {
+	clickRedo,
+	clickUndo,
+	mountEditor,
+} from "@/tests/browser/description-editor";
 import {
 	descriptionImageDataUrl,
 	startDescriptionImageFixtures,
@@ -155,18 +159,6 @@ async function deleteFromBlockMenu(
 	await user.click(item);
 }
 
-async function undo(dialog: HTMLElement, user: NativeUserEvent) {
-	await user.click(
-		await within(dialog).findByRole("button", { name: /^復原（/ }),
-	);
-}
-
-async function redo(dialog: HTMLElement, user: NativeUserEvent) {
-	await user.click(
-		await within(dialog).findByRole("button", { name: /^重做（/ }),
-	);
-}
-
 const paragraphToListValue: ProductDescription = {
 	version: "1.0",
 	blocks: [
@@ -311,7 +303,7 @@ describe("DescriptionEditorDeletion", () => {
 				);
 				expect(editableText(dialog, "第一段保留第二段保留")).toBeVisibleSync();
 			});
-			await undo(dialog, user);
+			await clickUndo(dialog, user);
 			await waitFor(() => {
 				expect(
 					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
@@ -334,7 +326,7 @@ describe("DescriptionEditorDeletion", () => {
 				).toEqual(["第一段保留第二段保留"]);
 				expect(editableText(dialog, "第一段保留第二段保留")).toBeVisibleSync();
 			});
-			await undo(dialog, user);
+			await clickUndo(dialog, user);
 			await waitFor(() => {
 				expect(
 					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
@@ -387,7 +379,7 @@ describe("DescriptionEditorDeletion", () => {
 				);
 				expect(editableText(dialog, "前段保留後段保留")).toBeVisibleSync();
 			});
-			await undo(dialog, user);
+			await clickUndo(dialog, user);
 			await waitFor(() => {
 				expect(
 					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
@@ -428,7 +420,7 @@ describe("DescriptionEditorDeletion", () => {
 				expect(editableText(dialog, "段落前端清單尾端")).toBeVisibleSync();
 				expect(editableText(dialog, "保留的後續項目")).toBeVisibleSync();
 			});
-			await undo(dialog, user);
+			await clickUndo(dialog, user);
 			await waitFor(() => {
 				const value = args.onChange.mock.lastCall?.[0] ?? args.value;
 				expect(documentText(value)).toEqual(["段落前端刪除起點"]);
@@ -474,7 +466,7 @@ describe("DescriptionEditorDeletion", () => {
 				expect(editableText(dialog, "前方項目保留")).toBeVisibleSync();
 				expect(editableText(dialog, "清單前端標題尾端")).toBeVisibleSync();
 			});
-			await undo(dialog, user);
+			await clickUndo(dialog, user);
 			await waitFor(() => {
 				const value = args.onChange.mock.lastCall?.[0] ?? args.value;
 				expect(documentText(value)).toEqual(["刪除終點標題尾端"]);
@@ -531,7 +523,7 @@ describe("DescriptionEditorDeletion", () => {
 				expect(editableText(dialog, "第二段保留")).toBeVisibleSync();
 			});
 			await expectNoAxeViolations("DescriptionEditor after block deletion");
-			await undo(dialog, user);
+			await clickUndo(dialog, user);
 			await waitFor(() => {
 				expect(
 					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
@@ -562,14 +554,14 @@ describe("DescriptionEditorDeletion", () => {
 				expect(within(dialog).queryByText(text)).toBeNull();
 			});
 			for (let cycle = 0; cycle < 3; cycle += 1) {
-				await undo(dialog, user);
+				await clickUndo(dialog, user);
 				await waitFor(() => {
 					expect(
 						documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
 					).toEqual([text]);
 					expect(editableText(dialog, text)).toBeVisibleSync();
 				});
-				await redo(dialog, user);
+				await clickRedo(dialog, user);
 				await waitFor(() => {
 					expect(args.onChange.mock.lastCall?.[0].blocks).toEqual([]);
 					expect(within(dialog).queryByText(text)).toBeNull();
@@ -795,7 +787,7 @@ describe("DescriptionEditorDeletion", () => {
 				).toBeEnabledSync();
 				assertMedia();
 			});
-			await undo(dialog, user);
+			await clickUndo(dialog, user, 1);
 			await checkPhase("undoRestoredText", () => {
 				expect(
 					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
@@ -828,14 +820,14 @@ describe("DescriptionEditorDeletion", () => {
 				expect(editableText(dialog, text)).toBeVisibleSync();
 			});
 			for (let cycle = 0; cycle < 2; cycle += 1) {
-				await redo(dialog, user);
+				await clickRedo(dialog, user);
 				await waitFor(() => {
 					expect(
 						documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
 					).toEqual([text.slice(0, -2)]);
 					expect(editableText(dialog, text.slice(0, -2))).toBeVisibleSync();
 				});
-				await undo(dialog, user);
+				await clickUndo(dialog, user);
 				await waitFor(() => {
 					expect(
 						documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
@@ -867,7 +859,7 @@ describe("DescriptionEditorDeletion", () => {
 				expect(text.replace(insertion, "")).toBe(original);
 				expect(editableText(dialog, text)).toBeVisibleSync();
 			});
-			await undo(dialog, user);
+			await clickUndo(dialog, user);
 			await waitFor(() => {
 				expect(
 					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
