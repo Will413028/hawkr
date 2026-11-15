@@ -93,7 +93,18 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: backend/.go-version
-          cache-dependency-path: backend/go.sum
+          cache: false
+      # setup-go 內建快取的 key 只看 go.sum，go.sum 不變就永遠還原第一次存的 build cache；
+      # 這裡每個 commit 存一份，還原最近的一份，讓 -race 編譯只重編改到的 package。
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-monolith-integration-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-monolith-integration-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-
+            go-monolith-integration-${{ runner.os }}-
       # 只跑加上 integration tag 後檔案組成會改變的 package；其餘 package 的測試和
       # check job 的 go test 完全相同，不重跑。
       # 壓力測試（testdb.RequireStress）只在上線前跑：要合併進 main 的 PR、main 的 push，與手動觸發。
@@ -122,7 +133,18 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: backend/.go-version
-          cache-dependency-path: backend/go.sum
+          cache: false
+      # setup-go 內建快取的 key 只看 go.sum，go.sum 不變就永遠還原第一次存的 build cache；
+      # 這裡每個 commit 存一份，還原最近的一份，讓 -race 編譯只重編改到的 package。
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-monolith-check-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-monolith-check-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-
+            go-monolith-check-${{ runner.os }}-
 
       - name: gofmt -l
         run: |
