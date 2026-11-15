@@ -88,6 +88,7 @@ test("每個值都有目錄的名稱（術語表的詞），UNSPECIFIED 與不�
 		"垃圾訊息",
 		"騷擾或霸凌",
 		"仇恨或歧視言論",
+		"色情或性相關內容",
 	]);
 	assert.equal(policyCategoryText(PolicyCategory.UNSPECIFIED), "未知");
 	assert.equal(policyCategoryText(99 as PolicyCategory), "未知");
