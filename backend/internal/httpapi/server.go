@@ -24,6 +24,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/adminauth"
 	httpagent "github.com/Will413028/hawkr/backend/internal/httpapi/agent"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/blocks"
 	httpbuyer "github.com/Will413028/hawkr/backend/internal/httpapi/buyer"
 	httpcontent "github.com/Will413028/hawkr/backend/internal/httpapi/content"
 	httpdelegation "github.com/Will413028/hawkr/backend/internal/httpapi/delegation"
@@ -295,12 +296,13 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(socialv1alpha1connect.NewSocialPublicServiceHandler(socialPublic, opts...))
-	socialApp, err := httpsocial.NewApp(deps.Social, deps.Social, deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin)
+	socialApp, err := httpsocial.NewApp(deps.Social, deps.Social, deps.Social, deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin)
 	if err != nil {
 		return nil, err
 	}
 	add(socialv1alpha1connect.NewSocialAppServiceHandler(socialApp, opts...))
-	buyerApp, err := httpbuyer.NewApp(deps.Buyer, deps.Images, deps.BuyerPorts, stats)
+	blocking := blocks.Sources{Authors: deps.Social, Identities: blocks.Identities{Buyers: deps.Buyer, Stores: deps.Seller}}
+	buyerApp, err := httpbuyer.NewApp(deps.Buyer, deps.Images, deps.BuyerPorts, stats, blocking)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +342,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	if err != nil {
 		return nil, err
 	}
-	sellerApp, err := httpseller.NewApp(deps.Seller, deps.Payment, deps.Buyer, deps.Images, dashboard, stats, deps.WebOrigin, deps.Logger)
+	sellerApp, err := httpseller.NewApp(deps.Seller, deps.Payment, deps.Buyer, deps.Images, dashboard, stats, deps.WebOrigin, blocking, deps.Logger)
 	if err != nil {
 		return nil, err
 	}

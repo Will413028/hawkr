@@ -59,7 +59,7 @@ export default function TrackingClient({ orderNo }: { orderNo: string }) {
 	const subtitleTrackingNo = track?.shipTradeNo || trackingNo;
 
 	return (
-		<main>
+		<div>
 			<SellerPageShell
 				title="物流追蹤"
 				subtitle={`訂單 #${orderNo}${subtitleTrackingNo ? `　·　託運單號 ${subtitleTrackingNo}` : ""}`}
@@ -150,6 +150,6 @@ export default function TrackingClient({ orderNo }: { orderNo: string }) {
 					</>
 				) : null}
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }

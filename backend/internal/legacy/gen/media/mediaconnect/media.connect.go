@@ -62,15 +62,6 @@ const (
 	// MediaServiceBatchGetAssetMetadataProcedure is the fully-qualified name of the MediaService's
 	// BatchGetAssetMetadata RPC.
 	MediaServiceBatchGetAssetMetadataProcedure = "/hawkr.media.MediaService/BatchGetAssetMetadata"
-	// MediaServiceImportDownloadAssetProcedure is the fully-qualified name of the MediaService's
-	// ImportDownloadAsset RPC.
-	MediaServiceImportDownloadAssetProcedure = "/hawkr.media.MediaService/ImportDownloadAsset"
-	// MediaServiceFinalizeImportAssetProcedure is the fully-qualified name of the MediaService's
-	// FinalizeImportAsset RPC.
-	MediaServiceFinalizeImportAssetProcedure = "/hawkr.media.MediaService/FinalizeImportAsset"
-	// MediaServiceBindStagedAssetProcedure is the fully-qualified name of the MediaService's
-	// BindStagedAsset RPC.
-	MediaServiceBindStagedAssetProcedure = "/hawkr.media.MediaService/BindStagedAsset"
 )
 
 // MediaServiceClient is a client for the hawkr.media.MediaService service.
@@ -106,7 +97,7 @@ type MediaServiceClient interface {
 	//
 	// 🔴 為什麼非有它不可：機敏資產在 R2 上是**加密的**，金鑰只有 media 拿得到
 	// ⇒ 上傳者服務事後想拿回自己那份 bytes，除了本 RPC 沒有第二條路
-	// （直接讀 OSS 會拿到密文，且違反「儲存 SDK 只准在 media/product-import」）。
+	// （直接讀 OSS 會拿到密文，且違反「儲存 SDK 只准在 media」）。
 	// 發票 PDF 由 invoice-service 以服務身分上傳、合法讀者卻有三個（買家／賣家／ADM），
 	// 那三個人的授權述詞在 invoice-service（order_no × buyer_id × document_id），不在 media
 	// ⇒ media 只負責「把 bytes 還給上傳它的那個服務」，誰能看是呼叫端的事。
@@ -131,19 +122,6 @@ type MediaServiceClient interface {
 	// 它回的是中介資料不是內容，但「這個 object_key 存不存在」本身就是資訊
 	// ⇒ 查無與越權必須無法分辨，否則它會變成一個可枚舉的 oracle。
 	BatchGetAssetMetadata(context.Context, *connect.Request[media.BatchGetAssetMetadataRequest]) (*connect.Response[media.BatchGetAssetMetadataResponse], error)
-	// 派工外部 URL 下載（async）：RPC 立刻回 DOWNLOADING，實際下載由 Media 內部 worker pool 執行
-	// 完成後 publish MediaImportAssetDownloadedEvent 到 hawkr.media exchange / import.asset.downloaded routing key
-	// 詳見 08 號設計書 §7.2 / §7.2a
-	ImportDownloadAsset(context.Context, *connect.Request[media.ImportDownloadAssetRequest]) (*connect.Response[media.ImportDownloadAssetResponse], error)
-	// 將 import_asset 搬到正式 refType 路徑並建立 media_asset
-	// 由 Product Service 在 CreateProductFromImportInternal commit 階段呼叫
-	// 詳見 08 號設計書 §7.3
-	FinalizeImportAsset(context.Context, *connect.Request[media.FinalizeImportAssetRequest]) (*connect.Response[media.FinalizeImportAssetResponse], error)
-	// 將賣家本地上傳取得的 staged_token 綁定為 import_asset（同步）
-	// 由 product-import-service 在 UpdateImportItem 階段呼叫
-	// 內部：驗證 staged_token → 由 upload_session OSS path 搬至 import_asset tmp path → INSERT import_asset (status=UPLOADED)
-	// 詳見 40 號設計書 §3.4 / §4.3
-	BindStagedAsset(context.Context, *connect.Request[media.BindStagedAssetRequest]) (*connect.Response[media.BindStagedAssetResponse], error)
 }
 
 // NewMediaServiceClient constructs a client for the hawkr.media.MediaService service. By default,
@@ -217,24 +195,6 @@ func NewMediaServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(mediaServiceMethods.ByName("BatchGetAssetMetadata")),
 			connect.WithClientOptions(opts...),
 		),
-		importDownloadAsset: connect.NewClient[media.ImportDownloadAssetRequest, media.ImportDownloadAssetResponse](
-			httpClient,
-			baseURL+MediaServiceImportDownloadAssetProcedure,
-			connect.WithSchema(mediaServiceMethods.ByName("ImportDownloadAsset")),
-			connect.WithClientOptions(opts...),
-		),
-		finalizeImportAsset: connect.NewClient[media.FinalizeImportAssetRequest, media.FinalizeImportAssetResponse](
-			httpClient,
-			baseURL+MediaServiceFinalizeImportAssetProcedure,
-			connect.WithSchema(mediaServiceMethods.ByName("FinalizeImportAsset")),
-			connect.WithClientOptions(opts...),
-		),
-		bindStagedAsset: connect.NewClient[media.BindStagedAssetRequest, media.BindStagedAssetResponse](
-			httpClient,
-			baseURL+MediaServiceBindStagedAssetProcedure,
-			connect.WithSchema(mediaServiceMethods.ByName("BindStagedAsset")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
@@ -250,9 +210,6 @@ type mediaServiceClient struct {
 	serverUploadSecureAndFinalize *connect.Client[media.ServerUploadSecureAndFinalizeRequest, media.ServerUploadSecureAndFinalizeResponse]
 	serverReadSecureAsset         *connect.Client[media.ServerReadSecureAssetRequest, media.ServerReadSecureAssetResponse]
 	batchGetAssetMetadata         *connect.Client[media.BatchGetAssetMetadataRequest, media.BatchGetAssetMetadataResponse]
-	importDownloadAsset           *connect.Client[media.ImportDownloadAssetRequest, media.ImportDownloadAssetResponse]
-	finalizeImportAsset           *connect.Client[media.FinalizeImportAssetRequest, media.FinalizeImportAssetResponse]
-	bindStagedAsset               *connect.Client[media.BindStagedAssetRequest, media.BindStagedAssetResponse]
 }
 
 // CreateUploadSession calls hawkr.media.MediaService.CreateUploadSession.
@@ -305,21 +262,6 @@ func (c *mediaServiceClient) BatchGetAssetMetadata(ctx context.Context, req *con
 	return c.batchGetAssetMetadata.CallUnary(ctx, req)
 }
 
-// ImportDownloadAsset calls hawkr.media.MediaService.ImportDownloadAsset.
-func (c *mediaServiceClient) ImportDownloadAsset(ctx context.Context, req *connect.Request[media.ImportDownloadAssetRequest]) (*connect.Response[media.ImportDownloadAssetResponse], error) {
-	return c.importDownloadAsset.CallUnary(ctx, req)
-}
-
-// FinalizeImportAsset calls hawkr.media.MediaService.FinalizeImportAsset.
-func (c *mediaServiceClient) FinalizeImportAsset(ctx context.Context, req *connect.Request[media.FinalizeImportAssetRequest]) (*connect.Response[media.FinalizeImportAssetResponse], error) {
-	return c.finalizeImportAsset.CallUnary(ctx, req)
-}
-
-// BindStagedAsset calls hawkr.media.MediaService.BindStagedAsset.
-func (c *mediaServiceClient) BindStagedAsset(ctx context.Context, req *connect.Request[media.BindStagedAssetRequest]) (*connect.Response[media.BindStagedAssetResponse], error) {
-	return c.bindStagedAsset.CallUnary(ctx, req)
-}
-
 // MediaServiceHandler is an implementation of the hawkr.media.MediaService service.
 type MediaServiceHandler interface {
 	// 建立上傳會話：回傳 OSS 簽名 URL 或會話 ID
@@ -353,7 +295,7 @@ type MediaServiceHandler interface {
 	//
 	// 🔴 為什麼非有它不可：機敏資產在 R2 上是**加密的**，金鑰只有 media 拿得到
 	// ⇒ 上傳者服務事後想拿回自己那份 bytes，除了本 RPC 沒有第二條路
-	// （直接讀 OSS 會拿到密文，且違反「儲存 SDK 只准在 media/product-import」）。
+	// （直接讀 OSS 會拿到密文，且違反「儲存 SDK 只准在 media」）。
 	// 發票 PDF 由 invoice-service 以服務身分上傳、合法讀者卻有三個（買家／賣家／ADM），
 	// 那三個人的授權述詞在 invoice-service（order_no × buyer_id × document_id），不在 media
 	// ⇒ media 只負責「把 bytes 還給上傳它的那個服務」，誰能看是呼叫端的事。
@@ -378,19 +320,6 @@ type MediaServiceHandler interface {
 	// 它回的是中介資料不是內容，但「這個 object_key 存不存在」本身就是資訊
 	// ⇒ 查無與越權必須無法分辨，否則它會變成一個可枚舉的 oracle。
 	BatchGetAssetMetadata(context.Context, *connect.Request[media.BatchGetAssetMetadataRequest]) (*connect.Response[media.BatchGetAssetMetadataResponse], error)
-	// 派工外部 URL 下載（async）：RPC 立刻回 DOWNLOADING，實際下載由 Media 內部 worker pool 執行
-	// 完成後 publish MediaImportAssetDownloadedEvent 到 hawkr.media exchange / import.asset.downloaded routing key
-	// 詳見 08 號設計書 §7.2 / §7.2a
-	ImportDownloadAsset(context.Context, *connect.Request[media.ImportDownloadAssetRequest]) (*connect.Response[media.ImportDownloadAssetResponse], error)
-	// 將 import_asset 搬到正式 refType 路徑並建立 media_asset
-	// 由 Product Service 在 CreateProductFromImportInternal commit 階段呼叫
-	// 詳見 08 號設計書 §7.3
-	FinalizeImportAsset(context.Context, *connect.Request[media.FinalizeImportAssetRequest]) (*connect.Response[media.FinalizeImportAssetResponse], error)
-	// 將賣家本地上傳取得的 staged_token 綁定為 import_asset（同步）
-	// 由 product-import-service 在 UpdateImportItem 階段呼叫
-	// 內部：驗證 staged_token → 由 upload_session OSS path 搬至 import_asset tmp path → INSERT import_asset (status=UPLOADED)
-	// 詳見 40 號設計書 §3.4 / §4.3
-	BindStagedAsset(context.Context, *connect.Request[media.BindStagedAssetRequest]) (*connect.Response[media.BindStagedAssetResponse], error)
 }
 
 // NewMediaServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -460,24 +389,6 @@ func NewMediaServiceHandler(svc MediaServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(mediaServiceMethods.ByName("BatchGetAssetMetadata")),
 		connect.WithHandlerOptions(opts...),
 	)
-	mediaServiceImportDownloadAssetHandler := connect.NewUnaryHandler(
-		MediaServiceImportDownloadAssetProcedure,
-		svc.ImportDownloadAsset,
-		connect.WithSchema(mediaServiceMethods.ByName("ImportDownloadAsset")),
-		connect.WithHandlerOptions(opts...),
-	)
-	mediaServiceFinalizeImportAssetHandler := connect.NewUnaryHandler(
-		MediaServiceFinalizeImportAssetProcedure,
-		svc.FinalizeImportAsset,
-		connect.WithSchema(mediaServiceMethods.ByName("FinalizeImportAsset")),
-		connect.WithHandlerOptions(opts...),
-	)
-	mediaServiceBindStagedAssetHandler := connect.NewUnaryHandler(
-		MediaServiceBindStagedAssetProcedure,
-		svc.BindStagedAsset,
-		connect.WithSchema(mediaServiceMethods.ByName("BindStagedAsset")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/hawkr.media.MediaService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case MediaServiceCreateUploadSessionProcedure:
@@ -500,12 +411,6 @@ func NewMediaServiceHandler(svc MediaServiceHandler, opts ...connect.HandlerOpti
 			mediaServiceServerReadSecureAssetHandler.ServeHTTP(w, r)
 		case MediaServiceBatchGetAssetMetadataProcedure:
 			mediaServiceBatchGetAssetMetadataHandler.ServeHTTP(w, r)
-		case MediaServiceImportDownloadAssetProcedure:
-			mediaServiceImportDownloadAssetHandler.ServeHTTP(w, r)
-		case MediaServiceFinalizeImportAssetProcedure:
-			mediaServiceFinalizeImportAssetHandler.ServeHTTP(w, r)
-		case MediaServiceBindStagedAssetProcedure:
-			mediaServiceBindStagedAssetHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -553,16 +458,4 @@ func (UnimplementedMediaServiceHandler) ServerReadSecureAsset(context.Context, *
 
 func (UnimplementedMediaServiceHandler) BatchGetAssetMetadata(context.Context, *connect.Request[media.BatchGetAssetMetadataRequest]) (*connect.Response[media.BatchGetAssetMetadataResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.media.MediaService.BatchGetAssetMetadata is not implemented"))
-}
-
-func (UnimplementedMediaServiceHandler) ImportDownloadAsset(context.Context, *connect.Request[media.ImportDownloadAssetRequest]) (*connect.Response[media.ImportDownloadAssetResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.media.MediaService.ImportDownloadAsset is not implemented"))
-}
-
-func (UnimplementedMediaServiceHandler) FinalizeImportAsset(context.Context, *connect.Request[media.FinalizeImportAssetRequest]) (*connect.Response[media.FinalizeImportAssetResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.media.MediaService.FinalizeImportAsset is not implemented"))
-}
-
-func (UnimplementedMediaServiceHandler) BindStagedAsset(context.Context, *connect.Request[media.BindStagedAssetRequest]) (*connect.Response[media.BindStagedAssetResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.media.MediaService.BindStagedAsset is not implemented"))
 }

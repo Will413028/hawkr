@@ -173,40 +173,6 @@ test("restock reports branded pending state without a pre-request animation dela
 	assert.doesNotMatch(restock, /RING_MS|phase === "ringing"/);
 });
 
-test("product-import mutations keep the initiating button identity", () => {
-	const jobDetail = readFileSync(
-		path.join(
-			root,
-			"features/seller-center/products-import/pages/JobDetailPage.tsx",
-		),
-		"utf8",
-	);
-	const itemForm = readFileSync(
-		path.join(
-			root,
-			"features/seller-center/products-import/components/ImportItemEditForm.tsx",
-		),
-		"utf8",
-	);
-
-	assert.match(
-		jobDetail,
-		/pendingAction\s*===\s*`retry-item:\$\{it\.importItemId\}`/,
-	);
-	assert.match(
-		jobDetail,
-		/pendingAction\s*===\s*`restore-item:\$\{it\.importItemId\}`/,
-	);
-	assert.match(
-		jobDetail,
-		/pendingAction\s*===\s*`remove-item:\$\{it\.importItemId\}`/,
-	);
-	assert.match(jobDetail, /pendingAction === "restore-selected"/);
-	assert.match(jobDetail, /pendingActionRef\.current/);
-	assert.match(itemForm, /isLoading=\{removing\}/);
-	assert.match(itemForm, /loadingLabel="移除匯入商品中…"/);
-});
-
 test("navbar logout keeps its initiating menu action visible until settlement", () => {
 	const navbar = readFileSync(
 		path.join(root, "components/shared/Navbar.tsx"),

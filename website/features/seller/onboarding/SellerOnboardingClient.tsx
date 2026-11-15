@@ -327,7 +327,7 @@ export default function SellerOnboardingClient() {
 	};
 
 	return (
-		<main
+		<div
 			data-standalone-flow="seller-onboarding"
 			className="mx-auto min-h-[100dvh] w-full max-w-[640px] px-4 pb-8 pt-6 sm:px-5 sm:pb-16 sm:pt-12 lg:pt-20"
 		>
@@ -480,6 +480,6 @@ export default function SellerOnboardingClient() {
 					</div>
 				)}
 			</section>
-		</main>
+		</div>
 	);
 }

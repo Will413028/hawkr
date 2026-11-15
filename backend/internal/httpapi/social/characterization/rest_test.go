@@ -1,7 +1,10 @@
+//go:build gateway
+
 package characterization
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -22,7 +25,50 @@ type restDriver struct {
 
 var _ Driver = (*restDriver)(nil)
 
+func newRESTDriver(base string, tokens map[ch.Caller]string, client *http.Client) *restDriver {
+	return &restDriver{
+		rest:   ch.REST{Base: base, Tokens: tokens, HTTP: client, Business: restBusinessKind},
+		images: map[string]string{},
+	}
+}
+
+// restBusinessKind 對應 social 的業務碼：hashtag 規則（3015 字元、3016 長度、3017 數量）與社群守則（9210）都是輸入不合法。
+func restBusinessKind(code int32) error {
+	switch code {
+	case 3015, 3016, 3017, 9210:
+		return ch.ErrInvalid
+	}
+	return nil
+}
+
 func (d *restDriver) Legacy() bool { return true }
+
+// errNoLegacyBlocking：舊的封鎖是另一套（雙向、Redis、userId 不帶 kind；SD3、SD15、CD3），封鎖的情境在舊的一端一律跳過，不會呼叫到這些方法。
+var errNoLegacyBlocking = errors.New("舊的 social-service 沒有對應單體語意的封鎖入口（SD3、SD15、D2）")
+
+func (d *restDriver) BlockAuthor(context.Context, ch.Caller, string) (bool, error) {
+	return false, errNoLegacyBlocking
+}
+
+func (d *restDriver) BlockStore(context.Context, ch.Caller, string) (bool, error) {
+	return false, errNoLegacyBlocking
+}
+
+func (d *restDriver) UnblockStore(context.Context, ch.Caller, string) (bool, error) {
+	return false, errNoLegacyBlocking
+}
+
+func (d *restDriver) SellerBlockAuthor(context.Context, ch.Caller, string) (bool, error) {
+	return false, errNoLegacyBlocking
+}
+
+func (d *restDriver) SellerBlockedBuyers(context.Context, ch.Caller) ([]BlockedBuyer, error) {
+	return nil, errNoLegacyBlocking
+}
+
+func (d *restDriver) SellerUnblockBuyer(context.Context, ch.Caller, string) (bool, error) {
+	return false, errNoLegacyBlocking
+}
 
 type wirePost struct {
 	ID           string   `json:"id"`

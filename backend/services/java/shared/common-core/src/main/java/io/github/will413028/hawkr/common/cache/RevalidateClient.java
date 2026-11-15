@@ -39,9 +39,20 @@ public class RevalidateClient {
     private final WebRevalidateProperties properties;
     private final HttpClient httpClient;
 
-    public RevalidateClient(WebRevalidateProperties properties, HttpClient httpClient) {
+    public RevalidateClient(WebRevalidateProperties properties) {
         this.properties = properties;
-        this.httpClient = httpClient;
+        // 強制 HTTP/1.1：目標是 cleartext http:// 的 Next.js /api/revalidate，該 Node server
+        // 不支援 HTTP/2 cleartext，收到 h2 即重置而靜默失敗；Java 預設 HTTP_2，必須顯式降級。
+        // 不跟隨轉址：3xx 代表 base URL 設錯，由 non-2xx 分支以 WARN 浮現為失敗。
+        this.httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
+    }
+
+    HttpClient httpClient() {
+        return httpClient;
     }
 
     /**

@@ -66,8 +66,6 @@ class ProductGrpcServiceCreateSkuGuardTest {
     @Mock private io.github.will413028.hawkr.product.service.GovCertificationService govCertificationService;
     @Mock private io.github.will413028.hawkr.product.service.HashtagService hashtagService;
     @Mock private io.github.will413028.hawkr.product.service.PopularHashtagService popularHashtagService;
-    @Mock private io.github.will413028.hawkr.product.service.ProductImportService productImportService;
-    @Mock private io.github.will413028.hawkr.product.service.validator.ProductPublishValidator productPublishValidator;
     @Mock private io.github.will413028.hawkr.product.repository.ProductRepository productRepository;
     @Mock io.github.will413028.hawkr.product.service.ProductCertificationApplicationService certificationApplicationService;
     @Mock io.github.will413028.hawkr.product.converter.ProductCertificationApplicationConverter certificationConverter;
@@ -106,7 +104,7 @@ class ProductGrpcServiceCreateSkuGuardTest {
                 productService, protoConverter, cacheService, categoryCacheService,
                 redisTemplate, stockService, sellerGrpcClient, shippingGrpcClient,
                 skuRepository, govCertificationService, hashtagService, popularHashtagService,
-                productImportService, productPublishValidator, productRepository,
+                productRepository,
                 certificationApplicationService, certificationConverter);
     }
 

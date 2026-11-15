@@ -22,7 +22,6 @@ test("private / thin paths are not indexable", () => {
 	assert.equal(isIndexable("/account/orders"), false);
 	assert.equal(isIndexable("/seller-center"), false);
 	assert.equal(isIndexable("/seller-center/dashboard"), false);
-	assert.equal(isIndexable("/seller-product-import-preview/job-1"), false);
 	assert.equal(isIndexable("/checkout"), false);
 	assert.equal(isIndexable("/cart"), false);
 	assert.equal(isIndexable("/login"), false);

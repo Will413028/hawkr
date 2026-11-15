@@ -14,6 +14,7 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -32,6 +33,7 @@ type appIdentity interface {
 	RevokeSession(ctx context.Context, accountID int64, sessionID identity.SessionID) error
 	ContactEmail(ctx context.Context, accountID int64) (identity.ContactEmail, bool, error)
 	SetSelfEnteredEmail(ctx context.Context, accountID int64, email string) (identity.ContactEmail, error)
+	CurrentSuspension(ctx context.Context, accountID int64) (identity.AccountSuspension, bool, error)
 }
 
 // buyerProfiles 是頁首顯示資料的來源：買家模組的公開讀取。
@@ -103,7 +105,7 @@ func (h *App) GetSession(ctx context.Context, _ *connect.Request[pb.GetSessionRe
 	}
 	resp := &pb.GetSessionResponse{Account: account(a)}
 	if at, suspended := rpc.SuspensionFrom(ctx); suspended {
-		resp.Suspension = &pb.Suspension{SuspendedAt: timestamppb.New(at)}
+		resp.Suspension = h.suspension(ctx, p.ID, at)
 	}
 	if profile, err := h.profiles.Profile(ctx, p.ID); err != nil {
 		// 買家紀錄已關閉（帳號刪除中）是預期狀態：不帶顯示資料，不是錯誤。
@@ -117,6 +119,22 @@ func (h *App) GetSession(ctx context.Context, _ *connect.Request[pb.GetSessionRe
 		}
 	}
 	return connect.NewResponse(resp), nil
+}
+
+// suspension 組停權狀態：時間來自入口認證（A7-D17），政策分類與理由是帳號擁有者有權讀的停權紀錄（A7-D9）。讀不到紀錄（解除與讀取之間的空檔、
+// 讀取失敗）時只帶時間，不讓登入狀態失敗。
+func (h *App) suspension(ctx context.Context, accountID int64, at time.Time) *pb.Suspension {
+	out := &pb.Suspension{SuspendedAt: timestamppb.New(at)}
+	rec, ok, err := h.m.CurrentSuspension(ctx, accountID)
+	if err != nil {
+		h.log.ErrorContext(ctx, "GetSession 讀取停權紀錄失敗，回應只帶停權時間", "account_id", accountID, "error", err)
+		return out
+	}
+	if ok {
+		out.Category = rpc.EnumToProto[commonpb.PolicyCategory](rec.Category)
+		out.Reason = rec.Reason
+	}
+	return out
 }
 
 // caller 回傳登入的帳號與它這次請求所用的 session；interceptor 保證登入的帳號有，沒有是組裝錯誤。

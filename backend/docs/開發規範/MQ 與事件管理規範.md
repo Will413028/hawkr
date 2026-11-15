@@ -294,7 +294,7 @@ destroy → destructive gate `exit 1`），**那是預期行為**，它在等你
 - [ ] Consumer `@RabbitListener` 指定 `manualAckContainerFactory`
 - [ ] `RabbitMqConfig` 含對應 `@Bean Queue` + `@Bean Binding`（意圖宣告，見 §1.3）
 - [ ] **`infra/mq/topology/topology.yaml` 已加對應條目**，且本機 `validate.py` + `unittest` + `mq-consumer-registration-check.py` 三道全綠（漏登記 = 訂閱失效，Go 端只有啟動時一行 log，實務上等於沒人會發現）
-- [ ] **DLQ / retry 以 `retry:` / `dlq:` policy 宣告**，未手寫 policy 會展開的衍生資源（`{queue}.dlq`、`{queue}.retry`、鏡射 binding——手寫會重複產生）。**三類例外必須手寫**：① `{exchange}.dlx` exchange 本身（展開不產生它）② 共用 DLQ 目的地（`aftersales.events.dlq`、`payment.rescue.refund.dlq`，以裸 queue 條目自行存在）③ 自建的延遲重試 queue（6 條 product-import `*.retry`，帶 `x-message-ttl` 走 `dlq:`，非 `retry:` policy 產物）
+- [ ] **DLQ / retry 以 `retry:` / `dlq:` policy 宣告**，未手寫 policy 會展開的衍生資源（`{queue}.dlq`、`{queue}.retry`、鏡射 binding——手寫會重複產生）。**三類例外必須手寫**：① `{exchange}.dlx` exchange 本身（展開不產生它）② 共用 DLQ 目的地（`aftersales.events.dlq`、`payment.rescue.refund.dlq`，以裸 queue 條目自行存在）③ 自建的延遲重試 queue（帶 `x-message-ttl` 走 `dlq:`，非 `retry:` policy 產物）
 - [ ] **已讀過 PR 上 dev + prod 兩份 `terraform plan`**，確認沒有非預期的 `must be replaced` / `destroy`（⚠️ PR 階段含 destroy **不會**讓 CI 變紅，綠燈不等於安全）
 - [ ] **consumer 登記需人工對照**——登記一致性沒有 CI gate，Go 與 Java 端漏登記都無自動攔截
 - [ ] 關鍵路徑有 idempotency 保護（dedup 表或 DB 樂觀鎖）

@@ -3,11 +3,13 @@ import { LOCAL_PRIVATE_KEYS } from "../../lib/auth/local-private-keys";
 import { CART_UPDATED_EVENT } from "../../lib/cart";
 import type { CartGroupWire, CartItemWire } from "../../lib/cart/types";
 import { ShippingMethod, ShippingTemperature } from "../../lib/codemeta/enums";
+import { expectNoAxeViolations } from "./helpers/axe";
 import {
 	mockBuyerAddresses,
 	seedStoredActiveRole,
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
+import { gotoStreamed, reloadStreamed } from "./helpers/streamed-navigation";
 
 const FARM = "鮮果測試農場";
 const FISHERY = "南方海味測試舖";
@@ -316,7 +318,7 @@ test("依店家選取商品，切店等待物流更新且結帳只帶可購買�
 		isMobile ? { width: 320, height: 844 } : { width: 1440, height: 1000 },
 	);
 	const fixture = await setupCart(page, baseURL);
-	await page.goto("/cart", { waitUntil: "domcontentloaded" });
+	await gotoStreamed(page, "/cart");
 	await expect(page.locator("li.cart-tile")).toHaveCount(5);
 	await expect(checkout(page)).toHaveAttribute("aria-disabled", "false");
 	await assertCheckedRows(page, ["珍珠芭樂", "金鑽鳳梨"]);
@@ -337,6 +339,7 @@ test("依店家選取商品，切店等待物流更新且結帳只帶可購買�
 	await expect(
 		page.locator("aside").getByText("NT$ 320", { exact: true }),
 	).toBeVisible();
+	await expectNoAxeViolations(page, "/cart");
 	await capture(page, testInfo, "store-selection-farm");
 
 	const shipping = fixture.holdFishery();
@@ -420,12 +423,12 @@ test("保留取消選取，更新中鎖住選店，移除最後已選商品不�
 		isMobile ? { width: 320, height: 844 } : { width: 1440, height: 1000 },
 	);
 	const fixture = await setupCart(page, baseURL);
-	await page.goto("/cart", { waitUntil: "domcontentloaded" });
+	await gotoStreamed(page, "/cart");
 	await expect(checkout(page)).toHaveAttribute("aria-disabled", "false");
 	await selectStore(page, FARM).check();
 	await selectStore(page, FARM).uncheck();
 	await assertCheckedRows(page, []);
-	await page.reload({ waitUntil: "domcontentloaded" });
+	await reloadStreamed(page);
 	await expect(page.locator("li.cart-tile")).toHaveCount(5);
 	await assertCheckedRows(page, []);
 	await expect(checkout(page)).toHaveAttribute("aria-disabled", "true");
@@ -517,7 +520,7 @@ test("保留取消選取，更新中鎖住選店，移除最後已選商品不�
 	).toHaveCount(0);
 	await expect(page.locator("li.cart-tile")).toHaveCount(4);
 	await assertCheckedRows(page, []);
-	await page.reload({ waitUntil: "domcontentloaded" });
+	await reloadStreamed(page);
 	await expect(page.locator("li.cart-tile")).toHaveCount(4);
 	await assertCheckedRows(page, []);
 	await expect(selectStore(page, FISHERY)).toBeEnabled();

@@ -27,7 +27,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,12 +34,12 @@ import static org.mockito.Mockito.when;
  * ADM 認證審核補商品名時，**必須**用不濾可見性的查詢（#2818）。
  *
  * <p>為什麼需要這一支而不是只有 converter 的測試：converter 測的是「拿到 brief 之後
- * 映射對不對」，把 {@code loadProductBriefsForAdmin} 改回 {@code findBriefByIds}
+ * 映射對不對」，把 {@code loadProductBriefsForAdmin} 改成帶 {@code deleted_at IS NULL} 的查詢
  * 那些測試**照樣全綠**——而那正是這個 bug 的本體。這裡守的是「呼叫了哪一支查詢」。
  *
  * <p>認證申請結構上會指向已軟刪商品（§15.3 migration 不濾 deleted_at、賣家送件後可刪商品、
  * {@code updateCertificationProjection} 刻意不濾以便 ADM 對已下架商品撤銷標章），
- * 用帶 {@code deleted_at IS NULL} 的 {@code findBriefByIds} 會讓六支 ADM 端點回空商品名。
+ * 用帶 {@code deleted_at IS NULL} 的查詢會讓六支 ADM 端點回空商品名。
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -58,8 +57,6 @@ class ProductGrpcServiceAdminCertificationProductLookupTest {
     @Mock private io.github.will413028.hawkr.product.service.GovCertificationService govCertificationService;
     @Mock private io.github.will413028.hawkr.product.service.HashtagService hashtagService;
     @Mock private io.github.will413028.hawkr.product.service.PopularHashtagService popularHashtagService;
-    @Mock private io.github.will413028.hawkr.product.service.ProductImportService productImportService;
-    @Mock private io.github.will413028.hawkr.product.service.validator.ProductPublishValidator productPublishValidator;
     @Mock private io.github.will413028.hawkr.product.repository.ProductRepository productRepository;
     @Mock private io.github.will413028.hawkr.product.service.ProductCertificationApplicationService certificationApplicationService;
     @Mock private io.github.will413028.hawkr.product.converter.ProductCertificationApplicationConverter certificationConverter;
@@ -75,7 +72,7 @@ class ProductGrpcServiceAdminCertificationProductLookupTest {
                 productService, protoConverter, cacheService, categoryCacheService,
                 redisTemplate, stockService, sellerGrpcClient, shippingGrpcClient,
                 skuRepository, govCertificationService, hashtagService, popularHashtagService,
-                productImportService, productPublishValidator, productRepository,
+                productRepository,
                 certificationApplicationService, certificationConverter);
     }
 
@@ -96,7 +93,7 @@ class ProductGrpcServiceAdminCertificationProductLookupTest {
     }
 
     @Test
-    @DisplayName("ADM 詳情補商品名走「含已軟刪」的查詢，且不得改用帶 deleted_at IS NULL 的 findBriefByIds")
+    @DisplayName("ADM 詳情補商品名走「含已軟刪」的查詢")
     void adminDetailUsesIncludingDeletedLookup() {
         Context previous = Context.current()
                 .withValue(GrpcAuthContext.ACCOUNT_ID, 2701338845L)
@@ -129,7 +126,6 @@ class ProductGrpcServiceAdminCertificationProductLookupTest {
                     responseObserver);
 
             verify(productRepository).findPublicationBriefByIdsIncludingDeleted(anyCollection());
-            verify(productRepository, never()).findBriefByIds(anyCollection());
 
             // 控制組：RPC 必須真的成功走完，否則上面的 verify 可能只是「炸掉之前剛好呼叫過」。
             ArgumentCaptor<ProductCertificationApplicationAdminResponse> captor =
@@ -174,7 +170,6 @@ class ProductGrpcServiceAdminCertificationProductLookupTest {
                     listObserver);
 
             verify(productRepository).findPublicationBriefByIdsIncludingDeleted(anyCollection());
-            verify(productRepository, never()).findBriefByIds(anyCollection());
 
             ArgumentCaptor<ListProductCertificationApplicationsForAdminResponse> captor =
                     ArgumentCaptor.forClass(ListProductCertificationApplicationsForAdminResponse.class);

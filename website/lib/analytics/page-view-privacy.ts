@@ -127,7 +127,6 @@ const STATIC_ANALYTICS_ROUTES = new Set([
 	"/seller-center/posts/new",
 	"/seller-center/preview",
 	"/seller-center/products",
-	"/seller-center/products/import",
 	"/seller-center/products/new",
 	"/seller-center/shipments/anomalies",
 	"/seller-center/suspended",
@@ -163,24 +162,8 @@ const DYNAMIC_ROUTE_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
 		"/adm/:storeId/:area",
 	],
 	[
-		/^\/seller-center\/products\/import\/[^/]+\/items\/[^/]+(?:\/.*)?$/,
-		"/seller-center/products/import/:jobId/items/:itemId",
-	],
-	[
-		/^\/seller-product-import-preview\/[^/]+\/items\/[^/]+(?:\/.*)?$/,
-		"/seller-product-import-preview/:jobId/items/:itemId",
-	],
-	[
 		/^\/sellers\/[^/]+\/products\/[^/]+(?:\/.*)?$/,
 		"/sellers/:sellerId/products/:productId",
-	],
-	[
-		/^\/seller-center\/products\/import\/[^/]+(?:\/.*)?$/,
-		"/seller-center/products/import/:jobId",
-	],
-	[
-		/^\/seller-product-import-preview\/[^/]+(?:\/.*)?$/,
-		"/seller-product-import-preview/:jobId",
 	],
 	[
 		/^\/seller-center\/coupons\/[^/]+(?:\/.*)?$/,

@@ -40,8 +40,7 @@ function dedupeKey(method: DelegatedProductShippingMethod): string {
  * 代行商品 DTO → `deriveDetailLayoutProps` 吃的 `product`。
  *
  * `storeId` 另外注入：`getProductSellerStoreId` 讀的是 `product.seller.storeId`／
- * `sellerAccountId`／`storeId`／`createdBy`，代行 DTO 一個都沒有，缺它整張賣家卡不畫
- * （與匯入預覽同一招，`PreviewDetailPage.tsx:130-132`）。
+ * `sellerAccountId`／`storeId`／`createdBy`，代行 DTO 一個都沒有，缺它整張賣家卡不畫。
  */
 export function delegatedPreviewProduct(
 	detail: DelegatedProductDetail,

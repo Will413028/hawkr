@@ -71,7 +71,7 @@ export default async function MarketProductsListPage({
 	);
 
 	return (
-		<main className="market-page market-public-page w-[min(1440px,calc(100%_-_48px))] mx-auto pt-[var(--page-start-gap,_6px)] pb-[60px]! max-[768px]:w-[min(100%_-_28px,680px)]">
+		<div className="market-page market-public-page w-[min(1440px,calc(100%_-_48px))] mx-auto pt-[var(--page-start-gap,_6px)] pb-[60px]! max-[768px]:w-[min(100%_-_28px,680px)]">
 			{productUrls.length > 0 && <JsonLd data={itemListSchema(productUrls)} />}
 			<Suspense fallback={null}>
 				<MarketProductsListClient
@@ -83,6 +83,6 @@ export default async function MarketProductsListPage({
 					defaultInitialDone={initialDone}
 				/>
 			</Suspense>
-		</main>
+		</div>
 	);
 }

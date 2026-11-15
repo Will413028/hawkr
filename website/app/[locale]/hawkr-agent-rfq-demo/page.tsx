@@ -39,12 +39,12 @@ async function RfqDemoContent({
 	const { request_id: requestId } = await searchParams;
 	if (!requestId) {
 		return (
-			<main style={{ maxWidth: 640, margin: "0 auto", padding: "48px 24px" }}>
+			<div style={{ maxWidth: 640, margin: "0 auto", padding: "48px 24px" }}>
 				<h1>缺少 request_id</h1>
 				<p>
 					網址加上 <code>?request_id=&lt;你的採購需求 id&gt;</code> 再開一次。
 				</p>
-			</main>
+			</div>
 		);
 	}
 

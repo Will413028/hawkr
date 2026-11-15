@@ -493,7 +493,7 @@ export default function Navbar({ megaMenuDynamicLinks }: NavbarProps = {}) {
 						>
 							<LazyAppIcon name="cart" size={24} />
 						</span>
-						<span>購物車</span>
+						<span aria-hidden="true">購物車</span>
 					</CartBubble>
 
 					{/* Auth-dependent rail. Only a request that carried a session
@@ -540,7 +540,7 @@ export default function Navbar({ megaMenuDynamicLinks }: NavbarProps = {}) {
 								>
 									<LazyAppIcon name="message" size={24} />
 								</span>
-								<span>訊息</span>
+								<span aria-hidden="true">訊息</span>
 							</ChatBubble>
 							<NotificationBell
 								href="/account/notifications"
@@ -558,7 +558,7 @@ export default function Navbar({ megaMenuDynamicLinks }: NavbarProps = {}) {
 								>
 									<LazyAppIcon name="notification" size={22} />
 								</span>
-								<span>通知</span>
+								<span aria-hidden="true">通知</span>
 							</NotificationBell>
 						</>
 					)}

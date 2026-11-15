@@ -22,6 +22,7 @@ import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import AppImage from "@/components/shared/AppImage";
 import Link from "@/components/shared/Link";
+import { ScrollableTableRegion } from "@/components/shared/ScrollableTableRegion";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import { TruckOverlay, TruckSpinner } from "@/components/shared/TruckSpinner";
 import UploadLoadingIndicator from "@/components/shared/UploadLoadingIndicator";
@@ -1395,7 +1396,7 @@ function OrdersTabBody({
 				className="seller-orders__card seller-orders__desktop-view"
 				data-loading={loading && scopedOrders.length > 0 ? "true" : undefined}
 			>
-				<div className="seller-orders__table-wrap">
+				<ScrollableTableRegion label="訂單表格">
 					<table className="seller-orders__table seller-orders__table--orders">
 						<thead>
 							<tr>
@@ -1459,7 +1460,7 @@ function OrdersTabBody({
 							)}
 						</tbody>
 					</table>
-				</div>
+				</ScrollableTableRegion>
 				{hasMore && (
 					<div className="seller-orders__more">
 						<Button

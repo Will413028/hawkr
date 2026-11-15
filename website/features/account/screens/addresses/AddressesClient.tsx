@@ -112,7 +112,7 @@ export default function AddressesClient() {
 	};
 
 	return (
-		<main className="addresses-page">
+		<div className="addresses-page">
 			<SellerPageShell
 				title="收件地址"
 				subtitle="這裡顯示你目前的預設宅配地址與 7-11 取貨門市，結帳時會自動帶入。點「管理」可切換預設或新增。"
@@ -341,7 +341,7 @@ export default function AddressesClient() {
 					setPickupEditTarget(null);
 				}}
 			/>
-		</main>
+		</div>
 	);
 }
 

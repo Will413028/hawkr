@@ -390,3 +390,7 @@
 - 依賴表：`seller` 依賴 `payment`；`reviewqueue` 依賴 `payment`（讀 `payment.pub_review_items`）。payment 是葉節點，擁有者是否營運中由組裝點注入（依賴反轉）。全域鎖順序 `platform/lockorder` 的 `Modules` 已把 payment 排在 seller 之前，不需要改：seller 的核准與個資清理在鎖住 seller 的列之後，對 payment 只做 `INSERT … ON CONFLICT DO NOTHING` 與排 job；payment 的同步先鎖帳戶列，再發 `PayoutAccountChanged`，由 seller 的同 transaction 訂閱者更新開通閘門的副本與防詐 hash。
 - D5 的字句「webhook 一律先寫 `webhook_inbox`……這是 `platform` 提供的單一機制」照此實作：platform 的 `internal/platform/inbox` 擁有 schema `inbox`（`(provider, event_id)` 唯一、收到與處理時間、處理者、原始 payload 與依 provider 的保存期）；入口驗簽後同一個 transaction 寫 inbox 並排派送 job，commit 之後才回 2xx；模組的 handler 由派送 job 呼叫，在自己的 transaction 寫業務列並經 platform API 標記已處理；補掃（只重派沒有派送成功的列）與清理是 platform 的週期 job。D5 第一點的 intent 列是模組自己的業務列（收款是 `payment.accounts` 的「建立中」列與冪等鍵），不是 platform 的表。
 - 未採：維持在 seller（B2 另建一份 provider 包裝與 inbox）、到 B2 再搬（已進 main，引用更多）；inbox 各模組自建同形狀的表（platform 要對模組的表下 SQL）。
+
+## 修訂：productimport 刪除（2026-11-15，Will 決定；ADR `2026-10-27-general-ecommerce-scope-cut` 文末的 2026-11-15 修訂）
+
+模組表的 `productimport` 列取消，不搬進單體；主計畫的 B5 標為已移除。product-import-service 與只服務它的 product、media RPC、資料表與 MQ 拓撲一併刪除。

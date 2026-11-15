@@ -91,10 +91,9 @@ Proto 的 `string` 要求僅適用於 **gRPC 介面與對外 API**。後端內�
 | coupon | 9950 | 9951 | 500 |
 | shipping | 9930 | 9931 | 600 |
 | aftersales | 9922 | 9923 | 700 |
-| product-import | 9960 | 9961 | 800 |
 | payuni-webhook | 9946 | 9947 | 500（與 coupon 共用，見下） |
 
-本表涵蓋全部 10 個 Java 微服務。**Node ID Base 的真實來源是各服務 `src/main/resources/application.yml` 的 `hawkr.tsid.node-id-base`**，本表是它的彙整；新增服務時挑下一個未使用的百位段並同步本表。每個服務實際佔用 `base` ~ `base+99`，區間內由 `pod-index` 取值。
+本表涵蓋全部 9 個 Java 微服務。**Node ID Base 的真實來源是各服務 `src/main/resources/application.yml` 的 `hawkr.tsid.node-id-base`**，本表是它的彙整；新增服務時挑下一個未使用的百位段並同步本表。每個服務實際佔用 `base` ~ `base+99`，區間內由 `pod-index` 取值。
 
 Port 欄位以 `k8s/values/{service}-service.yaml` 的 `SERVER_PORT` / `GRPC_PORT`（部署值）為準。少數服務 `application.yml` 的本機預設值與部署值不同（例：shipping 本機預設 9928 / 9929，部署為 9930 / 9931），這不影響 Node ID 分配。
 

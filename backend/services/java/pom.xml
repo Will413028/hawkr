@@ -33,6 +33,5 @@
         <module>shipping-service</module>
         <module>aftersales-service</module>
         <module>payuni-webhook-service</module>
-        <module>product-import-service</module>
     </modules>
 </project>

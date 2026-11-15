@@ -2,37 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { redirectForRole, requiredAccessForPath } from "../lib/auth/redirect";
 
-test("seller import preview is protected as a seller route", () => {
-	assert.equal(
-		requiredAccessForPath("/seller-product-import-preview/job-1"),
-		"seller",
-	);
-	assert.equal(
-		requiredAccessForPath("/seller-product-import-preview/job-1/items/item-1"),
-		"seller",
-	);
-});
-
-test("buyer sessions cannot be redirected into seller import preview", () => {
-	assert.equal(
-		redirectForRole("/seller-product-import-preview/job-1", "buyer"),
-		"/",
-	);
-	assert.equal(
-		redirectForRole("/seller-product-import-preview/job-1", "seller"),
-		"/seller-product-import-preview/job-1",
-	);
-});
-
 test("role redirects classify protected roots before query and hash", () => {
 	const cases = [
 		{ redirect: "/account?tab=orders#recent", role: "buyer" as const },
 		{ redirect: "/checkout?coupon=1", role: "buyer" as const },
 		{ redirect: "/seller-center?tab=orders#today", role: "seller" as const },
-		{
-			redirect: "/seller-product-import-preview?job=1",
-			role: "seller" as const,
-		},
 	];
 
 	for (const { redirect, role } of cases) {

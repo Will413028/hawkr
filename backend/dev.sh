@@ -15,7 +15,7 @@ INFRA_SERVICES=(postgres redis rabbitmq otel-collector)
 GO_SERVICES=(gateway social-service ai-service im-service review-service crm-service notification-service invoice-service)
 
 # Java 服務（需 rebuild image 才能更新）
-JAVA_SERVICES=(payment-service media-service product-service order-service cart-service coupon-service shipping-service aftersales-service payuni-webhook-service product-import-service)
+JAVA_SERVICES=(payment-service media-service product-service order-service cart-service coupon-service shipping-service aftersales-service payuni-webhook-service)
 
 # 全部應用服務
 ALL_APP_SERVICES=("${GO_SERVICES[@]}" "${JAVA_SERVICES[@]}")
@@ -794,7 +794,7 @@ cmd_help() {
 
     Java 服務（改完需 ./dev.sh rebuild）：
       payment, media, product, order, cart, coupon,
-      shipping, aftersales, payuni-webhook, product-import
+      shipping, aftersales, payuni-webhook
 
     基礎設施：
       postgres (5432), redis (6379), rabbitmq (5672/15672),

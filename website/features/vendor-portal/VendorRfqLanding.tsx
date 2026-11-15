@@ -168,7 +168,7 @@ export function VendorRfqLanding() {
 	);
 
 	return (
-		<main className="mx-auto w-full max-w-[1200px] px-4 py-8">
+		<div className="mx-auto w-full max-w-[1200px] px-4 py-8">
 			<PortalHeader />
 			{view.kind === "loading" && <CenteredCard title="載入中…" />}
 			{view.kind === "failed" && (
@@ -190,7 +190,7 @@ export function VendorRfqLanding() {
 					session={view.session}
 				/>
 			)}
-		</main>
+		</div>
 	);
 }
 

@@ -3,6 +3,7 @@
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Link from "@/components/shared/Link";
+import { ScrollableTableRegion } from "@/components/shared/ScrollableTableRegion";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import Button from "@/components/ui/Button";
 import { targetStoreLabel } from "@/features/delegated-operations/confirm-content";
@@ -854,26 +855,15 @@ export default function ProductsPage() {
 							＋ 上架新商品
 						</Link>
 					)}
-					{/* 代行不渲染批次匯入：封閉九值不含任何 import 能力，端點總表也沒有
-					    import 路徑；要做是新增第 10 個 capability，另一張票。 */}
 					{!delegated && (
-						<>
-							<Link
-								href="/seller-center/products/import"
-								className="seller-orders__btn"
-							>
-								<IconUpload />
-								批次匯入
-							</Link>
-							<Link
-								href="/seller-center/products/new"
-								// 同上：實心表面自己擁有前景色，否則 dark 下退成橄欖綠字。
-								data-hkui-button=""
-								className="seller-orders__btn seller-orders__btn--primary"
-							>
-								＋ 新增商品
-							</Link>
-						</>
+						<Link
+							href="/seller-center/products/new"
+							// 同上：實心表面自己擁有前景色，否則 dark 下退成橄欖綠字。
+							data-hkui-button=""
+							className="seller-orders__btn seller-orders__btn--primary"
+						>
+							＋ 新增商品
+						</Link>
 					)}
 				</>
 			}
@@ -1101,7 +1091,7 @@ export default function ProductsPage() {
 							表格比畫面寬，請左右捲動查看「狀態」欄；「操作」已固定在右側
 						</p>
 					)}
-					<div className="seller-orders__table-wrap">
+					<ScrollableTableRegion label="商品表格">
 						<table
 							className={`seller-orders__table seller-products-table${
 								delegated ? " seller-products-table--delegated" : ""
@@ -1446,7 +1436,7 @@ export default function ProductsPage() {
 								)}
 							</tbody>
 						</table>
-					</div>
+					</ScrollableTableRegion>
 
 					{hasMore && !search && statusFilter !== "low_stock" && (
 						<div className="seller-orders__more">
@@ -1717,10 +1707,6 @@ function isOffStatus(status?: string | number) {
 
 function IconSearch() {
 	return <AppIcon name="search" />;
-}
-
-function IconUpload() {
-	return <AppIcon name="upload" />;
 }
 
 function IconBoxes() {

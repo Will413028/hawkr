@@ -51,7 +51,7 @@
 
 ## 5. 上傳與儲存後端
 
-1. 儲存操作只准經 media-service／product-import-service 的 `StorageService` 層（R2 S3 API）；其他服務禁止直接依賴 storage SDK。
+1. 儲存操作只准經 media-service 的 `StorageService` 層（R2 S3 API）；其他服務禁止直接依賴 storage SDK。
 2. 上傳驗證最低要求：MIME 白名單、size 上限、finalize HEAD 回查實際 size/Content-Type、檔名消毒（拒 `/`、`..`）——見 49 號 §8.1。
 3. R2 憑證一律 secret 管理（k8s secret `hawkr-r2`／`.env` gitignored）；**禁止**寫入 application.yml fallback 預設值（歷史違規：OSS AK/SK 明文入 git）。
 4. R2 bucket browser CORS policy 是切換必要的 out-of-band 設定（不隨部署走），SSOT＝`infra/r2-cors/`；bucket 重建／遷移後必套用，遺漏＝presigned PUT 瀏覽器 preflight 403（見 49 號 §8.5）。

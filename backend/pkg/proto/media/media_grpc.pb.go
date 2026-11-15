@@ -29,9 +29,6 @@ const (
 	MediaService_ServerUploadSecureAndFinalize_FullMethodName = "/hawkr.media.MediaService/ServerUploadSecureAndFinalize"
 	MediaService_ServerReadSecureAsset_FullMethodName         = "/hawkr.media.MediaService/ServerReadSecureAsset"
 	MediaService_BatchGetAssetMetadata_FullMethodName         = "/hawkr.media.MediaService/BatchGetAssetMetadata"
-	MediaService_ImportDownloadAsset_FullMethodName           = "/hawkr.media.MediaService/ImportDownloadAsset"
-	MediaService_FinalizeImportAsset_FullMethodName           = "/hawkr.media.MediaService/FinalizeImportAsset"
-	MediaService_BindStagedAsset_FullMethodName               = "/hawkr.media.MediaService/BindStagedAsset"
 )
 
 // MediaServiceClient is the client API for MediaService service.
@@ -72,7 +69,7 @@ type MediaServiceClient interface {
 	//
 	// 🔴 為什麼非有它不可：機敏資產在 R2 上是**加密的**，金鑰只有 media 拿得到
 	// ⇒ 上傳者服務事後想拿回自己那份 bytes，除了本 RPC 沒有第二條路
-	// （直接讀 OSS 會拿到密文，且違反「儲存 SDK 只准在 media/product-import」）。
+	// （直接讀 OSS 會拿到密文，且違反「儲存 SDK 只准在 media」）。
 	// 發票 PDF 由 invoice-service 以服務身分上傳、合法讀者卻有三個（買家／賣家／ADM），
 	// 那三個人的授權述詞在 invoice-service（order_no × buyer_id × document_id），不在 media
 	// ⇒ media 只負責「把 bytes 還給上傳它的那個服務」，誰能看是呼叫端的事。
@@ -97,19 +94,6 @@ type MediaServiceClient interface {
 	// 它回的是中介資料不是內容，但「這個 object_key 存不存在」本身就是資訊
 	// ⇒ 查無與越權必須無法分辨，否則它會變成一個可枚舉的 oracle。
 	BatchGetAssetMetadata(ctx context.Context, in *BatchGetAssetMetadataRequest, opts ...grpc.CallOption) (*BatchGetAssetMetadataResponse, error)
-	// 派工外部 URL 下載（async）：RPC 立刻回 DOWNLOADING，實際下載由 Media 內部 worker pool 執行
-	// 完成後 publish MediaImportAssetDownloadedEvent 到 hawkr.media exchange / import.asset.downloaded routing key
-	// 詳見 08 號設計書 §7.2 / §7.2a
-	ImportDownloadAsset(ctx context.Context, in *ImportDownloadAssetRequest, opts ...grpc.CallOption) (*ImportDownloadAssetResponse, error)
-	// 將 import_asset 搬到正式 refType 路徑並建立 media_asset
-	// 由 Product Service 在 CreateProductFromImportInternal commit 階段呼叫
-	// 詳見 08 號設計書 §7.3
-	FinalizeImportAsset(ctx context.Context, in *FinalizeImportAssetRequest, opts ...grpc.CallOption) (*FinalizeImportAssetResponse, error)
-	// 將賣家本地上傳取得的 staged_token 綁定為 import_asset（同步）
-	// 由 product-import-service 在 UpdateImportItem 階段呼叫
-	// 內部：驗證 staged_token → 由 upload_session OSS path 搬至 import_asset tmp path → INSERT import_asset (status=UPLOADED)
-	// 詳見 40 號設計書 §3.4 / §4.3
-	BindStagedAsset(ctx context.Context, in *BindStagedAssetRequest, opts ...grpc.CallOption) (*BindStagedAssetResponse, error)
 }
 
 type mediaServiceClient struct {
@@ -220,36 +204,6 @@ func (c *mediaServiceClient) BatchGetAssetMetadata(ctx context.Context, in *Batc
 	return out, nil
 }
 
-func (c *mediaServiceClient) ImportDownloadAsset(ctx context.Context, in *ImportDownloadAssetRequest, opts ...grpc.CallOption) (*ImportDownloadAssetResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ImportDownloadAssetResponse)
-	err := c.cc.Invoke(ctx, MediaService_ImportDownloadAsset_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *mediaServiceClient) FinalizeImportAsset(ctx context.Context, in *FinalizeImportAssetRequest, opts ...grpc.CallOption) (*FinalizeImportAssetResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(FinalizeImportAssetResponse)
-	err := c.cc.Invoke(ctx, MediaService_FinalizeImportAsset_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *mediaServiceClient) BindStagedAsset(ctx context.Context, in *BindStagedAssetRequest, opts ...grpc.CallOption) (*BindStagedAssetResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BindStagedAssetResponse)
-	err := c.cc.Invoke(ctx, MediaService_BindStagedAsset_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // MediaServiceServer is the server API for MediaService service.
 // All implementations must embed UnimplementedMediaServiceServer
 // for forward compatibility.
@@ -288,7 +242,7 @@ type MediaServiceServer interface {
 	//
 	// 🔴 為什麼非有它不可：機敏資產在 R2 上是**加密的**，金鑰只有 media 拿得到
 	// ⇒ 上傳者服務事後想拿回自己那份 bytes，除了本 RPC 沒有第二條路
-	// （直接讀 OSS 會拿到密文，且違反「儲存 SDK 只准在 media/product-import」）。
+	// （直接讀 OSS 會拿到密文，且違反「儲存 SDK 只准在 media」）。
 	// 發票 PDF 由 invoice-service 以服務身分上傳、合法讀者卻有三個（買家／賣家／ADM），
 	// 那三個人的授權述詞在 invoice-service（order_no × buyer_id × document_id），不在 media
 	// ⇒ media 只負責「把 bytes 還給上傳它的那個服務」，誰能看是呼叫端的事。
@@ -313,19 +267,6 @@ type MediaServiceServer interface {
 	// 它回的是中介資料不是內容，但「這個 object_key 存不存在」本身就是資訊
 	// ⇒ 查無與越權必須無法分辨，否則它會變成一個可枚舉的 oracle。
 	BatchGetAssetMetadata(context.Context, *BatchGetAssetMetadataRequest) (*BatchGetAssetMetadataResponse, error)
-	// 派工外部 URL 下載（async）：RPC 立刻回 DOWNLOADING，實際下載由 Media 內部 worker pool 執行
-	// 完成後 publish MediaImportAssetDownloadedEvent 到 hawkr.media exchange / import.asset.downloaded routing key
-	// 詳見 08 號設計書 §7.2 / §7.2a
-	ImportDownloadAsset(context.Context, *ImportDownloadAssetRequest) (*ImportDownloadAssetResponse, error)
-	// 將 import_asset 搬到正式 refType 路徑並建立 media_asset
-	// 由 Product Service 在 CreateProductFromImportInternal commit 階段呼叫
-	// 詳見 08 號設計書 §7.3
-	FinalizeImportAsset(context.Context, *FinalizeImportAssetRequest) (*FinalizeImportAssetResponse, error)
-	// 將賣家本地上傳取得的 staged_token 綁定為 import_asset（同步）
-	// 由 product-import-service 在 UpdateImportItem 階段呼叫
-	// 內部：驗證 staged_token → 由 upload_session OSS path 搬至 import_asset tmp path → INSERT import_asset (status=UPLOADED)
-	// 詳見 40 號設計書 §3.4 / §4.3
-	BindStagedAsset(context.Context, *BindStagedAssetRequest) (*BindStagedAssetResponse, error)
 	mustEmbedUnimplementedMediaServiceServer()
 }
 
@@ -365,15 +306,6 @@ func (UnimplementedMediaServiceServer) ServerReadSecureAsset(context.Context, *S
 }
 func (UnimplementedMediaServiceServer) BatchGetAssetMetadata(context.Context, *BatchGetAssetMetadataRequest) (*BatchGetAssetMetadataResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method BatchGetAssetMetadata not implemented")
-}
-func (UnimplementedMediaServiceServer) ImportDownloadAsset(context.Context, *ImportDownloadAssetRequest) (*ImportDownloadAssetResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ImportDownloadAsset not implemented")
-}
-func (UnimplementedMediaServiceServer) FinalizeImportAsset(context.Context, *FinalizeImportAssetRequest) (*FinalizeImportAssetResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method FinalizeImportAsset not implemented")
-}
-func (UnimplementedMediaServiceServer) BindStagedAsset(context.Context, *BindStagedAssetRequest) (*BindStagedAssetResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method BindStagedAsset not implemented")
 }
 func (UnimplementedMediaServiceServer) mustEmbedUnimplementedMediaServiceServer() {}
 func (UnimplementedMediaServiceServer) testEmbeddedByValue()                      {}
@@ -576,60 +508,6 @@ func _MediaService_BatchGetAssetMetadata_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MediaService_ImportDownloadAsset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ImportDownloadAssetRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(MediaServiceServer).ImportDownloadAsset(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: MediaService_ImportDownloadAsset_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MediaServiceServer).ImportDownloadAsset(ctx, req.(*ImportDownloadAssetRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _MediaService_FinalizeImportAsset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(FinalizeImportAssetRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(MediaServiceServer).FinalizeImportAsset(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: MediaService_FinalizeImportAsset_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MediaServiceServer).FinalizeImportAsset(ctx, req.(*FinalizeImportAssetRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _MediaService_BindStagedAsset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BindStagedAssetRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(MediaServiceServer).BindStagedAsset(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: MediaService_BindStagedAsset_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MediaServiceServer).BindStagedAsset(ctx, req.(*BindStagedAssetRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // MediaService_ServiceDesc is the grpc.ServiceDesc for MediaService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -676,18 +554,6 @@ var MediaService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BatchGetAssetMetadata",
 			Handler:    _MediaService_BatchGetAssetMetadata_Handler,
-		},
-		{
-			MethodName: "ImportDownloadAsset",
-			Handler:    _MediaService_ImportDownloadAsset_Handler,
-		},
-		{
-			MethodName: "FinalizeImportAsset",
-			Handler:    _MediaService_FinalizeImportAsset_Handler,
-		},
-		{
-			MethodName: "BindStagedAsset",
-			Handler:    _MediaService_BindStagedAsset_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -48,7 +48,7 @@ service MediaService {
     //
     // 🔴 為什麼非有它不可：機敏資產在 R2 上是**加密的**，金鑰只有 media 拿得到
     // ⇒ 上傳者服務事後想拿回自己那份 bytes，除了本 RPC 沒有第二條路
-    // （直接讀 OSS 會拿到密文，且違反「儲存 SDK 只准在 media/product-import」）。
+    // （直接讀 OSS 會拿到密文，且違反「儲存 SDK 只准在 media」）。
     // 發票 PDF 由 invoice-service 以服務身分上傳、合法讀者卻有三個（買家／賣家／ADM），
     // 那三個人的授權述詞在 invoice-service（order_no × buyer_id × document_id），不在 media
     // ⇒ media 只負責「把 bytes 還給上傳它的那個服務」，誰能看是呼叫端的事。
@@ -74,24 +74,6 @@ service MediaService {
     // 它回的是中介資料不是內容，但「這個 object_key 存不存在」本身就是資訊
     // ⇒ 查無與越權必須無法分辨，否則它會變成一個可枚舉的 oracle。
     rpc BatchGetAssetMetadata(BatchGetAssetMetadataRequest) returns (BatchGetAssetMetadataResponse);
-
-    // ========== Product Import 整合（08 §7）==========
-
-    // 派工外部 URL 下載（async）：RPC 立刻回 DOWNLOADING，實際下載由 Media 內部 worker pool 執行
-    // 完成後 publish MediaImportAssetDownloadedEvent 到 hawkr.media exchange / import.asset.downloaded routing key
-    // 詳見 08 號設計書 §7.2 / §7.2a
-    rpc ImportDownloadAsset(ImportDownloadAssetRequest) returns (ImportDownloadAssetResponse);
-
-    // 將 import_asset 搬到正式 refType 路徑並建立 media_asset
-    // 由 Product Service 在 CreateProductFromImportInternal commit 階段呼叫
-    // 詳見 08 號設計書 §7.3
-    rpc FinalizeImportAsset(FinalizeImportAssetRequest) returns (FinalizeImportAssetResponse);
-
-    // 將賣家本地上傳取得的 staged_token 綁定為 import_asset（同步）
-    // 由 product-import-service 在 UpdateImportItem 階段呼叫
-    // 內部：驗證 staged_token → 由 upload_session OSS path 搬至 import_asset tmp path → INSERT import_asset (status=UPLOADED)
-    // 詳見 40 號設計書 §3.4 / §4.3
-    rpc BindStagedAsset(BindStagedAssetRequest) returns (BindStagedAssetResponse);
 }
 
 // ========== FinalizeImages ==========
@@ -283,67 +265,4 @@ message ServerReadSecureAssetResponse {
     // 顯示用檔名（下載／預覽的存檔名）：優先為使用者上傳當下的原始檔名；
     // media 尚未儲存原始檔名的舊資產才回退為 object_key 尾段（並剝去 .attempt-{uuid} 後綴）。
     string filename = 5;
-}
-
-// ========== ImportDownloadAsset（async，Product Import 委派下載）==========
-
-message ImportDownloadAssetRequest {
-    string ref_type = 1;                     // PRODUCT_IMPORT_PREVIEW | PRODUCT_IMPORT_PREVIEW_DESC（AssetReferenceType value）
-    // 賣家在 CSV 內原樣填寫的外部 URL：全鏈路都不做正規化（repo 內無任何 normalize 實作），
-    // 消費端不得假設它已被清理——可能帶 query 簽名參數、trailing slash 或百分比編碼。
-    string source_url = 2;
-    int64 store_id = 3;                      // 賣家 store_id（product-import-service 傳入）
-    int64 import_job_id = 4;
-    int64 import_item_id = 5;
-    string idempotency_key = 6;              // SHA256(url) + import_job_id
-    string expires_at = 7;                   // ISO 8601 UTC（建議 ImportJob.expires_at + 1d buffer）
-    int64 callback_correlation_id = 8;       // Import 端 product_import_item_asset.id；callback event 內 echo
-}
-
-message ImportDownloadAssetResponse {
-    int32 code = 1;
-    string message = 2;
-    string import_asset_id = 3;              // UUID（import_asset.id）
-    string status = 4;                       // ImportAssetMediaStatus.value()：DOWNLOADING(9401) / UPLOADED(9402) / FINALIZED(9403) / FAILED(9404) / EXPIRED(9405)
-                                             // 首次 INSERT 一律 DOWNLOADING；dedup 命中時 echo 既有 row 當下 status（含已 settled 終態）
-    string failure_reason = 5;               // (a) 派工本身失敗（罕見：DB INSERT 失敗 / MQ enqueue 失敗），或
-                                             // (b) dedup 命中且 status=FAILED 時 echo 既有 row 的 failure_reason（caller 同步 settle 用）
-    string object_key = 6;                   // dedup 命中且 status ∈ {UPLOADED, FINALIZED} 時填；caller 同步 settle 自己 row 用
-    string preview_url = 7;                  // 同 object_key 條件填；presigned download URL
-    string failure_detail = 8;               // dedup 命中且 status=FAILED 時填；caller 同步 settle 用
-}
-
-// ========== FinalizeImportAsset（Product 端 commit 階段呼叫）==========
-
-message FinalizeImportAssetRequest {
-    string import_asset_id = 1;
-    string target_ref_type = 2;              // PRODUCT | PRODUCT_DESC（不可是 PRODUCT_IMPORT_PREVIEW*）
-    int64 store_id = 3;                      // 現任賣家 store_id（product-service 傳入）
-    int64 product_id = 4;                    // 用於 finalized_object_key 路徑組裝（非 link，link 由 caller 自行 LinkImages）
-}
-
-message FinalizeImportAssetResponse {
-    int32 code = 1;
-    string message = 2;
-    string asset_id = 3;                     // media_asset.id（TSID 數字字串）
-    string object_key = 4;                   // 正式 OSS 路徑
-    string url = 5;                          // CDN URL（CdnProperties.buildUrl(objectKey)）
-}
-
-// ========== BindStagedAsset（sync，UpdateImportItem 階段用） ==========
-
-message BindStagedAssetRequest {
-    string staged_token = 1;                 // 賣家本地上傳取得（CompleteUploadSession 回傳）
-    int64 store_id = 2;                      // 賣家 store_id（product-import-service 傳入）
-    int64 import_job_id = 3;
-    int64 import_item_id = 4;
-    string ref_type = 5;                     // PRODUCT_IMPORT_PREVIEW | PRODUCT_IMPORT_PREVIEW_DESC
-}
-
-message BindStagedAssetResponse {
-    int32 code = 1;
-    string message = 2;
-    string import_asset_id = 3;              // UUID（import_asset.id）
-    string object_key = 4;                   // import_asset tmp OSS 路徑
-    string preview_url = 5;                  // CDN URL 供 UI 預覽
 }

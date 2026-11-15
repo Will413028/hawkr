@@ -4,6 +4,7 @@ import {
 	discoverAppPageRoutes,
 	discoverPermanentRedirects,
 } from "./helpers/app-route-inventory";
+import { expectNoAxeViolations } from "./helpers/axe";
 import {
 	fulfillConnectError,
 	GET_SESSION_URL,
@@ -11,6 +12,7 @@ import {
 } from "./helpers/mock-gateway";
 import { installProviderMocks } from "./helpers/mock-gsi";
 import { assertNoResidualLoading } from "./helpers/page-stability";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 const LOADER_KEY = "hawkr:initial-loader-seen";
 const PERMANENT_REDIRECT_SOURCES = new Set(
@@ -276,8 +278,7 @@ async function assertPublicStaticRoute(
 	guestState: GuestPageState,
 ) {
 	const runtimeIssues = attachRuntimeMonitors(page, baseURL);
-	const response = await page.goto(route, {
-		waitUntil: "domcontentloaded",
+	const response = await gotoStreamed(page, route, {
 		timeout: 25_000,
 	});
 	expect(response, `${route} returned no document response`).toBeTruthy();
@@ -349,6 +350,7 @@ async function assertPublicStaticRoute(
 	);
 	await assertNoResidualLoading(page, route);
 	await assertRenderedLinksSafe(page, route);
+	await expectNoAxeViolations(page, route);
 }
 
 test.describe("canonical public static route browser health", {

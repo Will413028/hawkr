@@ -3,6 +3,7 @@
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Link from "@/components/shared/Link";
+import { ScrollableTableRegion } from "@/components/shared/ScrollableTableRegion";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import Button from "@/components/ui/Button";
 import { downloadCsv } from "@/lib/csv/export";
@@ -568,7 +569,7 @@ export default function InventoryPage() {
 						</p>
 					)}
 
-					<div className="seller-orders__table-wrap">
+					<ScrollableTableRegion label="庫存表格">
 						<table
 							className="seller-inventory__table"
 							data-mobile-layout="cards"
@@ -677,7 +678,7 @@ export default function InventoryPage() {
 								)}
 							</tbody>
 						</table>
-					</div>
+					</ScrollableTableRegion>
 				</div>
 
 				{showSkeleton ? (

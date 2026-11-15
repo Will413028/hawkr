@@ -33,7 +33,7 @@ function Inner() {
 	};
 
 	return (
-		<main className="min-h-[calc(100vh-200px)] max-w-[580px] mx-auto py-10 px-5 pb-12 flex items-center justify-center">
+		<div className="min-h-[calc(100vh-200px)] max-w-[580px] mx-auto py-10 px-5 pb-12 flex items-center justify-center">
 			<PurchaseTracker fallbackOrderNo={orderNo || undefined} />
 			<div className="relative w-full bg-content1/90 border border-divider rounded-3xl p-10 px-7 pb-8 text-center flex flex-col items-center gap-3 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_18px_40px_-22px_rgb(var(--color-ink-700-rgb)/0.28),0_6px_18px_-12px_rgb(var(--color-ink-950-rgb)/0.18)] backdrop-blur-md overflow-hidden dark:bg-content1/86 animate-checkout-pop">
 				<div
@@ -99,6 +99,6 @@ function Inner() {
 					</Button>
 				</div>
 			</div>
-		</main>
+		</div>
 	);
 }

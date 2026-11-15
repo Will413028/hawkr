@@ -53,6 +53,13 @@ var customerEffects = map[string]Effect{
 	"/hawkr.buyer.v1alpha1.BuyerAppService/ListRestockSubscriptions": EffectRead,
 	"/hawkr.buyer.v1alpha1.BuyerAppService/SubscribeRestock":         EffectWrite,
 	"/hawkr.buyer.v1alpha1.BuyerAppService/UnsubscribeRestock":       EffectWrite,
+	// 個人封鎖是保護自己的動作（seller 模組的店家封鎖同理：停權時仍要能封鎖與解除），停權的帳號也能做；名單是讀取。
+	"/hawkr.buyer.v1alpha1.BuyerAppService/BlockAuthor":       EffectSelfService,
+	"/hawkr.buyer.v1alpha1.BuyerAppService/BlockStore":        EffectSelfService,
+	"/hawkr.buyer.v1alpha1.BuyerAppService/UnblockBuyer":      EffectSelfService,
+	"/hawkr.buyer.v1alpha1.BuyerAppService/UnblockStore":      EffectSelfService,
+	"/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedBuyers": EffectRead,
+	"/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedStores": EffectRead,
 
 	// IdentityAppService
 	"/hawkr.identity.v1alpha1.IdentityAppService/GetSession":           EffectRead,
@@ -106,6 +113,9 @@ var customerEffects = map[string]Effect{
 	"/hawkr.social.v1alpha1.SocialAppService/CancelPostSchedule":    EffectWrite,
 	"/hawkr.social.v1alpha1.SocialAppService/ListStoreComments":     EffectRead,
 	"/hawkr.social.v1alpha1.SocialAppService/GetStoreSocialSummary": EffectRead,
+	// 作者讀自己的處分與被隱藏內容的理由（A7-D9）：只讀，停權的帳號也要讀得到。
+	"/hawkr.social.v1alpha1.SocialAppService/ListMySanctions":     EffectRead,
+	"/hawkr.social.v1alpha1.SocialAppService/ListMyHiddenContent": EffectRead,
 
 	// SellerReportAppService
 	"/hawkr.seller.v1alpha1.SellerReportAppService/CreateReport":  EffectWrite,
@@ -157,6 +167,10 @@ var customerEffects = map[string]Effect{
 	"/hawkr.seller.v1alpha1.SellerAppService/GetMyMeasure":                   EffectRead,
 	"/hawkr.seller.v1alpha1.SellerAppService/SubmitAppeal":                   EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerAppService/RequestRemediation":             EffectWrite,
+	// 店家封鎖是保護動作（同 BuyerAppService 的個人封鎖）；名單是讀取。
+	"/hawkr.seller.v1alpha1.SellerAppService/BlockBuyer":        EffectSelfService,
+	"/hawkr.seller.v1alpha1.SellerAppService/UnblockBuyer":      EffectSelfService,
+	"/hawkr.seller.v1alpha1.SellerAppService/ListBlockedBuyers": EffectRead,
 
 	// SellerPublicService
 	"/hawkr.seller.v1alpha1.SellerPublicService/GetStore":            EffectRead,

@@ -439,6 +439,62 @@ extension type SellerAppServiceClient (connect.Transport _transport) {
       onTrailer: onTrailer,
     );
   }
+
+  /// BlockBuyer 以呼叫者店家的身分封鎖一位買家：該買家不能在這家店留言、討論區發言與按讚，仍看得到店家的公開內容。買家以留言或討論區留言的
+  /// 參照指定，參照要在呼叫者店家的內容裡讀得到，否則回 not_found；作者不是買家（是店家）回 invalid_argument；作者是店主本人的買家身分回
+  /// invalid_argument。已經封鎖時也成功，changed 為 false。賣家能力 CAP_CONTENT_CONTRACT（封鎖是保護動作，停權時仍可做）。
+  Future<hawkrsellerv1alpha1seller.BlockBuyerResponse> blockBuyer(
+    hawkrsellerv1alpha1seller.BlockBuyerRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SellerAppService.blockBuyer,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// UnblockBuyer 解除呼叫者店家對買家的封鎖；沒有封鎖時也成功，changed 為 false。賣家能力 CAP_CONTENT_CONTRACT。
+  Future<hawkrsellerv1alpha1seller.UnblockBuyerResponse> unblockBuyer(
+    hawkrsellerv1alpha1seller.UnblockBuyerRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SellerAppService.unblockBuyer,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// ListBlockedBuyers 列出呼叫者店家封鎖的買家，新到舊。賣家能力 CAP_CONTENT_CONTRACT。
+  Future<hawkrsellerv1alpha1seller.ListBlockedBuyersResponse> listBlockedBuyers(
+    hawkrsellerv1alpha1seller.ListBlockedBuyersRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SellerAppService.listBlockedBuyers,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
 }
 /// SellerPublicService 是任何人都能讀的店家資料，不需要登入（ADR 2026-10-03-public-store-identity-and-visibility）。
 /// 公開的店家以 store_code 識別、以 id 參照：店面頁網址用 store_code（亂數、不可列舉），各處的店家卡片用 id；

@@ -15,6 +15,7 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
+	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
@@ -36,6 +37,10 @@ type appModule struct {
 	revoked  []uuid.UUID
 	listErr  error
 	linked   map[int64][]identity.LinkedIdentity
+
+	suspension    identity.AccountSuspension
+	suspended     bool
+	suspensionErr error
 
 	contacts   map[int64]identity.ContactEmail
 	contactErr error
@@ -111,6 +116,10 @@ func (m *appModule) RevokeSession(_ context.Context, accountID int64, id identit
 		}
 	}
 	return apperr.NotFound("session 不存在")
+}
+
+func (m *appModule) CurrentSuspension(context.Context, int64) (identity.AccountSuspension, bool, error) {
+	return m.suspension, m.suspended, m.suspensionErr
 }
 
 func (m *appModule) Account(context.Context, int64) (identity.Account, error) {
@@ -760,5 +769,53 @@ func TestSetContactEmailPassesTheInputAndMapsTheField(t *testing.T) {
 	}
 	if missing := rpc.CheckFieldPaths((&pb.SetContactEmailRequest{}).ProtoReflect().Descriptor(), setContactEmailPaths); len(missing) > 0 {
 		t.Errorf("對應表指向不存在的請求欄位：%v", missing)
+	}
+}
+
+// 帳號停權時 GetSession 帶政策分類與理由（A7-D9）：帳號擁有者有權讀。
+func TestGetSessionCarriesTheSuspensionCategoryAndReason(t *testing.T) {
+	t.Parallel()
+	e := newAppEnv(t)
+	e.m.suspended = true
+	e.m.suspension = identity.AccountSuspension{Category: "HARASSMENT", Reason: "重複騷擾其他買家"}
+	at := appNow.Add(-time.Hour)
+	ctx := rpc.WithSuspension(callerContext(t, 42, uuid.New(), rpc.CredentialCookie), at)
+	resp, err := e.app.GetSession(ctx, connect.NewRequest(&pb.GetSessionRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := resp.Msg.GetSuspension()
+	if s == nil || !s.GetSuspendedAt().AsTime().Equal(at) || s.GetCategory() != commonpb.PolicyCategory_POLICY_CATEGORY_HARASSMENT || s.GetReason() != "重複騷擾其他買家" {
+		t.Fatalf("suspension = %v", s)
+	}
+}
+
+func TestGetSessionKeepsTheSuspensionTimeWhenTheRecordCannotBeRead(t *testing.T) {
+	t.Parallel()
+	e := newAppEnv(t)
+	e.m.suspensionErr = apperr.Unavailable("identity down")
+	at := appNow.Add(-time.Hour)
+	ctx := rpc.WithSuspension(callerContext(t, 42, uuid.New(), rpc.CredentialCookie), at)
+	resp, err := e.app.GetSession(ctx, connect.NewRequest(&pb.GetSessionRequest{}))
+	if err != nil {
+		t.Fatalf("讀不到停權紀錄不能讓登入狀態失敗：%v", err)
+	}
+	s := resp.Msg.GetSuspension()
+	if s == nil || !s.GetSuspendedAt().AsTime().Equal(at) || s.GetCategory() != commonpb.PolicyCategory_POLICY_CATEGORY_UNSPECIFIED || s.GetReason() != "" {
+		t.Fatalf("只帶停權時間：%v", s)
+	}
+	if !strings.Contains(e.logs.String(), "level=ERROR") {
+		t.Fatalf("讀取失敗要記 log：%q", e.logs.String())
+	}
+}
+
+func TestGetSessionWithoutASuspensionDoesNotReadTheRecord(t *testing.T) {
+	t.Parallel()
+	e := newAppEnv(t)
+	e.m.suspended = true // 若被讀了，回應就會帶 suspension
+	e.m.suspension = identity.AccountSuspension{Category: "SPAM"}
+	resp, err := e.app.GetSession(callerContext(t, 42, uuid.New(), rpc.CredentialCookie), connect.NewRequest(&pb.GetSessionRequest{}))
+	if err != nil || resp.Msg.Suspension != nil {
+		t.Fatalf("沒有停權：%v %v", err, resp.Msg.GetSuspension())
 	}
 }

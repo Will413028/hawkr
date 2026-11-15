@@ -298,8 +298,7 @@ public class ReturnStuckAlertScheduler {
      * <p><b>已知仍在舊 echo-back 反模式、同一個 bug class 的其餘 producer（campaign-level
      * follow-up 範圍，本次改動不觸碰）</b>：不要相信任何寫死的 enumerated 清單——上一版
      * javadoc 在這裡宣稱「三個 producer 本應對稱」，而本次修這段時手動列出的清單同樣當場
-     * 被下面這條 grep 證明是不完整的（漏了 media-service {@code ImportAssetService}
-     * 兩處、cart-service {@code CartService}、coupon-service {@code CouponGrpcService}
+     * 被下面這條 grep 證明是不完整的（漏了 cart-service {@code CartService}、coupon-service {@code CouponGrpcService}
      * 兩處等）——手動維護的清單本身就會腐爛，不要再嘗試維護一份，每次都重新跑：
      * <p>Java（已於 2026-08-05 實測跑過，此指令本身抓得到）：
      * {@code grep -rn -A2 "resolvePrincipals(" services/ --include='*.java' | grep -B2 getOrDefault}

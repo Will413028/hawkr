@@ -101,8 +101,6 @@ services:
       PROCUREMENT_REPLAY_SSE_ENABLED: ${PROCUREMENT_REPLAY_SSE_ENABLED:-false}
       PAYUNI_WEBHOOK_SERVICE_HOST: payuni-webhook-service
       PAYUNI_WEBHOOK_SERVICE_PORT: 9946
-      PRODUCT_IMPORT_SERVICE_HOST: product-import-service
-      PRODUCT_IMPORT_SERVICE_GRPC_PORT: 9961
       NOTIFICATION_SERVICE_HOST: notification-service
       NOTIFICATION_SERVICE_GRPC_PORT: 10037
       # invoice-service（58 號設計書 §12.1.2 F）。三個 INVOICE_SERVICE_* 必須一起加：
@@ -1210,13 +1208,6 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: HawkrRedis2026
 
-      # RabbitMQ
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: guest
-      RABBITMQ_PASSWORD: guest
-      RABBITMQ_VHOST: /
-
       # 儲存後端 R2（49 號設計書 §8.5）；OSS 將刪除，本地不再依賴。憑證走 ${R2_*}（.env）
       STORAGE_BACKEND: ${STORAGE_BACKEND:-r2}
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
@@ -1451,83 +1442,6 @@ services:
       COUPON_ADMIN_FALLBACK_IMAGE_KEY: ${COUPON_ADMIN_FALLBACK_IMAGE_KEY:-public/system/coupon-default.png}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9950/actuator/health"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - hawkr-network
-
-  # ==========================================
-  # Product Import Service（#40 商品匯入精靈）
-  # ==========================================
-
-  product-import-service:
-    build:
-      context: .
-      dockerfile: services/java/product-import-service/Dockerfile
-    image: hawkr/product-import-service:latest
-    container_name: product-import-service
-    restart: unless-stopped
-    ports:
-      - "9960:9960"
-      - "9961:9961"
-    environment:
-      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
-      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
-      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
-      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
-      TZ: UTC
-      SERVER_PORT: 9960
-      GRPC_PORT: 9961
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: hawkr_product_import
-      DB_USER: dbadmin
-      DB_PASSWORD: Hawkr2024Admin
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: HawkrRedis2026
-      # RabbitMQ
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: guest
-      RABBITMQ_PASSWORD: guest
-      FLYWAY_ENABLED: "true"
-      NACOS_ENABLED: "false"
-      JAVA_OPTS: ${JAVA_OPTS}
-      SKIP_ACCOUNT_TYPE_CHECK: ${SKIP_ACCOUNT_TYPE_CHECK:-true}
-      # 下游依賴
-      MEDIA_SERVICE_HOST: media-service
-      MEDIA_SERVICE_GRPC_PORT: 9937
-      PRODUCT_SERVICE_HOST: product-service
-      PRODUCT_SERVICE_GRPC_PORT: 9913
-      SHIPPING_SERVICE_HOST: shipping-service
-      SHIPPING_SERVICE_GRPC_PORT: 9931
-      # 儲存後端 R2（49 號設計書 §8.5）；CSV upload 沿用 media-service 同一 R2 bucket。
-      # 修正歷史 ALIYUN_OSS_* 變數名 drift（application.yml 實際讀 STORAGE_BACKEND / R2_* / OSS_*）
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-r2}
-      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
-      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
-      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
-      R2_BUCKET_NAME: ${R2_BUCKET_NAME}
-      # Product Import 配置（設計書 §9.2）
-      PRODUCT_IMPORT_JOB_TTL_DAYS: ${PRODUCT_IMPORT_JOB_TTL_DAYS:-7}
-      PRODUCT_IMPORT_CSV_INVALID_TTL_DAYS: ${PRODUCT_IMPORT_CSV_INVALID_TTL_DAYS:-3}
-      PRODUCT_IMPORT_COMMITTED_RETENTION_DAYS: ${PRODUCT_IMPORT_COMMITTED_RETENTION_DAYS:-7}
-      PRODUCT_IMPORT_EXPIRED_RETENTION_DAYS: ${PRODUCT_IMPORT_EXPIRED_RETENTION_DAYS:-7}
-      PRODUCT_IMPORT_ORPHAN_ASSET_GRACE_HOURS: ${PRODUCT_IMPORT_ORPHAN_ASSET_GRACE_HOURS:-24}
-      PRODUCT_IMPORT_CALLBACK_INBOX_RETENTION_DAYS: ${PRODUCT_IMPORT_CALLBACK_INBOX_RETENTION_DAYS:-14}
-      PRODUCT_IMPORT_MAX_ACTIVE_JOBS_PER_SELLER: ${PRODUCT_IMPORT_MAX_ACTIVE_JOBS_PER_SELLER:-5}
-      PRODUCT_IMPORT_MAX_DAILY_JOBS_PER_SELLER: ${PRODUCT_IMPORT_MAX_DAILY_JOBS_PER_SELLER:-10}
-      PRODUCT_IMPORT_CSV_MAX_FILE_SIZE_BYTES: ${PRODUCT_IMPORT_CSV_MAX_FILE_SIZE_BYTES:-2097152}
-      PRODUCT_IMPORT_CSV_MAX_ROWS: ${PRODUCT_IMPORT_CSV_MAX_ROWS:-500}
-      PRODUCT_IMPORT_ASSET_MAX_CONCURRENT: ${PRODUCT_IMPORT_ASSET_MAX_CONCURRENT:-8}
-      PRODUCT_IMPORT_ASSET_CALLBACK_TIMEOUT_MINUTES: ${PRODUCT_IMPORT_ASSET_CALLBACK_TIMEOUT_MINUTES:-30}
-      PRODUCT_IMPORT_CONFIRMATION_TOKEN_TTL_SECONDS: ${PRODUCT_IMPORT_CONFIRMATION_TOKEN_TTL_SECONDS:-300}
-      PRODUCT_IMPORT_GC_ENABLED: ${PRODUCT_IMPORT_GC_ENABLED:-true}
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9960/actuator/health"]
       interval: 60s
       timeout: 10s
       retries: 3

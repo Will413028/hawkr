@@ -8,22 +8,12 @@ import (
 
 	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
 	productpb "github.com/Will413028/hawkr/go-pkg/proto/product"
-	importpb "github.com/Will413028/hawkr/go-pkg/proto/product_import"
 	shippingpb "github.com/Will413028/hawkr/go-pkg/proto/shipping"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
 )
 
 // ==================== Mock proto clients（介面 embed：未 stub 的方法呼叫即 nil-panic）====================
-
-type mockProductImportServiceClient struct {
-	importpb.ProductImportServiceClient
-	ListImportJobsFn func(ctx context.Context, in *importpb.ListImportJobsRequest, opts ...grpc.CallOption) (*importpb.ListImportJobsResponse, error)
-}
-
-func (m *mockProductImportServiceClient) ListImportJobs(ctx context.Context, in *importpb.ListImportJobsRequest, opts ...grpc.CallOption) (*importpb.ListImportJobsResponse, error) {
-	return m.ListImportJobsFn(ctx, in, opts...)
-}
 
 func setupSellerRekeyRouter(h *Holder) *gin.Engine {
 	r := gin.New()
@@ -32,7 +22,6 @@ func setupSellerRekeyRouter(h *Holder) *gin.Engine {
 		app.GET("/products/:id", h.GetSellerProductDetail)
 		app.DELETE("/products/:id", h.DeleteSellerProduct)
 		app.GET("/products/:id/skus", h.GetSellerProductSkus)
-		app.GET("/product_import_jobs", h.ListImportJobs)
 		app.GET("/shipping_methods", h.ListSellerShippingMethods)
 	}
 	return r
@@ -154,23 +143,6 @@ func TestDeleteSellerProduct_PassesSurrogate(t *testing.T) {
 	assertHTTPStatus(t, w, 200)
 	if gotReqAccountID != rekeyTestSurrogate {
 		t.Errorf("DeleteProductRequest.StoreId = %d, want surrogate %d", gotReqAccountID, rekeyTestSurrogate)
-	}
-}
-
-func TestListImportJobs_PassesSurrogate(t *testing.T) {
-	var gotReqAccountID int64
-	mock := &mockProductImportServiceClient{
-		ListImportJobsFn: func(_ context.Context, in *importpb.ListImportJobsRequest, _ ...grpc.CallOption) (*importpb.ListImportJobsResponse, error) {
-			gotReqAccountID = in.StoreId
-			return &importpb.ListImportJobsResponse{Code: 0}, nil
-		},
-	}
-	h := &Holder{ProductImport: grpcclient.NewProductImportClientForTest(mock), Store: storeResolverForTest(rekeyTestSurrogate)}
-	w := doRekeyReq(t, setupSellerRekeyRouter(h), "GET", "/api/v1/app/product_import_jobs")
-
-	assertHTTPStatus(t, w, 200)
-	if gotReqAccountID != rekeyTestSurrogate {
-		t.Errorf("ListImportJobsRequest.StoreId = %d, want surrogate %d", gotReqAccountID, rekeyTestSurrogate)
 	}
 }
 

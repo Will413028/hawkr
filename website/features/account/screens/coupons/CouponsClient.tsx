@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import * as React from "react";
 import Avatar from "@/components/shared/Avatar";
 import Link from "@/components/shared/Link";
+import { ScPill } from "@/components/shared/ScPrimitives";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import { AccountEmptyStateIcon } from "@/features/account/components/AccountEmptyIcon";
 import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
@@ -84,30 +85,21 @@ export default function CouponsClient() {
 	const error = query.error instanceof Error ? query.error.message : null;
 
 	return (
-		<main className="coupons-page">
+		<div className="coupons-page">
 			<SellerPageShell
 				title="優惠券"
 				subtitle="結帳時系統會自動套用最優惠的組合。"
 				toolbar={
-					<div className="flex flex-wrap gap-2" role="tablist">
+					<div className="flex flex-wrap gap-2">
 						{TABS.map((t) => (
-							<button
+							<ScPill
 								key={t.value}
-								type="button"
-								role="tab"
-								aria-selected={tab === t.value}
-								className={[
-									"inline-flex items-center gap-1.5 h-8 px-3.5 border border-divider rounded-full text-sm font-bold cursor-pointer transition-colors duration-150 ease-out",
-									tab === t.value
-										? "bg-hkui-primary text-[var(--color-neutral-cream)] border-transparent"
-										: "bg-content1 text-foreground-muted hover:bg-content2 hover:text-foreground",
-								]
-									.filter(Boolean)
-									.join(" ")}
+								as="button"
+								active={tab === t.value}
 								onClick={() => setTab(t.value)}
 							>
 								{t.label}
-							</button>
+							</ScPill>
 						))}
 					</div>
 				}
@@ -288,6 +280,6 @@ export default function CouponsClient() {
 					</ul>
 				)}
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }

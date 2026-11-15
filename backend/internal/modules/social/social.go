@@ -142,6 +142,7 @@ type (
 	HiddenCursor       = model.HiddenCursor
 	HiddenPage         = model.HiddenPage
 	ContentOwner       = model.ContentOwner
+	ContentAuthor      = model.ContentAuthor
 	ContentSnapshot    = model.ContentSnapshot
 	// TakedownContentError 是內容下架的對象不成立（不存在、已刪除、不是措施的店家寫的）；OnMeasureCreated 回這個錯誤讓措施回滾。
 	TakedownContentError = stats.TakedownContentError
@@ -530,6 +531,11 @@ func (m *Module) RecordView(ctx context.Context, c Caller, postID uuid.UUID, v V
 // ContentOwner 回傳內容的歸屬（存在、作者、所屬店家、是否公開可讀），給 moderation 在建立處分前驗證。
 func (m *Module) ContentOwner(ctx context.Context, t Target) (ContentOwner, error) {
 	return m.sanction.Owner(ctx, t)
+}
+
+// ContentAuthorFor 回傳讀取者讀得到的留言或討論區留言的作者與所屬店家（從內容封鎖作者，A7-2e）；讀不到回 Found 為假。唯讀，套用與列表相同的觀看者規則。
+func (m *Module) ContentAuthorFor(ctx context.Context, c Caller, t Target) (ContentAuthor, error) {
+	return m.sanction.AuthorFor(ctx, c, t)
 }
 
 // ContentSnapshot 回傳內容此刻的歸屬（同 ContentOwner，含是否公開可讀）、本文與媒體參照，給 moderation 在檢舉送出時凍結（唯讀，不鎖）；內容不存在或已刪除回 Exists 為假。

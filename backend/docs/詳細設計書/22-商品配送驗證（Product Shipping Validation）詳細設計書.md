@@ -207,7 +207,7 @@ public static int parseDecimalToInt(String value, String fieldName) {
 - `SUCCESS` → 依 `allValid` / `results` 業務處理
 - 非 `SUCCESS` → 視為「呼叫失敗」，**不可**僅看 `allValid` / `results` 判斷「無 violation」
   - product-service `ShippingGrpcClient.validateProductShipping` 必須檢查 `response.getCode()`，非 SUCCESS 拋 RuntimeException 給 caller 走 degraded 路徑
-  - 🔴 這條規則的失效是**完全靜默的**：handler 若把 `INVALID_PARAM` 包成正常 response（`code=400, results=[]`），而 client 不檢 code 直接 return，product-service 會把空 `results` 當成「無 violation」放行，所有 shipping violation 都不會寫進 `product_import_item_error`，沒有任何錯誤訊息
+  - 🔴 這條規則的失效是**完全靜默的**：handler 若把 `INVALID_PARAM` 包成正常 response（`code=400, results=[]`），而 client 不檢 code 直接 return，product-service 會把空 `results` 當成「無 violation」放行，所有 shipping violation 都不會被呈現，沒有任何錯誤訊息
 
 ---
 
@@ -256,7 +256,6 @@ SKU「規格A」的 TAQBIN/AMBIENT 驗證失敗：材積總和 180cm 超過上�
 | gRPC Server | `ShippingGrpcServiceImpl.validateProductShipping` | dim/weight 以 `parseDecimalToInt` / `parseDecimalToLong` 解析 |
 | gRPC Client | `ShippingGrpcClient.validateProductShipping`（product-service） | **必檢 `response.getCode()`**，非 SUCCESS 拋 RuntimeException |
 | Service | `ProductService` | `createProduct()` / `updateProduct()` 中新增驗證呼叫 |
-| Validator | `ProductPublishValidator.validateShippingEnabled`（product-service） | catch RuntimeException → log ERROR + degraded return；**禁止**僅依 `getAllValid()` / `getResultsCount()` 判斷 |
 
 #### 3.6 邊界情況
 
@@ -264,7 +263,7 @@ SKU「規格A」的 TAQBIN/AMBIENT 驗證失敗：材積總和 180cm 超過上�
 |------|---------|
 | SKU 無配送方式 | 跳過驗證（空陣列合法） |
 | SKU 缺少材積欄位（length/width/height） | 跳過驗證（僅驗證有材積資料的 SKU） |
-| Shipping Service 不可用 / 回 INVALID_PARAM | Client 拋 RuntimeException；Validator catch 後 log ERROR + degraded return，**不阻擋上架但記事件供查**（`ProductPublishValidator.validateShippingEnabled.degraded`） |
+| Shipping Service 不可用 / 回 INVALID_PARAM | Client 拋 RuntimeException；`ProductService.validateSkuShippingMethods` 不在方法內攔截，例外往上傳 |
 | 同一 SKU 有多個配送方式 | 每個配送方式各自驗證 |
 | SKU dim/weight 字串含小數（"18.00"） | shipping-service handler 走 `parseDecimalToInt` truncate 為整數（見 §2.7） |
 

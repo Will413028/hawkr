@@ -261,21 +261,6 @@ public class ProductEntity implements Serializable {
     private Long storeId;
 
     /**
-     * 匯入任務 ID（02 §9.4）
-     * NULLABLE — 一般 CreateProduct 寫 NULL；經 Product Import Service 轉正才寫入，用於審計線索。
-     * 對應 V4__add_product_import_origin_columns.sql。
-     */
-    @TableField(updateStrategy = FieldStrategy.NEVER)
-    private Long importJobId;
-
-    /**
-     * 匯入暫存 item ID（02 §9.4）
-     * NULLABLE — 同 importJobId，由 Import Service 在 commit 階段傳入，記錄「此正式商品從哪 CSV row 轉正而來」。
-     */
-    @TableField(updateStrategy = FieldStrategy.NEVER)
-    private Long importItemId;
-
-    /**
      * 圖片項目結構
      */
     @Data

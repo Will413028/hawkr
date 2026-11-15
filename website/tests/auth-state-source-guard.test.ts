@@ -16,7 +16,7 @@ function sourceFiles(dir: string): string[] {
 	});
 }
 
-const ROOTS = ["app", "components", "features", "lib", "stories"];
+const ROOTS = ["app", "components", "features", "lib"];
 
 test("no source reintroduces an isLoggedIn boolean", () => {
 	const offenders = ROOTS.flatMap(sourceFiles).filter((file) =>

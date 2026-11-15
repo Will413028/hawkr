@@ -288,15 +288,14 @@ Java 側 gRPC channel 有**唯一工廠**：`GrpcChannelRegistry.buildChannel()`
 | coupon | aftersales, crm, order | ★ |
 | crm | buyer | |
 | im | social | |
-| media | aftersales, ai, buyer, content, im, order, product, product-import, review, seller, shipping, social | ★ |
+| media | aftersales, ai, buyer, content, im, order, product, review, seller, shipping, social | ★ |
 | notification | （僅 gateway） | |
 | order | aftersales, ai, buyer, coupon, crm, im, payment, review, seller, shipping | ★ |
 | payment | aftersales, order | ★ |
-| product | ai, buyer, cart, order, product-import, seller, social | ★★ |
-| product-import | （僅 gateway） | |
+| product | ai, buyer, cart, order, seller, social | ★★ |
 | review | seller, social | |
 | seller | aftersales, ai, buyer, cart, coupon, im, order, product, shipping, social | ★★ |
-| shipping | aftersales, order, product, product-import,（payuni-webhook＝**僅 dev/local sim**） | ★ |
+| shipping | aftersales, order, product,（payuni-webhook＝**僅 dev/local sim**） | ★ |
 | social | seller | |
 
 > **payuni-webhook 特例**：其唯一 gRPC 出站（→shipping）僅 `WebhookSimulatorController` 在 `APP_ENV∈{dev,local}` 啟用（prod 403）；**prod 無任何 payuni-webhook gRPC 出站**（真 webhook 走 MQ）。故 shipping ingress 的 payuni-webhook caller **僅 dev 需放行**，prod 可省。
@@ -353,7 +352,7 @@ apply 之後要 `kubectl rollout restart` 呼叫端：gRPC channel 在連線失�
 | order `GetOrderForShipping(Internal)` → recipientName/phone/address | 收件人 PII | 內部全域讀（shipping 讀所有賣家訂單） | 僅 orderNo 定位單筆；靠 HMAC+netpol（只 shipping/order 可達），不回整表 |
 | order `getBuyerMerchantSummary`（caller = **coupon-service** `getBuyerMemberSellerIds`） | 買家消費彙總 | 內部 scoped 讀 | 要求 `buyerId > 0`，缺/0 直接拒（`INVALID_ARGUMENT`） |
 | order `getBuyerOrdersForSeller`（caller = **gateway** seller CRM 使用者面 + **單體**（accountdeletion 經 `internal/legacy/orderservice`）內部面） | 買家在某商家的訂單 | 雙 caller（見下） | 要求 `storeId>0 && buyerId>0`，查詢恆以 (storeId,buyerId) scope |
-| shipping `getShipmentsByOrderNos` / `getShipmentByOrderNo` | 出貨/物流資訊 | 內部全域讀（by orderNo） | 靠 HMAC+netpol（只 order/aftersales/product/product-import 等合法 caller 可達） |
+| shipping `getShipmentsByOrderNos` / `getShipmentByOrderNo` | 出貨/物流資訊 | 內部全域讀（by orderNo） | 靠 HMAC+netpol（只 order/aftersales/product 等合法 caller 可達） |
 | aftersales `hasActiveCase` / `cancelActiveCaseOnConfirmReceipt`（caller = order 完成/售後鏈） | 售後案件狀態 | 內部全域讀 | 靠 HMAC+netpol（只 order 可達） |
 
 **`getBuyerOrdersForSeller` 雙軌授權**：此 RPC 同時接受「使用者面（gateway，帶 seller 身分 + gateway-resolved storeId、無 internal sig）」與「內部面（單體，有 internal sig）」。server 端本無 `requireAccountType`、純 param-scope 查詢（XML 已 `store_id=#{sellerId} AND buyer_id != #{sellerId}` scope），本層只把 internal 判定從明文改成驗簽、並加 `storeId/buyerId>0` 校驗，**行為不變**。維持單一 RPC 雙軌是預期設計，不拆兩支。gateway seller CRM 路徑的 IDOR 回歸以 `gateway/internal/handler/seller_crm_idor_test.go` 兜底。

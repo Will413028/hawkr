@@ -3,6 +3,7 @@ import {
 	seedStoredActiveRole,
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 const PATH = "/account/messages/assistant/demo";
 const PROCUREMENT_PATH = "/account/messages/assistant/procurement";
@@ -219,7 +220,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
 
-		const response = await page.goto(PATH, { waitUntil: "domcontentloaded" });
+		const response = await gotoStreamed(page, PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const workspace = page.locator('[data-assistant-mode="live"]');
@@ -515,7 +516,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
-		const response = await page.goto(PATH, { waitUntil: "domcontentloaded" });
+		const response = await gotoStreamed(page, PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const textarea = page.locator("#procurement-clarify-input");
@@ -692,7 +693,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
-		const response = await page.goto(PATH, { waitUntil: "domcontentloaded" });
+		const response = await gotoStreamed(page, PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const textarea = page.locator("#procurement-clarify-input");
@@ -780,9 +781,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
-		const response = await page.goto(PROCUREMENT_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, PROCUREMENT_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const textarea = page.locator("#procurement-clarify-input");
@@ -918,9 +917,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
-		const response = await page.goto(PROCUREMENT_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, PROCUREMENT_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const textarea = page.locator("#procurement-clarify-input");
@@ -1084,9 +1081,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
-		const response = await page.goto(PROCUREMENT_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, PROCUREMENT_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const textarea = page.locator("#procurement-clarify-input");
@@ -1240,9 +1235,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
-		const response = await page.goto(PROCUREMENT_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, PROCUREMENT_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const textarea = page.locator("#procurement-clarify-input");
@@ -1324,9 +1317,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
-		const response = await page.goto(PROCUREMENT_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, PROCUREMENT_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const textarea = page.locator("#procurement-clarify-input");
@@ -1441,9 +1432,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
-		const response = await page.goto(PROCUREMENT_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, PROCUREMENT_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const textarea = page.locator("#procurement-clarify-input");
@@ -1525,9 +1514,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
-		const response = await page.goto(PROCUREMENT_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, PROCUREMENT_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const textarea = page.locator("#procurement-clarify-input");
@@ -1647,9 +1634,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
-		const response = await page.goto(PROCUREMENT_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, PROCUREMENT_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const textarea = page.locator("#procurement-clarify-input");
@@ -1751,9 +1736,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
-		const response = await page.goto(PROCUREMENT_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, PROCUREMENT_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const textarea = page.locator("#procurement-clarify-input");
@@ -1834,9 +1817,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 			[HANDOFF_STORAGE_KEY, "企業送禮水果盒"] as const,
 		);
 
-		const response = await page.goto(PROCUREMENT_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, PROCUREMENT_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const textarea = page.locator("#procurement-clarify-input");
@@ -1921,7 +1902,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
 
-		await page.goto(PROCUREMENT_PATH, { waitUntil: "domcontentloaded" });
+		await gotoStreamed(page, PROCUREMENT_PATH);
 		const textarea = page.locator("#procurement-clarify-input");
 		await textarea.fill("我要訂水果禮盒");
 		await page.getByRole("button", { name: "送出" }).click();
@@ -2007,7 +1988,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
-		await page.goto(PROCUREMENT_PATH, { waitUntil: "domcontentloaded" });
+		await gotoStreamed(page, PROCUREMENT_PATH);
 		const textarea = page.locator("#procurement-clarify-input");
 		await textarea.fill("我要番茄");
 		await page.getByRole("button", { name: "送出", exact: true }).click();
@@ -2209,9 +2190,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
-		const response = await page.goto(PROCUREMENT_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, PROCUREMENT_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const textarea = page.locator("#procurement-clarify-input");

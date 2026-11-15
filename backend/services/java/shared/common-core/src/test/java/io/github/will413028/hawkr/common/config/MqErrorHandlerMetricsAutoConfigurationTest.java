@@ -3,11 +3,14 @@ package io.github.will413028.hawkr.common.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.actuate.autoconfigure.metrics.CompositeMeterRegistryAutoConfiguration;
 import org.springframework.boot.actuate.autoconfigure.metrics.MetricsAutoConfiguration;
 import org.springframework.boot.actuate.autoconfigure.metrics.export.simple.SimpleMetricsExportAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 /**
@@ -32,6 +35,22 @@ class MqErrorHandlerMetricsAutoConfigurationTest {
     @Test
     void skipsBinderWhenNoMeterRegistryExists() {
         runner.withConfiguration(AutoConfigurations.of(MqErrorHandlerMetricsAutoConfiguration.class))
+                .run(ctx -> assertThat(ctx).doesNotHaveBean("mqErrorHandlerMeterRegistryBinder"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "com.rabbitmq.client",
+            "org.springframework.amqp.core",
+            "org.springframework.amqp"
+    })
+    void backsOffWhenAnyClassUsedByMqErrorHandlerIsAbsent(String filteredPackage) {
+        runner.withClassLoader(new FilteredClassLoader(filteredPackage))
+                .withConfiguration(AutoConfigurations.of(
+                        MqErrorHandlerMetricsAutoConfiguration.class,
+                        MetricsAutoConfiguration.class,
+                        CompositeMeterRegistryAutoConfiguration.class,
+                        SimpleMetricsExportAutoConfiguration.class))
                 .run(ctx -> assertThat(ctx).doesNotHaveBean("mqErrorHandlerMeterRegistryBinder"));
     }
 }

@@ -26,21 +26,14 @@ public class MediaAssetEntity implements Serializable {
 
     /**
      * 真實登入帳號 ID（一般買/賣家/後台上傳者），透過 createMediaAsset 寫入。
-     * 系統直傳（serverUploadAndFinalize）或匯入轉正（見 importStoreId）皆為 NULL。
+     * 系統直傳（serverUploadAndFinalize）為 NULL。
      */
     private Long uploaderAccountId;
 
     /**
-     * 賣家 store_id，僅透過 CSV/URL 商品匯入管線轉正（ImportAssetService.commitFinalize）寫入。
-     * 其餘來源皆為 NULL。
-     */
-    private Long importStoreId;
-
-    /**
      * issue #3149：原始檔名（顯示用，非定址鍵）。
      *
-     * <p>一般上傳於 Finalize 時由 upload_session 複製；兩支後端直傳取 RPC 參數；
-     * 商品匯入依 source_type 解析（設計書 08 §4.9.2）。NULL 時讀取端回退至
+     * <p>一般上傳於 Finalize 時由 upload_session 複製；兩支後端直傳取 RPC 參數。NULL 時讀取端回退至
      * object_key 尾段。
      */
     private String originalFilename;

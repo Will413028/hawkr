@@ -167,7 +167,7 @@ test("auth login owner preserves the exact unlayered semantic CSS", () => {
 	// OAuth buttons, role tabs and cascade are intact.
 	assert.equal(
 		semanticDigest(authLogin),
-		"4470ca3983d9da7899e7c2a01ddd4237c7781037cc5208cb29dc3a3ff5af796b",
+		"5dc86390d29446348d460dc684dedf84d27e361a59f92a370b8c90dabf4a91da",
 	);
 	assert.deepEqual(inventory(authLogin), {
 		styleRules: 33,
@@ -238,7 +238,7 @@ test("LoginShell is the only synchronous auth stylesheet owner", () => {
 
 	const loginShell = source("features/auth/components/login/LoginShell.tsx");
 	assert.match(loginShell, /^import "@\/styles\/features\/auth-login\.css";/);
-	assert.match(loginShell, /<main className="hkui-login">/);
+	assert.match(loginShell, /<div className="hkui-login">/);
 
 	for (const screen of ["features/auth/screens/login/LoginPage.tsx"]) {
 		const contents = source(screen);

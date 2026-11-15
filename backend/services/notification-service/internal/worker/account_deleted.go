@@ -126,3 +126,18 @@ func newAccountDeletedHandler(inboxUC *usecase.NotificationInboxUseCase, logger 
 		return nil
 	})
 }
+
+// staticSubscriptions are the subscriptions that are not template-driven: they
+// scrub chat-notification inbox rows for a closed buyer stint (buyer.deleted), a
+// deleted account (account.deleted) and a closed seller stint (seller.deleted),
+// and soft-delete the retired stint's own inbox rows. The three legs are all
+// needed — see buyerDeletedSubscription and accountDeletedSubscription above for
+// why. startConsumer appends exactly this set, and the route checks in tests read
+// it from here.
+func staticSubscriptions(inboxUC *usecase.NotificationInboxUseCase, logger *zap.Logger) []mq.Subscription {
+	return []mq.Subscription{
+		buyerDeletedSubscription(inboxUC, logger),
+		accountDeletedSubscription(inboxUC, logger),
+		sellerDeletedSubscription(inboxUC, logger),
+	}
+}

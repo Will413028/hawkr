@@ -12,7 +12,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
  * and the exits add the reader's language prefix once. A page that goes around an exit works in zh-TW and
  * silently drops an English reader into the zh-TW site, so the exits are fenced here, by source.
  */
-const SOURCE_DIRS = ["app", "components", "features", "i18n", "lib", "stories"];
+const SOURCE_DIRS = ["app", "components", "features", "i18n", "lib"];
 
 /** Files that may do what the rule forbids elsewhere, with the reason it is safe there. */
 const ALLOWED = {

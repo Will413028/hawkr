@@ -365,9 +365,9 @@ MediaService,ServerUploadAndFinalize,media-service,
 MediaService,ServerUploadSecureAndFinalize,media-service,
 MediaService,ServerReadSecureAsset,media-service,
 MediaService,BatchGetAssetMetadata,media-service,
-MediaService,ImportDownloadAsset,media-service,
-MediaService,FinalizeImportAsset,media-service,
-MediaService,BindStagedAsset,media-service,
+MediaService,ImportDownloadAsset,media-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+MediaService,FinalizeImportAsset,media-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+MediaService,BindStagedAsset,media-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 MembershipBillingService,CreateMembershipSubscription,payment-service,
 MembershipBillingService,SuspendMembershipSubscription,payment-service,
 MembershipBillingService,RestartMembershipSubscription,payment-service,
@@ -471,24 +471,24 @@ PricebookService,ResolveCategoryMapping,pricebook-service,removed: 行情、預�
 PricebookService,UpsertCategoryMapping,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，執行計畫 2026-10-27-ecommerce-scope-cut 已刪除）
 PricebookService,ListCategoryMappingWorklist,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，執行計畫 2026-10-27-ecommerce-scope-cut 已刪除）
 PricebookService,GetCategoryPriceRollup,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，執行計畫 2026-10-27-ecommerce-scope-cut 已刪除）
-ProductImportService,CreateImportJob,product-import-service,
-ProductImportService,ReuploadImportJobCsv,product-import-service,
-ProductImportService,ListImportJobs,product-import-service,
-ProductImportService,GetImportJob,product-import-service,
-ProductImportService,GetImportJobPreviewListing,product-import-service,
-ProductImportService,CancelImportJob,product-import-service,
-ProductImportService,CommitImportJob,product-import-service,
-ProductImportService,ListImportItems,product-import-service,
-ProductImportService,GetImportItem,product-import-service,
-ProductImportService,GetImportItemPreview,product-import-service,
-ProductImportService,UpdateImportItem,product-import-service,
-ProductImportService,RemoveImportItems,product-import-service,
-ProductImportService,RestoreImportItems,product-import-service,
-ProductImportService,RetryImportItemAssets,product-import-service,
-ProductImportService,BatchUpdateItemsShipping,product-import-service,
-ProductImportService,BatchUpdateItemsTargetStatus,product-import-service,
-ProductImportService,BatchUpdateItemsCategory,product-import-service,
-ProductImportService,GetCategoryConfirmationToken,product-import-service,
+ProductImportService,CreateImportJob,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,ReuploadImportJobCsv,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,ListImportJobs,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,GetImportJob,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,GetImportJobPreviewListing,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,CancelImportJob,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,CommitImportJob,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,ListImportItems,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,GetImportItem,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,GetImportItemPreview,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,UpdateImportItem,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,RemoveImportItems,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,RestoreImportItems,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,RetryImportItemAssets,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,BatchUpdateItemsShipping,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,BatchUpdateItemsTargetStatus,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,BatchUpdateItemsCategory,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductImportService,GetCategoryConfirmationToken,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 ProductService,CreateProduct,product-service,
 ProductService,UpdateProduct,product-service,
 ProductService,GetProduct,product-service,
@@ -528,11 +528,11 @@ ProductService,GetPopularHashtags,product-service,
 ProductService,GetPublicOriginsSummary,product-service,
 ProductService,GetPublicSellerCitiesSummary,product-service,
 ProductService,ListStoreIDsWithPublicProductsInternal,product-service,
-ProductService,ValidateLeafCategoryInternal,product-service,
-ProductService,CreateProductFromImportInternal,product-service,
-ProductService,BatchCheckSellerProductNames,product-service,
-ProductService,ValidateProductDraft,product-service,
-ProductService,GetProductsBriefInternal,product-service,
+ProductService,ValidateLeafCategoryInternal,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductService,CreateProductFromImportInternal,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductService,BatchCheckSellerProductNames,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductService,ValidateProductDraft,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+ProductService,GetProductsBriefInternal,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 RecommendationService,PersonalizedRecommend,ai-service,
 ReviewService,GetProductReviews,review-service,
 ReviewService,GetReview,review-service,

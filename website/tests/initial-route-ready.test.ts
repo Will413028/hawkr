@@ -72,10 +72,6 @@ test("role-zone markers come from the access table, account pages included", () 
 	assert.deepEqual(routeContentReadySelectors("/checkout/pay"), [
 		'[data-hk-role-zone-ready="buyer"]',
 	]);
-	assert.deepEqual(
-		routeContentReadySelectors("/seller-product-import-preview/job-1"),
-		['[data-hk-role-zone-ready="seller"]'],
-	);
 	// Public and onboarding pages under /seller wait for no role zone.
 	assert.deepEqual(routeContentReadySelectors("/seller/pricing"), []);
 	assert.deepEqual(routeContentReadySelectors("/seller/onboarding"), []);

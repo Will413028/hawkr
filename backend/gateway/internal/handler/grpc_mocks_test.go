@@ -355,28 +355,6 @@ func (m *mockProductServiceClient) ListStoreIDsWithPublicProductsInternal(ctx co
 	return nil, nil
 }
 
-// ===== product-import 服務內部用 RPC（02 §9.1 / §9.2 / §9.x，#40 PR2 新增） =====
-
-func (m *mockProductServiceClient) ValidateLeafCategoryInternal(ctx context.Context, in *productpb.ValidateLeafCategoryInternalRequest, opts ...grpc.CallOption) (*productpb.ValidateLeafCategoryInternalResponse, error) {
-	return nil, nil
-}
-
-func (m *mockProductServiceClient) CreateProductFromImportInternal(ctx context.Context, in *productpb.CreateProductFromImportInternalRequest, opts ...grpc.CallOption) (*productpb.CreateProductFromImportInternalResponse, error) {
-	return nil, nil
-}
-
-func (m *mockProductServiceClient) BatchCheckSellerProductNames(ctx context.Context, in *productpb.BatchCheckSellerProductNamesRequest, opts ...grpc.CallOption) (*productpb.BatchCheckSellerProductNamesResponse, error) {
-	return nil, nil
-}
-
-func (m *mockProductServiceClient) ValidateProductDraft(ctx context.Context, in *productpb.ValidateProductDraftRequest, opts ...grpc.CallOption) (*productpb.ValidateProductDraftResponse, error) {
-	return nil, nil
-}
-
-func (m *mockProductServiceClient) GetProductsBriefInternal(ctx context.Context, in *productpb.GetProductsBriefInternalRequest, opts ...grpc.CallOption) (*productpb.GetProductsBriefInternalResponse, error) {
-	return nil, nil
-}
-
 // ---- 商品認證申請與審核（19 號設計書 §10.1）----
 
 func (m *mockProductServiceClient) SubmitProductCertification(ctx context.Context, in *productpb.SubmitProductCertificationRequest, opts ...grpc.CallOption) (*productpb.ProductCertificationApplicationResponse, error) {

@@ -5186,7 +5186,7 @@ sequenceDiagram
 
 #### 8.1.1 Tx 載體規定（強制）
 
-本規定為 aftersales-service 獨立適用，並與 40 號 Product Import Service 設計書「§2.5 狀態更新落地規範 — Tx 載體規定」屬同一類規範模式（同 root cause：Spring AOP CGLIB proxy 不攔截 self-invocation）。兩服務情境不同（aftersales 為 MQ Listener，product-import 為 gRPC handler），各自獨立適用。
+本規定為 aftersales-service 獨立適用（root cause：Spring AOP CGLIB proxy 不攔截 self-invocation）。
 
 - 短 tx 落地（§5.4.3 ATM webhook 成功 / 同步受理 / 失敗 revert / CC FAILED 旁路 enrich）**必須以 `TransactionTemplate.execute(...)` 程式式包覆**。**禁止**將 `@Transactional` 標於同 class private/protected 方法上、或從同 class 內部 `this.method(...)` 直接 call 的 method 上 — Spring AOP CGLIB proxy 不攔截 self-invocation → annotation 失效 → 任何 mid-flight throw 不會 rollback，造成 `refund_tasks` 已 UPDATE 但 `aftersale_cases` / `seller_cancel_requests` 未推進、`audit_log` 未補的破壞性副作用（INV-3 / INV-4 違反）
 - 由 gRPC handler 外部 entry 呼叫的 `public` 方法才可保留 `@Transactional`（透過 proxy 攔截生效）；**MQ Listener 外層方法即使為 `public` 也不標**（含 `channel.basicAck` 與 `MqErrorHandler.handleFailure` 等 MQ 協議操作，不應在 DB tx 範圍內，詳見下段 MQ Listener 規定）

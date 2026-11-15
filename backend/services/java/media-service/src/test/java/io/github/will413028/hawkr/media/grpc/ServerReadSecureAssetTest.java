@@ -10,7 +10,6 @@ import io.github.will413028.hawkr.media.repository.AssetReferenceRepository;
 import io.github.will413028.hawkr.media.repository.MediaAssetRepository;
 import io.github.will413028.hawkr.media.repository.UploadSessionRepository;
 import io.github.will413028.hawkr.media.service.AssetReferenceService;
-import io.github.will413028.hawkr.media.service.ImportAssetService;
 import io.github.will413028.hawkr.media.service.MediaAssetService;
 import io.github.will413028.hawkr.media.service.MediaUploadValidator;
 import io.github.will413028.hawkr.media.service.StagedTokenService;
@@ -103,8 +102,7 @@ class ServerReadSecureAssetTest {
                 mediaAssetService,
                 assetReferenceService,
                 mock(MediaAssetConverter.class),
-                mock(UploadSessionService.class),
-                mock(ImportAssetService.class));
+                mock(UploadSessionService.class));
     }
 
     // ==================== fixtures ====================

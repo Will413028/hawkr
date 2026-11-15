@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { canonicalSellerSegment } from "./helpers/canonical-seller";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 async function publicCatalogHasProducts(
 	request: import("@playwright/test").APIRequestContext,
@@ -59,7 +60,7 @@ test("product quick-view exits to the top of the seller storefront", {
 		"public catalog legitimately empty",
 	);
 
-	await page.goto("/market/products", { waitUntil: "domcontentloaded" });
+	await gotoStreamed(page, "/market/products");
 	await expect(
 		page.locator('[data-hk-market-products-hydrated="true"]'),
 	).toBeAttached();

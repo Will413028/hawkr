@@ -19,7 +19,7 @@ Snapshot: backend at monorepo HEAD `6c8bc0c15` (clean tree), analysed 2026-09-24
 - Built by hand from these sources:
   - absolute URLs in non-test source and config (after excluding docs, reference CSVs and node_modules);
   - third-party SDKs in go.mod and pom.xml (openai-go, genai/adk, firebase, aws-sdk s3, google api idtoken, payuni-java-client, okhttp);
-  - outbound HTTP call sites (`http.NewRequest*`, OkHttp, `java.net.http`, RestTemplate, SafeFetcher, S3Client);
+  - outbound HTTP call sites (`http.NewRequest*`, OkHttp, `java.net.http`, RestTemplate, S3Client);
   - the `internal/client/<vendor>` directories.
 - Shared-package clients (`pkg/sms`, `pkg/geocode`, `pkg/mail`, `pkg/revalidate`, `pkg/payuni`) are credited to the modules that import and wire them.
 - First-party web revalidate and edge workers/serverless are included but labelled as such.

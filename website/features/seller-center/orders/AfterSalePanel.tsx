@@ -3,6 +3,7 @@
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Link from "@/components/shared/Link";
+import { ScrollableTableRegion } from "@/components/shared/ScrollableTableRegion";
 import { AfterSaleDecisionDrawer } from "@/features/after-sales/components/AfterSaleDecisionDrawer";
 import {
 	AFTER_SALE_APPEAL_NEXT_STEP,
@@ -255,7 +256,7 @@ export function AfterSalePanel({
 			</div>
 
 			<div className="seller-orders__card seller-orders__desktop-view">
-				<div className="seller-orders__table-wrap">
+				<ScrollableTableRegion label="售後案件表格">
 					<table className="seller-orders__table seller-orders__table--aftersale">
 						<thead>
 							<tr>
@@ -354,7 +355,7 @@ export function AfterSalePanel({
 							)}
 						</tbody>
 					</table>
-				</div>
+				</ScrollableTableRegion>
 			</div>
 
 			<section
