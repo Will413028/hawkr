@@ -12,9 +12,10 @@ import (
 
 const (
 	// drainTimeout 是關機後處理中的訊息還能跑的時間：handler 的 context 不隨關機取消，關機滿 drainTimeout 才取消。
+	// 平常運作不設上限，handler 的逾時由它自己的呼叫負責。
 	drainTimeout = 5 * time.Second
-	// drainWait 是 runOnce 等消費者結束的上限，比 drainTimeout 多留 ack 或 nack 的時間。
-	drainWait = drainTimeout + time.Second
+	// ackMargin 是 handler 被取消後留給 ack 或 nack 的時間。
+	ackMargin = time.Second
 	// closeTimeout 是關閉連線時等 broker 回應的上限；關連線會取消其上的消費者，未 ack 的預取訊息由 broker 放回 queue。
 	closeTimeout = 5 * time.Second
 )
@@ -27,7 +28,7 @@ type Binding struct {
 // Run 訂閱 durable queue，連線中斷後重新宣告；永久錯誤送 dead-letter queue。
 func Run(ctx context.Context, url string, bindings []Binding, isPermanent func(error) bool, log *slog.Logger) {
 	for ctx.Err() == nil {
-		if err := runOnce(ctx, url, bindings, isPermanent, log); err != nil && ctx.Err() == nil {
+		if err := runOnce(ctx, url, bindings, isPermanent, log, drainTimeout); err != nil && ctx.Err() == nil {
 			log.ErrorContext(ctx, "rabbitmq：RabbitMQ 連線或消費失敗", "error", err)
 		}
 		select {
@@ -38,18 +39,23 @@ func Run(ctx context.Context, url string, bindings []Binding, isPermanent func(e
 	}
 }
 
-func runOnce(ctx context.Context, url string, bindings []Binding, isPermanent func(error) bool, log *slog.Logger) error {
+// runOnce 消費到 ctx 取消（關機）或連線、channel 出錯為止。不論哪一種，都先讓每個消費者停止取新訊息、等處理中的跑完，
+// 才關連線：返回時沒有 handler 還在執行。handler 拿到的 context 只在關機滿 drain 後取消；因出錯而結束時連線已不可用，
+// 等滿 drain 就關，未 ack 的訊息由 broker 重送。
+func runOnce(ctx context.Context, url string, bindings []Binding, isPermanent func(error) bool, log *slog.Logger, drain time.Duration) error {
 	conn, err := amqp.DialConfig(url, amqp.Config{Dial: amqp.DefaultDial(5 * time.Second)})
 	if err != nil {
 		return fmt.Errorf("連線：%w", err)
 	}
-	// 不論因關機、斷線或某個 delivery channel 關閉而結束，都先讓每個消費者停止取新訊息、等處理中的跑完，才關連線：
-	// runOnce 返回時沒有 handler 還在執行。
+	handlerCtx, cancelHandlers := context.WithCancel(context.WithoutCancel(ctx))
+	stopDrainTimer := context.AfterFunc(ctx, func() { time.AfterFunc(drain, cancelHandlers) })
 	stop, cancel := context.WithCancel(ctx)
 	var consumers sync.WaitGroup
 	defer func() {
 		cancel()
-		waitTimeout(&consumers, drainWait)
+		waitTimeout(&consumers, drain+ackMargin)
+		stopDrainTimer()
+		cancelHandlers()
 		_ = conn.CloseDeadline(time.Now().Add(closeTimeout))
 	}()
 	errors := make(chan error, len(bindings))
@@ -100,7 +106,12 @@ func runOnce(ctx context.Context, url string, bindings []Binding, isPermanent fu
 					if stop.Err() != nil {
 						return
 					}
-					Process(stop, d, b, isPermanent, log)
+					if !Process(handlerCtx, d, b, isPermanent, log) {
+						select {
+						case <-stop.Done():
+						case <-time.After(time.Second):
+						}
+					}
 				}
 			}
 		})
@@ -123,37 +134,24 @@ func waitTimeout(wg *sync.WaitGroup, d time.Duration) {
 	}
 }
 
-// Process 處理一則訊息並 ack 或 nack。ctx 是關機訊號：handler 的 context 在 ctx 取消後再過 drainTimeout 才取消，處理中的
-// 訊息能跑完並 ack；ctx 也決定暫時失敗後要不要等一秒再接下一則。
-func Process(ctx context.Context, delivery amqp.Delivery, binding Binding, isPermanent func(error) bool, log *slog.Logger) {
-	hctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	defer cancel()
-	stopAfter := context.AfterFunc(ctx, func() {
-		select {
-		case <-time.After(drainTimeout):
-			cancel()
-		case <-hctx.Done():
-		}
-	})
-	defer stopAfter()
-	if err := binding.Handle(hctx, delivery.Body); err != nil {
+// Process 以 ctx 執行 handler 並 ack 或 nack，回傳是否成功（永久錯誤送 DLQ 也算處理完）；暫時失敗時 nack 放回 queue，
+// 由呼叫端決定要不要等一下再接下一則。
+func Process(ctx context.Context, delivery amqp.Delivery, binding Binding, isPermanent func(error) bool, log *slog.Logger) bool {
+	if err := binding.Handle(ctx, delivery.Body); err != nil {
 		log.ErrorContext(ctx, "rabbitmq：處理事件失敗", "queue", binding.Queue, "error", err)
 		if isPermanent(err) {
 			if nackErr := delivery.Nack(false, false); nackErr != nil {
 				log.ErrorContext(ctx, "rabbitmq：送無效事件到 DLQ 失敗", "error", nackErr)
 			}
-			return
+			return true
 		}
 		if err := delivery.Nack(false, true); err != nil {
 			log.ErrorContext(ctx, "rabbitmq：nack 失敗", "error", err)
 		}
-		select {
-		case <-ctx.Done():
-		case <-time.After(time.Second):
-		}
-		return
+		return false
 	}
 	if err := delivery.Ack(false); err != nil {
 		log.ErrorContext(ctx, "rabbitmq：ack 失敗", "error", err)
 	}
+	return true
 }

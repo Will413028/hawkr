@@ -194,3 +194,86 @@ func TestRunDrainsInFlightAndReturnsAfterCancel(t *testing.T) {
 		}
 	}
 }
+
+// 處理中的 handler 不結束時，關機滿 drain 才取消它的 context，runOnce 隨後返回；關機前 handler 的 context 不會被取消。
+func TestRunOnceCancelsHandlerAfterDrain(t *testing.T) {
+	url := startBroker(t)
+	pub, err := New(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = pub.Close() }()
+	admin, err := amqp.Dial(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = admin.Close() })
+	prefix := fmt.Sprintf("drain.%d", time.Now().UnixNano())
+	exchange, queue := prefix+".ex", prefix+".q"
+	t.Cleanup(func() {
+		ch, err := admin.Channel()
+		if err != nil {
+			t.Errorf("清除 %s：%v", exchange, err)
+			return
+		}
+		defer func() { _ = ch.Close() }()
+		_, _ = ch.QueueDelete(queue, false, false, false)
+		_, _ = ch.QueueDelete(queue+".dead", false, false, false)
+		_ = ch.ExchangeDelete(exchange, false, false)
+	})
+
+	started := make(chan struct{}, 1)
+	cancelledAt := make(chan time.Time, 1)
+	handle := func(ctx context.Context, _ []byte) error {
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		<-ctx.Done()
+		select {
+		case cancelledAt <- time.Now():
+		default:
+		}
+		return ctx.Err()
+	}
+	const drain = 300 * time.Millisecond
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = runOnce(ctx, url, []Binding{{Queue: queue, Exchange: exchange, Key: "k", Handle: handle}}, func(error) bool { return false },
+			slog.New(slog.NewTextHandler(io.Discard, nil)), drain)
+	}()
+	waitFor(t, "handler 開始執行", func() bool {
+		if err := pub.Publish(context.Background(), exchange, "k", []byte("x")); err != nil {
+			return false
+		}
+		select {
+		case <-started:
+			return true
+		case <-time.After(200 * time.Millisecond):
+			return false
+		}
+	})
+	select {
+	case at := <-cancelledAt:
+		t.Fatalf("關機前 handler 的 context 就被取消了（%v）", at)
+	case <-time.After(drain * 2):
+	}
+	shutdownAt := time.Now()
+	cancel()
+	select {
+	case at := <-cancelledAt:
+		// 下限：關機不能直接取消 handler；上限：是 drain 計時取消的，不是等消費者逾時後的收尾取消。
+		if d := at.Sub(shutdownAt); d < drain || d >= drain+ackMargin/2 {
+			t.Fatalf("handler 在關機後 %v 被取消，要在 [%v, %v) 內", d, drain, drain+ackMargin/2)
+		}
+	case <-time.After(drain + 2*time.Second):
+		t.Fatal("關機滿 drain 後 handler 的 context 沒有被取消")
+	}
+	select {
+	case <-done:
+	case <-time.After(drain + ackMargin + 2*time.Second):
+		t.Fatal("handler 取消後 runOnce 沒有返回")
+	}
+}
