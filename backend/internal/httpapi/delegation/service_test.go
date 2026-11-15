@@ -29,7 +29,7 @@ import (
 
 const (
 	goodSession = "good-session"
-	storeID    = int64(5)
+	storeID     = int64(5)
 )
 
 // fakeSessions 以憑證回 session；沒有的憑證回模組的「憑證無效」拒絕。
