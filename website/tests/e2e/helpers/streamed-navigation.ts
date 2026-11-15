@@ -9,7 +9,9 @@ import type { Page, Response } from "@playwright/test";
  * staging copy yet, so these helpers resolve only once neither a pending
  * marker nor a staging copy remains. Specs must not pass
  * `waitUntil: "domcontentloaded"` themselves (scripts/check-e2e-streamed-goto.ts).
- * `options.timeout` is one deadline shared by the navigation and the reveal wait.
+ * Without `options.timeout` the navigation and the reveal wait each use their
+ * own Playwright defaults; when it is set, it is one deadline shared by both
+ * (0 means no limit, as in Playwright).
  */
 const STAGING_SELECTOR = 'template[id^="B:"], body > div[hidden][id^="S:"]';
 
@@ -24,7 +26,9 @@ async function waitForStreamReveal(
 	const remaining =
 		timeout === undefined
 			? undefined
-			: Math.max(1, timeout - (Date.now() - startedAt));
+			: timeout === 0
+				? 0
+				: Math.max(1, timeout - (Date.now() - startedAt));
 	try {
 		await page.waitForFunction(
 			(selector) => document.querySelector(selector) === null,
