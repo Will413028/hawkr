@@ -97,7 +97,6 @@ export default function FavoritesClient() {
 							<ScPill
 								key={t}
 								as="button"
-								aria-pressed={tab === t}
 								active={tab === t}
 								disabled={pendingAction !== null}
 								onClick={() => setTab(t)}

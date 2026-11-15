@@ -5,6 +5,7 @@ import AppIcon from "@/components/shared/AppIcon";
 import Avatar from "@/components/shared/Avatar";
 import { useDrawerMutated } from "@/components/shared/Drawer";
 import Link from "@/components/shared/Link";
+import { ScrollableTableRegion } from "@/components/shared/ScrollableTableRegion";
 import Button from "@/components/ui/Button";
 import { formatTaipeiDateTime } from "@/lib/date/taipei";
 import {
@@ -236,7 +237,7 @@ export default function CustomerDetailPanel({ buyerId, summary }: Props) {
 					<h2>購買紀錄</h2>
 					<span>{orderTotal.toLocaleString()} 筆</span>
 				</div>
-				<div className="seller-orders__table-wrap">
+				<ScrollableTableRegion label="購買紀錄表格">
 					<table className="seller-customers__table seller-customers__table--mini">
 						<thead>
 							<tr>
@@ -284,7 +285,7 @@ export default function CustomerDetailPanel({ buyerId, summary }: Props) {
 							)}
 						</tbody>
 					</table>
-				</div>
+				</ScrollableTableRegion>
 			</div>
 		</div>
 	);

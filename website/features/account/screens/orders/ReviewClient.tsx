@@ -68,6 +68,7 @@ export default function ReviewClient({ orderNo }: { orderNo: string }) {
 	if (loading && !order) {
 		return (
 			<div>
+				<h1 className="sr-only">評價商品</h1>
 				<p>載入中…</p>
 			</div>
 		);

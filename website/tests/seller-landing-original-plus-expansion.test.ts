@@ -10,7 +10,9 @@ function source(relativePath: string) {
 test("seller landing adds Scroll World before the untouched original story", () => {
 	const landing = source("features/seller/landing/SellerLandingPage.tsx");
 	const openingIndex = landing.indexOf("<SellerRecruitmentScrollWorld");
-	const mainIndex = landing.indexOf('key="seller-landing"');
+	const mainIndex = landing.search(
+		/<div\s+key="seller-landing"\s+className=\{`seller-onboarding hkh-page/,
+	);
 	const originalHeroIndex = landing.indexOf(
 		'className="seller-hero seller-snap-section"',
 	);

@@ -50,6 +50,7 @@ export default function ReturnClient({ orderNo }: { orderNo: string }) {
 	if (loading && !order) {
 		return (
 			<div className="returns-page">
+				<h1 className="sr-only">申請退換貨</h1>
 				<p>載入中…</p>
 			</div>
 		);

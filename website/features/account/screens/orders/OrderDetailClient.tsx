@@ -153,6 +153,7 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 	if (loading && !order) {
 		return (
 			<div>
+				<h1 className="sr-only">訂單詳情</h1>
 				<p>載入中…</p>
 			</div>
 		);

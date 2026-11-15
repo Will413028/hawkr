@@ -154,7 +154,7 @@ test("訊息篩選選取色不被訂單狀態覆寫，焦點框留在膠囊內",
 
 test("空狀態位於寬表格外，不再被 980px 表格撐寬", () => {
 	const wrapAt = workspace.indexOf(
-		'<div className="seller-orders__table-wrap seller-messages__table-wrap">',
+		'className="seller-orders__table-wrap seller-messages__table-wrap"',
 	);
 	const emptyAt = workspace.indexOf("<SellerEmptyState", wrapAt);
 	const tableClassAt = workspace.indexOf(

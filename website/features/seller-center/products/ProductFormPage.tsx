@@ -172,7 +172,6 @@ export default function ProductFormPage({ mode, productId }: Props) {
 						<button
 							type="button"
 							className="product-form__ai-btn"
-							aria-label="AI 助手：開啟 AI 上架助手"
 							onClick={() => setAiOpen(true)}
 						>
 							<SparkleIcon />

@@ -39,6 +39,7 @@ import * as React from "react";
 import Link from "@/components/shared/Link";
 import Pagination from "@/components/shared/Pagination";
 import { ScFilters, ScPill } from "@/components/shared/ScPrimitives";
+import { ScrollableTableRegion } from "@/components/shared/ScrollableTableRegion";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import { useSellerIdentity } from "@/components/shared/useSellerIdentity";
 import Button from "@/components/ui/Button";
@@ -238,7 +239,6 @@ export function SellerInvoiceDocumentsPage() {
 										key={item.value || "all-mode"}
 										as="button"
 										active={mode === item.value}
-										aria-pressed={mode === item.value}
 										onClick={() => setParams({ mode: item.value || null })}
 									>
 										{item.label ||
@@ -253,7 +253,6 @@ export function SellerInvoiceDocumentsPage() {
 										key={item.value || "all-status"}
 										as="button"
 										active={status === item.value}
-										aria-pressed={status === item.value}
 										onClick={() => setParams({ status: item.value || null })}
 									>
 										{item.label ||
@@ -264,7 +263,6 @@ export function SellerInvoiceDocumentsPage() {
 								<ScPill
 									as="button"
 									active={abnormalOnly}
-									aria-pressed={abnormalOnly}
 									onClick={() =>
 										setParams({ abnormal_only: abnormalOnly ? null : "true" })
 									}
@@ -331,7 +329,7 @@ export function SellerInvoiceDocumentsPage() {
 			) : (
 				<>
 					<section className="seller-card">
-						<div className="seller-orders__table-wrap">
+						<ScrollableTableRegion label={recordsLabel}>
 							{/*
 							 * ≥768px 走表格、<768px 走卡片：同一份資料渲染兩份 DOM ＋ Tailwind
 							 * 斷點 `hidden`。`display:none` 讓被隱藏那份不進 accessibility tree，
@@ -406,7 +404,7 @@ export function SellerInvoiceDocumentsPage() {
 									)}
 								</tbody>
 							</table>
-						</div>
+						</ScrollableTableRegion>
 
 						<ul className="m-0 flex list-none flex-col gap-[var(--hkui-space-3)] p-0 md:hidden">
 							{!datesValid ? (

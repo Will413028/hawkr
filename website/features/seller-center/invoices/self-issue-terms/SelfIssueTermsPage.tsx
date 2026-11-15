@@ -257,7 +257,7 @@ export function SelfIssueTermsPage() {
 			{/* 恆在，不得改寫、刪除或摺疊。 */}
 			<p
 				role="status"
-				className="mt-4 p-[12px_14px] rounded-hkui-lg border border-warning-200 bg-warning-50 text-[0.6875rem] leading-relaxed text-warning-700"
+				className="mt-4 p-[12px_14px] rounded-hkui-lg border border-warning-200 bg-warning-50 text-[0.6875rem] leading-relaxed text-hk-ink-800"
 			>
 				{SELF_ISSUE_DEADLINE_NOTICE}
 			</p>

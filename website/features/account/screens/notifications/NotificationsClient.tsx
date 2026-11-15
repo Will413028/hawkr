@@ -278,7 +278,6 @@ function NotificationsContent({
 								key={f.value || "all"}
 								as="button"
 								className="seller-notifications__filter-tab"
-								aria-pressed={filter === f.value}
 								active={filter === f.value}
 								disabled={pendingAction !== null}
 								onClick={() => setFilter(f.value)}

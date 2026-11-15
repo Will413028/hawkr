@@ -315,10 +315,10 @@ function GateBanner({ reason }: { reason: string }) {
 			role="status"
 			className="seller-card mt-4 flex flex-col gap-2 p-5 border border-warning-200 bg-warning-50"
 		>
-			<strong className="text-sm font-extrabold text-warning-700">
+			<strong className="text-sm font-extrabold text-hk-ink-800">
 				{copy.title}
 			</strong>
-			<p className="m-0 text-[0.6875rem] leading-relaxed text-warning-700/90">
+			<p className="m-0 text-[0.6875rem] leading-relaxed text-hk-ink-800">
 				{copy.description}
 			</p>
 			<div className="mt-1">

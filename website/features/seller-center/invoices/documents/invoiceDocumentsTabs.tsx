@@ -40,7 +40,6 @@ export function InvoiceDocumentsTabs({
 					key={item.value}
 					as="button"
 					active={tab === item.value}
-					aria-pressed={tab === item.value}
 					onClick={() => onChange(item.value)}
 				>
 					{item.label}

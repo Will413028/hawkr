@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Avatar from "@/components/shared/Avatar";
+import { ScrollableTableRegion } from "@/components/shared/ScrollableTableRegion";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import {
 	SellerCustomersSkeletonRows,
@@ -345,7 +346,7 @@ export default function CustomersClient() {
 					.filter(Boolean)
 					.join(" ")}
 			>
-				<div className="seller-orders__table-wrap">
+				<ScrollableTableRegion label="顧客表格">
 					<table
 						className="seller-customers__table seller-customers__table--list"
 						data-mobile-layout="cards"
@@ -459,7 +460,7 @@ export default function CustomersClient() {
 							)}
 						</tbody>
 					</table>
-				</div>
+				</ScrollableTableRegion>
 			</div>
 
 			{visible.length > 0 ? (
