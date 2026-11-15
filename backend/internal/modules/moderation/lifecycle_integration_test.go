@@ -153,7 +153,16 @@ func TestASnapshotHoldsItsImageUntilTheSnapshotIsPurged(t *testing.T) {
 	if f.media.HasRef(ref, asset) {
 		t.Fatal("引用由同步 job 寫入，送出的 transaction 內不呼叫 media")
 	}
+	if n := f.jobs.syncJobs(ref); n != 1 {
+		t.Fatalf("送出要在同 transaction 排入快照的同步 job，實際 %d 個", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.media_ref_sync WHERE ref_type = $1 AND ref_id = $2 AND seq > synced_seq", ref.Type, ref.ID); n != 1 {
+		t.Fatal("送出要把快照的 ref 記成待同步")
+	}
 	must(t, f.module.Retention().SyncSnapshotMedia(ctx, snap))
+	if n := f.count(t, "SELECT count(*) FROM moderation.media_ref_sync WHERE ref_type = $1 AND ref_id = $2 AND seq = synced_seq", ref.Type, ref.ID); n != 1 {
+		t.Fatal("同步之後快照的 ref 要結算")
+	}
 	if !f.media.HasRef(ref, asset) {
 		t.Fatalf("同步之後快照要引用圖片：%v", f.media.Referenced(ref))
 	}
@@ -174,6 +183,12 @@ func TestASnapshotHoldsItsImageUntilTheSnapshotIsPurged(t *testing.T) {
 	}
 	if !f.media.HasRef(ref, asset) {
 		t.Fatal("引用只由同步 job 解除，刪快照的 transaction 內不呼叫 media")
+	}
+	if n := f.jobs.syncJobs(ref); n != 2 {
+		t.Fatalf("刪快照要在同 transaction 再排入一個同步 job（共 2 個），實際 %d 個", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.media_ref_sync WHERE ref_type = $1 AND ref_id = $2 AND seq > synced_seq", ref.Type, ref.ID); n != 1 {
+		t.Fatal("刪快照要把快照的 ref 記成待同步")
 	}
 	must(t, f.module.Retention().SyncSnapshotMedia(ctx, snap))
 	if f.media.HasRef(ref, asset) {

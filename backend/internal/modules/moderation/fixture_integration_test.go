@@ -21,6 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -38,16 +39,36 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-type testQueue struct{}
+// testQueue 記錄排入的 job（必須在 transaction 內，與真正的 jobs.Client 相同）。
+type testQueue struct {
+	mu   sync.Mutex
+	args []river.JobArgs
+}
 
-func (testQueue) Enqueue(ctx context.Context, _ river.JobArgs, _ *river.InsertOpts) error {
+func (q *testQueue) Enqueue(ctx context.Context, args river.JobArgs, _ *river.InsertOpts) error {
 	if _, ok := db.TxFrom(ctx); !ok {
 		return errors.New("enqueue outside transaction")
 	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.args = append(q.args, args)
 	return nil
 }
 
-func (testQueue) EnqueueReport(context.Context, river.JobArgs, *river.InsertOpts) (bool, error) {
+// syncJobs 回傳排入的、屬於這個 ref 的 media 同步 job 數。
+func (q *testQueue) syncJobs(ref media.Ref) int {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	n := 0
+	for _, a := range q.args {
+		if s, ok := a.(mediaref.SyncArgs); ok && s.RefType == ref.Type && s.RefID == ref.ID {
+			n++
+		}
+	}
+	return n
+}
+
+func (*testQueue) EnqueueReport(context.Context, river.JobArgs, *river.InsertOpts) (bool, error) {
 	return true, nil
 }
 
@@ -92,6 +113,7 @@ type fixture struct {
 	suspend  *accountsuspension.Module
 	module   *Module
 	media    *media.Fake
+	jobs     *testQueue
 	ids      atomic.Int64
 	mu       sync.Mutex
 	now      time.Time
@@ -122,7 +144,8 @@ func setup(t *testing.T) *fixture {
 	f := &fixture{db: d, now: time.Date(2026, 11, 2, 4, 0, 0, 0, time.UTC)}
 	bus := events.NewBus()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	q := testQueue{}
+	q := &testQueue{}
+	f.jobs = q
 	fm := media.NewFake()
 	f.media = fm
 	fm.Key = func(_, token string) string { return "post/" + token + ".jpg" }
