@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"log/slog"
 	"time"
 	"uuid"
@@ -16,27 +15,23 @@ import (
 )
 
 // newDelegation 建立 delegation 模組，並訂閱事件：identity 撤銷管理員角色的 transaction 內撤銷該管理員進行中的代行（並取消他發起的排程）；
-// social 排程到點發布的 transaction 內寫單段的 SUCCEEDED 稽核，social 代行寫入（PostWrittenByActor）的 transaction 內寫 SUCCEEDED 稽核（所以執行排程 job 的 worker 也要組裝它）；seller 停權或關店的 transaction 內結束該店進行中的代行 session。serve、worker 與 CLI 用同一個組裝，
+// social 排程到點發布的 transaction 內寫單段的 SUCCEEDED 稽核，social 代行寫入（帶代行者的 PostCreated、PostUpdated、PostPublished 等事件，A7-D27）的 transaction 內寫 SUCCEEDED 稽核（所以執行排程 job 的 worker 也要組裝它）；seller 停權或關店的 transaction 內結束該店進行中的代行 session。serve、worker 與 CLI 用同一個組裝，
 // 各條路徑的效果相同。d.Social 是必填，組裝點要先以 delegation.NewScheduleAuthorizer 建 social，再把 social 填進 d。
 func newDelegation(bus *events.Bus, d delegation.Deps) *delegation.Module {
 	d.Events = bus
 	m := delegation.New(d)
 	events.Subscribe(bus, m.OnAdminRoleRevoked)
 	events.Subscribe(bus, m.OnPostPublished)
-	events.Subscribe(bus, m.OnPostWrittenByActor)
+	events.Subscribe(bus, m.OnPostCreated)
+	events.Subscribe(bus, m.OnPostUpdated)
+	events.Subscribe(bus, m.OnPostUnpublished)
+	events.Subscribe(bus, m.OnPostScheduled)
+	events.Subscribe(bus, m.OnPostPublishRepeated)
+	events.Subscribe(bus, m.OnPostUnpublishRepeated)
 	events.Subscribe(bus, m.OnStoreSuspended)
 	events.Subscribe(bus, m.OnStoreClosed)
 	events.Subscribe(bus, m.OnStorePendingDeletion)
 	return m
-}
-
-// requireDelegatedAudit 是啟動檢查：代行寫入的稽核只靠 delegation 對 social 的 PostWrittenByActor 的訂閱（A7-D26），沒有訂閱者時要在啟動就失敗，
-// 不能等到第一個代行寫入才在 transaction 內失敗關閉。
-func requireDelegatedAudit(bus *events.Bus) error {
-	if !events.HasSubscriber[social.PostWrittenByActor](bus) {
-		return errors.New("組裝：沒有 social.PostWrittenByActor 的訂閱者（delegation 的代行寫入稽核沒接上）")
-	}
-	return nil
 }
 
 // newDelegationOffline 是沒有 serve 的組裝（admin-role、delegation-eligibility 子命令）：撤銷角色或資格時 delegation 要取消代行發起的排程，

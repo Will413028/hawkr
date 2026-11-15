@@ -16,17 +16,18 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
 // Owner 是店主的貼文管理、店家範圍的留言與動態數的來源（*social.Module）：店家身分由 handler 以 seller.CurrentStore 推導後交給模組，
 // 賣家能力在模組內檢查（帳號路徑與代行路徑同一個入口），handler 不檢查。
 type Owner interface {
-	CreatePost(ctx context.Context, store seller.Store, in social.CreatePostInput) (social.Post, error)
-	UpdatePost(ctx context.Context, store seller.Store, in social.UpdatePostInput) (social.Post, error)
-	PublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (social.Post, error)
-	UnpublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (social.Post, error)
+	CreatePost(ctx context.Context, store seller.Store, in social.CreatePostInput, actor *delegatedactor.Actor) (social.Post, error)
+	UpdatePost(ctx context.Context, store seller.Store, in social.UpdatePostInput, actor *delegatedactor.Actor) (social.Post, error)
+	PublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64, actor *delegatedactor.Actor) (social.Post, error)
+	UnpublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64, actor *delegatedactor.Actor) (social.Post, error)
 	DeletePost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) error
-	SchedulePost(ctx context.Context, store seller.Store, in social.SchedulePostInput) (social.ScheduledPost, error)
+	SchedulePost(ctx context.Context, store seller.Store, in social.SchedulePostInput, actor *delegatedactor.Actor) (social.ScheduledPost, error)
 	CancelPostSchedule(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (int64, error)
 	ListPendingSchedules(ctx context.Context, storeID int64, after *social.ScheduleCursor, size int32) (social.SchedulePage, error)
 	MyPost(ctx context.Context, store seller.Store, id uuid.UUID) (social.Post, error)
@@ -166,7 +167,7 @@ func (h *App) CreatePost(ctx context.Context, req *connect.Request[pb.CreatePost
 	created, err := h.owner.CreatePost(ctx, st, social.CreatePostInput{
 		Body: msg.GetBody(), ImageToken: msg.GetImageStagedToken(), ProductID: productID, Hashtags: msg.GetHashtagInputs(),
 		Publish: msg.GetPublish(), RequestID: reqID,
-	})
+	}, nil)
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, createPostPaths)
 	}
@@ -252,7 +253,7 @@ func (h *App) UpdatePost(ctx context.Context, req *connect.Request[pb.UpdatePost
 	if err != nil {
 		return nil, err
 	}
-	updated, err := h.owner.UpdatePost(ctx, st, in)
+	updated, err := h.owner.UpdatePost(ctx, st, in, nil)
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, updatePostPaths)
 	}
@@ -264,7 +265,7 @@ func (h *App) UpdatePost(ctx context.Context, req *connect.Request[pb.UpdatePost
 }
 
 // transition 是發布與下架共同的流程：貼文 ID、必填的 etag、店家，再由 do 呼叫模組。
-func (h *App) transition(ctx context.Context, postID, etag string, do func(context.Context, seller.Store, uuid.UUID, int64) (social.Post, error)) (*pb.Post, error) {
+func (h *App) transition(ctx context.Context, postID, etag string, do func(context.Context, seller.Store, uuid.UUID, int64, *delegatedactor.Actor) (social.Post, error)) (*pb.Post, error) {
 	id, err := rpc.ParseUUID("post_id", postID)
 	if err != nil {
 		return nil, err
@@ -277,7 +278,7 @@ func (h *App) transition(ctx context.Context, postID, etag string, do func(conte
 	if err != nil {
 		return nil, err
 	}
-	p, err := do(ctx, st, id, version)
+	p, err := do(ctx, st, id, version, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +339,7 @@ func (h *App) SchedulePost(ctx context.Context, req *connect.Request[pb.Schedule
 	}
 	scheduled, err := h.owner.SchedulePost(ctx, st, social.SchedulePostInput{
 		PostID: id, Version: version, PublishAt: msg.GetPublishTime().AsTime(), By: social.ScheduledBy{Kind: social.ScheduleByOwner},
-	})
+	}, nil)
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, schedulePostPaths)
 	}

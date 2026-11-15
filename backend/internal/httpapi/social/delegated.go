@@ -20,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
 // DelegatedDeclaration 是 SocialDelegatedService 每個方法的代行宣告（API 設計規範（Connect）§二的 Delegated）：需要的代行能力，以及稽核列的動作與資源種類
@@ -51,7 +52,7 @@ func postMethod(c moddelegation.Capability, a moddelegation.AuditAction) moddele
 // DelegationRunner 是 handler 需要的 delegation 公開 API（*delegation.Module）：授權、重送偵測與稽核（DelegatedWrite；不開 transaction，稽核由 social 的事件在 social 自己的 transaction 內寫，A7-D26），與讀取的授權（DelegatedRead）。
 type DelegationRunner interface {
 	DelegatedRead(ctx context.Context, c moddelegation.DelegatedCaller, read func(ctx context.Context, st seller.Store) error) error
-	DelegatedWrite(ctx context.Context, c moddelegation.DelegatedCaller, w moddelegation.DelegatedWrite, do func(ctx context.Context, st seller.Store) error) (moddelegation.DelegatedWriteResult, error)
+	DelegatedWrite(ctx context.Context, c moddelegation.DelegatedCaller, w moddelegation.DelegatedWrite, do func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) error) (moddelegation.DelegatedWriteResult, error)
 }
 
 // DelegatedPosts 是代行讀寫貼文的來源（*social.Module）：與店主同一組方法（店家由 delegation 以 session 的目標店家讀出後交給模組），加上重送時讀回排程時間。
@@ -103,16 +104,16 @@ func postPreview(body string) string {
 	return b
 }
 
-// delegatedWrite 是每個代行寫入共同的流程：交給 delegation 檢查重送與店家、帶著代行者執行 do（social 在自己的 transaction 內發事件，稽核同 transaction 寫入）；重送（do 沒被呼叫）時讀回第一次寫入的貼文目前的樣子。
+// delegatedWrite 是每個代行寫入共同的流程：交給 delegation 檢查重送與店家、帶著代行者（明確的參數，A7-D27）執行 do（social 在自己的 transaction 內發帶代行者的事件，稽核同 transaction 寫入）；重送（do 沒被呼叫）時讀回第一次寫入的貼文目前的樣子。
 // 回傳貼文、店家、稽核列 ID，與排程的發布時間（只有排程）。
 func (h *Delegated) delegatedWrite(ctx context.Context, w moddelegation.DelegatedWrite,
-	do func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error)) (post social.Post, st seller.Store, auditID string, publishAt *time.Time, err error) {
+	do func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) (social.Post, *time.Time, error)) (post social.Post, st seller.Store, auditID string, publishAt *time.Time, err error) {
 	c, err := httpdelegation.CallerFrom(ctx)
 	if err != nil {
 		return social.Post{}, seller.Store{}, "", nil, err
 	}
-	res, err := h.runner.DelegatedWrite(ctx, c, w, func(ctx context.Context, st seller.Store) error {
-		p, at, err := do(ctx, st)
+	res, err := h.runner.DelegatedWrite(ctx, c, w, func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) error {
+		p, at, err := do(ctx, st, actor)
 		if err != nil {
 			return err
 		}
@@ -220,8 +221,8 @@ func (h *Delegated) CreateStorePost(ctx context.Context, req *connect.Request[pb
 	post, st, auditID, _, err := h.delegatedWrite(ctx, moddelegation.DelegatedWrite{
 		Op: op, ResourceName: postPreview(msg.GetBody()),
 		PayloadHash: moddelegation.DelegatedPayloadHash(moddelegation.AuditPostCreate, msg.GetBody(), msg.GetImageStagedToken(), productID, msg.GetHashtagInputs()),
-	}, func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error) {
-		p, err := h.posts.CreatePost(ctx, st, social.CreatePostInput{Body: msg.GetBody(), ImageToken: msg.GetImageStagedToken(), ProductID: productID, Hashtags: msg.GetHashtagInputs()})
+	}, func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) (social.Post, *time.Time, error) {
+		p, err := h.posts.CreatePost(ctx, st, social.CreatePostInput{Body: msg.GetBody(), ImageToken: msg.GetImageStagedToken(), ProductID: productID, Hashtags: msg.GetHashtagInputs()}, actor)
 		return p, nil, err
 	})
 	if err != nil {
@@ -258,8 +259,8 @@ func (h *Delegated) UpdateStorePost(ctx context.Context, req *connect.Request[pb
 	post, st, auditID, _, err := h.delegatedWrite(ctx, moddelegation.DelegatedWrite{
 		Op: op, ResourceID: id.String(), Version: &version,
 		PayloadHash: moddelegation.DelegatedPayloadHash(moddelegation.AuditPostUpdate, in.PostID, in.Version, in.Body, in.ImageToken, in.ClearImage, in.SetProduct, in.ProductID, in.Hashtags),
-	}, func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error) {
-		p, err := h.posts.UpdatePost(ctx, st, in)
+	}, func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) (social.Post, *time.Time, error) {
+		p, err := h.posts.UpdatePost(ctx, st, in, actor)
 		return p, nil, err
 	})
 	if err != nil {
@@ -274,7 +275,7 @@ func (h *Delegated) UpdateStorePost(ctx context.Context, req *connect.Request[pb
 
 // transition 是發布與下架共同的流程：operation、貼文 ID 與必填的 etag，再由 do 呼叫模組。
 func (h *Delegated) transition(ctx context.Context, op *pb.DelegatedOperation, postID, etag string, action moddelegation.AuditAction,
-	do func(context.Context, seller.Store, uuid.UUID, int64) (social.Post, error)) (*pb.Post, string, error) {
+	do func(context.Context, seller.Store, uuid.UUID, int64, *delegatedactor.Actor) (social.Post, error)) (*pb.Post, string, error) {
 	o, err := delegatedOperation(op)
 	if err != nil {
 		return nil, "", err
@@ -289,8 +290,8 @@ func (h *Delegated) transition(ctx context.Context, op *pb.DelegatedOperation, p
 	}
 	post, st, auditID, _, err := h.delegatedWrite(ctx, moddelegation.DelegatedWrite{
 		Op: o, ResourceID: id.String(), Version: &version, PayloadHash: moddelegation.DelegatedPayloadHash(action, id, version),
-	}, func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error) {
-		p, err := do(ctx, st, id, version)
+	}, func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) (social.Post, *time.Time, error) {
+		p, err := do(ctx, st, id, version, actor)
 		return p, nil, err
 	})
 	if err != nil {
@@ -342,8 +343,8 @@ func (h *Delegated) ScheduleStorePost(ctx context.Context, req *connect.Request[
 	post, st, auditID, at, err := h.delegatedWrite(ctx, moddelegation.DelegatedWrite{
 		Op: op, ResourceID: id.String(), Version: &version,
 		PayloadHash: moddelegation.DelegatedPayloadHash(moddelegation.AuditPostSchedule, id, version, publishAt.UTC()),
-	}, func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error) {
-		s, err := h.posts.SchedulePost(ctx, st, social.SchedulePostInput{PostID: id, Version: version, PublishAt: publishAt, By: by})
+	}, func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) (social.Post, *time.Time, error) {
+		s, err := h.posts.SchedulePost(ctx, st, social.SchedulePostInput{PostID: id, Version: version, PublishAt: publishAt, By: by}, actor)
 		sat := s.Schedule.PublishAt
 		return s.Post, &sat, err
 	})

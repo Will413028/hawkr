@@ -17,18 +17,22 @@ func (noSeller) Store(context.Context, int64) (seller.Store, error) { return sel
 
 type noSocial struct{ delegation.Social }
 
-// 代行寫入的稽核只靠 delegation 對 PostWrittenByActor 的訂閱：沒訂閱啟動就要失敗；newDelegation 接上之後通過。
-// 拿掉 newDelegation 裡的 events.Subscribe(bus, m.OnPostWrittenByActor)，這個測試失敗。
-func TestStartupRequiresTheDelegatedAuditSubscriber(t *testing.T) {
+// newDelegation 訂閱 social 每一種貼文寫入事件（代行寫入的稽核靠它們，A7-D27）。「必須有訂閱者」的保證在 events.PublishRequired，不在這裡；
+// 這個測試只確認正式組裝真的接了這些事件。
+func TestNewDelegationSubscribesEveryPostWriteEvent(t *testing.T) {
 	bus := events.NewBus()
-	if err := requireDelegatedAudit(bus); err == nil {
-		t.Fatal("沒有訂閱者卻通過啟動檢查")
-	}
 	newDelegation(bus, delegation.Deps{Seller: noSeller{}, Social: noSocial{}, NewID: uuid.NewV7})
-	if err := requireDelegatedAudit(bus); err != nil {
-		t.Fatalf("newDelegation 之後：%v", err)
-	}
-	if !events.HasSubscriber[social.PostWrittenByActor](bus) {
-		t.Fatal("PostWrittenByActor 沒有訂閱者")
+	for name, ok := range map[string]bool{
+		"PostCreated":           events.HasSubscriber[social.PostCreated](bus),
+		"PostUpdated":           events.HasSubscriber[social.PostUpdated](bus),
+		"PostPublished":         events.HasSubscriber[social.PostPublished](bus),
+		"PostUnpublished":       events.HasSubscriber[social.PostUnpublished](bus),
+		"PostScheduled":         events.HasSubscriber[social.PostScheduled](bus),
+		"PostPublishRepeated":   events.HasSubscriber[social.PostPublishRepeated](bus),
+		"PostUnpublishRepeated": events.HasSubscriber[social.PostUnpublishRepeated](bus),
+	} {
+		if !ok {
+			t.Errorf("%s 沒有訂閱者", name)
+		}
 	}
 }

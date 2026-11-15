@@ -155,40 +155,68 @@ func (s *Service) writeTags(ctx context.Context, q *store.Queries, postID uuid.U
 	return nil
 }
 
-func (s *Service) publishedEvent(ctx context.Context, p store.SocialPost, now time.Time, origin model.PostOrigin, sc store.SocialPostSchedule) error {
+func (s *Service) publishedEvent(ctx context.Context, p store.SocialPost, now time.Time, origin model.PostOrigin, sc store.SocialPostSchedule, actor *delegatedactor.Actor) error {
 	e := model.PostPublished{
 		EventID: uuid.NewV7(), OccurredAt: now, PostID: p.ID, StoreID: p.StoreID,
-		Preview: model.TruncateRunes(p.Body, model.PreviewMaxRunes), Origin: origin,
+		Preview: model.TruncateRunes(p.Body, model.PreviewMaxRunes), Version: p.Version, Origin: origin, Actor: actor,
 	}
 	if origin == model.OriginScheduled {
 		e.ScheduleID, e.ScheduledBy = sc.ID, model.ScheduledBy{Kind: model.ScheduleKind(sc.ScheduledByKind), Ref: sc.ScheduledByRef}
 	}
-	return events.Publish(ctx, s.d.Events, e)
+	return emit(ctx, s.d.Events, e, actor)
 }
 
-// actorWritten 在 ctx 帶著代行者時為這次寫入發 PostWrittenByActor（A7-D26）；沒有代行者什麼都不做。在寫入的 transaction 內呼叫，貼文已是寫入後的狀態。
-// 沒有訂閱者時失敗關閉：代行寫入不能沒有稽核。
-func (s *Service) actorWritten(ctx context.Context, kind model.PostWriteKind, storeID int64, postID uuid.UUID) error {
-	a, ok := delegatedactor.From(ctx)
-	if !ok {
-		return nil
+// emit 發布事件 e：帶代行者（actor 非 nil）的事件一定要有訂閱者（events.PublishRequired），沒有就失敗關閉，不會有沒稽核的代行寫入；
+// 店主自己的寫入沒有訂閱者也照發。「必須有訂閱者」只在 events 套件的 PublishRequired 一處保證。
+func emit[E any](ctx context.Context, b *events.Bus, e E, actor *delegatedactor.Actor) error {
+	if actor != nil {
+		return events.PublishRequired(ctx, b, e)
 	}
-	if !events.HasSubscriber[model.PostWrittenByActor](s.d.Events) {
-		return fmt.Errorf("social：代行寫入沒有稽核的訂閱者")
-	}
+	return events.Publish(ctx, b, e)
+}
+
+// writeKind 是 written 要發的事件種類。
+type writeKind string
+
+const (
+	writeCreated           writeKind = "CREATED"
+	writeUpdated           writeKind = "UPDATED"
+	writeUnpublished       writeKind = "UNPUBLISHED"
+	writeScheduled         writeKind = "SCHEDULED"
+	writePublishRepeated   writeKind = "PUBLISH_REPEATED"
+	writeUnpublishRepeated writeKind = "UNPUBLISH_REPEATED"
+)
+
+// written 在寫入的 transaction 內為這次寫入發 kind 對應的事件（含冪等的 no-op）；貼文已是寫入後的狀態。店主的寫入 actor 是 nil。
+func (s *Service) written(ctx context.Context, kind writeKind, storeID int64, postID uuid.UUID, actor *delegatedactor.Actor) error {
 	p, err := s.Own(ctx, storeID, postID)
 	if err != nil {
 		return err
 	}
-	return events.Publish(ctx, s.d.Events, model.PostWrittenByActor{
-		EventID: uuid.NewV7(), OccurredAt: s.d.Now().UTC(), Kind: kind, PostID: postID, StoreID: storeID,
-		Preview: model.TruncateRunes(p.Body, model.PreviewMaxRunes), Version: p.Version, Actor: a,
-	})
+	w := model.PostWritten{
+		EventID: uuid.NewV7(), OccurredAt: s.d.Now().UTC(), PostID: postID, StoreID: storeID,
+		Preview: model.TruncateRunes(p.Body, model.PreviewMaxRunes), Version: p.Version, Actor: actor,
+	}
+	switch kind {
+	case writeCreated:
+		return emit(ctx, s.d.Events, model.PostCreated{PostWritten: w}, actor)
+	case writeUpdated:
+		return emit(ctx, s.d.Events, model.PostUpdated{PostWritten: w}, actor)
+	case writeUnpublished:
+		return emit(ctx, s.d.Events, model.PostUnpublished{PostWritten: w}, actor)
+	case writeScheduled:
+		return emit(ctx, s.d.Events, model.PostScheduled{PostWritten: w}, actor)
+	case writePublishRepeated:
+		return emit(ctx, s.d.Events, model.PostPublishRepeated{PostWritten: w}, actor)
+	case writeUnpublishRepeated:
+		return emit(ctx, s.d.Events, model.PostUnpublishRepeated{PostWritten: w}, actor)
+	}
+	return fmt.Errorf("social：不認得的貼文寫入種類 %q", kind)
 }
 
 // publishLocked 是貼文轉為 PUBLISHED 唯一的路徑（手動發布與排程到點共用）：貼文列已鎖，公開要件在這裡檢查，之後寫狀態、發 PostPublished、排快取失效。
 // 呼叫方負責先處理這篇貼文的待發布排程（手動發布取消它，到點發布把它轉 PUBLISHED）。
-func (s *Service) publishLocked(ctx context.Context, q *store.Queries, row store.SocialPost, now time.Time, origin model.PostOrigin, sc store.SocialPostSchedule) error {
+func (s *Service) publishLocked(ctx context.Context, q *store.Queries, row store.SocialPost, now time.Time, origin model.PostOrigin, sc store.SocialPostSchedule, actor *delegatedactor.Actor) error {
 	if err := requirePublishable(ctx, row.Body, row.ImageKey != nil); err != nil {
 		return err
 	}
@@ -199,14 +227,14 @@ func (s *Service) publishLocked(ctx context.Context, q *store.Queries, row store
 	if err != nil {
 		return fmt.Errorf("social：發布貼文 %s：%w", row.ID, err)
 	}
-	if err := s.publishedEvent(ctx, upd, now, origin, sc); err != nil {
+	if err := s.publishedEvent(ctx, upd, now, origin, sc, actor); err != nil {
 		return err
 	}
 	return s.d.Cache.BustPost(ctx, row.ID, row.StoreID)
 }
 
 // Create 新增貼文。Publish 為真時同一個動作發布（公開要件在這裡驗證），草稿不發 PostPublished（SD8）。
-func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePostInput) (model.Post, error) {
+func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePostInput, actor *delegatedactor.Actor) (model.Post, error) {
 	if err := seller.Authorize(st, seller.CapMarketing); err != nil {
 		return model.Post{}, err
 	}
@@ -282,7 +310,7 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 			}
 		}
 		if in.Publish {
-			if err := s.publishedEvent(ctx, row, now, model.OriginDirect, store.SocialPostSchedule{}); err != nil {
+			if err := s.publishedEvent(ctx, row, now, model.OriginDirect, store.SocialPostSchedule{}, nil); err != nil {
 				return err
 			}
 			if err := s.d.Cache.BustPost(ctx, id, st.StoreID); err != nil {
@@ -292,7 +320,7 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 		if out, err = s.Own(ctx, st.StoreID, id); err != nil {
 			return err
 		}
-		return s.actorWritten(ctx, model.PostWriteCreated, st.StoreID, id)
+		return s.written(ctx, writeCreated, st.StoreID, id, actor)
 	})
 	if err != nil {
 		return model.Post{}, err
@@ -340,7 +368,7 @@ func (s *Service) lockOwned(ctx context.Context, q *store.Queries, storeID int64
 }
 
 // Update 修改貼文：Version 與目前的不符回 VersionConflict、不寫入。已發布的貼文被編輯後仍要滿足公開要件。
-func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePostInput) (model.Post, error) {
+func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePostInput, actor *delegatedactor.Actor) (model.Post, error) {
 	if err := seller.Authorize(st, seller.CapMarketing); err != nil {
 		return model.Post{}, err
 	}
@@ -439,7 +467,7 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 		if out, err = s.Own(ctx, st.StoreID, in.PostID); err != nil {
 			return err
 		}
-		return s.actorWritten(ctx, model.PostWriteUpdated, st.StoreID, in.PostID)
+		return s.written(ctx, writeUpdated, st.StoreID, in.PostID, actor)
 	})
 	if err != nil {
 		return model.Post{}, err
@@ -450,7 +478,7 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 // Publish 發布貼文（草稿或下架的貼文轉為 PUBLISHED）。published_at 固定在第一次發布（動態牆的順序不能靠下架再發布來洗：
 // 下架後再發布沿用原值）；已經是 PUBLISHED 時是冪等的 no-op：不寫入、不發 PostPublished、不遞增 version、不清快取
 // （與 Unpublish 對已下架的冪等一致，所以也不檢查 version）。
-func (s *Service) Publish(ctx context.Context, st seller.Store, postID uuid.UUID, version int64) (model.Post, error) {
+func (s *Service) Publish(ctx context.Context, st seller.Store, postID uuid.UUID, version int64, actor *delegatedactor.Actor) (model.Post, error) {
 	if err := seller.Authorize(st, seller.CapMarketing); err != nil {
 		return model.Post{}, err
 	}
@@ -465,7 +493,7 @@ func (s *Service) Publish(ctx context.Context, st seller.Store, postID uuid.UUID
 			return err
 		}
 		if row.Status == string(model.StatusPublished) {
-			return s.actorWritten(ctx, model.PostWritePublished, st.StoreID, postID)
+			return s.written(ctx, writePublishRepeated, st.StoreID, postID, actor)
 		}
 		if row.Version != version {
 			return versionConflict(ctx)
@@ -473,10 +501,10 @@ func (s *Service) Publish(ctx context.Context, st seller.Store, postID uuid.UUID
 		if _, err := s.d.Cancel.FromLockedPosts(ctx, []uuid.UUID{postID}, model.CancelReplaced, now, schedule.CallerBumps); err != nil {
 			return err
 		}
-		if err := s.publishLocked(ctx, q, row, now, model.OriginDirect, store.SocialPostSchedule{}); err != nil {
+		if err := s.publishLocked(ctx, q, row, now, model.OriginDirect, store.SocialPostSchedule{}, actor); err != nil {
 			return err
 		}
-		return s.actorWritten(ctx, model.PostWritePublished, st.StoreID, postID)
+		return nil
 	})
 	if err != nil {
 		return model.Post{}, err
@@ -485,7 +513,7 @@ func (s *Service) Publish(ctx context.Context, st seller.Store, postID uuid.UUID
 }
 
 // Unpublish 下架貼文（PUBLISHED 轉為 UNPUBLISHED；已經下架的冪等）。草稿沒有發布過，不能下架。
-func (s *Service) Unpublish(ctx context.Context, st seller.Store, postID uuid.UUID, version int64) (model.Post, error) {
+func (s *Service) Unpublish(ctx context.Context, st seller.Store, postID uuid.UUID, version int64, actor *delegatedactor.Actor) (model.Post, error) {
 	if err := seller.Authorize(st, seller.CapContentContract); err != nil {
 		return model.Post{}, err
 	}
@@ -501,7 +529,7 @@ func (s *Service) Unpublish(ctx context.Context, st seller.Store, postID uuid.UU
 		}
 		switch model.PostStatus(row.Status) {
 		case model.StatusUnpublished:
-			return s.actorWritten(ctx, model.PostWriteUnpublished, st.StoreID, postID)
+			return s.written(ctx, writeUnpublishRepeated, st.StoreID, postID, actor)
 		case model.StatusDraft:
 			return apperr.FailedPrecondition("%s", text.PostUnpublishDraft(uitext.LocaleFrom(ctx)))
 		case model.StatusPublished:
@@ -518,7 +546,7 @@ func (s *Service) Unpublish(ctx context.Context, st seller.Store, postID uuid.UU
 		if err := s.d.Cache.BustPost(ctx, postID, st.StoreID); err != nil {
 			return err
 		}
-		return s.actorWritten(ctx, model.PostWriteUnpublished, st.StoreID, postID)
+		return s.written(ctx, writeUnpublished, st.StoreID, postID, actor)
 	})
 	if err != nil {
 		return model.Post{}, err

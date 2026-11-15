@@ -260,9 +260,6 @@ func runServe(ctx context.Context) error {
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: buyerModule, Seller: sellerModule, Identity: id, Orders: orders, Now: time.Now, NewID: uuid.NewV7, Logger: log})
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
 	del := newDelegation(bus, delegationDeps)
-	if err := requireDelegatedAudit(bus); err != nil {
-		return err
-	}
 
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Ready:  d.Ping,

@@ -29,6 +29,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
 const (
@@ -103,7 +104,7 @@ func (f *fakeRunner) DelegatedRead(ctx context.Context, c moddelegation.Delegate
 }
 
 func (f *fakeRunner) DelegatedWrite(ctx context.Context, c moddelegation.DelegatedCaller, w moddelegation.DelegatedWrite,
-	do func(context.Context, seller.Store) error) (moddelegation.DelegatedWriteResult, error) {
+	do func(context.Context, seller.Store, *delegatedactor.Actor) error) (moddelegation.DelegatedWriteResult, error) {
 	f.calls = append(f.calls, "write:"+string(c.Method.Action))
 	f.caller, f.write = c, w
 	if f.err != nil {
@@ -113,7 +114,7 @@ func (f *fakeRunner) DelegatedWrite(ctx context.Context, c moddelegation.Delegat
 	if f.replayed {
 		return moddelegation.DelegatedWriteResult{Store: st, AuditLogID: f.audit, ResourceID: f.replayID, Replayed: true}, nil
 	}
-	if err := do(ctx, st); err != nil {
+	if err := do(ctx, st, &delegatedactor.Actor{SessionID: c.Session.ID, StoreID: st.StoreID}); err != nil {
 		return moddelegation.DelegatedWriteResult{}, err
 	}
 	return moddelegation.DelegatedWriteResult{Store: st, AuditLogID: f.audit}, nil
@@ -129,6 +130,7 @@ type fakePosts struct {
 		version int64
 	}
 	sched   social.SchedulePostInput
+	actors  map[string]*delegatedactor.Actor
 	status  social.PostStatus
 	after   *social.OwnPostCursor
 	store   seller.Store
@@ -139,27 +141,39 @@ type fakePosts struct {
 	err     error
 }
 
-func (f *fakePosts) CreatePost(_ context.Context, st seller.Store, in social.CreatePostInput) (social.Post, error) {
+func (f *fakePosts) seen(method string, a *delegatedactor.Actor) {
+	if f.actors == nil {
+		f.actors = map[string]*delegatedactor.Actor{}
+	}
+	f.actors[method] = a
+}
+
+func (f *fakePosts) CreatePost(_ context.Context, st seller.Store, in social.CreatePostInput, actor *delegatedactor.Actor) (social.Post, error) {
+	f.seen("CreatePost", actor)
 	f.store, f.create = st, in
 	return f.post, f.err
 }
 
-func (f *fakePosts) UpdatePost(_ context.Context, st seller.Store, in social.UpdatePostInput) (social.Post, error) {
+func (f *fakePosts) UpdatePost(_ context.Context, st seller.Store, in social.UpdatePostInput, actor *delegatedactor.Actor) (social.Post, error) {
+	f.seen("UpdatePost", actor)
 	f.store, f.update = st, in
 	return f.post, f.err
 }
 
-func (f *fakePosts) PublishPost(_ context.Context, st seller.Store, id uuid.UUID, v int64) (social.Post, error) {
+func (f *fakePosts) PublishPost(_ context.Context, st seller.Store, id uuid.UUID, v int64, actor *delegatedactor.Actor) (social.Post, error) {
+	f.seen("PublishPost", actor)
 	f.store, f.trans.post, f.trans.version = st, id, v
 	return f.post, f.err
 }
 
-func (f *fakePosts) UnpublishPost(_ context.Context, st seller.Store, id uuid.UUID, v int64) (social.Post, error) {
+func (f *fakePosts) UnpublishPost(_ context.Context, st seller.Store, id uuid.UUID, v int64, actor *delegatedactor.Actor) (social.Post, error) {
+	f.seen("UnpublishPost", actor)
 	f.store, f.trans.post, f.trans.version = st, id, v
 	return f.post, f.err
 }
 
-func (f *fakePosts) SchedulePost(_ context.Context, st seller.Store, in social.SchedulePostInput) (social.ScheduledPost, error) {
+func (f *fakePosts) SchedulePost(_ context.Context, st seller.Store, in social.SchedulePostInput, actor *delegatedactor.Actor) (social.ScheduledPost, error) {
+	f.seen("SchedulePost", actor)
 	f.store, f.sched = st, in
 	return social.ScheduledPost{Post: f.post, Schedule: social.Schedule{PublishAt: f.publish}}, f.err
 }
@@ -319,6 +333,12 @@ func TestEveryDelegatedMethodReachesTheComponentWithAGoodSession(t *testing.T) {
 		}
 		if want := DelegatedDeclaration.Methods[proc]; e.runner.caller.Method != want {
 			t.Errorf("%s 交給元件的方法宣告 = %+v，預期 %+v", proc, e.runner.caller.Method, want)
+		}
+	}
+	// A7-D27：代行的每個寫入都把元件交來的代行者原樣傳給 social；傳 nil 會被當成店主寫入而不稽核。
+	for _, m := range []string{"CreatePost", "UpdatePost", "PublishPost", "UnpublishPost", "SchedulePost"} {
+		if a := e.posts.actors[m]; a == nil || a.SessionID != delegatedSessID {
+			t.Errorf("代行的 %s 傳給 social 的代行者 = %+v，預期元件交來的那一個", m, a)
 		}
 	}
 	// 每個請求只唯讀解析一次（不回頭再解析），成功之後才順延閒置逾時。

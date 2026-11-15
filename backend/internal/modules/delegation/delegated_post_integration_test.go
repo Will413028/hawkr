@@ -15,10 +15,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// 代行 Connect 的共用元件（DelegatedWrite、DelegatedRead）：不開 transaction：呼叫資源模組（這裡是 social），social 在自己的 transaction 內發 PostWrittenByActor，訂閱者同 transaction 檢查 session 與能力、寫單段 SUCCEEDED 稽核（A7-D26）；
+// 代行 Connect 的共用元件（DelegatedWrite、DelegatedRead）：不開 transaction：呼叫資源模組（這裡是 social），social 在自己的 transaction 內發帶代行者的一般貼文事件（代行者是方法的明確參數，A7-D27），訂閱者同 transaction 檢查 session 與能力、寫單段 SUCCEEDED 稽核（A7-D26）；
 // 被拒絕與寫入失敗另開 transaction 寫 FAILED。handler 的角色由下面的 writePost 等輔助函式扮演（資源模組的 handler 在 httpapi/social）。
 
 var (
@@ -122,11 +123,11 @@ type written struct {
 }
 
 // writePost 扮演資源模組的 handler：交給元件執行 do；重送時讀回第一次寫入的貼文。
-func (f *fixture) writePost(c DelegatedCaller, w DelegatedWrite, do func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error)) (written, error) {
+func (f *fixture) writePost(c DelegatedCaller, w DelegatedWrite, do func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) (social.Post, *time.Time, error)) (written, error) {
 	ctx := context.Background()
 	var out written
-	res, err := f.m.DelegatedWrite(ctx, c, w, func(ctx context.Context, st seller.Store) error {
-		p, at, err := do(ctx, st)
+	res, err := f.m.DelegatedWrite(ctx, c, w, func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) error {
+		p, at, err := do(ctx, st, actor)
 		if err != nil {
 			return err
 		}
@@ -151,8 +152,8 @@ func (f *fixture) writePost(c DelegatedCaller, w DelegatedWrite, do func(ctx con
 
 func (f *fixture) createPost(c DelegatedCaller, op DelegatedOperation, body, token string) (written, error) {
 	return f.writePost(c, DelegatedWrite{Op: op, PayloadHash: DelegatedPayloadHash(AuditPostCreate, body, token)},
-		func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error) {
-			p, err := f.realSocial.CreatePost(ctx, st, social.CreatePostInput{Body: body, ImageToken: token})
+		func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) (social.Post, *time.Time, error) {
+			p, err := f.realSocial.CreatePost(ctx, st, social.CreatePostInput{Body: body, ImageToken: token}, actor)
 			return p, nil, err
 		})
 }
@@ -168,8 +169,8 @@ func (f *fixture) mustCreate(t *testing.T, o operator, op DelegatedOperation, bo
 
 func (f *fixture) updatePost(c DelegatedCaller, op DelegatedOperation, id uuid.UUID, version int64, body string) (written, error) {
 	return f.writePost(c, DelegatedWrite{Op: op, ResourceID: id.String(), Version: &version, PayloadHash: DelegatedPayloadHash(AuditPostUpdate, id, version, body)},
-		func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error) {
-			p, err := f.realSocial.UpdatePost(ctx, st, social.UpdatePostInput{PostID: id, Version: version, Body: &body})
+		func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) (social.Post, *time.Time, error) {
+			p, err := f.realSocial.UpdatePost(ctx, st, social.UpdatePostInput{PostID: id, Version: version, Body: &body}, actor)
 			return p, nil, err
 		})
 }
@@ -177,13 +178,13 @@ func (f *fixture) updatePost(c DelegatedCaller, op DelegatedOperation, id uuid.U
 func (f *fixture) transition(c DelegatedCaller, op DelegatedOperation, id uuid.UUID, version int64) (written, error) {
 	action := c.Method.Action
 	return f.writePost(c, DelegatedWrite{Op: op, ResourceID: id.String(), Version: &version, PayloadHash: DelegatedPayloadHash(action, id, version)},
-		func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error) {
+		func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) (social.Post, *time.Time, error) {
 			var p social.Post
 			var err error
 			if action == AuditPostPublish {
-				p, err = f.realSocial.PublishPost(ctx, st, id, version)
+				p, err = f.realSocial.PublishPost(ctx, st, id, version, actor)
 			} else {
-				p, err = f.realSocial.UnpublishPost(ctx, st, id, version)
+				p, err = f.realSocial.UnpublishPost(ctx, st, id, version, actor)
 			}
 			return p, nil, err
 		})
@@ -192,8 +193,8 @@ func (f *fixture) transition(c DelegatedCaller, op DelegatedOperation, id uuid.U
 func (f *fixture) schedulePost(c DelegatedCaller, op DelegatedOperation, id uuid.UUID, version int64, at time.Time) (written, error) {
 	by := social.ScheduledBy{Kind: social.ScheduleByDelegation, Ref: fmt.Sprint(c.Session.ID)}
 	return f.writePost(c, DelegatedWrite{Op: op, ResourceID: id.String(), Version: &version, PayloadHash: DelegatedPayloadHash(AuditPostSchedule, id, version, at.UTC())},
-		func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error) {
-			s, err := f.realSocial.SchedulePost(ctx, st, social.SchedulePostInput{PostID: id, Version: version, PublishAt: at, By: by})
+		func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) (social.Post, *time.Time, error) {
+			s, err := f.realSocial.SchedulePost(ctx, st, social.SchedulePostInput{PostID: id, Version: version, PublishAt: at, By: by}, actor)
 			sat := s.Schedule.PublishAt
 			return s.Post, &sat, err
 		})
@@ -710,7 +711,7 @@ func TestReasonlessFailureRecordsInternal(t *testing.T) {
 	c := f.caller(t, o, methodCreate)
 	op := f.op("內部錯誤")
 	_, err := f.writePost(c, DelegatedWrite{Op: op, PayloadHash: DelegatedPayloadHash(AuditPostCreate, "x", "tok-internal")},
-		func(context.Context, seller.Store) (social.Post, *time.Time, error) {
+		func(context.Context, seller.Store, *delegatedactor.Actor) (social.Post, *time.Time, error) {
 			return social.Post{}, nil, errors.New("boom")
 		})
 	if err == nil {
@@ -753,5 +754,43 @@ func TestFailureReasonCheckRejectsUnknownCodes(t *testing.T) {
 	}
 	if err := insert("FAILED", "VERSION_CONFLICT"); err != nil {
 		t.Errorf("合法的代碼被拒絕：%v", err)
+	}
+}
+
+// 店主自己的寫入（actor 傳 nil）一樣發事件，但訂閱者看到沒有代行者就略過：任何貼文寫入都不留稽核列（A7-D27）。
+func TestOwnerPostWritesLeaveNoAuditRows(t *testing.T) {
+	f := build(t, true)
+	ctx := context.Background()
+	o := f.newOperator(t, "owner-writes")
+	st, err := f.sellers.Store(ctx, o.session.Session.Target.StoreID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := f.realSocial.CreatePost(ctx, st, social.CreatePostInput{Body: "店主的貼文", ImageToken: fmt.Sprintf("tok-%d", f.next())}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p, err = f.realSocial.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: new("店主改過")}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if p, err = f.realSocial.PublishPost(ctx, st, p.ID, p.Version, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.realSocial.PublishPost(ctx, st, p.ID, p.Version, nil); err != nil {
+		t.Fatal(err)
+	}
+	if p, err = f.realSocial.UnpublishPost(ctx, st, p.ID, p.Version, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.realSocial.UnpublishPost(ctx, st, p.ID, p.Version, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.realSocial.SchedulePost(ctx, st, social.SchedulePostInput{
+		PostID: p.ID, Version: p.Version, PublishAt: f.now.Add(2 * time.Hour), By: social.ScheduledBy{Kind: social.ScheduleByOwner},
+	}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if n := f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE resource_id = $1`, p.ID.String()); n != 0 {
+		t.Fatalf("店主的寫入留下 %d 列稽核，預期 0", n)
 	}
 }

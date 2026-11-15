@@ -29,3 +29,15 @@ func TestSubscribeRejectsInterfaceEventTypes(t *testing.T) {
 	}()
 	Subscribe(NewBus(), func(context.Context, error) error { return nil })
 }
+
+// 「必須有訂閱者」的保證只在 PublishRequired 一處（A7-D27）：沒有 handler 回 ErrNoSubscriber；有 handler 才往下走（這裡沒有 transaction，所以是 ErrNoTransaction）。
+func TestPublishRequiredFailsClosedWithoutASubscriber(t *testing.T) {
+	b := NewBus()
+	if err := PublishRequired(context.Background(), b, thingHappened{ID: 1}); !errors.Is(err, ErrNoSubscriber) {
+		t.Fatalf("沒有訂閱者：err = %v，預期 ErrNoSubscriber", err)
+	}
+	Subscribe(b, func(context.Context, thingHappened) error { return nil })
+	if err := PublishRequired(context.Background(), b, thingHappened{ID: 1}); errors.Is(err, ErrNoSubscriber) || !errors.Is(err, ErrNoTransaction) {
+		t.Fatalf("有訂閱者：err = %v，預期通過訂閱者檢查、停在 ErrNoTransaction", err)
+	}
+}

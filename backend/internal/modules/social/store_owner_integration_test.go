@@ -80,7 +80,7 @@ func TestStoreCommentsScopeAndUnreplied(t *testing.T) {
 	onPost2 := comment(post2, b(), "貼文二的留言")
 	fromForeign := comment(foreign, b(), "別家貼文的留言")
 	// 貼文下架後留言仍在店主的範圍內（店主讀自己的貼文不必公開）。
-	_, err = f.module.UnpublishPost(ctx, f.store(t, storeID), post2.ID, f.current(t, storeID, post2).Version)
+	_, err = f.module.UnpublishPost(ctx, f.store(t, storeID), post2.ID, f.current(t, storeID, post2).Version, nil)
 	must(t, err)
 
 	all := f.listAllStoreComments(t, storeID, nil, false, 3)
@@ -189,7 +189,7 @@ func TestStoreSocialSummaryCountsPostsByStatus(t *testing.T) {
 	f.publishedPost(t, storeID, "發布二")
 	f.publishedPost(t, storeID, "發布三")
 	unpublished := f.publishedPost(t, storeID, "下架")
-	_, err := f.module.UnpublishPost(ctx, st, unpublished.ID, f.current(t, storeID, unpublished).Version)
+	_, err := f.module.UnpublishPost(ctx, st, unpublished.ID, f.current(t, storeID, unpublished).Version, nil)
 	must(t, err)
 	must(t, f.module.DeletePost(ctx, st, deletedDraft.ID, 0))
 	f.publishedPost(t, otherStore, "別家")
@@ -218,8 +218,8 @@ func TestPostRequestIDReplayReturnsTheFirstResultWithoutDuplicating(t *testing.T
 	rid := uuid.New()
 	in := social.CreatePostInput{Body: "新品", ImageToken: "tok-first", Hashtags: []string{"tea"}, Publish: true, RequestID: &rid}
 
-	first := mustV[social.Post](t)(f.module.CreatePost(ctx, st, in))
-	again := mustV[social.Post](t)(f.module.CreatePost(ctx, st, in))
+	first := mustV[social.Post](t)(f.module.CreatePost(ctx, st, in, nil))
+	again := mustV[social.Post](t)(f.module.CreatePost(ctx, st, in, nil))
 	if again.ID != first.ID || again.Body != first.Body || again.Status != social.StatusPublished {
 		t.Fatalf("重送應回第一次的貼文：%v 與 %v", first.ID, again.ID)
 	}
@@ -232,29 +232,29 @@ func TestPostRequestIDReplayReturnsTheFirstResultWithoutDuplicating(t *testing.T
 
 	different := in
 	different.Body = "別的內容"
-	if _, err := f.module.CreatePost(ctx, st, different); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.CreatePost(ctx, st, different, nil); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("同 request_id 不同內容：%v", err)
 	}
 	asDraft := in
 	asDraft.Publish = false
-	if _, err := f.module.CreatePost(ctx, st, asDraft); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.CreatePost(ctx, st, asDraft, nil); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("同 request_id 但是否發布不同：%v", err)
 	}
-	other := mustV[social.Post](t)(f.module.CreatePost(ctx, f.store(t, otherStore), social.CreatePostInput{Body: "新品", ImageToken: "tok-other", Hashtags: []string{"tea"}, Publish: true, RequestID: &rid}))
+	other := mustV[social.Post](t)(f.module.CreatePost(ctx, f.store(t, otherStore), social.CreatePostInput{Body: "新品", ImageToken: "tok-other", Hashtags: []string{"tea"}, Publish: true, RequestID: &rid}, nil))
 	if other.ID == first.ID {
 		t.Fatal("request_id 的範圍是店家：別家用同一個 id 是新貼文")
 	}
 
 	noKey := social.CreatePostInput{Body: "沒有 key"}
-	a := mustV[social.Post](t)(f.module.CreatePost(ctx, st, noKey))
-	c := mustV[social.Post](t)(f.module.CreatePost(ctx, st, noKey))
+	a := mustV[social.Post](t)(f.module.CreatePost(ctx, st, noKey, nil))
+	c := mustV[social.Post](t)(f.module.CreatePost(ctx, st, noKey, nil))
 	if a.ID == c.ID {
 		t.Fatal("沒帶 request_id 的重送各自建立")
 	}
 
 	// 貼文刪除後 request_id 仍占著：重送回原本那一篇，而它讀不到。
 	must(t, f.module.DeletePost(ctx, st, first.ID, 0))
-	if _, err := f.module.CreatePost(ctx, st, in); kindOf(err) != apperr.KindNotFound {
+	if _, err := f.module.CreatePost(ctx, st, in, nil); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("刪除後重送：%v，預期 not_found", err)
 	}
 	if n := f.scalar(t, `SELECT count(*) FROM social.posts WHERE store_id = $1 AND request_id = $2`, storeID, rid); n != 1 {
@@ -275,7 +275,7 @@ func TestPostRequestIDConcurrentRetriesCreateOnePost(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			p, err := f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "草稿", RequestID: &rid})
+			p, err := f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "草稿", RequestID: &rid}, nil)
 			if err != nil {
 				t.Error(err)
 				return
@@ -309,7 +309,7 @@ func TestPostRequestIDConcurrentRetriesWithImageCreateOnePost(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			p, err := f.module.CreatePost(ctx, st, in)
+			p, err := f.module.CreatePost(ctx, st, in, nil)
 			if err != nil {
 				t.Error(err)
 				return
@@ -328,7 +328,7 @@ func TestPostRequestIDConcurrentRetriesWithImageCreateOnePost(t *testing.T) {
 	}
 	different := in
 	different.Body = "內容不同"
-	if _, err := f.module.CreatePost(ctx, st, different); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.CreatePost(ctx, st, different, nil); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("同 request_id 不同內容：%v", err)
 	}
 }
@@ -347,7 +347,7 @@ func TestPostRequestIDWithDifferentContentIsInvalidInputEvenConcurrently(t *test
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, errs[i] = f.module.CreatePost(ctx, st, social.CreatePostInput{Body: fmt.Sprintf("內容%d", i%2), ImageToken: "tok-diff", Hashtags: []string{"tea"}, Publish: true, RequestID: &rid})
+			_, errs[i] = f.module.CreatePost(ctx, st, social.CreatePostInput{Body: fmt.Sprintf("內容%d", i%2), ImageToken: "tok-diff", Hashtags: []string{"tea"}, Publish: true, RequestID: &rid}, nil)
 		}()
 	}
 	wg.Wait()
@@ -377,13 +377,13 @@ func TestUpdatePostResponseReflectsTheWrite(t *testing.T) {
 	f := setup(t)
 	storeID, _ := f.exposableStore(t)
 	st := f.store(t, storeID)
-	p := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "舊", Hashtags: []string{"tea"}}))
+	p := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "舊", Hashtags: []string{"tea"}}, nil))
 	tags := []string{"coffee"}
-	up := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("新"), Hashtags: &tags}))
+	up := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("新"), Hashtags: &tags}, nil))
 	if up.Body != "新" || up.Version != p.Version+1 || len(up.Hashtags) != 1 || up.Hashtags[0].Name != "coffee" {
 		t.Fatalf("回應 = %+v", up)
 	}
-	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("過期")}); kindOf(err) != apperr.KindVersionConflict {
+	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("過期")}, nil); kindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("過期版本：%v", err)
 	}
 }

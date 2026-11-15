@@ -192,7 +192,7 @@ func TestDelegatedWriteChecksTheStoreBeforeTheWriteAndRecordsTheFailure(t *testi
 	rec := &recorder{}
 	m := &Module{seller: fixedSeller{store: closedStore()}, audit: rec}
 	did := false
-	_, err := m.DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsWrite), w, func(context.Context, seller.Store) error {
+	_, err := m.DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsWrite), w, func(context.Context, seller.Store, *delegatedactor.Actor) error {
 		did = true
 		return nil
 	})
@@ -214,7 +214,7 @@ func TestDelegatedWriteChecksSessionAndCapabilityBeforeTheWrite(t *testing.T) {
 	rec := &recorder{}
 	m := &Module{seller: fixedSeller{store: openStore()}, audit: rec}
 	did := false
-	_, err := m.DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsRead), w, func(context.Context, seller.Store) error {
+	_, err := m.DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsRead), w, func(context.Context, seller.Store, *delegatedactor.Actor) error {
 		did = true
 		return nil
 	})
@@ -234,7 +234,7 @@ func TestDelegatedWriteReplayReturnsTheFirstResultWhateverTheStoreState(t *testi
 	for name, st := range map[string]seller.Store{"可代行": openStore(), "已關閉": closedStore(), "等待刪除": storeIn(seller.PendingDeletion)} {
 		rec := &recorder{replayed: true}
 		did := false
-		res, err := (&Module{seller: fixedSeller{store: st}, audit: rec}).DelegatedWrite(t.Context(), c, w, func(context.Context, seller.Store) error {
+		res, err := (&Module{seller: fixedSeller{store: st}, audit: rec}).DelegatedWrite(t.Context(), c, w, func(context.Context, seller.Store, *delegatedactor.Actor) error {
 			did = true
 			return nil
 		})
@@ -252,7 +252,7 @@ func TestDelegatedWriteReplayReturnsTheFirstResultWhateverTheStoreState(t *testi
 	}
 }
 
-// delegation 不開 transaction 包住資源模組的寫入（A7-D26，單體規則 3、5）：do 拿到的 ctx 沒有 transaction，帶著代行者；
+// delegation 不開 transaction 包住資源模組的寫入（A7-D26，單體規則 3、5）：do 拿到的 ctx 沒有 transaction，代行者是明確的參數（A7-D27，不經 ctx）；
 // Module 沒有資料庫欄位，重新加上外層 InTx 會在這裡 panic 或讓 do 看到 transaction。
 func TestDelegatedWriteOpensNoTransactionAroundTheResourceWrite(t *testing.T) {
 	op := DelegatedOperation{RequestID: uuid.New(), Reason: "店家要求", NotifySeller: true}
@@ -261,16 +261,16 @@ func TestDelegatedWriteOpensNoTransactionAroundTheResourceWrite(t *testing.T) {
 	rec := &recorder{}
 	called := false
 	res, err := (&Module{seller: fixedSeller{store: openStore()}, audit: rec}).DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsWrite), w,
-		func(ctx context.Context, st seller.Store) error {
+		func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) error {
 			called = true
 			rec.ran = true
 			if _, ok := db.TxFrom(ctx); ok {
 				t.Error("do 的 ctx 帶著 transaction：delegation 不得開外層 transaction")
 			}
-			a, ok := delegatedactor.From(ctx)
-			if !ok || a.SessionID != 7 || a.StoreID != 5 || a.RequestID != op.RequestID.String() || a.Reason != "店家要求" || !a.NotifySeller ||
-				a.PayloadHash != auditPayloadHash(w) || a.Action != string(AuditPostCreate) || a.ResourceVersionBefore == nil || *a.ResourceVersionBefore != 3 {
-				t.Errorf("ctx 的代行者 = %+v ok=%v", a, ok)
+			a := actor
+			if a == nil || a.SessionID != 7 || a.StoreID != 5 || a.RequestID != op.RequestID.String() || a.Reason != "店家要求" || !a.NotifySeller ||
+				a.PayloadHash != auditPayloadHash(w) || a.ResourceVersionBefore == nil || *a.ResourceVersionBefore != 3 {
+				t.Errorf("明確傳給 do 的代行者 = %+v", a)
 			}
 			if st.StoreID != 5 {
 				t.Errorf("交給 do 的店家 = %d", st.StoreID)
@@ -287,7 +287,7 @@ func TestDelegatedWriteConvergesOnAConcurrentReplay(t *testing.T) {
 	w := DelegatedWrite{Op: DelegatedOperation{RequestID: uuid.New(), Reason: "店家要求"}, PayloadHash: "h"}
 	rec := &recorder{}
 	res, err := (&Module{seller: fixedSeller{store: openStore()}, audit: rec}).DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsWrite), w,
-		func(context.Context, seller.Store) error {
+		func(context.Context, seller.Store, *delegatedactor.Actor) error {
 			rec.ran = true // 對方的 transaction commit 了
 			return fmt.Errorf("events：處理：%w", model.ErrOperationKeyTaken)
 		})
@@ -301,7 +301,7 @@ func TestDelegatedWriteWithoutAnAuditRowIsAnInternalError(t *testing.T) {
 	w := DelegatedWrite{Op: DelegatedOperation{RequestID: uuid.New(), Reason: "店家要求"}, PayloadHash: "h"}
 	rec := &recorder{noAuditRow: true}
 	_, err := (&Module{seller: fixedSeller{store: openStore()}, audit: rec}).DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsWrite), w,
-		func(context.Context, seller.Store) error { rec.ran = true; return nil })
+		func(context.Context, seller.Store, *delegatedactor.Actor) error { rec.ran = true; return nil })
 	if err == nil || len(rec.got) != 1 {
 		t.Fatalf("err=%v FAILED=%d", err, len(rec.got))
 	}
@@ -313,7 +313,7 @@ func TestDelegatedWriteBusinessFailureRecordsAFailedRow(t *testing.T) {
 	rec := &recorder{}
 	boom := apperr.VersionConflict("版本衝突")
 	_, err := (&Module{seller: fixedSeller{store: openStore()}, audit: rec}).DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsWrite), w,
-		func(context.Context, seller.Store) error { return boom })
+		func(context.Context, seller.Store, *delegatedactor.Actor) error { return boom })
 	if !errors.Is(err, boom) || len(rec.got) != 1 {
 		t.Fatalf("err=%v FAILED=%d", err, len(rec.got))
 	}
@@ -365,7 +365,7 @@ func TestAuditPayloadHashCoversTheReasonAndNotifySeller(t *testing.T) {
 	}
 	ops := &recorder{}
 	m := &Module{seller: fixedSeller{store: openStore()}, audit: ops}
-	if _, err := m.DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsWrite), base, func(context.Context, seller.Store) error { ops.ran = true; return nil }); err != nil {
+	if _, err := m.DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsWrite), base, func(context.Context, seller.Store, *delegatedactor.Actor) error { ops.ran = true; return nil }); err != nil {
 		t.Fatal(err)
 	}
 	for _, in := range ops.opsGot {
@@ -480,36 +480,76 @@ func TestFailureReasonOfClassifiesTheCause(t *testing.T) {
 	}
 }
 
-// 訂閱者：事件與代行者宣告一致、店家可代行才寫 SUCCEEDED；不一致或店家不可代行回錯誤（social 的 transaction rollback），不寫稽核。
-func TestOnPostWrittenByActorChecksTheEventAgainstTheActorAndTheStore(t *testing.T) {
+// 訂閱者依事件種類決定稽核的動作與能力（事件不帶 delegation 的宣告字串，A7-D27）；店家一致、可代行才寫 SUCCEEDED；
+// 不一致或店家不可代行回錯誤（social 的 transaction rollback），不寫稽核；沒有代行者（店主自己的寫入）略過、不寫稽核。
+func TestPostWriteSubscribersMapEachEventKindToItsAuditActionAndCapability(t *testing.T) {
 	post := uuid.New()
-	actor := delegatedactor.Actor{
-		SessionID: 7, StoreID: 5, Capability: string(CapabilityPostsWrite), Action: string(AuditPostCreate), Resource: string(ResourcePost),
-		RequestID: uuid.New().String(), Reason: "店家要求", NotifySeller: true, PayloadHash: "h",
+	actor := &delegatedactor.Actor{
+		SessionID: 7, StoreID: 5, RequestID: uuid.New().String(), Reason: "店家要求", NotifySeller: true, PayloadHash: "h",
 	}
-	ev := social.PostWrittenByActor{Kind: social.PostWriteCreated, PostID: post, StoreID: 5, Preview: "  預覽  ", Version: 4, Actor: actor}
+	w := social.PostWritten{PostID: post, StoreID: 5, Preview: "  預覽  ", Version: 4, Actor: actor}
+	m := func(rec *recorder, st seller.Store) *Module {
+		return &Module{seller: fixedSeller{store: st}, audit: rec}
+	}
+	type sub func(*Module, context.Context, social.PostWritten) error
+	cases := []struct {
+		name   string
+		call   sub
+		action AuditAction
+		cap    Capability
+	}{
+		{"PostCreated", func(m *Module, c context.Context, w social.PostWritten) error {
+			return m.OnPostCreated(c, social.PostCreated{PostWritten: w})
+		}, AuditPostCreate, CapabilityPostsWrite},
+		{"PostUpdated", func(m *Module, c context.Context, w social.PostWritten) error {
+			return m.OnPostUpdated(c, social.PostUpdated{PostWritten: w})
+		}, AuditPostUpdate, CapabilityPostsWrite},
+		{"PostUnpublished", func(m *Module, c context.Context, w social.PostWritten) error {
+			return m.OnPostUnpublished(c, social.PostUnpublished{PostWritten: w})
+		}, AuditPostUnpublish, CapabilityPostsPublish},
+		{"PostScheduled", func(m *Module, c context.Context, w social.PostWritten) error {
+			return m.OnPostScheduled(c, social.PostScheduled{PostWritten: w})
+		}, AuditPostSchedule, CapabilityPostsPublish},
+		{"PostPublishRepeated", func(m *Module, c context.Context, w social.PostWritten) error {
+			return m.OnPostPublishRepeated(c, social.PostPublishRepeated{PostWritten: w})
+		}, AuditPostPublish, CapabilityPostsPublish},
+		{"PostUnpublishRepeated", func(m *Module, c context.Context, w social.PostWritten) error {
+			return m.OnPostUnpublishRepeated(c, social.PostUnpublishRepeated{PostWritten: w})
+		}, AuditPostUnpublish, CapabilityPostsPublish},
+		{"PostPublished", func(m *Module, c context.Context, w social.PostWritten) error {
+			return m.OnPostPublished(c, social.PostPublished{PostID: w.PostID, StoreID: w.StoreID, Preview: w.Preview, Version: w.Version, Origin: social.OriginDirect, Actor: w.Actor})
+		}, AuditPostPublish, CapabilityPostsPublish},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := &recorder{}
+			if err := tc.call(m(rec, openStore()), t.Context(), w); err != nil {
+				t.Fatal(err)
+			}
+			if len(rec.recorded) != 1 || rec.recorded[0].ResourceID != post.String() || rec.recorded[0].ResourceName != "預覽" || rec.recorded[0].RequestID != actor.RequestID ||
+				rec.recorded[0].Action != tc.action || rec.recorded[0].Capability != tc.cap || rec.recorded[0].ResourceType != ResourcePost || rec.recorded[0].SessionID != 7 ||
+				rec.outcomes[0].VersionAfter != 4 {
+				t.Fatalf("寫入的稽核 = %+v %+v，預期動作 %s 能力 %s", rec.recorded, rec.outcomes, tc.action, tc.cap)
+			}
 
-	rec := &recorder{}
-	if err := (&Module{seller: fixedSeller{store: openStore()}, audit: rec}).OnPostWrittenByActor(t.Context(), ev); err != nil {
-		t.Fatal(err)
-	}
-	if len(rec.recorded) != 1 || rec.recorded[0].ResourceID != post.String() || rec.recorded[0].ResourceName != "預覽" || rec.recorded[0].RequestID != actor.RequestID ||
-		rec.recorded[0].Action != AuditPostCreate || rec.outcomes[0].VersionAfter != 4 {
-		t.Fatalf("寫入的稽核 = %+v %+v", rec.recorded, rec.outcomes)
-	}
+			owner := w
+			owner.Actor = nil
+			rec = &recorder{}
+			if err := tc.call(m(rec, openStore()), t.Context(), owner); err != nil || len(rec.recorded) != 0 {
+				t.Errorf("店主的寫入（沒有代行者）：err=%v 稽核=%d，預期略過", err, len(rec.recorded))
+			}
 
-	wrongKind, wrongStore := ev, ev
-	wrongKind.Kind = social.PostWritePublished
-	wrongStore.StoreID = 6
-	for name, e := range map[string]social.PostWrittenByActor{"動作不一致": wrongKind, "店家不一致": wrongStore} {
-		rec := &recorder{}
-		if err := (&Module{seller: fixedSeller{store: openStore()}, audit: rec}).OnPostWrittenByActor(t.Context(), e); err == nil || len(rec.recorded) != 0 {
-			t.Errorf("%s：err=%v 稽核=%d", name, err, len(rec.recorded))
-		}
-	}
-	rec = &recorder{}
-	err := (&Module{seller: fixedSeller{store: closedStore()}, audit: rec}).OnPostWrittenByActor(t.Context(), ev)
-	if denialOf(t, err) != DenialStoreClosed || len(rec.recorded) != 0 {
-		t.Fatalf("店家已關閉：err=%v 稽核=%d", err, len(rec.recorded))
+			wrongStore := w
+			wrongStore.StoreID = 6
+			rec = &recorder{}
+			if err := tc.call(m(rec, openStore()), t.Context(), wrongStore); err == nil || len(rec.recorded) != 0 {
+				t.Errorf("店家不一致：err=%v 稽核=%d", err, len(rec.recorded))
+			}
+			rec = &recorder{}
+			err := tc.call(m(rec, closedStore()), t.Context(), w)
+			if denialOf(t, err) != DenialStoreClosed || len(rec.recorded) != 0 {
+				t.Errorf("店家已關閉：err=%v 稽核=%d", err, len(rec.recorded))
+			}
+		})
 	}
 }

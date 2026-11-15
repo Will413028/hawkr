@@ -126,12 +126,12 @@ func TestRevalidateIsEnqueuedInTheSameTransaction(t *testing.T) {
 	tags := func(postID uuidT) []string {
 		return append([]string{revalidate.PostTag(postID)}, revalidate.StoreTags(st.StoreID, st.StoreCode)...)
 	}
-	draft := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "草稿", ImageToken: "t"}))
+	draft := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "草稿", ImageToken: "t"}, nil))
 	if len(f.jobs.revalidations()) != 0 {
 		t.Fatal("草稿不失效")
 	}
 	f.jobs.reset()
-	p := mustV[social.Post](t)(f.module.PublishPost(ctx, st, draft.ID, draft.Version))
+	p := mustV[social.Post](t)(f.module.PublishPost(ctx, st, draft.ID, draft.Version, nil))
 	if got := f.jobs.revalidations(); len(got) != 1 || !slices.Equal(got[0], tags(p.ID)) {
 		t.Fatalf("發布：%v", got)
 	}
@@ -154,8 +154,8 @@ func TestRevalidateIsEnqueuedInTheSameTransaction(t *testing.T) {
 		t.Fatalf("還原：%v", got)
 	}
 	f.jobs.reset()
-	up := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("改")}))
-	mustV[social.Post](t)(f.module.UnpublishPost(ctx, st, p.ID, up.Version))
+	up := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("改")}, nil))
+	mustV[social.Post](t)(f.module.UnpublishPost(ctx, st, p.ID, up.Version, nil))
 	must(t, f.module.DeletePost(ctx, st, p.ID, 0))
 	if got := f.jobs.revalidations(); len(got) != 3 {
 		t.Fatalf("編輯已發布的貼文、下架、刪除各一個：%v", got)

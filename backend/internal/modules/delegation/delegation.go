@@ -471,9 +471,12 @@ func (m *Module) storeNotDelegable(ctx context.Context, storeID int64) error {
 	return m.session.EndDelegationsOfStore(ctx, storeID)
 }
 
-// OnPostPublished 訂閱 social 的 PostPublished：代行發起的排程到點發布時，在發布的同一個 transaction 內寫一列 SUCCEEDED 的稽核（單段，冪等鍵
+// OnPostPublished 訂閱 social 的 PostPublished：事件帶代行者（PublishPost 由代行呼叫）時，依事件種類寫 POST_PUBLISH 的 SUCCEEDED 稽核（同 recordPostWrite）；否則，代行發起的排程到點發布時，在發布的同一個 transaction 內寫一列 SUCCEEDED 的稽核（單段，冪等鍵
 // schedule:<排程 ID>，重送不寫第二列）。其他來源的發布（直接發布、店主自己的排程）不屬於代行，略過。組裝點以 events.Subscribe 訂閱。
 func (m *Module) OnPostPublished(ctx context.Context, e social.PostPublished) error {
+	if e.Actor != nil {
+		return m.recordPostWriteBy(ctx, postPublishWrite, e.Actor, e.PostID, e.StoreID, e.Preview, e.Version)
+	}
 	if e.Origin != social.OriginScheduled || e.ScheduledBy.Kind != social.ScheduleByDelegation {
 		return nil
 	}

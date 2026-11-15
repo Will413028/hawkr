@@ -1,8 +1,6 @@
-// Package delegatedactor 是代行寫入帶給資源模組的「代行者」：傳輸層的代行元件把它放進 ctx，資源模組在自己的 transaction 內為寫入發帶這份資料的事件，
-// 稽核的訂閱者同 transaction 寫 SUCCEEDED（A7-D26）。資源模組只讀它、不 import delegation，所以放在 platform。
+// Package delegatedactor 是代行寫入帶給資源模組的「代行者」：資源模組的寫入方法明確收一個 *Actor（店主寫入傳 nil，A7-D27），在自己的 transaction 內為寫入發
+// 領域事件並附上它，稽核的訂閱者同 transaction 寫 SUCCEEDED。資源模組只傳遞它、不解讀它、不 import delegation，所以放在 platform。
 package delegatedactor
-
-import "context"
 
 // Actor 是一次代行寫入的代行者與請求資料。欄位全是事實，不含判斷：授權與稽核由訂閱者在同一個 transaction 內檢查與寫入。
 type Actor struct {
@@ -10,10 +8,6 @@ type Actor struct {
 	AdminID   int64
 	// StoreID 是代行 session 的目標店家；資源模組的事件帶它，訂閱者核對它與被寫的店家相同。
 	StoreID int64
-	// Capability、Action、Resource 是被呼叫方法的代行宣告（delegation 的值域，資源模組不解讀）。
-	Capability string
-	Action     string
-	Resource   string
 	// RequestID 是 request_id（AIP-155），同一個 session 內去重。
 	RequestID    string
 	Reason       string
@@ -24,17 +18,4 @@ type Actor struct {
 	ResourceVersionBefore *int64
 	CorrelationID         string
 	UserAgent             string
-}
-
-type ctxKey struct{}
-
-// With 回傳帶著代行者的 ctx。
-func With(ctx context.Context, a Actor) context.Context {
-	return context.WithValue(ctx, ctxKey{}, a)
-}
-
-// From 讀 ctx 裡的代行者；沒有（店主自己的寫入）回 false。
-func From(ctx context.Context) (Actor, bool) {
-	a, ok := ctx.Value(ctxKey{}).(Actor)
-	return a, ok
 }

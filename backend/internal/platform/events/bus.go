@@ -16,6 +16,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
+// ErrNoSubscriber 表示 PublishRequired 的事件沒有任何 handler。
+var ErrNoSubscriber = errors.New("events：這個事件必須有訂閱者，卻沒有")
+
 // ErrNoTransaction 表示在 transaction 外發布事件。
 var ErrNoTransaction = errors.New("events：Publish 必須在 db.InTx 內呼叫")
 
@@ -60,6 +63,15 @@ func Publish[E any](ctx context.Context, b *Bus, e E) error {
 		}
 	}
 	return nil
+}
+
+// PublishRequired 與 Publish 相同，但事件 E 沒有 handler 時回 ErrNoSubscriber 而不發布：用在「事件一定被處理」才成立的寫入（例如代行寫入的稽核），
+// 讓這個保證只在 bus 這一處，不在每個發布方各寫一份，也不靠啟動檢查（測試與 CLI 的組裝同樣受保護）。
+func PublishRequired[E any](ctx context.Context, b *Bus, e E) error {
+	if !HasSubscriber[E](b) {
+		return fmt.Errorf("%w：%T", ErrNoSubscriber, e)
+	}
+	return Publish(ctx, b, e)
 }
 
 // HasSubscriber 回傳事件 E 是否至少有一個 handler。需要「事件一定被處理」的發布方（例如稽核）用它在 transaction 內失敗關閉；

@@ -236,7 +236,7 @@ func (f *fixture) post(t *testing.T, storeID int64, body string) social.Post {
 	}
 	p, err := f.social.CreatePost(context.Background(), st, social.CreatePostInput{
 		Body: body, ImageToken: fmt.Sprintf("tok-%d", f.next()), Publish: true,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

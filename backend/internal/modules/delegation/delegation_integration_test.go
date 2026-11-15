@@ -117,7 +117,12 @@ func build(t *testing.T, withSocial bool) *fixture {
 	f.m = f.newDelegation()
 	events.Subscribe(f.bus, f.m.OnAdminRoleRevoked)
 	events.Subscribe(f.bus, f.m.OnPostPublished)
-	events.Subscribe(f.bus, f.m.OnPostWrittenByActor)
+	events.Subscribe(f.bus, f.m.OnPostCreated)
+	events.Subscribe(f.bus, f.m.OnPostUpdated)
+	events.Subscribe(f.bus, f.m.OnPostUnpublished)
+	events.Subscribe(f.bus, f.m.OnPostScheduled)
+	events.Subscribe(f.bus, f.m.OnPostPublishRepeated)
+	events.Subscribe(f.bus, f.m.OnPostUnpublishRepeated)
 	events.Subscribe(f.bus, f.m.OnStoreSuspended)
 	events.Subscribe(f.bus, f.m.OnStoreClosed)
 	return f

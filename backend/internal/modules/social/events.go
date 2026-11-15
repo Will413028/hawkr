@@ -20,17 +20,23 @@ type PostLiked = model.PostLiked
 // PostScheduleCanceled 一個待發布的排程被取消（店主取消、被取代、貼文刪除或下架、授權失效、發起者撤銷）；每個被取消的排程各發一次，帶凍結的原因。
 type PostScheduleCanceled = model.PostScheduleCanceled
 
-// PostWriteKind 是代行者對貼文做的寫入種類。
-type PostWriteKind = model.PostWriteKind
+// PostCreated 貼文建立；每個成功的建立呼叫發一次（店主與代行都發），Actor 是明確傳入的代行者（沒有則 nil）。訂閱者與發布在同一個 transaction。
+type PostCreated = model.PostCreated
 
-const (
-	PostWriteCreated     = model.PostWriteCreated
-	PostWriteUpdated     = model.PostWriteUpdated
-	PostWritePublished   = model.PostWritePublished
-	PostWriteUnpublished = model.PostWriteUnpublished
-	PostWriteScheduled   = model.PostWriteScheduled
-)
+// PostUpdated 貼文修改，發布規則同 PostCreated。
+type PostUpdated = model.PostUpdated
 
-// PostWrittenByActor 在 ctx 帶著代行者（platform/delegatedactor）時，貼文的建立、修改、發布、下架、排程在寫入的 transaction 內各發一次（含冪等的 no-op），
-// 訂閱者同 transaction 寫稽核；店主自己的寫入不發。沒有訂閱者時代行寫入失敗關閉（rollback），不會有沒稽核的代行寫入。
-type PostWrittenByActor = model.PostWrittenByActor
+// PostUnpublished 貼文下架，發布規則同 PostCreated。
+type PostUnpublished = model.PostUnpublished
+
+// PostScheduled 貼文排定發布，發布規則同 PostCreated。
+type PostScheduled = model.PostScheduled
+
+// PostPublishRepeated 對已發布的貼文再發布（冪等的 no-op，不發 PostPublished）；請求本身要能被稽核。
+type PostPublishRepeated = model.PostPublishRepeated
+
+// PostUnpublishRepeated 對已下架的貼文再下架（冪等的 no-op）。
+type PostUnpublishRepeated = model.PostUnpublishRepeated
+
+// PostWritten 是上面這幾個事件共用的欄位。
+type PostWritten = model.PostWritten
