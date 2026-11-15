@@ -25,6 +25,7 @@
       "POLICY_CATEGORY_PLATFORM_ABUSE": "干擾或濫用平台",
       "POLICY_CATEGORY_PRIVACY": "不當使用個人資料",
       "POLICY_CATEGORY_PROHIBITED_GOODS": "違法或禁售商品",
+      "POLICY_CATEGORY_SEXUAL_CONTENT": "Sexual content",
       "POLICY_CATEGORY_SPAM": "Spam",
       "POLICY_CATEGORY_UNLICENSED_SALE": "未經許可販售"
     },

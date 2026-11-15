@@ -13,6 +13,8 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -562,6 +564,7 @@ func TestClosingTheCaseWithdrawsItsOpenInquiry(t *testing.T) {
 
 // 結案與記下回覆並行：不會留下已結案而還沒結束的詢問（J1），回覆與系統撤回只會有一個。
 func TestDecideAndAConcurrentReplyNeverLeaveAnOpenInquiryOnAClosedCase(t *testing.T) {
+	testdb.RequireStress(t)
 	t.Parallel()
 	f := setup(t)
 	_, s := f.open(t)

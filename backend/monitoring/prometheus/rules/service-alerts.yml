@@ -25,12 +25,12 @@ groups:
       #   - account / buyer / seller / im / ai / content 已改 gRPC-only，指標走 OTLP，**沒有 scrape target**
       #     ⇒ up{job=…} 這個 series 在 prod 從不存在 ⇒ absent() 恆為真。改由下方 ProdOtlpServiceAbsent 承接。
       #   - invoice-service 曾因 prod replicas=0（刻意未部署）移出清單；#3230 已把 replicas 改回 1，
-      #     **加回本條**。它不是 gRPC-only：k8s/values/invoice-service.yaml 有 ports.http(10040)，
+      #     **加回本條**。它不是 gRPC-only：invoice-service 有 HTTP port（10040），
       #     chart 因此打 prometheus.io/scrape ⇒ 有 up series，與 order／product 同類。
       #     ⚠️ 一度誤加進下方 ProdOtlpServiceAbsent —— 那條要的是 server_start_total，而它來自
       #     pkgotel.InitMeterProvider，invoice-service 沒有呼叫（全 repo 只有那 11 個服務有）⇒
       #     absent() 恆為真 ⇒ 會讓整條 or 鏈永久 firing，把那 11 個服務的偵測一起毀掉。
-      #     判準：**看 k8s/values/<svc>.yaml 有沒有 `transportMode: grpc-only`** —— 那才是 chart
+      #     判準：**看該服務的部署設定有沒有 `transportMode: grpc-only`** —— 那才是 chart
       #     決定要不要打 prometheus.io/scrape 的條件（deployment.yaml 的 $grpcOnly）。
       #     ⚠️ 不要用「有沒有 ports.http」當判準：chart 對 ports.http.containerPort 有預設值 8080，
       #     照字面永遠為真。今天兩者恰好同解（11 個 grpc-only 服務都沒顯式寫 ports），但下一個
@@ -318,7 +318,7 @@ groups:
           severity: critical
         annotations:
           summary: "Gateway 來源簽章驗證停用：key={{ $labels.key }} (env={{ $labels.env }})"
-          description: "ORIGIN_AUTH{{ if eq $labels.key \"ci\" }}_CI{{ end }}_SECRET 在 env={{ $labels.env }} 未設定，該類 X-HK-Origin-Auth 一律不採信、流量落回 per-ClientIP 配額（#2264 的原始狀態）。secret 由人工建立：在該環境跑 k8s/scripts/create-secrets.sh。"
+          description: "ORIGIN_AUTH{{ if eq $labels.key \"ci\" }}_CI{{ end }}_SECRET 在 env={{ $labels.env }} 未設定，該類 X-HK-Origin-Auth 一律不採信、流量落回 per-ClientIP 配額（#2264 的原始狀態）。secret 由人工在該環境建立。"
 
       # B：簽章對不上（密鑰漂移 / 輪替沒對齊 / 時鐘偏移）。
       # 分母排除 absent：絕大多數流量（瀏覽器、App）本來就不帶簽章，也包含「該把
@@ -494,7 +494,7 @@ groups:
       # 之後，量的是 procurement_degraded_total）的職責。
       #
       # 分母 ai_procurement_llm_budget_limit 是我們自己宣告的數字，不是 provider 配額
-      # （LLM_TOKEN_BUDGET_PER_MINUTE，k8s/values/ai-service.yaml）；未設定
+      # （LLM_TOKEN_BUDGET_PER_MINUTE，ai-service 的環境變數）；未設定
       # 時該 gauge 完全缺席（不是 0），這條 expr 就沒有分母、算不出任何結果、
       # 不會 fire——這是刻意的。⚠️ 若改成 export 0 後果相反於直覺：正數除以 0
       # 在 PromQL 是 `+Inf`，`+Inf > 0.4` 成立，會讓這條告警**立刻且永久
@@ -517,7 +517,7 @@ groups:
           severity: warning
         annotations:
           summary: "env={{ $labels.env }}：採購助手 LLM token 用量達自訂預算的 {{ $value | humanizePercentage }}"
-          description: "近 5 分鐘 procurement_llm_tokens_total（extract／narrate／realize／crop_suggest 四條角色的 prompt／completion／thoughts 合計，不含 cached——cached 是 prompt 的子集，算進去會重複計入且對不上 provider 實際計費）換算成的每分鐘 token 用量，已超過 LLM_TOKEN_BUDGET_PER_MINUTE（k8s/values/ai-service.yaml）宣告值的 40%。⚠️ 這不是 provider 掛了——LLM 仍在正常回應，AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 才回答『通不通』。處置：先查是不是有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
+          description: "近 5 分鐘 procurement_llm_tokens_total（extract／narrate／realize／crop_suggest 四條角色的 prompt／completion／thoughts 合計，不含 cached——cached 是 prompt 的子集，算進去會重複計入且對不上 provider 實際計費）換算成的每分鐘 token 用量，已超過 LLM_TOKEN_BUDGET_PER_MINUTE（ai-service 的環境變數）宣告值的 40%。⚠️ 這不是 provider 掛了——LLM 仍在正常回應，AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 才回答『通不通』。處置：先查是不是有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
 
       # 這條是同一顆比值換一個更高的門檻（100%），存在的理由是「用量超過
       # 自己宣告的上限」本身值得比 40% 逼近線更快被看到——但 🔴 2026-09-20
@@ -547,7 +547,7 @@ groups:
           severity: warning
         annotations:
           summary: "env={{ $labels.env }}：採購助手 LLM token 用量已超過自訂預算（{{ $value | humanizePercentage }}）"
-          description: "近 5 分鐘 procurement_llm_tokens_total（不含 cached，理由同 AIProcurementLLMTokenBudgetHigh）換算成的每分鐘 token 用量已達到或超過 LLM_TOKEN_BUDGET_PER_MINUTE（k8s/values/ai-service.yaml）宣告值的 100%——不是逼近，是已經超過我們自己定的線。⚠️ 與 AIProcurementLLMTokenBudgetHigh 的差別只在門檻與 for，兩者會同時 fire、不是重複告警。⚠️ 本條**不是**硬上限依賴接入治理規範 §2②要求的「已觸上限副作用」告警——那個角色由 AIProcurementLLMExtractionDegraded（procurement_degraded_total）擔任，本條只是同一顆比值換一個更高門檻。⚠️ 與 AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 的差別同上面那條——LLM 仍在正常回應，這不是 provider 掛了。這是我方自訂、非強制性的治理數字，沒有任何程式路徑會因此拒絕或降級呼叫，所以本條不代表任何請求失敗；但持續超過代表容量帳已經跟不上真實用量。處置：立刻查是否有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
+          description: "近 5 分鐘 procurement_llm_tokens_total（不含 cached，理由同 AIProcurementLLMTokenBudgetHigh）換算成的每分鐘 token 用量已達到或超過 LLM_TOKEN_BUDGET_PER_MINUTE（ai-service 的環境變數）宣告值的 100%——不是逼近，是已經超過我們自己定的線。⚠️ 與 AIProcurementLLMTokenBudgetHigh 的差別只在門檻與 for，兩者會同時 fire、不是重複告警。⚠️ 本條**不是**硬上限依賴接入治理規範 §2②要求的「已觸上限副作用」告警——那個角色由 AIProcurementLLMExtractionDegraded（procurement_degraded_total）擔任，本條只是同一顆比值換一個更高門檻。⚠️ 與 AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 的差別同上面那條——LLM 仍在正常回應，這不是 provider 掛了。這是我方自訂、非強制性的治理數字，沒有任何程式路徑會因此拒絕或降級呼叫，所以本條不代表任何請求失敗；但持續超過代表容量帳已經跟不上真實用量。處置：立刻查是否有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
 
       # 硬上限依賴接入治理規範 §2②「已觸上限的副作用」的真正落地：上面兩條
       # （TokenBudgetHigh／TokenBudgetExceeded）都是同一顆比值換個門檻，回答

@@ -25,7 +25,6 @@ type sanctionsTable struct {
 	SourceRef      postgres.ColumnString
 	AdminID        postgres.ColumnInteger
 	CreatedAt      postgres.ColumnTimestampz
-	EndsAt         postgres.ColumnTimestampz
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -75,9 +74,8 @@ func newSanctionsTableImpl(schemaName, tableName, alias string) sanctionsTable {
 		SourceRefColumn      = postgres.StringColumn("source_ref")
 		AdminIDColumn        = postgres.IntegerColumn("admin_id")
 		CreatedAtColumn      = postgres.TimestampzColumn("created_at")
-		EndsAtColumn         = postgres.TimestampzColumn("ends_at")
-		allColumns           = postgres.ColumnList{IDColumn, BuyerIDColumn, KindColumn, ReasonCategoryColumn, ReasonTextColumn, SourceRefColumn, AdminIDColumn, CreatedAtColumn, EndsAtColumn}
-		mutableColumns       = postgres.ColumnList{BuyerIDColumn, KindColumn, ReasonCategoryColumn, ReasonTextColumn, SourceRefColumn, AdminIDColumn, CreatedAtColumn, EndsAtColumn}
+		allColumns           = postgres.ColumnList{IDColumn, BuyerIDColumn, KindColumn, ReasonCategoryColumn, ReasonTextColumn, SourceRefColumn, AdminIDColumn, CreatedAtColumn}
+		mutableColumns       = postgres.ColumnList{BuyerIDColumn, KindColumn, ReasonCategoryColumn, ReasonTextColumn, SourceRefColumn, AdminIDColumn, CreatedAtColumn}
 		defaultColumns       = postgres.ColumnList{ReasonTextColumn}
 	)
 
@@ -93,7 +91,6 @@ func newSanctionsTableImpl(schemaName, tableName, alias string) sanctionsTable {
 		SourceRef:      SourceRefColumn,
 		AdminID:        AdminIDColumn,
 		CreatedAt:      CreatedAtColumn,
-		EndsAt:         EndsAtColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

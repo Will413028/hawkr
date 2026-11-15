@@ -106,7 +106,7 @@ Logo SVG 使用到的色票包含：
 | `--color-brand-primary-soft` | 橘紅淡階 | `#FCEBE6` | 252, 235, 230 | primary 12% 混白；淺底、標籤，配墨色文字不低於 4.5:1 |
 | `--color-brand-secondary-soft` | 橘黃淡階 | `#FDF1E1` | 253, 241, 225 | secondary 16% 混白；淺底、季節裝飾 |
 
-每個色票另有 `-rgb` 變體（例如 `--color-brand-ink-rgb: 31 41 51`），給 `rgb(var(...) / alpha)` 的半透明用法。各前景與背景組合的對比由 `website/scripts/contrast.py` 計算。
+每個色票另有 `-rgb` 變體（例如 `--color-brand-ink-rgb: 31 41 51`），給 `rgb(var(...) / alpha)` 的半透明用法。各前景與背景組合的對比由 `website/scripts/contrast.py` 計算，website CI 以 `pnpm run contrast:check` 當閘門（有任何不合格或解不出來的組合即失敗）。
 
 ### 3.2 狀態色
 

@@ -16,6 +16,10 @@ on:
       # design:check 比對兩支 App 的 theme 與 web 的 token 契約。
       - 'buyer-app/lib/core/theme/**'
       - 'seller-app/lib/core/theme/**'
+      # contrast.py 掃這些目錄的使用處。
+      - 'admin/src/**'
+      - 'buyer-app/lib/**'
+      - 'seller-app/lib/**'
       # 根目錄的 pnpm workspace（兩個 app 共用一份 lockfile 與工具版本）。
       # workspace 層級的 audit 與 override 檢查在 workspace-ci.yml，不在這裡。
       - 'package.json'
@@ -41,6 +45,10 @@ on:
       # design:check 比對兩支 App 的 theme 與 web 的 token 契約。
       - 'buyer-app/lib/core/theme/**'
       - 'seller-app/lib/core/theme/**'
+      # contrast.py 掃這些目錄的使用處。
+      - 'admin/src/**'
+      - 'buyer-app/lib/**'
+      - 'seller-app/lib/**'
       # 根目錄的 pnpm workspace（兩個 app 共用一份 lockfile 與工具版本）。
       # workspace 層級的 audit 與 override 檢查在 workspace-ci.yml，不在這裡。
       - 'package.json'
@@ -64,8 +72,6 @@ defaults:
     working-directory: website
 
 env:
-  # admin/website 的 `prepare` 會跑 `lefthook install`，CI 不需要 git hooks。
-  LEFTHOOK: '0'
   # 測試與 build 的預先渲染不得連到任何真的主機。API base 沒設時，dev flavor 會落到本機單體
   # （website/lib/config/env.ts 的 DEV_GATEWAY_HOST，http://localhost:8080），`next build` 的預先渲染就會對它發請求。這裡釘到 loopback
   # 的丟棄埠：頁面在後端不可用時本來就要能預先渲染（降級），測試另有守衛（website/tests/setup/hermetic.mjs）。
@@ -85,6 +91,8 @@ jobs:
       - run: pnpm run lint
       - name: 三端 design token 與契約一致
         run: pnpm run design:check --apps-root ..
+      - name: 色彩對比（contrast.py）
+        run: pnpm run contrast:check
       - run: pnpm run test:unit
       - run: pnpm test
       - run: pnpm run build

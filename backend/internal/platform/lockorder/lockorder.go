@@ -54,9 +54,10 @@ var Modules = []string{
 	"social",
 	"discovery",
 	"agent",
-	"reviewqueue",
 	"delegation",
 	"accountsuspension",
+	"moderation",
+	"reviewqueue",
 	"accountdeletion",
 	"notification",
 }

@@ -27,6 +27,7 @@ const DEFAULT: Readonly<Partial<Record<UiTextKey, Formatter>>> = {
 	"common.PolicyCategory.POLICY_CATEGORY_SPAM": () => "垃圾訊息",
 	"common.PolicyCategory.POLICY_CATEGORY_HARASSMENT": () => "騷擾或霸凌",
 	"common.PolicyCategory.POLICY_CATEGORY_HATE": () => "仇恨或歧視言論",
+	"common.PolicyCategory.POLICY_CATEGORY_SEXUAL_CONTENT": () => "色情或性相關內容",
 	"common.StoreCard.closed_store": () => "已關閉的店家",
 	"common.StoreCardStatus.STORE_CARD_STATUS_OPEN": () => "營業中",
 	"common.StoreCardStatus.STORE_CARD_STATUS_PAUSED": () => "暫停營業",

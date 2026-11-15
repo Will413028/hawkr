@@ -5,7 +5,6 @@ name: backend proto generated diff
 #   (2) Java 端 proto 副本 `services/java/shared/java-proto/src/main/proto/`（scripts/gen-java-proto.sh）
 # 做法：在權威 image 內重新生成全部 proto，與 repo 內的生成檔逐位元組對拍；
 # repo 以 :ro 唯讀掛載進容器，工作樹全程零寫入。
-# 由 backend/.github/workflows/proto-generated-diff.yml 搬來。
 
 on:
   pull_request:

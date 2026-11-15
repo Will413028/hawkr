@@ -229,7 +229,6 @@
     "lib/features/wallet/presentation/widgets/coupon_status_tabs.dart",
     "lib/main.dart",
     "lib/shared/utils/amount_utils.dart",
-    "lib/shared/utils/app_version_utils.dart",
     "lib/shared/utils/avatar_utils.dart",
     "lib/shared/utils/date_format_utils.dart",
     "lib/shared/utils/hk_log.dart",

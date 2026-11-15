@@ -23,10 +23,11 @@ const COMMUNITY = [
 	PolicyCategory.SPAM,
 	PolicyCategory.HARASSMENT,
 	PolicyCategory.HATE,
+	PolicyCategory.SEXUAL_CONTENT,
 ];
 
 test("檢舉人可選的類別：全部除了 PLATFORM_ABUSE 與社群類別（12 個，含 OTHER）", () => {
-	assert.equal(ALL_VALUES.length, 16);
+	assert.equal(ALL_VALUES.length, 17);
 	assert.deepEqual(
 		[...REPORTER_CATEGORIES].sort((a, b) => a - b),
 		ALL_VALUES.filter(
@@ -87,6 +88,7 @@ test("每個值都有目錄的名稱（術語表的詞），UNSPECIFIED 與不�
 		"垃圾訊息",
 		"騷擾或霸凌",
 		"仇恨或歧視言論",
+		"色情或性相關內容",
 	]);
 	assert.equal(policyCategoryText(PolicyCategory.UNSPECIFIED), "未知");
 	assert.equal(policyCategoryText(99 as PolicyCategory), "未知");

@@ -351,7 +351,6 @@ type Sanction struct {
 	SourceRef string
 	AdminID   int64
 	CreatedAt time.Time
-	EndsAt    *time.Time
 }
 
 // SanctionCursor 是處分清單的排序鍵：(CreatedAt, ID) 由大到小。
@@ -398,4 +397,15 @@ type ContentOwner struct {
 	Author   Actor
 	StoreID  int64
 	Readable bool
+}
+
+// ContentSnapshot 是檢舉當下一則內容的唯讀快照，給 moderation 凍結並雜湊：作者 (kind, id)、所屬店家、此刻是不是公開可讀（同 ContentOwner）、本文與媒體參照。貼文的作者是它所屬的店家
+// （STORE），媒體參照是圖片資產 ID（沒有圖片為空）。內容不存在或已刪除時 Exists 為假，其餘欄位為零值。
+type ContentSnapshot struct {
+	Exists    bool
+	Author    Actor
+	StoreID   int64
+	Readable  bool
+	Body      string
+	MediaRefs []string
 }

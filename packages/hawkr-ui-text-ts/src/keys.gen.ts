@@ -28,6 +28,7 @@ export type UiTextKey =
 	| "common.PolicyCategory.POLICY_CATEGORY_PLATFORM_ABUSE"
 	| "common.PolicyCategory.POLICY_CATEGORY_PRIVACY"
 	| "common.PolicyCategory.POLICY_CATEGORY_PROHIBITED_GOODS"
+	| "common.PolicyCategory.POLICY_CATEGORY_SEXUAL_CONTENT"
 	| "common.PolicyCategory.POLICY_CATEGORY_SPAM"
 	| "common.PolicyCategory.POLICY_CATEGORY_UNLICENSED_SALE"
 	| "common.StoreCard.closed_store"
@@ -220,6 +221,7 @@ const COMMON_POLICY_CATEGORY: Readonly<Partial<Record<number, UiTextKey>>> = {
 	14: "common.PolicyCategory.POLICY_CATEGORY_SPAM",
 	15: "common.PolicyCategory.POLICY_CATEGORY_HARASSMENT",
 	16: "common.PolicyCategory.POLICY_CATEGORY_HATE",
+	17: "common.PolicyCategory.POLICY_CATEGORY_SEXUAL_CONTENT",
 };
 
 /** common.PolicyCategory 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */

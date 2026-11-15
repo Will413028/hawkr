@@ -56,7 +56,7 @@ func GetConfigFromEnv() Config {
 // There is deliberately no REDIS_URL override. A URL that silently outranks
 // REDIS_HOST is invisible in the repo (it only ever exists inside a k8s Secret),
 // and that invisibility caused the 2026-07-29 dev outage: every service had been
-// talking to a managed provider for 12 days while k8s/values still read
+// talking to a managed provider for 12 days while the deploy config still read
 // "REDIS_HOST: redis", so nothing in git — and no test — could reveal the drift.
 // If a managed/TLS provider is ever needed again, add an explicit REDIS_TLS flag
 // rather than a URL that overrides the declared host.

@@ -29,8 +29,8 @@ WHERE forum_entry_id = sqlc.arg(forum_entry_id) AND restored_at IS NULL
 RETURNING *;
 
 -- name: InsertSanction :one
-INSERT INTO social.sanctions (id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at, ends_at)
-VALUES (sqlc.arg(id), sqlc.arg(buyer_id), sqlc.arg(kind), sqlc.arg(reason_category), sqlc.arg(reason_text), sqlc.narg(source_ref), sqlc.arg(admin_id), sqlc.arg(now), sqlc.narg(ends_at))
+INSERT INTO social.sanctions (id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(buyer_id), sqlc.arg(kind), sqlc.arg(reason_category), sqlc.arg(reason_text), sqlc.narg(source_ref), sqlc.arg(admin_id), sqlc.arg(now))
 RETURNING *;
 
 -- name: ListSanctions :many
@@ -61,3 +61,21 @@ WHERE h.restored_at IS NULL AND e.deleted_at IS NULL AND e.actor_kind = 'BUYER' 
 ORDER BY hidden_at DESC, hide_id DESC
 LIMIT sqlc.arg(max_rows);
 
+
+-- name: GetPostSnapshot :one
+-- 給 moderation 凍結檢舉當下的貼文內容：本文與圖片參照（唯讀，不鎖）。
+SELECT store_id, body, image_asset_id, (deleted_at IS NULL)::boolean AS exists_now
+FROM social.posts
+WHERE id = sqlc.arg(id);
+
+-- name: GetCommentSnapshot :one
+-- 給 moderation 凍結檢舉當下的留言內容（唯讀，不鎖）；body 在作者刪帳清除後是 NULL。
+SELECT actor_kind, actor_id, body, (deleted_at IS NULL)::boolean AS exists_now
+FROM social.comments
+WHERE id = sqlc.arg(id);
+
+-- name: GetForumEntrySnapshot :one
+-- 給 moderation 凍結檢舉當下的討論區留言內容（唯讀，不鎖）。
+SELECT actor_kind, actor_id, body, (deleted_at IS NULL)::boolean AS exists_now
+FROM social.forum_entries
+WHERE id = sqlc.arg(id);

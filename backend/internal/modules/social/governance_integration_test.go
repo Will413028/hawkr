@@ -20,7 +20,7 @@ func TestSD11WarningIsARecordTheBuyerCanRead(t *testing.T) {
 	b, other := f.newBuyer(t), f.newBuyer(t)
 	w, err := f.module.Warn(ctx, social.WarnInput{BuyerID: b.BuyerID, Category: "HARASSMENT", Text: "請勿辱罵他人", SourceRef: "case-77", AdminID: 5})
 	must(t, err)
-	if w.Kind != social.SanctionWarning || w.EndsAt != nil || w.Category != "HARASSMENT" || w.SourceRef != "case-77" {
+	if w.Kind != social.SanctionWarning || w.Category != "HARASSMENT" || w.SourceRef != "case-77" {
 		t.Fatalf("%+v", w)
 	}
 	mustV[social.Sanction](t)(f.module.Warn(ctx, social.WarnInput{BuyerID: b.BuyerID, Category: "SPAM", AdminID: 5}))
@@ -76,6 +76,42 @@ func TestContentOwnerReportsAuthorStoreAndReadability(t *testing.T) {
 	}
 	if got := owner(social.TargetComment, uuidNew()); got.Exists {
 		t.Fatalf("不存在的 ID %+v", got)
+	}
+}
+
+// ContentSnapshot 給 moderation 凍結內容：本文、媒體參照與作者；內容改過快照跟著變，刪除後不存在。
+func TestContentSnapshotReturnsBodyMediaAndAuthor(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	b := f.newBuyer(t)
+	p := f.publishedPost(t, storeID, "貼文本文")
+	c := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p.ID, Body: "留言本文"}))
+	e := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "討論本文"}))
+	snap := func(k social.TargetKind, id uuidT) social.ContentSnapshot {
+		return mustV[social.ContentSnapshot](t)(f.module.ContentSnapshot(ctx, social.Target{Kind: k, ID: id}))
+	}
+	buyer := social.Actor{Kind: social.ActorBuyer, ID: b.BuyerID}
+	if got := snap(social.TargetComment, c.ID); !got.Exists || got.Body != "留言本文" || got.Author != buyer || got.StoreID != storeID || !got.Readable || len(got.MediaRefs) != 0 {
+		t.Fatalf("留言 %+v", got)
+	}
+	if got := snap(social.TargetForumEntry, e.ID); !got.Exists || got.Body != "討論本文" || got.Author != buyer || got.StoreID != storeID {
+		t.Fatalf("討論區 %+v", got)
+	}
+	got := snap(social.TargetPost, p.ID)
+	if !got.Exists || got.Body != "貼文本文" || got.Author != (social.Actor{Kind: social.ActorStore, ID: storeID}) || !got.Readable || len(got.MediaRefs) != 1 || got.MediaRefs[0] == "" {
+		t.Fatalf("貼文 %+v", got)
+	}
+	must(t, f.module.DeleteComment(ctx, f.asBuyer(b), c.ID))
+	if got := snap(social.TargetComment, c.ID); got.Exists || got.Body != "" {
+		t.Fatalf("刪除後不存在 %+v", got)
+	}
+	if got := snap(social.TargetPost, uuidNew()); got.Exists {
+		t.Fatalf("不存在的 ID %+v", got)
+	}
+	if _, err := f.module.ContentSnapshot(ctx, social.Target{Kind: "CHAT", ID: p.ID}); kindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("不認得的種類：%v", err)
 	}
 }
 

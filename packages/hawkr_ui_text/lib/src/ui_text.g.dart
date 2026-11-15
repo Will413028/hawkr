@@ -50,6 +50,8 @@ return switch ((l, value)) {
 (UiLocale.en, 15) => 'Harassment or bullying',
 (UiLocale.zhTW, 16) => '仇恨或歧視言論',
 (UiLocale.en, 16) => 'Hate or discriminatory speech',
+(UiLocale.zhTW, 17) => '色情或性相關內容',
+(UiLocale.en, 17) => 'Sexual content',
 _ => null,
 };
 }

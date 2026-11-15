@@ -2,7 +2,7 @@
 
 ## 職責
 
-後台待辦：所有模組中等待營運處理的事項，依期限由急到緩，keyset 分頁，給後台的待辦頁用。只排序與分頁；待辦的成員、開始與期限的規則在各來源模組的 SQL（seller 的 `review_<種類>(at)`、payment 的 `pub_review_items(at)`）。行為規格的唯一來源是 `backend/docs/modules/reviewqueue.md`。
+後台待辦：所有模組中等待營運處理的事項，依期限由急到緩，keyset 分頁，給後台的待辦頁用。只排序與分頁；待辦的成員、開始與期限的規則在各來源模組的 SQL（seller 的 `review_<種類>(at)`、payment 與 moderation 的 `pub_review_items(at)`）。行為規格的唯一來源是 `backend/docs/modules/reviewqueue.md`。
 
 ## 擁有的資料
 
@@ -10,13 +10,13 @@
 
 ## 發布的讀取介面
 
-無。本模組不發布 `pub_*`，只讀 seller 發布的 `seller.pub_review_items(at)` 與 payment 發布的 `payment.pub_review_items(at)`（契約在兩者的 `db/pub.sql`；payment 的列沒有店名，由 `internal/httpapi/reviewqueue` 經 seller 補上）。對外是 `Module.List(ctx, now, kinds, after, limit)`，形狀見 `backend/docs/modules/reviewqueue.md` §1。
+無。本模組不發布 `pub_*`，只讀 seller 發布的 `seller.pub_review_items(at)`、payment 發布的 `payment.pub_review_items(at)` 與 moderation 發布的 `moderation.pub_review_items(at)`（契約在三者的 `db/pub.sql`；payment 的列沒有店名，由 `internal/httpapi/reviewqueue` 經 seller 補上）。對外是 `Module.List(ctx, now, kinds, after, limit)`，形狀見 `backend/docs/modules/reviewqueue.md` §1。
 
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法與對外型別別名（`Kind`、`Item`、`Cursor`）。
 - `internal/model`：種類、一列、游標與游標的檢查，不碰 I/O。`internal/items`：`List` 的實作。`internal/store`：sqlc 生成的資料存取葉節點，不得手改。
-- 依賴圖的唯一來源是 `internal/arch/modules.go`：模組依賴 `seller` 與 `payment`，不 import 它們的 Go 套件。查詢在 `db/queries/items.sql`（兩個來源 `UNION ALL`），`db/sqlc.yaml` 的 schema 只有 `../../seller/db/pub.sql` 與 `../../payment/db/pub.sql`。加來源的步驟見 `backend/docs/modules/reviewqueue.md` §1。
+- 依賴圖的唯一來源是 `internal/arch/modules.go`：模組依賴 `seller`、`payment` 與 `moderation`，不 import 它們的 Go 套件。查詢在 `db/queries/items.sql`（三個來源 `UNION ALL`），`db/sqlc.yaml` 的 schema 只有 seller、payment 與 moderation 的 `db/pub.sql`。加來源的步驟見 `backend/docs/modules/reviewqueue.md` §1。
 
 ## 不變量
 

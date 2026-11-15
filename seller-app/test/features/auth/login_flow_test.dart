@@ -522,7 +522,7 @@ void main() {
     expect(prefs.getString('auth_cache_owner'), 'B');
   });
 
-  test('背景重試停權會結束 session token 並發布伺服器文字', () async {
+  testWidgets('背景重試停權會結束 session token 並發布伺服器文字', (tester) async {
     final repo = FakeAuthRepository();
     var calls = 0;
     when(() => repo.currentAccountId()).thenAnswer((_) async {
@@ -539,13 +539,13 @@ void main() {
     final c = makeLoginContainer(repo: repo, auth: auth);
     await c.read(sessionProvider.notifier).initialize();
     expect(auth.isSignedIn, isTrue);
-    await Future<void>.delayed(const Duration(milliseconds: 1600));
+    await tester.pump(const Duration(milliseconds: 1600));
     expect(auth.isSignedIn, isFalse);
     expect(c.read(sessionRestoreErrorProvider), '帳號已停權');
     expect(calls, 2);
   });
 
-  test('限流冷啟動自動重試，成功後保持同帳號快取', () async {
+  testWidgets('限流冷啟動自動重試，成功後保持同帳號快取', (tester) async {
     await AuthStorage.restoreAccount('acc-1');
     await _saveCachedEditHistory();
     final repo = FakeAuthRepository();
@@ -564,7 +564,7 @@ void main() {
     await c.read(sessionProvider.notifier).initialize();
     expect(c.read(sessionProvider).isLoggedIn, isFalse);
     expect(calls, 1);
-    await Future<void>.delayed(const Duration(milliseconds: 1600));
+    await tester.pump(const Duration(milliseconds: 1600));
     expect(c.read(sessionProvider).isLoggedIn, isTrue);
     expect(calls, 2);
     expect(auth.calls, isEmpty);

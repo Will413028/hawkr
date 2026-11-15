@@ -38,3 +38,9 @@
 ## 修訂（2026-10-28）
 
 設計書 54（App 版本檢查與強制更新）已刪除，內容由 `docs/modules/content.md`（後端）、`packages/hawkr_app_update/docs/spec.md`（App 端）與 `docs/runbooks/app-version-gate.md`（排查與放行判準）承接。本文中「設計書 54」與它的章節編號（§3.1、§4.6、§9.2 等）指向已刪除的文件，內容見 git 歷史。
+
+## 修訂（2026-11-15）
+
+- `app_version_utils.dart`（`fetchAppVersion`、`fetchRawAppVersion`）搬進 `packages/hawkr_app_update/lib/app_version_utils.dart`，套件依賴 `package_info_plus`（Flutter plugin），兩支 App 改 import 套件、刪掉各自的副本；上文「後果」把它排除在範圍外的那條不再成立。
+- `brand_startup_splash.dart` 已經分歧（買家用 `HkBrandMark`，賣家是自己的動畫），不再是逐位元組相同的檔；在品牌動畫統一之前各 App 各留一份。
+- 設計書 54 §4.6.1 隨設計書刪除（見上一則修訂），這兩點以本修訂為準。

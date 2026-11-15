@@ -176,7 +176,7 @@ CREATE TABLE seller.cases (
     -- 政策分類（platform/policy）中平台判定與認定可用的值：全部除了 OTHER（含社群類別，內容下架措施的認定用它們）。
     CONSTRAINT cases_category_check CHECK (category IN (
         'FOOD_SAFETY', 'PROHIBITED_GOODS', 'UNLICENSED_SALE', 'MISLEADING_INFO', 'FAKE_CERTIFICATION', 'COUNTERFEIT',
-        'IP_INFRINGEMENT', 'FRAUD', 'OFF_PLATFORM_TRADE', 'PRIVACY', 'IMPERSONATION', 'PLATFORM_ABUSE', 'SPAM', 'HARASSMENT', 'HATE'
+        'IP_INFRINGEMENT', 'FRAUD', 'OFF_PLATFORM_TRADE', 'PRIVACY', 'IMPERSONATION', 'PLATFORM_ABUSE', 'SPAM', 'HARASSMENT', 'HATE', 'SEXUAL_CONTENT'
     )),
     CONSTRAINT cases_severity_check CHECK (severity IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
     -- 結案欄位只有三種組合。整個式子要是 TRUE（IS TRUE）：close_reason 或 decision 是 NULL 時，各個比較都是 NULL，CHECK 對 NULL 是放行的，
@@ -430,7 +430,7 @@ CREATE TABLE seller.violations (
     -- 政策分類（platform/policy）中平台判定與認定可用的值：全部除了 OTHER（OTHER 只給檢舉人選；含社群類別，內容下架措施的認定用它們）。
     CONSTRAINT violations_category_check CHECK (category IN (
         'FOOD_SAFETY', 'PROHIBITED_GOODS', 'UNLICENSED_SALE', 'MISLEADING_INFO', 'FAKE_CERTIFICATION', 'COUNTERFEIT',
-        'IP_INFRINGEMENT', 'FRAUD', 'OFF_PLATFORM_TRADE', 'PRIVACY', 'IMPERSONATION', 'PLATFORM_ABUSE', 'SPAM', 'HARASSMENT', 'HATE'
+        'IP_INFRINGEMENT', 'FRAUD', 'OFF_PLATFORM_TRADE', 'PRIVACY', 'IMPERSONATION', 'PLATFORM_ABUSE', 'SPAM', 'HARASSMENT', 'HATE', 'SEXUAL_CONTENT'
     )),
     CONSTRAINT violations_severity_check CHECK (severity IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
     CONSTRAINT violations_status_check CHECK (status IN ('ENFORCED', 'REVOKED')),

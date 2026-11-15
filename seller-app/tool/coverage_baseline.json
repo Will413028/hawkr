@@ -348,7 +348,6 @@
     "lib/features/wallet/presentation/wallet_coupon_section.dart",
     "lib/features/wallet/presentation/wallet_screen.dart",
     "lib/main_catalog.dart",
-    "lib/shared/utils/app_version_utils.dart",
     "lib/shared/utils/floating_toast.dart",
     "lib/shared/utils/hk_log.dart",
     "lib/shared/utils/image_format_detector.dart",

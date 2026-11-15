@@ -13,12 +13,9 @@ import (
 
 // social-recount 對全部可重算的計數覆寫並印出漂移；沒有漂移時印 0。
 func TestSocialRecountRewritesDriftedCounts(t *testing.T) {
-	url := pg.NewURL(t)
+	url := migratedURL(t)
 	t.Setenv("DATABASE_URL", url)
 	ctx := context.Background()
-	if err := run(ctx, []string{"migrate"}); err != nil {
-		t.Fatal(err)
-	}
 	conn, err := pgx.Connect(ctx, url)
 	if err != nil {
 		t.Fatal(err)

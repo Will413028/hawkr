@@ -26,8 +26,7 @@ type Config struct {
 	// `https://test-media.example.com`、prod 一律 `https://media.example.com`。
 	// 舊實作預設回退 `https://cdn.example.com`（退役中的舊 OSS 網域），DNS 一撤就會
 	// 讓漏設本變數的 pod 靜默吐出死連結；「猜一個域名」無論猜哪個都是錯的，所以直接
-	// 讓它啟動失敗。注入來源：dev = k8s/values/*.yaml、prod = overlays/prod/common.yaml、
-	// 本機 = docker-compose-local.yml。
+	// 讓它啟動失敗。注入來源：本機 = docker-compose-local.yml，部署環境由其環境變數提供。
 	MediaBaseURL string
 	// WebBaseURL 是賣家公開頁（買家與賣家網頁）的域名，由 gateway 自己設定。
 	// 目前唯一用途：admin 審核頁算平台

@@ -1161,8 +1161,8 @@ F／G 軸；SSOT ＝ 36 號 §3.3），**不在本書射程內** ⇒ 🔴 **不�
 ⚠️ **Java 側的 MQ 實作規約**：
 publisher 走 `obsRabbitPublisher.publish(...)`、consumer 走 `manualAckContainerFactory`，
 常數進 `MqConstants`（**不是** `pkg/mq`）。
-🔴 **Java 側漏登記 `topology.yaml` 沒有任何 CI gate 擋得住**
-（`static-gates.yml` 的登記一致性 step 只掃 Go）⇒ 本書的三條新 key 必須人工覆核到 review。
+🔴 **漏登記 `topology.yaml` 沒有任何 CI gate 擋得住**
+（Go 與 Java 都一樣）⇒ 本書的三條新 key 必須人工覆核到 review。
 
 🔴 **每一條 `logistics.*` routing key 的四面登記（上方 ①～④）必須在同一個 PR 內一次做完。**
 **只改 36 號、不改 topology** 會製造一個看不見的不一致——36 說有這條 queue、broker 上沒有，

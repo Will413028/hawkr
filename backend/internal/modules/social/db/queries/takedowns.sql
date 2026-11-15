@@ -11,15 +11,27 @@ SELECT sqlc.arg(measure_id)::uuid, NULL::uuid, NULL::uuid, f, sqlc.arg(created_a
 ON CONFLICT DO NOTHING;
 
 -- name: InvalidTakedownContents :many
--- 內容下架的歸屬核對（建立措施的同一個 transaction，留言與討論區留言的列已經鎖住）：回傳不存在、已刪除、或不是該店家自己寫的內容。貼文的作者是它所屬的店家。
+-- 內容下架的歸屬核對（建立措施的同一個 transaction，留言與討論區留言的列已經鎖住）：回傳存在（含已軟刪）但不是該店家自己寫的內容。列已經清除的內容不在此列：它的歸屬由 moderation 以案件快照核對，再呼叫 seller。貼文的作者是它所屬的店家。
 SELECT 'POST'::text AS content_kind, p::uuid AS content_id FROM unnest(sqlc.arg(post_ids)::uuid[]) AS p
-WHERE NOT EXISTS (SELECT 1 FROM social.posts AS x WHERE x.id = p AND x.store_id = sqlc.arg(store_id)::bigint AND x.deleted_at IS NULL)
+WHERE EXISTS (SELECT 1 FROM social.posts AS x WHERE x.id = p AND x.store_id <> sqlc.arg(store_id)::bigint)
 UNION ALL
 SELECT 'COMMENT'::text, c::uuid FROM unnest(sqlc.arg(comment_ids)::uuid[]) AS c
-WHERE NOT EXISTS (SELECT 1 FROM social.comments AS x WHERE x.id = c AND x.actor_kind = 'STORE' AND x.actor_id = sqlc.arg(store_id)::bigint AND x.deleted_at IS NULL)
+WHERE EXISTS (SELECT 1 FROM social.comments AS x WHERE x.id = c AND NOT (x.actor_kind = 'STORE' AND x.actor_id = sqlc.arg(store_id)::bigint))
 UNION ALL
 SELECT 'FORUM_ENTRY'::text, f::uuid FROM unnest(sqlc.arg(forum_entry_ids)::uuid[]) AS f
-WHERE NOT EXISTS (SELECT 1 FROM social.forum_entries AS x WHERE x.id = f AND x.actor_kind = 'STORE' AND x.actor_id = sqlc.arg(store_id)::bigint AND x.deleted_at IS NULL)
+WHERE EXISTS (SELECT 1 FROM social.forum_entries AS x WHERE x.id = f AND NOT (x.actor_kind = 'STORE' AND x.actor_id = sqlc.arg(store_id)::bigint))
+ORDER BY 1, 2;
+
+-- name: GoneTakedownContents :many
+-- 通過歸屬核對的內容裡已軟刪或列已清除的：沒有公開可見的東西要隱藏，不寫複本（也無列可供外鍵）。
+SELECT 'POST'::text AS content_kind, p::uuid AS content_id FROM unnest(sqlc.arg(post_ids)::uuid[]) AS p
+WHERE NOT EXISTS (SELECT 1 FROM social.posts AS x WHERE x.id = p AND x.deleted_at IS NULL)
+UNION ALL
+SELECT 'COMMENT'::text, c::uuid FROM unnest(sqlc.arg(comment_ids)::uuid[]) AS c
+WHERE NOT EXISTS (SELECT 1 FROM social.comments AS x WHERE x.id = c AND x.deleted_at IS NULL)
+UNION ALL
+SELECT 'FORUM_ENTRY'::text, f::uuid FROM unnest(sqlc.arg(forum_entry_ids)::uuid[]) AS f
+WHERE NOT EXISTS (SELECT 1 FROM social.forum_entries AS x WHERE x.id = f AND x.deleted_at IS NULL)
 ORDER BY 1, 2;
 
 -- name: InsertActiveTakedowns :execrows

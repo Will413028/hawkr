@@ -26,19 +26,19 @@
     },
     "common.PolicyCategory.POLICY_CATEGORY_FOOD_SAFETY": {
       "message": "食品安全",
-      "description": "有健康風險或疑似食物中毒，或未揭露安全疑慮的商品（條款第十一條、第十六條第 1 款）。入口：檢舉人、平台判定與認定。"
+      "description": "有健康風險或疑似食物中毒，或未揭露安全疑慮的商品（條款第十一條、第十六條第 1 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_FRAUD": {
       "message": "詐欺或操縱交易",
-      "description": "偽造交易、洗錢、詐欺、濫用優惠、操縱評價或規避風險控管（第十六條第 2 款）。入口：檢舉人、平台判定與認定。"
+      "description": "偽造交易、洗錢、詐欺、濫用優惠、操縱評價或規避風險控管（第十六條第 2 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_HARASSMENT": {
       "message": "騷擾或霸凌",
-      "description": "社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。"
+      "description": "社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_HATE": {
       "message": "仇恨或歧視言論",
-      "description": "社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。"
+      "description": "社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_IMPERSONATION": {
       "message": "冒用或誤導交易主體",
@@ -50,7 +50,7 @@
     },
     "common.PolicyCategory.POLICY_CATEGORY_MISLEADING_INFO": {
       "message": "不實或誤導資訊",
-      "description": "虛假資料、標示不實或誤導的商品或店家資訊（第十六條第 2 款）。入口：檢舉人、平台判定與認定。"
+      "description": "虛假資料、標示不實或誤導的商品或店家資訊（第十六條第 2 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_OFF_PLATFORM_TRADE": {
       "message": "繞過平台交易",
@@ -58,7 +58,7 @@
     },
     "common.PolicyCategory.POLICY_CATEGORY_OTHER": {
       "message": "其他",
-      "description": "檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。入口：只有檢舉人。"
+      "description": "檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。入口：店家通報與社群檢舉的檢舉人；平台判定與認定不能用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_PLATFORM_ABUSE": {
       "message": "干擾或濫用平台",
@@ -72,9 +72,13 @@
       "message": "違法或禁售商品",
       "description": "違法、違禁或來源不明，而沒有健康風險的商品（第十六條第 1 款）。入口：檢舉人、平台判定與認定。"
     },
+    "common.PolicyCategory.POLICY_CATEGORY_SEXUAL_CONTENT": {
+      "message": "色情或性相關內容",
+      "description": "社群內容中的色情、裸露或性暴力內容（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。"
+    },
     "common.PolicyCategory.POLICY_CATEGORY_SPAM": {
       "message": "垃圾訊息",
-      "description": "社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。"
+      "description": "社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_UNLICENSED_SALE": {
       "message": "未經許可販售",

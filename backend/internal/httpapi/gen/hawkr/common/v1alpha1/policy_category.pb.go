@@ -22,18 +22,18 @@ const (
 )
 
 // PolicyCategory 是平台的政策分類（step10e-reports-brief R10）：檢舉人選的類別、平台判定類別與認定的類別共用一份，
-// 各入口只接受自己的子集（見各值的「入口」）。店家治理的值對應賣家合作條款的依據，給賣家的理由要能指到條款；社群內容的值（SPAM、HARASSMENT、HATE）給買家寫的內容的隱藏與內容下架用，買家條款訂出後補條款依據；檢舉人選不到，認定與案件類別可以用。
+// 各入口只接受自己的子集（見各值的「入口」）。店家治理的值對應賣家合作條款的依據，給賣家的理由要能指到條款；社群內容的值（SPAM、HARASSMENT、HATE、SEXUAL_CONTENT）給買家寫的內容的隱藏與內容下架用，買家條款訂出後補條款依據；店家治理的檢舉人選不到它們，社群檢舉入口的檢舉人可選的子集是 SPAM、HARASSMENT、HATE、SEXUAL_CONTENT、MISLEADING_INFO、FOOD_SAFETY、FRAUD、OTHER；認定與案件類別都可以用。
 type PolicyCategory int32
 
 const (
 	PolicyCategory_POLICY_CATEGORY_UNSPECIFIED PolicyCategory = 0
-	// 有健康風險或疑似食物中毒，或未揭露安全疑慮的商品（條款第十一條、第十六條第 1 款）。入口：檢舉人、平台判定與認定。
+	// 有健康風險或疑似食物中毒，或未揭露安全疑慮的商品（條款第十一條、第十六條第 1 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。
 	PolicyCategory_POLICY_CATEGORY_FOOD_SAFETY PolicyCategory = 1
 	// 違法、違禁或來源不明，而沒有健康風險的商品（第十六條第 1 款）。入口：檢舉人、平台判定與認定。
 	PolicyCategory_POLICY_CATEGORY_PROHIBITED_GOODS PolicyCategory = 2
 	// 依法應有的登錄、許可或資格沒有完成就販售（第十一條第 2 項）。入口：檢舉人、平台判定與認定。
 	PolicyCategory_POLICY_CATEGORY_UNLICENSED_SALE PolicyCategory = 3
-	// 虛假資料、標示不實或誤導的商品或店家資訊（第十六條第 2 款）。入口：檢舉人、平台判定與認定。
+	// 虛假資料、標示不實或誤導的商品或店家資訊（第十六條第 2 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。
 	PolicyCategory_POLICY_CATEGORY_MISLEADING_INFO PolicyCategory = 4
 	// 不實的認證、檢驗或標章（第十六條第 2 款的一種）。入口：檢舉人、平台判定與認定。
 	PolicyCategory_POLICY_CATEGORY_FAKE_CERTIFICATION PolicyCategory = 5
@@ -41,7 +41,7 @@ const (
 	PolicyCategory_POLICY_CATEGORY_COUNTERFEIT PolicyCategory = 6
 	// 侵害他人商標、著作權、專利、營業秘密、肖像或其他權利的使用（第十六條第 5 款），例如店名或商品標題用了別人的商標；仿冒商品本身是 COUNTERFEIT。入口：檢舉人、平台判定與認定。
 	PolicyCategory_POLICY_CATEGORY_IP_INFRINGEMENT PolicyCategory = 7
-	// 偽造交易、洗錢、詐欺、濫用優惠、操縱評價或規避風險控管（第十六條第 2 款）。入口：檢舉人、平台判定與認定。
+	// 偽造交易、洗錢、詐欺、濫用優惠、操縱評價或規避風險控管（第十六條第 2 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。
 	PolicyCategory_POLICY_CATEGORY_FRAUD PolicyCategory = 8
 	// 引導買家繞過平台付款，或規避平台服務費（第十六條第 3 款）。入口：檢舉人、平台判定與認定。
 	PolicyCategory_POLICY_CATEGORY_OFF_PLATFORM_TRADE PolicyCategory = 9
@@ -51,14 +51,16 @@ const (
 	PolicyCategory_POLICY_CATEGORY_IMPERSONATION PolicyCategory = 11
 	// 干擾、探測或破壞平台與資訊安全，或以爬蟲、自動化不當取得資料（第十六條第 6、7 款）。入口：只有平台判定與認定。
 	PolicyCategory_POLICY_CATEGORY_PLATFORM_ABUSE PolicyCategory = 12
-	// 檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。入口：只有檢舉人。
+	// 檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。入口：店家通報與社群檢舉的檢舉人；平台判定與認定不能用。
 	PolicyCategory_POLICY_CATEGORY_OTHER PolicyCategory = 13
-	// 社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。
+	// 社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
 	PolicyCategory_POLICY_CATEGORY_SPAM PolicyCategory = 14
-	// 社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。
+	// 社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
 	PolicyCategory_POLICY_CATEGORY_HARASSMENT PolicyCategory = 15
-	// 社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。
+	// 社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
 	PolicyCategory_POLICY_CATEGORY_HATE PolicyCategory = 16
+	// 社群內容中的色情、裸露或性暴力內容（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
+	PolicyCategory_POLICY_CATEGORY_SEXUAL_CONTENT PolicyCategory = 17
 )
 
 // Enum value maps for PolicyCategory.
@@ -81,6 +83,7 @@ var (
 		14: "POLICY_CATEGORY_SPAM",
 		15: "POLICY_CATEGORY_HARASSMENT",
 		16: "POLICY_CATEGORY_HATE",
+		17: "POLICY_CATEGORY_SEXUAL_CONTENT",
 	}
 	PolicyCategory_value = map[string]int32{
 		"POLICY_CATEGORY_UNSPECIFIED":        0,
@@ -100,6 +103,7 @@ var (
 		"POLICY_CATEGORY_SPAM":               14,
 		"POLICY_CATEGORY_HARASSMENT":         15,
 		"POLICY_CATEGORY_HATE":               16,
+		"POLICY_CATEGORY_SEXUAL_CONTENT":     17,
 	}
 )
 
@@ -134,7 +138,7 @@ var File_hawkr_common_v1alpha1_policy_category_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_policy_category_proto_rawDesc = "" +
 	"\n" +
-	"+hawkr/common/v1alpha1/policy_category.proto\x12\x15hawkr.common.v1alpha1*\xc6\x04\n" +
+	"+hawkr/common/v1alpha1/policy_category.proto\x12\x15hawkr.common.v1alpha1*\xea\x04\n" +
 	"\x0ePolicyCategory\x12\x1f\n" +
 	"\x1bPOLICY_CATEGORY_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bPOLICY_CATEGORY_FOOD_SAFETY\x10\x01\x12$\n" +
@@ -153,7 +157,8 @@ const file_hawkr_common_v1alpha1_policy_category_proto_rawDesc = "" +
 	"\x15POLICY_CATEGORY_OTHER\x10\r\x12\x18\n" +
 	"\x14POLICY_CATEGORY_SPAM\x10\x0e\x12\x1e\n" +
 	"\x1aPOLICY_CATEGORY_HARASSMENT\x10\x0f\x12\x18\n" +
-	"\x14POLICY_CATEGORY_HATE\x10\x10B\x85\x02\n" +
+	"\x14POLICY_CATEGORY_HATE\x10\x10\x12\"\n" +
+	"\x1ePOLICY_CATEGORY_SEXUAL_CONTENT\x10\x11B\x85\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x13PolicyCategoryProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (

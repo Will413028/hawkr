@@ -10,8 +10,8 @@ var upperSnake = regexp.MustCompile(`^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$`)
 
 func TestValuesAreDistinctUpperSnakeCodes(t *testing.T) {
 	values := Values()
-	if len(values) != 16 {
-		t.Fatalf("政策分類有 %d 個值，預期 16 個", len(values))
+	if len(values) != 17 {
+		t.Fatalf("政策分類有 %d 個值，預期 17 個", len(values))
 	}
 	seen := map[Category]bool{}
 	for _, v := range values {
@@ -64,7 +64,7 @@ func TestOtherIsOnlyForReportersAndPlatformAbuseOnlyForAssessment(t *testing.T) 
 
 // 社群類別不給店家治理的檢舉人選，但店家治理的認定與案件類別接受（內容下架的認定）；社群的子集不含 Other。
 func TestCommunityCategoriesAreNotReporterSelectable(t *testing.T) {
-	if got := Community(); !slices.Equal(got, []Category{Spam, Harassment, Hate}) {
+	if got := Community(); !slices.Equal(got, []Category{Spam, Harassment, Hate, SexualContent}) {
 		t.Fatalf("Community() = %v", got)
 	}
 	for _, v := range Community() {
@@ -115,12 +115,12 @@ func TestFunctionsReturnFreshSlices(t *testing.T) {
 	}
 }
 
-// 社群內容的子集是明列的十個類別；商品與賣家才成立的類別、Other 不在其中，而且每個類別都必須明確歸在「可用」或「不可用」
+// 社群內容的子集是明列的十一個類別；商品與賣家才成立的類別、Other 不在其中，而且每個類別都必須明確歸在「可用」或「不可用」
 // （新增類別時這個測試失敗，逼出一次決定，而不是預設進子集）。
 func TestCommunityAssessableIsExplicit(t *testing.T) {
 	want := []Category{
 		MisleadingInfo, IPInfringement, Fraud, OffPlatformTrade, Privacy, Impersonation, PlatformAbuse,
-		Spam, Harassment, Hate,
+		Spam, Harassment, Hate, SexualContent,
 	}
 	if got := CommunityAssessable(); !slices.Equal(got, want) {
 		t.Fatalf("CommunityAssessable() = %v，預期 %v", got, want)
@@ -135,5 +135,39 @@ func TestCommunityAssessableIsExplicit(t *testing.T) {
 		if in, out := slices.Contains(want, v), slices.Contains(notForCommunity, v); in == out {
 			t.Errorf("%q 沒有明確歸類到社群內容的「可用」或「不可用」", v)
 		}
+	}
+}
+
+// 社群檢舉入口的檢舉人可選的子集恰好八個，店家通報的子集（ReporterSelectable）不因此改變：社群類別仍不在其中。
+func TestCommunityReporterSelectableIsExplicit(t *testing.T) {
+	want := []Category{Spam, Harassment, Hate, SexualContent, MisleadingInfo, FoodSafety, Fraud, Other}
+	got := CommunityReporterSelectable()
+	if !slices.Equal(got, want) || len(got) != 8 {
+		t.Fatalf("CommunityReporterSelectable() = %v，預期 %v", got, want)
+	}
+	for _, v := range Values() {
+		if g, w := v.CommunityReporterSelectable(), slices.Contains(want, v); g != w {
+			t.Errorf("%q.CommunityReporterSelectable() = %v，預期 %v", v, g, w)
+		}
+	}
+	for _, v := range Community() {
+		if v.ReporterSelectable() {
+			t.Errorf("%q 是社群類別，店家通報的檢舉人不能選", v)
+		}
+		if !v.CommunityReporterSelectable() {
+			t.Errorf("%q 是社群類別，社群檢舉的檢舉人要能選", v)
+		}
+	}
+	if PlatformAbuse.CommunityReporterSelectable() {
+		t.Error("PlatformAbuse 只給平台判定與認定")
+	}
+	for _, unknown := range []Category{"", "SEXUAL", "POLITICAL", "FAKE_NEWS"} {
+		if unknown.CommunityReporterSelectable() {
+			t.Errorf("%q 不是政策分類", unknown)
+		}
+	}
+	got[0] = Other
+	if CommunityReporterSelectable()[0] != Spam {
+		t.Error("CommunityReporterSelectable() 回傳了共用的切片")
 	}
 }

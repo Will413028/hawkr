@@ -12,6 +12,84 @@ import (
 	"uuid"
 )
 
+const getCommentSnapshot = `-- name: GetCommentSnapshot :one
+SELECT actor_kind, actor_id, body, (deleted_at IS NULL)::boolean AS exists_now
+FROM social.comments
+WHERE id = $1
+`
+
+type GetCommentSnapshotRow struct {
+	ActorKind string
+	ActorID   int64
+	Body      *string
+	ExistsNow bool
+}
+
+// 給 moderation 凍結檢舉當下的留言內容（唯讀，不鎖）；body 在作者刪帳清除後是 NULL。
+func (q *Queries) GetCommentSnapshot(ctx context.Context, id uuid.UUID) (GetCommentSnapshotRow, error) {
+	row := q.db.QueryRow(ctx, getCommentSnapshot, id)
+	var i GetCommentSnapshotRow
+	err := row.Scan(
+		&i.ActorKind,
+		&i.ActorID,
+		&i.Body,
+		&i.ExistsNow,
+	)
+	return i, err
+}
+
+const getForumEntrySnapshot = `-- name: GetForumEntrySnapshot :one
+SELECT actor_kind, actor_id, body, (deleted_at IS NULL)::boolean AS exists_now
+FROM social.forum_entries
+WHERE id = $1
+`
+
+type GetForumEntrySnapshotRow struct {
+	ActorKind string
+	ActorID   int64
+	Body      *string
+	ExistsNow bool
+}
+
+// 給 moderation 凍結檢舉當下的討論區留言內容（唯讀，不鎖）。
+func (q *Queries) GetForumEntrySnapshot(ctx context.Context, id uuid.UUID) (GetForumEntrySnapshotRow, error) {
+	row := q.db.QueryRow(ctx, getForumEntrySnapshot, id)
+	var i GetForumEntrySnapshotRow
+	err := row.Scan(
+		&i.ActorKind,
+		&i.ActorID,
+		&i.Body,
+		&i.ExistsNow,
+	)
+	return i, err
+}
+
+const getPostSnapshot = `-- name: GetPostSnapshot :one
+SELECT store_id, body, image_asset_id, (deleted_at IS NULL)::boolean AS exists_now
+FROM social.posts
+WHERE id = $1
+`
+
+type GetPostSnapshotRow struct {
+	StoreID      int64
+	Body         string
+	ImageAssetID *string
+	ExistsNow    bool
+}
+
+// 給 moderation 凍結檢舉當下的貼文內容：本文與圖片參照（唯讀，不鎖）。
+func (q *Queries) GetPostSnapshot(ctx context.Context, id uuid.UUID) (GetPostSnapshotRow, error) {
+	row := q.db.QueryRow(ctx, getPostSnapshot, id)
+	var i GetPostSnapshotRow
+	err := row.Scan(
+		&i.StoreID,
+		&i.Body,
+		&i.ImageAssetID,
+		&i.ExistsNow,
+	)
+	return i, err
+}
+
 const insertCommentHide = `-- name: InsertCommentHide :one
 
 INSERT INTO social.hides (id, comment_id, reason_category, reason_text, source_ref, admin_id, hidden_at)
@@ -106,9 +184,9 @@ func (q *Queries) InsertForumEntryHide(ctx context.Context, arg InsertForumEntry
 }
 
 const insertSanction = `-- name: InsertSanction :one
-INSERT INTO social.sanctions (id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at, ends_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at, ends_at
+INSERT INTO social.sanctions (id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at
 `
 
 type InsertSanctionParams struct {
@@ -120,7 +198,6 @@ type InsertSanctionParams struct {
 	SourceRef      *string
 	AdminID        int64
 	Now            time.Time
-	EndsAt         *time.Time
 }
 
 func (q *Queries) InsertSanction(ctx context.Context, arg InsertSanctionParams) (SocialSanction, error) {
@@ -133,7 +210,6 @@ func (q *Queries) InsertSanction(ctx context.Context, arg InsertSanctionParams) 
 		arg.SourceRef,
 		arg.AdminID,
 		arg.Now,
-		arg.EndsAt,
 	)
 	var i SocialSanction
 	err := row.Scan(
@@ -145,7 +221,6 @@ func (q *Queries) InsertSanction(ctx context.Context, arg InsertSanctionParams) 
 		&i.SourceRef,
 		&i.AdminID,
 		&i.CreatedAt,
-		&i.EndsAt,
 	)
 	return i, err
 }
@@ -228,7 +303,7 @@ func (q *Queries) ListHiddenContentOf(ctx context.Context, arg ListHiddenContent
 }
 
 const listSanctions = `-- name: ListSanctions :many
-SELECT id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at, ends_at FROM social.sanctions
+SELECT id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at FROM social.sanctions
 WHERE buyer_id = $1
   AND (created_at, id) < ($2::timestamptz, $3::uuid)
 ORDER BY created_at DESC, id DESC
@@ -266,7 +341,6 @@ func (q *Queries) ListSanctions(ctx context.Context, arg ListSanctionsParams) ([
 			&i.SourceRef,
 			&i.AdminID,
 			&i.CreatedAt,
-			&i.EndsAt,
 		); err != nil {
 			return nil, err
 		}

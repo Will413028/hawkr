@@ -334,7 +334,11 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(adminsellerconnect.NewSellerAdminServiceHandler(httpseller.NewAdmin(deps.Seller, deps.Images, deps.Payment, deps.Logger), opts...))
 	add(sellerconnect.NewSellerPublicServiceHandler(sellerPublic, opts...))
 	add(sellerconnect.NewSellerAppServiceHandler(sellerApp, append(slices.Clone(opts), connect.WithInterceptors(acting))...))
-	add(adminsellerconnect.NewSellerGovernanceAdminServiceHandler(httpseller.NewGovernance(deps.Seller, deps.Images), opts...))
+	governance, err := httpseller.NewGovernance(httpseller.GovernanceDeps{Module: deps.Seller, Images: deps.Images, ContentOwners: deps.Social})
+	if err != nil {
+		return nil, err
+	}
+	add(adminsellerconnect.NewSellerGovernanceAdminServiceHandler(governance, opts...))
 	// 通報人是買家或匿名者，不是店家：這兩個 service 不掛賣家能力的 interceptor。
 	reports, err := httpseller.NewReports(deps.Seller, deps.Buyer, accounts)
 	if err != nil {

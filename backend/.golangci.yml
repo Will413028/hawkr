@@ -59,7 +59,7 @@ linters:
         text: 'SA5011'
 
 # gofmt 在這裡而不是只留在 CI（2026-09-06）：CI 的「Go 檢查」job 另跑一道獨立的
-# `git ls-files -z '*.go' | xargs -0 gofmt -l`，而本機 lefthook 跑的是
+# `git ls-files -z '*.go' | xargs -0 gofmt -l`，而本機 pre-commit 只跑
 # golangci-lint。兩個 gate 的檢查集合原本不一樣，於是「本機 lint 全綠」對 gofmt
 # 毫無保證——PR #3191 就是這樣被 CI 擋下的（import 排序 ＋ doc comment 的方向引號
 # 改寫）。修法是讓本機 gate 追上 CI 的範圍，而不是在本機再長出第三套檢查。

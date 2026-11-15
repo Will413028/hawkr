@@ -20,7 +20,8 @@
 
 ## 決策
 
-- **A7-D14 案件粒度**：每個對象 `(target_kind, target_id)` 至多一個進行中案件，同對象的檢舉掛進該案，結案把決定寫進各檢舉的 outcome，不依類別分案；處置冪等＝案件 open → closed 的狀態轉移加 `version`。結案後的新檢舉開新案件。去重只比對還沒有結果的檢舉；每日上限 20 在同 transaction 的計數列原子 upsert 內強制；檢舉人與買家對象用 `buyer_id` 單一鍵。
+- **A7-D14 案件粒度**：每個對象 `(target_kind, target_key)` 至多一個進行中案件（partial UNIQUE `WHERE closed_at IS NULL`），同對象的檢舉掛進該案，不依類別分案；決定只存在案件（A7-D20），處置冪等＝案件 open → closed 的狀態轉移加 `version`。結案後的新檢舉開新案件。去重是 `UNIQUE (case_id, reporter_buyer_id)`；每日上限 20 在單一 upsert 內原子強制；檢舉人與買家對象用 `buyer_id` 單一鍵。
+- **A7-D20 案件決定、檢舉結果與內容快照**：決定（`VIOLATION` 帶認定類別與處置種類，或 `NO_VIOLATION`）、決定的管理員與結案時間只存在案件，三者同為 NULL 或同不為 NULL，結案是終態、不重開不改判，更正在擁有處分的模組做；檢舉不存結果，各檢舉的結果由所屬案件的決定在查詢時推導（不沿用 seller 的逐筆 outcome）。送出檢舉時凍結內容快照：擁有者模組提供唯讀方法（social 的本文、媒體參照與作者；buyer 的公開顯示欄位），moderation 正規化後取 SHA-256，每案每份內容一列（`UNIQUE (case_id, content_sha256)`），檢舉以 `snapshot_id ON DELETE SET NULL` 引用；結案滿 184 天由排程 job 刪除快照，案件與檢舉列留著。
 - **A7-D15 停權的單一入口**：新編排模組 `accountsuspension`（與 `accountdeletion` 同層，沒有自己的資料）是停權與解除的唯一入口，「擁有商店的帳號不能被停權」只在這裡（`ErrorReason` `ACCOUNT_HAS_STORE`）；identity 的停權、解除入口只被它呼叫，`internal/arch` 掃非測試程式的呼叫者。它在鎖住帳號列之後讀店家，與開店（同一個 transaction 持有同一把鎖）序列化；開店在同一份狀態裡拒絕被停權的帳號。
 - **A7-D16 只有永久停權與手動解除**：identity 的停權紀錄與 social 的處分紀錄都沒有 `ends_at`，停權型別只有永久。
 - **A7-D17 受限登入**：停權不再停用 Clerk 使用者；被停權帳號可登入，能做什麼依動作的性質（A7-D18）：`internal/httpapi` 的宣告表把每個顧客 procedure 標為讀取、寫入或自助，`withSession` 執行（公開方法以訪客執行，讀取與自助放行，寫入回 `ACCOUNT_SUSPENDED`；登出是 client 端的 Clerk）；identity 的認證結果帶停權狀態。停權與解除時 `accountsuspension` 在同一個 transaction 發事件（含理由類別），通知由 A8 消費。
@@ -40,3 +41,10 @@
 - 帳號刪除時未解除的紀錄以 `release_reason = 'ACCOUNT_DELETED'` 解除（刪除的帳號不再是停權狀態，`accounts_deleted_check`）。
 - A7-1d″ 已移除 ban job，解除後下一個請求就恢復；先前被停用的開發用 Clerk 測試帳號由 Will 手動解除。
 - 這一步 `seller` 開店的前置條件加上 identity 的帳號停權（`OpeningSuspended`），否則停權與開店並行時，停權先 commit 的帳號仍可開店。
+
+## 步驟 A7-1d 的事實
+
+- 資料表：`moderation.cases`（案件與決定）、`reports`（檢舉，不存結果）、`case_snapshots`、`reporter_daily_counts`（每位檢舉人一列，台北日換日重算）；主鍵 UUIDv7，不建跨 schema FK。
+- 處置種類 `HIDE`、`WARN`、`BAN`、`TAKEDOWN`，與對象種類的搭配由 `cases_action_target_check` 擋；作者是買家或店家向 social 核對。處置與結案在同一個 transaction，案件列最後才寫，結案 UPDATE 0 列回 `VersionConflict` 並回滾處置。
+- 檢舉原因是 `policy.CommunityReporterSelectable()` 的八個值；`SEXUAL_CONTENT` 是新的社群類別（`Community()`、`CommunityAssessable()`、`Assessable()` 含它）；seller 通報的 `ReporterSelectable()` 不變。
+- 快照保留期 184 天與 seller 措施申覆期限同值，各自一個常數；進行中案件的快照不刪。

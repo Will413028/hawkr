@@ -101,6 +101,71 @@ func (s *Service) Owner(ctx context.Context, t model.Target) (model.ContentOwner
 	return model.ContentOwner{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())
 }
 
+// Snapshot 回傳內容此刻的歸屬（存在、作者、所屬店家、是否公開可讀，同 Owner）、本文與媒體參照（給 moderation 在檢舉送出時凍結）：唯讀，不鎖；內容不存在或已刪除回
+// Exists 為假，不是錯誤。歸屬只查一次（Owner），本文與圖片另用一個查詢讀。
+func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSnapshot, error) {
+	o, err := s.Owner(ctx, t)
+	if err != nil {
+		return model.ContentSnapshot{}, err
+	}
+	if !o.Exists {
+		return model.ContentSnapshot{}, nil
+	}
+	out := model.ContentSnapshot{Exists: true, Author: o.Author, StoreID: o.StoreID, Readable: o.Readable, MediaRefs: []string{}}
+	q := s.q(ctx)
+	switch t.Kind {
+	case model.TargetComment:
+		r, err := q.GetCommentSnapshot(ctx, t.ID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.ContentSnapshot{}, nil
+		}
+		if err != nil {
+			return model.ContentSnapshot{}, fmt.Errorf("social：讀取留言的快照 %s：%w", t.ID, err)
+		}
+		if !r.ExistsNow {
+			return model.ContentSnapshot{}, nil
+		}
+		out.Body = deref(r.Body)
+	case model.TargetForumEntry:
+		r, err := q.GetForumEntrySnapshot(ctx, t.ID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.ContentSnapshot{}, nil
+		}
+		if err != nil {
+			return model.ContentSnapshot{}, fmt.Errorf("social：讀取討論區留言的快照 %s：%w", t.ID, err)
+		}
+		if !r.ExistsNow {
+			return model.ContentSnapshot{}, nil
+		}
+		out.Body = deref(r.Body)
+	case model.TargetPost:
+		r, err := q.GetPostSnapshot(ctx, t.ID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.ContentSnapshot{}, nil
+		}
+		if err != nil {
+			return model.ContentSnapshot{}, fmt.Errorf("social：讀取貼文的快照 %s：%w", t.ID, err)
+		}
+		if !r.ExistsNow {
+			return model.ContentSnapshot{}, nil
+		}
+		out.Body = r.Body
+		if r.ImageAssetID != nil {
+			out.MediaRefs = append(out.MediaRefs, *r.ImageAssetID)
+		}
+	default:
+		return model.ContentSnapshot{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())
+	}
+	return out, nil
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 // lockTarget 鎖住隱藏的目標列（與刪除、編輯同一把鎖），讓之後的 Owner 檢查和寫入看到同一個已提交的狀態：與並行的刪除序列化後，隱藏一則剛被刪除的
 // 內容回 NotFound，而不是對一則已經不存在的內容寫隱藏。計數的正確性不靠它（trigger 的 reevaluate 自己先鎖內容列）。目標不存在時不鎖，由 Owner 回 NotFound。
 func (s *Service) lockTarget(ctx context.Context, t model.Target) error {
@@ -261,7 +326,7 @@ func (s *Service) Warn(ctx context.Context, in model.WarnInput) (model.Sanction,
 }
 
 func toSanction(r store.SocialSanction) model.Sanction {
-	out := model.Sanction{ID: r.ID, BuyerID: r.BuyerID, Kind: model.SanctionKind(r.Kind), Category: r.ReasonCategory, Text: r.ReasonText, AdminID: r.AdminID, CreatedAt: r.CreatedAt, EndsAt: r.EndsAt}
+	out := model.Sanction{ID: r.ID, BuyerID: r.BuyerID, Kind: model.SanctionKind(r.Kind), Category: r.ReasonCategory, Text: r.ReasonText, AdminID: r.AdminID, CreatedAt: r.CreatedAt}
 	if r.SourceRef != nil {
 		out.SourceRef = *r.SourceRef
 	}

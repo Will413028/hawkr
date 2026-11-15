@@ -1,0 +1,141 @@
+{
+  "default": {
+    "report.buyer_not_found": {
+      "message": "找不到要檢舉的買家",
+      "description": "檢舉的買家不存在或已刪除。"
+    },
+    "report.category_invalid": {
+      "message": "檢舉原因不合法",
+      "description": "檢舉原因不是社群檢舉人可選的類別（policy.CommunityReporterSelectable）。"
+    },
+    "report.content_not_found": {
+      "message": "找不到要檢舉的內容",
+      "description": "檢舉的內容不存在、已刪除或不是公開可讀。"
+    },
+    "report.daily_limit": {
+      "message": "今天的檢舉次數已達 {max} 次上限",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "檢舉人當天新增的檢舉到達每日上限。max 是 model.DailyReportLimit。"
+    },
+    "report.description_too_long": {
+      "message": "檢舉說明不可超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "檢舉說明超過字數上限（以字元計）。max 是 model.MaxDescriptionRunes。"
+    },
+    "report.reporter_required": {
+      "message": "需要買家身分",
+      "description": "檢舉人沒有買家身分（沒有買家 ID）。"
+    },
+    "report.self_buyer": {
+      "message": "不能檢舉自己",
+      "description": "檢舉的買家是檢舉人自己（含同一帳號的其他買家身分）。"
+    },
+    "report.self_content": {
+      "message": "不能檢舉自己的內容",
+      "description": "檢舉的內容是檢舉人自己（含同一帳號的其他身分）寫的。"
+    },
+    "report.target_invalid": {
+      "message": "檢舉對象不合法",
+      "description": "檢舉對象的種類或 ID 不合法。"
+    }
+  },
+  "staff": {
+    "case.closed": {
+      "message": "案件已結案",
+      "description": "處理的案件已經結案。"
+    },
+    "case.not_found": {
+      "message": "案件不存在",
+      "description": "案件 ID 查無案件。"
+    },
+    "case.stale": {
+      "message": "案件已被結案或版本已過期，請重新讀取",
+      "description": "結案的轉移 0 列：案件已被結掉，或自管理員讀取之後有新的檢舉掛進來（版本改變）。"
+    },
+    "decide.action_invalid": {
+      "message": "處置種類不合法",
+      "description": "處置種類不是 HIDE、WARN、BAN、TAKEDOWN。"
+    },
+    "decide.action_not_for_target": {
+      "message": "這個處置不適用於這種對象",
+      "description": "處置種類與對象種類的搭配不合法。"
+    },
+    "decide.admin_required": {
+      "message": "管理員必填",
+      "description": "處理案件沒有管理員 ID。"
+    },
+    "decide.ban_not_buyer": {
+      "message": "作者不是買家，不能停權",
+      "description": "停權的對象作者不是買家。"
+    },
+    "decide.case_required": {
+      "message": "案件必填",
+      "description": "處理案件沒有案件 ID。"
+    },
+    "decide.category_not_for_action": {
+      "message": "認定類別不適用這個處置",
+      "description": "認定類別不在這個處置接受的子集。"
+    },
+    "decide.decision_invalid": {
+      "message": "決定不合法",
+      "description": "決定不是違規或不違規。"
+    },
+    "decide.hide_store_content": {
+      "message": "店家寫的內容不能隱藏，要用內容下架",
+      "description": "隱藏的對象是店家寫的內容。"
+    },
+    "decide.no_violation_shape": {
+      "message": "不違規不帶類別、處置與理由",
+      "description": "決定是不違規卻帶了類別、處置、理由、店家或嚴重度。"
+    },
+    "decide.reason_required": {
+      "message": "給作者的理由必填",
+      "description": "違規決定沒有給作者的理由。"
+    },
+    "decide.reason_too_long": {
+      "message": "理由不能超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "給作者的理由超過上限。max 是 model.MaxTextRunes。"
+    },
+    "decide.severity_invalid": {
+      "message": "嚴重度不合法",
+      "description": "內容下架的認定嚴重度不合法。"
+    },
+    "decide.snapshot_missing": {
+      "message": "內容已不存在而且沒有快照，無法確認作者",
+      "description": "警告或停權時內容已被刪除，案件也沒有快照可以確認作者。"
+    },
+    "decide.store_only_takedown": {
+      "message": "只有內容下架帶店家與嚴重度",
+      "description": "非內容下架的處置帶了店家或嚴重度。"
+    },
+    "decide.store_required": {
+      "message": "內容下架要指定內容所屬的店家",
+      "description": "內容下架沒有店家 ID。"
+    },
+    "decide.takedown_wrong_store": {
+      "message": "內容不是這家店寫的，不能對它建立內容下架措施",
+      "description": "內容下架指定的店家不是內容的作者店家。"
+    },
+    "decide.version_required": {
+      "message": "案件版本必填",
+      "description": "處理案件沒有案件版本。"
+    },
+    "decide.warn_not_buyer": {
+      "message": "作者不是買家，不能警告",
+      "description": "警告的對象作者不是買家。"
+    }
+  }
+}

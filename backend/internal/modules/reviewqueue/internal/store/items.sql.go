@@ -21,6 +21,10 @@ FROM (
     SELECT p.kind, p.item_id, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::smallint, NULL::bigint,
            NULL::uuid, NULL::uuid, NULL::uuid, p.store_id, NULL::text, p.start_at, p.due_at
     FROM payment.pub_review_items($1::timestamptz) p
+    UNION ALL
+    SELECT m.kind, m.item_id, NULL::uuid, m.case_id, NULL::uuid, NULL::uuid, NULL::smallint, NULL::bigint,
+           NULL::uuid, NULL::uuid, NULL::uuid, NULL::bigint, NULL::text, m.start_at, m.due_at
+    FROM moderation.pub_review_items($1::timestamptz) m
 ) q
 WHERE q.kind = ANY($2::text[])
   AND ($3::text IS NULL
@@ -41,8 +45,8 @@ type ListItemsParams struct {
 	Lim        int32
 }
 
-// 後台待辦：各來源發布的 pub_*_review_items 依期限由急到緩（step10e-3d-design.md §2.2）。現在是 seller 與 payment（收款帳戶，收款開通 ADR D28）；
-// A7-1e 加 moderation 的分支。payment 的列只有店家 ID，店名在這裡是 NULL，由後台的入口組裝（httpapi/reviewqueue）。
+// 後台待辦：各來源發布的 pub_*_review_items 依期限由急到緩（step10e-3d-design.md §2.2）。現在是 seller、payment（收款帳戶，收款開通 ADR D28）與 moderation（進行中的檢舉案件）。
+// moderation 的列只有案件 ID（case_id 欄）。payment 的列只有店家 ID，店名在這裡是 NULL，由後台的入口組裝（httpapi/reviewqueue）。
 // 全序是 (due_at, start_at, kind, item_id)，kind 與 item_id 以位元組順序（COLLATE "C"）比，與資料庫的預設 collation 無關；
 // keyset 用同樣的 row-value 比較；第一頁沒有游標（四個 after_* 都是 NULL），照 repo 的慣例寫 IS NULL OR。
 // 整句是一個語句快照（READ COMMITTED 下每個語句一個快照），不需要 transaction。

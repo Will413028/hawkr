@@ -15,12 +15,12 @@ import 'dart:core' as $core;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 /// PolicyCategory 是平台的政策分類（step10e-reports-brief R10）：檢舉人選的類別、平台判定類別與認定的類別共用一份，
-/// 各入口只接受自己的子集（見各值的「入口」）。店家治理的值對應賣家合作條款的依據，給賣家的理由要能指到條款；社群內容的值（SPAM、HARASSMENT、HATE）給買家寫的內容的隱藏與內容下架用，買家條款訂出後補條款依據；檢舉人選不到，認定與案件類別可以用。
+/// 各入口只接受自己的子集（見各值的「入口」）。店家治理的值對應賣家合作條款的依據，給賣家的理由要能指到條款；社群內容的值（SPAM、HARASSMENT、HATE、SEXUAL_CONTENT）給買家寫的內容的隱藏與內容下架用，買家條款訂出後補條款依據；店家治理的檢舉人選不到它們，社群檢舉入口的檢舉人可選的子集是 SPAM、HARASSMENT、HATE、SEXUAL_CONTENT、MISLEADING_INFO、FOOD_SAFETY、FRAUD、OTHER；認定與案件類別都可以用。
 class PolicyCategory extends $pb.ProtobufEnum {
   static const PolicyCategory POLICY_CATEGORY_UNSPECIFIED =
       PolicyCategory._(0, _omitEnumNames ? '' : 'POLICY_CATEGORY_UNSPECIFIED');
 
-  /// 有健康風險或疑似食物中毒，或未揭露安全疑慮的商品（條款第十一條、第十六條第 1 款）。入口：檢舉人、平台判定與認定。
+  /// 有健康風險或疑似食物中毒，或未揭露安全疑慮的商品（條款第十一條、第十六條第 1 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。
   static const PolicyCategory POLICY_CATEGORY_FOOD_SAFETY =
       PolicyCategory._(1, _omitEnumNames ? '' : 'POLICY_CATEGORY_FOOD_SAFETY');
 
@@ -34,7 +34,7 @@ class PolicyCategory extends $pb.ProtobufEnum {
       PolicyCategory._(
           3, _omitEnumNames ? '' : 'POLICY_CATEGORY_UNLICENSED_SALE');
 
-  /// 虛假資料、標示不實或誤導的商品或店家資訊（第十六條第 2 款）。入口：檢舉人、平台判定與認定。
+  /// 虛假資料、標示不實或誤導的商品或店家資訊（第十六條第 2 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。
   static const PolicyCategory POLICY_CATEGORY_MISLEADING_INFO =
       PolicyCategory._(
           4, _omitEnumNames ? '' : 'POLICY_CATEGORY_MISLEADING_INFO');
@@ -53,7 +53,7 @@ class PolicyCategory extends $pb.ProtobufEnum {
       PolicyCategory._(
           7, _omitEnumNames ? '' : 'POLICY_CATEGORY_IP_INFRINGEMENT');
 
-  /// 偽造交易、洗錢、詐欺、濫用優惠、操縱評價或規避風險控管（第十六條第 2 款）。入口：檢舉人、平台判定與認定。
+  /// 偽造交易、洗錢、詐欺、濫用優惠、操縱評價或規避風險控管（第十六條第 2 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。
   static const PolicyCategory POLICY_CATEGORY_FRAUD =
       PolicyCategory._(8, _omitEnumNames ? '' : 'POLICY_CATEGORY_FRAUD');
 
@@ -74,21 +74,25 @@ class PolicyCategory extends $pb.ProtobufEnum {
   static const PolicyCategory POLICY_CATEGORY_PLATFORM_ABUSE = PolicyCategory._(
       12, _omitEnumNames ? '' : 'POLICY_CATEGORY_PLATFORM_ABUSE');
 
-  /// 檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。入口：只有檢舉人。
+  /// 檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。入口：店家通報與社群檢舉的檢舉人；平台判定與認定不能用。
   static const PolicyCategory POLICY_CATEGORY_OTHER =
       PolicyCategory._(13, _omitEnumNames ? '' : 'POLICY_CATEGORY_OTHER');
 
-  /// 社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。
+  /// 社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
   static const PolicyCategory POLICY_CATEGORY_SPAM =
       PolicyCategory._(14, _omitEnumNames ? '' : 'POLICY_CATEGORY_SPAM');
 
-  /// 社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。
+  /// 社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
   static const PolicyCategory POLICY_CATEGORY_HARASSMENT =
       PolicyCategory._(15, _omitEnumNames ? '' : 'POLICY_CATEGORY_HARASSMENT');
 
-  /// 社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。
+  /// 社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
   static const PolicyCategory POLICY_CATEGORY_HATE =
       PolicyCategory._(16, _omitEnumNames ? '' : 'POLICY_CATEGORY_HATE');
+
+  /// 社群內容中的色情、裸露或性暴力內容（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
+  static const PolicyCategory POLICY_CATEGORY_SEXUAL_CONTENT = PolicyCategory._(
+      17, _omitEnumNames ? '' : 'POLICY_CATEGORY_SEXUAL_CONTENT');
 
   static const $core.List<PolicyCategory> values = <PolicyCategory>[
     POLICY_CATEGORY_UNSPECIFIED,
@@ -108,10 +112,11 @@ class PolicyCategory extends $pb.ProtobufEnum {
     POLICY_CATEGORY_SPAM,
     POLICY_CATEGORY_HARASSMENT,
     POLICY_CATEGORY_HATE,
+    POLICY_CATEGORY_SEXUAL_CONTENT,
   ];
 
   static final $core.List<PolicyCategory?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 16);
+      $pb.ProtobufEnum.$_initByValueList(values, 17);
   static PolicyCategory? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

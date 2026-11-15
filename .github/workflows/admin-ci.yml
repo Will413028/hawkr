@@ -53,10 +53,6 @@ defaults:
   run:
     working-directory: admin
 
-env:
-  # admin/website 的 `prepare` 會跑 `lefthook install`，CI 不需要 git hooks。
-  LEFTHOOK: '0'
-
 jobs:
   verify:
     name: Lint, test, build

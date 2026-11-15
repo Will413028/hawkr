@@ -1,0 +1,306 @@
+//go:build integration
+
+package moderation
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"testing"
+	"uuid"
+
+	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/policy"
+)
+
+func (f *fixture) openCase(t *testing.T, target Target) Case {
+	t.Helper()
+	reporter, _ := f.newBuyer(t)
+	return f.submit(t, reporter, target, policy.Spam).Case
+}
+
+// bumpVersion 模擬案件在管理員讀取之後被別人動過：版本過期，之後的結案 UPDATE 會是 0 列。
+func (f *fixture) bumpVersion(t *testing.T, id uuid.UUID) {
+	t.Helper()
+	f.exec(t, "UPDATE moderation.cases SET version = version + 1 WHERE id = $1", id)
+}
+
+func (f *fixture) decide(t *testing.T, c Case, action Action, category policy.Category) (CaseDetail, error) {
+	t.Helper()
+	return f.module.DecideCase(context.Background(), DecideInput{
+		CaseID: c.ID, Version: c.Version, AdminID: 9, Decision: DecisionViolation, Category: category, Action: action, Text: "違反社群規範",
+	})
+}
+
+func (f *fixture) suspended(t *testing.T, accountID int64) bool {
+	t.Helper()
+	return f.count(t, "SELECT count(*) FROM identity.accounts WHERE id = $1 AND suspended_at IS NOT NULL", accountID) == 1
+}
+
+// SD11 的處置面與 SD10：隱藏、警告、停權各自經擁有處分的模組留下紀錄，來源參照指到案件。
+func TestBuyerBranchActionsLeaveRecordsInTheOwningModules(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	ctx := context.Background()
+
+	hideCase := f.openCase(t, commentTarget(w.comment))
+	mustV[CaseDetail](t)(f.decide(t, hideCase, ActionHide, policy.Harassment))
+	if f.readable(t, social.TargetComment, w.comment.ID) {
+		t.Fatal("留言要被隱藏")
+	}
+	if n := f.count(t, "SELECT count(*) FROM social.hides WHERE comment_id = $1 AND source_ref = $2 AND admin_id = 9 AND reason_category = 'HARASSMENT'", w.comment.ID, SourceRefPrefix+hideCase.ID.String()); n != 1 {
+		t.Fatalf("隱藏紀錄 %d 筆", n)
+	}
+
+	warnComment := f.comment(t, w.post.ID, w.author, "第二則")
+	warnCase := f.openCase(t, commentTarget(warnComment))
+	mustV[CaseDetail](t)(f.decide(t, warnCase, ActionWarn, policy.Spam))
+	page := mustV[social.SanctionPage](t)(f.social.MySanctions(ctx, w.author, nil, 10))
+	if len(page.Sanctions) != 1 || page.Sanctions[0].Kind != social.SanctionWarning || page.Sanctions[0].SourceRef != SourceRefPrefix+warnCase.ID.String() {
+		t.Fatalf("作者的處分列表要有這筆警告：%+v", page)
+	}
+	if !f.readable(t, social.TargetComment, warnComment.ID) {
+		t.Fatal("警告不隱藏內容")
+	}
+
+	banCase := f.openCase(t, Target{Kind: TargetBuyer, BuyerID: w.author})
+	mustV[CaseDetail](t)(f.decide(t, banCase, ActionBan, policy.Fraud))
+	if !f.suspended(t, w.authorAccount) {
+		t.Fatal("帳號要被停權")
+	}
+	if n := f.count(t, "SELECT count(*) FROM identity.account_suspensions WHERE account_id = $1 AND source_ref = $2 AND released_at IS NULL", w.authorAccount, SourceRefPrefix+banCase.ID.String()); n != 1 {
+		t.Fatalf("停權紀錄 %d 筆", n)
+	}
+	closed := mustV[CaseDetail](t)(f.module.Case(ctx, banCase.ID))
+	if closed.Case.Action == nil || *closed.Case.Action != ActionBan || closed.Case.Category == nil || *closed.Case.Category != policy.Fraud || closed.Case.DecidedByAdmin == nil || *closed.Case.DecidedByAdmin != 9 {
+		t.Fatalf("決定要寫在案件上：%+v", closed.Case)
+	}
+}
+
+// 回滾：處置之後結案 UPDATE 失敗（版本過期），處置與紀錄全部回滾，被處置的內容與帳號狀態不變。
+func TestDecideRollsBackTheActionWhenCloseLosesTheRace(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	ctx := context.Background()
+	assertConflict := func(t *testing.T, err error) {
+		t.Helper()
+		if kindOf(err) != apperr.KindVersionConflict {
+			t.Fatalf("要回 VersionConflict：%v", err)
+		}
+	}
+
+	t.Run("Hide", func(t *testing.T) {
+		c := f.openCase(t, commentTarget(w.comment))
+		f.bumpVersion(t, c.ID)
+		_, err := f.decide(t, c, ActionHide, policy.Spam)
+		assertConflict(t, err)
+		if !f.readable(t, social.TargetComment, w.comment.ID) || f.count(t, "SELECT count(*) FROM social.hides") != 0 {
+			t.Fatal("隱藏要整個回滾")
+		}
+	})
+	t.Run("Warn", func(t *testing.T) {
+		c := f.openCase(t, commentTarget(w.comment))
+		f.bumpVersion(t, c.ID)
+		_, err := f.decide(t, c, ActionWarn, policy.Spam)
+		assertConflict(t, err)
+		if page := mustV[social.SanctionPage](t)(f.social.MySanctions(ctx, w.author, nil, 10)); len(page.Sanctions) != 0 {
+			t.Fatalf("警告要整個回滾：%+v", page)
+		}
+	})
+	t.Run("Suspend", func(t *testing.T) {
+		c := f.openCase(t, Target{Kind: TargetBuyer, BuyerID: w.author})
+		f.bumpVersion(t, c.ID)
+		_, err := f.decide(t, c, ActionBan, policy.Spam)
+		assertConflict(t, err)
+		if f.suspended(t, w.authorAccount) || f.count(t, "SELECT count(*) FROM identity.account_suspensions WHERE account_id = $1", w.authorAccount) != 0 {
+			t.Fatal("停權要整個回滾")
+		}
+	})
+	if n := f.count(t, "SELECT count(*) FROM moderation.cases WHERE closed_at IS NOT NULL"); n != 0 {
+		t.Fatalf("沒有案件可以結案：%d", n)
+	}
+}
+
+// SD10：店家不能被停權，店家寫的內容只能走內容下架；處置種類與對象或作者不搭配時什麼都不寫、案件仍是進行中。
+func TestActionsThatDoNotFitTheTargetAreRejected(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	postCase := f.openCase(t, Target{Kind: TargetPost, ContentID: w.post.ID})
+	for _, a := range []Action{ActionHide, ActionWarn, ActionBan} {
+		_, err := f.decide(t, postCase, a, policy.Spam)
+		if kindOf(err) != apperr.KindInvalidInput {
+			t.Errorf("貼文的處置 %s：%v，預期 InvalidInput", a, err)
+		}
+	}
+	commentCase := f.openCase(t, commentTarget(w.comment))
+	_, err := f.module.DecideCase(context.Background(), DecideInput{
+		CaseID: commentCase.ID, Version: 1, AdminID: 9, Decision: DecisionViolation, Category: policy.Spam, Action: ActionTakedown,
+		Text: "下架", StoreID: w.storeID, Severity: string(seller.SeverityValues()[0]),
+	})
+	if kindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("買家寫的留言不能走內容下架：%v", err)
+	}
+	for name, in := range map[string]DecideInput{
+		"類別不適用社群":  {CaseID: commentCase.ID, Version: 1, AdminID: 9, Decision: DecisionViolation, Category: policy.Counterfeit, Action: ActionHide, Text: "x"},
+		"沒有理由":     {CaseID: commentCase.ID, Version: 1, AdminID: 9, Decision: DecisionViolation, Category: policy.Spam, Action: ActionHide},
+		"不違規帶了處置":  {CaseID: commentCase.ID, Version: 1, AdminID: 9, Decision: DecisionNoViolation, Action: ActionHide},
+		"沒有管理員":    {CaseID: commentCase.ID, Version: 1, Decision: DecisionNoViolation},
+		"決定不合法":    {CaseID: commentCase.ID, Version: 1, AdminID: 9, Decision: "MAYBE"},
+		"內容下架沒有店家": {CaseID: commentCase.ID, Version: 1, AdminID: 9, Decision: DecisionViolation, Category: policy.Spam, Action: ActionTakedown, Text: "x", Severity: string(seller.SeverityValues()[0])},
+		"非下架帶了店家":  {CaseID: commentCase.ID, Version: 1, AdminID: 9, Decision: DecisionViolation, Category: policy.Spam, Action: ActionHide, Text: "x", StoreID: 1},
+	} {
+		if _, err := f.module.DecideCase(context.Background(), in); kindOf(err) != apperr.KindInvalidInput {
+			t.Errorf("%s：%v，預期 InvalidInput", name, err)
+		}
+	}
+	if _, err := f.module.DecideCase(context.Background(), DecideInput{CaseID: uuid.NewV7(), Version: 1, AdminID: 9, Decision: DecisionNoViolation}); kindOf(err) != apperr.KindNotFound {
+		t.Fatalf("不存在的案件：%v", err)
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.cases WHERE closed_at IS NOT NULL"); n != 0 {
+		t.Fatalf("被拒絕的處理不能結案：%d", n)
+	}
+}
+
+// 有店的帳號不能停權：案件仍是進行中，帳號沒有被停權。
+func TestBanRefusesAnAccountThatOwnsAStore(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	buyerID, accountID := f.newBuyer(t)
+	if _, err := f.seller.Apply(context.Background(), seller.ApplyInput{AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: accountID, StoreName: "測試小店"}); err != nil {
+		t.Fatal(err)
+	}
+	c := f.openCase(t, Target{Kind: TargetBuyer, BuyerID: buyerID})
+	_, err := f.decide(t, c, ActionBan, policy.Fraud)
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Reason != apperr.ReasonAccountHasStore {
+		t.Fatalf("要回 ACCOUNT_HAS_STORE：%v", err)
+	}
+	if f.suspended(t, accountID) || mustV[CaseDetail](t)(f.module.Case(context.Background(), c.ID)).Case.ClosedAt != nil {
+		t.Fatal("拒絕後帳號與案件都不能變")
+	}
+}
+
+// 店家分支：內容必須屬於管理員指定的店家才建立措施（別家內容不能建立措施）；成功時措施、認定的來源檢舉與結案同一個 transaction，貼文隨之下架。
+func TestTakedownVerifiesOwnershipThenCreatesTheMeasure(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	otherStore, _ := f.exposableStore(t)
+	var reporters []int64
+	for range 3 {
+		r, _ := f.newBuyer(t)
+		reporters = append(reporters, r)
+	}
+	var c Case
+	for _, r := range reporters {
+		c = f.submit(t, r, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
+	}
+	in := DecideInput{
+		CaseID: c.ID, Version: c.Version, AdminID: 9, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]),
+	}
+	wrong := in
+	wrong.StoreID = otherStore
+	if _, err := f.module.DecideCase(context.Background(), wrong); kindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("別家內容不能建立措施：%v", err)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measures"); n != 0 {
+		t.Fatalf("拒絕後留下 %d 個措施", n)
+	}
+	if !f.readable(t, social.TargetPost, w.post.ID) {
+		t.Fatal("拒絕後貼文不能下架")
+	}
+	right := in
+	right.StoreID = w.storeID
+	d := mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), right))
+	if d.Case.ClosedAt == nil || len(d.Reports) != 3 {
+		t.Fatalf("%+v", d)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measures WHERE store_id = $1 AND kind = 'CONTENT_TAKEDOWN'", w.storeID); n != 1 {
+		t.Fatalf("內容下架措施 %d 個", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.finding_moderation_reports"); n != 3 {
+		t.Fatalf("認定引用的來源檢舉 %d 筆，預期 3", n)
+	}
+	if f.readable(t, social.TargetPost, w.post.ID) {
+		t.Fatal("貼文要隨措施下架")
+	}
+}
+
+// 被檢舉的貼文在決議前已被清除：歸屬以案件快照核對，措施照常建立。
+func TestTakedownAfterThePostIsPurgedStillCreatesTheMeasure(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	var c Case
+	for range 3 {
+		r, _ := f.newBuyer(t)
+		c = f.submit(t, r, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
+	}
+	f.exec(t, `WITH c AS (SELECT id FROM social.comments WHERE post_id = $1),
+a AS (DELETE FROM social.comment_likes WHERE comment_id IN (SELECT id FROM c)),
+b AS (DELETE FROM social.comment_stats WHERE comment_id IN (SELECT id FROM c)),
+d AS (DELETE FROM social.hides WHERE comment_id IN (SELECT id FROM c)),
+e AS (DELETE FROM social.content_takedowns WHERE post_id = $1 OR comment_id IN (SELECT id FROM c)),
+g AS (DELETE FROM social.post_hashtags WHERE post_id = $1),
+h AS (DELETE FROM social.post_likes WHERE post_id = $1),
+i AS (DELETE FROM social.post_stats WHERE post_id = $1),
+j AS (DELETE FROM social.post_views WHERE post_id = $1),
+k AS (DELETE FROM social.post_shares WHERE post_id = $1),
+l AS (DELETE FROM social.comments WHERE post_id = $1)
+DELETE FROM social.posts WHERE id = $1`, w.post.ID)
+	d := mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), DecideInput{
+		CaseID: c.ID, Version: c.Version, AdminID: 9, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]), StoreID: w.storeID,
+	}))
+	if d.Case.ClosedAt == nil {
+		t.Fatalf("%+v", d)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measures WHERE store_id = $1 AND kind = 'CONTENT_TAKEDOWN'", w.storeID); n != 1 {
+		t.Fatalf("內容下架措施 %d 個", n)
+	}
+}
+
+// 鎖順序：moderation 建立內容下架與 accountdeletion 並行，不死結，也沒有半套狀態。
+func TestTakedownAndAccountDeletionRunConcurrentlyWithoutDeadlock(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	reporter, _ := f.newBuyer(t)
+	c := f.submit(t, reporter, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	var decideErr, deleteErr error
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		<-start
+		_, decideErr = f.module.DecideCase(context.Background(), DecideInput{
+			CaseID: c.ID, Version: 1, AdminID: 9, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+			Text: "不實", StoreID: w.storeID, Severity: string(seller.SeverityValues()[0]),
+		})
+	}()
+	go func() {
+		defer wg.Done()
+		<-start
+		_, deleteErr = f.deletion.Request(context.Background(), accountdeletion.RequestInput{AccountID: w.storeAccount, Requester: accountdeletion.AccountOwner})
+	}()
+	close(start)
+	wg.Wait()
+	for _, err := range []error{decideErr, deleteErr} {
+		if err != nil && apperr.KindOf(err) == apperr.KindInternal {
+			t.Fatalf("不能有死結或內部錯誤：decide=%v delete=%v", decideErr, deleteErr)
+		}
+	}
+	closed := mustV[CaseDetail](t)(f.module.Case(context.Background(), c.ID)).Case.ClosedAt != nil
+	measures := f.count(t, "SELECT count(*) FROM seller.measures WHERE store_id = $1 AND kind = 'CONTENT_TAKEDOWN'", w.storeID)
+	if closed != (measures == 1) || (decideErr == nil) != closed {
+		t.Fatalf("結案 %v 與措施 %d 個要同進退（decide=%v）", closed, measures, decideErr)
+	}
+}

@@ -371,20 +371,11 @@ cutover 之前就先開——這讓維護窗只剩「切 Endpoints + 重啟」�
 
 ## 已知缺口
 
-- **登記 gate 只掃 Go**：`.github/workflows/static-gates.yml` 的「MQ consumer ↔ topology 登記一致性」step 對 Go 的 queue 名
-  ↔ `topology.yaml` 做雙向檢查，**Java consumer 漏登記沒有任何 CI 攔得住**——review 必須人工查。
+- **沒有登記 gate**：consumer 的 queue 名與 `topology.yaml` 是否一致沒有任何 CI 檢查（Go 與 Java 都一樣）——review 必須人工查。
 - **新增 consumer 的 PR 沒有機制強制同步 `topology.yaml`**（Java 側尤其）：passive declare 下，
   broker 上不存在的 queue 會 404、該筆 subscription 靜默失效——不會進 DLQ，因為連 queue 本身都不存在。
   2026-07-25 的 issue #1795 就是這樣踩的：`crm.aftersales.refund.completed` 這條新 queue 因為
   晚於 topology 快照匯出才 merge，退款事件在 dev 完全沒進 crm-service。
-- **required status check 只有一項，而且只護 `dev`**：repo ruleset `core-gates`
-  （`enforcement: active`、`bypass_actors: []`）只作用於 `refs/heads/dev`，required check 僅
-  「靜態檢查總表」一項——上一條的 Go 登記 gate 正是 `static-gates.yml` 這支 job 裡的一個 step，
-  所以它紅了確實擋得住 merge 進 `dev`。但**其餘 workflow 紅了不擋 Merge 按鈕**，`mq-topology.yml`
-  的 plan job 也不在 required 清單內；**`main` 沒有任何 ruleset**。要讓更多 gate 有約束力，
-  得在 repo settings 把對應 job 加進 `core-gates` 的 required status checks。
-  查證：`gh api repos/<org>/backend-payuni/rulesets`。⚠️ `gh api .../branches/dev/protection`
-  回 404 是舊式 branch protection API 的預期結果，**不是**「沒有保護」的證據。
 - **drift 偵測不查 binding**：`check_unmanaged.py` 只比對 queue/exchange，手動加的野 binding
   兩邊都抓不到。
 - **`MQ_DISCORD_WEBHOOK_URL` 未設定**：drift 目前只反映在 CI job 失敗，沒有主動推播。

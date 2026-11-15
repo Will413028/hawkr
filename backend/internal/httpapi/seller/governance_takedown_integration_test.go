@@ -86,7 +86,7 @@ func (f *adminFixture) count(t *testing.T, sql string, args ...any) int64 {
 	return n
 }
 
-// 內容下架由 social 的同 transaction 訂閱者核對：別家店的內容、買家寫的內容、已刪除與不存在的內容都被拒絕，欄位路徑指到那一則，措施與複本都不存在。
+// 後台直接建立內容下架：handler 向 social 核對內容現存、種類相符、是這家店寫的：別家店的內容、買家寫的內容、已刪除與不存在的內容都被拒絕，欄位路徑指到那一則，措施與複本都不存在。
 func TestCreateContentTakedownRejectsContentOfAnotherStoreOrMissing(t *testing.T) {
 	t.Parallel()
 	f := setupAdmin(t)
@@ -203,8 +203,8 @@ func (f *adminFixture) countIn(ctx context.Context, sql string) int64 {
 	return n
 }
 
-// 不經 admin handler 的入口（CreateMeasureInTx，之後的 moderation）一樣被擋：歸屬核對在 social 的訂閱者，不在 handler。
-func TestContentTakedownThroughCreateInTxRejectsContentThatIsNotTheStoresOwn(t *testing.T) {
+// 不經 admin handler 的入口（CreateMeasureInTx，moderation）：social 的訂閱者只擋別家店與買家寫的內容；自家已刪除與已清除的內容成立（措施照常建立、不寫複本），歸屬由呼叫方先核對。
+func TestContentTakedownThroughCreateInTxChecksOnlyWhoseContentItIs(t *testing.T) {
 	t.Parallel()
 	f := setupAdmin(t)
 	ctx := context.Background()
@@ -212,27 +212,38 @@ func TestContentTakedownThroughCreateInTxRejectsContentThatIsNotTheStoresOwn(t *
 	_, other := f.newSeller(t, "別家的店")
 	mine, theirs := f.seedContent(t, target.StoreID), f.seedContent(t, other.StoreID)
 	finding := seller.ViolationBasis{Finding: &seller.NewFinding{Category: policy.Spam, Severity: seller.SeverityLow}}
-	for name, ref := range map[string]seller.ContentRef{
-		"別家店的貼文":  {Kind: seller.ContentPost, ID: theirs.post},
-		"買家的留言":   {Kind: seller.ContentComment, ID: mine.buyerComment},
-		"已刪除的貼文":  {Kind: seller.ContentPost, ID: mine.deletedPost},
-		"不存在的討論區": {Kind: seller.ContentForumEntry, ID: uuid.NewV7()},
-	} {
-		err := f.db.InTx(ctx, func(ctx context.Context) error {
+	create := func(ref seller.ContentRef) error {
+		return f.db.InTx(ctx, func(ctx context.Context) error {
 			_, err := f.module.CreateMeasureInTx(ctx, seller.CreateMeasureInput{
 				AdminID: f.adminID, StoreID: target.StoreID, Kind: seller.MeasureContentTakedown, StatementToSeller: "內容違規", Note: "內部紀錄", Violation: &finding,
 				Takedown: &seller.ContentTakedown{Contents: []seller.ContentRef{ref}},
 			})
 			return err
 		})
-		if err == nil {
+	}
+	for name, ref := range map[string]seller.ContentRef{
+		"別家店的貼文": {Kind: seller.ContentPost, ID: theirs.post},
+		"買家的留言":  {Kind: seller.ContentComment, ID: mine.buyerComment},
+	} {
+		if err := create(ref); err == nil {
 			t.Fatalf("%s：應被拒絕", name)
 		}
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.measures"); n != 0 {
 		t.Fatalf("被拒絕後不該有措施：%d", n)
 	}
+	for name, ref := range map[string]seller.ContentRef{
+		"自家已刪除的貼文": {Kind: seller.ContentPost, ID: mine.deletedPost},
+		"已清除的討論區":  {Kind: seller.ContentForumEntry, ID: uuid.NewV7()},
+	} {
+		if err := create(ref); err != nil {
+			t.Fatalf("%s：應成立：%v", name, err)
+		}
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measures"); n != 2 {
+		t.Fatalf("措施 %d 個，預期 2", n)
+	}
 	if n := f.count(t, "SELECT count(*) FROM social.content_takedowns"); n != 0 {
-		t.Fatalf("被拒絕後不該有複本：%d", n)
+		t.Fatalf("沒有公開可見的內容，不該有複本：%d", n)
 	}
 }

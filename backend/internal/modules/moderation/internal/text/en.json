@@ -1,0 +1,31 @@
+{
+  "default": {
+    "report.buyer_not_found": {
+      "message": "We could not find the buyer you are reporting"
+    },
+    "report.category_invalid": {
+      "message": "Invalid report reason"
+    },
+    "report.content_not_found": {
+      "message": "We could not find the content you are reporting"
+    },
+    "report.daily_limit": {
+      "message": "You have reached the daily limit of {max} reports"
+    },
+    "report.description_too_long": {
+      "message": "The description cannot exceed {max} characters"
+    },
+    "report.reporter_required": {
+      "message": "Buyer identity required"
+    },
+    "report.self_buyer": {
+      "message": "You cannot report yourself"
+    },
+    "report.self_content": {
+      "message": "You cannot report your own content"
+    },
+    "report.target_invalid": {
+      "message": "Invalid report target"
+    }
+  }
+}

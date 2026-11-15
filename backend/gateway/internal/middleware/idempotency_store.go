@@ -12,7 +12,7 @@ import (
 // §3.10：一道誠實標明邊界的 gate 是資產，一道被當成牆的 gate 是負債）：
 //
 //	① **紀錄只活在單一 gateway process 內**。prod gateway `replicas: 2`
-//	   （`k8s/values/overlays/prod/gateway.yaml`）⇒ 重送若被 Service 轉到另一顆 pod，
+//	   ⇒ 重送若被 Service 轉到另一顆 pod，
 //	   這裡查不到紀錄、請求會照常打到下游 —— 也就是**退化成本機制上線前的行為**，
 //	   不會更糟，但也擋不住。dev 是 1 顆 ⇒ dev 上是完整的。
 //	② 因此本層是 **best-effort**，不是耐久保證。耐久的那一份必須與寫入在同一個
@@ -59,7 +59,7 @@ const (
 )
 
 // 記憶體預算：1024 × (8 KiB body ＋ 約 300 B 鍵與後設) ≈ 8.3 MiB 上界，
-// 對 gateway 的 `limits.memory: 512Mi`（`k8s/values/gateway.yaml`）是 1.6%。
+// 對 gateway 的 `limits.memory: 512Mi`（部署設定）是 1.6%。
 
 // idempotencyOutcome 是 Begin 的四態。
 type idempotencyOutcome int

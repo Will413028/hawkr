@@ -11,7 +11,7 @@ import (
 // 空字串與不在 Kinds 裡的值都不是有效的種類。
 type Kind string
 
-// seller 發布的 10 種（pub_review_items）與 payment 發布的 1 種。A7-1e 加 moderation 的種類時加在這裡與 Kinds。
+// seller 發布的 10 種（pub_review_items）、payment 發布的 2 種與 moderation 發布的 1 種。
 const (
 	ReportTriage          Kind = "REPORT_TRIAGE"
 	CaseDecision          Kind = "CASE_DECISION"
@@ -28,12 +28,14 @@ const (
 	PaymentAccountPurgeStuck Kind = "PAYMENT_ACCOUNT_PURGE_STUCK"
 	// SharedBankAccount 是處分建立之後才與被處分帳號共用銀行帳號 fingerprint 的關聯帳號（subject 是處分與命中的帳號），由 seller 發布。
 	SharedBankAccount Kind = "SHARED_BANK_ACCOUNT"
+	// ModerationCase 是等待決定的檢舉案件（subject 是 moderation 的案件，CaseID 欄），由 moderation 發布。
+	ModerationCase Kind = "MODERATION_CASE"
 )
 
 // Kinds 是全部有效的種類。
 var Kinds = []Kind{
 	ReportTriage, CaseDecision, CaseInquiryOverdue, AuthorityOrder, AuthorityTargetNotice,
-	MeasureAppeal, MeasureLiftRequest, MeasureReview, KYCApplication, PaymentAccountCreateFailed, PaymentAccountPurgeStuck, SharedBankAccount,
+	MeasureAppeal, MeasureLiftRequest, MeasureReview, KYCApplication, PaymentAccountCreateFailed, PaymentAccountPurgeStuck, SharedBankAccount, ModerationCase,
 }
 
 // Valid 回傳 k 是不是有效的種類。

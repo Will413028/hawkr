@@ -47,7 +47,8 @@ enum ReviewQueueItemKind {
   REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT = 11;
   // 收款帳戶的清理無法完成（金流商拒絕關閉，或等待清理超過 7 天仍關不掉），等管理員重試關閉或確認已在金流商處理後刪除對應（subject 是 payment_account）。
   REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_PURGE_STUCK = 12;
-
+  // 等待決定的社群檢舉案件（subject 是 moderation_case_id）。
+  REVIEW_QUEUE_ITEM_KIND_MODERATION_CASE = 13;
 }
 
 message ListReviewQueueRequest {
@@ -81,6 +82,8 @@ message ReviewQueueItem {
     KYCApplicationRef kyc_application = 9;
     PaymentAccountRef payment_account = 10;
     SharedBankAccountRef shared_bank_account = 11;
+    // moderation 的案件 ID（與 case_id 不同：case_id 是 seller 的案件）。
+    string moderation_case_id = 15;
   }
 
 
