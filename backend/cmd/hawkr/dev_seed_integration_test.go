@@ -472,10 +472,7 @@ func TestDevSeedCheckRefusesSeedAccountsThatOwnOtherStores(t *testing.T) {
 	if err := runDevSeed(ctx, []string{"-check"}, new(bytes.Buffer)); err == nil || !strings.Contains(err.Error(), "店家 "+strconv.FormatInt(buyerStore, 10)) {
 		t.Fatalf("種子買家帳號名下的店家應該被擋下：%v", err)
 	}
-	if _, err := d.Pool().Exec(ctx, `UPDATE seller.stores SET status = 'CLOSED' WHERE store_id = $1`, buyerStore); err != nil {
-		t.Fatal(err)
-	}
-	mustExec(t, d, `DELETE FROM identity.account_roles WHERE account_id = 2001 AND role = 'SELLER'`)
+	closeStoreRow(t, d, buyerStore)
 	// 佔用種子 store_code 的非種子店家同樣擋下（unique 衝突會讓 upsert 失敗在半途）。
 	if _, err := d.Pool().Exec(ctx, `UPDATE seller.stores SET account_id = 60000, store_code = 9 WHERE store_id = $1`, other); err != nil {
 		t.Fatal(err)
@@ -888,7 +885,7 @@ func TestAccountSeedRefusesStateItWouldHaveToRevert(t *testing.T) {
 		{"SELLER 角色指向別的店", `UPDATE identity.account_roles SET source_id = 7 WHERE account_id = 9`, "種子帳號 9"},
 		{"買家 ID 對不上", `UPDATE buyer.buyers SET account_id = 2999 WHERE buyer_id = 52001`, "52001"},
 		{"種子以外的預設地址", `UPDATE buyer.shipping_addresses SET is_default = false WHERE address_id = 5200101;
-			INSERT INTO buyer.shipping_addresses (buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default, created_at, updated_at) VALUES (52001, 'u', '0900000000', '63000020', '使用者預設路1號', true, now(), now())`, "種子買家 52001 的預設地址不是種子地址"},
+			INSERT INTO buyer.shipping_addresses (buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default, created_at, updated_at) VALUES (52001, 'u', '0900000000', '63000020', '使用者預設路1號', true, now(), now())`, "種子買家 52001 有不在 fixture 內的預設地址"},
 		{"補回種子地址會超過上限", `DELETE FROM buyer.shipping_addresses WHERE address_id = 5200102;
 			INSERT INTO buyer.shipping_addresses (buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default, created_at, updated_at)
 			SELECT 52001, 'u', '0900000000', '63000020', '使用者路' || g, false, now(), now() FROM generate_series(1, 19) g`, "種子買家 52001（補回後 21 筆）"},

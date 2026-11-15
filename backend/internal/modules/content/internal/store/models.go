@@ -31,9 +31,9 @@ type ContentBanner struct {
 	PreviewImageAssetID string
 	PopupImageAssetID   string
 	CanvasJson          string
-	// 點擊行為（設計書 25）：popup、url、product、post；沒有預設值
+	// 點擊行為（設計書 25）：POPUP、URL、PRODUCT、POST；沒有預設值
 	ActionType string
-	// 點擊行為的值：url 的網址、product 與 post 的 ID；popup 是空字串
+	// 點擊行為的值：URL 的網址、PRODUCT 與 POST 的 ID；POPUP 是空字串
 	ActionTarget string
 	DisplayOrder int32
 	IsActive     bool
