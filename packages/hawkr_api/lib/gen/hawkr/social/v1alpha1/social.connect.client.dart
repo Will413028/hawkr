@@ -313,7 +313,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立，不重複建立。
+  /// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立。
   Future<hawkrsocialv1alpha1social.CreateForumEntryResponse> createForumEntry(
     hawkrsocialv1alpha1social.CreateForumEntryRequest input, {
     connect.Headers? headers,

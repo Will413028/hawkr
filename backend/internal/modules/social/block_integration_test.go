@@ -168,7 +168,7 @@ func TestBlockedBuyersForumEntriesAreHiddenInBothDirections(t *testing.T) {
 	// 已刪除的頂層 D，底下只剩 B 的回覆。
 	eD := enter(c, social.ForumInput{Body: "D"})
 	bReplyToD := enter(b, social.ForumInput{Body: "B 回 D", ParentID: &eD.ID})
-	must(t, f.module.DeleteForumEntry(ctx, f.asBuyer(c), eD.ID, nil))
+	must(t, f.module.DeleteForumEntry(ctx, f.asBuyer(c), eD.ID, 0))
 
 	f.blockBuyer(t, a, b)
 
@@ -225,7 +225,7 @@ func TestDeletedTopLevelCommentWithOnlyBlockedRepliesDisappears(t *testing.T) {
 	top := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(c), social.CommentInput{PostID: p.ID, Body: "C"}))
 	f.exec(t, `INSERT INTO social.comments (id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at)
 		VALUES ($1, $2, $3, $3, 'BUYER', $4, 'B 的回覆', $5, $5)`, uuidNew(), p.ID, top.ID, b.BuyerID, f.clock())
-	must(t, f.module.DeleteComment(ctx, f.asBuyer(c), top.ID, nil))
+	must(t, f.module.DeleteComment(ctx, f.asBuyer(c), top.ID, 0))
 
 	if got := f.topLevel(t, f.asBuyer(a), p.ID); len(got.Comments) != 1 || got.Comments[0].State != social.CommentDeleted {
 		t.Fatalf("沒有封鎖時，已刪除的頂層因為有可見的回覆而是佔位項目：%+v", got.Comments)
@@ -417,8 +417,8 @@ func TestStoreBlockingABuyerLeavesPublicContentReadable(t *testing.T) {
 		}
 	})
 	t.Run("不擋刪除自己的內容", func(t *testing.T) {
-		must(t, f.module.DeleteComment(ctx, viewer, mine.ID, nil))
-		must(t, f.module.DeleteForumEntry(ctx, viewer, entry.ID, nil))
+		must(t, f.module.DeleteComment(ctx, viewer, mine.ID, 0))
+		must(t, f.module.DeleteForumEntry(ctx, viewer, entry.ID, 0))
 	})
 }
 
@@ -729,8 +729,8 @@ func TestStoreCanDeleteExistingContentOfABuyerItBlocked(t *testing.T) {
 	f.storeBlocksBuyer(t, storeID, b)
 
 	store := f.asStore(t, storeID)
-	must(t, f.module.DeleteComment(ctx, store, cB.ID, nil))
-	must(t, f.module.DeleteForumEntry(ctx, store, eB.ID, nil))
+	must(t, f.module.DeleteComment(ctx, store, cB.ID, 0))
+	must(t, f.module.DeleteForumEntry(ctx, store, eB.ID, 0))
 	if got := f.topLevel(t, f.asBuyer(c), p.ID); len(got.Comments) != 0 {
 		t.Fatalf("留言已刪除：%v", commentIDs(got))
 	}

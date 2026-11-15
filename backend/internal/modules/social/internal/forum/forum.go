@@ -71,19 +71,16 @@ func withStats(ctx context.Context, q *store.Queries, out model.ForumEntry) (mod
 	return out, nil
 }
 
-// currentOf 是重送命中時回的項目：目前的狀態（已刪除、被隱藏、作者停用後是佔位）與計數，不是第一次建立當下的樣子。
-func currentOf(ctx context.Context, q *store.Queries, row store.SocialForumEntry) (model.ForumEntry, error) {
-	cur, err := q.GetForumEntry(ctx, row.ID)
+// currentOf 是重送命中時回的項目：列表讀取算出的目前狀態（已刪除、被隱藏、作者停用後是佔位）與計數，不是第一次建立當下的樣子。
+// row 是剛讀到的列，內文與版本直接用它。
+func (s *Service) currentOf(ctx context.Context, q *store.Queries, row store.SocialForumEntry) (model.ForumEntry, error) {
+	st, err := reads.One[reads.StateRow](ctx, s.d.DB.Conn(ctx), reads.ForumEntryState(row.ID))
 	if err != nil {
-		return model.ForumEntry{}, fmt.Errorf("social：讀取討論區留言 %s：%w", row.ID, err)
+		return model.ForumEntry{}, fmt.Errorf("social：讀取討論區留言的狀態 %s：%w", row.ID, err)
 	}
-	out := visible(cur)
-	switch {
-	case cur.Counted:
-	case cur.DeletedAt != nil:
-		out.State, out.Actor, out.Body = model.CommentDeleted, model.Actor{}, ""
-	default:
-		out.State, out.Actor, out.Body = model.CommentHidden, model.Actor{}, ""
+	out := visible(row)
+	if out.State = model.CommentState(st.State); out.State != model.CommentVisible {
+		out.Actor, out.Body = model.Actor{}, ""
 	}
 	return withStats(ctx, q, out)
 }
@@ -123,7 +120,7 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.ForumInpu
 		if row, ok, err := s.replay(ctx, q, a, in.RequestID, hash); err != nil || ok {
 			if err == nil {
 				isReplay = true
-				replayed, err = currentOf(ctx, q, row)
+				replayed, err = s.currentOf(ctx, q, row)
 			}
 			return err
 		}
@@ -168,7 +165,7 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.ForumInpu
 				return fmt.Errorf("social：討論區留言的 request_id %s 衝突，卻查不到原本那一則", in.RequestID)
 			}
 			isReplay = true
-			replayed, rerr = currentOf(ctx, q, row)
+			replayed, rerr = s.currentOf(ctx, q, row)
 			return rerr
 		}
 		if err != nil {
@@ -237,9 +234,6 @@ func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, vers
 		if err != nil {
 			return fmt.Errorf("social：鎖定討論區留言 %s：%w", id, err)
 		}
-		if row.Version != version {
-			return versionConflict(ctx)
-		}
 		hidden, err := reads.Flag(ctx, s.d.DB.Conn(ctx), reads.ForumEntryIsHidden(id))
 		if err != nil {
 			return fmt.Errorf("social：讀取討論區留言的隱藏 %s：%w", id, err)
@@ -247,10 +241,10 @@ func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, vers
 		if hidden {
 			return apperr.FailedPrecondition("%s", text.CommentEditHidden(uitext.LocaleFrom(ctx)))
 		}
-		row2, err := q.UpdateForumEntryBody(ctx, store.UpdateForumEntryBodyParams{ID: id, Body: body, Now: now, ExpectedVersion: version})
-		if errors.Is(err, pgx.ErrNoRows) {
+		if row.Version != version {
 			return versionConflict(ctx)
 		}
+		row2, err := q.UpdateForumEntryBody(ctx, store.UpdateForumEntryBodyParams{ID: id, Body: body, Now: now})
 		if err != nil {
 			return fmt.Errorf("social：修改討論區留言 %s：%w", id, err)
 		}
@@ -263,8 +257,8 @@ func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, vers
 	return updated, nil
 }
 
-// Delete 刪除討論區留言（軟刪）：作者本人，或該店。已經刪除的冪等；version 有帶時與目前的不符回 VersionConflict。店家身分的刪除要 CapContentContract。
-func (s *Service) Delete(ctx context.Context, c model.Caller, id uuid.UUID, version *int64) error {
+// Delete 刪除討論區留言（軟刪）：作者本人，或該店。已經刪除的冪等；version 非 0 時與目前的不符回 VersionConflict。店家身分的刪除要 CapContentContract。
+func (s *Service) Delete(ctx context.Context, c model.Caller, id uuid.UUID, version int64) error {
 	now := s.d.Now().UTC()
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
@@ -283,7 +277,7 @@ func (s *Service) Delete(ctx context.Context, c model.Caller, id uuid.UUID, vers
 		if row.DeletedAt != nil {
 			return nil
 		}
-		if version != nil && row.Version != *version {
+		if version != 0 && row.Version != version {
 			return versionConflict(ctx)
 		}
 		if ownsStore || row.ActorKind == string(model.ActorStore) {

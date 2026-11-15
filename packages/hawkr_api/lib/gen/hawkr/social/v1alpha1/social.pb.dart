@@ -3649,7 +3649,7 @@ class SocialAppServiceApi {
       _client.invoke<DeleteCommentResponse>(ctx, 'SocialAppService',
           'DeleteComment', request, DeleteCommentResponse());
 
-  /// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立，不重複建立。
+  /// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立。
   $async.Future<CreateForumEntryResponse> createForumEntry(
           $pb.ClientContext? ctx, CreateForumEntryRequest request) =>
       _client.invoke<CreateForumEntryResponse>(ctx, 'SocialAppService',

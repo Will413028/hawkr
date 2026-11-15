@@ -192,25 +192,19 @@ func (q *Queries) SoftDeleteForumEntry(ctx context.Context, arg SoftDeleteForumE
 
 const updateForumEntryBody = `-- name: UpdateForumEntryBody :one
 UPDATE social.forum_entries SET body = $1::text, version = version + 1, updated_at = $2
-WHERE id = $3 AND deleted_at IS NULL AND version = $4
+WHERE id = $3 AND deleted_at IS NULL
 RETURNING id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, version, request_id, request_hash
 `
 
 type UpdateForumEntryBodyParams struct {
-	Body            string
-	Now             time.Time
-	ID              uuid.UUID
-	ExpectedVersion int64
+	Body string
+	Now  time.Time
+	ID   uuid.UUID
 }
 
-// 版本不符回 0 列。
+// 呼叫方已在列鎖之下檢查版本與隱藏。
 func (q *Queries) UpdateForumEntryBody(ctx context.Context, arg UpdateForumEntryBodyParams) (SocialForumEntry, error) {
-	row := q.db.QueryRow(ctx, updateForumEntryBody,
-		arg.Body,
-		arg.Now,
-		arg.ID,
-		arg.ExpectedVersion,
-	)
+	row := q.db.QueryRow(ctx, updateForumEntryBody, arg.Body, arg.Now, arg.ID)
 	var i SocialForumEntry
 	err := row.Scan(
 		&i.ID,

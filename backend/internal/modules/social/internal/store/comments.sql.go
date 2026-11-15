@@ -219,25 +219,19 @@ func (q *Queries) SoftDeleteComment(ctx context.Context, arg SoftDeleteCommentPa
 
 const updateCommentBody = `-- name: UpdateCommentBody :one
 UPDATE social.comments SET body = $1::text, version = version + 1, updated_at = $2
-WHERE id = $3 AND deleted_at IS NULL AND version = $4
+WHERE id = $3 AND deleted_at IS NULL
 RETURNING id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, version, request_id, request_hash
 `
 
 type UpdateCommentBodyParams struct {
-	Body            string
-	Now             time.Time
-	ID              uuid.UUID
-	ExpectedVersion int64
+	Body string
+	Now  time.Time
+	ID   uuid.UUID
 }
 
-// 版本不符回 0 列。
+// 呼叫方已在列鎖之下檢查版本與隱藏。
 func (q *Queries) UpdateCommentBody(ctx context.Context, arg UpdateCommentBodyParams) (SocialComment, error) {
-	row := q.db.QueryRow(ctx, updateCommentBody,
-		arg.Body,
-		arg.Now,
-		arg.ID,
-		arg.ExpectedVersion,
-	)
+	row := q.db.QueryRow(ctx, updateCommentBody, arg.Body, arg.Now, arg.ID)
 	var i SocialComment
 	err := row.Scan(
 		&i.ID,

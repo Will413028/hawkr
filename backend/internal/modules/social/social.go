@@ -422,8 +422,8 @@ func (m *Module) UpdateComment(ctx context.Context, c Caller, id uuid.UUID, vers
 	return m.comment.Update(ctx, c, id, version, body)
 }
 
-// DeleteComment 刪除留言：作者或貼文所屬的店；冪等；version 有帶時要與目前的版本相符。
-func (m *Module) DeleteComment(ctx context.Context, c Caller, id uuid.UUID, version *int64) error {
+// DeleteComment 刪除留言：作者或貼文所屬的店；冪等；version 非 0 時要與目前的版本相符。
+func (m *Module) DeleteComment(ctx context.Context, c Caller, id uuid.UUID, version int64) error {
 	return m.comment.Delete(ctx, c, id, version)
 }
 
@@ -448,8 +448,8 @@ func (m *Module) UpdateForumEntry(ctx context.Context, c Caller, id uuid.UUID, v
 	return m.forum.Update(ctx, c, id, version, body)
 }
 
-// DeleteForumEntry 刪除討論區留言：作者或該店；冪等；version 有帶時要與目前的版本相符。
-func (m *Module) DeleteForumEntry(ctx context.Context, c Caller, id uuid.UUID, version *int64) error {
+// DeleteForumEntry 刪除討論區留言：作者或該店；冪等；version 非 0 時要與目前的版本相符。
+func (m *Module) DeleteForumEntry(ctx context.Context, c Caller, id uuid.UUID, version int64) error {
 	return m.forum.Delete(ctx, c, id, version)
 }
 
@@ -499,7 +499,7 @@ func (m *Module) RecordShare(ctx context.Context, buyerID int64, postID uuid.UUI
 }
 
 // RecordView 記一次瀏覽（只計公開可讀的貼文；同一篇、同一個台北日、同一個觀看者只算一次；匿名沒有 IP 時不計；貼文所屬店家的店主不計）。回傳這次有沒有計入。
-// 店主與代行的讀取由呼叫方不呼叫。
+// 店主由模組排除；代行的讀取由呼叫方不呼叫。
 func (m *Module) RecordView(ctx context.Context, c Caller, postID uuid.UUID, v Viewer) (bool, error) {
 	return m.engage.RecordView(ctx, c, postID, v)
 }

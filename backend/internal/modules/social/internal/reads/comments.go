@@ -45,6 +45,25 @@ func afterComment(created ColumnTimestampz, id ColumnString, pg CommentPage) Boo
 	return ROW(created, id).GT(ROW(TimestampzT(pg.AfterCreated), UUID(pg.AfterID)))
 }
 
+// stateOf 是留言與討論區留言列表項目的狀態算式，列表與單筆讀取共用。
+func stateOf(visible, gone BoolExpression) Expression {
+	return CASE().
+		WHEN(visible).THEN(NewEnumValue(stateVisible)).
+		WHEN(gone).THEN(NewEnumValue(stateDeleted)).
+		ELSE(NewEnumValue(stateHidden))
+}
+
+// StateRow 是單筆狀態讀取的列。
+type StateRow struct {
+	State string `db:"state"`
+}
+
+// CommentState 回留言此刻在列表裡的狀態（與列表同一個算式）。
+func CommentState(id uuid.UUID) SelectStatement {
+	c := visibility.CommentsOf("c", visibility.Anonymous)
+	return SELECT(stateOf(c.Counted(), c.Gone()).AS("state")).FROM(c.T).WHERE(c.T.ID.EQ(UUID(id)))
+}
+
 // placeholderComment 的內文與作者只在 visible 時給，否則是空值。
 func masked(visible BoolExpression, col Expression, empty Expression) Expression {
 	return COALESCE(CASE().WHEN(visible).THEN(col), empty)
@@ -59,10 +78,7 @@ func topLevelComments(postID uuid.UUID, v visibility.Viewer, pg CommentPage, con
 	s := table.CommentStats.AS("s")
 	vis := LATERAL(SELECT(c.Counted().AS("visible"))).AS("v")
 	visible := BoolColumn("visible").From(vis)
-	state := CASE().
-		WHEN(visible).THEN(NewEnumValue(stateVisible)).
-		WHEN(c.Gone()).THEN(NewEnumValue(stateDeleted)).
-		ELSE(NewEnumValue(stateHidden))
+	state := stateOf(visible, c.Gone())
 	hasVisibleReply := EXISTS(SELECT(r.T.ID).FROM(r.T).WHERE(r.Where(r.T.ParentID.EQ(c.T.ID), r.Counted())))
 	return SELECT(
 		c.T.ID.AS("id"), c.T.PostID.AS("post_id"), c.T.ParentID.AS("parent_id"), c.T.ReplyToID.AS("reply_to_id"),

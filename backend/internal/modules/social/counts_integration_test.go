@@ -129,7 +129,7 @@ func TestStatsMatchTheDatasetAfterRandomWrites(t *testing.T) {
 			if c.Actor.Kind == social.ActorBuyer {
 				caller = buyers[indexOf(profiles, c.Actor.ID)]
 			}
-			step("刪除", f.module.DeleteComment(ctx, caller, c.ID, nil))
+			step("刪除", f.module.DeleteComment(ctx, caller, c.ID, 0))
 		case op == 5 && len(comments) > 0:
 			c := comments[rng.IntN(len(comments))]
 			if c.Actor.Kind != social.ActorBuyer {

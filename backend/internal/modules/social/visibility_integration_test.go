@@ -267,8 +267,8 @@ func TestPlaceholderForTopLevelCommentWithVisibleReplies(t *testing.T) {
 	for _, parent := range []social.Comment{deleted, hidden} {
 		mustV[social.Comment](t)(f.module.CreateComment(ctx, store, social.CommentInput{PostID: p.ID, Body: "回覆", ParentID: &parent.ID}))
 	}
-	must(t, f.module.DeleteComment(ctx, f.asBuyer(buyerP), deleted.ID, nil))
-	must(t, f.module.DeleteComment(ctx, f.asBuyer(buyerP), alone.ID, nil))
+	must(t, f.module.DeleteComment(ctx, f.asBuyer(buyerP), deleted.ID, 0))
+	must(t, f.module.DeleteComment(ctx, f.asBuyer(buyerP), alone.ID, 0))
 	_, err := f.module.Hide(ctx, social.HideInput{Target: social.Target{Kind: social.TargetComment, ID: hidden.ID}, Category: "SPAM", AdminID: 1})
 	must(t, err)
 
@@ -303,7 +303,7 @@ func TestPlaceholderForTopLevelCommentWithVisibleReplies(t *testing.T) {
 	// 回覆也被刪掉之後，整則（含佔位項目）不再出現。
 	for _, c := range page.Comments {
 		replies := mustV[social.CommentPage](t)(f.module.ListReplies(ctx, social.Caller{}, c.PostID, c.ID, nil, 10))
-		must(t, f.module.DeleteComment(ctx, store, replies.Comments[0].ID, nil))
+		must(t, f.module.DeleteComment(ctx, store, replies.Comments[0].ID, 0))
 	}
 	if page := mustV[social.CommentPage](t)(f.module.ListComments(ctx, social.Caller{}, p.ID, nil, 10)); len(page.Comments) != 0 {
 		t.Fatalf("沒有可見的回覆時整則不出現：%+v", page.Comments)

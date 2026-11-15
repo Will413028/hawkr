@@ -118,12 +118,12 @@ func TestHideAndRestoreSerializeWithDelete(t *testing.T) {
 				top := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asStore(t, storeID), social.ForumInput{StoreID: storeID, Body: "公告"}))
 				e := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "回覆", ParentID: &top.ID}))
 				target = social.Target{Kind: social.TargetForumEntry, ID: e.ID}
-				remove = func(ctx context.Context) error { return f.module.DeleteForumEntry(ctx, f.asBuyer(b), e.ID, nil) }
+				remove = func(ctx context.Context) error { return f.module.DeleteForumEntry(ctx, f.asBuyer(b), e.ID, 0) }
 			} else {
 				p := f.publishedPost(t, storeID, "貼文")
 				cm := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p.ID, Body: "留言"}))
 				target = social.Target{Kind: social.TargetComment, ID: cm.ID}
-				remove = func(ctx context.Context) error { return f.module.DeleteComment(ctx, f.asBuyer(b), cm.ID, nil) }
+				remove = func(ctx context.Context) error { return f.module.DeleteComment(ctx, f.asBuyer(b), cm.ID, 0) }
 			}
 			hide := func() error {
 				_, err := f.module.Hide(context.Background(), social.HideInput{Target: target, Category: "SPAM", AdminID: 1})
@@ -280,8 +280,8 @@ func TestPurgeKeepsCountsExactForContentDeletedBetweenRequestAndPurge(t *testing
 	if n := f.scalar(t, "SELECT comment_count FROM social.post_stats WHERE post_id = $1", p.ID); n != 0 {
 		t.Fatalf("前提：申請的 transaction 已讓旗標由真轉假，留言數 %d", n)
 	}
-	must(t, f.module.DeleteComment(ctx, f.asBuyer(b), cm.ID, nil))
-	must(t, f.module.DeleteForumEntry(ctx, f.asBuyer(b), reply.ID, nil))
+	must(t, f.module.DeleteComment(ctx, f.asBuyer(b), cm.ID, 0))
+	must(t, f.module.DeleteForumEntry(ctx, f.asBuyer(b), reply.ID, 0))
 	if n := f.scalar(t, "SELECT comment_count FROM social.post_stats WHERE post_id = $1", p.ID); n != 0 {
 		t.Fatalf("刪除重新求值，旗標本來就是假，差額 0，留言數 %d，預期 0", n)
 	}

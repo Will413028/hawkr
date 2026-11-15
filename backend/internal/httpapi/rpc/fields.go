@@ -41,7 +41,7 @@ func ParseRequestID(raw string) (*uuid.UUID, error) {
 		return nil, nil
 	}
 	id, err := uuid.Parse(raw)
-	if err != nil || id[6]>>4 != 4 || id[8]&0xc0 != 0x80 {
+	if err != nil || len(raw) != 36 || id[6]>>4 != 4 || id[8]&0xc0 != 0x80 {
 		return nil, RequiredField("request_id", "request_id 必須是 UUIDv4")
 	}
 	return &id, nil

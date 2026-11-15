@@ -22,9 +22,9 @@ SELECT * FROM social.forum_entries WHERE id = sqlc.arg(id) FOR UPDATE;
 SELECT * FROM social.forum_entries WHERE id = sqlc.arg(id);
 
 -- name: UpdateForumEntryBody :one
--- 版本不符回 0 列。
+-- 呼叫方已在列鎖之下檢查版本與隱藏。
 UPDATE social.forum_entries SET body = sqlc.arg(body)::text, version = version + 1, updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND version = sqlc.arg(expected_version)
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL
 RETURNING *;
 
 -- name: SoftDeleteForumEntry :execrows

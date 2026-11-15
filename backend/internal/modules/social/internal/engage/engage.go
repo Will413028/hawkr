@@ -221,15 +221,17 @@ func (s *Service) RecordView(ctx context.Context, c model.Caller, postID uuid.UU
 	var counted bool
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		post, err := q.GetPost(ctx, postID)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("social：讀取貼文 %s：%w", postID, err)
-		}
-		if c.OwnsStore(post.SocialPost.StoreID) {
-			return nil
+		if c.Store != nil {
+			post, err := q.GetPost(ctx, postID)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			if err != nil {
+				return fmt.Errorf("social：讀取貼文 %s：%w", postID, err)
+			}
+			if c.OwnsStore(post.SocialPost.StoreID) {
+				return nil
+			}
 		}
 		ok, err := reads.Flag(ctx, s.d.DB.Conn(ctx), reads.PostIsPublic(postID, now, visibility.Viewer{BuyerID: c.BuyerID}))
 		if err != nil {

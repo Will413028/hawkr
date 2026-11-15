@@ -604,7 +604,7 @@ func (h *presenter) toComments(ctx context.Context, c social.Caller, postStore i
 		item.IsMine = c.IsAuthor(m.Actor)
 		item.ViewerCanEdit = item.IsMine
 		item.ViewerCanDelete = item.IsMine || c.OwnsStore(postStore)
-		item.ViewerCanReply = c.OwnsStore(postStore) && shared.replyAllowed
+		item.ViewerCanReply = c.OwnsStore(postStore)
 		item.Etag = rpc.Etag(m.Version)
 		if item.Author, err = h.toActor(m.Actor, shared.display, shared.stores); err != nil {
 			return nil, err

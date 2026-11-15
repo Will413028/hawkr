@@ -28,7 +28,7 @@ type writeCall struct {
 	id     uuid.UUID
 	body   string
 	ver    int64
-	delVer *int64
+	delVer int64
 	cin    social.CommentInput
 	fin    social.ForumInput
 }
@@ -81,7 +81,7 @@ func (f *fakeWrites) UpdateComment(_ context.Context, c social.Caller, id uuid.U
 	}, err
 }
 
-func (f *fakeWrites) DeleteComment(_ context.Context, c social.Caller, id uuid.UUID, version *int64) error {
+func (f *fakeWrites) DeleteComment(_ context.Context, c social.Caller, id uuid.UUID, version int64) error {
 	return f.rec(writeCall{op: "deleteComment", caller: c, id: id, delVer: version})
 }
 
@@ -105,7 +105,7 @@ func (f *fakeWrites) UpdateForumEntry(_ context.Context, c social.Caller, id uui
 	}, err
 }
 
-func (f *fakeWrites) DeleteForumEntry(_ context.Context, c social.Caller, id uuid.UUID, version *int64) error {
+func (f *fakeWrites) DeleteForumEntry(_ context.Context, c social.Caller, id uuid.UUID, version int64) error {
 	return f.rec(writeCall{op: "deleteForum", caller: c, id: id, delVer: version})
 }
 
@@ -248,10 +248,10 @@ func TestSocialAppSuccessPaths(t *testing.T) {
 	if c := w.calls[6]; c.ver != 3 || c.body != "改過" || c.id != id {
 		t.Errorf("UpdateComment 的版本與內文 = %+v", c)
 	}
-	if c := w.calls[7]; c.delVer != nil {
-		t.Errorf("DeleteComment 沒帶 etag 卻傳了版本 %d", *c.delVer)
+	if c := w.calls[7]; c.delVer != 0 {
+		t.Errorf("DeleteComment 沒帶 etag 卻傳了版本 %d", c.delVer)
 	}
-	if c := w.calls[10]; c.delVer == nil || *c.delVer != 6 {
+	if c := w.calls[10]; c.delVer != 6 {
 		t.Errorf("DeleteForumEntry 的版本 = %+v", c)
 	}
 	cin := w.calls[5].cin

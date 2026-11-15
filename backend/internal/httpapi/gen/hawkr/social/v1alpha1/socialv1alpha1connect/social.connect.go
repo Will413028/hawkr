@@ -426,7 +426,7 @@ type SocialAppServiceClient interface {
 	UpdateComment(context.Context, *connect.Request[v1alpha1.UpdateCommentRequest]) (*connect.Response[v1alpha1.UpdateCommentResponse], error)
 	// DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
 	DeleteComment(context.Context, *connect.Request[v1alpha1.DeleteCommentRequest]) (*connect.Response[v1alpha1.DeleteCommentResponse], error)
-	// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立，不重複建立。
+	// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立。
 	CreateForumEntry(context.Context, *connect.Request[v1alpha1.CreateForumEntryRequest]) (*connect.Response[v1alpha1.CreateForumEntryResponse], error)
 	// UpdateForumEntry 修改自己的討論區發言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
 	UpdateForumEntry(context.Context, *connect.Request[v1alpha1.UpdateForumEntryRequest]) (*connect.Response[v1alpha1.UpdateForumEntryResponse], error)
@@ -612,7 +612,7 @@ type SocialAppServiceHandler interface {
 	UpdateComment(context.Context, *connect.Request[v1alpha1.UpdateCommentRequest]) (*connect.Response[v1alpha1.UpdateCommentResponse], error)
 	// DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
 	DeleteComment(context.Context, *connect.Request[v1alpha1.DeleteCommentRequest]) (*connect.Response[v1alpha1.DeleteCommentResponse], error)
-	// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立，不重複建立。
+	// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立。
 	CreateForumEntry(context.Context, *connect.Request[v1alpha1.CreateForumEntryRequest]) (*connect.Response[v1alpha1.CreateForumEntryResponse], error)
 	// UpdateForumEntry 修改自己的討論區發言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
 	UpdateForumEntry(context.Context, *connect.Request[v1alpha1.UpdateForumEntryRequest]) (*connect.Response[v1alpha1.UpdateForumEntryResponse], error)

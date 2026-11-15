@@ -26,10 +26,10 @@ type Writes interface {
 	UnlikeComment(ctx context.Context, c social.Caller, commentID uuid.UUID) (bool, error)
 	CreateComment(ctx context.Context, c social.Caller, in social.CommentInput) (social.Comment, error)
 	UpdateComment(ctx context.Context, c social.Caller, id uuid.UUID, version int64, body string) (social.Comment, error)
-	DeleteComment(ctx context.Context, c social.Caller, id uuid.UUID, version *int64) error
+	DeleteComment(ctx context.Context, c social.Caller, id uuid.UUID, version int64) error
 	CreateForumEntry(ctx context.Context, c social.Caller, in social.ForumInput) (social.ForumEntry, error)
 	UpdateForumEntry(ctx context.Context, c social.Caller, id uuid.UUID, version int64, body string) (social.ForumEntry, error)
-	DeleteForumEntry(ctx context.Context, c social.Caller, id uuid.UUID, version *int64) error
+	DeleteForumEntry(ctx context.Context, c social.Caller, id uuid.UUID, version int64) error
 }
 
 // App 實作 SocialAppService。
@@ -96,18 +96,6 @@ func bodyUpdate(field string, resource proto.Message, mask *fieldmaskpb.FieldMas
 		return uuid.UUID{}, 0, "", rpc.RequiredField("update_mask", "update_mask 必須列 body（內文是唯一可以修改的欄位）")
 	}
 	return uid, version, body, nil
-}
-
-// optionalVersion 解析選填的 etag；沒帶是 nil。
-func optionalVersion(etag string) (*int64, error) {
-	if etag == "" {
-		return nil, nil
-	}
-	v, err := rpc.VersionFromEtag(etag)
-	if err != nil {
-		return nil, err
-	}
-	return &v, nil
 }
 
 func (h *App) SharePost(ctx context.Context, req *connect.Request[pb.SharePostRequest]) (*connect.Response[pb.SharePostResponse], error) {
@@ -244,7 +232,7 @@ func (h *App) DeleteComment(ctx context.Context, req *connect.Request[pb.DeleteC
 	if err != nil {
 		return nil, err
 	}
-	version, err := optionalVersion(req.Msg.GetEtag())
+	version, err := rpc.VersionFromEtag(req.Msg.GetEtag())
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +305,7 @@ func (h *App) DeleteForumEntry(ctx context.Context, req *connect.Request[pb.Dele
 	if err != nil {
 		return nil, err
 	}
-	version, err := optionalVersion(req.Msg.GetEtag())
+	version, err := rpc.VersionFromEtag(req.Msg.GetEtag())
 	if err != nil {
 		return nil, err
 	}

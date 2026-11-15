@@ -89,20 +89,16 @@ func (s *Service) withStats(ctx context.Context, q *store.Queries, c model.Calle
 	return out, nil
 }
 
-// currentOf 是重送命中時回的留言：目前的狀態（已刪除、被隱藏、作者停用後是佔位）與計數，不是第一次建立當下的樣子。
+// currentOf 是重送命中時回的留言：列表讀取算出的目前狀態（已刪除、被隱藏、作者停用後是佔位）與計數，不是第一次建立當下的樣子。
+// row 是剛讀到的列，內文與版本直接用它。
 func (s *Service) currentOf(ctx context.Context, q *store.Queries, c model.Caller, row store.SocialComment, postStore int64) (model.Comment, error) {
-	fresh, err := q.GetComment(ctx, row.ID)
+	st, err := reads.One[reads.StateRow](ctx, s.d.DB.Conn(ctx), reads.CommentState(row.ID))
 	if err != nil {
-		return model.Comment{}, fmt.Errorf("social：讀取留言 %s：%w", row.ID, err)
+		return model.Comment{}, fmt.Errorf("social：讀取留言的狀態 %s：%w", row.ID, err)
 	}
-	cur := fresh.SocialComment
-	out := visibleComment(cur, postStore)
-	switch {
-	case cur.Counted:
-	case cur.DeletedAt != nil:
-		out.State, out.Actor, out.Body = model.CommentDeleted, model.Actor{}, ""
-	default:
-		out.State, out.Actor, out.Body = model.CommentHidden, model.Actor{}, ""
+	out := visibleComment(row, postStore)
+	if out.State = model.CommentState(st.State); out.State != model.CommentVisible {
+		out.Actor, out.Body = model.Actor{}, ""
 	}
 	return s.withStats(ctx, q, c, out)
 }
@@ -233,7 +229,7 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.CommentIn
 	return visibleComment(created, postStore), nil
 }
 
-// replay 查 (互動者, request_id)：命中且內容相同回傳第一次建立的那一則；內容不同是 InvalidInput；沒帶 request_id 或沒命中回 false。
+// replay 查 (互動者, request_id)：命中且內容相同回傳那一則（呼叫方補上目前的狀態）；內容不同是 InvalidInput；沒帶 request_id 或沒命中回 false。
 func (s *Service) replay(ctx context.Context, q *store.Queries, a model.Actor, requestID *uuid.UUID, hash []byte) (store.SocialComment, bool, error) {
 	if requestID == nil {
 		return store.SocialComment{}, false, nil
@@ -284,9 +280,6 @@ func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, vers
 		if err != nil {
 			return fmt.Errorf("social：鎖定留言 %s：%w", id, err)
 		}
-		if row.SocialComment.Version != version {
-			return versionConflict(ctx)
-		}
 		hidden, err := reads.Flag(ctx, s.d.DB.Conn(ctx), reads.CommentIsHidden(id))
 		if err != nil {
 			return fmt.Errorf("social：讀取留言的隱藏 %s：%w", id, err)
@@ -294,10 +287,10 @@ func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, vers
 		if hidden {
 			return apperr.FailedPrecondition("%s", text.CommentEditHidden(uitext.LocaleFrom(ctx)))
 		}
-		row2, err := q.UpdateCommentBody(ctx, store.UpdateCommentBodyParams{ID: id, Body: body, Now: now, ExpectedVersion: version})
-		if errors.Is(err, pgx.ErrNoRows) {
+		if row.SocialComment.Version != version {
 			return versionConflict(ctx)
 		}
+		row2, err := q.UpdateCommentBody(ctx, store.UpdateCommentBodyParams{ID: id, Body: body, Now: now})
 		if err != nil {
 			return fmt.Errorf("social：修改留言 %s：%w", id, err)
 		}
@@ -310,9 +303,9 @@ func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, vers
 	return updated, nil
 }
 
-// Delete 刪除留言（軟刪）：作者本人，或貼文所屬的店。已經刪除的冪等（不做副作用，SD5）；version 有帶時與目前的不符回 VersionConflict。店家身分的刪除（刪自己的，或刪別人的）要
+// Delete 刪除留言（軟刪）：作者本人，或貼文所屬的店。已經刪除的冪等（不做副作用，SD5）；version 非 0 時與目前的不符回 VersionConflict。店家身分的刪除（刪自己的，或刪別人的）要
 // CapContentContract。
-func (s *Service) Delete(ctx context.Context, c model.Caller, id uuid.UUID, version *int64) error {
+func (s *Service) Delete(ctx context.Context, c model.Caller, id uuid.UUID, version int64) error {
 	now := s.d.Now().UTC()
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
@@ -331,7 +324,7 @@ func (s *Service) Delete(ctx context.Context, c model.Caller, id uuid.UUID, vers
 		if row.SocialComment.DeletedAt != nil {
 			return nil
 		}
-		if version != nil && row.SocialComment.Version != *version {
+		if version != 0 && row.SocialComment.Version != version {
 			return versionConflict(ctx)
 		}
 		if ownsPost || row.SocialComment.ActorKind == string(model.ActorStore) {
