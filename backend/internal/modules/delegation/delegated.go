@@ -14,6 +14,8 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
 // 代行 Connect 的共用元件（ADR 2026-09-27-delegation-module「代行 Connect」修訂）：資源模組擁有 `<模組>DelegatedService` 與資源的寫入，delegation 提供
@@ -46,18 +48,15 @@ type DelegatedOperation struct {
 // DelegatedWrite 描述一次代行寫入的稽核內容。
 type DelegatedWrite struct {
 	Op DelegatedOperation
-	// ResourceID 是資源自己的 ID；建立類在寫入前沒有，留空，寫入後由 DelegatedOutcome.ResourceID 補上。
+	// ResourceID 是資源自己的 ID；建立類在寫入前沒有，留空，寫入的事件到了由訂閱者補上。
 	ResourceID string
-	// ResourceName 寫入失敗或重送前就要記的名稱（建立類的預覽）；寫入成功後以 DelegatedOutcome 為準。
+	// ResourceName 寫入失敗或重送前就要記的名稱（建立類的預覽）；寫入成功後以事件為準。
 	ResourceName string
 	// Version 是請求帶的資源版本（寫入前的版本）。
 	Version *int64
 	// PayloadHash 綁定 request_id 與請求內容（DelegatedPayloadHash）：同一把 request_id、不同內容不是重送。
 	PayloadHash string
 }
-
-// DelegatedOutcome 是寫入完成後補進稽核列的事實。
-type DelegatedOutcome = model.OperationOutcome
 
 // DelegatedWriteResult 是 DelegatedWrite 的結果。Replayed 為真時 do 沒有被呼叫，ResourceID 是第一次寫入的資源，呼叫方據它讀回資源目前的樣子。
 type DelegatedWriteResult struct {
@@ -115,12 +114,15 @@ func (m *Module) DelegatedRead(ctx context.Context, c DelegatedCaller, read func
 	return read(ctx, st)
 }
 
-// DelegatedWrite 在代行店家上執行一次寫入 do，在同一個 transaction 內：檢查 session 與能力（interceptor 已在請求進來時檢查過一次，這裡是 transaction 內的第二次，對的是不同時間點的 session）、讀店家此刻可不可代行（只在第一次寫入）、寫一列 SUCCEEDED 的稽核（request_id 對到 (session_id, idempotency_key)）、
-// 呼叫 do、把資源與版本補進稽核列。do 失敗時整個 transaction rollback（稽核列跟著消失，所以「有 SUCCEEDED」等於「寫入成功」）。同一個 session 以同一個 request_id 重送
-// （內容相同）不呼叫 do，回第一次的結果（不再檢查店家此刻可不可代行）。任何失敗（被拒絕或 do 的業務失敗）都在 transaction 之外另寫一列 FAILED。
+// DelegatedWrite 在代行店家上執行一次寫入 do（A7-D26）：不開 transaction。先查重送，再讀店家此刻可不可代行，然後帶著代行者（platform/delegatedactor）呼叫 do；
+// 資源模組在自己的 transaction 內為寫入發帶代行者的事件，delegation 的訂閱者（OnPostWrittenByActor）同 transaction 檢查 session 與能力、再次確認店家可代行、寫一列 SUCCEEDED
+// （request_id 對到 (session_id, idempotency_key)）。do 失敗時資源模組的 transaction rollback，稽核列跟著消失，所以「有 SUCCEEDED」等於「寫入成功」。
 //
-// do 在 transaction 內執行，不得呼叫外部 provider（單體規則 5）；do 拿到的 ctx 帶著這個 transaction。
-func (m *Module) DelegatedWrite(ctx context.Context, c DelegatedCaller, w DelegatedWrite, do func(ctx context.Context, st seller.Store) (DelegatedOutcome, error)) (DelegatedWriteResult, error) {
+// 同一個 session 以同一個 request_id 重送（內容相同）不呼叫 do，回第一次的結果（不再檢查店家此刻可不可代行）；內容不同回 DenialIdempotencyKeyReused。並行的重送：後到的訂閱者撞稽核表唯一鍵、
+// 回 ErrOperationKeyTaken 讓資源模組的 transaction rollback，這裡再讀那一列，收斂成重送。任何失敗（被拒絕或 do 的業務失敗）都另開 transaction 寫一列 FAILED。
+//
+// do 不得假設自己在 transaction 內：外部 provider 的呼叫與 transaction 由資源模組自己安排（單體規則 3、5）。
+func (m *Module) DelegatedWrite(ctx context.Context, c DelegatedCaller, w DelegatedWrite, do func(ctx context.Context, st seller.Store) error) (DelegatedWriteResult, error) {
 	if w.PayloadHash == "" {
 		err := model.Deny(model.DenialInvalidCommand, "請求內容雜湊為必填")
 		m.recordFailure(ctx, c, w, err)
@@ -148,41 +150,124 @@ func auditPayloadHash(w DelegatedWrite) string {
 	return DelegatedPayloadHash(w.PayloadHash, strings.TrimSpace(w.Op.Reason), w.Op.NotifySeller)
 }
 
-func (m *Module) delegatedWrite(ctx context.Context, c DelegatedCaller, w DelegatedWrite, do func(ctx context.Context, st seller.Store) (DelegatedOutcome, error)) (DelegatedWriteResult, error) {
-	var st seller.Store
-	log, replayed, err := m.audit.RunOperation(ctx, model.OperationAuditInput{
+// auditInput 是請求這一側知道的稽核資料（重送比對用）；寫入後才知道的資源 ID 與版本由事件補上。
+func auditInput(c DelegatedCaller, w DelegatedWrite) model.OperationAuditInput {
+	return model.OperationAuditInput{
 		SessionID: c.Session.ID, Capability: c.Method.Capability, Action: c.Method.Action, ResourceType: c.Method.Resource,
 		ResourceID: w.ResourceID, ResourceName: w.ResourceName, ResourceVersionBefore: w.Version,
 		OperationReason: strings.TrimSpace(w.Op.Reason), NotifySeller: w.Op.NotifySeller,
 		RequestID: w.Op.RequestID.String(), CorrelationID: c.CorrelationID, UserAgent: c.UserAgent, PayloadHash: auditPayloadHash(w),
-	}, func(ctx context.Context) (model.OperationOutcome, error) {
-		var err error
-		if st, err = m.operableStore(ctx, c.Session.Target.StoreID); err != nil {
-			return model.OperationOutcome{}, err
-		}
-		return do(ctx, st)
-	})
+	}
+}
+
+func (m *Module) delegatedWrite(ctx context.Context, c DelegatedCaller, w DelegatedWrite, do func(ctx context.Context, st seller.Store) error) (DelegatedWriteResult, error) {
+	in := auditInput(c, w)
+	log, found, err := m.audit.LookupOperation(ctx, in)
 	if err != nil {
 		return DelegatedWriteResult{}, err
 	}
-	if replayed {
-		// 重送回第一次的結果，與店家此刻的狀態無關（AIP-155）：不可代行的檢查只屬於第一次寫入（在 transaction 內）。這裡只讀店家本身，交給呼叫方讀回資源。
-		var state model.StoreState
-		if st, state, err = readStore(ctx, m.seller, c.Session.Target.StoreID); err != nil {
-			return DelegatedWriteResult{}, replayReadError{err}
-		}
-		if !state.Found {
-			return DelegatedWriteResult{}, replayReadError{fmt.Errorf("delegation：重送的稽核列 %s 的店家 %d 不存在", log.ID, c.Session.Target.StoreID)}
-		}
+	if found {
+		return m.replayResult(ctx, c, log)
 	}
-	out := DelegatedWriteResult{Store: st, AuditLogID: log.ID, Replayed: replayed}
+	st, err := m.operableStore(ctx, c.Session.Target.StoreID)
+	if err != nil {
+		return DelegatedWriteResult{}, err
+	}
+	err = do(delegatedactor.With(ctx, actorOf(c, in)), st)
+	if errors.Is(err, model.ErrOperationKeyTaken) {
+		if log, found, err = m.audit.LookupOperation(ctx, in); err != nil {
+			return DelegatedWriteResult{}, err
+		}
+		if !found {
+			return DelegatedWriteResult{}, fmt.Errorf("delegation：並行的請求 %s 寫下的稽核列讀不到", in.RequestID)
+		}
+		return m.replayResult(ctx, c, log)
+	}
+	if err != nil {
+		return DelegatedWriteResult{}, err
+	}
+	log, found, err = m.audit.LookupOperation(ctx, in)
+	if err != nil {
+		return DelegatedWriteResult{}, err
+	}
+	if !found {
+		return DelegatedWriteResult{}, fmt.Errorf("delegation：代行寫入 %s 成功，卻沒有稽核列（資源模組沒發事件？）", in.RequestID)
+	}
+	out := DelegatedWriteResult{Store: st, AuditLogID: log.ID}
 	if log.ResourceID != nil {
 		out.ResourceID = *log.ResourceID
 	}
-	if replayed && out.ResourceID == "" {
-		return DelegatedWriteResult{}, fmt.Errorf("delegation：重送的稽核列 %s 沒有資源 ID", log.ID)
+	return out, nil
+}
+
+// replayResult 回第一次寫入的結果，與店家此刻的狀態無關（AIP-155）：不可代行的檢查只屬於第一次寫入。這裡只讀店家本身，交給呼叫方讀回資源。
+func (m *Module) replayResult(ctx context.Context, c DelegatedCaller, log model.AuditLog) (DelegatedWriteResult, error) {
+	st, state, err := readStore(ctx, m.seller, c.Session.Target.StoreID)
+	if err != nil {
+		return DelegatedWriteResult{}, replayReadError{err}
+	}
+	if !state.Found {
+		return DelegatedWriteResult{}, replayReadError{fmt.Errorf("delegation：重送的稽核列 %s 的店家 %d 不存在", log.ID, c.Session.Target.StoreID)}
+	}
+	out := DelegatedWriteResult{Store: st, AuditLogID: log.ID, Replayed: true}
+	if log.ResourceID != nil {
+		out.ResourceID = *log.ResourceID
+	}
+	if out.ResourceID == "" {
+		return DelegatedWriteResult{}, replayReadError{fmt.Errorf("delegation：重送的稽核列 %s 沒有資源 ID", log.ID)}
 	}
 	return out, nil
+}
+
+func actorOf(c DelegatedCaller, in model.OperationAuditInput) delegatedactor.Actor {
+	return delegatedactor.Actor{
+		SessionID: c.Session.ID, AdminID: c.Session.Actor.AdminID, StoreID: c.Session.Target.StoreID,
+		Capability: string(in.Capability), Action: string(in.Action), Resource: string(in.ResourceType),
+		RequestID: in.RequestID, Reason: in.OperationReason, NotifySeller: in.NotifySeller, PayloadHash: in.PayloadHash,
+		ResourceVersionBefore: in.ResourceVersionBefore, CorrelationID: in.CorrelationID, UserAgent: in.UserAgent,
+	}
+}
+
+// auditNameRunes 是稽核列的資源名稱長度（貼文內文去除首尾空白後的前 N 個字元），與 handler 寫 FAILED 列時的預覽一致。
+const auditNameRunes = 60
+
+// OnPostWrittenByActor 訂閱 social 的 PostWrittenByActor：代行寫入在 social 的 transaction 內，檢查事件與代行者一致（店家、動作）、session 此刻還能用且帶有能力、
+// 店家此刻可代行（第一次寫入；重送在呼叫 social 之前就回了），然後寫一列 SUCCEEDED 的稽核。任何一步失敗 social 的 transaction 整個 rollback。組裝點以 events.Subscribe 訂閱。
+func (m *Module) OnPostWrittenByActor(ctx context.Context, e social.PostWrittenByActor) error {
+	a := e.Actor
+	action, ok := postWriteAction(e.Kind)
+	if !ok || string(action) != a.Action || e.StoreID != a.StoreID {
+		return fmt.Errorf("delegation：貼文寫入事件 %s（店家 %d）與代行者宣告的 %s（店家 %d）不一致", e.Kind, e.StoreID, a.Action, a.StoreID)
+	}
+	if _, err := m.operableStore(ctx, a.StoreID); err != nil {
+		return err
+	}
+	name := strings.TrimSpace(e.Preview)
+	if r := []rune(name); len(r) > auditNameRunes {
+		name = string(r[:auditNameRunes])
+	}
+	return m.audit.RecordOperation(ctx, model.OperationAuditInput{
+		SessionID: a.SessionID, Capability: Capability(a.Capability), Action: action, ResourceType: AuditResourceType(a.Resource),
+		ResourceID: e.PostID.String(), ResourceName: name, ResourceVersionBefore: a.ResourceVersionBefore,
+		OperationReason: a.Reason, NotifySeller: a.NotifySeller,
+		RequestID: a.RequestID, CorrelationID: a.CorrelationID, UserAgent: a.UserAgent, PayloadHash: a.PayloadHash,
+	}, model.OperationOutcome{ResourceID: e.PostID.String(), ResourceName: name, VersionAfter: e.Version})
+}
+
+func postWriteAction(k social.PostWriteKind) (AuditAction, bool) {
+	switch k {
+	case social.PostWriteCreated:
+		return AuditPostCreate, true
+	case social.PostWriteUpdated:
+		return AuditPostUpdate, true
+	case social.PostWritePublished:
+		return AuditPostPublish, true
+	case social.PostWriteUnpublished:
+		return AuditPostUnpublish, true
+	case social.PostWriteScheduled:
+		return AuditPostSchedule, true
+	}
+	return "", false
 }
 
 // failureTimeout 是寫 FAILED 稽核的期限：請求的 ctx 已取消或逾時時仍要留下一列。

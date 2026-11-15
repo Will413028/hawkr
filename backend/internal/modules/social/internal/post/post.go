@@ -27,6 +27,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/textcheck"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
@@ -165,6 +166,26 @@ func (s *Service) publishedEvent(ctx context.Context, p store.SocialPost, now ti
 	return events.Publish(ctx, s.d.Events, e)
 }
 
+// actorWritten 在 ctx 帶著代行者時為這次寫入發 PostWrittenByActor（A7-D26）；沒有代行者什麼都不做。在寫入的 transaction 內呼叫，貼文已是寫入後的狀態。
+// 沒有訂閱者時失敗關閉：代行寫入不能沒有稽核。
+func (s *Service) actorWritten(ctx context.Context, kind model.PostWriteKind, storeID int64, postID uuid.UUID) error {
+	a, ok := delegatedactor.From(ctx)
+	if !ok {
+		return nil
+	}
+	if !events.HasSubscriber[model.PostWrittenByActor](s.d.Events) {
+		return fmt.Errorf("social：代行寫入沒有稽核的訂閱者")
+	}
+	p, err := s.Own(ctx, storeID, postID)
+	if err != nil {
+		return err
+	}
+	return events.Publish(ctx, s.d.Events, model.PostWrittenByActor{
+		EventID: uuid.NewV7(), OccurredAt: s.d.Now().UTC(), Kind: kind, PostID: postID, StoreID: storeID,
+		Preview: model.TruncateRunes(p.Body, model.PreviewMaxRunes), Version: p.Version, Actor: a,
+	})
+}
+
 // publishLocked 是貼文轉為 PUBLISHED 唯一的路徑（手動發布與排程到點共用）：貼文列已鎖，公開要件在這裡檢查，之後寫狀態、發 PostPublished、排快取失效。
 // 呼叫方負責先處理這篇貼文的待發布排程（手動發布取消它，到點發布把它轉 PUBLISHED）。
 func (s *Service) publishLocked(ctx context.Context, q *store.Queries, row store.SocialPost, now time.Time, origin model.PostOrigin, sc store.SocialPostSchedule) error {
@@ -268,8 +289,10 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 				return err
 			}
 		}
-		out, err = s.Own(ctx, st.StoreID, id)
-		return err
+		if out, err = s.Own(ctx, st.StoreID, id); err != nil {
+			return err
+		}
+		return s.actorWritten(ctx, model.PostWriteCreated, st.StoreID, id)
 	})
 	if err != nil {
 		return model.Post{}, err
@@ -413,8 +436,10 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 				return err
 			}
 		}
-		out, err = s.Own(ctx, st.StoreID, in.PostID)
-		return err
+		if out, err = s.Own(ctx, st.StoreID, in.PostID); err != nil {
+			return err
+		}
+		return s.actorWritten(ctx, model.PostWriteUpdated, st.StoreID, in.PostID)
 	})
 	if err != nil {
 		return model.Post{}, err
@@ -440,7 +465,7 @@ func (s *Service) Publish(ctx context.Context, st seller.Store, postID uuid.UUID
 			return err
 		}
 		if row.Status == string(model.StatusPublished) {
-			return nil
+			return s.actorWritten(ctx, model.PostWritePublished, st.StoreID, postID)
 		}
 		if row.Version != version {
 			return versionConflict(ctx)
@@ -448,7 +473,10 @@ func (s *Service) Publish(ctx context.Context, st seller.Store, postID uuid.UUID
 		if _, err := s.d.Cancel.FromLockedPosts(ctx, []uuid.UUID{postID}, model.CancelReplaced, now, schedule.CallerBumps); err != nil {
 			return err
 		}
-		return s.publishLocked(ctx, q, row, now, model.OriginDirect, store.SocialPostSchedule{})
+		if err := s.publishLocked(ctx, q, row, now, model.OriginDirect, store.SocialPostSchedule{}); err != nil {
+			return err
+		}
+		return s.actorWritten(ctx, model.PostWritePublished, st.StoreID, postID)
 	})
 	if err != nil {
 		return model.Post{}, err
@@ -473,7 +501,7 @@ func (s *Service) Unpublish(ctx context.Context, st seller.Store, postID uuid.UU
 		}
 		switch model.PostStatus(row.Status) {
 		case model.StatusUnpublished:
-			return nil
+			return s.actorWritten(ctx, model.PostWriteUnpublished, st.StoreID, postID)
 		case model.StatusDraft:
 			return apperr.FailedPrecondition("%s", text.PostUnpublishDraft(uitext.LocaleFrom(ctx)))
 		case model.StatusPublished:
@@ -487,7 +515,10 @@ func (s *Service) Unpublish(ctx context.Context, st seller.Store, postID uuid.UU
 			}
 			return fmt.Errorf("social：下架貼文 %s：%w", postID, err)
 		}
-		return s.d.Cache.BustPost(ctx, postID, st.StoreID)
+		if err := s.d.Cache.BustPost(ctx, postID, st.StoreID); err != nil {
+			return err
+		}
+		return s.actorWritten(ctx, model.PostWriteUnpublished, st.StoreID, postID)
 	})
 	if err != nil {
 		return model.Post{}, err

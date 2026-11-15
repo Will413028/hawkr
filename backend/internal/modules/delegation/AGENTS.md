@@ -30,7 +30,7 @@ schema `delegation`（`db/schema.sql`）五張表：`admin_eligibilities`（代�
 - 撤回代行資格與撤銷管理員角色在同一個 transaction 撤銷進行中的 session（固定值 `RevokeReason*`）；後台登出是「結束」（`EndDelegationsOfAdmin`，`expires_at` 夾值同 `EndDelegationSession`，憑證立刻失效），不寫 `REVOKED`、不取消排程。守門：`TestDisablingAdminEligibilityRevokesSessionsAtomically`、`TestAdminSignOutEndsItsDelegations`、`TestRoleRevocationAndDelegationRevocationRollBackTogether`。規格：§3「撤銷」。
 - 排程發布（social 擁有排程）的授權失效有四個觸發點：撤回店家授權、撤回代行資格、撤銷管理員角色、治理撤銷單一 session；同 transaction 內一律「先取消排程、再鎖或改 delegation 的列」（social 在 delegation 之前鎖）。守門：`TestTriggersCancelSchedulesIncludingEndedSessions`、`TestRevokeAndScheduledJobDoNotDeadlock`、`platform/lockorder`。規格：§3、§6。
 - 第五個觸發點（A7-D25）：seller 的 `StoreSuspended`、`StoreClosed`、`StorePendingDeletion` 同 transaction 先取消該店的待發布排程、再結束進行中的 session（`EndDelegationsOfStore`，同登出的「結束」）；請求時發現店家不可代行只拒絕。守門：`TestStoreTriggersCancelSchedulesBeforeTouchingSessions`、`TestStoreSuspendedAndClosedEndThatStoresSessions`、`TestStoreNotDelegableAtRequestTimeRejectsWithoutRevoking`。規格：§3。
-- 稽核（兩階段 intent／confirm、代行 Connect 的單段 `SUCCEEDED` 與 `FAILED`、排程發布的重驗與稽核）的不變量在 `internal/audit/AGENTS.md`。
+- 稽核（兩階段 intent／confirm、代行 Connect 的單段 `SUCCEEDED` 與 `FAILED`、排程發布的重驗與稽核）的不變量在 `internal/audit/AGENTS.md`。代行寫入不由 delegation 開 transaction（A7-D26），`OnPostWrittenByActor` 在 social 的 transaction 內寫 `SUCCEEDED`。
 - 開始代行要有 `delegation.sessions.create` 權限。守門：`TestStartDelegationRequiresTheCreatePermission`。規格：§3。
 - 店家狀態只經 seller 的公開 API 讀取，`Deps.Seller` 必填，句子由 seller 提供。`Deps.Social` 必填（取消排程）。守門：`TestPreflightDenials`。規格：§5。
 

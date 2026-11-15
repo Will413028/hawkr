@@ -61,3 +61,11 @@ func Publish[E any](ctx context.Context, b *Bus, e E) error {
 	}
 	return nil
 }
+
+// HasSubscriber 回傳事件 E 是否至少有一個 handler。需要「事件一定被處理」的發布方（例如稽核）用它在 transaction 內失敗關閉；
+// 沒有訂閱者也照發是 Publish 的預設。
+func HasSubscriber[E any](b *Bus) bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return len(b.handlers[reflect.TypeFor[E]()]) > 0
+}

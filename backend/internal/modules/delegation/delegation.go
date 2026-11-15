@@ -60,7 +60,8 @@ type Deps struct {
 
 // auditor 是 Module 對稽核子領域（*audit.Module）的全部需求：正式與單元測試共用同一個欄位；測試嵌入它、只實作用到的方法，讓不碰資料庫的路徑不需要 audit.Module。
 type auditor interface {
-	RunOperation(ctx context.Context, in model.OperationAuditInput, do func(ctx context.Context) (model.OperationOutcome, error)) (model.AuditLog, bool, error)
+	LookupOperation(ctx context.Context, in model.OperationAuditInput) (model.AuditLog, bool, error)
+	RecordOperation(ctx context.Context, in model.OperationAuditInput, outcome model.OperationOutcome) error
 	RecordFailure(ctx context.Context, in model.FailureAuditInput) error
 	DelegationAuditLogs(ctx context.Context, f model.AuditLogFilter, p model.DelegationPaging) (model.AuditLogPage, error)
 	RecordDelegationAuditIntent(ctx context.Context, in model.AuditIntentInput) (model.AuditIntent, error)

@@ -18,7 +18,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// 代行 Connect 的共用元件（DelegatedWrite、DelegatedRead）：同一個 transaction 內檢查 session 與能力、寫單段 SUCCEEDED 稽核、呼叫資源模組（這裡是 social）；
+// 代行 Connect 的共用元件（DelegatedWrite、DelegatedRead）：不開 transaction：呼叫資源模組（這裡是 social），social 在自己的 transaction 內發 PostWrittenByActor，訂閱者同 transaction 檢查 session 與能力、寫單段 SUCCEEDED 稽核（A7-D26）；
 // 被拒絕與寫入失敗另開 transaction 寫 FAILED。handler 的角色由下面的 writePost 等輔助函式扮演（資源模組的 handler 在 httpapi/social）。
 
 var (
@@ -125,13 +125,13 @@ type written struct {
 func (f *fixture) writePost(c DelegatedCaller, w DelegatedWrite, do func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error)) (written, error) {
 	ctx := context.Background()
 	var out written
-	res, err := f.m.DelegatedWrite(ctx, c, w, func(ctx context.Context, st seller.Store) (DelegatedOutcome, error) {
+	res, err := f.m.DelegatedWrite(ctx, c, w, func(ctx context.Context, st seller.Store) error {
 		p, at, err := do(ctx, st)
 		if err != nil {
-			return DelegatedOutcome{}, err
+			return err
 		}
 		out.Post, out.PublishAt = p, at
-		return DelegatedOutcome{ResourceID: p.ID.String(), ResourceName: p.Body, VersionAfter: p.Version}, nil
+		return nil
 	})
 	if err != nil {
 		return written{}, err
@@ -359,6 +359,38 @@ func TestReplayWithTheSamePayloadDoesNotCallSocialAgain(t *testing.T) {
 	}
 }
 
+// 並行的重送（同一個 session、同一個 request_id、內容相同）：兩個請求都成功，只有一篇貼文、一列 SUCCEEDED 稽核，沒有 FAILED；
+// 撞唯一鍵的那一個由 delegation 讀回稽核列收斂成重送，或由 social 自己的 request_id 去重（A7-D26）。
+func TestConcurrentReplaysConvergeOnOneWriteAndOneAuditRow(t *testing.T) {
+	f := build(t, true)
+	o := f.newOperator(t, "concurrent")
+	sid := o.session.Session.ID
+	op := f.op("並行重送")
+	c := f.caller(t, o, methodCreate)
+	const n = 4
+	errs := make(chan error, n)
+	for range n {
+		go func() {
+			_, err := f.createPost(c, op, "並行的一篇", "")
+			errs <- err
+		}()
+	}
+	for range n {
+		if err := <-errs; err != nil {
+			t.Fatalf("並行重送：%v", err)
+		}
+	}
+	if got := f.postCount(t, o.storeID); got != 1 {
+		t.Fatalf("貼文 %d 篇，預期 1", got)
+	}
+	if got := f.auditRowsOfKey(t, sid, op.RequestID.String()); got != 1 {
+		t.Fatalf("稽核 %d 列，預期 1", got)
+	}
+	if got := f.resultRows(t, sid, "FAILED"); got != 0 {
+		t.Fatalf("FAILED %d 列，預期 0", got)
+	}
+}
+
 // social 的寫入失敗時，SUCCEEDED 稽核跟著 rollback（同一個 transaction），但另開 transaction 留下一列 FAILED（failure_reason 是 social 回的 ErrorReason VERSION_CONFLICT、沒有冪等鍵）；
 // 失敗的嘗試不占用 request_id，之後用同一個 request_id 重試成功。
 func TestSocialFailureLeavesNoSucceededRowButAFailedRow(t *testing.T) {
@@ -569,8 +601,8 @@ func TestDelegatedReadsStayInTheTargetStoreAndTheReasonIsValidated(t *testing.T)
 	if n := f.resultRows(t, sid, "SUCCEEDED"); n != 0 {
 		t.Fatalf("不合法的請求留下 %d 列 SUCCEEDED", n)
 	}
-	if n := f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND result = 'FAILED' AND action = 'POST_CREATE' AND biz_code = 9260`, sid); n != len(reasons) {
-		t.Fatalf("FAILED（9260）%d 列，預期 %d", n, len(reasons))
+	if n := f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND result = 'FAILED' AND action = 'POST_CREATE' AND failure_reason = $2 AND biz_code IS NULL`, sid, DenialCodes()[DenialInvalidCommand]); n != len(reasons) {
+		t.Fatalf("FAILED（%s）%d 列，預期 %d", DenialCodes()[DenialInvalidCommand], n, len(reasons))
 	}
 	if n := f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND result = 'FAILED' AND operation_reason IS NOT NULL AND (char_length(operation_reason) NOT BETWEEN 1 AND 100 OR operation_reason ~ '[[:cntrl:]]')`, sid); n != 0 {
 		t.Fatalf("不合法的操作原因被寫進 FAILED 列 %d 列", n)

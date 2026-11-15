@@ -48,10 +48,10 @@ func postMethod(c moddelegation.Capability, a moddelegation.AuditAction) moddele
 	return moddelegation.DelegatedMethod{Capability: c, Action: a, Resource: moddelegation.ResourcePost}
 }
 
-// DelegationRunner 是 handler 需要的 delegation 公開 API（*delegation.Module）：同一個 transaction 內的授權、稽核與冪等（DelegatedWrite），與讀取的授權（DelegatedRead）。
+// DelegationRunner 是 handler 需要的 delegation 公開 API（*delegation.Module）：授權、重送偵測與稽核（DelegatedWrite；不開 transaction，稽核由 social 的事件在 social 自己的 transaction 內寫，A7-D26），與讀取的授權（DelegatedRead）。
 type DelegationRunner interface {
 	DelegatedRead(ctx context.Context, c moddelegation.DelegatedCaller, read func(ctx context.Context, st seller.Store) error) error
-	DelegatedWrite(ctx context.Context, c moddelegation.DelegatedCaller, w moddelegation.DelegatedWrite, do func(ctx context.Context, st seller.Store) (moddelegation.DelegatedOutcome, error)) (moddelegation.DelegatedWriteResult, error)
+	DelegatedWrite(ctx context.Context, c moddelegation.DelegatedCaller, w moddelegation.DelegatedWrite, do func(ctx context.Context, st seller.Store) error) (moddelegation.DelegatedWriteResult, error)
 }
 
 // DelegatedPosts 是代行讀寫貼文的來源（*social.Module）：與店主同一組方法（店家由 delegation 以 session 的目標店家讀出後交給模組），加上重送時讀回排程時間。
@@ -103,7 +103,7 @@ func postPreview(body string) string {
 	return b
 }
 
-// delegatedWrite 是每個代行寫入共同的流程：交給 delegation 在 transaction 內授權、稽核並執行 do；重送（do 沒被呼叫）時讀回第一次寫入的貼文目前的樣子。
+// delegatedWrite 是每個代行寫入共同的流程：交給 delegation 檢查重送與店家、帶著代行者執行 do（social 在自己的 transaction 內發事件，稽核同 transaction 寫入）；重送（do 沒被呼叫）時讀回第一次寫入的貼文目前的樣子。
 // 回傳貼文、店家、稽核列 ID，與排程的發布時間（只有排程）。
 func (h *Delegated) delegatedWrite(ctx context.Context, w moddelegation.DelegatedWrite,
 	do func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error)) (post social.Post, st seller.Store, auditID string, publishAt *time.Time, err error) {
@@ -111,13 +111,13 @@ func (h *Delegated) delegatedWrite(ctx context.Context, w moddelegation.Delegate
 	if err != nil {
 		return social.Post{}, seller.Store{}, "", nil, err
 	}
-	res, err := h.runner.DelegatedWrite(ctx, c, w, func(ctx context.Context, st seller.Store) (moddelegation.DelegatedOutcome, error) {
+	res, err := h.runner.DelegatedWrite(ctx, c, w, func(ctx context.Context, st seller.Store) error {
 		p, at, err := do(ctx, st)
 		if err != nil {
-			return moddelegation.DelegatedOutcome{}, err
+			return err
 		}
 		post, publishAt = p, at
-		return moddelegation.DelegatedOutcome{ResourceID: p.ID.String(), ResourceName: postPreview(p.Body), VersionAfter: p.Version}, nil
+		return nil
 	})
 	if err != nil {
 		return social.Post{}, seller.Store{}, "", nil, err

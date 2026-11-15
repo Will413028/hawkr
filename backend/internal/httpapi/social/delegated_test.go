@@ -103,7 +103,7 @@ func (f *fakeRunner) DelegatedRead(ctx context.Context, c moddelegation.Delegate
 }
 
 func (f *fakeRunner) DelegatedWrite(ctx context.Context, c moddelegation.DelegatedCaller, w moddelegation.DelegatedWrite,
-	do func(context.Context, seller.Store) (moddelegation.DelegatedOutcome, error)) (moddelegation.DelegatedWriteResult, error) {
+	do func(context.Context, seller.Store) error) (moddelegation.DelegatedWriteResult, error) {
 	f.calls = append(f.calls, "write:"+string(c.Method.Action))
 	f.caller, f.write = c, w
 	if f.err != nil {
@@ -113,11 +113,10 @@ func (f *fakeRunner) DelegatedWrite(ctx context.Context, c moddelegation.Delegat
 	if f.replayed {
 		return moddelegation.DelegatedWriteResult{Store: st, AuditLogID: f.audit, ResourceID: f.replayID, Replayed: true}, nil
 	}
-	out, err := do(ctx, st)
-	if err != nil {
+	if err := do(ctx, st); err != nil {
 		return moddelegation.DelegatedWriteResult{}, err
 	}
-	return moddelegation.DelegatedWriteResult{Store: st, AuditLogID: f.audit, ResourceID: out.ResourceID}, nil
+	return moddelegation.DelegatedWriteResult{Store: st, AuditLogID: f.audit}, nil
 }
 
 // fakePosts 記錄 social 的呼叫與收到的輸入，回固定的結果；沒有覆寫的 Owner 方法被呼叫會 panic。

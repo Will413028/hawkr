@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"errors"
 	"slices"
 	"strings"
 	"time"
@@ -270,7 +271,7 @@ type OperationAuditInput struct {
 	Capability   Capability
 	Action       AuditAction
 	ResourceType AuditResourceType
-	// ResourceID 是資源自己的 ID；建立類在寫入前沒有，留空，寫入後由 OperationOutcome.ResourceID 補上。
+	// ResourceID 是資源自己的 ID；建立類在寫入前沒有，留空，寫入的事件到了由 OperationOutcome.ResourceID 補上。
 	ResourceID            string
 	ResourceName          string
 	ResourceVersionBefore *int64
@@ -329,3 +330,7 @@ func LegalOperationReason(raw string) (string, bool) {
 	}
 	return reason, true
 }
+
+// ErrOperationKeyTaken 表示 (session, request_id) 的 SUCCEEDED 稽核列已被另一個並行的請求寫下：RecordOperation 回它時沒有寫任何列，
+// 呼叫方要回傳它讓整個 transaction rollback（資源模組的寫入跟著消失），再於 transaction 外重讀那一列收斂為重送。
+var ErrOperationKeyTaken = errors.New("delegation：request_id 已有稽核列")

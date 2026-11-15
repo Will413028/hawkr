@@ -3,6 +3,8 @@ package model
 import (
 	"time"
 	"uuid"
+
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
 // 模組事件只帶領域鍵（內容 ID、互動者 (kind, id)、store_id、以 rune 截斷的預覽），不帶名稱、頭像、account_id 或留言快照：A7-3 的
@@ -65,4 +67,28 @@ type PostLiked struct {
 	PostID     uuid.UUID
 	StoreID    int64
 	BuyerID    int64
+}
+
+// PostWriteKind 是代行者對貼文做的寫入種類。
+type PostWriteKind string
+
+const (
+	PostWriteCreated     PostWriteKind = "CREATED"
+	PostWriteUpdated     PostWriteKind = "UPDATED"
+	PostWritePublished   PostWriteKind = "PUBLISHED"
+	PostWriteUnpublished PostWriteKind = "UNPUBLISHED"
+	PostWriteScheduled   PostWriteKind = "SCHEDULED"
+)
+
+// PostWrittenByActor 是 ctx 帶著代行者（delegatedactor）時，每個貼文寫入在自己的 transaction 內發的事件（A7-D26）：建立、修改、發布、下架、排程各一次，
+// 冪等的 no-op（已發布再發布、已下架再下架）也發，因為請求本身要被稽核。店主自己的寫入（ctx 沒有代行者）不發。Version 是寫入後的貼文版本，Preview 是內文預覽。
+type PostWrittenByActor struct {
+	EventID    uuid.UUID
+	OccurredAt time.Time
+	Kind       PostWriteKind
+	PostID     uuid.UUID
+	StoreID    int64
+	Preview    string
+	Version    int64
+	Actor      delegatedactor.Actor
 }

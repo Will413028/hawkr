@@ -56,7 +56,7 @@ func TestNewDelegationEndsSessionsOfASuspendedOrClosedStore(t *testing.T) {
 					issued_at, expires_at, last_active_at, status, idempotency_key, create_request_id, create_correlation_id
 				) VALUES ($1, decode(repeat($2, 32), 'hex'), $3, 'ops', $4, 2, 'store',
 					'SELLER_REQUEST', 'seller request', ARRAY['posts.read'],
-					date_trunc('second', now()), date_trunc('second', now()) + interval '30 minutes',
+					date_trunc('second', now()) - interval '5 minutes', date_trunc('second', now()) + interval '25 minutes',
 					date_trunc('second', now()), 'ACTIVE', $1, $1, $1) RETURNING id`, code, hash, admin, storeID).Scan(&id); err != nil {
 					t.Fatal(err)
 				}

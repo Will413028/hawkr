@@ -164,8 +164,10 @@ func (s *Service) Schedule(ctx context.Context, st seller.Store, in model.Schedu
 		if err := s.d.Jobs.Enqueue(ctx, PublishScheduledArgs{ScheduleID: out.ID}, &opts); err != nil {
 			return err
 		}
-		posted, err = s.Own(ctx, st.StoreID, row.ID)
-		return err
+		if posted, err = s.Own(ctx, st.StoreID, row.ID); err != nil {
+			return err
+		}
+		return s.actorWritten(ctx, model.PostWriteScheduled, st.StoreID, row.ID)
 	})
 	if err != nil {
 		return model.ScheduledPost{}, err
