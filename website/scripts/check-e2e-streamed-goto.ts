@@ -3,15 +3,16 @@
 /**
  * e2e streamed-navigation gate: specs under tests/e2e must navigate through
  * gotoStreamed / reloadStreamed (tests/e2e/helpers/streamed-navigation.ts),
- * never with a raw `waitUntil: "domcontentloaded"`. Every route streams, and
+ * never with a raw `waitUntil: "domcontentloaded"`. Pages contain streamed Suspense boundaries, and
  * before React reveals the streamed content a hidden `body > div[hidden]
  * [id^="S:"]` copy coexists with the hydrated page, so locators can hit
  * strict-mode duplicates. A spec that must assert during streaming opts out
- * with a `// streamed-goto-allow: <reason>` line comment on the line above.
+ * with a `// streamed-goto-allow: <reason>` line comment on any of the 3 lines
+ * preceding the `waitUntil` line (so it can sit above a multi-line `page.goto(`).
  */
 
 import { readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 
 const root = process.cwd();
 const E2E_DIR = "tests/e2e";
@@ -19,12 +20,14 @@ const HELPER = "tests/e2e/helpers/streamed-navigation.ts";
 const RAW = /waitUntil:\s*["']domcontentloaded["']/;
 const ALLOW = /^\s*\/\/\s*streamed-goto-allow:\s*\S+/;
 
-export function findViolations(path: string, text: string): string[] {
+function findViolations(path: string, text: string): string[] {
 	const lines = text.split("\n");
 	const out: string[] = [];
 	lines.forEach((line, i) => {
 		if (!RAW.test(line)) return;
-		if (i > 0 && ALLOW.test(lines[i - 1] ?? "")) return;
+		for (let j = Math.max(0, i - 3); j < i; j++) {
+			if (ALLOW.test(lines[j] ?? "")) return;
+		}
 		out.push(
 			`${path}:${i + 1}: raw waitUntil "domcontentloaded" — use gotoStreamed/reloadStreamed from helpers/streamed-navigation (or add a "// streamed-goto-allow: <reason>" line above).`,
 		);
@@ -57,10 +60,7 @@ if (
 
 const files = walk(E2E_DIR).filter((p) => p !== HELPER);
 const failures = files.flatMap((p) =>
-	findViolations(
-		relative(root, join(root, p)),
-		readFileSync(join(root, p), "utf8"),
-	),
+	findViolations(p, readFileSync(join(root, p), "utf8")),
 );
 
 if (failures.length > 0) {

@@ -135,7 +135,7 @@ async function waitForStableCardCount(page: Page) {
  * flight. Blanking first leaves nothing running that could do it.
  */
 const blankSlate = (page: Page) =>
-	gotoStreamed(page, "about:blank", { timeout: 30_000 });
+	page.goto("about:blank", { timeout: 30_000 });
 
 /**
  * Navigates, and proves we arrived before a single number is read.
