@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page } from "@playwright/test";
-import { formatAxeViolations } from "../../shared/axe-format";
+import { formatAxeViolations } from "@/tests/shared/axe-format";
 
 /**
  * Runs axe's default rule set on the current page and fails on any violation,

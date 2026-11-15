@@ -8,12 +8,13 @@ import { formatAxeViolations } from "@/tests/shared/axe-format";
  * and target for each. Component tests render one component without a page
  * around it, so the page-level rules `region`, `landmark-one-main` and
  * `page-has-heading-one` (jest-axe also disables `region`) are off; the e2e
- * helper still enforces them on whole pages. Finite CSS animations and
- * transitions (dialog and popover fade-ins) finish first: axe samples the
- * blended colour of an element that is still fading in, which reports a
- * contrast failure the settled state does not have. Two animation frames
- * pass before collecting them, so a transition started by the interaction
- * just before the call is already registered.
+ * helper still enforces them on whole pages. Two animation frames pass
+ * first, so a transition started by the interaction just before the call is
+ * already registered. Then every running finite document-wide animation
+ * (portals render into body, so not only the container's) must finish:
+ * axe samples the blended colour of an element that is still fading in,
+ * which reports a contrast failure the settled state does not have. If any
+ * is still running after 2s the call throws, naming their targets.
  */
 export async function expectNoAxeViolations(
 	label: string,
@@ -22,24 +23,39 @@ export async function expectNoAxeViolations(
 	for (let frame = 0; frame < 2; frame++) {
 		await new Promise((resolve) => requestAnimationFrame(resolve));
 	}
-	const settled = Promise.all(
-		document
-			.getAnimations()
-			.filter(
-				(animation) =>
-					animation.effect?.getComputedTiming().iterations !== Infinity &&
-					(container instanceof Element
-						? container.contains(
-								(animation.effect as KeyframeEffect | null)?.target ?? null,
-							)
-						: true),
-			)
-			.map((animation) => animation.finished.catch(() => undefined)),
-	);
-	await Promise.race([
-		settled,
-		new Promise((resolve) => setTimeout(resolve, 2000)),
-	]);
+	const running = document
+		.getAnimations()
+		.filter(
+			(animation) =>
+				animation.playState === "running" &&
+				animation.effect?.getComputedTiming().iterations !== Infinity,
+		);
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		const outcome = await Promise.race([
+			Promise.all(
+				running.map((animation) => animation.finished.catch(() => undefined)),
+			).then(() => "settled" as const),
+			new Promise<"timeout">((resolve) => {
+				timer = setTimeout(() => resolve("timeout"), 2000);
+			}),
+		]);
+		if (outcome === "timeout") {
+			const targets = running
+				.filter((animation) => animation.playState === "running")
+				.map((animation) => {
+					const target = (animation.effect as KeyframeEffect | null)?.target;
+					return target
+						? `${target.tagName.toLowerCase()}${target.id ? `#${target.id}` : ""}`
+						: "(no target)";
+				});
+			throw new Error(
+				`${label}: animations still running after 2000ms: ${targets.join(", ")}`,
+			);
+		}
+	} finally {
+		clearTimeout(timer);
+	}
 	const { violations } = await axe.run(container, {
 		rules: {
 			region: { enabled: false },

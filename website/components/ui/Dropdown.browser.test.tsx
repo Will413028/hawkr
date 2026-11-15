@@ -39,6 +39,15 @@ function Controlled(props: Partial<Props>) {
 	);
 }
 
+const visibleLabelOnly = {
+	"aria-label": undefined,
+	floatingLabel: false,
+} satisfies Partial<Props>;
+const floatingLabelOnly = {
+	"aria-label": undefined,
+	floatingLabel: true,
+} satisfies Partial<Props>;
+
 const trigger = () => page.getByRole("button", { name: /^產地/ });
 
 describe("Dropdown", () => {
@@ -64,6 +73,22 @@ describe("Dropdown", () => {
 			.toContain("花蓮縣");
 		expect(onChange).toHaveBeenCalledWith("hualien");
 		await expect.element(trigger()).toHaveAttribute("aria-expanded", "false");
+	});
+
+	it.each([
+		["visible label only", visibleLabelOnly],
+		["floatingLabel only", floatingLabelOnly],
+	])("names the trigger and listbox exactly with %s", async (_setup, props) => {
+		renderWithIntl(<Controlled {...props} />, { frameMaxWidth: 420 });
+		const triggerName = page.getByRole("button", {
+			name: "產地 請選擇產地",
+			exact: true,
+		});
+		await expect.element(triggerName).toBeInTheDocument();
+		await userEvent.click(triggerName);
+		await expect
+			.element(page.getByRole("listbox", { name: "產地", exact: true }))
+			.toBeInTheDocument();
 	});
 
 	it("filters by search text and selects the matching option", async () => {

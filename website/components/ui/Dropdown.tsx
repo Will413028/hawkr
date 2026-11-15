@@ -406,11 +406,19 @@ export function Dropdown({
 		.filter(Boolean)
 		.join(" ");
 
-	const labelId = `${fieldId}-label`;
 	const valueId = `${fieldId}-value`;
-	// Name element of the listbox: the explicit aria-label, else the visible
-	// label, else the trigger itself.
-	const nameId = ariaLabel || (label && !floatingLabel) ? labelId : fieldId;
+	// The one element that carries the accessible name: the explicit
+	// aria-label (sr-only span), else the visible label, else the floating
+	// label. With none of them the listbox falls back to the trigger itself.
+	const nameSource = ariaLabel
+		? "aria-label"
+		: label
+			? floatingLabel
+				? "floating"
+				: "visible"
+			: undefined;
+	const nameElementId = nameSource ? `${fieldId}-label` : undefined;
+	const nameId = nameElementId ?? fieldId;
 	const valueText = shownItem
 		? shownItem.label
 		: floatingLabel && label && !(focused || open)
@@ -426,7 +434,7 @@ export function Dropdown({
 		>
 			{label && !floatingLabel && (
 				<label
-					id={ariaLabel ? undefined : labelId}
+					id={nameSource === "visible" ? nameElementId : undefined}
 					data-slot="label"
 					htmlFor={fieldId}
 					className={`text-sm font-medium text-foreground${isRequired ? " after:content-['_*'] after:text-[var(--hkui-danger-text)]" : ""}`}
@@ -435,7 +443,7 @@ export function Dropdown({
 				</label>
 			)}
 			{ariaLabel && (
-				<span id={labelId} className="sr-only">
+				<span id={nameElementId} className="sr-only">
 					{ariaLabel}
 				</span>
 			)}
@@ -458,7 +466,9 @@ export function Dropdown({
 					aria-expanded={open}
 					aria-controls={open ? `${fieldId}-listbox` : undefined}
 					aria-invalid={invalid || undefined}
-					aria-labelledby={ariaLabel ? `${labelId} ${valueId}` : undefined}
+					aria-labelledby={
+						nameElementId ? `${nameElementId} ${valueId}` : valueId
+					}
 					aria-describedby={
 						description || errorMessage ? `${fieldId}-desc` : undefined
 					}
@@ -486,6 +496,7 @@ export function Dropdown({
 				</button>
 				{floatingLabel && label && (
 					<label
+						id={nameSource === "floating" ? nameElementId : undefined}
 						htmlFor={fieldId}
 						data-slot="floating-label"
 						className={floatingLabelClasses({
