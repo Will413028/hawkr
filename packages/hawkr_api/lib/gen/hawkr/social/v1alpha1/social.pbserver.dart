@@ -132,6 +132,10 @@ abstract class SocialAppServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $4.DeletePostRequest request);
   $async.Future<$4.SchedulePostResponse> schedulePost(
       $pb.ServerContext ctx, $4.SchedulePostRequest request);
+  $async.Future<$4.ListPendingSchedulesResponse> listPendingSchedules(
+      $pb.ServerContext ctx, $4.ListPendingSchedulesRequest request);
+  $async.Future<$4.CancelPostScheduleResponse> cancelPostSchedule(
+      $pb.ServerContext ctx, $4.CancelPostScheduleRequest request);
   $async.Future<$4.ListStoreCommentsResponse> listStoreComments(
       $pb.ServerContext ctx, $4.ListStoreCommentsRequest request);
   $async.Future<$4.GetStoreSocialSummaryResponse> getStoreSocialSummary(
@@ -177,6 +181,10 @@ abstract class SocialAppServiceBase extends $pb.GeneratedService {
         return $4.DeletePostRequest();
       case 'SchedulePost':
         return $4.SchedulePostRequest();
+      case 'ListPendingSchedules':
+        return $4.ListPendingSchedulesRequest();
+      case 'CancelPostSchedule':
+        return $4.CancelPostScheduleRequest();
       case 'ListStoreComments':
         return $4.ListStoreCommentsRequest();
       case 'GetStoreSocialSummary':
@@ -227,6 +235,11 @@ abstract class SocialAppServiceBase extends $pb.GeneratedService {
         return deletePost(ctx, request as $4.DeletePostRequest);
       case 'SchedulePost':
         return schedulePost(ctx, request as $4.SchedulePostRequest);
+      case 'ListPendingSchedules':
+        return listPendingSchedules(
+            ctx, request as $4.ListPendingSchedulesRequest);
+      case 'CancelPostSchedule':
+        return cancelPostSchedule(ctx, request as $4.CancelPostScheduleRequest);
       case 'ListStoreComments':
         return listStoreComments(ctx, request as $4.ListStoreCommentsRequest);
       case 'GetStoreSocialSummary':

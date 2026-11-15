@@ -123,6 +123,12 @@ const (
 	// SocialAppServiceSchedulePostProcedure is the fully-qualified name of the SocialAppService's
 	// SchedulePost RPC.
 	SocialAppServiceSchedulePostProcedure = "/hawkr.social.v1alpha1.SocialAppService/SchedulePost"
+	// SocialAppServiceListPendingSchedulesProcedure is the fully-qualified name of the
+	// SocialAppService's ListPendingSchedules RPC.
+	SocialAppServiceListPendingSchedulesProcedure = "/hawkr.social.v1alpha1.SocialAppService/ListPendingSchedules"
+	// SocialAppServiceCancelPostScheduleProcedure is the fully-qualified name of the SocialAppService's
+	// CancelPostSchedule RPC.
+	SocialAppServiceCancelPostScheduleProcedure = "/hawkr.social.v1alpha1.SocialAppService/CancelPostSchedule"
 	// SocialAppServiceListStoreCommentsProcedure is the fully-qualified name of the SocialAppService's
 	// ListStoreComments RPC.
 	SocialAppServiceListStoreCommentsProcedure = "/hawkr.social.v1alpha1.SocialAppService/ListStoreComments"
@@ -480,8 +486,14 @@ type SocialAppServiceClient interface {
 	// DeletePost 刪除自己的貼文；已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
 	DeletePost(context.Context, *connect.Request[v1alpha1.DeletePostRequest]) (*connect.Response[v1alpha1.DeletePostResponse], error)
 	// SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
-	// 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
+	// 需要賣家能力 CAP_MARKETING。排程的讀取與取消見 ListPendingSchedules、CancelPostSchedule。
 	SchedulePost(context.Context, *connect.Request[v1alpha1.SchedulePostRequest]) (*connect.Response[v1alpha1.SchedulePostResponse], error)
+	// ListPendingSchedules 列出呼叫者此刻的店待發布的排程（含店主自己排的與代行營運排的），發布時間早的在前（同一時間以 ID 排序）。店主看得到代行排的貼文並能取消（CancelPostSchedule）。
+	// 只讀自己店的排程，店家由伺服器推導。
+	ListPendingSchedules(context.Context, *connect.Request[v1alpha1.ListPendingSchedulesRequest]) (*connect.Response[v1alpha1.ListPendingSchedulesResponse], error)
+	// CancelPostSchedule 店主取消貼文待發布的排程（不分發起者；取消原因記為店主取消）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT。貼文沒有待發布的排程時什麼都不做（不檢查 etag），回目前的 etag。
+	// 貼文不是這家店的回 not_found。需要賣家能力 CAP_MARKETING。
+	CancelPostSchedule(context.Context, *connect.Request[v1alpha1.CancelPostScheduleRequest]) (*connect.Response[v1alpha1.CancelPostScheduleResponse], error)
 	// ListStoreComments 列出呼叫者此刻的店所有貼文（含草稿與下架的貼文）的頂層留言，依建立時間舊到新；post_id 選填，設了只列那一篇。
 	// 刪除或隱藏而底下有可見回覆的頂層留言是佔位項目。unreplied 為真時只列「未回覆」的留言：本店貼文上、作者不是本店的頂層留言，沒有刪除、沒有被隱藏，
 	// 而且底下沒有任何一則仍可見、作者是本店的回覆（已刪除或被隱藏的店家回覆不算回覆）；此時沒有佔位項目。賣家能力 CAP_CONTENT_CONTRACT。
@@ -632,6 +644,20 @@ func NewSocialAppServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
+		listPendingSchedules: connect.NewClient[v1alpha1.ListPendingSchedulesRequest, v1alpha1.ListPendingSchedulesResponse](
+			httpClient,
+			baseURL+SocialAppServiceListPendingSchedulesProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("ListPendingSchedules")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		cancelPostSchedule: connect.NewClient[v1alpha1.CancelPostScheduleRequest, v1alpha1.CancelPostScheduleResponse](
+			httpClient,
+			baseURL+SocialAppServiceCancelPostScheduleProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("CancelPostSchedule")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
 		listStoreComments: connect.NewClient[v1alpha1.ListStoreCommentsRequest, v1alpha1.ListStoreCommentsResponse](
 			httpClient,
 			baseURL+SocialAppServiceListStoreCommentsProcedure,
@@ -670,6 +696,8 @@ type socialAppServiceClient struct {
 	unpublishPost         *connect.Client[v1alpha1.UnpublishPostRequest, v1alpha1.UnpublishPostResponse]
 	deletePost            *connect.Client[v1alpha1.DeletePostRequest, v1alpha1.DeletePostResponse]
 	schedulePost          *connect.Client[v1alpha1.SchedulePostRequest, v1alpha1.SchedulePostResponse]
+	listPendingSchedules  *connect.Client[v1alpha1.ListPendingSchedulesRequest, v1alpha1.ListPendingSchedulesResponse]
+	cancelPostSchedule    *connect.Client[v1alpha1.CancelPostScheduleRequest, v1alpha1.CancelPostScheduleResponse]
 	listStoreComments     *connect.Client[v1alpha1.ListStoreCommentsRequest, v1alpha1.ListStoreCommentsResponse]
 	getStoreSocialSummary *connect.Client[v1alpha1.GetStoreSocialSummaryRequest, v1alpha1.GetStoreSocialSummaryResponse]
 }
@@ -769,6 +797,16 @@ func (c *socialAppServiceClient) SchedulePost(ctx context.Context, req *connect.
 	return c.schedulePost.CallUnary(ctx, req)
 }
 
+// ListPendingSchedules calls hawkr.social.v1alpha1.SocialAppService.ListPendingSchedules.
+func (c *socialAppServiceClient) ListPendingSchedules(ctx context.Context, req *connect.Request[v1alpha1.ListPendingSchedulesRequest]) (*connect.Response[v1alpha1.ListPendingSchedulesResponse], error) {
+	return c.listPendingSchedules.CallUnary(ctx, req)
+}
+
+// CancelPostSchedule calls hawkr.social.v1alpha1.SocialAppService.CancelPostSchedule.
+func (c *socialAppServiceClient) CancelPostSchedule(ctx context.Context, req *connect.Request[v1alpha1.CancelPostScheduleRequest]) (*connect.Response[v1alpha1.CancelPostScheduleResponse], error) {
+	return c.cancelPostSchedule.CallUnary(ctx, req)
+}
+
 // ListStoreComments calls hawkr.social.v1alpha1.SocialAppService.ListStoreComments.
 func (c *socialAppServiceClient) ListStoreComments(ctx context.Context, req *connect.Request[v1alpha1.ListStoreCommentsRequest]) (*connect.Response[v1alpha1.ListStoreCommentsResponse], error) {
 	return c.listStoreComments.CallUnary(ctx, req)
@@ -822,8 +860,14 @@ type SocialAppServiceHandler interface {
 	// DeletePost 刪除自己的貼文；已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
 	DeletePost(context.Context, *connect.Request[v1alpha1.DeletePostRequest]) (*connect.Response[v1alpha1.DeletePostResponse], error)
 	// SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
-	// 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
+	// 需要賣家能力 CAP_MARKETING。排程的讀取與取消見 ListPendingSchedules、CancelPostSchedule。
 	SchedulePost(context.Context, *connect.Request[v1alpha1.SchedulePostRequest]) (*connect.Response[v1alpha1.SchedulePostResponse], error)
+	// ListPendingSchedules 列出呼叫者此刻的店待發布的排程（含店主自己排的與代行營運排的），發布時間早的在前（同一時間以 ID 排序）。店主看得到代行排的貼文並能取消（CancelPostSchedule）。
+	// 只讀自己店的排程，店家由伺服器推導。
+	ListPendingSchedules(context.Context, *connect.Request[v1alpha1.ListPendingSchedulesRequest]) (*connect.Response[v1alpha1.ListPendingSchedulesResponse], error)
+	// CancelPostSchedule 店主取消貼文待發布的排程（不分發起者；取消原因記為店主取消）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT。貼文沒有待發布的排程時什麼都不做（不檢查 etag），回目前的 etag。
+	// 貼文不是這家店的回 not_found。需要賣家能力 CAP_MARKETING。
+	CancelPostSchedule(context.Context, *connect.Request[v1alpha1.CancelPostScheduleRequest]) (*connect.Response[v1alpha1.CancelPostScheduleResponse], error)
 	// ListStoreComments 列出呼叫者此刻的店所有貼文（含草稿與下架的貼文）的頂層留言，依建立時間舊到新；post_id 選填，設了只列那一篇。
 	// 刪除或隱藏而底下有可見回覆的頂層留言是佔位項目。unreplied 為真時只列「未回覆」的留言：本店貼文上、作者不是本店的頂層留言，沒有刪除、沒有被隱藏，
 	// 而且底下沒有任何一則仍可見、作者是本店的回覆（已刪除或被隱藏的店家回覆不算回覆）；此時沒有佔位項目。賣家能力 CAP_CONTENT_CONTRACT。
@@ -970,6 +1014,20 @@ func NewSocialAppServiceHandler(svc SocialAppServiceHandler, opts ...connect.Han
 		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
+	socialAppServiceListPendingSchedulesHandler := connect.NewUnaryHandler(
+		SocialAppServiceListPendingSchedulesProcedure,
+		svc.ListPendingSchedules,
+		connect.WithSchema(socialAppServiceMethods.ByName("ListPendingSchedules")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceCancelPostScheduleHandler := connect.NewUnaryHandler(
+		SocialAppServiceCancelPostScheduleProcedure,
+		svc.CancelPostSchedule,
+		connect.WithSchema(socialAppServiceMethods.ByName("CancelPostSchedule")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
 	socialAppServiceListStoreCommentsHandler := connect.NewUnaryHandler(
 		SocialAppServiceListStoreCommentsProcedure,
 		svc.ListStoreComments,
@@ -1024,6 +1082,10 @@ func NewSocialAppServiceHandler(svc SocialAppServiceHandler, opts ...connect.Han
 			socialAppServiceDeletePostHandler.ServeHTTP(w, r)
 		case SocialAppServiceSchedulePostProcedure:
 			socialAppServiceSchedulePostHandler.ServeHTTP(w, r)
+		case SocialAppServiceListPendingSchedulesProcedure:
+			socialAppServiceListPendingSchedulesHandler.ServeHTTP(w, r)
+		case SocialAppServiceCancelPostScheduleProcedure:
+			socialAppServiceCancelPostScheduleHandler.ServeHTTP(w, r)
 		case SocialAppServiceListStoreCommentsProcedure:
 			socialAppServiceListStoreCommentsHandler.ServeHTTP(w, r)
 		case SocialAppServiceGetStoreSocialSummaryProcedure:
@@ -1111,6 +1173,14 @@ func (UnimplementedSocialAppServiceHandler) DeletePost(context.Context, *connect
 
 func (UnimplementedSocialAppServiceHandler) SchedulePost(context.Context, *connect.Request[v1alpha1.SchedulePostRequest]) (*connect.Response[v1alpha1.SchedulePostResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.SchedulePost is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) ListPendingSchedules(context.Context, *connect.Request[v1alpha1.ListPendingSchedulesRequest]) (*connect.Response[v1alpha1.ListPendingSchedulesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.ListPendingSchedules is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) CancelPostSchedule(context.Context, *connect.Request[v1alpha1.CancelPostScheduleRequest]) (*connect.Response[v1alpha1.CancelPostScheduleResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.CancelPostSchedule is not implemented"))
 }
 
 func (UnimplementedSocialAppServiceHandler) ListStoreComments(context.Context, *connect.Request[v1alpha1.ListStoreCommentsRequest]) (*connect.Response[v1alpha1.ListStoreCommentsResponse], error) {

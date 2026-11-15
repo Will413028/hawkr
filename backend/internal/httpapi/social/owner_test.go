@@ -23,22 +23,25 @@ import (
 
 // fakeOwner 記錄店主方法的呼叫並回固定的結果；它不判斷能力與去重，那些是模組的規則（見 TestOwnerDeclarationsMatchTheModuleChecks 與模組的 integration 測試）。
 type fakeOwner struct {
-	calls     []string
-	store     seller.Store
-	create    social.CreatePostInput
-	update    social.UpdatePostInput
-	version   int64
-	scheduled social.SchedulePostInput
-	postID    *uuid.UUID
-	unreplied bool
-	status    social.PostStatus
-	after     *social.OwnPostCursor
-	cafter    *social.CommentCursor
-	post      social.Post
-	page      social.OwnPostPage
-	comments  social.CommentPage
-	summary   social.StoreSummary
-	err       error
+	calls      []string
+	store      seller.Store
+	create     social.CreatePostInput
+	update     social.UpdatePostInput
+	version    int64
+	scheduled  social.SchedulePostInput
+	postID     *uuid.UUID
+	unreplied  bool
+	status     social.PostStatus
+	after      *social.OwnPostCursor
+	cafter     *social.CommentCursor
+	post       social.Post
+	page       social.OwnPostPage
+	comments   social.CommentPage
+	summary    social.StoreSummary
+	schedules  social.SchedulePage
+	schedAfter *social.ScheduleCursor
+	schedStore int64
+	err        error
 }
 
 func (f *fakeOwner) rec(op string, st seller.Store) error {
@@ -81,6 +84,16 @@ func (f *fakeOwner) DeletePost(_ context.Context, st seller.Store, _ uuid.UUID, 
 func (f *fakeOwner) SchedulePost(_ context.Context, st seller.Store, in social.SchedulePostInput) (social.ScheduledPost, error) {
 	f.scheduled = in
 	return social.ScheduledPost{Schedule: social.Schedule{PublishAt: in.PublishAt}, PostVersion: in.Version + 1, Post: f.current(in.PostID, in.Version+1)}, f.rec("schedule", st)
+}
+
+func (f *fakeOwner) CancelPostSchedule(_ context.Context, st seller.Store, id uuid.UUID, v int64) (int64, error) {
+	f.postID, f.version = &id, v
+	return v + 1, f.rec("cancelSchedule", st)
+}
+
+func (f *fakeOwner) ListPendingSchedules(_ context.Context, storeID int64, after *social.ScheduleCursor, _ int32) (social.SchedulePage, error) {
+	f.schedAfter, f.schedStore = after, storeID
+	return f.schedules, f.rec("listSchedules", seller.Store{StoreID: storeID})
 }
 
 func (f *fakeOwner) MyPost(_ context.Context, st seller.Store, id uuid.UUID) (social.Post, error) {
@@ -496,6 +509,16 @@ func (r *reaching) ListMyPosts(ctx context.Context, st seller.Store, s social.Po
 	return
 }
 
+func (r *reaching) CancelPostSchedule(ctx context.Context, st seller.Store, id uuid.UUID, v int64) (n int64, err error) {
+	err = r.run("CancelPostSchedule", func() (e error) { n, e = r.m.CancelPostSchedule(ctx, st, id, v); return })
+	return
+}
+
+func (r *reaching) ListPendingSchedules(ctx context.Context, storeID int64, a *social.ScheduleCursor, n int32) (p social.SchedulePage, err error) {
+	err = r.run("ListPendingSchedules", func() (e error) { p, e = r.m.ListPendingSchedules(ctx, storeID, a, n); return })
+	return
+}
+
 func (r *reaching) ListStoreComments(ctx context.Context, st seller.Store, id *uuid.UUID, u bool, a *social.CommentCursor, n int32) (p social.CommentPage, err error) {
 	err = r.run("ListStoreComments", func() (e error) { p, e = r.m.ListStoreComments(ctx, st, id, u, a, n); return })
 	return
@@ -561,6 +584,10 @@ func TestOwnerDeclarationsMatchTheModuleChecks(t *testing.T) {
 		}},
 		socialv1alpha1connect.SocialAppServiceSchedulePostProcedure: {"SchedulePost", func(e *appEnv) error {
 			_, err := e.client.SchedulePost(t.Context(), signedIn(&pb.SchedulePostRequest{PostId: id, Etag: "1", PublishTime: future}))
+			return err
+		}},
+		socialv1alpha1connect.SocialAppServiceCancelPostScheduleProcedure: {"CancelPostSchedule", func(e *appEnv) error {
+			_, err := e.client.CancelPostSchedule(t.Context(), signedIn(&pb.CancelPostScheduleRequest{PostId: id, Etag: "1"}))
 			return err
 		}},
 		socialv1alpha1connect.SocialAppServiceGetMyPostProcedure: {"MyPost", func(e *appEnv) error {
@@ -778,5 +805,68 @@ func TestNewAppRejectsADeclarationTableMissingARow(t *testing.T) {
 	}
 	if _, err := newApp(declarations, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, images, web); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestOwnerListPendingSchedulesReadsTheOwnStoreAndPages(t *testing.T) {
+	at := time.Date(2026, 12, 1, 3, 0, 0, 0, time.UTC)
+	first, second := uuid.New(), uuid.New()
+	f := &fakeOwner{schedules: social.SchedulePage{
+		Schedules: []social.Schedule{
+			{ID: first, PostID: uuid.New(), StoreID: 5, PublishAt: at, By: social.ScheduledBy{Kind: social.ScheduleByDelegation, Ref: "9"}, CreatedAt: at.Add(-time.Hour)},
+			{ID: second, PostID: uuid.New(), StoreID: 5, PublishAt: at.Add(time.Hour), By: social.ScheduledBy{Kind: social.ScheduleByOwner}, CreatedAt: at.Add(-time.Hour)},
+		},
+		Next: &social.ScheduleCursor{PublishAt: at.Add(time.Hour), ID: second},
+	}}
+	e := newAppEnvWith(t, &fakeWrites{}, f, &fakeStores{own: &seller.Store{StoreID: 5}})
+	resp, err := e.client.ListPendingSchedules(t.Context(), signedIn(&pb.ListPendingSchedulesRequest{PageSize: 2}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.schedStore != 5 || f.schedAfter != nil {
+		t.Fatalf("店家 %d、游標 %v：預期店家來自 CurrentStore、第一頁沒有游標", f.schedStore, f.schedAfter)
+	}
+	got := resp.Msg.GetSchedules()
+	if len(got) != 2 || got[0].GetScheduledBy() != pb.ScheduleKind_SCHEDULE_KIND_DELEGATION || got[1].GetScheduledBy() != pb.ScheduleKind_SCHEDULE_KIND_OWNER ||
+		got[0].GetId() != first.String() || !got[0].GetPublishTime().AsTime().Equal(at) {
+		t.Fatalf("schedules = %v", got)
+	}
+	if resp.Msg.GetNextPageToken() == "" {
+		t.Fatal("有下一頁卻沒有 next_page_token")
+	}
+	f.schedules.Next = nil
+	if _, err := e.client.ListPendingSchedules(t.Context(), signedIn(&pb.ListPendingSchedulesRequest{PageToken: resp.Msg.GetNextPageToken()})); err != nil {
+		t.Fatal(err)
+	}
+	if f.schedAfter == nil || f.schedAfter.ID != second || !f.schedAfter.PublishAt.Equal(at.Add(time.Hour)) {
+		t.Fatalf("第二頁的游標 = %v", f.schedAfter)
+	}
+	if _, err := e.client.ListPendingSchedules(t.Context(), signedIn(&pb.ListPendingSchedulesRequest{PageToken: "garbage"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("壞的 page_token：%v", err)
+	}
+}
+
+func TestOwnerCancelPostScheduleReturnsTheNextEtagAndRequiresOne(t *testing.T) {
+	f := &fakeOwner{}
+	e := newAppEnvWith(t, &fakeWrites{}, f, &fakeStores{own: &seller.Store{StoreID: 5}})
+	id := uuid.New()
+	resp, err := e.client.CancelPostSchedule(t.Context(), signedIn(&pb.CancelPostScheduleRequest{PostId: id.String(), Etag: "4"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Msg.GetEtag() != "5" || f.postID == nil || *f.postID != id || f.version != 4 || f.store.StoreID != 5 {
+		t.Fatalf("etag %q、貼文 %v、版本 %d、店家 %d", resp.Msg.GetEtag(), f.postID, f.version, f.store.StoreID)
+	}
+	f.calls = nil
+	for name, req := range map[string]*pb.CancelPostScheduleRequest{
+		"沒有 etag":   {PostId: id.String()},
+		"貼文 ID 不正確": {PostId: "x", Etag: "1"},
+	} {
+		if _, err := e.client.CancelPostSchedule(t.Context(), signedIn(req)); connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("%s：%v，預期 invalid_argument", name, err)
+		}
+	}
+	if len(f.calls) != 0 {
+		t.Fatalf("請求不合法不該到模組：%v", f.calls)
 	}
 }

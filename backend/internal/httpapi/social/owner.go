@@ -2,6 +2,7 @@ package social
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strconv"
 	"uuid"
@@ -26,6 +27,8 @@ type Owner interface {
 	UnpublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (social.Post, error)
 	DeletePost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) error
 	SchedulePost(ctx context.Context, store seller.Store, in social.SchedulePostInput) (social.ScheduledPost, error)
+	CancelPostSchedule(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (int64, error)
+	ListPendingSchedules(ctx context.Context, storeID int64, after *social.ScheduleCursor, size int32) (social.SchedulePage, error)
 	MyPost(ctx context.Context, store seller.Store, id uuid.UUID) (social.Post, error)
 	ListMyPosts(ctx context.Context, store seller.Store, status social.PostStatus, after *social.OwnPostCursor, size int32) (social.OwnPostPage, error)
 	ListStoreComments(ctx context.Context, store seller.Store, postID *uuid.UUID, unreplied bool, after *social.CommentCursor, size int32) (social.CommentPage, error)
@@ -57,16 +60,45 @@ func (h *App) store(ctx context.Context) (seller.Store, error) {
 
 // ownPosts 把店主讀自己的貼文轉成回應：公開貼文的欄位加上 status、etag 與 create_time（只有店主讀自己的貼文才設）。
 func (h *App) ownPosts(ctx context.Context, st seller.Store, posts []social.Post) ([]*pb.Post, error) {
-	out, err := h.toPosts(ctx, social.Caller{Store: &st}, posts)
+	return h.presenter.ownPosts(ctx, st, posts)
+}
+
+func (p *presenter) ownPosts(ctx context.Context, st seller.Store, posts []social.Post) ([]*pb.Post, error) {
+	out, err := p.toPosts(ctx, social.Caller{Store: &st}, posts)
 	if err != nil {
 		return nil, err
 	}
-	for i, p := range posts {
-		out[i].Status = rpc.EnumToProto[pb.PostStatus](p.Status)
-		out[i].Etag = rpc.Etag(p.Version)
-		out[i].CreateTime = timestamppb.New(p.CreatedAt)
+	for i, post := range posts {
+		out[i].Status = rpc.EnumToProto[pb.PostStatus](post.Status)
+		out[i].Etag = rpc.Etag(post.Version)
+		out[i].CreateTime = timestamppb.New(post.CreatedAt)
 	}
 	return out, nil
+}
+
+// OwnPosts 是店家自己的貼文轉成回應的組裝（與 SocialAppService 的店主方法同一份）：給代行店家讀寫貼文的 service 用，那裡的「店家」是代行 session 的目標店家。
+type OwnPosts struct{ p *presenter }
+
+// NewOwnPosts 建立組裝；webOrigin 不可是零值（單篇網址）。
+func NewOwnPosts(buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin) (OwnPosts, error) {
+	if webOrigin.IsZero() {
+		return OwnPosts{}, fmt.Errorf("httpapi/social：貼文的單篇網址需要 WebOrigin")
+	}
+	return OwnPosts{p: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin}}, nil
+}
+
+// Posts 把店家 st 自己的貼文轉成回應（含 status、etag、create_time）。
+func (o OwnPosts) Posts(ctx context.Context, st seller.Store, posts []social.Post) ([]*pb.Post, error) {
+	return o.p.ownPosts(ctx, st, posts)
+}
+
+// Post 是單篇的 Posts。
+func (o OwnPosts) Post(ctx context.Context, st seller.Store, post social.Post) (*pb.Post, error) {
+	out, err := o.p.ownPosts(ctx, st, []social.Post{post})
+	if err != nil {
+		return nil, err
+	}
+	return out[0], nil
 }
 
 func (h *App) ownPost(ctx context.Context, st seller.Store, p social.Post) (*pb.Post, error) {

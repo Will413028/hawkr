@@ -1,0 +1,165 @@
+syntax = "proto3";
+
+// delegation 模組給前台的 API：平台管理員代行營運（代行工作區）。代行 session 由 gateway 的 handoff 流程建立，憑證放在請求標頭 X-HK-Operation-Session
+// （由 website 的 BFF 轉送，不放在請求訊息），目標店家是 session 建立當下綁定的那一家，請求不帶 store_id。
+//
+// 能力（posts.read、posts.write、posts.publish）依方法宣告，憑證缺少或無效回 unauthenticated；session 已結束、到期或撤銷回 failed_precondition；session 沒有授予對應的能力回 permission_denied。
+// 每個代行寫入都在同一個 transaction 內留下一列單段的稽核（SUCCEEDED），寫入失敗時稽核一併 rollback。
+//
+// ID 是不透明的字串（貼文是 UUID，稽核列是 UUID），client 不解析（ADR 2026-09-25-row-identity-by-data-kind D5）。
+package hawkr.delegation.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "hawkr/social/v1alpha1/social.proto";
+
+// DelegationDelegatedService 是代行營運中的平台管理員：憑證是 X-HK-Operation-Session 標頭裡的代行 session，不讀顧客或管理員的身分。
+// 回應一律不可快取（private, no-store）。目前只有貼文的方法；商品與訂單在 A10 加進這個 service。
+service DelegationDelegatedService {
+  // ListPosts 列出代行店家自己的貼文（含草稿與下架，不含已刪除），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。需要能力 posts.read。
+  rpc ListPosts(ListPostsRequest) returns (ListPostsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetPost 讀代行店家的一篇貼文（任何狀態，不含已刪除）；別家的貼文與不存在一樣回 not_found。回應帶 status 與 etag。需要能力 posts.read。
+  rpc GetPost(GetPostRequest) returns (GetPostResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CreatePost 以代行店家建立草稿貼文（建立一律是草稿；要發布再呼叫 PublishPost）。同一個 session 以同一個 request_id 重送回第一次建立的貼文目前的樣子，
+  // 不重複建立、不重複寫稽核；內容不同回 failed_precondition。需要能力 posts.write。
+  rpc CreatePost(CreatePostRequest) returns (CreatePostResponse);
+
+  // UpdatePost 修改代行店家的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與
+  // VERSION_CONFLICT，不寫入也不留稽核。重送規則同 CreatePost。需要能力 posts.write。
+  rpc UpdatePost(UpdatePostRequest) returns (UpdatePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // PublishPost 立即發布草稿或下架的貼文；etag 必填。重送規則同 CreatePost。需要能力 posts.publish。
+  rpc PublishPost(PublishPostRequest) returns (PublishPostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // UnpublishPost 下架已發布的貼文；etag 必填。重送規則同 CreatePost。需要能力 posts.publish。
+  rpc UnpublishPost(UnpublishPostRequest) returns (UnpublishPostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天；貼文已有待發布的排程時，舊的被取代。排程屬於店家，session 結束後仍會
+  // 在到點時重驗授權並發布（授權已撤回則取消）。稽核寫 POST_SCHEDULE，到點發布時另寫一列 POST_PUBLISH。重送規則同 CreatePost。需要能力 posts.publish。
+  rpc SchedulePost(SchedulePostRequest) returns (SchedulePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+// DelegatedOperation 是每個代行寫入都要帶的稽核資料。
+message DelegatedOperation {
+  // UUIDv4（AIP-155）：同一個代行 session 內以同一個 request_id 重送，回第一次的結果，不重做寫入也不再寫稽核；同一個 request_id 用在不同的請求內容回 failed_precondition。必填。
+  string request_id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  // 操作原因，去除首尾空白後 1 到 100 個字元，不得含控制字元；寫進稽核，必填。
+  string operation_reason = 2 [(google.api.field_behavior) = REQUIRED];
+  // 是否在完成後通知店主；不設是通知。
+  optional bool notify_seller = 3;
+}
+
+message ListPostsRequest {
+  // 預設 20，上限 50。
+  int32 page_size = 1;
+  string page_token = 2;
+  // 只列這個狀態的貼文；不設（UNSPECIFIED）是全部。page_token 只能用在同一個 status。
+  hawkr.social.v1alpha1.PostStatus status = 3;
+}
+
+message ListPostsResponse {
+  repeated hawkr.social.v1alpha1.Post posts = 1;
+  string next_page_token = 2;
+}
+
+message GetPostRequest {
+  // 貼文 ID。
+  string post_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetPostResponse {
+  hawkr.social.v1alpha1.Post post = 1;
+}
+
+message CreatePostRequest {
+  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // 內文，去除首尾空白後最多 2200 個字元；草稿可以是空的。
+  string body = 2;
+  // 圖片的 staged token（media 上傳完成後拿到的）。
+  string image_staged_token = 3 [(google.api.field_behavior) = INPUT_ONLY];
+  // 貼文帶的商品 ID；商品要存在、上架中而且屬於這家店。
+  optional string product_id = 4;
+  // 標籤（使用者輸入的樣子，可帶開頭的 #）。
+  repeated string hashtag_inputs = 5;
+}
+
+message CreatePostResponse {
+  hawkr.social.v1alpha1.Post post = 1;
+  // 這次寫入的稽核列 ID（重送時是第一次的）。
+  string audit_log_id = 2;
+}
+
+message UpdatePostRequest {
+  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // id 與 etag 必填。可以修改的欄位是 body、image_staged_token、product_id、hashtag_inputs，update_mask 要列至少一個；沒列的欄位保留目前的值。
+  hawkr.social.v1alpha1.Post post = 2 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 3;
+}
+
+message UpdatePostResponse {
+  hawkr.social.v1alpha1.Post post = 1;
+  string audit_log_id = 2;
+}
+
+message PublishPostRequest {
+  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // 貼文 ID。
+  string post_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message PublishPostResponse {
+  hawkr.social.v1alpha1.Post post = 1;
+  string audit_log_id = 2;
+}
+
+message UnpublishPostRequest {
+  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // 貼文 ID。
+  string post_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UnpublishPostResponse {
+  hawkr.social.v1alpha1.Post post = 1;
+  string audit_log_id = 2;
+}
+
+message SchedulePostRequest {
+  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // 貼文 ID。
+  string post_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+  // 發布的時間點，距現在 5 分鐘到 90 天。
+  google.protobuf.Timestamp publish_time = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+message SchedulePostResponse {
+  // 排程後的貼文（含新的 etag）。
+  hawkr.social.v1alpha1.Post post = 1;
+  // 排定的發布時間。
+  google.protobuf.Timestamp publish_time = 2;
+  string audit_log_id = 3;
+}

@@ -170,7 +170,7 @@ func TestEveryDeclaredProcedureBehavesAsDeclaredForASuspendedAccount(t *testing.
 		audience, _ := rpc.AudienceOf(proc)
 		rec, s := callAs(t, h, "suspended", http.MethodPost, proc)
 		switch {
-		case audience == rpc.AudiencePublic || audience == rpc.AudienceInvitee:
+		case audience == rpc.AudiencePublic || audience == rpc.AudienceInvitee || audience == rpc.AudienceDelegated:
 			if rec.Code != http.StatusOK || s.Principal {
 				t.Errorf("%s：%d %+v，預期訪客", proc, rec.Code, s)
 			}
@@ -190,7 +190,7 @@ func TestEveryDeclaredProcedureBehavesAsDeclaredForASuspendedAccount(t *testing.
 func TestSuspendedAccountCannotWriteSocialButViewsAsAGuest(t *testing.T) {
 	h := suspendedEntry()
 	methods := socialv1alpha1.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialAppService").Methods()
-	if methods.Len() != 21 {
+	if methods.Len() != 23 {
 		t.Fatalf("SocialAppService 有 %d 支方法", methods.Len())
 	}
 	reads := 0
@@ -208,8 +208,8 @@ func TestSuspendedAccountCannotWriteSocialButViewsAsAGuest(t *testing.T) {
 			t.Errorf("%s：%d %q called=%v，預期 ACCOUNT_SUSPENDED", proc, rec.Code, rec.Body, s.Called)
 		}
 	}
-	if reads != 4 {
-		t.Errorf("SocialAppService 的讀取方法有 %d 支，預期 4（GetMyPost、ListMyPosts、ListStoreComments、GetStoreSocialSummary）", reads)
+	if reads != 5 {
+		t.Errorf("SocialAppService 的讀取方法有 %d 支，預期 5（GetMyPost、ListMyPosts、ListStoreComments、GetStoreSocialSummary、ListPendingSchedules）", reads)
 	}
 	rec, s := callAs(t, h, "suspended", http.MethodPost, "/hawkr.social.v1alpha1.SocialPublicService/RecordPostView")
 	if rec.Code != http.StatusOK || !s.Called || s.Principal {
@@ -253,7 +253,7 @@ func TestMountedCustomerServicesMatchTheEffectDeclarations(t *testing.T) {
 	for _, d := range descriptors {
 		methods += d.Methods().Len()
 	}
-	if methods != len(customerEffects) || len(descriptors) != 13 {
+	if methods != len(customerEffects) || len(descriptors) != 14 {
 		t.Fatalf("掛載 %d 個顧客 service、%d 支方法；宣告 %d 支", len(descriptors), methods, len(customerEffects))
 	}
 }

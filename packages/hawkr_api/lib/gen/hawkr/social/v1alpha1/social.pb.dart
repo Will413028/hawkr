@@ -18,15 +18,132 @@ import 'package:protobuf/protobuf.dart' as $pb;
 import 'package:protobuf/well_known_types/google/protobuf/field_mask.pb.dart'
     as $3;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
-    as $2;
+    as $0;
 
-import '../../common/v1alpha1/image.pb.dart' as $1;
-import '../../common/v1alpha1/store_card.pb.dart' as $0;
+import '../../common/v1alpha1/image.pb.dart' as $2;
+import '../../common/v1alpha1/store_card.pb.dart' as $1;
 import 'social.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'social.pbenum.dart';
+
+/// PostSchedule 是一篇貼文待發布的排程。
+class PostSchedule extends $pb.GeneratedMessage {
+  factory PostSchedule({
+    $core.String? id,
+    $core.String? postId,
+    $0.Timestamp? publishTime,
+    ScheduleKind? scheduledBy,
+    $0.Timestamp? createTime,
+  }) {
+    final result = PostSchedule._();
+    if (id != null) result.id = id;
+    if (postId != null) result.postId = postId;
+    if (publishTime != null) result.publishTime = publishTime;
+    if (scheduledBy != null) result.scheduledBy = scheduledBy;
+    if (createTime != null) result.createTime = createTime;
+    return result;
+  }
+
+  PostSchedule._();
+
+  factory PostSchedule.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PostSchedule()..mergeFromBuffer(data, registry);
+  factory PostSchedule.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PostSchedule()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PostSchedule',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: PostSchedule.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'postId')
+    ..aOM<$0.Timestamp>(3, _omitFieldNames ? '' : 'publishTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..aE<ScheduleKind>(4, _omitFieldNames ? '' : 'scheduledBy',
+        enumValues: ScheduleKind.values)
+    ..aOM<$0.Timestamp>(5, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PostSchedule clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PostSchedule copyWith(void Function(PostSchedule) updates) =>
+      super.copyWith((message) => updates(message as PostSchedule))
+          as PostSchedule;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PostSchedule() / PostSchedule.new instead')
+  static PostSchedule create() => PostSchedule._();
+  static $pb.GeneratedMessage $_createMessage() => PostSchedule._();
+  @$core.override
+  PostSchedule createEmptyInstance() => PostSchedule._();
+  @$core.pragma('dart2js:noInline')
+  static PostSchedule getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PostSchedule>(
+          PostSchedule.$_createMessage);
+  static PostSchedule? _defaultInstance;
+
+  /// 排程的 ID。
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  /// 要發布的貼文。
+  @$pb.TagNumber(2)
+  $core.String get postId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set postId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPostId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPostId() => $_clearField(2);
+
+  /// 發布的時間點。
+  @$pb.TagNumber(3)
+  $0.Timestamp get publishTime => $_getN(2);
+  @$pb.TagNumber(3)
+  set publishTime($0.Timestamp value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPublishTime() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPublishTime() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $0.Timestamp ensurePublishTime() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  ScheduleKind get scheduledBy => $_getN(3);
+  @$pb.TagNumber(4)
+  set scheduledBy(ScheduleKind value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasScheduledBy() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearScheduledBy() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $0.Timestamp get createTime => $_getN(4);
+  @$pb.TagNumber(5)
+  set createTime($0.Timestamp value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCreateTime() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCreateTime() => $_clearField(5);
+  @$pb.TagNumber(5)
+  $0.Timestamp ensureCreateTime() => $_ensure(4);
+}
 
 /// Hashtag 是貼文的一個標籤。
 class Hashtag extends $pb.GeneratedMessage {
@@ -103,13 +220,13 @@ class Hashtag extends $pb.GeneratedMessage {
 class Post extends $pb.GeneratedMessage {
   factory Post({
     $core.String? id,
-    $0.StoreCard? store,
+    $1.StoreCard? store,
     $core.String? body,
-    $1.Image? image,
+    $2.Image? image,
     $core.String? productId,
     $core.Iterable<Hashtag>? hashtags,
-    $2.Timestamp? publishTime,
-    $2.Timestamp? updateTime,
+    $0.Timestamp? publishTime,
+    $0.Timestamp? updateTime,
     $fixnum.Int64? likeCount,
     $fixnum.Int64? commentCount,
     $fixnum.Int64? viewCount,
@@ -118,7 +235,7 @@ class Post extends $pb.GeneratedMessage {
     $core.bool? viewerCanComment,
     PostStatus? status,
     $core.String? etag,
-    $2.Timestamp? createTime,
+    $0.Timestamp? createTime,
     $core.String? imageStagedToken,
     $core.Iterable<$core.String>? hashtagInputs,
   }) {
@@ -160,18 +277,18 @@ class Post extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
       createEmptyInstance: Post.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'id')
-    ..aOM<$0.StoreCard>(2, _omitFieldNames ? '' : 'store',
-        subBuilder: $0.StoreCard.$_createMessage)
+    ..aOM<$1.StoreCard>(2, _omitFieldNames ? '' : 'store',
+        subBuilder: $1.StoreCard.$_createMessage)
     ..aOS(3, _omitFieldNames ? '' : 'body')
-    ..aOM<$1.Image>(4, _omitFieldNames ? '' : 'image',
-        subBuilder: $1.Image.$_createMessage)
+    ..aOM<$2.Image>(4, _omitFieldNames ? '' : 'image',
+        subBuilder: $2.Image.$_createMessage)
     ..aOS(5, _omitFieldNames ? '' : 'productId')
     ..pPM<Hashtag>(6, _omitFieldNames ? '' : 'hashtags',
         subBuilder: Hashtag.$_createMessage)
-    ..aOM<$2.Timestamp>(7, _omitFieldNames ? '' : 'publishTime',
-        subBuilder: $2.Timestamp.$_createMessage)
-    ..aOM<$2.Timestamp>(8, _omitFieldNames ? '' : 'updateTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(7, _omitFieldNames ? '' : 'publishTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(8, _omitFieldNames ? '' : 'updateTime',
+        subBuilder: $0.Timestamp.$_createMessage)
     ..aInt64(9, _omitFieldNames ? '' : 'likeCount')
     ..aInt64(10, _omitFieldNames ? '' : 'commentCount')
     ..aInt64(11, _omitFieldNames ? '' : 'viewCount')
@@ -181,8 +298,8 @@ class Post extends $pb.GeneratedMessage {
     ..aE<PostStatus>(15, _omitFieldNames ? '' : 'status',
         enumValues: PostStatus.values)
     ..aOS(16, _omitFieldNames ? '' : 'etag')
-    ..aOM<$2.Timestamp>(17, _omitFieldNames ? '' : 'createTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(17, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $0.Timestamp.$_createMessage)
     ..aOS(18, _omitFieldNames ? '' : 'imageStagedToken')
     ..pPS(19, _omitFieldNames ? '' : 'hashtagInputs')
     ..hasRequiredFields = false;
@@ -218,15 +335,15 @@ class Post extends $pb.GeneratedMessage {
 
   /// 發文的店家。店家卡片讀不到時不設。
   @$pb.TagNumber(2)
-  $0.StoreCard get store => $_getN(1);
+  $1.StoreCard get store => $_getN(1);
   @$pb.TagNumber(2)
-  set store($0.StoreCard value) => $_setField(2, value);
+  set store($1.StoreCard value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasStore() => $_has(1);
   @$pb.TagNumber(2)
   void clearStore() => $_clearField(2);
   @$pb.TagNumber(2)
-  $0.StoreCard ensureStore() => $_ensure(1);
+  $1.StoreCard ensureStore() => $_ensure(1);
 
   @$pb.TagNumber(3)
   $core.String get body => $_getSZ(2);
@@ -239,15 +356,15 @@ class Post extends $pb.GeneratedMessage {
 
   /// 貼文的圖片，沒有圖時不設。
   @$pb.TagNumber(4)
-  $1.Image get image => $_getN(3);
+  $2.Image get image => $_getN(3);
   @$pb.TagNumber(4)
-  set image($1.Image value) => $_setField(4, value);
+  set image($2.Image value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasImage() => $_has(3);
   @$pb.TagNumber(4)
   void clearImage() => $_clearField(4);
   @$pb.TagNumber(4)
-  $1.Image ensureImage() => $_ensure(3);
+  $2.Image ensureImage() => $_ensure(3);
 
   /// 貼文帶的商品 ID，沒有時不設。
   @$pb.TagNumber(5)
@@ -264,26 +381,26 @@ class Post extends $pb.GeneratedMessage {
 
   /// 第一次發布的時間；下架後再發布沿用。
   @$pb.TagNumber(7)
-  $2.Timestamp get publishTime => $_getN(6);
+  $0.Timestamp get publishTime => $_getN(6);
   @$pb.TagNumber(7)
-  set publishTime($2.Timestamp value) => $_setField(7, value);
+  set publishTime($0.Timestamp value) => $_setField(7, value);
   @$pb.TagNumber(7)
   $core.bool hasPublishTime() => $_has(6);
   @$pb.TagNumber(7)
   void clearPublishTime() => $_clearField(7);
   @$pb.TagNumber(7)
-  $2.Timestamp ensurePublishTime() => $_ensure(6);
+  $0.Timestamp ensurePublishTime() => $_ensure(6);
 
   @$pb.TagNumber(8)
-  $2.Timestamp get updateTime => $_getN(7);
+  $0.Timestamp get updateTime => $_getN(7);
   @$pb.TagNumber(8)
-  set updateTime($2.Timestamp value) => $_setField(8, value);
+  set updateTime($0.Timestamp value) => $_setField(8, value);
   @$pb.TagNumber(8)
   $core.bool hasUpdateTime() => $_has(7);
   @$pb.TagNumber(8)
   void clearUpdateTime() => $_clearField(8);
   @$pb.TagNumber(8)
-  $2.Timestamp ensureUpdateTime() => $_ensure(7);
+  $0.Timestamp ensureUpdateTime() => $_ensure(7);
 
   @$pb.TagNumber(9)
   $fixnum.Int64 get likeCount => $_getI64(8);
@@ -364,15 +481,15 @@ class Post extends $pb.GeneratedMessage {
 
   /// 建立時間；只有店主讀自己的貼文才設（店主清單依它排序）。
   @$pb.TagNumber(17)
-  $2.Timestamp get createTime => $_getN(16);
+  $0.Timestamp get createTime => $_getN(16);
   @$pb.TagNumber(17)
-  set createTime($2.Timestamp value) => $_setField(17, value);
+  set createTime($0.Timestamp value) => $_setField(17, value);
   @$pb.TagNumber(17)
   $core.bool hasCreateTime() => $_has(16);
   @$pb.TagNumber(17)
   void clearCreateTime() => $_clearField(17);
   @$pb.TagNumber(17)
-  $2.Timestamp ensureCreateTime() => $_ensure(16);
+  $0.Timestamp ensureCreateTime() => $_ensure(16);
 
   /// 換圖：把 media 上傳完成後拿到的 staged token 設在這裡並列進 update_mask；列進 update_mask 而 token 是空字串是清掉圖（已發布或有待發布排程的貼文不能清）。
   @$pb.TagNumber(18)
@@ -395,7 +512,7 @@ class Actor extends $pb.GeneratedMessage {
     ActorKind? kind,
     $core.String? id,
     $core.String? name,
-    $1.Image? avatar,
+    $2.Image? avatar,
   }) {
     final result = Actor._();
     if (kind != null) result.kind = kind;
@@ -423,8 +540,8 @@ class Actor extends $pb.GeneratedMessage {
         enumValues: ActorKind.values)
     ..aOS(2, _omitFieldNames ? '' : 'id')
     ..aOS(3, _omitFieldNames ? '' : 'name')
-    ..aOM<$1.Image>(4, _omitFieldNames ? '' : 'avatar',
-        subBuilder: $1.Image.$_createMessage)
+    ..aOM<$2.Image>(4, _omitFieldNames ? '' : 'avatar',
+        subBuilder: $2.Image.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -476,15 +593,15 @@ class Actor extends $pb.GeneratedMessage {
   void clearName() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $1.Image get avatar => $_getN(3);
+  $2.Image get avatar => $_getN(3);
   @$pb.TagNumber(4)
-  set avatar($1.Image value) => $_setField(4, value);
+  set avatar($2.Image value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasAvatar() => $_has(3);
   @$pb.TagNumber(4)
   void clearAvatar() => $_clearField(4);
   @$pb.TagNumber(4)
-  $1.Image ensureAvatar() => $_ensure(3);
+  $2.Image ensureAvatar() => $_ensure(3);
 }
 
 /// Comment 是留言列表的一個項目（頂層留言或回覆）。
@@ -497,8 +614,8 @@ class Comment extends $pb.GeneratedMessage {
     CommentState? state,
     Actor? author,
     $core.String? body,
-    $2.Timestamp? createTime,
-    $2.Timestamp? updateTime,
+    $0.Timestamp? createTime,
+    $0.Timestamp? updateTime,
     $fixnum.Int64? likeCount,
     $fixnum.Int64? replyCount,
     $core.bool? viewerLiked,
@@ -552,10 +669,10 @@ class Comment extends $pb.GeneratedMessage {
     ..aOM<Actor>(6, _omitFieldNames ? '' : 'author',
         subBuilder: Actor.$_createMessage)
     ..aOS(7, _omitFieldNames ? '' : 'body')
-    ..aOM<$2.Timestamp>(8, _omitFieldNames ? '' : 'createTime',
-        subBuilder: $2.Timestamp.$_createMessage)
-    ..aOM<$2.Timestamp>(9, _omitFieldNames ? '' : 'updateTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(8, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(9, _omitFieldNames ? '' : 'updateTime',
+        subBuilder: $0.Timestamp.$_createMessage)
     ..aInt64(10, _omitFieldNames ? '' : 'likeCount')
     ..aInt64(11, _omitFieldNames ? '' : 'replyCount')
     ..aOB(12, _omitFieldNames ? '' : 'viewerLiked')
@@ -656,26 +773,26 @@ class Comment extends $pb.GeneratedMessage {
   void clearBody() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $2.Timestamp get createTime => $_getN(7);
+  $0.Timestamp get createTime => $_getN(7);
   @$pb.TagNumber(8)
-  set createTime($2.Timestamp value) => $_setField(8, value);
+  set createTime($0.Timestamp value) => $_setField(8, value);
   @$pb.TagNumber(8)
   $core.bool hasCreateTime() => $_has(7);
   @$pb.TagNumber(8)
   void clearCreateTime() => $_clearField(8);
   @$pb.TagNumber(8)
-  $2.Timestamp ensureCreateTime() => $_ensure(7);
+  $0.Timestamp ensureCreateTime() => $_ensure(7);
 
   @$pb.TagNumber(9)
-  $2.Timestamp get updateTime => $_getN(8);
+  $0.Timestamp get updateTime => $_getN(8);
   @$pb.TagNumber(9)
-  set updateTime($2.Timestamp value) => $_setField(9, value);
+  set updateTime($0.Timestamp value) => $_setField(9, value);
   @$pb.TagNumber(9)
   $core.bool hasUpdateTime() => $_has(8);
   @$pb.TagNumber(9)
   void clearUpdateTime() => $_clearField(9);
   @$pb.TagNumber(9)
-  $2.Timestamp ensureUpdateTime() => $_ensure(8);
+  $0.Timestamp ensureUpdateTime() => $_ensure(8);
 
   @$pb.TagNumber(10)
   $fixnum.Int64 get likeCount => $_getI64(9);
@@ -1467,8 +1584,8 @@ class SuggestTagsResponse extends $pb.GeneratedMessage {
 
 class SuggestTrendingTagsRequest extends $pb.GeneratedMessage {
   factory SuggestTrendingTagsRequest({
-    $2.Timestamp? startTime,
-    $2.Timestamp? endTime,
+    $0.Timestamp? startTime,
+    $0.Timestamp? endTime,
     $core.int? maxResults,
   }) {
     final result = SuggestTrendingTagsRequest._();
@@ -1492,10 +1609,10 @@ class SuggestTrendingTagsRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
       createEmptyInstance: SuggestTrendingTagsRequest.$_createMessage)
-    ..aOM<$2.Timestamp>(1, _omitFieldNames ? '' : 'startTime',
-        subBuilder: $2.Timestamp.$_createMessage)
-    ..aOM<$2.Timestamp>(2, _omitFieldNames ? '' : 'endTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(1, _omitFieldNames ? '' : 'startTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(2, _omitFieldNames ? '' : 'endTime',
+        subBuilder: $0.Timestamp.$_createMessage)
     ..aI(3, _omitFieldNames ? '' : 'maxResults')
     ..hasRequiredFields = false;
 
@@ -1528,27 +1645,27 @@ class SuggestTrendingTagsRequest extends $pb.GeneratedMessage {
 
   /// 時間窗的起點（含）；不設是 end_time 往前 30 天。
   @$pb.TagNumber(1)
-  $2.Timestamp get startTime => $_getN(0);
+  $0.Timestamp get startTime => $_getN(0);
   @$pb.TagNumber(1)
-  set startTime($2.Timestamp value) => $_setField(1, value);
+  set startTime($0.Timestamp value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasStartTime() => $_has(0);
   @$pb.TagNumber(1)
   void clearStartTime() => $_clearField(1);
   @$pb.TagNumber(1)
-  $2.Timestamp ensureStartTime() => $_ensure(0);
+  $0.Timestamp ensureStartTime() => $_ensure(0);
 
   /// 時間窗的終點（不含）；不設是現在。
   @$pb.TagNumber(2)
-  $2.Timestamp get endTime => $_getN(1);
+  $0.Timestamp get endTime => $_getN(1);
   @$pb.TagNumber(2)
-  set endTime($2.Timestamp value) => $_setField(2, value);
+  set endTime($0.Timestamp value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasEndTime() => $_has(1);
   @$pb.TagNumber(2)
   void clearEndTime() => $_clearField(2);
   @$pb.TagNumber(2)
-  $2.Timestamp ensureEndTime() => $_ensure(1);
+  $0.Timestamp ensureEndTime() => $_ensure(1);
 
   /// 最多回傳幾名，1 到 50；0 表示預設值 20，超過 50 以 50 計，負數回 invalid_argument。
   @$pb.TagNumber(3)
@@ -1700,8 +1817,8 @@ class ForumEntry extends $pb.GeneratedMessage {
     CommentState? state,
     Actor? author,
     $core.String? body,
-    $2.Timestamp? createTime,
-    $2.Timestamp? updateTime,
+    $0.Timestamp? createTime,
+    $0.Timestamp? updateTime,
     $fixnum.Int64? replyCount,
     $core.bool? isMine,
     $core.bool? viewerCanEdit,
@@ -1751,10 +1868,10 @@ class ForumEntry extends $pb.GeneratedMessage {
     ..aOM<Actor>(6, _omitFieldNames ? '' : 'author',
         subBuilder: Actor.$_createMessage)
     ..aOS(7, _omitFieldNames ? '' : 'body')
-    ..aOM<$2.Timestamp>(8, _omitFieldNames ? '' : 'createTime',
-        subBuilder: $2.Timestamp.$_createMessage)
-    ..aOM<$2.Timestamp>(9, _omitFieldNames ? '' : 'updateTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(8, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(9, _omitFieldNames ? '' : 'updateTime',
+        subBuilder: $0.Timestamp.$_createMessage)
     ..aInt64(10, _omitFieldNames ? '' : 'replyCount')
     ..aOB(11, _omitFieldNames ? '' : 'isMine')
     ..aOB(12, _omitFieldNames ? '' : 'viewerCanEdit')
@@ -1853,26 +1970,26 @@ class ForumEntry extends $pb.GeneratedMessage {
   void clearBody() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $2.Timestamp get createTime => $_getN(7);
+  $0.Timestamp get createTime => $_getN(7);
   @$pb.TagNumber(8)
-  set createTime($2.Timestamp value) => $_setField(8, value);
+  set createTime($0.Timestamp value) => $_setField(8, value);
   @$pb.TagNumber(8)
   $core.bool hasCreateTime() => $_has(7);
   @$pb.TagNumber(8)
   void clearCreateTime() => $_clearField(8);
   @$pb.TagNumber(8)
-  $2.Timestamp ensureCreateTime() => $_ensure(7);
+  $0.Timestamp ensureCreateTime() => $_ensure(7);
 
   @$pb.TagNumber(9)
-  $2.Timestamp get updateTime => $_getN(8);
+  $0.Timestamp get updateTime => $_getN(8);
   @$pb.TagNumber(9)
-  set updateTime($2.Timestamp value) => $_setField(9, value);
+  set updateTime($0.Timestamp value) => $_setField(9, value);
   @$pb.TagNumber(9)
   $core.bool hasUpdateTime() => $_has(8);
   @$pb.TagNumber(9)
   void clearUpdateTime() => $_clearField(9);
   @$pb.TagNumber(9)
-  $2.Timestamp ensureUpdateTime() => $_ensure(8);
+  $0.Timestamp ensureUpdateTime() => $_ensure(8);
 
   @$pb.TagNumber(10)
   $fixnum.Int64 get replyCount => $_getI64(9);
@@ -4567,7 +4684,7 @@ class SchedulePostRequest extends $pb.GeneratedMessage {
   factory SchedulePostRequest({
     $core.String? postId,
     $core.String? etag,
-    $2.Timestamp? publishTime,
+    $0.Timestamp? publishTime,
   }) {
     final result = SchedulePostRequest._();
     if (postId != null) result.postId = postId;
@@ -4592,8 +4709,8 @@ class SchedulePostRequest extends $pb.GeneratedMessage {
       createEmptyInstance: SchedulePostRequest.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'postId')
     ..aOS(2, _omitFieldNames ? '' : 'etag')
-    ..aOM<$2.Timestamp>(3, _omitFieldNames ? '' : 'publishTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(3, _omitFieldNames ? '' : 'publishTime',
+        subBuilder: $0.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4641,21 +4758,21 @@ class SchedulePostRequest extends $pb.GeneratedMessage {
 
   /// 發布的時間點，距現在 5 分鐘到 90 天。
   @$pb.TagNumber(3)
-  $2.Timestamp get publishTime => $_getN(2);
+  $0.Timestamp get publishTime => $_getN(2);
   @$pb.TagNumber(3)
-  set publishTime($2.Timestamp value) => $_setField(3, value);
+  set publishTime($0.Timestamp value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasPublishTime() => $_has(2);
   @$pb.TagNumber(3)
   void clearPublishTime() => $_clearField(3);
   @$pb.TagNumber(3)
-  $2.Timestamp ensurePublishTime() => $_ensure(2);
+  $0.Timestamp ensurePublishTime() => $_ensure(2);
 }
 
 class SchedulePostResponse extends $pb.GeneratedMessage {
   factory SchedulePostResponse({
     Post? post,
-    $2.Timestamp? publishTime,
+    $0.Timestamp? publishTime,
   }) {
     final result = SchedulePostResponse._();
     if (post != null) result.post = post;
@@ -4679,8 +4796,8 @@ class SchedulePostResponse extends $pb.GeneratedMessage {
       createEmptyInstance: SchedulePostResponse.$_createMessage)
     ..aOM<Post>(1, _omitFieldNames ? '' : 'post',
         subBuilder: Post.$_createMessage)
-    ..aOM<$2.Timestamp>(2, _omitFieldNames ? '' : 'publishTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(2, _omitFieldNames ? '' : 'publishTime',
+        subBuilder: $0.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4720,15 +4837,303 @@ class SchedulePostResponse extends $pb.GeneratedMessage {
 
   /// 排定的發布時間。
   @$pb.TagNumber(2)
-  $2.Timestamp get publishTime => $_getN(1);
+  $0.Timestamp get publishTime => $_getN(1);
   @$pb.TagNumber(2)
-  set publishTime($2.Timestamp value) => $_setField(2, value);
+  set publishTime($0.Timestamp value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasPublishTime() => $_has(1);
   @$pb.TagNumber(2)
   void clearPublishTime() => $_clearField(2);
   @$pb.TagNumber(2)
-  $2.Timestamp ensurePublishTime() => $_ensure(1);
+  $0.Timestamp ensurePublishTime() => $_ensure(1);
+}
+
+class ListPendingSchedulesRequest extends $pb.GeneratedMessage {
+  factory ListPendingSchedulesRequest({
+    $core.int? pageSize,
+    $core.String? pageToken,
+  }) {
+    final result = ListPendingSchedulesRequest._();
+    if (pageSize != null) result.pageSize = pageSize;
+    if (pageToken != null) result.pageToken = pageToken;
+    return result;
+  }
+
+  ListPendingSchedulesRequest._();
+
+  factory ListPendingSchedulesRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListPendingSchedulesRequest()..mergeFromBuffer(data, registry);
+  factory ListPendingSchedulesRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListPendingSchedulesRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListPendingSchedulesRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: ListPendingSchedulesRequest.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'pageSize')
+    ..aOS(2, _omitFieldNames ? '' : 'pageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListPendingSchedulesRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListPendingSchedulesRequest copyWith(
+          void Function(ListPendingSchedulesRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as ListPendingSchedulesRequest))
+          as ListPendingSchedulesRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListPendingSchedulesRequest() / ListPendingSchedulesRequest.new instead')
+  static ListPendingSchedulesRequest create() =>
+      ListPendingSchedulesRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ListPendingSchedulesRequest._();
+  @$core.override
+  ListPendingSchedulesRequest createEmptyInstance() =>
+      ListPendingSchedulesRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListPendingSchedulesRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListPendingSchedulesRequest>(
+          ListPendingSchedulesRequest.$_createMessage);
+  static ListPendingSchedulesRequest? _defaultInstance;
+
+  /// 預設 20，上限 50。
+  @$pb.TagNumber(1)
+  $core.int get pageSize => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set pageSize($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageSize() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageSize() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get pageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set pageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPageToken() => $_clearField(2);
+}
+
+class ListPendingSchedulesResponse extends $pb.GeneratedMessage {
+  factory ListPendingSchedulesResponse({
+    $core.Iterable<PostSchedule>? schedules,
+    $core.String? nextPageToken,
+  }) {
+    final result = ListPendingSchedulesResponse._();
+    if (schedules != null) result.schedules.addAll(schedules);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    return result;
+  }
+
+  ListPendingSchedulesResponse._();
+
+  factory ListPendingSchedulesResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListPendingSchedulesResponse()..mergeFromBuffer(data, registry);
+  factory ListPendingSchedulesResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListPendingSchedulesResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListPendingSchedulesResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: ListPendingSchedulesResponse.$_createMessage)
+    ..pPM<PostSchedule>(1, _omitFieldNames ? '' : 'schedules',
+        subBuilder: PostSchedule.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListPendingSchedulesResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListPendingSchedulesResponse copyWith(
+          void Function(ListPendingSchedulesResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as ListPendingSchedulesResponse))
+          as ListPendingSchedulesResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListPendingSchedulesResponse() / ListPendingSchedulesResponse.new instead')
+  static ListPendingSchedulesResponse create() =>
+      ListPendingSchedulesResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ListPendingSchedulesResponse._();
+  @$core.override
+  ListPendingSchedulesResponse createEmptyInstance() =>
+      ListPendingSchedulesResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListPendingSchedulesResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListPendingSchedulesResponse>(
+          ListPendingSchedulesResponse.$_createMessage);
+  static ListPendingSchedulesResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<PostSchedule> get schedules => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get nextPageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set nextPageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNextPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNextPageToken() => $_clearField(2);
+}
+
+class CancelPostScheduleRequest extends $pb.GeneratedMessage {
+  factory CancelPostScheduleRequest({
+    $core.String? postId,
+    $core.String? etag,
+  }) {
+    final result = CancelPostScheduleRequest._();
+    if (postId != null) result.postId = postId;
+    if (etag != null) result.etag = etag;
+    return result;
+  }
+
+  CancelPostScheduleRequest._();
+
+  factory CancelPostScheduleRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CancelPostScheduleRequest()..mergeFromBuffer(data, registry);
+  factory CancelPostScheduleRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CancelPostScheduleRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CancelPostScheduleRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: CancelPostScheduleRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'postId')
+    ..aOS(2, _omitFieldNames ? '' : 'etag')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CancelPostScheduleRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CancelPostScheduleRequest copyWith(
+          void Function(CancelPostScheduleRequest) updates) =>
+      super.copyWith((message) => updates(message as CancelPostScheduleRequest))
+          as CancelPostScheduleRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CancelPostScheduleRequest() / CancelPostScheduleRequest.new instead')
+  static CancelPostScheduleRequest create() => CancelPostScheduleRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      CancelPostScheduleRequest._();
+  @$core.override
+  CancelPostScheduleRequest createEmptyInstance() =>
+      CancelPostScheduleRequest._();
+  @$core.pragma('dart2js:noInline')
+  static CancelPostScheduleRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CancelPostScheduleRequest>(
+          CancelPostScheduleRequest.$_createMessage);
+  static CancelPostScheduleRequest? _defaultInstance;
+
+  /// 貼文 ID。
+  @$pb.TagNumber(1)
+  $core.String get postId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set postId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPostId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPostId() => $_clearField(1);
+
+  /// 讀取時拿到的 etag，必填。
+  @$pb.TagNumber(2)
+  $core.String get etag => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set etag($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEtag() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEtag() => $_clearField(2);
+}
+
+class CancelPostScheduleResponse extends $pb.GeneratedMessage {
+  factory CancelPostScheduleResponse({
+    $core.String? etag,
+  }) {
+    final result = CancelPostScheduleResponse._();
+    if (etag != null) result.etag = etag;
+    return result;
+  }
+
+  CancelPostScheduleResponse._();
+
+  factory CancelPostScheduleResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CancelPostScheduleResponse()..mergeFromBuffer(data, registry);
+  factory CancelPostScheduleResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CancelPostScheduleResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CancelPostScheduleResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: CancelPostScheduleResponse.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'etag')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CancelPostScheduleResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CancelPostScheduleResponse copyWith(
+          void Function(CancelPostScheduleResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as CancelPostScheduleResponse))
+          as CancelPostScheduleResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CancelPostScheduleResponse() / CancelPostScheduleResponse.new instead')
+  static CancelPostScheduleResponse create() => CancelPostScheduleResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      CancelPostScheduleResponse._();
+  @$core.override
+  CancelPostScheduleResponse createEmptyInstance() =>
+      CancelPostScheduleResponse._();
+  @$core.pragma('dart2js:noInline')
+  static CancelPostScheduleResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CancelPostScheduleResponse>(
+          CancelPostScheduleResponse.$_createMessage);
+  static CancelPostScheduleResponse? _defaultInstance;
+
+  /// 取消後貼文的 etag。
+  @$pb.TagNumber(1)
+  $core.String get etag => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set etag($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEtag() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEtag() => $_clearField(1);
 }
 
 class ListStoreCommentsRequest extends $pb.GeneratedMessage {
@@ -5281,11 +5686,25 @@ class SocialAppServiceApi {
           ctx, 'SocialAppService', 'DeletePost', request, DeletePostResponse());
 
   /// SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
-  /// 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
+  /// 需要賣家能力 CAP_MARKETING。排程的讀取與取消見 ListPendingSchedules、CancelPostSchedule。
   $async.Future<SchedulePostResponse> schedulePost(
           $pb.ClientContext? ctx, SchedulePostRequest request) =>
       _client.invoke<SchedulePostResponse>(ctx, 'SocialAppService',
           'SchedulePost', request, SchedulePostResponse());
+
+  /// ListPendingSchedules 列出呼叫者此刻的店待發布的排程（含店主自己排的與代行營運排的），發布時間早的在前（同一時間以 ID 排序）。店主看得到代行排的貼文並能取消（CancelPostSchedule）。
+  /// 只讀自己店的排程，店家由伺服器推導。
+  $async.Future<ListPendingSchedulesResponse> listPendingSchedules(
+          $pb.ClientContext? ctx, ListPendingSchedulesRequest request) =>
+      _client.invoke<ListPendingSchedulesResponse>(ctx, 'SocialAppService',
+          'ListPendingSchedules', request, ListPendingSchedulesResponse());
+
+  /// CancelPostSchedule 店主取消貼文待發布的排程（不分發起者；取消原因記為店主取消）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT。貼文沒有待發布的排程時什麼都不做（不檢查 etag），回目前的 etag。
+  /// 貼文不是這家店的回 not_found。需要賣家能力 CAP_MARKETING。
+  $async.Future<CancelPostScheduleResponse> cancelPostSchedule(
+          $pb.ClientContext? ctx, CancelPostScheduleRequest request) =>
+      _client.invoke<CancelPostScheduleResponse>(ctx, 'SocialAppService',
+          'CancelPostSchedule', request, CancelPostScheduleResponse());
 
   /// ListStoreComments 列出呼叫者此刻的店所有貼文（含草稿與下架的貼文）的頂層留言，依建立時間舊到新；post_id 選填，設了只列那一篇。
   /// 刪除或隱藏而底下有可見回覆的頂層留言是佔位項目。unreplied 為真時只列「未回覆」的留言：本店貼文上、作者不是本店的頂層留言，沒有刪除、沒有被隱藏，

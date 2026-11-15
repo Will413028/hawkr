@@ -26,6 +26,7 @@ import (
 	httpagent "github.com/Will413028/hawkr/backend/internal/httpapi/agent"
 	httpbuyer "github.com/Will413028/hawkr/backend/internal/httpapi/buyer"
 	httpcontent "github.com/Will413028/hawkr/backend/internal/httpapi/content"
+	httpdelegation "github.com/Will413028/hawkr/backend/internal/httpapi/delegation"
 	httpdiscovery "github.com/Will413028/hawkr/backend/internal/httpapi/discovery"
 	adminbuyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
 	admincontentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
@@ -36,6 +37,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/agent/v1alpha1/agentv1alpha1connect"
 	buyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/buyer/v1alpha1/buyerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/content/v1alpha1/contentv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/delegation/v1alpha1/delegationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1/discoveryv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
@@ -369,6 +371,17 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	}
 	add(agentv1alpha1connect.NewVendorPortalPublicServiceHandler(httpagent.NewPublic(deps.Agent, deps.Now), opts...))
 	add(agentv1alpha1connect.NewVendorPortalInviteeServiceHandler(httpagent.NewInvitee(deps.Agent, deps.Identity, deps.Logger), append(slices.Clone(opts), connect.WithInterceptors(invitee))...))
+	// 代行工作區（DelegationDelegatedService）：憑證是 X-HK-Operation-Session 的代行 session，由這支 interceptor 解析並逐方法檢查能力（宣告表在 httpapi/delegation），
+	// 只掛在這個 service、在 rpc.NewInterceptor 之內；全域的 adminauth 與顧客身分都不參與。限流與其他 service 一樣由 assemble 的 withRateLimit 包住。
+	delegated, err := httpdelegation.NewInterceptor(deps.Delegation)
+	if err != nil {
+		return nil, err
+	}
+	ownPosts, err := httpsocial.NewOwnPosts(deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin)
+	if err != nil {
+		return nil, err
+	}
+	add(delegationv1alpha1connect.NewDelegationDelegatedServiceHandler(httpdelegation.New(deps.Delegation, ownPosts), append(slices.Clone(opts), connect.WithInterceptors(delegated))...))
 	if err := checkAdminDeclarations(out); err != nil {
 		return nil, err
 	}
@@ -424,7 +437,7 @@ func checkAdminDeclarations(services []service) error {
 func mount(mux *http.ServeMux, path string, h http.Handler) {
 	audience, ok := rpc.AudienceOf(path)
 	if !ok {
-		panic(fmt.Sprintf("httpapi：%s 不符合 service 的命名規則（<模組>PublicService、<模組>AppService、<模組>InviteeService、hawkr.admin.* 的 <模組>AdminService）", path))
+		panic(fmt.Sprintf("httpapi：%s 不符合 service 的命名規則（<模組>PublicService、<模組>AppService、<模組>InviteeService、<模組>DelegatedService、hawkr.admin.* 的 <模組>AdminService）", path))
 	}
 	mux.Handle(path, cachePolicy(audience, isViewerDependent, h))
 }

@@ -18,10 +18,10 @@ import 'dart:typed_data' as $typed_data;
 import 'package:protobuf/well_known_types/google/protobuf/field_mask.pbjson.dart'
     as $3;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
-    as $2;
+    as $0;
 
-import '../../common/v1alpha1/image.pbjson.dart' as $1;
-import '../../common/v1alpha1/store_card.pbjson.dart' as $0;
+import '../../common/v1alpha1/image.pbjson.dart' as $2;
+import '../../common/v1alpha1/store_card.pbjson.dart' as $1;
 
 @$core.Deprecated('Use actorKindDescriptor instead')
 const ActorKind$json = {
@@ -71,6 +71,65 @@ final $typed_data.Uint8List postStatusDescriptor = $convert.base64Decode(
     'CgpQb3N0U3RhdHVzEhsKF1BPU1RfU1RBVFVTX1VOU1BFQ0lGSUVEEAASFQoRUE9TVF9TVEFUVV'
     'NfRFJBRlQQARIZChVQT1NUX1NUQVRVU19QVUJMSVNIRUQQAhIbChdQT1NUX1NUQVRVU19VTlBV'
     'QkxJU0hFRBAD');
+
+@$core.Deprecated('Use scheduleKindDescriptor instead')
+const ScheduleKind$json = {
+  '1': 'ScheduleKind',
+  '2': [
+    {'1': 'SCHEDULE_KIND_UNSPECIFIED', '2': 0},
+    {'1': 'SCHEDULE_KIND_OWNER', '2': 1},
+    {'1': 'SCHEDULE_KIND_DELEGATION', '2': 2},
+  ],
+};
+
+/// Descriptor for `ScheduleKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List scheduleKindDescriptor = $convert.base64Decode(
+    'CgxTY2hlZHVsZUtpbmQSHQoZU0NIRURVTEVfS0lORF9VTlNQRUNJRklFRBAAEhcKE1NDSEVEVU'
+    'xFX0tJTkRfT1dORVIQARIcChhTQ0hFRFVMRV9LSU5EX0RFTEVHQVRJT04QAg==');
+
+@$core.Deprecated('Use postScheduleDescriptor instead')
+const PostSchedule$json = {
+  '1': 'PostSchedule',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'id'},
+    {'1': 'post_id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+    {
+      '1': 'publish_time',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'publishTime'
+    },
+    {
+      '1': 'scheduled_by',
+      '3': 4,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.social.v1alpha1.ScheduleKind',
+      '8': {},
+      '10': 'scheduledBy'
+    },
+    {
+      '1': 'create_time',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'createTime'
+    },
+  ],
+};
+
+/// Descriptor for `PostSchedule`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List postScheduleDescriptor = $convert.base64Decode(
+    'CgxQb3N0U2NoZWR1bGUSEwoCaWQYASABKAlCA+BBCFICaWQSHAoHcG9zdF9pZBgCIAEoCUID4E'
+    'EDUgZwb3N0SWQSQgoMcHVibGlzaF90aW1lGAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVz'
+    'dGFtcEID4EEDUgtwdWJsaXNoVGltZRJLCgxzY2hlZHVsZWRfYnkYBCABKA4yIy5oYXdrci5zb2'
+    'NpYWwudjFhbHBoYTEuU2NoZWR1bGVLaW5kQgPgQQNSC3NjaGVkdWxlZEJ5EkAKC2NyZWF0ZV90'
+    'aW1lGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgpjcmVhdGVUaW1l');
 
 @$core.Deprecated('Use hashtagDescriptor instead')
 const Hashtag$json = {
@@ -1561,6 +1620,72 @@ final $typed_data.Uint8List schedulePostResponseDescriptor = $convert.base64Deco
     'xwaGExLlBvc3RSBHBvc3QSPQoMcHVibGlzaF90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVm'
     'LlRpbWVzdGFtcFILcHVibGlzaFRpbWU=');
 
+@$core.Deprecated('Use listPendingSchedulesRequestDescriptor instead')
+const ListPendingSchedulesRequest$json = {
+  '1': 'ListPendingSchedulesRequest',
+  '2': [
+    {'1': 'page_size', '3': 1, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 2, '4': 1, '5': 9, '10': 'pageToken'},
+  ],
+};
+
+/// Descriptor for `ListPendingSchedulesRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listPendingSchedulesRequestDescriptor =
+    $convert.base64Decode(
+        'ChtMaXN0UGVuZGluZ1NjaGVkdWxlc1JlcXVlc3QSGwoJcGFnZV9zaXplGAEgASgFUghwYWdlU2'
+        'l6ZRIdCgpwYWdlX3Rva2VuGAIgASgJUglwYWdlVG9rZW4=');
+
+@$core.Deprecated('Use listPendingSchedulesResponseDescriptor instead')
+const ListPendingSchedulesResponse$json = {
+  '1': 'ListPendingSchedulesResponse',
+  '2': [
+    {
+      '1': 'schedules',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.PostSchedule',
+      '10': 'schedules'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+  ],
+};
+
+/// Descriptor for `ListPendingSchedulesResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listPendingSchedulesResponseDescriptor =
+    $convert.base64Decode(
+        'ChxMaXN0UGVuZGluZ1NjaGVkdWxlc1Jlc3BvbnNlEkEKCXNjaGVkdWxlcxgBIAMoCzIjLmhhd2'
+        'tyLnNvY2lhbC52MWFscGhhMS5Qb3N0U2NoZWR1bGVSCXNjaGVkdWxlcxImCg9uZXh0X3BhZ2Vf'
+        'dG9rZW4YAiABKAlSDW5leHRQYWdlVG9rZW4=');
+
+@$core.Deprecated('Use cancelPostScheduleRequestDescriptor instead')
+const CancelPostScheduleRequest$json = {
+  '1': 'CancelPostScheduleRequest',
+  '2': [
+    {'1': 'post_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+    {'1': 'etag', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'etag'},
+  ],
+};
+
+/// Descriptor for `CancelPostScheduleRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List cancelPostScheduleRequestDescriptor =
+    $convert.base64Decode(
+        'ChlDYW5jZWxQb3N0U2NoZWR1bGVSZXF1ZXN0EhwKB3Bvc3RfaWQYASABKAlCA+BBAlIGcG9zdE'
+        'lkEhcKBGV0YWcYAiABKAlCA+BBAlIEZXRhZw==');
+
+@$core.Deprecated('Use cancelPostScheduleResponseDescriptor instead')
+const CancelPostScheduleResponse$json = {
+  '1': 'CancelPostScheduleResponse',
+  '2': [
+    {'1': 'etag', '3': 1, '4': 1, '5': 9, '10': 'etag'},
+  ],
+};
+
+/// Descriptor for `CancelPostScheduleResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List cancelPostScheduleResponseDescriptor =
+    $convert.base64Decode(
+        'ChpDYW5jZWxQb3N0U2NoZWR1bGVSZXNwb25zZRISCgRldGFnGAEgASgJUgRldGFn');
+
 @$core.Deprecated('Use listStoreCommentsRequestDescriptor instead')
 const ListStoreCommentsRequest$json = {
   '1': 'ListStoreCommentsRequest',
@@ -1729,10 +1854,10 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.social.v1alpha1.GetPostRequest': GetPostRequest$json,
   '.hawkr.social.v1alpha1.GetPostResponse': GetPostResponse$json,
   '.hawkr.social.v1alpha1.Post': Post$json,
-  '.hawkr.common.v1alpha1.StoreCard': $0.StoreCard$json,
-  '.hawkr.common.v1alpha1.Image': $1.Image$json,
+  '.hawkr.common.v1alpha1.StoreCard': $1.StoreCard$json,
+  '.hawkr.common.v1alpha1.Image': $2.Image$json,
   '.hawkr.social.v1alpha1.Hashtag': Hashtag$json,
-  '.google.protobuf.Timestamp': $2.Timestamp$json,
+  '.google.protobuf.Timestamp': $0.Timestamp$json,
   '.hawkr.social.v1alpha1.ListPostsRequest': ListPostsRequest$json,
   '.hawkr.social.v1alpha1.ListPostsResponse': ListPostsResponse$json,
   '.hawkr.social.v1alpha1.ListCommentsRequest': ListCommentsRequest$json,
@@ -1894,6 +2019,18 @@ const $core.Map<$core.String, $core.dynamic> SocialAppServiceBase$json = {
       '4': {'34': 2},
     },
     {
+      '1': 'ListPendingSchedules',
+      '2': '.hawkr.social.v1alpha1.ListPendingSchedulesRequest',
+      '3': '.hawkr.social.v1alpha1.ListPendingSchedulesResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'CancelPostSchedule',
+      '2': '.hawkr.social.v1alpha1.CancelPostScheduleRequest',
+      '3': '.hawkr.social.v1alpha1.CancelPostScheduleResponse',
+      '4': {'34': 2},
+    },
+    {
       '1': 'ListStoreComments',
       '2': '.hawkr.social.v1alpha1.ListStoreCommentsRequest',
       '3': '.hawkr.social.v1alpha1.ListStoreCommentsResponse',
@@ -1925,8 +2062,8 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.social.v1alpha1.CreateCommentResponse': CreateCommentResponse$json,
   '.hawkr.social.v1alpha1.Comment': Comment$json,
   '.hawkr.social.v1alpha1.Actor': Actor$json,
-  '.hawkr.common.v1alpha1.Image': $1.Image$json,
-  '.google.protobuf.Timestamp': $2.Timestamp$json,
+  '.hawkr.common.v1alpha1.Image': $2.Image$json,
+  '.google.protobuf.Timestamp': $0.Timestamp$json,
   '.hawkr.social.v1alpha1.UpdateCommentRequest': UpdateCommentRequest$json,
   '.google.protobuf.FieldMask': $3.FieldMask$json,
   '.hawkr.social.v1alpha1.UpdateCommentResponse': UpdateCommentResponse$json,
@@ -1948,7 +2085,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.social.v1alpha1.CreatePostRequest': CreatePostRequest$json,
   '.hawkr.social.v1alpha1.CreatePostResponse': CreatePostResponse$json,
   '.hawkr.social.v1alpha1.Post': Post$json,
-  '.hawkr.common.v1alpha1.StoreCard': $0.StoreCard$json,
+  '.hawkr.common.v1alpha1.StoreCard': $1.StoreCard$json,
   '.hawkr.social.v1alpha1.Hashtag': Hashtag$json,
   '.hawkr.social.v1alpha1.GetMyPostRequest': GetMyPostRequest$json,
   '.hawkr.social.v1alpha1.GetMyPostResponse': GetMyPostResponse$json,
@@ -1964,6 +2101,15 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.social.v1alpha1.DeletePostResponse': DeletePostResponse$json,
   '.hawkr.social.v1alpha1.SchedulePostRequest': SchedulePostRequest$json,
   '.hawkr.social.v1alpha1.SchedulePostResponse': SchedulePostResponse$json,
+  '.hawkr.social.v1alpha1.ListPendingSchedulesRequest':
+      ListPendingSchedulesRequest$json,
+  '.hawkr.social.v1alpha1.ListPendingSchedulesResponse':
+      ListPendingSchedulesResponse$json,
+  '.hawkr.social.v1alpha1.PostSchedule': PostSchedule$json,
+  '.hawkr.social.v1alpha1.CancelPostScheduleRequest':
+      CancelPostScheduleRequest$json,
+  '.hawkr.social.v1alpha1.CancelPostScheduleResponse':
+      CancelPostScheduleResponse$json,
   '.hawkr.social.v1alpha1.ListStoreCommentsRequest':
       ListStoreCommentsRequest$json,
   '.hawkr.social.v1alpha1.ListStoreCommentsResponse':
@@ -2014,9 +2160,13 @@ final $typed_data.Uint8List socialAppServiceDescriptor = $convert.base64Decode(
     'a3Iuc29jaWFsLnYxYWxwaGExLkRlbGV0ZVBvc3RSZXF1ZXN0GikuaGF3a3Iuc29jaWFsLnYxYW'
     'xwaGExLkRlbGV0ZVBvc3RSZXNwb25zZSIDkAICEmwKDFNjaGVkdWxlUG9zdBIqLmhhd2tyLnNv'
     'Y2lhbC52MWFscGhhMS5TY2hlZHVsZVBvc3RSZXF1ZXN0GisuaGF3a3Iuc29jaWFsLnYxYWxwaG'
-    'ExLlNjaGVkdWxlUG9zdFJlc3BvbnNlIgOQAgISewoRTGlzdFN0b3JlQ29tbWVudHMSLy5oYXdr'
-    'ci5zb2NpYWwudjFhbHBoYTEuTGlzdFN0b3JlQ29tbWVudHNSZXF1ZXN0GjAuaGF3a3Iuc29jaW'
-    'FsLnYxYWxwaGExLkxpc3RTdG9yZUNvbW1lbnRzUmVzcG9uc2UiA5ACARKHAQoVR2V0U3RvcmVT'
-    'b2NpYWxTdW1tYXJ5EjMuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkdldFN0b3JlU29jaWFsU3VtbW'
-    'FyeVJlcXVlc3QaNC5oYXdrci5zb2NpYWwudjFhbHBoYTEuR2V0U3RvcmVTb2NpYWxTdW1tYXJ5'
-    'UmVzcG9uc2UiA5ACAQ==');
+    'ExLlNjaGVkdWxlUG9zdFJlc3BvbnNlIgOQAgIShAEKFExpc3RQZW5kaW5nU2NoZWR1bGVzEjIu'
+    'aGF3a3Iuc29jaWFsLnYxYWxwaGExLkxpc3RQZW5kaW5nU2NoZWR1bGVzUmVxdWVzdBozLmhhd2'
+    'tyLnNvY2lhbC52MWFscGhhMS5MaXN0UGVuZGluZ1NjaGVkdWxlc1Jlc3BvbnNlIgOQAgESfgoS'
+    'Q2FuY2VsUG9zdFNjaGVkdWxlEjAuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkNhbmNlbFBvc3RTY2'
+    'hlZHVsZVJlcXVlc3QaMS5oYXdrci5zb2NpYWwudjFhbHBoYTEuQ2FuY2VsUG9zdFNjaGVkdWxl'
+    'UmVzcG9uc2UiA5ACAhJ7ChFMaXN0U3RvcmVDb21tZW50cxIvLmhhd2tyLnNvY2lhbC52MWFscG'
+    'hhMS5MaXN0U3RvcmVDb21tZW50c1JlcXVlc3QaMC5oYXdrci5zb2NpYWwudjFhbHBoYTEuTGlz'
+    'dFN0b3JlQ29tbWVudHNSZXNwb25zZSIDkAIBEocBChVHZXRTdG9yZVNvY2lhbFN1bW1hcnkSMy'
+    '5oYXdrci5zb2NpYWwudjFhbHBoYTEuR2V0U3RvcmVTb2NpYWxTdW1tYXJ5UmVxdWVzdBo0Lmhh'
+    'd2tyLnNvY2lhbC52MWFscGhhMS5HZXRTdG9yZVNvY2lhbFN1bW1hcnlSZXNwb25zZSIDkAIB');

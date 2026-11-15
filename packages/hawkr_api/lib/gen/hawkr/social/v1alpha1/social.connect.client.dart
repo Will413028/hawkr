@@ -497,7 +497,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
   }
 
   /// SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
-  /// 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
+  /// 需要賣家能力 CAP_MARKETING。排程的讀取與取消見 ListPendingSchedules、CancelPostSchedule。
   Future<hawkrsocialv1alpha1social.SchedulePostResponse> schedulePost(
     hawkrsocialv1alpha1social.SchedulePostRequest input, {
     connect.Headers? headers,
@@ -507,6 +507,44 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
   }) {
     return connect.Client(_transport).unary(
       specs.SocialAppService.schedulePost,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// ListPendingSchedules 列出呼叫者此刻的店待發布的排程（含店主自己排的與代行營運排的），發布時間早的在前（同一時間以 ID 排序）。店主看得到代行排的貼文並能取消（CancelPostSchedule）。
+  /// 只讀自己店的排程，店家由伺服器推導。
+  Future<hawkrsocialv1alpha1social.ListPendingSchedulesResponse> listPendingSchedules(
+    hawkrsocialv1alpha1social.ListPendingSchedulesRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialAppService.listPendingSchedules,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// CancelPostSchedule 店主取消貼文待發布的排程（不分發起者；取消原因記為店主取消）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT。貼文沒有待發布的排程時什麼都不做（不檢查 etag），回目前的 etag。
+  /// 貼文不是這家店的回 not_found。需要賣家能力 CAP_MARKETING。
+  Future<hawkrsocialv1alpha1social.CancelPostScheduleResponse> cancelPostSchedule(
+    hawkrsocialv1alpha1social.CancelPostScheduleRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialAppService.cancelPostSchedule,
       input,
       signal: signal,
       headers: headers,

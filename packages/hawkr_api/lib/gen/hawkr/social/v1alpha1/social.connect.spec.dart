@@ -264,12 +264,32 @@ abstract final class SocialAppService {
   );
 
   /// SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
-  /// 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
+  /// 需要賣家能力 CAP_MARKETING。排程的讀取與取消見 ListPendingSchedules、CancelPostSchedule。
   static const schedulePost = connect.Spec(
     '/$name/SchedulePost',
     connect.StreamType.unary,
     hawkrsocialv1alpha1social.SchedulePostRequest.new,
     hawkrsocialv1alpha1social.SchedulePostResponse.new,
+    idempotency: connect.Idempotency.idempotent,
+  );
+
+  /// ListPendingSchedules 列出呼叫者此刻的店待發布的排程（含店主自己排的與代行營運排的），發布時間早的在前（同一時間以 ID 排序）。店主看得到代行排的貼文並能取消（CancelPostSchedule）。
+  /// 只讀自己店的排程，店家由伺服器推導。
+  static const listPendingSchedules = connect.Spec(
+    '/$name/ListPendingSchedules',
+    connect.StreamType.unary,
+    hawkrsocialv1alpha1social.ListPendingSchedulesRequest.new,
+    hawkrsocialv1alpha1social.ListPendingSchedulesResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
+  /// CancelPostSchedule 店主取消貼文待發布的排程（不分發起者；取消原因記為店主取消）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT。貼文沒有待發布的排程時什麼都不做（不檢查 etag），回目前的 etag。
+  /// 貼文不是這家店的回 not_found。需要賣家能力 CAP_MARKETING。
+  static const cancelPostSchedule = connect.Spec(
+    '/$name/CancelPostSchedule',
+    connect.StreamType.unary,
+    hawkrsocialv1alpha1social.CancelPostScheduleRequest.new,
+    hawkrsocialv1alpha1social.CancelPostScheduleResponse.new,
     idempotency: connect.Idempotency.idempotent,
   );
 

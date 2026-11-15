@@ -161,8 +161,20 @@ service SocialAppService {
   }
 
   // SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
-  // 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
+  // 需要賣家能力 CAP_MARKETING。排程的讀取與取消見 ListPendingSchedules、CancelPostSchedule。
   rpc SchedulePost(SchedulePostRequest) returns (SchedulePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // ListPendingSchedules 列出呼叫者此刻的店待發布的排程（含店主自己排的與代行營運排的），發布時間早的在前（同一時間以 ID 排序）。店主看得到代行排的貼文並能取消（CancelPostSchedule）。
+  // 只讀自己店的排程，店家由伺服器推導。
+  rpc ListPendingSchedules(ListPendingSchedulesRequest) returns (ListPendingSchedulesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CancelPostSchedule 店主取消貼文待發布的排程（不分發起者；取消原因記為店主取消）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT。貼文沒有待發布的排程時什麼都不做（不檢查 etag），回目前的 etag。
+  // 貼文不是這家店的回 not_found。需要賣家能力 CAP_MARKETING。
+  rpc CancelPostSchedule(CancelPostScheduleRequest) returns (CancelPostScheduleResponse) {
     option idempotency_level = IDEMPOTENT;
   }
 
@@ -206,6 +218,27 @@ enum PostStatus {
   POST_STATUS_PUBLISHED = 2;
   // 發布過，被店主下架。
   POST_STATUS_UNPUBLISHED = 3;
+}
+
+// ScheduleKind 是排程的發起者種類。
+enum ScheduleKind {
+  SCHEDULE_KIND_UNSPECIFIED = 0;
+  // 店主自己排的。
+  SCHEDULE_KIND_OWNER = 1;
+  // 平台管理員代行營運時排的。
+  SCHEDULE_KIND_DELEGATION = 2;
+}
+
+// PostSchedule 是一篇貼文待發布的排程。
+message PostSchedule {
+  // 排程的 ID。
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 要發布的貼文。
+  string post_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 發布的時間點。
+  google.protobuf.Timestamp publish_time = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  ScheduleKind scheduled_by = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Hashtag 是貼文的一個標籤。
@@ -629,6 +662,29 @@ message SchedulePostResponse {
   Post post = 1;
   // 排定的發布時間。
   google.protobuf.Timestamp publish_time = 2;
+}
+
+message ListPendingSchedulesRequest {
+  // 預設 20，上限 50。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListPendingSchedulesResponse {
+  repeated PostSchedule schedules = 1;
+  string next_page_token = 2;
+}
+
+message CancelPostScheduleRequest {
+  // 貼文 ID。
+  string post_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CancelPostScheduleResponse {
+  // 取消後貼文的 etag。
+  string etag = 1;
 }
 
 message ListStoreCommentsRequest {
