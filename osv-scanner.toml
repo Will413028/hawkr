@@ -176,15 +176,15 @@ reason = "基準：npm fast-uri@3.1.8（CVSS 3.7，LOW）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-xxph-c9ww-hj94"
-ignoreUntil = 2026-12-15
-reason = "基準：Maven com.google.guava:guava@32.0.1-android，內含在 nacos-client-2.3.0.jar（Java 服務；CVSS 3.1 AV:N/AC:H/A:H，HIGH，2026-11-15 發現；修正版 33.7.2）；修正需升 nacos-client，Java 服務在遷移 phase B 改寫；升級待核准"
+ignoreUntil = 2027-03-15
+reason = "基準：Maven com.google.guava:guava@32.0.1-android，內含在 nacos-client-2.3.0.jar（Java 服務；CVSS 3.1 AV:N/AC:H/A:H，HIGH，2026-11-15 發現；修正版 33.7.2）；上游 nacos-client 最新 3.3.0 仍內含 guava 33.5.0，沒有修正版；系統未上線，Java 服務在遷移 phase B 移除時一併刪除本筆，不升級"
 
 [[IgnoredVulns]]
 id = "GHSA-w573-9ffj-6ff9"
-ignoreUntil = 2027-02-13
-reason = "基準：Maven io.netty:netty-transport-native-epoll@4.1.93.Final，內含在 nacos-client-2.3.0.jar（Java 服務；CVSS 3.1 AV:L，MODERATE，2026-11-15 發現；修正版 4.1.135.Final）；修正需升 nacos-client；升級待核准"
+ignoreUntil = 2027-05-13
+reason = "基準：Maven io.netty:netty-transport-native-epoll@4.1.93.Final，內含在 nacos-client-2.3.0.jar（Java 服務；CVSS 3.1 AV:L，MODERATE，2026-11-15 發現；修正版 4.1.135.Final）；系統未上線，Java 服務在遷移 phase B 移除時一併刪除本筆，不升級"
 
 [[IgnoredVulns]]
 id = "GHSA-crwc-vw2r-qr6m"
-ignoreUntil = 2027-02-13
-reason = "基準：Maven ognl:ognl@3.4.2，內含在 mybatis-3.5.15.jar（Java 服務；CVSS 3.1 AV:N/AC:H，MODERATE，2026-11-15 發現；修正版 3.4.13）；修正需升 mybatis；升級待核准"
+ignoreUntil = 2027-05-13
+reason = "基準：Maven ognl:ognl@3.4.2，內含在 mybatis-3.5.15.jar（Java 服務；CVSS 3.1 AV:N/AC:H，MODERATE，2026-11-15 發現；修正版 3.4.13）；修正需覆寫 mybatis 3.6.0；系統未上線，Java 服務在遷移 phase B 移除時一併刪除本筆，不升級"
