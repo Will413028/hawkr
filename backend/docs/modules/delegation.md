@@ -48,6 +48,7 @@ TTL、閒置、handoff、分頁與保留天數是 `internal/model` 的常數，�
 - 角色撤銷的 `revoked_by_admin_id` 是 NULL：系統因角色變動而撤銷，沒有操作者；誰撤的在 identity 的 `admin_role_events`。
 - 後台登出是「結束」不是撤銷：`internal/httpapi/identity` 直接呼叫 `EndDelegationsOfAdmin`，結束管理員進行中的 session（`ended_at` 與 `expires_at` 夾值與 `EndDelegationSession` 相同，憑證立刻失效），不寫 `REVOKED`，也不取消排程。撤銷只留給治理動作（不再信任這個人或授權）。
 - 排程發布的授權重驗與立即取消（A7-D22；社群貼文由 social 擁有，delegation 提供授權實作與取消呼叫）：到點時 social 的 job 鎖貼文列後問 `NewScheduleAuthorizer` 的實作，session 沒被撤銷（已結束或到期不擋）、session 的店家就是排程的店家，加上 `preflight` 與 `StartDelegation` 共用的授權述詞（資格、角色權限、店家可代行、授權有效且含 `posts.publish`；管理員不存在是拒絕不是錯誤），全部用不鎖的讀取（identity 的 `AdminAllowsNow`）；拒絕時排程轉 `AUTHORITY_LOST`。四個觸發點在同一個 transaction 內先取消排程、再改 delegation 的列：撤回店家授權（取消 → 鎖授權列 → 撤銷 session）、撤回代行資格與撤銷管理員角色（不鎖地列出該管理員未撤銷的 session → 取消 → 改資格列或撤銷 session）、治理撤銷單一 session（取消 → 改 session）。取消的範圍包含已結束的 session。
+- 第五個授權失效的觸發點（A7-D25）：訂閱 seller 的 `StoreSuspended`、`StoreClosed`，在同一個 transaction 內結束該店進行中的 session（`EndDelegationsOfStore`，`expires_at` 夾值同登出，不寫 `REVOKED`、不取消排程：到點重驗會因店家不可代行而取消）。請求時發現店家不可代行（不存在、已關閉、等待刪除、停權）只拒絕，不撤銷也不結束 session。
 - 撤回代行資格時，刪除資格與撤銷進行中的 session 在同一個 transaction，任一處失敗整個回滾。
 - 訂閱 identity 的 `AdminRoleRevoked`（`OnAdminRoleRevoked`，組裝點 `newDelegation` 訂閱）：剩下的角色不再允許 `delegation.sessions.create` 時，在撤銷角色的同一個 transaction 撤銷該管理員進行中的代行。
 - 撤銷保留較早的結束時間。
@@ -75,6 +76,7 @@ TTL、閒置、handoff、分頁與保留天數是 `internal/model` 的常數，�
 - 讀取、揭露與更正類動作不能通知店家；confirm 只在成功時檢查能力，`SUCCEEDED` 列的能力必須在該 session 的授權快照內。
 - confirm 只更新 `result`、`resource_id`、`after_snapshot`、`changed_fields`、`resource_version_after`、`biz_code`、`confirmed_at` 與 `notified_at`，其餘欄位寫入後不變；稽核列永不硬刪。
 - 排程到點發布走單段稽核：delegation 訂閱 social 的 `PostPublished`（origin SCHEDULED、發起者種類 DELEGATION），在發布的同一個 transaction 寫一列 `SUCCEEDED`（`POST_PUBLISH`、`posts.publish`、`SCHEDULED`），冪等鍵 `schedule:<排程 ID>`，重送撞唯一鍵當成功；操作理由與 `notify_seller`（再與 `Action.MayNotifySeller()` 相與）繼承同一個 session、同一篇貼文最近一筆 `POST_SCHEDULE` 的列，找不到時理由留空、通知預設為是；只有通知時才寫 `notified_at` 並發 `DelegationOperationCompleted`。四個取消觸發點的 session 以 social 的 `PendingSchedulerRefs`（目前有待發布代行排程的 session ID）與該管理員沒被撤銷的 session 求交集，不依 session 年齡截斷。這一列 `notify_seller` 為真、`notified_at` 同時寫入，同 transaction 發 `DelegationOperationCompleted`（賣家和手動操作一樣收到完成通知；重送不再發）。
+- 代行 Connect 的稽核（A7-D25；ADR `2026-09-27-delegation-module`「代行 Connect」修訂）：互動寫入由共用元件在同一個 transaction 內寫單段 `SUCCEEDED`（冪等鍵 = 請求的 `request_id`）；被拒絕的請求（能力不足、session 已失效、店家不可代行，含讀取）與寫入的業務失敗另開 transaction 寫 `FAILED`（沒有冪等鍵；`biz_code` 是代行拒絕的 9260–9299 碼，其他失敗為 NULL；讀取的 FAILED 用 `*_READ` 動作、不通知）；憑證解析不到 session 不寫列、只記結構化安全 log；成功的讀取不稽核。gateway 的兩段式 intent／confirm 在 A10 統一到此模型後刪除。
 - `origin=scheduled` 是排程執行的 intent（gateway 的兩階段路徑，不動）：session 已到期仍可寫入，已撤銷仍拒絕；只支援貼文、必須帶 `resourceId`；操作理由繼承同一 session、同一資源最近一筆 `POST_SCHEDULE` 的理由，找不到回 9279。
 - 事件只有 `DelegationOperationCompleted`；結束與撤銷不發事件。
 - intent 需要可用的工作階段與有效輸入；冪等鍵綁定指令、資源與 payload。

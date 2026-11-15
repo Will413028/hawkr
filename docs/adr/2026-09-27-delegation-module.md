@@ -78,28 +78,34 @@
 
 **相關**：`backend/docs/plans/2026-10-18-a7-social.md`（A7-D6、A7-D22、步驟 A7-1f）、`backend/docs/plans/2026-10-18-a7-social/step-1f-decision-brief.md`。
 
-## 修訂：代行 Connect（2026-11-15）
+## 修訂：代行 Connect（2026-11-15，2026-11-16 依 A7-D25 改寫）
 
-**脈絡**：A7-2d 把代行貼文的 6 條 gateway 路由換成單體的 Connect（A7 計畫 S1、A7-D24）；A10 的商品、訂單切片要沿用同一種形狀。gateway 的做法是三段式（稽核 intent → 寫入 → confirm）由 gateway 編排跨服務呼叫；單體裡 delegation 與 social 在同一個行程、同一個資料庫，不再需要跨服務的兩段。約束：use case 在 delegation（本 ADR 原決策：A10 的編排直接加進這個模組）；方向 delegation → social 合法；跨模組鎖由下往上、social 在 delegation 之前（單體規則 4，inherited，仍成立）；系統未上線，無相容性約束；gateway 仍在用的 `RecordDelegationAuditIntent`、`ConfirmDelegationAudit` 不動（商品、訂單到 A10 才搬）。
+**脈絡**：A7-2d 把代行貼文的 6 條 gateway 路由換成單體的 Connect（A7 計畫 S1）；A10 的商品、訂單切片要沿用同一種形狀。gateway 的做法是三段式（稽核 intent → 寫入 → confirm）由 gateway 編排跨服務呼叫；單體裡 delegation 與 social 在同一個行程、同一個資料庫，不再需要跨服務的兩段。約束：依賴方向 delegation → social 合法、social 不得 import delegation（依賴表，inherited，仍成立）；跨模組鎖由下往上、social 在 delegation 之前（單體規則 4，inherited，仍成立）；系統未上線，無相容性約束；gateway 仍在用的 `RecordDelegationAuditIntent`、`ConfirmDelegationAudit` 不動（商品、訂單到 A10 才搬）。
 
-**考慮過的方案**：
+**考慮過的方案**（代行 Connect 由誰擁有）：
 
 - 甲：把代行方法併進 `SocialAppService`。缺點：一條 interceptor 鏈要同時處理顧客 session 與代行 session 兩種憑證，宣告表的「能力」一半是賣家能力、一半是代行能力。
-- 乙（採用，A7-D24）：delegation 擁有的 `DelegationDelegatedService`（`hawkr.delegation.v1alpha1`），新的使用者類別 `Delegated`（API 設計規範（Connect）§二）。
-- 丙：沿用兩段式稽核，由 handler 先 intent 再呼叫 social 再 confirm。缺點：兩個 transaction 之間 social 成功而 confirm 失敗會留下 PENDING 列；單體沒有跨服務呼叫要補償。
+- 乙（2026-11-15 的版本，A7-D24，被取代）：delegation 擁有 `DelegationDelegatedService`（`hawkr.delegation.v1alpha1`），use case 也在 delegation。缺點：契約與資源的寫入分屬兩個模組；A10 的商品、訂單每加一個方法 delegation 就多一份資源專屬的膠水；service 名稱的重複感是前提錯位的症狀。
+- 丙（採用，A7-D25）：資源模組擁有 service（Google AIP 依資源切 service，act-as 的差別放在憑證層，不另開資源 API），audience 後綴沿用本專案的 `AppService`／`AdminService`／`InviteeService` 形式：`hawkr.social.v1alpha1.SocialDelegatedService`，A10 的商品、訂單各自有 `<模組>DelegatedService`；delegation 只提供共用的 interceptor 與同 transaction 的稽核＋能力檢查元件。
+- 丁：沿用兩段式稽核，由 handler 先 intent 再呼叫 social 再 confirm。缺點：兩個 transaction 之間 social 成功而 confirm 失敗會留下 PENDING 列；單體沒有跨服務呼叫要補償。
 
-**決策**：乙，以及下面的形狀（A10 沿用或修訂）。
+**決策**：丙（Will 2026-11-16，A7-D25），以及下面的形狀（A10 沿用或修訂）。
 
-- 服務與類別：服務名 `<模組>DelegatedService`（audience 後綴，與 `InviteeService` 同一個命名形式），`rpc.AudienceDelegated`；單體入口不經 adminauth、不讀顧客或管理員身分（停權的帳號不影響它），限流、log、錯誤轉換與其他 service 相同。
-- 傳輸（`backend/internal/httpapi/delegation`）：專屬 interceptor 只掛在這個 service、在 `rpc.NewInterceptor` 之內；讀請求標頭 `X-HK-Operation-Session`，以 `delegation.ResolveDelegation(credential, activity=true)` 解析（代行資源的路由算活動，順延閒置逾時），session 不是 ACTIVE 拒絕，依逐方法的能力宣告表檢查 session 帶有該能力，通過才把 session 放進 ctx；宣告表與 service 方法一一對應，缺漏或多出都不能啟動。目標店家只來自 session，請求不帶 `store_id`。能力檢查與 session 狀態檢查是同一個函式（`delegation.CheckDelegationSession`），use case 進入時再呼叫一次（模組的其他呼叫端不能繞過傳輸層）。
-- use case（delegation 模組，`DelegatedCreatePost` 等）：在同一個 `db.InTx` 內，先寫一列單段 `SUCCEEDED` 的稽核（`origin = INTERACTIVE`，新的內部寫入 `RunOperation`，不是 intent／confirm），再呼叫 social，最後把資源 ID 與寫入後的版本補進同一列；social 失敗時整個 transaction rollback，稽核列跟著消失，所以「有 SUCCEEDED 稽核」等於「寫入成功」。稽核要通知賣家時，完成事件在補上資源之後、同一個 transaction 內排入（與兩段式的 confirm 同一個事件）。排程一律先寫 `POST_SCHEDULE`（到點發布的稽核繼承它的操作理由與通知設定，見上一段修訂）。
-- 冪等：每個代行寫入的請求帶 `request_id`（UUIDv4，AIP-155；代行寫入一律必填，與 gateway 時期每個 mutation 都要 `Idempotency-Key` 一致），對到稽核表既有的 `(session_id, idempotency_key)` 唯一鍵；同一個 session 以同一個 `request_id` 重送，內容相同（動作、資源種類、資源 ID 與請求內容雜湊）不呼叫 social、回第一次的稽核列與資源目前的樣子；內容不同回 `DenialIdempotencyKeyReused`（failed_precondition）。`request_id` 同時寫進稽核列的 `request_id`；`correlation_id` 是請求的 trace ID。
-- 驗證：操作原因（去除首尾空白後 1–100 字、不得含控制字元）與 `request_id` 格式在稽核寫入之前檢查（模組內 `validateOperation`，傳輸層先擋一次並指向欄位）；內容的值域（長度、標籤數、圖片）由 social 判斷、單一來源，失敗時沒有稽核列所以不需要 gateway 時期的「intent 前先驗」。店家狀態（不存在、已關閉、等待刪除、停權）在 use case 開頭以 seller 的 `StoreActionDelegate` 判斷，句子與 `StartDelegation` 被拒時同一句。
-- 鎖順序：稽核寫入只有 INSERT（外鍵對 session 列的 `FOR KEY SHARE` 與所有 session 寫入的 `NO KEY UPDATE` 相容）與對自己剛寫的列的 UPDATE，沒有先鎖 delegation 既有的列；social 的貼文列鎖在其後取得，仍在任何與之衝突的 delegation 列鎖之前。`platform/lockorder` 不分類單純 INSERT。
+- 服務與類別：服務名 `<模組>DelegatedService`（audience 後綴），package 是擁有資源的模組的 `hawkr.<模組>.v1alpha1`；`rpc.AudienceDelegated`；單體入口不經 adminauth、不讀顧客或管理員身分（停權的帳號不影響它），限流、log、錯誤轉換與其他 service 相同。同一個 package 的 request／response 訊息名不得重複，所以 `SocialDelegatedService` 的方法是 `ListStorePosts`、`GetStorePost`、`CreateStorePost`、`UpdateStorePost`、`PublishStorePost`、`UnpublishStorePost`、`ScheduleStorePost`（`SocialAppService` 已有 `CreatePost` 等）。
+- 傳輸（`backend/internal/httpapi/delegation`，共用）：一支泛用的 interceptor，每個 `<模組>DelegatedService` 掛自己的一支、帶自己的宣告表（`Declaration`：service descriptor，與每個方法的代行能力、稽核動作與資源種類；宣告表在擁有 service 的 httpapi 套件，社群是 `httpapi/social`），在 `rpc.NewInterceptor` 之內。流程：讀請求標頭 `X-HK-Operation-Session`，以 `delegation.ResolveDelegation(credential, activity=true)` 解析（代行資源的路由算活動，順延閒置逾時）；解析不到 session（憑證缺少或無效）回 `UNAUTHENTICATED`、不寫稽核列（沒有 session 可歸屬），只記一筆結構化的安全 log（slog warn：procedure、trace ID、憑證是否存在，不含憑證的值）；解析到之後以 `delegation.AuthorizeDelegated` 授權：session 不是 ACTIVE（到期、已結束、已撤銷，`FAILED_PRECONDITION`）或沒有該方法宣告的能力（`PERMISSION_DENIED`）被拒絕，拒絕另寫一列 FAILED 稽核；通過才把代行（session 與方法宣告）放進 ctx。宣告表與 service 方法一一對應，缺漏或多出都不能啟動。目標店家只來自 session，請求不帶 `store_id`。
+- 資源模組的 handler（`httpapi/social` 的 `Delegated`）只做傳輸：解析請求、呼叫 delegation 的元件、把結果轉成回應；貼文的寫入仍是 social 的方法，delegation 不 import 它們的細節（delegation 的元件是泛用的，不含貼文專屬的方法）。
+- 共用元件（delegation 模組的公開 API，不含任何資源專屬的程式）：`DelegatedWrite(ctx, caller, write, do)` 在同一個 `db.InTx` 內，先以 transaction 內讀到的 session 檢查此刻還能用並帶有能力（與 interceptor 同一個函式 `delegation.CheckDelegationSession`，兩處對的是不同時間點的 session），寫一列單段 `SUCCEEDED` 的稽核（`origin = INTERACTIVE`，`request_id` 對到 `(session_id, idempotency_key)`），再呼叫呼叫方給的 `do`（資源的寫入），最後把資源 ID 與寫入後的版本補進同一列；`do` 失敗時整個 transaction rollback，稽核列跟著消失，所以「有 SUCCEEDED 稽核」等於「寫入成功」。稽核要通知賣家時，完成事件在補上資源之後、同一個 transaction 內排入（與兩段式的 confirm 同一個事件）。`DelegatedRead` 授權並讀店家狀態後執行讀取，成功的讀取不稽核。
+- 冪等：每個代行寫入的請求帶 `request_id`（UUIDv4，AIP-155；代行寫入一律必填，與 gateway 時期每個 mutation 都要 `Idempotency-Key` 一致），對到稽核表既有的 `(session_id, idempotency_key)` 唯一鍵；同一個 session 以同一個 `request_id` 重送，內容相同（動作、資源種類、資源 ID 與請求內容雜湊）不呼叫 `do`、回第一次的稽核列（`Replayed`，呼叫方據資源 ID 讀回資源目前的樣子）；內容不同回 `DenialIdempotencyKeyReused`（failed_precondition）。`request_id` 同時寫進稽核列的 `request_id`；`correlation_id` 是請求的 trace ID。失敗的嘗試不占用 `request_id`（FAILED 列沒有冪等鍵），同一個 `request_id` 之後仍可成功。
+- 稽核模型（成功與失敗都留紀錄，OWASP Logging Cheat Sheet、NIST SP 800-53 AU-2）：成功的寫入是上面同 transaction 的 `SUCCEEDED`；被拒絕的請求（能力不足、session 已失效、店家此刻不可代行，**讀取也寫**）與寫入的業務失敗，在另一個 transaction 寫一列 `FAILED`（被稽核的寫入 rollback 後這一列仍要留下）：沿用既有表的失敗欄位，`biz_code` 是代行拒絕對應的 9260–9299 業務碼（與舊 gateway 同一組值，表在模組 model 的 `DenialBizCodes`，legacy 轉接層共用同一張）；不是代行拒絕的業務失敗（版本衝突等）`biz_code` 是 NULL。被拒絕的讀取用 `*_READ` 動作（`POST_READ`），不通知賣家；`operation_reason` 只在值域合法（1–100 字）時寫入。FAILED 列寫不進去只記 log，不改變回給呼叫方的錯誤。憑證解析不到 session 不寫列，只記安全 log（見傳輸）。成功的讀取不稽核。
+- 請求時發現店家不可代行（不存在、已關閉、等待刪除、停權）：只拒絕（`DenialStoreNotDelegable`／`DenialStoreClosed`／`DenialStoreNotOperable`），寫 FAILED，不撤銷、不結束 session；狀態判斷用 seller 的 `StoreActionDelegate`，句子與 `StartDelegation` 被拒時同一句。
+- 第五個授權失效的觸發點：delegation 訂閱 seller 的 `StoreSuspended`、`StoreClosed`，在同一個 transaction 內結束該店進行中的 session（`EndActiveDelegationsOfStore`；結束同後台登出：`expires_at` 拉回現在、憑證立刻失效，不寫 `REVOKED`、不取消排程，到點的重驗會因為店家不可代行而取消，Microsoft CAE、RFC 7009）。只有對 delegation 自己列的 UPDATE，鎖順序是 seller 之後 delegation（由下往上）。別家店的 session 不受影響。
+- 鎖順序：稽核寫入只有 INSERT（外鍵對 session 列的 `FOR KEY SHARE` 與所有 session 寫入的 `NO KEY UPDATE` 相容）與對自己剛寫的列的 UPDATE，沒有先鎖 delegation 既有的列；`do` 在其後呼叫資源模組，social 的貼文列鎖仍在任何與之衝突的 delegation 列鎖之前。`platform/lockorder` 不分類單純 INSERT。
+- 驗證：操作原因（去除首尾空白後 1–100 字、不得含控制字元）與 `request_id` 格式在稽核寫入之前檢查（模組內 `validateOperation`，傳輸層先擋一次並指向欄位；傳輸層擋下的格式錯誤沒有稽核列：請求還沒有可歸屬的動作）；內容的值域（長度、標籤數、圖片）由 social 判斷、單一來源。
 - 店主側：`SocialAppService` 的 `ListPendingSchedules`、`CancelPostSchedule`，讓店主看見並取消代行排的貼文（取消原因 `OWNER_CANCELED`）；能力宣告依 social 模組實際的檢查（取消是 `CAP_MARKETING`，清單是模組沒有能力檢查的讀取，明列豁免與理由）。
+- gateway 的兩段式 `RecordDelegationAuditIntent`、`ConfirmDelegationAudit` 與它的 6 條貼文路由留到 A10（商品、訂單搬進單體時統一到這個模型），之後刪除。
 
-**理由與取捨**：單段稽核省掉 PENDING 的中間狀態與 confirm 的補償，代價是稽核列在 transaction 內「先於」被稽核的寫入，所以寫入失敗的嘗試沒有 FAILED 紀錄（與 gateway 時期不同；被拒絕的讀取與能力拒絕的稽核另案）。
+**理由與取捨**：單段稽核省掉 PENDING 的中間狀態與 confirm 的補償；失敗另開 transaction 讓被拒絕與失敗的嘗試有紀錄，代價是 FAILED 列不與業務寫入同 transaction（失敗列寫不進去時只記 log）。資源模組擁有 service 讓 A10 的每個資源各自演進，代價是每個 `<模組>DelegatedService` 要自己的宣告表與 handler；共用的部分（interceptor、稽核元件）只有一份。
 
-**撤銷條件**：若稽核需要保留失敗的嘗試（合規要求），改回兩段式並讓 intent 在獨立 transaction 提交；若 social 與 delegation 合併，重新評估鎖順序的敘述。
+**撤銷條件**：若稽核需要與業務寫入同 transaction 的失敗紀錄（合規要求失敗列也不可遺失），FAILED 改為與拒絕同步寫入並失敗時拒絕請求；若 social 與 delegation 合併，重新評估鎖順序的敘述。
 
-**相關**：`backend/docs/plans/2026-10-18-a7-social.md`（S1、A7-D22、A7-D24、步驟 A7-2d）、`api/hawkr/delegation/v1alpha1/delegation.proto`。
+**相關**：`backend/docs/plans/2026-10-18-a7-social.md`（S1、A7-D22、A7-D24（已被取代）、A7-D25、步驟 A7-2d）、`api/hawkr/social/v1alpha1/social.proto`（`SocialDelegatedService`）。
