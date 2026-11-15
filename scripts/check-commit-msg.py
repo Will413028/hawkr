@@ -13,6 +13,7 @@
 用法：
   python3 scripts/check-commit-msg.py <訊息檔>          # commit-msg hook
   python3 scripts/check-commit-msg.py --range A..B     # 檢查 A..B 之間每個非 merge commit
+  python3 scripts/check-commit-msg.py --range A..B --not --remotes=origin  # 後面的引數原樣交給 git log
 """
 import re
 import subprocess
@@ -42,9 +43,9 @@ def problem(first: str) -> str:
     return ""
 
 
-def check_range(rev_range: str) -> int:
+def check_range(rev_args: list) -> int:
     out = subprocess.run(
-        ["git", "log", "--no-merges", "--format=%H%x00%B%x1e", rev_range],
+        ["git", "log", "--no-merges", "--format=%H%x00%B%x1e", *rev_args],
         capture_output=True, text=True, check=True,
     ).stdout
     bad = 0
@@ -57,13 +58,13 @@ def check_range(rev_range: str) -> int:
     if bad:
         print(f"\n{bad} 個 commit 的訊息不符合 Conventional Commits。")
         return 1
-    print(f"通過：{rev_range} 的 commit 訊息都符合 Conventional Commits。")
+    print(f"通過：{' '.join(rev_args)} 的 commit 訊息都符合 Conventional Commits。")
     return 0
 
 
 def main(argv: list) -> int:
-    if len(argv) == 3 and argv[1] == "--range":
-        return check_range(argv[2])
+    if len(argv) >= 3 and argv[1] == "--range":
+        return check_range(argv[2:])
     if len(argv) != 2:
         print(__doc__, file=sys.stderr)
         return 2

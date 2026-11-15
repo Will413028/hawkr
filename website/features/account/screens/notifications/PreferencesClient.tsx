@@ -202,7 +202,7 @@ function PreferencesContent({
 	}, [prefs, forcedSet]);
 
 	return (
-		<main className="bg-transparent">
+		<div className="bg-transparent">
 			<SellerPageShell
 				title="通知設定"
 				subtitle={`選擇要接收哪些通知。設定僅套用於目前的「${role === "seller" ? "賣家" : "買家"}」身份。`}
@@ -309,6 +309,6 @@ function PreferencesContent({
 					</>
 				)}
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }

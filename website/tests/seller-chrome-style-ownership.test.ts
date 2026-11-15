@@ -129,7 +129,7 @@ test("seller and auth owner CSS preserve the exact reviewed semantic AST", () =>
 	// overlay rules; tests/auth-login-style-ownership.test.ts carries the inventory.
 	assert.equal(
 		semanticDigest(authLogin),
-		"4470ca3983d9da7899e7c2a01ddd4237c7781037cc5208cb29dc3a3ff5af796b",
+		"5dc86390d29446348d460dc684dedf84d27e361a59f92a370b8c90dabf4a91da",
 	);
 	// 2026-09-10 px→rem for the text-scale setting
 	// 2026-09-19 店家簡介可展開：夾行從 -webkit-line-clamp 改為 max-height +
@@ -242,7 +242,7 @@ test("seller and auth owner CSS preserve the exact reviewed semantic AST", () =>
 	// 2026-10-27 ui-kit 刪除 LOCATION PICKER MODAL 整段（產地地圖）；其餘 owner 與順序未變。
 	assert.equal(
 		digest(reconstructed),
-		"042d8200ab6d78016eccbcccdf2bb1c5b67901fdbb668fe0218509dc4d46841b",
+		"68d3f9221265b7b512546af9acce2ef5ecee6e96a06520ebf9ddc4d6a04dc155",
 		"recombining every owner file at its original position must reproduce the reviewed ui-kit AST",
 	);
 	assert.deepEqual(

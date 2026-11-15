@@ -31,11 +31,11 @@ export default async function SellerAppPaymentReturnPage({
 	const { locale } = await params;
 	const copy = COPY[localeFromParam(locale)];
 	return (
-		<main className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-3 px-4 text-center">
+		<div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-3 px-4 text-center">
 			<Suspense fallback={<h1 className="text-xl font-bold">{copy.done}</h1>}>
 				<ReturnHeading done={copy.done} expired={copy.expired} />
 			</Suspense>
 			<p>{copy.action}</p>
-		</main>
+		</div>
 	);
 }

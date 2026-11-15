@@ -160,6 +160,7 @@ export function ImageUploader({
 	const labelId = `${reactId}-label`;
 	const fileHintId = `${reactId}-filehint`;
 	const messageId = `${reactId}-message`;
+	const tileTextId = `${reactId}-tiletext`;
 	// Animate only when interacting (hover / dragging) or actively uploading;
 	// stays paused on initial render so the empty state reads as calm.
 	const playing = uploading || dragging || hovering;
@@ -229,6 +230,14 @@ export function ImageUploader({
 
 	const previewUrl = resolveCdnUrl(value);
 	const hasValue = Boolean(previewUrl);
+	const tileVisibleText = uploading
+		? "上傳中…"
+		: hasValue
+			? ""
+			: dragging
+				? "放開上傳"
+				: "點擊或拖曳上傳";
+	const hintInName = Boolean(fileHint) && !hasValue && !uploading;
 	const showUploadIndicator = !hasValue || uploading;
 	const clampedProgress =
 		typeof progress === "number"
@@ -300,7 +309,7 @@ export function ImageUploader({
 		.join(" ");
 
 	const describedBy =
-		[error || hint ? messageId : "", fileHint ? fileHintId : ""]
+		[error || hint ? messageId : "", fileHint && !hintInName ? fileHintId : ""]
 			.filter(Boolean)
 			.join(" ") || undefined;
 
@@ -343,7 +352,7 @@ export function ImageUploader({
 				}}
 			/>
 
-			{fileHint && (
+			{fileHint && !hintInName && (
 				<span id={fileHintId} className="sr-only">
 					{fileHint}
 				</span>
@@ -372,8 +381,18 @@ export function ImageUploader({
 				aria-busy={uploading || undefined}
 				aria-invalid={error ? true : undefined}
 				aria-describedby={describedBy}
-				aria-labelledby={label ? labelId : undefined}
-				aria-label={label ? undefined : (ariaLabel ?? "上傳圖片")}
+				aria-labelledby={
+					label
+						? tileVisibleText
+							? `${labelId} ${tileTextId}${hintInName ? ` ${fileHintId}` : ""}`
+							: labelId
+						: undefined
+				}
+				aria-label={
+					label
+						? undefined
+						: `${ariaLabel ?? "上傳圖片"} ${tileVisibleText}${hintInName ? ` ${fileHint}` : ""}`.trim()
+				}
 				id={id}
 				style={
 					aspect || tileStyle
@@ -419,11 +438,14 @@ export function ImageUploader({
 					<div
 						className={`flex flex-col items-center gap-0.5 mt-2 text-center pointer-events-none ${variant === "avatar" || variant === "compact" ? "hidden" : ""}`}
 					>
-						<strong className="text-[0.8125rem] font-semibold text-[var(--brand-text-black)] dark:text-[var(--hkui-foreground)]">
-							{dragging ? "放開上傳" : "點擊或拖曳上傳"}
+						<strong
+							id={tileTextId}
+							className="text-[0.8125rem] font-semibold text-[var(--brand-text-black)] dark:text-[var(--hkui-foreground)]"
+						>
+							{tileVisibleText}
 						</strong>
 						<small
-							aria-hidden="true"
+							id={fileHintId}
 							className="text-xs text-[var(--brand-text-gray)] dark:text-[var(--hkui-foreground-muted)]"
 						>
 							{fileHint}
@@ -436,7 +458,7 @@ export function ImageUploader({
 						className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 bg-black/45 text-[var(--color-neutral-cream)] text-[0.8125rem] font-semibold rounded-[inherit]"
 						role="status"
 					>
-						<span>上傳中…</span>
+						<span id={tileTextId}>{tileVisibleText}</span>
 						{clampedProgress !== undefined && (
 							<div
 								className="w-[70%] h-1 rounded-[var(--radius-pill)] bg-white/25 overflow-hidden"

@@ -49,19 +49,20 @@ export default function ReturnClient({ orderNo }: { orderNo: string }) {
 
 	if (loading && !order) {
 		return (
-			<main className="returns-page">
+			<div className="returns-page">
+				<h1 className="sr-only">申請退換貨</h1>
 				<p>載入中…</p>
-			</main>
+			</div>
 		);
 	}
 
 	if (!order) {
 		return (
-			<main className="returns-page">
+			<div className="returns-page">
 				<SellerPageShell title="申請退換貨">
 					<p className="text-danger-700 text-sm font-semibold">找不到訂單</p>
 				</SellerPageShell>
-			</main>
+			</div>
 		);
 	}
 
@@ -97,7 +98,7 @@ export default function ReturnClient({ orderNo }: { orderNo: string }) {
 
 	if (caseNo) {
 		return (
-			<main className="returns-page">
+			<div className="returns-page">
 				<SellerPageShell title="申請退換貨" subtitle={`訂單 #${orderNo}`}>
 					<div className="relative w-full bg-content1/90 border border-divider rounded-3xl p-10 px-7 pb-8 text-center flex flex-col items-center gap-3 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_18px_40px_-22px_rgb(var(--color-ink-700-rgb)/0.28),0_6px_18px_-12px_rgb(var(--color-ink-950-rgb)/0.18)] backdrop-blur-md overflow-hidden dark:bg-content1/86 animate-checkout-pop before:absolute before:inset-x-0 before:top-0 before:h-[140px] before:pointer-events-none before:z-0 before:bg-gradient-to-b before:from-success-50 before:to-transparent">
 						<span
@@ -133,12 +134,12 @@ export default function ReturnClient({ orderNo }: { orderNo: string }) {
 						</div>
 					</div>
 				</SellerPageShell>
-			</main>
+			</div>
 		);
 	}
 
 	return (
-		<main className="returns-page">
+		<div className="returns-page">
 			<SellerPageShell
 				title="申請退換貨"
 				subtitle={`訂單 #${orderNo}`}
@@ -299,6 +300,6 @@ export default function ReturnClient({ orderNo }: { orderNo: string }) {
 					</Button>
 				</div>
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }

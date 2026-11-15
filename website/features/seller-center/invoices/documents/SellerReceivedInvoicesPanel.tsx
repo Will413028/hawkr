@@ -24,6 +24,7 @@
 import * as React from "react";
 import Link from "@/components/shared/Link";
 import Pagination from "@/components/shared/Pagination";
+import { ScrollableTableRegion } from "@/components/shared/ScrollableTableRegion";
 import Button from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import {
@@ -125,7 +126,7 @@ export function SellerReceivedInvoicesPanel({
 						匯出本頁 CSV
 					</Button>
 				</div>
-				<div className="seller-orders__table-wrap">
+				<ScrollableTableRegion label="進項發票表格">
 					{/*
 					 * ≥768px 走表格、<768px 走卡片：同一份資料渲染兩份 DOM ＋ Tailwind
 					 * 斷點 `hidden`。`display:none` 讓被隱藏那份不進 accessibility tree。
@@ -184,7 +185,7 @@ export function SellerReceivedInvoicesPanel({
 							)}
 						</tbody>
 					</table>
-				</div>
+				</ScrollableTableRegion>
 
 				<ul className="m-0 flex list-none flex-col gap-[var(--hkui-space-3)] p-0 md:hidden">
 					{loading ? (

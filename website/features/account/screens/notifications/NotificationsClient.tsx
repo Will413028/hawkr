@@ -226,7 +226,7 @@ function NotificationsContent({
 	);
 
 	return (
-		<main className="bg-transparent">
+		<div className="bg-transparent">
 			{!list.loading ? (
 				<span data-hk-page-content-ready="notifications" hidden />
 			) : null}
@@ -278,8 +278,6 @@ function NotificationsContent({
 								key={f.value || "all"}
 								as="button"
 								className="seller-notifications__filter-tab"
-								role="tab"
-								aria-selected={filter === f.value}
 								active={filter === f.value}
 								disabled={pendingAction !== null}
 								onClick={() => setFilter(f.value)}
@@ -419,7 +417,7 @@ function NotificationsContent({
 					</div>
 				)}
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }
 

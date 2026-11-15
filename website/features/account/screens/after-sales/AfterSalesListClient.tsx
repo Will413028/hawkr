@@ -53,7 +53,7 @@ export default function AfterSalesListClient() {
 	);
 
 	return (
-		<main className="orders-page">
+		<div className="orders-page">
 			<SellerPageShell
 				title="售後案件"
 				subtitle={`共 ${records.length} 筆售後申請。點案件可查看退貨、退款進度。`}
@@ -67,12 +67,11 @@ export default function AfterSalesListClient() {
 								<button
 									type="button"
 									key={t.value}
-									aria-selected={active}
+									aria-pressed={active}
 									className={[PILL_BASE, active ? PILL_ACTIVE : PILL_INACTIVE]
 										.filter(Boolean)
 										.join(" ")}
 									onClick={() => setGroup(t.value)}
-									role="tab"
 								>
 									{t.label}
 									{typeof count === "number" && count > 0 ? (
@@ -107,7 +106,7 @@ export default function AfterSalesListClient() {
 					</ul>
 				)}
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }
 

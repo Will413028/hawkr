@@ -49,11 +49,11 @@ test("手機快速入口選取色使用跨亮暗模式的品牌 action tokens", 
 test("賣家通知分類的選取 tab 不再沿用共用亮綠 pill", () => {
 	assert.match(
 		notificationsClient,
-		/className="seller-notifications__filter-tab"[\s\S]*role="tab"/,
+		/as="button"[\s\S]*className="seller-notifications__filter-tab"[\s\S]*active=\{filter === f\.value\}/,
 	);
 	assert.match(
 		css,
-		/\.seller-shell\s+\.seller-notifications__filter-tab\[aria-selected="true"\]\s*\{[^}]*background:\s*var\(--theme-action-primary\)[^}]*color:\s*var\(--theme-text-inverse\)/s,
+		/\.seller-shell\s+\.seller-notifications__filter-tab\[aria-pressed="true"\]\s*\{[^}]*background:\s*var\(--theme-action-primary\)[^}]*color:\s*var\(--theme-text-inverse\)/s,
 	);
 });
 

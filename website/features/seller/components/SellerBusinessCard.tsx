@@ -100,6 +100,7 @@ const SellerBusinessCard = React.forwardRef<
 						/>
 						<QRCodeSVG
 							value={data.shareUrl}
+							aria-hidden="true"
 							size={qrSize}
 							level="H"
 							includeMargin={false}

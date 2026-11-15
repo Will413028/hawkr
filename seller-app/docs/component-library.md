@@ -14,21 +14,20 @@ fvm flutter pub get
 fvm flutter run -d chrome --target lib/main_catalog.dart --web-port 7352
 fvm flutter test --no-pub test/catalog/component_catalog_test.dart
 fvm flutter analyze --no-pub lib/main_catalog.dart lib/core/theme/app_theme.dart lib/app.dart test/catalog
-fvm flutter build web --no-pub --target lib/main_catalog.dart --output build/catalog --base-href /flutter/seller/ --no-web-resources-cdn
+fvm flutter build web --no-pub --target lib/main_catalog.dart --output build/catalog --base-href / --no-web-resources-cdn
 ```
 
 也可使用 `bash scripts/component-catalog.sh run|build|test`。腳本優先使用
 專案 FVM SDK 或 `fvm flutter`；環境沒有 FVM 時才使用 PATH 的 Flutter。
 
-最後一個命令提供 Web Storybook iframe 使用的靜態檔；請將整個
-`build/catalog/` 放在 host 的 `/flutter/seller/`，保留 assets 與 canvaskit。
-單獨提供根目錄服務時，將 `--base-href` 改成 `/`。
-Flutter Web host 只啟動元件庫；正式 seller App 的 Web 支援不在此範圍。
+最後一個命令產生靜態檔，base href 預設為 `/`（腳本可用 `CATALOG_BASE_HREF` 覆寫）；
+整個 `build/catalog/` 需一起放置，保留 assets 與 canvaskit。
+Flutter Web 只啟動元件庫；正式 seller App 的 Web 支援不在此範圍。
 
-## Storybook 深連結
+## 深連結
 
-例：`/flutter/seller/index.html?component=buttons&textScale=1.4&embedded=true`。
-頁首回歸：`/flutter/seller/index.html?component=chrome&textScale=1.4&embedded=true`。
+例：`/index.html?component=buttons&textScale=1.4`。
+頁首回歸：`/index.html?component=chrome&textScale=1.4`。
 
 | ID | 正式來源 | 覆蓋內容 |
 | --- | --- | --- |
@@ -42,8 +41,8 @@ Flutter Web host 只啟動元件庫；正式 seller App 的 Web 支援不在此�
 | `commerce` | `HkTemperatureTag`, `TemperatureTag`, `ProductTemperatureTags`, `LinkedProductCard`, `PillButton`, `StepIndicator` | 溫層選擇、缺圖商品、按內容寬度並排的訂單細節／出貨按鈕、物流步驟 |
 
 `component` 預設 `foundations`；`textScale` 預設 1 並限制在正式政策的
-0.8–1.4；`embedded=true` 隱藏搜尋與分類導覽，保留元件標題和實際範例。
-所有資料都是本機範例，按鈕只改變元件庫狀態。Storybook 靜態 host 請使用明確的 `index.html` 路徑。
+0.8–1.4。
+所有資料都是本機範例，按鈕只改變元件庫狀態。靜態伺服器請使用明確的 `index.html` 路徑。
 
 ## 正式 Flutter API
 
@@ -271,7 +270,7 @@ const StepIndicator(
 
 ## 一致性與維護
 
-- 基礎分類沿用 buyer 目錄的分類 ID、查詢參數與目標尺寸，方便在 Storybook 並排比較；`chrome` 額外集中賣家頁首與選圖版面。
+- 基礎分類沿用 buyer 目錄的分類 ID、查詢參數與目標尺寸，方便與買家目錄並排比較；`chrome` 額外集中賣家頁首與選圖版面。
 - ScreenUtil 停用寬高及文字縮放；只由實際 constraints 改變版面，文字遵循
   `AppMediaQueryPolicy`。測試直接渲染目錄入口，在 320、390、402、440、768 logical px
   與 1.4 倍文字檢查所有分類，並驗證篩選、表單、數量及營運操作。
@@ -307,7 +306,7 @@ Widget／catalog 測試不等於已安裝到手機，也不等於已登入的完
 
 ## 版本與文件維護
 
-共用 UI 修改需一起更新 catalog、Dart API 文件及測試；Web 的 Storybook 在 build 時直接讀入本檔。
+共用 UI 修改需一起更新 catalog、Dart API 文件及測試。
 
 受保護的 Web catalog 使用自訂 `web/flutter_bootstrap.js`，不安裝離線 service worker。舊 UI 版本以獨立 bundle 保留；回復文件庫版本不等於回復已發布的 App。
 

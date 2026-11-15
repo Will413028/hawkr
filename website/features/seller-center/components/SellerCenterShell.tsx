@@ -325,7 +325,11 @@ export default function SellerCenterShell({
 				onClick={() => setOpen(false)}
 			/>
 
-			<aside className="seller-sidebar" aria-hidden={false}>
+			<aside
+				className="seller-sidebar"
+				aria-hidden={false}
+				aria-label="賣家中心側邊欄"
+			>
 				<div className="seller-sidebar__profile">
 					<div className="seller-sidebar__avatar" aria-hidden="true">
 						<SellerAvatarImage src={avatar} alt="" variant="identity" />
@@ -387,10 +391,10 @@ export default function SellerCenterShell({
 				</div>
 			</aside>
 
-			<main className="seller-main">
+			<div className="seller-main">
 				<TerminationNoticeBanner />
 				{children}
-			</main>
+			</div>
 		</div>
 	);
 }

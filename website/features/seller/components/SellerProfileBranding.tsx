@@ -740,7 +740,7 @@ function TabButton({
 	return (
 		<button
 			type="button"
-			className={`bg-transparent border-0 p-[8px_0_9px] font-inherit text-xs font-semibold text-[#888] cursor-pointer relative dark:text-white/54 ${
+			className={`bg-transparent border-0 p-[8px_0_9px] font-inherit text-xs font-semibold text-foreground-soft cursor-pointer relative ${
 				active
 					? "text-hk-primary-strong after:content-[''] after:absolute after:left-1/4 after:right-1/4 after:bottom-[-1px] after:h-[2px] after:rounded-[2px] after:bg-hk-primary-strong dark:text-[#f1cd70] dark:after:bg-[#f1cd70]"
 					: ""

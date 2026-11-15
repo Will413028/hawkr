@@ -183,5 +183,4 @@ allowBuilds:
 patchedDependencies:
   '@editorjs/editorjs': patches/@editorjs__editorjs.patch
   '@opennextjs/cloudflare': patches/@opennextjs__cloudflare.patch
-  '@storybook/nextjs-vite@10.6.2': patches/@storybook__nextjs-vite@10.6.2.patch
   next: patches/next.patch

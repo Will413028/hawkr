@@ -151,8 +151,11 @@ for (const browserCase of CASES) {
 			});
 
 			const guide = page.locator('[data-webview-guide="sheet"]');
+			// The login route streams behind Suspense: until React's reveal script
+			// runs, a hidden `body > div#S:n` copy of the page coexists with the
+			// hydrated one, so scope to the live page under `main`.
 			const googleTrigger = page.locator(
-				'[data-webview-guide-trigger="google"]',
+				'main [data-webview-guide-trigger="google"]',
 			);
 			await expect(googleTrigger).toBeVisible();
 			await expect(googleTrigger).toBeEnabled();

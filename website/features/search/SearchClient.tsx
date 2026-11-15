@@ -31,7 +31,7 @@ export default function SearchClient({
 	const isLanding = !query;
 
 	return (
-		<main className="search-page pb-20" data-hk-page-content-ready="search">
+		<div className="search-page pb-20" data-hk-page-content-ready="search">
 			<SearchFreshnessBridge
 				scope="search:landing"
 				staleMs={MAIN_TAB_STALE_MS.search}
@@ -53,6 +53,6 @@ export default function SearchClient({
 			</section>
 
 			{isLanding ? landing : <SearchResultsClient query={query} sort={sort} />}
-		</main>
+		</div>
 	);
 }

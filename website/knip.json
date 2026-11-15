@@ -4,7 +4,9 @@
 		"scripts/*.ts",
 		"playwright*.config.ts",
 		"tests/**/*.{test,spec}.ts",
-		"tests/e2e/**/*.{ts,tsx}"
+		"tests/e2e/**/*.{ts,tsx}",
+		"{app,components,features,lib}/**/*.browser.test.tsx",
+		"tests/browser/**/*.{ts,tsx}"
 	],
 	"project": ["{app,components,features,lib,design-system,types}/**/*.{ts,tsx}"]
 }

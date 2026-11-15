@@ -509,9 +509,9 @@
 	--page-dropdown-item-fg: var(--hkui-foreground);
 	--page-dropdown-item-selected-bg: rgb(var(--color-ink-300-rgb) / 0.18);
 	--page-dropdown-item-selected-fg: var(--hkui-foreground);
-	--page-dropdown-item-active-bg: rgb(var(--color-ink-300-rgb) / 0.7);
+	--page-dropdown-item-active-bg: var(--color-ink-600);
 	--page-dropdown-item-active-fg: var(--color-neutral-white);
-	--page-dropdown-item-active-selected-bg: rgb(var(--color-ink-300-rgb) / 0.9);
+	--page-dropdown-item-active-selected-bg: var(--color-ink-700);
 	--page-dropdown-search-bg: var(--hkui-content1);
 	--page-dropdown-search-border: var(--page-dropdown-border);
 	--page-dropdown-search-fg: var(--hkui-foreground-soft);
