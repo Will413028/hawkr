@@ -3,6 +3,7 @@ package social
 import (
 	"context"
 	"slices"
+	"strconv"
 	"uuid"
 
 	"connectrpc.com/connect"
@@ -141,13 +142,16 @@ func (h *App) ListMyPosts(ctx context.Context, req *connect.Request[pb.ListMyPos
 	var status social.PostStatus
 	if msg.GetStatus() != pb.PostStatus_POST_STATUS_UNSPECIFIED {
 		status = rpc.EnumFromProto[social.PostStatus](msg.GetStatus())
+		if !slices.Contains(social.PostStatusValues(), status) {
+			return nil, rpc.RequiredField("status", "status 不是有效的貼文狀態")
+		}
 	}
-	scope := rpc.FilterScope(socialv1alpha1connect.SocialAppServiceListMyPostsProcedure, string(status))
-	after, err := rpc.ValidCursor[ownPostCursor](scope, msg.GetPageToken())
+	st, err := h.store(ctx)
 	if err != nil {
 		return nil, err
 	}
-	st, err := h.store(ctx)
+	scope := rpc.FilterScope(socialv1alpha1connect.SocialAppServiceListMyPostsProcedure, strconv.FormatInt(st.StoreID, 10), string(status))
+	after, err := rpc.ValidCursor[ownPostCursor](scope, msg.GetPageToken())
 	if err != nil {
 		return nil, err
 	}
@@ -207,16 +211,10 @@ func (h *App) UpdatePost(ctx context.Context, req *connect.Request[pb.UpdatePost
 	if err != nil {
 		return nil, err
 	}
-	cur, err := h.owner.MyPost(ctx, st, id)
-	if err != nil {
-		return nil, err
-	}
-	in := social.UpdatePostInput{PostID: id, Version: version, Body: cur.Body, ProductID: cur.ProductID}
+	in := social.UpdatePostInput{PostID: id, Version: version, SetProduct: has("product_id"), ProductID: productID}
 	if has("body") {
-		in.Body = msg.GetBody()
-	}
-	if has("product_id") {
-		in.ProductID = productID
+		body := msg.GetBody()
+		in.Body = &body
 	}
 	if has("image_staged_token") {
 		if msg.GetImageStagedToken() == "" {
@@ -322,11 +320,7 @@ func (h *App) SchedulePost(ctx context.Context, req *connect.Request[pb.Schedule
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, schedulePostPaths)
 	}
-	p, err := h.owner.MyPost(ctx, st, id)
-	if err != nil {
-		return nil, err
-	}
-	post, err := h.ownPost(ctx, st, p)
+	post, err := h.ownPost(ctx, st, scheduled.Post)
 	if err != nil {
 		return nil, err
 	}
@@ -339,16 +333,16 @@ func (h *App) ListStoreComments(ctx context.Context, req *connect.Request[pb.Lis
 	if err != nil {
 		return nil, err
 	}
+	st, err := h.store(ctx)
+	if err != nil {
+		return nil, err
+	}
 	scopePost := ""
 	if postID != nil {
 		scopePost = postID.String()
 	}
-	scope := rpc.FilterScope(socialv1alpha1connect.SocialAppServiceListStoreCommentsProcedure, scopePost, boolKey(msg.GetUnreplied()))
+	scope := rpc.FilterScope(socialv1alpha1connect.SocialAppServiceListStoreCommentsProcedure, strconv.FormatInt(st.StoreID, 10), scopePost, boolKey(msg.GetUnreplied()))
 	after, err := rpc.ValidCursor[commentCursor](scope, msg.GetPageToken())
-	if err != nil {
-		return nil, err
-	}
-	st, err := h.store(ctx)
 	if err != nil {
 		return nil, err
 	}

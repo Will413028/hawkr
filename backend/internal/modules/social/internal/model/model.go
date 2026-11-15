@@ -179,13 +179,15 @@ type CreatePostInput struct {
 }
 
 // UpdatePostInput 是修改貼文：Version 是讀取時拿到的版本。ImageToken 空字串沿用現在的圖，非空換成新圖；ClearImage 清掉圖
-// （已發布的貼文不能清）。Hashtags 為 nil 保留原本的標籤，非 nil（含空）整批取代。
+// （已發布的貼文不能清）。Body 為 nil 保留原本的內文；SetProduct 為假保留原本的商品（也不重新驗證它），為真時 ProductID 取代（nil 是清掉）。
+// Hashtags 為 nil 保留原本的標籤，非 nil（含空）整批取代。未變更的欄位在模組內以鎖住的列為準。
 type UpdatePostInput struct {
 	PostID     uuid.UUID
 	Version    int64
-	Body       string
+	Body       *string
 	ImageToken string
 	ClearImage bool
+	SetProduct bool
 	ProductID  *int64
 	Hashtags   *[]string
 }

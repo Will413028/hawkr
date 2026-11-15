@@ -92,6 +92,16 @@ func checkPublishable(ctx context.Context, body string, hasImage bool) error {
 	return nil
 }
 
+// requirePublishable 是 checkPublishable 的狀態版：貼文（不是這次請求的輸入）不符公開要件，發布與排程時回 FailedPrecondition；
+// 補齊內文或圖片之後才能成功。請求自己帶的輸入不符（建立並發布、編輯已發布的貼文）仍是 checkPublishable 的 InvalidInput。
+func requirePublishable(ctx context.Context, body string, hasImage bool) error {
+	err := checkPublishable(ctx, body, hasImage)
+	if err == nil {
+		return nil
+	}
+	return apperr.FailedPrecondition("%s", err.Error())
+}
+
 func (s *Service) verifyProduct(ctx context.Context, productID *int64, storeID int64) error {
 	if productID == nil {
 		return nil
@@ -158,7 +168,7 @@ func (s *Service) publishedEvent(ctx context.Context, p store.SocialPost, now ti
 // publishLocked 是貼文轉為 PUBLISHED 唯一的路徑（手動發布與排程到點共用）：貼文列已鎖，公開要件在這裡檢查，之後寫狀態、發 PostPublished、排快取失效。
 // 呼叫方負責先處理這篇貼文的待發布排程（手動發布取消它，到點發布把它轉 PUBLISHED）。
 func (s *Service) publishLocked(ctx context.Context, q *store.Queries, row store.SocialPost, now time.Time, origin model.PostOrigin, sc store.SocialPostSchedule) error {
-	if err := checkPublishable(ctx, row.Body, row.ImageKey != nil); err != nil {
+	if err := requirePublishable(ctx, row.Body, row.ImageKey != nil); err != nil {
 		return err
 	}
 	upd, err := q.SetPostStatus(ctx, store.SetPostStatusParams{ID: row.ID, Status: string(model.StatusPublished), Now: now, ExpectedVersion: row.Version})
@@ -195,10 +205,18 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 	var hash []byte
 	if in.RequestID != nil {
 		hash = model.RequestHash("post", body, in.ImageToken, model.OptionalInt(in.ProductID), tagsKey(tags), fmt.Sprint(in.Publish))
-		if row, ok, err := s.replay(ctx, s.q(ctx), st.StoreID, in.RequestID, hash); err != nil || ok {
-			if err != nil {
-				return model.Post{}, err
-			}
+		// 同一家店的同一個 request_id 一次只有一個請求往下走：圖片轉正在 transaction 之外，沒有序列化時並行的重送會互搶 staged token，
+		// 輸的那個轉正失敗卻又查不到對方（還沒 insert）。第二個請求等第一個結束（commit 或失敗）之後才開始，查得到就 replay。
+		unlock, err := s.lockRequest(ctx, st.StoreID, *in.RequestID)
+		if err != nil {
+			return model.Post{}, err
+		}
+		defer unlock()
+		row, ok, err := s.replay(ctx, s.q(ctx), st.StoreID, in.RequestID, hash)
+		if err != nil {
+			return model.Post{}, err
+		}
+		if ok {
 			return s.Own(ctx, st.StoreID, row.ID)
 		}
 	}
@@ -207,10 +225,6 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 	}
 	asset, err := s.finalizeImage(ctx, st, in.ImageToken)
 	if err != nil {
-		// 並行的重送已經用掉這個 staged token：回第一次建立的那一篇，不回 token 的錯誤。
-		if row, ok, rerr := s.replay(ctx, s.q(ctx), st.StoreID, in.RequestID, hash); rerr == nil && ok {
-			return s.Own(ctx, st.StoreID, row.ID)
-		}
 		return model.Post{}, err
 	}
 	id := s.d.NewID()
@@ -270,6 +284,28 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 	return s.Own(ctx, st.StoreID, id)
 }
 
+// lockRequest 取得 (店家, request_id) 的 session 層 advisory lock，回傳釋放它的函式。鎖綁在專用連線上（不開 transaction：
+// 持鎖期間要呼叫 media，規範不准在 transaction 內等它）；釋放失敗時整條連線丟掉，鎖隨連線結束。
+func (s *Service) lockRequest(ctx context.Context, storeID int64, requestID uuid.UUID) (func(), error) {
+	key := fmt.Sprintf("social.post_request:%d:%s", storeID, requestID)
+	c, err := s.d.DB.Pool().Acquire(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("social：取得連線以鎖定 request_id %s：%w", requestID, err)
+	}
+	if _, err := c.Exec(ctx, "SELECT pg_advisory_lock(hashtextextended($1, 0))", key); err != nil {
+		c.Release()
+		return nil, fmt.Errorf("social：鎖定貼文的 request_id %s：%w", requestID, err)
+	}
+	return func() {
+		bg := context.WithoutCancel(ctx)
+		if _, err := c.Exec(bg, "SELECT pg_advisory_unlock(hashtextextended($1, 0))", key); err != nil {
+			_ = c.Hijack().Close(bg)
+			return
+		}
+		c.Release()
+	}, nil
+}
+
 // tagsKey 是標籤集合進 RequestHash 的編碼：依輸入順序，名稱與顯示形式都算（顯示形式是使用者看得到的內容）。
 func tagsKey(tags []hashtag.Tag) string {
 	var b strings.Builder
@@ -317,10 +353,15 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 	if in.Version <= 0 {
 		return model.Post{}, apperr.InvalidInput("%s", text.PostUpdateEtagRequired(uitext.LocaleFrom(ctx)))
 	}
-	body, err := textcheck.Body(uitext.LocaleFrom(ctx), "Body", textcheck.PostBody, in.Body, model.MaxPostBodyRunes, false)
-	if err != nil {
-		return model.Post{}, err
+	var newBody *string
+	if in.Body != nil {
+		b, err := textcheck.Body(uitext.LocaleFrom(ctx), "Body", textcheck.PostBody, *in.Body, model.MaxPostBodyRunes, false)
+		if err != nil {
+			return model.Post{}, err
+		}
+		newBody = &b
 	}
+	var err error
 	var tags []hashtag.Tag
 	if in.Hashtags != nil {
 		if tags, err = hashtag.RequireSet(uitext.LocaleFrom(ctx), *in.Hashtags); err != nil {
@@ -337,8 +378,10 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 	if cur.Version != in.Version {
 		return model.Post{}, versionConflict(ctx)
 	}
-	if err := s.verifyProduct(ctx, in.ProductID, st.StoreID); err != nil {
-		return model.Post{}, err
+	if in.SetProduct {
+		if err := s.verifyProduct(ctx, in.ProductID, st.StoreID); err != nil {
+			return model.Post{}, err
+		}
 	}
 	asset, err := s.finalizeImage(ctx, st, in.ImageToken)
 	if err != nil {
@@ -355,6 +398,16 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 		if err := mediaref.Reject(ctx, q, ref, candidates(asset)...); err != nil {
 			return err
 		}
+		if row.Version != in.Version {
+			return versionConflict(ctx)
+		}
+		body, productID := row.Body, row.ProductID
+		if newBody != nil {
+			body = *newBody
+		}
+		if in.SetProduct {
+			productID = in.ProductID
+		}
 		hasImage := row.ImageKey != nil && !in.ClearImage || asset != nil
 		scheduled, err := s.hasPendingSchedule(ctx, q, in.PostID)
 		if err != nil {
@@ -365,7 +418,7 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 				return err
 			}
 		}
-		params := store.UpdatePostParams{ID: in.PostID, Body: body, ProductID: in.ProductID, ClearImage: in.ClearImage, Now: now, ExpectedVersion: in.Version}
+		params := store.UpdatePostParams{ID: in.PostID, Body: body, ProductID: productID, ClearImage: in.ClearImage, Now: now, ExpectedVersion: in.Version}
 		if asset != nil {
 			params.NewImageKey, params.NewImageAssetID = &asset.ObjectKey, &asset.ID
 		}

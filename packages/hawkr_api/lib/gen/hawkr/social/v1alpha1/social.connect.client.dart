@@ -442,7 +442,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// PublishPost 發布草稿或下架的貼文；etag 必填。已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。需要賣家能力 CAP_MARKETING。
+  /// PublishPost 發布草稿或下架的貼文；etag 必填。已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
   Future<hawkrsocialv1alpha1social.PublishPostResponse> publishPost(
     hawkrsocialv1alpha1social.PublishPostRequest input, {
     connect.Headers? headers,
@@ -460,7 +460,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// UnpublishPost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，停權時仍可執行（CAP_CONTENT_CONTRACT）。
+  /// UnpublishPost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
   Future<hawkrsocialv1alpha1social.UnpublishPostResponse> unpublishPost(
     hawkrsocialv1alpha1social.UnpublishPostRequest input, {
     connect.Headers? headers,
@@ -478,7 +478,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// DeletePost 刪除自己的貼文；已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。收縮類動作，停權時仍可執行（CAP_CONTENT_CONTRACT）。
+  /// DeletePost 刪除自己的貼文；已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
   Future<hawkrsocialv1alpha1social.DeletePostResponse> deletePost(
     hawkrsocialv1alpha1social.DeletePostRequest input, {
     connect.Headers? headers,
@@ -496,7 +496,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件；貼文已有待發布的排程時，舊的被取代。etag 必填。
+  /// SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
   /// 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
   Future<hawkrsocialv1alpha1social.SchedulePostResponse> schedulePost(
     hawkrsocialv1alpha1social.SchedulePostRequest input, {

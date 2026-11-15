@@ -80,7 +80,7 @@ func (f *fakeOwner) DeletePost(_ context.Context, st seller.Store, _ uuid.UUID, 
 
 func (f *fakeOwner) SchedulePost(_ context.Context, st seller.Store, in social.SchedulePostInput) (social.ScheduledPost, error) {
 	f.scheduled = in
-	return social.ScheduledPost{Schedule: social.Schedule{PublishAt: in.PublishAt}, PostVersion: in.Version + 1}, f.rec("schedule", st)
+	return social.ScheduledPost{Schedule: social.Schedule{PublishAt: in.PublishAt}, PostVersion: in.Version + 1, Post: f.current(in.PostID, in.Version+1)}, f.rec("schedule", st)
 }
 
 func (f *fakeOwner) MyPost(_ context.Context, st seller.Store, id uuid.UUID) (social.Post, error) {
@@ -182,7 +182,6 @@ func TestOwnerSuccessPaths(t *testing.T) {
 
 func TestOwnerUpdatePostMergesOnlyTheMaskedFields(t *testing.T) {
 	f := &fakeOwner{post: ownPost(5, social.StatusDraft)}
-	f.post.Body = "原本的內文"
 	e := newAppEnvWith(t, &fakeWrites{}, f, &fakeStores{own: &seller.Store{StoreID: 5}})
 	ctx := t.Context()
 	id := uuid.New().String()
@@ -190,19 +189,19 @@ func TestOwnerUpdatePostMergesOnlyTheMaskedFields(t *testing.T) {
 		_, err := e.client.UpdatePost(ctx, signedIn(&pb.UpdatePostRequest{Post: p, UpdateMask: mask(paths...)}))
 		return err
 	}
-	// 只列 product_id：內文沿用目前的，商品被清掉（沒設值），圖與標籤不動。
+	// 只列 product_id：商品被清掉（沒設值），內文不在輸入裡（模組以鎖住的列為準），圖與標籤不動。
 	if err := up(&pb.Post{Id: id, Etag: "4"}, "product_id"); err != nil {
 		t.Fatal(err)
 	}
 	u := f.update
-	if u.Body != "原本的內文" || u.ProductID != nil || u.ImageToken != "" || u.ClearImage || u.Hashtags != nil || u.Version != 4 {
+	if u.Body != nil || !u.SetProduct || u.ProductID != nil || u.ImageToken != "" || u.ClearImage || u.Hashtags != nil || u.Version != 4 {
 		t.Errorf("只改商品：%+v", u)
 	}
-	// 只列 body：商品沿用目前的。
+	// 只列 body：商品不在輸入裡（SetProduct 為假，模組不重驗商品）。
 	if err := up(&pb.Post{Id: id, Etag: "4", Body: "新內文"}, "body"); err != nil {
 		t.Fatal(err)
 	}
-	if u = f.update; u.Body != "新內文" || u.ProductID == nil || *u.ProductID != 88 {
+	if u = f.update; u.Body == nil || *u.Body != "新內文" || u.SetProduct || u.ProductID != nil {
 		t.Errorf("只改內文：%+v", u)
 	}
 	// 換圖、清圖、標籤整批取代（含空清單）。
@@ -670,4 +669,114 @@ func mustWeb(t *testing.T) rpc.WebOrigin {
 		t.Fatal(err)
 	}
 	return web
+}
+
+func TestOwnerListMyPostsRejectsUnknownStatusOnTheStatusField(t *testing.T) {
+	f := &fakeOwner{}
+	e := newAppEnvWith(t, &fakeWrites{}, f, &fakeStores{own: &seller.Store{StoreID: 5}})
+	ctx := t.Context()
+	_, err := e.client.ListMyPosts(ctx, signedIn(&pb.ListMyPostsRequest{Status: pb.PostStatus(99)}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument || len(f.calls) != 0 {
+		t.Fatalf("未知的 status：%v，呼叫 %v", err, f.calls)
+	}
+	var ce *connect.Error
+	if !errors.As(err, &ce) {
+		t.Fatal(err)
+	}
+	found := false
+	for _, d := range ce.Details() {
+		if v, derr := d.Value(); derr == nil {
+			if br, ok := v.(*errdetails.BadRequest); ok {
+				for _, fv := range br.GetFieldViolations() {
+					found = found || fv.GetField() == "status"
+				}
+			}
+		}
+	}
+	if !found {
+		t.Errorf("錯誤要指向 status 欄位：%v", ce.Details())
+	}
+	if _, err := e.client.ListMyPosts(ctx, signedIn(&pb.ListMyPostsRequest{})); err != nil || f.status != "" {
+		t.Errorf("UNSPECIFIED 是不篩選：%v %q", err, f.status)
+	}
+}
+
+func TestOwnerPageTokensAreBoundToTheStore(t *testing.T) {
+	at := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	f := &fakeOwner{
+		page:     social.OwnPostPage{Posts: []social.Post{ownPost(5, social.StatusDraft)}, Next: &social.OwnPostCursor{CreatedAt: at, ID: uuid.New()}},
+		comments: social.CommentPage{StoreID: 5, Next: &social.CommentCursor{CreatedAt: at, ID: uuid.New()}},
+	}
+	stores := &fakeStores{own: &seller.Store{StoreID: 5}}
+	e := newAppEnvWith(t, &fakeWrites{}, f, stores)
+	ctx := t.Context()
+	lp, err := e.client.ListMyPosts(ctx, signedIn(&pb.ListMyPostsRequest{}))
+	if err != nil || lp.Msg.GetNextPageToken() == "" {
+		t.Fatal(err)
+	}
+	lc, err := e.client.ListStoreComments(ctx, signedIn(&pb.ListStoreCommentsRequest{}))
+	if err != nil || lc.Msg.GetNextPageToken() == "" {
+		t.Fatal(err)
+	}
+	if _, err := e.client.ListMyPosts(ctx, signedIn(&pb.ListMyPostsRequest{PageToken: lp.Msg.GetNextPageToken()})); err != nil {
+		t.Fatalf("同一家店的 token：%v", err)
+	}
+	stores.own = &seller.Store{StoreID: 6}
+	if _, err := e.client.ListMyPosts(ctx, signedIn(&pb.ListMyPostsRequest{PageToken: lp.Msg.GetNextPageToken()})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("別家店的貼文 token：%v", err)
+	}
+	if _, err := e.client.ListStoreComments(ctx, signedIn(&pb.ListStoreCommentsRequest{PageToken: lc.Msg.GetNextPageToken()})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("別家店的留言 token：%v", err)
+	}
+}
+
+func TestOwnerSchedulePostRespondsFromTheScheduleResultWithoutAnotherRead(t *testing.T) {
+	f := &fakeOwner{post: ownPost(5, social.StatusDraft)}
+	e := newAppEnvWith(t, &fakeWrites{}, f, &fakeStores{own: &seller.Store{StoreID: 5}})
+	id := uuid.New()
+	at := time.Date(2026, 12, 1, 3, 0, 0, 0, time.UTC)
+	resp, err := e.client.SchedulePost(t.Context(), signedIn(&pb.SchedulePostRequest{PostId: id.String(), Etag: "4", PublishTime: timestamppb.New(at)}))
+	if err != nil || resp.Msg.GetPost().GetEtag() != "5" {
+		t.Fatal(err, resp)
+	}
+	if len(f.calls) != 1 || f.calls[0] != "schedule" {
+		t.Errorf("排程成功後不該再讀貼文：%v", f.calls)
+	}
+}
+
+func TestOwnerPublishabilityFailuresAreFailedPreconditionWithoutUnmappedFields(t *testing.T) {
+	f := &fakeOwner{err: apperr.FailedPrecondition("缺圖")}
+	e := newAppEnvWith(t, &fakeWrites{}, f, &fakeStores{own: &seller.Store{StoreID: 5}})
+	ctx := t.Context()
+	id := uuid.New().String()
+	_, err := e.client.PublishPost(ctx, signedIn(&pb.PublishPostRequest{PostId: id, Etag: "4"}))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Errorf("PublishPost：%v", err)
+	}
+	_, err = e.client.SchedulePost(ctx, signedIn(&pb.SchedulePostRequest{PostId: id, Etag: "4", PublishTime: timestamppb.New(time.Now().Add(time.Hour))}))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Errorf("SchedulePost：%v", err)
+	}
+}
+
+func TestNewAppRejectsADeclarationTableMissingARow(t *testing.T) {
+	images, err := rpc.NewImages("https://media.example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	web, err := rpc.NewWebOrigin("https://web.example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	short := map[string]declaration{}
+	for k, v := range declarations {
+		short[k] = v
+	}
+	delete(short, socialv1alpha1connect.SocialAppServiceUpdatePostProcedure)
+	if _, err := newApp(short, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, images, web); err == nil {
+		t.Fatal("缺一列的宣告表要不能啟動")
+	}
+	if _, err := newApp(declarations, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, images, web); err != nil {
+		t.Fatal(err)
+	}
 }

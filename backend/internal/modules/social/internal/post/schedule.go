@@ -123,6 +123,7 @@ func (s *Service) Schedule(ctx context.Context, st seller.Store, in model.Schedu
 	}
 	var out store.SocialPostSchedule
 	var version int64
+	var posted model.Post
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		row, err := s.lockOwned(ctx, q, st.StoreID, in.PostID)
@@ -142,7 +143,7 @@ func (s *Service) Schedule(ctx context.Context, st seller.Store, in model.Schedu
 		if down {
 			return apperr.FailedPrecondition("%s", text.PostScheduleTakenDown(uitext.LocaleFrom(ctx)))
 		}
-		if err := checkPublishable(ctx, row.Body, row.ImageKey != nil); err != nil {
+		if err := requirePublishable(ctx, row.Body, row.ImageKey != nil); err != nil {
 			return err
 		}
 		if _, err := s.d.Cancel.FromLockedPosts(ctx, []uuid.UUID{row.ID}, model.CancelReplaced, now, schedule.CallerBumps); err != nil {
@@ -160,12 +161,16 @@ func (s *Service) Schedule(ctx context.Context, st seller.Store, in model.Schedu
 		}
 		opts := PublishScheduledArgs{}.InsertOpts()
 		opts.ScheduledAt = publishAt
-		return s.d.Jobs.Enqueue(ctx, PublishScheduledArgs{ScheduleID: out.ID}, &opts)
+		if err := s.d.Jobs.Enqueue(ctx, PublishScheduledArgs{ScheduleID: out.ID}, &opts); err != nil {
+			return err
+		}
+		posted, err = s.Own(ctx, st.StoreID, row.ID)
+		return err
 	})
 	if err != nil {
 		return model.ScheduledPost{}, err
 	}
-	return model.ScheduledPost{Schedule: schedule.Of(out), PostVersion: version}, nil
+	return model.ScheduledPost{Schedule: schedule.Of(out), PostVersion: version, Post: posted}, nil
 }
 
 // bumpVersion 遞增貼文版本並回傳新版本：排程與取消排程改變貼文的狀態組合，持有舊 etag 的編輯、發布要重新讀取。貼文列已鎖。

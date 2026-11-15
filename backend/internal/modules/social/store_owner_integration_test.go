@@ -293,3 +293,42 @@ func TestPostRequestIDConcurrentRetriesCreateOnePost(t *testing.T) {
 		t.Fatalf("貼文數 = %d，預期 1", n)
 	}
 }
+
+// 並行的同 request_id 重送：序列化在圖片轉正之前，全部回同一篇；內容不同的並行請求被拒，不會被錯誤地吞成「圖片不可用」。
+func TestPostRequestIDConcurrentRetriesWithImageCreateOnePost(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	st := f.store(t, storeID)
+	rid := uuid.New()
+	in := social.CreatePostInput{Body: "並行", ImageToken: "tok-race", Hashtags: []string{"tea"}, Publish: true, RequestID: &rid}
+	ids := make([]uuid.UUID, 8)
+	var wg sync.WaitGroup
+	for i := range ids {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			p, err := f.module.CreatePost(ctx, st, in)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			ids[i] = p.ID
+		}()
+	}
+	wg.Wait()
+	for _, id := range ids {
+		if id != ids[0] {
+			t.Fatalf("並行重送回了不同的貼文：%v", ids)
+		}
+	}
+	if n := f.scalar(t, `SELECT count(*) FROM social.posts WHERE store_id = $1`, storeID); n != 1 {
+		t.Fatalf("貼文數 = %d，預期 1", n)
+	}
+	different := in
+	different.Body = "內容不同"
+	if _, err := f.module.CreatePost(ctx, st, different); kindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("同 request_id 不同內容：%v", err)
+	}
+}
