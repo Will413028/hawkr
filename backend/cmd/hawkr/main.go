@@ -53,7 +53,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
-	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -240,6 +239,7 @@ func runServe(ctx context.Context) error {
 	subscribeSellerViews(bus, sellerModule)
 	subscribeSellerRelay(bus, jc)
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, log)
+	subscribeModeration(bus, newModerationRetention(d, buyerModule, med, jc, log))
 	agentModule := newAgent(d, sellerModule)
 	subscribeAgent(bus, agentModule)
 	discoveryModule := newDiscovery(d, orders, products, reviews, sellerModule, log)
@@ -421,8 +421,8 @@ func runWorker(ctx context.Context) error {
 		AdvanceStore: sellerModule.AdvanceTerminations,
 		Jobs:         jc,
 	}
-	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
-	moderationModule := moderation.New(moderation.Deps{DB: d, Social: socialModule, Seller: sellerModule, Buyer: buyerModule, Suspension: suspension, NewID: uuid.NewV7, Now: time.Now})
+	moderationModule := newModerationRetention(d, buyerModule, med, jc, log)
+	subscribeModeration(bus, moderationModule)
 	contentModule := content.New(content.Deps{DB: d, Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))

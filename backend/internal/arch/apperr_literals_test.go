@@ -50,6 +50,46 @@ func TestSocialApperrCallsCarryNoSentenceLiterals(t *testing.T) {
 	}
 }
 
+// moderation 的 apperr.* 也不寫句子字面值：句子在 moderation/internal/text 的目錄（檢舉人受眾 zh-TW、en，管理員受眾 zh-TW）。
+func TestModerationApperrCallsCarryNoSentenceLiterals(t *testing.T) {
+	root := moduleRoot(t)
+	var files []string
+	err := filepath.WalkDir(filepath.Join(root, "internal", "modules", "moderation"), func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	apperrCalls, scanned := 0, 0
+	for _, path := range files {
+		src, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if generatedFile(src) {
+			continue
+		}
+		scanned++
+		apperrCalls += strings.Count(string(src), "apperr.")
+		got, err := CheckApperrLiterals(path, src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, v := range got {
+			t.Error(v)
+		}
+	}
+	if scanned < 8 || apperrCalls < 20 {
+		t.Fatalf("只掃到 %d 個檔、%d 處 apperr：檢查範圍不對", scanned, apperrCalls)
+	}
+}
+
 func TestCheckApperrLiteralsFlagsSentencesOnly(t *testing.T) {
 	const src = `package x
 

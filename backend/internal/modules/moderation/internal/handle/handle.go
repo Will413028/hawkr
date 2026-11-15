@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 	"unicode/utf8"
@@ -20,7 +21,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/snapshot"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/view"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -52,54 +55,45 @@ func New(d Deps) *Service { return &Service{d: d} }
 func Validate(in model.DecideInput) (model.DecideInput, error) {
 	switch {
 	case in.CaseID == uuid.UUID{}:
-		return in, apperr.InvalidInputOn([]string{"CaseID"}, "案件必填")
+		return in, apperr.InvalidInputOn([]string{"CaseID"}, "%s", text.DecideCaseRequired())
 	case in.Version < 1:
-		return in, apperr.InvalidInputOn([]string{"Version"}, "案件版本必填")
+		return in, apperr.InvalidInputOn([]string{"Version"}, "%s", text.DecideVersionRequired())
 	case in.AdminID <= 0:
-		return in, apperr.InvalidInputOn([]string{"AdminID"}, "管理員必填")
+		return in, apperr.InvalidInputOn([]string{"AdminID"}, "%s", text.DecideAdminRequired())
 	}
 	in.Text = trimtext.Trim(in.Text)
 	switch in.Decision {
 	case model.DecisionNoViolation:
 		if in.Category != "" || in.Action != "" || in.Text != "" || in.StoreID != 0 || in.Severity != "" {
-			return in, apperr.InvalidInputOn([]string{"Decision"}, "不違規不帶類別、處置與理由")
+			return in, apperr.InvalidInputOn([]string{"Decision"}, "%s", text.DecideNoViolationShape())
 		}
 	case model.DecisionViolation:
-		if !slicesContains(model.Actions(), in.Action) {
-			return in, apperr.InvalidInputOn([]string{"Action"}, "處置種類不合法")
+		if !slices.Contains(model.Actions(), in.Action) {
+			return in, apperr.InvalidInputOn([]string{"Action"}, "%s", text.DecideActionInvalid())
 		}
 		if !in.Action.CategoryAllowed(in.Category) {
-			return in, apperr.InvalidInputOn([]string{"Category"}, "認定類別不適用這個處置")
+			return in, apperr.InvalidInputOn([]string{"Category"}, "%s", text.DecideCategoryNotForAction())
 		}
 		if in.Text == "" {
-			return in, apperr.InvalidInputOn([]string{"Text"}, "給作者的理由必填")
+			return in, apperr.InvalidInputOn([]string{"Text"}, "%s", text.DecideReasonRequired())
 		}
 		if utf8.RuneCountInString(in.Text) > model.MaxTextRunes {
-			return in, apperr.InvalidInputOn([]string{"Text"}, "理由不能超過 %d 字", model.MaxTextRunes)
+			return in, apperr.InvalidInputOn([]string{"Text"}, "%s", text.DecideReasonTooLong(text.DecideReasonTooLongArgs{Max: model.MaxTextRunes}))
 		}
 		if in.Action == model.ActionTakedown {
 			if in.StoreID <= 0 {
-				return in, apperr.InvalidInputOn([]string{"StoreID"}, "內容下架要指定內容所屬的店家")
+				return in, apperr.InvalidInputOn([]string{"StoreID"}, "%s", text.DecideStoreRequired())
 			}
-			if !slicesContains(seller.SeverityValues(), seller.Severity(in.Severity)) {
-				return in, apperr.InvalidInputOn([]string{"Severity"}, "嚴重度不合法")
+			if !slices.Contains(seller.SeverityValues(), seller.Severity(in.Severity)) {
+				return in, apperr.InvalidInputOn([]string{"Severity"}, "%s", text.DecideSeverityInvalid())
 			}
 		} else if in.StoreID != 0 || in.Severity != "" {
-			return in, apperr.InvalidInputOn([]string{"Action"}, "只有內容下架帶店家與嚴重度")
+			return in, apperr.InvalidInputOn([]string{"Action"}, "%s", text.DecideStoreOnlyTakedown())
 		}
 	default:
-		return in, apperr.InvalidInputOn([]string{"Decision"}, "決定不合法")
+		return in, apperr.InvalidInputOn([]string{"Decision"}, "%s", text.DecideDecisionInvalid())
 	}
 	return in, nil
-}
-
-func slicesContains[T comparable](s []T, v T) bool {
-	for _, x := range s {
-		if x == v {
-			return true
-		}
-	}
-	return false
 }
 
 // Decide 處理案件並結案。案件不存在回 NotFound；案件已結案或版本過期回 VersionConflict（處置整個回滾）；處置種類不適用於對象、內容已不存在、作者種類
@@ -114,18 +108,18 @@ func (s *Service) Decide(ctx context.Context, in model.DecideInput) (model.CaseD
 		q := store.New(s.d.DB.Conn(ctx))
 		row, err := q.GetCase(ctx, in.CaseID)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return apperr.NotFound("案件不存在")
+			return apperr.NotFound("%s", text.CaseNotFound())
 		}
 		if err != nil {
 			return fmt.Errorf("moderation：讀取案件 %s：%w", in.CaseID, err)
 		}
 		c := view.Case(row)
 		if c.ClosedAt != nil {
-			return apperr.VersionConflict("案件已結案")
+			return apperr.VersionConflict("%s", text.CaseClosed())
 		}
 		if in.Decision == model.DecisionViolation {
 			if !in.Action.AllowedOn(c.Target.Kind) {
-				return apperr.InvalidInputOn([]string{"Action"}, "這個處置不適用於這種對象")
+				return apperr.InvalidInputOn([]string{"Action"}, "%s", text.DecideActionNotForTarget())
 			}
 			if err := s.apply(ctx, q, c, in); err != nil {
 				return err
@@ -154,7 +148,7 @@ func (s *Service) close(ctx context.Context, q *store.Queries, in model.DecideIn
 		return fmt.Errorf("moderation：結案 %s：%w", in.CaseID, err)
 	}
 	if n == 0 {
-		return apperr.VersionConflict("案件已被結案或版本已過期，請重新讀取")
+		return apperr.VersionConflict("%s", text.CaseStale())
 	}
 	return nil
 }
@@ -164,14 +158,14 @@ func ptr[T any](v T) *T { return &v }
 // apply 呼叫擁有處分的模組建立處分。
 func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in model.DecideInput) error {
 	ref := SourceRefPrefix + c.ID.String()
-	author, owner, err := s.author(ctx, c.Target)
+	author, owner, err := s.author(ctx, q, c, in.Action)
 	if err != nil {
 		return err
 	}
 	switch in.Action {
 	case model.ActionHide:
 		if author.Kind != social.ActorBuyer {
-			return apperr.FailedPrecondition("店家寫的內容不能隱藏，要用內容下架")
+			return apperr.FailedPrecondition("%s", text.DecideHideStoreContent())
 		}
 		_, err := s.d.Social.Hide(ctx, social.HideInput{
 			Target:   social.Target{Kind: social.TargetKind(c.Target.Kind), ID: c.Target.ContentID},
@@ -180,13 +174,13 @@ func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in 
 		return err
 	case model.ActionWarn:
 		if author.Kind != social.ActorBuyer {
-			return apperr.FailedPrecondition("作者不是買家，不能警告")
+			return apperr.FailedPrecondition("%s", text.DecideWarnNotBuyer())
 		}
 		_, err := s.d.Social.Warn(ctx, social.WarnInput{BuyerID: author.ID, Category: string(in.Category), Text: in.Text, SourceRef: ref, AdminID: in.AdminID})
 		return err
 	case model.ActionBan:
 		if author.Kind != social.ActorBuyer {
-			return apperr.FailedPrecondition("作者不是買家，不能停權")
+			return apperr.FailedPrecondition("%s", text.DecideBanNotBuyer())
 		}
 		accountID, err := s.d.Buyer.AccountIDByBuyerID(ctx, author.ID)
 		if err != nil {
@@ -197,11 +191,13 @@ func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in 
 	case model.ActionTakedown:
 		return s.takedown(ctx, q, c, owner, in)
 	}
-	return apperr.InvalidInputOn([]string{"Action"}, "處置種類不合法")
+	return apperr.InvalidInputOn([]string{"Action"}, "%s", text.DecideActionInvalid())
 }
 
-// author 回傳對象的作者：內容向 social 讀（內容已不存在回 FailedPrecondition），買家對象的作者就是那位買家。
-func (s *Service) author(ctx context.Context, t model.Target) (social.Actor, social.ContentOwner, error) {
+// author 回傳對象的作者：買家對象的作者就是那位買家；內容向 social 讀。內容已被刪除時，隱藏與內容下架沒有東西可以處置（回 FailedPrecondition），
+// 警告與停權針對作者、不是內容，所以改用案件快照裡凍結的作者（作者刪掉內容不能躲過處置）。
+func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case, action model.Action) (social.Actor, social.ContentOwner, error) {
+	t := c.Target
 	if t.Kind == model.TargetBuyer {
 		return social.Actor{Kind: social.ActorBuyer, ID: t.BuyerID}, social.ContentOwner{}, nil
 	}
@@ -209,26 +205,45 @@ func (s *Service) author(ctx context.Context, t model.Target) (social.Actor, soc
 	if err != nil {
 		return social.Actor{}, social.ContentOwner{}, err
 	}
-	if !owner.Exists {
-		return social.Actor{}, social.ContentOwner{}, apperr.FailedPrecondition("內容已不存在，無法處置")
+	if owner.Exists {
+		return owner.Author, owner, nil
 	}
-	return owner.Author, owner, nil
+	if action != model.ActionWarn && action != model.ActionBan {
+		return social.Actor{}, social.ContentOwner{}, apperr.FailedPrecondition("%s", text.DecideContentGone())
+	}
+	body, err := q.LatestSnapshotContent(ctx, c.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return social.Actor{}, social.ContentOwner{}, apperr.FailedPrecondition("%s", text.DecideSnapshotMissing())
+	}
+	if err != nil {
+		return social.Actor{}, social.ContentOwner{}, fmt.Errorf("moderation：讀取案件 %s 的快照：%w", c.ID, err)
+	}
+	frozen, err := snapshot.Decode(body)
+	if err != nil {
+		return social.Actor{}, social.ContentOwner{}, fmt.Errorf("moderation：解讀案件 %s 的快照：%w", c.ID, err)
+	}
+	return social.Actor{Kind: social.ActorKind(frozen.AuthorKind), ID: frozen.AuthorID}, social.ContentOwner{}, nil
 }
 
 func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, owner social.ContentOwner, in model.DecideInput) error {
 	if owner.Author.Kind != social.ActorStore || owner.Author.ID != in.StoreID || owner.StoreID != in.StoreID {
-		return apperr.FailedPrecondition("內容不是這家店寫的，不能對它建立內容下架措施")
+		return apperr.FailedPrecondition("%s", text.DecideTakedownWrongStore())
 	}
+	// 引用最早的 MaxSourceReports 筆，備註寫真正的檢舉數。檢舉集合在結案的版本比對下才算定案：這之後掛進來的檢舉會讓版本加一，結案回 VersionConflict、處置整個回滾。
 	ids, err := q.ReportIDsOfCase(ctx, store.ReportIDsOfCaseParams{CaseID: c.ID, MaxRows: model.MaxSourceReports})
 	if err != nil {
 		return fmt.Errorf("moderation：讀取案件的檢舉：%w", err)
+	}
+	total, err := q.CountReportsOfCase(ctx, c.ID)
+	if err != nil {
+		return fmt.Errorf("moderation：計算案件的檢舉數：%w", err)
 	}
 	_, err = s.d.Seller.CreateMeasureInTx(ctx, seller.CreateMeasureInput{
 		AdminID:           in.AdminID,
 		StoreID:           in.StoreID,
 		Kind:              seller.MeasureContentTakedown,
 		StatementToSeller: in.Text,
-		Note:              "moderation 案件 " + c.ID.String() + "（" + strconv.Itoa(len(ids)) + " 筆來源檢舉）",
+		Note:              "moderation 案件 " + c.ID.String() + "（" + strconv.FormatInt(total, 10) + " 筆來源檢舉）",
 		Violation: &seller.ViolationBasis{Finding: &seller.NewFinding{
 			Category: in.Category, Severity: seller.Severity(in.Severity), SourceModerationReportIDs: ids,
 		}},

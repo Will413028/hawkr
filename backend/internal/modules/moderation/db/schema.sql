@@ -10,20 +10,20 @@ CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA moderation;
 
--- 案件：一個對象（target_kind, target_key）同時至多一個進行中案件（partial UNIQUE，A7-D14），同對象的檢舉都掛進它；結案是終態，不重開也不改判，
--- 結案後對同一對象的新檢舉開新案件。對象是貼文、留言、討論區留言（content_id，social 的 UUID）或買家（buyer_id），恰好填一欄，target_key 是
--- 它的文字形式，讓兩種 ID 共用同一個唯一鍵（NULL 在唯一索引裡互不相等）。
+-- 案件：一個對象同時至多一個進行中案件（partial UNIQUE，A7-D14），同對象的檢舉都掛進它；結案是終態，不重開也不改判，
+-- 結案後對同一對象的新檢舉開新案件。對象是貼文、留言、討論區留言（content_id，social 的 UUID）或買家（buyer_id），恰好填一欄；
+-- 兩種 ID 型別各有一個 partial UNIQUE（cases_one_open_content、cases_one_open_buyer）。
 -- 決定只存在案件（A7-D14、A7-D20）：decision 是 VIOLATION（帶認定的政策分類 decision_category 與處置種類 decision_action）或 NO_VIOLATION，
 -- decided_by_admin_id、closed_at 與 decision 同為 NULL 或同不為 NULL；這就是 moderation 的處置決定紀錄，處分本身的紀錄在 social（隱藏、警告）、
 -- seller（內容下架措施）與 identity（帳號停權），不另建處置紀錄表。處置種類與對象種類的搭配由 cases_action_target_check 擋；作者是買家或店家由寫入端
--- 向 social 核對。version 是樂觀鎖：結案以 (id, version, closed_at IS NULL) 轉移，同時結案只有一個成功。
+-- 向 social 核對。version 是樂觀鎖：結案以 (id, version, closed_at IS NULL) 轉移，同時結案只有一個成功；新檢舉掛進既有案件也加一（同一個 transaction；開案的那筆不加，版本從 1 起），
+-- 所以管理員讀到的檢舉集合不是結案時的集合就會版本衝突。
 -- decision_category 是 platform/policy.Assessable 的值（模組的 TestChecksMatchGo）；買家分支另外限於 CommunityAssessable，由寫入端檢查。
 CREATE TABLE moderation.cases (
     id                  UUID        PRIMARY KEY,
     target_kind         TEXT        NOT NULL,
     content_id          UUID,
     buyer_id            BIGINT,
-    target_key          TEXT        NOT NULL GENERATED ALWAYS AS (COALESCE(content_id::text, buyer_id::text)) STORED,
     version             BIGINT      NOT NULL DEFAULT 1,
     opened_at           TIMESTAMPTZ NOT NULL,
     decision            TEXT,
@@ -58,7 +58,8 @@ CREATE TABLE moderation.cases (
     )
 );
 -- 一個對象至多一個進行中案件。
-CREATE UNIQUE INDEX cases_one_open ON moderation.cases (target_kind, target_key) WHERE closed_at IS NULL;
+CREATE UNIQUE INDEX cases_one_open_content ON moderation.cases (target_kind, content_id) WHERE closed_at IS NULL AND content_id IS NOT NULL;
+CREATE UNIQUE INDEX cases_one_open_buyer ON moderation.cases (buyer_id) WHERE closed_at IS NULL AND buyer_id IS NOT NULL;
 -- 待辦（A7-1e）依開案時間讀進行中的案件。
 CREATE INDEX cases_open_by_time ON moderation.cases (opened_at, id) WHERE closed_at IS NULL;
 -- 快照的保留 job 依結案時間找可以清的案件。
@@ -67,11 +68,13 @@ CREATE INDEX cases_closed_by_time ON moderation.cases (closed_at) WHERE closed_a
 -- 內容快照（A7-D20）：每案每份內容一列，UNIQUE (case_id, content_sha256)；content 是擁有者模組提供、經正規化的快照（canonical JSON 文字），
 -- content_sha256 是它的 SHA-256（不用各表的 version：留言、討論區留言沒有 version，buyer.version 改任何欄位都加一）。30 筆檢舉同一份內容只存一份，
 -- 內容改過才多一份。結案後 184 天由排程 job 刪除（reports.snapshot_id 是 ON DELETE SET NULL），案件與檢舉列留著、不含內容。
+-- asset_ids 是快照引用的圖片資產（A7-D21 證據保全）：快照在 media 以 (GOVERNANCE_EVIDENCE, 快照 ID) 登記引用，快照刪除時才解除。
 CREATE TABLE moderation.case_snapshots (
     id             UUID        PRIMARY KEY,
     case_id        UUID        NOT NULL REFERENCES moderation.cases (id),
     content_sha256 BYTEA       NOT NULL,
     content        TEXT        NOT NULL,
+    asset_ids      TEXT[]      NOT NULL DEFAULT '{}',
     captured_at    TIMESTAMPTZ NOT NULL,
     CONSTRAINT case_snapshots_case_content_key UNIQUE (case_id, content_sha256),
     CONSTRAINT case_snapshots_sha256_check CHECK (octet_length(content_sha256) = 32),
@@ -106,3 +109,26 @@ CREATE TABLE moderation.reporter_daily_counts (
     CONSTRAINT reporter_daily_counts_reporter_check CHECK (reporter_buyer_id > 0),
     CONSTRAINT reporter_daily_counts_submitted_check CHECK (submitted BETWEEN 1 AND 20)
 );
+
+-- 快照圖片在 media 的引用同步（internal/mediaref，演算法在 media 模組）：引用只由同步 job 寫入。media_ref_sync 的 seq 先於 job 遞增，synced_seq 結算
+-- 後才記下；列不刪除（刪掉再建會讓 seq 從頭算）。ref 是 (ref_type, ref_id)：快照的 ID。
+CREATE TABLE moderation.media_ref_sync (
+    ref_type   TEXT        NOT NULL,
+    ref_id     TEXT        NOT NULL,
+    seq        BIGINT      NOT NULL DEFAULT 1,
+    synced_seq BIGINT      NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (ref_type, ref_id)
+);
+CREATE INDEX media_ref_sync_unsynced ON moderation.media_ref_sync (updated_at) WHERE synced_seq < seq;
+
+-- 快照刪除時釋放的資產：同步 job 精確解除它們的引用。unlinked_at 是第一次解除成功的時間。
+CREATE TABLE moderation.retired_assets (
+    ref_type    TEXT        NOT NULL,
+    ref_id      TEXT        NOT NULL,
+    asset_id    TEXT        NOT NULL,
+    retired_at  TIMESTAMPTZ NOT NULL,
+    unlinked_at TIMESTAMPTZ,
+    PRIMARY KEY (ref_type, ref_id, asset_id)
+);
+CREATE INDEX retired_assets_retired_at ON moderation.retired_assets (retired_at);

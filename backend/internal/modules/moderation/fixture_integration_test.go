@@ -91,6 +91,7 @@ type fixture struct {
 	deletion *accountdeletion.Module
 	suspend  *accountsuspension.Module
 	module   *Module
+	media    *media.Fake
 	ids      atomic.Int64
 	mu       sync.Mutex
 	now      time.Time
@@ -123,6 +124,7 @@ func setup(t *testing.T) *fixture {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	q := testQueue{}
 	fm := media.NewFake()
+	f.media = fm
 	fm.Key = func(_, token string) string { return "post/" + token + ".jpg" }
 	f.identity = identity.New(identity.Deps{DB: d, Events: bus, Now: f.clock, Logger: log})
 	f.buyer = buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: q, Media: fm, Now: f.clock, Logger: log})
@@ -135,13 +137,15 @@ func setup(t *testing.T) *fixture {
 	})
 	f.deletion = accountdeletion.New(accountdeletion.Deps{DB: d, Identity: f.identity, Buyer: f.buyer, Seller: f.seller, Orders: noOrders{}, Now: f.clock})
 	f.suspend = accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: f.identity, Seller: f.seller, Logger: log})
-	f.module = New(Deps{DB: d, Social: f.social, Seller: f.seller, Buyer: f.buyer, Suspension: f.suspend, NewID: uuid.NewV7, Now: f.clock})
+	f.module = New(Deps{DB: d, Social: f.social, Seller: f.seller, Buyer: f.buyer, Suspension: f.suspend, Media: fm, Jobs: q, NewID: uuid.NewV7, Now: f.clock, Logger: log})
 	events.Subscribe(bus, f.buyer.OnAccountCreated)
 	events.Subscribe(bus, f.social.OnBuyerDeletionRequested)
 	events.Subscribe(bus, f.social.OnBuyerDeleted)
 	events.Subscribe(bus, f.social.OnStoreRetired)
 	events.Subscribe(bus, f.social.OnMeasureCreated)
 	events.Subscribe(bus, f.social.OnMeasureRevoked)
+	events.Subscribe(bus, f.module.Retention().OnBuyerDeletionRequested)
+	events.Subscribe(bus, f.module.Retention().OnBuyerDeleted)
 	// 測試只關心社群內容與 social 讀 seller 的 pub_exposable_stores：把 KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
 	f.exec(t, `DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint

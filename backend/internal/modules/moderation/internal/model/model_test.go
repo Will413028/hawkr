@@ -53,27 +53,26 @@ func TestCategoryAllowedFollowsTheBranch(t *testing.T) {
 	}
 }
 
-func TestTargetShapeAndKey(t *testing.T) {
+func TestTargetShape(t *testing.T) {
 	id := uuid.NewV7()
 	for name, c := range map[string]struct {
 		t     Target
 		valid bool
-		key   string
 	}{
-		"留言":       {Target{Kind: TargetComment, ContentID: id}, true, id.String()},
-		"貼文":       {Target{Kind: TargetPost, ContentID: id}, true, id.String()},
-		"買家":       {Target{Kind: TargetBuyer, BuyerID: 42}, true, "42"},
-		"留言沒有 ID":  {Target{Kind: TargetComment}, false, ""},
-		"留言帶買家":    {Target{Kind: TargetComment, ContentID: id, BuyerID: 1}, false, ""},
-		"買家帶內容 ID": {Target{Kind: TargetBuyer, BuyerID: 1, ContentID: id}, false, ""},
-		"買家 ID 為零": {Target{Kind: TargetBuyer}, false, ""},
-		"不認得的種類":   {Target{Kind: "CHAT", ContentID: id}, false, ""},
+		"留言":       {Target{Kind: TargetComment, ContentID: id}, true},
+		"貼文":       {Target{Kind: TargetPost, ContentID: id}, true},
+		"買家":       {Target{Kind: TargetBuyer, BuyerID: 42}, true},
+		"留言沒有 ID":  {Target{Kind: TargetComment}, false},
+		"留言帶買家":    {Target{Kind: TargetComment, ContentID: id, BuyerID: 1}, false},
+		"買家帶內容 ID": {Target{Kind: TargetBuyer, BuyerID: 1, ContentID: id}, false},
+		"買家 ID 為零": {Target{Kind: TargetBuyer}, false},
+		"不認得的種類":   {Target{Kind: "CHAT", ContentID: id}, false},
 	} {
 		if got := c.t.Validate(); got != c.valid {
 			t.Errorf("%s：Validate = %v", name, got)
 		}
-		if c.valid && c.t.Key() != c.key {
-			t.Errorf("%s：Key = %q，預期 %q", name, c.t.Key(), c.key)
+		if c.valid && (c.t.ContentIDPtr() == nil) == (c.t.BuyerIDPtr() == nil) {
+			t.Errorf("%s：內容 ID 與買家 ID 要恰好一個有值", name)
 		}
 	}
 }

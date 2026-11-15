@@ -7,6 +7,7 @@ import (
 	"context"
 	"embed"
 	"io/fs"
+	"log/slog"
 	"time"
 
 	"uuid"
@@ -15,7 +16,9 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/handle"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/report"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/retention"
@@ -23,6 +26,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -84,15 +88,18 @@ const (
 	SourceRefPrefix = handle.SourceRefPrefix
 )
 
-// Deps 是模組需要的外部依賴，全部必填。
+// Deps 是模組需要的外部依賴，全部必填（Logger 可為空）。
 type Deps struct {
 	DB         *db.DB
 	Social     *social.Module
 	Seller     *seller.Module
 	Buyer      *buyer.Module
 	Suspension *accountsuspension.Module
+	Media      media.Media
+	Jobs       jobs.Enqueuer
 	NewID      func() uuid.UUID
 	Now        func() time.Time
+	Logger     *slog.Logger
 }
 
 // Module 是 moderation 模組。
@@ -100,23 +107,73 @@ type Module struct {
 	d         Deps
 	report    *report.Service
 	handle    *handle.Service
-	retention *retention.Service
+	retention *Retention
 	view      view.Reader
 }
 
 // New 建立模組。
 func New(d Deps) *Module {
-	if d.DB == nil || d.Social == nil || d.Seller == nil || d.Buyer == nil || d.Suspension == nil || d.NewID == nil || d.Now == nil {
+	if d.DB == nil || d.Social == nil || d.Seller == nil || d.Buyer == nil || d.Suspension == nil || d.Media == nil || d.Jobs == nil || d.NewID == nil || d.Now == nil {
 		panic("moderation: missing dependency")
 	}
+	ret := NewRetention(RetentionDeps{DB: d.DB, Buyer: d.Buyer, Media: d.Media, Jobs: d.Jobs, Now: d.Now, Logger: d.Logger})
 	return &Module{
 		d:         d,
-		report:    report.New(report.Deps{DB: d.DB, Social: d.Social, Seller: d.Seller, Buyer: d.Buyer, NewID: d.NewID, Now: d.Now}),
+		report:    report.New(report.Deps{DB: d.DB, Social: d.Social, Seller: d.Seller, Buyer: d.Buyer, Holds: ret.svc.Holds(), NewID: d.NewID, Now: d.Now}),
 		handle:    handle.New(handle.Deps{DB: d.DB, Social: d.Social, Seller: d.Seller, Buyer: d.Buyer, Suspension: d.Suspension, Now: d.Now}),
-		retention: retention.New(retention.Deps{DB: d.DB, Now: d.Now}),
+		retention: ret,
 		view:      view.Reader{DB: d.DB},
 	}
 }
+
+// RetentionDeps 是只做保留期與檢舉人資料清除的依賴（不需要 social、seller、accountsuspension）。
+type RetentionDeps struct {
+	DB     *db.DB
+	Buyer  *buyer.Module
+	Media  media.Media
+	Jobs   jobs.Enqueuer
+	Now    func() time.Time
+	Logger *slog.Logger
+}
+
+// Retention 是 moderation 在背景與事件裡做的事：快照與說明的保留期、快照圖片的 media 引用、檢舉人刪帳的資料清除。worker 與訂閱買家事件的組裝只需要它，
+// 不必組出完整的 Module。
+type Retention struct{ svc *retention.Service }
+
+// NewRetention 建立 Retention。
+func NewRetention(d RetentionDeps) *Retention {
+	if d.DB == nil || d.Buyer == nil || d.Media == nil || d.Jobs == nil || d.Now == nil {
+		panic("moderation: missing retention dependency")
+	}
+	return &Retention{svc: retention.New(retention.Deps{DB: d.DB, Buyer: d.Buyer, Media: d.Media, Jobs: d.Jobs, Now: d.Now, Logger: d.Logger})}
+}
+
+// PurgeSnapshots 刪除結案超過 SnapshotRetention 的案件的內容快照（釋放它們在 media 的圖片引用）並清掉檢舉說明，回傳刪除的快照數。它是 moderation.purge_snapshots job 的內容，給 worker 與測試呼叫；冪等。
+func (r *Retention) PurgeSnapshots(ctx context.Context) (int64, error) {
+	return r.svc.PurgeSnapshots(ctx)
+}
+
+// SyncSnapshotMedia 同步一個快照在 media 的引用（Link 它現在引用的、Unlink 釋放的資產）一輪；同步 job 做的事，給測試與營運直接呼叫。
+func (r *Retention) SyncSnapshotMedia(ctx context.Context, snapshotID uuid.UUID) error {
+	_, err := r.svc.Syncer().Sync(ctx, mediaref.SnapshotRef(snapshotID))
+	return err
+}
+
+// OnBuyerDeletionRequested 是買家進入刪除中時同 transaction 的訂閱者：清掉這位檢舉人全部檢舉的說明與每日計數列，檢舉列與 reporter_buyer_id 留著（A7-D21）。
+func (r *Retention) OnBuyerDeletionRequested(ctx context.Context, e buyer.BuyerDeletionRequested) error {
+	return r.svc.OnBuyerDeletionRequested(ctx, e)
+}
+
+// OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者：同 OnBuyerDeletionRequested（冪等）。
+func (r *Retention) OnBuyerDeleted(ctx context.Context, e buyer.BuyerDeleted) error {
+	return r.svc.OnBuyerDeleted(ctx, e)
+}
+
+// AddWorkers 登記 River worker：快照保留期清除與快照圖片引用的同步、保底掃描。
+func (r *Retention) AddWorkers(workers *river.Workers) { r.svc.AddWorkers(workers) }
+
+// PeriodicJobs 回傳週期 job：每日清除過期的內容快照與說明、快照圖片引用的保底掃描。
+func (r *Retention) PeriodicJobs() []*river.PeriodicJob { return r.svc.PeriodicJobs() }
 
 // SubmitReport 送出一筆檢舉：對象要存在而且公開可讀，不能檢舉自己，每位檢舉人每個台北日最多新增 DailyReportLimit 筆；內容在送出時凍結成快照。
 // 這位檢舉人對這個對象在進行中案件裡已有檢舉時回傳既有的那一筆（Created 為假、不吃額度）；案件結案後可以再檢舉（開新案件）。
@@ -135,13 +192,16 @@ func (m *Module) Case(ctx context.Context, id uuid.UUID) (CaseDetail, error) {
 	return m.view.Case(ctx, id)
 }
 
-// PurgeSnapshots 刪除結案超過 SnapshotRetention 的案件的內容快照，回傳刪除的快照數。它是 moderation.purge_snapshots job 的內容，給 worker 與測試呼叫；冪等。
+// Retention 回傳模組的保留期與檢舉人資料清除（給組裝與測試）。
+func (m *Module) Retention() *Retention { return m.retention }
+
+// PurgeSnapshots 同 Retention.PurgeSnapshots。
 func (m *Module) PurgeSnapshots(ctx context.Context) (int64, error) {
 	return m.retention.PurgeSnapshots(ctx)
 }
 
 // AddWorkers 登記本模組的 River worker。
-func (m *Module) AddWorkers(workers *river.Workers) { retention.AddWorkers(workers, m.retention) }
+func (m *Module) AddWorkers(workers *river.Workers) { m.retention.AddWorkers(workers) }
 
-// PeriodicJobs 回傳週期 job：每日清除過期的內容快照。
-func (m *Module) PeriodicJobs() []*river.PeriodicJob { return retention.PeriodicJobs() }
+// PeriodicJobs 回傳週期 job。
+func (m *Module) PeriodicJobs() []*river.PeriodicJob { return m.retention.PeriodicJobs() }

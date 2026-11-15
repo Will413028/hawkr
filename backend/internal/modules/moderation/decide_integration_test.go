@@ -202,7 +202,7 @@ func TestTakedownVerifiesOwnershipThenCreatesTheMeasure(t *testing.T) {
 		c = f.submit(t, r, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
 	}
 	in := DecideInput{
-		CaseID: c.ID, Version: 1, AdminID: 9, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		CaseID: c.ID, Version: c.Version, AdminID: 9, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
 		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]),
 	}
 	wrong := in

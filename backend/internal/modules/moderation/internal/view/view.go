@@ -11,6 +11,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
@@ -77,7 +78,7 @@ type Reader struct{ DB *db.DB }
 func (r Reader) Case(ctx context.Context, id uuid.UUID) (model.CaseDetail, error) {
 	d, err := Detail(ctx, store.New(r.DB.Conn(ctx)), id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return model.CaseDetail{}, apperr.NotFound("案件不存在")
+		return model.CaseDetail{}, apperr.NotFound("%s", text.CaseNotFound())
 	}
 	return d, err
 }

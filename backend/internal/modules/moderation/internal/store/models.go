@@ -15,7 +15,6 @@ type ModerationCase struct {
 	TargetKind       string
 	ContentID        *uuid.UUID
 	BuyerID          *int64
-	TargetKey        string
 	Version          int64
 	OpenedAt         time.Time
 	Decision         *string
@@ -30,7 +29,16 @@ type ModerationCaseSnapshot struct {
 	CaseID        uuid.UUID
 	ContentSha256 []byte
 	Content       string
+	AssetIds      []string
 	CapturedAt    time.Time
+}
+
+type ModerationMediaRefSync struct {
+	RefType   string
+	RefID     string
+	Seq       int64
+	SyncedSeq int64
+	UpdatedAt time.Time
 }
 
 type ModerationReport struct {
@@ -47,4 +55,12 @@ type ModerationReporterDailyCount struct {
 	ReporterBuyerID int64
 	Day             time.Time
 	Submitted       int32
+}
+
+type ModerationRetiredAsset struct {
+	RefType    string
+	RefID      string
+	AssetID    string
+	RetiredAt  time.Time
+	UnlinkedAt *time.Time
 }

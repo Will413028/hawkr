@@ -1,6 +1,7 @@
 package report
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"uuid"
@@ -20,14 +21,14 @@ func TestValidateAcceptsExactlyTheCommunityReporterCategories(t *testing.T) {
 	for _, c := range policy.Values() {
 		in := input()
 		in.Category = c
-		_, err := Validate(in)
+		_, err := Validate(context.Background(), in)
 		if (err == nil) != c.CommunityReporterSelectable() {
 			t.Errorf("%s：err = %v，CommunityReporterSelectable = %v", c, err, c.CommunityReporterSelectable())
 		}
 	}
 	in := input()
 	in.Category = ""
-	if _, err := Validate(in); err == nil {
+	if _, err := Validate(context.Background(), in); err == nil {
 		t.Error("空的類別不能通過")
 	}
 }
@@ -42,7 +43,7 @@ func TestValidateRejectsMalformedInput(t *testing.T) {
 	} {
 		in := input()
 		mutate(&in)
-		if _, err := Validate(in); apperr.KindOf(err) != apperr.KindInvalidInput {
+		if _, err := Validate(context.Background(), in); apperr.KindOf(err) != apperr.KindInvalidInput {
 			t.Errorf("%s：%v", name, err)
 		}
 	}
@@ -51,12 +52,12 @@ func TestValidateRejectsMalformedInput(t *testing.T) {
 func TestValidateTrimsAndBoundsTheDescriptionByRunes(t *testing.T) {
 	in := input()
 	in.Description = "　 內容 \t"
-	out, err := Validate(in)
+	out, err := Validate(context.Background(), in)
 	if err != nil || out.Description != "內容" {
 		t.Fatalf("去頭尾空白：%q, %v", out.Description, err)
 	}
 	in.Description = strings.Repeat("字", model.MaxDescriptionRunes)
-	if _, err := Validate(in); err != nil {
+	if _, err := Validate(context.Background(), in); err != nil {
 		t.Fatalf("剛好上限要通過（以字數計，不是 bytes）：%v", err)
 	}
 }

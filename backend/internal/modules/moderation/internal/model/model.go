@@ -2,7 +2,7 @@
 package model
 
 import (
-	"strconv"
+	"slices"
 	"time"
 
 	"uuid"
@@ -39,14 +39,7 @@ func TargetKinds() []TargetKind {
 }
 
 // Valid 說明這是不是檢舉對象的種類。
-func (k TargetKind) Valid() bool {
-	for _, v := range TargetKinds() {
-		if k == v {
-			return true
-		}
-	}
-	return false
-}
+func (k TargetKind) Valid() bool { return slices.Contains(TargetKinds(), k) }
 
 // Target 是一個檢舉對象：內容（貼文、留言、討論區留言）用 ContentID，買家用 BuyerID，恰好填一欄。
 type Target struct {
@@ -55,12 +48,20 @@ type Target struct {
 	BuyerID   int64
 }
 
-// Key 是對象的文字形式，與 cases.target_key 一致。
-func (t Target) Key() string {
+// ContentIDPtr 是內容對象的 ID（買家對象為 nil），給 cases.content_id。
+func (t Target) ContentIDPtr() *uuid.UUID {
 	if t.Kind == TargetBuyer {
-		return strconv.FormatInt(t.BuyerID, 10)
+		return nil
 	}
-	return t.ContentID.String()
+	return &t.ContentID
+}
+
+// BuyerIDPtr 是買家對象的 ID（內容對象為 nil），給 cases.buyer_id。
+func (t Target) BuyerIDPtr() *int64 {
+	if t.Kind != TargetBuyer {
+		return nil
+	}
+	return &t.BuyerID
 }
 
 // Validate 檢查對象的形狀。

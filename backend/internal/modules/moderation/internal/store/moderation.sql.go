@@ -12,6 +12,32 @@ import (
 	"uuid"
 )
 
+const attachToCase = `-- name: AttachToCase :one
+UPDATE moderation.cases SET version = version + 1
+WHERE id = $1 AND closed_at IS NULL
+RETURNING id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at
+`
+
+// 新檢舉掛進案件：加一版本並鎖住案件列（同一個案件的結案與其他檢舉的掛入都要等這個 transaction 提交）；回傳 0 列就是案件已被結掉。
+func (q *Queries) AttachToCase(ctx context.Context, id uuid.UUID) (ModerationCase, error) {
+	row := q.db.QueryRow(ctx, attachToCase, id)
+	var i ModerationCase
+	err := row.Scan(
+		&i.ID,
+		&i.TargetKind,
+		&i.ContentID,
+		&i.BuyerID,
+		&i.Version,
+		&i.OpenedAt,
+		&i.Decision,
+		&i.DecisionCategory,
+		&i.DecisionAction,
+		&i.DecidedByAdminID,
+		&i.ClosedAt,
+	)
+	return i, err
+}
+
 const bumpDailyCount = `-- name: BumpDailyCount :one
 INSERT INTO moderation.reporter_daily_counts AS c (reporter_buyer_id, day, submitted)
 VALUES ($1, $2, 1)
@@ -34,6 +60,62 @@ func (q *Queries) BumpDailyCount(ctx context.Context, arg BumpDailyCountParams) 
 	var submitted int32
 	err := row.Scan(&submitted)
 	return submitted, err
+}
+
+const bumpRefSeq = `-- name: BumpRefSeq :exec
+INSERT INTO moderation.media_ref_sync (ref_type, ref_id, updated_at)
+VALUES ($1, $2, $3)
+ON CONFLICT (ref_type, ref_id) DO UPDATE SET seq = moderation.media_ref_sync.seq + 1, updated_at = EXCLUDED.updated_at
+`
+
+type BumpRefSeqParams struct {
+	RefType string
+	RefID   string
+	Now     time.Time
+}
+
+// ref 的資產改變了：遞增版本（沒有列時建立）並記下變動時間。與同步 job 的結算比對同一列，互相等待。
+func (q *Queries) BumpRefSeq(ctx context.Context, arg BumpRefSeqParams) error {
+	_, err := q.db.Exec(ctx, bumpRefSeq, arg.RefType, arg.RefID, arg.Now)
+	return err
+}
+
+const clearExpiredDescriptionsBatch = `-- name: ClearExpiredDescriptionsBatch :execrows
+UPDATE moderation.reports SET description = NULL
+WHERE id IN (
+    SELECT r.id FROM moderation.reports r
+    JOIN moderation.cases c ON c.id = r.case_id
+    WHERE r.description IS NOT NULL AND c.closed_at IS NOT NULL AND c.closed_at < $1
+    ORDER BY r.id
+    LIMIT $2::int
+)
+`
+
+type ClearExpiredDescriptionsBatchParams struct {
+	Cutoff  *time.Time
+	MaxRows int32
+}
+
+// 結案早於 cutoff 的案件的檢舉說明（同快照的保留期，A7-D21）。
+func (q *Queries) ClearExpiredDescriptionsBatch(ctx context.Context, arg ClearExpiredDescriptionsBatchParams) (int64, error) {
+	result, err := q.db.Exec(ctx, clearExpiredDescriptionsBatch, arg.Cutoff, arg.MaxRows)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const clearReporterDescriptions = `-- name: ClearReporterDescriptions :execrows
+UPDATE moderation.reports SET description = NULL WHERE reporter_buyer_id = $1 AND description IS NOT NULL
+`
+
+// 檢舉人刪帳（A7-D21）：清掉他全部檢舉的說明；檢舉列與 reporter_buyer_id（假名鍵）留著。
+func (q *Queries) ClearReporterDescriptions(ctx context.Context, reporterBuyerID int64) (int64, error) {
+	result, err := q.db.Exec(ctx, clearReporterDescriptions, reporterBuyerID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const closeCase = `-- name: CloseCase :execrows
@@ -70,22 +152,65 @@ func (q *Queries) CloseCase(ctx context.Context, arg CloseCaseParams) (int64, er
 	return result.RowsAffected(), nil
 }
 
+const countReportsOfCase = `-- name: CountReportsOfCase :one
+SELECT count(*) FROM moderation.reports WHERE case_id = $1
+`
+
+func (q *Queries) CountReportsOfCase(ctx context.Context, caseID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countReportsOfCase, caseID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const deleteReporterDailyCount = `-- name: DeleteReporterDailyCount :execrows
+DELETE FROM moderation.reporter_daily_counts WHERE reporter_buyer_id = $1
+`
+
+func (q *Queries) DeleteReporterDailyCount(ctx context.Context, reporterBuyerID int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteReporterDailyCount, reporterBuyerID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteSnapshots = `-- name: DeleteSnapshots :execrows
+DELETE FROM moderation.case_snapshots WHERE id = ANY($1::uuid[])
+`
+
+// 刪快照，檢舉的 snapshot_id 由 ON DELETE SET NULL 清空，案件與檢舉列留著。
+func (q *Queries) DeleteSnapshots(ctx context.Context, ids []uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSnapshots, ids)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const existingOpenReport = `-- name: ExistingOpenReport :one
 SELECT r.id, r.case_id, r.reporter_buyer_id, r.category, r.description, r.snapshot_id, r.created_at FROM moderation.reports r
 JOIN moderation.cases c ON c.id = r.case_id
-WHERE c.target_kind = $1 AND c.target_key = $2 AND c.closed_at IS NULL
-  AND r.reporter_buyer_id = $3
+WHERE c.target_kind = $1 AND c.closed_at IS NULL
+  AND (c.content_id = $2 OR c.buyer_id = $3)
+  AND r.reporter_buyer_id = $4
 `
 
 type ExistingOpenReportParams struct {
 	TargetKind      string
-	TargetKey       string
+	ContentID       *uuid.UUID
+	BuyerID         *int64
 	ReporterBuyerID int64
 }
 
 // 這位檢舉人對這個對象在進行中案件裡已有的檢舉。
 func (q *Queries) ExistingOpenReport(ctx context.Context, arg ExistingOpenReportParams) (ModerationReport, error) {
-	row := q.db.QueryRow(ctx, existingOpenReport, arg.TargetKind, arg.TargetKey, arg.ReporterBuyerID)
+	row := q.db.QueryRow(ctx, existingOpenReport,
+		arg.TargetKind,
+		arg.ContentID,
+		arg.BuyerID,
+		arg.ReporterBuyerID,
+	)
 	var i ModerationReport
 	err := row.Scan(
 		&i.ID,
@@ -99,8 +224,48 @@ func (q *Queries) ExistingOpenReport(ctx context.Context, arg ExistingOpenReport
 	return i, err
 }
 
+const expiredSnapshotsBatch = `-- name: ExpiredSnapshotsBatch :many
+SELECT s.id, s.asset_ids FROM moderation.case_snapshots s
+JOIN moderation.cases c ON c.id = s.case_id
+WHERE c.closed_at IS NOT NULL AND c.closed_at < $1
+ORDER BY s.id
+LIMIT $2::int
+FOR UPDATE OF s SKIP LOCKED
+`
+
+type ExpiredSnapshotsBatchParams struct {
+	Cutoff  *time.Time
+	MaxRows int32
+}
+
+type ExpiredSnapshotsBatchRow struct {
+	ID       uuid.UUID
+	AssetIds []string
+}
+
+// 結案早於 cutoff 的案件的快照（與它們引用的資產）：鎖住這些列，同一個 transaction 內釋放資產引用再刪除。
+func (q *Queries) ExpiredSnapshotsBatch(ctx context.Context, arg ExpiredSnapshotsBatchParams) ([]ExpiredSnapshotsBatchRow, error) {
+	rows, err := q.db.Query(ctx, expiredSnapshotsBatch, arg.Cutoff, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ExpiredSnapshotsBatchRow{}
+	for rows.Next() {
+		var i ExpiredSnapshotsBatchRow
+		if err := rows.Scan(&i.ID, &i.AssetIds); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCase = `-- name: GetCase :one
-SELECT id, target_kind, content_id, buyer_id, target_key, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at FROM moderation.cases WHERE id = $1
+SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at FROM moderation.cases WHERE id = $1
 `
 
 func (q *Queries) GetCase(ctx context.Context, id uuid.UUID) (ModerationCase, error) {
@@ -111,7 +276,6 @@ func (q *Queries) GetCase(ctx context.Context, id uuid.UUID) (ModerationCase, er
 		&i.TargetKind,
 		&i.ContentID,
 		&i.BuyerID,
-		&i.TargetKey,
 		&i.Version,
 		&i.OpenedAt,
 		&i.Decision,
@@ -123,28 +287,79 @@ func (q *Queries) GetCase(ctx context.Context, id uuid.UUID) (ModerationCase, er
 	return i, err
 }
 
-const insertCase = `-- name: InsertCase :one
-INSERT INTO moderation.cases (id, target_kind, content_id, buyer_id, opened_at)
-VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (target_kind, target_key) WHERE closed_at IS NULL DO NOTHING
-RETURNING id, target_kind, content_id, buyer_id, target_key, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at
+const healingRetired = `-- name: HealingRetired :one
+SELECT EXISTS (
+    SELECT 1 FROM moderation.retired_assets
+    WHERE ref_type = $1 AND ref_id = $2 AND unlinked_at >= $3
+)
 `
 
-type InsertCaseParams struct {
+type HealingRetiredParams struct {
+	RefType    string
+	RefID      string
+	HealBefore *time.Time
+}
+
+func (q *Queries) HealingRetired(ctx context.Context, arg HealingRetiredParams) (bool, error) {
+	row := q.db.QueryRow(ctx, healingRetired, arg.RefType, arg.RefID, arg.HealBefore)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const insertBuyerCase = `-- name: InsertBuyerCase :one
+INSERT INTO moderation.cases (id, target_kind, buyer_id, opened_at)
+VALUES ($1, 'BUYER', $2, $3)
+ON CONFLICT (buyer_id) WHERE closed_at IS NULL AND buyer_id IS NOT NULL DO NOTHING
+RETURNING id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at
+`
+
+type InsertBuyerCaseParams struct {
+	ID       uuid.UUID
+	BuyerID  *int64
+	OpenedAt time.Time
+}
+
+// 買家對象開案：同 InsertContentCase。
+func (q *Queries) InsertBuyerCase(ctx context.Context, arg InsertBuyerCaseParams) (ModerationCase, error) {
+	row := q.db.QueryRow(ctx, insertBuyerCase, arg.ID, arg.BuyerID, arg.OpenedAt)
+	var i ModerationCase
+	err := row.Scan(
+		&i.ID,
+		&i.TargetKind,
+		&i.ContentID,
+		&i.BuyerID,
+		&i.Version,
+		&i.OpenedAt,
+		&i.Decision,
+		&i.DecisionCategory,
+		&i.DecisionAction,
+		&i.DecidedByAdminID,
+		&i.ClosedAt,
+	)
+	return i, err
+}
+
+const insertContentCase = `-- name: InsertContentCase :one
+INSERT INTO moderation.cases (id, target_kind, content_id, opened_at)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (target_kind, content_id) WHERE closed_at IS NULL AND content_id IS NOT NULL DO NOTHING
+RETURNING id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at
+`
+
+type InsertContentCaseParams struct {
 	ID         uuid.UUID
 	TargetKind string
 	ContentID  *uuid.UUID
-	BuyerID    *int64
 	OpenedAt   time.Time
 }
 
-// 開案：同一對象已有進行中案件時什麼都不寫（沒有回傳列），呼叫方接著讀進行中的案件（撞唯一鍵用 ON CONFLICT，不在同一個 transaction 繼續下 SQL）。
-func (q *Queries) InsertCase(ctx context.Context, arg InsertCaseParams) (ModerationCase, error) {
-	row := q.db.QueryRow(ctx, insertCase,
+// 內容對象開案：同一對象已有進行中案件時什麼都不寫（沒有回傳列），呼叫方接著讀進行中的案件（撞唯一鍵用 ON CONFLICT，不在同一個 transaction 繼續下 SQL）。
+func (q *Queries) InsertContentCase(ctx context.Context, arg InsertContentCaseParams) (ModerationCase, error) {
+	row := q.db.QueryRow(ctx, insertContentCase,
 		arg.ID,
 		arg.TargetKind,
 		arg.ContentID,
-		arg.BuyerID,
 		arg.OpenedAt,
 	)
 	var i ModerationCase
@@ -153,7 +368,6 @@ func (q *Queries) InsertCase(ctx context.Context, arg InsertCaseParams) (Moderat
 		&i.TargetKind,
 		&i.ContentID,
 		&i.BuyerID,
-		&i.TargetKey,
 		&i.Version,
 		&i.OpenedAt,
 		&i.Decision,
@@ -206,9 +420,9 @@ func (q *Queries) InsertReport(ctx context.Context, arg InsertReportParams) (Mod
 	return i, err
 }
 
-const insertSnapshot = `-- name: InsertSnapshot :exec
-INSERT INTO moderation.case_snapshots (id, case_id, content_sha256, content, captured_at)
-VALUES ($1, $2, $3, $4, $5)
+const insertSnapshot = `-- name: InsertSnapshot :execrows
+INSERT INTO moderation.case_snapshots (id, case_id, content_sha256, content, asset_ids, captured_at)
+VALUES ($1, $2, $3, $4, $5::text[], $6)
 ON CONFLICT (case_id, content_sha256) DO NOTHING
 `
 
@@ -217,40 +431,82 @@ type InsertSnapshotParams struct {
 	CaseID        uuid.UUID
 	ContentSha256 []byte
 	Content       string
+	AssetIds      []string
 	CapturedAt    time.Time
 }
 
-func (q *Queries) InsertSnapshot(ctx context.Context, arg InsertSnapshotParams) error {
-	_, err := q.db.Exec(ctx, insertSnapshot,
+// 同一案同一份內容已有快照時什麼都不寫（0 列）。
+func (q *Queries) InsertSnapshot(ctx context.Context, arg InsertSnapshotParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertSnapshot,
 		arg.ID,
 		arg.CaseID,
 		arg.ContentSha256,
 		arg.Content,
+		arg.AssetIds,
 		arg.CapturedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const latestSnapshotContent = `-- name: LatestSnapshotContent :one
+SELECT content FROM moderation.case_snapshots WHERE case_id = $1 ORDER BY captured_at DESC, id DESC LIMIT 1
+`
+
+// 案件最近一份凍結的內容（內容已被刪除時用它確認作者）。
+func (q *Queries) LatestSnapshotContent(ctx context.Context, caseID uuid.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, latestSnapshotContent, caseID)
+	var content string
+	err := row.Scan(&content)
+	return content, err
+}
+
+const markUnlinked = `-- name: MarkUnlinked :exec
+UPDATE moderation.retired_assets
+SET unlinked_at = COALESCE(unlinked_at, $1)
+WHERE ref_type = $2 AND ref_id = $3 AND asset_id = ANY($4::text[])
+`
+
+type MarkUnlinkedParams struct {
+	Now      *time.Time
+	RefType  string
+	RefID    string
+	AssetIds []string
+}
+
+func (q *Queries) MarkUnlinked(ctx context.Context, arg MarkUnlinkedParams) error {
+	_, err := q.db.Exec(ctx, markUnlinked,
+		arg.Now,
+		arg.RefType,
+		arg.RefID,
+		arg.AssetIds,
 	)
 	return err
 }
 
 const openCaseByTarget = `-- name: OpenCaseByTarget :one
-SELECT id, target_kind, content_id, buyer_id, target_key, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at FROM moderation.cases
-WHERE target_kind = $1 AND target_key = $2 AND closed_at IS NULL
+SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at FROM moderation.cases
+WHERE target_kind = $1 AND closed_at IS NULL
+  AND (content_id = $2 OR buyer_id = $3)
 `
 
 type OpenCaseByTargetParams struct {
 	TargetKind string
-	TargetKey  string
+	ContentID  *uuid.UUID
+	BuyerID    *int64
 }
 
-// 對象目前進行中的案件（沒有就是 ErrNoRows）。
+// 對象目前進行中的案件（沒有就是 ErrNoRows）；內容對象帶 content_id、買家對象帶 buyer_id，另一個是 NULL。
 func (q *Queries) OpenCaseByTarget(ctx context.Context, arg OpenCaseByTargetParams) (ModerationCase, error) {
-	row := q.db.QueryRow(ctx, openCaseByTarget, arg.TargetKind, arg.TargetKey)
+	row := q.db.QueryRow(ctx, openCaseByTarget, arg.TargetKind, arg.ContentID, arg.BuyerID)
 	var i ModerationCase
 	err := row.Scan(
 		&i.ID,
 		&i.TargetKind,
 		&i.ContentID,
 		&i.BuyerID,
-		&i.TargetKey,
 		&i.Version,
 		&i.OpenedAt,
 		&i.Decision,
@@ -262,29 +518,36 @@ func (q *Queries) OpenCaseByTarget(ctx context.Context, arg OpenCaseByTargetPara
 	return i, err
 }
 
-const purgeSnapshotsBatch = `-- name: PurgeSnapshotsBatch :execrows
-DELETE FROM moderation.case_snapshots
-WHERE id IN (
-    SELECT s.id FROM moderation.case_snapshots s
-    JOIN moderation.cases c ON c.id = s.case_id
-    WHERE c.closed_at IS NOT NULL AND c.closed_at < $1
-    ORDER BY s.id
-    LIMIT $2::int
-)
+const purgeRetired = `-- name: PurgeRetired :exec
+DELETE FROM moderation.retired_assets
+WHERE unlinked_at < $1 AND retired_at < $2
 `
 
-type PurgeSnapshotsBatchParams struct {
-	Cutoff  *time.Time
-	MaxRows int32
+type PurgeRetiredParams struct {
+	HealBefore   *time.Time
+	RetireBefore time.Time
 }
 
-// 結案早於 cutoff 的案件的快照：刪快照，檢舉的 snapshot_id 由 ON DELETE SET NULL 清空，案件與檢舉列留著。
-func (q *Queries) PurgeSnapshotsBatch(ctx context.Context, arg PurgeSnapshotsBatchParams) (int64, error) {
-	result, err := q.db.Exec(ctx, purgeSnapshotsBatch, arg.Cutoff, arg.MaxRows)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+// 清掉已經過第二次解除、而且超過 staged token 有效期的退場紀錄（整個模組）。
+func (q *Queries) PurgeRetired(ctx context.Context, arg PurgeRetiredParams) error {
+	_, err := q.db.Exec(ctx, purgeRetired, arg.HealBefore, arg.RetireBefore)
+	return err
+}
+
+const refSeq = `-- name: RefSeq :one
+SELECT seq FROM moderation.media_ref_sync WHERE ref_type = $1 AND ref_id = $2
+`
+
+type RefSeqParams struct {
+	RefType string
+	RefID   string
+}
+
+func (q *Queries) RefSeq(ctx context.Context, arg RefSeqParams) (int64, error) {
+	row := q.db.QueryRow(ctx, refSeq, arg.RefType, arg.RefID)
+	var seq int64
+	err := row.Scan(&seq)
+	return seq, err
 }
 
 const reportIDsOfCase = `-- name: ReportIDsOfCase :many
@@ -384,29 +647,124 @@ func (q *Queries) ReportsOfCase(ctx context.Context, caseID uuid.UUID) ([]Modera
 	return items, nil
 }
 
-const shareLockCase = `-- name: ShareLockCase :one
-SELECT id, target_kind, content_id, buyer_id, target_key, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at FROM moderation.cases WHERE id = $1 FOR SHARE
+const retireAsset = `-- name: RetireAsset :exec
+INSERT INTO moderation.retired_assets (ref_type, ref_id, asset_id, retired_at)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (ref_type, ref_id, asset_id) DO NOTHING
 `
 
-// 共享鎖住案件：同一個案件的結案（UPDATE）要等這個 transaction 提交，所以掛上檢舉之後案件不會在中間被結掉；呼叫方檢查 closed_at。
-func (q *Queries) ShareLockCase(ctx context.Context, id uuid.UUID) (ModerationCase, error) {
-	row := q.db.QueryRow(ctx, shareLockCase, id)
-	var i ModerationCase
-	err := row.Scan(
-		&i.ID,
-		&i.TargetKind,
-		&i.ContentID,
-		&i.BuyerID,
-		&i.TargetKey,
-		&i.Version,
-		&i.OpenedAt,
-		&i.Decision,
-		&i.DecisionCategory,
-		&i.DecisionAction,
-		&i.DecidedByAdminID,
-		&i.ClosedAt,
+type RetireAssetParams struct {
+	RefType string
+	RefID   string
+	AssetID string
+	Now     time.Time
+}
+
+// 記下被釋放的資產；已經記過的不變。
+func (q *Queries) RetireAsset(ctx context.Context, arg RetireAssetParams) error {
+	_, err := q.db.Exec(ctx, retireAsset,
+		arg.RefType,
+		arg.RefID,
+		arg.AssetID,
+		arg.Now,
 	)
-	return i, err
+	return err
+}
+
+const retiredAmong = `-- name: RetiredAmong :many
+SELECT asset_id FROM moderation.retired_assets
+WHERE ref_type = $1 AND ref_id = $2 AND asset_id = ANY($3::text[])
+ORDER BY asset_id
+`
+
+type RetiredAmongParams struct {
+	RefType  string
+	RefID    string
+	AssetIds []string
+}
+
+func (q *Queries) RetiredAmong(ctx context.Context, arg RetiredAmongParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, retiredAmong, arg.RefType, arg.RefID, arg.AssetIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var asset_id string
+		if err := rows.Scan(&asset_id); err != nil {
+			return nil, err
+		}
+		items = append(items, asset_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const retiredAssetIDs = `-- name: RetiredAssetIDs :many
+SELECT asset_id FROM moderation.retired_assets
+WHERE ref_type = $1 AND ref_id = $2
+ORDER BY asset_id
+`
+
+type RetiredAssetIDsParams struct {
+	RefType string
+	RefID   string
+}
+
+func (q *Queries) RetiredAssetIDs(ctx context.Context, arg RetiredAssetIDsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, retiredAssetIDs, arg.RefType, arg.RefID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var asset_id string
+		if err := rows.Scan(&asset_id); err != nil {
+			return nil, err
+		}
+		items = append(items, asset_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const settleRefSeq = `-- name: SettleRefSeq :execrows
+UPDATE moderation.media_ref_sync
+SET synced_seq = $1
+WHERE ref_type = $2 AND ref_id = $3 AND seq = $1
+`
+
+type SettleRefSeqParams struct {
+	Seq     int64
+	RefType string
+	RefID   string
+}
+
+// 只在版本還是同步讀到的那個時記下已同步；0 列表示讀取之後 ref 又改變了。
+func (q *Queries) SettleRefSeq(ctx context.Context, arg SettleRefSeqParams) (int64, error) {
+	result, err := q.db.Exec(ctx, settleRefSeq, arg.Seq, arg.RefType, arg.RefID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const snapshotAssets = `-- name: SnapshotAssets :one
+SELECT asset_ids FROM moderation.case_snapshots WHERE id = $1
+`
+
+// 快照目前引用的資產（同步 job 以它為這個 ref 目前的資產）；快照已刪除沒有列。
+func (q *Queries) SnapshotAssets(ctx context.Context, id uuid.UUID) ([]string, error) {
+	row := q.db.QueryRow(ctx, snapshotAssets, id)
+	var asset_ids []string
+	err := row.Scan(&asset_ids)
+	return asset_ids, err
 }
 
 const snapshotContent = `-- name: SnapshotContent :one
@@ -434,4 +792,44 @@ func (q *Queries) SnapshotIDByHash(ctx context.Context, arg SnapshotIDByHashPara
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const unsyncedRefs = `-- name: UnsyncedRefs :many
+SELECT ref_type, ref_id, updated_at
+FROM moderation.media_ref_sync
+WHERE synced_seq < seq AND updated_at < $1
+ORDER BY updated_at
+LIMIT $2
+`
+
+type UnsyncedRefsParams struct {
+	IdleBefore time.Time
+	MaxRows    int32
+}
+
+type UnsyncedRefsRow struct {
+	RefType   string
+	RefID     string
+	UpdatedAt time.Time
+}
+
+// 版本比已同步的新、而且最後變動早於 idle_before 的 ref，最舊的先（保底掃描補排用）。
+func (q *Queries) UnsyncedRefs(ctx context.Context, arg UnsyncedRefsParams) ([]UnsyncedRefsRow, error) {
+	rows, err := q.db.Query(ctx, unsyncedRefs, arg.IdleBefore, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UnsyncedRefsRow{}
+	for rows.Next() {
+		var i UnsyncedRefsRow
+		if err := rows.Scan(&i.RefType, &i.RefID, &i.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

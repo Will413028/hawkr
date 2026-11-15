@@ -52,6 +52,7 @@ func TestThirtyReportsShareOneOpenCaseAndOutcomesFollowTheDecision(t *testing.T)
 	f := setup(t)
 	w := f.world(t)
 	var caseID uuid.UUID
+	var version int64
 	for i := range 30 {
 		reporter, _ := f.newBuyer(t)
 		r := f.submit(t, reporter, commentTarget(w.comment), policy.Spam)
@@ -63,6 +64,10 @@ func TestThirtyReportsShareOneOpenCaseAndOutcomesFollowTheDecision(t *testing.T)
 		} else if r.Case.ID != caseID {
 			t.Fatalf("第 %d 筆開了另一個案件", i)
 		}
+		version = r.Case.Version
+		if version != int64(i+1) {
+			t.Fatalf("第 %d 筆之後案件版本 %d，預期每筆掛進來加一（從 1 起）", i, version)
+		}
 	}
 	if n := f.count(t, "SELECT count(*) FROM moderation.cases WHERE closed_at IS NULL"); n != 1 {
 		t.Fatalf("進行中案件 %d 個", n)
@@ -70,7 +75,7 @@ func TestThirtyReportsShareOneOpenCaseAndOutcomesFollowTheDecision(t *testing.T)
 	if n := f.count(t, "SELECT count(*) FROM moderation.case_snapshots"); n != 1 {
 		t.Fatalf("內容沒有改過，快照要只有一份，得到 %d", n)
 	}
-	closed := mustV[CaseDetail](t)(f.decideHide(t, caseID, 1))
+	closed := mustV[CaseDetail](t)(f.decideHide(t, caseID, version))
 	if closed.Case.Decision == nil || *closed.Case.Decision != DecisionViolation || len(closed.Reports) != 30 {
 		t.Fatalf("%+v", closed.Case)
 	}

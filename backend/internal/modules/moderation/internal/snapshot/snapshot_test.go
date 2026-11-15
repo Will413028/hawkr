@@ -48,10 +48,8 @@ func TestBuyerProfileFieldsAreHashed(t *testing.T) {
 	b.Avatar = "k2"
 	c := a
 	c.DisplayName = "小華"
-	d := a
-	d.Deleted = true
 	_, ha := Encode(a)
-	for name, x := range map[string]Content{"頭像": b, "名稱": c, "刪除": d} {
+	for name, x := range map[string]Content{"頭像": b, "名稱": c} {
 		if _, h := Encode(x); h == ha {
 			t.Errorf("%s 不同，雜湊不能相同", name)
 		}
@@ -66,5 +64,18 @@ func TestNilAndEmptyMediaAreTheSame(t *testing.T) {
 	y, hy := Encode(comment("本文", []string{}...))
 	if x != y || hx != hy {
 		t.Fatalf("nil 與空切片要相同：%s %s", x, y)
+	}
+}
+
+func TestDecodeReadsBackWhatEncodeWrote(t *testing.T) {
+	c := comment("本文", "asset-b", "asset-a")
+	c.AuthorKind, c.AuthorID = "BUYER", 7
+	text, _ := Encode(c)
+	got, err := Decode(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.AuthorKind != "BUYER" || got.AuthorID != 7 || got.Body != "本文" || len(got.MediaRefs) != 2 {
+		t.Fatalf("%+v", got)
 	}
 }

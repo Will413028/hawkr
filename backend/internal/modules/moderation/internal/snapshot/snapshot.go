@@ -12,7 +12,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
-// Content 是快照的內容。內容對象用 Author、StoreID、Body、MediaRefs；買家對象用 DisplayName、Avatar 與 Deleted；沒用到的欄位是零值。
+// Content 是快照的內容。內容對象用 Author、StoreID、Body、MediaRefs；買家對象用 DisplayName、Avatar；沒用到的欄位是零值。
 type Content struct {
 	Kind        model.TargetKind `json:"kind"`
 	AuthorKind  string           `json:"author_kind"`
@@ -22,7 +22,6 @@ type Content struct {
 	MediaRefs   []string         `json:"media_refs"`
 	DisplayName string           `json:"display_name"`
 	Avatar      string           `json:"avatar"`
-	Deleted     bool             `json:"deleted"`
 }
 
 // Normalize 回傳正規化後的內容：換行統一成 LF、本文與名稱去頭尾空白（同 trimtext 的集合）、媒體參照排序去重、nil 切片變成空切片。
@@ -37,6 +36,13 @@ func Normalize(c Content) Content {
 		c.MediaRefs = []string{}
 	}
 	return c
+}
+
+// Decode 讀回 Encode 產生的 JSON 文字。
+func Decode(text string) (Content, error) {
+	var c Content
+	err := json.Unmarshal([]byte(text), &c)
+	return c, err
 }
 
 // Encode 回傳正規化後內容的 JSON 文字與它的 SHA-256。
