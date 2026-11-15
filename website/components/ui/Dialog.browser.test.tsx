@@ -25,9 +25,11 @@ function Example() {
 describe("Dialog", () => {
 	it("opens from its trigger and closes on Escape", async () => {
 		renderWithIntl(<Example />);
-		await userEvent.click(page.getByRole("button", { name: "查看配送說明" }));
+		await userEvent.click(
+			page.getByRole("button", { name: "查看配送說明", exact: true }),
+		);
 		await expect
-			.element(page.getByRole("dialog", { name: "配送說明" }))
+			.element(page.getByRole("dialog", { name: "配送說明", exact: true }))
 			.toBeVisible();
 		await userEvent.keyboard("{Escape}");
 		await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();

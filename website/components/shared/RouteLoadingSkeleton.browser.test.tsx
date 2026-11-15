@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
+import { queryRequired } from "@/tests/browser/query";
 import { renderWithIntl } from "@/tests/browser/render";
 import RouteLoadingSkeleton, {
 	FeedGridSkeleton,
@@ -21,6 +22,13 @@ const variants: Variant[] = [
 	"generic",
 ];
 
+// 各 variant 渲染的區塊（RouteLoadingVariants.tsx）；沒列出的 variant 沒有可比對的元素。
+const blockSelectors: Partial<Record<NonNullable<Variant>, string>> = {
+	"product-detail": ".route-loading-skeleton__purchase > span",
+	checkout: ".route-loading-skeleton__commerce-main > span",
+	workspace: ".route-loading-skeleton__workspace-head",
+};
+
 describe("RouteLoadingSkeleton", () => {
 	it.each(variants)(
 		"labels the %s page skeleton and keeps its blocks inside the root",
@@ -31,20 +39,18 @@ describe("RouteLoadingSkeleton", () => {
 			await expect
 				.element(page.getByRole("status"))
 				.toHaveAttribute("aria-label", "頁面載入中");
-			const root = container.querySelector(".route-loading-skeleton");
-			expect(root).not.toBeNull();
-			if (root) {
-				const bounds = root.getBoundingClientRect();
-				const blocks = root.querySelectorAll(
-					".route-loading-skeleton__purchase > span, .route-loading-skeleton__commerce-main > span, .route-loading-skeleton__workspace-head",
-				);
-				// 只有這兩個 variant 渲染這些區塊；其餘 variant 沒有可比對的元素。
-				if (variant === "product-detail" || variant === "workspace")
-					expect(blocks.length).toBeGreaterThan(0);
-				for (const element of blocks) {
-					const box = element.getBoundingClientRect();
-					expect(box.right).toBeLessThanOrEqual(bounds.right + 1);
-				}
+			const root = queryRequired<HTMLElement>(
+				container,
+				".route-loading-skeleton",
+			);
+			const bounds = root.getBoundingClientRect();
+			const selector = variant ? blockSelectors[variant] : undefined;
+			const blocks = selector ? root.querySelectorAll(selector) : [];
+			// 渲染這些區塊的 variant 必須真的找到元素，不能讓迴圈對零個元素通過。
+			if (selector) expect(blocks.length).toBeGreaterThan(0);
+			for (const element of blocks) {
+				const box = element.getBoundingClientRect();
+				expect(box.right).toBeLessThanOrEqual(bounds.right + 1);
 			}
 		},
 	);

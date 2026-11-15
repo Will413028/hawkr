@@ -124,38 +124,52 @@ describe("navigation recovery", () => {
 
 	it("falls back to a document navigation when the router never starts", async () => {
 		renderWithIntl(<NavigationRecoveryPreview scenario="unstarted" />);
-		await userEvent.click(page.getByRole("button", { name: "前往訂單頁面" }));
+		await userEvent.click(
+			page.getByRole("button", { name: "前往訂單頁面", exact: true }),
+		);
 		await expect
 			.element(page.getByRole("status"))
 			.toHaveTextContent("等待訂單頁面");
 		await expect
 			.element(page.getByRole("status"), { timeout: 2_000 })
 			.toHaveTextContent(`整頁目的地：${DESTINATION}（replace）`);
-		await expect.element(page.getByText("整頁跳轉次數：1")).toBeVisible();
+		await expect
+			.element(page.getByText("整頁跳轉次數：1", { exact: true }))
+			.toBeVisible();
 	});
 
 	it("keeps the document when the router starts late", async () => {
 		renderWithIntl(<NavigationRecoveryPreview scenario="late-start" />);
 		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-		await userEvent.click(page.getByRole("button", { name: "前往訂單頁面" }));
+		await userEvent.click(
+			page.getByRole("button", { name: "前往訂單頁面", exact: true }),
+		);
 		await vi.advanceTimersByTimeAsync(450);
 		await expect
 			.element(page.getByRole("status"))
 			.toHaveTextContent("延遲導覽已完成，保留目前文件");
 		await vi.advanceTimersByTimeAsync(1_000);
-		await expect.element(page.getByText("整頁跳轉次數：0")).toBeVisible();
+		await expect
+			.element(page.getByText("整頁跳轉次數：0", { exact: true }))
+			.toBeVisible();
 	});
 
 	it("lets a completed login supersede a pending navigation", async () => {
 		renderWithIntl(<NavigationRecoveryPreview scenario="login" />);
 		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-		await userEvent.click(page.getByRole("button", { name: "前往訂單頁面" }));
-		await userEvent.click(page.getByRole("button", { name: "模擬登入完成" }));
+		await userEvent.click(
+			page.getByRole("button", { name: "前往訂單頁面", exact: true }),
+		);
+		await userEvent.click(
+			page.getByRole("button", { name: "模擬登入完成", exact: true }),
+		);
 		await expect
 			.element(page.getByRole("status"))
 			.toHaveTextContent(`整頁目的地：${LOGIN_DESTINATION}（push）`);
 		await vi.advanceTimersByTimeAsync(1_000);
-		await expect.element(page.getByText("整頁跳轉次數：1")).toBeVisible();
+		await expect
+			.element(page.getByText("整頁跳轉次數：1", { exact: true }))
+			.toBeVisible();
 		await expect
 			.element(page.getByRole("status"))
 			.toHaveTextContent(`整頁目的地：${LOGIN_DESTINATION}（push）`);

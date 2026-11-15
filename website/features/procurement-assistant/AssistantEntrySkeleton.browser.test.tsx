@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ViewTransitions } from "@/components/shared/view-transitions";
 import { AuthProvider } from "@/lib/auth/context";
 import type { SessionState } from "@/lib/auth/session-state";
+import { queryRequired } from "@/tests/browser/query";
 import { renderWithIntl } from "@/tests/browser/render";
 import { AssistantEntrySkeleton } from "./AssistantEntryLayout";
 import AssistantEntryLink from "./AssistantEntryLink";
@@ -14,6 +15,9 @@ vi.mock("@/lib/intl/use-router", async (importOriginal) => {
 	const { staticRouter } = await import("@/tests/browser/static-router");
 	return { ...actual, useRouter: () => staticRouter };
 });
+
+// 入口連結依 HAWKR_AGENT_ENABLED（建置時決定的旗標）渲染；固定為開，測試不依賴 flavor 預設。
+vi.mock("./availability", () => ({ HAWKR_AGENT_ENABLED: true }));
 
 const GUEST_SESSION = Promise.resolve<SessionState>({ status: "guest" });
 
@@ -50,20 +54,14 @@ describe("AssistantEntrySkeleton", () => {
 				</ViewTransitions>
 			</QueryClientProvider>,
 		);
-		const loading = container.querySelector<HTMLElement>(
+		const loading = queryRequired<HTMLElement>(
+			container,
 			"[data-agent-entry-loading] > div",
 		);
-		expect(loading).not.toBeNull();
-		// 入口連結依 HAWKR_AGENT_ENABLED 旗標渲染，等它出現再量。
-		await vi.waitFor(() => {
-			expect(
-				container.querySelector("[data-agent-entry-loaded] > a"),
-			).not.toBeNull();
-		});
-		const loaded = container.querySelector<HTMLElement>(
+		const loaded = queryRequired<HTMLElement>(
+			container,
 			"[data-agent-entry-loaded] > a",
 		);
-		if (!loading || !loaded) throw new Error("entry elements missing");
 		expect(
 			Math.abs(
 				loading.getBoundingClientRect().height -

@@ -21,7 +21,7 @@ export function renderWithIntl(
 	root.classList.add("hk-font-rounded");
 	root.dataset.theme = options.theme ?? "light";
 	if (options.textScale !== undefined) {
-		root.style.fontSize = `${options.textScale * 100}%`;
+		root.style.fontSize = `${Number((options.textScale * 100).toFixed(4))}%`;
 		root.style.setProperty("--hk-text-scale", String(options.textScale));
 	}
 	return render(

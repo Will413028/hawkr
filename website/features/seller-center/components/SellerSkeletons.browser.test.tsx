@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { page } from "vitest/browser";
+import { queryRequired } from "@/tests/browser/query";
 import { renderWithIntl } from "@/tests/browser/render";
 import { SellerMobileDisclosureList } from "./SellerMobileDisclosureList";
 import {
@@ -96,6 +98,15 @@ function ProductTable({
 		</div>
 	);
 }
+
+const initialViewport = {
+	width: window.innerWidth,
+	height: window.innerHeight,
+};
+
+afterEach(async () => {
+	await page.viewport(initialViewport.width, initialViewport.height);
+});
 
 describe("Seller skeletons", () => {
 	it("renders the products skeleton with every column and a thumbnail", () => {
@@ -196,7 +207,9 @@ describe("Seller skeletons", () => {
 			await expect.element(cell as HTMLElement).toHaveAttribute("data-label");
 	});
 
-	it("keeps the phone disclosure skeleton the same size as the real row", () => {
+	it("keeps the phone disclosure skeleton the same size as the real row", async () => {
+		// .seller-mobile-disclosure-list 在 768px 以上隱藏：明確設成手機寬，afterEach 還原。
+		await page.viewport(390, 844);
 		const { container } = renderWithIntl(
 			<SellerShell>
 				<div className="seller-posts">
@@ -220,15 +233,14 @@ describe("Seller skeletons", () => {
 				</div>
 			</SellerShell>,
 		);
-		const loading = container.querySelector(
+		const loading = queryRequired<HTMLElement>(
+			container,
 			"[aria-busy='true'].seller-mobile-disclosure-list .seller-mobile-disclosure",
 		);
-		const reference = container.querySelector(
+		const reference = queryRequired<HTMLElement>(
+			container,
 			"ul[aria-label='正式折疊列幾何對照'] .seller-mobile-disclosure",
 		);
-		expect(loading).not.toBeNull();
-		expect(reference).not.toBeNull();
-		if (!loading || !reference) return;
 		expect(loading.getBoundingClientRect().height).toBeGreaterThan(0);
 		expect(loading.getBoundingClientRect().height).toBe(
 			reference.getBoundingClientRect().height,

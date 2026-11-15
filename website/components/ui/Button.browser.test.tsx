@@ -11,7 +11,9 @@ describe("Button", () => {
 				加入購物車
 			</Button>,
 		);
-		await userEvent.click(page.getByRole("button", { name: "加入購物車" }));
+		await userEvent.click(
+			page.getByRole("button", { name: "加入購物車", exact: true }),
+		);
 		expect(onClick).toHaveBeenCalledTimes(1);
 	});
 
@@ -43,7 +45,7 @@ describe("Button", () => {
 			</Button>,
 			{ theme: "dark" },
 		);
-		const button = page.getByRole("button", { name: "移除商品" });
+		const button = page.getByRole("button", { name: "移除商品", exact: true });
 		await expect.element(button).toBeVisible();
 		expect(getComputedStyle(button.element()).backgroundColor).not.toBe(
 			"rgba(0, 0, 0, 0)",

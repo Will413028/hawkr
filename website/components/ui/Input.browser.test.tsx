@@ -48,7 +48,7 @@ describe("Input", () => {
 
 	it("matches the App field appearance across states", async () => {
 		renderWithIntl(
-			<div style={{ display: "grid", gap: 24, maxWidth: 720 }}>
+			<div style={{ display: "grid", gap: 24 }}>
 				<Input
 					label="商品名稱"
 					placeholder="花蓮小農香米"
@@ -64,6 +64,7 @@ describe("Input", () => {
 				/>
 				<Input label="收件人姓名" floatingLabel />
 			</div>,
+			{ frameMaxWidth: 420 },
 		);
 		const normalLocator = textbox("商品名稱");
 		const normal = normalLocator.element() as HTMLElement;

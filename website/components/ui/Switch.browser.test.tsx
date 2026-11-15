@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
+import { queryRequired } from "@/tests/browser/query";
 import { renderWithIntl } from "@/tests/browser/render";
 import { Switch } from "./Switch";
 
@@ -32,11 +33,11 @@ describe("Switch", () => {
 			<Controlled onCheckedChange={onCheckedChange} />,
 		);
 		// role=switch 的 input 視覺上隱藏（react-aria），使用者點的是可見的軌道。
-		const control = container.querySelector<HTMLElement>(
+		const control = queryRequired<HTMLElement>(
+			container,
 			"[data-slot=switch-control]",
 		);
-		expect(control).not.toBeNull();
-		await userEvent.click(page.elementLocator(control as HTMLElement));
+		await userEvent.click(page.elementLocator(control));
 		await expect.element(page.getByRole("switch")).toBeChecked();
 		expect(onCheckedChange).toHaveBeenCalledWith(true);
 	});
