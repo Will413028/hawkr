@@ -43,7 +43,23 @@ export default defineConfig({
 			// 元件 browser 測試：只由 `pnpm test:browser` 跑（`--project browser`），不進 `pnpm test`。
 			{
 				extends: true,
-				optimizeDeps: { include: ["framer-motion"] },
+				// `next/image` 是 CJS，預先打包後 default 匯入成物件；解析時就換成 tests/browser/next-image.tsx，
+				// 並排除在預先打包之外。只比對完整的 `next/image`，`next/image-*` 等其他子路徑不動。
+				resolve: {
+					alias: [
+						{
+							find: /^next\/image$/,
+							replacement: fileURLToPath(
+								new URL("./tests/browser/next-image.tsx", import.meta.url),
+							),
+						},
+						{
+							find: "@",
+							replacement: fileURLToPath(new URL(".", import.meta.url)),
+						},
+					],
+				},
+				optimizeDeps: { include: ["framer-motion"], exclude: ["next/image"] },
 				// 瀏覽器沒有 Node 的 process.env：照 Next 的 client 編譯在建置時替換。API base
 				// 釘到 loopback 的丟棄埠，沒有 mock 的請求不會連到真的主機；其餘未設的
 				// NEXT_PUBLIC_* 由 tests/browser/setup.ts 的 process 墊片讀成 undefined。
