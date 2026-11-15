@@ -704,3 +704,37 @@ func TestDelegatedCreateMapsRequestIDToTheOperation(t *testing.T) {
 		t.Fatalf("欄位 = %v，預期 operation.request_id", fields)
 	}
 }
+
+// 每個代行寫入方法的宣告，等於稽核訂閱者對「這個方法發的事件」寫的能力與動作（A7-D27）：宣告由 delegation.PostWriteFor 衍生，
+// 這裡獨立列出每個方法實際發的事件種類（Publish 與 Unpublish 對已經是目標狀態的貼文發 *Repeated），任何一邊改了都會不一致而失敗。
+func TestWriteDeclarationsAgreeWithTheAuditSubscriberMapping(t *testing.T) {
+	emits := map[string][]any{
+		"CreateStorePost":    {social.PostCreated{}},
+		"UpdateStorePost":    {social.PostUpdated{}},
+		"PublishStorePost":   {social.PostPublished{}, social.PostPublishRepeated{}},
+		"UnpublishStorePost": {social.PostUnpublished{}, social.PostUnpublishRepeated{}},
+		"ScheduleStorePost":  {social.PostScheduled{}},
+	}
+	for name, events := range emits {
+		decl := DelegatedDeclaration.Methods["/hawkr.social.v1alpha1.SocialDelegatedService/"+name]
+		for _, e := range events {
+			w, ok := moddelegation.PostWriteFor(e)
+			if !ok || decl.Capability != w.Capability || decl.Action != w.Action {
+				t.Errorf("%s：宣告 (%s, %s)，%T 的訂閱者寫 (%s, %s)", name, decl.Capability, decl.Action, e, w.Capability, w.Action)
+			}
+		}
+	}
+	if len(emits) != 5 {
+		t.Fatal("寫入方法的清單要涵蓋 Create、Update、Publish、Unpublish、Schedule")
+	}
+}
+
+// 代行建立只能建草稿（A7-D27、ADR）：CreateStorePostRequest 沒有 publish 欄位，所以建立不會同時發布；要公開走 PublishStorePost（posts.publish 與 POST_PUBLISH 稽核）。
+func TestDelegatedCreateCannotPublish(t *testing.T) {
+	fields := (&pb.CreateStorePostRequest{}).ProtoReflect().Descriptor().Fields()
+	for i := range fields.Len() {
+		if n := string(fields.Get(i).Name()); strings.Contains(n, "publish") {
+			t.Errorf("CreateStorePostRequest 有欄位 %q：建立可以發布時，PostPublished 要帶代行者並要求 posts.publish", n)
+		}
+	}
+}

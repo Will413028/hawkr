@@ -168,7 +168,7 @@ func (s *Service) Schedule(ctx context.Context, st seller.Store, in model.Schedu
 		if posted, err = s.Own(ctx, st.StoreID, row.ID); err != nil {
 			return err
 		}
-		return s.written(ctx, writeScheduled, st.StoreID, row.ID, actor)
+		return emit(ctx, s.d.Events, model.PostScheduled{PostWritten: s.postWritten(posted.ID, posted.StoreID, posted.Body, posted.Version, actor)}, actor)
 	})
 	if err != nil {
 		return model.ScheduledPost{}, err

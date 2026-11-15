@@ -16,7 +16,7 @@ import (
 )
 
 // 正式組裝（newDelegation，serve、worker 與 CLI 共用；這裡經 newDelegationOffline 走到它）訂閱了 PostPublished：代行發起的排程發布事件
-// 在 transaction 內產生一列 SUCCEEDED 稽核。拿掉 newDelegation 裡的 events.Subscribe(bus, m.OnPostPublished)，這個測試失敗。
+// 在 transaction 內產生一列 SUCCEEDED 稽核。拿掉 newDelegation 裡的 events.SubscribeNamed(bus, delegatedactor.AuditHandler, m.OnPostPublished)，這個測試失敗。
 func TestNewDelegationWritesScheduledPublishAudit(t *testing.T) {
 	ctx := context.Background()
 	url := pg.NewURL(t)

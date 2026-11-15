@@ -21,6 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
@@ -116,13 +117,13 @@ func build(t *testing.T, withSocial bool) *fixture {
 	}
 	f.m = f.newDelegation()
 	events.Subscribe(f.bus, f.m.OnAdminRoleRevoked)
-	events.Subscribe(f.bus, f.m.OnPostPublished)
-	events.Subscribe(f.bus, f.m.OnPostCreated)
-	events.Subscribe(f.bus, f.m.OnPostUpdated)
-	events.Subscribe(f.bus, f.m.OnPostUnpublished)
-	events.Subscribe(f.bus, f.m.OnPostScheduled)
-	events.Subscribe(f.bus, f.m.OnPostPublishRepeated)
-	events.Subscribe(f.bus, f.m.OnPostUnpublishRepeated)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostPublished)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostCreated)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostUpdated)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostUnpublished)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostScheduled)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostPublishRepeated)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostUnpublishRepeated)
 	events.Subscribe(f.bus, f.m.OnStoreSuspended)
 	events.Subscribe(f.bus, f.m.OnStoreClosed)
 	return f

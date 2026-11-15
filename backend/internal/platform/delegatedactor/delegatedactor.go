@@ -2,6 +2,10 @@
 // 領域事件並附上它，稽核的訂閱者同 transaction 寫 SUCCEEDED。資源模組只傳遞它、不解讀它、不 import delegation，所以放在 platform。
 package delegatedactor
 
+// AuditHandler 是代行寫入的稽核 handler 在 events.Bus 上的註冊名稱：delegation 以它訂閱 social 的貼文寫入事件，social 帶代行者發布事件時用
+// events.PublishRequired 指名要求它存在，沒有就失敗關閉（A7-D27）。
+const AuditHandler = "delegation.audit"
+
 // Actor 是一次代行寫入的代行者與請求資料。欄位全是事實，不含判斷：授權與稽核由訂閱者在同一個 transaction 內檢查與寫入。
 type Actor struct {
 	SessionID int64

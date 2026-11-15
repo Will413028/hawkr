@@ -24,6 +24,8 @@ func TestPostWritesPublishOneGeneralEventEachAndFailClosedWithoutASubscriber(t *
 	actor := &delegatedactor.Actor{SessionID: 7, StoreID: storeID, RequestID: "r-1", Reason: "測試"}
 	ctx := context.Background()
 
+	// 別的訂閱者在也不算數：指名的稽核 handler 不在，代行寫入照樣失敗關閉（A7-D27）。
+	events.Subscribe(f.bus, func(context.Context, social.PostCreated) error { return nil })
 	before := f.scalar(t, `SELECT count(*) FROM social.posts WHERE store_id = $1`, storeID)
 	if _, err := f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "沒有訂閱者", ImageToken: fmt.Sprintf("tok-%d", f.next())}, actor); !errors.Is(err, events.ErrNoSubscriber) {
 		t.Fatalf("代行寫入沒有訂閱者：err=%v，預期 ErrNoSubscriber", err)
@@ -43,25 +45,25 @@ func TestPostWritesPublishOneGeneralEventEachAndFailClosedWithoutASubscriber(t *
 	}
 	on := func(kind string, add func(*events.Bus, func(social.PostWritten))) { add(f.bus, sub(kind)) }
 	on("created", func(b *events.Bus, h func(social.PostWritten)) {
-		events.Subscribe(b, func(_ context.Context, e social.PostCreated) error { h(e.PostWritten); return nil })
+		events.SubscribeNamed(b, delegatedactor.AuditHandler, func(_ context.Context, e social.PostCreated) error { h(e.PostWritten); return nil })
 	})
 	on("updated", func(b *events.Bus, h func(social.PostWritten)) {
-		events.Subscribe(b, func(_ context.Context, e social.PostUpdated) error { h(e.PostWritten); return nil })
+		events.SubscribeNamed(b, delegatedactor.AuditHandler, func(_ context.Context, e social.PostUpdated) error { h(e.PostWritten); return nil })
 	})
 	on("unpublished", func(b *events.Bus, h func(social.PostWritten)) {
-		events.Subscribe(b, func(_ context.Context, e social.PostUnpublished) error { h(e.PostWritten); return nil })
+		events.SubscribeNamed(b, delegatedactor.AuditHandler, func(_ context.Context, e social.PostUnpublished) error { h(e.PostWritten); return nil })
 	})
 	on("scheduled", func(b *events.Bus, h func(social.PostWritten)) {
-		events.Subscribe(b, func(_ context.Context, e social.PostScheduled) error { h(e.PostWritten); return nil })
+		events.SubscribeNamed(b, delegatedactor.AuditHandler, func(_ context.Context, e social.PostScheduled) error { h(e.PostWritten); return nil })
 	})
 	on("publish-repeated", func(b *events.Bus, h func(social.PostWritten)) {
-		events.Subscribe(b, func(_ context.Context, e social.PostPublishRepeated) error { h(e.PostWritten); return nil })
+		events.SubscribeNamed(b, delegatedactor.AuditHandler, func(_ context.Context, e social.PostPublishRepeated) error { h(e.PostWritten); return nil })
 	})
 	on("unpublish-repeated", func(b *events.Bus, h func(social.PostWritten)) {
-		events.Subscribe(b, func(_ context.Context, e social.PostUnpublishRepeated) error { h(e.PostWritten); return nil })
+		events.SubscribeNamed(b, delegatedactor.AuditHandler, func(_ context.Context, e social.PostUnpublishRepeated) error { h(e.PostWritten); return nil })
 	})
 	var published []social.PostPublished
-	events.Subscribe(f.bus, func(_ context.Context, e social.PostPublished) error { published = append(published, e); return nil })
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, func(_ context.Context, e social.PostPublished) error { published = append(published, e); return nil })
 
 	// 店主的寫入：一樣發事件，Actor 是 nil。
 	own, err := f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "店主自己的", ImageToken: fmt.Sprintf("tok-%d", f.next())}, nil)

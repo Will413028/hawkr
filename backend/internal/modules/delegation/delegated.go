@@ -248,7 +248,34 @@ var (
 	postScheduleWrite  = postWrite{CapabilityPostsPublish, AuditPostSchedule}
 )
 
-// OnPostCreated、OnPostUpdated、OnPostUnpublished、OnPostScheduled、OnPostPublishRepeated、OnPostUnpublishRepeated 訂閱 social 的同名事件（組裝點以 events.Subscribe 訂閱）：
+// PostWriteAudit 是一種貼文寫入事件在稽核上的能力與動作。
+type PostWriteAudit struct {
+	Capability Capability
+	Action     AuditAction
+}
+
+// PostWriteFor 回傳 social 貼文寫入事件 e（值，不是指標）對應的能力與動作，不是代行會寫入的事件回 false。這是代行寫入宣告的唯一來源：
+// 訂閱者寫稽核列用它，httpapi 的 DelegatedDeclaration 也由它衍生每個寫入方法的能力與動作，兩邊不會各寫一份而不一致。
+func PostWriteFor(e any) (PostWriteAudit, bool) {
+	var w postWrite
+	switch e.(type) {
+	case social.PostCreated:
+		w = postCreateWrite
+	case social.PostUpdated:
+		w = postUpdateWrite
+	case social.PostPublished, social.PostPublishRepeated:
+		w = postPublishWrite
+	case social.PostUnpublished, social.PostUnpublishRepeated:
+		w = postUnpublishWrite
+	case social.PostScheduled:
+		w = postScheduleWrite
+	default:
+		return PostWriteAudit{}, false
+	}
+	return PostWriteAudit{Capability: w.capability, Action: w.action}, true
+}
+
+// OnPostCreated、OnPostUpdated、OnPostUnpublished、OnPostScheduled、OnPostPublishRepeated、OnPostUnpublishRepeated 訂閱 social 的同名事件（組裝點以 events.SubscribeNamed 與 delegatedactor.AuditHandler 訂閱）：
 // 事件帶代行者時，代行寫入在 social 的 transaction 內，依事件種類決定稽核動作，再寫一列 SUCCEEDED；沒有代行者（店主自己的寫入）略過。
 func (m *Module) OnPostCreated(ctx context.Context, e social.PostCreated) error {
 	return m.recordPostWrite(ctx, postCreateWrite, e.PostWritten)

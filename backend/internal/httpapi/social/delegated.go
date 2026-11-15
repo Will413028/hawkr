@@ -30,11 +30,11 @@ var DelegatedDeclaration = httpdelegation.Declaration{
 	Methods: map[string]moddelegation.DelegatedMethod{
 		socialv1alpha1connect.SocialDelegatedServiceListStorePostsProcedure:     postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
 		socialv1alpha1connect.SocialDelegatedServiceGetStorePostProcedure:       postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
-		socialv1alpha1connect.SocialDelegatedServiceCreateStorePostProcedure:    postMethod(moddelegation.CapabilityPostsWrite, moddelegation.AuditPostCreate),
-		socialv1alpha1connect.SocialDelegatedServiceUpdateStorePostProcedure:    postMethod(moddelegation.CapabilityPostsWrite, moddelegation.AuditPostUpdate),
-		socialv1alpha1connect.SocialDelegatedServicePublishStorePostProcedure:   postMethod(moddelegation.CapabilityPostsPublish, moddelegation.AuditPostPublish),
-		socialv1alpha1connect.SocialDelegatedServiceUnpublishStorePostProcedure: postMethod(moddelegation.CapabilityPostsPublish, moddelegation.AuditPostUnpublish),
-		socialv1alpha1connect.SocialDelegatedServiceScheduleStorePostProcedure:  postMethod(moddelegation.CapabilityPostsPublish, moddelegation.AuditPostSchedule),
+		socialv1alpha1connect.SocialDelegatedServiceCreateStorePostProcedure:    writeMethod(social.PostCreated{}),
+		socialv1alpha1connect.SocialDelegatedServiceUpdateStorePostProcedure:    writeMethod(social.PostUpdated{}),
+		socialv1alpha1connect.SocialDelegatedServicePublishStorePostProcedure:   writeMethod(social.PostPublished{}),
+		socialv1alpha1connect.SocialDelegatedServiceUnpublishStorePostProcedure: writeMethod(social.PostUnpublished{}),
+		socialv1alpha1connect.SocialDelegatedServiceScheduleStorePostProcedure:  writeMethod(social.PostScheduled{}),
 	},
 }
 
@@ -44,6 +44,15 @@ var delegatedCreatePostPaths = func() rpc.FieldPaths {
 	p["RequestID"] = "operation.request_id"
 	return p
 }()
+
+// writeMethod 由這個寫入方法發的 social 事件種類衍生能力與動作（delegation.PostWriteFor，與稽核訂閱者共用，不在這裡再寫一份）。
+func writeMethod(e any) moddelegation.DelegatedMethod {
+	w, ok := moddelegation.PostWriteFor(e)
+	if !ok {
+		panic(fmt.Sprintf("httpapi/social：%T 不是代行會稽核的貼文寫入事件", e))
+	}
+	return postMethod(w.Capability, w.Action)
+}
 
 func postMethod(c moddelegation.Capability, a moddelegation.AuditAction) moddelegation.DelegatedMethod {
 	return moddelegation.DelegatedMethod{Capability: c, Action: a, Resource: moddelegation.ResourcePost}
