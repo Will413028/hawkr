@@ -348,7 +348,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 | 階段 | 狀態 | 備註 |
 |---|---|---|
 | 0 地基 | 進行中 | 已完成：0.1；0.2 的核心機制；0.3 的依賴方向、migration 與 query 隔離檢查；0.4 的 migration 套用器與 Atlas 開發設定；0.6 的 OpenAPI 規格與生成工具（2026-09-26 由 Connect 取代，規格改為現有 API 清單）；0.7 的 D9 gate；0.8 的盤點 gate；0.9 的本機環境；0.10 的指令檔；0.11 的 `backend-monolith` workflow（含 integration 測試）；0.5 的模組模板與 scaffold（2026-09-27，從 content 抽出）。單體統一使用 Postgres 18。前置修正：CodeMeta 的 Go 輸出從 `docs/` 移到 `internal/platform/codemeta`，因為中文目錄名不是合法的 import path，會讓根 module 無法建置 |
-| A Go 併入 | 進行中 | A0、A1、A2 完成；A4 取消（pricebook 刪除）。A3：步驟 1–9、10a、10b、10c、10e 完成，剩 10d 公開讀取（部分併進 A7）與 10f 信任與安全上線前（`2026-09-29-a3-buyer-seller.md`）；收款開通換 Stripe 已完成，決定在 `adr/2026-11-13-payment-onboarding-provider-port-stripe.md`。A7：1a、1b、1c、1d、1d′、1d″ 完成，下一步 A7-1e 待辦加 moderation 來源（`2026-10-18-a7-social.md`）。其餘 A5、A6、A8–A11 未開始 |
+| A Go 併入 | 進行中 | A0、A1、A2 完成；A4 取消（pricebook 刪除）。A3：步驟 1–9、10a、10b、10c、10e 完成，剩 10d 公開讀取（部分併進 A7）與 10f 信任與安全上線前（`2026-09-29-a3-buyer-seller.md`）；收款開通換 Stripe 已完成，決定在 `adr/2026-11-13-payment-onboarding-provider-port-stripe.md`。A7：1a、1b、1c、1d、1d′、1d″、1e 完成，下一步 A7-1f 排程發布（`2026-10-18-a7-social.md`）。其餘 A5、A6、A8–A11 未開始 |
 | B Java 改寫 | 未開始 | |
 | C 收尾 | 未開始 | |
 | D 前端 client | 取消（2026-09-26） | 併進模組完成的定義，收尾在階段 C |
