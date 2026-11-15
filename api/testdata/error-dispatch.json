@@ -92,6 +92,16 @@
       "expected": {"action": "reason", "reason": "SELLER_SUSPENDED", "message": "您的賣家帳號已停權，無法執行此操作"}
     },
     {
+      "name": "帳號停權（A7-D17）：permission_denied 加 ACCOUNT_SUSPENDED 是認得的 reason",
+      "input": {"method": {"idempotency": "UNKNOWN", "requestId": true}, "error": {"code": "permission_denied", "errorInfo": {"reason": "ACCOUNT_SUSPENDED", "domain": "hawkr"}, "localizedMessage": "帳號已停權，無法執行這個操作"}},
+      "expected": {"action": "reason", "reason": "ACCOUNT_SUSPENDED", "message": "帳號已停權，無法執行這個操作"}
+    },
+    {
+      "name": "帳號已有店家：failed_precondition 加 ACCOUNT_HAS_STORE 是認得的 reason",
+      "input": {"method": {"idempotency": "UNKNOWN", "requestId": false}, "error": {"code": "failed_precondition", "errorInfo": {"reason": "ACCOUNT_HAS_STORE", "domain": "hawkr"}, "localizedMessage": "這個帳號已經有店家"}},
+      "expected": {"action": "reason", "reason": "ACCOUNT_HAS_STORE", "message": "這個帳號已經有店家"}
+    },
+    {
       "name": "賣家停權的 reason 在別的 domain 不認得，顯示該 code 的預設文字",
       "input": {"method": {"idempotency": "UNKNOWN", "requestId": false}, "error": {"code": "permission_denied", "errorInfo": {"reason": "SELLER_SUSPENDED", "domain": "example.com"}}},
       "expected": {"action": "message", "message": null}
