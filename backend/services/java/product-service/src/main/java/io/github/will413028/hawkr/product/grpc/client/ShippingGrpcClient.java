@@ -26,8 +26,7 @@ public class ShippingGrpcClient {
      *
      * <p><b>為什麼非有不可</b>：共用元件 {@code GrpcStubFactory} 全域<b>零</b> deadline，
      * Java {@code ManagedChannelBuilder} 預設無 keepalive ⇒ 下游掛住時 blocking stub 永不返回。
-     * 本 client 走在商品上架驗證與 {@code /public/products} 讀路徑上（02 §2.7.2），
-     * 且 {@code validateProductShipping} 是 {@code ProductPublishValidator} 的同步依賴。
+     * 本 client 走在商品上架驗證與 {@code /public/products} 讀路徑上（02 §2.7.2）。
      *
      * <p><b>10 秒怎麼來的</b>：實查這三支在 shipping-service 內都只做<b>本地 DB 讀取 ＋ 本地運算</b>
      * （{@code onboardingService.listSellerShippingMethods} / {@code shippingFeeService.*}），

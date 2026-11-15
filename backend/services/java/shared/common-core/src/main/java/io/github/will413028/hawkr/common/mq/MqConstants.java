@@ -328,10 +328,6 @@ public final class MqConstants {
     public static final String EXCHANGE_IM_DLX = "hawkr.im.dlx";
     public static final String ROUTING_KEY_CHAT_MESSAGE_SENT = "chat.message.sent";
 
-    // Media routing keys (OSS cleanup)
-    public static final String EXCHANGE_MEDIA = "hawkr.media";
-    public static final String EXCHANGE_MEDIA_DLX = "hawkr.media.dlx";
-
     // PayUni Webhook Events（由 payuni-webhook-service 發布）
     public static final String EXCHANGE_PAYUNI_WEBHOOK = "payuni.events";
     public static final String ROUTING_KEY_PAYUNI_PAYMENT_UOP = "payuni.payment.uop";
@@ -611,67 +607,4 @@ public final class MqConstants {
     public static final String ROUTING_KEY_CUSTOMER_TAGGED = "seller.customer.tagged";
     public static final String ROUTING_KEY_BATCH_COUPON_TASK_CREATED = "seller.marketing.batch.created";
     public static final String ROUTING_KEY_BATCH_COUPON_TASK_COMPLETED = "seller.marketing.batch.completed";
-
-    // ============================================================================
-    // Product Import 領域（40 號設計書 §6 + 36 號設計書 §3.6b）
-    // ============================================================================
-
-    // Exchange
-    public static final String EXCHANGE_PRODUCT_IMPORT = "hawkr.product.import";
-    public static final String EXCHANGE_PRODUCT_IMPORT_DLX = "hawkr.product.import.dlx";
-
-    // Routing keys（內部 + 跨服務 + 跨團隊）
-    public static final String RK_PRODUCT_IMPORT_CSV_PARSE = "csv.parse";
-    public static final String RK_PRODUCT_IMPORT_HTML_FETCH = "html.fetch";
-    public static final String RK_PRODUCT_IMPORT_ASSET_DOWNLOAD = "asset.download";
-    public static final String RK_PRODUCT_IMPORT_COMMIT = "commit";
-    public static final String RK_PRODUCT_IMPORT_GC_EXPIRE_JOB = "gc.expire_job";
-    public static final String RK_PRODUCT_IMPORT_JOB_PARSED = "job.parsed";
-    public static final String RK_PRODUCT_IMPORT_JOB_COMMIT_FINISHED = "job.commit_finished";
-
-    // 主 queue（product-import-service 內部）
-    public static final String QUEUE_PRODUCT_IMPORT_CSV_PARSE = "product.import.csv.parse";
-    public static final String QUEUE_PRODUCT_IMPORT_HTML_FETCH = "product.import.html.fetch";
-    public static final String QUEUE_PRODUCT_IMPORT_ASSET_DOWNLOAD = "product.import.asset.download";
-    public static final String QUEUE_PRODUCT_IMPORT_COMMIT = "product.import.commit";
-
-    // Retry queue（依 36 號 §3.6b 設定 TTL 三階退避，binding 由各 service Config 決定 routing key）
-    public static final String QUEUE_PRODUCT_IMPORT_CSV_PARSE_RETRY = "product.import.csv.parse.retry";
-    public static final String QUEUE_PRODUCT_IMPORT_HTML_FETCH_RETRY = "product.import.html.fetch.retry";
-    public static final String QUEUE_PRODUCT_IMPORT_ASSET_DOWNLOAD_RETRY = "product.import.asset.download.retry";
-    public static final String QUEUE_PRODUCT_IMPORT_COMMIT_RETRY = "product.import.commit.retry";
-
-    // DLQ
-    public static final String QUEUE_PRODUCT_IMPORT_CSV_PARSE_DLQ = "dlq.product.import.csv.parse";
-    public static final String QUEUE_PRODUCT_IMPORT_HTML_FETCH_DLQ = "dlq.product.import.html.fetch";
-    public static final String QUEUE_PRODUCT_IMPORT_ASSET_DOWNLOAD_DLQ = "dlq.product.import.asset.download";
-    public static final String QUEUE_PRODUCT_IMPORT_COMMIT_DLQ = "dlq.product.import.commit";
-    public static final String QUEUE_PRODUCT_IMPORT_JOB_PARSED_DLQ = "dlq.product.import.job.parsed";
-    public static final String QUEUE_PRODUCT_IMPORT_JOB_COMMIT_FINISHED_DLQ = "dlq.product.import.job.commit_finished";
-
-    // 跨服務（media-service 訂閱 gc.expire_job）
-    public static final String QUEUE_MEDIA_PRODUCT_IMPORT_GC_EXPIRE_JOB = "media.product.import.gc.expire_job";
-    public static final String QUEUE_MEDIA_PRODUCT_IMPORT_GC_EXPIRE_JOB_DLQ = "dlq.media.product.import.gc.expire_job";
-
-    // 跨團隊（notification-service 訂閱 job.parsed / job.commit_finished — 名稱待 notification team 確定 binding 後同步補）
-
-    // ============================================================================
-    // Media Service Callback for Product Import（08 號 §7.2a）
-    //   Producer: media-service worker; Consumer: product-import-service MediaCallbackListener
-    //   Exchange: 沿用既有 EXCHANGE_MEDIA
-    // ============================================================================
-
-    public static final String RK_MEDIA_IMPORT_ASSET_DOWNLOADED = "import.asset.downloaded";
-    public static final String QUEUE_PRODUCT_IMPORT_MEDIA_CALLBACK = "product.import.media.callback";
-    public static final String QUEUE_PRODUCT_IMPORT_MEDIA_CALLBACK_RETRY = "product.import.media.callback.retry";
-    public static final String QUEUE_PRODUCT_IMPORT_MEDIA_CALLBACK_DLQ = "dlq.media.product.import.callback";
-
-    // ============================================================================
-    // Media Service 內部下載 worker pool（08 號 §7.2a；純 Media 內部，與對外 callback 區隔）
-    // ============================================================================
-
-    public static final String RK_MEDIA_IMPORT_ASSET_DOWNLOAD_INTERNAL = "import.asset.download.internal";
-    public static final String QUEUE_MEDIA_IMPORT_ASSET_DOWNLOAD_INTERNAL = "media.import.asset.download.internal";
-    public static final String QUEUE_MEDIA_IMPORT_ASSET_DOWNLOAD_INTERNAL_RETRY = "media.import.asset.download.internal.retry";
-    public static final String QUEUE_MEDIA_IMPORT_ASSET_DOWNLOAD_INTERNAL_DLQ = "dlq.media.import.asset.download.internal";
 }

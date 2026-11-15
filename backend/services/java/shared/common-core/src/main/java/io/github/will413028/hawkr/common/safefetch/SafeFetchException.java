@@ -1,8 +1,7 @@
 package io.github.will413028.hawkr.common.safefetch;
 
 /**
- * SafeFetcher 抛出的 SSRF / 違反守則異常。Reason 用於 caller 對應 ImportAssetFailureReason 等業務碼。
- * 詳見 40 號設計書 §10.2。
+ * SafeFetcher 抛出的 SSRF / 違反守則異常。Reason 用於 caller 對應業務碼。
  */
 public class SafeFetchException extends RuntimeException {
 

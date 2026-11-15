@@ -8,7 +8,7 @@ package io.github.will413028.hawkr.common.safefetch;
  * User-Agent、同 IP rate limit、Content-Type 白名單、size 上限。</p>
  *
  * <p>違反任一守則時拋 {@link SafeFetchException}，caller 依 {@link SafeFetchException#reason()}
- * 對應業務碼（ImportAssetFailureReason 等）。</p>
+ * 對應業務碼。</p>
  */
 public interface SafeFetcher {
 

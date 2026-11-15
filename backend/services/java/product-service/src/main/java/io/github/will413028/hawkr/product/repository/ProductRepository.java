@@ -4,11 +4,9 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.will413028.hawkr.product.entity.ProductEntity;
-import io.github.will413028.hawkr.product.entity.projection.ProductBriefProjection;
 import io.github.will413028.hawkr.product.entity.projection.ProductPublicationBriefProjection;
 import io.github.will413028.hawkr.product.entity.projection.ProductSellerRef;
 import io.github.will413028.hawkr.product.entity.projection.RestockTransitionProjection;
-import io.github.will413028.hawkr.product.entity.projection.SellerProductNameProjection;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.ResultMap;
@@ -551,62 +549,7 @@ public interface ProductRepository extends BaseMapper<ProductEntity> {
     List<ProductSellerRef> findProductSellerRefs(@Param("ids") List<Long> ids);
 
     /**
-     * 批次查詢「該賣家底下名稱命中的商品」projection（02 §9.5）。
-     *
-     * <p>用於 {@code BatchCheckSellerProductNames}：對 csv.parse / UpdateImportItem 階段提供
-     * 「賣家既有同名商品偵測」。回傳僅 (id, name, status) 三欄，由
-     * {@link SellerProductNameProjection} 承載，避免 partial-projection 反模式（docs/開發規範/Java 微服務開發規範.md §9.2）。
-     *
-     * <p>不過濾 deleted_at IS NULL — 軟刪除商品不參與同名提示。
-     *
-     * <p>caller 限制 names 集合大小 ≤ 500（{@link io.github.will413028.hawkr.product.service.ProductImportService#MAX_NAMES_PER_BATCH}）；
-     * 本 method 不二次校驗。
-     */
-    @Select("""
-        <script>
-        SELECT id, name, status
-        FROM product
-        WHERE store_id = #{storeId}
-          AND deleted_at IS NULL
-          AND seller_deleted_at IS NULL
-          AND name IN
-        <foreach collection="names" item="n" open="(" separator="," close=")">#{n}</foreach>
-        </script>
-        """)
-    List<SellerProductNameProjection> findSellerProductNameProjections(
-            @Param("storeId") Long storeId,
-            @Param("names") Collection<String> names);
-
-    /**
-     * 批次取得商品輕量資訊（40 號 §4.3b GetProductsBriefInternal）。
-     *
-     * <p>僅取 (id, name, status) 三欄，由 {@link ProductBriefProjection} 承載，
-     * 避免 partial-projection 反模式（docs/開發規範/Java 微服務開發規範.md §9.2）。
-     *
-     * <p>已軟刪除商品（deleted_at IS NOT NULL）不回傳；查不到的 id 不出現於結果。
-     *
-     * <p>caller 限制 ids 集合大小 ≤ 200（見 40 號 §4.3b），本 method 不二次校驗。
-     */
-    @Select("""
-        <script>
-        SELECT id, name, status
-        FROM product
-        WHERE deleted_at IS NULL
-          AND id IN
-        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
-        </script>
-        """)
-    List<ProductBriefProjection> findBriefByIds(@Param("ids") Collection<Long> ids);
-
-    /**
      * 批次取得商品輕量資訊，<b>刻意不套任何可見性過濾</b>（管理／稽核視角）。
-     *
-     * <p>與 {@link #findBriefByIds} 是兩支而不是一支參數化的方法。理由**不是**
-     * 「那是 40 號 §4.3b 的文件化契約」——40 號其實沒有寫到軟刪（實查全文零提及）——
-     * 而是這兩個可查證的事實：① 那支的 javadoc 與 SQL 都明寫已軟刪不回傳
-     * ② 它的第二個 caller 是 gRPC {@code GetProductsBriefInternal}，跨服務消費端是
-     * product-import-service 的 {@code ItemQueryService.batchFetchCommittedProductsBrief}。
-     * 就地放寬會靜默改掉那個服務的畫面（該 surface 自己的缺口見 #2819）。
      *
      * <p>本方法對齊 {@link #findByIdIncludingDeleted} 的語意：**取名字不該被可見性過濾**。
      * 同服務的 MQ 路徑（{@code ProductCertificationApplicationService#publishDecidedAfterCommit}）
@@ -615,7 +558,7 @@ public interface ProductRepository extends BaseMapper<ProductEntity> {
      * <p>回傳三個時間欄供呼叫端交給 {@code ProductPublicationPolicy#deriveState} 判斷公開生命週期；
      * 本方法不自己下判斷（規則的 SSOT 是 {@code ProductPublicationState}）。
      *
-     * <p>caller 需自行限制 ids 集合大小（與 {@link #findBriefByIds} 同慣例，≤ 200），
+     * <p>caller 需自行限制 ids 集合大小（≤ 200），
      * 並確保**不傳空集合**——{@code IN ()} 在 PostgreSQL 是語法錯誤，本方法不二次校驗。
      */
     @Select("""

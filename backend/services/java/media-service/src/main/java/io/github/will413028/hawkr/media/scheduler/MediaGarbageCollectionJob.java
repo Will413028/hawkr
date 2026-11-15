@@ -6,7 +6,6 @@ import io.github.will413028.hawkr.media.entity.UploadSessionEntity;
 import io.github.will413028.hawkr.media.repository.AssetReferenceRepository;
 import io.github.will413028.hawkr.media.repository.MediaAssetRepository;
 import io.github.will413028.hawkr.media.repository.UploadSessionRepository;
-import io.github.will413028.hawkr.media.service.ImportAssetService;
 import io.github.will413028.hawkr.media.storage.StorageService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -27,7 +26,7 @@ import java.util.List;
  * 1. 清理 Staging 孤兒：找出 upload_session 狀態為 INIT/COMPLETED 且過期者
  * 2. 清理未引用 Asset (Soft GC)：找出無引用且創建超過 7 天的 media_asset
  *
- * <p>Tx 載體規定（對齊 09 設計書 §8.1.1 / 40 設計書 §2.5）：
+ * <p>Tx 載體規定（對齊 09 設計書 §8.1.1）：
  * 三個清理 method 從 {@code runGarbageCollection} 內部 self-invoke，必須由 caller 用
  * {@link TransactionTemplate#execute} 程式式包覆，**禁止**用 {@code @Transactional}
  * annotation —— Spring AOP CGLIB proxy 不攔截 {@code this.cleanXxx(...)}，annotation 失效後
@@ -89,8 +88,7 @@ public class MediaGarbageCollectionJob {
     private final MediaAssetRepository mediaAssetRepository;
     private final AssetReferenceRepository assetReferenceRepository;
     private final StorageService storageService;
-    private final ImportAssetService importAssetService;
-    // 09 §8.1.1 / 40 §2.5 Tx 載體規定：同 class self-invocation 用 TransactionTemplate 程式式包覆
+    // 09 §8.1.1 Tx 載體規定：同 class self-invocation 用 TransactionTemplate 程式式包覆
     private final TransactionTemplate txTemplate;
     /**
      * R4-P1-2：<b>只給 lease claim 用</b>的獨立交易載體（{@code PROPAGATION_REQUIRES_NEW}）。
@@ -112,21 +110,15 @@ public class MediaGarbageCollectionJob {
     @Value("${media.gc.enabled:true}")
     private boolean gcEnabled;
 
-    /** import_asset EXPIRED 後保留天數（08 號設計書 §7.6）：超過則 DELETE row。 */
-    @Value("${media.import.asset.expired-retention-days:30}")
-    private int importAssetExpiredRetentionDays;
-
     public MediaGarbageCollectionJob(UploadSessionRepository uploadSessionRepository,
                                      MediaAssetRepository mediaAssetRepository,
                                      AssetReferenceRepository assetReferenceRepository,
                                      StorageService storageService,
-                                     ImportAssetService importAssetService,
                                      PlatformTransactionManager txManager) {
         this.uploadSessionRepository = uploadSessionRepository;
         this.mediaAssetRepository = mediaAssetRepository;
         this.assetReferenceRepository = assetReferenceRepository;
         this.storageService = storageService;
-        this.importAssetService = importAssetService;
         this.txTemplate = new TransactionTemplate(txManager);
         this.claimTxTemplate = new TransactionTemplate(txManager);
         this.claimTxTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -162,19 +154,11 @@ public class MediaGarbageCollectionJob {
             // 3. 清理孤立引用（asset 已不存在的 reference 記錄）
             int staleRefs = txTemplate.execute(status -> cleanStaleReferences());
 
-            // 4. 清理 import_asset：過期未 Finalize → EXPIRED + 刪 OSS tmp；已 EXPIRED 滿保留期 → DELETE
-            //    跨 class 呼叫 importAssetService（proxy 生效），無 self-invoke 問題
-            int expiredImportAssets = cleanupExpiredImportAssets();
-            int prunedImportAssets = pruneExpiredImportAssetRetention();
-
-            int total = expiredSessions + orphanedAssets + staleRefs
-                + expiredImportAssets + prunedImportAssets;
+            int total = expiredSessions + orphanedAssets + staleRefs;
             if (total > 0) {
                 log.info("gc.done", "垃圾回收完成, sessions=" + expiredSessions
                     + ", assets=" + orphanedAssets
-                    + ", staleRefs=" + staleRefs
-                    + ", importExpired=" + expiredImportAssets
-                    + ", importPruned=" + prunedImportAssets);
+                    + ", staleRefs=" + staleRefs);
             }
 
         } catch (Exception e) {
@@ -188,7 +172,7 @@ public class MediaGarbageCollectionJob {
      * 找出 upload_session 狀態為 INIT/COMPLETED 且過期者，
      * 刪除對應的 OSS 檔案並標記 EXPIRED
      *
-     * <p>09 §8.1.1 / 40 §2.5：必須由 caller 包進 {@code txTemplate.execute(...)}。
+     * <p>09 §8.1.1：必須由 caller 包進 {@code txTemplate.execute(...)}。
      * 禁止標 {@code @Transactional}（self-invocation 會繞過 Spring AOP CGLIB proxy）。
      */
     private int cleanExpiredSessions() {
@@ -248,7 +232,7 @@ public class MediaGarbageCollectionJob {
      * 找出無引用且創建超過 7 天的 media_asset，
      * 刪除 OSS 檔案和 DB 記錄
      *
-     * <p>09 §8.1.1 / 40 §2.5：必須由 caller 包進 {@code txTemplate.execute(...)}。
+     * <p>09 §8.1.1：必須由 caller 包進 {@code txTemplate.execute(...)}。
      * 禁止標 {@code @Transactional}。
      */
     private int cleanOrphanedAssets() {
@@ -320,7 +304,7 @@ public class MediaGarbageCollectionJob {
     /**
      * 清理孤立引用（asset 已被刪除但 reference 仍殘留）
      *
-     * <p>09 §8.1.1 / 40 §2.5：必須由 caller 包進 {@code txTemplate.execute(...)}。
+     * <p>09 §8.1.1：必須由 caller 包進 {@code txTemplate.execute(...)}。
      * 禁止標 {@code @Transactional}。
      *
      * <p><b>issue #2294 L8：這一段刻意<b>不</b>加租約</b>（與同 job 的另外兩段不同）。
@@ -345,46 +329,5 @@ public class MediaGarbageCollectionJob {
     public void triggerManualGc() {
         log.info("gc.manual.trigger", "手動觸發垃圾回收");
         runGarbageCollection();
-    }
-
-    /**
-     * GC 第 4 層第 1 階段：過期未 Finalize 的 import_asset
-     * （status ∈ {DOWNLOADING, UPLOADED, FAILED} 且 expires_at &lt; now → EXPIRED + 刪 OSS tmp）。
-     * <p>對應 08 號設計書 §7.6（被動兜底，與 §7.5 主動 gc.expire_job MQ 並存且 idempotent）。
-     *
-     * <p>由 {@code importAssetService}（跨 class）內部以 {@code @Transactional} 包覆，
-     * proxy 生效，無 self-invoke 問題。
-     *
-     * @return 標 EXPIRED 的筆數
-     */
-    public int cleanupExpiredImportAssets() {
-        int total = 0;
-        int round;
-        do {
-            round = importAssetService.cleanupExpiredCandidates(batchSize);
-            total += round;
-        } while (round == batchSize);
-        if (total > 0) {
-            log.info("gc.importAsset.expired", "import_asset 過期清理完成, count=" + total);
-        }
-        return total;
-    }
-
-    /**
-     * GC 第 4 層第 2 階段：已 EXPIRED 滿保留期的 import_asset → DELETE。
-     *
-     * @return 刪除筆數
-     */
-    public int pruneExpiredImportAssetRetention() {
-        int total = 0;
-        int round;
-        do {
-            round = importAssetService.cleanupExpiredRetention(importAssetExpiredRetentionDays, batchSize);
-            total += round;
-        } while (round == batchSize);
-        if (total > 0) {
-            log.info("gc.importAsset.pruned", "import_asset 保留期過後刪除完成, count=" + total);
-        }
-        return total;
     }
 }

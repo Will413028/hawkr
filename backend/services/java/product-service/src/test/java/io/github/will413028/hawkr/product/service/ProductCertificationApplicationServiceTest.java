@@ -1464,23 +1464,6 @@ class ProductCertificationApplicationServiceTest {
             assertFalse(STORE_ID.equals(submitter.getValue()),
                     "storeId 是營運鍵，不是登入 principal —— 頂替只有 re-key 過的店家會錯且無告警");
         }
-
-        /** 匯入路徑的來源必須是 PRODUCT_IMPORT，稽核 actor 記 SYSTEM（沒有具體的人在按按鈕）。 */
-        @Test
-        @DisplayName("匯入寫入 ⇒ source = PRODUCT_IMPORT，actor_role = SYSTEM")
-        void importWriteIsRecordedAsProductImport() {
-            service.syncFromProductWrite(
-                    new ProductCertificationApplicationService.CertificationSyncCommand(
-                            PRODUCT_ID, STORE_ID, null,
-                            ProductCertificationSource.PRODUCT_IMPORT.value(), false,
-                            List.of(input(ORGANIC, CERT_A))));
-
-            verify(applicationRepository).insertSubmittedIfAbsent(any(), any(), any(), any(),
-                    eq(ORGANIC), eq(CERT_A),
-                    eq(ProductCertificationSource.PRODUCT_IMPORT.value()),
-                    anyBooleanArg(), any(), any(), any(), any());
-            assertEquals("SYSTEM", capturedEvents().get(0).getActorRole());
-        }
     }
 
     // ==================== §16.3 冪等 ====================

@@ -6,7 +6,6 @@ import io.github.will413028.hawkr.media.entity.UploadSessionEntity;
 import io.github.will413028.hawkr.media.repository.AssetReferenceRepository;
 import io.github.will413028.hawkr.media.repository.MediaAssetRepository;
 import io.github.will413028.hawkr.media.repository.UploadSessionRepository;
-import io.github.will413028.hawkr.media.service.ImportAssetService;
 import io.github.will413028.hawkr.media.storage.StorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -60,9 +59,6 @@ class MediaGarbageCollectionJobTest {
     @Mock
     private StorageService storageService;
 
-    @Mock
-    private ImportAssetService importAssetService;
-
     private TestTxManager txManager;
     private MediaGarbageCollectionJob gcJob;
 
@@ -70,11 +66,10 @@ class MediaGarbageCollectionJobTest {
     void setUp() {
         txManager = new TestTxManager();
         gcJob = new MediaGarbageCollectionJob(uploadSessionRepository, mediaAssetRepository,
-                assetReferenceRepository, storageService, importAssetService, txManager);
+                assetReferenceRepository, storageService, txManager);
         ReflectionTestUtils.setField(gcJob, "orphanAssetDays", 7);
         ReflectionTestUtils.setField(gcJob, "batchSize", 100);
         ReflectionTestUtils.setField(gcJob, "gcEnabled", true);
-        ReflectionTestUtils.setField(gcJob, "importAssetExpiredRetentionDays", 30);
         // issue #2294 L8：加了 lease 閘門之後，Mockito 對 int 預設回 0 ⇒ 每一筆都 skip ⇒
         // 本檔所有「應該刪掉」的斷言全紅。這裡 stub 成「搶到」，讓原本的斷言回到它們要驗的事；
         // 閘門本身的兩條分支由 MediaGarbageCollectionJobClaimTest 覆蓋。

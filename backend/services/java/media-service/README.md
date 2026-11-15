@@ -161,7 +161,6 @@ media:
 |------|------|------|
 | `id` | BIGINT | 資產 ID（TSID） |
 | `uploader_account_id` | BIGINT | 上傳者真實登入 account_id（一般買/賣家/後台上傳，`createMediaAsset` 寫入）；系統直傳與匯入轉正列為 NULL |
-| `import_store_id` | BIGINT | 賣家 store_id，僅 CSV/URL 商品匯入管線轉正（`ImportAssetService.commitFinalize`）寫入；其餘為 NULL |
 | `object_key` | VARCHAR(512) | OSS 路徑 |
 | `ref_type` | VARCHAR(64) | 資源分類（Finalize 時設定，對應 AssetReferenceType） |
 | `is_secure` | BOOLEAN | 是否機敏檔案 |
