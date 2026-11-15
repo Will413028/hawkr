@@ -6,11 +6,11 @@
 
 ## 擁有的資料
 
-schema `moderation`（`db/schema.sql`）：`cases`（案件與決定）、`reports`（檢舉，不存結果）、`case_snapshots`（內容快照與它引用的圖片資產）、`reporter_daily_counts`（每日上限）、`media_ref_sync` 與 `retired_assets`（快照圖片在 media 的引用同步）。讀取模型：無。
+schema `moderation`（表在 `db/schema.sql`，發布的函式與複合型別在 `db/objects.sql`）：`cases`（案件與決定）、`reports`（檢舉，不存結果）、`case_snapshots`（內容快照與它引用的圖片資產）、`reporter_daily_counts`（每日上限）、`media_ref_sync` 與 `retired_assets`（快照圖片在 media 的引用同步）。讀取模型：無。
 
 ## 發布的讀取介面
 
-無。
+`moderation.pub_review_items(at)`：後台待辦的 moderation 部分（reviewqueue 讀，契約在 `db/pub.sql`），一列一個進行中案件（`decision IS NULL`），種類 `MODERATION_CASE`。期限的時長只寫在 `objects.sql` 的 `review_moderation_case(at)`，規格見 `backend/docs/modules/moderation.md` §7。
 
 ## 模組內部結構
 

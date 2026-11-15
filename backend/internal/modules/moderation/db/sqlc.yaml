@@ -1,11 +1,11 @@
-# 改完 schema.sql 或 queries/ 之後，在本目錄執行 `sqlc generate`。
+# 改完 schema.sql、objects.sql 或 queries/ 之後，在本目錄執行 `sqlc generate`。
 #
-# 只讀本模組的 schema.sql：query 參照別的模組的表時，sqlc generate 就會失敗
+# 只讀本模組的 schema.sql 與 objects.sql：query 參照別的模組的表時，sqlc generate 就會失敗
 # （ADR 2026-09-24-go-modular-monolith D3 的機械檢查；CI 重新生成並比對）。
 version: "2"
 sql:
   - engine: "postgresql"
-    schema: "schema.sql"
+    schema: ["schema.sql", "objects.sql"]
     queries: "queries/"
     gen:
       go:

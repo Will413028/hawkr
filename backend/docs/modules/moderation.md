@@ -8,6 +8,7 @@
 - 依賴 social、seller、buyer、`accountsuspension`、media（快照圖片的引用）；不依賴 identity、不依賴 notification（A7-1d 不發事件，A8 依案件決定通知時再加）。
 - 擁有的資料：`moderation.cases`、`reports`、`case_snapshots`、`reporter_daily_counts`、`media_ref_sync`、`retired_assets`（快照圖片引用的同步，演算法在 media）；主鍵 UUIDv7，不建跨 schema FK。
 - 對象：貼文、留言、討論區留言（`content_id`）與買家（`buyer_id`）。聊天與評價對象在 A6-4。
+- 發布：`moderation.pub_review_items(at)`（後台待辦，見 §7）；`db/objects.sql` 放函式與複合型別，`db/pub.sql` 是消費端 sqlc 讀的形狀。
 
 ## 2. 送出檢舉（SubmitReport）
 
@@ -47,3 +48,10 @@
 |---|---|---|
 | 一次處理只有一種處置 | 同一案件組合多種處置 | 產品要求同時隱藏與警告 |
 | 濫用檢舉人不逐筆標記 | 依 `NO_VIOLATION` 比例或「明顯無根據」的決定值限制檢舉人 | 營運回報濫用檢舉 |
+
+## 7. 後台待辦（pub_review_items）
+
+- `moderation.pub_review_items(at)` 一列是一個進行中案件（`cases.decision IS NULL`，與 `closed_at IS NULL` 等價，由 `cases_closed_together_check` 保證；A7-D14 一案一列）。沒有排序，reviewqueue 排序與分頁。
+- 欄位：`kind` 固定 `MODERATION_CASE`；`item_id` 與 `case_id` 是案件 ID（`item_id` 是它的文字）；`target_kind`（POST、COMMENT、FORUM_ENTRY、BUYER）與 `report_count`（案件的檢舉筆數）只供顯示，reviewqueue 不投影它們；`start_at`、`due_at`。
+- 期限（上線前的起始值）：從開案時間 `opened_at`（首筆檢舉的提交時間，`SubmitReport` 開案時寫入）起 72 小時，開始（轉黃）是期限前 24 小時，對齊 seller 通報的分案期限；社群類別沒有食安，不用 4 小時那一檔。時長只寫在 `db/objects.sql` 的 `review_moderation_case(at)`；`at` 由呼叫方傳入，不用 `now()`，期限與 `at` 無關。
+- 守門：`reviewqueue` 的 `TestModerationCasesAreInTheQueueExactlyWhenOpen`（每種領域狀態進不進待辦）、`TestCrossSourceKeysetPagingWithModeration`；`cmd/hawkr` 的 `TestPubContractsMatchMigrations` 比對 `pub.sql`。
