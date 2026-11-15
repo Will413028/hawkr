@@ -12,8 +12,42 @@ import (
 	"uuid"
 )
 
+const commentByRequest = `-- name: CommentByRequest :one
+SELECT id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, request_id, request_hash FROM social.comments
+WHERE actor_kind = $1 AND actor_id = $2 AND request_id = $3
+`
+
+type CommentByRequestParams struct {
+	ActorKind string
+	ActorID   int64
+	RequestID *uuid.UUID
+}
+
+// 冪等重送的查詢：範圍是 (互動者, request_id)。
+func (q *Queries) CommentByRequest(ctx context.Context, arg CommentByRequestParams) (SocialComment, error) {
+	row := q.db.QueryRow(ctx, commentByRequest, arg.ActorKind, arg.ActorID, arg.RequestID)
+	var i SocialComment
+	err := row.Scan(
+		&i.ID,
+		&i.PostID,
+		&i.ParentID,
+		&i.ReplyToID,
+		&i.ActorKind,
+		&i.ActorID,
+		&i.Body,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.ThreadID,
+		&i.Counted,
+		&i.RequestID,
+		&i.RequestHash,
+	)
+	return i, err
+}
+
 const getComment = `-- name: GetComment :one
-SELECT c.id, c.post_id, c.parent_id, c.reply_to_id, c.actor_kind, c.actor_id, c.body, c.created_at, c.updated_at, c.deleted_at, c.thread_id, c.counted, p.store_id AS post_store_id
+SELECT c.id, c.post_id, c.parent_id, c.reply_to_id, c.actor_kind, c.actor_id, c.body, c.created_at, c.updated_at, c.deleted_at, c.thread_id, c.counted, c.request_id, c.request_hash, p.store_id AS post_store_id
 FROM social.comments c
 JOIN social.posts p ON p.id = c.post_id
 WHERE c.id = $1
@@ -40,6 +74,8 @@ func (q *Queries) GetComment(ctx context.Context, id uuid.UUID) (GetCommentRow, 
 		&i.SocialComment.DeletedAt,
 		&i.SocialComment.ThreadID,
 		&i.SocialComment.Counted,
+		&i.SocialComment.RequestID,
+		&i.SocialComment.RequestHash,
 		&i.PostStoreID,
 	)
 	return i, err
@@ -63,27 +99,31 @@ func (q *Queries) GetCommentCounts(ctx context.Context, id uuid.UUID) (GetCommen
 
 const insertComment = `-- name: InsertComment :one
 
-INSERT INTO social.comments (id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at)
+INSERT INTO social.comments (id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, request_id, request_hash)
 VALUES (
     $1, $2, $3, $4, $5, $6,
-    $7::text, $8, $8
+    $7::text, $8, $8, $9, $10
 )
-RETURNING id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted
+ON CONFLICT (actor_kind, actor_id, request_id) DO NOTHING
+RETURNING id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, request_id, request_hash
 `
 
 type InsertCommentParams struct {
-	ID        uuid.UUID
-	PostID    uuid.UUID
-	ParentID  *uuid.UUID
-	ReplyToID *uuid.UUID
-	ActorKind string
-	ActorID   int64
-	Body      string
-	Now       time.Time
+	ID          uuid.UUID
+	PostID      uuid.UUID
+	ParentID    *uuid.UUID
+	ReplyToID   *uuid.UUID
+	ActorKind   string
+	ActorID     int64
+	Body        string
+	Now         time.Time
+	RequestID   *uuid.UUID
+	RequestHash []byte
 }
 
 // 貼文的留言的寫入與店主、作者自己的讀取。帶「公開可讀、可見」規則的讀取（列表、佔位項目、回覆的對象檢查、隱藏旗標）是 go-jet 建的，
 // 在 internal/reads，規則在 internal/visibility。
+// 同一個互動者的同一個 request_id 已經有時不寫入、回 0 列（不讓 transaction 失效，呼叫方接著讀原本那一則）。
 func (q *Queries) InsertComment(ctx context.Context, arg InsertCommentParams) (SocialComment, error) {
 	row := q.db.QueryRow(ctx, insertComment,
 		arg.ID,
@@ -94,6 +134,8 @@ func (q *Queries) InsertComment(ctx context.Context, arg InsertCommentParams) (S
 		arg.ActorID,
 		arg.Body,
 		arg.Now,
+		arg.RequestID,
+		arg.RequestHash,
 	)
 	var i SocialComment
 	err := row.Scan(
@@ -109,12 +151,14 @@ func (q *Queries) InsertComment(ctx context.Context, arg InsertCommentParams) (S
 		&i.DeletedAt,
 		&i.ThreadID,
 		&i.Counted,
+		&i.RequestID,
+		&i.RequestHash,
 	)
 	return i, err
 }
 
 const lockComment = `-- name: LockComment :one
-SELECT c.id, c.post_id, c.parent_id, c.reply_to_id, c.actor_kind, c.actor_id, c.body, c.created_at, c.updated_at, c.deleted_at, c.thread_id, c.counted, p.store_id AS post_store_id
+SELECT c.id, c.post_id, c.parent_id, c.reply_to_id, c.actor_kind, c.actor_id, c.body, c.created_at, c.updated_at, c.deleted_at, c.thread_id, c.counted, c.request_id, c.request_hash, p.store_id AS post_store_id
 FROM social.comments c
 JOIN social.posts p ON p.id = c.post_id
 WHERE c.id = $1
@@ -143,6 +187,8 @@ func (q *Queries) LockComment(ctx context.Context, id uuid.UUID) (LockCommentRow
 		&i.SocialComment.DeletedAt,
 		&i.SocialComment.ThreadID,
 		&i.SocialComment.Counted,
+		&i.SocialComment.RequestID,
+		&i.SocialComment.RequestHash,
 		&i.PostStoreID,
 	)
 	return i, err
@@ -170,7 +216,7 @@ func (q *Queries) SoftDeleteComment(ctx context.Context, arg SoftDeleteCommentPa
 const updateCommentBody = `-- name: UpdateCommentBody :one
 UPDATE social.comments SET body = $1::text, updated_at = $2
 WHERE id = $3 AND deleted_at IS NULL
-RETURNING id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted
+RETURNING id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, request_id, request_hash
 `
 
 type UpdateCommentBodyParams struct {
@@ -195,6 +241,8 @@ func (q *Queries) UpdateCommentBody(ctx context.Context, arg UpdateCommentBodyPa
 		&i.DeletedAt,
 		&i.ThreadID,
 		&i.Counted,
+		&i.RequestID,
+		&i.RequestHash,
 	)
 	return i, err
 }

@@ -350,6 +350,11 @@ func ReplySameThreadOnly(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "只能回覆同一串裡看得到的留言", Locale: uitext.ZhTW}
 }
 
+// RequestIdReused 是模組句子 request.id_reused；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func RequestIdReused(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "這次送出的內容和同一個請求先前送出的不同，請重新整理頁面後再試。", Locale: uitext.ZhTW}
+}
+
 // SanctionBuyerRequired 是後台員工受眾的模組句子 sanction.buyer_required（只有 zh-TW）。
 func SanctionBuyerRequired() uitext.Message {
 	return uitext.Message{Text: "缺少買家", Locale: uitext.ZhTW}

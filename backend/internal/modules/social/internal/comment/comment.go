@@ -3,6 +3,7 @@
 package comment
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -81,6 +82,10 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.CommentIn
 	var postStore int64
 	var replyTo *store.SocialComment
 	var a model.Actor
+	var hash []byte
+	if in.RequestID != nil {
+		hash = model.RequestHash("comment", in.PostID.String(), model.OptionalID(in.ParentID), model.OptionalID(in.ReplyToID), body)
+	}
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		post, err := q.GetPost(ctx, in.PostID)
@@ -101,6 +106,10 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.CommentIn
 		}
 		a, err = s.d.Actors.ForWrite(ctx, c, postStore, seller.CapMarketing)
 		if err != nil {
+			return err
+		}
+		if row, ok, err := s.replay(ctx, q, a, in.RequestID, hash); err != nil || ok {
+			created = row
 			return err
 		}
 		var parentID *uuid.UUID
@@ -141,8 +150,20 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.CommentIn
 		}
 		created, err = q.InsertComment(ctx, store.InsertCommentParams{
 			ID: s.d.NewID(), PostID: in.PostID, ParentID: parentID, ReplyToID: replyToID,
-			ActorKind: string(a.Kind), ActorID: a.ID, Body: body, Now: now,
+			ActorKind: string(a.Kind), ActorID: a.ID, Body: body, Now: now, RequestID: in.RequestID, RequestHash: hash,
 		})
+		if errors.Is(err, pgx.ErrNoRows) {
+			// 同一個 (互動者, request_id) 在上面的查詢之後才出現（並行的重送）：INSERT 等到對方 commit 才回 0 列，這時讀得到它。
+			row, ok, rerr := s.replay(ctx, q, a, in.RequestID, hash)
+			if rerr != nil {
+				return rerr
+			}
+			if !ok {
+				return fmt.Errorf("social：留言的 request_id %s 衝突，卻查不到原本那一則", in.RequestID)
+			}
+			created = row
+			return nil
+		}
 		if err != nil {
 			return fmt.Errorf("social：新增留言：%w", err)
 		}
@@ -161,6 +182,24 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.CommentIn
 		return model.Comment{}, err
 	}
 	return visibleComment(created), nil
+}
+
+// replay 查 (互動者, request_id)：命中且內容相同回傳第一次建立的那一則；內容不同是 InvalidInput；沒帶 request_id 或沒命中回 false。
+func (s *Service) replay(ctx context.Context, q *store.Queries, a model.Actor, requestID *uuid.UUID, hash []byte) (store.SocialComment, bool, error) {
+	if requestID == nil {
+		return store.SocialComment{}, false, nil
+	}
+	row, err := q.CommentByRequest(ctx, store.CommentByRequestParams{ActorKind: string(a.Kind), ActorID: a.ID, RequestID: requestID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return store.SocialComment{}, false, nil
+	}
+	if err != nil {
+		return store.SocialComment{}, false, fmt.Errorf("social：讀取留言的 request_id %s：%w", requestID, err)
+	}
+	if !bytes.Equal(row.RequestHash, hash) {
+		return store.SocialComment{}, false, apperr.InvalidInputOn([]string{"RequestID"}, "%s", text.RequestIdReused(uitext.LocaleFrom(ctx)))
+	}
+	return row, true, nil
 }
 
 // Update 修改留言：只限作者本人；被隱藏的留言作者不能編輯（SD7）；已刪除的留言是 NotFound。

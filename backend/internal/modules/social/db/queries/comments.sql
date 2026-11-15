@@ -2,12 +2,19 @@
 -- 在 internal/reads，規則在 internal/visibility。
 
 -- name: InsertComment :one
-INSERT INTO social.comments (id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at)
+-- 同一個互動者的同一個 request_id 已經有時不寫入、回 0 列（不讓 transaction 失效，呼叫方接著讀原本那一則）。
+INSERT INTO social.comments (id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, request_id, request_hash)
 VALUES (
     sqlc.arg(id), sqlc.arg(post_id), sqlc.narg(parent_id), sqlc.narg(reply_to_id), sqlc.arg(actor_kind), sqlc.arg(actor_id),
-    sqlc.arg(body)::text, sqlc.arg(now), sqlc.arg(now)
+    sqlc.arg(body)::text, sqlc.arg(now), sqlc.arg(now), sqlc.narg(request_id), sqlc.narg(request_hash)
 )
+ON CONFLICT (actor_kind, actor_id, request_id) DO NOTHING
 RETURNING *;
+
+-- name: CommentByRequest :one
+-- 冪等重送的查詢：範圍是 (互動者, request_id)。
+SELECT * FROM social.comments
+WHERE actor_kind = sqlc.arg(actor_kind) AND actor_id = sqlc.arg(actor_id) AND request_id = sqlc.arg(request_id);
 
 -- name: LockComment :one
 -- 鎖住留言（任何狀態）並帶回所屬貼文的店家：編輯與刪除要先確認作者與歸屬。

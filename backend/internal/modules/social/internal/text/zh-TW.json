@@ -228,6 +228,10 @@
     "reply.same_thread_only": {
       "message": "只能回覆同一串裡看得到的留言",
       "description": "回覆的對象不在同一串或看不到（留言與討論區留言共用）。"
+    },
+    "request.id_reused": {
+      "message": "這次送出的內容和同一個請求先前送出的不同，請重新整理頁面後再試。",
+      "description": "新增留言或討論區發言：同一位互動者的 request_id 已經用在內容不同的請求（AIP-155）。"
     }
   },
   "staff": {

@@ -3,9 +3,11 @@
 package forum
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 	"uuid"
 
@@ -67,6 +69,10 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.ForumInpu
 	}
 	now := s.d.Now().UTC()
 	var created store.SocialForumEntry
+	var hash []byte
+	if in.RequestID != nil {
+		hash = model.RequestHash("forum", rpcID(in.StoreID), model.OptionalID(in.ParentID), model.OptionalID(in.ReplyToID), body)
+	}
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		viewer := actor.ViewerFor(c, in.StoreID)
@@ -79,6 +85,10 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.ForumInpu
 		}
 		a, err := s.d.Actors.ForWrite(ctx, c, in.StoreID, seller.CapMarketing)
 		if err != nil {
+			return err
+		}
+		if row, ok, err := s.replay(ctx, q, a, in.RequestID, hash); err != nil || ok {
+			created = row
 			return err
 		}
 		var parentID, replyToID *uuid.UUID
@@ -110,8 +120,20 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.ForumInpu
 		}
 		created, err = q.InsertForumEntry(ctx, store.InsertForumEntryParams{
 			ID: s.d.NewID(), StoreID: in.StoreID, ParentID: parentID, ReplyToID: replyToID,
-			ActorKind: string(a.Kind), ActorID: a.ID, Body: body, Now: now,
+			ActorKind: string(a.Kind), ActorID: a.ID, Body: body, Now: now, RequestID: in.RequestID, RequestHash: hash,
 		})
+		if errors.Is(err, pgx.ErrNoRows) {
+			// 同一個 (互動者, request_id) 在上面的查詢之後才出現（並行的重送）：INSERT 等到對方 commit 才回 0 列，這時讀得到它。
+			row, ok, rerr := s.replay(ctx, q, a, in.RequestID, hash)
+			if rerr != nil {
+				return rerr
+			}
+			if !ok {
+				return fmt.Errorf("social：討論區留言的 request_id %s 衝突，卻查不到原本那一則", in.RequestID)
+			}
+			created = row
+			return nil
+		}
 		if err != nil {
 			return fmt.Errorf("social：新增討論區留言：%w", err)
 		}
@@ -122,6 +144,26 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.ForumInpu
 	}
 	return visible(created), nil
 }
+
+// replay 查 (互動者, request_id)：命中且內容相同回傳第一次建立的那一則；內容不同是 InvalidInput；沒帶 request_id 或沒命中回 false。
+func (s *Service) replay(ctx context.Context, q *store.Queries, a model.Actor, requestID *uuid.UUID, hash []byte) (store.SocialForumEntry, bool, error) {
+	if requestID == nil {
+		return store.SocialForumEntry{}, false, nil
+	}
+	row, err := q.ForumEntryByRequest(ctx, store.ForumEntryByRequestParams{ActorKind: string(a.Kind), ActorID: a.ID, RequestID: requestID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return store.SocialForumEntry{}, false, nil
+	}
+	if err != nil {
+		return store.SocialForumEntry{}, false, fmt.Errorf("social：讀取討論區留言的 request_id %s：%w", requestID, err)
+	}
+	if !bytes.Equal(row.RequestHash, hash) {
+		return store.SocialForumEntry{}, false, apperr.InvalidInputOn([]string{"RequestID"}, "%s", text.RequestIdReused(uitext.LocaleFrom(ctx)))
+	}
+	return row, true, nil
+}
+
+func rpcID(storeID int64) string { return strconv.FormatInt(storeID, 10) }
 
 // Update 修改討論區留言：只限作者本人；被隱藏的不能修改；已刪除的是 NotFound（SD7）。
 func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, newText string) (model.ForumEntry, error) {

@@ -2,6 +2,8 @@
 package model
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"time"
 	"unicode/utf8"
 	"uuid"
@@ -223,19 +225,25 @@ type CommentPage struct {
 }
 
 // CommentInput 是新增留言或回覆。ParentID 為 nil 是頂層留言；回覆的父一律壓成頂層，ReplyToID 是被回覆的那一則（同篇、可見）。
+//
+// RequestID 是選填的冪等鍵（AIP-155）：同一個互動者以同一個 RequestID 重送，內容相同回傳第一次建立的那一則、不重複建立（也不重發事件），
+// 內容不同是 InvalidInput。
 type CommentInput struct {
 	PostID    uuid.UUID
 	Body      string
 	ParentID  *uuid.UUID
 	ReplyToID *uuid.UUID
+	RequestID *uuid.UUID
 }
 
 // ForumInput 是新增討論區留言或回覆（容器是店家）。
+// RequestID 同 CommentInput。
 type ForumInput struct {
 	StoreID   int64
 	Body      string
 	ParentID  *uuid.UUID
 	ReplyToID *uuid.UUID
+	RequestID *uuid.UUID
 }
 
 // BodyText 是留言或討論區留言的內文。內文只有在買家刪帳的清除之後才是 NULL，而且那時列一定已刪除（comments_scrubbed_check），
@@ -410,4 +418,22 @@ type ContentSnapshot struct {
 	Readable  bool
 	Body      string
 	MediaRefs []string
+}
+
+// RequestHash 是建立輸入的 SHA-256（欄位依固定順序、以長度前綴編碼，不會因串接而混淆）：冪等重送比對「內容是否相同」的唯一定義。
+// 呼叫方傳入正規化後的欄位（內文已去空白），沒有的選填欄位傳 "-"。
+func RequestHash(parts ...string) []byte {
+	h := sha256.New()
+	for _, p := range parts {
+		_, _ = fmt.Fprintf(h, "%d:%s|", len(p), p)
+	}
+	return h.Sum(nil)
+}
+
+// OptionalID 把選填的 ID 編成 RequestHash 的欄位：沒有是 "-"。
+func OptionalID(id *uuid.UUID) string {
+	if id == nil {
+		return "-"
+	}
+	return id.String()
 }
