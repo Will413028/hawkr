@@ -72,6 +72,12 @@ var customerEffects = map[string]Effect{
 	// DiscoveryPublicService
 	"/hawkr.discovery.v1alpha1.DiscoveryPublicService/SuggestRecommendedSellers": EffectRead,
 
+	// SocialPublicService
+	"/hawkr.social.v1alpha1.SocialPublicService/GetPost":              EffectRead,
+	"/hawkr.social.v1alpha1.SocialPublicService/ListPosts":            EffectRead,
+	"/hawkr.social.v1alpha1.SocialPublicService/ListComments":         EffectRead,
+	"/hawkr.social.v1alpha1.SocialPublicService/SuggestTrendingPosts": EffectRead,
+
 	// SellerReportAppService
 	"/hawkr.seller.v1alpha1.SellerReportAppService/CreateReport":  EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerReportAppService/ListMyReports": EffectRead,
