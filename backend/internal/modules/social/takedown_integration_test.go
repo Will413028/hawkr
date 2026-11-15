@@ -324,19 +324,25 @@ func TestReconcileRemovesTheTakedownsTheSubscriberMissedRevoking(t *testing.T) {
 	}
 }
 
-// 內容不存在：複本的外鍵讓訂閱者失敗，措施跟著回滾。
-func TestTakedownOfMissingContentFailsTheCallersTransaction(t *testing.T) {
+// 列已清除或不存在的內容：成立且不寫複本（歸屬由 moderation 以案件快照核對），措施照常建立，同一批的存在內容照常寫複本。
+func TestTakedownOfPurgedContentSucceedsWithoutReplica(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 	f := setup(t)
-	td := f.takedowns(t)
+	f.takedowns(t)
 	w := f.takedownWorld(t)
-	err := f.db.InTx(context.Background(), func(ctx context.Context) error {
-		return events.Publish(ctx, f.bus, seller.MeasureCreated{MeasureID: uuid.NewV7(), StoreID: w.storeID, OccurredAt: f.clock(), Contents: []seller.ContentRef{ref(seller.ContentPost, uuid.NewV7())}})
-	})
-	if err == nil {
-		t.Fatal("不存在的內容要讓建立失敗")
+	purged := f.publishedPost(t, w.storeID, "已清除的貼文", "organic")
+	must(t, f.module.DeletePost(ctx, f.store(t, w.storeID), purged.ID, purged.Version))
+	f.exec(t, "DELETE FROM social.posts WHERE id = $1", purged.ID)
+	must(t, f.db.InTx(ctx, func(ctx context.Context) error {
+		return events.Publish(ctx, f.bus, seller.MeasureCreated{
+			MeasureID: uuid.NewV7(), StoreID: w.storeID, OccurredAt: f.clock(),
+			Contents: []seller.ContentRef{ref(seller.ContentPost, purged.ID), ref(seller.ContentComment, uuid.NewV7()), ref(seller.ContentForumEntry, uuid.NewV7()), ref(seller.ContentPost, w.post.ID)},
+		})
+	}))
+	if n := f.scalar(t, "SELECT count(*) FROM social.content_takedowns"); n != 1 {
+		t.Fatalf("只有存在的貼文寫複本：%d", n)
 	}
-	_ = td
 }
 
 // 不認得的內容種類：訂閱者回錯誤，措施跟著回滾，不是靜默略過。
@@ -356,7 +362,7 @@ func TestTakedownOfUnknownContentKindFailsTheCallersTransaction(t *testing.T) {
 	}
 }
 
-// 歸屬核對在訂閱者：買家寫的留言與討論區留言、別家店的內容（含別家店已刪除的）、不存在的內容都讓建立失敗，回 *TakedownContentError 指出是哪一則，措施回滾、旗標不動。
+// 歸屬核對在訂閱者：買家寫的留言與討論區留言、別家店的內容（含別家店已刪除的）都讓建立失敗，回 *TakedownContentError 指出是哪一則，措施回滾、旗標不動。
 func TestTakedownRejectsContentThatIsNotTheMeasureStoresOwn(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -375,7 +381,6 @@ func TestTakedownRejectsContentThatIsNotTheMeasureStoresOwn(t *testing.T) {
 		"買家的留言":     ref(seller.ContentComment, buyerComment.ID),
 		"買家的討論區留言":  ref(seller.ContentForumEntry, buyerEntry.ID),
 		"別家店已刪除的貼文": ref(seller.ContentPost, foreignDeleted.ID),
-		"不存在的討論區留言": ref(seller.ContentForumEntry, uuid.NewV7()),
 	} {
 		err := f.db.InTx(ctx, func(ctx context.Context) error {
 			return events.Publish(ctx, f.bus, seller.MeasureCreated{

@@ -53,47 +53,6 @@ func (q *Queries) DeleteTakedownsOfMeasure(ctx context.Context, measureID uuid.U
 	return result.RowsAffected(), nil
 }
 
-const deletedTakedownContents = `-- name: DeletedTakedownContents :many
-SELECT 'POST'::text AS content_kind, x.id AS content_id FROM social.posts AS x WHERE x.id = ANY($1::uuid[]) AND x.deleted_at IS NOT NULL
-UNION ALL
-SELECT 'COMMENT'::text, x.id FROM social.comments AS x WHERE x.id = ANY($2::uuid[]) AND x.deleted_at IS NOT NULL
-UNION ALL
-SELECT 'FORUM_ENTRY'::text, x.id FROM social.forum_entries AS x WHERE x.id = ANY($3::uuid[]) AND x.deleted_at IS NOT NULL
-ORDER BY 1, 2
-`
-
-type DeletedTakedownContentsParams struct {
-	PostIds       []uuid.UUID
-	CommentIds    []uuid.UUID
-	ForumEntryIds []uuid.UUID
-}
-
-type DeletedTakedownContentsRow struct {
-	ContentKind string
-	ContentID   uuid.UUID
-}
-
-// 通過歸屬核對的內容裡已軟刪的：沒有公開可見的東西要隱藏，不寫複本。
-func (q *Queries) DeletedTakedownContents(ctx context.Context, arg DeletedTakedownContentsParams) ([]DeletedTakedownContentsRow, error) {
-	rows, err := q.db.Query(ctx, deletedTakedownContents, arg.PostIds, arg.CommentIds, arg.ForumEntryIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []DeletedTakedownContentsRow{}
-	for rows.Next() {
-		var i DeletedTakedownContentsRow
-		if err := rows.Scan(&i.ContentKind, &i.ContentID); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const extraTakedowns = `-- name: ExtraTakedowns :many
 SELECT c.measure_id, c.post_id, c.comment_id, c.forum_entry_id FROM social.content_takedowns AS c
 WHERE NOT EXISTS (
@@ -128,6 +87,50 @@ func (q *Queries) ExtraTakedowns(ctx context.Context) ([]ExtraTakedownsRow, erro
 			&i.CommentID,
 			&i.ForumEntryID,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const goneTakedownContents = `-- name: GoneTakedownContents :many
+SELECT 'POST'::text AS content_kind, p::uuid AS content_id FROM unnest($1::uuid[]) AS p
+WHERE NOT EXISTS (SELECT 1 FROM social.posts AS x WHERE x.id = p AND x.deleted_at IS NULL)
+UNION ALL
+SELECT 'COMMENT'::text, c::uuid FROM unnest($2::uuid[]) AS c
+WHERE NOT EXISTS (SELECT 1 FROM social.comments AS x WHERE x.id = c AND x.deleted_at IS NULL)
+UNION ALL
+SELECT 'FORUM_ENTRY'::text, f::uuid FROM unnest($3::uuid[]) AS f
+WHERE NOT EXISTS (SELECT 1 FROM social.forum_entries AS x WHERE x.id = f AND x.deleted_at IS NULL)
+ORDER BY 1, 2
+`
+
+type GoneTakedownContentsParams struct {
+	PostIds       []uuid.UUID
+	CommentIds    []uuid.UUID
+	ForumEntryIds []uuid.UUID
+}
+
+type GoneTakedownContentsRow struct {
+	ContentKind string
+	ContentID   uuid.UUID
+}
+
+// 通過歸屬核對的內容裡已軟刪或列已清除的：沒有公開可見的東西要隱藏，不寫複本（也無列可供外鍵）。
+func (q *Queries) GoneTakedownContents(ctx context.Context, arg GoneTakedownContentsParams) ([]GoneTakedownContentsRow, error) {
+	rows, err := q.db.Query(ctx, goneTakedownContents, arg.PostIds, arg.CommentIds, arg.ForumEntryIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GoneTakedownContentsRow{}
+	for rows.Next() {
+		var i GoneTakedownContentsRow
+		if err := rows.Scan(&i.ContentKind, &i.ContentID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -213,13 +216,13 @@ func (q *Queries) InsertTakedowns(ctx context.Context, arg InsertTakedownsParams
 
 const invalidTakedownContents = `-- name: InvalidTakedownContents :many
 SELECT 'POST'::text AS content_kind, p::uuid AS content_id FROM unnest($1::uuid[]) AS p
-WHERE NOT EXISTS (SELECT 1 FROM social.posts AS x WHERE x.id = p AND x.store_id = $2::bigint)
+WHERE EXISTS (SELECT 1 FROM social.posts AS x WHERE x.id = p AND x.store_id <> $2::bigint)
 UNION ALL
 SELECT 'COMMENT'::text, c::uuid FROM unnest($3::uuid[]) AS c
-WHERE NOT EXISTS (SELECT 1 FROM social.comments AS x WHERE x.id = c AND x.actor_kind = 'STORE' AND x.actor_id = $2::bigint)
+WHERE EXISTS (SELECT 1 FROM social.comments AS x WHERE x.id = c AND NOT (x.actor_kind = 'STORE' AND x.actor_id = $2::bigint))
 UNION ALL
 SELECT 'FORUM_ENTRY'::text, f::uuid FROM unnest($4::uuid[]) AS f
-WHERE NOT EXISTS (SELECT 1 FROM social.forum_entries AS x WHERE x.id = f AND x.actor_kind = 'STORE' AND x.actor_id = $2::bigint)
+WHERE EXISTS (SELECT 1 FROM social.forum_entries AS x WHERE x.id = f AND NOT (x.actor_kind = 'STORE' AND x.actor_id = $2::bigint))
 ORDER BY 1, 2
 `
 
@@ -235,7 +238,7 @@ type InvalidTakedownContentsRow struct {
 	ContentID   uuid.UUID
 }
 
-// 內容下架的歸屬核對（建立措施的同一個 transaction，留言與討論區留言的列已經鎖住）：回傳不存在（已清除）、或不是該店家自己寫的內容；該店家自己寫而已軟刪的內容成立（刪除發生在被檢舉之後，措施仍要記下，由 DeletedTakedownContents 挑出不寫複本）。貼文的作者是它所屬的店家。
+// 內容下架的歸屬核對（建立措施的同一個 transaction，留言與討論區留言的列已經鎖住）：回傳存在（含已軟刪）但不是該店家自己寫的內容。列已經清除的內容不在此列：它的歸屬由 moderation 以案件快照核對，再呼叫 seller。貼文的作者是它所屬的店家。
 func (q *Queries) InvalidTakedownContents(ctx context.Context, arg InvalidTakedownContentsParams) ([]InvalidTakedownContentsRow, error) {
 	rows, err := q.db.Query(ctx, invalidTakedownContents,
 		arg.PostIds,

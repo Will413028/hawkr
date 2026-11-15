@@ -21,7 +21,7 @@ schema `social`（`db/schema.sql`；函式與 trigger 在 `db/objects.sql`，沒
 ## 不變量
 
 - 買家刪帳的事實有複本，由訂閱者在同一個 transaction 同步寫並重新求值。守門：`TestBuyerDeletionRequestUncountsTheContentInTheSameTransaction`、`TestDirectCloseStillHidesUncountsAndPurges`。規格：§7。
-- 內容下架的事實有複本 `content_takedowns`，由 seller 措施事件的同 transaction 訂閱者維護，每日對帳雙向核對 `seller.pub_content_takedowns()`；建立時訂閱者核對內容存在、作者是措施的店家（`TakedownContentError`）；已軟刪的自家內容成立但不寫複本（A7-D7 項目 10）。守門：`TestTakedownOfDeletedOwnContentSucceedsWithoutReplica`、`TestTakedownRejectsContentThatIsNotTheMeasureStoresOwn`、`TestReconcileAddsTheTakedownsTheSubscriberMissed`。規格：§4、§6。
+- 內容下架的事實有複本 `content_takedowns`，由 seller 措施事件的同 transaction 訂閱者維護，每日對帳雙向核對 `seller.pub_content_takedowns()`；建立時訂閱者核對存在的內容作者是措施的店家（`TakedownContentError`）；已軟刪的自家內容與已清除的內容成立但不寫複本（A7-D7 項目 10；已清除內容的歸屬由 moderation 以案件快照核對）。守門加 `TestTakedownOfPurgedContentSucceedsWithoutReplica`。守門：`TestTakedownOfDeletedOwnContentSucceedsWithoutReplica`、`TestTakedownRejectsContentThatIsNotTheMeasureStoresOwn`、`TestReconcileAddsTheTakedownsTheSubscriberMissed`。規格：§4、§6。
 - 跨模組鎖順序見 `backend/AGENTS.md` 單體規則 4（social 在 seller 之後）；本模組內：內容列 → 貼文 stats → 父項 stats，各依 ID 由小到大。守門：`TestMarkAuthorInactiveLocksStatsInTheSameOrderAsTheTriggers`、`TestEditLocksTheBuyerBeforeTheContentRow`。規格：§6、§7。
 - 使用者面的句子都在 `internal/text`，`apperr.*` 不帶字串字面值。守門：`TestSocialApperrCallsCarryNoSentenceLiterals`（`internal/arch`）。規格：§3。
 - 單一子領域的不變量在 `internal/<子領域>/AGENTS.md`（碰該目錄時才載入）；跨子領域的才放這裡。

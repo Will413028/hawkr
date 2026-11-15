@@ -10,7 +10,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/contentkind"
 )
 
-// TakedownContentError 是內容下架的對象不成立：內容不存在（已清除），或不是措施的店家自己寫的（買家寫的內容走隱藏）。訂閱者回這個錯誤讓建立措施的
+// TakedownContentError 是內容下架的對象不成立：內容存在但不是措施的店家自己寫的（買家寫的內容走隱藏）。訂閱者回這個錯誤讓建立措施的
 // transaction 回滾；呼叫方用 errors.As 取出是哪一則。
 type TakedownContentError struct {
 	Kind contentkind.Kind
@@ -18,7 +18,7 @@ type TakedownContentError struct {
 }
 
 func (e *TakedownContentError) Error() string {
-	return fmt.Sprintf("social：內容下架的對象不存在或不是這家店寫的：%s %s", e.Kind, e.ID)
+	return fmt.Sprintf("social：內容下架的對象是別家店寫的：%s %s", e.Kind, e.ID)
 }
 
 // Content 是內容下架的一個對象：種類加 social 的列 ID。
@@ -52,8 +52,8 @@ func splitContents(cs []Content) (contentSet, error) {
 func (c contentSet) empty() bool { return len(c.posts)+len(c.comments)+len(c.entries) == 0 }
 
 // ApplyTakedowns 把一個內容下架措施的對象寫進複本（social.content_takedowns），讓留言與討論區留言重新求值，並排受影響的貼文與店面頁的快取失效。
-// 它是 seller 的 MeasureCreated（內容下架）的訂閱者，措施的每一條建立入口（後台 handler、CreateInTx 的呼叫方）都經過它，所以「內容存在、作者是
-// 措施的店家 storeID」（已軟刪的內容成立但不寫複本，沒有可隱藏的東西）這條不變量在這裡、同一個 transaction 內核對：鎖住留言與討論區留言的列之後核對，不成立回 *model.TakedownContentError 讓措施回滾。貼文不加鎖
+// 它是 seller 的 MeasureCreated（內容下架）的訂閱者，措施的每一條建立入口（後台 handler、CreateInTx 的呼叫方）都經過它，所以「存在的內容，作者是
+// 措施的店家 storeID」（已軟刪或已清除的內容成立但不寫複本，沒有可隱藏的東西；已清除內容的歸屬由 moderation 以案件快照核對）這條不變量在這裡、同一個 transaction 內核對：鎖住留言與討論區留言的列之後核對，不成立回 *model.TakedownContentError 讓措施回滾。貼文不加鎖
 // （作者是所屬店家，不可變；核對之後被店家軟刪只是多一列複本，對帳不動它）。必須在呼叫方的 transaction 內：複本、旗標、計數與 job 一起提交或回滾。
 // 鎖的順序同 MarkAuthorInactive：先依 id 鎖內容列，再核對，再寫複本，再以兩次集合呼叫求值（函式依序鎖整批 stats），不另呼叫 Lock。
 // 貼文沒有計入旗標，公開讀取的述詞直接看複本。冪等：複本已經有的列不重複寫，沒有新增時不重新求值。
@@ -124,11 +124,11 @@ func (s *Service) checkTakedownOwnership(ctx context.Context, storeID int64, set
 	if len(bad) > 0 {
 		return contentSet{}, &TakedownContentError{Kind: contentkind.Kind(bad[0].ContentKind), ID: bad[0].ContentID}
 	}
-	deleted, err := q.DeletedTakedownContents(ctx, store.DeletedTakedownContentsParams{
+	deleted, err := q.GoneTakedownContents(ctx, store.GoneTakedownContentsParams{
 		PostIds: set.posts, CommentIds: set.comments, ForumEntryIds: set.entries,
 	})
 	if err != nil {
-		return contentSet{}, fmt.Errorf("social：讀取已刪除的下架內容：%w", err)
+		return contentSet{}, fmt.Errorf("social：讀取已刪除或已清除的下架內容：%w", err)
 	}
 	gone := map[uuid.UUID]bool{}
 	for _, d := range deleted {

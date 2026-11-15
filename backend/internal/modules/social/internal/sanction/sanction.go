@@ -122,6 +122,9 @@ func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSn
 		if err != nil {
 			return model.ContentSnapshot{}, fmt.Errorf("social：讀取留言的快照 %s：%w", t.ID, err)
 		}
+		if !r.ExistsNow {
+			return model.ContentSnapshot{}, nil
+		}
 		out.Body = deref(r.Body)
 	case model.TargetForumEntry:
 		r, err := q.GetForumEntrySnapshot(ctx, t.ID)
@@ -131,6 +134,9 @@ func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSn
 		if err != nil {
 			return model.ContentSnapshot{}, fmt.Errorf("social：讀取討論區留言的快照 %s：%w", t.ID, err)
 		}
+		if !r.ExistsNow {
+			return model.ContentSnapshot{}, nil
+		}
 		out.Body = deref(r.Body)
 	case model.TargetPost:
 		r, err := q.GetPostSnapshot(ctx, t.ID)
@@ -139,6 +145,9 @@ func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSn
 		}
 		if err != nil {
 			return model.ContentSnapshot{}, fmt.Errorf("social：讀取貼文的快照 %s：%w", t.ID, err)
+		}
+		if !r.ExistsNow {
+			return model.ContentSnapshot{}, nil
 		}
 		out.Body = r.Body
 		if r.ImageAssetID != nil {

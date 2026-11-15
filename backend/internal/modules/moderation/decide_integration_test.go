@@ -233,6 +233,29 @@ func TestTakedownVerifiesOwnershipThenCreatesTheMeasure(t *testing.T) {
 	}
 }
 
+// 被檢舉的貼文在決議前已被清除：歸屬以案件快照核對，措施照常建立。
+func TestTakedownAfterThePostIsPurgedStillCreatesTheMeasure(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	var c Case
+	for range 3 {
+		r, _ := f.newBuyer(t)
+		c = f.submit(t, r, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
+	}
+	f.exec(t, "DELETE FROM social.posts WHERE id = $1", w.post.ID)
+	d := mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), DecideInput{
+		CaseID: c.ID, Version: c.Version, AdminID: 9, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]), StoreID: w.storeID,
+	}))
+	if d.Case.ClosedAt == nil {
+		t.Fatalf("%+v", d)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measures WHERE store_id = $1 AND kind = 'CONTENT_TAKEDOWN'", w.storeID); n != 1 {
+		t.Fatalf("內容下架措施 %d 個", n)
+	}
+}
+
 // 鎖順序：moderation 建立內容下架與 accountdeletion 並行，不死結，也沒有半套狀態。
 func TestTakedownAndAccountDeletionRunConcurrentlyWithoutDeadlock(t *testing.T) {
 	t.Parallel()
