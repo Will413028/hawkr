@@ -360,3 +360,48 @@ func (f *fixture) storeOwnerBuyer(t *testing.T, w world) int64 {
 	}
 	return p.BuyerID
 }
+
+// 25 位不同檢舉人並行檢舉同一對象：只開一個進行中案件，25 筆檢舉全部掛進它（進行中案件的 partial UNIQUE 擋住並行開案）。
+func TestConcurrentReportsOfOneTargetShareExactlyOneOpenCase(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	const n = 25
+	reporters := make([]int64, n)
+	for i := range reporters {
+		reporters[i], _ = f.newBuyer(t)
+	}
+	caseIDs := make([]uuid.UUID, n)
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	for i, reporter := range reporters {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			r, err := f.module.SubmitReport(context.Background(), SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(w.comment), Category: policy.Spam})
+			if err != nil {
+				t.Errorf("檢舉人 %d：%v", i, err)
+				return
+			}
+			caseIDs[i] = r.Case.ID
+		}()
+	}
+	close(start)
+	wg.Wait()
+	if t.Failed() {
+		return
+	}
+	for i, id := range caseIDs {
+		if id != caseIDs[0] {
+			t.Fatalf("檢舉人 %d 的案件 %s 不同於 %s", i, id, caseIDs[0])
+		}
+	}
+	if c := f.count(t, "SELECT count(*) FROM moderation.cases WHERE closed_at IS NULL"); c != 1 {
+		t.Fatalf("進行中案件 %d 個", c)
+	}
+	detail := mustV[CaseDetail](t)(f.module.Case(context.Background(), caseIDs[0]))
+	if len(detail.Reports) != n || detail.Case.Version != n {
+		t.Fatalf("檢舉 %d 筆、版本 %d，預期都是 %d", len(detail.Reports), detail.Case.Version, n)
+	}
+}
