@@ -115,18 +115,21 @@ describe("pendingInterrupt", () => {
 			"interruptId 型別錯誤",
 			{ interruptId: 1, confirmationKind: "CLARIFICATION" },
 		],
-	])("restoredStateFrom 對格式錯誤的 openConfirmation（%s）防禦性回 null，不讓半吊子資料寫進 pendingInterrupt", async (_label, malformed) => {
-		const { restoredStateFrom } = await import("./useProcurementSession");
-		const restored = restoredStateFrom(null, {
-			requestId: "req-1",
-			revisionId: "rev-1",
-			status: "CLARIFYING",
-			slots: {},
-			missingRequired: ["quantity"],
-			openConfirmation: malformed,
-		});
-		expect(restored.pendingInterrupt).toBeNull();
-	});
+	])(
+		"restoredStateFrom 對格式錯誤的 openConfirmation（%s）防禦性回 null，不讓半吊子資料寫進 pendingInterrupt",
+		async (_label, malformed) => {
+			const { restoredStateFrom } = await import("./useProcurementSession");
+			const restored = restoredStateFrom(null, {
+				requestId: "req-1",
+				revisionId: "rev-1",
+				status: "CLARIFYING",
+				slots: {},
+				missingRequired: ["quantity"],
+				openConfirmation: malformed,
+			});
+			expect(restored.pendingInterrupt).toBeNull();
+		},
+	);
 });
 
 describe("publishedPublication", () => {
@@ -188,14 +191,17 @@ describe("publishedPublication", () => {
 		["缺 publicationId", { version: "1", publishedAt: "2026-09-13T04:29:04Z" }],
 		["publicationId 型別錯誤（number）", { publicationId: 12345 }],
 		["publicationId 空字串", { publicationId: "" }],
-	])("restoredStateFrom 對格式錯誤的 publishedPublication（%s）回 null——寧可少一個入口，也不要畫一個點進去是空的入口", async (_label, malformed) => {
-		const { restoredStateFrom } = await import("./useProcurementSession");
-		const restored = restoredStateFrom(null, {
-			...base,
-			publishedPublication: malformed,
-		});
-		expect(restored.publishedPublication).toBeNull();
-	});
+	])(
+		"restoredStateFrom 對格式錯誤的 publishedPublication（%s）回 null——寧可少一個入口，也不要畫一個點進去是空的入口",
+		async (_label, malformed) => {
+			const { restoredStateFrom } = await import("./useProcurementSession");
+			const restored = restoredStateFrom(null, {
+				...base,
+				publishedPublication: malformed,
+			});
+			expect(restored.publishedPublication).toBeNull();
+		},
+	);
 
 	it("version 與 publishedAt 缺席時仍認得發布事實，只把缺的欄位補成空字串——publicationId 才是那個事實本身", async () => {
 		const { restoredStateFrom } = await import("./useProcurementSession");

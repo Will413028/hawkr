@@ -30,17 +30,16 @@ function setup(status: AuthStatus) {
 }
 
 describe("accountQueryFn", () => {
-	it.each([
-		"unknown",
-		"guest",
-		"unavailable",
-	] as const)("%s: no request, and the query stays pending (never an empty success)", async (status) => {
-		const { fn, hook } = setup(status);
-		await new Promise((done) => setTimeout(done, 20));
-		expect(fn).not.toHaveBeenCalled();
-		expect(hook.result.current.isPending).toBe(true);
-		expect(hook.result.current.data).toBeUndefined();
-	});
+	it.each(["unknown", "guest", "unavailable"] as const)(
+		"%s: no request, and the query stays pending (never an empty success)",
+		async (status) => {
+			const { fn, hook } = setup(status);
+			await new Promise((done) => setTimeout(done, 20));
+			expect(fn).not.toHaveBeenCalled();
+			expect(hook.result.current.isPending).toBe(true);
+			expect(hook.result.current.data).toBeUndefined();
+		},
+	);
 
 	it("signedIn: fetches", async () => {
 		const { fn, hook } = setup("signedIn");

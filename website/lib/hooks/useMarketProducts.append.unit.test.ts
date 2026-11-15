@@ -104,83 +104,84 @@ afterEach(() => {
 		Object.defineProperty(window, "scrollY", originalScrollY);
 });
 
-describe.each([
-	false,
-	true,
-])("useMarketProducts append identity (canonical=%s)", (enableActivationRefresh) => {
-	it.each([
-		1, 24, 100,
-	])("retains %i existing product references while loading and appending", async (pageSize) => {
-		const initial = Array.from({ length: pageSize }, (_, index) =>
-			mapProduct(record(index + 1), index),
-		);
-		const response = deferred<ProductRecord[]>();
-		if (enableActivationRefresh) {
-			vi.mocked(fetchCanonicalMarketRecords).mockReturnValueOnce(
-				response.promise,
-			);
-		} else {
-			vi.mocked(fetchProducts).mockImplementationOnce(async () =>
-				pageEnvelope(await response.promise),
-			);
-		}
-		const { result, rerender } = mountProducts(
-			initial,
-			pageSize,
-			enableActivationRefresh,
-		);
-		const seeded = result.current.products;
-		expectSameItems(seeded, initial);
-		expect(fetchProducts).not.toHaveBeenCalled();
-		expect(fetchCanonicalMarketRecords).not.toHaveBeenCalled();
+describe.each([false, true])(
+	"useMarketProducts append identity (canonical=%s)",
+	(enableActivationRefresh) => {
+		it.each([1, 24, 100])(
+			"retains %i existing product references while loading and appending",
+			async (pageSize) => {
+				const initial = Array.from({ length: pageSize }, (_, index) =>
+					mapProduct(record(index + 1), index),
+				);
+				const response = deferred<ProductRecord[]>();
+				if (enableActivationRefresh) {
+					vi.mocked(fetchCanonicalMarketRecords).mockReturnValueOnce(
+						response.promise,
+					);
+				} else {
+					vi.mocked(fetchProducts).mockImplementationOnce(async () =>
+						pageEnvelope(await response.promise),
+					);
+				}
+				const { result, rerender } = mountProducts(
+					initial,
+					pageSize,
+					enableActivationRefresh,
+				);
+				const seeded = result.current.products;
+				expectSameItems(seeded, initial);
+				expect(fetchProducts).not.toHaveBeenCalled();
+				expect(fetchCanonicalMarketRecords).not.toHaveBeenCalled();
 
-		let append!: Promise<void>;
-		act(() => {
-			append = result.current.loadMore();
-		});
-		await waitFor(() => expect(result.current.loading).toBe(true));
-		expect(result.current.products).toBe(seeded);
-		expectSameItems(result.current.products, initial);
-		rerender();
-		expect(result.current.products).toBe(seeded);
+				let append!: Promise<void>;
+				act(() => {
+					append = result.current.loadMore();
+				});
+				await waitFor(() => expect(result.current.loading).toBe(true));
+				expect(result.current.products).toBe(seeded);
+				expectSameItems(result.current.products, initial);
+				rerender();
+				expect(result.current.products).toBe(seeded);
 
-		if (enableActivationRefresh) {
-			expect(fetchCanonicalMarketRecords).toHaveBeenCalledWith(
-				2,
-				expect.any(AbortSignal),
-			);
-			expect(fetchProducts).not.toHaveBeenCalled();
-		} else {
-			expect(fetchProducts).toHaveBeenCalledWith(
-				"",
-				2,
-				pageSize,
-				undefined,
-				undefined,
-				expect.objectContaining({ signal: expect.any(AbortSignal) }),
-			);
-			expect(fetchCanonicalMarketRecords).not.toHaveBeenCalled();
-		}
-		const appended = Array.from({ length: pageSize }, (_, index) =>
-			record(pageSize + index + 1),
+				if (enableActivationRefresh) {
+					expect(fetchCanonicalMarketRecords).toHaveBeenCalledWith(
+						2,
+						expect.any(AbortSignal),
+					);
+					expect(fetchProducts).not.toHaveBeenCalled();
+				} else {
+					expect(fetchProducts).toHaveBeenCalledWith(
+						"",
+						2,
+						pageSize,
+						undefined,
+						undefined,
+						expect.objectContaining({ signal: expect.any(AbortSignal) }),
+					);
+					expect(fetchCanonicalMarketRecords).not.toHaveBeenCalled();
+				}
+				const appended = Array.from({ length: pageSize }, (_, index) =>
+					record(pageSize + index + 1),
+				);
+				await act(async () => {
+					response.resolve(appended);
+					await append;
+				});
+				await waitFor(() =>
+					expect(result.current.products).toHaveLength(pageSize * 2),
+				);
+				expect(result.current.loading).toBe(false);
+				expect(result.current.products).not.toBe(seeded);
+				expectSameItems(result.current.products, initial);
+				expect(result.current.products.slice(pageSize)).toEqual(
+					appended.map((item, index) => mapProduct(item, pageSize + index)),
+				);
+				expect(result.current.page).toBe(2);
+				expect(result.current.done).toBe(false);
+			},
 		);
-		await act(async () => {
-			response.resolve(appended);
-			await append;
-		});
-		await waitFor(() =>
-			expect(result.current.products).toHaveLength(pageSize * 2),
-		);
-		expect(result.current.loading).toBe(false);
-		expect(result.current.products).not.toBe(seeded);
-		expectSameItems(result.current.products, initial);
-		expect(result.current.products.slice(pageSize)).toEqual(
-			appended.map((item, index) => mapProduct(item, pageSize + index)),
-		);
-		expect(result.current.page).toBe(2);
-		expect(result.current.done).toBe(false);
-	});
-});
+	},
+);
 
 describe("useMarketProducts dedupe and authoritative refresh", () => {
 	it("deduplicates repeated records across appended pages without cloning surviving products", async () => {

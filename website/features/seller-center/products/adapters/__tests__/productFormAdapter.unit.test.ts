@@ -58,8 +58,9 @@ describe("shipping methods per carrier", () => {
 			],
 		} as never);
 		const body = draftToSubmitBody(draft);
-		const sent = (body.skus?.[0] as { shippingMethods: unknown[] })
-			.shippingMethods;
+		const sent =
+			(body.skus?.[0] as { shippingMethods: unknown[] } | undefined)
+				?.shippingMethods ?? [];
 		expect(sent).toHaveLength(1);
 		expect(sent[0]).toMatchObject({ type: "3001" });
 		expect(sent[0]).not.toHaveProperty("temperature");

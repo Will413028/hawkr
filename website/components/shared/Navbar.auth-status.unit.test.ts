@@ -119,16 +119,19 @@ describe("Navbar right rail by auth status", () => {
 	it.each([
 		[undefined, "會員"],
 		["en" as const, "Member"],
-	])("a signed-in account without a nickname gets the %s text resource, not a hard-coded word", (locale, word) => {
-		auth.value = {
-			...auth.value,
-			status: "signedIn",
-			activeRole: "buyer",
-			identity: { accountId: "7", isSeller: false },
-		};
-		renderNavbar(locale);
-		expect(screen.getByTestId("account-menu-trigger").textContent).toContain(
-			word,
-		);
-	});
+	])(
+		"a signed-in account without a nickname gets the %s text resource, not a hard-coded word",
+		(locale, word) => {
+			auth.value = {
+				...auth.value,
+				status: "signedIn",
+				activeRole: "buyer",
+				identity: { accountId: "7", isSeller: false },
+			};
+			renderNavbar(locale);
+			expect(screen.getByTestId("account-menu-trigger").textContent).toContain(
+				word,
+			);
+		},
+	);
 });

@@ -88,18 +88,17 @@ function visibleRowIds() {
 }
 
 describe("AgentTaskPanel 當前回合的處理 surface", () => {
-	it.each([
-		"clarifying",
-		"ready",
-		"candidates",
-	] as const)("%s 階段沒有待處理回合時，不呈現舊列或任務空狀態", (stage) => {
-		const { container } = renderPanel({
-			stage,
-			liveActivity: [row],
-			searchActivity: searchRows,
-		});
-		expect(container.childElementCount).toBe(0);
-	});
+	it.each(["clarifying", "ready", "candidates"] as const)(
+		"%s 階段沒有待處理回合時，不呈現舊列或任務空狀態",
+		(stage) => {
+			const { container } = renderPanel({
+				stage,
+				liveActivity: [row],
+				searchActivity: searchRows,
+			});
+			expect(container.childElementCount).toBe(0);
+		},
+	);
 
 	it("尚未收到公開步驟時只中性等待，沒有虛構進度或額外 live region", () => {
 		const { container } = renderPanel({ pending: true });
@@ -206,23 +205,21 @@ describe("AgentTaskPanel 搜尋狀態", () => {
 		expect(screen.queryByText("理解採購需求")).toBeNull();
 	});
 
-	it.each([
-		{ searchActivity: searchRows },
-		{ searchActivity: [] },
-	])("搜尋事件與輪詢降級都提供可操作的連線重試入口 %#", ({
-		searchActivity,
-	}) => {
-		const retry = vi.fn();
-		renderPanel({
-			stage: "searching",
-			searchActivity,
-			pollError: true,
-			onRetryPolling: retry,
-		});
-		expect(screen.getByRole("alert")).toBeTruthy();
-		fireEvent.click(screen.getByRole("button", { name: "重試" }));
-		expect(retry).toHaveBeenCalledTimes(1);
-	});
+	it.each([{ searchActivity: searchRows }, { searchActivity: [] }])(
+		"搜尋事件與輪詢降級都提供可操作的連線重試入口 %#",
+		({ searchActivity }) => {
+			const retry = vi.fn();
+			renderPanel({
+				stage: "searching",
+				searchActivity,
+				pollError: true,
+				onRetryPolling: retry,
+			});
+			expect(screen.getByRole("alert")).toBeTruthy();
+			fireEvent.click(screen.getByRole("button", { name: "重試" }));
+			expect(retry).toHaveBeenCalledTimes(1);
+		},
+	);
 
 	it("搜尋完成移除思考，重新搜尋不繼承前次列", () => {
 		const { rerender } = renderPanel({

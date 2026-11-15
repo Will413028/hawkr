@@ -160,15 +160,16 @@ afterEach(() => {
 });
 
 describe("mobile bottom navigation gesture ownership", () => {
-	it.each([
-		50, 90,
-	])("does not swallow the first real tap after a drag ending at x=%i without a synthetic click", (x) => {
-		render(React.createElement(MobileBottomNav));
-		dragTo(x);
-		mocks.push.mockClear();
-		tap("市集", 150);
-		expect(mocks.push).toHaveBeenCalledExactlyOnceWith("/market/products");
-	});
+	it.each([50, 90])(
+		"does not swallow the first real tap after a drag ending at x=%i without a synthetic click",
+		(x) => {
+			render(React.createElement(MobileBottomNav));
+			dragTo(x);
+			mocks.push.mockClear();
+			tap("市集", 150);
+			expect(mocks.push).toHaveBeenCalledExactlyOnceWith("/market/products");
+		},
+	);
 
 	it("suppresses only the drag-release click and accepts the next gesture", () => {
 		render(React.createElement(MobileBottomNav));
@@ -206,21 +207,19 @@ describe("mobile bottom navigation gesture ownership", () => {
 });
 
 describe("mobile bottom navigation optimistic selection", () => {
-	it.each([
-		"ctrlKey",
-		"metaKey",
-		"shiftKey",
-		"altKey",
-	] as const)("leaves native %s activation untouched without changing the current pill", (modifier) => {
-		render(React.createElement(MobileBottomNav));
-		fireEvent.click(screen.getByRole("link", { name: "動態" }), {
-			detail: 1,
-			[modifier]: true,
-		});
-		expect(indicatorX()).toBe("0");
-		expect(mocks.clickWasPrevented).toHaveBeenCalledExactlyOnceWith(false);
-		expect(mocks.push).not.toHaveBeenCalled();
-	});
+	it.each(["ctrlKey", "metaKey", "shiftKey", "altKey"] as const)(
+		"leaves native %s activation untouched without changing the current pill",
+		(modifier) => {
+			render(React.createElement(MobileBottomNav));
+			fireEvent.click(screen.getByRole("link", { name: "動態" }), {
+				detail: 1,
+				[modifier]: true,
+			});
+			expect(indicatorX()).toBe("0");
+			expect(mocks.clickWasPrevented).toHaveBeenCalledExactlyOnceWith(false);
+			expect(mocks.push).not.toHaveBeenCalled();
+		},
+	);
 
 	it("moves the pill immediately while aria-current keeps the actual route", () => {
 		render(React.createElement(MobileBottomNav));
@@ -231,16 +230,16 @@ describe("mobile bottom navigation optimistic selection", () => {
 		).toBe("page");
 	});
 
-	it.each([
-		"abort",
-		null,
-	])("returns to the real tab after pending ends with %s and no commit", async (phase) => {
-		render(React.createElement(MobileBottomNav));
-		tap("動態", 90);
-		await pendingPhase("");
-		await pendingPhase(phase);
-		expect(indicatorX()).toBe("0");
-	});
+	it.each(["abort", null])(
+		"returns to the real tab after pending ends with %s and no commit",
+		async (phase) => {
+			render(React.createElement(MobileBottomNav));
+			tap("動態", 90);
+			await pendingPhase("");
+			await pendingPhase(phase);
+			expect(indicatorX()).toBe("0");
+		},
+	);
 
 	it("keeps the newest target when an old abort and a new begin arrive in one observer batch", async () => {
 		render(React.createElement(MobileBottomNav));
@@ -289,14 +288,14 @@ describe("mobile bottom navigation optimistic selection", () => {
 		).toBe("page");
 	});
 
-	it.each([
-		"popstate",
-		"pagehide",
-	] as const)("clears an uncommitted selection on %s", async (eventName) => {
-		render(React.createElement(MobileBottomNav));
-		tap("動態", 90);
-		await pendingPhase("");
-		fireEvent(window, new Event(eventName));
-		expect(indicatorX()).toBe("0");
-	});
+	it.each(["popstate", "pagehide"] as const)(
+		"clears an uncommitted selection on %s",
+		async (eventName) => {
+			render(React.createElement(MobileBottomNav));
+			tap("動態", 90);
+			await pendingPhase("");
+			fireEvent(window, new Event(eventName));
+			expect(indicatorX()).toBe("0");
+		},
+	);
 });

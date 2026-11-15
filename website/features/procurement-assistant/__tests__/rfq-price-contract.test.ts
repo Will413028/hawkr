@@ -81,17 +81,20 @@ describe("RFQ price preview contract", () => {
 		["1", "GRAM", false],
 		["1000", "KG", false],
 		["1", "BOX", false],
-	] as const)("checks canonical basis %s %s", (basisQuantity, basisUnit, expected) => {
-		const parsed = rfqPricePreviewSchema.parse({
-			...basePreview(),
-			buyerRequestedRange: {
-				...basePreview().buyerRequestedRange,
-				basisQuantity,
-				basisUnit,
-			},
-		});
-		expect(hasConfirmablePriceBasis(parsed)).toBe(expected);
-	});
+	] as const)(
+		"checks canonical basis %s %s",
+		(basisQuantity, basisUnit, expected) => {
+			const parsed = rfqPricePreviewSchema.parse({
+				...basePreview(),
+				buyerRequestedRange: {
+					...basePreview().buyerRequestedRange,
+					basisQuantity,
+					basisUnit,
+				},
+			});
+			expect(hasConfirmablePriceBasis(parsed)).toBe(expected);
+		},
+	);
 
 	it("normalises a missing total range to null", () => {
 		const { quoteTotalRange: _total, ...withoutTotal } = basePreview();
@@ -129,26 +132,20 @@ describe("RFQ price preview contract", () => {
 		expect(hasConfirmablePriceBasis(parsed, "CATTY")).toBe(false);
 	});
 
-	it.each([
-		"01",
-		" 1",
-		"1 ",
-		"1e3",
-		"-1",
-		"0",
-		"1.12345",
-		"1000000000000",
-	])("rejects a non-canonical server TWD amount %s", (amount) => {
-		expect(
-			rfqPricePreviewSchema.safeParse({
-				...basePreview(),
-				buyerRequestedRange: {
-					...basePreview().buyerRequestedRange,
-					lowerBoundAmount: amount,
-				},
-			}).success,
-		).toBe(false);
-	});
+	it.each(["01", " 1", "1 ", "1e3", "-1", "0", "1.12345", "1000000000000"])(
+		"rejects a non-canonical server TWD amount %s",
+		(amount) => {
+			expect(
+				rfqPricePreviewSchema.safeParse({
+					...basePreview(),
+					buyerRequestedRange: {
+						...basePreview().buyerRequestedRange,
+						lowerBoundAmount: amount,
+					},
+				}).success,
+			).toBe(false);
+		},
+	);
 
 	it("rejects decimal amounts in the buyer range", () => {
 		expect(
@@ -162,20 +159,17 @@ describe("RFQ price preview contract", () => {
 		).toBe(false);
 	});
 
-	it.each([
-		"0",
-		"abc",
-		" 1",
-		"9223372036854775808",
-		"10000000000000000000",
-	])("rejects a non-canonical or out-of-range int64 id %s", (id) => {
-		expect(
-			rfqPricePreviewSchema.safeParse({
-				...basePreview(),
-				pricePreviewId: id,
-			}).success,
-		).toBe(false);
-	});
+	it.each(["0", "abc", " 1", "9223372036854775808", "10000000000000000000"])(
+		"rejects a non-canonical or out-of-range int64 id %s",
+		(id) => {
+			expect(
+				rfqPricePreviewSchema.safeParse({
+					...basePreview(),
+					pricePreviewId: id,
+				}).success,
+			).toBe(false);
+		},
+	);
 });
 
 describe("RFQ confirmation and manual input", () => {

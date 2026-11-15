@@ -629,14 +629,17 @@ describe("分類中斷的權威問句還原", () => {
 				options: [categoryQuestion.options[1]],
 			},
 		],
-	])("reload 還原%s問題、保留 opaque optionId 並抑制舊分類卡", async (_stage, question) => {
-		getMock.mockResolvedValueOnce({ data: snapshotWithQuestion(question) });
-		const { result } = renderProcurementSession("req-1");
-		await waitFor(() => expect(result.current.restoring).toBe(false));
-		expect(result.current.question).toMatchObject(question);
-		expect(result.current.cropDisambiguation).toBeNull();
-		expect(result.current.pendingInterrupt?.interruptId).toBe("int-1");
-	});
+	])(
+		"reload 還原%s問題、保留 opaque optionId 並抑制舊分類卡",
+		async (_stage, question) => {
+			getMock.mockResolvedValueOnce({ data: snapshotWithQuestion(question) });
+			const { result } = renderProcurementSession("req-1");
+			await waitFor(() => expect(result.current.restoring).toBe(false));
+			expect(result.current.question).toMatchObject(question);
+			expect(result.current.cropDisambiguation).toBeNull();
+			expect(result.current.pendingInterrupt?.interruptId).toBe("int-1");
+		},
+	);
 
 	it("resume 失敗後以最新 snapshot 還原下一層問題及 interrupt", async () => {
 		getMock.mockResolvedValueOnce({

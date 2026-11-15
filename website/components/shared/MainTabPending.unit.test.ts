@@ -96,19 +96,19 @@ it("keeps only the latest unrevealed destination and cancels an older reveal dea
 	expect(content.inert).toBe(true);
 });
 
-it.each([
-	"popstate",
-	"pagehide",
-])("cancels an unrevealed skeleton on %s", (eventType) => {
-	render(createElement(MainTabPending));
-	act(() => beginMainTabPending("/feed", "push"));
-	act(() => vi.advanceTimersByTime(70));
-	act(() => window.dispatchEvent(new Event(eventType)));
-	act(() => vi.advanceTimersByTime(1000));
-	expect(document.querySelector("[data-main-tab-loading]")).toBeNull();
-	expect(content.inert).toBe(false);
-	expect(vi.getTimerCount()).toBe(0);
-});
+it.each(["popstate", "pagehide"])(
+	"cancels an unrevealed skeleton on %s",
+	(eventType) => {
+		render(createElement(MainTabPending));
+		act(() => beginMainTabPending("/feed", "push"));
+		act(() => vi.advanceTimersByTime(70));
+		act(() => window.dispatchEvent(new Event(eventType)));
+		act(() => vi.advanceTimersByTime(1000));
+		expect(document.querySelector("[data-main-tab-loading]")).toBeNull();
+		expect(content.inert).toBe(false);
+		expect(vi.getTimerCount()).toBe(0);
+	},
+);
 
 it("cancels the reveal timer when its surface owner unmounts", () => {
 	const view = render(createElement(MainTabPending));

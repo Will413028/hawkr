@@ -168,51 +168,53 @@ afterEach(() => {
 });
 
 describe("scoped feed activation", () => {
-	it.each([
-		{ sellerId: "seller-a" },
-		{ hashtag: "當季" },
-	])("keeps cached pages, refreshes only stale head and reuses a fresh revisit (%j)", async (scope) => {
-		const { client, wrapper } = makeClient();
-		const key = seedFeed(client, scope);
-		const response = deferred<ReturnType<typeof feedPage>>();
-		vi.mocked(fetchPublicPostsTyped).mockReturnValueOnce(response.promise);
-		const mount = () =>
-			renderHook(
-				() => useFeedPosts({ initialPosts: [], pageSize: 1, ...scope }),
-				{ wrapper },
+	it.each([{ sellerId: "seller-a" }, { hashtag: "當季" }])(
+		"keeps cached pages, refreshes only stale head and reuses a fresh revisit (%j)",
+		async (scope) => {
+			const { client, wrapper } = makeClient();
+			const key = seedFeed(client, scope);
+			const response = deferred<ReturnType<typeof feedPage>>();
+			vi.mocked(fetchPublicPostsTyped).mockReturnValueOnce(response.promise);
+			const mount = () =>
+				renderHook(
+					() => useFeedPosts({ initialPosts: [], pageSize: 1, ...scope }),
+					{ wrapper },
+				);
+			const first = mount();
+			expect(first.result.current.posts.map((item) => item.id)).toEqual([
+				"1",
+				"2",
+			]);
+			expect(first.result.current.initialLoading).toBe(false);
+			await waitFor(() =>
+				expect(fetchPublicPostsTyped).toHaveBeenCalledTimes(1),
 			);
-		const first = mount();
-		expect(first.result.current.posts.map((item) => item.id)).toEqual([
-			"1",
-			"2",
-		]);
-		expect(first.result.current.initialLoading).toBe(false);
-		await waitFor(() => expect(fetchPublicPostsTyped).toHaveBeenCalledTimes(1));
-		for (let index = 0; index < 8; index++) focus();
-		expect(fetchPublicPostsTyped).toHaveBeenCalledTimes(1);
-		expect(fetchPublicPostsTyped).toHaveBeenCalledWith(
-			expect.objectContaining({
-				page: 1,
-				pageSize: 1,
-				sellerId: scope.sellerId,
-				tag: scope.hashtag,
-				signal: expect.any(AbortSignal),
-			}),
-		);
-		await act(async () => response.resolve(feedPage([post("1", 9)])));
-		await waitFor(() =>
-			expect(first.result.current.posts[0]?.likeCount).toBe(9),
-		);
-		expect(first.result.current.page).toBe(2);
-		expect(client.getQueryData(key)).toMatchObject({ pageParams: [1, 2] });
-		expect(window.scrollTo).not.toHaveBeenCalled();
-		expect(fetchCanonicalFeedPage).not.toHaveBeenCalled();
-		first.unmount();
-		const second = mount();
-		await settleMount();
-		expect(second.result.current.posts).toHaveLength(2);
-		expect(fetchPublicPostsTyped).toHaveBeenCalledTimes(1);
-	});
+			for (let index = 0; index < 8; index++) focus();
+			expect(fetchPublicPostsTyped).toHaveBeenCalledTimes(1);
+			expect(fetchPublicPostsTyped).toHaveBeenCalledWith(
+				expect.objectContaining({
+					page: 1,
+					pageSize: 1,
+					sellerId: scope.sellerId,
+					tag: scope.hashtag,
+					signal: expect.any(AbortSignal),
+				}),
+			);
+			await act(async () => response.resolve(feedPage([post("1", 9)])));
+			await waitFor(() =>
+				expect(first.result.current.posts[0]?.likeCount).toBe(9),
+			);
+			expect(first.result.current.page).toBe(2);
+			expect(client.getQueryData(key)).toMatchObject({ pageParams: [1, 2] });
+			expect(window.scrollTo).not.toHaveBeenCalled();
+			expect(fetchCanonicalFeedPage).not.toHaveBeenCalled();
+			first.unmount();
+			const second = mount();
+			await settleMount();
+			expect(second.result.current.posts).toHaveLength(2);
+			expect(fetchPublicPostsTyped).toHaveBeenCalledTimes(1);
+		},
+	);
 
 	it("reconciles the loaded tail after five minutes without an extra head request or polling", async () => {
 		const { client, wrapper } = makeClient();
