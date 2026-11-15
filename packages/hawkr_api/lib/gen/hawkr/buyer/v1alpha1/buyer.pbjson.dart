@@ -1209,6 +1209,255 @@ const UnsubscribeRestockResponse$json = {
 final $typed_data.Uint8List unsubscribeRestockResponseDescriptor =
     $convert.base64Decode('ChpVbnN1YnNjcmliZVJlc3RvY2tSZXNwb25zZQ==');
 
+@$core.Deprecated('Use blockAuthorRequestDescriptor instead')
+const BlockAuthorRequest$json = {
+  '1': 'BlockAuthorRequest',
+  '2': [
+    {'1': 'comment_id', '3': 1, '4': 1, '5': 9, '9': 0, '10': 'commentId'},
+    {
+      '1': 'forum_entry_id',
+      '3': 2,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'forumEntryId'
+    },
+  ],
+  '8': [
+    {'1': 'source'},
+  ],
+};
+
+/// Descriptor for `BlockAuthorRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List blockAuthorRequestDescriptor = $convert.base64Decode(
+    'ChJCbG9ja0F1dGhvclJlcXVlc3QSHwoKY29tbWVudF9pZBgBIAEoCUgAUgljb21tZW50SWQSJg'
+    'oOZm9ydW1fZW50cnlfaWQYAiABKAlIAFIMZm9ydW1FbnRyeUlkQggKBnNvdXJjZQ==');
+
+@$core.Deprecated('Use blockAuthorResponseDescriptor instead')
+const BlockAuthorResponse$json = {
+  '1': 'BlockAuthorResponse',
+  '2': [
+    {'1': 'changed', '3': 1, '4': 1, '5': 8, '10': 'changed'},
+  ],
+};
+
+/// Descriptor for `BlockAuthorResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List blockAuthorResponseDescriptor =
+    $convert.base64Decode(
+        'ChNCbG9ja0F1dGhvclJlc3BvbnNlEhgKB2NoYW5nZWQYASABKAhSB2NoYW5nZWQ=');
+
+@$core.Deprecated('Use blockStoreRequestDescriptor instead')
+const BlockStoreRequest$json = {
+  '1': 'BlockStoreRequest',
+  '2': [
+    {'1': 'store_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'storeId'},
+  ],
+};
+
+/// Descriptor for `BlockStoreRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List blockStoreRequestDescriptor = $convert.base64Decode(
+    'ChFCbG9ja1N0b3JlUmVxdWVzdBIeCghzdG9yZV9pZBgBIAEoCUID4EECUgdzdG9yZUlk');
+
+@$core.Deprecated('Use blockStoreResponseDescriptor instead')
+const BlockStoreResponse$json = {
+  '1': 'BlockStoreResponse',
+  '2': [
+    {'1': 'changed', '3': 1, '4': 1, '5': 8, '10': 'changed'},
+  ],
+};
+
+/// Descriptor for `BlockStoreResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List blockStoreResponseDescriptor =
+    $convert.base64Decode(
+        'ChJCbG9ja1N0b3JlUmVzcG9uc2USGAoHY2hhbmdlZBgBIAEoCFIHY2hhbmdlZA==');
+
+@$core.Deprecated('Use unblockBuyerRequestDescriptor instead')
+const UnblockBuyerRequest$json = {
+  '1': 'UnblockBuyerRequest',
+  '2': [
+    {'1': 'buyer_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'buyerId'},
+  ],
+};
+
+/// Descriptor for `UnblockBuyerRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unblockBuyerRequestDescriptor = $convert.base64Decode(
+    'ChNVbmJsb2NrQnV5ZXJSZXF1ZXN0Eh4KCGJ1eWVyX2lkGAEgASgJQgPgQQJSB2J1eWVySWQ=');
+
+@$core.Deprecated('Use unblockBuyerResponseDescriptor instead')
+const UnblockBuyerResponse$json = {
+  '1': 'UnblockBuyerResponse',
+  '2': [
+    {'1': 'changed', '3': 1, '4': 1, '5': 8, '10': 'changed'},
+  ],
+};
+
+/// Descriptor for `UnblockBuyerResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unblockBuyerResponseDescriptor =
+    $convert.base64Decode(
+        'ChRVbmJsb2NrQnV5ZXJSZXNwb25zZRIYCgdjaGFuZ2VkGAEgASgIUgdjaGFuZ2Vk');
+
+@$core.Deprecated('Use unblockStoreRequestDescriptor instead')
+const UnblockStoreRequest$json = {
+  '1': 'UnblockStoreRequest',
+  '2': [
+    {'1': 'store_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'storeId'},
+  ],
+};
+
+/// Descriptor for `UnblockStoreRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unblockStoreRequestDescriptor = $convert.base64Decode(
+    'ChNVbmJsb2NrU3RvcmVSZXF1ZXN0Eh4KCHN0b3JlX2lkGAEgASgJQgPgQQJSB3N0b3JlSWQ=');
+
+@$core.Deprecated('Use unblockStoreResponseDescriptor instead')
+const UnblockStoreResponse$json = {
+  '1': 'UnblockStoreResponse',
+  '2': [
+    {'1': 'changed', '3': 1, '4': 1, '5': 8, '10': 'changed'},
+  ],
+};
+
+/// Descriptor for `UnblockStoreResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unblockStoreResponseDescriptor =
+    $convert.base64Decode(
+        'ChRVbmJsb2NrU3RvcmVSZXNwb25zZRIYCgdjaGFuZ2VkGAEgASgIUgdjaGFuZ2Vk');
+
+@$core.Deprecated('Use listBlockedBuyersRequestDescriptor instead')
+const ListBlockedBuyersRequest$json = {
+  '1': 'ListBlockedBuyersRequest',
+  '2': [
+    {'1': 'page_size', '3': 1, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 2, '4': 1, '5': 9, '10': 'pageToken'},
+  ],
+};
+
+/// Descriptor for `ListBlockedBuyersRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listBlockedBuyersRequestDescriptor =
+    $convert.base64Decode(
+        'ChhMaXN0QmxvY2tlZEJ1eWVyc1JlcXVlc3QSGwoJcGFnZV9zaXplGAEgASgFUghwYWdlU2l6ZR'
+        'IdCgpwYWdlX3Rva2VuGAIgASgJUglwYWdlVG9rZW4=');
+
+@$core.Deprecated('Use listBlockedBuyersResponseDescriptor instead')
+const ListBlockedBuyersResponse$json = {
+  '1': 'ListBlockedBuyersResponse',
+  '2': [
+    {
+      '1': 'blocked_buyers',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.buyer.v1alpha1.BlockedBuyer',
+      '10': 'blockedBuyers'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+  ],
+};
+
+/// Descriptor for `ListBlockedBuyersResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listBlockedBuyersResponseDescriptor = $convert.base64Decode(
+    'ChlMaXN0QmxvY2tlZEJ1eWVyc1Jlc3BvbnNlEkkKDmJsb2NrZWRfYnV5ZXJzGAEgAygLMiIuaG'
+    'F3a3IuYnV5ZXIudjFhbHBoYTEuQmxvY2tlZEJ1eWVyUg1ibG9ja2VkQnV5ZXJzEiYKD25leHRf'
+    'cGFnZV90b2tlbhgCIAEoCVINbmV4dFBhZ2VUb2tlbg==');
+
+@$core.Deprecated('Use listBlockedStoresRequestDescriptor instead')
+const ListBlockedStoresRequest$json = {
+  '1': 'ListBlockedStoresRequest',
+  '2': [
+    {'1': 'page_size', '3': 1, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 2, '4': 1, '5': 9, '10': 'pageToken'},
+  ],
+};
+
+/// Descriptor for `ListBlockedStoresRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listBlockedStoresRequestDescriptor =
+    $convert.base64Decode(
+        'ChhMaXN0QmxvY2tlZFN0b3Jlc1JlcXVlc3QSGwoJcGFnZV9zaXplGAEgASgFUghwYWdlU2l6ZR'
+        'IdCgpwYWdlX3Rva2VuGAIgASgJUglwYWdlVG9rZW4=');
+
+@$core.Deprecated('Use listBlockedStoresResponseDescriptor instead')
+const ListBlockedStoresResponse$json = {
+  '1': 'ListBlockedStoresResponse',
+  '2': [
+    {
+      '1': 'blocked_stores',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.buyer.v1alpha1.BlockedStore',
+      '10': 'blockedStores'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+  ],
+};
+
+/// Descriptor for `ListBlockedStoresResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listBlockedStoresResponseDescriptor = $convert.base64Decode(
+    'ChlMaXN0QmxvY2tlZFN0b3Jlc1Jlc3BvbnNlEkkKDmJsb2NrZWRfc3RvcmVzGAEgAygLMiIuaG'
+    'F3a3IuYnV5ZXIudjFhbHBoYTEuQmxvY2tlZFN0b3JlUg1ibG9ja2VkU3RvcmVzEiYKD25leHRf'
+    'cGFnZV90b2tlbhgCIAEoCVINbmV4dFBhZ2VUb2tlbg==');
+
+@$core.Deprecated('Use blockedBuyerDescriptor instead')
+const BlockedBuyer$json = {
+  '1': 'BlockedBuyer',
+  '2': [
+    {'1': 'buyer_id', '3': 1, '4': 1, '5': 9, '10': 'buyerId'},
+    {'1': 'deleted', '3': 2, '4': 1, '5': 8, '10': 'deleted'},
+    {'1': 'display_name', '3': 3, '4': 1, '5': 9, '10': 'displayName'},
+    {
+      '1': 'avatar',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.common.v1alpha1.Image',
+      '10': 'avatar'
+    },
+    {
+      '1': 'create_time',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'createTime'
+    },
+  ],
+};
+
+/// Descriptor for `BlockedBuyer`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List blockedBuyerDescriptor = $convert.base64Decode(
+    'CgxCbG9ja2VkQnV5ZXISGQoIYnV5ZXJfaWQYASABKAlSB2J1eWVySWQSGAoHZGVsZXRlZBgCIA'
+    'EoCFIHZGVsZXRlZBIhCgxkaXNwbGF5X25hbWUYAyABKAlSC2Rpc3BsYXlOYW1lEjQKBmF2YXRh'
+    'chgEIAEoCzIcLmhhd2tyLmNvbW1vbi52MWFscGhhMS5JbWFnZVIGYXZhdGFyEjsKC2NyZWF0ZV'
+    '90aW1lGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcFIKY3JlYXRlVGltZQ==');
+
+@$core.Deprecated('Use blockedStoreDescriptor instead')
+const BlockedStore$json = {
+  '1': 'BlockedStore',
+  '2': [
+    {'1': 'store_id', '3': 1, '4': 1, '5': 9, '10': 'storeId'},
+    {
+      '1': 'store',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.common.v1alpha1.StoreCard',
+      '10': 'store'
+    },
+    {
+      '1': 'create_time',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'createTime'
+    },
+  ],
+};
+
+/// Descriptor for `BlockedStore`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List blockedStoreDescriptor = $convert.base64Decode(
+    'CgxCbG9ja2VkU3RvcmUSGQoIc3RvcmVfaWQYASABKAlSB3N0b3JlSWQSNgoFc3RvcmUYAiABKA'
+    'syIC5oYXdrci5jb21tb24udjFhbHBoYTEuU3RvcmVDYXJkUgVzdG9yZRI7CgtjcmVhdGVfdGlt'
+    'ZRgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBSCmNyZWF0ZVRpbWU=');
+
 const $core.Map<$core.String, $core.dynamic> BuyerAppServiceBase$json = {
   '1': 'BuyerAppService',
   '2': [
@@ -1357,6 +1606,42 @@ const $core.Map<$core.String, $core.dynamic> BuyerAppServiceBase$json = {
       '3': '.hawkr.buyer.v1alpha1.UnsubscribeRestockResponse',
       '4': {'34': 2},
     },
+    {
+      '1': 'BlockAuthor',
+      '2': '.hawkr.buyer.v1alpha1.BlockAuthorRequest',
+      '3': '.hawkr.buyer.v1alpha1.BlockAuthorResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'BlockStore',
+      '2': '.hawkr.buyer.v1alpha1.BlockStoreRequest',
+      '3': '.hawkr.buyer.v1alpha1.BlockStoreResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'UnblockBuyer',
+      '2': '.hawkr.buyer.v1alpha1.UnblockBuyerRequest',
+      '3': '.hawkr.buyer.v1alpha1.UnblockBuyerResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'UnblockStore',
+      '2': '.hawkr.buyer.v1alpha1.UnblockStoreRequest',
+      '3': '.hawkr.buyer.v1alpha1.UnblockStoreResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'ListBlockedBuyers',
+      '2': '.hawkr.buyer.v1alpha1.ListBlockedBuyersRequest',
+      '3': '.hawkr.buyer.v1alpha1.ListBlockedBuyersResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'ListBlockedStores',
+      '2': '.hawkr.buyer.v1alpha1.ListBlockedStoresRequest',
+      '3': '.hawkr.buyer.v1alpha1.ListBlockedStoresResponse',
+      '4': {'34': 1},
+    },
   ],
 };
 
@@ -1439,6 +1724,24 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       UnsubscribeRestockRequest$json,
   '.hawkr.buyer.v1alpha1.UnsubscribeRestockResponse':
       UnsubscribeRestockResponse$json,
+  '.hawkr.buyer.v1alpha1.BlockAuthorRequest': BlockAuthorRequest$json,
+  '.hawkr.buyer.v1alpha1.BlockAuthorResponse': BlockAuthorResponse$json,
+  '.hawkr.buyer.v1alpha1.BlockStoreRequest': BlockStoreRequest$json,
+  '.hawkr.buyer.v1alpha1.BlockStoreResponse': BlockStoreResponse$json,
+  '.hawkr.buyer.v1alpha1.UnblockBuyerRequest': UnblockBuyerRequest$json,
+  '.hawkr.buyer.v1alpha1.UnblockBuyerResponse': UnblockBuyerResponse$json,
+  '.hawkr.buyer.v1alpha1.UnblockStoreRequest': UnblockStoreRequest$json,
+  '.hawkr.buyer.v1alpha1.UnblockStoreResponse': UnblockStoreResponse$json,
+  '.hawkr.buyer.v1alpha1.ListBlockedBuyersRequest':
+      ListBlockedBuyersRequest$json,
+  '.hawkr.buyer.v1alpha1.ListBlockedBuyersResponse':
+      ListBlockedBuyersResponse$json,
+  '.hawkr.buyer.v1alpha1.BlockedBuyer': BlockedBuyer$json,
+  '.hawkr.buyer.v1alpha1.ListBlockedStoresRequest':
+      ListBlockedStoresRequest$json,
+  '.hawkr.buyer.v1alpha1.ListBlockedStoresResponse':
+      ListBlockedStoresResponse$json,
+  '.hawkr.buyer.v1alpha1.BlockedStore': BlockedStore$json,
 };
 
 /// Descriptor for `BuyerAppService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
@@ -1493,4 +1796,16 @@ final $typed_data.Uint8List buyerAppServiceDescriptor = $convert.base64Decode(
     'YxYWxwaGExLlN1YnNjcmliZVJlc3RvY2tSZXF1ZXN0Gi4uaGF3a3IuYnV5ZXIudjFhbHBoYTEu'
     'U3Vic2NyaWJlUmVzdG9ja1Jlc3BvbnNlIgOQAgISfAoSVW5zdWJzY3JpYmVSZXN0b2NrEi8uaG'
     'F3a3IuYnV5ZXIudjFhbHBoYTEuVW5zdWJzY3JpYmVSZXN0b2NrUmVxdWVzdBowLmhhd2tyLmJ1'
-    'eWVyLnYxYWxwaGExLlVuc3Vic2NyaWJlUmVzdG9ja1Jlc3BvbnNlIgOQAgI=');
+    'eWVyLnYxYWxwaGExLlVuc3Vic2NyaWJlUmVzdG9ja1Jlc3BvbnNlIgOQAgISZwoLQmxvY2tBdX'
+    'Rob3ISKC5oYXdrci5idXllci52MWFscGhhMS5CbG9ja0F1dGhvclJlcXVlc3QaKS5oYXdrci5i'
+    'dXllci52MWFscGhhMS5CbG9ja0F1dGhvclJlc3BvbnNlIgOQAgISZAoKQmxvY2tTdG9yZRInLm'
+    'hhd2tyLmJ1eWVyLnYxYWxwaGExLkJsb2NrU3RvcmVSZXF1ZXN0GiguaGF3a3IuYnV5ZXIudjFh'
+    'bHBoYTEuQmxvY2tTdG9yZVJlc3BvbnNlIgOQAgISagoMVW5ibG9ja0J1eWVyEikuaGF3a3IuYn'
+    'V5ZXIudjFhbHBoYTEuVW5ibG9ja0J1eWVyUmVxdWVzdBoqLmhhd2tyLmJ1eWVyLnYxYWxwaGEx'
+    'LlVuYmxvY2tCdXllclJlc3BvbnNlIgOQAgISagoMVW5ibG9ja1N0b3JlEikuaGF3a3IuYnV5ZX'
+    'IudjFhbHBoYTEuVW5ibG9ja1N0b3JlUmVxdWVzdBoqLmhhd2tyLmJ1eWVyLnYxYWxwaGExLlVu'
+    'YmxvY2tTdG9yZVJlc3BvbnNlIgOQAgISeQoRTGlzdEJsb2NrZWRCdXllcnMSLi5oYXdrci5idX'
+    'llci52MWFscGhhMS5MaXN0QmxvY2tlZEJ1eWVyc1JlcXVlc3QaLy5oYXdrci5idXllci52MWFs'
+    'cGhhMS5MaXN0QmxvY2tlZEJ1eWVyc1Jlc3BvbnNlIgOQAgESeQoRTGlzdEJsb2NrZWRTdG9yZX'
+    'MSLi5oYXdrci5idXllci52MWFscGhhMS5MaXN0QmxvY2tlZFN0b3Jlc1JlcXVlc3QaLy5oYXdr'
+    'ci5idXllci52MWFscGhhMS5MaXN0QmxvY2tlZFN0b3Jlc1Jlc3BvbnNlIgOQAgE=');

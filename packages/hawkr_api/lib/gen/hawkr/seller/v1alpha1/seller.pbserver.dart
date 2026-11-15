@@ -66,6 +66,12 @@ abstract class SellerAppServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $10.SubmitAppealRequest request);
   $async.Future<$10.RequestRemediationResponse> requestRemediation(
       $pb.ServerContext ctx, $10.RequestRemediationRequest request);
+  $async.Future<$10.BlockBuyerResponse> blockBuyer(
+      $pb.ServerContext ctx, $10.BlockBuyerRequest request);
+  $async.Future<$10.UnblockBuyerResponse> unblockBuyer(
+      $pb.ServerContext ctx, $10.UnblockBuyerRequest request);
+  $async.Future<$10.ListBlockedBuyersResponse> listBlockedBuyers(
+      $pb.ServerContext ctx, $10.ListBlockedBuyersRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
@@ -111,6 +117,12 @@ abstract class SellerAppServiceBase extends $pb.GeneratedService {
         return $10.SubmitAppealRequest();
       case 'RequestRemediation':
         return $10.RequestRemediationRequest();
+      case 'BlockBuyer':
+        return $10.BlockBuyerRequest();
+      case 'UnblockBuyer':
+        return $10.UnblockBuyerRequest();
+      case 'ListBlockedBuyers':
+        return $10.ListBlockedBuyersRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -167,6 +179,12 @@ abstract class SellerAppServiceBase extends $pb.GeneratedService {
       case 'RequestRemediation':
         return requestRemediation(
             ctx, request as $10.RequestRemediationRequest);
+      case 'BlockBuyer':
+        return blockBuyer(ctx, request as $10.BlockBuyerRequest);
+      case 'UnblockBuyer':
+        return unblockBuyer(ctx, request as $10.UnblockBuyerRequest);
+      case 'ListBlockedBuyers':
+        return listBlockedBuyers(ctx, request as $10.ListBlockedBuyersRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

@@ -4191,6 +4191,1000 @@ class UnsubscribeRestockResponse extends $pb.GeneratedMessage {
   static UnsubscribeRestockResponse? _defaultInstance;
 }
 
+enum BlockAuthorRequest_Source { commentId, forumEntryId, notSet }
+
+class BlockAuthorRequest extends $pb.GeneratedMessage {
+  factory BlockAuthorRequest({
+    $core.String? commentId,
+    $core.String? forumEntryId,
+  }) {
+    final result = BlockAuthorRequest._();
+    if (commentId != null) result.commentId = commentId;
+    if (forumEntryId != null) result.forumEntryId = forumEntryId;
+    return result;
+  }
+
+  BlockAuthorRequest._();
+
+  factory BlockAuthorRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BlockAuthorRequest()..mergeFromBuffer(data, registry);
+  factory BlockAuthorRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BlockAuthorRequest()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, BlockAuthorRequest_Source>
+      _BlockAuthorRequest_SourceByTag = {
+    1: BlockAuthorRequest_Source.commentId,
+    2: BlockAuthorRequest_Source.forumEntryId,
+    0: BlockAuthorRequest_Source.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BlockAuthorRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: BlockAuthorRequest.$_createMessage)
+    ..oo(0, [1, 2])
+    ..aOS(1, _omitFieldNames ? '' : 'commentId')
+    ..aOS(2, _omitFieldNames ? '' : 'forumEntryId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockAuthorRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockAuthorRequest copyWith(void Function(BlockAuthorRequest) updates) =>
+      super.copyWith((message) => updates(message as BlockAuthorRequest))
+          as BlockAuthorRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use BlockAuthorRequest() / BlockAuthorRequest.new instead')
+  static BlockAuthorRequest create() => BlockAuthorRequest._();
+  static $pb.GeneratedMessage $_createMessage() => BlockAuthorRequest._();
+  @$core.override
+  BlockAuthorRequest createEmptyInstance() => BlockAuthorRequest._();
+  @$core.pragma('dart2js:noInline')
+  static BlockAuthorRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BlockAuthorRequest>(
+          BlockAuthorRequest.$_createMessage);
+  static BlockAuthorRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  BlockAuthorRequest_Source whichSource() =>
+      _BlockAuthorRequest_SourceByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  void clearSource() => $_clearField($_whichOneof(0));
+
+  /// 留言 ID。
+  @$pb.TagNumber(1)
+  $core.String get commentId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set commentId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCommentId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCommentId() => $_clearField(1);
+
+  /// 討論區留言 ID。
+  @$pb.TagNumber(2)
+  $core.String get forumEntryId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set forumEntryId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasForumEntryId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearForumEntryId() => $_clearField(2);
+}
+
+class BlockAuthorResponse extends $pb.GeneratedMessage {
+  factory BlockAuthorResponse({
+    $core.bool? changed,
+  }) {
+    final result = BlockAuthorResponse._();
+    if (changed != null) result.changed = changed;
+    return result;
+  }
+
+  BlockAuthorResponse._();
+
+  factory BlockAuthorResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BlockAuthorResponse()..mergeFromBuffer(data, registry);
+  factory BlockAuthorResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BlockAuthorResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BlockAuthorResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: BlockAuthorResponse.$_createMessage)
+    ..aOB(1, _omitFieldNames ? '' : 'changed')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockAuthorResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockAuthorResponse copyWith(void Function(BlockAuthorResponse) updates) =>
+      super.copyWith((message) => updates(message as BlockAuthorResponse))
+          as BlockAuthorResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use BlockAuthorResponse() / BlockAuthorResponse.new instead')
+  static BlockAuthorResponse create() => BlockAuthorResponse._();
+  static $pb.GeneratedMessage $_createMessage() => BlockAuthorResponse._();
+  @$core.override
+  BlockAuthorResponse createEmptyInstance() => BlockAuthorResponse._();
+  @$core.pragma('dart2js:noInline')
+  static BlockAuthorResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BlockAuthorResponse>(
+          BlockAuthorResponse.$_createMessage);
+  static BlockAuthorResponse? _defaultInstance;
+
+  /// 封鎖的狀態是否因這次呼叫而改變；本來就封鎖時為 false。
+  @$pb.TagNumber(1)
+  $core.bool get changed => $_getBF(0);
+  @$pb.TagNumber(1)
+  set changed($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChanged() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChanged() => $_clearField(1);
+}
+
+class BlockStoreRequest extends $pb.GeneratedMessage {
+  factory BlockStoreRequest({
+    $core.String? storeId,
+  }) {
+    final result = BlockStoreRequest._();
+    if (storeId != null) result.storeId = storeId;
+    return result;
+  }
+
+  BlockStoreRequest._();
+
+  factory BlockStoreRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BlockStoreRequest()..mergeFromBuffer(data, registry);
+  factory BlockStoreRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BlockStoreRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BlockStoreRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: BlockStoreRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'storeId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockStoreRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockStoreRequest copyWith(void Function(BlockStoreRequest) updates) =>
+      super.copyWith((message) => updates(message as BlockStoreRequest))
+          as BlockStoreRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use BlockStoreRequest() / BlockStoreRequest.new instead')
+  static BlockStoreRequest create() => BlockStoreRequest._();
+  static $pb.GeneratedMessage $_createMessage() => BlockStoreRequest._();
+  @$core.override
+  BlockStoreRequest createEmptyInstance() => BlockStoreRequest._();
+  @$core.pragma('dart2js:noInline')
+  static BlockStoreRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<BlockStoreRequest>(
+          BlockStoreRequest.$_createMessage);
+  static BlockStoreRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get storeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set storeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStoreId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStoreId() => $_clearField(1);
+}
+
+class BlockStoreResponse extends $pb.GeneratedMessage {
+  factory BlockStoreResponse({
+    $core.bool? changed,
+  }) {
+    final result = BlockStoreResponse._();
+    if (changed != null) result.changed = changed;
+    return result;
+  }
+
+  BlockStoreResponse._();
+
+  factory BlockStoreResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BlockStoreResponse()..mergeFromBuffer(data, registry);
+  factory BlockStoreResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BlockStoreResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BlockStoreResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: BlockStoreResponse.$_createMessage)
+    ..aOB(1, _omitFieldNames ? '' : 'changed')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockStoreResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockStoreResponse copyWith(void Function(BlockStoreResponse) updates) =>
+      super.copyWith((message) => updates(message as BlockStoreResponse))
+          as BlockStoreResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use BlockStoreResponse() / BlockStoreResponse.new instead')
+  static BlockStoreResponse create() => BlockStoreResponse._();
+  static $pb.GeneratedMessage $_createMessage() => BlockStoreResponse._();
+  @$core.override
+  BlockStoreResponse createEmptyInstance() => BlockStoreResponse._();
+  @$core.pragma('dart2js:noInline')
+  static BlockStoreResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BlockStoreResponse>(
+          BlockStoreResponse.$_createMessage);
+  static BlockStoreResponse? _defaultInstance;
+
+  /// 同 BlockAuthorResponse.changed。
+  @$pb.TagNumber(1)
+  $core.bool get changed => $_getBF(0);
+  @$pb.TagNumber(1)
+  set changed($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChanged() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChanged() => $_clearField(1);
+}
+
+class UnblockBuyerRequest extends $pb.GeneratedMessage {
+  factory UnblockBuyerRequest({
+    $core.String? buyerId,
+  }) {
+    final result = UnblockBuyerRequest._();
+    if (buyerId != null) result.buyerId = buyerId;
+    return result;
+  }
+
+  UnblockBuyerRequest._();
+
+  factory UnblockBuyerRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnblockBuyerRequest()..mergeFromBuffer(data, registry);
+  factory UnblockBuyerRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnblockBuyerRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnblockBuyerRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: UnblockBuyerRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'buyerId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnblockBuyerRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnblockBuyerRequest copyWith(void Function(UnblockBuyerRequest) updates) =>
+      super.copyWith((message) => updates(message as UnblockBuyerRequest))
+          as UnblockBuyerRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use UnblockBuyerRequest() / UnblockBuyerRequest.new instead')
+  static UnblockBuyerRequest create() => UnblockBuyerRequest._();
+  static $pb.GeneratedMessage $_createMessage() => UnblockBuyerRequest._();
+  @$core.override
+  UnblockBuyerRequest createEmptyInstance() => UnblockBuyerRequest._();
+  @$core.pragma('dart2js:noInline')
+  static UnblockBuyerRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UnblockBuyerRequest>(
+          UnblockBuyerRequest.$_createMessage);
+  static UnblockBuyerRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get buyerId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set buyerId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBuyerId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBuyerId() => $_clearField(1);
+}
+
+class UnblockBuyerResponse extends $pb.GeneratedMessage {
+  factory UnblockBuyerResponse({
+    $core.bool? changed,
+  }) {
+    final result = UnblockBuyerResponse._();
+    if (changed != null) result.changed = changed;
+    return result;
+  }
+
+  UnblockBuyerResponse._();
+
+  factory UnblockBuyerResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnblockBuyerResponse()..mergeFromBuffer(data, registry);
+  factory UnblockBuyerResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnblockBuyerResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnblockBuyerResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: UnblockBuyerResponse.$_createMessage)
+    ..aOB(1, _omitFieldNames ? '' : 'changed')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnblockBuyerResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnblockBuyerResponse copyWith(void Function(UnblockBuyerResponse) updates) =>
+      super.copyWith((message) => updates(message as UnblockBuyerResponse))
+          as UnblockBuyerResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UnblockBuyerResponse() / UnblockBuyerResponse.new instead')
+  static UnblockBuyerResponse create() => UnblockBuyerResponse._();
+  static $pb.GeneratedMessage $_createMessage() => UnblockBuyerResponse._();
+  @$core.override
+  UnblockBuyerResponse createEmptyInstance() => UnblockBuyerResponse._();
+  @$core.pragma('dart2js:noInline')
+  static UnblockBuyerResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UnblockBuyerResponse>(
+          UnblockBuyerResponse.$_createMessage);
+  static UnblockBuyerResponse? _defaultInstance;
+
+  /// 解除是否改變了狀態；本來就沒有封鎖時為 false。
+  @$pb.TagNumber(1)
+  $core.bool get changed => $_getBF(0);
+  @$pb.TagNumber(1)
+  set changed($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChanged() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChanged() => $_clearField(1);
+}
+
+class UnblockStoreRequest extends $pb.GeneratedMessage {
+  factory UnblockStoreRequest({
+    $core.String? storeId,
+  }) {
+    final result = UnblockStoreRequest._();
+    if (storeId != null) result.storeId = storeId;
+    return result;
+  }
+
+  UnblockStoreRequest._();
+
+  factory UnblockStoreRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnblockStoreRequest()..mergeFromBuffer(data, registry);
+  factory UnblockStoreRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnblockStoreRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnblockStoreRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: UnblockStoreRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'storeId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnblockStoreRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnblockStoreRequest copyWith(void Function(UnblockStoreRequest) updates) =>
+      super.copyWith((message) => updates(message as UnblockStoreRequest))
+          as UnblockStoreRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use UnblockStoreRequest() / UnblockStoreRequest.new instead')
+  static UnblockStoreRequest create() => UnblockStoreRequest._();
+  static $pb.GeneratedMessage $_createMessage() => UnblockStoreRequest._();
+  @$core.override
+  UnblockStoreRequest createEmptyInstance() => UnblockStoreRequest._();
+  @$core.pragma('dart2js:noInline')
+  static UnblockStoreRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UnblockStoreRequest>(
+          UnblockStoreRequest.$_createMessage);
+  static UnblockStoreRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get storeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set storeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStoreId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStoreId() => $_clearField(1);
+}
+
+class UnblockStoreResponse extends $pb.GeneratedMessage {
+  factory UnblockStoreResponse({
+    $core.bool? changed,
+  }) {
+    final result = UnblockStoreResponse._();
+    if (changed != null) result.changed = changed;
+    return result;
+  }
+
+  UnblockStoreResponse._();
+
+  factory UnblockStoreResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnblockStoreResponse()..mergeFromBuffer(data, registry);
+  factory UnblockStoreResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnblockStoreResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnblockStoreResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: UnblockStoreResponse.$_createMessage)
+    ..aOB(1, _omitFieldNames ? '' : 'changed')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnblockStoreResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnblockStoreResponse copyWith(void Function(UnblockStoreResponse) updates) =>
+      super.copyWith((message) => updates(message as UnblockStoreResponse))
+          as UnblockStoreResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UnblockStoreResponse() / UnblockStoreResponse.new instead')
+  static UnblockStoreResponse create() => UnblockStoreResponse._();
+  static $pb.GeneratedMessage $_createMessage() => UnblockStoreResponse._();
+  @$core.override
+  UnblockStoreResponse createEmptyInstance() => UnblockStoreResponse._();
+  @$core.pragma('dart2js:noInline')
+  static UnblockStoreResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UnblockStoreResponse>(
+          UnblockStoreResponse.$_createMessage);
+  static UnblockStoreResponse? _defaultInstance;
+
+  /// 同 UnblockBuyerResponse.changed。
+  @$pb.TagNumber(1)
+  $core.bool get changed => $_getBF(0);
+  @$pb.TagNumber(1)
+  set changed($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChanged() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChanged() => $_clearField(1);
+}
+
+class ListBlockedBuyersRequest extends $pb.GeneratedMessage {
+  factory ListBlockedBuyersRequest({
+    $core.int? pageSize,
+    $core.String? pageToken,
+  }) {
+    final result = ListBlockedBuyersRequest._();
+    if (pageSize != null) result.pageSize = pageSize;
+    if (pageToken != null) result.pageToken = pageToken;
+    return result;
+  }
+
+  ListBlockedBuyersRequest._();
+
+  factory ListBlockedBuyersRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListBlockedBuyersRequest()..mergeFromBuffer(data, registry);
+  factory ListBlockedBuyersRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListBlockedBuyersRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListBlockedBuyersRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: ListBlockedBuyersRequest.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'pageSize')
+    ..aOS(2, _omitFieldNames ? '' : 'pageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListBlockedBuyersRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListBlockedBuyersRequest copyWith(
+          void Function(ListBlockedBuyersRequest) updates) =>
+      super.copyWith((message) => updates(message as ListBlockedBuyersRequest))
+          as ListBlockedBuyersRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListBlockedBuyersRequest() / ListBlockedBuyersRequest.new instead')
+  static ListBlockedBuyersRequest create() => ListBlockedBuyersRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ListBlockedBuyersRequest._();
+  @$core.override
+  ListBlockedBuyersRequest createEmptyInstance() =>
+      ListBlockedBuyersRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListBlockedBuyersRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListBlockedBuyersRequest>(
+          ListBlockedBuyersRequest.$_createMessage);
+  static ListBlockedBuyersRequest? _defaultInstance;
+
+  /// 預設 20，上限 100。
+  @$pb.TagNumber(1)
+  $core.int get pageSize => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set pageSize($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageSize() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageSize() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get pageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set pageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPageToken() => $_clearField(2);
+}
+
+class ListBlockedBuyersResponse extends $pb.GeneratedMessage {
+  factory ListBlockedBuyersResponse({
+    $core.Iterable<BlockedBuyer>? blockedBuyers,
+    $core.String? nextPageToken,
+  }) {
+    final result = ListBlockedBuyersResponse._();
+    if (blockedBuyers != null) result.blockedBuyers.addAll(blockedBuyers);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    return result;
+  }
+
+  ListBlockedBuyersResponse._();
+
+  factory ListBlockedBuyersResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListBlockedBuyersResponse()..mergeFromBuffer(data, registry);
+  factory ListBlockedBuyersResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListBlockedBuyersResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListBlockedBuyersResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: ListBlockedBuyersResponse.$_createMessage)
+    ..pPM<BlockedBuyer>(1, _omitFieldNames ? '' : 'blockedBuyers',
+        subBuilder: BlockedBuyer.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListBlockedBuyersResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListBlockedBuyersResponse copyWith(
+          void Function(ListBlockedBuyersResponse) updates) =>
+      super.copyWith((message) => updates(message as ListBlockedBuyersResponse))
+          as ListBlockedBuyersResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListBlockedBuyersResponse() / ListBlockedBuyersResponse.new instead')
+  static ListBlockedBuyersResponse create() => ListBlockedBuyersResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ListBlockedBuyersResponse._();
+  @$core.override
+  ListBlockedBuyersResponse createEmptyInstance() =>
+      ListBlockedBuyersResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListBlockedBuyersResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListBlockedBuyersResponse>(
+          ListBlockedBuyersResponse.$_createMessage);
+  static ListBlockedBuyersResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<BlockedBuyer> get blockedBuyers => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get nextPageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set nextPageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNextPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNextPageToken() => $_clearField(2);
+}
+
+class ListBlockedStoresRequest extends $pb.GeneratedMessage {
+  factory ListBlockedStoresRequest({
+    $core.int? pageSize,
+    $core.String? pageToken,
+  }) {
+    final result = ListBlockedStoresRequest._();
+    if (pageSize != null) result.pageSize = pageSize;
+    if (pageToken != null) result.pageToken = pageToken;
+    return result;
+  }
+
+  ListBlockedStoresRequest._();
+
+  factory ListBlockedStoresRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListBlockedStoresRequest()..mergeFromBuffer(data, registry);
+  factory ListBlockedStoresRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListBlockedStoresRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListBlockedStoresRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: ListBlockedStoresRequest.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'pageSize')
+    ..aOS(2, _omitFieldNames ? '' : 'pageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListBlockedStoresRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListBlockedStoresRequest copyWith(
+          void Function(ListBlockedStoresRequest) updates) =>
+      super.copyWith((message) => updates(message as ListBlockedStoresRequest))
+          as ListBlockedStoresRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListBlockedStoresRequest() / ListBlockedStoresRequest.new instead')
+  static ListBlockedStoresRequest create() => ListBlockedStoresRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ListBlockedStoresRequest._();
+  @$core.override
+  ListBlockedStoresRequest createEmptyInstance() =>
+      ListBlockedStoresRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListBlockedStoresRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListBlockedStoresRequest>(
+          ListBlockedStoresRequest.$_createMessage);
+  static ListBlockedStoresRequest? _defaultInstance;
+
+  /// 預設 20，上限 100。
+  @$pb.TagNumber(1)
+  $core.int get pageSize => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set pageSize($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageSize() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageSize() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get pageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set pageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPageToken() => $_clearField(2);
+}
+
+class ListBlockedStoresResponse extends $pb.GeneratedMessage {
+  factory ListBlockedStoresResponse({
+    $core.Iterable<BlockedStore>? blockedStores,
+    $core.String? nextPageToken,
+  }) {
+    final result = ListBlockedStoresResponse._();
+    if (blockedStores != null) result.blockedStores.addAll(blockedStores);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    return result;
+  }
+
+  ListBlockedStoresResponse._();
+
+  factory ListBlockedStoresResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListBlockedStoresResponse()..mergeFromBuffer(data, registry);
+  factory ListBlockedStoresResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListBlockedStoresResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListBlockedStoresResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: ListBlockedStoresResponse.$_createMessage)
+    ..pPM<BlockedStore>(1, _omitFieldNames ? '' : 'blockedStores',
+        subBuilder: BlockedStore.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListBlockedStoresResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListBlockedStoresResponse copyWith(
+          void Function(ListBlockedStoresResponse) updates) =>
+      super.copyWith((message) => updates(message as ListBlockedStoresResponse))
+          as ListBlockedStoresResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListBlockedStoresResponse() / ListBlockedStoresResponse.new instead')
+  static ListBlockedStoresResponse create() => ListBlockedStoresResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ListBlockedStoresResponse._();
+  @$core.override
+  ListBlockedStoresResponse createEmptyInstance() =>
+      ListBlockedStoresResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListBlockedStoresResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListBlockedStoresResponse>(
+          ListBlockedStoresResponse.$_createMessage);
+  static ListBlockedStoresResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<BlockedStore> get blockedStores => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get nextPageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set nextPageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNextPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNextPageToken() => $_clearField(2);
+}
+
+/// BlockedBuyer 是呼叫者封鎖的買家。
+class BlockedBuyer extends $pb.GeneratedMessage {
+  factory BlockedBuyer({
+    $core.String? buyerId,
+    $core.bool? deleted,
+    $core.String? displayName,
+    $1.Image? avatar,
+    $2.Timestamp? createTime,
+  }) {
+    final result = BlockedBuyer._();
+    if (buyerId != null) result.buyerId = buyerId;
+    if (deleted != null) result.deleted = deleted;
+    if (displayName != null) result.displayName = displayName;
+    if (avatar != null) result.avatar = avatar;
+    if (createTime != null) result.createTime = createTime;
+    return result;
+  }
+
+  BlockedBuyer._();
+
+  factory BlockedBuyer.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BlockedBuyer()..mergeFromBuffer(data, registry);
+  factory BlockedBuyer.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BlockedBuyer()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BlockedBuyer',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: BlockedBuyer.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'buyerId')
+    ..aOB(2, _omitFieldNames ? '' : 'deleted')
+    ..aOS(3, _omitFieldNames ? '' : 'displayName')
+    ..aOM<$1.Image>(4, _omitFieldNames ? '' : 'avatar',
+        subBuilder: $1.Image.$_createMessage)
+    ..aOM<$2.Timestamp>(5, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockedBuyer clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockedBuyer copyWith(void Function(BlockedBuyer) updates) =>
+      super.copyWith((message) => updates(message as BlockedBuyer))
+          as BlockedBuyer;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use BlockedBuyer() / BlockedBuyer.new instead')
+  static BlockedBuyer create() => BlockedBuyer._();
+  static $pb.GeneratedMessage $_createMessage() => BlockedBuyer._();
+  @$core.override
+  BlockedBuyer createEmptyInstance() => BlockedBuyer._();
+  @$core.pragma('dart2js:noInline')
+  static BlockedBuyer getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<BlockedBuyer>(
+          BlockedBuyer.$_createMessage);
+  static BlockedBuyer? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get buyerId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set buyerId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBuyerId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBuyerId() => $_clearField(1);
+
+  /// 對方已刪除帳號：不帶名稱與頭像，client 顯示「已刪除的帳號」，仍可解除。
+  @$pb.TagNumber(2)
+  $core.bool get deleted => $_getBF(1);
+  @$pb.TagNumber(2)
+  set deleted($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDeleted() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDeleted() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get displayName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set displayName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDisplayName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDisplayName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $1.Image get avatar => $_getN(3);
+  @$pb.TagNumber(4)
+  set avatar($1.Image value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasAvatar() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearAvatar() => $_clearField(4);
+  @$pb.TagNumber(4)
+  $1.Image ensureAvatar() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  $2.Timestamp get createTime => $_getN(4);
+  @$pb.TagNumber(5)
+  set createTime($2.Timestamp value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCreateTime() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCreateTime() => $_clearField(5);
+  @$pb.TagNumber(5)
+  $2.Timestamp ensureCreateTime() => $_ensure(4);
+}
+
+/// BlockedStore 是呼叫者封鎖的店家。
+class BlockedStore extends $pb.GeneratedMessage {
+  factory BlockedStore({
+    $core.String? storeId,
+    $4.StoreCard? store,
+    $2.Timestamp? createTime,
+  }) {
+    final result = BlockedStore._();
+    if (storeId != null) result.storeId = storeId;
+    if (store != null) result.store = store;
+    if (createTime != null) result.createTime = createTime;
+    return result;
+  }
+
+  BlockedStore._();
+
+  factory BlockedStore.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BlockedStore()..mergeFromBuffer(data, registry);
+  factory BlockedStore.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BlockedStore()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BlockedStore',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: BlockedStore.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'storeId')
+    ..aOM<$4.StoreCard>(2, _omitFieldNames ? '' : 'store',
+        subBuilder: $4.StoreCard.$_createMessage)
+    ..aOM<$2.Timestamp>(3, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockedStore clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockedStore copyWith(void Function(BlockedStore) updates) =>
+      super.copyWith((message) => updates(message as BlockedStore))
+          as BlockedStore;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use BlockedStore() / BlockedStore.new instead')
+  static BlockedStore create() => BlockedStore._();
+  static $pb.GeneratedMessage $_createMessage() => BlockedStore._();
+  @$core.override
+  BlockedStore createEmptyInstance() => BlockedStore._();
+  @$core.pragma('dart2js:noInline')
+  static BlockedStore getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<BlockedStore>(
+          BlockedStore.$_createMessage);
+  static BlockedStore? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get storeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set storeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStoreId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStoreId() => $_clearField(1);
+
+  /// 不設表示這家店不顯示（從沒公開過或不存在）；已關閉的店家有卡片，status 是 CLOSED。
+  @$pb.TagNumber(2)
+  $4.StoreCard get store => $_getN(1);
+  @$pb.TagNumber(2)
+  set store($4.StoreCard value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasStore() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearStore() => $_clearField(2);
+  @$pb.TagNumber(2)
+  $4.StoreCard ensureStore() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $2.Timestamp get createTime => $_getN(2);
+  @$pb.TagNumber(3)
+  set createTime($2.Timestamp value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCreateTime() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCreateTime() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $2.Timestamp ensureCreateTime() => $_ensure(2);
+}
+
 /// BuyerAppService 是登入的帳號的方法。以呼叫者的買家身分操作，帳號沒有買家角色時回 permission_denied。
 class BuyerAppServiceApi {
   final $pb.RpcClient _client;
@@ -4355,6 +5349,44 @@ class BuyerAppServiceApi {
           $pb.ClientContext? ctx, UnsubscribeRestockRequest request) =>
       _client.invoke<UnsubscribeRestockResponse>(ctx, 'BuyerAppService',
           'UnsubscribeRestock', request, UnsubscribeRestockResponse());
+
+  /// BlockAuthor 封鎖一則留言或討論區留言的作者：作者是買家時封鎖那位買家（雙方互相看不到對方的留言，A7-1b），是店家時封鎖那家店
+  /// （該店的貼文與討論區不再出現）。參照是呼叫者讀得到的內容；讀不到（不存在、已刪除、被隱藏、貼文不公開、已被雙方的封鎖排除）一律回
+  /// not_found，不區分原因。作者是呼叫者自己、或是呼叫者自己的店，回 invalid_argument。已經封鎖時也成功，changed 為 false。
+  $async.Future<BlockAuthorResponse> blockAuthor(
+          $pb.ClientContext? ctx, BlockAuthorRequest request) =>
+      _client.invoke<BlockAuthorResponse>(ctx, 'BuyerAppService', 'BlockAuthor',
+          request, BlockAuthorResponse());
+
+  /// BlockStore 從店面頁封鎖店家；已經封鎖時也成功，changed 為 false。店家不存在或從沒公開過回 not_found，封鎖自己的店回 invalid_argument。
+  $async.Future<BlockStoreResponse> blockStore(
+          $pb.ClientContext? ctx, BlockStoreRequest request) =>
+      _client.invoke<BlockStoreResponse>(
+          ctx, 'BuyerAppService', 'BlockStore', request, BlockStoreResponse());
+
+  /// UnblockBuyer 解除對買家的封鎖；沒有封鎖時也成功，changed 為 false。
+  $async.Future<UnblockBuyerResponse> unblockBuyer(
+          $pb.ClientContext? ctx, UnblockBuyerRequest request) =>
+      _client.invoke<UnblockBuyerResponse>(ctx, 'BuyerAppService',
+          'UnblockBuyer', request, UnblockBuyerResponse());
+
+  /// UnblockStore 解除對店家的封鎖；沒有封鎖時也成功，changed 為 false。
+  $async.Future<UnblockStoreResponse> unblockStore(
+          $pb.ClientContext? ctx, UnblockStoreRequest request) =>
+      _client.invoke<UnblockStoreResponse>(ctx, 'BuyerAppService',
+          'UnblockStore', request, UnblockStoreResponse());
+
+  /// ListBlockedBuyers 列出呼叫者封鎖的買家，新到舊。
+  $async.Future<ListBlockedBuyersResponse> listBlockedBuyers(
+          $pb.ClientContext? ctx, ListBlockedBuyersRequest request) =>
+      _client.invoke<ListBlockedBuyersResponse>(ctx, 'BuyerAppService',
+          'ListBlockedBuyers', request, ListBlockedBuyersResponse());
+
+  /// ListBlockedStores 列出呼叫者封鎖的店家，新到舊；已關閉的店家照樣在名單裡（store 的 status 是 CLOSED），好讓使用者解除。
+  $async.Future<ListBlockedStoresResponse> listBlockedStores(
+          $pb.ClientContext? ctx, ListBlockedStoresRequest request) =>
+      _client.invoke<ListBlockedStoresResponse>(ctx, 'BuyerAppService',
+          'ListBlockedStores', request, ListBlockedStoresResponse());
 }
 
 const $core.bool _omitFieldNames =

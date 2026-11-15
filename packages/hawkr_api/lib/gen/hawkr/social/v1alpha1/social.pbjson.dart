@@ -72,6 +72,36 @@ final $typed_data.Uint8List postStatusDescriptor = $convert.base64Decode(
     'NfRFJBRlQQARIZChVQT1NUX1NUQVRVU19QVUJMSVNIRUQQAhIbChdQT1NUX1NUQVRVU19VTlBV'
     'QkxJU0hFRBAD');
 
+@$core.Deprecated('Use sanctionKindDescriptor instead')
+const SanctionKind$json = {
+  '1': 'SanctionKind',
+  '2': [
+    {'1': 'SANCTION_KIND_UNSPECIFIED', '2': 0},
+    {'1': 'SANCTION_KIND_WARNING', '2': 1},
+  ],
+};
+
+/// Descriptor for `SanctionKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List sanctionKindDescriptor = $convert.base64Decode(
+    'CgxTYW5jdGlvbktpbmQSHQoZU0FOQ1RJT05fS0lORF9VTlNQRUNJRklFRBAAEhkKFVNBTkNUSU'
+    '9OX0tJTkRfV0FSTklORxAB');
+
+@$core.Deprecated('Use hiddenContentKindDescriptor instead')
+const HiddenContentKind$json = {
+  '1': 'HiddenContentKind',
+  '2': [
+    {'1': 'HIDDEN_CONTENT_KIND_UNSPECIFIED', '2': 0},
+    {'1': 'HIDDEN_CONTENT_KIND_COMMENT', '2': 1},
+    {'1': 'HIDDEN_CONTENT_KIND_FORUM_ENTRY', '2': 2},
+  ],
+};
+
+/// Descriptor for `HiddenContentKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List hiddenContentKindDescriptor = $convert.base64Decode(
+    'ChFIaWRkZW5Db250ZW50S2luZBIjCh9ISURERU5fQ09OVEVOVF9LSU5EX1VOU1BFQ0lGSUVEEA'
+    'ASHwobSElEREVOX0NPTlRFTlRfS0lORF9DT01NRU5UEAESIwofSElEREVOX0NPTlRFTlRfS0lO'
+    'RF9GT1JVTV9FTlRSWRAC');
+
 @$core.Deprecated('Use hashtagDescriptor instead')
 const Hashtag$json = {
   '1': 'Hashtag',
@@ -1670,6 +1700,198 @@ final $typed_data.Uint8List postStatusCountDescriptor = $convert.base64Decode(
     'Cg9Qb3N0U3RhdHVzQ291bnQSOQoGc3RhdHVzGAEgASgOMiEuaGF3a3Iuc29jaWFsLnYxYWxwaG'
     'ExLlBvc3RTdGF0dXNSBnN0YXR1cxIUCgVjb3VudBgCIAEoA1IFY291bnQ=');
 
+@$core.Deprecated('Use listMySanctionsRequestDescriptor instead')
+const ListMySanctionsRequest$json = {
+  '1': 'ListMySanctionsRequest',
+  '2': [
+    {'1': 'page_size', '3': 1, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 2, '4': 1, '5': 9, '10': 'pageToken'},
+  ],
+};
+
+/// Descriptor for `ListMySanctionsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listMySanctionsRequestDescriptor =
+    $convert.base64Decode(
+        'ChZMaXN0TXlTYW5jdGlvbnNSZXF1ZXN0EhsKCXBhZ2Vfc2l6ZRgBIAEoBVIIcGFnZVNpemUSHQ'
+        'oKcGFnZV90b2tlbhgCIAEoCVIJcGFnZVRva2Vu');
+
+@$core.Deprecated('Use listMySanctionsResponseDescriptor instead')
+const ListMySanctionsResponse$json = {
+  '1': 'ListMySanctionsResponse',
+  '2': [
+    {
+      '1': 'sanctions',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Sanction',
+      '10': 'sanctions'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+  ],
+};
+
+/// Descriptor for `ListMySanctionsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listMySanctionsResponseDescriptor = $convert.base64Decode(
+    'ChdMaXN0TXlTYW5jdGlvbnNSZXNwb25zZRI9CglzYW5jdGlvbnMYASADKAsyHy5oYXdrci5zb2'
+    'NpYWwudjFhbHBoYTEuU2FuY3Rpb25SCXNhbmN0aW9ucxImCg9uZXh0X3BhZ2VfdG9rZW4YAiAB'
+    'KAlSDW5leHRQYWdlVG9rZW4=');
+
+@$core.Deprecated('Use sanctionDescriptor instead')
+const Sanction$json = {
+  '1': 'Sanction',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {
+      '1': 'kind',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.social.v1alpha1.SanctionKind',
+      '10': 'kind'
+    },
+    {
+      '1': 'category',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.common.v1alpha1.PolicyCategory',
+      '10': 'category'
+    },
+    {'1': 'reason', '3': 4, '4': 1, '5': 9, '10': 'reason'},
+    {
+      '1': 'create_time',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'createTime'
+    },
+  ],
+};
+
+/// Descriptor for `Sanction`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sanctionDescriptor = $convert.base64Decode(
+    'CghTYW5jdGlvbhIOCgJpZBgBIAEoCVICaWQSNwoEa2luZBgCIAEoDjIjLmhhd2tyLnNvY2lhbC'
+    '52MWFscGhhMS5TYW5jdGlvbktpbmRSBGtpbmQSQQoIY2F0ZWdvcnkYAyABKA4yJS5oYXdrci5j'
+    'b21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnlSCGNhdGVnb3J5EhYKBnJlYXNvbhgEIAEoCV'
+    'IGcmVhc29uEjsKC2NyZWF0ZV90aW1lGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFt'
+    'cFIKY3JlYXRlVGltZQ==');
+
+@$core.Deprecated('Use listMyHiddenContentRequestDescriptor instead')
+const ListMyHiddenContentRequest$json = {
+  '1': 'ListMyHiddenContentRequest',
+  '2': [
+    {'1': 'page_size', '3': 1, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 2, '4': 1, '5': 9, '10': 'pageToken'},
+  ],
+};
+
+/// Descriptor for `ListMyHiddenContentRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listMyHiddenContentRequestDescriptor =
+    $convert.base64Decode(
+        'ChpMaXN0TXlIaWRkZW5Db250ZW50UmVxdWVzdBIbCglwYWdlX3NpemUYASABKAVSCHBhZ2VTaX'
+        'plEh0KCnBhZ2VfdG9rZW4YAiABKAlSCXBhZ2VUb2tlbg==');
+
+@$core.Deprecated('Use listMyHiddenContentResponseDescriptor instead')
+const ListMyHiddenContentResponse$json = {
+  '1': 'ListMyHiddenContentResponse',
+  '2': [
+    {
+      '1': 'hidden_contents',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.HiddenContent',
+      '10': 'hiddenContents'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+  ],
+};
+
+/// Descriptor for `ListMyHiddenContentResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listMyHiddenContentResponseDescriptor =
+    $convert.base64Decode(
+        'ChtMaXN0TXlIaWRkZW5Db250ZW50UmVzcG9uc2USTQoPaGlkZGVuX2NvbnRlbnRzGAEgAygLMi'
+        'QuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkhpZGRlbkNvbnRlbnRSDmhpZGRlbkNvbnRlbnRzEiYK'
+        'D25leHRfcGFnZV90b2tlbhgCIAEoCVINbmV4dFBhZ2VUb2tlbg==');
+
+@$core.Deprecated('Use hiddenContentDescriptor instead')
+const HiddenContent$json = {
+  '1': 'HiddenContent',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {
+      '1': 'kind',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.social.v1alpha1.HiddenContentKind',
+      '10': 'kind'
+    },
+    {'1': 'content_id', '3': 3, '4': 1, '5': 9, '10': 'contentId'},
+    {
+      '1': 'post_id',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'postId',
+      '17': true
+    },
+    {
+      '1': 'store_id',
+      '3': 5,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'storeId',
+      '17': true
+    },
+    {'1': 'body', '3': 6, '4': 1, '5': 9, '10': 'body'},
+    {
+      '1': 'create_time',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'createTime'
+    },
+    {
+      '1': 'category',
+      '3': 8,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.common.v1alpha1.PolicyCategory',
+      '10': 'category'
+    },
+    {'1': 'reason', '3': 9, '4': 1, '5': 9, '10': 'reason'},
+    {
+      '1': 'hide_time',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'hideTime'
+    },
+  ],
+  '8': [
+    {'1': '_post_id'},
+    {'1': '_store_id'},
+  ],
+};
+
+/// Descriptor for `HiddenContent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List hiddenContentDescriptor = $convert.base64Decode(
+    'Cg1IaWRkZW5Db250ZW50Eg4KAmlkGAEgASgJUgJpZBI8CgRraW5kGAIgASgOMiguaGF3a3Iuc2'
+    '9jaWFsLnYxYWxwaGExLkhpZGRlbkNvbnRlbnRLaW5kUgRraW5kEh0KCmNvbnRlbnRfaWQYAyAB'
+    'KAlSCWNvbnRlbnRJZBIcCgdwb3N0X2lkGAQgASgJSABSBnBvc3RJZIgBARIeCghzdG9yZV9pZB'
+    'gFIAEoCUgBUgdzdG9yZUlkiAEBEhIKBGJvZHkYBiABKAlSBGJvZHkSOwoLY3JlYXRlX3RpbWUY'
+    'ByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wUgpjcmVhdGVUaW1lEkEKCGNhdGVnb3'
+    'J5GAggASgOMiUuaGF3a3IuY29tbW9uLnYxYWxwaGExLlBvbGljeUNhdGVnb3J5UghjYXRlZ29y'
+    'eRIWCgZyZWFzb24YCSABKAlSBnJlYXNvbhI3CgloaWRlX3RpbWUYCiABKAsyGi5nb29nbGUucH'
+    'JvdG9idWYuVGltZXN0YW1wUghoaWRlVGltZUIKCghfcG9zdF9pZEILCglfc3RvcmVfaWQ=');
+
 const $core.Map<$core.String, $core.dynamic> SocialPublicServiceBase$json = {
   '1': 'SocialPublicService',
   '2': [
@@ -1905,6 +2127,18 @@ const $core.Map<$core.String, $core.dynamic> SocialAppServiceBase$json = {
       '3': '.hawkr.social.v1alpha1.GetStoreSocialSummaryResponse',
       '4': {'34': 1},
     },
+    {
+      '1': 'ListMySanctions',
+      '2': '.hawkr.social.v1alpha1.ListMySanctionsRequest',
+      '3': '.hawkr.social.v1alpha1.ListMySanctionsResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'ListMyHiddenContent',
+      '2': '.hawkr.social.v1alpha1.ListMyHiddenContentRequest',
+      '3': '.hawkr.social.v1alpha1.ListMyHiddenContentResponse',
+      '4': {'34': 1},
+    },
   ],
 };
 
@@ -1973,6 +2207,15 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.social.v1alpha1.GetStoreSocialSummaryResponse':
       GetStoreSocialSummaryResponse$json,
   '.hawkr.social.v1alpha1.PostStatusCount': PostStatusCount$json,
+  '.hawkr.social.v1alpha1.ListMySanctionsRequest': ListMySanctionsRequest$json,
+  '.hawkr.social.v1alpha1.ListMySanctionsResponse':
+      ListMySanctionsResponse$json,
+  '.hawkr.social.v1alpha1.Sanction': Sanction$json,
+  '.hawkr.social.v1alpha1.ListMyHiddenContentRequest':
+      ListMyHiddenContentRequest$json,
+  '.hawkr.social.v1alpha1.ListMyHiddenContentResponse':
+      ListMyHiddenContentResponse$json,
+  '.hawkr.social.v1alpha1.HiddenContent': HiddenContent$json,
 };
 
 /// Descriptor for `SocialAppService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
@@ -2019,4 +2262,8 @@ final $typed_data.Uint8List socialAppServiceDescriptor = $convert.base64Decode(
     'FsLnYxYWxwaGExLkxpc3RTdG9yZUNvbW1lbnRzUmVzcG9uc2UiA5ACARKHAQoVR2V0U3RvcmVT'
     'b2NpYWxTdW1tYXJ5EjMuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkdldFN0b3JlU29jaWFsU3VtbW'
     'FyeVJlcXVlc3QaNC5oYXdrci5zb2NpYWwudjFhbHBoYTEuR2V0U3RvcmVTb2NpYWxTdW1tYXJ5'
-    'UmVzcG9uc2UiA5ACAQ==');
+    'UmVzcG9uc2UiA5ACARJ1Cg9MaXN0TXlTYW5jdGlvbnMSLS5oYXdrci5zb2NpYWwudjFhbHBoYT'
+    'EuTGlzdE15U2FuY3Rpb25zUmVxdWVzdBouLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaXN0TXlT'
+    'YW5jdGlvbnNSZXNwb25zZSIDkAIBEoEBChNMaXN0TXlIaWRkZW5Db250ZW50EjEuaGF3a3Iuc2'
+    '9jaWFsLnYxYWxwaGExLkxpc3RNeUhpZGRlbkNvbnRlbnRSZXF1ZXN0GjIuaGF3a3Iuc29jaWFs'
+    'LnYxYWxwaGExLkxpc3RNeUhpZGRlbkNvbnRlbnRSZXNwb25zZSIDkAIB');

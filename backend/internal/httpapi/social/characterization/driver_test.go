@@ -123,4 +123,24 @@ type Driver interface {
 
 	SuggestTags(ctx context.Context, c ch.Caller, q string) ([]TagCount, error)
 	TrendingTags(ctx context.Context, c ch.Caller) ([]TagCount, error)
+
+	// 封鎖（A7-2e）。舊的 social-service 的封鎖是雙向的、存在 Redis、聊天與評價共用 userId，與單體的語意刻意不同（SD3、SD15、D2），
+	// 舊的一端的 driver 不實作這些方法，封鎖的情境一律以 skipOnLegacy 跳過。
+	//
+	// BlockAuthor 是買家封鎖一則留言的作者（內容參照），回傳封鎖的狀態有沒有改變。
+	BlockAuthor(ctx context.Context, c ch.Caller, commentID string) (bool, error)
+	// BlockStore 是買家從店面頁封鎖店家。
+	BlockStore(ctx context.Context, c ch.Caller, sellerID string) (bool, error)
+	UnblockStore(ctx context.Context, c ch.Caller, sellerID string) (bool, error)
+	// SellerBlockAuthor 是店主以店家身分封鎖一則留言的作者。
+	SellerBlockAuthor(ctx context.Context, c ch.Caller, commentID string) (bool, error)
+	// SellerBlockedBuyers 是店主的封鎖名單；Deleted 表示對方已刪除帳號。
+	SellerBlockedBuyers(ctx context.Context, c ch.Caller) ([]BlockedBuyer, error)
+	SellerUnblockBuyer(ctx context.Context, c ch.Caller, buyerID string) (bool, error)
+}
+
+// BlockedBuyer 是店家封鎖名單的一列。
+type BlockedBuyer struct {
+	BuyerID string
+	Deleted bool
 }

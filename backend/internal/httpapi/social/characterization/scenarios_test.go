@@ -10,7 +10,7 @@ import (
 )
 
 // scenarios 是舊的 social-service 與單體都要通過的 28 條情境（情境清單的出處：A7-0 的介面盤點 interface-inventory.md 的
-// REST 清單，涵蓋貼文、留言、討論區、標籤；檢舉與封鎖在 A7-1d、A7-1b）：每個情境是 func(ctx context.Context, t ch.T, d Driver)，
+// REST 清單，涵蓋貼文、留言、討論區、標籤；檢舉在 A7-1d；封鎖的五條在 A7-2e，舊的一端全部跳過）：每個情境是 func(ctx context.Context, t ch.T, d Driver)，
 // 資料庫可能已經有別的資料，所以只看自己建立的那幾筆（標籤與內容帶 ch.Nonce()）。
 //
 // 標 skipOnLegacy 的是計畫的 SD 修正造成的刻意差異：舊的一端跳過並附 SD 編號，單體的一端（A7-2）照新行為斷言。
@@ -46,6 +46,12 @@ var scenarios = []ch.Scenario[Driver]{
 	{Name: "forum_edit_and_delete_by_author_only", Run: forumEditAndDeleteByAuthorOnly},
 	{Name: "hashtag_suggest_and_trending", Run: hashtagSuggestAndTrending},
 	{Name: "sd19_tag_search_treats_wildcards_literally", Run: sd19TagSearchTreatsWildcardsLiterally},
+	// 封鎖（A7-2e）：舊的一端全部跳過。
+	{Name: "block_author_by_comment_reference_is_idempotent", Run: blockAuthorByCommentReferenceIsIdempotent},
+	{Name: "block_by_unreadable_comment_is_not_found", Run: blockByUnreadableCommentIsNotFound},
+	{Name: "d2_buyer_blocking_a_store_hides_its_posts_only_for_the_blocker", Run: d2BuyerBlockingAStoreHidesItsPostsOnlyForTheBlocker},
+	{Name: "sd3_store_blocking_a_buyer_stops_that_buyers_writes_but_not_reads", Run: sd3StoreBlockingABuyerStopsWritesButNotReads},
+	{Name: "store_block_list_and_unblock", Run: storeBlockListAndUnblock},
 }
 
 // imageSeq 讓每次建立的貼文有自己的圖片參照（全數字：舊的 social-service 把 asset ID 當整數解析）。

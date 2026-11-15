@@ -478,13 +478,25 @@ const Suspension$json = {
       '8': {},
       '10': 'suspendedAt'
     },
+    {
+      '1': 'category',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.common.v1alpha1.PolicyCategory',
+      '8': {},
+      '10': 'category'
+    },
+    {'1': 'reason', '3': 3, '4': 1, '5': 9, '8': {}, '10': 'reason'},
   ],
 };
 
 /// Descriptor for `Suspension`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List suspensionDescriptor = $convert.base64Decode(
     'CgpTdXNwZW5zaW9uEkIKDHN1c3BlbmRlZF9hdBgBIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW'
-    '1lc3RhbXBCA+BBA1ILc3VzcGVuZGVkQXQ=');
+    '1lc3RhbXBCA+BBA1ILc3VzcGVuZGVkQXQSRgoIY2F0ZWdvcnkYAiABKA4yJS5oYXdrci5jb21t'
+    'b24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnlCA+BBA1IIY2F0ZWdvcnkSGwoGcmVhc29uGAMgAS'
+    'gJQgPgQQNSBnJlYXNvbg==');
 
 @$core.Deprecated('Use deleteAccountRequestDescriptor instead')
 const DeleteAccountRequest$json = {

@@ -14,6 +14,7 @@ import "google/api/field_info.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "hawkr/common/v1alpha1/image.proto";
+import "hawkr/common/v1alpha1/policy_category.proto";
 import "hawkr/common/v1alpha1/store_card.proto";
 
 // SocialPublicService 是任何人都能讀的貼文與留言，不需要登入。
@@ -176,6 +177,17 @@ service SocialAppService {
   // GetStoreSocialSummary 是賣家中心的動態數：呼叫者此刻的店的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數。數字由伺服器以資料庫計數，
   // 不是 client 以列表長度推算。賣家能力 CAP_CONTENT_CONTRACT。
   rpc GetStoreSocialSummary(GetStoreSocialSummaryRequest) returns (GetStoreSocialSummaryResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListMySanctions 列出呼叫者（買家）收到的社群處分，新到舊：種類、政策分類與理由，作者有權讀自己的處分。停權的帳號也可以呼叫。
+  rpc ListMySanctions(ListMySanctionsRequest) returns (ListMySanctionsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListMyHiddenContent 列出呼叫者（買家）被平台隱藏的留言與討論區留言，新隱藏到舊：連同本文與隱藏的政策分類與理由（別人看不到被隱藏的內容）。
+  // 已還原的隱藏不在名單裡。停權的帳號也可以呼叫。
+  rpc ListMyHiddenContent(ListMyHiddenContentRequest) returns (ListMyHiddenContentResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
@@ -659,4 +671,71 @@ message GetStoreSocialSummaryResponse {
 message PostStatusCount {
   PostStatus status = 1;
   int64 count = 2;
+}
+
+// SanctionKind 是社群處分的種類。
+enum SanctionKind {
+  SANCTION_KIND_UNSPECIFIED = 0;
+  // 警告。
+  SANCTION_KIND_WARNING = 1;
+}
+
+// HiddenContentKind 是被隱藏的內容的種類。
+enum HiddenContentKind {
+  HIDDEN_CONTENT_KIND_UNSPECIFIED = 0;
+  HIDDEN_CONTENT_KIND_COMMENT = 1;
+  HIDDEN_CONTENT_KIND_FORUM_ENTRY = 2;
+}
+
+message ListMySanctionsRequest {
+  // 預設 20，上限 50。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListMySanctionsResponse {
+  repeated Sanction sanctions = 1;
+  string next_page_token = 2;
+}
+
+// Sanction 是買家收到的一筆社群處分。
+message Sanction {
+  string id = 1;
+  SanctionKind kind = 2;
+  // 政策分類；不設表示沒有對應的分類。
+  hawkr.common.v1alpha1.PolicyCategory category = 3;
+  // 給作者看的理由；沒有補充說明時是空字串。
+  string reason = 4;
+  google.protobuf.Timestamp create_time = 5;
+}
+
+message ListMyHiddenContentRequest {
+  // 預設 20，上限 50。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListMyHiddenContentResponse {
+  repeated HiddenContent hidden_contents = 1;
+  string next_page_token = 2;
+}
+
+// HiddenContent 是買家被隱藏的一則內容與隱藏的理由。
+message HiddenContent {
+  // 隱藏紀錄的 ID。
+  string id = 1;
+  HiddenContentKind kind = 2;
+  // 留言或討論區留言的 ID。
+  string content_id = 3;
+  // 留言所屬的貼文；討論區留言沒有。
+  optional string post_id = 4;
+  // 內容所屬的店家 ID（過渡期的十進位整數字串）；留言沒有時不設。
+  optional string store_id = 5;
+  // 被隱藏的本文，只有作者讀得到。
+  string body = 6;
+  google.protobuf.Timestamp create_time = 7;
+  hawkr.common.v1alpha1.PolicyCategory category = 8;
+  // 給作者看的理由；沒有補充說明時是空字串。
+  string reason = 9;
+  google.protobuf.Timestamp hide_time = 10;
 }

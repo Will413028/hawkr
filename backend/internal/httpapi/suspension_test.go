@@ -190,7 +190,7 @@ func TestEveryDeclaredProcedureBehavesAsDeclaredForASuspendedAccount(t *testing.
 func TestSuspendedAccountCannotWriteSocialButViewsAsAGuest(t *testing.T) {
 	h := suspendedEntry()
 	methods := socialv1alpha1.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialAppService").Methods()
-	if methods.Len() != 21 {
+	if methods.Len() != 23 {
 		t.Fatalf("SocialAppService 有 %d 支方法", methods.Len())
 	}
 	reads := 0
@@ -208,8 +208,8 @@ func TestSuspendedAccountCannotWriteSocialButViewsAsAGuest(t *testing.T) {
 			t.Errorf("%s：%d %q called=%v，預期 ACCOUNT_SUSPENDED", proc, rec.Code, rec.Body, s.Called)
 		}
 	}
-	if reads != 4 {
-		t.Errorf("SocialAppService 的讀取方法有 %d 支，預期 4（GetMyPost、ListMyPosts、ListStoreComments、GetStoreSocialSummary）", reads)
+	if reads != 6 {
+		t.Errorf("SocialAppService 的讀取方法有 %d 支，預期 6（GetMyPost、ListMyPosts、ListStoreComments、GetStoreSocialSummary、ListMySanctions、ListMyHiddenContent）", reads)
 	}
 	rec, s := callAs(t, h, "suspended", http.MethodPost, "/hawkr.social.v1alpha1.SocialPublicService/RecordPostView")
 	if rec.Code != http.StatusOK || !s.Called || s.Principal {
@@ -385,6 +385,27 @@ func TestSuspendedAccountFoodSafetyReportCarriesNoAccount(t *testing.T) {
 		}
 		if got := m.submitted[0]; got.AccountID != wantAccount || got.StoreID != 12 {
 			t.Fatalf("%s：模組收到 %+v，預期 AccountID=%d", token, got, wantAccount)
+		}
+	}
+}
+
+// 作者讀自己的處分與被隱藏內容的理由（A7-D9）宣告為讀取：停權的帳號可以呼叫，handler 看得到 principal 與停權時間。
+// 封鎖是保護動作（宣告為自助），停權時也放行；名單是讀取。
+func TestSuspendedAccountCanReadItsOwnSanctionsAndManageItsBlocks(t *testing.T) {
+	h := suspendedEntry()
+	for _, proc := range []string{
+		"/hawkr.social.v1alpha1.SocialAppService/ListMySanctions",
+		"/hawkr.social.v1alpha1.SocialAppService/ListMyHiddenContent",
+		"/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedBuyers",
+		"/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedStores",
+		"/hawkr.buyer.v1alpha1.BuyerAppService/BlockAuthor",
+		"/hawkr.buyer.v1alpha1.BuyerAppService/BlockStore",
+		"/hawkr.buyer.v1alpha1.BuyerAppService/UnblockBuyer",
+		"/hawkr.buyer.v1alpha1.BuyerAppService/UnblockStore",
+	} {
+		rec, s := callAs(t, h, "suspended", http.MethodPost, proc)
+		if rec.Code != http.StatusOK || !s.Called || !s.Principal || !s.Suspended || !s.At.Equal(suspendedSince) {
+			t.Fatalf("%s：%d %+v，停權的帳號預期放行、帶 principal 與停權時間", proc, rec.Code, s)
 		}
 	}
 }
