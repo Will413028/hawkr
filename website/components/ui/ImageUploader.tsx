@@ -442,7 +442,7 @@ export function ImageUploader({
 							id={tileTextId}
 							className="text-[0.8125rem] font-semibold text-[var(--brand-text-black)] dark:text-[var(--hkui-foreground)]"
 						>
-							{dragging ? "放開上傳" : "點擊或拖曳上傳"}
+							{tileVisibleText}
 						</strong>
 						<small
 							id={fileHintId}
@@ -458,7 +458,7 @@ export function ImageUploader({
 						className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 bg-black/45 text-[var(--color-neutral-cream)] text-[0.8125rem] font-semibold rounded-[inherit]"
 						role="status"
 					>
-						<span id={tileTextId}>上傳中…</span>
+						<span id={tileTextId}>{tileVisibleText}</span>
 						{clampedProgress !== undefined && (
 							<div
 								className="w-[70%] h-1 rounded-[var(--radius-pill)] bg-white/25 overflow-hidden"

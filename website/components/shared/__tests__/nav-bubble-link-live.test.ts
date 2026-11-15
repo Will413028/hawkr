@@ -48,4 +48,11 @@ describe("NavBubbleLink", () => {
 		render(bubble(0));
 		expect(screen.getByRole("link", { name: "訊息" })).toBeTruthy();
 	});
+
+	it("keeps the sr-only name out of a span", () => {
+		const { container } = render(bubble(3));
+		const name = container.querySelector("a [data-nav-bubble-name]");
+		expect(name?.className).toContain("sr-only");
+		expect(name?.tagName.toLowerCase()).not.toBe("span");
+	});
 });

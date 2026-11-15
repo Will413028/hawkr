@@ -115,7 +115,10 @@ export default function NavBubbleLink({
 					onPointerDown?.(event);
 				}}
 			>
-				<small className="sr-only">{accessibleName}</small>
+				{/* 不可用 span：`body .site-nav-action span` 會把它解開成可見。 */}
+				<small className="sr-only" data-nav-bubble-name="">
+					{accessibleName}
+				</small>
 				<span {...innerProps} className={NOTIF_BELL_INNER}>
 					{children}
 				</span>

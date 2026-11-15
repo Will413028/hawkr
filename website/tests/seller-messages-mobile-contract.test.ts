@@ -152,9 +152,9 @@ test("訊息篩選選取色不被訂單狀態覆寫，焦點框留在膠囊內",
 	assert.match(focusRule, /border-radius:\s*var\(--radius-pill\)/);
 });
 
-test("空狀態位於寬表格外，不再被 980px 表格撐寬", () => {
+test("空狀態位於可捲動區域外，區域只包住表格", () => {
+	const emptyAt = workspace.indexOf("<SellerEmptyState");
 	const wrapAt = workspace.indexOf('className="seller-messages__table-wrap"');
-	const emptyAt = workspace.indexOf("<SellerEmptyState", wrapAt);
 	const tableClassAt = workspace.indexOf(
 		'className="seller-orders__table seller-messages__table"',
 		wrapAt,
@@ -162,17 +162,20 @@ test("空狀態位於寬表格外，不再被 980px 表格撐寬", () => {
 	const tableAt = workspace.lastIndexOf("<table", tableClassAt);
 	const tableEnd = workspace.indexOf("</table>", tableAt);
 
-	assert.notEqual(wrapAt, -1);
-	assert.ok(emptyAt > wrapAt);
-	assert.ok(tableAt > emptyAt);
+	assert.notEqual(emptyAt, -1);
+	assert.ok(wrapAt > emptyAt);
+	assert.ok(tableAt > wrapAt);
 	assert.ok(tableEnd > tableAt);
-	assert.match(workspace.slice(wrapAt, tableAt), /filteredRows\.length === 0/);
 	assert.match(
-		workspace.slice(wrapAt, tableAt),
+		workspace.slice(emptyAt - 80, wrapAt),
+		/filteredRows\.length === 0/,
+	);
+	assert.match(
+		workspace.slice(emptyAt, wrapAt),
 		/seller-messages__empty-state/,
 	);
 	assert.doesNotMatch(
-		workspace.slice(tableAt, tableEnd),
+		workspace.slice(wrapAt, tableEnd),
 		/SellerEmptyState|seller-orders__empty/,
 	);
 });

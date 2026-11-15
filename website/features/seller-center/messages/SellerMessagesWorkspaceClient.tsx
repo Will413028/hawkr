@@ -619,24 +619,24 @@ export default function SellerMessagesWorkspaceClient() {
 						.join(" ")}
 					data-loading={workspaceBusy ? "true" : undefined}
 				>
-					<ScrollableTableRegion
-						label="訊息列表"
-						className="seller-messages__table-wrap"
-					>
-						{!loadingInitial && filteredRows.length === 0 ? (
-							<SellerEmptyState
-								variant="messages"
-								searchQuery={query}
-								seamless
-								className="seller-messages__empty-state"
-								title={hasFilters ? "找不到符合條件的對話" : undefined}
-								description={
-									hasFilters
-										? "調整客戶分類、標籤或時間範圍後再試一次。"
-										: undefined
-								}
-							/>
-						) : (
+					{!loadingInitial && filteredRows.length === 0 ? (
+						<SellerEmptyState
+							variant="messages"
+							searchQuery={query}
+							seamless
+							className="seller-messages__empty-state"
+							title={hasFilters ? "找不到符合條件的對話" : undefined}
+							description={
+								hasFilters
+									? "調整客戶分類、標籤或時間範圍後再試一次。"
+									: undefined
+							}
+						/>
+					) : (
+						<ScrollableTableRegion
+							label="訊息列表"
+							className="seller-messages__table-wrap"
+						>
 							<table
 								className="seller-orders__table seller-messages__table"
 								data-mobile-layout="cards"
@@ -689,8 +689,8 @@ export default function SellerMessagesWorkspaceClient() {
 									)}
 								</tbody>
 							</table>
-						)}
-					</ScrollableTableRegion>
+						</ScrollableTableRegion>
+					)}
 				</div>
 
 				{!loadingInitial && filteredRows.length > 0 ? (
