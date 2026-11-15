@@ -594,8 +594,8 @@ func TestCrossSourceKeysetPagingWithModeration(t *testing.T) {
 	open, _ := moderationWorld(t, d)
 	// 案件 openOne 的期限是 base+73h、開始是 base+49h：食安通報（base+69h 建立，4 小時）與 payment 帳戶（base+49h 失敗）各自與它同期限，
 	// 其中帳戶連開始時間都相同，只剩種類與 ID 分序。
-	seedReport(t, d, store, "SPAM", base.Add(1*time.Hour))
-	seedReport(t, d, store, "SPAM", base.Add(2*time.Hour))
+	seedReport(t, d, store, "OTHER", base.Add(1*time.Hour))
+	seedReport(t, d, store, "OTHER", base.Add(2*time.Hour))
 	seedReport(t, d, store, "FOOD_SAFETY", base.Add(69*time.Hour))
 	for i, at := range []time.Time{base.Add(49 * time.Hour), base.Add(50 * time.Hour)} {
 		_, err := d.Conn(ctx).Exec(ctx, `INSERT INTO payment.accounts (store_id, provider, requirement_collection, create_failed_at, created_at, updated_at)
