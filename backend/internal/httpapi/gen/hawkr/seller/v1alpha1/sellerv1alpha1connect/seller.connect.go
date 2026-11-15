@@ -105,6 +105,15 @@ const (
 	// SellerAppServiceRequestRemediationProcedure is the fully-qualified name of the SellerAppService's
 	// RequestRemediation RPC.
 	SellerAppServiceRequestRemediationProcedure = "/hawkr.seller.v1alpha1.SellerAppService/RequestRemediation"
+	// SellerAppServiceBlockBuyerProcedure is the fully-qualified name of the SellerAppService's
+	// BlockBuyer RPC.
+	SellerAppServiceBlockBuyerProcedure = "/hawkr.seller.v1alpha1.SellerAppService/BlockBuyer"
+	// SellerAppServiceUnblockBuyerProcedure is the fully-qualified name of the SellerAppService's
+	// UnblockBuyer RPC.
+	SellerAppServiceUnblockBuyerProcedure = "/hawkr.seller.v1alpha1.SellerAppService/UnblockBuyer"
+	// SellerAppServiceListBlockedBuyersProcedure is the fully-qualified name of the SellerAppService's
+	// ListBlockedBuyers RPC.
+	SellerAppServiceListBlockedBuyersProcedure = "/hawkr.seller.v1alpha1.SellerAppService/ListBlockedBuyers"
 	// SellerPublicServiceGetStoreProcedure is the fully-qualified name of the SellerPublicService's
 	// GetStore RPC.
 	SellerPublicServiceGetStoreProcedure = "/hawkr.seller.v1alpha1.SellerPublicService/GetStore"
@@ -214,6 +223,14 @@ type SellerAppServiceClient interface {
 	// （VERSION_CONFLICT）；提出請求不改變 etag，所以請求已經生效後再送一次（包含重送同一個請求）回 failed_precondition，不寫入。
 	// 措施不是生效中、不是 RISK 依據、在冷卻期內、已有待處理的請求，或已撤銷時回 failed_precondition。不要求賣家角色。
 	RequestRemediation(context.Context, *connect.Request[v1alpha1.RequestRemediationRequest]) (*connect.Response[v1alpha1.RequestRemediationResponse], error)
+	// BlockBuyer 以呼叫者店家的身分封鎖一位買家：該買家不能在這家店留言、討論區發言與按讚，仍看得到店家的公開內容。買家以留言或討論區留言的
+	// 參照指定，參照要在呼叫者店家的內容裡讀得到，否則回 not_found；作者不是買家（是店家）回 invalid_argument；作者是店主本人的買家身分回
+	// invalid_argument。已經封鎖時也成功，changed 為 false。賣家能力 CAP_CONTENT_CONTRACT（封鎖是保護動作，停權時仍可做）。
+	BlockBuyer(context.Context, *connect.Request[v1alpha1.BlockBuyerRequest]) (*connect.Response[v1alpha1.BlockBuyerResponse], error)
+	// UnblockBuyer 解除呼叫者店家對買家的封鎖；沒有封鎖時也成功，changed 為 false。賣家能力 CAP_CONTENT_CONTRACT。
+	UnblockBuyer(context.Context, *connect.Request[v1alpha1.UnblockBuyerRequest]) (*connect.Response[v1alpha1.UnblockBuyerResponse], error)
+	// ListBlockedBuyers 列出呼叫者店家封鎖的買家，新到舊。賣家能力 CAP_CONTENT_CONTRACT。
+	ListBlockedBuyers(context.Context, *connect.Request[v1alpha1.ListBlockedBuyersRequest]) (*connect.Response[v1alpha1.ListBlockedBuyersResponse], error)
 }
 
 // NewSellerAppServiceClient constructs a client for the hawkr.seller.v1alpha1.SellerAppService
@@ -364,6 +381,27 @@ func NewSellerAppServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(sellerAppServiceMethods.ByName("RequestRemediation")),
 			connect.WithClientOptions(opts...),
 		),
+		blockBuyer: connect.NewClient[v1alpha1.BlockBuyerRequest, v1alpha1.BlockBuyerResponse](
+			httpClient,
+			baseURL+SellerAppServiceBlockBuyerProcedure,
+			connect.WithSchema(sellerAppServiceMethods.ByName("BlockBuyer")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		unblockBuyer: connect.NewClient[v1alpha1.UnblockBuyerRequest, v1alpha1.UnblockBuyerResponse](
+			httpClient,
+			baseURL+SellerAppServiceUnblockBuyerProcedure,
+			connect.WithSchema(sellerAppServiceMethods.ByName("UnblockBuyer")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		listBlockedBuyers: connect.NewClient[v1alpha1.ListBlockedBuyersRequest, v1alpha1.ListBlockedBuyersResponse](
+			httpClient,
+			baseURL+SellerAppServiceListBlockedBuyersProcedure,
+			connect.WithSchema(sellerAppServiceMethods.ByName("ListBlockedBuyers")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -390,6 +428,9 @@ type sellerAppServiceClient struct {
 	getMyMeasure                   *connect.Client[v1alpha1.GetMyMeasureRequest, v1alpha1.GetMyMeasureResponse]
 	submitAppeal                   *connect.Client[v1alpha1.SubmitAppealRequest, v1alpha1.SubmitAppealResponse]
 	requestRemediation             *connect.Client[v1alpha1.RequestRemediationRequest, v1alpha1.RequestRemediationResponse]
+	blockBuyer                     *connect.Client[v1alpha1.BlockBuyerRequest, v1alpha1.BlockBuyerResponse]
+	unblockBuyer                   *connect.Client[v1alpha1.UnblockBuyerRequest, v1alpha1.UnblockBuyerResponse]
+	listBlockedBuyers              *connect.Client[v1alpha1.ListBlockedBuyersRequest, v1alpha1.ListBlockedBuyersResponse]
 }
 
 // ApplyStore calls hawkr.seller.v1alpha1.SellerAppService.ApplyStore.
@@ -499,6 +540,21 @@ func (c *sellerAppServiceClient) RequestRemediation(ctx context.Context, req *co
 	return c.requestRemediation.CallUnary(ctx, req)
 }
 
+// BlockBuyer calls hawkr.seller.v1alpha1.SellerAppService.BlockBuyer.
+func (c *sellerAppServiceClient) BlockBuyer(ctx context.Context, req *connect.Request[v1alpha1.BlockBuyerRequest]) (*connect.Response[v1alpha1.BlockBuyerResponse], error) {
+	return c.blockBuyer.CallUnary(ctx, req)
+}
+
+// UnblockBuyer calls hawkr.seller.v1alpha1.SellerAppService.UnblockBuyer.
+func (c *sellerAppServiceClient) UnblockBuyer(ctx context.Context, req *connect.Request[v1alpha1.UnblockBuyerRequest]) (*connect.Response[v1alpha1.UnblockBuyerResponse], error) {
+	return c.unblockBuyer.CallUnary(ctx, req)
+}
+
+// ListBlockedBuyers calls hawkr.seller.v1alpha1.SellerAppService.ListBlockedBuyers.
+func (c *sellerAppServiceClient) ListBlockedBuyers(ctx context.Context, req *connect.Request[v1alpha1.ListBlockedBuyersRequest]) (*connect.Response[v1alpha1.ListBlockedBuyersResponse], error) {
+	return c.listBlockedBuyers.CallUnary(ctx, req)
+}
+
 // SellerAppServiceHandler is an implementation of the hawkr.seller.v1alpha1.SellerAppService
 // service.
 type SellerAppServiceHandler interface {
@@ -592,6 +648,14 @@ type SellerAppServiceHandler interface {
 	// （VERSION_CONFLICT）；提出請求不改變 etag，所以請求已經生效後再送一次（包含重送同一個請求）回 failed_precondition，不寫入。
 	// 措施不是生效中、不是 RISK 依據、在冷卻期內、已有待處理的請求，或已撤銷時回 failed_precondition。不要求賣家角色。
 	RequestRemediation(context.Context, *connect.Request[v1alpha1.RequestRemediationRequest]) (*connect.Response[v1alpha1.RequestRemediationResponse], error)
+	// BlockBuyer 以呼叫者店家的身分封鎖一位買家：該買家不能在這家店留言、討論區發言與按讚，仍看得到店家的公開內容。買家以留言或討論區留言的
+	// 參照指定，參照要在呼叫者店家的內容裡讀得到，否則回 not_found；作者不是買家（是店家）回 invalid_argument；作者是店主本人的買家身分回
+	// invalid_argument。已經封鎖時也成功，changed 為 false。賣家能力 CAP_CONTENT_CONTRACT（封鎖是保護動作，停權時仍可做）。
+	BlockBuyer(context.Context, *connect.Request[v1alpha1.BlockBuyerRequest]) (*connect.Response[v1alpha1.BlockBuyerResponse], error)
+	// UnblockBuyer 解除呼叫者店家對買家的封鎖；沒有封鎖時也成功，changed 為 false。賣家能力 CAP_CONTENT_CONTRACT。
+	UnblockBuyer(context.Context, *connect.Request[v1alpha1.UnblockBuyerRequest]) (*connect.Response[v1alpha1.UnblockBuyerResponse], error)
+	// ListBlockedBuyers 列出呼叫者店家封鎖的買家，新到舊。賣家能力 CAP_CONTENT_CONTRACT。
+	ListBlockedBuyers(context.Context, *connect.Request[v1alpha1.ListBlockedBuyersRequest]) (*connect.Response[v1alpha1.ListBlockedBuyersResponse], error)
 }
 
 // NewSellerAppServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -738,6 +802,27 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 		connect.WithSchema(sellerAppServiceMethods.ByName("RequestRemediation")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sellerAppServiceBlockBuyerHandler := connect.NewUnaryHandler(
+		SellerAppServiceBlockBuyerProcedure,
+		svc.BlockBuyer,
+		connect.WithSchema(sellerAppServiceMethods.ByName("BlockBuyer")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	sellerAppServiceUnblockBuyerHandler := connect.NewUnaryHandler(
+		SellerAppServiceUnblockBuyerProcedure,
+		svc.UnblockBuyer,
+		connect.WithSchema(sellerAppServiceMethods.ByName("UnblockBuyer")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	sellerAppServiceListBlockedBuyersHandler := connect.NewUnaryHandler(
+		SellerAppServiceListBlockedBuyersProcedure,
+		svc.ListBlockedBuyers,
+		connect.WithSchema(sellerAppServiceMethods.ByName("ListBlockedBuyers")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hawkr.seller.v1alpha1.SellerAppService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SellerAppServiceApplyStoreProcedure:
@@ -782,6 +867,12 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 			sellerAppServiceSubmitAppealHandler.ServeHTTP(w, r)
 		case SellerAppServiceRequestRemediationProcedure:
 			sellerAppServiceRequestRemediationHandler.ServeHTTP(w, r)
+		case SellerAppServiceBlockBuyerProcedure:
+			sellerAppServiceBlockBuyerHandler.ServeHTTP(w, r)
+		case SellerAppServiceUnblockBuyerProcedure:
+			sellerAppServiceUnblockBuyerHandler.ServeHTTP(w, r)
+		case SellerAppServiceListBlockedBuyersProcedure:
+			sellerAppServiceListBlockedBuyersHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -873,6 +964,18 @@ func (UnimplementedSellerAppServiceHandler) SubmitAppeal(context.Context, *conne
 
 func (UnimplementedSellerAppServiceHandler) RequestRemediation(context.Context, *connect.Request[v1alpha1.RequestRemediationRequest]) (*connect.Response[v1alpha1.RequestRemediationResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.RequestRemediation is not implemented"))
+}
+
+func (UnimplementedSellerAppServiceHandler) BlockBuyer(context.Context, *connect.Request[v1alpha1.BlockBuyerRequest]) (*connect.Response[v1alpha1.BlockBuyerResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.BlockBuyer is not implemented"))
+}
+
+func (UnimplementedSellerAppServiceHandler) UnblockBuyer(context.Context, *connect.Request[v1alpha1.UnblockBuyerRequest]) (*connect.Response[v1alpha1.UnblockBuyerResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.UnblockBuyer is not implemented"))
+}
+
+func (UnimplementedSellerAppServiceHandler) ListBlockedBuyers(context.Context, *connect.Request[v1alpha1.ListBlockedBuyersRequest]) (*connect.Response[v1alpha1.ListBlockedBuyersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.ListBlockedBuyers is not implemented"))
 }
 
 // SellerPublicServiceClient is a client for the hawkr.seller.v1alpha1.SellerPublicService service.

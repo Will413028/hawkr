@@ -463,4 +463,114 @@ extension type BuyerAppServiceClient (connect.Transport _transport) {
       onTrailer: onTrailer,
     );
   }
+
+  /// BlockAuthor 封鎖一則留言或討論區留言的作者：作者是買家時封鎖那位買家（雙方互相看不到對方的留言，A7-1b），是店家時封鎖那家店
+  /// （該店的貼文與討論區不再出現）。參照是呼叫者讀得到的內容；讀不到（不存在、已刪除、被隱藏、貼文不公開、已被雙方的封鎖排除）一律回
+  /// not_found，不區分原因。作者是呼叫者自己、或是呼叫者自己的店，回 invalid_argument。已經封鎖時也成功，changed 為 false。
+  Future<hawkrbuyerv1alpha1buyer.BlockAuthorResponse> blockAuthor(
+    hawkrbuyerv1alpha1buyer.BlockAuthorRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.BuyerAppService.blockAuthor,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// BlockStore 從店面頁封鎖店家；已經封鎖時也成功，changed 為 false。店家不存在或從沒公開過回 not_found，封鎖自己的店回 invalid_argument。
+  Future<hawkrbuyerv1alpha1buyer.BlockStoreResponse> blockStore(
+    hawkrbuyerv1alpha1buyer.BlockStoreRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.BuyerAppService.blockStore,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// UnblockBuyer 解除對買家的封鎖；沒有封鎖時也成功，changed 為 false。
+  Future<hawkrbuyerv1alpha1buyer.UnblockBuyerResponse> unblockBuyer(
+    hawkrbuyerv1alpha1buyer.UnblockBuyerRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.BuyerAppService.unblockBuyer,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// UnblockStore 解除對店家的封鎖；沒有封鎖時也成功，changed 為 false。
+  Future<hawkrbuyerv1alpha1buyer.UnblockStoreResponse> unblockStore(
+    hawkrbuyerv1alpha1buyer.UnblockStoreRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.BuyerAppService.unblockStore,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// ListBlockedBuyers 列出呼叫者封鎖的買家，新到舊。
+  Future<hawkrbuyerv1alpha1buyer.ListBlockedBuyersResponse> listBlockedBuyers(
+    hawkrbuyerv1alpha1buyer.ListBlockedBuyersRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.BuyerAppService.listBlockedBuyers,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// ListBlockedStores 列出呼叫者封鎖的店家，新到舊；已關閉的店家照樣在名單裡（store 的 status 是 CLOSED），好讓使用者解除。
+  Future<hawkrbuyerv1alpha1buyer.ListBlockedStoresResponse> listBlockedStores(
+    hawkrbuyerv1alpha1buyer.ListBlockedStoresRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.BuyerAppService.listBlockedStores,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
 }

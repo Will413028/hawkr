@@ -129,6 +129,12 @@ const (
 	// SocialAppServiceGetStoreSocialSummaryProcedure is the fully-qualified name of the
 	// SocialAppService's GetStoreSocialSummary RPC.
 	SocialAppServiceGetStoreSocialSummaryProcedure = "/hawkr.social.v1alpha1.SocialAppService/GetStoreSocialSummary"
+	// SocialAppServiceListMySanctionsProcedure is the fully-qualified name of the SocialAppService's
+	// ListMySanctions RPC.
+	SocialAppServiceListMySanctionsProcedure = "/hawkr.social.v1alpha1.SocialAppService/ListMySanctions"
+	// SocialAppServiceListMyHiddenContentProcedure is the fully-qualified name of the
+	// SocialAppService's ListMyHiddenContent RPC.
+	SocialAppServiceListMyHiddenContentProcedure = "/hawkr.social.v1alpha1.SocialAppService/ListMyHiddenContent"
 )
 
 // SocialPublicServiceClient is a client for the hawkr.social.v1alpha1.SocialPublicService service.
@@ -489,6 +495,11 @@ type SocialAppServiceClient interface {
 	// GetStoreSocialSummary 是賣家中心的動態數：呼叫者此刻的店的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數。數字由伺服器以資料庫計數，
 	// 不是 client 以列表長度推算。賣家能力 CAP_CONTENT_CONTRACT。
 	GetStoreSocialSummary(context.Context, *connect.Request[v1alpha1.GetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.GetStoreSocialSummaryResponse], error)
+	// ListMySanctions 列出呼叫者（買家）收到的社群處分，新到舊：種類、政策分類與理由，作者有權讀自己的處分。停權的帳號也可以呼叫。
+	ListMySanctions(context.Context, *connect.Request[v1alpha1.ListMySanctionsRequest]) (*connect.Response[v1alpha1.ListMySanctionsResponse], error)
+	// ListMyHiddenContent 列出呼叫者（買家）被平台隱藏的留言與討論區留言，新隱藏到舊：連同本文與隱藏的政策分類與理由（別人看不到被隱藏的內容）。
+	// 已還原的隱藏不在名單裡。停權的帳號也可以呼叫。
+	ListMyHiddenContent(context.Context, *connect.Request[v1alpha1.ListMyHiddenContentRequest]) (*connect.Response[v1alpha1.ListMyHiddenContentResponse], error)
 }
 
 // NewSocialAppServiceClient constructs a client for the hawkr.social.v1alpha1.SocialAppService
@@ -646,6 +657,20 @@ func NewSocialAppServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		listMySanctions: connect.NewClient[v1alpha1.ListMySanctionsRequest, v1alpha1.ListMySanctionsResponse](
+			httpClient,
+			baseURL+SocialAppServiceListMySanctionsProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("ListMySanctions")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		listMyHiddenContent: connect.NewClient[v1alpha1.ListMyHiddenContentRequest, v1alpha1.ListMyHiddenContentResponse](
+			httpClient,
+			baseURL+SocialAppServiceListMyHiddenContentProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("ListMyHiddenContent")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -672,6 +697,8 @@ type socialAppServiceClient struct {
 	schedulePost          *connect.Client[v1alpha1.SchedulePostRequest, v1alpha1.SchedulePostResponse]
 	listStoreComments     *connect.Client[v1alpha1.ListStoreCommentsRequest, v1alpha1.ListStoreCommentsResponse]
 	getStoreSocialSummary *connect.Client[v1alpha1.GetStoreSocialSummaryRequest, v1alpha1.GetStoreSocialSummaryResponse]
+	listMySanctions       *connect.Client[v1alpha1.ListMySanctionsRequest, v1alpha1.ListMySanctionsResponse]
+	listMyHiddenContent   *connect.Client[v1alpha1.ListMyHiddenContentRequest, v1alpha1.ListMyHiddenContentResponse]
 }
 
 // SharePost calls hawkr.social.v1alpha1.SocialAppService.SharePost.
@@ -779,6 +806,16 @@ func (c *socialAppServiceClient) GetStoreSocialSummary(ctx context.Context, req 
 	return c.getStoreSocialSummary.CallUnary(ctx, req)
 }
 
+// ListMySanctions calls hawkr.social.v1alpha1.SocialAppService.ListMySanctions.
+func (c *socialAppServiceClient) ListMySanctions(ctx context.Context, req *connect.Request[v1alpha1.ListMySanctionsRequest]) (*connect.Response[v1alpha1.ListMySanctionsResponse], error) {
+	return c.listMySanctions.CallUnary(ctx, req)
+}
+
+// ListMyHiddenContent calls hawkr.social.v1alpha1.SocialAppService.ListMyHiddenContent.
+func (c *socialAppServiceClient) ListMyHiddenContent(ctx context.Context, req *connect.Request[v1alpha1.ListMyHiddenContentRequest]) (*connect.Response[v1alpha1.ListMyHiddenContentResponse], error) {
+	return c.listMyHiddenContent.CallUnary(ctx, req)
+}
+
 // SocialAppServiceHandler is an implementation of the hawkr.social.v1alpha1.SocialAppService
 // service.
 type SocialAppServiceHandler interface {
@@ -831,6 +868,11 @@ type SocialAppServiceHandler interface {
 	// GetStoreSocialSummary 是賣家中心的動態數：呼叫者此刻的店的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數。數字由伺服器以資料庫計數，
 	// 不是 client 以列表長度推算。賣家能力 CAP_CONTENT_CONTRACT。
 	GetStoreSocialSummary(context.Context, *connect.Request[v1alpha1.GetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.GetStoreSocialSummaryResponse], error)
+	// ListMySanctions 列出呼叫者（買家）收到的社群處分，新到舊：種類、政策分類與理由，作者有權讀自己的處分。停權的帳號也可以呼叫。
+	ListMySanctions(context.Context, *connect.Request[v1alpha1.ListMySanctionsRequest]) (*connect.Response[v1alpha1.ListMySanctionsResponse], error)
+	// ListMyHiddenContent 列出呼叫者（買家）被平台隱藏的留言與討論區留言，新隱藏到舊：連同本文與隱藏的政策分類與理由（別人看不到被隱藏的內容）。
+	// 已還原的隱藏不在名單裡。停權的帳號也可以呼叫。
+	ListMyHiddenContent(context.Context, *connect.Request[v1alpha1.ListMyHiddenContentRequest]) (*connect.Response[v1alpha1.ListMyHiddenContentResponse], error)
 }
 
 // NewSocialAppServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -984,6 +1026,20 @@ func NewSocialAppServiceHandler(svc SocialAppServiceHandler, opts ...connect.Han
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
+	socialAppServiceListMySanctionsHandler := connect.NewUnaryHandler(
+		SocialAppServiceListMySanctionsProcedure,
+		svc.ListMySanctions,
+		connect.WithSchema(socialAppServiceMethods.ByName("ListMySanctions")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceListMyHiddenContentHandler := connect.NewUnaryHandler(
+		SocialAppServiceListMyHiddenContentProcedure,
+		svc.ListMyHiddenContent,
+		connect.WithSchema(socialAppServiceMethods.ByName("ListMyHiddenContent")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hawkr.social.v1alpha1.SocialAppService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SocialAppServiceSharePostProcedure:
@@ -1028,6 +1084,10 @@ func NewSocialAppServiceHandler(svc SocialAppServiceHandler, opts ...connect.Han
 			socialAppServiceListStoreCommentsHandler.ServeHTTP(w, r)
 		case SocialAppServiceGetStoreSocialSummaryProcedure:
 			socialAppServiceGetStoreSocialSummaryHandler.ServeHTTP(w, r)
+		case SocialAppServiceListMySanctionsProcedure:
+			socialAppServiceListMySanctionsHandler.ServeHTTP(w, r)
+		case SocialAppServiceListMyHiddenContentProcedure:
+			socialAppServiceListMyHiddenContentHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1119,4 +1179,12 @@ func (UnimplementedSocialAppServiceHandler) ListStoreComments(context.Context, *
 
 func (UnimplementedSocialAppServiceHandler) GetStoreSocialSummary(context.Context, *connect.Request[v1alpha1.GetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.GetStoreSocialSummaryResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.GetStoreSocialSummary is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) ListMySanctions(context.Context, *connect.Request[v1alpha1.ListMySanctionsRequest]) (*connect.Response[v1alpha1.ListMySanctionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.ListMySanctions is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) ListMyHiddenContent(context.Context, *connect.Request[v1alpha1.ListMyHiddenContentRequest]) (*connect.Response[v1alpha1.ListMyHiddenContentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.ListMyHiddenContent is not implemented"))
 }

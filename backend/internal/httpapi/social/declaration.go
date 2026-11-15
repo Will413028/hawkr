@@ -47,6 +47,10 @@ var declarations = map[string]declaration{
 	socialv1alpha1connect.SocialAppServiceListStoreCommentsProcedure:     requires(seller.CapContentContract),
 	socialv1alpha1connect.SocialAppServiceGetStoreSocialSummaryProcedure: requires(seller.CapContentContract),
 
+	// 作者讀自己的處分與被隱藏的內容（A7-D9）：只有買家身分的讀取，停權的帳號也要讀得到（效果宣告 EffectRead，internal/httpapi/effects.go）。
+	socialv1alpha1connect.SocialAppServiceListMySanctionsProcedure:     exempt(buyerOnlyReason),
+	socialv1alpha1connect.SocialAppServiceListMyHiddenContentProcedure: exempt(buyerOnlyReason),
+
 	// 買家與店家共用的方法：依資源判斷。
 	socialv1alpha1connect.SocialAppServiceSharePostProcedure:        exempt(buyerOnlyReason),
 	socialv1alpha1connect.SocialAppServiceLikePostProcedure:         exempt(buyerOnlyReason),

@@ -388,6 +388,9 @@ type SanctionCursor struct {
 	ID        uuid.UUID
 }
 
+// Valid 是 cursor 的內容合法（解自 client 回傳的 page token，不可信）。
+func (c SanctionCursor) Valid() bool { return !c.CreatedAt.IsZero() && c.ID != uuid.UUID{} }
+
 // SanctionPage 是一頁處分紀錄。
 type SanctionPage struct {
 	Sanctions []Sanction
@@ -413,6 +416,9 @@ type HiddenCursor struct {
 	HideID   uuid.UUID
 }
 
+// Valid 是 cursor 的內容合法（解自 client 回傳的 page token，不可信）。
+func (c HiddenCursor) Valid() bool { return !c.HiddenAt.IsZero() && c.HideID != uuid.UUID{} }
+
 // HiddenPage 是一頁被隱藏的內容。
 type HiddenPage struct {
 	Items []HiddenContent
@@ -426,6 +432,13 @@ type ContentOwner struct {
 	Author   Actor
 	StoreID  int64
 	Readable bool
+}
+
+// ContentAuthor 是 ContentAuthorFor 的結果：Found 為真表示這位讀取者讀得到這則內容；Author 是作者 (kind, id)，StoreID 是所屬店家。
+type ContentAuthor struct {
+	Found   bool
+	Author  Actor
+	StoreID int64
 }
 
 // ContentSnapshot 是檢舉當下一則內容的唯讀快照，給 moderation 凍結並雜湊：作者 (kind, id)、所屬店家、此刻是不是公開可讀（同 ContentOwner）、本文與媒體參照。貼文的作者是它所屬的店家

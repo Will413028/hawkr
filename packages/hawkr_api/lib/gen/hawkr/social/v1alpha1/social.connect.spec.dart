@@ -293,4 +293,23 @@ abstract final class SocialAppService {
     hawkrsocialv1alpha1social.GetStoreSocialSummaryResponse.new,
     idempotency: connect.Idempotency.noSideEffects,
   );
+
+  /// ListMySanctions 列出呼叫者（買家）收到的社群處分，新到舊：種類、政策分類與理由，作者有權讀自己的處分。停權的帳號也可以呼叫。
+  static const listMySanctions = connect.Spec(
+    '/$name/ListMySanctions',
+    connect.StreamType.unary,
+    hawkrsocialv1alpha1social.ListMySanctionsRequest.new,
+    hawkrsocialv1alpha1social.ListMySanctionsResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
+  /// ListMyHiddenContent 列出呼叫者（買家）被平台隱藏的留言與討論區留言，新隱藏到舊：連同本文與隱藏的政策分類與理由（別人看不到被隱藏的內容）。
+  /// 已還原的隱藏不在名單裡。停權的帳號也可以呼叫。
+  static const listMyHiddenContent = connect.Spec(
+    '/$name/ListMyHiddenContent',
+    connect.StreamType.unary,
+    hawkrsocialv1alpha1social.ListMyHiddenContentRequest.new,
+    hawkrsocialv1alpha1social.ListMyHiddenContentResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
 }
