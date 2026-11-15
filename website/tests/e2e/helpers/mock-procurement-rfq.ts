@@ -1,6 +1,7 @@
 import type { Page, Route } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { seedStoredActiveRole, setupGatewayMocks } from "./mock-gateway";
+import { gotoStreamed } from "./streamed-navigation";
 
 export const RFQ_PATH = "/account/messages/assistant/demo";
 export const RFQ_REQUEST_ID = "1234567890123456788";
@@ -455,7 +456,7 @@ export async function setupRfqPriceReview(
 	await page.addInitScript(() => {
 		sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 	});
-	await page.goto(RFQ_PATH, { waitUntil: "domcontentloaded" });
+	await gotoStreamed(page, RFQ_PATH);
 	await page
 		.locator("#procurement-clarify-input")
 		.fill("我要採購 50 KG 珍珠芭樂");

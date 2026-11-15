@@ -21,6 +21,7 @@ import {
 	isProductionArtifact,
 	TEST_MEDIA_HOSTNAME,
 } from "./helpers/production-media-guard";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 const LONG_PUBLIC_ROUTES = [
 	"/",
@@ -779,8 +780,7 @@ test.describe("long-page stability after ready", {
 			await recordAuthoredResourceHints(page);
 			await prepareGuestSession(page);
 
-			await page.goto(targetRoute, {
-				waitUntil: "domcontentloaded",
+			await gotoStreamed(page, targetRoute, {
 				timeout: 25_000,
 			});
 			await expect(page.locator(".initial-loader")).toBeHidden({
@@ -1053,8 +1053,7 @@ test.describe("soft-navigation stability", { tag: ["@ui", "@live"] }, () => {
 	}) => {
 		test.setTimeout(30_000);
 		await prepareGuestSession(page);
-		await page.goto("/about", {
-			waitUntil: "domcontentloaded",
+		await gotoStreamed(page, "/about", {
 			timeout: 25_000,
 		});
 		await expect(page.locator(".initial-loader")).toBeHidden({
@@ -1165,8 +1164,7 @@ test.describe("soft-navigation stability", { tag: ["@ui", "@live"] }, () => {
 		});
 
 		const sourceRoute = `/sellers/${sellerId}`;
-		await page.goto(sourceRoute, {
-			waitUntil: "domcontentloaded",
+		await gotoStreamed(page, sourceRoute, {
 			timeout: 25_000,
 		});
 		await expect(page.locator(".initial-loader")).toBeHidden({

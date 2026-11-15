@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { isGetSessionUrl } from "./helpers/mock-gateway";
 import { installProviderMocks } from "./helpers/mock-gsi";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 // Mirrors playwright.config.ts's PORT derivation — the server this suite
 // exercises doesn't always run on 3000 in CI (see PLAYWRIGHT_PORT there).
@@ -132,7 +133,7 @@ async function expectHealthyPage(
 	// `networkidle` would hang on SSE/EventSource streams, while `load` can be
 	// held open by third-party images. The document and hydrated UI are the
 	// health boundary; the explicit rendered-text wait below covers that.
-	const response = await page.goto(path, { waitUntil: "domcontentloaded" });
+	const response = await gotoStreamed(page, path);
 	expect(response, `${path} returned no response`).toBeTruthy();
 	expect(response?.status() ?? 0, `${path} document status`).toBeLessThan(400);
 
@@ -227,9 +228,7 @@ test.describe("route health", { tag: ["@ui"] }, () => {
 
 	test("unknown route renders a graceful 404", async ({ page }) => {
 		const issues = attachHealthMonitors(page);
-		const response = await page.goto("/this-route-does-not-exist-xyz", {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, "/this-route-does-not-exist-xyz");
 		expect(response?.status()).toBe(404);
 
 		// The branded splash intentionally owns at least the first 700ms and then
@@ -324,7 +323,7 @@ test.describe("interaction flows", { tag: ["@ui", "@live"] }, () => {
 		if (probeId === null) return;
 		const issues = attachHealthMonitors(page);
 
-		await page.goto("/market/products", { waitUntil: "domcontentloaded" });
+		await gotoStreamed(page, "/market/products");
 		// Do not click a server-rendered anchor before React owns it: that would
 		// exercise a native document navigation instead of the intercepted
 		// product quick-view route.
@@ -580,7 +579,7 @@ test.describe("interaction flows", { tag: ["@ui", "@live"] }, () => {
 			});
 		});
 
-		await page.goto("/market/products", { waitUntil: "domcontentloaded" });
+		await gotoStreamed(page, "/market/products");
 		await expect(
 			page.locator('[data-hk-market-products-hydrated="true"]'),
 		).toBeAttached();
@@ -612,7 +611,7 @@ test.describe("interaction flows", { tag: ["@ui", "@live"] }, () => {
 
 	test("feed viewer opens and closes cleanly", async ({ page }) => {
 		const issues = attachHealthMonitors(page);
-		await page.goto("/feed", { waitUntil: "domcontentloaded" });
+		await gotoStreamed(page, "/feed");
 		await page.waitForTimeout(800);
 
 		const card = page.locator(".hkui-feed-card").first();
@@ -641,7 +640,7 @@ test.describe("interaction flows", { tag: ["@ui", "@live"] }, () => {
 
 	test("theme toggle round-trips without breaking", async ({ page }) => {
 		const issues = attachHealthMonitors(page);
-		await page.goto("/feed", { waitUntil: "domcontentloaded" });
+		await gotoStreamed(page, "/feed");
 		await page.waitForTimeout(600);
 
 		// ThemeToggle 是 APG toggle：固定名稱「主題切換」+ aria-pressed 表狀態
@@ -666,7 +665,7 @@ test.describe("interaction flows", { tag: ["@ui", "@live"] }, () => {
 
 	test("feed infinite scroll loads more without breaking", async ({ page }) => {
 		const issues = attachHealthMonitors(page);
-		await page.goto("/feed", { waitUntil: "domcontentloaded" });
+		await gotoStreamed(page, "/feed");
 		await page.waitForTimeout(800);
 		const before = await page.locator(".hkui-feed-card").count();
 		test.skip(before === 0, "no feed posts available");

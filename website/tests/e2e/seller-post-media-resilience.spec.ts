@@ -7,6 +7,7 @@ import {
 	seedStoredActiveRole,
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 const SELLER_ID = "90010001";
 const IMAGE_KEY = "public/post/e2e/seller-post-media.png";
@@ -106,7 +107,7 @@ async function prepareSellerPosts(
 		sessionStorage.setItem(loaderKey, "1");
 	}, LOADER_KEY);
 
-	await page.goto("/seller-center/posts", { waitUntil: "domcontentloaded" });
+	await gotoStreamed(page, "/seller-center/posts");
 	await expect(
 		page.locator('[data-auth-status]:not([data-auth-status="unknown"])'),
 	).toBeAttached();

@@ -5,6 +5,7 @@ import {
 	seedStoredActiveRole,
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 const PORTRAIT_PRODUCT_SVG = `
 <svg xmlns="http://www.w3.org/2000/svg" width="600" height="1000" viewBox="0 0 600 1000">
@@ -100,9 +101,7 @@ test.describe("seller product image framing", { tag: ["@ui"] }, () => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
 
-		await page.goto("/seller-center/products/new", {
-			waitUntil: "domcontentloaded",
-		});
+		await gotoStreamed(page, "/seller-center/products/new");
 		await expect(
 			page.locator('[data-auth-status]:not([data-auth-status="unknown"])'),
 		).toBeAttached();
