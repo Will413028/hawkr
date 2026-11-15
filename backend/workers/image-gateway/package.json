@@ -21,5 +21,19 @@
   },
   "engines": {
     "node": ">=20"
-  }
+  },
+  "overrides": {
+    "miniflare": {
+      "sharp": "0.35.5",
+      "undici": "7.30.1"
+    },
+    "postcss": {
+      "nanoid": "3.3.18",
+      "source-map-js": "1.2.2"
+    },
+    "vitest": {
+      "vite": "8.1.6"
+    }
+  },
+  "//overrides": "Security floors on transitive deps, scoped to the requester. EXCEEDS-UPSTREAM: miniflare pins sharp 0.34.5 and undici 7.28.0 exactly. REMOVE-WHEN: miniflare requires sharp >=0.35.5 and undici >=7.30.1; postcss requires nanoid >=3.3.18 and source-map-js >=1.2.2; vitest requires vite >=8.1.6. Versions must be published >=2 weeks."
 }

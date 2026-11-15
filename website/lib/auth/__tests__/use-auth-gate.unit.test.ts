@@ -19,19 +19,19 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("useAuthGate", () => {
-	it.each([
-		"unknown",
-		"unavailable",
-	])("%s: parks the action, no guest flow", (status) => {
-		auth.status = status;
-		const onGuest = vi.fn();
-		const action = vi.fn();
-		const { result } = renderHook(() => useAuthGate(onGuest));
-		act(() => result.current.authGate(action));
-		expect(result.current.authWaiting).toBe(true);
-		expect(onGuest).not.toHaveBeenCalled();
-		expect(action).not.toHaveBeenCalled();
-	});
+	it.each(["unknown", "unavailable"])(
+		"%s: parks the action, no guest flow",
+		(status) => {
+			auth.status = status;
+			const onGuest = vi.fn();
+			const action = vi.fn();
+			const { result } = renderHook(() => useAuthGate(onGuest));
+			act(() => result.current.authGate(action));
+			expect(result.current.authWaiting).toBe(true);
+			expect(onGuest).not.toHaveBeenCalled();
+			expect(action).not.toHaveBeenCalled();
+		},
+	);
 
 	it("a parked action replays when the session becomes signedIn", () => {
 		auth.status = "unavailable";

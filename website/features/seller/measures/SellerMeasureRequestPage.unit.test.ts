@@ -293,53 +293,56 @@ const KINDS = [
 	},
 ] as const;
 
-describe.each(KINDS)("SellerMeasureRequestPage（$kind）的讀取狀態", ({
-	kind,
-}) => {
-	it("讀取中顯示骨架，不畫表單", () => {
-		setQuery({ measure: null, loading: true });
-		renderPage(kind);
-		expect(screen.getByTestId("skeleton")).toBeTruthy();
-		expect(screen.queryByRole("textbox")).toBeNull();
-	});
-
-	it("找不到（not_found、permission_denied）：回到措施與申覆", () => {
-		setQuery({ measure: null, notFound: true, error: "資源不存在" });
-		renderPage(kind);
-		expect(screen.getByText("找不到這項措施")).toBeTruthy();
-		expect(
-			screen.getByRole("link", { name: "回到措施與申覆" }).getAttribute("href"),
-		).toBe(MEASURES_PATH);
-	});
-
-	it("暫時性的錯誤可以重試", () => {
-		const refetch = vi.fn();
-		setQuery({ measure: null, error: "暫時無法使用", refetch });
-		renderPage(kind);
-		expect(screen.getByText("無法載入措施紀錄")).toBeTruthy();
-		fireEvent.click(screen.getByRole("button", { name: "重試" }));
-		expect(refetch).toHaveBeenCalledTimes(1);
-	});
-
-	it("表單顯示之後，背景重讀到不能提出也不卸載表單（輸入不會消失）", () => {
-		const { rerender } = renderPage(kind);
-		type("寫到一半的理由");
-		setQuery({
-			measure: measure({
-				canAppeal: false,
-				canRequestRemediation: false,
-				etag: "etag-2",
-			}),
+describe.each(KINDS)(
+	"SellerMeasureRequestPage（$kind）的讀取狀態",
+	({ kind }) => {
+		it("讀取中顯示骨架，不畫表單", () => {
+			setQuery({ measure: null, loading: true });
+			renderPage(kind);
+			expect(screen.getByTestId("skeleton")).toBeTruthy();
+			expect(screen.queryByRole("textbox")).toBeNull();
 		});
-		rerender(
-			React.createElement(SellerMeasureRequestPage, {
-				kind,
-				measureId: "m1",
-			}),
-		);
-		expect(reasonBox().value).toBe("寫到一半的理由");
-	});
-});
+
+		it("找不到（not_found、permission_denied）：回到措施與申覆", () => {
+			setQuery({ measure: null, notFound: true, error: "資源不存在" });
+			renderPage(kind);
+			expect(screen.getByText("找不到這項措施")).toBeTruthy();
+			expect(
+				screen
+					.getByRole("link", { name: "回到措施與申覆" })
+					.getAttribute("href"),
+			).toBe(MEASURES_PATH);
+		});
+
+		it("暫時性的錯誤可以重試", () => {
+			const refetch = vi.fn();
+			setQuery({ measure: null, error: "暫時無法使用", refetch });
+			renderPage(kind);
+			expect(screen.getByText("無法載入措施紀錄")).toBeTruthy();
+			fireEvent.click(screen.getByRole("button", { name: "重試" }));
+			expect(refetch).toHaveBeenCalledTimes(1);
+		});
+
+		it("表單顯示之後，背景重讀到不能提出也不卸載表單（輸入不會消失）", () => {
+			const { rerender } = renderPage(kind);
+			type("寫到一半的理由");
+			setQuery({
+				measure: measure({
+					canAppeal: false,
+					canRequestRemediation: false,
+					etag: "etag-2",
+				}),
+			});
+			rerender(
+				React.createElement(SellerMeasureRequestPage, {
+					kind,
+					measureId: "m1",
+				}),
+			);
+			expect(reasonBox().value).toBe("寫到一半的理由");
+		});
+	},
+);
 
 describe("SellerMeasureRequestPage 打開時已不能提出", () => {
 	it.each([
@@ -467,256 +470,256 @@ describe("SellerMeasureRequestPage 打開時已不能提出", () => {
 	});
 });
 
-describe.each(KINDS)("SellerMeasureRequestPage（$kind）的字數", ({
-	kind,
-	submitLabel,
-	tooLong,
-	submit,
-}) => {
-	it("以 rune 計：2000 個 emoji 剛好可送出，2001 個被擋下；沒有原生 maxlength", () => {
-		renderPage(kind);
-		expect(reasonBox().getAttribute("maxlength")).toBeNull();
-		type(EMOJI.repeat(2000));
-		expect(screen.getByText("2000 / 2000")).toBeTruthy();
-		expect((screen.getByText(submitLabel) as HTMLButtonElement).disabled).toBe(
-			false,
-		);
-		type(EMOJI.repeat(2001));
-		expect(screen.getByText("2001 / 2000")).toBeTruthy();
-		expect(screen.getByText(tooLong)).toBeTruthy();
-		expect((screen.getByText(submitLabel) as HTMLButtonElement).disabled).toBe(
-			true,
-		);
-	});
-
-	it("字數與送出的理由都先照 Go 的規則修剪；只有空白不能送出", async () => {
-		submit().mockResolvedValue(MEASURE);
-		renderPage(kind);
-		type("\u3000\u00a0 ");
-		expect(screen.getByText("0 / 2000")).toBeTruthy();
-		expect((screen.getByText(submitLabel) as HTMLButtonElement).disabled).toBe(
-			true,
-		);
-		type("\u3000已補上標示\u00a0\n");
-		expect(screen.getByText("5 / 2000")).toBeTruthy();
-		fireEvent.click(screen.getByText(submitLabel));
-		await waitFor(() => expect(submit()).toHaveBeenCalled());
-		expect(submit()).toHaveBeenCalledWith(MEASURE, {
-			reason: "已補上標示",
-			evidenceStagedTokens: [],
+describe.each(KINDS)(
+	"SellerMeasureRequestPage（$kind）的字數",
+	({ kind, submitLabel, tooLong, submit }) => {
+		it("以 rune 計：2000 個 emoji 剛好可送出，2001 個被擋下；沒有原生 maxlength", () => {
+			renderPage(kind);
+			expect(reasonBox().getAttribute("maxlength")).toBeNull();
+			type(EMOJI.repeat(2000));
+			expect(screen.getByText("2000 / 2000")).toBeTruthy();
+			expect(
+				(screen.getByText(submitLabel) as HTMLButtonElement).disabled,
+			).toBe(false);
+			type(EMOJI.repeat(2001));
+			expect(screen.getByText("2001 / 2000")).toBeTruthy();
+			expect(screen.getByText(tooLong)).toBeTruthy();
+			expect(
+				(screen.getByText(submitLabel) as HTMLButtonElement).disabled,
+			).toBe(true);
 		});
-	});
-});
 
-describe.each(KINDS)("SellerMeasureRequestPage（$kind）送出", ({
-	kind,
-	submitLabel,
-	submit,
-	other,
-	successToast,
-	canSubmitOff,
-}) => {
-	it("佐證走機敏上傳，送出的是機敏 staged token 與措施的 etag，只呼叫自己的 RPC；成功後提示並回這一筆措施頁", async () => {
-		submit().mockResolvedValue(MEASURE);
-		renderPage(kind);
-		type("已補上標示");
-		await addPhoto();
-		fireEvent.click(screen.getByText(submitLabel));
-		await waitFor(() =>
-			expect(mocks.replace).toHaveBeenCalledWith(DETAIL_PATH),
-		);
-		expect(mocks.uploadSecureDocument).toHaveBeenCalledTimes(1);
-		expect(submit()).toHaveBeenCalledWith(MEASURE, {
-			reason: "已補上標示",
-			evidenceStagedTokens: ["tok-1"],
+		it("字數與送出的理由都先照 Go 的規則修剪；只有空白不能送出", async () => {
+			submit().mockResolvedValue(MEASURE);
+			renderPage(kind);
+			type("\u3000\u00a0 ");
+			expect(screen.getByText("0 / 2000")).toBeTruthy();
+			expect(
+				(screen.getByText(submitLabel) as HTMLButtonElement).disabled,
+			).toBe(true);
+			type("\u3000已補上標示\u00a0\n");
+			expect(screen.getByText("5 / 2000")).toBeTruthy();
+			fireEvent.click(screen.getByText(submitLabel));
+			await waitFor(() => expect(submit()).toHaveBeenCalled());
+			expect(submit()).toHaveBeenCalledWith(MEASURE, {
+				reason: "已補上標示",
+				evidenceStagedTokens: [],
+			});
 		});
-		expect(other()).not.toHaveBeenCalled();
-		expect(mocks.toastSuccess).toHaveBeenCalledWith(successToast);
-	});
+	},
+);
 
-	it("返回：回到這一筆措施頁，不是列表", () => {
-		renderPage(kind);
-		fireEvent.click(screen.getByText("返回"));
-		expect(mocks.replace).toHaveBeenCalledWith(DETAIL_PATH);
-		expect(mocks.replace).not.toHaveBeenCalledWith(MEASURES_PATH);
-	});
+describe.each(KINDS)(
+	"SellerMeasureRequestPage（$kind）送出",
+	({ kind, submitLabel, submit, other, successToast, canSubmitOff }) => {
+		it("佐證走機敏上傳，送出的是機敏 staged token 與措施的 etag，只呼叫自己的 RPC；成功後提示並回這一筆措施頁", async () => {
+			submit().mockResolvedValue(MEASURE);
+			renderPage(kind);
+			type("已補上標示");
+			await addPhoto();
+			fireEvent.click(screen.getByText(submitLabel));
+			await waitFor(() =>
+				expect(mocks.replace).toHaveBeenCalledWith(DETAIL_PATH),
+			);
+			expect(mocks.uploadSecureDocument).toHaveBeenCalledTimes(1);
+			expect(submit()).toHaveBeenCalledWith(MEASURE, {
+				reason: "已補上標示",
+				evidenceStagedTokens: ["tok-1"],
+			});
+			expect(other()).not.toHaveBeenCalled();
+			expect(mocks.toastSuccess).toHaveBeenCalledWith(successToast);
+		});
 
-	it("失敗時不提示成功、不離開", async () => {
-		submit().mockRejectedValueOnce(new Error("boom"));
-		renderPage(kind);
-		type("已補上標示");
-		fireEvent.click(screen.getByText(submitLabel));
-		await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
-		expect(mocks.toastSuccess).not.toHaveBeenCalled();
-		expect(mocks.replace).not.toHaveBeenCalled();
-	});
+		it("返回：回到這一筆措施頁，不是列表", () => {
+			renderPage(kind);
+			fireEvent.click(screen.getByText("返回"));
+			expect(mocks.replace).toHaveBeenCalledWith(DETAIL_PATH);
+			expect(mocks.replace).not.toHaveBeenCalledWith(MEASURES_PATH);
+		});
 
-	it("VERSION_CONFLICT 重讀後仍可提出：保留輸入、換新的 etag、顯示更新提示", async () => {
-		const fresh = measure({ etag: "etag-2", statement: "更新後的說明" });
-		submit().mockRejectedValueOnce(versionConflict());
-		mocks.fetchMyMeasure.mockResolvedValue(fresh);
-		renderPage(kind);
-		type("已補上標示");
-		fireEvent.click(screen.getByText(submitLabel));
-		await waitFor(() =>
-			expect(screen.getByRole("alert").textContent).toContain("這項措施已更新"),
-		);
-		expect(mocks.fetchMyMeasure).toHaveBeenCalledWith("m1");
-		expect(mocks.adopt).toHaveBeenCalledWith(fresh);
-		expect(reasonBox().value).toBe("已補上標示");
-		expect(mocks.replace).not.toHaveBeenCalled();
-		expect(mocks.toastError).not.toHaveBeenCalled();
+		it("失敗時不提示成功、不離開", async () => {
+			submit().mockRejectedValueOnce(new Error("boom"));
+			renderPage(kind);
+			type("已補上標示");
+			fireEvent.click(screen.getByText(submitLabel));
+			await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+			expect(mocks.toastSuccess).not.toHaveBeenCalled();
+			expect(mocks.replace).not.toHaveBeenCalled();
+		});
 
-		submit().mockResolvedValueOnce(fresh);
-		fireEvent.click(screen.getByText(submitLabel));
-		await waitFor(() => expect(submit()).toHaveBeenCalledTimes(2));
-		expect(submit().mock.calls[1][0]).toBe(fresh);
-	});
-
-	it("failed_precondition 重讀後伺服器說仍可提出：保留輸入，重試送出同一筆內容", async () => {
-		const fresh = measure({ etag: "etag-2" });
-		submit().mockRejectedValueOnce(failedPrecondition());
-		submit().mockResolvedValueOnce(fresh);
-		mocks.fetchMyMeasure.mockResolvedValue(fresh);
-		renderPage(kind);
-		type("已補上標示");
-		fireEvent.click(screen.getByText(submitLabel));
-		await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
-		expect(reasonBox().value).toBe("已補上標示");
-		fireEvent.click(screen.getByText(submitLabel));
-		await waitFor(() => expect(submit()).toHaveBeenCalledTimes(2));
-		expect(submit().mock.calls[1][1]).toEqual(submit().mock.calls[0][1]);
-	});
-
-	it("failed_precondition 重讀後伺服器說不能提出：以 toast 說明並回這一筆措施頁，不留錯誤文字", async () => {
-		const fresh = measure({
-			...canSubmitOff,
-			state: MeasureState.REVOKED,
-			remediationUnavailabilities: [
-				unavailable(
-					RemediationUnavailableReason.REMEDIATION_PENDING,
-					REMEDIATION_SENTENCE.REMEDIATION_PENDING,
+		it("VERSION_CONFLICT 重讀後仍可提出：保留輸入、換新的 etag、顯示更新提示", async () => {
+			const fresh = measure({ etag: "etag-2", statement: "更新後的說明" });
+			submit().mockRejectedValueOnce(versionConflict());
+			mocks.fetchMyMeasure.mockResolvedValue(fresh);
+			renderPage(kind);
+			type("已補上標示");
+			fireEvent.click(screen.getByText(submitLabel));
+			await waitFor(() =>
+				expect(screen.getByRole("alert").textContent).toContain(
+					"這項措施已更新",
 				),
-			],
-			requests: [pendingRequest(MeasureRequestKind.APPEAL)],
+			);
+			expect(mocks.fetchMyMeasure).toHaveBeenCalledWith("m1");
+			expect(mocks.adopt).toHaveBeenCalledWith(fresh);
+			expect(reasonBox().value).toBe("已補上標示");
+			expect(mocks.replace).not.toHaveBeenCalled();
+			expect(mocks.toastError).not.toHaveBeenCalled();
+
+			submit().mockResolvedValueOnce(fresh);
+			fireEvent.click(screen.getByText(submitLabel));
+			await waitFor(() => expect(submit()).toHaveBeenCalledTimes(2));
+			expect(submit().mock.calls[1][0]).toBe(fresh);
 		});
-		submit().mockRejectedValueOnce(failedPrecondition());
-		mocks.fetchMyMeasure.mockResolvedValue(fresh);
-		renderPage(kind);
-		type("已補上標示");
-		fireEvent.click(screen.getByText(submitLabel));
-		await waitFor(() =>
-			expect(mocks.replace).toHaveBeenCalledWith(DETAIL_PATH),
-		);
-		expect(mocks.toastError).toHaveBeenCalledTimes(1);
-		expect(mocks.adopt).toHaveBeenCalledWith(fresh);
-		expect(screen.queryByRole("alert")).toBeNull();
-	});
 
-	it("重讀失敗：顯示無法載入最新版本，不離開", async () => {
-		submit().mockRejectedValueOnce(versionConflict());
-		mocks.fetchMyMeasure.mockRejectedValue(new Error("network"));
-		renderPage(kind);
-		type("已補上標示");
-		fireEvent.click(screen.getByText(submitLabel));
-		await waitFor(() =>
-			expect(screen.getByRole("alert").textContent).toContain(
-				"無法載入最新版本",
-			),
-		);
-		expect(mocks.replace).not.toHaveBeenCalled();
-		expect(mocks.adopt).not.toHaveBeenCalled();
-		expect(mocks.toastError).not.toHaveBeenCalled();
-		expect(reasonBox().value).toBe("已補上標示");
-	});
+		it("failed_precondition 重讀後伺服器說仍可提出：保留輸入，重試送出同一筆內容", async () => {
+			const fresh = measure({ etag: "etag-2" });
+			submit().mockRejectedValueOnce(failedPrecondition());
+			submit().mockResolvedValueOnce(fresh);
+			mocks.fetchMyMeasure.mockResolvedValue(fresh);
+			renderPage(kind);
+			type("已補上標示");
+			fireEvent.click(screen.getByText(submitLabel));
+			await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+			expect(reasonBox().value).toBe("已補上標示");
+			fireEvent.click(screen.getByText(submitLabel));
+			await waitFor(() => expect(submit()).toHaveBeenCalledTimes(2));
+			expect(submit().mock.calls[1][1]).toEqual(submit().mock.calls[0][1]);
+		});
 
-	it("理由欄的伺服器錯誤標在理由欄", async () => {
-		submit().mockRejectedValueOnce(invalidArgument({ reason: "理由不可空白" }));
-		renderPage(kind);
-		type("x");
-		fireEvent.click(screen.getByText(submitLabel));
-		await waitFor(() => expect(screen.getByText("理由不可空白")).toBeTruthy());
-		expect(reasonBox().getAttribute("aria-invalid")).toBe("true");
-	});
+		it("failed_precondition 重讀後伺服器說不能提出：以 toast 說明並回這一筆措施頁，不留錯誤文字", async () => {
+			const fresh = measure({
+				...canSubmitOff,
+				state: MeasureState.REVOKED,
+				remediationUnavailabilities: [
+					unavailable(
+						RemediationUnavailableReason.REMEDIATION_PENDING,
+						REMEDIATION_SENTENCE.REMEDIATION_PENDING,
+					),
+				],
+				requests: [pendingRequest(MeasureRequestKind.APPEAL)],
+			});
+			submit().mockRejectedValueOnce(failedPrecondition());
+			mocks.fetchMyMeasure.mockResolvedValue(fresh);
+			renderPage(kind);
+			type("已補上標示");
+			fireEvent.click(screen.getByText(submitLabel));
+			await waitFor(() =>
+				expect(mocks.replace).toHaveBeenCalledWith(DETAIL_PATH),
+			);
+			expect(mocks.toastError).toHaveBeenCalledTimes(1);
+			expect(mocks.adopt).toHaveBeenCalledWith(fresh);
+			expect(screen.queryByRole("alert")).toBeNull();
+		});
 
-	it("evidence_staged_tokens[i] 標在送出的第 i 張（以 token 對應），有失敗的照片時不能再送出", async () => {
-		submit().mockRejectedValueOnce(
-			invalidArgument({
-				"evidence_staged_tokens[1]": "這張已過期",
-				reason: "理由有問題",
-			}),
-		);
-		renderPage(kind);
-		type("已補上標示");
-		await addPhoto("a.jpg");
-		await addPhoto("b.jpg");
-		await addPhoto("c.jpg");
-		fireEvent.click(screen.getByText(submitLabel));
-		await waitFor(() => expect(screen.getByText("這張已過期")).toBeTruthy());
-		expect(submit().mock.calls[0][1].evidenceStagedTokens).toEqual([
-			"tok-1",
-			"tok-2",
-			"tok-3",
-		]);
-		const photos = screen.getAllByLabelText(/^已上傳照片/);
-		expect(photos[0].textContent).not.toContain("這張已過期");
-		expect(photos[1].textContent).toContain("這張已過期");
-		expect(photos[2].textContent).not.toContain("這張已過期");
-		expect((screen.getByText(submitLabel) as HTMLButtonElement).disabled).toBe(
-			true,
-		);
-		expect(screen.getByText("理由有問題")).toBeTruthy();
-	});
+		it("重讀失敗：顯示無法載入最新版本，不離開", async () => {
+			submit().mockRejectedValueOnce(versionConflict());
+			mocks.fetchMyMeasure.mockRejectedValue(new Error("network"));
+			renderPage(kind);
+			type("已補上標示");
+			fireEvent.click(screen.getByText(submitLabel));
+			await waitFor(() =>
+				expect(screen.getByRole("alert").textContent).toContain(
+					"無法載入最新版本",
+				),
+			);
+			expect(mocks.replace).not.toHaveBeenCalled();
+			expect(mocks.adopt).not.toHaveBeenCalled();
+			expect(mocks.toastError).not.toHaveBeenCalled();
+			expect(reasonBox().value).toBe("已補上標示");
+		});
 
-	it("照片的錯誤跟著該張照片：前面的照片被移除後錯誤留在同一張，那張被移除後錯誤消失", async () => {
-		submit().mockRejectedValueOnce(
-			invalidArgument({ "evidence_staged_tokens[1]": "這張已過期" }),
-		);
-		renderPage(kind);
-		type("已補上標示");
-		await addPhoto("a.jpg");
-		await addPhoto("b.jpg");
-		await addPhoto("c.jpg");
-		fireEvent.click(screen.getByText(submitLabel));
-		await waitFor(() => expect(screen.getByText("這張已過期")).toBeTruthy());
+		it("理由欄的伺服器錯誤標在理由欄", async () => {
+			submit().mockRejectedValueOnce(
+				invalidArgument({ reason: "理由不可空白" }),
+			);
+			renderPage(kind);
+			type("x");
+			fireEvent.click(screen.getByText(submitLabel));
+			await waitFor(() =>
+				expect(screen.getByText("理由不可空白")).toBeTruthy(),
+			);
+			expect(reasonBox().getAttribute("aria-invalid")).toBe("true");
+		});
 
-		fireEvent.click(screen.getByText("移除已上傳照片 1"));
-		const afterShift = screen.getAllByLabelText(/^已上傳照片/);
-		expect(afterShift).toHaveLength(2);
-		expect(afterShift[0].textContent).toContain("這張已過期");
-		expect(afterShift[1].textContent).not.toContain("這張已過期");
+		it("evidence_staged_tokens[i] 標在送出的第 i 張（以 token 對應），有失敗的照片時不能再送出", async () => {
+			submit().mockRejectedValueOnce(
+				invalidArgument({
+					"evidence_staged_tokens[1]": "這張已過期",
+					reason: "理由有問題",
+				}),
+			);
+			renderPage(kind);
+			type("已補上標示");
+			await addPhoto("a.jpg");
+			await addPhoto("b.jpg");
+			await addPhoto("c.jpg");
+			fireEvent.click(screen.getByText(submitLabel));
+			await waitFor(() => expect(screen.getByText("這張已過期")).toBeTruthy());
+			expect(submit().mock.calls[0][1].evidenceStagedTokens).toEqual([
+				"tok-1",
+				"tok-2",
+				"tok-3",
+			]);
+			const photos = screen.getAllByLabelText(/^已上傳照片/);
+			expect(photos[0].textContent).not.toContain("這張已過期");
+			expect(photos[1].textContent).toContain("這張已過期");
+			expect(photos[2].textContent).not.toContain("這張已過期");
+			expect(
+				(screen.getByText(submitLabel) as HTMLButtonElement).disabled,
+			).toBe(true);
+			expect(screen.getByText("理由有問題")).toBeTruthy();
+		});
 
-		fireEvent.click(screen.getByText("移除已上傳照片 1"));
-		expect(screen.queryByText("這張已過期")).toBeNull();
-		expect(screen.getAllByLabelText(/^已上傳照片/)).toHaveLength(1);
-	});
+		it("照片的錯誤跟著該張照片：前面的照片被移除後錯誤留在同一張，那張被移除後錯誤消失", async () => {
+			submit().mockRejectedValueOnce(
+				invalidArgument({ "evidence_staged_tokens[1]": "這張已過期" }),
+			);
+			renderPage(kind);
+			type("已補上標示");
+			await addPhoto("a.jpg");
+			await addPhoto("b.jpg");
+			await addPhoto("c.jpg");
+			fireEvent.click(screen.getByText(submitLabel));
+			await waitFor(() => expect(screen.getByText("這張已過期")).toBeTruthy());
 
-	it("沒有索引的 evidence_staged_tokens 是整個佐證欄位的錯誤，不標任何一張", async () => {
-		submit().mockRejectedValueOnce(
-			invalidArgument({ evidence_staged_tokens: "佐證圖片最多 5 張" }),
-		);
-		renderPage(kind);
-		type("已補上標示");
-		await addPhoto();
-		fireEvent.click(screen.getByText(submitLabel));
-		await waitFor(() =>
-			expect(screen.getByText("佐證圖片最多 5 張")).toBeTruthy(),
-		);
-		const [photo] = screen.getAllByLabelText(/^已上傳照片/);
-		expect(photo.textContent).not.toContain("佐證圖片最多 5 張");
-	});
+			fireEvent.click(screen.getByText("移除已上傳照片 1"));
+			const afterShift = screen.getAllByLabelText(/^已上傳照片/);
+			expect(afterShift).toHaveLength(2);
+			expect(afterShift[0].textContent).toContain("這張已過期");
+			expect(afterShift[1].textContent).not.toContain("這張已過期");
 
-	it("其他失敗顯示伺服器的文字，不重讀", async () => {
-		submit().mockRejectedValueOnce(new ConnectError("x", Code.NotFound));
-		renderPage(kind);
-		type("已補上標示");
-		fireEvent.click(screen.getByText(submitLabel));
-		await waitFor(() =>
-			expect(screen.getByRole("alert").textContent).toBe("資源不存在"),
-		);
-		expect(mocks.fetchMyMeasure).not.toHaveBeenCalled();
-	});
-});
+			fireEvent.click(screen.getByText("移除已上傳照片 1"));
+			expect(screen.queryByText("這張已過期")).toBeNull();
+			expect(screen.getAllByLabelText(/^已上傳照片/)).toHaveLength(1);
+		});
+
+		it("沒有索引的 evidence_staged_tokens 是整個佐證欄位的錯誤，不標任何一張", async () => {
+			submit().mockRejectedValueOnce(
+				invalidArgument({ evidence_staged_tokens: "佐證圖片最多 5 張" }),
+			);
+			renderPage(kind);
+			type("已補上標示");
+			await addPhoto();
+			fireEvent.click(screen.getByText(submitLabel));
+			await waitFor(() =>
+				expect(screen.getByText("佐證圖片最多 5 張")).toBeTruthy(),
+			);
+			const [photo] = screen.getAllByLabelText(/^已上傳照片/);
+			expect(photo.textContent).not.toContain("佐證圖片最多 5 張");
+		});
+
+		it("其他失敗顯示伺服器的文字，不重讀", async () => {
+			submit().mockRejectedValueOnce(new ConnectError("x", Code.NotFound));
+			renderPage(kind);
+			type("已補上標示");
+			fireEvent.click(screen.getByText(submitLabel));
+			await waitFor(() =>
+				expect(screen.getByRole("alert").textContent).toBe("資源不存在"),
+			);
+			expect(mocks.fetchMyMeasure).not.toHaveBeenCalled();
+		});
+	},
+);
 
 describe("SellerMeasureRequestPage 解除請求頁", () => {
 	it("標題是請求解除措施；欄位是改善說明", () => {
@@ -791,11 +794,11 @@ describe("SellerMeasureRequestPage 的冷卻警告", () => {
 		).toBeTruthy();
 	});
 
-	it.each([
-		"appeal",
-		"remediation",
-	] as const)("%s：沒有 rejectionCooldown 就不顯示", (kind) => {
-		renderPage(kind);
-		expect(screen.queryByText(/若本次經駁回/)).toBeNull();
-	});
+	it.each(["appeal", "remediation"] as const)(
+		"%s：沒有 rejectionCooldown 就不顯示",
+		(kind) => {
+			renderPage(kind);
+			expect(screen.queryByText(/若本次經駁回/)).toBeNull();
+		},
+	);
 });

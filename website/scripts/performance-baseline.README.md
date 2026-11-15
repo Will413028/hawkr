@@ -6,9 +6,9 @@ target separately, and use only public, non-sensitive URLs.
 
 ## Tool contract
 
-- Lighthouse is fixed to exactly `13.4.1`. The repository's current LHCI
-  dependency resolves Lighthouse `12.6.1`, so point `--lighthouse-path` at a
-  separately installed `13.4.1` CLI. A mismatch fails before opening any URL.
+- Lighthouse is fixed to exactly `13.4.1`. The repository does not depend on
+  Lighthouse, so point `--lighthouse-path` at a separately installed `13.4.1`
+  CLI. A mismatch fails before opening any URL.
 - Pass Chrome explicitly with `--chrome-path`. Both tool versions are read back
   and stored with the browser executable path in `manifest.json` and
   `summary.json`.

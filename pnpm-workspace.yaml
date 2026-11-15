@@ -27,40 +27,41 @@ auditConfig:
 # 兩個 app 共用的依賴版本（取 website 原有版本）。
 # typescript-compiler-api 是 npm:@typescript/typescript6 的別名（TypeScript 7 沒有穩定的 JS compiler API，website、admin 與 @hawkr/ui-text 的測試／檢查工具用）。
 catalog:
-  "@biomejs/biome": ^2.4.13
-  "@bufbuild/protobuf": 2.15.0
-  "@bufbuild/protoc-gen-es": 2.15.0
-  "@connectrpc/connect": 2.2.0
+  "@biomejs/biome": ^2.6.4
+  "@bufbuild/protobuf": 2.16.0
+  "@bufbuild/protoc-gen-es": 2.16.0
+  "@connectrpc/connect": 2.3.0
   "@connectrpc/connect-query": 2.3.1
-  "@connectrpc/connect-web": 2.2.0
-  "@types/node": ^26.0.0
-  "@types/react": 19.2.18
-  "@types/react-dom": 19.2.4
+  "@connectrpc/connect-web": 2.3.0
+  "@types/node": ^26.6.6
+  "@types/react": 19.3.0
+  "@types/react-dom": 19.3.0
   next: 16.4.1
-  next-intl: 4.13.0
-  react: 19.2.8
-  react-dom: 19.2.8
-  tsx: ^4.22.4
+  next-intl: 4.14.9
+  react: 19.3.1
+  react-dom: 19.3.1
+  tsx: ^4.23.15
   typescript: 7.0.2
   typescript-compiler-api: npm:@typescript/typescript6@6.0.2
-  use-intl: 4.13.0
+  use-intl: 4.14.9
   vitest: 5.0.5
 
-# minimumReleaseAge (pnpm 11 default: 24h) needs a live round-trip to
-# registry.npmjs.org per lockfile entry to read its publish date. That
-# round-trip has been failing specifically for @react-aria/color's metadata
-# from this CI's Node/pnpm client — 9/9 attempts across 13 minutes on
-# 2026-08-11 (PR #462/#463/#465), while a plain `curl` to the identical URL
-# succeeded every time in the same window. This is the verification mechanism
-# being unreachable for one entry, not the policy doing its job.
-#
-# Independently verified via `curl https://registry.npmjs.org/@react-aria%2Fcolor`
-# that 3.2.0 was published 2026-04-14 — four months before this exclude was
-# added, nowhere near the 24h threshold minimumReleaseAge exists to enforce.
+# 依賴發佈滿兩週才安裝（根目錄 AGENTS.md 的供應鏈規則），單位是分鐘。
+minimumReleaseAge: 20160
+
+# minimumReleaseAge 要對 registry.npmjs.org 逐筆往返讀取發佈時間。@react-aria/color 的 metadata
+# 在 CI 的 Node/pnpm client 上持續讀取失敗，而同一時段的 curl 每次都成功；這是驗證機制對單一
+# 條目不可達，不是政策在擋東西。已用 `curl https://registry.npmjs.org/@react-aria%2Fcolor`
+# 另行確認 3.2.0 早已發佈滿兩週。
 # REMOVE-WHEN: a dependency bump moves off exactly 3.2.0 (version-pinned, so
 # this stops applying on its own — no audit needed to retire it).
+#
+# tinybench@6.2.3 是 vitest 5.0.5 的精確依賴，發佈未滿兩週且沒有替代版本可選；帶版本號的
+# exclude 只豁免這個版本。
+# REMOVE-WHEN: 該版本發佈滿兩週後即可刪除。
 minimumReleaseAgeExclude:
   - "@react-aria/color@3.2.0"
+  - "tinybench@6.2.3"
 
 # Every entry below is a security floor we impose on a TRANSITIVE dependency
 # we do not control. Each one is checked by the scripts/check-dependency-overrides.ts
@@ -104,6 +105,11 @@ overrides:
   # 經 @sentry/nextjs>@sentry/bundler-plugin-core>glob>minimatch 進 --prod。
   # REMOVE-WHEN: requesters-demand >=5.0.12
   brace-expansion@^5.0.0: ^5.0.12
+  # GHSA-3jxr-9vmj-r5cp 等（brace-expansion 2.1.x <2.1.6）：經 minimatch 的 `^2.x` 宣告進來。
+  # 修補線 >=2.1.6；下限取 ^2.1.7，與 1.x、5.x 同樣用有界下限，仍在 requester 宣告的 2.x 範圍內，
+  # 不需要 EXCEEDS-UPSTREAM。
+  # REMOVE-WHEN: requesters-demand >=2.1.6
+  brace-expansion@^2.0.0: ^2.1.7
   # GHSA fast-uri host confusion (patched >=3.1.4) and GHSA-7p8r-x3mc-p8w7
   # (4.0.0 <=v< 4.1.2). ajv declares `^3.0.1`, so we stay INSIDE the major it
   # actually tests against; 3.x is still maintained upstream (dist-tag `three`)
@@ -132,13 +138,6 @@ overrides:
   # fast-uri entry: an unbounded `>=` is a subscription, not a pin).
   # REMOVE-WHEN: requesters-demand >=4.28.7
   browserslist: ^4.28.7
-  # CVE-2026-96889 (GHSA-wq5f-xc86-pv6w)：sharp 內建的 librsvg 有漏洞，修補線 >=0.35.5。
-  # next 宣告 `^0.35.4`（含 0.35.5），miniflare 4.x／5.x 則各自把 sharp 釘死在
-  # 0.34.5／0.35.2（只在開發與 build 工具鏈，不進 prod 執行期）。0.x 的 caret 只允許
-  # 同一個 minor，所以 `^0.35.5` 有界；website 的派生圖腳本鎖定同一個版本。
-  # EXCEEDS-UPSTREAM: miniflare — 兩個 miniflare 版本都以精確版本釘住較舊的 sharp
-  # REMOVE-WHEN: requesters-demand >=0.35.5
-  sharp: ^0.35.5
   # GHSA-jp82-f5mq-hwhp 等（critical＋high）：seroval <=1.6.2。只經 admin 的
   # @tanstack/react-query-devtools>@tanstack/query-devtools>@kobalte/core>…>solid-js
   # 進 --prod；solid-js 1.9.15（latest）宣告 `~1.5.4`，沒有可升的上游，故以有界 override

@@ -175,23 +175,23 @@ describe("shared Link navigation recovery integration", () => {
 		);
 	});
 
-	it.each([
-		"/account",
-		"/products/demo",
-	])("cancels the declared intent when onNavigate prevents %s, including intercepted routing", (href) => {
-		const onNavigate = vi.fn((event: { preventDefault(): void }) =>
-			event.preventDefault(),
-		);
-		renderLink({ href, onNavigate });
+	it.each(["/account", "/products/demo"])(
+		"cancels the declared intent when onNavigate prevents %s, including intercepted routing",
+		(href) => {
+			const onNavigate = vi.fn((event: { preventDefault(): void }) =>
+				event.preventDefault(),
+			);
+			renderLink({ href, onNavigate });
 
-		fireEvent.click(screen.getByRole("link"));
+			fireEvent.click(screen.getByRole("link"));
 
-		expect(onNavigate).toHaveBeenCalledTimes(1);
-		expect(mocks.beginNavigationIntent).toHaveBeenCalledTimes(1);
-		expect(mocks.cancelNavigationIntent).toHaveBeenCalledWith("intent-1");
-		expect(mocks.currentIntent).toBeNull();
-		expect(mocks.push).not.toHaveBeenCalled();
-	});
+			expect(onNavigate).toHaveBeenCalledTimes(1);
+			expect(mocks.beginNavigationIntent).toHaveBeenCalledTimes(1);
+			expect(mocks.cancelNavigationIntent).toHaveBeenCalledWith("intent-1");
+			expect(mocks.currentIntent).toBeNull();
+			expect(mocks.push).not.toHaveBeenCalled();
+		},
+	);
 
 	it("calls onNavigate once for a permitted route and leaves dispatch enabled", () => {
 		const onNavigate = vi.fn();
@@ -287,29 +287,31 @@ describe("shared Link navigation recovery integration", () => {
 		);
 	});
 
-	it.each([
-		"login document handoff",
-		"new programmatic intent",
-	])("does not let delayed link data override %s while the source URL is unchanged", async (replacement) => {
-		const settle = await startDeferredSellerLink();
-		if (replacement === "login document handoff") {
-			mocks.navigateDocument("/products/after-login", {
-				componentId: "login",
-				actionId: "login_completed",
-			});
-		} else {
-			mocks.beginNavigationIntent({ target: "/account", trigger: "router" });
-		}
+	it.each(["login document handoff", "new programmatic intent"])(
+		"does not let delayed link data override %s while the source URL is unchanged",
+		async (replacement) => {
+			const settle = await startDeferredSellerLink();
+			if (replacement === "login document handoff") {
+				mocks.navigateDocument("/products/after-login", {
+					componentId: "login",
+					actionId: "login_completed",
+				});
+			} else {
+				mocks.beginNavigationIntent({ target: "/account", trigger: "router" });
+			}
 
-		await settle();
+			await settle();
 
-		expect(window.location.pathname).toBe("/source");
-		expect(mocks.replace).not.toHaveBeenCalled();
-		expect(mocks.push).not.toHaveBeenCalled();
-		expect(mocks.endPending).toHaveBeenCalled();
-		expect(screen.getByRole("link").getAttribute("aria-busy")).not.toBe("true");
-		expect(screen.getByRole("link").hasAttribute("data-pending")).toBe(false);
-	});
+			expect(window.location.pathname).toBe("/source");
+			expect(mocks.replace).not.toHaveBeenCalled();
+			expect(mocks.push).not.toHaveBeenCalled();
+			expect(mocks.endPending).toHaveBeenCalled();
+			expect(screen.getByRole("link").getAttribute("aria-busy")).not.toBe(
+				"true",
+			);
+			expect(screen.getByRole("link").hasAttribute("data-pending")).toBe(false);
+		},
+	);
 });
 
 describe("shared Link in an English page", () => {

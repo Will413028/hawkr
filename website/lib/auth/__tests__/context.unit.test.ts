@@ -265,20 +265,23 @@ describe("AuthProvider on the server's session answer", () => {
 		["guest", guest],
 		["unavailable", unavailable],
 		["unknown", new Promise<SessionState>(() => {})],
-	])("a 401 while the state is %s has no identity to clear and never replaces the document, on the home page or elsewhere", async (_name, state) => {
-		for (const pathname of ["/", "/account"]) {
-			vi.stubGlobal("location", { pathname, reload: nav.reload });
-			const { result, unmount } = await render(state);
-			await flushMacrotasks();
-			expect(result.current.status).not.toBe("signedIn");
-			await act(async () => {
-				window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
-			});
-			await flushMacrotasks();
-			expect(nav.commit).not.toHaveBeenCalled();
-			unmount();
-		}
-	});
+	])(
+		"a 401 while the state is %s has no identity to clear and never replaces the document, on the home page or elsewhere",
+		async (_name, state) => {
+			for (const pathname of ["/", "/account"]) {
+				vi.stubGlobal("location", { pathname, reload: nav.reload });
+				const { result, unmount } = await render(state);
+				await flushMacrotasks();
+				expect(result.current.status).not.toBe("signedIn");
+				await act(async () => {
+					window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+				});
+				await flushMacrotasks();
+				expect(nav.commit).not.toHaveBeenCalled();
+				unmount();
+			}
+		},
+	);
 
 	it("a 401 inside a protected zone replaces the document even while the root answer is still `unavailable`", async () => {
 		const { result } = await render(
@@ -351,15 +354,18 @@ describe("AuthProvider on the server's session answer", () => {
 			"登出失敗，請確認網路後再試一次",
 		],
 		["refused", new LogoutRevokeFailedError("server"), "登出失敗，請再試一次"],
-	])("a failed SignOut (%s) toasts the text resource", async (_name, error, text) => {
-		api.logout.mockRejectedValueOnce(error);
-		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.status).toBe("signedIn"));
-		await act(async () => {
-			await result.current.signOut().catch(() => {});
-		});
-		expect(toasts.error).toHaveBeenCalledWith(text);
-	});
+	])(
+		"a failed SignOut (%s) toasts the text resource",
+		async (_name, error, text) => {
+			api.logout.mockRejectedValueOnce(error);
+			const { result } = await render(signedIn);
+			await waitFor(() => expect(result.current.status).toBe("signedIn"));
+			await act(async () => {
+				await result.current.signOut().catch(() => {});
+			});
+			expect(toasts.error).toHaveBeenCalledWith(text);
+		},
+	);
 
 	it("an unavailable answer is not a guest and never ends the session", async () => {
 		const { result } = await render(unavailable);

@@ -41,7 +41,6 @@ pnpm dev
 | `pnpm test:e2e:ui` | 以 UI 模式執行 E2E 測試 |
 | `pnpm build:seo` | 以 prod flavor + indexable 旗標 build（SEO 驗證用） |
 | `pnpm test:seo` | 跑 SEO 專用 Playwright suite（`playwright.seo.config.ts`） |
-| `pnpm lhci:desktop` / `pnpm lhci:mobile` | Lighthouse CI（desktop / mobile 設定） |
 | `pnpm smoke:google` | 線上驗證 Google Client ID 是否為正確 prod 值 |
 
 ## 目錄結構
@@ -207,7 +206,6 @@ async redirects() {
 - `biome.json`：統一格式化與 lint，Tab 縮排、雙引號，啟用 React Hooks 檢查。
 - `tsconfig.json`：開啟 `strict`、`noEmit`，`@/*` 路徑別名。
 - `playwright.config.ts` / `playwright.seo.config.ts`：E2E 與 SEO 專用測試設定。
-- `lighthouserc.desktop.js` / `lighthouserc.mobile.js`：Lighthouse CI 設定。
 - `knip.json`：未使用程式碼 / 依賴偵測。
 - `scripts/check-architecture.ts`：目錄邊界守門（`pnpm architecture:check`）。
 
@@ -294,7 +292,7 @@ SEO 邏輯收斂在 `lib/seo/`：
 - `indexability.ts` — 控制各環境是否 indexable
 - `tags.ts` — faceted / tag 相關
 
-路由層的 `app/sitemap.ts`、`app/robots.ts`、`app/manifest.ts`、`app/opengraph-image.tsx` 提供 sitemap / robots / manifest / 預設 OG。SEO 驗證跑 `pnpm build:seo` + `pnpm test:seo` + `pnpm lhci:*`。
+路由層的 `app/sitemap.ts`、`app/robots.ts`、`app/manifest.ts`、`app/opengraph-image.tsx` 提供 sitemap / robots / manifest / 預設 OG。SEO 驗證跑 `pnpm build:seo` + `pnpm test:seo`。
 
 ```typescript
 import type { Metadata } from "next";

@@ -242,15 +242,18 @@ describe("main nav intent prefetch coordinator", () => {
 		"/checkout",
 		"/products/example",
 		"/feed/post-123",
-	] as const)("does not idle-warm from restricted route %s", async (currentPathname) => {
-		setCurrentTab(currentPathname);
-		scheduleMainNavIdleWarm({ router, currentPathname });
-		await flushObservers();
+	] as const)(
+		"does not idle-warm from restricted route %s",
+		async (currentPathname) => {
+			setCurrentTab(currentPathname);
+			scheduleMainNavIdleWarm({ router, currentPathname });
+			await flushObservers();
 
-		expect(requestIdleCallback).not.toHaveBeenCalled();
-		vi.runAllTimers();
-		expect(prefetch).not.toHaveBeenCalled();
-	});
+			expect(requestIdleCallback).not.toHaveBeenCalled();
+			vi.runAllTimers();
+			expect(prefetch).not.toHaveBeenCalled();
+		},
+	);
 
 	it("does not idle-warm while hidden or on 3G", async () => {
 		vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
@@ -289,23 +292,26 @@ describe("main nav intent prefetch coordinator", () => {
 		["Save-Data", { onLine: true, effectiveType: "4g", saveData: true }],
 		["slow 2G", { onLine: true, effectiveType: "slow-2g", saveData: false }],
 		["2G", { onLine: true, effectiveType: "2g", saveData: false }],
-	] as const)("skips every intent while the connection is %s", (_label, state) => {
-		vi.stubGlobal("navigator", {
-			onLine: state.onLine,
-			connection: {
-				effectiveType: state.effectiveType,
-				saveData: state.saveData,
-			},
-		});
+	] as const)(
+		"skips every intent while the connection is %s",
+		(_label, state) => {
+			vi.stubGlobal("navigator", {
+				onLine: state.onLine,
+				connection: {
+					effectiveType: state.effectiveType,
+					saveData: state.saveData,
+				},
+			});
 
-		intent("/feed", "pointer");
-		intent("/market/products", "focus");
-		intent("/search", "touch");
-		vi.runAllTimers();
+			intent("/feed", "pointer");
+			intent("/market/products", "focus");
+			intent("/search", "touch");
+			vi.runAllTimers();
 
-		expect(prefetch).not.toHaveBeenCalled();
-		expect(preloadHomeTabBootstrap).not.toHaveBeenCalled();
-	});
+			expect(prefetch).not.toHaveBeenCalled();
+			expect(preloadHomeTabBootstrap).not.toHaveBeenCalled();
+		},
+	);
 
 	it("skips speculative hover on 3G but honours explicit focus", () => {
 		vi.stubGlobal("navigator", {
@@ -399,24 +405,24 @@ describe("main nav idle route readiness and cancellation", () => {
 		expect(prefetch).not.toHaveBeenCalled();
 	});
 
-	it.each([
-		"missing",
-		"terminal",
-	] as const)("expires a page with %s readiness without starting speculative work", async (state) => {
-		setCurrentTab("/feed", state === "terminal");
-		if (state === "terminal") {
-			const error = document.createElement("div");
-			error.setAttribute("data-hk-route-terminal-ready", "error");
-			document.body.append(error);
-		}
-		scheduleMainNavIdleWarm({ router, currentPathname: "/feed" });
-		await flushObservers();
-		await vi.advanceTimersByTimeAsync(10_001);
-		setCurrentTab();
-		await flushObservers();
-		expect(requestIdleCallback).not.toHaveBeenCalled();
-		expect(prefetch).not.toHaveBeenCalled();
-	});
+	it.each(["missing", "terminal"] as const)(
+		"expires a page with %s readiness without starting speculative work",
+		async (state) => {
+			setCurrentTab("/feed", state === "terminal");
+			if (state === "terminal") {
+				const error = document.createElement("div");
+				error.setAttribute("data-hk-route-terminal-ready", "error");
+				document.body.append(error);
+			}
+			scheduleMainNavIdleWarm({ router, currentPathname: "/feed" });
+			await flushObservers();
+			await vi.advanceTimersByTimeAsync(10_001);
+			setCurrentTab();
+			await flushObservers();
+			expect(requestIdleCallback).not.toHaveBeenCalled();
+			expect(prefetch).not.toHaveBeenCalled();
+		},
+	);
 
 	it("uses the timer fallback when requestIdleCallback is unavailable", async () => {
 		vi.stubGlobal("requestIdleCallback", undefined);
@@ -463,32 +469,32 @@ describe("main nav idle route readiness and cancellation", () => {
 		expect(preloadMainTabData).not.toHaveBeenCalled();
 	});
 
-	it.each([
-		"pointerdown",
-		"click",
-	] as const)("stops remaining speculation when a real link receives %s", async (eventType) => {
-		await startIdle();
-		idleCallback?.();
-		const link = document.createElement("a");
-		link.href = "/products/quick-view-target";
-		const child = document.createElement("span");
-		link.append(child);
-		document.body.append(link);
-		child.dispatchEvent(new Event(eventType, { bubbles: true }));
-		await vi.advanceTimersByTimeAsync(1_000);
-		expect(prefetch).not.toHaveBeenCalled();
-	});
+	it.each(["pointerdown", "click"] as const)(
+		"stops remaining speculation when a real link receives %s",
+		async (eventType) => {
+			await startIdle();
+			idleCallback?.();
+			const link = document.createElement("a");
+			link.href = "/products/quick-view-target";
+			const child = document.createElement("span");
+			link.append(child);
+			document.body.append(link);
+			child.dispatchEvent(new Event(eventType, { bubbles: true }));
+			await vi.advanceTimersByTimeAsync(1_000);
+			expect(prefetch).not.toHaveBeenCalled();
+		},
+	);
 
-	it.each([
-		"popstate",
-		"pagehide",
-	] as const)("cancels pending warming on %s", async (eventType) => {
-		await startIdle();
-		idleCallback?.();
-		window.dispatchEvent(new Event(eventType));
-		await vi.advanceTimersByTimeAsync(1_000);
-		expect(prefetch).not.toHaveBeenCalled();
-	});
+	it.each(["popstate", "pagehide"] as const)(
+		"cancels pending warming on %s",
+		async (eventType) => {
+			await startIdle();
+			idleCallback?.();
+			window.dispatchEvent(new Event(eventType));
+			await vi.advanceTimersByTimeAsync(1_000);
+			expect(prefetch).not.toHaveBeenCalled();
+		},
+	);
 
 	it("does not resurrect a canceled batch when deferred hydration resolves", async () => {
 		const hydration = deferred();
@@ -554,36 +560,36 @@ describe("main nav idle route readiness and cancellation", () => {
 		["slow 2G", { effectiveType: "slow-2g" }],
 		["2G", { effectiveType: "2g" }],
 		["3G", { effectiveType: "3g" }],
-	] as const)("does not start an idle batch while %s", async (_label, network) => {
-		setConnection(network);
-		scheduleMainNavIdleWarm({ router, currentPathname: "/feed" });
-		await flushObservers();
-		expect(requestIdleCallback).not.toHaveBeenCalled();
-		expect(prefetch).not.toHaveBeenCalled();
-	});
+	] as const)(
+		"does not start an idle batch while %s",
+		async (_label, network) => {
+			setConnection(network);
+			scheduleMainNavIdleWarm({ router, currentPathname: "/feed" });
+			await flushObservers();
+			expect(requestIdleCallback).not.toHaveBeenCalled();
+			expect(prefetch).not.toHaveBeenCalled();
+		},
+	);
 
-	it.each([
-		"offline",
-		"Save-Data",
-		"3G",
-		"hidden",
-		"new pathname",
-	] as const)("stops between routes when conditions change to %s", async (condition) => {
-		await startIdle();
-		idleCallback?.();
-		await vi.advanceTimersByTimeAsync(0);
-		if (condition === "hidden") {
-			vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
-		} else if (condition === "new pathname") {
-			window.history.replaceState(null, "", "/account");
-		} else {
-			setConnection({
-				onLine: condition !== "offline",
-				saveData: condition === "Save-Data",
-				effectiveType: condition === "3G" ? "3g" : "4g",
-			});
-		}
-		await vi.advanceTimersByTimeAsync(1_000);
-		expect(prefetch.mock.calls).toEqual([["/", { kind: "full" }]]);
-	});
+	it.each(["offline", "Save-Data", "3G", "hidden", "new pathname"] as const)(
+		"stops between routes when conditions change to %s",
+		async (condition) => {
+			await startIdle();
+			idleCallback?.();
+			await vi.advanceTimersByTimeAsync(0);
+			if (condition === "hidden") {
+				vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+			} else if (condition === "new pathname") {
+				window.history.replaceState(null, "", "/account");
+			} else {
+				setConnection({
+					onLine: condition !== "offline",
+					saveData: condition === "Save-Data",
+					effectiveType: condition === "3G" ? "3g" : "4g",
+				});
+			}
+			await vi.advanceTimersByTimeAsync(1_000);
+			expect(prefetch.mock.calls).toEqual([["/", { kind: "full" }]]);
+		},
+	);
 });

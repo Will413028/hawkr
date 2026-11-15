@@ -564,17 +564,20 @@ describe("開店入口讀 GetMyStoreOpening（送出前）", () => {
 			[unavailable(SO.SUSPENDED)],
 		],
 		["空原因", []],
-	])("can_apply_store 為 false 但原因是%s：仍停用送出、不顯示文字、ApplyStore 不被呼叫", async (_name, unavailabilities) => {
-		blocked(...unavailabilities);
-		const { container } = render(React.createElement(SellerOnboardingClient));
-		fillStore();
-		await acceptTerms();
-		await waitFor(() => expect(mocks.opening).toHaveBeenCalled());
-		await waitFor(() => expect(createButton().disabled).toBe(true));
-		expect(screen.queryByRole("alert")).toBeNull();
-		submitForm(container);
-		expect(mocks.apply).not.toHaveBeenCalled();
-	});
+	])(
+		"can_apply_store 為 false 但原因是%s：仍停用送出、不顯示文字、ApplyStore 不被呼叫",
+		async (_name, unavailabilities) => {
+			blocked(...unavailabilities);
+			const { container } = render(React.createElement(SellerOnboardingClient));
+			fillStore();
+			await acceptTerms();
+			await waitFor(() => expect(mocks.opening).toHaveBeenCalled());
+			await waitFor(() => expect(createButton().disabled).toBe(true));
+			expect(screen.queryByRole("alert")).toBeNull();
+			submitForm(container);
+			expect(mocks.apply).not.toHaveBeenCalled();
+		},
+	);
 
 	it("不認得的原因但有伺服器句子：顯示句子、不給措施與申覆連結", async () => {
 		blocked(unavailable(999, "伺服器新增的原因句"));

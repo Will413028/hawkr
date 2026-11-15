@@ -9,25 +9,25 @@ import { mapSlots } from "./session-logic";
  *  3. kind 是白名單，不是 `as` 斷言
  */
 describe("mapSlots 的 item_resolution", () => {
-	it.each([
-		"CATEGORY_CONFIRMED",
-		"BUYER_DESCRIBED",
-	] as const)("%s：欄位照 camelCase 轉過來", (kind) => {
-		const got = mapSlots({
-			item: "阿嬤自種特殊品種高麗菜",
-			item_resolution: {
+	it.each(["CATEGORY_CONFIRMED", "BUYER_DESCRIBED"] as const)(
+		"%s：欄位照 camelCase 轉過來",
+		(kind) => {
+			const got = mapSlots({
+				item: "阿嬤自種特殊品種高麗菜",
+				item_resolution: {
+					kind,
+					label: "阿嬤自種特殊品種高麗菜",
+					display_value: "阿嬤自種特殊品種高麗菜",
+				},
+			});
+
+			expect(got.itemResolution).toEqual({
 				kind,
 				label: "阿嬤自種特殊品種高麗菜",
-				display_value: "阿嬤自種特殊品種高麗菜",
-			},
-		});
-
-		expect(got.itemResolution).toEqual({
-			kind,
-			label: "阿嬤自種特殊品種高麗菜",
-			displayValue: "阿嬤自種特殊品種高麗菜",
-		});
-	});
+				displayValue: "阿嬤自種特殊品種高麗菜",
+			});
+		},
+	);
 
 	it("尚未解析：欄位不在時是 undefined，其餘 slots 照常", () => {
 		const got = mapSlots({ item: "高麗菜", quantity: 20 });

@@ -34,7 +34,8 @@ export default defineConfig({
 		navigationTimeout: 15_000,
 	},
 	// Invariants (H1/canonical/JSON-LD/meta) are viewport-independent → desktop
-	// only. Mobile coverage for CWV is Lighthouse's job (lighthouserc.mobile.cjs).
+	// only. There is no automated mobile Core Web Vitals or SEO-score gate
+	// (scripts/performance-baseline.mjs is a manual measurement, not run in CI).
 	//
 	// PW_CHANNEL 未設 → 走 Playwright 自帶的 chrome-headless-shell，正是 CI 的
 	// `playwright install --force --only-shell` 裝的那顆，CI 不必多裝瀏覽器。

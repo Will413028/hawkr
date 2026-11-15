@@ -1,5 +1,5 @@
 // 生成檔，不得手改。由 tools/gen.ts 依 src/names.ts 生成。
-// 來源：@material-symbols/svg-400 0.48.1（Material Symbols，Apache-2.0，見 ../LICENSE）。
+// 來源：@material-symbols/svg-400 0.48.2（Material Symbols，Apache-2.0，見 ../LICENSE）。
 // 修改：只取用到的 path。
 
 export const MATERIAL_SYMBOL_VIEW_BOX = "0 -960 960 960";

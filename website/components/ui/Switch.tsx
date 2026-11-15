@@ -43,9 +43,11 @@ export function Switch({
 				className,
 			)}
 		>
-			<HeroSwitch.Control>
-				<HeroSwitch.Thumb />
-			</HeroSwitch.Control>
+			<HeroSwitch.Content className="rounded-full data-[focus-visible=true]:outline-2 data-[focus-visible=true]:outline-offset-2 data-[focus-visible=true]:outline-[var(--hkui-focus)]">
+				<HeroSwitch.Control>
+					<HeroSwitch.Thumb />
+				</HeroSwitch.Control>
+			</HeroSwitch.Content>
 		</HeroSwitch>
 	);
 }

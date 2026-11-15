@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.4.13/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
 	"vcs": {
 		"enabled": false,
 		"clientKind": "git",
@@ -28,16 +28,22 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true,
+			"preset": "recommended",
 			"correctness": {
 				"useHookAtTopLevel": "error",
 				"noInvalidPositionAtImportRule": "off",
 				"useExhaustiveDependencies": {
 					"level": "error",
 					"options": {
-						"hooks": [{ "name": "useResettableError", "stableResult": [1] }]
+						"hooks": [
+							{
+								"name": "useResettableError",
+								"stableResult": [1]
+							}
+						]
 					}
-				}
+				},
+				"usePlaywrightValidDescribeCallback": "off"
 			}
 		}
 	},
@@ -77,17 +83,17 @@
 			"quoteStyle": "double"
 		}
 	},
-	"css": {
-		"parser": {
-			"tailwindDirectives": true
-		}
-	},
 	"assist": {
 		"enabled": true,
 		"actions": {
 			"source": {
 				"organizeImports": "on"
 			}
+		}
+	},
+	"markdown": {
+		"formatter": {
+			"enabled": false
 		}
 	}
 }
