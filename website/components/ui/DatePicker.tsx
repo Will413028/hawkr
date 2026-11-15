@@ -493,6 +493,7 @@ export function DatePicker({
 			setDraftValue(formatDisplay(`${iso}T${time}`, granularity, yearMode));
 			// keep popover open so user can also set time
 		} else {
+			onChange?.(iso);
 			setDraftValue(formatDisplay(iso, granularity, yearMode));
 			closeCalendar(true);
 		}
