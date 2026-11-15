@@ -218,8 +218,8 @@ func TestPurgeBumpsTheVersionOfWhatItChanges(t *testing.T) {
 		sql string
 		id  uuid.UUID
 	}{
-		{`SELECT count(*) FROM social.comments WHERE id = $1 AND deleted_at IS NOT NULL AND version = 2`, c.ID},
-		{`SELECT count(*) FROM social.forum_entries WHERE id = $1 AND deleted_at IS NOT NULL AND version = 2`, e.ID},
+		{`SELECT count(*) FROM social.comments WHERE id = $1 AND deleted_at IS NOT NULL AND body IS NULL AND version = 3`, c.ID},
+		{`SELECT count(*) FROM social.forum_entries WHERE id = $1 AND deleted_at IS NOT NULL AND body IS NULL AND version = 3`, e.ID},
 		{`SELECT count(*) FROM social.comments WHERE id = $1 AND body IS NULL AND version = 3`, keepC.ID},
 		{`SELECT count(*) FROM social.forum_entries WHERE id = $1 AND body IS NULL AND version = 3`, keepE.ID},
 	} {
