@@ -161,11 +161,12 @@ jobs:
             exit 1
           fi
 
-      - name: go vet（含 integration tag 的測試檔）
+      - name: go vet（含 integration、gateway tag 的測試檔）
         if: always()
         run: |
           go vet ./...
           go vet -tags integration ./...
+          go vet -tags gateway ./internal/httpapi/...
 
       - name: go test -race（含依賴方向檢查）
         if: always()
