@@ -81,7 +81,7 @@ env:
 jobs:
   # 三個 job 並行：彼此沒有相依，各自 install 的開銷小於依序跑的總時間。
   lint:
-    name: Lint 與靜態檢查
+    name: Lint、靜態檢查與 node:test 單元測試
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

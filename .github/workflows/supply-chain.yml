@@ -137,15 +137,19 @@ jobs:
               range="$PUSH_BEFORE..$SHA" ;;
             *) full ;;
           esac
-          if git diff --name-only "$range" -- \
+          # 清單涵蓋 OSV-Scanner 讀得到的 lockfile／manifest；新的生態系沒列到時，由每日排程與 main 前的全量掃描接住。
+          # 用 $(...) 判斷是否為空，不接 grep -q：pipefail 下 grep 提早結束會讓 git diff 收到 SIGPIPE 而誤判成沒變動。
+          changed=$(git diff --name-only "$range" -- \
               '*go.mod' '*go.sum' '*go.work' '*go.work.sum' \
-              '*package.json' '*package-lock.json' '*pnpm-lock.yaml' 'pnpm-workspace.yaml' \
-              '*pubspec.yaml' '*pubspec.lock' '*Podfile.lock' '*Gemfile.lock' \
-              '*pom.xml' '*requirements*.txt' \
-              'osv-scanner.toml' '.github/workflows/supply-chain.yml' \
-            | grep -q .; then
-            full
-          fi
+              '*package.json' '*package-lock.json' '*npm-shrinkwrap.json' '*pnpm-lock.yaml' 'pnpm-workspace.yaml' \
+              '*yarn.lock' '*bun.lock' '*bun.lockb' \
+              '*pubspec.yaml' '*pubspec.lock' '*Podfile.lock' '*Gemfile.lock' '*gems.locked' \
+              '*pom.xml' '*gradle.lockfile' '*buildscript-gradle.lockfile' '*verification-metadata.xml' \
+              '*requirements*.txt' '*poetry.lock' '*Pipfile.lock' '*pdm.lock' '*uv.lock' \
+              '*Cargo.lock' '*composer.lock' '*packages.lock.json' '*deps.json' '*mix.lock' \
+              '*renv.lock' '*conan.lock' '*cabal.project.freeze' '*stack.yaml.lock' \
+              'osv-scanner.toml' '.github/workflows/supply-chain.yml')
+          [ -n "$changed" ] && full
           echo "run=false" >> "$GITHUB_OUTPUT"
 
   osv-scanner:
