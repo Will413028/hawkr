@@ -215,24 +215,9 @@ ignoreUntil = 2027-01-28
 reason = "基準：RubyGems activesupport@7.2.2.2（CVSS 6.6，MEDIUM）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-33mh-2634-fwr2"
-ignoreUntil = 2027-01-28
-reason = "基準：RubyGems faraday@1.10.4（CVSS 5.8，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-3m6g-2423-7cp3"
 ignoreUntil = 2026-11-29
 reason = "基準：RubyGems json@2.18.0（CVSS 8.3，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-47m2-wp7j-p9vc"
-ignoreUntil = 2026-11-29
-reason = "基準：RubyGems rubyzip@2.4.1（CVSS 8.7，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-48rx-c7pg-q66r"
-ignoreUntil = 2027-01-28
-reason = "基準：RubyGems excon@0.112.0（CVSS 6.5，MEDIUM）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-6wx8-w4f5-wwcr"
@@ -243,16 +228,6 @@ reason = "基準：RubyGems concurrent-ruby@1.3.5（CVSS 2.1，LOW）；升級�
 id = "GHSA-89vf-4333-qx8v"
 ignoreUntil = 2027-01-28
 reason = "基準：RubyGems activesupport@7.2.2.2（CVSS 5.3，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-98m9-hrrm-r99r"
-ignoreUntil = 2026-11-29
-reason = "基準：RubyGems faraday@1.10.4（CVSS 7.5，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-c32j-vqhx-rx3x"
-ignoreUntil = 2026-11-29
-reason = "基準：RubyGems jwt@2.10.2（CVSS 7.4，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-cg4j-q9v8-6v38"
