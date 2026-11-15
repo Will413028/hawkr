@@ -48,6 +48,7 @@ knip 基線（2026-11-15 重做）：附件 `knip-baseline.json` 是 d69bbbbc（
 
 - 做：play 改寫、browser 測試的 runner 與 CI job、axe 進 e2e、刪除 Storybook 與連帶的 Flutter 目錄 web 宿主、文件更新。
 - 不做：視覺回歸（Storybook 目前也沒有）；admin（沒有 Storybook）；Flutter 目錄的其他改動（D2 只刪 Storybook 宿主留下的嵌入模式與 base href）。
+- 延後：`/about` 的 `.stage-cta` 樣式同時寫在 `HomeProcessCards.tsx` 的 Tailwind 與未分層的 `home.css`，後者永遠蓋過前者（code-review 第 2 輪，Will 2026-11-15 決定延後；觸發條件：下次修改 `/about` 首屏或把 `home.css` 收進 layer 時，收斂到單一來源）。
 - 延後：公開頁 axe 進 CI（觸發條件：#369 的錄製 fixture 可用時，把 `expectNoAxeViolations` 接到不帶 `@live` 的公開頁測試）。
 - 延後：Flutter 元件目錄的 web 版發佈（觸發條件：Will 需要在瀏覽器分享 App 元件目錄時）；屆時一併重新評估現在沒有消費端的 `?component=&textScale=` 深連結解析與 `component-catalog.sh build`（`CATALOG_BASE_HREF`），保留理由：本機手動開特定 section 仍可用。
 
