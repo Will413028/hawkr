@@ -34,7 +34,7 @@ export default function FoodCategoryIcon({
 	return (
 		<span
 			className={cn(
-				"grid size-full place-items-center rounded-hk-lg bg-hk-primary-subtle text-hk-primary",
+				"grid size-full place-items-center rounded-hk-lg bg-hk-primary-subtle text-hk-accent-on-tint",
 				className,
 			)}
 			data-food-category={categoryId}

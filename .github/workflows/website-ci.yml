@@ -85,6 +85,8 @@ jobs:
       - run: pnpm run lint
       - name: 三端 design token 與契約一致
         run: pnpm run design:check --apps-root ..
+      - name: 色彩對比（contrast.py）
+        run: pnpm run contrast:check
       - run: pnpm run test:unit
       - run: pnpm test
       - run: pnpm run build

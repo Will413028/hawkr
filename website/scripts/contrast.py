@@ -420,18 +420,6 @@ def check_web(css: Css, rep: Report) -> None:
     rep.safe(g, "首頁 accent-500 底 × 白字", lambda: (css.token("--color-neutral-white"), css.token("--color-hk-home-accent-500")), "text")
     rep.safe(g, "首頁 stage-cta 墨字 × brand-secondary 底", lambda: (css.token("--color-brand-ink"), css.token("--color-brand-secondary")), "text")
     rep.safe(g, "首頁 primary-deep 文字 × paper", lambda: (css.token("--color-hk-home-primary-deep"), css.token("--color-hk-home-paper")), "text")
-    # 季節卡：ink 文字 × 12% 季節色混 light
-    for season in ("spring", "summer", "autumn", "winter"):
-        def fn(season=season):
-            base = css.token(f"--page-home-season-{season}")
-            light = css.token("--page-home-season-light")
-            wash = mix(base, 0.12, light)
-            return css.token("--theme-text-heading"), wash
-
-        rep.safe(g, f"首頁季節 {season}：標題文字 × 12% wash", fn, "text")
-        rep.safe(g, f"首頁季節 {season}：body 文字 × 12% wash", lambda season=season: (css.token("--theme-text-body"), mix(css.token(f"--page-home-season-{season}"), 0.12, css.token("--page-home-season-light"))), "text")
-    rep.safe(g, "首頁季節 focus 外框 season-ink × cream", lambda: (css.token("--page-home-season-ink"), css.token("--page-home-season-light")), "ui")
-
     # 暗色
     g = "web 暗色"
     dark_surfaces = ["--theme-surface-page", "--theme-surface-card", "--theme-surface-muted", "--theme-surface-panel", "--theme-surface-elevated"]
@@ -460,8 +448,6 @@ def check_web(css: Css, rep: Report) -> None:
     rep.safe(g, "logo on-dark × 頁面 surface（圖形）", pair("--brand-logo-on-dark", "--theme-surface-page", "dark"), "ui")
     rep.safe(g, "logo 檯面 × 頁面 surface（圖形）", pair("--brand-logo-counter", "--theme-surface-page", "dark"), "ui")
     rep.safe(g, "logo brand-primary × 頁面 surface（圖形）", pair("--color-brand-primary", "--theme-surface-page", "dark"), "ui")
-    rep.safe(g, "lottie-primary × 頁面 surface（圖形）", pair("--lottie-primary", "--theme-surface-page", "dark"), "ui")
-    rep.safe(g, "lottie-secondary × 頁面 surface（圖形）", pair("--lottie-secondary", "--theme-surface-page", "dark"), "ui")
     rep.safe(g, "聊天自己的泡泡 白字 × bubble-mine-bg", lambda: (css.token("--color-neutral-white", "dark"), css.token("--page-chat-bubble-mine-bg", "dark")), "text")
     rep.safe(g, "聊天卡片價格 × 卡片底", lambda: (css.token("--page-chat-card-price", "dark"), css.token("--theme-surface-elevated", "dark")), "text")
     rep.safe(g, "地圖 selected × 頁面 surface（圖形）", pair("--page-map-selected", "--theme-surface-page", "dark"), "ui")

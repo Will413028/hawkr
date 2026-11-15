@@ -1298,6 +1298,9 @@ body[data-hk-overlay-open="true"] .tsqd-open-btn-container {
 			transparent
 		);
 }
+[data-theme="dark"] .hkui-calendar__jump-flag {
+	color: var(--theme-text-accent-on-tint);
+}
 .hkui-calendar__jump-select {
 	appearance: none;
 	-webkit-appearance: none;
