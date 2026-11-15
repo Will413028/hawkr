@@ -17,7 +17,8 @@ import (
 type Audience int
 
 const (
-	// AudiencePublic 是 <模組>PublicService：任何人都能呼叫，不讀身分。
+	// AudiencePublic 是 <模組>PublicService：任何人都能呼叫，不要求登入；請求帶有效 session 時 handler 可以讀呼叫者（例如依觀看者過濾、viewer_can_*），
+	// 停權帳號與無效 token 以訪客執行。帶憑證的 GET 回應是 private, no-store（API 設計規範（Connect）§九）。
 	AudiencePublic Audience = iota + 1
 	// AudienceApp 是 <模組>AppService：登入的買家、賣家。
 	AudienceApp
