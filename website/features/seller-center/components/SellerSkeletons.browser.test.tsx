@@ -190,7 +190,9 @@ describe("Seller skeletons", () => {
 				</div>
 			</SellerShell>,
 		);
-		for (const cell of container.querySelectorAll("tbody td"))
+		const cells = container.querySelectorAll("tbody td");
+		expect(cells.length).toBeGreaterThan(0);
+		for (const cell of cells)
 			await expect.element(cell as HTMLElement).toHaveAttribute("data-label");
 	});
 
@@ -224,14 +226,16 @@ describe("Seller skeletons", () => {
 		const reference = container.querySelector(
 			"ul[aria-label='正式折疊列幾何對照'] .seller-mobile-disclosure",
 		);
-		if (loading && reference && loading.getBoundingClientRect().height > 0) {
-			expect(loading.getBoundingClientRect().height).toBe(
-				reference.getBoundingClientRect().height,
-			);
-			expect(loading.getBoundingClientRect().width).toBe(
-				reference.getBoundingClientRect().width,
-			);
-		}
+		expect(loading).not.toBeNull();
+		expect(reference).not.toBeNull();
+		if (!loading || !reference) return;
+		expect(loading.getBoundingClientRect().height).toBeGreaterThan(0);
+		expect(loading.getBoundingClientRect().height).toBe(
+			reference.getBoundingClientRect().height,
+		);
+		expect(loading.getBoundingClientRect().width).toBe(
+			reference.getBoundingClientRect().width,
+		);
 	});
 
 	it("does not reserve square product images in form panels", () => {

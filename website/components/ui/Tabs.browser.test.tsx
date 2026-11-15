@@ -12,7 +12,9 @@ const items = [
 describe("Tabs", () => {
 	it("shows the clicked tab's panel", async () => {
 		renderWithIntl(<Tabs aria-label="訂單狀態" items={items} />);
-		await userEvent.click(page.getByRole("tab", { name: "配送中" }));
+		await userEvent.click(
+			page.getByRole("tab", { name: "配送中", exact: true }),
+		);
 		await expect
 			.poll(() => page.getByRole("tabpanel").element().textContent)
 			.toContain("配送中的訂單");
@@ -21,11 +23,13 @@ describe("Tabs", () => {
 	it("moves focus to the next tab with ArrowRight", async () => {
 		renderWithIntl(<Tabs aria-label="訂單狀態" items={items} />);
 		(
-			page.getByRole("tab", { name: "待處理" }).element() as HTMLElement
+			page
+				.getByRole("tab", { name: "待處理", exact: true })
+				.element() as HTMLElement
 		).focus();
 		await userEvent.keyboard("{ArrowRight}");
 		await expect
-			.element(page.getByRole("tab", { name: "配送中" }))
+			.element(page.getByRole("tab", { name: "配送中", exact: true }))
 			.toHaveFocus();
 	});
 
@@ -36,7 +40,9 @@ describe("Tabs", () => {
 		await expect
 			.element(document.documentElement)
 			.toHaveAttribute("data-theme", "dark");
-		await userEvent.click(page.getByRole("tab", { name: "配送中" }));
+		await userEvent.click(
+			page.getByRole("tab", { name: "配送中", exact: true }),
+		);
 		await expect
 			.poll(() => page.getByRole("tabpanel").element().textContent)
 			.toContain("配送中的訂單");

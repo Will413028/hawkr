@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { renderWithIntl } from "@/tests/browser/render";
 import { Input } from "./Input";
@@ -16,15 +16,11 @@ function renderedStyle(element: Element, pseudo?: string): CSSStyleDeclaration {
 const textbox = (name: string) =>
 	page.getByRole("textbox", { name, exact: true });
 
-afterEach(() => {
-	document.documentElement.style.removeProperty("font-size");
-	document.documentElement.style.removeProperty("--hk-text-scale");
-});
-
 describe("Input", () => {
 	it("accepts typed text", async () => {
 		renderWithIntl(
 			<Input label="商品名稱" placeholder="例如：花蓮小農香米" isRequired />,
+			{ frameMaxWidth: 420 },
 		);
 		const input = page.getByRole("textbox");
 		await userEvent.type(input, "花蓮小農香米");
@@ -40,6 +36,7 @@ describe("Input", () => {
 				isInvalid
 				errorMessage="請輸入商品名稱"
 			/>,
+			{ frameMaxWidth: 420 },
 		);
 		await expect
 			.element(page.getByRole("textbox"))
@@ -164,7 +161,6 @@ describe("Input", () => {
 	});
 
 	it("keeps floating label, long text and description readable at 320px and 1.4x text", async () => {
-		const root = document.documentElement;
 		renderWithIntl(
 			<div
 				style={{
@@ -181,9 +177,8 @@ describe("Input", () => {
 					description="欄位使用較大文字時，說明仍應完整換行顯示。"
 				/>
 			</div>,
+			{ textScale: 1.4 },
 		);
-		root.style.fontSize = "140%";
-		root.style.setProperty("--hk-text-scale", "1.4");
 		const floatingLocator = textbox("收件人姓名");
 		const floating = floatingLocator.element() as HTMLElement;
 		const label = page.getByText("收件人姓名", { exact: true }).element();
@@ -222,7 +217,7 @@ describe("Input", () => {
 				isInvalid
 				errorMessage="請輸入商品名稱"
 			/>,
-			{ theme: "dark" },
+			{ frameMaxWidth: 420, theme: "dark" },
 		);
 		await expect
 			.element(document.documentElement)

@@ -14,4 +14,6 @@ if (typeof globalThis.process === "undefined") {
 // 沒有開 vitest globals，@testing-library/react 不會自己註冊 cleanup。
 afterEach(() => {
 	cleanup();
+	document.documentElement.style.removeProperty("font-size");
+	document.documentElement.style.removeProperty("--hk-text-scale");
 });

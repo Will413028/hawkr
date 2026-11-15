@@ -11,9 +11,8 @@ const baseProps = {
 	value: "2026-09-18",
 	minDate: "2026-09-12",
 	maxDate: "2026-10-31",
-	onChange: vi.fn(),
 	locale: "zh-TW",
-} satisfies Props;
+} satisfies Partial<Props>;
 
 function Controlled(props: Partial<Props>) {
 	const merged = { ...baseProps, ...props } as Props;
@@ -33,8 +32,10 @@ function Controlled(props: Partial<Props>) {
 describe("DatePicker", () => {
 	it("selects a date from the calendar and reports an ISO date", async () => {
 		const onChange = vi.fn();
-		renderWithIntl(<Controlled onChange={onChange} />);
-		await userEvent.click(page.getByRole("button", { name: "開啟日期選擇" }));
+		renderWithIntl(<Controlled onChange={onChange} />, { frameMaxWidth: 420 });
+		await userEvent.click(
+			page.getByRole("button", { name: "開啟日期選擇", exact: true }),
+		);
 		await userEvent.click(
 			page.getByRole("gridcell", { name: /2026年9月20日/ }),
 		);
@@ -45,6 +46,7 @@ describe("DatePicker", () => {
 	it("describes the input with the error message when invalid", async () => {
 		renderWithIntl(
 			<Controlled isInvalid errorMessage="請重新選擇可配送的日期" />,
+			{ frameMaxWidth: 420 },
 		);
 		await expect
 			.element(page.getByRole("textbox"))
@@ -53,10 +55,12 @@ describe("DatePicker", () => {
 
 	it("disables the input and the calendar button when disabled", async () => {
 		const onChange = vi.fn();
-		renderWithIntl(<Controlled disabled onChange={onChange} />);
+		renderWithIntl(<Controlled disabled onChange={onChange} />, {
+			frameMaxWidth: 420,
+		});
 		await expect.element(page.getByRole("textbox")).toBeDisabled();
 		await expect
-			.element(page.getByRole("button", { name: "開啟日期選擇" }))
+			.element(page.getByRole("button", { name: "開啟日期選擇", exact: true }))
 			.toBeDisabled();
 		expect(onChange).not.toHaveBeenCalled();
 	});
@@ -64,7 +68,7 @@ describe("DatePicker", () => {
 	it("keeps the error description under the dark theme", async () => {
 		renderWithIntl(
 			<Controlled isInvalid errorMessage="請重新選擇可配送的日期" />,
-			{ theme: "dark" },
+			{ frameMaxWidth: 420, theme: "dark" },
 		);
 		await expect
 			.element(document.documentElement)

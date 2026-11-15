@@ -35,9 +35,13 @@ describe("RouteLoadingSkeleton", () => {
 			expect(root).not.toBeNull();
 			if (root) {
 				const bounds = root.getBoundingClientRect();
-				for (const element of root.querySelectorAll(
+				const blocks = root.querySelectorAll(
 					".route-loading-skeleton__purchase > span, .route-loading-skeleton__commerce-main > span, .route-loading-skeleton__workspace-head",
-				)) {
+				);
+				// 只有這兩個 variant 渲染這些區塊；其餘 variant 沒有可比對的元素。
+				if (variant === "product-detail" || variant === "workspace")
+					expect(blocks.length).toBeGreaterThan(0);
+				for (const element of blocks) {
 					const box = element.getBoundingClientRect();
 					expect(box.right).toBeLessThanOrEqual(bounds.right + 1);
 				}

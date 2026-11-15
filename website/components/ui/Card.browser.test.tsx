@@ -19,6 +19,7 @@ describe("Card", () => {
 					</Chip>
 				</CardFooter>
 			</Card>,
+			{ frameMaxWidth: 420 },
 		);
 		(page.getByRole("button").element() as HTMLElement).focus();
 		await userEvent.keyboard("{Enter}");

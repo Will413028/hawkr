@@ -7,7 +7,7 @@ import { renderWithIntl } from "@/tests/browser/render";
 import { AssistantEntrySkeleton } from "./AssistantEntryLayout";
 import AssistantEntryLink from "./AssistantEntryLink";
 
-// 預覽不掛 App Router：next/navigation 的 useRouter 在它之外會丟錯。mock 專案自己的
+// 測試不掛 App Router：next/navigation 的 useRouter 在它之外會丟錯。mock 專案自己的
 // `@/lib/intl/use-router`（所有 router 出口都經過它），不 mock 預先打包的 next/navigation。
 vi.mock("@/lib/intl/use-router", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("@/lib/intl/use-router")>();
@@ -29,7 +29,7 @@ afterEach(() => {
 });
 
 describe("AssistantEntrySkeleton", () => {
-	it("keeps the same height as the loaded entry link", () => {
+	it("keeps the same height as the loaded entry link", async () => {
 		const client = new QueryClient({
 			defaultOptions: { queries: { retry: false } },
 		});
@@ -50,12 +50,20 @@ describe("AssistantEntrySkeleton", () => {
 				</ViewTransitions>
 			</QueryClientProvider>,
 		);
-		const loading = container.querySelector(
+		const loading = container.querySelector<HTMLElement>(
 			"[data-agent-entry-loading] > div",
-		) as HTMLElement;
-		const loaded = container.querySelector(
+		);
+		expect(loading).not.toBeNull();
+		// 入口連結依 HAWKR_AGENT_ENABLED 旗標渲染，等它出現再量。
+		await vi.waitFor(() => {
+			expect(
+				container.querySelector("[data-agent-entry-loaded] > a"),
+			).not.toBeNull();
+		});
+		const loaded = container.querySelector<HTMLElement>(
 			"[data-agent-entry-loaded] > a",
-		) as HTMLElement;
+		);
+		if (!loading || !loaded) throw new Error("entry elements missing");
 		expect(
 			Math.abs(
 				loading.getBoundingClientRect().height -

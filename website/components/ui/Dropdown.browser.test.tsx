@@ -8,7 +8,6 @@ type Props = React.ComponentProps<typeof Dropdown>;
 
 const baseProps = {
 	value: undefined,
-	onChange: vi.fn(),
 	label: "產地",
 	"aria-label": "產地",
 	placeholder: "請選擇產地",
@@ -22,7 +21,7 @@ const baseProps = {
 			description: "暫不可選",
 		},
 	],
-} satisfies Props;
+} satisfies Partial<Props>;
 
 function Controlled(props: Partial<Props>) {
 	const merged = { ...baseProps, ...props } as Props;
@@ -33,7 +32,7 @@ function Controlled(props: Partial<Props>) {
 			value={value}
 			onChange={(next) => {
 				setValue(next);
-				merged.onChange(next);
+				merged.onChange?.(next);
 			}}
 		/>
 	);
@@ -44,7 +43,7 @@ const trigger = () => page.getByRole("button", { name: "產地", exact: true });
 describe("Dropdown", () => {
 	it("selects the first item with Home and Enter and closes the menu", async () => {
 		const onChange = vi.fn();
-		renderWithIntl(<Controlled onChange={onChange} />);
+		renderWithIntl(<Controlled onChange={onChange} />, { frameMaxWidth: 420 });
 		await userEvent.click(trigger());
 		await userEvent.keyboard("{Home}{Enter}");
 		await expect
@@ -56,7 +55,9 @@ describe("Dropdown", () => {
 
 	it("filters by search text and selects the matching option", async () => {
 		const onChange = vi.fn();
-		renderWithIntl(<Controlled searchable onChange={onChange} />);
+		renderWithIntl(<Controlled searchable onChange={onChange} />, {
+			frameMaxWidth: 420,
+		});
 		await userEvent.click(trigger());
 		await userEvent.type(
 			page.getByRole("combobox", { name: "搜尋選項", exact: true }),
@@ -71,7 +72,9 @@ describe("Dropdown", () => {
 
 	it("shows the empty state when nothing matches and selects nothing", async () => {
 		const onChange = vi.fn();
-		renderWithIntl(<Controlled searchable onChange={onChange} />);
+		renderWithIntl(<Controlled searchable onChange={onChange} />, {
+			frameMaxWidth: 420,
+		});
 		await userEvent.click(trigger());
 		await userEvent.type(
 			page.getByRole("combobox", { name: "搜尋選項", exact: true }),
@@ -86,6 +89,7 @@ describe("Dropdown", () => {
 
 	it("describes the trigger with the error message under the dark theme", async () => {
 		renderWithIntl(<Controlled isInvalid errorMessage="請選擇商品產地" />, {
+			frameMaxWidth: 420,
 			theme: "dark",
 		});
 		await expect
@@ -98,7 +102,10 @@ describe("Dropdown", () => {
 
 	it("is disabled and does not report a change when disabled", async () => {
 		const onChange = vi.fn();
-		renderWithIntl(<Controlled disabled value="hualien" onChange={onChange} />);
+		renderWithIntl(
+			<Controlled disabled value="hualien" onChange={onChange} />,
+			{ frameMaxWidth: 420 },
+		);
 		await expect.element(trigger()).toBeDisabled();
 		expect(onChange).not.toHaveBeenCalled();
 	});

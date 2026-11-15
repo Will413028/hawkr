@@ -35,7 +35,9 @@ function Controlled(
 describe("CalendarMonth", () => {
 	it("selects the next day with ArrowRight and Enter", async () => {
 		const onSelectDate = vi.fn();
-		renderWithIntl(<Controlled onSelectDate={onSelectDate} />);
+		renderWithIntl(<Controlled onSelectDate={onSelectDate} />, {
+			frameMaxWidth: 420,
+		});
 		await userEvent.click(
 			page.getByRole("gridcell", { name: /2026年9月18日/ }),
 		);
@@ -52,6 +54,7 @@ describe("CalendarMonth", () => {
 				minDate={new Date(2026, 8, 12)}
 				maxDate={new Date(2026, 8, 25)}
 			/>,
+			{ frameMaxWidth: 420 },
 		);
 		await expect
 			.element(page.getByRole("gridcell", { name: /2026年9月11日/ }))

@@ -11,6 +11,7 @@ describe("Textarea", () => {
 				placeholder="分享產地、風味與保存方式"
 				minRows={3}
 			/>,
+			{ frameMaxWidth: 420 },
 		);
 		await userEvent.type(page.getByRole("textbox"), "來自花蓮的當季收成");
 		await expect

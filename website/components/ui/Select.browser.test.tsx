@@ -21,6 +21,7 @@ describe("Select", () => {
 			>
 				{options}
 			</Select>,
+			{ frameMaxWidth: 420 },
 		);
 		const select = page.getByRole("combobox", { name: /配送方式/ });
 		await userEvent.selectOptions(select, "store");
@@ -39,6 +40,7 @@ describe("Select", () => {
 			>
 				{options}
 			</Select>,
+			{ frameMaxWidth: 420 },
 		);
 		const select = page.getByRole("combobox");
 		await expect.element(select).toHaveAttribute("aria-invalid", "true");
@@ -57,6 +59,7 @@ describe("Select", () => {
 			>
 				{options}
 			</Select>,
+			{ frameMaxWidth: 420 },
 		);
 		await expect.element(page.getByRole("combobox")).toBeDisabled();
 	});

@@ -41,9 +41,13 @@ describe("Sheet", () => {
 		async (_name, side) => {
 			const onClose = vi.fn();
 			renderWithIntl(<Example side={side} onClose={onClose} />);
-			await userEvent.click(page.getByRole("button", { name: "查看明細" }));
+			await userEvent.click(
+				page.getByRole("button", { name: "查看明細", exact: true }),
+			);
 			await expect
-				.element(page.getByRole("dialog", { name: "商品匯入明細" }))
+				.element(
+					page.getByRole("dialog", { name: "商品匯入明細", exact: true }),
+				)
 				.toBeVisible();
 			await userEvent.keyboard("{Escape}");
 			await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();

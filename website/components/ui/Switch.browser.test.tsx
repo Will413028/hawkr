@@ -32,11 +32,11 @@ describe("Switch", () => {
 			<Controlled onCheckedChange={onCheckedChange} />,
 		);
 		// role=switch 的 input 視覺上隱藏（react-aria），使用者點的是可見的軌道。
-		await userEvent.click(
-			page.elementLocator(
-				container.querySelector("[data-slot=switch-control]") as HTMLElement,
-			),
+		const control = container.querySelector<HTMLElement>(
+			"[data-slot=switch-control]",
 		);
+		expect(control).not.toBeNull();
+		await userEvent.click(page.elementLocator(control as HTMLElement));
 		await expect.element(page.getByRole("switch")).toBeChecked();
 		expect(onCheckedChange).toHaveBeenCalledWith(true);
 	});
