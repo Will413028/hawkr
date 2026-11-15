@@ -139,6 +139,7 @@ var InternalDependencies = map[string]InternalGraph{
 		"authorization": {"model", "store"},
 		"audit":         {"model", "store"},
 		"model":         {},
+		"postops":       {"model"},
 		"session":       {"model", "store"},
 		"store":         {},
 	}},

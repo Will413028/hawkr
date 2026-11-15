@@ -444,7 +444,8 @@ func sanctionsOf(suspended bool) *seller.Sanctions {
 }
 
 // noSchedules 是沒有 social 資料的測試組裝給 delegation 的 Social：這個測試不建排程，取消沒有東西可取消。
-type noSchedules struct{}
+// 內嵌的 *social.Module 是 nil：這些測試不寫代行貼文，只滿足 delegation.Social 的方法集合，被呼叫就 panic。
+type noSchedules struct{ *social.Module }
 
 func (noSchedules) CancelScheduledBy(context.Context, social.ScheduleKind, []string, social.CancelReason) ([]uuid.UUID, error) {
 	return nil, nil

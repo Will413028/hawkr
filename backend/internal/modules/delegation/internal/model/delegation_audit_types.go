@@ -256,3 +256,32 @@ type ScheduledPublishAuditInput struct {
 func ScheduledPublishIdempotencyKey(scheduleID uuid.UUID) string {
 	return "schedule:" + scheduleID.String()
 }
+
+// OperationAuditInput 是代行互動寫入的單段稽核：與被稽核的寫入同一個 transaction，寫入成功才留下（失敗時一起 rollback）。
+type OperationAuditInput struct {
+	SessionID    int64
+	Capability   Capability
+	Action       AuditAction
+	ResourceType AuditResourceType
+	// ResourceID 是資源自己的 ID；建立類在寫入前沒有，留空，寫入後由 OperationOutcome.ResourceID 補上。
+	ResourceID            string
+	ResourceName          string
+	ResourceVersionBefore *int64
+	// OperationReason 去除首尾空白後 1–100 字，不得含控制字元。
+	OperationReason string
+	NotifySeller    bool
+	// RequestID 是呼叫方的 request_id（AIP-155）：同時是稽核列的 request_id 與 (session_id, idempotency_key) 的冪等鍵。
+	RequestID     string
+	CorrelationID string
+	UserAgent     string
+	// PayloadHash 綁定冪等鍵與請求內容：同一把鍵、不同內容不是重送。
+	PayloadHash string
+}
+
+// OperationOutcome 是被稽核的寫入完成後補進稽核列的事實。
+type OperationOutcome struct {
+	ResourceID   string
+	ResourceName string
+	// VersionAfter 是資源寫入後的版本；0 表示沒有版本。
+	VersionAfter int64
+}
