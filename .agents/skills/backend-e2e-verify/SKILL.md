@@ -9,7 +9,7 @@ description: Proves a backend change end-to-end on the local stack (monolith as 
 gateway 轉送、寫進 DB 的是哪個身分、送上 RabbitMQ 的欄位長什麼樣。只在本機跑，不連任何外部環境（根目錄
 `AGENTS.md`「不連到舊公司」）。
 
-這份 skill 是探索與設計特性測試情境的工具，不是任何步驟的驗收：特性測試以 CI `backend-characterization.yml` 的 job 結論為證據，broker 路由以 `backend-monolith.yml` integration job 的 `internal/legacy/rabbitmq` 測試為證據（A7 計畫 A7-2v）。共用機器上不在本機起整套環境。
+這份 skill 是探索與設計特性測試情境的工具，不是任何步驟的驗收：特性測試以 CI `backend-characterization.yml` 的 job 結論為證據，broker 路由以 `backend-monolith.yml` integration job 的 `internal/legacy/rabbitmq` 測試為證據。共用機器上不在本機起整套環境。
 
 ## 1. 起環境
 
