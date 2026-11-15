@@ -13,6 +13,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi"
+	httpbuyer "github.com/Will413028/hawkr/backend/internal/httpapi/buyer"
 	ch "github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
@@ -99,7 +100,7 @@ func exposableStore(t *testing.T, d *db.DB, accountID int64) {
 }
 
 // TestMonolith 對單體的 Connect 入口跑同一份情境（D8）：handler 與 production 一樣由 httpapi.NewHandler 組出，資料庫是 testdb 的真實 Postgres。
-// 買家是 dev session，賣家是 dev session 加一家可曝光的店；全部情境共用一個資料庫，情境只看自己建立的資料。
+// 買家是 dev session，賣家是 dev session 加一家可曝光的店；全部情境共用一個資料庫，每個情境用自己的帳號與店家。
 func TestMonolith(t *testing.T) {
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
 		migrate.Module{Name: "identity", Dir: identity.Migrations()},
@@ -145,6 +146,7 @@ func TestMonolith(t *testing.T) {
 		Ready: d.Ping, Identity: id, Seller: sellers, Social: socialModule, Buyer: buyers, Images: images, Logger: log, Deletion: deletion,
 		Delegation: delegation.New(delegationDeps), Stats: ch.Stats(t), WebOrigin: ch.WebOrigin(t), DashboardOrders: noDashboardOrders{}, DashboardBudget: time.Minute,
 		Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{},
+		BuyerPorts: httpbuyer.Ports{Stores: sellers},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -152,18 +154,21 @@ func TestMonolith(t *testing.T) {
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 
-	tokens := map[ch.Caller]string{}
-	for _, c := range []ch.Caller{ch.Buyer, ch.Buyer2, ch.Seller, ch.Seller2} {
-		account, token, err := id.DevNewSession(t.Context())
-		if err != nil {
-			t.Fatal(err)
+	// 情境會留下封鎖等狀態，每個情境用自己的一組帳號與店家，彼此不影響。
+	for _, sc := range scenarios {
+		tokens := map[ch.Caller]string{}
+		for _, c := range []ch.Caller{ch.Buyer, ch.Buyer2, ch.Seller, ch.Seller2} {
+			account, token, err := id.DevNewSession(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			tokens[c] = token
+			if c == ch.Seller || c == ch.Seller2 {
+				exposableStore(t, d, account)
+			}
 		}
-		tokens[c] = token
-		if c == ch.Seller || c == ch.Seller2 {
-			exposableStore(t, d, account)
-		}
+		ch.Run[Driver](t, newConnectDriver(srv.Client(), srv.URL, tokens), []ch.Scenario[Driver]{sc})
 	}
-	ch.Run[Driver](t, newConnectDriver(srv.Client(), srv.URL, tokens), scenarios)
 }
 
 type noAccountOrders struct{}

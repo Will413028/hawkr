@@ -62,7 +62,7 @@ type presenter struct {
 	stores    Stores
 	images    rpc.Images
 	webOrigin rpc.WebOrigin
-	// liked 查買家讚過哪些貼文；nil 表示這條路徑的呼叫者沒有買家身分的讚（店主讀自己的貼文），viewer_liked 一律 false。
+	// liked 查買家讚過哪些貼文，只在呼叫者有買家身分時呼叫；店主路徑（App）的呼叫者沒有買家身分，不設。
 	liked func(ctx context.Context, buyerID int64, postIDs []uuid.UUID) (map[uuid.UUID]bool, error)
 }
 
@@ -539,9 +539,9 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 	return out, nil
 }
 
-// likedPosts 批次查呼叫者的買家身分讚過 posts 裡的哪幾篇；訪客與沒有買家的讚來源時是空的。
+// likedPosts 批次查呼叫者的買家身分讚過 posts 裡的哪幾篇；呼叫者沒有買家身分（訪客、店主）時是空的。
 func (h *presenter) likedPosts(ctx context.Context, c social.Caller, posts []social.Post) (map[uuid.UUID]bool, error) {
-	if c.BuyerID == 0 || h.liked == nil {
+	if c.BuyerID == 0 {
 		return nil, nil
 	}
 	ids := make([]uuid.UUID, len(posts))

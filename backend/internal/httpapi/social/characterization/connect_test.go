@@ -81,7 +81,7 @@ func (d *connectDriver) of(c ch.Caller) *connectClients { return d.clients[c] }
 const pageSize = 50
 
 // errNoConnectEntry：平台下架貼文在單體是賣家措施（A7-D5′，CreateMeasure ContentTakedown），沒有 SocialAdminService 的隱藏入口，
-// 貼文也沒有隱藏理由欄位與「隱藏」狀態。依賴這些的三個情境在單體的一端以 skipOnMonolith 跳過，不會呼叫到。
+// 貼文也沒有隱藏理由欄位與「隱藏」狀態。依賴這些的情境在單體的一端以 skipOnMonolith 跳過；sd2_comments_follow_post_visibility 只跳過平台隱藏的那一半，不會呼叫到。
 var errNoConnectEntry = errors.New("單體沒有隱藏或還原貼文的 Connect 入口（A7-D5′）")
 
 func (d *connectDriver) ModeratePost(context.Context, ch.Caller, string, bool, string) error {
@@ -182,16 +182,12 @@ func (d *connectDriver) entry(e *pb.ForumEntry) ForumEntry {
 	}
 }
 
-// postEtag 回傳貼文最後一次回應的 etag；沒有記錄時以店主身分讀一次。
-func (d *connectDriver) postEtag(ctx context.Context, c ch.Caller, id string) (string, error) {
+// etagOf 回傳資源最後一次回應的 etag；沒有記錄是情境的寫法超出 driver 能代勞的範圍，回 harness 的錯誤，不送出沒有 etag 的寫入。
+func (d *connectDriver) etagOf(id string) (string, error) {
 	if v, ok := d.lookup(d.etag, id); ok {
 		return v, nil
 	}
-	if _, err := d.GetMyPost(ctx, c, id); err != nil {
-		return "", err
-	}
-	v, _ := d.lookup(d.etag, id)
-	return v, nil
+	return "", fmt.Errorf("driver 沒有記錄 %s 的 etag", id)
 }
 
 func (d *connectDriver) CreatePost(ctx context.Context, c ch.Caller, in PostInput) (Post, error) {
@@ -205,7 +201,7 @@ func (d *connectDriver) CreatePost(ctx context.Context, c ch.Caller, in PostInpu
 }
 
 func (d *connectDriver) UpdatePost(ctx context.Context, c ch.Caller, id string, in PostInput) (Post, error) {
-	etag, err := d.postEtag(ctx, c, id)
+	etag, err := d.etagOf(id)
 	if err != nil {
 		return Post{}, err
 	}
@@ -227,7 +223,7 @@ func (d *connectDriver) UpdatePost(ctx context.Context, c ch.Caller, id string, 
 }
 
 func (d *connectDriver) PublishPost(ctx context.Context, c ch.Caller, id string) error {
-	etag, err := d.postEtag(ctx, c, id)
+	etag, err := d.etagOf(id)
 	if err != nil {
 		return err
 	}
@@ -240,7 +236,7 @@ func (d *connectDriver) PublishPost(ctx context.Context, c ch.Caller, id string)
 }
 
 func (d *connectDriver) UnpublishPost(ctx context.Context, c ch.Caller, id string) error {
-	etag, err := d.postEtag(ctx, c, id)
+	etag, err := d.etagOf(id)
 	if err != nil {
 		return err
 	}
@@ -319,33 +315,28 @@ func (d *connectDriver) ListSellerPosts(ctx context.Context, c ch.Caller, seller
 	}
 	var out Page[Post]
 	token := ""
-	for i := 1; i <= page; i++ {
+	for i := 1; ; i++ {
 		items, next, err := fetch(token, size)
 		if err != nil {
 			return Page[Post]{}, err
 		}
 		if i == page {
 			out.Items = items
-			break
 		}
+		out.Total += len(items)
 		if next == "" {
 			break
 		}
 		token = next
 	}
-	all, err := collect(func(token string) ([]Post, string, error) { return fetch(token, pageSize) })
-	if err != nil {
-		return Page[Post]{}, err
-	}
-	out.Total = len(all)
 	return out, nil
 }
 
-// ToggleLike 先以呼叫者的身分讀 viewer_liked，再按讚或取消；讀不到貼文或沒有權限時，寫入那一步回出原因。
+// ToggleLike 先以呼叫者的身分讀 viewer_liked，再按讚或取消；讀不到貼文時當作沒按過，寫入那一步回出原因。
 func (d *connectDriver) ToggleLike(ctx context.Context, c ch.Caller, postID string) (bool, error) {
 	cur, err := d.GetPost(ctx, c, postID)
 	if err != nil {
-		return false, err
+		cur = Post{}
 	}
 	if cur.Liked {
 		_, err = d.of(c).app.UnlikePost(ctx, connect.NewRequest(&pb.UnlikePostRequest{PostId: postID}))
@@ -388,7 +379,10 @@ func (d *connectDriver) createComment(ctx context.Context, c ch.Caller, req *pb.
 }
 
 func (d *connectDriver) UpdateComment(ctx context.Context, c ch.Caller, id, content string) (Comment, error) {
-	etag, _ := d.lookup(d.etag, id)
+	etag, err := d.etagOf(id)
+	if err != nil {
+		return Comment{}, err
+	}
 	res, err := d.of(c).app.UpdateComment(ctx, connect.NewRequest(&pb.UpdateCommentRequest{
 		Comment:    &pb.Comment{Id: id, Etag: etag, Body: content},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"body"}},
@@ -405,23 +399,25 @@ func (d *connectDriver) DeleteComment(ctx context.Context, c ch.Caller, id strin
 	return ch.ConnectKind(err)
 }
 
-// ToggleCommentLike 先以呼叫者的身分在留言所在的列表讀 viewer_liked（讀不到時當作沒按過，由寫入那一步回出原因）。
+// ToggleCommentLike 先以呼叫者的身分在留言所在的列表讀 viewer_liked，再按讚或取消；讀不到留言是 harness 或讀取的錯誤，原樣回傳。
 func (d *connectDriver) ToggleCommentLike(ctx context.Context, c ch.Caller, id string) (bool, error) {
-	liked := false
-	if postID, ok := d.lookup(d.postOf, id); ok {
-		var list []Comment
-		var err error
-		if parent, isReply := d.lookup(d.parent, id); isReply {
-			list, err = d.listComments(ctx, c, postID, &parent)
-		} else {
-			list, err = d.listComments(ctx, c, postID, nil)
-		}
-		if err == nil {
-			if got, found := findComment(list, id); found {
-				liked = got.Liked
-			}
-		}
+	postID, ok := d.lookup(d.postOf, id)
+	if !ok {
+		return false, fmt.Errorf("driver 沒有記錄留言 %s 所屬的貼文", id)
 	}
+	var parent *string
+	if p, isReply := d.lookup(d.parent, id); isReply {
+		parent = &p
+	}
+	list, err := d.listComments(ctx, c, postID, parent)
+	if err != nil {
+		return false, err
+	}
+	got, found := findComment(list, id)
+	if !found {
+		return false, fmt.Errorf("留言 %s 不在呼叫者讀得到的列表裡", id)
+	}
+	liked := got.Liked
 	if liked {
 		_, err := d.of(c).app.UnlikeComment(ctx, connect.NewRequest(&pb.UnlikeCommentRequest{CommentId: id}))
 		return false, ch.ConnectKind(err)
@@ -493,7 +489,10 @@ func (d *connectDriver) ReplyForumEntry(ctx context.Context, c ch.Caller, id, co
 }
 
 func (d *connectDriver) UpdateForumEntry(ctx context.Context, c ch.Caller, id, content string) (ForumEntry, error) {
-	etag, _ := d.lookup(d.etag, id)
+	etag, err := d.etagOf(id)
+	if err != nil {
+		return ForumEntry{}, err
+	}
 	res, err := d.of(c).app.UpdateForumEntry(ctx, connect.NewRequest(&pb.UpdateForumEntryRequest{
 		Entry:      &pb.ForumEntry{Id: id, Etag: etag, Body: content},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"body"}},

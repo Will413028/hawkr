@@ -2,11 +2,10 @@ package characterization
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"strconv"
 	"sync/atomic"
 	"time"
+	"uuid"
 
 	ch "github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 )
@@ -90,12 +89,7 @@ func absentID(d Driver) string {
 	if d.Legacy() {
 		return "999999999999"
 	}
-	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	b[6] = b[6]&0x0f | 0x40
-	b[8] = b[8]&0x3f | 0x80
-	h := hex.EncodeToString(b)
-	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:]
+	return uuid.NewV4().String()
 }
 
 // wantOwnerDenied 確認店主專屬方法被沒有店的帳號或別家店的賣家呼叫時的錯誤。SD26：舊的回權限不足；單體依〈API 設計規範（Connect）〉
@@ -599,6 +593,12 @@ func sd2CommentsFollowPostVisibility(ctx context.Context, t ch.T, d Driver) {
 	wantNoError(t, d.PublishPost(ctx, ch.Seller, p.ID), "重新發布")
 	if !hasComment(ch.Must(t, ch.Ret(d.ListComments(ctx, ch.Anonymous, p.ID))), c.ID) {
 		t.Errorf("重新發布之後留言要讀得到")
+	}
+	if !d.Legacy() {
+		if l, ok := t.(interface{ Logf(string, ...any) }); ok {
+			l.Logf("A7-D5′：單體沒有平台隱藏貼文的 Connect 入口，只跑下架與重新發布的那一半，A7-2f 以措施的情境覆蓋")
+		}
+		return
 	}
 	wantNoError(t, d.ModeratePost(ctx, ch.Admin, p.ID, true, "SD2"), "隱藏")
 	unreadable("貼文被隱藏")
