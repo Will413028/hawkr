@@ -8,7 +8,7 @@ name: supply chain
 # 工具版本與下載雜湊都釘死在本檔；升版時兩邊一起改，且版本要發佈滿兩週（見根目錄 AGENTS.md）。
 # 已知問題的基準（新的才擋）：
 #   - govulncheck：scripts/govulncheck-allowlist.json（每筆有理由與期限）
-#   - OSV-Scanner：osv-scanner.toml 的 IgnoredVulns（每筆有理由與 ignoreUntil）
+#   - OSV-Scanner、shaded-jar-gate（shaded jar 內含的函式庫，scripts/shaded-jar-gate.py）：osv-scanner.toml 的 IgnoredVulns（每筆有理由與 ignoreUntil）
 #   - gitleaks：.gitleaks.toml（誤報放行）與 .gitleaks-baseline.json（待人工確認的歷史命中）
 #   - zizmor：.github/zizmor.yml（每條停用有理由）
 
@@ -123,6 +123,33 @@ jobs:
           "$RUNNER_TEMP/osv-scanner" scan source --recursive --no-resolve \
             --config osv-scanner.toml --format table .
 
+  shaded-jar-gate:
+    name: shaded jar 內含函式庫（OSV）
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/services/java/**/pom.xml
+      # osv-scanner 看不到被打包進別的 jar 的函式庫（grpc-netty-shaded 內含 netty 等）。
+      # 先 package 讓 reactor 內部模組可解析，再把 runtime 依賴複製出來，由腳本讀 jar 內的版本資訊查 OSV。
+      - name: 解析 Java 服務的 runtime jar
+        working-directory: backend/services/java
+        run: |
+          ./mvnw -B -q -DskipTests package dependency:copy-dependencies \
+            -DoutputDirectory="$RUNNER_TEMP/shaded-jars" -DincludeScope=runtime \
+            -DexcludeGroupIds=io.github.will413028.hawkr
+      - name: 腳本單元測試
+        run: python3 -m unittest scripts/test_shaded_jar_gate.py
+      - name: 查內含函式庫的漏洞
+        run: python3 scripts/shaded-jar-gate.py --jars "$RUNNER_TEMP/shaded-jars"
+
   gitleaks:
     name: gitleaks（完整歷史）
     runs-on: ubuntu-latest
@@ -167,7 +194,7 @@ jobs:
     # The only required check on main: it passes when every other job in this workflow succeeded or was skipped.
     name: gate (supply-chain)
     if: always()
-    needs: [go-changes, govulncheck, osv-scanner, gitleaks, zizmor]
+    needs: [go-changes, govulncheck, osv-scanner, shaded-jar-gate, gitleaks, zizmor]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
