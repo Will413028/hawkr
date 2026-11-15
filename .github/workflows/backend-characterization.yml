@@ -1,7 +1,7 @@
 name: backend characterization
 
 # 特性測試：scripts/characterize.sh <模組> 在 runner 上起單體、gateway 與搬遷中模組的舊服務，
-# 同一份情境以 REST 打舊服務、以 Connect 打單體（計畫 2026-10-18-a7-social.md A7-2v）。
+# 同一份情境以 REST 打舊服務、以 Connect 打單體。
 # 每個有 internal/httpapi/<模組>/characterization/legacy.sh 的模組一個 matrix 項，清單由第一個 job 掃檔案得出，
 # 不手抄。腳本只用 Docker 的 Postgres、Redis 與本機服務，不連外（服務以 env -i 啟動）。
 # 終點：最後一個 legacy.sh 刪除時，連同本 workflow 一起刪除。

@@ -31,6 +31,7 @@ on:
       - 'backend/buf.gen.legacy.yaml'
       - 'backend/api/proto/media/**'
       - 'backend/tests/contract/golden/event_payload_keys.json'
+      - 'backend/infra/mq/topology/topology.yaml'
       - 'api/**'
       - '.github/workflows/backend-monolith.yml'
   push:
