@@ -166,7 +166,7 @@
 
 ## 後果
 
-- 本機的付款與物流端到端在付款、物流模組搬進單體前不通：`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 與物流的 `MerId` 是空值（Stripe 的 `acct_` 不是 PayUni 商店代號）。付款改走 port 時以外部帳戶 ID 取代這個接縫；物流改綠界後恢復建店與出貨（Will 2026-10-29、2026-11-12 接受）。修訂（Will 2026-11-15）：物流不改綠界，B3 改成賣家自寄主線加模擬 adapter（單體計畫 B3），物流 `MerId` 隨 Java shipping 退場刪除。
+- 本機的付款與物流端到端在付款、物流模組搬進單體前不通：`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 與物流的 `MerId` 是空值（Stripe 的 `acct_` 不是 PayUni 商店代號）。付款改走 port 時以外部帳戶 ID 取代這個接縫；物流改綠界後恢復建店與出貨（Will 2026-10-29、2026-11-12 接受）。修訂（Will 2026-11-15）：物流不改綠界，B3 改成賣家自寄主線加模擬 adapter（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`），物流 `MerId` 隨 Java shipping 退場刪除。
 - Stripe adapter 不示範台灣情境（沒有 TWD、台灣 KYC、超商與 ATM）。決定在台灣上線時，先確認法規（代理收付）與合約，再寫台灣金流商 adapter，並重新評估兩軸 port 的設計（平台收件是否要重建自建 KYC）與收款模式。
 - live mode 的銀行帳號 fingerprint 是否跨 connected account 一致，只在測試模式驗過；上線前核對範圍，防詐比對靠它。
 - 撥款模型與手續費（代理商費反推）未決定：付款與撥款搬進 payment 時重審（B2、B10 開工）。
