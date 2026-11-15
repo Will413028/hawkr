@@ -25,7 +25,7 @@ Web金額與數量使用等寬數字功能，減少更新時的寬度變化；Ap
 - Web 沿用 `lib/theme/text-scale.ts` 的小／中／大（0.875／1／1.125），以既有 root rem 縮放；`Cart.browser.test.tsx` 另覆蓋1.4倍壓力情境。這些是現有產品偏好，不是Apple Dynamic Type級距。
 - App 沿用 `AppTextSize`、既有儲存值及 `AppMediaQueryPolicy`，不另加狀態或改變全域縮放上下限；原生系統縮放仍受現行App政策約束，本次不宣稱完整覆蓋所有iOS accessibility字級。
 - 字級調整不縮小命中區：Web次要操作至少44px、主要48px；App至少48px。較大文字可讓控制項增高或換行。
-- **三端溫層標籤共用 Web 外觀**：Web 與兩 App 統一灰／橘／藍文字、同色 1px 框線、透明圓角膠囊及 11px 預設字級；App 使用 `HkTemperatureTag(value:)`，保留文字縮放與選擇控制的 48px 命中區。Web 預設高度 18px，App 隨文字縮放增高；標籤不套用購物車正文／輔助資訊角色。依使用者要求沿用的低對比橘／藍色票，已列為 [跨平台契約](./cross-platform.md) 的 `requested-web-legacy-parity` 例外，需三端一起調整。e2e 的 `/cart` axe 掃描（`tests/e2e/helpers/axe.ts`）使用預設規則、沒有排除項目；這不代表 App 文字對比通過。
+- **三端溫層標籤共用 Web 外觀**：Web 與兩 App 統一灰／橘／藍文字、同色 1px 框線、透明圓角膠囊及 11px 預設字級；App 使用 `HkTemperatureTag(value:)`，保留文字縮放與選擇控制的 48px 命中區。Web 預設高度 18px，App 隨文字縮放增高；標籤不套用購物車正文／輔助資訊角色。依使用者要求沿用的低對比橘／藍色票，已列為 [跨平台契約](./cross-platform.md) 的 `requested-web-legacy-parity` 例外，需三端一起調整。website 的 `/cart` 頁目前不渲染溫層標籤（`rg -n -i 'temperature|溫層' features components app` 只命中配送溫層的選擇與資料欄位），所以 `/cart` 的 e2e axe 掃描（`tests/e2e/helpers/axe.ts`）沒有涵蓋標籤對比；目前沒有任何自動檢查覆蓋標籤的文字對比，該例外只記錄在 [跨平台契約](./cross-platform.md)。這也不代表 App 文字對比通過。
 
 Web角色定義在 `styles/features/cart-typography.css`，由正式購物車及抽屜載入；22px是本表明確選用的局部角色，不改foundation的共同token契約。驗證入口為 `features/cart/components/Cart.browser.test.tsx`；App為真實Flutter `component=cart`。本地測試、CI、部署及真實交易證據各自記錄。
 

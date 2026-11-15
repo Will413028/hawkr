@@ -1,6 +1,6 @@
 # 三端元件庫交付與驗證
 
-範圍為買家 App、賣家 App、主網站含賣家中心。Web 元件由各自旁的 `*.browser.test.tsx`（Vitest browser mode，CI 跑）直接渲染正式 components 驗證；兩 App 以各自 `lib/main_catalog.dart` 編譯真實 Flutter widget 成獨立目錄，在各 App 目錄用 `flutter run` 執行。
+範圍為買家 App、賣家 App、主網站含賣家中心。Web 元件由各自旁的 `*.browser.test.tsx`（Vitest browser mode，CI 跑）直接渲染正式 components 驗證；兩 App 以各自 `lib/main_catalog.dart` 編譯真實 Flutter widget 成獨立目錄，在各 App 目錄用 `bash scripts/component-catalog.sh run` 執行。
 
 ## 本次 UI 更新
 
@@ -44,8 +44,6 @@
 | Scoped TypeScript、Biome、theme-token gate | 通過 |
 | 已移除的元件預覽的 build | 成功，兩 App 的 JS Web build 加上靜態輸出 |
 
-App／三端 iframe 預覽標記 `!test`，共20個，不計入65個 React 預覽測試。它們以 Flutter tests 與實際瀏覽器驗證，不把 iframe 容器測試當成原生 widget 驗證。
-
 上表是首次本機驗證紀錄；當時尚未執行遠端 CI 或部署。完整網站 `tsc --noEmit` 原設定會掃到本機 `output/playwright` 歷史診斷檔，含已不存在的臨時路徑；當時使用已移除的獨立 tsconfig 檢查元件庫及其 imports，未改寫或刪除歷史檔案。
 
 ## 重現與維護
@@ -56,7 +54,7 @@ Web 元件行為測試是各元件旁的 `*.browser.test.tsx`（`pnpm test:brows
 
 ```sh
 pnpm install --frozen-lockfile
-# 讀 monorepo 的 buyer-app、seller-app
+# 預設只檢查 Web；加 --apps-root .. 才一併檢查 buyer-app、seller-app
 pnpm design:check --apps-root ..
 ```
 

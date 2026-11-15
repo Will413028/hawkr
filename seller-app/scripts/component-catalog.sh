@@ -18,7 +18,7 @@ case "${1:-run}" in
   build)
     shift
     exec "${catalog_flutter[@]}" build web --target lib/main_catalog.dart \
-      --output build/catalog --base-href "${CATALOG_BASE_HREF:-/flutter/seller/}" \
+      --output build/catalog --base-href "${CATALOG_BASE_HREF:-/}" \
       --no-web-resources-cdn "$@"
     ;;
   test)

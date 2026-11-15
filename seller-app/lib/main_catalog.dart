@@ -60,7 +60,6 @@ class SellerComponentCatalogApp extends StatelessWidget {
     super.key,
     this.initialComponent = 'foundations',
     this.textScale = 1,
-    this.embedded = false,
   });
 
   factory SellerComponentCatalogApp.fromUri(Uri uri) {
@@ -71,14 +70,11 @@ class SellerComponentCatalogApp extends StatelessWidget {
           ? requested!
           : 'foundations',
       textScale: scale != null && scale.isFinite ? scale.clamp(0.8, 1.4) : 1,
-      embedded: uri.queryParameters['embedded'] == 'true',
     );
   }
 
   final String initialComponent;
   final double textScale;
-  final bool embedded;
-
   @override
   Widget build(BuildContext context) => ScreenUtilInit(
     designSize: const Size(414, 896),
@@ -101,19 +97,15 @@ class SellerComponentCatalogApp extends StatelessWidget {
         ),
         child: child!,
       ),
-      home: _CatalogPage(
-        initialComponent: initialComponent,
-        embedded: embedded,
-      ),
+      home: _CatalogPage(initialComponent: initialComponent),
     ),
   );
 }
 
 class _CatalogPage extends StatefulWidget {
-  const _CatalogPage({required this.initialComponent, required this.embedded});
+  const _CatalogPage({required this.initialComponent});
 
   final String initialComponent;
-  final bool embedded;
 
   @override
   State<_CatalogPage> createState() => _CatalogPageState();
@@ -162,36 +154,34 @@ class _CatalogPageState extends State<_CatalogPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (!widget.embedded) ...[
-                    Text('Hawkr · 賣家元件庫', style: AppTypography.display),
-                    const SizedBox(height: HkSpace.sm),
-                    const Text('正式元件、固定範例資料。可切換分類並操作元件狀態。'),
-                    const SizedBox(height: HkSpace.lg),
-                    TextField(
-                      key: const ValueKey('catalog-search'),
-                      decoration: const InputDecoration(
-                        labelText: '搜尋元件',
-                        hintText: '按鈕、cards、states…',
-                      ),
-                      onChanged: (value) => setState(() => _query = value),
+                  Text('Hawkr · 賣家元件庫', style: AppTypography.display),
+                  const SizedBox(height: HkSpace.sm),
+                  const Text('正式元件、固定範例資料。可切換分類並操作元件狀態。'),
+                  const SizedBox(height: HkSpace.lg),
+                  TextField(
+                    key: const ValueKey('catalog-search'),
+                    decoration: const InputDecoration(
+                      labelText: '搜尋元件',
+                      hintText: '按鈕、cards、states…',
                     ),
-                    const SizedBox(height: HkSpace.sm),
-                    Wrap(
-                      spacing: HkSpace.sm,
-                      runSpacing: HkSpace.xs,
-                      children: [
-                        for (final entry in matches)
-                          HkChoiceChip(
-                            key: ValueKey('nav-${entry.key}'),
-                            label: entry.value,
-                            selected: _component == entry.key,
-                            onTap: () => setState(() => _component = entry.key),
-                          ),
-                      ],
-                    ),
-                    if (matches.isEmpty) const Text('沒有符合的元件，請換個關鍵字。'),
-                    const Divider(height: HkSpace.section),
-                  ],
+                    onChanged: (value) => setState(() => _query = value),
+                  ),
+                  const SizedBox(height: HkSpace.sm),
+                  Wrap(
+                    spacing: HkSpace.sm,
+                    runSpacing: HkSpace.xs,
+                    children: [
+                      for (final entry in matches)
+                        HkChoiceChip(
+                          key: ValueKey('nav-${entry.key}'),
+                          label: entry.value,
+                          selected: _component == entry.key,
+                          onTap: () => setState(() => _component = entry.key),
+                        ),
+                    ],
+                  ),
+                  if (matches.isEmpty) const Text('沒有符合的元件，請換個關鍵字。'),
+                  const Divider(height: HkSpace.section),
                   Semantics(
                     header: true,
                     child: Text(

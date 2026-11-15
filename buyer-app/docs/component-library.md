@@ -11,16 +11,13 @@ bash scripts/component-catalog.sh test
 bash scripts/component-catalog.sh build
 ```
 
-建置結果為 `build/catalog/`，預設 base href 是 `/flutter/buyer/`；整個輸出目錄需一起放置，才能保留 assets 與 CanvasKit 相對路徑。Web runtime 檔案使用本地建置資源；Flutter 的瀏覽器字型 fallback 仍由 Flutter 自身管理。
+建置結果為 `build/catalog/`，預設 base href 是 `/`（可用 `CATALOG_BASE_HREF` 覆寫）；整個輸出目錄需一起放置，才能保留 assets 與 CanvasKit 相對路徑。Web runtime 檔案使用本地建置資源；Flutter 的瀏覽器字型 fallback 仍由 Flutter 自身管理。
 
-若要用一般靜態伺服器單獨查看：
+用一般靜態伺服器查看建置結果：
 
 ```bash
-CATALOG_BASE_HREF=/ bash scripts/component-catalog.sh build
 python3 -m http.server 7357 --directory build/catalog
 ```
-
-要恢復 `/flutter/buyer/` base href 時，再執行一次預設的 `build`。
 
 共同 URL 參數與賣家元件庫一致：
 
@@ -28,9 +25,8 @@ python3 -m http.server 7357 --directory build/catalog
 | --- | --- |
 | `component` | 下表的固定分類 ID；未知值回到 `foundations` |
 | `textScale=1.4` | 放大文字；預設 `1.0`，沿用正式 App 的 `0.8–1.4` 範圍 |
-| `embedded=true` | 隱藏搜尋與分類導覽，供嵌入式 iframe 使用 |
 
-例如：`/flutter/buyer/?component=commerce&textScale=1.4&embedded=true`。分類 ID 是可分享的固定入口；目錄內點選分類與切換文字比例只改變目前預覽狀態。
+例如：`/?component=commerce&textScale=1.4`。分類 ID 是可分享的固定入口；目錄內點選分類與切換文字比例只改變目前預覽狀態。
 
 ## 已收錄正式元件
 

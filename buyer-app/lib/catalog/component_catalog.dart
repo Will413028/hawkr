@@ -36,8 +36,7 @@ import '../shared/widgets/quantity_stepper.dart';
 import '../shared/widgets/hk_brand_loader.dart';
 import '../shared/widgets/hk_skeleton_shimmer.dart';
 
-/// These IDs are also used by the seller catalog. The embedded mode currently
-/// has no consumer; it is kept for a future web publication of the catalog.
+/// These IDs are also used by the seller catalog.
 const buyerCatalogSections = <String, String>{
   'foundations': '基礎樣式',
   'buttons': '按鈕',
@@ -75,7 +74,6 @@ class BuyerComponentCatalogApp extends StatefulWidget {
 
 class _BuyerComponentCatalogAppState extends State<BuyerComponentCatalogApp> {
   SemanticsHandle? _semanticsHandle;
-  late final bool _embedded;
   late String _section;
   late double _textScale;
   late AppTextSize _textSize;
@@ -97,7 +95,6 @@ class _BuyerComponentCatalogAppState extends State<BuyerComponentCatalogApp> {
       AppMediaQueryPolicy.minTextScale,
       AppMediaQueryPolicy.maxTextScale,
     );
-    _embedded = params['embedded'] == 'true';
   }
 
   @override
@@ -133,7 +130,6 @@ class _BuyerComponentCatalogAppState extends State<BuyerComponentCatalogApp> {
               builder: (context, constraints) {
                 final wide = constraints.maxWidth >= HkBreakpoints.wide;
                 final content = _content(context);
-                if (_embedded) return content;
                 if (wide) {
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
