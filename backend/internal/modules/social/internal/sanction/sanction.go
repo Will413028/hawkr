@@ -101,9 +101,17 @@ func (s *Service) Owner(ctx context.Context, t model.Target) (model.ContentOwner
 	return model.ContentOwner{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())
 }
 
-// Snapshot 回傳內容此刻的本文、媒體參照與作者（給 moderation 在檢舉送出時凍結）：唯讀，不鎖；內容不存在或已刪除回 Exists 為假，不是錯誤。
-// 是不是公開可讀由 Owner 回答，呼叫方兩個都問。
+// Snapshot 回傳內容此刻的歸屬（存在、作者、所屬店家、是否公開可讀，同 Owner）、本文與媒體參照（給 moderation 在檢舉送出時凍結）：唯讀，不鎖；內容不存在或已刪除回
+// Exists 為假，不是錯誤。歸屬只查一次（Owner），本文與圖片另用一個查詢讀。
 func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSnapshot, error) {
+	o, err := s.Owner(ctx, t)
+	if err != nil {
+		return model.ContentSnapshot{}, err
+	}
+	if !o.Exists {
+		return model.ContentSnapshot{}, nil
+	}
+	out := model.ContentSnapshot{Exists: true, Author: o.Author, StoreID: o.StoreID, Readable: o.Readable, MediaRefs: []string{}}
 	q := s.q(ctx)
 	switch t.Kind {
 	case model.TargetComment:
@@ -114,14 +122,7 @@ func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSn
 		if err != nil {
 			return model.ContentSnapshot{}, fmt.Errorf("social：讀取留言的快照 %s：%w", t.ID, err)
 		}
-		if !r.ExistsNow {
-			return model.ContentSnapshot{}, nil
-		}
-		owner, err := s.Owner(ctx, t)
-		if err != nil {
-			return model.ContentSnapshot{}, err
-		}
-		return model.ContentSnapshot{Exists: true, Author: model.Actor{Kind: model.ActorKind(r.ActorKind), ID: r.ActorID}, StoreID: owner.StoreID, Body: deref(r.Body), MediaRefs: []string{}}, nil
+		out.Body = deref(r.Body)
 	case model.TargetForumEntry:
 		r, err := q.GetForumEntrySnapshot(ctx, t.ID)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -130,14 +131,7 @@ func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSn
 		if err != nil {
 			return model.ContentSnapshot{}, fmt.Errorf("social：讀取討論區留言的快照 %s：%w", t.ID, err)
 		}
-		if !r.ExistsNow {
-			return model.ContentSnapshot{}, nil
-		}
-		owner, err := s.Owner(ctx, t)
-		if err != nil {
-			return model.ContentSnapshot{}, err
-		}
-		return model.ContentSnapshot{Exists: true, Author: model.Actor{Kind: model.ActorKind(r.ActorKind), ID: r.ActorID}, StoreID: owner.StoreID, Body: deref(r.Body), MediaRefs: []string{}}, nil
+		out.Body = deref(r.Body)
 	case model.TargetPost:
 		r, err := q.GetPostSnapshot(ctx, t.ID)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -146,16 +140,14 @@ func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSn
 		if err != nil {
 			return model.ContentSnapshot{}, fmt.Errorf("social：讀取貼文的快照 %s：%w", t.ID, err)
 		}
-		if !r.ExistsNow {
-			return model.ContentSnapshot{}, nil
-		}
-		media := []string{}
+		out.Body = r.Body
 		if r.ImageAssetID != nil {
-			media = append(media, *r.ImageAssetID)
+			out.MediaRefs = append(out.MediaRefs, *r.ImageAssetID)
 		}
-		return model.ContentSnapshot{Exists: true, Author: model.Actor{Kind: model.ActorStore, ID: r.StoreID}, StoreID: r.StoreID, Body: r.Body, MediaRefs: media}, nil
+	default:
+		return model.ContentSnapshot{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())
 	}
-	return model.ContentSnapshot{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())
+	return out, nil
 }
 
 func deref(s *string) string {

@@ -360,7 +360,7 @@ func (m *Module) ContentOwner(ctx context.Context, t Target) (ContentOwner, erro
 	return m.sanction.Owner(ctx, t)
 }
 
-// ContentSnapshot 回傳內容此刻的本文、媒體參照與作者，給 moderation 在檢舉送出時凍結（唯讀，不鎖）；內容不存在或已刪除回 Exists 為假。
+// ContentSnapshot 回傳內容此刻的歸屬（同 ContentOwner，含是否公開可讀）、本文與媒體參照，給 moderation 在檢舉送出時凍結（唯讀，不鎖）；內容不存在或已刪除回 Exists 為假。
 func (m *Module) ContentSnapshot(ctx context.Context, t Target) (ContentSnapshot, error) {
 	return m.sanction.Snapshot(ctx, t)
 }

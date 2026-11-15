@@ -93,14 +93,14 @@ func TestContentSnapshotReturnsBodyMediaAndAuthor(t *testing.T) {
 		return mustV[social.ContentSnapshot](t)(f.module.ContentSnapshot(ctx, social.Target{Kind: k, ID: id}))
 	}
 	buyer := social.Actor{Kind: social.ActorBuyer, ID: b.BuyerID}
-	if got := snap(social.TargetComment, c.ID); !got.Exists || got.Body != "留言本文" || got.Author != buyer || got.StoreID != storeID || len(got.MediaRefs) != 0 {
+	if got := snap(social.TargetComment, c.ID); !got.Exists || got.Body != "留言本文" || got.Author != buyer || got.StoreID != storeID || !got.Readable || len(got.MediaRefs) != 0 {
 		t.Fatalf("留言 %+v", got)
 	}
 	if got := snap(social.TargetForumEntry, e.ID); !got.Exists || got.Body != "討論本文" || got.Author != buyer || got.StoreID != storeID {
 		t.Fatalf("討論區 %+v", got)
 	}
 	got := snap(social.TargetPost, p.ID)
-	if !got.Exists || got.Body != "貼文本文" || got.Author != (social.Actor{Kind: social.ActorStore, ID: storeID}) || len(got.MediaRefs) != 1 || got.MediaRefs[0] == "" {
+	if !got.Exists || got.Body != "貼文本文" || got.Author != (social.Actor{Kind: social.ActorStore, ID: storeID}) || !got.Readable || len(got.MediaRefs) != 1 || got.MediaRefs[0] == "" {
 		t.Fatalf("貼文 %+v", got)
 	}
 	must(t, f.module.DeleteComment(ctx, f.asBuyer(b), c.ID))
