@@ -164,48 +164,20 @@ service ProductService {
     // 內部 RPC（seller 模組推薦賣家 / marketplace rail 用來濾掉空店），不對前端暴露。
     // 詳見 02 §5.13c
     rpc ListStoreIDsWithPublicProductsInternal (ListStoreIDsWithPublicProductsInternalRequest) returns (ListStoreIDsWithPublicProductsInternalResponse);
-
-    // ==================== Product Import 整合（02 §9） ====================
-
-    // 驗證 category_id 為合法葉節點，回傳 cat_l1/l2 反正規化欄位
-    // 內部 RPC（x-internal-service 免身份驗證），不對前端暴露
-    // 詳見 02 §9.1
-    rpc ValidateLeafCategoryInternal (ValidateLeafCategoryInternalRequest) returns (ValidateLeafCategoryInternalResponse);
-
-    // 由 Product Import Service 在 commit 階段呼叫，將暫存 import_item 轉正為 product + product_sku
-    // 內部 RPC，與 CreateProduct 分離以維持權限邊界與審計線索清晰
-    // 詳見 02 §9.2
-    rpc CreateProductFromImportInternal (CreateProductFromImportInternalRequest) returns (CreateProductFromImportInternalResponse);
-
-    // 批次偵測商品名稱是否與賣家既有商品重複（CSV 解析 + UpdateImportItem 時呼叫）
-    // 內部 RPC
-    // 詳見 02 §9.5
-    rpc BatchCheckSellerProductNames (BatchCheckSellerProductNamesRequest) returns (BatchCheckSellerProductNamesResponse);
-
-    // 商品上架完整檢核（雙時機點 validator）；csv 路徑不能繞過任何上架規則
-    // 內部 RPC；由 ProductPublishValidator 執行
-    // 詳見 40 號設計書 §4.3a
-    rpc ValidateProductDraft (ValidateProductDraftRequest) returns (ValidateProductDraftResponse);
-
-    // batch 查多個 product 的 (id, name, status, status_label) 用於 import 端 hydrate
-    // 內部 RPC
-    // 詳見 40 號設計書 §4.3b
-    rpc GetProductsBriefInternal (GetProductsBriefInternalRequest) returns (GetProductsBriefInternalResponse);
 }
 
 // ========== 共用訊息定義 ==========
 
-// 商品圖片（支援暫存 token / 既有資產 / Import 來源三種模式）
+// 商品圖片（支援暫存 token / 既有資產兩種模式）
 message ProductImage {
     string id = 1;             // 前端排序或暫時識別用（可選）
-    string staged_token = 2;   // 新增圖片用：UploadSession → FinalizeImages 路徑（與 import_asset_id 互斥）
+    string staged_token = 2;   // 新增圖片用：UploadSession → FinalizeImages 路徑
     string asset_id = 3;       // 既有圖片用：保留/更新時使用
     // 4 = object_key（2026-08-05 移除）：前端送進來後一路傳到 ProductImageDTO，但 gallery 組裝
     // （ProductService.processImages / processImageUpdate）只認 staged_token 與 asset_id，
     // 全 repo 無任何 reader。objectKey 的 SSOT 一律由 media-service finalize 回傳。
     reserved 4;
     reserved "object_key";
-    string import_asset_id = 5;  // Import 來源：FinalizeImportAsset 路徑（02 §9.2 / §9.3，與 staged_token 互斥）
 }
 
 // 商品 SKU（對應 product_sku 表）
@@ -283,14 +255,13 @@ message DescriptionBlock {
     string style_json = 4;     // 段落級樣式 JSON（fontSize, fontWeight, alignment）
 
     // image 類型欄位
-    string staged_token = 5;   // 新增圖片用（Finalize 前；與 import_asset_id 互斥）
+    string staged_token = 5;   // 新增圖片用（Finalize 前）
     string asset_id = 6;       // 既有圖片用（Finalize 後）
     string object_key = 7;     // objectKey（SSOT；49 §6.6：服務側只填此欄）
     string url = 8;            // 顯示 URL（49 §6.1/§6.6：由 Gateway 組，服務側不填）
     string width = 9;          // 圖片寬度（數字字串）
     string height = 10;        // 圖片高度（數字字串）
     string alt = 11;           // 替代文字
-    string import_asset_id = 12; // Import 來源（02 §9.2 / §9.3，與 staged_token 互斥）
 
     // inline-run 模型欄位（02 §3.6.1）
     repeated InlineRun runs = 13; // text block 行內 runs（取代 content）
@@ -1066,167 +1037,6 @@ message ListStoreIDsWithPublicProductsInternalResponse {
     // 沒有公開商品的店**不出現**在此列表 —— 呼叫端據此把空店排除，
     // 「查不到」與「回空集合」語意不同：RPC 失敗時呼叫端一律 fail-open 不過濾。
     repeated string store_ids = 3;
-}
-
-// ============================================================================
-// Product Import 整合（02 §9）
-// ============================================================================
-
-// ========== ValidateLeafCategoryInternal（02 §9.1） ==========
-
-message ValidateLeafCategoryInternalRequest {
-    string category_id = 1;                  // 葉節點候選 id（數字字串）
-}
-
-message ValidateLeafCategoryInternalResponse {
-    int32 code = 1;
-    string message = 2;
-    bool is_valid = 3;
-    string cat_l3_id = 4;
-    string cat_l3_name = 5;
-    string cat_l2_id = 6;
-    string cat_l2_name = 7;
-    string cat_l1_id = 8;
-    string cat_l1_name = 9;
-    string invalid_reason = 10;              // NOT_FOUND / NOT_LEAF / DISABLED
-}
-
-// ========== CreateProductFromImportInternal（02 §9.2） ==========
-
-// Import 來源的商品圖片（用 import_asset_id 取代 staged_token）
-message ProductImageImport {
-    string import_asset_id = 1;              // Media import_asset.id (UUID)
-    int32 sort_order = 2;
-}
-
-// Import 來源的 SKU（重用既有 SKU 結構但無 sku_id）
-message ProductSkuImport {
-    string sku_name = 1;
-    string price = 2;
-    string sale_price = 3;
-    string stock_qty = 4;
-    string weight = 5;
-    string unit = 6;
-    string length_cm = 7;
-    string width_cm = 8;
-    string height_cm = 9;
-    repeated ShippingMethod shipping_methods = 10;
-}
-
-message CreateProductFromImportInternalRequest {
-    string idempotency_key = 1;             // 由 Import 端組：import:{itemId}:rev:{revision}
-    int64 store_id = 2;                     // 賣家 store 代理鍵（Import Service 上下文已驗證）
-    string import_job_id = 3;               // 純記錄，寫入 product 表審計欄位
-    string import_item_id = 4;
-    string name = 5;
-    string category_id = 6;
-    ProductDescription description = 7;
-    repeated ProductImageImport images = 8;          // 用 import_asset_id 取代 staged_token
-    string origin = 9;
-    repeated Certification certifications = 10;
-    string target_status = 11;              // ACTIVE | DRAFT | PENDING_REVIEW
-    repeated ProductSkuImport skus = 12;
-    repeated string hashtags = 13;
-}
-
-message CreateProductFromImportInternalResponse {
-    int32 code = 1;
-    string message = 2;
-    string product_id = 3;                  // 數字字串
-    string idempotency_status = 4;          // CREATED | DUPLICATED
-}
-
-// ========== BatchCheckSellerProductNames（02 §9.5） ==========
-
-message BatchCheckSellerProductNamesRequest {
-    int64 store_id = 1;                     // 賣家 store_id（由呼叫端 product-import-service 解析後傳入，內部 RPC 免身份驗證）
-    repeated string names = 2;                // 上限 500，超過拋 INVALID_ARGUMENT
-}
-
-message BatchCheckSellerProductNamesResponse {
-    int32 code = 1;
-    string message = 2;
-    repeated ExistingProductByName existing = 3;  // 只回該賣家既有的 product；不存在不出現
-}
-
-message ExistingProductByName {
-    string name = 1;
-    string product_id = 2;                    // 第一筆碰到的 product.id
-    string status = 3;                        // 既有商品的 ProductStatus value
-}
-
-// ========== ValidateProductDraft（40 號 §4.3a） ==========
-
-message ValidateProductDraftRequest {
-    int64 store_id = 1;   // 賣家 store_id（由呼叫端 product-import-service 解析後傳入，內部 RPC 免身份驗證）
-    ProductDraft draft = 2;
-    // 上下文 hint：不同時機點 validator 對 ASSET_NOT_READY 等規則放寬程度不同
-    enum ValidationContext {
-        UNSPECIFIED = 0;
-        CSV_PARSE = 1;          // §5.2 場景
-        IMPORT_UPDATE = 2;      // §5.5 場景
-        IMPORT_COMMIT = 3;      // §5.7 場景
-        PUBLISH = 4;            // 正常商品上架 / 編輯
-    }
-    ValidationContext context = 3;
-}
-
-message ProductDraft {
-    string name = 1;
-    string category_id = 2;
-    string origin = 3;
-    repeated GalleryItem gallery = 4;
-    repeated ProductSkuImport skus = 5;        // reuse import sku 結構
-    repeated Certification certifications = 6;
-    repeated string hashtags = 7;
-    bytes description_json = 8;                 // HTML→JSON 後的 blocks
-    string target_status = 9;
-}
-
-message ValidateProductDraftResponse {
-    int32 code = 1;
-    string message = 2;
-    repeated DraftViolation violations = 3;
-    bool has_blocking_error = 4;
-}
-
-message DraftViolation {
-    string field = 1;                           // 對應 product_import_item_error.field
-    string code = 2;                            // 對應 error_type
-    string severity = 3;                        // ERROR | WARNING
-    string message = 4;                         // 已翻譯中文
-    string raw_value = 5;
-}
-
-// ========== GetProductsBriefInternal（40 號 §4.3b） ==========
-
-message GetProductsBriefInternalRequest {
-    repeated string product_ids = 1;            // 上限 200
-    int64 caller_store_id = 2;                  // 審計 log 用（account_id 命名債正名，Phase 2 Task 16 review 補漏——
-                                                 // 唯一呼叫端 product-import-service 傳入的一律是 store_id，非登入 account_id；
-                                                 // 原設計文件把本欄位歸類進「audit 用途排除」，但排除規則指的是「值本身就是
-                                                 // 登入 account_id」的 created_by/caller_account_id 這類欄位，本欄位的值語意
-                                                 // 其實跟 owner_store_id 一樣，只是「audit 用途」跟「值是 store_id」兩者不衝突）
-}
-
-message GetProductsBriefInternalResponse {
-    int32 code = 1;
-    string message = 2;
-    repeated ProductBriefInternal records = 3;  // 查不到的 id 不出現
-}
-
-message ProductBriefInternal {
-    string product_id = 1;
-    string name = 2;
-    string status = 3;                          // ProductStatus enum value（4001~4004，只答「能不能賣」）
-    string status_label = 4;                    // 上述 status 的中文標籤
-    // ProductPublicationState（4011~4014），與 status 正交：status 答「能不能賣」、
-    // 本欄答「曾不曾公開／還在不在」。4014 REMOVED = 已軟刪。
-    //
-    // 🔴 為什麼不是把 4014 塞進 status（#2819）：ProductStatus 只有 4001~4004，硬塞會讓
-    // ProductStatus.isValidValue 判 false ⇒ status_label 變空字串，用新 bug 換舊 bug。
-    // 底層查詢因此改用不濾 deleted_at 的版本，軟刪商品**會**出現在結果集。
-    string publication_state = 5;
 }
 
 // ==========================================================================

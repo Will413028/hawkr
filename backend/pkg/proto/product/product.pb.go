@@ -116,69 +116,12 @@ func (HashtagSearchMode) EnumDescriptor() ([]byte, []int) {
 	return file_product_product_proto_rawDescGZIP(), []int{1}
 }
 
-// 上下文 hint：不同時機點 validator 對 ASSET_NOT_READY 等規則放寬程度不同
-type ValidateProductDraftRequest_ValidationContext int32
-
-const (
-	ValidateProductDraftRequest_UNSPECIFIED   ValidateProductDraftRequest_ValidationContext = 0
-	ValidateProductDraftRequest_CSV_PARSE     ValidateProductDraftRequest_ValidationContext = 1 // §5.2 場景
-	ValidateProductDraftRequest_IMPORT_UPDATE ValidateProductDraftRequest_ValidationContext = 2 // §5.5 場景
-	ValidateProductDraftRequest_IMPORT_COMMIT ValidateProductDraftRequest_ValidationContext = 3 // §5.7 場景
-	ValidateProductDraftRequest_PUBLISH       ValidateProductDraftRequest_ValidationContext = 4 // 正常商品上架 / 編輯
-)
-
-// Enum value maps for ValidateProductDraftRequest_ValidationContext.
-var (
-	ValidateProductDraftRequest_ValidationContext_name = map[int32]string{
-		0: "UNSPECIFIED",
-		1: "CSV_PARSE",
-		2: "IMPORT_UPDATE",
-		3: "IMPORT_COMMIT",
-		4: "PUBLISH",
-	}
-	ValidateProductDraftRequest_ValidationContext_value = map[string]int32{
-		"UNSPECIFIED":   0,
-		"CSV_PARSE":     1,
-		"IMPORT_UPDATE": 2,
-		"IMPORT_COMMIT": 3,
-		"PUBLISH":       4,
-	}
-)
-
-func (x ValidateProductDraftRequest_ValidationContext) Enum() *ValidateProductDraftRequest_ValidationContext {
-	p := new(ValidateProductDraftRequest_ValidationContext)
-	*p = x
-	return p
-}
-
-func (x ValidateProductDraftRequest_ValidationContext) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (ValidateProductDraftRequest_ValidationContext) Descriptor() protoreflect.EnumDescriptor {
-	return file_product_product_proto_enumTypes[2].Descriptor()
-}
-
-func (ValidateProductDraftRequest_ValidationContext) Type() protoreflect.EnumType {
-	return &file_product_product_proto_enumTypes[2]
-}
-
-func (x ValidateProductDraftRequest_ValidationContext) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use ValidateProductDraftRequest_ValidationContext.Descriptor instead.
-func (ValidateProductDraftRequest_ValidationContext) EnumDescriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{94, 0}
-}
-
-// 商品圖片（支援暫存 token / 既有資產 / Import 來源三種模式）
+// 商品圖片（支援暫存 token / 既有資產兩種模式）
 type ProductImage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                              // 前端排序或暫時識別用（可選）
-	StagedToken   string                 `protobuf:"bytes,2,opt,name=staged_token,json=stagedToken,proto3" json:"staged_token,omitempty"`         // 新增圖片用：UploadSession → FinalizeImages 路徑（與 import_asset_id 互斥）
-	AssetId       string                 `protobuf:"bytes,3,opt,name=asset_id,json=assetId,proto3" json:"asset_id,omitempty"`                     // 既有圖片用：保留/更新時使用
-	ImportAssetId string                 `protobuf:"bytes,5,opt,name=import_asset_id,json=importAssetId,proto3" json:"import_asset_id,omitempty"` // Import 來源：FinalizeImportAsset 路徑（02 §9.2 / §9.3，與 staged_token 互斥）
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                      // 前端排序或暫時識別用（可選）
+	StagedToken   string                 `protobuf:"bytes,2,opt,name=staged_token,json=stagedToken,proto3" json:"staged_token,omitempty"` // 新增圖片用：UploadSession → FinalizeImages 路徑
+	AssetId       string                 `protobuf:"bytes,3,opt,name=asset_id,json=assetId,proto3" json:"asset_id,omitempty"`             // 既有圖片用：保留/更新時使用
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -230,13 +173,6 @@ func (x *ProductImage) GetStagedToken() string {
 func (x *ProductImage) GetAssetId() string {
 	if x != nil {
 		return x.AssetId
-	}
-	return ""
-}
-
-func (x *ProductImage) GetImportAssetId() string {
-	if x != nil {
-		return x.ImportAssetId
 	}
 	return ""
 }
@@ -719,14 +655,13 @@ type DescriptionBlock struct {
 	Content   string `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`                      // legacy 純文字（唯讀相容；backfill 後 reserved，新寫入用 runs）
 	StyleJson string `protobuf:"bytes,4,opt,name=style_json,json=styleJson,proto3" json:"style_json,omitempty"` // 段落級樣式 JSON（fontSize, fontWeight, alignment）
 	// image 類型欄位
-	StagedToken   string `protobuf:"bytes,5,opt,name=staged_token,json=stagedToken,proto3" json:"staged_token,omitempty"`          // 新增圖片用（Finalize 前；與 import_asset_id 互斥）
-	AssetId       string `protobuf:"bytes,6,opt,name=asset_id,json=assetId,proto3" json:"asset_id,omitempty"`                      // 既有圖片用（Finalize 後）
-	ObjectKey     string `protobuf:"bytes,7,opt,name=object_key,json=objectKey,proto3" json:"object_key,omitempty"`                // objectKey（SSOT；49 §6.6：服務側只填此欄）
-	Url           string `protobuf:"bytes,8,opt,name=url,proto3" json:"url,omitempty"`                                             // 顯示 URL（49 §6.1/§6.6：由 Gateway 組，服務側不填）
-	Width         string `protobuf:"bytes,9,opt,name=width,proto3" json:"width,omitempty"`                                         // 圖片寬度（數字字串）
-	Height        string `protobuf:"bytes,10,opt,name=height,proto3" json:"height,omitempty"`                                      // 圖片高度（數字字串）
-	Alt           string `protobuf:"bytes,11,opt,name=alt,proto3" json:"alt,omitempty"`                                            // 替代文字
-	ImportAssetId string `protobuf:"bytes,12,opt,name=import_asset_id,json=importAssetId,proto3" json:"import_asset_id,omitempty"` // Import 來源（02 §9.2 / §9.3，與 staged_token 互斥）
+	StagedToken string `protobuf:"bytes,5,opt,name=staged_token,json=stagedToken,proto3" json:"staged_token,omitempty"` // 新增圖片用（Finalize 前）
+	AssetId     string `protobuf:"bytes,6,opt,name=asset_id,json=assetId,proto3" json:"asset_id,omitempty"`             // 既有圖片用（Finalize 後）
+	ObjectKey   string `protobuf:"bytes,7,opt,name=object_key,json=objectKey,proto3" json:"object_key,omitempty"`       // objectKey（SSOT；49 §6.6：服務側只填此欄）
+	Url         string `protobuf:"bytes,8,opt,name=url,proto3" json:"url,omitempty"`                                    // 顯示 URL（49 §6.1/§6.6：由 Gateway 組，服務側不填）
+	Width       string `protobuf:"bytes,9,opt,name=width,proto3" json:"width,omitempty"`                                // 圖片寬度（數字字串）
+	Height      string `protobuf:"bytes,10,opt,name=height,proto3" json:"height,omitempty"`                             // 圖片高度（數字字串）
+	Alt         string `protobuf:"bytes,11,opt,name=alt,proto3" json:"alt,omitempty"`                                   // 替代文字
 	// inline-run 模型欄位（02 §3.6.1）
 	Runs          []*InlineRun `protobuf:"bytes,13,rep,name=runs,proto3" json:"runs,omitempty"`                            // text block 行內 runs（取代 content）
 	TableJson     string       `protobuf:"bytes,14,opt,name=table_json,json=tableJson,proto3" json:"table_json,omitempty"` // table block 資料（cells 內含 runs 的 JSON 字串，後端 opaque）
@@ -838,13 +773,6 @@ func (x *DescriptionBlock) GetHeight() string {
 func (x *DescriptionBlock) GetAlt() string {
 	if x != nil {
 		return x.Alt
-	}
-	return ""
-}
-
-func (x *DescriptionBlock) GetImportAssetId() string {
-	if x != nil {
-		return x.ImportAssetId
 	}
 	return ""
 }
@@ -6713,1222 +6641,6 @@ func (x *ListStoreIDsWithPublicProductsInternalResponse) GetStoreIds() []string 
 	return nil
 }
 
-type ValidateLeafCategoryInternalRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CategoryId    string                 `protobuf:"bytes,1,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"` // 葉節點候選 id（數字字串）
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ValidateLeafCategoryInternalRequest) Reset() {
-	*x = ValidateLeafCategoryInternalRequest{}
-	mi := &file_product_product_proto_msgTypes[85]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ValidateLeafCategoryInternalRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ValidateLeafCategoryInternalRequest) ProtoMessage() {}
-
-func (x *ValidateLeafCategoryInternalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[85]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ValidateLeafCategoryInternalRequest.ProtoReflect.Descriptor instead.
-func (*ValidateLeafCategoryInternalRequest) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{85}
-}
-
-func (x *ValidateLeafCategoryInternalRequest) GetCategoryId() string {
-	if x != nil {
-		return x.CategoryId
-	}
-	return ""
-}
-
-type ValidateLeafCategoryInternalResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	IsValid       bool                   `protobuf:"varint,3,opt,name=is_valid,json=isValid,proto3" json:"is_valid,omitempty"`
-	CatL3Id       string                 `protobuf:"bytes,4,opt,name=cat_l3_id,json=catL3Id,proto3" json:"cat_l3_id,omitempty"`
-	CatL3Name     string                 `protobuf:"bytes,5,opt,name=cat_l3_name,json=catL3Name,proto3" json:"cat_l3_name,omitempty"`
-	CatL2Id       string                 `protobuf:"bytes,6,opt,name=cat_l2_id,json=catL2Id,proto3" json:"cat_l2_id,omitempty"`
-	CatL2Name     string                 `protobuf:"bytes,7,opt,name=cat_l2_name,json=catL2Name,proto3" json:"cat_l2_name,omitempty"`
-	CatL1Id       string                 `protobuf:"bytes,8,opt,name=cat_l1_id,json=catL1Id,proto3" json:"cat_l1_id,omitempty"`
-	CatL1Name     string                 `protobuf:"bytes,9,opt,name=cat_l1_name,json=catL1Name,proto3" json:"cat_l1_name,omitempty"`
-	InvalidReason string                 `protobuf:"bytes,10,opt,name=invalid_reason,json=invalidReason,proto3" json:"invalid_reason,omitempty"` // NOT_FOUND / NOT_LEAF / DISABLED
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ValidateLeafCategoryInternalResponse) Reset() {
-	*x = ValidateLeafCategoryInternalResponse{}
-	mi := &file_product_product_proto_msgTypes[86]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ValidateLeafCategoryInternalResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ValidateLeafCategoryInternalResponse) ProtoMessage() {}
-
-func (x *ValidateLeafCategoryInternalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[86]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ValidateLeafCategoryInternalResponse.ProtoReflect.Descriptor instead.
-func (*ValidateLeafCategoryInternalResponse) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{86}
-}
-
-func (x *ValidateLeafCategoryInternalResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *ValidateLeafCategoryInternalResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *ValidateLeafCategoryInternalResponse) GetIsValid() bool {
-	if x != nil {
-		return x.IsValid
-	}
-	return false
-}
-
-func (x *ValidateLeafCategoryInternalResponse) GetCatL3Id() string {
-	if x != nil {
-		return x.CatL3Id
-	}
-	return ""
-}
-
-func (x *ValidateLeafCategoryInternalResponse) GetCatL3Name() string {
-	if x != nil {
-		return x.CatL3Name
-	}
-	return ""
-}
-
-func (x *ValidateLeafCategoryInternalResponse) GetCatL2Id() string {
-	if x != nil {
-		return x.CatL2Id
-	}
-	return ""
-}
-
-func (x *ValidateLeafCategoryInternalResponse) GetCatL2Name() string {
-	if x != nil {
-		return x.CatL2Name
-	}
-	return ""
-}
-
-func (x *ValidateLeafCategoryInternalResponse) GetCatL1Id() string {
-	if x != nil {
-		return x.CatL1Id
-	}
-	return ""
-}
-
-func (x *ValidateLeafCategoryInternalResponse) GetCatL1Name() string {
-	if x != nil {
-		return x.CatL1Name
-	}
-	return ""
-}
-
-func (x *ValidateLeafCategoryInternalResponse) GetInvalidReason() string {
-	if x != nil {
-		return x.InvalidReason
-	}
-	return ""
-}
-
-// Import 來源的商品圖片（用 import_asset_id 取代 staged_token）
-type ProductImageImport struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ImportAssetId string                 `protobuf:"bytes,1,opt,name=import_asset_id,json=importAssetId,proto3" json:"import_asset_id,omitempty"` // Media import_asset.id (UUID)
-	SortOrder     int32                  `protobuf:"varint,2,opt,name=sort_order,json=sortOrder,proto3" json:"sort_order,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ProductImageImport) Reset() {
-	*x = ProductImageImport{}
-	mi := &file_product_product_proto_msgTypes[87]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ProductImageImport) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProductImageImport) ProtoMessage() {}
-
-func (x *ProductImageImport) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[87]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProductImageImport.ProtoReflect.Descriptor instead.
-func (*ProductImageImport) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{87}
-}
-
-func (x *ProductImageImport) GetImportAssetId() string {
-	if x != nil {
-		return x.ImportAssetId
-	}
-	return ""
-}
-
-func (x *ProductImageImport) GetSortOrder() int32 {
-	if x != nil {
-		return x.SortOrder
-	}
-	return 0
-}
-
-// Import 來源的 SKU（重用既有 SKU 結構但無 sku_id）
-type ProductSkuImport struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	SkuName         string                 `protobuf:"bytes,1,opt,name=sku_name,json=skuName,proto3" json:"sku_name,omitempty"`
-	Price           string                 `protobuf:"bytes,2,opt,name=price,proto3" json:"price,omitempty"`
-	SalePrice       string                 `protobuf:"bytes,3,opt,name=sale_price,json=salePrice,proto3" json:"sale_price,omitempty"`
-	StockQty        string                 `protobuf:"bytes,4,opt,name=stock_qty,json=stockQty,proto3" json:"stock_qty,omitempty"`
-	Weight          string                 `protobuf:"bytes,5,opt,name=weight,proto3" json:"weight,omitempty"`
-	Unit            string                 `protobuf:"bytes,6,opt,name=unit,proto3" json:"unit,omitempty"`
-	LengthCm        string                 `protobuf:"bytes,7,opt,name=length_cm,json=lengthCm,proto3" json:"length_cm,omitempty"`
-	WidthCm         string                 `protobuf:"bytes,8,opt,name=width_cm,json=widthCm,proto3" json:"width_cm,omitempty"`
-	HeightCm        string                 `protobuf:"bytes,9,opt,name=height_cm,json=heightCm,proto3" json:"height_cm,omitempty"`
-	ShippingMethods []*ShippingMethod      `protobuf:"bytes,10,rep,name=shipping_methods,json=shippingMethods,proto3" json:"shipping_methods,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
-}
-
-func (x *ProductSkuImport) Reset() {
-	*x = ProductSkuImport{}
-	mi := &file_product_product_proto_msgTypes[88]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ProductSkuImport) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProductSkuImport) ProtoMessage() {}
-
-func (x *ProductSkuImport) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[88]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProductSkuImport.ProtoReflect.Descriptor instead.
-func (*ProductSkuImport) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{88}
-}
-
-func (x *ProductSkuImport) GetSkuName() string {
-	if x != nil {
-		return x.SkuName
-	}
-	return ""
-}
-
-func (x *ProductSkuImport) GetPrice() string {
-	if x != nil {
-		return x.Price
-	}
-	return ""
-}
-
-func (x *ProductSkuImport) GetSalePrice() string {
-	if x != nil {
-		return x.SalePrice
-	}
-	return ""
-}
-
-func (x *ProductSkuImport) GetStockQty() string {
-	if x != nil {
-		return x.StockQty
-	}
-	return ""
-}
-
-func (x *ProductSkuImport) GetWeight() string {
-	if x != nil {
-		return x.Weight
-	}
-	return ""
-}
-
-func (x *ProductSkuImport) GetUnit() string {
-	if x != nil {
-		return x.Unit
-	}
-	return ""
-}
-
-func (x *ProductSkuImport) GetLengthCm() string {
-	if x != nil {
-		return x.LengthCm
-	}
-	return ""
-}
-
-func (x *ProductSkuImport) GetWidthCm() string {
-	if x != nil {
-		return x.WidthCm
-	}
-	return ""
-}
-
-func (x *ProductSkuImport) GetHeightCm() string {
-	if x != nil {
-		return x.HeightCm
-	}
-	return ""
-}
-
-func (x *ProductSkuImport) GetShippingMethods() []*ShippingMethod {
-	if x != nil {
-		return x.ShippingMethods
-	}
-	return nil
-}
-
-type CreateProductFromImportInternalRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	IdempotencyKey string                 `protobuf:"bytes,1,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"` // 由 Import 端組：import:{itemId}:rev:{revision}
-	StoreId        int64                  `protobuf:"varint,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`                     // 賣家 store 代理鍵（Import Service 上下文已驗證）
-	ImportJobId    string                 `protobuf:"bytes,3,opt,name=import_job_id,json=importJobId,proto3" json:"import_job_id,omitempty"`        // 純記錄，寫入 product 表審計欄位
-	ImportItemId   string                 `protobuf:"bytes,4,opt,name=import_item_id,json=importItemId,proto3" json:"import_item_id,omitempty"`
-	Name           string                 `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
-	CategoryId     string                 `protobuf:"bytes,6,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
-	Description    *ProductDescription    `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
-	Images         []*ProductImageImport  `protobuf:"bytes,8,rep,name=images,proto3" json:"images,omitempty"` // 用 import_asset_id 取代 staged_token
-	Origin         string                 `protobuf:"bytes,9,opt,name=origin,proto3" json:"origin,omitempty"`
-	Certifications []*Certification       `protobuf:"bytes,10,rep,name=certifications,proto3" json:"certifications,omitempty"`
-	TargetStatus   string                 `protobuf:"bytes,11,opt,name=target_status,json=targetStatus,proto3" json:"target_status,omitempty"` // ACTIVE | DRAFT | PENDING_REVIEW
-	Skus           []*ProductSkuImport    `protobuf:"bytes,12,rep,name=skus,proto3" json:"skus,omitempty"`
-	Hashtags       []string               `protobuf:"bytes,13,rep,name=hashtags,proto3" json:"hashtags,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *CreateProductFromImportInternalRequest) Reset() {
-	*x = CreateProductFromImportInternalRequest{}
-	mi := &file_product_product_proto_msgTypes[89]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CreateProductFromImportInternalRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CreateProductFromImportInternalRequest) ProtoMessage() {}
-
-func (x *CreateProductFromImportInternalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[89]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CreateProductFromImportInternalRequest.ProtoReflect.Descriptor instead.
-func (*CreateProductFromImportInternalRequest) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{89}
-}
-
-func (x *CreateProductFromImportInternalRequest) GetIdempotencyKey() string {
-	if x != nil {
-		return x.IdempotencyKey
-	}
-	return ""
-}
-
-func (x *CreateProductFromImportInternalRequest) GetStoreId() int64 {
-	if x != nil {
-		return x.StoreId
-	}
-	return 0
-}
-
-func (x *CreateProductFromImportInternalRequest) GetImportJobId() string {
-	if x != nil {
-		return x.ImportJobId
-	}
-	return ""
-}
-
-func (x *CreateProductFromImportInternalRequest) GetImportItemId() string {
-	if x != nil {
-		return x.ImportItemId
-	}
-	return ""
-}
-
-func (x *CreateProductFromImportInternalRequest) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *CreateProductFromImportInternalRequest) GetCategoryId() string {
-	if x != nil {
-		return x.CategoryId
-	}
-	return ""
-}
-
-func (x *CreateProductFromImportInternalRequest) GetDescription() *ProductDescription {
-	if x != nil {
-		return x.Description
-	}
-	return nil
-}
-
-func (x *CreateProductFromImportInternalRequest) GetImages() []*ProductImageImport {
-	if x != nil {
-		return x.Images
-	}
-	return nil
-}
-
-func (x *CreateProductFromImportInternalRequest) GetOrigin() string {
-	if x != nil {
-		return x.Origin
-	}
-	return ""
-}
-
-func (x *CreateProductFromImportInternalRequest) GetCertifications() []*Certification {
-	if x != nil {
-		return x.Certifications
-	}
-	return nil
-}
-
-func (x *CreateProductFromImportInternalRequest) GetTargetStatus() string {
-	if x != nil {
-		return x.TargetStatus
-	}
-	return ""
-}
-
-func (x *CreateProductFromImportInternalRequest) GetSkus() []*ProductSkuImport {
-	if x != nil {
-		return x.Skus
-	}
-	return nil
-}
-
-func (x *CreateProductFromImportInternalRequest) GetHashtags() []string {
-	if x != nil {
-		return x.Hashtags
-	}
-	return nil
-}
-
-type CreateProductFromImportInternalResponse struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Code              int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message           string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	ProductId         string                 `protobuf:"bytes,3,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`                         // 數字字串
-	IdempotencyStatus string                 `protobuf:"bytes,4,opt,name=idempotency_status,json=idempotencyStatus,proto3" json:"idempotency_status,omitempty"` // CREATED | DUPLICATED
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
-}
-
-func (x *CreateProductFromImportInternalResponse) Reset() {
-	*x = CreateProductFromImportInternalResponse{}
-	mi := &file_product_product_proto_msgTypes[90]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CreateProductFromImportInternalResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CreateProductFromImportInternalResponse) ProtoMessage() {}
-
-func (x *CreateProductFromImportInternalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[90]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CreateProductFromImportInternalResponse.ProtoReflect.Descriptor instead.
-func (*CreateProductFromImportInternalResponse) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{90}
-}
-
-func (x *CreateProductFromImportInternalResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *CreateProductFromImportInternalResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *CreateProductFromImportInternalResponse) GetProductId() string {
-	if x != nil {
-		return x.ProductId
-	}
-	return ""
-}
-
-func (x *CreateProductFromImportInternalResponse) GetIdempotencyStatus() string {
-	if x != nil {
-		return x.IdempotencyStatus
-	}
-	return ""
-}
-
-type BatchCheckSellerProductNamesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	StoreId       int64                  `protobuf:"varint,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"` // 賣家 store_id（由呼叫端 product-import-service 解析後傳入，內部 RPC 免身份驗證）
-	Names         []string               `protobuf:"bytes,2,rep,name=names,proto3" json:"names,omitempty"`                     // 上限 500，超過拋 INVALID_ARGUMENT
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BatchCheckSellerProductNamesRequest) Reset() {
-	*x = BatchCheckSellerProductNamesRequest{}
-	mi := &file_product_product_proto_msgTypes[91]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BatchCheckSellerProductNamesRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BatchCheckSellerProductNamesRequest) ProtoMessage() {}
-
-func (x *BatchCheckSellerProductNamesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[91]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BatchCheckSellerProductNamesRequest.ProtoReflect.Descriptor instead.
-func (*BatchCheckSellerProductNamesRequest) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{91}
-}
-
-func (x *BatchCheckSellerProductNamesRequest) GetStoreId() int64 {
-	if x != nil {
-		return x.StoreId
-	}
-	return 0
-}
-
-func (x *BatchCheckSellerProductNamesRequest) GetNames() []string {
-	if x != nil {
-		return x.Names
-	}
-	return nil
-}
-
-type BatchCheckSellerProductNamesResponse struct {
-	state         protoimpl.MessageState   `protogen:"open.v1"`
-	Code          int32                    `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string                   `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Existing      []*ExistingProductByName `protobuf:"bytes,3,rep,name=existing,proto3" json:"existing,omitempty"` // 只回該賣家既有的 product；不存在不出現
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BatchCheckSellerProductNamesResponse) Reset() {
-	*x = BatchCheckSellerProductNamesResponse{}
-	mi := &file_product_product_proto_msgTypes[92]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BatchCheckSellerProductNamesResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BatchCheckSellerProductNamesResponse) ProtoMessage() {}
-
-func (x *BatchCheckSellerProductNamesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[92]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BatchCheckSellerProductNamesResponse.ProtoReflect.Descriptor instead.
-func (*BatchCheckSellerProductNamesResponse) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{92}
-}
-
-func (x *BatchCheckSellerProductNamesResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *BatchCheckSellerProductNamesResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *BatchCheckSellerProductNamesResponse) GetExisting() []*ExistingProductByName {
-	if x != nil {
-		return x.Existing
-	}
-	return nil
-}
-
-type ExistingProductByName struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	ProductId     string                 `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 第一筆碰到的 product.id
-	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`                        // 既有商品的 ProductStatus value
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ExistingProductByName) Reset() {
-	*x = ExistingProductByName{}
-	mi := &file_product_product_proto_msgTypes[93]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ExistingProductByName) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ExistingProductByName) ProtoMessage() {}
-
-func (x *ExistingProductByName) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[93]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ExistingProductByName.ProtoReflect.Descriptor instead.
-func (*ExistingProductByName) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{93}
-}
-
-func (x *ExistingProductByName) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *ExistingProductByName) GetProductId() string {
-	if x != nil {
-		return x.ProductId
-	}
-	return ""
-}
-
-func (x *ExistingProductByName) GetStatus() string {
-	if x != nil {
-		return x.Status
-	}
-	return ""
-}
-
-type ValidateProductDraftRequest struct {
-	state         protoimpl.MessageState                        `protogen:"open.v1"`
-	StoreId       int64                                         `protobuf:"varint,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"` // 賣家 store_id（由呼叫端 product-import-service 解析後傳入，內部 RPC 免身份驗證）
-	Draft         *ProductDraft                                 `protobuf:"bytes,2,opt,name=draft,proto3" json:"draft,omitempty"`
-	Context       ValidateProductDraftRequest_ValidationContext `protobuf:"varint,3,opt,name=context,proto3,enum=hawkr.product.ValidateProductDraftRequest_ValidationContext" json:"context,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ValidateProductDraftRequest) Reset() {
-	*x = ValidateProductDraftRequest{}
-	mi := &file_product_product_proto_msgTypes[94]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ValidateProductDraftRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ValidateProductDraftRequest) ProtoMessage() {}
-
-func (x *ValidateProductDraftRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[94]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ValidateProductDraftRequest.ProtoReflect.Descriptor instead.
-func (*ValidateProductDraftRequest) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{94}
-}
-
-func (x *ValidateProductDraftRequest) GetStoreId() int64 {
-	if x != nil {
-		return x.StoreId
-	}
-	return 0
-}
-
-func (x *ValidateProductDraftRequest) GetDraft() *ProductDraft {
-	if x != nil {
-		return x.Draft
-	}
-	return nil
-}
-
-func (x *ValidateProductDraftRequest) GetContext() ValidateProductDraftRequest_ValidationContext {
-	if x != nil {
-		return x.Context
-	}
-	return ValidateProductDraftRequest_UNSPECIFIED
-}
-
-type ProductDraft struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Name            string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	CategoryId      string                 `protobuf:"bytes,2,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
-	Origin          string                 `protobuf:"bytes,3,opt,name=origin,proto3" json:"origin,omitempty"`
-	Gallery         []*GalleryItem         `protobuf:"bytes,4,rep,name=gallery,proto3" json:"gallery,omitempty"`
-	Skus            []*ProductSkuImport    `protobuf:"bytes,5,rep,name=skus,proto3" json:"skus,omitempty"` // reuse import sku 結構
-	Certifications  []*Certification       `protobuf:"bytes,6,rep,name=certifications,proto3" json:"certifications,omitempty"`
-	Hashtags        []string               `protobuf:"bytes,7,rep,name=hashtags,proto3" json:"hashtags,omitempty"`
-	DescriptionJson []byte                 `protobuf:"bytes,8,opt,name=description_json,json=descriptionJson,proto3" json:"description_json,omitempty"` // HTML→JSON 後的 blocks
-	TargetStatus    string                 `protobuf:"bytes,9,opt,name=target_status,json=targetStatus,proto3" json:"target_status,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
-}
-
-func (x *ProductDraft) Reset() {
-	*x = ProductDraft{}
-	mi := &file_product_product_proto_msgTypes[95]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ProductDraft) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProductDraft) ProtoMessage() {}
-
-func (x *ProductDraft) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[95]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProductDraft.ProtoReflect.Descriptor instead.
-func (*ProductDraft) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{95}
-}
-
-func (x *ProductDraft) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *ProductDraft) GetCategoryId() string {
-	if x != nil {
-		return x.CategoryId
-	}
-	return ""
-}
-
-func (x *ProductDraft) GetOrigin() string {
-	if x != nil {
-		return x.Origin
-	}
-	return ""
-}
-
-func (x *ProductDraft) GetGallery() []*GalleryItem {
-	if x != nil {
-		return x.Gallery
-	}
-	return nil
-}
-
-func (x *ProductDraft) GetSkus() []*ProductSkuImport {
-	if x != nil {
-		return x.Skus
-	}
-	return nil
-}
-
-func (x *ProductDraft) GetCertifications() []*Certification {
-	if x != nil {
-		return x.Certifications
-	}
-	return nil
-}
-
-func (x *ProductDraft) GetHashtags() []string {
-	if x != nil {
-		return x.Hashtags
-	}
-	return nil
-}
-
-func (x *ProductDraft) GetDescriptionJson() []byte {
-	if x != nil {
-		return x.DescriptionJson
-	}
-	return nil
-}
-
-func (x *ProductDraft) GetTargetStatus() string {
-	if x != nil {
-		return x.TargetStatus
-	}
-	return ""
-}
-
-type ValidateProductDraftResponse struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Code             int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message          string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Violations       []*DraftViolation      `protobuf:"bytes,3,rep,name=violations,proto3" json:"violations,omitempty"`
-	HasBlockingError bool                   `protobuf:"varint,4,opt,name=has_blocking_error,json=hasBlockingError,proto3" json:"has_blocking_error,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
-}
-
-func (x *ValidateProductDraftResponse) Reset() {
-	*x = ValidateProductDraftResponse{}
-	mi := &file_product_product_proto_msgTypes[96]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ValidateProductDraftResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ValidateProductDraftResponse) ProtoMessage() {}
-
-func (x *ValidateProductDraftResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[96]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ValidateProductDraftResponse.ProtoReflect.Descriptor instead.
-func (*ValidateProductDraftResponse) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{96}
-}
-
-func (x *ValidateProductDraftResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *ValidateProductDraftResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *ValidateProductDraftResponse) GetViolations() []*DraftViolation {
-	if x != nil {
-		return x.Violations
-	}
-	return nil
-}
-
-func (x *ValidateProductDraftResponse) GetHasBlockingError() bool {
-	if x != nil {
-		return x.HasBlockingError
-	}
-	return false
-}
-
-type DraftViolation struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Field         string                 `protobuf:"bytes,1,opt,name=field,proto3" json:"field,omitempty"`       // 對應 product_import_item_error.field
-	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`         // 對應 error_type
-	Severity      string                 `protobuf:"bytes,3,opt,name=severity,proto3" json:"severity,omitempty"` // ERROR | WARNING
-	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`   // 已翻譯中文
-	RawValue      string                 `protobuf:"bytes,5,opt,name=raw_value,json=rawValue,proto3" json:"raw_value,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DraftViolation) Reset() {
-	*x = DraftViolation{}
-	mi := &file_product_product_proto_msgTypes[97]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DraftViolation) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DraftViolation) ProtoMessage() {}
-
-func (x *DraftViolation) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[97]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DraftViolation.ProtoReflect.Descriptor instead.
-func (*DraftViolation) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{97}
-}
-
-func (x *DraftViolation) GetField() string {
-	if x != nil {
-		return x.Field
-	}
-	return ""
-}
-
-func (x *DraftViolation) GetCode() string {
-	if x != nil {
-		return x.Code
-	}
-	return ""
-}
-
-func (x *DraftViolation) GetSeverity() string {
-	if x != nil {
-		return x.Severity
-	}
-	return ""
-}
-
-func (x *DraftViolation) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *DraftViolation) GetRawValue() string {
-	if x != nil {
-		return x.RawValue
-	}
-	return ""
-}
-
-type GetProductsBriefInternalRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProductIds    []string               `protobuf:"bytes,1,rep,name=product_ids,json=productIds,proto3" json:"product_ids,omitempty"`             // 上限 200
-	CallerStoreId int64                  `protobuf:"varint,2,opt,name=caller_store_id,json=callerStoreId,proto3" json:"caller_store_id,omitempty"` // 審計 log 用（account_id 命名債正名，Phase 2 Task 16 review 補漏——
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetProductsBriefInternalRequest) Reset() {
-	*x = GetProductsBriefInternalRequest{}
-	mi := &file_product_product_proto_msgTypes[98]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetProductsBriefInternalRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetProductsBriefInternalRequest) ProtoMessage() {}
-
-func (x *GetProductsBriefInternalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[98]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetProductsBriefInternalRequest.ProtoReflect.Descriptor instead.
-func (*GetProductsBriefInternalRequest) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{98}
-}
-
-func (x *GetProductsBriefInternalRequest) GetProductIds() []string {
-	if x != nil {
-		return x.ProductIds
-	}
-	return nil
-}
-
-func (x *GetProductsBriefInternalRequest) GetCallerStoreId() int64 {
-	if x != nil {
-		return x.CallerStoreId
-	}
-	return 0
-}
-
-type GetProductsBriefInternalResponse struct {
-	state         protoimpl.MessageState  `protogen:"open.v1"`
-	Code          int32                   `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string                  `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Records       []*ProductBriefInternal `protobuf:"bytes,3,rep,name=records,proto3" json:"records,omitempty"` // 查不到的 id 不出現
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetProductsBriefInternalResponse) Reset() {
-	*x = GetProductsBriefInternalResponse{}
-	mi := &file_product_product_proto_msgTypes[99]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetProductsBriefInternalResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetProductsBriefInternalResponse) ProtoMessage() {}
-
-func (x *GetProductsBriefInternalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[99]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetProductsBriefInternalResponse.ProtoReflect.Descriptor instead.
-func (*GetProductsBriefInternalResponse) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{99}
-}
-
-func (x *GetProductsBriefInternalResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *GetProductsBriefInternalResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *GetProductsBriefInternalResponse) GetRecords() []*ProductBriefInternal {
-	if x != nil {
-		return x.Records
-	}
-	return nil
-}
-
-type ProductBriefInternal struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	ProductId   string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
-	Name        string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Status      string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`                              // ProductStatus enum value（4001~4004，只答「能不能賣」）
-	StatusLabel string                 `protobuf:"bytes,4,opt,name=status_label,json=statusLabel,proto3" json:"status_label,omitempty"` // 上述 status 的中文標籤
-	// ProductPublicationState（4011~4014），與 status 正交：status 答「能不能賣」、
-	// 本欄答「曾不曾公開／還在不在」。4014 REMOVED = 已軟刪。
-	//
-	// 🔴 為什麼不是把 4014 塞進 status（#2819）：ProductStatus 只有 4001~4004，硬塞會讓
-	// ProductStatus.isValidValue 判 false ⇒ status_label 變空字串，用新 bug 換舊 bug。
-	// 底層查詢因此改用不濾 deleted_at 的版本，軟刪商品**會**出現在結果集。
-	PublicationState string `protobuf:"bytes,5,opt,name=publication_state,json=publicationState,proto3" json:"publication_state,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
-}
-
-func (x *ProductBriefInternal) Reset() {
-	*x = ProductBriefInternal{}
-	mi := &file_product_product_proto_msgTypes[100]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ProductBriefInternal) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProductBriefInternal) ProtoMessage() {}
-
-func (x *ProductBriefInternal) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[100]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProductBriefInternal.ProtoReflect.Descriptor instead.
-func (*ProductBriefInternal) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{100}
-}
-
-func (x *ProductBriefInternal) GetProductId() string {
-	if x != nil {
-		return x.ProductId
-	}
-	return ""
-}
-
-func (x *ProductBriefInternal) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *ProductBriefInternal) GetStatus() string {
-	if x != nil {
-		return x.Status
-	}
-	return ""
-}
-
-func (x *ProductBriefInternal) GetStatusLabel() string {
-	if x != nil {
-		return x.StatusLabel
-	}
-	return ""
-}
-
-func (x *ProductBriefInternal) GetPublicationState() string {
-	if x != nil {
-		return x.PublicationState
-	}
-	return ""
-}
-
 type ProductCertificationApplication struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	Id                   string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"` // TSID，字串
@@ -7973,7 +6685,7 @@ type ProductCertificationApplication struct {
 
 func (x *ProductCertificationApplication) Reset() {
 	*x = ProductCertificationApplication{}
-	mi := &file_product_product_proto_msgTypes[101]
+	mi := &file_product_product_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7985,7 +6697,7 @@ func (x *ProductCertificationApplication) String() string {
 func (*ProductCertificationApplication) ProtoMessage() {}
 
 func (x *ProductCertificationApplication) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[101]
+	mi := &file_product_product_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7998,7 +6710,7 @@ func (x *ProductCertificationApplication) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProductCertificationApplication.ProtoReflect.Descriptor instead.
 func (*ProductCertificationApplication) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{101}
+	return file_product_product_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *ProductCertificationApplication) GetId() string {
@@ -8169,7 +6881,7 @@ type ProductCertificationSummary struct {
 
 func (x *ProductCertificationSummary) Reset() {
 	*x = ProductCertificationSummary{}
-	mi := &file_product_product_proto_msgTypes[102]
+	mi := &file_product_product_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8181,7 +6893,7 @@ func (x *ProductCertificationSummary) String() string {
 func (*ProductCertificationSummary) ProtoMessage() {}
 
 func (x *ProductCertificationSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[102]
+	mi := &file_product_product_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8194,7 +6906,7 @@ func (x *ProductCertificationSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProductCertificationSummary.ProtoReflect.Descriptor instead.
 func (*ProductCertificationSummary) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{102}
+	return file_product_product_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *ProductCertificationSummary) GetId() string {
@@ -8260,7 +6972,7 @@ type GovVerifyResult struct {
 
 func (x *GovVerifyResult) Reset() {
 	*x = GovVerifyResult{}
-	mi := &file_product_product_proto_msgTypes[103]
+	mi := &file_product_product_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8272,7 +6984,7 @@ func (x *GovVerifyResult) String() string {
 func (*GovVerifyResult) ProtoMessage() {}
 
 func (x *GovVerifyResult) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[103]
+	mi := &file_product_product_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8285,7 +6997,7 @@ func (x *GovVerifyResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GovVerifyResult.ProtoReflect.Descriptor instead.
 func (*GovVerifyResult) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{103}
+	return file_product_product_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *GovVerifyResult) GetCertType() string {
@@ -8402,7 +7114,7 @@ type ProductCertificationReviewEvent struct {
 
 func (x *ProductCertificationReviewEvent) Reset() {
 	*x = ProductCertificationReviewEvent{}
-	mi := &file_product_product_proto_msgTypes[104]
+	mi := &file_product_product_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8414,7 +7126,7 @@ func (x *ProductCertificationReviewEvent) String() string {
 func (*ProductCertificationReviewEvent) ProtoMessage() {}
 
 func (x *ProductCertificationReviewEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[104]
+	mi := &file_product_product_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8427,7 +7139,7 @@ func (x *ProductCertificationReviewEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProductCertificationReviewEvent.ProtoReflect.Descriptor instead.
 func (*ProductCertificationReviewEvent) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{104}
+	return file_product_product_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *ProductCertificationReviewEvent) GetId() string {
@@ -8549,7 +7261,7 @@ type SubmitProductCertificationRequest struct {
 
 func (x *SubmitProductCertificationRequest) Reset() {
 	*x = SubmitProductCertificationRequest{}
-	mi := &file_product_product_proto_msgTypes[105]
+	mi := &file_product_product_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8561,7 +7273,7 @@ func (x *SubmitProductCertificationRequest) String() string {
 func (*SubmitProductCertificationRequest) ProtoMessage() {}
 
 func (x *SubmitProductCertificationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[105]
+	mi := &file_product_product_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8574,7 +7286,7 @@ func (x *SubmitProductCertificationRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use SubmitProductCertificationRequest.ProtoReflect.Descriptor instead.
 func (*SubmitProductCertificationRequest) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{105}
+	return file_product_product_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *SubmitProductCertificationRequest) GetProductId() string {
@@ -8633,7 +7345,7 @@ type ListProductCertificationApplicationsRequest struct {
 
 func (x *ListProductCertificationApplicationsRequest) Reset() {
 	*x = ListProductCertificationApplicationsRequest{}
-	mi := &file_product_product_proto_msgTypes[106]
+	mi := &file_product_product_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8645,7 +7357,7 @@ func (x *ListProductCertificationApplicationsRequest) String() string {
 func (*ListProductCertificationApplicationsRequest) ProtoMessage() {}
 
 func (x *ListProductCertificationApplicationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[106]
+	mi := &file_product_product_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8658,7 +7370,7 @@ func (x *ListProductCertificationApplicationsRequest) ProtoReflect() protoreflec
 
 // Deprecated: Use ListProductCertificationApplicationsRequest.ProtoReflect.Descriptor instead.
 func (*ListProductCertificationApplicationsRequest) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{106}
+	return file_product_product_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *ListProductCertificationApplicationsRequest) GetProductId() string {
@@ -8717,7 +7429,7 @@ type ListProductCertificationApplicationsResponse struct {
 
 func (x *ListProductCertificationApplicationsResponse) Reset() {
 	*x = ListProductCertificationApplicationsResponse{}
-	mi := &file_product_product_proto_msgTypes[107]
+	mi := &file_product_product_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8729,7 +7441,7 @@ func (x *ListProductCertificationApplicationsResponse) String() string {
 func (*ListProductCertificationApplicationsResponse) ProtoMessage() {}
 
 func (x *ListProductCertificationApplicationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[107]
+	mi := &file_product_product_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8742,7 +7454,7 @@ func (x *ListProductCertificationApplicationsResponse) ProtoReflect() protorefle
 
 // Deprecated: Use ListProductCertificationApplicationsResponse.ProtoReflect.Descriptor instead.
 func (*ListProductCertificationApplicationsResponse) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{107}
+	return file_product_product_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *ListProductCertificationApplicationsResponse) GetCode() int32 {
@@ -8801,7 +7513,7 @@ type WithdrawProductCertificationRequest struct {
 
 func (x *WithdrawProductCertificationRequest) Reset() {
 	*x = WithdrawProductCertificationRequest{}
-	mi := &file_product_product_proto_msgTypes[108]
+	mi := &file_product_product_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8813,7 +7525,7 @@ func (x *WithdrawProductCertificationRequest) String() string {
 func (*WithdrawProductCertificationRequest) ProtoMessage() {}
 
 func (x *WithdrawProductCertificationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[108]
+	mi := &file_product_product_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8826,7 +7538,7 @@ func (x *WithdrawProductCertificationRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use WithdrawProductCertificationRequest.ProtoReflect.Descriptor instead.
 func (*WithdrawProductCertificationRequest) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{108}
+	return file_product_product_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *WithdrawProductCertificationRequest) GetProductId() string {
@@ -8882,7 +7594,7 @@ type ProductCertificationApplicationResponse struct {
 
 func (x *ProductCertificationApplicationResponse) Reset() {
 	*x = ProductCertificationApplicationResponse{}
-	mi := &file_product_product_proto_msgTypes[109]
+	mi := &file_product_product_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8894,7 +7606,7 @@ func (x *ProductCertificationApplicationResponse) String() string {
 func (*ProductCertificationApplicationResponse) ProtoMessage() {}
 
 func (x *ProductCertificationApplicationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[109]
+	mi := &file_product_product_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8907,7 +7619,7 @@ func (x *ProductCertificationApplicationResponse) ProtoReflect() protoreflect.Me
 
 // Deprecated: Use ProductCertificationApplicationResponse.ProtoReflect.Descriptor instead.
 func (*ProductCertificationApplicationResponse) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{109}
+	return file_product_product_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *ProductCertificationApplicationResponse) GetCode() int32 {
@@ -8941,7 +7653,7 @@ type GetProductCertificationApplicationForAdminRequest struct {
 
 func (x *GetProductCertificationApplicationForAdminRequest) Reset() {
 	*x = GetProductCertificationApplicationForAdminRequest{}
-	mi := &file_product_product_proto_msgTypes[110]
+	mi := &file_product_product_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8953,7 +7665,7 @@ func (x *GetProductCertificationApplicationForAdminRequest) String() string {
 func (*GetProductCertificationApplicationForAdminRequest) ProtoMessage() {}
 
 func (x *GetProductCertificationApplicationForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[110]
+	mi := &file_product_product_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8966,7 +7678,7 @@ func (x *GetProductCertificationApplicationForAdminRequest) ProtoReflect() proto
 
 // Deprecated: Use GetProductCertificationApplicationForAdminRequest.ProtoReflect.Descriptor instead.
 func (*GetProductCertificationApplicationForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{110}
+	return file_product_product_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *GetProductCertificationApplicationForAdminRequest) GetApplicationId() string {
@@ -9000,7 +7712,7 @@ type ListProductCertificationApplicationsForAdminRequest struct {
 
 func (x *ListProductCertificationApplicationsForAdminRequest) Reset() {
 	*x = ListProductCertificationApplicationsForAdminRequest{}
-	mi := &file_product_product_proto_msgTypes[111]
+	mi := &file_product_product_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9012,7 +7724,7 @@ func (x *ListProductCertificationApplicationsForAdminRequest) String() string {
 func (*ListProductCertificationApplicationsForAdminRequest) ProtoMessage() {}
 
 func (x *ListProductCertificationApplicationsForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[111]
+	mi := &file_product_product_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9025,7 +7737,7 @@ func (x *ListProductCertificationApplicationsForAdminRequest) ProtoReflect() pro
 
 // Deprecated: Use ListProductCertificationApplicationsForAdminRequest.ProtoReflect.Descriptor instead.
 func (*ListProductCertificationApplicationsForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{111}
+	return file_product_product_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *ListProductCertificationApplicationsForAdminRequest) GetStatus() string {
@@ -9105,7 +7817,7 @@ type ListProductCertificationApplicationsForAdminResponse struct {
 
 func (x *ListProductCertificationApplicationsForAdminResponse) Reset() {
 	*x = ListProductCertificationApplicationsForAdminResponse{}
-	mi := &file_product_product_proto_msgTypes[112]
+	mi := &file_product_product_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9117,7 +7829,7 @@ func (x *ListProductCertificationApplicationsForAdminResponse) String() string {
 func (*ListProductCertificationApplicationsForAdminResponse) ProtoMessage() {}
 
 func (x *ListProductCertificationApplicationsForAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[112]
+	mi := &file_product_product_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9130,7 +7842,7 @@ func (x *ListProductCertificationApplicationsForAdminResponse) ProtoReflect() pr
 
 // Deprecated: Use ListProductCertificationApplicationsForAdminResponse.ProtoReflect.Descriptor instead.
 func (*ListProductCertificationApplicationsForAdminResponse) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{112}
+	return file_product_product_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *ListProductCertificationApplicationsForAdminResponse) GetCode() int32 {
@@ -9187,7 +7899,7 @@ type ListProductCertificationAuditLogsForAdminRequest struct {
 
 func (x *ListProductCertificationAuditLogsForAdminRequest) Reset() {
 	*x = ListProductCertificationAuditLogsForAdminRequest{}
-	mi := &file_product_product_proto_msgTypes[113]
+	mi := &file_product_product_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9199,7 +7911,7 @@ func (x *ListProductCertificationAuditLogsForAdminRequest) String() string {
 func (*ListProductCertificationAuditLogsForAdminRequest) ProtoMessage() {}
 
 func (x *ListProductCertificationAuditLogsForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[113]
+	mi := &file_product_product_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9212,7 +7924,7 @@ func (x *ListProductCertificationAuditLogsForAdminRequest) ProtoReflect() protor
 
 // Deprecated: Use ListProductCertificationAuditLogsForAdminRequest.ProtoReflect.Descriptor instead.
 func (*ListProductCertificationAuditLogsForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{113}
+	return file_product_product_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *ListProductCertificationAuditLogsForAdminRequest) GetApplicationId() string {
@@ -9257,7 +7969,7 @@ type ListProductCertificationAuditLogsForAdminResponse struct {
 
 func (x *ListProductCertificationAuditLogsForAdminResponse) Reset() {
 	*x = ListProductCertificationAuditLogsForAdminResponse{}
-	mi := &file_product_product_proto_msgTypes[114]
+	mi := &file_product_product_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9269,7 +7981,7 @@ func (x *ListProductCertificationAuditLogsForAdminResponse) String() string {
 func (*ListProductCertificationAuditLogsForAdminResponse) ProtoMessage() {}
 
 func (x *ListProductCertificationAuditLogsForAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[114]
+	mi := &file_product_product_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9282,7 +7994,7 @@ func (x *ListProductCertificationAuditLogsForAdminResponse) ProtoReflect() proto
 
 // Deprecated: Use ListProductCertificationAuditLogsForAdminResponse.ProtoReflect.Descriptor instead.
 func (*ListProductCertificationAuditLogsForAdminResponse) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{114}
+	return file_product_product_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *ListProductCertificationAuditLogsForAdminResponse) GetCode() int32 {
@@ -9338,7 +8050,7 @@ type ProductCertificationApplicationAdminResponse struct {
 
 func (x *ProductCertificationApplicationAdminResponse) Reset() {
 	*x = ProductCertificationApplicationAdminResponse{}
-	mi := &file_product_product_proto_msgTypes[115]
+	mi := &file_product_product_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9350,7 +8062,7 @@ func (x *ProductCertificationApplicationAdminResponse) String() string {
 func (*ProductCertificationApplicationAdminResponse) ProtoMessage() {}
 
 func (x *ProductCertificationApplicationAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[115]
+	mi := &file_product_product_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9363,7 +8075,7 @@ func (x *ProductCertificationApplicationAdminResponse) ProtoReflect() protorefle
 
 // Deprecated: Use ProductCertificationApplicationAdminResponse.ProtoReflect.Descriptor instead.
 func (*ProductCertificationApplicationAdminResponse) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{115}
+	return file_product_product_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *ProductCertificationApplicationAdminResponse) GetCode() int32 {
@@ -9403,7 +8115,7 @@ type ReviewProductCertificationForAdminRequest struct {
 
 func (x *ReviewProductCertificationForAdminRequest) Reset() {
 	*x = ReviewProductCertificationForAdminRequest{}
-	mi := &file_product_product_proto_msgTypes[116]
+	mi := &file_product_product_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9415,7 +8127,7 @@ func (x *ReviewProductCertificationForAdminRequest) String() string {
 func (*ReviewProductCertificationForAdminRequest) ProtoMessage() {}
 
 func (x *ReviewProductCertificationForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[116]
+	mi := &file_product_product_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9428,7 +8140,7 @@ func (x *ReviewProductCertificationForAdminRequest) ProtoReflect() protoreflect.
 
 // Deprecated: Use ReviewProductCertificationForAdminRequest.ProtoReflect.Descriptor instead.
 func (*ReviewProductCertificationForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{116}
+	return file_product_product_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *ReviewProductCertificationForAdminRequest) GetApplicationId() string {
@@ -9492,7 +8204,7 @@ type ReverifyProductCertificationForAdminRequest struct {
 
 func (x *ReverifyProductCertificationForAdminRequest) Reset() {
 	*x = ReverifyProductCertificationForAdminRequest{}
-	mi := &file_product_product_proto_msgTypes[117]
+	mi := &file_product_product_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9504,7 +8216,7 @@ func (x *ReverifyProductCertificationForAdminRequest) String() string {
 func (*ReverifyProductCertificationForAdminRequest) ProtoMessage() {}
 
 func (x *ReverifyProductCertificationForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[117]
+	mi := &file_product_product_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9517,7 +8229,7 @@ func (x *ReverifyProductCertificationForAdminRequest) ProtoReflect() protoreflec
 
 // Deprecated: Use ReverifyProductCertificationForAdminRequest.ProtoReflect.Descriptor instead.
 func (*ReverifyProductCertificationForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{117}
+	return file_product_product_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *ReverifyProductCertificationForAdminRequest) GetApplicationId() string {
@@ -9554,7 +8266,7 @@ type CertificationWarning struct {
 
 func (x *CertificationWarning) Reset() {
 	*x = CertificationWarning{}
-	mi := &file_product_product_proto_msgTypes[118]
+	mi := &file_product_product_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9566,7 +8278,7 @@ func (x *CertificationWarning) String() string {
 func (*CertificationWarning) ProtoMessage() {}
 
 func (x *CertificationWarning) ProtoReflect() protoreflect.Message {
-	mi := &file_product_product_proto_msgTypes[118]
+	mi := &file_product_product_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9579,7 +8291,7 @@ func (x *CertificationWarning) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CertificationWarning.ProtoReflect.Descriptor instead.
 func (*CertificationWarning) Descriptor() ([]byte, []int) {
-	return file_product_product_proto_rawDescGZIP(), []int{118}
+	return file_product_product_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *CertificationWarning) GetCertificationType() string {
@@ -9614,12 +8326,11 @@ var File_product_product_proto protoreflect.FileDescriptor
 
 const file_product_product_proto_rawDesc = "" +
 	"\n" +
-	"\x15product/product.proto\x12\rhawkr.product\x1a\x17common/delegation.proto\"\x96\x01\n" +
+	"\x15product/product.proto\x12\rhawkr.product\x1a\x17common/delegation.proto\"n\n" +
 	"\fProductImage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fstaged_token\x18\x02 \x01(\tR\vstagedToken\x12\x19\n" +
-	"\basset_id\x18\x03 \x01(\tR\aassetId\x12&\n" +
-	"\x0fimport_asset_id\x18\x05 \x01(\tR\rimportAssetIdJ\x04\b\x04\x10\x05R\n" +
+	"\basset_id\x18\x03 \x01(\tR\aassetIdJ\x04\b\x04\x10\x05R\n" +
 	"object_key\"\x99\x03\n" +
 	"\n" +
 	"ProductSku\x12\x0e\n" +
@@ -9660,7 +8371,7 @@ const file_product_product_proto_rawDesc = "" +
 	"\x06italic\x18\x03 \x01(\bR\x06italic\x12\x1c\n" +
 	"\tunderline\x18\x04 \x01(\bR\tunderline\x12\x14\n" +
 	"\x05color\x18\x05 \x01(\tR\x05color\x12\x12\n" +
-	"\x04href\x18\x06 \x01(\tR\x04href\"\xb0\x03\n" +
+	"\x04href\x18\x06 \x01(\tR\x04href\"\x88\x03\n" +
 	"\x10DescriptionBlock\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x18\n" +
@@ -9675,8 +8386,7 @@ const file_product_product_proto_rawDesc = "" +
 	"\x05width\x18\t \x01(\tR\x05width\x12\x16\n" +
 	"\x06height\x18\n" +
 	" \x01(\tR\x06height\x12\x10\n" +
-	"\x03alt\x18\v \x01(\tR\x03alt\x12&\n" +
-	"\x0fimport_asset_id\x18\f \x01(\tR\rimportAssetId\x12,\n" +
+	"\x03alt\x18\v \x01(\tR\x03alt\x12,\n" +
 	"\x04runs\x18\r \x03(\v2\x18.hawkr.product.InlineRunR\x04runs\x12\x1d\n" +
 	"\n" +
 	"table_json\x18\x0e \x01(\tR\ttableJson\x12\x1b\n" +
@@ -10206,122 +8916,7 @@ const file_product_product_proto_rawDesc = "" +
 	".ListStoreIDsWithPublicProductsInternalResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1b\n" +
-	"\tstore_ids\x18\x03 \x03(\tR\bstoreIds\"F\n" +
-	"#ValidateLeafCategoryInternalRequest\x12\x1f\n" +
-	"\vcategory_id\x18\x01 \x01(\tR\n" +
-	"categoryId\"\xca\x02\n" +
-	"$ValidateLeafCategoryInternalResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12\x19\n" +
-	"\bis_valid\x18\x03 \x01(\bR\aisValid\x12\x1a\n" +
-	"\tcat_l3_id\x18\x04 \x01(\tR\acatL3Id\x12\x1e\n" +
-	"\vcat_l3_name\x18\x05 \x01(\tR\tcatL3Name\x12\x1a\n" +
-	"\tcat_l2_id\x18\x06 \x01(\tR\acatL2Id\x12\x1e\n" +
-	"\vcat_l2_name\x18\a \x01(\tR\tcatL2Name\x12\x1a\n" +
-	"\tcat_l1_id\x18\b \x01(\tR\acatL1Id\x12\x1e\n" +
-	"\vcat_l1_name\x18\t \x01(\tR\tcatL1Name\x12%\n" +
-	"\x0einvalid_reason\x18\n" +
-	" \x01(\tR\rinvalidReason\"[\n" +
-	"\x12ProductImageImport\x12&\n" +
-	"\x0fimport_asset_id\x18\x01 \x01(\tR\rimportAssetId\x12\x1d\n" +
-	"\n" +
-	"sort_order\x18\x02 \x01(\x05R\tsortOrder\"\xca\x02\n" +
-	"\x10ProductSkuImport\x12\x19\n" +
-	"\bsku_name\x18\x01 \x01(\tR\askuName\x12\x14\n" +
-	"\x05price\x18\x02 \x01(\tR\x05price\x12\x1d\n" +
-	"\n" +
-	"sale_price\x18\x03 \x01(\tR\tsalePrice\x12\x1b\n" +
-	"\tstock_qty\x18\x04 \x01(\tR\bstockQty\x12\x16\n" +
-	"\x06weight\x18\x05 \x01(\tR\x06weight\x12\x12\n" +
-	"\x04unit\x18\x06 \x01(\tR\x04unit\x12\x1b\n" +
-	"\tlength_cm\x18\a \x01(\tR\blengthCm\x12\x19\n" +
-	"\bwidth_cm\x18\b \x01(\tR\awidthCm\x12\x1b\n" +
-	"\theight_cm\x18\t \x01(\tR\bheightCm\x12H\n" +
-	"\x10shipping_methods\x18\n" +
-	" \x03(\v2\x1d.hawkr.product.ShippingMethodR\x0fshippingMethods\"\xbf\x04\n" +
-	"&CreateProductFromImportInternalRequest\x12'\n" +
-	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x19\n" +
-	"\bstore_id\x18\x02 \x01(\x03R\astoreId\x12\"\n" +
-	"\rimport_job_id\x18\x03 \x01(\tR\vimportJobId\x12$\n" +
-	"\x0eimport_item_id\x18\x04 \x01(\tR\fimportItemId\x12\x12\n" +
-	"\x04name\x18\x05 \x01(\tR\x04name\x12\x1f\n" +
-	"\vcategory_id\x18\x06 \x01(\tR\n" +
-	"categoryId\x12C\n" +
-	"\vdescription\x18\a \x01(\v2!.hawkr.product.ProductDescriptionR\vdescription\x129\n" +
-	"\x06images\x18\b \x03(\v2!.hawkr.product.ProductImageImportR\x06images\x12\x16\n" +
-	"\x06origin\x18\t \x01(\tR\x06origin\x12D\n" +
-	"\x0ecertifications\x18\n" +
-	" \x03(\v2\x1c.hawkr.product.CertificationR\x0ecertifications\x12#\n" +
-	"\rtarget_status\x18\v \x01(\tR\ftargetStatus\x123\n" +
-	"\x04skus\x18\f \x03(\v2\x1f.hawkr.product.ProductSkuImportR\x04skus\x12\x1a\n" +
-	"\bhashtags\x18\r \x03(\tR\bhashtags\"\xa5\x01\n" +
-	"'CreateProductFromImportInternalResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1d\n" +
-	"\n" +
-	"product_id\x18\x03 \x01(\tR\tproductId\x12-\n" +
-	"\x12idempotency_status\x18\x04 \x01(\tR\x11idempotencyStatus\"V\n" +
-	"#BatchCheckSellerProductNamesRequest\x12\x19\n" +
-	"\bstore_id\x18\x01 \x01(\x03R\astoreId\x12\x14\n" +
-	"\x05names\x18\x02 \x03(\tR\x05names\"\x96\x01\n" +
-	"$BatchCheckSellerProductNamesResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12@\n" +
-	"\bexisting\x18\x03 \x03(\v2$.hawkr.product.ExistingProductByNameR\bexisting\"b\n" +
-	"\x15ExistingProductByName\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1d\n" +
-	"\n" +
-	"product_id\x18\x02 \x01(\tR\tproductId\x12\x16\n" +
-	"\x06status\x18\x03 \x01(\tR\x06status\"\xab\x02\n" +
-	"\x1bValidateProductDraftRequest\x12\x19\n" +
-	"\bstore_id\x18\x01 \x01(\x03R\astoreId\x121\n" +
-	"\x05draft\x18\x02 \x01(\v2\x1b.hawkr.product.ProductDraftR\x05draft\x12V\n" +
-	"\acontext\x18\x03 \x01(\x0e2<.hawkr.product.ValidateProductDraftRequest.ValidationContextR\acontext\"f\n" +
-	"\x11ValidationContext\x12\x0f\n" +
-	"\vUNSPECIFIED\x10\x00\x12\r\n" +
-	"\tCSV_PARSE\x10\x01\x12\x11\n" +
-	"\rIMPORT_UPDATE\x10\x02\x12\x11\n" +
-	"\rIMPORT_COMMIT\x10\x03\x12\v\n" +
-	"\aPUBLISH\x10\x04\"\xf8\x02\n" +
-	"\fProductDraft\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1f\n" +
-	"\vcategory_id\x18\x02 \x01(\tR\n" +
-	"categoryId\x12\x16\n" +
-	"\x06origin\x18\x03 \x01(\tR\x06origin\x124\n" +
-	"\agallery\x18\x04 \x03(\v2\x1a.hawkr.product.GalleryItemR\agallery\x123\n" +
-	"\x04skus\x18\x05 \x03(\v2\x1f.hawkr.product.ProductSkuImportR\x04skus\x12D\n" +
-	"\x0ecertifications\x18\x06 \x03(\v2\x1c.hawkr.product.CertificationR\x0ecertifications\x12\x1a\n" +
-	"\bhashtags\x18\a \x03(\tR\bhashtags\x12)\n" +
-	"\x10description_json\x18\b \x01(\fR\x0fdescriptionJson\x12#\n" +
-	"\rtarget_status\x18\t \x01(\tR\ftargetStatus\"\xb9\x01\n" +
-	"\x1cValidateProductDraftResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12=\n" +
-	"\n" +
-	"violations\x18\x03 \x03(\v2\x1d.hawkr.product.DraftViolationR\n" +
-	"violations\x12,\n" +
-	"\x12has_blocking_error\x18\x04 \x01(\bR\x10hasBlockingError\"\x8d\x01\n" +
-	"\x0eDraftViolation\x12\x14\n" +
-	"\x05field\x18\x01 \x01(\tR\x05field\x12\x12\n" +
-	"\x04code\x18\x02 \x01(\tR\x04code\x12\x1a\n" +
-	"\bseverity\x18\x03 \x01(\tR\bseverity\x12\x18\n" +
-	"\amessage\x18\x04 \x01(\tR\amessage\x12\x1b\n" +
-	"\traw_value\x18\x05 \x01(\tR\brawValue\"j\n" +
-	"\x1fGetProductsBriefInternalRequest\x12\x1f\n" +
-	"\vproduct_ids\x18\x01 \x03(\tR\n" +
-	"productIds\x12&\n" +
-	"\x0fcaller_store_id\x18\x02 \x01(\x03R\rcallerStoreId\"\x8f\x01\n" +
-	" GetProductsBriefInternalResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12=\n" +
-	"\arecords\x18\x03 \x03(\v2#.hawkr.product.ProductBriefInternalR\arecords\"\xb1\x01\n" +
-	"\x14ProductBriefInternal\x12\x1d\n" +
-	"\n" +
-	"product_id\x18\x01 \x01(\tR\tproductId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
-	"\x06status\x18\x03 \x01(\tR\x06status\x12!\n" +
-	"\fstatus_label\x18\x04 \x01(\tR\vstatusLabel\x12+\n" +
-	"\x11publication_state\x18\x05 \x01(\tR\x10publicationState\"\xb2\a\n" +
+	"\tstore_ids\x18\x03 \x03(\tR\bstoreIds\"\xb2\a\n" +
 	"\x1fProductCertificationApplication\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -10500,7 +9095,7 @@ const file_product_product_proto_rawDesc = "" +
 	"\x11HASHTAG_MATCH_ALL\x10\x01*J\n" +
 	"\x11HashtagSearchMode\x12\x19\n" +
 	"\x15HASHTAG_SEARCH_PREFIX\x10\x00\x12\x1a\n" +
-	"\x16HASHTAG_SEARCH_CONTAIN\x10\x012\xa3+\n" +
+	"\x16HASHTAG_SEARCH_CONTAIN\x10\x012\x8e&\n" +
 	"\x0eProductService\x12Z\n" +
 	"\rCreateProduct\x12#.hawkr.product.CreateProductRequest\x1a$.hawkr.product.CreateProductResponse\x12Z\n" +
 	"\rUpdateProduct\x12#.hawkr.product.UpdateProductRequest\x1a$.hawkr.product.UpdateProductResponse\x12Q\n" +
@@ -10541,12 +9136,7 @@ const file_product_product_proto_rawDesc = "" +
 	"\x12GetPopularHashtags\x12(.hawkr.product.GetPopularHashtagsRequest\x1a).hawkr.product.GetPopularHashtagsResponse\x12x\n" +
 	"\x17GetPublicOriginsSummary\x12-.hawkr.product.GetPublicOriginsSummaryRequest\x1a..hawkr.product.GetPublicOriginsSummaryResponse\x12\x87\x01\n" +
 	"\x1cGetPublicSellerCitiesSummary\x122.hawkr.product.GetPublicSellerCitiesSummaryRequest\x1a3.hawkr.product.GetPublicSellerCitiesSummaryResponse\x12\xa5\x01\n" +
-	"&ListStoreIDsWithPublicProductsInternal\x12<.hawkr.product.ListStoreIDsWithPublicProductsInternalRequest\x1a=.hawkr.product.ListStoreIDsWithPublicProductsInternalResponse\x12\x87\x01\n" +
-	"\x1cValidateLeafCategoryInternal\x122.hawkr.product.ValidateLeafCategoryInternalRequest\x1a3.hawkr.product.ValidateLeafCategoryInternalResponse\x12\x90\x01\n" +
-	"\x1fCreateProductFromImportInternal\x125.hawkr.product.CreateProductFromImportInternalRequest\x1a6.hawkr.product.CreateProductFromImportInternalResponse\x12\x87\x01\n" +
-	"\x1cBatchCheckSellerProductNames\x122.hawkr.product.BatchCheckSellerProductNamesRequest\x1a3.hawkr.product.BatchCheckSellerProductNamesResponse\x12o\n" +
-	"\x14ValidateProductDraft\x12*.hawkr.product.ValidateProductDraftRequest\x1a+.hawkr.product.ValidateProductDraftResponse\x12{\n" +
-	"\x18GetProductsBriefInternal\x12..hawkr.product.GetProductsBriefInternalRequest\x1a/.hawkr.product.GetProductsBriefInternalResponseBk\n" +
+	"&ListStoreIDsWithPublicProductsInternal\x12<.hawkr.product.ListStoreIDsWithPublicProductsInternalRequest\x1a=.hawkr.product.ListStoreIDsWithPublicProductsInternalResponseBk\n" +
 	"'io.github.will413028.hawkr.product.grpcB\fProductProtoP\x01Z0github.com/Will413028/hawkr/go-pkg/proto/productb\x06proto3"
 
 var (
@@ -10561,316 +9151,276 @@ func file_product_product_proto_rawDescGZIP() []byte {
 	return file_product_product_proto_rawDescData
 }
 
-var file_product_product_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_product_product_proto_msgTypes = make([]protoimpl.MessageInfo, 121)
+var file_product_product_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_product_product_proto_msgTypes = make([]protoimpl.MessageInfo, 105)
 var file_product_product_proto_goTypes = []any{
 	(HashtagMatchMode)(0),                                        // 0: hawkr.product.HashtagMatchMode
 	(HashtagSearchMode)(0),                                       // 1: hawkr.product.HashtagSearchMode
-	(ValidateProductDraftRequest_ValidationContext)(0),           // 2: hawkr.product.ValidateProductDraftRequest.ValidationContext
-	(*ProductImage)(nil),                                         // 3: hawkr.product.ProductImage
-	(*ProductSku)(nil),                                           // 4: hawkr.product.ProductSku
-	(*ShippingMethod)(nil),                                       // 5: hawkr.product.ShippingMethod
-	(*Certification)(nil),                                        // 6: hawkr.product.Certification
-	(*GalleryItem)(nil),                                          // 7: hawkr.product.GalleryItem
-	(*ProductDescription)(nil),                                   // 8: hawkr.product.ProductDescription
-	(*InlineRun)(nil),                                            // 9: hawkr.product.InlineRun
-	(*DescriptionBlock)(nil),                                     // 10: hawkr.product.DescriptionBlock
-	(*CreateProductRequest)(nil),                                 // 11: hawkr.product.CreateProductRequest
-	(*CreateProductResponse)(nil),                                // 12: hawkr.product.CreateProductResponse
-	(*UpdateProductRequest)(nil),                                 // 13: hawkr.product.UpdateProductRequest
-	(*UpdateProductResponse)(nil),                                // 14: hawkr.product.UpdateProductResponse
-	(*GetProductForAdminRequest)(nil),                            // 15: hawkr.product.GetProductForAdminRequest
-	(*UpdateProductStatusRequest)(nil),                           // 16: hawkr.product.UpdateProductStatusRequest
-	(*UpdateSellerProductStatusRequest)(nil),                     // 17: hawkr.product.UpdateSellerProductStatusRequest
-	(*BatchProductStatusItem)(nil),                               // 18: hawkr.product.BatchProductStatusItem
-	(*BatchGetSellerProductsForDelegationRequest)(nil),           // 19: hawkr.product.BatchGetSellerProductsForDelegationRequest
-	(*BatchProductSnapshot)(nil),                                 // 20: hawkr.product.BatchProductSnapshot
-	(*BatchGetSellerProductsForDelegationResponse)(nil),          // 21: hawkr.product.BatchGetSellerProductsForDelegationResponse
-	(*BatchUpdateSellerProductStatusRequest)(nil),                // 22: hawkr.product.BatchUpdateSellerProductStatusRequest
-	(*BatchProductStatusResult)(nil),                             // 23: hawkr.product.BatchProductStatusResult
-	(*BatchUpdateSellerProductStatusResponse)(nil),               // 24: hawkr.product.BatchUpdateSellerProductStatusResponse
-	(*GetProductRequest)(nil),                                    // 25: hawkr.product.GetProductRequest
-	(*GetProductResponse)(nil),                                   // 26: hawkr.product.GetProductResponse
-	(*GetPublicProductRequest)(nil),                              // 27: hawkr.product.GetPublicProductRequest
-	(*GetProductListRequest)(nil),                                // 28: hawkr.product.GetProductListRequest
-	(*GetProductListResponse)(nil),                               // 29: hawkr.product.GetProductListResponse
-	(*ProductDetail)(nil),                                        // 30: hawkr.product.ProductDetail
-	(*SellerInfo)(nil),                                           // 31: hawkr.product.SellerInfo
-	(*ReviewPreview)(nil),                                        // 32: hawkr.product.ReviewPreview
-	(*ProductListItem)(nil),                                      // 33: hawkr.product.ProductListItem
-	(*GetProductsByIDsRequest)(nil),                              // 34: hawkr.product.GetProductsByIDsRequest
-	(*GetProductsByIDsResponse)(nil),                             // 35: hawkr.product.GetProductsByIDsResponse
-	(*ProductInfo)(nil),                                          // 36: hawkr.product.ProductInfo
-	(*ProductResponse)(nil),                                      // 37: hawkr.product.ProductResponse
-	(*DeleteProductRequest)(nil),                                 // 38: hawkr.product.DeleteProductRequest
-	(*DeleteProductResponse)(nil),                                // 39: hawkr.product.DeleteProductResponse
-	(*DeductStockRequest)(nil),                                   // 40: hawkr.product.DeductStockRequest
-	(*RestoreStockRequest)(nil),                                  // 41: hawkr.product.RestoreStockRequest
-	(*StockItem)(nil),                                            // 42: hawkr.product.StockItem
-	(*StockOperationResponse)(nil),                               // 43: hawkr.product.StockOperationResponse
-	(*InsufficientItem)(nil),                                     // 44: hawkr.product.InsufficientItem
-	(*GetStockRequest)(nil),                                      // 45: hawkr.product.GetStockRequest
-	(*GetStockResponse)(nil),                                     // 46: hawkr.product.GetStockResponse
-	(*StockInfo)(nil),                                            // 47: hawkr.product.StockInfo
-	(*PurgeProductCacheRequest)(nil),                             // 48: hawkr.product.PurgeProductCacheRequest
-	(*PurgeProductCacheResponse)(nil),                            // 49: hawkr.product.PurgeProductCacheResponse
-	(*PurgeCacheResult)(nil),                                     // 50: hawkr.product.PurgeCacheResult
-	(*GetProductSimpleRequest)(nil),                              // 51: hawkr.product.GetProductSimpleRequest
-	(*GetProductSimpleResponse)(nil),                             // 52: hawkr.product.GetProductSimpleResponse
-	(*ProductSimpleInfo)(nil),                                    // 53: hawkr.product.ProductSimpleInfo
-	(*BatchGetSkuCartInfoRequest)(nil),                           // 54: hawkr.product.BatchGetSkuCartInfoRequest
-	(*BatchGetSkuCartInfoResponse)(nil),                          // 55: hawkr.product.BatchGetSkuCartInfoResponse
-	(*SkuCartInfo)(nil),                                          // 56: hawkr.product.SkuCartInfo
-	(*BatchGetProductForCheckoutRequest)(nil),                    // 57: hawkr.product.BatchGetProductForCheckoutRequest
-	(*BatchGetProductForCheckoutResponse)(nil),                   // 58: hawkr.product.BatchGetProductForCheckoutResponse
-	(*ProductForCheckoutInfo)(nil),                               // 59: hawkr.product.ProductForCheckoutInfo
-	(*CalculateShippingOptionsRequest)(nil),                      // 60: hawkr.product.CalculateShippingOptionsRequest
-	(*CalculateShippingOptionsResponse)(nil),                     // 61: hawkr.product.CalculateShippingOptionsResponse
-	(*ShippingCalculationData)(nil),                              // 62: hawkr.product.ShippingCalculationData
-	(*AvailableTemperatureProto)(nil),                            // 63: hawkr.product.AvailableTemperatureProto
-	(*ShippingOptionProto)(nil),                                  // 64: hawkr.product.ShippingOptionProto
-	(*ShippingLimitsProto)(nil),                                  // 65: hawkr.product.ShippingLimitsProto
-	(*GetRelatedProductsRequest)(nil),                            // 66: hawkr.product.GetRelatedProductsRequest
-	(*GetRelatedProductsResponse)(nil),                           // 67: hawkr.product.GetRelatedProductsResponse
-	(*VerifyCertificationRequest)(nil),                           // 68: hawkr.product.VerifyCertificationRequest
-	(*VerifyCertificationResponse)(nil),                          // 69: hawkr.product.VerifyCertificationResponse
-	(*ListProductsByCategoryForAdminRequest)(nil),                // 70: hawkr.product.ListProductsByCategoryForAdminRequest
-	(*ListProductsByCategoryForAdminResponse)(nil),               // 71: hawkr.product.ListProductsByCategoryForAdminResponse
-	(*BatchChangeProductCategoryForAdminRequest)(nil),            // 72: hawkr.product.BatchChangeProductCategoryForAdminRequest
-	(*BatchChangeProductCategoryForAdminResponse)(nil),           // 73: hawkr.product.BatchChangeProductCategoryForAdminResponse
-	(*HashtagItem)(nil),                                          // 74: hawkr.product.HashtagItem
-	(*SearchHashtagsRequest)(nil),                                // 75: hawkr.product.SearchHashtagsRequest
-	(*SearchHashtagsResponse)(nil),                               // 76: hawkr.product.SearchHashtagsResponse
-	(*GetPopularHashtagsRequest)(nil),                            // 77: hawkr.product.GetPopularHashtagsRequest
-	(*GetPopularHashtagsResponse)(nil),                           // 78: hawkr.product.GetPopularHashtagsResponse
-	(*PopularHashtagItem)(nil),                                   // 79: hawkr.product.PopularHashtagItem
-	(*GetPublicOriginsSummaryRequest)(nil),                       // 80: hawkr.product.GetPublicOriginsSummaryRequest
-	(*GetPublicOriginsSummaryResponse)(nil),                      // 81: hawkr.product.GetPublicOriginsSummaryResponse
-	(*OriginSummaryItem)(nil),                                    // 82: hawkr.product.OriginSummaryItem
-	(*GetPublicSellerCitiesSummaryRequest)(nil),                  // 83: hawkr.product.GetPublicSellerCitiesSummaryRequest
-	(*GetPublicSellerCitiesSummaryResponse)(nil),                 // 84: hawkr.product.GetPublicSellerCitiesSummaryResponse
-	(*SellerCitySummaryItem)(nil),                                // 85: hawkr.product.SellerCitySummaryItem
-	(*ListStoreIDsWithPublicProductsInternalRequest)(nil),        // 86: hawkr.product.ListStoreIDsWithPublicProductsInternalRequest
-	(*ListStoreIDsWithPublicProductsInternalResponse)(nil),       // 87: hawkr.product.ListStoreIDsWithPublicProductsInternalResponse
-	(*ValidateLeafCategoryInternalRequest)(nil),                  // 88: hawkr.product.ValidateLeafCategoryInternalRequest
-	(*ValidateLeafCategoryInternalResponse)(nil),                 // 89: hawkr.product.ValidateLeafCategoryInternalResponse
-	(*ProductImageImport)(nil),                                   // 90: hawkr.product.ProductImageImport
-	(*ProductSkuImport)(nil),                                     // 91: hawkr.product.ProductSkuImport
-	(*CreateProductFromImportInternalRequest)(nil),               // 92: hawkr.product.CreateProductFromImportInternalRequest
-	(*CreateProductFromImportInternalResponse)(nil),              // 93: hawkr.product.CreateProductFromImportInternalResponse
-	(*BatchCheckSellerProductNamesRequest)(nil),                  // 94: hawkr.product.BatchCheckSellerProductNamesRequest
-	(*BatchCheckSellerProductNamesResponse)(nil),                 // 95: hawkr.product.BatchCheckSellerProductNamesResponse
-	(*ExistingProductByName)(nil),                                // 96: hawkr.product.ExistingProductByName
-	(*ValidateProductDraftRequest)(nil),                          // 97: hawkr.product.ValidateProductDraftRequest
-	(*ProductDraft)(nil),                                         // 98: hawkr.product.ProductDraft
-	(*ValidateProductDraftResponse)(nil),                         // 99: hawkr.product.ValidateProductDraftResponse
-	(*DraftViolation)(nil),                                       // 100: hawkr.product.DraftViolation
-	(*GetProductsBriefInternalRequest)(nil),                      // 101: hawkr.product.GetProductsBriefInternalRequest
-	(*GetProductsBriefInternalResponse)(nil),                     // 102: hawkr.product.GetProductsBriefInternalResponse
-	(*ProductBriefInternal)(nil),                                 // 103: hawkr.product.ProductBriefInternal
-	(*ProductCertificationApplication)(nil),                      // 104: hawkr.product.ProductCertificationApplication
-	(*ProductCertificationSummary)(nil),                          // 105: hawkr.product.ProductCertificationSummary
-	(*GovVerifyResult)(nil),                                      // 106: hawkr.product.GovVerifyResult
-	(*ProductCertificationReviewEvent)(nil),                      // 107: hawkr.product.ProductCertificationReviewEvent
-	(*SubmitProductCertificationRequest)(nil),                    // 108: hawkr.product.SubmitProductCertificationRequest
-	(*ListProductCertificationApplicationsRequest)(nil),          // 109: hawkr.product.ListProductCertificationApplicationsRequest
-	(*ListProductCertificationApplicationsResponse)(nil),         // 110: hawkr.product.ListProductCertificationApplicationsResponse
-	(*WithdrawProductCertificationRequest)(nil),                  // 111: hawkr.product.WithdrawProductCertificationRequest
-	(*ProductCertificationApplicationResponse)(nil),              // 112: hawkr.product.ProductCertificationApplicationResponse
-	(*GetProductCertificationApplicationForAdminRequest)(nil),    // 113: hawkr.product.GetProductCertificationApplicationForAdminRequest
-	(*ListProductCertificationApplicationsForAdminRequest)(nil),  // 114: hawkr.product.ListProductCertificationApplicationsForAdminRequest
-	(*ListProductCertificationApplicationsForAdminResponse)(nil), // 115: hawkr.product.ListProductCertificationApplicationsForAdminResponse
-	(*ListProductCertificationAuditLogsForAdminRequest)(nil),     // 116: hawkr.product.ListProductCertificationAuditLogsForAdminRequest
-	(*ListProductCertificationAuditLogsForAdminResponse)(nil),    // 117: hawkr.product.ListProductCertificationAuditLogsForAdminResponse
-	(*ProductCertificationApplicationAdminResponse)(nil),         // 118: hawkr.product.ProductCertificationApplicationAdminResponse
-	(*ReviewProductCertificationForAdminRequest)(nil),            // 119: hawkr.product.ReviewProductCertificationForAdminRequest
-	(*ReverifyProductCertificationForAdminRequest)(nil),          // 120: hawkr.product.ReverifyProductCertificationForAdminRequest
-	(*CertificationWarning)(nil),                                 // 121: hawkr.product.CertificationWarning
-	nil,                                                          // 122: hawkr.product.BatchGetSkuCartInfoResponse.SkusEntry
-	nil,                                                          // 123: hawkr.product.BatchGetProductForCheckoutResponse.DataEntry
-	(*common.DelegationContext)(nil),                             // 124: hawkr.common.DelegationContext
+	(*ProductImage)(nil),                                         // 2: hawkr.product.ProductImage
+	(*ProductSku)(nil),                                           // 3: hawkr.product.ProductSku
+	(*ShippingMethod)(nil),                                       // 4: hawkr.product.ShippingMethod
+	(*Certification)(nil),                                        // 5: hawkr.product.Certification
+	(*GalleryItem)(nil),                                          // 6: hawkr.product.GalleryItem
+	(*ProductDescription)(nil),                                   // 7: hawkr.product.ProductDescription
+	(*InlineRun)(nil),                                            // 8: hawkr.product.InlineRun
+	(*DescriptionBlock)(nil),                                     // 9: hawkr.product.DescriptionBlock
+	(*CreateProductRequest)(nil),                                 // 10: hawkr.product.CreateProductRequest
+	(*CreateProductResponse)(nil),                                // 11: hawkr.product.CreateProductResponse
+	(*UpdateProductRequest)(nil),                                 // 12: hawkr.product.UpdateProductRequest
+	(*UpdateProductResponse)(nil),                                // 13: hawkr.product.UpdateProductResponse
+	(*GetProductForAdminRequest)(nil),                            // 14: hawkr.product.GetProductForAdminRequest
+	(*UpdateProductStatusRequest)(nil),                           // 15: hawkr.product.UpdateProductStatusRequest
+	(*UpdateSellerProductStatusRequest)(nil),                     // 16: hawkr.product.UpdateSellerProductStatusRequest
+	(*BatchProductStatusItem)(nil),                               // 17: hawkr.product.BatchProductStatusItem
+	(*BatchGetSellerProductsForDelegationRequest)(nil),           // 18: hawkr.product.BatchGetSellerProductsForDelegationRequest
+	(*BatchProductSnapshot)(nil),                                 // 19: hawkr.product.BatchProductSnapshot
+	(*BatchGetSellerProductsForDelegationResponse)(nil),          // 20: hawkr.product.BatchGetSellerProductsForDelegationResponse
+	(*BatchUpdateSellerProductStatusRequest)(nil),                // 21: hawkr.product.BatchUpdateSellerProductStatusRequest
+	(*BatchProductStatusResult)(nil),                             // 22: hawkr.product.BatchProductStatusResult
+	(*BatchUpdateSellerProductStatusResponse)(nil),               // 23: hawkr.product.BatchUpdateSellerProductStatusResponse
+	(*GetProductRequest)(nil),                                    // 24: hawkr.product.GetProductRequest
+	(*GetProductResponse)(nil),                                   // 25: hawkr.product.GetProductResponse
+	(*GetPublicProductRequest)(nil),                              // 26: hawkr.product.GetPublicProductRequest
+	(*GetProductListRequest)(nil),                                // 27: hawkr.product.GetProductListRequest
+	(*GetProductListResponse)(nil),                               // 28: hawkr.product.GetProductListResponse
+	(*ProductDetail)(nil),                                        // 29: hawkr.product.ProductDetail
+	(*SellerInfo)(nil),                                           // 30: hawkr.product.SellerInfo
+	(*ReviewPreview)(nil),                                        // 31: hawkr.product.ReviewPreview
+	(*ProductListItem)(nil),                                      // 32: hawkr.product.ProductListItem
+	(*GetProductsByIDsRequest)(nil),                              // 33: hawkr.product.GetProductsByIDsRequest
+	(*GetProductsByIDsResponse)(nil),                             // 34: hawkr.product.GetProductsByIDsResponse
+	(*ProductInfo)(nil),                                          // 35: hawkr.product.ProductInfo
+	(*ProductResponse)(nil),                                      // 36: hawkr.product.ProductResponse
+	(*DeleteProductRequest)(nil),                                 // 37: hawkr.product.DeleteProductRequest
+	(*DeleteProductResponse)(nil),                                // 38: hawkr.product.DeleteProductResponse
+	(*DeductStockRequest)(nil),                                   // 39: hawkr.product.DeductStockRequest
+	(*RestoreStockRequest)(nil),                                  // 40: hawkr.product.RestoreStockRequest
+	(*StockItem)(nil),                                            // 41: hawkr.product.StockItem
+	(*StockOperationResponse)(nil),                               // 42: hawkr.product.StockOperationResponse
+	(*InsufficientItem)(nil),                                     // 43: hawkr.product.InsufficientItem
+	(*GetStockRequest)(nil),                                      // 44: hawkr.product.GetStockRequest
+	(*GetStockResponse)(nil),                                     // 45: hawkr.product.GetStockResponse
+	(*StockInfo)(nil),                                            // 46: hawkr.product.StockInfo
+	(*PurgeProductCacheRequest)(nil),                             // 47: hawkr.product.PurgeProductCacheRequest
+	(*PurgeProductCacheResponse)(nil),                            // 48: hawkr.product.PurgeProductCacheResponse
+	(*PurgeCacheResult)(nil),                                     // 49: hawkr.product.PurgeCacheResult
+	(*GetProductSimpleRequest)(nil),                              // 50: hawkr.product.GetProductSimpleRequest
+	(*GetProductSimpleResponse)(nil),                             // 51: hawkr.product.GetProductSimpleResponse
+	(*ProductSimpleInfo)(nil),                                    // 52: hawkr.product.ProductSimpleInfo
+	(*BatchGetSkuCartInfoRequest)(nil),                           // 53: hawkr.product.BatchGetSkuCartInfoRequest
+	(*BatchGetSkuCartInfoResponse)(nil),                          // 54: hawkr.product.BatchGetSkuCartInfoResponse
+	(*SkuCartInfo)(nil),                                          // 55: hawkr.product.SkuCartInfo
+	(*BatchGetProductForCheckoutRequest)(nil),                    // 56: hawkr.product.BatchGetProductForCheckoutRequest
+	(*BatchGetProductForCheckoutResponse)(nil),                   // 57: hawkr.product.BatchGetProductForCheckoutResponse
+	(*ProductForCheckoutInfo)(nil),                               // 58: hawkr.product.ProductForCheckoutInfo
+	(*CalculateShippingOptionsRequest)(nil),                      // 59: hawkr.product.CalculateShippingOptionsRequest
+	(*CalculateShippingOptionsResponse)(nil),                     // 60: hawkr.product.CalculateShippingOptionsResponse
+	(*ShippingCalculationData)(nil),                              // 61: hawkr.product.ShippingCalculationData
+	(*AvailableTemperatureProto)(nil),                            // 62: hawkr.product.AvailableTemperatureProto
+	(*ShippingOptionProto)(nil),                                  // 63: hawkr.product.ShippingOptionProto
+	(*ShippingLimitsProto)(nil),                                  // 64: hawkr.product.ShippingLimitsProto
+	(*GetRelatedProductsRequest)(nil),                            // 65: hawkr.product.GetRelatedProductsRequest
+	(*GetRelatedProductsResponse)(nil),                           // 66: hawkr.product.GetRelatedProductsResponse
+	(*VerifyCertificationRequest)(nil),                           // 67: hawkr.product.VerifyCertificationRequest
+	(*VerifyCertificationResponse)(nil),                          // 68: hawkr.product.VerifyCertificationResponse
+	(*ListProductsByCategoryForAdminRequest)(nil),                // 69: hawkr.product.ListProductsByCategoryForAdminRequest
+	(*ListProductsByCategoryForAdminResponse)(nil),               // 70: hawkr.product.ListProductsByCategoryForAdminResponse
+	(*BatchChangeProductCategoryForAdminRequest)(nil),            // 71: hawkr.product.BatchChangeProductCategoryForAdminRequest
+	(*BatchChangeProductCategoryForAdminResponse)(nil),           // 72: hawkr.product.BatchChangeProductCategoryForAdminResponse
+	(*HashtagItem)(nil),                                          // 73: hawkr.product.HashtagItem
+	(*SearchHashtagsRequest)(nil),                                // 74: hawkr.product.SearchHashtagsRequest
+	(*SearchHashtagsResponse)(nil),                               // 75: hawkr.product.SearchHashtagsResponse
+	(*GetPopularHashtagsRequest)(nil),                            // 76: hawkr.product.GetPopularHashtagsRequest
+	(*GetPopularHashtagsResponse)(nil),                           // 77: hawkr.product.GetPopularHashtagsResponse
+	(*PopularHashtagItem)(nil),                                   // 78: hawkr.product.PopularHashtagItem
+	(*GetPublicOriginsSummaryRequest)(nil),                       // 79: hawkr.product.GetPublicOriginsSummaryRequest
+	(*GetPublicOriginsSummaryResponse)(nil),                      // 80: hawkr.product.GetPublicOriginsSummaryResponse
+	(*OriginSummaryItem)(nil),                                    // 81: hawkr.product.OriginSummaryItem
+	(*GetPublicSellerCitiesSummaryRequest)(nil),                  // 82: hawkr.product.GetPublicSellerCitiesSummaryRequest
+	(*GetPublicSellerCitiesSummaryResponse)(nil),                 // 83: hawkr.product.GetPublicSellerCitiesSummaryResponse
+	(*SellerCitySummaryItem)(nil),                                // 84: hawkr.product.SellerCitySummaryItem
+	(*ListStoreIDsWithPublicProductsInternalRequest)(nil),        // 85: hawkr.product.ListStoreIDsWithPublicProductsInternalRequest
+	(*ListStoreIDsWithPublicProductsInternalResponse)(nil),       // 86: hawkr.product.ListStoreIDsWithPublicProductsInternalResponse
+	(*ProductCertificationApplication)(nil),                      // 87: hawkr.product.ProductCertificationApplication
+	(*ProductCertificationSummary)(nil),                          // 88: hawkr.product.ProductCertificationSummary
+	(*GovVerifyResult)(nil),                                      // 89: hawkr.product.GovVerifyResult
+	(*ProductCertificationReviewEvent)(nil),                      // 90: hawkr.product.ProductCertificationReviewEvent
+	(*SubmitProductCertificationRequest)(nil),                    // 91: hawkr.product.SubmitProductCertificationRequest
+	(*ListProductCertificationApplicationsRequest)(nil),          // 92: hawkr.product.ListProductCertificationApplicationsRequest
+	(*ListProductCertificationApplicationsResponse)(nil),         // 93: hawkr.product.ListProductCertificationApplicationsResponse
+	(*WithdrawProductCertificationRequest)(nil),                  // 94: hawkr.product.WithdrawProductCertificationRequest
+	(*ProductCertificationApplicationResponse)(nil),              // 95: hawkr.product.ProductCertificationApplicationResponse
+	(*GetProductCertificationApplicationForAdminRequest)(nil),    // 96: hawkr.product.GetProductCertificationApplicationForAdminRequest
+	(*ListProductCertificationApplicationsForAdminRequest)(nil),  // 97: hawkr.product.ListProductCertificationApplicationsForAdminRequest
+	(*ListProductCertificationApplicationsForAdminResponse)(nil), // 98: hawkr.product.ListProductCertificationApplicationsForAdminResponse
+	(*ListProductCertificationAuditLogsForAdminRequest)(nil),     // 99: hawkr.product.ListProductCertificationAuditLogsForAdminRequest
+	(*ListProductCertificationAuditLogsForAdminResponse)(nil),    // 100: hawkr.product.ListProductCertificationAuditLogsForAdminResponse
+	(*ProductCertificationApplicationAdminResponse)(nil),         // 101: hawkr.product.ProductCertificationApplicationAdminResponse
+	(*ReviewProductCertificationForAdminRequest)(nil),            // 102: hawkr.product.ReviewProductCertificationForAdminRequest
+	(*ReverifyProductCertificationForAdminRequest)(nil),          // 103: hawkr.product.ReverifyProductCertificationForAdminRequest
+	(*CertificationWarning)(nil),                                 // 104: hawkr.product.CertificationWarning
+	nil,                                                          // 105: hawkr.product.BatchGetSkuCartInfoResponse.SkusEntry
+	nil,                                                          // 106: hawkr.product.BatchGetProductForCheckoutResponse.DataEntry
+	(*common.DelegationContext)(nil),                             // 107: hawkr.common.DelegationContext
 }
 var file_product_product_proto_depIdxs = []int32{
-	5,   // 0: hawkr.product.ProductSku.shipping_methods:type_name -> hawkr.product.ShippingMethod
-	10,  // 1: hawkr.product.ProductDescription.blocks:type_name -> hawkr.product.DescriptionBlock
-	9,   // 2: hawkr.product.DescriptionBlock.runs:type_name -> hawkr.product.InlineRun
-	8,   // 3: hawkr.product.CreateProductRequest.description:type_name -> hawkr.product.ProductDescription
-	3,   // 4: hawkr.product.CreateProductRequest.images:type_name -> hawkr.product.ProductImage
-	4,   // 5: hawkr.product.CreateProductRequest.skus:type_name -> hawkr.product.ProductSku
-	6,   // 6: hawkr.product.CreateProductRequest.certifications:type_name -> hawkr.product.Certification
-	124, // 7: hawkr.product.CreateProductRequest.delegation:type_name -> hawkr.common.DelegationContext
-	30,  // 8: hawkr.product.CreateProductResponse.data:type_name -> hawkr.product.ProductDetail
-	121, // 9: hawkr.product.CreateProductResponse.certification_warnings:type_name -> hawkr.product.CertificationWarning
-	8,   // 10: hawkr.product.UpdateProductRequest.description:type_name -> hawkr.product.ProductDescription
-	3,   // 11: hawkr.product.UpdateProductRequest.images:type_name -> hawkr.product.ProductImage
-	4,   // 12: hawkr.product.UpdateProductRequest.skus:type_name -> hawkr.product.ProductSku
-	6,   // 13: hawkr.product.UpdateProductRequest.certifications:type_name -> hawkr.product.Certification
-	124, // 14: hawkr.product.UpdateProductRequest.delegation:type_name -> hawkr.common.DelegationContext
-	30,  // 15: hawkr.product.UpdateProductResponse.data:type_name -> hawkr.product.ProductDetail
-	121, // 16: hawkr.product.UpdateProductResponse.certification_warnings:type_name -> hawkr.product.CertificationWarning
-	124, // 17: hawkr.product.UpdateSellerProductStatusRequest.delegation:type_name -> hawkr.common.DelegationContext
-	124, // 18: hawkr.product.BatchGetSellerProductsForDelegationRequest.delegation:type_name -> hawkr.common.DelegationContext
-	30,  // 19: hawkr.product.BatchProductSnapshot.detail:type_name -> hawkr.product.ProductDetail
-	20,  // 20: hawkr.product.BatchGetSellerProductsForDelegationResponse.results:type_name -> hawkr.product.BatchProductSnapshot
-	18,  // 21: hawkr.product.BatchUpdateSellerProductStatusRequest.items:type_name -> hawkr.product.BatchProductStatusItem
-	124, // 22: hawkr.product.BatchUpdateSellerProductStatusRequest.delegation:type_name -> hawkr.common.DelegationContext
-	23,  // 23: hawkr.product.BatchUpdateSellerProductStatusResponse.results:type_name -> hawkr.product.BatchProductStatusResult
-	124, // 24: hawkr.product.GetProductRequest.delegation:type_name -> hawkr.common.DelegationContext
-	30,  // 25: hawkr.product.GetProductResponse.data:type_name -> hawkr.product.ProductDetail
+	4,   // 0: hawkr.product.ProductSku.shipping_methods:type_name -> hawkr.product.ShippingMethod
+	9,   // 1: hawkr.product.ProductDescription.blocks:type_name -> hawkr.product.DescriptionBlock
+	8,   // 2: hawkr.product.DescriptionBlock.runs:type_name -> hawkr.product.InlineRun
+	7,   // 3: hawkr.product.CreateProductRequest.description:type_name -> hawkr.product.ProductDescription
+	2,   // 4: hawkr.product.CreateProductRequest.images:type_name -> hawkr.product.ProductImage
+	3,   // 5: hawkr.product.CreateProductRequest.skus:type_name -> hawkr.product.ProductSku
+	5,   // 6: hawkr.product.CreateProductRequest.certifications:type_name -> hawkr.product.Certification
+	107, // 7: hawkr.product.CreateProductRequest.delegation:type_name -> hawkr.common.DelegationContext
+	29,  // 8: hawkr.product.CreateProductResponse.data:type_name -> hawkr.product.ProductDetail
+	104, // 9: hawkr.product.CreateProductResponse.certification_warnings:type_name -> hawkr.product.CertificationWarning
+	7,   // 10: hawkr.product.UpdateProductRequest.description:type_name -> hawkr.product.ProductDescription
+	2,   // 11: hawkr.product.UpdateProductRequest.images:type_name -> hawkr.product.ProductImage
+	3,   // 12: hawkr.product.UpdateProductRequest.skus:type_name -> hawkr.product.ProductSku
+	5,   // 13: hawkr.product.UpdateProductRequest.certifications:type_name -> hawkr.product.Certification
+	107, // 14: hawkr.product.UpdateProductRequest.delegation:type_name -> hawkr.common.DelegationContext
+	29,  // 15: hawkr.product.UpdateProductResponse.data:type_name -> hawkr.product.ProductDetail
+	104, // 16: hawkr.product.UpdateProductResponse.certification_warnings:type_name -> hawkr.product.CertificationWarning
+	107, // 17: hawkr.product.UpdateSellerProductStatusRequest.delegation:type_name -> hawkr.common.DelegationContext
+	107, // 18: hawkr.product.BatchGetSellerProductsForDelegationRequest.delegation:type_name -> hawkr.common.DelegationContext
+	29,  // 19: hawkr.product.BatchProductSnapshot.detail:type_name -> hawkr.product.ProductDetail
+	19,  // 20: hawkr.product.BatchGetSellerProductsForDelegationResponse.results:type_name -> hawkr.product.BatchProductSnapshot
+	17,  // 21: hawkr.product.BatchUpdateSellerProductStatusRequest.items:type_name -> hawkr.product.BatchProductStatusItem
+	107, // 22: hawkr.product.BatchUpdateSellerProductStatusRequest.delegation:type_name -> hawkr.common.DelegationContext
+	22,  // 23: hawkr.product.BatchUpdateSellerProductStatusResponse.results:type_name -> hawkr.product.BatchProductStatusResult
+	107, // 24: hawkr.product.GetProductRequest.delegation:type_name -> hawkr.common.DelegationContext
+	29,  // 25: hawkr.product.GetProductResponse.data:type_name -> hawkr.product.ProductDetail
 	0,   // 26: hawkr.product.GetProductListRequest.hashtag_match_mode:type_name -> hawkr.product.HashtagMatchMode
-	124, // 27: hawkr.product.GetProductListRequest.delegation:type_name -> hawkr.common.DelegationContext
-	33,  // 28: hawkr.product.GetProductListResponse.products:type_name -> hawkr.product.ProductListItem
-	8,   // 29: hawkr.product.ProductDetail.description:type_name -> hawkr.product.ProductDescription
-	7,   // 30: hawkr.product.ProductDetail.gallery:type_name -> hawkr.product.GalleryItem
-	6,   // 31: hawkr.product.ProductDetail.certifications:type_name -> hawkr.product.Certification
-	4,   // 32: hawkr.product.ProductDetail.skus:type_name -> hawkr.product.ProductSku
-	31,  // 33: hawkr.product.ProductDetail.seller:type_name -> hawkr.product.SellerInfo
-	32,  // 34: hawkr.product.ProductDetail.reviews:type_name -> hawkr.product.ReviewPreview
-	5,   // 35: hawkr.product.ProductDetail.shipping_methods:type_name -> hawkr.product.ShippingMethod
-	74,  // 36: hawkr.product.ProductDetail.hashtags:type_name -> hawkr.product.HashtagItem
-	7,   // 37: hawkr.product.ProductListItem.gallery:type_name -> hawkr.product.GalleryItem
-	31,  // 38: hawkr.product.ProductListItem.seller:type_name -> hawkr.product.SellerInfo
-	74,  // 39: hawkr.product.ProductListItem.hashtags:type_name -> hawkr.product.HashtagItem
-	6,   // 40: hawkr.product.ProductListItem.certifications:type_name -> hawkr.product.Certification
-	5,   // 41: hawkr.product.ProductListItem.shipping_methods:type_name -> hawkr.product.ShippingMethod
-	33,  // 42: hawkr.product.GetProductsByIDsResponse.products:type_name -> hawkr.product.ProductListItem
-	36,  // 43: hawkr.product.ProductResponse.data:type_name -> hawkr.product.ProductInfo
-	42,  // 44: hawkr.product.DeductStockRequest.items:type_name -> hawkr.product.StockItem
-	42,  // 45: hawkr.product.RestoreStockRequest.items:type_name -> hawkr.product.StockItem
-	44,  // 46: hawkr.product.StockOperationResponse.insufficient_items:type_name -> hawkr.product.InsufficientItem
-	47,  // 47: hawkr.product.GetStockResponse.items:type_name -> hawkr.product.StockInfo
-	50,  // 48: hawkr.product.PurgeProductCacheResponse.data:type_name -> hawkr.product.PurgeCacheResult
-	53,  // 49: hawkr.product.GetProductSimpleResponse.data:type_name -> hawkr.product.ProductSimpleInfo
-	122, // 50: hawkr.product.BatchGetSkuCartInfoResponse.skus:type_name -> hawkr.product.BatchGetSkuCartInfoResponse.SkusEntry
-	123, // 51: hawkr.product.BatchGetProductForCheckoutResponse.data:type_name -> hawkr.product.BatchGetProductForCheckoutResponse.DataEntry
-	5,   // 52: hawkr.product.ProductForCheckoutInfo.shipping_methods:type_name -> hawkr.product.ShippingMethod
-	62,  // 53: hawkr.product.CalculateShippingOptionsResponse.data:type_name -> hawkr.product.ShippingCalculationData
-	63,  // 54: hawkr.product.ShippingCalculationData.available_temperatures:type_name -> hawkr.product.AvailableTemperatureProto
-	64,  // 55: hawkr.product.ShippingCalculationData.shipping_options:type_name -> hawkr.product.ShippingOptionProto
-	65,  // 56: hawkr.product.ShippingOptionProto.limits:type_name -> hawkr.product.ShippingLimitsProto
-	33,  // 57: hawkr.product.GetRelatedProductsResponse.products:type_name -> hawkr.product.ProductListItem
-	106, // 58: hawkr.product.VerifyCertificationResponse.result:type_name -> hawkr.product.GovVerifyResult
-	33,  // 59: hawkr.product.ListProductsByCategoryForAdminResponse.products:type_name -> hawkr.product.ProductListItem
+	107, // 27: hawkr.product.GetProductListRequest.delegation:type_name -> hawkr.common.DelegationContext
+	32,  // 28: hawkr.product.GetProductListResponse.products:type_name -> hawkr.product.ProductListItem
+	7,   // 29: hawkr.product.ProductDetail.description:type_name -> hawkr.product.ProductDescription
+	6,   // 30: hawkr.product.ProductDetail.gallery:type_name -> hawkr.product.GalleryItem
+	5,   // 31: hawkr.product.ProductDetail.certifications:type_name -> hawkr.product.Certification
+	3,   // 32: hawkr.product.ProductDetail.skus:type_name -> hawkr.product.ProductSku
+	30,  // 33: hawkr.product.ProductDetail.seller:type_name -> hawkr.product.SellerInfo
+	31,  // 34: hawkr.product.ProductDetail.reviews:type_name -> hawkr.product.ReviewPreview
+	4,   // 35: hawkr.product.ProductDetail.shipping_methods:type_name -> hawkr.product.ShippingMethod
+	73,  // 36: hawkr.product.ProductDetail.hashtags:type_name -> hawkr.product.HashtagItem
+	6,   // 37: hawkr.product.ProductListItem.gallery:type_name -> hawkr.product.GalleryItem
+	30,  // 38: hawkr.product.ProductListItem.seller:type_name -> hawkr.product.SellerInfo
+	73,  // 39: hawkr.product.ProductListItem.hashtags:type_name -> hawkr.product.HashtagItem
+	5,   // 40: hawkr.product.ProductListItem.certifications:type_name -> hawkr.product.Certification
+	4,   // 41: hawkr.product.ProductListItem.shipping_methods:type_name -> hawkr.product.ShippingMethod
+	32,  // 42: hawkr.product.GetProductsByIDsResponse.products:type_name -> hawkr.product.ProductListItem
+	35,  // 43: hawkr.product.ProductResponse.data:type_name -> hawkr.product.ProductInfo
+	41,  // 44: hawkr.product.DeductStockRequest.items:type_name -> hawkr.product.StockItem
+	41,  // 45: hawkr.product.RestoreStockRequest.items:type_name -> hawkr.product.StockItem
+	43,  // 46: hawkr.product.StockOperationResponse.insufficient_items:type_name -> hawkr.product.InsufficientItem
+	46,  // 47: hawkr.product.GetStockResponse.items:type_name -> hawkr.product.StockInfo
+	49,  // 48: hawkr.product.PurgeProductCacheResponse.data:type_name -> hawkr.product.PurgeCacheResult
+	52,  // 49: hawkr.product.GetProductSimpleResponse.data:type_name -> hawkr.product.ProductSimpleInfo
+	105, // 50: hawkr.product.BatchGetSkuCartInfoResponse.skus:type_name -> hawkr.product.BatchGetSkuCartInfoResponse.SkusEntry
+	106, // 51: hawkr.product.BatchGetProductForCheckoutResponse.data:type_name -> hawkr.product.BatchGetProductForCheckoutResponse.DataEntry
+	4,   // 52: hawkr.product.ProductForCheckoutInfo.shipping_methods:type_name -> hawkr.product.ShippingMethod
+	61,  // 53: hawkr.product.CalculateShippingOptionsResponse.data:type_name -> hawkr.product.ShippingCalculationData
+	62,  // 54: hawkr.product.ShippingCalculationData.available_temperatures:type_name -> hawkr.product.AvailableTemperatureProto
+	63,  // 55: hawkr.product.ShippingCalculationData.shipping_options:type_name -> hawkr.product.ShippingOptionProto
+	64,  // 56: hawkr.product.ShippingOptionProto.limits:type_name -> hawkr.product.ShippingLimitsProto
+	32,  // 57: hawkr.product.GetRelatedProductsResponse.products:type_name -> hawkr.product.ProductListItem
+	89,  // 58: hawkr.product.VerifyCertificationResponse.result:type_name -> hawkr.product.GovVerifyResult
+	32,  // 59: hawkr.product.ListProductsByCategoryForAdminResponse.products:type_name -> hawkr.product.ProductListItem
 	1,   // 60: hawkr.product.SearchHashtagsRequest.mode:type_name -> hawkr.product.HashtagSearchMode
-	74,  // 61: hawkr.product.SearchHashtagsResponse.items:type_name -> hawkr.product.HashtagItem
-	79,  // 62: hawkr.product.GetPopularHashtagsResponse.records:type_name -> hawkr.product.PopularHashtagItem
-	82,  // 63: hawkr.product.GetPublicOriginsSummaryResponse.records:type_name -> hawkr.product.OriginSummaryItem
-	85,  // 64: hawkr.product.GetPublicSellerCitiesSummaryResponse.records:type_name -> hawkr.product.SellerCitySummaryItem
-	5,   // 65: hawkr.product.ProductSkuImport.shipping_methods:type_name -> hawkr.product.ShippingMethod
-	8,   // 66: hawkr.product.CreateProductFromImportInternalRequest.description:type_name -> hawkr.product.ProductDescription
-	90,  // 67: hawkr.product.CreateProductFromImportInternalRequest.images:type_name -> hawkr.product.ProductImageImport
-	6,   // 68: hawkr.product.CreateProductFromImportInternalRequest.certifications:type_name -> hawkr.product.Certification
-	91,  // 69: hawkr.product.CreateProductFromImportInternalRequest.skus:type_name -> hawkr.product.ProductSkuImport
-	96,  // 70: hawkr.product.BatchCheckSellerProductNamesResponse.existing:type_name -> hawkr.product.ExistingProductByName
-	98,  // 71: hawkr.product.ValidateProductDraftRequest.draft:type_name -> hawkr.product.ProductDraft
-	2,   // 72: hawkr.product.ValidateProductDraftRequest.context:type_name -> hawkr.product.ValidateProductDraftRequest.ValidationContext
-	7,   // 73: hawkr.product.ProductDraft.gallery:type_name -> hawkr.product.GalleryItem
-	91,  // 74: hawkr.product.ProductDraft.skus:type_name -> hawkr.product.ProductSkuImport
-	6,   // 75: hawkr.product.ProductDraft.certifications:type_name -> hawkr.product.Certification
-	100, // 76: hawkr.product.ValidateProductDraftResponse.violations:type_name -> hawkr.product.DraftViolation
-	103, // 77: hawkr.product.GetProductsBriefInternalResponse.records:type_name -> hawkr.product.ProductBriefInternal
-	106, // 78: hawkr.product.ProductCertificationApplication.gov_verify_payload:type_name -> hawkr.product.GovVerifyResult
-	105, // 79: hawkr.product.ProductCertificationApplication.current_approved:type_name -> hawkr.product.ProductCertificationSummary
-	104, // 80: hawkr.product.ListProductCertificationApplicationsResponse.records:type_name -> hawkr.product.ProductCertificationApplication
-	104, // 81: hawkr.product.ProductCertificationApplicationResponse.data:type_name -> hawkr.product.ProductCertificationApplication
-	104, // 82: hawkr.product.ListProductCertificationApplicationsForAdminResponse.records:type_name -> hawkr.product.ProductCertificationApplication
-	107, // 83: hawkr.product.ListProductCertificationAuditLogsForAdminResponse.records:type_name -> hawkr.product.ProductCertificationReviewEvent
-	104, // 84: hawkr.product.ProductCertificationApplicationAdminResponse.data:type_name -> hawkr.product.ProductCertificationApplication
-	56,  // 85: hawkr.product.BatchGetSkuCartInfoResponse.SkusEntry.value:type_name -> hawkr.product.SkuCartInfo
-	59,  // 86: hawkr.product.BatchGetProductForCheckoutResponse.DataEntry.value:type_name -> hawkr.product.ProductForCheckoutInfo
-	11,  // 87: hawkr.product.ProductService.CreateProduct:input_type -> hawkr.product.CreateProductRequest
-	13,  // 88: hawkr.product.ProductService.UpdateProduct:input_type -> hawkr.product.UpdateProductRequest
-	25,  // 89: hawkr.product.ProductService.GetProduct:input_type -> hawkr.product.GetProductRequest
-	27,  // 90: hawkr.product.ProductService.GetPublicProduct:input_type -> hawkr.product.GetPublicProductRequest
-	28,  // 91: hawkr.product.ProductService.GetProductList:input_type -> hawkr.product.GetProductListRequest
-	15,  // 92: hawkr.product.ProductService.GetProductForAdmin:input_type -> hawkr.product.GetProductForAdminRequest
-	16,  // 93: hawkr.product.ProductService.UpdateProductStatus:input_type -> hawkr.product.UpdateProductStatusRequest
-	17,  // 94: hawkr.product.ProductService.UpdateSellerProductStatus:input_type -> hawkr.product.UpdateSellerProductStatusRequest
-	22,  // 95: hawkr.product.ProductService.BatchUpdateSellerProductStatus:input_type -> hawkr.product.BatchUpdateSellerProductStatusRequest
-	19,  // 96: hawkr.product.ProductService.BatchGetSellerProductsForDelegation:input_type -> hawkr.product.BatchGetSellerProductsForDelegationRequest
-	48,  // 97: hawkr.product.ProductService.PurgeProductCache:input_type -> hawkr.product.PurgeProductCacheRequest
-	40,  // 98: hawkr.product.ProductService.DeductStock:input_type -> hawkr.product.DeductStockRequest
-	41,  // 99: hawkr.product.ProductService.RestoreStock:input_type -> hawkr.product.RestoreStockRequest
-	45,  // 100: hawkr.product.ProductService.GetStock:input_type -> hawkr.product.GetStockRequest
-	51,  // 101: hawkr.product.ProductService.GetProductSimple:input_type -> hawkr.product.GetProductSimpleRequest
-	54,  // 102: hawkr.product.ProductService.BatchGetSkuCartInfo:input_type -> hawkr.product.BatchGetSkuCartInfoRequest
-	57,  // 103: hawkr.product.ProductService.BatchGetProductForCheckout:input_type -> hawkr.product.BatchGetProductForCheckoutRequest
-	34,  // 104: hawkr.product.ProductService.GetProductsByIDs:input_type -> hawkr.product.GetProductsByIDsRequest
-	66,  // 105: hawkr.product.ProductService.GetRelatedProducts:input_type -> hawkr.product.GetRelatedProductsRequest
-	38,  // 106: hawkr.product.ProductService.DeleteProduct:input_type -> hawkr.product.DeleteProductRequest
-	60,  // 107: hawkr.product.ProductService.CalculateShippingOptions:input_type -> hawkr.product.CalculateShippingOptionsRequest
-	68,  // 108: hawkr.product.ProductService.VerifyCertification:input_type -> hawkr.product.VerifyCertificationRequest
-	108, // 109: hawkr.product.ProductService.SubmitProductCertification:input_type -> hawkr.product.SubmitProductCertificationRequest
-	109, // 110: hawkr.product.ProductService.ListProductCertificationApplications:input_type -> hawkr.product.ListProductCertificationApplicationsRequest
-	111, // 111: hawkr.product.ProductService.WithdrawProductCertification:input_type -> hawkr.product.WithdrawProductCertificationRequest
-	114, // 112: hawkr.product.ProductService.ListProductCertificationApplicationsForAdmin:input_type -> hawkr.product.ListProductCertificationApplicationsForAdminRequest
-	113, // 113: hawkr.product.ProductService.GetProductCertificationApplicationForAdmin:input_type -> hawkr.product.GetProductCertificationApplicationForAdminRequest
-	116, // 114: hawkr.product.ProductService.ListProductCertificationAuditLogsForAdmin:input_type -> hawkr.product.ListProductCertificationAuditLogsForAdminRequest
-	119, // 115: hawkr.product.ProductService.ApproveProductCertificationForAdmin:input_type -> hawkr.product.ReviewProductCertificationForAdminRequest
-	119, // 116: hawkr.product.ProductService.RejectProductCertificationForAdmin:input_type -> hawkr.product.ReviewProductCertificationForAdminRequest
-	119, // 117: hawkr.product.ProductService.RevokeProductCertificationForAdmin:input_type -> hawkr.product.ReviewProductCertificationForAdminRequest
-	120, // 118: hawkr.product.ProductService.ReverifyProductCertificationForAdmin:input_type -> hawkr.product.ReverifyProductCertificationForAdminRequest
-	70,  // 119: hawkr.product.ProductService.ListProductsByCategoryForAdmin:input_type -> hawkr.product.ListProductsByCategoryForAdminRequest
-	72,  // 120: hawkr.product.ProductService.BatchChangeProductCategoryForAdmin:input_type -> hawkr.product.BatchChangeProductCategoryForAdminRequest
-	75,  // 121: hawkr.product.ProductService.SearchHashtags:input_type -> hawkr.product.SearchHashtagsRequest
-	77,  // 122: hawkr.product.ProductService.GetPopularHashtags:input_type -> hawkr.product.GetPopularHashtagsRequest
-	80,  // 123: hawkr.product.ProductService.GetPublicOriginsSummary:input_type -> hawkr.product.GetPublicOriginsSummaryRequest
-	83,  // 124: hawkr.product.ProductService.GetPublicSellerCitiesSummary:input_type -> hawkr.product.GetPublicSellerCitiesSummaryRequest
-	86,  // 125: hawkr.product.ProductService.ListStoreIDsWithPublicProductsInternal:input_type -> hawkr.product.ListStoreIDsWithPublicProductsInternalRequest
-	88,  // 126: hawkr.product.ProductService.ValidateLeafCategoryInternal:input_type -> hawkr.product.ValidateLeafCategoryInternalRequest
-	92,  // 127: hawkr.product.ProductService.CreateProductFromImportInternal:input_type -> hawkr.product.CreateProductFromImportInternalRequest
-	94,  // 128: hawkr.product.ProductService.BatchCheckSellerProductNames:input_type -> hawkr.product.BatchCheckSellerProductNamesRequest
-	97,  // 129: hawkr.product.ProductService.ValidateProductDraft:input_type -> hawkr.product.ValidateProductDraftRequest
-	101, // 130: hawkr.product.ProductService.GetProductsBriefInternal:input_type -> hawkr.product.GetProductsBriefInternalRequest
-	12,  // 131: hawkr.product.ProductService.CreateProduct:output_type -> hawkr.product.CreateProductResponse
-	14,  // 132: hawkr.product.ProductService.UpdateProduct:output_type -> hawkr.product.UpdateProductResponse
-	26,  // 133: hawkr.product.ProductService.GetProduct:output_type -> hawkr.product.GetProductResponse
-	26,  // 134: hawkr.product.ProductService.GetPublicProduct:output_type -> hawkr.product.GetProductResponse
-	29,  // 135: hawkr.product.ProductService.GetProductList:output_type -> hawkr.product.GetProductListResponse
-	26,  // 136: hawkr.product.ProductService.GetProductForAdmin:output_type -> hawkr.product.GetProductResponse
-	14,  // 137: hawkr.product.ProductService.UpdateProductStatus:output_type -> hawkr.product.UpdateProductResponse
-	14,  // 138: hawkr.product.ProductService.UpdateSellerProductStatus:output_type -> hawkr.product.UpdateProductResponse
-	24,  // 139: hawkr.product.ProductService.BatchUpdateSellerProductStatus:output_type -> hawkr.product.BatchUpdateSellerProductStatusResponse
-	21,  // 140: hawkr.product.ProductService.BatchGetSellerProductsForDelegation:output_type -> hawkr.product.BatchGetSellerProductsForDelegationResponse
-	49,  // 141: hawkr.product.ProductService.PurgeProductCache:output_type -> hawkr.product.PurgeProductCacheResponse
-	43,  // 142: hawkr.product.ProductService.DeductStock:output_type -> hawkr.product.StockOperationResponse
-	43,  // 143: hawkr.product.ProductService.RestoreStock:output_type -> hawkr.product.StockOperationResponse
-	46,  // 144: hawkr.product.ProductService.GetStock:output_type -> hawkr.product.GetStockResponse
-	52,  // 145: hawkr.product.ProductService.GetProductSimple:output_type -> hawkr.product.GetProductSimpleResponse
-	55,  // 146: hawkr.product.ProductService.BatchGetSkuCartInfo:output_type -> hawkr.product.BatchGetSkuCartInfoResponse
-	58,  // 147: hawkr.product.ProductService.BatchGetProductForCheckout:output_type -> hawkr.product.BatchGetProductForCheckoutResponse
-	35,  // 148: hawkr.product.ProductService.GetProductsByIDs:output_type -> hawkr.product.GetProductsByIDsResponse
-	67,  // 149: hawkr.product.ProductService.GetRelatedProducts:output_type -> hawkr.product.GetRelatedProductsResponse
-	39,  // 150: hawkr.product.ProductService.DeleteProduct:output_type -> hawkr.product.DeleteProductResponse
-	61,  // 151: hawkr.product.ProductService.CalculateShippingOptions:output_type -> hawkr.product.CalculateShippingOptionsResponse
-	69,  // 152: hawkr.product.ProductService.VerifyCertification:output_type -> hawkr.product.VerifyCertificationResponse
-	112, // 153: hawkr.product.ProductService.SubmitProductCertification:output_type -> hawkr.product.ProductCertificationApplicationResponse
-	110, // 154: hawkr.product.ProductService.ListProductCertificationApplications:output_type -> hawkr.product.ListProductCertificationApplicationsResponse
-	112, // 155: hawkr.product.ProductService.WithdrawProductCertification:output_type -> hawkr.product.ProductCertificationApplicationResponse
-	115, // 156: hawkr.product.ProductService.ListProductCertificationApplicationsForAdmin:output_type -> hawkr.product.ListProductCertificationApplicationsForAdminResponse
-	118, // 157: hawkr.product.ProductService.GetProductCertificationApplicationForAdmin:output_type -> hawkr.product.ProductCertificationApplicationAdminResponse
-	117, // 158: hawkr.product.ProductService.ListProductCertificationAuditLogsForAdmin:output_type -> hawkr.product.ListProductCertificationAuditLogsForAdminResponse
-	118, // 159: hawkr.product.ProductService.ApproveProductCertificationForAdmin:output_type -> hawkr.product.ProductCertificationApplicationAdminResponse
-	118, // 160: hawkr.product.ProductService.RejectProductCertificationForAdmin:output_type -> hawkr.product.ProductCertificationApplicationAdminResponse
-	118, // 161: hawkr.product.ProductService.RevokeProductCertificationForAdmin:output_type -> hawkr.product.ProductCertificationApplicationAdminResponse
-	118, // 162: hawkr.product.ProductService.ReverifyProductCertificationForAdmin:output_type -> hawkr.product.ProductCertificationApplicationAdminResponse
-	71,  // 163: hawkr.product.ProductService.ListProductsByCategoryForAdmin:output_type -> hawkr.product.ListProductsByCategoryForAdminResponse
-	73,  // 164: hawkr.product.ProductService.BatchChangeProductCategoryForAdmin:output_type -> hawkr.product.BatchChangeProductCategoryForAdminResponse
-	76,  // 165: hawkr.product.ProductService.SearchHashtags:output_type -> hawkr.product.SearchHashtagsResponse
-	78,  // 166: hawkr.product.ProductService.GetPopularHashtags:output_type -> hawkr.product.GetPopularHashtagsResponse
-	81,  // 167: hawkr.product.ProductService.GetPublicOriginsSummary:output_type -> hawkr.product.GetPublicOriginsSummaryResponse
-	84,  // 168: hawkr.product.ProductService.GetPublicSellerCitiesSummary:output_type -> hawkr.product.GetPublicSellerCitiesSummaryResponse
-	87,  // 169: hawkr.product.ProductService.ListStoreIDsWithPublicProductsInternal:output_type -> hawkr.product.ListStoreIDsWithPublicProductsInternalResponse
-	89,  // 170: hawkr.product.ProductService.ValidateLeafCategoryInternal:output_type -> hawkr.product.ValidateLeafCategoryInternalResponse
-	93,  // 171: hawkr.product.ProductService.CreateProductFromImportInternal:output_type -> hawkr.product.CreateProductFromImportInternalResponse
-	95,  // 172: hawkr.product.ProductService.BatchCheckSellerProductNames:output_type -> hawkr.product.BatchCheckSellerProductNamesResponse
-	99,  // 173: hawkr.product.ProductService.ValidateProductDraft:output_type -> hawkr.product.ValidateProductDraftResponse
-	102, // 174: hawkr.product.ProductService.GetProductsBriefInternal:output_type -> hawkr.product.GetProductsBriefInternalResponse
-	131, // [131:175] is the sub-list for method output_type
-	87,  // [87:131] is the sub-list for method input_type
-	87,  // [87:87] is the sub-list for extension type_name
-	87,  // [87:87] is the sub-list for extension extendee
-	0,   // [0:87] is the sub-list for field type_name
+	73,  // 61: hawkr.product.SearchHashtagsResponse.items:type_name -> hawkr.product.HashtagItem
+	78,  // 62: hawkr.product.GetPopularHashtagsResponse.records:type_name -> hawkr.product.PopularHashtagItem
+	81,  // 63: hawkr.product.GetPublicOriginsSummaryResponse.records:type_name -> hawkr.product.OriginSummaryItem
+	84,  // 64: hawkr.product.GetPublicSellerCitiesSummaryResponse.records:type_name -> hawkr.product.SellerCitySummaryItem
+	89,  // 65: hawkr.product.ProductCertificationApplication.gov_verify_payload:type_name -> hawkr.product.GovVerifyResult
+	88,  // 66: hawkr.product.ProductCertificationApplication.current_approved:type_name -> hawkr.product.ProductCertificationSummary
+	87,  // 67: hawkr.product.ListProductCertificationApplicationsResponse.records:type_name -> hawkr.product.ProductCertificationApplication
+	87,  // 68: hawkr.product.ProductCertificationApplicationResponse.data:type_name -> hawkr.product.ProductCertificationApplication
+	87,  // 69: hawkr.product.ListProductCertificationApplicationsForAdminResponse.records:type_name -> hawkr.product.ProductCertificationApplication
+	90,  // 70: hawkr.product.ListProductCertificationAuditLogsForAdminResponse.records:type_name -> hawkr.product.ProductCertificationReviewEvent
+	87,  // 71: hawkr.product.ProductCertificationApplicationAdminResponse.data:type_name -> hawkr.product.ProductCertificationApplication
+	55,  // 72: hawkr.product.BatchGetSkuCartInfoResponse.SkusEntry.value:type_name -> hawkr.product.SkuCartInfo
+	58,  // 73: hawkr.product.BatchGetProductForCheckoutResponse.DataEntry.value:type_name -> hawkr.product.ProductForCheckoutInfo
+	10,  // 74: hawkr.product.ProductService.CreateProduct:input_type -> hawkr.product.CreateProductRequest
+	12,  // 75: hawkr.product.ProductService.UpdateProduct:input_type -> hawkr.product.UpdateProductRequest
+	24,  // 76: hawkr.product.ProductService.GetProduct:input_type -> hawkr.product.GetProductRequest
+	26,  // 77: hawkr.product.ProductService.GetPublicProduct:input_type -> hawkr.product.GetPublicProductRequest
+	27,  // 78: hawkr.product.ProductService.GetProductList:input_type -> hawkr.product.GetProductListRequest
+	14,  // 79: hawkr.product.ProductService.GetProductForAdmin:input_type -> hawkr.product.GetProductForAdminRequest
+	15,  // 80: hawkr.product.ProductService.UpdateProductStatus:input_type -> hawkr.product.UpdateProductStatusRequest
+	16,  // 81: hawkr.product.ProductService.UpdateSellerProductStatus:input_type -> hawkr.product.UpdateSellerProductStatusRequest
+	21,  // 82: hawkr.product.ProductService.BatchUpdateSellerProductStatus:input_type -> hawkr.product.BatchUpdateSellerProductStatusRequest
+	18,  // 83: hawkr.product.ProductService.BatchGetSellerProductsForDelegation:input_type -> hawkr.product.BatchGetSellerProductsForDelegationRequest
+	47,  // 84: hawkr.product.ProductService.PurgeProductCache:input_type -> hawkr.product.PurgeProductCacheRequest
+	39,  // 85: hawkr.product.ProductService.DeductStock:input_type -> hawkr.product.DeductStockRequest
+	40,  // 86: hawkr.product.ProductService.RestoreStock:input_type -> hawkr.product.RestoreStockRequest
+	44,  // 87: hawkr.product.ProductService.GetStock:input_type -> hawkr.product.GetStockRequest
+	50,  // 88: hawkr.product.ProductService.GetProductSimple:input_type -> hawkr.product.GetProductSimpleRequest
+	53,  // 89: hawkr.product.ProductService.BatchGetSkuCartInfo:input_type -> hawkr.product.BatchGetSkuCartInfoRequest
+	56,  // 90: hawkr.product.ProductService.BatchGetProductForCheckout:input_type -> hawkr.product.BatchGetProductForCheckoutRequest
+	33,  // 91: hawkr.product.ProductService.GetProductsByIDs:input_type -> hawkr.product.GetProductsByIDsRequest
+	65,  // 92: hawkr.product.ProductService.GetRelatedProducts:input_type -> hawkr.product.GetRelatedProductsRequest
+	37,  // 93: hawkr.product.ProductService.DeleteProduct:input_type -> hawkr.product.DeleteProductRequest
+	59,  // 94: hawkr.product.ProductService.CalculateShippingOptions:input_type -> hawkr.product.CalculateShippingOptionsRequest
+	67,  // 95: hawkr.product.ProductService.VerifyCertification:input_type -> hawkr.product.VerifyCertificationRequest
+	91,  // 96: hawkr.product.ProductService.SubmitProductCertification:input_type -> hawkr.product.SubmitProductCertificationRequest
+	92,  // 97: hawkr.product.ProductService.ListProductCertificationApplications:input_type -> hawkr.product.ListProductCertificationApplicationsRequest
+	94,  // 98: hawkr.product.ProductService.WithdrawProductCertification:input_type -> hawkr.product.WithdrawProductCertificationRequest
+	97,  // 99: hawkr.product.ProductService.ListProductCertificationApplicationsForAdmin:input_type -> hawkr.product.ListProductCertificationApplicationsForAdminRequest
+	96,  // 100: hawkr.product.ProductService.GetProductCertificationApplicationForAdmin:input_type -> hawkr.product.GetProductCertificationApplicationForAdminRequest
+	99,  // 101: hawkr.product.ProductService.ListProductCertificationAuditLogsForAdmin:input_type -> hawkr.product.ListProductCertificationAuditLogsForAdminRequest
+	102, // 102: hawkr.product.ProductService.ApproveProductCertificationForAdmin:input_type -> hawkr.product.ReviewProductCertificationForAdminRequest
+	102, // 103: hawkr.product.ProductService.RejectProductCertificationForAdmin:input_type -> hawkr.product.ReviewProductCertificationForAdminRequest
+	102, // 104: hawkr.product.ProductService.RevokeProductCertificationForAdmin:input_type -> hawkr.product.ReviewProductCertificationForAdminRequest
+	103, // 105: hawkr.product.ProductService.ReverifyProductCertificationForAdmin:input_type -> hawkr.product.ReverifyProductCertificationForAdminRequest
+	69,  // 106: hawkr.product.ProductService.ListProductsByCategoryForAdmin:input_type -> hawkr.product.ListProductsByCategoryForAdminRequest
+	71,  // 107: hawkr.product.ProductService.BatchChangeProductCategoryForAdmin:input_type -> hawkr.product.BatchChangeProductCategoryForAdminRequest
+	74,  // 108: hawkr.product.ProductService.SearchHashtags:input_type -> hawkr.product.SearchHashtagsRequest
+	76,  // 109: hawkr.product.ProductService.GetPopularHashtags:input_type -> hawkr.product.GetPopularHashtagsRequest
+	79,  // 110: hawkr.product.ProductService.GetPublicOriginsSummary:input_type -> hawkr.product.GetPublicOriginsSummaryRequest
+	82,  // 111: hawkr.product.ProductService.GetPublicSellerCitiesSummary:input_type -> hawkr.product.GetPublicSellerCitiesSummaryRequest
+	85,  // 112: hawkr.product.ProductService.ListStoreIDsWithPublicProductsInternal:input_type -> hawkr.product.ListStoreIDsWithPublicProductsInternalRequest
+	11,  // 113: hawkr.product.ProductService.CreateProduct:output_type -> hawkr.product.CreateProductResponse
+	13,  // 114: hawkr.product.ProductService.UpdateProduct:output_type -> hawkr.product.UpdateProductResponse
+	25,  // 115: hawkr.product.ProductService.GetProduct:output_type -> hawkr.product.GetProductResponse
+	25,  // 116: hawkr.product.ProductService.GetPublicProduct:output_type -> hawkr.product.GetProductResponse
+	28,  // 117: hawkr.product.ProductService.GetProductList:output_type -> hawkr.product.GetProductListResponse
+	25,  // 118: hawkr.product.ProductService.GetProductForAdmin:output_type -> hawkr.product.GetProductResponse
+	13,  // 119: hawkr.product.ProductService.UpdateProductStatus:output_type -> hawkr.product.UpdateProductResponse
+	13,  // 120: hawkr.product.ProductService.UpdateSellerProductStatus:output_type -> hawkr.product.UpdateProductResponse
+	23,  // 121: hawkr.product.ProductService.BatchUpdateSellerProductStatus:output_type -> hawkr.product.BatchUpdateSellerProductStatusResponse
+	20,  // 122: hawkr.product.ProductService.BatchGetSellerProductsForDelegation:output_type -> hawkr.product.BatchGetSellerProductsForDelegationResponse
+	48,  // 123: hawkr.product.ProductService.PurgeProductCache:output_type -> hawkr.product.PurgeProductCacheResponse
+	42,  // 124: hawkr.product.ProductService.DeductStock:output_type -> hawkr.product.StockOperationResponse
+	42,  // 125: hawkr.product.ProductService.RestoreStock:output_type -> hawkr.product.StockOperationResponse
+	45,  // 126: hawkr.product.ProductService.GetStock:output_type -> hawkr.product.GetStockResponse
+	51,  // 127: hawkr.product.ProductService.GetProductSimple:output_type -> hawkr.product.GetProductSimpleResponse
+	54,  // 128: hawkr.product.ProductService.BatchGetSkuCartInfo:output_type -> hawkr.product.BatchGetSkuCartInfoResponse
+	57,  // 129: hawkr.product.ProductService.BatchGetProductForCheckout:output_type -> hawkr.product.BatchGetProductForCheckoutResponse
+	34,  // 130: hawkr.product.ProductService.GetProductsByIDs:output_type -> hawkr.product.GetProductsByIDsResponse
+	66,  // 131: hawkr.product.ProductService.GetRelatedProducts:output_type -> hawkr.product.GetRelatedProductsResponse
+	38,  // 132: hawkr.product.ProductService.DeleteProduct:output_type -> hawkr.product.DeleteProductResponse
+	60,  // 133: hawkr.product.ProductService.CalculateShippingOptions:output_type -> hawkr.product.CalculateShippingOptionsResponse
+	68,  // 134: hawkr.product.ProductService.VerifyCertification:output_type -> hawkr.product.VerifyCertificationResponse
+	95,  // 135: hawkr.product.ProductService.SubmitProductCertification:output_type -> hawkr.product.ProductCertificationApplicationResponse
+	93,  // 136: hawkr.product.ProductService.ListProductCertificationApplications:output_type -> hawkr.product.ListProductCertificationApplicationsResponse
+	95,  // 137: hawkr.product.ProductService.WithdrawProductCertification:output_type -> hawkr.product.ProductCertificationApplicationResponse
+	98,  // 138: hawkr.product.ProductService.ListProductCertificationApplicationsForAdmin:output_type -> hawkr.product.ListProductCertificationApplicationsForAdminResponse
+	101, // 139: hawkr.product.ProductService.GetProductCertificationApplicationForAdmin:output_type -> hawkr.product.ProductCertificationApplicationAdminResponse
+	100, // 140: hawkr.product.ProductService.ListProductCertificationAuditLogsForAdmin:output_type -> hawkr.product.ListProductCertificationAuditLogsForAdminResponse
+	101, // 141: hawkr.product.ProductService.ApproveProductCertificationForAdmin:output_type -> hawkr.product.ProductCertificationApplicationAdminResponse
+	101, // 142: hawkr.product.ProductService.RejectProductCertificationForAdmin:output_type -> hawkr.product.ProductCertificationApplicationAdminResponse
+	101, // 143: hawkr.product.ProductService.RevokeProductCertificationForAdmin:output_type -> hawkr.product.ProductCertificationApplicationAdminResponse
+	101, // 144: hawkr.product.ProductService.ReverifyProductCertificationForAdmin:output_type -> hawkr.product.ProductCertificationApplicationAdminResponse
+	70,  // 145: hawkr.product.ProductService.ListProductsByCategoryForAdmin:output_type -> hawkr.product.ListProductsByCategoryForAdminResponse
+	72,  // 146: hawkr.product.ProductService.BatchChangeProductCategoryForAdmin:output_type -> hawkr.product.BatchChangeProductCategoryForAdminResponse
+	75,  // 147: hawkr.product.ProductService.SearchHashtags:output_type -> hawkr.product.SearchHashtagsResponse
+	77,  // 148: hawkr.product.ProductService.GetPopularHashtags:output_type -> hawkr.product.GetPopularHashtagsResponse
+	80,  // 149: hawkr.product.ProductService.GetPublicOriginsSummary:output_type -> hawkr.product.GetPublicOriginsSummaryResponse
+	83,  // 150: hawkr.product.ProductService.GetPublicSellerCitiesSummary:output_type -> hawkr.product.GetPublicSellerCitiesSummaryResponse
+	86,  // 151: hawkr.product.ProductService.ListStoreIDsWithPublicProductsInternal:output_type -> hawkr.product.ListStoreIDsWithPublicProductsInternalResponse
+	113, // [113:152] is the sub-list for method output_type
+	74,  // [74:113] is the sub-list for method input_type
+	74,  // [74:74] is the sub-list for extension type_name
+	74,  // [74:74] is the sub-list for extension extendee
+	0,   // [0:74] is the sub-list for field type_name
 }
 
 func init() { file_product_product_proto_init() }
@@ -10883,8 +9433,8 @@ func file_product_product_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_product_product_proto_rawDesc), len(file_product_product_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   121,
+			NumEnums:      2,
+			NumMessages:   105,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
