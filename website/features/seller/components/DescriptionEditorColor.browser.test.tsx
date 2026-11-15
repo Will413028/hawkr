@@ -111,13 +111,13 @@ describe("DescriptionEditorColor", () => {
 				color: "rgb(86, 58, 114)",
 			}),
 		);
-		await userEvent.click(ui.getByRole("button", { name: /^復原（/ }));
+		await userEvent.click(await ui.findByRole("button", { name: /^復原（/ }));
 		await waitFor(() =>
 			expect(
 				args.onChange.mock.lastCall?.[0].blocks[0].runs?.[0].color,
 			).toBeUndefined(),
 		);
-		await userEvent.click(ui.getByRole("button", { name: /^重做（/ }));
+		await userEvent.click(await ui.findByRole("button", { name: /^重做（/ }));
 		await waitFor(() =>
 			expect(args.onChange.mock.lastCall?.[0].blocks[0].runs?.[0].color).toBe(
 				"#563a72",
@@ -321,7 +321,9 @@ describe("DescriptionEditorColor", () => {
 				await expectState(index + 2, `apply${phase}`);
 			}
 			for (let index = 3; index >= 0; index -= 1) {
-				await userEvent.click(ui.getByRole("button", { name: /^復原（/ }));
+				await userEvent.click(
+					await ui.findByRole("button", { name: /^復原（/ }),
+				);
 				await expectState(
 					index,
 					`undo${["Color", "Bold", "Italic", "Underline"][index]}`,

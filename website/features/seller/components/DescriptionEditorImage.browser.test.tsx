@@ -299,7 +299,7 @@ describe("DescriptionEditorImage", () => {
 			expect(image?.assetId).toBeUndefined();
 		});
 		await assertDecodedImage(dialog);
-		await userEvent.click(ui.getByRole("button", { name: /^復原（/ }));
+		await userEvent.click(await ui.findByRole("button", { name: /^復原（/ }));
 		await waitFor(() =>
 			expect(images(args.onChange.mock.lastCall?.[0])).toEqual([
 				expect.objectContaining({
@@ -310,7 +310,7 @@ describe("DescriptionEditorImage", () => {
 			]),
 		);
 		await assertDecodedImage(dialog, oldImage.alt);
-		await userEvent.click(ui.getByRole("button", { name: /^重做（/ }));
+		await userEvent.click(await ui.findByRole("button", { name: /^重做（/ }));
 		await waitFor(() => {
 			const image = images(args.onChange.mock.lastCall?.[0])[0];
 			expect(image?.imageKey).toBe(newImageKey);
@@ -330,7 +330,7 @@ describe("DescriptionEditorImage", () => {
 			expect(images(args.onChange.mock.lastCall?.[0])).toEqual([]);
 			expect(ui.queryByRole("img")).toBeNull();
 		});
-		await userEvent.click(ui.getByRole("button", { name: /^復原（/ }));
+		await userEvent.click(await ui.findByRole("button", { name: /^復原（/ }));
 		await waitFor(() =>
 			expect(images(args.onChange.mock.lastCall?.[0])).toEqual([
 				expect.objectContaining({

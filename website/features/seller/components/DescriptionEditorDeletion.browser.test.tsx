@@ -156,11 +156,15 @@ async function deleteFromBlockMenu(
 }
 
 async function undo(dialog: HTMLElement, user: NativeUserEvent) {
-	await user.click(within(dialog).getByRole("button", { name: /^復原（/ }));
+	await user.click(
+		await within(dialog).findByRole("button", { name: /^復原（/ }),
+	);
 }
 
 async function redo(dialog: HTMLElement, user: NativeUserEvent) {
-	await user.click(within(dialog).getByRole("button", { name: /^重做（/ }));
+	await user.click(
+		await within(dialog).findByRole("button", { name: /^重做（/ }),
+	);
 }
 
 const paragraphToListValue: ProductDescription = {

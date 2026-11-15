@@ -345,7 +345,9 @@ describe("DescriptionEditor", () => {
 				})),
 			});
 		});
-		await userEvent.click(editor.getByRole("button", { name: /^復原（/ }));
+		await userEvent.click(
+			await editor.findByRole("button", { name: /^復原（/ }),
+		);
 		await waitFor(() => {
 			expect(textBlocks(args.onChange.mock.lastCall?.[0])).toBe(
 				"商品規格\n來源資訊\n保存方式",
@@ -511,13 +513,17 @@ describe("DescriptionEditor", () => {
 		await waitFor(() =>
 			expect(dialog).toHaveAttributeSync("aria-busy", "false"),
 		);
-		await userEvent.click(editor.getByRole("button", { name: /^復原（/ }));
+		await userEvent.click(
+			await editor.findByRole("button", { name: /^復原（/ }),
+		);
 		await waitFor(() => {
 			expect(dialog).toHaveAttributeSync("aria-busy", "false");
 			expect(editor.getByText("## 商品資訊")).toBeVisibleSync();
 			expect(editor.getByRole("button", { name: /^重做（/ })).toBeEnabledSync();
 		});
-		await userEvent.click(editor.getByRole("button", { name: /^重做（/ }));
+		await userEvent.click(
+			await editor.findByRole("button", { name: /^重做（/ }),
+		);
 		await waitFor(() => {
 			expect(dialog).toHaveAttributeSync("aria-busy", "false");
 			expect(editor.queryByText("## 商品資訊")).toBeNull();
