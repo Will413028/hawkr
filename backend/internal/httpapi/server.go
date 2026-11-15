@@ -370,6 +370,9 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	if err := checkCustomerEffects(out); err != nil {
 		return nil, err
 	}
+	if err := checkPublicViewerDependence(out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -418,7 +421,7 @@ func mount(mux *http.ServeMux, path string, h http.Handler) {
 	if !ok {
 		panic(fmt.Sprintf("httpapi：%s 不符合 service 的命名規則（<模組>PublicService、<模組>AppService、<模組>InviteeService、hawkr.admin.* 的 <模組>AdminService）", path))
 	}
-	mux.Handle(path, cachePolicy(audience, h))
+	mux.Handle(path, cachePolicy(audience, isViewerDependent, h))
 }
 
 // withTracing 為每個請求開一個新的 trace：單體是入口，不接續 client 帶來的 traceparent（client 不可信，而且同一頁

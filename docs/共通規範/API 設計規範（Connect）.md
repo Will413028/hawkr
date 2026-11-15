@@ -180,11 +180,11 @@
 
   | 類別 | 值 |
   |---|---|
-  | `PublicService` 的讀取，請求不帶憑證 | `public, no-cache`，加弱 `ETag`；client 與 CDN 每次都向來源確認，沒變時回 304 |
-  | `PublicService` 的讀取，請求帶憑證（`Authorization: Bearer` 或 session cookie） | `private, no-store`，沒有 `ETag` |
+  | `PublicService` 的讀取，不依觀看者，或依觀看者但請求不帶憑證 | `public, no-cache`，加弱 `ETag`；client 與 CDN 每次都向來源確認，沒變時回 304 |
+  | `PublicService` 的讀取，依觀看者（handler 讀呼叫者：`viewer_can_*`、`is_mine`、封鎖過濾）而且請求帶憑證（`Authorization: Bearer` 或 session cookie） | `private, no-store`，沒有 `ETag` |
   | `AppService`、`AdminService`、`InviteeService` 的所有回應 | `private, no-store`；`InviteeService` 的讀取可以用 GET（以 cookie 認證），回應仍不可快取，沒有 `ETag` |
 
-  `PublicService` 的 GET 回應一律帶 `Vary: Authorization, Cookie`（與 `Accept-Encoding`）。判斷依據是請求有沒有帶憑證，不是 handler 有沒有讀到呼叫者：停權帳號與無效 token 以訪客執行，回應仍不得進共享快取。部署前提：Cloudflare 對帶 cookie 或 `Authorization` 的請求設不走快取（CDN 是否依 `Vary` 分開快取未查證），上線計畫驗證。
+  `PublicService` 的 GET 回應一律帶 `Vary: Accept-Encoding, Authorization, Cookie`。每個 Public procedure 在 `httpapi/viewer.go` 的 `publicViewerDependent` 宣告回應是否依觀看者而定，缺宣告、多宣告都不能啟動；不依觀看者的方法（例如 `SuggestTags`、內容、探索）帶 cookie 也照常 `public, no-cache`。依觀看者的方法，判斷依據是請求有沒有帶憑證，不是 handler 有沒有讀到呼叫者：停權帳號與無效 token 以訪客執行，回應仍不得進共享快取。部署前提：Cloudflare 對帶 cookie 或 `Authorization` 的請求設不走快取（CDN 是否依 `Vary` 分開快取未查證），上線計畫驗證。
 
   公開讀取先不設 `max-age`：website 在寫入後以 tag 立即失效（`platform/revalidate`），而 CDN 若在 `max-age` 內回舊資料，website 會把舊資料再快取一輪。要設 `max-age` 的方法，連同 website 的失效流程在 CD 驗證 Cloudflare 的行為時一起決定。
 - 資源的 etag（第七節）與 HTTP 的 `ETag`（條件請求、304）是兩件事：前者是版本，後者是回應內容的雜湊。
