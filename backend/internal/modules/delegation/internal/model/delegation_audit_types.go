@@ -242,3 +242,17 @@ type AuditConfirmInput struct {
 	AfterSnapshot        json.RawMessage
 	ChangedFields        []ChangedField
 }
+
+// ScheduledPublishAuditInput 是排程到點發布成功的單段稽核（沒有 intent 與 confirm）：SessionID 是發起排程的代行 session，ScheduleID 是冪等鍵的來源。
+type ScheduledPublishAuditInput struct {
+	SessionID  int64
+	ScheduleID uuid.UUID
+	PostID     uuid.UUID
+	// Preview 是貼文內文的預覽，寫成資源名稱（截到 ResourceNameMaxRunes）。
+	Preview string
+}
+
+// ScheduledPublishIdempotencyKey 是單段稽核的冪等鍵：一次排程至多一列。
+func ScheduledPublishIdempotencyKey(scheduleID uuid.UUID) string {
+	return "schedule:" + scheduleID.String()
+}

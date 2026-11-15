@@ -17,6 +17,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect"
 	"github.com/go-jose/go-jose/v4"
@@ -97,7 +98,7 @@ func setup(t *testing.T, o options) *fixture {
 	// 與正式組裝相同：buyer 在建帳的 transaction 內建立買家並授予 BUYER（cmd/hawkr 的 subscribeBuyerLifecycle）。
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: jc, Now: time.Now, Logger: log})
 	events.Subscribe(bus, buyers.OnAccountCreated)
-	del := delegation.New(delegation.Deps{DB: d, Identity: m, Events: bus, Seller: &seller.Module{}, Now: time.Now, Logger: log})
+	del := delegation.New(delegation.Deps{DB: d, Identity: m, Events: bus, Seller: &seller.Module{}, Social: noSchedules{}, Now: time.Now, Logger: log})
 	events.Subscribe(bus, del.OnAdminRoleRevoked)
 	h, err := httpapi.NewHandler(httpapi.Deps{Buyer: buyers, Social: &social.Module{}, Legacy: o.legacy, LegacyPrefixes: []string{"/api/v1/"}, Ready: d.Ping, Identity: m, Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Delegation: del, Origins: []string{"https://web.example"}, Logger: log})
 	if err != nil {
@@ -399,16 +400,19 @@ func TestAdminSessionAccountListAndSignOut(t *testing.T) {
 	// 換了篩選就不能沿用 page token。
 	_, err = admin.ListAccounts(ctx, connect.NewRequest(&adminpb.ListAccountsRequest{PageSize: 2, Query: "x", PageToken: page.Msg.GetNextPageToken()}))
 	wantCode(t, err, connect.CodeInvalidArgument)
-	// 登出前撤銷代行；沒有代行時也成功。
+	// 登出前結束代行（不是撤銷）；沒有代行時也成功。
 	if _, err := admin.SignOut(ctx, connect.NewRequest(&adminpb.SignOutRequest{})); err != nil {
 		t.Fatal(err)
 	}
-	var status, reason string
-	if err := f.db.Pool().QueryRow(ctx, `SELECT status, revoke_reason FROM delegation.delegated_operation_sessions WHERE actor_admin_id = $1`, adminID).Scan(&status, &reason); err != nil {
+	var status string
+	var reason *string
+	var ended, clamped bool
+	if err := f.db.Pool().QueryRow(ctx, `SELECT status, revoke_reason, ended_at IS NOT NULL, expires_at < issued_at + interval '30 minutes'
+		FROM delegation.delegated_operation_sessions WHERE actor_admin_id = $1`, adminID).Scan(&status, &reason, &ended, &clamped); err != nil {
 		t.Fatal(err)
 	}
-	if status != "REVOKED" || reason != "admin_logout" {
-		t.Fatalf("登出後代行狀態 = %s, %s", status, reason)
+	if status != "ACTIVE" || reason != nil || !ended || !clamped {
+		t.Fatalf("登出後代行是結束（有 ended_at、expires_at 被夾短），不是撤銷：status=%s reason=%v ended=%v clamped=%v", status, reason, ended, clamped)
 	}
 }
 
@@ -474,4 +478,15 @@ func TestAdminGetAccountFindsALiveAccountAndHidesTheDeadOnes(t *testing.T) {
 	}
 	_, err = admin.GetAccount(ctx, connect.NewRequest(&adminpb.GetAccountRequest{AccountId: aID}))
 	wantCode(t, err, connect.CodeNotFound)
+}
+
+// noSchedules 是沒有 social 資料的測試組裝給 delegation 的 Social：這個測試不建排程，取消沒有東西可取消。
+type noSchedules struct{}
+
+func (noSchedules) CancelScheduledBy(context.Context, social.ScheduleKind, []string, social.CancelReason) ([]uuid.UUID, error) {
+	return nil, nil
+}
+
+func (noSchedules) CancelDelegatedSchedulesOfStore(context.Context, int64, social.CancelReason) ([]uuid.UUID, error) {
+	return nil, nil
 }

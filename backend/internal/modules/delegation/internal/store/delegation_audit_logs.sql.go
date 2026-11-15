@@ -390,6 +390,72 @@ func (q *Queries) InsertDelegationAuditLog(ctx context.Context, arg InsertDelega
 	return i, err
 }
 
+const insertScheduledPublishAuditLog = `-- name: InsertScheduledPublishAuditLog :one
+INSERT INTO delegation.admin_operation_audit_logs (
+    id, session_id, actor_admin_id, actor_display_name,
+    target_store_id, target_seller_account_id, target_store_name,
+    origin, capability, action, resource_type, resource_id, resource_name,
+    result, operation_reason, case_reference,
+    request_id, correlation_id, idempotency_key,
+    risk_level, notify_seller, created_at, confirmed_at
+) VALUES (
+    $1, $2, $3, $4,
+    $5, $6, $7,
+    'SCHEDULED', 'posts.publish', 'POST_PUBLISH', 'POST', $8::text, $9,
+    'SUCCEEDED', $10, $11,
+    $12, $13, $14::text,
+    $15, false, $16::timestamptz, date_trunc('second', $16::timestamptz)
+)
+ON CONFLICT (session_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
+RETURNING id
+`
+
+type InsertScheduledPublishAuditLogParams struct {
+	ID                    uuid.UUID
+	SessionID             int64
+	ActorAdminID          int64
+	ActorDisplayName      string
+	TargetStoreID         int64
+	TargetSellerAccountID int64
+	TargetStoreName       string
+	ResourceID            string
+	ResourceName          *string
+	OperationReason       *string
+	CaseReference         *string
+	RequestID             string
+	CorrelationID         string
+	IdempotencyKey        string
+	RiskLevel             string
+	Now                   time.Time
+}
+
+// 排程到點發布的單段稽核：與貼文發布同一個 transaction 寫入，直接是 SUCCEEDED（沒有 intent 與 confirm 兩段，貼文發布的事實就是結果）。
+// 冪等鍵是 schedule:<排程 ID>；同一個 session 的同一把鍵已經有列時沒有列回傳（重送的事件，呼叫方當成功）。固定值：origin SCHEDULED、
+// capability posts.publish、action POST_PUBLISH、resource_type POST；confirmed_at 與 confirm 一樣截秒。
+func (q *Queries) InsertScheduledPublishAuditLog(ctx context.Context, arg InsertScheduledPublishAuditLogParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, insertScheduledPublishAuditLog,
+		arg.ID,
+		arg.SessionID,
+		arg.ActorAdminID,
+		arg.ActorDisplayName,
+		arg.TargetStoreID,
+		arg.TargetSellerAccountID,
+		arg.TargetStoreName,
+		arg.ResourceID,
+		arg.ResourceName,
+		arg.OperationReason,
+		arg.CaseReference,
+		arg.RequestID,
+		arg.CorrelationID,
+		arg.IdempotencyKey,
+		arg.RiskLevel,
+		arg.Now,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const latestDelegationAuditReason = `-- name: LatestDelegationAuditReason :one
 SELECT operation_reason FROM delegation.admin_operation_audit_logs
 WHERE session_id = $1 AND resource_id = $2::text AND action = $3

@@ -11,7 +11,10 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -46,14 +49,10 @@ func (noStoreBlocks) StoreBlocksBuyer(context.Context, int64, int64) (bool, erro
 	return false, errors.New("此組裝不做買家身分的寫入，沒有店家封鎖的來源")
 }
 
-// scheduleAuthorizers 是 social 的排程授權實作，依發起者種類登記（缺一種 social.New 就 panic）。代行（DELEGATION）的實作由 delegation 提供，
-// 在它接上之前這裡以「一律拒絕」頂著：到點的代行排程轉 CANCELED（AUTHORITY_LOST），不會發布，也沒有任何呼叫方能建立代行排程。
-func scheduleAuthorizers() map[social.ScheduleKind]social.ScheduleAuthorizer {
-	return map[social.ScheduleKind]social.ScheduleAuthorizer{
-		social.ScheduleByDelegation: social.ScheduleAuthorizerFunc(func(context.Context, social.ScheduledPublish) error {
-			return social.ErrScheduleDenied
-		}),
-	}
+// scheduleAuthorizers 是 social 的排程授權實作，依發起者種類登記（缺一種 social.New 就 panic）。代行（DELEGATION）的實作由 delegation 提供
+// （delegation.NewScheduleAuthorizer），每一個組裝 social 的地方都傳真的實作，沒有「一律拒絕」的佔位。
+func scheduleAuthorizers(delegationAuthorizer social.ScheduleAuthorizer) map[social.ScheduleKind]social.ScheduleAuthorizer {
+	return map[social.ScheduleKind]social.ScheduleAuthorizer{social.ScheduleByDelegation: delegationAuthorizer}
 }
 
 // socialSellers 是 social 對 seller 的兩個依賴：讀店家與店家封鎖檢查；正式組裝傳 *seller.Module。
@@ -64,10 +63,10 @@ type socialSellers interface {
 
 // newSocial 組裝 social 模組。serve 與 worker 都需要它：serve 要訂閱買家與店家的事件（買家的刪除事件在發布方的 transaction 內記複本並重新求值、排清除 job；店家退場只排清除 job），worker 執行
 // 它的 job（圖片引用、清除、瀏覽資料清理、每日對帳；排程的是 PeriodicJobs）。
-func newSocial(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, buyers *buyer.Module, sellers socialSellers, med media.Media, products socialProducts, log *slog.Logger) *social.Module {
+func newSocial(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, buyers *buyer.Module, sellers socialSellers, med media.Media, products socialProducts, delegationAuthorizer social.ScheduleAuthorizer, log *slog.Logger) *social.Module {
 	m := social.New(social.Deps{
 		DB: d, Events: bus, Media: med, Jobs: jc, Buyers: buyers, Stores: sellers, StoreBlocks: sellers, Products: products,
-		ScheduleAuthorizers: scheduleAuthorizers(),
+		ScheduleAuthorizers: scheduleAuthorizers(delegationAuthorizer),
 		NewID:               uuid.NewV7, Now: time.Now, Logger: log,
 	})
 	subscribeSocial(bus, m)
@@ -97,7 +96,11 @@ func runSocialRecount(ctx context.Context, out io.Writer) error {
 		return err
 	}
 	defer d.Close()
-	m := social.New(social.Deps{DB: d, StoreBlocks: noStoreBlocks{}, ScheduleAuthorizers: scheduleAuthorizers(), NewID: uuid.NewV7, Now: time.Now, Logger: newLogger()})
+	log := newLogger()
+	delegationAuthorizer := delegation.NewScheduleAuthorizer(delegation.Deps{
+		DB: d, Identity: identity.New(identity.Deps{DB: d, Now: time.Now, Logger: log}), Seller: seller.NewReader(d, time.Now), Now: time.Now, Logger: log,
+	})
+	m := social.New(social.Deps{DB: d, StoreBlocks: noStoreBlocks{}, ScheduleAuthorizers: scheduleAuthorizers(delegationAuthorizer), NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	rep, err := m.RecountAll(ctx)
 	if err != nil {
 		return err

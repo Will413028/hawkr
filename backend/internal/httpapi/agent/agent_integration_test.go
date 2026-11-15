@@ -16,6 +16,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect"
 
@@ -181,7 +182,7 @@ func TestVendorPortalFromInviteToTheGateway(t *testing.T) {
 	h, err := httpapi.NewHandler(httpapi.Deps{Buyer: &buyer.Module{}, Social: &social.Module{},
 		Ready: d.Ping, Identity: id, Agent: agents, Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
 		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{},
-		Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: &seller.Module{}, Now: now, Logger: log}),
+		Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: &seller.Module{}, Social: noSchedules{}, Now: now, Logger: log}),
 		Legacy:     proxy, LegacyPrefixes: gatewayproxy.Prefixes, Now: now, Logger: log,
 	})
 	if err != nil {
@@ -434,4 +435,15 @@ func TestVendorPortalFromInviteToTheGateway(t *testing.T) {
 	if got := forward("43", both); !slices.Equal(got, unverified("43", infoB)) {
 		t.Fatalf("B 仍未驗證：gateway 收到 %v", got)
 	}
+}
+
+// noSchedules 是沒有 social 資料的測試組裝給 delegation 的 Social：這個測試不建排程，取消沒有東西可取消。
+type noSchedules struct{}
+
+func (noSchedules) CancelScheduledBy(context.Context, social.ScheduleKind, []string, social.CancelReason) ([]uuid.UUID, error) {
+	return nil, nil
+}
+
+func (noSchedules) CancelDelegatedSchedulesOfStore(context.Context, int64, social.CancelReason) ([]uuid.UUID, error) {
+	return nil, nil
 }

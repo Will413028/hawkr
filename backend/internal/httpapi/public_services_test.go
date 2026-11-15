@@ -174,7 +174,7 @@ func TestRecordProductViewIsLimitedPerSourceIP(t *testing.T) {
 
 // 統計組裝（評價）與排行是店面頁與推薦排行的必要依賴：沒有它們，組裝時就失敗，不是在請求時才回錯誤。
 func TestNewHandlerRequiresDiscoveryAndStats(t *testing.T) {
-	deps := Deps{Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}}
+	deps := Deps{Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}}
 	withRatings := deps
 	withRatings.Stats = characterize.Stats(t)
 	if _, err := NewHandler(withRatings); err == nil || !strings.Contains(err.Error(), "Discovery") {
@@ -190,7 +190,7 @@ func TestNewHandlerRequiresDiscoveryAndStats(t *testing.T) {
 // 後台待辦的 handler 需要 ReviewQueue：組裝漏接時啟動就失敗，不是第一個請求才 nil pointer panic。
 func TestNewHandlerRequiresReviewQueue(t *testing.T) {
 	deps := Deps{
-		Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
+		Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
 		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: struct{ httpseller.DashboardOrders }{}, Discovery: &discoverymod.Module{}, Agent: &agent.Module{},
 	}
 	if _, err := NewHandler(deps); err == nil || !strings.Contains(err.Error(), "ReviewQueue") {
@@ -201,7 +201,7 @@ func TestNewHandlerRequiresReviewQueue(t *testing.T) {
 // GetSession 的顯示資料與買家區都讀 Buyer：漏接時啟動就失敗，不是 GetSession 第一次被呼叫時 nil pointer panic。
 func TestNewHandlerRequiresBuyer(t *testing.T) {
 	deps := Deps{
-		Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
+		Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
 		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: struct{ httpseller.DashboardOrders }{}, Discovery: &discoverymod.Module{}, Agent: &agent.Module{},
 		ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Social: &social.Module{},
 	}

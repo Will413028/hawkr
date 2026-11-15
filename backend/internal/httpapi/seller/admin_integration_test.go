@@ -155,10 +155,12 @@ func setupAdmin(t *testing.T) *adminFixture {
 		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: f.now, Logger: log}),
 	})
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: m, Orders: orders, Now: time.Now, Logger: log})
+	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: m, Now: time.Now, Logger: log}
 	socialModule := social.New(social.Deps{
 		DB: d, Events: bus, Media: mediaFake, Jobs: queue, Buyers: buyers, Stores: m, StoreBlocks: m, NewID: uuid.NewV7, Now: f.now, Logger: log,
-		ScheduleAuthorizers: map[social.ScheduleKind]social.ScheduleAuthorizer{social.ScheduleByDelegation: social.ScheduleAuthorizerFunc(func(context.Context, social.ScheduledPublish) error { return social.ErrScheduleDenied })},
+		ScheduleAuthorizers: map[social.ScheduleKind]social.ScheduleAuthorizer{social.ScheduleByDelegation: delegation.NewScheduleAuthorizer(delegationDeps)},
 	})
+	delegationDeps.Social = socialModule
 	events.Subscribe(bus, socialModule.OnMeasureCreated)
 	events.Subscribe(bus, socialModule.OnMeasureRevoked)
 	images, err := rpc.NewImages("https://media.example.test")
@@ -167,7 +169,7 @@ func setupAdmin(t *testing.T) *adminFixture {
 	}
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Ready: d.Ping, Identity: id, Seller: m, Social: socialModule, Buyer: buyers, Images: images, Logger: log, Deletion: deletion,
-		Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: m, Now: time.Now, Logger: log}), Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{},
+		Delegation: delegation.New(delegationDeps), Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{},
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -58,73 +58,36 @@ func (m *Module) DelegationPreflight(ctx context.Context, in model.DelegationPre
 }
 
 func (m *Module) preflight(ctx context.Context, q *store.Queries, in model.DelegationPreflightInput, now time.Time, checkEligibility bool) (model.DelegationPreflight, error) {
-	admin, err := m.d.Identity.Admin(ctx, in.AdminID)
+	st, err := m.checkAuthority(ctx, q, authorityIn{AdminID: in.AdminID, StoreID: in.StoreID, Now: now, Eligibility: checkEligibility})
 	if err != nil {
-		// gateway 從有效的管理員 session 解析出來的 ID 在這裡找不到，是不變量被打破，不是業務的答案。
-		return model.DelegationPreflight{}, fmt.Errorf("delegation：讀取管理員 %d：%w", in.AdminID, err)
+		return model.DelegationPreflight{}, err
 	}
 	res := model.DelegationPreflight{
 		Target:                model.DelegationTarget{StoreID: in.StoreID},
-		Actor:                 model.DelegationActor{AdminID: admin.ID, DisplayName: admin.Email},
+		Actor:                 model.DelegationActor{AdminID: st.Admin.ID, DisplayName: st.Admin.Email},
 		ReasonOptions:         model.DelegationReasonOptions(),
 		Capabilities:          model.Capabilities(),
 		TTL:                   model.DelegationTTL,
 		IdleTimeout:           model.DelegationIdleTimeout,
 		CaseReferenceRequired: model.AnyCaseReferenceRequired(),
 	}
+	if st.StoreFound {
+		res.Target = model.DelegationTarget{StoreID: st.Store.StoreID, SellerAccountID: st.Store.SellerAccountID, StoreName: st.Store.Name}
+		if res.Target.StoreID == 0 {
+			res.Target.StoreID = in.StoreID
+		}
+		res.TargetKnown = true
+	}
+	if st.HasAuth && len(st.Auth.GrantedCapabilities) > 0 {
+		res.Capabilities = model.ToCapabilities(st.Auth.GrantedCapabilities)
+	}
+	if !st.holds() {
+		res.Denial, res.DeniedLabel = st.Denial, st.Label
+		return res, nil
+	}
 	denied := func(d model.DelegationDenial) (model.DelegationPreflight, error) {
 		res.Denial, res.DeniedLabel = d, model.DeniedLabel(d)
 		return res, nil
-	}
-	if checkEligibility {
-		eligible, err := q.AdminDelegationEligible(ctx, in.AdminID)
-		if err != nil {
-			return model.DelegationPreflight{}, fmt.Errorf("delegation：讀取管理員代行資格：%w", err)
-		}
-		if !eligible {
-			return denied(model.DenialAdminNotAllowlisted)
-		}
-	}
-	st, err := m.d.StoreState(ctx, in.StoreID)
-	switch {
-	case err != nil:
-		return model.DelegationPreflight{}, err
-	case !st.Found:
-		return denied(model.DenialStoreNotDelegable)
-	}
-	res.Target = model.DelegationTarget{StoreID: st.StoreID, SellerAccountID: st.SellerAccountID, StoreName: st.Name}
-	if res.Target.StoreID == 0 {
-		res.Target.StoreID = in.StoreID
-	}
-	res.TargetKnown = true
-
-	// 授權在判斷能不能營運之前讀：不允許時也要回「這家店會被核發的集合」。
-	auth, err := q.GetDelegationAuthorizationForStore(ctx, in.StoreID)
-	hasAuth := err == nil
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return model.DelegationPreflight{}, fmt.Errorf("delegation：讀取代行授權：%w", err)
-	}
-	if hasAuth && len(auth.GrantedCapabilities) > 0 {
-		res.Capabilities = model.ToCapabilities(auth.GrantedCapabilities)
-	}
-	if !st.Operable {
-		// 句子由 seller 給（StoreActionDelegate 的第一個原因）；沒有句子是程式錯誤，不寫通用句。
-		if st.UnavailableText == "" {
-			return model.DelegationPreflight{}, fmt.Errorf("delegation：店家 %d 不可營運但 seller 沒有給原因", in.StoreID)
-		}
-		d := model.DenialStoreNotOperable
-		if st.Closed {
-			d = model.DenialStoreClosed
-		}
-		res.Denial, res.DeniedLabel = d, st.UnavailableText
-		return res, nil
-	}
-	// 從來沒有開通（9286，引導去開通）與已撤回或到期（9264，引導去重新開通）刻意分開。
-	switch {
-	case !hasAuth:
-		return denied(model.DenialAuthorizationNotFound)
-	case !model.IsAuthorizationEffective(auth.RevokedAt, auth.EffectiveFrom, auth.EffectiveUntil, now):
-		return denied(model.DenialAuthorizationRevoked)
 	}
 	// 管理員與店家分兩句問（OR 會讓兩個 partial unique index 都用不上）；已經到期的列不算衝突。
 	if _, err := q.GetActiveDelegationSessionOfActor(ctx, store.GetActiveDelegationSessionOfActorParams{
@@ -428,29 +391,47 @@ func (m *Module) RevokeDelegation(ctx context.Context, in model.RevokeDelegation
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 200 {
 		return model.DelegationSession{}, model.Deny(model.DenialInvalidCommand, "revokeReason 必須為 1–200 字")
 	}
-	now := m.d.Now()
-	q := m.q(ctx)
-	row, err := q.RevokeDelegationSession(ctx, store.RevokeDelegationSessionParams{
-		Now: now, RevokeReason: in.Reason, RevokedByAdminID: in.AdminID, ID: in.SessionID,
-	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		// 已經撤銷過，或不存在。
-		row, err = q.GetDelegationSession(ctx, in.SessionID)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return model.DelegationSession{}, model.Deny(model.DenialSessionNotFound, "找不到指定的代行工作階段")
+	var out model.DelegationSession
+	err := m.d.DB.InTx(ctx, func(ctx context.Context) error {
+		// 先取消這個 session 的排程，再改 session 的列：social 的貼文列在 delegation 之前鎖（單體規則 4）。
+		if err := m.d.CancelSchedules(ctx, []int64{in.SessionID}); err != nil {
+			return err
 		}
-	}
-	if err != nil {
-		return model.DelegationSession{}, fmt.Errorf("delegation：撤銷代行：%w", err)
-	}
-	return toDelegationSession(row, now), nil
+		now := m.d.Now()
+		q := m.q(ctx)
+		row, err := q.RevokeDelegationSession(ctx, store.RevokeDelegationSessionParams{
+			Now: now, RevokeReason: in.Reason, RevokedByAdminID: in.AdminID, ID: in.SessionID,
+		})
+		if errors.Is(err, pgx.ErrNoRows) {
+			// 已經撤銷過，或不存在。
+			row, err = q.GetDelegationSession(ctx, in.SessionID)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return model.Deny(model.DenialSessionNotFound, "找不到指定的代行工作階段")
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("delegation：撤銷代行：%w", err)
+		}
+		out = toDelegationSession(row, now)
+		return nil
+	})
+	return out, err
 }
 
-// RevokeDelegationsOfAdmin 在一個 transaction 內撤銷管理員進行中的代行。
-func (m *Module) RevokeDelegationsOfAdmin(ctx context.Context, adminID int64) error {
-	return m.d.DB.InTx(ctx, func(ctx context.Context) error {
-		return m.revokeDelegationsOfAdmin(ctx, adminID, &adminID, model.RevokeReasonAdminLogout)
+// EndDelegationsOfAdmin 結束管理員進行中的代行（後台登出）。登出是操作者自己離開，不是不再信任這個人或授權：session 寫 ended_at 並把
+// expires_at 拉回現在（憑證立刻失效），不寫 REVOKED，它發起的排程也不取消，到點由重驗依當下的授權決定。
+func (m *Module) EndDelegationsOfAdmin(ctx context.Context, adminID int64) error {
+	now := m.d.Now()
+	ids, err := m.q(ctx).EndActiveDelegationsOfActor(ctx, store.EndActiveDelegationsOfActorParams{
+		ActorAdminID: adminID, Now: now, IdleSince: model.IdleSince(now),
 	})
+	if err != nil {
+		return fmt.Errorf("delegation：結束管理員進行中的代行：%w", err)
+	}
+	if len(ids) > 0 {
+		m.d.Logger.InfoContext(ctx, "delegation：結束管理員進行中的代行", "admin_id", adminID, "sessions", len(ids))
+	}
+	return nil
 }
 
 // OnAdminRoleRevoked 在 identity 撤銷管理員角色的 transaction 內，若剩下的角色不再允許 delegation.sessions.create，
@@ -468,6 +449,23 @@ func (m *Module) OnAdminRoleRevoked(ctx context.Context, e identity.AdminRoleRev
 
 // revokeDelegationsOfAdmin 的 operatorAdminID 為 nil 表示沒有操作者（系統因角色變動撤銷），revoked_by_admin_id 寫 NULL。
 func (m *Module) revokeDelegationsOfAdmin(ctx context.Context, adminID int64, operatorAdminID *int64, reason string) error {
+	if err := m.cancelSchedulesOfAdmin(ctx, adminID); err != nil {
+		return err
+	}
+	return m.revokeActiveDelegationsOfAdmin(ctx, adminID, operatorAdminID, reason)
+}
+
+// cancelSchedulesOfAdmin 取消這位管理員所有沒被撤銷的 session（含已結束、已到期的）發起的待發布排程。session ID 以不鎖的讀取列出；列出之後
+// 才新開的 session 與漏接取消的路徑，由到點的重驗擋下。必須在鎖或改 delegation 的任何列之前呼叫（social 的貼文列在 delegation 之前鎖）。
+func (m *Module) cancelSchedulesOfAdmin(ctx context.Context, adminID int64) error {
+	ids, err := m.q(ctx).ListUnrevokedDelegationSessionIDsOfActor(ctx, adminID)
+	if err != nil {
+		return fmt.Errorf("delegation：列出管理員的代行：%w", err)
+	}
+	return m.d.CancelSchedules(ctx, ids)
+}
+
+func (m *Module) revokeActiveDelegationsOfAdmin(ctx context.Context, adminID int64, operatorAdminID *int64, reason string) error {
 	now := m.d.Now()
 	ids, err := m.q(ctx).RevokeActiveDelegationsOfActor(ctx, store.RevokeActiveDelegationsOfActorParams{
 		ActorAdminID: adminID, Now: now, IdleSince: model.IdleSince(now),
@@ -482,7 +480,7 @@ func (m *Module) revokeDelegationsOfAdmin(ctx context.Context, adminID int64, op
 	return nil
 }
 
-// SetAdminEligibility 開通或撤回管理員的代行資格；撤回時一併撤銷進行中的工作階段。
+// SetAdminEligibility 開通或撤回管理員的代行資格；撤回時一併取消他發起的排程、撤銷進行中的工作階段。
 func (m *Module) SetAdminEligibility(ctx context.Context, in model.AdminEligibilityChange) error {
 	if in.AdminID <= 0 || in.OperatorAdminID <= 0 {
 		return model.Deny(model.DenialAdminRequired, "缺少管理員身分")
@@ -497,10 +495,14 @@ func (m *Module) SetAdminEligibility(ctx context.Context, in model.AdminEligibil
 		return nil
 	}
 	return m.d.DB.InTx(ctx, func(ctx context.Context) error {
+		// 順序：取消排程 → 改資格列 → 撤銷進行中的 session。social 的列在 delegation 之前鎖。
+		if err := m.cancelSchedulesOfAdmin(ctx, in.AdminID); err != nil {
+			return err
+		}
 		if err := m.q(ctx).DisableAdminDelegation(ctx, in.AdminID); err != nil {
 			return fmt.Errorf("delegation：撤回管理員代行資格：%w", err)
 		}
-		return m.revokeDelegationsOfAdmin(ctx, in.AdminID, &in.OperatorAdminID, model.RevokeReasonDelegationDisabled)
+		return m.revokeActiveDelegationsOfAdmin(ctx, in.AdminID, &in.OperatorAdminID, model.RevokeReasonDelegationDisabled)
 	})
 }
 

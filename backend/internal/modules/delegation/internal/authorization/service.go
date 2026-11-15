@@ -17,8 +17,10 @@ type Deps struct {
 	Session  Sessions
 	// StoreState 讀店家此刻的狀態；讀取失敗回 seller 的錯誤，不是拒絕。
 	StoreState func(ctx context.Context, storeID int64) (model.StoreState, error)
-	NewID      func() uuid.UUID
-	Now        func() time.Time
+	// CancelSchedulesOfStore 取消這家店所有代行發起的待發布排程（原因授權失效）；它鎖 social 的列，所以在鎖授權列之前呼叫。
+	CancelSchedulesOfStore func(ctx context.Context, storeID int64) error
+	NewID                  func() uuid.UUID
+	Now                    func() time.Time
 }
 
 type Sessions interface {

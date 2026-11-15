@@ -238,7 +238,9 @@ func runServe(ctx context.Context) error {
 	}
 	subscribeSellerViews(bus, sellerModule)
 	subscribeSellerRelay(bus, jc)
-	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, log)
+	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
+	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
+	delegationDeps.Social = socialModule
 	subscribeModeration(bus, newModerationRetention(d, buyerModule, med, jc, log))
 	agentModule := newAgent(d, sellerModule)
 	subscribeAgent(bus, agentModule)
@@ -257,10 +259,7 @@ func runServe(ctx context.Context) error {
 	}
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: buyerModule, Seller: sellerModule, Identity: id, Orders: orders, Now: time.Now, NewID: uuid.NewV7, Logger: log})
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
-	del := newDelegation(bus, delegation.Deps{
-		DB: d, Identity: id, Seller: sellerModule,
-		NewID: uuid.NewV7, Now: time.Now, Logger: log,
-	})
+	del := newDelegation(bus, delegationDeps)
 
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Ready:  d.Ping,
@@ -403,7 +402,10 @@ func runWorker(ctx context.Context) error {
 	}
 	subscribeSellerViews(bus, sellerModule)
 	subscribeSellerRelay(bus, jc)
-	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, log)
+	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
+	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
+	delegationDeps.Social = socialModule
+	newDelegation(bus, delegationDeps)
 	discoveryModule := newDiscovery(d, orders, products, reviews, sellerModule, log)
 	agentModule := newAgent(d, sellerModule)
 	subscribeAgent(bus, agentModule)

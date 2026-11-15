@@ -10,6 +10,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
 func TestHealthAndReadiness(t *testing.T) {
@@ -49,13 +50,13 @@ func TestNewHandlerRequiresDelegation(t *testing.T) {
 }
 
 func TestNewHandlerRequiresSeller(t *testing.T) {
-	if _, err := NewHandler(Deps{Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}}), Deletion: &accountdeletion.Module{}}); err == nil {
+	if _, err := NewHandler(Deps{Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}}); err == nil {
 		t.Fatal("缺少 Seller 時應回傳組裝錯誤")
 	}
 }
 
 func TestNewHandlerRequiresDeletion(t *testing.T) {
-	if _, err := NewHandler(Deps{Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}})}); err == nil {
+	if _, err := NewHandler(Deps{Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}})}); err == nil {
 		t.Fatal("缺少 Deletion 時應回傳組裝錯誤")
 	}
 }

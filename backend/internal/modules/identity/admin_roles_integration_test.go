@@ -301,6 +301,39 @@ func TestAdminAllowsReadsRolesInsideTheCallersTransaction(t *testing.T) {
 	}
 }
 
+// AdminAllowsNow 不鎖角色列：別的 transaction 持有角色列的 FOR UPDATE 時它照樣立刻回答（FOR SHARE 的 AdminAllows 會等到那個 transaction 結束，
+// 在排程發布的重驗裡會倒退鎖順序）。答案與 AdminAllows 相同，且不需要在 transaction 內呼叫。
+func TestAdminAllowsNowDoesNotWaitForARoleRowLock(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	owner, _ := f.admin(t, "user_owner", "owner@example.com")
+	zero, _ := f.admin(t, "user_zero", "zero@example.com")
+	if _, err := f.m.GrantAdminRole(ctx, change(owner)); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := f.db.Pool().Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM identity.admin_roles WHERE admin_id = $1 FOR UPDATE`, owner); err != nil {
+		t.Fatal(err)
+	}
+	readCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	for _, tc := range []struct {
+		name  string
+		admin int64
+		want  bool
+	}{{"OWNER", owner, true}, {"零角色", zero, false}, {"不存在的管理員", 9999, false}} {
+		got, err := f.m.AdminAllowsNow(readCtx, tc.admin, adminperm.DelegationSessionsCreate)
+		if err != nil || got != tc.want {
+			t.Errorf("%s = %v, %v，預期 %v", tc.name, got, err, tc.want)
+		}
+	}
+}
+
 // AdminAllows 以 FOR SHARE 鎖住角色列：它所在的 transaction 還沒結束時，撤銷的 DELETE 要等；結束之後撤銷才完成，
 // 之後的檢查讀不到角色。以 pg_stat_activity 的鎖等待判斷，不看時間。
 func TestRevokeWaitsForATransactionThatCheckedThePermission(t *testing.T) {

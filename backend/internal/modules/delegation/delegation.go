@@ -4,8 +4,10 @@ package delegation
 import (
 	"context"
 	"embed"
+	"fmt"
 	"io/fs"
 	"log/slog"
+	"strconv"
 	"time"
 	"uuid"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation/internal/session"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -36,12 +39,19 @@ type Seller interface {
 	Store(ctx context.Context, storeID int64) (seller.Store, error)
 }
 
-// Deps 是模組需要的外部依賴，全部在組裝點提供。Seller 必填：seller 在同一個行程，每個子命令都組得出它，沒有「沒有 seller」的組態。
+// Social 是模組取消排程需要的 social 公開 API；*social.Module 滿足它。
+type Social interface {
+	CancelScheduledBy(ctx context.Context, kind social.ScheduleKind, refs []string, reason social.CancelReason) ([]uuid.UUID, error)
+	CancelDelegatedSchedulesOfStore(ctx context.Context, storeID int64, reason social.CancelReason) ([]uuid.UUID, error)
+}
+
+// Deps 是模組需要的外部依賴，全部在組裝點提供。Social 必填（撤銷授權與資格時取消排程）；Seller 必填：seller 在同一個行程，每個子命令都組得出它，沒有「沒有 seller」的組態。
 type Deps struct {
 	DB       *db.DB
 	Events   *events.Bus
 	Identity *identity.Module
 	Seller   Seller
+	Social   Social
 	NewID    func() uuid.UUID
 	Now      func() time.Time
 	Logger   *slog.Logger
@@ -82,15 +92,30 @@ func New(d Deps) *Module {
 	if d.Seller == nil {
 		panic("delegation: missing dependency Seller")
 	}
+	if d.Social == nil {
+		panic("delegation: missing dependency Social")
+	}
 	storeState := storeStateOf(d.Seller)
 	s := session.New(session.Deps{
 		DB: d.DB, Identity: d.Identity, StoreState: storeState,
+		CancelSchedules: func(ctx context.Context, sessionIDs []int64) error {
+			refs := make([]string, len(sessionIDs))
+			for i, id := range sessionIDs {
+				refs[i] = strconv.FormatInt(id, 10)
+			}
+			_, err := d.Social.CancelScheduledBy(ctx, social.ScheduleByDelegation, refs, social.CancelAuthorityLost)
+			return err
+		},
 		Now: d.Now, Logger: d.Logger,
 	})
 	return &Module{
 		session: s,
 		authorization: authorization.New(authorization.Deps{
 			DB: d.DB, Identity: d.Identity, Session: s, StoreState: storeState, NewID: d.NewID, Now: d.Now,
+			CancelSchedulesOfStore: func(ctx context.Context, storeID int64) error {
+				_, err := d.Social.CancelDelegatedSchedulesOfStore(ctx, storeID, social.CancelAuthorityLost)
+				return err
+			},
 		}),
 		audit: audit.New(audit.Deps{
 			DB: d.DB, Events: d.Events, Session: s, NewID: d.NewID, Now: d.Now,
@@ -241,7 +266,6 @@ const (
 )
 
 const DelegationMaxBatch = model.DelegationMaxBatch
-const RevokeReasonAdminLogout = model.RevokeReasonAdminLogout
 const RevokeReasonAuthorizationRevoked = model.RevokeReasonAuthorizationRevoked
 const RevokeReasonAdminRoleRevoked = model.RevokeReasonAdminRoleRevoked
 
@@ -354,7 +378,54 @@ func (m *Module) OnAdminRoleRevoked(ctx context.Context, e identity.AdminRoleRev
 	return m.session.OnAdminRoleRevoked(ctx, e)
 }
 
-// RevokeDelegationsOfAdmin 撤銷管理員進行中的代行；後台登出時呼叫。
-func (m *Module) RevokeDelegationsOfAdmin(ctx context.Context, adminID int64) error {
-	return m.session.RevokeDelegationsOfAdmin(ctx, adminID)
+// EndDelegationsOfAdmin 結束管理員進行中的代行（憑證立刻失效，不寫 REVOKED，發起的排程不取消）；後台登出時呼叫。
+func (m *Module) EndDelegationsOfAdmin(ctx context.Context, adminID int64) error {
+	return m.session.EndDelegationsOfAdmin(ctx, adminID)
+}
+
+// OnPostPublished 訂閱 social 的 PostPublished：代行發起的排程到點發布時，在發布的同一個 transaction 內寫一列 SUCCEEDED 的稽核（單段，冪等鍵
+// schedule:<排程 ID>，重送不寫第二列）。其他來源的發布（直接發布、店主自己的排程）不屬於代行，略過。組裝點以 events.Subscribe 訂閱。
+func (m *Module) OnPostPublished(ctx context.Context, e social.PostPublished) error {
+	if e.Origin != social.OriginScheduled || e.ScheduledBy.Kind != social.ScheduleByDelegation {
+		return nil
+	}
+	sessionID, err := strconv.ParseInt(e.ScheduledBy.Ref, 10, 64)
+	if err != nil {
+		return fmt.Errorf("delegation：排程 %s 的發起者 ref %q 不是代行 session ID：%w", e.ScheduleID, e.ScheduledBy.Ref, err)
+	}
+	return m.audit.RecordScheduledPublish(ctx, model.ScheduledPublishAuditInput{
+		SessionID: sessionID, ScheduleID: e.ScheduleID, PostID: e.PostID, Preview: e.Preview,
+	})
+}
+
+// scheduleAuthorizer 是 social 的排程授權 port 的 delegation 實作（發起者種類 DELEGATION，ref 是 session ID）。
+type scheduleAuthorizer struct{ session *session.Module }
+
+// AuthorizeScheduledPublish 在 social 的排程 job 內（貼文列已被鎖）重驗代行發起的排程：session 沒被撤銷、session 的店家就是排程的店家，加上開始代行用的
+// 同一個授權述詞（資格、角色權限、店家可代行、授權有效且含 posts.publish）。全部是不鎖的讀取（鎖 identity 或 delegation 的列會倒退鎖順序）。
+// 拒絕回 social.ErrScheduleDenied（job 取消排程為授權失效、不重試），讀取失敗原樣回傳（job 重試）。
+func (a scheduleAuthorizer) AuthorizeScheduledPublish(ctx context.Context, p social.ScheduledPublish) error {
+	sessionID, err := strconv.ParseInt(p.By.Ref, 10, 64)
+	if err != nil {
+		return fmt.Errorf("%w：發起者 ref %q 不是代行 session ID", social.ErrScheduleDenied, p.By.Ref)
+	}
+	ok, reason, err := a.session.SessionAuthority(ctx, sessionID, p.StoreID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("%w：%s", social.ErrScheduleDenied, reason)
+	}
+	return nil
+}
+
+// NewScheduleAuthorizer 建立 DELEGATION 排程的授權實作。它不需要 Deps.Social，所以組裝點先建它、再建 social、最後建 delegation 模組
+// （social 要它，delegation 要 social）。
+func NewScheduleAuthorizer(d Deps) social.ScheduleAuthorizer {
+	if d.Seller == nil {
+		panic("delegation: missing dependency Seller")
+	}
+	return scheduleAuthorizer{session: session.New(session.Deps{
+		DB: d.DB, Identity: d.Identity, StoreState: storeStateOf(d.Seller), Now: d.Now, Logger: d.Logger,
+	})}
 }

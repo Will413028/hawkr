@@ -618,7 +618,8 @@ func TestSummaryDurationStopsAtIdleTimeout(t *testing.T) {
 	}
 }
 
-func TestAdminSignOutRevokesItsDelegations(t *testing.T) {
+// 登出是操作者自己離開：session 結束（憑證立刻失效、ended_at 有值），不是撤銷；結束與撤銷的差別是治理痕跡，不是憑證效力。
+func TestAdminSignOutEndsItsDelegations(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	admin := f.delegationAdmin(t, "ops@hawkr.example", true)
@@ -628,18 +629,28 @@ func TestAdminSignOutRevokesItsDelegations(t *testing.T) {
 	mine := f.start(t, startInput(admin, testStore, "ik-1"))
 	theirs := f.start(t, startInput(other, testStore+1, "ik-2"))
 
-	if err := f.m.RevokeDelegationsOfAdmin(ctx, admin); err != nil {
+	f.now = f.now.Add(time.Minute)
+	if err := f.m.EndDelegationsOfAdmin(ctx, admin); err != nil {
 		t.Fatal(err)
 	}
-	s, _ := f.m.ResolveDelegation(ctx, mine.Credential, false)
-	if s.Status != DelegationRevoked || *s.RevokeReason != "admin_logout" || *s.RevokedByAdminID != admin {
-		t.Fatalf("登出的管理員的代行 = %+v", s)
+	if got, err := f.m.ResolveDelegation(ctx, mine.Credential, false); err != nil || got.Status != model.DelegationExpired {
+		t.Fatalf("登出之後 credential 解出的 session 是到期（呼叫方據此拒絕），不是進行中：%+v, %v", got, err)
+	}
+	if got, err := f.m.ResolveDelegation(ctx, mine.Credential, true); err != nil || got.Status != model.DelegationExpired {
+		t.Fatalf("以活動方式使用也是到期，閒置期限不會把它救回來：%+v, %v", got, err)
+	}
+	s, err := f.m.DelegationSessionSummary(ctx, mine.Session.ID)
+	if err != nil || s.Session.Status != model.DelegationExpired || s.Session.EndedAt == nil || s.Session.RevokedAt != nil || s.Session.RevokeReason != nil {
+		t.Fatalf("登出的管理員的代行是結束（到期、有 ended_at），不是撤銷：%+v, %v", s, err)
+	}
+	if !s.Session.ExpiresAt.Equal(f.now) {
+		t.Fatalf("expires_at 被拉回現在（截秒）：%v，現在 %v", s.Session.ExpiresAt, f.now)
 	}
 	if s, _ := f.m.ResolveDelegation(ctx, theirs.Credential, false); s.Status != model.DelegationActive {
 		t.Fatalf("別人的代行不受影響：%+v", s)
 	}
 	// 冪等：再登出一次沒有事。
-	if err := f.m.RevokeDelegationsOfAdmin(ctx, admin); err != nil {
+	if err := f.m.EndDelegationsOfAdmin(ctx, admin); err != nil {
 		t.Fatal(err)
 	}
 }

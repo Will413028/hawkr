@@ -402,6 +402,11 @@ func (m *Module) RevokeDelegationAuthorization(ctx context.Context, in model.Del
 	var out model.RevokedAuthorization
 	err = m.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := m.q(ctx)
+		// 順序：取消這家店代行發起的排程 → 鎖授權列 → 撤銷進行中的 session。social 的貼文列在 delegation 之前鎖（單體規則 4），
+		// 所以取消一定在鎖授權列之前；授權列不存在或已撤回時取消是 no-op 的語意也成立（沒有授權就沒有可發布的排程）。
+		if err := m.d.CancelSchedulesOfStore(ctx, in.StoreID); err != nil {
+			return err
+		}
 		before, found, err := lockAuthorization(ctx, q, in.StoreID)
 		if err != nil {
 			return err

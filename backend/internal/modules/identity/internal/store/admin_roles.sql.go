@@ -115,6 +115,32 @@ func (q *Queries) InsertAdminRoleEvent(ctx context.Context, arg InsertAdminRoleE
 	return err
 }
 
+const listAdminRoles = `-- name: ListAdminRoles :many
+SELECT role FROM identity.admin_roles WHERE admin_id = $1 ORDER BY role
+`
+
+// 不鎖的角色讀取：呼叫方已經持有比 identity 更上層的列鎖（排程發布的重驗，鎖著 social 的貼文列），再鎖 identity 的角色列會倒退
+// 鎖順序。正確性由呼叫方的鎖保證，不靠這次讀取。
+func (q *Queries) ListAdminRoles(ctx context.Context, adminID int64) ([]string, error) {
+	rows, err := q.db.Query(ctx, listAdminRoles, adminID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var role string
+		if err := rows.Scan(&role); err != nil {
+			return nil, err
+		}
+		items = append(items, role)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAdminRolesForShare = `-- name: ListAdminRolesForShare :many
 SELECT role FROM identity.admin_roles WHERE admin_id = $1 ORDER BY role FOR SHARE
 `

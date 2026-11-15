@@ -43,10 +43,11 @@ TTL、閒置、handoff、分頁與保留天數是 `internal/model` 的常數，�
 
 ### 撤銷
 
-- 模組自己寫入的 `revoke_reason` 是固定值（`internal/model` 的 `RevokeReason*`），DB 只有長度的 CHECK：登出 `admin_logout`、撤回資格 `delegation_disabled`、撤回店家授權 `authorization_revoked`、撤銷管理員角色 `admin_role_revoked`。
+- 模組自己寫入的 `revoke_reason` 是固定值（`internal/model` 的 `RevokeReason*`），DB 只有長度的 CHECK：撤回資格 `delegation_disabled`、撤回店家授權 `authorization_revoked`、撤銷管理員角色 `admin_role_revoked`。
 - `RevokeDelegationSession` 的理由由呼叫端帶入（1–200 字）：gateway 在授權鏈第 8 項命中時帶 `store_not_operable`（`pkg/delegation`），人工撤銷帶操作者填的文字。
 - 角色撤銷的 `revoked_by_admin_id` 是 NULL：系統因角色變動而撤銷，沒有操作者；誰撤的在 identity 的 `admin_role_events`。
-- 後台登出時由 `internal/httpapi/identity` 直接呼叫 `RevokeDelegationsOfAdmin`。
+- 後台登出是「結束」不是撤銷：`internal/httpapi/identity` 直接呼叫 `EndDelegationsOfAdmin`，結束管理員進行中的 session（`ended_at` 與 `expires_at` 夾值與 `EndDelegationSession` 相同，憑證立刻失效），不寫 `REVOKED`，也不取消排程。撤銷只留給治理動作（不再信任這個人或授權）。
+- 排程發布的授權重驗與立即取消（A7-D22；社群貼文由 social 擁有，delegation 提供授權實作與取消呼叫）：到點時 social 的 job 鎖貼文列後問 `NewScheduleAuthorizer` 的實作，session 沒被撤銷（已結束或到期不擋）、session 的店家就是排程的店家，加上 `preflight` 與 `StartDelegation` 共用的授權述詞（資格、角色權限、店家可代行、授權有效且含 `posts.publish`；管理員不存在是拒絕不是錯誤），全部用不鎖的讀取（identity 的 `AdminAllowsNow`）；拒絕時排程轉 `AUTHORITY_LOST`。四個觸發點在同一個 transaction 內先取消排程、再改 delegation 的列：撤回店家授權（取消 → 鎖授權列 → 撤銷 session）、撤回代行資格與撤銷管理員角色（不鎖地列出該管理員未撤銷的 session → 取消 → 改資格列或撤銷 session）、治理撤銷單一 session（取消 → 改 session）。取消的範圍包含已結束的 session。
 - 撤回代行資格時，刪除資格與撤銷進行中的 session 在同一個 transaction，任一處失敗整個回滾。
 - 訂閱 identity 的 `AdminRoleRevoked`（`OnAdminRoleRevoked`，組裝點 `newDelegation` 訂閱）：剩下的角色不再允許 `delegation.sessions.create` 時，在撤銷角色的同一個 transaction 撤銷該管理員進行中的代行。
 - 撤銷保留較早的結束時間。
@@ -73,7 +74,8 @@ TTL、閒置、handoff、分頁與保留天數是 `internal/model` 的常數，�
 - 兩階段：寫入前先寫 PENDING intent；confirm 只從 PENDING 轉移一次，成功且需通知時在同一個 transaction 發出事件。事件發不出去則 confirm 回滾。
 - 讀取、揭露與更正類動作不能通知店家；confirm 只在成功時檢查能力，`SUCCEEDED` 列的能力必須在該 session 的授權快照內。
 - confirm 只更新 `result`、`resource_id`、`after_snapshot`、`changed_fields`、`resource_version_after`、`biz_code`、`confirmed_at` 與 `notified_at`，其餘欄位寫入後不變；稽核列永不硬刪。
-- `origin=scheduled` 是排程執行的 intent：session 已到期仍可寫入，已撤銷仍拒絕；只支援貼文、必須帶 `resourceId`；操作理由繼承同一 session、同一資源最近一筆 `POST_SCHEDULE` 的理由，找不到回 9279。
+- 排程到點發布走單段稽核：delegation 訂閱 social 的 `PostPublished`（origin SCHEDULED、發起者種類 DELEGATION），在發布的同一個 transaction 寫一列 `SUCCEEDED`（`POST_PUBLISH`、`posts.publish`、`SCHEDULED`），冪等鍵 `schedule:<排程 ID>`，重送撞唯一鍵當成功；操作理由繼承建立排程那一列，找不到時留空。
+- `origin=scheduled` 是排程執行的 intent（gateway 的兩階段路徑，不動）：session 已到期仍可寫入，已撤銷仍拒絕；只支援貼文、必須帶 `resourceId`；操作理由繼承同一 session、同一資源最近一筆 `POST_SCHEDULE` 的理由，找不到回 9279。
 - 事件只有 `DelegationOperationCompleted`；結束與撤銷不發事件。
 - intent 需要可用的工作階段與有效輸入；冪等鍵綁定指令、資源與 payload。
 - 批次上限 50。

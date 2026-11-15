@@ -11,11 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"uuid"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -129,6 +126,8 @@ func runAdminRole(ctx context.Context, args []string, out io.Writer) error {
 	log := newLogger()
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
-	newDelegation(bus, delegation.Deps{DB: d, Identity: id, Seller: seller.NewReader(d, time.Now), NewID: uuid.NewV7, Now: time.Now, Logger: log})
+	if _, err := newDelegationOffline(d, bus, id, log); err != nil {
+		return err
+	}
 	return applyAdminRole(ctx, id, action, in, out)
 }

@@ -256,7 +256,7 @@ func setupWeb(t *testing.T) *webFixture {
 	m := identity.New(identity.Deps{DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()}, Now: clock.Now, Logger: log})
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: jc, Now: time.Now, Logger: log})
 	events.Subscribe(bus, buyers.OnAccountCreated)
-	del := delegation.New(delegation.Deps{DB: d, Identity: m, Events: bus, Seller: &seller.Module{}, Now: time.Now, Logger: log})
+	del := delegation.New(delegation.Deps{DB: d, Identity: m, Events: bus, Seller: &seller.Module{}, Social: noSchedules{}, Now: time.Now, Logger: log})
 
 	f := &webFixture{clock: clock, db: d, m: m, idp: map[identity.Provider]*fakeIdP{}, gwSeen: make(chan http.Header, 8)}
 	var providers []httpidentity.WebProvider
