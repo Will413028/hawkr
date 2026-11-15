@@ -76,20 +76,25 @@ describe("Dropdown", () => {
 	});
 
 	it.each([
-		["visible label only", visibleLabelOnly],
-		["floatingLabel only", floatingLabelOnly],
-	])("names the trigger and listbox exactly with %s", async (_setup, props) => {
-		renderWithIntl(<Controlled {...props} />, { frameMaxWidth: 420 });
-		const triggerName = page.getByRole("button", {
-			name: "產地 請選擇產地",
-			exact: true,
-		});
-		await expect.element(triggerName).toBeInTheDocument();
-		await userEvent.click(triggerName);
-		await expect
-			.element(page.getByRole("listbox", { name: "產地", exact: true }))
-			.toBeInTheDocument();
-	});
+		// A resting floating label stands in for the placeholder, so no value
+		// text is shown or named until the field is focused or filled.
+		["visible label only", visibleLabelOnly, "產地 請選擇產地"],
+		["floatingLabel only", floatingLabelOnly, "產地"],
+	])(
+		"names the trigger and listbox exactly with %s",
+		async (_setup, props, name) => {
+			renderWithIntl(<Controlled {...props} />, { frameMaxWidth: 420 });
+			const triggerName = page.getByRole("button", {
+				name,
+				exact: true,
+			});
+			await expect.element(triggerName).toBeInTheDocument();
+			await userEvent.click(triggerName);
+			await expect
+				.element(page.getByRole("listbox", { name: "產地", exact: true }))
+				.toBeInTheDocument();
+		},
+	);
 
 	it("filters by search text and selects the matching option", async () => {
 		const onChange = vi.fn();
