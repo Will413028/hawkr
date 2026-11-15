@@ -1,4 +1,3 @@
-import path from "node:path";
 import pkg from "@next/env";
 import { defineConfig, devices } from "@playwright/test";
 
@@ -44,19 +43,6 @@ export default defineConfig({
 	reporter: [["list"], ["html", { open: "never" }]],
 	expect: {
 		timeout: 15_000,
-		toHaveScreenshot: {
-			// CSS → Tailwind migration must be pixel-faithful. Use an ABSOLUTE
-			// pixel budget, not a ratio: full-page mobile shots are very tall at
-			// DPR 2.75, so a ratio dilutes localized regressions (a whole tabs bar
-			// changing width stayed under 0.5%). An absolute budget catches a
-			// localized change regardless of page height while tolerating
-			// sub-pixel AA noise on text-heavy pages.
-			maxDiffPixels: 120,
-			animations: "disabled",
-			caret: "hide",
-			// Hides the dev-only Next.js indicator so it never counts as a diff.
-			stylePath: path.join(process.cwd(), "tests/visual/screenshot.css"),
-		},
 	},
 	use: {
 		baseURL: `http://localhost:${PORT}`,
