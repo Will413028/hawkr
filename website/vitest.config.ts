@@ -1,6 +1,26 @@
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { playwright } from "@vitest/browser-playwright";
+import type { Plugin } from "vite";
 import { defineConfig } from "vitest/config";
+
+// msw 的 service worker 腳本要由同源的 `/mockServiceWorker.js` 提供。放在 tests/browser，
+// 由 browser project 的 dev server 以 middleware 回應，不進 website/public（那是 Next 的發佈目錄）。
+function serveMswWorker(): Plugin {
+	const worker = fileURLToPath(
+		new URL("./tests/browser/mockServiceWorker.js", import.meta.url),
+	);
+	return {
+		name: "hawkr:serve-msw-worker",
+		configureServer(server) {
+			server.middlewares.use("/mockServiceWorker.js", (_request, response) => {
+				response.setHeader("Content-Type", "text/javascript");
+				response.setHeader("Cache-Control", "no-store");
+				response.end(readFileSync(worker));
+			});
+		},
+	};
+}
 
 export default defineConfig({
 	// 對齊 tsconfig paths `@/*` → 專案根，否則 unit test 透過模組圖載入 @/ 別名會解析失敗。
@@ -43,6 +63,7 @@ export default defineConfig({
 			// 元件 browser 測試：只由 `pnpm test:browser` 跑（`--project browser`），不進 `pnpm test`。
 			{
 				extends: true,
+				plugins: [serveMswWorker()],
 				// `next/image` 是 CJS，預先打包後 default 匯入成物件；解析時就換成 tests/browser/next-image.tsx，
 				// 並排除在預先打包之外。只比對完整的 `next/image`，`next/image-*` 等其他子路徑不動。
 				resolve: {
