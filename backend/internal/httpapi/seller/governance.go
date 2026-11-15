@@ -2,6 +2,7 @@ package seller
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"strconv"
 	"time"
@@ -75,23 +76,25 @@ type ContentOwners interface {
 	ContentOwner(ctx context.Context, t social.Target) (social.ContentOwner, error)
 }
 
-// GovernanceOption 調整 Governance 的相依。
-type GovernanceOption func(*Governance)
-
-// WithContentOwners 提供內容歸屬的來源；建立內容下架措施需要它。
-func WithContentOwners(o ContentOwners) GovernanceOption {
-	return func(g *Governance) { g.owners = o }
-}
-
 var _ sellerv1alpha1connect.SellerGovernanceAdminServiceHandler = (*Governance)(nil)
 
-// NewGovernance 建立後台治理的 handler；images 給轉報資料裡店家的 logo 與封面。後台直接建立內容下架時，內容須是這家店現存（沒有刪除）的內容，由 handler 向 social 核對；social 的同 transaction 訂閱者另擋別家店的內容。
-func NewGovernance(m GovernanceModule, images rpc.Images, opts ...GovernanceOption) *Governance {
-	g := &Governance{m: m, images: images}
-	for _, o := range opts {
-		o(g)
+// GovernanceDeps 是 NewGovernance 的相依，全部必填。
+type GovernanceDeps struct {
+	Module GovernanceModule
+	Images rpc.Images
+	// ContentOwners 在後台建立內容下架前核對內容歸屬。
+	ContentOwners ContentOwners
+}
+
+// NewGovernance 建立後台治理的 handler；Images 給轉報資料裡店家的 logo 與封面。後台直接建立內容下架時，內容須是這家店現存（沒有刪除）的內容，由 handler 向 social 核對；social 的同 transaction 訂閱者另擋別家店的內容。
+func NewGovernance(d GovernanceDeps) (*Governance, error) {
+	if d.Module == nil {
+		return nil, errors.New("seller governance：需要 Module")
 	}
-	return g
+	if d.ContentOwners == nil {
+		return nil, errors.New("seller governance：需要 ContentOwners")
+	}
+	return &Governance{m: d.Module, images: d.Images, owners: d.ContentOwners}, nil
 }
 
 // 模組輸入的欄位對應到請求的路徑。

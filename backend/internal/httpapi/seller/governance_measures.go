@@ -3,7 +3,6 @@ package seller
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 	"uuid"
 
@@ -373,9 +372,6 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 
 // verifyTakedownContents 核對每一則內容現在存在（沒有刪除）、種類相符、作者是這家店；後台處理的是現存的內容，已刪除與不存在的都拒絕。
 func (h *Governance) verifyTakedownContents(ctx context.Context, storeID int64, contents []model.ContentRef) error {
-	if h.owners == nil {
-		return fmt.Errorf("seller governance：缺少內容歸屬的來源")
-	}
 	for i, c := range contents {
 		o, err := h.owners.ContentOwner(ctx, social.Target{Kind: social.TargetKind(c.Kind), ID: c.ID})
 		if err != nil {
