@@ -382,17 +382,28 @@ const ListPostsRequest$json = {
       '10': 'storeId',
       '17': true
     },
+    {
+      '1': 'hashtag',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'hashtag',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_store_id'},
+    {'1': '_hashtag'},
   ],
 };
 
 /// Descriptor for `ListPostsRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List listPostsRequestDescriptor = $convert.base64Decode(
     'ChBMaXN0UG9zdHNSZXF1ZXN0EhsKCXBhZ2Vfc2l6ZRgBIAEoBVIIcGFnZVNpemUSHQoKcGFnZV'
-    '90b2tlbhgCIAEoCVIJcGFnZVRva2VuEh4KCHN0b3JlX2lkGAMgASgJSABSB3N0b3JlSWSIAQFC'
-    'CwoJX3N0b3JlX2lk');
+    '90b2tlbhgCIAEoCVIJcGFnZVRva2VuEh4KCHN0b3JlX2lkGAMgASgJSABSB3N0b3JlSWSIAQES'
+    'HQoHaGFzaHRhZxgEIAEoCUgBUgdoYXNodGFniAEBQgsKCV9zdG9yZV9pZEIKCghfaGFzaHRhZw'
+    '==');
 
 @$core.Deprecated('Use listPostsResponseDescriptor instead')
 const ListPostsResponse$json = {
@@ -500,6 +511,268 @@ final $typed_data.Uint8List suggestTrendingPostsResponseDescriptor =
         'ChxTdWdnZXN0VHJlbmRpbmdQb3N0c1Jlc3BvbnNlEjEKBXBvc3RzGAEgAygLMhsuaGF3a3Iuc2'
         '9jaWFsLnYxYWxwaGExLlBvc3RSBXBvc3Rz');
 
+@$core.Deprecated('Use suggestTagsRequestDescriptor instead')
+const SuggestTagsRequest$json = {
+  '1': 'SuggestTagsRequest',
+  '2': [
+    {'1': 'query', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'query'},
+    {'1': 'contains', '3': 2, '4': 1, '5': 8, '10': 'contains'},
+    {'1': 'max_results', '3': 3, '4': 1, '5': 5, '10': 'maxResults'},
+  ],
+};
+
+/// Descriptor for `SuggestTagsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List suggestTagsRequestDescriptor = $convert.base64Decode(
+    'ChJTdWdnZXN0VGFnc1JlcXVlc3QSGQoFcXVlcnkYASABKAlCA+BBAlIFcXVlcnkSGgoIY29udG'
+    'FpbnMYAiABKAhSCGNvbnRhaW5zEh8KC21heF9yZXN1bHRzGAMgASgFUgptYXhSZXN1bHRz');
+
+@$core.Deprecated('Use suggestTagsResponseDescriptor instead')
+const SuggestTagsResponse$json = {
+  '1': 'SuggestTagsResponse',
+  '2': [
+    {
+      '1': 'tags',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.TagCount',
+      '10': 'tags'
+    },
+  ],
+};
+
+/// Descriptor for `SuggestTagsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List suggestTagsResponseDescriptor = $convert.base64Decode(
+    'ChNTdWdnZXN0VGFnc1Jlc3BvbnNlEjMKBHRhZ3MYASADKAsyHy5oYXdrci5zb2NpYWwudjFhbH'
+    'BoYTEuVGFnQ291bnRSBHRhZ3M=');
+
+@$core.Deprecated('Use listTrendingTagsRequestDescriptor instead')
+const ListTrendingTagsRequest$json = {
+  '1': 'ListTrendingTagsRequest',
+  '2': [
+    {
+      '1': 'start_time',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'startTime'
+    },
+    {
+      '1': 'end_time',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'endTime'
+    },
+    {'1': 'max_results', '3': 3, '4': 1, '5': 5, '10': 'maxResults'},
+  ],
+};
+
+/// Descriptor for `ListTrendingTagsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listTrendingTagsRequestDescriptor = $convert.base64Decode(
+    'ChdMaXN0VHJlbmRpbmdUYWdzUmVxdWVzdBI5CgpzdGFydF90aW1lGAEgASgLMhouZ29vZ2xlLn'
+    'Byb3RvYnVmLlRpbWVzdGFtcFIJc3RhcnRUaW1lEjUKCGVuZF90aW1lGAIgASgLMhouZ29vZ2xl'
+    'LnByb3RvYnVmLlRpbWVzdGFtcFIHZW5kVGltZRIfCgttYXhfcmVzdWx0cxgDIAEoBVIKbWF4Um'
+    'VzdWx0cw==');
+
+@$core.Deprecated('Use listTrendingTagsResponseDescriptor instead')
+const ListTrendingTagsResponse$json = {
+  '1': 'ListTrendingTagsResponse',
+  '2': [
+    {
+      '1': 'tags',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.TagCount',
+      '10': 'tags'
+    },
+  ],
+};
+
+/// Descriptor for `ListTrendingTagsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listTrendingTagsResponseDescriptor =
+    $convert.base64Decode(
+        'ChhMaXN0VHJlbmRpbmdUYWdzUmVzcG9uc2USMwoEdGFncxgBIAMoCzIfLmhhd2tyLnNvY2lhbC'
+        '52MWFscGhhMS5UYWdDb3VudFIEdGFncw==');
+
+@$core.Deprecated('Use tagCountDescriptor instead')
+const TagCount$json = {
+  '1': 'TagCount',
+  '2': [
+    {'1': 'name', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'name'},
+    {'1': 'post_count', '3': 2, '4': 1, '5': 3, '8': {}, '10': 'postCount'},
+  ],
+};
+
+/// Descriptor for `TagCount`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List tagCountDescriptor = $convert.base64Decode(
+    'CghUYWdDb3VudBIXCgRuYW1lGAEgASgJQgPgQQNSBG5hbWUSIgoKcG9zdF9jb3VudBgCIAEoA0'
+    'ID4EEDUglwb3N0Q291bnQ=');
+
+@$core.Deprecated('Use forumEntryDescriptor instead')
+const ForumEntry$json = {
+  '1': 'ForumEntry',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'id'},
+    {'1': 'store_id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'storeId'},
+    {
+      '1': 'parent_id',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '8': {},
+      '9': 0,
+      '10': 'parentId',
+      '17': true
+    },
+    {
+      '1': 'reply_to_id',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '8': {},
+      '9': 1,
+      '10': 'replyToId',
+      '17': true
+    },
+    {
+      '1': 'state',
+      '3': 5,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.social.v1alpha1.CommentState',
+      '8': {},
+      '10': 'state'
+    },
+    {
+      '1': 'author',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Actor',
+      '8': {},
+      '10': 'author'
+    },
+    {'1': 'body', '3': 7, '4': 1, '5': 9, '8': {}, '10': 'body'},
+    {
+      '1': 'create_time',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'createTime'
+    },
+    {
+      '1': 'update_time',
+      '3': 9,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'updateTime'
+    },
+    {'1': 'reply_count', '3': 10, '4': 1, '5': 3, '8': {}, '10': 'replyCount'},
+    {'1': 'is_mine', '3': 11, '4': 1, '5': 8, '8': {}, '10': 'isMine'},
+    {
+      '1': 'viewer_can_edit',
+      '3': 12,
+      '4': 1,
+      '5': 8,
+      '8': {},
+      '10': 'viewerCanEdit'
+    },
+    {
+      '1': 'viewer_can_delete',
+      '3': 13,
+      '4': 1,
+      '5': 8,
+      '8': {},
+      '10': 'viewerCanDelete'
+    },
+    {
+      '1': 'viewer_can_reply',
+      '3': 14,
+      '4': 1,
+      '5': 8,
+      '8': {},
+      '10': 'viewerCanReply'
+    },
+  ],
+  '8': [
+    {'1': '_parent_id'},
+    {'1': '_reply_to_id'},
+  ],
+};
+
+/// Descriptor for `ForumEntry`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List forumEntryDescriptor = $convert.base64Decode(
+    'CgpGb3J1bUVudHJ5EhMKAmlkGAEgASgJQgPgQQhSAmlkEh4KCHN0b3JlX2lkGAIgASgJQgPgQQ'
+    'NSB3N0b3JlSWQSJQoJcGFyZW50X2lkGAMgASgJQgPgQQNIAFIIcGFyZW50SWSIAQESKAoLcmVw'
+    'bHlfdG9faWQYBCABKAlCA+BBA0gBUglyZXBseVRvSWSIAQESPgoFc3RhdGUYBSABKA4yIy5oYX'
+    'drci5zb2NpYWwudjFhbHBoYTEuQ29tbWVudFN0YXRlQgPgQQNSBXN0YXRlEjkKBmF1dGhvchgG'
+    'IAEoCzIcLmhhd2tyLnNvY2lhbC52MWFscGhhMS5BY3RvckID4EEDUgZhdXRob3ISFwoEYm9keR'
+    'gHIAEoCUID4EEDUgRib2R5EkAKC2NyZWF0ZV90aW1lGAggASgLMhouZ29vZ2xlLnByb3RvYnVm'
+    'LlRpbWVzdGFtcEID4EEDUgpjcmVhdGVUaW1lEkAKC3VwZGF0ZV90aW1lGAkgASgLMhouZ29vZ2'
+    'xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgp1cGRhdGVUaW1lEiQKC3JlcGx5X2NvdW50GAog'
+    'ASgDQgPgQQNSCnJlcGx5Q291bnQSHAoHaXNfbWluZRgLIAEoCEID4EEDUgZpc01pbmUSKwoPdm'
+    'lld2VyX2Nhbl9lZGl0GAwgASgIQgPgQQNSDXZpZXdlckNhbkVkaXQSLwoRdmlld2VyX2Nhbl9k'
+    'ZWxldGUYDSABKAhCA+BBA1IPdmlld2VyQ2FuRGVsZXRlEi0KEHZpZXdlcl9jYW5fcmVwbHkYDi'
+    'ABKAhCA+BBA1IOdmlld2VyQ2FuUmVwbHlCDAoKX3BhcmVudF9pZEIOCgxfcmVwbHlfdG9faWQ=');
+
+@$core.Deprecated('Use listForumEntriesRequestDescriptor instead')
+const ListForumEntriesRequest$json = {
+  '1': 'ListForumEntriesRequest',
+  '2': [
+    {'1': 'store_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'storeId'},
+    {'1': 'page_size', '3': 2, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 3, '4': 1, '5': 9, '10': 'pageToken'},
+    {
+      '1': 'parent_id',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'parentId',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_parent_id'},
+  ],
+};
+
+/// Descriptor for `ListForumEntriesRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listForumEntriesRequestDescriptor = $convert.base64Decode(
+    'ChdMaXN0Rm9ydW1FbnRyaWVzUmVxdWVzdBIeCghzdG9yZV9pZBgBIAEoCUID4EECUgdzdG9yZU'
+    'lkEhsKCXBhZ2Vfc2l6ZRgCIAEoBVIIcGFnZVNpemUSHQoKcGFnZV90b2tlbhgDIAEoCVIJcGFn'
+    'ZVRva2VuEiAKCXBhcmVudF9pZBgEIAEoCUgAUghwYXJlbnRJZIgBAUIMCgpfcGFyZW50X2lk');
+
+@$core.Deprecated('Use listForumEntriesResponseDescriptor instead')
+const ListForumEntriesResponse$json = {
+  '1': 'ListForumEntriesResponse',
+  '2': [
+    {
+      '1': 'entries',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.ForumEntry',
+      '10': 'entries'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+  ],
+};
+
+/// Descriptor for `ListForumEntriesResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listForumEntriesResponseDescriptor = $convert.base64Decode(
+    'ChhMaXN0Rm9ydW1FbnRyaWVzUmVzcG9uc2USOwoHZW50cmllcxgBIAMoCzIhLmhhd2tyLnNvY2'
+    'lhbC52MWFscGhhMS5Gb3J1bUVudHJ5UgdlbnRyaWVzEiYKD25leHRfcGFnZV90b2tlbhgCIAEo'
+    'CVINbmV4dFBhZ2VUb2tlbg==');
+
 const $core.Map<$core.String, $core.dynamic> SocialPublicServiceBase$json = {
   '1': 'SocialPublicService',
   '2': [
@@ -527,6 +800,24 @@ const $core.Map<$core.String, $core.dynamic> SocialPublicServiceBase$json = {
       '3': '.hawkr.social.v1alpha1.SuggestTrendingPostsResponse',
       '4': {'34': 1},
     },
+    {
+      '1': 'SuggestTags',
+      '2': '.hawkr.social.v1alpha1.SuggestTagsRequest',
+      '3': '.hawkr.social.v1alpha1.SuggestTagsResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'ListTrendingTags',
+      '2': '.hawkr.social.v1alpha1.ListTrendingTagsRequest',
+      '3': '.hawkr.social.v1alpha1.ListTrendingTagsResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'ListForumEntries',
+      '2': '.hawkr.social.v1alpha1.ListForumEntriesRequest',
+      '3': '.hawkr.social.v1alpha1.ListForumEntriesResponse',
+      '4': {'34': 1},
+    },
   ],
 };
 
@@ -550,6 +841,18 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       SuggestTrendingPostsRequest$json,
   '.hawkr.social.v1alpha1.SuggestTrendingPostsResponse':
       SuggestTrendingPostsResponse$json,
+  '.hawkr.social.v1alpha1.SuggestTagsRequest': SuggestTagsRequest$json,
+  '.hawkr.social.v1alpha1.SuggestTagsResponse': SuggestTagsResponse$json,
+  '.hawkr.social.v1alpha1.TagCount': TagCount$json,
+  '.hawkr.social.v1alpha1.ListTrendingTagsRequest':
+      ListTrendingTagsRequest$json,
+  '.hawkr.social.v1alpha1.ListTrendingTagsResponse':
+      ListTrendingTagsResponse$json,
+  '.hawkr.social.v1alpha1.ListForumEntriesRequest':
+      ListForumEntriesRequest$json,
+  '.hawkr.social.v1alpha1.ListForumEntriesResponse':
+      ListForumEntriesResponse$json,
+  '.hawkr.social.v1alpha1.ForumEntry': ForumEntry$json,
 };
 
 /// Descriptor for `SocialPublicService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
@@ -562,4 +865,10 @@ final $typed_data.Uint8List socialPublicServiceDescriptor = $convert.base64Decod
     'orLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaXN0Q29tbWVudHNSZXNwb25zZSIDkAIBEoQBChRT'
     'dWdnZXN0VHJlbmRpbmdQb3N0cxIyLmhhd2tyLnNvY2lhbC52MWFscGhhMS5TdWdnZXN0VHJlbm'
     'RpbmdQb3N0c1JlcXVlc3QaMy5oYXdrci5zb2NpYWwudjFhbHBoYTEuU3VnZ2VzdFRyZW5kaW5n'
-    'UG9zdHNSZXNwb25zZSIDkAIB');
+    'UG9zdHNSZXNwb25zZSIDkAIBEmkKC1N1Z2dlc3RUYWdzEikuaGF3a3Iuc29jaWFsLnYxYWxwaG'
+    'ExLlN1Z2dlc3RUYWdzUmVxdWVzdBoqLmhhd2tyLnNvY2lhbC52MWFscGhhMS5TdWdnZXN0VGFn'
+    'c1Jlc3BvbnNlIgOQAgESeAoQTGlzdFRyZW5kaW5nVGFncxIuLmhhd2tyLnNvY2lhbC52MWFscG'
+    'hhMS5MaXN0VHJlbmRpbmdUYWdzUmVxdWVzdBovLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaXN0'
+    'VHJlbmRpbmdUYWdzUmVzcG9uc2UiA5ACARJ4ChBMaXN0Rm9ydW1FbnRyaWVzEi4uaGF3a3Iuc2'
+    '9jaWFsLnYxYWxwaGExLkxpc3RGb3J1bUVudHJpZXNSZXF1ZXN0Gi8uaGF3a3Iuc29jaWFsLnYx'
+    'YWxwaGExLkxpc3RGb3J1bUVudHJpZXNSZXNwb25zZSIDkAIB');

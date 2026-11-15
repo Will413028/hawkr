@@ -162,6 +162,8 @@ const (
 	SanctionWarning   = model.SanctionWarning
 	// MaxTopPosts 是 TopPosts 能回的篇數上限。
 	MaxTopPosts = model.MaxTopPosts
+	// DefaultTrendingWindow 是熱門標籤呼叫端沒給時間窗時用的長度，也是時間窗的上限。
+	DefaultTrendingWindow = model.DefaultTrendingWindow
 
 	ScheduleByOwner      = model.ScheduleByOwner
 	ScheduleByDelegation = model.ScheduleByDelegation

@@ -25,7 +25,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/social/v1alpha1/social.proto.
  */
 export const file_hawkr_social_v1alpha1_social: GenFile = /*@__PURE__*/
-  fileDesc("CiJoYXdrci9zb2NpYWwvdjFhbHBoYTEvc29jaWFsLnByb3RvEhVoYXdrci5zb2NpYWwudjFhbHBoYTEiMgoHSGFzaHRhZxIRCgRuYW1lGAEgASgJQgPgQQMSFAoHZGlzcGxheRgCIAEoCUID4EEDIu8DCgRQb3N0Eg8KAmlkGAEgASgJQgPgQQgSNAoFc3RvcmUYAiABKAsyIC5oYXdrci5jb21tb24udjFhbHBoYTEuU3RvcmVDYXJkQgPgQQMSDAoEYm9keRgDIAEoCRIrCgVpbWFnZRgEIAEoCzIcLmhhd2tyLmNvbW1vbi52MWFscGhhMS5JbWFnZRIXCgpwcm9kdWN0X2lkGAUgASgJSACIAQESNQoIaGFzaHRhZ3MYBiADKAsyHi5oYXdrci5zb2NpYWwudjFhbHBoYTEuSGFzaHRhZ0ID4EEDEjUKDHB1Ymxpc2hfdGltZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxI0Cgt1cGRhdGVfdGltZRgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxIXCgpsaWtlX2NvdW50GAkgASgDQgPgQQMSGgoNY29tbWVudF9jb3VudBgKIAEoA0ID4EEDEhcKCnZpZXdfY291bnQYCyABKANCA+BBAxIYCgtzaGFyZV9jb3VudBgMIAEoA0ID4EEDEhAKA3VybBgNIAEoCUID4EEDEh8KEnZpZXdlcl9jYW5fY29tbWVudBgOIAEoCEID4EEDQg0KC19wcm9kdWN0X2lkIqEBCgVBY3RvchIzCgRraW5kGAEgASgOMiAuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkFjdG9yS2luZEID4EEDEg8KAmlkGAIgASgJQgPgQQMSFgoEbmFtZRgDIAEoCUID4EEDSACIAQESMQoGYXZhdGFyGAQgASgLMhwuaGF3a3IuY29tbW9uLnYxYWxwaGExLkltYWdlQgPgQQNCBwoFX25hbWUitgQKB0NvbW1lbnQSDwoCaWQYASABKAlCA+BBCBIUCgdwb3N0X2lkGAIgASgJQgPgQQMSGwoJcGFyZW50X2lkGAMgASgJQgPgQQNIAIgBARIdCgtyZXBseV90b19pZBgEIAEoCUID4EEDSAGIAQESNwoFc3RhdGUYBSABKA4yIy5oYXdrci5zb2NpYWwudjFhbHBoYTEuQ29tbWVudFN0YXRlQgPgQQMSMQoGYXV0aG9yGAYgASgLMhwuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkFjdG9yQgPgQQMSEQoEYm9keRgHIAEoCUID4EEDEjQKC2NyZWF0ZV90aW1lGAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjQKC3VwZGF0ZV90aW1lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEhcKCmxpa2VfY291bnQYCiABKANCA+BBAxIYCgtyZXBseV9jb3VudBgLIAEoA0ID4EEDEhkKDHZpZXdlcl9saWtlZBgMIAEoCEID4EEDEhQKB2lzX21pbmUYDSABKAhCA+BBAxIcCg92aWV3ZXJfY2FuX2VkaXQYDiABKAhCA+BBAxIeChF2aWV3ZXJfY2FuX2RlbGV0ZRgPIAEoCEID4EEDEh0KEHZpZXdlcl9jYW5fcmVwbHkYECABKAhCA+BBA0IMCgpfcGFyZW50X2lkQg4KDF9yZXBseV90b19pZCImCg5HZXRQb3N0UmVxdWVzdBIUCgdwb3N0X2lkGAEgASgJQgPgQQIiPAoPR2V0UG9zdFJlc3BvbnNlEikKBHBvc3QYASABKAsyGy5oYXdrci5zb2NpYWwudjFhbHBoYTEuUG9zdCJdChBMaXN0UG9zdHNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJEhUKCHN0b3JlX2lkGAMgASgJSACIAQFCCwoJX3N0b3JlX2lkIlgKEUxpc3RQb3N0c1Jlc3BvbnNlEioKBXBvc3RzGAEgAygLMhsuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlBvc3QSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIngKE0xpc3RDb21tZW50c1JlcXVlc3QSFAoHcG9zdF9pZBgBIAEoCUID4EECEhEKCXBhZ2Vfc2l6ZRgCIAEoBRISCgpwYWdlX3Rva2VuGAMgASgJEhYKCXBhcmVudF9pZBgEIAEoCUgAiAEBQgwKCl9wYXJlbnRfaWQiYQoUTGlzdENvbW1lbnRzUmVzcG9uc2USMAoIY29tbWVudHMYASADKAsyHi5oYXdrci5zb2NpYWwudjFhbHBoYTEuQ29tbWVudBIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkiMgobU3VnZ2VzdFRyZW5kaW5nUG9zdHNSZXF1ZXN0EhMKC21heF9yZXN1bHRzGAEgASgFIkoKHFN1Z2dlc3RUcmVuZGluZ1Bvc3RzUmVzcG9uc2USKgoFcG9zdHMYASADKAsyGy5oYXdrci5zb2NpYWwudjFhbHBoYTEuUG9zdCpTCglBY3RvcktpbmQSGgoWQUNUT1JfS0lORF9VTlNQRUNJRklFRBAAEhQKEEFDVE9SX0tJTkRfQlVZRVIQARIUChBBQ1RPUl9LSU5EX1NUT1JFEAIqfQoMQ29tbWVudFN0YXRlEh0KGUNPTU1FTlRfU1RBVEVfVU5TUEVDSUZJRUQQABIZChVDT01NRU5UX1NUQVRFX1ZJU0lCTEUQARIZChVDT01NRU5UX1NUQVRFX0RFTEVURUQQAhIYChRDT01NRU5UX1NUQVRFX0hJRERFThADMs4DChNTb2NpYWxQdWJsaWNTZXJ2aWNlEl0KB0dldFBvc3QSJS5oYXdrci5zb2NpYWwudjFhbHBoYTEuR2V0UG9zdFJlcXVlc3QaJi5oYXdrci5zb2NpYWwudjFhbHBoYTEuR2V0UG9zdFJlc3BvbnNlIgOQAgESYwoJTGlzdFBvc3RzEicuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkxpc3RQb3N0c1JlcXVlc3QaKC5oYXdrci5zb2NpYWwudjFhbHBoYTEuTGlzdFBvc3RzUmVzcG9uc2UiA5ACARJsCgxMaXN0Q29tbWVudHMSKi5oYXdrci5zb2NpYWwudjFhbHBoYTEuTGlzdENvbW1lbnRzUmVxdWVzdBorLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaXN0Q29tbWVudHNSZXNwb25zZSIDkAIBEoQBChRTdWdnZXN0VHJlbmRpbmdQb3N0cxIyLmhhd2tyLnNvY2lhbC52MWFscGhhMS5TdWdnZXN0VHJlbmRpbmdQb3N0c1JlcXVlc3QaMy5oYXdrci5zb2NpYWwudjFhbHBoYTEuU3VnZ2VzdFRyZW5kaW5nUG9zdHNSZXNwb25zZSIDkAIBYgZwcm90bzM", [file_google_api_field_behavior, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_image, file_hawkr_common_v1alpha1_store_card]);
+  fileDesc("CiJoYXdrci9zb2NpYWwvdjFhbHBoYTEvc29jaWFsLnByb3RvEhVoYXdrci5zb2NpYWwudjFhbHBoYTEiMgoHSGFzaHRhZxIRCgRuYW1lGAEgASgJQgPgQQMSFAoHZGlzcGxheRgCIAEoCUID4EEDIu8DCgRQb3N0Eg8KAmlkGAEgASgJQgPgQQgSNAoFc3RvcmUYAiABKAsyIC5oYXdrci5jb21tb24udjFhbHBoYTEuU3RvcmVDYXJkQgPgQQMSDAoEYm9keRgDIAEoCRIrCgVpbWFnZRgEIAEoCzIcLmhhd2tyLmNvbW1vbi52MWFscGhhMS5JbWFnZRIXCgpwcm9kdWN0X2lkGAUgASgJSACIAQESNQoIaGFzaHRhZ3MYBiADKAsyHi5oYXdrci5zb2NpYWwudjFhbHBoYTEuSGFzaHRhZ0ID4EEDEjUKDHB1Ymxpc2hfdGltZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxI0Cgt1cGRhdGVfdGltZRgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxIXCgpsaWtlX2NvdW50GAkgASgDQgPgQQMSGgoNY29tbWVudF9jb3VudBgKIAEoA0ID4EEDEhcKCnZpZXdfY291bnQYCyABKANCA+BBAxIYCgtzaGFyZV9jb3VudBgMIAEoA0ID4EEDEhAKA3VybBgNIAEoCUID4EEDEh8KEnZpZXdlcl9jYW5fY29tbWVudBgOIAEoCEID4EEDQg0KC19wcm9kdWN0X2lkIqEBCgVBY3RvchIzCgRraW5kGAEgASgOMiAuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkFjdG9yS2luZEID4EEDEg8KAmlkGAIgASgJQgPgQQMSFgoEbmFtZRgDIAEoCUID4EEDSACIAQESMQoGYXZhdGFyGAQgASgLMhwuaGF3a3IuY29tbW9uLnYxYWxwaGExLkltYWdlQgPgQQNCBwoFX25hbWUitgQKB0NvbW1lbnQSDwoCaWQYASABKAlCA+BBCBIUCgdwb3N0X2lkGAIgASgJQgPgQQMSGwoJcGFyZW50X2lkGAMgASgJQgPgQQNIAIgBARIdCgtyZXBseV90b19pZBgEIAEoCUID4EEDSAGIAQESNwoFc3RhdGUYBSABKA4yIy5oYXdrci5zb2NpYWwudjFhbHBoYTEuQ29tbWVudFN0YXRlQgPgQQMSMQoGYXV0aG9yGAYgASgLMhwuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkFjdG9yQgPgQQMSEQoEYm9keRgHIAEoCUID4EEDEjQKC2NyZWF0ZV90aW1lGAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjQKC3VwZGF0ZV90aW1lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEhcKCmxpa2VfY291bnQYCiABKANCA+BBAxIYCgtyZXBseV9jb3VudBgLIAEoA0ID4EEDEhkKDHZpZXdlcl9saWtlZBgMIAEoCEID4EEDEhQKB2lzX21pbmUYDSABKAhCA+BBAxIcCg92aWV3ZXJfY2FuX2VkaXQYDiABKAhCA+BBAxIeChF2aWV3ZXJfY2FuX2RlbGV0ZRgPIAEoCEID4EEDEh0KEHZpZXdlcl9jYW5fcmVwbHkYECABKAhCA+BBA0IMCgpfcGFyZW50X2lkQg4KDF9yZXBseV90b19pZCImCg5HZXRQb3N0UmVxdWVzdBIUCgdwb3N0X2lkGAEgASgJQgPgQQIiPAoPR2V0UG9zdFJlc3BvbnNlEikKBHBvc3QYASABKAsyGy5oYXdrci5zb2NpYWwudjFhbHBoYTEuUG9zdCJ/ChBMaXN0UG9zdHNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJEhUKCHN0b3JlX2lkGAMgASgJSACIAQESFAoHaGFzaHRhZxgEIAEoCUgBiAEBQgsKCV9zdG9yZV9pZEIKCghfaGFzaHRhZyJYChFMaXN0UG9zdHNSZXNwb25zZRIqCgVwb3N0cxgBIAMoCzIbLmhhd2tyLnNvY2lhbC52MWFscGhhMS5Qb3N0EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSJ4ChNMaXN0Q29tbWVudHNSZXF1ZXN0EhQKB3Bvc3RfaWQYASABKAlCA+BBAhIRCglwYWdlX3NpemUYAiABKAUSEgoKcGFnZV90b2tlbhgDIAEoCRIWCglwYXJlbnRfaWQYBCABKAlIAIgBAUIMCgpfcGFyZW50X2lkImEKFExpc3RDb21tZW50c1Jlc3BvbnNlEjAKCGNvbW1lbnRzGAEgAygLMh4uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkNvbW1lbnQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIjIKG1N1Z2dlc3RUcmVuZGluZ1Bvc3RzUmVxdWVzdBITCgttYXhfcmVzdWx0cxgBIAEoBSJKChxTdWdnZXN0VHJlbmRpbmdQb3N0c1Jlc3BvbnNlEioKBXBvc3RzGAEgAygLMhsuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlBvc3QiTwoSU3VnZ2VzdFRhZ3NSZXF1ZXN0EhIKBXF1ZXJ5GAEgASgJQgPgQQISEAoIY29udGFpbnMYAiABKAgSEwoLbWF4X3Jlc3VsdHMYAyABKAUiRAoTU3VnZ2VzdFRhZ3NSZXNwb25zZRItCgR0YWdzGAEgAygLMh8uaGF3a3Iuc29jaWFsLnYxYWxwaGExLlRhZ0NvdW50IowBChdMaXN0VHJlbmRpbmdUYWdzUmVxdWVzdBIuCgpzdGFydF90aW1lGAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCghlbmRfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEwoLbWF4X3Jlc3VsdHMYAyABKAUiSQoYTGlzdFRyZW5kaW5nVGFnc1Jlc3BvbnNlEi0KBHRhZ3MYASADKAsyHy5oYXdrci5zb2NpYWwudjFhbHBoYTEuVGFnQ291bnQiNgoIVGFnQ291bnQSEQoEbmFtZRgBIAEoCUID4EEDEhcKCnBvc3RfY291bnQYAiABKANCA+BBAyKGBAoKRm9ydW1FbnRyeRIPCgJpZBgBIAEoCUID4EEIEhUKCHN0b3JlX2lkGAIgASgJQgPgQQMSGwoJcGFyZW50X2lkGAMgASgJQgPgQQNIAIgBARIdCgtyZXBseV90b19pZBgEIAEoCUID4EEDSAGIAQESNwoFc3RhdGUYBSABKA4yIy5oYXdrci5zb2NpYWwudjFhbHBoYTEuQ29tbWVudFN0YXRlQgPgQQMSMQoGYXV0aG9yGAYgASgLMhwuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkFjdG9yQgPgQQMSEQoEYm9keRgHIAEoCUID4EEDEjQKC2NyZWF0ZV90aW1lGAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjQKC3VwZGF0ZV90aW1lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEhgKC3JlcGx5X2NvdW50GAogASgDQgPgQQMSFAoHaXNfbWluZRgLIAEoCEID4EEDEhwKD3ZpZXdlcl9jYW5fZWRpdBgMIAEoCEID4EEDEh4KEXZpZXdlcl9jYW5fZGVsZXRlGA0gASgIQgPgQQMSHQoQdmlld2VyX2Nhbl9yZXBseRgOIAEoCEID4EEDQgwKCl9wYXJlbnRfaWRCDgoMX3JlcGx5X3RvX2lkIn0KF0xpc3RGb3J1bUVudHJpZXNSZXF1ZXN0EhUKCHN0b3JlX2lkGAEgASgJQgPgQQISEQoJcGFnZV9zaXplGAIgASgFEhIKCnBhZ2VfdG9rZW4YAyABKAkSFgoJcGFyZW50X2lkGAQgASgJSACIAQFCDAoKX3BhcmVudF9pZCJnChhMaXN0Rm9ydW1FbnRyaWVzUmVzcG9uc2USMgoHZW50cmllcxgBIAMoCzIhLmhhd2tyLnNvY2lhbC52MWFscGhhMS5Gb3J1bUVudHJ5EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSpTCglBY3RvcktpbmQSGgoWQUNUT1JfS0lORF9VTlNQRUNJRklFRBAAEhQKEEFDVE9SX0tJTkRfQlVZRVIQARIUChBBQ1RPUl9LSU5EX1NUT1JFEAIqfQoMQ29tbWVudFN0YXRlEh0KGUNPTU1FTlRfU1RBVEVfVU5TUEVDSUZJRUQQABIZChVDT01NRU5UX1NUQVRFX1ZJU0lCTEUQARIZChVDT01NRU5UX1NUQVRFX0RFTEVURUQQAhIYChRDT01NRU5UX1NUQVRFX0hJRERFThADMq0GChNTb2NpYWxQdWJsaWNTZXJ2aWNlEl0KB0dldFBvc3QSJS5oYXdrci5zb2NpYWwudjFhbHBoYTEuR2V0UG9zdFJlcXVlc3QaJi5oYXdrci5zb2NpYWwudjFhbHBoYTEuR2V0UG9zdFJlc3BvbnNlIgOQAgESYwoJTGlzdFBvc3RzEicuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkxpc3RQb3N0c1JlcXVlc3QaKC5oYXdrci5zb2NpYWwudjFhbHBoYTEuTGlzdFBvc3RzUmVzcG9uc2UiA5ACARJsCgxMaXN0Q29tbWVudHMSKi5oYXdrci5zb2NpYWwudjFhbHBoYTEuTGlzdENvbW1lbnRzUmVxdWVzdBorLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaXN0Q29tbWVudHNSZXNwb25zZSIDkAIBEoQBChRTdWdnZXN0VHJlbmRpbmdQb3N0cxIyLmhhd2tyLnNvY2lhbC52MWFscGhhMS5TdWdnZXN0VHJlbmRpbmdQb3N0c1JlcXVlc3QaMy5oYXdrci5zb2NpYWwudjFhbHBoYTEuU3VnZ2VzdFRyZW5kaW5nUG9zdHNSZXNwb25zZSIDkAIBEmkKC1N1Z2dlc3RUYWdzEikuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlN1Z2dlc3RUYWdzUmVxdWVzdBoqLmhhd2tyLnNvY2lhbC52MWFscGhhMS5TdWdnZXN0VGFnc1Jlc3BvbnNlIgOQAgESeAoQTGlzdFRyZW5kaW5nVGFncxIuLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaXN0VHJlbmRpbmdUYWdzUmVxdWVzdBovLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaXN0VHJlbmRpbmdUYWdzUmVzcG9uc2UiA5ACARJ4ChBMaXN0Rm9ydW1FbnRyaWVzEi4uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkxpc3RGb3J1bUVudHJpZXNSZXF1ZXN0Gi8uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkxpc3RGb3J1bUVudHJpZXNSZXNwb25zZSIDkAIBYgZwcm90bzM", [file_google_api_field_behavior, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_image, file_hawkr_common_v1alpha1_store_card]);
 
 /**
  * Hashtag 是貼文的一個標籤。
@@ -356,6 +356,13 @@ export type ListPostsRequest = Message<"hawkr.social.v1alpha1.ListPostsRequest">
    * @generated from field: optional string store_id = 3;
    */
   storeId?: string | undefined;
+
+  /**
+   * 只列帶這個標籤的貼文；名稱不分大小寫、可以帶開頭的 #，不設是不篩選。不能與 store_id 同時設。page_token 只能用在同一個 hashtag。
+   *
+   * @generated from field: optional string hashtag = 4;
+   */
+  hashtag?: string | undefined;
 };
 
 /**
@@ -484,6 +491,290 @@ export const SuggestTrendingPostsResponseSchema: GenMessage<SuggestTrendingPosts
   messageDesc(file_hawkr_social_v1alpha1_social, 11);
 
 /**
+ * @generated from message hawkr.social.v1alpha1.SuggestTagsRequest
+ */
+export type SuggestTagsRequest = Message<"hawkr.social.v1alpha1.SuggestTagsRequest"> & {
+  /**
+   * 搜尋字串，可以帶開頭的 #；正規化後是空的回空清單。
+   *
+   * @generated from field: string query = 1;
+   */
+  query: string;
+
+  /**
+   * true 是名稱包含 query，false 是以 query 開頭。
+   *
+   * @generated from field: bool contains = 2;
+   */
+  contains: boolean;
+
+  /**
+   * 最多回傳幾筆，1 到 20；0 表示預設值 10，超過 20 以 20 計，負數回 invalid_argument。
+   *
+   * @generated from field: int32 max_results = 3;
+   */
+  maxResults: number;
+};
+
+/**
+ * Describes the message hawkr.social.v1alpha1.SuggestTagsRequest.
+ * Use `create(SuggestTagsRequestSchema)` to create a new message.
+ */
+export const SuggestTagsRequestSchema: GenMessage<SuggestTagsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_social_v1alpha1_social, 12);
+
+/**
+ * @generated from message hawkr.social.v1alpha1.SuggestTagsResponse
+ */
+export type SuggestTagsResponse = Message<"hawkr.social.v1alpha1.SuggestTagsResponse"> & {
+  /**
+   * @generated from field: repeated hawkr.social.v1alpha1.TagCount tags = 1;
+   */
+  tags: TagCount[];
+};
+
+/**
+ * Describes the message hawkr.social.v1alpha1.SuggestTagsResponse.
+ * Use `create(SuggestTagsResponseSchema)` to create a new message.
+ */
+export const SuggestTagsResponseSchema: GenMessage<SuggestTagsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_social_v1alpha1_social, 13);
+
+/**
+ * @generated from message hawkr.social.v1alpha1.ListTrendingTagsRequest
+ */
+export type ListTrendingTagsRequest = Message<"hawkr.social.v1alpha1.ListTrendingTagsRequest"> & {
+  /**
+   * 時間窗的起點（含）；不設是 end_time 往前 30 天。
+   *
+   * @generated from field: google.protobuf.Timestamp start_time = 1;
+   */
+  startTime?: Timestamp | undefined;
+
+  /**
+   * 時間窗的終點（不含）；不設是現在。
+   *
+   * @generated from field: google.protobuf.Timestamp end_time = 2;
+   */
+  endTime?: Timestamp | undefined;
+
+  /**
+   * 最多回傳幾名，1 到 50；0 表示預設值 20，超過 50 以 50 計，負數回 invalid_argument。
+   *
+   * @generated from field: int32 max_results = 3;
+   */
+  maxResults: number;
+};
+
+/**
+ * Describes the message hawkr.social.v1alpha1.ListTrendingTagsRequest.
+ * Use `create(ListTrendingTagsRequestSchema)` to create a new message.
+ */
+export const ListTrendingTagsRequestSchema: GenMessage<ListTrendingTagsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_social_v1alpha1_social, 14);
+
+/**
+ * @generated from message hawkr.social.v1alpha1.ListTrendingTagsResponse
+ */
+export type ListTrendingTagsResponse = Message<"hawkr.social.v1alpha1.ListTrendingTagsResponse"> & {
+  /**
+   * @generated from field: repeated hawkr.social.v1alpha1.TagCount tags = 1;
+   */
+  tags: TagCount[];
+};
+
+/**
+ * Describes the message hawkr.social.v1alpha1.ListTrendingTagsResponse.
+ * Use `create(ListTrendingTagsResponseSchema)` to create a new message.
+ */
+export const ListTrendingTagsResponseSchema: GenMessage<ListTrendingTagsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_social_v1alpha1_social, 15);
+
+/**
+ * TagCount 是一個標籤與它在範圍內的公開貼文數。
+ *
+ * @generated from message hawkr.social.v1alpha1.TagCount
+ */
+export type TagCount = Message<"hawkr.social.v1alpha1.TagCount"> & {
+  /**
+   * 正規化後的名稱，用來比對與連結。
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: int64 post_count = 2;
+   */
+  postCount: bigint;
+};
+
+/**
+ * Describes the message hawkr.social.v1alpha1.TagCount.
+ * Use `create(TagCountSchema)` to create a new message.
+ */
+export const TagCountSchema: GenMessage<TagCount> = /*@__PURE__*/
+  messageDesc(file_hawkr_social_v1alpha1_social, 16);
+
+/**
+ * ForumEntry 是店家討論區的一個項目（頂層留言或回覆）。
+ *
+ * @generated from message hawkr.social.v1alpha1.ForumEntry
+ */
+export type ForumEntry = Message<"hawkr.social.v1alpha1.ForumEntry"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string store_id = 2;
+   */
+  storeId: string;
+
+  /**
+   * 回覆所屬的頂層留言；頂層留言不設。
+   *
+   * @generated from field: optional string parent_id = 3;
+   */
+  parentId?: string | undefined;
+
+  /**
+   * 回覆針對的那一則留言；沒有時不設。
+   *
+   * @generated from field: optional string reply_to_id = 4;
+   */
+  replyToId?: string | undefined;
+
+  /**
+   * @generated from field: hawkr.social.v1alpha1.CommentState state = 5;
+   */
+  state: CommentState;
+
+  /**
+   * 只有 VISIBLE 的項目有作者與內文。
+   *
+   * @generated from field: hawkr.social.v1alpha1.Actor author = 6;
+   */
+  author?: Actor | undefined;
+
+  /**
+   * @generated from field: string body = 7;
+   */
+  body: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp create_time = 8;
+   */
+  createTime?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp update_time = 9;
+   */
+  updateTime?: Timestamp | undefined;
+
+  /**
+   * @generated from field: int64 reply_count = 10;
+   */
+  replyCount: bigint;
+
+  /**
+   * 這則是不是觀看者自己的某個身分（買家或此刻的店）寫的。
+   *
+   * @generated from field: bool is_mine = 11;
+   */
+  isMine: boolean;
+
+  /**
+   * 觀看者能不能編輯：只有 VISIBLE 而且是自己的。
+   *
+   * @generated from field: bool viewer_can_edit = 12;
+   */
+  viewerCanEdit: boolean;
+
+  /**
+   * 觀看者能不能刪除：VISIBLE 的自己的留言，或這是自己的店的討論區。
+   *
+   * @generated from field: bool viewer_can_delete = 13;
+   */
+  viewerCanDelete: boolean;
+
+  /**
+   * 觀看者能不能回覆：VISIBLE，而且觀看者在這家店的討論區沒有被封鎖（訪客是 false；店主讀自己的討論區是 true）。顯示用的提示，寫入時伺服器仍會檢查。
+   *
+   * @generated from field: bool viewer_can_reply = 14;
+   */
+  viewerCanReply: boolean;
+};
+
+/**
+ * Describes the message hawkr.social.v1alpha1.ForumEntry.
+ * Use `create(ForumEntrySchema)` to create a new message.
+ */
+export const ForumEntrySchema: GenMessage<ForumEntry> = /*@__PURE__*/
+  messageDesc(file_hawkr_social_v1alpha1_social, 17);
+
+/**
+ * @generated from message hawkr.social.v1alpha1.ListForumEntriesRequest
+ */
+export type ListForumEntriesRequest = Message<"hawkr.social.v1alpha1.ListForumEntriesRequest"> & {
+  /**
+   * 店家 ID。
+   *
+   * @generated from field: string store_id = 1;
+   */
+  storeId: string;
+
+  /**
+   * 預設 20，上限 50。
+   *
+   * @generated from field: int32 page_size = 2;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 3;
+   */
+  pageToken: string;
+
+  /**
+   * 設了是該頂層留言的回覆；不設是討論區的頂層留言。page_token 只能用在同一組 store_id 與 parent_id。
+   *
+   * @generated from field: optional string parent_id = 4;
+   */
+  parentId?: string | undefined;
+};
+
+/**
+ * Describes the message hawkr.social.v1alpha1.ListForumEntriesRequest.
+ * Use `create(ListForumEntriesRequestSchema)` to create a new message.
+ */
+export const ListForumEntriesRequestSchema: GenMessage<ListForumEntriesRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_social_v1alpha1_social, 18);
+
+/**
+ * @generated from message hawkr.social.v1alpha1.ListForumEntriesResponse
+ */
+export type ListForumEntriesResponse = Message<"hawkr.social.v1alpha1.ListForumEntriesResponse"> & {
+  /**
+   * @generated from field: repeated hawkr.social.v1alpha1.ForumEntry entries = 1;
+   */
+  entries: ForumEntry[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message hawkr.social.v1alpha1.ListForumEntriesResponse.
+ * Use `create(ListForumEntriesResponseSchema)` to create a new message.
+ */
+export const ListForumEntriesResponseSchema: GenMessage<ListForumEntriesResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_social_v1alpha1_social, 19);
+
+/**
  * ActorKind 是互動者的種類：買家或店家。
  *
  * @generated from enum hawkr.social.v1alpha1.ActorKind
@@ -568,7 +859,8 @@ export const SocialPublicService: GenService<{
     output: typeof GetPostResponseSchema;
   },
   /**
-   * ListPosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶 store_id 是全站動態牆，帶了是該店的貼文頁。
+   * ListPosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶篩選是全站動態牆，帶 store_id 是該店的貼文頁，
+   * 帶 hashtag 是該標籤的貼文頁；兩個篩選不能同時帶（invalid_argument）。
    * 觀看者個人封鎖的店不出現在動態牆，過濾在分頁之前，所以一頁可以少於 page_size，結束只看 next_page_token。
    *
    * @generated from rpc hawkr.social.v1alpha1.SocialPublicService.ListPosts
@@ -600,6 +892,39 @@ export const SocialPublicService: GenService<{
     methodKind: "unary";
     input: typeof SuggestTrendingPostsRequestSchema;
     output: typeof SuggestTrendingPostsResponseSchema;
+  },
+  /**
+   * SuggestTags 是標籤輸入時的建議：公開貼文上名稱符合的標籤與貼文數，貼文數多的在前。全域彙總，不依觀看者。沒有分頁，最多 20 筆。
+   *
+   * @generated from rpc hawkr.social.v1alpha1.SocialPublicService.SuggestTags
+   */
+  suggestTags: {
+    methodKind: "unary";
+    input: typeof SuggestTagsRequestSchema;
+    output: typeof SuggestTagsResponseSchema;
+  },
+  /**
+   * ListTrendingTags 是熱門標籤：發布時間落在時間窗內的公開貼文上，各標籤的貼文數，多的在前。全域彙總，不依觀看者。
+   * 這是只取前 max_results 名的排行榜（最多 50 名），不分頁；時間窗最長 30 天。
+   *
+   * @generated from rpc hawkr.social.v1alpha1.SocialPublicService.ListTrendingTags
+   */
+  listTrendingTags: {
+    methodKind: "unary";
+    input: typeof ListTrendingTagsRequestSchema;
+    output: typeof ListTrendingTagsResponseSchema;
+  },
+  /**
+   * ListForumEntries 列出店家討論區的頂層留言，或某則頂層留言的回覆，依建立時間舊到新。刪除或隱藏而底下有可見回覆的頂層留言是佔位項目
+   * （只有 id、store_id、create_time、reply_count 與 state）；觀看者封鎖了這家店、或與作者任一方向有個人封鎖時，對應的內容不出現，
+   * 該頁因此可以少於 page_size。店家讀不到時是空的一頁；指定的 parent_id 不屬於這家店回 not_found。
+   *
+   * @generated from rpc hawkr.social.v1alpha1.SocialPublicService.ListForumEntries
+   */
+  listForumEntries: {
+    methodKind: "unary";
+    input: typeof ListForumEntriesRequestSchema;
+    output: typeof ListForumEntriesResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_hawkr_social_v1alpha1_social, 0);

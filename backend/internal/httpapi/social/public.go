@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
+	"time"
 	"uuid"
 
 	"connectrpc.com/connect"
@@ -34,6 +35,11 @@ type Reads interface {
 	ListComments(ctx context.Context, c social.Caller, postID uuid.UUID, after *social.CommentCursor, size int32) (social.CommentPage, error)
 	ListReplies(ctx context.Context, c social.Caller, parentID uuid.UUID, after *social.CommentCursor, size int32) (social.CommentPage, error)
 	TopPosts(ctx context.Context, c social.Caller, n int32) ([]social.Post, error)
+	ListHashtagPosts(ctx context.Context, c social.Caller, tag string, after *social.PostCursor, size int32) (social.PostPage, error)
+	SuggestHashtags(ctx context.Context, q string, contains bool, limit int32) ([]social.HashtagCount, error)
+	TrendingHashtags(ctx context.Context, from, to time.Time, limit int32) ([]social.HashtagCount, error)
+	ListForumEntries(ctx context.Context, c social.Caller, storeID int64, after *social.CommentCursor, size int32) (social.ForumPage, error)
+	ListForumReplies(ctx context.Context, c social.Caller, parentID uuid.UUID, after *social.CommentCursor, size int32) (social.ForumPage, error)
 }
 
 // Buyers 是呼叫者的買家身分與留言作者顯示資料的來源（*buyer.Module）。
@@ -56,16 +62,20 @@ type Public struct {
 	stores    Stores
 	images    rpc.Images
 	webOrigin rpc.WebOrigin
+	now       func() time.Time
 }
 
 var _ socialv1alpha1connect.SocialPublicServiceHandler = (*Public)(nil)
 
-// NewPublic 建立前台的 handler；webOrigin 組貼文的單篇網址，不可是零值。
-func NewPublic(reads Reads, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin) (*Public, error) {
+// NewPublic 建立前台的 handler；webOrigin 組貼文的單篇網址，不可是零值；now 是熱門標籤預設時間窗的終點，nil 時用 time.Now。
+func NewPublic(reads Reads, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin, now func() time.Time) (*Public, error) {
 	if webOrigin.IsZero() {
 		return nil, fmt.Errorf("httpapi/social：貼文的單篇網址需要 WebOrigin")
 	}
-	return &Public{reads: reads, buyers: buyers, stores: stores, images: images, webOrigin: webOrigin}, nil
+	if now == nil {
+		now = time.Now
+	}
+	return &Public{reads: reads, buyers: buyers, stores: stores, images: images, webOrigin: webOrigin, now: now}, nil
 }
 
 // caller 是請求的呼叫者此刻的兩個身分；訪客（沒有登入、停權帳號與無效 token 都以訪客執行）與管理員是零值。
@@ -124,7 +134,14 @@ func (h *Public) ListPosts(ctx context.Context, req *connect.Request[pb.ListPost
 		}
 		scopeStore = rpc.FormatID(storeID)
 	}
-	scope := rpc.FilterScope(socialv1alpha1connect.SocialPublicServiceListPostsProcedure, scopeStore)
+	if msg.Hashtag != nil && msg.StoreId != nil {
+		return nil, rpc.RequiredField("hashtag", "hashtag 與 store_id 不能同時設")
+	}
+	scopeTag := ""
+	if msg.Hashtag != nil {
+		scopeTag = msg.GetHashtag()
+	}
+	scope := rpc.FilterScope(socialv1alpha1connect.SocialPublicServiceListPostsProcedure, scopeStore, scopeTag)
 	after, err := rpc.ValidCursor[postCursor](scope, msg.GetPageToken())
 	if err != nil {
 		return nil, err
@@ -138,9 +155,12 @@ func (h *Public) ListPosts(ctx context.Context, req *connect.Request[pb.ListPost
 		cur = &social.PostCursor{PublishedAt: after.PublishedAt, ID: after.ID}
 	}
 	var page social.PostPage
-	if msg.StoreId != nil {
+	switch {
+	case msg.Hashtag != nil:
+		page, err = h.reads.ListHashtagPosts(ctx, c, msg.GetHashtag(), cur, msg.GetPageSize())
+	case msg.StoreId != nil:
 		page, err = h.reads.ListStorePosts(ctx, c, storeID, cur, msg.GetPageSize())
-	} else {
+	default:
 		page, err = h.reads.ListFeed(ctx, c, cur, msg.GetPageSize())
 	}
 	if err != nil {
@@ -234,6 +254,163 @@ func (h *Public) SuggestTrendingPosts(ctx context.Context, req *connect.Request[
 		return nil, err
 	}
 	return connect.NewResponse(&pb.SuggestTrendingPostsResponse{Posts: posts}), nil
+}
+
+func (h *Public) SuggestTags(ctx context.Context, req *connect.Request[pb.SuggestTagsRequest]) (*connect.Response[pb.SuggestTagsResponse], error) {
+	n := req.Msg.GetMaxResults()
+	if n < 0 {
+		return nil, rpc.RequiredField("max_results", "max_results 不可以是負數")
+	}
+	tags, err := h.reads.SuggestHashtags(ctx, req.Msg.GetQuery(), req.Msg.GetContains(), n)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.SuggestTagsResponse{Tags: toTagCounts(tags)}), nil
+}
+
+func (h *Public) ListTrendingTags(ctx context.Context, req *connect.Request[pb.ListTrendingTagsRequest]) (*connect.Response[pb.ListTrendingTagsResponse], error) {
+	msg := req.Msg
+	if msg.GetMaxResults() < 0 {
+		return nil, rpc.RequiredField("max_results", "max_results 不可以是負數")
+	}
+	to := h.now().UTC()
+	if msg.EndTime != nil {
+		to = msg.GetEndTime().AsTime()
+	}
+	from := to.Add(-social.DefaultTrendingWindow)
+	if msg.StartTime != nil {
+		from = msg.GetStartTime().AsTime()
+	}
+	tags, err := h.reads.TrendingHashtags(ctx, from, to, msg.GetMaxResults())
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.ListTrendingTagsResponse{Tags: toTagCounts(tags)}), nil
+}
+
+func toTagCounts(tags []social.HashtagCount) []*pb.TagCount {
+	out := make([]*pb.TagCount, len(tags))
+	for i, t := range tags {
+		out[i] = &pb.TagCount{Name: t.Name, PostCount: t.Posts}
+	}
+	return out
+}
+
+func (h *Public) ListForumEntries(ctx context.Context, req *connect.Request[pb.ListForumEntriesRequest]) (*connect.Response[pb.ListForumEntriesResponse], error) {
+	msg := req.Msg
+	storeID, err := rpc.ParseID("store_id", msg.GetStoreId())
+	if err != nil {
+		return nil, err
+	}
+	var parentID uuid.UUID
+	scopeParent := ""
+	if msg.ParentId != nil {
+		if parentID, err = rpc.ParseUUID("parent_id", msg.GetParentId()); err != nil {
+			return nil, err
+		}
+		scopeParent = parentID.String()
+	}
+	scope := rpc.FilterScope(socialv1alpha1connect.SocialPublicServiceListForumEntriesProcedure, rpc.FormatID(storeID), scopeParent)
+	after, err := rpc.ValidCursor[commentCursor](scope, msg.GetPageToken())
+	if err != nil {
+		return nil, err
+	}
+	c, err := h.caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var cur *social.CommentCursor
+	if after != nil {
+		cur = &social.CommentCursor{CreatedAt: after.CreatedAt, ID: after.ID}
+	}
+	var page social.ForumPage
+	if msg.ParentId != nil {
+		page, err = h.reads.ListForumReplies(ctx, c, parentID, cur, msg.GetPageSize())
+	} else {
+		page, err = h.reads.ListForumEntries(ctx, c, storeID, cur, msg.GetPageSize())
+	}
+	if err != nil {
+		return nil, err
+	}
+	if slices.ContainsFunc(page.Entries, func(e social.ForumEntry) bool { return e.StoreID != storeID }) {
+		return nil, apperr.NotFound("留言不存在")
+	}
+	entries, err := h.toForumEntries(ctx, c, storeID, page.Entries)
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.ListForumEntriesResponse{Entries: entries}
+	if page.Next != nil {
+		out.NextPageToken = rpc.TokenFor(scope, commentCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
+	}
+	return connect.NewResponse(out), nil
+}
+
+func (h *Public) toForumEntries(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry) ([]*pb.ForumEntry, error) {
+	var buyerIDs, storeIDs []int64
+	for _, e := range entries {
+		if e.State != social.CommentVisible {
+			continue
+		}
+		switch e.Actor.Kind {
+		case social.ActorBuyer:
+			buyerIDs = append(buyerIDs, e.Actor.ID)
+		case social.ActorStore:
+			storeIDs = append(storeIDs, e.Actor.ID)
+		}
+	}
+	stores, err := h.loadStores(ctx, c, append(storeIDs, storeID), true)
+	if err != nil {
+		return nil, err
+	}
+	display, err := h.buyerDisplays(ctx, buyerIDs)
+	if err != nil {
+		return nil, err
+	}
+	replyAllowed := canComment(c, storeID, stores.blocking)
+	out := make([]*pb.ForumEntry, len(entries))
+	for i, e := range entries {
+		item := &pb.ForumEntry{
+			Id: e.ID.String(), StoreId: rpc.FormatID(e.StoreID), State: rpc.EnumToProto[pb.CommentState](e.State),
+			CreateTime: timestamppb.New(e.CreatedAt), UpdateTime: timestamppb.New(e.UpdatedAt), ReplyCount: e.ReplyCount,
+		}
+		if e.ParentID != nil {
+			s := e.ParentID.String()
+			item.ParentId = &s
+		}
+		if e.ReplyToID != nil {
+			s := e.ReplyToID.String()
+			item.ReplyToId = &s
+		}
+		out[i] = item
+		if e.State != social.CommentVisible {
+			continue
+		}
+		item.Body = e.Body
+		item.IsMine = c.IsAuthor(e.Actor)
+		item.ViewerCanEdit = item.IsMine
+		item.ViewerCanDelete = item.IsMine || c.OwnsStore(storeID)
+		item.ViewerCanReply = replyAllowed
+		if item.Author, err = h.toActor(e.Actor, display, stores); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+func (h *Public) buyerDisplays(ctx context.Context, buyerIDs []int64) (map[int64]buyer.Display, error) {
+	display := map[int64]buyer.Display{}
+	if buyerIDs = uniq(buyerIDs); len(buyerIDs) == 0 {
+		return display, nil
+	}
+	ds, err := h.buyers.BatchDisplay(ctx, buyerIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range ds {
+		display[d.BuyerID] = d
+	}
+	return display, nil
 }
 
 // postStores 是一頁貼文共用的店家資料：卡片，以及封鎖了觀看者的店（批次查詢，不逐列查）。
@@ -340,15 +517,9 @@ func (h *Public) toComments(ctx context.Context, c social.Caller, post social.Po
 	if err != nil {
 		return nil, err
 	}
-	display := map[int64]buyer.Display{}
-	if buyerIDs = uniq(buyerIDs); len(buyerIDs) > 0 {
-		ds, err := h.buyers.BatchDisplay(ctx, buyerIDs)
-		if err != nil {
-			return nil, err
-		}
-		for _, d := range ds {
-			display[d.BuyerID] = d
-		}
+	display, err := h.buyerDisplays(ctx, buyerIDs)
+	if err != nil {
+		return nil, err
 	}
 	replyAllowed := canComment(c, post.StoreID, stores.blocking)
 	out := make([]*pb.Comment, len(comments))

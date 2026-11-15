@@ -29,6 +29,12 @@ abstract class SocialPublicServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $3.ListCommentsRequest request);
   $async.Future<$3.SuggestTrendingPostsResponse> suggestTrendingPosts(
       $pb.ServerContext ctx, $3.SuggestTrendingPostsRequest request);
+  $async.Future<$3.SuggestTagsResponse> suggestTags(
+      $pb.ServerContext ctx, $3.SuggestTagsRequest request);
+  $async.Future<$3.ListTrendingTagsResponse> listTrendingTags(
+      $pb.ServerContext ctx, $3.ListTrendingTagsRequest request);
+  $async.Future<$3.ListForumEntriesResponse> listForumEntries(
+      $pb.ServerContext ctx, $3.ListForumEntriesRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
@@ -40,6 +46,12 @@ abstract class SocialPublicServiceBase extends $pb.GeneratedService {
         return $3.ListCommentsRequest();
       case 'SuggestTrendingPosts':
         return $3.SuggestTrendingPostsRequest();
+      case 'SuggestTags':
+        return $3.SuggestTagsRequest();
+      case 'ListTrendingTags':
+        return $3.ListTrendingTagsRequest();
+      case 'ListForumEntries':
+        return $3.ListForumEntriesRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -57,6 +69,12 @@ abstract class SocialPublicServiceBase extends $pb.GeneratedService {
       case 'SuggestTrendingPosts':
         return suggestTrendingPosts(
             ctx, request as $3.SuggestTrendingPostsRequest);
+      case 'SuggestTags':
+        return suggestTags(ctx, request as $3.SuggestTagsRequest);
+      case 'ListTrendingTags':
+        return listTrendingTags(ctx, request as $3.ListTrendingTagsRequest);
+      case 'ListForumEntries':
+        return listForumEntries(ctx, request as $3.ListForumEntriesRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

@@ -8,6 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -28,6 +29,44 @@ type fakeReads struct {
 	top      []social.Post
 	topN     int32
 	callers  []social.Caller
+
+	tagFeed    social.PostPage
+	tag        string
+	tagCounts  []social.HashtagCount
+	suggestQ   string
+	suggestN   int32
+	suggestSub bool
+	from, to   time.Time
+	trendN     int32
+	forum      social.ForumPage
+	forumStore int64
+	forumReply social.ForumPage
+	repliesTo  uuid.UUID
+}
+
+func (f *fakeReads) ListHashtagPosts(_ context.Context, _ social.Caller, tag string, _ *social.PostCursor, _ int32) (social.PostPage, error) {
+	f.tag = tag
+	return f.tagFeed, nil
+}
+
+func (f *fakeReads) SuggestHashtags(_ context.Context, q string, contains bool, limit int32) ([]social.HashtagCount, error) {
+	f.suggestQ, f.suggestSub, f.suggestN = q, contains, limit
+	return f.tagCounts, nil
+}
+
+func (f *fakeReads) TrendingHashtags(_ context.Context, from, to time.Time, limit int32) ([]social.HashtagCount, error) {
+	f.from, f.to, f.trendN = from, to, limit
+	return f.tagCounts, nil
+}
+
+func (f *fakeReads) ListForumEntries(_ context.Context, _ social.Caller, storeID int64, _ *social.CommentCursor, _ int32) (social.ForumPage, error) {
+	f.forumStore = storeID
+	return f.forum, nil
+}
+
+func (f *fakeReads) ListForumReplies(_ context.Context, _ social.Caller, parentID uuid.UUID, _ *social.CommentCursor, _ int32) (social.ForumPage, error) {
+	f.repliesTo = parentID
+	return f.forumReply, nil
 }
 
 func (f *fakeReads) PublicPost(_ context.Context, c social.Caller, _ uuid.UUID) (social.Post, error) {
@@ -109,12 +148,14 @@ func newPublic(t *testing.T, r *fakeReads, b fakeBuyers, s *fakeStores) *Public 
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := NewPublic(r, b, s, images, web)
+	h, err := NewPublic(r, b, s, images, web, func() time.Time { return trendNow })
 	if err != nil {
 		t.Fatal(err)
 	}
 	return h
 }
+
+var trendNow = time.Date(2026, 11, 15, 0, 0, 0, 0, time.UTC)
 
 func asBuyer(ctx context.Context) context.Context {
 	return rpc.WithPrincipal(ctx, identity.Principal{Kind: identity.PrincipalAccount, ID: 7})
@@ -140,7 +181,7 @@ func TestEverySocialPublicMethodIsNoSideEffects(t *testing.T) {
 }
 
 func TestNewPublicRequiresWebOrigin(t *testing.T) {
-	if _, err := NewPublic(&fakeReads{}, fakeBuyers{}, &fakeStores{}, rpc.Images{}, rpc.WebOrigin{}); err == nil {
+	if _, err := NewPublic(&fakeReads{}, fakeBuyers{}, &fakeStores{}, rpc.Images{}, rpc.WebOrigin{}, nil); err == nil {
 		t.Fatal("零值 WebOrigin 應該失敗")
 	}
 }
@@ -326,6 +367,137 @@ func TestSuggestTrendingPostsMaxResults(t *testing.T) {
 			t.Errorf("max_results=%d：err=%v n=%d", c.in, err, reads.topN)
 		}
 	}
+}
+
+func TestListPostsHashtagFilter(t *testing.T) {
+	p := post(5)
+	reads := &fakeReads{tagFeed: social.PostPage{Posts: []social.Post{p}}, feed: social.PostPage{Posts: []social.Post{post(6), post(6)}}}
+	h := newPublic(t, reads, fakeBuyers{}, &fakeStores{})
+	tag := "#Cake"
+	resp, err := h.ListPosts(t.Context(), connect.NewRequest(&pb.ListPostsRequest{Hashtag: &tag}))
+	if err != nil || reads.tag != "#Cake" || len(resp.Msg.GetPosts()) != 1 || resp.Msg.GetPosts()[0].GetId() != p.ID.String() {
+		t.Fatalf("hashtag 篩選：err=%v tag=%q posts=%v", err, reads.tag, resp.Msg.GetPosts())
+	}
+	store := "5"
+	if _, err := h.ListPosts(t.Context(), connect.NewRequest(&pb.ListPostsRequest{Hashtag: &tag, StoreId: &store})); codeOf(t, err) != connect.CodeInvalidArgument {
+		t.Errorf("hashtag 與 store_id 同時設：%v，預期 invalid_argument", err)
+	}
+	reads.tagFeed.Next = &social.PostCursor{PublishedAt: trendNow, ID: p.ID}
+	resp, err = h.ListPosts(t.Context(), connect.NewRequest(&pb.ListPostsRequest{Hashtag: &tag}))
+	if err != nil || resp.Msg.GetNextPageToken() == "" {
+		t.Fatalf("沒有 token：%v", err)
+	}
+	other := "Pie"
+	if _, err := h.ListPosts(t.Context(), connect.NewRequest(&pb.ListPostsRequest{Hashtag: &other, PageToken: resp.Msg.GetNextPageToken()})); codeOf(t, err) != connect.CodeInvalidArgument {
+		t.Errorf("換了 hashtag 沿用 token：%v", err)
+	}
+	if _, err := h.ListPosts(t.Context(), connect.NewRequest(&pb.ListPostsRequest{PageToken: resp.Msg.GetNextPageToken()})); codeOf(t, err) != connect.CodeInvalidArgument {
+		t.Errorf("拿標籤的 token 讀動態牆：%v", err)
+	}
+}
+
+func TestSuggestTags(t *testing.T) {
+	reads := &fakeReads{tagCounts: []social.HashtagCount{{Name: "cake", Posts: 4}}}
+	h := newPublic(t, reads, fakeBuyers{}, &fakeStores{})
+	resp, err := h.SuggestTags(t.Context(), connect.NewRequest(&pb.SuggestTagsRequest{Query: "#ca", Contains: true, MaxResults: 7}))
+	if err != nil || reads.suggestQ != "#ca" || !reads.suggestSub || reads.suggestN != 7 {
+		t.Fatalf("err=%v q=%q contains=%v n=%d", err, reads.suggestQ, reads.suggestSub, reads.suggestN)
+	}
+	if got := resp.Msg.GetTags(); len(got) != 1 || got[0].GetName() != "cake" || got[0].GetPostCount() != 4 {
+		t.Errorf("tags = %v", got)
+	}
+	if _, err := h.SuggestTags(t.Context(), connect.NewRequest(&pb.SuggestTagsRequest{Query: "c", MaxResults: -1})); codeOf(t, err) != connect.CodeInvalidArgument {
+		t.Errorf("max_results=-1：%v", err)
+	}
+}
+
+func TestListTrendingTagsWindow(t *testing.T) {
+	reads := &fakeReads{tagCounts: []social.HashtagCount{{Name: "cake", Posts: 4}}}
+	h := newPublic(t, reads, fakeBuyers{}, &fakeStores{})
+	if _, err := h.ListTrendingTags(t.Context(), connect.NewRequest(&pb.ListTrendingTagsRequest{})); err != nil ||
+		!reads.to.Equal(trendNow) || !reads.from.Equal(trendNow.Add(-social.DefaultTrendingWindow)) {
+		t.Fatalf("預設時間窗：err=%v %v ~ %v", err, reads.from, reads.to)
+	}
+	start, end := trendNow.Add(-48*time.Hour), trendNow.Add(-24*time.Hour)
+	resp, err := h.ListTrendingTags(t.Context(), connect.NewRequest(&pb.ListTrendingTagsRequest{StartTime: timestamppb.New(start), EndTime: timestamppb.New(end), MaxResults: 3}))
+	if err != nil || !reads.from.Equal(start) || !reads.to.Equal(end) || reads.trendN != 3 || resp.Msg.GetTags()[0].GetPostCount() != 4 {
+		t.Fatalf("指定時間窗：err=%v %v ~ %v n=%d", err, reads.from, reads.to, reads.trendN)
+	}
+	if _, err := h.ListTrendingTags(t.Context(), connect.NewRequest(&pb.ListTrendingTagsRequest{MaxResults: -1})); codeOf(t, err) != connect.CodeInvalidArgument {
+		t.Errorf("max_results=-1：%v", err)
+	}
+}
+
+func TestListForumEntriesFlagsAndScoping(t *testing.T) {
+	now := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+	entry := func(store int64, state social.CommentState, buyerID int64) social.ForumEntry {
+		return social.ForumEntry{ID: uuid.New(), StoreID: store, State: state, Actor: social.Actor{Kind: social.ActorBuyer, ID: buyerID}, Body: "x", CreatedAt: now, UpdatedAt: now}
+	}
+	mine, other, holder := entry(5, social.CommentVisible, 7), entry(5, social.CommentVisible, 8), entry(5, social.CommentDeleted, 0)
+	reads := &fakeReads{forum: social.ForumPage{Entries: []social.ForumEntry{mine, other, holder}, Next: &social.CommentCursor{CreatedAt: now, ID: holder.ID}}}
+	id := "5"
+
+	t.Run("買家", func(t *testing.T) {
+		h := newPublic(t, reads, fakeBuyers{id: 7}, &fakeStores{})
+		resp, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id}))
+		if err != nil || reads.forumStore != 5 {
+			t.Fatalf("err=%v store=%d", err, reads.forumStore)
+		}
+		e := resp.Msg.GetEntries()
+		if !e[0].GetIsMine() || !e[0].GetViewerCanEdit() || !e[0].GetViewerCanDelete() || !e[0].GetViewerCanReply() {
+			t.Errorf("自己的 = %v", e[0])
+		}
+		if e[1].GetIsMine() || e[1].GetViewerCanEdit() || e[1].GetViewerCanDelete() || !e[1].GetViewerCanReply() {
+			t.Errorf("別人的 = %v", e[1])
+		}
+		if g := e[2]; g.GetState() != pb.CommentState_COMMENT_STATE_DELETED || g.GetAuthor() != nil || g.GetBody() != "" || g.GetViewerCanReply() {
+			t.Errorf("佔位 = %v", g)
+		}
+		if resp.Msg.GetNextPageToken() == "" {
+			t.Error("沒有 next_page_token")
+		}
+	})
+	t.Run("被店家封鎖的買家不能回覆", func(t *testing.T) {
+		h := newPublic(t, reads, fakeBuyers{id: 7}, &fakeStores{blocking: map[int64]bool{5: true}})
+		resp, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id}))
+		if err != nil || resp.Msg.GetEntries()[1].GetViewerCanReply() {
+			t.Errorf("err=%v", err)
+		}
+	})
+	t.Run("訪客", func(t *testing.T) {
+		h := newPublic(t, reads, fakeBuyers{}, &fakeStores{})
+		resp, err := h.ListForumEntries(t.Context(), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range resp.Msg.GetEntries() {
+			if e.GetIsMine() || e.GetViewerCanEdit() || e.GetViewerCanDelete() || e.GetViewerCanReply() {
+				t.Errorf("訪客旗標 = %v", e)
+			}
+		}
+	})
+	t.Run("回覆", func(t *testing.T) {
+		reads := &fakeReads{forumReply: social.ForumPage{Entries: []social.ForumEntry{entry(5, social.CommentVisible, 8)}}}
+		h := newPublic(t, reads, fakeBuyers{}, &fakeStores{})
+		parent := uuid.New().String()
+		if _, err := h.ListForumEntries(t.Context(), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id, ParentId: &parent})); err != nil || reads.repliesTo.String() != parent {
+			t.Errorf("err=%v parent=%v", err, reads.repliesTo)
+		}
+		reads.forumReply = social.ForumPage{Entries: []social.ForumEntry{entry(6, social.CommentVisible, 8)}}
+		if _, err := h.ListForumEntries(t.Context(), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id, ParentId: &parent})); codeOf(t, err) != connect.CodeNotFound {
+			t.Errorf("別家店的父留言：%v，預期 not_found", err)
+		}
+	})
+	t.Run("格式與 token", func(t *testing.T) {
+		h := newPublic(t, reads, fakeBuyers{}, &fakeStores{})
+		if _, err := h.ListForumEntries(t.Context(), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: "abc"})); codeOf(t, err) != connect.CodeInvalidArgument {
+			t.Errorf("store_id 格式：%v", err)
+		}
+		resp, _ := h.ListForumEntries(t.Context(), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id}))
+		if _, err := h.ListForumEntries(t.Context(), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: "6", PageToken: resp.Msg.GetNextPageToken()})); codeOf(t, err) != connect.CodeInvalidArgument {
+			t.Errorf("換店沿用 token：%v", err)
+		}
+	})
 }
 
 // codeOf 是 interceptor 轉出的 Connect code（handler 回的是 apperr 或 rpc.Error，轉換在傳輸層）。

@@ -289,7 +289,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	stats := deps.Stats
 	add(contentv1alpha1connect.NewContentPublicServiceHandler(httpcontent.NewPublic(deps.Content, deps.Images), opts...))
 	add(admincontentconnect.NewContentAdminServiceHandler(httpcontent.NewAdmin(deps.Content, deps.Images), opts...))
-	socialPublic, err := httpsocial.NewPublic(deps.Social, deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin)
+	socialPublic, err := httpsocial.NewPublic(deps.Social, deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin, deps.Now)
 	if err != nil {
 		return nil, err
 	}

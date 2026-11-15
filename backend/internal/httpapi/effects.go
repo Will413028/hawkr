@@ -77,6 +77,9 @@ var customerEffects = map[string]Effect{
 	"/hawkr.social.v1alpha1.SocialPublicService/ListPosts":            EffectRead,
 	"/hawkr.social.v1alpha1.SocialPublicService/ListComments":         EffectRead,
 	"/hawkr.social.v1alpha1.SocialPublicService/SuggestTrendingPosts": EffectRead,
+	"/hawkr.social.v1alpha1.SocialPublicService/SuggestTags":          EffectRead,
+	"/hawkr.social.v1alpha1.SocialPublicService/ListTrendingTags":     EffectRead,
+	"/hawkr.social.v1alpha1.SocialPublicService/ListForumEntries":     EffectRead,
 
 	// SellerReportAppService
 	"/hawkr.seller.v1alpha1.SellerReportAppService/CreateReport":  EffectWrite,
