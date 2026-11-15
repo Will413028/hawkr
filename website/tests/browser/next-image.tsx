@@ -38,7 +38,6 @@ export default function NextImageStub({
 			}
 		: undefined;
 	return (
-		// biome-ignore lint/performance/noImgElement: test stand-in for next/image
 		<img
 			{...rest}
 			alt={alt}
