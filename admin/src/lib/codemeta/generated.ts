@@ -1553,7 +1553,6 @@ export const INVOICE_TAX_RISK_FLAG_LABEL: Record<string, string> = {
 /** 一筆認證申請是從哪條寫入路徑產生的。19 §6.1 定義五條寫入路徑收斂到單一收斂點，本值域是那五條路徑在資料上留下的唯一區分——缺了它，事後查不出「這筆是賣家自己送的、還是 ADM 代行送的、還是 migration 造出來的」，而三者的追責對象完全不同。 */
 export const ProductCertificationSource = {
 	SELLER: "SELLER",
-	PRODUCT_IMPORT: "PRODUCT_IMPORT",
 	DELEGATED_ADMIN: "DELEGATED_ADMIN",
 	SEED: "SEED",
 	LEGACY_MIGRATION: "LEGACY_MIGRATION",
@@ -1563,7 +1562,6 @@ export type ProductCertificationSourceValue = (typeof ProductCertificationSource
 
 export const PRODUCT_CERTIFICATION_SOURCE_LABEL: Record<string, string> = {
 	"SELLER": "賣家送出",
-	"PRODUCT_IMPORT": "商品匯入",
 	"DELEGATED_ADMIN": "管理員代行",
 	"SEED": "種子資料",
 	"LEGACY_MIGRATION": "存量遷移",
