@@ -44,9 +44,9 @@ function Block({ block }: { block: LegalBlock }) {
 			return null;
 		case "h3":
 			return (
-				<h4 className="mt-[var(--space-4)] mb-[var(--space-2)] font-bold text-[color:var(--text-heading)]">
+				<h3 className="mt-[var(--space-4)] mb-[var(--space-2)] font-bold text-[color:var(--text-heading)]">
 					{block.text}
-				</h4>
+				</h3>
 			);
 		case "p":
 			return (

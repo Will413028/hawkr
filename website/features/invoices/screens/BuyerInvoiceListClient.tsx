@@ -174,7 +174,7 @@ export default function BuyerInvoiceListClient() {
 	const failed = datesValid && !loading && !result;
 
 	return (
-		<main>
+		<div>
 			<SellerPageShell
 				title={T.pageTitle}
 				eyebrow={T.eyebrow}
@@ -187,7 +187,6 @@ export default function BuyerInvoiceListClient() {
 									key={item.value || "all-kind"}
 									as="button"
 									active={documentKind === item.value}
-									aria-selected={documentKind === item.value}
 									onClick={() =>
 										setParams({ document_kind: item.value || null })
 									}
@@ -202,7 +201,6 @@ export default function BuyerInvoiceListClient() {
 									key={item.value || "all-status"}
 									as="button"
 									active={documentStatus === item.value}
-									aria-selected={documentStatus === item.value}
 									onClick={() => setParams({ status: item.value || null })}
 								>
 									{item.label || statusLabel(item.value)}
@@ -346,7 +344,7 @@ export default function BuyerInvoiceListClient() {
 					total={totalPages}
 				/>
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }
 

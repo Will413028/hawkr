@@ -406,6 +406,25 @@ export function Dropdown({
 		.filter(Boolean)
 		.join(" ");
 
+	const valueId = `${fieldId}-value`;
+	// The one element that carries the accessible name: the explicit
+	// aria-label (sr-only span), else the visible label, else the floating
+	// label. With none of them the listbox falls back to the trigger itself.
+	const nameSource = ariaLabel
+		? "aria-label"
+		: label
+			? floatingLabel
+				? "floating"
+				: "visible"
+			: undefined;
+	const nameElementId = nameSource ? `${fieldId}-label` : undefined;
+	const nameId = nameElementId ?? fieldId;
+	const valueText = shownItem
+		? shownItem.label
+		: floatingLabel && label && !(focused || open)
+			? ""
+			: placeholder;
+
 	return (
 		<div
 			data-slot="field"
@@ -415,12 +434,18 @@ export function Dropdown({
 		>
 			{label && !floatingLabel && (
 				<label
+					id={nameSource === "visible" ? nameElementId : undefined}
 					data-slot="label"
 					htmlFor={fieldId}
 					className={`text-sm font-medium text-foreground${isRequired ? " after:content-['_*'] after:text-[var(--hkui-danger-text)]" : ""}`}
 				>
 					{label}
 				</label>
+			)}
+			{ariaLabel && (
+				<span id={nameElementId} className="sr-only">
+					{ariaLabel}
+				</span>
 			)}
 			<div
 				ref={wrapRef}
@@ -441,7 +466,9 @@ export function Dropdown({
 					aria-expanded={open}
 					aria-controls={open ? `${fieldId}-listbox` : undefined}
 					aria-invalid={invalid || undefined}
-					aria-label={ariaLabel}
+					aria-labelledby={
+						nameElementId ? `${nameElementId} ${valueId}` : valueId
+					}
 					aria-describedby={
 						description || errorMessage ? `${fieldId}-desc` : undefined
 					}
@@ -457,14 +484,11 @@ export function Dropdown({
 						// vertical layout targets: Tailwind reads `_` inside an arbitrary
 						// variant as a descendant combinator, so `.hkui-dropdown__value`
 						// cannot be addressed from a utility at all.
+						id={valueId}
 						data-slot="dropdown-value"
 						className={`hkui-dropdown__value${shownItem ? "" : " is-placeholder"}`}
 					>
-						{shownItem
-							? shownItem.label
-							: floatingLabel && label && !(focused || open)
-								? ""
-								: placeholder}
+						{valueText}
 					</span>
 					<span className="hkui-dropdown__chevron" aria-hidden="true">
 						<ChevronDown />
@@ -472,6 +496,7 @@ export function Dropdown({
 				</button>
 				{floatingLabel && label && (
 					<label
+						id={nameSource === "floating" ? nameElementId : undefined}
 						htmlFor={fieldId}
 						data-slot="floating-label"
 						className={floatingLabelClasses({
@@ -511,6 +536,7 @@ export function Dropdown({
 							onKeyDown={handleMenuKey}
 							noResultsLabel={noResultsLabel}
 							labelledBy={fieldId}
+							nameId={nameId}
 						/>,
 						document.body,
 					)
@@ -552,6 +578,7 @@ interface DropdownMenuProps {
 	onKeyDown: (e: React.KeyboardEvent) => void;
 	noResultsLabel: string;
 	labelledBy: string;
+	nameId: string;
 }
 
 const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
@@ -572,6 +599,7 @@ const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
 			onKeyDown,
 			noResultsLabel,
 			labelledBy,
+			nameId,
 		},
 		ref,
 	) {
@@ -621,6 +649,7 @@ const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
 				) : (
 					<DropdownListbox
 						labelledBy={labelledBy}
+						nameId={nameId}
 						items={items}
 						activeIdx={activeIdx}
 						hoverIdx={hoverIdx}
@@ -636,6 +665,7 @@ const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
 
 interface DropdownListboxProps {
 	labelledBy: string;
+	nameId: string;
 	items: DropdownItem[];
 	activeIdx: number;
 	hoverIdx: number;
@@ -646,6 +676,7 @@ interface DropdownListboxProps {
 
 function DropdownListbox({
 	labelledBy,
+	nameId,
 	items,
 	activeIdx,
 	hoverIdx,
@@ -659,7 +690,7 @@ function DropdownListbox({
 			className="hkui-dropdown__list"
 			role="listbox"
 			tabIndex={-1}
-			aria-labelledby={labelledBy}
+			aria-labelledby={nameId}
 			aria-activedescendant={
 				activeIdx >= 0 ? `${labelledBy}-opt-${activeIdx}` : undefined
 			}

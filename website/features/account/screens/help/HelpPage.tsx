@@ -28,7 +28,7 @@ const FAQ = [
 
 export default function Page() {
 	return (
-		<main className="help-page">
+		<div className="help-page">
 			<SellerPageShell
 				title="客服中心"
 				subtitle="我們希望你逛得安心、買得開心、吃得健康。"
@@ -130,6 +130,6 @@ export default function Page() {
 					</ul>
 				</section>
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }

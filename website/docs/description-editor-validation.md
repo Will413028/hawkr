@@ -18,24 +18,24 @@
 
 ## 覆蓋範圍
 
-Storybook 測試比對實際編輯區、`onChange` 文件及瀏覽器錯誤。刪除案例使用 Vitest Browser 的原生鍵盤；程式只設定選取 Range，不手動刪除 DOM 假造結果。普通預覽保留固定文件供操作，不執行交易。
+Browser 測試比對實際編輯區、`onChange` 文件及瀏覽器錯誤。刪除案例使用 Vitest Browser 的原生鍵盤；程式只設定選取 Range，不手動刪除 DOM 假造結果。測試使用固定文件，不執行交易。
 
-- `DescriptionEditor.stories.tsx`：日常編輯、空白、窄版、選取格式、Markdown 貼上、清單／標題／對齊、整理與預覽。
-- `DescriptionEditorDeletion.stories.tsx`：12 個段落、清單、區塊、混合媒體與快速復原案例。
-- `DescriptionEditorTableDeletion.stories.tsx`：單格與跨格刪除，嚴格比對所有儲存格、對齊、前後段落和復原。
-- `DescriptionEditorColor.stories.tsx`：5 個局部／完整選取、取消、放大模式、顏色搭配粗斜底線與逐步復原案例。
-- `DescriptionEditorImage.stories.tsx`：空白、實際進度、失敗重試、更換及移除復原、上傳途中移除、檔案驗證、閱讀預覽與窄版深色。只攔截 `public/storybook/` 指定 fixture 圖片，真正的上傳 API 不執行。
-- `DescriptionColorPicker.stories.tsx`：4 個色域／色相、HEX／RGB 驗證、取消與 Escape、窄版深色／停用案例。
+- `DescriptionEditor.browser.test.tsx`：日常編輯、空白、窄版、選取格式、Markdown 貼上、清單／標題／對齊、整理與預覽。
+- `DescriptionEditorDeletion.browser.test.tsx`：12 個段落、清單、區塊、混合媒體與快速復原案例。
+- `DescriptionEditorTableDeletion.browser.test.tsx`：單格與跨格刪除，嚴格比對所有儲存格、對齊、前後段落和復原。
+- `DescriptionEditorColor.browser.test.tsx`：5 個局部／完整選取、取消、放大模式、顏色搭配粗斜底線與逐步復原案例。
+- `DescriptionEditorImage.browser.test.tsx`：空白、實際進度、失敗重試、更換及移除復原、上傳途中移除、檔案驗證、閱讀預覽與窄版深色。只攔截 `tests/browser/description-image-fixtures.ts` 指定的 fixture 圖片，真正的上傳 API 不執行。
+- `DescriptionColorPicker.browser.test.tsx`：4 個色域／色相、HEX／RGB 驗證、取消與 Escape、窄版深色／停用案例。
 
-瀏覽器另實看桌面圖片、375px 深色圖片、320px 空白圖片區，以及桌面、375px 與 320px 色盤，並檢查放大模式的 Escape 與焦點返回。這些是本機 Chromium 與 Storybook 證據；未執行正式商品寫入、遠端 CI、部署或 iOS／Android 原生鍵盤測試。
+瀏覽器另實看桌面圖片、375px 深色圖片、320px 空白圖片區，以及桌面、375px 與 320px 色盤，並檢查放大模式的 Escape 與焦點返回。這些是本機 Chromium 與已移除的元件預覽證據；未執行正式商品寫入、遠端 CI、部署或 iOS／Android 原生鍵盤測試。
 
 ## 2026-09-12 最終本機結果
 
 | 檢查 | 結果 |
 | --- | --- |
-| MCP `test-run` 完整 Web／基礎回歸，含 a11y | 116 個案例全部通過，內含 42 個編輯器、色盤與圖片案例 |
+| 已移除的元件預覽的 MCP `test-run` 完整 Web／基礎回歸，含 a11y | 116 個案例全部通過，內含 42 個編輯器、色盤與圖片案例 |
 | 相關 Node unit | 81 個全部通過，含格式保存、快照序列、空白刪除、清單、表格、圖片與 object key |
-| `pnpm storybook:typecheck` | 通過 |
+| 已移除的元件預覽的型別檢查 | 通過 |
 | 完整 Node unit（獨立提交工作區） | 2471 通過、1 個既有跳過，沒有失敗 |
 | Vitest unit（獨立提交工作區） | 206 個測試檔、1926 個案例通過 |
 | 完整 `pnpm lint`（獨立提交工作區） | 通過；保留既有非阻擋 warnings／infos |
@@ -44,5 +44,5 @@ Storybook 測試比對實際編輯區、`onChange` 文件及瀏覽器錯誤。�
 | 圖片 UI 與選檔 | 桌面、375px 深色及 320px 空白圖片區無水平溢出；手機操作按鈕 44px。原生選檔取消無錯誤，重新選圖成功且無說明欄；本地 stub 不連上傳 API |
 | 響應式色盤 | 375px 文件寬度 375px；320px 放大模式色盤左右各留 8px，沒有水平溢出 |
 
-這份表格記錄本次來源提交前的本機驗證；同批 Web 回歸包含 Input 與 PostContent stories，但不代表重新執行兩 App 的原生測試。人工元件庫契約仍為 draft，沒有填入本次遠端 CI 或已發布結果。
+這份表格記錄本次來源提交前的本機驗證；同批 Web 回歸包含 Input 與 PostContent 預覽，但不代表重新執行兩 App 的原生測試。人工元件庫契約仍為 draft，沒有填入本次遠端 CI 或已發布結果。
 

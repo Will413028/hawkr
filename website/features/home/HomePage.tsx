@@ -195,7 +195,7 @@ export default function HomePage({ snapshot }: HomePageProps) {
 	// HomeContent seeds `snapshot` as react-query initialData: first paint uses
 	// it directly, and the browser query only reconciles price/stock afterwards.
 	return (
-		<main
+		<div
 			className={`hkh-page home-page ${zenMaruGothic.variable} ${openhuninn.variable}`}
 		>
 			{/* sr-only h1 gives the visually heading-less home hero a single,
@@ -206,6 +206,6 @@ export default function HomePage({ snapshot }: HomePageProps) {
 			<Suspense fallback={null}>
 				<HomeContent initialSnapshot={snapshot} />
 			</Suspense>
-		</main>
+		</div>
 	);
 }

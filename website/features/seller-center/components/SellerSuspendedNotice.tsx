@@ -174,7 +174,7 @@ function NoticeFrame({
 					<AppIcon name="danger" size={64} />
 				</div>
 				<div className="flex flex-col gap-1.5">
-					<span className="inline-flex w-fit text-[0.8125rem] font-bold uppercase tracking-normal text-[var(--hkui-danger)]">
+					<span className="inline-flex w-fit text-[0.8125rem] font-bold uppercase tracking-normal text-[var(--hkui-danger-text)]">
 						帳號狀態
 					</span>
 					<strong className="text-lg text-[var(--hkui-foreground)]">

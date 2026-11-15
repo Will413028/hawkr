@@ -45,7 +45,7 @@ export default function StatusPageLayout({
 	...rest
 }: StatusPageLayoutProps) {
 	return (
-		<main
+		<div
 			className={cn(
 				"grid min-h-[72vh] place-items-center px-6 py-16 text-hk-body",
 				className,
@@ -81,7 +81,7 @@ export default function StatusPageLayout({
 				</div>
 				{footnote}
 			</section>
-		</main>
+		</div>
 	);
 }
 

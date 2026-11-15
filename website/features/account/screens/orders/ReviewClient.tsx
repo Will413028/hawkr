@@ -67,19 +67,20 @@ export default function ReviewClient({ orderNo }: { orderNo: string }) {
 
 	if (loading && !order) {
 		return (
-			<main>
+			<div>
+				<h1 className="sr-only">評價商品</h1>
 				<p>載入中…</p>
-			</main>
+			</div>
 		);
 	}
 
 	if (!order) {
 		return (
-			<main>
+			<div>
 				<SellerPageShell title="評價商品">
 					<p className="text-danger-700 text-sm font-semibold">找不到訂單</p>
 				</SellerPageShell>
-			</main>
+			</div>
 		);
 	}
 
@@ -179,7 +180,7 @@ export default function ReviewClient({ orderNo }: { orderNo: string }) {
 	);
 
 	return (
-		<main>
+		<div>
 			<SellerPageShell
 				title="評價商品"
 				subtitle={`訂單 #${orderNo}　·　逐項給分跟留言，協助其他人挑食材。`}
@@ -429,6 +430,6 @@ export default function ReviewClient({ orderNo }: { orderNo: string }) {
 					</div>
 				)}
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }

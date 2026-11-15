@@ -57,7 +57,7 @@ export default function ProductUnavailableView({ productId }: Props) {
 	};
 
 	return (
-		<main
+		<div
 			className="min-h-[60vh] grid place-items-center p-[var(--hkui-space-6)]"
 			data-hk-page-content-ready="product-detail"
 			data-hk-product-detail-id={productId}
@@ -117,6 +117,6 @@ export default function ProductUnavailableView({ productId }: Props) {
 					<Button href="/market/products">去逛逛商品</Button>
 				</div>
 			</div>
-		</main>
+		</div>
 	);
 }

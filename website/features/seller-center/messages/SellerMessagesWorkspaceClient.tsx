@@ -4,6 +4,7 @@ import { parseAsString, useQueryState } from "nuqs";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Avatar from "@/components/shared/Avatar";
+import { ScrollableTableRegion } from "@/components/shared/ScrollableTableRegion";
 import SellerPageShell from "@/components/shared/SellerPageShell";
 import Button from "@/components/ui/Button";
 import {
@@ -618,21 +619,24 @@ export default function SellerMessagesWorkspaceClient() {
 						.join(" ")}
 					data-loading={workspaceBusy ? "true" : undefined}
 				>
-					<div className="seller-orders__table-wrap seller-messages__table-wrap">
-						{!loadingInitial && filteredRows.length === 0 ? (
-							<SellerEmptyState
-								variant="messages"
-								searchQuery={query}
-								seamless
-								className="seller-messages__empty-state"
-								title={hasFilters ? "找不到符合條件的對話" : undefined}
-								description={
-									hasFilters
-										? "調整客戶分類、標籤或時間範圍後再試一次。"
-										: undefined
-								}
-							/>
-						) : (
+					{!loadingInitial && filteredRows.length === 0 ? (
+						<SellerEmptyState
+							variant="messages"
+							searchQuery={query}
+							seamless
+							className="seller-messages__empty-state"
+							title={hasFilters ? "找不到符合條件的對話" : undefined}
+							description={
+								hasFilters
+									? "調整客戶分類、標籤或時間範圍後再試一次。"
+									: undefined
+							}
+						/>
+					) : (
+						<ScrollableTableRegion
+							label="訊息列表"
+							className="seller-messages__table-wrap"
+						>
 							<table
 								className="seller-orders__table seller-messages__table"
 								data-mobile-layout="cards"
@@ -685,8 +689,8 @@ export default function SellerMessagesWorkspaceClient() {
 									)}
 								</tbody>
 							</table>
-						)}
-					</div>
+						</ScrollableTableRegion>
+					)}
 				</div>
 
 				{!loadingInitial && filteredRows.length > 0 ? (

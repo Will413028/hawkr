@@ -25,7 +25,7 @@ export default function LoginShell({
 	hero,
 }: LoginShellProps) {
 	return (
-		<main className="hkui-login">
+		<div className="hkui-login">
 			<div className="hkui-login__panel">
 				{hero && <div className="hkui-login__hero">{hero}</div>}
 				{eyebrow && <span className="hkui-login__eyebrow">{eyebrow}</span>}
@@ -36,6 +36,6 @@ export default function LoginShell({
 
 				{footer && <div className="hkui-login__footer">{footer}</div>}
 			</div>
-		</main>
+		</div>
 	);
 }

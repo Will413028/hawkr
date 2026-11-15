@@ -140,17 +140,17 @@ export default function InvoiceDocumentDetailClient({
 
 	if (loading && !detail) {
 		return (
-			<main>
+			<div>
 				<SellerPageShell title={T.pageTitle} eyebrow={T.eyebrow}>
 					<p className="text-foreground-soft text-sm">{T.loading}</p>
 				</SellerPageShell>
-			</main>
+			</div>
 		);
 	}
 
 	if (!detail) {
 		return (
-			<main>
+			<div>
 				<SellerPageShell
 					title={T.notFoundTitle}
 					actions={
@@ -170,7 +170,7 @@ export default function InvoiceDocumentDetailClient({
 						{error || T.notFoundBody}
 					</p>
 				</SellerPageShell>
-			</main>
+			</div>
 		);
 	}
 
@@ -183,7 +183,7 @@ export default function InvoiceDocumentDetailClient({
 	const taxNote = taxCategoryNote(detail.taxCategory);
 
 	return (
-		<main>
+		<div>
 			<SellerPageShell
 				title={T.pageTitle}
 				eyebrow={T.eyebrow}
@@ -388,7 +388,7 @@ export default function InvoiceDocumentDetailClient({
 					) : null}
 				</div>
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }
 

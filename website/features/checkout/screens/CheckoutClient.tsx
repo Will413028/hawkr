@@ -229,6 +229,34 @@ function isStorePickupMethod(method: string) {
 	return method === ShippingMethodCode.SEVEN_ELEVEN_STORE_PICKUP;
 }
 
+function CheckoutNotice({
+	message,
+	link = true,
+	busy = false,
+}: {
+	message: string;
+	link?: boolean;
+	busy?: boolean;
+}) {
+	return (
+		<section
+			className="min-h-[calc(100vh-280px)] flex flex-col items-center justify-center gap-4 text-center px-4"
+			aria-busy={busy || undefined}
+		>
+			<h1 className="sr-only">結帳</h1>
+			<p>{message}</p>
+			{link && (
+				<Link
+					href="/cart"
+					className="hk-cta-primary inline-flex items-center justify-center min-h-[48px] px-[22px] rounded-[var(--radius-pill)] border border-hk-primary bg-hk-primary text-hk-inverse font-bold no-underline transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-hk-card"
+				>
+					回購物車
+				</Link>
+			)}
+		</section>
+	);
+}
+
 /**
  * 這張草稿的收件／取貨資料齊不齊。
  *
@@ -614,55 +642,24 @@ export default function CheckoutClient() {
 	}, [draft?.shipping.method, preview?.totalPayAmount, selectedItems, draft]);
 
 	if (!draftLoaded || (cart.loading && cart.items.length === 0)) {
-		return (
-			<section
-				className="min-h-[calc(100vh-280px)] flex flex-col items-center justify-center gap-4 text-center px-4"
-				aria-busy="true"
-			>
-				<p>正在讀取結帳資料…</p>
-			</section>
-		);
+		return <CheckoutNotice message="正在讀取結帳資料…" link={false} busy />;
 	}
 
 	if (!draft) {
 		return (
-			<section className="min-h-[calc(100vh-280px)] flex flex-col items-center justify-center gap-4 text-center px-4">
-				<p>結帳資料已過期，請從購物車重新確認商品、配送與優惠券。</p>
-				<Link
-					href="/cart"
-					className="hk-cta-primary inline-flex items-center justify-center min-h-[48px] px-[22px] rounded-[var(--radius-pill)] border border-hk-primary bg-hk-primary text-hk-inverse font-bold no-underline transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-hk-card"
-				>
-					回購物車
-				</Link>
-			</section>
+			<CheckoutNotice message="結帳資料已過期，請從購物車重新確認商品、配送與優惠券。" />
 		);
 	}
 
 	if (!orderConfirmed && (selectedItems.length === 0 || hasInvalidCartItems)) {
 		return (
-			<section className="min-h-[calc(100vh-280px)] flex flex-col items-center justify-center gap-4 text-center px-4">
-				<p>商品資料同步中，請回購物車重新確認後再結帳。</p>
-				<Link
-					href="/cart"
-					className="hk-cta-primary inline-flex items-center justify-center min-h-[48px] px-[22px] rounded-[var(--radius-pill)] border border-hk-primary bg-hk-primary text-hk-inverse font-bold no-underline transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-hk-card"
-				>
-					回購物車
-				</Link>
-			</section>
+			<CheckoutNotice message="商品資料同步中，請回購物車重新確認後再結帳。" />
 		);
 	}
 
 	if (!hasRequiredRecipient) {
 		return (
-			<section className="min-h-[calc(100vh-280px)] flex flex-col items-center justify-center gap-4 text-center px-4">
-				<p>配送資料不完整，請回購物車重新選擇收件地址或取貨門市。</p>
-				<Link
-					href="/cart"
-					className="hk-cta-primary inline-flex items-center justify-center min-h-[48px] px-[22px] rounded-[var(--radius-pill)] border border-hk-primary bg-hk-primary text-hk-inverse font-bold no-underline transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-hk-card"
-				>
-					回購物車
-				</Link>
-			</section>
+			<CheckoutNotice message="配送資料不完整，請回購物車重新選擇收件地址或取貨門市。" />
 		);
 	}
 

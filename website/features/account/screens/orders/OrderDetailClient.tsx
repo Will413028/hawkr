@@ -152,15 +152,16 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 
 	if (loading && !order) {
 		return (
-			<main>
+			<div>
+				<h1 className="sr-only">訂單詳情</h1>
 				<p>載入中…</p>
-			</main>
+			</div>
 		);
 	}
 
 	if (error || !order) {
 		return (
-			<main>
+			<div>
 				<SellerPageShell
 					title="找不到訂單"
 					actions={
@@ -178,7 +179,7 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 						{error || "找不到訂單"}
 					</p>
 				</SellerPageShell>
-			</main>
+			</div>
 		);
 	}
 
@@ -524,7 +525,7 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 	};
 
 	return (
-		<main>
+		<div>
 			<SellerPageShell
 				title="訂單詳情"
 				subtitle={
@@ -827,7 +828,7 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 					</section>
 				</div>
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }
 

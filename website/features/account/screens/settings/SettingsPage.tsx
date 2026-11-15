@@ -85,7 +85,7 @@ export const SECTIONS: readonly {
 
 export default function Page() {
 	return (
-		<main className="settings-page">
+		<div className="settings-page">
 			<SellerPageShell
 				title="設定"
 				subtitle="一站管理你的帳號、購物偏好、通知設定。"
@@ -152,6 +152,6 @@ export default function Page() {
 					<DeleteAccountSection />
 				</div>
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }

@@ -24,7 +24,7 @@ test("隱私政策的生效日是它引用的生成文件中最新的一次修�
 test("預告橫幅掛在賣家中心外框、措施與申覆入口掛在帳號總覽", () => {
 	assert.match(
 		compact("features/seller-center/components/SellerCenterShell.tsx"),
-		/<mainclassName="seller-main"><TerminationNoticeBanner\/>\{children\}<\/main>/,
+		/<divclassName="seller-main"><TerminationNoticeBanner\/>\{children\}<\/div>/,
 	);
 	assert.match(
 		compact("features/account/screens/overview/AccountOverviewClient.tsx"),

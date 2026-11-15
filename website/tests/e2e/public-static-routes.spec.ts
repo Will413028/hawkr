@@ -4,6 +4,7 @@ import {
 	discoverAppPageRoutes,
 	discoverPermanentRedirects,
 } from "./helpers/app-route-inventory";
+import { expectNoAxeViolations } from "./helpers/axe";
 import {
 	fulfillConnectError,
 	GET_SESSION_URL,
@@ -349,6 +350,7 @@ async function assertPublicStaticRoute(
 	);
 	await assertNoResidualLoading(page, route);
 	await assertRenderedLinksSafe(page, route);
+	await expectNoAxeViolations(page, route);
 }
 
 test.describe("canonical public static route browser health", {

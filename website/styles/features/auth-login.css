@@ -177,10 +177,10 @@
 }
 .hkui-login__terms a {
 	color: var(--hkui-primary);
-	text-decoration: none;
+	text-decoration: underline;
 }
 .hkui-login__terms a:hover {
-	text-decoration: underline;
+	text-decoration-thickness: 2px;
 }
 
 /* ============================================================

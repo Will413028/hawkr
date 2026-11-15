@@ -15,6 +15,7 @@
 
 import * as React from "react";
 import Link from "@/components/shared/Link";
+import { ScrollableTableRegion } from "@/components/shared/ScrollableTableRegion";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import { useSellerIdentity } from "@/components/shared/useSellerIdentity";
 import Button from "@/components/ui/Button";
@@ -326,8 +327,11 @@ function RecentDocumentsCard({
 					</Link>
 				</span>
 			</header>
-			<div
-				className={`seller-orders__table-wrap${documents.length > 0 ? " seller-mobile-disclosure-desktop" : ""}`}
+			<ScrollableTableRegion
+				label="最近開立的發票與收據"
+				className={
+					documents.length > 0 ? "seller-mobile-disclosure-desktop" : undefined
+				}
 			>
 				<table className="seller-table" data-mobile-layout="cards">
 					<caption className="sr-only">最近開立的發票與收據</caption>
@@ -396,7 +400,7 @@ function RecentDocumentsCard({
 						)}
 					</tbody>
 				</table>
-			</div>
+			</ScrollableTableRegion>
 			{documents.length > 0 ? (
 				<div className="p-3">
 					<SellerMobileDisclosureList

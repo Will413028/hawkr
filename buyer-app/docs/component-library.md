@@ -2,7 +2,7 @@
 
 `lib/main_catalog.dart` 是獨立的 Flutter 入口，直接使用正式元件與 `AppTheme.light`。不啟動 Firebase、登入、API、推播或分析服務。範例的商品、價格、數量與操作結果都是本地展示資料。
 
-## 啟動與 Web Storybook 整合
+## 啟動
 
 ```bash
 # 優先使用專案 .fvm/flutter_sdk，否則使用 PATH 中的 flutter
@@ -11,16 +11,13 @@ bash scripts/component-catalog.sh test
 bash scripts/component-catalog.sh build
 ```
 
-建置結果為 `build/catalog/`，預設 base href 是 `/flutter/buyer/`。將整個輸出目錄放入 Web Storybook 靜態資料夾的 `flutter/buyer/`，才能保留 assets 與 CanvasKit 相對路徑。Web runtime 檔案使用本地建置資源；Flutter 的瀏覽器字型 fallback 仍由 Flutter 自身管理。
+建置結果為 `build/catalog/`，預設 base href 是 `/`（可用 `CATALOG_BASE_HREF` 覆寫）；整個輸出目錄需一起放置，才能保留 assets 與 CanvasKit 相對路徑。Web runtime 檔案使用本地建置資源；Flutter 的瀏覽器字型 fallback 仍由 Flutter 自身管理。
 
-若要用一般靜態伺服器單獨查看：
+用一般靜態伺服器查看建置結果：
 
 ```bash
-CATALOG_BASE_HREF=/ bash scripts/component-catalog.sh build
 python3 -m http.server 7357 --directory build/catalog
 ```
-
-重新整合 Storybook 前，再執行一次預設的 `build`，恢復 `/flutter/buyer/` base href。
 
 共同 URL 參數與賣家元件庫一致：
 
@@ -28,9 +25,8 @@ python3 -m http.server 7357 --directory build/catalog
 | --- | --- |
 | `component` | 下表的固定分類 ID；未知值回到 `foundations` |
 | `textScale=1.4` | 放大文字；預設 `1.0`，沿用正式 App 的 `0.8–1.4` 範圍 |
-| `embedded=true` | 隱藏搜尋與分類導覽，供 Storybook iframe 使用 |
 
-例如：`/flutter/buyer/?component=commerce&textScale=1.4&embedded=true`。分類 ID 是可分享的固定入口；目錄內點選分類與切換文字比例只改變目前預覽狀態。
+例如：`/?component=commerce&textScale=1.4`。分類 ID 是可分享的固定入口；目錄內點選分類與切換文字比例只改變目前預覽狀態。
 
 ## 已收錄正式元件
 
@@ -214,7 +210,7 @@ HkSkeletonShimmer(child: _ProductCardSkeleton());
 - 主題只有 `lib/core/theme/app_theme.dart` 一份；正式 `lib/main.dart` 與 catalog 共用。此檔案由原本 `main.dart` 的 ThemeData 原樣抽出，沒有重設品牌色、字級或按鈕規格。
 - 品牌 token 保留在 `core/theme/`；目錄本身不新增另一組產品色票。
 - 新的共用元件先放入正式 `shared/widgets/` 或明確的 feature widgets，再以 import 加入 `lib/catalog/component_catalog.dart`。避免在 catalog 複製一份正式元件實作。
-- 新增分類時同步 `buyerCatalogSections`、搜尋詞、此表格及 Web Storybook 的 iframe story。既有深連結 ID 保持穩定。
+- 新增分類時同步 `buyerCatalogSections`、搜尋詞、此表格。既有深連結 ID 保持穩定。
 - ScreenUtil 寬高與文字縮放維持停用；版面用 constraints 重排，文字比例使用正式 `AppMediaQueryPolicy`。
 
 ## 驗證與範圍
@@ -226,7 +222,7 @@ HkSkeletonShimmer(child: _ProductCardSkeleton());
 
 ## 版本與文件維護
 
-共用 UI 修改需一起更新 catalog、Dart API 文件及測試；Web 的 Storybook 在 build 時直接讀入本檔。
+共用 UI 修改需一起更新 catalog、Dart API 文件及測試。
 
 受保護的 Web catalog 使用自訂 `web/flutter_bootstrap.js`，不安裝離線 service worker。舊 UI 版本以獨立 bundle 保留；回復文件庫版本不等於回復已發布的 App。
 

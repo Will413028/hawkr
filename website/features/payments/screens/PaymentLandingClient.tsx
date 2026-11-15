@@ -73,7 +73,7 @@ function Inner({ orderNo }: PaymentLandingClientProps) {
 	}
 
 	return (
-		<main className="min-h-[calc(100vh-200px)] max-w-[580px] mx-auto py-10 px-5 pb-12 flex items-center justify-center">
+		<div className="min-h-[calc(100vh-200px)] max-w-[580px] mx-auto py-10 px-5 pb-12 flex items-center justify-center">
 			<div className="relative w-full bg-content1/90 border border-divider rounded-3xl p-10 px-7 pb-8 text-center flex flex-col items-center gap-3 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_18px_40px_-22px_rgb(var(--color-ink-950-rgb)/0.12),0_6px_18px_-12px_rgb(var(--color-ink-950-rgb)/0.08)] backdrop-blur-md overflow-hidden dark:bg-content1/86 animate-checkout-pop">
 				<span
 					className="m-0 my-4 inline-block text-hk-primary"
@@ -96,6 +96,6 @@ function Inner({ orderNo }: PaymentLandingClientProps) {
 							: reason || "未付款成功，導向重試頁。"}
 				</p>
 			</div>
-		</main>
+		</div>
 	);
 }
