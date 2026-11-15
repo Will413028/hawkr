@@ -84,9 +84,6 @@ expect.extend({
 		return pass(isVisible(target), "to be visible", target);
 	},
 	toBeInTheDocumentSync(received: unknown) {
-		if (received === null) {
-			return pass(false, "to be in the document", received);
-		}
 		const target = element(received, "toBeInTheDocumentSync");
 		return pass(
 			target.ownerDocument.contains(target),

@@ -125,14 +125,23 @@ async function deleteFromBlockMenu(
 		".ce-toolbar__settings-btn",
 	);
 	if (!settings) throw new Error("找不到區塊調整按鈕");
-	// 工具列在 mousemove 後才移到滑鼠指向的區塊；等它對齊目標區塊再開選單，
-	// 否則選單會開在原本有游標的區塊上。
-	await waitFor(async () => {
-		await user.hover(block);
-		const blockRect = block.getBoundingClientRect();
-		const buttonRect = settings.getBoundingClientRect();
-		const middle = buttonRect.top + buttonRect.height / 2;
-		expect(middle >= blockRect.top && middle <= blockRect.bottom).toBe(true);
+	// Editor.js 只在 redactor 的 mousemove（target 在 .ce-block 內）才把工具列移到該區塊
+	// （editorjs.mjs watchBlockHoveredEvents → Toolbar.moveAndOpen，會設 wrapper.style.top 並加 ce-toolbar--opened）。
+	// 指標只移一次；之後等到工具列開啟、按鈕可見，且 top 離目標區塊最近。
+	const toolbar = settings.closest<HTMLElement>(".ce-toolbar");
+	if (!toolbar) throw new Error("找不到區塊工具列");
+	const blocks = Array.from(dialog.querySelectorAll<HTMLElement>(".ce-block"));
+	await user.hover(block);
+	await waitFor(() => {
+		expect(toolbar.classList.contains("ce-toolbar--opened")).toBe(true);
+		expect(settings).toBeVisibleSync();
+		const top = Number.parseFloat(toolbar.style.top);
+		const nearest = blocks.reduce((best, candidate) =>
+			Math.abs(candidate.offsetTop - top) < Math.abs(best.offsetTop - top)
+				? candidate
+				: best,
+		);
+		expect(nearest).toBe(block);
 	});
 	await user.click(settings);
 	const item = await waitFor(() => {
@@ -512,9 +521,7 @@ describe("DescriptionEditorDeletion", () => {
 				expect(
 					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
 				).toEqual(["第二段保留"]);
-				expect(
-					within(dialog).queryByText("第一段保留"),
-				).not.toBeInTheDocumentSync();
+				expect(within(dialog).queryByText("第一段保留")).toBeNull();
 				expect(editableText(dialog, "第二段保留")).toBeVisibleSync();
 			});
 			await undo(dialog, user);
@@ -545,7 +552,7 @@ describe("DescriptionEditorDeletion", () => {
 			await deleteFromBlockMenu(dialog, editableText(dialog, text), user);
 			await waitFor(() => {
 				expect(args.onChange.mock.lastCall?.[0].blocks).toEqual([]);
-				expect(within(dialog).queryByText(text)).not.toBeInTheDocumentSync();
+				expect(within(dialog).queryByText(text)).toBeNull();
 			});
 			for (let cycle = 0; cycle < 3; cycle += 1) {
 				await undo(dialog, user);
@@ -558,7 +565,7 @@ describe("DescriptionEditorDeletion", () => {
 				await redo(dialog, user);
 				await waitFor(() => {
 					expect(args.onChange.mock.lastCall?.[0].blocks).toEqual([]);
-					expect(within(dialog).queryByText(text)).not.toBeInTheDocumentSync();
+					expect(within(dialog).queryByText(text)).toBeNull();
 				});
 			}
 		});

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import type { ProductDescription } from "@/lib/products/seller-repo";
 import { mountEditor } from "@/tests/browser/description-editor";
-import { waitFor } from "@/tests/browser/dom";
+import { expectAbsent, waitFor } from "@/tests/browser/dom";
 
 const document: ProductDescription = {
 	version: "1.0",
@@ -137,12 +137,10 @@ describe("DescriptionEditorColor", () => {
 		await userEvent.clear(input);
 		await userEvent.type(input, "#563a72");
 		await userEvent.click(picker.getByRole("button", { name: "取消" }));
-		await expect(
-			ui.queryByRole("dialog", { name: "文字顏色" }),
-		).not.toBeInTheDocumentSync();
-		await expect(
-			ui.getByRole("button", { name: "文字顏色" }),
-		).toHaveFocusSync();
+		await expectAbsent(() => ui.queryByRole("dialog", { name: "文字顏色" }));
+		await waitFor(() =>
+			expect(ui.getByRole("button", { name: "文字顏色" })).toHaveFocusSync(),
+		);
 		await expect(
 			args.onChange.mock.lastCall?.[0].blocks[0].runs?.[0].color,
 		).toBeUndefined();
@@ -195,12 +193,10 @@ describe("DescriptionEditorColor", () => {
 			picker.getByRole("textbox", { name: "HEX 色碼" }),
 		).toHaveValueSync("#b8441f");
 		await userEvent.keyboard("{Escape}");
-		await expect(
-			ui.queryByRole("dialog", { name: "文字顏色" }),
-		).not.toBeInTheDocumentSync();
-		await expect(
-			ui.getByRole("button", { name: "縮小編輯區" }),
-		).toBeVisibleSync();
+		await expectAbsent(() => ui.queryByRole("dialog", { name: "文字顏色" }));
+		await waitFor(() =>
+			expect(ui.getByRole("button", { name: "縮小編輯區" })).toBeVisibleSync(),
+		);
 		await userEvent.click(ui.getByRole("button", { name: "縮小編輯區" }));
 		await waitFor(() => {
 			const expand = ui.getByRole("button", { name: "放大編輯" });

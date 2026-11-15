@@ -202,7 +202,10 @@ describe("DescriptionEditor", () => {
 				"介紹商品的特色與來源",
 			),
 		);
-		await expectTextContains(() => paragraph, "介紹商品的特色與來源");
+		await expectTextContains(
+			() => paragraphEditor(dialog),
+			"介紹商品的特色與來源",
+		);
 		await expect(args.uploadImageFile).not.toHaveBeenCalled();
 	});
 
@@ -486,7 +489,7 @@ describe("DescriptionEditor", () => {
 		const editor = within(dialog);
 		await userEvent.click(editor.getByRole("button", { name: "整理格式" }));
 		await waitFor(() => {
-			expect(editor.queryByText("## 商品資訊")).not.toBeInTheDocumentSync();
+			expect(editor.queryByText("## 商品資訊")).toBeNull();
 			expect(
 				editor.getByText("標稱規格合計：445g（265g＋180g）"),
 			).toBeVisibleSync();
@@ -507,7 +510,7 @@ describe("DescriptionEditor", () => {
 		await userEvent.click(editor.getByRole("button", { name: /^重做（/ }));
 		await waitFor(() => {
 			expect(dialog).toHaveAttributeSync("aria-busy", "false");
-			expect(editor.queryByText("## 商品資訊")).not.toBeInTheDocumentSync();
+			expect(editor.queryByText("## 商品資訊")).toBeNull();
 			expect(
 				editor.getByRole("button", { name: "閱讀預覽" }),
 			).toBeEnabledSync();

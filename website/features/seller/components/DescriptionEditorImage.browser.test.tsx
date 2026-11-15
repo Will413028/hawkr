@@ -1,13 +1,5 @@
 import { within } from "@testing-library/dom";
-import {
-	afterAll,
-	afterEach,
-	beforeAll,
-	describe,
-	expect,
-	it,
-	vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { getEnv } from "@/lib/config/env";
 import type { UploadedAsset } from "@/lib/media/upload";
@@ -18,7 +10,7 @@ import {
 	descriptionImageSvg,
 	startDescriptionImageFixtures,
 } from "@/tests/browser/description-image-fixtures";
-import { expectTextContains, waitFor } from "@/tests/browser/dom";
+import { expectAbsent, expectTextContains, waitFor } from "@/tests/browser/dom";
 
 // 媒體 origin 要在被測模組載入前就設定（getEnv 會記住第一次的結果）。fixture 攔的是 test-media.example.com，
 // 與 .github/workflows/website-e2e.yml 的 NEXT_PUBLIC_MEDIA_BASE_URL 相同；沒設時 buildImageUrl 不組網址，圖片區塊會被判定資料無效。
@@ -27,13 +19,10 @@ vi.hoisted(() => {
 });
 
 let fixtures: Awaited<ReturnType<typeof startDescriptionImageFixtures>>;
-beforeAll(async () => {
+beforeEach(async () => {
 	fixtures = await startDescriptionImageFixtures();
 });
 afterEach(() => {
-	fixtures.resetHandlers();
-});
-afterAll(() => {
 	fixtures.stop();
 });
 
@@ -196,7 +185,7 @@ describe("DescriptionEditorImage", () => {
 					stagedToken: uploaded.stagedToken,
 				}),
 			]);
-			expect(ui.queryByRole("progressbar")).not.toBeInTheDocumentSync();
+			expect(ui.queryByRole("progressbar")).toBeNull();
 		});
 		await assertDecodedImage(dialog);
 	});
@@ -242,9 +231,7 @@ describe("DescriptionEditorImage", () => {
 		const assertRejected = async (message: string) => {
 			await expectTextContains(() => ui.getByRole("alert"), message);
 			await expect(args.uploadImageFile).not.toHaveBeenCalled();
-			await expect(
-				ui.queryByRole("button", { name: "重試上傳" }),
-			).not.toBeInTheDocumentSync();
+			await expectAbsent(() => ui.queryByRole("button", { name: "重試上傳" }));
 			await expect(
 				images(args.onChange.mock.lastCall?.[0] ?? args.value),
 			).toEqual([
@@ -335,7 +322,7 @@ describe("DescriptionEditorImage", () => {
 		await userEvent.click(ui.getByRole("button", { name: "移除圖片" }));
 		await waitFor(() => {
 			expect(images(args.onChange.mock.lastCall?.[0])).toEqual([]);
-			expect(ui.queryByRole("img")).not.toBeInTheDocumentSync();
+			expect(ui.queryByRole("img")).toBeNull();
 		});
 		await userEvent.click(ui.getByRole("button", { name: /^復原（/ }));
 		await waitFor(() =>
@@ -377,8 +364,8 @@ describe("DescriptionEditorImage", () => {
 		await userEvent.click(ui.getByRole("button", { name: "移除圖片" }));
 		await waitFor(() => {
 			expect(dialog).toHaveAttributeSync("aria-busy", "false");
-			expect(ui.queryByLabelText("選擇商品圖片")).not.toBeInTheDocumentSync();
-			expect(ui.queryByRole("img")).not.toBeInTheDocumentSync();
+			expect(ui.queryByLabelText("選擇商品圖片")).toBeNull();
+			expect(ui.queryByRole("img")).toBeNull();
 			expect(images(args.onChange.mock.lastCall?.[0] ?? args.value)).toEqual(
 				[],
 			);
@@ -395,7 +382,7 @@ describe("DescriptionEditorImage", () => {
 		await waitFor(() => {
 			expect(dialog).toHaveAttributeSync("data-preview", "true");
 			expect(dialog).toHaveAttributeSync("aria-busy", "false");
-			expect(ui.queryByRole("img")).not.toBeInTheDocumentSync();
+			expect(ui.queryByRole("img")).toBeNull();
 			expect((args.onChange.mock.lastCall?.[0] ?? args.value).blocks).toEqual(
 				textDocument.blocks,
 			);
