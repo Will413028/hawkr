@@ -46,6 +46,9 @@ catalog:
   use-intl: 4.14.9
   vitest: 5.0.5
 
+# 依賴發佈滿兩週才安裝（根目錄 AGENTS.md 的供應鏈規則），單位是分鐘。
+minimumReleaseAge: 20160
+
 # minimumReleaseAge (pnpm 11 default: 24h) needs a live round-trip to
 # registry.npmjs.org per lockfile entry to read its publish date. That
 # round-trip has been failing specifically for @react-aria/color's metadata
@@ -59,8 +62,13 @@ catalog:
 # added, nowhere near the 24h threshold minimumReleaseAge exists to enforce.
 # REMOVE-WHEN: a dependency bump moves off exactly 3.2.0 (version-pinned, so
 # this stops applying on its own — no audit needed to retire it).
+#
+# tinybench@6.2.3（vitest 5.0.5 的精確依賴，dev 分支已鎖定）2026-11-01T15:14Z 發佈，
+# 滿兩週的時間是 2026-11-15T15:14Z。純粹是時間差，沒有替代版本可選。
+# REMOVE-WHEN: 2026-11-16 之後（版本釘住，之後這筆沒有作用，可直接刪）。
 minimumReleaseAgeExclude:
   - "@react-aria/color@3.2.0"
+  - "tinybench@6.2.3"
 
 # Every entry below is a security floor we impose on a TRANSITIVE dependency
 # we do not control. Each one is checked by the scripts/check-dependency-overrides.ts
@@ -143,24 +151,12 @@ overrides:
   # postcss 宣告 `^1.2.1`，修補版 1.2.2 仍在宣告範圍內，不需要 EXCEEDS-UPSTREAM。
   # REMOVE-WHEN: requesters-demand >=1.2.2
   source-map-js: ^1.2.2
-  # 發佈未滿兩週的間接依賴：vite 8.1.6 宣告 rolldown `~1.1.5`，會浮到 1.1.8（2026-11-11），
-  # 其 @rolldown/pluginutils `^1.0.0` 會浮到 1.1.1（2026-11-13），違反「依賴發佈滿兩週」。
-  # 1.1.5（2026-07-08）與 1.0.1（2026-05-13）都在宣告範圍內。無安全 advisory，純為滿足發佈年齡規則。
-  # REMOVE-WHEN: requesters-demand >=1.1.8
-  rolldown@~1.1.5: 1.1.5
-  # REMOVE-WHEN: requesters-demand >=1.1.1
-  "@rolldown/pluginutils@^1.0.0": 1.0.1
   # GHSA-2m5v-pch6-74hx 等（HIGH）：undici 7.x <7.30.1。miniflare（admin 的 wrangler 與
   # @opennextjs/cloudflare 的建置／預覽工具鏈，不進 prod 執行期）把 undici 釘死在 7.28.0，
-  # 所有穩定的 4.x 都一樣。`^7.0.0` 的選擇器只動 7.x，不碰 jsdom 用的 8.x；釘 7.30.1 是因為 7.30.2（2026-11-05）發佈未滿兩週。
+  # 所有穩定的 4.x 都一樣。`^7.0.0` 的選擇器只動 7.x，不碰 jsdom 用的 8.x。
   # EXCEEDS-UPSTREAM: miniflare — 精確版本釘住較舊的 undici 7.28.0
   # REMOVE-WHEN: requesters-demand >=7.30.1
   undici@^7.0.0: 7.30.1
-  # GHSA-3jxr-9vmj-r5cp 等（brace-expansion 2.1.x <2.1.6）：經 minimatch 的 `^2.x` 宣告進來，
-  # 不然會浮到 2.1.8（2026-11-11，發佈未滿兩週）。釘 2.1.6（2026-09-14，修補版）；
-  # 仍在 requester 宣告的 2.x 範圍內，不需要 EXCEEDS-UPSTREAM。
-  # REMOVE-WHEN: requesters-demand >=2.1.6
-  brace-expansion@^2.0.0: 2.1.6
   # 以下為 admin 原有、併入根目錄的條目（根目錄一份 workspace，同一批 override 作用到兩個 app）。
   # Only the 1.x line of brace-expansion is reached through --prod
   # (minimatch 3.x via glob 7 / rimraf). The selector keeps

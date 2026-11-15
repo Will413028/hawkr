@@ -7,37 +7,37 @@
 [[IgnoredVulns]]
 id = "GHSA-8474-xrp6-wh69"
 ignoreUntil = 2027-02-13
-reason = "基準：RubyGems activesupport@7.2.2.2（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 7.5，HIGH，2026-11-15 發現）；修正只在 8.x，cocoapods-core 1.17.0 要求 activesupport < 8；觸發條件：cocoapods 放行 8；Will 2026-11-15 核准延後"
+reason = "基準：RubyGems activesupport@7.2.2.2（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 7.5，HIGH，2026-11-15 發現）；修正只在 8.x，cocoapods-core 1.16.2（ios/Gemfile.lock 鎖定版）宣告 activesupport >= 5.0, < 8；修正版 8.0.5.2、8.1.4.1；觸發條件：cocoapods 放行 8；Will 2026-11-15 核准延後"
 
 [[IgnoredVulns]]
 id = "GHSA-539f-xcgw-2gjg"
 ignoreUntil = 2027-02-13
-reason = "基準：RubyGems addressable@2.8.8（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 3.1，LOW，2026-11-15 發現；修正版 2.9.1）；升級待核准"
+reason = "基準：RubyGems addressable@2.9.0（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 3.1，LOW，2026-11-15 發現；修正版 2.9.1）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-8gmh-2hhj-2hv9"
 ignoreUntil = 2027-02-13
-reason = "基準：RubyGems addressable@2.8.8（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 4.8，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
+reason = "基準：RubyGems addressable@2.9.0（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 4.8，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-9crm-g4mf-wc5j"
 ignoreUntil = 2027-02-13
-reason = "基準：RubyGems addressable@2.8.8（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 4.3，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
+reason = "基準：RubyGems addressable@2.9.0（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 4.3，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-9f42-57jx-vpp3"
 ignoreUntil = 2027-02-13
-reason = "基準：RubyGems addressable@2.8.8（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 5.9，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
+reason = "基準：RubyGems addressable@2.9.0（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 5.9，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-j82w-28jv-3pmj"
 ignoreUntil = 2027-02-13
-reason = "基準：RubyGems addressable@2.8.8（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 5.9，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
+reason = "基準：RubyGems addressable@2.9.0（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 5.9，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-qq38-m9mg-xjj5"
 ignoreUntil = 2027-02-13
-reason = "基準：RubyGems addressable@2.8.8（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 5.9，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
+reason = "基準：RubyGems addressable@2.9.0（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 5.9，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-3g3m-2fjr-6pw4"
@@ -67,17 +67,17 @@ reason = "基準：Go github.com/quic-go/quic-go@0.59.0（CVSS 5.3，MEDIUM）�
 [[IgnoredVulns]]
 id = "GO-2026-5932"
 ignoreUntil = 2026-11-29
-reason = "基準：Go golang.org/x/crypto@0.54.0, golang.org/x/crypto@0.55.0（無 CVSS 分數，UNSCORED）；升級待核准"
+reason = "基準：Go golang.org/x/crypto@0.58.0（修正版 0.58.1 以上；無 CVSS 分數，UNSCORED）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GO-2026-6860"
 ignoreUntil = 2026-11-29
-reason = "基準：Go golang.org/x/net@0.57.0（無 CVSS 分數，UNSCORED）；升級待核准"
+reason = "基準：Go golang.org/x/net@0.61.0（修正版 0.62.0；無 CVSS 分數，UNSCORED）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GO-2026-6866"
 ignoreUntil = 2026-11-29
-reason = "基準：Go golang.org/x/net@0.57.0（無 CVSS 分數，UNSCORED）；升級待核准"
+reason = "基準：Go golang.org/x/net@0.61.0（修正版 0.62.0；無 CVSS 分數，UNSCORED）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-mgvc-8q2h-5pgc"
@@ -102,7 +102,7 @@ reason = "基準：RubyGems activesupport@7.2.2.2（CVSS 6.9，MEDIUM）；升�
 [[IgnoredVulns]]
 id = "GHSA-x2f5-4prf-w687"
 ignoreUntil = 2027-01-28
-reason = "基準：RubyGems json@2.18.0（CVSS 3.7，LOW）；升級待核准"
+reason = "基準：RubyGems json@2.19.2（buyer-app、seller-app 的 ios/Gemfile.lock；修正版 2.19.9）（CVSS 3.7，LOW）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-27r3-jxmh-p828"
@@ -142,7 +142,7 @@ reason = "基準：npm seroval@1.6.8（CVSS 5.3，MEDIUM）；升級待核准"
 [[IgnoredVulns]]
 id = "GHSA-fxqj-rqcc-2cmp"
 ignoreUntil = 2027-01-28
-reason = "基準：npm postcss@8.5.18（CVSS 6.3，MEDIUM）；升級待核准"
+reason = "基準：npm postcss@8.5.18（backend/workers/image-gateway 的 package-lock.json；CVSS 6.3，MEDIUM；修正版 8.5.23）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-g7r4-m6w7-qqqr"
@@ -153,11 +153,6 @@ reason = "基準：npm esbuild@0.28.0（CVSS 2.5，LOW）；升級待核准"
 id = "GHSA-mrhx-c7xc-m3w5"
 ignoreUntil = 2026-11-29
 reason = "基準：npm zod@3.25.76, zod@4.4.3（CVSS 8.2，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-q2hr-2g5m-vwhr"
-ignoreUntil = 2027-01-28
-reason = "基準：npm brace-expansion@2.1.1（CVSS 5.3，MEDIUM）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-qxg6-89mg-rqv8"
