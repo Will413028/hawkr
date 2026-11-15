@@ -53,7 +53,6 @@ export const NON_LOCALIZED_EXACT = [
 const SELLER_SURFACE_PREFIXES = [
 	"/seller",
 	"/seller-center",
-	"/seller-product-import-preview",
 	"/seller-app",
 ] as const;
 

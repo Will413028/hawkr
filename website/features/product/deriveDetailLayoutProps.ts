@@ -1,7 +1,7 @@
 /**
  * PDP layout props derive helper（pure function）。
  *
- * Server PDP（`ProductDetailPage`）與賣家批次匯入預覽 PDP（`PreviewDetailPage`）
+ * Server PDP（`ProductDetailPage`）與代行預覽 PDP
  * 共用同一條 render path：兩者拿到 product / seller / reviews 之後，全部走本
  * helper 展平成 `ProductDetailLayout` 接得到的 props，避免 adapter 自己又翻譯
  * 一次資料形狀（會塞 placeholder 字串 / 假 origin / 假 unit）。
@@ -280,19 +280,12 @@ export function deriveDetailLayoutProps(
 	if (thumbnails.length === 0 && typeof product.imageKey === "string") {
 		if (product.imageKey) thumbnails.push(product.imageKey);
 	}
-	// gallery 條目。**這條 derive 同時服務兩個來源**，兩者的圖片欄名不同，
-	// 而且不同是刻意的（backend#2235）：
-	//   - 正式商品（handler.GalleryItem / PublicGalleryItem）→ `imageKey`，
-	//     是平台 objectKey，下游可以套 preset。
-	//   - 匯入預覽（handler.GalleryItemResponse）→ `previewUrl`，是 presigned
-	//     或原站 URL，沒有對應 objectKey（圖還在 tmp/product-import/ 前綴），
-	//     套 preset 會 404。
-	// 讀兩個名字在這裡不是 fallback，是兩個端點；`buildImageUrl` 對 http 開頭
-	// 的值 passthrough，所以兩者都渲染得出來。
+	// gallery 條目：正式商品（handler.GalleryItem / PublicGalleryItem）的
+	// `imageKey`，是平台 objectKey，下游可以套 preset。
 	if (thumbnails.length === 0 && Array.isArray(product.gallery)) {
 		for (const g of product.gallery as unknown[]) {
 			const rec = asRecord(g);
-			const src = textOrEmpty(rec.imageKey) || textOrEmpty(rec.previewUrl);
+			const src = textOrEmpty(rec.imageKey);
 			if (src) thumbnails.push(src);
 		}
 	}
@@ -326,10 +319,7 @@ export function deriveDetailLayoutProps(
 				? originalPrice
 				: 0;
 
-		// 兩個來源（商品詳情 handler.SkuItem、匯入預覽 ImportItemSkuResponse）
-		// 都是 `skuName` / `stockQty`（seller_product_import.go:291,294）。
-		// 這裡曾寫著「preview_data 走 snake_case」——該前提不成立，snake 分支
-		// 從來沒有被走到過。
+		// 商品詳情 handler.SkuItem 的欄名是 `skuName` / `stockQty`。
 		const stockNum = Number.parseInt(textOrEmpty(s.stockQty), 10);
 		const nameStr = typeof s.skuName === "string" ? s.skuName.trim() : "";
 		const fallbackName = rawSkus.length === 1 ? "預設" : `規格 ${i + 1}`;

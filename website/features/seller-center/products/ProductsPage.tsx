@@ -854,26 +854,15 @@ export default function ProductsPage() {
 							＋ 上架新商品
 						</Link>
 					)}
-					{/* 代行不渲染批次匯入：封閉九值不含任何 import 能力，端點總表也沒有
-					    import 路徑；要做是新增第 10 個 capability，另一張票。 */}
 					{!delegated && (
-						<>
-							<Link
-								href="/seller-center/products/import"
-								className="seller-orders__btn"
-							>
-								<IconUpload />
-								批次匯入
-							</Link>
-							<Link
-								href="/seller-center/products/new"
-								// 同上：實心表面自己擁有前景色，否則 dark 下退成橄欖綠字。
-								data-hkui-button=""
-								className="seller-orders__btn seller-orders__btn--primary"
-							>
-								＋ 新增商品
-							</Link>
-						</>
+						<Link
+							href="/seller-center/products/new"
+							// 同上：實心表面自己擁有前景色，否則 dark 下退成橄欖綠字。
+							data-hkui-button=""
+							className="seller-orders__btn seller-orders__btn--primary"
+						>
+							＋ 新增商品
+						</Link>
 					)}
 				</>
 			}
@@ -1717,10 +1706,6 @@ function isOffStatus(status?: string | number) {
 
 function IconSearch() {
 	return <AppIcon name="search" />;
-}
-
-function IconUpload() {
-	return <AppIcon name="upload" />;
 }
 
 function IconBoxes() {

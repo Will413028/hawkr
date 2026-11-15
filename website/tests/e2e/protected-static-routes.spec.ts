@@ -101,25 +101,6 @@ async function prepareAuthenticatedPage(
 		missingRequirements: ["ONBOARDING_COMPLETE"],
 	});
 	await mockMyKyc(page, { status: "NOT_STARTED" });
-	await page.route("**/api/v1/app/product_import_jobs**", (route) => {
-		const request = route.request();
-		const pathname = new URL(request.url()).pathname;
-		if (
-			request.method() !== "GET" ||
-			!pathname.endsWith("/app/product_import_jobs")
-		) {
-			void route.fallback();
-			return;
-		}
-		route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: JSON.stringify({
-				code: 0,
-				data: { records: [], total: 0, page: 1, pageSize: 20 },
-			}),
-		});
-	});
 	await page
 		.context()
 		.addCookies([{ name: "hk_session", value: "opaque", url: baseURL }]);

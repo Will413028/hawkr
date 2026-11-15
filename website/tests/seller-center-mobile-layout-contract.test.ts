@@ -53,26 +53,12 @@ const invoices = source(
 const messages = source(
 	"features/seller-center/messages/SellerMessagesWorkspaceClient.tsx",
 );
-const importList = source(
-	"features/seller-center/products-import/pages/JobsListPage.tsx",
-);
-const importDetail = source(
-	"features/seller-center/products-import/pages/JobDetailPage.tsx",
-);
-const importPreviewList = source(
-	"features/seller-center/products-import/pages/PreviewListingPage.tsx",
-);
-const importPreviewDetail = source(
-	"features/seller-center/products-import/pages/PreviewDetailPage.tsx",
-);
 const pagination = source("components/shared/Pagination.tsx");
 const css = source("styles/features/seller-center.css");
 
 test("SellerPageShell exposes one shared mobile action-rail seam", () => {
 	assert.match(shell, /seller-page-shell__actions flex items-center/);
 	assert.match(messages, /seller-page-shell__action-group/);
-	assert.match(importList, /seller-page-shell__action-group/);
-	assert.match(importDetail, /seller-page-shell__action-group/);
 
 	const mobileActions = regionBetween(
 		css,
@@ -119,8 +105,6 @@ test("all seller header CTAs share the order-page phone geometry", () => {
 		/\.seller-dashboard__head > \[data-hkui-button\]/,
 	);
 	assert.match(dashboard, /className="seller-page-header-cta"/);
-	assert.match(importPreviewList, /className="seller-page-header-cta /);
-	assert.match(importPreviewDetail, /className="seller-page-header-cta /);
 	assert.doesNotMatch(products, /seller-products__header-actions/);
 
 	const phoneAdaptation = css.slice(

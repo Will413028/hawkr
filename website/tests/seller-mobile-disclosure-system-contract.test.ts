@@ -85,7 +85,6 @@ test("賣家中心的主要紀錄頁共用同一套手機 disclosure，而不是
 		"features/seller-center/invoices/documents/SellerInvoiceDocumentsPage.tsx",
 		"features/seller-center/invoices/documents/SellerReceivedInvoicesPanel.tsx",
 		"features/seller-center/invoices/appeals/SellerInvoiceAppealsPage.tsx",
-		"features/seller-center/products-import/pages/JobsListPage.tsx",
 		"features/seller-center/wallet/WalletClient.tsx",
 	];
 
