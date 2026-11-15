@@ -46,10 +46,6 @@ app.*.map.json
 /android/app/release
 ios/build/derived_data
 
-# Fastlane sensitive environment files
-ios/fastlane/.env
-android/fastlane/.env
-
 # FVM Version Cache
 .fvm/
 # 忽略Codex Agent
@@ -62,9 +58,7 @@ AGENTS.md
 .release/secrets.local.yaml
 dist/
 
-# fastlane build artifacts
-ios/fastlane/README.md
-ios/fastlane/report.xml
+# iOS build artifacts
 ios/Runner.ipa
 ios/Runner.app.dSYM.zip
 

@@ -53,17 +53,11 @@ app.*.map.json
 dist/
 AGENTS.md
 
-# fastlane secrets / artifacts
-ios/fastlane/.env
-android/fastlane/.env
-ios/fastlane/report.xml
-ios/fastlane/test_output/
+# iOS build output
 ios/build/
 
 
-# fastlane build artifacts
-ios/fastlane/README.md
-ios/fastlane/report.xml
+# iOS build artifacts
 ios/Runner.ipa
 ios/Runner.app.dSYM.zip
 

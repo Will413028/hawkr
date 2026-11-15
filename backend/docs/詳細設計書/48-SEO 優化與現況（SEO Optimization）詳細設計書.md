@@ -257,8 +257,7 @@ SEO 的把關點在 **CI**，不在 runtime：
 
 ### 9.1 SLO / SLI
 
-| 指標 (SLI) | 目標 (SLO) | 量測點 |
-|---|---|---|
+N/A——目前沒有自動化的 SEO 或 Core Web Vitals 門檻（SLO），SEO 把關只有 §6 的 Playwright 契約測試。
 
 ### 9.2 容量與規模 (Capacity & Scaling)
 
