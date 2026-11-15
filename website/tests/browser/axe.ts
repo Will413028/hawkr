@@ -10,12 +10,17 @@ import { expect } from "vitest";
  * helper still enforces them on whole pages. Finite CSS animations and
  * transitions (dialog and popover fade-ins) finish first: axe samples the
  * blended colour of an element that is still fading in, which reports a
- * contrast failure the settled state does not have.
+ * contrast failure the settled state does not have. Two animation frames
+ * pass before collecting them, so a transition started by the interaction
+ * just before the call is already registered.
  */
 export async function expectNoAxeViolations(
 	label: string,
 	container: Element | Document = document,
 ) {
+	for (let frame = 0; frame < 2; frame++) {
+		await new Promise((resolve) => requestAnimationFrame(resolve));
+	}
 	await Promise.all(
 		document
 			.getAnimations()
@@ -35,7 +40,15 @@ export async function expectNoAxeViolations(
 	const summary = violations.map((violation) => ({
 		rule: violation.id,
 		impact: violation.impact,
-		targets: violation.nodes.map((node) => node.target.join(" ")),
+		targets: violation.nodes.map((node) => {
+			const data = node.any[0]?.data as
+				| { fgColor?: string; bgColor?: string; contrastRatio?: number }
+				| undefined;
+			const target = node.target.join(" ");
+			return data?.contrastRatio === undefined
+				? target
+				: `${target} (${data.fgColor} on ${data.bgColor}, ${data.contrastRatio}:1)`;
+		}),
 	}));
 	expect(summary, `${label} has axe violations`).toEqual([]);
 }
