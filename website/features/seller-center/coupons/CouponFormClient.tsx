@@ -316,6 +316,7 @@ export default function CouponFormClient({
 						floatingLabel
 						variant="bordered"
 						size="lg"
+						label="優惠券名稱"
 						isRequired
 						maxLength={40}
 						disabled={readOnly}
