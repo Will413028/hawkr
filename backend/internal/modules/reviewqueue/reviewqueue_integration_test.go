@@ -483,11 +483,11 @@ func seedCase(t *testing.T, d *db.DB, c modCase, contentID *uuid.UUID, buyerID *
 		must(t, err)
 	case "VIOLATION":
 		_, err := d.Conn(ctx).Exec(ctx, `INSERT INTO moderation.cases (id, target_kind, content_id, buyer_id, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at)
-			VALUES ($1, $2, $3, $4, $5, 'VIOLATION', 'SPAM', 'WARN', 1, $5 + interval '1 hour')`, c.id, c.target, contentID, buyerID, c.opened)
+			VALUES ($1, $2, $3, $4, $5::timestamptz, 'VIOLATION', 'SPAM', 'WARN', 1, $5::timestamptz + interval '1 hour')`, c.id, c.target, contentID, buyerID, c.opened)
 		must(t, err)
 	case "NO_VIOLATION":
 		_, err := d.Conn(ctx).Exec(ctx, `INSERT INTO moderation.cases (id, target_kind, content_id, buyer_id, opened_at, decision, decided_by_admin_id, closed_at)
-			VALUES ($1, $2, $3, $4, $5, 'NO_VIOLATION', 1, $5 + interval '1 hour')`, c.id, c.target, contentID, buyerID, c.opened)
+			VALUES ($1, $2, $3, $4, $5::timestamptz, 'NO_VIOLATION', 1, $5::timestamptz + interval '1 hour')`, c.id, c.target, contentID, buyerID, c.opened)
 		must(t, err)
 	default:
 		t.Fatalf("不認得的決定 %q", c.decision)
