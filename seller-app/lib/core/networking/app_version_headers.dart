@@ -1,4 +1,4 @@
-import '../../shared/utils/app_version_utils.dart';
+import 'package:hawkr_app_update/app_version_utils.dart';
 import '../codemeta/code_meta.dart';
 
 /// 每個請求都帶的 header（含 WebSocket 握手）。

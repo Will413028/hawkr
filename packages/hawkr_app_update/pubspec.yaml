@@ -8,6 +8,7 @@ environment:
 dependencies:
   hawkr_api:
     path: ../hawkr_api
+  package_info_plus: ^9.0.1
 
 dev_dependencies:
   test: 1.33.0

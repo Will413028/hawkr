@@ -43,7 +43,6 @@ dependencies:
   photo_manager: ^3.7.1
   video_player: ^2.10.0
   flutter_svg: ^2.2.0
-  package_info_plus: ^9.0.1
   firebase_core: ^4.3.0
   firebase_messaging: ^16.1.0
   flutter_local_notifications: ^18.0.0

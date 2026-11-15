@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:hawkr_seller/shared/utils/app_version_utils.dart';
+import 'package:hawkr_app_update/app_version_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
