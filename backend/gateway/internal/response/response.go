@@ -31,7 +31,7 @@ type Envelope = envelope.Envelope
 
 // PageData 是 pkg/envelope.PageData 的型別別名，理由同 Envelope
 // （既有 response.PageData{...} 字面值建構，如 handler/order.go、
-// handler/aftersales.go、handler/seller_product_import.go）。
+// handler/aftersales.go）。
 type PageData = envelope.PageData
 
 // ==================== 出口守衛（bizcarrier）====================

@@ -213,17 +213,7 @@ func TestSellerProductUpdate_ShippingMethodsCarryAmbientTemperature(t *testing.T
 	}
 }
 
-func TestImportAndBatchAndDelegated_ShippingMethodsCarryAmbientTemperature(t *testing.T) {
-	for _, m := range toPbShippingMethods([]ShippingMethodInputDTO{{Method: "3101"}}) {
-		if m.Temperature != "3201" {
-			t.Errorf("import update Temperature = %q, want 3201", m.Temperature)
-		}
-	}
-	for _, m := range toPbBatchShippingMethods([]BatchShippingMethodInputDTO{{Type: "3101", FreeThreshold: "0"}}) {
-		if m.Temperature != "3201" {
-			t.Errorf("batch Temperature = %q, want 3201", m.Temperature)
-		}
-	}
+func TestDelegated_ShippingMethodsCarryAmbientTemperature(t *testing.T) {
 	for _, m := range toShippingMethodProtosFromInput([]DelegatedShippingMethodInput{{Type: "3101"}}) {
 		if m.Temperature != "3201" {
 			t.Errorf("delegated input Temperature = %q, want 3201", m.Temperature)
