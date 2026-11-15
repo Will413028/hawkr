@@ -25,6 +25,8 @@
 
 **驗收基線：** 快照 commit 上 CI 的 website-e2e 最近一次 dev run（`gh run list -w website-e2e.yml -b dev -L 1`，run 43667284291）開工時仍在跑，步驟 1 開工前讀它每個 job 的結論並記到進度表；有失敗的 job 以那份結果為既有失敗，不在本計畫修。本機可跑的 `pnpm lint`、`pnpm test`、`pnpm knip`、`pnpm design:check --apps-root ..` 在步驟 1 開工時跑一次記錄。
 
+步驟 1 開工時的結果（2026-11-15）：run 43667284291 每個 job 綠；`pnpm lint`、`pnpm test`、`pnpm design:check --apps-root ..` 通過；`pnpm knip` 在快照上就失敗（CI 不跑它），輸出存為附件 `knip-baseline.json`（`pnpm knip --reporter json`，不含行列位置），各步驟的 knip 驗收改為「與基線相比沒有新增 finding」；`pnpm architecture:check` 在快照上就失敗（`components/ui/Badge.tsx` 不存在）。
+
 ## 本階段依賴的不變量
 
 | 不變量 | 依賴它的機制 |
@@ -50,11 +52,13 @@
 
 **mutation 流程（各步共用）：** 在本步驟的 PR（`remove-storybook` 系列分支 → `dev`，`pull_request` 會觸發 `website-e2e.yml`）推一個只含破壞的暫時 commit，確認對應 job 紅燈後 `git revert` 它，紅燈與回綠的 run 連結記進進度表。
 
-- [ ] **1. Browser runner 與試點**（被擋於：無）
+- [x] **1. Browser runner 與試點**（被擋於：無）
   - 範圍：spike 在不加依賴的前提下驗證三項，結論逐項寫進本步驟：JSX 轉譯與 React `act` 環境（tsconfig `jsx: react-jsx`，沒有 `@vitejs/plugin-react`）、Next.js 模組（`next/navigation`、`next/image`、`next/link`）用 `vi.mock` 或 Vite alias 替代、全域 CSS 匯入。`website/vitest.config.ts` 新增 `browser` project（include `**/*.browser.test.tsx`，`@vitest/browser-playwright` chromium headless），只由新 script `test:browser`（`vitest run --project browser`）跑，`pnpm test` 不變；`website/tests/browser/` 放 setup（全域 CSS、Intl provider 的 render helper）。改寫 `Button`、`Dialog`、`NavigationRecovery`（含 `sb.mock` spy 的替代）共 8 個 play。`.github/workflows/website-e2e.yml` 新增「元件 browser 測試」job（同 storybook job 的映像與版本檢查），與 storybook job 並存。
   - 消費端：`rg -n 'vitest.config|VITEST_STORYBOOK|--project' website .github`
   - 不能動：`unit` project 的設定與 hermetic setup；storybook job 與 story 檔（步驟 5 才刪）。
   - 驗收：本機 `pnpm lint`、`pnpm test`、`pnpm knip` 通過；PR 上新 job 綠且 log 顯示 8 個以上測試通過；mutation：把 `Button` 的 disabled 處理改壞（mutation 流程見下）。
+  - spike 結論（CI 實跑證實）：(a) Vite 8 讀 tsconfig 的 `jsx: react-jsx` 轉 TSX，不需 `@vitejs/plugin-react`；沒開 vitest globals，`tests/browser/setup.ts` 自己註冊 `cleanup`。(b) 試點元件沒有用到 `next/*`；步驟 2、3 遇到時用 `vi.mock`。(c) 全域 CSS 在 setup 匯入與 `.storybook/preview.tsx` 相同的 4 檔。另外：瀏覽器沒有 `process`，browser project 以 `define` 替換 `process.env.NODE_ENV` 與 loopback 的 `NEXT_PUBLIC_API_BASE_URL`，setup 補空的 `process` 墊片（Next client 的行為）。改寫注意：`vitest/browser` 的 `toHaveTextContent` 傳字串是整段比對，不是 jest-dom 的子字串。
+  - 延後：`.storybook/preview.css` 的字型與 body 顏色沒搬進 setup（觸發條件：改寫的斷言依賴字型、顏色或版面時，把需要的 token 搬進 `tests/browser/`）。
   - 停止條件：Next.js 模組的替代需要新依賴（例如 `@vitejs/plugin-react` 或 Storybook 以外的 Next 模擬套件）——列出套件與版本回報，等 Will 決定。
 - [ ] **2. 基礎元件改寫**（被擋於：步驟 1）
   - 範圍：`inventory.md` §1 標「步驟 2 改寫」的 23 檔、78 個 play。可拆成兩個子批（各自 PR 綠才算完成）。
@@ -95,7 +99,7 @@
 
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
-| 1 Browser runner 與試點 | 未開始 | | | |
+| 1 Browser runner 與試點 | 完成 | lint、test、knip（對基線無新增）本機；PR #377 新 job 8 測試綠（run 43672612523，含 8 個 e2e shard）；mutation 忽略 `disabled` 時只有 `is disabled when disabled is set` 失敗（run 43672321091），revert 後回綠 | — | 36649e77..aecd731b |
 | 2 基礎元件改寫 | 未開始 | | | |
 | 3 Cart、DescriptionEditor | 未開始 | | | |
 | 4 axe 進 e2e | 未開始 | | | |
