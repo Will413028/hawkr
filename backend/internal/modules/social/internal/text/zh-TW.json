@@ -131,6 +131,10 @@
       "message": "發布的貼文需要 1 張照片",
       "description": "發布貼文時沒有照片。"
     },
+    "post.schedule_cancel_etag_required": {
+      "message": "取消排程必須帶讀取時的版本（etag）",
+      "description": "店主取消貼文的排程沒有帶 etag。"
+    },
     "post.schedule_etag_required": {
       "message": "排程發布必須帶讀取時的版本（etag）",
       "description": "排程發布沒有帶 etag。"
@@ -142,6 +146,10 @@
     "post.schedule_status_invalid": {
       "message": "已發布的貼文不能排程",
       "description": "對已經是公開的貼文排程發布（只有草稿與已下架的貼文能排程）。"
+    },
+    "post.schedule_taken_down": {
+      "message": "被內容下架的貼文不能排程",
+      "description": "對被內容下架措施下架的貼文排程發布。"
     },
     "post.schedule_time_out_of_range": {
       "message": "排程的發布時間要在 {minutes} 分鐘到 {days} 天之後之間",

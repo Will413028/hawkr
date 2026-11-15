@@ -234,6 +234,11 @@ func PostPublishImageRequired(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "發布的貼文需要 1 張照片", Locale: uitext.ZhTW}
 }
 
+// PostScheduleCancelEtagRequired 是模組句子 post.schedule_cancel_etag_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostScheduleCancelEtagRequired(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "取消排程必須帶讀取時的版本（etag）", Locale: uitext.ZhTW}
+}
+
 // PostScheduleEtagRequired 是模組句子 post.schedule_etag_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func PostScheduleEtagRequired(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "排程發布必須帶讀取時的版本（etag）", Locale: uitext.ZhTW}
@@ -247,6 +252,11 @@ func PostScheduleNotFound(l uitext.Locale) uitext.Message {
 // PostScheduleStatusInvalid 是模組句子 post.schedule_status_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func PostScheduleStatusInvalid(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "已發布的貼文不能排程", Locale: uitext.ZhTW}
+}
+
+// PostScheduleTakenDown 是模組句子 post.schedule_taken_down；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostScheduleTakenDown(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "被內容下架的貼文不能排程", Locale: uitext.ZhTW}
 }
 
 // PostScheduleTimeOutOfRangeArgs 是 PostScheduleTimeOutOfRange 的參數。

@@ -9,6 +9,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
 // RecordScheduledPublish 在貼文排程發布的同一個 transaction 內寫一列 SUCCEEDED 的稽核（origin SCHEDULED、POST_PUBLISH、posts.publish）：發布
@@ -29,7 +30,7 @@ func (m *Module) RecordScheduledPublish(ctx context.Context, in model.ScheduledP
 		return fmt.Errorf("delegation：讀取排程的操作理由：%w", err)
 	}
 	key := model.ScheduledPublishIdempotencyKey(in.ScheduleID)
-	_, err = q.InsertScheduledPublishAuditLog(ctx, store.InsertScheduledPublishAuditLogParams{
+	row, err := q.InsertScheduledPublishAuditLog(ctx, store.InsertScheduledPublishAuditLogParams{
 		ID:                    m.d.NewID(),
 		SessionID:             s.ID,
 		ActorAdminID:          s.Actor.AdminID,
@@ -54,5 +55,5 @@ func (m *Module) RecordScheduledPublish(ctx context.Context, in model.ScheduledP
 	if err != nil {
 		return fmt.Errorf("delegation：寫入排程發布的稽核：%w", err)
 	}
-	return nil
+	return events.Publish(ctx, m.d.Events, delegationCompleted(row, s))
 }

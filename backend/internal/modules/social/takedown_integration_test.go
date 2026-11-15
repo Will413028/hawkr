@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"slices"
 	"testing"
+	"time"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -464,4 +465,27 @@ func TestReconcileInsertRechecksThatTheMeasureIsStillActive(t *testing.T) {
 	if get, feed, _, _ := f.postVisible(t, w.post.ID); !get || !feed {
 		t.Fatal("貼文照常可讀")
 	}
+}
+
+// 對帳補漏只取消實際寫入複本的貼文的排程：措施在讀到「缺」的清單之後被撤銷、語句沒有寫入任何列時，貼文沒有被下架，它的排程原樣保留。
+func TestReconcileInsertCancelsOnlyTheSchedulesOfInsertedTakedowns(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	td := f.takedowns(t)
+	storeID, _ := f.exposableStore(t)
+	p := f.draft(t, storeID)
+	s := f.schedule(t, storeID, p, time.Hour, f.owner())
+	id := td.seed(t, storeID, []seller.ContentRef{ref(seller.ContentPost, p.ID)})
+	f.exec(t, "UPDATE seller.measures SET status = 'REVOKED' WHERE id = $1", id)
+	svc := stats.New(stats.Deps{DB: f.db, Logger: slog.New(slog.DiscardHandler), Now: f.clock, Cancel: schedule.Canceler{DB: f.db, Events: f.bus}})
+	must(t, svc.ApplyMissingTakedowns(ctx, id, f.clock(), []stats.Content{{Kind: contentkind.Post, ID: p.ID}}))
+	f.wantSchedule(t, s.ID, "PENDING", "")
+	if n := len(f.events.canceledEvents()); n != 0 {
+		t.Fatalf("沒有寫入複本就沒有取消：%d 個事件", n)
+	}
+
+	live := td.seed(t, storeID, []seller.ContentRef{ref(seller.ContentPost, p.ID)})
+	must(t, svc.ApplyMissingTakedowns(ctx, live, f.clock(), []stats.Content{{Kind: contentkind.Post, ID: p.ID}}))
+	f.wantSchedule(t, s.ID, "CANCELED", "TAKEN_DOWN")
 }

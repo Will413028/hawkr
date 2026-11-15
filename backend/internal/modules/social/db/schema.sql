@@ -52,7 +52,7 @@ COMMENT ON COLUMN social.posts.status IS '貼文狀態：DRAFT、PUBLISHED、UNP
 COMMENT ON COLUMN social.posts.published_at IS '第一次發布的時間，之後不變（下架不清、再發布沿用）；DRAFT 沒有，發布過的一定有';
 COMMENT ON COLUMN social.posts.version IS '樂觀鎖的版本，對外是 etag；每次修改加一';
 
--- 貼文的排程發布：一次排程一列，永不重用；唯一的真相是這張表，River job 只帶 id、是到點的觸發器（A7-D22）。state 是 PENDING → PUBLISHED 或 CANCELED，
+-- 貼文的排程發布：一次排程一列，永不重用；唯一的真相是這張表，River job 只帶 id、是到點的觸發器。state 是 PENDING → PUBLISHED 或 CANCELED，
 -- 取消原因凍結在列上（cancel_reason 只在 CANCELED 有值，resolved_at 在離開 PENDING 時寫）：貼文的狀態之後會變，事後反查會得到錯的答案。
 -- scheduled_by_kind 是排程的發起者種類（OWNER 店主、DELEGATION 代行），scheduled_by_ref 是發起者擁有格式的不透明字串（DELEGATION 放 session ID）。
 -- 同一篇貼文同時最多一個 PENDING（重排時舊的先轉 REPLACED）。鎖順序：貼文列 → 排程列。

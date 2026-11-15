@@ -12,17 +12,16 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
-	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/readcache"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// Canceler 取消待發布的排程：同一個 transaction 內改列、發 PostScheduleCanceled、排貼文的快取失效。
+// Canceler 取消待發布的排程：同一個 transaction 內改列、發 PostScheduleCanceled。有待發布排程的貼文不是公開的，取消排程不改變公開狀態，所以不排快取失效；
+// 讓貼文公開狀態改變的呼叫方（發布、刪除、內容下架、店家清除）自己排。
 type Canceler struct {
 	DB     *db.DB
 	Events *events.Bus
-	Cache  readcache.Cache
 }
 
 // Of 把 store 的列轉成模組型別。
@@ -38,16 +37,13 @@ func Of(r store.SocialPostSchedule) model.Schedule {
 	return s
 }
 
-// After 是排程已被寫成 CANCELED 之後的副作用：每筆發事件、排貼文的快取失效。
+// After 是排程已被寫成 CANCELED 之後的副作用：每筆發事件。
 func (c Canceler) After(ctx context.Context, rows []store.SocialPostSchedule, now time.Time) error {
 	for _, r := range rows {
 		reason := model.CancelReason(*r.CancelReason)
 		if err := events.Publish(ctx, c.Events, model.PostScheduleCanceled{
 			EventID: uuid.NewV7(), OccurredAt: now, ScheduleID: r.ID, PostID: r.PostID, Reason: reason,
 		}); err != nil {
-			return err
-		}
-		if err := c.Cache.BustPost(ctx, r.PostID, r.StoreID); err != nil {
 			return err
 		}
 	}

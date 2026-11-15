@@ -74,7 +74,7 @@ TTL、閒置、handoff、分頁與保留天數是 `internal/model` 的常數，�
 - 兩階段：寫入前先寫 PENDING intent；confirm 只從 PENDING 轉移一次，成功且需通知時在同一個 transaction 發出事件。事件發不出去則 confirm 回滾。
 - 讀取、揭露與更正類動作不能通知店家；confirm 只在成功時檢查能力，`SUCCEEDED` 列的能力必須在該 session 的授權快照內。
 - confirm 只更新 `result`、`resource_id`、`after_snapshot`、`changed_fields`、`resource_version_after`、`biz_code`、`confirmed_at` 與 `notified_at`，其餘欄位寫入後不變；稽核列永不硬刪。
-- 排程到點發布走單段稽核：delegation 訂閱 social 的 `PostPublished`（origin SCHEDULED、發起者種類 DELEGATION），在發布的同一個 transaction 寫一列 `SUCCEEDED`（`POST_PUBLISH`、`posts.publish`、`SCHEDULED`），冪等鍵 `schedule:<排程 ID>`，重送撞唯一鍵當成功；操作理由繼承建立排程那一列，找不到時留空。
+- 排程到點發布走單段稽核：delegation 訂閱 social 的 `PostPublished`（origin SCHEDULED、發起者種類 DELEGATION），在發布的同一個 transaction 寫一列 `SUCCEEDED`（`POST_PUBLISH`、`posts.publish`、`SCHEDULED`），冪等鍵 `schedule:<排程 ID>`，重送撞唯一鍵當成功；操作理由繼承建立排程那一列，找不到時留空。這一列 `notify_seller` 為真、`notified_at` 同時寫入，同 transaction 發 `DelegationOperationCompleted`（賣家和手動操作一樣收到完成通知；重送不再發）。
 - `origin=scheduled` 是排程執行的 intent（gateway 的兩階段路徑，不動）：session 已到期仍可寫入，已撤銷仍拒絕；只支援貼文、必須帶 `resourceId`；操作理由繼承同一 session、同一資源最近一筆 `POST_SCHEDULE` 的理由，找不到回 9279。
 - 事件只有 `DelegationOperationCompleted`；結束與撤銷不發事件。
 - intent 需要可用的工作階段與有效輸入；冪等鍵綁定指令、資源與 payload。

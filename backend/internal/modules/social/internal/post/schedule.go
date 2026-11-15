@@ -15,6 +15,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/readcache"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/schedule"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/text"
@@ -72,16 +73,25 @@ func ValidateAuthorizers(a map[model.ScheduleKind]model.ScheduleAuthorizer) erro
 	return nil
 }
 
-// ownerAuthorizer 是店主排程的授權：店主沒有 social 之外的授權要重驗，social 自己的檢查（沒刪除、沒下架、仍滿足公開要件）對每一種發起者都在
-// 到點時先做（RunScheduled）。
-type ownerAuthorizer struct{}
+// ownerAuthorizer 是店主排程的授權：與手動發布同一個店家授權（seller.Authorize 的 CapMarketing），店家已關閉、停權或不再滿足前置條件就拒絕。
+// social 自己的檢查（沒刪除、沒下架、仍滿足公開要件）對每一種發起者都在到點時先做（RunScheduled）。
+type ownerAuthorizer struct{ stores readcache.Stores }
 
-func (ownerAuthorizer) AuthorizeScheduledPublish(context.Context, model.ScheduledPublish) error {
-	return nil
+func (a ownerAuthorizer) AuthorizeScheduledPublish(ctx context.Context, p model.ScheduledPublish) error {
+	st, err := a.stores.Store(ctx, p.StoreID)
+	if err == nil {
+		err = seller.Authorize(st, seller.CapMarketing)
+	}
+	if k := apperr.KindOf(err); k == apperr.KindNotFound || k == apperr.KindPermissionDenied || k == apperr.KindFailedPrecondition {
+		return fmt.Errorf("%w：%w", model.ErrScheduleDenied, err)
+	}
+	return err
 }
 
-// OwnerAuthorizer 回傳店主排程的授權實作。
-func OwnerAuthorizer() model.ScheduleAuthorizer { return ownerAuthorizer{} }
+// OwnerAuthorizer 回傳店主排程的授權實作；stores 是讀店家的 seller 公開 API（不鎖列）。
+func OwnerAuthorizer(stores readcache.Stores) model.ScheduleAuthorizer {
+	return ownerAuthorizer{stores: stores}
+}
 
 func (s *Service) hasPendingSchedule(ctx context.Context, q *store.Queries, postID uuid.UUID) (bool, error) {
 	_, err := q.GetPendingScheduleOfPost(ctx, postID)
@@ -140,10 +150,20 @@ func (s *Service) Schedule(ctx context.Context, st seller.Store, in model.Schedu
 		if row.Version != in.Version {
 			return versionConflict(ctx)
 		}
+		down, err := q.PostIsTakenDown(ctx, &row.ID)
+		if err != nil {
+			return fmt.Errorf("social：讀取貼文的下架 %s：%w", row.ID, err)
+		}
+		if down {
+			return apperr.FailedPrecondition("%s", text.PostScheduleTakenDown(uitext.LocaleFrom(ctx)))
+		}
 		if err := checkPublishable(ctx, row.Body, row.ImageKey != nil); err != nil {
 			return err
 		}
 		if _, err := s.d.Cancel.FromLockedPosts(ctx, []uuid.UUID{row.ID}, model.CancelReplaced, now); err != nil {
+			return err
+		}
+		if err := s.bumpVersion(ctx, q, row, now); err != nil {
 			return err
 		}
 		out, err = q.InsertSchedule(ctx, store.InsertScheduleParams{
@@ -163,19 +183,43 @@ func (s *Service) Schedule(ctx context.Context, st seller.Store, in model.Schedu
 	return schedule.Of(out), nil
 }
 
-// CancelSchedule 是店主取消貼文待發布的排程（OWNER_CANCELED）；沒有待發布的排程時什麼都不做（冪等）。店家要有 CapMarketing。
-func (s *Service) CancelSchedule(ctx context.Context, st seller.Store, postID uuid.UUID) error {
+// bumpVersion 遞增貼文版本：排程與取消排程改變貼文的狀態組合，持有舊 etag 的編輯、發布要重新讀取。貼文列已鎖。
+func (s *Service) bumpVersion(ctx context.Context, q *store.Queries, row store.SocialPost, now time.Time) error {
+	if _, err := q.BumpPostVersion(ctx, store.BumpPostVersionParams{ID: row.ID, Now: now, ExpectedVersion: row.Version}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return versionConflict(ctx)
+		}
+		return fmt.Errorf("social：遞增貼文版本 %s：%w", row.ID, err)
+	}
+	return nil
+}
+
+// CancelSchedule 是店主取消貼文待發布的排程（OWNER_CANCELED），version 是讀取時的版本；沒有待發布的排程時什麼都不做（冪等，不檢查版本）。店家要有 CapMarketing。
+func (s *Service) CancelSchedule(ctx context.Context, st seller.Store, postID uuid.UUID, version int64) error {
 	if err := seller.Authorize(st, seller.CapMarketing); err != nil {
 		return err
 	}
+	if version <= 0 {
+		return apperr.InvalidInput("%s", text.PostScheduleCancelEtagRequired(uitext.LocaleFrom(ctx)))
+	}
 	now := s.d.Now().UTC()
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		row, err := s.lockOwned(ctx, s.q(ctx), st.StoreID, postID)
+		q := s.q(ctx)
+		row, err := s.lockOwned(ctx, q, st.StoreID, postID)
 		if err != nil {
 			return err
 		}
-		_, err = s.d.Cancel.FromLockedPosts(ctx, []uuid.UUID{row.ID}, model.CancelOwnerCanceled, now)
-		return err
+		pending, err := s.hasPendingSchedule(ctx, q, row.ID)
+		if err != nil || !pending {
+			return err
+		}
+		if row.Version != version {
+			return versionConflict(ctx)
+		}
+		if _, err := s.d.Cancel.FromLockedPosts(ctx, []uuid.UUID{row.ID}, model.CancelOwnerCanceled, now); err != nil {
+			return err
+		}
+		return s.bumpVersion(ctx, q, row, now)
 	})
 }
 
@@ -264,6 +308,9 @@ func (s *Service) RunScheduled(ctx context.Context, scheduleID uuid.UUID) error 
 		if down {
 			return s.resolveCanceled(ctx, q, scheduleID, model.CancelTakenDown, now)
 		}
+		if model.PostStatus(row.Status) == model.StatusPublished {
+			return s.resolveCanceled(ctx, q, scheduleID, model.CancelReplaced, now)
+		}
 		auth := s.d.Authorizers[model.ScheduleKind(sc.ScheduledByKind)]
 		if auth == nil {
 			return fmt.Errorf("social：排程 %s 的發起者 %s 沒有授權實作", scheduleID, sc.ScheduledByKind)
@@ -278,16 +325,10 @@ func (s *Service) RunScheduled(ctx context.Context, scheduleID uuid.UUID) error 
 		case err != nil:
 			return err
 		}
-		if err := checkPublishable(ctx, row.Body, row.ImageKey != nil); err != nil {
-			if apperr.KindOf(err) != apperr.KindInvalidInput {
-				return err
-			}
-			return s.resolveCanceled(ctx, q, scheduleID, model.CancelNotPublishable, now)
-		}
-		if model.PostStatus(row.Status) == model.StatusPublished {
-			return fmt.Errorf("social：排程 %s 的貼文 %s 已經是公開的", scheduleID, row.ID)
-		}
 		if err := s.publishLocked(ctx, q, row, now, model.OriginScheduled, sc); err != nil {
+			if apperr.KindOf(err) == apperr.KindInvalidInput {
+				return s.resolveCanceled(ctx, q, scheduleID, model.CancelNotPublishable, now)
+			}
 			return err
 		}
 		if _, err := q.ResolveSchedule(ctx, store.ResolveScheduleParams{ID: scheduleID, State: string(model.SchedulePublished), Now: &now}); err != nil {

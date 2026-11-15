@@ -17,7 +17,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 )
 
-// 排程發布（A7-1f）：代行 session 排的貼文到點由 social 的 job 發布；授權在到點時重驗，四個授權失效的觸發點在同一個 transaction 內先取消排程。
+// 排程發布：代行 session 排的貼文到點由 social 的 job 發布；授權在到點時重驗，四個授權失效的觸發點在同一個 transaction 內先取消排程。
 
 func (f *fixture) next() int64 {
 	f.nextID++
@@ -146,13 +146,14 @@ func TestScheduledPublishOfAnEndedSessionPublishesWithOneSucceededAudit(t *testi
 	reason := "賣家請求排程"
 	f.intent(t, AuditIntentInput{
 		SessionID: sc.session.Session.ID, Capability: CapabilityPostsPublish, Action: AuditPostSchedule, ResourceType: ResourcePost,
-		ResourceID: post.ID.String(), OperationReason: reason, IdempotencyKey: "ik-schedule", RequestID: "req", CorrelationID: "corr",
+		ResourceID: post.ID.String(), OperationReason: reason, Origin: AuditInteractive, IdempotencyKey: "ik-schedule", RequestID: "req", CorrelationID: "corr",
 	})
 
 	f.now = f.now.Add(45 * time.Minute)
 	if s, _ := f.m.ResolveDelegation(ctx, sc.session.Credential, false); s.Status != model.DelegationExpired {
 		t.Fatalf("session 已到期：%+v", s)
 	}
+	completedBefore := len(f.completed)
 	f.publishDue(t, sched)
 	f.wantSchedule(t, sched.ID, "PUBLISHED", "")
 	if got := f.postStatus(t, post.ID); got != "PUBLISHED" {
@@ -174,8 +175,14 @@ func TestScheduledPublishOfAnEndedSessionPublishesWithOneSucceededAudit(t *testi
 		t.Fatal(err)
 	}
 	if result != "SUCCEEDED" || origin != "SCHEDULED" || capability != "posts.publish" || action != "POST_PUBLISH" || resourceType != "POST" ||
-		resourceID != post.ID.String() || actor != sc.admin || target != sc.storeID || notify || !confirmed || gotReason == nil || *gotReason != reason {
+		resourceID != post.ID.String() || actor != sc.admin || target != sc.storeID || !notify || !confirmed || gotReason == nil || *gotReason != reason {
 		t.Fatalf("稽核列 = %s %s %s %s %s %s actor=%d target=%d notify=%v confirmed=%v reason=%v", result, origin, capability, action, resourceType, resourceID, actor, target, notify, confirmed, gotReason)
+	}
+	if len(f.completed) != completedBefore+1 {
+		t.Fatalf("賣家要收到恰好一則完成通知：%d -> %d", completedBefore, len(f.completed))
+	}
+	if e := f.completed[len(f.completed)-1]; e.Action != AuditPostPublish || e.TargetStoreID != sc.storeID || e.SessionID != sc.session.Session.ID || e.CorrelationID != "schedule:"+sched.ID.String() {
+		t.Fatalf("完成通知 = %+v", e)
 	}
 	// job 重跑：排程已經不是 PENDING，什麼都不做。
 	if err := f.realSocial.PublishScheduled(ctx, sched.ID); err != nil {
@@ -193,6 +200,9 @@ func TestScheduledPublishOfAnEndedSessionPublishesWithOneSucceededAudit(t *testi
 	}
 	if n := f.scheduleAudits(t, sched.ID); n != 1 {
 		t.Fatalf("重跑與重送之後稽核仍是一列：%d", n)
+	}
+	if len(f.completed) != completedBefore+1 {
+		t.Fatalf("重送不再發完成通知：%d", len(f.completed)-completedBefore)
 	}
 	// 直接發布與店主自己的排程不寫代行稽核。
 	direct := ev
@@ -412,4 +422,20 @@ func TestRevokeAndScheduledJobDoNotDeadlock(t *testing.T) {
 			}
 		})
 	}
+}
+
+// 取消排程只列最長排程距離加代行有效期之內發出的 session：更早發出的 session，它排的排程都已到點，由到點的重驗處理。
+func TestCancelOnTriggerOnlyListsSessionsWithinTheScheduleHorizon(t *testing.T) {
+	f := build(t, true)
+	governor := f.delegationAdmin(t, "governor@hawkr.example", true)
+	sc := f.newScheduler(t, "ops")
+	_, farthest := f.scheduledPost(t, sc.storeID, sc.session.Session.ID, social.MaxScheduleLead)
+
+	f.now = f.now.Add(social.MaxScheduleLead + model.DelegationTTL + time.Minute)
+	if err := f.m.SetAdminEligibility(context.Background(), AdminEligibilityChange{AdminID: sc.admin, OperatorAdminID: governor}); err != nil {
+		t.Fatal(err)
+	}
+	f.wantSchedule(t, farthest.ID, "PENDING", "")
+	f.publishDue(t, farthest)
+	f.wantSchedule(t, farthest.ID, "CANCELED", "AUTHORITY_LOST")
 }

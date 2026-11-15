@@ -36,6 +36,13 @@ SET status = sqlc.arg(status),
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND version = sqlc.arg(expected_version)
 RETURNING *;
 
+-- name: BumpPostVersion :one
+-- 只遞增版本（排程與取消排程改變貼文的狀態組合，舊的 etag 隨之失效）。版本不符回 0 列。
+UPDATE social.posts
+SET version = version + 1, updated_at = sqlc.arg(now)
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND version = sqlc.arg(expected_version)
+RETURNING *;
+
 -- name: SoftDeletePost :execrows
 -- 軟刪；已經刪除的 0 列（呼叫方不做副作用）。expected_version 為 0 表示不檢查版本。
 UPDATE social.posts

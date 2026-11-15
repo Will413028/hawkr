@@ -397,17 +397,17 @@ INSERT INTO delegation.admin_operation_audit_logs (
     origin, capability, action, resource_type, resource_id, resource_name,
     result, operation_reason, case_reference,
     request_id, correlation_id, idempotency_key,
-    risk_level, notify_seller, created_at, confirmed_at
+    risk_level, notify_seller, created_at, confirmed_at, notified_at
 ) VALUES (
     $1, $2, $3, $4,
     $5, $6, $7,
     'SCHEDULED', 'posts.publish', 'POST_PUBLISH', 'POST', $8::text, $9,
     'SUCCEEDED', $10, $11,
     $12, $13, $14::text,
-    $15, false, $16::timestamptz, date_trunc('second', $16::timestamptz)
+    $15, true, $16::timestamptz, date_trunc('second', $16::timestamptz), date_trunc('second', $16::timestamptz)
 )
 ON CONFLICT (session_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
-RETURNING id
+RETURNING id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at
 `
 
 type InsertScheduledPublishAuditLogParams struct {
@@ -431,8 +431,8 @@ type InsertScheduledPublishAuditLogParams struct {
 
 // 排程到點發布的單段稽核：與貼文發布同一個 transaction 寫入，直接是 SUCCEEDED（沒有 intent 與 confirm 兩段，貼文發布的事實就是結果）。
 // 冪等鍵是 schedule:<排程 ID>；同一個 session 的同一把鍵已經有列時沒有列回傳（重送的事件，呼叫方當成功）。固定值：origin SCHEDULED、
-// capability posts.publish、action POST_PUBLISH、resource_type POST；confirmed_at 與 confirm 一樣截秒。
-func (q *Queries) InsertScheduledPublishAuditLog(ctx context.Context, arg InsertScheduledPublishAuditLogParams) (uuid.UUID, error) {
+// capability posts.publish、action POST_PUBLISH、resource_type POST；confirmed_at 與 notified_at 與 confirm 一樣截秒；notify_seller 為 true（賣家要收到完成通知）。
+func (q *Queries) InsertScheduledPublishAuditLog(ctx context.Context, arg InsertScheduledPublishAuditLogParams) (DelegationAdminOperationAuditLog, error) {
 	row := q.db.QueryRow(ctx, insertScheduledPublishAuditLog,
 		arg.ID,
 		arg.SessionID,
@@ -451,9 +451,42 @@ func (q *Queries) InsertScheduledPublishAuditLog(ctx context.Context, arg Insert
 		arg.RiskLevel,
 		arg.Now,
 	)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
+	var i DelegationAdminOperationAuditLog
+	err := row.Scan(
+		&i.ID,
+		&i.SessionID,
+		&i.ActorAdminID,
+		&i.ActorDisplayName,
+		&i.TargetStoreID,
+		&i.TargetSellerAccountID,
+		&i.TargetStoreName,
+		&i.Origin,
+		&i.Capability,
+		&i.Action,
+		&i.ResourceType,
+		&i.ResourceID,
+		&i.ResourceName,
+		&i.Result,
+		&i.BizCode,
+		&i.OperationReason,
+		&i.CaseReference,
+		&i.RequestID,
+		&i.CorrelationID,
+		&i.IdempotencyKey,
+		&i.PayloadHash,
+		&i.BeforeSnapshot,
+		&i.AfterSnapshot,
+		&i.ChangedFields,
+		&i.ResourceVersionBefore,
+		&i.ResourceVersionAfter,
+		&i.UserAgent,
+		&i.RiskLevel,
+		&i.NotifySeller,
+		&i.NotifiedAt,
+		&i.CreatedAt,
+		&i.ConfirmedAt,
+	)
+	return i, err
 }
 
 const latestDelegationAuditReason = `-- name: LatestDelegationAuditReason :one

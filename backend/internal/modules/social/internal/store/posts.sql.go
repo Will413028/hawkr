@@ -12,6 +12,40 @@ import (
 	"uuid"
 )
 
+const bumpPostVersion = `-- name: BumpPostVersion :one
+UPDATE social.posts
+SET version = version + 1, updated_at = $1
+WHERE id = $2 AND deleted_at IS NULL AND version = $3
+RETURNING id, store_id, body, image_key, image_asset_id, product_id, status, published_at, version, created_at, updated_at, deleted_at
+`
+
+type BumpPostVersionParams struct {
+	Now             time.Time
+	ID              uuid.UUID
+	ExpectedVersion int64
+}
+
+// 只遞增版本（排程與取消排程改變貼文的狀態組合，舊的 etag 隨之失效）。版本不符回 0 列。
+func (q *Queries) BumpPostVersion(ctx context.Context, arg BumpPostVersionParams) (SocialPost, error) {
+	row := q.db.QueryRow(ctx, bumpPostVersion, arg.Now, arg.ID, arg.ExpectedVersion)
+	var i SocialPost
+	err := row.Scan(
+		&i.ID,
+		&i.StoreID,
+		&i.Body,
+		&i.ImageKey,
+		&i.ImageAssetID,
+		&i.ProductID,
+		&i.Status,
+		&i.PublishedAt,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const deletePostHashtags = `-- name: DeletePostHashtags :exec
 DELETE FROM social.post_hashtags WHERE post_id = $1
 `

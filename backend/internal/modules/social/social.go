@@ -237,12 +237,12 @@ func New(d Deps) *Module {
 	}
 	actors := actor.Resolver{Buyers: d.Buyers, Blocks: d.StoreBlocks}
 	cache := readcache.Cache{Jobs: d.Jobs, Stores: d.Stores}
-	authorizers := map[ScheduleKind]ScheduleAuthorizer{ScheduleByOwner: post.OwnerAuthorizer()}
+	authorizers := map[ScheduleKind]ScheduleAuthorizer{ScheduleByOwner: post.OwnerAuthorizer(d.Stores)}
 	maps.Copy(authorizers, d.ScheduleAuthorizers)
 	if err := post.ValidateAuthorizers(authorizers); err != nil {
 		panic(err)
 	}
-	cancel := schedule.Canceler{DB: d.DB, Events: d.Events, Cache: cache}
+	cancel := schedule.Canceler{DB: d.DB, Events: d.Events}
 	st := stats.New(stats.Deps{DB: d.DB, Logger: d.Logger, Now: d.Now, Cache: cache, Cancel: cancel})
 	return &Module{
 		post: post.New(post.Deps{
@@ -293,9 +293,9 @@ func (m *Module) SchedulePost(ctx context.Context, store seller.Store, in Schedu
 	return m.post.Schedule(ctx, store, in)
 }
 
-// CancelPostSchedule 是店主取消貼文待發布的排程（OWNER_CANCELED）；沒有待發布的排程時什麼都不做；店家要有 CapMarketing。
-func (m *Module) CancelPostSchedule(ctx context.Context, store seller.Store, postID uuid.UUID) error {
-	return m.post.CancelSchedule(ctx, store, postID)
+// CancelPostSchedule 是店主取消貼文待發布的排程（OWNER_CANCELED）；version 是讀取時的版本；沒有待發布的排程時什麼都不做（不檢查版本）；店家要有 CapMarketing。
+func (m *Module) CancelPostSchedule(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) error {
+	return m.post.CancelSchedule(ctx, store, postID, version)
 }
 
 // CancelScheduledBy 取消某個發起者（種類加一批 ref，例如代行的 session ID）所有待發布的排程，原因凍結為 reason，回傳被取消的排程 ID；空的 refs 是 no-op。

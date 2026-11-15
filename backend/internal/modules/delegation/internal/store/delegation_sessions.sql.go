@@ -617,14 +617,20 @@ func (q *Queries) ListDelegationSessions(ctx context.Context, arg ListDelegation
 
 const listUnrevokedDelegationSessionIDsOfActor = `-- name: ListUnrevokedDelegationSessionIDsOfActor :many
 SELECT id FROM delegation.delegated_operation_sessions
-WHERE actor_admin_id = $1 AND status <> 'REVOKED'
+WHERE actor_admin_id = $1 AND status <> 'REVOKED' AND issued_at > $2::timestamptz
 ORDER BY id
 `
 
-// 不鎖的讀取：這位管理員所有沒被撤銷的 session（含已結束、已到期的，它們發起的排程還在等）。取消排程要在鎖或改 delegation 的列之前做
+type ListUnrevokedDelegationSessionIDsOfActorParams struct {
+	ActorAdminID int64
+	IssuedSince  time.Time
+}
+
+// 不鎖的讀取：這位管理員在 issued_since 之後發出、沒被撤銷的 session（含已結束、已到期的，它們發起的排程還在等）。更早發出的 session，
+// 它排的排程都已到點（排程只在 session 的存活期內建立，publish_at 不超過建立時點加上最長排程距離）。取消排程要在鎖或改 delegation 的列之前做
 // （social 在 delegation 之前），所以先用不鎖的讀取列出 ID。
-func (q *Queries) ListUnrevokedDelegationSessionIDsOfActor(ctx context.Context, actorAdminID int64) ([]int64, error) {
-	rows, err := q.db.Query(ctx, listUnrevokedDelegationSessionIDsOfActor, actorAdminID)
+func (q *Queries) ListUnrevokedDelegationSessionIDsOfActor(ctx context.Context, arg ListUnrevokedDelegationSessionIDsOfActorParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listUnrevokedDelegationSessionIDsOfActor, arg.ActorAdminID, arg.IssuedSince)
 	if err != nil {
 		return nil, err
 	}
