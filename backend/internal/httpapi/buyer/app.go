@@ -3,7 +3,6 @@ package buyer
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -19,7 +18,6 @@ import (
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	model "github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 // Module 是買家業務資料的讀寫介面。
@@ -63,16 +61,6 @@ func accountCaller(ctx context.Context) (int64, error) {
 	return p.ID, nil
 }
 
-// buyerInvariant 把「存活的帳號查不到現任買家」轉成 internal：帳號活著 ⇔ 買家活著（ADR
-// 2026-09-30-account-created-provisions-buyer），認證過的帳號都活著，所以這是不變量被破壞（interceptor 記 error log），
-// 不當成「沒有買家」。
-func buyerInvariant(accountID int64, err error) error {
-	if apperr.KindOf(err) == apperr.KindNotFound {
-		return fmt.Errorf("httpapi/buyer：存活的帳號 %d 沒有現任買家（不變量被破壞）", accountID)
-	}
-	return err
-}
-
 // caller 解析呼叫者的 buyer_id：每個帳號都是買家，每個請求只查 buyer_id，不讀 profile 個資。
 func (h *App) caller(ctx context.Context) (int64, error) {
 	accountID, err := accountCaller(ctx)
@@ -81,7 +69,7 @@ func (h *App) caller(ctx context.Context) (int64, error) {
 	}
 	buyerID, err := h.m.CurrentBuyerID(ctx, accountID)
 	if err != nil {
-		return 0, buyerInvariant(accountID, err)
+		return 0, rpc.BuyerInvariant(accountID, err)
 	}
 	return buyerID, nil
 }
@@ -94,7 +82,7 @@ func (h *App) callerProfile(ctx context.Context) (model.Profile, error) {
 	}
 	profile, err := h.m.Profile(ctx, accountID)
 	if err != nil {
-		return model.Profile{}, buyerInvariant(accountID, err)
+		return model.Profile{}, rpc.BuyerInvariant(accountID, err)
 	}
 	return profile, nil
 }

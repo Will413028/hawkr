@@ -546,9 +546,9 @@ final $typed_data.Uint8List suggestTagsResponseDescriptor = $convert.base64Decod
     'ChNTdWdnZXN0VGFnc1Jlc3BvbnNlEjMKBHRhZ3MYASADKAsyHy5oYXdrci5zb2NpYWwudjFhbH'
     'BoYTEuVGFnQ291bnRSBHRhZ3M=');
 
-@$core.Deprecated('Use listTrendingTagsRequestDescriptor instead')
-const ListTrendingTagsRequest$json = {
-  '1': 'ListTrendingTagsRequest',
+@$core.Deprecated('Use suggestTrendingTagsRequestDescriptor instead')
+const SuggestTrendingTagsRequest$json = {
+  '1': 'SuggestTrendingTagsRequest',
   '2': [
     {
       '1': 'start_time',
@@ -570,16 +570,16 @@ const ListTrendingTagsRequest$json = {
   ],
 };
 
-/// Descriptor for `ListTrendingTagsRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List listTrendingTagsRequestDescriptor = $convert.base64Decode(
-    'ChdMaXN0VHJlbmRpbmdUYWdzUmVxdWVzdBI5CgpzdGFydF90aW1lGAEgASgLMhouZ29vZ2xlLn'
-    'Byb3RvYnVmLlRpbWVzdGFtcFIJc3RhcnRUaW1lEjUKCGVuZF90aW1lGAIgASgLMhouZ29vZ2xl'
-    'LnByb3RvYnVmLlRpbWVzdGFtcFIHZW5kVGltZRIfCgttYXhfcmVzdWx0cxgDIAEoBVIKbWF4Um'
-    'VzdWx0cw==');
+/// Descriptor for `SuggestTrendingTagsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List suggestTrendingTagsRequestDescriptor = $convert.base64Decode(
+    'ChpTdWdnZXN0VHJlbmRpbmdUYWdzUmVxdWVzdBI5CgpzdGFydF90aW1lGAEgASgLMhouZ29vZ2'
+    'xlLnByb3RvYnVmLlRpbWVzdGFtcFIJc3RhcnRUaW1lEjUKCGVuZF90aW1lGAIgASgLMhouZ29v'
+    'Z2xlLnByb3RvYnVmLlRpbWVzdGFtcFIHZW5kVGltZRIfCgttYXhfcmVzdWx0cxgDIAEoBVIKbW'
+    'F4UmVzdWx0cw==');
 
-@$core.Deprecated('Use listTrendingTagsResponseDescriptor instead')
-const ListTrendingTagsResponse$json = {
-  '1': 'ListTrendingTagsResponse',
+@$core.Deprecated('Use suggestTrendingTagsResponseDescriptor instead')
+const SuggestTrendingTagsResponse$json = {
+  '1': 'SuggestTrendingTagsResponse',
   '2': [
     {
       '1': 'tags',
@@ -592,11 +592,11 @@ const ListTrendingTagsResponse$json = {
   ],
 };
 
-/// Descriptor for `ListTrendingTagsResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List listTrendingTagsResponseDescriptor =
+/// Descriptor for `SuggestTrendingTagsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List suggestTrendingTagsResponseDescriptor =
     $convert.base64Decode(
-        'ChhMaXN0VHJlbmRpbmdUYWdzUmVzcG9uc2USMwoEdGFncxgBIAMoCzIfLmhhd2tyLnNvY2lhbC'
-        '52MWFscGhhMS5UYWdDb3VudFIEdGFncw==');
+        'ChtTdWdnZXN0VHJlbmRpbmdUYWdzUmVzcG9uc2USMwoEdGFncxgBIAMoCzIfLmhhd2tyLnNvY2'
+        'lhbC52MWFscGhhMS5UYWdDb3VudFIEdGFncw==');
 
 @$core.Deprecated('Use tagCountDescriptor instead')
 const TagCount$json = {
@@ -807,9 +807,9 @@ const $core.Map<$core.String, $core.dynamic> SocialPublicServiceBase$json = {
       '4': {'34': 1},
     },
     {
-      '1': 'ListTrendingTags',
-      '2': '.hawkr.social.v1alpha1.ListTrendingTagsRequest',
-      '3': '.hawkr.social.v1alpha1.ListTrendingTagsResponse',
+      '1': 'SuggestTrendingTags',
+      '2': '.hawkr.social.v1alpha1.SuggestTrendingTagsRequest',
+      '3': '.hawkr.social.v1alpha1.SuggestTrendingTagsResponse',
       '4': {'34': 1},
     },
     {
@@ -844,10 +844,10 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.social.v1alpha1.SuggestTagsRequest': SuggestTagsRequest$json,
   '.hawkr.social.v1alpha1.SuggestTagsResponse': SuggestTagsResponse$json,
   '.hawkr.social.v1alpha1.TagCount': TagCount$json,
-  '.hawkr.social.v1alpha1.ListTrendingTagsRequest':
-      ListTrendingTagsRequest$json,
-  '.hawkr.social.v1alpha1.ListTrendingTagsResponse':
-      ListTrendingTagsResponse$json,
+  '.hawkr.social.v1alpha1.SuggestTrendingTagsRequest':
+      SuggestTrendingTagsRequest$json,
+  '.hawkr.social.v1alpha1.SuggestTrendingTagsResponse':
+      SuggestTrendingTagsResponse$json,
   '.hawkr.social.v1alpha1.ListForumEntriesRequest':
       ListForumEntriesRequest$json,
   '.hawkr.social.v1alpha1.ListForumEntriesResponse':
@@ -867,8 +867,8 @@ final $typed_data.Uint8List socialPublicServiceDescriptor = $convert.base64Decod
     'RpbmdQb3N0c1JlcXVlc3QaMy5oYXdrci5zb2NpYWwudjFhbHBoYTEuU3VnZ2VzdFRyZW5kaW5n'
     'UG9zdHNSZXNwb25zZSIDkAIBEmkKC1N1Z2dlc3RUYWdzEikuaGF3a3Iuc29jaWFsLnYxYWxwaG'
     'ExLlN1Z2dlc3RUYWdzUmVxdWVzdBoqLmhhd2tyLnNvY2lhbC52MWFscGhhMS5TdWdnZXN0VGFn'
-    'c1Jlc3BvbnNlIgOQAgESeAoQTGlzdFRyZW5kaW5nVGFncxIuLmhhd2tyLnNvY2lhbC52MWFscG'
-    'hhMS5MaXN0VHJlbmRpbmdUYWdzUmVxdWVzdBovLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaXN0'
-    'VHJlbmRpbmdUYWdzUmVzcG9uc2UiA5ACARJ4ChBMaXN0Rm9ydW1FbnRyaWVzEi4uaGF3a3Iuc2'
-    '9jaWFsLnYxYWxwaGExLkxpc3RGb3J1bUVudHJpZXNSZXF1ZXN0Gi8uaGF3a3Iuc29jaWFsLnYx'
-    'YWxwaGExLkxpc3RGb3J1bUVudHJpZXNSZXNwb25zZSIDkAIB');
+    'c1Jlc3BvbnNlIgOQAgESgQEKE1N1Z2dlc3RUcmVuZGluZ1RhZ3MSMS5oYXdrci5zb2NpYWwudj'
+    'FhbHBoYTEuU3VnZ2VzdFRyZW5kaW5nVGFnc1JlcXVlc3QaMi5oYXdrci5zb2NpYWwudjFhbHBo'
+    'YTEuU3VnZ2VzdFRyZW5kaW5nVGFnc1Jlc3BvbnNlIgOQAgESeAoQTGlzdEZvcnVtRW50cmllcx'
+    'IuLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaXN0Rm9ydW1FbnRyaWVzUmVxdWVzdBovLmhhd2ty'
+    'LnNvY2lhbC52MWFscGhhMS5MaXN0Rm9ydW1FbnRyaWVzUmVzcG9uc2UiA5ACAQ==');

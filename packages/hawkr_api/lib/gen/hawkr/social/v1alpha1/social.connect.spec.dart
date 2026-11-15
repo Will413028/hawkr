@@ -62,13 +62,13 @@ abstract final class SocialPublicService {
     idempotency: connect.Idempotency.noSideEffects,
   );
 
-  /// ListTrendingTags 是熱門標籤：發布時間落在時間窗內的公開貼文上，各標籤的貼文數，多的在前。全域彙總，不依觀看者。
+  /// SuggestTrendingTags 是熱門標籤：發布時間落在時間窗內的公開貼文上，各標籤的貼文數，多的在前。全域彙總，不依觀看者。
   /// 這是只取前 max_results 名的排行榜（最多 50 名），不分頁；時間窗最長 30 天。
-  static const listTrendingTags = connect.Spec(
-    '/$name/ListTrendingTags',
+  static const suggestTrendingTags = connect.Spec(
+    '/$name/SuggestTrendingTags',
     connect.StreamType.unary,
-    hawkrsocialv1alpha1social.ListTrendingTagsRequest.new,
-    hawkrsocialv1alpha1social.ListTrendingTagsResponse.new,
+    hawkrsocialv1alpha1social.SuggestTrendingTagsRequest.new,
+    hawkrsocialv1alpha1social.SuggestTrendingTagsResponse.new,
     idempotency: connect.Idempotency.noSideEffects,
   );
 

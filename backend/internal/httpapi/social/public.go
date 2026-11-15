@@ -33,13 +33,13 @@ type Reads interface {
 	ListFeed(ctx context.Context, c social.Caller, after *social.PostCursor, size int32) (social.PostPage, error)
 	ListStorePosts(ctx context.Context, c social.Caller, storeID int64, after *social.PostCursor, size int32) (social.PostPage, error)
 	ListComments(ctx context.Context, c social.Caller, postID uuid.UUID, after *social.CommentCursor, size int32) (social.CommentPage, error)
-	ListReplies(ctx context.Context, c social.Caller, parentID uuid.UUID, after *social.CommentCursor, size int32) (social.CommentPage, error)
+	ListReplies(ctx context.Context, c social.Caller, postID, parentID uuid.UUID, after *social.CommentCursor, size int32) (social.CommentPage, error)
 	TopPosts(ctx context.Context, c social.Caller, n int32) ([]social.Post, error)
 	ListHashtagPosts(ctx context.Context, c social.Caller, tag string, after *social.PostCursor, size int32) (social.PostPage, error)
 	SuggestHashtags(ctx context.Context, q string, contains bool, limit int32) ([]social.HashtagCount, error)
 	TrendingHashtags(ctx context.Context, from, to time.Time, limit int32) ([]social.HashtagCount, error)
 	ListForumEntries(ctx context.Context, c social.Caller, storeID int64, after *social.CommentCursor, size int32) (social.ForumPage, error)
-	ListForumReplies(ctx context.Context, c social.Caller, parentID uuid.UUID, after *social.CommentCursor, size int32) (social.ForumPage, error)
+	ListForumReplies(ctx context.Context, c social.Caller, storeID int64, parentID uuid.UUID, after *social.CommentCursor, size int32) (social.ForumPage, error)
 }
 
 // Buyers 是呼叫者的買家身分與留言作者顯示資料的來源（*buyer.Module）。
@@ -85,11 +85,8 @@ func (h *Public) caller(ctx context.Context) (social.Caller, error) {
 		return social.Caller{}, nil
 	}
 	buyerID, err := h.buyers.CurrentBuyerID(ctx, p.ID)
-	if apperr.KindOf(err) == apperr.KindNotFound {
-		return social.Caller{}, fmt.Errorf("httpapi/social：存活的帳號 %d 沒有現任買家（不變量被破壞）", p.ID)
-	}
 	if err != nil {
-		return social.Caller{}, err
+		return social.Caller{}, rpc.BuyerInvariant(p.ID, err)
 	}
 	c := social.Caller{BuyerID: buyerID}
 	store, err := h.stores.CurrentStore(ctx, p.ID)
@@ -139,7 +136,7 @@ func (h *Public) ListPosts(ctx context.Context, req *connect.Request[pb.ListPost
 	}
 	scopeTag := ""
 	if msg.Hashtag != nil {
-		scopeTag = msg.GetHashtag()
+		scopeTag, _ = social.NormalizeHashtag(msg.GetHashtag())
 	}
 	scope := rpc.FilterScope(socialv1alpha1connect.SocialPublicServiceListPostsProcedure, scopeStore, scopeTag)
 	after, err := rpc.ValidCursor[postCursor](scope, msg.GetPageToken())
@@ -200,27 +197,20 @@ func (h *Public) ListComments(ctx context.Context, req *connect.Request[pb.ListC
 	if err != nil {
 		return nil, err
 	}
-	post, err := h.reads.PublicPost(ctx, c, postID)
-	if err != nil {
-		return nil, err
-	}
 	var cur *social.CommentCursor
 	if after != nil {
 		cur = &social.CommentCursor{CreatedAt: after.CreatedAt, ID: after.ID}
 	}
 	var page social.CommentPage
 	if msg.ParentId != nil {
-		page, err = h.reads.ListReplies(ctx, c, parentID, cur, msg.GetPageSize())
+		page, err = h.reads.ListReplies(ctx, c, postID, parentID, cur, msg.GetPageSize())
 	} else {
 		page, err = h.reads.ListComments(ctx, c, postID, cur, msg.GetPageSize())
 	}
 	if err != nil {
 		return nil, err
 	}
-	if slices.ContainsFunc(page.Comments, func(m social.Comment) bool { return m.PostID != postID }) {
-		return nil, apperr.NotFound("留言不存在")
-	}
-	comments, err := h.toComments(ctx, c, post, page.Comments)
+	comments, err := h.toComments(ctx, c, page.StoreID, page.Comments)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +258,7 @@ func (h *Public) SuggestTags(ctx context.Context, req *connect.Request[pb.Sugges
 	return connect.NewResponse(&pb.SuggestTagsResponse{Tags: toTagCounts(tags)}), nil
 }
 
-func (h *Public) ListTrendingTags(ctx context.Context, req *connect.Request[pb.ListTrendingTagsRequest]) (*connect.Response[pb.ListTrendingTagsResponse], error) {
+func (h *Public) SuggestTrendingTags(ctx context.Context, req *connect.Request[pb.SuggestTrendingTagsRequest]) (*connect.Response[pb.SuggestTrendingTagsResponse], error) {
 	msg := req.Msg
 	if msg.GetMaxResults() < 0 {
 		return nil, rpc.RequiredField("max_results", "max_results 不可以是負數")
@@ -285,7 +275,7 @@ func (h *Public) ListTrendingTags(ctx context.Context, req *connect.Request[pb.L
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&pb.ListTrendingTagsResponse{Tags: toTagCounts(tags)}), nil
+	return connect.NewResponse(&pb.SuggestTrendingTagsResponse{Tags: toTagCounts(tags)}), nil
 }
 
 func toTagCounts(tags []social.HashtagCount) []*pb.TagCount {
@@ -325,15 +315,12 @@ func (h *Public) ListForumEntries(ctx context.Context, req *connect.Request[pb.L
 	}
 	var page social.ForumPage
 	if msg.ParentId != nil {
-		page, err = h.reads.ListForumReplies(ctx, c, parentID, cur, msg.GetPageSize())
+		page, err = h.reads.ListForumReplies(ctx, c, storeID, parentID, cur, msg.GetPageSize())
 	} else {
 		page, err = h.reads.ListForumEntries(ctx, c, storeID, cur, msg.GetPageSize())
 	}
 	if err != nil {
 		return nil, err
-	}
-	if slices.ContainsFunc(page.Entries, func(e social.ForumEntry) bool { return e.StoreID != storeID }) {
-		return nil, apperr.NotFound("留言不存在")
 	}
 	entries, err := h.toForumEntries(ctx, c, storeID, page.Entries)
 	if err != nil {
@@ -347,32 +334,28 @@ func (h *Public) ListForumEntries(ctx context.Context, req *connect.Request[pb.L
 }
 
 func (h *Public) toForumEntries(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry) ([]*pb.ForumEntry, error) {
-	var buyerIDs, storeIDs []int64
+	if len(entries) == 0 {
+		return []*pb.ForumEntry{}, nil
+	}
+	actors := make([]social.Actor, 0, len(entries))
 	for _, e := range entries {
-		if e.State != social.CommentVisible {
-			continue
-		}
-		switch e.Actor.Kind {
-		case social.ActorBuyer:
-			buyerIDs = append(buyerIDs, e.Actor.ID)
-		case social.ActorStore:
-			storeIDs = append(storeIDs, e.Actor.ID)
+		if e.State == social.CommentVisible {
+			actors = append(actors, e.Actor)
 		}
 	}
-	stores, err := h.loadStores(ctx, c, append(storeIDs, storeID), true)
+	shared, err := h.loadShared(ctx, c, storeID, actors)
 	if err != nil {
 		return nil, err
 	}
-	display, err := h.buyerDisplays(ctx, buyerIDs)
-	if err != nil {
-		return nil, err
-	}
-	replyAllowed := canComment(c, storeID, stores.blocking)
 	out := make([]*pb.ForumEntry, len(entries))
 	for i, e := range entries {
 		item := &pb.ForumEntry{
 			Id: e.ID.String(), StoreId: rpc.FormatID(e.StoreID), State: rpc.EnumToProto[pb.CommentState](e.State),
-			CreateTime: timestamppb.New(e.CreatedAt), UpdateTime: timestamppb.New(e.UpdatedAt), ReplyCount: e.ReplyCount,
+			CreateTime: timestamppb.New(e.CreatedAt), ReplyCount: e.ReplyCount,
+		}
+		out[i] = item
+		if e.State != social.CommentVisible {
+			continue
 		}
 		if e.ParentID != nil {
 			s := e.ParentID.String()
@@ -382,20 +365,53 @@ func (h *Public) toForumEntries(ctx context.Context, c social.Caller, storeID in
 			s := e.ReplyToID.String()
 			item.ReplyToId = &s
 		}
-		out[i] = item
-		if e.State != social.CommentVisible {
-			continue
-		}
+		item.UpdateTime = timestamppb.New(e.UpdatedAt)
 		item.Body = e.Body
 		item.IsMine = c.IsAuthor(e.Actor)
 		item.ViewerCanEdit = item.IsMine
 		item.ViewerCanDelete = item.IsMine || c.OwnsStore(storeID)
-		item.ViewerCanReply = replyAllowed
-		if item.Author, err = h.toActor(e.Actor, display, stores); err != nil {
+		item.ViewerCanReply = shared.replyAllowed
+		if item.Author, err = h.toActor(e.Actor, shared.display, shared.stores); err != nil {
 			return nil, err
 		}
 	}
 	return out, nil
+}
+
+// sharedAuthors 是一頁留言共用的顯示資料：作者的買家名稱與店家卡片、觀看者能不能在這個店的貼文或討論區留言。
+type sharedAuthors struct {
+	display      map[int64]buyer.Display
+	stores       postStores
+	replyAllowed bool
+}
+
+// loadShared 批次讀一頁可見留言的作者資料：卡片只取店家作者的，觀看者的封鎖旗標另外取（針對留言所在的店與店家作者，一次查詢）。
+func (h *Public) loadShared(ctx context.Context, c social.Caller, contextStore int64, actors []social.Actor) (sharedAuthors, error) {
+	if len(actors) == 0 {
+		return sharedAuthors{}, nil
+	}
+	var buyerIDs, storeIDs []int64
+	for _, a := range actors {
+		switch a.Kind {
+		case social.ActorBuyer:
+			buyerIDs = append(buyerIDs, a.ID)
+		case social.ActorStore:
+			storeIDs = append(storeIDs, a.ID)
+		}
+	}
+	cards, err := h.storeCards(ctx, storeIDs)
+	if err != nil {
+		return sharedAuthors{}, err
+	}
+	blocking, err := h.blockingStores(ctx, c, []int64{contextStore})
+	if err != nil {
+		return sharedAuthors{}, err
+	}
+	display, err := h.buyerDisplays(ctx, buyerIDs)
+	if err != nil {
+		return sharedAuthors{}, err
+	}
+	return sharedAuthors{display: display, stores: postStores{cards: cards, blocking: blocking}, replyAllowed: canComment(c, contextStore, blocking)}, nil
 }
 
 func (h *Public) buyerDisplays(ctx context.Context, buyerIDs []int64) (map[int64]buyer.Display, error) {
@@ -419,25 +435,29 @@ type postStores struct {
 	blocking map[int64]bool
 }
 
-func (h *Public) loadStores(ctx context.Context, c social.Caller, storeIDs []int64, wantBlocks bool) (postStores, error) {
+func (h *Public) storeCards(ctx context.Context, storeIDs []int64) (map[int64]seller.StoreCard, error) {
+	out := map[int64]seller.StoreCard{}
 	ids := uniq(storeIDs)
-	out := postStores{cards: map[int64]seller.StoreCard{}}
 	if len(ids) == 0 {
 		return out, nil
 	}
 	cards, err := h.stores.StoreCards(ctx, ids)
 	if err != nil {
-		return postStores{}, err
+		return nil, err
 	}
 	for _, card := range cards {
-		out.cards[card.StoreID] = card
-	}
-	if wantBlocks && c.BuyerID != 0 {
-		if out.blocking, err = h.stores.StoresBlockingBuyer(ctx, c.BuyerID, ids); err != nil {
-			return postStores{}, err
-		}
+		out[card.StoreID] = card
 	}
 	return out, nil
+}
+
+// blockingStores 是 storeIDs 之中封鎖了觀看者的店（一次批次查詢）；訪客沒有封鎖可言，不查。
+func (h *Public) blockingStores(ctx context.Context, c social.Caller, storeIDs []int64) (map[int64]bool, error) {
+	ids := uniq(storeIDs)
+	if c.BuyerID == 0 || len(ids) == 0 {
+		return nil, nil
+	}
+	return h.stores.StoresBlockingBuyer(ctx, c.BuyerID, ids)
 }
 
 // canComment 是觀看者能不能在店 storeID 的貼文留言：買家沒有被這家店封鎖，或這就是觀看者此刻的店。寫入時伺服器仍會檢查。
@@ -453,10 +473,18 @@ func (h *Public) toPosts(ctx context.Context, c social.Caller, posts []social.Po
 	for i, p := range posts {
 		storeIDs[i] = p.StoreID
 	}
-	stores, err := h.loadStores(ctx, c, storeIDs, true)
+	if len(posts) == 0 {
+		return []*pb.Post{}, nil
+	}
+	cards, err := h.storeCards(ctx, storeIDs)
 	if err != nil {
 		return nil, err
 	}
+	blocking, err := h.blockingStores(ctx, c, storeIDs)
+	if err != nil {
+		return nil, err
+	}
+	stores := postStores{cards: cards, blocking: blocking}
 	out := make([]*pb.Post, len(posts))
 	for i, p := range posts {
 		if out[i], err = h.toPost(c, p, stores); err != nil {
@@ -500,34 +528,29 @@ func (h *Public) toPost(c social.Caller, p social.Post, stores postStores) (*pb.
 	return out, nil
 }
 
-func (h *Public) toComments(ctx context.Context, c social.Caller, post social.Post, comments []social.Comment) ([]*pb.Comment, error) {
-	var buyerIDs, storeIDs []int64
+func (h *Public) toComments(ctx context.Context, c social.Caller, postStore int64, comments []social.Comment) ([]*pb.Comment, error) {
+	if len(comments) == 0 {
+		return []*pb.Comment{}, nil
+	}
+	actors := make([]social.Actor, 0, len(comments))
 	for _, m := range comments {
-		if m.State != social.CommentVisible {
-			continue
-		}
-		switch m.Actor.Kind {
-		case social.ActorBuyer:
-			buyerIDs = append(buyerIDs, m.Actor.ID)
-		case social.ActorStore:
-			storeIDs = append(storeIDs, m.Actor.ID)
+		if m.State == social.CommentVisible {
+			actors = append(actors, m.Actor)
 		}
 	}
-	stores, err := h.loadStores(ctx, c, append(storeIDs, post.StoreID), true)
+	shared, err := h.loadShared(ctx, c, postStore, actors)
 	if err != nil {
 		return nil, err
 	}
-	display, err := h.buyerDisplays(ctx, buyerIDs)
-	if err != nil {
-		return nil, err
-	}
-	replyAllowed := canComment(c, post.StoreID, stores.blocking)
 	out := make([]*pb.Comment, len(comments))
 	for i, m := range comments {
 		item := &pb.Comment{
 			Id: m.ID.String(), PostId: m.PostID.String(), State: rpc.EnumToProto[pb.CommentState](m.State),
-			CreateTime: timestamppb.New(m.CreatedAt), UpdateTime: timestamppb.New(m.UpdatedAt),
-			LikeCount: m.Likes, ReplyCount: m.ReplyCount,
+			CreateTime: timestamppb.New(m.CreatedAt), ReplyCount: m.ReplyCount,
+		}
+		out[i] = item
+		if m.State != social.CommentVisible {
+			continue
 		}
 		if m.ParentID != nil {
 			s := m.ParentID.String()
@@ -537,17 +560,15 @@ func (h *Public) toComments(ctx context.Context, c social.Caller, post social.Po
 			s := m.ReplyToID.String()
 			item.ReplyToId = &s
 		}
-		out[i] = item
-		if m.State != social.CommentVisible {
-			continue
-		}
+		item.UpdateTime = timestamppb.New(m.UpdatedAt)
+		item.LikeCount = m.Likes
 		item.Body = m.Body
 		item.ViewerLiked = m.LikedByMe
 		item.IsMine = c.IsAuthor(m.Actor)
 		item.ViewerCanEdit = item.IsMine
-		item.ViewerCanDelete = item.IsMine || c.OwnsStore(post.StoreID)
-		item.ViewerCanReply = replyAllowed
-		if item.Author, err = h.toActor(m.Actor, display, stores); err != nil {
+		item.ViewerCanDelete = item.IsMine || c.OwnsStore(postStore)
+		item.ViewerCanReply = shared.replyAllowed
+		if item.Author, err = h.toActor(m.Actor, shared.display, shared.stores); err != nil {
 			return nil, err
 		}
 	}

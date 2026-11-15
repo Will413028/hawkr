@@ -1386,33 +1386,33 @@ class SuggestTagsResponse extends $pb.GeneratedMessage {
   $pb.PbList<TagCount> get tags => $_getList(0);
 }
 
-class ListTrendingTagsRequest extends $pb.GeneratedMessage {
-  factory ListTrendingTagsRequest({
+class SuggestTrendingTagsRequest extends $pb.GeneratedMessage {
+  factory SuggestTrendingTagsRequest({
     $2.Timestamp? startTime,
     $2.Timestamp? endTime,
     $core.int? maxResults,
   }) {
-    final result = ListTrendingTagsRequest._();
+    final result = SuggestTrendingTagsRequest._();
     if (startTime != null) result.startTime = startTime;
     if (endTime != null) result.endTime = endTime;
     if (maxResults != null) result.maxResults = maxResults;
     return result;
   }
 
-  ListTrendingTagsRequest._();
+  SuggestTrendingTagsRequest._();
 
-  factory ListTrendingTagsRequest.fromBuffer($core.List<$core.int> data,
+  factory SuggestTrendingTagsRequest.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ListTrendingTagsRequest()..mergeFromBuffer(data, registry);
-  factory ListTrendingTagsRequest.fromJson($core.String json,
+      SuggestTrendingTagsRequest()..mergeFromBuffer(data, registry);
+  factory SuggestTrendingTagsRequest.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ListTrendingTagsRequest()..mergeFromJson(json, registry);
+      SuggestTrendingTagsRequest()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ListTrendingTagsRequest',
+      _omitMessageNames ? '' : 'SuggestTrendingTagsRequest',
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
-      createEmptyInstance: ListTrendingTagsRequest.$_createMessage)
+      createEmptyInstance: SuggestTrendingTagsRequest.$_createMessage)
     ..aOM<$2.Timestamp>(1, _omitFieldNames ? '' : 'startTime',
         subBuilder: $2.Timestamp.$_createMessage)
     ..aOM<$2.Timestamp>(2, _omitFieldNames ? '' : 'endTime',
@@ -1421,28 +1421,31 @@ class ListTrendingTagsRequest extends $pb.GeneratedMessage {
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ListTrendingTagsRequest clone() => deepCopy();
+  SuggestTrendingTagsRequest clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ListTrendingTagsRequest copyWith(
-          void Function(ListTrendingTagsRequest) updates) =>
-      super.copyWith((message) => updates(message as ListTrendingTagsRequest))
-          as ListTrendingTagsRequest;
+  SuggestTrendingTagsRequest copyWith(
+          void Function(SuggestTrendingTagsRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as SuggestTrendingTagsRequest))
+          as SuggestTrendingTagsRequest;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
   @$core.Deprecated(
-      'Use ListTrendingTagsRequest() / ListTrendingTagsRequest.new instead')
-  static ListTrendingTagsRequest create() => ListTrendingTagsRequest._();
-  static $pb.GeneratedMessage $_createMessage() => ListTrendingTagsRequest._();
+      'Use SuggestTrendingTagsRequest() / SuggestTrendingTagsRequest.new instead')
+  static SuggestTrendingTagsRequest create() => SuggestTrendingTagsRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      SuggestTrendingTagsRequest._();
   @$core.override
-  ListTrendingTagsRequest createEmptyInstance() => ListTrendingTagsRequest._();
+  SuggestTrendingTagsRequest createEmptyInstance() =>
+      SuggestTrendingTagsRequest._();
   @$core.pragma('dart2js:noInline')
-  static ListTrendingTagsRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ListTrendingTagsRequest>(
-          ListTrendingTagsRequest.$_createMessage);
-  static ListTrendingTagsRequest? _defaultInstance;
+  static SuggestTrendingTagsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SuggestTrendingTagsRequest>(
+          SuggestTrendingTagsRequest.$_createMessage);
+  static SuggestTrendingTagsRequest? _defaultInstance;
 
   /// 時間窗的起點（含）；不設是 end_time 往前 30 天。
   @$pb.TagNumber(1)
@@ -1479,57 +1482,60 @@ class ListTrendingTagsRequest extends $pb.GeneratedMessage {
   void clearMaxResults() => $_clearField(3);
 }
 
-class ListTrendingTagsResponse extends $pb.GeneratedMessage {
-  factory ListTrendingTagsResponse({
+class SuggestTrendingTagsResponse extends $pb.GeneratedMessage {
+  factory SuggestTrendingTagsResponse({
     $core.Iterable<TagCount>? tags,
   }) {
-    final result = ListTrendingTagsResponse._();
+    final result = SuggestTrendingTagsResponse._();
     if (tags != null) result.tags.addAll(tags);
     return result;
   }
 
-  ListTrendingTagsResponse._();
+  SuggestTrendingTagsResponse._();
 
-  factory ListTrendingTagsResponse.fromBuffer($core.List<$core.int> data,
+  factory SuggestTrendingTagsResponse.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ListTrendingTagsResponse()..mergeFromBuffer(data, registry);
-  factory ListTrendingTagsResponse.fromJson($core.String json,
+      SuggestTrendingTagsResponse()..mergeFromBuffer(data, registry);
+  factory SuggestTrendingTagsResponse.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ListTrendingTagsResponse()..mergeFromJson(json, registry);
+      SuggestTrendingTagsResponse()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ListTrendingTagsResponse',
+      _omitMessageNames ? '' : 'SuggestTrendingTagsResponse',
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
-      createEmptyInstance: ListTrendingTagsResponse.$_createMessage)
+      createEmptyInstance: SuggestTrendingTagsResponse.$_createMessage)
     ..pPM<TagCount>(1, _omitFieldNames ? '' : 'tags',
         subBuilder: TagCount.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ListTrendingTagsResponse clone() => deepCopy();
+  SuggestTrendingTagsResponse clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ListTrendingTagsResponse copyWith(
-          void Function(ListTrendingTagsResponse) updates) =>
-      super.copyWith((message) => updates(message as ListTrendingTagsResponse))
-          as ListTrendingTagsResponse;
+  SuggestTrendingTagsResponse copyWith(
+          void Function(SuggestTrendingTagsResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as SuggestTrendingTagsResponse))
+          as SuggestTrendingTagsResponse;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
   @$core.Deprecated(
-      'Use ListTrendingTagsResponse() / ListTrendingTagsResponse.new instead')
-  static ListTrendingTagsResponse create() => ListTrendingTagsResponse._();
-  static $pb.GeneratedMessage $_createMessage() => ListTrendingTagsResponse._();
+      'Use SuggestTrendingTagsResponse() / SuggestTrendingTagsResponse.new instead')
+  static SuggestTrendingTagsResponse create() =>
+      SuggestTrendingTagsResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      SuggestTrendingTagsResponse._();
   @$core.override
-  ListTrendingTagsResponse createEmptyInstance() =>
-      ListTrendingTagsResponse._();
+  SuggestTrendingTagsResponse createEmptyInstance() =>
+      SuggestTrendingTagsResponse._();
   @$core.pragma('dart2js:noInline')
-  static ListTrendingTagsResponse getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ListTrendingTagsResponse>(
-          ListTrendingTagsResponse.$_createMessage);
-  static ListTrendingTagsResponse? _defaultInstance;
+  static SuggestTrendingTagsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SuggestTrendingTagsResponse>(
+          SuggestTrendingTagsResponse.$_createMessage);
+  static SuggestTrendingTagsResponse? _defaultInstance;
 
   @$pb.TagNumber(1)
   $pb.PbList<TagCount> get tags => $_getList(0);
@@ -2044,12 +2050,12 @@ class SocialPublicServiceApi {
       _client.invoke<SuggestTagsResponse>(ctx, 'SocialPublicService',
           'SuggestTags', request, SuggestTagsResponse());
 
-  /// ListTrendingTags 是熱門標籤：發布時間落在時間窗內的公開貼文上，各標籤的貼文數，多的在前。全域彙總，不依觀看者。
+  /// SuggestTrendingTags 是熱門標籤：發布時間落在時間窗內的公開貼文上，各標籤的貼文數，多的在前。全域彙總，不依觀看者。
   /// 這是只取前 max_results 名的排行榜（最多 50 名），不分頁；時間窗最長 30 天。
-  $async.Future<ListTrendingTagsResponse> listTrendingTags(
-          $pb.ClientContext? ctx, ListTrendingTagsRequest request) =>
-      _client.invoke<ListTrendingTagsResponse>(ctx, 'SocialPublicService',
-          'ListTrendingTags', request, ListTrendingTagsResponse());
+  $async.Future<SuggestTrendingTagsResponse> suggestTrendingTags(
+          $pb.ClientContext? ctx, SuggestTrendingTagsRequest request) =>
+      _client.invoke<SuggestTrendingTagsResponse>(ctx, 'SocialPublicService',
+          'SuggestTrendingTags', request, SuggestTrendingTagsResponse());
 
   /// ListForumEntries 列出店家討論區的頂層留言，或某則頂層留言的回覆，依建立時間舊到新。刪除或隱藏而底下有可見回覆的頂層留言是佔位項目
   /// （只有 id、store_id、create_time、reply_count 與 state）；觀看者封鎖了這家店、或與作者任一方向有個人封鎖時，對應的內容不出現，

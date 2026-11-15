@@ -77,9 +77,9 @@ func (f *fixture) topLevel(t *testing.T, c social.Caller, postID uuid.UUID) soci
 	return mustV[social.CommentPage](t)(f.module.ListComments(context.Background(), c, postID, nil, 50))
 }
 
-func (f *fixture) replies(t *testing.T, c social.Caller, parentID uuid.UUID) social.CommentPage {
+func (f *fixture) replies(t *testing.T, c social.Caller, parent social.Comment) social.CommentPage {
 	t.Helper()
-	return mustV[social.CommentPage](t)(f.module.ListReplies(context.Background(), c, parentID, nil, 50))
+	return mustV[social.CommentPage](t)(f.module.ListReplies(context.Background(), c, parent.PostID, parent.ID, nil, 50))
 }
 
 func (f *fixture) forumTop(t *testing.T, c social.Caller, storeID int64) social.ForumPage {
@@ -87,9 +87,9 @@ func (f *fixture) forumTop(t *testing.T, c social.Caller, storeID int64) social.
 	return mustV[social.ForumPage](t)(f.module.ListForumEntries(context.Background(), c, storeID, nil, 50))
 }
 
-func (f *fixture) forumReplies(t *testing.T, c social.Caller, parentID uuid.UUID) social.ForumPage {
+func (f *fixture) forumReplies(t *testing.T, c social.Caller, parent social.ForumEntry) social.ForumPage {
 	t.Helper()
-	return mustV[social.ForumPage](t)(f.module.ListForumReplies(context.Background(), c, parentID, nil, 50))
+	return mustV[social.ForumPage](t)(f.module.ListForumReplies(context.Background(), c, parent.StoreID, parent.ID, nil, 50))
 }
 
 // D2：買家↔買家雙向互不可見。留言：被封鎖者的頂層連同底下的回覆，對封鎖者整則不出現、不留佔位；被封鎖者看不到封鎖者的留言；
@@ -121,10 +121,10 @@ func TestBlockedBuyersCommentsAreHiddenInBothDirections(t *testing.T) {
 		}
 	}
 	// 帶被封鎖者的頂層 ID 讀不到回覆；別串的回覆照常。
-	if got := f.replies(t, f.asBuyer(a), cB.ID); len(got.Comments) != 0 {
+	if got := f.replies(t, f.asBuyer(a), cB); len(got.Comments) != 0 {
 		t.Fatalf("帶被封鎖者的頂層 ID 讀不到回覆：%v", commentIDs(got))
 	}
-	if got := f.replies(t, f.asBuyer(a), cC.ID); !sameIDs(commentIDs(got), rC.ID) {
+	if got := f.replies(t, f.asBuyer(a), cC); !sameIDs(commentIDs(got), rC.ID) {
 		t.Fatalf("別串的回覆照常：%v", commentIDs(got))
 	}
 	// 被封鎖者 B：看不到 A 的留言（雙向互不可見）。
@@ -136,7 +136,7 @@ func TestBlockedBuyersCommentsAreHiddenInBothDirections(t *testing.T) {
 		if got := f.topLevel(t, viewer, p.ID); !sameIDs(commentIDs(got), cA.ID, cB.ID, cC.ID) {
 			t.Fatalf("%s看得到全部：%v", name, commentIDs(got))
 		}
-		if got := f.replies(t, viewer, cB.ID); !sameIDs(commentIDs(got), rB.ID) {
+		if got := f.replies(t, viewer, cB); !sameIDs(commentIDs(got), rB.ID) {
 			t.Fatalf("%s看得到被封鎖者那串的回覆：%v", name, commentIDs(got))
 		}
 	}
@@ -176,10 +176,10 @@ func TestBlockedBuyersForumEntriesAreHiddenInBothDirections(t *testing.T) {
 	if !sameIDs(forumIDs(got), eA.ID, eC.ID) {
 		t.Fatalf("被封鎖者的頂層連同回覆整則不出現；已刪除的頂層只剩被封鎖者的回覆時也不出現：%v", forumIDs(got))
 	}
-	if got := f.forumReplies(t, f.asBuyer(a), eB.ID); len(got.Entries) != 0 {
+	if got := f.forumReplies(t, f.asBuyer(a), eB); len(got.Entries) != 0 {
 		t.Fatalf("帶被封鎖者的頂層 ID 讀不到回覆：%v", forumIDs(got))
 	}
-	if got := f.forumReplies(t, f.asBuyer(a), eC.ID); len(got.Entries) != 0 {
+	if got := f.forumReplies(t, f.asBuyer(a), eC); len(got.Entries) != 0 {
 		t.Fatalf("同一串裡被封鎖者的回覆不出現：%v", forumIDs(got))
 	}
 	// 被封鎖者 B：看不到 A 的留言，其餘照常。
@@ -195,10 +195,10 @@ func TestBlockedBuyersForumEntriesAreHiddenInBothDirections(t *testing.T) {
 		if got.Entries[3].State != social.CommentDeleted {
 			t.Fatalf("%s：已刪除的頂層是佔位項目：%+v", name, got.Entries[3])
 		}
-		if got := f.forumReplies(t, viewer, eD.ID); !sameIDs(forumIDs(got), bReplyToD.ID) {
+		if got := f.forumReplies(t, viewer, eD); !sameIDs(forumIDs(got), bReplyToD.ID) {
 			t.Fatalf("%s看得到佔位底下的回覆：%v", name, forumIDs(got))
 		}
-		if got := f.forumReplies(t, viewer, eB.ID); !sameIDs(forumIDs(got), storeReply.ID) {
+		if got := f.forumReplies(t, viewer, eB); !sameIDs(forumIDs(got), storeReply.ID) {
 			t.Fatalf("%s看得到被封鎖者那串的回覆：%v", name, forumIDs(got))
 		}
 	}
@@ -278,7 +278,7 @@ func TestBuyerBlockingAStoreHidesItsContentAndStopsWrites(t *testing.T) {
 	if got := f.forumTop(t, viewer, blockedStore); len(got.Entries) != 0 {
 		t.Fatalf("討論區是空的：%v", forumIDs(got))
 	}
-	if got := f.forumReplies(t, viewer, entry.ID); len(got.Entries) != 0 {
+	if got := f.forumReplies(t, viewer, entry); len(got.Entries) != 0 {
 		t.Fatalf("討論區的回覆也讀不到：%v", forumIDs(got))
 	}
 	// 寫入：讀不到就不能寫。
@@ -303,7 +303,7 @@ func TestBuyerBlockingAStoreHidesItsContentAndStopsWrites(t *testing.T) {
 		if feed := mustV[social.PostPage](t)(f.module.ListFeed(ctx, who, nil, 50)); len(feed.Posts) != 2 || !slices.Contains(postIDs(feed), pBlocked.ID) || !slices.Contains(postIDs(feed), pOther.ID) {
 			t.Fatalf("%s的動態牆含兩家店：%v", name, postIDs(feed))
 		}
-		if got := f.forumReplies(t, who, entry.ID); !sameIDs(forumIDs(got), reply.ID) {
+		if got := f.forumReplies(t, who, entry); !sameIDs(forumIDs(got), reply.ID) {
 			t.Fatalf("%s看得到討論區的回覆：%v", name, forumIDs(got))
 		}
 	}
@@ -342,7 +342,7 @@ func TestStoreBlockingABuyerLeavesPublicContentReadable(t *testing.T) {
 	if got := f.topLevel(t, viewer, p.ID); !sameIDs(commentIDs(got), mine.ID) {
 		t.Fatalf("被封鎖的買家仍看得到留言：%v", commentIDs(got))
 	}
-	if got := f.replies(t, viewer, mine.ID); !sameIDs(commentIDs(got), reply.ID) {
+	if got := f.replies(t, viewer, mine); !sameIDs(commentIDs(got), reply.ID) {
 		t.Fatalf("被封鎖的買家仍看得到店家的回覆：%v", commentIDs(got))
 	}
 	if got := f.forumTop(t, viewer, storeID); !sameIDs(forumIDs(got), entry.ID) {
@@ -443,7 +443,7 @@ func TestStoreOwnerReadsOwnStoreIgnoringPersonalBlocks(t *testing.T) {
 	if got := f.topLevel(t, ownerCaller, p.ID); !sameIDs(commentIDs(got), c1.ID, c2.ID) {
 		t.Fatalf("店主仍看得到封鎖自己的買家與被自己封鎖的買家的留言：%v", commentIDs(got))
 	}
-	if got := f.replies(t, ownerCaller, c1.ID); !sameIDs(commentIDs(got), r1.ID) {
+	if got := f.replies(t, ownerCaller, c1); !sameIDs(commentIDs(got), r1.ID) {
 		t.Fatalf("店主仍讀得到回覆：%v", commentIDs(got))
 	}
 	if got := f.forumTop(t, ownerCaller, storeID); !sameIDs(forumIDs(got), e1.ID, e2.ID) {
@@ -736,5 +736,57 @@ func TestStoreCanDeleteExistingContentOfABuyerItBlocked(t *testing.T) {
 	}
 	if got := f.forumTop(t, f.asBuyer(c), storeID); len(got.Entries) != 0 {
 		t.Fatalf("討論區留言已刪除：%v", forumIDs(got))
+	}
+}
+
+// 回覆列表先驗證父項屬於指定的貼文或店：不存在、不是頂層或屬於別處都是 NotFound，即使那一頁本來就是空的。
+func TestReplyListsRejectAMissingOrForeignParent(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	otherStore, _ := f.exposableStore(t)
+	a := f.newBuyer(t)
+	p, other := f.publishedPost(t, storeID, "貼文"), f.publishedPost(t, otherStore, "別店的貼文")
+	top := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(a), social.CommentInput{PostID: p.ID, Body: "頂層"}))
+	reply := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(a), social.CommentInput{PostID: p.ID, Body: "回覆", ParentID: &top.ID}))
+	entry := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(a), social.ForumInput{StoreID: storeID, Body: "頂層"}))
+	forumReply := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(a), social.ForumInput{StoreID: storeID, Body: "回覆", ParentID: &entry.ID}))
+
+	for name, call := range map[string]func() error{
+		"留言：父留言不存在": func() error {
+			_, err := f.module.ListReplies(ctx, social.Caller{}, p.ID, uuid.New(), nil, 10)
+			return err
+		},
+		"留言：父留言屬於別篇貼文": func() error {
+			_, err := f.module.ListReplies(ctx, social.Caller{}, other.ID, top.ID, nil, 10)
+			return err
+		},
+		"留言：父留言不是頂層": func() error {
+			_, err := f.module.ListReplies(ctx, social.Caller{}, p.ID, reply.ID, nil, 10)
+			return err
+		},
+		"討論區：父留言不存在": func() error {
+			_, err := f.module.ListForumReplies(ctx, social.Caller{}, storeID, uuid.New(), nil, 10)
+			return err
+		},
+		"討論區：父留言屬於別家店": func() error {
+			_, err := f.module.ListForumReplies(ctx, social.Caller{}, otherStore, entry.ID, nil, 10)
+			return err
+		},
+		"討論區：父留言不是頂層": func() error {
+			_, err := f.module.ListForumReplies(ctx, social.Caller{}, storeID, forumReply.ID, nil, 10)
+			return err
+		},
+	} {
+		if err := call(); apperr.KindOf(err) != apperr.KindNotFound {
+			t.Errorf("%s：want NotFound，got %v", name, err)
+		}
+	}
+	if got := f.replies(t, social.Caller{}, top); !sameIDs(commentIDs(got), reply.ID) {
+		t.Fatalf("正確的父留言照常列出：%v", commentIDs(got))
+	}
+	if got := f.forumReplies(t, social.Caller{}, entry); !sameIDs(forumIDs(got), forumReply.ID) {
+		t.Fatalf("正確的父留言照常列出：%v", forumIDs(got))
 	}
 }

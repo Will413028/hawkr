@@ -7,6 +7,7 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -42,6 +43,12 @@ type fakeReads struct {
 	forumStore int64
 	forumReply social.ForumPage
 	repliesTo  uuid.UUID
+
+	commentParents map[uuid.UUID]uuid.UUID
+	forumParents   map[uuid.UUID]int64
+	repliesPost    uuid.UUID
+	repliesStore   int64
+	postReads      int
 }
 
 func (f *fakeReads) ListHashtagPosts(_ context.Context, _ social.Caller, tag string, _ *social.PostCursor, _ int32) (social.PostPage, error) {
@@ -64,12 +71,17 @@ func (f *fakeReads) ListForumEntries(_ context.Context, _ social.Caller, storeID
 	return f.forum, nil
 }
 
-func (f *fakeReads) ListForumReplies(_ context.Context, _ social.Caller, parentID uuid.UUID, _ *social.CommentCursor, _ int32) (social.ForumPage, error) {
-	f.repliesTo = parentID
+// ListForumReplies 與模組一樣先驗證父留言屬於 storeID：不存在或屬於別家店是 NotFound，不論頁面內容。
+func (f *fakeReads) ListForumReplies(_ context.Context, _ social.Caller, storeID int64, parentID uuid.UUID, _ *social.CommentCursor, _ int32) (social.ForumPage, error) {
+	f.repliesTo, f.repliesStore = parentID, storeID
+	if owner, ok := f.forumParents[parentID]; f.forumParents != nil && (!ok || owner != storeID) {
+		return social.ForumPage{}, apperr.NotFound("entry")
+	}
 	return f.forumReply, nil
 }
 
 func (f *fakeReads) PublicPost(_ context.Context, c social.Caller, _ uuid.UUID) (social.Post, error) {
+	f.postReads++
 	f.callers = append(f.callers, c)
 	return f.post, f.postErr
 }
@@ -86,11 +98,16 @@ func (f *fakeReads) ListStorePosts(_ context.Context, c social.Caller, storeID i
 }
 
 func (f *fakeReads) ListComments(context.Context, social.Caller, uuid.UUID, *social.CommentCursor, int32) (social.CommentPage, error) {
-	return f.comments, nil
+	return f.comments, f.postErr
 }
 
-func (f *fakeReads) ListReplies(context.Context, social.Caller, uuid.UUID, *social.CommentCursor, int32) (social.CommentPage, error) {
-	return f.replies, nil
+// ListReplies 與模組一樣先驗證父留言屬於 postID：不存在或屬於別篇是 NotFound，不論頁面內容。
+func (f *fakeReads) ListReplies(_ context.Context, _ social.Caller, postID, parentID uuid.UUID, _ *social.CommentCursor, _ int32) (social.CommentPage, error) {
+	f.repliesPost = postID
+	if owner, ok := f.commentParents[parentID]; f.commentParents != nil && (!ok || owner != postID) {
+		return social.CommentPage{}, apperr.NotFound("comment")
+	}
+	return f.replies, f.postErr
 }
 
 func (f *fakeReads) TopPosts(_ context.Context, _ social.Caller, n int32) ([]social.Post, error) {
@@ -280,8 +297,8 @@ func TestListCommentsFlagsAndPlaceholders(t *testing.T) {
 	now := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
 	mine := social.Comment{ID: uuid.New(), PostID: p.ID, State: social.CommentVisible, Actor: social.Actor{Kind: social.ActorBuyer, ID: 7}, Body: "a", CreatedAt: now, UpdatedAt: now}
 	other := social.Comment{ID: uuid.New(), PostID: p.ID, State: social.CommentVisible, Actor: social.Actor{Kind: social.ActorBuyer, ID: 8}, Body: "b", CreatedAt: now, UpdatedAt: now, LikedByMe: true}
-	holder := social.Comment{ID: uuid.New(), PostID: p.ID, State: social.CommentDeleted, CreatedAt: now, UpdatedAt: now, ReplyCount: 2}
-	reads := &fakeReads{post: p, comments: social.CommentPage{Comments: []social.Comment{mine, other, holder}}}
+	holder := social.Comment{ID: uuid.New(), PostID: p.ID, State: social.CommentHidden, CreatedAt: now, UpdatedAt: now, ReplyCount: 2, Likes: 9, Body: "leak", LikedByMe: true, Actor: social.Actor{Kind: social.ActorBuyer, ID: 8}}
+	reads := &fakeReads{post: p, comments: social.CommentPage{Comments: []social.Comment{mine, other, holder}, StoreID: 5}}
 
 	t.Run("買家", func(t *testing.T) {
 		h := newPublic(t, reads, fakeBuyers{id: 7}, &fakeStores{})
@@ -299,9 +316,9 @@ func TestListCommentsFlagsAndPlaceholders(t *testing.T) {
 		if c[1].GetAuthor().GetName() != "buyer" || c[1].GetAuthor().GetKind() != pb.ActorKind_ACTOR_KIND_BUYER {
 			t.Errorf("作者 = %v", c[1].GetAuthor())
 		}
-		if g := c[2]; g.GetState() != pb.CommentState_COMMENT_STATE_DELETED || g.GetAuthor() != nil || g.GetBody() != "" ||
-			g.GetViewerCanReply() || g.GetViewerCanEdit() || g.GetViewerCanDelete() || g.GetReplyCount() != 2 {
-			t.Errorf("佔位項目 = %v", g)
+		want := &pb.Comment{Id: holder.ID.String(), PostId: p.ID.String(), State: pb.CommentState_COMMENT_STATE_HIDDEN, CreateTime: timestamppb.New(now), ReplyCount: 2}
+		if g := c[2]; !proto.Equal(g, want) {
+			t.Errorf("佔位項目只有 id、post_id、create_time、reply_count、state：%v", g)
 		}
 	})
 	t.Run("訪客全部是 false", func(t *testing.T) {
@@ -336,13 +353,43 @@ func TestListCommentsFlagsAndPlaceholders(t *testing.T) {
 			t.Errorf("被封鎖仍可回覆：%v", c)
 		}
 	})
-	t.Run("回覆的貼文與 post_id 不符是 not_found", func(t *testing.T) {
-		parent := uuid.New().String()
-		reads := &fakeReads{post: p, replies: social.CommentPage{Comments: []social.Comment{{ID: uuid.New(), PostID: uuid.New(), State: social.CommentVisible, CreatedAt: now, UpdatedAt: now}}}}
+	t.Run("回覆：父留言不存在或屬於別篇貼文是 not_found，即使頁面是空的", func(t *testing.T) {
+		known := uuid.New()
+		reads := &fakeReads{commentParents: map[uuid.UUID]uuid.UUID{known: uuid.New()}, postErr: nil}
 		h := newPublic(t, reads, fakeBuyers{}, &fakeStores{})
-		_, err := h.ListComments(t.Context(), connect.NewRequest(&pb.ListCommentsRequest{PostId: p.ID.String(), ParentId: &parent}))
-		if codeOf(t, err) != connect.CodeNotFound {
-			t.Errorf("err = %v，預期 not found", err)
+		for name, parent := range map[string]string{"不存在": uuid.New().String(), "別篇貼文的": known.String()} {
+			_, err := h.ListComments(t.Context(), connect.NewRequest(&pb.ListCommentsRequest{PostId: p.ID.String(), ParentId: &parent}))
+			if codeOf(t, err) != connect.CodeNotFound {
+				t.Errorf("%s父留言：err = %v，預期 not found", name, err)
+			}
+		}
+		reads.commentParents[known] = p.ID
+		parent := known.String()
+		if _, err := h.ListComments(t.Context(), connect.NewRequest(&pb.ListCommentsRequest{PostId: p.ID.String(), ParentId: &parent})); err != nil || reads.repliesPost != p.ID {
+			t.Errorf("正確的父留言：err=%v post=%v", err, reads.repliesPost)
+		}
+	})
+	t.Run("不另外讀貼文，店 id 取自模組回傳的頁", func(t *testing.T) {
+		reads := &fakeReads{comments: social.CommentPage{Comments: []social.Comment{other}, StoreID: 5}}
+		stores := &fakeStores{}
+		h := newPublic(t, reads, fakeBuyers{id: 7}, stores)
+		if _, err := h.ListComments(asBuyer(t.Context()), connect.NewRequest(&pb.ListCommentsRequest{PostId: p.ID.String()})); err != nil || reads.postReads != 0 {
+			t.Fatalf("err=%v PublicPost 讀了 %d 次", err, reads.postReads)
+		}
+		if len(stores.asked) != 1 || len(stores.asked[0]) != 1 || stores.asked[0][0] != 5 {
+			t.Errorf("封鎖旗標只查留言所在的店：%v", stores.asked)
+		}
+	})
+	t.Run("空頁與只有佔位項目不查店家與買家", func(t *testing.T) {
+		stores := &fakeStores{}
+		reads := &fakeReads{comments: social.CommentPage{StoreID: 5}}
+		h := newPublic(t, reads, fakeBuyers{id: 7}, stores)
+		if _, err := h.ListComments(asBuyer(t.Context()), connect.NewRequest(&pb.ListCommentsRequest{PostId: p.ID.String()})); err != nil || len(stores.asked) != 0 {
+			t.Fatalf("空頁：err=%v asked=%v", err, stores.asked)
+		}
+		reads.comments = social.CommentPage{StoreID: 5, Comments: []social.Comment{holder}}
+		if _, err := h.ListComments(asBuyer(t.Context()), connect.NewRequest(&pb.ListCommentsRequest{PostId: p.ID.String()})); err != nil || len(stores.asked) != 0 {
+			t.Fatalf("只有佔位項目：err=%v asked=%v", err, stores.asked)
 		}
 	})
 }
@@ -387,6 +434,10 @@ func TestListPostsHashtagFilter(t *testing.T) {
 	if err != nil || resp.Msg.GetNextPageToken() == "" {
 		t.Fatalf("沒有 token：%v", err)
 	}
+	lower := "cake"
+	if _, err := h.ListPosts(t.Context(), connect.NewRequest(&pb.ListPostsRequest{Hashtag: &lower, PageToken: resp.Msg.GetNextPageToken()})); err != nil {
+		t.Errorf("第一頁 %q、第二頁 %q 正規化後相同，token 應該通用：%v", tag, lower, err)
+	}
 	other := "Pie"
 	if _, err := h.ListPosts(t.Context(), connect.NewRequest(&pb.ListPostsRequest{Hashtag: &other, PageToken: resp.Msg.GetNextPageToken()})); codeOf(t, err) != connect.CodeInvalidArgument {
 		t.Errorf("換了 hashtag 沿用 token：%v", err)
@@ -411,19 +462,19 @@ func TestSuggestTags(t *testing.T) {
 	}
 }
 
-func TestListTrendingTagsWindow(t *testing.T) {
+func TestSuggestTrendingTagsWindow(t *testing.T) {
 	reads := &fakeReads{tagCounts: []social.HashtagCount{{Name: "cake", Posts: 4}}}
 	h := newPublic(t, reads, fakeBuyers{}, &fakeStores{})
-	if _, err := h.ListTrendingTags(t.Context(), connect.NewRequest(&pb.ListTrendingTagsRequest{})); err != nil ||
+	if _, err := h.SuggestTrendingTags(t.Context(), connect.NewRequest(&pb.SuggestTrendingTagsRequest{})); err != nil ||
 		!reads.to.Equal(trendNow) || !reads.from.Equal(trendNow.Add(-social.DefaultTrendingWindow)) {
 		t.Fatalf("預設時間窗：err=%v %v ~ %v", err, reads.from, reads.to)
 	}
 	start, end := trendNow.Add(-48*time.Hour), trendNow.Add(-24*time.Hour)
-	resp, err := h.ListTrendingTags(t.Context(), connect.NewRequest(&pb.ListTrendingTagsRequest{StartTime: timestamppb.New(start), EndTime: timestamppb.New(end), MaxResults: 3}))
+	resp, err := h.SuggestTrendingTags(t.Context(), connect.NewRequest(&pb.SuggestTrendingTagsRequest{StartTime: timestamppb.New(start), EndTime: timestamppb.New(end), MaxResults: 3}))
 	if err != nil || !reads.from.Equal(start) || !reads.to.Equal(end) || reads.trendN != 3 || resp.Msg.GetTags()[0].GetPostCount() != 4 {
 		t.Fatalf("指定時間窗：err=%v %v ~ %v n=%d", err, reads.from, reads.to, reads.trendN)
 	}
-	if _, err := h.ListTrendingTags(t.Context(), connect.NewRequest(&pb.ListTrendingTagsRequest{MaxResults: -1})); codeOf(t, err) != connect.CodeInvalidArgument {
+	if _, err := h.SuggestTrendingTags(t.Context(), connect.NewRequest(&pb.SuggestTrendingTagsRequest{MaxResults: -1})); codeOf(t, err) != connect.CodeInvalidArgument {
 		t.Errorf("max_results=-1：%v", err)
 	}
 }
@@ -433,7 +484,8 @@ func TestListForumEntriesFlagsAndScoping(t *testing.T) {
 	entry := func(store int64, state social.CommentState, buyerID int64) social.ForumEntry {
 		return social.ForumEntry{ID: uuid.New(), StoreID: store, State: state, Actor: social.Actor{Kind: social.ActorBuyer, ID: buyerID}, Body: "x", CreatedAt: now, UpdatedAt: now}
 	}
-	mine, other, holder := entry(5, social.CommentVisible, 7), entry(5, social.CommentVisible, 8), entry(5, social.CommentDeleted, 0)
+	mine, other, holder := entry(5, social.CommentVisible, 7), entry(5, social.CommentVisible, 8), entry(5, social.CommentDeleted, 8)
+	holder.Body, holder.UpdatedAt = "leak", now.Add(time.Hour)
 	reads := &fakeReads{forum: social.ForumPage{Entries: []social.ForumEntry{mine, other, holder}, Next: &social.CommentCursor{CreatedAt: now, ID: holder.ID}}}
 	id := "5"
 
@@ -450,8 +502,9 @@ func TestListForumEntriesFlagsAndScoping(t *testing.T) {
 		if e[1].GetIsMine() || e[1].GetViewerCanEdit() || e[1].GetViewerCanDelete() || !e[1].GetViewerCanReply() {
 			t.Errorf("別人的 = %v", e[1])
 		}
-		if g := e[2]; g.GetState() != pb.CommentState_COMMENT_STATE_DELETED || g.GetAuthor() != nil || g.GetBody() != "" || g.GetViewerCanReply() {
-			t.Errorf("佔位 = %v", g)
+		want := &pb.ForumEntry{Id: holder.ID.String(), StoreId: "5", State: pb.CommentState_COMMENT_STATE_DELETED, CreateTime: timestamppb.New(now)}
+		if g := e[2]; !proto.Equal(g, want) {
+			t.Errorf("佔位只有 id、store_id、create_time、reply_count、state：%v", g)
 		}
 		if resp.Msg.GetNextPageToken() == "" {
 			t.Error("沒有 next_page_token")
@@ -477,15 +530,29 @@ func TestListForumEntriesFlagsAndScoping(t *testing.T) {
 		}
 	})
 	t.Run("回覆", func(t *testing.T) {
-		reads := &fakeReads{forumReply: social.ForumPage{Entries: []social.ForumEntry{entry(5, social.CommentVisible, 8)}}}
+		known := uuid.New()
+		reads := &fakeReads{forumParents: map[uuid.UUID]int64{known: 5}, forumReply: social.ForumPage{Entries: []social.ForumEntry{entry(5, social.CommentVisible, 8)}}}
 		h := newPublic(t, reads, fakeBuyers{}, &fakeStores{})
-		parent := uuid.New().String()
-		if _, err := h.ListForumEntries(t.Context(), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id, ParentId: &parent})); err != nil || reads.repliesTo.String() != parent {
-			t.Errorf("err=%v parent=%v", err, reads.repliesTo)
+		parent := known.String()
+		if _, err := h.ListForumEntries(t.Context(), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id, ParentId: &parent})); err != nil || reads.repliesTo != known || reads.repliesStore != 5 {
+			t.Errorf("err=%v parent=%v store=%d", err, reads.repliesTo, reads.repliesStore)
 		}
-		reads.forumReply = social.ForumPage{Entries: []social.ForumEntry{entry(6, social.CommentVisible, 8)}}
-		if _, err := h.ListForumEntries(t.Context(), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id, ParentId: &parent})); codeOf(t, err) != connect.CodeNotFound {
-			t.Errorf("別家店的父留言：%v，預期 not_found", err)
+	})
+	t.Run("回覆：父留言不存在或屬於別家店是 not_found，即使頁面是空的", func(t *testing.T) {
+		known := uuid.New()
+		reads := &fakeReads{forumParents: map[uuid.UUID]int64{known: 6}}
+		h := newPublic(t, reads, fakeBuyers{}, &fakeStores{})
+		for name, parent := range map[string]string{"不存在": uuid.New().String(), "別家店的": known.String()} {
+			if _, err := h.ListForumEntries(t.Context(), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id, ParentId: &parent})); codeOf(t, err) != connect.CodeNotFound {
+				t.Errorf("%s父留言：%v，預期 not_found", name, err)
+			}
+		}
+	})
+	t.Run("空頁不查店家與封鎖", func(t *testing.T) {
+		stores := &fakeStores{}
+		h := newPublic(t, &fakeReads{}, fakeBuyers{id: 7}, stores)
+		if _, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id})); err != nil || len(stores.asked) != 0 {
+			t.Errorf("err=%v asked=%v", err, stores.asked)
 		}
 	})
 	t.Run("格式與 token", func(t *testing.T) {

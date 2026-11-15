@@ -101,10 +101,7 @@ func (h *Reports) callerBuyer(ctx context.Context) (accountID, buyerID int64, er
 		return 0, 0, errNoPrincipal
 	}
 	buyerID, err = h.buyers.CurrentBuyerID(ctx, p.ID)
-	if apperr.KindOf(err) == apperr.KindNotFound {
-		return 0, 0, fmt.Errorf("httpapi/seller：存活的帳號 %d 沒有現任買家（不變量被破壞）", p.ID)
-	}
-	return p.ID, buyerID, err
+	return p.ID, buyerID, rpc.BuyerInvariant(p.ID, err)
 }
 
 func toMyReport(r model.Report) *pb.MyReport {

@@ -1123,7 +1123,7 @@ func (x *SuggestTagsResponse) GetTags() []*TagCount {
 	return nil
 }
 
-type ListTrendingTagsRequest struct {
+type SuggestTrendingTagsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 時間窗的起點（含）；不設是 end_time 往前 30 天。
 	StartTime *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
@@ -1135,20 +1135,20 @@ type ListTrendingTagsRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListTrendingTagsRequest) Reset() {
-	*x = ListTrendingTagsRequest{}
+func (x *SuggestTrendingTagsRequest) Reset() {
+	*x = SuggestTrendingTagsRequest{}
 	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListTrendingTagsRequest) String() string {
+func (x *SuggestTrendingTagsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListTrendingTagsRequest) ProtoMessage() {}
+func (*SuggestTrendingTagsRequest) ProtoMessage() {}
 
-func (x *ListTrendingTagsRequest) ProtoReflect() protoreflect.Message {
+func (x *SuggestTrendingTagsRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1160,53 +1160,53 @@ func (x *ListTrendingTagsRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListTrendingTagsRequest.ProtoReflect.Descriptor instead.
-func (*ListTrendingTagsRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use SuggestTrendingTagsRequest.ProtoReflect.Descriptor instead.
+func (*SuggestTrendingTagsRequest) Descriptor() ([]byte, []int) {
 	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{14}
 }
 
-func (x *ListTrendingTagsRequest) GetStartTime() *timestamppb.Timestamp {
+func (x *SuggestTrendingTagsRequest) GetStartTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.StartTime
 	}
 	return nil
 }
 
-func (x *ListTrendingTagsRequest) GetEndTime() *timestamppb.Timestamp {
+func (x *SuggestTrendingTagsRequest) GetEndTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.EndTime
 	}
 	return nil
 }
 
-func (x *ListTrendingTagsRequest) GetMaxResults() int32 {
+func (x *SuggestTrendingTagsRequest) GetMaxResults() int32 {
 	if x != nil {
 		return x.MaxResults
 	}
 	return 0
 }
 
-type ListTrendingTagsResponse struct {
+type SuggestTrendingTagsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Tags          []*TagCount            `protobuf:"bytes,1,rep,name=tags,proto3" json:"tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListTrendingTagsResponse) Reset() {
-	*x = ListTrendingTagsResponse{}
+func (x *SuggestTrendingTagsResponse) Reset() {
+	*x = SuggestTrendingTagsResponse{}
 	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListTrendingTagsResponse) String() string {
+func (x *SuggestTrendingTagsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListTrendingTagsResponse) ProtoMessage() {}
+func (*SuggestTrendingTagsResponse) ProtoMessage() {}
 
-func (x *ListTrendingTagsResponse) ProtoReflect() protoreflect.Message {
+func (x *SuggestTrendingTagsResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1218,12 +1218,12 @@ func (x *ListTrendingTagsResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListTrendingTagsResponse.ProtoReflect.Descriptor instead.
-func (*ListTrendingTagsResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use SuggestTrendingTagsResponse.ProtoReflect.Descriptor instead.
+func (*SuggestTrendingTagsResponse) Descriptor() ([]byte, []int) {
 	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{15}
 }
 
-func (x *ListTrendingTagsResponse) GetTags() []*TagCount {
+func (x *SuggestTrendingTagsResponse) GetTags() []*TagCount {
 	if x != nil {
 		return x.Tags
 	}
@@ -1662,14 +1662,14 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"\vmax_results\x18\x03 \x01(\x05R\n" +
 	"maxResults\"J\n" +
 	"\x13SuggestTagsResponse\x123\n" +
-	"\x04tags\x18\x01 \x03(\v2\x1f.hawkr.social.v1alpha1.TagCountR\x04tags\"\xac\x01\n" +
-	"\x17ListTrendingTagsRequest\x129\n" +
+	"\x04tags\x18\x01 \x03(\v2\x1f.hawkr.social.v1alpha1.TagCountR\x04tags\"\xaf\x01\n" +
+	"\x1aSuggestTrendingTagsRequest\x129\n" +
 	"\n" +
 	"start_time\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\tstartTime\x125\n" +
 	"\bend_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\aendTime\x12\x1f\n" +
 	"\vmax_results\x18\x03 \x01(\x05R\n" +
-	"maxResults\"O\n" +
-	"\x18ListTrendingTagsResponse\x123\n" +
+	"maxResults\"R\n" +
+	"\x1bSuggestTrendingTagsResponse\x123\n" +
 	"\x04tags\x18\x01 \x03(\v2\x1f.hawkr.social.v1alpha1.TagCountR\x04tags\"G\n" +
 	"\bTagCount\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\x12\"\n" +
@@ -1717,14 +1717,14 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"\x19COMMENT_STATE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15COMMENT_STATE_VISIBLE\x10\x01\x12\x19\n" +
 	"\x15COMMENT_STATE_DELETED\x10\x02\x12\x18\n" +
-	"\x14COMMENT_STATE_HIDDEN\x10\x032\xad\x06\n" +
+	"\x14COMMENT_STATE_HIDDEN\x10\x032\xb7\x06\n" +
 	"\x13SocialPublicService\x12]\n" +
 	"\aGetPost\x12%.hawkr.social.v1alpha1.GetPostRequest\x1a&.hawkr.social.v1alpha1.GetPostResponse\"\x03\x90\x02\x01\x12c\n" +
 	"\tListPosts\x12'.hawkr.social.v1alpha1.ListPostsRequest\x1a(.hawkr.social.v1alpha1.ListPostsResponse\"\x03\x90\x02\x01\x12l\n" +
 	"\fListComments\x12*.hawkr.social.v1alpha1.ListCommentsRequest\x1a+.hawkr.social.v1alpha1.ListCommentsResponse\"\x03\x90\x02\x01\x12\x84\x01\n" +
 	"\x14SuggestTrendingPosts\x122.hawkr.social.v1alpha1.SuggestTrendingPostsRequest\x1a3.hawkr.social.v1alpha1.SuggestTrendingPostsResponse\"\x03\x90\x02\x01\x12i\n" +
-	"\vSuggestTags\x12).hawkr.social.v1alpha1.SuggestTagsRequest\x1a*.hawkr.social.v1alpha1.SuggestTagsResponse\"\x03\x90\x02\x01\x12x\n" +
-	"\x10ListTrendingTags\x12..hawkr.social.v1alpha1.ListTrendingTagsRequest\x1a/.hawkr.social.v1alpha1.ListTrendingTagsResponse\"\x03\x90\x02\x01\x12x\n" +
+	"\vSuggestTags\x12).hawkr.social.v1alpha1.SuggestTagsRequest\x1a*.hawkr.social.v1alpha1.SuggestTagsResponse\"\x03\x90\x02\x01\x12\x81\x01\n" +
+	"\x13SuggestTrendingTags\x121.hawkr.social.v1alpha1.SuggestTrendingTagsRequest\x1a2.hawkr.social.v1alpha1.SuggestTrendingTagsResponse\"\x03\x90\x02\x01\x12x\n" +
 	"\x10ListForumEntries\x12..hawkr.social.v1alpha1.ListForumEntriesRequest\x1a/.hawkr.social.v1alpha1.ListForumEntriesResponse\"\x03\x90\x02\x01B\xfd\x01\n" +
 	"\x19com.hawkr.social.v1alpha1B\vSocialProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1;socialv1alpha1\xa2\x02\x03HSX\xaa\x02\x15Hawkr.Social.V1alpha1\xca\x02\x15Hawkr\\Social\\V1alpha1\xe2\x02!Hawkr\\Social\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Social::V1alpha1b\x06proto3"
 
@@ -1759,8 +1759,8 @@ var file_hawkr_social_v1alpha1_social_proto_goTypes = []any{
 	(*SuggestTrendingPostsResponse)(nil), // 13: hawkr.social.v1alpha1.SuggestTrendingPostsResponse
 	(*SuggestTagsRequest)(nil),           // 14: hawkr.social.v1alpha1.SuggestTagsRequest
 	(*SuggestTagsResponse)(nil),          // 15: hawkr.social.v1alpha1.SuggestTagsResponse
-	(*ListTrendingTagsRequest)(nil),      // 16: hawkr.social.v1alpha1.ListTrendingTagsRequest
-	(*ListTrendingTagsResponse)(nil),     // 17: hawkr.social.v1alpha1.ListTrendingTagsResponse
+	(*SuggestTrendingTagsRequest)(nil),   // 16: hawkr.social.v1alpha1.SuggestTrendingTagsRequest
+	(*SuggestTrendingTagsResponse)(nil),  // 17: hawkr.social.v1alpha1.SuggestTrendingTagsResponse
 	(*TagCount)(nil),                     // 18: hawkr.social.v1alpha1.TagCount
 	(*ForumEntry)(nil),                   // 19: hawkr.social.v1alpha1.ForumEntry
 	(*ListForumEntriesRequest)(nil),      // 20: hawkr.social.v1alpha1.ListForumEntriesRequest
@@ -1786,9 +1786,9 @@ var file_hawkr_social_v1alpha1_social_proto_depIdxs = []int32{
 	5,  // 13: hawkr.social.v1alpha1.ListCommentsResponse.comments:type_name -> hawkr.social.v1alpha1.Comment
 	3,  // 14: hawkr.social.v1alpha1.SuggestTrendingPostsResponse.posts:type_name -> hawkr.social.v1alpha1.Post
 	18, // 15: hawkr.social.v1alpha1.SuggestTagsResponse.tags:type_name -> hawkr.social.v1alpha1.TagCount
-	24, // 16: hawkr.social.v1alpha1.ListTrendingTagsRequest.start_time:type_name -> google.protobuf.Timestamp
-	24, // 17: hawkr.social.v1alpha1.ListTrendingTagsRequest.end_time:type_name -> google.protobuf.Timestamp
-	18, // 18: hawkr.social.v1alpha1.ListTrendingTagsResponse.tags:type_name -> hawkr.social.v1alpha1.TagCount
+	24, // 16: hawkr.social.v1alpha1.SuggestTrendingTagsRequest.start_time:type_name -> google.protobuf.Timestamp
+	24, // 17: hawkr.social.v1alpha1.SuggestTrendingTagsRequest.end_time:type_name -> google.protobuf.Timestamp
+	18, // 18: hawkr.social.v1alpha1.SuggestTrendingTagsResponse.tags:type_name -> hawkr.social.v1alpha1.TagCount
 	1,  // 19: hawkr.social.v1alpha1.ForumEntry.state:type_name -> hawkr.social.v1alpha1.CommentState
 	4,  // 20: hawkr.social.v1alpha1.ForumEntry.author:type_name -> hawkr.social.v1alpha1.Actor
 	24, // 21: hawkr.social.v1alpha1.ForumEntry.create_time:type_name -> google.protobuf.Timestamp
@@ -1799,14 +1799,14 @@ var file_hawkr_social_v1alpha1_social_proto_depIdxs = []int32{
 	10, // 26: hawkr.social.v1alpha1.SocialPublicService.ListComments:input_type -> hawkr.social.v1alpha1.ListCommentsRequest
 	12, // 27: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:input_type -> hawkr.social.v1alpha1.SuggestTrendingPostsRequest
 	14, // 28: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:input_type -> hawkr.social.v1alpha1.SuggestTagsRequest
-	16, // 29: hawkr.social.v1alpha1.SocialPublicService.ListTrendingTags:input_type -> hawkr.social.v1alpha1.ListTrendingTagsRequest
+	16, // 29: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:input_type -> hawkr.social.v1alpha1.SuggestTrendingTagsRequest
 	20, // 30: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:input_type -> hawkr.social.v1alpha1.ListForumEntriesRequest
 	7,  // 31: hawkr.social.v1alpha1.SocialPublicService.GetPost:output_type -> hawkr.social.v1alpha1.GetPostResponse
 	9,  // 32: hawkr.social.v1alpha1.SocialPublicService.ListPosts:output_type -> hawkr.social.v1alpha1.ListPostsResponse
 	11, // 33: hawkr.social.v1alpha1.SocialPublicService.ListComments:output_type -> hawkr.social.v1alpha1.ListCommentsResponse
 	13, // 34: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:output_type -> hawkr.social.v1alpha1.SuggestTrendingPostsResponse
 	15, // 35: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:output_type -> hawkr.social.v1alpha1.SuggestTagsResponse
-	17, // 36: hawkr.social.v1alpha1.SocialPublicService.ListTrendingTags:output_type -> hawkr.social.v1alpha1.ListTrendingTagsResponse
+	17, // 36: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:output_type -> hawkr.social.v1alpha1.SuggestTrendingTagsResponse
 	21, // 37: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:output_type -> hawkr.social.v1alpha1.ListForumEntriesResponse
 	31, // [31:38] is the sub-list for method output_type
 	24, // [24:31] is the sub-list for method input_type

@@ -105,17 +105,17 @@ extension type SocialPublicServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// ListTrendingTags 是熱門標籤：發布時間落在時間窗內的公開貼文上，各標籤的貼文數，多的在前。全域彙總，不依觀看者。
+  /// SuggestTrendingTags 是熱門標籤：發布時間落在時間窗內的公開貼文上，各標籤的貼文數，多的在前。全域彙總，不依觀看者。
   /// 這是只取前 max_results 名的排行榜（最多 50 名），不分頁；時間窗最長 30 天。
-  Future<hawkrsocialv1alpha1social.ListTrendingTagsResponse> listTrendingTags(
-    hawkrsocialv1alpha1social.ListTrendingTagsRequest input, {
+  Future<hawkrsocialv1alpha1social.SuggestTrendingTagsResponse> suggestTrendingTags(
+    hawkrsocialv1alpha1social.SuggestTrendingTagsRequest input, {
     connect.Headers? headers,
     connect.AbortSignal? signal,
     Function(connect.Headers)? onHeader,
     Function(connect.Headers)? onTrailer,
   }) {
     return connect.Client(_transport).unary(
-      specs.SocialPublicService.listTrendingTags,
+      specs.SocialPublicService.suggestTrendingTags,
       input,
       signal: signal,
       headers: headers,

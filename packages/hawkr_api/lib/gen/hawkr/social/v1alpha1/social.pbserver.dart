@@ -31,8 +31,8 @@ abstract class SocialPublicServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $3.SuggestTrendingPostsRequest request);
   $async.Future<$3.SuggestTagsResponse> suggestTags(
       $pb.ServerContext ctx, $3.SuggestTagsRequest request);
-  $async.Future<$3.ListTrendingTagsResponse> listTrendingTags(
-      $pb.ServerContext ctx, $3.ListTrendingTagsRequest request);
+  $async.Future<$3.SuggestTrendingTagsResponse> suggestTrendingTags(
+      $pb.ServerContext ctx, $3.SuggestTrendingTagsRequest request);
   $async.Future<$3.ListForumEntriesResponse> listForumEntries(
       $pb.ServerContext ctx, $3.ListForumEntriesRequest request);
 
@@ -48,8 +48,8 @@ abstract class SocialPublicServiceBase extends $pb.GeneratedService {
         return $3.SuggestTrendingPostsRequest();
       case 'SuggestTags':
         return $3.SuggestTagsRequest();
-      case 'ListTrendingTags':
-        return $3.ListTrendingTagsRequest();
+      case 'SuggestTrendingTags':
+        return $3.SuggestTrendingTagsRequest();
       case 'ListForumEntries':
         return $3.ListForumEntriesRequest();
       default:
@@ -71,8 +71,9 @@ abstract class SocialPublicServiceBase extends $pb.GeneratedService {
             ctx, request as $3.SuggestTrendingPostsRequest);
       case 'SuggestTags':
         return suggestTags(ctx, request as $3.SuggestTagsRequest);
-      case 'ListTrendingTags':
-        return listTrendingTags(ctx, request as $3.ListTrendingTagsRequest);
+      case 'SuggestTrendingTags':
+        return suggestTrendingTags(
+            ctx, request as $3.SuggestTrendingTagsRequest);
       case 'ListForumEntries':
         return listForumEntries(ctx, request as $3.ListForumEntriesRequest);
       default:

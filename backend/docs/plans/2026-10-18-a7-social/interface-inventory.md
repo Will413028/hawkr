@@ -42,7 +42,7 @@
 | 11 | AdminListPosts | social_client.go:201（post.go:558） | `GET /admin/posts`（`routes_admin.go:16`） | api: `SocialAdminService.ListPosts`（要在 `platform/adminperm` 加權限，目前沒有 social／moderation 權限，`rg -i 'moderat\|posts' M/platform/adminperm` 無） |
 | 12 | AdminModeratePost | social_client.go:212（post.go:603） | `PATCH /admin/posts/{id}`（`routes_admin.go:17`） | api: `moderation` 的隱藏／恢復內容；作者是店家時改成 seller 措施「內容下架」（D5′），不再直接 `HidePost` |
 | 13 | SearchHashtags | social_client.go:386（post_hashtag.go:51） | `GET /public/tags/suggest` | api: `SocialPublicService.SuggestTags` |
-| 14 | GetTrendingHashtags | social_client.go:396（post_hashtag.go:108） | `GET /public/tags/trending` | api: `SocialPublicService.ListTrendingTags` |
+| 14 | GetTrendingHashtags | social_client.go:396（post_hashtag.go:108） | `GET /public/tags/trending` | api: `SocialPublicService.SuggestTrendingTags` |
 | 15 | GetCommentList | social_client.go:234（post.go:642 `GetPostComments`）、:296（post.go:679 `GetCommentReplies`，同一支 RPC 以 parent 篩選） | `GET /public/posts/{id}/comments`、`GET /public/posts/comments/{id}/replies` | api: `SocialPublicService.ListComments`（parent 為請求欄位；帶 D4 的 `viewer_can_*`、`is_mine`） |
 | 16 | CreateComment | social_client.go:247（post.go:732 `CreatePostComment`、:788 `ReplyPostComment`） | `POST /app/posts/{id}/comments`、`POST /app/posts/comments/{id}/replies` | api: `SocialAppService.CreateComment`（回覆＝帶 parent，兩條 REST 併成一支）；身分由伺服器推導（A7-D1） |
 | 17 | UpdateComment | social_client.go:262（post.go:841） | `PUT /app/posts/comments/{id}` | api: `SocialAppService.UpdateComment`（`CapMarketing` 當店家身分） |
@@ -166,7 +166,7 @@ gateway 側身分編排（每個需要的 handler 都先打單體 legacy gRPC）
 | 12 | Post | POST /app/sellers/posts/{id}/unpublish | routes_post.go:78 | post.go:298 `UnpublishMyPost` | JWT＋`CapContentContract` | #6 | 同上 | removed: `UnpublishPost` |
 | 13 | Post | POST /app/sellers/posts/{id}/reports | routes_post.go:82 | post.go:439 `ReportPost` | JWT | #9 | `resolveModerationUserID`（:451） | removed: 併入 `SubmitReport`（路徑錯置在 `/sellers/` 下） |
 | 14 | PostHashtag | GET /public/tags/suggest | routes_post.go:21 | post_hashtag.go:35 | public | #13 | — | removed: `SuggestTags` |
-| 15 | PostHashtag | GET /public/tags/trending | routes_post.go:22 | post_hashtag.go:97 | public | #14 | — | removed: `ListTrendingTags` |
+| 15 | PostHashtag | GET /public/tags/trending | routes_post.go:22 | post_hashtag.go:97 | public | #14 | — | removed: `SuggestTrendingTags` |
 | 16 | Comment | GET /public/posts/{id}/comments | routes_post.go:40 | post.go:630 `GetPostComments` | OptionalJWT | #15 | `socialCaller`（:637） | removed: `ListComments` |
 | 17 | Comment | GET /public/posts/comments/{id}/replies | routes_post.go:41 | post.go:667 `GetCommentReplies` | OptionalJWT | #15 | `socialCaller`（:674） | removed: `ListComments`（parent 篩選） |
 | 18 | Comment | POST /app/posts/{id}/comments | routes_post.go:56 | post.go:706 `CreatePostComment` | JWT＋`injectSellerSuspension` | #16 | `socialCaller`（:727） | removed: `CreateComment` |

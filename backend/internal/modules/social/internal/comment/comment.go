@@ -293,7 +293,7 @@ func (s *Service) finish(ctx context.Context, c model.Caller, sc scope, rows []r
 	if more {
 		rows = rows[:size]
 	}
-	out := model.CommentPage{Comments: make([]model.Comment, len(rows))}
+	out := model.CommentPage{Comments: make([]model.Comment, len(rows)), StoreID: sc.post.SocialPost.StoreID}
 	ids := make([]uuid.UUID, 0, len(rows))
 	for i, r := range rows {
 		out.Comments[i] = toComment(r)
@@ -347,21 +347,22 @@ func (s *Service) ListTopLevel(ctx context.Context, c model.Caller, postID uuid.
 	return s.finish(ctx, c, sc, rows, size)
 }
 
-// ListReplies 列出頂層留言的回覆（父留言可以已刪除或被隱藏：回覆照常顯示）。規則同 ListTopLevel。
-func (s *Service) ListReplies(ctx context.Context, c model.Caller, parentID uuid.UUID, after *model.CommentCursor, size int32) (model.CommentPage, error) {
+// ListReplies 列出貼文 postID 的頂層留言 parentID 的回覆（父留言可以已刪除或被隱藏：回覆照常顯示）。
+// 父留言不存在、不是頂層或不屬於 postID 都是 NotFound，不論這一頁有沒有內容。規則同 ListTopLevel。
+func (s *Service) ListReplies(ctx context.Context, c model.Caller, postID, parentID uuid.UUID, after *model.CommentCursor, size int32) (model.CommentPage, error) {
 	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
 	if err != nil {
 		return model.CommentPage{}, err
 	}
 	q := s.q(ctx)
 	parent, err := q.GetComment(ctx, parentID)
-	if errors.Is(err, pgx.ErrNoRows) || err == nil && parent.SocialComment.ParentID != nil {
+	if errors.Is(err, pgx.ErrNoRows) || err == nil && (parent.SocialComment.ParentID != nil || parent.SocialComment.PostID != postID) {
 		return model.CommentPage{}, commentNotFound(ctx)
 	}
 	if err != nil {
 		return model.CommentPage{}, fmt.Errorf("social：讀取留言 %s：%w", parentID, err)
 	}
-	sc, err := s.scope(ctx, c, parent.SocialComment.PostID)
+	sc, err := s.scope(ctx, c, postID)
 	if err != nil {
 		return model.CommentPage{}, err
 	}

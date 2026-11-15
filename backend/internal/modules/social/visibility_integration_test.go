@@ -290,7 +290,7 @@ func TestPlaceholderForTopLevelCommentWithVisibleReplies(t *testing.T) {
 		t.Fatalf("狀態：%v", states)
 	}
 	for _, c := range page.Comments {
-		replies := mustV[social.CommentPage](t)(f.module.ListReplies(ctx, social.Caller{}, c.ID, nil, 10))
+		replies := mustV[social.CommentPage](t)(f.module.ListReplies(ctx, social.Caller{}, c.PostID, c.ID, nil, 10))
 		if len(replies.Comments) != 1 || replies.Comments[0].Body != "回覆" {
 			t.Fatalf("回覆照常顯示：%+v", replies)
 		}
@@ -302,7 +302,7 @@ func TestPlaceholderForTopLevelCommentWithVisibleReplies(t *testing.T) {
 	}
 	// 回覆也被刪掉之後，整則（含佔位項目）不再出現。
 	for _, c := range page.Comments {
-		replies := mustV[social.CommentPage](t)(f.module.ListReplies(ctx, social.Caller{}, c.ID, nil, 10))
+		replies := mustV[social.CommentPage](t)(f.module.ListReplies(ctx, social.Caller{}, c.PostID, c.ID, nil, 10))
 		must(t, f.module.DeleteComment(ctx, store, replies.Comments[0].ID))
 	}
 	if page := mustV[social.CommentPage](t)(f.module.ListComments(ctx, social.Caller{}, p.ID, nil, 10)); len(page.Comments) != 0 {

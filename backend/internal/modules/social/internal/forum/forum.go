@@ -249,15 +249,16 @@ func (s *Service) ListTopLevel(ctx context.Context, c model.Caller, storeID int6
 	return finish(rows, size), nil
 }
 
-// ListReplies 列出頂層討論區留言的回覆（父留言可以已刪除或被隱藏，但不能被觀看者的封鎖排除）。父留言不存在是空的一頁。
-func (s *Service) ListReplies(ctx context.Context, c model.Caller, parentID uuid.UUID, after *model.CommentCursor, size int32) (model.ForumPage, error) {
+// ListReplies 列出店 storeID 的頂層討論區留言 parentID 的回覆（父留言可以已刪除或被隱藏，但不能被觀看者的封鎖排除）。
+// 父留言不存在、不是頂層或不屬於 storeID 都是 NotFound，不論這一頁有沒有內容。
+func (s *Service) ListReplies(ctx context.Context, c model.Caller, storeID int64, parentID uuid.UUID, after *model.CommentCursor, size int32) (model.ForumPage, error) {
 	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
 	if err != nil {
 		return model.ForumPage{}, err
 	}
 	parent, err := s.q(ctx).GetForumEntry(ctx, parentID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return model.ForumPage{Entries: []model.ForumEntry{}}, nil
+	if errors.Is(err, pgx.ErrNoRows) || err == nil && (parent.StoreID != storeID || parent.ParentID != nil) {
+		return model.ForumPage{}, entryNotFound(ctx)
 	}
 	if err != nil {
 		return model.ForumPage{}, fmt.Errorf("social：讀取討論區留言 %s：%w", parentID, err)

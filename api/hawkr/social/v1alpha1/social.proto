@@ -47,9 +47,9 @@ service SocialPublicService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  // ListTrendingTags 是熱門標籤：發布時間落在時間窗內的公開貼文上，各標籤的貼文數，多的在前。全域彙總，不依觀看者。
+  // SuggestTrendingTags 是熱門標籤：發布時間落在時間窗內的公開貼文上，各標籤的貼文數，多的在前。全域彙總，不依觀看者。
   // 這是只取前 max_results 名的排行榜（最多 50 名），不分頁；時間窗最長 30 天。
-  rpc ListTrendingTags(ListTrendingTagsRequest) returns (ListTrendingTagsResponse) {
+  rpc SuggestTrendingTags(SuggestTrendingTagsRequest) returns (SuggestTrendingTagsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
@@ -210,7 +210,7 @@ message SuggestTagsResponse {
   repeated TagCount tags = 1;
 }
 
-message ListTrendingTagsRequest {
+message SuggestTrendingTagsRequest {
   // 時間窗的起點（含）；不設是 end_time 往前 30 天。
   google.protobuf.Timestamp start_time = 1;
   // 時間窗的終點（不含）；不設是現在。
@@ -219,7 +219,7 @@ message ListTrendingTagsRequest {
   int32 max_results = 3;
 }
 
-message ListTrendingTagsResponse {
+message SuggestTrendingTagsResponse {
   repeated TagCount tags = 1;
 }
 

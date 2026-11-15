@@ -55,9 +55,9 @@ const (
 	// SocialPublicServiceSuggestTagsProcedure is the fully-qualified name of the SocialPublicService's
 	// SuggestTags RPC.
 	SocialPublicServiceSuggestTagsProcedure = "/hawkr.social.v1alpha1.SocialPublicService/SuggestTags"
-	// SocialPublicServiceListTrendingTagsProcedure is the fully-qualified name of the
-	// SocialPublicService's ListTrendingTags RPC.
-	SocialPublicServiceListTrendingTagsProcedure = "/hawkr.social.v1alpha1.SocialPublicService/ListTrendingTags"
+	// SocialPublicServiceSuggestTrendingTagsProcedure is the fully-qualified name of the
+	// SocialPublicService's SuggestTrendingTags RPC.
+	SocialPublicServiceSuggestTrendingTagsProcedure = "/hawkr.social.v1alpha1.SocialPublicService/SuggestTrendingTags"
 	// SocialPublicServiceListForumEntriesProcedure is the fully-qualified name of the
 	// SocialPublicService's ListForumEntries RPC.
 	SocialPublicServiceListForumEntriesProcedure = "/hawkr.social.v1alpha1.SocialPublicService/ListForumEntries"
@@ -81,9 +81,9 @@ type SocialPublicServiceClient interface {
 	SuggestTrendingPosts(context.Context, *connect.Request[v1alpha1.SuggestTrendingPostsRequest]) (*connect.Response[v1alpha1.SuggestTrendingPostsResponse], error)
 	// SuggestTags 是標籤輸入時的建議：公開貼文上名稱符合的標籤與貼文數，貼文數多的在前。全域彙總，不依觀看者。沒有分頁，最多 20 筆。
 	SuggestTags(context.Context, *connect.Request[v1alpha1.SuggestTagsRequest]) (*connect.Response[v1alpha1.SuggestTagsResponse], error)
-	// ListTrendingTags 是熱門標籤：發布時間落在時間窗內的公開貼文上，各標籤的貼文數，多的在前。全域彙總，不依觀看者。
+	// SuggestTrendingTags 是熱門標籤：發布時間落在時間窗內的公開貼文上，各標籤的貼文數，多的在前。全域彙總，不依觀看者。
 	// 這是只取前 max_results 名的排行榜（最多 50 名），不分頁；時間窗最長 30 天。
-	ListTrendingTags(context.Context, *connect.Request[v1alpha1.ListTrendingTagsRequest]) (*connect.Response[v1alpha1.ListTrendingTagsResponse], error)
+	SuggestTrendingTags(context.Context, *connect.Request[v1alpha1.SuggestTrendingTagsRequest]) (*connect.Response[v1alpha1.SuggestTrendingTagsResponse], error)
 	// ListForumEntries 列出店家討論區的頂層留言，或某則頂層留言的回覆，依建立時間舊到新。刪除或隱藏而底下有可見回覆的頂層留言是佔位項目
 	// （只有 id、store_id、create_time、reply_count 與 state）；觀看者封鎖了這家店、或與作者任一方向有個人封鎖時，對應的內容不出現，
 	// 該頁因此可以少於 page_size。店家讀不到時是空的一頁；指定的 parent_id 不屬於這家店回 not_found。
@@ -136,10 +136,10 @@ func NewSocialPublicServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
-		listTrendingTags: connect.NewClient[v1alpha1.ListTrendingTagsRequest, v1alpha1.ListTrendingTagsResponse](
+		suggestTrendingTags: connect.NewClient[v1alpha1.SuggestTrendingTagsRequest, v1alpha1.SuggestTrendingTagsResponse](
 			httpClient,
-			baseURL+SocialPublicServiceListTrendingTagsProcedure,
-			connect.WithSchema(socialPublicServiceMethods.ByName("ListTrendingTags")),
+			baseURL+SocialPublicServiceSuggestTrendingTagsProcedure,
+			connect.WithSchema(socialPublicServiceMethods.ByName("SuggestTrendingTags")),
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
@@ -160,7 +160,7 @@ type socialPublicServiceClient struct {
 	listComments         *connect.Client[v1alpha1.ListCommentsRequest, v1alpha1.ListCommentsResponse]
 	suggestTrendingPosts *connect.Client[v1alpha1.SuggestTrendingPostsRequest, v1alpha1.SuggestTrendingPostsResponse]
 	suggestTags          *connect.Client[v1alpha1.SuggestTagsRequest, v1alpha1.SuggestTagsResponse]
-	listTrendingTags     *connect.Client[v1alpha1.ListTrendingTagsRequest, v1alpha1.ListTrendingTagsResponse]
+	suggestTrendingTags  *connect.Client[v1alpha1.SuggestTrendingTagsRequest, v1alpha1.SuggestTrendingTagsResponse]
 	listForumEntries     *connect.Client[v1alpha1.ListForumEntriesRequest, v1alpha1.ListForumEntriesResponse]
 }
 
@@ -189,9 +189,9 @@ func (c *socialPublicServiceClient) SuggestTags(ctx context.Context, req *connec
 	return c.suggestTags.CallUnary(ctx, req)
 }
 
-// ListTrendingTags calls hawkr.social.v1alpha1.SocialPublicService.ListTrendingTags.
-func (c *socialPublicServiceClient) ListTrendingTags(ctx context.Context, req *connect.Request[v1alpha1.ListTrendingTagsRequest]) (*connect.Response[v1alpha1.ListTrendingTagsResponse], error) {
-	return c.listTrendingTags.CallUnary(ctx, req)
+// SuggestTrendingTags calls hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags.
+func (c *socialPublicServiceClient) SuggestTrendingTags(ctx context.Context, req *connect.Request[v1alpha1.SuggestTrendingTagsRequest]) (*connect.Response[v1alpha1.SuggestTrendingTagsResponse], error) {
+	return c.suggestTrendingTags.CallUnary(ctx, req)
 }
 
 // ListForumEntries calls hawkr.social.v1alpha1.SocialPublicService.ListForumEntries.
@@ -218,9 +218,9 @@ type SocialPublicServiceHandler interface {
 	SuggestTrendingPosts(context.Context, *connect.Request[v1alpha1.SuggestTrendingPostsRequest]) (*connect.Response[v1alpha1.SuggestTrendingPostsResponse], error)
 	// SuggestTags 是標籤輸入時的建議：公開貼文上名稱符合的標籤與貼文數，貼文數多的在前。全域彙總，不依觀看者。沒有分頁，最多 20 筆。
 	SuggestTags(context.Context, *connect.Request[v1alpha1.SuggestTagsRequest]) (*connect.Response[v1alpha1.SuggestTagsResponse], error)
-	// ListTrendingTags 是熱門標籤：發布時間落在時間窗內的公開貼文上，各標籤的貼文數，多的在前。全域彙總，不依觀看者。
+	// SuggestTrendingTags 是熱門標籤：發布時間落在時間窗內的公開貼文上，各標籤的貼文數，多的在前。全域彙總，不依觀看者。
 	// 這是只取前 max_results 名的排行榜（最多 50 名），不分頁；時間窗最長 30 天。
-	ListTrendingTags(context.Context, *connect.Request[v1alpha1.ListTrendingTagsRequest]) (*connect.Response[v1alpha1.ListTrendingTagsResponse], error)
+	SuggestTrendingTags(context.Context, *connect.Request[v1alpha1.SuggestTrendingTagsRequest]) (*connect.Response[v1alpha1.SuggestTrendingTagsResponse], error)
 	// ListForumEntries 列出店家討論區的頂層留言，或某則頂層留言的回覆，依建立時間舊到新。刪除或隱藏而底下有可見回覆的頂層留言是佔位項目
 	// （只有 id、store_id、create_time、reply_count 與 state）；觀看者封鎖了這家店、或與作者任一方向有個人封鎖時，對應的內容不出現，
 	// 該頁因此可以少於 page_size。店家讀不到時是空的一頁；指定的 parent_id 不屬於這家店回 not_found。
@@ -269,10 +269,10 @@ func NewSocialPublicServiceHandler(svc SocialPublicServiceHandler, opts ...conne
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
-	socialPublicServiceListTrendingTagsHandler := connect.NewUnaryHandler(
-		SocialPublicServiceListTrendingTagsProcedure,
-		svc.ListTrendingTags,
-		connect.WithSchema(socialPublicServiceMethods.ByName("ListTrendingTags")),
+	socialPublicServiceSuggestTrendingTagsHandler := connect.NewUnaryHandler(
+		SocialPublicServiceSuggestTrendingTagsProcedure,
+		svc.SuggestTrendingTags,
+		connect.WithSchema(socialPublicServiceMethods.ByName("SuggestTrendingTags")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
@@ -295,8 +295,8 @@ func NewSocialPublicServiceHandler(svc SocialPublicServiceHandler, opts ...conne
 			socialPublicServiceSuggestTrendingPostsHandler.ServeHTTP(w, r)
 		case SocialPublicServiceSuggestTagsProcedure:
 			socialPublicServiceSuggestTagsHandler.ServeHTTP(w, r)
-		case SocialPublicServiceListTrendingTagsProcedure:
-			socialPublicServiceListTrendingTagsHandler.ServeHTTP(w, r)
+		case SocialPublicServiceSuggestTrendingTagsProcedure:
+			socialPublicServiceSuggestTrendingTagsHandler.ServeHTTP(w, r)
 		case SocialPublicServiceListForumEntriesProcedure:
 			socialPublicServiceListForumEntriesHandler.ServeHTTP(w, r)
 		default:
@@ -328,8 +328,8 @@ func (UnimplementedSocialPublicServiceHandler) SuggestTags(context.Context, *con
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialPublicService.SuggestTags is not implemented"))
 }
 
-func (UnimplementedSocialPublicServiceHandler) ListTrendingTags(context.Context, *connect.Request[v1alpha1.ListTrendingTagsRequest]) (*connect.Response[v1alpha1.ListTrendingTagsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialPublicService.ListTrendingTags is not implemented"))
+func (UnimplementedSocialPublicServiceHandler) SuggestTrendingTags(context.Context, *connect.Request[v1alpha1.SuggestTrendingTagsRequest]) (*connect.Response[v1alpha1.SuggestTrendingTagsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags is not implemented"))
 }
 
 func (UnimplementedSocialPublicServiceHandler) ListForumEntries(context.Context, *connect.Request[v1alpha1.ListForumEntriesRequest]) (*connect.Response[v1alpha1.ListForumEntriesResponse], error) {

@@ -242,7 +242,7 @@ func TestBuyerPurgeScrubsBodiesAndKeepsTombstones(t *testing.T) {
 	if placeholder == nil || placeholder.State != social.CommentDeleted || placeholder.Body != "" || placeholder.Actor.ID != 0 {
 		t.Fatalf("有店家回覆的頂層留言是佔位項目：%+v", placeholder)
 	}
-	replies := mustV[social.CommentPage](t)(f.module.ListReplies(ctx, social.Caller{}, top.ID, nil, 10))
+	replies := mustV[social.CommentPage](t)(f.module.ListReplies(ctx, social.Caller{}, top.PostID, top.ID, nil, 10))
 	if len(replies.Comments) != 1 || replies.Comments[0].Body != "店家的回覆" {
 		t.Fatalf("佔位項目底下的回覆還在：%+v", replies.Comments)
 	}

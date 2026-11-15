@@ -24,6 +24,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/comment"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/engage"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/forum"
+	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/hashtag"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/post"
@@ -385,6 +386,12 @@ func (m *Module) ListHashtagPosts(ctx context.Context, c Caller, tag string, aft
 	return m.post.ListByHashtag(ctx, c, tag, after, size)
 }
 
+// NormalizeHashtag 回傳標籤輸入正規化後的名稱（去頭尾空白與開頭的 #、ASCII 小寫）；輸入是空的或只剩 # 時 ok 為假。
+func NormalizeHashtag(raw string) (name string, ok bool) {
+	name, _, ok = hashtag.Normalize(raw)
+	return name, ok
+}
+
 // ListOwnPosts 是店主自己的貼文（含草稿與下架）；status 為空字串不篩選。
 func (m *Module) ListOwnPosts(ctx context.Context, storeID int64, status PostStatus, after *OwnPostCursor, size int32) (OwnPostPage, error) {
 	return m.post.ListOwn(ctx, storeID, status, after, size)
@@ -426,9 +433,9 @@ func (m *Module) ListComments(ctx context.Context, c Caller, postID uuid.UUID, a
 	return m.comment.ListTopLevel(ctx, c, postID, after, size)
 }
 
-// ListReplies 列出頂層留言的回覆。
-func (m *Module) ListReplies(ctx context.Context, c Caller, parentID uuid.UUID, after *CommentCursor, size int32) (CommentPage, error) {
-	return m.comment.ListReplies(ctx, c, parentID, after, size)
+// ListReplies 列出貼文 postID 的頂層留言 parentID 的回覆；父留言不存在或不屬於該貼文是 NotFound。
+func (m *Module) ListReplies(ctx context.Context, c Caller, postID, parentID uuid.UUID, after *CommentCursor, size int32) (CommentPage, error) {
+	return m.comment.ListReplies(ctx, c, postID, parentID, after, size)
 }
 
 // CreateForumEntry 在店家的討論區新增留言或回覆。
@@ -451,9 +458,9 @@ func (m *Module) ListForumEntries(ctx context.Context, c Caller, storeID int64, 
 	return m.forum.ListTopLevel(ctx, c, storeID, after, size)
 }
 
-// ListForumReplies 列出頂層討論區留言的回覆。
-func (m *Module) ListForumReplies(ctx context.Context, c Caller, parentID uuid.UUID, after *CommentCursor, size int32) (ForumPage, error) {
-	return m.forum.ListReplies(ctx, c, parentID, after, size)
+// ListForumReplies 列出店 storeID 的頂層討論區留言 parentID 的回覆；父留言不存在或不屬於該店是 NotFound。
+func (m *Module) ListForumReplies(ctx context.Context, c Caller, storeID int64, parentID uuid.UUID, after *CommentCursor, size int32) (ForumPage, error) {
+	return m.forum.ListReplies(ctx, c, storeID, parentID, after, size)
 }
 
 // LikePost 對公開可讀的貼文按讚（買家）；已經按過回 false。

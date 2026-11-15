@@ -218,6 +218,8 @@ type CommentCursor struct {
 type CommentPage struct {
 	Comments []Comment
 	Next     *CommentCursor
+	// StoreID 是貼文所屬的店。
+	StoreID int64
 }
 
 // CommentInput 是新增留言或回覆。ParentID 為 nil 是頂層留言；回覆的父一律壓成頂層，ReplyToID 是被回覆的那一則（同篇、可見）。
