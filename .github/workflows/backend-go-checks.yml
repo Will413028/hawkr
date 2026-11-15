@@ -27,6 +27,11 @@ on:
       - '!backend/internal/**'
       - '!backend/go.mod'
       - '!backend/go.sum'
+      # 排除之後再收回：notification-service 的 relay_routes_test 讀 relay 原始碼與 topology.yaml，
+      # 它們變動時要重跑（路徑規則後者勝）。
+      - 'backend/internal/legacy/sellerrelay/relay.go'
+      - 'backend/internal/legacy/buyerrelay/relay.go'
+      - 'backend/infra/mq/topology/topology.yaml'
   push:
     branches: [main, dev]
     paths: *go_paths
