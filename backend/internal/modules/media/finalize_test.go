@@ -132,6 +132,22 @@ func TestFakeRejectsCallerBugsLikeTheRealClient(t *testing.T) {
 	}
 }
 
+// 規格 §2：同一個 token 重複轉正回同一個資產（Finalize 冪等），呼叫方靠它重試而不加鎖。
+func TestFakeFinalizeIsIdempotentForTheSameToken(t *testing.T) {
+	f := media.NewFake()
+	u := media.Uploader{ID: 1}
+	first, err := f.Finalize(context.Background(), u, "tok", media.RefTypePost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		again, err := f.Finalize(context.Background(), u, "tok", media.RefTypePost)
+		if err != nil || again != first {
+			t.Fatalf("重複轉正 = %+v、%v，預期 %+v", again, err, first)
+		}
+	}
+}
+
 // refTypes 是 ref_type.go（生成檔）常數的全集：生成檔增減常數時，CheckFinalizeArgs 的封閉集合要跟著改。
 func TestRefTypesMatchTheGeneratedConstants(t *testing.T) {
 	file, err := parser.ParseFile(token.NewFileSet(), "ref_type.go", nil, 0)

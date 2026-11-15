@@ -4,10 +4,12 @@
 package post
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 	"uuid"
 
@@ -90,6 +92,16 @@ func checkPublishable(ctx context.Context, body string, hasImage bool) error {
 	return nil
 }
 
+// requirePublishable 是 checkPublishable 的狀態版：貼文（不是這次請求的輸入）不符公開要件，發布與排程時回 FailedPrecondition；
+// 補齊內文或圖片之後才能成功。請求自己帶的輸入不符（建立並發布、編輯已發布的貼文）仍是 checkPublishable 的 InvalidInput。
+func requirePublishable(ctx context.Context, body string, hasImage bool) error {
+	err := checkPublishable(ctx, body, hasImage)
+	if err == nil {
+		return nil
+	}
+	return apperr.FailedPrecondition("%s", err.Error())
+}
+
 func (s *Service) verifyProduct(ctx context.Context, productID *int64, storeID int64) error {
 	if productID == nil {
 		return nil
@@ -156,7 +168,7 @@ func (s *Service) publishedEvent(ctx context.Context, p store.SocialPost, now ti
 // publishLocked 是貼文轉為 PUBLISHED 唯一的路徑（手動發布與排程到點共用）：貼文列已鎖，公開要件在這裡檢查，之後寫狀態、發 PostPublished、排快取失效。
 // 呼叫方負責先處理這篇貼文的待發布排程（手動發布取消它，到點發布把它轉 PUBLISHED）。
 func (s *Service) publishLocked(ctx context.Context, q *store.Queries, row store.SocialPost, now time.Time, origin model.PostOrigin, sc store.SocialPostSchedule) error {
-	if err := checkPublishable(ctx, row.Body, row.ImageKey != nil); err != nil {
+	if err := requirePublishable(ctx, row.Body, row.ImageKey != nil); err != nil {
 		return err
 	}
 	upd, err := q.SetPostStatus(ctx, store.SetPostStatusParams{ID: row.ID, Status: string(model.StatusPublished), Now: now, ExpectedVersion: row.Version})
@@ -190,6 +202,17 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 			return model.Post{}, err
 		}
 	}
+	var hash []byte
+	if in.RequestID != nil {
+		hash = model.RequestHash("post", body, in.ImageToken, model.OptionalInt(in.ProductID), tagsKey(tags), fmt.Sprint(in.Publish))
+		row, ok, err := s.replay(ctx, s.q(ctx), st.StoreID, in.RequestID, hash)
+		if err != nil {
+			return model.Post{}, err
+		}
+		if ok {
+			return s.Own(ctx, st.StoreID, row.ID)
+		}
+	}
 	if err := s.verifyProduct(ctx, in.ProductID, st.StoreID); err != nil {
 		return model.Post{}, err
 	}
@@ -200,19 +223,32 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 	id := s.d.NewID()
 	ref := mediaref.PostRef(id)
 	now := s.d.Now().UTC()
-	params := store.InsertPostParams{ID: id, StoreID: st.StoreID, Body: body, ProductID: in.ProductID, Status: string(model.StatusDraft), Now: now}
+	params := store.InsertPostParams{ID: id, StoreID: st.StoreID, Body: body, ProductID: in.ProductID, Status: string(model.StatusDraft), Now: now, RequestID: in.RequestID, RequestHash: hash}
 	if in.Publish {
 		params.Status, params.PublishedAt = string(model.StatusPublished), &now
 	}
 	if asset != nil {
 		params.ImageKey, params.ImageAssetID = &asset.ObjectKey, &asset.ID
 	}
+	var out model.Post
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		if err := mediaref.Reject(ctx, q, ref, candidates(asset)...); err != nil {
 			return err
 		}
 		row, err := q.InsertPost(ctx, params)
+		if errors.Is(err, pgx.ErrNoRows) {
+			// 同一家店的同一個 request_id 在上面的查詢之後才出現（並行的重送）：INSERT 等到對方 commit 才回 0 列，這時讀得到它；不發事件、不動圖片引用。
+			existing, ok, rerr := s.replay(ctx, q, st.StoreID, in.RequestID, hash)
+			if rerr != nil {
+				return rerr
+			}
+			if !ok {
+				return fmt.Errorf("social：貼文的 request_id %s 衝突，卻查不到原本那一篇", in.RequestID)
+			}
+			out, err = s.Own(ctx, st.StoreID, existing.ID)
+			return err
+		}
 		if err != nil {
 			return fmt.Errorf("social：新增貼文：%w", err)
 		}
@@ -228,14 +264,44 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 			if err := s.publishedEvent(ctx, row, now, model.OriginDirect, store.SocialPostSchedule{}); err != nil {
 				return err
 			}
-			return s.d.Cache.BustPost(ctx, id, st.StoreID)
+			if err := s.d.Cache.BustPost(ctx, id, st.StoreID); err != nil {
+				return err
+			}
 		}
-		return nil
+		out, err = s.Own(ctx, st.StoreID, id)
+		return err
 	})
 	if err != nil {
 		return model.Post{}, err
 	}
-	return s.Own(ctx, st.StoreID, id)
+	return out, nil
+}
+
+// tagsKey 是標籤集合進 RequestHash 的編碼：依輸入順序，名稱與顯示形式都算（顯示形式是使用者看得到的內容）。
+func tagsKey(tags []hashtag.Tag) string {
+	var b strings.Builder
+	for _, t := range tags {
+		fmt.Fprintf(&b, "%d:%s|%d:%s;", len(t.Name), t.Name, len(t.Display), t.Display)
+	}
+	return b.String()
+}
+
+// replay 查 (店家, request_id)：命中且內容相同回傳那一篇；內容不同是 InvalidInput；沒帶 request_id 或沒命中回 false。
+func (s *Service) replay(ctx context.Context, q *store.Queries, storeID int64, requestID *uuid.UUID, hash []byte) (store.SocialPost, bool, error) {
+	if requestID == nil {
+		return store.SocialPost{}, false, nil
+	}
+	row, err := q.PostByRequest(ctx, store.PostByRequestParams{StoreID: storeID, RequestID: requestID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return store.SocialPost{}, false, nil
+	}
+	if err != nil {
+		return store.SocialPost{}, false, fmt.Errorf("social：讀取貼文的 request_id %s：%w", requestID, err)
+	}
+	if !bytes.Equal(row.RequestHash, hash) {
+		return store.SocialPost{}, false, apperr.InvalidInputOn([]string{"RequestID"}, "%s", text.RequestIdReused(uitext.LocaleFrom(ctx)))
+	}
+	return row, true, nil
 }
 
 // lockOwned 鎖住貼文並確認屬於這家店；別家的貼文與不存在一樣回 NotFound。
@@ -258,10 +324,15 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 	if in.Version <= 0 {
 		return model.Post{}, apperr.InvalidInput("%s", text.PostUpdateEtagRequired(uitext.LocaleFrom(ctx)))
 	}
-	body, err := textcheck.Body(uitext.LocaleFrom(ctx), "Body", textcheck.PostBody, in.Body, model.MaxPostBodyRunes, false)
-	if err != nil {
-		return model.Post{}, err
+	var newBody *string
+	if in.Body != nil {
+		b, err := textcheck.Body(uitext.LocaleFrom(ctx), "Body", textcheck.PostBody, *in.Body, model.MaxPostBodyRunes, false)
+		if err != nil {
+			return model.Post{}, err
+		}
+		newBody = &b
 	}
+	var err error
 	var tags []hashtag.Tag
 	if in.Hashtags != nil {
 		if tags, err = hashtag.RequireSet(uitext.LocaleFrom(ctx), *in.Hashtags); err != nil {
@@ -271,15 +342,10 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 	if in.ClearImage && in.ImageToken != "" {
 		return model.Post{}, apperr.InvalidInputOn([]string{"ClearImage"}, "%s", text.PostImageReplaceAndClear(uitext.LocaleFrom(ctx)))
 	}
-	cur, err := s.Own(ctx, st.StoreID, in.PostID)
-	if err != nil {
-		return model.Post{}, err
-	}
-	if cur.Version != in.Version {
-		return model.Post{}, versionConflict(ctx)
-	}
-	if err := s.verifyProduct(ctx, in.ProductID, st.StoreID); err != nil {
-		return model.Post{}, err
+	if in.SetProduct {
+		if err := s.verifyProduct(ctx, in.ProductID, st.StoreID); err != nil {
+			return model.Post{}, err
+		}
 	}
 	asset, err := s.finalizeImage(ctx, st, in.ImageToken)
 	if err != nil {
@@ -287,6 +353,7 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 	}
 	ref := mediaref.PostRef(in.PostID)
 	now := s.d.Now().UTC()
+	var out model.Post
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		row, err := s.lockOwned(ctx, q, st.StoreID, in.PostID)
@@ -295,6 +362,16 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 		}
 		if err := mediaref.Reject(ctx, q, ref, candidates(asset)...); err != nil {
 			return err
+		}
+		if row.Version != in.Version {
+			return versionConflict(ctx)
+		}
+		body, productID := row.Body, row.ProductID
+		if newBody != nil {
+			body = *newBody
+		}
+		if in.SetProduct {
+			productID = in.ProductID
 		}
 		hasImage := row.ImageKey != nil && !in.ClearImage || asset != nil
 		scheduled, err := s.hasPendingSchedule(ctx, q, in.PostID)
@@ -306,7 +383,7 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 				return err
 			}
 		}
-		params := store.UpdatePostParams{ID: in.PostID, Body: body, ProductID: in.ProductID, ClearImage: in.ClearImage, Now: now, ExpectedVersion: in.Version}
+		params := store.UpdatePostParams{ID: in.PostID, Body: body, ProductID: productID, ClearImage: in.ClearImage, Now: now, ExpectedVersion: in.Version}
 		if asset != nil {
 			params.NewImageKey, params.NewImageAssetID = &asset.ObjectKey, &asset.ID
 		}
@@ -332,14 +409,17 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 			}
 		}
 		if upd.Status == string(model.StatusPublished) {
-			return s.d.Cache.BustPost(ctx, in.PostID, st.StoreID)
+			if err := s.d.Cache.BustPost(ctx, in.PostID, st.StoreID); err != nil {
+				return err
+			}
 		}
-		return nil
+		out, err = s.Own(ctx, st.StoreID, in.PostID)
+		return err
 	})
 	if err != nil {
 		return model.Post{}, err
 	}
-	return s.Own(ctx, st.StoreID, in.PostID)
+	return out, nil
 }
 
 // Publish 發布貼文（草稿或下架的貼文轉為 PUBLISHED）。published_at 固定在第一次發布（動態牆的順序不能靠下架再發布來洗：

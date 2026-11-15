@@ -16,7 +16,7 @@ const bumpPostVersion = `-- name: BumpPostVersion :one
 UPDATE social.posts
 SET version = version + 1, updated_at = $1
 WHERE id = $2 AND deleted_at IS NULL AND version = $3
-RETURNING id, store_id, body, image_key, image_asset_id, product_id, status, published_at, version, created_at, updated_at, deleted_at
+RETURNING id, store_id, body, image_key, image_asset_id, product_id, status, published_at, version, created_at, updated_at, deleted_at, request_id, request_hash
 `
 
 type BumpPostVersionParams struct {
@@ -42,6 +42,8 @@ func (q *Queries) BumpPostVersion(ctx context.Context, arg BumpPostVersionParams
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.RequestID,
+		&i.RequestHash,
 	)
 	return i, err
 }
@@ -63,6 +65,36 @@ func (q *Queries) BumpPostVersions(ctx context.Context, arg BumpPostVersionsPara
 	return err
 }
 
+const countStorePostsByStatus = `-- name: CountStorePostsByStatus :many
+SELECT status, count(*)::bigint AS posts FROM social.posts WHERE store_id = $1 AND deleted_at IS NULL GROUP BY status
+`
+
+type CountStorePostsByStatusRow struct {
+	Status string
+	Posts  int64
+}
+
+// 店家的貼文依狀態的篇數（不含已刪除）；沒有貼文的狀態沒有列，呼叫方補 0。
+func (q *Queries) CountStorePostsByStatus(ctx context.Context, storeID int64) ([]CountStorePostsByStatusRow, error) {
+	rows, err := q.db.Query(ctx, countStorePostsByStatus, storeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountStorePostsByStatusRow{}
+	for rows.Next() {
+		var i CountStorePostsByStatusRow
+		if err := rows.Scan(&i.Status, &i.Posts); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deletePostHashtags = `-- name: DeletePostHashtags :exec
 DELETE FROM social.post_hashtags WHERE post_id = $1
 `
@@ -74,7 +106,7 @@ func (q *Queries) DeletePostHashtags(ctx context.Context, postID uuid.UUID) erro
 }
 
 const getPost = `-- name: GetPost :one
-SELECT p.id, p.store_id, p.body, p.image_key, p.image_asset_id, p.product_id, p.status, p.published_at, p.version, p.created_at, p.updated_at, p.deleted_at, s.post_id, s.like_count, s.comment_count, s.view_count, s.share_count
+SELECT p.id, p.store_id, p.body, p.image_key, p.image_asset_id, p.product_id, p.status, p.published_at, p.version, p.created_at, p.updated_at, p.deleted_at, p.request_id, p.request_hash, s.post_id, s.like_count, s.comment_count, s.view_count, s.share_count
 FROM social.posts p
 JOIN social.post_stats s ON s.post_id = p.id
 WHERE p.id = $1 AND p.deleted_at IS NULL
@@ -102,6 +134,8 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 		&i.SocialPost.CreatedAt,
 		&i.SocialPost.UpdatedAt,
 		&i.SocialPost.DeletedAt,
+		&i.SocialPost.RequestID,
+		&i.SocialPost.RequestHash,
 		&i.SocialPostStat.PostID,
 		&i.SocialPostStat.LikeCount,
 		&i.SocialPostStat.CommentCount,
@@ -113,12 +147,13 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 
 const insertPost = `-- name: InsertPost :one
 
-INSERT INTO social.posts (id, store_id, body, image_key, image_asset_id, product_id, status, published_at, created_at, updated_at)
+INSERT INTO social.posts (id, store_id, body, image_key, image_asset_id, product_id, status, published_at, created_at, updated_at, request_id, request_hash)
 VALUES (
     $1, $2, $3, $4, $5, $6,
-    $7, $8, $9, $9
+    $7, $8, $9, $9, $10, $11
 )
-RETURNING id, store_id, body, image_key, image_asset_id, product_id, status, published_at, version, created_at, updated_at, deleted_at
+ON CONFLICT (store_id, request_id) DO NOTHING
+RETURNING id, store_id, body, image_key, image_asset_id, product_id, status, published_at, version, created_at, updated_at, deleted_at, request_id, request_hash
 `
 
 type InsertPostParams struct {
@@ -131,10 +166,13 @@ type InsertPostParams struct {
 	Status       string
 	PublishedAt  *time.Time
 	Now          time.Time
+	RequestID    *uuid.UUID
+	RequestHash  []byte
 }
 
 // 貼文的寫入與店主的讀取。帶「公開可讀」規則的讀取（單篇、動態牆、店家頁、標籤、熱門、建議）是 go-jet 建的，在 internal/reads，規則在
 // internal/visibility。
+// 同一家店的同一個 request_id 已經有時不寫入、回 0 列（不讓 transaction 失效，呼叫方接著讀原本那一篇）。
 func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (SocialPost, error) {
 	row := q.db.QueryRow(ctx, insertPost,
 		arg.ID,
@@ -146,6 +184,8 @@ func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (SocialP
 		arg.Status,
 		arg.PublishedAt,
 		arg.Now,
+		arg.RequestID,
+		arg.RequestHash,
 	)
 	var i SocialPost
 	err := row.Scan(
@@ -161,6 +201,8 @@ func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (SocialP
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.RequestID,
+		&i.RequestHash,
 	)
 	return i, err
 }
@@ -227,7 +269,7 @@ func (q *Queries) ListHashtagsOfPosts(ctx context.Context, postIds []uuid.UUID) 
 }
 
 const listOwnPosts = `-- name: ListOwnPosts :many
-SELECT p.id, p.store_id, p.body, p.image_key, p.image_asset_id, p.product_id, p.status, p.published_at, p.version, p.created_at, p.updated_at, p.deleted_at, s.post_id, s.like_count, s.comment_count, s.view_count, s.share_count
+SELECT p.id, p.store_id, p.body, p.image_key, p.image_asset_id, p.product_id, p.status, p.published_at, p.version, p.created_at, p.updated_at, p.deleted_at, p.request_id, p.request_hash, s.post_id, s.like_count, s.comment_count, s.view_count, s.share_count
 FROM social.posts p
 JOIN social.post_stats s ON s.post_id = p.id
 WHERE p.store_id = $1 AND p.deleted_at IS NULL
@@ -279,6 +321,8 @@ func (q *Queries) ListOwnPosts(ctx context.Context, arg ListOwnPostsParams) ([]L
 			&i.SocialPost.CreatedAt,
 			&i.SocialPost.UpdatedAt,
 			&i.SocialPost.DeletedAt,
+			&i.SocialPost.RequestID,
+			&i.SocialPost.RequestHash,
 			&i.SocialPostStat.PostID,
 			&i.SocialPostStat.LikeCount,
 			&i.SocialPostStat.CommentCount,
@@ -296,7 +340,7 @@ func (q *Queries) ListOwnPosts(ctx context.Context, arg ListOwnPostsParams) ([]L
 }
 
 const lockPost = `-- name: LockPost :one
-SELECT id, store_id, body, image_key, image_asset_id, product_id, status, published_at, version, created_at, updated_at, deleted_at FROM social.posts WHERE id = $1 AND deleted_at IS NULL FOR UPDATE
+SELECT id, store_id, body, image_key, image_asset_id, product_id, status, published_at, version, created_at, updated_at, deleted_at, request_id, request_hash FROM social.posts WHERE id = $1 AND deleted_at IS NULL FOR UPDATE
 `
 
 // 鎖住貼文並回傳目前的狀態與圖（換圖、刪除與狀態轉移要依它判斷）；已刪除的貼文不回。
@@ -316,6 +360,40 @@ func (q *Queries) LockPost(ctx context.Context, id uuid.UUID) (SocialPost, error
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.RequestID,
+		&i.RequestHash,
+	)
+	return i, err
+}
+
+const postByRequest = `-- name: PostByRequest :one
+SELECT id, store_id, body, image_key, image_asset_id, product_id, status, published_at, version, created_at, updated_at, deleted_at, request_id, request_hash FROM social.posts WHERE store_id = $1 AND request_id = $2
+`
+
+type PostByRequestParams struct {
+	StoreID   int64
+	RequestID *uuid.UUID
+}
+
+// 冪等重送的查詢：範圍是 (店家, request_id)；含已刪除的貼文（request_id 仍占著）。
+func (q *Queries) PostByRequest(ctx context.Context, arg PostByRequestParams) (SocialPost, error) {
+	row := q.db.QueryRow(ctx, postByRequest, arg.StoreID, arg.RequestID)
+	var i SocialPost
+	err := row.Scan(
+		&i.ID,
+		&i.StoreID,
+		&i.Body,
+		&i.ImageKey,
+		&i.ImageAssetID,
+		&i.ProductID,
+		&i.Status,
+		&i.PublishedAt,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.RequestID,
+		&i.RequestHash,
 	)
 	return i, err
 }
@@ -327,7 +405,7 @@ SET status = $1,
     version = version + 1,
     updated_at = $2
 WHERE id = $3 AND deleted_at IS NULL AND version = $4
-RETURNING id, store_id, body, image_key, image_asset_id, product_id, status, published_at, version, created_at, updated_at, deleted_at
+RETURNING id, store_id, body, image_key, image_asset_id, product_id, status, published_at, version, created_at, updated_at, deleted_at, request_id, request_hash
 `
 
 type SetPostStatusParams struct {
@@ -360,6 +438,8 @@ func (q *Queries) SetPostStatus(ctx context.Context, arg SetPostStatusParams) (S
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.RequestID,
+		&i.RequestHash,
 	)
 	return i, err
 }
@@ -394,7 +474,7 @@ SET body = $1,
     version = version + 1,
     updated_at = $6
 WHERE id = $7 AND deleted_at IS NULL AND version = $8
-RETURNING id, store_id, body, image_key, image_asset_id, product_id, status, published_at, version, created_at, updated_at, deleted_at
+RETURNING id, store_id, body, image_key, image_asset_id, product_id, status, published_at, version, created_at, updated_at, deleted_at, request_id, request_hash
 `
 
 type UpdatePostParams struct {
@@ -434,6 +514,8 @@ func (q *Queries) UpdatePost(ctx context.Context, arg UpdatePostParams) (SocialP
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.RequestID,
+		&i.RequestHash,
 	)
 	return i, err
 }

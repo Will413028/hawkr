@@ -90,10 +90,11 @@ type Schedule struct {
 	ResolvedAt   *time.Time
 }
 
-// ScheduledPost 是排程成功的結果：新的排程與貼文排程後的版本（etag）。
+// ScheduledPost 是排程成功的結果：新的排程、貼文排程後的版本（etag），以及同一個 transaction 讀到的貼文（版本已是排程後的）。
 type ScheduledPost struct {
 	Schedule    Schedule
 	PostVersion int64
+	Post        Post
 }
 
 // SchedulePostInput 是排程發布：貼文要是 DRAFT 或 UNPUBLISHED，Version 是讀取時的版本。

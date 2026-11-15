@@ -379,12 +379,12 @@ func (s *Service) scope(ctx context.Context, c model.Caller, postID uuid.UUID) (
 	return scope{post: post}, nil
 }
 
-func (s *Service) finish(ctx context.Context, c model.Caller, sc scope, rows []reads.CommentRow, size int32) (model.CommentPage, error) {
+func (s *Service) finish(ctx context.Context, c model.Caller, storeID int64, rows []reads.CommentRow, size int32) (model.CommentPage, error) {
 	more := len(rows) > int(size)
 	if more {
 		rows = rows[:size]
 	}
-	out := model.CommentPage{Comments: make([]model.Comment, len(rows)), StoreID: sc.post.SocialPost.StoreID}
+	out := model.CommentPage{Comments: make([]model.Comment, len(rows)), StoreID: storeID}
 	ids := make([]uuid.UUID, 0, len(rows))
 	for i, r := range rows {
 		out.Comments[i] = toComment(r)
@@ -392,7 +392,7 @@ func (s *Service) finish(ctx context.Context, c model.Caller, sc scope, rows []r
 			ids = append(ids, r.ID)
 		}
 	}
-	if a, ok := actor.ForViewer(c, sc.post.SocialPost.StoreID); ok && len(ids) > 0 {
+	if a, ok := actor.ForViewer(c, storeID); ok && len(ids) > 0 {
 		liked, err := s.q(ctx).CommentsLikedBy(ctx, store.CommentsLikedByParams{ActorKind: string(a.Kind), ActorID: a.ID, CommentIds: ids})
 		if err != nil {
 			return model.CommentPage{}, fmt.Errorf("social：讀取留言的讚：%w", err)
@@ -435,7 +435,40 @@ func (s *Service) ListTopLevel(ctx context.Context, c model.Caller, postID uuid.
 	if err != nil {
 		return model.CommentPage{}, fmt.Errorf("social：列出留言：%w", err)
 	}
-	return s.finish(ctx, c, sc, rows, size)
+	return s.finish(ctx, c, sc.post.SocialPost.StoreID, rows, size)
+}
+
+// ListForStore 列出店家所有貼文（任何狀態，不必公開）的頂層留言，依建立時間由舊到新的 keyset；postID 非 nil 時只列那一篇（要是本店未刪除的貼文，否則 NotFound）。
+// unreplied 為真只列「未回覆」的留言（定義見 reads.ListStoreUnrepliedComments）。店家要有 model.StoreReadCapability。
+func (s *Service) ListForStore(ctx context.Context, st seller.Store, postID *uuid.UUID, unreplied bool, after *model.CommentCursor, size int32) (model.CommentPage, error) {
+	if err := seller.Authorize(st, model.StoreReadCapability); err != nil {
+		return model.CommentPage{}, err
+	}
+	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
+	if err != nil {
+		return model.CommentPage{}, err
+	}
+	if postID != nil {
+		row, err := s.q(ctx).GetPost(ctx, *postID)
+		if errors.Is(err, pgx.ErrNoRows) || err == nil && row.SocialPost.StoreID != st.StoreID {
+			return model.CommentPage{}, postNotFound(ctx)
+		}
+		if err != nil {
+			return model.CommentPage{}, fmt.Errorf("social：讀取貼文 %s：%w", *postID, err)
+		}
+	}
+	at, id := after.Key()
+	pg := reads.CommentPage{AfterCreated: at, AfterID: id, Limit: int64(size) + 1}
+	var stmt reads.Stmt = reads.ListStoreTopLevelComments(st.StoreID, postID, pg)
+	if unreplied {
+		stmt = reads.ListStoreUnrepliedComments(st.StoreID, postID, pg)
+	}
+	rows, err := reads.Many[reads.CommentRow](ctx, s.d.DB.Conn(ctx), stmt)
+	if err != nil {
+		return model.CommentPage{}, fmt.Errorf("social：列出店家的留言：%w", err)
+	}
+	c := model.Caller{Store: &st}
+	return s.finish(ctx, c, st.StoreID, rows, size)
 }
 
 // ListReplies 列出貼文 postID 的頂層留言 parentID 的回覆（父留言可以已刪除或被隱藏：回覆照常顯示）。
@@ -469,5 +502,5 @@ func (s *Service) ListReplies(ctx context.Context, c model.Caller, postID, paren
 	if err != nil {
 		return model.CommentPage{}, fmt.Errorf("social：列出回覆：%w", err)
 	}
-	return s.finish(ctx, c, sc, rows, size)
+	return s.finish(ctx, c, sc.post.SocialPost.StoreID, rows, size)
 }

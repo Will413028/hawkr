@@ -186,19 +186,30 @@ func TestEveryDeclaredProcedureBehavesAsDeclaredForASuspendedAccount(t *testing.
 	}
 }
 
-// SocialAppService 的每支方法都是寫入，停權的帳號回 ACCOUNT_SUSPENDED、模組不被呼叫；RecordPostView 是公開方法，停權的帳號以訪客執行（計為匿名瀏覽）。
+// SocialAppService 的寫入方法，停權的帳號回 ACCOUNT_SUSPENDED、模組不被呼叫；店主的讀取方法（動作性質是讀取，A7-D18）照常放行；RecordPostView 是公開方法，停權的帳號以訪客執行（計為匿名瀏覽）。
 func TestSuspendedAccountCannotWriteSocialButViewsAsAGuest(t *testing.T) {
 	h := suspendedEntry()
 	methods := socialv1alpha1.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialAppService").Methods()
-	if methods.Len() != 11 {
+	if methods.Len() != 21 {
 		t.Fatalf("SocialAppService 有 %d 支方法", methods.Len())
 	}
+	reads := 0
 	for i := range methods.Len() {
 		proc := "/hawkr.social.v1alpha1.SocialAppService/" + string(methods.Get(i).Name())
 		rec, s := callAs(t, h, "suspended", http.MethodPost, proc)
+		if effectOf(proc) == EffectRead {
+			reads++
+			if rec.Code != http.StatusOK || !s.Called {
+				t.Errorf("%s 是讀取：%d %q called=%v，停權的帳號照常放行", proc, rec.Code, rec.Body, s.Called)
+			}
+			continue
+		}
 		if _, reason := reasonOf(t, rec.Body.Bytes()); rec.Code != http.StatusForbidden || reason != "ACCOUNT_SUSPENDED" || s.Called {
 			t.Errorf("%s：%d %q called=%v，預期 ACCOUNT_SUSPENDED", proc, rec.Code, rec.Body, s.Called)
 		}
+	}
+	if reads != 4 {
+		t.Errorf("SocialAppService 的讀取方法有 %d 支，預期 4（GetMyPost、ListMyPosts、ListStoreComments、GetStoreSocialSummary）", reads)
 	}
 	rec, s := callAs(t, h, "suspended", http.MethodPost, "/hawkr.social.v1alpha1.SocialPublicService/RecordPostView")
 	if rec.Code != http.StatusOK || !s.Called || s.Principal {

@@ -545,6 +545,13 @@
       "tsModule": "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb",
       "inCatalog": false,
       "serverOwned": false
+    },
+    {
+      "name": "hawkr.social.v1alpha1.PostStatus",
+      "tsName": "PostStatus",
+      "tsModule": "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb",
+      "inCatalog": false,
+      "serverOwned": false
     }
   ]
 }

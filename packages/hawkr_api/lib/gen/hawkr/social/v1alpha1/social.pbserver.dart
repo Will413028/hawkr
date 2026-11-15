@@ -116,6 +116,26 @@ abstract class SocialAppServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $4.UpdateForumEntryRequest request);
   $async.Future<$4.DeleteForumEntryResponse> deleteForumEntry(
       $pb.ServerContext ctx, $4.DeleteForumEntryRequest request);
+  $async.Future<$4.CreatePostResponse> createPost(
+      $pb.ServerContext ctx, $4.CreatePostRequest request);
+  $async.Future<$4.GetMyPostResponse> getMyPost(
+      $pb.ServerContext ctx, $4.GetMyPostRequest request);
+  $async.Future<$4.ListMyPostsResponse> listMyPosts(
+      $pb.ServerContext ctx, $4.ListMyPostsRequest request);
+  $async.Future<$4.UpdatePostResponse> updatePost(
+      $pb.ServerContext ctx, $4.UpdatePostRequest request);
+  $async.Future<$4.PublishPostResponse> publishPost(
+      $pb.ServerContext ctx, $4.PublishPostRequest request);
+  $async.Future<$4.UnpublishPostResponse> unpublishPost(
+      $pb.ServerContext ctx, $4.UnpublishPostRequest request);
+  $async.Future<$4.DeletePostResponse> deletePost(
+      $pb.ServerContext ctx, $4.DeletePostRequest request);
+  $async.Future<$4.SchedulePostResponse> schedulePost(
+      $pb.ServerContext ctx, $4.SchedulePostRequest request);
+  $async.Future<$4.ListStoreCommentsResponse> listStoreComments(
+      $pb.ServerContext ctx, $4.ListStoreCommentsRequest request);
+  $async.Future<$4.GetStoreSocialSummaryResponse> getStoreSocialSummary(
+      $pb.ServerContext ctx, $4.GetStoreSocialSummaryRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
@@ -141,6 +161,26 @@ abstract class SocialAppServiceBase extends $pb.GeneratedService {
         return $4.UpdateForumEntryRequest();
       case 'DeleteForumEntry':
         return $4.DeleteForumEntryRequest();
+      case 'CreatePost':
+        return $4.CreatePostRequest();
+      case 'GetMyPost':
+        return $4.GetMyPostRequest();
+      case 'ListMyPosts':
+        return $4.ListMyPostsRequest();
+      case 'UpdatePost':
+        return $4.UpdatePostRequest();
+      case 'PublishPost':
+        return $4.PublishPostRequest();
+      case 'UnpublishPost':
+        return $4.UnpublishPostRequest();
+      case 'DeletePost':
+        return $4.DeletePostRequest();
+      case 'SchedulePost':
+        return $4.SchedulePostRequest();
+      case 'ListStoreComments':
+        return $4.ListStoreCommentsRequest();
+      case 'GetStoreSocialSummary':
+        return $4.GetStoreSocialSummaryRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -171,6 +211,27 @@ abstract class SocialAppServiceBase extends $pb.GeneratedService {
         return updateForumEntry(ctx, request as $4.UpdateForumEntryRequest);
       case 'DeleteForumEntry':
         return deleteForumEntry(ctx, request as $4.DeleteForumEntryRequest);
+      case 'CreatePost':
+        return createPost(ctx, request as $4.CreatePostRequest);
+      case 'GetMyPost':
+        return getMyPost(ctx, request as $4.GetMyPostRequest);
+      case 'ListMyPosts':
+        return listMyPosts(ctx, request as $4.ListMyPostsRequest);
+      case 'UpdatePost':
+        return updatePost(ctx, request as $4.UpdatePostRequest);
+      case 'PublishPost':
+        return publishPost(ctx, request as $4.PublishPostRequest);
+      case 'UnpublishPost':
+        return unpublishPost(ctx, request as $4.UnpublishPostRequest);
+      case 'DeletePost':
+        return deletePost(ctx, request as $4.DeletePostRequest);
+      case 'SchedulePost':
+        return schedulePost(ctx, request as $4.SchedulePostRequest);
+      case 'ListStoreComments':
+        return listStoreComments(ctx, request as $4.ListStoreCommentsRequest);
+      case 'GetStoreSocialSummary':
+        return getStoreSocialSummary(
+            ctx, request as $4.GetStoreSocialSummaryRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
