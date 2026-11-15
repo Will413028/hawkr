@@ -41,12 +41,14 @@ describe("Button", () => {
 			<Button color="danger" size="lg" onClick={onClick}>
 				移除商品
 			</Button>,
+			{ theme: "dark" },
 		);
-		document.documentElement.dataset.theme = "dark";
-		await expect
-			.element(document.documentElement)
-			.toHaveAttribute("data-theme", "dark");
-		await userEvent.click(page.getByRole("button", { name: "移除商品" }));
+		const button = page.getByRole("button", { name: "移除商品" });
+		await expect.element(button).toBeVisible();
+		expect(getComputedStyle(button.element()).backgroundColor).not.toBe(
+			"rgba(0, 0, 0, 0)",
+		);
+		await userEvent.click(button);
 		expect(onClick).toHaveBeenCalledTimes(1);
 	});
 });

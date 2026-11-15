@@ -50,9 +50,14 @@ export default defineConfig({
 					exclude: [
 						"node_modules",
 						".next",
+						"output/**",
 						"**/.worktrees/**",
 						".worktrees/**",
 					],
+					env: {
+						API_BASE_URL: "http://127.0.0.1:9/api/v1",
+						NEXT_PUBLIC_API_BASE_URL: "http://127.0.0.1:9/api/v1",
+					},
 					setupFiles: ["./tests/browser/setup.ts"],
 					browser: {
 						enabled: true,

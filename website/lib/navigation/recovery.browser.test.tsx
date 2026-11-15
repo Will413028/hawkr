@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
-import Button from "@/components/ui/Button";
 import { track } from "@/lib/analytics/gtag";
 import { renderWithIntl } from "@/tests/browser/render";
 import { commitDocumentNavigation } from "./document-location";
@@ -23,6 +22,11 @@ vi.mock("@/lib/analytics/gtag", { spy: true });
 const DESTINATION = "/account/orders?status=paid#latest";
 const LOGIN_DESTINATION = "/account?from=login#profile";
 
+// 預覽元件掛上時才有監聽者；commitDocumentNavigation 的 spy 在 beforeEach 安裝、afterEach 還原。
+let documentNavigationListener:
+	| ((target: string, replace?: boolean) => void)
+	| undefined;
+
 function NavigationRecoveryPreview({
 	scenario,
 }: {
@@ -34,18 +38,17 @@ function NavigationRecoveryPreview({
 		undefined,
 	);
 	useEffect(() => {
-		const documentNavigation = vi.mocked(commitDocumentNavigation);
-		documentNavigation.mockImplementation((target, replace) => {
+		documentNavigationListener = (target, replace) => {
 			const url = new URL(target);
 			setDispatches((count) => count + 1);
 			setStatus(
 				`整頁目的地：${url.pathname}${url.search}${url.hash}（${replace ? "replace" : "push"}）`,
 			);
-		});
+		};
 		return () => {
 			clearTimeout(lateStart.current);
 			cancelNavigationIntent();
-			documentNavigation.mockRestore();
+			documentNavigationListener = undefined;
 		};
 	}, []);
 	function startNavigation() {
@@ -65,12 +68,12 @@ function NavigationRecoveryPreview({
 	}
 	return (
 		<section>
-			<Button variant="bordered" onClick={startNavigation}>
+			<button type="button" onClick={startNavigation}>
 				前往訂單頁面
-			</Button>
+			</button>
 			{scenario === "login" ? (
-				<Button
-					color="primary"
+				<button
+					type="button"
 					onClick={() =>
 						navigateDocument(LOGIN_DESTINATION, {
 							componentId: "login",
@@ -79,7 +82,7 @@ function NavigationRecoveryPreview({
 					}
 				>
 					模擬登入完成
-				</Button>
+				</button>
 			) : null}
 			<output aria-live="polite">{status}</output>
 			<p>整頁跳轉次數：{dispatches}</p>
@@ -97,6 +100,9 @@ describe("navigation recovery", () => {
 		sessionStorage.removeItem("__hk_navigation_recovery_used");
 		vi.mocked(navigationRecoveryTimeout).mockReturnValue(800);
 		vi.mocked(track).mockImplementation(() => {});
+		vi.mocked(commitDocumentNavigation).mockImplementation((target, replace) =>
+			documentNavigationListener?.(target, replace),
+		);
 		previousMotion = document.documentElement.dataset.vt;
 		document.documentElement.dataset.vt = "none";
 	});
@@ -109,6 +115,8 @@ describe("navigation recovery", () => {
 			sessionStorage.setItem("__hk_navigation_recovery_used", previousMarker);
 		vi.mocked(navigationRecoveryTimeout).mockRestore();
 		vi.mocked(track).mockRestore();
+		vi.mocked(commitDocumentNavigation).mockRestore();
+		vi.useRealTimers();
 		if (previousMotion === undefined)
 			delete document.documentElement.dataset.vt;
 		else document.documentElement.dataset.vt = previousMotion;
@@ -128,22 +136,25 @@ describe("navigation recovery", () => {
 
 	it("keeps the document when the router starts late", async () => {
 		renderWithIntl(<NavigationRecoveryPreview scenario="late-start" />);
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 		await userEvent.click(page.getByRole("button", { name: "前往訂單頁面" }));
+		await vi.advanceTimersByTimeAsync(450);
 		await expect
 			.element(page.getByRole("status"))
 			.toHaveTextContent("延遲導覽已完成");
-		await new Promise((resolve) => setTimeout(resolve, 500));
+		await vi.advanceTimersByTimeAsync(1_000);
 		await expect.element(page.getByText("整頁跳轉次數：0")).toBeVisible();
 	});
 
 	it("lets a completed login supersede a pending navigation", async () => {
 		renderWithIntl(<NavigationRecoveryPreview scenario="login" />);
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 		await userEvent.click(page.getByRole("button", { name: "前往訂單頁面" }));
 		await userEvent.click(page.getByRole("button", { name: "模擬登入完成" }));
 		await expect
 			.element(page.getByRole("status"))
 			.toHaveTextContent(`${LOGIN_DESTINATION}（push）`);
-		await new Promise((resolve) => setTimeout(resolve, 950));
+		await vi.advanceTimersByTimeAsync(1_000);
 		await expect.element(page.getByText("整頁跳轉次數：1")).toBeVisible();
 		await expect
 			.element(page.getByRole("status"))
