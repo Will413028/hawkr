@@ -112,7 +112,7 @@ func storeBlockListAndUnblock(ctx context.Context, t ch.T, d Driver) {
 		t.Fatalf("封鎖名單是空的")
 	}
 	_, err := d.SellerBlockedBuyers(ctx, ch.Buyer)
-	ch.WantKind(t, err, ch.ErrPermission)
+	wantOwnerDenied(t, d, err)
 	// 解除之後買家可以再留言。
 	for _, b := range list {
 		if !b.Deleted {

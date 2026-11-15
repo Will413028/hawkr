@@ -1,8 +1,9 @@
 // Package characterization 是 social 對外 API 的特性測試（ADR 2026-09-24-go-modular-monolith D8 的第一層
 // 安全網、ADR 2026-09-26-external-contract-protobuf-connect D4），共用的部分在 internal/httpapi/characterize。
 //
-// 情境只寫一次（scenarios_test.go），透過 Driver 操作：REST driver 經 gateway 打舊的 social-service；Connect driver
-// 打單體，在 A7-2 加上（連同 connect_test.go 與 monolith_integration_test.go，照 content 的寫法）。本步只跑舊的那一端（scripts/characterize.sh social，build tag gateway）。
+// 情境只寫一次（scenarios_test.go），透過 Driver 操作：REST driver 經 gateway 打舊的 social-service（scripts/characterize.sh social，
+// build tag gateway）；Connect driver（connect_test.go）打單體，由 monolith_integration_test.go 以 httpapi.NewHandler 組出與 production
+// 相同的 handler 執行（build tag integration）。
 //
 // 兩個 driver 的 wire 不同，情境只看業務上的結果：ID 當成不透明的字串、錯誤只比 characterize 的分類。與舊實作
 // 刻意不同的行為（計畫的 SD 編號）寫成共用的情境，舊的一端以 skipOnLegacy 跳過並附 SD 編號，單體的一端照新行為斷言。

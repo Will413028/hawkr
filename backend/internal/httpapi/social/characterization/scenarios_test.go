@@ -2,6 +2,8 @@ package characterization
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -70,6 +72,41 @@ func skipOnLegacy(t ch.T, d Driver, why string) bool {
 		s.Skipf("舊的 social-service 的行為不同：%s", why)
 	}
 	return true
+}
+
+// skipOnMonolith 在單體的一端跳過情境：單體刻意沒有這個行為的 Connect 入口。回傳 true 時情境直接結束。
+func skipOnMonolith(t ch.T, d Driver, why string) bool {
+	if d.Legacy() {
+		return false
+	}
+	if s, ok := t.(interface{ Skipf(string, ...any) }); ok {
+		s.Skipf("單體沒有對應的 Connect 入口：%s", why)
+	}
+	return true
+}
+
+// absentID 是格式正確但不存在的 ID：舊的 ID 是整數，單體的 ID 是 UUID，格式不對會先被當成 invalid_argument。
+func absentID(d Driver) string {
+	if d.Legacy() {
+		return "999999999999"
+	}
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	b[6] = b[6]&0x0f | 0x40
+	b[8] = b[8]&0x3f | 0x80
+	h := hex.EncodeToString(b)
+	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:]
+}
+
+// wantOwnerDenied 確認店主專屬方法被沒有店的帳號或別家店的賣家呼叫時的錯誤。SD26：舊的回權限不足；單體依〈API 設計規範（Connect）〉
+// 的防列舉規則回 not_found（資源的存在與否不對無權者洩漏）。
+func wantOwnerDenied(t ch.T, d Driver, err error) {
+	t.Helper()
+	if d.Legacy() {
+		ch.WantKind(t, err, ch.ErrPermission)
+		return
+	}
+	ch.WantKind(t, err, ch.ErrNotFound)
 }
 
 func newPost(ctx context.Context, t ch.T, d Driver, c ch.Caller, tags ...string) Post {
@@ -168,7 +205,7 @@ func postCreateIsPublic(ctx context.Context, t ch.T, d Driver) {
 func postCreateAuthzAndValidation(ctx context.Context, t ch.T, d Driver) {
 	in := PostInput{Content: "內容 " + ch.Nonce(), Image: image()}
 	_, err := d.CreatePost(ctx, ch.Buyer, in)
-	ch.WantKind(t, err, ch.ErrPermission)
+	wantOwnerDenied(t, d, err)
 	_, err = d.CreatePost(ctx, ch.Anonymous, in)
 	ch.WantKind(t, err, ch.ErrUnauthenticated)
 	_, err = d.CreatePost(ctx, ch.Seller, PostInput{Content: "   ", Image: image()})
@@ -201,11 +238,11 @@ func postUpdateReplacesContentAndTags(ctx context.Context, t ch.T, d Driver) {
 func postOtherSellerCannotModify(ctx context.Context, t ch.T, d Driver) {
 	p := newPost(ctx, t, d, ch.Seller)
 	_, err := d.UpdatePost(ctx, ch.Seller2, p.ID, PostInput{Content: "別人改的"})
-	ch.WantKind(t, err, ch.ErrPermission)
-	ch.WantKind(t, d.UnpublishPost(ctx, ch.Seller2, p.ID), ch.ErrPermission)
-	ch.WantKind(t, d.PublishPost(ctx, ch.Seller2, p.ID), ch.ErrPermission)
-	ch.WantKind(t, d.DeletePost(ctx, ch.Seller2, p.ID), ch.ErrPermission)
-	ch.WantKind(t, d.DeletePost(ctx, ch.Buyer, p.ID), ch.ErrPermission)
+	wantOwnerDenied(t, d, err)
+	wantOwnerDenied(t, d, d.UnpublishPost(ctx, ch.Seller2, p.ID))
+	wantOwnerDenied(t, d, d.PublishPost(ctx, ch.Seller2, p.ID))
+	wantOwnerDenied(t, d, d.DeletePost(ctx, ch.Seller2, p.ID))
+	wantOwnerDenied(t, d, d.DeletePost(ctx, ch.Buyer, p.ID))
 	mine := ch.Must(t, ch.Ret(d.GetMyPost(ctx, ch.Seller, p.ID)))
 	if mine.Content != p.Content || mine.Status != "PUBLISHED" {
 		t.Errorf("被拒絕的修改不該留下痕跡：%+v", mine)
@@ -268,6 +305,9 @@ func postListsAndPaging(ctx context.Context, t ch.T, d Driver) {
 }
 
 func postAdminHideAndRestore(ctx context.Context, t ch.T, d Driver) {
+	if skipOnMonolith(t, d, "A7-D5′：平台下架貼文是賣家措施（CreateMeasure ContentTakedown），沒有隱藏與還原的 Connect 入口，A7-2f 以措施的情境覆蓋") {
+		return
+	}
 	n := ch.Nonce()
 	tag := "hide" + n
 	p := newPost(ctx, t, d, ch.Seller, tag)
@@ -334,6 +374,9 @@ func sd1PublicDetailRequiresPublicPost(ctx context.Context, t ch.T, d Driver) {
 	if skipOnLegacy(t, d, "SD1：公開單篇不過濾下架與平台隱藏") {
 		return
 	}
+	if skipOnMonolith(t, d, "A7-D5′：情境的後半段要平台隱藏貼文，單體沒有 Connect 入口，A7-2f 以措施的情境覆蓋") {
+		return
+	}
 	p := newPost(ctx, t, d, ch.Seller)
 	wantNoError(t, d.UnpublishPost(ctx, ch.Seller, p.ID), "下架")
 	_, err := d.GetPost(ctx, ch.Anonymous, p.ID)
@@ -397,6 +440,9 @@ func sd7HiddenPostCannotBeEdited(ctx context.Context, t ch.T, d Driver) {
 	if skipOnLegacy(t, d, "SD7：舊的被隱藏的貼文仍能編輯") {
 		return
 	}
+	if skipOnMonolith(t, d, "A7-D5′：要先平台隱藏貼文，單體沒有 Connect 入口，A7-2f 以措施的情境覆蓋") {
+		return
+	}
 	p := newPost(ctx, t, d, ch.Seller)
 	wantNoError(t, d.ModeratePost(ctx, ch.Admin, p.ID, true, "SD7"), "隱藏")
 	_, err := d.UpdatePost(ctx, ch.Seller, p.ID, PostInput{Content: "隱藏後的編輯"})
@@ -435,7 +481,7 @@ func commentCreateListAndValidation(ctx context.Context, t ch.T, d Driver) {
 	ch.WantKind(t, err, ch.ErrInvalid)
 	_, err = d.CreateComment(ctx, ch.Buyer, p.ID, "你這個白痴")
 	ch.WantKind(t, err, ch.ErrInvalid)
-	_, err = d.CreateComment(ctx, ch.Buyer, "999999999999", "留言")
+	_, err = d.CreateComment(ctx, ch.Buyer, absentID(d), "留言")
 	ch.WantKind(t, err, ch.ErrNotFound)
 	wantNoError(t, d.DeletePost(ctx, ch.Seller, p.ID), "刪除貼文")
 	_, err = d.CreateComment(ctx, ch.Buyer, p.ID, "已刪貼文的留言")
@@ -568,7 +614,7 @@ func sd4ReplyToMustBeVisibleCommentOfSamePost(ctx context.Context, t ch.T, d Dri
 	elsewhere := ch.Must(t, ch.Ret(d.CreateComment(ctx, ch.Buyer, other.ID, "別篇 "+ch.Nonce())))
 	gone := ch.Must(t, ch.Ret(d.ReplyComment(ctx, ch.Seller, p.ID, top.ID, "", "會被刪除的回覆 "+ch.Nonce())))
 	wantNoError(t, d.DeleteComment(ctx, ch.Seller, gone.ID), "刪除回覆")
-	for name, target := range map[string]string{"不存在": "999999999999", "別篇的留言": elsewhere.ID, "已刪除的回覆": gone.ID} {
+	for name, target := range map[string]string{"不存在": absentID(d), "別篇的留言": elsewhere.ID, "已刪除的回覆": gone.ID} {
 		_, err := d.ReplyComment(ctx, ch.Seller, p.ID, top.ID, target, "回覆 "+ch.Nonce())
 		wantError(t, err, "replyToId 指向"+name)
 	}
