@@ -1067,6 +1067,13 @@ func TestMarkReportSupplementsSeenForwardsTheEtag(t *testing.T) {
 	}
 }
 
+// ownsEverything 回報每則內容都存在、是 storeID 這家店寫的。
+type ownsEverything struct{ storeID int64 }
+
+func (o ownsEverything) ContentOwner(context.Context, social.Target) (social.ContentOwner, error) {
+	return social.ContentOwner{Exists: true, Author: social.Actor{Kind: social.ActorStore, ID: o.storeID}, StoreID: o.storeID, Readable: true}, nil
+}
+
 // 內容下架的分支：種類與對象交給模組，依據一定是認定；模組的欄位錯誤對應到 content_takedown 的路徑；回應帶對象。
 func TestCreateContentTakedownMapsTheBranchAndTheTargets(t *testing.T) {
 	measure := riskMeasureFixture()
@@ -1075,7 +1082,7 @@ func TestCreateContentTakedownMapsTheBranchAndTheTargets(t *testing.T) {
 	measure.Contents = []model.ContentRef{{Kind: model.ContentPost, ID: uuid.NewV7()}, {Kind: model.ContentForumEntry, ID: uuid.NewV7()}}
 	m := &governanceModule{measure: measure}
 	post, forum := uuid.NewV7(), uuid.NewV7()
-	h := NewGovernance(m, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{}, WithContentOwners(ownsEverything{storeID: 12}))
 	got, err := h.CreateMeasure(adminCtx(42), connect.NewRequest(&adminpb.CreateMeasureRequest{
 		StoreId: "12", Statement: "s", Note: "d",
 		Measure: &adminpb.CreateMeasureRequest_ContentTakedown{ContentTakedown: &adminpb.ContentTakedownInput{
@@ -1127,7 +1134,7 @@ func TestCreateContentTakedownMapsTheOwnershipErrorToTheOffendingItem(t *testing
 		}},
 	}
 	m := &governanceModule{createErr: fmt.Errorf("events：處理 MeasureCreated：%w", &social.TakedownContentError{Kind: model.ContentComment, ID: bad})}
-	h := NewGovernance(m, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{}, WithContentOwners(ownsEverything{storeID: 12}))
 	wrapped := rpc.NewInterceptor(slog.New(slog.DiscardHandler)).WrapUnary(func(ctx context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
 		return h.CreateMeasure(ctx, connect.NewRequest(req))
 	})

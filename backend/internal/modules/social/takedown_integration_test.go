@@ -333,7 +333,18 @@ func TestTakedownOfPurgedContentSucceedsWithoutReplica(t *testing.T) {
 	w := f.takedownWorld(t)
 	purged := f.publishedPost(t, w.storeID, "已清除的貼文", "organic")
 	must(t, f.module.DeletePost(ctx, f.store(t, w.storeID), purged.ID, purged.Version))
-	f.exec(t, "DELETE FROM social.posts WHERE id = $1", purged.ID)
+	f.exec(t, `WITH c AS (SELECT id FROM social.comments WHERE post_id = $1),
+a AS (DELETE FROM social.comment_likes WHERE comment_id IN (SELECT id FROM c)),
+b AS (DELETE FROM social.comment_stats WHERE comment_id IN (SELECT id FROM c)),
+d AS (DELETE FROM social.hides WHERE comment_id IN (SELECT id FROM c)),
+e AS (DELETE FROM social.content_takedowns WHERE post_id = $1 OR comment_id IN (SELECT id FROM c)),
+g AS (DELETE FROM social.post_hashtags WHERE post_id = $1),
+h AS (DELETE FROM social.post_likes WHERE post_id = $1),
+i AS (DELETE FROM social.post_stats WHERE post_id = $1),
+j AS (DELETE FROM social.post_views WHERE post_id = $1),
+k AS (DELETE FROM social.post_shares WHERE post_id = $1),
+l AS (DELETE FROM social.comments WHERE post_id = $1)
+DELETE FROM social.posts WHERE id = $1`, purged.ID)
 	must(t, f.db.InTx(ctx, func(ctx context.Context) error {
 		return events.Publish(ctx, f.bus, seller.MeasureCreated{
 			MeasureID: uuid.NewV7(), StoreID: w.storeID, OccurredAt: f.clock(),

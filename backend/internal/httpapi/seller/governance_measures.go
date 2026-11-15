@@ -3,6 +3,7 @@ package seller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 	"uuid"
 
@@ -351,6 +352,9 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 			}
 			t.Contents = append(t.Contents, model.ContentRef{Kind: rpc.EnumFromProto[model.ContentKind](ref.GetKind()), ID: id})
 		}
+		if err := h.verifyTakedownContents(ctx, in.StoreID, t.Contents); err != nil {
+			return nil, err
+		}
 		in.Takedown = t
 	default:
 		return nil, rpc.RequiredField("warning", "必須指定措施種類（warning、suspension、termination 或 content_takedown）")
@@ -365,6 +369,23 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 		return nil, rpc.WithFieldPaths(err, paths)
 	}
 	return connect.NewResponse(&adminpb.CreateMeasureResponse{Measure: toAdminMeasure(result.Measure)}), nil
+}
+
+// verifyTakedownContents 核對每一則內容現在存在（沒有刪除）、種類相符、作者是這家店；後台處理的是現存的內容，已刪除與不存在的都拒絕。
+func (h *Governance) verifyTakedownContents(ctx context.Context, storeID int64, contents []model.ContentRef) error {
+	if h.owners == nil {
+		return fmt.Errorf("seller governance：缺少內容歸屬的來源")
+	}
+	for i, c := range contents {
+		o, err := h.owners.ContentOwner(ctx, social.Target{Kind: social.TargetKind(c.Kind), ID: c.ID})
+		if err != nil {
+			return err
+		}
+		if !o.Exists || o.StoreID != storeID || o.Author.Kind != social.ActorStore || o.Author.ID != storeID {
+			return rpc.WithFieldPaths(apperr.InvalidInputOn([]string{apperr.IndexedField("Takedown.Contents", i)}, "內容不存在、已刪除，或不是這家店自己寫的"), createTakedownPaths)
+		}
+	}
+	return nil
 }
 
 // takedownContentError 把 social 訂閱者回的歸屬錯誤對到請求裡那一則內容的欄位路徑；找不到對應的項目時原樣回傳。

@@ -243,7 +243,18 @@ func TestTakedownAfterThePostIsPurgedStillCreatesTheMeasure(t *testing.T) {
 		r, _ := f.newBuyer(t)
 		c = f.submit(t, r, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
 	}
-	f.exec(t, "DELETE FROM social.posts WHERE id = $1", w.post.ID)
+	f.exec(t, `WITH c AS (SELECT id FROM social.comments WHERE post_id = $1),
+a AS (DELETE FROM social.comment_likes WHERE comment_id IN (SELECT id FROM c)),
+b AS (DELETE FROM social.comment_stats WHERE comment_id IN (SELECT id FROM c)),
+d AS (DELETE FROM social.hides WHERE comment_id IN (SELECT id FROM c)),
+e AS (DELETE FROM social.content_takedowns WHERE post_id = $1 OR comment_id IN (SELECT id FROM c)),
+g AS (DELETE FROM social.post_hashtags WHERE post_id = $1),
+h AS (DELETE FROM social.post_likes WHERE post_id = $1),
+i AS (DELETE FROM social.post_stats WHERE post_id = $1),
+j AS (DELETE FROM social.post_views WHERE post_id = $1),
+k AS (DELETE FROM social.post_shares WHERE post_id = $1),
+l AS (DELETE FROM social.comments WHERE post_id = $1)
+DELETE FROM social.posts WHERE id = $1`, w.post.ID)
 	d := mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), DecideInput{
 		CaseID: c.ID, Version: c.Version, AdminID: 9, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
 		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]), StoreID: w.storeID,
