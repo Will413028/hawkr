@@ -15,10 +15,7 @@ function workerPackageVersion(source: string): string | undefined {
 
 test("tests/browser/mockServiceWorker.js matches the installed msw version", () => {
 	const worker = readFileSync(
-		new URL(
-			process.env.MSW_WORKER_PATH ?? "./browser/mockServiceWorker.js",
-			import.meta.url,
-		),
+		new URL("./browser/mockServiceWorker.js", import.meta.url),
 		"utf8",
 	);
 	assert.equal(workerPackageVersion(worker), installed.version);
