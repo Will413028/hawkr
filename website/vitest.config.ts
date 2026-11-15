@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -37,6 +38,28 @@ export default defineConfig({
 					// `next/server` without an extension. Node's own resolver rejects that for an
 					// externalized package; inlining it lets Vite resolve it like the app does.
 					server: { deps: { inline: ["next-intl"] } },
+				},
+			},
+			// 元件 browser 測試：只由 `pnpm test:browser` 跑（`--project browser`），不進 `pnpm test`。
+			{
+				extends: true,
+				optimizeDeps: { include: ["framer-motion"] },
+				test: {
+					name: "browser",
+					include: ["**/*.browser.test.tsx"],
+					exclude: [
+						"node_modules",
+						".next",
+						"**/.worktrees/**",
+						".worktrees/**",
+					],
+					setupFiles: ["./tests/browser/setup.ts"],
+					browser: {
+						enabled: true,
+						headless: true,
+						provider: playwright(),
+						instances: [{ browser: "chromium" }],
+					},
 				},
 			},
 			// The Next.js Storybook plugin loads app env/Next image settings at

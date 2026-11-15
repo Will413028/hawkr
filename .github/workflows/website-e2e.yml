@@ -162,3 +162,18 @@ jobs:
       - name: 確認 Playwright 版本與映像一致
         run: test "$(pnpm exec playwright --version)" = "Version 1.59.1"
       - run: pnpm run storybook:test
+
+  component-browser:
+    name: 元件 browser 測試
+    runs-on: ubuntu-24.04
+    container: mcr.microsoft.com/playwright:v1.59.1-noble@sha256:b0ab6f3cb99aa7803adbc14d9027ec1785fc6e433b97e134e0f8fe61683b6b53
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
+      # 映像的版本要和 lockfile 的 @playwright/test 相同，否則找不到瀏覽器；升級時兩邊一起改。
+      - name: 確認 Playwright 版本與映像一致
+        run: test "$(pnpm exec playwright --version)" = "Version 1.59.1"
+      - run: pnpm run test:browser

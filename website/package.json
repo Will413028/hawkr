@@ -10,6 +10,7 @@
 		"start": "next start",
 		"start:standalone": "node .next/standalone/server.js",
 		"test": "vitest run --project unit",
+		"test:browser": "vitest run --project browser",
 		"test:watch": "vitest --project unit",
 		"lint": "tsc --noEmit && biome check --max-diagnostics=200 app components features lib scripts tests middleware.ts next.config.ts postcss.config.mjs && tsx scripts/check-transport.ts && tsx scripts/check-no-emoji.ts && tsx scripts/check-theme-tokens.ts && tsx scripts/check-jsx-cjk-linebreak.ts && pnpm --filter @hawkr/ui-text check-enum-text ../../website",
 		"architecture:check": "tsx scripts/check-architecture.ts",
