@@ -22,5 +22,5 @@ export async function startDescriptionImageFixtures() {
 		onUnhandledRequest: "bypass",
 		serviceWorker: { url: "/mockServiceWorker.js" },
 	});
-	return () => worker.stop();
+	return worker;
 }

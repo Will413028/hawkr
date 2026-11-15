@@ -8,15 +8,17 @@ export function waitFor<T>(
 	return vi.waitFor(callback, { timeout: 5000, interval: 50, ...options });
 }
 
-/** jest-dom 的 toHaveTextContent 是子字串比對（vitest/browser 的字串版是整段比對）：重試到文字包含 `text`。 */
+/** 重試到元素的文字（空白正規化後）包含 `text`；`getElement` 每次重試都重新取得元素。 */
 export async function expectTextContains(
 	getElement: () => Element | null,
 	text: string,
 ) {
+	if (text === "") throw new TypeError("expectTextContains 不接受空字串");
 	await waitFor(() => {
 		const element = getElement();
 		expect(element, "找不到元素").not.toBeNull();
-		expect(element?.textContent ?? "").toContain(text);
+		const actual = (element?.textContent ?? "").replace(/\s+/g, " ").trim();
+		expect(actual).toContain(text);
 	});
 }
 

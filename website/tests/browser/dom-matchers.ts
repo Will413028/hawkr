@@ -1,12 +1,23 @@
-// vitest/browser 的型別提供 jest-dom 風格的 matcher 宣告（它們只在 expect.element 上有實作）。
-import "vitest/browser";
 import { expect } from "vitest";
 
-// 同步的 DOM matcher，語意對齊 jest-dom：原 Storybook play 的 waitFor 重試迴圈裡直接呼叫它們。
-// `expect.element` 的版本是自己重試、且字串版 toHaveTextContent 是整段比對，不能在 waitFor 內同步使用。
+// 同步 DOM matcher：`expect(element)` 直接檢查一個已取得的元素，用在 waitFor 的重試迴圈裡。
+// 名稱都帶 Sync 後綴，不覆蓋 vitest/browser 內建（只用在 `expect.element`、自己重試）的同名 matcher。
 // 只有 import 本檔的測試檔才註冊。
 
-type Received = Element | null;
+declare module "vitest" {
+	interface Assertion {
+		toBeVisibleSync(): void;
+		toBeInTheDocumentSync(): void;
+		toBeEnabledSync(): void;
+		toBeDisabledSync(): void;
+		toHaveFocusSync(): void;
+		toHaveAttributeSync(name: string, value?: string): void;
+		toBeCheckedSync(): void;
+		toBePartiallyCheckedSync(): void;
+		toHaveValueSync(expected: string | number): void;
+		toHaveStyleSync(expected: Record<string, string>): void;
+	}
+}
 
 function pass(ok: boolean, expectation: string, received: unknown) {
 	return {
@@ -23,12 +34,22 @@ function describe(received: unknown): string {
 	return String(received);
 }
 
+/** 與 jest-dom 相同：收到的不是元素就丟錯，`not` 也不會讓它通過。 */
+function element(received: unknown, matcher: string): Element {
+	if (!(received instanceof Element)) {
+		throw new TypeError(
+			`${matcher} 需要 DOM 元素，收到 ${describe(received)}；要檢查「不存在」請用 expectAbsent`,
+		);
+	}
+	return received;
+}
+
 function kebab(name: string) {
 	return name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 }
 
-function isStyleVisible(element: Element) {
-	const style = element.ownerDocument.defaultView?.getComputedStyle(element);
+function isStyleVisible(node: Element) {
+	const style = node.ownerDocument.defaultView?.getComputedStyle(node);
 	if (!style) return false;
 	return (
 		style.display !== "none" &&
@@ -38,9 +59,9 @@ function isStyleVisible(element: Element) {
 	);
 }
 
-function isVisible(element: Element): boolean {
-	if (!element.ownerDocument.contains(element)) return false;
-	for (let node: Element | null = element; node; node = node.parentElement) {
+function isVisible(target: Element): boolean {
+	if (!target.ownerDocument.contains(target)) return false;
+	for (let node: Element | null = target; node; node = node.parentElement) {
 		if (!isStyleVisible(node)) return false;
 		if (node.hasAttribute("hidden")) return false;
 	}
@@ -58,92 +79,88 @@ function normalizeStyleValue(
 }
 
 expect.extend({
-	toBeVisible(received: Received) {
-		return pass(
-			received !== null && isVisible(received),
-			"to be visible",
-			received,
-		);
+	toBeVisibleSync(received: unknown) {
+		const target = element(received, "toBeVisibleSync");
+		return pass(isVisible(target), "to be visible", target);
 	},
-	toBeInTheDocument(received: Received) {
+	toBeInTheDocumentSync(received: unknown) {
+		if (received === null) {
+			return pass(false, "to be in the document", received);
+		}
+		const target = element(received, "toBeInTheDocumentSync");
 		return pass(
-			received?.ownerDocument.contains(received) === true,
+			target.ownerDocument.contains(target),
 			"to be in the document",
-			received,
+			target,
 		);
 	},
-	toBeEnabled(received: Element) {
-		return pass(!received.matches(":disabled"), "to be enabled", received);
+	toBeEnabledSync(received: unknown) {
+		const target = element(received, "toBeEnabledSync");
+		return pass(!target.matches(":disabled"), "to be enabled", target);
 	},
-	toBeDisabled(received: Element) {
-		return pass(received.matches(":disabled"), "to be disabled", received);
+	toBeDisabledSync(received: unknown) {
+		const target = element(received, "toBeDisabledSync");
+		return pass(target.matches(":disabled"), "to be disabled", target);
 	},
-	toHaveFocus(received: Element) {
+	toHaveFocusSync(received: unknown) {
+		const target = element(received, "toHaveFocusSync");
 		return pass(
-			received.ownerDocument.activeElement === received,
+			target.ownerDocument.activeElement === target,
 			"to have focus",
-			received,
+			target,
 		);
 	},
-	toHaveAttribute(received: Element, name: string, value?: string) {
-		const actual = received.getAttribute(name);
+	toHaveAttributeSync(received: unknown, name: string, value?: string) {
+		const target = element(received, "toHaveAttributeSync");
+		const actual = target.getAttribute(name);
 		const ok = value === undefined ? actual !== null : actual === value;
 		return pass(
 			ok,
 			`to have attribute ${name}${value === undefined ? "" : `="${value}"`} (actual: ${actual})`,
-			received,
+			target,
 		);
 	},
-	toBeChecked(received: Element) {
+	toBeCheckedSync(received: unknown) {
+		const target = element(received, "toBeCheckedSync");
 		const ok =
-			received instanceof HTMLInputElement
-				? received.checked
-				: received.getAttribute("aria-checked") === "true";
-		return pass(ok, "to be checked", received);
+			target instanceof HTMLInputElement
+				? target.checked
+				: target.getAttribute("aria-checked") === "true";
+		return pass(ok, "to be checked", target);
 	},
-	toBePartiallyChecked(received: Element) {
+	toBePartiallyCheckedSync(received: unknown) {
+		const target = element(received, "toBePartiallyCheckedSync");
 		const ok =
-			received instanceof HTMLInputElement
-				? received.indeterminate
-				: received.getAttribute("aria-checked") === "mixed";
-		return pass(ok, "to be partially checked", received);
+			target instanceof HTMLInputElement
+				? target.indeterminate
+				: target.getAttribute("aria-checked") === "mixed";
+		return pass(ok, "to be partially checked", target);
 	},
-	toHaveValue(received: Element, expected: string | number) {
+	toHaveValueSync(received: unknown, expected: string | number) {
+		const target = element(received, "toHaveValueSync");
 		let actual: string | number | null;
-		if (received instanceof HTMLInputElement && received.type === "number") {
-			actual = received.value === "" ? null : Number(received.value);
+		if (target instanceof HTMLInputElement && target.type === "number") {
+			actual = target.value === "" ? null : Number(target.value);
 		} else {
-			actual = (received as HTMLInputElement).value;
+			actual = (target as HTMLInputElement).value;
 		}
 		return pass(
 			actual === expected,
 			`to have value ${JSON.stringify(expected)} (actual: ${JSON.stringify(actual)})`,
-			received,
+			target,
 		);
 	},
-	toHaveStyle(received: Element, expected: Record<string, string>) {
-		const computed =
-			received.ownerDocument.defaultView?.getComputedStyle(received);
+	toHaveStyleSync(received: unknown, expected: Record<string, string>) {
+		const target = element(received, "toHaveStyleSync");
+		const computed = target.ownerDocument.defaultView?.getComputedStyle(target);
 		const mismatches = Object.entries(expected).filter(([property, value]) => {
-			const want = normalizeStyleValue(received.ownerDocument, property, value);
+			const want = normalizeStyleValue(target.ownerDocument, property, value);
 			return computed?.getPropertyValue(kebab(property)) !== want;
 		});
 		return pass(
 			mismatches.length === 0,
 			`to have style ${JSON.stringify(expected)}`,
-			received,
-		);
-	},
-	toHaveTextContent(received: Element, expected: string | RegExp) {
-		const text = (received.textContent ?? "").replace(/\s+/g, " ").trim();
-		const ok =
-			typeof expected === "string"
-				? text.includes(expected)
-				: expected.test(text);
-		return pass(
-			ok,
-			`to have text content ${String(expected)} (actual: "${text}")`,
-			received,
+			target,
 		);
 	},
 });

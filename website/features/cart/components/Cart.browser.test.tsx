@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { screen, within } from "@testing-library/dom";
+import { cleanup } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { ViewTransitions } from "@/components/shared/view-transitions";
 import Button from "@/components/ui/Button";
 import {
@@ -511,6 +512,8 @@ function ShippingAndAddressPreview() {
 
 const cleanups: Array<() => void> = [];
 afterEach(() => {
+	// 先卸載元件，再還原 spy 與全域：避免卸載時的 effect 讀到已還原的 fetch、Date.now。
+	cleanup();
 	while (cleanups.length > 0) cleanups.pop()?.();
 });
 beforeEach(() => {
@@ -700,9 +703,15 @@ async function playSellerSelection(container: HTMLElement) {
 	await expect.element(switchStore).toHaveFocus();
 	await userEvent.keyboard("{Enter}");
 	const secondGroup = () =>
-		second.getByRole("checkbox", {
-			name: `選取${secondSeller.sellerName}的全部商品`,
-		});
+		page
+			.getByRole("region", {
+				name: `${secondSeller.sellerName}購物車`,
+				exact: true,
+			})
+			.getByRole("checkbox", {
+				name: `選取${secondSeller.sellerName}的全部商品`,
+				exact: true,
+			});
 	await expect.element(secondGroup()).toBeChecked();
 	await expect.element(secondGroup()).toHaveFocus();
 	for (const item of sellerProducts.slice(0, 2)) {

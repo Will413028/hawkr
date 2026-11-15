@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import type { ProductDescription } from "@/lib/products/seller-repo";
 import { mountEditor } from "@/tests/browser/description-editor";
-import { waitFor } from "@/tests/browser/dom";
+import { expectTextContains, waitFor } from "@/tests/browser/dom";
 
 const productDescription: ProductDescription = {
 	version: "1.0",
@@ -101,9 +101,9 @@ async function waitForEditor(canvasElement: HTMLElement) {
 	});
 	await waitFor(
 		() => {
-			expect(dialog).toHaveAttribute("data-ready", "true");
-			expect(dialog).toHaveAttribute("aria-busy", "false");
-			expect(dialog).toBeVisible();
+			expect(dialog).toHaveAttributeSync("data-ready", "true");
+			expect(dialog).toHaveAttributeSync("aria-busy", "false");
+			expect(dialog).toBeVisibleSync();
 		},
 		{ timeout: 15_000 },
 	);
@@ -170,8 +170,8 @@ describe("DescriptionEditor", () => {
 		const dialog = await waitForEditor(canvasElement);
 		await expect(
 			within(dialog).getByRole("toolbar", { name: "文字樣式" }),
-		).toBeVisible();
-		await expect(within(dialog).getByText("商品資訊")).toBeVisible();
+		).toBeVisibleSync();
+		await expect(within(dialog).getByText("商品資訊")).toBeVisibleSync();
 		await expect(args.uploadImageFile).not.toHaveBeenCalled();
 	});
 
@@ -181,10 +181,10 @@ describe("DescriptionEditor", () => {
 		const dialog = await waitForEditor(canvasElement);
 		// Readiness and painted content are separate: query the live node on retry.
 		await waitFor(() => {
-			expect(within(dialog).getByText("## 商品資訊")).toBeVisible();
+			expect(within(dialog).getByText("## 商品資訊")).toBeVisibleSync();
 			expect(
 				within(dialog).getByRole("button", { name: "整理格式" }),
-			).toBeEnabled();
+			).toBeEnabledSync();
 		});
 	});
 
@@ -202,7 +202,7 @@ describe("DescriptionEditor", () => {
 				"介紹商品的特色與來源",
 			),
 		);
-		await expect(paragraph).toHaveTextContent("介紹商品的特色與來源");
+		await expectTextContains(() => paragraph, "介紹商品的特色與來源");
 		await expect(args.uploadImageFile).not.toHaveBeenCalled();
 	});
 
@@ -216,15 +216,19 @@ describe("DescriptionEditor", () => {
 		await expect(dialog.getBoundingClientRect().width).toBeLessThanOrEqual(375);
 		const editor = within(dialog);
 		await userEvent.click(editor.getByRole("button", { name: "更多格式" }));
-		await expect(editor.getByRole("button", { name: "置中" })).toBeVisible();
+		await expect(
+			editor.getByRole("button", { name: "置中" }),
+		).toBeVisibleSync();
 		await userEvent.click(editor.getByRole("button", { name: "更多格式" }));
 		await userEvent.click(editor.getByRole("button", { name: "放大編輯" }));
 		await expect(
 			editor.getByRole("button", { name: "縮小編輯區" }),
-		).toHaveAttribute("aria-expanded", "true");
+		).toHaveAttributeSync("aria-expanded", "true");
 		await userEvent.click(editor.getByRole("button", { name: "縮小編輯區" }));
 		await waitFor(() =>
-			expect(editor.getByRole("button", { name: "放大編輯" })).toBeVisible(),
+			expect(
+				editor.getByRole("button", { name: "放大編輯" }),
+			).toBeVisibleSync(),
 		);
 	});
 
@@ -246,7 +250,7 @@ describe("DescriptionEditor", () => {
 				{ text: "選取文字後即可調整格式", bold: true },
 			]);
 		});
-		await expect(boldButton).toHaveAttribute("aria-pressed", "true");
+		await expect(boldButton).toHaveAttributeSync("aria-pressed", "true");
 		await userEvent.keyboard("{Control>}z{/Control}");
 		await waitFor(() => {
 			expect(args.onChange.mock.lastCall?.[0].blocks[0].runs).toEqual([
@@ -282,8 +286,8 @@ describe("DescriptionEditor", () => {
 			);
 		});
 		await waitFor(() => {
-			expect(within(dialog).getByText("商品資訊")).toBeVisible();
-			expect(within(dialog).getByText("規格：445g")).toBeVisible();
+			expect(within(dialog).getByText("商品資訊")).toBeVisibleSync();
+			expect(within(dialog).getByText("規格：445g")).toBeVisibleSync();
 		});
 		await expect(args.uploadImageFile).not.toHaveBeenCalled();
 	});
@@ -367,7 +371,7 @@ describe("DescriptionEditor", () => {
 		await waitFor(() =>
 			expect(
 				editor.getByRole("button", { name: "大標（⌘⇧H）" }),
-			).toHaveAttribute("aria-pressed", "true"),
+			).toHaveAttributeSync("aria-pressed", "true"),
 		);
 		await userEvent.click(editor.getByRole("button", { name: "更多格式" }));
 		await userEvent.click(editor.getByRole("button", { name: "置中" }));
@@ -377,7 +381,7 @@ describe("DescriptionEditor", () => {
 			),
 		);
 		await waitFor(() =>
-			expect(editor.getByRole("button", { name: "置中" })).toHaveAttribute(
+			expect(editor.getByRole("button", { name: "置中" })).toHaveAttributeSync(
 				"aria-pressed",
 				"true",
 			),
@@ -396,7 +400,7 @@ describe("DescriptionEditor", () => {
 			expect(textBlocks(description)).toBe("選取文字後即可調整格式");
 		});
 		await waitFor(() =>
-			expect(editor.getByRole("button", { name: "內文" })).toHaveAttribute(
+			expect(editor.getByRole("button", { name: "內文" })).toHaveAttributeSync(
 				"aria-pressed",
 				"true",
 			),
@@ -451,9 +455,9 @@ describe("DescriptionEditor", () => {
 			expect(textBlocks(description)).toBe("這一段維持內文");
 		});
 		await waitFor(() =>
-			expect(editor.getByText("這一段改成清單")).toBeVisible(),
+			expect(editor.getByText("這一段改成清單")).toBeVisibleSync(),
 		);
-		await expect(editor.getByText("這一段維持內文")).toBeVisible();
+		await expect(editor.getByText("這一段維持內文")).toBeVisibleSync();
 		await userEvent.click(editor.getByText("這一段改成清單"));
 		await userEvent.click(
 			editor.getByRole("button", { name: /^套用編號清單/ }),
@@ -482,52 +486,72 @@ describe("DescriptionEditor", () => {
 		const editor = within(dialog);
 		await userEvent.click(editor.getByRole("button", { name: "整理格式" }));
 		await waitFor(() => {
-			expect(editor.queryByText("## 商品資訊")).not.toBeInTheDocument();
+			expect(editor.queryByText("## 商品資訊")).not.toBeInTheDocumentSync();
 			expect(
 				editor.getByText("標稱規格合計：445g（265g＋180g）"),
-			).toBeVisible();
-			expect(editor.getByText("保存條件：冷凍 −18°C")).toBeVisible();
+			).toBeVisibleSync();
+			expect(editor.getByText("保存條件：冷凍 −18°C")).toBeVisibleSync();
 			expect(textBlocks(args.onChange.mock.lastCall?.[0])).toContain(
 				"請依各包正式解凍及料理指引安排火候。",
 			);
 		});
-		await waitFor(() => expect(dialog).toHaveAttribute("aria-busy", "false"));
+		await waitFor(() =>
+			expect(dialog).toHaveAttributeSync("aria-busy", "false"),
+		);
 		await userEvent.click(editor.getByRole("button", { name: /^復原（/ }));
 		await waitFor(() => {
-			expect(dialog).toHaveAttribute("aria-busy", "false");
-			expect(editor.getByText("## 商品資訊")).toBeVisible();
-			expect(editor.getByRole("button", { name: /^重做（/ })).toBeEnabled();
+			expect(dialog).toHaveAttributeSync("aria-busy", "false");
+			expect(editor.getByText("## 商品資訊")).toBeVisibleSync();
+			expect(editor.getByRole("button", { name: /^重做（/ })).toBeEnabledSync();
 		});
 		await userEvent.click(editor.getByRole("button", { name: /^重做（/ }));
 		await waitFor(() => {
-			expect(dialog).toHaveAttribute("aria-busy", "false");
-			expect(editor.queryByText("## 商品資訊")).not.toBeInTheDocument();
-			expect(editor.getByRole("button", { name: "閱讀預覽" })).toBeEnabled();
+			expect(dialog).toHaveAttributeSync("aria-busy", "false");
+			expect(editor.queryByText("## 商品資訊")).not.toBeInTheDocumentSync();
+			expect(
+				editor.getByRole("button", { name: "閱讀預覽" }),
+			).toBeEnabledSync();
 		});
 		await userEvent.click(editor.getByRole("button", { name: "閱讀預覽" }));
 		await waitFor(() => {
-			expect(dialog).toHaveAttribute("aria-busy", "false");
-			expect(dialog).toHaveAttribute("data-preview", "true");
-			expect(editor.getByRole("button", { name: "繼續編輯" })).toBeVisible();
-			expect(editor.getByRole("button", { name: "繼續編輯" })).toBeEnabled();
+			expect(dialog).toHaveAttributeSync("aria-busy", "false");
+			expect(dialog).toHaveAttributeSync("data-preview", "true");
+			expect(
+				editor.getByRole("button", { name: "繼續編輯" }),
+			).toBeVisibleSync();
+			expect(
+				editor.getByRole("button", { name: "繼續編輯" }),
+			).toBeEnabledSync();
 			const preview = editor.getByRole("region", {
 				name: "商品描述閱讀預覽",
 			});
-			expect(preview).toHaveTextContent("標稱規格合計：445g（265g＋180g）");
 			expect(preview.querySelector('[contenteditable="true"]')).toBeNull();
 		});
+		await expectTextContains(
+			() => editor.getByRole("region", { name: "商品描述閱讀預覽" }),
+			"標稱規格合計：445g（265g＋180g）",
+		);
 		await userEvent.click(editor.getByRole("button", { name: "繼續編輯" }));
 		await waitFor(() => {
-			expect(dialog).toHaveAttribute("aria-busy", "false");
-			expect(dialog).toHaveAttribute("data-preview", "false");
-			expect(editor.getByRole("toolbar", { name: "文字樣式" })).toBeVisible();
+			expect(dialog).toHaveAttributeSync("aria-busy", "false");
+			expect(dialog).toHaveAttributeSync("data-preview", "false");
+			expect(
+				editor.getByRole("toolbar", { name: "文字樣式" }),
+			).toBeVisibleSync();
 			const content = editor.getByRole("region", {
 				name: "商品描述編輯內容",
 			});
-			expect(content).toHaveTextContent("標稱規格合計：445g（265g＋180g）");
-			expect(content).toHaveTextContent("請依各包正式解凍及料理指引安排火候。");
 			expect(content.querySelector('[contenteditable="true"]')).not.toBeNull();
 		});
+		for (const text of [
+			"標稱規格合計：445g（265g＋180g）",
+			"請依各包正式解凍及料理指引安排火候。",
+		]) {
+			await expectTextContains(
+				() => editor.getByRole("region", { name: "商品描述編輯內容" }),
+				text,
+			);
+		}
 		await expect(args.uploadImageFile).not.toHaveBeenCalled();
 	});
 });

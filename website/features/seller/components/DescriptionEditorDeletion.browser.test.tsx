@@ -1,5 +1,5 @@
 import { within } from "@testing-library/dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import type { ProductDescription } from "@/lib/products/seller-repo";
 import { mountEditor } from "@/tests/browser/description-editor";
@@ -39,9 +39,12 @@ async function nativeDeletionTest(
 	const dialog = within(canvasElement).getByRole("dialog", {
 		name: "商品描述編輯器",
 	});
-	await waitFor(() => expect(dialog).toHaveAttribute("data-ready", "true"), {
-		timeout: 15_000,
-	});
+	await waitFor(
+		() => expect(dialog).toHaveAttributeSync("data-ready", "true"),
+		{
+			timeout: 15_000,
+		},
+	);
 	const errors: string[] = [];
 	const view = dialog.ownerDocument.defaultView;
 	if (!view) throw new Error("缺少編輯器瀏覽器視窗");
@@ -117,18 +120,26 @@ async function deleteFromBlockMenu(
 ) {
 	const block = target.closest<HTMLElement>(".ce-block");
 	if (!block) throw new Error("找不到要刪除的內容區塊");
-	await user.hover(block);
 	// Editor.js supplies these controls without a stable accessible name.
 	const settings = dialog.querySelector<HTMLElement>(
 		".ce-toolbar__settings-btn",
 	);
 	if (!settings) throw new Error("找不到區塊調整按鈕");
+	// 工具列在 mousemove 後才移到滑鼠指向的區塊；等它對齊目標區塊再開選單，
+	// 否則選單會開在原本有游標的區塊上。
+	await waitFor(async () => {
+		await user.hover(block);
+		const blockRect = block.getBoundingClientRect();
+		const buttonRect = settings.getBoundingClientRect();
+		const middle = buttonRect.top + buttonRect.height / 2;
+		expect(middle >= blockRect.top && middle <= blockRect.bottom).toBe(true);
+	});
 	await user.click(settings);
 	const item = await waitFor(() => {
 		const candidate = dialog.querySelector<HTMLElement>(
 			'.ce-popover-item[data-item-name="delete"]',
 		);
-		expect(candidate).toBeVisible();
+		expect(candidate).toBeVisibleSync();
 		if (!candidate) throw new Error("找不到刪除區塊選項");
 		return candidate;
 	});
@@ -246,11 +257,6 @@ vi.hoisted(() => {
 	process.env.NEXT_PUBLIC_MEDIA_BASE_URL = "https://test-media.example.com";
 });
 
-const stopFixtures: Array<() => void> = [];
-afterEach(() => {
-	while (stopFixtures.length > 0) stopFixtures.pop()?.();
-});
-
 function mount(
 	overrides: Parameters<typeof mountEditor>[0] = {},
 	options: Parameters<typeof mountEditor>[1] = {},
@@ -290,14 +296,14 @@ describe("DescriptionEditorDeletion", () => {
 						{ text: "第一段保留", bold: true, color: "#682e0e" },
 					]),
 				);
-				expect(editableText(dialog, "第一段保留第二段保留")).toBeVisible();
+				expect(editableText(dialog, "第一段保留第二段保留")).toBeVisibleSync();
 			});
 			await undo(dialog, user);
 			await waitFor(() => {
 				expect(
 					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
 				).toEqual(["第一段保留", "第二段保留"]);
-				expect(editableText(dialog, "第二段保留")).toBeVisible();
+				expect(editableText(dialog, "第二段保留")).toBeVisibleSync();
 			});
 		});
 	});
@@ -313,14 +319,14 @@ describe("DescriptionEditorDeletion", () => {
 				expect(
 					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
 				).toEqual(["第一段保留第二段保留"]);
-				expect(editableText(dialog, "第一段保留第二段保留")).toBeVisible();
+				expect(editableText(dialog, "第一段保留第二段保留")).toBeVisibleSync();
 			});
 			await undo(dialog, user);
 			await waitFor(() => {
 				expect(
 					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
 				).toEqual(["第一段保留", "第二段保留"]);
-				expect(editableText(dialog, "第一段保留")).toBeVisible();
+				expect(editableText(dialog, "第一段保留")).toBeVisibleSync();
 			});
 		});
 	});
@@ -366,14 +372,14 @@ describe("DescriptionEditorDeletion", () => {
 						{ text: "後段保留", italic: true },
 					]),
 				);
-				expect(editableText(dialog, "前段保留後段保留")).toBeVisible();
+				expect(editableText(dialog, "前段保留後段保留")).toBeVisibleSync();
 			});
 			await undo(dialog, user);
 			await waitFor(() => {
 				expect(
 					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
 				).toEqual(["前段保留刪掉", "整段刪掉", "刪掉後段保留"]);
-				expect(editableText(dialog, "整段刪掉")).toBeVisible();
+				expect(editableText(dialog, "整段刪掉")).toBeVisibleSync();
 			});
 		});
 	});
@@ -406,8 +412,8 @@ describe("DescriptionEditorDeletion", () => {
 					textAlign: "right",
 					items: [{ runs: [{ text: "保留的後續項目", underline: true }] }],
 				});
-				expect(editableText(dialog, "段落前端清單尾端")).toBeVisible();
-				expect(editableText(dialog, "保留的後續項目")).toBeVisible();
+				expect(editableText(dialog, "段落前端清單尾端")).toBeVisibleSync();
+				expect(editableText(dialog, "保留的後續項目")).toBeVisibleSync();
 			});
 			await undo(dialog, user);
 			await waitFor(() => {
@@ -421,7 +427,7 @@ describe("DescriptionEditorDeletion", () => {
 				).toEqual(
 					JSON.parse(paragraphToListValue.blocks[1].listJson ?? "null"),
 				);
-				expect(editableText(dialog, "刪除終點清單尾端")).toBeVisible();
+				expect(editableText(dialog, "刪除終點清單尾端")).toBeVisibleSync();
 			});
 		});
 	});
@@ -452,8 +458,8 @@ describe("DescriptionEditorDeletion", () => {
 						},
 					],
 				});
-				expect(editableText(dialog, "前方項目保留")).toBeVisible();
-				expect(editableText(dialog, "清單前端標題尾端")).toBeVisible();
+				expect(editableText(dialog, "前方項目保留")).toBeVisibleSync();
+				expect(editableText(dialog, "清單前端標題尾端")).toBeVisibleSync();
 			});
 			await undo(dialog, user);
 			await waitFor(() => {
@@ -468,7 +474,7 @@ describe("DescriptionEditorDeletion", () => {
 							"null",
 					),
 				).toEqual(JSON.parse(listToHeadingValue.blocks[0].listJson ?? "null"));
-				expect(editableText(dialog, "刪除終點標題尾端")).toBeVisible();
+				expect(editableText(dialog, "刪除終點標題尾端")).toBeVisibleSync();
 			});
 		});
 	});
@@ -493,7 +499,7 @@ describe("DescriptionEditorDeletion", () => {
 			},
 		});
 		await nativeDeletionTest(canvasElement, async (dialog, user) => {
-			await expect(editableText(dialog, "第一段保留")).toHaveStyle({
+			await expect(editableText(dialog, "第一段保留")).toHaveStyleSync({
 				textAlign: "center",
 			});
 			await user.click(editableText(dialog, "第二段保留"));
@@ -508,16 +514,16 @@ describe("DescriptionEditorDeletion", () => {
 				).toEqual(["第二段保留"]);
 				expect(
 					within(dialog).queryByText("第一段保留"),
-				).not.toBeInTheDocument();
-				expect(editableText(dialog, "第二段保留")).toBeVisible();
+				).not.toBeInTheDocumentSync();
+				expect(editableText(dialog, "第二段保留")).toBeVisibleSync();
 			});
 			await undo(dialog, user);
 			await waitFor(() => {
 				expect(
 					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
 				).toEqual(["第一段保留", "第二段保留"]);
-				expect(editableText(dialog, "第一段保留")).toBeVisible();
-				expect(editableText(dialog, "第一段保留")).toHaveStyle({
+				expect(editableText(dialog, "第一段保留")).toBeVisibleSync();
+				expect(editableText(dialog, "第一段保留")).toHaveStyleSync({
 					textAlign: "center",
 				});
 				expect(
@@ -539,7 +545,7 @@ describe("DescriptionEditorDeletion", () => {
 			await deleteFromBlockMenu(dialog, editableText(dialog, text), user);
 			await waitFor(() => {
 				expect(args.onChange.mock.lastCall?.[0].blocks).toEqual([]);
-				expect(within(dialog).queryByText(text)).not.toBeInTheDocument();
+				expect(within(dialog).queryByText(text)).not.toBeInTheDocumentSync();
 			});
 			for (let cycle = 0; cycle < 3; cycle += 1) {
 				await undo(dialog, user);
@@ -547,12 +553,12 @@ describe("DescriptionEditorDeletion", () => {
 					expect(
 						documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
 					).toEqual([text]);
-					expect(editableText(dialog, text)).toBeVisible();
+					expect(editableText(dialog, text)).toBeVisibleSync();
 				});
 				await redo(dialog, user);
 				await waitFor(() => {
 					expect(args.onChange.mock.lastCall?.[0].blocks).toEqual([]);
-					expect(within(dialog).queryByText(text)).not.toBeInTheDocument();
+					expect(within(dialog).queryByText(text)).not.toBeInTheDocumentSync();
 				});
 			}
 		});
@@ -592,7 +598,7 @@ describe("DescriptionEditorDeletion", () => {
 					items: [{ runs: [{ text: "保留的清單項目" }] }],
 				});
 				expect(documentText(value)).toEqual(["離開清單後的文字"]);
-				expect(editableText(dialog, "離開清單後的文字")).toBeVisible();
+				expect(editableText(dialog, "離開清單後的文字")).toBeVisibleSync();
 			});
 		});
 	});
@@ -665,14 +671,17 @@ describe("DescriptionEditorDeletion", () => {
 					ordered: false,
 					items: [{ runs: [{ text: "保存方式依包裝標示" }] }],
 				});
-				expect(editableText(dialog, "## 保存與料理")).toBeVisible();
-				expect(within(dialog).getByText("保存方式依包裝標示")).toBeVisible();
+				expect(editableText(dialog, "## 保存與料理")).toBeVisibleSync();
+				expect(
+					within(dialog).getByText("保存方式依包裝標示"),
+				).toBeVisibleSync();
 			});
 		});
 	});
 
 	it("圖片與表格之間 · 刪字保留資料", async () => {
-		stopFixtures.push(await startDescriptionImageFixtures());
+		const fixtures = await startDescriptionImageFixtures();
+		onTestFinished(() => fixtures.stop());
 		const { container: canvasElement, args } = mount({
 			value: {
 				version: "1.0",
@@ -728,7 +737,7 @@ describe("DescriptionEditorDeletion", () => {
 			await checkPhase("initialHistoryEmpty", () => {
 				expect(
 					ui.getByRole("button", { name: "目前沒有可復原的動作" }),
-				).toBeDisabled();
+				).toBeDisabledSync();
 				expect(
 					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
 				).toEqual(["刪除這段文字", "表格後的文字保留"]);
@@ -756,10 +765,10 @@ describe("DescriptionEditorDeletion", () => {
 							"null",
 					),
 				).toEqual(JSON.parse(tableJson));
-				expect(within(dialog).getByText("展示文字")).toBeVisible();
+				expect(within(dialog).getByText("展示文字")).toBeVisibleSync();
 				expect(
 					within(dialog).getByRole("img", { name: "本地測試圖片" }),
-				).toBeVisible();
+				).toBeVisibleSync();
 			};
 			await checkPhase("deletedTextSaved", () => {
 				expect(
@@ -769,7 +778,7 @@ describe("DescriptionEditorDeletion", () => {
 					ui.getByRole("button", {
 						name: "復原（⌘/Ctrl+Z，還可復原 1 步）",
 					}),
-				).toBeEnabled();
+				).toBeEnabledSync();
 				assertMedia();
 			});
 			await undo(dialog, user);
@@ -779,8 +788,8 @@ describe("DescriptionEditorDeletion", () => {
 				).toEqual(["刪除這段文字", "表格後的文字保留"]);
 				expect(
 					ui.getByRole("button", { name: "目前沒有可復原的動作" }),
-				).toBeDisabled();
-				expect(editableText(dialog, "刪除這段文字")).toBeVisible();
+				).toBeDisabledSync();
+				expect(editableText(dialog, "刪除這段文字")).toBeVisibleSync();
 				assertMedia();
 			});
 			await expect(args.uploadImageFile).not.toHaveBeenCalled();
@@ -802,7 +811,7 @@ describe("DescriptionEditorDeletion", () => {
 				expect(
 					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
 				).toEqual([text]);
-				expect(editableText(dialog, text)).toBeVisible();
+				expect(editableText(dialog, text)).toBeVisibleSync();
 			});
 			for (let cycle = 0; cycle < 2; cycle += 1) {
 				await redo(dialog, user);
@@ -810,14 +819,14 @@ describe("DescriptionEditorDeletion", () => {
 					expect(
 						documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
 					).toEqual([text.slice(0, -2)]);
-					expect(editableText(dialog, text.slice(0, -2))).toBeVisible();
+					expect(editableText(dialog, text.slice(0, -2))).toBeVisibleSync();
 				});
 				await undo(dialog, user);
 				await waitFor(() => {
 					expect(
 						documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
 					).toEqual([text]);
-					expect(editableText(dialog, text)).toBeVisible();
+					expect(editableText(dialog, text)).toBeVisibleSync();
 				});
 			}
 		});
@@ -842,14 +851,14 @@ describe("DescriptionEditorDeletion", () => {
 				).join("");
 				expect(text.split(insertion)).toHaveLength(2);
 				expect(text.replace(insertion, "")).toBe(original);
-				expect(editableText(dialog, text)).toBeVisible();
+				expect(editableText(dialog, text)).toBeVisibleSync();
 			});
 			await undo(dialog, user);
 			await waitFor(() => {
 				expect(
 					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
 				).toEqual([original]);
-				expect(editableText(dialog, original)).toBeVisible();
+				expect(editableText(dialog, original)).toBeVisibleSync();
 			});
 		});
 	});

@@ -22,7 +22,6 @@ export function mountEditor(
 	options: {
 		theme?: "light" | "dark";
 		width?: number;
-		fullWidth?: boolean;
 	} = {},
 ) {
 	const args: EditorArgs = {
@@ -39,7 +38,7 @@ export function mountEditor(
 		return (
 			<div
 				style={{
-					width: options.width ?? (options.fullWidth ? "100%" : undefined),
+					width: options.width,
 					maxWidth: options.width ? "100%" : 1040,
 					marginInline: "auto",
 				}}

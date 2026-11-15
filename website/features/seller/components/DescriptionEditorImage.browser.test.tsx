@@ -1,5 +1,13 @@
 import { within } from "@testing-library/dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
 import { userEvent } from "vitest/browser";
 import { getEnv } from "@/lib/config/env";
 import type { UploadedAsset } from "@/lib/media/upload";
@@ -10,7 +18,7 @@ import {
 	descriptionImageSvg,
 	startDescriptionImageFixtures,
 } from "@/tests/browser/description-image-fixtures";
-import { waitFor } from "@/tests/browser/dom";
+import { expectTextContains, waitFor } from "@/tests/browser/dom";
 
 // 媒體 origin 要在被測模組載入前就設定（getEnv 會記住第一次的結果）。fixture 攔的是 test-media.example.com，
 // 與 .github/workflows/website-e2e.yml 的 NEXT_PUBLIC_MEDIA_BASE_URL 相同；沒設時 buildImageUrl 不組網址，圖片區塊會被判定資料無效。
@@ -18,12 +26,15 @@ vi.hoisted(() => {
 	process.env.NEXT_PUBLIC_MEDIA_BASE_URL = "https://test-media.example.com";
 });
 
-const stopFixtures: Array<() => void> = [];
-beforeEach(async () => {
-	stopFixtures.push(await startDescriptionImageFixtures());
+let fixtures: Awaited<ReturnType<typeof startDescriptionImageFixtures>>;
+beforeAll(async () => {
+	fixtures = await startDescriptionImageFixtures();
 });
 afterEach(() => {
-	while (stopFixtures.length > 0) stopFixtures.pop()?.();
+	fixtures.resetHandlers();
+});
+afterAll(() => {
+	fixtures.stop();
 });
 
 const newImageKey = "public/storybook/image-new.svg";
@@ -64,9 +75,12 @@ async function setup(canvasElement: HTMLElement) {
 	const dialog = within(canvasElement).getByRole("dialog", {
 		name: "商品描述編輯器",
 	});
-	await waitFor(() => expect(dialog).toHaveAttribute("data-ready", "true"), {
-		timeout: 15_000,
-	});
+	await waitFor(
+		() => expect(dialog).toHaveAttributeSync("data-ready", "true"),
+		{
+			timeout: 15_000,
+		},
+	);
 	return dialog;
 }
 
@@ -87,12 +101,12 @@ async function insertImage(dialog: HTMLElement) {
 	await waitFor(() => {
 		// The hidden file input can exist while the new block is still being
 		// revealed. Upload stories must wait for the same usable control as users.
-		expect(fileInput(dialog)).toBeInTheDocument();
+		expect(fileInput(dialog)).toBeInTheDocumentSync();
 		const choose = within(dialog).getByRole("button", {
 			name: /加入商品圖片/,
 		});
-		expect(choose).toBeVisible();
-		expect(choose).toBeEnabled();
+		expect(choose).toBeVisibleSync();
+		expect(choose).toBeEnabledSync();
 	});
 }
 
@@ -110,8 +124,8 @@ function assertNoCaption(dialog: HTMLElement) {
 async function assertDecodedImage(dialog: HTMLElement, alt?: string) {
 	await waitFor(() => {
 		const image = within(dialog).getByRole("img", alt ? { name: alt } : {});
-		expect(image).toBeVisible();
-		expect(image).toHaveStyle({ opacity: "1" });
+		expect(image).toBeVisibleSync();
+		expect(image).toHaveStyleSync({ opacity: "1" });
 		expect((image as HTMLImageElement).naturalWidth).toBeGreaterThan(0);
 	});
 	assertNoCaption(dialog);
@@ -133,9 +147,9 @@ describe("DescriptionEditorImage", () => {
 		await waitFor(() =>
 			expect(
 				within(dialog).getByRole("button", { name: /加入商品圖片/ }),
-			).toBeVisible(),
+			).toBeVisibleSync(),
 		);
-		await expect(fileInput(dialog)).toHaveAttribute("accept", "image/*");
+		await expect(fileInput(dialog)).toHaveAttributeSync("accept", "image/*");
 		assertNoCaption(dialog);
 		await expect(args.uploadImageFile).not.toHaveBeenCalled();
 	});
@@ -159,9 +173,9 @@ describe("DescriptionEditorImage", () => {
 		const selected = file();
 		await userEvent.upload(fileInput(dialog), selected);
 		await waitFor(() =>
-			expect(ui.getByRole("progressbar", { name: "圖片上傳進度" })).toHaveValue(
-				37,
-			),
+			expect(
+				ui.getByRole("progressbar", { name: "圖片上傳進度" }),
+			).toHaveValueSync(37),
 		);
 		await expect(args.uploadImageFile).toHaveBeenCalledWith(
 			selected,
@@ -170,9 +184,9 @@ describe("DescriptionEditorImage", () => {
 		);
 		progress?.(0.72);
 		await waitFor(() =>
-			expect(ui.getByRole("progressbar", { name: "圖片上傳進度" })).toHaveValue(
-				72,
-			),
+			expect(
+				ui.getByRole("progressbar", { name: "圖片上傳進度" }),
+			).toHaveValueSync(72),
 		);
 		complete(uploaded);
 		await waitFor(() => {
@@ -182,7 +196,7 @@ describe("DescriptionEditorImage", () => {
 					stagedToken: uploaded.stagedToken,
 				}),
 			]);
-			expect(ui.queryByRole("progressbar")).not.toBeInTheDocument();
+			expect(ui.queryByRole("progressbar")).not.toBeInTheDocumentSync();
 		});
 		await assertDecodedImage(dialog);
 	});
@@ -198,7 +212,8 @@ describe("DescriptionEditorImage", () => {
 		await insertImage(dialog);
 		const selected = file();
 		await userEvent.upload(fileInput(dialog), selected);
-		await expect(await ui.findByRole("alert")).toHaveTextContent(
+		await expectTextContains(
+			() => ui.getByRole("alert"),
 			"圖片上傳失敗，請重試或選擇其他圖片。",
 		);
 		await expect(images(args.onChange.mock.lastCall?.[0])).toEqual([]);
@@ -225,13 +240,11 @@ describe("DescriptionEditorImage", () => {
 		const ui = within(dialog);
 		await assertDecodedImage(dialog, oldImage.alt);
 		const assertRejected = async (message: string) => {
-			await waitFor(() =>
-				expect(ui.getByRole("alert")).toHaveTextContent(message),
-			);
+			await expectTextContains(() => ui.getByRole("alert"), message);
 			await expect(args.uploadImageFile).not.toHaveBeenCalled();
 			await expect(
 				ui.queryByRole("button", { name: "重試上傳" }),
-			).not.toBeInTheDocument();
+			).not.toBeInTheDocumentSync();
 			await expect(
 				images(args.onChange.mock.lastCall?.[0] ?? args.value),
 			).toEqual([
@@ -274,7 +287,7 @@ describe("DescriptionEditorImage", () => {
 			.mockResolvedValueOnce(uploaded);
 		await assertDecodedImage(dialog, oldImage.alt);
 		await userEvent.upload(fileInput(dialog), file());
-		await expect(await ui.findByRole("alert")).toBeVisible();
+		await expect(await ui.findByRole("alert")).toBeVisibleSync();
 		await expect(
 			images(args.onChange.mock.lastCall?.[0] ?? args.value),
 		).toEqual([
@@ -322,7 +335,7 @@ describe("DescriptionEditorImage", () => {
 		await userEvent.click(ui.getByRole("button", { name: "移除圖片" }));
 		await waitFor(() => {
 			expect(images(args.onChange.mock.lastCall?.[0])).toEqual([]);
-			expect(ui.queryByRole("img")).not.toBeInTheDocument();
+			expect(ui.queryByRole("img")).not.toBeInTheDocumentSync();
 		});
 		await userEvent.click(ui.getByRole("button", { name: /^復原（/ }));
 		await waitFor(() =>
@@ -354,16 +367,18 @@ describe("DescriptionEditorImage", () => {
 		await insertImage(dialog);
 		await userEvent.upload(fileInput(dialog), file());
 		await waitFor(() =>
-			expect(ui.getByRole("progressbar", { name: "圖片上傳進度" })).toHaveValue(
-				42,
-			),
+			expect(
+				ui.getByRole("progressbar", { name: "圖片上傳進度" }),
+			).toHaveValueSync(42),
 		);
-		await expect(ui.getByRole("button", { name: "移除圖片" })).toBeEnabled();
+		await expect(
+			ui.getByRole("button", { name: "移除圖片" }),
+		).toBeEnabledSync();
 		await userEvent.click(ui.getByRole("button", { name: "移除圖片" }));
 		await waitFor(() => {
-			expect(dialog).toHaveAttribute("aria-busy", "false");
-			expect(ui.queryByLabelText("選擇商品圖片")).not.toBeInTheDocument();
-			expect(ui.queryByRole("img")).not.toBeInTheDocument();
+			expect(dialog).toHaveAttributeSync("aria-busy", "false");
+			expect(ui.queryByLabelText("選擇商品圖片")).not.toBeInTheDocumentSync();
+			expect(ui.queryByRole("img")).not.toBeInTheDocumentSync();
 			expect(images(args.onChange.mock.lastCall?.[0] ?? args.value)).toEqual(
 				[],
 			);
@@ -378,9 +393,9 @@ describe("DescriptionEditorImage", () => {
 		);
 		await userEvent.click(ui.getByRole("button", { name: "閱讀預覽" }));
 		await waitFor(() => {
-			expect(dialog).toHaveAttribute("data-preview", "true");
-			expect(dialog).toHaveAttribute("aria-busy", "false");
-			expect(ui.queryByRole("img")).not.toBeInTheDocument();
+			expect(dialog).toHaveAttributeSync("data-preview", "true");
+			expect(dialog).toHaveAttributeSync("aria-busy", "false");
+			expect(ui.queryByRole("img")).not.toBeInTheDocumentSync();
 			expect((args.onChange.mock.lastCall?.[0] ?? args.value).blocks).toEqual(
 				textDocument.blocks,
 			);
@@ -397,7 +412,9 @@ describe("DescriptionEditorImage", () => {
 		const dialog = await setup(canvasElement);
 		const ui = within(dialog);
 		await userEvent.click(ui.getByRole("button", { name: "閱讀預覽" }));
-		await waitFor(() => expect(dialog).toHaveAttribute("data-preview", "true"));
+		await waitFor(() =>
+			expect(dialog).toHaveAttributeSync("data-preview", "true"),
+		);
 		await assertDecodedImage(dialog, oldImage.alt);
 		await expect(ui.queryByRole("button", { name: "更換圖片" })).toBeNull();
 		await expect(ui.queryByRole("button", { name: "移除圖片" })).toBeNull();
@@ -421,8 +438,12 @@ describe("DescriptionEditorImage", () => {
 		await expect(dialog.scrollWidth).toBeLessThanOrEqual(
 			dialog.clientWidth + 1,
 		);
-		await expect(ui.getByRole("button", { name: "更換圖片" })).toBeVisible();
-		await expect(ui.getByRole("button", { name: "移除圖片" })).toBeVisible();
+		await expect(
+			ui.getByRole("button", { name: "更換圖片" }),
+		).toBeVisibleSync();
+		await expect(
+			ui.getByRole("button", { name: "移除圖片" }),
+		).toBeVisibleSync();
 		await expect(args.uploadImageFile).not.toHaveBeenCalled();
 	});
 });

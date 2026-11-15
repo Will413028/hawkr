@@ -73,9 +73,12 @@ async function nativeTableTest(
 	const dialog = within(canvasElement).getByRole("dialog", {
 		name: "商品描述編輯器",
 	});
-	await waitFor(() => expect(dialog).toHaveAttribute("data-ready", "true"), {
-		timeout: 15_000,
-	});
+	await waitFor(
+		() => expect(dialog).toHaveAttributeSync("data-ready", "true"),
+		{
+			timeout: 15_000,
+		},
+	);
 	const view = dialog.ownerDocument.defaultView;
 	if (!view) throw new Error("缺少表格編輯器的瀏覽器視窗");
 	const errors: string[] = [];
@@ -213,8 +216,8 @@ function assertTableState(
 			row.map((cell) => cell.runs.map((run) => run.text).join("")),
 		),
 	);
-	expect(within(dialog).getByText("表格前方文字保留")).toBeVisible();
-	expect(within(dialog).getByText("表格後方文字保留")).toBeVisible();
+	expect(within(dialog).getByText("表格前方文字保留")).toBeVisibleSync();
+	expect(within(dialog).getByText("表格後方文字保留")).toBeVisibleSync();
 }
 
 function mount(

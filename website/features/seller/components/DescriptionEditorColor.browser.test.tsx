@@ -27,10 +27,12 @@ async function setup(canvasElement: HTMLElement) {
 	});
 	await waitFor(
 		() => {
-			expect(dialog).toHaveAttribute("data-ready", "true");
-			expect(dialog).toHaveAttribute("aria-busy", "false");
-			expect(dialog).toBeVisible();
-			expect(within(dialog).getByText("選取這段文字調整顏色")).toBeVisible();
+			expect(dialog).toHaveAttributeSync("data-ready", "true");
+			expect(dialog).toHaveAttributeSync("aria-busy", "false");
+			expect(dialog).toBeVisibleSync();
+			expect(
+				within(dialog).getByText("選取這段文字調整顏色"),
+			).toBeVisibleSync();
 		},
 		{ timeout: 15_000 },
 	);
@@ -52,11 +54,13 @@ async function waitForPalette(dialog: HTMLElement) {
 	// also animates its parent dialog; existence alone does not mean visible.
 	return waitFor(() => {
 		const panel = within(dialog).getByRole("dialog", { name: "文字顏色" });
-		expect(panel).toBeVisible();
-		expect(within(panel).getByRole("slider", { name: "色相" })).toBeVisible();
+		expect(panel).toBeVisibleSync();
+		expect(
+			within(panel).getByRole("slider", { name: "色相" }),
+		).toBeVisibleSync();
 		expect(
 			within(panel).getByRole("slider", { name: "飽和度與亮度" }),
-		).toHaveFocus();
+		).toHaveFocusSync();
 		return panel;
 	});
 }
@@ -103,7 +107,7 @@ describe("DescriptionEditorColor", () => {
 			]);
 		});
 		await waitFor(() =>
-			expect(ui.getByText("選取這段文字調整顏色")).toHaveStyle({
+			expect(ui.getByText("選取這段文字調整顏色")).toHaveStyleSync({
 				color: "rgb(86, 58, 114)",
 			}),
 		);
@@ -135,15 +139,17 @@ describe("DescriptionEditorColor", () => {
 		await userEvent.click(picker.getByRole("button", { name: "取消" }));
 		await expect(
 			ui.queryByRole("dialog", { name: "文字顏色" }),
-		).not.toBeInTheDocument();
-		await expect(ui.getByRole("button", { name: "文字顏色" })).toHaveFocus();
+		).not.toBeInTheDocumentSync();
+		await expect(
+			ui.getByRole("button", { name: "文字顏色" }),
+		).toHaveFocusSync();
 		await expect(
 			args.onChange.mock.lastCall?.[0].blocks[0].runs?.[0].color,
 		).toBeUndefined();
 		picker = within(await openPalette(dialog));
 		await expect(
 			picker.getByRole("textbox", { name: "HEX 色碼" }),
-		).not.toHaveValue("#563a72");
+		).not.toHaveValueSync("#563a72");
 		await userEvent.keyboard("{Escape}");
 		await userEvent.click(ui.getByRole("button", { name: /^粗體/ }));
 		await waitFor(() => {
@@ -169,8 +175,8 @@ describe("DescriptionEditorColor", () => {
 		await userEvent.click(ui.getByRole("button", { name: "放大編輯" }));
 		await waitFor(() => {
 			const collapse = ui.getByRole("button", { name: "縮小編輯區" });
-			expect(collapse).toHaveAttribute("aria-expanded", "true");
-			expect(collapse).toBeVisible();
+			expect(collapse).toHaveAttributeSync("aria-expanded", "true");
+			expect(collapse).toBeVisibleSync();
 		});
 		selectText(ui.getByText("選取這段文字調整顏色"));
 		let picker = within(await openPalette(dialog));
@@ -185,19 +191,21 @@ describe("DescriptionEditorColor", () => {
 		);
 		selectText(ui.getByText("選取這段文字調整顏色"));
 		picker = within(await openPalette(dialog));
-		await expect(picker.getByRole("textbox", { name: "HEX 色碼" })).toHaveValue(
-			"#b8441f",
-		);
+		await expect(
+			picker.getByRole("textbox", { name: "HEX 色碼" }),
+		).toHaveValueSync("#b8441f");
 		await userEvent.keyboard("{Escape}");
 		await expect(
 			ui.queryByRole("dialog", { name: "文字顏色" }),
-		).not.toBeInTheDocument();
-		await expect(ui.getByRole("button", { name: "縮小編輯區" })).toBeVisible();
+		).not.toBeInTheDocumentSync();
+		await expect(
+			ui.getByRole("button", { name: "縮小編輯區" }),
+		).toBeVisibleSync();
 		await userEvent.click(ui.getByRole("button", { name: "縮小編輯區" }));
 		await waitFor(() => {
 			const expand = ui.getByRole("button", { name: "放大編輯" });
-			expect(expand).toHaveAttribute("aria-expanded", "false");
-			expect(expand).toBeVisible();
+			expect(expand).toHaveAttributeSync("aria-expanded", "false");
+			expect(expand).toBeVisibleSync();
 		});
 	});
 
@@ -229,7 +237,7 @@ describe("DescriptionEditorColor", () => {
 				{ text: "調整顏色" },
 			]),
 		);
-		await expect(ui.getByText("這段文字")).toHaveStyle({
+		await expect(ui.getByText("這段文字")).toHaveStyleSync({
 			color: "rgb(104, 46, 14)",
 		});
 	});
@@ -275,13 +283,13 @@ describe("DescriptionEditorColor", () => {
 						// History publishes its snapshot before the final busy-state
 						// update. Check the current rendered text after that update,
 						// rather than retaining a node from an intermediate render.
-						expect(dialog).toHaveAttribute("aria-busy", "false");
+						expect(dialog).toHaveAttributeSync("aria-busy", "false");
 						const next = args.onChange.mock.lastCall?.[0];
 						expect(next?.blocks[0].runs).toEqual([states[index]]);
 						expect(next?.blocks[1].runs).toEqual([
 							{ text: "其餘內容維持原來的樣式" },
 						]);
-						expect(within(dialog).getByText(text)).toBeVisible();
+						expect(within(dialog).getByText(text)).toBeVisibleSync();
 					});
 				} catch (cause) {
 					throw new Error(
