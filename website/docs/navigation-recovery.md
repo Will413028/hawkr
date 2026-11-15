@@ -55,17 +55,17 @@ import {
 
 正式期限與取消條件由 [`recovery-state.ts`](../lib/navigation/recovery-state.ts) 管理；意圖、完成與跨文件關聯在 [`observability.ts`](../lib/navigation/observability.ts)，已開始的導覽由 [`navigation-watchdog.ts`](../lib/loading/navigation-watchdog.ts) 接手。登入使用 [`LoginPage.tsx`](../features/auth/screens/login/LoginPage.tsx)。來源仍是行為與 API 的最終依據。
 
-## Stories 與驗證狀態
+## 瀏覽器測試與驗證狀態
 
-[`stories/web/NavigationRecovery.stories.tsx`](../stories/web/NavigationRecovery.stories.tsx) 使用正式導覽狀態機與共用 Button，替換文件導覽 I/O、縮短期限並驅動 router 開始／提交訊號。文件導覽只更新隔離預覽，沒有登入交換、真實 API 或交易。正式 Link 與登入 hook 的接線由 React 整合單元測試驗證；Storybook 內建 Link mock 會先取消點擊，不能拿它當正式 Next 路由的執行證據。
+[`lib/navigation/recovery.browser.test.tsx`](../lib/navigation/recovery.browser.test.tsx) 使用正式導覽狀態機與共用 Button，替換文件導覽 I/O、縮短期限並驅動 router 開始／提交訊號。文件導覽只更新隔離預覽，沒有登入交換、真實 API 或交易。正式 Link 與登入 hook 的接線由 React 整合單元測試驗證；瀏覽器測試環境的 Link mock 會先取消點擊，不能拿它當正式 Next 路由的執行證據。
 
-| Story export | 審查情境 |
+| 測試情境 | 審查內容 |
 | --- | --- |
 | `UnstartedRecovery` | router 未啟動時只復原一次。 |
 | `LateRouterStart` | 延遲啟動仍正常到達，不被提早判失敗。 |
 | `LoginSupersedesPending` | 登入離頁接管舊等待，舊期限不能覆蓋目的地。 |
 
-預覽將復原等待縮短至 800ms，方便互動審查；正式 10／20 秒期限由 Node 單元測試驗證，不能拿 story 的等待時間當成產品設定。
+預覽將復原等待縮短至 800ms，方便互動審查；正式 10／20 秒期限由 Node 單元測試驗證，不能拿測試的等待時間當成產品設定。
 
 本次本機驗證：
 
@@ -74,8 +74,8 @@ import {
 | 本機 React 整合單元測試 | `pnpm test features/auth/screens/login/LoginPage.unit.test.ts components/shared/Link.navigation.unit.test.ts`：2 檔、29 項通過。涵蓋登入頁導向單體的 OAuth start、provider 回來後的離頁與目的地保留、重複點擊，以及連結導覽的取消、replace、延遲回呼。 |
 | 完整單元測試 | `pnpm test`：220 檔、2022 項全數通過；包含 storage key 分類、共用 Link 與手機底部導覽。 |
 | core Node 測試 | observability、watchdog、route contract 三套最新合計 66 項通過。登入角色／redirect、樣式 ownership 與賣家通知 contract 另 17 項通過。 |
-| MCP `test-run` | 最後完整一輪 146 項全數通過，包含 3 個新預覽。前一輪商品描述 story 的可見性等待失敗，限定重跑與完整重跑均通過，未修改商品描述程式。 |
-| 型別與靜態檢查 | `pnpm storybook:typecheck`、本次 17 檔 Biome、`git diff --check` 通過。應用程式型別檢查排除既有 `output` 測試產物後通過；原始全庫 `tsc` 仍被 `output/playwright` 既有產物的型別錯誤阻擋。 |
+| 已移除的元件預覽的 MCP `test-run` | 最後完整一輪 146 項全數通過，包含 3 個新預覽。前一輪商品描述 story 的可見性等待失敗，限定重跑與完整重跑均通過，未修改商品描述程式。 |
+| 型別與靜態檢查 | 已移除的元件預覽型別檢查、本次 17 檔 Biome、`git diff --check` 通過。應用程式型別檢查排除既有 `output` 測試產物後通過；原始全庫 `tsc` 仍被 `output/playwright` 既有產物的型別錯誤阻擋。 |
 | 瀏覽器預覽 | Chromium 桌面與 390px 手機尺寸完成實際預覽、截圖檢查。截圖位於 `output/playwright/navigation-recovery-*.png`；這是隔離狀態機驗證，不是正式登入或 Safari 裝置回歸。 |
 | CI、push、部署、正式 Safari 回歸 | 本次尚無完成證據。 |
 

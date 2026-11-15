@@ -36,7 +36,7 @@ import '../shared/widgets/quantity_stepper.dart';
 import '../shared/widgets/hk_brand_loader.dart';
 import '../shared/widgets/hk_skeleton_shimmer.dart';
 
-/// These IDs are also used by the seller catalog and Web Storybook iframe stories.
+/// These IDs are also used by the seller catalog and embedded iframe hosts.
 const buyerCatalogSections = <String, String>{
   'foundations': '基礎樣式',
   'buttons': '按鈕',
@@ -83,7 +83,7 @@ class _BuyerComponentCatalogAppState extends State<BuyerComponentCatalogApp> {
   @override
   void initState() {
     super.initState();
-    // Catalog-only: expose real Flutter controls to Storybook/browser tools
+    // Catalog-only: expose real Flutter controls to browser tools
     // without first requiring a visitor to activate the accessibility overlay.
     if (kIsWeb) _semanticsHandle = WidgetsBinding.instance.ensureSemantics();
     final params = (widget.initialUri ?? Uri.base).queryParameters;
