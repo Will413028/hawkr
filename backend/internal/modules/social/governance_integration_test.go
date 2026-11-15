@@ -79,6 +79,42 @@ func TestContentOwnerReportsAuthorStoreAndReadability(t *testing.T) {
 	}
 }
 
+// ContentSnapshot 給 moderation 凍結內容：本文、媒體參照與作者；內容改過快照跟著變，刪除後不存在。
+func TestContentSnapshotReturnsBodyMediaAndAuthor(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	b := f.newBuyer(t)
+	p := f.publishedPost(t, storeID, "貼文本文")
+	c := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p.ID, Body: "留言本文"}))
+	e := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "討論本文"}))
+	snap := func(k social.TargetKind, id uuidT) social.ContentSnapshot {
+		return mustV[social.ContentSnapshot](t)(f.module.ContentSnapshot(ctx, social.Target{Kind: k, ID: id}))
+	}
+	buyer := social.Actor{Kind: social.ActorBuyer, ID: b.BuyerID}
+	if got := snap(social.TargetComment, c.ID); !got.Exists || got.Body != "留言本文" || got.Author != buyer || got.StoreID != storeID || len(got.MediaRefs) != 0 {
+		t.Fatalf("留言 %+v", got)
+	}
+	if got := snap(social.TargetForumEntry, e.ID); !got.Exists || got.Body != "討論本文" || got.Author != buyer || got.StoreID != storeID {
+		t.Fatalf("討論區 %+v", got)
+	}
+	got := snap(social.TargetPost, p.ID)
+	if !got.Exists || got.Body != "貼文本文" || got.Author != (social.Actor{Kind: social.ActorStore, ID: storeID}) || len(got.MediaRefs) != 1 || got.MediaRefs[0] == "" {
+		t.Fatalf("貼文 %+v", got)
+	}
+	must(t, f.module.DeleteComment(ctx, f.asBuyer(b), c.ID))
+	if got := snap(social.TargetComment, c.ID); got.Exists || got.Body != "" {
+		t.Fatalf("刪除後不存在 %+v", got)
+	}
+	if got := snap(social.TargetPost, uuidNew()); got.Exists {
+		t.Fatalf("不存在的 ID %+v", got)
+	}
+	if _, err := f.module.ContentSnapshot(ctx, social.Target{Kind: "CHAT", ID: p.ID}); kindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("不認得的種類：%v", err)
+	}
+}
+
 // 快取失效：發布、隱藏、還原各排入一個 revalidate job（貼文 tag 加店家 tag）；重複隱藏與重複刪除不做副作用；編輯草稿不失效。
 func TestRevalidateIsEnqueuedInTheSameTransaction(t *testing.T) {
 	t.Parallel()

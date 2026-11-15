@@ -101,6 +101,70 @@ func (s *Service) Owner(ctx context.Context, t model.Target) (model.ContentOwner
 	return model.ContentOwner{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())
 }
 
+// Snapshot 回傳內容此刻的本文、媒體參照與作者（給 moderation 在檢舉送出時凍結）：唯讀，不鎖；內容不存在或已刪除回 Exists 為假，不是錯誤。
+// 是不是公開可讀由 Owner 回答，呼叫方兩個都問。
+func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSnapshot, error) {
+	q := s.q(ctx)
+	switch t.Kind {
+	case model.TargetComment:
+		r, err := q.GetCommentSnapshot(ctx, t.ID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.ContentSnapshot{}, nil
+		}
+		if err != nil {
+			return model.ContentSnapshot{}, fmt.Errorf("social：讀取留言的快照 %s：%w", t.ID, err)
+		}
+		if !r.ExistsNow {
+			return model.ContentSnapshot{}, nil
+		}
+		owner, err := s.Owner(ctx, t)
+		if err != nil {
+			return model.ContentSnapshot{}, err
+		}
+		return model.ContentSnapshot{Exists: true, Author: model.Actor{Kind: model.ActorKind(r.ActorKind), ID: r.ActorID}, StoreID: owner.StoreID, Body: deref(r.Body), MediaRefs: []string{}}, nil
+	case model.TargetForumEntry:
+		r, err := q.GetForumEntrySnapshot(ctx, t.ID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.ContentSnapshot{}, nil
+		}
+		if err != nil {
+			return model.ContentSnapshot{}, fmt.Errorf("social：讀取討論區留言的快照 %s：%w", t.ID, err)
+		}
+		if !r.ExistsNow {
+			return model.ContentSnapshot{}, nil
+		}
+		owner, err := s.Owner(ctx, t)
+		if err != nil {
+			return model.ContentSnapshot{}, err
+		}
+		return model.ContentSnapshot{Exists: true, Author: model.Actor{Kind: model.ActorKind(r.ActorKind), ID: r.ActorID}, StoreID: owner.StoreID, Body: deref(r.Body), MediaRefs: []string{}}, nil
+	case model.TargetPost:
+		r, err := q.GetPostSnapshot(ctx, t.ID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.ContentSnapshot{}, nil
+		}
+		if err != nil {
+			return model.ContentSnapshot{}, fmt.Errorf("social：讀取貼文的快照 %s：%w", t.ID, err)
+		}
+		if !r.ExistsNow {
+			return model.ContentSnapshot{}, nil
+		}
+		media := []string{}
+		if r.ImageAssetID != nil {
+			media = append(media, *r.ImageAssetID)
+		}
+		return model.ContentSnapshot{Exists: true, Author: model.Actor{Kind: model.ActorStore, ID: r.StoreID}, StoreID: r.StoreID, Body: r.Body, MediaRefs: media}, nil
+	}
+	return model.ContentSnapshot{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 // lockTarget 鎖住隱藏的目標列（與刪除、編輯同一把鎖），讓之後的 Owner 檢查和寫入看到同一個已提交的狀態：與並行的刪除序列化後，隱藏一則剛被刪除的
 // 內容回 NotFound，而不是對一則已經不存在的內容寫隱藏。計數的正確性不靠它（trigger 的 reevaluate 自己先鎖內容列）。目標不存在時不鎖，由 Owner 回 NotFound。
 func (s *Service) lockTarget(ctx context.Context, t model.Target) error {
