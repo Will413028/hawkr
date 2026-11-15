@@ -361,7 +361,7 @@ function listSourceFiles(dir: string, acc: string[]): string[] {
 		}
 		if (
 			/\.(ts|tsx)$/.test(entry.name) &&
-			!/\.unit\.test\.tsx?$/.test(entry.name)
+			!/\.(unit|browser)\.test\.tsx?$/.test(entry.name)
 		) {
 			acc.push(full);
 		}
