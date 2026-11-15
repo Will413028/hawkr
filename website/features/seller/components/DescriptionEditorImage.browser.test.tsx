@@ -26,13 +26,13 @@ afterEach(() => {
 	fixtures.stop();
 });
 
-const newImageKey = "public/storybook/image-new.svg";
+const newImageKey = "public/fixtures/image-new.svg";
 
 const uploaded: UploadedAsset = {
 	// 上傳結果的 previewUrl 要落在設定的媒體 origin 才會還原成 object key（lib/media/cdn.ts），
 	// 所以跟著 NEXT_PUBLIC_MEDIA_BASE_URL，不寫死主機。
 	previewUrl: `${getEnv().mediaBaseUrl}/${newImageKey}`,
-	stagedToken: "storybook-image-upload-token",
+	stagedToken: "fixture-image-upload-token",
 };
 
 const textDocument: ProductDescription = {
@@ -49,8 +49,8 @@ const textDocument: ProductDescription = {
 const oldImage = {
 	id: "image-story-existing",
 	type: "image" as const,
-	assetId: "storybook-old-asset",
-	imageKey: "public/storybook/image-old.svg",
+	assetId: "fixture-old-asset",
+	imageKey: "public/fixtures/image-old.svg",
 	imageUrl: descriptionImageDataUrl,
 	alt: "既有商品圖片的替代文字",
 };

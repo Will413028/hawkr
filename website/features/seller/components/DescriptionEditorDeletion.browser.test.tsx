@@ -698,7 +698,7 @@ describe("DescriptionEditorDeletion", () => {
 						id: "preserved-image",
 						type: "image",
 						assetId: "story-image",
-						imageKey: "public/storybook/deletion-fixture.svg",
+						imageKey: "public/fixtures/deletion-fixture.svg",
 						imageUrl: localImage,
 						alt: "本地測試圖片",
 					},
@@ -763,7 +763,7 @@ describe("DescriptionEditorDeletion", () => {
 				expect(value.blocks.filter((block) => block.type === "image")).toEqual([
 					expect.objectContaining({
 						assetId: "story-image",
-						imageKey: "public/storybook/deletion-fixture.svg",
+						imageKey: "public/fixtures/deletion-fixture.svg",
 						alt: "本地測試圖片",
 					}),
 				]);

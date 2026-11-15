@@ -10,7 +10,7 @@ export async function startDescriptionImageFixtures() {
 	const { setupWorker } = await import("msw/browser");
 	const worker = setupWorker(
 		http.get(
-			/^https:\/\/(?:test-)?media\.example\.com\/(?:i\/original\/)?public\/storybook\/(?:image-(?:old|new)|deletion-fixture)\.svg$/,
+			/^https:\/\/(?:test-)?media\.example\.com\/(?:i\/original\/)?public\/fixtures\/(?:image-(?:old|new)|deletion-fixture)\.svg$/,
 			() =>
 				new HttpResponse(descriptionImageSvg, {
 					headers: { "Content-Type": "image/svg+xml" },
