@@ -66,7 +66,7 @@
 		"@heroui/styles": "^3.0.5",
 		"@hookform/resolvers": "^5.4.0",
 		"@sentry/nextjs": "10.75.2",
-		"@sentry/vercel-edge": "10.75.2",
+		"@sentry/vercel-edge": "11.8.0",
 		"@stripe/connect-js": "3.4.6",
 		"@stripe/react-connect-js": "3.4.4",
 		"@tanstack/react-query": "^5.104.0",
