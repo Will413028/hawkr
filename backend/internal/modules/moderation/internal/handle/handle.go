@@ -96,7 +96,7 @@ func Validate(in model.DecideInput) (model.DecideInput, error) {
 	return in, nil
 }
 
-// Decide 處理案件並結案。案件不存在回 NotFound；案件已結案或版本過期回 VersionConflict（處置整個回滾）；處置種類不適用於對象、內容已不存在、作者種類
+// Decide 處理案件並結案。案件不存在回 NotFound；案件已結案或版本過期回 VersionConflict（處置整個回滾）；處置種類不適用於對象、作者種類
 // 不符、內容不屬於指定的店家回 InvalidInput 或 FailedPrecondition，什麼都不寫；帳號擁有店家時停權回 ACCOUNT_HAS_STORE。
 func (s *Service) Decide(ctx context.Context, in model.DecideInput) (model.CaseDetail, error) {
 	in, err := Validate(in)
@@ -158,7 +158,7 @@ func ptr[T any](v T) *T { return &v }
 // apply 呼叫擁有處分的模組建立處分。
 func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in model.DecideInput) error {
 	ref := SourceRefPrefix + c.ID.String()
-	author, owner, err := s.author(ctx, q, c, in.Action)
+	author, owner, err := s.author(ctx, q, c)
 	if err != nil {
 		return err
 	}
@@ -166,6 +166,9 @@ func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in 
 	case model.ActionHide:
 		if author.Kind != social.ActorBuyer {
 			return apperr.FailedPrecondition("%s", text.DecideHideStoreContent())
+		}
+		if !owner.Exists {
+			return nil
 		}
 		_, err := s.d.Social.Hide(ctx, social.HideInput{
 			Target:   social.Target{Kind: social.TargetKind(c.Target.Kind), ID: c.Target.ContentID},
@@ -194,9 +197,9 @@ func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in 
 	return apperr.InvalidInputOn([]string{"Action"}, "%s", text.DecideActionInvalid())
 }
 
-// author 回傳對象的作者：買家對象的作者就是那位買家；內容向 social 讀。內容已被刪除時，隱藏與內容下架沒有東西可以處置（回 FailedPrecondition），
-// 警告與停權針對作者、不是內容，所以改用案件快照裡凍結的作者（作者刪掉內容不能躲過處置）。
-func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case, action model.Action) (social.Actor, social.ContentOwner, error) {
+// author 回傳對象的作者與歸屬：買家對象的作者就是那位買家；內容向 social 讀。內容已被刪除時（Exists 為假）改用案件快照裡凍結的作者與店家，
+// 所以作者刪掉內容不能躲過警告、停權與內容下架的歸屬驗證；隱藏的目的（內容不可見）已達成，由呼叫端視為成功。
+func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case) (social.Actor, social.ContentOwner, error) {
 	t := c.Target
 	if t.Kind == model.TargetBuyer {
 		return social.Actor{Kind: social.ActorBuyer, ID: t.BuyerID}, social.ContentOwner{}, nil
@@ -207,9 +210,6 @@ func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case, ac
 	}
 	if owner.Exists {
 		return owner.Author, owner, nil
-	}
-	if action != model.ActionWarn && action != model.ActionBan {
-		return social.Actor{}, social.ContentOwner{}, apperr.FailedPrecondition("%s", text.DecideContentGone())
 	}
 	body, err := q.LatestSnapshotContent(ctx, c.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -222,7 +222,8 @@ func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case, ac
 	if err != nil {
 		return social.Actor{}, social.ContentOwner{}, fmt.Errorf("moderation：解讀案件 %s 的快照：%w", c.ID, err)
 	}
-	return social.Actor{Kind: social.ActorKind(frozen.AuthorKind), ID: frozen.AuthorID}, social.ContentOwner{}, nil
+	author := social.Actor{Kind: social.ActorKind(frozen.AuthorKind), ID: frozen.AuthorID}
+	return author, social.ContentOwner{Author: author, StoreID: frozen.StoreID}, nil
 }
 
 func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, owner social.ContentOwner, in model.DecideInput) error {

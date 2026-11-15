@@ -26,7 +26,7 @@ func (f *fixture) deleteComment(t *testing.T, buyerID int64, id uuid.UUID) {
 	must(t, f.social.DeleteComment(context.Background(), social.Caller{BuyerID: buyerID}, id))
 }
 
-// 作者刪掉被檢舉的內容不能躲過警告與停權：處置用案件快照裡凍結的作者；內容已不存在時隱藏沒有東西可以處置，案件維持進行中。
+// 作者刪掉被檢舉的內容不能躲過警告與停權：處置用案件快照裡凍結的作者。
 func TestWarnAndBanUseTheFrozenAuthorWhenTheContentIsGone(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -48,19 +48,6 @@ func TestWarnAndBanUseTheFrozenAuthorWhenTheContentIsGone(t *testing.T) {
 	mustV[CaseDetail](t)(f.decide(t, banCase, ActionBan, policy.Fraud))
 	if !f.suspended(t, w.authorAccount) {
 		t.Fatal("內容刪掉之後停權仍要生效")
-	}
-
-	hidden := f.comment(t, w.post.ID, w.author, "已刪除的留言")
-	hideCase := f.openCase(t, commentTarget(hidden))
-	f.deleteComment(t, w.author, hidden.ID)
-	if _, err := f.decide(t, hideCase, ActionHide, policy.Spam); kindOf(err) != apperr.KindFailedPrecondition {
-		t.Fatalf("內容已刪除時隱藏沒有東西可以處置：%v", err)
-	}
-	if mustV[CaseDetail](t)(f.module.Case(ctx, hideCase.ID)).Case.ClosedAt != nil {
-		t.Fatal("被拒絕的處置不能結案")
-	}
-	if n := f.count(t, "SELECT count(*) FROM social.hides"); n != 0 {
-		t.Fatalf("拒絕後留下 %d 筆隱藏", n)
 	}
 }
 
@@ -137,7 +124,7 @@ func TestTakedownNoteCountsEveryReportButCitesTheEarliestTwenty(t *testing.T) {
 		t.Fatalf("引用 %d 筆，預期上限 20", n)
 	}
 	var note string
-	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT note FROM seller.measures WHERE store_id = $1", w.storeID).Scan(&note); err != nil {
+	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT n.body FROM seller.governance_notes n JOIN seller.measures m ON m.id = n.measure_id WHERE m.store_id = $1", w.storeID).Scan(&note); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(note, "25 筆") {
@@ -242,5 +229,67 @@ func TestReporterDeletionClearsDescriptionsAndDailyCountButKeepsTheReports(t *te
 	}
 	if n := f.count(t, "SELECT count(*) FROM moderation.reports WHERE id = $1 AND description = '別人的說明'", theirs.Report.ID); n != 1 {
 		t.Fatal("別人的說明不能動")
+	}
+}
+
+// A7-D7 第 10 項：買家寫的內容已被刪除時，隱藏視為已達成：成功結案、不呼叫 social 的隱藏（沒有隱藏紀錄），案件結為違規。
+func TestHideOfDeletedBuyerContentSucceedsWithoutCallingSocial(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	ctx := context.Background()
+	gone := f.comment(t, w.post.ID, w.author, "已刪除的留言")
+	c := f.openCase(t, commentTarget(gone))
+	f.deleteComment(t, w.author, gone.ID)
+	d := mustV[CaseDetail](t)(f.decide(t, c, ActionHide, policy.Spam))
+	if d.Case.ClosedAt == nil || d.Case.Decision == nil || *d.Case.Decision != DecisionViolation {
+		t.Fatalf("案件要結為違規：%+v", d.Case)
+	}
+	if n := f.count(t, "SELECT count(*) FROM social.hides"); n != 0 {
+		t.Fatalf("內容已刪除不呼叫 Hide，卻有 %d 筆隱藏", n)
+	}
+	if mustV[CaseDetail](t)(f.module.Case(ctx, c.ID)).Case.ClosedAt == nil {
+		t.Fatal("案件要已結案")
+	}
+}
+
+// A7-D7 第 10 項：店家的貼文已被刪除時，內容下架仍用快照凍結的作者與店家驗證歸屬，建立認定與措施（對象是已刪除的內容 id）；別家店仍被拒絕。
+func TestTakedownOfDeletedStoreContentVerifiesAgainstTheSnapshotAndStillCreatesTheMeasure(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	otherStore, _ := f.exposableStore(t)
+	ctx := context.Background()
+	reporter, _ := f.newBuyer(t)
+	c := f.submit(t, reporter, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
+	st, err := f.sellerRd.Store(ctx, w.storeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	must(t, f.social.DeletePost(ctx, st, w.post.ID, 0))
+
+	in := DecideInput{
+		CaseID: c.ID, Version: c.Version, AdminID: 9, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]), StoreID: otherStore,
+	}
+	if _, err := f.module.DecideCase(ctx, in); kindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("別家店不能對已刪除的內容建立措施：%v", err)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measures"); n != 0 {
+		t.Fatalf("拒絕後留下 %d 個措施", n)
+	}
+	in.StoreID = w.storeID
+	d := mustV[CaseDetail](t)(f.module.DecideCase(ctx, in))
+	if d.Case.ClosedAt == nil {
+		t.Fatalf("案件要結案：%+v", d.Case)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measures WHERE store_id = $1 AND kind = 'CONTENT_TAKEDOWN'", w.storeID); n != 1 {
+		t.Fatalf("內容下架措施 %d 個", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measure_contents WHERE content_kind = 'POST' AND content_id = $1", w.post.ID); n != 1 {
+		t.Fatalf("措施的對象要是已刪除的貼文：%d", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.finding_moderation_reports"); n != 1 {
+		t.Fatalf("認定引用的來源檢舉 %d 筆，預期 1", n)
 	}
 }

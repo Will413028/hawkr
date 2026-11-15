@@ -54,11 +54,6 @@ func DecideCategoryNotForAction() uitext.Message {
 	return uitext.Message{Text: "認定類別不適用這個處置", Locale: uitext.ZhTW}
 }
 
-// DecideContentGone 是後台員工受眾的模組句子 decide.content_gone（只有 zh-TW）。
-func DecideContentGone() uitext.Message {
-	return uitext.Message{Text: "內容已不存在，無法處置", Locale: uitext.ZhTW}
-}
-
 // DecideDecisionInvalid 是後台員工受眾的模組句子 decide.decision_invalid（只有 zh-TW）。
 func DecideDecisionInvalid() uitext.Message {
 	return uitext.Message{Text: "決定不合法", Locale: uitext.ZhTW}

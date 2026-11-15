@@ -84,10 +84,6 @@
       "message": "認定類別不適用這個處置",
       "description": "認定類別不在這個處置接受的子集。"
     },
-    "decide.content_gone": {
-      "message": "內容已不存在，無法處置",
-      "description": "隱藏或內容下架的內容已被刪除，沒有東西可以處置（警告與停權用快照裡的作者，不受影響）。"
-    },
     "decide.decision_invalid": {
       "message": "決定不合法",
       "description": "決定不是違規或不違規。"
