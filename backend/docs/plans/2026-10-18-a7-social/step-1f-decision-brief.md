@@ -36,7 +36,7 @@
 - 批次撤銷只撤進行中的 session（`delegation/db/queries/delegation_sessions.sql:157-186` 的 `status = 'ACTIVE' AND ended_at IS NULL …`）；`SessionForAudit` 對 scheduled origin 只擋 `REVOKED`（`internal/session/query.go:45-60`）。照 A7-D6 原文，撤回店家授權或拔掉管理員權限後，先前排的貼文照發、稽核寫 SUCCEEDED。
 - 設計書 56 第 4821 行把「目標店家轉為不可代行」（§8.1.3 第 8 項 `store_not_operable`）列為取消來源之一；重驗等同重跑開代行的判斷，自然涵蓋。
 
-**執行時重驗**（delegation 的同 transaction 稽核訂閱者內，失敗回權限類 `apperr`，social 的 job 把排程轉 `CANCELED`、原因 `AUTHORITY_LOST`、發 `PostScheduleCanceled`、不重試）：
+**執行時重驗**（接法：social 定義排程授權介面、`cmd/hawkr` 注入 delegation 實作，job 在同一個 transaction 先鎖貼文列再問授權，拒絕就把排程轉 `CANCELED`、原因 `AUTHORITY_LOST`、發 `PostScheduleCanceled`、不重試；開工設計審查後 Will 2026-11-15 選定，取代「訂閱者回錯誤讓發布 rollback」，見 ADR `2026-09-27-delegation-module` 2026-11-15 修訂）：
 - 該 session 沒有被治理撤銷（`REVOKED`）；已結束或到期不擋。
 - 店家授權仍有效且含 `posts.publish`，店家仍可代行；管理員仍存在、仍開通資格、角色仍有 `delegation.sessions.create`。
 - 這組條件從 `preflight`（`session.go:57-140`）抽成一個授權述詞，`StartDelegation` 與重驗共用；並行上限（`GetActiveDelegationSessionOfActor/Store`）、TTL、閒置留在 `StartDelegation`，不進述詞。管理員不存在是拒絕（轉 `AUTHORITY_LOST`），不是錯誤（現在 `preflight` 回錯誤，`session.go:61-64`，會讓 job 無限重試）。
