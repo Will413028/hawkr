@@ -67,7 +67,7 @@
   - 消費端：`rg -n 'description-image-fixtures|mockServiceWorker' website .github`
   - 不能動：`.github/workflows/website-e2e.yml` 第 86 行描述的圖片網域判定（fixture 攔的網域不變）。
   - 驗收：同步驟 2 的對照表與 CI；mutation：`DescriptionEditorDeletion` 與 `Cart` 各破壞一個被斷言的行為，job 要失敗。
-- [ ] **4. a11y 改用 axe 進 Playwright e2e**（被擋於：D1）
+- [ ] **4. a11y 改用 axe 進 Playwright e2e**（被擋於：步驟 1；D1 已決）
   - 範圍：依 D1 加入套件，在既有 e2e（`website/tests/e2e/`）的主要頁面加 axe 掃描，規則等級對齊 Storybook 的 `a11y.test: "error"`（違規即失敗）；涵蓋原 story 的元件出現的頁面清單寫在 spec 開頭註解之外的 PR 描述。
   - 消費端：`rg -ln 'test\(' website/tests/e2e`
   - 不能動：既有 e2e 的 mock 與斷言。
@@ -82,12 +82,12 @@
 
 ## 決定
 
-- **D1 a11y 掃描用哪個套件**（狀態：未決；擋住步驟：4；需要的事實：版本與發佈日期，步驟 4 開工時查）
+- **D1 a11y 掃描用哪個套件**（狀態：已決 2026-11-15，Will；擋住步驟：4；需要的事實：無）
   - A：`@axe-core/playwright`——Deque 官方的 Playwright 整合，業界常見做法；新增一個 devDependency（axe-core 4.11.4 已是傳遞依賴）。（建議）
   - B：直接用 `axe-core` 並在 `page.evaluate` 注入——不加整合套件，但要自己寫注入與結果格式。
-  - 結論：待 Will 核准套件與版本；ADR：無（Will 已決定方向，這題只是套件選擇）。
+  - 結論：A，`@axe-core/playwright` 4.14.0（2026-10-15 發佈，peer `playwright-core >= 1.0.0`）；步驟 4 開工時以 `npm view @axe-core/playwright@4.14.0 dependencies` 確認帶入的 `axe-core` 版本；ADR：無（Will 已決定方向，這題只是套件選擇）。
 
-拍板順序：D1 可以現在拍，步驟 1–3 不受它影響。
+拍板順序：無未決題。
 
 ## 進度
 
