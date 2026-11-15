@@ -489,9 +489,9 @@ class _ScanVisitor extends RecursiveAstVisitor<void> {
     if (init is RecordLiteral) {
       return init.fields.any(
         (f) =>
-            f is NamedExpression &&
-            f.name.label.name == key &&
-            _hasHanLiteral(f.expression),
+            f is RecordLiteralNamedField &&
+            f.name.lexeme == key &&
+            _hasHanLiteral(f.fieldExpression),
       );
     }
     if (init is SetOrMapLiteral) {
@@ -785,8 +785,11 @@ class _ScanVisitor extends RecursiveAstVisitor<void> {
 
   /// 並列的成員（record 欄位、引數、list 元素）：有選擇子時，其他成員有文字就命中。
   void _pair(Iterable<AstNode> items) {
-    Expression? value(AstNode n) =>
-        n is NamedExpression ? n.expression : (n is Expression ? n : null);
+    Expression? value(AstNode n) => switch (n) {
+      RecordLiteralField() => n.fieldExpression,
+      Argument() => n.argumentExpression,
+      _ => null,
+    };
     final list = items.toList();
     final sels = <_Sel>[];
     final others = <AstNode>[];

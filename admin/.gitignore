@@ -48,3 +48,6 @@ cloudflare-env.d.ts
 # 本機驗證用的截圖與腳本（vcs.useIgnoreFile=false，故 biome.json 需另行排除）
 .claude-verify/
 output/
+
+# next 依 dev／build 重新產生，路徑會不同
+next-env.d.ts

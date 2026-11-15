@@ -460,8 +460,8 @@ importers:
   website:
     dependencies:
       '@ag-ui/core':
-        specifier: 0.0.58
-        version: 0.0.58
+        specifier: 1.0.2
+        version: 1.0.2(zod@4.4.3)
       '@bufbuild/protobuf':
         specifier: 'catalog:'
         version: 2.16.0
@@ -733,8 +733,13 @@ packages:
       react: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
       react-dom: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
 
-  '@ag-ui/core@0.0.58':
-    resolution: {integrity: sha512-XgGb7YmhV+yMBaEmlrpsd5S+nUxq0JgSegss2t4gIFR1j7w3w0ibtKfRgcQHWeMvwZxcT5S28VEEarqtgxYYHw==}
+  '@ag-ui/core@1.0.2':
+    resolution: {integrity: sha512-lb0YfvHY4eTHcXthTWzXjsElLqycGWDhaXGTejwMkUV5TtJVZircRS12/tMpqzd32sL+WZ2PWQ4m0+ThKrGF8A==}
+    peerDependencies:
+      zod: ^3.25.18 || ^4.0.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
 
   '@alloc/quick-lru@5.2.0':
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
@@ -7951,9 +7956,9 @@ snapshots:
       react-transition-group: 4.4.5(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       use-sync-external-store: 1.6.0(react@19.3.1)
 
-  '@ag-ui/core@0.0.58':
-    dependencies:
-      zod: 3.25.76
+  '@ag-ui/core@1.0.2(zod@4.4.3)':
+    optionalDependencies:
+      zod: 4.4.3
 
   '@alloc/quick-lru@5.2.0': {}
 
