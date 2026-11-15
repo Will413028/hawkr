@@ -60,12 +60,14 @@
   - spike 結論（CI 實跑證實）：(a) Vite 8 讀 tsconfig 的 `jsx: react-jsx` 轉 TSX，不需 `@vitejs/plugin-react`；沒開 vitest globals，`tests/browser/setup.ts` 自己註冊 `cleanup`。(b) 試點元件沒有用到 `next/*`；`vi.mock("next/navigation", importOriginal)` 對 Vite 預先打包的依賴會匯入失敗（CI 實證：does not provide an export named 't'）；步驟 2、3 需要 router 時改 mock 專案自己的 `@/lib/intl/use-router`（`importOriginal` 保留 `useLocalizedHref`，`useRouter` 換成 `tests/browser/static-router.ts` 的靜態 router），不 mock `next/*`，唯一例外是 `next/image`：它是 CJS，預先打包後 default 變成物件，渲染 `AppImage` 丟 "Element type is invalid"（CI 實證，ProductGallery 3 條）。Storybook 的替身來自 `@storybook/nextjs-vite` 內部套件，步驟 N 移除後不能依賴；`vi.mock("next/image")` 放在 setup 檔也不生效（CI 實證，修正後仍同樣 3 條失敗），所以改成解析時替換：browser project 的 `resolve.alias` 把正規表示式 `^next/image$` 對到 `tests/browser/next-image.tsx`（輸出 `<img>`：src 原樣、fill 絕對定位、丟掉 loader／quality／priority 等 next 專屬屬性），並把 `next/image` 加進該 project 的 `optimizeDeps.exclude`。已查：其餘被測元件沒有用到 `next/dynamic` 或 `next/link`（`next/link` 只經專案自己的 `@/lib/intl/*`，而且 89 條現有通過）。(c) 全域 CSS 在 setup 匯入與 `.storybook/preview.tsx` 相同的 4 檔。另外：瀏覽器沒有 `process`，browser project 以 `define` 替換 `process.env.NODE_ENV` 與 loopback 的 `NEXT_PUBLIC_API_BASE_URL`，setup 補空的 `process` 墊片（Next client 的行為）。改寫注意：`vitest/browser` 的 `toHaveTextContent` 傳字串是整段比對，不是 jest-dom 的子字串。
   - 延後：`.storybook/preview.css` 的字型與 body 顏色沒搬進 setup（觸發條件：改寫的斷言依賴字型、顏色或版面時，把需要的 token 搬進 `tests/browser/`）。
   - 停止條件：Next.js 模組的替代需要新依賴（例如 `@vitejs/plugin-react` 或 Storybook 以外的 Next 模擬套件）——列出套件與版本回報，等 Will 決定。
-- [ ] **2. 基礎元件改寫**（被擋於：步驟 1）
+- [x] **2. 基礎元件改寫**（被擋於：步驟 1）
   - 範圍：`inventory.md` §1 標「步驟 2 改寫」的 21 檔、74 個 play。可拆成兩個子批（各自 PR 綠才算完成）。
   - 消費端：無（新增測試檔）。
   - 不能動：被測元件的程式（測試搬移暴露的缺陷另開 bug-fix，不在本步驟順手改）。
   - 驗收：每個 story 檔的 play 數與新測試的斷言對照表貼在 PR 描述（`plays.txt` 為來源）；CI 元件 browser job 綠；mutation：抽 3 個元件（含 `DatePicker`、`ProcurementClarifyQuestion`）各破壞一個被斷言的行為，job 要失敗。
   - 停止條件：某個 play 依賴 Storybook 專屬行為且無法等價改寫——回報，不刪弱斷言。
+  - 延後：深色主題的測試只斷言 `data-theme=dark`（與原 play 相同，但該屬性由 render helper 設定，驗不到深色樣式；觸發條件：步驟 4 的 axe 或任何深色樣式回歸需要元件層證據時補樣式斷言）；只出現在 `*.browser.test.tsx` 的 Tailwind class 不會產生（`globals.css` 的 `@source not`；觸發條件：某個改寫需要 app 程式碼沒用過的外框 class，屆時讓 browser setup 掃描測試檔）。
+  - 待決（Will）：knip 基線。快照基線之後 exports/types/unlisted 多了 66 筆，步驟 2 未新增任何一筆；後續步驟的 knip 驗收要改以 c8f1cd39 的輸出為基線，還是先查清這 66 筆的來源。
 - [ ] **3. Cart、DescriptionEditor 系列**（被擋於：步驟 1；與步驟 2 都會改 `website/vitest.config.ts` 的 browser project 與 `website/tests/browser/`，兩步依序合併，不並行）
   - 範圍：`inventory.md` §1 標「步驟 3 改寫」的 7 檔、57 個 play；msw service worker 與 `description-image-fixtures.ts` 搬到 `website/tests/browser/`。
   - 消費端：`rg -n 'description-image-fixtures|mockServiceWorker' website .github`
@@ -100,7 +102,7 @@
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
 | 1 Browser runner 與試點 | 完成 | lint、test、knip（對基線無新增）本機；PR #377 新 job 8 測試綠（run 43672612523，含 8 個 e2e shard）；mutation 忽略 `disabled` 時只有 `is disabled when disabled is set` 失敗（run 43672321091），revert 後回綠 | — | 36649e77..a74318de |
-| 2 基礎元件改寫 | 未開始 | | | |
+| 2 基礎元件改寫 | 完成 | lint、`test:unit` 本機；PR #377 在 dcd3f3bd 全部檢查綠（website-e2e run 43680495072：元件 browser job 25 檔 92 測試、8 個 e2e shard；website-ci run 43680495013）；mutation 各只有目標測試失敗後 revert 回綠：DatePicker 選日期不回報 onChange（run 43675932096）、ClarifyQuestionCard 描述不 trim（run 43679360536）、Tabs 非受控點擊不切換（run 43679556022）；play 對照表在 PR 描述；`/code-review` 2a 兩輪、2b 一輪，finding 全部修正或附理由駁回 | knip：dcd3f3bd 與 c8f1cd39 的 `pnpm knip --reporter json` 逐分類筆數完全相同（本步驟無新增）；但兩者都比 `knip-baseline.json` 多 exports 41、types 21、unlisted 4（逐筆比對），步驟 1 那列的「對基線無新增」只比了分類名稱，不成立，見步驟 2 的待決 | e83cd330..dcd3f3bd |
 | 3 Cart、DescriptionEditor | 未開始 | | | |
 | 4 axe 進 e2e | 未開始 | | | |
 | 5 確認並刪除 Storybook | 未開始 | | | |
