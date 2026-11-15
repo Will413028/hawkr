@@ -134,7 +134,7 @@ func TestAccountSeedAddressesMatchTheBuyerModule(t *testing.T) {
 	}
 	sql := accountSeedSQL(t)
 	n := regexp.MustCompile(`max_addresses CONSTANT INT := (\d+);`).FindStringSubmatch(sql)
-	if n == nil || n[1] != string(m[1]) {
+	if len(n) != 2 || n[1] != string(m[1]) {
 		t.Errorf("01-account.sql 的 max_addresses %v 與買家模組的 MaxAddresses %s 不一致", n, m[1])
 	}
 	buyers := map[int64]bool{}
