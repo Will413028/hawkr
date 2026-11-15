@@ -61,21 +61,37 @@ func ActionUnavailableViolationBasis() uitext.Message {
 
 // AppealUnavailableAlreadyAppealed 是模組句子 appeal.unavailable.already_appealed；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func AppealUnavailableAlreadyAppealed(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This action has already been appealed. Each action can be appealed only once.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "這筆措施已提出過申覆，每筆措施只能申覆一次", Locale: uitext.ZhTW}
 }
 
 // AppealUnavailableRequestPending 是模組句子 appeal.unavailable.request_pending；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func AppealUnavailableRequestPending(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This action has a request to lift that is still pending. You can appeal after it is reviewed.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "這筆措施有待處理的解除請求，審核完成後才能申覆", Locale: uitext.ZhTW}
 }
 
 // AppealUnavailableRevoked 是模組句子 appeal.unavailable.revoked；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func AppealUnavailableRevoked(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This action has been revoked, so there is nothing to appeal.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "這筆措施已撤銷，不需要申覆", Locale: uitext.ZhTW}
 }
 
 // AppealUnavailableWindowEnded 是模組句子 appeal.unavailable.window_ended；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func AppealUnavailableWindowEnded(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The appeal period for this termination has ended.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "終止合作的申覆期限已過", Locale: uitext.ZhTW}
 }
 
@@ -326,11 +342,19 @@ func InquiryUnavailableWithdrawn() uitext.Message {
 
 // KycEditUnavailableApproved 是模組句子 kyc.edit_unavailable.approved；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func KycEditUnavailableApproved(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your seller verification is approved, so you do not need to edit or resubmit it.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "商家認證已通過，不需要修改或重新送出。", Locale: uitext.ZhTW}
 }
 
 // KycEditUnavailableUnderReview 是模組句子 kyc.edit_unavailable.under_review；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func KycEditUnavailableUnderReview(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your application is under review. Cancel it first if you want to make changes.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "申請審核中，要修改請先取消申請。", Locale: uitext.ZhTW}
 }
 
@@ -346,6 +370,10 @@ func ListStateInvalid() uitext.Message {
 
 // MeasureRetryExhausted 是模組句子 measure.retry_exhausted；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func MeasureRetryExhausted(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This action just changed. Please try again.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "措施剛剛有變動，請重試。", Locale: uitext.ZhTW}
 }
 
@@ -603,26 +631,46 @@ func OnboardingTitleProfile(l uitext.Locale) uitext.Message {
 
 // OpeningUnavailableAccountDeleting 是模組句子 opening.unavailable.account_deleting；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func OpeningUnavailableAccountDeleting(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your account is being deleted, so you cannot apply to open a store.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "帳號正在刪除，不能申請開店", Locale: uitext.ZhTW}
 }
 
 // OpeningUnavailableStoreExists 是模組句子 opening.unavailable.store_exists；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func OpeningUnavailableStoreExists(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "You are already a seller, so you do not need to apply again.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "你已經是賣家，不需要重複申請", Locale: uitext.ZhTW}
 }
 
 // OpeningUnavailableSuspended 是模組句子 opening.unavailable.suspended；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func OpeningUnavailableSuspended(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your account is suspended. You cannot open a store until the suspension is lifted.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "帳號停權中，解除停權前不能開店", Locale: uitext.ZhTW}
 }
 
 // OpeningUnavailableTerminated 是模組句子 opening.unavailable.terminated；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func OpeningUnavailableTerminated(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This account cannot open a store again because the partnership was terminated (Section 21.3). If you disagree, you can appeal the termination.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "此帳號因終止合作（第 21.3 條）不能重新開店。如有異議，可對該終止提出申覆。", Locale: uitext.ZhTW}
 }
 
 // RemediationUnavailableAppealPending 是模組句子 remediation.unavailable.appeal_pending；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func RemediationUnavailableAppealPending(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The appeal for this action is under review. You cannot request to lift it until the review is complete.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "這筆措施的申覆審核中，審核完成前不能請求解除", Locale: uitext.ZhTW}
 }
 
@@ -633,31 +681,55 @@ type RemediationUnavailableCooldownArgs struct {
 
 // RemediationUnavailableCooldown 是模組句子 remediation.unavailable.cooldown；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func RemediationUnavailableCooldown(l uitext.Locale, a RemediationUnavailableCooldownArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A request to lift this action is in its cooldown period. You can submit another after " + a.Time + ".", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "解除請求目前在冷卻期內，" + a.Time + " 後可再提出", Locale: uitext.ZhTW}
 }
 
 // RemediationUnavailableNotActive 是模組句子 remediation.unavailable.not_active；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func RemediationUnavailableNotActive(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This action is not currently in effect.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "這筆措施目前不在生效中", Locale: uitext.ZhTW}
 }
 
 // RemediationUnavailableNotActiveRevoked 是模組句子 remediation.unavailable.not_active_revoked；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func RemediationUnavailableNotActiveRevoked(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This action has been revoked.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "這筆措施已撤銷", Locale: uitext.ZhTW}
 }
 
 // RemediationUnavailableNotRisk 是模組句子 remediation.unavailable.not_risk；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func RemediationUnavailableNotRisk(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Only actions based on a risk type can be requested to be lifted.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "只有依據風險類型的措施可以請求解除", Locale: uitext.ZhTW}
 }
 
 // RemediationUnavailableRemediationPending 是模組句子 remediation.unavailable.remediation_pending；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func RemediationUnavailableRemediationPending(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The request to lift this action is under review. You cannot submit another until the review is complete.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "這筆措施的解除請求審核中，審核完成前不能再提出", Locale: uitext.ZhTW}
 }
 
 // ReportDuplicateSupplemented 是模組句子 report.duplicate_supplemented；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReportDuplicateSupplemented(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "You already reported this store in this category today. Your new details were added to the original report.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "你今天已經檢舉過這家店的這個類別，這次的內容已經補充到原本的檢舉。", Locale: uitext.ZhTW}
 }
 
@@ -668,11 +740,19 @@ func ReportNotFound() uitext.Message {
 
 // ReportOwnStore 是模組句子 report.own_store；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReportOwnStore(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "You cannot report your own store.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "不能檢舉自己的店。", Locale: uitext.ZhTW}
 }
 
 // ReportSubmitConflict 是模組句子 report.submit_conflict；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReportSubmitConflict(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A conflict occurred while submitting. Please try again shortly.", Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "送出時發生衝突，請稍後再試一次。", Locale: uitext.ZhTW}
 }
 
@@ -683,6 +763,17 @@ type ReportSupplementLimitArgs struct {
 
 // ReportSupplementLimit 是模組句子 report.supplement_limit；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReportSupplementLimit(l uitext.Locale, a ReportSupplementLimitArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: func() string {
+			switch uitext.PluralCategory(uitext.EN, a.Max) {
+			case "one":
+				return "This report has already been supplemented " + strconv.Itoa(a.Max) + " time and cannot be supplemented again."
+			default:
+				return "This report has already been supplemented " + strconv.Itoa(a.Max) + " times and cannot be supplemented again."
+			}
+		}(), Locale: uitext.EN}
+	}
 	return uitext.Message{Text: "這筆檢舉已經補充 " + strconv.Itoa(a.Max) + " 次，不能再補充。", Locale: uitext.ZhTW}
 }
 
