@@ -395,3 +395,15 @@ func (s *Server) buildTemplate(ctx context.Context, name string, steps []Step) (
 	}
 	return nil
 }
+
+// StressEnv 是開啟壓力測試的環境變數；值為 1 時 RequireStress 才讓測試執行。
+const StressEnv = "HAWKR_STRESS_TESTS"
+
+// RequireStress 讓重複上百輪、檢查並行交錯（死鎖、不變式）的壓力測試只在 StressEnv=1 時執行，
+// 否則略過。CI 只在要合併進 main（上線前）時開啟。
+func RequireStress(t *testing.T) {
+	t.Helper()
+	if os.Getenv(StressEnv) != "1" {
+		t.Skipf("壓力測試；設 %s=1 才執行", StressEnv)
+	}
+}

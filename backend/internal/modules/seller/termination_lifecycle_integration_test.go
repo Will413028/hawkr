@@ -12,6 +12,8 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
@@ -591,6 +593,7 @@ func TestLinkedAccountStoresAreHeldWhileTheSourceHasAPendingAppeal(t *testing.T)
 
 // 鎖：來源與關聯帳號並發撤銷與建立，重複多次沒有 deadlock（壓力測試；不當 mutation 斷言）。
 func TestConcurrentSourceRevokeAndLinkedCreateNeverDeadlock(t *testing.T) {
+	testdb.RequireStress(t)
 	t.Parallel()
 	const rounds = 200
 	f := setup(t)
@@ -625,6 +628,7 @@ func TestConcurrentSourceRevokeAndLinkedCreateNeverDeadlock(t *testing.T) {
 // 鎖：並發的「建立措施」與「關店」在同一個有兩個 stint 的帳號上重複 200 次，沒有 deadlock（先鎖帳號全部的 stint 再寫措施；改回 LockStore(current) 時預期
 // 出現 40P01，非確定性，不當 mutation 斷言）。
 func TestConcurrentMeasureCreationAndCloseOnAnAccountWithTwoStintsNeverDeadlock(t *testing.T) {
+	testdb.RequireStress(t)
 	t.Parallel()
 	const rounds = 200
 	f := setup(t)

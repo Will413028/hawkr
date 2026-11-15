@@ -10,6 +10,8 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
@@ -75,6 +77,7 @@ func TestConcurrentTriageOfTheSameStoreAndCategoryOpensExactlyOneCase(t *testing
 // 結案對同時加入案件的分案：結案前已加入的成員被帶入結果；結案之後才到的，要加入的案件已經關閉（案件版本衝突）。
 // 任何一輪都不能留下「已結案卻有成員沒有結果」（I2）。
 func TestDecideAndAConcurrentTriageNeverLeaveAnUnresolvedMemberInAClosedCase(t *testing.T) {
+	testdb.RequireStress(t)
 	t.Parallel()
 	const rounds = 200
 	f := setup(t)
@@ -113,6 +116,7 @@ func TestDecideAndAConcurrentTriageNeverLeaveAnUnresolvedMemberInAClosedCase(t *
 
 // 結案對補充、移動對補充：不互鎖。結案先鎖全部成員通報，補充只鎖原通報；補充在原通報被結案之後到的，找到的那一筆已有結果，這次是新的檢舉。
 func TestDecideAndMoveNeverDeadlockWithASupplementToTheSameReport(t *testing.T) {
+	testdb.RequireStress(t)
 	t.Parallel()
 	const rounds = 200
 	f := setup(t)
@@ -168,6 +172,7 @@ func TestDecideAndMoveNeverDeadlockWithASupplementToTheSameReport(t *testing.T) 
 // 分案對建立措施、結案對帶 source_case_id 的建立措施：不互鎖。後者互斥：建立措施連到案件與決定不採取措施只有一個能成功
 // （不採取措施的案件不會有未撤銷的導出措施），否則「告訴檢舉人未違規，賣家卻有生效中的措施」。
 func TestTriageAndDecideNeverDeadlockWithCreatingMeasures(t *testing.T) {
+	testdb.RequireStress(t)
 	t.Parallel()
 	const rounds = 200
 	f := setup(t)

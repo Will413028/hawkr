@@ -96,7 +96,10 @@ jobs:
           cache-dependency-path: backend/go.sum
       # 只跑加上 integration tag 後檔案組成會改變的 package；其餘 package 的測試和
       # check job 的 go test 完全相同，不重跑。
+      # 壓力測試（testdb.RequireStress）只在上線前跑：要合併進 main 的 PR、main 的 push，與手動觸發。
       - name: integration test（testcontainers）
+        env:
+          HAWKR_STRESS_TESTS: ${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && '1' || '0' }}
         run: |
           tmpl='{{.ImportPath}} {{.GoFiles}} {{.TestGoFiles}} {{.XTestGoFiles}}'
           mapfile -t pkgs < <(comm -13 <(go list -f "$tmpl" ./... | sort) \
