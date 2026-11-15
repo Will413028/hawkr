@@ -348,7 +348,7 @@ v1 D6 的第 3、5、6、7、8、9、10 點**不變**。修改與新增如下：
 - 3d 排在最後，因為佇列的每一種列都要連到已經存在的詳情頁。3a 到 3c 期間，「最急」由各清單既有的伺服器篩選撐著：系統沒有上線，這是同一步驟內的施工順序，不是技術債。
 - 如果 10d 的 K1（4 條）先落地：484 → 483 → 476 → 476，3c 刪掉整個 `routes_governance.go`。每次 rebase 都以 openapi 的實際數目重算（現在 `openapi_coverage_test.go:27` 是 492）。
 - 審查：3a、3c、3d 各做 code-review 與 design-review（3d 另外要有 keyset 跨種類不漏不重，以及「成員資格 ⇔ 判定式」的資料集測試）；3b 只做 code-review。
-- 回退：每段都是單一 commit。migration 只往前（forward-only，`backend/AGENTS.md`）：3a 的 `measure_notes` 遷移不附 down，回退是 `git revert` 加一支新的往前 migration；其餘照 v1。
+- 回退：每段都是單一 commit。migration 只往前（forward-only，`backend/AGENTS.md`）：3a 的 `measure_notes` 遷移不附 down，回退是還原程式碼、保留已套用的 migration 檔，再加一支新的往前 migration 撤銷 schema 變更；其餘照 v1。
 
 ---
 
@@ -393,14 +393,14 @@ v1 D6 的第 3、5、6、7、8、9、10 點**不變**。修改與新增如下：
 
 1. **`can_revoke_findings` 與 `revoke_findings=true` 的拒絕規則**：`Measure.can_revoke_findings` 從「依據是 VIOLATION」收窄為「依據認定、而且措施自己建立了至少一筆尚未撤銷的認定」；`RevokeMeasure` 與 `DecideAppeal` 在 `revoke_findings=true` 而 `can_revoke_findings` 為 false 時回 `invalid_argument`（欄位 `revoke_findings`），原本是靜默不做事。runbook `seller-violation-management-runbook.md` 的裁定表已記。
 2. **管理員撤銷的輸入列舉**：`RevokeMeasureRequest.reason` 改用 admin governance.proto 的 `AdminRevokeReason`（`UNSPECIFIED` 加 `ADMIN_CORRECTION`、`EXTERNAL_DECISION`、`OTHER`），讓請求表示不出 `APPEAL_ACCEPTED`、`FINDING_REVOKED`、`SOURCE_REVOKED`；admin 的選項取自生成的列舉值，不再自己維護一份清單。儲存與回應仍是 seller 的 `RevokeReason`。模組的 `Revoke` 仍自己檢查 `ManualRevokeReasonValues()`（不依賴傳輸層，領域不變量；第 4 輪修正還原）。（沿用盤點：`CARRYOVER.md`）
-3. **migration 只有 up（Will 2026-11-15 決定）**：上文「回退」一列原文要求 3a 的 `measure_notes` 遷移附 down migration，已改為不附。seller 模組沒有任何 down migration（36 個檔，全是 `<時間戳>_<名稱>.sql` 加 `atlas.sum`），3a 的遷移 `20261016120000_seller_governance_notes.sql` 照慣例只有 up；回退是 `git revert` 加一支新的往前 migration。業界基準：Atlas 與 Flyway 的社群版都以往前修正（roll-forward）為主，Atlas 的 down 是由 schema 差異即時產生而不是手寫檔。這條已升為 `backend/AGENTS.md` 的現行規則。
+3. **migration 只有 up（Will 2026-11-15 決定）**：上文「回退」一列原文要求 3a 的 `measure_notes` 遷移附 down migration，已改為不附。seller 模組沒有任何 down migration（36 個檔，全是 `<時間戳>_<名稱>.sql` 加 `atlas.sum`），3a 的遷移 `20261016120000_seller_governance_notes.sql` 照慣例只有 up；回退是還原程式碼、保留已套用的 migration 檔，再加一支新的往前 migration 撤銷 schema 變更。業界基準：Atlas 與 Flyway 的社群版都以往前修正（roll-forward）為主，Atlas 的 down 是由 schema 差異即時產生而不是手寫檔。這條已升為 `backend/AGENTS.md` 的現行規則。
 4. **不能操作的原因帶伺服器的文字**（Will 2026-10-17，`step10e-labels-brief.md` D-L2，3a 提交前修正）：四個 `*_unavailable_reasons` 欄位（enum 清單）改成 `*_unavailabilities`，型別 `repeated MeasureActionUnavailability { reason; google.rpc.LocalizedMessage message }`（欄位號 39–42 沿用：它們從未進過任何 commit）。文字由 `model.ActionUnavailableText(reason, action)` 一個函式產生，API 的 `message` 與被拒絕時錯誤的 `LocalizedMessage`（取第一項）共用；admin 刪 `UNAVAILABLE_REASON_LABEL`，直接顯示 `message`，沒有文字才顯示通用文字。「賣家已提出請求，只能縮短期間」不準確（凍結條件是提出過申訴，或有待處理的解除請求；警告提出申訴後也不能縮短），改成依動作的兩句。proto 的「標籤」註解（`ViolationCategory`／`ViolationSeverity`、`MeasureActionUnavailableReason`）一併刪除；admin 的認定類別／嚴重度對照表暫留，由刀 L 的共用文案目錄取代。
 
 ---
 
 ## 實作時的修訂（3b）
 
-1. **`finding_reports` 的 migration 只有 up**：同 3a 修訂 3（`20261018000223_seller_finding_reports.sql`：建表、搬資料、刪 `violations.source_report_id`；回退是 `git revert` 加新的往前 migration）。同一家店與「不是不成立」的規則仍在應用層檢查（鎖通報列之後），沒有為它再加複合外鍵。
+1. **`finding_reports` 的 migration 只有 up**：同 3a 修訂 3（`20261018000223_seller_finding_reports.sql`：建表、搬資料、刪 `violations.source_report_id`；回退是還原程式碼、保留已套用的 migration 檔，再加新的往前 migration 撤銷 schema 變更）。同一家店與「不是不成立」的規則仍在應用層檢查（鎖通報列之後），沒有為它再加複合外鍵。
 2. **建立措施對話框的新文字**（簡報沒有原文，實作者補，Will 2026-10-18 核准）：成功提示「已建立措施。」；欄位標籤「種類」（沿用 D6 第 4 點的欄名）；來源通報的選項「通報 {id}・{類別}・建立 {時間}」、說明「選填；最多 20 筆，只列這家店還沒判定不成立的通報。」、空狀態「這家店沒有可以當來源的通報。」、載入「載入通報中...」；引用認定的說明「選填；引用的認定必須未撤銷。」、空狀態「這個帳號沒有生效中的認定。」；驗證訊息「請選擇種類。」「請選擇類別。」「請選擇嚴重度。」「請填寫結束時間。」「來源通報最多 20 筆。」。其餘（給賣家的理由、內部註記、結束時間、停權警告、失敗後備句）沿用 `CreateRiskMeasureDialog` 與 `store-detail.ts` 已核准的原文。
 3. **發票申訴頁**：兩顆鈕與「賣家治理」說明照 D6 第 10 點；說明的後半句「處分才會帶有到期時間與自動恢復」併入新句，不再重複。同頁與 `admin-actions.ts` 其餘提到「賣家治理頁建立違規紀錄」「違規表單」的句子（`complaints/[complaintId]/page.tsx` 的停權建議提示、建議理由欄標題、確認勾選，`features/invoices/admin-actions.ts` 的兩句動作說明）簡報沒有改文；Will 2026-10-18 核准的新文：停權建議提示「這是一份建議，**還沒有任何人被停權**。建立措施之後，處分才會生效。」、欄標題「建議理由（可直接複製到措施的理由）」、確認勾選「…實際處分要另外建立措施。」、兩句動作說明的後半改成「處分要另外建立措施。」與「實際處分要另外建立措施。」。
 4. **舊的通報詳情頁**（`violation-reports/[source]/[id]`）原本連到 `violations/new` 的「後續：建立違規處罰紀錄」區塊隨路由一併刪除（那頁用舊 REST 的整數 id，與新的通報 id 不互通，3c 整頁改寫）；3c 的通報詳情掛 `CreateMeasureDialog`（`initialSourceReportIds`）。
