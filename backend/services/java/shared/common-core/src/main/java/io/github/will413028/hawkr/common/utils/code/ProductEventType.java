@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 商品領域 MQ 事件類型，全部由 product-service 的 `ProductEventPublisher` 發布到 `hawkr.product` exchange。Code 與 Value 一致（UPPER_SNAKE_CASE），與 routing key 不同 — routing key 為點分式（`product.restock` / `product.restock.target` / `product.certification.*`），Java 側寫於 `MqConstants`、Go 側寫於 `pkg/mq/exchanges.go`。對齊 OrderEventType / BuyerEventType / SocialEventType / NotificationEventType 設計。⚠️ `PRODUCT_CERTIFICATION_VERIFY_REQUESTED` 是本 exchange 上**第一個「自己 publish、自己 consume」**的事件（product-service 現有 8 條 queue 全部消費別人的 exchange），它的 queue `product.certification.verify` **必須在同一個 PR 內登記進 `infra/mq/topology/topology.yaml`**——服務端已 passive declare，漏登記＝訂閱靜默失效（不 crash、不進 DLQ、無告警），而 `static-gates.yml` 的登記一致性檢查**只掃 Go**，Java 側沒有任何 CI 擋得住。
+ * 商品領域 MQ 事件類型，全部由 product-service 的 `ProductEventPublisher` 發布到 `hawkr.product` exchange。Code 與 Value 一致（UPPER_SNAKE_CASE），與 routing key 不同 — routing key 為點分式（`product.restock` / `product.restock.target` / `product.certification.*`），Java 側寫於 `MqConstants`、Go 側寫於 `pkg/mq/exchanges.go`。對齊 OrderEventType / BuyerEventType / SocialEventType / NotificationEventType 設計。⚠️ `PRODUCT_CERTIFICATION_VERIFY_REQUESTED` 是本 exchange 上**第一個「自己 publish、自己 consume」**的事件（product-service 現有 8 條 queue 全部消費別人的 exchange），它的 queue `product.certification.verify` **必須在同一個 PR 內登記進 `infra/mq/topology/topology.yaml`**——服務端已 passive declare，漏登記＝訂閱靜默失效（不 crash、不進 DLQ、無告警），而 queue 登記與 `topology.yaml` 是否一致**沒有任何 CI gate**（Go 與 Java 都一樣），只能靠 review。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class

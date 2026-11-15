@@ -5740,7 +5740,7 @@ Query：`actor_account_id`／`store_id`／`order_no`／`document_id`／`job_id`�
 | Gate | 內容 |
 |---|---|
 | `proto-generated-diff.yml` | Step 1 在權威 image 內重新生成 `pkg/proto` 並逐位元組 `diff -ru`；**Step 2（`if: always()`）無條件 `diff -r api/proto services/java/shared/java-proto/src/main/proto`** ⇒ 即使 invoice-service 是純 Go，Java 副本仍必須同步 |
-| `static-gates.yml` | `make proto-lint-numeric` |
+| `backend-db-proto-checks.yml` | `make proto-lint-numeric` |
 
 **不要把「`buf lint` 全綠」寫成驗收條件**：實跑 `buf lint api/proto` 有 438 行既存違規（含 24× `PACKAGE_DIRECTORY_MATCH`），且它不在任何 CI 或 hook 中。正確的 proto 驗收條件是：`make proto-lint-numeric` 綠 ＋ `proto-generated-diff.yml` 綠 ＋ 相關 Go/Java consumer 編譯與測試綠。
 
@@ -6538,7 +6538,7 @@ gate 斷言分兩組，**分組判準是「吃不吃 `if !tmpl.Enabled { t.Skip(
 
 | Gate | 觸發 | 檢查什麼 | 本案會不會被擋 |
 |---|---|---|---|
-| `static-gates.yml`「MQ consumer ↔ topology 登記一致性」（blocking，**每個 PR 都跑、刻意不設 paths filter**） | 全部 PR | **方向 ①** code → topology：`pkg/mq/exchanges.go` 的 `Queue*` 常數、任何 `.go` 的 `Queue: "..."` 字面值、`map[string]string` 的 value 必須存在於 `queues:`。**方向 ②** topology → code：帶 `retry:` 的 queue 名必須以字面值出現在某個非測試 `.go` | 會。三條 queue 都必須雙向對上。**方向 ② 直接決定了 PR 怎麼切** |
+| （沒有自動 gate）consumer 登記 ↔ topology | — | consumer 的 queue 名與 `topology.yaml` 是否一致沒有 CI 檢查，靠 review 雙向對照：**方向 ①** code → topology：`pkg/mq/exchanges.go` 的 `Queue*` 常數、任何 `.go` 的 `Queue: "..."` 字面值、`map[string]string` 的 value 必須存在於 `queues:`。**方向 ②** topology → code：帶 `retry:` 的 queue 名必須以字面值出現在某個非測試 `.go` | 不會被擋，但三條 queue 仍須人工雙向對上。**方向 ② 直接決定了 PR 怎麼切** |
 | `mq-topology.yml`（`infra/mq/**`） | 改 topology | `validate.py` → `unittest` → dev/prod 各跑一次 `plan` → apply | 會（資源數 pin） |
 | `contract-tests.yml` | 改 golden／模板 | testcontainers 起真 Postgres → 套用全部 notification migrations → 逐 row 跑 A 組 5 條 ＋ B 組 5 條 ＋ 兩條反向 | 會。**模板列與 golden 條目必須同一個 PR**（互為前置，拆開兩邊都紅） |
 | `proto-generated-diff.yml` | 改 `api/proto/**` | 權威 image 內重新生成並對拍 | 會 |
@@ -9509,7 +9509,7 @@ message AdminInvoiceOperationView {
 
 **替代方案就是 DB**：`invoice_inbox_events` 的兩道唯一索引是唯一的去重依據（I1／I2），它與業務資料在**同一個 PostgreSQL 交易**內，因此「事件已收下」與「業務效果已套用」不可能不一致——這是 Redis 方案在原理上就做不到的（跨兩個儲存沒有交易）。
 
-**Redis 唯一被允許的用途**是純讀取加速的快取，且必須滿足「快取整個消失時行為仍然正確、只是變慢」。Phase 1 沒有這樣的需求 ⇒ invoice-service 的 values 不宣告任何 Redis 設定（且 `hawkr-common` 禁止宣告 `REDIS_URL`，CI gate `scripts/check-redis-single-source.sh` 在 `static-gates.yml:151` 擋）。
+**Redis 唯一被允許的用途**是純讀取加速的快取，且必須滿足「快取整個消失時行為仍然正確、只是變慢」。Phase 1 沒有這樣的需求 ⇒ invoice-service 的 values 不宣告任何 Redis 設定（且 `hawkr-common` 禁止宣告 `REDIS_URL`，這條目前沒有自動 gate，靠 review）。
 
 ---
 
@@ -11219,7 +11219,7 @@ CodeMeta 的四份 `.md` 是 `generate.sh` 的**輸入** ⇒ 碼值必須先落 
 |---|---|---|
 | **2.0** | **先建 secret**（G2）：`.env` 補齊四個 key → 在 dev VM 跑 `create-secrets.sh` | `kubectl get secret hawkr-amego -n hawkr -o jsonpath='{.data}' \| jq 'keys'` ⇒ 至少含兩個必填 key。**不要 `-o yaml` 印全文**（值會落進 transcript） |
 | **2.1** | **再建 DB**：`init-databases.sh` 加 `hawkr_invoice` 並在 dev 執行 | `psql … -lqt \| cut -d'\|' -f1 \| grep -w hawkr_invoice` 有輸出。Infra VM 沒有 psql 時走 `docker exec -i <postgres 容器> psql -U dbadmin …` |
-| 2.2 | push → PR。CI 會跑 `go-tests.yml`（**第一個 step 是 `gofmt -l`**）、`sqlc-generated-diff`、`static-gates`、`proto-generated-diff`、`contract-tests`（模板＋golden 必須同 PR） | 全綠。**本機先跑等價命令**（§12.3.3） |
+| 2.2 | push → PR。CI 會跑 `go-tests.yml`（**第一個 step 是 `gofmt -l`**）、`sqlc-generated-diff`、`proto-generated-diff`、`contract-tests`（模板＋golden 必須同 PR） | 全綠。**本機先跑等價命令**（§12.3.3） |
 | 2.3 | merge → 自動偵測 Dockerfile → build → **migrate job 先跑 atlas** → helm upgrade | deploy job 綠；`atlas migrate status --env dev` ⇒ `Migration Status: OK` |
 | 2.4 | 確認 pod 起來且設定讀到了 | `kubectl get deploy invoice-service -o wide` ⇒ READY 1/1；`kubectl exec … -- env \| grep -cE '^(AMEGO_\|INVOICE_)'` ⇒ 數量對得上 §12.1.2 |
 | 2.5 | **確認訂閱真的接上**（G1 的驗收） | `rabbitmqctl list_queues name consumers \| grep '^invoice\.'` ⇒ **兩條都 `consumers ≥ 1`**。仍為 0 ⇒ `rollout restart`（純配置生效，**不是**繞過 CI/CD）；再為 0 ⇒ 查啟動 log 有無 `skipping queue` |
@@ -11288,18 +11288,12 @@ git ls-files -z '*.go' | xargs -0 gofmt -l          # 有輸出＝未過，跑 g
 go work edit -json | python3 -c "import json,sys;[print(u['DiskPath']) for u in json.load(sys.stdin)['Use']]" > /tmp/mods.txt
 N=0; while IFS= read -r d; do N=$((N+1)); (cd "$d" && go test ./... 2>&1 | grep -E '^FAIL'); done < /tmp/mods.txt; echo "跑過 $N 個模組"
 
-# ③ 靜態閘門（各自對應一支 static-gates step）
-bash scripts/check-compose-k8s-align.sh
-bash k8s/scripts/check-secret-declarations.sh
-python3 scripts/check-networkpolicy-single-owner.py
-python3 scripts/mq-consumer-registration-check.py
-
-# ④ MQ topology（cwd 不同，不能接在上面跑）
+# ③ MQ topology（cwd 不同，不能接在上面跑）
 cd infra/mq/tools                                   # 相對 repo root
 python3 validate.py --topology ../topology/topology.yaml
 python3 -m unittest discover -p 'test_*.py'
 
-# ⑤ 動到 order-service 時（Phase 3）
+# ④ 動到 order-service 時（Phase 3）
 cd services/java && ./mvnw -pl order-service -am test   # 相對 repo root
 ./infra/smoke-checkout.sh --env=dev
 ```
@@ -11637,7 +11631,7 @@ COMMIT;
 | `mq-topology.yml` | 新增 2 exchange ＋ 3 queue | PR 階段只有 plan；**plan 含 destroy 不會讓 CI 變紅**，自己讀 Step Summary。apply 只走 CI |
 | `contract-tests.yml` | 新增 `InvoiceEventType` 常數 ＋ golden 條目 ＋ 通知模板 migration | 已知盲區：只驗「template 讀的 key ⊆ golden」，**不驗** 「golden ⊆ publisher 實發」⇒ golden 手寫錯不會被抓。驗收方式是**實際發一則事件、從 Loki 或 RabbitMQ management 撈 raw body 逐 key 比對**，不要憑 struct 定義推斷 |
 | `gateway-json-contract.yml` | 新增發票 handler | Check A（角色前綴舊名棘輪）＋ Check B（`@Success` ↔ 實吐 key） |
-| `static-gates.yml` | 多項 | compose ↔ values 對齊／服務 env 契約／`SCRIPT_REVISION` 遞增／Secret 宣告完整性／Proto numeric／**MQ consumer ↔ topology 雙向登記**（只掃 Go）／identity ratchet（發票端一律 `store_id`／`buyer_id`）／**帶 build tag 的測試必須有 CI 執行路徑**／K8s 物件單一宣告來源／CodeMeta 重新生成對拍 |
+| `backend-db-proto-checks.yml`、`backend-monolith.yml` | Proto numeric（`make proto-lint-numeric`）／CodeMeta 生成物重新生成對拍 | compose ↔ values 對齊、`SCRIPT_REVISION`、Secret 宣告、MQ consumer ↔ topology 登記、identity ratchet、K8s 單一宣告來源目前都沒有自動 gate |
 | ~~`code-quality.yml`~~ | **不會自動觸發**（`workflow_dispatch` only ＋ step 以 `\|\| true` 收尾） | 服務清單仍要登記（為了哪天恢復自動觸發），但**不得把任何驗收掛在它身上**——golangci-lint／ruleguard 在本 repo 沒有 blocking 路徑 |
 
 **`integration-tests.yml` 的兩個限制**（不處理＝§13 的 L2 等於不存在）：它只在 `base: main` 的 PR 觸發，而本 repo 一般 PR 的 base 是 `dev` ⇒ **日常 PR 完全不會跑整合測試**（這是刻意的設計，避免 cold build 佔用共用 concurrency slot）。⇒ 本服務的整合測試**必須主動跑起來**：`gh workflow run integration-tests.yml`（先確認 deploy job 的 `if` 不會連帶觸發部署），或本機 `make test-integration`。判準：改動大到會動共用層時主動把這些 gate 跑起來，不要等 merge——而發票 PR **必然**動到 `pkg/mq`、`api/proto`、gateway 路由表、order-service schema。
@@ -11908,7 +11902,7 @@ cd "docs/代碼管理（CodeMeta）/scripts" && ./generate.sh --go --go-media --
 | `SELLER_EXEMPT_NO_RECEIPT`（不是 `InvoiceNotApplicableReason` 第 6 值） | 決策樹沒有任何分支產生它 ⇒ 零 emitter。若它確實要成為第六個分支，那是**決策樹加一格 ＋ 本表加一列，兩件事一起做** |
 | `BUYER_REPLY`（不是 `InvoiceComplaintEventType` 第 8 值） | M5 沒有「買家回覆但狀態不變」這條轉移；買家的異議走 K07 而 K07 寫 `ESCALATED` ⇒ 登記後從未有 emitter 的死碼 |
 
-⚠️ **「這個值有沒有人 emit」沒有任何機械 gate 看得到**：既有測試只斷言「生成檔的條目數 ＝ `.md` 的條目數」、`static-gates` 只做重新生成對拍、各 `chk_*` 只驗值域集合——**三者都只看值域對不對**。⇒ §C.7 的 emitter 表必須逐值寫得到「哪一條轉移／哪一支端點」，寫不出來的那一值就是死碼。**emitter 欄的斷言是雙向的**：每個值都要寫得出 emitter，且每個寫出來的 emitter 代號都能在 §7 對應的轉移表裡找到同名的那一列——指向已被刪除的代號與零 emitter 是同一種死碼，而前者連「值域三方相等」都看不出來。
+⚠️ **「這個值有沒有人 emit」沒有任何機械 gate 看得到**：既有測試只斷言「生成檔的條目數 ＝ `.md` 的條目數」、CodeMeta 的 CI 只做重新生成對拍（`backend-monolith.yml`）、各 `chk_*` 只驗值域集合——**三者都只看值域對不對**。⇒ §C.7 的 emitter 表必須逐值寫得到「哪一條轉移／哪一支端點」，寫不出來的那一值就是死碼。**emitter 欄的斷言是雙向的**：每個值都要寫得出 emitter，且每個寫出來的 emitter 代號都能在 §7 對應的轉移表裡找到同名的那一列——指向已被刪除的代號與零 emitter 是同一種死碼，而前者連「值域三方相等」都看不出來。
 
 ### C.5 三張 allowlist
 

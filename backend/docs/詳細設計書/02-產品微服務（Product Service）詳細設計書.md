@@ -1700,7 +1700,7 @@ message ListSubscribedSellerIdsResponse {
 - DLX Exchange: `hawkr.product.dlx`
 - DLQ: `product.order.cancelled.dlq` / `product.buyer.favorite.added.dlq` / `product.buyer.favorite.removed.dlq` / `product.seller.deleted.dlq` / `product.seller.suspended.dlq` / `product.seller.unsuspended.dlq` / `product.certification.verify.dlq`
 
-> 🔴 **`product.certification.verify` 必須在同一 PR 登記進 `infra/mq/topology/topology.yaml`**：服務端已 passive declare，**漏登記＝訂閱靜默失效（不 crash、不進 DLQ、無告警）**，唯一線索是連線當下印一行 `skipping queue X (NOT consumed)`。而 `static-gates.yml` 的「MQ consumer ↔ topology 登記一致性」**只掃 Go**，Java 側漏登記沒有任何 CI 擋得住。條目格式見 19 號 §12.2。
+> 🔴 **`product.certification.verify` 必須在同一 PR 登記進 `infra/mq/topology/topology.yaml`**：服務端已 passive declare，**漏登記＝訂閱靜默失效（不 crash、不進 DLQ、無告警）**，唯一線索是連線當下印一行 `skipping queue X (NOT consumed)`。而 consumer 登記與 `topology.yaml` 是否一致**沒有任何 CI gate**（Go 與 Java 都一樣），漏登記只能靠 review。條目格式見 19 號 §12.2。
 
 #### 4.3.2 發布（Publish）
 
