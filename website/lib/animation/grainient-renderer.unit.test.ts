@@ -331,25 +331,25 @@ describe("Grainient renderer runtime", () => {
 		expect(onError).not.toHaveBeenCalled();
 	});
 
-	it.each([
-		"compile",
-		"link",
-	])("cleans partial GPU allocations after a %s failure", (phase) => {
-		if (phase === "compile")
-			gl.getShaderParameter
-				.mockReturnValueOnce(true)
-				.mockReturnValueOnce(false);
-		else gl.getProgramParameter.mockReturnValue(false);
-		renderer = createGrainientRenderer(canvas, {
-			colors,
-			dark: false,
-			onError,
-		});
-		expect(renderer).toBeNull();
-		expectResourcesReleased();
-		expect(gl.drawArrays).not.toHaveBeenCalled();
-		expect(onError).not.toHaveBeenCalled();
-	});
+	it.each(["compile", "link"])(
+		"cleans partial GPU allocations after a %s failure",
+		(phase) => {
+			if (phase === "compile")
+				gl.getShaderParameter
+					.mockReturnValueOnce(true)
+					.mockReturnValueOnce(false);
+			else gl.getProgramParameter.mockReturnValue(false);
+			renderer = createGrainientRenderer(canvas, {
+				colors,
+				dark: false,
+				onError,
+			});
+			expect(renderer).toBeNull();
+			expectResourcesReleased();
+			expect(gl.drawArrays).not.toHaveBeenCalled();
+			expect(onError).not.toHaveBeenCalled();
+		},
+	);
 
 	it("reports context loss only once and cannot restart the failed renderer", () => {
 		const active = start();

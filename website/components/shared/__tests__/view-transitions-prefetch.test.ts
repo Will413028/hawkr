@@ -226,17 +226,20 @@ describe("shared Link intent prefetch", () => {
 		],
 		["new tab", { href: "/faq" }, "/faq", { target: "_blank" }],
 		["hash only", { href: "/about#team" }, "/about#team", {}],
-	] as const)("does not prefetch %s", (_label, linkProps, href, eventOptions) => {
-		const props = renderLink(linkProps);
-		props.onPointerDown?.(
-			intentEvent(
-				new URL(href, "https://example.com").href,
-				eventOptions,
-			) as React.PointerEvent<HTMLAnchorElement>,
-		);
+	] as const)(
+		"does not prefetch %s",
+		(_label, linkProps, href, eventOptions) => {
+			const props = renderLink(linkProps);
+			props.onPointerDown?.(
+				intentEvent(
+					new URL(href, "https://example.com").href,
+					eventOptions,
+				) as React.PointerEvent<HTMLAnchorElement>,
+			);
 
-		expect(prefetch).not.toHaveBeenCalled();
-	});
+			expect(prefetch).not.toHaveBeenCalled();
+		},
+	);
 
 	it("marks hard navigation on the rendered anchor for capture listeners", () => {
 		expect(

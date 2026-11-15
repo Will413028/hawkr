@@ -229,49 +229,52 @@ describe("product list append render isolation", () => {
 		expect(screen.getByRole("link", { name: "查看商品：商品 0" })).toBeTruthy();
 	});
 
-	it.each([
-		1, 24, 100,
-	])("keeps %i existing cards idle through loading, append and masonry reflow", (count) => {
-		products = Array.from({ length: count }, (_, index) => product(index));
-		const view = render(list());
-		const cards = Array.from(view.container.querySelectorAll("article"));
-		imageRender.mockClear();
-		loading = true;
-		view.rerender(list());
-		const loadingRenders = imageRender.mock.calls.length;
-		imageRender.mockClear();
-		products = [
-			...products,
-			...Array.from({ length: 24 }, (_, index) => product(count + index)),
-		];
-		loading = false;
-		view.rerender(list());
-		const oldRenders = imageRender.mock.calls.filter(
-			([name]) => Number(name.split(" ")[1]) < count,
-		).length;
-		const newRenders = imageRender.mock.calls.length - oldRenders;
-		imageRender.mockClear();
-		act(() => window.dispatchEvent(new Event("resize")));
-		const resizeRenders = imageRender.mock.calls.length;
-		console.info(
-			JSON.stringify({
-				count,
-				appended: 24,
-				loadingRenders,
-				oldRenders,
-				newRenders,
-				resizeRenders,
-			}),
-		);
-		expect(loadingRenders).toBe(0);
-		expect(oldRenders).toBe(0);
-		expect(newRenders).toBe(24);
-		expect(resizeRenders).toBe(0);
-		expect(view.container.querySelectorAll("article")).toHaveLength(count + 24);
-		cards.forEach((card, index) => {
-			expect(view.container.querySelectorAll("article")[index]).toBe(card);
-		});
-	});
+	it.each([1, 24, 100])(
+		"keeps %i existing cards idle through loading, append and masonry reflow",
+		(count) => {
+			products = Array.from({ length: count }, (_, index) => product(index));
+			const view = render(list());
+			const cards = Array.from(view.container.querySelectorAll("article"));
+			imageRender.mockClear();
+			loading = true;
+			view.rerender(list());
+			const loadingRenders = imageRender.mock.calls.length;
+			imageRender.mockClear();
+			products = [
+				...products,
+				...Array.from({ length: 24 }, (_, index) => product(count + index)),
+			];
+			loading = false;
+			view.rerender(list());
+			const oldRenders = imageRender.mock.calls.filter(
+				([name]) => Number(name.split(" ")[1]) < count,
+			).length;
+			const newRenders = imageRender.mock.calls.length - oldRenders;
+			imageRender.mockClear();
+			act(() => window.dispatchEvent(new Event("resize")));
+			const resizeRenders = imageRender.mock.calls.length;
+			console.info(
+				JSON.stringify({
+					count,
+					appended: 24,
+					loadingRenders,
+					oldRenders,
+					newRenders,
+					resizeRenders,
+				}),
+			);
+			expect(loadingRenders).toBe(0);
+			expect(oldRenders).toBe(0);
+			expect(newRenders).toBe(24);
+			expect(resizeRenders).toBe(0);
+			expect(view.container.querySelectorAll("article")).toHaveLength(
+				count + 24,
+			);
+			cards.forEach((card, index) => {
+				expect(view.container.querySelectorAll("article")[index]).toBe(card);
+			});
+		},
+	);
 
 	it("still updates quantity locally and refreshed business data on the affected card", () => {
 		const view = render(list());

@@ -297,22 +297,21 @@ describe("middleware storefront handling", () => {
 		}
 	});
 
-	it.each([
-		500,
-		503,
-		null,
-	])("serves the page when the gateway cannot answer (%s)", async (status) => {
-		// The fail-OPEN half. A blip must degrade to the old soft-404, never
-		// 404 a storefront that exists.
-		const { calls } = mockSellerOutage(status);
-		const response = await get(`/sellers/${STORE_ID}/reviews`);
-		expect(response.status).toBe(200);
-		expect(response.headers.get("location")).toBeNull();
-		expectServedAsZhTw(response);
-		// The gateway really was asked — otherwise this 200 would prove
-		// nothing about how a failed answer is treated.
-		expect(calls).toContain(STORE_ID);
-	});
+	it.each([500, 503, null])(
+		"serves the page when the gateway cannot answer (%s)",
+		async (status) => {
+			// The fail-OPEN half. A blip must degrade to the old soft-404, never
+			// 404 a storefront that exists.
+			const { calls } = mockSellerOutage(status);
+			const response = await get(`/sellers/${STORE_ID}/reviews`);
+			expect(response.status).toBe(200);
+			expect(response.headers.get("location")).toBeNull();
+			expectServedAsZhTw(response);
+			// The gateway really was asked — otherwise this 200 would prove
+			// nothing about how a failed answer is treated.
+			expect(calls).toContain(STORE_ID);
+		},
+	);
 
 	it("serves the page when a 404 came from the router, not the handler", async () => {
 		// Gin's plain-text `404 page not found` — the shape a dropped or renamed

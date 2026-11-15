@@ -204,7 +204,7 @@ test("the restricted scan keeps runtime class maps and imported HeroUI apply out
 		[".toggle-button", "position", "relative"],
 		[".color-swatch-picker", "display", "flex"],
 		[".slider", "display", "grid"],
-		[".switch", "display", "inline-flex"],
+		[".switch__content", "display", "inline-flex"],
 	] as const) {
 		const rules = rulesFor(result.root, selector);
 		assert.ok(rules.length > 0, `${selector} HeroUI component CSS is missing`);

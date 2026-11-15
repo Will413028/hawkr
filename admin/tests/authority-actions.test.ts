@@ -194,7 +194,8 @@ test("完成：每個對象都要選告知方式（沿用核准的伺服器句�
 		],
 	);
 	assert.deepEqual(
-		(data.targetNotices?.[1].notice as { recheckDate?: unknown }).recheckDate,
+		(data.targetNotices?.[1]?.notice as { recheckDate?: unknown } | undefined)
+			?.recheckDate,
 		{
 			year: 2026,
 			month: 11,

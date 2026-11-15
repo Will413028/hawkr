@@ -131,32 +131,35 @@ describe("upload preview media", () => {
 		"https://test-media.example.com/public/user_avatar/1/avatar.png",
 		"https://uploads.example.net/bucket-a/public/avatar.png",
 		"https://account.example.net/public/avatar.png",
-	])("PUTs to whatever destination the backend presigned, without a host guard of its own: %s", async (uploadUrl) => {
-		apiMocks.authedFetch
-			.mockResolvedValueOnce({
-				data: {
-					sessionId: "session-1",
-					uploadUrl,
-					expiresIn: "10m",
-					isSecure: false,
-				},
-			})
-			.mockResolvedValueOnce({
-				data: {
-					previewUrl: "public/user_avatar/1/avatar.png",
-					stagedToken: "staged-token",
-				},
+	])(
+		"PUTs to whatever destination the backend presigned, without a host guard of its own: %s",
+		async (uploadUrl) => {
+			apiMocks.authedFetch
+				.mockResolvedValueOnce({
+					data: {
+						sessionId: "session-1",
+						uploadUrl,
+						expiresIn: "10m",
+						isSecure: false,
+					},
+				})
+				.mockResolvedValueOnce({
+					data: {
+						previewUrl: "public/user_avatar/1/avatar.png",
+						stagedToken: "staged-token",
+					},
+				});
+			const file = new File([new Uint8Array([1, 2, 3])], "avatar.png", {
+				type: "image/png",
 			});
-		const file = new File([new Uint8Array([1, 2, 3])], "avatar.png", {
-			type: "image/png",
-		});
 
-		await uploadImageFile(file, undefined, { compress: false });
+			await uploadImageFile(file, undefined, { compress: false });
 
-		expect(recordedUploadRequests.map((request) => request.url)).toEqual([
-			uploadUrl,
-		]);
-	});
+			expect(recordedUploadRequests.map((request) => request.url)).toEqual([
+				uploadUrl,
+			]);
+		},
+	);
 
 	it("builds the preview from the configured media origin, and not at all when none is configured", async () => {
 		const respond = () =>

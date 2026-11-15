@@ -28,16 +28,19 @@ describe("main-tab pending content store", () => {
 		["/", "feed", "/feed"],
 		["/", "market-list", "/market/products"],
 		["/", "search", "/search"],
-	])("publishes the %s to %s target synchronously", (source, variant, target) => {
-		window.history.replaceState(null, "", source);
-		beginMainTabPending(target, "push");
-		expect(getMainTabPendingSnapshot()).toEqual({
-			id: expect.any(Number),
-			sourcePathname: source,
-			targetPathname: target,
-			variant,
-		});
-	});
+	])(
+		"publishes the %s to %s target synchronously",
+		(source, variant, target) => {
+			window.history.replaceState(null, "", source);
+			beginMainTabPending(target, "push");
+			expect(getMainTabPendingSnapshot()).toEqual({
+				id: expect.any(Number),
+				sourcePathname: source,
+				targetPathname: target,
+				variant,
+			});
+		},
+	);
 
 	it("accepts same-origin URLs and target queries without treating queries as new tabs", () => {
 		beginMainTabPending(`${window.location.origin}/search?q=fish`, "replace");
@@ -74,17 +77,15 @@ describe("main-tab pending content store", () => {
 		expect(vi.getTimerCount()).toBe(0);
 	});
 
-	it.each([
-		"/account",
-		"/products/product-1",
-		"/feed/post-1",
-		"/about",
-	])("does not create a main-tab surface from non-tab source %s", (source) => {
-		beginMainTabPending("/feed");
-		window.history.replaceState(null, "", source);
-		beginMainTabPending("/search");
-		expect(getMainTabPendingSnapshot()).toBeNull();
-	});
+	it.each(["/account", "/products/product-1", "/feed/post-1", "/about"])(
+		"does not create a main-tab surface from non-tab source %s",
+		(source) => {
+			beginMainTabPending("/feed");
+			window.history.replaceState(null, "", source);
+			beginMainTabPending("/search");
+			expect(getMainTabPendingSnapshot()).toBeNull();
+		},
+	);
 
 	it("clears a pending destination when the source tab is selected again", () => {
 		beginMainTabPending("/feed");
@@ -130,29 +131,28 @@ describe("main-tab pending content store", () => {
 		expect(getMainTabPendingSnapshot()).toBe(pending);
 	});
 
-	it.each([
-		"/feed",
-		"/login",
-		"/search",
-	])("clears after the target or redirect actually commits to %s", (committedPathname) => {
-		beginMainTabPending("/feed");
-		window.history.replaceState(null, "", committedPathname);
-		completeMainTabPending(committedPathname);
-		expect(getMainTabPendingSnapshot()).toBeNull();
-		expect(vi.getTimerCount()).toBe(0);
-	});
+	it.each(["/feed", "/login", "/search"])(
+		"clears after the target or redirect actually commits to %s",
+		(committedPathname) => {
+			beginMainTabPending("/feed");
+			window.history.replaceState(null, "", committedPathname);
+			completeMainTabPending(committedPathname);
+			expect(getMainTabPendingSnapshot()).toBeNull();
+			expect(vi.getTimerCount()).toBe(0);
+		},
+	);
 
-	it.each([
-		"popstate",
-		"pagehide",
-	])("clears immediately on %s and still accepts later navigations", (eventType) => {
-		beginMainTabPending("/feed");
-		window.dispatchEvent(new Event(eventType));
-		expect(getMainTabPendingSnapshot()).toBeNull();
-		expect(vi.getTimerCount()).toBe(0);
-		beginMainTabPending("/search");
-		expect(getMainTabPendingSnapshot()?.targetPathname).toBe("/search");
-	});
+	it.each(["popstate", "pagehide"])(
+		"clears immediately on %s and still accepts later navigations",
+		(eventType) => {
+			beginMainTabPending("/feed");
+			window.dispatchEvent(new Event(eventType));
+			expect(getMainTabPendingSnapshot()).toBeNull();
+			expect(vi.getTimerCount()).toBe(0);
+			beginMainTabPending("/search");
+			expect(getMainTabPendingSnapshot()?.targetPathname).toBe("/search");
+		},
+	);
 
 	it("cleans up after the watchdog budget without claiming a route committed", () => {
 		beginMainTabPending("/feed");
