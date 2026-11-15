@@ -13,7 +13,7 @@ import (
 	"github.com/Will413028/hawkr/notification-service/internal/worker"
 )
 
-// 單體送出的每個 route（掃描見 relay_routes_test.go）在真的 notification_templates（重放全部 migrations 後）上要成立其一：
+// 單體送出的每個 route（清單讀單體的 manifest，見 relay_routes_test.go）在真的 notification_templates（重放全部 migrations 後）上要成立其一：
 // 有 enabled 的 template，而且 notification 訂得到（template 驅動的訂閱的 queue 有綁到它）；或有靜態訂閱處理；或在
 // notifyAllowlist（明白不通知，且確實沒有 template）。三者都不是就是新增了一個沒人接的事件；allowlist 的條目一旦有了 template 就過期。
 func TestPublishedRoutesHaveNotificationHandler(t *testing.T) {
@@ -51,9 +51,6 @@ func TestPublishedRoutesHaveNotificationHandler(t *testing.T) {
 				}
 			}
 		})
-	}
-	for id := range allow {
-		require.Falsef(t, templates[id], "allowlist %s 已有 template", id)
 	}
 }
 

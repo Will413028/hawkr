@@ -63,19 +63,7 @@ func startConsumer(
 	}
 
 	subs := buildDynamicSubscriptions(cache, sendPush, inboxUC, cfg.MediaBaseURL, logger, vendorInvite)
-	// buyer.deleted, account.deleted, and seller.deleted are not template-driven:
-	// append static subscriptions that scrub chat-notification inbox rows for the
-	// closed buyer stint / deleted account / closed seller stint respectively
-	// (個資法), plus soft-delete the retired buyer stint's / seller incarnation's
-	// own inbox rows (44 號設計書 §10 D6 for buyer; issue #2707 for seller). Split
-	// per buyer store-stint rekey W2/W3 D6 — see account_deleted.go's doc comments
-	// for why buyer.deleted and account.deleted are both needed (buyer.deleted
-	// misses seller-only-account deletes; account.deleted misses buyer-role-only
-	// closures on a dual-role account). seller.deleted is the third leg covering a
-	// seller role closing alone on a multi-role account.
-	subs = append(subs, buyerDeletedSubscription(inboxUC, logger))
-	subs = append(subs, accountDeletedSubscription(inboxUC, logger))
-	subs = append(subs, sellerDeletedSubscription(inboxUC, logger))
+	subs = append(subs, staticSubscriptions(inboxUC, logger)...)
 	consumer := mq.NewResilientConsumer(cfg.RabbitMQ.URL, subs, mq.WithOTelMetrics(meterProvider))
 
 	lc.Append(fx.Hook{

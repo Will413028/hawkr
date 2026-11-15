@@ -2,7 +2,7 @@ package worker
 
 import "testing"
 
-// 給 package worker_test 的整合測試用：發送點掃描、allowlist 與訂閱資訊都在 package worker 的測試檔裡。
+// 給 package worker_test 的整合測試用：發送點 manifest、allowlist 與訂閱資訊都在 package worker 的測試檔裡。
 
 type PublishRoute struct{ Pkg, Exchange, Key string }
 
@@ -11,8 +11,8 @@ type NotifyAllowlistEntry struct{ Exchange, Key, ConsumerQueue, Reason string }
 func MonolithPublishRoutes(t *testing.T) []PublishRoute {
 	t.Helper()
 	var out []PublishRoute
-	for _, r := range publishRoutes(t, monolithInternal, monolithSelf) {
-		out = append(out, PublishRoute{r.pkg, r.exchange, r.key})
+	for _, r := range publishRoutes(t) {
+		out = append(out, PublishRoute{r.Package, r.Exchange, r.Key})
 	}
 	return out
 }

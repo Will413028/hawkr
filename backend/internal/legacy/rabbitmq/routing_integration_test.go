@@ -19,7 +19,7 @@ import (
 
 func TestPublishedRoutesReachTopologyQueues(t *testing.T) {
 	doc := loadTopologyDoc(t)
-	rows := publishRoutes(t, internalRoot, publisherSelf)
+	rows := publishRoutes(t)
 
 	url := startBroker(t)
 	conn, err := amqp.Dial(url)
@@ -57,15 +57,15 @@ func TestPublishedRoutesReachTopologyQueues(t *testing.T) {
 	t.Cleanup(func() { _ = pub.Close() })
 
 	for _, row := range rows {
-		t.Run(row.pkg+"/"+row.exchange+"/"+row.key, func(t *testing.T) {
-			want := doc.boundQueues(row.exchange, row.key)
+		t.Run(row.Package+"/"+row.Exchange+"/"+row.Key, func(t *testing.T) {
+			want := doc.boundQueues(row.Exchange, row.Key)
 			if len(want) == 0 {
-				t.Fatalf("topology.yaml 沒有任何 queue 綁到 %s/%s：這個事件送出去沒有人收", row.exchange, row.key)
+				t.Fatalf("topology.yaml 沒有任何 queue 綁到 %s/%s：這個事件送出去沒有人收", row.Exchange, row.Key)
 			}
-			body := []byte(fmt.Sprintf(`{"event_id":"routing-%s-%s","note":"路由測試，內容不重要"}`, runID, row.key))
+			body := []byte(fmt.Sprintf(`{"event_id":"routing-%s-%s","note":"路由測試，內容不重要"}`, runID, row.Key))
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-			if err := pub.Publish(ctx, row.exchange, row.key, body); err != nil {
+			if err := pub.Publish(ctx, row.Exchange, row.Key, body); err != nil {
 				t.Fatal(err)
 			}
 			var got []string
@@ -84,7 +84,7 @@ func TestPublishedRoutesReachTopologyQueues(t *testing.T) {
 			}
 			slices.Sort(got)
 			if !slices.Equal(got, want) {
-				t.Errorf("%s/%s 落在的 queue 與 topology.yaml 的 binding 不符：\n got  %v\n want %v", row.exchange, row.key, got, want)
+				t.Errorf("%s/%s 落在的 queue 與 topology.yaml 的 binding 不符：\n got  %v\n want %v", row.Exchange, row.Key, got, want)
 			}
 		})
 	}

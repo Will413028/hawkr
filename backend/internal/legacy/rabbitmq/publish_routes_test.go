@@ -1,6 +1,11 @@
 package rabbitmq
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -10,26 +15,41 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"go.yaml.in/yaml/v3"
 )
 
 // 單體裡每個把事件交給本 package 的 Publisher 的地方（PublishArgs 字面值），送出的每個 (exchange, routing key)，
-// 都要落在 infra/mq/topology/topology.yaml 宣告的 queue。清單由 internal/ 底下的原始碼導出，不手抄，也不寫死 package 名單：
-// 新增一個發送者就多一列。這裡讀原始碼而不是讓 relay 匯出路由表，因為消費端 notification-service 是另一個 Go module，
-// 不能 import 單體，兩邊都得讀原始碼；單體這側的發送清單由這份掃描統一產生。
-// notification-service 的 relay_routes_test.go 有同一份掃描（兩個 module 不能共用），改這裡要一併改那裡。
+// 都要落在 infra/mq/topology/topology.yaml 宣告的 queue。清單由 internal/ 與 cmd/ 底下的原始碼導出，不手抄，也不寫死 package 名單：
+// 新增一個發送者就多一列。
 //
-// 掃不全就失敗，不靜默略過：PublishArgs 只允許出現在「字面值」與「函式參數型別」兩種位置；字面值的 Exchange、RoutingKey
-// 必須是字串字面值或同 package 的 package 層 const，或是轉手函式（以函式參數填入）的參數，而轉手函式的每個呼叫點都要是
-// 可解析的呼叫（不得被當成值傳遞）。欄位正確性不在這裡（那是各 package 的 wire_test）。終點：最後一個舊 Publisher 使用者刪除時刪掉。
+// 這份掃描是唯一的原始碼掃描：結果寫成 testdata/routes.json（每個 (exchange, routing key, package) 一列，排序），
+// 消費端 notification-service 是另一個 Go module，不能 import 單體，改讀這份 manifest 檢查自己這一側。
+// 發送者變動而 manifest 沒更新時 TestPublishRoutesManifest 失敗；重新產生：
+//
+//	cd backend && GOWORK=off go test ./internal/legacy/rabbitmq/ -run TestPublishRoutesManifest -update
+//
+// 掃不全就失敗，不靜默略過：
+//   - PublishArgs 只允許出現在「字面值」與「函式參數型別」兩種位置。
+//   - 字面值的 Exchange、RoutingKey 必須是字串字面值或同 package 的 package 層 const，或是轉手函式（以函式參數填入）的參數。
+//   - 轉手函式必須是未匯出的、在 package 內名稱唯一的函式或方法（同名的不同 receiver 無法不靠型別資訊分辨）；
+//     函式本體不得以閉包參數或區域宣告遮蔽那兩個參數；它的每個引用都要是直接呼叫（不得被當成值傳遞）。
+//   - 引用 legacy/rabbitmq 的檔案不得直接呼叫 Publish（四個參數），任何 package 也不得宣告帶 []byte 的四參數 Publish 方法或介面。
+//
+// 欄位正確性不在這裡（那是各 package 的 wire_test）。終點：最後一個舊 Publisher 使用者刪除時刪掉。
+
+var update = flag.Bool("update", false, "重寫 testdata/routes.json")
 
 const (
 	topologyFile  = "../../../infra/mq/topology/topology.yaml"
-	internalRoot  = "../.."
+	manifestFile  = "testdata/routes.json"
+	backendRoot   = "../../.."
 	publisherSelf = "../../legacy/rabbitmq"
 )
+
+var scanRoots = []string{"../..", "../../../cmd"}
 
 type topologyDoc struct {
 	Exchanges []struct {
@@ -76,41 +96,86 @@ func (d topologyDoc) boundQueues(exchange, key string) []string {
 	return out
 }
 
-type routeRow struct{ pkg, exchange, key string }
+type routeRow struct {
+	Exchange string `json:"exchange"`
+	Key      string `json:"routing_key"`
+	Package  string `json:"package"`
+}
 
 type forwarder struct {
 	name          string
 	exIdx, keyIdx int
 }
 
-// publishRoutes 掃描 root 底下每個 package（略過 skipDir 與 _test.go）。
-func publishRoutes(t *testing.T, root, skipDir string) []routeRow {
+var (
+	scanOnce sync.Once
+	scanRows []routeRow
+	scanErr  error
+)
+
+// publishRoutes 回傳 scanRoots 底下每個 package（略過 publisherSelf、testdata 與 _test.go）的發送點；每個 test binary 只算一次。
+func publishRoutes(t *testing.T) []routeRow {
 	t.Helper()
-	skip, _ := filepath.Abs(skipDir)
-	var dirs []string
-	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	scanOnce.Do(func() { scanRows, scanErr = scanAll() })
+	if scanErr != nil {
+		t.Fatal(scanErr)
+	}
+	return scanRows
+}
+
+type scanFail struct{ msg string }
+
+func failf(format string, args ...any) { panic(scanFail{fmt.Sprintf(format, args...)}) }
+
+func scanAll() (rows []routeRow, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			sf, ok := r.(scanFail)
+			if !ok {
+				panic(r)
+			}
+			err = errors.New(sf.msg)
 		}
-		if d.IsDir() {
-			if abs, _ := filepath.Abs(p); abs == skip {
+	}()
+	skip, _ := filepath.Abs(publisherSelf)
+	for _, root := range scanRoots {
+		walkErr := filepath.WalkDir(root, func(p string, d fs.DirEntry, werr error) error {
+			if werr != nil {
+				return werr
+			}
+			if !d.IsDir() {
+				return nil
+			}
+			if abs, _ := filepath.Abs(p); abs == skip || d.Name() == "testdata" || (strings.HasPrefix(d.Name(), ".") && p != root) {
 				return filepath.SkipDir
 			}
-			dirs = append(dirs, p)
+			rows = append(rows, scanPackageRoutes(p)...)
+			return nil
+		})
+		if walkErr != nil {
+			return nil, walkErr
 		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var rows []routeRow
-	for _, dir := range dirs {
-		rows = append(rows, scanPackageRoutes(t, dir)...)
 	}
 	if len(rows) == 0 {
-		t.Fatalf("%s 底下掃不到任何 PublishArgs 發送點：掃描壞了", root)
+		return nil, errors.New("internal/、cmd/ 底下掃不到任何 PublishArgs 發送點：掃描壞了")
 	}
-	return rows
+	sort.Slice(rows, func(i, j int) bool {
+		a, b := rows[i], rows[j]
+		if a.Exchange != b.Exchange {
+			return a.Exchange < b.Exchange
+		}
+		if a.Key != b.Key {
+			return a.Key < b.Key
+		}
+		return a.Package < b.Package
+	})
+	out := rows[:0]
+	for i, r := range rows {
+		if i == 0 || r != rows[i-1] {
+			out = append(out, r)
+		}
+	}
+	return out, nil
 }
 
 func isPublishArgs(e ast.Expr) bool {
@@ -118,33 +183,108 @@ func isPublishArgs(e ast.Expr) bool {
 	return ok && sel.Sel.Name == "PublishArgs"
 }
 
-func scanPackageRoutes(t *testing.T, dir string) []routeRow {
-	t.Helper()
+func isByteSlice(e ast.Expr) bool {
+	at, ok := e.(*ast.ArrayType)
+	if !ok || at.Len != nil {
+		return false
+	}
+	id, ok := at.Elt.(*ast.Ident)
+	return ok && id.Name == "byte"
+}
+
+func hasByteSliceFourParams(ft *ast.FuncType) bool {
+	n, hasBytes := 0, false
+	for _, p := range ft.Params.List {
+		c := len(p.Names)
+		if c == 0 {
+			c = 1
+		}
+		n += c
+		if isByteSlice(p.Type) {
+			hasBytes = true
+		}
+	}
+	return n >= 4 && hasBytes
+}
+
+func scanPackageRoutes(dir string) []routeRow {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		t.Fatal(err)
+		failf("%s：%v", dir, err)
 	}
-	fset := token.NewFileSet()
-	var files []*ast.File
+	var paths []string
+	relevant := false
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
 			continue
 		}
-		f, err := parser.ParseFile(fset, filepath.Join(dir, e.Name()), nil, 0)
+		p := filepath.Join(dir, e.Name())
+		raw, err := os.ReadFile(p)
 		if err != nil {
-			t.Fatal(err)
+			failf("%s：%v", p, err)
+		}
+		paths = append(paths, p)
+		if bytes.Contains(raw, []byte("PublishArgs")) || bytes.Contains(raw, []byte("Publish(")) {
+			relevant = true
+		}
+	}
+	if !relevant {
+		return nil
+	}
+	fset := token.NewFileSet()
+	var files []*ast.File
+	for _, p := range paths {
+		f, err := parser.ParseFile(fset, p, nil, 0)
+		if err != nil {
+			failf("%s：%v", p, err)
 		}
 		files = append(files, f)
 	}
-	if len(files) == 0 {
-		return nil
+	absDir, _ := filepath.Abs(dir)
+	absRoot, _ := filepath.Abs(backendRoot)
+	rel, err := filepath.Rel(absRoot, absDir)
+	if err != nil {
+		failf("%s：%v", dir, err)
 	}
-	pkg := filepath.ToSlash(dir)
+	pkg := filepath.ToSlash(rel)
+
+	// 直接呼叫 Publisher.Publish 的檢查：沒有型別資訊，所以用「引用本 package」與「方法簽章」兩個訊號，寧可誤報。
+	for _, f := range files {
+		importsPublisher := false
+		for _, im := range f.Imports {
+			if strings.HasSuffix(strings.Trim(im.Path.Value, `"`), "/internal/legacy/rabbitmq") {
+				importsPublisher = true
+			}
+		}
+		ast.Inspect(f, func(n ast.Node) bool {
+			switch v := n.(type) {
+			case *ast.CallExpr:
+				if sel, ok := v.Fun.(*ast.SelectorExpr); ok && importsPublisher && sel.Sel.Name == "Publish" && len(v.Args) == 4 {
+					failf("%s：引用 legacy/rabbitmq 的檔案直接呼叫了 Publish，掃描看不到它的 exchange 與 routing key；改走 PublishArgs 字面值", pkg)
+				}
+			case *ast.FuncDecl:
+				if v.Name.Name == "Publish" && hasByteSliceFourParams(v.Type) {
+					failf("%s：宣告了帶 []byte 的 Publish 方法，可能是繞過 PublishArgs 的送出點，掃描看不到", pkg)
+				}
+			case *ast.InterfaceType:
+				for _, m := range v.Methods.List {
+					if ft, ok := m.Type.(*ast.FuncType); ok && len(m.Names) == 1 && m.Names[0].Name == "Publish" && hasByteSliceFourParams(ft) {
+						failf("%s：介面宣告了帶 []byte 的 Publish，可能是繞過 PublishArgs 的送出點，掃描看不到", pkg)
+					}
+				}
+			}
+			return true
+		})
+	}
 
 	// 只解析 package 層的 const：函式內的同名 const 不算。
 	consts := map[string]string{}
+	declCount := map[string]int{}
 	for _, f := range files {
 		for _, d := range f.Decls {
+			if fd, ok := d.(*ast.FuncDecl); ok {
+				declCount[fd.Name.Name]++
+			}
 			gd, ok := d.(*ast.GenDecl)
 			if !ok || gd.Tok != token.CONST {
 				continue
@@ -202,7 +342,7 @@ func scanPackageRoutes(t *testing.T, dir string) []routeRow {
 			return true
 		})
 		if total != allowed {
-			t.Fatalf("%s：PublishArgs 有 %d 處不是字面值也不是函式參數型別（變數宣告、欄位、泛型等），掃描看不到它的值", pkg, total-allowed)
+			failf("%s：PublishArgs 有 %d 處不是字面值也不是函式參數型別（變數宣告、欄位、回傳值、泛型等），掃描看不到它的值", pkg, total-allowed)
 		}
 
 		for _, d := range f.Decls {
@@ -227,9 +367,13 @@ func scanPackageRoutes(t *testing.T, dir string) []routeRow {
 				for _, el := range lit.Elts {
 					kv, ok := el.(*ast.KeyValueExpr)
 					if !ok {
-						t.Fatalf("%s：PublishArgs 字面值不是 key: value 寫法", pkg)
+						failf("%s：PublishArgs 字面值不是 key: value 寫法", pkg)
 					}
-					switch kv.Key.(*ast.Ident).Name {
+					id, ok := kv.Key.(*ast.Ident)
+					if !ok {
+						failf("%s：PublishArgs 字面值的欄位名不是識別字", pkg)
+					}
+					switch id.Name {
 					case "Exchange":
 						exprs[0] = kv.Value
 					case "RoutingKey":
@@ -237,12 +381,12 @@ func scanPackageRoutes(t *testing.T, dir string) []routeRow {
 					}
 				}
 				if exprs[0] == nil || exprs[1] == nil {
-					t.Fatalf("%s：PublishArgs 字面值缺 Exchange 或 RoutingKey", pkg)
+					failf("%s：PublishArgs 字面值缺 Exchange 或 RoutingKey", pkg)
 				}
 				ex, exOK := resolve(exprs[0])
 				key, keyOK := resolve(exprs[1])
 				if exOK && keyOK {
-					rows = append(rows, routeRow{pkg, ex, key})
+					rows = append(rows, routeRow{ex, key, pkg})
 					return true
 				}
 				idx := func(e ast.Expr) int {
@@ -257,9 +401,17 @@ func scanPackageRoutes(t *testing.T, dir string) []routeRow {
 				}
 				exIdx, keyIdx := idx(exprs[0]), idx(exprs[1])
 				if exIdx < 0 || keyIdx < 0 {
-					t.Fatalf("%s：PublishArgs 的 Exchange 或 RoutingKey 不是字串字面值、package 層 const，也不是外層函式的參數", pkg)
+					failf("%s：PublishArgs 的 Exchange 或 RoutingKey 不是字串字面值、package 層 const，也不是外層函式的參數", pkg)
 				}
-				forwarders[fn.Name.Name] = forwarder{fn.Name.Name, exIdx, keyIdx}
+				name := fn.Name.Name
+				if fn.Name.IsExported() {
+					failf("%s：轉手函式 %s 是匯出的，別的 package 的呼叫點掃描看不到；改成未匯出", pkg, name)
+				}
+				if declCount[name] > 1 {
+					failf("%s：轉手函式 %s 在 package 內有同名宣告（不同 receiver？），沒有型別資訊分辨不了呼叫點；改名", pkg, name)
+				}
+				checkNoShadow(pkg, fn, params[exIdx], params[keyIdx])
+				forwarders[name] = forwarder{name, exIdx, keyIdx}
 				return true
 			})
 		}
@@ -287,30 +439,73 @@ func scanPackageRoutes(t *testing.T, dir string) []routeRow {
 					}
 					calls++
 					if len(v.Args) <= max(fw.exIdx, fw.keyIdx) {
-						t.Fatalf("%s：%s 的呼叫參數數量不對，掃描要跟著改", pkg, fw.name)
+						failf("%s：%s 的呼叫參數數量不對，掃描要跟著改", pkg, fw.name)
 					}
 					ex, exOK := resolve(v.Args[fw.exIdx])
 					key, keyOK := resolve(v.Args[fw.keyIdx])
 					if !exOK || !keyOK {
-						t.Fatalf("%s：%s 的 exchange 或 routing key 不是字串字面值或 package 層 const，掃描看不到", pkg, fw.name)
+						failf("%s：%s 的 exchange 或 routing key 不是字串字面值或 package 層 const，掃描看不到", pkg, fw.name)
 					}
-					rows = append(rows, routeRow{pkg, ex, key})
+					rows = append(rows, routeRow{ex, key, pkg})
 				}
 				return true
 			})
 		}
 		// 識別字出現次數 = 一個宣告 + 每個呼叫；多出來的是被當成值傳遞（method value）或被其他方式引用。
 		if idents != calls+1 {
-			t.Fatalf("%s：%s 有 %d 處引用不是直接呼叫（被當成值傳遞？），掃描看不到那些送出點", pkg, fw.name, idents-calls-1)
+			failf("%s：%s 有 %d 處引用不是直接呼叫（被當成值傳遞、同名欄位或區域變數？），掃描看不到那些送出點", pkg, fw.name, idents-calls-1)
 		}
 		if calls == 0 {
-			t.Fatalf("%s：%s 沒有任何呼叫點", pkg, fw.name)
+			failf("%s：%s 沒有任何呼叫點", pkg, fw.name)
 		}
 	}
 	return rows
 }
 
-// topicMatch 是 AMQP topic exchange 的比對：* 一個字，# 零個以上的字（notification-service 的 relay_routes_test.go 有同一份）。
+// checkNoShadow：轉手函式本體裡，閉包參數、:=、var、range 都不得重新宣告 exchange 或 routing key 參數的名字，
+// 否則字面值裡的同名識別字指的不是外層參數，位置對應會錯。
+func checkNoShadow(pkg string, fn *ast.FuncDecl, names ...string) {
+	if fn.Body == nil {
+		return
+	}
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		var ids []*ast.Ident
+		switch v := n.(type) {
+		case *ast.FuncLit:
+			for _, p := range v.Type.Params.List {
+				ids = append(ids, p.Names...)
+			}
+		case *ast.AssignStmt:
+			if v.Tok == token.DEFINE {
+				for _, l := range v.Lhs {
+					if id, ok := l.(*ast.Ident); ok {
+						ids = append(ids, id)
+					}
+				}
+			}
+		case *ast.ValueSpec:
+			ids = append(ids, v.Names...)
+		case *ast.RangeStmt:
+			if v.Tok == token.DEFINE {
+				for _, e := range []ast.Expr{v.Key, v.Value} {
+					if id, ok := e.(*ast.Ident); ok {
+						ids = append(ids, id)
+					}
+				}
+			}
+		}
+		for _, id := range ids {
+			for _, name := range names {
+				if id.Name == name {
+					failf("%s：轉手函式 %s 內重新宣告了參數 %s（閉包參數或區域變數遮蔽），掃描分不清它指哪一個", pkg, fn.Name.Name, name)
+				}
+			}
+		}
+		return true
+	})
+}
+
+// topicMatch 是 AMQP topic exchange 的比對：* 一個字，# 零個以上的字（notification-service 的 relay_routes_test.go 因為是另一個 module 有同一份，改這裡要一併改那裡）。
 func topicMatch(pattern, key string) bool {
 	var match func(p, k []string) bool
 	match = func(p, k []string) bool {
@@ -335,9 +530,35 @@ func topicMatch(pattern, key string) bool {
 
 func TestPublishedRoutesAreBoundInTopology(t *testing.T) {
 	doc := loadTopologyDoc(t)
-	for _, r := range publishRoutes(t, internalRoot, publisherSelf) {
-		if len(doc.boundQueues(r.exchange, r.key)) == 0 {
-			t.Errorf("%s 送出 %s/%s，topology.yaml 沒有任何 queue 綁到它：這個事件送出去沒有人收", r.pkg, r.exchange, r.key)
+	for _, r := range publishRoutes(t) {
+		if len(doc.boundQueues(r.Exchange, r.Key)) == 0 {
+			t.Errorf("%s 送出 %s/%s，topology.yaml 沒有任何 queue 綁到它：這個事件送出去沒有人收", r.Package, r.Exchange, r.Key)
 		}
+	}
+}
+
+// TestPublishRoutesManifest 讓 testdata/routes.json 與原始碼掃描結果一致；notification-service 讀這份檔。
+func TestPublishRoutesManifest(t *testing.T) {
+	got, err := json.MarshalIndent(publishRoutes(t), "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got = append(got, '\n')
+	if *update {
+		if err := os.MkdirAll(filepath.Dir(manifestFile), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(manifestFile, got, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	want, err := os.ReadFile(manifestFile)
+	if err != nil {
+		t.Fatalf("讀不到 %s：%v。重新產生：cd backend && GOWORK=off go test ./internal/legacy/rabbitmq/ -run TestPublishRoutesManifest -update", manifestFile, err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("%s 與原始碼掃描結果不一致（新增、刪除或改了送出點？）。重新產生並一起提交：\n"+
+			"  cd backend && GOWORK=off go test ./internal/legacy/rabbitmq/ -run TestPublishRoutesManifest -update", manifestFile)
 	}
 }
