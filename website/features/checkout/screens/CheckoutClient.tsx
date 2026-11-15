@@ -619,6 +619,7 @@ export default function CheckoutClient() {
 				className="min-h-[calc(100vh-280px)] flex flex-col items-center justify-center gap-4 text-center px-4"
 				aria-busy="true"
 			>
+				<h1 className="sr-only">結帳</h1>
 				<p>正在讀取結帳資料…</p>
 			</section>
 		);
@@ -627,6 +628,7 @@ export default function CheckoutClient() {
 	if (!draft) {
 		return (
 			<section className="min-h-[calc(100vh-280px)] flex flex-col items-center justify-center gap-4 text-center px-4">
+				<h1 className="sr-only">結帳</h1>
 				<p>結帳資料已過期，請從購物車重新確認商品、配送與優惠券。</p>
 				<Link
 					href="/cart"
@@ -641,6 +643,7 @@ export default function CheckoutClient() {
 	if (!orderConfirmed && (selectedItems.length === 0 || hasInvalidCartItems)) {
 		return (
 			<section className="min-h-[calc(100vh-280px)] flex flex-col items-center justify-center gap-4 text-center px-4">
+				<h1 className="sr-only">結帳</h1>
 				<p>商品資料同步中，請回購物車重新確認後再結帳。</p>
 				<Link
 					href="/cart"

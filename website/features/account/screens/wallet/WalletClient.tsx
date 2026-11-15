@@ -35,7 +35,7 @@ export default function WalletClient() {
 	};
 
 	return (
-		<main className="buyer-wallet-page">
+		<div className="buyer-wallet-page">
 			<SellerPageShell
 				title="會員卡"
 				subtitle="你曾消費過的商家，以及在每一家的累計金額。"
@@ -127,6 +127,6 @@ export default function WalletClient() {
 					</div>
 				)}
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }

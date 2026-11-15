@@ -387,10 +387,10 @@ export default function SellerCenterShell({
 				</div>
 			</aside>
 
-			<main className="seller-main">
+			<div className="seller-main">
 				<TerminationNoticeBanner />
 				{children}
-			</main>
+			</div>
 		</div>
 	);
 }

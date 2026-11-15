@@ -10,7 +10,7 @@ function source(relativePath: string) {
 test("seller landing adds Scroll World before the untouched original story", () => {
 	const landing = source("features/seller/landing/SellerLandingPage.tsx");
 	const openingIndex = landing.indexOf("<SellerRecruitmentScrollWorld");
-	const mainIndex = landing.indexOf("<main");
+	const mainIndex = landing.indexOf('key="seller-landing"');
 	const originalHeroIndex = landing.indexOf(
 		'className="seller-hero seller-snap-section"',
 	);
@@ -18,11 +18,11 @@ test("seller landing adds Scroll World before the untouched original story", () 
 	assert.ok(openingIndex > -1, "Scroll World should be rendered");
 	assert.ok(
 		openingIndex < mainIndex,
-		"Scroll World should sit before the old main",
+		"Scroll World should sit before the old page root",
 	);
 	assert.ok(
 		mainIndex < originalHeroIndex,
-		"the original seller hero should remain inside its existing main",
+		"the original seller hero should remain inside its existing page root",
 	);
 	assert.match(
 		landing,

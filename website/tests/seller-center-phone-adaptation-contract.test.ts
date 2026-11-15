@@ -134,7 +134,7 @@ test("product and profile fixed actions stay usable at 320px", () => {
 	);
 	assert.match(productForm, /className="product-form__mobile-toolbar/);
 	assert.match(productForm, /className="product-form__mobile-more"/);
-	assert.match(productForm, /aria-label="開啟 AI 上架助手"/);
+	assert.match(productForm, /aria-label="AI 助手：開啟 AI 上架助手"/);
 	assert.match(
 		productForm,
 		/submitFromButton\(mobileProminentAction\.action\)/,

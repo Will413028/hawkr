@@ -98,16 +98,16 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 
 	if (loadError) {
 		return (
-			<main className={styles.shell}>
+			<div className={styles.shell}>
 				<p className={styles.error}>{loadError}</p>
-			</main>
+			</div>
 		);
 	}
 	if (!context) {
 		return (
-			<main className={styles.shell}>
+			<div className={styles.shell}>
 				<p className={styles.loading}>載入需求與收件名單…</p>
-			</main>
+			</div>
 		);
 	}
 
@@ -185,7 +185,7 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 	}
 
 	return (
-		<main className={styles.shell}>
+		<div className={styles.shell}>
 			<header className={styles.head}>
 				<div>
 					<p className={styles.eyebrow}>Hawkr Agent · 商務線 demo</p>
@@ -444,6 +444,6 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 					</button>
 				</section>
 			) : null}
-		</main>
+		</div>
 	);
 }

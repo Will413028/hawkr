@@ -20,7 +20,7 @@ function Inner() {
 	const { order } = useOrder(orderNo || undefined);
 
 	return (
-		<main className="min-h-[calc(100vh-200px)] max-w-[580px] mx-auto py-10 px-5 pb-12 flex items-center justify-center">
+		<div className="min-h-[calc(100vh-200px)] max-w-[580px] mx-auto py-10 px-5 pb-12 flex items-center justify-center">
 			<div className="relative w-full bg-content1/90 border border-divider rounded-3xl p-10 px-7 pb-8 text-center flex flex-col items-center gap-3 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_18px_40px_-22px_rgba(46,70,94,0.24),0_6px_18px_-12px_rgba(15,24,33,0.16)] backdrop-blur-md overflow-hidden dark:bg-content1/86 animate-checkout-pop">
 				<span
 					className="relative z-1 inline-flex items-center justify-center w-[148px] h-[148px] -mt-1.5 mb-[-4px] animate-checkout-icon-pop [&_svg]:w-16 [&_svg]:h-16 [&_svg]:stroke-warning [&_svg]:stroke-[2] [&_svg]:stroke-linecap-round [&_svg]:stroke-linejoin-round [&_svg]:fill-none"
@@ -83,6 +83,6 @@ function Inner() {
 					</Button>
 				</div>
 			</div>
-		</main>
+		</div>
 	);
 }

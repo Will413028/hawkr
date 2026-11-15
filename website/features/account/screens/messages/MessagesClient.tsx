@@ -22,7 +22,7 @@ interface Props {
 
 /**
  * Right-pane "no thread selected" content for `/account/messages`.
- * The surrounding `<main className="chat-page">` + `<div className="chat-shell">`
+ * The surrounding `<div className="chat-page">` + `<div className="chat-shell">`
  * + sidebar live in `layout.tsx` so they persist across navigation.
  */
 export default function MessagesClient(_: Props) {

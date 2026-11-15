@@ -164,7 +164,7 @@ export function ReceiptAuthPage() {
 						// 🔴 兩種 unavailableReason 對賣家的文案逐字相同——區分只在後端稽核。
 						<small
 							role="status"
-							className="text-[0.6875rem] text-foreground/60"
+							className="text-[0.6875rem] text-foreground-soft"
 						>
 							依據文件尚未提供，請洽平台客服。
 						</small>
@@ -172,7 +172,7 @@ export function ReceiptAuthPage() {
 						// 還沒核定就沒有核定依據文件，這不是缺漏，不要叫他洽客服。
 						<small
 							role="status"
-							className="text-[0.6875rem] text-foreground/60"
+							className="text-[0.6875rem] text-foreground-soft"
 						>
 							核定完成後，這裡會顯示平台的核定依據文件。
 						</small>
@@ -185,7 +185,7 @@ export function ReceiptAuthPage() {
 				<h2 className="text-sm font-extrabold text-foreground">
 					平台代製收據的意思
 				</h2>
-				<ul className="mt-3 flex flex-col gap-2 text-[0.6875rem] leading-relaxed text-foreground/70 list-disc pl-5">
+				<ul className="mt-3 flex flex-col gap-2 text-[0.6875rem] leading-relaxed text-foreground-soft list-disc pl-5">
 					<li>Hawkr 依你的授權，代為製作與寄送交易收據。</li>
 					<li>
 						{
@@ -226,7 +226,7 @@ export function ReceiptAuthPage() {
 						<Row label="條款版本" value={authorization.consentVersion || "—"} />
 					</dl>
 				) : revokedOrExpired ? (
-					<p className="text-[0.6875rem] leading-relaxed text-foreground/70">
+					<p className="text-[0.6875rem] leading-relaxed text-foreground-soft">
 						{"資格失效期間無法新增授權。請先回到「稅務身分」重新提交核定證明。"}
 					</p>
 				) : (
@@ -256,7 +256,7 @@ export function ReceiptAuthPage() {
 							{!checked ? (
 								<small
 									role="status"
-									className="text-[0.625rem] text-foreground/55"
+									className="text-[0.625rem] text-foreground-soft"
 								>
 									請先勾選上方確認項目
 								</small>
@@ -333,7 +333,7 @@ function GateBanner({ reason }: { reason: string }) {
 function Row({ label, value }: { label: string; value: string }) {
 	return (
 		<div className="flex items-baseline justify-between gap-3">
-			<dt className="text-foreground/60 shrink-0">{label}</dt>
+			<dt className="text-foreground-soft shrink-0">{label}</dt>
 			<dd className="font-extrabold text-foreground text-right min-w-0 truncate">
 				{value}
 			</dd>

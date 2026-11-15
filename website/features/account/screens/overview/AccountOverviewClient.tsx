@@ -340,7 +340,7 @@ export default function AccountOverviewClient() {
 	const loadingStats = orders.loading && orders.orders.length === 0;
 
 	return (
-		<main className="flex flex-col gap-7 max-w-[920px]">
+		<div className="flex flex-col gap-7 max-w-[920px]">
 			<header>
 				<h1 className="m-0 mb-1.5 text-[length:clamp(24px,2.2vw,32px)] font-bold tracking-[0.01em] text-foreground inline-flex items-center gap-2 dark:text-[var(--hk-text-strong,#f5e9c3)]">
 					嗨，{displayName}{" "}
@@ -688,6 +688,6 @@ export default function AccountOverviewClient() {
 					);
 				})()}
 			</section>
-		</main>
+		</div>
 	);
 }

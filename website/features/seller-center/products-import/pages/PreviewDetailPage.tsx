@@ -144,7 +144,7 @@ export function PreviewDetailPage({ jobId, itemId }: Props) {
 	});
 
 	return (
-		<main className="max-w-[1440px] mx-auto pt-[var(--page-start-gap,6px)] px-6 pb-[60px] max-md:pt-[var(--page-start-gap,16px)] max-md:px-4 max-md:pb-10">
+		<div className="max-w-[1440px] mx-auto pt-[var(--page-start-gap,6px)] px-6 pb-[60px] max-md:pt-[var(--page-start-gap,16px)] max-md:px-4 max-md:pb-10">
 			{/* 輕量 header：取代 SellerPageShell（預覽頁掛在 (public) 不能用賣家中心殼）。 */}
 			<header className="mt-2 mb-4 flex flex-wrap items-center justify-between gap-3 max-md:mt-0 max-md:mb-3">
 				<div className="flex flex-col gap-1">
@@ -195,6 +195,6 @@ export function PreviewDetailPage({ jobId, itemId }: Props) {
 					返回列表預覽
 				</Link>
 			</div>
-		</main>
+		</div>
 	);
 }

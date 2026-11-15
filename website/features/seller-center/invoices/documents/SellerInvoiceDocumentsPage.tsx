@@ -238,7 +238,7 @@ export function SellerInvoiceDocumentsPage() {
 										key={item.value || "all-mode"}
 										as="button"
 										active={mode === item.value}
-										aria-selected={mode === item.value}
+										aria-pressed={mode === item.value}
 										onClick={() => setParams({ mode: item.value || null })}
 									>
 										{item.label ||
@@ -253,7 +253,7 @@ export function SellerInvoiceDocumentsPage() {
 										key={item.value || "all-status"}
 										as="button"
 										active={status === item.value}
-										aria-selected={status === item.value}
+										aria-pressed={status === item.value}
 										onClick={() => setParams({ status: item.value || null })}
 									>
 										{item.label ||
@@ -264,7 +264,7 @@ export function SellerInvoiceDocumentsPage() {
 								<ScPill
 									as="button"
 									active={abnormalOnly}
-									aria-selected={abnormalOnly}
+									aria-pressed={abnormalOnly}
 									onClick={() =>
 										setParams({ abnormal_only: abnormalOnly ? null : "true" })
 									}

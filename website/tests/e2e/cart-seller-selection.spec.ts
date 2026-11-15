@@ -3,6 +3,7 @@ import { LOCAL_PRIVATE_KEYS } from "../../lib/auth/local-private-keys";
 import { CART_UPDATED_EVENT } from "../../lib/cart";
 import type { CartGroupWire, CartItemWire } from "../../lib/cart/types";
 import { ShippingMethod, ShippingTemperature } from "../../lib/codemeta/enums";
+import { expectNoAxeViolations } from "./helpers/axe";
 import {
 	mockBuyerAddresses,
 	seedStoredActiveRole,
@@ -337,6 +338,7 @@ test("依店家選取商品，切店等待物流更新且結帳只帶可購買�
 	await expect(
 		page.locator("aside").getByText("NT$ 320", { exact: true }),
 	).toBeVisible();
+	await expectNoAxeViolations(page, "/cart");
 	await capture(page, testInfo, "store-selection-farm");
 
 	const shipping = fixture.holdFishery();

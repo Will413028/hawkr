@@ -1395,7 +1395,12 @@ function OrdersTabBody({
 				className="seller-orders__card seller-orders__desktop-view"
 				data-loading={loading && scopedOrders.length > 0 ? "true" : undefined}
 			>
-				<div className="seller-orders__table-wrap">
+				<section
+					className="seller-orders__table-wrap"
+					aria-label="訂單表格"
+					// biome-ignore lint/a11y/noNoninteractiveTabindex: This horizontally scrollable table needs a keyboard focus target.
+					tabIndex={0}
+				>
 					<table className="seller-orders__table seller-orders__table--orders">
 						<thead>
 							<tr>
@@ -1459,7 +1464,7 @@ function OrdersTabBody({
 							)}
 						</tbody>
 					</table>
-				</div>
+				</section>
 				{hasMore && (
 					<div className="seller-orders__more">
 						<Button

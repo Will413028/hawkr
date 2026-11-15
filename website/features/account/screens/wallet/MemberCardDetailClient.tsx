@@ -70,7 +70,7 @@ export default function MemberCardDetailClient({
 	const hasRefund = Number(totalRefund) > 0;
 
 	return (
-		<main className="buyer-wallet-page">
+		<div className="buyer-wallet-page">
 			<SellerPageShell
 				title={sellerName ? `${sellerName} · 會員卡` : "會員卡明細"}
 				subtitle="你在這家商家的消費紀錄。"
@@ -182,6 +182,6 @@ export default function MemberCardDetailClient({
 				loading={activeOrderSn !== null && !drawerOrder}
 				onClose={() => setActiveOrderSn(null)}
 			/>
-		</main>
+		</div>
 	);
 }

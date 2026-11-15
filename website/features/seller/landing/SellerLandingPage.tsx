@@ -154,7 +154,7 @@ export default function SellerLandingPage() {
 			key="seller-scroll-world"
 			className={`${zenMaruGothic.variable} ${openhuninn.variable}`}
 		/>,
-		<main
+		<div
 			key="seller-landing"
 			className={`seller-onboarding hkh-page ${zenMaruGothic.variable} ${openhuninn.variable}`}
 		>
@@ -423,6 +423,6 @@ export default function SellerLandingPage() {
 			</section>
 
 			<SellerAnimations />
-		</main>,
+		</div>,
 	];
 }

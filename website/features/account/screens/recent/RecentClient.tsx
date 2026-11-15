@@ -74,7 +74,7 @@ export default function RecentClient() {
 	);
 
 	return (
-		<main className="recent-page">
+		<div className="recent-page">
 			<SellerPageShell
 				title="瀏覽紀錄"
 				subtitle="逛過的商品會自動出現在這裡。"
@@ -216,6 +216,6 @@ export default function RecentClient() {
 					</div>
 				)}
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }

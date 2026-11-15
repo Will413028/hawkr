@@ -194,7 +194,7 @@ function Inner({ orderNo }: { orderNo: string }) {
 	const c = loading ? CHROME.unknown : chrome;
 
 	return (
-		<main className="min-h-[calc(100vh-200px)] max-w-[580px] mx-auto py-10 px-5 pb-12 flex items-center justify-center">
+		<div className="min-h-[calc(100vh-200px)] max-w-[580px] mx-auto py-10 px-5 pb-12 flex items-center justify-center">
 			<div
 				className={`relative w-full bg-content1/90 border border-divider rounded-3xl p-10 px-7 pb-8 text-center flex flex-col items-center gap-3 backdrop-blur-md overflow-hidden dark:bg-content1/86 animate-checkout-pop ${c.shadow}`}
 			>
@@ -297,6 +297,6 @@ function Inner({ orderNo }: { orderNo: string }) {
 					</div>
 				)}
 			</div>
-		</main>
+		</div>
 	);
 }

@@ -136,7 +136,7 @@ export default function OrdersClient() {
 		: `總共 ${list.total} 筆訂單。點訂單可操作下一步或查看詳情。`;
 
 	return (
-		<main className="orders-page">
+		<div className="orders-page">
 			<SellerPageShell
 				title="我的訂單"
 				subtitle={subtitle}
@@ -148,14 +148,12 @@ export default function OrdersClient() {
 							return (
 								<Link
 									aria-current={active ? "page" : undefined}
-									aria-selected={active}
 									className={[PILL_BASE, active ? PILL_ACTIVE : PILL_INACTIVE]
 										.filter(Boolean)
 										.join(" ")}
 									href={hrefForStatusTab(t.value, searchParams)}
 									key={t.value || "all"}
 									prefetch={false}
-									role="tab"
 								>
 									{t.label}
 									{typeof count === "number" && count > 0 ? (
@@ -213,7 +211,7 @@ export default function OrdersClient() {
 					void afterSales.refresh();
 				}}
 			/>
-		</main>
+		</div>
 	);
 }
 

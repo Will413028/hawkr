@@ -135,7 +135,7 @@ function Inner({ mode, initialId }: AddressFormClientProps) {
 		(editRecordMissing ? "找不到要編輯的地址，請返回地址列表後重新進入" : null);
 
 	return (
-		<main className="addresses-page">
+		<div className="addresses-page">
 			<SellerPageShell
 				title={mode === "edit" ? "編輯地址" : "新增地址"}
 				actions={
@@ -265,6 +265,6 @@ function Inner({ mode, initialId }: AddressFormClientProps) {
 					</form>
 				</section>
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }

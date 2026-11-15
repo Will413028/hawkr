@@ -238,7 +238,7 @@ test("LoginShell is the only synchronous auth stylesheet owner", () => {
 
 	const loginShell = source("features/auth/components/login/LoginShell.tsx");
 	assert.match(loginShell, /^import "@\/styles\/features\/auth-login\.css";/);
-	assert.match(loginShell, /<main className="hkui-login">/);
+	assert.match(loginShell, /<div className="hkui-login">/);
 
 	for (const screen of ["features/auth/screens/login/LoginPage.tsx"]) {
 		const contents = source(screen);

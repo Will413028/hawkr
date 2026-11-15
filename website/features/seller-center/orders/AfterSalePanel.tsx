@@ -255,7 +255,12 @@ export function AfterSalePanel({
 			</div>
 
 			<div className="seller-orders__card seller-orders__desktop-view">
-				<div className="seller-orders__table-wrap">
+				<section
+					className="seller-orders__table-wrap"
+					aria-label="售後案件表格"
+					// biome-ignore lint/a11y/noNoninteractiveTabindex: This horizontally scrollable table needs a keyboard focus target.
+					tabIndex={0}
+				>
 					<table className="seller-orders__table seller-orders__table--aftersale">
 						<thead>
 							<tr>
@@ -354,7 +359,7 @@ export function AfterSalePanel({
 							)}
 						</tbody>
 					</table>
-				</div>
+				</section>
 			</div>
 
 			<section

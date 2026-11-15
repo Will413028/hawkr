@@ -248,7 +248,7 @@ export function PreviewListingPage({ jobId }: Props) {
 		);
 
 	return (
-		<main className="market-page w-[min(1440px,calc(100%_-_48px))] mx-auto pt-[var(--page-start-gap,_6px)] pb-[60px]! max-[768px]:w-[min(100%_-_28px,680px)]">
+		<div className="market-page w-[min(1440px,calc(100%_-_48px))] mx-auto pt-[var(--page-start-gap,_6px)] pb-[60px]! max-[768px]:w-[min(100%_-_28px,680px)]">
 			<header className="mt-2 mb-4 flex flex-wrap items-center justify-between gap-3 max-md:mt-0 max-md:mb-3">
 				<div className="flex flex-col gap-1">
 					<span className="text-xs font-semibold tracking-wider text-hk-primary uppercase">
@@ -341,6 +341,6 @@ export function PreviewListingPage({ jobId }: Props) {
 					</Button>
 				</nav>
 			) : null}
-		</main>
+		</div>
 	);
 }

@@ -102,7 +102,7 @@ export function SelfIssueTermsPage() {
 					<strong className="text-sm font-extrabold text-foreground">
 						還沒有稅務身分資料
 					</strong>
-					<p className="m-0 text-[0.6875rem] leading-relaxed text-foreground/70">
+					<p className="m-0 text-[0.6875rem] leading-relaxed text-foreground-soft">
 						{
 							"這份條款是送出稅務身分審核時要具結的內容。請先填寫稅籍資料並送出審核。"
 						}
@@ -153,14 +153,14 @@ export function SelfIssueTermsPage() {
 									<strong className="text-xs font-extrabold text-foreground">
 										{point.title}
 									</strong>
-									<small className="text-[0.6875rem] leading-relaxed text-foreground/65">
+									<small className="text-[0.6875rem] leading-relaxed text-foreground-soft">
 										{point.description}
 									</small>
 								</span>
 							</li>
 						))}
 					</ol>
-					<p className="mt-4 pt-3 border-t border-divider text-[0.625rem] text-foreground/55">
+					<p className="mt-4 pt-3 border-t border-divider text-[0.625rem] text-foreground-soft">
 						版本 {currentTermsVersion || "—"}
 					</p>
 				</section>
@@ -208,7 +208,7 @@ export function SelfIssueTermsPage() {
 									// disabled 一定要有可見的原因。
 									<small
 										role="status"
-										className="text-[0.625rem] text-foreground/55"
+										className="text-[0.625rem] text-foreground-soft"
 									>
 										請先勾選上方同意項目
 									</small>
@@ -262,7 +262,7 @@ export function SelfIssueTermsPage() {
 				{SELF_ISSUE_DEADLINE_NOTICE}
 			</p>
 
-			<p className="mt-3 text-[0.625rem] text-foreground/55">
+			<p className="mt-3 text-[0.625rem] text-foreground-soft">
 				想查看目前的審核進度，回到{" "}
 				<Link href={TAX_STATUS_HREF} className="text-hk-accent underline">
 					稅務身分
@@ -276,7 +276,7 @@ export function SelfIssueTermsPage() {
 function Row({ label, value }: { label: string; value: string }) {
 	return (
 		<div className="flex items-baseline justify-between gap-3">
-			<dt className="text-foreground/60 shrink-0">{label}</dt>
+			<dt className="text-foreground-soft shrink-0">{label}</dt>
 			<dd className="font-extrabold text-foreground text-right min-w-0 truncate">
 				{value}
 			</dd>

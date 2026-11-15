@@ -84,7 +84,7 @@ export default function CouponsClient() {
 	const error = query.error instanceof Error ? query.error.message : null;
 
 	return (
-		<main className="coupons-page">
+		<div className="coupons-page">
 			<SellerPageShell
 				title="優惠券"
 				subtitle="結帳時系統會自動套用最優惠的組合。"
@@ -288,6 +288,6 @@ export default function CouponsClient() {
 					</ul>
 				)}
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }
