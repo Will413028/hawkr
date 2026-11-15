@@ -435,7 +435,7 @@ const Button = React.forwardRef<
 			type={type}
 			data-hkui-button=""
 			className={classes}
-			disabled={isLoading}
+			disabled={disabled || isLoading}
 			aria-busy={resolvedAriaBusy}
 		>
 			{inner}
