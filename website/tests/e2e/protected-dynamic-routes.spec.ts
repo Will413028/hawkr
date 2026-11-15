@@ -19,6 +19,7 @@ import {
 } from "./helpers/mock-gateway";
 import { assertNoResidualLoading } from "./helpers/page-stability";
 import { isKnownNonEnforcingConsoleError } from "./helpers/runtime-console";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 const ACTIVE_ROLE_KEY = "hkui:auth:active-role";
 const LOADER_KEY = "hawkr:initial-loader-seen";
@@ -1185,8 +1186,7 @@ async function runDynamicRouteSmoke(
 	);
 	await routeCase.setup?.(page);
 
-	const response = await page.goto(routeCase.url, {
-		waitUntil: "domcontentloaded",
+	const response = await gotoStreamed(page, routeCase.url, {
 		timeout: 25_000,
 	});
 	expect(

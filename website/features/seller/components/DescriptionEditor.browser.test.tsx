@@ -2,7 +2,11 @@ import { within } from "@testing-library/dom";
 import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import type { ProductDescription } from "@/lib/products/seller-repo";
-import { mountEditor } from "@/tests/browser/description-editor";
+import {
+	clickRedo,
+	clickUndo,
+	mountEditor,
+} from "@/tests/browser/description-editor";
 import { expectTextContains, waitFor } from "@/tests/browser/dom";
 
 const productDescription: ProductDescription = {
@@ -345,7 +349,7 @@ describe("DescriptionEditor", () => {
 				})),
 			});
 		});
-		await userEvent.click(editor.getByRole("button", { name: /^復原（/ }));
+		await clickUndo(editor);
 		await waitFor(() => {
 			expect(textBlocks(args.onChange.mock.lastCall?.[0])).toBe(
 				"商品規格\n來源資訊\n保存方式",
@@ -511,13 +515,12 @@ describe("DescriptionEditor", () => {
 		await waitFor(() =>
 			expect(dialog).toHaveAttributeSync("aria-busy", "false"),
 		);
-		await userEvent.click(editor.getByRole("button", { name: /^復原（/ }));
+		await clickUndo(editor);
 		await waitFor(() => {
 			expect(dialog).toHaveAttributeSync("aria-busy", "false");
 			expect(editor.getByText("## 商品資訊")).toBeVisibleSync();
-			expect(editor.getByRole("button", { name: /^重做（/ })).toBeEnabledSync();
 		});
-		await userEvent.click(editor.getByRole("button", { name: /^重做（/ }));
+		await clickRedo(editor);
 		await waitFor(() => {
 			expect(dialog).toHaveAttributeSync("aria-busy", "false");
 			expect(editor.queryByText("## 商品資訊")).toBeNull();

@@ -3,6 +3,7 @@ import {
 	seedStoredActiveRole,
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
+import { gotoStreamed, reloadStreamed } from "./helpers/streamed-navigation";
 
 const ACTIVE_PATH = "/account/messages/assistant/1002";
 const CONVERSATIONS_API = "**/api/v1/app/buyers/me/procurement/conversations**";
@@ -84,9 +85,7 @@ test.describe("Hawkr Agent 對話分類彈珠", { tag: ["@ui"] }, () => {
 			});
 		});
 
-		const response = await page.goto(ACTIVE_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, ACTIVE_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		for (const expected of CATEGORY_FIXTURES) {
@@ -121,7 +120,7 @@ test.describe("Hawkr Agent 對話分類彈珠", { tag: ["@ui"] }, () => {
 		await page.evaluate(() => {
 			localStorage.setItem("hkui:chat:sidebar-collapsed", "1");
 		});
-		await page.reload({ waitUntil: "domcontentloaded" });
+		await reloadStreamed(page);
 		await expect(page.locator(".chat-shell")).toHaveAttribute(
 			"data-sidebar-collapsed",
 			"true",

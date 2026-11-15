@@ -2,7 +2,11 @@ import { within } from "@testing-library/dom";
 import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import type { ProductDescription } from "@/lib/products/seller-repo";
-import { mountEditor } from "@/tests/browser/description-editor";
+import {
+	clickRedo,
+	clickUndo,
+	mountEditor,
+} from "@/tests/browser/description-editor";
 import { expectAbsent, waitFor } from "@/tests/browser/dom";
 
 const document: ProductDescription = {
@@ -111,13 +115,13 @@ describe("DescriptionEditorColor", () => {
 				color: "rgb(86, 58, 114)",
 			}),
 		);
-		await userEvent.click(ui.getByRole("button", { name: /^復原（/ }));
+		await clickUndo(ui);
 		await waitFor(() =>
 			expect(
 				args.onChange.mock.lastCall?.[0].blocks[0].runs?.[0].color,
 			).toBeUndefined(),
 		);
-		await userEvent.click(ui.getByRole("button", { name: /^重做（/ }));
+		await clickRedo(ui);
 		await waitFor(() =>
 			expect(args.onChange.mock.lastCall?.[0].blocks[0].runs?.[0].color).toBe(
 				"#563a72",
@@ -321,7 +325,7 @@ describe("DescriptionEditorColor", () => {
 				await expectState(index + 2, `apply${phase}`);
 			}
 			for (let index = 3; index >= 0; index -= 1) {
-				await userEvent.click(ui.getByRole("button", { name: /^復原（/ }));
+				await clickUndo(ui, userEvent, index + 1);
 				await expectState(
 					index,
 					`undo${["Color", "Bold", "Italic", "Underline"][index]}`,

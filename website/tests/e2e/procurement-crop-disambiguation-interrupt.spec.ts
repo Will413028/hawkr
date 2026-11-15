@@ -3,6 +3,7 @@ import {
 	seedStoredActiveRole,
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 const DEMO_PATH = "/account/messages/assistant/demo";
 const PROCUREMENT_PATH = "/account/messages/assistant/procurement";
@@ -186,9 +187,7 @@ test.describe("procurement assistant — interrupt／resume（doc57 run ledger�
 			},
 		);
 
-		const response = await page.goto(DEMO_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, DEMO_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const workspace = page.locator('[data-assistant-mode="live"]');
@@ -329,9 +328,7 @@ test.describe("procurement assistant — interrupt／resume（doc57 run ledger�
 			},
 		);
 
-		const response = await page.goto(PROCUREMENT_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, PROCUREMENT_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const workspace = page.locator('[data-assistant-mode="live"]');
@@ -394,9 +391,7 @@ test.describe("procurement assistant — interrupt／resume（doc57 run ledger�
 				}),
 		);
 
-		const response = await page.goto(PROCUREMENT_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, PROCUREMENT_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const workspace = page.locator('[data-assistant-mode="live"]');
@@ -438,9 +433,7 @@ test.describe("procurement assistant — interrupt／resume（doc57 run ledger�
 				}),
 		);
 
-		const response = await page.goto(PROCUREMENT_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, PROCUREMENT_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const workspace = page.locator('[data-assistant-mode="live"]');
@@ -479,9 +472,7 @@ test.describe("procurement assistant — interrupt／resume（doc57 run ledger�
 				}),
 		);
 
-		const response = await page.goto(PROCUREMENT_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, PROCUREMENT_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const workspace = page.locator('[data-assistant-mode="live"]');
@@ -571,9 +562,7 @@ test.describe("procurement assistant — interrupt／resume（doc57 run ledger�
 				}),
 		);
 
-		const response = await page.goto(DEMO_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, DEMO_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const workspace = page.locator('[data-assistant-mode="live"]');
@@ -647,9 +636,9 @@ test.describe("procurement assistant — interrupt／resume（doc57 run ledger�
 			},
 		);
 
-		const response = await page.goto(
+		const response = await gotoStreamed(
+			page,
 			`${PROCUREMENT_PATH}?requestId=${REQUEST_ID}`,
-			{ waitUntil: "domcontentloaded" },
 		);
 		expect(response?.status()).toBeLessThan(400);
 
@@ -808,9 +797,7 @@ test.describe("procurement assistant — interrupt／resume（doc57 run ledger�
 			},
 		);
 
-		const response = await page.goto(DEMO_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, DEMO_PATH);
 		expect(response?.status()).toBeLessThan(400);
 
 		const workspace = page.locator('[data-assistant-mode="live"]');
