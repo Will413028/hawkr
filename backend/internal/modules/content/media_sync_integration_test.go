@@ -109,7 +109,7 @@ func TestImageKeysAndAssetIDsArePaired(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
-	if _, err := f.db.Pool().Exec(ctx, `INSERT INTO content.banners (id, title, preview_image_key, popup_image_key, action_type) VALUES ($1, 't', 'k', 'k', 'popup')`, uuid.NewV7()); err == nil {
+	if _, err := f.db.Pool().Exec(ctx, `INSERT INTO content.banners (id, title, preview_image_key, popup_image_key, action_type) VALUES ($1, 't', 'k', 'k', 'POPUP')`, uuid.NewV7()); err == nil {
 		t.Fatal("沒有 asset ID 的 banner 列應該被拒絕")
 	}
 }

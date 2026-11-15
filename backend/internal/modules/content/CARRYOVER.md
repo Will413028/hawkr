@@ -58,7 +58,7 @@ content-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 
 - 食譜功能已刪除（ADR `docs/adr/2026-10-27-general-ecommerce-scope-cut.md`），表由 migration `drop_recipes` 移除。
 - 拿掉 `banners.click_count`：從來沒有被遞增，也沒有對外暴露，而且每次修改 banner 都被寫回 0。
-- 點擊行為從 JSONB 的 `banners.action` 改成 `action_type`、`action_target` 兩欄加 CHECK；url 只接受 http、https（原本只檢查非空）。
+- 點擊行為從 JSONB 的 `banners.action` 改成 `action_type`、`action_target` 兩欄加 CHECK；url 只接受 http、https（原本只檢查非空）。儲存的代碼是 UPPER_SNAKE（`POPUP`、`URL`、`PRODUCT`、`POST`，migration `banner_action_upper_snake`）。
 - `banners.id`（TSID）改成應用層產生的 UUIDv7，不設 DEFAULT（ADR `2026-09-25-row-identity-by-data-kind.md`）。
 - 排序不再拿 ID 代表建立時間：banner 依 `display_order, created_at`，ID 只當最後的 tiebreaker。
 - 文字欄位從 `VARCHAR(n)` 改成 `text`，長度上限只留 banner 按鈕文字的 12 字（原本 DB 與寫入端都是 100，後台編輯器限 12）。

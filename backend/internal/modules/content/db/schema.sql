@@ -30,18 +30,18 @@ CREATE TABLE content.banners (
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     -- 排程是 [開始, 結束)：結束必須晚於開始（模組的 BannerInput.validate 是第一道）。
     CONSTRAINT banners_schedule_check CHECK (start_date IS NULL OR end_date IS NULL OR start_date < end_date),
-    -- 點擊行為一定完整（模組的 BannerAction.validate 是第一道）：popup 不帶值；url 是 http(s) 網址；
-    -- product、post 帶 ID。
+    -- 點擊行為一定完整（模組的 BannerAction.validate 是第一道）：POPUP 不帶值；URL 是 http(s) 網址；
+    -- PRODUCT、POST 帶 ID。
     CONSTRAINT banners_action_check CHECK (
-        (action_type = 'popup' AND action_target = '')
-        OR (action_type = 'url' AND action_target ~ '^https?://')
-        OR (action_type IN ('product', 'post') AND action_target <> '')
+        (action_type = 'POPUP' AND action_target = '')
+        OR (action_type = 'URL' AND action_target ~ '^https?://')
+        OR (action_type IN ('PRODUCT', 'POST') AND action_target <> '')
     )
 );
 
 COMMENT ON COLUMN content.banners.version IS '樂觀鎖的版本，對外是 etag；每次修改加一（ADR 2026-09-25-optimistic-concurrency-etag）';
-COMMENT ON COLUMN content.banners.action_type IS '點擊行為（設計書 25）：popup、url、product、post；沒有預設值';
-COMMENT ON COLUMN content.banners.action_target IS '點擊行為的值：url 的網址、product 與 post 的 ID；popup 是空字串';
+COMMENT ON COLUMN content.banners.action_type IS '點擊行為（設計書 25）：POPUP、URL、PRODUCT、POST；沒有預設值';
+COMMENT ON COLUMN content.banners.action_target IS '點擊行為的值：URL 的網址、PRODUCT 與 POST 的 ID；POPUP 是空字串';
 
 -- banner 由後台維護、筆數少，全表掃描加排序就夠快，所以除了主鍵不建索引：索引要等 EXPLAIN 證明需要才加。
 

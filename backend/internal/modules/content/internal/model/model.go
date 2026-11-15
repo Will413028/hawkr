@@ -10,13 +10,13 @@ type BannerActionType string
 
 const (
 	// BannerActionPopup 顯示彈窗大圖，不帶其他值。
-	BannerActionPopup BannerActionType = "popup"
+	BannerActionPopup BannerActionType = "POPUP"
 	// BannerActionURL 開啟外部網頁，帶 URL。
-	BannerActionURL BannerActionType = "url"
+	BannerActionURL BannerActionType = "URL"
 	// BannerActionProduct 開啟商品頁，帶商品 ID。
-	BannerActionProduct BannerActionType = "product"
+	BannerActionProduct BannerActionType = "PRODUCT"
 	// BannerActionPost 開啟貼文頁，帶貼文 ID。
-	BannerActionPost BannerActionType = "post"
+	BannerActionPost BannerActionType = "POST"
 )
 
 // BannerAction 是點擊行為。Target 是 url 的網址、product 與 post 的 ID；popup 沒有值。

@@ -683,7 +683,7 @@ func TestBannerScheduleCheckMatchesTheGoRule(t *testing.T) {
 		}
 		_, err := f.db.Pool().Exec(context.Background(),
 			`INSERT INTO content.banners (id, title, preview_image_key, popup_image_key, preview_image_asset_id, popup_image_asset_id, action_type, start_date, end_date)
-			 VALUES ($1, '排程', 'k', 'k', 'a', 'a', 'popup', $2, $3)`, uuid.NewV7(), start, end)
+			 VALUES ($1, '排程', 'k', 'k', 'a', 'a', 'POPUP', $2, $3)`, uuid.NewV7(), start, end)
 		if err != nil && !strings.Contains(err.Error(), "banners_schedule_check") {
 			t.Fatalf("結束減開始 = %v：%v", end.Sub(start), err)
 		}
