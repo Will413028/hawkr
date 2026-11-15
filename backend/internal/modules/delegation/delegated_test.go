@@ -3,6 +3,7 @@ package delegation
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"uuid"
@@ -43,16 +44,16 @@ func openStore() seller.Store   { return storeIn(seller.Active) }
 func closedStore() seller.Store { return storeIn(seller.Closed) }
 func notFound() error           { return apperr.NotFound("店家不存在") }
 
-// bizCodeOf 與 BizCode 是失敗列的業務碼：拒絕對應的碼，與 FAILED 列實際寫的碼（model.BizCodeOf）要一致。
-func bizCodeOf(d DelegationDenial) int32 { return DenialBizCodes()[d] }
+// failureReasonOf 與 FailureReason 是失敗列的 failure_reason：拒絕對應的代碼，與 FAILED 列實際寫的值（model.FailureReasonOf）要一致。
+func failureReasonOf(d DelegationDenial) string { return DenialCodes()[d] }
 
-func BizCode(t *testing.T, cause error) int32 {
+func FailureReason(t *testing.T, cause error) string {
 	t.Helper()
-	c := model.BizCodeOf(cause)
-	if c == nil {
-		t.Fatalf("%v 沒有業務碼", cause)
+	c := model.FailureReasonOf(cause)
+	if c == "" || c == model.FailureReasonInternal {
+		t.Fatalf("%v 的失敗原因是 %q，預期拒絕的代碼", cause, c)
 	}
-	return *c
+	return c
 }
 
 func caller(status DelegationStatus, m DelegatedMethod, caps ...Capability) DelegatedCaller {
@@ -98,7 +99,7 @@ func TestAuthorizeDelegatedRecordsAFailedRowForEveryDenial(t *testing.T) {
 		}
 		in := rec.got[0]
 		if in.Session.ID != 7 || in.Capability != tc.c.Method.Capability || in.Action != tc.c.Method.Action || in.ResourceType != ResourcePost ||
-			in.CorrelationID != "trace-1" || in.RequestID != "trace-1" || in.UserAgent != "ua" || BizCode(t, in.Cause) != bizCodeOf(tc.denial) {
+			in.CorrelationID != "trace-1" || in.RequestID != "trace-1" || in.UserAgent != "ua" || FailureReason(t, in.Cause) != failureReasonOf(tc.denial) {
 			t.Errorf("%s：FAILED 紀錄 = %+v", name, in)
 		}
 	}
@@ -130,7 +131,7 @@ func TestDelegatedReadRecordsDenialsAndSkipsTheRead(t *testing.T) {
 		if denialOf(t, err) != tc.denial || read {
 			t.Errorf("%s：%v（讀取執行 %v），預期 %v 且不執行", name, err, read, tc.denial)
 		}
-		if len(rec.got) != 1 || rec.got[0].Action != AuditPostRead || BizCode(t, rec.got[0].Cause) != bizCodeOf(tc.denial) {
+		if len(rec.got) != 1 || rec.got[0].Action != AuditPostRead || FailureReason(t, rec.got[0].Cause) != failureReasonOf(tc.denial) {
 			t.Errorf("%s：FAILED 紀錄 = %+v", name, rec.got)
 		}
 	}
@@ -296,14 +297,36 @@ func TestDelegatedPayloadHashBindsEveryPart(t *testing.T) {
 	}
 }
 
-func TestEveryDenialHasAnAuditBizCode(t *testing.T) {
-	codes := DenialBizCodes()
-	for _, d := range []DelegationDenial{DenialCapabilityDenied, DenialSessionRevoked, DenialSessionExpired, DenialStoreClosed, DenialStoreNotDelegable, DenialStoreNotOperable, DenialIdempotencyKeyReused, DenialInvalidCommand} {
-		if codes[d] == 0 {
-			t.Errorf("%v 沒有業務碼", d)
+func TestEveryDenialHasAFailureCode(t *testing.T) {
+	codes := DenialCodes()
+	for d := range DenialBizCodes() {
+		c := codes[d]
+		if c == "" {
+			t.Errorf("%v 沒有 failure_reason 的代碼", d)
+		}
+		if back, ok := DenialOfCode(c); !ok || back != d {
+			t.Errorf("代碼 %q 對不回 %v", c, d)
 		}
 	}
-	if codes[DenialCapabilityDenied] != 9262 {
-		t.Errorf("能力不足的業務碼 = %d，預期 9262", codes[DenialCapabilityDenied])
+	if codes[DenialCapabilityDenied] != "CAPABILITY_DENIED" {
+		t.Errorf("能力不足的代碼 = %q", codes[DenialCapabilityDenied])
+	}
+}
+
+func TestFailureReasonOfClassifiesTheCause(t *testing.T) {
+	wrapped := fmt.Errorf("wrap: %w", apperr.VersionConflict("版本過時"))
+	for name, tc := range map[string]struct {
+		err  error
+		want string
+	}{
+		"denial":               {model.Deny(model.DenialSessionRevoked, "x"), "SESSION_REVOKED"},
+		"business reason":      {wrapped, "VERSION_CONFLICT"},
+		"classified no reason": {apperr.NotFound("x"), FailureReasonInternal},
+		"plain error":          {errors.New("boom"), FailureReasonInternal},
+		"nil":                  {nil, FailureReasonInternal},
+	} {
+		if got := model.FailureReasonOf(tc.err); got != tc.want {
+			t.Errorf("%s：%q，預期 %q", name, got, tc.want)
+		}
 	}
 }

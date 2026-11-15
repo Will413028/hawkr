@@ -160,18 +160,20 @@ type ChangedField struct {
 
 // AuditLog 是一列代行稽核。actor 與 target 是寫入當下的快照，不由 session 推導（中途改名時兩者可能不同）。
 type AuditLog struct {
-	ID              uuid.UUID
-	SessionID       int64
-	Actor           DelegationActor
-	Target          DelegationTarget
-	Origin          AuditOrigin
-	Capability      Capability
-	Action          AuditAction
-	ResourceType    AuditResourceType
-	ResourceID      *string
-	ResourceName    *string
-	Result          AuditResult
+	ID           uuid.UUID
+	SessionID    int64
+	Actor        DelegationActor
+	Target       DelegationTarget
+	Origin       AuditOrigin
+	Capability   Capability
+	Action       AuditAction
+	ResourceType AuditResourceType
+	ResourceID   *string
+	ResourceName *string
+	Result       AuditResult
+	// BizCode 只有舊 gateway 的兩段式路徑寫入（過渡邊界）；FailureReason 是 FAILED 列的失敗原因（拒絕的代碼或 ErrorReason 的值名）。
 	BizCode         *int32
+	FailureReason   *string
 	OperationReason *string
 	CaseReference   *string
 	RequestID       string
@@ -237,8 +239,10 @@ type AuditConfirmInput struct {
 	AuditLogID uuid.UUID
 	// Result 是 SUCCEEDED 或 FAILED。
 	Result AuditResult
-	// BizCode 只記在 FAILED 的列；零值表示沒有。
+	// BizCode 只記在 FAILED 的列；零值表示沒有。只有舊 gateway 的轉接層帶（過渡邊界）。
 	BizCode int32
+	// FailureReason 是 FAILED 列的失敗原因（拒絕的代碼或 ErrorReason 的值名）；空值寫 FailureReasonInternal。
+	FailureReason string
 	// ResourceID 是建立類在這裡補上的 ID；nil 保留 intent 寫入的值。
 	ResourceID           *string
 	ResourceVersionAfter *int64
@@ -307,7 +311,7 @@ type FailureAuditInput struct {
 	RequestID     string
 	CorrelationID string
 	UserAgent     string
-	// Cause 是失敗的原因：代行拒絕寫入對應的業務碼，其他錯誤的業務碼是 NULL。
+	// Cause 是失敗的原因：failure_reason 取自 FailureReasonOf(Cause)：代行拒絕的代碼、ErrorReason，都沒有則是 INTERNAL。
 	Cause error
 }
 

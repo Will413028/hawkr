@@ -162,7 +162,7 @@ func (m *Module) RecordFailure(ctx context.Context, in model.FailureAuditInput) 
 			ResourceType:          string(in.ResourceType),
 			ResourceID:            model.Optional(in.ResourceID),
 			ResourceName:          model.Optional(truncateRunes(in.ResourceName, model.ResourceNameMaxRunes)),
-			BizCode:               model.BizCodeOf(in.Cause),
+			FailureReason:         model.FailureReasonOf(in.Cause),
 			OperationReason:       model.Optional(reason),
 			CaseReference:         s.CaseReference,
 			RequestID:             in.RequestID,

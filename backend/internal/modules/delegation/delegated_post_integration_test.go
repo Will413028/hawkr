@@ -83,9 +83,9 @@ func (f *fixture) postCount(t *testing.T, storeID int64) int {
 	return f.count(t, `SELECT count(*) FROM social.posts WHERE store_id = $1`, storeID)
 }
 
-// failedRow 是 session 的 FAILED 稽核列中指定動作的那一列：biz_code、操作原因、冪等鍵、request_id、能力與 notify_seller。
+// failedRow 是 session 的 FAILED 稽核列中指定動作的那一列：failure_reason、操作原因、冪等鍵、request_id、能力與 notify_seller。
 type failedRow struct {
-	bizCode                    *int32
+	failureReason              *string
 	reason, key                *string
 	requestID, capability, cor string
 	notify                     bool
@@ -99,18 +99,18 @@ func (f *fixture) failedRow(t *testing.T, sessionID int64, action string) failed
 	if r.n == 0 {
 		return r
 	}
-	if err := f.db.Pool().QueryRow(context.Background(), `SELECT biz_code, operation_reason, idempotency_key, request_id, capability, correlation_id, notify_seller
+	if err := f.db.Pool().QueryRow(context.Background(), `SELECT failure_reason, operation_reason, idempotency_key, request_id, capability, correlation_id, notify_seller
 		FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND action = $2 AND result = 'FAILED' ORDER BY created_at DESC, id DESC LIMIT 1`, sessionID, action).
-		Scan(&r.bizCode, &r.reason, &r.key, &r.requestID, &r.capability, &r.cor, &r.notify); err != nil {
+		Scan(&r.failureReason, &r.reason, &r.key, &r.requestID, &r.capability, &r.cor, &r.notify); err != nil {
 		t.Fatal(err)
 	}
 	return r
 }
 
-func wantBizCode(t *testing.T, what string, got *int32, want int32) {
+func wantFailureReason(t *testing.T, what string, got *string, want string) {
 	t.Helper()
 	if got == nil || *got != want {
-		t.Fatalf("%s 的 biz_code = %v，預期 %d", what, got, want)
+		t.Fatalf("%s 的 failure_reason = %v，預期 %s", what, got, want)
 	}
 }
 
@@ -353,13 +353,13 @@ func TestReplayWithTheSamePayloadDoesNotCallSocialAgain(t *testing.T) {
 	if row.n != 1 {
 		t.Fatalf("FAILED %d 列，預期 1", row.n)
 	}
-	wantBizCode(t, "request_id 用在不同內容", row.bizCode, 9267)
+	wantFailureReason(t, "request_id 用在不同內容", row.failureReason, "IDEMPOTENCY_KEY_REUSED")
 	if n := f.auditRowsOfKey(t, sid, op.RequestID.String()); n != 1 {
 		t.Fatalf("冪等鍵 %s 的列 %d，預期仍是第一次的那一列", op.RequestID, n)
 	}
 }
 
-// social 的寫入失敗時，SUCCEEDED 稽核跟著 rollback（同一個 transaction），但另開 transaction 留下一列 FAILED（沒有業務碼：不是代行的拒絕、沒有冪等鍵）；
+// social 的寫入失敗時，SUCCEEDED 稽核跟著 rollback（同一個 transaction），但另開 transaction 留下一列 FAILED（failure_reason 是 social 回的 ErrorReason VERSION_CONFLICT、沒有冪等鍵）；
 // 失敗的嘗試不占用 request_id，之後用同一個 request_id 重試成功。
 func TestSocialFailureLeavesNoSucceededRowButAFailedRow(t *testing.T) {
 	f := build(t, true)
@@ -378,7 +378,7 @@ func TestSocialFailureLeavesNoSucceededRowButAFailedRow(t *testing.T) {
 		t.Fatalf("social 失敗後 SUCCEEDED %d 列，預期 0", n)
 	}
 	row := f.failedRow(t, sid, "POST_PUBLISH")
-	if row.n != 1 || row.bizCode != nil || row.key != nil || row.requestID != op.RequestID.String() || row.capability != "posts.publish" || row.notify {
+	if row.n != 1 || row.failureReason == nil || *row.failureReason != "VERSION_CONFLICT" || row.key != nil || row.requestID != op.RequestID.String() || row.capability != "posts.publish" || row.notify {
 		t.Fatalf("FAILED 列 = %+v", row)
 	}
 	if row.reason == nil || *row.reason != "版本過期的發布" {
@@ -433,7 +433,7 @@ func TestEndedOrRevokedSessionCannotWriteAndLeavesFailedRows(t *testing.T) {
 	if row.n != 2 {
 		t.Fatalf("FAILED %d 列，預期 2", row.n)
 	}
-	wantBizCode(t, "撤銷的 session", row.bizCode, 9271)
+	wantFailureReason(t, "撤銷的 session", row.failureReason, "SESSION_REVOKED")
 
 	// 結束的 session（到期）：以到期的快照呼叫。
 	o2 := f.newOperator(t, "ended2")
@@ -455,7 +455,7 @@ func TestEndedOrRevokedSessionCannotWriteAndLeavesFailedRows(t *testing.T) {
 	if row.n != 1 {
 		t.Fatalf("FAILED %d 列，預期 1", row.n)
 	}
-	wantBizCode(t, "結束的 session", row.bizCode, 9270)
+	wantFailureReason(t, "結束的 session", row.failureReason, "SESSION_EXPIRED")
 }
 
 // 缺能力被元件擋下：沒有 posts.write 不能建立與修改，沒有 posts.publish 不能發布、下架與排程，沒有 posts.read 不能讀；每一次都留下 FAILED（9262），讀取也一樣。
@@ -488,7 +488,7 @@ func TestMissingCapabilityIsRejectedAndLeavesFailedRows(t *testing.T) {
 		if row.n != 1 {
 			t.Fatalf("%s 的 FAILED %d 列，預期 1", a, row.n)
 		}
-		wantBizCode(t, a, row.bizCode, 9262)
+		wantFailureReason(t, a, row.failureReason, "CAPABILITY_DENIED")
 	}
 	if n := f.postCount(t, o.storeID); n != 1 {
 		t.Fatalf("貼文 %d 篇，預期只有一開始的草稿", n)
@@ -508,7 +508,7 @@ func TestMissingCapabilityIsRejectedAndLeavesFailedRows(t *testing.T) {
 	if row.n != 1 {
 		t.Fatalf("被拒絕的讀取 FAILED %d 列，預期 1", row.n)
 	}
-	wantBizCode(t, "被拒絕的讀取", row.bizCode, 9262)
+	wantFailureReason(t, "被拒絕的讀取", row.failureReason, "CAPABILITY_DENIED")
 	if row.notify {
 		t.Fatal("讀取的 FAILED 列不通知賣家")
 	}
@@ -536,7 +536,7 @@ func TestStoreNotDelegableAtRequestTimeRejectsWithoutRevoking(t *testing.T) {
 		if row.n != 1 {
 			t.Fatalf("%s 的 FAILED %d 列，預期 1", a, row.n)
 		}
-		wantBizCode(t, a, row.bizCode, 9265)
+		wantFailureReason(t, a, row.failureReason, "STORE_CLOSED")
 	}
 	if n := f.resultRows(t, sid, "SUCCEEDED"); n != 0 {
 		t.Fatalf("SUCCEEDED %d 列，預期 0", n)
@@ -667,5 +667,59 @@ func TestStoreSuspendedAndClosedEndThatStoresSessions(t *testing.T) {
 				t.Fatalf("transaction 回滾，session 仍進行中：%+v", o)
 			}
 		})
+	}
+}
+
+// 沒有 ErrorReason 的失敗（內部錯誤）寫明確的 INTERNAL，不是空值。
+func TestReasonlessFailureRecordsInternal(t *testing.T) {
+	f := build(t, true)
+	o := f.newOperator(t, "reasonless")
+	sid := o.session.Session.ID
+	c := f.caller(t, o, methodCreate)
+	op := f.op("內部錯誤")
+	_, err := f.writePost(c, DelegatedWrite{Op: op, PayloadHash: DelegatedPayloadHash(AuditPostCreate, "x", "tok-internal")},
+		func(context.Context, seller.Store) (social.Post, *time.Time, error) {
+			return social.Post{}, nil, errors.New("boom")
+		})
+	if err == nil {
+		t.Fatal("要失敗")
+	}
+	row := f.failedRow(t, sid, "POST_CREATE")
+	if row.n != 1 {
+		t.Fatalf("FAILED %d 列，預期 1", row.n)
+	}
+	wantFailureReason(t, "沒有原因的錯誤", row.failureReason, FailureReasonInternal)
+}
+
+// failure_reason 的 CHECK：FAILED 一定有值、值必須是 UPPER_SNAKE 代碼（不是 UNSPECIFIED）、非 FAILED 不得有值。
+func TestFailureReasonCheckRejectsUnknownCodes(t *testing.T) {
+	f := build(t, true)
+	o := f.newOperator(t, "check")
+	insert := func(result string, reason any) error {
+		_, err := f.db.Pool().Exec(context.Background(), `INSERT INTO delegation.admin_operation_audit_logs
+			(id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name,
+			 origin, capability, action, resource_type, result, request_id, correlation_id, risk_level, notify_seller,
+			 created_at, confirmed_at, failure_reason)
+			VALUES ($1, $2, 1, 'x', $3, 0, 'x', 'INTERACTIVE', 'posts.write', 'POST_CREATE', 'POST', $4, 'r', 'c', 'LOW', false,
+			        $5, CASE WHEN $4 = 'PENDING' THEN NULL ELSE $5::timestamptz END, $6)`,
+			uuid.NewV7(), o.session.Session.ID, o.storeID, result, f.now, reason)
+		return err
+	}
+	for name, tc := range map[string]struct {
+		result string
+		reason any
+	}{
+		"failed without reason": {"FAILED", nil},
+		"lowercase":             {"FAILED", "version_conflict"},
+		"free text":             {"FAILED", "bad code"},
+		"unspecified":           {"FAILED", "UNSPECIFIED"},
+		"succeeded with reason": {"SUCCEEDED", "INTERNAL"},
+	} {
+		if err := insert(tc.result, tc.reason); err == nil || !strings.Contains(err.Error(), "admin_operation_audit_logs_failure_reason_check") {
+			t.Errorf("%s：%v", name, err)
+		}
+	}
+	if err := insert("FAILED", "VERSION_CONFLICT"); err != nil {
+		t.Errorf("合法的代碼被拒絕：%v", err)
 	}
 }

@@ -326,8 +326,17 @@ const DenialStoreNotDelegable = model.DenialStoreNotDelegable
 const DenialStoreNotOperable = model.DenialStoreNotOperable
 const DenialStoreClosed = model.DenialStoreClosed
 
-// DenialBizCodes 是每一種拒絕的業務碼（稽核列的 biz_code 與舊 gateway 的回應碼同一組）；回傳副本。
+// DenialBizCodes 是每一種拒絕的舊業務碼（只服務舊 gateway 的轉接層，過渡邊界）；回傳副本。稽核列存的是 DenialCodes 的代碼。
 func DenialBizCodes() map[DelegationDenial]int32 { return model.DenialBizCodes() }
+
+// DenialCodes 是每一種拒絕寫進稽核列 failure_reason 的代碼；回傳副本。
+func DenialCodes() map[DelegationDenial]string { return model.DenialCodes() }
+
+// DenialOfCode 由 failure_reason 的代碼找回拒絕；不是拒絕的代碼回 false。
+func DenialOfCode(code string) (DelegationDenial, bool) { return model.DenialOfCode(code) }
+
+// FailureReasonInternal 是沒有原因的失敗寫進 failure_reason 的值。
+const FailureReasonInternal = model.FailureReasonInternal
 
 func DelegationDenialOf(err error) (*DelegationError, bool) { return model.DelegationDenialOf(err) }
 

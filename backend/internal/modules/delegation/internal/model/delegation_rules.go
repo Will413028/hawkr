@@ -417,8 +417,8 @@ func NewDisplayCode() string {
 	return string(out)
 }
 
-// denialBizCodes 是每一種拒絕的稽核業務碼（設計書 56 §6.5.1 的 9260–9299）：稽核列的 biz_code 與舊 gateway 的回應碼是同一組值，
-// 稽核清單的讀者看到的碼不因寫入的路徑而不同。每一種拒絕都要有（TestEveryDenialHasABusinessCode）。
+// denialBizCodes 是每一種拒絕的舊業務碼（設計書 56 §6.5.1 的 9260–9299），只服務舊 gateway 的回應與稽核清單的舊欄位（過渡邊界，A10 刪除）；
+// 新路徑的稽核列存 failure_reason 的代碼，不存這組數字。每一種拒絕都要有（TestEveryDenialHasABusinessCode）。
 var denialBizCodes = map[DelegationDenial]int32{
 	DenialInvalidCommand:             9260,
 	DenialAdminRequired:              9261,
@@ -444,17 +444,63 @@ var denialBizCodes = map[DelegationDenial]int32{
 // DenialBizCodes 回傳拒絕對應的業務碼表的副本。
 func DenialBizCodes() map[DelegationDenial]int32 { return maps.Clone(denialBizCodes) }
 
-// BizCodeOf 是 err 鏈上的代行拒絕對應的業務碼；不是代行的拒絕（業務錯誤、內部錯誤）回 nil。
-func BizCodeOf(err error) *int32 {
-	d, ok := DelegationDenialOf(err)
-	if !ok {
-		return nil
+// denialCodes 是每一種拒絕寫進稽核列 failure_reason 的代碼（UPPER_SNAKE）。與 apperr 的 Reason 共用同一個欄位，所以名稱不得與
+// proto 的 ErrorReason 值名相同（TestDenialCodesAreDistinctFromErrorReasons）。每一種拒絕都要有（TestEveryDenialHasAFailureCode）。
+var denialCodes = map[DelegationDenial]string{ //nolint:gosec // G101 false positive: CREDENTIAL_INVALID is a denial code name, not a secret
+	DenialInvalidCommand:             "INVALID_COMMAND",
+	DenialAdminRequired:              "ADMIN_REQUIRED",
+	DenialCapabilityDenied:           "CAPABILITY_DENIED",
+	DenialAuthorizationRevoked:       "AUTHORIZATION_REVOKED",
+	DenialStoreNotDelegable:          "STORE_NOT_DELEGABLE",
+	DenialStoreClosed:                "STORE_CLOSED",
+	DenialIdempotencyKeyReused:       "IDEMPOTENCY_KEY_REUSED",
+	DenialActorBusy:                  "ACTOR_BUSY",
+	DenialStoreBusy:                  "STORE_BUSY",
+	DenialSessionExpired:             "SESSION_EXPIRED",
+	DenialSessionRevoked:             "SESSION_REVOKED",
+	DenialStoreNotOperable:           "STORE_NOT_OPERABLE",
+	DenialCredentialInvalid:          "CREDENTIAL_INVALID",
+	DenialSessionNotFound:            "SESSION_NOT_FOUND",
+	DenialAuditIntentFailed:          "AUDIT_INTENT_FAILED",
+	DenialHandoffInvalid:             "HANDOFF_INVALID",
+	DenialAuthorizationAlreadyActive: "AUTHORIZATION_ALREADY_ACTIVE",
+	DenialAuthorizationNotFound:      "AUTHORIZATION_NOT_FOUND",
+	DenialAdminNotAllowlisted:        "ADMIN_NOT_ALLOWLISTED",
+}
+
+// FailureReasonInternal 是沒有 ErrorReason 也不是代行拒絕的失敗（內部錯誤、沒有業務原因的分類錯誤）寫進 failure_reason 的明確值。
+const FailureReasonInternal = "INTERNAL"
+
+// Code 是拒絕寫進稽核列的代碼；沒有登錄的值回空字串。
+func (d DelegationDenial) Code() string { return denialCodes[d] }
+
+// DenialCodes 回傳拒絕對應的代碼表的副本。
+func DenialCodes() map[DelegationDenial]string { return maps.Clone(denialCodes) }
+
+// DenialOfCode 由 failure_reason 的代碼找回拒絕；不是拒絕的代碼（ErrorReason、INTERNAL）回 false。
+func DenialOfCode(code string) (DelegationDenial, bool) {
+	for d, c := range denialCodes {
+		if c == code {
+			return d, true
+		}
 	}
-	c, ok := denialBizCodes[d.Denial]
-	if !ok {
-		return nil
+	return 0, false
+}
+
+// FailureReasonOf 是 err 鏈上的失敗原因：代行拒絕是拒絕的代碼，其次是 apperr.Error 的 ErrorReason，都沒有則是 FailureReasonInternal。
+func FailureReasonOf(err error) string {
+	if d, ok := DelegationDenialOf(err); ok {
+		if c := d.Denial.Code(); c != "" {
+			return c
+		}
 	}
-	return &c
+	var ae *apperr.Error
+	if errors.As(err, &ae) {
+		if r := ae.Reason.String(); r != "" {
+			return r
+		}
+	}
+	return FailureReasonInternal
 }
 
 // CheckSession 檢查代行 session 此刻還能用（ACTIVE；到期與已撤銷分別是 DenialSessionExpired、DenialSessionRevoked）並帶有能力 c（DenialCapabilityDenied）。

@@ -31,6 +31,7 @@ func toAuditLog(l store.DelegationAdminOperationAuditLog) model.AuditLog {
 		ResourceName:          l.ResourceName,
 		Result:                model.AuditResult(l.Result),
 		BizCode:               l.BizCode,
+		FailureReason:         l.FailureReason,
 		OperationReason:       l.OperationReason,
 		CaseReference:         l.CaseReference,
 		RequestID:             l.RequestID,
@@ -315,13 +316,21 @@ func (m *Module) confirmAudit(ctx context.Context, q *store.Queries, in model.Au
 	if in.Result == model.AuditFailed && in.BizCode != 0 {
 		bizCode = &in.BizCode
 	}
+	var failureReason *string
+	if in.Result == model.AuditFailed {
+		fr := in.FailureReason
+		if fr == "" {
+			fr = model.FailureReasonInternal
+		}
+		failureReason = &fr
+	}
 	var after []byte
 	if len(in.AfterSnapshot) > 0 {
 		after = in.AfterSnapshot
 	}
 	row, err := q.ConfirmDelegationAuditLog(ctx, store.ConfirmDelegationAuditLogParams{
 		Result: string(in.Result), ResourceID: in.ResourceID, AfterSnapshot: after, ChangedFields: changed,
-		ResourceVersionAfter: in.ResourceVersionAfter, BizCode: bizCode, Now: now, ID: in.AuditLogID,
+		ResourceVersionAfter: in.ResourceVersionAfter, BizCode: bizCode, FailureReason: failureReason, Now: now, ID: in.AuditLogID,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		// 已經確認過：既有的結論不被覆蓋。
