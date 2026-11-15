@@ -63,7 +63,6 @@ export const Tabs: React.FC<TabsProps> = ({
 	const current = selectedKey ?? internal;
 
 	const select = (key: string) => {
-		if (!isControlled) setInternal(key);
 		onSelectionChange?.(key);
 	};
 
