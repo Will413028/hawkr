@@ -47,7 +47,7 @@ knip 基線（2026-11-15 重做）：附件 `knip-baseline.json` 是 d69bbbbc（
 ## 範圍
 
 - 做：play 改寫、browser 測試的 runner 與 CI job、axe 進 e2e、刪除 Storybook 與連帶的 Flutter 目錄 web 宿主、文件更新。
-- 不做：視覺回歸（Storybook 目前也沒有）；admin（沒有 Storybook）；Flutter 目錄本身的改動（只改指向 Storybook 的說明）。
+- 不做：視覺回歸（Storybook 目前也沒有）；admin（沒有 Storybook）；Flutter 目錄的其他改動（D2 只刪 Storybook 宿主留下的嵌入模式與 base href）。
 - 延後：Flutter 元件目錄的 web 版發佈（觸發條件：Will 需要在瀏覽器分享 App 元件目錄時）。
 
 ## 步驟
@@ -83,7 +83,7 @@ knip 基線（2026-11-15 重做）：附件 `knip-baseline.json` 是 d69bbbbc（
   - 不能動：既有 e2e 的 mock 與斷言。
   - 驗收：CI website-e2e 每個 shard 綠；mutation：移除一個被掃描頁面上表單元素的 label，掃描要失敗。
   - 停止條件：既有頁面掃出違規——列清單回報，由 Will 決定修或以規則例外接受，不自行關規則。
-- [ ] **5. 確認並刪除 Storybook**（被擋於：步驟 2、3、4）
+- [x] **5. 確認並刪除 Storybook**（被擋於：步驟 2、3、4）
   - 範圍：先在刪除後的工作區跑 `pnpm design:check --apps-root ..` 與 `pnpm design:test` 證明不依賴 stories；再依 `inventory.md` §3 刪除全部 story、`.storybook/`、`vitest.storybook.config.ts`、`tsconfig.storybook.json`、7 個 scripts、依賴（6 個加 knip 判定的第 7 個）、patch 與 `pnpm-workspace.yaml` 條目、`UPSTREAM-WATCH.md` 條目、dependabot 規則、CI 的 storybook job、相關腳本與測試、`.mcp.json`，並更新盤點表列出的文件與 `.claude/rules/website.md`。
   - 消費端：`rg -il 'storybook|stories/' --hidden -g '!**/node_modules/**' -g '!.git/**'`
   - 不能動：盤點表標「保留」的歷史紀錄。
@@ -97,6 +97,10 @@ knip 基線（2026-11-15 重做）：附件 `knip-baseline.json` 是 d69bbbbc（
   - B：直接用 `axe-core` 並在 `page.evaluate` 注入——不加整合套件，但要自己寫注入與結果格式。
   - 結論：A，`@axe-core/playwright` 4.14.0（2026-10-15 發佈，peer `playwright-core >= 1.0.0`）；步驟 4 開工時以 `npm view @axe-core/playwright@4.14.0 dependencies` 確認帶入的 `axe-core` 版本；ADR：無（Will 已決定方向，這題只是套件選擇）。
 
+- **D2 Flutter 元件目錄的嵌入模式**（狀態：已決 2026-11-15，Will；擋住步驟：5；需要的事實：無）
+  - 背景：Storybook 是 `embedded=true` 與 `/flutter/buyer|seller/` base href 唯一的宿主，刪除後沒有消費端；原範圍「不改 Flutter 目錄」與共通規則「不留技術債」衝突。
+  - 結論：兩支 App 刪除 `embedded` 模式，`component-catalog.sh` 預設 base href 改為 `/`；延後項的 web 版發佈屆時重新設計。
+
 拍板順序：無未決題。
 
 ## 進度
@@ -109,5 +113,5 @@ knip 基線（2026-11-15 重做）：附件 `knip-baseline.json` 是 d69bbbbc（
 | 2 基礎元件改寫 | 完成 | lint、`test:unit` 本機；PR #377 在 dcd3f3bd 全部檢查綠（website-e2e run 43680495072：元件 browser job 25 檔 92 測試、8 個 e2e shard；website-ci run 43680495013）；mutation 各只有目標測試失敗後 revert 回綠：DatePicker 選日期不回報 onChange（run 43675932096）、ClarifyQuestionCard 描述不 trim（run 43679360536）、Tabs 非受控點擊不切換（run 43679556022）；play 對照表在 PR 描述；`/code-review` 2a 兩輪、2b 一輪，finding 全部修正或附理由駁回 | knip：0e4b2b02 對新基線（d69bbbbc）`knip-diff.py` new 0；原「多 66 筆」已查清，見驗收基線段 | e83cd330..dcd3f3bd |
 | 3 Cart、DescriptionEditor | 完成 | lint、`test:unit`、knip（`knip-diff.py` new 0）本機；PR #377 在 44284b2e 全部檢查綠（website-e2e run 43688865121：元件 browser job 32 檔 151 測試、8 個 e2e shard）；mutation（run 43688094850）拿掉存檔失敗後的重試時只有「最後一次存檔失敗 · 補存後 onChange 跟上」失敗、不可購買商品數量不停用時只有「disables quantity for an unavailable item…」失敗，revert 後回綠；play 對照表在 PR 描述；`/code-review` 兩輪加 Will 同意的第三輪，契約對照審查 1 項 should 已修 | — | 831991d8..44284b2e |
 | 4 axe 進 e2e | 完成 | 掃描接在 protected／public static routes 與 `/cart`；首跑 51 頁違規（run 43696298022），Will 決定全部修；修正後 website-e2e 全綠（run 43709161412，元件 browser job、8 個 e2e shard，含 `/cart`）；mutation 拿掉 `/seller-center/coupons/new` 優惠券名稱的 label 時掃描報 `label`／`label-title-only` 失敗（run 43706283438），revert 後回綠；`label-content-name-mismatch` 的成因以診斷 commit 加 axe 4.14.0 原始碼證實（axe 以 `screenReader=false` 計算可見文字，`aria-hidden` 的可見文字也算）；`/code-review` 兩輪：第一輪 9 項全修，第二輪 10 項：修 7 項（live region 字串、表格 region class 合併附 red-proof；手機寬度空 region×3 改為只在溢出時成為可聚焦 region；sr-only 名稱元素不得為 span 的測試；ImageUploader 文字單一來源；AI 助手按鈕以 aria-describedby 補用途），Will 2026-11-15 決定；本機 lint、test、test:unit、knip 綠 | 上傳鈕名稱含檔案提示：已接受（Will 2026-11-15）；早退狀態 h1 收斂到共用外框：延後，觸發條件為新增早退狀態時；`public-static-routes` 標 `@live`，CI 不跑 | 519fe31e..dfe9696a |
-| 5 確認並刪除 Storybook | 未開始 | | | |
+| 5 確認並刪除 Storybook | 完成 | 本機：lockfile `@storybook/` 0 筆、`pnpm lint`、`pnpm test`（2936）、`test:unit`、`design:check --apps-root ..`、`design:test`、knip（`knip-diff.py` new 0）、`check-doc-paths.py`、buyer `flutter test`（1499）、seller `flutter test`（2279）；PR #377 在 ad987139 全部 workflow 綠（website-e2e run 43716667299、website-ci 43716667534、supply-chain 43716667533、buyer 43716667377、seller 43716667411 等 12 個）；消費端搜尋只剩四個保留檔、本計畫與附件、測試圖檔 key `public/storybook/…svg`（測試資料，不依賴 Storybook）；`/code-review` 兩輪：第一輪 10 項（修 8、延後 1 後經 D2 改為修、駁回 1：元件層 a11y 由步驟 4 前提決定），第二輪 9 項依 Will 2026-11-15 指示一次修完，以 CI 為準不開第三輪 | — | 92b20f3c..ad987139 |
 | 6 收尾 | 未開始 | | | |
