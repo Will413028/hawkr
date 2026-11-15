@@ -1995,9 +1995,9 @@ Gateway 對未登錄的業務碼一律塌縮成 HTTP 409；ADM／賣家前端**�
 **漏了＝服務端 passive declare 查不到 queue，訂閱靜默失效：不 crash、不進 DLQ、無告警**，
 唯一線索是連線當下印一行 `skipping queue X (NOT consumed)`。
 
-⚠️ `static-gates.yml` 的「MQ consumer ↔ topology 登記一致性」**只掃 Go**，
-**Java 側漏登記沒有任何 CI 擋得住**，review 必人工查。
-push 前跑 `infra/mq/tools/validate.py` ＋ repo root 的 `scripts/mq-consumer-registration-check.py`（**兩支 cwd 不同**）。
+⚠️ consumer 登記與 `topology.yaml` 是否一致**沒有任何 CI gate**（Go 與 Java 都一樣），
+漏登記沒有任何自動攔截，review 必人工查。
+push 前可在本機跑 `backend/infra/mq/tools/validate.py` 檢查 `topology.yaml` 自身（不比對 consumer 程式碼）。
 
 ⚠️ **通知端不需動 topology**：`notification.product` 綁 `hawkr.product` key `'#'` 全收（已實證）；
 同 exchange 另一個 binding 是 `buyer.product.restock` 的**精確 key** `product.restock`，

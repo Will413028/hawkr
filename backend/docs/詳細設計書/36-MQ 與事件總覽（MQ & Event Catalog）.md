@@ -1051,7 +1051,7 @@ notification-service 在 `buyer_id` 缺漏或格式錯誤時 **fail-closed 不�
 
 這是 product-service 第一個「**自己 publish、自己 consume**」的 queue：現有 8 條 product-service queue 全部消費**別人的** exchange（order／buyer／review／seller）。
 服務端已 passive declare（`SPRING_RABBITMQ_DYNAMIC=false`，見《[MQ Topology 管理（Terraform）](../基礎建設/MQ%20Topology%20管理（Terraform）.md)》）⇒ **queue 不存在時不 crash、不進 DLQ、無告警**，唯一線索是連線當下的一行 log；
-而 `static-gates.yml` 的「MQ consumer ↔ topology 登記一致性」step **只掃 Go**，Java 側漏登記只能靠人工 review。
+而 consumer 登記與 `topology.yaml` 是否一致**沒有任何 CI gate**（Go 與 Java 都一樣），漏登記只能靠人工 review。
 
 **條目（格式對齊同服務既有八條 Java queue，全部走 `dlq: {via, routing_key}`）**：
 

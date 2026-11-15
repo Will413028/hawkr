@@ -280,8 +280,8 @@ groups:
   #    **有註冊、零觀測** —— /metrics 上看得到三行值為 0 的序列，而 ①②⑧ 三條告警永不觸發。
   # ⚠️ sql_exporter 的 invoice job 漏建 ⇒ ③③④⑥⑨ 五條的 PromQL 回 no data ⇒ 永不觸發，
   #    而 no data 與「一切正常」在 `> 0` 的表達式上完全一樣（驗收判準是「series 存在」不是「值為 0」）。
-  # 🔴 上面兩種失效（沒有生產者／有生產者但零觀測）現在由 CI 的
-  #    `scripts/check-invoice-metric-producers.py` 兩層檢查守住（static-gates）。
+  # 🔴 上面兩種失效（沒有生產者／有生產者但零觀測）由
+  #    `backend/scripts/check-invoice-metric-producers.py` 兩層檢查守住（本機手動執行，沒有 CI gate）。
   #    新增告警時**不必**手動維護任何清單：它從本檔的 expr 反查生產者。
   # ⚠️ 聚合一律 sum by (env) / max by (env)，禁裸 sum/max：同一台 Prometheus 同時抓 dev 與 prod，
   #    丟掉 env 會把兩環境加成一個數字，且 annotation 的 {{ $labels.env }} 渲染成空字串。

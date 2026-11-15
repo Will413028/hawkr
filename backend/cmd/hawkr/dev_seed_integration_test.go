@@ -439,24 +439,23 @@ func TestDevSeedRerunRestoresSeedStoresAndLeavesOtherStoresUntouched(t *testing.
 	}
 }
 
-// 01-account.sql 重建的帳號（這裡是 3001~3099）擁有種子以外的店家時，前提檢查失敗並說明處理方式，dev-seed 本身也拒絕；兩者都不寫、不刪任何資料
-// （不自動刪店：刪了店，帳號重建後的 SELLER 角色沒有對應的店，反過來不刪，重建帳號會讓店家失去角色）。
-func TestDevSeedCheckRefusesRebuiltAccountsThatOwnOtherStores(t *testing.T) {
+// 種子帳號（這裡是 9）名下有種子以外的未關閉店家時，前提檢查失敗並說明處理方式，dev-seed 本身也拒絕；兩者都不寫、不刪任何資料
+// （不自動刪店：種子店家寫入會撞上一帳號一家店與 SELLER 角色的 source_id）。
+func TestDevSeedCheckRefusesSeedAccountsThatOwnOtherStores(t *testing.T) {
 	ctx := context.Background()
 	d := devSeedEnv(t)
 	if err := runDevSeed(ctx, []string{"-check"}, new(bytes.Buffer)); err != nil {
 		t.Fatalf("乾淨的資料庫上前提檢查應該成立：%v", err)
 	}
-	newAccount(t, d, 3002)
-	other := openStore(t, 3002, "開店的買家")
+	other := openStore(t, 9, "種子帳號的店")
 	if err := runDevSeed(ctx, nil, new(bytes.Buffer)); err == nil {
-		t.Fatal("區間內有種子以外的店家時 dev-seed 不該寫入")
+		t.Fatal("種子帳號名下有種子以外的店家時 dev-seed 不該寫入")
 	}
 	err := runDevSeed(ctx, []string{"-check"}, new(bytes.Buffer))
 	if err == nil {
 		t.Fatal("前提檢查應該失敗")
 	}
-	for _, want := range []string{"店家 " + strconv.FormatInt(other, 10), "帳號 3002", "重建本機資料庫", "不帶 -account"} {
+	for _, want := range []string{"店家 " + strconv.FormatInt(other, 10), "帳號 9", "重建本機資料庫", "不帶 -account"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("錯誤訊息缺少 %q：%v", want, err)
 		}
@@ -464,7 +463,7 @@ func TestDevSeedCheckRefusesRebuiltAccountsThatOwnOtherStores(t *testing.T) {
 	if n := count(t, d, `SELECT count(*) FROM seller.stores`); n != 1 {
 		t.Errorf("seller.stores 有 %d 列，want 只剩使用者的 1 家（沒有寫入、沒有刪除）", n)
 	}
-	if n := count(t, d, `SELECT count(*) FROM identity.account_roles WHERE account_id = 3002 AND source_id = $1`, other); n != 1 {
+	if n := count(t, d, `SELECT count(*) FROM identity.account_roles WHERE account_id = 9 AND source_id = $1`, other); n != 1 {
 		t.Errorf("SELLER 角色被動過")
 	}
 	// 佔用種子 store_code 的非種子店家同樣擋下（unique 衝突會讓 upsert 失敗在半途）。
@@ -473,6 +472,26 @@ func TestDevSeedCheckRefusesRebuiltAccountsThatOwnOtherStores(t *testing.T) {
 	}
 	if err := runDevSeed(ctx, []string{"-check"}, new(bytes.Buffer)); err == nil || !strings.Contains(err.Error(), "store_code 9") {
 		t.Fatalf("佔用種子 store_code 的店家應該被擋下：%v", err)
+	}
+}
+
+// 01 不再重建 3001~3099 之類保留區間的帳號：區間內種子以外的帳號擁有的未關閉店家不擋前提檢查，種子照常執行、那家店原封不動。
+func TestDevSeedLeavesStoresOfNonSeedAccountsUntouched(t *testing.T) {
+	ctx := context.Background()
+	d := devSeedEnv(t)
+	newAccount(t, d, 3002)
+	other := openStore(t, 3002, "開店的買家")
+	if err := runDevSeed(ctx, []string{"-check"}, new(bytes.Buffer)); err != nil {
+		t.Fatalf("非種子帳號的店家不該擋前提檢查：%v", err)
+	}
+	before := rowJSON(t, d, `SELECT to_jsonb(s)::text FROM seller.stores s WHERE store_id = $1`, other)
+	seedOK(t)
+	seedOK(t)
+	if now := rowJSON(t, d, `SELECT to_jsonb(s)::text FROM seller.stores s WHERE store_id = $1`, other); now != before {
+		t.Errorf("非種子店家被改動：\n之前 %s\n之後 %s", before, now)
+	}
+	if n := count(t, d, `SELECT count(*) FROM identity.account_roles WHERE account_id = 3002 AND source_id = $1`, other); n != 1 {
+		t.Errorf("非種子帳號的 SELLER 角色被動過")
 	}
 }
 
@@ -583,7 +602,7 @@ func TestDevSeedRefusesLifecycleStateItWouldHaveToRevert(t *testing.T) {
 		{"進行中的刪帳申請", func(t *testing.T, d *db.DB) {
 			mustExec(t, d, `INSERT INTO accountdeletion.deletion_requests (id, account_id, status, requested_at) VALUES (gen_random_uuid(), 4, 'PENDING_ORDERS', now())`)
 		}, []string{"帳號 [4]", "刪帳申請"}},
-		{"非種子的重建帳號有進行中的刪帳申請", func(t *testing.T, d *db.DB) {
+		{"種子買家帳號有進行中的刪帳申請", func(t *testing.T, d *db.DB) {
 			mustExec(t, d, `INSERT INTO accountdeletion.deletion_requests (id, account_id, status, requested_at) VALUES (gen_random_uuid(), 2001, 'PENDING_ORDERS', now())`)
 		}, []string{"帳號 [2001]", "刪帳申請"}},
 	} {
@@ -658,13 +677,11 @@ func closeStoreRow(t *testing.T, d *db.DB, storeID int64) {
 	mustExec(t, d, `DELETE FROM identity.account_roles WHERE source_id = $1`, storeID)
 }
 
-// 01 重建的帳號擁有的「已關閉」非種子店家不擋前提檢查（角色已移除，01 動不到它），未關閉的仍擋；種子照常執行、已關閉的店家原封不動。
-func TestDevSeedCheckAllowsAClosedStoreOfARebuiltAccount(t *testing.T) {
+// 種子帳號名下的「已關閉」非種子店家不擋前提檢查（角色已移除，種子動不到它）；種子照常執行、已關閉的店家原封不動。
+func TestDevSeedCheckAllowsAClosedStoreOfASeedAccount(t *testing.T) {
 	ctx := context.Background()
 	d := devSeedEnv(t)
-	seedOK(t)
-	newAccount(t, d, 3003)
-	closed := openStore(t, 3003, "開過又關掉的店")
+	closed := openStore(t, 9, "開過又關掉的店")
 	closeStoreRow(t, d, closed)
 	if err := runDevSeed(ctx, []string{"-check"}, new(bytes.Buffer)); err != nil {
 		t.Fatalf("已關閉的非種子店家不該擋前提檢查：%v", err)
@@ -673,12 +690,6 @@ func TestDevSeedCheckAllowsAClosedStoreOfARebuiltAccount(t *testing.T) {
 	seedOK(t)
 	if now := rowJSON(t, d, `SELECT to_jsonb(s)::text FROM seller.stores s WHERE store_id = $1`, closed); now != before {
 		t.Errorf("已關閉的店家被改動：\n之前 %s\n之後 %s", before, now)
-	}
-	// 同一個帳號重新開了一家未關閉的店，就擋下。
-	reopened := openStore(t, 3003, "重新入駐")
-	err := runDevSeed(ctx, []string{"-check"}, new(bytes.Buffer))
-	if err == nil || !strings.Contains(err.Error(), "店家 "+strconv.FormatInt(reopened, 10)) || strings.Contains(err.Error(), "店家 "+strconv.FormatInt(closed, 10)) {
-		t.Fatalf("只該擋未關閉的 %d，不該列已關閉的 %d：%v", reopened, closed, err)
 	}
 }
 
@@ -785,6 +796,102 @@ func TestDevSeedRefusesAnEnvironmentThatIsNotLocalDevelopment(t *testing.T) {
 			}
 			if n := count(t, d, `SELECT count(*) FROM seller.stores`); n != 0 {
 				t.Fatalf("被拒絕之後仍寫了 %d 家店", n)
+			}
+		})
+	}
+}
+
+func runAccountSeed(t *testing.T, d *db.DB) error {
+	t.Helper()
+	b, err := os.ReadFile("../../infra/seed-data/01-account.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = d.Pool().Exec(context.Background(), string(b))
+	return err
+}
+
+// 01-account.sql 是冪等 upsert：重跑結果相同、版本不變；被改動的種子買家個資收斂回 fixture 且版本加一；種子以外的帳號、買家與地址原封不動；序號不倒退。
+func TestAccountSeedIsAnIdempotentUpsert(t *testing.T) {
+	d := devSeedEnv(t)
+	if err := runAccountSeed(t, d); err != nil {
+		t.Fatal(err)
+	}
+	const snapshot = `SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.buyer_id), '[]')::text FROM (
+		SELECT b.*, (SELECT jsonb_agg(to_jsonb(a) - 'address_id' ORDER BY a.town_code, a.address_detail) FROM buyer.shipping_addresses a WHERE a.buyer_id = b.buyer_id) AS addresses
+		FROM buyer.buyers b WHERE b.buyer_id IN (50009, 50004, 52001, 52002, 53001)) x`
+	first := rowJSON(t, d, snapshot)
+	if err := runAccountSeed(t, d); err != nil {
+		t.Fatal(err)
+	}
+	if again := rowJSON(t, d, snapshot); again != first {
+		t.Errorf("重跑改動了列：\n之前 %s\n之後 %s", first, again)
+	}
+
+	newAccount(t, d, 2050)
+	mustExec(t, d, `INSERT INTO buyer.buyers (buyer_id, account_id, display_name, created_at, updated_at) OVERRIDING SYSTEM VALUE VALUES (52050, 2050, '使用者', now(), now())`)
+	mustExec(t, d, `INSERT INTO buyer.shipping_addresses (buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default, created_at, updated_at) VALUES (52050, 'u', '0900000000', '63000020', '使用者路1號', true, now(), now())`)
+	mustExec(t, d, `INSERT INTO buyer.shipping_addresses (buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default, created_at, updated_at) VALUES (52001, 'u', '0900000000', '63000020', '使用者路2號', false, now(), now())`)
+	other := rowJSON(t, d, `SELECT jsonb_agg(to_jsonb(b))::text FROM buyer.buyers b WHERE buyer_id = 52050`)
+	mustExec(t, d, `UPDATE buyer.buyers SET display_name = '改過', version = version + 1 WHERE buyer_id = 52001`)
+	mustExec(t, d, `UPDATE buyer.shipping_addresses SET is_default = false WHERE buyer_id = 52001 AND town_code = '63000020' AND address_detail = '松仁路100號12樓'`)
+	var seqBefore int64
+	if err := d.Pool().QueryRow(context.Background(), `SELECT last_value FROM pg_sequences WHERE sequencename = 'buyers_buyer_id_seq'`).Scan(&seqBefore); err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, d, `SELECT setval(pg_get_serial_sequence('buyer.buyers', 'buyer_id'), $1)`, seqBefore+500)
+	if err := runAccountSeed(t, d); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, d, `SELECT count(*) FROM buyer.buyers WHERE buyer_id = 52001 AND display_name = '王小明' AND version = 3`); n != 1 {
+		t.Errorf("被改過的種子買家沒有收斂回 fixture 並加版本")
+	}
+	if n := count(t, d, `SELECT count(*) FROM buyer.shipping_addresses WHERE buyer_id = 52001 AND is_default AND address_detail = '松仁路100號12樓'`); n != 1 {
+		t.Errorf("種子預設地址沒有還原")
+	}
+	if n := count(t, d, `SELECT count(*) FROM buyer.shipping_addresses WHERE address_detail LIKE '使用者路%'`); n != 2 {
+		t.Errorf("使用者建立的地址被刪或被改，剩 %d 筆", n)
+	}
+	if now := rowJSON(t, d, `SELECT jsonb_agg(to_jsonb(b))::text FROM buyer.buyers b WHERE buyer_id = 52050`); now != other {
+		t.Errorf("種子以外的買家被改動：\n之前 %s\n之後 %s", other, now)
+	}
+	var seqAfter int64
+	if err := d.Pool().QueryRow(context.Background(), `SELECT last_value FROM pg_sequences WHERE sequencename = 'buyers_buyer_id_seq'`).Scan(&seqAfter); err != nil {
+		t.Fatal(err)
+	}
+	if seqAfter < seqBefore+500 {
+		t.Errorf("序號倒退：%d → %d", seqBefore+500, seqAfter)
+	}
+}
+
+// 01 遇到有下游消費者的生命週期狀態或與 fixture 對不上的資料就整個中止，不寫任何列。
+func TestAccountSeedRefusesStateItWouldHaveToRevert(t *testing.T) {
+	for _, tc := range []struct {
+		name, setup, want string
+	}{
+		{"帳號等待刪除", `UPDATE identity.accounts SET deletion_pending_at = now() WHERE id = 2001`, "種子帳號 2001"},
+		{"買家等待刪除", `UPDATE buyer.buyers SET status = 'PENDING_DELETION' WHERE buyer_id = 52002`, "種子買家 52002"},
+		{"SELLER 角色指向別的店", `UPDATE identity.account_roles SET source_id = 7 WHERE account_id = 9`, "種子帳號 9"},
+		{"買家 ID 對不上", `UPDATE buyer.buyers SET account_id = 2999 WHERE buyer_id = 52001`, "52001"},
+		{"種子以外的預設地址", `UPDATE buyer.shipping_addresses SET address_detail = '別處' WHERE buyer_id = 52001 AND is_default`, "種子買家 52001"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := devSeedEnv(t)
+			if err := runAccountSeed(t, d); err != nil {
+				t.Fatal(err)
+			}
+			if tc.name == "買家 ID 對不上" {
+				mustExec(t, d, `INSERT INTO identity.accounts (id) OVERRIDING SYSTEM VALUE VALUES (2999)`)
+			}
+			mustExec(t, d, tc.setup)
+			const snapshot = `SELECT (SELECT coalesce(jsonb_agg(to_jsonb(a) ORDER BY id), '[]') FROM identity.accounts a)::text || (SELECT coalesce(jsonb_agg(to_jsonb(b) ORDER BY buyer_id), '[]') FROM buyer.buyers b)::text || (SELECT coalesce(jsonb_agg(to_jsonb(s) ORDER BY address_id), '[]') FROM buyer.shipping_addresses s)::text`
+			before := rowJSON(t, d, snapshot)
+			err := runAccountSeed(t, d)
+			if err == nil || !strings.Contains(err.Error(), tc.want) || !strings.Contains(err.Error(), "重建本機資料庫") {
+				t.Fatalf("應該中止並說明處理方式（含 %q）：%v", tc.want, err)
+			}
+			if now := rowJSON(t, d, snapshot); now != before {
+				t.Errorf("中止之後有列被改動")
 			}
 		})
 	}

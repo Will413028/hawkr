@@ -17,8 +17,7 @@
 //
 // 同一個判準先前用在 repository/txguard（把 23505 偵測收走且不匯出，讓呼叫端
 // 寫不出會打爆呼叫端交易的版本）。ADK 的 gemini.NewModel／openaimodel.NewModel
-// 是外部套件、擋不住直接 import，那道殘餘的縫由 scripts/check-llm-client-
-// construction.py 守（static-gates），與 txguard 的收尾方式相同。
+// 是外部套件、擋不住直接 import，那道殘餘的縫沒有自動 gate，靠 review。
 package llmprovider
 
 import (
