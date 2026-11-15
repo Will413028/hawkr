@@ -3,11 +3,10 @@ package social
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
 	"uuid"
 
 	"connectrpc.com/connect"
@@ -37,6 +36,13 @@ var DelegatedDeclaration = httpdelegation.Declaration{
 		socialv1alpha1connect.SocialDelegatedServiceScheduleStorePostProcedure:  postMethod(moddelegation.CapabilityPostsPublish, moddelegation.AuditPostSchedule),
 	},
 }
+
+// delegatedCreatePostPaths 由店主建立的欄位對照表衍生：委派建立的 request_id 在 operation 之內。
+var delegatedCreatePostPaths = func() rpc.FieldPaths {
+	p := maps.Clone(createPostPaths)
+	p["RequestID"] = "operation.request_id"
+	return p
+}()
 
 func postMethod(c moddelegation.Capability, a moddelegation.AuditAction) moddelegation.DelegatedMethod {
 	return moddelegation.DelegatedMethod{Capability: c, Action: a, Resource: moddelegation.ResourcePost}
@@ -80,9 +86,10 @@ func delegatedOperation(op *pb.DelegatedOperation) (moddelegation.DelegatedOpera
 	if err != nil || id == nil {
 		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation.request_id", "operation.request_id 必填，而且必須是 UUIDv4")
 	}
-	reason := strings.TrimSpace(op.GetOperationReason())
-	if reason == "" || utf8.RuneCountInString(reason) > 100 || strings.ContainsFunc(reason, unicode.IsControl) {
-		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation.operation_reason", "operation.operation_reason 必填，去除首尾空白後 1 到 100 個字元，不得含控制字元")
+	reason, ok := moddelegation.LegalOperationReason(op.GetOperationReason())
+	if !ok {
+		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation.operation_reason",
+			fmt.Sprintf("operation.operation_reason 必填，去除首尾空白後 1 到 %d 個字元，不得含控制字元", moddelegation.OperationReasonMaxRunes))
 	}
 	return moddelegation.DelegatedOperation{RequestID: *id, Reason: reason, NotifySeller: op.NotifySeller == nil || op.GetNotifySeller()}, nil
 }
@@ -218,7 +225,7 @@ func (h *Delegated) CreateStorePost(ctx context.Context, req *connect.Request[pb
 		return p, nil, err
 	})
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, createPostPaths)
+		return nil, rpc.WithFieldPaths(err, delegatedCreatePostPaths)
 	}
 	out, err := h.ownPost(ctx, st, post)
 	if err != nil {

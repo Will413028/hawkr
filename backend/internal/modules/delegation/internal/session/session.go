@@ -362,6 +362,15 @@ func (m *Module) ResolveDelegation(ctx context.Context, credential string, activ
 	return toDelegationSession(row, now), nil
 }
 
+// TouchDelegation 順延進行中 session 的閒置逾時（代行請求成功之後呼叫），不回列；已結束、逾時或撤銷的 session 不受影響。
+func (m *Module) TouchDelegation(ctx context.Context, sessionID int64) error {
+	now := m.d.Now()
+	if err := m.q(ctx).TouchDelegationSessionByID(ctx, store.TouchDelegationSessionByIDParams{Now: now, IdleSince: model.IdleSince(now), ID: sessionID}); err != nil {
+		return fmt.Errorf("delegation：順延閒置逾時：%w", err)
+	}
+	return nil
+}
+
 // EndDelegation 結束 session（立刻到期）。任何方向都冪等：已經結束、到期、撤銷，甚至對不到任何 session 的 credential
 // 都成功——回 401 或 404 會讓前端停在「結果未知」而永遠關不掉工作區。
 func (m *Module) EndDelegation(ctx context.Context, credential string) error {

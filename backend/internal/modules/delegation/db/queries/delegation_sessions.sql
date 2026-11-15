@@ -56,6 +56,15 @@ SET last_active_at = CASE
 WHERE credential_hash = sqlc.arg(credential_hash)
 RETURNING *;
 
+-- name: TouchDelegationSessionByID :exec
+-- 代行請求成功之後順延閒置逾時（不回列）。述詞與 TouchDelegationSession 的 CASE 相同：只有進行中的 session 才算活動，已逾時的不會被救回來。
+UPDATE delegation.delegated_operation_sessions
+SET last_active_at = date_trunc('second', sqlc.arg(now)::timestamptz)
+WHERE id = sqlc.arg(id)
+  AND status = 'ACTIVE' AND ended_at IS NULL
+  AND sqlc.arg(now)::timestamptz < expires_at
+  AND last_active_at > sqlc.arg(idle_since)::timestamptz;
+
 -- name: GetActiveDelegationSessionOfActor :one
 -- preflight 的衝突探測。管理員與店家拆成兩句（OR 會讓兩個 partial unique index 都用不上）。
 SELECT * FROM delegation.delegated_operation_sessions

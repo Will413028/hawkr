@@ -1040,3 +1040,24 @@ func (q *Queries) TouchDelegationSession(ctx context.Context, arg TouchDelegatio
 	)
 	return i, err
 }
+
+const touchDelegationSessionByID = `-- name: TouchDelegationSessionByID :exec
+UPDATE delegation.delegated_operation_sessions
+SET last_active_at = date_trunc('second', $1::timestamptz)
+WHERE id = $2
+  AND status = 'ACTIVE' AND ended_at IS NULL
+  AND $1::timestamptz < expires_at
+  AND last_active_at > $3::timestamptz
+`
+
+type TouchDelegationSessionByIDParams struct {
+	Now       time.Time
+	ID        int64
+	IdleSince time.Time
+}
+
+// 代行請求成功之後順延閒置逾時（不回列）。述詞與 TouchDelegationSession 的 CASE 相同：只有進行中的 session 才算活動，已逾時的不會被救回來。
+func (q *Queries) TouchDelegationSessionByID(ctx context.Context, arg TouchDelegationSessionByIDParams) error {
+	_, err := q.db.Exec(ctx, touchDelegationSessionByID, arg.Now, arg.ID, arg.IdleSince)
+	return err
+}

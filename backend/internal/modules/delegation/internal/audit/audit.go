@@ -290,6 +290,9 @@ func (m *Module) confirmAudit(ctx context.Context, q *store.Queries, in model.Au
 	if in.Result != model.AuditSucceeded && in.Result != model.AuditFailed {
 		return model.AuditLog{}, model.Deny(model.DenialInvalidCommand, "result 必須是 SUCCEEDED 或 FAILED")
 	}
+	if in.Result == model.AuditFailed && in.FailureReason != "" && !model.LegalFailureReason(in.FailureReason) {
+		return model.AuditLog{}, model.Deny(model.DenialInvalidCommand, "failureReason 必須是大寫底線分隔的代碼（不得是 UNSPECIFIED）")
+	}
 	existing, err := q.GetDelegationAuditLog(ctx, in.AuditLogID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.AuditLog{}, model.Deny(model.DenialAuditIntentFailed, "找不到對應的稽核紀錄")

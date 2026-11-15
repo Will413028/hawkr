@@ -21,9 +21,11 @@ import (
 // OperationSessionHeader 是代行 session 的憑證所在的請求標頭（website 的 BFF 轉送）。
 const OperationSessionHeader = "X-HK-Operation-Session"
 
-// Sessions 是 interceptor 需要的 delegation 公開 API（*delegation.Module）：以憑證解析代行 session（activity 為真時順延閒置逾時；interceptor 先唯讀解析，授權通過才以 activity 為真再解析一次），與授權（被拒絕時寫 FAILED 稽核）。
+// Sessions 是 interceptor 需要的 delegation 公開 API（*delegation.Module）：以憑證唯讀解析代行 session，授權（被拒絕時寫 FAILED 稽核），
+// 與請求成功之後順延閒置逾時（TouchDelegation，不回列）。
 type Sessions interface {
 	ResolveDelegation(ctx context.Context, credential string, activity bool) (moddelegation.DelegationSession, error)
+	TouchDelegation(ctx context.Context, sessionID int64) error
 	AuthorizeDelegated(ctx context.Context, c moddelegation.DelegatedCaller) error
 }
 
@@ -65,7 +67,7 @@ func CallerFrom(ctx context.Context) (Caller, error) {
 // NewInterceptor 建立只掛在 decl 那個 service 的 interceptor，要放在 rpc.NewInterceptor 之內，錯誤才會被轉換並記 log。流程：讀 X-HK-Operation-Session，
 // 以 ResolveDelegation 解析（唯讀，不算活動）；解析不到 session（缺少或無效的憑證）回 unauthenticated，不寫稽核列（沒有 session 可歸屬），只記一筆結構化的安全 log
 // （procedure 與 trace，不含憑證）；解析到之後以 AuthorizeDelegated 授權：session 不是 ACTIVE（到期、已結束、已撤銷）或沒有該方法的能力被拒絕，拒絕另寫一列 FAILED 稽核；
-// 通過才再以 ResolveDelegation 順延閒置逾時（被拒絕的請求不算活動），並把代行放進 ctx。目標店家只來自 session，請求沒有 store_id 可以指向別家。
+// 通過才把代行放進 ctx；請求處理成功之後才以 TouchDelegation 順延閒置逾時（任何地方被拒絕或失敗的請求都不算活動）。目標店家只來自 session，請求沒有 store_id 可以指向別家。
 func NewInterceptor(sessions Sessions, logger *slog.Logger, decl Declaration) (connect.Interceptor, error) {
 	if sessions == nil {
 		return nil, errors.New("httpapi/delegation：NewInterceptor 需要 Sessions")
@@ -103,10 +105,6 @@ func (i *interceptor) enter(ctx context.Context, procedure string, header http.H
 	if err := i.sessions.AuthorizeDelegated(ctx, caller); err != nil {
 		return ctx, err
 	}
-	// 授權通過才算活動：被拒絕的請求不順延閒置逾時。
-	if _, err := i.sessions.ResolveDelegation(ctx, credential, true); err != nil {
-		return ctx, err
-	}
 	return context.WithValue(ctx, callerKey{}, caller), nil
 }
 
@@ -116,7 +114,17 @@ func (i *interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		if err != nil {
 			return nil, err
 		}
-		return next(ctx, req)
+		resp, err := next(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		// 請求成功才算活動：被拒絕或失敗的請求（含 handler 與元件內的拒絕）不順延閒置逾時；順延失敗不改變已完成的請求結果。
+		if c, cerr := CallerFrom(ctx); cerr == nil {
+			if terr := i.sessions.TouchDelegation(ctx, c.Session.ID); terr != nil {
+				i.logger.ErrorContext(ctx, "代行 session 順延閒置逾時失敗", "session_id", c.Session.ID, "err", terr)
+			}
+		}
+		return resp, nil
 	}
 }
 

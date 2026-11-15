@@ -58,19 +58,24 @@ type Deps struct {
 	Logger   *slog.Logger
 }
 
-// failureRecorder 寫 FAILED 的稽核列（*audit.Module）；單獨成介面，讓拒絕路徑的單元測試不需要資料庫。
-type failureRecorder interface {
+// auditor 是 Module 對稽核子領域（*audit.Module）的全部需求：正式與單元測試共用同一個欄位；測試嵌入它、只實作用到的方法，讓不碰資料庫的路徑不需要 audit.Module。
+type auditor interface {
+	RunOperation(ctx context.Context, in model.OperationAuditInput, do func(ctx context.Context) (model.OperationOutcome, error)) (model.AuditLog, bool, error)
 	RecordFailure(ctx context.Context, in model.FailureAuditInput) error
+	DelegationAuditLogs(ctx context.Context, f model.AuditLogFilter, p model.DelegationPaging) (model.AuditLogPage, error)
+	RecordDelegationAuditIntent(ctx context.Context, in model.AuditIntentInput) (model.AuditIntent, error)
+	RecordDelegationAuditIntents(ctx context.Context, items []model.AuditIntentInput) ([]model.AuditIntentOutcome, error)
+	ConfirmDelegationAudit(ctx context.Context, in model.AuditConfirmInput) (model.AuditLog, error)
+	ConfirmDelegationAudits(ctx context.Context, items []model.AuditConfirmInput) ([]model.AuditLog, error)
+	RecordScheduledPublish(ctx context.Context, in model.ScheduledPublishAuditInput) error
 }
 
 type Module struct {
 	seller               Seller
 	cancelStoreSchedules func(ctx context.Context, storeID int64) error
-	failures             failureRecorder
-	operations           operationRunner
 	logger               *slog.Logger
 	authorization        *authorization.Module
-	audit                *audit.Module
+	audit                auditor
 	session              *session.Module
 }
 
@@ -150,8 +155,6 @@ func New(d Deps) *Module {
 		session:              s,
 		audit:                auditModule,
 		seller:               d.Seller,
-		failures:             auditModule,
-		operations:           auditModule,
 		logger:               d.Logger,
 		authorization: authorization.New(authorization.Deps{
 			DB: d.DB, Identity: d.Identity, Session: s, StoreState: storeState, NewID: d.NewID, Now: d.Now,
@@ -335,6 +338,12 @@ func DenialCodes() map[DelegationDenial]string { return model.DenialCodes() }
 // DenialOfCode 由 failure_reason 的代碼找回拒絕；不是拒絕的代碼回 false。
 func DenialOfCode(code string) (DelegationDenial, bool) { return model.DenialOfCode(code) }
 
+// OperationReasonMaxRunes 是操作原因的上限；LegalOperationReason 是操作原因的唯一規則（去除首尾空白後 1 到上限字、不含控制字元），傳輸層與稽核寫入共用。
+const OperationReasonMaxRunes = model.OperationReasonMaxRunes
+
+// LegalOperationReason 回傳去除首尾空白後的操作原因，與它是否合法。
+func LegalOperationReason(raw string) (string, bool) { return model.LegalOperationReason(raw) }
+
 // FailureReasonInternal 是沒有原因的失敗寫進 failure_reason 的值。
 const FailureReasonInternal = model.FailureReasonInternal
 
@@ -386,6 +395,11 @@ func (m *Module) RedeemDelegationHandoff(ctx context.Context, code string) (Rede
 
 func (m *Module) ResolveDelegation(ctx context.Context, credential string, activity bool) (DelegationSession, error) {
 	return m.session.ResolveDelegation(ctx, credential, activity)
+}
+
+// TouchDelegation 在代行請求成功之後順延該 session 的閒置逾時；被拒絕或失敗的請求不呼叫它。
+func (m *Module) TouchDelegation(ctx context.Context, sessionID int64) error {
+	return m.session.TouchDelegation(ctx, sessionID)
 }
 
 func (m *Module) EndDelegation(ctx context.Context, credential string) error {

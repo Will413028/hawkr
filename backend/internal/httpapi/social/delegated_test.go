@@ -3,6 +3,7 @@ package social
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"maps"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -42,6 +44,12 @@ type fakeSessions struct {
 	resolved []string
 	activity []bool
 	denied   []string
+	touched  []int64
+}
+
+func (f *fakeSessions) TouchDelegation(_ context.Context, id int64) error {
+	f.touched = append(f.touched, id)
+	return nil
 }
 
 func (f *fakeSessions) ResolveDelegation(_ context.Context, c string, activity bool) (moddelegation.DelegationSession, error) {
@@ -314,14 +322,12 @@ func TestEveryDelegatedMethodReachesTheComponentWithAGoodSession(t *testing.T) {
 			t.Errorf("%s 交給元件的方法宣告 = %+v，預期 %+v", proc, e.runner.caller.Method, want)
 		}
 	}
-	// 每個請求先唯讀解析（false），授權通過才再解析一次算活動（true，順延閒置逾時）。
-	if len(e.sessions.activity) != 2*len(all) {
-		t.Fatalf("解析 %d 次，預期每個請求 2 次", len(e.sessions.activity))
+	// 每個請求只唯讀解析一次（不回頭再解析），成功之後才順延閒置逾時。
+	if len(e.sessions.activity) != len(all) || slices.Contains(e.sessions.activity, true) {
+		t.Fatalf("解析 %v，預期每個請求唯讀解析 1 次", e.sessions.activity)
 	}
-	for i, a := range e.sessions.activity {
-		if a != (i%2 == 1) {
-			t.Fatalf("第 %d 次解析的 activity = %v：授權前要唯讀、授權後才算活動", i, a)
-		}
+	if len(e.sessions.touched) != len(all) {
+		t.Fatalf("成功的請求順延 %d 次，預期 %d 次", len(e.sessions.touched), len(all))
 	}
 	if len(e.sessions.denied) != 0 {
 		t.Fatalf("好的 session 不該被拒絕：%v", e.sessions.denied)
@@ -362,8 +368,8 @@ func TestEndedSessionsAreRejectedAndAudited(t *testing.T) {
 		if len(e.runner.calls) != 0 {
 			t.Fatalf("%s 的 session 不該到元件：%v", status, e.runner.calls)
 		}
-		if slices.Contains(e.sessions.activity, true) {
-			t.Fatalf("%s：被拒絕的請求不該算活動（順延閒置逾時）：%v", status, e.sessions.activity)
+		if slices.Contains(e.sessions.activity, true) || len(e.sessions.touched) != 0 {
+			t.Fatalf("%s：被拒絕的請求不該算活動（順延閒置逾時）：%v %v", status, e.sessions.activity, e.sessions.touched)
 		}
 		if len(e.sessions.denied) != len(DelegatedDeclaration.Methods) || !slices.Contains(e.sessions.denied, "POST_READ") {
 			t.Fatalf("%s：被拒絕的請求 %v，預期每個方法一次（含讀取的 POST_READ）", status, e.sessions.denied)
@@ -645,10 +651,37 @@ func TestComponentAndSocialErrorsReachTheClientWithTheirKind(t *testing.T) {
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("request_id 用在不同內容：%v，預期 failed_precondition", err)
 	}
+	if len(e.sessions.touched) != 0 {
+		t.Fatalf("元件內被拒絕的請求不該算活動：%v", e.sessions.touched)
+	}
 	e.runner.err = nil
 	e.posts.err = apperr.NotFound("貼文不存在")
 	_, err = e.client.GetStorePost(t.Context(), withCredential(&pb.GetStorePostRequest{PostId: uuid.New().String()}, goodSession))
 	if connect.CodeOf(err) != connect.CodeNotFound {
 		t.Fatalf("social 的 not_found：%v", err)
+	}
+}
+
+// 委派建立的 request_id 在 operation 之內：模組回報 RequestID 欄位錯誤時，指向 operation.request_id，不是頂層的 request_id。
+func TestDelegatedCreateMapsRequestIDToTheOperation(t *testing.T) {
+	e := newDelegatedEnv(t, goodSessions())
+	e.posts.err = apperr.InvalidInputOn([]string{"RequestID"}, "%s", "reused")
+	_, err := e.client.CreateStorePost(t.Context(), withCredential(&pb.CreateStorePostRequest{Operation: delegatedOp(), Body: "x"}, goodSession))
+	var ce *connect.Error
+	if !errors.As(err, &ce) {
+		t.Fatal(err)
+	}
+	var fields []string
+	for _, d := range ce.Details() {
+		if v, derr := d.Value(); derr == nil {
+			if br, ok := v.(*errdetails.BadRequest); ok {
+				for _, fv := range br.GetFieldViolations() {
+					fields = append(fields, fv.GetField())
+				}
+			}
+		}
+	}
+	if !slices.Equal(fields, []string{"operation.request_id"}) {
+		t.Fatalf("欄位 = %v，預期 operation.request_id", fields)
 	}
 }

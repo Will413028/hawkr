@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"errors"
 	"maps"
+	"regexp"
 	"slices"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -487,7 +489,15 @@ func DenialOfCode(code string) (DelegationDenial, bool) {
 	return 0, false
 }
 
-// FailureReasonOf 是 err 鏈上的失敗原因：代行拒絕是拒絕的代碼，其次是 apperr.Error 的 ErrorReason，都沒有則是 FailureReasonInternal。
+var failureReasonFormat = regexp.MustCompile(`^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$`)
+
+// LegalFailureReason 回傳 s 是否是合法的 failure_reason：與 DB CHECK（admin_operation_audit_logs_failure_reason_check）同一條規則，UPPER_SNAKE 且不是 UNSPECIFIED。
+func LegalFailureReason(s string) bool {
+	return failureReasonFormat.MatchString(s) && s != "UNSPECIFIED"
+}
+
+// FailureReasonOf 是 err 鏈上的失敗原因：代行拒絕是拒絕的代碼，其次是 apperr.Error 的 ErrorReason，沒有 ErrorReason 的分類錯誤取分類的大寫名稱
+// （NOT_FOUND、INVALID_INPUT、FAILED_PRECONDITION…），其餘（內部錯誤、沒有分類的錯誤）是 FailureReasonInternal。
 func FailureReasonOf(err error) string {
 	if d, ok := DelegationDenialOf(err); ok {
 		if c := d.Denial.Code(); c != "" {
@@ -498,6 +508,9 @@ func FailureReasonOf(err error) string {
 	if errors.As(err, &ae) {
 		if r := ae.Reason.String(); r != "" {
 			return r
+		}
+		if k := apperr.KindOf(err); k != apperr.KindInternal {
+			return strings.ToUpper(k.String())
 		}
 	}
 	return FailureReasonInternal

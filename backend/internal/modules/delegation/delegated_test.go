@@ -16,7 +16,15 @@ import (
 // 拒絕路徑的單元測試：session 與能力、店家狀態的拒絕發生在任何資料庫存取之前，所以用替身的 seller 與 FAILED 紀錄器就能驗證「被拒絕就寫一列 FAILED、不執行讀寫」。
 // 成功路徑與 transaction 內的行為（SUCCEEDED、冪等、rollback）在 integration 測試。
 
-type recorder struct{ got []model.FailureAuditInput }
+// recorder 是稽核子領域的替身（Module.audit 的唯一欄位）：嵌入 auditor，只實作 RecordFailure 與 RunOperation。
+type recorder struct {
+	auditor
+	got []model.FailureAuditInput
+	// RunOperation：記下收到的輸入，像正式的一樣在「transaction 內」呼叫 do（do 失敗就整段失敗，不留 SUCCEEDED）；replayed 為真時回第一次的列、不呼叫 do。
+	opsGot   []model.OperationAuditInput
+	replayed bool
+	ran      bool
+}
 
 func (r *recorder) RecordFailure(_ context.Context, in model.FailureAuditInput) error {
 	r.got = append(r.got, in)
@@ -77,7 +85,7 @@ func denialOf(t *testing.T, err error) DelegationDenial {
 	return d.Denial
 }
 
-func newTestModule(rec *recorder, s Seller) *Module { return &Module{seller: s, failures: rec} }
+func newTestModule(rec *recorder, s Seller) *Module { return &Module{seller: s, audit: rec} }
 
 func TestAuthorizeDelegatedRecordsAFailedRowForEveryDenial(t *testing.T) {
 	for name, tc := range map[string]struct {
@@ -150,20 +158,13 @@ func TestDelegatedReadRecordsDenialsAndSkipsTheRead(t *testing.T) {
 	}
 }
 
-// operations 是單段稽核的替身：記下收到的輸入，像 RunOperation 一樣在「transaction 內」呼叫 do（do 失敗就整段失敗，不留 SUCCEEDED）。
-type operations struct {
-	got      []model.OperationAuditInput
-	replayed bool
-	ran      bool
-}
-
-func (o *operations) RunOperation(ctx context.Context, in model.OperationAuditInput, do func(context.Context) (model.OperationOutcome, error)) (model.AuditLog, bool, error) {
-	o.got = append(o.got, in)
-	if o.replayed {
+func (r *recorder) RunOperation(ctx context.Context, in model.OperationAuditInput, do func(context.Context) (model.OperationOutcome, error)) (model.AuditLog, bool, error) {
+	r.opsGot = append(r.opsGot, in)
+	if r.replayed {
 		id := "res-1"
 		return model.AuditLog{ResourceID: &id}, true, nil
 	}
-	o.ran = true
+	r.ran = true
 	if _, err := do(ctx); err != nil {
 		return model.AuditLog{}, false, err
 	}
@@ -175,15 +176,15 @@ func (o *operations) RunOperation(ctx context.Context, in model.OperationAuditIn
 func TestDelegatedWriteChecksTheStoreInsideTheOperationAndRecordsTheFailure(t *testing.T) {
 	op := DelegatedOperation{RequestID: uuid.New(), Reason: "店家要求"}
 	w := DelegatedWrite{Op: op, PayloadHash: "h", ResourceName: "預覽", ResourceID: "r-1"}
-	rec, ops := &recorder{}, &operations{}
-	m := &Module{seller: fixedSeller{store: closedStore()}, failures: rec, operations: ops}
+	rec := &recorder{}
+	m := &Module{seller: fixedSeller{store: closedStore()}, audit: rec}
 	did := false
 	_, err := m.DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsWrite), w, func(context.Context, seller.Store) (DelegatedOutcome, error) {
 		did = true
 		return DelegatedOutcome{}, nil
 	})
-	if denialOf(t, err) != DenialStoreClosed || did || !ops.ran {
-		t.Fatalf("err=%v do=%v 稽核=%v，預期 StoreClosed、do 不執行、店家檢查在 RunOperation 之內", err, did, ops.ran)
+	if denialOf(t, err) != DenialStoreClosed || did || !rec.ran {
+		t.Fatalf("err=%v do=%v 稽核=%v，預期 StoreClosed、do 不執行、店家檢查在 RunOperation 之內", err, did, rec.ran)
 	}
 	if len(rec.got) != 1 {
 		t.Fatalf("FAILED 紀錄 %d 筆", len(rec.got))
@@ -193,17 +194,56 @@ func TestDelegatedWriteChecksTheStoreInsideTheOperationAndRecordsTheFailure(t *t
 	}
 }
 
-// 重送：do 沒有被呼叫，店家仍要此刻可代行（拒絕就回拒絕）。
-func TestDelegatedWriteReplayStillRequiresAnOperableStore(t *testing.T) {
+// 重送回第一次的結果，與店家此刻的狀態無關（AIP-155）：店家已關閉也成功，不呼叫 do、不寫 FAILED。
+func TestDelegatedWriteReplayReturnsTheFirstResultWhateverTheStoreState(t *testing.T) {
 	w := DelegatedWrite{Op: DelegatedOperation{RequestID: uuid.New(), Reason: "店家要求"}, PayloadHash: "h"}
 	c := caller(DelegationActive, writeMethod, CapabilityPostsWrite)
-	do := func(context.Context, seller.Store) (DelegatedOutcome, error) { return DelegatedOutcome{}, nil }
-	res, err := (&Module{seller: fixedSeller{store: openStore()}, failures: &recorder{}, operations: &operations{replayed: true}}).DelegatedWrite(t.Context(), c, w, do)
-	if err != nil || !res.Replayed || res.ResourceID != "res-1" || res.Store.StoreID != 5 {
-		t.Fatalf("重送：%+v %v", res, err)
+	for name, st := range map[string]seller.Store{"可代行": openStore(), "已關閉": closedStore(), "等待刪除": storeIn(seller.PendingDeletion)} {
+		rec := &recorder{replayed: true}
+		did := false
+		res, err := (&Module{seller: fixedSeller{store: st}, audit: rec}).DelegatedWrite(t.Context(), c, w, func(context.Context, seller.Store) (DelegatedOutcome, error) {
+			did = true
+			return DelegatedOutcome{}, nil
+		})
+		if err != nil || !res.Replayed || res.ResourceID != "res-1" || res.Store.StoreID != 5 || did {
+			t.Fatalf("%s 的重送：%+v %v do=%v", name, res, err, did)
+		}
+		if len(rec.got) != 0 {
+			t.Fatalf("%s：重送不該寫 FAILED：%+v", name, rec.got)
+		}
 	}
-	if _, err := (&Module{seller: fixedSeller{store: closedStore()}, failures: &recorder{}, operations: &operations{replayed: true}}).DelegatedWrite(t.Context(), c, w, do); denialOf(t, err) != DenialStoreClosed {
-		t.Fatalf("店家已關閉的重送：%v", err)
+	// 讀不到店家的重送失敗也不為這把 request_id 寫 FAILED（它已經有 SUCCEEDED 的列）。
+	rec := &recorder{replayed: true}
+	if _, err := (&Module{seller: fixedSeller{err: notFound()}, audit: rec}).DelegatedWrite(t.Context(), c, w, nil); err == nil || len(rec.got) != 0 {
+		t.Fatalf("店家不存在的重送：err=%v FAILED=%d", err, len(rec.got))
+	}
+}
+
+// 請求內容雜湊空白：INVALID_COMMAND，不進稽核的寫入（也不被 reason／notify_seller 的包裝蓋掉）。
+func TestDelegatedWriteRejectsAnEmptyPayloadHash(t *testing.T) {
+	rec := &recorder{}
+	w := DelegatedWrite{Op: DelegatedOperation{RequestID: uuid.New(), Reason: "店家要求", NotifySeller: true}}
+	_, err := (&Module{seller: fixedSeller{store: openStore()}, audit: rec}).DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsWrite), w, nil)
+	if denialOf(t, err) != DenialInvalidCommand || len(rec.opsGot) != 0 {
+		t.Fatalf("err=%v 稽核寫入=%d，預期 INVALID_COMMAND 且沒有寫入", err, len(rec.opsGot))
+	}
+}
+
+// DelegatedRead 自己檢查 session 與能力（公開 API 不信任呼叫方已授權）：被拒絕不執行讀取並寫 FAILED。
+func TestDelegatedReadChecksTheSessionAndCapabilityItself(t *testing.T) {
+	for name, tc := range map[string]struct {
+		c      DelegatedCaller
+		denial DelegationDenial
+	}{
+		"已撤銷": {caller(DelegationRevoked, readMethod, CapabilityPostsRead), DenialSessionRevoked},
+		"缺能力": {caller(DelegationActive, readMethod, CapabilityPostsWrite), DenialCapabilityDenied},
+	} {
+		rec := &recorder{}
+		read := false
+		err := (&Module{seller: fixedSeller{store: openStore()}, audit: rec}).DelegatedRead(t.Context(), tc.c, func(context.Context, seller.Store) error { read = true; return nil })
+		if denialOf(t, err) != tc.denial || read || len(rec.got) != 1 {
+			t.Errorf("%s：err=%v 讀取=%v FAILED=%d", name, err, read, len(rec.got))
+		}
 	}
 }
 
@@ -223,13 +263,13 @@ func TestAuditPayloadHashCoversTheReasonAndNotifySeller(t *testing.T) {
 	if auditPayloadHash(DelegatedWrite{Op: DelegatedOperation{RequestID: base.Op.RequestID, Reason: "  原因 ", NotifySeller: true}, PayloadHash: "h"}) != h {
 		t.Error("首尾空白不算不同的原因")
 	}
-	ops := &operations{}
-	m := &Module{seller: fixedSeller{store: openStore()}, failures: &recorder{}, operations: ops}
+	ops := &recorder{}
+	m := &Module{seller: fixedSeller{store: openStore()}, audit: ops}
 	if _, err := m.DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsWrite), base, func(context.Context, seller.Store) (DelegatedOutcome, error) { return DelegatedOutcome{}, nil }); err != nil {
 		t.Fatal(err)
 	}
-	if len(ops.got) != 1 || ops.got[0].PayloadHash != h {
-		t.Fatalf("交給稽核的雜湊 = %+v，預期 %s", ops.got, h)
+	if len(ops.opsGot) != 1 || ops.opsGot[0].PayloadHash != h {
+		t.Fatalf("交給稽核的雜湊 = %+v，預期 %s", ops.opsGot, h)
 	}
 }
 
@@ -240,7 +280,7 @@ func TestFailureIsRecordedEvenWhenTheRequestContextIsCanceled(t *testing.T) {
 	var seen error
 	var hasDeadline bool
 	rec := &ctxRecorder{fn: func(c context.Context) { seen = c.Err(); _, hasDeadline = c.Deadline() }}
-	m := &Module{seller: fixedSeller{store: openStore()}, failures: rec}
+	m := &Module{seller: fixedSeller{store: openStore()}, audit: rec}
 	m.recordFailure(ctx, caller(DelegationActive, writeMethod, CapabilityPostsWrite), DelegatedWrite{}, context.Canceled)
 	if !rec.called || seen != nil || !hasDeadline {
 		t.Fatalf("called=%v ctx.Err=%v deadline=%v，預期呼叫、未取消、有期限", rec.called, seen, hasDeadline)
@@ -248,6 +288,7 @@ func TestFailureIsRecordedEvenWhenTheRequestContextIsCanceled(t *testing.T) {
 }
 
 type ctxRecorder struct {
+	auditor
 	fn     func(context.Context)
 	called bool
 }
@@ -319,14 +360,17 @@ func TestFailureReasonOfClassifiesTheCause(t *testing.T) {
 		err  error
 		want string
 	}{
-		"denial":               {model.Deny(model.DenialSessionRevoked, "x"), "SESSION_REVOKED"},
-		"business reason":      {wrapped, "VERSION_CONFLICT"},
-		"classified no reason": {apperr.NotFound("x"), FailureReasonInternal},
-		"plain error":          {errors.New("boom"), FailureReasonInternal},
-		"nil":                  {nil, FailureReasonInternal},
+		"denial":              {model.Deny(model.DenialSessionRevoked, "x"), "SESSION_REVOKED"},
+		"business reason":     {wrapped, "VERSION_CONFLICT"},
+		"not found":           {apperr.NotFound("x"), "NOT_FOUND"},
+		"invalid input":       {apperr.InvalidInput("x"), "INVALID_INPUT"},
+		"failed precondition": {apperr.FailedPrecondition("x"), "FAILED_PRECONDITION"},
+		"unavailable":         {apperr.Unavailable("x"), "UNAVAILABLE"},
+		"plain error":         {errors.New("boom"), FailureReasonInternal},
+		"nil":                 {nil, FailureReasonInternal},
 	} {
-		if got := model.FailureReasonOf(tc.err); got != tc.want {
-			t.Errorf("%s：%q，預期 %q", name, got, tc.want)
+		if got := model.FailureReasonOf(tc.err); got != tc.want || !model.LegalFailureReason(got) {
+			t.Errorf("%s：%q，預期 %q（且符合 CHECK 格式）", name, got, tc.want)
 		}
 	}
 }
