@@ -134,5 +134,4 @@
   - [賣家通知身分 store_id backfill（device_tokens + notification_preferences）](runbooks/seller-notification-identity-store-id-backfill.md)
 
 - 補充資料
-  - [商品匯入精靈 E2E 樣本 CSV](補充資料/product_import_e2e_sample.md)
   - [45 首頁動態區塊排序與營運干預提案（PM 版）](補充資料/45-首頁動態區塊排序與營運干預提案%EF%BC%88PM版%EF%BC%89.md)

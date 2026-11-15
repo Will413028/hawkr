@@ -8,6 +8,7 @@ import org.springframework.boot.actuate.autoconfigure.metrics.CompositeMeterRegi
 import org.springframework.boot.actuate.autoconfigure.metrics.MetricsAutoConfiguration;
 import org.springframework.boot.actuate.autoconfigure.metrics.export.simple.SimpleMetricsExportAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 /**
@@ -32,6 +33,17 @@ class MqErrorHandlerMetricsAutoConfigurationTest {
     @Test
     void skipsBinderWhenNoMeterRegistryExists() {
         runner.withConfiguration(AutoConfigurations.of(MqErrorHandlerMetricsAutoConfiguration.class))
+                .run(ctx -> assertThat(ctx).doesNotHaveBean("mqErrorHandlerMeterRegistryBinder"));
+    }
+
+    @Test
+    void backsOffWhenAmqpIsAbsent() {
+        runner.withClassLoader(new FilteredClassLoader("org.springframework.amqp"))
+                .withConfiguration(AutoConfigurations.of(
+                        MqErrorHandlerMetricsAutoConfiguration.class,
+                        MetricsAutoConfiguration.class,
+                        CompositeMeterRegistryAutoConfiguration.class,
+                        SimpleMetricsExportAutoConfiguration.class))
                 .run(ctx -> assertThat(ctx).doesNotHaveBean("mqErrorHandlerMeterRegistryBinder"));
     }
 }

@@ -238,13 +238,6 @@ class TestExpandedCountsAgainstRealTopology(unittest.TestCase):
         #                                 payment.events.dlx→.dlq；recurring 1 條來源 binding
         #                                 （payuni.events→payuni.payment.recurring）＋ 1 條
         #                                 payment.webhook.dlx→.dlq
-        #
-        # 商品匯入相關的 topology 條目（22 條 queue、4 個 exchange）整批刪除：
-        # exchanges        98 →  94 (-4)  hawkr.product.import、hawkr.product.import.dlx 與
-        #                                 不再有 queue 綁定的 hawkr.media、hawkr.media.dlx
-        # queues          163 → 147 (-16)
-        # queues_json_args  6 →   0 (-6)  帶 args_json 的 6 條 .retry
-        # bindings        203 → 193 (-10)
         self.assertEqual(len(out["exchanges"]), 94, "exchanges 數量與 pin 不符")
         self.assertEqual(len(out["queues"]), 147, "queues 數量與 pin 不符")
         self.assertEqual(

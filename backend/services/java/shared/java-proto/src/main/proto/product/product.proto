@@ -176,8 +176,8 @@ message ProductImage {
     // 4 = object_key（2026-08-05 移除）：前端送進來後一路傳到 ProductImageDTO，但 gallery 組裝
     // （ProductService.processImages / processImageUpdate）只認 staged_token 與 asset_id，
     // 全 repo 無任何 reader。objectKey 的 SSOT 一律由 media-service finalize 回傳。
-    reserved 4;
-    reserved "object_key";
+    reserved 4, 5;
+    reserved "object_key", "import_asset_id";
 }
 
 // 商品 SKU（對應 product_sku 表）
@@ -267,6 +267,9 @@ message DescriptionBlock {
     repeated InlineRun runs = 13; // text block 行內 runs（取代 content）
     string table_json = 14;    // table block 資料（cells 內含 runs 的 JSON 字串，後端 opaque）
     string list_json = 15;     // list block 資料（items 內含 runs 的 JSON 字串，後端 opaque）
+
+    reserved 12;
+    reserved "import_asset_id";
 }
 
 // ========== CreateProduct ==========

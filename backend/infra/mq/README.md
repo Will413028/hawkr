@@ -125,20 +125,20 @@ binding 沒有自己的區塊，它寫在 queue 的 `bindings:` 底下（因為 
 ```
 你在 topology.yaml 寫的             展開規則              broker 上實際存在的
 ─────────────────────              ────────              ──────────────────
-36 exchanges                          →                    122 exchanges
-114 queues                            →                    187 queues + 6 json-args
-119 bindings                           →                    241 bindings
+32 exchanges                          →                    94 exchanges
+80 queues                             →                    147 queues + 0 json-args
+95 bindings                           →                    193 bindings
 ─────────────────────                                     ──────────────────
-269 條宣告                                                  556 個資源
+207 條宣告                                                  434 個資源
 ```
 
-**多出來的 287 個就是展開產生的。** 你不會、也不該在 YAML 裡看到它們。
+**多出來的 227 個就是展開產生的。** 你不會、也不該在 YAML 裡看到它們。
 
 「policy」指的是 queue 條目上那幾個會觸發展開的欄位——`retry:`、`dlq:`、`args_json:`。
 目前的分佈是：31 條用 `retry:`、45 條用 `dlq:`、0 條 `args_json:`、4 條沒有 policy（純裸 queue）。
 
 **為什麼要這樣做**：`.retry` exchange、`.dlq` queue、dlx→dlq binding 與 dead-letter 參數這些東西是機械衍生的
-——每次都長一樣、每次都要寫對三四個名字。手寫 184 條不只是麻煩，是**漏一條不會有人發現**
+——每次都長一樣、每次都要寫對三四個名字。手寫 227 條不只是麻煩，是**漏一條不會有人發現**
 （plan 照樣乾淨、apply 照樣成功，只是死信沒地方去）。交給規則產生就不會漏。
 
 **代價是你不能手寫那些衍生資源**：自己加一條 `im.account.deleted.dlq` 到 YAML 裡，展開規則會再產生
@@ -295,7 +295,7 @@ python3 -m unittest discover -p 'test_*.py'
 `topology.yaml` 無關——**但有一個例外**：
 
 `test_expand.py` 的 `test_expanded_resource_counts_are_pinned` 拿**真實的** `topology.yaml` 跑展開，
-把結果釘死在 **122 exchanges / 187 queues / 6 json-args / 241 bindings / 556 total**。
+把結果釘死在 **94 exchanges / 147 queues / 0 json-args / 193 bindings / 434 total**。
 
 這是「**過度產生**」的唯一防線。少產資源你會發現（服務連不上），多產不會——展開規則寫錯多生出
 一批 queue，plan 會照建、apply 會成功、broker 上多一堆沒人用的東西，沒有任何人會察覺。所以那組

@@ -3,13 +3,13 @@ package io.github.will413028.hawkr.common.cache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.PropertySource;
 
 import java.net.http.HttpClient;
+import java.time.Duration;
 
 /**
  * Frontend cache invalidation 共用自動設定（後端服務責任邊界規範 §9）。
@@ -18,16 +18,26 @@ import java.net.http.HttpClient;
  * 注入 {@code RevalidateClient} 即可在 mutation tx 完成後呼叫
  * {@link RevalidateClient#bustAfterCommit}。
  *
- * <p>依賴 {@code HttpClient} bean（由 common-core SafeFetchAutoConfiguration 提供），
- * 故 {@code @AutoConfigureAfter} 確保 SafeFetch 先註冊。
+ * <p>未自行提供 {@code HttpClient} bean 時，由本設定建立 {@link #revalidateHttpClient()}。
  */
 @AutoConfiguration
-@AutoConfigureAfter(io.github.will413028.hawkr.common.safefetch.SafeFetchAutoConfiguration.class)
 @EnableConfigurationProperties(WebRevalidateProperties.class)
 @PropertySource("classpath:common-core-defaults.properties")
 public class RevalidateAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(RevalidateAutoConfiguration.class);
+
+    @Bean
+    @ConditionalOnMissingBean(HttpClient.class)
+    public HttpClient revalidateHttpClient() {
+        // 強制 HTTP/1.1：目標是 cleartext http:// 的 Next.js /api/revalidate，該 Node server
+        // 不支援 HTTP/2 cleartext，收到 h2 即重置而靜默失敗；Java 預設 HTTP_2，必須顯式降級。
+        return HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .connectTimeout(Duration.ofSeconds(5))
+            .build();
+    }
 
     @Bean
     @ConditionalOnMissingBean(RevalidateClient.class)
