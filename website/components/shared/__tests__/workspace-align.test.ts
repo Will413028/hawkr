@@ -68,17 +68,16 @@ async function mount() {
 }
 
 describe("WorkspaceAlign acts only on a signed-in session", () => {
-	it.each([
-		"unknown",
-		"unavailable",
-		"guest",
-	])("%s: no switch, no reload, no navigation", async (status) => {
-		mocks.auth.status = status;
-		await mount();
-		expect(mocks.auth.switchRole).not.toHaveBeenCalled();
-		expect(reload).not.toHaveBeenCalled();
-		expect(mocks.commit).not.toHaveBeenCalled();
-	});
+	it.each(["unknown", "unavailable", "guest"])(
+		"%s: no switch, no reload, no navigation",
+		async (status) => {
+			mocks.auth.status = status;
+			await mount();
+			expect(mocks.auth.switchRole).not.toHaveBeenCalled();
+			expect(reload).not.toHaveBeenCalled();
+			expect(mocks.commit).not.toHaveBeenCalled();
+		},
+	);
 
 	it("signedIn dual-role account in the buyer workspace on a seller zone switches and reloads", async () => {
 		mocks.auth.status = "signedIn";

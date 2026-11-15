@@ -347,19 +347,21 @@ describe("site Grainient progressive enhancement", () => {
 		expect(mocks.createRenderer.mock.calls[0]?.[1].dark).toBe(true);
 	});
 
-	it.each([
-		REDUCED,
-		FORCED,
-	])("does not initialize when %s is already enabled", async (query) => {
-		preference(query).matches = true;
-		const { container } = render(React.createElement(SiteGrainientBackground));
-		await releaseBarrier();
-		setVisible(true);
-		await flushIdle();
-		expect(mocks.createRenderer).not.toHaveBeenCalled();
-		expect(container.querySelector("canvas")).toBeNull();
-		expect(getSiteBackgroundState().available).toBe(false);
-	});
+	it.each([REDUCED, FORCED])(
+		"does not initialize when %s is already enabled",
+		async (query) => {
+			preference(query).matches = true;
+			const { container } = render(
+				React.createElement(SiteGrainientBackground),
+			);
+			await releaseBarrier();
+			setVisible(true);
+			await flushIdle();
+			expect(mocks.createRenderer).not.toHaveBeenCalled();
+			expect(container.querySelector("canvas")).toBeNull();
+			expect(getSiteBackgroundState().available).toBe(false);
+		},
+	);
 
 	it("keeps Save-Data users on the static fallback", async () => {
 		connection.saveData = true;
@@ -402,17 +404,19 @@ describe("site Grainient progressive enhancement", () => {
 		expect(mocks.createRenderer).not.toHaveBeenCalled();
 	});
 
-	it.each([
-		REDUCED,
-		FORCED,
-	])("destroys the enhancement when %s changes at runtime", async (query) => {
-		const { container } = render(React.createElement(SiteGrainientBackground));
-		await activate();
-		act(() => preference(query).set(true));
-		expect(mocks.renderer.destroy).toHaveBeenCalledTimes(1);
-		expect(container.querySelector("canvas")).toBeNull();
-		expect(getSiteBackgroundState().available).toBe(false);
-	});
+	it.each([REDUCED, FORCED])(
+		"destroys the enhancement when %s changes at runtime",
+		async (query) => {
+			const { container } = render(
+				React.createElement(SiteGrainientBackground),
+			);
+			await activate();
+			act(() => preference(query).set(true));
+			expect(mocks.renderer.destroy).toHaveBeenCalledTimes(1);
+			expect(container.querySelector("canvas")).toBeNull();
+			expect(getSiteBackgroundState().available).toBe(false);
+		},
+	);
 
 	it("keeps the exact canvas and renderer across repeated visibility changes", async () => {
 		const { container } = render(React.createElement(SiteGrainientBackground));

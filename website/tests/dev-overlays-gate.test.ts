@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import path from "node:path";
 import test from "node:test";
 import { devOverlaysEnabled } from "../lib/config/env";
 
@@ -160,10 +161,16 @@ test("devtools 停靠樣式依賴的 class 名，在安裝的套件裡仍然存�
 	// 的解析起點往下解，pnpm 的巢狀結構才找得到。
 	const require = createRequire(import.meta.url);
 	const core = createRequire(require.resolve("@tanstack/react-query-devtools"));
-	const bundle = await readFile(
-		core.resolve("@tanstack/query-devtools"),
-		"utf8",
+	const entry = core.resolve("@tanstack/query-devtools");
+	const buildDir = path.dirname(entry);
+	const chunks = (await readdir(buildDir)).filter((name) =>
+		name.endsWith(path.extname(entry)),
 	);
+	const bundle = (
+		await Promise.all(
+			chunks.map((name) => readFile(path.join(buildDir, name), "utf8")),
+		)
+	).join("\n");
 	assert.ok(
 		bundle.includes("tsqd-open-btn-container"),
 		"@tanstack/react-query-devtools 的產物裡找不到 `tsqd-open-btn-container` —— " +

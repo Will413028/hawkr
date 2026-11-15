@@ -179,37 +179,38 @@ describe("ProductGallery measured media", () => {
 	it.each([
 		{ width: 390, density: 3, preset: "detail" },
 		{ width: 700, density: 2, preset: "banner" },
-	])("uses $preset for a $width px box at $density x", ({
-		width,
-		density,
-		preset,
-	}) => {
-		galleryWidth = width;
-		vi.stubGlobal("devicePixelRatio", density);
-		renderGallery();
-		expect(details()).toHaveLength(8);
-		for (const [index, preview] of previews().entries()) {
-			if (index === 1) {
-				expect(preview.src).toBe(`${MEDIA_BASE}/i/motion/${images[index]}`);
-				expect(preview.parentElement?.querySelectorAll("img")).toHaveLength(1);
-				continue;
+	])(
+		"uses $preset for a $width px box at $density x",
+		({ width, density, preset }) => {
+			galleryWidth = width;
+			vi.stubGlobal("devicePixelRatio", density);
+			renderGallery();
+			expect(details()).toHaveLength(8);
+			for (const [index, preview] of previews().entries()) {
+				if (index === 1) {
+					expect(preview.src).toBe(`${MEDIA_BASE}/i/motion/${images[index]}`);
+					expect(preview.parentElement?.querySelectorAll("img")).toHaveLength(
+						1,
+					);
+					continue;
+				}
+				const detail = detailAt(index);
+				expect(detail.src).toBe(`${MEDIA_BASE}/i/${preset}/${images[index]}`);
+				expect(detail.getAttribute("data-priority")).toBe("false");
+				expect(detail.getAttribute("loading")).toBe(
+					index === 0 ? "eager" : "lazy",
+				);
+				expect(detail.getAttribute("fetchpriority")).toBe(
+					index === 0 ? "high" : "low",
+				);
 			}
-			const detail = detailAt(index);
-			expect(detail.src).toBe(`${MEDIA_BASE}/i/${preset}/${images[index]}`);
-			expect(detail.getAttribute("data-priority")).toBe("false");
-			expect(detail.getAttribute("loading")).toBe(
-				index === 0 ? "eager" : "lazy",
-			);
-			expect(detail.getAttribute("fetchpriority")).toBe(
-				index === 0 ? "high" : "low",
-			);
-		}
-		expect(
-			previews().filter(
-				(image) => image.getAttribute("data-priority") === "true",
-			),
-		).toHaveLength(1);
-	});
+			expect(
+				previews().filter(
+					(image) => image.getAttribute("data-priority") === "true",
+				),
+			).toHaveLength(1);
+		},
+	);
 
 	it("promotes selected images and their neighbors while retaining decoded images on return", () => {
 		renderGallery();

@@ -138,37 +138,40 @@ describe("POST /api/public/seller-leads", () => {
 		["undecided", "annual", "年繳偏好（方案與金額待確認）"],
 		["growth", "monthly", "月繳偏好（舊版方案，需人工確認）"],
 		["growth", "annual", "年繳偏好（舊版方案，需人工確認）"],
-	] as const)("maps %s with %s billing to the plan-aware label", async (plan, billingCycle, label) => {
-		const fetchMock = stubUpstream();
-		const response = await POST(
-			sellerLeadRequest({ ...VALID_LEAD, plan, billingCycle }),
-		);
+	] as const)(
+		"maps %s with %s billing to the plan-aware label",
+		async (plan, billingCycle, label) => {
+			const fetchMock = stubUpstream();
+			const response = await POST(
+				sellerLeadRequest({ ...VALID_LEAD, plan, billingCycle }),
+			);
 
-		expect(response.status).toBe(200);
-		const body = fetchMock.mock.calls[0]?.[1]?.body as URLSearchParams;
-		const summary = body.get("entry.409767") ?? "";
-		expect(summary).toContain(`付款週期：${label}`);
-		if (plan !== "pro") {
-			expect(summary).not.toContain("NT$29,900");
-			expect(summary).not.toContain("NT$5,980");
-		}
-	});
+			expect(response.status).toBe(200);
+			const body = fetchMock.mock.calls[0]?.[1]?.body as URLSearchParams;
+			const summary = body.get("entry.409767") ?? "";
+			expect(summary).toContain(`付款週期：${label}`);
+			if (plan !== "pro") {
+				expect(summary).not.toContain("NT$29,900");
+				expect(summary).not.toContain("NT$5,980");
+			}
+		},
+	);
 
-	it.each([
-		"starter",
-		"undecided",
-	] as const)("never describes the %s annual preference as the Pro annual fee", async (plan) => {
-		const fetchMock = stubUpstream();
-		const response = await POST(
-			sellerLeadRequest({ ...VALID_LEAD, plan, billingCycle: "annual" }),
-		);
+	it.each(["starter", "undecided"] as const)(
+		"never describes the %s annual preference as the Pro annual fee",
+		async (plan) => {
+			const fetchMock = stubUpstream();
+			const response = await POST(
+				sellerLeadRequest({ ...VALID_LEAD, plan, billingCycle: "annual" }),
+			);
 
-		expect(response.status).toBe(200);
-		const body = fetchMock.mock.calls[0]?.[1]?.body as URLSearchParams;
-		const summary = body.get("entry.409767") ?? "";
-		expect(summary).not.toContain("付款週期：年繳（NT$29,900／年");
-		expect(summary).not.toContain("省 NT$5,980");
-	});
+			expect(response.status).toBe(200);
+			const body = fetchMock.mock.calls[0]?.[1]?.body as URLSearchParams;
+			const summary = body.get("entry.409767") ?? "";
+			expect(summary).not.toContain("付款週期：年繳（NT$29,900／年");
+			expect(summary).not.toContain("省 NT$5,980");
+		},
+	);
 
 	it.each([
 		["none", "暫不需要"],
@@ -176,16 +179,19 @@ describe("POST /api/public/seller-leads", () => {
 		["launch", "開店上線包（NT$2,990／次）"],
 		["content", "成交內容包（NT$5,990／次）"],
 		["full", "完整行銷包（NT$7,990／次）"],
-	] as const)("accepts the explicit %s service interest value", async (serviceInterest, label) => {
-		const fetchMock = stubUpstream();
-		const response = await POST(
-			sellerLeadRequest({ ...VALID_LEAD, serviceInterest }),
-		);
+	] as const)(
+		"accepts the explicit %s service interest value",
+		async (serviceInterest, label) => {
+			const fetchMock = stubUpstream();
+			const response = await POST(
+				sellerLeadRequest({ ...VALID_LEAD, serviceInterest }),
+			);
 
-		expect(response.status).toBe(200);
-		const body = fetchMock.mock.calls[0]?.[1]?.body as URLSearchParams;
-		expect(body.get("entry.409767")).toContain(`想了解的人工服務：${label}`);
-	});
+			expect(response.status).toBe(200);
+			const body = fetchMock.mock.calls[0]?.[1]?.body as URLSearchParams;
+			expect(body.get("entry.409767")).toContain(`想了解的人工服務：${label}`);
+		},
+	);
 
 	it.each([
 		["missing required field", { ...VALID_LEAD, brandName: "" }],
@@ -221,17 +227,16 @@ describe("POST /api/public/seller-leads", () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
-	it.each([
-		null,
-		"https://evil.example",
-		"null",
-	])("rejects the untrusted Origin %s before parsing or forwarding", async (origin) => {
-		const fetchMock = stubUpstream();
-		const response = await POST(sellerLeadRequest(VALID_LEAD, { origin }));
+	it.each([null, "https://evil.example", "null"])(
+		"rejects the untrusted Origin %s before parsing or forwarding",
+		async (origin) => {
+			const fetchMock = stubUpstream();
+			const response = await POST(sellerLeadRequest(VALID_LEAD, { origin }));
 
-		expect(response.status).toBe(403);
-		expect(fetchMock).not.toHaveBeenCalled();
-	});
+			expect(response.status).toBe(403);
+			expect(fetchMock).not.toHaveBeenCalled();
+		},
+	);
 
 	it("rejects non-JSON and oversized bodies before forwarding", async () => {
 		const fetchMock = stubUpstream();

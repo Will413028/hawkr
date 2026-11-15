@@ -185,26 +185,26 @@ describe("useGalleryCardMotion gestures", () => {
 		expect(result.current.activeIndex).toBe(1);
 	});
 
-	it.each([
-		"onPointerCancel",
-		"onLostPointerCapture",
-	] as const)("snaps back after %s and accepts the next gesture", (handler) => {
-		const { result } = setup();
-		act(() => result.current.select(1));
-		act(() => result.current.handlers.onPointerDown(pointer(200)));
-		act(() => result.current.handlers.onPointerMove(pointer(80)));
-		expect(result.current.position.get()).toBeGreaterThan(1);
-		act(() => result.current.handlers[handler](pointer(80)));
-		expect(result.current.position.get()).toBe(1);
-		expect(result.current.activeIndex).toBe(1);
-		expect(result.current.dragging).toBe(false);
-		act(() => result.current.handlers.onPointerUp(pointer(80)));
-		expect(result.current.activeIndex).toBe(1);
-		act(() => result.current.handlers.onPointerDown(pointer(200)));
-		act(() => result.current.handlers.onPointerMove(pointer(80)));
-		act(() => result.current.handlers.onPointerUp(pointer(80)));
-		expect(result.current.activeIndex).toBe(2);
-	});
+	it.each(["onPointerCancel", "onLostPointerCapture"] as const)(
+		"snaps back after %s and accepts the next gesture",
+		(handler) => {
+			const { result } = setup();
+			act(() => result.current.select(1));
+			act(() => result.current.handlers.onPointerDown(pointer(200)));
+			act(() => result.current.handlers.onPointerMove(pointer(80)));
+			expect(result.current.position.get()).toBeGreaterThan(1);
+			act(() => result.current.handlers[handler](pointer(80)));
+			expect(result.current.position.get()).toBe(1);
+			expect(result.current.activeIndex).toBe(1);
+			expect(result.current.dragging).toBe(false);
+			act(() => result.current.handlers.onPointerUp(pointer(80)));
+			expect(result.current.activeIndex).toBe(1);
+			act(() => result.current.handlers.onPointerDown(pointer(200)));
+			act(() => result.current.handlers.onPointerMove(pointer(80)));
+			act(() => result.current.handlers.onPointerUp(pointer(80)));
+			expect(result.current.activeIndex).toBe(2);
+		},
+	);
 
 	it("uses the latest selection for rapid keyboard and thumbnail commands before animations finish", () => {
 		animateMock.mockImplementation(() => ({ stop: vi.fn() }));

@@ -74,7 +74,7 @@ test("分頁依序是 待裁定｜複審到期｜生效中｜全部，各自只�
 test("待裁定不指定請求種類（申覆與解除請求合在同一個分頁）；空狀態文字", () => {
 	const [pending, due] = MEASURE_LIST_TABS;
 	assert.equal(
-		(pending?.filter as Record<string, unknown>).requestKind,
+		(pending?.filter as Record<string, unknown> | undefined)?.requestKind,
 		undefined,
 	);
 	assert.equal(pending?.emptyText, "沒有待裁定的申覆或解除請求");
