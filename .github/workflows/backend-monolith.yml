@@ -82,6 +82,32 @@ jobs:
           working-directory: backend
           args: --config=.golangci.monolith.yml --build-tags=integration ./cmd/... ./internal/...
 
+  integration:
+    name: integration test（testcontainers）
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: backend/go.sum
+      # 只跑加上 integration tag 後檔案組成會改變的 package；其餘 package 的測試和
+      # check job 的 go test 完全相同，不重跑。
+      - name: integration test（testcontainers）
+        run: |
+          tmpl='{{.ImportPath}} {{.GoFiles}} {{.TestGoFiles}} {{.XTestGoFiles}}'
+          mapfile -t pkgs < <(comm -13 <(go list -f "$tmpl" ./... | sort) \
+            <(go list -tags integration -f "$tmpl" ./... | sort) | cut -d' ' -f1)
+          if [ "${#pkgs[@]}" -eq 0 ]; then
+            echo "::error::找不到含 integration tag 的 package，篩選邏輯失效"
+            exit 1
+          fi
+          echo "integration packages: ${#pkgs[@]}"
+          go test -race -timeout 15m -tags integration "${pkgs[@]}"
+
   check:
     name: gofmt／vet／test／tidy
     runs-on: ubuntu-latest
@@ -113,10 +139,6 @@ jobs:
       - name: go test -race（含依賴方向檢查）
         if: always()
         run: go test -race ./...
-
-      - name: integration test（testcontainers）
-        if: always()
-        run: go test -race -timeout 15m -tags integration ./...
 
       - name: 讀取 buf 的版本
         if: always()
