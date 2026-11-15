@@ -205,13 +205,6 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 	var hash []byte
 	if in.RequestID != nil {
 		hash = model.RequestHash("post", body, in.ImageToken, model.OptionalInt(in.ProductID), tagsKey(tags), fmt.Sprint(in.Publish))
-		// 同一家店的同一個 request_id 一次只有一個請求往下走：圖片轉正在 transaction 之外，沒有序列化時並行的重送會互搶 staged token，
-		// 輸的那個轉正失敗卻又查不到對方（還沒 insert）。第二個請求等第一個結束（commit 或失敗）之後才開始，查得到就 replay。
-		unlock, err := s.lockRequest(ctx, st.StoreID, *in.RequestID)
-		if err != nil {
-			return model.Post{}, err
-		}
-		defer unlock()
 		row, ok, err := s.replay(ctx, s.q(ctx), st.StoreID, in.RequestID, hash)
 		if err != nil {
 			return model.Post{}, err
@@ -237,7 +230,7 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 	if asset != nil {
 		params.ImageKey, params.ImageAssetID = &asset.ObjectKey, &asset.ID
 	}
-	var replayed *store.SocialPost
+	var out model.Post
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		if err := mediaref.Reject(ctx, q, ref, candidates(asset)...); err != nil {
@@ -253,8 +246,8 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 			if !ok {
 				return fmt.Errorf("social：貼文的 request_id %s 衝突，卻查不到原本那一篇", in.RequestID)
 			}
-			replayed = &existing
-			return nil
+			out, err = s.Own(ctx, st.StoreID, existing.ID)
+			return err
 		}
 		if err != nil {
 			return fmt.Errorf("social：新增貼文：%w", err)
@@ -271,39 +264,17 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 			if err := s.publishedEvent(ctx, row, now, model.OriginDirect, store.SocialPostSchedule{}); err != nil {
 				return err
 			}
-			return s.d.Cache.BustPost(ctx, id, st.StoreID)
+			if err := s.d.Cache.BustPost(ctx, id, st.StoreID); err != nil {
+				return err
+			}
 		}
-		return nil
+		out, err = s.Own(ctx, st.StoreID, id)
+		return err
 	})
 	if err != nil {
 		return model.Post{}, err
 	}
-	if replayed != nil {
-		return s.Own(ctx, st.StoreID, replayed.ID)
-	}
-	return s.Own(ctx, st.StoreID, id)
-}
-
-// lockRequest 取得 (店家, request_id) 的 session 層 advisory lock，回傳釋放它的函式。鎖綁在專用連線上（不開 transaction：
-// 持鎖期間要呼叫 media，規範不准在 transaction 內等它）；釋放失敗時整條連線丟掉，鎖隨連線結束。
-func (s *Service) lockRequest(ctx context.Context, storeID int64, requestID uuid.UUID) (func(), error) {
-	key := fmt.Sprintf("social.post_request:%d:%s", storeID, requestID)
-	c, err := s.d.DB.Pool().Acquire(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("social：取得連線以鎖定 request_id %s：%w", requestID, err)
-	}
-	if _, err := c.Exec(ctx, "SELECT pg_advisory_lock(hashtextextended($1, 0))", key); err != nil {
-		c.Release()
-		return nil, fmt.Errorf("social：鎖定貼文的 request_id %s：%w", requestID, err)
-	}
-	return func() {
-		bg := context.WithoutCancel(ctx)
-		if _, err := c.Exec(bg, "SELECT pg_advisory_unlock(hashtextextended($1, 0))", key); err != nil {
-			_ = c.Hijack().Close(bg)
-			return
-		}
-		c.Release()
-	}, nil
+	return out, nil
 }
 
 // tagsKey 是標籤集合進 RequestHash 的編碼：依輸入順序，名稱與顯示形式都算（顯示形式是使用者看得到的內容）。
@@ -371,13 +342,6 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 	if in.ClearImage && in.ImageToken != "" {
 		return model.Post{}, apperr.InvalidInputOn([]string{"ClearImage"}, "%s", text.PostImageReplaceAndClear(uitext.LocaleFrom(ctx)))
 	}
-	cur, err := s.Own(ctx, st.StoreID, in.PostID)
-	if err != nil {
-		return model.Post{}, err
-	}
-	if cur.Version != in.Version {
-		return model.Post{}, versionConflict(ctx)
-	}
 	if in.SetProduct {
 		if err := s.verifyProduct(ctx, in.ProductID, st.StoreID); err != nil {
 			return model.Post{}, err
@@ -389,6 +353,7 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 	}
 	ref := mediaref.PostRef(in.PostID)
 	now := s.d.Now().UTC()
+	var out model.Post
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		row, err := s.lockOwned(ctx, q, st.StoreID, in.PostID)
@@ -444,14 +409,17 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 			}
 		}
 		if upd.Status == string(model.StatusPublished) {
-			return s.d.Cache.BustPost(ctx, in.PostID, st.StoreID)
+			if err := s.d.Cache.BustPost(ctx, in.PostID, st.StoreID); err != nil {
+				return err
+			}
 		}
-		return nil
+		out, err = s.Own(ctx, st.StoreID, in.PostID)
+		return err
 	})
 	if err != nil {
 		return model.Post{}, err
 	}
-	return s.Own(ctx, st.StoreID, in.PostID)
+	return out, nil
 }
 
 // Publish 發布貼文（草稿或下架的貼文轉為 PUBLISHED）。published_at 固定在第一次發布（動態牆的順序不能靠下架再發布來洗：

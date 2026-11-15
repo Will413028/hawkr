@@ -4,6 +4,7 @@ package social_test
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sync"
 	"testing"
@@ -330,5 +331,60 @@ func TestPostRequestIDConcurrentRetriesWithImageCreateOnePost(t *testing.T) {
 	different.Body = "內容不同"
 	if _, err := f.module.CreatePost(ctx, st, different); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("同 request_id 不同內容：%v", err)
+	}
+}
+
+// 同 request_id 不同內容：循序與並行都回 InvalidInput，且只有先到的那一篇存在。
+func TestPostRequestIDWithDifferentContentIsInvalidInputEvenConcurrently(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	st := f.store(t, storeID)
+	rid := uuid.New()
+	var wg sync.WaitGroup
+	errs := make([]error, 8)
+	for i := range errs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, errs[i] = f.module.CreatePost(ctx, st, social.CreatePostInput{Body: fmt.Sprintf("內容%d", i%2), ImageToken: "tok-diff", Hashtags: []string{"tea"}, Publish: true, RequestID: &rid})
+		}()
+	}
+	wg.Wait()
+	ok, bad := 0, 0
+	for _, err := range errs {
+		switch {
+		case err == nil:
+			ok++
+		case kindOf(err) == apperr.KindInvalidInput:
+			bad++
+		default:
+			t.Fatalf("非預期的錯誤：%v", err)
+		}
+	}
+	if ok == 0 || bad == 0 {
+		t.Fatalf("成功 %d、被拒 %d：兩種內容都應該各自有結果", ok, bad)
+	}
+	if n := f.scalar(t, `SELECT count(*) FROM social.posts WHERE store_id = $1`, storeID); n != 1 {
+		t.Fatalf("貼文數 = %d，預期 1", n)
+	}
+}
+
+// Update 的回應是交易內讀出的寫入結果。
+func TestUpdatePostResponseReflectsTheWrite(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	st := f.store(t, storeID)
+	p := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "舊", Hashtags: []string{"tea"}}))
+	tags := []string{"coffee"}
+	up := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("新"), Hashtags: &tags}))
+	if up.Body != "新" || up.Version != p.Version+1 || len(up.Hashtags) != 1 || up.Hashtags[0].Name != "coffee" {
+		t.Fatalf("回應 = %+v", up)
+	}
+	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("過期")}); kindOf(err) != apperr.KindVersionConflict {
+		t.Fatalf("過期版本：%v", err)
 	}
 }
