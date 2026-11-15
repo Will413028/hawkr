@@ -2008,6 +2008,1482 @@ class ListForumEntriesResponse extends $pb.GeneratedMessage {
   void clearNextPageToken() => $_clearField(2);
 }
 
+class RecordPostViewRequest extends $pb.GeneratedMessage {
+  factory RecordPostViewRequest({
+    $core.String? postId,
+  }) {
+    final result = RecordPostViewRequest._();
+    if (postId != null) result.postId = postId;
+    return result;
+  }
+
+  RecordPostViewRequest._();
+
+  factory RecordPostViewRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RecordPostViewRequest()..mergeFromBuffer(data, registry);
+  factory RecordPostViewRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RecordPostViewRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RecordPostViewRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: RecordPostViewRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'postId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RecordPostViewRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RecordPostViewRequest copyWith(
+          void Function(RecordPostViewRequest) updates) =>
+      super.copyWith((message) => updates(message as RecordPostViewRequest))
+          as RecordPostViewRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use RecordPostViewRequest() / RecordPostViewRequest.new instead')
+  static RecordPostViewRequest create() => RecordPostViewRequest._();
+  static $pb.GeneratedMessage $_createMessage() => RecordPostViewRequest._();
+  @$core.override
+  RecordPostViewRequest createEmptyInstance() => RecordPostViewRequest._();
+  @$core.pragma('dart2js:noInline')
+  static RecordPostViewRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RecordPostViewRequest>(
+          RecordPostViewRequest.$_createMessage);
+  static RecordPostViewRequest? _defaultInstance;
+
+  /// 貼文 ID。
+  @$pb.TagNumber(1)
+  $core.String get postId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set postId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPostId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPostId() => $_clearField(1);
+}
+
+class RecordPostViewResponse extends $pb.GeneratedMessage {
+  factory RecordPostViewResponse() => RecordPostViewResponse._();
+
+  RecordPostViewResponse._();
+
+  factory RecordPostViewResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RecordPostViewResponse()..mergeFromBuffer(data, registry);
+  factory RecordPostViewResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RecordPostViewResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RecordPostViewResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: RecordPostViewResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RecordPostViewResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RecordPostViewResponse copyWith(
+          void Function(RecordPostViewResponse) updates) =>
+      super.copyWith((message) => updates(message as RecordPostViewResponse))
+          as RecordPostViewResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use RecordPostViewResponse() / RecordPostViewResponse.new instead')
+  static RecordPostViewResponse create() => RecordPostViewResponse._();
+  static $pb.GeneratedMessage $_createMessage() => RecordPostViewResponse._();
+  @$core.override
+  RecordPostViewResponse createEmptyInstance() => RecordPostViewResponse._();
+  @$core.pragma('dart2js:noInline')
+  static RecordPostViewResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RecordPostViewResponse>(
+          RecordPostViewResponse.$_createMessage);
+  static RecordPostViewResponse? _defaultInstance;
+}
+
+class SharePostRequest extends $pb.GeneratedMessage {
+  factory SharePostRequest({
+    $core.String? postId,
+  }) {
+    final result = SharePostRequest._();
+    if (postId != null) result.postId = postId;
+    return result;
+  }
+
+  SharePostRequest._();
+
+  factory SharePostRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SharePostRequest()..mergeFromBuffer(data, registry);
+  factory SharePostRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SharePostRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SharePostRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: SharePostRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'postId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SharePostRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SharePostRequest copyWith(void Function(SharePostRequest) updates) =>
+      super.copyWith((message) => updates(message as SharePostRequest))
+          as SharePostRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SharePostRequest() / SharePostRequest.new instead')
+  static SharePostRequest create() => SharePostRequest._();
+  static $pb.GeneratedMessage $_createMessage() => SharePostRequest._();
+  @$core.override
+  SharePostRequest createEmptyInstance() => SharePostRequest._();
+  @$core.pragma('dart2js:noInline')
+  static SharePostRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SharePostRequest>(
+          SharePostRequest.$_createMessage);
+  static SharePostRequest? _defaultInstance;
+
+  /// 貼文 ID。
+  @$pb.TagNumber(1)
+  $core.String get postId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set postId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPostId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPostId() => $_clearField(1);
+}
+
+class SharePostResponse extends $pb.GeneratedMessage {
+  factory SharePostResponse() => SharePostResponse._();
+
+  SharePostResponse._();
+
+  factory SharePostResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SharePostResponse()..mergeFromBuffer(data, registry);
+  factory SharePostResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SharePostResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SharePostResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: SharePostResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SharePostResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SharePostResponse copyWith(void Function(SharePostResponse) updates) =>
+      super.copyWith((message) => updates(message as SharePostResponse))
+          as SharePostResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SharePostResponse() / SharePostResponse.new instead')
+  static SharePostResponse create() => SharePostResponse._();
+  static $pb.GeneratedMessage $_createMessage() => SharePostResponse._();
+  @$core.override
+  SharePostResponse createEmptyInstance() => SharePostResponse._();
+  @$core.pragma('dart2js:noInline')
+  static SharePostResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SharePostResponse>(
+          SharePostResponse.$_createMessage);
+  static SharePostResponse? _defaultInstance;
+}
+
+class LikePostRequest extends $pb.GeneratedMessage {
+  factory LikePostRequest({
+    $core.String? postId,
+  }) {
+    final result = LikePostRequest._();
+    if (postId != null) result.postId = postId;
+    return result;
+  }
+
+  LikePostRequest._();
+
+  factory LikePostRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LikePostRequest()..mergeFromBuffer(data, registry);
+  factory LikePostRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LikePostRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LikePostRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: LikePostRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'postId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LikePostRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LikePostRequest copyWith(void Function(LikePostRequest) updates) =>
+      super.copyWith((message) => updates(message as LikePostRequest))
+          as LikePostRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use LikePostRequest() / LikePostRequest.new instead')
+  static LikePostRequest create() => LikePostRequest._();
+  static $pb.GeneratedMessage $_createMessage() => LikePostRequest._();
+  @$core.override
+  LikePostRequest createEmptyInstance() => LikePostRequest._();
+  @$core.pragma('dart2js:noInline')
+  static LikePostRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<LikePostRequest>(
+          LikePostRequest.$_createMessage);
+  static LikePostRequest? _defaultInstance;
+
+  /// 貼文 ID。
+  @$pb.TagNumber(1)
+  $core.String get postId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set postId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPostId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPostId() => $_clearField(1);
+}
+
+class LikePostResponse extends $pb.GeneratedMessage {
+  factory LikePostResponse() => LikePostResponse._();
+
+  LikePostResponse._();
+
+  factory LikePostResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LikePostResponse()..mergeFromBuffer(data, registry);
+  factory LikePostResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LikePostResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LikePostResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: LikePostResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LikePostResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LikePostResponse copyWith(void Function(LikePostResponse) updates) =>
+      super.copyWith((message) => updates(message as LikePostResponse))
+          as LikePostResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use LikePostResponse() / LikePostResponse.new instead')
+  static LikePostResponse create() => LikePostResponse._();
+  static $pb.GeneratedMessage $_createMessage() => LikePostResponse._();
+  @$core.override
+  LikePostResponse createEmptyInstance() => LikePostResponse._();
+  @$core.pragma('dart2js:noInline')
+  static LikePostResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<LikePostResponse>(
+          LikePostResponse.$_createMessage);
+  static LikePostResponse? _defaultInstance;
+}
+
+class UnlikePostRequest extends $pb.GeneratedMessage {
+  factory UnlikePostRequest({
+    $core.String? postId,
+  }) {
+    final result = UnlikePostRequest._();
+    if (postId != null) result.postId = postId;
+    return result;
+  }
+
+  UnlikePostRequest._();
+
+  factory UnlikePostRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnlikePostRequest()..mergeFromBuffer(data, registry);
+  factory UnlikePostRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnlikePostRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnlikePostRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: UnlikePostRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'postId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnlikePostRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnlikePostRequest copyWith(void Function(UnlikePostRequest) updates) =>
+      super.copyWith((message) => updates(message as UnlikePostRequest))
+          as UnlikePostRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use UnlikePostRequest() / UnlikePostRequest.new instead')
+  static UnlikePostRequest create() => UnlikePostRequest._();
+  static $pb.GeneratedMessage $_createMessage() => UnlikePostRequest._();
+  @$core.override
+  UnlikePostRequest createEmptyInstance() => UnlikePostRequest._();
+  @$core.pragma('dart2js:noInline')
+  static UnlikePostRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<UnlikePostRequest>(
+          UnlikePostRequest.$_createMessage);
+  static UnlikePostRequest? _defaultInstance;
+
+  /// 貼文 ID。
+  @$pb.TagNumber(1)
+  $core.String get postId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set postId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPostId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPostId() => $_clearField(1);
+}
+
+class UnlikePostResponse extends $pb.GeneratedMessage {
+  factory UnlikePostResponse() => UnlikePostResponse._();
+
+  UnlikePostResponse._();
+
+  factory UnlikePostResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnlikePostResponse()..mergeFromBuffer(data, registry);
+  factory UnlikePostResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnlikePostResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnlikePostResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: UnlikePostResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnlikePostResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnlikePostResponse copyWith(void Function(UnlikePostResponse) updates) =>
+      super.copyWith((message) => updates(message as UnlikePostResponse))
+          as UnlikePostResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use UnlikePostResponse() / UnlikePostResponse.new instead')
+  static UnlikePostResponse create() => UnlikePostResponse._();
+  static $pb.GeneratedMessage $_createMessage() => UnlikePostResponse._();
+  @$core.override
+  UnlikePostResponse createEmptyInstance() => UnlikePostResponse._();
+  @$core.pragma('dart2js:noInline')
+  static UnlikePostResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UnlikePostResponse>(
+          UnlikePostResponse.$_createMessage);
+  static UnlikePostResponse? _defaultInstance;
+}
+
+class LikeCommentRequest extends $pb.GeneratedMessage {
+  factory LikeCommentRequest({
+    $core.String? commentId,
+  }) {
+    final result = LikeCommentRequest._();
+    if (commentId != null) result.commentId = commentId;
+    return result;
+  }
+
+  LikeCommentRequest._();
+
+  factory LikeCommentRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LikeCommentRequest()..mergeFromBuffer(data, registry);
+  factory LikeCommentRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LikeCommentRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LikeCommentRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: LikeCommentRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'commentId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LikeCommentRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LikeCommentRequest copyWith(void Function(LikeCommentRequest) updates) =>
+      super.copyWith((message) => updates(message as LikeCommentRequest))
+          as LikeCommentRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use LikeCommentRequest() / LikeCommentRequest.new instead')
+  static LikeCommentRequest create() => LikeCommentRequest._();
+  static $pb.GeneratedMessage $_createMessage() => LikeCommentRequest._();
+  @$core.override
+  LikeCommentRequest createEmptyInstance() => LikeCommentRequest._();
+  @$core.pragma('dart2js:noInline')
+  static LikeCommentRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LikeCommentRequest>(
+          LikeCommentRequest.$_createMessage);
+  static LikeCommentRequest? _defaultInstance;
+
+  /// 留言 ID。
+  @$pb.TagNumber(1)
+  $core.String get commentId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set commentId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCommentId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCommentId() => $_clearField(1);
+}
+
+class LikeCommentResponse extends $pb.GeneratedMessage {
+  factory LikeCommentResponse() => LikeCommentResponse._();
+
+  LikeCommentResponse._();
+
+  factory LikeCommentResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LikeCommentResponse()..mergeFromBuffer(data, registry);
+  factory LikeCommentResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LikeCommentResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LikeCommentResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: LikeCommentResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LikeCommentResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LikeCommentResponse copyWith(void Function(LikeCommentResponse) updates) =>
+      super.copyWith((message) => updates(message as LikeCommentResponse))
+          as LikeCommentResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use LikeCommentResponse() / LikeCommentResponse.new instead')
+  static LikeCommentResponse create() => LikeCommentResponse._();
+  static $pb.GeneratedMessage $_createMessage() => LikeCommentResponse._();
+  @$core.override
+  LikeCommentResponse createEmptyInstance() => LikeCommentResponse._();
+  @$core.pragma('dart2js:noInline')
+  static LikeCommentResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LikeCommentResponse>(
+          LikeCommentResponse.$_createMessage);
+  static LikeCommentResponse? _defaultInstance;
+}
+
+class UnlikeCommentRequest extends $pb.GeneratedMessage {
+  factory UnlikeCommentRequest({
+    $core.String? commentId,
+  }) {
+    final result = UnlikeCommentRequest._();
+    if (commentId != null) result.commentId = commentId;
+    return result;
+  }
+
+  UnlikeCommentRequest._();
+
+  factory UnlikeCommentRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnlikeCommentRequest()..mergeFromBuffer(data, registry);
+  factory UnlikeCommentRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnlikeCommentRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnlikeCommentRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: UnlikeCommentRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'commentId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnlikeCommentRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnlikeCommentRequest copyWith(void Function(UnlikeCommentRequest) updates) =>
+      super.copyWith((message) => updates(message as UnlikeCommentRequest))
+          as UnlikeCommentRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UnlikeCommentRequest() / UnlikeCommentRequest.new instead')
+  static UnlikeCommentRequest create() => UnlikeCommentRequest._();
+  static $pb.GeneratedMessage $_createMessage() => UnlikeCommentRequest._();
+  @$core.override
+  UnlikeCommentRequest createEmptyInstance() => UnlikeCommentRequest._();
+  @$core.pragma('dart2js:noInline')
+  static UnlikeCommentRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UnlikeCommentRequest>(
+          UnlikeCommentRequest.$_createMessage);
+  static UnlikeCommentRequest? _defaultInstance;
+
+  /// 留言 ID。
+  @$pb.TagNumber(1)
+  $core.String get commentId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set commentId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCommentId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCommentId() => $_clearField(1);
+}
+
+class UnlikeCommentResponse extends $pb.GeneratedMessage {
+  factory UnlikeCommentResponse() => UnlikeCommentResponse._();
+
+  UnlikeCommentResponse._();
+
+  factory UnlikeCommentResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnlikeCommentResponse()..mergeFromBuffer(data, registry);
+  factory UnlikeCommentResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnlikeCommentResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnlikeCommentResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: UnlikeCommentResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnlikeCommentResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnlikeCommentResponse copyWith(
+          void Function(UnlikeCommentResponse) updates) =>
+      super.copyWith((message) => updates(message as UnlikeCommentResponse))
+          as UnlikeCommentResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UnlikeCommentResponse() / UnlikeCommentResponse.new instead')
+  static UnlikeCommentResponse create() => UnlikeCommentResponse._();
+  static $pb.GeneratedMessage $_createMessage() => UnlikeCommentResponse._();
+  @$core.override
+  UnlikeCommentResponse createEmptyInstance() => UnlikeCommentResponse._();
+  @$core.pragma('dart2js:noInline')
+  static UnlikeCommentResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UnlikeCommentResponse>(
+          UnlikeCommentResponse.$_createMessage);
+  static UnlikeCommentResponse? _defaultInstance;
+}
+
+class CreateCommentRequest extends $pb.GeneratedMessage {
+  factory CreateCommentRequest({
+    $core.String? postId,
+    $core.String? body,
+    $core.String? parentId,
+    $core.String? replyToId,
+    $core.String? requestId,
+  }) {
+    final result = CreateCommentRequest._();
+    if (postId != null) result.postId = postId;
+    if (body != null) result.body = body;
+    if (parentId != null) result.parentId = parentId;
+    if (replyToId != null) result.replyToId = replyToId;
+    if (requestId != null) result.requestId = requestId;
+    return result;
+  }
+
+  CreateCommentRequest._();
+
+  factory CreateCommentRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateCommentRequest()..mergeFromBuffer(data, registry);
+  factory CreateCommentRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateCommentRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreateCommentRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: CreateCommentRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'postId')
+    ..aOS(2, _omitFieldNames ? '' : 'body')
+    ..aOS(3, _omitFieldNames ? '' : 'parentId')
+    ..aOS(4, _omitFieldNames ? '' : 'replyToId')
+    ..aOS(5, _omitFieldNames ? '' : 'requestId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateCommentRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateCommentRequest copyWith(void Function(CreateCommentRequest) updates) =>
+      super.copyWith((message) => updates(message as CreateCommentRequest))
+          as CreateCommentRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CreateCommentRequest() / CreateCommentRequest.new instead')
+  static CreateCommentRequest create() => CreateCommentRequest._();
+  static $pb.GeneratedMessage $_createMessage() => CreateCommentRequest._();
+  @$core.override
+  CreateCommentRequest createEmptyInstance() => CreateCommentRequest._();
+  @$core.pragma('dart2js:noInline')
+  static CreateCommentRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CreateCommentRequest>(
+          CreateCommentRequest.$_createMessage);
+  static CreateCommentRequest? _defaultInstance;
+
+  /// 貼文 ID。
+  @$pb.TagNumber(1)
+  $core.String get postId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set postId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPostId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPostId() => $_clearField(1);
+
+  /// 內文，去除首尾空白後 1 到 2200 個字元（以 Unicode 字元計）。
+  @$pb.TagNumber(2)
+  $core.String get body => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set body($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBody() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBody() => $_clearField(2);
+
+  /// 設了是回覆；父留言不是頂層時，回覆掛在它所屬的頂層留言底下。不設是頂層留言。
+  @$pb.TagNumber(3)
+  $core.String get parentId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set parentId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasParentId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearParentId() => $_clearField(3);
+
+  /// 回覆針對的那一則留言，必須與 parent_id 同一串；只能在設了 parent_id 時設，不設是父留言。
+  @$pb.TagNumber(4)
+  $core.String get replyToId => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set replyToId($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasReplyToId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearReplyToId() => $_clearField(4);
+
+  /// 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回第一次建立的留言；內容不同回 invalid_argument。
+  @$pb.TagNumber(5)
+  $core.String get requestId => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set requestId($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasRequestId() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearRequestId() => $_clearField(5);
+}
+
+class CreateCommentResponse extends $pb.GeneratedMessage {
+  factory CreateCommentResponse({
+    Comment? comment,
+  }) {
+    final result = CreateCommentResponse._();
+    if (comment != null) result.comment = comment;
+    return result;
+  }
+
+  CreateCommentResponse._();
+
+  factory CreateCommentResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateCommentResponse()..mergeFromBuffer(data, registry);
+  factory CreateCommentResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateCommentResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreateCommentResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: CreateCommentResponse.$_createMessage)
+    ..aOM<Comment>(1, _omitFieldNames ? '' : 'comment',
+        subBuilder: Comment.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateCommentResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateCommentResponse copyWith(
+          void Function(CreateCommentResponse) updates) =>
+      super.copyWith((message) => updates(message as CreateCommentResponse))
+          as CreateCommentResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CreateCommentResponse() / CreateCommentResponse.new instead')
+  static CreateCommentResponse create() => CreateCommentResponse._();
+  static $pb.GeneratedMessage $_createMessage() => CreateCommentResponse._();
+  @$core.override
+  CreateCommentResponse createEmptyInstance() => CreateCommentResponse._();
+  @$core.pragma('dart2js:noInline')
+  static CreateCommentResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CreateCommentResponse>(
+          CreateCommentResponse.$_createMessage);
+  static CreateCommentResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Comment get comment => $_getN(0);
+  @$pb.TagNumber(1)
+  set comment(Comment value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasComment() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearComment() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Comment ensureComment() => $_ensure(0);
+}
+
+class UpdateCommentRequest extends $pb.GeneratedMessage {
+  factory UpdateCommentRequest({
+    $core.String? commentId,
+    $core.String? body,
+  }) {
+    final result = UpdateCommentRequest._();
+    if (commentId != null) result.commentId = commentId;
+    if (body != null) result.body = body;
+    return result;
+  }
+
+  UpdateCommentRequest._();
+
+  factory UpdateCommentRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateCommentRequest()..mergeFromBuffer(data, registry);
+  factory UpdateCommentRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateCommentRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateCommentRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: UpdateCommentRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'commentId')
+    ..aOS(2, _omitFieldNames ? '' : 'body')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateCommentRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateCommentRequest copyWith(void Function(UpdateCommentRequest) updates) =>
+      super.copyWith((message) => updates(message as UpdateCommentRequest))
+          as UpdateCommentRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UpdateCommentRequest() / UpdateCommentRequest.new instead')
+  static UpdateCommentRequest create() => UpdateCommentRequest._();
+  static $pb.GeneratedMessage $_createMessage() => UpdateCommentRequest._();
+  @$core.override
+  UpdateCommentRequest createEmptyInstance() => UpdateCommentRequest._();
+  @$core.pragma('dart2js:noInline')
+  static UpdateCommentRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateCommentRequest>(
+          UpdateCommentRequest.$_createMessage);
+  static UpdateCommentRequest? _defaultInstance;
+
+  /// 留言 ID。
+  @$pb.TagNumber(1)
+  $core.String get commentId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set commentId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCommentId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCommentId() => $_clearField(1);
+
+  /// 新的內文，規則同 CreateCommentRequest.body。留言只有內文可以修改，所以沒有 update_mask。
+  @$pb.TagNumber(2)
+  $core.String get body => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set body($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBody() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBody() => $_clearField(2);
+}
+
+/// UpdateCommentResponse 只帶修改的結果。留言的讚數與回覆數不在這裡，client 保留列表上原有的值。
+class UpdateCommentResponse extends $pb.GeneratedMessage {
+  factory UpdateCommentResponse({
+    $core.String? body,
+    $2.Timestamp? updateTime,
+  }) {
+    final result = UpdateCommentResponse._();
+    if (body != null) result.body = body;
+    if (updateTime != null) result.updateTime = updateTime;
+    return result;
+  }
+
+  UpdateCommentResponse._();
+
+  factory UpdateCommentResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateCommentResponse()..mergeFromBuffer(data, registry);
+  factory UpdateCommentResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateCommentResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateCommentResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: UpdateCommentResponse.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'body')
+    ..aOM<$2.Timestamp>(2, _omitFieldNames ? '' : 'updateTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateCommentResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateCommentResponse copyWith(
+          void Function(UpdateCommentResponse) updates) =>
+      super.copyWith((message) => updates(message as UpdateCommentResponse))
+          as UpdateCommentResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UpdateCommentResponse() / UpdateCommentResponse.new instead')
+  static UpdateCommentResponse create() => UpdateCommentResponse._();
+  static $pb.GeneratedMessage $_createMessage() => UpdateCommentResponse._();
+  @$core.override
+  UpdateCommentResponse createEmptyInstance() => UpdateCommentResponse._();
+  @$core.pragma('dart2js:noInline')
+  static UpdateCommentResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateCommentResponse>(
+          UpdateCommentResponse.$_createMessage);
+  static UpdateCommentResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get body => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set body($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBody() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBody() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $2.Timestamp get updateTime => $_getN(1);
+  @$pb.TagNumber(2)
+  set updateTime($2.Timestamp value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasUpdateTime() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearUpdateTime() => $_clearField(2);
+  @$pb.TagNumber(2)
+  $2.Timestamp ensureUpdateTime() => $_ensure(1);
+}
+
+class DeleteCommentRequest extends $pb.GeneratedMessage {
+  factory DeleteCommentRequest({
+    $core.String? commentId,
+  }) {
+    final result = DeleteCommentRequest._();
+    if (commentId != null) result.commentId = commentId;
+    return result;
+  }
+
+  DeleteCommentRequest._();
+
+  factory DeleteCommentRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteCommentRequest()..mergeFromBuffer(data, registry);
+  factory DeleteCommentRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteCommentRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteCommentRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: DeleteCommentRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'commentId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteCommentRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteCommentRequest copyWith(void Function(DeleteCommentRequest) updates) =>
+      super.copyWith((message) => updates(message as DeleteCommentRequest))
+          as DeleteCommentRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DeleteCommentRequest() / DeleteCommentRequest.new instead')
+  static DeleteCommentRequest create() => DeleteCommentRequest._();
+  static $pb.GeneratedMessage $_createMessage() => DeleteCommentRequest._();
+  @$core.override
+  DeleteCommentRequest createEmptyInstance() => DeleteCommentRequest._();
+  @$core.pragma('dart2js:noInline')
+  static DeleteCommentRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeleteCommentRequest>(
+          DeleteCommentRequest.$_createMessage);
+  static DeleteCommentRequest? _defaultInstance;
+
+  /// 留言 ID。
+  @$pb.TagNumber(1)
+  $core.String get commentId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set commentId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCommentId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCommentId() => $_clearField(1);
+}
+
+class DeleteCommentResponse extends $pb.GeneratedMessage {
+  factory DeleteCommentResponse() => DeleteCommentResponse._();
+
+  DeleteCommentResponse._();
+
+  factory DeleteCommentResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteCommentResponse()..mergeFromBuffer(data, registry);
+  factory DeleteCommentResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteCommentResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteCommentResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: DeleteCommentResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteCommentResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteCommentResponse copyWith(
+          void Function(DeleteCommentResponse) updates) =>
+      super.copyWith((message) => updates(message as DeleteCommentResponse))
+          as DeleteCommentResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DeleteCommentResponse() / DeleteCommentResponse.new instead')
+  static DeleteCommentResponse create() => DeleteCommentResponse._();
+  static $pb.GeneratedMessage $_createMessage() => DeleteCommentResponse._();
+  @$core.override
+  DeleteCommentResponse createEmptyInstance() => DeleteCommentResponse._();
+  @$core.pragma('dart2js:noInline')
+  static DeleteCommentResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeleteCommentResponse>(
+          DeleteCommentResponse.$_createMessage);
+  static DeleteCommentResponse? _defaultInstance;
+}
+
+class CreateForumEntryRequest extends $pb.GeneratedMessage {
+  factory CreateForumEntryRequest({
+    $core.String? storeId,
+    $core.String? body,
+    $core.String? parentId,
+    $core.String? replyToId,
+    $core.String? requestId,
+  }) {
+    final result = CreateForumEntryRequest._();
+    if (storeId != null) result.storeId = storeId;
+    if (body != null) result.body = body;
+    if (parentId != null) result.parentId = parentId;
+    if (replyToId != null) result.replyToId = replyToId;
+    if (requestId != null) result.requestId = requestId;
+    return result;
+  }
+
+  CreateForumEntryRequest._();
+
+  factory CreateForumEntryRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateForumEntryRequest()..mergeFromBuffer(data, registry);
+  factory CreateForumEntryRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateForumEntryRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreateForumEntryRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: CreateForumEntryRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'storeId')
+    ..aOS(2, _omitFieldNames ? '' : 'body')
+    ..aOS(3, _omitFieldNames ? '' : 'parentId')
+    ..aOS(4, _omitFieldNames ? '' : 'replyToId')
+    ..aOS(5, _omitFieldNames ? '' : 'requestId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateForumEntryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateForumEntryRequest copyWith(
+          void Function(CreateForumEntryRequest) updates) =>
+      super.copyWith((message) => updates(message as CreateForumEntryRequest))
+          as CreateForumEntryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CreateForumEntryRequest() / CreateForumEntryRequest.new instead')
+  static CreateForumEntryRequest create() => CreateForumEntryRequest._();
+  static $pb.GeneratedMessage $_createMessage() => CreateForumEntryRequest._();
+  @$core.override
+  CreateForumEntryRequest createEmptyInstance() => CreateForumEntryRequest._();
+  @$core.pragma('dart2js:noInline')
+  static CreateForumEntryRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CreateForumEntryRequest>(
+          CreateForumEntryRequest.$_createMessage);
+  static CreateForumEntryRequest? _defaultInstance;
+
+  /// 店家 ID。
+  @$pb.TagNumber(1)
+  $core.String get storeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set storeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStoreId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStoreId() => $_clearField(1);
+
+  /// 內文，規則同 CreateCommentRequest.body。
+  @$pb.TagNumber(2)
+  $core.String get body => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set body($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBody() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBody() => $_clearField(2);
+
+  /// 設了是回覆；父項不是頂層時，回覆掛在它所屬的頂層項目底下。不設是頂層發言。
+  @$pb.TagNumber(3)
+  $core.String get parentId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set parentId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasParentId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearParentId() => $_clearField(3);
+
+  /// 回覆針對的那一則，必須與 parent_id 同一串；只能在設了 parent_id 時設，不設是父項。
+  @$pb.TagNumber(4)
+  $core.String get replyToId => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set replyToId($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasReplyToId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearReplyToId() => $_clearField(4);
+
+  /// 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回第一次建立的項目；內容不同回 invalid_argument。
+  @$pb.TagNumber(5)
+  $core.String get requestId => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set requestId($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasRequestId() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearRequestId() => $_clearField(5);
+}
+
+class CreateForumEntryResponse extends $pb.GeneratedMessage {
+  factory CreateForumEntryResponse({
+    ForumEntry? entry,
+  }) {
+    final result = CreateForumEntryResponse._();
+    if (entry != null) result.entry = entry;
+    return result;
+  }
+
+  CreateForumEntryResponse._();
+
+  factory CreateForumEntryResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateForumEntryResponse()..mergeFromBuffer(data, registry);
+  factory CreateForumEntryResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateForumEntryResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreateForumEntryResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: CreateForumEntryResponse.$_createMessage)
+    ..aOM<ForumEntry>(1, _omitFieldNames ? '' : 'entry',
+        subBuilder: ForumEntry.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateForumEntryResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateForumEntryResponse copyWith(
+          void Function(CreateForumEntryResponse) updates) =>
+      super.copyWith((message) => updates(message as CreateForumEntryResponse))
+          as CreateForumEntryResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CreateForumEntryResponse() / CreateForumEntryResponse.new instead')
+  static CreateForumEntryResponse create() => CreateForumEntryResponse._();
+  static $pb.GeneratedMessage $_createMessage() => CreateForumEntryResponse._();
+  @$core.override
+  CreateForumEntryResponse createEmptyInstance() =>
+      CreateForumEntryResponse._();
+  @$core.pragma('dart2js:noInline')
+  static CreateForumEntryResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CreateForumEntryResponse>(
+          CreateForumEntryResponse.$_createMessage);
+  static CreateForumEntryResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ForumEntry get entry => $_getN(0);
+  @$pb.TagNumber(1)
+  set entry(ForumEntry value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEntry() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEntry() => $_clearField(1);
+  @$pb.TagNumber(1)
+  ForumEntry ensureEntry() => $_ensure(0);
+}
+
+class UpdateForumEntryRequest extends $pb.GeneratedMessage {
+  factory UpdateForumEntryRequest({
+    $core.String? entryId,
+    $core.String? body,
+  }) {
+    final result = UpdateForumEntryRequest._();
+    if (entryId != null) result.entryId = entryId;
+    if (body != null) result.body = body;
+    return result;
+  }
+
+  UpdateForumEntryRequest._();
+
+  factory UpdateForumEntryRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateForumEntryRequest()..mergeFromBuffer(data, registry);
+  factory UpdateForumEntryRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateForumEntryRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateForumEntryRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: UpdateForumEntryRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'entryId')
+    ..aOS(2, _omitFieldNames ? '' : 'body')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateForumEntryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateForumEntryRequest copyWith(
+          void Function(UpdateForumEntryRequest) updates) =>
+      super.copyWith((message) => updates(message as UpdateForumEntryRequest))
+          as UpdateForumEntryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UpdateForumEntryRequest() / UpdateForumEntryRequest.new instead')
+  static UpdateForumEntryRequest create() => UpdateForumEntryRequest._();
+  static $pb.GeneratedMessage $_createMessage() => UpdateForumEntryRequest._();
+  @$core.override
+  UpdateForumEntryRequest createEmptyInstance() => UpdateForumEntryRequest._();
+  @$core.pragma('dart2js:noInline')
+  static UpdateForumEntryRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateForumEntryRequest>(
+          UpdateForumEntryRequest.$_createMessage);
+  static UpdateForumEntryRequest? _defaultInstance;
+
+  /// 討論區項目 ID。
+  @$pb.TagNumber(1)
+  $core.String get entryId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set entryId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEntryId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEntryId() => $_clearField(1);
+
+  /// 新的內文，規則同 CreateCommentRequest.body。討論區項目只有內文可以修改，所以沒有 update_mask。
+  @$pb.TagNumber(2)
+  $core.String get body => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set body($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBody() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBody() => $_clearField(2);
+}
+
+/// UpdateForumEntryResponse 只帶修改的結果。回覆數不在這裡，client 保留列表上原有的值。
+class UpdateForumEntryResponse extends $pb.GeneratedMessage {
+  factory UpdateForumEntryResponse({
+    $core.String? body,
+    $2.Timestamp? updateTime,
+  }) {
+    final result = UpdateForumEntryResponse._();
+    if (body != null) result.body = body;
+    if (updateTime != null) result.updateTime = updateTime;
+    return result;
+  }
+
+  UpdateForumEntryResponse._();
+
+  factory UpdateForumEntryResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateForumEntryResponse()..mergeFromBuffer(data, registry);
+  factory UpdateForumEntryResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateForumEntryResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateForumEntryResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: UpdateForumEntryResponse.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'body')
+    ..aOM<$2.Timestamp>(2, _omitFieldNames ? '' : 'updateTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateForumEntryResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateForumEntryResponse copyWith(
+          void Function(UpdateForumEntryResponse) updates) =>
+      super.copyWith((message) => updates(message as UpdateForumEntryResponse))
+          as UpdateForumEntryResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UpdateForumEntryResponse() / UpdateForumEntryResponse.new instead')
+  static UpdateForumEntryResponse create() => UpdateForumEntryResponse._();
+  static $pb.GeneratedMessage $_createMessage() => UpdateForumEntryResponse._();
+  @$core.override
+  UpdateForumEntryResponse createEmptyInstance() =>
+      UpdateForumEntryResponse._();
+  @$core.pragma('dart2js:noInline')
+  static UpdateForumEntryResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateForumEntryResponse>(
+          UpdateForumEntryResponse.$_createMessage);
+  static UpdateForumEntryResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get body => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set body($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBody() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBody() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $2.Timestamp get updateTime => $_getN(1);
+  @$pb.TagNumber(2)
+  set updateTime($2.Timestamp value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasUpdateTime() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearUpdateTime() => $_clearField(2);
+  @$pb.TagNumber(2)
+  $2.Timestamp ensureUpdateTime() => $_ensure(1);
+}
+
+class DeleteForumEntryRequest extends $pb.GeneratedMessage {
+  factory DeleteForumEntryRequest({
+    $core.String? entryId,
+  }) {
+    final result = DeleteForumEntryRequest._();
+    if (entryId != null) result.entryId = entryId;
+    return result;
+  }
+
+  DeleteForumEntryRequest._();
+
+  factory DeleteForumEntryRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteForumEntryRequest()..mergeFromBuffer(data, registry);
+  factory DeleteForumEntryRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteForumEntryRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteForumEntryRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: DeleteForumEntryRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'entryId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteForumEntryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteForumEntryRequest copyWith(
+          void Function(DeleteForumEntryRequest) updates) =>
+      super.copyWith((message) => updates(message as DeleteForumEntryRequest))
+          as DeleteForumEntryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DeleteForumEntryRequest() / DeleteForumEntryRequest.new instead')
+  static DeleteForumEntryRequest create() => DeleteForumEntryRequest._();
+  static $pb.GeneratedMessage $_createMessage() => DeleteForumEntryRequest._();
+  @$core.override
+  DeleteForumEntryRequest createEmptyInstance() => DeleteForumEntryRequest._();
+  @$core.pragma('dart2js:noInline')
+  static DeleteForumEntryRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeleteForumEntryRequest>(
+          DeleteForumEntryRequest.$_createMessage);
+  static DeleteForumEntryRequest? _defaultInstance;
+
+  /// 討論區項目 ID。
+  @$pb.TagNumber(1)
+  $core.String get entryId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set entryId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEntryId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEntryId() => $_clearField(1);
+}
+
+class DeleteForumEntryResponse extends $pb.GeneratedMessage {
+  factory DeleteForumEntryResponse() => DeleteForumEntryResponse._();
+
+  DeleteForumEntryResponse._();
+
+  factory DeleteForumEntryResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteForumEntryResponse()..mergeFromBuffer(data, registry);
+  factory DeleteForumEntryResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteForumEntryResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteForumEntryResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: DeleteForumEntryResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteForumEntryResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteForumEntryResponse copyWith(
+          void Function(DeleteForumEntryResponse) updates) =>
+      super.copyWith((message) => updates(message as DeleteForumEntryResponse))
+          as DeleteForumEntryResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DeleteForumEntryResponse() / DeleteForumEntryResponse.new instead')
+  static DeleteForumEntryResponse create() => DeleteForumEntryResponse._();
+  static $pb.GeneratedMessage $_createMessage() => DeleteForumEntryResponse._();
+  @$core.override
+  DeleteForumEntryResponse createEmptyInstance() =>
+      DeleteForumEntryResponse._();
+  @$core.pragma('dart2js:noInline')
+  static DeleteForumEntryResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeleteForumEntryResponse>(
+          DeleteForumEntryResponse.$_createMessage);
+  static DeleteForumEntryResponse? _defaultInstance;
+}
+
 /// SocialPublicService 是任何人都能讀的貼文與留言，不需要登入。
 class SocialPublicServiceApi {
   final $pb.RpcClient _client;
@@ -2064,6 +3540,90 @@ class SocialPublicServiceApi {
           $pb.ClientContext? ctx, ListForumEntriesRequest request) =>
       _client.invoke<ListForumEntriesResponse>(ctx, 'SocialPublicService',
           'ListForumEntries', request, ListForumEntriesResponse());
+
+  /// RecordPostView 記一次貼文瀏覽，匿名也能呼叫。只計觀看者讀得到的貼文，同一篇、同一個台北日、同一個觀看者只算一次；
+  /// 讀不到的貼文與沒有計入的呼叫都回成功，不區分原因。登入者以帳號去重，訪客以來源 IP 與 User-Agent 去重；停權的帳號與無效的憑證以訪客計入。
+  /// 店主看自己店的貼文不計。每個來源 IP 有額度，超過回 resource_exhausted 與 RetryInfo。瀏覽是寫入，所以不標 NO_SIDE_EFFECTS，client 以 POST 呼叫；
+  /// 讀取貼文的方法（GetPost）不計瀏覽。
+  $async.Future<RecordPostViewResponse> recordPostView(
+          $pb.ClientContext? ctx, RecordPostViewRequest request) =>
+      _client.invoke<RecordPostViewResponse>(ctx, 'SocialPublicService',
+          'RecordPostView', request, RecordPostViewResponse());
+}
+
+/// SocialAppService 是登入者在貼文、留言與店家討論區上的互動寫入。呼叫者的身分由伺服器從 session 推導：呼叫者此刻的店擁有該貼文或討論區時，
+/// 互動者是店家，否則是買家。被店家封鎖的買家在這家店的留言、發言、編輯與按讚被拒（permission_denied，不另給原因，與讀取回應的
+/// viewer_can_comment 一致）。
+class SocialAppServiceApi {
+  final $pb.RpcClient _client;
+
+  SocialAppServiceApi(this._client);
+
+  /// SharePost 記一次分享：同一位買家對同一篇只算一次，重送安全。貼文讀不到回 not_found。
+  $async.Future<SharePostResponse> sharePost(
+          $pb.ClientContext? ctx, SharePostRequest request) =>
+      _client.invoke<SharePostResponse>(
+          ctx, 'SocialAppService', 'SharePost', request, SharePostResponse());
+
+  /// LikePost 對貼文按讚，已經讚過也回成功（設定而不是切換）。只有買家能按讚；貼文讀不到回 not_found。
+  $async.Future<LikePostResponse> likePost(
+          $pb.ClientContext? ctx, LikePostRequest request) =>
+      _client.invoke<LikePostResponse>(
+          ctx, 'SocialAppService', 'LikePost', request, LikePostResponse());
+
+  /// UnlikePost 取消貼文的讚，沒有讚過也回成功。
+  $async.Future<UnlikePostResponse> unlikePost(
+          $pb.ClientContext? ctx, UnlikePostRequest request) =>
+      _client.invoke<UnlikePostResponse>(
+          ctx, 'SocialAppService', 'UnlikePost', request, UnlikePostResponse());
+
+  /// LikeComment 對留言按讚，已經讚過也回成功。留言讀不到回 not_found。
+  $async.Future<LikeCommentResponse> likeComment(
+          $pb.ClientContext? ctx, LikeCommentRequest request) =>
+      _client.invoke<LikeCommentResponse>(ctx, 'SocialAppService',
+          'LikeComment', request, LikeCommentResponse());
+
+  /// UnlikeComment 取消留言的讚，沒有讚過也回成功。
+  $async.Future<UnlikeCommentResponse> unlikeComment(
+          $pb.ClientContext? ctx, UnlikeCommentRequest request) =>
+      _client.invoke<UnlikeCommentResponse>(ctx, 'SocialAppService',
+          'UnlikeComment', request, UnlikeCommentResponse());
+
+  /// CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回第一次建立的留言，不重複建立。
+  $async.Future<CreateCommentResponse> createComment(
+          $pb.ClientContext? ctx, CreateCommentRequest request) =>
+      _client.invoke<CreateCommentResponse>(ctx, 'SocialAppService',
+          'CreateComment', request, CreateCommentResponse());
+
+  /// UpdateComment 修改自己的留言內文；被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
+  $async.Future<UpdateCommentResponse> updateComment(
+          $pb.ClientContext? ctx, UpdateCommentRequest request) =>
+      _client.invoke<UpdateCommentResponse>(ctx, 'SocialAppService',
+          'UpdateComment', request, UpdateCommentResponse());
+
+  /// DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功。
+  $async.Future<DeleteCommentResponse> deleteComment(
+          $pb.ClientContext? ctx, DeleteCommentRequest request) =>
+      _client.invoke<DeleteCommentResponse>(ctx, 'SocialAppService',
+          'DeleteComment', request, DeleteCommentResponse());
+
+  /// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（回覆只限該店家）。帶 request_id 重送回第一次建立的項目，不重複建立。
+  $async.Future<CreateForumEntryResponse> createForumEntry(
+          $pb.ClientContext? ctx, CreateForumEntryRequest request) =>
+      _client.invoke<CreateForumEntryResponse>(ctx, 'SocialAppService',
+          'CreateForumEntry', request, CreateForumEntryResponse());
+
+  /// UpdateForumEntry 修改自己的討論區發言內文；被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
+  $async.Future<UpdateForumEntryResponse> updateForumEntry(
+          $pb.ClientContext? ctx, UpdateForumEntryRequest request) =>
+      _client.invoke<UpdateForumEntryResponse>(ctx, 'SocialAppService',
+          'UpdateForumEntry', request, UpdateForumEntryResponse());
+
+  /// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功。
+  $async.Future<DeleteForumEntryResponse> deleteForumEntry(
+          $pb.ClientContext? ctx, DeleteForumEntryRequest request) =>
+      _client.invoke<DeleteForumEntryResponse>(ctx, 'SocialAppService',
+          'DeleteForumEntry', request, DeleteForumEntryResponse());
 }
 
 const $core.bool _omitFieldNames =

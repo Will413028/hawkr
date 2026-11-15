@@ -773,6 +773,374 @@ final $typed_data.Uint8List listForumEntriesResponseDescriptor = $convert.base64
     'lhbC52MWFscGhhMS5Gb3J1bUVudHJ5UgdlbnRyaWVzEiYKD25leHRfcGFnZV90b2tlbhgCIAEo'
     'CVINbmV4dFBhZ2VUb2tlbg==');
 
+@$core.Deprecated('Use recordPostViewRequestDescriptor instead')
+const RecordPostViewRequest$json = {
+  '1': 'RecordPostViewRequest',
+  '2': [
+    {'1': 'post_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+  ],
+};
+
+/// Descriptor for `RecordPostViewRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List recordPostViewRequestDescriptor = $convert.base64Decode(
+    'ChVSZWNvcmRQb3N0Vmlld1JlcXVlc3QSHAoHcG9zdF9pZBgBIAEoCUID4EECUgZwb3N0SWQ=');
+
+@$core.Deprecated('Use recordPostViewResponseDescriptor instead')
+const RecordPostViewResponse$json = {
+  '1': 'RecordPostViewResponse',
+};
+
+/// Descriptor for `RecordPostViewResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List recordPostViewResponseDescriptor =
+    $convert.base64Decode('ChZSZWNvcmRQb3N0Vmlld1Jlc3BvbnNl');
+
+@$core.Deprecated('Use sharePostRequestDescriptor instead')
+const SharePostRequest$json = {
+  '1': 'SharePostRequest',
+  '2': [
+    {'1': 'post_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+  ],
+};
+
+/// Descriptor for `SharePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sharePostRequestDescriptor = $convert.base64Decode(
+    'ChBTaGFyZVBvc3RSZXF1ZXN0EhwKB3Bvc3RfaWQYASABKAlCA+BBAlIGcG9zdElk');
+
+@$core.Deprecated('Use sharePostResponseDescriptor instead')
+const SharePostResponse$json = {
+  '1': 'SharePostResponse',
+};
+
+/// Descriptor for `SharePostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sharePostResponseDescriptor =
+    $convert.base64Decode('ChFTaGFyZVBvc3RSZXNwb25zZQ==');
+
+@$core.Deprecated('Use likePostRequestDescriptor instead')
+const LikePostRequest$json = {
+  '1': 'LikePostRequest',
+  '2': [
+    {'1': 'post_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+  ],
+};
+
+/// Descriptor for `LikePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List likePostRequestDescriptor = $convert.base64Decode(
+    'Cg9MaWtlUG9zdFJlcXVlc3QSHAoHcG9zdF9pZBgBIAEoCUID4EECUgZwb3N0SWQ=');
+
+@$core.Deprecated('Use likePostResponseDescriptor instead')
+const LikePostResponse$json = {
+  '1': 'LikePostResponse',
+};
+
+/// Descriptor for `LikePostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List likePostResponseDescriptor =
+    $convert.base64Decode('ChBMaWtlUG9zdFJlc3BvbnNl');
+
+@$core.Deprecated('Use unlikePostRequestDescriptor instead')
+const UnlikePostRequest$json = {
+  '1': 'UnlikePostRequest',
+  '2': [
+    {'1': 'post_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+  ],
+};
+
+/// Descriptor for `UnlikePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unlikePostRequestDescriptor = $convert.base64Decode(
+    'ChFVbmxpa2VQb3N0UmVxdWVzdBIcCgdwb3N0X2lkGAEgASgJQgPgQQJSBnBvc3RJZA==');
+
+@$core.Deprecated('Use unlikePostResponseDescriptor instead')
+const UnlikePostResponse$json = {
+  '1': 'UnlikePostResponse',
+};
+
+/// Descriptor for `UnlikePostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unlikePostResponseDescriptor =
+    $convert.base64Decode('ChJVbmxpa2VQb3N0UmVzcG9uc2U=');
+
+@$core.Deprecated('Use likeCommentRequestDescriptor instead')
+const LikeCommentRequest$json = {
+  '1': 'LikeCommentRequest',
+  '2': [
+    {'1': 'comment_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'commentId'},
+  ],
+};
+
+/// Descriptor for `LikeCommentRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List likeCommentRequestDescriptor = $convert.base64Decode(
+    'ChJMaWtlQ29tbWVudFJlcXVlc3QSIgoKY29tbWVudF9pZBgBIAEoCUID4EECUgljb21tZW50SW'
+    'Q=');
+
+@$core.Deprecated('Use likeCommentResponseDescriptor instead')
+const LikeCommentResponse$json = {
+  '1': 'LikeCommentResponse',
+};
+
+/// Descriptor for `LikeCommentResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List likeCommentResponseDescriptor =
+    $convert.base64Decode('ChNMaWtlQ29tbWVudFJlc3BvbnNl');
+
+@$core.Deprecated('Use unlikeCommentRequestDescriptor instead')
+const UnlikeCommentRequest$json = {
+  '1': 'UnlikeCommentRequest',
+  '2': [
+    {'1': 'comment_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'commentId'},
+  ],
+};
+
+/// Descriptor for `UnlikeCommentRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unlikeCommentRequestDescriptor = $convert.base64Decode(
+    'ChRVbmxpa2VDb21tZW50UmVxdWVzdBIiCgpjb21tZW50X2lkGAEgASgJQgPgQQJSCWNvbW1lbn'
+    'RJZA==');
+
+@$core.Deprecated('Use unlikeCommentResponseDescriptor instead')
+const UnlikeCommentResponse$json = {
+  '1': 'UnlikeCommentResponse',
+};
+
+/// Descriptor for `UnlikeCommentResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unlikeCommentResponseDescriptor =
+    $convert.base64Decode('ChVVbmxpa2VDb21tZW50UmVzcG9uc2U=');
+
+@$core.Deprecated('Use createCommentRequestDescriptor instead')
+const CreateCommentRequest$json = {
+  '1': 'CreateCommentRequest',
+  '2': [
+    {'1': 'post_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+    {'1': 'body', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'body'},
+    {
+      '1': 'parent_id',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'parentId',
+      '17': true
+    },
+    {
+      '1': 'reply_to_id',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'replyToId',
+      '17': true
+    },
+    {'1': 'request_id', '3': 5, '4': 1, '5': 9, '8': {}, '10': 'requestId'},
+  ],
+  '8': [
+    {'1': '_parent_id'},
+    {'1': '_reply_to_id'},
+  ],
+};
+
+/// Descriptor for `CreateCommentRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createCommentRequestDescriptor = $convert.base64Decode(
+    'ChRDcmVhdGVDb21tZW50UmVxdWVzdBIcCgdwb3N0X2lkGAEgASgJQgPgQQJSBnBvc3RJZBIXCg'
+    'Rib2R5GAIgASgJQgPgQQJSBGJvZHkSIAoJcGFyZW50X2lkGAMgASgJSABSCHBhcmVudElkiAEB'
+    'EiMKC3JlcGx5X3RvX2lkGAQgASgJSAFSCXJlcGx5VG9JZIgBARInCgpyZXF1ZXN0X2lkGAUgAS'
+    'gJQgjijM/XCAIIAVIJcmVxdWVzdElkQgwKCl9wYXJlbnRfaWRCDgoMX3JlcGx5X3RvX2lk');
+
+@$core.Deprecated('Use createCommentResponseDescriptor instead')
+const CreateCommentResponse$json = {
+  '1': 'CreateCommentResponse',
+  '2': [
+    {
+      '1': 'comment',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Comment',
+      '10': 'comment'
+    },
+  ],
+};
+
+/// Descriptor for `CreateCommentResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createCommentResponseDescriptor = $convert.base64Decode(
+    'ChVDcmVhdGVDb21tZW50UmVzcG9uc2USOAoHY29tbWVudBgBIAEoCzIeLmhhd2tyLnNvY2lhbC'
+    '52MWFscGhhMS5Db21tZW50Ugdjb21tZW50');
+
+@$core.Deprecated('Use updateCommentRequestDescriptor instead')
+const UpdateCommentRequest$json = {
+  '1': 'UpdateCommentRequest',
+  '2': [
+    {'1': 'comment_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'commentId'},
+    {'1': 'body', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'body'},
+  ],
+};
+
+/// Descriptor for `UpdateCommentRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateCommentRequestDescriptor = $convert.base64Decode(
+    'ChRVcGRhdGVDb21tZW50UmVxdWVzdBIiCgpjb21tZW50X2lkGAEgASgJQgPgQQJSCWNvbW1lbn'
+    'RJZBIXCgRib2R5GAIgASgJQgPgQQJSBGJvZHk=');
+
+@$core.Deprecated('Use updateCommentResponseDescriptor instead')
+const UpdateCommentResponse$json = {
+  '1': 'UpdateCommentResponse',
+  '2': [
+    {'1': 'body', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'body'},
+    {
+      '1': 'update_time',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'updateTime'
+    },
+  ],
+};
+
+/// Descriptor for `UpdateCommentResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateCommentResponseDescriptor = $convert.base64Decode(
+    'ChVVcGRhdGVDb21tZW50UmVzcG9uc2USFwoEYm9keRgBIAEoCUID4EEDUgRib2R5EkAKC3VwZG'
+    'F0ZV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgp1cGRhdGVU'
+    'aW1l');
+
+@$core.Deprecated('Use deleteCommentRequestDescriptor instead')
+const DeleteCommentRequest$json = {
+  '1': 'DeleteCommentRequest',
+  '2': [
+    {'1': 'comment_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'commentId'},
+  ],
+};
+
+/// Descriptor for `DeleteCommentRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List deleteCommentRequestDescriptor = $convert.base64Decode(
+    'ChREZWxldGVDb21tZW50UmVxdWVzdBIiCgpjb21tZW50X2lkGAEgASgJQgPgQQJSCWNvbW1lbn'
+    'RJZA==');
+
+@$core.Deprecated('Use deleteCommentResponseDescriptor instead')
+const DeleteCommentResponse$json = {
+  '1': 'DeleteCommentResponse',
+};
+
+/// Descriptor for `DeleteCommentResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List deleteCommentResponseDescriptor =
+    $convert.base64Decode('ChVEZWxldGVDb21tZW50UmVzcG9uc2U=');
+
+@$core.Deprecated('Use createForumEntryRequestDescriptor instead')
+const CreateForumEntryRequest$json = {
+  '1': 'CreateForumEntryRequest',
+  '2': [
+    {'1': 'store_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'storeId'},
+    {'1': 'body', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'body'},
+    {
+      '1': 'parent_id',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'parentId',
+      '17': true
+    },
+    {
+      '1': 'reply_to_id',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'replyToId',
+      '17': true
+    },
+    {'1': 'request_id', '3': 5, '4': 1, '5': 9, '8': {}, '10': 'requestId'},
+  ],
+  '8': [
+    {'1': '_parent_id'},
+    {'1': '_reply_to_id'},
+  ],
+};
+
+/// Descriptor for `CreateForumEntryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createForumEntryRequestDescriptor = $convert.base64Decode(
+    'ChdDcmVhdGVGb3J1bUVudHJ5UmVxdWVzdBIeCghzdG9yZV9pZBgBIAEoCUID4EECUgdzdG9yZU'
+    'lkEhcKBGJvZHkYAiABKAlCA+BBAlIEYm9keRIgCglwYXJlbnRfaWQYAyABKAlIAFIIcGFyZW50'
+    'SWSIAQESIwoLcmVwbHlfdG9faWQYBCABKAlIAVIJcmVwbHlUb0lkiAEBEicKCnJlcXVlc3RfaW'
+    'QYBSABKAlCCOKMz9cIAggBUglyZXF1ZXN0SWRCDAoKX3BhcmVudF9pZEIOCgxfcmVwbHlfdG9f'
+    'aWQ=');
+
+@$core.Deprecated('Use createForumEntryResponseDescriptor instead')
+const CreateForumEntryResponse$json = {
+  '1': 'CreateForumEntryResponse',
+  '2': [
+    {
+      '1': 'entry',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.ForumEntry',
+      '10': 'entry'
+    },
+  ],
+};
+
+/// Descriptor for `CreateForumEntryResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createForumEntryResponseDescriptor =
+    $convert.base64Decode(
+        'ChhDcmVhdGVGb3J1bUVudHJ5UmVzcG9uc2USNwoFZW50cnkYASABKAsyIS5oYXdrci5zb2NpYW'
+        'wudjFhbHBoYTEuRm9ydW1FbnRyeVIFZW50cnk=');
+
+@$core.Deprecated('Use updateForumEntryRequestDescriptor instead')
+const UpdateForumEntryRequest$json = {
+  '1': 'UpdateForumEntryRequest',
+  '2': [
+    {'1': 'entry_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'entryId'},
+    {'1': 'body', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'body'},
+  ],
+};
+
+/// Descriptor for `UpdateForumEntryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateForumEntryRequestDescriptor =
+    $convert.base64Decode(
+        'ChdVcGRhdGVGb3J1bUVudHJ5UmVxdWVzdBIeCghlbnRyeV9pZBgBIAEoCUID4EECUgdlbnRyeU'
+        'lkEhcKBGJvZHkYAiABKAlCA+BBAlIEYm9keQ==');
+
+@$core.Deprecated('Use updateForumEntryResponseDescriptor instead')
+const UpdateForumEntryResponse$json = {
+  '1': 'UpdateForumEntryResponse',
+  '2': [
+    {'1': 'body', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'body'},
+    {
+      '1': 'update_time',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'updateTime'
+    },
+  ],
+};
+
+/// Descriptor for `UpdateForumEntryResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateForumEntryResponseDescriptor = $convert.base64Decode(
+    'ChhVcGRhdGVGb3J1bUVudHJ5UmVzcG9uc2USFwoEYm9keRgBIAEoCUID4EEDUgRib2R5EkAKC3'
+    'VwZGF0ZV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgp1cGRh'
+    'dGVUaW1l');
+
+@$core.Deprecated('Use deleteForumEntryRequestDescriptor instead')
+const DeleteForumEntryRequest$json = {
+  '1': 'DeleteForumEntryRequest',
+  '2': [
+    {'1': 'entry_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'entryId'},
+  ],
+};
+
+/// Descriptor for `DeleteForumEntryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List deleteForumEntryRequestDescriptor =
+    $convert.base64Decode(
+        'ChdEZWxldGVGb3J1bUVudHJ5UmVxdWVzdBIeCghlbnRyeV9pZBgBIAEoCUID4EECUgdlbnRyeU'
+        'lk');
+
+@$core.Deprecated('Use deleteForumEntryResponseDescriptor instead')
+const DeleteForumEntryResponse$json = {
+  '1': 'DeleteForumEntryResponse',
+};
+
+/// Descriptor for `DeleteForumEntryResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List deleteForumEntryResponseDescriptor =
+    $convert.base64Decode('ChhEZWxldGVGb3J1bUVudHJ5UmVzcG9uc2U=');
+
 const $core.Map<$core.String, $core.dynamic> SocialPublicServiceBase$json = {
   '1': 'SocialPublicService',
   '2': [
@@ -818,6 +1186,11 @@ const $core.Map<$core.String, $core.dynamic> SocialPublicServiceBase$json = {
       '3': '.hawkr.social.v1alpha1.ListForumEntriesResponse',
       '4': {'34': 1},
     },
+    {
+      '1': 'RecordPostView',
+      '2': '.hawkr.social.v1alpha1.RecordPostViewRequest',
+      '3': '.hawkr.social.v1alpha1.RecordPostViewResponse'
+    },
   ],
 };
 
@@ -853,6 +1226,8 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.social.v1alpha1.ListForumEntriesResponse':
       ListForumEntriesResponse$json,
   '.hawkr.social.v1alpha1.ForumEntry': ForumEntry$json,
+  '.hawkr.social.v1alpha1.RecordPostViewRequest': RecordPostViewRequest$json,
+  '.hawkr.social.v1alpha1.RecordPostViewResponse': RecordPostViewResponse$json,
 };
 
 /// Descriptor for `SocialPublicService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
@@ -871,4 +1246,140 @@ final $typed_data.Uint8List socialPublicServiceDescriptor = $convert.base64Decod
     'FhbHBoYTEuU3VnZ2VzdFRyZW5kaW5nVGFnc1JlcXVlc3QaMi5oYXdrci5zb2NpYWwudjFhbHBo'
     'YTEuU3VnZ2VzdFRyZW5kaW5nVGFnc1Jlc3BvbnNlIgOQAgESeAoQTGlzdEZvcnVtRW50cmllcx'
     'IuLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaXN0Rm9ydW1FbnRyaWVzUmVxdWVzdBovLmhhd2ty'
-    'LnNvY2lhbC52MWFscGhhMS5MaXN0Rm9ydW1FbnRyaWVzUmVzcG9uc2UiA5ACAQ==');
+    'LnNvY2lhbC52MWFscGhhMS5MaXN0Rm9ydW1FbnRyaWVzUmVzcG9uc2UiA5ACARJtCg5SZWNvcm'
+    'RQb3N0VmlldxIsLmhhd2tyLnNvY2lhbC52MWFscGhhMS5SZWNvcmRQb3N0Vmlld1JlcXVlc3Qa'
+    'LS5oYXdrci5zb2NpYWwudjFhbHBoYTEuUmVjb3JkUG9zdFZpZXdSZXNwb25zZQ==');
+
+const $core.Map<$core.String, $core.dynamic> SocialAppServiceBase$json = {
+  '1': 'SocialAppService',
+  '2': [
+    {
+      '1': 'SharePost',
+      '2': '.hawkr.social.v1alpha1.SharePostRequest',
+      '3': '.hawkr.social.v1alpha1.SharePostResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'LikePost',
+      '2': '.hawkr.social.v1alpha1.LikePostRequest',
+      '3': '.hawkr.social.v1alpha1.LikePostResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'UnlikePost',
+      '2': '.hawkr.social.v1alpha1.UnlikePostRequest',
+      '3': '.hawkr.social.v1alpha1.UnlikePostResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'LikeComment',
+      '2': '.hawkr.social.v1alpha1.LikeCommentRequest',
+      '3': '.hawkr.social.v1alpha1.LikeCommentResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'UnlikeComment',
+      '2': '.hawkr.social.v1alpha1.UnlikeCommentRequest',
+      '3': '.hawkr.social.v1alpha1.UnlikeCommentResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'CreateComment',
+      '2': '.hawkr.social.v1alpha1.CreateCommentRequest',
+      '3': '.hawkr.social.v1alpha1.CreateCommentResponse'
+    },
+    {
+      '1': 'UpdateComment',
+      '2': '.hawkr.social.v1alpha1.UpdateCommentRequest',
+      '3': '.hawkr.social.v1alpha1.UpdateCommentResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'DeleteComment',
+      '2': '.hawkr.social.v1alpha1.DeleteCommentRequest',
+      '3': '.hawkr.social.v1alpha1.DeleteCommentResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'CreateForumEntry',
+      '2': '.hawkr.social.v1alpha1.CreateForumEntryRequest',
+      '3': '.hawkr.social.v1alpha1.CreateForumEntryResponse'
+    },
+    {
+      '1': 'UpdateForumEntry',
+      '2': '.hawkr.social.v1alpha1.UpdateForumEntryRequest',
+      '3': '.hawkr.social.v1alpha1.UpdateForumEntryResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'DeleteForumEntry',
+      '2': '.hawkr.social.v1alpha1.DeleteForumEntryRequest',
+      '3': '.hawkr.social.v1alpha1.DeleteForumEntryResponse',
+      '4': {'34': 2},
+    },
+  ],
+};
+
+@$core.Deprecated('Use socialAppServiceDescriptor instead')
+const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
+    SocialAppServiceBase$messageJson = {
+  '.hawkr.social.v1alpha1.SharePostRequest': SharePostRequest$json,
+  '.hawkr.social.v1alpha1.SharePostResponse': SharePostResponse$json,
+  '.hawkr.social.v1alpha1.LikePostRequest': LikePostRequest$json,
+  '.hawkr.social.v1alpha1.LikePostResponse': LikePostResponse$json,
+  '.hawkr.social.v1alpha1.UnlikePostRequest': UnlikePostRequest$json,
+  '.hawkr.social.v1alpha1.UnlikePostResponse': UnlikePostResponse$json,
+  '.hawkr.social.v1alpha1.LikeCommentRequest': LikeCommentRequest$json,
+  '.hawkr.social.v1alpha1.LikeCommentResponse': LikeCommentResponse$json,
+  '.hawkr.social.v1alpha1.UnlikeCommentRequest': UnlikeCommentRequest$json,
+  '.hawkr.social.v1alpha1.UnlikeCommentResponse': UnlikeCommentResponse$json,
+  '.hawkr.social.v1alpha1.CreateCommentRequest': CreateCommentRequest$json,
+  '.hawkr.social.v1alpha1.CreateCommentResponse': CreateCommentResponse$json,
+  '.hawkr.social.v1alpha1.Comment': Comment$json,
+  '.hawkr.social.v1alpha1.Actor': Actor$json,
+  '.hawkr.common.v1alpha1.Image': $1.Image$json,
+  '.google.protobuf.Timestamp': $2.Timestamp$json,
+  '.hawkr.social.v1alpha1.UpdateCommentRequest': UpdateCommentRequest$json,
+  '.hawkr.social.v1alpha1.UpdateCommentResponse': UpdateCommentResponse$json,
+  '.hawkr.social.v1alpha1.DeleteCommentRequest': DeleteCommentRequest$json,
+  '.hawkr.social.v1alpha1.DeleteCommentResponse': DeleteCommentResponse$json,
+  '.hawkr.social.v1alpha1.CreateForumEntryRequest':
+      CreateForumEntryRequest$json,
+  '.hawkr.social.v1alpha1.CreateForumEntryResponse':
+      CreateForumEntryResponse$json,
+  '.hawkr.social.v1alpha1.ForumEntry': ForumEntry$json,
+  '.hawkr.social.v1alpha1.UpdateForumEntryRequest':
+      UpdateForumEntryRequest$json,
+  '.hawkr.social.v1alpha1.UpdateForumEntryResponse':
+      UpdateForumEntryResponse$json,
+  '.hawkr.social.v1alpha1.DeleteForumEntryRequest':
+      DeleteForumEntryRequest$json,
+  '.hawkr.social.v1alpha1.DeleteForumEntryResponse':
+      DeleteForumEntryResponse$json,
+};
+
+/// Descriptor for `SocialAppService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
+final $typed_data.Uint8List socialAppServiceDescriptor = $convert.base64Decode(
+    'ChBTb2NpYWxBcHBTZXJ2aWNlEmMKCVNoYXJlUG9zdBInLmhhd2tyLnNvY2lhbC52MWFscGhhMS'
+    '5TaGFyZVBvc3RSZXF1ZXN0GiguaGF3a3Iuc29jaWFsLnYxYWxwaGExLlNoYXJlUG9zdFJlc3Bv'
+    'bnNlIgOQAgISYAoITGlrZVBvc3QSJi5oYXdrci5zb2NpYWwudjFhbHBoYTEuTGlrZVBvc3RSZX'
+    'F1ZXN0GicuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkxpa2VQb3N0UmVzcG9uc2UiA5ACAhJmCgpV'
+    'bmxpa2VQb3N0EiguaGF3a3Iuc29jaWFsLnYxYWxwaGExLlVubGlrZVBvc3RSZXF1ZXN0GikuaG'
+    'F3a3Iuc29jaWFsLnYxYWxwaGExLlVubGlrZVBvc3RSZXNwb25zZSIDkAICEmkKC0xpa2VDb21t'
+    'ZW50EikuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkxpa2VDb21tZW50UmVxdWVzdBoqLmhhd2tyLn'
+    'NvY2lhbC52MWFscGhhMS5MaWtlQ29tbWVudFJlc3BvbnNlIgOQAgISbwoNVW5saWtlQ29tbWVu'
+    'dBIrLmhhd2tyLnNvY2lhbC52MWFscGhhMS5Vbmxpa2VDb21tZW50UmVxdWVzdBosLmhhd2tyLn'
+    'NvY2lhbC52MWFscGhhMS5Vbmxpa2VDb21tZW50UmVzcG9uc2UiA5ACAhJqCg1DcmVhdGVDb21t'
+    'ZW50EisuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkNyZWF0ZUNvbW1lbnRSZXF1ZXN0GiwuaGF3a3'
+    'Iuc29jaWFsLnYxYWxwaGExLkNyZWF0ZUNvbW1lbnRSZXNwb25zZRJvCg1VcGRhdGVDb21tZW50'
+    'EisuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlVwZGF0ZUNvbW1lbnRSZXF1ZXN0GiwuaGF3a3Iuc2'
+    '9jaWFsLnYxYWxwaGExLlVwZGF0ZUNvbW1lbnRSZXNwb25zZSIDkAICEm8KDURlbGV0ZUNvbW1l'
+    'bnQSKy5oYXdrci5zb2NpYWwudjFhbHBoYTEuRGVsZXRlQ29tbWVudFJlcXVlc3QaLC5oYXdrci'
+    '5zb2NpYWwudjFhbHBoYTEuRGVsZXRlQ29tbWVudFJlc3BvbnNlIgOQAgIScwoQQ3JlYXRlRm9y'
+    'dW1FbnRyeRIuLmhhd2tyLnNvY2lhbC52MWFscGhhMS5DcmVhdGVGb3J1bUVudHJ5UmVxdWVzdB'
+    'ovLmhhd2tyLnNvY2lhbC52MWFscGhhMS5DcmVhdGVGb3J1bUVudHJ5UmVzcG9uc2USeAoQVXBk'
+    'YXRlRm9ydW1FbnRyeRIuLmhhd2tyLnNvY2lhbC52MWFscGhhMS5VcGRhdGVGb3J1bUVudHJ5Um'
+    'VxdWVzdBovLmhhd2tyLnNvY2lhbC52MWFscGhhMS5VcGRhdGVGb3J1bUVudHJ5UmVzcG9uc2Ui'
+    'A5ACAhJ4ChBEZWxldGVGb3J1bUVudHJ5Ei4uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkRlbGV0ZU'
+    'ZvcnVtRW50cnlSZXF1ZXN0Gi8uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkRlbGV0ZUZvcnVtRW50'
+    'cnlSZXNwb25zZSIDkAIC');

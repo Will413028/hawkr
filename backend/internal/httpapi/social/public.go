@@ -55,31 +55,42 @@ type Stores interface {
 	StoresBlockingBuyer(ctx context.Context, buyerID int64, storeIDs []int64) (map[int64]bool, error)
 }
 
-// Public 實作 SocialPublicService。
-type Public struct {
-	reads     Reads
+// presenter 是 Public 與 App 共用的組裝：呼叫者的身分，與貼文、留言、討論區項目轉成回應所需的顯示資料（店家卡片、買家名稱、封鎖旗標）。
+type presenter struct {
 	buyers    Buyers
 	stores    Stores
 	images    rpc.Images
 	webOrigin rpc.WebOrigin
-	now       func() time.Time
+}
+
+// Views 是瀏覽打點的寫入端（*social.Module）。
+type Views interface {
+	RecordView(ctx context.Context, postID uuid.UUID, v social.Viewer) (bool, error)
+}
+
+// Public 實作 SocialPublicService。
+type Public struct {
+	*presenter
+	reads Reads
+	views Views
+	now   func() time.Time
 }
 
 var _ socialv1alpha1connect.SocialPublicServiceHandler = (*Public)(nil)
 
 // NewPublic 建立前台的 handler；webOrigin 組貼文的單篇網址，不可是零值；now 是熱門標籤預設時間窗的終點，nil 時用 time.Now。
-func NewPublic(reads Reads, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin, now func() time.Time) (*Public, error) {
+func NewPublic(reads Reads, views Views, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin, now func() time.Time) (*Public, error) {
 	if webOrigin.IsZero() {
 		return nil, fmt.Errorf("httpapi/social：貼文的單篇網址需要 WebOrigin")
 	}
 	if now == nil {
 		now = time.Now
 	}
-	return &Public{reads: reads, buyers: buyers, stores: stores, images: images, webOrigin: webOrigin, now: now}, nil
+	return &Public{presenter: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin}, reads: reads, views: views, now: now}, nil
 }
 
 // caller 是請求的呼叫者此刻的兩個身分；訪客（沒有登入、停權帳號與無效 token 都以訪客執行）與管理員是零值。
-func (h *Public) caller(ctx context.Context) (social.Caller, error) {
+func (h *presenter) caller(ctx context.Context) (social.Caller, error) {
 	p, ok := rpc.PrincipalFrom(ctx)
 	if !ok || p.Kind != identity.PrincipalAccount {
 		return social.Caller{}, nil
@@ -118,6 +129,38 @@ func (h *Public) GetPost(ctx context.Context, req *connect.Request[pb.GetPostReq
 		return nil, err
 	}
 	return connect.NewResponse(&pb.GetPostResponse{Post: posts[0]}), nil
+}
+
+// RecordPostView 只計觀看者讀得到的貼文，而且店主看自己的貼文不計（模組要求呼叫方不呼叫）；讀不到與沒有計入都回成功，不洩漏貼文是否存在。
+// 停權的帳號與無效的憑證在入口已經是訪客，這裡自然計為匿名瀏覽。每個來源 IP 的額度在入口（httpapi 的 tierPostView）。
+func (h *Public) RecordPostView(ctx context.Context, req *connect.Request[pb.RecordPostViewRequest]) (*connect.Response[pb.RecordPostViewResponse], error) {
+	id, err := rpc.ParseUUID("post_id", req.Msg.GetPostId())
+	if err != nil {
+		return nil, err
+	}
+	c, err := h.caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	done := connect.NewResponse(&pb.RecordPostViewResponse{})
+	if c.Store != nil {
+		switch p, err := h.reads.PublicPost(ctx, c, id); {
+		case apperr.KindOf(err) == apperr.KindNotFound:
+			return done, nil
+		case err != nil:
+			return nil, err
+		case c.OwnsStore(p.StoreID):
+			return done, nil
+		}
+	}
+	v := social.Viewer{BuyerID: c.BuyerID, IP: rpc.ClientIPFrom(ctx), UserAgent: req.Header().Get("User-Agent")}
+	if p, ok := rpc.PrincipalFrom(ctx); ok && p.Kind == identity.PrincipalAccount {
+		v.AccountID = p.ID
+	}
+	if _, err := h.views.RecordView(ctx, id, v); err != nil {
+		return nil, err
+	}
+	return done, nil
 }
 
 func (h *Public) ListPosts(ctx context.Context, req *connect.Request[pb.ListPostsRequest]) (*connect.Response[pb.ListPostsResponse], error) {
@@ -333,7 +376,7 @@ func (h *Public) ListForumEntries(ctx context.Context, req *connect.Request[pb.L
 	return connect.NewResponse(out), nil
 }
 
-func (h *Public) toForumEntries(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry) ([]*pb.ForumEntry, error) {
+func (h *presenter) toForumEntries(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry) ([]*pb.ForumEntry, error) {
 	if len(entries) == 0 {
 		return []*pb.ForumEntry{}, nil
 	}
@@ -386,7 +429,7 @@ type sharedAuthors struct {
 }
 
 // loadShared 批次讀一頁可見留言的作者資料：卡片只取店家作者的，觀看者的封鎖旗標另外取（針對留言所在的店與店家作者，一次查詢）。
-func (h *Public) loadShared(ctx context.Context, c social.Caller, contextStore int64, actors []social.Actor) (sharedAuthors, error) {
+func (h *presenter) loadShared(ctx context.Context, c social.Caller, contextStore int64, actors []social.Actor) (sharedAuthors, error) {
 	if len(actors) == 0 {
 		return sharedAuthors{}, nil
 	}
@@ -414,7 +457,7 @@ func (h *Public) loadShared(ctx context.Context, c social.Caller, contextStore i
 	return sharedAuthors{display: display, stores: postStores{cards: cards, blocking: blocking}, replyAllowed: canComment(c, contextStore, blocking)}, nil
 }
 
-func (h *Public) buyerDisplays(ctx context.Context, buyerIDs []int64) (map[int64]buyer.Display, error) {
+func (h *presenter) buyerDisplays(ctx context.Context, buyerIDs []int64) (map[int64]buyer.Display, error) {
 	display := map[int64]buyer.Display{}
 	if buyerIDs = uniq(buyerIDs); len(buyerIDs) == 0 {
 		return display, nil
@@ -435,7 +478,7 @@ type postStores struct {
 	blocking map[int64]bool
 }
 
-func (h *Public) storeCards(ctx context.Context, storeIDs []int64) (map[int64]seller.StoreCard, error) {
+func (h *presenter) storeCards(ctx context.Context, storeIDs []int64) (map[int64]seller.StoreCard, error) {
 	out := map[int64]seller.StoreCard{}
 	ids := uniq(storeIDs)
 	if len(ids) == 0 {
@@ -452,7 +495,7 @@ func (h *Public) storeCards(ctx context.Context, storeIDs []int64) (map[int64]se
 }
 
 // blockingStores 是 storeIDs 之中封鎖了觀看者的店（一次批次查詢）；訪客沒有封鎖可言，不查。
-func (h *Public) blockingStores(ctx context.Context, c social.Caller, storeIDs []int64) (map[int64]bool, error) {
+func (h *presenter) blockingStores(ctx context.Context, c social.Caller, storeIDs []int64) (map[int64]bool, error) {
 	ids := uniq(storeIDs)
 	if c.BuyerID == 0 || len(ids) == 0 {
 		return nil, nil
@@ -468,7 +511,7 @@ func canComment(c social.Caller, storeID int64, blocking map[int64]bool) bool {
 	return c.BuyerID != 0 && !blocking[storeID]
 }
 
-func (h *Public) toPosts(ctx context.Context, c social.Caller, posts []social.Post) ([]*pb.Post, error) {
+func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social.Post) ([]*pb.Post, error) {
 	storeIDs := make([]int64, len(posts))
 	for i, p := range posts {
 		storeIDs[i] = p.StoreID
@@ -494,7 +537,7 @@ func (h *Public) toPosts(ctx context.Context, c social.Caller, posts []social.Po
 	return out, nil
 }
 
-func (h *Public) toPost(c social.Caller, p social.Post, stores postStores) (*pb.Post, error) {
+func (h *presenter) toPost(c social.Caller, p social.Post, stores postStores) (*pb.Post, error) {
 	postURL, err := h.webOrigin.URL("/feed?post=" + url.QueryEscape(p.ID.String()))
 	if err != nil {
 		return nil, err
@@ -528,7 +571,7 @@ func (h *Public) toPost(c social.Caller, p social.Post, stores postStores) (*pb.
 	return out, nil
 }
 
-func (h *Public) toComments(ctx context.Context, c social.Caller, postStore int64, comments []social.Comment) ([]*pb.Comment, error) {
+func (h *presenter) toComments(ctx context.Context, c social.Caller, postStore int64, comments []social.Comment) ([]*pb.Comment, error) {
 	if len(comments) == 0 {
 		return []*pb.Comment{}, nil
 	}
@@ -575,7 +618,7 @@ func (h *Public) toComments(ctx context.Context, c social.Caller, postStore int6
 	return out, nil
 }
 
-func (h *Public) toActor(a social.Actor, display map[int64]buyer.Display, stores postStores) (*pb.Actor, error) {
+func (h *presenter) toActor(a social.Actor, display map[int64]buyer.Display, stores postStores) (*pb.Actor, error) {
 	out := &pb.Actor{Kind: rpc.EnumToProto[pb.ActorKind](a.Kind), Id: rpc.FormatID(a.ID)}
 	var avatar *string
 	switch a.Kind {

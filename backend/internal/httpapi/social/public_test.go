@@ -157,6 +157,11 @@ func (f *fakeStores) StoresBlockingBuyer(_ context.Context, _ int64, ids []int64
 
 func newPublic(t *testing.T, r *fakeReads, b fakeBuyers, s *fakeStores) *Public {
 	t.Helper()
+	return newPublicWithViews(t, r, &fakeViews{}, b, s)
+}
+
+func newPublicWithViews(t *testing.T, r *fakeReads, v *fakeViews, b fakeBuyers, s *fakeStores) *Public {
+	t.Helper()
 	images, err := rpc.NewImages("https://media.example.test")
 	if err != nil {
 		t.Fatal(err)
@@ -165,7 +170,7 @@ func newPublic(t *testing.T, r *fakeReads, b fakeBuyers, s *fakeStores) *Public 
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := NewPublic(r, b, s, images, web, func() time.Time { return trendNow })
+	h, err := NewPublic(r, v, b, s, images, web, func() time.Time { return trendNow })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,22 +188,49 @@ func post(storeID int64) social.Post {
 	return social.Post{ID: uuid.New(), StoreID: storeID, Body: "hi", PublishedAt: &at, UpdatedAt: at, Stats: social.PostStats{Views: 3}}
 }
 
-func TestEverySocialPublicMethodIsNoSideEffects(t *testing.T) {
+// 讀取一律 NO_SIDE_EFFECTS（GET）；RecordPostView 是唯一的寫入，POST、不標 NO_SIDE_EFFECTS（規範第三節：讀取不得順便寫入）。
+func TestOnlyRecordPostViewIsAWriteInSocialPublicService(t *testing.T) {
 	methods := pb.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialPublicService").Methods()
 	if methods.Len() == 0 {
 		t.Fatal("沒有方法")
 	}
+	sawView := false
 	for i := range methods.Len() {
 		m := methods.Get(i)
 		opts, ok := m.Options().(*descriptorpb.MethodOptions)
-		if !ok || opts.GetIdempotencyLevel() != descriptorpb.MethodOptions_NO_SIDE_EFFECTS {
+		noSideEffects := ok && opts.GetIdempotencyLevel() == descriptorpb.MethodOptions_NO_SIDE_EFFECTS
+		if m.Name() == "RecordPostView" {
+			sawView = true
+			if noSideEffects {
+				t.Errorf("%s 會寫入，不能標 NO_SIDE_EFFECTS", m.FullName())
+			}
+			continue
+		}
+		if !noSideEffects {
 			t.Errorf("%s 不是 NO_SIDE_EFFECTS", m.FullName())
+		}
+	}
+	if !sawView {
+		t.Error("沒有 RecordPostView")
+	}
+}
+
+func TestNoSocialAppMethodIsNoSideEffects(t *testing.T) {
+	methods := pb.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialAppService").Methods()
+	if methods.Len() != 11 {
+		t.Fatalf("SocialAppService 有 %d 支方法，預期 11", methods.Len())
+	}
+	for i := range methods.Len() {
+		m := methods.Get(i)
+		opts, _ := m.Options().(*descriptorpb.MethodOptions)
+		if opts.GetIdempotencyLevel() == descriptorpb.MethodOptions_NO_SIDE_EFFECTS {
+			t.Errorf("%s 是寫入，不能標 NO_SIDE_EFFECTS", m.FullName())
 		}
 	}
 }
 
 func TestNewPublicRequiresWebOrigin(t *testing.T) {
-	if _, err := NewPublic(&fakeReads{}, fakeBuyers{}, &fakeStores{}, rpc.Images{}, rpc.WebOrigin{}, nil); err == nil {
+	if _, err := NewPublic(&fakeReads{}, &fakeViews{}, fakeBuyers{}, &fakeStores{}, rpc.Images{}, rpc.WebOrigin{}, nil); err == nil {
 		t.Fatal("零值 WebOrigin 應該失敗")
 	}
 }
@@ -574,4 +606,101 @@ func codeOf(t *testing.T, err error) connect.Code {
 		t.Fatal("預期有錯誤")
 	}
 	return rpc.ConnectError(t.Context(), err).Code()
+}
+
+type viewCall struct {
+	post uuid.UUID
+	v    social.Viewer
+}
+
+type fakeViews struct {
+	calls []viewCall
+	err   error
+}
+
+func (f *fakeViews) RecordView(_ context.Context, postID uuid.UUID, v social.Viewer) (bool, error) {
+	f.calls = append(f.calls, viewCall{postID, v})
+	return true, f.err
+}
+
+// 瀏覽只由 RecordPostView 記：讀取貼文（GetPost）不計。
+func TestGetPostDoesNotRecordAViewButRecordPostViewDoes(t *testing.T) {
+	p := post(5)
+	views := &fakeViews{}
+	h := newPublicWithViews(t, &fakeReads{post: p}, views, fakeBuyers{id: 7}, &fakeStores{})
+	if _, err := h.GetPost(asBuyer(t.Context()), connect.NewRequest(&pb.GetPostRequest{PostId: p.ID.String()})); err != nil {
+		t.Fatal(err)
+	}
+	if len(views.calls) != 0 {
+		t.Fatalf("GetPost 不該計瀏覽：%v", views.calls)
+	}
+	if _, err := h.RecordPostView(asBuyer(t.Context()), connect.NewRequest(&pb.RecordPostViewRequest{PostId: p.ID.String()})); err != nil {
+		t.Fatal(err)
+	}
+	if len(views.calls) != 1 || views.calls[0].post != p.ID {
+		t.Fatalf("RecordPostView 應計一次：%v", views.calls)
+	}
+}
+
+func TestRecordPostViewBuildsTheViewer(t *testing.T) {
+	p := post(5)
+	t.Run("訪客以來源與 User-Agent 計為匿名", func(t *testing.T) {
+		views := &fakeViews{}
+		h := newPublicWithViews(t, &fakeReads{post: p}, views, fakeBuyers{id: 7}, &fakeStores{})
+		req := connect.NewRequest(&pb.RecordPostViewRequest{PostId: p.ID.String()})
+		req.Header().Set("User-Agent", "ua-1")
+		if _, err := h.RecordPostView(rpc.WithClientIP(t.Context(), "203.0.113.9"), req); err != nil {
+			t.Fatal(err)
+		}
+		want := social.Viewer{IP: "203.0.113.9", UserAgent: "ua-1"}
+		if len(views.calls) != 1 || views.calls[0].v != want {
+			t.Fatalf("viewer = %+v，預期 %+v", views.calls, want)
+		}
+	})
+	t.Run("登入的買家帶帳號與買家身分", func(t *testing.T) {
+		views := &fakeViews{}
+		h := newPublicWithViews(t, &fakeReads{post: p}, views, fakeBuyers{id: 11}, &fakeStores{})
+		if _, err := h.RecordPostView(asBuyer(t.Context()), connect.NewRequest(&pb.RecordPostViewRequest{PostId: p.ID.String()})); err != nil {
+			t.Fatal(err)
+		}
+		if len(views.calls) != 1 || views.calls[0].v.AccountID != 7 || views.calls[0].v.BuyerID != 11 {
+			t.Fatalf("viewer = %+v", views.calls)
+		}
+	})
+	t.Run("店主看自己店的貼文不計", func(t *testing.T) {
+		views := &fakeViews{}
+		h := newPublicWithViews(t, &fakeReads{post: post(9)}, views, fakeBuyers{id: 7}, &fakeStores{own: &seller.Store{StoreID: 9}})
+		if _, err := h.RecordPostView(asBuyer(t.Context()), connect.NewRequest(&pb.RecordPostViewRequest{PostId: uuid.New().String()})); err != nil {
+			t.Fatal(err)
+		}
+		if len(views.calls) != 0 {
+			t.Fatalf("店主自己的瀏覽不該計：%v", views.calls)
+		}
+	})
+	t.Run("店主看別家店的貼文照計", func(t *testing.T) {
+		views := &fakeViews{}
+		h := newPublicWithViews(t, &fakeReads{post: post(5)}, views, fakeBuyers{id: 7}, &fakeStores{own: &seller.Store{StoreID: 9}})
+		if _, err := h.RecordPostView(asBuyer(t.Context()), connect.NewRequest(&pb.RecordPostViewRequest{PostId: uuid.New().String()})); err != nil {
+			t.Fatal(err)
+		}
+		if len(views.calls) != 1 {
+			t.Fatalf("應計一次：%v", views.calls)
+		}
+	})
+	t.Run("店主讀不到的貼文回成功、不計", func(t *testing.T) {
+		views := &fakeViews{}
+		h := newPublicWithViews(t, &fakeReads{postErr: apperr.NotFound("post")}, views, fakeBuyers{id: 7}, &fakeStores{own: &seller.Store{StoreID: 9}})
+		if _, err := h.RecordPostView(asBuyer(t.Context()), connect.NewRequest(&pb.RecordPostViewRequest{PostId: uuid.New().String()})); err != nil {
+			t.Fatal(err)
+		}
+		if len(views.calls) != 0 {
+			t.Fatalf("不該計：%v", views.calls)
+		}
+	})
+	t.Run("格式錯誤的 ID", func(t *testing.T) {
+		h := newPublic(t, &fakeReads{}, fakeBuyers{}, &fakeStores{})
+		if _, err := h.RecordPostView(t.Context(), connect.NewRequest(&pb.RecordPostViewRequest{PostId: "x"})); apperr.KindOf(err) != apperr.KindInvalidInput {
+			t.Fatalf("err = %v", err)
+		}
+	})
 }

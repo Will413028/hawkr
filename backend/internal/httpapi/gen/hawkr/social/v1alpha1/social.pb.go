@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: hawkr/social/v1alpha1/social.proto
 
-// social 模組給前台的 API：店家貼文與留言的公開讀取。寫入與互動（讚、留言、瀏覽）在 SocialAppService 與 RecordPostView（A7-2b 起）。
+// social 模組給前台的 API：店家貼文與留言的公開讀取（SocialPublicService），瀏覽打點（RecordPostView），以及登入者的互動寫入（SocialAppService：分享、讚、留言、討論區）。
 //
 // ID 是不透明的字串（貼文與留言是 UUID，店家是過渡期的十進位整數字串），client 不解析、不轉數字
 // （ADR 2026-09-25-row-identity-by-data-kind D5）。圖片是 hawkr.common.v1alpha1.Image，店家卡片是 hawkr.common.v1alpha1.StoreCard。
@@ -1563,11 +1563,1123 @@ func (x *ListForumEntriesResponse) GetNextPageToken() string {
 	return ""
 }
 
+type RecordPostViewRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 貼文 ID。
+	PostId        string `protobuf:"bytes,1,opt,name=post_id,json=postId,proto3" json:"post_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecordPostViewRequest) Reset() {
+	*x = RecordPostViewRequest{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecordPostViewRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecordPostViewRequest) ProtoMessage() {}
+
+func (x *RecordPostViewRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecordPostViewRequest.ProtoReflect.Descriptor instead.
+func (*RecordPostViewRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *RecordPostViewRequest) GetPostId() string {
+	if x != nil {
+		return x.PostId
+	}
+	return ""
+}
+
+type RecordPostViewResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecordPostViewResponse) Reset() {
+	*x = RecordPostViewResponse{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecordPostViewResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecordPostViewResponse) ProtoMessage() {}
+
+func (x *RecordPostViewResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecordPostViewResponse.ProtoReflect.Descriptor instead.
+func (*RecordPostViewResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{21}
+}
+
+type SharePostRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 貼文 ID。
+	PostId        string `protobuf:"bytes,1,opt,name=post_id,json=postId,proto3" json:"post_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SharePostRequest) Reset() {
+	*x = SharePostRequest{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SharePostRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SharePostRequest) ProtoMessage() {}
+
+func (x *SharePostRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SharePostRequest.ProtoReflect.Descriptor instead.
+func (*SharePostRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *SharePostRequest) GetPostId() string {
+	if x != nil {
+		return x.PostId
+	}
+	return ""
+}
+
+type SharePostResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SharePostResponse) Reset() {
+	*x = SharePostResponse{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SharePostResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SharePostResponse) ProtoMessage() {}
+
+func (x *SharePostResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SharePostResponse.ProtoReflect.Descriptor instead.
+func (*SharePostResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{23}
+}
+
+type LikePostRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 貼文 ID。
+	PostId        string `protobuf:"bytes,1,opt,name=post_id,json=postId,proto3" json:"post_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LikePostRequest) Reset() {
+	*x = LikePostRequest{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LikePostRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LikePostRequest) ProtoMessage() {}
+
+func (x *LikePostRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LikePostRequest.ProtoReflect.Descriptor instead.
+func (*LikePostRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *LikePostRequest) GetPostId() string {
+	if x != nil {
+		return x.PostId
+	}
+	return ""
+}
+
+type LikePostResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LikePostResponse) Reset() {
+	*x = LikePostResponse{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LikePostResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LikePostResponse) ProtoMessage() {}
+
+func (x *LikePostResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LikePostResponse.ProtoReflect.Descriptor instead.
+func (*LikePostResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{25}
+}
+
+type UnlikePostRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 貼文 ID。
+	PostId        string `protobuf:"bytes,1,opt,name=post_id,json=postId,proto3" json:"post_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnlikePostRequest) Reset() {
+	*x = UnlikePostRequest{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnlikePostRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnlikePostRequest) ProtoMessage() {}
+
+func (x *UnlikePostRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnlikePostRequest.ProtoReflect.Descriptor instead.
+func (*UnlikePostRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *UnlikePostRequest) GetPostId() string {
+	if x != nil {
+		return x.PostId
+	}
+	return ""
+}
+
+type UnlikePostResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnlikePostResponse) Reset() {
+	*x = UnlikePostResponse{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnlikePostResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnlikePostResponse) ProtoMessage() {}
+
+func (x *UnlikePostResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnlikePostResponse.ProtoReflect.Descriptor instead.
+func (*UnlikePostResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{27}
+}
+
+type LikeCommentRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 留言 ID。
+	CommentId     string `protobuf:"bytes,1,opt,name=comment_id,json=commentId,proto3" json:"comment_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LikeCommentRequest) Reset() {
+	*x = LikeCommentRequest{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LikeCommentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LikeCommentRequest) ProtoMessage() {}
+
+func (x *LikeCommentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LikeCommentRequest.ProtoReflect.Descriptor instead.
+func (*LikeCommentRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *LikeCommentRequest) GetCommentId() string {
+	if x != nil {
+		return x.CommentId
+	}
+	return ""
+}
+
+type LikeCommentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LikeCommentResponse) Reset() {
+	*x = LikeCommentResponse{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LikeCommentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LikeCommentResponse) ProtoMessage() {}
+
+func (x *LikeCommentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LikeCommentResponse.ProtoReflect.Descriptor instead.
+func (*LikeCommentResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{29}
+}
+
+type UnlikeCommentRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 留言 ID。
+	CommentId     string `protobuf:"bytes,1,opt,name=comment_id,json=commentId,proto3" json:"comment_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnlikeCommentRequest) Reset() {
+	*x = UnlikeCommentRequest{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnlikeCommentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnlikeCommentRequest) ProtoMessage() {}
+
+func (x *UnlikeCommentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnlikeCommentRequest.ProtoReflect.Descriptor instead.
+func (*UnlikeCommentRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *UnlikeCommentRequest) GetCommentId() string {
+	if x != nil {
+		return x.CommentId
+	}
+	return ""
+}
+
+type UnlikeCommentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnlikeCommentResponse) Reset() {
+	*x = UnlikeCommentResponse{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnlikeCommentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnlikeCommentResponse) ProtoMessage() {}
+
+func (x *UnlikeCommentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnlikeCommentResponse.ProtoReflect.Descriptor instead.
+func (*UnlikeCommentResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{31}
+}
+
+type CreateCommentRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 貼文 ID。
+	PostId string `protobuf:"bytes,1,opt,name=post_id,json=postId,proto3" json:"post_id,omitempty"`
+	// 內文，去除首尾空白後 1 到 2200 個字元（以 Unicode 字元計）。
+	Body string `protobuf:"bytes,2,opt,name=body,proto3" json:"body,omitempty"`
+	// 設了是回覆；父留言不是頂層時，回覆掛在它所屬的頂層留言底下。不設是頂層留言。
+	ParentId *string `protobuf:"bytes,3,opt,name=parent_id,json=parentId,proto3,oneof" json:"parent_id,omitempty"`
+	// 回覆針對的那一則留言，必須與 parent_id 同一串；只能在設了 parent_id 時設，不設是父留言。
+	ReplyToId *string `protobuf:"bytes,4,opt,name=reply_to_id,json=replyToId,proto3,oneof" json:"reply_to_id,omitempty"`
+	// 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回第一次建立的留言；內容不同回 invalid_argument。
+	RequestId     string `protobuf:"bytes,5,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateCommentRequest) Reset() {
+	*x = CreateCommentRequest{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateCommentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateCommentRequest) ProtoMessage() {}
+
+func (x *CreateCommentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateCommentRequest.ProtoReflect.Descriptor instead.
+func (*CreateCommentRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *CreateCommentRequest) GetPostId() string {
+	if x != nil {
+		return x.PostId
+	}
+	return ""
+}
+
+func (x *CreateCommentRequest) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *CreateCommentRequest) GetParentId() string {
+	if x != nil && x.ParentId != nil {
+		return *x.ParentId
+	}
+	return ""
+}
+
+func (x *CreateCommentRequest) GetReplyToId() string {
+	if x != nil && x.ReplyToId != nil {
+		return *x.ReplyToId
+	}
+	return ""
+}
+
+func (x *CreateCommentRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type CreateCommentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Comment       *Comment               `protobuf:"bytes,1,opt,name=comment,proto3" json:"comment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateCommentResponse) Reset() {
+	*x = CreateCommentResponse{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateCommentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateCommentResponse) ProtoMessage() {}
+
+func (x *CreateCommentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateCommentResponse.ProtoReflect.Descriptor instead.
+func (*CreateCommentResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *CreateCommentResponse) GetComment() *Comment {
+	if x != nil {
+		return x.Comment
+	}
+	return nil
+}
+
+type UpdateCommentRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 留言 ID。
+	CommentId string `protobuf:"bytes,1,opt,name=comment_id,json=commentId,proto3" json:"comment_id,omitempty"`
+	// 新的內文，規則同 CreateCommentRequest.body。留言只有內文可以修改，所以沒有 update_mask。
+	Body          string `protobuf:"bytes,2,opt,name=body,proto3" json:"body,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateCommentRequest) Reset() {
+	*x = UpdateCommentRequest{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateCommentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateCommentRequest) ProtoMessage() {}
+
+func (x *UpdateCommentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateCommentRequest.ProtoReflect.Descriptor instead.
+func (*UpdateCommentRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *UpdateCommentRequest) GetCommentId() string {
+	if x != nil {
+		return x.CommentId
+	}
+	return ""
+}
+
+func (x *UpdateCommentRequest) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+// UpdateCommentResponse 只帶修改的結果。留言的讚數與回覆數不在這裡，client 保留列表上原有的值。
+type UpdateCommentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Body          string                 `protobuf:"bytes,1,opt,name=body,proto3" json:"body,omitempty"`
+	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateCommentResponse) Reset() {
+	*x = UpdateCommentResponse{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateCommentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateCommentResponse) ProtoMessage() {}
+
+func (x *UpdateCommentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateCommentResponse.ProtoReflect.Descriptor instead.
+func (*UpdateCommentResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *UpdateCommentResponse) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *UpdateCommentResponse) GetUpdateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdateTime
+	}
+	return nil
+}
+
+type DeleteCommentRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 留言 ID。
+	CommentId     string `protobuf:"bytes,1,opt,name=comment_id,json=commentId,proto3" json:"comment_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteCommentRequest) Reset() {
+	*x = DeleteCommentRequest{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteCommentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteCommentRequest) ProtoMessage() {}
+
+func (x *DeleteCommentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteCommentRequest.ProtoReflect.Descriptor instead.
+func (*DeleteCommentRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *DeleteCommentRequest) GetCommentId() string {
+	if x != nil {
+		return x.CommentId
+	}
+	return ""
+}
+
+type DeleteCommentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteCommentResponse) Reset() {
+	*x = DeleteCommentResponse{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteCommentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteCommentResponse) ProtoMessage() {}
+
+func (x *DeleteCommentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteCommentResponse.ProtoReflect.Descriptor instead.
+func (*DeleteCommentResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{37}
+}
+
+type CreateForumEntryRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 店家 ID。
+	StoreId string `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	// 內文，規則同 CreateCommentRequest.body。
+	Body string `protobuf:"bytes,2,opt,name=body,proto3" json:"body,omitempty"`
+	// 設了是回覆；父項不是頂層時，回覆掛在它所屬的頂層項目底下。不設是頂層發言。
+	ParentId *string `protobuf:"bytes,3,opt,name=parent_id,json=parentId,proto3,oneof" json:"parent_id,omitempty"`
+	// 回覆針對的那一則，必須與 parent_id 同一串；只能在設了 parent_id 時設，不設是父項。
+	ReplyToId *string `protobuf:"bytes,4,opt,name=reply_to_id,json=replyToId,proto3,oneof" json:"reply_to_id,omitempty"`
+	// 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回第一次建立的項目；內容不同回 invalid_argument。
+	RequestId     string `protobuf:"bytes,5,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateForumEntryRequest) Reset() {
+	*x = CreateForumEntryRequest{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateForumEntryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateForumEntryRequest) ProtoMessage() {}
+
+func (x *CreateForumEntryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateForumEntryRequest.ProtoReflect.Descriptor instead.
+func (*CreateForumEntryRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *CreateForumEntryRequest) GetStoreId() string {
+	if x != nil {
+		return x.StoreId
+	}
+	return ""
+}
+
+func (x *CreateForumEntryRequest) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *CreateForumEntryRequest) GetParentId() string {
+	if x != nil && x.ParentId != nil {
+		return *x.ParentId
+	}
+	return ""
+}
+
+func (x *CreateForumEntryRequest) GetReplyToId() string {
+	if x != nil && x.ReplyToId != nil {
+		return *x.ReplyToId
+	}
+	return ""
+}
+
+func (x *CreateForumEntryRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type CreateForumEntryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Entry         *ForumEntry            `protobuf:"bytes,1,opt,name=entry,proto3" json:"entry,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateForumEntryResponse) Reset() {
+	*x = CreateForumEntryResponse{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateForumEntryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateForumEntryResponse) ProtoMessage() {}
+
+func (x *CreateForumEntryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateForumEntryResponse.ProtoReflect.Descriptor instead.
+func (*CreateForumEntryResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *CreateForumEntryResponse) GetEntry() *ForumEntry {
+	if x != nil {
+		return x.Entry
+	}
+	return nil
+}
+
+type UpdateForumEntryRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 討論區項目 ID。
+	EntryId string `protobuf:"bytes,1,opt,name=entry_id,json=entryId,proto3" json:"entry_id,omitempty"`
+	// 新的內文，規則同 CreateCommentRequest.body。討論區項目只有內文可以修改，所以沒有 update_mask。
+	Body          string `protobuf:"bytes,2,opt,name=body,proto3" json:"body,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateForumEntryRequest) Reset() {
+	*x = UpdateForumEntryRequest{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateForumEntryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateForumEntryRequest) ProtoMessage() {}
+
+func (x *UpdateForumEntryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateForumEntryRequest.ProtoReflect.Descriptor instead.
+func (*UpdateForumEntryRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *UpdateForumEntryRequest) GetEntryId() string {
+	if x != nil {
+		return x.EntryId
+	}
+	return ""
+}
+
+func (x *UpdateForumEntryRequest) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+// UpdateForumEntryResponse 只帶修改的結果。回覆數不在這裡，client 保留列表上原有的值。
+type UpdateForumEntryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Body          string                 `protobuf:"bytes,1,opt,name=body,proto3" json:"body,omitempty"`
+	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateForumEntryResponse) Reset() {
+	*x = UpdateForumEntryResponse{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateForumEntryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateForumEntryResponse) ProtoMessage() {}
+
+func (x *UpdateForumEntryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateForumEntryResponse.ProtoReflect.Descriptor instead.
+func (*UpdateForumEntryResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *UpdateForumEntryResponse) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *UpdateForumEntryResponse) GetUpdateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdateTime
+	}
+	return nil
+}
+
+type DeleteForumEntryRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 討論區項目 ID。
+	EntryId       string `protobuf:"bytes,1,opt,name=entry_id,json=entryId,proto3" json:"entry_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteForumEntryRequest) Reset() {
+	*x = DeleteForumEntryRequest{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteForumEntryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteForumEntryRequest) ProtoMessage() {}
+
+func (x *DeleteForumEntryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteForumEntryRequest.ProtoReflect.Descriptor instead.
+func (*DeleteForumEntryRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *DeleteForumEntryRequest) GetEntryId() string {
+	if x != nil {
+		return x.EntryId
+	}
+	return ""
+}
+
+type DeleteForumEntryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteForumEntryResponse) Reset() {
+	*x = DeleteForumEntryResponse{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteForumEntryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteForumEntryResponse) ProtoMessage() {}
+
+func (x *DeleteForumEntryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteForumEntryResponse.ProtoReflect.Descriptor instead.
+func (*DeleteForumEntryResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{43}
+}
+
 var File_hawkr_social_v1alpha1_social_proto protoreflect.FileDescriptor
 
 const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"\n" +
-	"\"hawkr/social/v1alpha1/social.proto\x12\x15hawkr.social.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\x1a&hawkr/common/v1alpha1/store_card.proto\"A\n" +
+	"\"hawkr/social/v1alpha1/social.proto\x12\x15hawkr.social.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\x1a&hawkr/common/v1alpha1/store_card.proto\"A\n" +
 	"\aHashtag\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\x12\x1d\n" +
 	"\adisplay\x18\x02 \x01(\tB\x03\xe0A\x03R\adisplay\"\xfc\x04\n" +
@@ -1708,7 +2820,73 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"_parent_id\"\x7f\n" +
 	"\x18ListForumEntriesResponse\x12;\n" +
 	"\aentries\x18\x01 \x03(\v2!.hawkr.social.v1alpha1.ForumEntryR\aentries\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken*S\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"5\n" +
+	"\x15RecordPostViewRequest\x12\x1c\n" +
+	"\apost_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x06postId\"\x18\n" +
+	"\x16RecordPostViewResponse\"0\n" +
+	"\x10SharePostRequest\x12\x1c\n" +
+	"\apost_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x06postId\"\x13\n" +
+	"\x11SharePostResponse\"/\n" +
+	"\x0fLikePostRequest\x12\x1c\n" +
+	"\apost_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x06postId\"\x12\n" +
+	"\x10LikePostResponse\"1\n" +
+	"\x11UnlikePostRequest\x12\x1c\n" +
+	"\apost_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x06postId\"\x14\n" +
+	"\x12UnlikePostResponse\"8\n" +
+	"\x12LikeCommentRequest\x12\"\n" +
+	"\n" +
+	"comment_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tcommentId\"\x15\n" +
+	"\x13LikeCommentResponse\":\n" +
+	"\x14UnlikeCommentRequest\x12\"\n" +
+	"\n" +
+	"comment_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tcommentId\"\x17\n" +
+	"\x15UnlikeCommentResponse\"\xdb\x01\n" +
+	"\x14CreateCommentRequest\x12\x1c\n" +
+	"\apost_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x06postId\x12\x17\n" +
+	"\x04body\x18\x02 \x01(\tB\x03\xe0A\x02R\x04body\x12 \n" +
+	"\tparent_id\x18\x03 \x01(\tH\x00R\bparentId\x88\x01\x01\x12#\n" +
+	"\vreply_to_id\x18\x04 \x01(\tH\x01R\treplyToId\x88\x01\x01\x12'\n" +
+	"\n" +
+	"request_id\x18\x05 \x01(\tB\b\xe2\x8c\xcf\xd7\b\x02\b\x01R\trequestIdB\f\n" +
+	"\n" +
+	"_parent_idB\x0e\n" +
+	"\f_reply_to_id\"Q\n" +
+	"\x15CreateCommentResponse\x128\n" +
+	"\acomment\x18\x01 \x01(\v2\x1e.hawkr.social.v1alpha1.CommentR\acomment\"S\n" +
+	"\x14UpdateCommentRequest\x12\"\n" +
+	"\n" +
+	"comment_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tcommentId\x12\x17\n" +
+	"\x04body\x18\x02 \x01(\tB\x03\xe0A\x02R\x04body\"r\n" +
+	"\x15UpdateCommentResponse\x12\x17\n" +
+	"\x04body\x18\x01 \x01(\tB\x03\xe0A\x03R\x04body\x12@\n" +
+	"\vupdate_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"updateTime\":\n" +
+	"\x14DeleteCommentRequest\x12\"\n" +
+	"\n" +
+	"comment_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tcommentId\"\x17\n" +
+	"\x15DeleteCommentResponse\"\xe0\x01\n" +
+	"\x17CreateForumEntryRequest\x12\x1e\n" +
+	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\x12\x17\n" +
+	"\x04body\x18\x02 \x01(\tB\x03\xe0A\x02R\x04body\x12 \n" +
+	"\tparent_id\x18\x03 \x01(\tH\x00R\bparentId\x88\x01\x01\x12#\n" +
+	"\vreply_to_id\x18\x04 \x01(\tH\x01R\treplyToId\x88\x01\x01\x12'\n" +
+	"\n" +
+	"request_id\x18\x05 \x01(\tB\b\xe2\x8c\xcf\xd7\b\x02\b\x01R\trequestIdB\f\n" +
+	"\n" +
+	"_parent_idB\x0e\n" +
+	"\f_reply_to_id\"S\n" +
+	"\x18CreateForumEntryResponse\x127\n" +
+	"\x05entry\x18\x01 \x01(\v2!.hawkr.social.v1alpha1.ForumEntryR\x05entry\"R\n" +
+	"\x17UpdateForumEntryRequest\x12\x1e\n" +
+	"\bentry_id\x18\x01 \x01(\tB\x03\xe0A\x02R\aentryId\x12\x17\n" +
+	"\x04body\x18\x02 \x01(\tB\x03\xe0A\x02R\x04body\"u\n" +
+	"\x18UpdateForumEntryResponse\x12\x17\n" +
+	"\x04body\x18\x01 \x01(\tB\x03\xe0A\x03R\x04body\x12@\n" +
+	"\vupdate_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"updateTime\"9\n" +
+	"\x17DeleteForumEntryRequest\x12\x1e\n" +
+	"\bentry_id\x18\x01 \x01(\tB\x03\xe0A\x02R\aentryId\"\x1a\n" +
+	"\x18DeleteForumEntryResponse*S\n" +
 	"\tActorKind\x12\x1a\n" +
 	"\x16ACTOR_KIND_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10ACTOR_KIND_BUYER\x10\x01\x12\x14\n" +
@@ -1717,7 +2895,7 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"\x19COMMENT_STATE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15COMMENT_STATE_VISIBLE\x10\x01\x12\x19\n" +
 	"\x15COMMENT_STATE_DELETED\x10\x02\x12\x18\n" +
-	"\x14COMMENT_STATE_HIDDEN\x10\x032\xb7\x06\n" +
+	"\x14COMMENT_STATE_HIDDEN\x10\x032\xa6\a\n" +
 	"\x13SocialPublicService\x12]\n" +
 	"\aGetPost\x12%.hawkr.social.v1alpha1.GetPostRequest\x1a&.hawkr.social.v1alpha1.GetPostResponse\"\x03\x90\x02\x01\x12c\n" +
 	"\tListPosts\x12'.hawkr.social.v1alpha1.ListPostsRequest\x1a(.hawkr.social.v1alpha1.ListPostsResponse\"\x03\x90\x02\x01\x12l\n" +
@@ -1725,7 +2903,21 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"\x14SuggestTrendingPosts\x122.hawkr.social.v1alpha1.SuggestTrendingPostsRequest\x1a3.hawkr.social.v1alpha1.SuggestTrendingPostsResponse\"\x03\x90\x02\x01\x12i\n" +
 	"\vSuggestTags\x12).hawkr.social.v1alpha1.SuggestTagsRequest\x1a*.hawkr.social.v1alpha1.SuggestTagsResponse\"\x03\x90\x02\x01\x12\x81\x01\n" +
 	"\x13SuggestTrendingTags\x121.hawkr.social.v1alpha1.SuggestTrendingTagsRequest\x1a2.hawkr.social.v1alpha1.SuggestTrendingTagsResponse\"\x03\x90\x02\x01\x12x\n" +
-	"\x10ListForumEntries\x12..hawkr.social.v1alpha1.ListForumEntriesRequest\x1a/.hawkr.social.v1alpha1.ListForumEntriesResponse\"\x03\x90\x02\x01B\xfd\x01\n" +
+	"\x10ListForumEntries\x12..hawkr.social.v1alpha1.ListForumEntriesRequest\x1a/.hawkr.social.v1alpha1.ListForumEntriesResponse\"\x03\x90\x02\x01\x12m\n" +
+	"\x0eRecordPostView\x12,.hawkr.social.v1alpha1.RecordPostViewRequest\x1a-.hawkr.social.v1alpha1.RecordPostViewResponse2\xd4\t\n" +
+	"\x10SocialAppService\x12c\n" +
+	"\tSharePost\x12'.hawkr.social.v1alpha1.SharePostRequest\x1a(.hawkr.social.v1alpha1.SharePostResponse\"\x03\x90\x02\x02\x12`\n" +
+	"\bLikePost\x12&.hawkr.social.v1alpha1.LikePostRequest\x1a'.hawkr.social.v1alpha1.LikePostResponse\"\x03\x90\x02\x02\x12f\n" +
+	"\n" +
+	"UnlikePost\x12(.hawkr.social.v1alpha1.UnlikePostRequest\x1a).hawkr.social.v1alpha1.UnlikePostResponse\"\x03\x90\x02\x02\x12i\n" +
+	"\vLikeComment\x12).hawkr.social.v1alpha1.LikeCommentRequest\x1a*.hawkr.social.v1alpha1.LikeCommentResponse\"\x03\x90\x02\x02\x12o\n" +
+	"\rUnlikeComment\x12+.hawkr.social.v1alpha1.UnlikeCommentRequest\x1a,.hawkr.social.v1alpha1.UnlikeCommentResponse\"\x03\x90\x02\x02\x12j\n" +
+	"\rCreateComment\x12+.hawkr.social.v1alpha1.CreateCommentRequest\x1a,.hawkr.social.v1alpha1.CreateCommentResponse\x12o\n" +
+	"\rUpdateComment\x12+.hawkr.social.v1alpha1.UpdateCommentRequest\x1a,.hawkr.social.v1alpha1.UpdateCommentResponse\"\x03\x90\x02\x02\x12o\n" +
+	"\rDeleteComment\x12+.hawkr.social.v1alpha1.DeleteCommentRequest\x1a,.hawkr.social.v1alpha1.DeleteCommentResponse\"\x03\x90\x02\x02\x12s\n" +
+	"\x10CreateForumEntry\x12..hawkr.social.v1alpha1.CreateForumEntryRequest\x1a/.hawkr.social.v1alpha1.CreateForumEntryResponse\x12x\n" +
+	"\x10UpdateForumEntry\x12..hawkr.social.v1alpha1.UpdateForumEntryRequest\x1a/.hawkr.social.v1alpha1.UpdateForumEntryResponse\"\x03\x90\x02\x02\x12x\n" +
+	"\x10DeleteForumEntry\x12..hawkr.social.v1alpha1.DeleteForumEntryRequest\x1a/.hawkr.social.v1alpha1.DeleteForumEntryResponse\"\x03\x90\x02\x02B\xfd\x01\n" +
 	"\x19com.hawkr.social.v1alpha1B\vSocialProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1;socialv1alpha1\xa2\x02\x03HSX\xaa\x02\x15Hawkr.Social.V1alpha1\xca\x02\x15Hawkr\\Social\\V1alpha1\xe2\x02!Hawkr\\Social\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Social::V1alpha1b\x06proto3"
 
 var (
@@ -1741,7 +2933,7 @@ func file_hawkr_social_v1alpha1_social_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_social_v1alpha1_social_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_hawkr_social_v1alpha1_social_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_hawkr_social_v1alpha1_social_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
 var file_hawkr_social_v1alpha1_social_proto_goTypes = []any{
 	(ActorKind)(0),                       // 0: hawkr.social.v1alpha1.ActorKind
 	(CommentState)(0),                    // 1: hawkr.social.v1alpha1.CommentState
@@ -1765,54 +2957,106 @@ var file_hawkr_social_v1alpha1_social_proto_goTypes = []any{
 	(*ForumEntry)(nil),                   // 19: hawkr.social.v1alpha1.ForumEntry
 	(*ListForumEntriesRequest)(nil),      // 20: hawkr.social.v1alpha1.ListForumEntriesRequest
 	(*ListForumEntriesResponse)(nil),     // 21: hawkr.social.v1alpha1.ListForumEntriesResponse
-	(*v1alpha1.StoreCard)(nil),           // 22: hawkr.common.v1alpha1.StoreCard
-	(*v1alpha1.Image)(nil),               // 23: hawkr.common.v1alpha1.Image
-	(*timestamppb.Timestamp)(nil),        // 24: google.protobuf.Timestamp
+	(*RecordPostViewRequest)(nil),        // 22: hawkr.social.v1alpha1.RecordPostViewRequest
+	(*RecordPostViewResponse)(nil),       // 23: hawkr.social.v1alpha1.RecordPostViewResponse
+	(*SharePostRequest)(nil),             // 24: hawkr.social.v1alpha1.SharePostRequest
+	(*SharePostResponse)(nil),            // 25: hawkr.social.v1alpha1.SharePostResponse
+	(*LikePostRequest)(nil),              // 26: hawkr.social.v1alpha1.LikePostRequest
+	(*LikePostResponse)(nil),             // 27: hawkr.social.v1alpha1.LikePostResponse
+	(*UnlikePostRequest)(nil),            // 28: hawkr.social.v1alpha1.UnlikePostRequest
+	(*UnlikePostResponse)(nil),           // 29: hawkr.social.v1alpha1.UnlikePostResponse
+	(*LikeCommentRequest)(nil),           // 30: hawkr.social.v1alpha1.LikeCommentRequest
+	(*LikeCommentResponse)(nil),          // 31: hawkr.social.v1alpha1.LikeCommentResponse
+	(*UnlikeCommentRequest)(nil),         // 32: hawkr.social.v1alpha1.UnlikeCommentRequest
+	(*UnlikeCommentResponse)(nil),        // 33: hawkr.social.v1alpha1.UnlikeCommentResponse
+	(*CreateCommentRequest)(nil),         // 34: hawkr.social.v1alpha1.CreateCommentRequest
+	(*CreateCommentResponse)(nil),        // 35: hawkr.social.v1alpha1.CreateCommentResponse
+	(*UpdateCommentRequest)(nil),         // 36: hawkr.social.v1alpha1.UpdateCommentRequest
+	(*UpdateCommentResponse)(nil),        // 37: hawkr.social.v1alpha1.UpdateCommentResponse
+	(*DeleteCommentRequest)(nil),         // 38: hawkr.social.v1alpha1.DeleteCommentRequest
+	(*DeleteCommentResponse)(nil),        // 39: hawkr.social.v1alpha1.DeleteCommentResponse
+	(*CreateForumEntryRequest)(nil),      // 40: hawkr.social.v1alpha1.CreateForumEntryRequest
+	(*CreateForumEntryResponse)(nil),     // 41: hawkr.social.v1alpha1.CreateForumEntryResponse
+	(*UpdateForumEntryRequest)(nil),      // 42: hawkr.social.v1alpha1.UpdateForumEntryRequest
+	(*UpdateForumEntryResponse)(nil),     // 43: hawkr.social.v1alpha1.UpdateForumEntryResponse
+	(*DeleteForumEntryRequest)(nil),      // 44: hawkr.social.v1alpha1.DeleteForumEntryRequest
+	(*DeleteForumEntryResponse)(nil),     // 45: hawkr.social.v1alpha1.DeleteForumEntryResponse
+	(*v1alpha1.StoreCard)(nil),           // 46: hawkr.common.v1alpha1.StoreCard
+	(*v1alpha1.Image)(nil),               // 47: hawkr.common.v1alpha1.Image
+	(*timestamppb.Timestamp)(nil),        // 48: google.protobuf.Timestamp
 }
 var file_hawkr_social_v1alpha1_social_proto_depIdxs = []int32{
-	22, // 0: hawkr.social.v1alpha1.Post.store:type_name -> hawkr.common.v1alpha1.StoreCard
-	23, // 1: hawkr.social.v1alpha1.Post.image:type_name -> hawkr.common.v1alpha1.Image
+	46, // 0: hawkr.social.v1alpha1.Post.store:type_name -> hawkr.common.v1alpha1.StoreCard
+	47, // 1: hawkr.social.v1alpha1.Post.image:type_name -> hawkr.common.v1alpha1.Image
 	2,  // 2: hawkr.social.v1alpha1.Post.hashtags:type_name -> hawkr.social.v1alpha1.Hashtag
-	24, // 3: hawkr.social.v1alpha1.Post.publish_time:type_name -> google.protobuf.Timestamp
-	24, // 4: hawkr.social.v1alpha1.Post.update_time:type_name -> google.protobuf.Timestamp
+	48, // 3: hawkr.social.v1alpha1.Post.publish_time:type_name -> google.protobuf.Timestamp
+	48, // 4: hawkr.social.v1alpha1.Post.update_time:type_name -> google.protobuf.Timestamp
 	0,  // 5: hawkr.social.v1alpha1.Actor.kind:type_name -> hawkr.social.v1alpha1.ActorKind
-	23, // 6: hawkr.social.v1alpha1.Actor.avatar:type_name -> hawkr.common.v1alpha1.Image
+	47, // 6: hawkr.social.v1alpha1.Actor.avatar:type_name -> hawkr.common.v1alpha1.Image
 	1,  // 7: hawkr.social.v1alpha1.Comment.state:type_name -> hawkr.social.v1alpha1.CommentState
 	4,  // 8: hawkr.social.v1alpha1.Comment.author:type_name -> hawkr.social.v1alpha1.Actor
-	24, // 9: hawkr.social.v1alpha1.Comment.create_time:type_name -> google.protobuf.Timestamp
-	24, // 10: hawkr.social.v1alpha1.Comment.update_time:type_name -> google.protobuf.Timestamp
+	48, // 9: hawkr.social.v1alpha1.Comment.create_time:type_name -> google.protobuf.Timestamp
+	48, // 10: hawkr.social.v1alpha1.Comment.update_time:type_name -> google.protobuf.Timestamp
 	3,  // 11: hawkr.social.v1alpha1.GetPostResponse.post:type_name -> hawkr.social.v1alpha1.Post
 	3,  // 12: hawkr.social.v1alpha1.ListPostsResponse.posts:type_name -> hawkr.social.v1alpha1.Post
 	5,  // 13: hawkr.social.v1alpha1.ListCommentsResponse.comments:type_name -> hawkr.social.v1alpha1.Comment
 	3,  // 14: hawkr.social.v1alpha1.SuggestTrendingPostsResponse.posts:type_name -> hawkr.social.v1alpha1.Post
 	18, // 15: hawkr.social.v1alpha1.SuggestTagsResponse.tags:type_name -> hawkr.social.v1alpha1.TagCount
-	24, // 16: hawkr.social.v1alpha1.SuggestTrendingTagsRequest.start_time:type_name -> google.protobuf.Timestamp
-	24, // 17: hawkr.social.v1alpha1.SuggestTrendingTagsRequest.end_time:type_name -> google.protobuf.Timestamp
+	48, // 16: hawkr.social.v1alpha1.SuggestTrendingTagsRequest.start_time:type_name -> google.protobuf.Timestamp
+	48, // 17: hawkr.social.v1alpha1.SuggestTrendingTagsRequest.end_time:type_name -> google.protobuf.Timestamp
 	18, // 18: hawkr.social.v1alpha1.SuggestTrendingTagsResponse.tags:type_name -> hawkr.social.v1alpha1.TagCount
 	1,  // 19: hawkr.social.v1alpha1.ForumEntry.state:type_name -> hawkr.social.v1alpha1.CommentState
 	4,  // 20: hawkr.social.v1alpha1.ForumEntry.author:type_name -> hawkr.social.v1alpha1.Actor
-	24, // 21: hawkr.social.v1alpha1.ForumEntry.create_time:type_name -> google.protobuf.Timestamp
-	24, // 22: hawkr.social.v1alpha1.ForumEntry.update_time:type_name -> google.protobuf.Timestamp
+	48, // 21: hawkr.social.v1alpha1.ForumEntry.create_time:type_name -> google.protobuf.Timestamp
+	48, // 22: hawkr.social.v1alpha1.ForumEntry.update_time:type_name -> google.protobuf.Timestamp
 	19, // 23: hawkr.social.v1alpha1.ListForumEntriesResponse.entries:type_name -> hawkr.social.v1alpha1.ForumEntry
-	6,  // 24: hawkr.social.v1alpha1.SocialPublicService.GetPost:input_type -> hawkr.social.v1alpha1.GetPostRequest
-	8,  // 25: hawkr.social.v1alpha1.SocialPublicService.ListPosts:input_type -> hawkr.social.v1alpha1.ListPostsRequest
-	10, // 26: hawkr.social.v1alpha1.SocialPublicService.ListComments:input_type -> hawkr.social.v1alpha1.ListCommentsRequest
-	12, // 27: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:input_type -> hawkr.social.v1alpha1.SuggestTrendingPostsRequest
-	14, // 28: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:input_type -> hawkr.social.v1alpha1.SuggestTagsRequest
-	16, // 29: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:input_type -> hawkr.social.v1alpha1.SuggestTrendingTagsRequest
-	20, // 30: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:input_type -> hawkr.social.v1alpha1.ListForumEntriesRequest
-	7,  // 31: hawkr.social.v1alpha1.SocialPublicService.GetPost:output_type -> hawkr.social.v1alpha1.GetPostResponse
-	9,  // 32: hawkr.social.v1alpha1.SocialPublicService.ListPosts:output_type -> hawkr.social.v1alpha1.ListPostsResponse
-	11, // 33: hawkr.social.v1alpha1.SocialPublicService.ListComments:output_type -> hawkr.social.v1alpha1.ListCommentsResponse
-	13, // 34: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:output_type -> hawkr.social.v1alpha1.SuggestTrendingPostsResponse
-	15, // 35: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:output_type -> hawkr.social.v1alpha1.SuggestTagsResponse
-	17, // 36: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:output_type -> hawkr.social.v1alpha1.SuggestTrendingTagsResponse
-	21, // 37: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:output_type -> hawkr.social.v1alpha1.ListForumEntriesResponse
-	31, // [31:38] is the sub-list for method output_type
-	24, // [24:31] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	5,  // 24: hawkr.social.v1alpha1.CreateCommentResponse.comment:type_name -> hawkr.social.v1alpha1.Comment
+	48, // 25: hawkr.social.v1alpha1.UpdateCommentResponse.update_time:type_name -> google.protobuf.Timestamp
+	19, // 26: hawkr.social.v1alpha1.CreateForumEntryResponse.entry:type_name -> hawkr.social.v1alpha1.ForumEntry
+	48, // 27: hawkr.social.v1alpha1.UpdateForumEntryResponse.update_time:type_name -> google.protobuf.Timestamp
+	6,  // 28: hawkr.social.v1alpha1.SocialPublicService.GetPost:input_type -> hawkr.social.v1alpha1.GetPostRequest
+	8,  // 29: hawkr.social.v1alpha1.SocialPublicService.ListPosts:input_type -> hawkr.social.v1alpha1.ListPostsRequest
+	10, // 30: hawkr.social.v1alpha1.SocialPublicService.ListComments:input_type -> hawkr.social.v1alpha1.ListCommentsRequest
+	12, // 31: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:input_type -> hawkr.social.v1alpha1.SuggestTrendingPostsRequest
+	14, // 32: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:input_type -> hawkr.social.v1alpha1.SuggestTagsRequest
+	16, // 33: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:input_type -> hawkr.social.v1alpha1.SuggestTrendingTagsRequest
+	20, // 34: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:input_type -> hawkr.social.v1alpha1.ListForumEntriesRequest
+	22, // 35: hawkr.social.v1alpha1.SocialPublicService.RecordPostView:input_type -> hawkr.social.v1alpha1.RecordPostViewRequest
+	24, // 36: hawkr.social.v1alpha1.SocialAppService.SharePost:input_type -> hawkr.social.v1alpha1.SharePostRequest
+	26, // 37: hawkr.social.v1alpha1.SocialAppService.LikePost:input_type -> hawkr.social.v1alpha1.LikePostRequest
+	28, // 38: hawkr.social.v1alpha1.SocialAppService.UnlikePost:input_type -> hawkr.social.v1alpha1.UnlikePostRequest
+	30, // 39: hawkr.social.v1alpha1.SocialAppService.LikeComment:input_type -> hawkr.social.v1alpha1.LikeCommentRequest
+	32, // 40: hawkr.social.v1alpha1.SocialAppService.UnlikeComment:input_type -> hawkr.social.v1alpha1.UnlikeCommentRequest
+	34, // 41: hawkr.social.v1alpha1.SocialAppService.CreateComment:input_type -> hawkr.social.v1alpha1.CreateCommentRequest
+	36, // 42: hawkr.social.v1alpha1.SocialAppService.UpdateComment:input_type -> hawkr.social.v1alpha1.UpdateCommentRequest
+	38, // 43: hawkr.social.v1alpha1.SocialAppService.DeleteComment:input_type -> hawkr.social.v1alpha1.DeleteCommentRequest
+	40, // 44: hawkr.social.v1alpha1.SocialAppService.CreateForumEntry:input_type -> hawkr.social.v1alpha1.CreateForumEntryRequest
+	42, // 45: hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry:input_type -> hawkr.social.v1alpha1.UpdateForumEntryRequest
+	44, // 46: hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry:input_type -> hawkr.social.v1alpha1.DeleteForumEntryRequest
+	7,  // 47: hawkr.social.v1alpha1.SocialPublicService.GetPost:output_type -> hawkr.social.v1alpha1.GetPostResponse
+	9,  // 48: hawkr.social.v1alpha1.SocialPublicService.ListPosts:output_type -> hawkr.social.v1alpha1.ListPostsResponse
+	11, // 49: hawkr.social.v1alpha1.SocialPublicService.ListComments:output_type -> hawkr.social.v1alpha1.ListCommentsResponse
+	13, // 50: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:output_type -> hawkr.social.v1alpha1.SuggestTrendingPostsResponse
+	15, // 51: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:output_type -> hawkr.social.v1alpha1.SuggestTagsResponse
+	17, // 52: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:output_type -> hawkr.social.v1alpha1.SuggestTrendingTagsResponse
+	21, // 53: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:output_type -> hawkr.social.v1alpha1.ListForumEntriesResponse
+	23, // 54: hawkr.social.v1alpha1.SocialPublicService.RecordPostView:output_type -> hawkr.social.v1alpha1.RecordPostViewResponse
+	25, // 55: hawkr.social.v1alpha1.SocialAppService.SharePost:output_type -> hawkr.social.v1alpha1.SharePostResponse
+	27, // 56: hawkr.social.v1alpha1.SocialAppService.LikePost:output_type -> hawkr.social.v1alpha1.LikePostResponse
+	29, // 57: hawkr.social.v1alpha1.SocialAppService.UnlikePost:output_type -> hawkr.social.v1alpha1.UnlikePostResponse
+	31, // 58: hawkr.social.v1alpha1.SocialAppService.LikeComment:output_type -> hawkr.social.v1alpha1.LikeCommentResponse
+	33, // 59: hawkr.social.v1alpha1.SocialAppService.UnlikeComment:output_type -> hawkr.social.v1alpha1.UnlikeCommentResponse
+	35, // 60: hawkr.social.v1alpha1.SocialAppService.CreateComment:output_type -> hawkr.social.v1alpha1.CreateCommentResponse
+	37, // 61: hawkr.social.v1alpha1.SocialAppService.UpdateComment:output_type -> hawkr.social.v1alpha1.UpdateCommentResponse
+	39, // 62: hawkr.social.v1alpha1.SocialAppService.DeleteComment:output_type -> hawkr.social.v1alpha1.DeleteCommentResponse
+	41, // 63: hawkr.social.v1alpha1.SocialAppService.CreateForumEntry:output_type -> hawkr.social.v1alpha1.CreateForumEntryResponse
+	43, // 64: hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry:output_type -> hawkr.social.v1alpha1.UpdateForumEntryResponse
+	45, // 65: hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry:output_type -> hawkr.social.v1alpha1.DeleteForumEntryResponse
+	47, // [47:66] is the sub-list for method output_type
+	28, // [28:47] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_social_v1alpha1_social_proto_init() }
@@ -1827,15 +3071,17 @@ func file_hawkr_social_v1alpha1_social_proto_init() {
 	file_hawkr_social_v1alpha1_social_proto_msgTypes[8].OneofWrappers = []any{}
 	file_hawkr_social_v1alpha1_social_proto_msgTypes[17].OneofWrappers = []any{}
 	file_hawkr_social_v1alpha1_social_proto_msgTypes[18].OneofWrappers = []any{}
+	file_hawkr_social_v1alpha1_social_proto_msgTypes[32].OneofWrappers = []any{}
+	file_hawkr_social_v1alpha1_social_proto_msgTypes[38].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_social_v1alpha1_social_proto_rawDesc), len(file_hawkr_social_v1alpha1_social_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   20,
+			NumMessages:   44,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_hawkr_social_v1alpha1_social_proto_goTypes,
 		DependencyIndexes: file_hawkr_social_v1alpha1_social_proto_depIdxs,

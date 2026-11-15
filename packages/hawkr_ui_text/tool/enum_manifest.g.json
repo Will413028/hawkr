@@ -300,6 +300,20 @@
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
       "inCatalog": false,
       "serverOwned": false
+    },
+    {
+      "name": "hawkr.social.v1alpha1.ActorKind",
+      "dartClass": "ActorKind",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.social.v1alpha1.CommentState",
+      "dartClass": "CommentState",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
     }
   ]
 }

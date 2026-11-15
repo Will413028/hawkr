@@ -23,6 +23,7 @@ var publicViewerDependent = map[string]bool{
 	"/hawkr.social.v1alpha1.SocialPublicService/SuggestTrendingPosts": true,
 	"/hawkr.social.v1alpha1.SocialPublicService/SuggestTags":          false,
 	"/hawkr.social.v1alpha1.SocialPublicService/SuggestTrendingTags":  false,
+	"/hawkr.social.v1alpha1.SocialPublicService/RecordPostView":       false,
 
 	"/hawkr.seller.v1alpha1.SellerReportPublicService/SubmitFoodSafetyReport": false,
 

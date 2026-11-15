@@ -289,11 +289,16 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	stats := deps.Stats
 	add(contentv1alpha1connect.NewContentPublicServiceHandler(httpcontent.NewPublic(deps.Content, deps.Images), opts...))
 	add(admincontentconnect.NewContentAdminServiceHandler(httpcontent.NewAdmin(deps.Content, deps.Images), opts...))
-	socialPublic, err := httpsocial.NewPublic(deps.Social, deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin, deps.Now)
+	socialPublic, err := httpsocial.NewPublic(deps.Social, deps.Social, deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin, deps.Now)
 	if err != nil {
 		return nil, err
 	}
 	add(socialv1alpha1connect.NewSocialPublicServiceHandler(socialPublic, opts...))
+	socialApp, err := httpsocial.NewApp(deps.Social, deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin)
+	if err != nil {
+		return nil, err
+	}
+	add(socialv1alpha1connect.NewSocialAppServiceHandler(socialApp, opts...))
 	buyerApp, err := httpbuyer.NewApp(deps.Buyer, deps.Images, deps.BuyerPorts, stats)
 	if err != nil {
 		return nil, err

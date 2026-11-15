@@ -531,6 +531,20 @@
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
       "inCatalog": false,
       "serverOwned": false
+    },
+    {
+      "name": "hawkr.social.v1alpha1.ActorKind",
+      "tsName": "ActorKind",
+      "tsModule": "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.social.v1alpha1.CommentState",
+      "tsName": "CommentState",
+      "tsModule": "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb",
+      "inCatalog": false,
+      "serverOwned": false
     }
   ]
 }

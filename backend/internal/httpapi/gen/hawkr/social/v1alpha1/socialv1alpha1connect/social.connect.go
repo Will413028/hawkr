@@ -2,7 +2,7 @@
 //
 // Source: hawkr/social/v1alpha1/social.proto
 
-// social 模組給前台的 API：店家貼文與留言的公開讀取。寫入與互動（讚、留言、瀏覽）在 SocialAppService 與 RecordPostView（A7-2b 起）。
+// social 模組給前台的 API：店家貼文與留言的公開讀取（SocialPublicService），瀏覽打點（RecordPostView），以及登入者的互動寫入（SocialAppService：分享、讚、留言、討論區）。
 //
 // ID 是不透明的字串（貼文與留言是 UUID，店家是過渡期的十進位整數字串），client 不解析、不轉數字
 // （ADR 2026-09-25-row-identity-by-data-kind D5）。圖片是 hawkr.common.v1alpha1.Image，店家卡片是 hawkr.common.v1alpha1.StoreCard。
@@ -30,6 +30,8 @@ const _ = connect.IsAtLeastVersion1_13_0
 const (
 	// SocialPublicServiceName is the fully-qualified name of the SocialPublicService service.
 	SocialPublicServiceName = "hawkr.social.v1alpha1.SocialPublicService"
+	// SocialAppServiceName is the fully-qualified name of the SocialAppService service.
+	SocialAppServiceName = "hawkr.social.v1alpha1.SocialAppService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -61,6 +63,42 @@ const (
 	// SocialPublicServiceListForumEntriesProcedure is the fully-qualified name of the
 	// SocialPublicService's ListForumEntries RPC.
 	SocialPublicServiceListForumEntriesProcedure = "/hawkr.social.v1alpha1.SocialPublicService/ListForumEntries"
+	// SocialPublicServiceRecordPostViewProcedure is the fully-qualified name of the
+	// SocialPublicService's RecordPostView RPC.
+	SocialPublicServiceRecordPostViewProcedure = "/hawkr.social.v1alpha1.SocialPublicService/RecordPostView"
+	// SocialAppServiceSharePostProcedure is the fully-qualified name of the SocialAppService's
+	// SharePost RPC.
+	SocialAppServiceSharePostProcedure = "/hawkr.social.v1alpha1.SocialAppService/SharePost"
+	// SocialAppServiceLikePostProcedure is the fully-qualified name of the SocialAppService's LikePost
+	// RPC.
+	SocialAppServiceLikePostProcedure = "/hawkr.social.v1alpha1.SocialAppService/LikePost"
+	// SocialAppServiceUnlikePostProcedure is the fully-qualified name of the SocialAppService's
+	// UnlikePost RPC.
+	SocialAppServiceUnlikePostProcedure = "/hawkr.social.v1alpha1.SocialAppService/UnlikePost"
+	// SocialAppServiceLikeCommentProcedure is the fully-qualified name of the SocialAppService's
+	// LikeComment RPC.
+	SocialAppServiceLikeCommentProcedure = "/hawkr.social.v1alpha1.SocialAppService/LikeComment"
+	// SocialAppServiceUnlikeCommentProcedure is the fully-qualified name of the SocialAppService's
+	// UnlikeComment RPC.
+	SocialAppServiceUnlikeCommentProcedure = "/hawkr.social.v1alpha1.SocialAppService/UnlikeComment"
+	// SocialAppServiceCreateCommentProcedure is the fully-qualified name of the SocialAppService's
+	// CreateComment RPC.
+	SocialAppServiceCreateCommentProcedure = "/hawkr.social.v1alpha1.SocialAppService/CreateComment"
+	// SocialAppServiceUpdateCommentProcedure is the fully-qualified name of the SocialAppService's
+	// UpdateComment RPC.
+	SocialAppServiceUpdateCommentProcedure = "/hawkr.social.v1alpha1.SocialAppService/UpdateComment"
+	// SocialAppServiceDeleteCommentProcedure is the fully-qualified name of the SocialAppService's
+	// DeleteComment RPC.
+	SocialAppServiceDeleteCommentProcedure = "/hawkr.social.v1alpha1.SocialAppService/DeleteComment"
+	// SocialAppServiceCreateForumEntryProcedure is the fully-qualified name of the SocialAppService's
+	// CreateForumEntry RPC.
+	SocialAppServiceCreateForumEntryProcedure = "/hawkr.social.v1alpha1.SocialAppService/CreateForumEntry"
+	// SocialAppServiceUpdateForumEntryProcedure is the fully-qualified name of the SocialAppService's
+	// UpdateForumEntry RPC.
+	SocialAppServiceUpdateForumEntryProcedure = "/hawkr.social.v1alpha1.SocialAppService/UpdateForumEntry"
+	// SocialAppServiceDeleteForumEntryProcedure is the fully-qualified name of the SocialAppService's
+	// DeleteForumEntry RPC.
+	SocialAppServiceDeleteForumEntryProcedure = "/hawkr.social.v1alpha1.SocialAppService/DeleteForumEntry"
 )
 
 // SocialPublicServiceClient is a client for the hawkr.social.v1alpha1.SocialPublicService service.
@@ -88,6 +126,11 @@ type SocialPublicServiceClient interface {
 	// （只有 id、store_id、create_time、reply_count 與 state）；觀看者封鎖了這家店、或與作者任一方向有個人封鎖時，對應的內容不出現，
 	// 該頁因此可以少於 page_size。店家讀不到時是空的一頁；指定的 parent_id 不屬於這家店回 not_found。
 	ListForumEntries(context.Context, *connect.Request[v1alpha1.ListForumEntriesRequest]) (*connect.Response[v1alpha1.ListForumEntriesResponse], error)
+	// RecordPostView 記一次貼文瀏覽，匿名也能呼叫。只計觀看者讀得到的貼文，同一篇、同一個台北日、同一個觀看者只算一次；
+	// 讀不到的貼文與沒有計入的呼叫都回成功，不區分原因。登入者以帳號去重，訪客以來源 IP 與 User-Agent 去重；停權的帳號與無效的憑證以訪客計入。
+	// 店主看自己店的貼文不計。每個來源 IP 有額度，超過回 resource_exhausted 與 RetryInfo。瀏覽是寫入，所以不標 NO_SIDE_EFFECTS，client 以 POST 呼叫；
+	// 讀取貼文的方法（GetPost）不計瀏覽。
+	RecordPostView(context.Context, *connect.Request[v1alpha1.RecordPostViewRequest]) (*connect.Response[v1alpha1.RecordPostViewResponse], error)
 }
 
 // NewSocialPublicServiceClient constructs a client for the
@@ -150,6 +193,12 @@ func NewSocialPublicServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		recordPostView: connect.NewClient[v1alpha1.RecordPostViewRequest, v1alpha1.RecordPostViewResponse](
+			httpClient,
+			baseURL+SocialPublicServiceRecordPostViewProcedure,
+			connect.WithSchema(socialPublicServiceMethods.ByName("RecordPostView")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -162,6 +211,7 @@ type socialPublicServiceClient struct {
 	suggestTags          *connect.Client[v1alpha1.SuggestTagsRequest, v1alpha1.SuggestTagsResponse]
 	suggestTrendingTags  *connect.Client[v1alpha1.SuggestTrendingTagsRequest, v1alpha1.SuggestTrendingTagsResponse]
 	listForumEntries     *connect.Client[v1alpha1.ListForumEntriesRequest, v1alpha1.ListForumEntriesResponse]
+	recordPostView       *connect.Client[v1alpha1.RecordPostViewRequest, v1alpha1.RecordPostViewResponse]
 }
 
 // GetPost calls hawkr.social.v1alpha1.SocialPublicService.GetPost.
@@ -199,6 +249,11 @@ func (c *socialPublicServiceClient) ListForumEntries(ctx context.Context, req *c
 	return c.listForumEntries.CallUnary(ctx, req)
 }
 
+// RecordPostView calls hawkr.social.v1alpha1.SocialPublicService.RecordPostView.
+func (c *socialPublicServiceClient) RecordPostView(ctx context.Context, req *connect.Request[v1alpha1.RecordPostViewRequest]) (*connect.Response[v1alpha1.RecordPostViewResponse], error) {
+	return c.recordPostView.CallUnary(ctx, req)
+}
+
 // SocialPublicServiceHandler is an implementation of the hawkr.social.v1alpha1.SocialPublicService
 // service.
 type SocialPublicServiceHandler interface {
@@ -225,6 +280,11 @@ type SocialPublicServiceHandler interface {
 	// （只有 id、store_id、create_time、reply_count 與 state）；觀看者封鎖了這家店、或與作者任一方向有個人封鎖時，對應的內容不出現，
 	// 該頁因此可以少於 page_size。店家讀不到時是空的一頁；指定的 parent_id 不屬於這家店回 not_found。
 	ListForumEntries(context.Context, *connect.Request[v1alpha1.ListForumEntriesRequest]) (*connect.Response[v1alpha1.ListForumEntriesResponse], error)
+	// RecordPostView 記一次貼文瀏覽，匿名也能呼叫。只計觀看者讀得到的貼文，同一篇、同一個台北日、同一個觀看者只算一次；
+	// 讀不到的貼文與沒有計入的呼叫都回成功，不區分原因。登入者以帳號去重，訪客以來源 IP 與 User-Agent 去重；停權的帳號與無效的憑證以訪客計入。
+	// 店主看自己店的貼文不計。每個來源 IP 有額度，超過回 resource_exhausted 與 RetryInfo。瀏覽是寫入，所以不標 NO_SIDE_EFFECTS，client 以 POST 呼叫；
+	// 讀取貼文的方法（GetPost）不計瀏覽。
+	RecordPostView(context.Context, *connect.Request[v1alpha1.RecordPostViewRequest]) (*connect.Response[v1alpha1.RecordPostViewResponse], error)
 }
 
 // NewSocialPublicServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -283,6 +343,12 @@ func NewSocialPublicServiceHandler(svc SocialPublicServiceHandler, opts ...conne
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
+	socialPublicServiceRecordPostViewHandler := connect.NewUnaryHandler(
+		SocialPublicServiceRecordPostViewProcedure,
+		svc.RecordPostView,
+		connect.WithSchema(socialPublicServiceMethods.ByName("RecordPostView")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hawkr.social.v1alpha1.SocialPublicService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SocialPublicServiceGetPostProcedure:
@@ -299,6 +365,8 @@ func NewSocialPublicServiceHandler(svc SocialPublicServiceHandler, opts ...conne
 			socialPublicServiceSuggestTrendingTagsHandler.ServeHTTP(w, r)
 		case SocialPublicServiceListForumEntriesProcedure:
 			socialPublicServiceListForumEntriesHandler.ServeHTTP(w, r)
+		case SocialPublicServiceRecordPostViewProcedure:
+			socialPublicServiceRecordPostViewHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -334,4 +402,379 @@ func (UnimplementedSocialPublicServiceHandler) SuggestTrendingTags(context.Conte
 
 func (UnimplementedSocialPublicServiceHandler) ListForumEntries(context.Context, *connect.Request[v1alpha1.ListForumEntriesRequest]) (*connect.Response[v1alpha1.ListForumEntriesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialPublicService.ListForumEntries is not implemented"))
+}
+
+func (UnimplementedSocialPublicServiceHandler) RecordPostView(context.Context, *connect.Request[v1alpha1.RecordPostViewRequest]) (*connect.Response[v1alpha1.RecordPostViewResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialPublicService.RecordPostView is not implemented"))
+}
+
+// SocialAppServiceClient is a client for the hawkr.social.v1alpha1.SocialAppService service.
+type SocialAppServiceClient interface {
+	// SharePost 記一次分享：同一位買家對同一篇只算一次，重送安全。貼文讀不到回 not_found。
+	SharePost(context.Context, *connect.Request[v1alpha1.SharePostRequest]) (*connect.Response[v1alpha1.SharePostResponse], error)
+	// LikePost 對貼文按讚，已經讚過也回成功（設定而不是切換）。只有買家能按讚；貼文讀不到回 not_found。
+	LikePost(context.Context, *connect.Request[v1alpha1.LikePostRequest]) (*connect.Response[v1alpha1.LikePostResponse], error)
+	// UnlikePost 取消貼文的讚，沒有讚過也回成功。
+	UnlikePost(context.Context, *connect.Request[v1alpha1.UnlikePostRequest]) (*connect.Response[v1alpha1.UnlikePostResponse], error)
+	// LikeComment 對留言按讚，已經讚過也回成功。留言讀不到回 not_found。
+	LikeComment(context.Context, *connect.Request[v1alpha1.LikeCommentRequest]) (*connect.Response[v1alpha1.LikeCommentResponse], error)
+	// UnlikeComment 取消留言的讚，沒有讚過也回成功。
+	UnlikeComment(context.Context, *connect.Request[v1alpha1.UnlikeCommentRequest]) (*connect.Response[v1alpha1.UnlikeCommentResponse], error)
+	// CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回第一次建立的留言，不重複建立。
+	CreateComment(context.Context, *connect.Request[v1alpha1.CreateCommentRequest]) (*connect.Response[v1alpha1.CreateCommentResponse], error)
+	// UpdateComment 修改自己的留言內文；被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
+	UpdateComment(context.Context, *connect.Request[v1alpha1.UpdateCommentRequest]) (*connect.Response[v1alpha1.UpdateCommentResponse], error)
+	// DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功。
+	DeleteComment(context.Context, *connect.Request[v1alpha1.DeleteCommentRequest]) (*connect.Response[v1alpha1.DeleteCommentResponse], error)
+	// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（回覆只限該店家）。帶 request_id 重送回第一次建立的項目，不重複建立。
+	CreateForumEntry(context.Context, *connect.Request[v1alpha1.CreateForumEntryRequest]) (*connect.Response[v1alpha1.CreateForumEntryResponse], error)
+	// UpdateForumEntry 修改自己的討論區發言內文；被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
+	UpdateForumEntry(context.Context, *connect.Request[v1alpha1.UpdateForumEntryRequest]) (*connect.Response[v1alpha1.UpdateForumEntryResponse], error)
+	// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功。
+	DeleteForumEntry(context.Context, *connect.Request[v1alpha1.DeleteForumEntryRequest]) (*connect.Response[v1alpha1.DeleteForumEntryResponse], error)
+}
+
+// NewSocialAppServiceClient constructs a client for the hawkr.social.v1alpha1.SocialAppService
+// service. By default, it uses the Connect protocol with the binary Protobuf Codec, asks for
+// gzipped responses, and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply
+// the connect.WithGRPC() or connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewSocialAppServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) SocialAppServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	socialAppServiceMethods := v1alpha1.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialAppService").Methods()
+	return &socialAppServiceClient{
+		sharePost: connect.NewClient[v1alpha1.SharePostRequest, v1alpha1.SharePostResponse](
+			httpClient,
+			baseURL+SocialAppServiceSharePostProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("SharePost")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		likePost: connect.NewClient[v1alpha1.LikePostRequest, v1alpha1.LikePostResponse](
+			httpClient,
+			baseURL+SocialAppServiceLikePostProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("LikePost")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		unlikePost: connect.NewClient[v1alpha1.UnlikePostRequest, v1alpha1.UnlikePostResponse](
+			httpClient,
+			baseURL+SocialAppServiceUnlikePostProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("UnlikePost")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		likeComment: connect.NewClient[v1alpha1.LikeCommentRequest, v1alpha1.LikeCommentResponse](
+			httpClient,
+			baseURL+SocialAppServiceLikeCommentProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("LikeComment")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		unlikeComment: connect.NewClient[v1alpha1.UnlikeCommentRequest, v1alpha1.UnlikeCommentResponse](
+			httpClient,
+			baseURL+SocialAppServiceUnlikeCommentProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("UnlikeComment")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		createComment: connect.NewClient[v1alpha1.CreateCommentRequest, v1alpha1.CreateCommentResponse](
+			httpClient,
+			baseURL+SocialAppServiceCreateCommentProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("CreateComment")),
+			connect.WithClientOptions(opts...),
+		),
+		updateComment: connect.NewClient[v1alpha1.UpdateCommentRequest, v1alpha1.UpdateCommentResponse](
+			httpClient,
+			baseURL+SocialAppServiceUpdateCommentProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("UpdateComment")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		deleteComment: connect.NewClient[v1alpha1.DeleteCommentRequest, v1alpha1.DeleteCommentResponse](
+			httpClient,
+			baseURL+SocialAppServiceDeleteCommentProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("DeleteComment")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		createForumEntry: connect.NewClient[v1alpha1.CreateForumEntryRequest, v1alpha1.CreateForumEntryResponse](
+			httpClient,
+			baseURL+SocialAppServiceCreateForumEntryProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("CreateForumEntry")),
+			connect.WithClientOptions(opts...),
+		),
+		updateForumEntry: connect.NewClient[v1alpha1.UpdateForumEntryRequest, v1alpha1.UpdateForumEntryResponse](
+			httpClient,
+			baseURL+SocialAppServiceUpdateForumEntryProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("UpdateForumEntry")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		deleteForumEntry: connect.NewClient[v1alpha1.DeleteForumEntryRequest, v1alpha1.DeleteForumEntryResponse](
+			httpClient,
+			baseURL+SocialAppServiceDeleteForumEntryProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("DeleteForumEntry")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// socialAppServiceClient implements SocialAppServiceClient.
+type socialAppServiceClient struct {
+	sharePost        *connect.Client[v1alpha1.SharePostRequest, v1alpha1.SharePostResponse]
+	likePost         *connect.Client[v1alpha1.LikePostRequest, v1alpha1.LikePostResponse]
+	unlikePost       *connect.Client[v1alpha1.UnlikePostRequest, v1alpha1.UnlikePostResponse]
+	likeComment      *connect.Client[v1alpha1.LikeCommentRequest, v1alpha1.LikeCommentResponse]
+	unlikeComment    *connect.Client[v1alpha1.UnlikeCommentRequest, v1alpha1.UnlikeCommentResponse]
+	createComment    *connect.Client[v1alpha1.CreateCommentRequest, v1alpha1.CreateCommentResponse]
+	updateComment    *connect.Client[v1alpha1.UpdateCommentRequest, v1alpha1.UpdateCommentResponse]
+	deleteComment    *connect.Client[v1alpha1.DeleteCommentRequest, v1alpha1.DeleteCommentResponse]
+	createForumEntry *connect.Client[v1alpha1.CreateForumEntryRequest, v1alpha1.CreateForumEntryResponse]
+	updateForumEntry *connect.Client[v1alpha1.UpdateForumEntryRequest, v1alpha1.UpdateForumEntryResponse]
+	deleteForumEntry *connect.Client[v1alpha1.DeleteForumEntryRequest, v1alpha1.DeleteForumEntryResponse]
+}
+
+// SharePost calls hawkr.social.v1alpha1.SocialAppService.SharePost.
+func (c *socialAppServiceClient) SharePost(ctx context.Context, req *connect.Request[v1alpha1.SharePostRequest]) (*connect.Response[v1alpha1.SharePostResponse], error) {
+	return c.sharePost.CallUnary(ctx, req)
+}
+
+// LikePost calls hawkr.social.v1alpha1.SocialAppService.LikePost.
+func (c *socialAppServiceClient) LikePost(ctx context.Context, req *connect.Request[v1alpha1.LikePostRequest]) (*connect.Response[v1alpha1.LikePostResponse], error) {
+	return c.likePost.CallUnary(ctx, req)
+}
+
+// UnlikePost calls hawkr.social.v1alpha1.SocialAppService.UnlikePost.
+func (c *socialAppServiceClient) UnlikePost(ctx context.Context, req *connect.Request[v1alpha1.UnlikePostRequest]) (*connect.Response[v1alpha1.UnlikePostResponse], error) {
+	return c.unlikePost.CallUnary(ctx, req)
+}
+
+// LikeComment calls hawkr.social.v1alpha1.SocialAppService.LikeComment.
+func (c *socialAppServiceClient) LikeComment(ctx context.Context, req *connect.Request[v1alpha1.LikeCommentRequest]) (*connect.Response[v1alpha1.LikeCommentResponse], error) {
+	return c.likeComment.CallUnary(ctx, req)
+}
+
+// UnlikeComment calls hawkr.social.v1alpha1.SocialAppService.UnlikeComment.
+func (c *socialAppServiceClient) UnlikeComment(ctx context.Context, req *connect.Request[v1alpha1.UnlikeCommentRequest]) (*connect.Response[v1alpha1.UnlikeCommentResponse], error) {
+	return c.unlikeComment.CallUnary(ctx, req)
+}
+
+// CreateComment calls hawkr.social.v1alpha1.SocialAppService.CreateComment.
+func (c *socialAppServiceClient) CreateComment(ctx context.Context, req *connect.Request[v1alpha1.CreateCommentRequest]) (*connect.Response[v1alpha1.CreateCommentResponse], error) {
+	return c.createComment.CallUnary(ctx, req)
+}
+
+// UpdateComment calls hawkr.social.v1alpha1.SocialAppService.UpdateComment.
+func (c *socialAppServiceClient) UpdateComment(ctx context.Context, req *connect.Request[v1alpha1.UpdateCommentRequest]) (*connect.Response[v1alpha1.UpdateCommentResponse], error) {
+	return c.updateComment.CallUnary(ctx, req)
+}
+
+// DeleteComment calls hawkr.social.v1alpha1.SocialAppService.DeleteComment.
+func (c *socialAppServiceClient) DeleteComment(ctx context.Context, req *connect.Request[v1alpha1.DeleteCommentRequest]) (*connect.Response[v1alpha1.DeleteCommentResponse], error) {
+	return c.deleteComment.CallUnary(ctx, req)
+}
+
+// CreateForumEntry calls hawkr.social.v1alpha1.SocialAppService.CreateForumEntry.
+func (c *socialAppServiceClient) CreateForumEntry(ctx context.Context, req *connect.Request[v1alpha1.CreateForumEntryRequest]) (*connect.Response[v1alpha1.CreateForumEntryResponse], error) {
+	return c.createForumEntry.CallUnary(ctx, req)
+}
+
+// UpdateForumEntry calls hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry.
+func (c *socialAppServiceClient) UpdateForumEntry(ctx context.Context, req *connect.Request[v1alpha1.UpdateForumEntryRequest]) (*connect.Response[v1alpha1.UpdateForumEntryResponse], error) {
+	return c.updateForumEntry.CallUnary(ctx, req)
+}
+
+// DeleteForumEntry calls hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry.
+func (c *socialAppServiceClient) DeleteForumEntry(ctx context.Context, req *connect.Request[v1alpha1.DeleteForumEntryRequest]) (*connect.Response[v1alpha1.DeleteForumEntryResponse], error) {
+	return c.deleteForumEntry.CallUnary(ctx, req)
+}
+
+// SocialAppServiceHandler is an implementation of the hawkr.social.v1alpha1.SocialAppService
+// service.
+type SocialAppServiceHandler interface {
+	// SharePost 記一次分享：同一位買家對同一篇只算一次，重送安全。貼文讀不到回 not_found。
+	SharePost(context.Context, *connect.Request[v1alpha1.SharePostRequest]) (*connect.Response[v1alpha1.SharePostResponse], error)
+	// LikePost 對貼文按讚，已經讚過也回成功（設定而不是切換）。只有買家能按讚；貼文讀不到回 not_found。
+	LikePost(context.Context, *connect.Request[v1alpha1.LikePostRequest]) (*connect.Response[v1alpha1.LikePostResponse], error)
+	// UnlikePost 取消貼文的讚，沒有讚過也回成功。
+	UnlikePost(context.Context, *connect.Request[v1alpha1.UnlikePostRequest]) (*connect.Response[v1alpha1.UnlikePostResponse], error)
+	// LikeComment 對留言按讚，已經讚過也回成功。留言讀不到回 not_found。
+	LikeComment(context.Context, *connect.Request[v1alpha1.LikeCommentRequest]) (*connect.Response[v1alpha1.LikeCommentResponse], error)
+	// UnlikeComment 取消留言的讚，沒有讚過也回成功。
+	UnlikeComment(context.Context, *connect.Request[v1alpha1.UnlikeCommentRequest]) (*connect.Response[v1alpha1.UnlikeCommentResponse], error)
+	// CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回第一次建立的留言，不重複建立。
+	CreateComment(context.Context, *connect.Request[v1alpha1.CreateCommentRequest]) (*connect.Response[v1alpha1.CreateCommentResponse], error)
+	// UpdateComment 修改自己的留言內文；被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
+	UpdateComment(context.Context, *connect.Request[v1alpha1.UpdateCommentRequest]) (*connect.Response[v1alpha1.UpdateCommentResponse], error)
+	// DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功。
+	DeleteComment(context.Context, *connect.Request[v1alpha1.DeleteCommentRequest]) (*connect.Response[v1alpha1.DeleteCommentResponse], error)
+	// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（回覆只限該店家）。帶 request_id 重送回第一次建立的項目，不重複建立。
+	CreateForumEntry(context.Context, *connect.Request[v1alpha1.CreateForumEntryRequest]) (*connect.Response[v1alpha1.CreateForumEntryResponse], error)
+	// UpdateForumEntry 修改自己的討論區發言內文；被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
+	UpdateForumEntry(context.Context, *connect.Request[v1alpha1.UpdateForumEntryRequest]) (*connect.Response[v1alpha1.UpdateForumEntryResponse], error)
+	// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功。
+	DeleteForumEntry(context.Context, *connect.Request[v1alpha1.DeleteForumEntryRequest]) (*connect.Response[v1alpha1.DeleteForumEntryResponse], error)
+}
+
+// NewSocialAppServiceHandler builds an HTTP handler from the service implementation. It returns the
+// path on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewSocialAppServiceHandler(svc SocialAppServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	socialAppServiceMethods := v1alpha1.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialAppService").Methods()
+	socialAppServiceSharePostHandler := connect.NewUnaryHandler(
+		SocialAppServiceSharePostProcedure,
+		svc.SharePost,
+		connect.WithSchema(socialAppServiceMethods.ByName("SharePost")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceLikePostHandler := connect.NewUnaryHandler(
+		SocialAppServiceLikePostProcedure,
+		svc.LikePost,
+		connect.WithSchema(socialAppServiceMethods.ByName("LikePost")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceUnlikePostHandler := connect.NewUnaryHandler(
+		SocialAppServiceUnlikePostProcedure,
+		svc.UnlikePost,
+		connect.WithSchema(socialAppServiceMethods.ByName("UnlikePost")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceLikeCommentHandler := connect.NewUnaryHandler(
+		SocialAppServiceLikeCommentProcedure,
+		svc.LikeComment,
+		connect.WithSchema(socialAppServiceMethods.ByName("LikeComment")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceUnlikeCommentHandler := connect.NewUnaryHandler(
+		SocialAppServiceUnlikeCommentProcedure,
+		svc.UnlikeComment,
+		connect.WithSchema(socialAppServiceMethods.ByName("UnlikeComment")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceCreateCommentHandler := connect.NewUnaryHandler(
+		SocialAppServiceCreateCommentProcedure,
+		svc.CreateComment,
+		connect.WithSchema(socialAppServiceMethods.ByName("CreateComment")),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceUpdateCommentHandler := connect.NewUnaryHandler(
+		SocialAppServiceUpdateCommentProcedure,
+		svc.UpdateComment,
+		connect.WithSchema(socialAppServiceMethods.ByName("UpdateComment")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceDeleteCommentHandler := connect.NewUnaryHandler(
+		SocialAppServiceDeleteCommentProcedure,
+		svc.DeleteComment,
+		connect.WithSchema(socialAppServiceMethods.ByName("DeleteComment")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceCreateForumEntryHandler := connect.NewUnaryHandler(
+		SocialAppServiceCreateForumEntryProcedure,
+		svc.CreateForumEntry,
+		connect.WithSchema(socialAppServiceMethods.ByName("CreateForumEntry")),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceUpdateForumEntryHandler := connect.NewUnaryHandler(
+		SocialAppServiceUpdateForumEntryProcedure,
+		svc.UpdateForumEntry,
+		connect.WithSchema(socialAppServiceMethods.ByName("UpdateForumEntry")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceDeleteForumEntryHandler := connect.NewUnaryHandler(
+		SocialAppServiceDeleteForumEntryProcedure,
+		svc.DeleteForumEntry,
+		connect.WithSchema(socialAppServiceMethods.ByName("DeleteForumEntry")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/hawkr.social.v1alpha1.SocialAppService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case SocialAppServiceSharePostProcedure:
+			socialAppServiceSharePostHandler.ServeHTTP(w, r)
+		case SocialAppServiceLikePostProcedure:
+			socialAppServiceLikePostHandler.ServeHTTP(w, r)
+		case SocialAppServiceUnlikePostProcedure:
+			socialAppServiceUnlikePostHandler.ServeHTTP(w, r)
+		case SocialAppServiceLikeCommentProcedure:
+			socialAppServiceLikeCommentHandler.ServeHTTP(w, r)
+		case SocialAppServiceUnlikeCommentProcedure:
+			socialAppServiceUnlikeCommentHandler.ServeHTTP(w, r)
+		case SocialAppServiceCreateCommentProcedure:
+			socialAppServiceCreateCommentHandler.ServeHTTP(w, r)
+		case SocialAppServiceUpdateCommentProcedure:
+			socialAppServiceUpdateCommentHandler.ServeHTTP(w, r)
+		case SocialAppServiceDeleteCommentProcedure:
+			socialAppServiceDeleteCommentHandler.ServeHTTP(w, r)
+		case SocialAppServiceCreateForumEntryProcedure:
+			socialAppServiceCreateForumEntryHandler.ServeHTTP(w, r)
+		case SocialAppServiceUpdateForumEntryProcedure:
+			socialAppServiceUpdateForumEntryHandler.ServeHTTP(w, r)
+		case SocialAppServiceDeleteForumEntryProcedure:
+			socialAppServiceDeleteForumEntryHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedSocialAppServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedSocialAppServiceHandler struct{}
+
+func (UnimplementedSocialAppServiceHandler) SharePost(context.Context, *connect.Request[v1alpha1.SharePostRequest]) (*connect.Response[v1alpha1.SharePostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.SharePost is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) LikePost(context.Context, *connect.Request[v1alpha1.LikePostRequest]) (*connect.Response[v1alpha1.LikePostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.LikePost is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) UnlikePost(context.Context, *connect.Request[v1alpha1.UnlikePostRequest]) (*connect.Response[v1alpha1.UnlikePostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.UnlikePost is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) LikeComment(context.Context, *connect.Request[v1alpha1.LikeCommentRequest]) (*connect.Response[v1alpha1.LikeCommentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.LikeComment is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) UnlikeComment(context.Context, *connect.Request[v1alpha1.UnlikeCommentRequest]) (*connect.Response[v1alpha1.UnlikeCommentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.UnlikeComment is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) CreateComment(context.Context, *connect.Request[v1alpha1.CreateCommentRequest]) (*connect.Response[v1alpha1.CreateCommentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.CreateComment is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) UpdateComment(context.Context, *connect.Request[v1alpha1.UpdateCommentRequest]) (*connect.Response[v1alpha1.UpdateCommentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.UpdateComment is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) DeleteComment(context.Context, *connect.Request[v1alpha1.DeleteCommentRequest]) (*connect.Response[v1alpha1.DeleteCommentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.DeleteComment is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) CreateForumEntry(context.Context, *connect.Request[v1alpha1.CreateForumEntryRequest]) (*connect.Response[v1alpha1.CreateForumEntryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.CreateForumEntry is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) UpdateForumEntry(context.Context, *connect.Request[v1alpha1.UpdateForumEntryRequest]) (*connect.Response[v1alpha1.UpdateForumEntryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) DeleteForumEntry(context.Context, *connect.Request[v1alpha1.DeleteForumEntryRequest]) (*connect.Response[v1alpha1.DeleteForumEntryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry is not implemented"))
 }
