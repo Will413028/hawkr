@@ -1,4 +1,5 @@
 import type * as React from "react";
+import { cn } from "@/lib/utils/cn";
 
 interface ScrollableTableRegionProps {
 	label: string;
@@ -12,12 +13,12 @@ interface ScrollableTableRegionProps {
  */
 export function ScrollableTableRegion({
 	label,
-	className = "seller-orders__table-wrap",
+	className,
 	children,
 }: ScrollableTableRegionProps) {
 	return (
 		<section
-			className={className}
+			className={cn("seller-orders__table-wrap", className)}
 			aria-label={label}
 			// biome-ignore lint/a11y/noNoninteractiveTabindex: This horizontally scrollable table needs a keyboard focus target.
 			tabIndex={0}

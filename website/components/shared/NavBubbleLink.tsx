@@ -80,7 +80,7 @@ export default function NavBubbleLink({
 	React.useEffect(() => {
 		if (previousCount.current === count) return;
 		previousCount.current = count;
-		setLiveMessage(count > 0 ? `${label}${countLabel(display)}` : "");
+		setLiveMessage(count > 0 ? `${label} ${countLabel(display)}` : "");
 	}, [count, display, label, countLabel]);
 
 	const armPrefetch = React.useCallback(() => {

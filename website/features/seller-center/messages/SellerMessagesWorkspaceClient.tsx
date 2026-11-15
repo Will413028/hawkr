@@ -621,7 +621,7 @@ export default function SellerMessagesWorkspaceClient() {
 				>
 					<ScrollableTableRegion
 						label="訊息列表"
-						className="seller-orders__table-wrap seller-messages__table-wrap"
+						className="seller-messages__table-wrap"
 					>
 						{!loadingInitial && filteredRows.length === 0 ? (
 							<SellerEmptyState

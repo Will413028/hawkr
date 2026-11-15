@@ -329,7 +329,9 @@ function RecentDocumentsCard({
 			</header>
 			<ScrollableTableRegion
 				label="最近開立的發票與收據"
-				className={`seller-orders__table-wrap${documents.length > 0 ? " seller-mobile-disclosure-desktop" : ""}`}
+				className={
+					documents.length > 0 ? "seller-mobile-disclosure-desktop" : undefined
+				}
 			>
 				<table className="seller-table" data-mobile-layout="cards">
 					<caption className="sr-only">最近開立的發票與收據</caption>
