@@ -1,5 +1,5 @@
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterEach, vi } from "vitest";
 import "../../styles/globals.css";
 import "../../styles/components/product-modal.css";
 import "../../styles/components/ui-kit.css";
@@ -10,6 +10,8 @@ import "../../styles/components/input-field-fx.css";
 if (typeof globalThis.process === "undefined") {
 	Object.assign(globalThis, { process: { env: {} } });
 }
+
+vi.mock("next/image", async () => await import("./next-image"));
 
 // 沒有開 vitest globals，@testing-library/react 不會自己註冊 cleanup。
 afterEach(() => {
