@@ -1,6 +1,6 @@
 # 拆除 website Storybook
 
-**Goal：** website 不再依賴 Storybook：原本 33 個 story 檔的 144 個 play 都改寫成 Vitest browser mode 的 `*.browser.test.tsx` 並在 CI 執行，a11y 由 Playwright e2e 的 axe 掃描守，Storybook 的依賴、patch、設定、scripts 與 CI job 全部刪除（驗收見步驟 6）。
+**Goal：** website 不再依賴 Storybook：原本 31 個 story 檔的 139 個 play 都改寫成 Vitest browser mode 的 `*.browser.test.tsx` 並在 CI 執行，a11y 由 Playwright e2e 的 axe 掃描守，Storybook 的依賴、patch、設定、scripts 與 CI job 全部刪除（驗收見步驟 6）。
 
 **上層：** 主清單在 repo 外，見本機個人脈絡檔。
 
@@ -39,8 +39,8 @@
 
 | | 步驟 1（試點） | 步驟 2（基礎元件） | 步驟 3（Cart、DescriptionEditor） | 產生計數的位置 |
 |---|---|---|---|---|
-| story 檔 | 3 | 23 | 7 | `inventory.md` §1（`rg -c 'play\s*:' website/stories`） |
-| play | 8 | 78 | 58 | 同上 |
+| story 檔 | 3 | 21 | 7 | `inventory.md` §1（`rg -c '\bplay\s*:' website/stories`） |
+| play | 8 | 74 | 57 | 同上 |
 
 ## 範圍
 
@@ -61,13 +61,13 @@
   - 延後：`.storybook/preview.css` 的字型與 body 顏色沒搬進 setup（觸發條件：改寫的斷言依賴字型、顏色或版面時，把需要的 token 搬進 `tests/browser/`）。
   - 停止條件：Next.js 模組的替代需要新依賴（例如 `@vitejs/plugin-react` 或 Storybook 以外的 Next 模擬套件）——列出套件與版本回報，等 Will 決定。
 - [ ] **2. 基礎元件改寫**（被擋於：步驟 1）
-  - 範圍：`inventory.md` §1 標「步驟 2 改寫」的 23 檔、78 個 play。可拆成兩個子批（各自 PR 綠才算完成）。
+  - 範圍：`inventory.md` §1 標「步驟 2 改寫」的 21 檔、74 個 play。可拆成兩個子批（各自 PR 綠才算完成）。
   - 消費端：無（新增測試檔）。
   - 不能動：被測元件的程式（測試搬移暴露的缺陷另開 bug-fix，不在本步驟順手改）。
   - 驗收：每個 story 檔的 play 數與新測試的斷言對照表貼在 PR 描述（`plays.txt` 為來源）；CI 元件 browser job 綠；mutation：抽 3 個元件（含 `DatePicker`、`ProcurementClarifyQuestion`）各破壞一個被斷言的行為，job 要失敗。
   - 停止條件：某個 play 依賴 Storybook 專屬行為且無法等價改寫——回報，不刪弱斷言。
 - [ ] **3. Cart、DescriptionEditor 系列**（被擋於：步驟 1；與步驟 2 都會改 `website/vitest.config.ts` 的 browser project 與 `website/tests/browser/`，兩步依序合併，不並行）
-  - 範圍：`inventory.md` §1 標「步驟 3 改寫」的 7 檔、58 個 play；msw service worker 與 `description-image-fixtures.ts` 搬到 `website/tests/browser/`。
+  - 範圍：`inventory.md` §1 標「步驟 3 改寫」的 7 檔、57 個 play；msw service worker 與 `description-image-fixtures.ts` 搬到 `website/tests/browser/`。
   - 消費端：`rg -n 'description-image-fixtures|mockServiceWorker' website .github`
   - 不能動：`.github/workflows/website-e2e.yml` 第 86 行描述的圖片網域判定（fixture 攔的網域不變）。
   - 驗收：同步驟 2 的對照表與 CI；mutation：`DescriptionEditorDeletion` 與 `Cart` 各破壞一個被斷言的行為，job 要失敗。

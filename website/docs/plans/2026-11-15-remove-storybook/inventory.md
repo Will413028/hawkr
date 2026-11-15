@@ -4,14 +4,14 @@
 
 ## 1. Story 檔與 play（去向）
 
-產生：`rg -c 'play\s*:' website/stories | sort`（結果存在 `plays.txt`，33 檔、合計 144）；全部 story 檔：`find website/stories -name '*.stories.*' | sort`（38 檔）。
+產生：`rg -c '\bplay\s*:' website/stories | sort`（\b 排除 CSS `display:` 的誤配；結果存在 `plays.txt`，31 檔、合計 139）；全部 story 檔：`find website/stories -name '*.stories.*' | sort`（38 檔）。
 
 | Story 檔 | play 數 | 去向 |
 |---|---|---|
-| `website/stories/Foundations.stories.tsx` | 1 | 步驟 2 改寫 |
+| `website/stories/Foundations.stories.tsx` | 0 | 刪除：沒有 play、沒有斷言 |
 | `website/stories/ProductGallery.stories.tsx` | 3 | 步驟 2 改寫 |
 | `website/stories/web/AfterSalePhotoUploader.stories.tsx` | 2 | 步驟 2 改寫 |
-| `website/stories/web/BrandLogoLoader.stories.tsx` | 1 | 步驟 2 改寫 |
+| `website/stories/web/BrandLogoLoader.stories.tsx` | 0 | 刪除：沒有 play、沒有斷言 |
 | `website/stories/web/Button.stories.tsx` | 4 | 步驟 1 試點改寫 |
 | `website/stories/web/BuyerQuoteComparison.stories.tsx` | 6 | 步驟 2 改寫 |
 | `website/stories/web/CalendarMonth.stories.tsx` | 2 | 步驟 2 改寫 |
@@ -24,12 +24,12 @@
 | `website/stories/web/InlineLoading.stories.tsx` | 2 | 步驟 2 改寫 |
 | `website/stories/web/Input.stories.tsx` | 5 | 步驟 2 改寫 |
 | `website/stories/web/NavigationRecovery.stories.tsx` | 3 | 步驟 1 試點改寫（用到 `sb.mock` 的 spy） |
-| `website/stories/web/PostContent.stories.tsx` | 7 | 步驟 2 改寫 |
+| `website/stories/web/PostContent.stories.tsx` | 6 | 步驟 2 改寫 |
 | `website/stories/web/ProcurementClarifyQuestion.stories.tsx` | 9 | 步驟 2 改寫 |
 | `website/stories/web/QuoteBatchSummary.stories.tsx` | 8 | 步驟 2 改寫 |
 | `website/stories/web/RouteLoadingSkeleton.stories.tsx` | 4 | 步驟 2 改寫 |
 | `website/stories/web/Select.stories.tsx` | 3 | 步驟 2 改寫 |
-| `website/stories/web/SellerSkeletons.stories.tsx` | 6 | 步驟 2 改寫 |
+| `website/stories/web/SellerSkeletons.stories.tsx` | 5 | 步驟 2 改寫 |
 | `website/stories/web/Sheet.stories.tsx` | 2 | 步驟 2 改寫 |
 | `website/stories/web/Switch.stories.tsx` | 1 | 步驟 2 改寫 |
 | `website/stories/web/Tabs.stories.tsx` | 3 | 步驟 2 改寫 |
@@ -40,7 +40,7 @@
 | `website/stories/web/DescriptionEditorDeletion.stories.tsx` | 13 | 步驟 3 改寫 |
 | `website/stories/web/DescriptionEditorImage.stories.tsx` | 9 | 步驟 3 改寫（用 msw 圖片 fixture） |
 | `website/stories/web/DescriptionEditorTableDeletion.stories.tsx` | 2 | 步驟 3 改寫 |
-| `website/stories/web/DescriptionColorPicker.stories.tsx` | 5 | 步驟 3 改寫 |
+| `website/stories/web/DescriptionColorPicker.stories.tsx` | 4 | 步驟 3 改寫 |
 | `website/stories/web/Chip.stories.tsx` | 0 | 刪除：只有展示，沒有斷言；a11y 改由步驟 4 的頁面掃描覆蓋 |
 | `website/stories/web/Stars.stories.tsx` | 0 | 刪除：同上 |
 | `website/stories/apps/Buyer.stories.tsx` | 0 | 刪除：只嵌入 `storybook:apps` 產出的 Flutter web 目錄，Storybook 是唯一宿主 |
@@ -52,7 +52,7 @@
 | `website/stories/Introduction.mdx` | — | 刪除：Storybook 首頁導覽 |
 | `website/stories/documentation/Maintenance.mdx`（68 行） | — | 步驟 5 逐段判斷：仍適用的維護規則搬到 `website/docs/component-library.md`，只關於 Storybook 操作的刪除；搬移對照列在 PR 描述 |
 
-play 合計：步驟 1 = 8、步驟 2 = 78、步驟 3 = 58，共 144。非 story 檔來源：`find website/stories -type f ! -name '*.stories.*'`（5 檔）。
+play 合計：步驟 1 = 8、步驟 2 = 74、步驟 3 = 57，共 139。非 story 檔來源：`find website/stories -type f ! -name '*.stories.*'`（5 檔）。
 
 ## 2. Storybook 執行期提供、改寫時要另外補的東西
 
