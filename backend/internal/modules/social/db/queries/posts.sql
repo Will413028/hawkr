@@ -43,6 +43,12 @@ SET version = version + 1, updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND version = sqlc.arg(expected_version)
 RETURNING *;
 
+-- name: BumpPostVersions :exec
+-- 系統取消排程時遞增這些貼文的版本（不比對版本；呼叫方已鎖貼文列）。已軟刪或不存在的不動。
+UPDATE social.posts
+SET version = version + 1, updated_at = sqlc.arg(now)
+WHERE id = ANY(sqlc.arg(ids)::uuid[]) AND deleted_at IS NULL;
+
 -- name: SoftDeletePost :execrows
 -- 軟刪；已經刪除的 0 列（呼叫方不做副作用）。expected_version 為 0 表示不檢查版本。
 UPDATE social.posts

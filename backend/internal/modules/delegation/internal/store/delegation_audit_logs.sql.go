@@ -404,7 +404,8 @@ INSERT INTO delegation.admin_operation_audit_logs (
     'SCHEDULED', 'posts.publish', 'POST_PUBLISH', 'POST', $8::text, $9,
     'SUCCEEDED', $10, $11,
     $12, $13, $14::text,
-    $15, true, $16::timestamptz, date_trunc('second', $16::timestamptz), date_trunc('second', $16::timestamptz)
+    $15, $16::boolean, $17::timestamptz, date_trunc('second', $17::timestamptz),
+    CASE WHEN $16::boolean THEN date_trunc('second', $17::timestamptz) END
 )
 ON CONFLICT (session_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
 RETURNING id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at
@@ -426,12 +427,13 @@ type InsertScheduledPublishAuditLogParams struct {
 	CorrelationID         string
 	IdempotencyKey        string
 	RiskLevel             string
+	NotifySeller          bool
 	Now                   time.Time
 }
 
 // 排程到點發布的單段稽核：與貼文發布同一個 transaction 寫入，直接是 SUCCEEDED（沒有 intent 與 confirm 兩段，貼文發布的事實就是結果）。
 // 冪等鍵是 schedule:<排程 ID>；同一個 session 的同一把鍵已經有列時沒有列回傳（重送的事件，呼叫方當成功）。固定值：origin SCHEDULED、
-// capability posts.publish、action POST_PUBLISH、resource_type POST；confirmed_at 與 notified_at 與 confirm 一樣截秒；notify_seller 為 true（賣家要收到完成通知）。
+// capability posts.publish、action POST_PUBLISH、resource_type POST；confirmed_at 與 notified_at 與 confirm 一樣截秒；notify_seller 由呼叫方依排程動作的稽核列決定，為 true 才寫 notified_at。
 func (q *Queries) InsertScheduledPublishAuditLog(ctx context.Context, arg InsertScheduledPublishAuditLogParams) (DelegationAdminOperationAuditLog, error) {
 	row := q.db.QueryRow(ctx, insertScheduledPublishAuditLog,
 		arg.ID,
@@ -449,6 +451,7 @@ func (q *Queries) InsertScheduledPublishAuditLog(ctx context.Context, arg Insert
 		arg.CorrelationID,
 		arg.IdempotencyKey,
 		arg.RiskLevel,
+		arg.NotifySeller,
 		arg.Now,
 	)
 	var i DelegationAdminOperationAuditLog
@@ -490,7 +493,7 @@ func (q *Queries) InsertScheduledPublishAuditLog(ctx context.Context, arg Insert
 }
 
 const latestDelegationAuditReason = `-- name: LatestDelegationAuditReason :one
-SELECT operation_reason FROM delegation.admin_operation_audit_logs
+SELECT operation_reason, notify_seller FROM delegation.admin_operation_audit_logs
 WHERE session_id = $1 AND resource_id = $2::text AND action = $3
 ORDER BY created_at DESC, id DESC
 LIMIT 1
@@ -502,13 +505,18 @@ type LatestDelegationAuditReasonParams struct {
 	Action     string
 }
 
-// 排程執行繼承的操作理由：同一個 session、同一個資源、建立排程的那個動作最新的一列。不過濾 result：理由在
+type LatestDelegationAuditReasonRow struct {
+	OperationReason *string
+	NotifySeller    bool
+}
+
+// 排程執行繼承的操作理由與是否通知賣家：同一個 session、同一個資源、建立排程的那個動作最新的一列。不過濾 result：兩者在
 // intent 當下就寫定了，confirm 沒送到而停在 PENDING 的排程也是合法的。
-func (q *Queries) LatestDelegationAuditReason(ctx context.Context, arg LatestDelegationAuditReasonParams) (*string, error) {
+func (q *Queries) LatestDelegationAuditReason(ctx context.Context, arg LatestDelegationAuditReasonParams) (LatestDelegationAuditReasonRow, error) {
 	row := q.db.QueryRow(ctx, latestDelegationAuditReason, arg.SessionID, arg.ResourceID, arg.Action)
-	var operation_reason *string
-	err := row.Scan(&operation_reason)
-	return operation_reason, err
+	var i LatestDelegationAuditReasonRow
+	err := row.Scan(&i.OperationReason, &i.NotifySeller)
+	return i, err
 }
 
 const listDelegationAuditLogs = `-- name: ListDelegationAuditLogs :many

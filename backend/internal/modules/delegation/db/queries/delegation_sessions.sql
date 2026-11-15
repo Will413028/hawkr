@@ -149,11 +149,10 @@ WHERE actor_admin_id = sqlc.arg(actor_admin_id)
 RETURNING id;
 
 -- name: ListUnrevokedDelegationSessionIDsOfActor :many
--- 不鎖的讀取：這位管理員在 issued_since 之後發出、沒被撤銷的 session（含已結束、已到期的，它們發起的排程還在等）。更早發出的 session，
--- 它排的排程都已到點（排程只在 session 的存活期內建立，publish_at 不超過建立時點加上最長排程距離）。取消排程要在鎖或改 delegation 的列之前做
--- （social 在 delegation 之前），所以先用不鎖的讀取列出 ID。
+-- 不鎖的讀取：這位管理員沒被撤銷的 session（含已結束、已到期的，它們發起的排程還在等）中，ID 在 ids 裡的。ids 是 social 目前有待發布排程的 session ID，
+-- 所以結果以待發布的排程為界，不隨管理員的歷史 session 增長。取消排程要在鎖或改 delegation 的列之前做（social 在 delegation 之前），所以先用不鎖的讀取列出 ID。
 SELECT id FROM delegation.delegated_operation_sessions
-WHERE actor_admin_id = sqlc.arg(actor_admin_id) AND status <> 'REVOKED' AND issued_at > sqlc.arg(issued_since)::timestamptz
+WHERE actor_admin_id = sqlc.arg(actor_admin_id) AND status <> 'REVOKED' AND id = ANY(sqlc.arg(ids)::bigint[])
 ORDER BY id;
 
 -- name: RevokeDelegationSession :one

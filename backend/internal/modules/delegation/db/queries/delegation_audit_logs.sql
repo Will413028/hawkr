@@ -27,7 +27,7 @@ RETURNING *;
 -- name: InsertScheduledPublishAuditLog :one
 -- 排程到點發布的單段稽核：與貼文發布同一個 transaction 寫入，直接是 SUCCEEDED（沒有 intent 與 confirm 兩段，貼文發布的事實就是結果）。
 -- 冪等鍵是 schedule:<排程 ID>；同一個 session 的同一把鍵已經有列時沒有列回傳（重送的事件，呼叫方當成功）。固定值：origin SCHEDULED、
--- capability posts.publish、action POST_PUBLISH、resource_type POST；confirmed_at 與 notified_at 與 confirm 一樣截秒；notify_seller 為 true（賣家要收到完成通知）。
+-- capability posts.publish、action POST_PUBLISH、resource_type POST；confirmed_at 與 notified_at 與 confirm 一樣截秒；notify_seller 由呼叫方依排程動作的稽核列決定，為 true 才寫 notified_at。
 INSERT INTO delegation.admin_operation_audit_logs (
     id, session_id, actor_admin_id, actor_display_name,
     target_store_id, target_seller_account_id, target_store_name,
@@ -41,7 +41,8 @@ INSERT INTO delegation.admin_operation_audit_logs (
     'SCHEDULED', 'posts.publish', 'POST_PUBLISH', 'POST', sqlc.arg(resource_id)::text, sqlc.narg(resource_name),
     'SUCCEEDED', sqlc.narg(operation_reason), sqlc.narg(case_reference),
     sqlc.arg(request_id), sqlc.arg(correlation_id), sqlc.arg(idempotency_key)::text,
-    sqlc.arg(risk_level), true, sqlc.arg(now)::timestamptz, date_trunc('second', sqlc.arg(now)::timestamptz), date_trunc('second', sqlc.arg(now)::timestamptz)
+    sqlc.arg(risk_level), sqlc.arg(notify_seller)::boolean, sqlc.arg(now)::timestamptz, date_trunc('second', sqlc.arg(now)::timestamptz),
+    CASE WHEN sqlc.arg(notify_seller)::boolean THEN date_trunc('second', sqlc.arg(now)::timestamptz) END
 )
 ON CONFLICT (session_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
 RETURNING *;
@@ -54,9 +55,9 @@ SELECT * FROM delegation.admin_operation_audit_logs
 WHERE session_id = sqlc.arg(session_id) AND idempotency_key = sqlc.arg(idempotency_key);
 
 -- name: LatestDelegationAuditReason :one
--- 排程執行繼承的操作理由：同一個 session、同一個資源、建立排程的那個動作最新的一列。不過濾 result：理由在
+-- 排程執行繼承的操作理由與是否通知賣家：同一個 session、同一個資源、建立排程的那個動作最新的一列。不過濾 result：兩者在
 -- intent 當下就寫定了，confirm 沒送到而停在 PENDING 的排程也是合法的。
-SELECT operation_reason FROM delegation.admin_operation_audit_logs
+SELECT operation_reason, notify_seller FROM delegation.admin_operation_audit_logs
 WHERE session_id = sqlc.arg(session_id) AND resource_id = sqlc.arg(resource_id)::text AND action = sqlc.arg(action)
 ORDER BY created_at DESC, id DESC
 LIMIT 1;

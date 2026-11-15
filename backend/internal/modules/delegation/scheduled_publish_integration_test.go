@@ -75,7 +75,7 @@ func (f *fixture) scheduledPost(t *testing.T, storeID, sessionID int64, lead tim
 	if err != nil {
 		t.Fatal(err)
 	}
-	return p, s
+	return p, s.Schedule
 }
 
 func (f *fixture) scheduleRow(t *testing.T, id uuid.UUID) (state, reason string) {
@@ -146,7 +146,7 @@ func TestScheduledPublishOfAnEndedSessionPublishesWithOneSucceededAudit(t *testi
 	reason := "賣家請求排程"
 	f.intent(t, AuditIntentInput{
 		SessionID: sc.session.Session.ID, Capability: CapabilityPostsPublish, Action: AuditPostSchedule, ResourceType: ResourcePost,
-		ResourceID: post.ID.String(), OperationReason: reason, Origin: AuditInteractive, IdempotencyKey: "ik-schedule", RequestID: "req", CorrelationID: "corr",
+		ResourceID: post.ID.String(), OperationReason: reason, Origin: AuditInteractive, IdempotencyKey: "ik-schedule", RequestID: "req", CorrelationID: "corr", NotifySeller: true,
 	})
 
 	f.now = f.now.Add(45 * time.Minute)
@@ -424,8 +424,8 @@ func TestRevokeAndScheduledJobDoNotDeadlock(t *testing.T) {
 	}
 }
 
-// 取消排程只列最長排程距離加代行有效期之內發出的 session：更早發出的 session，它排的排程都已到點，由到點的重驗處理。
-func TestCancelOnTriggerOnlyListsSessionsWithinTheScheduleHorizon(t *testing.T) {
+// 取消排程不依 session 的年齡截斷：逾期還是 PENDING 的排程（job 沒跑），即使它的 session 早在最長排程距離加代行有效期之前發出，觸發當下仍被取消。
+func TestCancelOnTriggerCoversAnOverduePendingScheduleOfAnOldSession(t *testing.T) {
 	f := build(t, true)
 	governor := f.delegationAdmin(t, "governor@hawkr.example", true)
 	sc := f.newScheduler(t, "ops")
@@ -435,7 +435,36 @@ func TestCancelOnTriggerOnlyListsSessionsWithinTheScheduleHorizon(t *testing.T) 
 	if err := f.m.SetAdminEligibility(context.Background(), AdminEligibilityChange{AdminID: sc.admin, OperatorAdminID: governor}); err != nil {
 		t.Fatal(err)
 	}
-	f.wantSchedule(t, farthest.ID, "PENDING", "")
-	f.publishDue(t, farthest)
 	f.wantSchedule(t, farthest.ID, "CANCELED", "AUTHORITY_LOST")
+}
+
+// 排程發布的稽核繼承建立排程那一列的 notify_seller：為真才寫 notified_at 並發完成事件，為假都不做。
+func TestScheduledPublishAuditInheritsNotifySeller(t *testing.T) {
+	for _, notify := range []bool{true, false} {
+		t.Run(fmt.Sprint(notify), func(t *testing.T) {
+			f := build(t, true)
+			ctx := context.Background()
+			sc := f.newScheduler(t, "ops")
+			post, sched := f.scheduledPost(t, sc.storeID, sc.session.Session.ID, time.Hour)
+			f.intent(t, AuditIntentInput{
+				SessionID: sc.session.Session.ID, Capability: CapabilityPostsPublish, Action: AuditPostSchedule, ResourceType: ResourcePost,
+				ResourceID: post.ID.String(), OperationReason: "賣家請求排程", Origin: AuditInteractive, IdempotencyKey: "ik-schedule", RequestID: "req", CorrelationID: "corr",
+				NotifySeller: notify,
+			})
+			completedBefore := len(f.completed)
+			f.publishDue(t, sched)
+			var gotNotify, notified bool
+			if err := f.db.Pool().QueryRow(ctx, `SELECT notify_seller, notified_at IS NOT NULL FROM delegation.admin_operation_audit_logs
+				WHERE session_id = $1 AND idempotency_key = $2`, sc.session.Session.ID, "schedule:"+sched.ID.String()).Scan(&gotNotify, &notified); err != nil {
+				t.Fatal(err)
+			}
+			want := 0
+			if notify {
+				want = 1
+			}
+			if gotNotify != notify || notified != notify || len(f.completed)-completedBefore != want {
+				t.Fatalf("notify=%v：稽核 notify_seller=%v notified_at=%v、完成事件 %d 則", notify, gotNotify, notified, len(f.completed)-completedBefore)
+			}
+		})
+	}
 }

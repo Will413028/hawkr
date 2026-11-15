@@ -316,7 +316,7 @@ func (s *Service) PurgeStore(ctx context.Context, storeID int64) error {
 			if err := s.lock(ctx, b); err != nil {
 				return err
 			}
-			if _, err := s.d.Cancel.FromLockedPosts(ctx, postIDs, model.CancelDeleted, now); err != nil {
+			if _, err := s.d.Cancel.FromLockedPosts(ctx, postIDs, model.CancelDeleted, now, schedule.CallerBumps); err != nil {
 				return err
 			}
 			for _, p := range posts {

@@ -490,3 +490,7 @@ func (noSchedules) CancelScheduledBy(context.Context, social.ScheduleKind, []str
 func (noSchedules) CancelDelegatedSchedulesOfStore(context.Context, int64, social.CancelReason) ([]uuid.UUID, error) {
 	return nil, nil
 }
+
+func (noSchedules) PendingSchedulerRefs(context.Context, social.ScheduleKind) ([]string, error) {
+	return nil, nil
+}

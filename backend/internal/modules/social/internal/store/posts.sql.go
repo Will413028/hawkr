@@ -46,6 +46,23 @@ func (q *Queries) BumpPostVersion(ctx context.Context, arg BumpPostVersionParams
 	return i, err
 }
 
+const bumpPostVersions = `-- name: BumpPostVersions :exec
+UPDATE social.posts
+SET version = version + 1, updated_at = $1
+WHERE id = ANY($2::uuid[]) AND deleted_at IS NULL
+`
+
+type BumpPostVersionsParams struct {
+	Now time.Time
+	Ids []uuid.UUID
+}
+
+// 系統取消排程時遞增這些貼文的版本（不比對版本；呼叫方已鎖貼文列）。已軟刪或不存在的不動。
+func (q *Queries) BumpPostVersions(ctx context.Context, arg BumpPostVersionsParams) error {
+	_, err := q.db.Exec(ctx, bumpPostVersions, arg.Now, arg.Ids)
+	return err
+}
+
 const deletePostHashtags = `-- name: DeletePostHashtags :exec
 DELETE FROM social.post_hashtags WHERE post_id = $1
 `

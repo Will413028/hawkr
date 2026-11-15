@@ -14,6 +14,9 @@ const (
 	MaxScheduleLead = 90 * 24 * time.Hour
 )
 
+// ScheduleExpiry 是到點後仍可補發的期限：job 在 publish_at 之後超過這麼久才跑，排程取消為 EXPIRED，不發布。
+const ScheduleExpiry = 24 * time.Hour
+
 // MaxScheduledByRefRunes 是 scheduled_by_ref 的上限（schema 的 post_schedules_by_ref_check）。
 const MaxScheduledByRefRunes = 200
 
@@ -57,11 +60,15 @@ const (
 	CancelOwnerCanceled CancelReason = "OWNER_CANCELED"
 	// CancelNotPublishable 是到點時貼文不再滿足公開要件（內文或圖片被拿掉）：不重試，也不由授權實作判斷。
 	CancelNotPublishable CancelReason = "NOT_PUBLISHABLE"
+	// CancelRetryExhausted 是到點發布的 job 重試用盡仍失敗：排程不再等待，由店主重新排程。
+	CancelRetryExhausted CancelReason = "RETRY_EXHAUSTED"
+	// CancelExpired 是到點時已超過 ScheduleExpiry：不補發過期的貼文。
+	CancelExpired CancelReason = "EXPIRED"
 )
 
 // CancelReasonValues 回傳全部取消原因；DB 的 CHECK 與它一致。
 func CancelReasonValues() []CancelReason {
-	return []CancelReason{CancelAuthorityLost, CancelDeleted, CancelTakenDown, CancelReplaced, CancelOwnerCanceled, CancelNotPublishable}
+	return []CancelReason{CancelAuthorityLost, CancelDeleted, CancelTakenDown, CancelReplaced, CancelOwnerCanceled, CancelNotPublishable, CancelRetryExhausted, CancelExpired}
 }
 
 // ScheduledBy 是排程的發起者：Ref 是發起者擁有格式的不透明字串（代行放 session ID）。
@@ -81,6 +88,12 @@ type Schedule struct {
 	CancelReason CancelReason
 	CreatedAt    time.Time
 	ResolvedAt   *time.Time
+}
+
+// ScheduledPost 是排程成功的結果：新的排程與貼文排程後的版本（etag）。
+type ScheduledPost struct {
+	Schedule    Schedule
+	PostVersion int64
 }
 
 // SchedulePostInput 是排程發布：貼文要是 DRAFT 或 UNPUBLISHED，Version 是讀取時的版本。

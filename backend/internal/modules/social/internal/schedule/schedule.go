@@ -17,7 +17,17 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// Canceler 取消待發布的排程：同一個 transaction 內改列、發 PostScheduleCanceled。有待發布排程的貼文不是公開的，取消排程不改變公開狀態，所以不排快取失效；
+// VersionBump 說明被取消排程的貼文版本由誰遞增：取消排程改變貼文的狀態組合，持有舊 etag 的編輯與發布要重新讀取，所以每個取消路徑都要遞增一次。
+type VersionBump bool
+
+const (
+	// BumpVersion 由 Canceler 遞增（呼叫方沒有自己寫貼文列）。
+	BumpVersion VersionBump = true
+	// CallerBumps 是呼叫方在同一個 transaction 自己遞增（發布、刪除、排程、店主取消），或貼文列已被清除。
+	CallerBumps VersionBump = false
+)
+
+// Canceler 取消待發布的排程：同一個 transaction 內改列、遞增貼文版本、發 PostScheduleCanceled。有待發布排程的貼文不是公開的，取消排程不改變公開狀態，所以不排快取失效；
 // 讓貼文公開狀態改變的呼叫方（發布、刪除、內容下架、店家清除）自己排。
 type Canceler struct {
 	DB     *db.DB
@@ -37,8 +47,17 @@ func Of(r store.SocialPostSchedule) model.Schedule {
 	return s
 }
 
-// After 是排程已被寫成 CANCELED 之後的副作用：每筆發事件。
-func (c Canceler) After(ctx context.Context, rows []store.SocialPostSchedule, now time.Time) error {
+// After 是排程已被寫成 CANCELED 之後的副作用：bump 為 BumpVersion 時遞增這些貼文的版本（貼文列已鎖），每筆發事件。
+func (c Canceler) After(ctx context.Context, rows []store.SocialPostSchedule, now time.Time, bump VersionBump) error {
+	if bump == BumpVersion && len(rows) > 0 {
+		postIDs := make([]uuid.UUID, len(rows))
+		for i, r := range rows {
+			postIDs[i] = r.PostID
+		}
+		if err := store.New(c.DB.Conn(ctx)).BumpPostVersions(ctx, store.BumpPostVersionsParams{Now: now, Ids: postIDs}); err != nil {
+			return fmt.Errorf("social：遞增被取消排程的貼文版本：%w", err)
+		}
+	}
 	for _, r := range rows {
 		reason := model.CancelReason(*r.CancelReason)
 		if err := events.Publish(ctx, c.Events, model.PostScheduleCanceled{
@@ -63,8 +82,8 @@ func ids(rows []store.SocialPostSchedule) []uuid.UUID {
 	return out
 }
 
-// FromLockedPosts 取消這些貼文的待發布排程。呼叫方已鎖這些貼文列。回傳被取消的排程 ID；沒有待發布的排程是 no-op。
-func (c Canceler) FromLockedPosts(ctx context.Context, postIDs []uuid.UUID, reason model.CancelReason, now time.Time) ([]uuid.UUID, error) {
+// FromLockedPosts 取消這些貼文的待發布排程。呼叫方已鎖這些貼文列，bump 說明版本由誰遞增。回傳被取消的排程 ID；沒有待發布的排程是 no-op。
+func (c Canceler) FromLockedPosts(ctx context.Context, postIDs []uuid.UUID, reason model.CancelReason, now time.Time, bump VersionBump) ([]uuid.UUID, error) {
 	if len(postIDs) == 0 {
 		return nil, nil
 	}
@@ -73,7 +92,7 @@ func (c Canceler) FromLockedPosts(ctx context.Context, postIDs []uuid.UUID, reas
 	if err != nil {
 		return nil, fmt.Errorf("social：取消貼文的排程：%w", err)
 	}
-	if err := c.After(ctx, rows, now); err != nil {
+	if err := c.After(ctx, rows, now, bump); err != nil {
 		return nil, err
 	}
 	return ids(rows), nil
@@ -104,7 +123,7 @@ func (c Canceler) ByScheduler(ctx context.Context, kind model.ScheduleKind, refs
 		if err != nil {
 			return fmt.Errorf("social：取消發起者的排程：%w", err)
 		}
-		if err := c.After(ctx, rows, now); err != nil {
+		if err := c.After(ctx, rows, now, BumpVersion); err != nil {
 			return err
 		}
 		out = ids(rows)
@@ -134,7 +153,7 @@ func (c Canceler) OfStoreByKind(ctx context.Context, storeID int64, kind model.S
 		if err != nil {
 			return fmt.Errorf("social：取消店家的排程：%w", err)
 		}
-		if err := c.After(ctx, rows, now); err != nil {
+		if err := c.After(ctx, rows, now, BumpVersion); err != nil {
 			return err
 		}
 		out = ids(rows)

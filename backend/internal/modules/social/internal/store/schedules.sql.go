@@ -251,44 +251,6 @@ func (q *Queries) InsertSchedule(ctx context.Context, arg InsertScheduleParams) 
 	return i, err
 }
 
-const listOverduePendingScheduleIDs = `-- name: ListOverduePendingScheduleIDs :many
-SELECT id, publish_at FROM social.post_schedules
-WHERE state = 'PENDING' AND publish_at < $1
-ORDER BY publish_at, id
-LIMIT $2
-`
-
-type ListOverduePendingScheduleIDsParams struct {
-	Before  time.Time
-	MaxRows int32
-}
-
-type ListOverduePendingScheduleIDsRow struct {
-	ID        uuid.UUID
-	PublishAt time.Time
-}
-
-// 保底掃描：到點已久、還是 PENDING 的排程（job 遺失或被清掉時由它補排）。
-func (q *Queries) ListOverduePendingScheduleIDs(ctx context.Context, arg ListOverduePendingScheduleIDsParams) ([]ListOverduePendingScheduleIDsRow, error) {
-	rows, err := q.db.Query(ctx, listOverduePendingScheduleIDs, arg.Before, arg.MaxRows)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListOverduePendingScheduleIDsRow{}
-	for rows.Next() {
-		var i ListOverduePendingScheduleIDsRow
-		if err := rows.Scan(&i.ID, &i.PublishAt); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listPendingSchedulesOfStore = `-- name: ListPendingSchedulesOfStore :many
 SELECT id, post_id, store_id, publish_at, scheduled_by_kind, scheduled_by_ref, state, cancel_reason, created_at, resolved_at FROM social.post_schedules
 WHERE store_id = $1 AND state = 'PENDING'
@@ -450,6 +412,33 @@ func (q *Queries) PendingPostIDsOfStoreByKind(ctx context.Context, arg PendingPo
 			return nil, err
 		}
 		items = append(items, post_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const pendingSchedulerRefs = `-- name: PendingSchedulerRefs :many
+SELECT DISTINCT scheduled_by_ref FROM social.post_schedules
+WHERE scheduled_by_kind = $1 AND state = 'PENDING'
+ORDER BY scheduled_by_ref
+`
+
+// 某種發起者目前有待發布排程的 ref（去重）：筆數以待發布的排程為界，不隨發起者的歷史增長。
+func (q *Queries) PendingSchedulerRefs(ctx context.Context, kind string) ([]string, error) {
+	rows, err := q.db.Query(ctx, pendingSchedulerRefs, kind)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var scheduled_by_ref string
+		if err := rows.Scan(&scheduled_by_ref); err != nil {
+			return nil, err
+		}
+		items = append(items, scheduled_by_ref)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

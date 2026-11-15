@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
 func (f *fixture) draft(t *testing.T, storeID int64) social.Post {
@@ -44,13 +46,14 @@ func (f *fixture) schedule(t *testing.T, storeID int64, p social.Post, lead time
 		PostID: p.ID, Version: f.current(t, storeID, p).Version, PublishAt: f.clock().Add(lead), By: by,
 	})
 	must(t, err)
-	return s
+	return s.Schedule
 }
 
 // cancelSchedule 以貼文此刻的版本取消排程。
 func (f *fixture) cancelSchedule(t *testing.T, storeID int64, p social.Post) error {
 	t.Helper()
-	return f.module.CancelPostSchedule(context.Background(), f.store(t, storeID), p.ID, f.current(t, storeID, p).Version)
+	_, err := f.module.CancelPostSchedule(context.Background(), f.store(t, storeID), p.ID, f.current(t, storeID, p).Version)
+	return err
 }
 
 func (f *fixture) scheduleState(t *testing.T, id uuid.UUID) (state, reason string, resolved bool) {
@@ -164,8 +167,12 @@ func TestScheduleBounds(t *testing.T) {
 	storeID, _ := f.exposableStore(t)
 	p := f.draft(t, storeID)
 	st := f.store(t, storeID)
+	version := p.Version
 	try := func(lead time.Duration) error {
-		_, err := f.module.SchedulePost(ctx, st, social.SchedulePostInput{PostID: p.ID, Version: p.Version, PublishAt: f.clock().Add(lead), By: f.owner()})
+		out, err := f.module.SchedulePost(ctx, st, social.SchedulePostInput{PostID: p.ID, Version: version, PublishAt: f.clock().Add(lead), By: f.owner()})
+		if err == nil {
+			version = out.PostVersion
+		}
 		return err
 	}
 	for _, lead := range []time.Duration{-time.Hour, 0, social.MinScheduleLead - time.Microsecond, social.MaxScheduleLead + time.Microsecond} {
@@ -402,18 +409,20 @@ func TestOwnerCancelsTheSchedule(t *testing.T) {
 	s := f.schedule(t, storeID, p, time.Hour, f.delegated("sess"))
 	other, _ := f.exposableStore(t)
 	ver := f.current(t, storeID, p).Version
-	if err := f.module.CancelPostSchedule(ctx, f.store(t, other), p.ID, ver); kindOf(err) != apperr.KindNotFound {
+	if _, err := f.module.CancelPostSchedule(ctx, f.store(t, other), p.ID, ver); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("別家的貼文：%v", err)
 	}
-	if err := f.module.CancelPostSchedule(ctx, f.store(t, storeID), p.ID, 0); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.CancelPostSchedule(ctx, f.store(t, storeID), p.ID, 0); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("要帶版本：%v", err)
 	}
-	if err := f.module.CancelPostSchedule(ctx, f.store(t, storeID), p.ID, ver-1); kindOf(err) != apperr.KindVersionConflict {
+	if _, err := f.module.CancelPostSchedule(ctx, f.store(t, storeID), p.ID, ver-1); kindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("版本不符：%v", err)
 	}
 	f.wantSchedule(t, s.ID, "PENDING", "")
 	f.jobs.reset()
-	must(t, f.module.CancelPostSchedule(ctx, f.store(t, storeID), p.ID, ver))
+	if got := mustV[int64](t)(f.module.CancelPostSchedule(ctx, f.store(t, storeID), p.ID, ver)); got != ver+1 {
+		t.Fatalf("取消回傳新的版本：%d，要 %d", got, ver+1)
+	}
 	f.wantSchedule(t, s.ID, "CANCELED", "OWNER_CANCELED")
 	if got := f.current(t, storeID, p).Version; got != ver+1 {
 		t.Fatalf("取消遞增版本：%d→%d", ver, got)
@@ -421,7 +430,9 @@ func TestOwnerCancelsTheSchedule(t *testing.T) {
 	if len(f.jobs.revalidations()) != 0 {
 		t.Fatalf("有排程的貼文不是公開的，取消不排快取失效：%v", f.jobs.revalidations())
 	}
-	must(t, f.module.CancelPostSchedule(ctx, f.store(t, storeID), p.ID, 1))
+	if got := mustV[int64](t)(f.module.CancelPostSchedule(ctx, f.store(t, storeID), p.ID, 1)); got != ver+1 {
+		t.Fatalf("沒有待發布的排程：冪等、不檢查版本、回傳目前的版本：%d", got)
+	}
 	if evs := f.events.canceledEvents(); len(evs) != 1 || evs[0].Reason != social.CancelOwnerCanceled {
 		t.Fatalf("再取消一次是 no-op：%+v", evs)
 	}
@@ -583,7 +594,7 @@ func TestScheduledPublishAndOwnerCancelSerialize(t *testing.T) {
 		var runErr, cancelErr error
 		wg.Add(2)
 		go func() { defer wg.Done(); <-start; runErr = f.module.PublishScheduled(ctx, s.ID) }()
-		go func() { defer wg.Done(); <-start; cancelErr = f.module.CancelPostSchedule(ctx, st, p.ID, ver) }()
+		go func() { defer wg.Done(); <-start; _, cancelErr = f.module.CancelPostSchedule(ctx, st, p.ID, ver) }()
 		close(start)
 		wg.Wait()
 		must(t, runErr)
@@ -659,32 +670,6 @@ func TestListPendingSchedulesIsKeysetByPublishTime(t *testing.T) {
 	}
 }
 
-// 保底掃描：到點超過寬限還是 PENDING 的排程補排 job；寬限內的不補。
-func TestSweepRequeuesOverdueSchedules(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	f := setup(t)
-	storeID, _ := f.exposableStore(t)
-	s := f.schedule(t, storeID, f.draft(t, storeID), time.Hour, f.owner())
-	f.advance(time.Hour)
-	f.jobs.reset()
-	if n := mustV[int](t)(f.module.SweepSchedules(ctx)); n != 0 || len(f.jobs.scheduledJobs()) != 0 {
-		t.Fatalf("寬限內不補排：%d", n)
-	}
-	f.advance(11 * time.Minute)
-	if n := mustV[int](t)(f.module.SweepSchedules(ctx)); n != 1 {
-		t.Fatalf("補排 %d", n)
-	}
-	if at, ok := f.jobs.scheduledJobs()[s.ID]; !ok || !at.IsZero() {
-		t.Fatalf("補排的 job 帶 schedule_id、立即可跑（沒有 ScheduledAt）：%v", f.jobs.scheduledJobs())
-	}
-	must(t, f.module.PublishScheduled(ctx, s.ID))
-	f.jobs.reset()
-	if n := mustV[int](t)(f.module.SweepSchedules(ctx)); n != 0 {
-		t.Fatalf("已發布的不補排：%d", n)
-	}
-}
-
 // 排程列的 CHECK 與索引：取消原因只在 CANCELED 有值、resolved_at 在離開 PENDING 時有值、同一篇貼文同時只有一個 PENDING。
 func TestScheduleRowConstraints(t *testing.T) {
 	t.Parallel()
@@ -742,7 +727,24 @@ func TestScheduleRollsBackWithTheCallersTransaction(t *testing.T) {
 }
 
 // 店主排程到點時要過和手動發布同一個店家授權：店家已不能經營（這裡是等待刪除）就取消為 AUTHORITY_LOST，不發布。
-func TestOwnerScheduleIsCanceledWhenTheStoreCanNoLongerPost(t *testing.T) {
+func TestOwnerScheduleIsCanceledWhenTheStoreHasNoRightToPost(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	p := f.draft(t, storeID)
+	s := f.schedule(t, storeID, p, time.Hour, f.owner())
+	f.exec(t, "UPDATE seller.stores SET status = 'CLOSED' WHERE store_id = $1", storeID)
+	f.advance(time.Hour)
+	must(t, f.module.PublishScheduled(ctx, s.ID))
+	f.wantSchedule(t, s.ID, "CANCELED", "AUTHORITY_LOST")
+	if got := f.postStatus(t, p.ID); got != "DRAFT" || len(f.events.publishedEvents()) != 0 {
+		t.Fatalf("不發布：%s、%d 個事件", got, len(f.events.publishedEvents()))
+	}
+}
+
+// 店家只是暫時不滿足前置條件（等待刪除）不是永久失去權利：job 回錯誤重試，排程維持 PENDING。
+func TestOwnerScheduleIsRetriedWhileThePreconditionIsMissing(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
@@ -751,10 +753,12 @@ func TestOwnerScheduleIsCanceledWhenTheStoreCanNoLongerPost(t *testing.T) {
 	s := f.schedule(t, storeID, p, time.Hour, f.owner())
 	f.exec(t, "UPDATE seller.stores SET status = 'PENDING_DELETION' WHERE store_id = $1", storeID)
 	f.advance(time.Hour)
-	must(t, f.module.PublishScheduled(ctx, s.ID))
-	f.wantSchedule(t, s.ID, "CANCELED", "AUTHORITY_LOST")
-	if got := f.postStatus(t, p.ID); got != "DRAFT" || len(f.events.publishedEvents()) != 0 {
-		t.Fatalf("不發布：%s、%d 個事件", got, len(f.events.publishedEvents()))
+	if err := f.module.PublishScheduled(ctx, s.ID); err == nil {
+		t.Fatal("FailedPrecondition 是暫時的，要回錯誤讓 job 重試")
+	}
+	f.wantSchedule(t, s.ID, "PENDING", "")
+	if len(f.events.canceledEvents()) != 0 || f.postStatus(t, p.ID) != "DRAFT" {
+		t.Fatal("重試不取消、不發布")
 	}
 }
 
@@ -826,5 +830,130 @@ func TestScheduleRejectsAPostUnderTakedown(t *testing.T) {
 	}
 	if n := f.pendingCount(t, p.ID); n != 0 {
 		t.Fatalf("沒有排程：%d", n)
+	}
+}
+
+// 公開要件只在寫入之前檢查：發布之後訂閱者的 InvalidInput 不是 NOT_PUBLISHABLE，整個 transaction 回滾、排程維持 PENDING、job 重試。
+func TestSubscriberFailureAfterPublishRollsBackInsteadOfCancelingAsNotPublishable(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	p := f.draft(t, storeID)
+	s := f.schedule(t, storeID, p, time.Hour, f.owner())
+	f.advance(time.Hour)
+	events.Subscribe(f.bus, func(context.Context, social.PostPublished) error {
+		return apperr.InvalidInput("%s", "訂閱者拒絕")
+	})
+	if err := f.module.PublishScheduled(ctx, s.ID); err == nil {
+		t.Fatal("訂閱者的錯誤要原樣回傳讓 job 重試")
+	}
+	f.wantSchedule(t, s.ID, "PENDING", "")
+	if got := f.postStatus(t, p.ID); got != "DRAFT" {
+		t.Fatalf("回滾後貼文不是公開的：%s", got)
+	}
+	if len(f.events.canceledEvents()) != 0 {
+		t.Fatal("不發 PostScheduleCanceled")
+	}
+}
+
+// 系統取消（授權失效、下架、不可發布、過期）都遞增貼文版本，持有舊 etag 的編輯與發布要重新讀取。
+func TestEverySystemCancelBumpsThePostVersion(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	cases := map[string]func(t *testing.T, f *fixture, storeID int64, p social.Post, s social.Schedule){
+		"CancelScheduledBy": func(t *testing.T, f *fixture, _ int64, _ social.Post, _ social.Schedule) {
+			mustV[[]uuid.UUID](t)(f.module.CancelScheduledBy(ctx, social.ScheduleByDelegation, []string{"sess"}, social.CancelAuthorityLost))
+		},
+		"CancelDelegatedSchedulesOfStore": func(t *testing.T, f *fixture, storeID int64, _ social.Post, _ social.Schedule) {
+			mustV[[]uuid.UUID](t)(f.module.CancelDelegatedSchedulesOfStore(ctx, storeID, social.CancelAuthorityLost))
+		},
+		"takedown": func(t *testing.T, f *fixture, storeID int64, p social.Post, _ social.Schedule) {
+			f.takedowns(t).create(t, storeID, ref(seller.ContentPost, p.ID))
+		},
+		"NOT_PUBLISHABLE": func(t *testing.T, f *fixture, _ int64, p social.Post, s social.Schedule) {
+			f.exec(t, "UPDATE social.posts SET body = '' WHERE id = $1", p.ID)
+			f.advance(time.Hour)
+			must(t, f.module.PublishScheduled(ctx, s.ID))
+		},
+		"EXPIRED": func(t *testing.T, f *fixture, _ int64, _ social.Post, s social.Schedule) {
+			f.advance(time.Hour + social.ScheduleExpiry + time.Minute)
+			must(t, f.module.PublishScheduled(ctx, s.ID))
+		},
+		"AUTHORITY_LOST at run time": func(t *testing.T, f *fixture, _ int64, _ social.Post, s social.Schedule) {
+			f.deleg.set(social.ErrScheduleDenied)
+			f.advance(time.Hour)
+			must(t, f.module.PublishScheduled(ctx, s.ID))
+		},
+	}
+	for name, run := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := setup(t)
+			storeID, _ := f.exposableStore(t)
+			p := f.draft(t, storeID)
+			s := f.schedule(t, storeID, p, time.Hour, f.delegated("sess"))
+			before := f.current(t, storeID, p).Version
+			run(t, f, storeID, p, s)
+			if state, _, _ := f.scheduleState(t, s.ID); state != "CANCELED" {
+				t.Fatalf("排程要被取消：%s", state)
+			}
+			if got := f.current(t, storeID, p).Version; got != before+1 {
+				t.Fatalf("取消遞增版本恰好一次：%d→%d", before, got)
+			}
+		})
+	}
+}
+
+// 到點超過 ScheduleExpiry 不補發，取消為 EXPIRED 而且不問授權；恰好在期限上仍發布。
+func TestDueScheduleBeyondTheExpiryWindowIsCanceledAsExpired(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	onTime := f.draft(t, storeID)
+	late := f.draft(t, storeID)
+	a := f.schedule(t, storeID, onTime, time.Hour, f.delegated("sess"))
+	b := f.schedule(t, storeID, late, time.Hour, f.delegated("sess"))
+	f.advance(time.Hour + social.ScheduleExpiry)
+	must(t, f.module.PublishScheduled(ctx, a.ID))
+	f.wantSchedule(t, a.ID, "PUBLISHED", "")
+	f.advance(time.Microsecond)
+	f.jobs.reset()
+	asked := len(f.deleg.asked())
+	must(t, f.module.PublishScheduled(ctx, b.ID))
+	f.wantSchedule(t, b.ID, "CANCELED", "EXPIRED")
+	if f.postStatus(t, late.ID) != "DRAFT" || len(f.deleg.asked()) != asked {
+		t.Fatal("過期不發布、不問授權")
+	}
+}
+
+// 重試用盡：最後一次失敗在自己的 transaction 把排程取消為 RETRY_EXHAUSTED 並記 error log；還沒到最後一次不動。
+func TestRetryExhaustionCancelsTheSchedule(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	p := f.draft(t, storeID)
+	s := f.schedule(t, storeID, p, time.Hour, f.delegated("sess"))
+	before := f.current(t, storeID, p).Version
+	f.advance(time.Hour)
+	f.deleg.set(errors.New("session 讀取暫時失敗"))
+	if err := f.module.PublishScheduledAttempt(ctx, s.ID, false); err == nil {
+		t.Fatal("失敗要回傳讓 job 重試")
+	}
+	f.wantSchedule(t, s.ID, "PENDING", "")
+	if err := f.module.PublishScheduledAttempt(ctx, s.ID, true); err == nil {
+		t.Fatal("最後一次仍回傳原錯誤")
+	}
+	f.wantSchedule(t, s.ID, "CANCELED", "RETRY_EXHAUSTED")
+	if evs := f.events.canceledEvents(); len(evs) != 1 || evs[0].Reason != social.CancelRetryExhausted {
+		t.Fatalf("%+v", evs)
+	}
+	if got := f.current(t, storeID, p).Version; got != before+1 {
+		t.Fatalf("遞增版本：%d→%d", before, got)
+	}
+	if !strings.Contains(f.logs.String(), "level=ERROR") {
+		t.Fatalf("要記 error log：%s", f.logs.String())
 	}
 }

@@ -111,6 +111,7 @@ type (
 	CommentInput    = model.CommentInput
 	// 排程發布：Schedule 是一次排程，ScheduledBy 是發起者（種類加發起者擁有格式的不透明 ref），ScheduleAuthorizer 是到點重驗授權的 port。
 	Schedule           = model.Schedule
+	ScheduledPost      = model.ScheduledPost
 	ScheduleKind       = model.ScheduleKind
 	ScheduleState      = model.ScheduleState
 	CancelReason       = model.CancelReason
@@ -171,6 +172,8 @@ const (
 	CancelDeleted        = model.CancelDeleted
 	CancelTakenDown      = model.CancelTakenDown
 	CancelNotPublishable = model.CancelNotPublishable
+	CancelRetryExhausted = model.CancelRetryExhausted
+	CancelExpired        = model.CancelExpired
 	CancelReplaced       = model.CancelReplaced
 	CancelOwnerCanceled  = model.CancelOwnerCanceled
 	OriginDirect         = model.OriginDirect
@@ -178,6 +181,8 @@ const (
 	// MinScheduleLead 與 MaxScheduleLead 是排程發布時點距現在的區間。
 	MinScheduleLead = model.MinScheduleLead
 	MaxScheduleLead = model.MaxScheduleLead
+	// ScheduleExpiry 是到點後仍可補發的期限，超過取消為 EXPIRED。
+	ScheduleExpiry = model.ScheduleExpiry
 )
 
 // ScheduleAuthorizerFunc 讓一個函式當排程授權實作（組裝點與測試用）。
@@ -247,7 +252,7 @@ func New(d Deps) *Module {
 	return &Module{
 		post: post.New(post.Deps{
 			DB: d.DB, Media: d.Media, Jobs: d.Jobs, Events: d.Events, Products: d.Products, Cache: cache, Cancel: cancel, Authorizers: authorizers,
-			NewID: d.NewID, Now: d.Now,
+			NewID: d.NewID, Now: d.Now, Logger: d.Logger,
 		}),
 		comment:   comment.New(comment.Deps{DB: d.DB, Events: d.Events, Actors: actors, NewID: d.NewID, Now: d.Now}),
 		forum:     forum.New(forum.Deps{DB: d.DB, Actors: actors, NewID: d.NewID, Now: d.Now}),
@@ -289,12 +294,12 @@ func (m *Module) DeletePost(ctx context.Context, store seller.Store, postID uuid
 
 // SchedulePost 排程發布：貼文要是 DRAFT 或 UNPUBLISHED，in.PublishAt 距現在 5 分鐘到 90 天，仍要滿足公開要件；貼文已有待發布的排程時先把它轉 REPLACED。
 // in.By 是發起者：OWNER 的 ref 由伺服器填，DELEGATION 的 ref 由呼叫方給（代行 session 的 ID）；店家要有 CapMarketing。排程與到點的 job 在同一個 transaction 寫入。
-func (m *Module) SchedulePost(ctx context.Context, store seller.Store, in SchedulePostInput) (Schedule, error) {
+func (m *Module) SchedulePost(ctx context.Context, store seller.Store, in SchedulePostInput) (ScheduledPost, error) {
 	return m.post.Schedule(ctx, store, in)
 }
 
-// CancelPostSchedule 是店主取消貼文待發布的排程（OWNER_CANCELED）；version 是讀取時的版本；沒有待發布的排程時什麼都不做（不檢查版本）；店家要有 CapMarketing。
-func (m *Module) CancelPostSchedule(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) error {
+// CancelPostSchedule 是店主取消貼文待發布的排程（OWNER_CANCELED）；version 是讀取時的版本；回傳取消後貼文的新版本（etag）；沒有待發布的排程時什麼都不做（不檢查版本，回傳目前的版本）；店家要有 CapMarketing。
+func (m *Module) CancelPostSchedule(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (int64, error) {
 	return m.post.CancelSchedule(ctx, store, postID, version)
 }
 
@@ -317,6 +322,11 @@ func (m *Module) CancelDelegatedSchedulesOfStore(ctx context.Context, storeID in
 	return m.cancel.OfStoreByKind(ctx, storeID, ScheduleByDelegation, reason, m.now().UTC())
 }
 
+// PendingSchedulerRefs 回傳某種發起者目前有待發布排程的 ref（去重）；筆數以待發布的排程為界。發起者的模組用它和自己的資料求交集，找出該取消的排程。
+func (m *Module) PendingSchedulerRefs(ctx context.Context, kind ScheduleKind) ([]string, error) {
+	return m.post.PendingSchedulerRefs(ctx, kind)
+}
+
 func checkCancelArgs(kind ScheduleKind, reason CancelReason) error {
 	if !slices.Contains(ScheduleKindValues(), kind) {
 		return fmt.Errorf("social：不認得的排程發起者種類 %q", kind)
@@ -337,14 +347,16 @@ func (m *Module) ListPendingSchedules(ctx context.Context, storeID int64, after 
 	return m.post.ListPendingSchedules(ctx, storeID, after, size)
 }
 
+// PublishScheduledAttempt 是 social.publish_scheduled job 的一次執行：final 為真是 River 的最後一次嘗試，失敗時把排程取消為 RETRY_EXHAUSTED，並仍回傳原錯誤。
+func (m *Module) PublishScheduledAttempt(ctx context.Context, scheduleID uuid.UUID, final bool) error {
+	return m.post.RunScheduledAttempt(ctx, scheduleID, final)
+}
+
 // PublishScheduled 是 social.publish_scheduled job 的內容，給 worker 與測試呼叫：排程不是 PENDING 就什麼都不做（冪等），否則依
 // 貼文列 → 排程列的順序鎖住、做 social 自己的檢查、問發起者種類的授權實作，通過才發布（授權被拒就取消、原因 AUTHORITY_LOST、不重試）。
 func (m *Module) PublishScheduled(ctx context.Context, scheduleID uuid.UUID) error {
 	return m.post.RunScheduled(ctx, scheduleID)
 }
-
-// SweepSchedules 是 social.sweep_schedules job 的內容：補排到點很久還是 PENDING 的排程的 job；回傳補排的數量。
-func (m *Module) SweepSchedules(ctx context.Context) (int, error) { return m.post.SweepSchedules(ctx) }
 
 // OwnPost 讀店家自己的貼文（任何狀態）。
 func (m *Module) OwnPost(ctx context.Context, storeID int64, id uuid.UUID) (Post, error) {
@@ -610,10 +622,9 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 	post.AddWorkers(workers, m.post)
 }
 
-// PeriodicJobs 回傳週期 job：media 引用的保底掃描、瀏覽資料清理、每日對帳、排程的保底掃描。
+// PeriodicJobs 回傳週期 job：media 引用的保底掃描、瀏覽資料清理、每日對帳。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	out := mediaref.PeriodicJobs()
 	out = append(out, purge.PeriodicJobs()...)
-	out = append(out, post.PeriodicJobs()...)
 	return append(out, stats.PeriodicJobs()...)
 }

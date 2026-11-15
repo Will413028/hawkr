@@ -14,7 +14,6 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 )
 
@@ -456,13 +455,18 @@ func (m *Module) revokeDelegationsOfAdmin(ctx context.Context, adminID int64, op
 	return m.revokeActiveDelegationsOfAdmin(ctx, adminID, operatorAdminID, reason)
 }
 
-// cancelSchedulesOfAdmin 取消這位管理員所有沒被撤銷的 session（含已結束、已到期的）發起的待發布排程；只列 social.MaxScheduleLead 加 model.DelegationTTL
-// 之內發出的 session（排程建立在 session 存活期內，更早發出的 session 排的排程都已到點）。session ID 以不鎖的讀取列出；列出之後
-// 才新開的 session 與漏接取消的路徑，由到點的重驗擋下。必須在鎖或改 delegation 的任何列之前呼叫（social 的貼文列在 delegation 之前鎖）。
+// cancelSchedulesOfAdmin 取消這位管理員所有沒被撤銷的 session（含已結束、已到期的）發起的待發布排程：先問 social 目前有待發布排程的代行 session ID
+// （筆數以待發布的排程為界），再與這位管理員沒被撤銷的 session 求交集，不依 session 的年齡截斷。兩個讀取都不鎖；讀取之後才新開的 session 與漏接取消的路徑，
+// 由到點的重驗擋下。必須在鎖或改 delegation 的任何列之前呼叫（social 的貼文列在 delegation 之前鎖）。
 func (m *Module) cancelSchedulesOfAdmin(ctx context.Context, adminID int64) error {
-	ids, err := m.q(ctx).ListUnrevokedDelegationSessionIDsOfActor(ctx, store.ListUnrevokedDelegationSessionIDsOfActorParams{
-		ActorAdminID: adminID, IssuedSince: m.d.Now().Add(-(social.MaxScheduleLead + model.DelegationTTL)),
-	})
+	pending, err := m.d.PendingScheduleSessionIDs(ctx)
+	if err != nil {
+		return err
+	}
+	if len(pending) == 0 {
+		return nil
+	}
+	ids, err := m.q(ctx).ListUnrevokedDelegationSessionIDsOfActor(ctx, store.ListUnrevokedDelegationSessionIDsOfActorParams{ActorAdminID: adminID, Ids: pending})
 	if err != nil {
 		return fmt.Errorf("delegation：列出管理員的代行：%w", err)
 	}

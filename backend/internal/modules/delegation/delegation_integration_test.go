@@ -188,3 +188,7 @@ func (*queue) Enqueue(ctx context.Context, _ river.JobArgs, _ *river.InsertOpts)
 type noStoreBlocks struct{}
 
 func (noStoreBlocks) StoreBlocksBuyer(context.Context, int64, int64) (bool, error) { return false, nil }
+
+func (noSchedules) PendingSchedulerRefs(context.Context, social.ScheduleKind) ([]string, error) {
+	return nil, nil
+}

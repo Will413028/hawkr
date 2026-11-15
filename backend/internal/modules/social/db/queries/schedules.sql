@@ -66,12 +66,11 @@ SET state = 'CANCELED', cancel_reason = sqlc.arg(reason), resolved_at = sqlc.arg
 WHERE post_id = ANY(sqlc.arg(post_ids)::uuid[]) AND store_id = sqlc.arg(store_id) AND scheduled_by_kind = sqlc.arg(kind) AND state = 'PENDING'
 RETURNING *;
 
--- name: ListOverduePendingScheduleIDs :many
--- 保底掃描：到點已久、還是 PENDING 的排程（job 遺失或被清掉時由它補排）。
-SELECT id, publish_at FROM social.post_schedules
-WHERE state = 'PENDING' AND publish_at < sqlc.arg(before)
-ORDER BY publish_at, id
-LIMIT sqlc.arg(max_rows);
+-- name: PendingSchedulerRefs :many
+-- 某種發起者目前有待發布排程的 ref（去重）：筆數以待發布的排程為界，不隨發起者的歷史增長。
+SELECT DISTINCT scheduled_by_ref FROM social.post_schedules
+WHERE scheduled_by_kind = sqlc.arg(kind) AND state = 'PENDING'
+ORDER BY scheduled_by_ref;
 
 -- name: PostIsTakenDown :one
 -- 貼文有沒有被內容下架措施下架（複本 content_takedowns）。

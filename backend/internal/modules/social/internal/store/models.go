@@ -182,7 +182,7 @@ type SocialPostSchedule struct {
 	// 發起者擁有格式的不透明字串；DELEGATION 放代行 session 的 ID，OWNER 放店家帳號 ID 的十進位字串
 	ScheduledByRef string
 	State          string
-	// 取消原因，凍結在列上：AUTHORITY_LOST 到點時授權已失效、DELETED 貼文被刪、TAKEN_DOWN 貼文被下架措施、REPLACED 被立即發布或新排程取代、OWNER_CANCELED 店主取消、NOT_PUBLISHABLE 到點時貼文不再滿足公開要件
+	// 取消原因，凍結在列上：AUTHORITY_LOST 到點時授權已失效、DELETED 貼文被刪、TAKEN_DOWN 貼文被下架措施、REPLACED 被立即發布或新排程取代、OWNER_CANCELED 店主取消、NOT_PUBLISHABLE 到點時貼文不再滿足公開要件、RETRY_EXHAUSTED 到點發布重試用盡、EXPIRED 到點時已超過可補發的期限
 	CancelReason *string
 	CreatedAt    time.Time
 	ResolvedAt   *time.Time

@@ -7,6 +7,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/schedule"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/contentkind"
 )
@@ -62,11 +63,7 @@ func (s *Service) ApplyTakedowns(ctx context.Context, measureID uuid.UUID, store
 		return s.checkTakedownOwnership(ctx, storeID, set)
 	}, func(ctx context.Context, q *store.Queries, p store.InsertTakedownsParams) (inserted, error) {
 		rows, err := q.InsertTakedowns(ctx, p)
-		var out inserted
-		for _, r := range rows {
-			out.add(r.PostID)
-		}
-		return out, err
+		return insertedOf(rows, func(r store.InsertTakedownsRow) *uuid.UUID { return r.PostID }), err
 	})
 }
 
@@ -78,11 +75,7 @@ func (s *Service) ApplyMissingTakedowns(ctx context.Context, measureID uuid.UUID
 		rows, err := q.InsertActiveTakedowns(ctx, store.InsertActiveTakedownsParams{
 			MeasureID: p.MeasureID, CreatedAt: p.CreatedAt, PostIds: p.PostIds, CommentIds: p.CommentIds, ForumEntryIds: p.ForumEntryIds,
 		})
-		var out inserted
-		for _, r := range rows {
-			out.add(r.PostID)
-		}
-		return out, err
+		return insertedOf(rows, func(r store.InsertActiveTakedownsRow) *uuid.UUID { return r.PostID }), err
 	})
 }
 
@@ -92,11 +85,14 @@ type inserted struct {
 	posts []uuid.UUID
 }
 
-func (i *inserted) add(post *uuid.UUID) {
-	i.n++
-	if post != nil {
-		i.posts = append(i.posts, *post)
+func insertedOf[R any](rows []R, post func(R) *uuid.UUID) inserted {
+	out := inserted{n: len(rows)}
+	for _, r := range rows {
+		if id := post(r); id != nil {
+			out.posts = append(out.posts, *id)
+		}
 	}
+	return out
 }
 
 // applyTakedowns 是 ApplyTakedowns 與對帳補漏共用的寫入：鎖內容列、check（建立入口核對歸屬；對帳不核對，措施已經生效）、insert 寫複本、求值。
@@ -137,7 +133,7 @@ func (s *Service) applyTakedowns(ctx context.Context, measureID uuid.UUID, at ti
 		if rows.n == 0 {
 			return nil
 		}
-		if _, err := s.d.Cancel.FromLockedPosts(ctx, rows.posts, model.CancelTakenDown, at); err != nil {
+		if _, err := s.d.Cancel.FromLockedPosts(ctx, rows.posts, model.CancelTakenDown, at, schedule.BumpVersion); err != nil {
 			return err
 		}
 		return s.afterTakedownChange(ctx, set)

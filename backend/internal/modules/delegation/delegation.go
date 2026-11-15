@@ -43,6 +43,7 @@ type Seller interface {
 type Social interface {
 	CancelScheduledBy(ctx context.Context, kind social.ScheduleKind, refs []string, reason social.CancelReason) ([]uuid.UUID, error)
 	CancelDelegatedSchedulesOfStore(ctx context.Context, storeID int64, reason social.CancelReason) ([]uuid.UUID, error)
+	PendingSchedulerRefs(ctx context.Context, kind social.ScheduleKind) ([]string, error)
 }
 
 // Deps 是模組需要的外部依賴，全部在組裝點提供。Social 必填（撤銷授權與資格時取消排程）；Seller 必填：seller 在同一個行程，每個子命令都組得出它，沒有「沒有 seller」的組態。
@@ -105,6 +106,19 @@ func New(d Deps) *Module {
 			}
 			_, err := d.Social.CancelScheduledBy(ctx, social.ScheduleByDelegation, refs, social.CancelAuthorityLost)
 			return err
+		},
+		PendingScheduleSessionIDs: func(ctx context.Context) ([]int64, error) {
+			refs, err := d.Social.PendingSchedulerRefs(ctx, social.ScheduleByDelegation)
+			if err != nil {
+				return nil, err
+			}
+			ids := make([]int64, 0, len(refs))
+			for _, r := range refs {
+				if id, err := strconv.ParseInt(r, 10, 64); err == nil {
+					ids = append(ids, id)
+				}
+			}
+			return ids, nil
 		},
 		Now: d.Now, Logger: d.Logger,
 	})

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 	"uuid"
 
@@ -58,6 +59,7 @@ type Deps struct {
 	Authorizers map[model.ScheduleKind]model.ScheduleAuthorizer
 	NewID       func() uuid.UUID
 	Now         func() time.Time
+	Logger      *slog.Logger
 }
 
 // Service 是貼文的 use case。
@@ -363,7 +365,7 @@ func (s *Service) Publish(ctx context.Context, st seller.Store, postID uuid.UUID
 		if row.Version != version {
 			return versionConflict(ctx)
 		}
-		if _, err := s.d.Cancel.FromLockedPosts(ctx, []uuid.UUID{postID}, model.CancelReplaced, now); err != nil {
+		if _, err := s.d.Cancel.FromLockedPosts(ctx, []uuid.UUID{postID}, model.CancelReplaced, now, schedule.CallerBumps); err != nil {
 			return err
 		}
 		return s.publishLocked(ctx, q, row, now, model.OriginDirect, store.SocialPostSchedule{})
@@ -431,7 +433,7 @@ func (s *Service) Delete(ctx context.Context, st seller.Store, postID uuid.UUID,
 		if row.StoreID != st.StoreID {
 			return notFound(ctx)
 		}
-		if _, err := s.d.Cancel.FromLockedPosts(ctx, []uuid.UUID{postID}, model.CancelDeleted, now); err != nil {
+		if _, err := s.d.Cancel.FromLockedPosts(ctx, []uuid.UUID{postID}, model.CancelDeleted, now, schedule.CallerBumps); err != nil {
 			return err
 		}
 		n, err := q.SoftDeletePost(ctx, store.SoftDeletePostParams{ID: postID, Now: &now, ExpectedVersion: version})
