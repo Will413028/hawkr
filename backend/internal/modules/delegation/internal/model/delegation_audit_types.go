@@ -285,3 +285,23 @@ type OperationOutcome struct {
 	// VersionAfter 是資源寫入後的版本；0 表示沒有版本。
 	VersionAfter int64
 }
+
+// FailureAuditInput 是一次失敗的代行請求的稽核：被拒絕（能力不足、session 已失效、店家不可代行，含讀取）或寫入的業務失敗。Session 是請求當時解析到的
+// session（可能已結束、到期或撤銷：失敗列正是要記下這一種嘗試）。
+type FailureAuditInput struct {
+	Session      DelegationSession
+	Capability   Capability
+	Action       AuditAction
+	ResourceType AuditResourceType
+	// ResourceID 與 ResourceVersionBefore 是請求指向的資源與它的版本；不知道（建立類、尚未解析）留空。
+	ResourceID            string
+	ResourceVersionBefore *int64
+	// OperationReason 只在值域合法時寫入（1–100 字）；寫入類的請求在驗證前就被拒絕時，理由可能是不合法的值，這時不寫。
+	OperationReason string
+	// RequestID 是呼叫方的 request_id；被拒絕得比解析請求還早（讀取、interceptor 的拒絕）時用請求的 trace ID。
+	RequestID     string
+	CorrelationID string
+	UserAgent     string
+	// Cause 是失敗的原因：代行拒絕寫入對應的業務碼，其他錯誤的業務碼是 NULL。
+	Cause error
+}

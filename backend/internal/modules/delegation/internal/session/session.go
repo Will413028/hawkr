@@ -434,6 +434,22 @@ func (m *Module) EndDelegationsOfAdmin(ctx context.Context, adminID int64) error
 	return nil
 }
 
+// EndDelegationsOfStore 結束這家店進行中的代行（憑證立刻失效，不寫 REVOKED，發起的排程不取消：到點的重驗會因為店家不可代行而取消）；店家停權或關店時呼叫。
+// 只有 UPDATE，在 seller 的 transaction 內呼叫時鎖順序是 seller 之後 delegation（由下往上）。
+func (m *Module) EndDelegationsOfStore(ctx context.Context, storeID int64) error {
+	now := m.d.Now()
+	ids, err := m.q(ctx).EndActiveDelegationsOfStore(ctx, store.EndActiveDelegationsOfStoreParams{
+		TargetStoreID: storeID, Now: now, IdleSince: model.IdleSince(now),
+	})
+	if err != nil {
+		return fmt.Errorf("delegation：結束店家進行中的代行：%w", err)
+	}
+	if len(ids) > 0 {
+		m.d.Logger.InfoContext(ctx, "delegation：店家不可代行，結束進行中的代行", "store_id", storeID, "sessions", len(ids))
+	}
+	return nil
+}
+
 // OnAdminRoleRevoked 在 identity 撤銷管理員角色的 transaction 內，若剩下的角色不再允許 delegation.sessions.create，
 // 撤銷這位管理員進行中的代行，不等代行自己到期。撤銷與事件同一個 transaction：這裡失敗時角色不會被撤銷。
 func (m *Module) OnAdminRoleRevoked(ctx context.Context, e identity.AdminRoleRevoked) error {

@@ -134,6 +134,48 @@ func (q *Queries) EndActiveDelegationsOfActor(ctx context.Context, arg EndActive
 	return items, nil
 }
 
+const endActiveDelegationsOfStore = `-- name: EndActiveDelegationsOfStore :many
+UPDATE delegation.delegated_operation_sessions
+SET ended_at = $1::timestamptz,
+    expires_at = GREATEST(issued_at + INTERVAL '1 second',
+                          LEAST(expires_at, date_trunc('second', $1::timestamptz))),
+    revision = revision + 1,
+    updated_at = $1::timestamptz
+WHERE target_store_id = $2
+  AND status = 'ACTIVE' AND ended_at IS NULL
+  AND $1::timestamptz < expires_at
+  AND last_active_at > $3::timestamptz
+RETURNING id
+`
+
+type EndActiveDelegationsOfStoreParams struct {
+	Now           time.Time
+	TargetStoreID int64
+	IdleSince     time.Time
+}
+
+// 店家停權或關店（seller 的 StoreSuspended、StoreClosed）：結束這家店進行中的 session（不是撤銷，撤銷只留給治理動作）。ended_at 與 expires_at 的夾值與 EndDelegationSession 相同：推導的狀態
+// 不看 ended_at，憑證只靠 expires_at 被拉回現在而失效，只寫 ended_at 會讓登出後 credential 仍然有效。
+func (q *Queries) EndActiveDelegationsOfStore(ctx context.Context, arg EndActiveDelegationsOfStoreParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, endActiveDelegationsOfStore, arg.Now, arg.TargetStoreID, arg.IdleSince)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const endDelegationSession = `-- name: EndDelegationSession :execrows
 UPDATE delegation.delegated_operation_sessions
 SET ended_at = $1::timestamptz,

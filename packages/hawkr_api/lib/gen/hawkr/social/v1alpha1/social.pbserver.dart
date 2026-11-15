@@ -254,3 +254,68 @@ abstract class SocialAppServiceBase extends $pb.GeneratedService {
   $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       get $messageJson => SocialAppServiceBase$messageJson;
 }
+
+abstract class SocialDelegatedServiceBase extends $pb.GeneratedService {
+  $async.Future<$4.ListStorePostsResponse> listStorePosts(
+      $pb.ServerContext ctx, $4.ListStorePostsRequest request);
+  $async.Future<$4.GetStorePostResponse> getStorePost(
+      $pb.ServerContext ctx, $4.GetStorePostRequest request);
+  $async.Future<$4.CreateStorePostResponse> createStorePost(
+      $pb.ServerContext ctx, $4.CreateStorePostRequest request);
+  $async.Future<$4.UpdateStorePostResponse> updateStorePost(
+      $pb.ServerContext ctx, $4.UpdateStorePostRequest request);
+  $async.Future<$4.PublishStorePostResponse> publishStorePost(
+      $pb.ServerContext ctx, $4.PublishStorePostRequest request);
+  $async.Future<$4.UnpublishStorePostResponse> unpublishStorePost(
+      $pb.ServerContext ctx, $4.UnpublishStorePostRequest request);
+  $async.Future<$4.ScheduleStorePostResponse> scheduleStorePost(
+      $pb.ServerContext ctx, $4.ScheduleStorePostRequest request);
+
+  $pb.GeneratedMessage createRequest($core.String methodName) {
+    switch (methodName) {
+      case 'ListStorePosts':
+        return $4.ListStorePostsRequest();
+      case 'GetStorePost':
+        return $4.GetStorePostRequest();
+      case 'CreateStorePost':
+        return $4.CreateStorePostRequest();
+      case 'UpdateStorePost':
+        return $4.UpdateStorePostRequest();
+      case 'PublishStorePost':
+        return $4.PublishStorePostRequest();
+      case 'UnpublishStorePost':
+        return $4.UnpublishStorePostRequest();
+      case 'ScheduleStorePost':
+        return $4.ScheduleStorePostRequest();
+      default:
+        throw $core.ArgumentError('Unknown method: $methodName');
+    }
+  }
+
+  $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx,
+      $core.String methodName, $pb.GeneratedMessage request) {
+    switch (methodName) {
+      case 'ListStorePosts':
+        return listStorePosts(ctx, request as $4.ListStorePostsRequest);
+      case 'GetStorePost':
+        return getStorePost(ctx, request as $4.GetStorePostRequest);
+      case 'CreateStorePost':
+        return createStorePost(ctx, request as $4.CreateStorePostRequest);
+      case 'UpdateStorePost':
+        return updateStorePost(ctx, request as $4.UpdateStorePostRequest);
+      case 'PublishStorePost':
+        return publishStorePost(ctx, request as $4.PublishStorePostRequest);
+      case 'UnpublishStorePost':
+        return unpublishStorePost(ctx, request as $4.UnpublishStorePostRequest);
+      case 'ScheduleStorePost':
+        return scheduleStorePost(ctx, request as $4.ScheduleStorePostRequest);
+      default:
+        throw $core.ArgumentError('Unknown method: $methodName');
+    }
+  }
+
+  $core.Map<$core.String, $core.dynamic> get $json =>
+      SocialDelegatedServiceBase$json;
+  $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
+      get $messageJson => SocialDelegatedServiceBase$messageJson;
+}

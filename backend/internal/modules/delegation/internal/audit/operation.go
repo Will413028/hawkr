@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -14,11 +15,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// RunOperation 是代行互動寫入的單段稽核：在同一個 transaction 內先寫一列 SUCCEEDED 的稽核（冪等鍵是 in.RequestID），再執行 do（被稽核的寫入），
+// RunOperation 是代行互動寫入的單段稽核：在同一個 transaction 內檢查 session 此刻還能用且帶有 in.Capability（model.CheckSession，讀的是這個 transaction 內的 session），先寫一列 SUCCEEDED 的稽核（冪等鍵是 in.RequestID），再執行 do（被稽核的寫入），
 // 最後把資源與版本補進那一列。do 失敗時整個 transaction rollback，稽核列跟著消失，所以「稽核成功」一定對應「寫入成功」。
 //
 // 同一個 session 以同一把 RequestID 重送（內容相同）時不執行 do，回傳第一次的那一列與 replayed 為 true，呼叫方據 ResourceID 讀回資源目前的樣子；
-// 內容不同（動作、資源種類、資源 ID 或內容雜湊不同）回 DenialIdempotencyKeyReused。session 已撤銷或到期寫不進稽核（排程到點的例外不走這條路）。
+// 內容不同（動作、資源種類、資源 ID 或內容雜湊不同）回 DenialIdempotencyKeyReused。session 已撤銷或到期、缺能力都不寫 SUCCEEDED、不執行 do（失敗的嘗試由 RecordFailure 另記）（排程到點的例外不走這條路）。
 // 稽核列要通知賣家時，完成事件在補上資源之後、同一個 transaction 內排入送出。
 //
 // 鎖：只有 INSERT（外鍵對 session 列的 FOR KEY SHARE 與所有 session 寫入的 NO KEY UPDATE 相容）與 UPDATE 自己剛寫的列，沒有先鎖 delegation 既有的列；
@@ -35,6 +36,9 @@ func (m *Module) RunOperation(ctx context.Context, in model.OperationAuditInput,
 		now := m.d.Now()
 		s, err := m.d.Session.SessionForAudit(ctx, model.AuditSessionInput{ID: in.SessionID, Origin: model.AuditInteractive, Now: now})
 		if err != nil {
+			return err
+		}
+		if err := model.CheckSession(s, in.Capability); err != nil {
 			return err
 		}
 		q := m.q(ctx)
@@ -143,4 +147,45 @@ func validateOperation(in model.OperationAuditInput) error {
 		}
 	}
 	return nil
+}
+
+// RecordFailure 寫一列 FAILED 的稽核（失敗的代行請求：被拒絕或寫入的業務失敗），在自己的 transaction 內：被稽核的寫入若已 rollback，這一列仍要留下。
+// 沒有冪等鍵，不占用 request_id。呼叫方不得在 transaction 內呼叫（那會與外層一起 rollback）。
+func (m *Module) RecordFailure(ctx context.Context, in model.FailureAuditInput) error {
+	if !in.Action.Known() || !in.ResourceType.Valid() || !in.Capability.Valid() {
+		return fmt.Errorf("delegation：失敗稽核的動作、資源種類或能力不在登錄的值域內：%s %s %s", in.Action, in.ResourceType, in.Capability)
+	}
+	s := in.Session
+	reason := strings.TrimSpace(in.OperationReason)
+	if n := utf8.RuneCountInString(reason); n == 0 || n > 100 {
+		reason = ""
+	}
+	return m.d.DB.InTx(ctx, func(ctx context.Context) error {
+		_, err := m.q(ctx).InsertFailedAuditLog(ctx, store.InsertFailedAuditLogParams{
+			ID:                    m.d.NewID(),
+			SessionID:             s.ID,
+			ActorAdminID:          s.Actor.AdminID,
+			ActorDisplayName:      s.Actor.DisplayName,
+			TargetStoreID:         s.Target.StoreID,
+			TargetSellerAccountID: s.Target.SellerAccountID,
+			TargetStoreName:       s.Target.StoreName,
+			Capability:            string(in.Capability),
+			Action:                string(in.Action),
+			ResourceType:          string(in.ResourceType),
+			ResourceID:            model.Optional(in.ResourceID),
+			BizCode:               model.BizCodeOf(in.Cause),
+			OperationReason:       model.Optional(reason),
+			CaseReference:         s.CaseReference,
+			RequestID:             in.RequestID,
+			CorrelationID:         in.CorrelationID,
+			ResourceVersionBefore: in.ResourceVersionBefore,
+			UserAgent:             model.Optional(in.UserAgent),
+			RiskLevel:             string(in.Action.RiskLevel()),
+			Now:                   m.d.Now(),
+		})
+		if err != nil {
+			return fmt.Errorf("delegation：寫入失敗的代行稽核：%w", err)
+		}
+		return nil
+	})
 }

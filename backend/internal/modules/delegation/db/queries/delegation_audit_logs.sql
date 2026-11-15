@@ -72,6 +72,27 @@ INSERT INTO delegation.admin_operation_audit_logs (
 ON CONFLICT (session_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
 RETURNING *;
 
+-- name: InsertFailedAuditLog :one
+-- 代行互動請求的失敗紀錄：被拒絕（能力不足、session 已失效、店家不可代行，含讀取）或寫入的業務失敗。在獨立的 transaction 寫入（被稽核的寫入若已 rollback，這一列仍要留下）。
+-- 直接是 FAILED，沒有冪等鍵（失敗的嘗試不占用 request_id，同一個 request_id 重送仍可成功）；origin 固定 INTERACTIVE；notify_seller 固定 false；
+-- confirmed_at 與 confirm 一樣截秒；biz_code 為 NULL 表示失敗不是代行的拒絕（沒有對應的業務碼）。
+INSERT INTO delegation.admin_operation_audit_logs (
+    id, session_id, actor_admin_id, actor_display_name,
+    target_store_id, target_seller_account_id, target_store_name,
+    origin, capability, action, resource_type, resource_id, resource_name,
+    result, biz_code, operation_reason, case_reference,
+    request_id, correlation_id, resource_version_before, user_agent,
+    risk_level, notify_seller, created_at, confirmed_at
+) VALUES (
+    sqlc.arg(id), sqlc.arg(session_id), sqlc.arg(actor_admin_id), sqlc.arg(actor_display_name),
+    sqlc.arg(target_store_id), sqlc.arg(target_seller_account_id), sqlc.arg(target_store_name),
+    'INTERACTIVE', sqlc.arg(capability), sqlc.arg(action), sqlc.arg(resource_type), sqlc.narg(resource_id)::text, sqlc.narg(resource_name),
+    'FAILED', sqlc.narg(biz_code), sqlc.narg(operation_reason), sqlc.narg(case_reference),
+    sqlc.arg(request_id), sqlc.arg(correlation_id), sqlc.narg(resource_version_before), sqlc.narg(user_agent),
+    sqlc.arg(risk_level), false, sqlc.arg(now)::timestamptz, date_trunc('second', sqlc.arg(now)::timestamptz)
+)
+RETURNING *;
+
 -- name: SetAuditLogOutcome :one
 -- 寫入完成後補上稽核列的資源：建立類在這裡才有貼文 ID（已有值的保留），並記下資源名稱與寫入後的版本。只動這一列。
 UPDATE delegation.admin_operation_audit_logs

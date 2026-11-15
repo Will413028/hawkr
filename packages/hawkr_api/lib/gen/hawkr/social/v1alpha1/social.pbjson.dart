@@ -1795,6 +1795,404 @@ final $typed_data.Uint8List postStatusCountDescriptor = $convert.base64Decode(
     'Cg9Qb3N0U3RhdHVzQ291bnQSOQoGc3RhdHVzGAEgASgOMiEuaGF3a3Iuc29jaWFsLnYxYWxwaG'
     'ExLlBvc3RTdGF0dXNSBnN0YXR1cxIUCgVjb3VudBgCIAEoA1IFY291bnQ=');
 
+@$core.Deprecated('Use delegatedOperationDescriptor instead')
+const DelegatedOperation$json = {
+  '1': 'DelegatedOperation',
+  '2': [
+    {'1': 'request_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'requestId'},
+    {
+      '1': 'operation_reason',
+      '3': 2,
+      '4': 1,
+      '5': 9,
+      '8': {},
+      '10': 'operationReason'
+    },
+    {
+      '1': 'notify_seller',
+      '3': 3,
+      '4': 1,
+      '5': 8,
+      '9': 0,
+      '10': 'notifySeller',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_notify_seller'},
+  ],
+};
+
+/// Descriptor for `DelegatedOperation`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List delegatedOperationDescriptor = $convert.base64Decode(
+    'ChJEZWxlZ2F0ZWRPcGVyYXRpb24SKgoKcmVxdWVzdF9pZBgBIAEoCUIL4EEC4ozP1wgCCAFSCX'
+    'JlcXVlc3RJZBIuChBvcGVyYXRpb25fcmVhc29uGAIgASgJQgPgQQJSD29wZXJhdGlvblJlYXNv'
+    'bhIoCg1ub3RpZnlfc2VsbGVyGAMgASgISABSDG5vdGlmeVNlbGxlcogBAUIQCg5fbm90aWZ5X3'
+    'NlbGxlcg==');
+
+@$core.Deprecated('Use listStorePostsRequestDescriptor instead')
+const ListStorePostsRequest$json = {
+  '1': 'ListStorePostsRequest',
+  '2': [
+    {'1': 'page_size', '3': 1, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 2, '4': 1, '5': 9, '10': 'pageToken'},
+    {
+      '1': 'status',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.social.v1alpha1.PostStatus',
+      '10': 'status'
+    },
+  ],
+};
+
+/// Descriptor for `ListStorePostsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listStorePostsRequestDescriptor = $convert.base64Decode(
+    'ChVMaXN0U3RvcmVQb3N0c1JlcXVlc3QSGwoJcGFnZV9zaXplGAEgASgFUghwYWdlU2l6ZRIdCg'
+    'pwYWdlX3Rva2VuGAIgASgJUglwYWdlVG9rZW4SOQoGc3RhdHVzGAMgASgOMiEuaGF3a3Iuc29j'
+    'aWFsLnYxYWxwaGExLlBvc3RTdGF0dXNSBnN0YXR1cw==');
+
+@$core.Deprecated('Use listStorePostsResponseDescriptor instead')
+const ListStorePostsResponse$json = {
+  '1': 'ListStorePostsResponse',
+  '2': [
+    {
+      '1': 'posts',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '10': 'posts'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+  ],
+};
+
+/// Descriptor for `ListStorePostsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listStorePostsResponseDescriptor = $convert.base64Decode(
+    'ChZMaXN0U3RvcmVQb3N0c1Jlc3BvbnNlEjEKBXBvc3RzGAEgAygLMhsuaGF3a3Iuc29jaWFsLn'
+    'YxYWxwaGExLlBvc3RSBXBvc3RzEiYKD25leHRfcGFnZV90b2tlbhgCIAEoCVINbmV4dFBhZ2VU'
+    'b2tlbg==');
+
+@$core.Deprecated('Use getStorePostRequestDescriptor instead')
+const GetStorePostRequest$json = {
+  '1': 'GetStorePostRequest',
+  '2': [
+    {'1': 'post_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+  ],
+};
+
+/// Descriptor for `GetStorePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getStorePostRequestDescriptor =
+    $convert.base64Decode(
+        'ChNHZXRTdG9yZVBvc3RSZXF1ZXN0EhwKB3Bvc3RfaWQYASABKAlCA+BBAlIGcG9zdElk');
+
+@$core.Deprecated('Use getStorePostResponseDescriptor instead')
+const GetStorePostResponse$json = {
+  '1': 'GetStorePostResponse',
+  '2': [
+    {
+      '1': 'post',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '10': 'post'
+    },
+  ],
+};
+
+/// Descriptor for `GetStorePostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getStorePostResponseDescriptor = $convert.base64Decode(
+    'ChRHZXRTdG9yZVBvc3RSZXNwb25zZRIvCgRwb3N0GAEgASgLMhsuaGF3a3Iuc29jaWFsLnYxYW'
+    'xwaGExLlBvc3RSBHBvc3Q=');
+
+@$core.Deprecated('Use createStorePostRequestDescriptor instead')
+const CreateStorePostRequest$json = {
+  '1': 'CreateStorePostRequest',
+  '2': [
+    {
+      '1': 'operation',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.DelegatedOperation',
+      '8': {},
+      '10': 'operation'
+    },
+    {'1': 'body', '3': 2, '4': 1, '5': 9, '10': 'body'},
+    {
+      '1': 'image_staged_token',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '8': {},
+      '10': 'imageStagedToken'
+    },
+    {
+      '1': 'product_id',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'productId',
+      '17': true
+    },
+    {'1': 'hashtag_inputs', '3': 5, '4': 3, '5': 9, '10': 'hashtagInputs'},
+  ],
+  '8': [
+    {'1': '_product_id'},
+  ],
+};
+
+/// Descriptor for `CreateStorePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createStorePostRequestDescriptor = $convert.base64Decode(
+    'ChZDcmVhdGVTdG9yZVBvc3RSZXF1ZXN0EkwKCW9wZXJhdGlvbhgBIAEoCzIpLmhhd2tyLnNvY2'
+    'lhbC52MWFscGhhMS5EZWxlZ2F0ZWRPcGVyYXRpb25CA+BBAlIJb3BlcmF0aW9uEhIKBGJvZHkY'
+    'AiABKAlSBGJvZHkSMQoSaW1hZ2Vfc3RhZ2VkX3Rva2VuGAMgASgJQgPgQQRSEGltYWdlU3RhZ2'
+    'VkVG9rZW4SIgoKcHJvZHVjdF9pZBgEIAEoCUgAUglwcm9kdWN0SWSIAQESJQoOaGFzaHRhZ19p'
+    'bnB1dHMYBSADKAlSDWhhc2h0YWdJbnB1dHNCDQoLX3Byb2R1Y3RfaWQ=');
+
+@$core.Deprecated('Use createStorePostResponseDescriptor instead')
+const CreateStorePostResponse$json = {
+  '1': 'CreateStorePostResponse',
+  '2': [
+    {
+      '1': 'post',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '10': 'post'
+    },
+    {'1': 'audit_log_id', '3': 2, '4': 1, '5': 9, '10': 'auditLogId'},
+  ],
+};
+
+/// Descriptor for `CreateStorePostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createStorePostResponseDescriptor = $convert.base64Decode(
+    'ChdDcmVhdGVTdG9yZVBvc3RSZXNwb25zZRIvCgRwb3N0GAEgASgLMhsuaGF3a3Iuc29jaWFsLn'
+    'YxYWxwaGExLlBvc3RSBHBvc3QSIAoMYXVkaXRfbG9nX2lkGAIgASgJUgphdWRpdExvZ0lk');
+
+@$core.Deprecated('Use updateStorePostRequestDescriptor instead')
+const UpdateStorePostRequest$json = {
+  '1': 'UpdateStorePostRequest',
+  '2': [
+    {
+      '1': 'operation',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.DelegatedOperation',
+      '8': {},
+      '10': 'operation'
+    },
+    {
+      '1': 'post',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '8': {},
+      '10': 'post'
+    },
+    {
+      '1': 'update_mask',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.FieldMask',
+      '10': 'updateMask'
+    },
+  ],
+};
+
+/// Descriptor for `UpdateStorePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateStorePostRequestDescriptor = $convert.base64Decode(
+    'ChZVcGRhdGVTdG9yZVBvc3RSZXF1ZXN0EkwKCW9wZXJhdGlvbhgBIAEoCzIpLmhhd2tyLnNvY2'
+    'lhbC52MWFscGhhMS5EZWxlZ2F0ZWRPcGVyYXRpb25CA+BBAlIJb3BlcmF0aW9uEjQKBHBvc3QY'
+    'AiABKAsyGy5oYXdrci5zb2NpYWwudjFhbHBoYTEuUG9zdEID4EECUgRwb3N0EjsKC3VwZGF0ZV'
+    '9tYXNrGAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFza1IKdXBkYXRlTWFzaw==');
+
+@$core.Deprecated('Use updateStorePostResponseDescriptor instead')
+const UpdateStorePostResponse$json = {
+  '1': 'UpdateStorePostResponse',
+  '2': [
+    {
+      '1': 'post',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '10': 'post'
+    },
+    {'1': 'audit_log_id', '3': 2, '4': 1, '5': 9, '10': 'auditLogId'},
+  ],
+};
+
+/// Descriptor for `UpdateStorePostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateStorePostResponseDescriptor = $convert.base64Decode(
+    'ChdVcGRhdGVTdG9yZVBvc3RSZXNwb25zZRIvCgRwb3N0GAEgASgLMhsuaGF3a3Iuc29jaWFsLn'
+    'YxYWxwaGExLlBvc3RSBHBvc3QSIAoMYXVkaXRfbG9nX2lkGAIgASgJUgphdWRpdExvZ0lk');
+
+@$core.Deprecated('Use publishStorePostRequestDescriptor instead')
+const PublishStorePostRequest$json = {
+  '1': 'PublishStorePostRequest',
+  '2': [
+    {
+      '1': 'operation',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.DelegatedOperation',
+      '8': {},
+      '10': 'operation'
+    },
+    {'1': 'post_id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+    {'1': 'etag', '3': 3, '4': 1, '5': 9, '8': {}, '10': 'etag'},
+  ],
+};
+
+/// Descriptor for `PublishStorePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List publishStorePostRequestDescriptor = $convert.base64Decode(
+    'ChdQdWJsaXNoU3RvcmVQb3N0UmVxdWVzdBJMCglvcGVyYXRpb24YASABKAsyKS5oYXdrci5zb2'
+    'NpYWwudjFhbHBoYTEuRGVsZWdhdGVkT3BlcmF0aW9uQgPgQQJSCW9wZXJhdGlvbhIcCgdwb3N0'
+    'X2lkGAIgASgJQgPgQQJSBnBvc3RJZBIXCgRldGFnGAMgASgJQgPgQQJSBGV0YWc=');
+
+@$core.Deprecated('Use publishStorePostResponseDescriptor instead')
+const PublishStorePostResponse$json = {
+  '1': 'PublishStorePostResponse',
+  '2': [
+    {
+      '1': 'post',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '10': 'post'
+    },
+    {'1': 'audit_log_id', '3': 2, '4': 1, '5': 9, '10': 'auditLogId'},
+  ],
+};
+
+/// Descriptor for `PublishStorePostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List publishStorePostResponseDescriptor = $convert.base64Decode(
+    'ChhQdWJsaXNoU3RvcmVQb3N0UmVzcG9uc2USLwoEcG9zdBgBIAEoCzIbLmhhd2tyLnNvY2lhbC'
+    '52MWFscGhhMS5Qb3N0UgRwb3N0EiAKDGF1ZGl0X2xvZ19pZBgCIAEoCVIKYXVkaXRMb2dJZA==');
+
+@$core.Deprecated('Use unpublishStorePostRequestDescriptor instead')
+const UnpublishStorePostRequest$json = {
+  '1': 'UnpublishStorePostRequest',
+  '2': [
+    {
+      '1': 'operation',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.DelegatedOperation',
+      '8': {},
+      '10': 'operation'
+    },
+    {'1': 'post_id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+    {'1': 'etag', '3': 3, '4': 1, '5': 9, '8': {}, '10': 'etag'},
+  ],
+};
+
+/// Descriptor for `UnpublishStorePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unpublishStorePostRequestDescriptor = $convert.base64Decode(
+    'ChlVbnB1Ymxpc2hTdG9yZVBvc3RSZXF1ZXN0EkwKCW9wZXJhdGlvbhgBIAEoCzIpLmhhd2tyLn'
+    'NvY2lhbC52MWFscGhhMS5EZWxlZ2F0ZWRPcGVyYXRpb25CA+BBAlIJb3BlcmF0aW9uEhwKB3Bv'
+    'c3RfaWQYAiABKAlCA+BBAlIGcG9zdElkEhcKBGV0YWcYAyABKAlCA+BBAlIEZXRhZw==');
+
+@$core.Deprecated('Use unpublishStorePostResponseDescriptor instead')
+const UnpublishStorePostResponse$json = {
+  '1': 'UnpublishStorePostResponse',
+  '2': [
+    {
+      '1': 'post',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '10': 'post'
+    },
+    {'1': 'audit_log_id', '3': 2, '4': 1, '5': 9, '10': 'auditLogId'},
+  ],
+};
+
+/// Descriptor for `UnpublishStorePostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unpublishStorePostResponseDescriptor =
+    $convert.base64Decode(
+        'ChpVbnB1Ymxpc2hTdG9yZVBvc3RSZXNwb25zZRIvCgRwb3N0GAEgASgLMhsuaGF3a3Iuc29jaW'
+        'FsLnYxYWxwaGExLlBvc3RSBHBvc3QSIAoMYXVkaXRfbG9nX2lkGAIgASgJUgphdWRpdExvZ0lk');
+
+@$core.Deprecated('Use scheduleStorePostRequestDescriptor instead')
+const ScheduleStorePostRequest$json = {
+  '1': 'ScheduleStorePostRequest',
+  '2': [
+    {
+      '1': 'operation',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.DelegatedOperation',
+      '8': {},
+      '10': 'operation'
+    },
+    {'1': 'post_id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+    {'1': 'etag', '3': 3, '4': 1, '5': 9, '8': {}, '10': 'etag'},
+    {
+      '1': 'publish_time',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'publishTime'
+    },
+  ],
+};
+
+/// Descriptor for `ScheduleStorePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List scheduleStorePostRequestDescriptor = $convert.base64Decode(
+    'ChhTY2hlZHVsZVN0b3JlUG9zdFJlcXVlc3QSTAoJb3BlcmF0aW9uGAEgASgLMikuaGF3a3Iuc2'
+    '9jaWFsLnYxYWxwaGExLkRlbGVnYXRlZE9wZXJhdGlvbkID4EECUglvcGVyYXRpb24SHAoHcG9z'
+    'dF9pZBgCIAEoCUID4EECUgZwb3N0SWQSFwoEZXRhZxgDIAEoCUID4EECUgRldGFnEkIKDHB1Ym'
+    'xpc2hfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAlILcHVibGlz'
+    'aFRpbWU=');
+
+@$core.Deprecated('Use scheduleStorePostResponseDescriptor instead')
+const ScheduleStorePostResponse$json = {
+  '1': 'ScheduleStorePostResponse',
+  '2': [
+    {
+      '1': 'post',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '10': 'post'
+    },
+    {
+      '1': 'publish_time',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'publishTime'
+    },
+    {'1': 'audit_log_id', '3': 3, '4': 1, '5': 9, '10': 'auditLogId'},
+  ],
+};
+
+/// Descriptor for `ScheduleStorePostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List scheduleStorePostResponseDescriptor = $convert.base64Decode(
+    'ChlTY2hlZHVsZVN0b3JlUG9zdFJlc3BvbnNlEi8KBHBvc3QYASABKAsyGy5oYXdrci5zb2NpYW'
+    'wudjFhbHBoYTEuUG9zdFIEcG9zdBI9CgxwdWJsaXNoX3RpbWUYAiABKAsyGi5nb29nbGUucHJv'
+    'dG9idWYuVGltZXN0YW1wUgtwdWJsaXNoVGltZRIgCgxhdWRpdF9sb2dfaWQYAyABKAlSCmF1ZG'
+    'l0TG9nSWQ=');
+
 const $core.Map<$core.String, $core.dynamic> SocialPublicServiceBase$json = {
   '1': 'SocialPublicService',
   '2': [
@@ -2170,3 +2568,103 @@ final $typed_data.Uint8List socialAppServiceDescriptor = $convert.base64Decode(
     'dFN0b3JlQ29tbWVudHNSZXNwb25zZSIDkAIBEocBChVHZXRTdG9yZVNvY2lhbFN1bW1hcnkSMy'
     '5oYXdrci5zb2NpYWwudjFhbHBoYTEuR2V0U3RvcmVTb2NpYWxTdW1tYXJ5UmVxdWVzdBo0Lmhh'
     'd2tyLnNvY2lhbC52MWFscGhhMS5HZXRTdG9yZVNvY2lhbFN1bW1hcnlSZXNwb25zZSIDkAIB');
+
+const $core.Map<$core.String, $core.dynamic> SocialDelegatedServiceBase$json = {
+  '1': 'SocialDelegatedService',
+  '2': [
+    {
+      '1': 'ListStorePosts',
+      '2': '.hawkr.social.v1alpha1.ListStorePostsRequest',
+      '3': '.hawkr.social.v1alpha1.ListStorePostsResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'GetStorePost',
+      '2': '.hawkr.social.v1alpha1.GetStorePostRequest',
+      '3': '.hawkr.social.v1alpha1.GetStorePostResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'CreateStorePost',
+      '2': '.hawkr.social.v1alpha1.CreateStorePostRequest',
+      '3': '.hawkr.social.v1alpha1.CreateStorePostResponse'
+    },
+    {
+      '1': 'UpdateStorePost',
+      '2': '.hawkr.social.v1alpha1.UpdateStorePostRequest',
+      '3': '.hawkr.social.v1alpha1.UpdateStorePostResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'PublishStorePost',
+      '2': '.hawkr.social.v1alpha1.PublishStorePostRequest',
+      '3': '.hawkr.social.v1alpha1.PublishStorePostResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'UnpublishStorePost',
+      '2': '.hawkr.social.v1alpha1.UnpublishStorePostRequest',
+      '3': '.hawkr.social.v1alpha1.UnpublishStorePostResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'ScheduleStorePost',
+      '2': '.hawkr.social.v1alpha1.ScheduleStorePostRequest',
+      '3': '.hawkr.social.v1alpha1.ScheduleStorePostResponse',
+      '4': {'34': 2},
+    },
+  ],
+};
+
+@$core.Deprecated('Use socialDelegatedServiceDescriptor instead')
+const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
+    SocialDelegatedServiceBase$messageJson = {
+  '.hawkr.social.v1alpha1.ListStorePostsRequest': ListStorePostsRequest$json,
+  '.hawkr.social.v1alpha1.ListStorePostsResponse': ListStorePostsResponse$json,
+  '.hawkr.social.v1alpha1.Post': Post$json,
+  '.hawkr.common.v1alpha1.StoreCard': $1.StoreCard$json,
+  '.hawkr.common.v1alpha1.Image': $2.Image$json,
+  '.hawkr.social.v1alpha1.Hashtag': Hashtag$json,
+  '.google.protobuf.Timestamp': $0.Timestamp$json,
+  '.hawkr.social.v1alpha1.GetStorePostRequest': GetStorePostRequest$json,
+  '.hawkr.social.v1alpha1.GetStorePostResponse': GetStorePostResponse$json,
+  '.hawkr.social.v1alpha1.CreateStorePostRequest': CreateStorePostRequest$json,
+  '.hawkr.social.v1alpha1.DelegatedOperation': DelegatedOperation$json,
+  '.hawkr.social.v1alpha1.CreateStorePostResponse':
+      CreateStorePostResponse$json,
+  '.hawkr.social.v1alpha1.UpdateStorePostRequest': UpdateStorePostRequest$json,
+  '.google.protobuf.FieldMask': $3.FieldMask$json,
+  '.hawkr.social.v1alpha1.UpdateStorePostResponse':
+      UpdateStorePostResponse$json,
+  '.hawkr.social.v1alpha1.PublishStorePostRequest':
+      PublishStorePostRequest$json,
+  '.hawkr.social.v1alpha1.PublishStorePostResponse':
+      PublishStorePostResponse$json,
+  '.hawkr.social.v1alpha1.UnpublishStorePostRequest':
+      UnpublishStorePostRequest$json,
+  '.hawkr.social.v1alpha1.UnpublishStorePostResponse':
+      UnpublishStorePostResponse$json,
+  '.hawkr.social.v1alpha1.ScheduleStorePostRequest':
+      ScheduleStorePostRequest$json,
+  '.hawkr.social.v1alpha1.ScheduleStorePostResponse':
+      ScheduleStorePostResponse$json,
+};
+
+/// Descriptor for `SocialDelegatedService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
+final $typed_data.Uint8List socialDelegatedServiceDescriptor = $convert.base64Decode(
+    'ChZTb2NpYWxEZWxlZ2F0ZWRTZXJ2aWNlEnIKDkxpc3RTdG9yZVBvc3RzEiwuaGF3a3Iuc29jaW'
+    'FsLnYxYWxwaGExLkxpc3RTdG9yZVBvc3RzUmVxdWVzdBotLmhhd2tyLnNvY2lhbC52MWFscGhh'
+    'MS5MaXN0U3RvcmVQb3N0c1Jlc3BvbnNlIgOQAgESbAoMR2V0U3RvcmVQb3N0EiouaGF3a3Iuc2'
+    '9jaWFsLnYxYWxwaGExLkdldFN0b3JlUG9zdFJlcXVlc3QaKy5oYXdrci5zb2NpYWwudjFhbHBo'
+    'YTEuR2V0U3RvcmVQb3N0UmVzcG9uc2UiA5ACARJwCg9DcmVhdGVTdG9yZVBvc3QSLS5oYXdrci'
+    '5zb2NpYWwudjFhbHBoYTEuQ3JlYXRlU3RvcmVQb3N0UmVxdWVzdBouLmhhd2tyLnNvY2lhbC52'
+    'MWFscGhhMS5DcmVhdGVTdG9yZVBvc3RSZXNwb25zZRJ1Cg9VcGRhdGVTdG9yZVBvc3QSLS5oYX'
+    'drci5zb2NpYWwudjFhbHBoYTEuVXBkYXRlU3RvcmVQb3N0UmVxdWVzdBouLmhhd2tyLnNvY2lh'
+    'bC52MWFscGhhMS5VcGRhdGVTdG9yZVBvc3RSZXNwb25zZSIDkAICEngKEFB1Ymxpc2hTdG9yZV'
+    'Bvc3QSLi5oYXdrci5zb2NpYWwudjFhbHBoYTEuUHVibGlzaFN0b3JlUG9zdFJlcXVlc3QaLy5o'
+    'YXdrci5zb2NpYWwudjFhbHBoYTEuUHVibGlzaFN0b3JlUG9zdFJlc3BvbnNlIgOQAgISfgoSVW'
+    '5wdWJsaXNoU3RvcmVQb3N0EjAuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlVucHVibGlzaFN0b3Jl'
+    'UG9zdFJlcXVlc3QaMS5oYXdrci5zb2NpYWwudjFhbHBoYTEuVW5wdWJsaXNoU3RvcmVQb3N0Um'
+    'VzcG9uc2UiA5ACAhJ7ChFTY2hlZHVsZVN0b3JlUG9zdBIvLmhhd2tyLnNvY2lhbC52MWFscGhh'
+    'MS5TY2hlZHVsZVN0b3JlUG9zdFJlcXVlc3QaMC5oYXdrci5zb2NpYWwudjFhbHBoYTEuU2NoZW'
+    'R1bGVTdG9yZVBvc3RSZXNwb25zZSIDkAIC');

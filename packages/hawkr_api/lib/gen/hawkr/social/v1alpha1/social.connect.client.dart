@@ -9,7 +9,7 @@ import "social.connect.spec.dart" as specs;
 
 /// SocialPublicService 是任何人都能讀的貼文與留言，不需要登入。
 extension type SocialPublicServiceClient (connect.Transport _transport) {
-  /// GetPost 讀一篇觀看者可讀的貼文：已發布、沒有被下架或平台隱藏，而且店家不是被觀看者個人封鎖的。其他一律回 not_found，
+  /// GetStorePost 讀一篇觀看者可讀的貼文：已發布、沒有被下架或平台隱藏，而且店家不是被觀看者個人封鎖的。其他一律回 not_found，
   /// 不區分原因。店主讀自己店的貼文不套個人封鎖。這個方法不計瀏覽數，瀏覽由 RecordPostView 另外記錄。
   Future<hawkrsocialv1alpha1social.GetPostResponse> getPost(
     hawkrsocialv1alpha1social.GetPostRequest input, {
@@ -28,7 +28,7 @@ extension type SocialPublicServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// ListPosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶篩選是全站動態牆，帶 store_id 是該店的貼文頁，
+  /// ListStorePosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶篩選是全站動態牆，帶 store_id 是該店的貼文頁，
   /// 帶 hashtag 是該標籤的貼文頁；兩個篩選不能同時帶（invalid_argument）。
   /// 觀看者個人封鎖的店不出現在動態牆，過濾在分頁之前，所以一頁可以少於 page_size，結束只看 next_page_token。
   Future<hawkrsocialv1alpha1social.ListPostsResponse> listPosts(
@@ -367,7 +367,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// CreatePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
+  /// CreateStorePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
   /// 草稿可以不完整。帶 request_id 重送回第一次建立的貼文目前的樣子（狀態與計數是此刻的），不重複建立；內容不同回 invalid_argument。需要賣家能力 CAP_MARKETING。
   Future<hawkrsocialv1alpha1social.CreatePostResponse> createPost(
     hawkrsocialv1alpha1social.CreatePostRequest input, {
@@ -423,7 +423,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// UpdatePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
+  /// UpdateStorePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
   /// 已發布或有待發布排程的貼文被修改後仍要滿足公開要件。需要賣家能力 CAP_MARKETING。
   Future<hawkrsocialv1alpha1social.UpdatePostResponse> updatePost(
     hawkrsocialv1alpha1social.UpdatePostRequest input, {
@@ -460,7 +460,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// UnpublishPost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
+  /// UnpublishStorePost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
   Future<hawkrsocialv1alpha1social.UnpublishPostResponse> unpublishPost(
     hawkrsocialv1alpha1social.UnpublishPostRequest input, {
     connect.Headers? headers,
@@ -496,7 +496,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
+  /// ScheduleStorePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
   /// 需要賣家能力 CAP_MARKETING。排程的讀取與取消見 ListPendingSchedules、CancelPostSchedule。
   Future<hawkrsocialv1alpha1social.SchedulePostResponse> schedulePost(
     hawkrsocialv1alpha1social.SchedulePostRequest input, {
@@ -584,6 +584,143 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
   }) {
     return connect.Client(_transport).unary(
       specs.SocialAppService.getStoreSocialSummary,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+}
+/// SocialDelegatedService 是代行營運中的平台管理員讀寫代行店家的貼文：憑證是 X-HK-Operation-Session 標頭裡的代行 session（由 website 的 BFF 轉送，不放在請求訊息），
+/// 不讀顧客或管理員的身分；目標店家是 session 建立當下綁定的那一家，請求不帶 store_id。商品與訂單由各自模組的 `<模組>DelegatedService` 在 A10 提供。
+/// 回應一律不可快取（private, no-store）。
+/// 能力（posts.read、posts.write、posts.publish）依方法宣告：憑證缺少或無效回 unauthenticated；session 已結束、到期或撤銷回 failed_precondition；
+/// session 沒有授予對應的能力回 permission_denied；店家此刻不可代行（不存在、已關閉、等待刪除、停權）回 failed_precondition，只拒絕、不撤銷 session。
+/// 稽核：成功的寫入在同一個 transaction 內留下一列 SUCCEEDED（寫入失敗時一併 rollback）；被拒絕的請求（含讀取）與寫入的業務失敗另開 transaction 留下一列 FAILED；
+/// 成功的讀取不稽核。
+extension type SocialDelegatedServiceClient (connect.Transport _transport) {
+  /// ListStorePosts 列出代行店家自己的貼文（含草稿與下架，不含已刪除），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。需要能力 posts.read。
+  Future<hawkrsocialv1alpha1social.ListStorePostsResponse> listStorePosts(
+    hawkrsocialv1alpha1social.ListStorePostsRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialDelegatedService.listStorePosts,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// GetStorePost 讀代行店家的一篇貼文（任何狀態，不含已刪除）；別家的貼文與不存在一樣回 not_found。回應帶 status 與 etag。需要能力 posts.read。
+  Future<hawkrsocialv1alpha1social.GetStorePostResponse> getStorePost(
+    hawkrsocialv1alpha1social.GetStorePostRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialDelegatedService.getStorePost,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// CreateStorePost 以代行店家建立草稿貼文（建立一律是草稿；要發布再呼叫 PublishStorePost）。同一個 session 以同一個 request_id 重送回第一次建立的貼文目前的樣子，
+  /// 不重複建立、不重複寫稽核；內容不同回 failed_precondition。需要能力 posts.write。
+  Future<hawkrsocialv1alpha1social.CreateStorePostResponse> createStorePost(
+    hawkrsocialv1alpha1social.CreateStorePostRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialDelegatedService.createStorePost,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// UpdateStorePost 修改代行店家的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與
+  /// VERSION_CONFLICT，不寫入也不留稽核。重送規則同 CreateStorePost。需要能力 posts.write。
+  Future<hawkrsocialv1alpha1social.UpdateStorePostResponse> updateStorePost(
+    hawkrsocialv1alpha1social.UpdateStorePostRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialDelegatedService.updateStorePost,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// PublishStorePost 立即發布草稿或下架的貼文；etag 必填。重送規則同 CreateStorePost。需要能力 posts.publish。
+  Future<hawkrsocialv1alpha1social.PublishStorePostResponse> publishStorePost(
+    hawkrsocialv1alpha1social.PublishStorePostRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialDelegatedService.publishStorePost,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// UnpublishStorePost 下架已發布的貼文；etag 必填。重送規則同 CreateStorePost。需要能力 posts.publish。
+  Future<hawkrsocialv1alpha1social.UnpublishStorePostResponse> unpublishStorePost(
+    hawkrsocialv1alpha1social.UnpublishStorePostRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialDelegatedService.unpublishStorePost,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// ScheduleStorePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天；貼文已有待發布的排程時，舊的被取代。排程屬於店家，session 結束後仍會
+  /// 在到點時重驗授權並發布（授權已撤回則取消）。稽核寫 POST_SCHEDULE，到點發布時另寫一列 POST_PUBLISH。重送規則同 CreateStorePost。需要能力 posts.publish。
+  Future<hawkrsocialv1alpha1social.ScheduleStorePostResponse> scheduleStorePost(
+    hawkrsocialv1alpha1social.ScheduleStorePostRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialDelegatedService.scheduleStorePost,
       input,
       signal: signal,
       headers: headers,

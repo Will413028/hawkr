@@ -37,7 +37,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/agent/v1alpha1/agentv1alpha1connect"
 	buyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/buyer/v1alpha1/buyerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/content/v1alpha1/contentv1alpha1connect"
-	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/delegation/v1alpha1/delegationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1/discoveryv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
@@ -371,17 +370,17 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	}
 	add(agentv1alpha1connect.NewVendorPortalPublicServiceHandler(httpagent.NewPublic(deps.Agent, deps.Now), opts...))
 	add(agentv1alpha1connect.NewVendorPortalInviteeServiceHandler(httpagent.NewInvitee(deps.Agent, deps.Identity, deps.Logger), append(slices.Clone(opts), connect.WithInterceptors(invitee))...))
-	// 代行工作區（DelegationDelegatedService）：憑證是 X-HK-Operation-Session 的代行 session，由這支 interceptor 解析並逐方法檢查能力（宣告表在 httpapi/delegation），
-	// 只掛在這個 service、在 rpc.NewInterceptor 之內；全域的 adminauth 與顧客身分都不參與。限流與其他 service 一樣由 assemble 的 withRateLimit 包住。
-	delegated, err := httpdelegation.NewInterceptor(deps.Delegation)
+	// 代行工作區（SocialDelegatedService，A10 起各模組有自己的 <模組>DelegatedService）：憑證是 X-HK-Operation-Session 的代行 session，由 httpapi/delegation 的 interceptor 解析、
+	// 依該 service 的宣告表授權並稽核被拒絕的請求；每個 service 掛自己的一支，在 rpc.NewInterceptor 之內，全域的 adminauth 與顧客身分都不參與。限流與其他 service 一樣由 assemble 的 withRateLimit 包住。
+	socialDelegated, err := httpdelegation.NewInterceptor(deps.Delegation, deps.Logger, httpsocial.DelegatedDeclaration)
 	if err != nil {
 		return nil, err
 	}
-	ownPosts, err := httpsocial.NewOwnPosts(deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin)
+	delegatedSocial, err := httpsocial.NewDelegated(deps.Delegation, deps.Social, deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin)
 	if err != nil {
 		return nil, err
 	}
-	add(delegationv1alpha1connect.NewDelegationDelegatedServiceHandler(httpdelegation.New(deps.Delegation, ownPosts), append(slices.Clone(opts), connect.WithInterceptors(delegated))...))
+	add(socialv1alpha1connect.NewSocialDelegatedServiceHandler(delegatedSocial, append(slices.Clone(opts), connect.WithInterceptors(socialDelegated))...))
 	if err := checkAdminDeclarations(out); err != nil {
 		return nil, err
 	}

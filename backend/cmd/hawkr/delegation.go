@@ -15,13 +15,15 @@ import (
 )
 
 // newDelegation 建立 delegation 模組，並訂閱事件：identity 撤銷管理員角色的 transaction 內撤銷該管理員進行中的代行（並取消他發起的排程）；
-// social 排程到點發布的 transaction 內寫單段的 SUCCEEDED 稽核（所以執行排程 job 的 worker 也要組裝它）。serve、worker 與 CLI 用同一個組裝，
+// social 排程到點發布的 transaction 內寫單段的 SUCCEEDED 稽核（所以執行排程 job 的 worker 也要組裝它）；seller 停權或關店的 transaction 內結束該店進行中的代行 session。serve、worker 與 CLI 用同一個組裝，
 // 各條路徑的效果相同。d.Social 是必填，組裝點要先以 delegation.NewScheduleAuthorizer 建 social，再把 social 填進 d。
 func newDelegation(bus *events.Bus, d delegation.Deps) *delegation.Module {
 	d.Events = bus
 	m := delegation.New(d)
 	events.Subscribe(bus, m.OnAdminRoleRevoked)
 	events.Subscribe(bus, m.OnPostPublished)
+	events.Subscribe(bus, m.OnStoreSuspended)
+	events.Subscribe(bus, m.OnStoreClosed)
 	return m
 }
 

@@ -390,6 +390,114 @@ func (q *Queries) InsertDelegationAuditLog(ctx context.Context, arg InsertDelega
 	return i, err
 }
 
+const insertFailedAuditLog = `-- name: InsertFailedAuditLog :one
+INSERT INTO delegation.admin_operation_audit_logs (
+    id, session_id, actor_admin_id, actor_display_name,
+    target_store_id, target_seller_account_id, target_store_name,
+    origin, capability, action, resource_type, resource_id, resource_name,
+    result, biz_code, operation_reason, case_reference,
+    request_id, correlation_id, resource_version_before, user_agent,
+    risk_level, notify_seller, created_at, confirmed_at
+) VALUES (
+    $1, $2, $3, $4,
+    $5, $6, $7,
+    'INTERACTIVE', $8, $9, $10, $11::text, $12,
+    'FAILED', $13, $14, $15,
+    $16, $17, $18, $19,
+    $20, false, $21::timestamptz, date_trunc('second', $21::timestamptz)
+)
+RETURNING id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at
+`
+
+type InsertFailedAuditLogParams struct {
+	ID                    uuid.UUID
+	SessionID             int64
+	ActorAdminID          int64
+	ActorDisplayName      string
+	TargetStoreID         int64
+	TargetSellerAccountID int64
+	TargetStoreName       string
+	Capability            string
+	Action                string
+	ResourceType          string
+	ResourceID            *string
+	ResourceName          *string
+	BizCode               *int32
+	OperationReason       *string
+	CaseReference         *string
+	RequestID             string
+	CorrelationID         string
+	ResourceVersionBefore *int64
+	UserAgent             *string
+	RiskLevel             string
+	Now                   time.Time
+}
+
+// 代行互動請求的失敗紀錄：被拒絕（能力不足、session 已失效、店家不可代行，含讀取）或寫入的業務失敗。在獨立的 transaction 寫入（被稽核的寫入若已 rollback，這一列仍要留下）。
+// 直接是 FAILED，沒有冪等鍵（失敗的嘗試不占用 request_id，同一個 request_id 重送仍可成功）；origin 固定 INTERACTIVE；notify_seller 固定 false；
+// confirmed_at 與 confirm 一樣截秒；biz_code 為 NULL 表示失敗不是代行的拒絕（沒有對應的業務碼）。
+func (q *Queries) InsertFailedAuditLog(ctx context.Context, arg InsertFailedAuditLogParams) (DelegationAdminOperationAuditLog, error) {
+	row := q.db.QueryRow(ctx, insertFailedAuditLog,
+		arg.ID,
+		arg.SessionID,
+		arg.ActorAdminID,
+		arg.ActorDisplayName,
+		arg.TargetStoreID,
+		arg.TargetSellerAccountID,
+		arg.TargetStoreName,
+		arg.Capability,
+		arg.Action,
+		arg.ResourceType,
+		arg.ResourceID,
+		arg.ResourceName,
+		arg.BizCode,
+		arg.OperationReason,
+		arg.CaseReference,
+		arg.RequestID,
+		arg.CorrelationID,
+		arg.ResourceVersionBefore,
+		arg.UserAgent,
+		arg.RiskLevel,
+		arg.Now,
+	)
+	var i DelegationAdminOperationAuditLog
+	err := row.Scan(
+		&i.ID,
+		&i.SessionID,
+		&i.ActorAdminID,
+		&i.ActorDisplayName,
+		&i.TargetStoreID,
+		&i.TargetSellerAccountID,
+		&i.TargetStoreName,
+		&i.Origin,
+		&i.Capability,
+		&i.Action,
+		&i.ResourceType,
+		&i.ResourceID,
+		&i.ResourceName,
+		&i.Result,
+		&i.BizCode,
+		&i.OperationReason,
+		&i.CaseReference,
+		&i.RequestID,
+		&i.CorrelationID,
+		&i.IdempotencyKey,
+		&i.PayloadHash,
+		&i.BeforeSnapshot,
+		&i.AfterSnapshot,
+		&i.ChangedFields,
+		&i.ResourceVersionBefore,
+		&i.ResourceVersionAfter,
+		&i.UserAgent,
+		&i.RiskLevel,
+		&i.NotifySeller,
+		&i.NotifiedAt,
+		&i.CreatedAt,
+		&i.ConfirmedAt,
+	)
+	return i, err
+}
+
 const insertScheduledPublishAuditLog = `-- name: InsertScheduledPublishAuditLog :one
 INSERT INTO delegation.admin_operation_audit_logs (
     id, session_id, actor_admin_id, actor_display_name,

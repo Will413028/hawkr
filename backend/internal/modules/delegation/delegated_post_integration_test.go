@@ -4,7 +4,9 @@ package delegation
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 	"uuid"
@@ -13,9 +15,20 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// 代行貼文的 use case：每個寫入在同一個 transaction 內先寫單段 SUCCEEDED 稽核再呼叫 social；request_id 是 (session, 冪等鍵)。
+// 代行 Connect 的共用元件（DelegatedWrite、DelegatedRead）：同一個 transaction 內檢查 session 與能力、寫單段 SUCCEEDED 稽核、呼叫資源模組（這裡是 social）；
+// 被拒絕與寫入失敗另開 transaction 寫 FAILED。handler 的角色由下面的 writePost 等輔助函式扮演（資源模組的 handler 在 httpapi/social）。
+
+var (
+	methodRead      = DelegatedMethod{Capability: CapabilityPostsRead, Action: AuditPostRead, Resource: ResourcePost}
+	methodCreate    = DelegatedMethod{Capability: CapabilityPostsWrite, Action: AuditPostCreate, Resource: ResourcePost}
+	methodUpdate    = DelegatedMethod{Capability: CapabilityPostsWrite, Action: AuditPostUpdate, Resource: ResourcePost}
+	methodPublish   = DelegatedMethod{Capability: CapabilityPostsPublish, Action: AuditPostPublish, Resource: ResourcePost}
+	methodUnpublish = DelegatedMethod{Capability: CapabilityPostsPublish, Action: AuditPostUnpublish, Resource: ResourcePost}
+	methodSchedule  = DelegatedMethod{Capability: CapabilityPostsPublish, Action: AuditPostSchedule, Resource: ResourcePost}
+)
 
 type operator struct {
 	storeID int64
@@ -36,14 +49,14 @@ func (f *fixture) newOperator(t *testing.T, tag string, caps ...Capability) oper
 	return operator{storeID: storeID, admin: admin, session: f.start(t, startInput(admin, storeID, "ik-"+tag, caps...))}
 }
 
-// caller 是 interceptor 解出的代行：以憑證重新解析（與傳輸層相同）。
-func (f *fixture) caller(t *testing.T, o operator) DelegatedCaller {
+// caller 是 interceptor 解出的代行：以憑證重新解析（與傳輸層相同），帶著被呼叫的方法宣告。
+func (f *fixture) caller(t *testing.T, o operator, m DelegatedMethod) DelegatedCaller {
 	t.Helper()
 	s, err := f.m.ResolveDelegation(context.Background(), o.session.Credential, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return DelegatedCaller{Session: s, CorrelationID: "corr-it", UserAgent: "integration-test"}
+	return DelegatedCaller{Session: s, Method: m, CorrelationID: "corr-it", UserAgent: "integration-test"}
 }
 
 func (f *fixture) op(reason string) DelegatedOperation {
@@ -60,18 +73,140 @@ func (f *fixture) auditRowsOfKey(t *testing.T, sessionID int64, key string) int 
 	return f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND idempotency_key = $2`, sessionID, key)
 }
 
+func (f *fixture) resultRows(t *testing.T, sessionID int64, result string) int {
+	t.Helper()
+	return f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND result = $2`, sessionID, result)
+}
+
 func (f *fixture) postCount(t *testing.T, storeID int64) int {
 	t.Helper()
 	return f.count(t, `SELECT count(*) FROM social.posts WHERE store_id = $1`, storeID)
 }
 
-func create(f *fixture, t *testing.T, o operator, op DelegatedOperation, body string) DelegatedPostResult {
+// failedRow 是 session 的 FAILED 稽核列中指定動作的那一列：biz_code、操作原因、冪等鍵、request_id、能力與 notify_seller。
+type failedRow struct {
+	bizCode                    *int32
+	reason, key                *string
+	requestID, capability, cor string
+	notify                     bool
+	n                          int
+}
+
+func (f *fixture) failedRow(t *testing.T, sessionID int64, action string) failedRow {
 	t.Helper()
-	r, err := f.m.DelegatedCreatePost(context.Background(), f.caller(t, o), DelegatedCreatePostInput{Op: op, Body: body, ImageToken: fmt.Sprintf("tok-%d", f.next())})
+	var r failedRow
+	r.n = f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND action = $2 AND result = 'FAILED'`, sessionID, action)
+	if r.n == 0 {
+		return r
+	}
+	if err := f.db.Pool().QueryRow(context.Background(), `SELECT biz_code, operation_reason, idempotency_key, request_id, capability, correlation_id, notify_seller
+		FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND action = $2 AND result = 'FAILED' ORDER BY created_at DESC, id DESC LIMIT 1`, sessionID, action).
+		Scan(&r.bizCode, &r.reason, &r.key, &r.requestID, &r.capability, &r.cor, &r.notify); err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+func wantBizCode(t *testing.T, what string, got *int32, want int32) {
+	t.Helper()
+	if got == nil || *got != want {
+		t.Fatalf("%s 的 biz_code = %v，預期 %d", what, got, want)
+	}
+}
+
+// written 是 handler 扮演者的結果：貼文、元件的結果與排程時間。
+type written struct {
+	Post      social.Post
+	Res       DelegatedWriteResult
+	PublishAt *time.Time
+}
+
+// writePost 扮演資源模組的 handler：交給元件執行 do；重送時讀回第一次寫入的貼文。
+func (f *fixture) writePost(c DelegatedCaller, w DelegatedWrite, do func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error)) (written, error) {
+	ctx := context.Background()
+	var out written
+	res, err := f.m.DelegatedWrite(ctx, c, w, func(ctx context.Context, st seller.Store) (DelegatedOutcome, error) {
+		p, at, err := do(ctx, st)
+		if err != nil {
+			return DelegatedOutcome{}, err
+		}
+		out.Post, out.PublishAt = p, at
+		return DelegatedOutcome{ResourceID: p.ID.String(), ResourceName: p.Body, VersionAfter: p.Version}, nil
+	})
+	if err != nil {
+		return written{}, err
+	}
+	out.Res = res
+	if res.Replayed {
+		id, err := uuid.Parse(res.ResourceID)
+		if err != nil {
+			return written{}, err
+		}
+		if out.Post, err = f.realSocial.MyPost(ctx, res.Store, id); err != nil {
+			return written{}, err
+		}
+	}
+	return out, nil
+}
+
+func (f *fixture) createPost(c DelegatedCaller, op DelegatedOperation, body, token string) (written, error) {
+	return f.writePost(c, DelegatedWrite{Op: op, PayloadHash: DelegatedPayloadHash(AuditPostCreate, body, token)},
+		func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error) {
+			p, err := f.realSocial.CreatePost(ctx, st, social.CreatePostInput{Body: body, ImageToken: token})
+			return p, nil, err
+		})
+}
+
+func (f *fixture) mustCreate(t *testing.T, o operator, op DelegatedOperation, body string) written {
+	t.Helper()
+	r, err := f.createPost(f.caller(t, o, methodCreate), op, body, fmt.Sprintf("tok-%d", f.next()))
 	if err != nil {
 		t.Fatal(err)
 	}
 	return r
+}
+
+func (f *fixture) updatePost(c DelegatedCaller, op DelegatedOperation, id uuid.UUID, version int64, body string) (written, error) {
+	return f.writePost(c, DelegatedWrite{Op: op, ResourceID: id.String(), Version: &version, PayloadHash: DelegatedPayloadHash(AuditPostUpdate, id, version, body)},
+		func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error) {
+			p, err := f.realSocial.UpdatePost(ctx, st, social.UpdatePostInput{PostID: id, Version: version, Body: &body})
+			return p, nil, err
+		})
+}
+
+func (f *fixture) transition(c DelegatedCaller, op DelegatedOperation, id uuid.UUID, version int64) (written, error) {
+	action := c.Method.Action
+	return f.writePost(c, DelegatedWrite{Op: op, ResourceID: id.String(), Version: &version, PayloadHash: DelegatedPayloadHash(action, id, version)},
+		func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error) {
+			var p social.Post
+			var err error
+			if action == AuditPostPublish {
+				p, err = f.realSocial.PublishPost(ctx, st, id, version)
+			} else {
+				p, err = f.realSocial.UnpublishPost(ctx, st, id, version)
+			}
+			return p, nil, err
+		})
+}
+
+func (f *fixture) schedulePost(c DelegatedCaller, op DelegatedOperation, id uuid.UUID, version int64, at time.Time) (written, error) {
+	by := social.ScheduledBy{Kind: social.ScheduleByDelegation, Ref: fmt.Sprint(c.Session.ID)}
+	return f.writePost(c, DelegatedWrite{Op: op, ResourceID: id.String(), Version: &version, PayloadHash: DelegatedPayloadHash(AuditPostSchedule, id, version, at.UTC())},
+		func(ctx context.Context, st seller.Store) (social.Post, *time.Time, error) {
+			s, err := f.realSocial.SchedulePost(ctx, st, social.SchedulePostInput{PostID: id, Version: version, PublishAt: at, By: by})
+			sat := s.Schedule.PublishAt
+			return s.Post, &sat, err
+		})
+}
+
+func (f *fixture) readPost(c DelegatedCaller, id uuid.UUID) (social.Post, error) {
+	var p social.Post
+	err := f.m.DelegatedRead(context.Background(), c, func(ctx context.Context, st seller.Store) error {
+		var err error
+		p, err = f.realSocial.MyPost(ctx, st, id)
+		return err
+	})
+	return p, err
 }
 
 // 每個寫入都留下恰好一列 SUCCEEDED 的稽核：動作、能力、資源、版本、操作理由、冪等鍵與 request_id 都對。
@@ -81,18 +216,18 @@ func TestEveryDelegatedPostWriteLeavesOneSucceededAuditRow(t *testing.T) {
 	o := f.newOperator(t, "writer")
 	sid := o.session.Session.ID
 
-	created := create(f, t, o, f.op("店家請我們代為建立"), "代行建立的貼文")
-	if created.Replayed || created.Post.Status != social.StatusDraft {
+	createOp := f.op("店家請我們代為建立")
+	created := f.mustCreate(t, o, createOp, "代行建立的貼文")
+	if created.Res.Replayed || created.Post.Status != social.StatusDraft {
 		t.Fatalf("created = %+v", created)
 	}
 	updOp := f.op("修改錯字")
-	body := "改過的貼文"
-	updated, err := f.m.DelegatedUpdatePost(ctx, f.caller(t, o), DelegatedUpdatePostInput{Op: updOp, Update: social.UpdatePostInput{PostID: created.Post.ID, Version: created.Post.Version, Body: &body}})
+	updated, err := f.updatePost(f.caller(t, o, methodUpdate), updOp, created.Post.ID, created.Post.Version, "改過的貼文")
 	if err != nil {
 		t.Fatal(err)
 	}
 	pubOp := f.op("店家要求上架")
-	published, err := f.m.DelegatedPublishPost(ctx, f.caller(t, o), DelegatedPostTransitionInput{Op: pubOp, PostID: created.Post.ID, Version: updated.Post.Version})
+	published, err := f.transition(f.caller(t, o, methodPublish), pubOp, created.Post.ID, updated.Post.Version)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,13 +235,13 @@ func TestEveryDelegatedPostWriteLeavesOneSucceededAuditRow(t *testing.T) {
 		t.Fatalf("published = %+v", published.Post)
 	}
 	unOp := f.op("內容有爭議先下架")
-	unpublished, err := f.m.DelegatedUnpublishPost(ctx, f.caller(t, o), DelegatedPostTransitionInput{Op: unOp, PostID: created.Post.ID, Version: published.Post.Version})
+	unpublished, err := f.transition(f.caller(t, o, methodUnpublish), unOp, created.Post.ID, published.Post.Version)
 	if err != nil {
 		t.Fatal(err)
 	}
 	schedOp := f.op("改排在週末")
 	at := f.now.Add(2 * time.Hour)
-	scheduled, err := f.m.DelegatedSchedulePost(ctx, f.caller(t, o), DelegatedSchedulePostInput{Op: schedOp, PostID: created.Post.ID, Version: unpublished.Post.Version, PublishAt: at})
+	scheduled, err := f.schedulePost(f.caller(t, o, methodSchedule), schedOp, created.Post.ID, unpublished.Post.Version, at)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,9 +252,9 @@ func TestEveryDelegatedPostWriteLeavesOneSucceededAuditRow(t *testing.T) {
 	want := []struct {
 		action, capability, reason string
 		op                         DelegatedOperation
-		result                     DelegatedPostResult
+		result                     written
 	}{
-		{"POST_CREATE", "posts.write", "店家請我們代為建立", DelegatedOperation{}, created},
+		{"POST_CREATE", "posts.write", "店家請我們代為建立", createOp, created},
 		{"POST_UPDATE", "posts.write", "修改錯字", updOp, updated},
 		{"POST_PUBLISH", "posts.publish", "店家要求上架", pubOp, published},
 		{"POST_UNPUBLISH", "posts.publish", "內容有爭議先下架", unOp, unpublished},
@@ -142,18 +277,21 @@ func TestEveryDelegatedPostWriteLeavesOneSucceededAuditRow(t *testing.T) {
 			t.Fatal(err)
 		}
 		if result != "SUCCEEDED" || origin != "INTERACTIVE" || capability != w.capability || resourceType != "POST" || resourceID != created.Post.ID.String() ||
-			reason == nil || *reason != w.reason || !notify || !confirmed || id != w.result.AuditLogID || after == nil || *after != w.result.Post.Version {
+			reason == nil || *reason != w.reason || !notify || !confirmed || id != w.result.Res.AuditLogID || after == nil || *after != w.result.Post.Version {
 			t.Fatalf("%s 的稽核列 = %s %s %s %s %s reason=%v notify=%v confirmed=%v id=%s after=%v", w.action, result, origin, capability, resourceType, resourceID, reason, notify, confirmed, id, after)
 		}
-		if w.op.RequestID != (uuid.UUID{}) && (key != w.op.RequestID.String() || requestID != w.op.RequestID.String()) {
+		if key != w.op.RequestID.String() || requestID != w.op.RequestID.String() {
 			t.Fatalf("%s 的冪等鍵 %q、request_id %q，預期都是 %s", w.action, key, requestID, w.op.RequestID)
 		}
+	}
+	if n := f.resultRows(t, sid, "FAILED"); n != 0 {
+		t.Fatalf("成功的寫入留下 %d 列 FAILED", n)
 	}
 	// 通知賣家的完成事件：五個寫入各一則。
 	if len(f.completed) != 5 {
 		t.Fatalf("完成通知 %d 則，預期 5", len(f.completed))
 	}
-	// 排程是店家的、發起者是這個 session，且以 session 的名義到點發布時繼承 POST_SCHEDULE 的理由。
+	// 排程是店家的、發起者是這個 session。
 	var kind, ref string
 	if err := f.db.Pool().QueryRow(ctx, `SELECT scheduled_by_kind, scheduled_by_ref FROM social.post_schedules WHERE post_id = $1 AND state = 'PENDING'`, scheduled.Post.ID).Scan(&kind, &ref); err != nil {
 		t.Fatal(err)
@@ -163,25 +301,24 @@ func TestEveryDelegatedPostWriteLeavesOneSucceededAuditRow(t *testing.T) {
 	}
 }
 
-// 以相同內容重送（同一個 request_id）：不呼叫 social、回同一篇貼文與同一列稽核。
+// 以相同內容重送（同一個 request_id）：不呼叫 social、回同一篇貼文與同一列稽核，不再通知賣家，也不寫 FAILED。
 func TestReplayWithTheSamePayloadDoesNotCallSocialAgain(t *testing.T) {
 	f := build(t, true)
-	ctx := context.Background()
 	o := f.newOperator(t, "replay2")
 	sid := o.session.Session.ID
 	op := f.op("重送")
-	in := DelegatedCreatePostInput{Op: op, Body: "只該有一篇", ImageToken: "tok-fixed"}
+	c := f.caller(t, o, methodCreate)
 
-	first, err := f.m.DelegatedCreatePost(ctx, f.caller(t, o), in)
+	first, err := f.createPost(c, op, "只該有一篇", "tok-fixed")
 	if err != nil {
 		t.Fatal(err)
 	}
 	completed := len(f.completed)
-	again, err := f.m.DelegatedCreatePost(ctx, f.caller(t, o), in)
+	again, err := f.createPost(c, op, "只該有一篇", "tok-fixed")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !again.Replayed || again.Post.ID != first.Post.ID || again.AuditLogID != first.AuditLogID {
+	if !again.Res.Replayed || again.Post.ID != first.Post.ID || again.Res.AuditLogID != first.Res.AuditLogID {
 		t.Fatalf("重送 = %+v，預期同一篇、同一列稽核", again)
 	}
 	if n := f.postCount(t, o.storeID); n != 1 {
@@ -193,86 +330,110 @@ func TestReplayWithTheSamePayloadDoesNotCallSocialAgain(t *testing.T) {
 	if len(f.completed) != completed {
 		t.Fatalf("重送不該再通知賣家：%d -> %d", completed, len(f.completed))
 	}
+	if n := f.resultRows(t, sid, "FAILED"); n != 0 {
+		t.Fatalf("重送留下 %d 列 FAILED", n)
+	}
 	// 重送回的是貼文此刻的樣子：第一次之後貼文被改過，重送看到新的版本。
-	body := "後來改的"
-	if _, err := f.m.DelegatedUpdatePost(ctx, f.caller(t, o), DelegatedUpdatePostInput{Op: f.op("改"), Update: social.UpdatePostInput{PostID: first.Post.ID, Version: first.Post.Version, Body: &body}}); err != nil {
+	if _, err := f.updatePost(f.caller(t, o, methodUpdate), f.op("改"), first.Post.ID, first.Post.Version, "後來改的"); err != nil {
 		t.Fatal(err)
 	}
-	later, err := f.m.DelegatedCreatePost(ctx, f.caller(t, o), in)
-	if err != nil || !later.Replayed || later.Post.Body != body {
+	later, err := f.createPost(c, op, "只該有一篇", "tok-fixed")
+	if err != nil || !later.Res.Replayed || later.Post.Body != "後來改的" {
 		t.Fatalf("重送要回目前的樣子：%+v %v", later.Post.Body, err)
 	}
-	// 同一把 request_id、不同內容不是重送。
-	if _, err := f.m.DelegatedCreatePost(ctx, f.caller(t, o), DelegatedCreatePostInput{Op: op, Body: "別的內容", ImageToken: "tok-fixed"}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	// 同一把 request_id、不同內容不是重送：拒絕，且另寫一列 FAILED（9267）。
+	_, err = f.createPost(c, op, "別的內容", "tok-fixed")
+	if apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("同一個 request_id、不同內容：%v，預期 failed_precondition", err)
 	}
 	if n := f.postCount(t, o.storeID); n != 1 {
 		t.Fatalf("貼文 %d 篇，預期 1", n)
 	}
+	row := f.failedRow(t, sid, "POST_CREATE")
+	if row.n != 1 {
+		t.Fatalf("FAILED %d 列，預期 1", row.n)
+	}
+	wantBizCode(t, "request_id 用在不同內容", row.bizCode, 9267)
+	if n := f.auditRowsOfKey(t, sid, op.RequestID.String()); n != 1 {
+		t.Fatalf("冪等鍵 %s 的列 %d，預期仍是第一次的那一列", op.RequestID, n)
+	}
 }
 
-// social 的寫入失敗時，稽核列跟著 rollback（同一個 transaction）；失敗的重送之後仍然可以用同一個 request_id 成功。
-func TestSocialFailureLeavesNoAuditRow(t *testing.T) {
+// social 的寫入失敗時，SUCCEEDED 稽核跟著 rollback（同一個 transaction），但另開 transaction 留下一列 FAILED（沒有業務碼：不是代行的拒絕、沒有冪等鍵）；
+// 失敗的嘗試不占用 request_id，之後用同一個 request_id 重試成功。
+func TestSocialFailureLeavesNoSucceededRowButAFailedRow(t *testing.T) {
 	f := build(t, true)
-	ctx := context.Background()
 	o := f.newOperator(t, "rollback")
 	sid := o.session.Session.ID
 	p := f.draftPost(t, o.storeID)
+	c := f.caller(t, o, methodPublish)
 
 	op := f.op("版本過期的發布")
-	_, err := f.m.DelegatedPublishPost(ctx, f.caller(t, o), DelegatedPostTransitionInput{Op: op, PostID: p.ID, Version: p.Version + 100})
+	stale := p.Version + 100
+	_, err := f.transition(c, op, p.ID, stale)
 	if err == nil {
 		t.Fatal("過期的版本要失敗")
 	}
-	if n := f.auditRowsOfKey(t, sid, op.RequestID.String()); n != 0 {
-		t.Fatalf("social 失敗後稽核 %d 列，預期 0", n)
+	if n := f.resultRows(t, sid, "SUCCEEDED"); n != 0 {
+		t.Fatalf("social 失敗後 SUCCEEDED %d 列，預期 0", n)
 	}
-	if n := f.auditRows(t, sid, "POST_PUBLISH"); n != 0 {
-		t.Fatalf("POST_PUBLISH 稽核 %d 列，預期 0", n)
+	row := f.failedRow(t, sid, "POST_PUBLISH")
+	if row.n != 1 || row.bizCode != nil || row.key != nil || row.requestID != op.RequestID.String() || row.capability != "posts.publish" || row.notify {
+		t.Fatalf("FAILED 列 = %+v", row)
+	}
+	if row.reason == nil || *row.reason != "版本過期的發布" {
+		t.Fatalf("FAILED 列的操作原因 = %v", row.reason)
 	}
 	if got := f.postStatus(t, p.ID); got != "DRAFT" {
 		t.Fatalf("貼文 = %s", got)
 	}
-	// 同一個 request_id 以正確的版本重試成功，且只有一列稽核。
-	if _, err := f.m.DelegatedPublishPost(ctx, f.caller(t, o), DelegatedPostTransitionInput{Op: op, PostID: p.ID, Version: p.Version}); err != nil {
+	// 同一個 request_id 以正確的版本重試成功，SUCCEEDED 只有一列，FAILED 那一列仍在。
+	if _, err := f.transition(c, op, p.ID, p.Version); err != nil {
 		t.Fatal(err)
 	}
 	if n := f.auditRowsOfKey(t, sid, op.RequestID.String()); n != 1 {
-		t.Fatalf("成功後稽核 %d 列，預期 1", n)
+		t.Fatalf("成功後冪等鍵的列 %d，預期 1", n)
+	}
+	if f.resultRows(t, sid, "SUCCEEDED") != 1 || f.resultRows(t, sid, "FAILED") != 1 {
+		t.Fatalf("SUCCEEDED %d、FAILED %d，預期各 1", f.resultRows(t, sid, "SUCCEEDED"), f.resultRows(t, sid, "FAILED"))
 	}
 }
 
-// 已撤銷、已結束、已到期的 session 寫不進去：use case 擋下，沒有貼文、沒有稽核。
-func TestEndedOrRevokedSessionCannotWrite(t *testing.T) {
+// 已撤銷、已結束的 session 寫不進去：沒有貼文、沒有 SUCCEEDED，被拒絕的嘗試留下 FAILED（撤銷 9271、到期 9270）。
+func TestEndedOrRevokedSessionCannotWriteAndLeavesFailedRows(t *testing.T) {
 	f := build(t, true)
 	ctx := context.Background()
 	o := f.newOperator(t, "ended")
 	sid := o.session.Session.ID
-	live := f.caller(t, o)
+	live := f.caller(t, o, methodCreate)
 
-	// 傳輸層解析之後才被撤銷：用過期的快照（ACTIVE）呼叫，稽核的 session 檢查擋下。
 	if _, err := f.m.RevokeDelegation(ctx, RevokeDelegationInput{SessionID: sid, AdminID: o.admin, Reason: "測試撤銷"}); err != nil {
 		t.Fatal(err)
 	}
-	op := f.op("撤銷之後")
-	_, err := f.m.DelegatedCreatePost(ctx, live, DelegatedCreatePostInput{Op: op, Body: "x", ImageToken: "tok-x"})
+	// 傳輸層解析之後才被撤銷：用過期的快照（ACTIVE）呼叫，transaction 內的 session 檢查擋下。
+	_, err := f.createPost(live, f.op("撤銷之後"), "x", "tok-x")
 	if d, ok := DelegationDenialOf(err); !ok || d.Denial != DenialSessionRevoked {
 		t.Fatalf("撤銷後（舊快照）：%v，預期 DenialSessionRevoked", err)
 	}
-	// 重新解析得到的快照是 REVOKED：use case 在進交易之前就擋下。
-	fresh := f.caller(t, o)
+	// 重新解析得到的快照是 REVOKED：進交易之前就擋下。
+	fresh := f.caller(t, o, methodCreate)
 	if fresh.Session.Status != DelegationRevoked {
 		t.Fatalf("status = %s", fresh.Session.Status)
 	}
-	if _, err := f.m.DelegatedCreatePost(ctx, fresh, DelegatedCreatePostInput{Op: f.op("again"), Body: "x", ImageToken: "tok-y"}); err == nil {
+	if _, err := f.createPost(fresh, f.op("again"), "x", "tok-y"); err == nil {
 		t.Fatal("REVOKED 的 session 不能寫")
 	}
 	if n := f.postCount(t, o.storeID); n != 0 {
 		t.Fatalf("貼文 %d 篇，預期 0", n)
 	}
-	if n := f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND action = 'POST_CREATE'`, sid); n != 0 {
-		t.Fatalf("稽核 %d 列，預期 0", n)
+	if n := f.resultRows(t, sid, "SUCCEEDED"); n != 0 {
+		t.Fatalf("SUCCEEDED %d 列，預期 0", n)
 	}
+	row := f.failedRow(t, sid, "POST_CREATE")
+	if row.n != 2 {
+		t.Fatalf("FAILED %d 列，預期 2", row.n)
+	}
+	wantBizCode(t, "撤銷的 session", row.bizCode, 9271)
 
 	// 結束的 session（到期）：以到期的快照呼叫。
 	o2 := f.newOperator(t, "ended2")
@@ -280,24 +441,28 @@ func TestEndedOrRevokedSessionCannotWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.now = f.now.Add(time.Second)
-	exp := f.caller(t, o2)
+	exp := f.caller(t, o2, methodCreate)
 	if exp.Session.Status != DelegationExpired {
 		t.Fatalf("status = %s", exp.Session.Status)
 	}
-	if _, err := f.m.DelegatedCreatePost(ctx, exp, DelegatedCreatePostInput{Op: f.op("結束後"), Body: "x", ImageToken: "tok-z"}); err == nil {
+	if _, err := f.createPost(exp, f.op("結束後"), "x", "tok-z"); err == nil {
 		t.Fatal("已結束的 session 不能寫")
 	}
 	if n := f.postCount(t, o2.storeID); n != 0 {
 		t.Fatalf("貼文 %d 篇，預期 0", n)
 	}
+	row = f.failedRow(t, o2.session.Session.ID, "POST_CREATE")
+	if row.n != 1 {
+		t.Fatalf("FAILED %d 列，預期 1", row.n)
+	}
+	wantBizCode(t, "結束的 session", row.bizCode, 9270)
 }
 
-// 缺能力被 use case 擋下（傳輸層之外的第二道）：沒有 posts.write 不能建立與修改，沒有 posts.publish 不能發布、下架與排程，沒有 posts.read 不能讀。
-func TestMissingCapabilityIsRejectedByTheUseCase(t *testing.T) {
+// 缺能力被元件擋下：沒有 posts.write 不能建立與修改，沒有 posts.publish 不能發布、下架與排程，沒有 posts.read 不能讀；每一次都留下 FAILED（9262），讀取也一樣。
+func TestMissingCapabilityIsRejectedAndLeavesFailedRows(t *testing.T) {
 	f := build(t, true)
-	ctx := context.Background()
 	o := f.newOperator(t, "readonly", CapabilityPostsRead)
-	c := f.caller(t, o)
+	sid := o.session.Session.ID
 	p := f.draftPost(t, o.storeID)
 	deny := func(name string, err error) {
 		t.Helper()
@@ -305,58 +470,110 @@ func TestMissingCapabilityIsRejectedByTheUseCase(t *testing.T) {
 			t.Errorf("%s：%v，預期 DenialCapabilityDenied", name, err)
 		}
 	}
-	_, err := f.m.DelegatedCreatePost(ctx, c, DelegatedCreatePostInput{Op: f.op("r"), Body: "x"})
+	_, err := f.createPost(f.caller(t, o, methodCreate), f.op("r"), "x", "tok-1")
 	deny("建立", err)
-	body := "x"
-	_, err = f.m.DelegatedUpdatePost(ctx, c, DelegatedUpdatePostInput{Op: f.op("r"), Update: social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: &body}})
+	_, err = f.updatePost(f.caller(t, o, methodUpdate), f.op("r"), p.ID, p.Version, "x")
 	deny("修改", err)
-	_, err = f.m.DelegatedPublishPost(ctx, c, DelegatedPostTransitionInput{Op: f.op("r"), PostID: p.ID, Version: p.Version})
+	_, err = f.transition(f.caller(t, o, methodPublish), f.op("r"), p.ID, p.Version)
 	deny("發布", err)
-	_, err = f.m.DelegatedUnpublishPost(ctx, c, DelegatedPostTransitionInput{Op: f.op("r"), PostID: p.ID, Version: p.Version})
+	_, err = f.transition(f.caller(t, o, methodUnpublish), f.op("r"), p.ID, p.Version)
 	deny("下架", err)
-	_, err = f.m.DelegatedSchedulePost(ctx, c, DelegatedSchedulePostInput{Op: f.op("r"), PostID: p.ID, Version: p.Version, PublishAt: f.now.Add(time.Hour)})
+	_, err = f.schedulePost(f.caller(t, o, methodSchedule), f.op("r"), p.ID, p.Version, f.now.Add(time.Hour))
 	deny("排程", err)
-	if n := f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND action LIKE 'POST_%'`, o.session.Session.ID); n != 0 {
-		t.Fatalf("被擋下的寫入留下 %d 列稽核", n)
+	if n := f.resultRows(t, sid, "SUCCEEDED"); n != 0 {
+		t.Fatalf("被擋下的寫入留下 %d 列 SUCCEEDED", n)
 	}
-	// 讀取有 posts.read：能讀。
-	if _, err := f.m.DelegatedPost(ctx, c, p.ID); err != nil {
+	for _, a := range []string{"POST_CREATE", "POST_UPDATE", "POST_PUBLISH", "POST_UNPUBLISH", "POST_SCHEDULE"} {
+		row := f.failedRow(t, sid, a)
+		if row.n != 1 {
+			t.Fatalf("%s 的 FAILED %d 列，預期 1", a, row.n)
+		}
+		wantBizCode(t, a, row.bizCode, 9262)
+	}
+	if n := f.postCount(t, o.storeID); n != 1 {
+		t.Fatalf("貼文 %d 篇，預期只有一開始的草稿", n)
+	}
+	// 讀取有 posts.read：能讀，而且成功的讀取不稽核。
+	if _, err := f.readPost(f.caller(t, o, methodRead), p.ID); err != nil {
 		t.Fatal(err)
 	}
-	page, err := f.m.DelegatedPosts(ctx, c, "", nil, 20)
-	if err != nil || len(page.Page.Posts) != 1 {
-		t.Fatalf("清單 = %+v %v", page.Page.Posts, err)
+	if n := f.auditRows(t, sid, "POST_READ"); n != 0 {
+		t.Fatalf("成功的讀取留下 %d 列稽核", n)
 	}
-	// 沒有 posts.read 的 session 讀不了。
+	// 沒有 posts.read 的 session 讀不了，被拒絕的讀取寫 FAILED（POST_READ，9262）。
 	w := f.newOperator(t, "writeonly", CapabilityPostsWrite)
-	_, err = f.m.DelegatedPost(ctx, f.caller(t, w), p.ID)
+	_, err = f.readPost(f.caller(t, w, methodRead), p.ID)
 	deny("讀取", err)
+	row := f.failedRow(t, w.session.Session.ID, "POST_READ")
+	if row.n != 1 {
+		t.Fatalf("被拒絕的讀取 FAILED %d 列，預期 1", row.n)
+	}
+	wantBizCode(t, "被拒絕的讀取", row.bizCode, 9262)
+	if row.notify {
+		t.Fatal("讀取的 FAILED 列不通知賣家")
+	}
 }
 
-// 代行 session 只碰自己的目標店家：別家的貼文與不存在一樣 NotFound；操作理由不合法被擋下且不留稽核。
-func TestDelegatedReadsStayInTheTargetStoreAndTheReasonIsValidated(t *testing.T) {
+// 店家此刻不可代行：寫入與讀取都只被拒絕、寫 FAILED，session 不被撤銷、不被結束（請求時發現只拒絕，不撤銷）。
+func TestStoreNotDelegableAtRequestTimeRejectsWithoutRevoking(t *testing.T) {
 	f := build(t, true)
 	ctx := context.Background()
+	o := f.newOperator(t, "closedstore")
+	sid := o.session.Session.ID
+	p := f.draftPost(t, o.storeID)
+	f.storeFn = fixedFn(seller.Closed, false)
+
+	_, err := f.createPost(f.caller(t, o, methodCreate), f.op("店家關了"), "x", "tok-closed")
+	if d, ok := DelegationDenialOf(err); !ok || d.Denial != DenialStoreClosed {
+		t.Fatalf("寫入：%v，預期 DenialStoreClosed", err)
+	}
+	_, err = f.readPost(f.caller(t, o, methodRead), p.ID)
+	if d, ok := DelegationDenialOf(err); !ok || d.Denial != DenialStoreClosed {
+		t.Fatalf("讀取：%v，預期 DenialStoreClosed", err)
+	}
+	for _, a := range []string{"POST_CREATE", "POST_READ"} {
+		row := f.failedRow(t, sid, a)
+		if row.n != 1 {
+			t.Fatalf("%s 的 FAILED %d 列，預期 1", a, row.n)
+		}
+		wantBizCode(t, a, row.bizCode, 9265)
+	}
+	if n := f.resultRows(t, sid, "SUCCEEDED"); n != 0 {
+		t.Fatalf("SUCCEEDED %d 列，預期 0", n)
+	}
+	s, err := f.m.ResolveDelegation(ctx, o.session.Credential, false)
+	if err != nil || s.Status != DelegationActive || s.RevokedAt != nil {
+		t.Fatalf("請求時發現店家不可代行只拒絕，不撤銷：%+v %v", s, err)
+	}
+}
+
+// 代行 session 只碰自己的目標店家：別家的貼文與不存在一樣 NotFound（讀取的業務失敗不稽核）；操作理由不合法被擋下，FAILED 列的操作原因是 NULL。
+func TestDelegatedReadsStayInTheTargetStoreAndTheReasonIsValidated(t *testing.T) {
+	f := build(t, true)
 	o := f.newOperator(t, "scope")
-	otherStore := f.exposableStore(t)
-	other := f.draftPost(t, otherStore)
-	if _, err := f.m.DelegatedPost(ctx, f.caller(t, o), other.ID); apperr.KindOf(err) != apperr.KindNotFound {
+	sid := o.session.Session.ID
+	other := f.draftPost(t, f.exposableStore(t))
+	if _, err := f.readPost(f.caller(t, o, methodRead), other.ID); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("別家的貼文：%v，預期 not_found", err)
 	}
-	for name, reason := range map[string]string{"空白": "   ", "超過 100 字": string(make([]rune, 101)), "控制字元": "a\x07b"} {
-		if name == "超過 100 字" {
-			reason = ""
-			for range 101 {
-				reason += "字"
-			}
-		}
-		_, err := f.m.DelegatedCreatePost(ctx, f.caller(t, o), DelegatedCreatePostInput{Op: DelegatedOperation{RequestID: uuid.New(), Reason: reason}, Body: "x"})
+	if n := f.auditRows(t, sid, "POST_READ"); n != 0 {
+		t.Fatalf("讀取的業務失敗留下 %d 列稽核", n)
+	}
+	reasons := map[string]string{"空白": "   ", "超過 100 字": strings.Repeat("字", 101), "控制字元": "a\x07b"}
+	for name, reason := range reasons {
+		_, err := f.createPost(f.caller(t, o, methodCreate), DelegatedOperation{RequestID: uuid.New(), Reason: reason}, "x", "tok-r")
 		if d, ok := DelegationDenialOf(err); !ok || d.Denial != DenialInvalidCommand {
 			t.Errorf("操作原因 %s：%v，預期 DenialInvalidCommand", name, err)
 		}
 	}
-	if n := f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND action LIKE 'POST_%'`, o.session.Session.ID); n != 0 {
-		t.Fatalf("不合法的請求留下 %d 列稽核", n)
+	if n := f.resultRows(t, sid, "SUCCEEDED"); n != 0 {
+		t.Fatalf("不合法的請求留下 %d 列 SUCCEEDED", n)
+	}
+	if n := f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND result = 'FAILED' AND action = 'POST_CREATE' AND biz_code = 9260`, sid); n != len(reasons) {
+		t.Fatalf("FAILED（9260）%d 列，預期 %d", n, len(reasons))
+	}
+	if n := f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND result = 'FAILED' AND operation_reason IS NOT NULL AND char_length(operation_reason) NOT BETWEEN 1 AND 100`, sid); n != 0 {
+		t.Fatalf("不合法的操作原因被寫進 FAILED 列 %d 列", n)
 	}
 }
 
@@ -367,19 +584,18 @@ func TestScheduleWritesPostScheduleAuditAndThePublishInheritsItsReason(t *testin
 	o := f.newOperator(t, "sched")
 	p := f.draftPost(t, o.storeID)
 	op := f.op("先排好")
-	s, err := f.m.DelegatedSchedulePost(ctx, f.caller(t, o), DelegatedSchedulePostInput{Op: op, PostID: p.ID, Version: p.Version, PublishAt: f.now.Add(time.Hour)})
+	s, err := f.schedulePost(f.caller(t, o, methodSchedule), op, p.ID, p.Version, f.now.Add(time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if n := f.auditRows(t, o.session.Session.ID, string(model.AuditPostSchedule)); n != 1 {
 		t.Fatalf("POST_SCHEDULE 稽核 %d 列", n)
 	}
-	var sched social.Schedule
 	page, err := f.realSocial.ListPendingSchedules(ctx, o.storeID, nil, 10)
 	if err != nil || len(page.Schedules) != 1 {
 		t.Fatalf("待發布的排程 %v %v", page.Schedules, err)
 	}
-	sched = page.Schedules[0]
+	sched := page.Schedules[0]
 	if sched.By.Kind != social.ScheduleByDelegation || sched.By.Ref != fmt.Sprint(o.session.Session.ID) || sched.PostID != s.Post.ID {
 		t.Fatalf("排程 = %+v", sched)
 	}
@@ -391,5 +607,65 @@ func TestScheduleWritesPostScheduleAuditAndThePublishInheritsItsReason(t *testin
 	}
 	if reason == nil || *reason != "先排好" {
 		t.Fatalf("到點發布的稽核理由 = %v", reason)
+	}
+}
+
+// 第五個觸發點：seller 的 StoreSuspended、StoreClosed 在同一個 transaction 內結束該店進行中的 session（結束，不是撤銷），別家店的 session 不受影響。
+func TestStoreSuspendedAndClosedEndThatStoresSessions(t *testing.T) {
+	for name, event := range map[string]func(storeID int64) any{
+		"StoreSuspended": func(id int64) any { return seller.StoreSuspended{StoreID: id, AccountID: id + 100, PeriodID: 1} },
+		"StoreClosed":    func(id int64) any { return seller.StoreClosed{StoreID: id, StoreCode: id + 200, AccountID: id + 100} },
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := setup(t)
+			ctx := context.Background()
+			admin := f.delegationAdmin(t, "ops@hawkr.example", true)
+			other := f.delegationAdmin(t, "other@hawkr.example", true)
+			f.grant(t, admin, testStore)
+			f.grant(t, other, testStore+1)
+			mine := f.start(t, startInput(admin, testStore, "ik-1"))
+			theirs := f.start(t, startInput(other, testStore+1, "ik-2"))
+
+			f.now = f.now.Add(time.Minute)
+			if err := f.db.InTx(ctx, func(ctx context.Context) error {
+				switch e := event(testStore).(type) {
+				case seller.StoreSuspended:
+					return events.Publish(ctx, f.bus, e)
+				case seller.StoreClosed:
+					return events.Publish(ctx, f.bus, e)
+				}
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			got, err := f.m.ResolveDelegation(ctx, mine.Credential, true)
+			if err != nil || got.Status != DelegationExpired {
+				t.Fatalf("該店的 session 被結束（到期，不是進行中）：%+v %v", got, err)
+			}
+			s, err := f.m.DelegationSessionSummary(ctx, mine.Session.ID)
+			if err != nil || s.Session.EndedAt == nil || s.Session.RevokedAt != nil || s.Session.RevokeReason != nil {
+				t.Fatalf("是結束（有 ended_at），不是撤銷：%+v %v", s.Session, err)
+			}
+			if !s.Session.ExpiresAt.Equal(f.now) {
+				t.Fatalf("expires_at 被拉回現在（截秒）：%v，現在 %v", s.Session.ExpiresAt, f.now)
+			}
+			if o, _ := f.m.ResolveDelegation(ctx, theirs.Credential, false); o.Status != DelegationActive {
+				t.Fatalf("別家店的 session 不受影響：%+v", o)
+			}
+			// 事件的 transaction 失敗時結束一起 rollback（同一個 transaction）。
+			again := f.start(t, startInput(admin, testStore, "ik-3"))
+			boom := fmt.Errorf("boom")
+			if err := f.db.InTx(ctx, func(ctx context.Context) error {
+				if err := f.m.OnStoreSuspended(ctx, seller.StoreSuspended{StoreID: testStore}); err != nil {
+					return err
+				}
+				return boom
+			}); !errors.Is(err, boom) {
+				t.Fatalf("err = %v", err)
+			}
+			if o, _ := f.m.ResolveDelegation(ctx, again.Credential, false); o.Status != DelegationActive {
+				t.Fatalf("transaction 回滾，session 仍進行中：%+v", o)
+			}
+		})
 	}
 }

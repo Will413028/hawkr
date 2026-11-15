@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation/internal/audit"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation/internal/authorization"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation/internal/model"
-	"github.com/Will413028/hawkr/backend/internal/modules/delegation/internal/postops"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation/internal/session"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -40,9 +39,8 @@ type Seller interface {
 	Store(ctx context.Context, storeID int64) (seller.Store, error)
 }
 
-// Social 是模組取消排程與代行貼文需要的 social 公開 API；*social.Module 滿足它。
+// Social 是模組取消排程需要的 social 公開 API；*social.Module 滿足它。
 type Social interface {
-	postops.Social
 	CancelScheduledBy(ctx context.Context, kind social.ScheduleKind, refs []string, reason social.CancelReason) ([]uuid.UUID, error)
 	CancelDelegatedSchedulesOfStore(ctx context.Context, storeID int64, reason social.CancelReason) ([]uuid.UUID, error)
 	PendingSchedulerRefs(ctx context.Context, kind social.ScheduleKind) ([]string, error)
@@ -61,10 +59,11 @@ type Deps struct {
 }
 
 type Module struct {
+	seller        Seller
+	logger        *slog.Logger
 	authorization *authorization.Module
 	audit         *audit.Module
 	session       *session.Module
-	posts         *postops.Module
 }
 
 // storeStateOf 讀店家此刻的狀態：只有 seller 回 NotFound 時才是找不到（Found 為 false）；已關閉的店家存在，Found 為 true、Closed 為 true。可營運與原因
@@ -78,7 +77,7 @@ func storeStateOf(s Seller) func(context.Context, int64) (model.StoreState, erro
 	}
 }
 
-// readStore 讀店家與它此刻的可代行狀態（storeStateOf 的語意）；店家本身交給需要它的呼叫方（代行貼文把它交給 social）。
+// readStore 讀店家與它此刻的可代行狀態（storeStateOf 的語意）；店家本身交給需要它的呼叫方（代行元件把它交給資源模組）。
 func readStore(ctx context.Context, s Seller, storeID int64) (seller.Store, model.StoreState, error) {
 	st, err := s.Store(ctx, storeID)
 	switch {
@@ -96,24 +95,6 @@ func readStore(ctx context.Context, s Seller, storeID int64) (seller.Store, mode
 		out.UnavailableText = seller.StoreActionUnavailableText(reasons[0], seller.StoreActionDelegate).Text
 	}
 	return st, out, nil
-}
-
-// operableStore 是代行貼文要交給 social 的店家：不存在、已關閉或此刻不可代行時回代行的拒絕（句子與 StartDelegation 被拒時同一句）。
-func operableStore(s Seller) func(context.Context, int64) (seller.Store, error) {
-	return func(ctx context.Context, storeID int64) (seller.Store, error) {
-		st, state, err := readStore(ctx, s, storeID)
-		switch {
-		case err != nil:
-			return seller.Store{}, err
-		case !state.Found:
-			return seller.Store{}, model.Deny(model.DenialStoreNotDelegable, "店家不存在")
-		case state.Closed:
-			return seller.Store{}, model.Deny(model.DenialStoreClosed, "%s", state.UnavailableText)
-		case !state.Operable:
-			return seller.Store{}, model.Deny(model.DenialStoreNotOperable, "%s", state.UnavailableText)
-		}
-		return st, nil
-	}
 }
 
 func New(d Deps) *Module {
@@ -155,7 +136,8 @@ func New(d Deps) *Module {
 	return &Module{
 		session: s,
 		audit:   auditModule,
-		posts:   postops.New(postops.Deps{Audit: auditModule, Social: d.Social, Store: operableStore(d.Seller)}),
+		seller:  d.Seller,
+		logger:  d.Logger,
 		authorization: authorization.New(authorization.Deps{
 			DB: d.DB, Identity: d.Identity, Session: s, StoreState: storeState, NewID: d.NewID, Now: d.Now,
 			CancelSchedulesOfStore: func(ctx context.Context, storeID int64) error {
@@ -166,14 +148,6 @@ func New(d Deps) *Module {
 	}
 }
 
-type DelegatedCaller = postops.Caller
-type DelegatedOperation = postops.Operation
-type DelegatedCreatePostInput = postops.CreatePostInput
-type DelegatedUpdatePostInput = postops.UpdatePostInput
-type DelegatedPostTransitionInput = postops.PostTransitionInput
-type DelegatedSchedulePostInput = postops.SchedulePostInput
-type DelegatedPostResult = postops.PostResult
-type DelegatedPostPageResult = postops.PostPageResult
 type AuditAction = model.AuditAction
 type AdminEligibilityChange = model.AdminEligibilityChange
 type AuditConfirmInput = model.AuditConfirmInput
@@ -340,6 +314,9 @@ const DenialStoreNotDelegable = model.DenialStoreNotDelegable
 const DenialStoreNotOperable = model.DenialStoreNotOperable
 const DenialStoreClosed = model.DenialStoreClosed
 
+// DenialBizCodes 是每一種拒絕的業務碼（稽核列的 biz_code 與舊 gateway 的回應碼同一組）；回傳副本。
+func DenialBizCodes() map[DelegationDenial]int32 { return model.DenialBizCodes() }
+
 func DelegationDenialOf(err error) (*DelegationError, bool) { return model.DelegationDenialOf(err) }
 
 func (m *Module) DelegationAuthorizations(ctx context.Context, in ListDelegationAuthorizationsInput) (DelegationAuthorizationPage, error) {
@@ -434,6 +411,17 @@ func (m *Module) EndDelegationsOfAdmin(ctx context.Context, adminID int64) error
 	return m.session.EndDelegationsOfAdmin(ctx, adminID)
 }
 
+// OnStoreSuspended 訂閱 seller 的 StoreSuspended：在停權生效的同一個 transaction 內結束該店進行中的代行 session（第五個授權失效的觸發點；結束同後台登出：憑證立刻失效，
+// 不寫 REVOKED）。組裝點以 events.Subscribe 訂閱。
+func (m *Module) OnStoreSuspended(ctx context.Context, e seller.StoreSuspended) error {
+	return m.session.EndDelegationsOfStore(ctx, e.StoreID)
+}
+
+// OnStoreClosed 訂閱 seller 的 StoreClosed：與 OnStoreSuspended 相同，在關店的同一個 transaction 內結束該店進行中的代行 session。組裝點以 events.Subscribe 訂閱。
+func (m *Module) OnStoreClosed(ctx context.Context, e seller.StoreClosed) error {
+	return m.session.EndDelegationsOfStore(ctx, e.StoreID)
+}
+
 // OnPostPublished 訂閱 social 的 PostPublished：代行發起的排程到點發布時，在發布的同一個 transaction 內寫一列 SUCCEEDED 的稽核（單段，冪等鍵
 // schedule:<排程 ID>，重送不寫第二列）。其他來源的發布（直接發布、店主自己的排程）不屬於代行，略過。組裝點以 events.Subscribe 訂閱。
 func (m *Module) OnPostPublished(ctx context.Context, e social.PostPublished) error {
@@ -481,42 +469,6 @@ func NewScheduleAuthorizer(d Deps) social.ScheduleAuthorizer {
 	})}
 }
 
-// DelegatedCreatePost 以代行店家建立草稿貼文：同一個 transaction 內先寫單段 SUCCEEDED 稽核（冪等鍵是 in.Op.RequestID），再呼叫 social；social 失敗時稽核一併 rollback，
-// 同一個 session 以同一個 request_id 重送回第一次的貼文（目前的樣子），不再呼叫 social。能力 posts.write。
-func (m *Module) DelegatedCreatePost(ctx context.Context, c DelegatedCaller, in DelegatedCreatePostInput) (DelegatedPostResult, error) {
-	return m.posts.CreatePost(ctx, c, in)
-}
-
-// DelegatedUpdatePost 以代行店家修改貼文（稽核與重送同 DelegatedCreatePost）。能力 posts.write。
-func (m *Module) DelegatedUpdatePost(ctx context.Context, c DelegatedCaller, in DelegatedUpdatePostInput) (DelegatedPostResult, error) {
-	return m.posts.UpdatePost(ctx, c, in)
-}
-
-// DelegatedPublishPost 以代行店家立即發布貼文（稽核與重送同 DelegatedCreatePost）。能力 posts.publish。
-func (m *Module) DelegatedPublishPost(ctx context.Context, c DelegatedCaller, in DelegatedPostTransitionInput) (DelegatedPostResult, error) {
-	return m.posts.PublishPost(ctx, c, in)
-}
-
-// DelegatedUnpublishPost 以代行店家下架貼文（稽核與重送同 DelegatedCreatePost）。能力 posts.publish。
-func (m *Module) DelegatedUnpublishPost(ctx context.Context, c DelegatedCaller, in DelegatedPostTransitionInput) (DelegatedPostResult, error) {
-	return m.posts.UnpublishPost(ctx, c, in)
-}
-
-// DelegatedSchedulePost 以代行店家排程發布（稽核一律先寫 POST_SCHEDULE；發起者種類 DELEGATION，ref 是 session ID；其餘同 DelegatedCreatePost）。能力 posts.publish。
-func (m *Module) DelegatedSchedulePost(ctx context.Context, c DelegatedCaller, in DelegatedSchedulePostInput) (DelegatedPostResult, error) {
-	return m.posts.SchedulePost(ctx, c, in)
-}
-
-// DelegatedPost 讀代行店家的一篇貼文（任何狀態，不含已刪除）。能力 posts.read；讀取不寫稽核。
-func (m *Module) DelegatedPost(ctx context.Context, c DelegatedCaller, id uuid.UUID) (DelegatedPostResult, error) {
-	return m.posts.GetPost(ctx, c, id)
-}
-
-// DelegatedPosts 列出代行店家的貼文。能力 posts.read；讀取不寫稽核。
-func (m *Module) DelegatedPosts(ctx context.Context, c DelegatedCaller, status social.PostStatus, after *social.OwnPostCursor, size int32) (DelegatedPostPageResult, error) {
-	return m.posts.ListPosts(ctx, c, status, after, size)
-}
-
 // CheckDelegationSession 檢查代行 session 此刻還能用（ACTIVE，到期與已撤銷分別是 DenialSessionExpired、DenialSessionRevoked）並帶有能力 c（DenialCapabilityDenied）；
 // 代行 Connect 的 interceptor 與每個代行 use case 用的是同一個函式。
-func CheckDelegationSession(s DelegationSession, c Capability) error { return postops.Gate(s, c) }
+func CheckDelegationSession(s DelegationSession, c Capability) error { return model.CheckSession(s, c) }

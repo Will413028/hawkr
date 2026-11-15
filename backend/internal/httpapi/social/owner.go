@@ -2,12 +2,12 @@ package social
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"strconv"
 	"uuid"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
@@ -59,10 +59,6 @@ func (h *App) store(ctx context.Context) (seller.Store, error) {
 }
 
 // ownPosts 把店主讀自己的貼文轉成回應：公開貼文的欄位加上 status、etag 與 create_time（只有店主讀自己的貼文才設）。
-func (h *App) ownPosts(ctx context.Context, st seller.Store, posts []social.Post) ([]*pb.Post, error) {
-	return h.presenter.ownPosts(ctx, st, posts)
-}
-
 func (p *presenter) ownPosts(ctx context.Context, st seller.Store, posts []social.Post) ([]*pb.Post, error) {
 	out, err := p.toPosts(ctx, social.Caller{Store: &st}, posts)
 	if err != nil {
@@ -76,33 +72,8 @@ func (p *presenter) ownPosts(ctx context.Context, st seller.Store, posts []socia
 	return out, nil
 }
 
-// OwnPosts 是店家自己的貼文轉成回應的組裝（與 SocialAppService 的店主方法同一份）：給代行店家讀寫貼文的 service 用，那裡的「店家」是代行 session 的目標店家。
-type OwnPosts struct{ p *presenter }
-
-// NewOwnPosts 建立組裝；webOrigin 不可是零值（單篇網址）。
-func NewOwnPosts(buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin) (OwnPosts, error) {
-	if webOrigin.IsZero() {
-		return OwnPosts{}, fmt.Errorf("httpapi/social：貼文的單篇網址需要 WebOrigin")
-	}
-	return OwnPosts{p: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin}}, nil
-}
-
-// Posts 把店家 st 自己的貼文轉成回應（含 status、etag、create_time）。
-func (o OwnPosts) Posts(ctx context.Context, st seller.Store, posts []social.Post) ([]*pb.Post, error) {
-	return o.p.ownPosts(ctx, st, posts)
-}
-
-// Post 是單篇的 Posts。
-func (o OwnPosts) Post(ctx context.Context, st seller.Store, post social.Post) (*pb.Post, error) {
-	out, err := o.p.ownPosts(ctx, st, []social.Post{post})
-	if err != nil {
-		return nil, err
-	}
-	return out[0], nil
-}
-
-func (h *App) ownPost(ctx context.Context, st seller.Store, p social.Post) (*pb.Post, error) {
-	posts, err := h.ownPosts(ctx, st, []social.Post{p})
+func (p *presenter) ownPost(ctx context.Context, st seller.Store, post social.Post) (*pb.Post, error) {
+	posts, err := p.ownPosts(ctx, st, []social.Post{post})
 	if err != nil {
 		return nil, err
 	}
@@ -119,6 +90,63 @@ func optionalProductID(path string, raw *string) (*int64, error) {
 		return nil, err
 	}
 	return &id, nil
+}
+
+// postStatusFilter 解析清單的 status 篩選；UNSPECIFIED 是全部（空字串）。
+func postStatusFilter(s pb.PostStatus) (social.PostStatus, error) {
+	if s == pb.PostStatus_POST_STATUS_UNSPECIFIED {
+		return "", nil
+	}
+	status := rpc.EnumFromProto[social.PostStatus](s)
+	if !slices.Contains(social.PostStatusValues(), status) {
+		return "", rpc.RequiredField("status", "status 不是有效的貼文狀態")
+	}
+	return status, nil
+}
+
+// updatePostInput 把 UpdatePost 的 post 與 update_mask 轉成模組的輸入：只有 mask 列出的欄位被修改，列了不能修改的欄位或沒有列任何欄位是錯誤。
+// 店主與代行的 UpdatePost 共用。
+func updatePostInput(msg *pb.Post, mask *fieldmaskpb.FieldMask, id uuid.UUID, version int64) (social.UpdatePostInput, error) {
+	paths, err := rpc.WritableFields(msg, mask)
+	if err != nil {
+		return social.UpdatePostInput{}, err
+	}
+	paths = slices.DeleteFunc(paths, func(p string) bool { return p == "etag" })
+	for _, p := range paths {
+		if !slices.Contains(updatablePostFields, p) {
+			return social.UpdatePostInput{}, rpc.RequiredField("update_mask", "update_mask 的 "+p+" 不是可以修改的欄位（可以修改：body、image_staged_token、product_id、hashtag_inputs）")
+		}
+	}
+	if len(paths) == 0 {
+		return social.UpdatePostInput{}, rpc.RequiredField("update_mask", "update_mask 必須列至少一個可以修改的欄位（body、image_staged_token、product_id、hashtag_inputs）")
+	}
+	has := func(p string) bool { return slices.Contains(paths, p) }
+	var productID *int64
+	if has("product_id") {
+		if productID, err = optionalProductID("post.product_id", msg.ProductId); err != nil {
+			return social.UpdatePostInput{}, err
+		}
+	}
+	in := social.UpdatePostInput{PostID: id, Version: version, SetProduct: has("product_id"), ProductID: productID}
+	if has("body") {
+		body := msg.GetBody()
+		in.Body = &body
+	}
+	if has("image_staged_token") {
+		if msg.GetImageStagedToken() == "" {
+			in.ClearImage = true
+		} else {
+			in.ImageToken = msg.GetImageStagedToken()
+		}
+	}
+	if has("hashtag_inputs") {
+		tags := slices.Clone(msg.GetHashtagInputs())
+		if tags == nil {
+			tags = []string{}
+		}
+		in.Hashtags = &tags
+	}
+	return in, nil
 }
 
 func (h *App) CreatePost(ctx context.Context, req *connect.Request[pb.CreatePostRequest]) (*connect.Response[pb.CreatePostResponse], error) {
@@ -171,12 +199,9 @@ func (h *App) GetMyPost(ctx context.Context, req *connect.Request[pb.GetMyPostRe
 
 func (h *App) ListMyPosts(ctx context.Context, req *connect.Request[pb.ListMyPostsRequest]) (*connect.Response[pb.ListMyPostsResponse], error) {
 	msg := req.Msg
-	var status social.PostStatus
-	if msg.GetStatus() != pb.PostStatus_POST_STATUS_UNSPECIFIED {
-		status = rpc.EnumFromProto[social.PostStatus](msg.GetStatus())
-		if !slices.Contains(social.PostStatusValues(), status) {
-			return nil, rpc.RequiredField("status", "status 不是有效的貼文狀態")
-		}
+	status, err := postStatusFilter(msg.GetStatus())
+	if err != nil {
+		return nil, err
 	}
 	st, err := h.store(ctx)
 	if err != nil {
@@ -219,48 +244,13 @@ func (h *App) UpdatePost(ctx context.Context, req *connect.Request[pb.UpdatePost
 	if err != nil {
 		return nil, err
 	}
-	paths, err := rpc.WritableFields(msg, req.Msg.GetUpdateMask())
+	in, err := updatePostInput(msg, req.Msg.GetUpdateMask(), id, version)
 	if err != nil {
 		return nil, err
-	}
-	paths = slices.DeleteFunc(paths, func(p string) bool { return p == "etag" })
-	for _, p := range paths {
-		if !slices.Contains(updatablePostFields, p) {
-			return nil, rpc.RequiredField("update_mask", "update_mask 的 "+p+" 不是可以修改的欄位（可以修改：body、image_staged_token、product_id、hashtag_inputs）")
-		}
-	}
-	if len(paths) == 0 {
-		return nil, rpc.RequiredField("update_mask", "update_mask 必須列至少一個可以修改的欄位（body、image_staged_token、product_id、hashtag_inputs）")
-	}
-	has := func(p string) bool { return slices.Contains(paths, p) }
-	var productID *int64
-	if has("product_id") {
-		if productID, err = optionalProductID("post.product_id", msg.ProductId); err != nil {
-			return nil, err
-		}
 	}
 	st, err := h.store(ctx)
 	if err != nil {
 		return nil, err
-	}
-	in := social.UpdatePostInput{PostID: id, Version: version, SetProduct: has("product_id"), ProductID: productID}
-	if has("body") {
-		body := msg.GetBody()
-		in.Body = &body
-	}
-	if has("image_staged_token") {
-		if msg.GetImageStagedToken() == "" {
-			in.ClearImage = true
-		} else {
-			in.ImageToken = msg.GetImageStagedToken()
-		}
-	}
-	if has("hashtag_inputs") {
-		tags := slices.Clone(msg.GetHashtagInputs())
-		if tags == nil {
-			tags = []string{}
-		}
-		in.Hashtags = &tags
 	}
 	updated, err := h.owner.UpdatePost(ctx, st, in)
 	if err != nil {

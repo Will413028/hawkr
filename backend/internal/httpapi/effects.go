@@ -118,14 +118,14 @@ var customerEffects = map[string]Effect{
 	"/hawkr.agent.v1alpha1.VendorPortalPublicService/PreviewInvite":  EffectRead,
 	"/hawkr.agent.v1alpha1.VendorPortalPublicService/ExchangeInvite": EffectWrite,
 
-	// DelegationDelegatedService：憑證是代行 session，不讀帳號，停權的帳號不受影響；宣告仍要誠實標示方法的性質。
-	"/hawkr.delegation.v1alpha1.DelegationDelegatedService/ListPosts":     EffectRead,
-	"/hawkr.delegation.v1alpha1.DelegationDelegatedService/GetPost":       EffectRead,
-	"/hawkr.delegation.v1alpha1.DelegationDelegatedService/CreatePost":    EffectWrite,
-	"/hawkr.delegation.v1alpha1.DelegationDelegatedService/UpdatePost":    EffectWrite,
-	"/hawkr.delegation.v1alpha1.DelegationDelegatedService/PublishPost":   EffectWrite,
-	"/hawkr.delegation.v1alpha1.DelegationDelegatedService/UnpublishPost": EffectWrite,
-	"/hawkr.delegation.v1alpha1.DelegationDelegatedService/SchedulePost":  EffectWrite,
+	// SocialDelegatedService：憑證是代行 session，不讀帳號，停權的帳號不受影響；宣告仍要誠實標示方法的性質。
+	"/hawkr.social.v1alpha1.SocialDelegatedService/ListStorePosts":     EffectRead,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/GetStorePost":       EffectRead,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/CreateStorePost":    EffectWrite,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/UpdateStorePost":    EffectWrite,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/PublishStorePost":   EffectWrite,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/UnpublishStorePost": EffectWrite,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/ScheduleStorePost":  EffectWrite,
 
 	// VendorPortalInviteeService
 	"/hawkr.agent.v1alpha1.VendorPortalInviteeService/GetSession":    EffectRead,

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"maps"
 	"slices"
 	"time"
 	"unicode/utf8"
@@ -414,4 +415,60 @@ func NewDisplayCode() string {
 		}
 	}
 	return string(out)
+}
+
+// denialBizCodes 是每一種拒絕的稽核業務碼（設計書 56 §6.5.1 的 9260–9299）：稽核列的 biz_code 與舊 gateway 的回應碼是同一組值，
+// 稽核清單的讀者看到的碼不因寫入的路徑而不同。每一種拒絕都要有（TestEveryDenialHasABusinessCode）。
+var denialBizCodes = map[DelegationDenial]int32{
+	DenialInvalidCommand:             9260,
+	DenialAdminRequired:              9261,
+	DenialCapabilityDenied:           9262,
+	DenialAuthorizationRevoked:       9264,
+	DenialStoreNotDelegable:          9265,
+	DenialStoreClosed:                9265,
+	DenialIdempotencyKeyReused:       9267,
+	DenialActorBusy:                  9268,
+	DenialStoreBusy:                  9269,
+	DenialSessionExpired:             9270,
+	DenialSessionRevoked:             9271,
+	DenialStoreNotOperable:           9272,
+	DenialCredentialInvalid:          9274,
+	DenialSessionNotFound:            9277,
+	DenialAuditIntentFailed:          9279,
+	DenialHandoffInvalid:             9282,
+	DenialAuthorizationAlreadyActive: 9285,
+	DenialAuthorizationNotFound:      9286,
+	DenialAdminNotAllowlisted:        9288,
+}
+
+// DenialBizCodes 回傳拒絕對應的業務碼表的副本。
+func DenialBizCodes() map[DelegationDenial]int32 { return maps.Clone(denialBizCodes) }
+
+// BizCodeOf 是 err 鏈上的代行拒絕對應的業務碼；不是代行的拒絕（業務錯誤、內部錯誤）回 nil。
+func BizCodeOf(err error) *int32 {
+	d, ok := DelegationDenialOf(err)
+	if !ok {
+		return nil
+	}
+	c, ok := denialBizCodes[d.Denial]
+	if !ok {
+		return nil
+	}
+	return &c
+}
+
+// CheckSession 檢查代行 session 此刻還能用（ACTIVE；到期與已撤銷分別是 DenialSessionExpired、DenialSessionRevoked）並帶有能力 c（DenialCapabilityDenied）。
+// 傳輸層的 interceptor 與同 transaction 的稽核寫入都呼叫它（兩處對的是不同時間點讀到的 session）。
+func CheckSession(s DelegationSession, c Capability) error {
+	switch s.Status {
+	case DelegationRevoked:
+		return Deny(DenialSessionRevoked, "代行工作階段已被撤銷")
+	case DelegationExpired:
+		return Deny(DenialSessionExpired, "代行工作階段已逾時")
+	case DelegationActive:
+	}
+	if !slices.Contains(s.Capabilities, c) {
+		return Deny(DenialCapabilityDenied, "此工作階段未取得執行該操作的能力")
+	}
+	return nil
 }
