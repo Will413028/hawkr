@@ -9,74 +9,115 @@ import (
 	"testing"
 )
 
-// devSeedRebuiltAccounts 要與 01-account.sql 刪除重建的帳號雙向一致：01 多一個帳號，區間內的店家不會被前提檢查擋下，重建帳號後失去 SELLER 角色；
-// 這裡多一個，前提檢查會無端拒絕。兩邊都解析成 (From, To) 的清單（單一 ID 是 (n, n)）後逐項比對，條件裡有認不得的寫法也失敗。
-func TestDevSeedRebuiltAccountsMatchTheAccountSeed(t *testing.T) {
+func accountSeedSQL(t *testing.T) string {
+	t.Helper()
 	b, err := os.ReadFile("../../infra/seed-data/01-account.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
-	const marker = "SELECT id FROM identity.accounts WHERE "
-	_, rest, ok := strings.Cut(string(b), marker)
+	var code []string
+	for _, line := range strings.Split(string(b), "\n") {
+		if !strings.HasPrefix(strings.TrimSpace(line), "--") {
+			code = append(code, line)
+		}
+	}
+	return strings.Join(code, "\n")
+}
+
+// seedTable 回傳 01 的 INSERT INTO <table> (…) VALUES 之後每一列的欄位文字（以逗號切開、去空白），列以 "(" 開頭、"),"或");" 結尾。
+func seedTable(t *testing.T, sql, table string) [][]string {
+	t.Helper()
+	_, rest, ok := strings.Cut(sql, "INSERT INTO "+table+" ")
 	if !ok {
-		t.Fatalf("01-account.sql 找不到 %q", marker)
+		t.Fatalf("01-account.sql 找不到 INSERT INTO %s", table)
 	}
-	where, _, _ := strings.Cut(rest, ";")
+	_, rest, ok = strings.Cut(rest, "VALUES")
+	if !ok {
+		t.Fatalf("01-account.sql 的 %s 沒有 VALUES", table)
+	}
+	values, _, _ := strings.Cut(rest, ";")
+	var rows [][]string
+	for _, m := range regexp.MustCompile(`(?m)^\s*\(([^\n]*)\)[,]?\s*$`).FindAllStringSubmatch(values, -1) {
+		var cols []string
+		for _, c := range strings.Split(m[1], ",") {
+			cols = append(cols, strings.Trim(strings.TrimSpace(c), "'"))
+		}
+		rows = append(rows, cols)
+	}
+	if len(rows) == 0 {
+		t.Fatalf("01-account.sql 的 %s 解析不到任何列", table)
+	}
+	return rows
+}
 
-	type span struct{ from, to int64 }
-	var got []span
-	num := func(s string) int64 {
-		n, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64)
-		if err != nil {
-			t.Fatalf("01-account.sql 的清除條件有不是數字的值 %q：%s", s, where)
-		}
-		return n
+func mustInt(t *testing.T, s string) int64 {
+	t.Helper()
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		t.Fatalf("不是數字：%q", s)
 	}
-	left := where
-	between := regexp.MustCompile(`id BETWEEN (\d+) AND (\d+)`)
-	for _, m := range between.FindAllStringSubmatch(left, -1) {
-		got = append(got, span{num(m[1]), num(m[2])})
-	}
-	left = between.ReplaceAllString(left, "")
-	in := regexp.MustCompile(`id IN \(([^)]*)\)`)
-	for _, m := range in.FindAllStringSubmatch(left, -1) {
-		for _, v := range strings.Split(m[1], ",") {
-			got = append(got, span{num(v), num(v)})
-		}
-	}
-	left = in.ReplaceAllString(left, "")
-	if rest := strings.TrimSpace(strings.ReplaceAll(left, "OR", "")); rest != "" {
-		t.Fatalf("01-account.sql 的清除條件有這個測試認不得的寫法 %q（支援 id IN (…) 與 id BETWEEN a AND b，以 OR 連接）：%s", rest, where)
-	}
+	return n
+}
 
-	var want []span
-	for _, r := range devSeedRebuiltAccounts {
-		want = append(want, span{r.From, r.To})
-	}
-	cmp := func(a, b span) int {
-		if a.from != b.from {
-			return int(a.from - b.from)
+// devSeedAccountIDs 要與 01-account.sql 的 seed_accounts 雙向一致：01 多一個帳號，它的刪帳申請不會被前提檢查擋下；這裡多一個，前提檢查會無端拒絕。
+// 帶賣家店家的帳號要與 devSeedStores 的店家與 store_id 逐一對上（SELLER 角色的 source_id 是店家）。
+func TestDevSeedAccountIDsMatchTheAccountSeed(t *testing.T) {
+	rows := seedTable(t, accountSeedSQL(t), "seed_accounts (id, email, seller_store_id)")
+	var got []int64
+	roleStore := map[int64]int64{}
+	for _, r := range rows {
+		id := mustInt(t, r[0])
+		got = append(got, id)
+		if r[2] != "NULL" {
+			roleStore[id] = mustInt(t, r[2])
 		}
-		return int(a.to - b.to)
 	}
-	slices.SortFunc(got, cmp)
-	slices.SortFunc(want, cmp)
+	want := slices.Clone(devSeedAccountIDs)
+	slices.Sort(got)
+	slices.Sort(want)
 	if !slices.Equal(got, want) {
-		t.Errorf("01-account.sql 刪除重建的帳號 %v 與 devSeedRebuiltAccounts %v 不一致：%s", got, want, where)
+		t.Errorf("01-account.sql 的種子帳號 %v 與 devSeedAccountIDs %v 不一致", got, want)
+	}
+	stores := map[int64]int64{}
+	for _, st := range devSeedStores() {
+		stores[st.AccountID] = st.StoreID
+	}
+	if len(stores) != len(roleStore) {
+		t.Fatalf("01 授予 SELLER 的帳號 %v 與 devSeedStores 的店家 %v 不一致", roleStore, stores)
+	}
+	for account, store := range stores {
+		if roleStore[account] != store {
+			t.Errorf("帳號 %d：01 的 SELLER source_id = %d，devSeedStores 的 store_id = %d", account, roleStore[account], store)
+		}
 	}
 }
 
-// dev 使用者以帳號 ID 識別，seed 不建任何假的登入身分（account_identities）；重置段落仍刪它，真人連結過的 seed 帳號才能重置。
-func TestAccountSeedCreatesNoLoginIdentities(t *testing.T) {
-	b, err := os.ReadFile("../../infra/seed-data/01-account.sql")
-	if err != nil {
-		t.Fatal(err)
+// 買家的 buyer_id 一律是 account_id + 50000，帳號與買家的集合一一對應。
+func TestAccountSeedBuyersFollowTheIDRule(t *testing.T) {
+	sql := accountSeedSQL(t)
+	accounts := map[int64]bool{}
+	for _, r := range seedTable(t, sql, "seed_accounts (id, email, seller_store_id)") {
+		accounts[mustInt(t, r[0])] = true
 	}
-	sql := string(b)
+	buyers := seedTable(t, sql, "seed_buyers (buyer_id, account_id, display_name, phone, gender, city)")
+	if len(buyers) != len(accounts) {
+		t.Errorf("買家 %d 列、帳號 %d 列，要一一對應", len(buyers), len(accounts))
+	}
+	for _, r := range buyers {
+		buyerID, accountID := mustInt(t, r[0]), mustInt(t, r[1])
+		if buyerID != accountID+50000 || !accounts[accountID] {
+			t.Errorf("買家 %d 的帳號 %d 不符 buyer_id = account_id + 50000 或不在種子帳號內", buyerID, accountID)
+		}
+	}
+}
+
+// 01 是 upsert：不刪任何列；dev 使用者以帳號 ID 識別，seed 不建任何假的登入身分（account_identities）。
+func TestAccountSeedNeverDeletesAndCreatesNoLoginIdentities(t *testing.T) {
+	sql := accountSeedSQL(t)
+	if m := regexp.MustCompile(`(?i)\b(DELETE\s+FROM|TRUNCATE)`).FindString(sql); m != "" {
+		t.Errorf("01-account.sql 不該刪除資料（%q）：種子是冪等 upsert", m)
+	}
 	if regexp.MustCompile(`(?i)INSERT\s+INTO\s+identity\.account_identities`).MatchString(sql) {
 		t.Error("01-account.sql 不該插入 identity.account_identities")
-	}
-	if !strings.Contains(sql, "DELETE FROM identity.account_identities WHERE account_id IN (SELECT id FROM seed_accounts)") {
-		t.Error("01-account.sql 的重置段落要刪 seed 帳號的 account_identities")
 	}
 }

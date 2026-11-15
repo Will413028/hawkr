@@ -652,22 +652,19 @@ func (m *Module) ReconcileExposure(ctx context.Context) (int, error) {
 // DevSeedStore 是本機開發種子的一家店（明文 fixture）。
 type DevSeedStore = devseed.Store
 
-// DevSeedAccountRange 是 01-account.sql 會刪除重建的一段帳號 ID（含兩端）。
-type DevSeedAccountRange = devseed.AccountRange
-
 // SeedDevStores 在一個 transaction 內把本機開發的種子店家還原成 fixture（upsert，只動這幾家店與它們的子列，不碰別的店家）：固定的 store_id 與
 // store_code、已核准的 KYC（識別欄位以執行中的金鑰加密）、logo；公告列保留，version 只增不減。只給本機開發的
 // dev-seed 子命令使用：它直接寫列，繞過開店、送出、審核與綁定的狀態轉移；profile 有變時發 StoreProfileChanged，刪掉的證件與佐證經退場機制釋放
 // media 的引用；停權、關閉、等待刪除這些有下游消費者的生命週期狀態不還原，前提檢查發現就拒絕。寫完之後要 ReannounceExposures 讓下游知道可曝光。
-// rebuilt 是 01-account.sql 重建的帳號區間，區間內有種子以外的未關閉店家時整個拒絕（見 CheckDevSeed）。必須在 transaction 外呼叫。
-func (m *Module) SeedDevStores(ctx context.Context, stores []DevSeedStore, rebuilt []DevSeedAccountRange) error {
-	return m.devSeed.Seed(ctx, stores, rebuilt)
+// 種子帳號名下有種子以外的未關閉店家時整個拒絕（見 CheckDevSeed）。必須在 transaction 外呼叫。
+func (m *Module) SeedDevStores(ctx context.Context, stores []DevSeedStore) error {
+	return m.devSeed.Seed(ctx, stores)
 }
 
-// CheckDevSeed 不寫任何資料，確認 SeedDevStores 可以安全執行（在 01-account.sql 之前呼叫）：rebuilt 內沒有種子以外的未關閉店家，也沒有種子以外的店家
+// CheckDevSeed 不寫任何資料，確認 SeedDevStores 可以安全執行（在 01-account.sql 之前呼叫）：種子帳號名下沒有種子以外的未關閉店家，也沒有種子以外的店家
 // 佔用種子的 store_code，種子店家沒有生效中的停權或處分、停權期間，也不是 CLOSED 或 PENDING_DELETION。不成立時回的錯誤列出店家與處理方式。
-func (m *Module) CheckDevSeed(ctx context.Context, stores []DevSeedStore, rebuilt []DevSeedAccountRange) error {
-	return m.devSeed.Check(ctx, stores, rebuilt)
+func (m *Module) CheckDevSeed(ctx context.Context, stores []DevSeedStore) error {
+	return m.devSeed.Check(ctx, stores)
 }
 
 // ReannounceExposures 由 seller 全量重新公告可曝光：每一家店（含已關閉的）都以現在算出來的值更新公告並發 StoreExposureChanged，不比對

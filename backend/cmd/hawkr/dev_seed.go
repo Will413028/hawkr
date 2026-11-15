@@ -11,9 +11,9 @@ const (
 	devSeedStoreA, devSeedStoreB = 1009, 1004
 )
 
-// devSeedRebuiltAccounts 是 infra/seed-data/01-account.sql 刪除重建的帳號（9、4、買家 2001~2099、還沒開店的買家 3001~3099）：它們若擁有種子以外
-// 的未關閉店家，重建帳號會讓店家失去 SELLER 角色，dev-seed 在前提檢查（-check）與寫入時都拒絕（已關閉的店家沒有角色，不擋）。dev_seed_test.go 檢查它與 01 的 SQL 一致。
-var devSeedRebuiltAccounts = []seller.DevSeedAccountRange{{From: 4, To: 4}, {From: 9, To: 9}, {From: 2001, To: 2099}, {From: 3001, To: 3099}}
+// devSeedAccountIDs 是 infra/seed-data/01-account.sql 以固定 ID upsert 的帳號（賣家 9、4，買家 2001、2002，還沒開店的買家 3001）：
+// 它們有未完成的刪帳申請時 dev-seed 在前提檢查（-check）與寫入時都拒絕。dev_seed_test.go 檢查它與 01 的 SQL 一致。
+var devSeedAccountIDs = []int64{4, 9, 2001, 2002, 3001}
 
 func devSeedStores() []seller.DevSeedStore {
 	individual := seller.KYCIndividual

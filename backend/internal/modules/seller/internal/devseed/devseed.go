@@ -71,9 +71,8 @@ func New(d Deps) *Service {
 //   - 先鎖店家列（與模組的寫入者同一個順序：店家、申請），才刪子列；
 //   - media_ref_sync 與 retired_assets 不刪（ref 的列刪了再建會讓 seq 從頭算，見 schema.sql 的註解）。
 //
-// 它不碰別人的資料：不在種子的店家（含 SELLER 角色）原封不動。前提不成立時拒絕執行：01-account.sql 會刪除重建的帳號區間若擁有種子以外
-// 的未關閉店家，重建帳號會讓店家失去 SELLER 角色（有店沒角色是壞掉的不變量），Check 在 01 執行之前就擋下，不自動刪店。已關閉的店家（角色已移除）
-// 不受影響。
+// 它不碰別人的資料：不在種子的店家（含 SELLER 角色）原封不動。前提不成立時拒絕執行：種子帳號若擁有種子以外的未關閉店家，種子店家寫入會撞上
+// 一帳號一家店與 SELLER 角色的 source_id，Check 在寫入之前就擋下，不自動刪店。已關閉的店家（角色已移除）不受影響。
 var clearChildrenSQL = []string{
 	`DELETE FROM seller.evidence_accesses WHERE report_id IN (SELECT id FROM seller.reports WHERE store_id = ANY($1)) OR request_id IN (SELECT id FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))) OR inquiry_id IN (SELECT id FROM seller.case_inquiries WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.measure_request_evidence WHERE request_id IN (SELECT id FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1)))`,
@@ -184,17 +183,13 @@ SELECT setval(seq, GREATEST(
     9999))
 FROM (SELECT pg_get_serial_sequence('seller.stores', 'store_id') AS seq) s`
 
-// AccountRange 是 01-account.sql 會刪除重建的一段帳號 ID（含兩端）。
-type AccountRange struct{ From, To int64 }
-
-// 01 重建的帳號擁有種子以外的未關閉店家、或種子以外的店家佔用種子的 store_code：已關閉的店家沒有 SELLER 角色（關閉時同一個 transaction 移除），
-// 01 動不到它的不變量，不在此限（stores_current_account 的 UNIQUE 也只管未關閉的）；store_code 的 unique index 涵蓋所有狀態，所以那一支不篩選。
+// 種子帳號擁有種子以外的未關閉店家、或種子以外的店家佔用種子的 store_code：一個帳號同時只有一家未關閉的店（stores_current_account 的 UNIQUE）、
+// SELLER 角色的 source_id 只有一個，種子店家寫入會撞上它；已關閉的店家沒有角色，不在此限。store_code 的 unique index 涵蓋所有狀態，所以那一支不篩選。
+// （$1 種子 store_id、$2 種子 store_code、$3 種子帳號。）
 const conflictingStoresSQL = `
 SELECT store_id, account_id, store_code FROM seller.stores
 WHERE store_id <> ALL($1)
-  AND (store_code = ANY($2)
-       OR (status <> 'CLOSED'
-           AND EXISTS (SELECT 1 FROM unnest($3::bigint[], $4::bigint[]) r(lo, hi) WHERE account_id BETWEEN r.lo AND r.hi)))
+  AND (store_code = ANY($2) OR (status <> 'CLOSED' AND account_id = ANY($3)))
 ORDER BY store_id`
 
 // 種子店家身上還在進行的生命週期狀態：不是 ACTIVE（關閉的有目前的關店紀錄）或個資已清理；還沒結束的停權期間（到期之後要等 worker 的 Recompute 結束它並發
@@ -273,14 +268,14 @@ SELECT t.order_id::text,
 FROM touching t
 ORDER BY 1`
 
-// Check 在不寫任何資料的前提下確認種子可以安全執行：重建的帳號區間（rebuilt）不擁有種子以外的未關閉店家，沒有種子以外的店家佔用種子的
+// Check 在不寫任何資料的前提下確認種子可以安全執行：種子帳號不擁有種子以外的未關閉店家，沒有種子以外的店家佔用種子的
 // store_code，而且種子店家沒有還在進行的生命週期狀態（停權措施、關閉、等待刪除）。不成立時回錯誤（列出店家與處理方式），不自動刪店、不還原狀態。
 // （種子帳號的刪帳申請由 accountdeletion 擁有，呼叫方在 cmd 另外檢查。）
-func (s *Service) Check(ctx context.Context, stores []Store, rebuilt []AccountRange) error {
-	return check(ctx, s.d.DB.Conn(ctx), stores, rebuilt, s.d.Now().UTC())
+func (s *Service) Check(ctx context.Context, stores []Store) error {
+	return check(ctx, s.d.DB.Conn(ctx), stores, s.d.Now().UTC())
 }
 
-func check(ctx context.Context, conn db.DBTX, stores []Store, rebuilt []AccountRange, now time.Time) error {
+func check(ctx context.Context, conn db.DBTX, stores []Store, now time.Time) error {
 	if err := validate(stores); err != nil {
 		return err
 	}
@@ -288,17 +283,13 @@ func check(ctx context.Context, conn db.DBTX, stores []Store, rebuilt []AccountR
 	for i, st := range stores {
 		ids[i], codes[i], accountIDs[i] = st.StoreID, st.StoreCode, st.AccountID
 	}
-	lo, hi := make([]int64, len(rebuilt)), make([]int64, len(rebuilt))
-	for i, r := range rebuilt {
-		lo[i], hi[i] = r.From, r.To
-	}
 	conflicts, err := lines(ctx, conn, conflictingStoresSQL, func(rows scanner) (string, error) {
 		var id, account, code int64
 		if err := rows.Scan(&id, &account, &code); err != nil {
 			return "", err
 		}
 		return fmt.Sprintf("  店家 %d（帳號 %d、store_code %d）", id, account, code), nil
-	}, ids, codes, lo, hi)
+	}, ids, codes, accountIDs)
 	if err != nil {
 		return err
 	}
@@ -345,7 +336,7 @@ func check(ctx context.Context, conn db.DBTX, stores []Store, rebuilt []AccountR
 	mixed = slices.DeleteFunc(mixed, func(l string) bool { return l == "" })
 	var sections []string
 	if len(conflicts) > 0 {
-		sections = append(sections, "下列店家屬於 01-account.sql 會重建的帳號，或佔用種子的 store_code；重建帳號會讓未關閉的店家失去 SELLER 角色。\n"+strings.Join(conflicts, "\n")+"\n"+
+		sections = append(sections, "下列店家是種子帳號名下種子以外的未關閉店家，或佔用種子的 store_code；種子店家寫入會撞上一帳號一家店與 SELLER 角色的 source_id。\n"+strings.Join(conflicts, "\n")+"\n"+
 			"請重建本機資料庫（01 的前提：改用這份 seed 前先重建本機 DB）；手動測試改用 make dev-token 不帶 -account 建立的新帳號（.agents/skills/backend-e2e-verify/SKILL.md §2），不要用種子的帳號區間")
 	}
 	if len(states) > 0 {
@@ -384,7 +375,7 @@ func lines(ctx context.Context, conn db.DBTX, query string, line func(scanner) (
 
 // Seed 在一個 transaction 內把種子店家還原成 fixture（upsert，見檔頭的說明）；先鎖店家列再做 Check，前提不成立時不寫任何資料。
 // 必須在 transaction 外呼叫。
-func (s *Service) Seed(ctx context.Context, stores []Store, rebuilt []AccountRange) error {
+func (s *Service) Seed(ctx context.Context, stores []Store) error {
 	if _, ok := db.TxFrom(ctx); ok {
 		return errors.New("seller：種子必須在 transaction 外開始")
 	}
@@ -405,7 +396,7 @@ func (s *Service) Seed(ctx context.Context, stores []Store, rebuilt []AccountRan
 		if err != nil {
 			return fmt.Errorf("seller：鎖住種子店家：%w", err)
 		}
-		if err := check(ctx, conn, stores, rebuilt, now); err != nil {
+		if err := check(ctx, conn, stores, now); err != nil {
 			return err
 		}
 		if err := lockApplications(ctx, conn, ids); err != nil {
