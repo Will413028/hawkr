@@ -93,23 +93,38 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: backend/.go-version
-          cache-dependency-path: backend/go.sum
-      # 只跑加上 integration tag 後檔案組成會改變的 package；其餘 package 的測試和
-      # check job 的 go test 完全相同，不重跑。
+          cache: false
+      # setup-go 內建快取的 key 只看 go.sum，go.sum 不變就永遠還原第一次存的 build cache；
+      # 這裡還原最近的一份，讓 -race 編譯只重編改到的 package。只有 main、dev 的 push 存新的一份
+      # （PR 共用 base 分支的快取），避免每個 PR commit 各佔一份 repo 的快取額度。
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-monolith-integration-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-monolith-integration-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-
+            go-monolith-integration-${{ runner.os }}-
+      # 只跑加上 integration tag 後測試執行檔會改變的 package（自己或連結進來的依賴有 tag 檔，
+      # 見 scripts/integration-packages.py）；其餘 package 的測試執行檔和 check job 的 go test 相同，不重跑。
       # 壓力測試（testdb.RequireStress）只在上線前跑：要合併進 main 的 PR、main 的 push，與手動觸發。
       - name: integration test（testcontainers）
         env:
           HAWKR_STRESS_TESTS: ${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && '1' || '0' }}
         run: |
-          tmpl='{{.ImportPath}} {{.GoFiles}} {{.TestGoFiles}} {{.XTestGoFiles}}'
-          mapfile -t pkgs < <(comm -13 <(go list -f "$tmpl" ./... | sort) \
-            <(go list -tags integration -f "$tmpl" ./... | sort) | cut -d' ' -f1)
-          if [ "${#pkgs[@]}" -eq 0 ]; then
-            echo "::error::找不到含 integration tag 的 package，篩選邏輯失效"
-            exit 1
-          fi
+          python3 scripts/integration-packages.py > "$RUNNER_TEMP/integration-packages"
+          mapfile -t pkgs < "$RUNNER_TEMP/integration-packages"
           echo "integration packages: ${#pkgs[@]}"
           go test -race -timeout 15m -tags integration "${pkgs[@]}"
+      - name: 存 Go 快取（只有 main、dev 的 push）
+        if: always() && github.event_name == 'push'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-monolith-integration-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-${{ github.sha }}
 
   check:
     name: gofmt／vet／test／tidy
@@ -122,7 +137,19 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: backend/.go-version
-          cache-dependency-path: backend/go.sum
+          cache: false
+      # setup-go 內建快取的 key 只看 go.sum，go.sum 不變就永遠還原第一次存的 build cache；
+      # 這裡還原最近的一份，讓 -race 編譯只重編改到的 package。只有 main、dev 的 push 存新的一份
+      # （PR 共用 base 分支的快取），避免每個 PR commit 各佔一份 repo 的快取額度。
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-monolith-check-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-monolith-check-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-
+            go-monolith-check-${{ runner.os }}-
 
       - name: gofmt -l
         run: |
@@ -216,3 +243,11 @@ jobs:
             echo "::error::go mod tidy 產生了變更，請在本機跑 go mod tidy 後 commit"
             exit 1
           fi
+      - name: 存 Go 快取（只有 main、dev 的 push）
+        if: always() && github.event_name == 'push'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-monolith-check-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-${{ github.sha }}

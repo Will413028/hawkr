@@ -34,3 +34,15 @@ func ParseUUID(path, raw string) (uuid.UUID, error) {
 	}
 	return id, nil
 }
+
+// ParseRequestID 解析選填的 request_id：RFC 4122 的 UUIDv4（API 契約 field_info.format = UUID4）；不設是 nil。
+func ParseRequestID(raw string) (*uuid.UUID, error) {
+	if raw == "" {
+		return nil, nil
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil || len(raw) != 36 || id[6]>>4 != 4 || id[8]&0xc0 != 0x80 {
+		return nil, RequiredField("request_id", "request_id 必須是 UUIDv4")
+	}
+	return &id, nil
+}

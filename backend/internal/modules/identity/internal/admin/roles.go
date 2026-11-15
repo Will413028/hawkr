@@ -108,6 +108,20 @@ func (m *Service) AdminAllows(ctx context.Context, adminID int64, perm adminperm
 	return adminperm.Allows(roles, perm), nil
 }
 
+// AdminAllowsNow 不鎖地讀管理員此刻的角色並回答是否允許權限 perm，可在任何 transaction 內或之外呼叫。它不擋住撤銷：只給已經持有更上層
+// 鎖、不能再鎖 identity 角色列的呼叫方（排程發布到點的重驗）；要「通過後撤銷等我」的檢查用 AdminAllows。
+func (m *Service) AdminAllowsNow(ctx context.Context, adminID int64, perm adminperm.Permission) (bool, error) {
+	rows, err := m.q(ctx).ListAdminRoles(ctx, adminID)
+	if err != nil {
+		return false, fmt.Errorf("identity：讀取管理員的角色：%w", err)
+	}
+	roles := make([]adminperm.Role, len(rows))
+	for i, r := range rows {
+		roles[i] = adminperm.Role(r)
+	}
+	return adminperm.Allows(roles, perm), nil
+}
+
 func (m *Service) validate(in model.AdminRoleChangeInput) (string, error) {
 	switch {
 	case (in.AdminID > 0) == (in.Email != ""):

@@ -15,7 +15,7 @@ schema `delegation`（`db/schema.sql`）五張表：`admin_eligibilities`（代�
 ## 模組內部結構
 
 - 根套件只組裝 `Module`、轉呼叫、公開 `internal/model` 的型別別名與事件；整合測試在根套件，只經公開 API。
-- 根套件的 `Deps` 是組裝 API，各子領域宣告最小 `Deps`。`internal/session` 管工作階段的寫入、狀態與管理員登出撤銷；`internal/authorization` 管授權與治理歷史，撤回時經 session 撤銷；`internal/audit` 管稽核與回看，經 session 判斷工作階段是否可用。
+- 根套件的 `Deps` 是組裝 API，各子領域宣告最小 `Deps`。`internal/session` 管工作階段的寫入、狀態、授權述詞與管理員登出結束；`internal/authorization` 管授權與治理歷史，撤回時經 session 撤銷；`internal/audit` 管稽核與回看，經 session 判斷工作階段是否可用。
 - `internal/model` 放公開型別及不碰 I/O 的規則（含 TTL 等常數）；`internal/store` 是 sqlc 生成的資料存取葉節點。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 
@@ -27,10 +27,13 @@ schema `delegation`（`db/schema.sql`）五張表：`admin_eligibilities`（代�
 - 能力是封閉的九項，拒絕履約、退款與金流。守門：`TestCapabilitiesAreTheClosedNine`、DB CHECK `delegated_operation_sessions_capabilities_check`。規格：§3。
 - 店家層級授權列一旦存在，即遮蔽全域列。守門：`TestPreflightDenials`。規格：§4。
 - 授權寫入與治理歷史同 transaction；撤回同時撤銷該店進行中的工作階段。守門：`TestAuthorizationAndItsHistoryCommitTogether`、`TestRevokingTheAuthorizationEndsRunningSessions`。規格：§4。
-- 撤回代行資格、後台登出、撤銷管理員角色都在同一個 transaction 撤銷進行中的 session，原因是固定值 `RevokeReason*`。守門：`TestDisablingAdminEligibilityRevokesSessionsAtomically`、`TestAdminSignOutRevokesItsDelegations`、`TestRoleRevocationAndDelegationRevocationRollBackTogether`。規格：§3「撤銷」。
+- 撤回代行資格與撤銷管理員角色在同一個 transaction 撤銷進行中的 session（固定值 `RevokeReason*`）；後台登出是「結束」（`EndDelegationsOfAdmin`，`expires_at` 夾值同 `EndDelegationSession`，憑證立刻失效），不寫 `REVOKED`、不取消排程。守門：`TestDisablingAdminEligibilityRevokesSessionsAtomically`、`TestAdminSignOutEndsItsDelegations`、`TestRoleRevocationAndDelegationRevocationRollBackTogether`。規格：§3「撤銷」。
+- 排程發布（social 擁有排程）的授權失效有四個觸發點，同 transaction 內一律「先取消排程、再鎖或改 delegation 的列」（social 在 delegation 之前鎖）：撤回店家授權（取消 → 鎖授權列）；撤回代行資格、撤銷管理員角色（以 `PendingSchedulerRefs` 求交集 → 取消 → 改列）；治理撤銷單一 session（取消 → 改列）。
+- 上一條的守門：`TestTriggersCancelSchedulesIncludingEndedSessions`、`TestRevokeAndScheduledJobDoNotDeadlock`、`platform/lockorder`。規格：§3、§6。
+- 到點重驗與 `StartDelegation` 共用 `internal/session/authority.go` 的授權述詞，全部不鎖的讀取，session 只擋 `REVOKED`；單段 `SUCCEEDED` 稽核由 `OnPostPublished` 在發布的 transaction 內寫，冪等鍵 `schedule:<排程 ID>`。守門：`TestAuthorityLostByDirectDataChangeCancelsAtRun`、`TestScheduledPublishOfAnEndedSessionPublishesWithOneSucceededAudit`。規格：§3、§6。
 - 開始代行要有 `delegation.sessions.create` 權限。守門：`TestStartDelegationRequiresTheCreatePermission`。規格：§3。
 - 稽核 intent 是寫入前置；confirm 只從 PENDING 轉移一次，成功且需通知時在同 transaction 發事件。守門：`TestAuditIntentAndConfirm`、`TestConfirmRollsBackWhenTheEventIsNotQueued`。規格：§6。
-- 店家狀態只經 seller 的公開 API 讀取，`Deps.Seller` 必填，句子由 seller 提供。守門：`TestPreflightDenials`。規格：§5。
+- 店家狀態只經 seller 的公開 API 讀取，`Deps.Seller` 必填，句子由 seller 提供。`Deps.Social` 必填（取消排程）。守門：`TestPreflightDenials`。規格：§5。
 
 ## 不負責
 

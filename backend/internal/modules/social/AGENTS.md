@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `social`（`db/schema.sql`；函式與 trigger 在 `db/objects.sql`，沒有 view），依子領域：貼文與 hashtag、留言與讚、討論區、計數、處分與隱藏、買家刪帳與內容下架的複本、瀏覽與分享、media 引用同步。表單見規格 §1。讀取模型：無。
+schema `social`（`db/schema.sql`；函式與 trigger 在 `db/objects.sql`，沒有 view），依子領域：貼文與 hashtag、排程發布（`post_schedules`）、留言與讚、討論區、計數、處分與隱藏、買家刪帳與內容下架的複本、瀏覽與分享、media 引用同步。表單見規格 §1。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -23,13 +23,14 @@ schema `social`（`db/schema.sql`；函式與 trigger 在 `db/objects.sql`，沒
 - 買家刪帳的事實有複本，由訂閱者在同一個 transaction 同步寫並重新求值。守門：`TestBuyerDeletionRequestUncountsTheContentInTheSameTransaction`、`TestDirectCloseStillHidesUncountsAndPurges`。規格：§7。
 - 內容下架的事實有複本 `content_takedowns`，由 seller 措施事件的同 transaction 訂閱者維護，每日對帳雙向核對 `seller.pub_content_takedowns()`；建立時訂閱者核對存在的內容作者是措施的店家（`TakedownContentError`）；已軟刪的自家內容與已清除的內容成立但不寫複本（A7-D7 項目 10；已清除內容的歸屬由 moderation 以案件快照核對）。守門加 `TestTakedownOfPurgedContentSucceedsWithoutReplica`。守門：`TestTakedownOfDeletedOwnContentSucceedsWithoutReplica`、`TestTakedownRejectsContentThatIsNotTheMeasureStoresOwn`、`TestReconcileAddsTheTakedownsTheSubscriberMissed`。規格：§4、§6。
 - 跨模組鎖順序見 `backend/AGENTS.md` 單體規則 4（social 在 seller 之後）；本模組內：內容列 → 貼文 stats → 父項 stats，各依 ID 由小到大。守門：`TestMarkAuthorInactiveLocksStatsInTheSameOrderAsTheTriggers`、`TestEditLocksTheBuyerBeforeTheContentRow`。規格：§6、§7。
+- 排程發布：唯一的真相是 `post_schedules`，River job 只是到點的觸發器；鎖順序貼文列 → 排程列，所有取消都先鎖貼文列。別的模組（delegation）取消排程必須在自己的 transaction 內、鎖或改自己的列「之前」呼叫 `CancelScheduledBy`、`CancelDelegatedSchedulesOfStore`（social 在 delegation 之前）。細節見 `internal/post/AGENTS.md`。規格：§2、§6。
 - 使用者面的句子都在 `internal/text`，`apperr.*` 不帶字串字面值。守門：`TestSocialApperrCallsCarryNoSentenceLiterals`（`internal/arch`）。規格：§3。
 - 單一子領域的不變量在 `internal/<子領域>/AGENTS.md`（碰該目錄時才載入）；跨子領域的才放這裡。
 
 ## 不負責
 
 - 檢舉、案件與處置：moderation；social 只存隱藏與警告的紀錄，案件以不透明的 `source_ref` 參照。
-- 排程發布、Connect 與 handler、推播 relay：尚未在本模組（見 `backend/docs/plans/2026-10-18-a7-social.md`）。
+- Connect 與 handler、推播 relay：尚未在本模組（見 `backend/docs/plans/2026-10-18-a7-social.md`）；代行排程的到點授權由 delegation 實作、`cmd/hawkr` 注入，social 不 import delegation。
 - 店家與買家的名稱、頭像：讀取時由 seller、buyer 批次補，social 不存快照。
 
 ## 決策紀錄

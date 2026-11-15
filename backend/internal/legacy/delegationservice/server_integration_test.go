@@ -26,6 +26,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -125,7 +126,7 @@ func setup(t *testing.T) *fixture {
 		Now: time.Now, Logger: log,
 	})
 	f.m = delegation.New(delegation.Deps{
-		DB: d, Events: bus, Identity: f.identity, Seller: f.stores,
+		DB: d, Events: bus, Identity: f.identity, Seller: f.stores, Social: noSchedules{},
 		NewID: uuid.NewV7, Now: time.Now, Logger: log,
 	})
 	mux := http.NewServeMux()
@@ -440,4 +441,19 @@ func sanctionsOf(suspended bool) *seller.Sanctions {
 	}
 	ground := seller.RiskFraud
 	return seller.SanctionedBy(seller.EffectiveMeasure{Kind: seller.MeasureSuspension, MeasureID: uuid.NewV7(), Basis: seller.BasisRisk, RiskGround: &ground})
+}
+
+// noSchedules 是沒有 social 資料的測試組裝給 delegation 的 Social：這個測試不建排程，取消沒有東西可取消。
+type noSchedules struct{}
+
+func (noSchedules) CancelScheduledBy(context.Context, social.ScheduleKind, []string, social.CancelReason) ([]uuid.UUID, error) {
+	return nil, nil
+}
+
+func (noSchedules) CancelDelegatedSchedulesOfStore(context.Context, int64, social.CancelReason) ([]uuid.UUID, error) {
+	return nil, nil
+}
+
+func (noSchedules) PendingSchedulerRefs(context.Context, social.ScheduleKind) ([]string, error) {
+	return nil, nil
 }

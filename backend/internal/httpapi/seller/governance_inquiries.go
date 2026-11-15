@@ -69,7 +69,7 @@ func (h *Governance) CreateCaseInquiry(ctx context.Context, req *connect.Request
 	if err != nil {
 		return nil, err
 	}
-	reqID, err := requestID(msg.GetRequestId())
+	reqID, err := rpc.ParseRequestID(msg.GetRequestId())
 	if err != nil {
 		return nil, err
 	}

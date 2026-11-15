@@ -92,6 +92,48 @@ func (q *Queries) DelegationStoreSlotTaken(ctx context.Context, targetStoreID in
 	return taken, err
 }
 
+const endActiveDelegationsOfActor = `-- name: EndActiveDelegationsOfActor :many
+UPDATE delegation.delegated_operation_sessions
+SET ended_at = $1::timestamptz,
+    expires_at = GREATEST(issued_at + INTERVAL '1 second',
+                          LEAST(expires_at, date_trunc('second', $1::timestamptz))),
+    revision = revision + 1,
+    updated_at = $1::timestamptz
+WHERE actor_admin_id = $2
+  AND status = 'ACTIVE' AND ended_at IS NULL
+  AND $1::timestamptz < expires_at
+  AND last_active_at > $3::timestamptz
+RETURNING id
+`
+
+type EndActiveDelegationsOfActorParams struct {
+	Now          time.Time
+	ActorAdminID int64
+	IdleSince    time.Time
+}
+
+// 管理員登出：結束他進行中的 session（不是撤銷，撤銷只留給治理動作）。ended_at 與 expires_at 的夾值與 EndDelegationSession 相同：推導的狀態
+// 不看 ended_at，憑證只靠 expires_at 被拉回現在而失效，只寫 ended_at 會讓登出後 credential 仍然有效。
+func (q *Queries) EndActiveDelegationsOfActor(ctx context.Context, arg EndActiveDelegationsOfActorParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, endActiveDelegationsOfActor, arg.Now, arg.ActorAdminID, arg.IdleSince)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const endDelegationSession = `-- name: EndDelegationSession :execrows
 UPDATE delegation.delegated_operation_sessions
 SET ended_at = $1::timestamptz,
@@ -566,6 +608,39 @@ func (q *Queries) ListDelegationSessions(ctx context.Context, arg ListDelegation
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUnrevokedDelegationSessionIDsOfActor = `-- name: ListUnrevokedDelegationSessionIDsOfActor :many
+SELECT id FROM delegation.delegated_operation_sessions
+WHERE actor_admin_id = $1 AND status <> 'REVOKED' AND id = ANY($2::bigint[])
+ORDER BY id
+`
+
+type ListUnrevokedDelegationSessionIDsOfActorParams struct {
+	ActorAdminID int64
+	Ids          []int64
+}
+
+// 不鎖的讀取：這位管理員沒被撤銷的 session（含已結束、已到期的，它們發起的排程還在等）中，ID 在 ids 裡的。ids 是 social 目前有待發布排程的 session ID，
+// 所以結果以待發布的排程為界，不隨管理員的歷史 session 增長。取消排程要在鎖或改 delegation 的列之前做（social 在 delegation 之前），所以先用不鎖的讀取列出 ID。
+func (q *Queries) ListUnrevokedDelegationSessionIDsOfActor(ctx context.Context, arg ListUnrevokedDelegationSessionIDsOfActorParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listUnrevokedDelegationSessionIDsOfActor, arg.ActorAdminID, arg.Ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

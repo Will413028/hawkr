@@ -12,8 +12,43 @@ import (
 	"uuid"
 )
 
+const forumEntryByRequest = `-- name: ForumEntryByRequest :one
+SELECT id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, version, request_id, request_hash FROM social.forum_entries
+WHERE actor_kind = $1 AND actor_id = $2 AND request_id = $3
+`
+
+type ForumEntryByRequestParams struct {
+	ActorKind string
+	ActorID   int64
+	RequestID *uuid.UUID
+}
+
+// 冪等重送的查詢：範圍是 (互動者, request_id)。
+func (q *Queries) ForumEntryByRequest(ctx context.Context, arg ForumEntryByRequestParams) (SocialForumEntry, error) {
+	row := q.db.QueryRow(ctx, forumEntryByRequest, arg.ActorKind, arg.ActorID, arg.RequestID)
+	var i SocialForumEntry
+	err := row.Scan(
+		&i.ID,
+		&i.StoreID,
+		&i.ParentID,
+		&i.ReplyToID,
+		&i.ActorKind,
+		&i.ActorID,
+		&i.Body,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.ThreadID,
+		&i.Counted,
+		&i.Version,
+		&i.RequestID,
+		&i.RequestHash,
+	)
+	return i, err
+}
+
 const getForumEntry = `-- name: GetForumEntry :one
-SELECT id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted FROM social.forum_entries WHERE id = $1
+SELECT id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, version, request_id, request_hash FROM social.forum_entries WHERE id = $1
 `
 
 func (q *Queries) GetForumEntry(ctx context.Context, id uuid.UUID) (SocialForumEntry, error) {
@@ -32,32 +67,50 @@ func (q *Queries) GetForumEntry(ctx context.Context, id uuid.UUID) (SocialForumE
 		&i.DeletedAt,
 		&i.ThreadID,
 		&i.Counted,
+		&i.Version,
+		&i.RequestID,
+		&i.RequestHash,
 	)
 	return i, err
 }
 
+const getForumEntryReplyCount = `-- name: GetForumEntryReplyCount :one
+SELECT reply_count FROM social.forum_entry_stats WHERE forum_entry_id = $1
+`
+
+func (q *Queries) GetForumEntryReplyCount(ctx context.Context, id uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, getForumEntryReplyCount, id)
+	var reply_count int64
+	err := row.Scan(&reply_count)
+	return reply_count, err
+}
+
 const insertForumEntry = `-- name: InsertForumEntry :one
 
-INSERT INTO social.forum_entries (id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at)
+INSERT INTO social.forum_entries (id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, request_id, request_hash)
 VALUES (
     $1, $2, $3, $4, $5, $6,
-    $7::text, $8, $8
+    $7::text, $8, $8, $9, $10
 )
-RETURNING id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted
+ON CONFLICT (actor_kind, actor_id, request_id) DO NOTHING
+RETURNING id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, version, request_id, request_hash
 `
 
 type InsertForumEntryParams struct {
-	ID        uuid.UUID
-	StoreID   int64
-	ParentID  *uuid.UUID
-	ReplyToID *uuid.UUID
-	ActorKind string
-	ActorID   int64
-	Body      string
-	Now       time.Time
+	ID          uuid.UUID
+	StoreID     int64
+	ParentID    *uuid.UUID
+	ReplyToID   *uuid.UUID
+	ActorKind   string
+	ActorID     int64
+	Body        string
+	Now         time.Time
+	RequestID   *uuid.UUID
+	RequestHash []byte
 }
 
 // 店家的討論區留言的寫入與作者自己的讀取。帶「公開可讀、可見」規則的讀取在 internal/reads（go-jet），規則在 internal/visibility。
+// 同一個互動者的同一個 request_id 已經有時不寫入、回 0 列（不讓 transaction 失效，呼叫方接著讀原本那一則）。
 func (q *Queries) InsertForumEntry(ctx context.Context, arg InsertForumEntryParams) (SocialForumEntry, error) {
 	row := q.db.QueryRow(ctx, insertForumEntry,
 		arg.ID,
@@ -68,6 +121,8 @@ func (q *Queries) InsertForumEntry(ctx context.Context, arg InsertForumEntryPara
 		arg.ActorID,
 		arg.Body,
 		arg.Now,
+		arg.RequestID,
+		arg.RequestHash,
 	)
 	var i SocialForumEntry
 	err := row.Scan(
@@ -83,12 +138,15 @@ func (q *Queries) InsertForumEntry(ctx context.Context, arg InsertForumEntryPara
 		&i.DeletedAt,
 		&i.ThreadID,
 		&i.Counted,
+		&i.Version,
+		&i.RequestID,
+		&i.RequestHash,
 	)
 	return i, err
 }
 
 const lockForumEntry = `-- name: LockForumEntry :one
-SELECT id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted FROM social.forum_entries WHERE id = $1 FOR UPDATE
+SELECT id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, version, request_id, request_hash FROM social.forum_entries WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockForumEntry(ctx context.Context, id uuid.UUID) (SocialForumEntry, error) {
@@ -107,12 +165,15 @@ func (q *Queries) LockForumEntry(ctx context.Context, id uuid.UUID) (SocialForum
 		&i.DeletedAt,
 		&i.ThreadID,
 		&i.Counted,
+		&i.Version,
+		&i.RequestID,
+		&i.RequestHash,
 	)
 	return i, err
 }
 
 const softDeleteForumEntry = `-- name: SoftDeleteForumEntry :execrows
-UPDATE social.forum_entries SET deleted_at = $1, updated_at = $1
+UPDATE social.forum_entries SET deleted_at = $1, version = version + 1, updated_at = $1
 WHERE id = $2 AND deleted_at IS NULL
 `
 
@@ -130,9 +191,9 @@ func (q *Queries) SoftDeleteForumEntry(ctx context.Context, arg SoftDeleteForumE
 }
 
 const updateForumEntryBody = `-- name: UpdateForumEntryBody :one
-UPDATE social.forum_entries SET body = $1::text, updated_at = $2
+UPDATE social.forum_entries SET body = $1::text, version = version + 1, updated_at = $2
 WHERE id = $3 AND deleted_at IS NULL
-RETURNING id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted
+RETURNING id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, version, request_id, request_hash
 `
 
 type UpdateForumEntryBodyParams struct {
@@ -141,6 +202,7 @@ type UpdateForumEntryBodyParams struct {
 	ID   uuid.UUID
 }
 
+// 呼叫方已在列鎖之下檢查版本與隱藏。
 func (q *Queries) UpdateForumEntryBody(ctx context.Context, arg UpdateForumEntryBodyParams) (SocialForumEntry, error) {
 	row := q.db.QueryRow(ctx, updateForumEntryBody, arg.Body, arg.Now, arg.ID)
 	var i SocialForumEntry
@@ -157,6 +219,9 @@ func (q *Queries) UpdateForumEntryBody(ctx context.Context, arg UpdateForumEntry
 		&i.DeletedAt,
 		&i.ThreadID,
 		&i.Counted,
+		&i.Version,
+		&i.RequestID,
+		&i.RequestHash,
 	)
 	return i, err
 }

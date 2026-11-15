@@ -1,0 +1,457 @@
+syntax = "proto3";
+
+// social 模組給前台的 API：店家貼文與留言的公開讀取（SocialPublicService），瀏覽打點（RecordPostView），以及登入者的互動寫入（SocialAppService：分享、讚、留言、討論區）。
+//
+// ID 是不透明的字串（貼文與留言是 UUID，店家是過渡期的十進位整數字串），client 不解析、不轉數字
+// （ADR 2026-09-25-row-identity-by-data-kind D5）。圖片是 hawkr.common.v1alpha1.Image，店家卡片是 hawkr.common.v1alpha1.StoreCard。
+//
+// 帶登入憑證的請求，回應可能依觀看者而定（viewer_* 欄位、被觀看者封鎖的買家的留言不出現），整個回應是 private, no-store；
+// 不帶憑證的請求才是可共享快取的版本（API 設計規範（Connect）第九節）。停權的帳號與無效的憑證以訪客讀取。
+package hawkr.social.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/image.proto";
+import "hawkr/common/v1alpha1/store_card.proto";
+
+// SocialPublicService 是任何人都能讀的貼文與留言，不需要登入。
+service SocialPublicService {
+  // GetPost 讀一篇觀看者可讀的貼文：已發布、沒有被下架或平台隱藏，而且店家不是被觀看者個人封鎖的。其他一律回 not_found，
+  // 不區分原因。店主讀自己店的貼文不套個人封鎖。這個方法不計瀏覽數，瀏覽由 RecordPostView 另外記錄。
+  rpc GetPost(GetPostRequest) returns (GetPostResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListPosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶篩選是全站動態牆，帶 store_id 是該店的貼文頁，
+  // 帶 hashtag 是該標籤的貼文頁；兩個篩選不能同時帶（invalid_argument）。
+  // 觀看者個人封鎖的店不出現在動態牆，過濾在分頁之前，所以一頁可以少於 page_size，結束只看 next_page_token。
+  rpc ListPosts(ListPostsRequest) returns (ListPostsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListComments 列出貼文的頂層留言，或某則頂層留言的回覆，依建立時間舊到新。刪除或隱藏而底下有可見回覆的頂層留言是佔位項目
+  // （只有 id、post_id、create_time、reply_count 與 state）；與觀看者任一方向有個人封鎖的買家的留言連同回覆整則不出現。
+  // 貼文讀不到時回 not_found。
+  rpc ListComments(ListCommentsRequest) returns (ListCommentsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // SuggestTrendingPosts 是「本週主題」：最近發布的 30 篇觀看者可讀的貼文中，瀏覽數最高的前 max_results 篇（同分以發布時間、ID 排序）。
+  // 沒有分頁，時間窗不是日期而是「最近 30 篇」，所以回傳的篇數不超過 30，也可能更少。
+  rpc SuggestTrendingPosts(SuggestTrendingPostsRequest) returns (SuggestTrendingPostsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // SuggestTags 是標籤輸入時的建議：公開貼文上名稱符合的標籤與貼文數，貼文數多的在前。全域彙總，不依觀看者。沒有分頁，最多 20 筆。
+  rpc SuggestTags(SuggestTagsRequest) returns (SuggestTagsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // SuggestTrendingTags 是熱門標籤：發布時間落在時間窗內的公開貼文上，各標籤的貼文數，多的在前。全域彙總，不依觀看者。
+  // 這是只取前 max_results 名的排行榜（最多 50 名），不分頁；時間窗最長 30 天。
+  rpc SuggestTrendingTags(SuggestTrendingTagsRequest) returns (SuggestTrendingTagsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListForumEntries 列出店家討論區的頂層留言，或某則頂層留言的回覆，依建立時間舊到新。刪除或隱藏而底下有可見回覆的頂層留言是佔位項目
+  // （只有 id、store_id、create_time、reply_count 與 state）；觀看者封鎖了這家店、或與作者任一方向有個人封鎖時，對應的內容不出現，
+  // 該頁因此可以少於 page_size。店家讀不到時是空的一頁；指定的 parent_id 不屬於這家店回 not_found。
+  rpc ListForumEntries(ListForumEntriesRequest) returns (ListForumEntriesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // RecordPostView 記一次貼文瀏覽，匿名也能呼叫。只計觀看者讀得到的貼文，同一篇、同一個台北日、同一個觀看者只算一次；
+  // 讀不到的貼文與沒有計入的呼叫都回成功，不區分原因。登入者以帳號去重，訪客以來源 IP 與 User-Agent 去重；停權的帳號與無效的憑證以訪客計入。
+  // 店主看自己店的貼文不計。每個來源 IP 有額度，超過回 resource_exhausted 與 RetryInfo。瀏覽是寫入，所以不標 NO_SIDE_EFFECTS，client 以 POST 呼叫；
+  // 讀取貼文的方法（GetPost）不計瀏覽。
+  rpc RecordPostView(RecordPostViewRequest) returns (RecordPostViewResponse);
+}
+
+// SocialAppService 是登入者在貼文、留言與店家討論區上的互動寫入。呼叫者的身分由伺服器從 session 推導：呼叫者此刻的店擁有該貼文或討論區時，
+// 互動者是店家，否則是買家。被店家封鎖的買家在這家店的留言、發言、編輯與按讚被拒（permission_denied，不另給原因，與讀取回應的
+// viewer_can_comment 一致）。
+service SocialAppService {
+  // SharePost 記一次分享：同一位買家對同一篇只算一次，重送安全。貼文讀不到回 not_found。
+  rpc SharePost(SharePostRequest) returns (SharePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // LikePost 對貼文按讚，已經讚過也回成功（設定而不是切換）。只有買家能按讚；貼文讀不到回 not_found。
+  rpc LikePost(LikePostRequest) returns (LikePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // UnlikePost 取消貼文的讚，沒有讚過也回成功。
+  rpc UnlikePost(UnlikePostRequest) returns (UnlikePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // LikeComment 對留言按讚，已經讚過也回成功。留言讀不到回 not_found。
+  rpc LikeComment(LikeCommentRequest) returns (LikeCommentResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // UnlikeComment 取消留言的讚，沒有讚過也回成功。
+  rpc UnlikeComment(UnlikeCommentRequest) returns (UnlikeCommentResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回目前的留言（狀態與計數是此刻的），不重複建立。
+  rpc CreateComment(CreateCommentRequest) returns (CreateCommentResponse);
+
+  // UpdateComment 修改自己的留言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
+  rpc UpdateComment(UpdateCommentRequest) returns (UpdateCommentResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
+  rpc DeleteComment(DeleteCommentRequest) returns (DeleteCommentResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立。
+  rpc CreateForumEntry(CreateForumEntryRequest) returns (CreateForumEntryResponse);
+
+  // UpdateForumEntry 修改自己的討論區發言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
+  rpc UpdateForumEntry(UpdateForumEntryRequest) returns (UpdateForumEntryResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
+  rpc DeleteForumEntry(DeleteForumEntryRequest) returns (DeleteForumEntryResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+// ActorKind 是互動者的種類：買家或店家。
+enum ActorKind {
+  ACTOR_KIND_UNSPECIFIED = 0;
+  ACTOR_KIND_BUYER = 1;
+  ACTOR_KIND_STORE = 2;
+}
+
+// CommentState 是留言列表項目的狀態。
+enum CommentState {
+  COMMENT_STATE_UNSPECIFIED = 0;
+  // 有內文與作者。
+  COMMENT_STATE_VISIBLE = 1;
+  // 作者或店家刪除；只有底下有可見回覆時才以佔位項目出現。
+  COMMENT_STATE_DELETED = 2;
+  // 被平台隱藏或內容下架；只有底下有可見回覆時才以佔位項目出現。
+  COMMENT_STATE_HIDDEN = 3;
+}
+
+// Hashtag 是貼文的一個標籤。
+message Hashtag {
+  // 正規化後的名稱，用來比對與連結。
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 使用者輸入的樣子，用來顯示。
+  string display = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Post 是一篇公開的貼文。
+message Post {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 發文的店家。店家卡片讀不到時不設。
+  hawkr.common.v1alpha1.StoreCard store = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string body = 3;
+  // 貼文的圖片，沒有圖時不設。
+  hawkr.common.v1alpha1.Image image = 4;
+  // 貼文帶的商品 ID，沒有時不設。
+  optional string product_id = 5;
+  repeated Hashtag hashtags = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 第一次發布的時間；下架後再發布沿用。
+  google.protobuf.Timestamp publish_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 like_count = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 comment_count = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 view_count = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 share_count = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 這篇貼文的單篇網址（絕對網址，由伺服器組，分享用）；client 不自己拼。
+  string url = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者此刻能不能在這篇貼文留言：訪客是 false；買家在這家店沒有被封鎖時是 true；店主讀自己店的貼文是 true。
+  // 這是顯示用的提示，寫入時伺服器仍會檢查。
+  bool viewer_can_comment = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Actor 是留言的作者，名稱與頭像在讀取時由 buyer、seller 補。
+message Actor {
+  ActorKind kind = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 買家或店家的 ID（依 kind）；已刪除的買家仍有 ID，但沒有名稱與頭像。
+  string id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional string name = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.Image avatar = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Comment 是留言列表的一個項目（頂層留言或回覆）。
+message Comment {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string post_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 回覆所屬的頂層留言；頂層留言不設。
+  optional string parent_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 回覆針對的那一則留言；沒有時不設。
+  optional string reply_to_id = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  CommentState state = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 只有 VISIBLE 的項目有作者與內文。
+  Actor author = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 留言唯一可以修改的欄位（UpdateComment 的 update_mask 列 body）。
+  string body = 7;
+  google.protobuf.Timestamp create_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 like_count = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 reply_count = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者是否讚過；訪客是 false。
+  bool viewer_liked = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 這則留言是不是觀看者自己的某個身分（買家或此刻的店）寫的。
+  bool is_mine = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者能不能編輯：只有 VISIBLE 而且是自己的。
+  bool viewer_can_edit = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者能不能刪除：VISIBLE 的自己的留言，或這篇貼文是自己的店的。
+  bool viewer_can_delete = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者能不能回覆：VISIBLE，而且這篇貼文是觀看者此刻的店的（貼文留言的回覆只限貼文所屬的店，買家一律 false）。
+  bool viewer_can_reply = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 只有 VISIBLE 的項目有；修改與刪除時帶回，client 視為不透明字串。
+  string etag = 17;
+}
+
+message GetPostRequest {
+  // 貼文 ID。
+  string post_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetPostResponse {
+  Post post = 1;
+}
+
+message ListPostsRequest {
+  // 預設 20，上限 50。
+  int32 page_size = 1;
+  string page_token = 2;
+  // 只列這家店的貼文；不設是全站動態牆。page_token 只能用在同一個 store_id。
+  optional string store_id = 3;
+  // 只列帶這個標籤的貼文；名稱不分大小寫、可以帶開頭的 #，不設是不篩選。不能與 store_id 同時設。page_token 只能用在同一個 hashtag。
+  optional string hashtag = 4;
+}
+
+message ListPostsResponse {
+  repeated Post posts = 1;
+  string next_page_token = 2;
+}
+
+message ListCommentsRequest {
+  // 貼文 ID。
+  string post_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 預設 20，上限 50。
+  int32 page_size = 2;
+  string page_token = 3;
+  // 設了是該頂層留言的回覆；不設是貼文的頂層留言。page_token 只能用在同一組 post_id 與 parent_id。
+  optional string parent_id = 4;
+}
+
+message ListCommentsResponse {
+  repeated Comment comments = 1;
+  string next_page_token = 2;
+}
+
+message SuggestTrendingPostsRequest {
+  // 最多回傳幾篇，1 到 30；0 表示預設值 10，超過 30 以 30 計，負數回 invalid_argument。
+  int32 max_results = 1;
+}
+
+message SuggestTrendingPostsResponse {
+  repeated Post posts = 1;
+}
+
+message SuggestTagsRequest {
+  // 搜尋字串，可以帶開頭的 #；正規化後是空的回空清單。
+  string query = 1 [(google.api.field_behavior) = REQUIRED];
+  // true 是名稱包含 query，false 是以 query 開頭。
+  bool contains = 2;
+  // 最多回傳幾筆，1 到 20；0 表示預設值 10，超過 20 以 20 計，負數回 invalid_argument。
+  int32 max_results = 3;
+}
+
+message SuggestTagsResponse {
+  repeated TagCount tags = 1;
+}
+
+message SuggestTrendingTagsRequest {
+  // 時間窗的起點（含）；不設是 end_time 往前 30 天。
+  google.protobuf.Timestamp start_time = 1;
+  // 時間窗的終點（不含）；不設是現在。
+  google.protobuf.Timestamp end_time = 2;
+  // 最多回傳幾名，1 到 50；0 表示預設值 20，超過 50 以 50 計，負數回 invalid_argument。
+  int32 max_results = 3;
+}
+
+message SuggestTrendingTagsResponse {
+  repeated TagCount tags = 1;
+}
+
+// TagCount 是一個標籤與它在範圍內的公開貼文數。
+message TagCount {
+  // 正規化後的名稱，用來比對與連結。
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 post_count = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ForumEntry 是店家討論區的一個項目（頂層留言或回覆）。
+message ForumEntry {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string store_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 回覆所屬的頂層留言；頂層留言不設。
+  optional string parent_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 回覆針對的那一則留言；沒有時不設。
+  optional string reply_to_id = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  CommentState state = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 只有 VISIBLE 的項目有作者與內文。
+  Actor author = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 項目唯一可以修改的欄位（UpdateForumEntry 的 update_mask 列 body）。
+  string body = 7;
+  google.protobuf.Timestamp create_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 reply_count = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 這則是不是觀看者自己的某個身分（買家或此刻的店）寫的。
+  bool is_mine = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者能不能編輯：只有 VISIBLE 而且是自己的。
+  bool viewer_can_edit = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者能不能刪除：VISIBLE 的自己的留言，或這是自己的店的討論區。
+  bool viewer_can_delete = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者能不能回覆：VISIBLE，而且觀看者在這家店的討論區沒有被封鎖（訪客是 false；店主讀自己的討論區是 true）。顯示用的提示，寫入時伺服器仍會檢查。
+  bool viewer_can_reply = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 只有 VISIBLE 的項目有；修改與刪除時帶回，client 視為不透明字串。
+  string etag = 15;
+}
+
+message ListForumEntriesRequest {
+  // 店家 ID。
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 預設 20，上限 50。
+  int32 page_size = 2;
+  string page_token = 3;
+  // 設了是該頂層留言的回覆；不設是討論區的頂層留言。page_token 只能用在同一組 store_id 與 parent_id。
+  optional string parent_id = 4;
+}
+
+message ListForumEntriesResponse {
+  repeated ForumEntry entries = 1;
+  string next_page_token = 2;
+}
+
+message RecordPostViewRequest {
+  // 貼文 ID。
+  string post_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message RecordPostViewResponse {}
+
+message SharePostRequest {
+  // 貼文 ID。
+  string post_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message SharePostResponse {}
+
+message LikePostRequest {
+  // 貼文 ID。
+  string post_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message LikePostResponse {}
+
+message UnlikePostRequest {
+  // 貼文 ID。
+  string post_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UnlikePostResponse {}
+
+message LikeCommentRequest {
+  // 留言 ID。
+  string comment_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message LikeCommentResponse {}
+
+message UnlikeCommentRequest {
+  // 留言 ID。
+  string comment_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UnlikeCommentResponse {}
+
+message CreateCommentRequest {
+  // 貼文 ID。
+  string post_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 內文，去除首尾空白後 1 到 2200 個字元（以 Unicode 字元計）。
+  string body = 2 [(google.api.field_behavior) = REQUIRED];
+  // 設了是回覆；父留言不是頂層時，回覆掛在它所屬的頂層留言底下。不設是頂層留言。
+  optional string parent_id = 3;
+  // 回覆針對的那一則留言，必須與 parent_id 同一串；只能在設了 parent_id 時設，不設是父留言。
+  optional string reply_to_id = 4;
+  // 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回這則留言目前的樣子；內容不同回 invalid_argument。
+  string request_id = 5 [(google.api.field_info).format = UUID4];
+}
+
+message CreateCommentResponse {
+  Comment comment = 1;
+}
+
+message UpdateCommentRequest {
+  // id 與 etag 必填；body 的規則同 CreateCommentRequest.body。留言只有內文可以修改，update_mask 要列 body。
+  Comment comment = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+// UpdateCommentResponse 的留言是修改後的完整資源（含讚數、回覆數與新的 etag）。
+message UpdateCommentResponse {
+  Comment comment = 1;
+}
+
+message DeleteCommentRequest {
+  // 留言 ID。
+  string comment_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 帶了就檢查版本；已經刪除的留言不檢查。
+  string etag = 2;
+}
+
+message DeleteCommentResponse {}
+
+message CreateForumEntryRequest {
+  // 店家 ID。
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 內文，規則同 CreateCommentRequest.body。
+  string body = 2 [(google.api.field_behavior) = REQUIRED];
+  // 設了是回覆；父項不是頂層時，回覆掛在它所屬的頂層項目底下。不設是頂層發言。
+  optional string parent_id = 3;
+  // 回覆針對的那一則，必須與 parent_id 同一串；只能在設了 parent_id 時設，不設是父項。
+  optional string reply_to_id = 4;
+  // 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回這個項目目前的樣子；內容不同回 invalid_argument。
+  string request_id = 5 [(google.api.field_info).format = UUID4];
+}
+
+message CreateForumEntryResponse {
+  ForumEntry entry = 1;
+}
+
+message UpdateForumEntryRequest {
+  // id 與 etag 必填；body 的規則同 CreateCommentRequest.body。討論區項目只有內文可以修改，update_mask 要列 body。
+  ForumEntry entry = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+// UpdateForumEntryResponse 的項目是修改後的完整資源（含回覆數與新的 etag）。
+message UpdateForumEntryResponse {
+  ForumEntry entry = 1;
+}
+
+message DeleteForumEntryRequest {
+  // 討論區項目 ID。
+  string entry_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 帶了就檢查版本；已經刪除的項目不檢查。
+  string etag = 2;
+}
+
+message DeleteForumEntryResponse {}

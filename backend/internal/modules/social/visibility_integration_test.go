@@ -189,10 +189,10 @@ func TestSD7SD13HiddenContentIsVisibleToItsAuthorOnly(t *testing.T) {
 	if theirs := mustV[social.HiddenPage](t)(f.module.MyHiddenContent(ctx, other.BuyerID, nil, 10)); len(theirs.Items) != 0 {
 		t.Fatalf("別人讀不到：%+v", theirs)
 	}
-	if _, err := f.module.UpdateComment(ctx, f.asBuyer(author), c.ID, "想偷改"); kindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.UpdateComment(ctx, f.asBuyer(author), c.ID, 1, "想偷改"); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("被隱藏的留言不能編輯：%v", err)
 	}
-	if _, err := f.module.UpdateForumEntry(ctx, f.asBuyer(author), e.ID, "想偷改"); kindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.UpdateForumEntry(ctx, f.asBuyer(author), e.ID, 1, "想偷改"); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("被隱藏的討論區留言不能編輯：%v", err)
 	}
 	// 冪等：同一則再隱藏回既有的那一筆。
@@ -212,7 +212,7 @@ func TestSD7SD13HiddenContentIsVisibleToItsAuthorOnly(t *testing.T) {
 	if len(page.Comments) != 1 || page.Comments[0].Body != "原本的留言" {
 		t.Fatalf("還原後公開列表含該留言：%+v", page)
 	}
-	if _, err := f.module.UpdateComment(ctx, f.asBuyer(author), c.ID, "改好了"); err != nil {
+	if _, err := f.module.UpdateComment(ctx, f.asBuyer(author), c.ID, 1, "改好了"); err != nil {
 		t.Fatalf("還原後可以編輯：%v", err)
 	}
 	if n := f.scalar(t, "SELECT count(*) FROM social.hides WHERE comment_id = $1 AND restored_at IS NOT NULL", c.ID); n != 1 {
@@ -267,8 +267,8 @@ func TestPlaceholderForTopLevelCommentWithVisibleReplies(t *testing.T) {
 	for _, parent := range []social.Comment{deleted, hidden} {
 		mustV[social.Comment](t)(f.module.CreateComment(ctx, store, social.CommentInput{PostID: p.ID, Body: "回覆", ParentID: &parent.ID}))
 	}
-	must(t, f.module.DeleteComment(ctx, f.asBuyer(buyerP), deleted.ID))
-	must(t, f.module.DeleteComment(ctx, f.asBuyer(buyerP), alone.ID))
+	must(t, f.module.DeleteComment(ctx, f.asBuyer(buyerP), deleted.ID, 0))
+	must(t, f.module.DeleteComment(ctx, f.asBuyer(buyerP), alone.ID, 0))
 	_, err := f.module.Hide(ctx, social.HideInput{Target: social.Target{Kind: social.TargetComment, ID: hidden.ID}, Category: "SPAM", AdminID: 1})
 	must(t, err)
 
@@ -290,7 +290,7 @@ func TestPlaceholderForTopLevelCommentWithVisibleReplies(t *testing.T) {
 		t.Fatalf("狀態：%v", states)
 	}
 	for _, c := range page.Comments {
-		replies := mustV[social.CommentPage](t)(f.module.ListReplies(ctx, social.Caller{}, c.ID, nil, 10))
+		replies := mustV[social.CommentPage](t)(f.module.ListReplies(ctx, social.Caller{}, c.PostID, c.ID, nil, 10))
 		if len(replies.Comments) != 1 || replies.Comments[0].Body != "回覆" {
 			t.Fatalf("回覆照常顯示：%+v", replies)
 		}
@@ -302,8 +302,8 @@ func TestPlaceholderForTopLevelCommentWithVisibleReplies(t *testing.T) {
 	}
 	// 回覆也被刪掉之後，整則（含佔位項目）不再出現。
 	for _, c := range page.Comments {
-		replies := mustV[social.CommentPage](t)(f.module.ListReplies(ctx, social.Caller{}, c.ID, nil, 10))
-		must(t, f.module.DeleteComment(ctx, store, replies.Comments[0].ID))
+		replies := mustV[social.CommentPage](t)(f.module.ListReplies(ctx, social.Caller{}, c.PostID, c.ID, nil, 10))
+		must(t, f.module.DeleteComment(ctx, store, replies.Comments[0].ID, 0))
 	}
 	if page := mustV[social.CommentPage](t)(f.module.ListComments(ctx, social.Caller{}, p.ID, nil, 10)); len(page.Comments) != 0 {
 		t.Fatalf("沒有可見的回覆時整則不出現：%+v", page.Comments)

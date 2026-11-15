@@ -12,6 +12,7 @@ SELECT c.id AS "id",
      COALESCE((CASE WHEN v.visible THEN c.body END), $3::text) AS "body",
      c.created_at AS "created_at",
      c.updated_at AS "updated_at",
+     c.version AS "version",
      s.like_count AS "like_count",
      s.reply_count AS "reply_count"
 FROM social.comments AS c

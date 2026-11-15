@@ -21,6 +21,7 @@ func UseSchema(schema string) {
 	MediaRefSync = MediaRefSync.FromSchema(schema)
 	PostHashtags = PostHashtags.FromSchema(schema)
 	PostLikes = PostLikes.FromSchema(schema)
+	PostSchedules = PostSchedules.FromSchema(schema)
 	PostShares = PostShares.FromSchema(schema)
 	PostStats = PostStats.FromSchema(schema)
 	PostViews = PostViews.FromSchema(schema)

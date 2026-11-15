@@ -8,6 +8,7 @@ SELECT c.id AS "id",
      c.body AS "body",
      c.created_at AS "created_at",
      c.updated_at AS "updated_at",
+     c.version AS "version",
      s.like_count AS "like_count",
      s.reply_count AS "reply_count"
 FROM social.comments AS c

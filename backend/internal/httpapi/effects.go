@@ -72,6 +72,29 @@ var customerEffects = map[string]Effect{
 	// DiscoveryPublicService
 	"/hawkr.discovery.v1alpha1.DiscoveryPublicService/SuggestRecommendedSellers": EffectRead,
 
+	// SocialPublicService
+	"/hawkr.social.v1alpha1.SocialPublicService/GetPost":              EffectRead,
+	"/hawkr.social.v1alpha1.SocialPublicService/ListPosts":            EffectRead,
+	"/hawkr.social.v1alpha1.SocialPublicService/ListComments":         EffectRead,
+	"/hawkr.social.v1alpha1.SocialPublicService/SuggestTrendingPosts": EffectRead,
+	"/hawkr.social.v1alpha1.SocialPublicService/SuggestTags":          EffectRead,
+	"/hawkr.social.v1alpha1.SocialPublicService/SuggestTrendingTags":  EffectRead,
+	"/hawkr.social.v1alpha1.SocialPublicService/ListForumEntries":     EffectRead,
+	"/hawkr.social.v1alpha1.SocialPublicService/RecordPostView":       EffectWrite,
+
+	// SocialAppService
+	"/hawkr.social.v1alpha1.SocialAppService/SharePost":        EffectWrite,
+	"/hawkr.social.v1alpha1.SocialAppService/LikePost":         EffectWrite,
+	"/hawkr.social.v1alpha1.SocialAppService/UnlikePost":       EffectWrite,
+	"/hawkr.social.v1alpha1.SocialAppService/LikeComment":      EffectWrite,
+	"/hawkr.social.v1alpha1.SocialAppService/UnlikeComment":    EffectWrite,
+	"/hawkr.social.v1alpha1.SocialAppService/CreateComment":    EffectWrite,
+	"/hawkr.social.v1alpha1.SocialAppService/UpdateComment":    EffectWrite,
+	"/hawkr.social.v1alpha1.SocialAppService/DeleteComment":    EffectWrite,
+	"/hawkr.social.v1alpha1.SocialAppService/CreateForumEntry": EffectWrite,
+	"/hawkr.social.v1alpha1.SocialAppService/UpdateForumEntry": EffectWrite,
+	"/hawkr.social.v1alpha1.SocialAppService/DeleteForumEntry": EffectWrite,
+
 	// SellerReportAppService
 	"/hawkr.seller.v1alpha1.SellerReportAppService/CreateReport":  EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerReportAppService/ListMyReports": EffectRead,

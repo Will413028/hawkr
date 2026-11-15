@@ -201,19 +201,18 @@ func (s *Service) RecordShare(ctx context.Context, buyerID int64, postID uuid.UU
 	return added, err
 }
 
-// Viewer 是瀏覽貼文的人：已登入的帳號（AccountID > 0），或匿名的 IP 與 User-Agent。BuyerID 是已登入者的買家身分（不是買家就是 0），
-// 公開可讀的判斷用它套個人封鎖。
+// Viewer 是瀏覽貼文的人：已登入的帳號（AccountID > 0），或匿名的 IP 與 User-Agent。
 type Viewer struct {
 	AccountID int64
-	BuyerID   int64
 	IP        string
 	UserAgent string
 }
 
 // RecordView 記一次瀏覽：只計公開可讀的貼文；(貼文, 台北日, 觀看者鍵) 插入成功才算（trigger 把瀏覽數加一）。觀看者鍵是以當日 salt
-// 做的 HMAC-SHA256（登入者是帳號，匿名是貼文 + IP + User-Agent），表裡沒有可回推的帳號或 IP；匿名沒有 IP 時不計數。店主與代行的讀取
-// 由呼叫方不呼叫。回傳這次有沒有計入。觀看者封鎖了這家店時，貼文對他不公開可讀，不計入；已計入的瀏覽數不因封鎖回頭改變。
-func (s *Service) RecordView(ctx context.Context, postID uuid.UUID, v Viewer) (bool, error) {
+// 做的 HMAC-SHA256（登入者是帳號，匿名是貼文 + IP + User-Agent），表裡沒有可回推的帳號或 IP；匿名沒有 IP 時不計數。貼文所屬店家的店主
+// （c.Store）看自己的貼文不計；代行讀取由呼叫方不呼叫。回傳這次有沒有計入。c.BuyerID 套個人封鎖：觀看者封鎖了這家店時，貼文對他不公開可讀，
+// 不計入；已計入的瀏覽數不因封鎖回頭改變。
+func (s *Service) RecordView(ctx context.Context, c model.Caller, postID uuid.UUID, v Viewer) (bool, error) {
 	if v.AccountID <= 0 && v.IP == "" {
 		return false, nil
 	}
@@ -222,7 +221,19 @@ func (s *Service) RecordView(ctx context.Context, postID uuid.UUID, v Viewer) (b
 	var counted bool
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		ok, err := reads.Flag(ctx, s.d.DB.Conn(ctx), reads.PostIsPublic(postID, now, visibility.Viewer{BuyerID: v.BuyerID}))
+		if c.Store != nil {
+			post, err := q.GetPost(ctx, postID)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			if err != nil {
+				return fmt.Errorf("social：讀取貼文 %s：%w", postID, err)
+			}
+			if c.OwnsStore(post.SocialPost.StoreID) {
+				return nil
+			}
+		}
+		ok, err := reads.Flag(ctx, s.d.DB.Conn(ctx), reads.PostIsPublic(postID, now, visibility.Viewer{BuyerID: c.BuyerID}))
 		if err != nil {
 			return fmt.Errorf("social：讀取貼文 %s：%w", postID, err)
 		}

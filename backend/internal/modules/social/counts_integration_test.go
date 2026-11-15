@@ -129,7 +129,7 @@ func TestStatsMatchTheDatasetAfterRandomWrites(t *testing.T) {
 			if c.Actor.Kind == social.ActorBuyer {
 				caller = buyers[indexOf(profiles, c.Actor.ID)]
 			}
-			step("刪除", f.module.DeleteComment(ctx, caller, c.ID))
+			step("刪除", f.module.DeleteComment(ctx, caller, c.ID, 0))
 		case op == 5 && len(comments) > 0:
 			c := comments[rng.IntN(len(comments))]
 			if c.Actor.Kind != social.ActorBuyer {
@@ -273,7 +273,7 @@ func TestReconcileOverwritesDriftAndLogsIt(t *testing.T) {
 	p := f.publishedPost(t, storeID, "貼文")
 	b := f.newBuyer(t)
 	mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p.ID, Body: "留言"}))
-	mustV[bool](t)(f.module.RecordView(ctx, p.ID, social.Viewer{AccountID: 1}))
+	mustV[bool](t)(f.module.RecordView(ctx, social.Caller{}, p.ID, social.Viewer{AccountID: 1}))
 	rep, err := f.module.Reconcile(ctx)
 	must(t, err)
 	if rep.Drifted != 0 || strings.Contains(f.logs.String(), "漂移") {

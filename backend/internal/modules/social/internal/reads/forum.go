@@ -22,6 +22,7 @@ type EntryRow struct {
 	Body       string
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+	Version    int64
 	ReplyCount int64
 }
 
@@ -33,10 +34,7 @@ func ListTopLevelForumEntries(storeID int64, now time.Time, v visibility.Viewer,
 	s := table.ForumEntryStats.AS("s")
 	vis := LATERAL(SELECT(c.Counted().AS("visible"))).AS("v")
 	visible := BoolColumn("visible").From(vis)
-	state := CASE().
-		WHEN(visible).THEN(NewEnumValue(stateVisible)).
-		WHEN(c.Gone()).THEN(NewEnumValue(stateDeleted)).
-		ELSE(NewEnumValue(stateHidden))
+	state := stateOf(visible, c.Gone())
 	hasVisibleReply := EXISTS(SELECT(r.T.ID).FROM(r.T).WHERE(r.Where(r.T.ParentID.EQ(c.T.ID), r.Counted())))
 	return SELECT(
 		c.T.ID.AS("id"), c.T.StoreID.AS("store_id"), c.T.ParentID.AS("parent_id"), c.T.ReplyToID.AS("reply_to_id"),
@@ -44,7 +42,7 @@ func ListTopLevelForumEntries(storeID int64, now time.Time, v visibility.Viewer,
 		masked(visible, c.T.ActorKind, String("")).AS("actor_kind"),
 		masked(visible, c.T.ActorID, Int64(0)).AS("actor_id"),
 		masked(visible, c.T.Body, String("")).AS("body"),
-		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), s.ReplyCount.AS("reply_count"),
+		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), c.T.Version.AS("version"), s.ReplyCount.AS("reply_count"),
 	).
 		FROM(c.T.INNER_JOIN(s, s.ForumEntryID.EQ(c.T.ID)).CROSS_JOIN(vis)).
 		WHERE(c.Where(
@@ -66,7 +64,7 @@ func ListForumReplies(parentID uuid.UUID, now time.Time, v visibility.Viewer, pg
 		c.T.ID.AS("id"), c.T.StoreID.AS("store_id"), c.T.ParentID.AS("parent_id"), c.T.ReplyToID.AS("reply_to_id"),
 		NewEnumValue(stateVisible).AS("state"),
 		c.T.ActorKind.AS("actor_kind"), c.T.ActorID.AS("actor_id"), c.T.Body.AS("body"),
-		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), s.ReplyCount.AS("reply_count"),
+		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), c.T.Version.AS("version"), s.ReplyCount.AS("reply_count"),
 	).
 		FROM(c.T.INNER_JOIN(s, s.ForumEntryID.EQ(c.T.ID))).
 		WHERE(c.Where(
@@ -96,4 +94,10 @@ func ForumEntryIsHidden(id uuid.UUID) SelectStatement {
 // ForumIsReadable 回店家的討論區對觀看者此刻可不可以讀：店家可曝光，而且觀看者沒有封鎖這家店。
 func ForumIsReadable(storeID int64, now time.Time, v visibility.Viewer) SelectStatement {
 	return SELECT(visibility.ReadableForum(now, v, Int64(storeID)).AS("value"))
+}
+
+// ForumEntryState 回討論區留言此刻在列表裡的狀態（與列表同一個算式）。
+func ForumEntryState(id uuid.UUID) SelectStatement {
+	e := visibility.ForumEntriesOf("e", visibility.Anonymous)
+	return SELECT(stateOf(e.Counted(), e.Gone()).AS("state")).FROM(e.T).WHERE(e.T.ID.EQ(UUID(id)))
 }

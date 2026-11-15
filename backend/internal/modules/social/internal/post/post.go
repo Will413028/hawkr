@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 	"uuid"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/readcache"
+	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/schedule"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/textcheck"
@@ -51,8 +53,13 @@ type Deps struct {
 	Events   *events.Bus
 	Products ProductVerifier
 	Cache    readcache.Cache
-	NewID    func() uuid.UUID
-	Now      func() time.Time
+	// Cancel 取消貼文的待發布排程（發布、刪除時；同一個 transaction，貼文列已鎖）。
+	Cancel schedule.Canceler
+	// Authorizers 是排程到點時依發起者種類重驗授權的實作；每一種都要有（social.New 檢查）。
+	Authorizers map[model.ScheduleKind]model.ScheduleAuthorizer
+	NewID       func() uuid.UUID
+	Now         func() time.Time
+	Logger      *slog.Logger
 }
 
 // Service 是貼文的 use case。
@@ -135,11 +142,34 @@ func (s *Service) writeTags(ctx context.Context, q *store.Queries, postID uuid.U
 	return nil
 }
 
-func (s *Service) publishedEvent(ctx context.Context, p store.SocialPost, now time.Time) error {
-	return events.Publish(ctx, s.d.Events, model.PostPublished{
+func (s *Service) publishedEvent(ctx context.Context, p store.SocialPost, now time.Time, origin model.PostOrigin, sc store.SocialPostSchedule) error {
+	e := model.PostPublished{
 		EventID: uuid.NewV7(), OccurredAt: now, PostID: p.ID, StoreID: p.StoreID,
-		Preview: model.TruncateRunes(p.Body, model.PreviewMaxRunes),
-	})
+		Preview: model.TruncateRunes(p.Body, model.PreviewMaxRunes), Origin: origin,
+	}
+	if origin == model.OriginScheduled {
+		e.ScheduleID, e.ScheduledBy = sc.ID, model.ScheduledBy{Kind: model.ScheduleKind(sc.ScheduledByKind), Ref: sc.ScheduledByRef}
+	}
+	return events.Publish(ctx, s.d.Events, e)
+}
+
+// publishLocked 是貼文轉為 PUBLISHED 唯一的路徑（手動發布與排程到點共用）：貼文列已鎖，公開要件在這裡檢查，之後寫狀態、發 PostPublished、排快取失效。
+// 呼叫方負責先處理這篇貼文的待發布排程（手動發布取消它，到點發布把它轉 PUBLISHED）。
+func (s *Service) publishLocked(ctx context.Context, q *store.Queries, row store.SocialPost, now time.Time, origin model.PostOrigin, sc store.SocialPostSchedule) error {
+	if err := checkPublishable(ctx, row.Body, row.ImageKey != nil); err != nil {
+		return err
+	}
+	upd, err := q.SetPostStatus(ctx, store.SetPostStatusParams{ID: row.ID, Status: string(model.StatusPublished), Now: now, ExpectedVersion: row.Version})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return versionConflict(ctx)
+	}
+	if err != nil {
+		return fmt.Errorf("social：發布貼文 %s：%w", row.ID, err)
+	}
+	if err := s.publishedEvent(ctx, upd, now, origin, sc); err != nil {
+		return err
+	}
+	return s.d.Cache.BustPost(ctx, row.ID, row.StoreID)
 }
 
 // Create 新增貼文。Publish 為真時同一個動作發布（公開要件在這裡驗證），草稿不發 PostPublished（SD8）。
@@ -195,7 +225,7 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 			}
 		}
 		if in.Publish {
-			if err := s.publishedEvent(ctx, row, now); err != nil {
+			if err := s.publishedEvent(ctx, row, now, model.OriginDirect, store.SocialPostSchedule{}); err != nil {
 				return err
 			}
 			return s.d.Cache.BustPost(ctx, id, st.StoreID)
@@ -267,7 +297,11 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 			return err
 		}
 		hasImage := row.ImageKey != nil && !in.ClearImage || asset != nil
-		if row.Status == string(model.StatusPublished) {
+		scheduled, err := s.hasPendingSchedule(ctx, q, in.PostID)
+		if err != nil {
+			return err
+		}
+		if row.Status == string(model.StatusPublished) || scheduled {
 			if err := checkPublishable(ctx, body, hasImage); err != nil {
 				return err
 			}
@@ -331,20 +365,10 @@ func (s *Service) Publish(ctx context.Context, st seller.Store, postID uuid.UUID
 		if row.Version != version {
 			return versionConflict(ctx)
 		}
-		if err := checkPublishable(ctx, row.Body, row.ImageKey != nil); err != nil {
+		if _, err := s.d.Cancel.FromLockedPosts(ctx, []uuid.UUID{postID}, model.CancelReplaced, now, schedule.CallerBumps); err != nil {
 			return err
 		}
-		upd, err := q.SetPostStatus(ctx, store.SetPostStatusParams{ID: postID, Status: string(model.StatusPublished), Now: now, ExpectedVersion: version})
-		if errors.Is(err, pgx.ErrNoRows) {
-			return versionConflict(ctx)
-		}
-		if err != nil {
-			return fmt.Errorf("social：發布貼文 %s：%w", postID, err)
-		}
-		if err := s.publishedEvent(ctx, upd, now); err != nil {
-			return err
-		}
-		return s.d.Cache.BustPost(ctx, postID, st.StoreID)
+		return s.publishLocked(ctx, q, row, now, model.OriginDirect, store.SocialPostSchedule{})
 	})
 	if err != nil {
 		return model.Post{}, err
@@ -408,6 +432,9 @@ func (s *Service) Delete(ctx context.Context, st seller.Store, postID uuid.UUID,
 		}
 		if row.StoreID != st.StoreID {
 			return notFound(ctx)
+		}
+		if _, err := s.d.Cancel.FromLockedPosts(ctx, []uuid.UUID{postID}, model.CancelDeleted, now, schedule.CallerBumps); err != nil {
+			return err
 		}
 		n, err := q.SoftDeletePost(ctx, store.SoftDeletePostParams{ID: postID, Now: &now, ExpectedVersion: version})
 		if err != nil {

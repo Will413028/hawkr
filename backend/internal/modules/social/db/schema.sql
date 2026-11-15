@@ -52,6 +52,39 @@ COMMENT ON COLUMN social.posts.status IS '貼文狀態：DRAFT、PUBLISHED、UNP
 COMMENT ON COLUMN social.posts.published_at IS '第一次發布的時間，之後不變（下架不清、再發布沿用）；DRAFT 沒有，發布過的一定有';
 COMMENT ON COLUMN social.posts.version IS '樂觀鎖的版本，對外是 etag；每次修改加一';
 
+-- 貼文的排程發布：一次排程一列，永不重用；唯一的真相是這張表，River job 只帶 id、是到點的觸發器。state 是 PENDING → PUBLISHED 或 CANCELED，
+-- 取消原因凍結在列上（cancel_reason 只在 CANCELED 有值，resolved_at 在離開 PENDING 時寫）：貼文的狀態之後會變，事後反查會得到錯的答案。
+-- scheduled_by_kind 是排程的發起者種類（OWNER 店主、DELEGATION 代行），scheduled_by_ref 是發起者擁有格式的不透明字串（DELEGATION 放 session ID）。
+-- 同一篇貼文同時最多一個 PENDING（重排時舊的先轉 REPLACED）。鎖順序：貼文列 → 排程列。
+CREATE TABLE social.post_schedules (
+    id                UUID        PRIMARY KEY,
+    post_id           UUID        NOT NULL REFERENCES social.posts (id),
+    store_id          BIGINT      NOT NULL,
+    publish_at        TIMESTAMPTZ NOT NULL,
+    scheduled_by_kind TEXT        NOT NULL,
+    scheduled_by_ref  TEXT        NOT NULL,
+    state             TEXT        NOT NULL,
+    cancel_reason     TEXT,
+    created_at        TIMESTAMPTZ NOT NULL,
+    resolved_at       TIMESTAMPTZ,
+    CONSTRAINT post_schedules_store_check CHECK (store_id > 0),
+    CONSTRAINT post_schedules_by_kind_check CHECK (scheduled_by_kind IN ('OWNER', 'DELEGATION')),
+    CONSTRAINT post_schedules_by_ref_check CHECK (char_length(scheduled_by_ref) >= 1 AND char_length(scheduled_by_ref) <= 200 AND scheduled_by_ref !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
+    CONSTRAINT post_schedules_state_check CHECK (state IN ('PENDING', 'PUBLISHED', 'CANCELED')),
+    CONSTRAINT post_schedules_reason_check CHECK (cancel_reason IN ('AUTHORITY_LOST', 'DELETED', 'TAKEN_DOWN', 'REPLACED', 'OWNER_CANCELED', 'NOT_PUBLISHABLE', 'RETRY_EXHAUSTED', 'EXPIRED')),
+    CONSTRAINT post_schedules_reason_state_check CHECK ((state = 'CANCELED') = (cancel_reason IS NOT NULL)),
+    CONSTRAINT post_schedules_resolved_check CHECK ((state = 'PENDING') = (resolved_at IS NULL))
+);
+-- 一篇貼文同時最多一個待發布的排程。
+CREATE UNIQUE INDEX post_schedules_post_pending ON social.post_schedules (post_id) WHERE state = 'PENDING';
+-- 取消某個發起者（例如某個代行 session）的待發布排程。
+CREATE INDEX post_schedules_by_pending ON social.post_schedules (scheduled_by_kind, scheduled_by_ref) WHERE state = 'PENDING';
+-- 取消與列出某家店的待發布排程。
+CREATE INDEX post_schedules_store_pending ON social.post_schedules (store_id) WHERE state = 'PENDING';
+
+COMMENT ON COLUMN social.post_schedules.scheduled_by_ref IS '發起者擁有格式的不透明字串；DELEGATION 放代行 session 的 ID，OWNER 放店家帳號 ID 的十進位字串';
+COMMENT ON COLUMN social.post_schedules.cancel_reason IS '取消原因，凍結在列上：AUTHORITY_LOST 到點時授權已失效、DELETED 貼文被刪、TAKEN_DOWN 貼文被下架措施、REPLACED 被立即發布或新排程取代、OWNER_CANCELED 店主取消、NOT_PUBLISHABLE 到點時貼文不再滿足公開要件、RETRY_EXHAUSTED 到點發布重試用盡、EXPIRED 到點時已超過可補發的期限';
+
 -- 貼文的留言：兩層（回覆的父一律是頂層，由寫入端保證，DB 保證同篇與 reply_to 在同一串）。actor_kind、actor_id 是互動者 (kind, id)，由伺服器依資源歸屬推導
 -- （ADR 2026-10-17-social-actor-identity）：BUYER 的 actor_id 是 buyer_id，STORE 的是 store_id。不存作者名稱與頭像快照，讀取時由
 -- buyer、seller 批次補。同篇靠 UNIQUE (post_id, id) 與複合 FK：parent_id 指到別篇的留言時 DB 就拒絕；reply_to 在同一串靠產生欄位
@@ -70,6 +103,12 @@ CREATE TABLE social.comments (
     deleted_at  TIMESTAMPTZ,
     thread_id   UUID        NOT NULL GENERATED ALWAYS AS (COALESCE(parent_id, id)) STORED,
     counted     BOOLEAN     NOT NULL DEFAULT FALSE,
+    version     BIGINT      NOT NULL DEFAULT 1,
+    request_id   UUID,
+    request_hash BYTEA,
+    CONSTRAINT comments_request_key UNIQUE (actor_kind, actor_id, request_id),
+    CONSTRAINT comments_version_check CHECK (version >= 1),
+    CONSTRAINT comments_request_check CHECK ((request_id IS NULL) = (request_hash IS NULL)),
     CONSTRAINT comments_post_id_key UNIQUE (post_id, id),
     CONSTRAINT comments_thread_key UNIQUE (post_id, thread_id, id),
     CONSTRAINT comments_parent_fk FOREIGN KEY (post_id, parent_id) REFERENCES social.comments (post_id, id),
@@ -91,6 +130,9 @@ CREATE INDEX comments_actor ON social.comments (actor_kind, actor_id, id);
 
 COMMENT ON COLUMN social.comments.counted IS '此刻是否計入貼文的留言數與父留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_comments 求值）；只由 social.reevaluate_comments 維護，讀取直接用它，貼文的 comment_count 與留言的 reply_count 是這個旗標的加總';
 COMMENT ON COLUMN social.comments.body IS '內文；作者自己刪除時保留，買家刪帳的清除 job 之後設為 NULL（保留列讓討論串結構與佔位項目還在），所以 NULL 一定是已刪除的列（comments_scrubbed_check）';
+COMMENT ON COLUMN social.comments.version IS '樂觀鎖的版本，對外是 etag；內文修改與刪除各加一';
+COMMENT ON COLUMN social.comments.request_id IS '建立時 client 帶的 request_id（AIP-155，選填）；範圍是 (互動者, request_id)，同一個互動者重送回這一列';
+COMMENT ON COLUMN social.comments.request_hash IS '建立輸入（貼文、父留言、被回覆的留言、內文）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有';
 COMMENT ON COLUMN social.comments.actor_kind IS '互動者的種類：BUYER（actor_id 是 buyer_id）、STORE（actor_id 是 store_id）；買家與店家各自連號，同一個數值在兩邊是不同的人';
 
 -- 留言的讚：互動者是 (kind, id)，複合鍵保證重複按讚冪等（INSERT ... ON CONFLICT DO NOTHING）。
@@ -130,6 +172,12 @@ CREATE TABLE social.forum_entries (
     deleted_at  TIMESTAMPTZ,
     thread_id   UUID        NOT NULL GENERATED ALWAYS AS (COALESCE(parent_id, id)) STORED,
     counted     BOOLEAN     NOT NULL DEFAULT FALSE,
+    version     BIGINT      NOT NULL DEFAULT 1,
+    request_id   UUID,
+    request_hash BYTEA,
+    CONSTRAINT forum_entries_request_key UNIQUE (actor_kind, actor_id, request_id),
+    CONSTRAINT forum_entries_version_check CHECK (version >= 1),
+    CONSTRAINT forum_entries_request_check CHECK ((request_id IS NULL) = (request_hash IS NULL)),
     CONSTRAINT forum_entries_store_id_key UNIQUE (store_id, id),
     CONSTRAINT forum_entries_thread_key UNIQUE (store_id, thread_id, id),
     CONSTRAINT forum_entries_parent_fk FOREIGN KEY (store_id, parent_id) REFERENCES social.forum_entries (store_id, id),
@@ -144,6 +192,9 @@ CREATE TABLE social.forum_entries (
 );
 COMMENT ON COLUMN social.forum_entries.counted IS '此刻是否計入父討論區留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_forum_entries 求值）；只由 social.reevaluate_forum_entries 維護，讀取直接用它，父項的 reply_count 是這個旗標的加總';
 COMMENT ON COLUMN social.forum_entries.body IS '內文；作者自己刪除時保留，買家刪帳的清除 job 之後設為 NULL（保留列讓討論串結構與佔位項目還在），所以 NULL 一定是已刪除的列（forum_entries_scrubbed_check）';
+COMMENT ON COLUMN social.forum_entries.version IS '樂觀鎖的版本，對外是 etag；內文修改與刪除各加一';
+COMMENT ON COLUMN social.forum_entries.request_id IS '建立時 client 帶的 request_id（AIP-155，選填）；範圍是 (互動者, request_id)，同一個互動者重送回這一列';
+COMMENT ON COLUMN social.forum_entries.request_hash IS '建立輸入（店家、父項、被回覆的項目、內文）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有';
 CREATE INDEX forum_entries_top_level ON social.forum_entries (store_id, created_at, id) WHERE parent_id IS NULL;
 CREATE INDEX forum_entries_replies ON social.forum_entries (parent_id, created_at, id) WHERE counted;
 CREATE INDEX forum_entries_actor ON social.forum_entries (actor_kind, actor_id, id);

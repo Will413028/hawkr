@@ -4,6 +4,7 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -11,13 +12,15 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 // Audience 是 service 的使用者類別，授權跟著它走（API 設計規範（Connect）§二）。
 type Audience int
 
 const (
-	// AudiencePublic 是 <模組>PublicService：任何人都能呼叫，不讀身分。
+	// AudiencePublic 是 <模組>PublicService：任何人都能呼叫，不要求登入；請求帶有效 session 時 handler 可以讀呼叫者（例如依觀看者過濾、viewer_can_*），
+	// 停權帳號與無效 token 以訪客執行。依觀看者而定的方法（httpapi 的 publicViewerDependent）在請求帶憑證時，GET 回應是 private, no-store（API 設計規範（Connect）§九）。
 	AudiencePublic Audience = iota + 1
 	// AudienceApp 是 <模組>AppService：登入的買家、賣家。
 	AudienceApp
@@ -122,4 +125,14 @@ func TraceID(ctx context.Context) string {
 		return sc.TraceID().String()
 	}
 	return ""
+}
+
+// BuyerInvariant 把「存活的帳號查不到現任買家」轉成 internal：帳號活著 ⇔ 買家活著（ADR
+// 2026-09-30-account-created-provisions-buyer），認證過的帳號都活著，所以這是不變量被破壞（interceptor 記 error log），
+// 不當成「沒有買家」。其他錯誤原樣回傳，err 是 nil 時回 nil。
+func BuyerInvariant(accountID int64, err error) error {
+	if apperr.KindOf(err) == apperr.KindNotFound {
+		return fmt.Errorf("存活的帳號 %d 沒有現任買家（不變量被破壞）", accountID)
+	}
+	return err
 }

@@ -348,6 +348,12 @@ func (m *Module) AdminAllows(ctx context.Context, adminID int64, perm adminperm.
 	return m.admin.AdminAllows(ctx, adminID, perm)
 }
 
+// AdminAllowsNow 不鎖地讀管理員此刻的角色並回答是否有權限 perm；不擋住撤銷，只給已持有更上層列鎖的呼叫方（排程發布到點的重驗，鎖順序見
+// 單體規則 4）。要「通過的檢查在 transaction 結束前不會被撤銷」用 AdminAllows。
+func (m *Module) AdminAllowsNow(ctx context.Context, adminID int64, perm adminperm.Permission) (bool, error) {
+	return m.admin.AdminAllowsNow(ctx, adminID, perm)
+}
+
 // Authenticate 驗證顧客的 session token（Bearer 或 cookie 的值）或後台 Access/dev token：後台 token 以 iss 辨認，其餘一律當 session。
 // 無效、逾時的 token 與已刪除的帳號回 KindUnauthenticated；停權的帳號照樣認證成功，結果帶 SuspendedAt（A7-D18）；provider 或資料庫
 // 故障回其他錯誤。

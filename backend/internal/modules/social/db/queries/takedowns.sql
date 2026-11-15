@@ -1,14 +1,15 @@
 -- 內容下架的複本（schema.sql 的 content_takedowns）：訂閱者在 seller 建立與撤銷內容下架措施的同一個 transaction 寫入，每日對帳雙向核對 seller.pub_content_takedowns()。
 
--- name: InsertTakedowns :execrows
--- 冪等：(措施, 內容) 已經有的列略過。內容不存在時外鍵失敗，措施的建立跟著回滾。
+-- name: InsertTakedowns :many
+-- 冪等：(措施, 內容) 已經有的列略過。內容不存在時外鍵失敗，措施的建立跟著回滾。回傳實際寫入的列（呼叫方只對這些貼文取消排程）。
 INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, created_at)
 SELECT sqlc.arg(measure_id)::uuid, p, NULL::uuid, NULL::uuid, sqlc.arg(created_at)::timestamptz FROM unnest(sqlc.arg(post_ids)::uuid[]) AS p
 UNION ALL
 SELECT sqlc.arg(measure_id)::uuid, NULL::uuid, c, NULL::uuid, sqlc.arg(created_at)::timestamptz FROM unnest(sqlc.arg(comment_ids)::uuid[]) AS c
 UNION ALL
 SELECT sqlc.arg(measure_id)::uuid, NULL::uuid, NULL::uuid, f, sqlc.arg(created_at)::timestamptz FROM unnest(sqlc.arg(forum_entry_ids)::uuid[]) AS f
-ON CONFLICT DO NOTHING;
+ON CONFLICT DO NOTHING
+RETURNING post_id, comment_id, forum_entry_id;
 
 -- name: InvalidTakedownContents :many
 -- 內容下架的歸屬核對（建立措施的同一個 transaction，留言與討論區留言的列已經鎖住）：回傳存在（含已軟刪）但不是該店家自己寫的內容。列已經清除的內容不在此列：它的歸屬由 moderation 以案件快照核對，再呼叫 seller。貼文的作者是它所屬的店家。
@@ -34,8 +35,8 @@ SELECT 'FORUM_ENTRY'::text, f::uuid FROM unnest(sqlc.arg(forum_entry_ids)::uuid[
 WHERE NOT EXISTS (SELECT 1 FROM social.forum_entries AS x WHERE x.id = f AND x.deleted_at IS NULL)
 ORDER BY 1, 2;
 
--- name: InsertActiveTakedowns :execrows
--- 對帳補漏：只寫此刻 seller.pub_content_takedowns() 仍生效的列（在寫入的語句裡再看一次，讀到「缺」的清單之後措施才被撤銷時不寫回）。冪等：已有的列略過。
+-- name: InsertActiveTakedowns :many
+-- 對帳補漏：只寫此刻 seller.pub_content_takedowns() 仍生效的列（在寫入的語句裡再看一次，讀到「缺」的清單之後措施才被撤銷時不寫回）。冪等：已有的列略過；回傳實際寫入的列。
 INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, created_at)
 SELECT t.measure_id,
        CASE WHEN t.content_kind = 'POST' THEN t.content_id END,
@@ -47,7 +48,8 @@ WHERE t.measure_id = sqlc.arg(measure_id)::uuid
   AND ((t.content_kind = 'POST' AND t.content_id = ANY(sqlc.arg(post_ids)::uuid[]))
     OR (t.content_kind = 'COMMENT' AND t.content_id = ANY(sqlc.arg(comment_ids)::uuid[]))
     OR (t.content_kind = 'FORUM_ENTRY' AND t.content_id = ANY(sqlc.arg(forum_entry_ids)::uuid[])))
-ON CONFLICT DO NOTHING;
+ON CONFLICT DO NOTHING
+RETURNING post_id, comment_id, forum_entry_id;
 
 -- name: TakedownsOfMeasure :many
 SELECT post_id, comment_id, forum_entry_id FROM social.content_takedowns

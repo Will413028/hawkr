@@ -25,7 +25,7 @@
 | 三處冪等鍵、稽核 hash 不比對 | 重送不得重做 | 鍵需求成立，忽略不同 payload 不成立 | 鍵綁定請求語意，衝突回錯 | 三處唯一鍵與 `ON CONFLICT DO NOTHING`；稽核重放比對 action、resource、payload hash。 |
 | CodeMeta 下發中文標籤、session 存理由快照 | 舊契約仍讀文字 | 到 A10 成立 | 文字由 client 呈現；事實快照按需保存 | 過渡期標籤由 delegation 的 Go 表提供，理由快照保留；A10 由 client 呈現。 |
 | `admin_accounts.delegation_enabled` 人工 SQL，取消不撤銷 | 小型營運名單 | 資格屬代行；跨 schema 兩步無原子性 | 授權 context 擁有資格，撤回與 session 同 transaction | `delegation.admin_eligibilities` 保管資格；`SetAdminEligibility` 撤回時一併撤銷 active session。 |
-| gateway 登出呼叫 `RevokeSessionsByActor` | 登出與撤銷分服務 | Access 處理登出，identity 沒有登出寫入 | 上層直接呼叫授權擁有者 | `internal/httpapi/identity` 直接呼叫 delegation 撤銷；legacy RPC 不實作。 |
+| gateway 登出呼叫 `RevokeSessionsByActor` | 登出與撤銷分服務 | Access 處理登出，identity 沒有登出寫入 | 上層直接呼叫授權擁有者 | `internal/httpapi/identity` 直接呼叫 delegation 結束進行中的 session（A7-D22：登出是結束不是撤銷）；legacy RPC 不實作。 |
 | 稽核 `resource_id` bigint 與未使用的 image key | 資源 ID 都是數字 | 不成立，訂單以訂單號指稱 | 不透明 ID 用 text | `resource_id` 用 text；移除未寫入的 image key。 |
 | `varchar(n)`、status/notify 預設、未使用索引 | DB 防止違反產品長度，省略欄位有預設 | 產品長度成立，其餘不成立 | CHECK 業務長度，必要欄位顯式寫入 | 保留產品長度 CHECK，其餘 text；移除兩個 DEFAULT 及無讀取端索引。 |
 | OFFSET 分頁及總數 | 舊契約用頁碼 | 到 A10 成立 | 新契約用 keyset/page token | 過渡期保留，A10 改契約時再換。 |

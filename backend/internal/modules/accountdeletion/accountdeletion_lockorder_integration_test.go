@@ -59,6 +59,7 @@ func TestDeletionLocksBuyerAndSellerBeforeSocialRows(t *testing.T) {
 			sm := social.New(social.Deps{
 				DB: f.db, Events: f.bus, Media: media.NewFake(), Jobs: f.queue, Buyers: f.buyer, Stores: seller.NewReader(f.db, time.Now), StoreBlocks: noStoreBlocks{},
 				Products: noProductChecks{}, NewID: uuid.NewV7, Now: time.Now,
+				ScheduleAuthorizers: map[social.ScheduleKind]social.ScheduleAuthorizer{social.ScheduleByDelegation: social.ScheduleAuthorizerFunc(func(context.Context, social.ScheduledPublish) error { return social.ErrScheduleDenied })},
 			})
 			events.Subscribe(f.bus, sm.OnBuyerDeletionRequested)
 			events.Subscribe(f.bus, sm.OnBuyerDeleted)

@@ -39,11 +39,13 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1/discoveryv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	httpidentity "github.com/Will413028/hawkr/backend/internal/httpapi/identity"
 	httppayment "github.com/Will413028/hawkr/backend/internal/httpapi/payment"
 	httpreviewqueue "github.com/Will413028/hawkr/backend/internal/httpapi/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
+	httpsocial "github.com/Will413028/hawkr/backend/internal/httpapi/social"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/agent"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
@@ -287,6 +289,16 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	stats := deps.Stats
 	add(contentv1alpha1connect.NewContentPublicServiceHandler(httpcontent.NewPublic(deps.Content, deps.Images), opts...))
 	add(admincontentconnect.NewContentAdminServiceHandler(httpcontent.NewAdmin(deps.Content, deps.Images), opts...))
+	socialPublic, err := httpsocial.NewPublic(deps.Social, deps.Social, deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin, deps.Now)
+	if err != nil {
+		return nil, err
+	}
+	add(socialv1alpha1connect.NewSocialPublicServiceHandler(socialPublic, opts...))
+	socialApp, err := httpsocial.NewApp(deps.Social, deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin)
+	if err != nil {
+		return nil, err
+	}
+	add(socialv1alpha1connect.NewSocialAppServiceHandler(socialApp, opts...))
 	buyerApp, err := httpbuyer.NewApp(deps.Buyer, deps.Images, deps.BuyerPorts, stats)
 	if err != nil {
 		return nil, err
@@ -363,6 +375,9 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	if err := checkCustomerEffects(out); err != nil {
 		return nil, err
 	}
+	if err := checkPublicViewerDependence(out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -411,7 +426,7 @@ func mount(mux *http.ServeMux, path string, h http.Handler) {
 	if !ok {
 		panic(fmt.Sprintf("httpapi：%s 不符合 service 的命名規則（<模組>PublicService、<模組>AppService、<模組>InviteeService、hawkr.admin.* 的 <模組>AdminService）", path))
 	}
-	mux.Handle(path, cachePolicy(audience, h))
+	mux.Handle(path, cachePolicy(audience, isViewerDependent, h))
 }
 
 // withTracing 為每個請求開一個新的 trace：單體是入口，不接續 client 帶來的 traceparent（client 不可信，而且同一頁

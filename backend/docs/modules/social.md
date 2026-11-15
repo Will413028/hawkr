@@ -5,9 +5,9 @@
 ## 1. 範圍與公開介面
 
 - 模組目前只有根套件 API 與 job，沒有對外入口（Connect handler）。
-- 資料在 schema `social`（`db/schema.sql`）：`posts`、`post_hashtags`、`comments`、`comment_likes`、`post_likes`、`forum_entries`、`hides`、`sanctions`、`inactive_authors`（買家刪帳的複本）、`content_takedowns`（seller 內容下架措施的複本）、`post_stats`、`comment_stats`、`forum_entry_stats`、`post_views`、`view_salts`、`post_shares`，以及 media 引用的同步狀態 `media_ref_sync` 與退場資產 `retired_assets`。函式與 trigger 在 `db/objects.sql`，沒有 view。
+- 資料在 schema `social`（`db/schema.sql`）：`posts`、`post_schedules`（排程發布，見 §2）、`post_hashtags`、`comments`、`comment_likes`、`post_likes`、`forum_entries`、`hides`、`sanctions`、`inactive_authors`（買家刪帳的複本）、`content_takedowns`（seller 內容下架措施的複本）、`post_stats`、`comment_stats`、`forum_entry_stats`、`post_views`、`view_salts`、`post_shares`，以及 media 引用的同步狀態 `media_ref_sync` 與退場資產 `retired_assets`。函式與 trigger 在 `db/objects.sql`，沒有 view。
 - migration 是兩支基線：`social_baseline`（Atlas 從 `schema.sql` 生成，含 `CREATE SCHEMA`）與手寫的 `social_objects`（`objects.sql` 的函式與 trigger）；部署後不得改已套用的 migration。
-- 模組事件 `PostPublished`、`CommentCreated`、`CommentReplied`、`PostLiked` 只帶領域鍵。
+- 模組事件 `PostPublished`（帶 `origin`：`DIRECT` 或 `SCHEDULED`，排程的另帶排程 ID 與發起者）、`PostScheduleCanceled{schedule_id, post_id, reason}`、`CommentCreated`、`CommentReplied`、`PostLiked` 只帶領域鍵。
 - 買家的社群處分（`sanctions`）與隱藏紀錄（`hides`）對 moderation 提供 `Hide`、`Restore`、`Warn`、`ContentOwner`，對作者提供 `MySanctions`、`MyHiddenContent`。
 - 買家刪帳與店家退場各有實體清除 job；貼文的快取失效經 `platform/revalidate` 的 tag。
 - 依賴：`buyer`、`seller`、`media`；依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
@@ -15,6 +15,7 @@
 ## 2. 貼文與 hashtag
 
 - 貼文生命週期：DRAFT → PUBLISHED → UNPUBLISHED → PUBLISHED；刪除是軟刪。公開有要件，商品經 port 驗證（存在、上架中、屬於這家店），圖片引用照 content 的 `media.Ref`／`SyncMedia`。
+- 排程發布：`post_schedules` 一次排程一列、不重用，`state` 是 `PENDING` → `PUBLISHED` 或 `CANCELED`，取消原因（`AUTHORITY_LOST`、`DELETED`、`TAKEN_DOWN`、`REPLACED`、`OWNER_CANCELED`、`NOT_PUBLISHABLE`、`RETRY_EXHAUSTED`、`EXPIRED`）凍結在列上；同一篇貼文同時最多一個 `PENDING`。可排程的是 `DRAFT`、`UNPUBLISHED`，時點距現在 5 分鐘到 90 天，仍要滿足公開要件；排程中的貼文可以編輯，編輯後仍要滿足公開要件；排程與店主取消排程（帶讀取時的版本；沒有待發布排程時冪等、不檢查版本）都遞增貼文版本並把新版本回給呼叫方，所有系統取消（授權失效、下架、不可發布、過期、重試用盡、刪除）也由取消的那一處恰好遞增一次；被內容下架的貼文不能排程。排程與到點的 River job（只帶 `schedule_id`）同 transaction 寫入；到點時 job 先鎖貼文列、再鎖排程列，不是 `PENDING` 就不做事，先做 social 自己的檢查（已刪 `DELETED`、已下架 `TAKEN_DOWN`、已公開 `REPLACED`、到點已超過 24 小時 `EXPIRED`），再問該發起者種類的 `ScheduleAuthorizer`（拒絕 `ErrScheduleDenied` 就取消為 `AUTHORITY_LOST` 且不重試，其他錯誤重試；`OWNER` 只有「沒有這項權利」與「店家不存在」是永久拒絕，前置條件暫時不滿足重試），再在任何寫入之前檢查公開要件（不滿足 `NOT_PUBLISHABLE`，不重試），通過才經手動發布的同一條路徑發布；發布與訂閱者的任何錯誤都回滾並重試。最後一次嘗試失敗時，另開 transaction 把排程取消為 `RETRY_EXHAUSTED` 並記 error log。手動發布、重排、刪除、內容下架、店家清除、店主取消都在鎖貼文列之後取消 `PENDING` 的排程；沒有保底掃描（job 與排程同 transaction 寫入）。根套件 API：`SchedulePost`、`CancelPostSchedule`、`CancelScheduledBy`、`CancelDelegatedSchedulesOfStore`、`PendingSchedulerRefs`、`PendingSchedule`、`ListPendingSchedules`。
 - hashtag 隨貼文整批替換；標籤以值的集合 `post_hashtags` 存，沒有 `hashtags` 實體表。
 - 熱門標籤的窗口最長 `model.MaxTrendingWindow`（30 天），超過是 InvalidInput；預設窗口是 `model.DefaultTrendingWindow`。
 - 軟刪保留內容與圖片引用，直到隱私權政策訂出保留期；買家刪帳的清除 job 是例外（見 §6）。
@@ -65,6 +66,7 @@
 - 每則留言與討論區留言存旗標 `counted`。reevaluate 對一批內容鎖定後求值，旗標不同才改旗標並加減貼文的留言數與父項的回覆數；冪等。
 - trigger（留言與討論區留言的建立與 `deleted_at` 改變、隱藏的新增與還原）、買家刪帳的訂閱者（`stats.MarkAuthorInactive`）與每日對帳都只呼叫 reevaluate。stats 是旗標之和，旗標只由 reevaluate 改，所以讀取與重算不重新推導。
 - 鎖的順序固定：內容列 → 貼文的 stats → 父項的 stats，各自依 ID 由小到大（reevaluate 自己取，不依呼叫方）。
+- 排程的鎖順序：貼文列 → 排程列。所有取消都先鎖貼文列（多篇依 ID 由小到大；內容下架與店家清除先鎖貼文、再鎖留言與討論區留言）；別的模組的呼叫在自己的 transaction 內、鎖或改自己的列之前呼叫取消（social 在 delegation 之前）。授權實作用不鎖的讀取。
 - 每日對帳依序：核對複本與 `buyer.pub_inactive_buyers`（缺的補上，`AuthorsAdded`）；讓全部內容重新求值（修旗標，`FlagsFixed`）；用 `reads` 的批次重算語句（500 列一批，一批一個 transaction）覆寫計數。手動全量重算是 `hawkr social-recount`。
 - 瀏覽數是只增的事件計數，不重算。
 - 讚、分享、瀏覽是單列加減，不經 reevaluate。

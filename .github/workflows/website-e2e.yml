@@ -3,10 +3,6 @@ name: website e2e
 # website 的 Playwright e2e（tests/e2e 等，server 回應全由 page.route 攔截）與元件 browser 測試（`*.browser.test.tsx`）。
 # 本機不跑瀏覽器測試（AGENTS.local.md），這支是它們唯一的執行位置。
 # admin 沒有 Playwright 或瀏覽器測試（admin/package.json 沒有相關依賴與指令），所以沒有對應的 admin-e2e。
-#
-# 視覺基準（`*-snapshots/` 目錄）不在版控：
-# - 找不到任何基準時，以 --update-snapshots 跑並把產生的基準當 artifact 上傳，由人下載後 commit，此時不以缺基準判失敗。
-# - 有基準時才逐像素比對，失敗時上傳 playwright-report（含差異圖）。
 
 on:
   pull_request:
@@ -111,34 +107,11 @@ jobs:
         run: test "$(pnpm exec playwright --version)" = "Version 1.64.1"
       # CI 的 webServer 是 `pnpm start`，吃這一步 build 出的產物。
       - run: pnpm run build
-      - name: 偵測視覺基準
-        id: baseline
-        run: |
-          if [ -n "$(find tests -type d -name '*-snapshots' -print -quit)" ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::找不到視覺基準，本次以 --update-snapshots 產生並上傳 artifact（website-visual-baseline-<shard>，八份合起來才是完整基準）"
-          fi
       # @live 的 spec 會打外部服務，不跑。
-      - name: e2e（比對基準）
-        if: steps.baseline.outputs.present == 'true'
+      - name: e2e
         env:
           SHARD: ${{ matrix.shard }}
         run: pnpm run test:e2e:hermetic --shard="${SHARD}/8"
-      - name: e2e（產生基準）
-        if: steps.baseline.outputs.present != 'true'
-        env:
-          SHARD: ${{ matrix.shard }}
-        run: pnpm run test:e2e:hermetic --update-snapshots --shard="${SHARD}/8"
-      - name: 上傳視覺基準
-        if: steps.baseline.outputs.present != 'true' && always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: website-visual-baseline-${{ matrix.shard }}
-          path: website/tests/**/*-snapshots/
-          if-no-files-found: ignore
-          retention-days: 30
       - name: 上傳 Playwright 報告
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

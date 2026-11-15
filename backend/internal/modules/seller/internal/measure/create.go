@@ -3,7 +3,6 @@ package measure
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"slices"
@@ -23,6 +22,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/idempotency"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
@@ -248,12 +248,8 @@ func sortedContents(refs []model.ContentRef) []model.ContentRef {
 // 定義。所有 id 清單（來源通報、引用的既有認定）都是集合，不看輸入順序，編碼排序後的複本，沒有例外（主要依據由規則決定，不編碼在位置裡，
 // 見 findings）；其他欄位照輸入。排序不改動呼叫端的清單。
 func requestHash(in model.CreateMeasureInput) []byte {
-	h := sha256.New()
-	put := func(parts ...string) {
-		for _, p := range parts {
-			_, _ = fmt.Fprintf(h, "%d:%s|", len(p), p)
-		}
-	}
+	h := idempotency.New()
+	put := h.Put
 	at := func(t *time.Time) string {
 		if t == nil {
 			return "-"
@@ -322,7 +318,7 @@ func requestHash(in model.CreateMeasureInput) []byte {
 		// 同上：同一個 request_id 帶不同的來函是不同的請求。
 		put("SOURCE_AUTHORITY_ORDER", in.SourceAuthorityOrderID.String())
 	}
-	return h.Sum(nil)
+	return h.Sum()
 }
 
 // Create 建立措施（admin 的 handler 路徑）。帶 request_id 時冪等（AIP-155）：同一位管理員、同一個 request_id、同樣的內容回傳原本的措施的目前狀態

@@ -141,7 +141,7 @@ func (q *Queries) GoneTakedownContents(ctx context.Context, arg GoneTakedownCont
 	return items, nil
 }
 
-const insertActiveTakedowns = `-- name: InsertActiveTakedowns :execrows
+const insertActiveTakedowns = `-- name: InsertActiveTakedowns :many
 INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, created_at)
 SELECT t.measure_id,
        CASE WHEN t.content_kind = 'POST' THEN t.content_id END,
@@ -154,6 +154,7 @@ WHERE t.measure_id = $2::uuid
     OR (t.content_kind = 'COMMENT' AND t.content_id = ANY($4::uuid[]))
     OR (t.content_kind = 'FORUM_ENTRY' AND t.content_id = ANY($5::uuid[])))
 ON CONFLICT DO NOTHING
+RETURNING post_id, comment_id, forum_entry_id
 `
 
 type InsertActiveTakedownsParams struct {
@@ -164,9 +165,15 @@ type InsertActiveTakedownsParams struct {
 	ForumEntryIds []uuid.UUID
 }
 
-// 對帳補漏：只寫此刻 seller.pub_content_takedowns() 仍生效的列（在寫入的語句裡再看一次，讀到「缺」的清單之後措施才被撤銷時不寫回）。冪等：已有的列略過。
-func (q *Queries) InsertActiveTakedowns(ctx context.Context, arg InsertActiveTakedownsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, insertActiveTakedowns,
+type InsertActiveTakedownsRow struct {
+	PostID       *uuid.UUID
+	CommentID    *uuid.UUID
+	ForumEntryID *uuid.UUID
+}
+
+// 對帳補漏：只寫此刻 seller.pub_content_takedowns() 仍生效的列（在寫入的語句裡再看一次，讀到「缺」的清單之後措施才被撤銷時不寫回）。冪等：已有的列略過；回傳實際寫入的列。
+func (q *Queries) InsertActiveTakedowns(ctx context.Context, arg InsertActiveTakedownsParams) ([]InsertActiveTakedownsRow, error) {
+	rows, err := q.db.Query(ctx, insertActiveTakedowns,
 		arg.CreatedAt,
 		arg.MeasureID,
 		arg.PostIds,
@@ -174,12 +181,24 @@ func (q *Queries) InsertActiveTakedowns(ctx context.Context, arg InsertActiveTak
 		arg.ForumEntryIds,
 	)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	items := []InsertActiveTakedownsRow{}
+	for rows.Next() {
+		var i InsertActiveTakedownsRow
+		if err := rows.Scan(&i.PostID, &i.CommentID, &i.ForumEntryID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-const insertTakedowns = `-- name: InsertTakedowns :execrows
+const insertTakedowns = `-- name: InsertTakedowns :many
 
 INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, created_at)
 SELECT $1::uuid, p, NULL::uuid, NULL::uuid, $2::timestamptz FROM unnest($3::uuid[]) AS p
@@ -188,6 +207,7 @@ SELECT $1::uuid, NULL::uuid, c, NULL::uuid, $2::timestamptz FROM unnest($4::uuid
 UNION ALL
 SELECT $1::uuid, NULL::uuid, NULL::uuid, f, $2::timestamptz FROM unnest($5::uuid[]) AS f
 ON CONFLICT DO NOTHING
+RETURNING post_id, comment_id, forum_entry_id
 `
 
 type InsertTakedownsParams struct {
@@ -198,10 +218,16 @@ type InsertTakedownsParams struct {
 	ForumEntryIds []uuid.UUID
 }
 
+type InsertTakedownsRow struct {
+	PostID       *uuid.UUID
+	CommentID    *uuid.UUID
+	ForumEntryID *uuid.UUID
+}
+
 // 內容下架的複本（schema.sql 的 content_takedowns）：訂閱者在 seller 建立與撤銷內容下架措施的同一個 transaction 寫入，每日對帳雙向核對 seller.pub_content_takedowns()。
-// 冪等：(措施, 內容) 已經有的列略過。內容不存在時外鍵失敗，措施的建立跟著回滾。
-func (q *Queries) InsertTakedowns(ctx context.Context, arg InsertTakedownsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, insertTakedowns,
+// 冪等：(措施, 內容) 已經有的列略過。內容不存在時外鍵失敗，措施的建立跟著回滾。回傳實際寫入的列（呼叫方只對這些貼文取消排程）。
+func (q *Queries) InsertTakedowns(ctx context.Context, arg InsertTakedownsParams) ([]InsertTakedownsRow, error) {
+	rows, err := q.db.Query(ctx, insertTakedowns,
 		arg.MeasureID,
 		arg.CreatedAt,
 		arg.PostIds,
@@ -209,9 +235,21 @@ func (q *Queries) InsertTakedowns(ctx context.Context, arg InsertTakedownsParams
 		arg.ForumEntryIds,
 	)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	items := []InsertTakedownsRow{}
+	for rows.Next() {
+		var i InsertTakedownsRow
+		if err := rows.Scan(&i.PostID, &i.CommentID, &i.ForumEntryID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const invalidTakedownContents = `-- name: InvalidTakedownContents :many

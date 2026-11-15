@@ -133,6 +133,28 @@ SET handoff_code_hash = sqlc.arg(handoff_code_hash), handoff_expires_at = sqlc.a
 WHERE id = sqlc.arg(id) AND credential_hash IS NULL
 RETURNING *;
 
+-- name: EndActiveDelegationsOfActor :many
+-- 管理員登出：結束他進行中的 session（不是撤銷，撤銷只留給治理動作）。ended_at 與 expires_at 的夾值與 EndDelegationSession 相同：推導的狀態
+-- 不看 ended_at，憑證只靠 expires_at 被拉回現在而失效，只寫 ended_at 會讓登出後 credential 仍然有效。
+UPDATE delegation.delegated_operation_sessions
+SET ended_at = sqlc.arg(now)::timestamptz,
+    expires_at = GREATEST(issued_at + INTERVAL '1 second',
+                          LEAST(expires_at, date_trunc('second', sqlc.arg(now)::timestamptz))),
+    revision = revision + 1,
+    updated_at = sqlc.arg(now)::timestamptz
+WHERE actor_admin_id = sqlc.arg(actor_admin_id)
+  AND status = 'ACTIVE' AND ended_at IS NULL
+  AND sqlc.arg(now)::timestamptz < expires_at
+  AND last_active_at > sqlc.arg(idle_since)::timestamptz
+RETURNING id;
+
+-- name: ListUnrevokedDelegationSessionIDsOfActor :many
+-- 不鎖的讀取：這位管理員沒被撤銷的 session（含已結束、已到期的，它們發起的排程還在等）中，ID 在 ids 裡的。ids 是 social 目前有待發布排程的 session ID，
+-- 所以結果以待發布的排程為界，不隨管理員的歷史 session 增長。取消排程要在鎖或改 delegation 的列之前做（social 在 delegation 之前），所以先用不鎖的讀取列出 ID。
+SELECT id FROM delegation.delegated_operation_sessions
+WHERE actor_admin_id = sqlc.arg(actor_admin_id) AND status <> 'REVOKED' AND id = ANY(sqlc.arg(ids)::bigint[])
+ORDER BY id;
+
 -- name: RevokeDelegationSession :one
 -- 治理的撤銷：單句 CAS；單筆撤銷只要求 revoked_at IS NULL（已到期或已結束的也能撤銷，留下治理痕跡）。沒有列表示已經
 -- 撤銷過，呼叫方回傳既有的列（revoked_at 是舉證欄，不能每次不同）。ended_at 一起寫：已經結束的保留原本的時刻，

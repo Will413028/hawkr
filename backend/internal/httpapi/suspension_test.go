@@ -21,6 +21,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
+	socialv1alpha1 "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
@@ -185,6 +186,26 @@ func TestEveryDeclaredProcedureBehavesAsDeclaredForASuspendedAccount(t *testing.
 	}
 }
 
+// SocialAppService 的每支方法都是寫入，停權的帳號回 ACCOUNT_SUSPENDED、模組不被呼叫；RecordPostView 是公開方法，停權的帳號以訪客執行（計為匿名瀏覽）。
+func TestSuspendedAccountCannotWriteSocialButViewsAsAGuest(t *testing.T) {
+	h := suspendedEntry()
+	methods := socialv1alpha1.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialAppService").Methods()
+	if methods.Len() != 11 {
+		t.Fatalf("SocialAppService 有 %d 支方法", methods.Len())
+	}
+	for i := range methods.Len() {
+		proc := "/hawkr.social.v1alpha1.SocialAppService/" + string(methods.Get(i).Name())
+		rec, s := callAs(t, h, "suspended", http.MethodPost, proc)
+		if _, reason := reasonOf(t, rec.Body.Bytes()); rec.Code != http.StatusForbidden || reason != "ACCOUNT_SUSPENDED" || s.Called {
+			t.Errorf("%s：%d %q called=%v，預期 ACCOUNT_SUSPENDED", proc, rec.Code, rec.Body, s.Called)
+		}
+	}
+	rec, s := callAs(t, h, "suspended", http.MethodPost, "/hawkr.social.v1alpha1.SocialPublicService/RecordPostView")
+	if rec.Code != http.StatusOK || !s.Called || s.Principal {
+		t.Errorf("RecordPostView：%d %+v，預期以訪客執行", rec.Code, s)
+	}
+}
+
 // 舊 gateway 的 REST（不是 Connect）依 HTTP method：GET、HEAD 放行，其餘回 gateway 的 403 envelope。
 func TestSuspendedAccountOnLegacyRESTIsDecidedByMethod(t *testing.T) {
 	h := suspendedEntry()
@@ -221,7 +242,7 @@ func TestMountedCustomerServicesMatchTheEffectDeclarations(t *testing.T) {
 	for _, d := range descriptors {
 		methods += d.Methods().Len()
 	}
-	if methods != len(customerEffects) || len(descriptors) != 11 {
+	if methods != len(customerEffects) || len(descriptors) != 13 {
 		t.Fatalf("掛載 %d 個顧客 service、%d 支方法；宣告 %d 支", len(descriptors), methods, len(customerEffects))
 	}
 }

@@ -69,7 +69,7 @@ func TestDirectHideRowRacingADeleteCountsOnce(t *testing.T) {
 	cm := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p.ID, Body: "留言"}))
 	holdErr, opErr := f.race(t, func() error { return f.hideRow(context.Background(), cm.ID) },
 		func(ctx context.Context, r *racer) error {
-			if err := f.module.DeleteComment(ctx, f.asBuyer(b), cm.ID); err != nil {
+			if err := f.module.DeleteComment(ctx, f.asBuyer(b), cm.ID, 0); err != nil {
 				return err
 			}
 			r.Start()

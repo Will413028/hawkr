@@ -10,9 +10,9 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
 func parseDelegationEligibility(args []string) (delegation.AdminEligibilityChange, error) {
@@ -51,6 +51,9 @@ func runDelegationEligibility(ctx context.Context, args []string) error {
 	defer d.Close()
 	log := newLogger()
 	id := identity.New(identity.Deps{DB: d, Now: time.Now, Logger: log})
-	del := delegation.New(delegation.Deps{DB: d, Identity: id, Seller: seller.NewReader(d, time.Now), Now: time.Now, Logger: log})
+	del, err := newDelegationOffline(d, events.NewBus(), id, log)
+	if err != nil {
+		return err
+	}
 	return del.SetAdminEligibility(ctx, in)
 }

@@ -64,6 +64,7 @@ var trimmedColumns = []trimmedColumn{
 	{table: "social.sanctions", column: "reason_text", constraint: "sanctions_reason_text_check"},
 	{table: "social.sanctions", column: "source_ref", constraint: "sanctions_source_ref_check"},
 	{table: "moderation.reports", column: "description", constraint: "reports_description_check"},
+	{table: "social.post_schedules", column: "scheduled_by_ref", constraint: "post_schedules_by_ref_check"},
 	{table: "social.posts", column: "body", constraint: "posts_body_check"},
 	{table: "social.comments", column: "body", constraint: "comments_body_check"},
 	{table: "social.forum_entries", column: "body", constraint: "forum_entries_body_check"},

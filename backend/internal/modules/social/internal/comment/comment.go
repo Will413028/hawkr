@@ -3,6 +3,7 @@
 package comment
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -48,6 +49,10 @@ func (s *Service) postIsPublic(ctx context.Context, postID uuid.UUID, now time.T
 	return reads.Flag(ctx, s.d.DB.Conn(ctx), reads.PostIsPublic(postID, now, v))
 }
 
+func versionConflict(ctx context.Context) error {
+	return apperr.VersionConflict("%s", text.CommentVersionConflict(uitext.LocaleFrom(ctx)))
+}
+
 func commentNotFound(ctx context.Context) error {
 	return apperr.NotFound("%s", text.CommentNotFound(uitext.LocaleFrom(ctx)))
 }
@@ -59,11 +64,43 @@ func authorOf(c store.SocialComment) model.Actor {
 	return model.Actor{Kind: model.ActorKind(c.ActorKind), ID: c.ActorID}
 }
 
-func visibleComment(c store.SocialComment) model.Comment {
+func visibleComment(c store.SocialComment, postStore int64) model.Comment {
 	return model.Comment{
 		ID: c.ID, PostID: c.PostID, ParentID: c.ParentID, ReplyToID: c.ReplyToID, State: model.CommentVisible,
 		Actor: authorOf(c), Body: model.BodyText(c.Body), CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt,
+		Version: c.Version, StoreID: postStore,
 	}
+}
+
+// withStats 補上留言此刻的讚數與回覆數，以及呼叫者（依貼文歸屬推導的互動者）有沒有讚過。
+func (s *Service) withStats(ctx context.Context, q *store.Queries, c model.Caller, out model.Comment) (model.Comment, error) {
+	counts, err := q.GetCommentCounts(ctx, out.ID)
+	if err != nil {
+		return model.Comment{}, fmt.Errorf("social：讀取留言的計數 %s：%w", out.ID, err)
+	}
+	out.Likes, out.ReplyCount = counts.LikeCount, counts.ReplyCount
+	if a, ok := actor.ForViewer(c, out.StoreID); ok && out.State == model.CommentVisible {
+		liked, err := q.CommentsLikedBy(ctx, store.CommentsLikedByParams{ActorKind: string(a.Kind), ActorID: a.ID, CommentIds: []uuid.UUID{out.ID}})
+		if err != nil {
+			return model.Comment{}, fmt.Errorf("social：讀取留言的讚：%w", err)
+		}
+		out.LikedByMe = len(liked) > 0
+	}
+	return out, nil
+}
+
+// currentOf 是重送命中時回的留言：列表讀取算出的目前狀態（已刪除、被隱藏、作者停用後是佔位）與計數，不是第一次建立當下的樣子。
+// row 是剛讀到的列，內文與版本直接用它。
+func (s *Service) currentOf(ctx context.Context, q *store.Queries, c model.Caller, row store.SocialComment, postStore int64) (model.Comment, error) {
+	st, err := reads.One[reads.StateRow](ctx, s.d.DB.Conn(ctx), reads.CommentState(row.ID))
+	if err != nil {
+		return model.Comment{}, fmt.Errorf("social：讀取留言的狀態 %s：%w", row.ID, err)
+	}
+	out := visibleComment(row, postStore)
+	if out.State = model.CommentState(st.State); out.State != model.CommentVisible {
+		out.Actor, out.Body = model.Actor{}, ""
+	}
+	return s.withStats(ctx, q, c, out)
 }
 
 // Create 新增留言或回覆。貼文要公開可讀（草稿與下架的貼文不能留言）。回覆只限貼文所屬的店家（舊 social 的規則）；回覆的父一律壓成
@@ -78,9 +115,15 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.CommentIn
 	}
 	now := s.d.Now().UTC()
 	var created store.SocialComment
+	var replayed model.Comment
+	var isReplay bool
 	var postStore int64
 	var replyTo *store.SocialComment
 	var a model.Actor
+	var hash []byte
+	if in.RequestID != nil {
+		hash = model.RequestHash("comment", in.PostID.String(), model.OptionalID(in.ParentID), model.OptionalID(in.ReplyToID), body)
+	}
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		post, err := q.GetPost(ctx, in.PostID)
@@ -101,6 +144,13 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.CommentIn
 		}
 		a, err = s.d.Actors.ForWrite(ctx, c, postStore, seller.CapMarketing)
 		if err != nil {
+			return err
+		}
+		if row, ok, err := s.replay(ctx, q, a, in.RequestID, hash); err != nil || ok {
+			if err == nil {
+				isReplay = true
+				replayed, err = s.currentOf(ctx, q, c, row, postStore)
+			}
 			return err
 		}
 		var parentID *uuid.UUID
@@ -141,8 +191,21 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.CommentIn
 		}
 		created, err = q.InsertComment(ctx, store.InsertCommentParams{
 			ID: s.d.NewID(), PostID: in.PostID, ParentID: parentID, ReplyToID: replyToID,
-			ActorKind: string(a.Kind), ActorID: a.ID, Body: body, Now: now,
+			ActorKind: string(a.Kind), ActorID: a.ID, Body: body, Now: now, RequestID: in.RequestID, RequestHash: hash,
 		})
+		if errors.Is(err, pgx.ErrNoRows) {
+			// 同一個 (互動者, request_id) 在上面的查詢之後才出現（並行的重送）：INSERT 等到對方 commit 才回 0 列，這時讀得到它。
+			row, ok, rerr := s.replay(ctx, q, a, in.RequestID, hash)
+			if rerr != nil {
+				return rerr
+			}
+			if !ok {
+				return fmt.Errorf("social：留言的 request_id %s 衝突，卻查不到原本那一則", in.RequestID)
+			}
+			isReplay = true
+			replayed, rerr = s.currentOf(ctx, q, c, row, postStore)
+			return rerr
+		}
 		if err != nil {
 			return fmt.Errorf("social：新增留言：%w", err)
 		}
@@ -160,17 +223,38 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.CommentIn
 	if err != nil {
 		return model.Comment{}, err
 	}
-	return visibleComment(created), nil
+	if isReplay {
+		return replayed, nil
+	}
+	return visibleComment(created, postStore), nil
 }
 
-// Update 修改留言：只限作者本人；被隱藏的留言作者不能編輯（SD7）；已刪除的留言是 NotFound。
-func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, newText string) (model.Comment, error) {
+// replay 查 (互動者, request_id)：命中且內容相同回傳那一則（呼叫方補上目前的狀態）；內容不同是 InvalidInput；沒帶 request_id 或沒命中回 false。
+func (s *Service) replay(ctx context.Context, q *store.Queries, a model.Actor, requestID *uuid.UUID, hash []byte) (store.SocialComment, bool, error) {
+	if requestID == nil {
+		return store.SocialComment{}, false, nil
+	}
+	row, err := q.CommentByRequest(ctx, store.CommentByRequestParams{ActorKind: string(a.Kind), ActorID: a.ID, RequestID: requestID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return store.SocialComment{}, false, nil
+	}
+	if err != nil {
+		return store.SocialComment{}, false, fmt.Errorf("social：讀取留言的 request_id %s：%w", requestID, err)
+	}
+	if !bytes.Equal(row.RequestHash, hash) {
+		return store.SocialComment{}, false, apperr.InvalidInputOn([]string{"RequestID"}, "%s", text.RequestIdReused(uitext.LocaleFrom(ctx)))
+	}
+	return row, true, nil
+}
+
+// Update 修改留言：只限作者本人；被隱藏的留言作者不能編輯（SD7）；已刪除的留言是 NotFound。version 與目前的不符回 VersionConflict、不寫入。回傳修改後的完整留言（含讚數與回覆數）。
+func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, version int64, newText string) (model.Comment, error) {
 	body, err := textcheck.Body(uitext.LocaleFrom(ctx), "Body", textcheck.Comment, newText, model.MaxCommentBodyRunes, true)
 	if err != nil {
 		return model.Comment{}, err
 	}
 	now := s.d.Now().UTC()
-	var updated store.SocialComment
+	var updated model.Comment
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		// 鎖的順序 identity → buyer → seller → social：作者與歸屬在鎖之前用不加鎖的讀取確認（作者不會變），買家列的共享鎖先於留言列的鎖。
@@ -203,21 +287,25 @@ func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, newT
 		if hidden {
 			return apperr.FailedPrecondition("%s", text.CommentEditHidden(uitext.LocaleFrom(ctx)))
 		}
-		updated, err = q.UpdateCommentBody(ctx, store.UpdateCommentBodyParams{ID: id, Body: body, Now: now})
+		if row.SocialComment.Version != version {
+			return versionConflict(ctx)
+		}
+		row2, err := q.UpdateCommentBody(ctx, store.UpdateCommentBodyParams{ID: id, Body: body, Now: now})
 		if err != nil {
 			return fmt.Errorf("social：修改留言 %s：%w", id, err)
 		}
-		return nil
+		updated, err = s.withStats(ctx, q, c, visibleComment(row2, row.PostStoreID))
+		return err
 	})
 	if err != nil {
 		return model.Comment{}, err
 	}
-	return visibleComment(updated), nil
+	return updated, nil
 }
 
-// Delete 刪除留言（軟刪）：作者本人，或貼文所屬的店。已經刪除的冪等（不做副作用，SD5）。店家身分的刪除（刪自己的，或刪別人的）要
+// Delete 刪除留言（軟刪）：作者本人，或貼文所屬的店。已經刪除的冪等（不做副作用，SD5）；version 非 0 時與目前的不符回 VersionConflict。店家身分的刪除（刪自己的，或刪別人的）要
 // CapContentContract。
-func (s *Service) Delete(ctx context.Context, c model.Caller, id uuid.UUID) error {
+func (s *Service) Delete(ctx context.Context, c model.Caller, id uuid.UUID, version int64) error {
 	now := s.d.Now().UTC()
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
@@ -236,6 +324,9 @@ func (s *Service) Delete(ctx context.Context, c model.Caller, id uuid.UUID) erro
 		if row.SocialComment.DeletedAt != nil {
 			return nil
 		}
+		if version != 0 && row.SocialComment.Version != version {
+			return versionConflict(ctx)
+		}
 		if ownsPost || row.SocialComment.ActorKind == string(model.ActorStore) {
 			if err := seller.Authorize(*c.Store, seller.CapContentContract); err != nil {
 				return err
@@ -251,7 +342,7 @@ func (s *Service) Delete(ctx context.Context, c model.Caller, id uuid.UUID) erro
 func toComment(r reads.CommentRow) model.Comment {
 	out := model.Comment{
 		ID: r.ID, PostID: r.PostID, ParentID: r.ParentID, ReplyToID: r.ReplyToID, State: model.CommentState(r.State),
-		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, Likes: r.LikeCount, ReplyCount: r.ReplyCount,
+		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, Version: r.Version, Likes: r.LikeCount, ReplyCount: r.ReplyCount,
 	}
 	if out.State == model.CommentVisible {
 		out.Actor = model.Actor{Kind: model.ActorKind(r.ActorKind), ID: r.ActorID}
@@ -293,7 +384,7 @@ func (s *Service) finish(ctx context.Context, c model.Caller, sc scope, rows []r
 	if more {
 		rows = rows[:size]
 	}
-	out := model.CommentPage{Comments: make([]model.Comment, len(rows))}
+	out := model.CommentPage{Comments: make([]model.Comment, len(rows)), StoreID: sc.post.SocialPost.StoreID}
 	ids := make([]uuid.UUID, 0, len(rows))
 	for i, r := range rows {
 		out.Comments[i] = toComment(r)
@@ -347,21 +438,22 @@ func (s *Service) ListTopLevel(ctx context.Context, c model.Caller, postID uuid.
 	return s.finish(ctx, c, sc, rows, size)
 }
 
-// ListReplies 列出頂層留言的回覆（父留言可以已刪除或被隱藏：回覆照常顯示）。規則同 ListTopLevel。
-func (s *Service) ListReplies(ctx context.Context, c model.Caller, parentID uuid.UUID, after *model.CommentCursor, size int32) (model.CommentPage, error) {
+// ListReplies 列出貼文 postID 的頂層留言 parentID 的回覆（父留言可以已刪除或被隱藏：回覆照常顯示）。
+// 父留言不存在、不是頂層或不屬於 postID 都是 NotFound，不論這一頁有沒有內容。規則同 ListTopLevel。
+func (s *Service) ListReplies(ctx context.Context, c model.Caller, postID, parentID uuid.UUID, after *model.CommentCursor, size int32) (model.CommentPage, error) {
 	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
 	if err != nil {
 		return model.CommentPage{}, err
 	}
 	q := s.q(ctx)
 	parent, err := q.GetComment(ctx, parentID)
-	if errors.Is(err, pgx.ErrNoRows) || err == nil && parent.SocialComment.ParentID != nil {
+	if errors.Is(err, pgx.ErrNoRows) || err == nil && (parent.SocialComment.ParentID != nil || parent.SocialComment.PostID != postID) {
 		return model.CommentPage{}, commentNotFound(ctx)
 	}
 	if err != nil {
 		return model.CommentPage{}, fmt.Errorf("social：讀取留言 %s：%w", parentID, err)
 	}
-	sc, err := s.scope(ctx, c, parent.SocialComment.PostID)
+	sc, err := s.scope(ctx, c, postID)
 	if err != nil {
 		return model.CommentPage{}, err
 	}

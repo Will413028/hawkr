@@ -70,7 +70,7 @@ func TestContentOwnerReportsAuthorStoreAndReadability(t *testing.T) {
 	if got := owner(social.TargetComment, c.ID); !got.Exists || got.Readable {
 		t.Fatalf("被隱藏：存在但不可讀 %+v", got)
 	}
-	must(t, f.module.DeleteComment(ctx, f.asBuyer(b), c.ID))
+	must(t, f.module.DeleteComment(ctx, f.asBuyer(b), c.ID, 0))
 	if got := owner(social.TargetComment, c.ID); got.Exists {
 		t.Fatalf("刪除後不存在 %+v", got)
 	}
@@ -103,7 +103,7 @@ func TestContentSnapshotReturnsBodyMediaAndAuthor(t *testing.T) {
 	if !got.Exists || got.Body != "貼文本文" || got.Author != (social.Actor{Kind: social.ActorStore, ID: storeID}) || !got.Readable || len(got.MediaRefs) != 1 || got.MediaRefs[0] == "" {
 		t.Fatalf("貼文 %+v", got)
 	}
-	must(t, f.module.DeleteComment(ctx, f.asBuyer(b), c.ID))
+	must(t, f.module.DeleteComment(ctx, f.asBuyer(b), c.ID, 0))
 	if got := snap(social.TargetComment, c.ID); got.Exists || got.Body != "" {
 		t.Fatalf("刪除後不存在 %+v", got)
 	}

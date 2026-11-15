@@ -10,12 +10,27 @@ import (
 // 自己通知自己的略過由消費端判斷。
 
 // PostPublished 貼文轉為公開（建立時直接發布、發布、再發布）；建立草稿不發。已經是 PUBLISHED 時再發布不再發。
+//
+// Origin 是 DIRECT（呼叫發布）或 SCHEDULED（排程到點）；ScheduleID 與 ScheduledBy 只在 SCHEDULED 有值（DIRECT 是零值），稽核以排程 ID 當冪等鍵。
 type PostPublished struct {
+	EventID     uuid.UUID
+	OccurredAt  time.Time
+	PostID      uuid.UUID
+	StoreID     int64
+	Preview     string
+	Origin      PostOrigin
+	ScheduleID  uuid.UUID
+	ScheduledBy ScheduledBy
+}
+
+// PostScheduleCanceled 一個待發布的排程被取消（店主取消、被取代、貼文刪除或下架、授權失效、發起者撤銷）；每個被取消的排程各發一次。
+// 排程到點發布不發事件（PostPublished 的 Origin 是 SCHEDULED），建立排程也不發。
+type PostScheduleCanceled struct {
 	EventID    uuid.UUID
 	OccurredAt time.Time
+	ScheduleID uuid.UUID
 	PostID     uuid.UUID
-	StoreID    int64
-	Preview    string
+	Reason     CancelReason
 }
 
 // CommentCreated 頂層留言建立。StoreID 是貼文所屬的店家。

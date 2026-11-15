@@ -31,7 +31,7 @@
 | D2 來源不明的圖片 | 品牌圖用 `brand/hawkr/`，示範圖改成程式產生的佔位 SVG | Unsplash：要逐張判斷授權；AI 生成：授權依工具條款 |
 | D3 issue | 在新 repo 重建，並替換舊名與舊路徑 | 留在封存：當初搬 issue 就是為了不漏 |
 | D4 反向 DNS 前綴 | `io.github.will413028.hawkr` | `dev.hawkr`：沒有這個網域，被別人註冊後就成了冒用 |
-| D5 e2e | 在本階段新增 website 與 admin 的 Playwright workflow；視覺基準第一次在 CI 產生 | 延後：現況是 e2e 在本機與 CI 都沒有跑 |
+| D5 e2e | 在本階段新增 website 與 admin 的 Playwright workflow；視覺基準第一次在 CI 產生（修訂：截圖比對從未建立基準，已撤除；CI 只跑行為與 computed-style 檢查） | 延後：現況是 e2e 在本機與 CI 都沒有跑 |
 | D6 兩字母縮寫 | 改成 `hk-`／`hk_` | 保留：會讓人看出舊名 |
 | D7 名字類檢查（品牌、法人、同事） | 只在本機 pre-commit／pre-push 執行，讀不進版控的明文清單；CI 只跑不含名字的檢查、gitleaks 與 secret scanning | 公開未加鹽的雜湊：可以用字典反查；HMAC 加 repository secret：fork PR 會跳過，還要多管一個 secret |
 

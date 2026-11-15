@@ -29,6 +29,7 @@ type CommentRow struct {
 	Body       string
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+	Version    int64
 	LikeCount  int64
 	ReplyCount int64
 }
@@ -42,6 +43,25 @@ type CommentPage struct {
 
 func afterComment(created ColumnTimestampz, id ColumnString, pg CommentPage) BoolExpression {
 	return ROW(created, id).GT(ROW(TimestampzT(pg.AfterCreated), UUID(pg.AfterID)))
+}
+
+// stateOf 是留言與討論區留言列表項目的狀態算式，列表與單筆讀取共用。
+func stateOf(visible, gone BoolExpression) Expression {
+	return CASE().
+		WHEN(visible).THEN(NewEnumValue(stateVisible)).
+		WHEN(gone).THEN(NewEnumValue(stateDeleted)).
+		ELSE(NewEnumValue(stateHidden))
+}
+
+// StateRow 是單筆狀態讀取的列。
+type StateRow struct {
+	State string `db:"state"`
+}
+
+// CommentState 回留言此刻在列表裡的狀態（與列表同一個算式）。
+func CommentState(id uuid.UUID) SelectStatement {
+	c := visibility.CommentsOf("c", visibility.Anonymous)
+	return SELECT(stateOf(c.Counted(), c.Gone()).AS("state")).FROM(c.T).WHERE(c.T.ID.EQ(UUID(id)))
 }
 
 // placeholderComment 的內文與作者只在 visible 時給，否則是空值。
@@ -58,10 +78,7 @@ func topLevelComments(postID uuid.UUID, v visibility.Viewer, pg CommentPage, con
 	s := table.CommentStats.AS("s")
 	vis := LATERAL(SELECT(c.Counted().AS("visible"))).AS("v")
 	visible := BoolColumn("visible").From(vis)
-	state := CASE().
-		WHEN(visible).THEN(NewEnumValue(stateVisible)).
-		WHEN(c.Gone()).THEN(NewEnumValue(stateDeleted)).
-		ELSE(NewEnumValue(stateHidden))
+	state := stateOf(visible, c.Gone())
 	hasVisibleReply := EXISTS(SELECT(r.T.ID).FROM(r.T).WHERE(r.Where(r.T.ParentID.EQ(c.T.ID), r.Counted())))
 	return SELECT(
 		c.T.ID.AS("id"), c.T.PostID.AS("post_id"), c.T.ParentID.AS("parent_id"), c.T.ReplyToID.AS("reply_to_id"),
@@ -69,7 +86,7 @@ func topLevelComments(postID uuid.UUID, v visibility.Viewer, pg CommentPage, con
 		masked(visible, c.T.ActorKind, String("")).AS("actor_kind"),
 		masked(visible, c.T.ActorID, Int64(0)).AS("actor_id"),
 		masked(visible, c.T.Body, String("")).AS("body"),
-		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), s.LikeCount.AS("like_count"), s.ReplyCount.AS("reply_count"),
+		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), c.T.Version.AS("version"), s.LikeCount.AS("like_count"), s.ReplyCount.AS("reply_count"),
 	).
 		FROM(c.T.INNER_JOIN(s, s.CommentID.EQ(c.T.ID)).CROSS_JOIN(vis)).
 		WHERE(c.Where(
@@ -107,7 +124,7 @@ func replies(parentID uuid.UUID, v visibility.Viewer, pg CommentPage, post visib
 		c.T.ID.AS("id"), c.T.PostID.AS("post_id"), c.T.ParentID.AS("parent_id"), c.T.ReplyToID.AS("reply_to_id"),
 		NewEnumValue(stateVisible).AS("state"),
 		c.T.ActorKind.AS("actor_kind"), c.T.ActorID.AS("actor_id"), c.T.Body.AS("body"),
-		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), s.LikeCount.AS("like_count"), s.ReplyCount.AS("reply_count"),
+		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), c.T.Version.AS("version"), s.LikeCount.AS("like_count"), s.ReplyCount.AS("reply_count"),
 	).
 		FROM(c.T.INNER_JOIN(post.T, post.T.ID.EQ(c.T.PostID)).INNER_JOIN(s, s.CommentID.EQ(c.T.ID))).
 		WHERE(c.Where(

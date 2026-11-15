@@ -305,7 +305,9 @@ test(
 				] as const) {
 					const loc = page.locator(sel).first();
 					if ((await loc.count()) === 0) continue;
-					await loc.hover().catch(() => {});
+					// Hidden at this viewport (≤960 hides the pill): hover would wait out the
+					// action timeout, and the read below records the unhovered state anyway.
+					if (await loc.isVisible()) await loc.hover().catch(() => {});
 					hover[name] = await loc.evaluate((el) => {
 						const s = getComputedStyle(el as Element);
 						return {

@@ -17,6 +17,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/readcache"
+	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/schedule"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/stats"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -33,7 +34,9 @@ type Deps struct {
 	Jobs  jobs.Enqueuer
 	Stats *stats.Service
 	Cache readcache.Cache
-	Now   func() time.Time
+	// Cancel 取消店家貼文的待發布排程（貼文被清除軟刪的同一個 transaction）。
+	Cancel schedule.Canceler
+	Now    func() time.Time
 }
 
 // Service 執行清除。
@@ -311,6 +314,9 @@ func (s *Service) PurgeStore(ctx context.Context, storeID int64) error {
 				return nil
 			}
 			if err := s.lock(ctx, b); err != nil {
+				return err
+			}
+			if _, err := s.d.Cancel.FromLockedPosts(ctx, postIDs, model.CancelDeleted, now, schedule.CallerBumps); err != nil {
 				return err
 			}
 			for _, p := range posts {

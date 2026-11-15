@@ -220,13 +220,13 @@ func inheritedReason(ctx context.Context, q *store.Queries, in model.AuditIntent
 	reason, err := q.LatestDelegationAuditReason(ctx, store.LatestDelegationAuditReasonParams{
 		SessionID: in.SessionID, ResourceID: in.ResourceID, Action: string(model.AuditPostSchedule),
 	})
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && reason == nil) {
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && reason.OperationReason == nil) {
 		return nil, model.Deny(model.DenialAuditIntentFailed, "找不到可繼承操作理由的排程稽核紀錄")
 	}
 	if err != nil {
 		return nil, fmt.Errorf("delegation：讀取排程的操作理由：%w", err)
 	}
-	return reason, nil
+	return reason.OperationReason, nil
 }
 
 // truncateRunes 把 s 截到 n 個字。

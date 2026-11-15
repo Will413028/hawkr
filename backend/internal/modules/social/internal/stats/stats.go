@@ -20,6 +20,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/readcache"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/reads"
+	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/schedule"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
@@ -31,6 +32,8 @@ type Deps struct {
 	Now    func() time.Time
 	// Cache 排內容下架影響的貼文與店面頁的快取失效。
 	Cache readcache.Cache
+	// Cancel 取消被下架貼文的待發布排程。
+	Cancel schedule.Canceler
 }
 
 // Service 重算計數。

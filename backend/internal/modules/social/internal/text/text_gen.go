@@ -49,6 +49,11 @@ func CommentReplyStoreOnly(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "只有貼文所屬的店家能回覆留言", Locale: uitext.ZhTW}
 }
 
+// CommentVersionConflict 是模組句子 comment.version_conflict；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentVersionConflict(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "這則內容已被修改，請對照最新的內容後再送出", Locale: uitext.ZhTW}
+}
+
 // CommentBodyCommunityRules 是模組句子 comment_body.community_rules；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func CommentBodyCommunityRules(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "留言不符社群守則", Locale: uitext.ZhTW}
@@ -234,6 +239,42 @@ func PostPublishImageRequired(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "發布的貼文需要 1 張照片", Locale: uitext.ZhTW}
 }
 
+// PostScheduleCancelEtagRequired 是模組句子 post.schedule_cancel_etag_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostScheduleCancelEtagRequired(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "取消排程必須帶讀取時的版本（etag）", Locale: uitext.ZhTW}
+}
+
+// PostScheduleEtagRequired 是模組句子 post.schedule_etag_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostScheduleEtagRequired(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "排程發布必須帶讀取時的版本（etag）", Locale: uitext.ZhTW}
+}
+
+// PostScheduleNotFound 是模組句子 post.schedule_not_found；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostScheduleNotFound(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "這篇貼文沒有待發布的排程", Locale: uitext.ZhTW}
+}
+
+// PostScheduleStatusInvalid 是模組句子 post.schedule_status_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostScheduleStatusInvalid(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "已發布的貼文不能排程", Locale: uitext.ZhTW}
+}
+
+// PostScheduleTakenDown 是模組句子 post.schedule_taken_down；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostScheduleTakenDown(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "被內容下架的貼文不能排程", Locale: uitext.ZhTW}
+}
+
+// PostScheduleTimeOutOfRangeArgs 是 PostScheduleTimeOutOfRange 的參數。
+type PostScheduleTimeOutOfRangeArgs struct {
+	Days    int
+	Minutes int
+}
+
+// PostScheduleTimeOutOfRange 是模組句子 post.schedule_time_out_of_range；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostScheduleTimeOutOfRange(l uitext.Locale, a PostScheduleTimeOutOfRangeArgs) uitext.Message {
+	return uitext.Message{Text: "排程的發布時間要在 " + strconv.Itoa(a.Minutes) + " 分鐘到 " + strconv.Itoa(a.Days) + " 天之後之間", Locale: uitext.ZhTW}
+}
+
 // PostStatusInvalid 是模組句子 post.status_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func PostStatusInvalid(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "貼文狀態不合法", Locale: uitext.ZhTW}
@@ -312,6 +353,11 @@ func ReplyParentRequired(l uitext.Locale) uitext.Message {
 // ReplySameThreadOnly 是模組句子 reply.same_thread_only；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReplySameThreadOnly(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "只能回覆同一串裡看得到的留言", Locale: uitext.ZhTW}
+}
+
+// RequestIdReused 是模組句子 request.id_reused；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func RequestIdReused(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "這次送出的內容和同一個請求先前送出的不同，請重新整理頁面後再試。", Locale: uitext.ZhTW}
 }
 
 // SanctionBuyerRequired 是後台員工受眾的模組句子 sanction.buyer_required（只有 zh-TW）。

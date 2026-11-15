@@ -13,6 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/discovery"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1/discoveryv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
+	socialconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
@@ -172,9 +173,23 @@ func TestRecordProductViewIsLimitedPerSourceIP(t *testing.T) {
 	}
 }
 
+// 貼文瀏覽的打點同樣是匿名的公開寫入：有自己的級別（獨立計數，不與商品瀏覽共用），額度低於一般的公開讀取。
+func TestRecordPostViewHasItsOwnLowerQuota(t *testing.T) {
+	tiers := tiersOf(socialconnect.SocialPublicServiceRecordPostViewProcedure)
+	if len(tiers) != 1 || tiers[0].name != tierPostView.name {
+		t.Fatalf("級別 = %+v，預期只有 %s", tiers, tierPostView.name)
+	}
+	if tierPostView.name == tierProductView.name || tierPostView.visitor >= tierPublic.visitor {
+		t.Fatalf("tierPostView = %+v 應獨立計數而且低於 tierPublic（%d）", tierPostView, tierPublic.visitor)
+	}
+	if got := tiersOf(socialconnect.SocialPublicServiceGetPostProcedure); len(got) != 1 || got[0].name != tierPublic.name {
+		t.Fatalf("讀取貼文不該有打點的額度：%+v", got)
+	}
+}
+
 // 統計組裝（評價）與排行是店面頁與推薦排行的必要依賴：沒有它們，組裝時就失敗，不是在請求時才回錯誤。
 func TestNewHandlerRequiresDiscoveryAndStats(t *testing.T) {
-	deps := Deps{Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}}
+	deps := Deps{Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}}
 	withRatings := deps
 	withRatings.Stats = characterize.Stats(t)
 	if _, err := NewHandler(withRatings); err == nil || !strings.Contains(err.Error(), "Discovery") {
@@ -190,7 +205,7 @@ func TestNewHandlerRequiresDiscoveryAndStats(t *testing.T) {
 // 後台待辦的 handler 需要 ReviewQueue：組裝漏接時啟動就失敗，不是第一個請求才 nil pointer panic。
 func TestNewHandlerRequiresReviewQueue(t *testing.T) {
 	deps := Deps{
-		Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
+		Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
 		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: struct{ httpseller.DashboardOrders }{}, Discovery: &discoverymod.Module{}, Agent: &agent.Module{},
 	}
 	if _, err := NewHandler(deps); err == nil || !strings.Contains(err.Error(), "ReviewQueue") {
@@ -201,7 +216,7 @@ func TestNewHandlerRequiresReviewQueue(t *testing.T) {
 // GetSession 的顯示資料與買家區都讀 Buyer：漏接時啟動就失敗，不是 GetSession 第一次被呼叫時 nil pointer panic。
 func TestNewHandlerRequiresBuyer(t *testing.T) {
 	deps := Deps{
-		Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
+		Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
 		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: struct{ httpseller.DashboardOrders }{}, Discovery: &discoverymod.Module{}, Agent: &agent.Module{},
 		ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Social: &social.Module{},
 	}

@@ -22,6 +22,11 @@ VALUES (sqlc.arg(admin_id), sqlc.arg(role), sqlc.arg(action), sqlc.arg(reason), 
 -- 結束之前不會被撤銷。
 SELECT role FROM identity.admin_roles WHERE admin_id = $1 ORDER BY role FOR SHARE;
 
+-- name: ListAdminRoles :many
+-- 不鎖的角色讀取：呼叫方已經持有比 identity 更上層的列鎖（排程發布的重驗，鎖著 social 的貼文列），再鎖 identity 的角色列會倒退
+-- 鎖順序。正確性由呼叫方的鎖保證，不靠這次讀取。
+SELECT role FROM identity.admin_roles WHERE admin_id = $1 ORDER BY role;
+
 -- name: AdminRoleHolderExists :one
 -- 有沒有任何管理員持有這個角色。
 SELECT EXISTS (SELECT 1 FROM identity.admin_roles WHERE role = $1) AS held;

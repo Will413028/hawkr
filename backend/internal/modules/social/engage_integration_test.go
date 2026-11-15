@@ -132,7 +132,7 @@ func TestSD18ViewsAreDeduplicatedPerTaipeiDay(t *testing.T) {
 	views := func() int64 {
 		return mustV[social.Post](t)(f.module.PublicPost(ctx, social.Caller{}, p.ID)).Stats.Views
 	}
-	count := func(v social.Viewer) bool { return mustV[bool](t)(f.module.RecordView(ctx, p.ID, v)) }
+	count := func(v social.Viewer) bool { return mustV[bool](t)(f.module.RecordView(ctx, social.Caller{}, p.ID, v)) }
 
 	anon := social.Viewer{IP: "203.0.113.7", UserAgent: "Mozilla/5.0"}
 	if !count(anon) || count(anon) || views() != 1 {
@@ -184,7 +184,7 @@ func TestSD18ViewsAreDeduplicatedPerTaipeiDay(t *testing.T) {
 	}
 	// 不公開的貼文不計；清理 job 只刪舊的去重列與 salt，不扣瀏覽數。
 	draft := mustV[social.Post](t)(f.module.CreatePost(ctx, f.store(t, storeID), social.CreatePostInput{Body: "草稿"}))
-	if mustV[bool](t)(f.module.RecordView(ctx, draft.ID, anon)) {
+	if mustV[bool](t)(f.module.RecordView(ctx, social.Caller{}, draft.ID, anon)) {
 		t.Fatal("草稿不計瀏覽")
 	}
 	f.advance(48 * time.Hour)
@@ -234,7 +234,7 @@ func TestTopPostsRanksTheLatestThirtyByViews(t *testing.T) {
 	}
 	view := func(p social.Post, n int) {
 		for i := range n {
-			mustV[bool](t)(f.module.RecordView(ctx, p.ID, social.Viewer{AccountID: int64(1000 + i)}))
+			mustV[bool](t)(f.module.RecordView(ctx, social.Caller{}, p.ID, social.Viewer{AccountID: int64(1000 + i)}))
 		}
 	}
 	view(posts[0], 3)

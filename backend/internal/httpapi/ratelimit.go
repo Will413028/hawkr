@@ -11,6 +11,7 @@ import (
 	agentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/agent/v1alpha1/agentv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
+	socialconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 )
@@ -38,6 +39,8 @@ var (
 	// tierProductView 是商品瀏覽打點：匿名、不需要登入、每次都寫入一筆事件，是公開寫入裡最容易被灌的一個，額度比一般的
 	// 公開讀取低（頁面每載入一次送一次；共用位址的人也在額度內）。
 	tierProductView = rateTier{name: "product-view", visitor: 120, ssr: 2400, ci: 60}
+	// tierPostView 是貼文瀏覽打點：匿名、每次都可能寫入一筆去重列，額度同 tierProductView（頁面每載入一篇送一次；共用位址的人也在額度內）。
+	tierPostView = rateTier{name: "post-view", visitor: 120, ssr: 2400, ci: 60}
 )
 
 // tierAppLogin 是 App 原生登入的兩個公開 procedure（IssueAppLoginNonce、ExchangeIdToken）的額度，兩者共用同一個計數器，以來源 IP 計數（沒有登入的
@@ -65,6 +68,7 @@ var tierReportSubmit = func() []rateTier {
 // procedureTiers 是需要自己額度的 procedure（每個時間窗一個級別，全部在額度內才放行）；其餘依 service 的使用者類別。
 var procedureTiers = map[string][]rateTier{
 	sellerconnect.SellerPublicServiceRecordProductViewProcedure:            {tierProductView},
+	socialconnect.SocialPublicServiceRecordPostViewProcedure:               {tierPostView},
 	sellerconnect.SellerReportPublicServiceSubmitFoodSafetyReportProcedure: tierReportSubmit,
 	agentconnect.VendorPortalPublicServicePreviewInviteProcedure:           {tierVendorPortalInvite},
 	agentconnect.VendorPortalPublicServiceExchangeInviteProcedure:          {tierVendorPortalInvite},

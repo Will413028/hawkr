@@ -137,13 +137,13 @@ func (h *Admin) DeleteAccount(ctx context.Context, req *connect.Request[adminpb.
 	return connect.NewResponse(&adminpb.DeleteAccountResponse{State: result}), nil
 }
 
-// SignOut 在管理員登出之前撤銷他進行中的代行（設計書 56 §4.5）；登出本身由 Access 處理。
+// SignOut 在管理員登出之前結束他進行中的代行（憑證立刻失效，不寫 REVOKED，設計書 56 §4.5）；登出本身由 Access 處理。
 func (h *Admin) SignOut(ctx context.Context, _ *connect.Request[adminpb.SignOutRequest]) (*connect.Response[adminpb.SignOutResponse], error) {
 	p, ok := rpc.PrincipalFrom(ctx)
 	if !ok || p.Kind != identity.PrincipalAdmin {
 		return nil, errors.New("httpapi/identity：後台的請求沒有管理員，interceptor 沒有掛上")
 	}
-	if err := h.d.RevokeDelegationsOfAdmin(ctx, p.ID); err != nil {
+	if err := h.d.EndDelegationsOfAdmin(ctx, p.ID); err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&adminpb.SignOutResponse{}), nil

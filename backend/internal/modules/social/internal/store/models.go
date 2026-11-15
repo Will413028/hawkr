@@ -68,6 +68,12 @@ type SocialComment struct {
 	ThreadID  uuid.UUID
 	// 此刻是否計入貼文的留言數與父留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_comments 求值）；只由 social.reevaluate_comments 維護，讀取直接用它，貼文的 comment_count 與留言的 reply_count 是這個旗標的加總
 	Counted bool
+	// 樂觀鎖的版本，對外是 etag；內文修改與刪除各加一
+	Version int64
+	// 建立時 client 帶的 request_id（AIP-155，選填）；範圍是 (互動者, request_id)，同一個互動者重送回這一列
+	RequestID *uuid.UUID
+	// 建立輸入（貼文、父留言、被回覆的留言、內文）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有
+	RequestHash []byte
 }
 
 type SocialCommentLike struct {
@@ -106,6 +112,12 @@ type SocialForumEntry struct {
 	ThreadID  uuid.UUID
 	// 此刻是否計入父討論區留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_forum_entries 求值）；只由 social.reevaluate_forum_entries 維護，讀取直接用它，父項的 reply_count 是這個旗標的加總
 	Counted bool
+	// 樂觀鎖的版本，對外是 etag；內文修改與刪除各加一
+	Version int64
+	// 建立時 client 帶的 request_id（AIP-155，選填）；範圍是 (互動者, request_id)，同一個互動者重送回這一列
+	RequestID *uuid.UUID
+	// 建立輸入（店家、父項、被回覆的項目、內文）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有
+	RequestHash []byte
 }
 
 type SocialForumEntryStat struct {
@@ -171,6 +183,21 @@ type SocialPostLike struct {
 	PostID    uuid.UUID
 	BuyerID   int64
 	CreatedAt time.Time
+}
+
+type SocialPostSchedule struct {
+	ID              uuid.UUID
+	PostID          uuid.UUID
+	StoreID         int64
+	PublishAt       time.Time
+	ScheduledByKind string
+	// 發起者擁有格式的不透明字串；DELEGATION 放代行 session 的 ID，OWNER 放店家帳號 ID 的十進位字串
+	ScheduledByRef string
+	State          string
+	// 取消原因，凍結在列上：AUTHORITY_LOST 到點時授權已失效、DELETED 貼文被刪、TAKEN_DOWN 貼文被下架措施、REPLACED 被立即發布或新排程取代、OWNER_CANCELED 店主取消、NOT_PUBLISHABLE 到點時貼文不再滿足公開要件、RETRY_EXHAUSTED 到點發布重試用盡、EXPIRED 到點時已超過可補發的期限
+	CancelReason *string
+	CreatedAt    time.Time
+	ResolvedAt   *time.Time
 }
 
 type SocialPostShare struct {

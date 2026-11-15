@@ -2004,7 +2004,7 @@ Content-Type: application/json
 - 下一次 `GET current` 與**任何**代行寫入立即 fail-closed（9271 / 410）
 - 冪等：已 revoked 再撤銷 → 回同樣的 200（`revision` 不再 bump）
 - 已 expired 的工作階段**仍可撤銷**（留下治理痕跡）；`revoked` 為終態
-- **ADM session 登出時，其下所有 active 工作階段一併撤銷**（落點 `gateway/internal/handler/auth.go`，§4.5）。⚠️ **前端 P7 的原始假設「logout 之後會清掉 operation cookie」在跨 host 之後不成立**——cookie 在 `hawkr-website` 的 host 上，ADM 的 `Set-Cookie` 碰不到它。**它清不掉，但也不需要清**：撤銷是伺服端狀態，www 的下一次請求（含每 30 秒的 `GET current` 輪詢）就會拿到 9271／`revoked`，工作區照 §4.5 的失敗行為切成阻擋畫面並清掉自己那一份。⇒ **這條連動是 跨 host 之後承接 actor 比對的三道兜底之首**，而撤銷失敗只記 warn、不影響登出結果，因此 §13 security ⑦(c) 把「登出之後 www 端的 credential 確實失效」列為必測
+- **ADM session 登出時，其下所有 active 工作階段一併結束**（A7-D22 起是「結束」不是「撤銷」：寫 `ended_at` 並把 `expires_at` 拉回現在，憑證立刻失效，不寫 `REVOKED`；落點 `gateway/internal/handler/auth.go`，§4.5）。⚠️ **前端 P7 的原始假設「logout 之後會清掉 operation cookie」在跨 host 之後不成立**——cookie 在 `hawkr-website` 的 host 上，ADM 的 `Set-Cookie` 碰不到它。**它清不掉，但也不需要清**：結束是伺服端狀態，www 的下一次請求（含每 30 秒的 `GET current` 輪詢）就會拿到 9270／`expired`，工作區照 §4.5 的失敗行為切成阻擋畫面並清掉自己那一份。⇒ **這條連動是 跨 host 之後承接 actor 比對的三道兜底之首**，而結束失敗只記 warn、不影響登出結果，因此 §13 security ⑦(c) 把「登出之後 www 端的 credential 確實失效」列為必測
 
 **失敗情境表**（共通列見 §6.1.0）
 
@@ -4406,7 +4406,7 @@ sequenceDiagram
 **兩個容易誤解的地方**：
 
 1. **`revision + 1` 不是為了通知任何人**，它是 session 列自己的樂觀鎖版本（`docs/modules/delegation.md` §3）。前端察覺撤銷靠的是下一次 `GET current` 讀到 `status='revoked'`，不是靠 `revision` 變了。
-2. **ADM 登出連動走 `RevokeSessionsByActor`**，`revoke_reason = 'admin_logout'`、`revoked_by_admin_id` 填**該 admin 自己**（實作落點見 §4.5 的 admin logout handler）。**它與 `RevokeSession` 是同一個轉態、同一組 SET 子句**，差別只在定位方式：登出 handler 手上只有 `admin_accounts.id`，而 `RevokeSession` 以 `session_id` 定位 ⇒ 需要一支以 actor 為條件的批次版。它不是第二條機制，因此也自動獲得上面兩個連帶。
+2. **ADM 登出連動是「結束」不是撤銷**（A7-D22）：單體的 `EndDelegationsOfAdmin` 結束該 admin 所有進行中的 session（`ended_at` 與 `expires_at` 夾值同 `EndDelegationSession`，憑證立刻失效），不寫 `REVOKED`、`revoke_reason`，也就不取消排程；單體已不再有 `admin_logout` 這個撤銷理由。實作落點見 §4.5 的 admin logout handler。上面兩個連帶只屬於撤銷。
    **第三個呼叫者是店家狀態重驗**（§8.1.3 第 8 項）：`revoke_reason = 'store_not_operable'`、`revoked_by_admin_id` 同樣填當前這位 ADM 自己。**本節的三個連帶對它一體適用**——這正是第 8 項不必自己實作「取消排程」與「卸載工作區」的原因。**三個呼叫者共用同一支 RPC、同一組連帶，只有 `revoke_reason` 不同。**
 
 #### 7.2.8 批次下架的逐項語意與部分成功（S-6 批次）
@@ -4816,7 +4816,7 @@ UPDATE cms_post
 
 機制上**不做任何跨服務推送**（那會變成補償流程）：worker 在 T1 執行前必然要呼叫 `RecordAuditIntent`，而 `origin=scheduled` 的判定條件是 `status <> 'revoked'` ⇒ 已撤銷的 session 會在這一步被拒絕（`DELEGATION_SESSION_REVOKED`），worker 據此把該排程轉為 `schedule_state='cancelled_by_revocation'` 並清 lease。**fail-closed 發生在執行時，不需要撤銷端去追殺任何東西。**
 
-同理，ADM session 登出時其下所有 active 工作階段一併撤銷（見 `docs/modules/delegation.md` §3），因此登出也會連帶讓未執行的排程在到點時被拒絕——這是同一條機制的自然結果，不是額外邏輯。
+ADM session 登出時其下所有 active 工作階段一併「結束」（見 `docs/modules/delegation.md` §3，A7-D22）：登出是操作者自己離開，不是不再信任這個人或授權，因此**不會**讓未執行的排程被拒絕；到點由執行時重驗依當下的授權決定。撤銷只保留給治理動作（撤回店家授權、撤回代行資格、撤銷管理員角色、治理撤銷單一 session），這四個觸發點在同一個 transaction 內先取消排程。
 
 **`cancelled_by_revocation` 這個終態值有四個來源，不是一個**（`docs/modules/delegation.md` §3 的 `active → revoked` 觸發者表即其全集）：人工撤銷、ADM 登出連動、**治理端撤回該店的代行授權**（§6.1.15 端點 6 的連帶轉態）、以及**目標店家轉為不可代行**（§8.1.3 第 8 項）。四者都寫同一個終態轉換（`RevokeSession`，登出連動走它的批次版 `RevokeSessionsByActor`）／同一個前置條件被拒，因此 worker 端只有一條分支；要分辨是哪一種，讀 session 列的 `revoke_reason`（固定字面值 `admin_logout`／`store_not_operable`／`delegation_disabled`／`authorization_revoked`／人工填入的工單號；完整對照表見 §12.4 ①）。
 
@@ -5076,7 +5076,7 @@ flowchart TD
 
 ⚠️ **編號一律不重排。** 全書數十處以「第 5 項」「第 8 項」指名本流程圖的判定，重排會讓每一處同時指錯。第 4 項保留為空號，不得拿去掛任何新判定。
 
-**這條防線是真的少了，不是換了一種方式達成**：舊設計的 9281 擋得住「同一台電腦上 ADM 的登入者換了人，而 operation cookie 沒清」。跨 host 之後那個錯配仍然可能發生，只是再也沒有第二個事實可以察覺它。接手的三道既有機制（ADM 登出連動撤銷／idle 900 與 hard 1800／S5 撤銷）**都不是即時攔截**，逐條邊界與代價見 [ADR：工作區落在哪個 repo、憑證怎麼跨 host、身分由什麼承擔](/docs/adr/2026-09-18-adm-delegation-workspace-host.md)，**不得**寫成「有別的機制所以更安全」。
+**這條防線是真的少了，不是換了一種方式達成**：舊設計的 9281 擋得住「同一台電腦上 ADM 的登入者換了人，而 operation cookie 沒清」。跨 host 之後那個錯配仍然可能發生，只是再也沒有第二個事實可以察覺它。接手的三道既有機制（ADM 登出連動結束／idle 900 與 hard 1800／S5 撤銷）**都不是即時攔截**，逐條邊界與代價見 [ADR：工作區落在哪個 repo、憑證怎麼跨 host、身分由什麼承擔](/docs/adr/2026-09-18-adm-delegation-workspace-host.md)，**不得**寫成「有別的機制所以更安全」。
 
 **配套的機械保證（落點在 §8.1.2 boot 斷言第 4 條＝§4.5 的 (g)）**：`/api/v1/admin/**` 這個前綴從此**不再蘊含 `requireAdmin`**。⇒ 該前綴下凡不經 `requireAdmin()` 的路由，必須逐條列在具名白名單內（26 支：20 資源 ＋ S3 ＋ S4 ＋ `current/summary` ＋ 兩支媒體 ＋ S6），不在名單內即 boot panic。少了它，日後把一支治理端點掛到 credential-only 群組上，就是一支**沒有任何身分要求的治理端點**，而它在 review 時看起來與其他 `/admin/` 路由毫無差別。
 

@@ -51,6 +51,8 @@ func Registry() []Entry {
 		{Name: "ReadableCommentPost", Row: StoreIDRow{}, Build: func(v visibility.Viewer) Statement { return ReadableCommentPost(sampleID, sampleNow, v) }},
 		{Name: "ReplyTargetIsReadable", Row: BoolRow{}, Build: func(v visibility.Viewer) Statement { return ReplyTargetIsReadable(sampleID, sampleID2, sampleID3, v) }},
 		{Name: "CommentIsHidden", Row: BoolRow{}, Build: func(visibility.Viewer) Statement { return CommentIsHidden(sampleID) }},
+		{Name: "CommentState", Row: StateRow{}, Build: func(visibility.Viewer) Statement { return CommentState(sampleID) }},
+		{Name: "ForumEntryState", Row: StateRow{}, Build: func(visibility.Viewer) Statement { return ForumEntryState(sampleID) }},
 		{Name: "ListTopLevelForumEntries", Row: EntryRow{}, Keyset: true, Build: func(v visibility.Viewer) Statement { return ListTopLevelForumEntries(7, sampleNow, v, sampleCmt) }},
 		{Name: "ListForumReplies", Row: EntryRow{}, Keyset: true, Build: func(v visibility.Viewer) Statement { return ListForumReplies(sampleID, sampleNow, v, sampleCmt) }},
 		{Name: "ForumReplyTargetIsReadable", Row: BoolRow{}, Build: func(v visibility.Viewer) Statement { return ForumReplyTargetIsReadable(sampleID, 7, sampleID3, v) }},
