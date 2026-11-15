@@ -226,7 +226,7 @@ func TestReportCategoryIsLimitedToWhatAReporterCanPick(t *testing.T) {
 	ctx := context.Background()
 	_, s := f.open(t)
 	f.everExposed(t, s.StoreID)
-	rejected := []policy.Category{policy.PlatformAbuse, "", "UNAUTHORIZED_SALE", policy.Spam, policy.Harassment, policy.Hate}
+	rejected := append([]policy.Category{policy.PlatformAbuse, "", "UNAUTHORIZED_SALE"}, policy.Community()...)
 	for _, c := range rejected {
 		_, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: 5, Category: c, Description: "x"})
 		if apperr.KindOf(err) != apperr.KindInvalidInput {
@@ -246,13 +246,13 @@ func TestReportCategoryIsLimitedToWhatAReporterCanPick(t *testing.T) {
 		}
 		accepted++
 	}
-	if accepted != 12 {
-		t.Fatalf("檢舉人可選的類別 %d 個，預期 15 個", accepted)
+	if want := len(policy.ReporterSelectable()); accepted != want {
+		t.Fatalf("檢舉人可選的類別 %d 個，預期 %d 個（policy.ReporterSelectable）", accepted, want)
 	}
-	if n := f.count(t, "SELECT count(*) FROM seller.reports"); n != 12 {
-		t.Fatalf("寫入了 %d 筆通報，預期 12 筆", n)
+	if n := f.count(t, "SELECT count(*) FROM seller.reports"); n != accepted {
+		t.Fatalf("寫入了 %d 筆通報，預期 %d 筆", n, accepted)
 	}
-	for _, c := range []policy.Category{"", "UNAUTHORIZED_SALE", policy.Spam, policy.Harassment, policy.Hate} {
+	for _, c := range append([]policy.Category{"", "UNAUTHORIZED_SALE"}, policy.Community()...) {
 		if _, err := f.module.AdminReports(ctx, ReportListInput{Category: &c, PageSize: 10}); apperr.KindOf(err) != apperr.KindInvalidInput {
 			t.Errorf("清單篩選的類別 %q：%v，預期 invalid_argument", c, err)
 		}
@@ -1014,11 +1014,11 @@ func TestFindingCategoryIsLimitedToWhatThePlatformCanAssess(t *testing.T) {
 		}
 		accepted++
 	}
-	if accepted != 15 {
-		t.Fatalf("認定可用的類別 %d 個，預期 15 個", accepted)
+	if want := len(policy.Assessable()); accepted != want {
+		t.Fatalf("認定可用的類別 %d 個，預期 %d 個（policy.Assessable，含 SEXUAL_CONTENT）", accepted, want)
 	}
-	if n := f.count(t, "SELECT count(*) FROM seller.violations"); n != 15 {
-		t.Fatalf("寫入了 %d 筆認定，預期 15 筆", n)
+	if n := f.count(t, "SELECT count(*) FROM seller.violations"); n != accepted {
+		t.Fatalf("寫入了 %d 筆認定，預期 %d 筆", n, accepted)
 	}
 }
 
