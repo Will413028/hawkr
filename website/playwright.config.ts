@@ -7,12 +7,9 @@ import { defineConfig, devices } from "@playwright/test";
 const { loadEnvConfig } = pkg;
 loadEnvConfig(process.cwd());
 
-// CI runs many refs concurrently on the same self-hosted runner pool (the
-// web-deploy-${{ github.ref }} concurrency group only serializes same-ref
-// runs). A fixed port meant two unrelated runs landing on the same runner
-// would collide ("address already in use"). deploy.yml derives a unique
-// PLAYWRIGHT_PORT per run (run id + attempt) and exports it before this
-// config loads; local dev has no such env var and stays on 3000.
+// PLAYWRIGHT_PORT overrides the port so concurrent runs on one machine do not
+// collide ("address already in use"). No workflow sets it, so CI and local
+// runs default to 3000.
 const PORT = process.env.PLAYWRIGHT_PORT || "3000";
 // The site reads the session on the server, so the monolith's GetSession needs a real upstream
 // (tests/e2e/helpers/fake-session-upstream.ts); it follows PORT so concurrent runs do not collide.
@@ -22,8 +19,7 @@ export default defineConfig({
 	testDir: "./tests",
 	testMatch: "**/*.spec.ts",
 	// `tests/seo/**` 由 playwright.seo.config.ts 承接，不是「被排除掉沒人跑」——
-	// 執行入口是 deploy.yml 的「🔍 SEO 不變式閘門（tests/seo）」step（`pnpm run
-	// test:seo`，與本 config 的全量 E2E 同一階梯：main push / PR 進 main）。
+	// 執行入口是 `pnpm run test:seo`；目前沒有 workflow 自動執行它。
 	//
 	// 這一行是**必要的**，不能為了「讓 SEO 測試也跑到」而拿掉：那批斷言的前提是
 	// indexability gate 打開的建置物（NEXT_PUBLIC_FLAVOR=prod +
@@ -109,8 +105,8 @@ export default defineConfig({
 			// the flaky page.goto timeouts. `next build` precompiles every route, so
 			// `next start` serves instantly and deterministically.
 			//
-			// The CI job already runs `pnpm run build` as a separate "cacheComponents
-			// gate" step (.github/workflows/deploy.yml) BEFORE the E2E step, so we only
+			// The CI job already runs `pnpm run build` as a separate step
+			// (.github/workflows/website-e2e.yml) BEFORE the E2E step, so we only
 			// `pnpm start` here — reusing that artifact. Folding the build into the
 			// webServer command would (a) build twice and (b) bury a build failure
 			// inside Playwright's webServer boot instead of failing at the gate step.
@@ -125,8 +121,8 @@ export default defineConfig({
 			// deployment does. SSR inherits the branch-correct gateway
 			// loaded from .env.local: main exercises the formal API, while dev/local
 			// defaults to the test API.
-			// (CI's pnpm-start build bakes the matching PORT-scoped value via
-			// .env.local in deploy.yml — NEXT_PUBLIC_* is inlined at build time, so
+			// (CI's pnpm-start build bakes the matching value via the job `env` in
+			// website-e2e.yml — NEXT_PUBLIC_* is inlined at build time, so
 			// setting it here only affects local `next dev`, not the CI prebuilt run.)
 			env: {
 				PORT,

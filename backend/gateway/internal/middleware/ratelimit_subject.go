@@ -105,9 +105,8 @@ var originAuthKeyHolder atomic.Pointer[originAuthKeys]
 //
 //   - Not "verify anyway": HMAC("", ·) is computable by anyone, so every claim
 //     would verify — any caller could charge itself to any victim's subject.
-//   - Not "fail to boot": k8s/scripts/create-secrets.sh is not executed by any
-//     workflow; the
-//     secrets are created by hand, once per environment. Making them a startup
+//   - Not "fail to boot": the secrets
+//     are created by hand, once per environment. Making them a startup
 //     requirement means a CrashLoop the first time each environment deploys —
 //     including once on prod, triggered by whoever runs the routine dev → main.
 //

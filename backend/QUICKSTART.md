@@ -45,13 +45,7 @@ cp ../.env.template ../.env  # 填入實際值
 make secrets ENV_FILE=../.env
 ```
 
-外部服務（PostgreSQL / Redis / RabbitMQ）透過 K8s Endpoints 指向 Infra VM，
-設定檔在 `k8s/external-services/` 下（selector-less Service + 手填 Endpoints，
-**PostgreSQL 不在叢集內**）。如需修改 IP，編輯對應 yaml 後重新 apply：
-
-```bash
-kubectl apply -f external-services/postgresql.yaml   # 或 redis.yaml / rabbitmq.yaml
-```
+外部服務（PostgreSQL / Redis / RabbitMQ）的位址由部署環境提供，repo 內沒有對應的叢集設定。
 
 ### 5. 建立資料庫
 
@@ -250,7 +244,7 @@ atlas migrate status --env dev      # 看落後哪幾支、錯在哪支
 kubectl logs <pod-name> -n hawkr --previous
 
 # 常見原因：
-# 1. 缺少 Secret（檢查 k8s/values/<service>.yaml 的 secretRef）
+# 1. 缺少 Secret（檢查該服務需要的環境變數是否已提供）
 # 2. 資料庫未建立（make db-init）
 # 3. 依賴服務未啟動（檢查 gRPC 連線的 host/port）
 # 4. RabbitMQ queue 屬性衝突（需到 RabbitMQ 管理介面刪除舊 queue）

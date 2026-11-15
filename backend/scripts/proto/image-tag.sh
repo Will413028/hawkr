@@ -17,8 +17,7 @@
 # 縮排。那不是有人改壞了什麼，是 CI 從來沒有真的釘住這個 image。
 #
 # tag 改成 Dockerfile 內容的雜湊之後：改 base digest／protoc 版本／任何一行 → tag 變 →
-# 所有 runner 都必須重建 → 大家收斂到同一個 image。跟 go-base 與 22 個服務用的是同一招
-# （見 k8s/scripts/go-base-tag.sh、k8s/scripts/content-addressed-tag.sh）。
+# 所有 runner 都必須重建 → 大家收斂到同一個 image。
 #
 # 這也讓「IMAGE tag 必須等於 PROTOC_VERSION」那條人工對帳規則消失——tag 由檔案內容算出，
 # 沒有第二個地方可以寫錯。

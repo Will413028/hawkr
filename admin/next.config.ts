@@ -48,8 +48,7 @@ const CONTENT_SECURITY_POLICY = [
  * gap. Flip back to `false` once `connect-src` allows the R2 endpoint (both
  * the virtual-hosted `*.<account>.r2.cloudflarestorage.com` and the
  * path-style `<account>.r2.cloudflarestorage.com` forms) — and revert the
- * paired expectation in `tests/csp-report.test.ts` plus the smoke mode passed
- * by `.github/workflows/deploy.yml`.
+ * paired expectation in `tests/csp-report.test.ts`.
  */
 const CSP_REPORT_ONLY = true;
 

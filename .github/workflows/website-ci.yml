@@ -72,8 +72,6 @@ defaults:
     working-directory: website
 
 env:
-  # admin/website 的 `prepare` 會跑 `lefthook install`，CI 不需要 git hooks。
-  LEFTHOOK: '0'
   # 測試與 build 的預先渲染不得連到任何真的主機。API base 沒設時，dev flavor 會落到本機單體
   # （website/lib/config/env.ts 的 DEV_GATEWAY_HOST，http://localhost:8080），`next build` 的預先渲染就會對它發請求。這裡釘到 loopback
   # 的丟棄埠：頁面在後端不可用時本來就要能預先渲染（降級），測試另有守衛（website/tests/setup/hermetic.mjs）。

@@ -72,7 +72,6 @@ defaults:
     working-directory: website
 
 env:
-  LEFTHOOK: '0'
   # 不得連到任何真的主機：未被 page.route 攔截的 SSR 請求打到 loopback 的丟棄埠，漏掉的 mock 會失敗而不是連出去。
   API_BASE_URL: http://127.0.0.1:9/api/v1
   # NEXT_PUBLIC_* 在 build 時被字面替換，要與 playwright.config.ts 的 webServer 同源（預設 port 3000）。

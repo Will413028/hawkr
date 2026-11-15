@@ -6,9 +6,7 @@
 #   Go 服務跑 `target: dev`（Air hot-reload）——go.mod / pkg/ 皆由 bind mount 掛進去、
 #   在容器內即時 `go build`。因此 dev container **必須能連 module proxy**：
 #     • GOPROXY 一律 `https://proxy.golang.org,direct`，**嚴禁 "off"**。
-#       k8s/values/*.yaml 的 `GOPROXY: "off"` 是給 prod builder 用的（go-base image
-#       已含全 monorepo deps、無 egress），不適用本地 dev container；此處刻意與 k8s
-#       不一致，check-compose-k8s-align.sh 白名單已放行 GOPROXY。
+#       （`GOPROXY: "off"` 只適用無 egress 的 builder，不適用本地 dev container。）
 #     • `go-mod-cache:/go/pkg/mod` 具名 volume：module cache 必須活在 volume 而非
 #       image layer，才不會隨 image 老化而過期。
 #   為何（#2025 實測）：dev image 的 /go/pkg/mod 是 build 時 `go mod download` 烘進
@@ -135,7 +133,7 @@ services:
       SSE_MAX_CONN_LIFETIME: 8m
       SSE_EVICT_WINDOW: 30s
 
-      # 分層限流（#1416 / #2022 / #2264）— 值等同 k8s/values/gateway.yaml 與 code
+      # 分層限流（#1416 / #2022 / #2264）— 值等同 code 的預設
       # default，讓本地重現 dev/prod 的限流行為。各層上限 = 每
       # RATE_LIMIT_WINDOW_SECONDS 秒、每個「限流身分」允許的請求數（身分不是
       # client IP，見 01 設計書 §3.2.4）；auth-failure 軸則是 401 次數上限
@@ -1666,7 +1664,7 @@ services:
       # RabbitMQ
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
 
-      # Downstream peer gRPC（key 名與 k8s/values/invoice-service.yaml + config.go 一致）
+      # Downstream peer gRPC（key 名與 config.go 一致）
       ORDER_SERVICE_ADDR: order-service:9915
       SELLER_SERVICE_ADDR: host.docker.internal:9941
       PAYMENT_SERVICE_ADDR: payment-service:9925
@@ -1702,7 +1700,7 @@ services:
       AMEGO_CB_TIMEOUT_SECONDS: 10
       AMEGO_CB_MAX_REQUESTS: 3
 
-      # ── C. 排程與租約（值與 k8s/values/invoice-service.yaml 逐格同值）──
+      # ── C. 排程與租約──
       INVOICE_ISSUE_POLL_INTERVAL_SECONDS: 10
       INVOICE_ISSUE_BATCH_SIZE: 50
       INVOICE_ISSUE_LEASE_SECONDS: 120

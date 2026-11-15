@@ -29,7 +29,7 @@ const repoRoot = fileURLToPath(new URL("../", import.meta.url));
  * anything about (hawkr-website#369).
  *
  * WHY THIS TEST EXISTS — the dev-push E2E tier used to be a hardcoded list of
- * four spec paths inside deploy.yml. A spec added after that list was written
+ * four spec paths inside a workflow file. A spec added after that list was written
  * belonged to no tier and nothing said so. Tags fix the expressiveness problem;
  * this test fixes the completeness problem. An untagged test is a test whose
  * ladder nobody chose.
@@ -123,7 +123,7 @@ test("every Playwright test declares exactly one layer intent tag", () => {
 		[...new Set(offenders)],
 		[],
 		"每個 e2e test 必須帶且只帶一個意圖標籤（@ui 或 @contract），另可選擇性加 @live。\n" +
-			"沒有標籤的測試 = 沒有人決定它該在哪個 CI 階梯上跑（這正是 deploy.yml 舊的四檔硬編碼清單的失效模式）。\n" +
+			"沒有標籤的測試 = 沒有人決定它該在哪個 CI 階梯上跑（這正是硬編碼檔案清單的失效模式）。\n" +
 			offenders.join("\n"),
 	);
 });

@@ -821,7 +821,7 @@ groups:
           channel: business
         annotations:
           summary: "env={{ $labels.env }}：平台 AMEGO 憑證只設了一半，手機條碼驗證已靜默停用"
-          description: "env={{ $labels.env }}：`AMEGO_PLATFORM_INVOICE` 有值但 `AMEGO_PLATFORM_APP_KEY` 沒有（後者是 optional secret ⇒ 缺它是**合法啟動狀態**）。後果：買家在常用發票資料送出一個無效的手機條碼時，入口層驗證整段跳過 ⇒ HTTP 200 建立成功、零錯誤、零 log（2026-09-08 dev 實測）。⚠️ **這不是「發票會開錯」**——開票前那一層（PR #3258）仍然有效，錯的載具不會真的開出去；差別是買家要到**付款之後**才知道打錯，而那時只剩「轉人工」。處置：backend#3269——向光貿取得正式 App Key、放進該環境 env 來源後重跑 `k8s/scripts/create-secrets.sh`（宣告已在 `k8s/values/invoice-service.yaml` 的 secretRef 與該腳本的 `optional_literal`）。⚠️ 憑證**填錯字**這一支看不出來（gauge 只驗配對缺一半），那要看 M3 `invoice_amego_response_code_total`。⚠️ 也**不要**把 AppKey 改成必填來讓它消失：prod 現在就缺，改必填會讓 prod 一部署就 boot 失敗——那是把靜默失效換成全服務中斷。"
+          description: "env={{ $labels.env }}：`AMEGO_PLATFORM_INVOICE` 有值但 `AMEGO_PLATFORM_APP_KEY` 沒有（後者是 optional secret ⇒ 缺它是**合法啟動狀態**）。後果：買家在常用發票資料送出一個無效的手機條碼時，入口層驗證整段跳過 ⇒ HTTP 200 建立成功、零錯誤、零 log（2026-09-08 dev 實測）。⚠️ **這不是「發票會開錯」**——開票前那一層（PR #3258）仍然有效，錯的載具不會真的開出去；差別是買家要到**付款之後**才知道打錯，而那時只剩「轉人工」。處置：backend#3269——向光貿取得正式 App Key、放進該環境 env 來源後重新部署該環境。⚠️ 憑證**填錯字**這一支看不出來（gauge 只驗配對缺一半），那要看 M3 `invoice_amego_response_code_total`。⚠️ 也**不要**把 AppKey 改成必填來讓它消失：prod 現在就缺，改必填會讓 prod 一部署就 boot 失敗——那是把靜默失效換成全服務中斷。"
 
       # ㉙ M34 的告警面，也是 §4.5.8 把 AMEGO_PLATFORM_INVOICE 放寬成選填的**配套條件**。
       # 沒有它，放寬的淨效果只是把一個吵鬧的失敗（boot 起不來）換成一個安靜的失敗

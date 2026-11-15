@@ -34,10 +34,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  # app 的 `prepare` 會跑 `lefthook install`，CI 不需要 git hooks。
-  LEFTHOOK: '0'
-
 jobs:
   deps:
     name: audit 與 override 檢查
