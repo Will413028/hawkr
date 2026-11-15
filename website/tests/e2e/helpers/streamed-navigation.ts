@@ -5,11 +5,12 @@ import type { Page, Response } from "@playwright/test";
  * `<main>` children in Suspense), and `domcontentloaded` fires before React
  * reveals the streamed content: until then a hidden staging copy
  * `body > div[hidden][id^="S:"]` coexists with the hydrated page, so text and
- * CSS locators can hit strict-mode duplicates. These helpers resolve only once
- * no staging copy remains. Specs must not pass `waitUntil: "domcontentloaded"`
+ * CSS locators can hit strict-mode duplicates. A boundary still showing its
+ * fallback has a `template[id^="B:"]` marker and no staging copy yet, so these
+ * helpers resolve only once neither a pending marker nor a staging copy remains. Specs must not pass `waitUntil: "domcontentloaded"`
  * themselves (scripts/check-e2e-streamed-goto.ts).
  */
-const STAGING_SELECTOR = 'body > div[hidden][id^="S:"]';
+const STAGING_SELECTOR = 'template[id^="B:"], body > div[hidden][id^="S:"]';
 
 type GotoOptions = NonNullable<Parameters<Page["goto"]>[1]>;
 type ReloadOptions = NonNullable<Parameters<Page["reload"]>[0]>;
