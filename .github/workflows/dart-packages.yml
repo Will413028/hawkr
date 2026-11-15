@@ -64,4 +64,4 @@ jobs:
         env:
           PACKAGE: ${{ matrix.package }}
         run: |
-          if [ "$PACKAGE" = hawkr_auth ]; then flutter test; else dart test; fi
+          if [ "$PACKAGE" = hawkr_auth ] || [ "$PACKAGE" = hawkr_app_update ]; then flutter test; else dart test; fi

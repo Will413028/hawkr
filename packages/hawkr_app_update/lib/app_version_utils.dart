@@ -2,7 +2,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 /// 取得格式化的 App 版本字串
 ///
-/// 返回格式：`"v1.0.0(7)"`（含版次，且不含前綴 0）或 `"v1.0.0"`（無版次）
+/// 返回格式：`"1.0.3(7)"`（含版次，版次去掉前綴 0）或 `"1.0.3"`（無版次），沒有 `v` 前綴
 /// 失敗時返回空字串 `""`
 Future<String> fetchAppVersion() async {
   try {

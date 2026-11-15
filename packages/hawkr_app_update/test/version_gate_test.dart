@@ -7,7 +7,7 @@ import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.pb.dart';
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_app_update/hawkr_app_update.dart';
-import 'package:test/test.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 /// 假的 CheckAppVersion：記下每次請求，回應由 [respond] 決定（丟出例外就是失敗）。
 class _Backend {
