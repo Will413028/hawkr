@@ -105,11 +105,6 @@ export default defineConfig({
 					},
 				},
 			},
-			// The Next.js Storybook plugin loads app env/Next image settings at
-			// config time. Keep it out of the hermetic unit-test process.
-			...(process.env.VITEST_STORYBOOK === "true"
-				? ["./vitest.storybook.config.ts"]
-				: []),
 		],
 	},
 });

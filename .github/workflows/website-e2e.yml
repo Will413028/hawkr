@@ -1,6 +1,6 @@
 name: website e2e
 
-# website 的 Playwright e2e（tests/e2e 等，server 回應全由 page.route 攔截）與 Storybook 互動測試。
+# website 的 Playwright e2e（tests/e2e 等，server 回應全由 page.route 攔截）與元件 browser 測試（`*.browser.test.tsx`）。
 # 本機不跑瀏覽器測試（AGENTS.local.md），這支是它們唯一的執行位置。
 # admin 沒有 Playwright 或瀏覽器測試（admin/package.json 沒有相關依賴與指令），所以沒有對應的 admin-e2e。
 #
@@ -82,7 +82,7 @@ env:
   WEB_PROCUREMENT_RFQ_PRICE_RANGE_V1: 'true'
   WEB_PROCUREMENT_RFQ_APPROVAL_V1: 'true'
   # 媒體 origin（測試用假網域，不指向任何真的主機）：沒設時 buildImageUrl 不組網址，e2e 的圖片全部缺席，
-  # Storybook 的描述編輯器圖片區塊也會判定資料無效而跳過（fixture 的 msw 攔的就是這個網域）。
+  # 元件 browser 測試的描述編輯器圖片區塊也會判定資料無效而跳過（fixture 的 msw 攔的就是這個網域）。
   NEXT_PUBLIC_MEDIA_BASE_URL: https://test-media.example.com
   # 容器以 root 執行，/github/home 與 node_modules 的上層目錄沒有 sticky 保護，@swc/core 會拒絕把 native binding 快取放在那裡；
   # /tmp 有 sticky bit，可通過它的檢查。
@@ -149,21 +149,6 @@ jobs:
             website/test-results/
           if-no-files-found: ignore
           retention-days: 14
-
-  storybook:
-    name: Storybook 互動測試
-    runs-on: ubuntu-24.04
-    container: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/pnpm-install
-      # 映像的版本要和 lockfile 的 @playwright/test 相同，否則找不到瀏覽器；升級時兩邊一起改。
-      - name: 確認 Playwright 版本與映像一致
-        run: test "$(pnpm exec playwright --version)" = "Version 1.64.1"
-      - run: pnpm run storybook:test
 
   component-browser:
     name: 元件 browser 測試

@@ -40,7 +40,3 @@ export const placeholders = {
 	post: "/placeholders/post.svg",
 	buyerAvatar: "/placeholders/avatar.svg",
 } as const;
-
-/* ===== Type-safe accessors ===== */
-
-export type BrandAssetKey = keyof typeof brandAssets;
