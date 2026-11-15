@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
+import { expectNoAxeViolations } from "@/tests/browser/axe";
 import { renderWithIntl } from "@/tests/browser/render";
 import { Dropdown } from "./Dropdown";
 
@@ -45,6 +46,7 @@ describe("Dropdown", () => {
 		const onChange = vi.fn();
 		renderWithIntl(<Controlled onChange={onChange} />, { frameMaxWidth: 420 });
 		await userEvent.click(trigger());
+		await expectNoAxeViolations("opened Dropdown");
 		await userEvent.keyboard("{Home}{Enter}");
 		await expect
 			.poll(() => trigger().element().textContent)

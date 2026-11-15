@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
+import { expectNoAxeViolations } from "@/tests/browser/axe";
 import { renderWithIntl } from "@/tests/browser/render";
 import Button from "./Button";
 import { Sheet } from "./Dialog";
@@ -49,6 +50,7 @@ describe("Sheet", () => {
 					page.getByRole("dialog", { name: "商品匯入明細", exact: true }),
 				)
 				.toBeVisible();
+			await expectNoAxeViolations(`opened ${_name} Sheet`);
 			await userEvent.keyboard("{Escape}");
 			await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
 			expect(onClose).toHaveBeenCalledTimes(1);

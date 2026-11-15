@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import { page, userEvent } from "vitest/browser";
+import { expectNoAxeViolations } from "@/tests/browser/axe";
 import { renderWithIntl } from "@/tests/browser/render";
 import Button from "./Button";
 import { Dialog } from "./Dialog";
@@ -31,6 +32,7 @@ describe("Dialog", () => {
 		await expect
 			.element(page.getByRole("dialog", { name: "配送說明", exact: true }))
 			.toBeVisible();
+		await expectNoAxeViolations("opened Dialog");
 		await userEvent.keyboard("{Escape}");
 		await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
 	});

@@ -2,6 +2,7 @@ import { within } from "@testing-library/dom";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import type { ProductDescription } from "@/lib/products/seller-repo";
+import { expectNoAxeViolations } from "@/tests/browser/axe";
 import { mountEditor } from "@/tests/browser/description-editor";
 import {
 	descriptionImageDataUrl,
@@ -525,6 +526,7 @@ describe("DescriptionEditorDeletion", () => {
 				expect(within(dialog).queryByText("第一段保留")).toBeNull();
 				expect(editableText(dialog, "第二段保留")).toBeVisibleSync();
 			});
+			await expectNoAxeViolations("DescriptionEditor after block deletion");
 			await undo(dialog, user);
 			await waitFor(() => {
 				expect(

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
+import { expectNoAxeViolations } from "@/tests/browser/axe";
 import { renderWithIntl } from "@/tests/browser/render";
 import { DatePicker } from "./DatePicker";
 
@@ -36,6 +37,7 @@ describe("DatePicker", () => {
 		await userEvent.click(
 			page.getByRole("button", { name: "開啟日期選擇", exact: true }),
 		);
+		await expectNoAxeViolations("opened DatePicker calendar");
 		await userEvent.click(
 			page.getByRole("gridcell", { name: /2026年9月20日/ }),
 		);

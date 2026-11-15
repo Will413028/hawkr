@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
+import { expectNoAxeViolations } from "@/tests/browser/axe";
 import { renderWithIntl } from "@/tests/browser/render";
 import { Input } from "./Input";
 
@@ -44,6 +45,7 @@ describe("Input", () => {
 		await expect
 			.element(page.getByText("請輸入商品名稱", { exact: true }))
 			.toBeVisible();
+		await expectNoAxeViolations("invalid Input");
 	});
 
 	it("matches the App field appearance across states", async () => {

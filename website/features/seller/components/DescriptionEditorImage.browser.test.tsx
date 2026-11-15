@@ -4,6 +4,7 @@ import { userEvent } from "vitest/browser";
 import { getEnv } from "@/lib/config/env";
 import type { UploadedAsset } from "@/lib/media/upload";
 import type { ProductDescription } from "@/lib/products/seller-repo";
+import { expectNoAxeViolations } from "@/tests/browser/axe";
 import { mountEditor } from "@/tests/browser/description-editor";
 import {
 	descriptionImageDataUrl,
@@ -207,6 +208,7 @@ describe("DescriptionEditorImage", () => {
 			() => ui.getByRole("alert"),
 			"圖片上傳失敗，請重試或選擇其他圖片。",
 		);
+		await expectNoAxeViolations("DescriptionEditor upload error");
 		await expect(images(args.onChange.mock.lastCall?.[0])).toEqual([]);
 		await userEvent.click(ui.getByRole("button", { name: "重試上傳" }));
 		await waitFor(() =>
