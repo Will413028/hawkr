@@ -1772,6 +1772,7 @@ export function DescriptionEditorCanvas({
 					)
 						return;
 					saveRetries += 1;
+					requestAnimationFrame(() => void saveCurrentEditor(true));
 				}
 			};
 
