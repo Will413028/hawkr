@@ -338,7 +338,7 @@ export async function fetchSellerReviews(id: string, page = 1, strict = false) {
 // the sole server caller and owns the cache window (seller:<id> tag + SELLER_PROFILE
 // TTL), so there is no inner next:{revalidate} here — a nested SWR layer would
 // re-cache stale stats for an extra cycle. Client callers (default) soften all —
-// e.g. products-import PreviewDetailPage reads it bare and degrades to rating 0.
+// e.g. a bare client read degrades to rating 0.
 export async function fetchSellerReviewStats(id: string, strict = false) {
 	if (!isSellerAccountId(id)) return null;
 	const { data } = await apiClient.public.get<LooseJson>(

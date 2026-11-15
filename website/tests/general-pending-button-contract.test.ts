@@ -43,15 +43,6 @@ test("list-like async controls retain per-action pending identity", () => {
 	assert.match(addresses, /isLoading=\{selectingId === String\(a\.id\)\}/);
 	assert.match(addresses, /loadingLabel="設定預設地址中…"/);
 
-	const preview = source(
-		"features/seller-center/products-import/pages/PreviewListingPage.tsx",
-	);
-	assert.match(preview, /"previous" \| "next" \| null/);
-	assert.match(preview, /isLoading=\{paginationAction === "previous"\}/);
-	assert.match(preview, /loadingLabel="載入上一頁中…"/);
-	assert.match(preview, /isLoading=\{paginationAction === "next"\}/);
-	assert.match(preview, /loadingLabel="載入下一頁中…"/);
-
 	const customerDetail = source(
 		"features/seller-center/customers/CustomerDetailPanel.tsx",
 	);

@@ -17,7 +17,6 @@ import { type AppLocale, defaultLocale } from "../intl/locales";
 export const PRIVATE_PREFIXES = [
 	"/account",
 	"/seller-center",
-	"/seller-product-import-preview",
 	"/seller/measures",
 	"/checkout",
 	"/cart",

@@ -171,7 +171,7 @@ REVALIDATE_SECRET=
 - `cacheComponents: true`：預設動態、靜態 shell 預渲染（PPR），動態部分以 `<Suspense>` 洞在每個請求串流。route segment config（`dynamic`、`revalidate`、`runtime`）一律不能用；`generateStaticParams` 至少回一筆（沒有真實資料可預渲染時回 sentinel，見 `lib/api/static-params.ts`）。
   - **快取模型**：資料層在 `lib/api/cached.ts`，每個讀取是一個 `'use cache'` 函式，用 `cacheTag` 帶 tag、`applyCacheTier`（`cacheLife`）帶 TTL 安全網；`'use cache'` 本身會合併同一個 key 的併發讀取（同請求與跨請求），不另做 in-flight 去重。`'use cache'` 內不得讀 cookie 或 header，也不得放因人而異的讀取。
   - `POST /api/revalidate`（帶 `REVALIDATE_SECRET`）以 tag 提前 bust，tag 名見 `app/api/revalidate/route.ts`。
-  - **登入狀態由伺服器決定**：根 layout 不 await `verifySession()`（`lib/auth/dal.ts`），把 promise 交給 `AuthProvider`，在 `<Suspense>` 內以 `use()` 讀；受保護區（`/account`、`/checkout`、`/seller-center`、`/seller-product-import-preview`、`/seller/measures`）的 layout 用 `ZoneGate` 依 DAL 導向，middleware 只做「cookie 在不在」的樂觀導向。
+  - **登入狀態由伺服器決定**：根 layout 不 await `verifySession()`（`lib/auth/dal.ts`），把 promise 交給 `AuthProvider`，在 `<Suspense>` 內以 `use()` 讀；受保護區（`/account`、`/checkout`、`/seller-center`、`/seller/measures`）的 layout 用 `ZoneGate` 依 DAL 導向，middleware 只做「cookie 在不在」的樂觀導向。
   - 改動根 layout 且在 `<Suspense>` 之外的元件後，`pnpm build` 是必跑項：該位置的 dynamic read 只有 build 的 prerender 階段會擋。`pnpm test:build-output` 讀 prerender manifest，斷言含頁首的頁與受保護頁是 `PARTIALLY_STATIC`。
 - `images`：custom loader → Alibaba OSS image service（`lib/media/ossImageLoader.ts`），用 OSS 的 resize/quality/WebP pipeline 取代 Next 內建 optimizer（已移除舊的 `unoptimized: true`）。`qualities` 需先列出才能當 prop 用。
 - `turbopack.root`：明確指定專案根目錄。

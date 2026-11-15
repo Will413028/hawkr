@@ -167,7 +167,6 @@ describe("surfaceOfPath", () => {
 			"/seller/onboarding",
 			"/seller-center",
 			"/seller-center/orders/12",
-			"/seller-product-import-preview/job-1",
 		]) {
 			expect(surfaceOfPath(path), path).toBe("seller");
 		}

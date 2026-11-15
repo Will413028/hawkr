@@ -38,7 +38,7 @@ export const SELLER_FEATURE_OVERVIEW: readonly SellerFeatureOverviewGroup[] = [
 		summary:
 			"從食品資訊、圖片到規格價格集中建檔；商品上架仍須完成對應的商家資格及資料審核。",
 		features: [
-			"單筆建立商品，或使用 CSV 批次匯入",
+			"建立商品，填寫名稱、描述與規格",
 			"編輯名稱、描述、分類、產地與最多 9 張商品圖片",
 			"建立多組 SKU，分別設定規格、原價與優惠價",
 			"管理草稿、上下架狀態",
