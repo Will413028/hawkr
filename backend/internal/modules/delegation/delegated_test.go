@@ -207,6 +207,25 @@ func TestDelegatedWriteChecksTheStoreBeforeTheWriteAndRecordsTheFailure(t *testi
 	}
 }
 
+// 沒有能力的 session 在呼叫資源模組之前就被拒絕：do 不執行（資源模組的業務驗證不得先於授權），並寫一列 CAPABILITY_DENIED 的 FAILED。
+// 拿掉呼叫 do 之前的 CheckSession，do 會被執行，這個測試失敗。
+func TestDelegatedWriteChecksSessionAndCapabilityBeforeTheWrite(t *testing.T) {
+	w := DelegatedWrite{Op: DelegatedOperation{RequestID: uuid.New(), Reason: "店家要求"}, PayloadHash: "h"}
+	rec := &recorder{}
+	m := &Module{seller: fixedSeller{store: openStore()}, audit: rec}
+	did := false
+	_, err := m.DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsRead), w, func(context.Context, seller.Store) error {
+		did = true
+		return nil
+	})
+	if denialOf(t, err) != DenialCapabilityDenied || did {
+		t.Fatalf("err=%v do=%v，預期 CapabilityDenied、do 不執行", err, did)
+	}
+	if len(rec.got) != 1 || model.FailureReasonOf(rec.got[0].Cause) != failureReasonOf(DenialCapabilityDenied) {
+		t.Fatalf("FAILED 紀錄 = %+v", rec.got)
+	}
+}
+
 // 重送回第一次的結果，與店家此刻的狀態無關（AIP-155）：店家已關閉也成功，不呼叫 do、不寫 FAILED。
 // 拿掉呼叫 do 之前的 LookupOperation，重送會呼叫 do（或在已關閉的店家被拒絕），這個測試失敗。
 func TestDelegatedWriteReplayReturnsTheFirstResultWhateverTheStoreState(t *testing.T) {

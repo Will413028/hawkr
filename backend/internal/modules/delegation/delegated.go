@@ -114,7 +114,7 @@ func (m *Module) DelegatedRead(ctx context.Context, c DelegatedCaller, read func
 	return read(ctx, st)
 }
 
-// DelegatedWrite 在代行店家上執行一次寫入 do（A7-D26）：不開 transaction。先查重送，再讀店家此刻可不可代行，然後帶著代行者（platform/delegatedactor）呼叫 do；
+// DelegatedWrite 在代行店家上執行一次寫入 do（A7-D26）：不開 transaction。先查重送，再檢查 session 此刻還能用並帶有能力（公開 API 的縱深防禦：資源模組的業務驗證不得先於授權），再讀店家此刻可不可代行，然後帶著代行者（platform/delegatedactor）呼叫 do；
 // 資源模組在自己的 transaction 內為寫入發帶代行者的事件，delegation 的訂閱者（OnPostWrittenByActor）同 transaction 檢查 session 與能力、再次確認店家可代行、寫一列 SUCCEEDED
 // （request_id 對到 (session_id, idempotency_key)）。do 失敗時資源模組的 transaction rollback，稽核列跟著消失，所以「有 SUCCEEDED」等於「寫入成功」。
 //
@@ -168,6 +168,9 @@ func (m *Module) delegatedWrite(ctx context.Context, c DelegatedCaller, w Delega
 	}
 	if found {
 		return m.replayResult(ctx, c, log)
+	}
+	if err := model.CheckSession(c.Session, c.Method.Capability); err != nil {
+		return DelegatedWriteResult{}, err
 	}
 	st, err := m.operableStore(ctx, c.Session.Target.StoreID)
 	if err != nil {
