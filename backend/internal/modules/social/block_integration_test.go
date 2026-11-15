@@ -749,7 +749,7 @@ func TestReplyListsRejectAMissingOrForeignParent(t *testing.T) {
 	a := f.newBuyer(t)
 	p, other := f.publishedPost(t, storeID, "貼文"), f.publishedPost(t, otherStore, "別店的貼文")
 	top := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(a), social.CommentInput{PostID: p.ID, Body: "頂層"}))
-	reply := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(a), social.CommentInput{PostID: p.ID, Body: "回覆", ParentID: &top.ID}))
+	reply := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asStore(t, storeID), social.CommentInput{PostID: p.ID, Body: "回覆", ParentID: &top.ID}))
 	entry := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(a), social.ForumInput{StoreID: storeID, Body: "頂層"}))
 	forumReply := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(a), social.ForumInput{StoreID: storeID, Body: "回覆", ParentID: &entry.ID}))
 

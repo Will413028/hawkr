@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -570,10 +571,16 @@ func TestHTTPCaching(t *testing.T) {
 	if first.StatusCode != http.StatusOK || first.Header.Get("Cache-Control") != "public, no-cache" || !strings.HasPrefix(tag, `W/"`) {
 		t.Fatalf("第一次 = %d，Cache-Control %q，ETag %q", first.StatusCode, first.Header.Get("Cache-Control"), tag)
 	}
-	// connect-go 對 GET 加上 Accept-Encoding，語系協商加上 Accept-Language；各出現一次，cachePolicy 不再重複。
-	vary := first.Header.Values("Vary")
-	if len(vary) != 2 || strings.Count(strings.Join(vary, ","), "Accept-Encoding") != 1 || strings.Count(strings.Join(vary, ","), "Accept-Language") != 1 {
-		t.Fatalf("Vary = %q，預期 Accept-Encoding 與 Accept-Language 各一個", vary)
+	// Public GET 一律帶 Vary: Authorization, Cookie, Accept-Encoding（httpcache.go），語系協商再加 Accept-Language；各出現一次。
+	varyTokens := map[string]int{}
+	for _, line := range first.Header.Values("Vary") {
+		for _, tok := range strings.Split(line, ",") {
+			varyTokens[strings.TrimSpace(tok)]++
+		}
+	}
+	wantVary := map[string]int{"Accept-Language": 1, "Accept-Encoding": 1, "Authorization": 1, "Cookie": 1}
+	if !reflect.DeepEqual(varyTokens, wantVary) {
+		t.Fatalf("Vary = %q，預期 Accept-Language、Accept-Encoding、Authorization、Cookie 各一個", first.Header.Values("Vary"))
 	}
 	if again := get(live, tag, false); again.StatusCode != http.StatusNotModified || again.Header.Get("ETag") != tag {
 		t.Fatalf("內容沒變 = %d（ETag %q）", again.StatusCode, again.Header.Get("ETag"))
