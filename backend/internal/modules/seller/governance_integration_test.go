@@ -249,7 +249,7 @@ func TestReportCategoryIsLimitedToWhatAReporterCanPick(t *testing.T) {
 	if want := len(policy.ReporterSelectable()); accepted != want {
 		t.Fatalf("檢舉人可選的類別 %d 個，預期 %d 個（policy.ReporterSelectable）", accepted, want)
 	}
-	if n := f.count(t, "SELECT count(*) FROM seller.reports"); n != accepted {
+	if n := f.count(t, "SELECT count(*) FROM seller.reports"); n != int64(accepted) {
 		t.Fatalf("寫入了 %d 筆通報，預期 %d 筆", n, accepted)
 	}
 	for _, c := range append([]policy.Category{"", "UNAUTHORIZED_SALE"}, policy.Community()...) {
@@ -1017,7 +1017,7 @@ func TestFindingCategoryIsLimitedToWhatThePlatformCanAssess(t *testing.T) {
 	if want := len(policy.Assessable()); accepted != want {
 		t.Fatalf("認定可用的類別 %d 個，預期 %d 個（policy.Assessable，含 SEXUAL_CONTENT）", accepted, want)
 	}
-	if n := f.count(t, "SELECT count(*) FROM seller.violations"); n != accepted {
+	if n := f.count(t, "SELECT count(*) FROM seller.violations"); n != int64(accepted) {
 		t.Fatalf("寫入了 %d 筆認定，預期 %d 筆", n, accepted)
 	}
 }
