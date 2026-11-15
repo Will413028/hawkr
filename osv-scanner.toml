@@ -145,11 +145,6 @@ ignoreUntil = 2027-01-28
 reason = "基準：npm postcss@8.5.18（backend/workers/image-gateway 的 package-lock.json；CVSS 6.3，MEDIUM；修正版 8.5.23）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-g7r4-m6w7-qqqr"
-ignoreUntil = 2027-01-28
-reason = "基準：npm esbuild@0.28.0（CVSS 2.5，LOW）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-mrhx-c7xc-m3w5"
 ignoreUntil = 2026-11-29
 reason = "基準：npm zod@3.25.76, zod@4.4.3（CVSS 8.2，HIGH）；升級待核准"
