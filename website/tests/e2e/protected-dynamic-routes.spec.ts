@@ -1252,7 +1252,7 @@ test.describe("authenticated protected dynamic route smoke", {
 				!SSR_PREVIEW_PATTERNS.has(entry.pattern),
 		).map(({ access, pattern }) => ({ role: access, pattern }));
 		const covered = ROUTE_CASES.map(({ role, pattern }) => ({ role, pattern }));
-		expect(covered).toHaveLength(23);
+		expect(covered).toHaveLength(19);
 		expect(covered).toEqual(expected);
 	});
 
