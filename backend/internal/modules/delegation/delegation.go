@@ -58,8 +58,14 @@ type Deps struct {
 	Logger   *slog.Logger
 }
 
+// failureRecorder 寫 FAILED 的稽核列（*audit.Module）；單獨成介面，讓拒絕路徑的單元測試不需要資料庫。
+type failureRecorder interface {
+	RecordFailure(ctx context.Context, in model.FailureAuditInput) error
+}
+
 type Module struct {
 	seller        Seller
+	failures      failureRecorder
 	logger        *slog.Logger
 	authorization *authorization.Module
 	audit         *audit.Module
@@ -134,10 +140,11 @@ func New(d Deps) *Module {
 		DB: d.DB, Events: d.Events, Session: s, NewID: d.NewID, Now: d.Now,
 	})
 	return &Module{
-		session: s,
-		audit:   auditModule,
-		seller:  d.Seller,
-		logger:  d.Logger,
+		session:  s,
+		audit:    auditModule,
+		seller:   d.Seller,
+		failures: auditModule,
+		logger:   d.Logger,
 		authorization: authorization.New(authorization.Deps{
 			DB: d.DB, Identity: d.Identity, Session: s, StoreState: storeState, NewID: d.NewID, Now: d.Now,
 			CancelSchedulesOfStore: func(ctx context.Context, storeID int64) error {

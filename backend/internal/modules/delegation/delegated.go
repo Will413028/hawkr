@@ -162,7 +162,7 @@ func (m *Module) recordFailure(ctx context.Context, c DelegatedCaller, w Delegat
 	if requestID == "" {
 		requestID = uuid.New().String()
 	}
-	err := m.audit.RecordFailure(ctx, model.FailureAuditInput{
+	err := m.failures.RecordFailure(ctx, model.FailureAuditInput{
 		Session: c.Session, Capability: c.Method.Capability, Action: c.Method.Action, ResourceType: c.Method.Resource,
 		ResourceID: w.ResourceID, ResourceVersionBefore: w.Version, OperationReason: w.Op.Reason,
 		RequestID: requestID, CorrelationID: c.CorrelationID, UserAgent: c.UserAgent, Cause: cause,
