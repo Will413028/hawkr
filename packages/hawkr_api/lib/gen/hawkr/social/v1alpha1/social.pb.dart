@@ -122,6 +122,7 @@ class Post extends $pb.GeneratedMessage {
     $2.Timestamp? createTime,
     $core.String? imageStagedToken,
     $core.Iterable<$core.String>? hashtagInputs,
+    $core.bool? viewerLiked,
   }) {
     final result = Post._();
     if (id != null) result.id = id;
@@ -143,6 +144,7 @@ class Post extends $pb.GeneratedMessage {
     if (createTime != null) result.createTime = createTime;
     if (imageStagedToken != null) result.imageStagedToken = imageStagedToken;
     if (hashtagInputs != null) result.hashtagInputs.addAll(hashtagInputs);
+    if (viewerLiked != null) result.viewerLiked = viewerLiked;
     return result;
   }
 
@@ -186,6 +188,7 @@ class Post extends $pb.GeneratedMessage {
         subBuilder: $2.Timestamp.$_createMessage)
     ..aOS(18, _omitFieldNames ? '' : 'imageStagedToken')
     ..pPS(19, _omitFieldNames ? '' : 'hashtagInputs')
+    ..aOB(20, _omitFieldNames ? '' : 'viewerLiked')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -388,6 +391,16 @@ class Post extends $pb.GeneratedMessage {
   /// 標籤的輸入（使用者輸入的樣子，可帶開頭的 #）；列進 update_mask 是整批取代（空清單是清掉所有標籤），沒有列進去保留原本的標籤。
   @$pb.TagNumber(19)
   $pb.PbList<$core.String> get hashtagInputs => $_getList(18);
+
+  /// 觀看者是否讚過；訪客是 false。店主讀自己店的貼文（GetMyPost、ListMyPosts 與店主寫入的回應）時不是買家身分，一律 false。
+  @$pb.TagNumber(20)
+  $core.bool get viewerLiked => $_getBF(19);
+  @$pb.TagNumber(20)
+  set viewerLiked($core.bool value) => $_setBool(19, value);
+  @$pb.TagNumber(20)
+  $core.bool hasViewerLiked() => $_has(19);
+  @$pb.TagNumber(20)
+  void clearViewerLiked() => $_clearField(20);
 }
 
 /// Actor 是留言的作者，名稱與頭像在讀取時由 buyer、seller 補。

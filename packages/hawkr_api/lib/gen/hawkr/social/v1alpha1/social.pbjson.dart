@@ -231,6 +231,14 @@ const Post$json = {
       '8': {},
       '10': 'hashtagInputs'
     },
+    {
+      '1': 'viewer_liked',
+      '3': 20,
+      '4': 1,
+      '5': 8,
+      '8': {},
+      '10': 'viewerLiked'
+    },
   ],
   '8': [
     {'1': '_product_id'},
@@ -254,7 +262,8 @@ final $typed_data.Uint8List postDescriptor = $convert.base64Decode(
     'LlBvc3RTdGF0dXNCA+BBA1IGc3RhdHVzEhIKBGV0YWcYECABKAlSBGV0YWcSQAoLY3JlYXRlX3'
     'RpbWUYESABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCmNyZWF0ZVRpbWUS'
     'MQoSaW1hZ2Vfc3RhZ2VkX3Rva2VuGBIgASgJQgPgQQRSEGltYWdlU3RhZ2VkVG9rZW4SKgoOaG'
-    'FzaHRhZ19pbnB1dHMYEyADKAlCA+BBBFINaGFzaHRhZ0lucHV0c0INCgtfcHJvZHVjdF9pZA==');
+    'FzaHRhZ19pbnB1dHMYEyADKAlCA+BBBFINaGFzaHRhZ0lucHV0cxImCgx2aWV3ZXJfbGlrZWQY'
+    'FCABKAhCA+BBA1ILdmlld2VyTGlrZWRCDQoLX3Byb2R1Y3RfaWQ=');
 
 @$core.Deprecated('Use actorDescriptor instead')
 const Actor$json = {

@@ -49,6 +49,13 @@ type fakeReads struct {
 	repliesPost    uuid.UUID
 	repliesStore   int64
 	postReads      int
+	likedIDs       map[uuid.UUID]bool
+	likedAsked     [][]uuid.UUID
+}
+
+func (f *fakeReads) PostsLikedBy(_ context.Context, _ int64, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
+	f.likedAsked = append(f.likedAsked, ids)
+	return f.likedIDs, nil
 }
 
 func (f *fakeReads) ListHashtagPosts(_ context.Context, _ social.Caller, tag string, _ *social.PostCursor, _ int32) (social.PostPage, error) {
@@ -294,6 +301,37 @@ func TestGetPostViewerCanCommentFollowsStoreBlocks(t *testing.T) {
 				t.Errorf("訪客不該查封鎖：%v", stores.asked)
 			}
 		})
+	}
+}
+
+func TestPostViewerLikedFollowsTheBuyersLikes(t *testing.T) {
+	liked, other := post(5), post(5)
+	reads := &fakeReads{feed: social.PostPage{Posts: []social.Post{liked, other}}, post: liked, likedIDs: map[uuid.UUID]bool{liked.ID: true}}
+	h := newPublic(t, reads, fakeBuyers{id: 7}, &fakeStores{})
+	resp, err := h.GetPost(asBuyer(t.Context()), connect.NewRequest(&pb.GetPostRequest{PostId: liked.ID.String()}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resp.Msg.GetPost().GetViewerLiked() {
+		t.Errorf("買家讚過的貼文 viewer_liked = false")
+	}
+	list, err := h.ListPosts(asBuyer(t.Context()), connect.NewRequest(&pb.ListPostsRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := list.Msg.GetPosts(); !got[0].GetViewerLiked() || got[1].GetViewerLiked() {
+		t.Errorf("viewer_liked = %v %v，預期 true false", got[0].GetViewerLiked(), got[1].GetViewerLiked())
+	}
+	if len(reads.likedAsked) != 2 || len(reads.likedAsked[1]) != 2 {
+		t.Errorf("讚的查詢 = %v，預期每次請求一次、列表一次帶兩篇", reads.likedAsked)
+	}
+	before := len(reads.likedAsked)
+	guest, err := h.GetPost(t.Context(), connect.NewRequest(&pb.GetPostRequest{PostId: liked.ID.String()}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if guest.Msg.GetPost().GetViewerLiked() || len(reads.likedAsked) != before {
+		t.Errorf("訪客 viewer_liked = true 或查了讚")
 	}
 }
 

@@ -261,6 +261,8 @@ message Post {
   string image_staged_token = 18 [(google.api.field_behavior) = INPUT_ONLY];
   // 標籤的輸入（使用者輸入的樣子，可帶開頭的 #）；列進 update_mask 是整批取代（空清單是清掉所有標籤），沒有列進去保留原本的標籤。
   repeated string hashtag_inputs = 19 [(google.api.field_behavior) = INPUT_ONLY];
+  // 觀看者是否讚過；訪客是 false。店主讀自己店的貼文（GetMyPost、ListMyPosts 與店主寫入的回應）時不是買家身分，一律 false。
+  bool viewer_liked = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Actor 是留言的作者，名稱與頭像在讀取時由 buyer、seller 補。
