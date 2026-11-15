@@ -235,7 +235,7 @@ function ClarifyQuestionForm({
 	const submitCropOther = () => {
 		if (!canSubmitCropOther || !onSubmitCropOther) return;
 		onSubmitCropOther({
-			description: cropOtherDescription,
+			description: cropOtherDescription.trim(),
 		});
 		setShowCropOtherForm(false);
 		setCropOtherDescription("");
