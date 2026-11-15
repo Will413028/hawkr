@@ -28,7 +28,7 @@
 		"chart.js": "^4.4.1",
 		"clsx": "^2.1.1",
 		"fabric": "^7.4.0",
-		"framer-motion": "^12.29.2",
+		"framer-motion": "^14.3.0",
 		"konva": "^10.0.12",
 		"next": "catalog:",
 		"react": "catalog:",
