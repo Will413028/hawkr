@@ -72,11 +72,54 @@ class EvaluateTest(unittest.TestCase):
     def test_expired_ignore_fails(self):
         failed, _ = gate.evaluate(self.FINDINGS, {"GHSA-1": datetime.date(2026, 11, 14)}, self.TODAY)
         self.assertEqual(len(failed), 1)
-        self.assertIn("已過", failed[0])
+        self.assertEqual(failed[0][0], ("io.netty:netty-common", "4.1.1"))
+        self.assertIn("已過", failed[0][1])
+
+    def test_ignore_expires_on_its_date(self):
+        for until, expect_failed in ((self.TODAY, 1), (datetime.date(2026, 11, 16), 0)):
+            failed, _ = gate.evaluate(self.FINDINGS, {"GHSA-1": until}, self.TODAY)
+            self.assertEqual(len(failed), expect_failed, until)
+
+    def test_entry_without_ignore_until_never_expires(self):
+        ignores = gate.load_ignores('[[IgnoredVulns]]\nid = "GHSA-1"\nreason = "r"\n')
+        failed, allowed = gate.evaluate(self.FINDINGS, ignores, self.TODAY)
+        self.assertEqual(failed, [])
+        self.assertEqual(len(allowed), 1)
+
+    def test_toml_datetime_is_normalized_to_date(self):
+        toml = '[[IgnoredVulns]]\nid = "GHSA-1"\nignoreUntil = 2027-02-13T00:00:00Z\nreason = "r"\n'
+        self.assertEqual(gate.load_ignores(toml), {"GHSA-1": datetime.date(2027, 2, 13)})
 
     def test_load_ignores(self):
         toml = '[[IgnoredVulns]]\nid = "GHSA-1"\nignoreUntil = 2027-02-13\nreason = "r"\n'
         self.assertEqual(gate.load_ignores(toml), {"GHSA-1": datetime.date(2027, 2, 13)})
+
+
+class RetryTest(unittest.TestCase):
+    def test_retries_transient_then_succeeds(self):
+        import urllib.error
+        calls = []
+
+        def fn():
+            calls.append(1)
+            if len(calls) < 3:
+                raise urllib.error.HTTPError("u", 503, "x", {}, None)
+            return "ok"
+
+        self.assertEqual(gate._retry(fn, attempts=5, base_delay=0), "ok")
+        self.assertEqual(len(calls), 3)
+
+    def test_does_not_retry_client_errors(self):
+        import urllib.error
+        calls = []
+
+        def fn():
+            calls.append(1)
+            raise urllib.error.HTTPError("u", 404, "x", {}, None)
+
+        with self.assertRaises(urllib.error.HTTPError):
+            gate._retry(fn, attempts=5, base_delay=0)
+        self.assertEqual(len(calls), 1)
 
 
 if __name__ == "__main__":

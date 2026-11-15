@@ -8,7 +8,7 @@ osv-scanner（scan source --no-resolve）只看 pom.xml 與 lockfile 寫出的�
   - META-INF/maven/<group>/<artifact>/pom.properties，扣掉 jar 自己的那一筆 → 內含的 <group>:<artifact>
 
 再以 OSV querybatch（ecosystem Maven）查漏洞。漏洞 id（或其別名）在 osv-scanner.toml 的 IgnoredVulns 且
-ignoreUntil 未過 → 放行；其餘失敗；ignoreUntil 已過的視同未放行。
+ignoreUntil 未到期 → 放行（與 osv-scanner 相同：ignoreUntil 當天即視為過期；沒寫 ignoreUntil 的永不過期）；其餘失敗。
 
 用法：
   shaded-jar-gate.py --jars <放 jar 的目錄> [--config osv-scanner.toml] [--today YYYY-MM-DD]
@@ -21,7 +21,9 @@ import datetime
 import json
 import re
 import sys
+import time
 import tomllib
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -87,35 +89,78 @@ def scan_jar(path: Path) -> list[tuple[str, str, str]]:
     return bundled_in_jar(path.name, files)
 
 
+def _as_date(value) -> datetime.date:
+    if isinstance(value, datetime.datetime):
+        return value.date()
+    if isinstance(value, datetime.date):
+        return value
+    return datetime.date.fromisoformat(str(value)[:10])
+
+
 def load_ignores(toml_text: str) -> dict[str, datetime.date]:
+    """沒有 ignoreUntil 的項目不過期（同 osv-scanner）；TOML datetime 正規化成日期。"""
     data = tomllib.loads(toml_text)
-    return {e["id"]: e["ignoreUntil"] for e in data.get("IgnoredVulns", [])}
+    return {
+        e["id"]: _as_date(e["ignoreUntil"]) if "ignoreUntil" in e else datetime.date.max
+        for e in data.get("IgnoredVulns", [])
+    }
 
 
 def evaluate(findings: dict[tuple[str, str], list[dict]], ignores: dict[str, datetime.date], today: datetime.date):
-    """findings: {(座標, 版本): [{id, aliases}]}。回傳 (失敗行, 放行行)。"""
-    failed, allowed = [], []
-    for (coord, version), vulns in sorted(findings.items()):
+    """findings: {(座標, 版本): [{id, aliases}]}。回傳 (失敗 [((座標, 版本), 訊息)], 放行訊息)。
+    ignoreUntil 當天即過期（同 osv-scanner）。"""
+    failed: list[tuple[tuple[str, str], str]] = []
+    allowed: list[str] = []
+    for key, vulns in sorted(findings.items()):
+        coord, version = key
         for v in vulns:
             ids = [v["id"], *v.get("aliases", [])]
             hit = next((i for i in ids if i in ignores), None)
             if hit is None:
-                failed.append(f"{coord}@{version}: {v['id']} 不在 osv-scanner.toml 的 IgnoredVulns")
-            elif ignores[hit] < today:
-                failed.append(f"{coord}@{version}: {v['id']}（{hit}）的 ignoreUntil {ignores[hit]} 已過")
+                failed.append((key, f"{coord}@{version}: {v['id']} 不在 osv-scanner.toml 的 IgnoredVulns"))
+            elif ignores[hit] <= today:
+                failed.append((key, f"{coord}@{version}: {v['id']}（{hit}）的 ignoreUntil {ignores[hit]} 已過"))
             else:
-                allowed.append(f"{coord}@{version}: {v['id']} 已放行（{hit}，到 {ignores[hit]}）")
+                until = "不過期" if ignores[hit] == datetime.date.max else f"到 {ignores[hit]}"
+                allowed.append(f"{coord}@{version}: {v['id']} 已放行（{hit}，{until}）")
     return failed, allowed
 
 
+def _retry(fn, attempts: int = 5, base_delay: float = 2.0):
+    """暫時性錯誤（連線、逾時、5xx、429）以指數退避重試。"""
+    for n in range(attempts):
+        try:
+            return fn()
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 500, 502, 503, 504) or n == attempts - 1:
+                raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if n == attempts - 1:
+                raise
+        time.sleep(base_delay * 2**n)
+
+
 def _post(url: str, body: dict) -> dict:
-    req = urllib.request.Request(url, json.dumps(body).encode(), {"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return json.load(r)
+    def call():
+        req = urllib.request.Request(url, json.dumps(body).encode(), {"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return json.load(r)
+
+    return _retry(call)
 
 
-def query_osv(coords: list[tuple[str, str]]) -> dict[tuple[str, str], list[dict]]:
-    """querybatch 只回 id；有漏洞時再取一次別名。分頁以 next_page_token 追到底。"""
+def _get(url: str) -> dict:
+    def call():
+        with urllib.request.urlopen(url, timeout=60) as r:
+            return json.load(r)
+
+    return _retry(call)
+
+
+def query_osv(
+    coords: list[tuple[str, str]], ignores: dict[str, datetime.date]
+) -> dict[tuple[str, str], list[dict]]:
+    """querybatch 只回 id；id 不在 ignores 時才取別名。分頁以 next_page_token 追到底。"""
     result: dict[tuple[str, str], list[dict]] = {}
     for start in range(0, len(coords), 500):
         chunk = coords[start:start + 500]
@@ -133,8 +178,8 @@ def query_osv(coords: list[tuple[str, str]]) -> dict[tuple[str, str], list[dict]
             pending = nxt
     for vulns in result.values():
         for v in vulns:
-            with urllib.request.urlopen(OSV_VULN + v["id"], timeout=60) as r:
-                v["aliases"] = json.load(r).get("aliases", [])
+            if v["id"] not in ignores:
+                v["aliases"] = _get(OSV_VULN + v["id"]).get("aliases", [])
     return result
 
 
@@ -156,14 +201,13 @@ def main() -> int:
     print(f"掃了 {len(jars)} 個 jar，找到 {len(bundled)} 個內含的（座標，版本）")
     for (coord, version), sources in sorted(bundled.items()):
         print(f"  {coord}@{version}  <- {', '.join(sorted(sources))}")
-    findings = query_osv(sorted(bundled))
-    failed, allowed = evaluate(
-        findings, load_ignores(Path(args.config).read_text()), datetime.date.fromisoformat(args.today)
-    )
+    ignores = load_ignores(Path(args.config).read_text())
+    findings = query_osv(sorted(bundled), ignores)
+    failed, allowed = evaluate(findings, ignores, datetime.date.fromisoformat(args.today))
     for line in allowed:
         print("allow", line)
-    for line in failed:
-        print("::error::" + line + f"（來源：{', '.join(sorted(bundled[tuple(line.split(': ')[0].rsplit('@', 1))]))}）")
+    for key, message in failed:
+        print("::error::" + message + f"（來源：{', '.join(sorted(bundled[key]))}）")
     return 1 if failed else 0
 
 

@@ -123,8 +123,41 @@ jobs:
           "$RUNNER_TEMP/osv-scanner" scan source --recursive --no-resolve \
             --config osv-scanner.toml --format table .
 
+  shaded-changes:
+    name: 判斷要不要跑 shaded jar 檢查
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$BASE...$HEAD" -- \
+              'backend/services/java/pom.xml' 'backend/services/java/**/pom.xml' 'backend/services/java/.mvn/**' \
+              'osv-scanner.toml' 'scripts/shaded-jar-gate.py' 'scripts/test_shaded_jar_gate.py' \
+            | grep -q .; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
   shaded-jar-gate:
     name: shaded jar 內含函式庫（OSV）
+    needs: shaded-changes
+    if: needs.shaded-changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -194,7 +227,7 @@ jobs:
     # The only required check on main: it passes when every other job in this workflow succeeded or was skipped.
     name: gate (supply-chain)
     if: always()
-    needs: [go-changes, govulncheck, osv-scanner, shaded-jar-gate, gitleaks, zizmor]
+    needs: [go-changes, govulncheck, osv-scanner, shaded-changes, shaded-jar-gate, gitleaks, zizmor]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}

@@ -174,8 +174,6 @@ id = "GHSA-xhq7-xmqj-769h"
 ignoreUntil = 2027-01-28
 reason = "基準：npm fast-uri@3.1.8（CVSS 3.7，LOW）；升級待核准"
 
-# 下面三筆來自 scripts/shaded-jar-gate.py（CI 的 shaded-jar-gate job）：內含在別的 jar 裡、osv-scanner 看不到的函式庫（2026-11-15 首次掃描）。
-
 [[IgnoredVulns]]
 id = "GHSA-xxph-c9ww-hj94"
 ignoreUntil = 2026-12-15
