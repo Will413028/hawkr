@@ -131,7 +131,18 @@ async function deleteFromBlockMenu(
 	const toolbar = settings.closest<HTMLElement>(".ce-toolbar");
 	if (!toolbar) throw new Error("找不到區塊工具列");
 	const blocks = Array.from(dialog.querySelectorAll<HTMLElement>(".ce-block"));
-	await user.hover(block);
+	// 合成 mousemove：Editor.js 只聽 redactor 上冒泡的 mousemove，真實指標移動不保證觸發它。
+	const content =
+		block.querySelector<HTMLElement>(".ce-block__content") ?? block;
+	const rect = content.getBoundingClientRect();
+	const init = {
+		bubbles: true,
+		clientX: rect.left + rect.width / 2,
+		clientY: rect.top + rect.height / 2,
+	};
+	for (const type of ["mouseover", "mouseenter", "mousemove"]) {
+		content.dispatchEvent(new MouseEvent(type, init));
+	}
 	await waitFor(() => {
 		expect(toolbar.classList.contains("ce-toolbar--opened")).toBe(true);
 		expect(settings).toBeVisibleSync();
