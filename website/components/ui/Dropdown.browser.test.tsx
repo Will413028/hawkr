@@ -45,9 +45,20 @@ describe("Dropdown", () => {
 	it("selects the first item with Home and Enter and closes the menu", async () => {
 		const onChange = vi.fn();
 		renderWithIntl(<Controlled onChange={onChange} />, { frameMaxWidth: 420 });
+		await expect
+			.element(
+				page.getByRole("button", { name: "產地 請選擇產地", exact: true }),
+			)
+			.toBeInTheDocument();
 		await userEvent.click(trigger());
+		await expect
+			.element(page.getByRole("listbox", { name: "產地", exact: true }))
+			.toBeInTheDocument();
 		await expectNoAxeViolations("opened Dropdown");
 		await userEvent.keyboard("{Home}{Enter}");
+		await expect
+			.element(page.getByRole("button", { name: "產地 花蓮縣", exact: true }))
+			.toBeInTheDocument();
 		await expect
 			.poll(() => trigger().element().textContent)
 			.toContain("花蓮縣");

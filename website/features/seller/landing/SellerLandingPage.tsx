@@ -87,6 +87,9 @@ const FAQS = [
 	},
 ];
 
+const SELLER_CTA_HEADING_LINES = ["準備好了?", "一起", "Hawkr"] as const;
+const SELLER_CTA_HEADING_LABEL = SELLER_CTA_HEADING_LINES.join(" ");
+
 function CharSplit({ text }: { text: string }) {
 	return (
 		<>
@@ -386,12 +389,16 @@ export default function SellerLandingPage() {
 						<span>#加入 Hawkr</span>
 						<span>#一起開店</span>
 					</div>
-					<h2 className="seller-h" id="apply" aria-label="準備好了? 一起 Hawkr">
-						<CharSplit text="準備好了?" />
+					<h2
+						className="seller-h"
+						id="apply"
+						aria-label={SELLER_CTA_HEADING_LABEL}
+					>
+						<CharSplit text={SELLER_CTA_HEADING_LINES[0]} />
 						<br />
-						<CharSplit text="一起" />
+						<CharSplit text={SELLER_CTA_HEADING_LINES[1]} />
 						<em>
-							<CharSplit text="Hawkr" />
+							<CharSplit text={SELLER_CTA_HEADING_LINES[2]} />
 						</em>
 					</h2>
 					{/* 「攤商」與「我們」之間原本是 `——`，490f0a80 那次文案改寫把本頁的

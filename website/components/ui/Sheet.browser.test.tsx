@@ -39,7 +39,7 @@ describe("Sheet", () => {
 		["right", "right"],
 	] as const)(
 		"opens as a %s sheet and closes on Escape",
-		async (_name, side) => {
+		async (name, side) => {
 			const onClose = vi.fn();
 			renderWithIntl(<Example side={side} onClose={onClose} />);
 			await userEvent.click(
@@ -50,7 +50,7 @@ describe("Sheet", () => {
 					page.getByRole("dialog", { name: "商品匯入明細", exact: true }),
 				)
 				.toBeVisible();
-			await expectNoAxeViolations(`opened ${_name} Sheet`);
+			await expectNoAxeViolations(`opened ${name} Sheet`);
 			await userEvent.keyboard("{Escape}");
 			await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
 			expect(onClose).toHaveBeenCalledTimes(1);

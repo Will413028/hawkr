@@ -336,11 +336,10 @@ export default function HomeProcessCards() {
 				</div>
 
 				<Link
-					className="stage-cta absolute right-[7vw] bottom-[8vh] z-[6] flex items-center gap-[12px] no-underline bg-hk-brand-secondary text-[color:var(--color-brand-ink)] font-['Roboto',var(--font-body)] font-black text-[0.9375rem] tracking-[0.18em] px-[28px] py-[18px] rounded-[100px] shadow-[0_14px_30px_-10px_rgb(var(--color-brand-secondary-rgb)/0.56)] transition-[transform_0.3s_cubic-bezier(0.2,0.7,0.2,1),background_0.2s] hover:-translate-y-[2px] hover:bg-hk-home-gold-deep max-[640px]:relative max-[640px]:right-auto max-[640px]:bottom-auto max-[640px]:w-fit max-[640px]:mx-auto max-[640px]:mt-[24px] max-[640px]:[transform:none] max-[640px]:px-[22px] max-[640px]:py-[14px] max-[640px]:text-[0.8125rem] max-[640px]:hover:-translate-y-[2px]"
+					className="stage-cta absolute right-[7vw] bottom-[8vh] z-[6] flex items-center gap-[12px] no-underline font-['Roboto',var(--font-body)] font-black text-[0.9375rem] tracking-[0.18em] px-[28px] py-[18px] rounded-[100px] shadow-[0_14px_30px_-10px_rgb(var(--color-brand-secondary-rgb)/0.56)] transition-[transform_0.3s_cubic-bezier(0.2,0.7,0.2,1),background_0.2s] hover:-translate-y-[2px] max-[640px]:relative max-[640px]:right-auto max-[640px]:bottom-auto max-[640px]:w-fit max-[640px]:mx-auto max-[640px]:mt-[24px] max-[640px]:[transform:none] max-[640px]:px-[22px] max-[640px]:py-[14px] max-[640px]:text-[0.8125rem] max-[640px]:hover:-translate-y-[2px]"
 					href="/market/products"
 				>
-					開始選購{" "}
-					<span className="pip w-[8px] h-[8px] rounded-[100px] bg-white" />
+					開始選購 <span className="pip w-[8px] h-[8px] rounded-[100px]" />
 				</Link>
 			</div>
 		</section>

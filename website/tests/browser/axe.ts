@@ -1,9 +1,10 @@
 import axe from "axe-core";
 import { expect } from "vitest";
+import { formatAxeViolations } from "@/tests/shared/axe-format";
 
 /**
- * Runs axe's default rule set (same as the e2e helper in
- * `tests/e2e/helpers/axe.ts`) and fails on any violation, listing rule id
+ * Runs axe's default rule set (the e2e helper in `tests/e2e/helpers/axe.ts`
+ * runs the same set, minus the three page-level rules disabled below) and fails on any violation, listing rule id
  * and target for each. Component tests render one component without a page
  * around it, so the page-level rules `region`, `landmark-one-main` and
  * `page-has-heading-one` (jest-axe also disables `region`) are off; the e2e
@@ -21,15 +22,24 @@ export async function expectNoAxeViolations(
 	for (let frame = 0; frame < 2; frame++) {
 		await new Promise((resolve) => requestAnimationFrame(resolve));
 	}
-	await Promise.all(
+	const settled = Promise.all(
 		document
 			.getAnimations()
 			.filter(
 				(animation) =>
-					animation.effect?.getComputedTiming().iterations !== Infinity,
+					animation.effect?.getComputedTiming().iterations !== Infinity &&
+					(container instanceof Element
+						? container.contains(
+								(animation.effect as KeyframeEffect | null)?.target ?? null,
+							)
+						: true),
 			)
 			.map((animation) => animation.finished.catch(() => undefined)),
 	);
+	await Promise.race([
+		settled,
+		new Promise((resolve) => setTimeout(resolve, 2000)),
+	]);
 	const { violations } = await axe.run(container, {
 		rules: {
 			region: { enabled: false },
@@ -37,18 +47,6 @@ export async function expectNoAxeViolations(
 			"page-has-heading-one": { enabled: false },
 		},
 	});
-	const summary = violations.map((violation) => ({
-		rule: violation.id,
-		impact: violation.impact,
-		targets: violation.nodes.map((node) => {
-			const data = node.any[0]?.data as
-				| { fgColor?: string; bgColor?: string; contrastRatio?: number }
-				| undefined;
-			const target = node.target.join(" ");
-			return data?.contrastRatio === undefined
-				? target
-				: `${target} (${data.fgColor} on ${data.bgColor}, ${data.contrastRatio}:1)`;
-		}),
-	}));
+	const summary = formatAxeViolations(violations);
 	expect(summary, `${label} has axe violations`).toEqual([]);
 }
