@@ -69,5 +69,35 @@ class CommentState extends $pb.ProtobufEnum {
   const CommentState._(super.value, super.name);
 }
 
+/// PostStatus 是貼文的狀態：DRAFT → PUBLISHED → UNPUBLISHED → PUBLISHED。只有店主讀自己的貼文時看得到。
+class PostStatus extends $pb.ProtobufEnum {
+  static const PostStatus POST_STATUS_UNSPECIFIED =
+      PostStatus._(0, _omitEnumNames ? '' : 'POST_STATUS_UNSPECIFIED');
+
+  /// 草稿，還沒發布過。
+  static const PostStatus POST_STATUS_DRAFT =
+      PostStatus._(1, _omitEnumNames ? '' : 'POST_STATUS_DRAFT');
+  static const PostStatus POST_STATUS_PUBLISHED =
+      PostStatus._(2, _omitEnumNames ? '' : 'POST_STATUS_PUBLISHED');
+
+  /// 發布過，被店主下架。
+  static const PostStatus POST_STATUS_UNPUBLISHED =
+      PostStatus._(3, _omitEnumNames ? '' : 'POST_STATUS_UNPUBLISHED');
+
+  static const $core.List<PostStatus> values = <PostStatus>[
+    POST_STATUS_UNSPECIFIED,
+    POST_STATUS_DRAFT,
+    POST_STATUS_PUBLISHED,
+    POST_STATUS_UNPUBLISHED,
+  ];
+
+  static final $core.List<PostStatus?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static PostStatus? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const PostStatus._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

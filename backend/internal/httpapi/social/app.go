@@ -36,16 +36,21 @@ type Writes interface {
 type App struct {
 	*presenter
 	writes Writes
+	owner  Owner
 }
 
 var _ socialv1alpha1connect.SocialAppServiceHandler = (*App)(nil)
 
-// NewApp 建立登入者互動寫入的 handler；webOrigin 與 Public 共用，組回應裡貼文的單篇網址，不可是零值。
-func NewApp(writes Writes, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin) (*App, error) {
+// NewApp 建立登入者互動寫入與店主貼文管理的 handler；webOrigin 與 Public 共用，組回應裡貼文的單篇網址，不可是零值。
+// 能力宣告表（declarations）與 SocialAppService 的方法對不上時回錯誤，不能啟動。
+func NewApp(writes Writes, owner Owner, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin) (*App, error) {
 	if webOrigin.IsZero() {
 		return nil, fmt.Errorf("httpapi/social：貼文的單篇網址需要 WebOrigin")
 	}
-	return &App{presenter: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin}, writes: writes}, nil
+	if err := checkDeclarations(declarations, serviceDescriptor()); err != nil {
+		return nil, err
+	}
+	return &App{presenter: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin}, writes: writes, owner: owner}, nil
 }
 
 var (
