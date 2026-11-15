@@ -18,6 +18,13 @@ repos:
         entry: python3 scripts/check-commit-msg.py
         language: system
         stages: [commit-msg]
+      - id: conventional-commit-message-pre-push
+        name: Conventional Commits（要推的 commit）
+        entry: bash scripts/pre-push-commit-msg.sh
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
       # 只掃要推的範圍，離線且很快；沒裝 gitleaks 時只警告（CI 掃完整歷史）。
       - id: gitleaks-pre-push
         name: gitleaks（要推的 commit）
