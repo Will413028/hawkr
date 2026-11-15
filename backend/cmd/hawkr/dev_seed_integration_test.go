@@ -37,7 +37,7 @@ func setSellerEnv(t *testing.T) {
 func devSeedEnv(t *testing.T) *db.DB {
 	t.Helper()
 	ctx := context.Background()
-	url := pg.NewURL(t)
+	url := migratedURL(t)
 	t.Setenv("DATABASE_URL", url)
 	setSellerEnv(t)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -53,9 +53,6 @@ func devSeedEnv(t *testing.T) *db.DB {
 		t.Fatal(err)
 	}
 	t.Setenv("DEV_AUTH_KEY_FILE", path)
-	if err := run(ctx, []string{"migrate"}); err != nil {
-		t.Fatalf("migrate：%v", err)
-	}
 	d, err := db.Open(ctx, db.Config{URL: url, MaxConns: 4})
 	if err != nil {
 		t.Fatal(err)

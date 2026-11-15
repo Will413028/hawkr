@@ -26,6 +26,14 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
+// migratedURL 建一個套用好 migrate 子命令全部 migration 的 database（River 的表與 migrations() 的每個模組，
+// 順序同 runMigrate），從 template 複製，不必每支測試重跑 migration。migrate 子命令本身由
+// TestMigrateIsRepeatableAgainstARealDatabase 對空的 database 驗證。
+func migratedURL(t *testing.T) string {
+	t.Helper()
+	return pg.NewURL(t, testdb.Jobs(), testdb.Migrations(migrations()...))
+}
+
 func TestMigrateIsRepeatableAgainstARealDatabase(t *testing.T) {
 	t.Setenv("DATABASE_URL", pg.NewURL(t))
 
@@ -177,7 +185,7 @@ func TestWorkerRunsQueuedJobs(t *testing.T) {
 	}))
 	defer website.Close()
 
-	url := pg.NewURL(t)
+	url := migratedURL(t)
 	t.Setenv("DATABASE_URL", url)
 	t.Setenv("WEB_REVALIDATE_BASE_URL", website.URL)
 	t.Setenv("WEB_REVALIDATE_SECRET", "test")
@@ -190,9 +198,6 @@ func TestWorkerRunsQueuedJobs(t *testing.T) {
 	t.Setenv("PRODUCT_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("REVIEW_SERVICE_ADDR", "127.0.0.1:1")
 	ctx := context.Background()
-	if err := run(ctx, []string{"migrate"}); err != nil {
-		t.Fatal(err)
-	}
 
 	d, err := db.Open(ctx, db.Config{URL: url, ConnectRetryBudget: 5 * time.Second})
 	if err != nil {
