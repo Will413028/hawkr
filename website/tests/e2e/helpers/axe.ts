@@ -10,7 +10,10 @@ export async function expectNoAxeViolations(page: Page, label: string) {
 	const summary = violations.map((violation) => ({
 		rule: violation.id,
 		impact: violation.impact,
-		targets: violation.nodes.map((node) => node.target.join(" ")),
+		targets: violation.nodes.map(
+			(node) =>
+				`${node.target.join(" ")} :: ${node.html} :: ${node.failureSummary} :: ${JSON.stringify(node.any.concat(node.all, node.none).map((c) => c.data))}`,
+		),
 	}));
 	expect(summary, `${label} has axe violations`).toEqual([]);
 }
