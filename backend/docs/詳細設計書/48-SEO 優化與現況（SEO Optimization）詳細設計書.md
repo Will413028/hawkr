@@ -257,7 +257,7 @@ SEO 的把關點在 **CI**，不在 runtime：
 
 ### 9.1 SLO / SLI
 
-N/A——目前沒有自動化的 SEO 或 Core Web Vitals 門檻（SLO），SEO 把關只有 §6 的 Playwright 契約測試。
+N/A——目前沒有自動化的 SEO 或 Core Web Vitals 門檻（SLO），SEO 把關只有 §8.2 的 Playwright 契約測試。
 
 ### 9.2 容量與規模 (Capacity & Scaling)
 
@@ -309,5 +309,4 @@ N/A。
 | hreflang | 告知搜尋引擎同一內容的不同語言版本對應關係的 meta 標籤 |
 | Slug | URL 中語意化、可讀的識別字串（如 `/products/fresh-apple` 而非純數字 ID） |
 | ISR / `'use cache'` | Next.js 的快取重新驗證機制，本文件情境為 on-demand tag-based revalidate |
-| Lighthouse | Google 提供的網頁品質稽核工具，含 SEO 分類評分 |
 | Core Web Vitals | Google 定義的網頁使用者體驗核心指標（LCP/INP/CLS） |

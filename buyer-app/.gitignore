@@ -53,11 +53,8 @@ app.*.map.json
 dist/
 AGENTS.md
 
-# iOS build output
+# iOS build output and artifacts
 ios/build/
-
-
-# iOS build artifacts
 ios/Runner.ipa
 ios/Runner.app.dSYM.zip
 

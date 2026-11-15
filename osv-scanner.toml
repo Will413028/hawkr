@@ -67,7 +67,7 @@ reason = "基準：Go github.com/quic-go/quic-go@0.59.0（CVSS 5.3，MEDIUM）�
 [[IgnoredVulns]]
 id = "GO-2026-5932"
 ignoreUntil = 2026-11-29
-reason = "基準：Go golang.org/x/crypto@0.58.0（修正版 0.58.1 以上；無 CVSS 分數，UNSCORED）；升級待核准"
+reason = "基準：Go golang.org/x/crypto@0.58.0（修正版 v0.59.0，是第一個含修補的 tag；openpgp 路徑本身已被棄用；無 CVSS 分數，UNSCORED）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GO-2026-6860"
