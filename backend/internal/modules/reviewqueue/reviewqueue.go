@@ -37,7 +37,7 @@ type (
 	Cursor = model.Cursor
 )
 
-// 待辦的種類：seller 發布的 10 種與 payment 發布的 2 種（PaymentAccountCreateFailed、PaymentAccountPurgeStuck）。
+// 待辦的種類：seller 發布的 10 種、payment 發布的 2 種（PaymentAccountCreateFailed、PaymentAccountPurgeStuck）與 moderation 發布的 1 種（ModerationCase）。
 const (
 	ReportTriage               = model.ReportTriage
 	CaseDecision               = model.CaseDecision
@@ -51,6 +51,7 @@ const (
 	PaymentAccountCreateFailed = model.PaymentAccountCreateFailed
 	PaymentAccountPurgeStuck   = model.PaymentAccountPurgeStuck
 	SharedBankAccount          = model.SharedBankAccount
+	ModerationCase             = model.ModerationCase
 )
 
 // Kinds 回傳全部有效的種類（新的切片，呼叫端可以改）。

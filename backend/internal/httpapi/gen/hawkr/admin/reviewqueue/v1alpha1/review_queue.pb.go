@@ -57,6 +57,8 @@ const (
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT ReviewQueueItemKind = 11
 	// 收款帳戶的清理無法完成（金流商拒絕關閉，或等待清理超過 7 天仍關不掉），等管理員重試關閉或確認已在金流商處理後刪除對應（subject 是 payment_account）。
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_PURGE_STUCK ReviewQueueItemKind = 12
+	// 等待決定的社群檢舉案件（subject 是 moderation_case_id）。
+	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_MODERATION_CASE ReviewQueueItemKind = 13
 )
 
 // Enum value maps for ReviewQueueItemKind.
@@ -75,6 +77,7 @@ var (
 		10: "REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED",
 		11: "REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT",
 		12: "REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_PURGE_STUCK",
+		13: "REVIEW_QUEUE_ITEM_KIND_MODERATION_CASE",
 	}
 	ReviewQueueItemKind_value = map[string]int32{
 		"REVIEW_QUEUE_ITEM_KIND_UNSPECIFIED":                   0,
@@ -90,6 +93,7 @@ var (
 		"REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED": 10,
 		"REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT":           11,
 		"REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_PURGE_STUCK":   12,
+		"REVIEW_QUEUE_ITEM_KIND_MODERATION_CASE":               13,
 	}
 )
 
@@ -254,6 +258,7 @@ type ReviewQueueItem struct {
 	//	*ReviewQueueItem_KycApplication
 	//	*ReviewQueueItem_PaymentAccount
 	//	*ReviewQueueItem_SharedBankAccount
+	//	*ReviewQueueItem_ModerationCaseId
 	Subject isReviewQueueItem_Subject `protobuf_oneof:"subject"`
 	// 對象所屬的店家；空字串表示這個項目沒有單一店家（例如來函）。
 	StoreId string `protobuf:"bytes,12,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
@@ -399,6 +404,15 @@ func (x *ReviewQueueItem) GetSharedBankAccount() *SharedBankAccountRef {
 	return nil
 }
 
+func (x *ReviewQueueItem) GetModerationCaseId() string {
+	if x != nil {
+		if x, ok := x.Subject.(*ReviewQueueItem_ModerationCaseId); ok {
+			return x.ModerationCaseId
+		}
+	}
+	return ""
+}
+
 func (x *ReviewQueueItem) GetStoreId() string {
 	if x != nil {
 		return x.StoreId
@@ -464,6 +478,11 @@ type ReviewQueueItem_SharedBankAccount struct {
 	SharedBankAccount *SharedBankAccountRef `protobuf:"bytes,11,opt,name=shared_bank_account,json=sharedBankAccount,proto3,oneof"`
 }
 
+type ReviewQueueItem_ModerationCaseId struct {
+	// moderation 的案件 ID（與 case_id 不同：case_id 是 seller 的案件）。
+	ModerationCaseId string `protobuf:"bytes,15,opt,name=moderation_case_id,json=moderationCaseId,proto3,oneof"`
+}
+
 func (*ReviewQueueItem_ReportId) isReviewQueueItem_Subject() {}
 
 func (*ReviewQueueItem_CaseId) isReviewQueueItem_Subject() {}
@@ -483,6 +502,8 @@ func (*ReviewQueueItem_KycApplication) isReviewQueueItem_Subject() {}
 func (*ReviewQueueItem_PaymentAccount) isReviewQueueItem_Subject() {}
 
 func (*ReviewQueueItem_SharedBankAccount) isReviewQueueItem_Subject() {}
+
+func (*ReviewQueueItem_ModerationCaseId) isReviewQueueItem_Subject() {}
 
 // CaseInquiryRef 指到案件裡的一筆詢問。
 type CaseInquiryRef struct {
@@ -816,7 +837,7 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"\x05kinds\x18\x03 \x03(\x0e25.hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKindR\x05kinds\"\x8a\x01\n" +
 	"\x17ListReviewQueueResponse\x12G\n" +
 	"\x05items\x18\x01 \x03(\v21.hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemR\x05items\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xb7\a\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xe7\a\n" +
 	"\x0fReviewQueueItem\x12N\n" +
 	"\x04kind\x18\x01 \x01(\x0e25.hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKindB\x03\xe0A\x02R\x04kind\x12\x1d\n" +
 	"\treport_id\x18\x02 \x01(\tH\x00R\breportId\x12\x19\n" +
@@ -830,7 +851,8 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"\x0fkyc_application\x18\t \x01(\v23.hawkr.admin.reviewqueue.v1alpha1.KYCApplicationRefH\x00R\x0ekycApplication\x12^\n" +
 	"\x0fpayment_account\x18\n" +
 	" \x01(\v23.hawkr.admin.reviewqueue.v1alpha1.PaymentAccountRefH\x00R\x0epaymentAccount\x12h\n" +
-	"\x13shared_bank_account\x18\v \x01(\v26.hawkr.admin.reviewqueue.v1alpha1.SharedBankAccountRefH\x00R\x11sharedBankAccount\x12\x19\n" +
+	"\x13shared_bank_account\x18\v \x01(\v26.hawkr.admin.reviewqueue.v1alpha1.SharedBankAccountRefH\x00R\x11sharedBankAccount\x12.\n" +
+	"\x12moderation_case_id\x18\x0f \x01(\tH\x00R\x10moderationCaseId\x12\x19\n" +
 	"\bstore_id\x18\f \x01(\tR\astoreId\x12\x1d\n" +
 	"\n" +
 	"store_name\x18\r \x01(\tR\tstoreName\x12@\n" +
@@ -859,7 +881,7 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"account_id\x18\x02 \x01(\tR\taccountId\"U\n" +
 	"\x11KYCApplicationRef\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12%\n" +
-	"\x0eapplication_id\x18\x02 \x01(\tR\rapplicationId*\xf7\x04\n" +
+	"\x0eapplication_id\x18\x02 \x01(\tR\rapplicationId*\xa3\x05\n" +
 	"\x13ReviewQueueItemKind\x12&\n" +
 	"\"REVIEW_QUEUE_ITEM_KIND_UNSPECIFIED\x10\x00\x12(\n" +
 	"$REVIEW_QUEUE_ITEM_KIND_REPORT_TRIAGE\x10\x01\x12(\n" +
@@ -874,7 +896,8 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"4REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED\x10\n" +
 	"\x12.\n" +
 	"*REVIEW_QUEUE_ITEM_KIND_SHARED_BANK_ACCOUNT\x10\v\x126\n" +
-	"2REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_PURGE_STUCK\x10\f2\xa7\x01\n" +
+	"2REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_PURGE_STUCK\x10\f\x12*\n" +
+	"&REVIEW_QUEUE_ITEM_KIND_MODERATION_CASE\x10\r2\xa7\x01\n" +
 	"\x17ReviewQueueAdminService\x12\x8b\x01\n" +
 	"\x0fListReviewQueue\x128.hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueRequest\x1a9.hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueResponse\"\x03\x90\x02\x01B\xca\x02\n" +
 	"$com.hawkr.admin.reviewqueue.v1alpha1B\x10ReviewQueueProtoP\x01Zmgithub.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/reviewqueue/v1alpha1;reviewqueuev1alpha1\xa2\x02\x03HAR\xaa\x02 Hawkr.Admin.Reviewqueue.V1alpha1\xca\x02 Hawkr\\Admin\\Reviewqueue\\V1alpha1\xe2\x02,Hawkr\\Admin\\Reviewqueue\\V1alpha1\\GPBMetadata\xea\x02#Hawkr::Admin::Reviewqueue::V1alpha1b\x06proto3"
@@ -942,6 +965,7 @@ func file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_init() {
 		(*ReviewQueueItem_KycApplication)(nil),
 		(*ReviewQueueItem_PaymentAccount)(nil),
 		(*ReviewQueueItem_SharedBankAccount)(nil),
+		(*ReviewQueueItem_ModerationCaseId)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

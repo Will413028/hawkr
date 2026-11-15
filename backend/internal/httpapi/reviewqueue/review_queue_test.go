@@ -169,8 +169,8 @@ func TestKindsAreOneToOneWithTheContract(t *testing.T) {
 	if !slices.Equal(fromProto, all) {
 		t.Errorf("proto %v，模組 %v", fromProto, all)
 	}
-	if len(all) != 12 {
-		t.Errorf("種類 %d 個，預期 12 個", len(all))
+	if len(all) != 13 {
+		t.Errorf("種類 %d 個，預期 13 個", len(all))
 	}
 	// 權限表：逐種類寫死期望的來源讀取權限（E13），每個權限都在目錄裡。
 	wantPerm := map[rq.Kind]adminperm.Permission{
@@ -188,6 +188,8 @@ func TestKindsAreOneToOneWithTheContract(t *testing.T) {
 		rq.PaymentAccountPurgeStuck:   adminperm.PaymentAccountsGet,
 		// 共用銀行帳號提醒的來源是措施：看得到它的是措施的讀取權（處分頁的關聯帳號列）。
 		rq.SharedBankAccount: adminperm.SellerMeasuresList,
+		// 社群檢舉案件的來源是 moderation 的案件讀取權。
+		rq.ModerationCase: adminperm.ModerationCasesList,
 	}
 	for _, k := range rq.Kinds() {
 		perm, ok := kindPermissions[k]
@@ -412,7 +414,7 @@ func TestKindsAreIntersectedWithThePermissionsOfTheCaller(t *testing.T) {
 	}
 	// OWNER 是全部。
 	f.calls = nil
-	if _, err := list(t, newAdmin(f), asOwner, kinds()); err != nil || len(f.calls[0].kinds) != 12 {
+	if _, err := list(t, newAdmin(f), asOwner, kinds()); err != nil || len(f.calls[0].kinds) != 13 {
 		t.Errorf("OWNER：%v %v", err, f.calls)
 	}
 	// 呼叫者不是管理員、或沒有認證：interceptor 在 handler 之前擋下，不呼叫模組。
@@ -470,6 +472,7 @@ func TestToProtoBuildsTheSubjectOfEachKind(t *testing.T) {
 		{rq.Item{Kind: rq.SharedBankAccount, MeasureID: id(), AccountID: &acc}, func(p *adminpb.ReviewQueueItem) string {
 			return p.GetSharedBankAccount().GetMeasureId() + "/" + p.GetSharedBankAccount().GetAccountId()
 		}, "shared_bank_account"},
+		{rq.Item{Kind: rq.ModerationCase, CaseID: id()}, func(p *adminpb.ReviewQueueItem) string { return p.GetModerationCaseId() }, "moderation_case"},
 		{rq.Item{Kind: rq.PaymentAccountCreateFailed}, func(p *adminpb.ReviewQueueItem) string { return p.GetPaymentAccount().GetStoreId() }, "payment_account_create_failed"},
 		{rq.Item{Kind: rq.PaymentAccountPurgeStuck}, func(p *adminpb.ReviewQueueItem) string { return p.GetPaymentAccount().GetStoreId() }, "payment_account_purge_stuck"},
 	} {
@@ -510,7 +513,7 @@ func TestToProtoBuildsTheSubjectOfEachKind(t *testing.T) {
 		}
 		// 只設一支 subject：其他 oneof 的 getter 都是零值。
 		set := 0
-		for _, s := range []string{p.GetReportId(), p.GetCaseId(), p.GetAuthorityOrderId(), p.GetMeasureId()} {
+		for _, s := range []string{p.GetReportId(), p.GetCaseId(), p.GetAuthorityOrderId(), p.GetMeasureId(), p.GetModerationCaseId()} {
 			if s != "" {
 				set++
 			}
@@ -570,5 +573,38 @@ func TestPageTokenSurvivesAPermissionChangeMidwayThroughThePages(t *testing.T) {
 	allowed[adminperm.SellerKYCApplicationsList] = true // 權限變多了
 	if _, err := list(t, h, asOwner, &adminpb.ListReviewQueueRequest{PageSize: 2, PageToken: first.NextPageToken}); err != nil {
 		t.Errorf("權限改變之後 token 失效：%v", err)
+	}
+}
+
+// 社群檢舉案件的待辦只給有 moderation.cases.list 的管理員：沒有這個權限，空的 kinds 不展開到它，明確請求它也不傳給模組。
+// mutation：把 kindPermissions 的 rq.ModerationCase 改成別的權限，這裡失敗。
+func TestModerationCaseKindRequiresTheCasesListPermission(t *testing.T) {
+	enum := rpc.EnumToProto[adminpb.ReviewQueueItemKind](rq.ModerationCase)
+	for _, tt := range []struct {
+		name  string
+		allow adminperm.Permission
+		want  bool
+	}{
+		{"有 moderation.cases.list", adminperm.ModerationCasesList, true},
+		{"只有 moderation.cases.get", adminperm.ModerationCasesGet, false},
+		{"只有 seller 的案件讀取權", adminperm.SellerCasesList, false},
+	} {
+		f := &fakeLister{}
+		h := newAdmin(f)
+		h.allows = func(_ identity.Principal, p adminperm.Permission) bool { return p == tt.allow }
+		if _, err := list(t, h, asOwner, &adminpb.ListReviewQueueRequest{}); err != nil {
+			t.Fatal(err)
+		}
+		got := len(f.calls) == 1 && slices.Contains(f.calls[0].kinds, rq.ModerationCase)
+		if got != tt.want {
+			t.Errorf("%s：空的 kinds 是否含 MODERATION_CASE = %v，預期 %v", tt.name, got, tt.want)
+		}
+		f.calls = nil
+		if _, err := list(t, h, asOwner, &adminpb.ListReviewQueueRequest{Kinds: []adminpb.ReviewQueueItemKind{enum}}); err != nil {
+			t.Fatal(err)
+		}
+		if asked := len(f.calls) == 1; asked != tt.want {
+			t.Errorf("%s：明確請求後是否呼叫模組 = %v，預期 %v", tt.name, asked, tt.want)
+		}
 	}
 }

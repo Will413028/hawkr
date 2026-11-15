@@ -31,7 +31,7 @@ const (
 
 // kindPermissions 是種類 → 看這一種待辦所需的既有讀取權限（E13）：待辦只列呼叫者對來源有讀取權的種類。
 // 權限是來源的讀取權：通報、案件（待決定）、案件的詢問、來函（來函與告知被指名者）、措施（申覆、解除請求與複審）、
-// 商家認證各自頁面的 list 權限。
+// 商家認證、社群檢舉案件各自頁面的 list 權限。
 // 新種類沒有列在這裡，TestKindsAreOneToOneWithTheContract 失敗（它逐種類寫死期望的權限）。
 var kindPermissions = map[rq.Kind]adminperm.Permission{
 	rq.ReportTriage:               adminperm.SellerReportsList,
@@ -46,6 +46,7 @@ var kindPermissions = map[rq.Kind]adminperm.Permission{
 	rq.PaymentAccountCreateFailed: adminperm.PaymentAccountsGet,
 	rq.PaymentAccountPurgeStuck:   adminperm.PaymentAccountsGet,
 	rq.SharedBankAccount:          adminperm.SellerMeasuresList,
+	rq.ModerationCase:             adminperm.ModerationCasesList,
 }
 
 // Lister 是 handler 需要的模組方法（*reviewqueue.Module 實作它）。
@@ -263,6 +264,11 @@ func toProto(item rq.Item) (*adminpb.ReviewQueueItem, error) {
 		out.Subject = &adminpb.ReviewQueueItem_SharedBankAccount{SharedBankAccount: &adminpb.SharedBankAccountRef{
 			MeasureId: item.MeasureID.String(), AccountId: strconv.FormatInt(*item.AccountID, 10),
 		}}
+	case rq.ModerationCase:
+		if item.CaseID == nil {
+			return nil, missing("case_id")
+		}
+		out.Subject = &adminpb.ReviewQueueItem_ModerationCaseId{ModerationCaseId: item.CaseID.String()}
 	default:
 		return nil, fmt.Errorf("httpapi/reviewqueue：不認得的種類 %q", item.Kind)
 	}

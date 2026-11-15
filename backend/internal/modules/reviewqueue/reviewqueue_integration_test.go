@@ -15,6 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -30,7 +31,7 @@ func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 // setup 給這支測試一個套用了 seller migration 的 database（本模組沒有自己的 schema，讀 seller 發布的 pub_review_items，函式建在 seller 的表上）。
 func setup(t *testing.T) (*db.DB, *reviewqueue.Module) {
 	t.Helper()
-	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "seller", Dir: seller.Migrations()}, migrate.Module{Name: "payment", Dir: payment.Migrations()}))
+	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "seller", Dir: seller.Migrations()}, migrate.Module{Name: "payment", Dir: payment.Migrations()}, migrate.Module{Name: "moderation", Dir: moderation.Migrations()}))
 	return d, reviewqueue.New(reviewqueue.Deps{DB: d})
 }
 
@@ -299,7 +300,7 @@ func TestListRejectsInvalidInput(t *testing.T) {
 	}
 }
 
-// 模組認得的種類與來源一致：seller 的 10 支函式與 payment 的 pub_review_items 各自的 kind 字面值，集合等於模組的 Kinds（加來源的種類時沒有同步
+// 模組認得的種類與來源一致：seller 的 10 支函式、payment 與 moderation 的函式各自的 kind 字面值，集合等於模組的 Kinds（加來源的種類時沒有同步
 // model.Kinds，這裡失敗）。
 // 查詢以 kinds 篩選，所以來源多出模組不認得的種類時，那些列在執行期不會出現在結果裡、也不報錯，只有這個測試（測試期）看得到。
 func TestKindsMatchTheSource(t *testing.T) {
@@ -309,7 +310,7 @@ func TestKindsMatchTheSource(t *testing.T) {
 	fns := []string{
 		"seller.review_report_triage", "seller.review_case_decision", "seller.review_case_inquiry_overdue", "seller.review_authority_order",
 		"seller.review_authority_target_notice", "seller.review_measure_appeal", "seller.review_measure_lift_request", "seller.review_measure_review",
-		"seller.review_kyc_application", "seller.review_shared_bank_account", "payment.pub_review_items",
+		"seller.review_kyc_application", "seller.review_shared_bank_account", "payment.pub_review_items", "moderation.review_moderation_case",
 	}
 	var sourceKinds []string
 	// 每支函式的 kind 字面值：從函式定義裡讀（pg_get_functiondef 的第一個 SELECT 字面值）。
@@ -345,7 +346,7 @@ func TestKindsMatchTheSource(t *testing.T) {
 	}
 	slices.Sort(known)
 	if !slices.Equal(sourceKinds, known) {
-		t.Errorf("seller 的 10 支函式與 payment 的函式發布的 kind %v，模組認得的 %v", sourceKinds, known)
+		t.Errorf("seller、payment 與 moderation 的函式發布的 kind %v，模組認得的 %v", sourceKinds, known)
 	}
 }
 
@@ -371,7 +372,7 @@ func setupICU(t *testing.T) (*db.DB, *reviewqueue.Module) {
 	d, err := db.Open(ctx, db.Config{URL: u.String(), MaxConns: 5, ConnectRetryBudget: 10 * time.Second})
 	must(t, err)
 	t.Cleanup(d.Close)
-	must(t, migrate.Apply(ctx, d, []migrate.Module{{Name: "seller", Dir: seller.Migrations()}, {Name: "payment", Dir: payment.Migrations()}}))
+	must(t, migrate.Apply(ctx, d, []migrate.Module{{Name: "seller", Dir: seller.Migrations()}, {Name: "payment", Dir: payment.Migrations()}, {Name: "moderation", Dir: moderation.Migrations()}}))
 	return d, reviewqueue.New(reviewqueue.Deps{DB: d})
 }
 
@@ -459,5 +460,180 @@ func TestPaymentPurgeStuckItemsAreMergedIntoTheQueue(t *testing.T) {
 	if len(items) != 1 || items[0].Kind != reviewqueue.PaymentAccountPurgeStuck || items[0].ItemID != "43" || items[0].StoreID == nil || *items[0].StoreID != 43 ||
 		!items[0].Start.Equal(base) || !items[0].Due.Equal(base.Add(24*time.Hour)) {
 		t.Fatalf("items=%+v", items)
+	}
+}
+
+type modCase struct {
+	id       uuid.UUID
+	opened   time.Time
+	reports  int
+	target   string
+	decision string // 空字串是進行中
+}
+
+// seedCase 直接寫 moderation 的表：一個案件與它的檢舉（decision 空字串是進行中；NO_VIOLATION 與 VIOLATION 帶合法的結案欄位）。
+// contentID 為 nil 時是買家對象。
+func seedCase(t *testing.T, d *db.DB, c modCase, contentID *uuid.UUID, buyerID *int64) {
+	t.Helper()
+	ctx := context.Background()
+	switch c.decision {
+	case "":
+		_, err := d.Conn(ctx).Exec(ctx, `INSERT INTO moderation.cases (id, target_kind, content_id, buyer_id, opened_at) VALUES ($1, $2, $3, $4, $5)`,
+			c.id, c.target, contentID, buyerID, c.opened)
+		must(t, err)
+	case "VIOLATION":
+		_, err := d.Conn(ctx).Exec(ctx, `INSERT INTO moderation.cases (id, target_kind, content_id, buyer_id, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at)
+			VALUES ($1, $2, $3, $4, $5, 'VIOLATION', 'SPAM', 'WARN', 1, $5 + interval '1 hour')`, c.id, c.target, contentID, buyerID, c.opened)
+		must(t, err)
+	case "NO_VIOLATION":
+		_, err := d.Conn(ctx).Exec(ctx, `INSERT INTO moderation.cases (id, target_kind, content_id, buyer_id, opened_at, decision, decided_by_admin_id, closed_at)
+			VALUES ($1, $2, $3, $4, $5, 'NO_VIOLATION', 1, $5 + interval '1 hour')`, c.id, c.target, contentID, buyerID, c.opened)
+		must(t, err)
+	default:
+		t.Fatalf("不認得的決定 %q", c.decision)
+	}
+	for i := 0; i < c.reports; i++ {
+		_, err := d.Conn(ctx).Exec(ctx, `INSERT INTO moderation.reports (id, case_id, reporter_buyer_id, category, created_at) VALUES ($1, $2, $3, 'SPAM', $4)`,
+			uuid.NewV7(), c.id, reporterSeq.Add(1), c.opened.Add(time.Duration(i)*time.Minute))
+		must(t, err)
+	}
+}
+
+// moderationWorld 建每一種案件的領域狀態；回傳進行中的案件（應該在待辦裡的）與其他的。
+func moderationWorld(t *testing.T, d *db.DB) (open, other []modCase) {
+	t.Helper()
+	post, comment, entry, reused := uuid.NewV7(), uuid.NewV7(), uuid.NewV7(), uuid.NewV7()
+	buyerA, buyerB := int64(501), int64(502)
+	mk := func(opened time.Time, reports int, target, decision string) modCase {
+		return modCase{id: uuid.NewV7(), opened: opened, reports: reports, target: target, decision: decision}
+	}
+	openOne := mk(base.Add(1*time.Hour), 1, "POST", "")
+	openMany := mk(base.Add(2*time.Hour), 4, "COMMENT", "")
+	closedViolation := mk(base.Add(3*time.Hour), 2, "FORUM_ENTRY", "VIOLATION")
+	closedNo := mk(base.Add(4*time.Hour), 1, "COMMENT", "NO_VIOLATION")
+	reopened := mk(base.Add(30*time.Hour), 2, "FORUM_ENTRY", "")
+	buyerOpen := mk(base.Add(5*time.Hour), 3, "BUYER", "")
+	buyerClosed := mk(base.Add(6*time.Hour), 1, "BUYER", "NO_VIOLATION")
+	buyerReopened := mk(base.Add(40*time.Hour), 1, "BUYER", "")
+	seedCase(t, d, openOne, &post, nil)
+	seedCase(t, d, openMany, &comment, nil)
+	seedCase(t, d, closedViolation, &entry, nil)
+	seedCase(t, d, closedNo, &reused, nil)
+	seedCase(t, d, reopened, &entry, nil)
+	seedCase(t, d, buyerOpen, nil, &buyerA)
+	seedCase(t, d, buyerClosed, nil, &buyerB)
+	seedCase(t, d, buyerReopened, nil, &buyerB)
+	return []modCase{openOne, openMany, reopened, buyerOpen, buyerReopened}, []modCase{closedViolation, closedNo, buyerClosed}
+}
+
+// 每種領域狀態進不進待辦，等於 moderation 的判定式（案件的 decision IS NULL）：進行中的（一筆或多筆檢舉、結案後同對象重開的新案件、買家對象）都在，
+// 結案的（VIOLATION、NO_VIOLATION、買家的結案）都不在；期限是開案後 72 小時、開始是期限前 24 小時，kind 是 MODERATION_CASE，item_id 與 CaseID 是案件 ID，沒有店家。
+// mutation：moderation.review_moderation_case 漏掉一種進行中的狀態（例如 WHERE 加 AND target_kind <> 'BUYER'）→ 進行中的買家案件不在待辦，這裡失敗。
+func TestModerationCasesAreInTheQueueExactlyWhenOpen(t *testing.T) {
+	t.Parallel()
+	d, m := setup(t)
+	ctx := context.Background()
+	open, other := moderationWorld(t, d)
+	now := base.Add(100 * time.Hour)
+	items, err := m.List(ctx, now, []reviewqueue.Kind{reviewqueue.ModerationCase}, nil, 100)
+	must(t, err)
+	got := map[string]reviewqueue.Item{}
+	for _, it := range items {
+		got[it.ItemID] = it
+	}
+	if len(got) != len(items) || len(items) != len(open) {
+		t.Fatalf("待辦 %d 件，預期進行中的 %d 件：%+v", len(items), len(open), items)
+	}
+	for _, c := range open {
+		it, ok := got[c.id.String()]
+		if !ok {
+			t.Errorf("進行中的案件 %s（%s、%d 筆檢舉）不在待辦", c.id, c.target, c.reports)
+			continue
+		}
+		due := c.opened.Add(72 * time.Hour)
+		if it.Kind != reviewqueue.ModerationCase || it.CaseID == nil || *it.CaseID != c.id || it.StoreID != nil || it.StoreName != "" ||
+			!it.Due.Equal(due) || !it.Start.Equal(due.Add(-24*time.Hour)) {
+			t.Errorf("案件 %s 的列 %+v，預期期限 %v、開始 %v", c.id, it, due, due.Add(-24*time.Hour))
+		}
+	}
+	for _, c := range other {
+		if _, ok := got[c.id.String()]; ok {
+			t.Errorf("結案的案件 %s（%s）在待辦裡", c.id, c.decision)
+		}
+	}
+	for i := 1; i < len(items); i++ {
+		if items[i-1].Due.After(items[i].Due) {
+			t.Errorf("沒有依期限排序：%v", ident(items))
+		}
+	}
+}
+
+// 期限與時間無關：at 只是呼叫方傳入的時間，不是 now()；案件已逾期（at 在期限之後）仍在待辦，at 早於開案也一樣在。
+func TestModerationCaseDeadlineDoesNotDependOnAt(t *testing.T) {
+	t.Parallel()
+	d, m := setup(t)
+	ctx := context.Background()
+	open, _ := moderationWorld(t, d)
+	for _, at := range []time.Time{base.Add(-time.Hour), base.Add(3 * time.Hour), base.Add(1000 * time.Hour)} {
+		items, err := m.List(ctx, at, []reviewqueue.Kind{reviewqueue.ModerationCase}, nil, 100)
+		must(t, err)
+		if len(items) != len(open) {
+			t.Errorf("at=%v：待辦 %d 件，預期 %d", at, len(items), len(open))
+		}
+	}
+}
+
+// 跨種類的 keyset：seller 的通報、payment 的收款帳戶與 moderation 的案件交錯，其中有期限與開始時間都相同的列；每頁 1、2、3、5 筆讀完，
+// 序列等於三個來源的全部列依 (期限, 開始, 種類, ID) 的位元組順序排好的序列，沒有漏、沒有重複，也沒有多出別的列。
+// mutation：items.sql 拿掉 moderation 的 UNION ALL 分支，序列少了案件，這裡失敗。
+func TestCrossSourceKeysetPagingWithModeration(t *testing.T) {
+	t.Parallel()
+	d, m := setup(t)
+	ctx := context.Background()
+	store := seedStore(t, d, 1, "範例小農")
+	open, _ := moderationWorld(t, d)
+	// 案件 openOne 的期限是 base+73h、開始是 base+49h：食安通報（base+69h 建立，4 小時）與 payment 帳戶（base+49h 失敗）各自與它同期限，
+	// 其中帳戶連開始時間都相同，只剩種類與 ID 分序。
+	seedReport(t, d, store, "SPAM", base.Add(1*time.Hour))
+	seedReport(t, d, store, "SPAM", base.Add(2*time.Hour))
+	seedReport(t, d, store, "FOOD_SAFETY", base.Add(69*time.Hour))
+	for i, at := range []time.Time{base.Add(49 * time.Hour), base.Add(50 * time.Hour)} {
+		_, err := d.Conn(ctx).Exec(ctx, `INSERT INTO payment.accounts (store_id, provider, requirement_collection, create_failed_at, created_at, updated_at)
+			VALUES ($1, 'fake', 'PROVIDER', $2, $2, $2)`, int64(900+i), at)
+		must(t, err)
+	}
+	now := base.Add(200 * time.Hour)
+	var want []reviewqueue.Item
+	want = append(want, reference(t, d, now)...)
+	rows, err := d.Conn(ctx).Query(ctx, `SELECT kind, item_id, start_at, due_at FROM payment.pub_review_items($1::timestamptz) UNION ALL SELECT kind, item_id, start_at, due_at FROM moderation.pub_review_items($1::timestamptz)`, now)
+	must(t, err)
+	for rows.Next() {
+		var kind, id string
+		var it reviewqueue.Item
+		must(t, rows.Scan(&kind, &id, &it.Start, &it.Due))
+		it.Kind, it.ItemID = reviewqueue.Kind(kind), id
+		want = append(want, it)
+	}
+	must(t, rows.Err())
+	rows.Close()
+	slices.SortFunc(want, func(a, b reviewqueue.Item) int {
+		return cmpAll(a.Due.Compare(b.Due), a.Start.Compare(b.Start), strings.Compare(string(a.Kind), string(b.Kind)), strings.Compare(a.ItemID, b.ItemID))
+	})
+	if len(want) != 3+2+len(open) {
+		t.Fatalf("參考序列 %d 列，預期 %d：%v", len(want), 3+2+len(open), ident(want))
+	}
+	for _, size := range []int32{1, 2, 3, 5} {
+		got, _ := pageAll(t, m, now, reviewqueue.Kinds(), size)
+		if !slices.Equal(ident(got), ident(want)) {
+			t.Errorf("每頁 %d 筆：\n得到 %v\n預期 %v", size, ident(got), ident(want))
+		}
+		seen := map[string]bool{}
+		for _, it := range got {
+			k := string(it.Kind) + "/" + it.ItemID
+			if seen[k] {
+				t.Errorf("每頁 %d 筆：%s 重複", size, k)
+			}
+			seen[k] = true
+		}
 	}
 }

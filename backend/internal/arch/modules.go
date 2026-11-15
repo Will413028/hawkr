@@ -36,7 +36,7 @@ var Dependencies = map[string][]string{
 	"accountdeletion":   {"identity", "buyer", "seller"},                                  // 刪除帳號的流程管理者。
 	"accountsuspension": {"identity", "seller"},                                           // 停權與解除的唯一入口：鎖帳號、確認沒有店家、再呼叫 identity。
 	"moderation":        {"social", "seller", "buyer", "accountsuspension", "media"},      // 社群檢舉與處置：案件、檢舉、內容快照；處分經各擁有者模組建立；快照引用的圖片在 media 登記引用（證據保全）。
-	"reviewqueue":       {"seller", "payment"},                                            // 後台待辦：讀各來源發布的 pub_*_review_items 排序分頁。
+	"reviewqueue":       {"seller", "payment", "moderation"},                              // 後台待辦：讀各來源發布的 pub_*_review_items 排序分頁。
 	"agent":             {"ordering", "catalog", "buyer", "seller", "media"},
 	"notification": {
 		"identity", "buyer", "seller", "catalog", "ordering", "fulfillment", "payment", "invoice",
