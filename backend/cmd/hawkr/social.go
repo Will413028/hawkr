@@ -46,6 +46,16 @@ func (noStoreBlocks) StoreBlocksBuyer(context.Context, int64, int64) (bool, erro
 	return false, errors.New("此組裝不做買家身分的寫入，沒有店家封鎖的來源")
 }
 
+// scheduleAuthorizers 是 social 的排程授權實作，依發起者種類登記（缺一種 social.New 就 panic）。代行（DELEGATION）的實作由 delegation 提供，
+// 在它接上之前這裡以「一律拒絕」頂著：到點的代行排程轉 CANCELED（AUTHORITY_LOST），不會發布，也沒有任何呼叫方能建立代行排程。
+func scheduleAuthorizers() map[social.ScheduleKind]social.ScheduleAuthorizer {
+	return map[social.ScheduleKind]social.ScheduleAuthorizer{
+		social.ScheduleByDelegation: social.ScheduleAuthorizerFunc(func(context.Context, social.ScheduledPublish) error {
+			return social.ErrScheduleDenied
+		}),
+	}
+}
+
 // socialSellers 是 social 對 seller 的兩個依賴：讀店家與店家封鎖檢查；正式組裝傳 *seller.Module。
 type socialSellers interface {
 	social.Stores
@@ -57,7 +67,8 @@ type socialSellers interface {
 func newSocial(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, buyers *buyer.Module, sellers socialSellers, med media.Media, products socialProducts, log *slog.Logger) *social.Module {
 	m := social.New(social.Deps{
 		DB: d, Events: bus, Media: med, Jobs: jc, Buyers: buyers, Stores: sellers, StoreBlocks: sellers, Products: products,
-		NewID: uuid.NewV7, Now: time.Now, Logger: log,
+		ScheduleAuthorizers: scheduleAuthorizers(),
+		NewID:               uuid.NewV7, Now: time.Now, Logger: log,
 	})
 	subscribeSocial(bus, m)
 	return m
@@ -86,7 +97,7 @@ func runSocialRecount(ctx context.Context, out io.Writer) error {
 		return err
 	}
 	defer d.Close()
-	m := social.New(social.Deps{DB: d, StoreBlocks: noStoreBlocks{}, NewID: uuid.NewV7, Now: time.Now, Logger: newLogger()})
+	m := social.New(social.Deps{DB: d, StoreBlocks: noStoreBlocks{}, ScheduleAuthorizers: scheduleAuthorizers(), NewID: uuid.NewV7, Now: time.Now, Logger: newLogger()})
 	rep, err := m.RecountAll(ctx)
 	if err != nil {
 		return err

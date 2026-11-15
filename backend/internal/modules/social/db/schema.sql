@@ -52,6 +52,39 @@ COMMENT ON COLUMN social.posts.status IS '貼文狀態：DRAFT、PUBLISHED、UNP
 COMMENT ON COLUMN social.posts.published_at IS '第一次發布的時間，之後不變（下架不清、再發布沿用）；DRAFT 沒有，發布過的一定有';
 COMMENT ON COLUMN social.posts.version IS '樂觀鎖的版本，對外是 etag；每次修改加一';
 
+-- 貼文的排程發布：一次排程一列，永不重用；唯一的真相是這張表，River job 只帶 id、是到點的觸發器（A7-D22）。state 是 PENDING → PUBLISHED 或 CANCELED，
+-- 取消原因凍結在列上（cancel_reason 只在 CANCELED 有值，resolved_at 在離開 PENDING 時寫）：貼文的狀態之後會變，事後反查會得到錯的答案。
+-- scheduled_by_kind 是排程的發起者種類（OWNER 店主、DELEGATION 代行），scheduled_by_ref 是發起者擁有格式的不透明字串（DELEGATION 放 session ID）。
+-- 同一篇貼文同時最多一個 PENDING（重排時舊的先轉 REPLACED）。鎖順序：貼文列 → 排程列。
+CREATE TABLE social.post_schedules (
+    id                UUID        PRIMARY KEY,
+    post_id           UUID        NOT NULL REFERENCES social.posts (id),
+    store_id          BIGINT      NOT NULL,
+    publish_at        TIMESTAMPTZ NOT NULL,
+    scheduled_by_kind TEXT        NOT NULL,
+    scheduled_by_ref  TEXT        NOT NULL,
+    state             TEXT        NOT NULL,
+    cancel_reason     TEXT,
+    created_at        TIMESTAMPTZ NOT NULL,
+    resolved_at       TIMESTAMPTZ,
+    CONSTRAINT post_schedules_store_check CHECK (store_id > 0),
+    CONSTRAINT post_schedules_by_kind_check CHECK (scheduled_by_kind IN ('OWNER', 'DELEGATION')),
+    CONSTRAINT post_schedules_by_ref_check CHECK (char_length(scheduled_by_ref) >= 1 AND char_length(scheduled_by_ref) <= 200 AND scheduled_by_ref !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
+    CONSTRAINT post_schedules_state_check CHECK (state IN ('PENDING', 'PUBLISHED', 'CANCELED')),
+    CONSTRAINT post_schedules_reason_check CHECK (cancel_reason IN ('AUTHORITY_LOST', 'DELETED', 'TAKEN_DOWN', 'REPLACED', 'OWNER_CANCELED')),
+    CONSTRAINT post_schedules_reason_state_check CHECK ((state = 'CANCELED') = (cancel_reason IS NOT NULL)),
+    CONSTRAINT post_schedules_resolved_check CHECK ((state = 'PENDING') = (resolved_at IS NULL))
+);
+-- 一篇貼文同時最多一個待發布的排程。
+CREATE UNIQUE INDEX post_schedules_post_pending ON social.post_schedules (post_id) WHERE state = 'PENDING';
+-- 取消某個發起者（例如某個代行 session）的待發布排程。
+CREATE INDEX post_schedules_by_pending ON social.post_schedules (scheduled_by_kind, scheduled_by_ref) WHERE state = 'PENDING';
+-- 取消與列出某家店的待發布排程。
+CREATE INDEX post_schedules_store_pending ON social.post_schedules (store_id) WHERE state = 'PENDING';
+
+COMMENT ON COLUMN social.post_schedules.scheduled_by_ref IS '發起者擁有格式的不透明字串；DELEGATION 放代行 session 的 ID，OWNER 放店家帳號 ID 的十進位字串';
+COMMENT ON COLUMN social.post_schedules.cancel_reason IS '取消原因，凍結在列上：AUTHORITY_LOST 到點時授權已失效、DELETED 貼文被刪、TAKEN_DOWN 貼文被下架措施、REPLACED 被立即發布或新排程取代、OWNER_CANCELED 店主取消';
+
 -- 貼文的留言：兩層（回覆的父一律是頂層，由寫入端保證，DB 保證同篇與 reply_to 在同一串）。actor_kind、actor_id 是互動者 (kind, id)，由伺服器依資源歸屬推導
 -- （ADR 2026-10-17-social-actor-identity）：BUYER 的 actor_id 是 buyer_id，STORE 的是 store_id。不存作者名稱與頭像快照，讀取時由
 -- buyer、seller 批次補。同篇靠 UNIQUE (post_id, id) 與複合 FK：parent_id 指到別篇的留言時 DB 就拒絕；reply_to 在同一串靠產生欄位

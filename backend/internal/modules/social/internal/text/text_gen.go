@@ -234,6 +234,32 @@ func PostPublishImageRequired(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "發布的貼文需要 1 張照片", Locale: uitext.ZhTW}
 }
 
+// PostScheduleEtagRequired 是模組句子 post.schedule_etag_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostScheduleEtagRequired(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "排程發布必須帶讀取時的版本（etag）", Locale: uitext.ZhTW}
+}
+
+// PostScheduleNotFound 是模組句子 post.schedule_not_found；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostScheduleNotFound(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "這篇貼文沒有待發布的排程", Locale: uitext.ZhTW}
+}
+
+// PostScheduleStatusInvalid 是模組句子 post.schedule_status_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostScheduleStatusInvalid(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "已發布的貼文不能排程", Locale: uitext.ZhTW}
+}
+
+// PostScheduleTimeOutOfRangeArgs 是 PostScheduleTimeOutOfRange 的參數。
+type PostScheduleTimeOutOfRangeArgs struct {
+	Days    int
+	Minutes int
+}
+
+// PostScheduleTimeOutOfRange 是模組句子 post.schedule_time_out_of_range；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostScheduleTimeOutOfRange(l uitext.Locale, a PostScheduleTimeOutOfRangeArgs) uitext.Message {
+	return uitext.Message{Text: "排程的發布時間要在 " + strconv.Itoa(a.Minutes) + " 分鐘到 " + strconv.Itoa(a.Days) + " 天之後之間", Locale: uitext.ZhTW}
+}
+
 // PostStatusInvalid 是模組句子 post.status_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func PostStatusInvalid(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "貼文狀態不合法", Locale: uitext.ZhTW}

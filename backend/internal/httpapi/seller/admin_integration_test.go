@@ -157,6 +157,7 @@ func setupAdmin(t *testing.T) *adminFixture {
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: m, Orders: orders, Now: time.Now, Logger: log})
 	socialModule := social.New(social.Deps{
 		DB: d, Events: bus, Media: mediaFake, Jobs: queue, Buyers: buyers, Stores: m, StoreBlocks: m, NewID: uuid.NewV7, Now: f.now, Logger: log,
+		ScheduleAuthorizers: map[social.ScheduleKind]social.ScheduleAuthorizer{social.ScheduleByDelegation: social.ScheduleAuthorizerFunc(func(context.Context, social.ScheduledPublish) error { return social.ErrScheduleDenied })},
 	})
 	events.Subscribe(bus, socialModule.OnMeasureCreated)
 	events.Subscribe(bus, socialModule.OnMeasureRevoked)

@@ -21,6 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/post"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -37,22 +38,41 @@ func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 type queue struct {
 	mu   sync.Mutex
 	args []river.JobArgs
+	opts []*river.InsertOpts
 }
 
-func (q *queue) Enqueue(ctx context.Context, args river.JobArgs, _ *river.InsertOpts) error {
+func (q *queue) Enqueue(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) error {
 	if _, ok := db.TxFrom(ctx); !ok {
 		return errors.New("enqueue outside transaction")
 	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.args = append(q.args, args)
+	q.opts = append(q.opts, opts)
 	return nil
 }
 
 func (q *queue) reset() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	q.args = nil
+	q.args, q.opts = nil, nil
+}
+
+// scheduledJobs 回傳目前排入的排程發布 job（schedule_id 與到點時間 ScheduledAt）。
+func (q *queue) scheduledJobs() map[uuid.UUID]time.Time {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	out := map[uuid.UUID]time.Time{}
+	for i, a := range q.args {
+		if j, ok := a.(post.PublishScheduledArgs); ok {
+			var at time.Time
+			if q.opts[i] != nil {
+				at = q.opts[i].ScheduledAt
+			}
+			out[j.ScheduleID] = at
+		}
+	}
+	return out
 }
 
 // revalidations 回傳目前排入的失效 job 的 tag 清單。
@@ -100,6 +120,51 @@ func (p *products) VerifyProduct(_ context.Context, productID, storeID int64) er
 	return nil
 }
 
+// scheduleAuth 是代行（DELEGATION）的排程授權在測試裡的替身：記下被問的事實，回傳測試設定的結果（預設允許）。
+type scheduleAuth struct {
+	mu    sync.Mutex
+	err   error
+	calls []social.ScheduledPublish
+}
+
+func (a *scheduleAuth) AuthorizeScheduledPublish(_ context.Context, p social.ScheduledPublish) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.calls = append(a.calls, p)
+	return a.err
+}
+
+func (a *scheduleAuth) set(err error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.err = err
+}
+
+func (a *scheduleAuth) asked() []social.ScheduledPublish {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return append([]social.ScheduledPublish(nil), a.calls...)
+}
+
+// eventLog 記下 social 發的排程相關事件。
+type eventLog struct {
+	mu        sync.Mutex
+	published []social.PostPublished
+	canceled  []social.PostScheduleCanceled
+}
+
+func (e *eventLog) publishedEvents() []social.PostPublished {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return append([]social.PostPublished(nil), e.published...)
+}
+
+func (e *eventLog) canceledEvents() []social.PostScheduleCanceled {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return append([]social.PostScheduleCanceled(nil), e.canceled...)
+}
+
 type fixture struct {
 	db       *db.DB
 	module   *social.Module
@@ -109,6 +174,8 @@ type fixture struct {
 	jobs     *queue
 	media    *media.Fake
 	products *products
+	deleg    *scheduleAuth
+	events   *eventLog
 
 	mu   sync.Mutex
 	now  time.Time
@@ -155,8 +222,8 @@ func setup(t *testing.T) *fixture {
 	))
 	f := &fixture{
 		db: database, bus: events.NewBus(), jobs: &queue{}, media: media.NewFake(),
-		products: &products{owner: map[int64]int64{}},
-		now:      time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC),
+		products: &products{owner: map[int64]int64{}}, deleg: &scheduleAuth{}, events: &eventLog{},
+		now: time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC),
 	}
 	f.media.Key = func(_, token string) string { return "post/" + token + ".jpg" }
 	logger := slog.New(slog.NewTextHandler(&f.logs, nil))
@@ -164,7 +231,20 @@ func setup(t *testing.T) *fixture {
 	f.sellers = seller.NewReader(database, f.clock)
 	f.module = social.New(social.Deps{
 		DB: database, Events: f.bus, Media: f.media, Jobs: f.jobs, Buyers: f.buyers, Stores: f.sellers, StoreBlocks: storeBlocksFromTable{database}, Products: f.products,
-		NewID: uuid.NewV7, Now: f.clock, Logger: logger,
+		ScheduleAuthorizers: map[social.ScheduleKind]social.ScheduleAuthorizer{social.ScheduleByDelegation: f.deleg},
+		NewID:               uuid.NewV7, Now: f.clock, Logger: logger,
+	})
+	events.Subscribe(f.bus, func(_ context.Context, e social.PostPublished) error {
+		f.events.mu.Lock()
+		defer f.events.mu.Unlock()
+		f.events.published = append(f.events.published, e)
+		return nil
+	})
+	events.Subscribe(f.bus, func(_ context.Context, e social.PostScheduleCanceled) error {
+		f.events.mu.Lock()
+		defer f.events.mu.Unlock()
+		f.events.canceled = append(f.events.canceled, e)
+		return nil
 	})
 	events.Subscribe(f.bus, f.module.OnBuyerDeletionRequested)
 	events.Subscribe(f.bus, f.module.OnBuyerDeleted)

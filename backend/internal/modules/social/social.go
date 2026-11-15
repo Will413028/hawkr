@@ -7,8 +7,11 @@ package social
 import (
 	"context"
 	"embed"
+	"fmt"
 	"io/fs"
 	"log/slog"
+	"maps"
+	"slices"
 	"time"
 	"uuid"
 
@@ -27,6 +30,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/purge"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/readcache"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/sanction"
+	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/schedule"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/stats"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -75,6 +79,9 @@ type Deps struct {
 	// StoreBlocks 檢查店家是否封鎖了買家；正式組裝傳 seller.Module。
 	StoreBlocks StoreBlocks
 	Products    ProductVerifier
+	// ScheduleAuthorizers 是排程到點時依發起者種類重驗授權的實作（單體規則 4：social 不 import 發起者的模組，實作由 cmd/hawkr 注入）。
+	// OWNER 由 social 自己提供；其他每一種種類都要在這裡給，缺一種 New 就 panic（啟動失敗）。
+	ScheduleAuthorizers map[ScheduleKind]ScheduleAuthorizer
 	// NewID 產生實體的主鍵，組裝點給 uuid.NewV7（ADR 2026-09-25-row-identity-by-data-kind）。
 	NewID func() uuid.UUID
 	// Now 是目前時間；測試注入固定值。
@@ -102,24 +109,36 @@ type (
 	CommentCursor   = model.CommentCursor
 	CommentPage     = model.CommentPage
 	CommentInput    = model.CommentInput
-	ForumEntry      = model.ForumEntry
-	ForumPage       = model.ForumPage
-	ForumInput      = model.ForumInput
-	Target          = model.Target
-	TargetKind      = model.TargetKind
-	HideInput       = model.HideInput
-	RestoreInput    = model.RestoreInput
-	Hide            = model.Hide
-	WarnInput       = model.WarnInput
-	Sanction        = model.Sanction
-	SanctionKind    = model.SanctionKind
-	SanctionCursor  = model.SanctionCursor
-	SanctionPage    = model.SanctionPage
-	HiddenContent   = model.HiddenContent
-	HiddenCursor    = model.HiddenCursor
-	HiddenPage      = model.HiddenPage
-	ContentOwner    = model.ContentOwner
-	ContentSnapshot = model.ContentSnapshot
+	// 排程發布：Schedule 是一次排程，ScheduledBy 是發起者（種類加發起者擁有格式的不透明 ref），ScheduleAuthorizer 是到點重驗授權的 port。
+	Schedule           = model.Schedule
+	ScheduleKind       = model.ScheduleKind
+	ScheduleState      = model.ScheduleState
+	CancelReason       = model.CancelReason
+	ScheduledBy        = model.ScheduledBy
+	SchedulePostInput  = model.SchedulePostInput
+	ScheduleCursor     = model.ScheduleCursor
+	SchedulePage       = model.SchedulePage
+	ScheduledPublish   = model.ScheduledPublish
+	ScheduleAuthorizer = model.ScheduleAuthorizer
+	PostOrigin         = model.PostOrigin
+	ForumEntry         = model.ForumEntry
+	ForumPage          = model.ForumPage
+	ForumInput         = model.ForumInput
+	Target             = model.Target
+	TargetKind         = model.TargetKind
+	HideInput          = model.HideInput
+	RestoreInput       = model.RestoreInput
+	Hide               = model.Hide
+	WarnInput          = model.WarnInput
+	Sanction           = model.Sanction
+	SanctionKind       = model.SanctionKind
+	SanctionCursor     = model.SanctionCursor
+	SanctionPage       = model.SanctionPage
+	HiddenContent      = model.HiddenContent
+	HiddenCursor       = model.HiddenCursor
+	HiddenPage         = model.HiddenPage
+	ContentOwner       = model.ContentOwner
+	ContentSnapshot    = model.ContentSnapshot
 	// TakedownContentError 是內容下架的對象不成立（不存在、已刪除、不是措施的店家寫的）；OnMeasureCreated 回這個錯誤讓措施回滾。
 	TakedownContentError = stats.TakedownContentError
 	Viewer               = engage.Viewer
@@ -142,7 +161,43 @@ const (
 	SanctionWarning   = model.SanctionWarning
 	// MaxTopPosts 是 TopPosts 能回的篇數上限。
 	MaxTopPosts = model.MaxTopPosts
+
+	ScheduleByOwner      = model.ScheduleByOwner
+	ScheduleByDelegation = model.ScheduleByDelegation
+	SchedulePending      = model.SchedulePending
+	SchedulePublished    = model.SchedulePublished
+	ScheduleCanceled     = model.ScheduleCanceled
+	CancelAuthorityLost  = model.CancelAuthorityLost
+	CancelDeleted        = model.CancelDeleted
+	CancelTakenDown      = model.CancelTakenDown
+	CancelReplaced       = model.CancelReplaced
+	CancelOwnerCanceled  = model.CancelOwnerCanceled
+	OriginDirect         = model.OriginDirect
+	OriginScheduled      = model.OriginScheduled
+	// MinScheduleLead 與 MaxScheduleLead 是排程發布時點距現在的區間。
+	MinScheduleLead = model.MinScheduleLead
+	MaxScheduleLead = model.MaxScheduleLead
 )
+
+// ScheduleAuthorizerFunc 讓一個函式當排程授權實作（組裝點與測試用）。
+type ScheduleAuthorizerFunc func(ctx context.Context, p ScheduledPublish) error
+
+// AuthorizeScheduledPublish 實作 ScheduleAuthorizer。
+func (f ScheduleAuthorizerFunc) AuthorizeScheduledPublish(ctx context.Context, p ScheduledPublish) error {
+	return f(ctx, p)
+}
+
+// ErrScheduleDenied 是授權實作回報「現在不能發布」：排程轉 CANCELED（AUTHORITY_LOST）、不重試；其他錯誤讓 job 重試。可以用 fmt.Errorf("%w") 包裝。
+var ErrScheduleDenied = model.ErrScheduleDenied
+
+// ScheduleKindValues 回傳全部排程發起者種類。
+func ScheduleKindValues() []ScheduleKind { return model.ScheduleKindValues() }
+
+// ScheduleStateValues 回傳全部排程狀態。
+func ScheduleStateValues() []ScheduleState { return model.ScheduleStateValues() }
+
+// CancelReasonValues 回傳全部排程取消原因。
+func CancelReasonValues() []CancelReason { return model.CancelReasonValues() }
 
 // PostStatusValues 回傳全部貼文狀態。
 func PostStatusValues() []PostStatus { return model.PostStatusValues() }
@@ -164,6 +219,8 @@ type Module struct {
 	purge     *purge.Service
 	mediaSync *media.RefSyncer
 	jobs      jobs.Enqueuer
+	cancel    schedule.Canceler
+	now       func() time.Time
 }
 
 // New 建立模組。
@@ -179,17 +236,28 @@ func New(d Deps) *Module {
 	}
 	actors := actor.Resolver{Buyers: d.Buyers, Blocks: d.StoreBlocks}
 	cache := readcache.Cache{Jobs: d.Jobs, Stores: d.Stores}
-	st := stats.New(stats.Deps{DB: d.DB, Logger: d.Logger, Now: d.Now, Cache: cache})
+	authorizers := map[ScheduleKind]ScheduleAuthorizer{ScheduleByOwner: post.OwnerAuthorizer()}
+	maps.Copy(authorizers, d.ScheduleAuthorizers)
+	if err := post.ValidateAuthorizers(authorizers); err != nil {
+		panic(err)
+	}
+	cancel := schedule.Canceler{DB: d.DB, Events: d.Events, Cache: cache}
+	st := stats.New(stats.Deps{DB: d.DB, Logger: d.Logger, Now: d.Now, Cache: cache, Cancel: cancel})
 	return &Module{
-		post:      post.New(post.Deps{DB: d.DB, Media: d.Media, Jobs: d.Jobs, Events: d.Events, Products: d.Products, Cache: cache, NewID: d.NewID, Now: d.Now}),
+		post: post.New(post.Deps{
+			DB: d.DB, Media: d.Media, Jobs: d.Jobs, Events: d.Events, Products: d.Products, Cache: cache, Cancel: cancel, Authorizers: authorizers,
+			NewID: d.NewID, Now: d.Now,
+		}),
 		comment:   comment.New(comment.Deps{DB: d.DB, Events: d.Events, Actors: actors, NewID: d.NewID, Now: d.Now}),
 		forum:     forum.New(forum.Deps{DB: d.DB, Actors: actors, NewID: d.NewID, Now: d.Now}),
 		engage:    engage.New(engage.Deps{DB: d.DB, Events: d.Events, Actors: actors, Now: d.Now}),
 		sanction:  sanction.New(sanction.Deps{DB: d.DB, Cache: cache, NewID: d.NewID, Now: d.Now}),
 		stats:     st,
-		purge:     purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, Stats: st, Cache: cache, Now: d.Now}),
+		purge:     purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, Stats: st, Cache: cache, Cancel: cancel, Now: d.Now}),
 		mediaSync: mediaref.NewSyncer(d.DB, d.Media, d.Jobs, d.Now, d.Logger),
 		jobs:      d.Jobs,
+		cancel:    cancel,
+		now:       d.Now,
 	}
 }
 
@@ -217,6 +285,65 @@ func (m *Module) UnpublishPost(ctx context.Context, store seller.Store, postID u
 func (m *Module) DeletePost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) error {
 	return m.post.Delete(ctx, store, postID, version)
 }
+
+// SchedulePost 排程發布：貼文要是 DRAFT 或 UNPUBLISHED，in.PublishAt 距現在 5 分鐘到 90 天，仍要滿足公開要件；貼文已有待發布的排程時先把它轉 REPLACED。
+// in.By 是發起者：OWNER 的 ref 由伺服器填，DELEGATION 的 ref 由呼叫方給（代行 session 的 ID）；店家要有 CapMarketing。排程與到點的 job 在同一個 transaction 寫入。
+func (m *Module) SchedulePost(ctx context.Context, store seller.Store, in SchedulePostInput) (Schedule, error) {
+	return m.post.Schedule(ctx, store, in)
+}
+
+// CancelPostSchedule 是店主取消貼文待發布的排程（OWNER_CANCELED）；沒有待發布的排程時什麼都不做；店家要有 CapMarketing。
+func (m *Module) CancelPostSchedule(ctx context.Context, store seller.Store, postID uuid.UUID) error {
+	return m.post.CancelSchedule(ctx, store, postID)
+}
+
+// CancelScheduledBy 取消某個發起者（種類加一批 ref，例如代行的 session ID）所有待發布的排程，原因凍結為 reason，回傳被取消的排程 ID；空的 refs 是 no-op。
+// 每個被取消的排程發一個 PostScheduleCanceled。會依 ID 由小到大鎖相關貼文列（social 的鎖順序：貼文列 → 排程列），所以別的模組要在自己的 transaction 內、
+// 鎖或改自己的列「之前」呼叫它（單體規則 4：social 在 delegation 之前）。
+func (m *Module) CancelScheduledBy(ctx context.Context, kind ScheduleKind, refs []string, reason CancelReason) ([]uuid.UUID, error) {
+	if err := checkCancelArgs(kind, reason); err != nil {
+		return nil, err
+	}
+	return m.cancel.ByScheduler(ctx, kind, refs, reason, m.now().UTC())
+}
+
+// CancelDelegatedSchedulesOfStore 取消一家店所有發起者是代行（DELEGATION）、待發布的排程（撤回店家授權時，不必列舉 session），回傳被取消的排程 ID。
+// 呼叫時機與鎖順序同 CancelScheduledBy。
+func (m *Module) CancelDelegatedSchedulesOfStore(ctx context.Context, storeID int64, reason CancelReason) ([]uuid.UUID, error) {
+	if err := checkCancelArgs(ScheduleByDelegation, reason); err != nil {
+		return nil, err
+	}
+	return m.cancel.OfStoreByKind(ctx, storeID, ScheduleByDelegation, reason, m.now().UTC())
+}
+
+func checkCancelArgs(kind ScheduleKind, reason CancelReason) error {
+	if !slices.Contains(ScheduleKindValues(), kind) {
+		return fmt.Errorf("social：不認得的排程發起者種類 %q", kind)
+	}
+	if !slices.Contains(CancelReasonValues(), reason) {
+		return fmt.Errorf("social：不認得的排程取消原因 %q", reason)
+	}
+	return nil
+}
+
+// PendingSchedule 讀貼文待發布的排程；貼文不是這家店的或沒有待發布的排程回 NotFound。
+func (m *Module) PendingSchedule(ctx context.Context, storeID int64, postID uuid.UUID) (Schedule, error) {
+	return m.post.PendingSchedule(ctx, storeID, postID)
+}
+
+// ListPendingSchedules 列出店家待發布的排程（含各種發起者）：發布時間早的在前，keyset。
+func (m *Module) ListPendingSchedules(ctx context.Context, storeID int64, after *ScheduleCursor, size int32) (SchedulePage, error) {
+	return m.post.ListPendingSchedules(ctx, storeID, after, size)
+}
+
+// PublishScheduled 是 social.publish_scheduled job 的內容，給 worker 與測試呼叫：排程不是 PENDING 就什麼都不做（冪等），否則依
+// 貼文列 → 排程列的順序鎖住、做 social 自己的檢查、問發起者種類的授權實作，通過才發布（授權被拒就取消、原因 AUTHORITY_LOST、不重試）。
+func (m *Module) PublishScheduled(ctx context.Context, scheduleID uuid.UUID) error {
+	return m.post.RunScheduled(ctx, scheduleID)
+}
+
+// SweepSchedules 是 social.sweep_schedules job 的內容：補排到點很久還是 PENDING 的排程的 job；回傳補排的數量。
+func (m *Module) SweepSchedules(ctx context.Context) (int, error) { return m.post.SweepSchedules(ctx) }
 
 // OwnPost 讀店家自己的貼文（任何狀態）。
 func (m *Module) OwnPost(ctx context.Context, storeID int64, id uuid.UUID) (Post, error) {
@@ -474,16 +601,18 @@ func (m *Module) SyncMedia(ctx context.Context, ref media.Ref) (media.SyncResult
 // SweepMedia 執行 media 引用的保底掃描；回傳補排的 ref 數。它是 social.media_sweep job 的內容。
 func (m *Module) SweepMedia(ctx context.Context) (int, error) { return m.mediaSync.Sweep(ctx) }
 
-// AddWorkers 登記本模組的 River worker：media 引用、清除、瀏覽資料清理與每日對帳。
+// AddWorkers 登記本模組的 River worker：media 引用、清除、瀏覽資料清理、每日對帳與排程發布。
 func (m *Module) AddWorkers(workers *river.Workers) {
 	mediaref.AddWorkers(workers, m.mediaSync)
 	purge.AddWorkers(workers, m.purge)
 	stats.AddWorkers(workers, m.stats)
+	post.AddWorkers(workers, m.post)
 }
 
-// PeriodicJobs 回傳週期 job：media 引用的保底掃描、瀏覽資料清理、每日對帳。
+// PeriodicJobs 回傳週期 job：media 引用的保底掃描、瀏覽資料清理、每日對帳、排程的保底掃描。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	out := mediaref.PeriodicJobs()
 	out = append(out, purge.PeriodicJobs()...)
+	out = append(out, post.PeriodicJobs()...)
 	return append(out, stats.PeriodicJobs()...)
 }

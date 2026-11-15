@@ -6,6 +6,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/contentkind"
 )
@@ -53,10 +54,9 @@ func (c contentSet) empty() bool { return len(c.posts)+len(c.comments)+len(c.ent
 
 // ApplyTakedowns 把一個內容下架措施的對象寫進複本（social.content_takedowns），讓留言與討論區留言重新求值，並排受影響的貼文與店面頁的快取失效。
 // 它是 seller 的 MeasureCreated（內容下架）的訂閱者，措施的每一條建立入口（後台 handler、CreateInTx 的呼叫方）都經過它，所以「存在的內容，作者是
-// 措施的店家 storeID」（已軟刪或已清除的內容成立但不寫複本，沒有可隱藏的東西；已清除內容的歸屬由 moderation 以案件快照核對）這條不變量在這裡、同一個 transaction 內核對：鎖住留言與討論區留言的列之後核對，不成立回 *model.TakedownContentError 讓措施回滾。貼文不加鎖
-// （作者是所屬店家，不可變；核對之後被店家軟刪只是多一列複本，對帳不動它）。必須在呼叫方的 transaction 內：複本、旗標、計數與 job 一起提交或回滾。
-// 鎖的順序同 MarkAuthorInactive：先依 id 鎖內容列，再核對，再寫複本，再以兩次集合呼叫求值（函式依序鎖整批 stats），不另呼叫 Lock。
-// 貼文沒有計入旗標，公開讀取的述詞直接看複本。冪等：複本已經有的列不重複寫，沒有新增時不重新求值。
+// 措施的店家 storeID」（已軟刪或已清除的內容成立但不寫複本，沒有可隱藏的東西；已清除內容的歸屬由 moderation 以案件快照核對）這條不變量在這裡、同一個 transaction 內核對：鎖住留言與討論區留言的列之後核對，不成立回 *model.TakedownContentError 讓措施回滾。貼文的作者是所屬店家、不可變，歸屬核對不受鎖影響；核對之後被店家軟刪只是多一列複本，對帳不動它。必須在呼叫方的 transaction 內：複本、旗標、計數與 job 一起提交或回滾。
+// 鎖的順序同 MarkAuthorInactive：先依 id 鎖貼文列（排程發布的鎖順序是貼文列在前，與店家清除一致），再鎖留言與討論區留言的列，再核對，取消被下架貼文的待發布排程
+// （TAKEN_DOWN），再寫複本，再以兩次集合呼叫求值（函式依序鎖整批 stats），不另呼叫 Lock。貼文沒有計入旗標，公開讀取的述詞直接看複本。冪等：複本已經有的列不重複寫，沒有新增時不重新求值。
 func (s *Service) ApplyTakedowns(ctx context.Context, measureID uuid.UUID, storeID int64, at time.Time, contents []Content) error {
 	return s.applyTakedowns(ctx, measureID, at, contents, func(ctx context.Context, set contentSet) (contentSet, error) {
 		return s.checkTakedownOwnership(ctx, storeID, set)
@@ -87,6 +87,11 @@ func (s *Service) applyTakedowns(ctx context.Context, measureID uuid.UUID, at ti
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
+		if len(set.posts) > 0 {
+			if _, err := q.LockPostsByID(ctx, set.posts); err != nil {
+				return fmt.Errorf("social：鎖定被下架的貼文：%w", err)
+			}
+		}
 		if err := s.lockContent(ctx, set); err != nil {
 			return err
 		}
@@ -99,6 +104,9 @@ func (s *Service) applyTakedowns(ctx context.Context, measureID uuid.UUID, at ti
 			if set.empty() {
 				return nil
 			}
+		}
+		if _, err := s.d.Cancel.FromLockedPosts(ctx, set.posts, model.CancelTakenDown, at); err != nil {
+			return err
 		}
 		n, err := insert(ctx, q, store.InsertTakedownsParams{
 			MeasureID: measureID, CreatedAt: at, PostIds: set.posts, CommentIds: set.comments, ForumEntryIds: set.entries,

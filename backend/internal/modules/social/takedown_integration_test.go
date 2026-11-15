@@ -12,6 +12,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/schedule"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/stats"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/contentkind"
@@ -454,7 +455,7 @@ func TestReconcileInsertRechecksThatTheMeasureIsStillActive(t *testing.T) {
 	refs := []seller.ContentRef{ref(seller.ContentPost, w.post.ID), ref(seller.ContentComment, w.comment.ID)}
 	id := td.seed(t, w.storeID, refs)
 	f.exec(t, "UPDATE seller.measures SET status = 'REVOKED' WHERE id = $1", id)
-	svc := stats.New(stats.Deps{DB: f.db, Logger: slog.New(slog.DiscardHandler), Now: f.clock})
+	svc := stats.New(stats.Deps{DB: f.db, Logger: slog.New(slog.DiscardHandler), Now: f.clock, Cancel: schedule.Canceler{DB: f.db, Events: f.bus}})
 	stale := []stats.Content{{Kind: contentkind.Post, ID: w.post.ID}, {Kind: contentkind.Comment, ID: w.comment.ID}}
 	must(t, svc.ApplyMissingTakedowns(ctx, id, f.clock(), stale))
 	if n := f.scalar(t, "SELECT count(*) FROM social.content_takedowns"); n != 0 {

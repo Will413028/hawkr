@@ -38,6 +38,9 @@ func TestChecksMatchGo(t *testing.T) {
 		{"hides", "hides_reason_category_check", stringsOf(policy.CommunityAssessable())},
 		{"sanctions", "sanctions_reason_category_check", stringsOf(policy.CommunityAssessable())},
 		{"sanctions", "sanctions_kind_check", stringsOf(social.SanctionKindValues())},
+		{"post_schedules", "post_schedules_by_kind_check", stringsOf(social.ScheduleKindValues())},
+		{"post_schedules", "post_schedules_state_check", stringsOf(social.ScheduleStateValues())},
+		{"post_schedules", "post_schedules_reason_check", stringsOf(social.CancelReasonValues())},
 	} {
 		for _, v := range tt.values {
 			if !upperSnake.MatchString(v) {

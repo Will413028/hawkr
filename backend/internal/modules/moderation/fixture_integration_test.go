@@ -156,7 +156,8 @@ func setup(t *testing.T) *fixture {
 	f.sellerRd = seller.NewReader(d, f.clock)
 	f.social = social.New(social.Deps{
 		DB: d, Events: bus, Media: fm, Jobs: q, Buyers: f.buyer, Stores: f.sellerRd, StoreBlocks: storeBlocksFromTable{d}, Products: noProductVerifier{},
-		NewID: uuid.NewV7, Now: f.clock, Logger: log,
+		ScheduleAuthorizers: map[social.ScheduleKind]social.ScheduleAuthorizer{social.ScheduleByDelegation: social.ScheduleAuthorizerFunc(func(context.Context, social.ScheduledPublish) error { return social.ErrScheduleDenied })},
+		NewID:               uuid.NewV7, Now: f.clock, Logger: log,
 	})
 	f.deletion = accountdeletion.New(accountdeletion.Deps{DB: d, Identity: f.identity, Buyer: f.buyer, Seller: f.seller, Orders: noOrders{}, Now: f.clock})
 	f.suspend = accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: f.identity, Seller: f.seller, Logger: log})
