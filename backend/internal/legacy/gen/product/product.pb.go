@@ -8320,12 +8320,12 @@ var File_product_product_proto protoreflect.FileDescriptor
 
 const file_product_product_proto_rawDesc = "" +
 	"\n" +
-	"\x15product/product.proto\x12\rhawkr.product\x1a\x17common/delegation.proto\"n\n" +
+	"\x15product/product.proto\x12\rhawkr.product\x1a\x17common/delegation.proto\"\x85\x01\n" +
 	"\fProductImage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fstaged_token\x18\x02 \x01(\tR\vstagedToken\x12\x19\n" +
-	"\basset_id\x18\x03 \x01(\tR\aassetIdJ\x04\b\x04\x10\x05R\n" +
-	"object_key\"\x99\x03\n" +
+	"\basset_id\x18\x03 \x01(\tR\aassetIdJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\n" +
+	"object_keyR\x0fimport_asset_id\"\x99\x03\n" +
 	"\n" +
 	"ProductSku\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
@@ -8365,7 +8365,7 @@ const file_product_product_proto_rawDesc = "" +
 	"\x06italic\x18\x03 \x01(\bR\x06italic\x12\x1c\n" +
 	"\tunderline\x18\x04 \x01(\bR\tunderline\x12\x14\n" +
 	"\x05color\x18\x05 \x01(\tR\x05color\x12\x12\n" +
-	"\x04href\x18\x06 \x01(\tR\x04href\"\x88\x03\n" +
+	"\x04href\x18\x06 \x01(\tR\x04href\"\x9f\x03\n" +
 	"\x10DescriptionBlock\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x18\n" +
@@ -8384,7 +8384,7 @@ const file_product_product_proto_rawDesc = "" +
 	"\x04runs\x18\r \x03(\v2\x18.hawkr.product.InlineRunR\x04runs\x12\x1d\n" +
 	"\n" +
 	"table_json\x18\x0e \x01(\tR\ttableJson\x12\x1b\n" +
-	"\tlist_json\x18\x0f \x01(\tR\blistJson\"\xb8\x04\n" +
+	"\tlist_json\x18\x0f \x01(\tR\blistJsonJ\x04\b\f\x10\rR\x0fimport_asset_id\"\xb8\x04\n" +
 	"\x14CreateProductRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +

@@ -18,13 +18,18 @@ import org.springframework.context.annotation.Bean;
  * <p>
  * {@code @ConditionalOnBean} 只看已註冊的 bean，自動設定預設依類別全名排序，所以順序明寫：
  * 排在建立 {@link MeterRegistry} 的 Spring Boot 自動設定之後。common-core 的編譯期沒有 actuator，
- * 故以類別名稱字串指定。{@link MqErrorHandler} 引用 Spring AMQP 類別，沒有 AMQP 的服務不載入本設定。
+ * 故以類別名稱字串指定。{@link MqErrorHandler} 引用 RabbitMQ client 與 Spring AMQP core 類別，缺任一個 的服務不載入本設定。
  */
 @AutoConfiguration(afterName = {
         "org.springframework.boot.actuate.autoconfigure.metrics.MetricsAutoConfiguration",
         "org.springframework.boot.actuate.autoconfigure.metrics.CompositeMeterRegistryAutoConfiguration"
 })
-@ConditionalOnClass(value = MeterRegistry.class, name = "org.springframework.amqp.rabbit.core.RabbitTemplate")
+@ConditionalOnClass(value = MeterRegistry.class, name = {
+        "com.rabbitmq.client.AMQP",
+        "com.rabbitmq.client.Channel",
+        "org.springframework.amqp.core.Message",
+        "org.springframework.amqp.core.MessageProperties"
+})
 public class MqErrorHandlerMetricsAutoConfiguration {
 
     @Bean

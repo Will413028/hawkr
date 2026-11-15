@@ -8,9 +8,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.PropertySource;
 
-import java.net.http.HttpClient;
-import java.time.Duration;
-
 /**
  * Frontend cache invalidation 共用自動設定（後端服務責任邊界規範 §9）。
  *
@@ -18,7 +15,8 @@ import java.time.Duration;
  * 注入 {@code RevalidateClient} 即可在 mutation tx 完成後呼叫
  * {@link RevalidateClient#bustAfterCommit}。
  *
- * <p>未自行提供 {@code HttpClient} bean 時，由本設定建立 {@link #revalidateHttpClient()}。
+ * <p>{@link RevalidateClient} 自建私有的 HTTP/1.1 client，不從 context 取 {@code HttpClient}，
+ * 服務自己的 {@code HttpClient} bean 不會取代它。
  */
 @AutoConfiguration
 @EnableConfigurationProperties(WebRevalidateProperties.class)
@@ -28,25 +26,13 @@ public class RevalidateAutoConfiguration {
     private static final Logger log = LoggerFactory.getLogger(RevalidateAutoConfiguration.class);
 
     @Bean
-    @ConditionalOnMissingBean(HttpClient.class)
-    public HttpClient revalidateHttpClient() {
-        // 強制 HTTP/1.1：目標是 cleartext http:// 的 Next.js /api/revalidate，該 Node server
-        // 不支援 HTTP/2 cleartext，收到 h2 即重置而靜默失敗；Java 預設 HTTP_2，必須顯式降級。
-        return HttpClient.newBuilder()
-            .version(HttpClient.Version.HTTP_1_1)
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .connectTimeout(Duration.ofSeconds(5))
-            .build();
-    }
-
-    @Bean
     @ConditionalOnMissingBean(RevalidateClient.class)
-    public RevalidateClient revalidateClient(WebRevalidateProperties properties, HttpClient httpClient) {
+    public RevalidateClient revalidateClient(WebRevalidateProperties properties) {
         // 部署漏設 WEB_REVALIDATE_* 時 client 靜默 no-op → 前端快取永不失效卻無訊號。
         // 啟動時發一次 WARN（不 fail startup，本地無此 config 仍可開發）。§9.5
         if (!properties.isEnabled()) {
             log.warn("RevalidateClient.disabled hawkr.web-revalidate.base-url / secret 未設定，前端快取將不失效");
         }
-        return new RevalidateClient(properties, httpClient);
+        return new RevalidateClient(properties);
     }
 }

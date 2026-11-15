@@ -3,6 +3,8 @@ package io.github.will413028.hawkr.common.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.actuate.autoconfigure.metrics.CompositeMeterRegistryAutoConfiguration;
 import org.springframework.boot.actuate.autoconfigure.metrics.MetricsAutoConfiguration;
@@ -36,9 +38,14 @@ class MqErrorHandlerMetricsAutoConfigurationTest {
                 .run(ctx -> assertThat(ctx).doesNotHaveBean("mqErrorHandlerMeterRegistryBinder"));
     }
 
-    @Test
-    void backsOffWhenAmqpIsAbsent() {
-        runner.withClassLoader(new FilteredClassLoader("org.springframework.amqp"))
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "com.rabbitmq.client",
+            "org.springframework.amqp.core",
+            "org.springframework.amqp"
+    })
+    void backsOffWhenAnyClassUsedByMqErrorHandlerIsAbsent(String filteredPackage) {
+        runner.withClassLoader(new FilteredClassLoader(filteredPackage))
                 .withConfiguration(AutoConfigurations.of(
                         MqErrorHandlerMetricsAutoConfiguration.class,
                         MetricsAutoConfiguration.class,
