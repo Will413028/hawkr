@@ -2,13 +2,15 @@
 // 取代 seller 自己的違規類別。每個值對應賣家合作條款的依據，給賣家的理由要能指到條款。
 //
 // 各入口只接受自己的子集，伺服器照樣驗證（C3：client 的常數只是呈現順序）：
-//   - ReporterSelectable：店家治理的檢舉人可以選的類別，除了 PlatformAbuse；
+//   - ReporterSelectable：店家治理的檢舉人可以選的類別，除了 PlatformAbuse 與社群類別；
+//   - CommunityReporterSelectable：社群檢舉入口（moderation）的檢舉人可以選的類別，明列的八個；
 //   - Assessable：店家治理的平台判定類別與認定（含案件的類別）可用的類別，除了 Other（Other 只給檢舉人選，理由要指到條款，
 //     所以分案時要改判成有依據的類別，或直接設定結果）；含社群類別，因為內容下架措施的認定用它們；
 //   - CommunityAssessable：社群內容（買家寫的留言、討論區留言）的隱藏與警告可用的類別：社群類別 Community 加上對買家言論成立的類別，
 //     不含只對商品或賣家成立的類別（FoodSafety、ProhibitedGoods、UnlicensedSale、FakeCertification、Counterfeit）與 Other。
 //
-// 社群類別（Spam、Harassment、Hate）不屬於 ReporterSelectable：店家本身的檢舉走 seller 通報表單，檢舉人選不到它們。
+// 社群類別（Spam、Harassment、Hate、SexualContent）不屬於 ReporterSelectable：店家本身的檢舉走 seller 通報表單，那個入口的檢舉人選不到它們；
+// 社群檢舉入口的檢舉人選得到其中的四個，見 CommunityReporterSelectable。
 //
 // 值與契約 api/hawkr/common/v1alpha1/policy_category.proto 的 PolicyCategory 一一對應（proto 的值名去掉
 // POLICY_CATEGORY_ 前綴）；儲存的代碼是 UPPER_SNAKE，各表的 CHECK 對自己的子集（模組的 TestChecksMatchGo）。platform 不得依賴任何模組。
@@ -52,18 +54,20 @@ const (
 	Harassment Category = "HARASSMENT"
 	// Hate 社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人。
 	Hate Category = "HATE"
+	// SexualContent 社群內容中的色情、裸露或性暴力內容。
+	SexualContent Category = "SEXUAL_CONTENT"
 )
 
 // Values 回傳全部類別，順序同契約的數字；每次回傳新的切片，呼叫端可以自由改動。
 func Values() []Category {
 	return []Category{
 		FoodSafety, ProhibitedGoods, UnlicensedSale, MisleadingInfo, FakeCertification, Counterfeit, IPInfringement,
-		Fraud, OffPlatformTrade, Privacy, Impersonation, PlatformAbuse, Other, Spam, Harassment, Hate,
+		Fraud, OffPlatformTrade, Privacy, Impersonation, PlatformAbuse, Other, Spam, Harassment, Hate, SexualContent,
 	}
 }
 
-// Community 回傳社群內容的類別（Spam、Harassment、Hate）。
-func Community() []Category { return []Category{Spam, Harassment, Hate} }
+// Community 回傳社群內容的類別（Spam、Harassment、Hate、SexualContent）。
+func Community() []Category { return []Category{Spam, Harassment, Hate, SexualContent} }
 
 // ReporterSelectable 回傳店家治理的檢舉人可以選的類別（全部除了 PlatformAbuse 與社群類別），與 reports.category 的 CHECK 一致。
 func ReporterSelectable() []Category {
@@ -80,8 +84,14 @@ func Assessable() []Category { return without(Values(), Other) }
 func CommunityAssessable() []Category {
 	return []Category{
 		MisleadingInfo, IPInfringement, Fraud, OffPlatformTrade, Privacy, Impersonation, PlatformAbuse,
-		Spam, Harassment, Hate,
+		Spam, Harassment, Hate, SexualContent,
 	}
+}
+
+// CommunityReporterSelectable 回傳社群檢舉入口（moderation）的檢舉人可以選的類別，恰好八個：四個社群類別加上 MisleadingInfo、
+// FoodSafety、Fraud 與 Other。明列允許的類別，新增的類別預設選不到（TestCommunityReporterSelectableIsExplicit）。
+func CommunityReporterSelectable() []Category {
+	return []Category{Spam, Harassment, Hate, SexualContent, MisleadingInfo, FoodSafety, Fraud, Other}
 }
 
 // ReporterSelectable 說明店家治理的檢舉人可不可以選這個類別。
@@ -89,6 +99,11 @@ func (c Category) ReporterSelectable() bool { return c != PlatformAbuse && !c.Co
 
 // Assessable 說明店家治理的平台判定與認定可不可以用這個類別。
 func (c Category) Assessable() bool { return c != Other && c.valid() }
+
+// CommunityReporterSelectable 說明社群檢舉入口的檢舉人可不可以選這個類別。
+func (c Category) CommunityReporterSelectable() bool {
+	return slices.Contains(CommunityReporterSelectable(), c)
+}
 
 // CommunityAssessable 說明社群內容的隱藏與警告可不可以用這個類別。
 func (c Category) CommunityAssessable() bool { return slices.Contains(CommunityAssessable(), c) }

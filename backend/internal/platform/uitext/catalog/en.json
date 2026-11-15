@@ -18,6 +18,9 @@
     "common.PolicyCategory.POLICY_CATEGORY_HATE": {
       "message": "Hate or discriminatory speech"
     },
+    "common.PolicyCategory.POLICY_CATEGORY_SEXUAL_CONTENT": {
+      "message": "Sexual content"
+    },
     "common.PolicyCategory.POLICY_CATEGORY_SPAM": {
       "message": "Spam"
     },

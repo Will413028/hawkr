@@ -1,4 +1,4 @@
-h1:6dnqGSDyxRzuj3AgD8U7igfZ2Y3Itj9V5F0OVMip3qY=
+h1:ubCZjzwJgMHK6Iqzw3y2949c3hYYv4kci949onqQfR0=
 20261001160141_seller_core.sql h1:hVkQ8Wo6S5BLgzr4nFSGS/1EZpRX9mHqRwpxmIP3Yeg=
 20261002120004_seller_governance.sql h1:Dj/zGg4clK5U8YBsKn+TWnE5ZizigjU9/s7EXXHuc+g=
 20261002133159_seller_kyc.sql h1:QiN6KkqvCU/lwdw0B66YQniBEGnAhojvTYHQJ8lOqlc=
@@ -65,3 +65,4 @@ h1:6dnqGSDyxRzuj3AgD8U7igfZ2Y3Itj9V5F0OVMip3qY=
 20261114054941_seller_payment_onboarding_drop_objects.sql h1:WC8tMHcovLiT4OKphyigfjYby1eemGojHnZe5jyrM8I=
 20261114055147_seller_payment_onboarding_schema.sql h1:4JpiAcX+OTCDhBC5k7DK3th4CpkcZHSCK/INM9bsMSA=
 20261114055304_seller_payment_onboarding_objects.sql h1:ZTB1ReDmUPc8fdQKOxyCyJIe1zm0j1eudU0tE/E50UY=
+20261115024215_seller_sexual_content_category.sql h1:dekd6fCPZtbpyKA+dvnx3eGzJWILt0ORb2cmpz0I5js=

@@ -39,6 +39,8 @@
   {"key":"common.PolicyCategory.POLICY_CATEGORY_HARASSMENT","fn":"common.PolicyCategory","value":"POLICY_CATEGORY_HARASSMENT","audience":"default","locale":"en","want":"Harassment or bullying"},
   {"key":"common.PolicyCategory.POLICY_CATEGORY_HATE","fn":"common.PolicyCategory","value":"POLICY_CATEGORY_HATE","audience":"default","locale":"zh-TW","want":"仇恨或歧視言論"},
   {"key":"common.PolicyCategory.POLICY_CATEGORY_HATE","fn":"common.PolicyCategory","value":"POLICY_CATEGORY_HATE","audience":"default","locale":"en","want":"Hate or discriminatory speech"},
+  {"key":"common.PolicyCategory.POLICY_CATEGORY_SEXUAL_CONTENT","fn":"common.PolicyCategory","value":"POLICY_CATEGORY_SEXUAL_CONTENT","audience":"default","locale":"zh-TW","want":"色情或性相關內容"},
+  {"key":"common.PolicyCategory.POLICY_CATEGORY_SEXUAL_CONTENT","fn":"common.PolicyCategory","value":"POLICY_CATEGORY_SEXUAL_CONTENT","audience":"default","locale":"en","want":"Sexual content"},
   {"key":"common.StoreCard.closed_store","fn":"common.StoreCard.closed_store","audience":"default","locale":"zh-TW","want":"已關閉的店家"},
   {"key":"common.StoreCard.closed_store","fn":"common.StoreCard.closed_store","audience":"default","locale":"en","want":"Closed store"},
   {"key":"common.StoreCardStatus.STORE_CARD_STATUS_OPEN","fn":"common.StoreCardStatus","value":"STORE_CARD_STATUS_OPEN","audience":"default","locale":"zh-TW","want":"營業中"},

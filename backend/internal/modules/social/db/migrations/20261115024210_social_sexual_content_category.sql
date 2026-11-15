@@ -1,0 +1,4 @@
+-- Modify "hides" table
+ALTER TABLE "social"."hides" DROP CONSTRAINT "hides_reason_category_check", ADD CONSTRAINT "hides_reason_category_check" CHECK (reason_category = ANY (ARRAY['MISLEADING_INFO'::text, 'IP_INFRINGEMENT'::text, 'FRAUD'::text, 'OFF_PLATFORM_TRADE'::text, 'PRIVACY'::text, 'IMPERSONATION'::text, 'PLATFORM_ABUSE'::text, 'SPAM'::text, 'HARASSMENT'::text, 'HATE'::text, 'SEXUAL_CONTENT'::text]));
+-- Modify "sanctions" table
+ALTER TABLE "social"."sanctions" DROP CONSTRAINT "sanctions_reason_category_check", ADD CONSTRAINT "sanctions_reason_category_check" CHECK (reason_category = ANY (ARRAY['MISLEADING_INFO'::text, 'IP_INFRINGEMENT'::text, 'FRAUD'::text, 'OFF_PLATFORM_TRADE'::text, 'PRIVACY'::text, 'IMPERSONATION'::text, 'PLATFORM_ABUSE'::text, 'SPAM'::text, 'HARASSMENT'::text, 'HATE'::text, 'SEXUAL_CONTENT'::text]));

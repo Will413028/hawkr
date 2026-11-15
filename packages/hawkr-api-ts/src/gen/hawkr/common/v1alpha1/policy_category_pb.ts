@@ -9,11 +9,11 @@ import { enumDesc, fileDesc } from "@bufbuild/protobuf/codegenv2";
  * Describes the file hawkr/common/v1alpha1/policy_category.proto.
  */
 export const file_hawkr_common_v1alpha1_policy_category: GenFile = /*@__PURE__*/
-  fileDesc("CitoYXdrci9jb21tb24vdjFhbHBoYTEvcG9saWN5X2NhdGVnb3J5LnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqxgQKDlBvbGljeUNhdGVnb3J5Eh8KG1BPTElDWV9DQVRFR09SWV9VTlNQRUNJRklFRBAAEh8KG1BPTElDWV9DQVRFR09SWV9GT09EX1NBRkVUWRABEiQKIFBPTElDWV9DQVRFR09SWV9QUk9ISUJJVEVEX0dPT0RTEAISIwofUE9MSUNZX0NBVEVHT1JZX1VOTElDRU5TRURfU0FMRRADEiMKH1BPTElDWV9DQVRFR09SWV9NSVNMRUFESU5HX0lORk8QBBImCiJQT0xJQ1lfQ0FURUdPUllfRkFLRV9DRVJUSUZJQ0FUSU9OEAUSHwobUE9MSUNZX0NBVEVHT1JZX0NPVU5URVJGRUlUEAYSIwofUE9MSUNZX0NBVEVHT1JZX0lQX0lORlJJTkdFTUVOVBAHEhkKFVBPTElDWV9DQVRFR09SWV9GUkFVRBAIEiYKIlBPTElDWV9DQVRFR09SWV9PRkZfUExBVEZPUk1fVFJBREUQCRIbChdQT0xJQ1lfQ0FURUdPUllfUFJJVkFDWRAKEiEKHVBPTElDWV9DQVRFR09SWV9JTVBFUlNPTkFUSU9OEAsSIgoeUE9MSUNZX0NBVEVHT1JZX1BMQVRGT1JNX0FCVVNFEAwSGQoVUE9MSUNZX0NBVEVHT1JZX09USEVSEA0SGAoUUE9MSUNZX0NBVEVHT1JZX1NQQU0QDhIeChpQT0xJQ1lfQ0FURUdPUllfSEFSQVNTTUVOVBAPEhgKFFBPTElDWV9DQVRFR09SWV9IQVRFEBBiBnByb3RvMw");
+  fileDesc("CitoYXdrci9jb21tb24vdjFhbHBoYTEvcG9saWN5X2NhdGVnb3J5LnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEq6gQKDlBvbGljeUNhdGVnb3J5Eh8KG1BPTElDWV9DQVRFR09SWV9VTlNQRUNJRklFRBAAEh8KG1BPTElDWV9DQVRFR09SWV9GT09EX1NBRkVUWRABEiQKIFBPTElDWV9DQVRFR09SWV9QUk9ISUJJVEVEX0dPT0RTEAISIwofUE9MSUNZX0NBVEVHT1JZX1VOTElDRU5TRURfU0FMRRADEiMKH1BPTElDWV9DQVRFR09SWV9NSVNMRUFESU5HX0lORk8QBBImCiJQT0xJQ1lfQ0FURUdPUllfRkFLRV9DRVJUSUZJQ0FUSU9OEAUSHwobUE9MSUNZX0NBVEVHT1JZX0NPVU5URVJGRUlUEAYSIwofUE9MSUNZX0NBVEVHT1JZX0lQX0lORlJJTkdFTUVOVBAHEhkKFVBPTElDWV9DQVRFR09SWV9GUkFVRBAIEiYKIlBPTElDWV9DQVRFR09SWV9PRkZfUExBVEZPUk1fVFJBREUQCRIbChdQT0xJQ1lfQ0FURUdPUllfUFJJVkFDWRAKEiEKHVBPTElDWV9DQVRFR09SWV9JTVBFUlNPTkFUSU9OEAsSIgoeUE9MSUNZX0NBVEVHT1JZX1BMQVRGT1JNX0FCVVNFEAwSGQoVUE9MSUNZX0NBVEVHT1JZX09USEVSEA0SGAoUUE9MSUNZX0NBVEVHT1JZX1NQQU0QDhIeChpQT0xJQ1lfQ0FURUdPUllfSEFSQVNTTUVOVBAPEhgKFFBPTElDWV9DQVRFR09SWV9IQVRFEBASIgoeUE9MSUNZX0NBVEVHT1JZX1NFWFVBTF9DT05URU5UEBFiBnByb3RvMw");
 
 /**
  * PolicyCategory 是平台的政策分類（step10e-reports-brief R10）：檢舉人選的類別、平台判定類別與認定的類別共用一份，
- * 各入口只接受自己的子集（見各值的「入口」）。店家治理的值對應賣家合作條款的依據，給賣家的理由要能指到條款；社群內容的值（SPAM、HARASSMENT、HATE）給買家寫的內容的隱藏與內容下架用，買家條款訂出後補條款依據；檢舉人選不到，認定與案件類別可以用。
+ * 各入口只接受自己的子集（見各值的「入口」）。店家治理的值對應賣家合作條款的依據，給賣家的理由要能指到條款；社群內容的值（SPAM、HARASSMENT、HATE、SEXUAL_CONTENT）給買家寫的內容的隱藏與內容下架用，買家條款訂出後補條款依據；店家治理的檢舉人選不到它們，社群檢舉入口的檢舉人可選的子集是 SPAM、HARASSMENT、HATE、SEXUAL_CONTENT、MISLEADING_INFO、FOOD_SAFETY、FRAUD、OTHER；認定與案件類別都可以用。
  *
  * @generated from enum hawkr.common.v1alpha1.PolicyCategory
  */
@@ -24,7 +24,7 @@ export enum PolicyCategory {
   UNSPECIFIED = 0,
 
   /**
-   * 有健康風險或疑似食物中毒，或未揭露安全疑慮的商品（條款第十一條、第十六條第 1 款）。入口：檢舉人、平台判定與認定。
+   * 有健康風險或疑似食物中毒，或未揭露安全疑慮的商品（條款第十一條、第十六條第 1 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。
    *
    * @generated from enum value: POLICY_CATEGORY_FOOD_SAFETY = 1;
    */
@@ -45,7 +45,7 @@ export enum PolicyCategory {
   UNLICENSED_SALE = 3,
 
   /**
-   * 虛假資料、標示不實或誤導的商品或店家資訊（第十六條第 2 款）。入口：檢舉人、平台判定與認定。
+   * 虛假資料、標示不實或誤導的商品或店家資訊（第十六條第 2 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。
    *
    * @generated from enum value: POLICY_CATEGORY_MISLEADING_INFO = 4;
    */
@@ -73,7 +73,7 @@ export enum PolicyCategory {
   IP_INFRINGEMENT = 7,
 
   /**
-   * 偽造交易、洗錢、詐欺、濫用優惠、操縱評價或規避風險控管（第十六條第 2 款）。入口：檢舉人、平台判定與認定。
+   * 偽造交易、洗錢、詐欺、濫用優惠、操縱評價或規避風險控管（第十六條第 2 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。
    *
    * @generated from enum value: POLICY_CATEGORY_FRAUD = 8;
    */
@@ -108,32 +108,39 @@ export enum PolicyCategory {
   PLATFORM_ABUSE = 12,
 
   /**
-   * 檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。入口：只有檢舉人。
+   * 檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。入口：店家通報與社群檢舉的檢舉人；平台判定與認定不能用。
    *
    * @generated from enum value: POLICY_CATEGORY_OTHER = 13;
    */
   OTHER = 13,
 
   /**
-   * 社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。
+   * 社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
    *
    * @generated from enum value: POLICY_CATEGORY_SPAM = 14;
    */
   SPAM = 14,
 
   /**
-   * 社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。
+   * 社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
    *
    * @generated from enum value: POLICY_CATEGORY_HARASSMENT = 15;
    */
   HARASSMENT = 15,
 
   /**
-   * 社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。
+   * 社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
    *
    * @generated from enum value: POLICY_CATEGORY_HATE = 16;
    */
   HATE = 16,
+
+  /**
+   * 社群內容中的色情、裸露或性暴力內容（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
+   *
+   * @generated from enum value: POLICY_CATEGORY_SEXUAL_CONTENT = 17;
+   */
+  SEXUAL_CONTENT = 17,
 }
 
 /**

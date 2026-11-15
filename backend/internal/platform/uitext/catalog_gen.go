@@ -48,6 +48,8 @@ func (t Text) CommonPolicyCategory(v string) (string, bool) {
 			return "Harassment or bullying", true
 		case "HATE":
 			return "Hate or discriminatory speech", true
+		case "SEXUAL_CONTENT":
+			return "Sexual content", true
 		}
 	}
 	switch v {
@@ -83,6 +85,8 @@ func (t Text) CommonPolicyCategory(v string) (string, bool) {
 		return "騷擾或霸凌", true
 	case "HATE":
 		return "仇恨或歧視言論", true
+	case "SEXUAL_CONTENT":
+		return "色情或性相關內容", true
 	}
 	return "", false
 }
