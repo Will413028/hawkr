@@ -106,7 +106,7 @@ func TestRunDrainsInFlightAndReturnsAfterCancel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = admin.Close() }()
+	t.Cleanup(func() { _ = admin.Close() }) // 先註冊、最後執行：各輪的清除要用這條連線
 	adminCh, err := admin.Channel()
 	if err != nil {
 		t.Fatal(err)
@@ -119,11 +119,17 @@ func TestRunDrainsInFlightAndReturnsAfterCancel(t *testing.T) {
 		exchange := fmt.Sprintf("%s.ex.%d", prefix, i)
 		queues := []string{fmt.Sprintf("%s.a.%d", prefix, i), fmt.Sprintf("%s.b.%d", prefix, i)}
 		t.Cleanup(func() {
-			for _, q := range queues {
-				_, _ = adminCh.QueueDelete(q, false, false, false)
-				_, _ = adminCh.QueueDelete(q+".dead", false, false, false)
+			ch, err := admin.Channel()
+			if err != nil {
+				t.Errorf("清除 %s：%v", exchange, err)
+				return
 			}
-			_ = adminCh.ExchangeDelete(exchange, false, false)
+			defer func() { _ = ch.Close() }()
+			for _, q := range queues {
+				_, _ = ch.QueueDelete(q, false, false, false)
+				_, _ = ch.QueueDelete(q+".dead", false, false, false)
+			}
+			_ = ch.ExchangeDelete(exchange, false, false)
 		})
 		recorders := []*recorder{{handled: map[string]bool{}}, {handled: map[string]bool{}}}
 		bindings := []Binding{

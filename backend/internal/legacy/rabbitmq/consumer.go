@@ -11,8 +11,10 @@ import (
 )
 
 const (
-	// handlerTimeout 是一則訊息的處理上限。處理中的訊息在關機時照樣跑完並 ack，不受關機訊號取消。
-	handlerTimeout = 5 * time.Second
+	// drainTimeout 是關機後處理中的訊息還能跑的時間：handler 的 context 不隨關機取消，關機滿 drainTimeout 才取消。
+	drainTimeout = 5 * time.Second
+	// drainWait 是 runOnce 等消費者結束的上限，比 drainTimeout 多留 ack 或 nack 的時間。
+	drainWait = drainTimeout + time.Second
 	// closeTimeout 是關閉連線時等 broker 回應的上限；關連線會取消其上的消費者，未 ack 的預取訊息由 broker 放回 queue。
 	closeTimeout = 5 * time.Second
 )
@@ -47,7 +49,7 @@ func runOnce(ctx context.Context, url string, bindings []Binding, isPermanent fu
 	var consumers sync.WaitGroup
 	defer func() {
 		cancel()
-		waitTimeout(&consumers, handlerTimeout)
+		waitTimeout(&consumers, drainWait)
 		_ = conn.CloseDeadline(time.Now().Add(closeTimeout))
 	}()
 	errors := make(chan error, len(bindings))
@@ -121,11 +123,19 @@ func waitTimeout(wg *sync.WaitGroup, d time.Duration) {
 	}
 }
 
-// Process 處理一則訊息並 ack 或 nack。handler 的 context 不隨 ctx 取消，上限是 handlerTimeout；ctx 只決定暫時失敗後要不要
-// 等一秒再接下一則。
+// Process 處理一則訊息並 ack 或 nack。ctx 是關機訊號：handler 的 context 在 ctx 取消後再過 drainTimeout 才取消，處理中的
+// 訊息能跑完並 ack；ctx 也決定暫時失敗後要不要等一秒再接下一則。
 func Process(ctx context.Context, delivery amqp.Delivery, binding Binding, isPermanent func(error) bool, log *slog.Logger) {
-	hctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), handlerTimeout)
+	hctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	defer cancel()
+	stopAfter := context.AfterFunc(ctx, func() {
+		select {
+		case <-time.After(drainTimeout):
+			cancel()
+		case <-hctx.Done():
+		}
+	})
+	defer stopAfter()
 	if err := binding.Handle(hctx, delivery.Body); err != nil {
 		log.ErrorContext(ctx, "rabbitmq：處理事件失敗", "queue", binding.Queue, "error", err)
 		if isPermanent(err) {
