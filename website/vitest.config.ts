@@ -44,6 +44,15 @@ export default defineConfig({
 			{
 				extends: true,
 				optimizeDeps: { include: ["framer-motion"] },
+				// 瀏覽器沒有 Node 的 process.env：照 Next 的 client 編譯在建置時替換。API base
+				// 釘到 loopback 的丟棄埠，沒有 mock 的請求不會連到真的主機；其餘未設的
+				// NEXT_PUBLIC_* 由 tests/browser/setup.ts 的 process 墊片讀成 undefined。
+				define: {
+					"process.env.NODE_ENV": JSON.stringify("test"),
+					"process.env.NEXT_PUBLIC_API_BASE_URL": JSON.stringify(
+						"http://127.0.0.1:9/api/v1",
+					),
+				},
 				test: {
 					name: "browser",
 					include: ["**/*.browser.test.tsx"],
@@ -54,10 +63,6 @@ export default defineConfig({
 						"**/.worktrees/**",
 						".worktrees/**",
 					],
-					env: {
-						API_BASE_URL: "http://127.0.0.1:9/api/v1",
-						NEXT_PUBLIC_API_BASE_URL: "http://127.0.0.1:9/api/v1",
-					},
 					setupFiles: ["./tests/browser/setup.ts"],
 					browser: {
 						enabled: true,
