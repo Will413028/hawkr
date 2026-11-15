@@ -130,7 +130,7 @@ describe("navigation recovery", () => {
 			.toHaveTextContent("等待訂單頁面");
 		await expect
 			.element(page.getByRole("status"), { timeout: 2_000 })
-			.toHaveTextContent(`${DESTINATION}（replace）`);
+			.toHaveTextContent(`整頁目的地：${DESTINATION}（replace）`);
 		await expect.element(page.getByText("整頁跳轉次數：1")).toBeVisible();
 	});
 
@@ -141,7 +141,7 @@ describe("navigation recovery", () => {
 		await vi.advanceTimersByTimeAsync(450);
 		await expect
 			.element(page.getByRole("status"))
-			.toHaveTextContent("延遲導覽已完成");
+			.toHaveTextContent("延遲導覽已完成，保留目前文件");
 		await vi.advanceTimersByTimeAsync(1_000);
 		await expect.element(page.getByText("整頁跳轉次數：0")).toBeVisible();
 	});
@@ -153,11 +153,11 @@ describe("navigation recovery", () => {
 		await userEvent.click(page.getByRole("button", { name: "模擬登入完成" }));
 		await expect
 			.element(page.getByRole("status"))
-			.toHaveTextContent(`${LOGIN_DESTINATION}（push）`);
+			.toHaveTextContent(`整頁目的地：${LOGIN_DESTINATION}（push）`);
 		await vi.advanceTimersByTimeAsync(1_000);
 		await expect.element(page.getByText("整頁跳轉次數：1")).toBeVisible();
 		await expect
 			.element(page.getByRole("status"))
-			.toHaveTextContent(LOGIN_DESTINATION);
+			.toHaveTextContent(`整頁目的地：${LOGIN_DESTINATION}（push）`);
 	});
 });
