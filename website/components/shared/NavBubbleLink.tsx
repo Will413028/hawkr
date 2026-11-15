@@ -28,10 +28,10 @@ import { cn } from "@/lib/utils/cn";
 export interface NavBubbleLinkProps {
 	href: string;
 	className?: string;
-	/** Base name; the count is folded into the accessible name when non-zero. */
+	/** Base name; the count is appended to the sr-only name text when non-zero. */
 	label: string;
 	count: number;
-	/** Renders the "（N 則未讀）"/"（N 件商品）" suffix and the live message. */
+	/** Renders the "N 則未讀"/"N 件商品" suffix and the live message. */
 	countLabel: (display: string) => string;
 	children?: React.ReactNode;
 	onClick?: React.MouseEventHandler<HTMLAnchorElement>;
@@ -71,9 +71,7 @@ export default function NavBubbleLink({
 	const [routePrefetchEnabled, setRoutePrefetchEnabled] = React.useState(false);
 	const display = count > 99 ? "99+" : String(count);
 	const hasCount = count > 0;
-	const accessibleName = hasCount
-		? `${label}（${countLabel(display)}）`
-		: label;
+	const accessibleName = hasCount ? `${label} ${countLabel(display)}` : label;
 
 	// Announce only transitions. On first render the accessible name already
 	// carries the count, so seeding the region would double-speak it.
@@ -102,7 +100,6 @@ export default function NavBubbleLink({
 					hasCount && "notif-bell--has-unread",
 					className,
 				)}
-				aria-label={accessibleName}
 				data-has-unread={hasCount ? "true" : undefined}
 				onClick={onClick}
 				onFocus={(event) => {
@@ -118,6 +115,7 @@ export default function NavBubbleLink({
 					onPointerDown?.(event);
 				}}
 			>
+				<small className="sr-only">{accessibleName}</small>
 				<span {...innerProps} className={NOTIF_BELL_INNER}>
 					{children}
 				</span>

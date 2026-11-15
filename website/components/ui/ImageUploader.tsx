@@ -237,6 +237,7 @@ export function ImageUploader({
 			: dragging
 				? "放開上傳"
 				: "點擊或拖曳上傳";
+	const hintInName = Boolean(fileHint) && !hasValue && !uploading;
 	const showUploadIndicator = !hasValue || uploading;
 	const clampedProgress =
 		typeof progress === "number"
@@ -308,7 +309,7 @@ export function ImageUploader({
 		.join(" ");
 
 	const describedBy =
-		[error || hint ? messageId : "", fileHint ? fileHintId : ""]
+		[error || hint ? messageId : "", fileHint && !hintInName ? fileHintId : ""]
 			.filter(Boolean)
 			.join(" ") || undefined;
 
@@ -351,7 +352,7 @@ export function ImageUploader({
 				}}
 			/>
 
-			{fileHint && (
+			{fileHint && !hintInName && (
 				<span id={fileHintId} className="sr-only">
 					{fileHint}
 				</span>
@@ -383,14 +384,14 @@ export function ImageUploader({
 				aria-labelledby={
 					label
 						? tileVisibleText
-							? `${labelId} ${tileTextId}`
+							? `${labelId} ${tileTextId}${hintInName ? ` ${fileHintId}` : ""}`
 							: labelId
 						: undefined
 				}
 				aria-label={
 					label
 						? undefined
-						: `${ariaLabel ?? "上傳圖片"} ${tileVisibleText}`.trim()
+						: `${ariaLabel ?? "上傳圖片"} ${tileVisibleText}${hintInName ? ` ${fileHint}` : ""}`.trim()
 				}
 				id={id}
 				style={
@@ -444,7 +445,7 @@ export function ImageUploader({
 							{dragging ? "放開上傳" : "點擊或拖曳上傳"}
 						</strong>
 						<small
-							aria-hidden="true"
+							id={fileHintId}
 							className="text-xs text-[var(--brand-text-gray)] dark:text-[var(--hkui-foreground-muted)]"
 						>
 							{fileHint}
