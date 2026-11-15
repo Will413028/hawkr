@@ -668,7 +668,7 @@ async function playSellerSelection(container: HTMLElement) {
 	await expect.element(firstGroup).toBePartiallyChecked();
 	await userEvent.click(firstGroup);
 	await expect.element(firstGroup).toBeChecked();
-	await waitFor(() => expect(getComputedStyle(secondRegion).opacity).toBe("1"));
+	expect(getComputedStyle(secondRegion).opacity).toBe("1");
 	const inactiveRow = within(
 		required(
 			second
