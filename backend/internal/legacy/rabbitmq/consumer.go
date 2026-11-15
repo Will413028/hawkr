@@ -70,7 +70,9 @@ func runOnce(ctx context.Context, url string, bindings []Binding, isPermanent fu
 		if err := ch.QueueBind(b.Queue, b.Key, b.Exchange, false, nil); err != nil {
 			return err
 		}
-		deliveries, err := ch.ConsumeWithContext(ctx, b.Queue, b.Queue, false, false, false, false, nil)
+		// 不用 ConsumeWithContext：它在 ctx 取消時另起 basic.cancel，和下面 defer 的 ch.Close 搶同一個 RPC 回應，
+		// Close 會等不到 close-ok 而卡住。消費者隨 channel 關閉一起取消。
+		deliveries, err := ch.Consume(b.Queue, b.Queue, false, false, false, false, nil)
 		if err != nil {
 			return err
 		}
