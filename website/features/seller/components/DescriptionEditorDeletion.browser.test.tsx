@@ -156,6 +156,27 @@ async function deleteFromBlockMenu(
 }
 
 async function undo(dialog: HTMLElement, user: NativeUserEvent) {
+	const t0 = performance.now();
+	const undoTitle = () =>
+		within(dialog)
+			.getAllByRole("button")
+			.map((b) => b.getAttribute("title") ?? "")
+			.find((t) => t.startsWith("復原（") || t === "目前沒有可復原的動作");
+	const initial = undoTitle();
+	let final = initial;
+	try {
+		await waitFor(
+			() => {
+				final = undoTitle();
+				if (!final?.startsWith("復原（")) throw new Error("not yet");
+			},
+			{ timeout: 3000 },
+		);
+	} finally {
+		console.log(
+			`[DEBUG-undo] initial=${initial} final=${final} waitedMs=${Math.round(performance.now() - t0)}`,
+		);
+	}
 	await user.click(within(dialog).getByRole("button", { name: /^復原（/ }));
 }
 
@@ -317,7 +338,7 @@ describe("DescriptionEditorDeletion", () => {
 		});
 	});
 
-	it("段落結尾 · Delete 合併與復原", async () => {
+	it("段落結尾 · Delete 合併與復原", { repeats: 40 }, async () => {
 		const { container: canvasElement, args } = mount({});
 		await nativeDeletionTest(canvasElement, async (dialog, user) => {
 			const first = editableText(dialog, "第一段保留");
