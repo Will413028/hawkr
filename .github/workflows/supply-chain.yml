@@ -1,9 +1,11 @@
 name: supply chain
 
 # 供應鏈檢查：已知漏洞（govulncheck、OSV-Scanner）、外洩的機敏資料（gitleaks）、workflow 本身的安全（zizmor）。
-# OSV-Scanner、gitleaks、zizmor 不設 path 條件：它們掃整個 repo，任何依賴、設定、歷史的變動都可能引入問題。
+# gitleaks、zizmor 不設 path 條件：它們掃整個 repo，任何設定、歷史的變動都可能引入問題。
+# OSV-Scanner 的結果只取決於 lockfile／manifest、osv-scanner.toml 與漏洞資料庫：push 到 dev 與以 dev 為 base 的 PR
+# 只在改到這些時才跑；main 的 push、以 main 為 base 的 PR（上線前）、每日排程與手動觸發一律全量掃，接住資料庫新增的漏洞。
 # govulncheck 的結果只取決於 backend 的 Go 程式、go.mod／go.sum／go.work／.go-version 與漏洞資料庫：
-# PR 只在改到這些時才跑；push 到 main、dev 與每週一的排程（預設分支）一律全量掃，接住資料庫新增的漏洞。
+# PR 只在改到這些時才跑；push 到 main、dev 與每日排程（預設分支）一律全量掃，接住資料庫新增的漏洞。
 #
 # 工具版本與下載雜湊都釘死在本檔；升版時兩邊一起改，且版本要發佈滿兩週（見根目錄 AGENTS.md）。
 # 已知問題的基準（新的才擋）：
@@ -17,7 +19,7 @@ on:
   push:
     branches: [main, dev]
   schedule:
-    - cron: '17 3 * * 1'
+    - cron: '17 3 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -101,8 +103,55 @@ jobs:
             exit 1
           fi
 
+  osv-changes:
+    name: 判斷要不要跑 OSV-Scanner
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          PR_BASE_REF: ${{ github.base_ref }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          full() { echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; }
+          case "$EVENT" in
+            pull_request)
+              [ "$PR_BASE_REF" = main ] && full
+              range="$PR_BASE...$PR_HEAD" ;;
+            push)
+              [ "$REF" = refs/heads/main ] && full
+              # 新分支或 force push 後 before 不在歷史裡：無從比較，全量掃。
+              git cat-file -e "${PUSH_BEFORE}^{commit}" 2>/dev/null || full
+              range="$PUSH_BEFORE..$SHA" ;;
+            *) full ;;
+          esac
+          if git diff --name-only "$range" -- \
+              '*go.mod' '*go.sum' '*go.work' '*go.work.sum' \
+              '*package.json' '*package-lock.json' '*pnpm-lock.yaml' 'pnpm-workspace.yaml' \
+              '*pubspec.yaml' '*pubspec.lock' '*Podfile.lock' '*Gemfile.lock' \
+              '*pom.xml' '*requirements*.txt' \
+              'osv-scanner.toml' '.github/workflows/supply-chain.yml' \
+            | grep -q .; then
+            full
+          fi
+          echo "run=false" >> "$GITHUB_OUTPUT"
+
   osv-scanner:
     name: OSV-Scanner（所有 lockfile 與 pom.xml）
+    needs: osv-changes
+    if: needs.osv-changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -227,7 +276,7 @@ jobs:
     # The only required check on main: it passes when every other job in this workflow succeeded or was skipped.
     name: gate (supply-chain)
     if: always()
-    needs: [go-changes, govulncheck, osv-scanner, shaded-changes, shaded-jar-gate, gitleaks, zizmor]
+    needs: [go-changes, govulncheck, osv-changes, osv-scanner, shaded-changes, shaded-jar-gate, gitleaks, zizmor]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
