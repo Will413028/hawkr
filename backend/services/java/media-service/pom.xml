@@ -76,11 +76,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
-        <!-- RabbitMQ（PR2 商品匯入精靈：import_asset 內部 worker / gc.expire_job consumer / 對外 callback publish） -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-amqp</artifactId>
-        </dependency>
 
         <!-- 共用工具、基礎類別、TSID 產生器 -->
         <dependency>

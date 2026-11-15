@@ -13,7 +13,6 @@ import java.util.stream.Collectors;
 public enum ProductCertificationSource implements CodeMeta {
 
     SELLER("SELLER", "SELLER", "賣家送出", "賣家自行透過商品建立／編輯或專用申請端點送出"),
-    PRODUCT_IMPORT("PRODUCT_IMPORT", "PRODUCT_IMPORT", "商品匯入", "product-import-service 的 CSV 匯入 commit 路徑帶入"),
     DELEGATED_ADMIN("DELEGATED_ADMIN", "DELEGATED_ADMIN", "管理員代行", "ADM 在代行工作階段中代替賣家送出；`submitted_by_account_id` 是代行管理員本人"),
     SEED("SEED", "SEED", "種子資料", "`infra/seed-data/` 建立的測試資料，不代表任何真實賣家宣稱"),
     LEGACY_MIGRATION("LEGACY_MIGRATION", "LEGACY_MIGRATION", "存量遷移", "V18 migration 由既有 `product.certifications` JSONB 回填；`submitted_by_account_id` 必為 NULL（migration 沒有送出者，**不得**拿 `store_id` 頂替）");

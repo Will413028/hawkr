@@ -11,7 +11,7 @@ import HowItWorksDemoSection from "./components/HowItWorksDemoSection";
 
 export default function AboutPage() {
 	return (
-		<main
+		<div
 			className={`hkh-page ${zenMaruGothic.variable} ${openhuninn.variable}`}
 		>
 			<section className="hero about-hero">
@@ -69,6 +69,6 @@ export default function AboutPage() {
 			<HomeProcessCards />
 			<HowItWorksDemoSection />
 			<BrandStoryTrailSection />
-		</main>
+		</div>
 	);
 }

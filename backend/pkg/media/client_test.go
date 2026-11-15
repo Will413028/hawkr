@@ -66,19 +66,6 @@ func (s *stubMediaServiceClient) ServerReadSecureAsset(_ context.Context, _ *pb.
 	return nil, nil
 }
 
-// import_asset 入口（#40 PR2 新增）
-func (s *stubMediaServiceClient) ImportDownloadAsset(_ context.Context, _ *pb.ImportDownloadAssetRequest, _ ...grpc.CallOption) (*pb.ImportDownloadAssetResponse, error) {
-	return nil, nil
-}
-
-func (s *stubMediaServiceClient) FinalizeImportAsset(_ context.Context, _ *pb.FinalizeImportAssetRequest, _ ...grpc.CallOption) (*pb.FinalizeImportAssetResponse, error) {
-	return nil, nil
-}
-
-func (s *stubMediaServiceClient) BindStagedAsset(_ context.Context, _ *pb.BindStagedAssetRequest, _ ...grpc.CallOption) (*pb.BindStagedAssetResponse, error) {
-	return nil, nil
-}
-
 func (s *stubMediaServiceClient) ReleaseReferences(_ context.Context, _ *pb.ReleaseReferencesRequest, _ ...grpc.CallOption) (*pb.ReleaseReferencesResponse, error) {
 	return nil, nil
 }

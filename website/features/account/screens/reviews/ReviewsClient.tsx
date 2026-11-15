@@ -12,7 +12,7 @@ import ReviewedList from "./ReviewedList";
  */
 export default function ReviewsClient() {
 	return (
-		<main className="bg-transparent">
+		<div className="bg-transparent">
 			<SellerPageShell
 				title="我的評價"
 				subtitle="撰寫待評價訂單，或回顧寫過的評價"
@@ -25,6 +25,6 @@ export default function ReviewsClient() {
 					]}
 				/>
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }

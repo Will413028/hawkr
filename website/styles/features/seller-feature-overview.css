@@ -82,7 +82,7 @@
 	margin-inline-start: -1px;
 	padding: 4px 18px;
 	border-inline-start: 2px solid transparent;
-	color: var(--theme-text-muted);
+	color: var(--theme-text-body);
 	font-family: var(--font-primary);
 	font-size: 1rem;
 	font-weight: 650;

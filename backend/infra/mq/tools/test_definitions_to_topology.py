@@ -16,14 +16,14 @@ DEV = {"exchanges": [
 DEV_JSON_ARGS = {"exchanges": [
         {"name": "hawkr.order", "vhost": "/", "type": "topic", "durable": True, "auto_delete": False, "arguments": {}}],
        "queues": [
-        {"name": "product.import.commit.retry", "vhost": "/", "durable": True, "auto_delete": False,
-         "arguments": {"x-dead-letter-exchange": "hawkr.product.import",
+        {"name": "sample.job.run.retry", "vhost": "/", "durable": True, "auto_delete": False,
+         "arguments": {"x-dead-letter-exchange": "hawkr.sample",
                        "x-dead-letter-routing-key": "commit", "x-message-ttl": 10000}},
         {"name": "order.paid.queue", "vhost": "/", "durable": True, "auto_delete": False,
          "arguments": {"x-queue-type": "classic", "x-dead-letter-exchange": "hawkr.order.dlx"}}],
        "bindings": [
-        {"source": "hawkr.order", "vhost": "/", "destination": "product.import.commit.retry",
-         "destination_type": "queue", "routing_key": "product.import.commit", "arguments": {}}]}
+        {"source": "hawkr.order", "vhost": "/", "destination": "sample.job.run.retry",
+         "destination_type": "queue", "routing_key": "sample.job.run", "arguments": {}}]}
 EMPTY = {"exchanges": [], "queues": [], "bindings": []}
 PROD = {"exchanges": [
         {"name": "hawkr.order", "vhost": "/", "type": "topic", "durable": True, "auto_delete": False, "arguments": {}},
@@ -61,14 +61,14 @@ class TestGen(unittest.TestCase):
         topo, report = self._run(DEV_JSON_ARGS, EMPTY)
         json_args_names = {q["name"] for q in topo["queues_json_args"]}
         plain_names = {q["name"] for q in topo["queues"]}
-        self.assertIn("product.import.commit.retry", json_args_names)   # x-message-ttl 是 int → json_args
-        self.assertNotIn("product.import.commit.retry", plain_names)
+        self.assertIn("sample.job.run.retry", json_args_names)   # x-message-ttl 是 int → json_args
+        self.assertNotIn("sample.job.run.retry", plain_names)
         self.assertIn("order.paid.queue", plain_names)                  # 剩下皆 string arg（x-queue-type 已被剝除）→ 留在 queues
         self.assertNotIn("order.paid.queue", json_args_names)
         # binding 指向 json_args queue，不應被當成「指向被剔除 queue」而濾掉
         self.assertEqual(len(topo["bindings"]), 1)
-        self.assertEqual(topo["bindings"][0]["destination"], "product.import.commit.retry")
-        self.assertIn("product.import.commit.retry", report)  # audit report 仍點名該 queue 的非 string arg
+        self.assertEqual(topo["bindings"][0]["destination"], "sample.job.run.retry")
+        self.assertIn("sample.job.run.retry", report)  # audit report 仍點名該 queue 的非 string arg
 
 if __name__ == "__main__":
     unittest.main()

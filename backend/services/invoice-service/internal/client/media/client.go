@@ -237,7 +237,7 @@ var ErrAssetNotSecure = errors.New("media: asset is not secure")
 // ReadSecure 把先前以服務身分上傳的機敏檔讀回原始位元組（58 §6.1.4）。
 //
 // 🔴 為什麼不能直接讀 OSS：機敏資產在儲存上是**加密的**，金鑰只有 media 拿得到；
-// 而「儲存 SDK 只准在 media／product-import」是 §25 的硬規則。
+// 而「儲存 SDK 只准在 media」是 §25 的硬規則。
 //
 // 🔴 為什麼不能走 media 的 `secure_download`：那支的授權述詞是「**使用者**是上傳者
 // 或有 asset_reference」。發票 PDF 由本服務以服務身分上傳，合法讀者卻是買家／賣家／ADM

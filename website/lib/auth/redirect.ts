@@ -28,7 +28,7 @@ const ACCESS_RULES: ReadonlyArray<{
 	{ access: "buyer", prefixes: ["/account", "/checkout"] },
 	{
 		access: "seller",
-		prefixes: ["/seller-center", "/seller-product-import-preview"],
+		prefixes: ["/seller-center"],
 	},
 	{ access: "account", prefixes: ["/seller/measures"] },
 ];

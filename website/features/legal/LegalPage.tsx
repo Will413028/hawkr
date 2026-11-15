@@ -52,9 +52,9 @@ export default function LegalPage({
 							id={section.id}
 							className={`glass-card glass-card--sm p-[var(--space-8)] md:p-[var(--space-6)_var(--space-4)]${solidCards ? " glass-card--solid" : ""}`}
 						>
-							<h3 className="font-[var(--font-chinese)] text-[length:var(--text-xl)] font-bold text-[var(--color-primary)] mb-[var(--space-4)] pb-[var(--space-3)] border-b-2 border-[var(--color-primary)]">
+							<h2 className="font-[var(--font-chinese)] text-[length:var(--text-xl)] font-bold text-[var(--color-primary)] mb-[var(--space-4)] pb-[var(--space-3)] border-b-2 border-[var(--color-primary)]">
 								{section.title}
-							</h3>
+							</h2>
 							<div className="font-[var(--font-chinese)] text-[length:var(--text-base)] text-[color:var(--text-body)] leading-relaxed [&_p]:mb-[var(--space-4)] [&_p:last-child]:mb-0 [&_ul]:pl-[var(--space-6)] [&_ul]:mb-[var(--space-4)] [&_ul]:list-disc [&_li]:mb-[var(--space-2)] [&_strong]:font-bold [&_strong]:text-[color:var(--text-heading)]">
 								{section.content}
 							</div>

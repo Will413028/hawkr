@@ -76,7 +76,7 @@ interface ProductPurchaseBoxProps {
 	purchasable?: boolean;
 	publicationState?: string;
 	/**
-	 * 預覽模式（賣家匯入精靈 Page 5 用）：layout 與真實 PDP 完全一致，
+	 * 預覽模式：layout 與真實 PDP 完全一致，
 	 * 但 AddToCart / 立即購買 / 補貨通知按鈕全部 disabled，no-op。
 	 */
 	previewMode?: boolean;
@@ -172,9 +172,9 @@ export default function ProductPurchaseBox({
 	// own subscription list on mount. Page size 50 is enough for typical buyers;
 	// if larger lists are ever common the gateway should add a per-product check
 	// (`GET /app/products/{id}/restock_subscriptions`) — for now keep it simple.
-	// ⚠️ `previewMode` 在這裡是**必要**條件，不是保險。預覽路徑（匯入精靈、代行工作區）
+	// ⚠️ `previewMode` 在這裡是**必要**條件，不是保險。預覽路徑（代行工作區）
 	// 傳進來的 `productId` 不是買家端認得的商品，而這一發是 `/app/*` 的買家端請求。
-	// 今天它不會送出，只是因為那兩個預覽面恰好都沒有 www 登入態（`status` 不是
+	// 今天它不會送出，只是因為預覽面恰好沒有 www 登入態（`status` 不是
 	// `signedIn`）—— 那是巧合不是保證：管理員本人若剛好也在同一個瀏覽器登入過 www，這一發
 	// 就會用他自己的買家身分打出去。按鈕全部 disabled 卻仍發請求，正是 previewMode
 	// 要防的形狀。

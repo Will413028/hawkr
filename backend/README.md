@@ -16,7 +16,7 @@
 
 - **Gateway**（`gateway/`, Go/Gin, port 9900）：REST → gRPC 路由、JWT auth、rate limit、circuit breaker、OTel tracing
 - **Go 服務**（`services/`）：account / buyer / seller / im / ai / content / crm / social / review / notification — 使用 **Atlas declarative** schema migration
-- **Java 服務**（`services/`, Spring Boot）：product / order / media / aftersales / payment / cart / shipping / coupon / payuni-webhook / product-import — 使用 **Flyway** migration
+- **Java 服務**（`services/`, Spring Boot）：product / order / media / aftersales / payment / cart / shipping / coupon / payuni-webhook — 使用 **Flyway** migration
 
 各服務 port、API、資料模型詳見 [backend/docs/詳細設計書/](docs/詳細設計書/)。
 

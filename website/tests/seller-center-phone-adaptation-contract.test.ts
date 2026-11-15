@@ -53,8 +53,6 @@ test("seller list tables opt into phone cards with visible field labels", () => 
 		"features/seller-center/customers/CustomersClient.tsx",
 		"features/seller-center/messages/SellerMessagesWorkspaceClient.tsx",
 		"features/seller-center/invoices/SellerInvoiceOverviewPage.tsx",
-		"features/seller-center/products-import/pages/JobsListPage.tsx",
-		"features/seller-center/products-import/pages/JobDetailPage.tsx",
 	];
 
 	for (const file of listTables) {
@@ -78,14 +76,6 @@ test("shared phone controls stay single-line and meet the touch target", () => {
 	assert.match(
 		adaptation,
 		/seller-page-shell__action-group[\s\S]*height:\s*44px/,
-	);
-	assert.match(
-		adaptation,
-		/\.seller-import-detail__filter-rail[\s\S]*flex-wrap:\s*nowrap/,
-	);
-	assert.match(
-		adaptation,
-		/\.seller-import-item__action-rail[\s\S]*flex-wrap:\s*nowrap/,
 	);
 	assert.match(adaptation, /\.seller-card__link[\s\S]*min-height:\s*44px/);
 	assert.match(
@@ -134,7 +124,15 @@ test("product and profile fixed actions stay usable at 320px", () => {
 	);
 	assert.match(productForm, /className="product-form__mobile-toolbar/);
 	assert.match(productForm, /className="product-form__mobile-more"/);
-	assert.match(productForm, /aria-label="開啟 AI 上架助手"/);
+	assert.match(productForm, /aria-describedby="product-form-ai-desc"/);
+	assert.match(
+		productForm,
+		/id="product-form-ai-desc" className="sr-only">\s*開啟 AI 上架助手/,
+	);
+	assert.match(
+		productForm,
+		/className="product-form__ai-label">AI 助手<\/span>/,
+	);
 	assert.match(
 		productForm,
 		/submitFromButton\(mobileProminentAction\.action\)/,

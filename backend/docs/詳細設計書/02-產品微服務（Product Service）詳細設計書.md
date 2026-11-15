@@ -477,7 +477,7 @@ flowchart TD
 
 **認證驗證（GovCertificationService）降級**：該服務用 Redis 做政府 API 結果快取 + circuit breaker。Redis 失聯時 → 結果快取讀取視同 miss、circuit 視同未開；快取寫回失敗 log.warn 略過。
 
-> 🔴 **商品 create / update / import-commit 等同步寫入路徑不得呼叫 `verify()`**。
+> 🔴 **商品 create / update 等同步寫入路徑不得呼叫 `verify()`**。
 > `verify()` 逾時／IO 例外會呼叫 `openCircuit()` 寫 `gov:cert:circuit:{type}`（TTL 60s、per-type、**Redis 全域共享**），使緊接著排出去的**背景查驗**落在 60 秒窗口內被短路成 `UNAVAILABLE` —— 同步路徑會把背景機制自己封死。
 > ⇒ 同步階段**只讀 Redis 結構化查驗快取**（新前綴 `gov:certv2:{type}:{hash}`），**零外部呼叫**；未命中即落 `SUBMITTED(PENDING)` 並發事件排背景查驗。**商品建立永不被政府 API 影響，這是結構保證不是約定。**
 > Redis 失聯時同步階段一律視同 miss ⇒ 全部走背景查驗，商品寫入不受阻。詳見 [19 號 §8.2](19-農業認證驗證%EF%BC%88Certification%20Verification%EF%BC%89詳細設計書.md)。
@@ -578,7 +578,7 @@ Enum 定義見 [業務狀態碼 § ProductPublicationState](../代碼管理%EF%B
 - 型別 `TIMESTAMPTZ`，nullable；語意為**首次進入 ACTIVE 的時間**。`NULL` = 無法證明曾公開過。
 - **一旦寫入永不改變**：下架、再上架、改價、改分類都不影響它。
 - **寫入時機**：任何路徑把 `status` 落地為 `ACTIVE (4004)` 且當前值為 `NULL` 時寫入 `now()`。
-- **雙層保證**：應用層由 `ProductPublicationPolicy.firstPublishedAtOnActivation(...)` 在 `CreateProduct`（converter 落地）、`UpdateProductStatus`（admin）、`UpdateSellerProductStatus`（賣家）三處計算；DB 層另有 `BEFORE INSERT OR UPDATE` trigger `set_product_first_published_at` 兜底。理由：product 另有 import 轉正、停權批次還原等 SQL 寫入路徑，**DB invariant 才能保證任何路徑都只寫一次、且後續 UPDATE 不得覆寫**。
+- **雙層保證**：應用層由 `ProductPublicationPolicy.firstPublishedAtOnActivation(...)` 在 `CreateProduct`（converter 落地）、`UpdateProductStatus`（admin）、`UpdateSellerProductStatus`（賣家）三處計算；DB 層另有 `BEFORE INSERT OR UPDATE` trigger `set_product_first_published_at` 兜底。理由：product 另有停權批次還原等 SQL 寫入路徑，**DB invariant 才能保證任何路徑都只寫一次、且後續 UPDATE 不得覆寫**。
 - ⚠️ **`NULL` 不得被猜測補值**：把 INACTIVE 商品推測成「曾公開」會讓從未公開的草稿／審核未過商品洩漏出去。
 
 #### 2.9.2 推導規則（`ProductPublicationPolicy.deriveState`）
@@ -870,7 +870,7 @@ UPDATE product SET favorite_count = favorite_count ± 1 WHERE id = ?;
 
 - `withHeadings`：首列為標題列
 - `rows`：二維陣列，每個 cell = `{ "runs": [...] }`（同 run 模型，可局部粗體 / 顏色 / 連結）
-- **上限（貼上 / 匯入 / 後端寫入三處驗證）**：欄 ≤ **10**、列 ≤ **50**、單 cell 純文字 ≤ **200** 字、`table_json` 序列化 ≤ **20 KB**；超過截斷 + warning
+- **上限（貼上 / 後端寫入兩處驗證）**：欄 ≤ **10**、列 ≤ **50**、單 cell 純文字 ≤ **200** 字、`table_json` 序列化 ≤ **20 KB**；超過截斷 + warning
 - **合併儲存格（colspan / rowspan）不支援**：拆開正規化為獨立 cell（來源合併格內容落左上 cell，其餘補空 cell）
 
 **list 結構**（`list_json` 字串內容，後端 opaque 儲存、僅長度 / 項目數上限驗證）：
@@ -887,8 +887,8 @@ UPDATE product SET favorite_count = favorite_count ± 1 WHERE id = ?;
 
 - `ordered`：`true` = 有序清單（`<ol>`，帶序號）、`false` = 無序清單（`<ul>`，帶項目符號）
 - `items`：一維陣列，每個 item = `{ "runs": [...] }`（同 run 模型，項目內可局部粗體 / 顏色 / 連結）
-- **僅平坊清單**：巢狀清單（項目內再含子清單）**不支援**；貼上 / 匯入的巢狀結構攤平為單層 item（子項以獨立 item 承接）
-- **上限（貼上 / 匯入 / 後端寫入三處驗證）**：項目數 ≤ **50**、單項純文字 ≤ **200** 字、`list_json` 序列化 ≤ **20 KB**；超過截斷 + warning
+- **僅平坊清單**：巢狀清單（項目內再含子清單）**不支援**；貼上的巢狀結構攤平為單層 item（子項以獨立 item 承接）
+- **上限（貼上 / 後端寫入兩處驗證）**：項目數 ≤ **50**、單項純文字 ≤ **200** 字、`list_json` 序列化 ≤ **20 KB**；超過截斷 + warning
 - **外部貼上**：web 編輯器（Editor.js `@editorjs/list`）支援自其他網頁 / 文件複製 `<ol>` / `<ul>` 直接貼上，經 `pasteConfig`（OL / UL / LI）自動轉為 `list` block，項目 HTML 經既有 `htmlToRuns` 轉為 `runs`（保留項目內粗體 / 連結），與手動建立走同一 `list_json` 契約
 
 **§3.6.1 gRPC 契約（proto 擴充）**：新增 `InlineRun` message，`DescriptionBlock` 加 `runs` / `table_json` / `list_json`（`api/proto/product/product.proto`）：
@@ -915,13 +915,13 @@ message DescriptionBlock {
 }
 ```
 
-- field number：`runs = 13` / `table_json = 14` / `list_json = 15`（接續現有 `import_asset_id = 12`）
+- field number：`runs = 13` / `table_json = 14` / `list_json = 15`
 - 實作位置：`api/proto/product/product.proto` → `gen-go-proto.sh` → rsync `java-proto/src/main/proto/` → `mvn clean install`
 - `content = 3`：backfill 完成、驗證無殘留後改 `reserved 3; reserved "content";`（禁 field number reuse）
 - **JSON key 大小寫**：proto 檔用 snake（`table_json` / `list_json`），但 **JSONB 儲存 / HTTP body / 前端一律 camelCase**（`tableJson`、`listJson`、`objectKey`、`assetId`…，對齊既有 entity 欄位 + [《PostgreSQL 設計規範與最佳實踐》六、JSONB 使用規範](../開發規範/PostgreSQL%20設計規範與最佳實踐.md) 的 camelCase 規則）。本節 JSON sample 的 snake 標示僅為可讀性，實作以 camelCase 為準。`list_json` 內層 key（`ordered` / `items`）與 run 欄位 `text/bold/italic/underline/color/href` 皆單字，無大小寫差異
 
 **run 正規化（canonical form，保 round-trip idempotent，對齊 §3.6.3）**：
-- 相鄰且**樣式旗標完全相同**的 run 一律合併（`fromEditorData`(save) 與 import 轉換兩處套同一規則）
+- 相鄰且**樣式旗標完全相同**的 run 一律合併（`fromEditorData`(save) 套同一規則）
 - `text` 為空字串的 run 一律丟棄
 - 套用後 runs 為唯一正規形 → 存 N 次位元組穩定
 
@@ -1198,11 +1198,6 @@ Proto 檔案：`api/proto/product/product.proto`、`api/proto/category/category.
 | 24 | `GetPublicOriginsSummary` | Gateway (Public) | 公開商品產地聚合：依當前 ACTIVE 商品 group by `origin` 回傳產地與商品數列表（詳見 §5.13） |
 | 25 | `BatchGetProductForCheckout` | Order Service | 結帳鏈路專用批次商品查詢，**接受 inactive product 不拋例外**（含 status / is_active），回完整 weight / dimension / shipping_method 等結帳必要欄位。詳見 §5.5.2 |
 | 26 | `GetPublicSellerCitiesSummary` | Gateway (Public) | 商家註冊所在地聚合：固定回 22 縣市；城市歸屬與列表 `seller_city_code` filter 共用 seller SSOT，`sellerCount` / `previewStoreIds` 只計「至少一件公開上架商品」的店（與 §5.13c 共用同一句聚合，見 `ProductSellerCitySummaryPolicy`） |
-| 27 | `ValidateLeafCategoryInternal` | Product Import Service | **內部 RPC**：驗證 category_id 為合法葉節點，回傳 `cat_l1` / `cat_l2` 反正規化欄位。詳見 §9.1 |
-| 28 | `CreateProductFromImportInternal` | Product Import Service | **內部 RPC**：commit 階段把暫存 `import_item` 轉正為 product + product_sku；與 `CreateProduct` 刻意分離以維持權限邊界與審計線索。詳見 §9.2 |
-| 29 | `BatchCheckSellerProductNames` | Product Import Service | **內部 RPC**：批次偵測商品名稱是否與該賣家既有商品重複（CSV 解析與 `UpdateImportItem` 時呼叫）。詳見 §9.5 |
-| 30 | `ValidateProductDraft` | Product Import Service | **內部 RPC**：商品上架完整檢核（雙時機點 validator），由 `ProductPublishValidator` 執行——CSV 路徑不得繞過任何上架規則。詳見 40 號 §4.3a |
-| 31 | `GetProductsBriefInternal` | Product Import Service | **內部 RPC**：批次查 `(id, name, status, status_label, publication_state)` 供 import 端 hydrate。**底層刻意不濾 `deleted_at`**——已軟刪商品要回得出來並帶 `publication_state=4014`，否則與 RPC 失敗同形（#2819）。詳見 40 號 §4.3b |
 | 32 | `BatchUpdateSellerProductStatus` | Gateway (Seller) | 批次上下架 |
 | 33 | `BatchGetSellerProductsForDelegation` | Gateway (Admin 代行) | 代行工作區批次取商品快照 |
 | 34 | `SubmitProductCertification` | Gateway (Seller) | 單筆送出商品認證申請。詳見 [19 號 §10](19-農業認證驗證%EF%BC%88Certification%20Verification%EF%BC%89詳細設計書.md) |
@@ -3491,7 +3486,6 @@ sequenceDiagram
 | 操作 | 事務範圍 | 補償策略 |
 |------|---------|---------|
 | CreateProduct | `@Transactional`（product + SKU + hashtag UPSERT + product_hashtag + counter delta + **product.stock_qty / shipping_methods cascade**（§5.13a） + 冪等記錄） | 圖片 Link 失敗不回滾 DB（記 LOG，best-effort） |
-| CreateProductFromImportInternal（`ProductImportService.doCreate`，§9.3a） | `@Transactional`（product + SKU + hashtag + 反正規化 + **FinalizeImportAsset + LinkImages(gallery/desc)**） | **與 CreateProduct 不同：finalize / link 失敗讓例外傳播 → 全事務 rollback → import_item 標 COMMIT_FAILED**（import commit 不可逆且須符驗收「不得建出帶壞圖商品」；避免 finalize 成功但 link 失敗留下被孤兒 GC 回收的 media_asset） |
 | UpdateProduct | `@Transactional`（product + SKU + hashtag diff + counter delta + **product.stock_qty / shipping_methods cascade 重算**（§5.13a） + 冪等記錄） | 圖片 Link/Unlink 失敗不回滾 DB |
 | UpdateSellerProductStatus / UpdateProductStatus | `@Transactional`（product status 更新 + counter delta） | counter delta 與 status 同生共死 |
 | DeleteProduct | `@Transactional`（軟刪 + counter delta） | 同上 |
@@ -3517,7 +3511,6 @@ sequenceDiagram
 
 - **設計原則**：先寫 DB 再 Link，保證 DB 回滾時不留孤兒引用
 - **容錯（互動式 CreateProduct / UpdateProduct 路徑）**：Link 失敗 → best-effort 記 LOG 不回滾 → 前端看到破圖（使用者可察覺並重新上傳）
-- **★ import commit 路徑例外（CreateProductFromImportInternal，§9.3a）**：Link 失敗**不走 best-effort**，改讓例外傳播 → DB rollback → item 標 COMMIT_FAILED。理由：import commit 不可逆、批次無人盯，best-effort 會讓 finalize 成功但 link 失敗的 media_asset 變孤兒，7 天後被 Media GC 連同 OSS 物件刪除 → 商品永久破圖。
 
 ### 7.4 Hashtag counter 一致性
 
@@ -3553,7 +3546,7 @@ sequenceDiagram
 
 - **單一寫入路徑**：投影只由 `ProductCertificationApplicationService.rebuildProjection(productId)` 產生
   ——由該商品**當前所有 `APPROVED` 申請**重算。**任何路徑不得再直接 `setCertifications` 寫投影**
-  （原本的 W1 建立 / W2 更新 / W3・W4 代行 / W5 匯入五條路徑全部改呼叫收斂點）。
+  （原本的 W1 建立 / W2 更新 / W3・W4 代行四條路徑全部改呼叫收斂點）。
 - **同事務內重建（強制）**：每一個改變 approved 集合的操作都必須在**同一 transaction** 內呼叫 `rebuildProjection`：
   `APPROVE`（人工＋系統）／`SUPERSEDE`／`WITHDRAW`（由 APPROVED 轉出）／`REVOKE`；
   `REJECT` 不改集合但為統一亦呼叫（冪等）。
@@ -3630,274 +3623,7 @@ sequenceDiagram
 
 ---
 
-## 9. 商品匯入整合擴充
-
-> 本章節定義 Product Service 為 [40 號設計書（商品匯入精靈服務）](40-商品匯入精靈服務（Product%20Import%20Service）詳細設計書.md)承擔的契約：內部驗證 RPC、內部轉正 RPC、`product` 表的 2 個審計欄位、以及 description 圖片的 Finalize 路徑。
-
-### 9.1 內部 RPC：ValidateLeafCategoryInternal
-
-**用途**：給商品匯入服務（與未來其他批次工具）在「商品建立前」驗證 `category_id` 是否為合法葉節點，並取回反正規化 `cat_l1/l2` 欄位，避免每筆 import row 在 commit 階段才知道分類錯誤。
-
-**Proto**（新增到 `api/proto/product/product.proto`）：
-
-```protobuf
-rpc ValidateLeafCategoryInternal(ValidateLeafCategoryInternalRequest)
-    returns (ValidateLeafCategoryInternalResponse);
-
-message ValidateLeafCategoryInternalRequest {
-    string category_id = 1;                  // 葉節點候選 id（數字字串）
-}
-
-message ValidateLeafCategoryInternalResponse {
-    int32 code = 1;
-    string message = 2;
-    bool is_valid = 3;
-    string cat_l3_id = 4;
-    string cat_l3_name = 5;
-    string cat_l2_id = 6;
-    string cat_l2_name = 7;
-    string cat_l1_id = 8;
-    string cat_l1_name = 9;
-    string invalid_reason = 10;              // NOT_FOUND / NOT_LEAF / DISABLED
-}
-```
-
-**權限**：純內部 RPC，由 `x-internal-service` metadata 自動識別免身份驗證；Gateway 不暴露對應 REST。
-
-**實作位置**：
-
-- 新增 `ProductGrpcService.validateLeafCategoryInternal()` handler
-- 重用既有 `CategoryService` 內 `getParentId()` 與 leaf 判定邏輯
-- 不查詢任何使用者層級資料，純讀 category 表
-
-**錯誤策略**：
-
-- category_id 不存在 → `is_valid=false`, `invalid_reason=NOT_FOUND`（不拋 gRPC error，因為這是「驗證」場景，false 屬於正常回應）
-- category_id 非葉節點 → `is_valid=false`, `invalid_reason=NOT_LEAF`
-- 葉節點但 status=DISABLED → `is_valid=false`, `invalid_reason=DISABLED`
-
-### 9.2 內部 RPC：CreateProductFromImportInternal
-
-**用途**：給商品匯入服務在 commit 階段建立正式商品。與既有 `CreateProduct`（Gateway 對前端 APP）分離，以維持權限邊界與審計線索清晰。
-
-**為何不重用 `CreateProduct`**：
-
-| 議題 | `CreateProduct` | `CreateProductFromImportInternal` |
-|------|----------------|-----------------------------------|
-| Access | Gateway 對前端開放（賣家 JWT） | 內部 only（`x-internal-service`） |
-| `store_id` 來源 | Gateway resolver 注入（現任 store surrogate） | Import Service 傳入（已驗證的賣家 store id） |
-| 來源追溯欄位 | 無 | 帶 `import_job_id` / `import_item_id` |
-| 圖片承載 | `staged_token`（30 min TTL JWT） | `import_asset_id`（無 TTL，UUID） |
-| 描述圖 Finalize | `processDescriptionImages`（既有，by stagedToken） | `processDescriptionImportAssets`（§9.3 新方法，by import_asset_id） |
-
-**Proto**（新增到 `api/proto/product/product.proto`）：
-
-```protobuf
-rpc CreateProductFromImportInternal(CreateProductFromImportInternalRequest)
-    returns (CreateProductFromImportInternalResponse);
-
-message CreateProductFromImportInternalRequest {
-    string idempotency_key = 1;             // 由 Import 端組：import:{itemId}:rev:{revision}
-    int64 store_id = 2;                     // 賣家 store 代理鍵（Import 服務上下文已驗證）
-    string import_job_id = 3;               // 純記錄，寫入 product 表審計欄位
-    string import_item_id = 4;              // 同上
-    string name = 5;
-    string category_id = 6;
-    ProductDescription description = 7;
-    repeated ProductImageImport images = 8;          // 用 import_asset_id 取代 staged_token
-    string origin = 9;
-    repeated Certification certifications = 10;
-    string target_status = 11;              // ACTIVE | DRAFT | PENDING_REVIEW
-    repeated ProductSkuImport skus = 12;    // 重用既有 SKU 結構，但畫面顯示無 sku_id
-    repeated string hashtags = 13;
-}
-
-message ProductImageImport {
-    string import_asset_id = 1;             // Media import_asset.id (UUID)
-    int32 sort_order = 2;
-}
-
-message ProductSkuImport {
-    string sku_name = 1;
-    string price = 2;
-    string sale_price = 3;
-    string stock_qty = 4;
-    string weight = 5;
-    string unit = 6;
-    string length_cm = 7;
-    string width_cm = 8;
-    string height_cm = 9;
-    repeated ShippingMethod shipping_methods = 10;   // 重用既有
-}
-
-message CreateProductFromImportInternalResponse {
-    int32 code = 1;
-    string message = 2;
-    string product_id = 3;                  // 數字字串
-    string idempotency_status = 4;          // CREATED | DUPLICATED（與既有 IdempotencyService 對齊）
-}
-```
-
-**Description 內嵌圖**：
-
-`ProductDescription.blocks[]` 內 type=image 的 block 不再帶 `staged_token`，改帶**新欄位** `import_asset_id`（需在既有 `DescriptionBlock` proto message 新增 `string import_asset_id = N;`）。Product Service 內部判斷：
-
-- 若 `staged_token` 非空 → 走既有 `processDescriptionImages`（finalizeImages by stagedToken）
-- 若 `import_asset_id` 非空 → 走新 `processDescriptionImportAssets`（§9.3，finalize by import_asset_id）
-- 兩者**同一個 block 互斥**，違反時拋 INVALID_ARGUMENT
-
-### 9.3 新增內部方法：processDescriptionImportAssets
-
-**位置**：`ProductService.java`，與既有 `processDescriptionImages`（[L1517](../../services/java/product-service/src/main/java/io/github/will413028/hawkr/product/service/ProductService.java#L1517)）並排。
-
-**簽名**：
-
-```java
-private void processDescriptionImportAssets(Long productId,
-                                             ProductEntity.ProductDescription description,
-                                             Long storeId);
-```
-
-**邏輯（對齊既有 `processDescriptionImages`）**：
-
-```
-1. 過濾 description.blocks 內 type=image 且 import_asset_id 非空的 block
-2. 逐一呼叫 Media FinalizeImportAsset(importAssetId, refType=PRODUCT_DESC, productId, storeId)
-3. 回填 block.assetId / block.objectKey / block.url，清掉 import_asset_id
-4. 建立 asset_reference (refType=PRODUCT_DESC, ref_id=productId) — 重用既有 linkDescriptionImages 路徑
-5. 失敗策略：**與 §9.3a 一致（import commit 走 strict，不同於互動式 processDescriptionImages 的 best-effort）**。
-   finalize 或 link 任一失敗 → 讓例外傳播 → doCreate 全事務 rollback → import_item 標 COMMIT_FAILED。
-   finalize 成功但 link 失敗會留下被孤兒 GC 回收的 media_asset ⇒ 描述圖的 link 同樣不得吞例外。
-```
-
-**主圖類似**：原 `finalizeAndPersistImages`（gallery 主圖 finalize 路徑）需擴充：
-
-```
-- 若 ProductImage.staged_token 非空 → 走既有 FinalizeImages by stagedToken
-- 若 ProductImage.import_asset_id 非空 → 走新 FinalizeImportAssets by import_asset_id
-- 兩者互斥
-```
-
-### 9.3a Import 轉正資產生命週期（Finalize → DB 落盤 → **Link**，強制）
-
-> 🔴 **import 轉正流程必須與 `CreateProduct`（§5.1）走同一條 `Finalize → 業務 DB 落盤 → Link` 契約**（Media 08 §4.1 step 4 防孤兒機制 / 08 §7.3 LinkImages 強制）。
-
-**實作位置（實況）**：import 轉正的編排在 `ProductImportService.doCreate`（與 `CreateProduct` 嚴格分離，[《Java 微服務開發規範》§4.1 角色分離](../開發規範/Java%20微服務開發規範.md)），透過 `ProductImportAssetProcessor.processGallery` / `processDescription` 呼叫 Media `FinalizeImportAsset` 取得 `assetId / objectKey`。**finalize 與 link 兩步驟拆開**：finalize 只把 OSS object 搬到正式路徑 + 建 `media_asset`，**不建 `asset_reference`**。
-
-**強制順序**（`doCreate` 內，`@Transactional`）：
-
-```
-1. processGallery       → 逐張 FinalizeImportAsset(refType=PRODUCT)，回填 GalleryItem{assetId, objectKey}
-2. processDescription   → 逐張 FinalizeImportAsset(refType=PRODUCT_DESC)，回填 DescriptionBlock{assetId, objectKey}
-3. UPDATE product       → 業務資料落盤（gallery / description / 反正規化欄位）
-4. LinkImages(gallery)  → linkImages(galleryAssetIds, refType=PRODUCT,      refId=productId)   ★ 不可省
-5. LinkImages(desc)     → linkImages(descAssetIds,    refType=PRODUCT_DESC, refId=productId)   ★ 不可省
-```
-
-> ⚠️ **缺第 4/5 步 = 圖片 7 天後 404**：`FinalizeImportAsset` 建立的 `media_asset` 若無對應 `asset_reference`，會被 Media `MediaGarbageCollectionJob` 孤兒清理（無引用且 `created_at` 超過 `media.gc.orphan-asset-days`，預設 7 天）**連 DB row + OSS 物件一起刪** → 正式商品 `images[]` 全數 404。
-
-**錯誤處理**：link 失敗**一律讓例外傳播** → `@Transactional` 連同 product 寫入 rollback → import 路徑標 `COMMIT_FAILED` 由賣家 retry；互動式 `CreateProduct` / `UpdateProduct` 亦同（不得 catch + log 放行）。理由與媒體生命週期不變式一致（Media 08 §4.6.2）：吞掉 link 錯誤會 commit 出「`product.gallery` 指著 assetId、卻沒有 `asset_reference`」的列，7 天後被 GC 連同 R2 物件實體刪除；讓它 rollback 則只留下無人引用的資產，正好落在 GC 的孤兒回收範圍。
-
-**collect helper 去重（[《Java 微服務開發規範》§15 重複實作防護](../開發規範/Java%20微服務開發規範.md)）**：`collectGalleryAssetIds` / `collectDescriptionAssetIds` / link 邏輯抽為共用元件 `ProductMediaReferenceLinker`（位置：`services/java/product-service/src/main/java/io/github/will413028/hawkr/product/service/helper/ProductMediaReferenceLinker.java`），由 `ProductService` 與 `ProductImportService` 共用，禁止複製。元件提供 `linkGallery(productId, gallery)` / `linkDescription(productId, description)`，內部封裝 collect + `MediaGrpcClient.linkImages`。**兩邊 caller 的失敗語意一致**：不吞例外，讓其傳播觸發 rollback。
-
-```mermaid
-sequenceDiagram
-    participant IMP as ProductImportService.doCreate
-    participant PROC as ProductImportAssetProcessor
-    participant MS as Media Service
-    participant PDB as Product DB
-
-    Note over IMP: @Transactional
-    IMP->>PROC: processGallery(importAssetIds)
-    PROC->>MS: FinalizeImportAsset(refType=PRODUCT) ×N
-    MS-->>PROC: {assetId, objectKey}  （正式路徑 public/product/{acc}/{date}/{uuid}）
-    IMP->>PROC: processDescription(importAssetIds)
-    PROC->>MS: FinalizeImportAsset(refType=PRODUCT_DESC) ×M
-    MS-->>PROC: {assetId, objectKey}
-    IMP->>PDB: UPDATE product（gallery / description / 反正規化）— 業務落盤
-    alt finalize / link 全成功
-        IMP->>MS: LinkImages(PRODUCT, productId, galleryAssetIds)   ★
-        IMP->>MS: LinkImages(PRODUCT_DESC, productId, descAssetIds) ★
-        Note over IMP,PDB: tx commit → item=COMMITTED
-    else finalize 或 link 任一失敗
-        MS-->>IMP: 例外（gRPC error）
-        Note over IMP,PDB: 例外傳播 → @Transactional rollback（product 不落盤）
-        IMP->>IMP: CommitItemService 捕捉 → import_item.status=COMMIT_FAILED（賣家可 retry）
-    end
-```
-
-> COMMIT_FAILED 狀態流轉見 40 號設計書 §2.2 ImportItem 狀態機（COMMITTING → COMMIT_FAILED；賣家修正後可 RetryImportItemAssets / 重新 commit）。
-
-### 9.4 product 表的 import 審計欄位
-
-```sql
-ALTER TABLE product
-    ADD COLUMN import_job_id  BIGINT,
-    ADD COLUMN import_item_id BIGINT;
-
-CREATE INDEX idx_product_import_origin ON product (import_job_id, import_item_id)
-    WHERE import_job_id IS NOT NULL;
-```
-
-| 欄位 | 說明 |
-|------|------|
-| `import_job_id` | NULLABLE — 一般賣家上架為 NULL；經 Import Service 轉正才寫入 |
-| `import_item_id` | 同上；用於審計「這個正式商品從哪 CSV 來」 |
-
-**寫入時機**：`CreateProductFromImportInternal` handler 內，與其他 product 欄位**同事務**寫入。一般 `CreateProduct` 寫 NULL。
-
-### 9.5 內部 RPC：BatchCheckSellerProductNames
-
-**用途**：給 Product Import Service 在 CSV 解析 + 賣家編輯時批次偵測商品名稱是否與賣家既有商品重複，協助 import 階段 UX「重名提示 / 確認允許」流程（見 [40 號 §5.2 / §5.5](../詳細設計書/40-商品匯入精靈服務（Product%20Import%20Service）詳細設計書.md)）。
-
-**Proto**（新增到 `api/proto/product/product.proto`）：
-
-```protobuf
-rpc BatchCheckSellerProductNames(BatchCheckSellerProductNamesRequest)
-    returns (BatchCheckSellerProductNamesResponse);
-
-message BatchCheckSellerProductNamesRequest {
-    int64 store_id = 1;                      // 賣家 store 代理鍵
-    repeated string names = 2;                // 上限 500，超過拋 INVALID_ARGUMENT
-}
-
-message BatchCheckSellerProductNamesResponse {
-    int32 code = 1;
-    string message = 2;
-    repeated ExistingProductByName existing = 3;  // 只回該賣家既有的 product；不存在不出現
-}
-
-message ExistingProductByName {
-    string name = 1;
-    string product_id = 2;                    // 第一筆碰到的 product.id（賣家可能 race 已有同名 N 筆，回任一）
-    string status = 3;                        // 既有商品的 ProductStatus value
-}
-```
-
-**權限**：純內部 RPC，由 `x-internal-service` metadata 自動識別免身份驗證；Gateway 不暴露對應 REST。
-
-**實作流程**：
-
-```
-1. 校驗 names.size() ≤ 500，否則 INVALID_ARGUMENT
-2. SELECT id, name, status FROM product
-   WHERE store_id = :storeId AND deleted_at IS NULL AND name IN (?, ?, ...)
-3. 對每個有命中的 name 建一筆 ExistingProductByName
-4. 不命中的 name 不出現於回應
-```
-
-**索引**：依賴 `product.store_id` owner key 與 `name` 條件；目前 repository 使用 `store_id = #{storeId}`，不再以 audit 欄位 `created_by` 做賣家範圍查詢。
-
-**Race 容忍**：本 RPC 僅做「偵測」，不會 SET FOR UPDATE 鎖商品。Import 端在 csv.parse 與 UpdateImportItem 時呼叫，commit 階段不再呼叫（極端 race 由 §40 §8.3a 容忍策略處理）。
-
-### 9.6 對既有 IdempotencyService 的影響
-
-無影響。新 RPC 使用既有 `IdempotencyService.acquireLock / markSucceeded / markFailed`，only 變動：
-
-- `endpoint` 欄位寫 `CreateProductFromImportInternal`（區別於既有 `CreateProduct`）
-- idempotency_key 格式由 Import 端組裝為 `import:{itemId}:rev:{revision}`
-
-`IdempotencyService.acquireLock` 對 FAILED 記錄自動刪除以允許 retry，符合 Import revision 機制需求。
+## 9. 圖片轉正配對契約
 
 ### 9.7 finalizeImages 回傳的配對契約（強制）
 
@@ -3906,7 +3632,6 @@ message ExistingProductByName {
 `Collectors.toMap(FinalizedImage::getStagedToken, f -> f, (a, b) -> a)` 建 mapping（merge function 保留第一個，避免 duplicate staged_token 觸發 `IllegalStateException`），
 再依 staged_token 取轉正結果；gallery 組裝以 DTO 輸入順序 iterate（那才是 gallery 顯示位置的依據）。
 ⚠️ 依賴 index 配對只在「Media server 恰好循序處理且無 partial-success」時才碰巧正確 —— 那不是契約，server 改 `parallelStream` 或支援 partial-success 就會錯配圖片且無任何訊號。
-`processDescriptionImportAssets` 與 `FinalizeImportAssets` 同理，改以 **import_asset_id** 配對。
 
 ---
 

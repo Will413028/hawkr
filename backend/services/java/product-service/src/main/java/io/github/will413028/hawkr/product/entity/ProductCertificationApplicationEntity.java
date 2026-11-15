@@ -75,7 +75,7 @@ public class ProductCertificationApplicationEntity implements Serializable {
     /** 審核狀態（ProductCertificationStatus；DB DEFAULT 'SUBMITTED'） */
     private String status;
 
-    /** 申請來源（ProductCertificationSource：SELLER／PRODUCT_IMPORT／DELEGATED_ADMIN／SEED／LEGACY_MIGRATION） */
+    /** 申請來源（ProductCertificationSource：SELLER／DELEGATED_ADMIN／SEED／LEGACY_MIGRATION） */
     private String source;
 
     /**

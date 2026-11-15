@@ -87,7 +87,7 @@ export default function FavoritesClient() {
 	);
 
 	return (
-		<main className="favorites-page">
+		<div className="favorites-page">
 			<SellerPageShell
 				title="我的收藏"
 				subtitle="收藏的商品與追蹤的賣家。"
@@ -97,8 +97,6 @@ export default function FavoritesClient() {
 							<ScPill
 								key={t}
 								as="button"
-								role="tab"
-								aria-selected={tab === t}
 								active={tab === t}
 								disabled={pendingAction !== null}
 								onClick={() => setTab(t)}
@@ -361,6 +359,6 @@ export default function FavoritesClient() {
 					</section>
 				)}
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }

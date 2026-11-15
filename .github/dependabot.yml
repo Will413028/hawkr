@@ -30,7 +30,6 @@ updates:
       # following patches/UPSTREAM-WATCH.md, instead of inside a grouped update.
       - dependency-name: "@editorjs/editorjs"
       - dependency-name: "@opennextjs/cloudflare"
-      - dependency-name: "@storybook/nextjs-vite"
       - dependency-name: "next"
     cooldown:
       default-days: 14

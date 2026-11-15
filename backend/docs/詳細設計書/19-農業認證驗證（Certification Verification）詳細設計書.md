@@ -22,8 +22,7 @@
 
 1. **填了就公開**：賣家 create/update 路徑（`POST/PUT /app/products`）對 `certifications` **完全不查驗**，
    JSONB 直寫，寫入當下即出現在公開商品卡與 PDP 的認證標章上。任何人可宣稱任意認證。
-2. **查不到就被拒絕**（且拒錯了）：賣家 App 在查驗查無時**直接丟棄號碼**、CSV 匯入 validator 把
-   `CERT_VERIFY_FAILED` 判成 ERROR **擋住 commit**。而**「查不到」多半不是真的查不到**：
+2. **查不到就被拒絕**（且拒錯了）：賣家 App 在查驗查無時**直接丟棄號碼**。而**「查不到」多半不是真的查不到**：
    - 產銷履歷（3702）政府 API 的回應延遲以**十秒為量級**（約 33–82 秒），而我方同步路徑的
      `read-timeout` 為 10 秒 ⇒ **每一次 3702 同步查驗都必定逾時**，與號碼是否存在無關。
      前端把逾時顯示成「查無此編號」。
@@ -66,7 +65,7 @@
 
 ```mermaid
 flowchart TD
-    A["賣家／代行／匯入 送出 (type, certNo)"] --> B{"輸入合法？<br/>type ∈ 3701-3706<br/>certNo 非空、字元集、長度 ≤64"}
+    A["賣家／代行 送出 (type, certNo)"] --> B{"輸入合法？<br/>type ∈ 3701-3706<br/>certNo 非空、字元集、長度 ≤64"}
     B -->|否| B1["剔除該筆 + warn log<br/>不回 4xx、不影響商品其他欄位"]
 
     B -->|是| C{"同 product+type+certNo<br/>已 APPROVED？"}
@@ -110,7 +109,7 @@ flowchart TD
 
 ```mermaid
 stateDiagram-v2
-    [*] --> SUBMITTED : 賣家送出／代行／匯入／migration
+    [*] --> SUBMITTED : 賣家送出／代行／migration
     SUBMITTED --> APPROVED : 自動核准（SYSTEM）／人工核准（ADMIN）
     SUBMITTED --> REJECTED : ADM 駁回（reason 必填）
     SUBMITTED --> WITHDRAWN : 賣家撤回
@@ -323,7 +322,7 @@ sequenceDiagram
 | `certification_type` | INTEGER | N | — | **string** | `CertificationType` value（3701–3706） |
 | `certificate_no` | VARCHAR(64) | N | — | string | **只 trim，保留前導 0，不轉數字** |
 | `status` | VARCHAR(16) | N | `'SUBMITTED'` | string | `ProductCertificationStatus`；DB CHECK 六值 |
-| `source` | VARCHAR(24) | N | — | string | `ProductCertificationSource`：SELLER／PRODUCT_IMPORT／DELEGATED_ADMIN／SEED／LEGACY_MIGRATION |
+| `source` | VARCHAR(24) | N | — | string | `ProductCertificationSource`：SELLER／DELEGATED_ADMIN／SEED／LEGACY_MIGRATION |
 | `requires_manual_review` | BOOLEAN | N | `false` | bool | true ⇒ **永不自動核准**（§6.3 Step 3） |
 | `gov_verify_state` | VARCHAR(16) | N | `'PENDING'` | string | `ProductCertificationGovVerifyState`：PENDING／VERIFIED／NOT_FOUND／EXPIRED／UNSUPPORTED／UNAVAILABLE |
 | `gov_verify_payload` | JSONB | Y | null | object | 政府查驗結構化結果（§8.3 `GovVerifyResult` 的修剪版），ADM 判斷依據 |
@@ -424,7 +423,6 @@ CREATE INDEX idx_pcre_application ON product_certification_review_event (applica
 | `ProductCertificationReviewAction` | [業務類型碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務類型碼.md) | `review_event.action` |
 | `ProductCertificationRejectReason` | [業務類型碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務類型碼.md) | `reason_code` |
 | `ProductPublicationState` | [業務狀態碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務狀態碼.md#ProductPublicationState)（既有 enum，**必須列入 `ADMIN_ENUMS`**） | ADM 回應的 `product_publication_state`（§9.2）；規則見 02 號 §2.9 |
-| `ImportItemErrorType` | [業務類型碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務類型碼.md#ImportItemErrorType) | 匯入 violation code（本系統**不新增任何碼**，見 §6.5） |
 | `ProductEventType` | [內部技術碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/內部技術碼.md) | MQ 事件型別（本書使用 4 個，見 §12） |
 
 **流程強制**：先改 `docs/代碼管理（CodeMeta）/*.md` → `cd docs/代碼管理（CodeMeta）/scripts && ./generate.sh --go --go-media --web --admin --flutter`（CI 的 drift 步驟用同一組旗標；生成物直寫進 monorepo，不需複製）
@@ -439,7 +437,7 @@ ADM 需先把新 enum 加進 `generate.sh` 的 `ADMIN_ENUMS`（舊的 `codemeta-
 
 | From | To | 觸發者 | 條件 |
 |---|---|---|---|
-| （建立） | `SUBMITTED` | SELLER / ADMIN(代行) / SYSTEM(匯入・migration) | 輸入合法且未命中 §6.3 Step 1/2 |
+| （建立） | `SUBMITTED` | SELLER / ADMIN(代行) / SYSTEM(migration) | 輸入合法且未命中 §6.3 Step 1/2 |
 | `SUBMITTED` | `APPROVED` | SYSTEM | `gov_verify_state = VERIFIED` 且 `requires_manual_review = false` 且 type 允許自動核准（§8.5） |
 | `SUBMITTED` | `APPROVED` | ADMIN | 人工核准，帶 `expectedVersion` |
 | `SUBMITTED` | `REJECTED` | ADMIN | `reason_code` 必填 |
@@ -478,7 +476,7 @@ ADM 需先把新 enum 加進 `generate.sh` 的 `ADMIN_ENUMS`（舊的 `codemeta-
 
 ## 6. 寫入收斂
 
-### 6.1 五條寫入路徑 → 單一收斂點
+### 6.1 寫入路徑 → 單一收斂點
 
 | # | 入口 | 現況收斂點 | 收斂後 |
 |---|---|---|---|
@@ -486,7 +484,6 @@ ADM 需先把新 enum 加進 `generate.sh` 的 `ADMIN_ENUMS`（舊的 `codemeta-
 | W2 | `PUT /app/products/:id`（賣家更新，全量取代） | 同上 | 同上 |
 | W3 | ADM 代行建立（`admin_delegated_product.go`） | 走 W1 鏈 | 同上 |
 | W4 | ADM 代行更新 | 走 W2 鏈 | 同上 |
-| W5 | 匯入 commit（`CreateProductFromImportInternal`） | `ProductImportService` | 同上 |
 | W6 | seed SQL | `infra/seed-data/04-product.sql` | 直接寫合法值 ＋ 同時寫 application（§15.4） |
 | W7 | AI 上架助手（ai-service） | 只回 patch＋SSE，**不寫 DB** | 不是寫入路徑；但 jsonschema 要改教模型產碼值（§14） |
 
@@ -502,7 +499,6 @@ ADM 需先把新 enum 加進 `generate.sh` 的 `ADMIN_ENUMS`（舊的 `codemeta-
 |---|---|---|
 | W1／W2 賣家 | **剔除該筆＋warn log** | Gateway handler **內的 filter**（`CreateSellerProduct` / `UpdateSellerProduct` 各一處），見 §6.2.1 |
 | W3／W4 代行 | 同上 | Gateway handler 內的 filter（代行 create／代行 update 各一處）。⚠️ 代行走**另一個 DTO** `DelegatedProductCertification`，且 `validateProductArrays` 現在只擋筆數，值域驗證要另外補 |
-| W5 匯入 | **L2 與 parse 兩層維持現行行為**（見 §6.5） | — |
 | W6 seed | SQL 層直接寫合法值 | §15.4 |
 
 #### 6.2.1 🔴 剔除**必須在 handler 內以 filter 實作，不得用 `binding` tag**
@@ -517,7 +513,7 @@ ADM 需先把新 enum 加進 `generate.sh` 的 `ADMIN_ENUMS`（舊的 `codemeta-
 | 層 | 動作 |
 |---|---|
 | ① Gateway handler filter | **bind 之後、組 gRPC request 之前**逐筆檢查，非法者**不放進 request** 並記 warn log（含 productId／storeId／type／被剔除的原因）。四個 handler 各一處：`CreateSellerProduct`／`UpdateSellerProduct`／代行 create／代行 update |
-| ② 收斂點第二道防線 | `ProductCertificationApplicationService` 進 §6.3 之前再驗一次（縱深防禦：gRPC 直呼、未來新增的第五條路徑都會被接住） |
+| ② 收斂點第二道防線 | `ProductCertificationApplicationService` 進 §6.3 之前再驗一次（縱深防禦：gRPC 直呼、未來新增的路徑都會被接住） |
 | ③ certNo 規則共用常數 | **抽成單一來源**（字元集 ＋ 長度上限），Gateway 與 product-service 各自引用，**不得再新增第三份字面值** |
 
 > ⚠️ **③ 不是潔癖**：現況已有**兩份**——Gateway `handler/product.go` 的 `certNoPattern`（＋`certNoMaxLength`）
@@ -541,7 +537,6 @@ ADM 需先把新 enum 加進 `generate.sh` 的 `ADMIN_ENUMS`（舊的 `codemeta-
 
 - 防污染目的照樣達成（非法值不進申請表、不灌 ADM 佇列）
 - 舊 App 不壞
-- ⚠️ **不得再用「與匯入路徑的既有 warning 語意一致」當理由**——匯入側實際上是**三種不同行為**（§6.5），沒有一致的既有語意可以援引
 - web 端的即時回饋由**前端輸入驗證**提供（正常情況根本不會送出非法值）
 
 ### 6.2.9 certNo 的字元規則必須**分兩類**
@@ -570,7 +565,7 @@ ADM 需先把新 enum 加進 `generate.sh` 的 `ADMIN_ENUMS`（舊的 `codemeta-
 
 | 路徑 | 非法輸入的處置 |
 |---|---|
-| 商品 create／update 內嵌的認證（W1–W5，批次） | **剔除該筆＋warn log＋列入 `certificationWarnings[]`**，回 200 |
+| 商品 create／update 內嵌的認證（W1–W4，批次） | **剔除該筆＋warn log＋列入 `certificationWarnings[]`**，回 200 |
 | 單筆 `POST .../certification_applications` | **回 typed 業務碼**（400 家族），不剔除 |
 
 ⚠️ 兩層都要遵守：Gateway 對單筆端點不套 filter，收斂點對單筆 submit 路徑以業務碼回答。
@@ -685,7 +680,7 @@ T1 commit → T2 走 DO NOTHING，**無列、無錯**。必須顯式檢查才知
 
 | 入口 | `rowsAffected = 0` 時 |
 |---|---|
-| **商品 create/update 內嵌的認證**（W1–W5） | **跳過該筆**，不影響商品其他欄位、**不 rollback、不回 4xx**；記 warn log ＋ metric，**並在回應的 `certificationWarnings[]` 明列該筆**（§6.3.1） |
+| **商品 create/update 內嵌的認證**（W1–W4） | **跳過該筆**，不影響商品其他欄位、**不 rollback、不回 4xx**；記 warn log ＋ metric，**並在回應的 `certificationWarnings[]` 明列該筆**（§6.3.1） |
 | **§9.1 的專用申請端點** | 回 typed 409（單筆明確動作，賣家看得懂該重試什麼） |
 
 > ⚠️ 為什麼商品路徑不回 4xx：舊 App 不得收到 4xx（§6.2.2），而一個認證層級的競態不該讓整次商品儲存失敗。
@@ -749,80 +744,6 @@ Gateway 把自己 filter 掉的那幾筆**併進同一個陣列**再回給前端
 > payload 只有 B ⇒ A 落入「沒送」⇒ **送出當下就 WITHDRAWN、標章立即消失**，而 B 還在待審。三個後果：
 > ① 「新證書待審時舊證書仍公開」做不到 ② `SUPERSEDED` 在主路徑上永不觸發（§5.2 為它寫的存在理由落空）
 > ③ audit 把「換號」記成「賣家停止宣稱」，與事實不符。
-
-### 6.5 匯入路徑（W5）：拆碼 ＋ 移除同步查驗，**不新增任何碼**
-
-#### 6.5.1 匯入側的既有行為是**三種**，不是一種
-
-匯入路徑的三層對認證欄位各有不同的處置，實作前必須分清楚：
-
-| 層 | 位置 | 實際行為 | 阻擋粒度 |
-|---|---|---|---|
-| L2 內容驗證（CSV 上傳當下） | `L2ContentValidator` | `CERT_FORMAT_INVALID`／`CERT_ENUM_INVALID`／`CERT_NO_MISSING` **三個碼全部走 `errors.add(...)`** | **整份 job 標 `CSV_INVALID` 退回**、不發 parse 事件 ⇒ 200 列裡一格認證違規＝整份退回 |
-| CSV 解析 | `CsvParseService.parseCertifications` | 對不認得的 type（`CodeMetaNormalizer.certificationTypeToValue` 回 null）**直接 `continue`**——**無聲丟棄，連 warning 都不發** | 無（該筆認證憑空消失，賣家不會收到任何訊息） |
-| 上架檢核（commit / publish） | `ProductPublishValidator.validateCertifications` | `error(...)` ⇒ `ValidationResult.hasBlockingError()` | **擋單筆 item 的 commit** |
-
-> ⚠️ **`CERT_FORMAT_INVALID` 在 SSOT 的 description 是 `L2 / JOB`，不是 `warning`**
-> （`CERT_ENUM_INVALID` / `CERT_NO_MISSING` 才是「warning，跳過該 cert」）。
-> 那三個 description **對執行期零影響**——見 §6.5.2。SSOT 的字面與 `L2ContentValidator` 的實際行為
-> 不一致（三個碼在該層全部是 job 級阻擋），本系統不修正這個既有落差。
-
-🔴 **L2 與 parse 兩層維持現行行為**：它們是既有的匯入品質閘門，改動會擴大到 **job 級行為**
-（整份退回的門檻、無聲丟棄是否要補 warning），不在本系統的範圍內。
-⇒ §6.2 的「不擋 commit」對 CSV 路徑**只在「通過 L2 之後」成立**。
-
-#### 6.5.2 ⚠️ `ImportItemErrorType` 沒有 severity 欄位
-
-建構子是 `(code, value, label, description)`，CodeMeta 表裡的 `"ERROR"`／`"warning，跳過該 cert"`／`"L2 / JOB"`
-**都只是 description 字串**。真正的 severity 由 `ProductPublishValidator` 的 `error()` / `warning()`
-兩個 static helper 寫死，阻擋判定在 `ValidationResult.hasBlockingError()`。
-⇒ **改 CodeMeta `.md` 對執行期零影響**；要改行為只能改 validator 的呼叫。
-
-#### 6.5.3 要改兩件事（缺一不可）
-
-**① `ProductPublishValidator.validateCertifications` 的兩個發出點**——目前**共用同一個碼 `CERT_VERIFY_FAILED`
-且都是 `error()`**——改成**拆碼 ＋ 各自 warning**：
-
-| 發出點 | 改前 | 改後 | 文案 |
-|---|---|---|---|
-| 認證**類型不合法** | `error(..., "CERT_VERIFY_FAILED", "認證類型不合法：…")` | **改用既有的 `CERT_ENUM_INVALID`** ＋ `warning(...)` | **沿用既有文案**「認證代碼不在可選清單內，已自動略過該筆認證」——**不必改** |
-| 政府查驗**查無** | `error(..., "CERT_VERIFY_FAILED", "認證編號驗證失敗（查無此認證）：…")` | 維持 `CERT_VERIFY_FAILED` ＋ 改 `warning(...)` | **要改**：既有中文是「認證資訊驗證失敗」，語意變成**「已轉送人工審核」** |
-
-> 🔴 **為什麼是拆碼而不是「兩支都改 warning 但共用一碼」**：文案是**碼層級的對照表**
-> （`ImportErrorMessageCatalog` 與 website `products-import/i18n.ts` 都以碼為 key）。
-> 兩支共用一碼 ⇒ 只能有一份文案，而兩者要說的是**兩件不同的事**
-> （「代碼不在清單內、已略過」 vs 「查無、已轉送人工審核」）⇒ 必有一邊的文案是錯的。
-> 拆碼之後**兩個碼各自語意單一、文案各自正確**，且 `CERT_ENUM_INVALID` 的既有 description
-> 「warning，跳過該 cert」與新用法**完全吻合**（不再有「同碼兩種 severity」的問題）。
-> ⚠️ **不新增任何碼**：兩個都是既有碼。
-
-**② 🔴 同時移除該處對 `govCertificationService.verify()` 的同步呼叫**（改為只讀 §8.3 的新前綴快取，
-或整段移交申請流程）。
-**為什麼非移不可**：`validateCertifications` 跑在 **IMPORT_COMMIT／PUBLISH 等同步寫入路徑**上
-（`ProductImportService` 的 commit final guard ＋ `ProductGrpcService.validateProductDraft`）。
-`verify()` 逾時／IO 例外 → `openCircuit()`（TTL 60s、per-type、**Redis 全域共享**）
-⇒ 緊接著排出去的背景查驗落在 60 秒窗口內被短路成 `UNAVAILABLE`。
-**只改 severity 不移除呼叫 ⇒ §8.2 的「零外部呼叫是結構保證」降級成一句約定。**
-
-⚠️ **連帶效果：`CERT_VERIFY_PENDING` 在本路徑變成不可達**。
-該碼目前由 `validateCertifications` 的 `catch` 區塊發出（`warning(..., "CERT_VERIFY_PENDING", ...)`，
-語意是「政府 API 暫不可用，後續會重試」）。移除 `verify()` 呼叫後**不再有例外可 catch**
-⇒ 該分支成為死碼，應一併移除。
-🔴 **但碼值本身保留、不得從 CodeMeta 刪除**：`product_import_item_error` 既有列可能仍存著它，
-且它在 `certifications_set` 的 wipe 清單內。**刪碼會讓歷史列的 `error_type` 變成無法翻譯的孤兒值。**
-（此判定與 [40 號](40-商品匯入精靈服務（Product%20Import%20Service）詳細設計書.md) §11.3a 一致。）
-
-#### 6.5.4 要同步的文案（只有一處）
-
-`CERT_VERIFY_FAILED` 的文案：Java 側 `ImportErrorMessageCatalog` ＋ website `products-import/i18n.ts`
-**兩處一起改**成「已轉送人工審核」語意（否則賣家看到「驗證失敗」而實際是待審中）。
-`CERT_ENUM_INVALID` 的文案**不動**（既有文案本來就對）。
-
-#### 6.5.5 ⚠️ CSV wire 的 type 值域是 name 不是碼值
-
-`L2ContentValidator.ALLOWED_CERT_TYPE = {ORGANIC, TAP, CAS, HACCP, ISO, GMP}`，
-碼值轉換由 `CodeMetaNormalizer.certificationTypeToValue` 在解析層完成。
-⇒ §6.2 的「type 必須是 3701–3706」**不適用於 CSV wire 層**，照字面實作會擋掉全部合法 CSV。
 
 ### 6.6 核准 transaction（人工／系統兩個入口，共用同一實作）
 
@@ -896,7 +817,6 @@ lock application ＋ product
 | **新增**：賣家查詢自己商品的申請 | §9.1 的 `GET .../certification_applications`，否則賣家 web 的狀態徽章無資料來源 |
 | Admin 商品詳情 | 投影（approved-only）＋ 另由 §9.2 的申請端點看全貌 |
 | 代行 diff snapshot | 見 §7.3 |
-| 匯入項目詳情 | 讀 `product_import_item.certifications` 暫存，不受影響 |
 
 ### 7.2 投影重建的觸發點
 
@@ -1201,7 +1121,7 @@ RPC 契約見 §10（`MatchCertificateHolder`）；稽核只記命中欄位名�
 ⚠️ **advisory 端點的對外語意要一起處理**：`GET /app/products/certifications/verify` 的回應只有 `{exists}`，
 本節之後「已失效」會塌成 `exists=false`，前端沿用「查無此編號，請確認後再試」
 ⇒ **對已失效證書是錯的訊息**。⇒ 該端點回應擴充為結構化（§9.4），
-三個前端消費點（網頁商品表單、網頁匯入編輯、代行工作區）的文案同步。
+兩個前端消費點（網頁商品表單、代行工作區）的文案同步。
 
 ### 8.7 現行 API Key 輪替與超時（沿用，僅調整背景 timeout）
 
@@ -1377,7 +1297,7 @@ Entity，partial projection 禁令），來源是 `ProductRepository.findPublica
 | 賣家操作 | 送件後可以隨時軟刪自己的商品。**該路徑會 cascade `SUBMITTED`**（見 §8.3.10），但 `APPROVED` 刻意保留 ⇒ 「申請還在、商品已軟刪」仍然成立，只是不再包含待審件 |
 | 本設計自己的要求 | `updateCertificationProjection` 明文不加 `deleted_at IS NULL`——ADM 要能對已下架商品撤銷標章（該說明在該方法的 javadoc，不在 §7.2） |
 
-⇒ 用公開視角的查詢（`findBriefByIds`，帶 `WHERE deleted_at IS NULL`）取商品名，會讓 ADM 的
+⇒ 用公開視角的查詢（帶 `WHERE deleted_at IS NULL`）取商品名，會讓 ADM 的
 **六支端點**（佇列／詳情／approve／reject／revoke／reverify）全部回空字串；而同一支佇列端點的
 keyword 搜尋（`findForAdmin` 的 `JOIN product`）**不濾** `deleted_at` ⇒ 同一個請求裡兩個 SQL
 對「這個商品存不存在」給出相反答案。
@@ -1393,16 +1313,8 @@ keyword 搜尋（`findForAdmin` 的 `JOIN product`）**不濾** `deleted_at` ⇒
 **不得**在 SQL 或 mapper 內另寫 `deletedAt != null || sellerDeletedAt != null`——那條規則的 SSOT 是
 CodeMeta 的 `ProductPublicationState`（`REMOVED` = `4014`），寫第二份就會漂。
 
-⚠️ **不得改用「放寬 `findBriefByIds` 本身」的修法**，理由是下面兩個事實：
-
-1. 該方法的 SQL 帶 `WHERE deleted_at IS NULL`，其 javadoc 也明寫「已軟刪除商品不回傳」
-   （`services/java/product-service/.../repository/ProductRepository.java`）
-2. 它的第二個 caller 是 gRPC `GetProductsBriefInternal`，跨服務消費端是 product-import-service
-   （`ItemQueryService.batchFetchCommittedProductsBrief`）
-
-⇒ 就地放寬會**靜默改掉另一個服務的畫面**：匯入紀錄會對已刪除的正式商品顯示一個 `ProductStatus`，
-而 `ProductStatus` 四個值都無法表達「已刪除」。那個 surface 的缺口需要 proto 契約變更，
-屬 40 號自己的範圍，**不得用放寬 `findBriefByIds` 的方式一併處理**。
+⚠️ **不得改用帶 `WHERE deleted_at IS NULL` 的公開視角查詢**
+（`services/java/product-service/.../repository/ProductRepository.java`），公開視角的語意不得就地改動。
 
 **`currentApproved` 的形狀**（上面是首次申請故為 `null`；**換號情境**下會是同 type 現行有效那筆）：
 
@@ -1549,9 +1461,9 @@ GET /api/v1/app/products/certifications/verify?cert_no={certNo}&type={value}
 
 `validity` ∈ `VALID` / `EXPIRED` / `TERMINATED` / `SUSPENDED` / `NOT_FOUND` / `UNKNOWN`。
 
-> 🔴 **為什麼必須擴充**：§8.6 之後「已失效」會塌成 `exists=false`，而三個前端消費點
-> （網頁商品表單、網頁匯入編輯、代行工作區）的文案是「查無此編號，請確認後再試」
-> ⇒ **對已失效證書是錯的訊息**。三處文案必須同步改成能區分 `EXPIRED` 與 `NOT_FOUND`。
+> 🔴 **為什麼必須擴充**：§8.6 之後「已失效」會塌成 `exists=false`，而兩個前端消費點
+> （網頁商品表單、代行工作區）的文案是「查無此編號，請確認後再試」
+> ⇒ **對已失效證書是錯的訊息**。兩處文案必須同步改成能區分 `EXPIRED` 與 `NOT_FOUND`。
 >
 > ⚠️ **相容性**：`exists` 欄位**保留一版且必須出現在回應中**（`exists = found && validity == VALID`），
 > 讓舊版 App 不壞；新前端一律讀 `validity`。移除時機見 §17。
@@ -1600,7 +1512,7 @@ type CertificationWarningOutput struct {
 - **無警告時回空陣列**（不是省略欄位）——省略會讓前端分不出「後端沒實作」與「這次沒有警告」。
 - ⚠️ `certifications` 是 **approved-only 投影**，`certificationWarnings` 是**本次未被採用的輸入**；
   兩者不重疊，前端不得把後者當成前者的一部分渲染。
-- **賣家 web 渲染要求**：三個認證輸入面（商品建立／編輯、CSV 匯入逐筆編輯、代營運工作區）
+- **賣家 web 渲染要求**：兩個認證輸入面（商品建立／編輯、代營運工作區）
   在儲存成功後**必須把 `certificationWarnings[]` 顯示出來**（非阻斷式提示，不可只寫進 console）。
   ⚠️ 這一步不做，本節就白做了——欄位存在但沒人渲染，跟不回這個欄位是同一個結果（§14.2）。
 
@@ -2071,9 +1983,7 @@ notification template 走 Atlas migration `INSERT INTO notification_templates`�
 | `services/java/product-service/.../service/ProductCertificationApplicationService.java` | **新增，獨立 `@Service` bean**（§6.7）：**§6.3 Step 0 的 `effectiveUpdate` 閘門（第一行就 return；條件是「旗標 OR 認證非空」，不是只看旗標）**、§6.3 同步規則、§6.4 全量取代、§6.6 核准 tx、`rebuildProjection` |
 | `services/java/product-service/.../domain/ProductCertificationRules.java` | **新增**：狀態機合法轉移、自動核准適用範圍（§8.5）。純函式，**不得放進 CodeMeta enum** |
 | `services/java/product-service/.../service/GovCertificationService.java` | 新增 `verifyDetailed()`；`verify()` 改走其內部實作；`parseResponse` 加三道防線；新 key 前綴 |
-| `services/java/product-service/.../service/validator/ProductPublishValidator.java` | `validateCertifications` **拆碼**：類型不合法改 `CERT_ENUM_INVALID` + `warning()`、查無維持 `CERT_VERIFY_FAILED` 但改 `warning()`；**移除同步 `verify()` 呼叫**（§6.5.3） |
 | `services/java/product-service/.../converter/ProductEntityConverter.java` | **移除** `setCertifications` 直寫，改呼叫收斂點 |
-| `services/java/product-service/.../service/ProductImportService.java` | 匯入路徑改呼叫收斂點 |
 | `services/java/product-service/.../mq/CertificationVerifyConsumer.java` | **新增**：背景查驗 consumer（manual ack ＋ DLQ） |
 | `services/java/product-service/.../mq/ProductEventPublisher.java` | 新增四個 publish 方法（沿用 obs wrapper） |
 | `services/java/product-service/.../grpc/ProductGrpcService.java` | 新增 10 RPC handler；`CreateProduct`／`UpdateProduct` response 填 `certification_warnings` |
@@ -2106,15 +2016,12 @@ notification template 走 Atlas migration `INSERT INTO notification_templates`�
 
 ### 14.2 前端三端
 
-**賣家 web（`hawkr-website` `/seller-center/*`）**——三個認證輸入面全部要改，
-且**收斂成單一共用元件**（現況 `CertRow` 有三份 copy）：① 商品建立／編輯 ② CSV 匯入逐筆編輯 ③ 代營運工作區。
+**賣家 web（`hawkr-website` `/seller-center/*`）**——兩個認證輸入面全部要改，
+且**收斂成單一共用元件**（現況 `CertRow` 有多份 copy）：① 商品建立／編輯 ② 代營運工作區。
 
 - 顯示真實狀態徽章（審核中／已通過／未通過＋原因），資料來自 §9.1 的查詢端點
 - 🔴 **儲存成功後必須渲染 `certificationWarnings[]`**（§9.5）——非阻斷式提示，**不可只寫進 console**。被剔除／被跳過的那一筆不在投影也不在申請表，不顯示＝賣家永遠不知道它沒進去
-- **移除**讀回時無條件標 `verified: true` 的行為——**共兩處，缺一即失效**：
-  ① `features/seller-center/products/adapters/productFormAdapter.ts`（商品建立／編輯）
-  ② `features/seller-center/products-import/adapters/importItemAdapter.ts`（CSV 匯入逐筆編輯）
-  ⚠️ ② 正是本節第②個輸入面。只改 ① 的話，匯入編輯畫面仍會把每一筆都顯示成「已驗證」，而它們實際上可能還在 `SUBMITTED`
+- **移除**讀回時無條件標 `verified: true` 的行為——：`features/seller-center/products/adapters/productFormAdapter.ts`（商品建立／編輯）
 - 取消勾選 → 呼叫 withdraw API（不再靠全量取代移除）
 - advisory 端點文案改用 `validity` 區分 `EXPIRED` / `NOT_FOUND` / `UNAVAILABLE`（§9.4）
 - ⚠️ **不 reuse `certStatusBanner()`**：那是商家 KYC／PayUni 金流審核的文案
@@ -2151,7 +2058,6 @@ notification template 走 Atlas migration `INSERT INTO notification_templates`�
 |---|---|
 | [02 號（Product Service）](02-產品微服務（Product%20Service）詳細設計書.md) | `certifications` 欄位語意、兩張新表指標、**10 RPC 登記**、`certificationWarnings` 回應擴充、篩選語意、快取失效路徑 |
 | [36 號（MQ Catalog）](36-MQ%20與事件總覽（MQ%20%26%20Event%20Catalog）.md) | 四個事件條目（§3.6h.1）＋ topology 條目說明。**payload schema 以它為 SSOT，本設計書不複製欄位清單**（§12.4） |
-| [40 號（Product Import）](40-商品匯入精靈服務（Product%20Import%20Service）詳細設計書.md) | ① `CERT_VERIFY_FAILED` severity 與文案變更、類型不合法改用 `CERT_ENUM_INVALID`（§6.5.3）② **誠實補寫匯入側的三種既有行為**（§6.5.1）：`L2ContentValidator` 三個碼全部 `errors.add` ⇒ 整份 job 標 `CSV_INVALID` 退回；`CsvParseService.parseCertifications` 對不認得的 type **無聲丟棄、連 warning 都不發**；`ProductPublishValidator` 擋單筆 commit。並註明 `CERT_FORMAT_INVALID` 在 SSOT 的 description 是 `L2 / JOB` 而非 `warning` |
 | [56 號（ADM 代行營運）](56-ADM%20代行營運（Delegated%20Operations）詳細設計書.md) | certifications 稽核快照來源改為申請表（§7.3） |
 | [Redis 快取管理](../速查參考/Redis%20快取管理.md) | 新 key 前綴 `gov:certv2:*` |
 | `docs/代碼管理（CodeMeta）/*.md` | §4.4 的五個新 Enum ＋ 五個新錯誤碼 ＋ 四個 `ProductEventType` |
@@ -2298,6 +2204,5 @@ WHERE certifications IS NOT NULL AND jsonb_array_length(certifications) > 0;
 | **3703 CAS 自動核准** | `Emblem_ID` 是**工廠**編號，一個編號可對到上百個產品 ⇒ 自動核准等於讓賣家用工廠編號給任意商品掛 CAS 標章（§8.5） |
 | **移除 advisory 端點的 `exists` 欄位** | advisory 端點**保留** `exists` 欄位供舊版 App 讀取 |
 | **移除 `messageZh` 非標準 envelope 欄位** | 前端仍在讀，屬破壞性契約變更（§11.5） |
-| **修改 CSV 上傳當下的 L2 整檔退回語意** | 本系統不改動 L2 驗證的整檔退回語意（見 §6.5）；改它會擴大到整個 L2 驗證的語意 |
 | **名稱比對（賣家名 vs 政府 `Name`/`Producer`/`Factory_CName`）** | 同「自動比對業者名稱」；`gov_verify_payload` 已把業者名交到 ADM 眼前，人眼判定即可 |
 | **App 的 AI 上架路徑修正** | 本系統不涵蓋 App 的 AI 上架路徑。該路徑以中文標題比對後直接塞值、繞過同檔驗證閘門，修正需隨 App 版本發佈 |

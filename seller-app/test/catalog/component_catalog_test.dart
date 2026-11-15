@@ -21,7 +21,6 @@ Future<void> pumpCatalog(
   double devicePixelRatio = 1,
   EdgeInsets safeInsets = EdgeInsets.zero,
   double scale = 1.4,
-  bool embedded = true,
 }) async {
   tester.view.physicalSize = Size(
     width * devicePixelRatio,
@@ -39,9 +38,7 @@ Future<void> pumpCatalog(
   addTearDown(tester.view.resetPadding);
   await tester.pumpWidget(
     catalog.SellerComponentCatalogApp.fromUri(
-      Uri.parse(
-        'https://catalog.test/?component=$component&textScale=$scale&embedded=$embedded',
-      ),
+      Uri.parse('https://catalog.test/?component=$component&textScale=$scale'),
     ),
   );
   await tester.pump(const Duration(milliseconds: 100));
@@ -50,16 +47,13 @@ Future<void> pumpCatalog(
 void main() {
   test('deep links select components and safely constrain text size', () {
     final app = catalog.SellerComponentCatalogApp.fromUri(
-      Uri.parse(
-        'https://catalog.test/?component=buttons&textScale=1.4&embedded=true',
-      ),
+      Uri.parse('https://catalog.test/?component=buttons&textScale=1.4'),
     );
     expect(app.initialComponent, 'buttons');
     expect(app.textScale, 1.4);
-    expect(app.embedded, isTrue);
     expect(
       catalog.SellerComponentCatalogApp.fromUri(
-        Uri.parse('https://catalog.test/?component=chrome&embedded=true'),
+        Uri.parse('https://catalog.test/?component=chrome'),
       ).initialComponent,
       'chrome',
     );
@@ -101,7 +95,7 @@ void main() {
           await pumpCatalog(tester, component: component, width: width);
           expect(
             find.text(catalog.sellerCatalogComponents[component]!),
-            findsOneWidget,
+            findsNWidgets(2),
           );
           final context = tester.element(find.byType(Scaffold).first);
           expect(
@@ -271,7 +265,7 @@ void main() {
   testWidgets(
     'compact navigation searches and selects the real button examples',
     (tester) async {
-      await pumpCatalog(tester, embedded: false);
+      await pumpCatalog(tester);
       await tester.enterText(
         find.byKey(const ValueKey('catalog-search')),
         'buttons',
@@ -297,6 +291,7 @@ void main() {
           .onPressed,
       isNull,
     );
+    await tester.ensureVisible(find.byKey(const ValueKey('primary-action')));
     await tester.tap(find.byKey(const ValueKey('primary-action')));
     await tester.pump();
     expect(find.text('操作次數：1'), findsOneWidget);
@@ -356,6 +351,7 @@ void main() {
     tester,
   ) async {
     await pumpCatalog(tester, component: 'chips');
+    await tester.ensureVisible(find.widgetWithText(HkChoiceChip, '草稿'));
     await tester.tap(find.widgetWithText(HkChoiceChip, '草稿'));
     await tester.pump();
     expect(find.text('目前篩選：草稿'), findsOneWidget);

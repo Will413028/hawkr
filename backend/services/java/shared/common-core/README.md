@@ -48,8 +48,7 @@ TSID (Time-Sorted ID) 是一個 64-bit 的時序唯一識別碼，用於替代�
 | **Coupon Service** | 500 | 500-599 | 優惠券 |
 | **Shipping Service** | 600 | 600-699 | 物流 |
 | **AfterSales Service** | 700 | 700-799 | 售後 / 退貨退款 |
-| **Product Import Service** | 800 | 800-899 | 商品匯入精靈 |
-| *預留* | 900-1023 | - | 未來服務擴展 |
+| *預留* | 800-1023 | - | 未來服務擴展 |
 
 > `payuni-webhook-service` 與 Coupon 共用 500：該服務全表 BIGSERIAL，不生成任何 TSID，無衝突可能。
 >

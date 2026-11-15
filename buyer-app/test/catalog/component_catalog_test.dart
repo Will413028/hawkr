@@ -56,7 +56,7 @@ void main() {
   testWidgets('search locates and opens the actual production component', (
     tester,
   ) async {
-    await _pump(tester, section: 'foundations', width: 1280, embedded: false);
+    await _pump(tester, section: 'foundations', width: 1280);
     await tester.enterText(
       find.byKey(const ValueKey('catalog-search')),
       'ProductCard',
@@ -255,13 +255,7 @@ void main() {
   testWidgets('compact full shell remains usable with enlarged text', (
     tester,
   ) async {
-    await _pump(
-      tester,
-      section: 'buttons',
-      width: 320,
-      scale: 1.4,
-      embedded: false,
-    );
+    await _pump(tester, section: 'buttons', width: 320, scale: 1.4);
     expect(find.byKey(const ValueKey('catalog-search')), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.enterText(
@@ -279,7 +273,6 @@ Future<void> _pump(
   required String section,
   double width = 390,
   double scale = 1,
-  bool embedded = true,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = Size(width, 844);
@@ -289,7 +282,7 @@ Future<void> _pump(
     BuyerComponentCatalogApp(
       key: UniqueKey(),
       initialUri: Uri.parse(
-        'http://localhost/?component=$section&textScale=$scale&embedded=$embedded',
+        'http://localhost/?component=$section&textScale=$scale',
       ),
     ),
   );

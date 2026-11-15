@@ -50,7 +50,7 @@ function renderBubble(
 				href: "/account/messages",
 				...callbacks,
 			},
-			"訊息",
+			React.createElement("span", { "aria-hidden": "true" }, "訊息"),
 		),
 	);
 }
@@ -71,7 +71,7 @@ describe("ChatBubble intent-prefetch boundary", () => {
 			event.preventDefault();
 		});
 		renderBubble({ onClick, onMouseEnter });
-		const link = screen.getByRole("link", { name: "訊息（7 則未讀）" });
+		const link = screen.getByRole("link", { name: "訊息 7 則未讀" });
 
 		expect(link.getAttribute("href")).toBe("/account/messages");
 		expect(currentPrefetch()).toBe(false);
@@ -86,7 +86,7 @@ describe("ChatBubble intent-prefetch boundary", () => {
 	it("enables framework prefetch on keyboard focus and preserves the callback", () => {
 		const onFocus = vi.fn();
 		renderBubble({ onFocus });
-		const link = screen.getByRole("link", { name: "訊息（7 則未讀）" });
+		const link = screen.getByRole("link", { name: "訊息 7 則未讀" });
 
 		expect(currentPrefetch()).toBe(false);
 		fireEvent.focus(link);
@@ -97,7 +97,7 @@ describe("ChatBubble intent-prefetch boundary", () => {
 	it("enables framework prefetch on touch pointer intent", () => {
 		const onPointerDown = vi.fn();
 		renderBubble({ onPointerDown });
-		const link = screen.getByRole("link", { name: "訊息（7 則未讀）" });
+		const link = screen.getByRole("link", { name: "訊息 7 則未讀" });
 
 		expect(currentPrefetch()).toBe(false);
 		fireEvent.pointerDown(link, { pointerType: "touch" });

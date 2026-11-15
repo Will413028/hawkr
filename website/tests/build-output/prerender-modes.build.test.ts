@@ -72,7 +72,6 @@ test("every protected zone page is PARTIALLY_STATIC", () => {
 		"/checkout",
 		"/seller-center",
 		"/seller/measures",
-		"/seller-product-import-preview",
 	]) {
 		assert.ok(
 			protectedPages.some(([path]) => stripLocale(path).startsWith(prefix)),

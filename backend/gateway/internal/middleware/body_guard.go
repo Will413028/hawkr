@@ -49,9 +49,8 @@ type bodyLimits struct {
 // New routes are covered by the default tier automatically — this map only
 // needs entries for the exceptions.
 var uploadRoutes = map[string]bodyLimits{
-	"POST /api/v1/app/image_transformations":                 {uploadMaxBodyBytes, uploadReadDeadline},
-	"PUT /api/v1/app/product_import_jobs/:import_job_id/csv": {uploadMaxBodyBytes, uploadReadDeadline},
-	"PUT /api/v1/app/media/secure_upload/:id":                {kycUploadMaxBodyBytes, kycUploadReadDeadline},
+	"POST /api/v1/app/image_transformations":  {uploadMaxBodyBytes, uploadReadDeadline},
+	"PUT /api/v1/app/media/secure_upload/:id": {kycUploadMaxBodyBytes, kycUploadReadDeadline},
 }
 
 // BodyGuard bounds request body size and read duration before any handler

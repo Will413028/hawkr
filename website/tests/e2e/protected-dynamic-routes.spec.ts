@@ -28,8 +28,6 @@ const SELLER_ID = "200";
 const BUYER_ID = "300";
 const POST_ID = "400";
 const PRODUCT_ID = "500";
-const JOB_ID = "600";
-const ITEM_ID = "601";
 const ORDER_NO = "HK-ROUTE-SMOKE";
 const CASE_NO = "AS-ROUTE-SMOKE";
 const COUPON_ID = "900";
@@ -318,167 +316,6 @@ const SELLER_INVOICE_JOB_FIXTURE = {
 	externalInvoiceDate: "",
 	reportedAt: "",
 	canReportExternal: false,
-};
-
-const IMPORT_ITEM_BRIEF = {
-	importItemId: ITEM_ID,
-	productKey: "row-2",
-	status: "9203",
-	name: "路由測試青菜",
-	categoryId: "301",
-	catL3Name: "葉菜類",
-	skuCount: "1",
-	priceMin: "120",
-	priceMax: "120",
-	firstImageUrl: "",
-	blockingErrorCount: "0",
-	warningCount: "0",
-	needsFix: false,
-	hasDuplicateExisting: false,
-	commitRevision: "0",
-	version: "0",
-};
-
-const IMPORT_ITEM_DETAIL = {
-	brief: IMPORT_ITEM_BRIEF,
-	descriptionJson: '{"version":"1.0","blocks":[]}',
-	skus: [
-		{
-			skuId: "sku-import-1",
-			csvLine: "2",
-			skuName: "一份",
-			price: "120",
-			salePrice: "",
-			stockQty: "10",
-			weight: "1",
-			unit: "3301",
-			lengthCm: "",
-			widthCm: "",
-			heightCm: "",
-			shippingMethods: [],
-		},
-	],
-	galleryAssets: [],
-	descriptionAssets: [],
-	errors: [],
-	warnings: [],
-	commitRevision: "0",
-	origin: "台灣",
-	hashtags: ["路由測試"],
-	targetStatus: "DRAFT",
-};
-
-const IMPORT_JOB_DETAIL = {
-	importJobId: JOB_ID,
-	status: "9104",
-	sourceFilename: "route-smoke.csv",
-	totalRows: "1",
-	totalItems: "1",
-	targetStatus: "DRAFT",
-	createdAt: "2026-01-01T00:00:00Z",
-	updatedAt: "2026-01-01T00:00:00Z",
-	expiresAt: "2027-01-01T00:00:00Z",
-	validationErrors: [],
-	counters: {
-		itemsTotal: "1",
-		itemsParsed: "1",
-		itemsAssetDownloading: "0",
-		itemsReady: "1",
-		itemsNeedsFix: "0",
-		itemsRemoved: "0",
-		itemsCommitting: "0",
-		itemsCommitted: "0",
-		itemsCommitFailed: "0",
-		itemsWithWarnings: "0",
-		itemsDuplicateExisting: "0",
-		assetsTotal: "0",
-		assetsPending: "0",
-		assetsDownloading: "0",
-		assetsUploaded: "0",
-		assetsFailed: "0",
-		assetsLinked: "0",
-	},
-	progress: {
-		overallPercentage: "100",
-		parsePercentage: "100",
-		assetDownloadPercentage: "100",
-		commitPercentage: "0",
-		parseCompleted: true,
-		assetDownloadCompleted: true,
-		commitCompleted: false,
-	},
-};
-
-const IMPORT_PREVIEW_LISTING = {
-	importJobId: JOB_ID,
-	totalEligible: "1",
-	totalNeedsFix: "0",
-	totalPending: "0",
-	totalRemoved: "0",
-	total: "1",
-	page: "1",
-	pageSize: "24",
-	records: [
-		{
-			importItemId: ITEM_ID,
-			importStatus: "9203",
-			previewData: {
-				id: ITEM_ID,
-				name: "路由測試青菜",
-				rating: "0",
-				categoryId: "301",
-				categoryName: "葉菜類",
-				origin: "台灣",
-				gallery: [],
-				priceMin: "120",
-				priceMax: "120",
-				reviewCount: "0",
-				skuCount: "1",
-				imageUrl: "",
-			},
-		},
-	],
-};
-
-const IMPORT_PREVIEW_DETAIL = {
-	importJobId: JOB_ID,
-	importItemId: ITEM_ID,
-	importStatus: "9203",
-	validationErrors: [],
-	warnings: [],
-	previewData: {
-		id: ITEM_ID,
-		name: "路由測試青菜",
-		rating: "0",
-		status: "0",
-		categoryId: "301",
-		origin: "台灣",
-		description: '{"version":"1.0","blocks":[]}',
-		gallery: [],
-		priceMin: "120",
-		priceMax: "120",
-		skus: [
-			{
-				skuId: "sku-import-1",
-				skuName: "一份",
-				price: "120",
-				salePrice: "",
-				stockQty: "10",
-				weight: "1",
-				unit: "3301",
-				lengthCm: "",
-				widthCm: "",
-				heightCm: "",
-				shippingMethods: [],
-			},
-		],
-		catL1Id: "3",
-		catL1Name: "生鮮",
-		catL2Id: "30",
-		catL2Name: "蔬菜",
-		catL3Id: "301",
-		catL3Name: "葉菜類",
-	},
 };
 
 const CHAT_BACKGROUND_MOCKS: readonly ApiMock[] = [
@@ -1136,145 +973,6 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 			await expect(page.locator("#product-name")).toHaveValue("路由測試青菜");
 		},
 	},
-	{
-		id: "seller-import-job",
-		pattern: "/seller-center/products/import/[job_id]",
-		role: "seller",
-		url: `/seller-center/products/import/${JOB_ID}`,
-		pathname: `/seller-center/products/import/${JOB_ID}`,
-		mocks: [
-			{
-				path: `/app/product_import_jobs/${JOB_ID}`,
-				data: IMPORT_JOB_DETAIL,
-			},
-			{
-				path: `/app/product_import_jobs/${JOB_ID}/items`,
-				data: {
-					records: [IMPORT_ITEM_BRIEF],
-					total: "1",
-					page: "1",
-					pageSize: "50",
-				},
-			},
-		],
-		requiredRequests: [
-			{
-				method: "GET",
-				path: `/app/product_import_jobs/${JOB_ID}`,
-			},
-			{
-				method: "GET",
-				path: `/app/product_import_jobs/${JOB_ID}/items`,
-			},
-		],
-		async assertVisible(page) {
-			await assertHeading(page, /route-smoke\.csv/);
-			await assertText(page, "路由測試青菜");
-			await expect(
-				page.getByRole("checkbox", { name: "選取 路由測試青菜" }),
-			).toBeVisible();
-		},
-	},
-	{
-		id: "seller-import-item-edit",
-		pattern: "/seller-center/products/import/[job_id]/items/[item_id]/edit",
-		role: "seller",
-		url: `/seller-center/products/import/${JOB_ID}/items/${ITEM_ID}/edit`,
-		pathname: `/seller-center/products/import/${JOB_ID}/items/${ITEM_ID}/edit`,
-		mocks: [
-			{
-				path: `/app/product_import_jobs/${JOB_ID}/items/${ITEM_ID}`,
-				data: IMPORT_ITEM_DETAIL,
-			},
-		],
-		requiredRequests: [
-			{
-				method: "GET",
-				path: `/app/product_import_jobs/${JOB_ID}/items/${ITEM_ID}`,
-			},
-		],
-		async assertVisible(page) {
-			await assertHeading(page, "編輯匯入商品");
-			await expect(page.locator("#import-product-name")).toHaveValue(
-				"路由測試青菜",
-			);
-			await assertHeading(page, "目標上架狀態");
-		},
-	},
-	{
-		id: "seller-import-preview-list",
-		pattern: "/seller-product-import-preview/[job_id]",
-		role: "seller",
-		url: `/seller-product-import-preview/${JOB_ID}`,
-		pathname: `/seller-product-import-preview/${JOB_ID}`,
-		mocks: [
-			{
-				path: `/app/product_import_jobs/${JOB_ID}`,
-				data: IMPORT_JOB_DETAIL,
-			},
-			{
-				path: `/app/product_import_jobs/${JOB_ID}/preview_listing`,
-				data: IMPORT_PREVIEW_LISTING,
-			},
-			{ path: `/public/sellers/${SELLER_ID}`, data: PUBLIC_SELLER },
-		],
-		requiredRequests: [
-			{
-				method: "GET",
-				path: `/app/product_import_jobs/${JOB_ID}`,
-			},
-			{
-				method: "GET",
-				path: `/app/product_import_jobs/${JOB_ID}/preview_listing`,
-			},
-		],
-		async assertVisible(page) {
-			await assertText(page, "列表預覽（完整商城 layout）");
-			await assertText(page, "路由測試青菜");
-			// MarketProductCard 改成單一 full-card overlay link（見
-			// bf573afa），accessible name 變成 `查看商品：${name}`，不再是
-			// 裸商品名 — 改用該次改動就加的穩定 hook 屬性選取。
-			const previewLink = page.locator("[data-market-product-primary-link]");
-			await expect(previewLink).toBeVisible();
-			await expect(previewLink).toHaveAttribute(
-				"href",
-				`/seller-product-import-preview/${JOB_ID}/items/${ITEM_ID}`,
-			);
-		},
-	},
-	{
-		id: "seller-import-preview-detail",
-		pattern: "/seller-product-import-preview/[job_id]/items/[item_id]",
-		role: "seller",
-		url: `/seller-product-import-preview/${JOB_ID}/items/${ITEM_ID}`,
-		pathname: `/seller-product-import-preview/${JOB_ID}/items/${ITEM_ID}`,
-		mocks: [
-			{
-				path: `/app/product_import_jobs/${JOB_ID}/items/${ITEM_ID}/preview`,
-				data: IMPORT_PREVIEW_DETAIL,
-			},
-			{ path: `/public/sellers/${SELLER_ID}`, data: PUBLIC_SELLER },
-			{
-				path: `/public/sellers/${SELLER_ID}/reviews/stats`,
-				data: { averageRating: "0", reviewCount: "0" },
-			},
-		],
-		requiredRequests: [
-			{
-				method: "GET",
-				path: `/app/product_import_jobs/${JOB_ID}/items/${ITEM_ID}/preview`,
-			},
-		],
-		async assertVisible(page) {
-			await assertText(page, "商品詳情預覽（完整 PDP layout）");
-			await assertHeading(page, "路由測試青菜");
-			await expect(
-				page
-					.locator(`a[href="/seller-product-import-preview/${JOB_ID}"]`)
-					.filter({ hasText: "返回列表預覽" }),
-			).toBeVisible();
-		},
-	},
 ];
 
 const SSR_PREVIEW_PATTERNS = new Set([
@@ -1285,7 +983,7 @@ const SSR_PREVIEW_PATTERNS = new Set([
 ]);
 
 const ERROR_SHELL =
-	/Application error|Internal Server Error|NEXT_NOT_FOUND|This page could not be found|糟糕，火箭偏離了航道|暫時迷航|這頁不在貨架上|找不到訂單|找不到售後案件|找不到任務|找不到預覽商品|載入動態失敗/i;
+	/Application error|Internal Server Error|NEXT_NOT_FOUND|This page could not be found|糟糕，火箭偏離了航道|暫時迷航|這頁不在貨架上|找不到訂單|找不到售後案件|載入動態失敗/i;
 
 function apiPath(url: string): string | null {
 	try {
@@ -1554,7 +1252,7 @@ test.describe("authenticated protected dynamic route smoke", {
 				!SSR_PREVIEW_PATTERNS.has(entry.pattern),
 		).map(({ access, pattern }) => ({ role: access, pattern }));
 		const covered = ROUTE_CASES.map(({ role, pattern }) => ({ role, pattern }));
-		expect(covered).toHaveLength(23);
+		expect(covered).toHaveLength(19);
 		expect(covered).toEqual(expected);
 	});
 
@@ -1577,7 +1275,6 @@ const MOBILE_CANARY_IDS = new Set([
 	"buyer-procurement-assistant-demo",
 	"buyer-order-detail",
 	"seller-product-edit",
-	"seller-import-preview-list",
 ]);
 
 test.describe("protected dynamic mobile canaries", { tag: ["@ui"] }, () => {

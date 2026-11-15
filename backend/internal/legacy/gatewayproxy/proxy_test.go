@@ -220,10 +220,10 @@ func TestMultipartBodiesStreamThrough(t *testing.T) {
 	}), nil)
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
-	fw, _ := mw.CreateFormFile("file", "products.csv")
+	fw, _ := mw.CreateFormFile("file", "photo.png")
 	_, _ = fw.Write(bytes.Repeat([]byte("a"), 3<<20))
 	_ = mw.Close()
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, front.URL+"/api/v1/app/product_import_jobs", &body)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, front.URL+"/api/v1/app/image_transformations", &body)
 	if err != nil {
 		t.Fatal(err)
 	}

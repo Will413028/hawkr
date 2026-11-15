@@ -80,16 +80,16 @@ export default function ProfileClient() {
 
 	if (loading && !profile) {
 		return (
-			<main className="profile-page">
+			<div className="profile-page">
 				<SellerPageShell title="個人資料">
 					<p className="text-foreground-soft text-sm">載入中…</p>
 				</SellerPageShell>
-			</main>
+			</div>
 		);
 	}
 
 	return (
-		<main className="profile-page">
+		<div className="profile-page">
 			<SellerPageShell
 				title="個人資料"
 				subtitle="管理你的暱稱、生日與聯絡資訊。"
@@ -230,6 +230,6 @@ export default function ProfileClient() {
 					</div>
 				</form>
 			</SellerPageShell>
-		</main>
+		</div>
 	);
 }

@@ -58,11 +58,6 @@ const (
 	ProductService_GetPublicOriginsSummary_FullMethodName                      = "/hawkr.product.ProductService/GetPublicOriginsSummary"
 	ProductService_GetPublicSellerCitiesSummary_FullMethodName                 = "/hawkr.product.ProductService/GetPublicSellerCitiesSummary"
 	ProductService_ListStoreIDsWithPublicProductsInternal_FullMethodName       = "/hawkr.product.ProductService/ListStoreIDsWithPublicProductsInternal"
-	ProductService_ValidateLeafCategoryInternal_FullMethodName                 = "/hawkr.product.ProductService/ValidateLeafCategoryInternal"
-	ProductService_CreateProductFromImportInternal_FullMethodName              = "/hawkr.product.ProductService/CreateProductFromImportInternal"
-	ProductService_BatchCheckSellerProductNames_FullMethodName                 = "/hawkr.product.ProductService/BatchCheckSellerProductNames"
-	ProductService_ValidateProductDraft_FullMethodName                         = "/hawkr.product.ProductService/ValidateProductDraft"
-	ProductService_GetProductsBriefInternal_FullMethodName                     = "/hawkr.product.ProductService/GetProductsBriefInternal"
 )
 
 // ProductServiceClient is the client API for ProductService service.
@@ -162,26 +157,6 @@ type ProductServiceClient interface {
 	// 內部 RPC（seller 模組推薦賣家 / marketplace rail 用來濾掉空店），不對前端暴露。
 	// 詳見 02 §5.13c
 	ListStoreIDsWithPublicProductsInternal(ctx context.Context, in *ListStoreIDsWithPublicProductsInternalRequest, opts ...grpc.CallOption) (*ListStoreIDsWithPublicProductsInternalResponse, error)
-	// 驗證 category_id 為合法葉節點，回傳 cat_l1/l2 反正規化欄位
-	// 內部 RPC（x-internal-service 免身份驗證），不對前端暴露
-	// 詳見 02 §9.1
-	ValidateLeafCategoryInternal(ctx context.Context, in *ValidateLeafCategoryInternalRequest, opts ...grpc.CallOption) (*ValidateLeafCategoryInternalResponse, error)
-	// 由 Product Import Service 在 commit 階段呼叫，將暫存 import_item 轉正為 product + product_sku
-	// 內部 RPC，與 CreateProduct 分離以維持權限邊界與審計線索清晰
-	// 詳見 02 §9.2
-	CreateProductFromImportInternal(ctx context.Context, in *CreateProductFromImportInternalRequest, opts ...grpc.CallOption) (*CreateProductFromImportInternalResponse, error)
-	// 批次偵測商品名稱是否與賣家既有商品重複（CSV 解析 + UpdateImportItem 時呼叫）
-	// 內部 RPC
-	// 詳見 02 §9.5
-	BatchCheckSellerProductNames(ctx context.Context, in *BatchCheckSellerProductNamesRequest, opts ...grpc.CallOption) (*BatchCheckSellerProductNamesResponse, error)
-	// 商品上架完整檢核（雙時機點 validator）；csv 路徑不能繞過任何上架規則
-	// 內部 RPC；由 ProductPublishValidator 執行
-	// 詳見 40 號設計書 §4.3a
-	ValidateProductDraft(ctx context.Context, in *ValidateProductDraftRequest, opts ...grpc.CallOption) (*ValidateProductDraftResponse, error)
-	// batch 查多個 product 的 (id, name, status, status_label) 用於 import 端 hydrate
-	// 內部 RPC
-	// 詳見 40 號設計書 §4.3b
-	GetProductsBriefInternal(ctx context.Context, in *GetProductsBriefInternalRequest, opts ...grpc.CallOption) (*GetProductsBriefInternalResponse, error)
 }
 
 type productServiceClient struct {
@@ -582,56 +557,6 @@ func (c *productServiceClient) ListStoreIDsWithPublicProductsInternal(ctx contex
 	return out, nil
 }
 
-func (c *productServiceClient) ValidateLeafCategoryInternal(ctx context.Context, in *ValidateLeafCategoryInternalRequest, opts ...grpc.CallOption) (*ValidateLeafCategoryInternalResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ValidateLeafCategoryInternalResponse)
-	err := c.cc.Invoke(ctx, ProductService_ValidateLeafCategoryInternal_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *productServiceClient) CreateProductFromImportInternal(ctx context.Context, in *CreateProductFromImportInternalRequest, opts ...grpc.CallOption) (*CreateProductFromImportInternalResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CreateProductFromImportInternalResponse)
-	err := c.cc.Invoke(ctx, ProductService_CreateProductFromImportInternal_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *productServiceClient) BatchCheckSellerProductNames(ctx context.Context, in *BatchCheckSellerProductNamesRequest, opts ...grpc.CallOption) (*BatchCheckSellerProductNamesResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BatchCheckSellerProductNamesResponse)
-	err := c.cc.Invoke(ctx, ProductService_BatchCheckSellerProductNames_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *productServiceClient) ValidateProductDraft(ctx context.Context, in *ValidateProductDraftRequest, opts ...grpc.CallOption) (*ValidateProductDraftResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ValidateProductDraftResponse)
-	err := c.cc.Invoke(ctx, ProductService_ValidateProductDraft_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *productServiceClient) GetProductsBriefInternal(ctx context.Context, in *GetProductsBriefInternalRequest, opts ...grpc.CallOption) (*GetProductsBriefInternalResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetProductsBriefInternalResponse)
-	err := c.cc.Invoke(ctx, ProductService_GetProductsBriefInternal_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // ProductServiceServer is the server API for ProductService service.
 // All implementations must embed UnimplementedProductServiceServer
 // for forward compatibility.
@@ -729,26 +654,6 @@ type ProductServiceServer interface {
 	// 內部 RPC（seller 模組推薦賣家 / marketplace rail 用來濾掉空店），不對前端暴露。
 	// 詳見 02 §5.13c
 	ListStoreIDsWithPublicProductsInternal(context.Context, *ListStoreIDsWithPublicProductsInternalRequest) (*ListStoreIDsWithPublicProductsInternalResponse, error)
-	// 驗證 category_id 為合法葉節點，回傳 cat_l1/l2 反正規化欄位
-	// 內部 RPC（x-internal-service 免身份驗證），不對前端暴露
-	// 詳見 02 §9.1
-	ValidateLeafCategoryInternal(context.Context, *ValidateLeafCategoryInternalRequest) (*ValidateLeafCategoryInternalResponse, error)
-	// 由 Product Import Service 在 commit 階段呼叫，將暫存 import_item 轉正為 product + product_sku
-	// 內部 RPC，與 CreateProduct 分離以維持權限邊界與審計線索清晰
-	// 詳見 02 §9.2
-	CreateProductFromImportInternal(context.Context, *CreateProductFromImportInternalRequest) (*CreateProductFromImportInternalResponse, error)
-	// 批次偵測商品名稱是否與賣家既有商品重複（CSV 解析 + UpdateImportItem 時呼叫）
-	// 內部 RPC
-	// 詳見 02 §9.5
-	BatchCheckSellerProductNames(context.Context, *BatchCheckSellerProductNamesRequest) (*BatchCheckSellerProductNamesResponse, error)
-	// 商品上架完整檢核（雙時機點 validator）；csv 路徑不能繞過任何上架規則
-	// 內部 RPC；由 ProductPublishValidator 執行
-	// 詳見 40 號設計書 §4.3a
-	ValidateProductDraft(context.Context, *ValidateProductDraftRequest) (*ValidateProductDraftResponse, error)
-	// batch 查多個 product 的 (id, name, status, status_label) 用於 import 端 hydrate
-	// 內部 RPC
-	// 詳見 40 號設計書 §4.3b
-	GetProductsBriefInternal(context.Context, *GetProductsBriefInternalRequest) (*GetProductsBriefInternalResponse, error)
 	mustEmbedUnimplementedProductServiceServer()
 }
 
@@ -875,21 +780,6 @@ func (UnimplementedProductServiceServer) GetPublicSellerCitiesSummary(context.Co
 }
 func (UnimplementedProductServiceServer) ListStoreIDsWithPublicProductsInternal(context.Context, *ListStoreIDsWithPublicProductsInternalRequest) (*ListStoreIDsWithPublicProductsInternalResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListStoreIDsWithPublicProductsInternal not implemented")
-}
-func (UnimplementedProductServiceServer) ValidateLeafCategoryInternal(context.Context, *ValidateLeafCategoryInternalRequest) (*ValidateLeafCategoryInternalResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ValidateLeafCategoryInternal not implemented")
-}
-func (UnimplementedProductServiceServer) CreateProductFromImportInternal(context.Context, *CreateProductFromImportInternalRequest) (*CreateProductFromImportInternalResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method CreateProductFromImportInternal not implemented")
-}
-func (UnimplementedProductServiceServer) BatchCheckSellerProductNames(context.Context, *BatchCheckSellerProductNamesRequest) (*BatchCheckSellerProductNamesResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method BatchCheckSellerProductNames not implemented")
-}
-func (UnimplementedProductServiceServer) ValidateProductDraft(context.Context, *ValidateProductDraftRequest) (*ValidateProductDraftResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ValidateProductDraft not implemented")
-}
-func (UnimplementedProductServiceServer) GetProductsBriefInternal(context.Context, *GetProductsBriefInternalRequest) (*GetProductsBriefInternalResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetProductsBriefInternal not implemented")
 }
 func (UnimplementedProductServiceServer) mustEmbedUnimplementedProductServiceServer() {}
 func (UnimplementedProductServiceServer) testEmbeddedByValue()                        {}
@@ -1614,96 +1504,6 @@ func _ProductService_ListStoreIDsWithPublicProductsInternal_Handler(srv interfac
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ProductService_ValidateLeafCategoryInternal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ValidateLeafCategoryInternalRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ProductServiceServer).ValidateLeafCategoryInternal(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ProductService_ValidateLeafCategoryInternal_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProductServiceServer).ValidateLeafCategoryInternal(ctx, req.(*ValidateLeafCategoryInternalRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ProductService_CreateProductFromImportInternal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateProductFromImportInternalRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ProductServiceServer).CreateProductFromImportInternal(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ProductService_CreateProductFromImportInternal_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProductServiceServer).CreateProductFromImportInternal(ctx, req.(*CreateProductFromImportInternalRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ProductService_BatchCheckSellerProductNames_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BatchCheckSellerProductNamesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ProductServiceServer).BatchCheckSellerProductNames(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ProductService_BatchCheckSellerProductNames_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProductServiceServer).BatchCheckSellerProductNames(ctx, req.(*BatchCheckSellerProductNamesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ProductService_ValidateProductDraft_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ValidateProductDraftRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ProductServiceServer).ValidateProductDraft(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ProductService_ValidateProductDraft_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProductServiceServer).ValidateProductDraft(ctx, req.(*ValidateProductDraftRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ProductService_GetProductsBriefInternal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetProductsBriefInternalRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ProductServiceServer).GetProductsBriefInternal(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ProductService_GetProductsBriefInternal_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProductServiceServer).GetProductsBriefInternal(ctx, req.(*GetProductsBriefInternalRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // ProductService_ServiceDesc is the grpc.ServiceDesc for ProductService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1866,26 +1666,6 @@ var ProductService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListStoreIDsWithPublicProductsInternal",
 			Handler:    _ProductService_ListStoreIDsWithPublicProductsInternal_Handler,
-		},
-		{
-			MethodName: "ValidateLeafCategoryInternal",
-			Handler:    _ProductService_ValidateLeafCategoryInternal_Handler,
-		},
-		{
-			MethodName: "CreateProductFromImportInternal",
-			Handler:    _ProductService_CreateProductFromImportInternal_Handler,
-		},
-		{
-			MethodName: "BatchCheckSellerProductNames",
-			Handler:    _ProductService_BatchCheckSellerProductNames_Handler,
-		},
-		{
-			MethodName: "ValidateProductDraft",
-			Handler:    _ProductService_ValidateProductDraft_Handler,
-		},
-		{
-			MethodName: "GetProductsBriefInternal",
-			Handler:    _ProductService_GetProductsBriefInternal_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

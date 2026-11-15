@@ -325,7 +325,7 @@ body:has(.hkh-page) .site-nav {
 	font-family: var(--font-primary);
 	font-size: 1rem;
 	line-height: 1.6;
-	color: rgba(58, 42, 26, 0.65);
+	color: var(--theme-text-body);
 	margin: 0;
 	max-width: 36ch;
 }
@@ -1207,7 +1207,7 @@ body:has(.hkh-page) .site-nav {
 	gap: 12px;
 	text-decoration: none;
 	background: var(--color-accent-500);
-	color: #fff;
+	color: var(--color-brand-ink);
 	font-family: "Roboto", var(--font-body);
 	font-weight: var(--weight-black);
 	font-size: 0.9375rem;
@@ -1227,7 +1227,7 @@ body:has(.hkh-page) .site-nav {
 	width: 8px;
 	height: 8px;
 	border-radius: 100px;
-	background: #fff;
+	background: var(--color-brand-ink);
 }
 .hkh-page .progress-rail {
 	position: absolute;

@@ -12,7 +12,7 @@ var refTypes = map[string]bool{
 	RefTypeProduct: true, RefTypeProductDesc: true, RefTypeSellerLogo: true, RefTypeShipping: true, RefTypeSellerCover: true,
 	RefTypeIdentityVerification: true, RefTypeChatMessage: true, RefTypePost: true, RefTypeBanner: true, RefTypeAftersale: true,
 	RefTypeCertification: true, RefTypeBuyerAvatar: true, RefTypeOrderReceipt: true, RefTypeAiStyle: true, RefTypeOrderReview: true,
-	RefTypeProductImportPreview: true, RefTypeProductImportPreviewDesc: true, RefTypeGovernanceEvidence: true, RefTypeRecipe: true,
+	RefTypeGovernanceEvidence: true, RefTypeRecipe: true,
 	RefTypeInvoiceDocument: true, RefTypeDeliveryPod: true, RefTypeSellerProspectLogo: true, RefTypeSellerProspectCover: true,
 	RefTypeOther: true,
 }

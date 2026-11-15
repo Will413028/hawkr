@@ -81,7 +81,7 @@ export default function MessagesLayout({
 	}, [agent.conversations, activeAgentConversationId]);
 
 	return (
-		<main
+		<div
 			className="chat-page"
 			data-chat-view={isThreadRoute ? "thread" : "list"}
 			data-chat-workspace="buyer"
@@ -136,6 +136,6 @@ export default function MessagesLayout({
 				/>
 				{children}
 			</div>
-		</main>
+		</div>
 	);
 }

@@ -5,10 +5,6 @@ import {
 	emptyDraft,
 	validateDraft,
 } from "../features/seller-center/products/adapters/productFormAdapter";
-import {
-	fieldLabel,
-	validationErrorLabel,
-} from "../features/seller-center/products-import/i18n";
 
 function source(relativePath: string): string {
 	return readFileSync(new URL(`../${relativePath}`, import.meta.url), "utf8");
@@ -59,13 +55,5 @@ test("price validation and import field labels use the same seller terminology",
 	assert.ok(
 		validateDraft(invalidSale).includes("售價需小於原價"),
 		"a discounted price at or above the list price is reported in 售價 terms",
-	);
-	assert.equal(fieldLabel("sku_price"), "規格原價");
-	assert.equal(fieldLabel("sku_sale_price"), "規格售價");
-	assert.equal(fieldLabel("skus[0].price"), "商品規格 第 1 組 · 原價");
-	assert.equal(fieldLabel("skus[0].sale_price"), "商品規格 第 1 組 · 售價");
-	assert.equal(
-		validationErrorLabel("SALE_PRICE_INVALID"),
-		"售價必須大於 0 且小於原價",
 	);
 });

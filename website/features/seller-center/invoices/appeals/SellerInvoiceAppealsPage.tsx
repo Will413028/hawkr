@@ -128,7 +128,6 @@ export function SellerInvoiceAppealsPage() {
 							key={item.value}
 							as="button"
 							active={view === item.value}
-							aria-selected={view === item.value}
 							onClick={() => setParams({ tab: item.value })}
 						>
 							{item.label}

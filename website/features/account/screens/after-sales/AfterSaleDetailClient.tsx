@@ -147,11 +147,11 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 
 	if (loading && !detail) {
 		return (
-			<main>
+			<div>
 				<SellerPageShell title="售後案件">
 					<p className="text-foreground-soft text-sm">載入中…</p>
 				</SellerPageShell>
-			</main>
+			</div>
 		);
 	}
 
@@ -159,7 +159,7 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 	// background refetch fails — only fall to not-found when there's no data.
 	if (!detail) {
 		return (
-			<main>
+			<div>
 				<SellerPageShell
 					title="找不到售後案件"
 					actions={
@@ -177,7 +177,7 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 						{error || "找不到售後案件"}
 					</p>
 				</SellerPageShell>
-			</main>
+			</div>
 		);
 	}
 
@@ -211,7 +211,7 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 		shipBackDeadlineMs - Date.now() < 24 * 60 * 60 * 1000;
 
 	return (
-		<main>
+		<div>
 			<SellerPageShell
 				title="售後案件"
 				subtitle={
@@ -553,7 +553,7 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 				onClose={() => setAppealOpen(false)}
 				onSubmit={submitAppeal}
 			/>
-		</main>
+		</div>
 	);
 }
 

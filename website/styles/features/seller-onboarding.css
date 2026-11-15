@@ -1346,7 +1346,7 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	color: inherit;
 }
 
-.seller-onboarding .eyebrow--hashtags > span + span {
+.seller-onboarding .eyebrow--hashtags.eyebrow--on-dark > span + span {
 	color: color-mix(in srgb, currentColor 72%, transparent);
 }
 

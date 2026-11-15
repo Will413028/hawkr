@@ -32,12 +32,6 @@ spring:
       minimum-idle: 2            # 閒置時最少保持的連線數
       maximum-pool-size: 10      # 連線池上限（含閒置+使用中）
       connection-timeout: 30000  # 取得連線的最長等待時間（毫秒），超時拋 SQLException
-  rabbitmq:
-    host: ${RABBITMQ_HOST:127.0.0.1}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME}
-    password: ${RABBITMQ_PASSWORD}
-    virtual-host: ${RABBITMQ_VHOST:/}
   flyway:
     url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:hawkr_media}?sslmode=${DB_SSLMODE:disable}
     user: ${DB_USER}
