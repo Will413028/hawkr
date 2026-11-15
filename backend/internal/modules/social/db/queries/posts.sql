@@ -2,12 +2,22 @@
 -- internal/visibility。
 
 -- name: InsertPost :one
-INSERT INTO social.posts (id, store_id, body, image_key, image_asset_id, product_id, status, published_at, created_at, updated_at)
+-- 同一家店的同一個 request_id 已經有時不寫入、回 0 列（不讓 transaction 失效，呼叫方接著讀原本那一篇）。
+INSERT INTO social.posts (id, store_id, body, image_key, image_asset_id, product_id, status, published_at, created_at, updated_at, request_id, request_hash)
 VALUES (
     sqlc.arg(id), sqlc.arg(store_id), sqlc.arg(body), sqlc.narg(image_key), sqlc.narg(image_asset_id), sqlc.narg(product_id),
-    sqlc.arg(status), sqlc.narg(published_at), sqlc.arg(now), sqlc.arg(now)
+    sqlc.arg(status), sqlc.narg(published_at), sqlc.arg(now), sqlc.arg(now), sqlc.narg(request_id), sqlc.narg(request_hash)
 )
+ON CONFLICT (store_id, request_id) DO NOTHING
 RETURNING *;
+
+-- name: PostByRequest :one
+-- 冪等重送的查詢：範圍是 (店家, request_id)；含已刪除的貼文（request_id 仍占著）。
+SELECT * FROM social.posts WHERE store_id = sqlc.arg(store_id) AND request_id = sqlc.arg(request_id);
+
+-- name: CountStorePostsByStatus :many
+-- 店家的貼文依狀態的篇數（不含已刪除）；沒有貼文的狀態沒有列，呼叫方補 0。
+SELECT status, count(*)::bigint AS posts FROM social.posts WHERE store_id = sqlc.arg(store_id) AND deleted_at IS NULL GROUP BY status;
 
 -- name: LockPost :one
 -- 鎖住貼文並回傳目前的狀態與圖（換圖、刪除與狀態轉移要依它判斷）；已刪除的貼文不回。

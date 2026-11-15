@@ -53,8 +53,6 @@ test("seller list tables opt into phone cards with visible field labels", () => 
 		"features/seller-center/customers/CustomersClient.tsx",
 		"features/seller-center/messages/SellerMessagesWorkspaceClient.tsx",
 		"features/seller-center/invoices/SellerInvoiceOverviewPage.tsx",
-		"features/seller-center/products-import/pages/JobsListPage.tsx",
-		"features/seller-center/products-import/pages/JobDetailPage.tsx",
 	];
 
 	for (const file of listTables) {
@@ -78,14 +76,6 @@ test("shared phone controls stay single-line and meet the touch target", () => {
 	assert.match(
 		adaptation,
 		/seller-page-shell__action-group[\s\S]*height:\s*44px/,
-	);
-	assert.match(
-		adaptation,
-		/\.seller-import-detail__filter-rail[\s\S]*flex-wrap:\s*nowrap/,
-	);
-	assert.match(
-		adaptation,
-		/\.seller-import-item__action-rail[\s\S]*flex-wrap:\s*nowrap/,
 	);
 	assert.match(adaptation, /\.seller-card__link[\s\S]*min-height:\s*44px/);
 	assert.match(

@@ -75,3 +75,7 @@ ORDER BY scheduled_by_ref;
 -- name: PostIsTakenDown :one
 -- 貼文有沒有被內容下架措施下架（複本 content_takedowns）。
 SELECT EXISTS (SELECT 1 FROM social.content_takedowns WHERE post_id = sqlc.arg(post_id));
+
+-- name: CountPendingSchedulesOfStore :one
+-- 店家有待發布排程的貼文篇數（一篇貼文最多一個 PENDING）。
+SELECT count(*)::bigint FROM social.post_schedules WHERE store_id = sqlc.arg(store_id) AND state = 'PENDING';

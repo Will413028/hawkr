@@ -38,7 +38,7 @@ import java.util.*;
  * <p>
  * 職責：處理 FinalizeImages，將 Staging 轉為正式資產
  *
- * <p><b>儲存端操作一律在事務外</b>（比照 {@link ImportAssetService#finalizeImportAsset}）：
+ * <p><b>儲存端操作一律在事務外</b>：
  * R2 不參與 DB 事務，把 copy/upload 放進 {@code @Transactional} 方法裡，任何後續 rollback
  * 都會留下「R2 有物件、{@code media_asset} 無列」的孤兒。而 {@code MediaGarbageCollectionJob}
  * 掃的是 {@code media_asset LEFT JOIN asset_reference}（見
@@ -396,7 +396,7 @@ public class MediaAssetService {
 
         // Fallback：依 accountId 查找最近的資產（相容舊資料）
         // 只用於一般上傳重入流程，恆為 bucket 1（真實登入 account_id），故查
-        // uploaderAccountId 即可，不需考慮 importStoreId。
+        // uploaderAccountId 即可。
         List<MediaAssetEntity> assets = mediaAssetRepository.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MediaAssetEntity>()
                         .eq(MediaAssetEntity::getUploaderAccountId, session.getAccountId())
@@ -418,7 +418,7 @@ public class MediaAssetService {
      * 後端直傳並轉正（服務間呼叫，不經前端上傳流程）
      *
      * 路徑格式：public/{refType}/{yyyyMMdd}/{uuid}/{filename}
-     * 系統上傳：uploaderAccountId / importStoreId 皆不設（NULL）
+     * 系統上傳：uploaderAccountId 不設（NULL）
      *
      * @param fileData    檔案二進位資料
      * @param filename    檔案名稱
@@ -447,7 +447,7 @@ public class MediaAssetService {
         // 3. 建立 media_asset 記錄；失敗即補償刪除，否則 R2 留下沒有任何一張表認得的物件
         MediaAssetEntity asset = new MediaAssetEntity();
         asset.setId(TsidUtil.generate());
-        // bucket 2（系統直傳）：uploaderAccountId / importStoreId 皆不設，維持 NULL
+        // 系統直傳：uploaderAccountId 不設，維持 NULL
         asset.setObjectKey(objectKey);
         asset.setRefType(refType);
         asset.setIsSecure(false);
@@ -591,7 +591,7 @@ public class MediaAssetService {
      * {@code GET /app/media/secure_download/{asset_id}} 的授權述詞是「使用者是上傳者、
      * 或使用者持有該資產的 asset_reference」⇒ 三個合法讀者（買家／賣家／ADM）一個都不成立。
      * 加密金鑰又只有 media 拿得到（呼叫端直接讀 R2 只會拿到密文，且違反 25 號規範的
-     * 「儲存 SDK 只准在 media／product-import」），所以必須有一支「把 bytes 還給上傳它的
+     * 「儲存 SDK 只准在 media」），所以必須有一支「把 bytes 還給上傳它的
      * 那個服務」的內部 RPC——誰能看是呼叫端的事，media 只驗資產歸屬。
      *
      * <p><b>授權述詞＝三元組全等</b>：{@code object_key} 會出現在呼叫端的 DB 與 log 裡，

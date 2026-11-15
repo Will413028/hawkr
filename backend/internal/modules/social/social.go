@@ -110,6 +110,7 @@ type (
 	CommentCursor   = model.CommentCursor
 	CommentPage     = model.CommentPage
 	CommentInput    = model.CommentInput
+	StoreSummary    = model.StoreSummary
 	// 排程發布：Schedule 是一次排程，ScheduledBy 是發起者（種類加發起者擁有格式的不透明 ref），ScheduleAuthorizer 是到點重驗授權的 port。
 	Schedule           = model.Schedule
 	ScheduledPost      = model.ScheduledPost
@@ -359,6 +360,27 @@ func (m *Module) PublishScheduledAttempt(ctx context.Context, scheduleID uuid.UU
 // 貼文列 → 排程列的順序鎖住、做 social 自己的檢查、問發起者種類的授權實作，通過才發布（授權被拒就取消、原因 AUTHORITY_LOST、不重試）。
 func (m *Module) PublishScheduled(ctx context.Context, scheduleID uuid.UUID) error {
 	return m.post.RunScheduled(ctx, scheduleID)
+}
+
+// MyPost 是店主讀自己的貼文（任何狀態，不含刪除）；店家要有 CapContentContract（讀取在停權時放行）。
+func (m *Module) MyPost(ctx context.Context, store seller.Store, id uuid.UUID) (Post, error) {
+	return m.post.Mine(ctx, store, id)
+}
+
+// ListMyPosts 是店主自己的貼文（含草稿與下架）；status 為空字串不篩選；店家要有 CapContentContract。
+func (m *Module) ListMyPosts(ctx context.Context, store seller.Store, status PostStatus, after *OwnPostCursor, size int32) (OwnPostPage, error) {
+	return m.post.ListMine(ctx, store, status, after, size)
+}
+
+// StoreSocialSummary 是店主的動態數：貼文依狀態的篇數（每個狀態都有，不含已刪除）與待發布排程的篇數，DB 計數、同一個讀取快照；店家要有 CapContentContract。
+func (m *Module) StoreSocialSummary(ctx context.Context, store seller.Store) (StoreSummary, error) {
+	return m.post.Summary(ctx, store)
+}
+
+// ListStoreComments 列出店主自己店所有貼文（任何狀態）的頂層留言，舊到新的 keyset；postID 非 nil 時只列那一篇（要是本店的貼文）；
+// unreplied 為真只列未回覆的留言：作者不是本店、沒有刪除也沒有被隱藏，而且底下沒有計入的本店回覆。店家要有 CapContentContract。
+func (m *Module) ListStoreComments(ctx context.Context, store seller.Store, postID *uuid.UUID, unreplied bool, after *CommentCursor, size int32) (CommentPage, error) {
+	return m.comment.ListForStore(ctx, store, postID, unreplied, after, size)
 }
 
 // OwnPost 讀店家自己的貼文（任何狀態）。

@@ -30,9 +30,6 @@ shipping-service,Arbitrary CSV URL (holiday import; URL supplied via RPC),servic
 payuni-webhook-service,PayUni (inbound webhook; decrypt via payuni-java-client),services/java/payuni-webhook-service/src/main/resources/application.yml
 payuni-webhook-service,Uber Direct (inbound webhook signature verification),services/java/payuni-webhook-service/src/main/java/io/github/will413028/hawkr/webhook/uber/UberWebhookParser.java
 media-service,Cloudflare R2 (S3 API; sole storage backend),services/java/media-service/src/main/java/io/github/will413028/hawkr/media/storage/R2StorageService.java
-media-service,Arbitrary external image URLs (import asset download via SafeFetcher),services/java/media-service/src/main/java/io/github/will413028/hawkr/media/service/ImportAssetService.java
-product-import-service,Cloudflare R2 (S3 API),services/java/product-import-service/src/main/java/io/github/will413028/hawkr/productimport/storage/ProductImportR2Storage.java
-product-import-service,Arbitrary seller web pages (HTML fetch via SafeFetcher + jsoup),services/java/product-import-service/src/main/java/io/github/will413028/hawkr/productimport/service/HtmlFetchService.java
 product-service,MOA open data (organic / traceability / CAS certification lookup),services/java/product-service/src/main/java/io/github/will413028/hawkr/product/service/GovCertificationService.java
 product-service,hawkr web on-demand revalidate (first-party Next.js; not third-party),services/java/product-service/src/main/java/io/github/will413028/hawkr/product/service/ProductRevalidationService.java
 workers/image-gateway,Cloudflare R2 + Cloudflare Images bindings (edge worker; not a merge candidate),workers/image-gateway/README.md

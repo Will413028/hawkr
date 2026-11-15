@@ -21,10 +21,6 @@ exchanges:
   type: topic
 - name: hawkr.marketing
   type: topic
-- name: hawkr.media
-  type: topic
-- name: hawkr.media.dlx
-  type: topic
 - name: hawkr.merchant
   type: topic
 - name: hawkr.notification
@@ -42,10 +38,6 @@ exchanges:
 - name: hawkr.product
   type: topic
 - name: hawkr.product.dlx
-  type: topic
-- name: hawkr.product.import
-  type: topic
-- name: hawkr.product.import.dlx
   type: topic
 - name: hawkr.review
   type: topic
@@ -176,21 +168,6 @@ queues:
   bindings:
   - exchange: hawkr.coupon.dlx
     key: dlq.coupon.seller.unsuspended
-- name: dlq.media.import.asset.download.internal
-  bindings:
-  - exchange: hawkr.media.dlx
-    key: dlq.media.import.asset.download.internal
-- name: dlq.media.product.import.callback
-- name: dlq.media.product.import.gc.expire_job
-  bindings:
-  - exchange: hawkr.product.import.dlx
-    key: dlq.media.product.import.gc.expire_job
-- name: dlq.product.import.asset.download
-- name: dlq.product.import.commit
-- name: dlq.product.import.csv.parse
-- name: dlq.product.import.html.fetch
-- name: dlq.product.import.job.commit_finished
-- name: dlq.product.import.job.parsed
 - name: im.account.deleted
   retry:
     max_attempts: 3
@@ -233,33 +210,6 @@ queues:
   bindings:
   - exchange: hawkr.order
     key: order.cancelled
-- name: media.import.asset.download.internal
-  dlq:
-    via: hawkr.media.dlx
-    queue: media.import.asset.download.internal.retry
-    routing_key: media.import.asset.download.internal.retry
-  bindings:
-  - exchange: hawkr.media
-    key: import.asset.download.internal
-- name: media.import.asset.download.internal.retry
-  dlq:
-    via: hawkr.media
-    queue: media.import.asset.download.internal
-    routing_key: import.asset.download.internal
-  bindings:
-  - exchange: hawkr.media.dlx
-    key: media.import.asset.download.internal.retry
-  args_json: true
-  arguments:
-    x-message-ttl: 60000
-- name: media.product.import.gc.expire_job
-  dlq:
-    via: hawkr.product.import.dlx
-    queue: dlq.media.product.import.gc.expire_job
-    routing_key: dlq.media.product.import.gc.expire_job
-  bindings:
-  - exchange: hawkr.product.import
-    key: gc.expire_job
 - name: notification.account.deleted
   retry:
     max_attempts: 3
@@ -598,86 +548,6 @@ queues:
   bindings:
   - exchange: hawkr.product
     key: product.certification.verify.requested
-- name: product.import.asset.download
-  dlq:
-    via: ''
-    queue: dlq.product.import.asset.download
-    routing_key: dlq.product.import.asset.download
-  bindings:
-  - exchange: hawkr.product.import
-    key: asset.download
-- name: product.import.asset.download.retry
-  dlq:
-    via: hawkr.product.import
-    queue: product.import.asset.download
-    routing_key: asset.download
-  args_json: true
-  arguments:
-    x-message-ttl: 120000
-- name: product.import.commit
-  dlq:
-    via: ''
-    queue: dlq.product.import.commit
-    routing_key: dlq.product.import.commit
-  bindings:
-  - exchange: hawkr.product.import
-    key: commit
-- name: product.import.commit.retry
-  dlq:
-    via: hawkr.product.import
-    queue: product.import.commit
-    routing_key: commit
-  args_json: true
-  arguments:
-    x-message-ttl: 10000
-- name: product.import.csv.parse
-  dlq:
-    via: ''
-    queue: dlq.product.import.csv.parse
-    routing_key: dlq.product.import.csv.parse
-  bindings:
-  - exchange: hawkr.product.import
-    key: csv.parse
-- name: product.import.csv.parse.retry
-  dlq:
-    via: hawkr.product.import
-    queue: product.import.csv.parse
-    routing_key: csv.parse
-  args_json: true
-  arguments:
-    x-message-ttl: 30000
-- name: product.import.html.fetch
-  dlq:
-    via: ''
-    queue: dlq.product.import.html.fetch
-    routing_key: dlq.product.import.html.fetch
-  bindings:
-  - exchange: hawkr.product.import
-    key: html.fetch
-- name: product.import.html.fetch.retry
-  dlq:
-    via: hawkr.product.import
-    queue: product.import.html.fetch
-    routing_key: html.fetch
-  args_json: true
-  arguments:
-    x-message-ttl: 120000
-- name: product.import.media.callback
-  dlq:
-    via: ''
-    queue: dlq.media.product.import.callback
-    routing_key: dlq.media.product.import.callback
-  bindings:
-  - exchange: hawkr.media
-    key: import.asset.downloaded
-- name: product.import.media.callback.retry
-  dlq:
-    via: hawkr.media
-    queue: product.import.media.callback
-    routing_key: import.asset.downloaded
-  args_json: true
-  arguments:
-    x-message-ttl: 300000
 - name: product.order.cancelled
   dlq:
     via: hawkr.product.dlx

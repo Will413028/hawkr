@@ -1,6 +1,6 @@
 # 後端改為 Go modular monolith：遷移計畫
 
-**Goal：** 把 22 個 deployable（12 Go、10 Java）加 gateway，改成一個 Go module、一個 binary、一個資料庫的 modular monolith。完成後刪除內部 gRPC／proto、RabbitMQ、Flyway 與 Java toolchain。
+**Goal：** 把 21 個 deployable（12 Go、9 Java）加 gateway，改成一個 Go module、一個 binary、一個資料庫的 modular monolith。完成後刪除內部 gRPC／proto、RabbitMQ、Flyway 與 Java toolchain。
 
 **決策與理由：** `docs/adr/2026-09-24-go-modular-monolith.md`（D1–D9）。本檔只寫步驟、驗收與進度，不重複理由。
 
@@ -267,7 +267,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 - [ ] **B3 fulfillment**
   - 物流供應商改綠界（`2026-10-24-portfolio-public`（計畫已刪除，見該 ADR 文末修訂）前提；收款開通 ADR D5）：超商與宅配的建單、列印、貨態 webhook 不再走 PayUni 的 MerID 與 `payuni-webhook-service`；開工前先查綠界測試帳號與平台條件（daily 2026-10-29 2350 的 Followup）。
   - 刪除 Uber 即時配送（ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：Java shipping 的 Uber 程式、payuni-webhook-service 的 Uber webhook、只服務它們的 proto RPC 與生成物、CodeMeta 的 Uber 值域、`.env.template` 與 `docker-compose-local.yml` 的 Uber 設定、`backend/docs/runbooks/uber-quote-retention/`，4 份 Uber ADR 標 superseded；設計書 03、06、09、58 描述 3003（Uber）的段落與 `backend/docs/runbooks/uber-quote-retention.md` 一併刪除；清單見原執行計畫 `2026-10-27-ecommerce-scope-cut` 的「延後」（計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂；Will 2026-10-29）。
-  - 上一項的清單與觸發條件的來源是原執行計畫 `2026-10-27-ecommerce-scope-cut` 的「延後」（計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂）；補充範圍：CodeMeta 的 Uber 值域是 `ShippingMethod` 3003、`UberDeliveryOutcome`、`ShipmentAnomalyType` 的 4 個 UBER 值與錯誤碼 9024（`pkg/errors/bizcode`），Java 仍實作的 proto（order、shipping、product_import）裡的 Uber 欄位與 RPC 隨之刪除，client 裡斷言「3003 一律 unsupported」的回歸測試（website `lib/checkout/shipping-requirements.unit.test.ts`、`lib/seller/shipment-provider.unit.test.ts`，buyer-app `test/core/codemeta/shipping_presentation_test.dart`）在值域刪除時一起改。
+  - 上一項的清單與觸發條件的來源是原執行計畫 `2026-10-27-ecommerce-scope-cut` 的「延後」（計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂）；補充範圍：CodeMeta 的 Uber 值域是 `ShippingMethod` 3003、`UberDeliveryOutcome`、`ShipmentAnomalyType` 的 4 個 UBER 值與錯誤碼 9024（`pkg/errors/bizcode`），Java 仍實作的 proto（order、shipping）裡的 Uber 欄位與 RPC 隨之刪除，client 裡斷言「3003 一律 unsupported」的回歸測試（website `lib/checkout/shipping-requirements.unit.test.ts`、`lib/seller/shipment-provider.unit.test.ts`，buyer-app `test/core/codemeta/shipping_presentation_test.dart`）在值域刪除時一起改。
   - 4 份 Uber ADR 在 B3 刪 Java 程式時標 superseded（指向 ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：`2026-09-11-uber-commerce-model-seller-direct`、`2026-09-11-uber-logistics-fee-charge-trigger`、`2026-09-14-uber-create-idempotency-precommit-key`、`2026-09-06-uber-webhook-slice-in-payuni-webhook-service`。
 - [ ] **B4 catalog**
   - 不建 `store_state` 讀取模型：catalog 的列表在 SQL 內 join `seller.pub_exposable_stores(at)`（時間用請求的 clock），取代停權快照（ADR 2026-09-24 修訂段，2026-10-18；簡報 `backend/docs/plans/2026-10-18-a7-social/d3-read-model-brief.md` §4.2）。
@@ -277,12 +277,11 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - 賣家中心的低庫存徽章改由伺服器提供數量：website 現在只從前 100 筆商品算（`SellerCenterShell`），超過就少算（A3 計畫第 4C 刀的決定）。
   - 商品限制措施（A3b `step10e-reports-brief.md` R6、`step10e-measure-brief.md` D7，Will 2026-10-18）：seller 的措施對象加商品（`measure_contents.content_kind` 加 PRODUCT），有理由、可以申覆、擋住重新上架；admin 的強制下架對話框改成建立這個措施；主管機關來函指名的商品頁資料依保存期限保存（R5，食安法修正草案第 43-1 條）。第一次部署前一定要有。
   - 延後項（原執行計畫 `2026-10-27-ecommerce-scope-cut`「延後」，計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂，2026-10-29）：Java 的配送溫層、產銷履歷與有機標章、商品認證欄位（`product.proto` 的 `certification_types`、`ProductCertification*`，catalog 的認證申請與審核流程、通知模板 `product_certification_*`）改寫時不帶，契約上一起消失；client 已拿掉介面（步驟 7）。觸發：B4 catalog 改寫，以及 B3 fulfillment、B6 cart 改寫配送方式聚合。同時刪除：
-    - gateway 替賣家端承接的常溫處理（ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂的 D9）：`backend/gateway/internal/handler/shipping_ambient.go` 的常數、商品建立／更新／匯入／批次／代操作的 `temperature` 補值、超商開通 `goodsType` 補值，以及運費試算、物流開通與配送方式清單只回常溫列的過濾；程式註解寫明 B4 刪除。
-    - CSV 匯入的溫層欄位由 Java 解析（`CsvParseService.java:478-499`），gateway 不過濾匯入預覽的列（只拿掉溫層欄位，ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂的 D9），賣家仍可能存進冷藏或冷凍。B4 改寫匯入時一併決定：解析端只接受常溫，或拒絕非常溫的 CSV 列。
+    - gateway 替賣家端承接的常溫處理（ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂的 D9）：`backend/gateway/internal/handler/shipping_ambient.go` 的常數、商品建立／更新／批次／代操作的 `temperature` 補值、超商開通 `goodsType` 補值，以及運費試算、物流開通與配送方式清單只回常溫列的過濾；程式註解寫明 B4 刪除。
     - Java 組好的配送選項名稱含溫層字樣（例如「黑貓宅急便（常溫）」，ADR 計畫 D8）：伺服器端改成不帶；買家端 client 目前原樣顯示，不改寫。
     - gateway 的商品認證路由與 handler（`routes_product.go`、`admin_product_certification.go`、`seller_product_certification.go` 與其測試、`router/constants.go`）和 OpenAPI operation：兩端的 client 呼叫已刪，Java 認證流程退場時一起刪。
     - CodeMeta `ShippingTemperature`、`ProductCertification*` 值域與 design token 之外的生成物。
-- [ ] **B5 productimport**
+- [x] **B5 productimport**：不改寫，整個移除（Will 2026-11-15 範圍裁切，ADR `2026-10-27-general-ecommerce-scope-cut` 文末的 2026-11-15 修訂）。Java product-import-service、gateway 的 `/app/product_import_jobs` 端點、product 與 media 的匯入專用 RPC 與資料表、MQ 拓撲與 CodeMeta 值域一併刪除。
 - [ ] **B6 cart**
   - 延後項（原執行計畫 `2026-10-27-ecommerce-scope-cut`「延後」，計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂，2026-10-29）：購物車與結帳契約裡的配送溫層（`cart.proto` 的 `delivery_temp`、`溫層`，order 的 `deliveryTemp`）。買家端 client 現在原樣回傳伺服器配送選項的 `deliveryTemp`（ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂的 D8：Java 以它查運費、材積上限、免運與運費負擔，寫死常溫會讓冷藏、冷凍商品算錯）：website `lib/checkout/draft.ts`、`lib/checkout/repo.ts`、`features/cart/cartUiStore.ts`、`features/checkout/screens/CheckoutClient.tsx`，buyer-app `features/cart/data/cart_repository.dart`、`checkout_payment_sheet.dart`。觸發：B6 cart 改寫（與 B8 ordering 的結帳）不帶溫層欄位時，三處 client 的欄位與測試一起刪。
 - [ ] **B7 coupon**

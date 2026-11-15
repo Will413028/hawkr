@@ -7,7 +7,6 @@ import io.github.will413028.hawkr.media.entity.UploadSessionEntity;
 import io.github.will413028.hawkr.media.repository.AssetReferenceRepository;
 import io.github.will413028.hawkr.media.repository.MediaAssetRepository;
 import io.github.will413028.hawkr.media.repository.UploadSessionRepository;
-import io.github.will413028.hawkr.media.service.ImportAssetService;
 import io.github.will413028.hawkr.media.storage.StorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -59,18 +58,16 @@ class MediaGarbageCollectionJobClaimTest {
     @Mock private MediaAssetRepository mediaAssetRepository;
     @Mock private AssetReferenceRepository assetReferenceRepository;
     @Mock private StorageService storageService;
-    @Mock private ImportAssetService importAssetService;
 
     private MediaGarbageCollectionJob gcJob;
 
     @BeforeEach
     void setUp() {
         gcJob = new MediaGarbageCollectionJob(uploadSessionRepository, mediaAssetRepository,
-                assetReferenceRepository, storageService, importAssetService, new NoopTxManager());
+                assetReferenceRepository, storageService, new NoopTxManager());
         ReflectionTestUtils.setField(gcJob, "orphanAssetDays", 7);
         ReflectionTestUtils.setField(gcJob, "batchSize", 100);
         ReflectionTestUtils.setField(gcJob, "gcEnabled", true);
-        ReflectionTestUtils.setField(gcJob, "importAssetExpiredRetentionDays", 30);
     }
 
     private static UploadSessionEntity session(String key) {
@@ -251,11 +248,10 @@ class MediaGarbageCollectionJobClaimTest {
     void sessionClaimCommitsBeforeSideEffect() {
         CountingTxManager tx = new CountingTxManager();
         MediaGarbageCollectionJob job = new MediaGarbageCollectionJob(uploadSessionRepository,
-                mediaAssetRepository, assetReferenceRepository, storageService, importAssetService, tx);
+                mediaAssetRepository, assetReferenceRepository, storageService, tx);
         ReflectionTestUtils.setField(job, "orphanAssetDays", 7);
         ReflectionTestUtils.setField(job, "batchSize", 100);
         ReflectionTestUtils.setField(job, "gcEnabled", true);
-        ReflectionTestUtils.setField(job, "importAssetExpiredRetentionDays", 30);
 
         int[] commitsAtClaim = {-1};
         int[] commitsAtDelete = {-1};
@@ -292,11 +288,10 @@ class MediaGarbageCollectionJobClaimTest {
     void assetClaimCommitsBeforeSideEffect() {
         CountingTxManager tx = new CountingTxManager();
         MediaGarbageCollectionJob job = new MediaGarbageCollectionJob(uploadSessionRepository,
-                mediaAssetRepository, assetReferenceRepository, storageService, importAssetService, tx);
+                mediaAssetRepository, assetReferenceRepository, storageService, tx);
         ReflectionTestUtils.setField(job, "orphanAssetDays", 7);
         ReflectionTestUtils.setField(job, "batchSize", 100);
         ReflectionTestUtils.setField(job, "gcEnabled", true);
-        ReflectionTestUtils.setField(job, "importAssetExpiredRetentionDays", 30);
 
         int[] commitsAtClaim = {-1};
         int[] commitsAtDelete = {-1};

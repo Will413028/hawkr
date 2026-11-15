@@ -125,8 +125,8 @@ func TestBreaker_BusinessErrorsDoNotTrip(t *testing.T) {
 // #3230：單一使用者踩滿自己的業務配額，不得讓全體使用者的該服務所有端點 503。
 //
 // breaker 以 cc.Target() 為 key、一個服務的所有路由共用一顆 ⇒ 若 ResourceExhausted
-// 計入失敗，一個賣家連按「重寄通知」踩滿 9352 節流（或踩滿匯入 job 上限），就會把
-// 整個 invoice-service／product-import-service 的 breaker 推開。
+// 計入失敗，一個賣家連按「重寄通知」踩滿 9352 節流，就會把
+// 整個 invoice-service 的 breaker 推開。
 //
 // 這一支驗的是**行為**（breaker 不開、invoker 每次都被呼叫），不是判定函式的回傳值
 // ——後者由 TestBreakerIsSuccessful 守，兩者缺一都不足以擋住這個缺陷。

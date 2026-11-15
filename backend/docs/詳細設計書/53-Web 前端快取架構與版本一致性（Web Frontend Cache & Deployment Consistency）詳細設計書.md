@@ -317,7 +317,7 @@ expansion 只展開 entity「實際被嵌入」的 domain-collection tag，**不
 
 🔴 **共發 `seller:<id>` 的判準是「該 mutation 是否改變賣家有哪些公開商品」**（責任邊界 §9.3 ★）——對不改變該集合的 mutation 共發 `seller:<id>` 是純 over-invalidation：欄位編輯（`updateProduct`）／庫存（`StockService`）／改分類（`batchChangeProductCategory`、`CategoryService` cascade）／未跨 ACTIVE 的狀態變更／非 ACTIVE 商品刪除 → **只發 `product:<id>`**；建立即上架／刪除 ACTIVE 商品／上下架跨 ACTIVE／賣家批次下架 → 仍共發 `seller:<id>`。一次商品價格編輯或一次下單扣庫存的假失效因此歸零。
 
-> **推薦賣家的「有無公開上架商品」過濾不改變本判準**：該過濾把 `sellers:list` 的成員集合綁在「賣家有沒有公開商品」上，而集合會變動的時機恰好等於上面判準為真的那四種——`ProductService.createProduct`（`isActive` 分支）／`updateProductStatus`／`updateSellerProductStatus`（皆走 `crossesActiveBoundary`）／`deleteProduct`（`wasActive` 分支）走 `revalidateProductAndSeller`，`SellerProductOffShelfService` 的批次下架／復架走 `revalidateProductsWithSellers`，`ProductImportService` commit 亦共發。⇒ 過濾是**成員**變動、不是**排序**變動，而成員變動的每一個 producer 都已共發 `seller:<id>`，展開含 `sellers:list`，失效面完整。排行快照本身每 15 分鐘重算一次（`docs/modules/discovery.md` §3、§7），失效只讓 web 重取當下的快照。
+> **推薦賣家的「有無公開上架商品」過濾不改變本判準**：該過濾把 `sellers:list` 的成員集合綁在「賣家有沒有公開商品」上，而集合會變動的時機恰好等於上面判準為真的那四種——`ProductService.createProduct`（`isActive` 分支）／`updateProductStatus`／`updateSellerProductStatus`（皆走 `crossesActiveBoundary`）／`deleteProduct`（`wasActive` 分支）走 `revalidateProductAndSeller`，`SellerProductOffShelfService` 的批次下架／復架走 `revalidateProductsWithSellers`。⇒ 過濾是**成員**變動、不是**排序**變動，而成員變動的每一個 producer 都已共發 `seller:<id>`，展開含 `sellers:list`，失效面完整。排行快照本身每 15 分鐘重算一次（`docs/modules/discovery.md` §3、§7），失效只讓 web 重取當下的快照。
 
 ### 4.5 失效後收斂：合成讀者（Warm）
 

@@ -255,7 +255,7 @@ public class GovCertificationService {
     /**
      * 同步路徑查驗（advisory 端點）：read-timeout 10 秒、走 circuit breaker。
      *
-     * <p>⚠️ 不得在商品寫入鏈（IMPORT_COMMIT／PUBLISH）上呼叫本方法：逾時會打開 per-type、
+     * <p>⚠️ 不得在商品寫入鏈（PUBLISH）上呼叫本方法：逾時會打開 per-type、
      * TTL 60 秒、Redis 全域共享的 circuit，把緊接著排出去的背景查驗一起封死（§6.5.3）。
      */
     public GovVerifyResult verifyDetailed(String certNo, CertificationType certType) {

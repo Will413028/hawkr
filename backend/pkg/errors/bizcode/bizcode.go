@@ -295,23 +295,6 @@ const (
 	// Seller Membership 業務碼（9410~9419）
 	SellerInvalidPlanCode int32 = 9410
 
-	// Product Import 業務碼（1100~1199）
-	ProductImportJobNotFound              int32 = 1101
-	ProductImportItemNotFound             int32 = 1102
-	ProductImportFileTooLarge             int32 = 1103
-	ProductImportFileTooManyRows          int32 = 1104
-	ProductImportFileEncodingUnsupported  int32 = 1105
-	ProductImportFileHeaderInvalid        int32 = 1106
-	ProductImportRateLimited              int32 = 1107
-	ProductImportFilenameConflict         int32 = 1108
-	ProductImportJobWrongStatus           int32 = 1109
-	ProductImportItemWrongStatus          int32 = 1110
-	ProductImportOptimisticLockFailed     int32 = 1111
-	ProductImportNoEligibleItems          int32 = 1112
-	ProductImportCategoryInvalid          int32 = 1113
-	ProductImportConfirmationTokenInvalid int32 = 1114
-	ProductImportItemAlreadyCommitted     int32 = 1115
-
 	// AfterSales 業務碼（9001~9099）
 	AftersaleNotFound                          int32 = 9001
 	AftersaleDuplicate                         int32 = 9002
@@ -659,21 +642,6 @@ var bizCodeMessages = map[int32]string{
 	9354: "賣家尚未完成平台代製收據授權，無法核定為免用統一發票",
 	9400: "無此方案代碼",
 	9410: "無此賣家方案代碼",
-	1101: "找不到匯入任務",
-	1102: "找不到匯入商品項",
-	1103: "CSV 檔案超過大小上限（%s bytes）",
-	1104: "CSV row 數超過上限（%s 筆）",
-	1105: "CSV 編碼非 UTF-8，請以 UTF-8 重新匯出",
-	1106: "CSV header 缺必要欄位：%s",
-	1107: "同時進行的匯入任務或每日上傳次數已達上限",
-	1108: "同名 CSV 任務尚未結案，請先處理既有任務或更改檔名",
-	1109: "任務目前狀態不允許此操作（%s）",
-	1110: "商品項目前狀態不允許編輯",
-	1111: "資料已被其他操作更新，請重新整理後再試",
-	1112: "沒有可上架的商品項，請先修正錯誤後再 commit",
-	1113: "商品分類非合法葉節點",
-	1114: "分類二次確認 token 無效或已過期，請重新選擇分類",
-	1115: "該匯入商品已併入正式商品，無法再編輯或移除",
 	9001: "售後單不存在",
 	9002: "該訂單已有進行中的售後申請",
 	9003: "已超過售後申請時限",

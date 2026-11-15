@@ -104,9 +104,8 @@ graph TD
 | 欄位名 | 類型 | Nullable | Default | 說明 |
 | --- | --- | --- | --- | --- |
 | id | bigint | PK | | Asset ID - TSID，由 `TsidUtil.generate()` 生成 |
-| uploader_account_id | bigint | Y | | 上傳者真實登入帳號 ID。僅一般買/賣家/後台上傳（`MediaAssetService.createMediaAsset`）寫入；系統直傳（`serverUploadAndFinalize`）與匯入轉正皆為 NULL |
-| import_store_id | bigint | Y | | 賣家 `store_id`。僅 CSV/URL 商品匯入管線轉正（`ImportAssetService.commitFinalize`）寫入，其餘來源皆為 NULL |
-| object_key | varchar(512) | N | | R2 最終路徑。格式：`{visibility}/{category}/{ownerId}/{date}/{filename}`（`{filename}` 沿用暫存 key 末段，一般上傳為 `{uuid}{ext}`；**機敏上傳自 #2759 起為 `{uuid}{ext}.attempt-{uuid}`**——per-attempt key 由 CAS 贏家寫回 `upload_session.object_key` 後被原樣沿用，見 §4.3／§4.9.3）。`{ownerId}` 是 `AbstractStorageService.generateFinalObjectKey` 的 `ownerId` 參數，**只作路徑分桶、不是授權依據**，其來源依上傳路徑而異：一般上傳為上傳者 `account_id`、匯入轉正為賣家 `store_id`、**ADM 代行上傳（56 號）為 ADM 的 `admin_accounts.id`**。⚠️ 最後一種**跨 id 空間**——那一段連「屬於 `accounts` 的哪一列」都不成立，因此**禁止**新增任何「以路徑段歸集店家用量／清理店家媒體／判斷資源歸屬」的邏輯（歸屬的唯一 SSOT 是 `asset_reference(ref_type, ref_id)`）。兩支後端直傳不經此方法：`serverUploadAndFinalize` 為 `public/{category}/{date}/{uuid}/{filename}`、`serverUploadSecureAndFinalize` 為 `secure/{category}/{date}/{uuid}/{filename}`（皆無擁有者段，且**末段就是呼叫端傳入的 filename**，見 §4.9.2） |
+| uploader_account_id | bigint | Y | | 上傳者真實登入帳號 ID。僅一般買/賣家/後台上傳（`MediaAssetService.createMediaAsset`）寫入；系統直傳（`serverUploadAndFinalize`）為 NULL |
+| object_key | varchar(512) | N | | R2 最終路徑。格式：`{visibility}/{category}/{ownerId}/{date}/{filename}`（`{filename}` 沿用暫存 key 末段，一般上傳為 `{uuid}{ext}`；**機敏上傳自 #2759 起為 `{uuid}{ext}.attempt-{uuid}`**——per-attempt key 由 CAS 贏家寫回 `upload_session.object_key` 後被原樣沿用，見 §4.3／§4.9.3）。`{ownerId}` 是 `AbstractStorageService.generateFinalObjectKey` 的 `ownerId` 參數，**只作路徑分桶、不是授權依據**，其來源依上傳路徑而異：一般上傳為上傳者 `account_id`、**ADM 代行上傳（56 號）為 ADM 的 `admin_accounts.id`**。⚠️ 最後一種**跨 id 空間**——那一段連「屬於 `accounts` 的哪一列」都不成立，因此**禁止**新增任何「以路徑段歸集店家用量／清理店家媒體／判斷資源歸屬」的邏輯（歸屬的唯一 SSOT 是 `asset_reference(ref_type, ref_id)`）。兩支後端直傳不經此方法：`serverUploadAndFinalize` 為 `public/{category}/{date}/{uuid}/{filename}`、`serverUploadSecureAndFinalize` 為 `secure/{category}/{date}/{uuid}/{filename}`（皆無擁有者段，且**末段就是呼叫端傳入的 filename**，見 §4.9.2） |
 | ref_type | varchar(64) | Y | | 資源分類（Finalize 時設定），對應 `AssetReferenceType` |
 | is_secure | boolean | N | false | 是否為機敏檔案 |
 | encryption_key | varchar(256) | Y | | 機敏檔案專用：流式加密金鑰 (加密存儲) |
@@ -114,9 +113,9 @@ graph TD
 | size_bytes | bigint | N | | 檔案大小（位元組） |
 | created_at | timestamp | N | NOW() | |
 | gc_lease_until | timestamptz | Y | | GC 排程的**租約到期時間**（非「已 GC 旗標」）；NULL 或 `<= NOW()` 表示可搶佔。見 §8 |
-| original_filename | varchar(255) | Y | | 原始檔名，Finalize 時由 upload_session 複製（後端直傳與匯入路徑見 §4.9.2）。V9 之前的列為 NULL，讀取端回退至 object_key 尾段 |
+| original_filename | varchar(255) | Y | | 原始檔名，Finalize 時由 upload_session 複製（後端直傳見 §4.9.2）。V9 之前的列為 NULL，讀取端回退至 object_key 尾段 |
 
-> **本表沒有單一的「帳號」欄**：身分依上傳路徑分別落在 `uploader_account_id` 與 `import_store_id`，系統直傳列兩欄皆為 NULL（「無身分」即以「兩欄皆 NULL」表達，不得用 sentinel `0`）。`media_asset` **無以帳號為鍵的索引**。
+> **本表沒有單一的「帳號」欄**：身分只落在 `uploader_account_id`，系統直傳列為 NULL（「無身分」即以 NULL 表達，不得用 sentinel `0`）。`media_asset` **無以帳號為鍵的索引**。
 
 **索引**：
 - `uk_media_asset_object_key` UNIQUE ON (object_key) — 一個 `object_key` 只准有一列 media_asset（V7；防併發轉正產生兩列共用同一 R2 物件，GC 刪一列即讓另一列變死指標）
@@ -227,7 +226,7 @@ Media Service 不對管理員提供機敏檔的下載或預覽。通用端點（
 
 ### 3.2 gRPC Proto 定義（核心）
 
-Proto 定義位於 `api/proto/media/media.proto`，**該檔是 RPC 清單的唯一權威**——本節只列日常最常用的幾支，不宣稱窮舉（商品匯入相關的見 §7；`BindStagedAsset` 屬 40 號設計書的範圍）。
+Proto 定義位於 `api/proto/media/media.proto`，**該檔是 RPC 清單的唯一權威**——本節只列日常最常用的幾支，不宣稱窮舉。
 
 ```protobuf
 service MediaService {
@@ -323,7 +322,7 @@ LinkImages 使用 ON CONFLICT DO NOTHING，多次呼叫視為冪等。
 
 實作類別：`io.github.will413028.hawkr.media.service.MediaAssetService`
 
-**★ 事務邊界（強制，與 §7.3 `FinalizeImportAsset` 同規）**：整批四階段——
+**★ 事務邊界（強制）**：整批四階段——
 **① 準備（事務內、唯讀）** token/session 驗證 + 算出最終路徑 →
 **② R2 搬移（事務外）** HEAD 回查 + `copyObject` →
 **③ 落庫（事務內）** 狀態 CAS + INSERT `media_asset` →
@@ -348,7 +347,7 @@ LinkImages 使用 ON CONFLICT DO NOTHING，多次呼叫視為冪等。
 5. **R2 搬移**（S3 API；儲存後端見 49 號設計書 §4.1）：
    - 生成最終路徑：`{visibility}/{category}/{ownerId}/{date}/{filename}`（本路徑的 `{ownerId}` 即上傳者 `account_id`；欄位語意見 §2.2）
    - `ref_type` 對外契約使用 `AssetReferenceType.value()`；但 `object_key` 的 `{category}` 內部仍使用對應 `code().toLowerCase()`，以維持語義化路徑名稱
-   - **★ `{date}` 段萃取規則（強制）**：`generateFinalObjectKey` 必須從暫存 key 中**以 `\d{8}` 樣式定位日期段**取得 `{date}`，**禁止**依賴「日期固定在倒數第二段」這種與 key 深度耦合的假設。理由：暫存 key 結構**不只一種深度**——一般上傳是 3 段 `tmp/{date}/{uuid}{ext}`，但 import 暫存 key 是 5 段 `tmp/{date}/{storeId}/import/{uuid}{ext}`（見 §7.1）。若用「倒數第二段」當日期，import key 會把字面 `import` 當成日期段，產出 `public/product/{storeId}/import/{uuid}` 這種**不符本格式**的路徑。萃取不到 `\d{8}` 時 fallback 為 `LocalDate.now()`，末段一律為 filename。
+   - **★ `{date}` 段萃取規則（強制）**：`generateFinalObjectKey` 必須從暫存 key 中**以 `\d{8}` 樣式定位日期段**取得 `{date}`，**禁止**依賴「日期固定在倒數第二段」這種與 key 深度耦合的假設。理由：暫存 key 的深度不應與萃取邏輯耦合。萃取不到 `\d{8}` 時 fallback 為 `LocalDate.now()`，末段一律為 filename。
    - S3 `copyObject`：從暫存路徑複製到最終路徑（階段②，事務外）
    - S3 `deleteObject`：刪除暫存物件（階段④，**DB commit 之後**）
 6. **狀態轉換**（階段③，同一事務）：
@@ -713,7 +712,7 @@ sequenceDiagram
    > 若同一 key 有兩列，回收其中一列就會刪掉另一列（仍被業務引用）指向的物件。生產端的對應約束見 §4.1「先 CAS 再 INSERT」。
 
 > ⚠️ **GC 的結構性盲區（決定孤兒只能從生產端堵）**：三個階段都是**從 DB 列出發**去刪 R2 物件。
-> 「R2 有物件、但四張追蹤表（`media_asset` / `upload_session` / `import_asset` / `product_import_job`）都沒有列」
+> 「R2 有物件、但兩張追蹤表（`media_asset` / `upload_session`）都沒有列」
 > 這類孤兒**永遠不在任何一階段的掃描範圍**，只能靠對帳腳本人工清理。
 > 因此凡是會寫 R2 的路徑，都必須確保「物件存在 ⇒ 有 DB 列認得它」——見 §4.1 / §4.7 的事務邊界規定。
 3. **清理孤立引用 (Stale Reference)**（`cleanStaleReferences`）：刪除 asset_reference 中 asset_id 指向已不存在 media_asset 的殘留記錄。
@@ -783,11 +782,8 @@ CreateUploadSession(filename)
 | `FinalizeImages`（一般上傳／機敏上傳） | `upload_session.original_filename`（使用者上傳時宣告的） |
 | `ServerUploadAndFinalize`（後端直傳，如物流標籤） | RPC 參數 `filename`（呼叫端自產，例：`{shipmentNo}.pdf`） |
 | `ServerUploadSecureAndFinalize`（後端機敏直傳，如發票 PDF） | 同上（例：`{發票號}.pdf`） |
-| `FinalizeImportAsset`（商品匯入） | **先分支判 `source_type`**：STAGED 查 `upload_session.original_filename`；URL 才解析 `source_url`（規則見 4.9.2a） |
 
 > ⚠️ **兩支後端直傳（`ServerUploadAndFinalize`／`ServerUploadSecureAndFinalize`）的 objectKey 末段就是參數 `filename`**（前者 `public/{category}/{date}/{uuid}/{filename}`、後者 `secure/{category}/…`），因此尾段推導對它們剛好也推得出正確結果。欄位仍然要寫，目的是讓讀取端只有一個判準，不必知道自己面對的是哪條上傳路徑。
->
-> 🔴 **`FinalizeImportAsset` 不適用上述巧合**：該路徑的 key 由 `generateFinalObjectKey` 產生，末段是 `{uuid}{ext}`（§7.3 step 5）——**不含檔名**。它必須走完整的 `source_type` 分支與 §4.9.2a 的 URL 解析，那是本節最複雜、也最容易出錯的一條。
 
 🔴 **objectKey 的生成規則不得更動**：它是既有資料的定址鍵——`selectByObjectKey`、GC 的補償刪除、重入查詢與唯一索引 `uk_media_asset_object_key` 全部以它為準。把檔名塞進 key、或把 `.attempt-` 後綴從 final key 剝掉，都會讓已存在的物件與新產生的 key 規則不一致。
 
@@ -838,32 +834,6 @@ CreateUploadSession(filename)
 
 ⇒ 實作上**禁止覆寫 `filename` 區域變數**；一律另宣告 `displayName`，且它只出現在
 設定 `original_filename` 的那一行。兩者的分歧是刻意的，不是疏漏。
-
-#### 4.9.2a 匯入路徑的 URL → 檔名（`FinalizeImportAsset` 的 URL 分支）
-
-`source_url` 是賣家在 CSV 裡自己填的外部 URL，**不能當成檔名直接用**：
-
-```
-URI.create(sourceUrl)        // 失敗（IllegalArgumentException）→ 回 null
-  → getPath()                // 回 null（opaque URI，如 data:）→ 回 null
-  → 取 basename              // 空（trailing slash）→ 回 null
-  → sanitize()               // 見 4.9.2
-```
-
-三個容易寫錯的地方，每一個都會產生**靜默錯誤**而不是例外：
-
-1. **不得再做一次 URL-decode**。`URI.getPath()` 回傳的已經是解碼後的路徑（`getRawPath()`
-   才是原始形式）。多解一次會讓 `100%25_off.jpg` 拋例外、`my+file.jpg` 的 `+` 變成空格、
-   而 `a%252F..%252F..` 會被還原成真的路徑分隔符。
-2. **`URI.create(null)` 拋的是 `NullPointerException` 不是 `IllegalArgumentException`**，
-   而 `source_url` 可以是 NULL（STAGED 來源的 CHECK 約束**強制**它為 NULL）⇒ 分支判斷
-   必須在解析**之前**，不能靠 catch 兜。
-3. **不得直接對整串 URL 取 basename**（那正是最直覺的寫法）。賣家的圖片 URL 常帶簽名參數，
-   `https://x/a/img.jpg?sig=<token>` 的 basename 是 `img.jpg?sig=<token>`——那個 token 會被
-   一路寫進 DB 與 `Content-Disposition`。走 `getPath()` 就不會遇到這件事，因為它本來就不含
-   query 與 fragment；這一點列在這裡是為了擋住**繞過流程**的寫法。
-
-> 與 `sanitizedExtension` 的分工：後者守的是 **objectKey**（拒絕含路徑穿越的副檔名，直接丟 `INVALID_PARAM`）；本函式守的是**顯示值**，採清洗而非拒絕——顯示值壞掉不該讓上傳失敗。
 
 #### 4.9.3 讀取側：單一入口（`AssetFilename.resolveDisplayName`）
 
@@ -925,7 +895,7 @@ response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
 | Migration | `services/java/media-service/src/main/resources/db/migration/V9__add_original_filename.sql` |
 | Entity | `io.github.will413028.hawkr.media.entity.UploadSessionEntity`／`MediaAssetEntity` 各加 `originalFilename`（MyBatis-Plus 自動映射；兩表既有查詢都是 `SELECT *`，無 partial projection 需處理） |
 | 共用函式 | `io.github.will413028.hawkr.media.util.AssetFilename`（**static utility，不是 Spring bean**——做成 bean 會迫使四支既有測試的顯式建構子全部改簽章） |
-| 寫入 | `UploadSessionService.createSession`／`MediaAssetService.createMediaAsset`／`serverUploadAndFinalize`／`serverUploadSecureAndFinalize`／`ImportAssetService.prepareFinalize`＋`commitFinalize` |
+| 寫入 | `UploadSessionService.createSession`／`MediaAssetService.createMediaAsset`／`serverUploadAndFinalize`／`serverUploadSecureAndFinalize` |
 | 讀取 | `MediaAssetService.serverReadSecureAsset`／`batchGetAssetMetadata`；`SecureMediaController` 的 preview 與 download（私有 helper 一併刪除） |
 | Proto | `AssetMetadataItem.file_name`／`ServerReadSecureAssetResponse.filename`（wire 形狀不隨本節改變）。兩者的註解語意為「優先原始檔名、舊資產回退 object_key 尾段」；`source_url` 全鏈路不做正規化。改 `api/proto/` 後需重新生成並同步 java-proto 副本 |
 
@@ -933,7 +903,7 @@ response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
 
 - **既有列不 backfill**：`original_filename` 為 NULL 的列無從推導（見 4.9.3）。
 - **不引入補償任務基礎設施**：`original_filename` 由既有寫入路徑在**同一事務內**維護
-  （§4.1 step 6、§7.3 step 8），沒有 reconciliation job、backfill CLI 或漂移偵測。
+  （§4.1 step 6），沒有 reconciliation job、backfill CLI 或漂移偵測。
   該欄為 NULL 是合法終態而不是待修復的狀態——讀取端的回退（§4.9.3）就是它的處理方式。
 
 ---
@@ -1022,345 +992,6 @@ hawkr:
 
 ---
 
-## 7. 商品匯入整合擴充
-
-> 本章節為 [40 號設計書（商品匯入精靈服務）](40-商品匯入精靈服務（Product%20Import%20Service）詳細設計書.md)要求的對 Media Service 的擴充。涵蓋：1 張新表、2 個新內部 RPC、2 個新 refType、1 個 MQ Consumer、SafeFetch 模組整合。
-
-### 7.1 新增資料表：import_asset
-
-本服務新增獨立資產生命週期，與既有 `upload_session` / `media_asset` 並排：
-
-- `upload_session` 處理「使用者上傳 + 過渡 staged_token」流程，30 分鐘 TTL，JWT 機制
-- `media_asset` 處理「已正式發布的資產」
-- **`import_asset`** 處理「Import Service 委派的外部 URL 下載」，**無 JWT TTL**，生命週期跟著 ImportJob（最長 8 天）
-
-完整 DDL 與欄位說明見 [40 號設計書 §3.7](40-商品匯入精靈服務（Product%20Import%20Service）詳細設計書.md#37-import_assetmedia-db本服務跨服務影響)。摘要：
-
-```sql
-CREATE TABLE import_asset (
-    id                  VARCHAR(64) PRIMARY KEY,           -- UUID
-    store_id            BIGINT      NOT NULL,              -- 下載/綁定當下的賣家 store_id（product-import-service 傳入），非登入 account_id
-    import_job_id       BIGINT      NOT NULL,
-    import_item_id      BIGINT      NOT NULL,
-    callback_correlation_id BIGINT  NOT NULL,              -- Import 端 product_import_item_asset.id；callback 時 echo 回去
-    source_type         VARCHAR(20) NOT NULL DEFAULT 'URL',-- URL=外部下載 / STAGED=賣家本地上傳 staged_token 綁定
-    staged_session_id   VARCHAR(64),                       -- source_type=STAGED 時必填，對應 upload_session.id
-    source_url          VARCHAR(2000),                     -- source_type=URL 時必填
-    source_url_hash     VARCHAR(64),                       -- 同上
-    ref_type            VARCHAR(40) NOT NULL,              -- PRODUCT_IMPORT_PREVIEW | PRODUCT_IMPORT_PREVIEW_DESC
-    status              VARCHAR(20) NOT NULL,              -- 9401~9405
-    object_key          VARCHAR(500),                      -- R2 tmp 路徑
-    content_type        VARCHAR(50),
-    file_size           BIGINT,
-    preview_url         VARCHAR(1000),
-    finalized_asset_id  BIGINT,                            -- FINALIZED 後對應 media_asset.id
-    finalized_object_key VARCHAR(500),
-    finalized_ref_type  VARCHAR(40),                       -- PRODUCT | PRODUCT_DESC
-    failure_reason      VARCHAR(80),
-    failure_detail      TEXT,
-    expires_at          TIMESTAMPTZ NOT NULL,
-    finalized_at        TIMESTAMPTZ,
-    expired_at          TIMESTAMPTZ,
-    version             INTEGER     NOT NULL DEFAULT 0,
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- dedup 為條件式唯一索引（STAGED row 的 source_url_hash 為 NULL，不能與 URL row 共用同一把鎖）
-CREATE UNIQUE INDEX uk_import_asset_dedup_url
-    ON import_asset (store_id, import_job_id, source_url_hash) WHERE source_type = 'URL';
-CREATE UNIQUE INDEX uk_import_asset_dedup_staged
-    ON import_asset (store_id, import_job_id, staged_session_id) WHERE source_type = 'STAGED';
-```
-
-**Migration 檔**：Media Service 的 `V2__add_import_asset.sql` 建表，`V3__add_staged_session_to_import_asset.sql` 補 STAGED 兩欄與條件式 dedup 索引，`V5__rename_import_asset_account_id_to_store_id.sql` 把 `account_id` 正名為 `store_id`（V1 凍結、append-only，見 [38 號設計書](38-Flyway%20自動同步與%20DB%20自動初始化（Flyway%20Auto%20Sync%20&%20DB%20Auto%20Init）詳細設計書.md)）。
-
-> ⚠️ `version` 欄位走 **MyBatis-Plus 樂觀鎖**（entity `@Version` + DB `NOT NULL DEFAULT 0` + `OptimisticLockerInnerInterceptor`）。三件套規則見 [Java 微服務開發規範 §10.5](../開發規範/Java%20微服務開發規範.md)。本服務 **禁止** 自行 override `MybatisPlusInterceptor` Bean — interceptor 由 `common-core/MyBatisPlusAutoConfiguration` 統一提供。
-
-### 7.2 新增內部 RPC：ImportDownloadAsset（async）
-
-**用途**：給 Import Service 委派「下載外部 URL → 校驗 → 上 R2 tmp → 建 import_asset」。**Async 設計**：RPC 立刻派工並回應，真實下載由 Media 內部 worker pool 執行（§7.2a），完成後 publish callback event 通知 Import Service。完整 SSRF + 校驗邏輯由本服務集中執行（避免每個 caller 自己實作）。
-
-**Proto**（新增到 `api/proto/media/media.proto`）：
-
-```protobuf
-rpc ImportDownloadAsset(ImportDownloadAssetRequest)
-    returns (ImportDownloadAssetResponse);
-
-message ImportDownloadAssetRequest {
-    string ref_type = 1;                     // PRODUCT_IMPORT_PREVIEW | PRODUCT_IMPORT_PREVIEW_DESC
-    string source_url = 2;                   // 賣家 CSV 提供的外部 URL（已 normalize）
-    int64 store_id = 3;                      // 賣家 store_id（product-import-service 傳入）
-    int64 import_job_id = 4;
-    int64 import_item_id = 5;
-    string idempotency_key = 6;              // SHA256(url) + import_job_id
-    string expires_at = 7;                   // ISO 8601；建議 ImportJob.expires_at + 1d buffer
-    int64 callback_correlation_id = 8;       // Import 端 product_import_item_asset.id；Media 在 callback event 內 echo 回來
-}
-
-message ImportDownloadAssetResponse {
-    int32 code = 1;
-    string message = 2;
-    string import_asset_id = 3;              // UUID（即 import_asset.id）
-    string status = 4;                       // 對齊 ImportAssetMediaStatus.value()：DOWNLOADING(9401) / UPLOADED(9402) / FINALIZED(9403) / FAILED(9404) / EXPIRED(9405)
-                                             // 首次 INSERT 一律 DOWNLOADING；dedup 命中時 echo 既有 row 當下 status（含已 settled 終態）
-    string failure_reason = 5;               // 兩種來源：(a) 派工本身失敗（罕見：DB INSERT 失敗 / RabbitMQ enqueue 失敗）
-                                             // (b) dedup 命中且 status=FAILED 時回傳既有 row 的 failure_reason
-    string object_key = 6;                   // dedup 命中且 status ∈ {UPLOADED, FINALIZED} 時填；caller 同步 settle 用
-    string preview_url = 7;                  // 同上條件填；presigned download URL
-    string failure_detail = 8;               // dedup 命中且 status=FAILED 時填
-}
-```
-
-**權限**：純內部 RPC，由 `x-internal-service` metadata 自動識別免身份驗證。
-
-**Async 派工流程**（同步 RPC handler 端做的事，毫秒級完成）：
-
-```
-1. 校驗 idempotency_key（(store_id, import_job_id, source_url_hash)）是否已存在 import_asset
-   命中 → 直接回 import_asset_id + 當前 status + settled metadata（DOWNLOADING / UPLOADED / FAILED / FINALIZED / EXPIRED）
-       - status=UPLOADED / FINALIZED → echo object_key + preview_url（caller 可同步 settle 自己的 row）
-       - status=FAILED → echo failure_reason + failure_detail
-       - status=DOWNLOADING → 其餘欄位空（caller 設自己 row 為 DOWNLOADING，等 callback fan-out）
-   未命中 → 繼續
-2. UNIQUE (store_id, import_job_id, source_url_hash) 並發保護
-   ON CONFLICT → SELECT 既有 row 走 step 1 的 echo 規則回傳
-3. INSERT import_asset (status=DOWNLOADING, expires_at=req.expires_at, callback_correlation_id, source_url, ...)
-4. publish 內部下載任務 InternalDownloadTaskEvent { importAssetId } 到 Media 內部 worker queue（§7.2a）
-   走 ObsRabbitPublisher.publish(...) + afterCommit hook，確保 DB commit 後才發
-5. 回 ImportDownloadAssetResponse(import_asset_id, status=DOWNLOADING)
-```
-
-> 步驟 4 後 RPC 立即返回，Import 端 worker thread 立刻釋放。實際下載由 §7.2a worker 處理；完成後 publish callback event 回 Import Service。
-
-**dedup 命中時必須 echo settled metadata**（`object_key` / `preview_url` / `failure_reason` / `failure_detail`）：
-
-> Media 端對同 `(store, job, source_url)` 只 INSERT 一個 `import_asset`，後續 caller 透過 dedup 共用同一 row，而 callback **只 fire 一次**。若 caller side N 個 row 對應同一個 `import_asset_id`，那些在 callback fire **之後**才完成 RPC dispatch 的 caller **收不到任何 callback**（已 ACK、inbox 已 dedup，不會再 fire）⇒ 只做 callback 路徑會讓它們的 row 永遠卡在 DOWNLOADING。
->
-> 因此 caller 必須能在 RPC handler 內**同步 settle 自己的 row**；callback 路徑僅用於「首位 caller 已 INSERT row 且仍 DOWNLOADING」的場景。詳見 40 號 §5.4.1 step 4 同步 settle 分支與 §5.4.2 Fan-out 與同步 settle 雙路徑共存。
-
-### 7.2a Media 內部下載 worker pool + callback publisher
-
-**內部 MQ topology**（純 Media 內部，與 callback exchange 區隔）：
-
-| Queue | Exchange | Routing Key | 用途 |
-|-------|----------|------------|------|
-| `media.import.asset.download.internal` | `hawkr.media` | `import.asset.download.internal` | Media 內部派工 |
-| `media.import.asset.download.internal.retry` | 同上 | 同上 retry | 5s / 30s / 2min 三階退避 |
-| `dlq.media.import.asset.download.internal` | 同上 dlx | 同上 dlq | 3 次失敗後進入 |
-
-**對外 callback queue**（由 Import 端 binding 訂閱 `hawkr.media` exchange）：
-
-| Routing Key | Producer | Consumer |
-|------------|----------|----------|
-| `import.asset.downloaded` | Media internal worker | Import Service `MediaCallbackListener` |
-
-**Worker 流程**：
-
-```
-0. 接 InternalDownloadTaskEvent (importAssetId)
-1. SELECT import_asset FOR UPDATE，狀態必須 DOWNLOADING
-   → 否則直接 ACK（罕見：被 EXPIRED 標到、被前一輪重入處理過）
-2. 呼叫 SafeFetcher.fetch(import_asset.source_url, allowed_content_types=image/*, max_size=10MB)
-   → SafeFetchException → status=FAILED + failure_reason
-3. 若成功 → 上傳 R2 tmp 路徑：tmp/{yyyyMMdd}/{storeId}/import/{uuid}{ext}
-   → R2 失敗 → status=FAILED + failure_reason=FETCH_ERROR
-4. UPDATE import_asset SET status='9402'（UPLOADED） + object_key + content_type + file_size + preview_url（同事務）
-5. publish MediaImportAssetDownloadedEvent 到 `hawkr.media` exchange, routing key `import.asset.downloaded`
-   走 ObsRabbitPublisher.publish(...) + afterCommit hook，確保 DB commit 後才發
-6. ACK
-```
-
-**Callback Event Payload**（Media → Import）：
-
-> 位置：`common-core` `io.github.will413028.hawkr.common.mq.events.MediaImportAssetDownloadedEvent`。
-> 兩端共用同一個 record，杜絕 Media / Import 各自定義導致 schema 漂移（≥2 服務共用的型別與配置一律上移 `common-core`，見 [Java 微服務開發規範](../開發規範/Java%20微服務開發規範.md) §10 與 [MQ 與事件管理規範](../開發規範/MQ%20與事件管理規範.md)）。
-
-```java
-public record MediaImportAssetDownloadedEvent(
-    String eventId,                    // UUID，由 Media 端生成
-    String importAssetId,
-    Long importJobId,
-    Long importItemId,
-    Long productImportItemAssetId,     // 即 ImportDownloadAssetRequest.callback_correlation_id（echo）
-    String resultStatus,               // 對齊 ImportAssetMediaStatus.value()：9402=UPLOADED / 9404=FAILED
-    String objectKey,                  // UPLOADED 時填
-    String previewUrl,                 // UPLOADED 時填
-    String contentType,                // UPLOADED 時填
-    Long fileSize,                     // UPLOADED 時填（位元組）
-    String failureReason,              // FAILED 時填，對齊 ImportAssetFailureReason
-    String failureDetail,              // FAILED 時填
-    String completedAt
-) {}
-```
-
-**Consumer 對齊規則**：consumer 比對 `resultStatus` 時必須走 `ImportAssetMediaStatus.UPLOADED.value().equals(...)` / `ImportAssetMediaStatus.FAILED.value().equals(...)`，禁止寫死字面值 `"UPLOADED"` / `"FAILED"`（禁硬編碼，見 [Java 微服務開發規範](../開發規範/Java%20微服務開發規範.md) §6 與 [CodeMeta 代碼管理](../代碼管理（CodeMeta）/README.md)）。
-
-**Publisher 規範**：走 `ObsRabbitPublisher.publish(EXCHANGE_MEDIA, RK_MEDIA_IMPORT_ASSET_DOWNLOADED, payload, MediaEventType.MEDIA_IMPORT_ASSET_DOWNLOADED)`（Observability 規範見 [Java 微服務開發規範](../開發規範/Java%20微服務開發規範.md) §8）。
-
-**Exchange ownership**：callback 一律發到 `hawkr.media`（Media 自己擁有的 exchange）＋ `import.asset.downloaded` routing key，**不得**發到 Import 端的 exchange——事件由誰 produce 就由誰擁有 exchange。其他服務要消費下載結果時，bind 同一個 exchange ＋ routing key 即可。
-
-### 7.3 新增內部 RPC：FinalizeImportAsset
-
-**用途**：給 Product Service 在 `CreateProductFromImportInternal` commit 階段呼叫，把 import_asset 的 R2 object 搬到正式 refType 路徑，並建立 `media_asset`。
-
-**Proto**：
-
-```protobuf
-rpc FinalizeImportAsset(FinalizeImportAssetRequest)
-    returns (FinalizeImportAssetResponse);
-
-message FinalizeImportAssetRequest {
-    string import_asset_id = 1;
-    string target_ref_type = 2;              // PRODUCT | PRODUCT_DESC（不可是 PRODUCT_IMPORT_PREVIEW*）
-    int64 store_id = 3;                      // 現任賣家 store_id（product-service 傳入）
-    int64 product_id = 4;                    // 用於 finalized_object_key 路徑組裝（非 link，link 由 caller 自己跑 LinkImages）
-}
-
-message FinalizeImportAssetResponse {
-    int32 code = 1;
-    string message = 2;
-    string asset_id = 3;                     // media_asset.id（TSID 數字字串）
-    string object_key = 4;                   // 正式路徑
-    string url = 5;                          // 原圖 URL（MediaUrlProperties.buildUrl(objectKey)，即時組出、不落庫；詳見 49 號 §6.2）
-}
-```
-
-**原始檔名**：依 `source_type` 分支——STAGED 取自對應 `upload_session.original_filename`；URL 來源解析 `source_url`（規則與三個易錯點見 §4.9.2a）。兩者都取不到時留 NULL 走回退。
-
-**實作流程**（重用既有 `MediaAssetService.finalizeSingleImage` 的搬移邏輯）：
-
-```
-1. 取 import_asset FOR UPDATE
-2. 校驗擁有者：`import_asset.store_id` 與 request `store_id` 相同即放行（快路徑）；不同時各自經單體 seller 模組的 `resolvePrincipals` 解析回登入 principal 再比對（賣家在 job 存活期內刪店重開會換 store_id，直接相等比對會誤判越權；解析失敗 fail-closed）。判定不通過 → NOT_FOUND（防枚舉，回應與「import_asset 不存在」一致，API 設計規範 §14.1）
-3. 校驗 status:
-   FINALIZED → 重入語意，直接回 finalized_asset_id（idempotent）
-   非 UPLOADED → INVALID_ARGUMENT（"import_asset 尚未下載完成或已失敗"）
-4. 校驗 target_ref_type ∈ {PRODUCT, PRODUCT_DESC}
-5. generateFinalObjectKey(originalKey, isSecure=false, target_ref_type, ownerId=request.store_id)
-   結果：public/{target_ref_type lowercase}/{storeId}/{yyyyMMdd}/{uuid}{ext}
-   （本路徑的 {ownerId} 段是賣家 store_id 而非 account_id，見 §2.2）
-   ⚠️ originalKey 為 import 5 段暫存 key（`tmp/{yyyyMMdd}/{storeId}/import/{uuid}{ext}`，§7.1）；
-      generateFinalObjectKey 必須依 §4.1 step 5「`\d{8}` 日期段萃取規則」取得 {yyyyMMdd}，
-      禁止把字面 `import` 段當日期（否則產出 `public/product/{storeId}/import/{uuid}`，違反 §2.2 格式）。
-6. R2 copyObject(tmp → final)（S3 API）
-7. R2 deleteObject(tmp)（S3 API）
-8. INSERT media_asset (ref_type=target_ref_type, object_key=final, import_store_id=import_asset.store_id, uploader_account_id=NULL, original_filename=依 source_type 解析（§4.9.2／§4.9.2a），解不出即 NULL, ...)
-9. UPDATE import_asset SET
-     status=FINALIZED,
-     finalized_asset_id=media_asset.id,
-     finalized_object_key=final,
-     finalized_ref_type=target_ref_type,
-     finalized_at=NOW()
-10. 回 asset_id, object_key, url=MediaUrlProperties.buildUrl(object_key)
-```
-
-**事務邊界**：步驟 8 + 9 同事務（保證 import_asset 標 FINALIZED 與 media_asset 建立原子性）；步驟 6 + 7 R2 操作在事務外（R2 操作不可回滾，但失敗時步驟 8 不會執行，留下 tmp object 由 GC 接住）。
-
-**LinkImages（強制，缺則資產被 GC 回收）**：Finalize 不負責 link；caller（Product Service）拿到 asset_id 後**必須**自行呼叫既有 `LinkImages(refType, refId, asset_ids)`，與既有 `CreateProduct` 流程一致（gallery link 見 02 §5.1 flow / createProduct step 19；import commit 完整契約見 02 §9.3a）。
-
-> ⚠️ **缺 link = 圖片 7 天後消失**：`FinalizeImportAsset` 只 INSERT `media_asset`，**不建 `asset_reference`**。若 caller 漏呼叫 `LinkImages`，該 media_asset 永遠無引用，會被 §6 `MediaGarbageCollectionJob` 的「孤兒資產清理」（`asset_reference` 為空且 `created_at` 超過 `media.gc.orphan-asset-days`，預設 7 天）**連同 DB row 與 R2 物件一起刪除** → 正式商品圖片 404。`CreateProductFromImportInternal` 必須對 **gallery（refType=PRODUCT）** 與 **description 內嵌圖（refType=PRODUCT_DESC）** 兩者都建立引用（見 02 §9.3）。
-
-### 7.4 新增 AssetReferenceType：PRODUCT_IMPORT_PREVIEW / PRODUCT_IMPORT_PREVIEW_DESC
-
-CodeMeta `業務類型碼.md` 新增 2 個 enum value（詳見 [40 號設計書 §14.7 / §B.2 / §B.4](40-商品匯入精靈服務（Product%20Import%20Service）詳細設計書.md#147-修改codemeta-markdown-ssotclaudemd-§85)）：
-
-- `PRODUCT_IMPORT_PREVIEW`（7116）— import_asset 主圖階段 refType
-- `PRODUCT_IMPORT_PREVIEW_DESC`（7117）— import_asset 描述圖階段 refType
-
-這兩個 refType 只用於 import_asset 表的 `ref_type` 欄位；**不會出現在 `media_asset.ref_type`**（FinalizeImportAsset 已將之轉為 PRODUCT / PRODUCT_DESC）。
-
-### 7.5 新增 MQ Consumer：gc.expire_job
-
-訂閱 40 號設計書的 `hawkr.product.import` exchange 上 `gc.expire_job` routing key：
-
-```java
-@Bean
-public Queue mediaImportGcExpireJobQueue() {
-    return QueueBuilder.durable("media.product.import.gc.expire_job")
-        .withArgument("x-dead-letter-exchange", "")
-        .withArgument("x-dead-letter-routing-key", "dlq.media.product.import.gc.expire_job")
-        .build();
-}
-
-@Bean
-public Binding mediaImportGcExpireJobBinding(Queue mediaImportGcExpireJobQueue,
-                                              TopicExchange productImportExchange) {
-    return BindingBuilder.bind(mediaImportGcExpireJobQueue)
-        .to(productImportExchange)
-        .with(MqConstants.RK_PRODUCT_IMPORT_GC_EXPIRE_JOB);
-}
-
-@RabbitListener(queues = "media.product.import.gc.expire_job",
-                containerFactory = "manualAckContainerFactory")
-public void onExpireJob(ExpireJobEvent event) {
-    importAssetService.expireByJobId(event.importJobId());
-}
-```
-
-**處理邏輯**：
-
-```sql
--- 1) 先撈出即將被標 EXPIRED 的 row，取得待刪的 object_key
-SELECT id, object_key FROM import_asset
-WHERE import_job_id = ? AND status NOT IN ('9403', '9405');
-
--- 2) 標記（object_key 保留原值，不清空——審計與兜底重試都要靠它）
-UPDATE import_asset
-SET status='9405', expired_at=NOW(), updated_at=NOW()
-WHERE import_job_id = ? AND status NOT IN ('9403', '9405');
-
--- 3) 對步驟 1 撈到的每個 object_key R2 deleteObject（S3 API，事務外；失敗只記 WARN，
---    留下的 tmp 物件由 §7.6 GC 第 4 層兜底）
-```
-
-**Idempotency**：UPDATE 帶 `status NOT IN (FINALIZED, EXPIRED)` 條件天然 idempotent，重複收到事件不會重複處理。
-
-### 7.6 既有 MediaGarbageCollectionJob 擴充
-
-既有 GC job（[§4.8](#48-垃圾回收mediagarbagecollectionjob)）擴充第 4 層清理：
-
-```
-4. import_asset：
-   - 過期未 Finalize（status=DOWNLOADING/UPLOADED/FAILED AND expires_at < NOW()）
-     → UPDATE status='9405'（EXPIRED）, expired_at=NOW(), 刪 R2 tmp object
-   - 已 EXPIRED 滿 30 天的 row → DELETE（保留 30 天供審計）
-```
-
-注意：**`gc.expire_job` MQ event 是「主動清理」（由 Import 端 ImportJob 過期觸發）；既有 GC job 是「被動兜底」（防止 ImportJob 卡住或 MQ 漏單）。兩條路徑不衝突，都依 `status NOT IN (FINALIZED, EXPIRED)` 條件保持 idempotent**。
-
-### 7.7 SafeFetch 模組整合
-
-依 [40 號設計書 §10](40-商品匯入精靈服務（Product%20Import%20Service）詳細設計書.md#10-ssrf-與外部-url-安全規範) 規範，本服務依賴 `common-core/utils/safefetch/SafeFetcher`：
-
-- `ImportDownloadAsset` 內呼叫 `SafeFetcher.fetch(url, allowedContentTypes=[image/jpeg, image/png, image/webp], maxSizeBytes=10*1024*1024, ...)`
-- SafeFetchException 對應 `failure_reason`：
-  - `PROTOCOL_NOT_ALLOWED` / `IP_BLOCKED_*` / `DOMAIN_BLOCKED_INTERNAL` / `REDIRECT_*` → `SSRF_BLOCKED`
-  - `SIZE_EXCEEDED` → `SIZE_EXCEEDED`
-  - `TIMEOUT_*` → `TIMEOUT`
-  - `CONTENT_TYPE_NOT_ALLOWED` → `UNSUPPORTED_TYPE`
-  - `NOT_FOUND` → `NOT_FOUND`
-  - `TLS_VERIFY_FAILED` / `FETCH_ERROR` → `FETCH_ERROR`
-
-### 7.8 環境變數新增
-
-```yaml
-media:
-  import:
-    download:
-      max-file-size-bytes: ${MEDIA_IMPORT_DOWNLOAD_MAX_FILE_SIZE_BYTES:10485760}   # 10 MB
-      connect-timeout-seconds: ${MEDIA_IMPORT_DOWNLOAD_CONNECT_TIMEOUT_SECONDS:5}
-      read-timeout-seconds: ${MEDIA_IMPORT_DOWNLOAD_READ_TIMEOUT_SECONDS:30}
-      max-redirect-hops: ${MEDIA_IMPORT_DOWNLOAD_MAX_REDIRECT_HOPS:3}
-      per-ip-rate-limit-per-minute: ${MEDIA_IMPORT_DOWNLOAD_PER_IP_RATE_LIMIT:60}
-      user-agent: ${MEDIA_IMPORT_DOWNLOAD_USER_AGENT:HawkrImportBot/1.0 (+https://example.com/bot)}
-    asset:
-      expired-retention-days: ${MEDIA_IMPORT_ASSET_EXPIRED_RETENTION_DAYS:30}
-```
-
-依[新增微服務指南 — 新增環境變數](../開發規範/新增微服務指南.md#新增環境變數)配置（非敏感值進 `k8s/values/<service>.yaml` 的 `config:`，敏感值進 k8s Secret）。
-
-
 ## 8. 多副本排程搶佔語意（Scheduler Claim）
 
 **規範全文**：[開發規範／多副本排程搶佔規範](../開發規範/多副本排程搶佔規範.md)。本節只列 media-service 的套用結果。
@@ -1377,7 +1008,6 @@ media:
 | `cleanExpiredSessions` | `status IN ('7001','7002') AND expires_at < now` | `deleteObject`（OSS/R2）＋ 標 `EXPIRED` | **per-row lease on `upload_session.gc_lease_until`**／**60 分鐘** | `V8__add_media_gc_lease_columns.sql` |
 | `cleanOrphanedAssets` | 無 `asset_reference` ＋ `created_at < now − orphan-asset-days(7)` | `deleteObject` ＋ `deleteByIds` | **per-row lease on `media_asset.gc_lease_until`**／**60 分鐘** | 同上（`V8`） |
 | `cleanStaleReferences` | （單一 bulk DELETE，無 per-row 迴圈） | 純 DB 刪除 | **刻意不加租約**，理由見 §8.3 | — |
-| `cleanupExpiredImportAssets` / `pruneExpiredImportAssetRetention` | 由 `ImportAssetService` 的 `@Transactional` 方法承載 | OSS tmp 刪除 ＋ 狀態轉換 | **無 per-row 租約**（由該方法的交易邊界承載） | — |
 
 **候選窗口寬度＝∞**（兩段的述詞都只有下界 `expires_at < now` / `created_at < threshold`，沒有時間上界）⇒ 租約不會退化成永久旗標。租約的**上界**改由排程週期決定：必須明顯小於 GC 週期（每日 = 1440 分），否則刪除失敗的那一列會**連著跳過下一次 GC**。取 60 分（1/24）。**下界**＝單筆最壞耗時（一次 OSS `DeleteObject`，秒級）。機械保證＝`MediaGarbageCollectionJobClaimTest.leaseLengthIsBoundedByGcPeriod`。
 
@@ -1391,7 +1021,7 @@ media:
 
 🔴 **禁止整批依條件更新**（`UPDATE ... WHERE status IN (...) AND expires_at < now`）：它會把**別的 pod 剛搶走的列**一併標成 `EXPIRED`，兩個 pod 互相沖掉對方的成果；而且它無法只標記刪除成功的那幾筆，只能退化成「任何一筆失敗就整批不標記」。
 
-**`cleanStaleReferences` 刻意不加租約**：它整段就是**單一 bulk DELETE**（`deleteOrphanedReferences`），沒有 per-row 迴圈、沒有任何外部副作用（不碰儲存、不發 MQ）。兩個 pod 同時跑的結果是其中一個刪到 N 列、另一個刪到 0 列，DB 自己保證原子性 —— 沒有「重複副作用」可言，也沒有可以被搶佔的 row 身分。為它加租約欄需要一個它根本沒有的 per-row 判準，換來的保護是零。
+**`cleanStaleReferences` 刻意不加租約**：它整段就是**單一 bulk DELETE**（`deleteOrphanedReferences`），沒有 per-row 迴圈、沒有任何外部副作用（不碰儲存）。兩個 pod 同時跑的結果是其中一個刪到 N 列、另一個刪到 0 列，DB 自己保證原子性 —— 沒有「重複副作用」可言，也沒有可以被搶佔的 row 身分。為它加租約欄需要一個它根本沒有的 per-row 判準，換來的保護是零。
 ⚠️ 若日後把它改成「先撈 id 再逐筆處理」或加上任何外部呼叫，**這個豁免立刻失效**，必須比照 `cleanExpiredSessions` 補 per-row 租約。
 
 ### 8.3a 🚨 claim 必須重述候選述詞的**每一個**條件（TOCTOU 關閉點）
@@ -1403,7 +1033,7 @@ media:
 | claim | 重述的條件 | 少了會怎樣 |
 |---|---|---|
 | `UploadSessionRepository.claimSessionForGc` | `status IN ('7001','7002')` ＋ `expires_at < #{now}` ＋ 租約述詞 | session 期間被 finalize ⇒ 刪掉已轉正的物件 |
-| `MediaAssetRepository.claimAssetForGc` | `created_at < #{threshold}` ＋ 租約述詞 ＋ **`NOT EXISTS (SELECT 1 FROM asset_reference ar WHERE ar.asset_id = media_asset.id)`** | 期間有人替這個 asset 建了 reference（商品綁圖／匯入轉正）⇒ **把一個已被引用的物件從儲存端刪掉，且 DB 列一併刪除**，不可逆 |
+| `MediaAssetRepository.claimAssetForGc` | `created_at < #{threshold}` ＋ 租約述詞 ＋ **`NOT EXISTS (SELECT 1 FROM asset_reference ar WHERE ar.asset_id = media_asset.id)`** | 期間有人替這個 asset 建了 reference（商品綁圖）⇒ **把一個已被引用的物件從儲存端刪掉，且 DB 列一併刪除**，不可逆 |
 
 - 候選查詢的「無引用」是 `LEFT JOIN asset_reference … WHERE ar.id IS NULL`；claim 端改用 `NOT EXISTS` 是因為 **UPDATE 沒有 join 語法**，且 `NOT EXISTS` 走 `asset_reference(asset_id)` 索引可以 semi-join 早停。**兩者判定的是同一件事，不是放寬。**
 
@@ -1443,6 +1073,5 @@ pod 在 claim 與 `deleteObject` 之間崩潰，該物件會**延後一個租約
 | Enum | 值 | 定義來源 |
 |------|----|---------|
 | MediaUploadSessionStatus | INIT / COMPLETED / FINALIZED / EXPIRED | [業務狀態碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務狀態碼.md#MediaUploadSessionStatus) |
-| AssetReferenceType | PRODUCT / PRODUCT_DESC / SELLER_LOGO / BUYER_AVATAR / PRODUCT_IMPORT_PREVIEW / PRODUCT_IMPORT_PREVIEW_DESC | [業務類型碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務類型碼.md#AssetReferenceType) |
+| AssetReferenceType | PRODUCT / PRODUCT_DESC / SELLER_LOGO / BUYER_AVATAR | [業務類型碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務類型碼.md#AssetReferenceType) |
 | StagedTokenScope | MEDIA_UPLOAD_SESSION / MEDIA_SECURE_UPLOAD | [業務類型碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務類型碼.md#StagedTokenScope) |
-| ImportAssetMediaStatus | DOWNLOADING(9401) / UPLOADED(9402) / FINALIZED(9403) / FAILED(9404) / EXPIRED(9405) | [業務狀態碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務狀態碼.md#ImportAssetMediaStatus) |

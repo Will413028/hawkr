@@ -54,8 +54,7 @@ export default async function ProductDetailPage({ productId: id }: Props) {
 		sellerStats: null,
 		reviewsResult: null,
 		// Media gateway short-circuits the OSS dimension probe (recedes to no-op
-		// once MEDIA_BASE_URL is set), so image blocks fall back to a raw <img>,
-		// matching the products-import preview page.
+		// once MEDIA_BASE_URL is set), so image blocks fall back to a raw <img>.
 		descriptionImageDimEntries: [],
 	});
 

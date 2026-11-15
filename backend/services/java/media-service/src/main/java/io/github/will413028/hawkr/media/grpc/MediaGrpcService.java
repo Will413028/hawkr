@@ -15,7 +15,6 @@ import io.github.will413028.hawkr.media.dto.FinalizedAssetDTO;
 import io.github.will413028.hawkr.media.dto.SecureAssetContentDTO;
 import io.github.will413028.hawkr.media.exception.MediaServiceException;
 import io.github.will413028.hawkr.media.service.AssetReferenceService;
-import io.github.will413028.hawkr.media.service.ImportAssetService;
 import io.github.will413028.hawkr.media.service.MediaAssetService;
 import io.github.will413028.hawkr.media.service.UploadSessionService;
 import io.grpc.Status;
@@ -43,7 +42,6 @@ public class MediaGrpcService extends MediaServiceGrpc.MediaServiceImplBase {
     private final AssetReferenceService assetReferenceService;
     private final MediaAssetConverter mediaAssetConverter;
     private final UploadSessionService uploadSessionService;
-    private final ImportAssetService importAssetService;
 
     /**
      * 轉正圖片
@@ -860,182 +858,5 @@ public class MediaGrpcService extends MediaServiceGrpc.MediaServiceImplBase {
         }
         return GrpcServiceHelper.mapStatusCode(
                 code.toStatus().asRuntimeException());
-    }
-
-    // ============================================================================
-    // Product Import 整合（08 號設計書 §7）
-    //
-    // 純內部 RPC：由 x-internal-service metadata 識別免身份驗證（docs/詳細設計書/52-微服務間內部授權（Internal Service Authorization）詳細設計書.md）。
-    // ============================================================================
-
-    /**
-     * 派工外部 URL 下載（async）。詳見 08 號設計書 §7.2 / §7.2a。
-     *
-     * <p>RPC 同步階段：dedup → INSERT import_asset → afterCommit publish 內部派工事件。
-     * 實際 SafeFetch + OSS 上傳由 {@code MediaImportAssetDownloadListener} 執行；
-     * 結果透過 {@code hawkr.media} exchange + {@code import.asset.downloaded} routing key 通知 Import Service。</p>
-     */
-    @Override
-    public void importDownloadAsset(
-        ImportDownloadAssetRequest request,
-        StreamObserver<ImportDownloadAssetResponse> responseObserver
-    ) {
-        log.info("MediaGrpcService.importDownloadAsset.start",
-            "收到 ImportDownloadAsset 請求",
-            "import_job_id",
-            "import_job_id=" + request.getImportJobId() + ", import_item_id=" + request.getImportItemId());
-
-        try {
-            ImportAssetService.DispatchResult result = importAssetService.importDownloadAsset(
-                request.getRefType(),
-                request.getSourceUrl(),
-                request.getStoreId(),
-                request.getImportJobId(),
-                request.getImportItemId(),
-                request.getExpiresAt(),
-                request.getCallbackCorrelationId()
-            );
-
-            ImportDownloadAssetResponse.Builder builder = ImportDownloadAssetResponse.newBuilder()
-                .setCode(GrpcResponseCode.SUCCESS.code())
-                .setMessage(result.reused() ? "dedup 命中既有 import_asset" : "派工成功")
-                .setImportAssetId(result.importAssetId())
-                .setStatus(result.status());
-            // dedup 命中且 settled 時 echo metadata,讓 caller 同步 settle 自己 row (08 號 §7.2)
-            if (result.objectKey() != null) builder.setObjectKey(result.objectKey());
-            if (result.previewUrl() != null) builder.setPreviewUrl(result.previewUrl());
-            if (result.failureReason() != null) builder.setFailureReason(result.failureReason());
-            if (result.failureDetail() != null) builder.setFailureDetail(result.failureDetail());
-            ImportDownloadAssetResponse response = builder.build();
-
-            log.info("MediaGrpcService.importDownloadAsset.success",
-                "派工流程完成",
-                "import_asset_id",
-                "import_asset_id=" + result.importAssetId() + ", status=" + result.status() + ", reused=" + result.reused());
-
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-
-        } catch (MediaServiceException e) {
-            log.warn("MediaGrpcService.importDownloadAsset.bizError", e.getMessage());
-            responseObserver.onNext(ImportDownloadAssetResponse.newBuilder()
-                .setCode(mapToResponseCode(e.getGrpcStatusCode()))
-                .setMessage(e.getMessage())
-                .setStatus("")
-                .setFailureReason(e.getMessage())
-                .build());
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(
-                responseObserver, ImportDownloadAssetResponse.newBuilder(), e,
-                "MediaGrpcService", "importDownloadAsset");
-        }
-    }
-
-    /**
-     * Import asset 轉正為 PRODUCT / PRODUCT_DESC media_asset。詳見 08 號設計書 §7.3。
-     *
-     * <p>由 Product Service 在 {@code CreateProductFromImportInternal} commit 階段呼叫。
-     * 流程：取 import_asset FOR UPDATE → OSS copy/delete → INSERT media_asset + UPDATE FINALIZED。</p>
-     */
-    @Override
-    public void finalizeImportAsset(
-        FinalizeImportAssetRequest request,
-        StreamObserver<FinalizeImportAssetResponse> responseObserver
-    ) {
-        log.info("MediaGrpcService.finalizeImportAsset.start",
-            "收到 FinalizeImportAsset 請求",
-            "import_asset_id",
-            "import_asset_id=" + request.getImportAssetId() + ", target_ref_type=" + request.getTargetRefType());
-
-        try {
-            ImportAssetService.FinalizeResult result = importAssetService.finalizeImportAsset(
-                request.getImportAssetId(),
-                request.getTargetRefType(),
-                request.getStoreId(),
-                request.getProductId()
-            );
-
-            FinalizeImportAssetResponse response = FinalizeImportAssetResponse.newBuilder()
-                .setCode(GrpcResponseCode.SUCCESS.code())
-                .setMessage("轉正完成")
-                .setAssetId(ProtoConversionUtils.formatLong(result.assetId()))
-                .setObjectKey(result.objectKey() != null ? result.objectKey() : "")
-                .setUrl(result.url() != null ? result.url() : "")
-                .build();
-
-            log.info("MediaGrpcService.finalizeImportAsset.success",
-                "import_asset 轉正完成",
-                "import_asset_id",
-                "import_asset_id=" + request.getImportAssetId() + ", asset_id=" + result.assetId());
-
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-
-        } catch (MediaServiceException e) {
-            log.warn("MediaGrpcService.finalizeImportAsset.bizError", e.getMessage());
-            responseObserver.onNext(FinalizeImportAssetResponse.newBuilder()
-                .setCode(mapToResponseCode(e.getGrpcStatusCode()))
-                .setMessage(e.getMessage())
-                .build());
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(
-                responseObserver, FinalizeImportAssetResponse.newBuilder(), e,
-                "MediaGrpcService", "finalizeImportAsset");
-        }
-    }
-
-    /**
-     * 將賣家本地上傳的 staged_token 同步綁定為 import_asset（40 號設計書 §3.4 / §4.3）。
-     * <p>由 product-import-service 在 UpdateImportItem 階段呼叫；同步回傳 import_asset_id / object_key / preview_url。</p>
-     */
-    @Override
-    public void bindStagedAsset(
-        BindStagedAssetRequest request,
-        StreamObserver<BindStagedAssetResponse> responseObserver
-    ) {
-        log.info("MediaGrpcService.bindStagedAsset.start",
-            "收到 BindStagedAsset 請求",
-            "import_job_id",
-            "import_job_id=" + request.getImportJobId() + ", import_item_id=" + request.getImportItemId());
-
-        try {
-            ImportAssetService.BindResult result = importAssetService.bindStagedAsset(
-                request.getStagedToken(),
-                request.getStoreId(),
-                request.getImportJobId(),
-                request.getImportItemId(),
-                request.getRefType()
-            );
-
-            BindStagedAssetResponse response = BindStagedAssetResponse.newBuilder()
-                .setCode(GrpcResponseCode.SUCCESS.code())
-                .setMessage(result.reused() ? "dedup 命中既有 STAGED import_asset" : "綁定成功")
-                .setImportAssetId(result.importAssetId())
-                .setObjectKey(result.objectKey() != null ? result.objectKey() : "")
-                .setPreviewUrl(result.previewUrl() != null ? result.previewUrl() : "")
-                .build();
-
-            log.info("MediaGrpcService.bindStagedAsset.success",
-                "BindStagedAsset 完成",
-                "import_asset_id",
-                "import_asset_id=" + result.importAssetId() + ", reused=" + result.reused());
-
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-
-        } catch (MediaServiceException e) {
-            log.warn("MediaGrpcService.bindStagedAsset.bizError", e.getMessage());
-            responseObserver.onNext(BindStagedAssetResponse.newBuilder()
-                .setCode(mapToResponseCode(e.getGrpcStatusCode()))
-                .setMessage(e.getMessage())
-                .build());
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(
-                responseObserver, BindStagedAssetResponse.newBuilder(), e,
-                "MediaGrpcService", "bindStagedAsset");
-        }
     }
 }

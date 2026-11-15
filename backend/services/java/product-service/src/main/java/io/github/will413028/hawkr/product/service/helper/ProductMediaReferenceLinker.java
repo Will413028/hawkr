@@ -13,17 +13,17 @@ import java.util.List;
  * 商品 Media 引用（asset_reference）建立共用元件。
  *
  * <p>封裝「從 gallery / description 收集 assetId」+「呼叫 Media {@code LinkImages} 建立引用」邏輯，
- * 由 {@code ProductService}（互動式建立 / 更新）與 {@code ProductImportService}（匯入轉正）共用，
+ * 由 {@code ProductService}（互動式建立 / 更新）使用，
  * 避免重複實作（docs/開發規範/Java 微服務開發規範.md §15）。
  *
  * <p><b>失敗語意（重要）</b>：本元件的 {@code linkGallery} / {@code linkDescription} <b>不吞例外</b>，
- * 且**所有 caller 都必須讓它傳播** → {@code @Transactional} rollback（互動式建立/更新與匯入轉正一致）。
+ * 且**所有 caller 都必須讓它傳播** → {@code @Transactional} rollback。
  * <ul>
  *   <li>吞掉 = commit 出「{@code product.gallery} 指著 assetId、卻沒有 asset_reference」的列，
  *       7 天後被 media GC 連同 R2 物件實體刪除（#1203 / #2222）。</li>
  *   <li>傳播 = product 未落庫，剛轉正的資產無人引用，正好落在 GC 的孤兒回收範圍。</li>
  * </ul>
- * 契約全文見 Media 08 號設計書 §4.6.2（媒體生命週期不變式）與 02 號設計書 §9.3a。
+ * 契約全文見 Media 08 號設計書 §4.6.2（媒體生命週期不變式）。
  */
 @Component
 @RequiredArgsConstructor

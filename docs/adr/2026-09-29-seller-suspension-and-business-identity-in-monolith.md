@@ -93,3 +93,12 @@ A3 把 buyer、seller 搬進單體，入口在單體（A2），gateway 只剩還
 ## 修訂：pricebook 刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D1；計畫 `2026-10-27-ecommerce-scope-cut` 步驟 6，計畫已刪除，見 `2026-10-27-general-ecommerce-scope-cut` 文末修訂）
 
 脈絡裡列的「帶營業類宣告的 gateway 路由」不再包含 pricebook：那些路由已刪除。
+
+## 修訂：SocialAppService 的能力宣告（A7-2c）
+
+原決策段保留歷史；承接上方「能力宣告可以掛在其他模組的 AppService」的修訂（2026-10-17），A7-2c 補上 `SocialAppService` 的實作形狀。
+
+- **宣告表在 httpapi，執行點在 social 模組。** 表放在 `internal/httpapi/social/declaration.go`（key 是生成的 procedure 常數，涵蓋 `SocialAppService` 的所有方法），在 `NewApp` 時雙向對照 service descriptor：缺宣告、多宣告、一筆宣告同時沒有或同時有「能力」與「豁免理由」、宣告了不存在的能力，都不能啟動。與 `SellerAppService` 不同，這張表不掛 interceptor、不執行檢查：能力由 social 模組在每個店家身分的入口以 `seller.Authorize` 檢查。理由是帳號路徑（`SocialAppService`）與管理員代行路徑（A7-2d）必須走同一個入口（`step-1a-design.md`「店家身分寫入的單一入口」），能力檢查若放在 interceptor，代行路徑就會繞過它或重寫一份；表只負責「方法與能力的對應有沒有漏」，與模組實際檢查是否一致由 `TestOwnerDeclarationsMatchTheModuleChecks` 對齊（宣告的能力在 `seller.Authorize` 的結果，必須等於模組對停權與關閉的店家的實際反應）。
+- **店主的方法依能力類別宣告**：建立、編輯、發布、排程是 `CapMarketing`；下架、刪除是 `CapContentContract`。店主讀自己的貼文、店家範圍的留言與動態數也宣告 `CapContentContract`：它只要求店家營運中，停權時照樣授予（D3「收縮需要的讀取放行」），店主才看得到要下架或刪除的內容；不用 `CapAccountSelfRead`（它的語意是店家資料與停權狀態），也不用 `CapMarketing`（停權時會擋掉讀取，與 D3 相反）。
+- **共用的方法以「依資源判斷」豁免**：留言與討論區的讚、建立、編輯、刪除，互動者由伺服器依資源歸屬推導，是店家身分時模組才檢查能力，不是則不查，無法靜態宣告，宣告表寫豁免與理由；分享、貼文的讚只有買家身分，寫「只有買家身分」的豁免。雙向對照照舊：豁免也要有理由，方法新增時必須回來決定是能力還是豁免。
+

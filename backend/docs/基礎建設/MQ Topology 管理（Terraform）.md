@@ -77,7 +77,7 @@ queues:
 ### 1. 裸 queue（無 policy）
 
 只產出 queue 本身與它自己的 bindings，不衍生任何東西。共用 DLQ 的目的地
-（`aftersales.events.dlq`、`payment.rescue.refund.dlq`、`dlq.product.import.*`）都是這種
+（`aftersales.events.dlq`、`payment.rescue.refund.dlq`）都是這種
 條目——**它們不會被任何 policy 自動生成，必須自己列一條**。
 
 ### 2. `retry: {max_attempts: N}`（Go retry 框架）
@@ -132,8 +132,7 @@ Terraform 若把 args 改成別的值，Spring 啟動時 declare 會撞
 `MQ_PASSIVE_DECLARE=true`，passive declare 只驗存在、不驗 args。
 
 `via: ''`（空字串）是合法值，代表 RabbitMQ 的 **default（無名）exchange**——它靠
-routing key 直接比對 queue 名稱來路由，不需要具名 DLX 也不需要 binding。5 條
-product-import queue 是這個形狀，來自活的 definitions export，**不是漏填**。
+routing key 直接比對 queue 名稱來路由，不需要具名 DLX 也不需要 binding；這是合法形狀，**不是漏填**。
 
 ### 4. `args_json: true`
 
@@ -170,7 +169,7 @@ flowchart TB
 ### 1. 程式碼宣告的服務（多數情況）
 
 6 個 Go 服務（buyer / crm / im / notification / seller / social，即使用
-`pkg/mq.ResilientConsumer` 者）＋ 10 個 Java 服務。改 code 的同一個 PR 裡要手動
+`pkg/mq.ResilientConsumer` 者）＋ 9 個 Java 服務。改 code 的同一個 PR 裡要手動
 把對應條目加進 `infra/mq/topology/topology.yaml`（宣告式寫法見下方「新增 / 修改 queue」）。
 
 `notification-service` 一度是例外——它的 queue 由 `notification_templates` 資料表的

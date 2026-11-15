@@ -22,7 +22,6 @@ var appPrefix = APIV1Path + AppPath
 // deny-by-default net for those; this strict-prefix check is the boot backstop.
 var strictSellerPrefixes = []string{
 	appPrefix + "/products",
-	appPrefix + "/product_import_jobs",
 	appPrefix + "/shipments",
 	appPrefix + "/shipping_onboardings",
 	appPrefix + "/shipping_methods",
@@ -46,7 +45,7 @@ var sellerAreaExemptions = map[string]struct{}{
 }
 
 // underPrefix reports whether path is prefix itself or a sub-path of it (segment
-// boundary aware, so "/products" does not match "/product_import_jobs").
+// boundary aware, so "/products" does not match "/products_x").
 func underPrefix(path, prefix string) bool {
 	return path == prefix || strings.HasPrefix(path, prefix+"/")
 }

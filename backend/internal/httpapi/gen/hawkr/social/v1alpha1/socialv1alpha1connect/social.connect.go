@@ -2,7 +2,7 @@
 //
 // Source: hawkr/social/v1alpha1/social.proto
 
-// social 模組給前台的 API：店家貼文與留言的公開讀取（SocialPublicService），瀏覽打點（RecordPostView），以及登入者的互動寫入（SocialAppService：分享、讚、留言、討論區）。
+// social 模組給前台的 API：店家貼文與留言的公開讀取（SocialPublicService），瀏覽打點（RecordPostView），以及登入者的互動寫入與店主的貼文管理（SocialAppService：分享、讚、留言、討論區；店主的貼文 CRUD、發布、排程、店家範圍的留言與動態數）。
 //
 // ID 是不透明的字串（貼文與留言是 UUID，店家是過渡期的十進位整數字串），client 不解析、不轉數字
 // （ADR 2026-09-25-row-identity-by-data-kind D5）。圖片是 hawkr.common.v1alpha1.Image，店家卡片是 hawkr.common.v1alpha1.StoreCard。
@@ -99,6 +99,36 @@ const (
 	// SocialAppServiceDeleteForumEntryProcedure is the fully-qualified name of the SocialAppService's
 	// DeleteForumEntry RPC.
 	SocialAppServiceDeleteForumEntryProcedure = "/hawkr.social.v1alpha1.SocialAppService/DeleteForumEntry"
+	// SocialAppServiceCreatePostProcedure is the fully-qualified name of the SocialAppService's
+	// CreatePost RPC.
+	SocialAppServiceCreatePostProcedure = "/hawkr.social.v1alpha1.SocialAppService/CreatePost"
+	// SocialAppServiceGetMyPostProcedure is the fully-qualified name of the SocialAppService's
+	// GetMyPost RPC.
+	SocialAppServiceGetMyPostProcedure = "/hawkr.social.v1alpha1.SocialAppService/GetMyPost"
+	// SocialAppServiceListMyPostsProcedure is the fully-qualified name of the SocialAppService's
+	// ListMyPosts RPC.
+	SocialAppServiceListMyPostsProcedure = "/hawkr.social.v1alpha1.SocialAppService/ListMyPosts"
+	// SocialAppServiceUpdatePostProcedure is the fully-qualified name of the SocialAppService's
+	// UpdatePost RPC.
+	SocialAppServiceUpdatePostProcedure = "/hawkr.social.v1alpha1.SocialAppService/UpdatePost"
+	// SocialAppServicePublishPostProcedure is the fully-qualified name of the SocialAppService's
+	// PublishPost RPC.
+	SocialAppServicePublishPostProcedure = "/hawkr.social.v1alpha1.SocialAppService/PublishPost"
+	// SocialAppServiceUnpublishPostProcedure is the fully-qualified name of the SocialAppService's
+	// UnpublishPost RPC.
+	SocialAppServiceUnpublishPostProcedure = "/hawkr.social.v1alpha1.SocialAppService/UnpublishPost"
+	// SocialAppServiceDeletePostProcedure is the fully-qualified name of the SocialAppService's
+	// DeletePost RPC.
+	SocialAppServiceDeletePostProcedure = "/hawkr.social.v1alpha1.SocialAppService/DeletePost"
+	// SocialAppServiceSchedulePostProcedure is the fully-qualified name of the SocialAppService's
+	// SchedulePost RPC.
+	SocialAppServiceSchedulePostProcedure = "/hawkr.social.v1alpha1.SocialAppService/SchedulePost"
+	// SocialAppServiceListStoreCommentsProcedure is the fully-qualified name of the SocialAppService's
+	// ListStoreComments RPC.
+	SocialAppServiceListStoreCommentsProcedure = "/hawkr.social.v1alpha1.SocialAppService/ListStoreComments"
+	// SocialAppServiceGetStoreSocialSummaryProcedure is the fully-qualified name of the
+	// SocialAppService's GetStoreSocialSummary RPC.
+	SocialAppServiceGetStoreSocialSummaryProcedure = "/hawkr.social.v1alpha1.SocialAppService/GetStoreSocialSummary"
 )
 
 // SocialPublicServiceClient is a client for the hawkr.social.v1alpha1.SocialPublicService service.
@@ -432,6 +462,33 @@ type SocialAppServiceClient interface {
 	UpdateForumEntry(context.Context, *connect.Request[v1alpha1.UpdateForumEntryRequest]) (*connect.Response[v1alpha1.UpdateForumEntryResponse], error)
 	// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
 	DeleteForumEntry(context.Context, *connect.Request[v1alpha1.DeleteForumEntryRequest]) (*connect.Response[v1alpha1.DeleteForumEntryResponse], error)
+	// CreatePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
+	// 草稿可以不完整。帶 request_id 重送回第一次建立的貼文目前的樣子（狀態與計數是此刻的），不重複建立；內容不同回 invalid_argument。需要賣家能力 CAP_MARKETING。
+	CreatePost(context.Context, *connect.Request[v1alpha1.CreatePostRequest]) (*connect.Response[v1alpha1.CreatePostResponse], error)
+	// GetMyPost 讀呼叫者此刻的店自己的貼文：任何狀態（草稿、已發布、已下架），不含已刪除；別家的貼文與不存在一樣回 not_found。回應帶 status 與 etag。
+	// 賣家能力 CAP_CONTENT_CONTRACT（停權時仍可讀，才能下架與刪除）。
+	GetMyPost(context.Context, *connect.Request[v1alpha1.GetMyPostRequest]) (*connect.Response[v1alpha1.GetMyPostResponse], error)
+	// ListMyPosts 列出呼叫者此刻的店自己的貼文（含草稿與下架），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。賣家能力 CAP_CONTENT_CONTRACT。
+	ListMyPosts(context.Context, *connect.Request[v1alpha1.ListMyPostsRequest]) (*connect.Response[v1alpha1.ListMyPostsResponse], error)
+	// UpdatePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
+	// 已發布或有待發布排程的貼文被修改後仍要滿足公開要件。需要賣家能力 CAP_MARKETING。
+	UpdatePost(context.Context, *connect.Request[v1alpha1.UpdatePostRequest]) (*connect.Response[v1alpha1.UpdatePostResponse], error)
+	// PublishPost 發布草稿或下架的貼文；etag 必填。已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
+	PublishPost(context.Context, *connect.Request[v1alpha1.PublishPostRequest]) (*connect.Response[v1alpha1.PublishPostResponse], error)
+	// UnpublishPost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
+	UnpublishPost(context.Context, *connect.Request[v1alpha1.UnpublishPostRequest]) (*connect.Response[v1alpha1.UnpublishPostResponse], error)
+	// DeletePost 刪除自己的貼文；已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
+	DeletePost(context.Context, *connect.Request[v1alpha1.DeletePostRequest]) (*connect.Response[v1alpha1.DeletePostResponse], error)
+	// SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
+	// 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
+	SchedulePost(context.Context, *connect.Request[v1alpha1.SchedulePostRequest]) (*connect.Response[v1alpha1.SchedulePostResponse], error)
+	// ListStoreComments 列出呼叫者此刻的店所有貼文（含草稿與下架的貼文）的頂層留言，依建立時間舊到新；post_id 選填，設了只列那一篇。
+	// 刪除或隱藏而底下有可見回覆的頂層留言是佔位項目。unreplied 為真時只列「未回覆」的留言：本店貼文上、作者不是本店的頂層留言，沒有刪除、沒有被隱藏，
+	// 而且底下沒有任何一則仍可見、作者是本店的回覆（已刪除或被隱藏的店家回覆不算回覆）；此時沒有佔位項目。賣家能力 CAP_CONTENT_CONTRACT。
+	ListStoreComments(context.Context, *connect.Request[v1alpha1.ListStoreCommentsRequest]) (*connect.Response[v1alpha1.ListStoreCommentsResponse], error)
+	// GetStoreSocialSummary 是賣家中心的動態數：呼叫者此刻的店的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數。數字由伺服器以資料庫計數，
+	// 不是 client 以列表長度推算。賣家能力 CAP_CONTENT_CONTRACT。
+	GetStoreSocialSummary(context.Context, *connect.Request[v1alpha1.GetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.GetStoreSocialSummaryResponse], error)
 }
 
 // NewSocialAppServiceClient constructs a client for the hawkr.social.v1alpha1.SocialAppService
@@ -520,22 +577,101 @@ func NewSocialAppServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
+		createPost: connect.NewClient[v1alpha1.CreatePostRequest, v1alpha1.CreatePostResponse](
+			httpClient,
+			baseURL+SocialAppServiceCreatePostProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("CreatePost")),
+			connect.WithClientOptions(opts...),
+		),
+		getMyPost: connect.NewClient[v1alpha1.GetMyPostRequest, v1alpha1.GetMyPostResponse](
+			httpClient,
+			baseURL+SocialAppServiceGetMyPostProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("GetMyPost")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		listMyPosts: connect.NewClient[v1alpha1.ListMyPostsRequest, v1alpha1.ListMyPostsResponse](
+			httpClient,
+			baseURL+SocialAppServiceListMyPostsProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("ListMyPosts")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		updatePost: connect.NewClient[v1alpha1.UpdatePostRequest, v1alpha1.UpdatePostResponse](
+			httpClient,
+			baseURL+SocialAppServiceUpdatePostProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("UpdatePost")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		publishPost: connect.NewClient[v1alpha1.PublishPostRequest, v1alpha1.PublishPostResponse](
+			httpClient,
+			baseURL+SocialAppServicePublishPostProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("PublishPost")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		unpublishPost: connect.NewClient[v1alpha1.UnpublishPostRequest, v1alpha1.UnpublishPostResponse](
+			httpClient,
+			baseURL+SocialAppServiceUnpublishPostProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("UnpublishPost")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		deletePost: connect.NewClient[v1alpha1.DeletePostRequest, v1alpha1.DeletePostResponse](
+			httpClient,
+			baseURL+SocialAppServiceDeletePostProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("DeletePost")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		schedulePost: connect.NewClient[v1alpha1.SchedulePostRequest, v1alpha1.SchedulePostResponse](
+			httpClient,
+			baseURL+SocialAppServiceSchedulePostProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("SchedulePost")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		listStoreComments: connect.NewClient[v1alpha1.ListStoreCommentsRequest, v1alpha1.ListStoreCommentsResponse](
+			httpClient,
+			baseURL+SocialAppServiceListStoreCommentsProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("ListStoreComments")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		getStoreSocialSummary: connect.NewClient[v1alpha1.GetStoreSocialSummaryRequest, v1alpha1.GetStoreSocialSummaryResponse](
+			httpClient,
+			baseURL+SocialAppServiceGetStoreSocialSummaryProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("GetStoreSocialSummary")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // socialAppServiceClient implements SocialAppServiceClient.
 type socialAppServiceClient struct {
-	sharePost        *connect.Client[v1alpha1.SharePostRequest, v1alpha1.SharePostResponse]
-	likePost         *connect.Client[v1alpha1.LikePostRequest, v1alpha1.LikePostResponse]
-	unlikePost       *connect.Client[v1alpha1.UnlikePostRequest, v1alpha1.UnlikePostResponse]
-	likeComment      *connect.Client[v1alpha1.LikeCommentRequest, v1alpha1.LikeCommentResponse]
-	unlikeComment    *connect.Client[v1alpha1.UnlikeCommentRequest, v1alpha1.UnlikeCommentResponse]
-	createComment    *connect.Client[v1alpha1.CreateCommentRequest, v1alpha1.CreateCommentResponse]
-	updateComment    *connect.Client[v1alpha1.UpdateCommentRequest, v1alpha1.UpdateCommentResponse]
-	deleteComment    *connect.Client[v1alpha1.DeleteCommentRequest, v1alpha1.DeleteCommentResponse]
-	createForumEntry *connect.Client[v1alpha1.CreateForumEntryRequest, v1alpha1.CreateForumEntryResponse]
-	updateForumEntry *connect.Client[v1alpha1.UpdateForumEntryRequest, v1alpha1.UpdateForumEntryResponse]
-	deleteForumEntry *connect.Client[v1alpha1.DeleteForumEntryRequest, v1alpha1.DeleteForumEntryResponse]
+	sharePost             *connect.Client[v1alpha1.SharePostRequest, v1alpha1.SharePostResponse]
+	likePost              *connect.Client[v1alpha1.LikePostRequest, v1alpha1.LikePostResponse]
+	unlikePost            *connect.Client[v1alpha1.UnlikePostRequest, v1alpha1.UnlikePostResponse]
+	likeComment           *connect.Client[v1alpha1.LikeCommentRequest, v1alpha1.LikeCommentResponse]
+	unlikeComment         *connect.Client[v1alpha1.UnlikeCommentRequest, v1alpha1.UnlikeCommentResponse]
+	createComment         *connect.Client[v1alpha1.CreateCommentRequest, v1alpha1.CreateCommentResponse]
+	updateComment         *connect.Client[v1alpha1.UpdateCommentRequest, v1alpha1.UpdateCommentResponse]
+	deleteComment         *connect.Client[v1alpha1.DeleteCommentRequest, v1alpha1.DeleteCommentResponse]
+	createForumEntry      *connect.Client[v1alpha1.CreateForumEntryRequest, v1alpha1.CreateForumEntryResponse]
+	updateForumEntry      *connect.Client[v1alpha1.UpdateForumEntryRequest, v1alpha1.UpdateForumEntryResponse]
+	deleteForumEntry      *connect.Client[v1alpha1.DeleteForumEntryRequest, v1alpha1.DeleteForumEntryResponse]
+	createPost            *connect.Client[v1alpha1.CreatePostRequest, v1alpha1.CreatePostResponse]
+	getMyPost             *connect.Client[v1alpha1.GetMyPostRequest, v1alpha1.GetMyPostResponse]
+	listMyPosts           *connect.Client[v1alpha1.ListMyPostsRequest, v1alpha1.ListMyPostsResponse]
+	updatePost            *connect.Client[v1alpha1.UpdatePostRequest, v1alpha1.UpdatePostResponse]
+	publishPost           *connect.Client[v1alpha1.PublishPostRequest, v1alpha1.PublishPostResponse]
+	unpublishPost         *connect.Client[v1alpha1.UnpublishPostRequest, v1alpha1.UnpublishPostResponse]
+	deletePost            *connect.Client[v1alpha1.DeletePostRequest, v1alpha1.DeletePostResponse]
+	schedulePost          *connect.Client[v1alpha1.SchedulePostRequest, v1alpha1.SchedulePostResponse]
+	listStoreComments     *connect.Client[v1alpha1.ListStoreCommentsRequest, v1alpha1.ListStoreCommentsResponse]
+	getStoreSocialSummary *connect.Client[v1alpha1.GetStoreSocialSummaryRequest, v1alpha1.GetStoreSocialSummaryResponse]
 }
 
 // SharePost calls hawkr.social.v1alpha1.SocialAppService.SharePost.
@@ -593,6 +729,56 @@ func (c *socialAppServiceClient) DeleteForumEntry(ctx context.Context, req *conn
 	return c.deleteForumEntry.CallUnary(ctx, req)
 }
 
+// CreatePost calls hawkr.social.v1alpha1.SocialAppService.CreatePost.
+func (c *socialAppServiceClient) CreatePost(ctx context.Context, req *connect.Request[v1alpha1.CreatePostRequest]) (*connect.Response[v1alpha1.CreatePostResponse], error) {
+	return c.createPost.CallUnary(ctx, req)
+}
+
+// GetMyPost calls hawkr.social.v1alpha1.SocialAppService.GetMyPost.
+func (c *socialAppServiceClient) GetMyPost(ctx context.Context, req *connect.Request[v1alpha1.GetMyPostRequest]) (*connect.Response[v1alpha1.GetMyPostResponse], error) {
+	return c.getMyPost.CallUnary(ctx, req)
+}
+
+// ListMyPosts calls hawkr.social.v1alpha1.SocialAppService.ListMyPosts.
+func (c *socialAppServiceClient) ListMyPosts(ctx context.Context, req *connect.Request[v1alpha1.ListMyPostsRequest]) (*connect.Response[v1alpha1.ListMyPostsResponse], error) {
+	return c.listMyPosts.CallUnary(ctx, req)
+}
+
+// UpdatePost calls hawkr.social.v1alpha1.SocialAppService.UpdatePost.
+func (c *socialAppServiceClient) UpdatePost(ctx context.Context, req *connect.Request[v1alpha1.UpdatePostRequest]) (*connect.Response[v1alpha1.UpdatePostResponse], error) {
+	return c.updatePost.CallUnary(ctx, req)
+}
+
+// PublishPost calls hawkr.social.v1alpha1.SocialAppService.PublishPost.
+func (c *socialAppServiceClient) PublishPost(ctx context.Context, req *connect.Request[v1alpha1.PublishPostRequest]) (*connect.Response[v1alpha1.PublishPostResponse], error) {
+	return c.publishPost.CallUnary(ctx, req)
+}
+
+// UnpublishPost calls hawkr.social.v1alpha1.SocialAppService.UnpublishPost.
+func (c *socialAppServiceClient) UnpublishPost(ctx context.Context, req *connect.Request[v1alpha1.UnpublishPostRequest]) (*connect.Response[v1alpha1.UnpublishPostResponse], error) {
+	return c.unpublishPost.CallUnary(ctx, req)
+}
+
+// DeletePost calls hawkr.social.v1alpha1.SocialAppService.DeletePost.
+func (c *socialAppServiceClient) DeletePost(ctx context.Context, req *connect.Request[v1alpha1.DeletePostRequest]) (*connect.Response[v1alpha1.DeletePostResponse], error) {
+	return c.deletePost.CallUnary(ctx, req)
+}
+
+// SchedulePost calls hawkr.social.v1alpha1.SocialAppService.SchedulePost.
+func (c *socialAppServiceClient) SchedulePost(ctx context.Context, req *connect.Request[v1alpha1.SchedulePostRequest]) (*connect.Response[v1alpha1.SchedulePostResponse], error) {
+	return c.schedulePost.CallUnary(ctx, req)
+}
+
+// ListStoreComments calls hawkr.social.v1alpha1.SocialAppService.ListStoreComments.
+func (c *socialAppServiceClient) ListStoreComments(ctx context.Context, req *connect.Request[v1alpha1.ListStoreCommentsRequest]) (*connect.Response[v1alpha1.ListStoreCommentsResponse], error) {
+	return c.listStoreComments.CallUnary(ctx, req)
+}
+
+// GetStoreSocialSummary calls hawkr.social.v1alpha1.SocialAppService.GetStoreSocialSummary.
+func (c *socialAppServiceClient) GetStoreSocialSummary(ctx context.Context, req *connect.Request[v1alpha1.GetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.GetStoreSocialSummaryResponse], error) {
+	return c.getStoreSocialSummary.CallUnary(ctx, req)
+}
+
 // SocialAppServiceHandler is an implementation of the hawkr.social.v1alpha1.SocialAppService
 // service.
 type SocialAppServiceHandler interface {
@@ -618,6 +804,33 @@ type SocialAppServiceHandler interface {
 	UpdateForumEntry(context.Context, *connect.Request[v1alpha1.UpdateForumEntryRequest]) (*connect.Response[v1alpha1.UpdateForumEntryResponse], error)
 	// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
 	DeleteForumEntry(context.Context, *connect.Request[v1alpha1.DeleteForumEntryRequest]) (*connect.Response[v1alpha1.DeleteForumEntryResponse], error)
+	// CreatePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
+	// 草稿可以不完整。帶 request_id 重送回第一次建立的貼文目前的樣子（狀態與計數是此刻的），不重複建立；內容不同回 invalid_argument。需要賣家能力 CAP_MARKETING。
+	CreatePost(context.Context, *connect.Request[v1alpha1.CreatePostRequest]) (*connect.Response[v1alpha1.CreatePostResponse], error)
+	// GetMyPost 讀呼叫者此刻的店自己的貼文：任何狀態（草稿、已發布、已下架），不含已刪除；別家的貼文與不存在一樣回 not_found。回應帶 status 與 etag。
+	// 賣家能力 CAP_CONTENT_CONTRACT（停權時仍可讀，才能下架與刪除）。
+	GetMyPost(context.Context, *connect.Request[v1alpha1.GetMyPostRequest]) (*connect.Response[v1alpha1.GetMyPostResponse], error)
+	// ListMyPosts 列出呼叫者此刻的店自己的貼文（含草稿與下架），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。賣家能力 CAP_CONTENT_CONTRACT。
+	ListMyPosts(context.Context, *connect.Request[v1alpha1.ListMyPostsRequest]) (*connect.Response[v1alpha1.ListMyPostsResponse], error)
+	// UpdatePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
+	// 已發布或有待發布排程的貼文被修改後仍要滿足公開要件。需要賣家能力 CAP_MARKETING。
+	UpdatePost(context.Context, *connect.Request[v1alpha1.UpdatePostRequest]) (*connect.Response[v1alpha1.UpdatePostResponse], error)
+	// PublishPost 發布草稿或下架的貼文；etag 必填。已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
+	PublishPost(context.Context, *connect.Request[v1alpha1.PublishPostRequest]) (*connect.Response[v1alpha1.PublishPostResponse], error)
+	// UnpublishPost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
+	UnpublishPost(context.Context, *connect.Request[v1alpha1.UnpublishPostRequest]) (*connect.Response[v1alpha1.UnpublishPostResponse], error)
+	// DeletePost 刪除自己的貼文；已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
+	DeletePost(context.Context, *connect.Request[v1alpha1.DeletePostRequest]) (*connect.Response[v1alpha1.DeletePostResponse], error)
+	// SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
+	// 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
+	SchedulePost(context.Context, *connect.Request[v1alpha1.SchedulePostRequest]) (*connect.Response[v1alpha1.SchedulePostResponse], error)
+	// ListStoreComments 列出呼叫者此刻的店所有貼文（含草稿與下架的貼文）的頂層留言，依建立時間舊到新；post_id 選填，設了只列那一篇。
+	// 刪除或隱藏而底下有可見回覆的頂層留言是佔位項目。unreplied 為真時只列「未回覆」的留言：本店貼文上、作者不是本店的頂層留言，沒有刪除、沒有被隱藏，
+	// 而且底下沒有任何一則仍可見、作者是本店的回覆（已刪除或被隱藏的店家回覆不算回覆）；此時沒有佔位項目。賣家能力 CAP_CONTENT_CONTRACT。
+	ListStoreComments(context.Context, *connect.Request[v1alpha1.ListStoreCommentsRequest]) (*connect.Response[v1alpha1.ListStoreCommentsResponse], error)
+	// GetStoreSocialSummary 是賣家中心的動態數：呼叫者此刻的店的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數。數字由伺服器以資料庫計數，
+	// 不是 client 以列表長度推算。賣家能力 CAP_CONTENT_CONTRACT。
+	GetStoreSocialSummary(context.Context, *connect.Request[v1alpha1.GetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.GetStoreSocialSummaryResponse], error)
 }
 
 // NewSocialAppServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -702,6 +915,75 @@ func NewSocialAppServiceHandler(svc SocialAppServiceHandler, opts ...connect.Han
 		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
+	socialAppServiceCreatePostHandler := connect.NewUnaryHandler(
+		SocialAppServiceCreatePostProcedure,
+		svc.CreatePost,
+		connect.WithSchema(socialAppServiceMethods.ByName("CreatePost")),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceGetMyPostHandler := connect.NewUnaryHandler(
+		SocialAppServiceGetMyPostProcedure,
+		svc.GetMyPost,
+		connect.WithSchema(socialAppServiceMethods.ByName("GetMyPost")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceListMyPostsHandler := connect.NewUnaryHandler(
+		SocialAppServiceListMyPostsProcedure,
+		svc.ListMyPosts,
+		connect.WithSchema(socialAppServiceMethods.ByName("ListMyPosts")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceUpdatePostHandler := connect.NewUnaryHandler(
+		SocialAppServiceUpdatePostProcedure,
+		svc.UpdatePost,
+		connect.WithSchema(socialAppServiceMethods.ByName("UpdatePost")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServicePublishPostHandler := connect.NewUnaryHandler(
+		SocialAppServicePublishPostProcedure,
+		svc.PublishPost,
+		connect.WithSchema(socialAppServiceMethods.ByName("PublishPost")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceUnpublishPostHandler := connect.NewUnaryHandler(
+		SocialAppServiceUnpublishPostProcedure,
+		svc.UnpublishPost,
+		connect.WithSchema(socialAppServiceMethods.ByName("UnpublishPost")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceDeletePostHandler := connect.NewUnaryHandler(
+		SocialAppServiceDeletePostProcedure,
+		svc.DeletePost,
+		connect.WithSchema(socialAppServiceMethods.ByName("DeletePost")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceSchedulePostHandler := connect.NewUnaryHandler(
+		SocialAppServiceSchedulePostProcedure,
+		svc.SchedulePost,
+		connect.WithSchema(socialAppServiceMethods.ByName("SchedulePost")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceListStoreCommentsHandler := connect.NewUnaryHandler(
+		SocialAppServiceListStoreCommentsProcedure,
+		svc.ListStoreComments,
+		connect.WithSchema(socialAppServiceMethods.ByName("ListStoreComments")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceGetStoreSocialSummaryHandler := connect.NewUnaryHandler(
+		SocialAppServiceGetStoreSocialSummaryProcedure,
+		svc.GetStoreSocialSummary,
+		connect.WithSchema(socialAppServiceMethods.ByName("GetStoreSocialSummary")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hawkr.social.v1alpha1.SocialAppService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SocialAppServiceSharePostProcedure:
@@ -726,6 +1008,26 @@ func NewSocialAppServiceHandler(svc SocialAppServiceHandler, opts ...connect.Han
 			socialAppServiceUpdateForumEntryHandler.ServeHTTP(w, r)
 		case SocialAppServiceDeleteForumEntryProcedure:
 			socialAppServiceDeleteForumEntryHandler.ServeHTTP(w, r)
+		case SocialAppServiceCreatePostProcedure:
+			socialAppServiceCreatePostHandler.ServeHTTP(w, r)
+		case SocialAppServiceGetMyPostProcedure:
+			socialAppServiceGetMyPostHandler.ServeHTTP(w, r)
+		case SocialAppServiceListMyPostsProcedure:
+			socialAppServiceListMyPostsHandler.ServeHTTP(w, r)
+		case SocialAppServiceUpdatePostProcedure:
+			socialAppServiceUpdatePostHandler.ServeHTTP(w, r)
+		case SocialAppServicePublishPostProcedure:
+			socialAppServicePublishPostHandler.ServeHTTP(w, r)
+		case SocialAppServiceUnpublishPostProcedure:
+			socialAppServiceUnpublishPostHandler.ServeHTTP(w, r)
+		case SocialAppServiceDeletePostProcedure:
+			socialAppServiceDeletePostHandler.ServeHTTP(w, r)
+		case SocialAppServiceSchedulePostProcedure:
+			socialAppServiceSchedulePostHandler.ServeHTTP(w, r)
+		case SocialAppServiceListStoreCommentsProcedure:
+			socialAppServiceListStoreCommentsHandler.ServeHTTP(w, r)
+		case SocialAppServiceGetStoreSocialSummaryProcedure:
+			socialAppServiceGetStoreSocialSummaryHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -777,4 +1079,44 @@ func (UnimplementedSocialAppServiceHandler) UpdateForumEntry(context.Context, *c
 
 func (UnimplementedSocialAppServiceHandler) DeleteForumEntry(context.Context, *connect.Request[v1alpha1.DeleteForumEntryRequest]) (*connect.Response[v1alpha1.DeleteForumEntryResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) CreatePost(context.Context, *connect.Request[v1alpha1.CreatePostRequest]) (*connect.Response[v1alpha1.CreatePostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.CreatePost is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) GetMyPost(context.Context, *connect.Request[v1alpha1.GetMyPostRequest]) (*connect.Response[v1alpha1.GetMyPostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.GetMyPost is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) ListMyPosts(context.Context, *connect.Request[v1alpha1.ListMyPostsRequest]) (*connect.Response[v1alpha1.ListMyPostsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.ListMyPosts is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) UpdatePost(context.Context, *connect.Request[v1alpha1.UpdatePostRequest]) (*connect.Response[v1alpha1.UpdatePostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.UpdatePost is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) PublishPost(context.Context, *connect.Request[v1alpha1.PublishPostRequest]) (*connect.Response[v1alpha1.PublishPostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.PublishPost is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) UnpublishPost(context.Context, *connect.Request[v1alpha1.UnpublishPostRequest]) (*connect.Response[v1alpha1.UnpublishPostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.UnpublishPost is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) DeletePost(context.Context, *connect.Request[v1alpha1.DeletePostRequest]) (*connect.Response[v1alpha1.DeletePostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.DeletePost is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) SchedulePost(context.Context, *connect.Request[v1alpha1.SchedulePostRequest]) (*connect.Response[v1alpha1.SchedulePostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.SchedulePost is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) ListStoreComments(context.Context, *connect.Request[v1alpha1.ListStoreCommentsRequest]) (*connect.Response[v1alpha1.ListStoreCommentsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.ListStoreComments is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) GetStoreSocialSummary(context.Context, *connect.Request[v1alpha1.GetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.GetStoreSocialSummaryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.GetStoreSocialSummary is not implemented"))
 }

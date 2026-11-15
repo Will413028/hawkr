@@ -376,3 +376,5 @@ func (s storeBlocksFromTable) StoreBlocksBuyer(ctx context.Context, storeID, buy
 	err := s.db.Conn(ctx).QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM seller.store_blocks WHERE store_id = $1 AND buyer_id = $2)", storeID, buyerID).Scan(&blocked)
 	return blocked, err
 }
+
+func ptr[T any](v T) *T { return &v }

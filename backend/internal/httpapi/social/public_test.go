@@ -215,17 +215,30 @@ func TestOnlyRecordPostViewIsAWriteInSocialPublicService(t *testing.T) {
 	}
 }
 
-func TestNoSocialAppMethodIsNoSideEffects(t *testing.T) {
+// SocialAppService 只有店主的四個讀取方法標 NO_SIDE_EFFECTS（GET）；其餘都是寫入，不得標。
+func TestOnlyOwnerReadsInSocialAppServiceAreNoSideEffects(t *testing.T) {
 	methods := pb.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialAppService").Methods()
-	if methods.Len() != 11 {
-		t.Fatalf("SocialAppService 有 %d 支方法，預期 11", methods.Len())
+	if methods.Len() != 21 {
+		t.Fatalf("SocialAppService 有 %d 支方法，預期 21", methods.Len())
 	}
+	reads := map[string]bool{"GetMyPost": true, "ListMyPosts": true, "ListStoreComments": true, "GetStoreSocialSummary": true}
+	seen := 0
 	for i := range methods.Len() {
 		m := methods.Get(i)
 		opts, _ := m.Options().(*descriptorpb.MethodOptions)
-		if opts.GetIdempotencyLevel() == descriptorpb.MethodOptions_NO_SIDE_EFFECTS {
+		noSideEffects := opts.GetIdempotencyLevel() == descriptorpb.MethodOptions_NO_SIDE_EFFECTS
+		switch {
+		case reads[string(m.Name())]:
+			seen++
+			if !noSideEffects {
+				t.Errorf("%s 是讀取，要標 NO_SIDE_EFFECTS", m.FullName())
+			}
+		case noSideEffects:
 			t.Errorf("%s 是寫入，不能標 NO_SIDE_EFFECTS", m.FullName())
 		}
+	}
+	if seen != len(reads) {
+		t.Errorf("只找到 %d 個店主的讀取方法", seen)
 	}
 }
 

@@ -13,7 +13,6 @@ import (
 	orderpb "github.com/Will413028/hawkr/go-pkg/proto/order"
 	paymentpb "github.com/Will413028/hawkr/go-pkg/proto/payment"
 	productpb "github.com/Will413028/hawkr/go-pkg/proto/product"
-	productimportpb "github.com/Will413028/hawkr/go-pkg/proto/product_import"
 	reviewpb "github.com/Will413028/hawkr/go-pkg/proto/review"
 	sellerpb "github.com/Will413028/hawkr/go-pkg/proto/seller"
 	shippingpb "github.com/Will413028/hawkr/go-pkg/proto/shipping"
@@ -208,11 +207,4 @@ func NewOrderReviewClientForTest(c reviewpb.ReviewServiceClient) *OrderReviewSer
 // NewShippingClientForTest creates a ShippingClient with the given mock proto client.
 func NewShippingClientForTest(c shippingpb.ShippingServiceClient) *ShippingClient {
 	return &ShippingClient{shippingClient: c}
-}
-
-// ==================== ProductImport ====================
-
-// NewProductImportClientForTest creates a ProductImportClient with the given mock proto client.
-func NewProductImportClientForTest(c productimportpb.ProductImportServiceClient) *ProductImportClient {
-	return &ProductImportClient{client: c}
 }

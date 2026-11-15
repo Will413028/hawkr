@@ -1492,506 +1492,6 @@ func (x *ServerReadSecureAssetResponse) GetFilename() string {
 	return ""
 }
 
-type ImportDownloadAssetRequest struct {
-	state   protoimpl.MessageState `protogen:"open.v1"`
-	RefType string                 `protobuf:"bytes,1,opt,name=ref_type,json=refType,proto3" json:"ref_type,omitempty"` // PRODUCT_IMPORT_PREVIEW | PRODUCT_IMPORT_PREVIEW_DESC（AssetReferenceType value）
-	// 賣家在 CSV 內原樣填寫的外部 URL：全鏈路都不做正規化（repo 內無任何 normalize 實作），
-	// 消費端不得假設它已被清理——可能帶 query 簽名參數、trailing slash 或百分比編碼。
-	SourceUrl             string `protobuf:"bytes,2,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
-	StoreId               int64  `protobuf:"varint,3,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"` // 賣家 store_id（product-import-service 傳入）
-	ImportJobId           int64  `protobuf:"varint,4,opt,name=import_job_id,json=importJobId,proto3" json:"import_job_id,omitempty"`
-	ImportItemId          int64  `protobuf:"varint,5,opt,name=import_item_id,json=importItemId,proto3" json:"import_item_id,omitempty"`
-	IdempotencyKey        string `protobuf:"bytes,6,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`                         // SHA256(url) + import_job_id
-	ExpiresAt             string `protobuf:"bytes,7,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`                                        // ISO 8601 UTC（建議 ImportJob.expires_at + 1d buffer）
-	CallbackCorrelationId int64  `protobuf:"varint,8,opt,name=callback_correlation_id,json=callbackCorrelationId,proto3" json:"callback_correlation_id,omitempty"` // Import 端 product_import_item_asset.id；callback event 內 echo
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
-}
-
-func (x *ImportDownloadAssetRequest) Reset() {
-	*x = ImportDownloadAssetRequest{}
-	mi := &file_media_media_proto_msgTypes[22]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ImportDownloadAssetRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ImportDownloadAssetRequest) ProtoMessage() {}
-
-func (x *ImportDownloadAssetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_media_media_proto_msgTypes[22]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ImportDownloadAssetRequest.ProtoReflect.Descriptor instead.
-func (*ImportDownloadAssetRequest) Descriptor() ([]byte, []int) {
-	return file_media_media_proto_rawDescGZIP(), []int{22}
-}
-
-func (x *ImportDownloadAssetRequest) GetRefType() string {
-	if x != nil {
-		return x.RefType
-	}
-	return ""
-}
-
-func (x *ImportDownloadAssetRequest) GetSourceUrl() string {
-	if x != nil {
-		return x.SourceUrl
-	}
-	return ""
-}
-
-func (x *ImportDownloadAssetRequest) GetStoreId() int64 {
-	if x != nil {
-		return x.StoreId
-	}
-	return 0
-}
-
-func (x *ImportDownloadAssetRequest) GetImportJobId() int64 {
-	if x != nil {
-		return x.ImportJobId
-	}
-	return 0
-}
-
-func (x *ImportDownloadAssetRequest) GetImportItemId() int64 {
-	if x != nil {
-		return x.ImportItemId
-	}
-	return 0
-}
-
-func (x *ImportDownloadAssetRequest) GetIdempotencyKey() string {
-	if x != nil {
-		return x.IdempotencyKey
-	}
-	return ""
-}
-
-func (x *ImportDownloadAssetRequest) GetExpiresAt() string {
-	if x != nil {
-		return x.ExpiresAt
-	}
-	return ""
-}
-
-func (x *ImportDownloadAssetRequest) GetCallbackCorrelationId() int64 {
-	if x != nil {
-		return x.CallbackCorrelationId
-	}
-	return 0
-}
-
-type ImportDownloadAssetResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	ImportAssetId string                 `protobuf:"bytes,3,opt,name=import_asset_id,json=importAssetId,proto3" json:"import_asset_id,omitempty"` // UUID（import_asset.id）
-	Status        string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`                                      // ImportAssetMediaStatus.value()：DOWNLOADING(9401) / UPLOADED(9402) / FINALIZED(9403) / FAILED(9404) / EXPIRED(9405)
-	// 首次 INSERT 一律 DOWNLOADING；dedup 命中時 echo 既有 row 當下 status（含已 settled 終態）
-	FailureReason string `protobuf:"bytes,5,opt,name=failure_reason,json=failureReason,proto3" json:"failure_reason,omitempty"` // (a) 派工本身失敗（罕見：DB INSERT 失敗 / MQ enqueue 失敗），或
-	// (b) dedup 命中且 status=FAILED 時 echo 既有 row 的 failure_reason（caller 同步 settle 用）
-	ObjectKey     string `protobuf:"bytes,6,opt,name=object_key,json=objectKey,proto3" json:"object_key,omitempty"`             // dedup 命中且 status ∈ {UPLOADED, FINALIZED} 時填；caller 同步 settle 自己 row 用
-	PreviewUrl    string `protobuf:"bytes,7,opt,name=preview_url,json=previewUrl,proto3" json:"preview_url,omitempty"`          // 同 object_key 條件填；presigned download URL
-	FailureDetail string `protobuf:"bytes,8,opt,name=failure_detail,json=failureDetail,proto3" json:"failure_detail,omitempty"` // dedup 命中且 status=FAILED 時填；caller 同步 settle 用
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ImportDownloadAssetResponse) Reset() {
-	*x = ImportDownloadAssetResponse{}
-	mi := &file_media_media_proto_msgTypes[23]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ImportDownloadAssetResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ImportDownloadAssetResponse) ProtoMessage() {}
-
-func (x *ImportDownloadAssetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_media_media_proto_msgTypes[23]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ImportDownloadAssetResponse.ProtoReflect.Descriptor instead.
-func (*ImportDownloadAssetResponse) Descriptor() ([]byte, []int) {
-	return file_media_media_proto_rawDescGZIP(), []int{23}
-}
-
-func (x *ImportDownloadAssetResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *ImportDownloadAssetResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *ImportDownloadAssetResponse) GetImportAssetId() string {
-	if x != nil {
-		return x.ImportAssetId
-	}
-	return ""
-}
-
-func (x *ImportDownloadAssetResponse) GetStatus() string {
-	if x != nil {
-		return x.Status
-	}
-	return ""
-}
-
-func (x *ImportDownloadAssetResponse) GetFailureReason() string {
-	if x != nil {
-		return x.FailureReason
-	}
-	return ""
-}
-
-func (x *ImportDownloadAssetResponse) GetObjectKey() string {
-	if x != nil {
-		return x.ObjectKey
-	}
-	return ""
-}
-
-func (x *ImportDownloadAssetResponse) GetPreviewUrl() string {
-	if x != nil {
-		return x.PreviewUrl
-	}
-	return ""
-}
-
-func (x *ImportDownloadAssetResponse) GetFailureDetail() string {
-	if x != nil {
-		return x.FailureDetail
-	}
-	return ""
-}
-
-type FinalizeImportAssetRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ImportAssetId string                 `protobuf:"bytes,1,opt,name=import_asset_id,json=importAssetId,proto3" json:"import_asset_id,omitempty"`
-	TargetRefType string                 `protobuf:"bytes,2,opt,name=target_ref_type,json=targetRefType,proto3" json:"target_ref_type,omitempty"` // PRODUCT | PRODUCT_DESC（不可是 PRODUCT_IMPORT_PREVIEW*）
-	StoreId       int64                  `protobuf:"varint,3,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`                    // 現任賣家 store_id（product-service 傳入）
-	ProductId     int64                  `protobuf:"varint,4,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`              // 用於 finalized_object_key 路徑組裝（非 link，link 由 caller 自行 LinkImages）
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *FinalizeImportAssetRequest) Reset() {
-	*x = FinalizeImportAssetRequest{}
-	mi := &file_media_media_proto_msgTypes[24]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *FinalizeImportAssetRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*FinalizeImportAssetRequest) ProtoMessage() {}
-
-func (x *FinalizeImportAssetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_media_media_proto_msgTypes[24]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use FinalizeImportAssetRequest.ProtoReflect.Descriptor instead.
-func (*FinalizeImportAssetRequest) Descriptor() ([]byte, []int) {
-	return file_media_media_proto_rawDescGZIP(), []int{24}
-}
-
-func (x *FinalizeImportAssetRequest) GetImportAssetId() string {
-	if x != nil {
-		return x.ImportAssetId
-	}
-	return ""
-}
-
-func (x *FinalizeImportAssetRequest) GetTargetRefType() string {
-	if x != nil {
-		return x.TargetRefType
-	}
-	return ""
-}
-
-func (x *FinalizeImportAssetRequest) GetStoreId() int64 {
-	if x != nil {
-		return x.StoreId
-	}
-	return 0
-}
-
-func (x *FinalizeImportAssetRequest) GetProductId() int64 {
-	if x != nil {
-		return x.ProductId
-	}
-	return 0
-}
-
-type FinalizeImportAssetResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	AssetId       string                 `protobuf:"bytes,3,opt,name=asset_id,json=assetId,proto3" json:"asset_id,omitempty"`       // media_asset.id（TSID 數字字串）
-	ObjectKey     string                 `protobuf:"bytes,4,opt,name=object_key,json=objectKey,proto3" json:"object_key,omitempty"` // 正式 OSS 路徑
-	Url           string                 `protobuf:"bytes,5,opt,name=url,proto3" json:"url,omitempty"`                              // CDN URL（CdnProperties.buildUrl(objectKey)）
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *FinalizeImportAssetResponse) Reset() {
-	*x = FinalizeImportAssetResponse{}
-	mi := &file_media_media_proto_msgTypes[25]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *FinalizeImportAssetResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*FinalizeImportAssetResponse) ProtoMessage() {}
-
-func (x *FinalizeImportAssetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_media_media_proto_msgTypes[25]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use FinalizeImportAssetResponse.ProtoReflect.Descriptor instead.
-func (*FinalizeImportAssetResponse) Descriptor() ([]byte, []int) {
-	return file_media_media_proto_rawDescGZIP(), []int{25}
-}
-
-func (x *FinalizeImportAssetResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *FinalizeImportAssetResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *FinalizeImportAssetResponse) GetAssetId() string {
-	if x != nil {
-		return x.AssetId
-	}
-	return ""
-}
-
-func (x *FinalizeImportAssetResponse) GetObjectKey() string {
-	if x != nil {
-		return x.ObjectKey
-	}
-	return ""
-}
-
-func (x *FinalizeImportAssetResponse) GetUrl() string {
-	if x != nil {
-		return x.Url
-	}
-	return ""
-}
-
-type BindStagedAssetRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	StagedToken   string                 `protobuf:"bytes,1,opt,name=staged_token,json=stagedToken,proto3" json:"staged_token,omitempty"` // 賣家本地上傳取得（CompleteUploadSession 回傳）
-	StoreId       int64                  `protobuf:"varint,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`            // 賣家 store_id（product-import-service 傳入）
-	ImportJobId   int64                  `protobuf:"varint,3,opt,name=import_job_id,json=importJobId,proto3" json:"import_job_id,omitempty"`
-	ImportItemId  int64                  `protobuf:"varint,4,opt,name=import_item_id,json=importItemId,proto3" json:"import_item_id,omitempty"`
-	RefType       string                 `protobuf:"bytes,5,opt,name=ref_type,json=refType,proto3" json:"ref_type,omitempty"` // PRODUCT_IMPORT_PREVIEW | PRODUCT_IMPORT_PREVIEW_DESC
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BindStagedAssetRequest) Reset() {
-	*x = BindStagedAssetRequest{}
-	mi := &file_media_media_proto_msgTypes[26]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BindStagedAssetRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BindStagedAssetRequest) ProtoMessage() {}
-
-func (x *BindStagedAssetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_media_media_proto_msgTypes[26]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BindStagedAssetRequest.ProtoReflect.Descriptor instead.
-func (*BindStagedAssetRequest) Descriptor() ([]byte, []int) {
-	return file_media_media_proto_rawDescGZIP(), []int{26}
-}
-
-func (x *BindStagedAssetRequest) GetStagedToken() string {
-	if x != nil {
-		return x.StagedToken
-	}
-	return ""
-}
-
-func (x *BindStagedAssetRequest) GetStoreId() int64 {
-	if x != nil {
-		return x.StoreId
-	}
-	return 0
-}
-
-func (x *BindStagedAssetRequest) GetImportJobId() int64 {
-	if x != nil {
-		return x.ImportJobId
-	}
-	return 0
-}
-
-func (x *BindStagedAssetRequest) GetImportItemId() int64 {
-	if x != nil {
-		return x.ImportItemId
-	}
-	return 0
-}
-
-func (x *BindStagedAssetRequest) GetRefType() string {
-	if x != nil {
-		return x.RefType
-	}
-	return ""
-}
-
-type BindStagedAssetResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	ImportAssetId string                 `protobuf:"bytes,3,opt,name=import_asset_id,json=importAssetId,proto3" json:"import_asset_id,omitempty"` // UUID（import_asset.id）
-	ObjectKey     string                 `protobuf:"bytes,4,opt,name=object_key,json=objectKey,proto3" json:"object_key,omitempty"`               // import_asset tmp OSS 路徑
-	PreviewUrl    string                 `protobuf:"bytes,5,opt,name=preview_url,json=previewUrl,proto3" json:"preview_url,omitempty"`            // CDN URL 供 UI 預覽
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BindStagedAssetResponse) Reset() {
-	*x = BindStagedAssetResponse{}
-	mi := &file_media_media_proto_msgTypes[27]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BindStagedAssetResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BindStagedAssetResponse) ProtoMessage() {}
-
-func (x *BindStagedAssetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_media_media_proto_msgTypes[27]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BindStagedAssetResponse.ProtoReflect.Descriptor instead.
-func (*BindStagedAssetResponse) Descriptor() ([]byte, []int) {
-	return file_media_media_proto_rawDescGZIP(), []int{27}
-}
-
-func (x *BindStagedAssetResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *BindStagedAssetResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *BindStagedAssetResponse) GetImportAssetId() string {
-	if x != nil {
-		return x.ImportAssetId
-	}
-	return ""
-}
-
-func (x *BindStagedAssetResponse) GetObjectKey() string {
-	if x != nil {
-		return x.ObjectKey
-	}
-	return ""
-}
-
-func (x *BindStagedAssetResponse) GetPreviewUrl() string {
-	if x != nil {
-		return x.PreviewUrl
-	}
-	return ""
-}
-
 var File_media_media_proto protoreflect.FileDescriptor
 
 const file_media_media_proto_rawDesc = "" +
@@ -2114,57 +1614,7 @@ const file_media_media_proto_rawDesc = "" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1b\n" +
 	"\tfile_data\x18\x03 \x01(\fR\bfileData\x12!\n" +
 	"\fcontent_type\x18\x04 \x01(\tR\vcontentType\x12\x1a\n" +
-	"\bfilename\x18\x05 \x01(\tR\bfilename\"\xbb\x02\n" +
-	"\x1aImportDownloadAssetRequest\x12\x19\n" +
-	"\bref_type\x18\x01 \x01(\tR\arefType\x12\x1d\n" +
-	"\n" +
-	"source_url\x18\x02 \x01(\tR\tsourceUrl\x12\x19\n" +
-	"\bstore_id\x18\x03 \x01(\x03R\astoreId\x12\"\n" +
-	"\rimport_job_id\x18\x04 \x01(\x03R\vimportJobId\x12$\n" +
-	"\x0eimport_item_id\x18\x05 \x01(\x03R\fimportItemId\x12'\n" +
-	"\x0fidempotency_key\x18\x06 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
-	"\n" +
-	"expires_at\x18\a \x01(\tR\texpiresAt\x126\n" +
-	"\x17callback_correlation_id\x18\b \x01(\x03R\x15callbackCorrelationId\"\x99\x02\n" +
-	"\x1bImportDownloadAssetResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12&\n" +
-	"\x0fimport_asset_id\x18\x03 \x01(\tR\rimportAssetId\x12\x16\n" +
-	"\x06status\x18\x04 \x01(\tR\x06status\x12%\n" +
-	"\x0efailure_reason\x18\x05 \x01(\tR\rfailureReason\x12\x1d\n" +
-	"\n" +
-	"object_key\x18\x06 \x01(\tR\tobjectKey\x12\x1f\n" +
-	"\vpreview_url\x18\a \x01(\tR\n" +
-	"previewUrl\x12%\n" +
-	"\x0efailure_detail\x18\b \x01(\tR\rfailureDetail\"\xa6\x01\n" +
-	"\x1aFinalizeImportAssetRequest\x12&\n" +
-	"\x0fimport_asset_id\x18\x01 \x01(\tR\rimportAssetId\x12&\n" +
-	"\x0ftarget_ref_type\x18\x02 \x01(\tR\rtargetRefType\x12\x19\n" +
-	"\bstore_id\x18\x03 \x01(\x03R\astoreId\x12\x1d\n" +
-	"\n" +
-	"product_id\x18\x04 \x01(\x03R\tproductId\"\x97\x01\n" +
-	"\x1bFinalizeImportAssetResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12\x19\n" +
-	"\basset_id\x18\x03 \x01(\tR\aassetId\x12\x1d\n" +
-	"\n" +
-	"object_key\x18\x04 \x01(\tR\tobjectKey\x12\x10\n" +
-	"\x03url\x18\x05 \x01(\tR\x03url\"\xbb\x01\n" +
-	"\x16BindStagedAssetRequest\x12!\n" +
-	"\fstaged_token\x18\x01 \x01(\tR\vstagedToken\x12\x19\n" +
-	"\bstore_id\x18\x02 \x01(\x03R\astoreId\x12\"\n" +
-	"\rimport_job_id\x18\x03 \x01(\x03R\vimportJobId\x12$\n" +
-	"\x0eimport_item_id\x18\x04 \x01(\x03R\fimportItemId\x12\x19\n" +
-	"\bref_type\x18\x05 \x01(\tR\arefType\"\xaf\x01\n" +
-	"\x17BindStagedAssetResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12&\n" +
-	"\x0fimport_asset_id\x18\x03 \x01(\tR\rimportAssetId\x12\x1d\n" +
-	"\n" +
-	"object_key\x18\x04 \x01(\tR\tobjectKey\x12\x1f\n" +
-	"\vpreview_url\x18\x05 \x01(\tR\n" +
-	"previewUrl2\xdc\n" +
-	"\n" +
+	"\bfilename\x18\x05 \x01(\tR\bfilename2\xaa\b\n" +
 	"\fMediaService\x12h\n" +
 	"\x13CreateUploadSession\x12'.hawkr.media.CreateUploadSessionRequest\x1a(.hawkr.media.CreateUploadSessionResponse\x12n\n" +
 	"\x15CompleteUploadSession\x12).hawkr.media.CompleteUploadSessionRequest\x1a*.hawkr.media.CompleteUploadSessionResponse\x12Y\n" +
@@ -2176,10 +1626,7 @@ const file_media_media_proto_rawDesc = "" +
 	"\x17ServerUploadAndFinalize\x12+.hawkr.media.ServerUploadAndFinalizeRequest\x1a,.hawkr.media.ServerUploadAndFinalizeResponse\x12\x86\x01\n" +
 	"\x1dServerUploadSecureAndFinalize\x121.hawkr.media.ServerUploadSecureAndFinalizeRequest\x1a2.hawkr.media.ServerUploadSecureAndFinalizeResponse\x12n\n" +
 	"\x15ServerReadSecureAsset\x12).hawkr.media.ServerReadSecureAssetRequest\x1a*.hawkr.media.ServerReadSecureAssetResponse\x12n\n" +
-	"\x15BatchGetAssetMetadata\x12).hawkr.media.BatchGetAssetMetadataRequest\x1a*.hawkr.media.BatchGetAssetMetadataResponse\x12h\n" +
-	"\x13ImportDownloadAsset\x12'.hawkr.media.ImportDownloadAssetRequest\x1a(.hawkr.media.ImportDownloadAssetResponse\x12h\n" +
-	"\x13FinalizeImportAsset\x12'.hawkr.media.FinalizeImportAssetRequest\x1a(.hawkr.media.FinalizeImportAssetResponse\x12\\\n" +
-	"\x0fBindStagedAsset\x12#.hawkr.media.BindStagedAssetRequest\x1a$.hawkr.media.BindStagedAssetResponseBe\n" +
+	"\x15BatchGetAssetMetadata\x12).hawkr.media.BatchGetAssetMetadataRequest\x1a*.hawkr.media.BatchGetAssetMetadataResponseBe\n" +
 	"%io.github.will413028.hawkr.media.grpcB\n" +
 	"MediaProtoP\x01Z.github.com/Will413028/hawkr/go-pkg/proto/mediab\x06proto3"
 
@@ -2195,7 +1642,7 @@ func file_media_media_proto_rawDescGZIP() []byte {
 	return file_media_media_proto_rawDescData
 }
 
-var file_media_media_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_media_media_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_media_media_proto_goTypes = []any{
 	(*FinalizeImagesRequest)(nil),                 // 0: hawkr.media.FinalizeImagesRequest
 	(*FinalizedAsset)(nil),                        // 1: hawkr.media.FinalizedAsset
@@ -2219,12 +1666,6 @@ var file_media_media_proto_goTypes = []any{
 	(*BatchGetAssetMetadataResponse)(nil),         // 19: hawkr.media.BatchGetAssetMetadataResponse
 	(*ServerReadSecureAssetRequest)(nil),          // 20: hawkr.media.ServerReadSecureAssetRequest
 	(*ServerReadSecureAssetResponse)(nil),         // 21: hawkr.media.ServerReadSecureAssetResponse
-	(*ImportDownloadAssetRequest)(nil),            // 22: hawkr.media.ImportDownloadAssetRequest
-	(*ImportDownloadAssetResponse)(nil),           // 23: hawkr.media.ImportDownloadAssetResponse
-	(*FinalizeImportAssetRequest)(nil),            // 24: hawkr.media.FinalizeImportAssetRequest
-	(*FinalizeImportAssetResponse)(nil),           // 25: hawkr.media.FinalizeImportAssetResponse
-	(*BindStagedAssetRequest)(nil),                // 26: hawkr.media.BindStagedAssetRequest
-	(*BindStagedAssetResponse)(nil),               // 27: hawkr.media.BindStagedAssetResponse
 }
 var file_media_media_proto_depIdxs = []int32{
 	1,  // 0: hawkr.media.FinalizeImagesResponse.assets:type_name -> hawkr.media.FinalizedAsset
@@ -2239,24 +1680,18 @@ var file_media_media_proto_depIdxs = []int32{
 	15, // 9: hawkr.media.MediaService.ServerUploadSecureAndFinalize:input_type -> hawkr.media.ServerUploadSecureAndFinalizeRequest
 	20, // 10: hawkr.media.MediaService.ServerReadSecureAsset:input_type -> hawkr.media.ServerReadSecureAssetRequest
 	17, // 11: hawkr.media.MediaService.BatchGetAssetMetadata:input_type -> hawkr.media.BatchGetAssetMetadataRequest
-	22, // 12: hawkr.media.MediaService.ImportDownloadAsset:input_type -> hawkr.media.ImportDownloadAssetRequest
-	24, // 13: hawkr.media.MediaService.FinalizeImportAsset:input_type -> hawkr.media.FinalizeImportAssetRequest
-	26, // 14: hawkr.media.MediaService.BindStagedAsset:input_type -> hawkr.media.BindStagedAssetRequest
-	10, // 15: hawkr.media.MediaService.CreateUploadSession:output_type -> hawkr.media.CreateUploadSessionResponse
-	12, // 16: hawkr.media.MediaService.CompleteUploadSession:output_type -> hawkr.media.CompleteUploadSessionResponse
-	2,  // 17: hawkr.media.MediaService.FinalizeImages:output_type -> hawkr.media.FinalizeImagesResponse
-	4,  // 18: hawkr.media.MediaService.LinkImages:output_type -> hawkr.media.LinkImagesResponse
-	6,  // 19: hawkr.media.MediaService.UnlinkImages:output_type -> hawkr.media.UnlinkImagesResponse
-	8,  // 20: hawkr.media.MediaService.ReleaseReferences:output_type -> hawkr.media.ReleaseReferencesResponse
-	14, // 21: hawkr.media.MediaService.ServerUploadAndFinalize:output_type -> hawkr.media.ServerUploadAndFinalizeResponse
-	16, // 22: hawkr.media.MediaService.ServerUploadSecureAndFinalize:output_type -> hawkr.media.ServerUploadSecureAndFinalizeResponse
-	21, // 23: hawkr.media.MediaService.ServerReadSecureAsset:output_type -> hawkr.media.ServerReadSecureAssetResponse
-	19, // 24: hawkr.media.MediaService.BatchGetAssetMetadata:output_type -> hawkr.media.BatchGetAssetMetadataResponse
-	23, // 25: hawkr.media.MediaService.ImportDownloadAsset:output_type -> hawkr.media.ImportDownloadAssetResponse
-	25, // 26: hawkr.media.MediaService.FinalizeImportAsset:output_type -> hawkr.media.FinalizeImportAssetResponse
-	27, // 27: hawkr.media.MediaService.BindStagedAsset:output_type -> hawkr.media.BindStagedAssetResponse
-	15, // [15:28] is the sub-list for method output_type
-	2,  // [2:15] is the sub-list for method input_type
+	10, // 12: hawkr.media.MediaService.CreateUploadSession:output_type -> hawkr.media.CreateUploadSessionResponse
+	12, // 13: hawkr.media.MediaService.CompleteUploadSession:output_type -> hawkr.media.CompleteUploadSessionResponse
+	2,  // 14: hawkr.media.MediaService.FinalizeImages:output_type -> hawkr.media.FinalizeImagesResponse
+	4,  // 15: hawkr.media.MediaService.LinkImages:output_type -> hawkr.media.LinkImagesResponse
+	6,  // 16: hawkr.media.MediaService.UnlinkImages:output_type -> hawkr.media.UnlinkImagesResponse
+	8,  // 17: hawkr.media.MediaService.ReleaseReferences:output_type -> hawkr.media.ReleaseReferencesResponse
+	14, // 18: hawkr.media.MediaService.ServerUploadAndFinalize:output_type -> hawkr.media.ServerUploadAndFinalizeResponse
+	16, // 19: hawkr.media.MediaService.ServerUploadSecureAndFinalize:output_type -> hawkr.media.ServerUploadSecureAndFinalizeResponse
+	21, // 20: hawkr.media.MediaService.ServerReadSecureAsset:output_type -> hawkr.media.ServerReadSecureAssetResponse
+	19, // 21: hawkr.media.MediaService.BatchGetAssetMetadata:output_type -> hawkr.media.BatchGetAssetMetadataResponse
+	12, // [12:22] is the sub-list for method output_type
+	2,  // [2:12] is the sub-list for method input_type
 	2,  // [2:2] is the sub-list for extension type_name
 	2,  // [2:2] is the sub-list for extension extendee
 	0,  // [0:2] is the sub-list for field type_name
@@ -2273,7 +1708,7 @@ func file_media_media_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_media_media_proto_rawDesc), len(file_media_media_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   28,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

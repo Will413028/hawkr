@@ -213,7 +213,7 @@ func TestScheduleStateAndVersionRules(t *testing.T) {
 		t.Fatalf("別家的貼文：%v", err)
 	}
 	empty := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "沒有圖"}))
-	if _, err := f.module.SchedulePost(ctx, st, in(empty, empty.Version)); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.SchedulePost(ctx, st, in(empty, empty.Version)); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("草稿不完整不能排程：%v", err)
 	}
 	un := f.publishedPost(t, storeID, "要下架")
@@ -624,25 +624,25 @@ func TestEditingAScheduledPostStillMeetsPublishRequirements(t *testing.T) {
 	storeID, _ := f.exposableStore(t)
 	st := f.store(t, storeID)
 	plain := f.draft(t, storeID)
-	_, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: plain.ID, Version: plain.Version, Body: "", ClearImage: true})
+	_, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: plain.ID, Version: plain.Version, Body: ptr(""), ClearImage: true})
 	must(t, err)
 
 	p := f.draft(t, storeID)
 	s := f.schedule(t, storeID, p, time.Hour, f.owner())
 	p = f.current(t, storeID, p)
-	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: "新內文", ClearImage: true}); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("新內文"), ClearImage: true}); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("清掉圖要被拒絕：%v", err)
 	}
-	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ""}); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("")}); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("清空內文要被拒絕：%v", err)
 	}
-	updated := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: "新內文"}))
+	updated := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("新內文")}))
 	if updated.Body != "新內文" {
 		t.Fatalf("%+v", updated)
 	}
 	f.wantSchedule(t, s.ID, "PENDING", "")
 	must(t, f.cancelSchedule(t, storeID, p))
-	_, err = f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: f.current(t, storeID, p).Version, Body: "", ClearImage: true})
+	_, err = f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: f.current(t, storeID, p).Version, Body: ptr(""), ClearImage: true})
 	must(t, err)
 }
 
@@ -805,7 +805,7 @@ func TestScheduleBumpsThePostVersion(t *testing.T) {
 	if _, err := f.module.PublishPost(ctx, st, p.ID, before); kindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("舊版本發布要衝突：%v", err)
 	}
-	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: before, Body: "舊版本的編輯"}); kindOf(err) != apperr.KindVersionConflict {
+	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: before, Body: ptr("舊版本的編輯")}); kindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("舊版本編輯要衝突：%v", err)
 	}
 	if _, err := f.module.SchedulePost(ctx, st, social.SchedulePostInput{PostID: p.ID, Version: before, PublishAt: f.clock().Add(2 * time.Hour), By: f.owner()}); kindOf(err) != apperr.KindVersionConflict {

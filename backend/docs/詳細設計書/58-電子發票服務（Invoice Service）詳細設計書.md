@@ -500,7 +500,7 @@ flowchart TD
 | **E24** | 「誰消費它」是每個後端變更的必答題：拿路由字串或欄位名去**所有**前端 repo grep，零命中＝未交付。web 端 wire types 是手寫、無同步機制 | §6.1 每一條路由都必須指名消費者（哪個 repo 的哪個畫面）。若 notification 的 refType 新增 `INVOICE`，還要評估四個前端消費者（gateway fallback 表、seller App inbox switch + FCM router、buyer App `destination.dart`、website `lib/notifications/resolve.ts`），順序不可顛倒 | `docs/開發規範/Web 前端契約同步規範.md` |
 | **E25** | 重複實作防護：新增 formatter／validator／計算器／resolver／client 前先 grep `pkg/`、`services/java/shared/` 與同 domain 既有實作 | 本案特別容易踩三處：① AES-256-GCM 欄位級加密 → Go 有 `pkg/crypto`（`EncryptToBase64`／`DecryptFromBase64`），Java 側查無；② 工作天曆 → 既有 `HolidayService` 在 shipping-service，禁止複製第二份；③ 「售後是否還活著」→ 用既有 helper／RPC，禁止自造第二套終態集合（自造＝在撥款閘門與開票閘門之間製造靜默分歧） | `pkg/crypto/crypto.go:83-110`；24 號；`.../common-core/.../helper/AfterSaleCaseStatusRules.java` |
 | **E26** | 賣家中心的元件禁止直接 import 傳輸層：`hawkr-website/biome.json:54-66` 的 `noRestrictedImports` 明令 `features/seller-center/**` 不得從 `@/lib/api/client`（含相對路徑）import `authedFetch` 或 `apiClient`，必須經 `lib/seller-data/scope.tsx` 的 repo 工廠注入 fetcher | 同一個元件會被 `/seller-center` 與 `/adm/[storeId]` 兩條路徑渲染，自己 import 傳輸層等於寫死打 `/app/*` ⇒ 發票的賣家頁一寫 `apiClient` 就 lint 紅 | `hawkr-website/biome.json:54-66` |
-| **E27** | 新增 `/seller-center/*` 路由自動被登入守衛涵蓋，不必改 middleware（`SELLER_PREFIXES = ["/seller-center", "/seller-product-import-preview"]`） | 賣家發票頁的登入保護是免費的；**但停權導頁不是**（E15／D16 的 `suspensionWhitelist`），兩者是不同機制 | `hawkr-website/lib/auth/redirect.ts:5,59`；`hawkr-website/middleware.ts` |
+| **E27** | 新增 `/seller-center/*` 路由自動被登入守衛涵蓋，不必改 middleware（`SELLER_PREFIXES = ["/seller-center"]`） | 賣家發票頁的登入保護是免費的；**但停權導頁不是**（E15／D16 的 `suspensionWhitelist`），兩者是不同機制 | `hawkr-website/lib/auth/redirect.ts:5,59`；`hawkr-website/middleware.ts` |
 
 ### 3.6 假設 (Assumptions)
 
@@ -4619,7 +4619,7 @@ URL 片段一律進 `gateway/internal/router/constants.go`（發票區塊接在�
 |---|---|---|
 | 版本走 body 不走 `If-Match` | 全部帶版本的 mutation | CDN／BFF 轉送不保證帶得到自訂 header |
 | 格式驗證只有一個執行點：新建 `gateway/internal/middleware/idempotency.go` 的 `RequireIdempotencyKey()` —— 對 `POST`／`PUT`／`DELETE` 比對上表正則，不符即 `response.BadRequest(c, "Idempotency-Key 格式不符 ^[A-Za-z0-9._:-]{8,128}$")` ＋ `c.Abort()`，其餘 method 直接 `c.Next()`。照 `middleware/csrf.go:43-46` 的「寫回應 ＋ `c.Abort`」兩行寫法，**沒有 `response.AbortBadRequest` 這支 helper，不要自創第三支** | 全部 mutation | 散落各 handler ⇒ 漏一支就是一個無格式保護的寫入口 |
-| 中介層**只驗格式不做去重**；去重是 invoice-service 的 usecase 責任 | 全部 mutation | `idempotency_key` 淪為第二個死欄位（`product_import.proto:135-145` 的前例） |
+| 中介層**只驗格式不做去重**；去重是 invoice-service 的 usecase 責任 | 全部 mutation | `idempotency_key` 淪為第二個死欄位 |
 
 **重放語意三態（必須寫死）**
 
@@ -5725,7 +5725,7 @@ Query：`actor_account_id`／`store_id`／`order_no`／`document_id`／`job_id`�
 
 | 項目 | 定版 |
 |---|---|
-| `idempotency_key` | 所有 mutation RPC 都帶，值由 Gateway 原樣透傳。**每一支都必須在 usecase 層真的用它去重**，否則就是第二個死欄位（`product_import.proto:135-145` 的 `idempotency_key` 已 `reserved`，註解說明 Gateway 照收照送卻沒人用） |
+| `idempotency_key` | 所有 mutation RPC 都帶，值由 Gateway 原樣透傳。**每一支都必須在 usecase 層真的用它去重**，否則就是第二個死欄位（Gateway 照收照送卻沒人用） |
 | 分頁 | 逐 message 手寫，**沒有共用 Pagination message**：Request `string page; string page_size;`，Response `repeated X records; string total; string page; string page_size;` |
 | gRPC port | **10041** |
 | HTTP port（`/metrics` + `/health`） | **10040**（Go 慣例 HTTP = gRPC − 1）。這是 `pkg/server.NewInternalHTTPServer` 的共用 router，只有 health/metrics/pprof，**不得加業務路由** |
@@ -8678,7 +8678,7 @@ f0401 開立成功（取得 invoice_number）
 | A2 | **授權判定必須在 invoice-service，且與 not-found 走同一行程式碼** | 「誰是這張發票的合法讀者」有三個答案且會隨 store incarnation 換手（44 號 §5.1）——那是 invoice 的業務知識。述詞形態同 §8.1.4(b) |
 | A3 | 回應必須帶 `Cache-Control: private, no-store`；`Content-Disposition` 依 `?disposition=` 給 `attachment`（預設）或 `inline` | 這條通道回的是 bytes 不是 JSON，Gateway 的 envelope 保護在此不適用；漏了 `Cache-Control` 就可能被瀏覽器或中間層快取住**別人的發票**。disposition 是顯示方式、與快取安全無關 |
 
-**bytes 從哪裡來**：invoice-service 不能碰儲存 SDK（《多媒體與圖片 URL 規範》：SDK 只准在 media-service／product-import-service）⇒ media 再提供一支內部專用取檔 RPC（本案第二支跨服務前置）：
+**bytes 從哪裡來**：invoice-service 不能碰儲存 SDK（《多媒體與圖片 URL 規範》：SDK 只准在 media-service）⇒ media 再提供一支內部專用取檔 RPC（本案第二支跨服務前置）：
 
 ```protobuf
 // api/proto/media/media.proto —— 新增第二支（內部專用）
@@ -11129,7 +11129,7 @@ echo "  hawkr-amego"
 
 **`podSelector` 的 label key 是 `app.kubernetes.io/name`，不是 `app`。** 寫成 `app: gateway` 不會有任何錯誤——NetworkPolicy 照樣 apply 成功，只是那條 `from` 匹配到零個 pod，效果等同沒寫。(d) 的症狀有第二個獨立成因（gateway 的 `INVOICE_SERVICE_FILE_PORT` 沒同步）⇒ 排查時兩邊都要看。
 
-**invoice-service 不需要新增任何 egress policy**：全 repo 只有兩個 Egress policy（media-service 與 product-import，兩者都是 SSRF 縱深防禦），其餘服務只有 Ingress policy、egress 預設全開。要加的不是 caller 的 egress，是**被呼叫方（order／seller／buyer／media／shipping）的 ingress 白名單**（＝ §12.2.2 第 18 列）。兩者搞混的後果是「照設計書做完，peer 呼叫還是全部被擋」。
+**invoice-service 不需要新增任何 egress policy**：全 repo 只有一個 Egress policy（media-service，SSRF 縱深防禦），其餘服務只有 Ingress policy、egress 預設全開。要加的不是 caller 的 egress，是**被呼叫方（order／seller／buyer／media／shipping）的 ingress 白名單**（＝ §12.2.2 第 18 列）。兩者搞混的後果是「照設計書做完，peer 呼叫還是全部被擋」。
 
 #### 12.2.5 契約層（proto／gateway／CodeMeta／MQ／文件）
 

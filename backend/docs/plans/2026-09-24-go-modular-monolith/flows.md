@@ -25,7 +25,7 @@
 | D2 | 帳號刪除 cascade | seller/buyer→order(RPC 未結訂單)→account(RPC RemoveRole)→MQ fan-out（product,coupon,social,im,notification,crm,pricebook,media） | `seller_deleted_outbox` 兩段 checkpoint；`buyer_deleted_outbox`；`rolestate` OtherRoleState 協定；`account.deleted` 直發 best-effort；`apple_revoke_outbox` | **partly**（角色／帳號 yes；Apple／R2／FCM no） |
 | D3 | ADM 代行 | gateway→account(intent)→seller/product/social/order(寫)→account(confirm)→notification | 兩段 intent→寫入→confirm；`admin_operation_outbox` lease；`DelegationContext`＋`audit_log_id` 契約 | **yes**（大部分） |
 | D4 | 賣家停權 cascade | seller→(outbox)→product,coupon,order,notification,im | `product_suspension_snapshot`、`disabled_by_suspension`、order 取消未付款單 | **yes**（product/coupon；order partly） |
-| D5 | 商品匯入 commit | product-import→product→media(R2) | `idempotency_request`（24h）、`product_import_commit_attempt`、`media_callback_inbox`、GC jobs | **partly** |
+| D5 | 商品匯入 commit（已移除：Will 2026-11-15） | product-import→product→media(R2) | `idempotency_request`（24h）、`product_import_commit_attempt`、`media_callback_inbox`、GC jobs | **partly** |
 | D6 | 跨服務計數器 | order/buyer/review/seller→product/seller/ai/crm | MQ＋dedup 表（sales/favorite/seller_ranking_processed_events）、full-recompute、social counter.delta＋reconciler | **yes**（多數；hot row 例外） |
 | E1 | 媒體引用 | 12 個 owner 服務→media | `asset_reference` 靠 Link（commit 前）→業務寫入→ReleaseReferences（best-effort）順序契約 | **partly**（引用 yes；R2 刪除 no） |
 | E2 | gateway 協調的複本寫入 | gateway→order／seller | `SnapshotPaymentInfo` 重寫、`RecordStoreVisit` goroutine | **yes** |
@@ -137,7 +137,7 @@
 - 缺口：outbox 無每賣家順序保證；restore 不檢查仍在停權或 `seller_deleted_at`、coupon 旗標未綁 suspension_id → 遲到的 unsuspended 可能在新停權／刪除後復活商品與券。
 - 單一 tx：product／coupon **yes**（公開可見性改 join `sellers.status`，可刪 `product_suspension_snapshot`、`disabled_by_suspension`、`product.seller_deleted_at` 與兩組 consumer）；order 取消 **partly**（付款 SoT gate，保留同庫 job）。
 
-### D5 商品匯入 commit
+### D5 商品匯入 commit（已移除：Will 2026-11-15 範圍裁切，整個商品匯入刪除）
 - product-import `CommitJobService.commitJob:43` → MQ commit → `CommitItemService.commitOne:99` → product `ValidateProductDraft`＋`CreateProductFromImportInternal` → product `@Transactional` 內逐圖同步 RPC media `FinalizeImportAsset`（R2 tmp→public 並刪 tmp）＋`LinkImages` → 回 PI `applySuccessBody:232` → `job.commit_finished`。冪等：`import:{itemId}:rev:{rev}` → product `idempotency_request`（24h 清）；`product_import_commit_attempt` UNIQUE、無 fencing；`product(import_job_id, import_item_id)` 只有非唯一索引（`B/services/java/product-service/src/main/resources/db/migration/V4__add_product_import_origin_columns.sql:5-7`，已抽驗）；下載回呼 `media_callback_inbox`。
 - 缺口：Link 後 product rollback → 幽靈 `asset_reference`＋R2 外洩；Finalize 刪 tmp 後 DB 失敗 → import_asset 卡 UPLOADED；revision 變更或 >24h 重試 → 重複商品；DLQ 後 item 永停 COMMITTING；commitJob 在 commit 前 publish。
 - 單一 tx：**partly**。可移除 `idempotency_request`（改 `UNIQUE(import_item_id)`＋item CAS）、callback inbox、commit_attempt 大部分、`cleanStaleReferences`、gc.expire_job MQ；保留 R2 copy/delete、孤兒 GC、外部 URL 下載 timeout。
@@ -149,7 +149,7 @@
 ## E. 其他跨服務一致性點（主 agent 讀碼）
 
 ### E1 媒體引用 `asset_reference`
-- 12 個 owner 服務（product、seller、buyer、social、content、im、invoice、review、order、shipping、ai、product-import）以 media gRPC `FinalizeImages`→`LinkImages`（commit 前、失敗須致命）→ 業務寫入 → `ReleaseReferences`（best-effort、只送一次）維持「有引用集合 ⊇ 業務列指向集合」不變式（`backend/docs/詳細設計書/08-多媒體微服務（Media Service）詳細設計書.md` §4.6.2）。失敗一律倒向洩漏；殘留引用與資產互相保護，GC 永遠清不到，只能維運 SQL（`scripts/audit_media_reference_precheck.py`）。
+- 12 個 owner 服務（product、seller、buyer、social、content、im、invoice、review、order、shipping、ai；product-import 已於 2026-11-15 移除）以 media gRPC `FinalizeImages`→`LinkImages`（commit 前、失敗須致命）→ 業務寫入 → `ReleaseReferences`（best-effort、只送一次）維持「有引用集合 ⊇ 業務列指向集合」不變式（`backend/docs/詳細設計書/08-多媒體微服務（Media Service）詳細設計書.md` §4.6.2）。失敗一律倒向洩漏；殘留引用與資產互相保護，GC 永遠清不到，只能維運 SQL（`scripts/audit_media_reference_precheck.py`）。
 - 單一 tx：**partly**。Link／Release 與業務寫入同 tx（`asset_reference` 可加 FK 甚至改由 owner 表反查），洩漏類缺口消失；R2 物件刪除與孤兒 GC 仍非同步。
 
 ### E2 gateway 協調的複本寫入

@@ -78,8 +78,8 @@ invoice.resolved_externally,hawkr.invoice,invoice-service,notification-service,n
 invoice.seller_tax_profile.status_changed,hawkr.invoice,invoice-service,notification-service,notification.invoice,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
 invoice.voided,hawkr.invoice,invoice-service,notification-service,notification.invoice,push+inbox notification (buyer:visible),yes,SIDE_EFFECT,
 coupon.expiring,hawkr.marketing,coupon-service,notification-service,notification.marketing,push+inbox notification (buyer:visible),yes,SIDE_EFFECT,
-import.asset.download.internal,hawkr.media,media-service,media-service,media.import.asset.download.internal,internal asset download worker,yes,STATE,
-import.asset.downloaded,hawkr.media,media-service,product-import-service,product.import.media.callback,media download result callback,yes,STATE,
+import.asset.download.internal,hawkr.media,media-service,media-service,media.import.asset.download.internal,internal asset download worker,yes,STATE,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+import.asset.downloaded,hawkr.media,media-service,product-import-service,product.import.media.callback,media download result callback,yes,STATE,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 merchant.verification.approved,hawkr.merchant,seller-service,notification-service,notification.merchant,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
 merchant.verification.forwarded,hawkr.merchant,seller-service,notification-service,notification.merchant,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
 merchant.verification.pending_info,hawkr.merchant,seller-service,notification-service,notification.merchant,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
@@ -109,11 +109,11 @@ product.certification.revoked,hawkr.product,product-service,notification-service
 product.certification.verify.requested,hawkr.product,product-service,product-service,product.certification.verify,background certification verification,yes,STATE,
 product.restock,hawkr.product,product-service,buyer-service,buyer.product.restock,fan-out restock subscribers -> product.restock.target,yes,SIDE_EFFECT,job: 單體的 legacy consumer（queue hawkr.monolith.buyer.product.restock，取代 buyer.product.restock）以 event_id 為 River 唯一 job，分批送出 product.restock.target；catalog 搬進單體時改成模組事件
 product.restock.target,hawkr.product,buyer-service,notification-service,notification.product,push+inbox notification (buyer:visible),yes,SIDE_EFFECT,
-asset.download,hawkr.product.import,product-import-service,product-import-service,product.import.asset.download,import job pipeline step,yes,STATE,
-commit,hawkr.product.import,product-import-service,product-import-service,product.import.commit,import job pipeline step,yes,STATE,
-csv.parse,hawkr.product.import,product-import-service,product-import-service,product.import.csv.parse,import job pipeline step,yes,STATE,
-gc.expire_job,hawkr.product.import,product-import-service,media-service,media.product.import.gc.expire_job,GC media of expired import job,yes,STATE,
-html.fetch,hawkr.product.import,product-import-service,product-import-service,product.import.html.fetch,import job pipeline step,yes,STATE,
+asset.download,hawkr.product.import,product-import-service,product-import-service,product.import.asset.download,import job pipeline step,yes,STATE,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+commit,hawkr.product.import,product-import-service,product-import-service,product.import.commit,import job pipeline step,yes,STATE,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+csv.parse,hawkr.product.import,product-import-service,product-import-service,product.import.csv.parse,import job pipeline step,yes,STATE,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+gc.expire_job,hawkr.product.import,product-import-service,media-service,media.product.import.gc.expire_job,GC media of expired import job,yes,STATE,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+html.fetch,hawkr.product.import,product-import-service,product-import-service,product.import.html.fetch,import job pipeline step,yes,STATE,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 review.created,hawkr.review,review-service,notification-service,notification.review,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
 review.created,hawkr.review,review-service,order-service,order.review.created,mark order reviewed + review snapshot,yes,PROJECTION,
 review.created,hawkr.review,review-service,product-service,product.review.stats,overwrite product rating/review_count,yes,PROJECTION,
@@ -183,8 +183,8 @@ seller.governance.notify.temporary_takedown_self_check,hawkr.governance,seller-s
 seller.governance.violation_created,hawkr.governance,seller-service,notification-service,,seller governance notice (doc); exchange not provisioned,producer-only,SIDE_EFFECT,
 seller.governance.violation_revoked,hawkr.governance,seller-service,notification-service,,seller governance notice (doc); exchange not provisioned,producer-only,SIDE_EFFECT,
 order.delivered,hawkr.order,order-service,notification-service,notification.order,delivered-notification push claimed in doc §3.7; no template => dropped,producer-only,SIDE_EFFECT,
-job.commit_finished,hawkr.product.import,product-import-service,notification-service,,import finished push (doc); no binding/queue => unroutable,producer-only,SIDE_EFFECT,
-job.parsed,hawkr.product.import,product-import-service,notification-service,,import parsed push (doc); no binding/queue => unroutable,producer-only,SIDE_EFFECT,
+job.commit_finished,hawkr.product.import,product-import-service,notification-service,,import finished push (doc); no binding/queue => unroutable,producer-only,SIDE_EFFECT,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
+job.parsed,hawkr.product.import,product-import-service,notification-service,,import parsed push (doc); no binding/queue => unroutable,producer-only,SIDE_EFFECT,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 fulfillment.responsibility.unresolved,hawkr.shipping,payment-service,notification-service,notification.shipping,ops/seller alert claimed in doc; no template => dropped,producer-only,SIDE_EFFECT,
 payment.membership.buyer.failed,payment.events,payment-service,buyer-service,buyer.membership.payment.result,"apply membership charge result (buyer); consumer inferred from queue name, not implemented",producer-only,STATE,
 payment.membership.buyer.success,payment.events,payment-service,buyer-service,buyer.membership.payment.result,"apply membership charge result (buyer); consumer inferred from queue name, not implemented",producer-only,STATE,

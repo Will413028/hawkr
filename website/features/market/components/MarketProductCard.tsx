@@ -27,7 +27,7 @@ interface Props {
 	listContext?: { listId: string; listName: string };
 	index?: number;
 	/**
-	 * 預覽模式（賣家匯入精靈 Page 4 用）：layout 與真實列表完全一致，但鎖掉所有互動
+	 * 預覽模式：layout 與真實列表完全一致，但鎖掉所有互動
 	 * — FavoriteButton / 數量步進器 / AddToCartButton / RestockNotifyButton 全部不能按；
 	 * 改用「預覽」chip 取代右上角愛心位置。
 	 * 點圖片 / 標題仍會走 `product.href`（由父層設成預覽詳情頁路徑）。

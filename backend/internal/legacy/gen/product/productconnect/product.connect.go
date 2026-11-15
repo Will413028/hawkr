@@ -149,21 +149,6 @@ const (
 	// ProductServiceListStoreIDsWithPublicProductsInternalProcedure is the fully-qualified name of the
 	// ProductService's ListStoreIDsWithPublicProductsInternal RPC.
 	ProductServiceListStoreIDsWithPublicProductsInternalProcedure = "/hawkr.product.ProductService/ListStoreIDsWithPublicProductsInternal"
-	// ProductServiceValidateLeafCategoryInternalProcedure is the fully-qualified name of the
-	// ProductService's ValidateLeafCategoryInternal RPC.
-	ProductServiceValidateLeafCategoryInternalProcedure = "/hawkr.product.ProductService/ValidateLeafCategoryInternal"
-	// ProductServiceCreateProductFromImportInternalProcedure is the fully-qualified name of the
-	// ProductService's CreateProductFromImportInternal RPC.
-	ProductServiceCreateProductFromImportInternalProcedure = "/hawkr.product.ProductService/CreateProductFromImportInternal"
-	// ProductServiceBatchCheckSellerProductNamesProcedure is the fully-qualified name of the
-	// ProductService's BatchCheckSellerProductNames RPC.
-	ProductServiceBatchCheckSellerProductNamesProcedure = "/hawkr.product.ProductService/BatchCheckSellerProductNames"
-	// ProductServiceValidateProductDraftProcedure is the fully-qualified name of the ProductService's
-	// ValidateProductDraft RPC.
-	ProductServiceValidateProductDraftProcedure = "/hawkr.product.ProductService/ValidateProductDraft"
-	// ProductServiceGetProductsBriefInternalProcedure is the fully-qualified name of the
-	// ProductService's GetProductsBriefInternal RPC.
-	ProductServiceGetProductsBriefInternalProcedure = "/hawkr.product.ProductService/GetProductsBriefInternal"
 )
 
 // ProductServiceClient is a client for the hawkr.product.ProductService service.
@@ -256,26 +241,6 @@ type ProductServiceClient interface {
 	// 內部 RPC（seller 模組推薦賣家 / marketplace rail 用來濾掉空店），不對前端暴露。
 	// 詳見 02 §5.13c
 	ListStoreIDsWithPublicProductsInternal(context.Context, *connect.Request[product.ListStoreIDsWithPublicProductsInternalRequest]) (*connect.Response[product.ListStoreIDsWithPublicProductsInternalResponse], error)
-	// 驗證 category_id 為合法葉節點，回傳 cat_l1/l2 反正規化欄位
-	// 內部 RPC（x-internal-service 免身份驗證），不對前端暴露
-	// 詳見 02 §9.1
-	ValidateLeafCategoryInternal(context.Context, *connect.Request[product.ValidateLeafCategoryInternalRequest]) (*connect.Response[product.ValidateLeafCategoryInternalResponse], error)
-	// 由 Product Import Service 在 commit 階段呼叫，將暫存 import_item 轉正為 product + product_sku
-	// 內部 RPC，與 CreateProduct 分離以維持權限邊界與審計線索清晰
-	// 詳見 02 §9.2
-	CreateProductFromImportInternal(context.Context, *connect.Request[product.CreateProductFromImportInternalRequest]) (*connect.Response[product.CreateProductFromImportInternalResponse], error)
-	// 批次偵測商品名稱是否與賣家既有商品重複（CSV 解析 + UpdateImportItem 時呼叫）
-	// 內部 RPC
-	// 詳見 02 §9.5
-	BatchCheckSellerProductNames(context.Context, *connect.Request[product.BatchCheckSellerProductNamesRequest]) (*connect.Response[product.BatchCheckSellerProductNamesResponse], error)
-	// 商品上架完整檢核（雙時機點 validator）；csv 路徑不能繞過任何上架規則
-	// 內部 RPC；由 ProductPublishValidator 執行
-	// 詳見 40 號設計書 §4.3a
-	ValidateProductDraft(context.Context, *connect.Request[product.ValidateProductDraftRequest]) (*connect.Response[product.ValidateProductDraftResponse], error)
-	// batch 查多個 product 的 (id, name, status, status_label) 用於 import 端 hydrate
-	// 內部 RPC
-	// 詳見 40 號設計書 §4.3b
-	GetProductsBriefInternal(context.Context, *connect.Request[product.GetProductsBriefInternalRequest]) (*connect.Response[product.GetProductsBriefInternalResponse], error)
 }
 
 // NewProductServiceClient constructs a client for the hawkr.product.ProductService service. By
@@ -523,36 +488,6 @@ func NewProductServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(productServiceMethods.ByName("ListStoreIDsWithPublicProductsInternal")),
 			connect.WithClientOptions(opts...),
 		),
-		validateLeafCategoryInternal: connect.NewClient[product.ValidateLeafCategoryInternalRequest, product.ValidateLeafCategoryInternalResponse](
-			httpClient,
-			baseURL+ProductServiceValidateLeafCategoryInternalProcedure,
-			connect.WithSchema(productServiceMethods.ByName("ValidateLeafCategoryInternal")),
-			connect.WithClientOptions(opts...),
-		),
-		createProductFromImportInternal: connect.NewClient[product.CreateProductFromImportInternalRequest, product.CreateProductFromImportInternalResponse](
-			httpClient,
-			baseURL+ProductServiceCreateProductFromImportInternalProcedure,
-			connect.WithSchema(productServiceMethods.ByName("CreateProductFromImportInternal")),
-			connect.WithClientOptions(opts...),
-		),
-		batchCheckSellerProductNames: connect.NewClient[product.BatchCheckSellerProductNamesRequest, product.BatchCheckSellerProductNamesResponse](
-			httpClient,
-			baseURL+ProductServiceBatchCheckSellerProductNamesProcedure,
-			connect.WithSchema(productServiceMethods.ByName("BatchCheckSellerProductNames")),
-			connect.WithClientOptions(opts...),
-		),
-		validateProductDraft: connect.NewClient[product.ValidateProductDraftRequest, product.ValidateProductDraftResponse](
-			httpClient,
-			baseURL+ProductServiceValidateProductDraftProcedure,
-			connect.WithSchema(productServiceMethods.ByName("ValidateProductDraft")),
-			connect.WithClientOptions(opts...),
-		),
-		getProductsBriefInternal: connect.NewClient[product.GetProductsBriefInternalRequest, product.GetProductsBriefInternalResponse](
-			httpClient,
-			baseURL+ProductServiceGetProductsBriefInternalProcedure,
-			connect.WithSchema(productServiceMethods.ByName("GetProductsBriefInternal")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
@@ -597,11 +532,6 @@ type productServiceClient struct {
 	getPublicOriginsSummary                      *connect.Client[product.GetPublicOriginsSummaryRequest, product.GetPublicOriginsSummaryResponse]
 	getPublicSellerCitiesSummary                 *connect.Client[product.GetPublicSellerCitiesSummaryRequest, product.GetPublicSellerCitiesSummaryResponse]
 	listStoreIDsWithPublicProductsInternal       *connect.Client[product.ListStoreIDsWithPublicProductsInternalRequest, product.ListStoreIDsWithPublicProductsInternalResponse]
-	validateLeafCategoryInternal                 *connect.Client[product.ValidateLeafCategoryInternalRequest, product.ValidateLeafCategoryInternalResponse]
-	createProductFromImportInternal              *connect.Client[product.CreateProductFromImportInternalRequest, product.CreateProductFromImportInternalResponse]
-	batchCheckSellerProductNames                 *connect.Client[product.BatchCheckSellerProductNamesRequest, product.BatchCheckSellerProductNamesResponse]
-	validateProductDraft                         *connect.Client[product.ValidateProductDraftRequest, product.ValidateProductDraftResponse]
-	getProductsBriefInternal                     *connect.Client[product.GetProductsBriefInternalRequest, product.GetProductsBriefInternalResponse]
 }
 
 // CreateProduct calls hawkr.product.ProductService.CreateProduct.
@@ -810,32 +740,6 @@ func (c *productServiceClient) ListStoreIDsWithPublicProductsInternal(ctx contex
 	return c.listStoreIDsWithPublicProductsInternal.CallUnary(ctx, req)
 }
 
-// ValidateLeafCategoryInternal calls hawkr.product.ProductService.ValidateLeafCategoryInternal.
-func (c *productServiceClient) ValidateLeafCategoryInternal(ctx context.Context, req *connect.Request[product.ValidateLeafCategoryInternalRequest]) (*connect.Response[product.ValidateLeafCategoryInternalResponse], error) {
-	return c.validateLeafCategoryInternal.CallUnary(ctx, req)
-}
-
-// CreateProductFromImportInternal calls
-// hawkr.product.ProductService.CreateProductFromImportInternal.
-func (c *productServiceClient) CreateProductFromImportInternal(ctx context.Context, req *connect.Request[product.CreateProductFromImportInternalRequest]) (*connect.Response[product.CreateProductFromImportInternalResponse], error) {
-	return c.createProductFromImportInternal.CallUnary(ctx, req)
-}
-
-// BatchCheckSellerProductNames calls hawkr.product.ProductService.BatchCheckSellerProductNames.
-func (c *productServiceClient) BatchCheckSellerProductNames(ctx context.Context, req *connect.Request[product.BatchCheckSellerProductNamesRequest]) (*connect.Response[product.BatchCheckSellerProductNamesResponse], error) {
-	return c.batchCheckSellerProductNames.CallUnary(ctx, req)
-}
-
-// ValidateProductDraft calls hawkr.product.ProductService.ValidateProductDraft.
-func (c *productServiceClient) ValidateProductDraft(ctx context.Context, req *connect.Request[product.ValidateProductDraftRequest]) (*connect.Response[product.ValidateProductDraftResponse], error) {
-	return c.validateProductDraft.CallUnary(ctx, req)
-}
-
-// GetProductsBriefInternal calls hawkr.product.ProductService.GetProductsBriefInternal.
-func (c *productServiceClient) GetProductsBriefInternal(ctx context.Context, req *connect.Request[product.GetProductsBriefInternalRequest]) (*connect.Response[product.GetProductsBriefInternalResponse], error) {
-	return c.getProductsBriefInternal.CallUnary(ctx, req)
-}
-
 // ProductServiceHandler is an implementation of the hawkr.product.ProductService service.
 type ProductServiceHandler interface {
 	// 建立商品
@@ -926,26 +830,6 @@ type ProductServiceHandler interface {
 	// 內部 RPC（seller 模組推薦賣家 / marketplace rail 用來濾掉空店），不對前端暴露。
 	// 詳見 02 §5.13c
 	ListStoreIDsWithPublicProductsInternal(context.Context, *connect.Request[product.ListStoreIDsWithPublicProductsInternalRequest]) (*connect.Response[product.ListStoreIDsWithPublicProductsInternalResponse], error)
-	// 驗證 category_id 為合法葉節點，回傳 cat_l1/l2 反正規化欄位
-	// 內部 RPC（x-internal-service 免身份驗證），不對前端暴露
-	// 詳見 02 §9.1
-	ValidateLeafCategoryInternal(context.Context, *connect.Request[product.ValidateLeafCategoryInternalRequest]) (*connect.Response[product.ValidateLeafCategoryInternalResponse], error)
-	// 由 Product Import Service 在 commit 階段呼叫，將暫存 import_item 轉正為 product + product_sku
-	// 內部 RPC，與 CreateProduct 分離以維持權限邊界與審計線索清晰
-	// 詳見 02 §9.2
-	CreateProductFromImportInternal(context.Context, *connect.Request[product.CreateProductFromImportInternalRequest]) (*connect.Response[product.CreateProductFromImportInternalResponse], error)
-	// 批次偵測商品名稱是否與賣家既有商品重複（CSV 解析 + UpdateImportItem 時呼叫）
-	// 內部 RPC
-	// 詳見 02 §9.5
-	BatchCheckSellerProductNames(context.Context, *connect.Request[product.BatchCheckSellerProductNamesRequest]) (*connect.Response[product.BatchCheckSellerProductNamesResponse], error)
-	// 商品上架完整檢核（雙時機點 validator）；csv 路徑不能繞過任何上架規則
-	// 內部 RPC；由 ProductPublishValidator 執行
-	// 詳見 40 號設計書 §4.3a
-	ValidateProductDraft(context.Context, *connect.Request[product.ValidateProductDraftRequest]) (*connect.Response[product.ValidateProductDraftResponse], error)
-	// batch 查多個 product 的 (id, name, status, status_label) 用於 import 端 hydrate
-	// 內部 RPC
-	// 詳見 40 號設計書 §4.3b
-	GetProductsBriefInternal(context.Context, *connect.Request[product.GetProductsBriefInternalRequest]) (*connect.Response[product.GetProductsBriefInternalResponse], error)
 }
 
 // NewProductServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -1189,36 +1073,6 @@ func NewProductServiceHandler(svc ProductServiceHandler, opts ...connect.Handler
 		connect.WithSchema(productServiceMethods.ByName("ListStoreIDsWithPublicProductsInternal")),
 		connect.WithHandlerOptions(opts...),
 	)
-	productServiceValidateLeafCategoryInternalHandler := connect.NewUnaryHandler(
-		ProductServiceValidateLeafCategoryInternalProcedure,
-		svc.ValidateLeafCategoryInternal,
-		connect.WithSchema(productServiceMethods.ByName("ValidateLeafCategoryInternal")),
-		connect.WithHandlerOptions(opts...),
-	)
-	productServiceCreateProductFromImportInternalHandler := connect.NewUnaryHandler(
-		ProductServiceCreateProductFromImportInternalProcedure,
-		svc.CreateProductFromImportInternal,
-		connect.WithSchema(productServiceMethods.ByName("CreateProductFromImportInternal")),
-		connect.WithHandlerOptions(opts...),
-	)
-	productServiceBatchCheckSellerProductNamesHandler := connect.NewUnaryHandler(
-		ProductServiceBatchCheckSellerProductNamesProcedure,
-		svc.BatchCheckSellerProductNames,
-		connect.WithSchema(productServiceMethods.ByName("BatchCheckSellerProductNames")),
-		connect.WithHandlerOptions(opts...),
-	)
-	productServiceValidateProductDraftHandler := connect.NewUnaryHandler(
-		ProductServiceValidateProductDraftProcedure,
-		svc.ValidateProductDraft,
-		connect.WithSchema(productServiceMethods.ByName("ValidateProductDraft")),
-		connect.WithHandlerOptions(opts...),
-	)
-	productServiceGetProductsBriefInternalHandler := connect.NewUnaryHandler(
-		ProductServiceGetProductsBriefInternalProcedure,
-		svc.GetProductsBriefInternal,
-		connect.WithSchema(productServiceMethods.ByName("GetProductsBriefInternal")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/hawkr.product.ProductService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ProductServiceCreateProductProcedure:
@@ -1299,16 +1153,6 @@ func NewProductServiceHandler(svc ProductServiceHandler, opts ...connect.Handler
 			productServiceGetPublicSellerCitiesSummaryHandler.ServeHTTP(w, r)
 		case ProductServiceListStoreIDsWithPublicProductsInternalProcedure:
 			productServiceListStoreIDsWithPublicProductsInternalHandler.ServeHTTP(w, r)
-		case ProductServiceValidateLeafCategoryInternalProcedure:
-			productServiceValidateLeafCategoryInternalHandler.ServeHTTP(w, r)
-		case ProductServiceCreateProductFromImportInternalProcedure:
-			productServiceCreateProductFromImportInternalHandler.ServeHTTP(w, r)
-		case ProductServiceBatchCheckSellerProductNamesProcedure:
-			productServiceBatchCheckSellerProductNamesHandler.ServeHTTP(w, r)
-		case ProductServiceValidateProductDraftProcedure:
-			productServiceValidateProductDraftHandler.ServeHTTP(w, r)
-		case ProductServiceGetProductsBriefInternalProcedure:
-			productServiceGetProductsBriefInternalHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1472,24 +1316,4 @@ func (UnimplementedProductServiceHandler) GetPublicSellerCitiesSummary(context.C
 
 func (UnimplementedProductServiceHandler) ListStoreIDsWithPublicProductsInternal(context.Context, *connect.Request[product.ListStoreIDsWithPublicProductsInternalRequest]) (*connect.Response[product.ListStoreIDsWithPublicProductsInternalResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.product.ProductService.ListStoreIDsWithPublicProductsInternal is not implemented"))
-}
-
-func (UnimplementedProductServiceHandler) ValidateLeafCategoryInternal(context.Context, *connect.Request[product.ValidateLeafCategoryInternalRequest]) (*connect.Response[product.ValidateLeafCategoryInternalResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.product.ProductService.ValidateLeafCategoryInternal is not implemented"))
-}
-
-func (UnimplementedProductServiceHandler) CreateProductFromImportInternal(context.Context, *connect.Request[product.CreateProductFromImportInternalRequest]) (*connect.Response[product.CreateProductFromImportInternalResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.product.ProductService.CreateProductFromImportInternal is not implemented"))
-}
-
-func (UnimplementedProductServiceHandler) BatchCheckSellerProductNames(context.Context, *connect.Request[product.BatchCheckSellerProductNamesRequest]) (*connect.Response[product.BatchCheckSellerProductNamesResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.product.ProductService.BatchCheckSellerProductNames is not implemented"))
-}
-
-func (UnimplementedProductServiceHandler) ValidateProductDraft(context.Context, *connect.Request[product.ValidateProductDraftRequest]) (*connect.Response[product.ValidateProductDraftResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.product.ProductService.ValidateProductDraft is not implemented"))
-}
-
-func (UnimplementedProductServiceHandler) GetProductsBriefInternal(context.Context, *connect.Request[product.GetProductsBriefInternalRequest]) (*connect.Response[product.GetProductsBriefInternalResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.product.ProductService.GetProductsBriefInternal is not implemented"))
 }

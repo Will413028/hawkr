@@ -176,7 +176,6 @@ flowchart LR
 | 11 | 三個 repo 的 UI 實作細節（版面像素、動畫、狀態管理選型） | 本書只列同波修改清單與後端必須滿足的義務。⚠️ **「前端已上 dev」不是本列的理由**——改動成本要看那份實作有多少行、有沒有消費者、鎖住的是契約還是佔位（[ADR：規則權威歸屬的判定程序](/docs/adr/2026-09-18-adm-delegation-authority-test.md)） | `hawkr-admin`／`hawkr-website` |
 | 12 | admin 其他既有路由的 capability 收斂 | 本期只有代行路由宣告 admin capability；機制對全部 admin 路由開放但不強制 | 另案 |
 | 13 | 代行工作區的「店面外觀預覽／商品預覽／動態預覽」（買家視角） | 屬**前端權威**（畫面上渲染什麼）：**以本書各代行 GET 端點回傳的 DTO 自繪，不新增預覽端點、且不得改打 `/api/v1/public/*`**。⚠️ 改打公開 API 是最省事、也最錯的做法——草稿與未發布內容在 public 路徑上**根本查不到**（§5.1.5 的 `publish_status = 4402` 過濾），預覽會**靜默空白**而不是報錯。**產品需求的商店預覽視窗畫的正是這個形狀**——視窗上緣的網址列寫著 `example.com/sellers/s9001`（＝嵌入公開店面頁），照它做即命中本列禁令。若既有 DTO 不足以渲染買家視角，那是 §6.1.7／§6.1.8／§6.1.9 的**欄位補充（契約變更）**，走本書流程。<br/>**工作區在 `hawkr-website`，這一列的禁令因此更容易違反、也更容易守。**「更容易違反」是因為那個 repo 裡本來就有買家視角的元件與 `app/(public)` 的店面頁，順手 import 一個就等於改打公開資料源；「更容易守」是因為 `authedFetch` 在代行執行期會 throw（§4.5），而公開頁走的是 `apiClient.public` ⇒ **要再加一條**：`app/(delegated)/**` 之下同樣禁止 import `apiClient.public`，違反即 CI 紅。既有的 `features/seller-center/preview/**`（賣家自己的預覽）**不得**在代行工作區重用，理由同上——它讀的是公開路徑 | `hawkr-website` |
-| 14 | 代行使用**商品批次匯入**工具 | `gateway/internal/router/routes_product_import.go` 起的 `registerProductImportRoutes` 全部掛 `sellerHandle` ＋ `authz.CapProductManage` 且註冊在 `/app` group ＝ **賣家側工具**；代行 capability 是封閉九值、不含任何 import 能力，§6.1.1 端點總表也沒有任何 import 路徑。要做 ＝ 新增第 10 個 capability ＋ 新增代行端點，須同時動封閉九值、`seller_delegation_authorizations_capabilities_check`、跨 repo 白名單，並與 admin repo 白名單同波發布 —— **是另一張票，不是 TTL 題** | 另案 |
 | 15 | 訂單詳情的「💬 通知賣家」CTA | 訂單面**唯讀**，而 `notifySeller` 是**依附於一筆 mutation** 的旗標（§8.4 W5 只在 `result='SUCCEEDED'` 時才建 完成事件）—— 唯讀路徑沒有可依附的 mutation。做它等於為代行新增一條「主動對賣家發訊」的能力，那是**第 10 個 capability** 的形狀（同 #14 的同波成本）。本期不做；要主動提醒賣家走既有 IM 或治理管道 | admin repo／29 號 |
 
 ### 2.3 角色與身分模型
@@ -612,7 +611,7 @@ hawkr.common.DelegationContext delegation = 100;
 
 | 位置 |
 |---|
-| `services/java/product-service/src/main/java/io/github/will413028/hawkr/product/entity/ProductEntity.java`（加 `@Version private Long version;`，接在 `importItemId` 之後、內部類 `GalleryItem`之前。全 repo 只有 6 個 entity 有 `@Version`，`OptimisticLockerInnerInterceptor` 已在 `services/java/shared/common-core/.../config/MyBatisPlusAutoConfiguration.java` 全域註冊，**不需再配置**） |
+| `services/java/product-service/src/main/java/io/github/will413028/hawkr/product/entity/ProductEntity.java`（加 `@Version private Long version;`，接在 `storeId` 之後、內部類 `GalleryItem`之前。全 repo 只有 6 個 entity 有 `@Version`，`OptimisticLockerInnerInterceptor` 已在 `services/java/shared/common-core/.../config/MyBatisPlusAutoConfiguration.java` 全域註冊，**不需再配置**） |
 | `services/java/product-service/src/main/resources/db/migration/V16__add_product_version.sql`（V1 凍結、append-only、**禁跳號**；`ADD COLUMN version BIGINT NOT NULL DEFAULT 0` 對既有列填 0 即正確語意，不需要回填 UPDATE） |
 | `services/java/product-service/src/main/java/io/github/will413028/hawkr/product/grpc/ProductGrpcService.java`：`createProduct`、`updateProduct`、`updateSellerProductStatus`三處 `requireAccountType(AccountType.SELLER)` → `requireSellerOrDelegated(...)`。**`calculateShippingOptions`與 `verifyCertification`不放寬**——這兩支走 admin 既有讀取路徑即可，放寬會多出兩個沒有 capability 對應的入口；**`deleteProduct`不放寬**——刪除不在 9 個 capability 內；`*ForAdmin` 系列是 ADMIN 專用治理 RPC，**完全不動** |
 | `services/java/product-service/.../grpc/ProductGrpcService.java`：`getProduct`、`getProductList`兩支**讀取** RPC 接受 `DelegationContext`（代行的讀與寫一律走賣家既有 RPC，§4.1.2）。這兩支**現況沒有 `requireAccountType`**（同時服務公開頁與匿名呼叫），因此判定必須以 `delegation` 欄位是否非空做條件分支——**不得把整支 RPC 收斂成賣家專屬**，否則公開商品頁一起掛掉。<br/>⚠️ **`delegation` 非空的分支必須額外斷言 Q4 歸屬，這一步不能靠既有邏輯代勞**：`getProduct` 要斷言該商品的 `store_id` **等於 request 的 `owner_store_id`**，不符一律拋 **9275**（`DELEGATION_RESOURCE_NOT_OWNED`）；`getProductList` 在 `delegation` 非空時 `owner_store_id` **必填且非零**，為零即 **9260**。理由是現況 `ProductService.java` 的述詞是 `if (!isActive && !isOwner) throw` —— **ACTIVE 商品對任何 storeId 一律放行**，照現況接上代行等於 A 店 credential 讀得到 B 店所有上架商品，而成功讀取不落稽核（§7.1.2）⇒ **零痕跡、零告警**。**公開／匿名分支維持現狀不動**（那條路徑本來就該讓任何人讀得到 ACTIVE 商品） |
@@ -1108,7 +1107,7 @@ ALTER TABLE product_sku ADD CONSTRAINT chk_product_sku_version_nonneg CHECK (ver
 
 | # | 寫入路徑 | 機制 | 是否 bump `version` | 處置 |
 |---|---|---|---|---|
-| 1 | `ProductService.updateSkus`／`createProduct`／`ProductImportService.doCreate` 的 `productSkuRepository.insert` | `insert` | ✅ DB `DEFAULT 0` | 無需改動 |
+| 1 | `ProductService.updateSkus`／`createProduct` 的 `productSkuRepository.insert` | `insert` | ✅ DB `DEFAULT 0` | 無需改動 |
 | 2 | `ProductService.updateSkus` 的 `productSkuRepository.updateById` | `updateById` | ✅ 自動 | 賣家／代行 SKU 編輯的主路徑；`applySkuExpectedVersion` 把 client 的 `expectedVersion` 蓋進 entity 才送去 CAS——不覆蓋就是拿本交易剛讀到的版本比對自己，永遠命中，鎖是裝飾品 |
 | 3 | `ProductSkuRepository.deductStock` | `@Update` 自訂 SQL | ❌ → **已改為 bump** | 這是唯一一條「賣家看不見卻會改 `stock_qty`」的路徑，也就是本缺陷的成因 |
 | 4 | `ProductSkuRepository.restoreStock` | `@Update` 自訂 SQL | ❌ → **已改為 bump** | 訂單取消（`OrderCancelledConsumer`）同樣落在編輯窗口內；只改第 3 列而漏這一列，等於鎖只擋得住「賣掉」擋不住「取消退回」 |
@@ -1147,7 +1146,6 @@ Go 側 CAS 寫法固定為 `UPDATE ... SET <欄位...>, version = version + 1 WH
 | 4 | `ProductService.updateSellerProductStatus` | `updateById` | ✅ 自動 | 賣家／代行上下架 |
 | 5 | `ProductService.reflowSearchableForProductIds` | `updateById` | ✅ 自動 | — |
 | 6 | `ProductService.softDeleteProduct`（`deleteById`） | 邏輯刪除 | ❌ 不 bump | **可接受**：軟刪後該列退出所有代行讀寫路徑（查詢一律 `deleted_at IS NULL`），代行的下一次操作得到 404 而非靜默覆蓋 |
-| 7 | `ProductImportService.doCreate`（`ProductImportService.java` 的 `insert`／`updateById`） | `insert` / `updateById` | ✅ 自動 | — |
 | 8 | `batchUpdateCategoryHierarchy`（`ProductRepository.java`） | `@Update` 自訂 SQL | ❌ **不 bump** | **必須改**：SQL 加 `version = version + 1` |
 | 9 | `batchUpdateStatusByIds` | `@Update` 自訂 SQL | ❌ **不 bump** | **必須改**：同上。這條尤其重要——它是賣家停權／刪除的連動下架，與代行的上下架寫同一個欄位 |
 | 10 | `stampSellerDeletedByMerchant` | `@Update` 自訂 SQL | ❌ 不 bump | **可接受並標明**：只蓋 `seller_deleted_at`，且蓋完該賣家已進入刪除流程、不會再有代行 session |

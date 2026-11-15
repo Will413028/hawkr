@@ -3618,8 +3618,6 @@ rpc ValidateProductShipping(ValidateProductShippingRequest) returns (ValidatePro
 
 **訊息規則**：`rejection_message` 一律使用 `ShippingMethod.label()` 與 `ShippingTemperature.label()` 中文 label，禁止露出 enum code / value（如 `SEVEN_ELEVEN_STORE_PICKUP`、`3203`）。caller 可直接顯示給使用者。
 
-> **跨服務契約**：Product Service 的 `ProductPublishValidator.validateShippingEnabled` 走 fallback，把 `METHOD_NOT_AVAILABLE`／`METHOD_NOT_ONBOARDED`／`TEMPERATURE_NOT_ONBOARDED` 三個值統一歸入 `SHIPPING_NOT_ENABLED` violation type。
-
 > 🔴 **`OnboardingService.listSellerShippingMethods` 對每一個 slot（不分 `onboardingRequired`）都必須先檢查 `hasAnyEnabledConfig(method)`**，系統層級無 config → `available=false`。少了這道，會出現「系統未啟用該 method、賣家卻看到可勾」的漏洞。
 > 3003 另需賣家層 `uber_store_mapping`／`uber_organization` 判定，見 §5.13。
 

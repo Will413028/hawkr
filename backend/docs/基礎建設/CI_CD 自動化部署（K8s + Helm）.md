@@ -160,7 +160,7 @@ Go 服務的 Dockerfile 是多 stage：builder 階段 `FROM ghcr.io/<org>/<repo>
 ```bash
 # -pl 由 changed_services 中的 Java 服務動態組成，例如：
 (cd services/java && ./mvnw install \
-  -pl :payment-service,:order-service,:product-import-service \
+  -pl :payment-service,:order-service,:product-service \
   -am -fae -T 1C -B -Dmaven.test.skip=true)
 ```
 
@@ -177,7 +177,7 @@ DAG 排程示意（4 core runner）：
 t=0   common-core / java-proto / observability / payuni-client  ← 4 shared 平行（4 thread）
 t=15  payment / order / cart / shipping                          ← 服務 batch 1
 t=60  coupon / aftersales / product / media                      ← 服務 batch 2
-t=105 payuni-webhook / product-import                            ← 收尾
+t=105 payuni-webhook                                            ← 收尾
 ```
 
 完成後過濾出 `services/java/*/target/*.jar` 存在的服務為 `java_succeeded`。任一服務沒產出 jar，`Java build status gate` step 會讓 `test-and-build` 轉紅，deploy 的 needs gate 因此擋下——避免「部分編譯失敗」時成功的那幾個被半推半就部署出去。
@@ -449,7 +449,7 @@ kubectl rollout status deployment/<service> -n hawkr
         <module>shared/observability-common</module>
         <module>shared/payuni-java-client</module>
 
-        <!-- microservices（10 個） -->
+        <!-- microservices（9 個） -->
         <module>payment-service</module>
         <module>media-service</module>
         <module>product-service</module>
@@ -459,7 +459,6 @@ kubectl rollout status deployment/<service> -n hawkr
         <module>shipping-service</module>
         <module>aftersales-service</module>
         <module>payuni-webhook-service</module>
-        <module>product-import-service</module>
     </modules>
 </project>
 ```

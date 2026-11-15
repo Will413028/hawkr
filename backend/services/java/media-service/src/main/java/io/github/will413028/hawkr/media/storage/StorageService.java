@@ -20,11 +20,7 @@ public interface StorageService {
     /**
      * 生成轉正後的最終 object key（{visibility}/{category}/{ownerId}/{date}/{uuid}{ext}）。
      *
-     * <p>{@code ownerId} 刻意是**軸中立**的：一般上傳路徑
-     * （{@code MediaAssetService.finalizeSingleImage}）傳的是真登入 account_id，
-     * CSV/URL 匯入轉正路徑（{@code ImportAssetService.prepareFinalize}）傳的是賣家
-     * store_id。此值只作路徑分桶字串，不參與任何身份判斷，故不綁定單一 id 軸；
-     * 但也因此**不可以**叫 accountId——那會讓一半的呼叫端與名字不符。</p>
+     * <p>{@code ownerId} 只作路徑分桶字串，不參與任何身份判斷，故不綁定單一 id 軸。</p>
      */
     String generateFinalObjectKey(String originalKey, boolean isSecure, String refType, Long ownerId);
 

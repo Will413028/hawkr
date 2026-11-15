@@ -20,7 +20,6 @@ var Dependencies = map[string][]string{
 	"content":           {"media"},
 	"fulfillment":       {"buyer", "seller", "media"},
 	"catalog":           {"seller", "buyer", "media", "fulfillment"},
-	"productimport":     {"catalog", "media", "fulfillment"},
 	"invoice":           {"payment", "fulfillment", "buyer", "seller", "media"},
 	"cart":              {"catalog", "buyer", "seller"},
 	"coupon":            {"identity", "buyer", "seller"},

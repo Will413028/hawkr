@@ -55,6 +55,23 @@ final $typed_data.Uint8List commentStateDescriptor = $convert.base64Decode(
     'RfU1RBVEVfVklTSUJMRRABEhkKFUNPTU1FTlRfU1RBVEVfREVMRVRFRBACEhgKFENPTU1FTlRf'
     'U1RBVEVfSElEREVOEAM=');
 
+@$core.Deprecated('Use postStatusDescriptor instead')
+const PostStatus$json = {
+  '1': 'PostStatus',
+  '2': [
+    {'1': 'POST_STATUS_UNSPECIFIED', '2': 0},
+    {'1': 'POST_STATUS_DRAFT', '2': 1},
+    {'1': 'POST_STATUS_PUBLISHED', '2': 2},
+    {'1': 'POST_STATUS_UNPUBLISHED', '2': 3},
+  ],
+};
+
+/// Descriptor for `PostStatus`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List postStatusDescriptor = $convert.base64Decode(
+    'CgpQb3N0U3RhdHVzEhsKF1BPU1RfU1RBVFVTX1VOU1BFQ0lGSUVEEAASFQoRUE9TVF9TVEFUVV'
+    'NfRFJBRlQQARIZChVQT1NUX1NUQVRVU19QVUJMSVNIRUQQAhIbChdQT1NUX1NUQVRVU19VTlBV'
+    'QkxJU0hFRBAD');
+
 @$core.Deprecated('Use hashtagDescriptor instead')
 const Hashtag$json = {
   '1': 'Hashtag',
@@ -90,6 +107,7 @@ const Post$json = {
       '4': 1,
       '5': 11,
       '6': '.hawkr.common.v1alpha1.Image',
+      '8': {},
       '10': 'image'
     },
     {
@@ -148,6 +166,41 @@ const Post$json = {
       '8': {},
       '10': 'viewerCanComment'
     },
+    {
+      '1': 'status',
+      '3': 15,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.social.v1alpha1.PostStatus',
+      '8': {},
+      '10': 'status'
+    },
+    {'1': 'etag', '3': 16, '4': 1, '5': 9, '10': 'etag'},
+    {
+      '1': 'create_time',
+      '3': 17,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'createTime'
+    },
+    {
+      '1': 'image_staged_token',
+      '3': 18,
+      '4': 1,
+      '5': 9,
+      '8': {},
+      '10': 'imageStagedToken'
+    },
+    {
+      '1': 'hashtag_inputs',
+      '3': 19,
+      '4': 3,
+      '5': 9,
+      '8': {},
+      '10': 'hashtagInputs'
+    },
   ],
   '8': [
     {'1': '_product_id'},
@@ -157,17 +210,21 @@ const Post$json = {
 /// Descriptor for `Post`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List postDescriptor = $convert.base64Decode(
     'CgRQb3N0EhMKAmlkGAEgASgJQgPgQQhSAmlkEjsKBXN0b3JlGAIgASgLMiAuaGF3a3IuY29tbW'
-    '9uLnYxYWxwaGExLlN0b3JlQ2FyZEID4EEDUgVzdG9yZRISCgRib2R5GAMgASgJUgRib2R5EjIK'
-    'BWltYWdlGAQgASgLMhwuaGF3a3IuY29tbW9uLnYxYWxwaGExLkltYWdlUgVpbWFnZRIiCgpwcm'
-    '9kdWN0X2lkGAUgASgJSABSCXByb2R1Y3RJZIgBARI/CghoYXNodGFncxgGIAMoCzIeLmhhd2ty'
-    'LnNvY2lhbC52MWFscGhhMS5IYXNodGFnQgPgQQNSCGhhc2h0YWdzEkIKDHB1Ymxpc2hfdGltZR'
-    'gHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA1ILcHVibGlzaFRpbWUSQAoL'
-    'dXBkYXRlX3RpbWUYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCnVwZG'
-    'F0ZVRpbWUSIgoKbGlrZV9jb3VudBgJIAEoA0ID4EEDUglsaWtlQ291bnQSKAoNY29tbWVudF9j'
-    'b3VudBgKIAEoA0ID4EEDUgxjb21tZW50Q291bnQSIgoKdmlld19jb3VudBgLIAEoA0ID4EEDUg'
-    'l2aWV3Q291bnQSJAoLc2hhcmVfY291bnQYDCABKANCA+BBA1IKc2hhcmVDb3VudBIVCgN1cmwY'
-    'DSABKAlCA+BBA1IDdXJsEjEKEnZpZXdlcl9jYW5fY29tbWVudBgOIAEoCEID4EEDUhB2aWV3ZX'
-    'JDYW5Db21tZW50Qg0KC19wcm9kdWN0X2lk');
+    '9uLnYxYWxwaGExLlN0b3JlQ2FyZEID4EEDUgVzdG9yZRISCgRib2R5GAMgASgJUgRib2R5EjcK'
+    'BWltYWdlGAQgASgLMhwuaGF3a3IuY29tbW9uLnYxYWxwaGExLkltYWdlQgPgQQNSBWltYWdlEi'
+    'IKCnByb2R1Y3RfaWQYBSABKAlIAFIJcHJvZHVjdElkiAEBEj8KCGhhc2h0YWdzGAYgAygLMh4u'
+    'aGF3a3Iuc29jaWFsLnYxYWxwaGExLkhhc2h0YWdCA+BBA1IIaGFzaHRhZ3MSQgoMcHVibGlzaF'
+    '90aW1lGAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgtwdWJsaXNoVGlt'
+    'ZRJACgt1cGRhdGVfdGltZRgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA1'
+    'IKdXBkYXRlVGltZRIiCgpsaWtlX2NvdW50GAkgASgDQgPgQQNSCWxpa2VDb3VudBIoCg1jb21t'
+    'ZW50X2NvdW50GAogASgDQgPgQQNSDGNvbW1lbnRDb3VudBIiCgp2aWV3X2NvdW50GAsgASgDQg'
+    'PgQQNSCXZpZXdDb3VudBIkCgtzaGFyZV9jb3VudBgMIAEoA0ID4EEDUgpzaGFyZUNvdW50EhUK'
+    'A3VybBgNIAEoCUID4EEDUgN1cmwSMQoSdmlld2VyX2Nhbl9jb21tZW50GA4gASgIQgPgQQNSEH'
+    'ZpZXdlckNhbkNvbW1lbnQSPgoGc3RhdHVzGA8gASgOMiEuaGF3a3Iuc29jaWFsLnYxYWxwaGEx'
+    'LlBvc3RTdGF0dXNCA+BBA1IGc3RhdHVzEhIKBGV0YWcYECABKAlSBGV0YWcSQAoLY3JlYXRlX3'
+    'RpbWUYESABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCmNyZWF0ZVRpbWUS'
+    'MQoSaW1hZ2Vfc3RhZ2VkX3Rva2VuGBIgASgJQgPgQQRSEGltYWdlU3RhZ2VkVG9rZW4SKgoOaG'
+    'FzaHRhZ19pbnB1dHMYEyADKAlCA+BBBFINaGFzaHRhZ0lucHV0c0INCgtfcHJvZHVjdF9pZA==');
 
 @$core.Deprecated('Use actorDescriptor instead')
 const Actor$json = {
@@ -1174,6 +1231,445 @@ const DeleteForumEntryResponse$json = {
 final $typed_data.Uint8List deleteForumEntryResponseDescriptor =
     $convert.base64Decode('ChhEZWxldGVGb3J1bUVudHJ5UmVzcG9uc2U=');
 
+@$core.Deprecated('Use createPostRequestDescriptor instead')
+const CreatePostRequest$json = {
+  '1': 'CreatePostRequest',
+  '2': [
+    {'1': 'body', '3': 1, '4': 1, '5': 9, '10': 'body'},
+    {
+      '1': 'image_staged_token',
+      '3': 2,
+      '4': 1,
+      '5': 9,
+      '8': {},
+      '10': 'imageStagedToken'
+    },
+    {
+      '1': 'product_id',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'productId',
+      '17': true
+    },
+    {'1': 'hashtag_inputs', '3': 4, '4': 3, '5': 9, '10': 'hashtagInputs'},
+    {'1': 'publish', '3': 5, '4': 1, '5': 8, '10': 'publish'},
+    {'1': 'request_id', '3': 6, '4': 1, '5': 9, '8': {}, '10': 'requestId'},
+  ],
+  '8': [
+    {'1': '_product_id'},
+  ],
+};
+
+/// Descriptor for `CreatePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createPostRequestDescriptor = $convert.base64Decode(
+    'ChFDcmVhdGVQb3N0UmVxdWVzdBISCgRib2R5GAEgASgJUgRib2R5EjEKEmltYWdlX3N0YWdlZF'
+    '90b2tlbhgCIAEoCUID4EEEUhBpbWFnZVN0YWdlZFRva2VuEiIKCnByb2R1Y3RfaWQYAyABKAlI'
+    'AFIJcHJvZHVjdElkiAEBEiUKDmhhc2h0YWdfaW5wdXRzGAQgAygJUg1oYXNodGFnSW5wdXRzEh'
+    'gKB3B1Ymxpc2gYBSABKAhSB3B1Ymxpc2gSJwoKcmVxdWVzdF9pZBgGIAEoCUII4ozP1wgCCAFS'
+    'CXJlcXVlc3RJZEINCgtfcHJvZHVjdF9pZA==');
+
+@$core.Deprecated('Use createPostResponseDescriptor instead')
+const CreatePostResponse$json = {
+  '1': 'CreatePostResponse',
+  '2': [
+    {
+      '1': 'post',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '10': 'post'
+    },
+  ],
+};
+
+/// Descriptor for `CreatePostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createPostResponseDescriptor = $convert.base64Decode(
+    'ChJDcmVhdGVQb3N0UmVzcG9uc2USLwoEcG9zdBgBIAEoCzIbLmhhd2tyLnNvY2lhbC52MWFscG'
+    'hhMS5Qb3N0UgRwb3N0');
+
+@$core.Deprecated('Use getMyPostRequestDescriptor instead')
+const GetMyPostRequest$json = {
+  '1': 'GetMyPostRequest',
+  '2': [
+    {'1': 'post_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+  ],
+};
+
+/// Descriptor for `GetMyPostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getMyPostRequestDescriptor = $convert.base64Decode(
+    'ChBHZXRNeVBvc3RSZXF1ZXN0EhwKB3Bvc3RfaWQYASABKAlCA+BBAlIGcG9zdElk');
+
+@$core.Deprecated('Use getMyPostResponseDescriptor instead')
+const GetMyPostResponse$json = {
+  '1': 'GetMyPostResponse',
+  '2': [
+    {
+      '1': 'post',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '10': 'post'
+    },
+  ],
+};
+
+/// Descriptor for `GetMyPostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getMyPostResponseDescriptor = $convert.base64Decode(
+    'ChFHZXRNeVBvc3RSZXNwb25zZRIvCgRwb3N0GAEgASgLMhsuaGF3a3Iuc29jaWFsLnYxYWxwaG'
+    'ExLlBvc3RSBHBvc3Q=');
+
+@$core.Deprecated('Use listMyPostsRequestDescriptor instead')
+const ListMyPostsRequest$json = {
+  '1': 'ListMyPostsRequest',
+  '2': [
+    {'1': 'page_size', '3': 1, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 2, '4': 1, '5': 9, '10': 'pageToken'},
+    {
+      '1': 'status',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.social.v1alpha1.PostStatus',
+      '10': 'status'
+    },
+  ],
+};
+
+/// Descriptor for `ListMyPostsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listMyPostsRequestDescriptor = $convert.base64Decode(
+    'ChJMaXN0TXlQb3N0c1JlcXVlc3QSGwoJcGFnZV9zaXplGAEgASgFUghwYWdlU2l6ZRIdCgpwYW'
+    'dlX3Rva2VuGAIgASgJUglwYWdlVG9rZW4SOQoGc3RhdHVzGAMgASgOMiEuaGF3a3Iuc29jaWFs'
+    'LnYxYWxwaGExLlBvc3RTdGF0dXNSBnN0YXR1cw==');
+
+@$core.Deprecated('Use listMyPostsResponseDescriptor instead')
+const ListMyPostsResponse$json = {
+  '1': 'ListMyPostsResponse',
+  '2': [
+    {
+      '1': 'posts',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '10': 'posts'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+  ],
+};
+
+/// Descriptor for `ListMyPostsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listMyPostsResponseDescriptor = $convert.base64Decode(
+    'ChNMaXN0TXlQb3N0c1Jlc3BvbnNlEjEKBXBvc3RzGAEgAygLMhsuaGF3a3Iuc29jaWFsLnYxYW'
+    'xwaGExLlBvc3RSBXBvc3RzEiYKD25leHRfcGFnZV90b2tlbhgCIAEoCVINbmV4dFBhZ2VUb2tl'
+    'bg==');
+
+@$core.Deprecated('Use updatePostRequestDescriptor instead')
+const UpdatePostRequest$json = {
+  '1': 'UpdatePostRequest',
+  '2': [
+    {
+      '1': 'post',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '8': {},
+      '10': 'post'
+    },
+    {
+      '1': 'update_mask',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.FieldMask',
+      '10': 'updateMask'
+    },
+  ],
+};
+
+/// Descriptor for `UpdatePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updatePostRequestDescriptor = $convert.base64Decode(
+    'ChFVcGRhdGVQb3N0UmVxdWVzdBI0CgRwb3N0GAEgASgLMhsuaGF3a3Iuc29jaWFsLnYxYWxwaG'
+    'ExLlBvc3RCA+BBAlIEcG9zdBI7Cgt1cGRhdGVfbWFzaxgCIAEoCzIaLmdvb2dsZS5wcm90b2J1'
+    'Zi5GaWVsZE1hc2tSCnVwZGF0ZU1hc2s=');
+
+@$core.Deprecated('Use updatePostResponseDescriptor instead')
+const UpdatePostResponse$json = {
+  '1': 'UpdatePostResponse',
+  '2': [
+    {
+      '1': 'post',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '10': 'post'
+    },
+  ],
+};
+
+/// Descriptor for `UpdatePostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updatePostResponseDescriptor = $convert.base64Decode(
+    'ChJVcGRhdGVQb3N0UmVzcG9uc2USLwoEcG9zdBgBIAEoCzIbLmhhd2tyLnNvY2lhbC52MWFscG'
+    'hhMS5Qb3N0UgRwb3N0');
+
+@$core.Deprecated('Use publishPostRequestDescriptor instead')
+const PublishPostRequest$json = {
+  '1': 'PublishPostRequest',
+  '2': [
+    {'1': 'post_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+    {'1': 'etag', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'etag'},
+  ],
+};
+
+/// Descriptor for `PublishPostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List publishPostRequestDescriptor = $convert.base64Decode(
+    'ChJQdWJsaXNoUG9zdFJlcXVlc3QSHAoHcG9zdF9pZBgBIAEoCUID4EECUgZwb3N0SWQSFwoEZX'
+    'RhZxgCIAEoCUID4EECUgRldGFn');
+
+@$core.Deprecated('Use publishPostResponseDescriptor instead')
+const PublishPostResponse$json = {
+  '1': 'PublishPostResponse',
+  '2': [
+    {
+      '1': 'post',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '10': 'post'
+    },
+  ],
+};
+
+/// Descriptor for `PublishPostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List publishPostResponseDescriptor = $convert.base64Decode(
+    'ChNQdWJsaXNoUG9zdFJlc3BvbnNlEi8KBHBvc3QYASABKAsyGy5oYXdrci5zb2NpYWwudjFhbH'
+    'BoYTEuUG9zdFIEcG9zdA==');
+
+@$core.Deprecated('Use unpublishPostRequestDescriptor instead')
+const UnpublishPostRequest$json = {
+  '1': 'UnpublishPostRequest',
+  '2': [
+    {'1': 'post_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+    {'1': 'etag', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'etag'},
+  ],
+};
+
+/// Descriptor for `UnpublishPostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unpublishPostRequestDescriptor = $convert.base64Decode(
+    'ChRVbnB1Ymxpc2hQb3N0UmVxdWVzdBIcCgdwb3N0X2lkGAEgASgJQgPgQQJSBnBvc3RJZBIXCg'
+    'RldGFnGAIgASgJQgPgQQJSBGV0YWc=');
+
+@$core.Deprecated('Use unpublishPostResponseDescriptor instead')
+const UnpublishPostResponse$json = {
+  '1': 'UnpublishPostResponse',
+  '2': [
+    {
+      '1': 'post',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '10': 'post'
+    },
+  ],
+};
+
+/// Descriptor for `UnpublishPostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unpublishPostResponseDescriptor = $convert.base64Decode(
+    'ChVVbnB1Ymxpc2hQb3N0UmVzcG9uc2USLwoEcG9zdBgBIAEoCzIbLmhhd2tyLnNvY2lhbC52MW'
+    'FscGhhMS5Qb3N0UgRwb3N0');
+
+@$core.Deprecated('Use deletePostRequestDescriptor instead')
+const DeletePostRequest$json = {
+  '1': 'DeletePostRequest',
+  '2': [
+    {'1': 'post_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+    {'1': 'etag', '3': 2, '4': 1, '5': 9, '10': 'etag'},
+  ],
+};
+
+/// Descriptor for `DeletePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List deletePostRequestDescriptor = $convert.base64Decode(
+    'ChFEZWxldGVQb3N0UmVxdWVzdBIcCgdwb3N0X2lkGAEgASgJQgPgQQJSBnBvc3RJZBISCgRldG'
+    'FnGAIgASgJUgRldGFn');
+
+@$core.Deprecated('Use deletePostResponseDescriptor instead')
+const DeletePostResponse$json = {
+  '1': 'DeletePostResponse',
+};
+
+/// Descriptor for `DeletePostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List deletePostResponseDescriptor =
+    $convert.base64Decode('ChJEZWxldGVQb3N0UmVzcG9uc2U=');
+
+@$core.Deprecated('Use schedulePostRequestDescriptor instead')
+const SchedulePostRequest$json = {
+  '1': 'SchedulePostRequest',
+  '2': [
+    {'1': 'post_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'postId'},
+    {'1': 'etag', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'etag'},
+    {
+      '1': 'publish_time',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'publishTime'
+    },
+  ],
+};
+
+/// Descriptor for `SchedulePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List schedulePostRequestDescriptor = $convert.base64Decode(
+    'ChNTY2hlZHVsZVBvc3RSZXF1ZXN0EhwKB3Bvc3RfaWQYASABKAlCA+BBAlIGcG9zdElkEhcKBG'
+    'V0YWcYAiABKAlCA+BBAlIEZXRhZxJCCgxwdWJsaXNoX3RpbWUYAyABKAsyGi5nb29nbGUucHJv'
+    'dG9idWYuVGltZXN0YW1wQgPgQQJSC3B1Ymxpc2hUaW1l');
+
+@$core.Deprecated('Use schedulePostResponseDescriptor instead')
+const SchedulePostResponse$json = {
+  '1': 'SchedulePostResponse',
+  '2': [
+    {
+      '1': 'post',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Post',
+      '10': 'post'
+    },
+    {
+      '1': 'publish_time',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'publishTime'
+    },
+  ],
+};
+
+/// Descriptor for `SchedulePostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List schedulePostResponseDescriptor = $convert.base64Decode(
+    'ChRTY2hlZHVsZVBvc3RSZXNwb25zZRIvCgRwb3N0GAEgASgLMhsuaGF3a3Iuc29jaWFsLnYxYW'
+    'xwaGExLlBvc3RSBHBvc3QSPQoMcHVibGlzaF90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVm'
+    'LlRpbWVzdGFtcFILcHVibGlzaFRpbWU=');
+
+@$core.Deprecated('Use listStoreCommentsRequestDescriptor instead')
+const ListStoreCommentsRequest$json = {
+  '1': 'ListStoreCommentsRequest',
+  '2': [
+    {'1': 'page_size', '3': 1, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 2, '4': 1, '5': 9, '10': 'pageToken'},
+    {
+      '1': 'post_id',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'postId',
+      '17': true
+    },
+    {'1': 'unreplied', '3': 4, '4': 1, '5': 8, '10': 'unreplied'},
+  ],
+  '8': [
+    {'1': '_post_id'},
+  ],
+};
+
+/// Descriptor for `ListStoreCommentsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listStoreCommentsRequestDescriptor = $convert.base64Decode(
+    'ChhMaXN0U3RvcmVDb21tZW50c1JlcXVlc3QSGwoJcGFnZV9zaXplGAEgASgFUghwYWdlU2l6ZR'
+    'IdCgpwYWdlX3Rva2VuGAIgASgJUglwYWdlVG9rZW4SHAoHcG9zdF9pZBgDIAEoCUgAUgZwb3N0'
+    'SWSIAQESHAoJdW5yZXBsaWVkGAQgASgIUgl1bnJlcGxpZWRCCgoIX3Bvc3RfaWQ=');
+
+@$core.Deprecated('Use listStoreCommentsResponseDescriptor instead')
+const ListStoreCommentsResponse$json = {
+  '1': 'ListStoreCommentsResponse',
+  '2': [
+    {
+      '1': 'comments',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Comment',
+      '10': 'comments'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+  ],
+};
+
+/// Descriptor for `ListStoreCommentsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listStoreCommentsResponseDescriptor = $convert.base64Decode(
+    'ChlMaXN0U3RvcmVDb21tZW50c1Jlc3BvbnNlEjoKCGNvbW1lbnRzGAEgAygLMh4uaGF3a3Iuc2'
+    '9jaWFsLnYxYWxwaGExLkNvbW1lbnRSCGNvbW1lbnRzEiYKD25leHRfcGFnZV90b2tlbhgCIAEo'
+    'CVINbmV4dFBhZ2VUb2tlbg==');
+
+@$core.Deprecated('Use getStoreSocialSummaryRequestDescriptor instead')
+const GetStoreSocialSummaryRequest$json = {
+  '1': 'GetStoreSocialSummaryRequest',
+};
+
+/// Descriptor for `GetStoreSocialSummaryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getStoreSocialSummaryRequestDescriptor =
+    $convert.base64Decode('ChxHZXRTdG9yZVNvY2lhbFN1bW1hcnlSZXF1ZXN0');
+
+@$core.Deprecated('Use getStoreSocialSummaryResponseDescriptor instead')
+const GetStoreSocialSummaryResponse$json = {
+  '1': 'GetStoreSocialSummaryResponse',
+  '2': [
+    {
+      '1': 'post_counts',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.PostStatusCount',
+      '10': 'postCounts'
+    },
+    {
+      '1': 'scheduled_post_count',
+      '3': 2,
+      '4': 1,
+      '5': 3,
+      '10': 'scheduledPostCount'
+    },
+  ],
+};
+
+/// Descriptor for `GetStoreSocialSummaryResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getStoreSocialSummaryResponseDescriptor =
+    $convert.base64Decode(
+        'Ch1HZXRTdG9yZVNvY2lhbFN1bW1hcnlSZXNwb25zZRJHCgtwb3N0X2NvdW50cxgBIAMoCzImLm'
+        'hhd2tyLnNvY2lhbC52MWFscGhhMS5Qb3N0U3RhdHVzQ291bnRSCnBvc3RDb3VudHMSMAoUc2No'
+        'ZWR1bGVkX3Bvc3RfY291bnQYAiABKANSEnNjaGVkdWxlZFBvc3RDb3VudA==');
+
+@$core.Deprecated('Use postStatusCountDescriptor instead')
+const PostStatusCount$json = {
+  '1': 'PostStatusCount',
+  '2': [
+    {
+      '1': 'status',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.social.v1alpha1.PostStatus',
+      '10': 'status'
+    },
+    {'1': 'count', '3': 2, '4': 1, '5': 3, '10': 'count'},
+  ],
+};
+
+/// Descriptor for `PostStatusCount`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List postStatusCountDescriptor = $convert.base64Decode(
+    'Cg9Qb3N0U3RhdHVzQ291bnQSOQoGc3RhdHVzGAEgASgOMiEuaGF3a3Iuc29jaWFsLnYxYWxwaG'
+    'ExLlBvc3RTdGF0dXNSBnN0YXR1cxIUCgVjb3VudBgCIAEoA1IFY291bnQ=');
+
 const $core.Map<$core.String, $core.dynamic> SocialPublicServiceBase$json = {
   '1': 'SocialPublicService',
   '2': [
@@ -1350,6 +1846,65 @@ const $core.Map<$core.String, $core.dynamic> SocialAppServiceBase$json = {
       '3': '.hawkr.social.v1alpha1.DeleteForumEntryResponse',
       '4': {'34': 2},
     },
+    {
+      '1': 'CreatePost',
+      '2': '.hawkr.social.v1alpha1.CreatePostRequest',
+      '3': '.hawkr.social.v1alpha1.CreatePostResponse'
+    },
+    {
+      '1': 'GetMyPost',
+      '2': '.hawkr.social.v1alpha1.GetMyPostRequest',
+      '3': '.hawkr.social.v1alpha1.GetMyPostResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'ListMyPosts',
+      '2': '.hawkr.social.v1alpha1.ListMyPostsRequest',
+      '3': '.hawkr.social.v1alpha1.ListMyPostsResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'UpdatePost',
+      '2': '.hawkr.social.v1alpha1.UpdatePostRequest',
+      '3': '.hawkr.social.v1alpha1.UpdatePostResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'PublishPost',
+      '2': '.hawkr.social.v1alpha1.PublishPostRequest',
+      '3': '.hawkr.social.v1alpha1.PublishPostResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'UnpublishPost',
+      '2': '.hawkr.social.v1alpha1.UnpublishPostRequest',
+      '3': '.hawkr.social.v1alpha1.UnpublishPostResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'DeletePost',
+      '2': '.hawkr.social.v1alpha1.DeletePostRequest',
+      '3': '.hawkr.social.v1alpha1.DeletePostResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'SchedulePost',
+      '2': '.hawkr.social.v1alpha1.SchedulePostRequest',
+      '3': '.hawkr.social.v1alpha1.SchedulePostResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'ListStoreComments',
+      '2': '.hawkr.social.v1alpha1.ListStoreCommentsRequest',
+      '3': '.hawkr.social.v1alpha1.ListStoreCommentsResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'GetStoreSocialSummary',
+      '2': '.hawkr.social.v1alpha1.GetStoreSocialSummaryRequest',
+      '3': '.hawkr.social.v1alpha1.GetStoreSocialSummaryResponse',
+      '4': {'34': 1},
+    },
   ],
 };
 
@@ -1390,6 +1945,34 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       DeleteForumEntryRequest$json,
   '.hawkr.social.v1alpha1.DeleteForumEntryResponse':
       DeleteForumEntryResponse$json,
+  '.hawkr.social.v1alpha1.CreatePostRequest': CreatePostRequest$json,
+  '.hawkr.social.v1alpha1.CreatePostResponse': CreatePostResponse$json,
+  '.hawkr.social.v1alpha1.Post': Post$json,
+  '.hawkr.common.v1alpha1.StoreCard': $0.StoreCard$json,
+  '.hawkr.social.v1alpha1.Hashtag': Hashtag$json,
+  '.hawkr.social.v1alpha1.GetMyPostRequest': GetMyPostRequest$json,
+  '.hawkr.social.v1alpha1.GetMyPostResponse': GetMyPostResponse$json,
+  '.hawkr.social.v1alpha1.ListMyPostsRequest': ListMyPostsRequest$json,
+  '.hawkr.social.v1alpha1.ListMyPostsResponse': ListMyPostsResponse$json,
+  '.hawkr.social.v1alpha1.UpdatePostRequest': UpdatePostRequest$json,
+  '.hawkr.social.v1alpha1.UpdatePostResponse': UpdatePostResponse$json,
+  '.hawkr.social.v1alpha1.PublishPostRequest': PublishPostRequest$json,
+  '.hawkr.social.v1alpha1.PublishPostResponse': PublishPostResponse$json,
+  '.hawkr.social.v1alpha1.UnpublishPostRequest': UnpublishPostRequest$json,
+  '.hawkr.social.v1alpha1.UnpublishPostResponse': UnpublishPostResponse$json,
+  '.hawkr.social.v1alpha1.DeletePostRequest': DeletePostRequest$json,
+  '.hawkr.social.v1alpha1.DeletePostResponse': DeletePostResponse$json,
+  '.hawkr.social.v1alpha1.SchedulePostRequest': SchedulePostRequest$json,
+  '.hawkr.social.v1alpha1.SchedulePostResponse': SchedulePostResponse$json,
+  '.hawkr.social.v1alpha1.ListStoreCommentsRequest':
+      ListStoreCommentsRequest$json,
+  '.hawkr.social.v1alpha1.ListStoreCommentsResponse':
+      ListStoreCommentsResponse$json,
+  '.hawkr.social.v1alpha1.GetStoreSocialSummaryRequest':
+      GetStoreSocialSummaryRequest$json,
+  '.hawkr.social.v1alpha1.GetStoreSocialSummaryResponse':
+      GetStoreSocialSummaryResponse$json,
+  '.hawkr.social.v1alpha1.PostStatusCount': PostStatusCount$json,
 };
 
 /// Descriptor for `SocialAppService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
@@ -1416,4 +1999,24 @@ final $typed_data.Uint8List socialAppServiceDescriptor = $convert.base64Decode(
     'VxdWVzdBovLmhhd2tyLnNvY2lhbC52MWFscGhhMS5VcGRhdGVGb3J1bUVudHJ5UmVzcG9uc2Ui'
     'A5ACAhJ4ChBEZWxldGVGb3J1bUVudHJ5Ei4uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkRlbGV0ZU'
     'ZvcnVtRW50cnlSZXF1ZXN0Gi8uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkRlbGV0ZUZvcnVtRW50'
-    'cnlSZXNwb25zZSIDkAIC');
+    'cnlSZXNwb25zZSIDkAICEmEKCkNyZWF0ZVBvc3QSKC5oYXdrci5zb2NpYWwudjFhbHBoYTEuQ3'
+    'JlYXRlUG9zdFJlcXVlc3QaKS5oYXdrci5zb2NpYWwudjFhbHBoYTEuQ3JlYXRlUG9zdFJlc3Bv'
+    'bnNlEmMKCUdldE15UG9zdBInLmhhd2tyLnNvY2lhbC52MWFscGhhMS5HZXRNeVBvc3RSZXF1ZX'
+    'N0GiguaGF3a3Iuc29jaWFsLnYxYWxwaGExLkdldE15UG9zdFJlc3BvbnNlIgOQAgESaQoLTGlz'
+    'dE15UG9zdHMSKS5oYXdrci5zb2NpYWwudjFhbHBoYTEuTGlzdE15UG9zdHNSZXF1ZXN0GiouaG'
+    'F3a3Iuc29jaWFsLnYxYWxwaGExLkxpc3RNeVBvc3RzUmVzcG9uc2UiA5ACARJmCgpVcGRhdGVQ'
+    'b3N0EiguaGF3a3Iuc29jaWFsLnYxYWxwaGExLlVwZGF0ZVBvc3RSZXF1ZXN0GikuaGF3a3Iuc2'
+    '9jaWFsLnYxYWxwaGExLlVwZGF0ZVBvc3RSZXNwb25zZSIDkAICEmkKC1B1Ymxpc2hQb3N0Eiku'
+    'aGF3a3Iuc29jaWFsLnYxYWxwaGExLlB1Ymxpc2hQb3N0UmVxdWVzdBoqLmhhd2tyLnNvY2lhbC'
+    '52MWFscGhhMS5QdWJsaXNoUG9zdFJlc3BvbnNlIgOQAgISbwoNVW5wdWJsaXNoUG9zdBIrLmhh'
+    'd2tyLnNvY2lhbC52MWFscGhhMS5VbnB1Ymxpc2hQb3N0UmVxdWVzdBosLmhhd2tyLnNvY2lhbC'
+    '52MWFscGhhMS5VbnB1Ymxpc2hQb3N0UmVzcG9uc2UiA5ACAhJmCgpEZWxldGVQb3N0EiguaGF3'
+    'a3Iuc29jaWFsLnYxYWxwaGExLkRlbGV0ZVBvc3RSZXF1ZXN0GikuaGF3a3Iuc29jaWFsLnYxYW'
+    'xwaGExLkRlbGV0ZVBvc3RSZXNwb25zZSIDkAICEmwKDFNjaGVkdWxlUG9zdBIqLmhhd2tyLnNv'
+    'Y2lhbC52MWFscGhhMS5TY2hlZHVsZVBvc3RSZXF1ZXN0GisuaGF3a3Iuc29jaWFsLnYxYWxwaG'
+    'ExLlNjaGVkdWxlUG9zdFJlc3BvbnNlIgOQAgISewoRTGlzdFN0b3JlQ29tbWVudHMSLy5oYXdr'
+    'ci5zb2NpYWwudjFhbHBoYTEuTGlzdFN0b3JlQ29tbWVudHNSZXF1ZXN0GjAuaGF3a3Iuc29jaW'
+    'FsLnYxYWxwaGExLkxpc3RTdG9yZUNvbW1lbnRzUmVzcG9uc2UiA5ACARKHAQoVR2V0U3RvcmVT'
+    'b2NpYWxTdW1tYXJ5EjMuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkdldFN0b3JlU29jaWFsU3VtbW'
+    'FyeVJlcXVlc3QaNC5oYXdrci5zb2NpYWwudjFhbHBoYTEuR2V0U3RvcmVTb2NpYWxTdW1tYXJ5'
+    'UmVzcG9uc2UiA5ACAQ==');

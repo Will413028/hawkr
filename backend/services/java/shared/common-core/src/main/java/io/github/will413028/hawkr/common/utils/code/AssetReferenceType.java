@@ -27,8 +27,6 @@ public enum AssetReferenceType implements CodeMeta {
     ORDER_RECEIPT("ORDER_RECEIPT", "7113", "ORDER_RECEIPT", "買家確認收貨上傳照片引用"),
     AI_STYLE("AI_STYLE", "7114", "AI_STYLE", "AI 修圖風格縮圖引用"),
     ORDER_REVIEW("ORDER_REVIEW", "7115", "ORDER_REVIEW", "訂單評論圖片引用"),
-    PRODUCT_IMPORT_PREVIEW("PRODUCT_IMPORT_PREVIEW", "7116", "PRODUCT_IMPORT_PREVIEW", "商品匯入預覽主圖（暫存階段，FinalizeImportAsset 後轉為 PRODUCT）"),
-    PRODUCT_IMPORT_PREVIEW_DESC("PRODUCT_IMPORT_PREVIEW_DESC", "7117", "PRODUCT_IMPORT_PREVIEW_DESC", "商品匯入預覽描述圖（暫存階段，FinalizeImportAsset 後轉為 PRODUCT_DESC）"),
     GOVERNANCE_EVIDENCE("GOVERNANCE_EVIDENCE", "7118", "GOVERNANCE_EVIDENCE", "商家治理檢舉/申訴佐證圖片引用（seller_violation_reports.evidence_asset_ids / seller_violations.appeal_evidence_asset_ids）"),
     RECIPE("RECIPE", "7119", "RECIPE", "食譜主圖引用"),
     INVOICE_DOCUMENT("INVOICE_DOCUMENT", "7120", "INVOICE_DOCUMENT", "電子發票／折讓單 PDF 引用（invoice-service 經 media-service `ServerUploadSecureAndFinalize` 寫入 `secure/invoice_document/` 前綴，僅供三條 PDF 下載端點以 `GetSecureAssetInternal` 取用；58 §8.1）"),

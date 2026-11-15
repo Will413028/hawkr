@@ -125,20 +125,20 @@ binding 沒有自己的區塊，它寫在 queue 的 `bindings:` 底下（因為 
 ```
 你在 topology.yaml 寫的             展開規則              broker 上實際存在的
 ─────────────────────              ────────              ──────────────────
-36 exchanges                          →                    122 exchanges
-114 queues                            →                    187 queues + 6 json-args
-119 bindings                           →                    241 bindings
+32 exchanges                          →                    94 exchanges
+80 queues                             →                    147 queues + 0 json-args
+95 bindings                           →                    193 bindings
 ─────────────────────                                     ──────────────────
-269 條宣告                                                  556 個資源
+207 條宣告                                                  434 個資源
 ```
 
-**多出來的 287 個就是展開產生的。** 你不會、也不該在 YAML 裡看到它們。
+**多出來的 227 個就是展開產生的。** 你不會、也不該在 YAML 裡看到它們。
 
 「policy」指的是 queue 條目上那幾個會觸發展開的欄位——`retry:`、`dlq:`、`args_json:`。
-目前的分佈是：43 條用 `retry:`、58 條用 `dlq:`、6 條 `args_json:`、13 條沒有 policy（純裸 queue）。
+目前的分佈是：31 條用 `retry:`、45 條用 `dlq:`、0 條 `args_json:`、4 條沒有 policy（純裸 queue）。
 
 **為什麼要這樣做**：`.retry` exchange、`.dlq` queue、dlx→dlq binding 與 dead-letter 參數這些東西是機械衍生的
-——每次都長一樣、每次都要寫對三四個名字。手寫 184 條不只是麻煩，是**漏一條不會有人發現**
+——每次都長一樣、每次都要寫對三四個名字。手寫 227 條不只是麻煩，是**漏一條不會有人發現**
 （plan 照樣乾淨、apply 照樣成功，只是死信沒地方去）。交給規則產生就不會漏。
 
 **代價是你不能手寫那些衍生資源**：自己加一條 `im.account.deleted.dlq` 到 YAML 裡，展開規則會再產生
@@ -233,11 +233,11 @@ passive declare 只驗存在、不驗 args）。
 **⑤ `args_json: true`** —— `arguments` 含非字串值時必須加：
 
 ```yaml
-- name: product.import.asset.download.retry
+- name: example.job.run.retry
   dlq:
-    via: hawkr.product.import
-    queue: product.import.asset.download
-    routing_key: asset.download
+    via: hawkr.example
+    queue: example.job.run
+    routing_key: run
   args_json: true                        # 因為下面有 int
   arguments:
     x-message-ttl: 120000                # 停留 120 秒後死信回主 queue = 延遲重試
@@ -252,8 +252,7 @@ provider 的 `arguments` 是 `map[string]string`，數字型參數只能走 `arg
 - routing key 是 `#` 或 `*` 時必須加引號（`key: "#"`）——不加引號 YAML 會把它解析成 `null`，
   `validate.py` 會擋下。
 - `via: ''`（空字串）是合法值，代表 RabbitMQ 的 **default（無名）exchange**——靠 routing key 直接
-  比對 queue 名稱路由，不需要具名 DLX 也不需要 binding。5 條 product-import queue 是這個形狀，
-  **不是漏填**。
+  比對 queue 名稱路由，不需要具名 DLX 也不需要 binding；這是合法形狀，**不是漏填**。
 
 ⚠️ **新增 consumer 的 PR 必須同時登記 topology.yaml**。passive declare 下 broker 沒有的
 queue 會 404、該筆 subscription 靜默失效（不進 DLQ，因為 queue 根本不存在）——issue #1795
@@ -296,7 +295,7 @@ python3 -m unittest discover -p 'test_*.py'
 `topology.yaml` 無關——**但有一個例外**：
 
 `test_expand.py` 的 `test_expanded_resource_counts_are_pinned` 拿**真實的** `topology.yaml` 跑展開，
-把結果釘死在 **122 exchanges / 187 queues / 6 json-args / 241 bindings / 556 total**。
+把結果釘死在 **94 exchanges / 147 queues / 0 json-args / 193 bindings / 434 total**。
 
 這是「**過度產生**」的唯一防線。少產資源你會發現（服務連不上），多產不會——展開規則寫錯多生出
 一批 queue，plan 會照建、apply 會成功、broker 上多一堆沒人用的東西，沒有任何人會察覺。所以那組

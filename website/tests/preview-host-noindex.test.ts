@@ -140,7 +140,6 @@ test("middleware covers every page route, including the ones it never saw before
 		"/account/orders",
 		"/checkout/confirm",
 		"/seller-center/dashboard",
-		"/seller-product-import-preview/1",
 	]) {
 		assert.ok(regex.test(pathname), `${pathname} 應納入 middleware`);
 	}

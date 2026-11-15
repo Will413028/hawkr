@@ -171,7 +171,7 @@ queue，這個變數對 `pkg/mq.ResilientConsumer` 已完全沒有作用，加�
    kubectl -n hawkr rollout restart deployment/aftersales-service \
      deployment/cart-service deployment/coupon-service deployment/media-service \
      deployment/order-service deployment/payment-service deployment/payuni-webhook-service \
-     deployment/product-import-service deployment/product-service deployment/shipping-service
+     deployment/product-service deployment/shipping-service
    ```
 5. 驗證：
    - `kubectl get endpoints rabbitmq -n hawkr` 顯示 3 個 IP

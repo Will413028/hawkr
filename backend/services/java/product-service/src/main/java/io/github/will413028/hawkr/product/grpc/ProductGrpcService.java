@@ -83,8 +83,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     private final GovCertificationService govCertificationService;
     private final io.github.will413028.hawkr.product.service.HashtagService hashtagService;
     private final io.github.will413028.hawkr.product.service.PopularHashtagService popularHashtagService;
-    private final io.github.will413028.hawkr.product.service.ProductImportService productImportService;
-    private final io.github.will413028.hawkr.product.service.validator.ProductPublishValidator productPublishValidator;
     private final io.github.will413028.hawkr.product.repository.ProductRepository productRepository;
     private final io.github.will413028.hawkr.product.service.ProductCertificationApplicationService certificationApplicationService;
     private final io.github.will413028.hawkr.product.converter.ProductCertificationApplicationConverter certificationConverter;
@@ -102,8 +100,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
             GovCertificationService govCertificationService,
             io.github.will413028.hawkr.product.service.HashtagService hashtagService,
             io.github.will413028.hawkr.product.service.PopularHashtagService popularHashtagService,
-            io.github.will413028.hawkr.product.service.ProductImportService productImportService,
-            io.github.will413028.hawkr.product.service.validator.ProductPublishValidator productPublishValidator,
             io.github.will413028.hawkr.product.repository.ProductRepository productRepository,
             io.github.will413028.hawkr.product.service.ProductCertificationApplicationService certificationApplicationService,
             io.github.will413028.hawkr.product.converter.ProductCertificationApplicationConverter certificationConverter
@@ -120,8 +116,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         this.govCertificationService = govCertificationService;
         this.hashtagService = hashtagService;
         this.popularHashtagService = popularHashtagService;
-        this.productImportService = productImportService;
-        this.productPublishValidator = productPublishValidator;
         this.productRepository = productRepository;
         this.certificationApplicationService = certificationApplicationService;
         this.certificationConverter = certificationConverter;
@@ -2403,253 +2397,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         responseObserver.onCompleted();
     }
 
-    // ============================================================================
-    // Product Import 整合（02 號設計書 §9.1 / §9.2 / §9.5）
-    //
-    // PR1 階段：純 stub（拋 UNIMPLEMENTED），proto 契約凍結但無行為改動。
-    // 完整實作於 PR2，與 product-import-service 本體一起上線。
-    // ============================================================================
-
-    /** 02 §9.1 — 驗證 category_id 為合法葉節點並回傳 cat_l1/l2 反正規化資料（內部 RPC，免身份驗證）。 */
-    @Override
-    public void validateLeafCategoryInternal(
-            io.github.will413028.hawkr.product.grpc.ValidateLeafCategoryInternalRequest request,
-            io.grpc.stub.StreamObserver<io.github.will413028.hawkr.product.grpc.ValidateLeafCategoryInternalResponse> responseObserver) {
-        try {
-            io.github.will413028.hawkr.product.grpc.ValidateLeafCategoryInternalResponse response =
-                    productImportService.validateLeafCategory(request.getCategoryId());
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-        } catch (ProductBusinessException e) {
-            log.warn("ProductGrpcService.validateLeafCategoryInternal.businessFailed",
-                    "category_id=" + request.getCategoryId() + "，error=" + e.getMessage());
-            responseObserver.onNext(io.github.will413028.hawkr.product.grpc.ValidateLeafCategoryInternalResponse.newBuilder()
-                    .setCode(e.code())
-                    .setMessage(e.getMessage())
-                    .setIsValid(false)
-                    .setInvalidReason("NOT_FOUND")
-                    .build());
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(
-                    responseObserver,
-                    io.github.will413028.hawkr.product.grpc.ValidateLeafCategoryInternalResponse.newBuilder(),
-                    e, "ProductGrpcService", "validateLeafCategoryInternal");
-        }
-    }
-
-    /** 02 §9.2 — 由 Product Import Service 在 commit 階段呼叫，將暫存 item 轉正為 product + product_sku（內部 RPC，免身份驗證）。 */
-    @Override
-    public void createProductFromImportInternal(
-            io.github.will413028.hawkr.product.grpc.CreateProductFromImportInternalRequest request,
-            io.grpc.stub.StreamObserver<io.github.will413028.hawkr.product.grpc.CreateProductFromImportInternalResponse> responseObserver) {
-        try {
-            io.github.will413028.hawkr.product.service.ProductImportService.CreateProductFromImportInternalResponseDTO result =
-                    productImportService.createProductFromImport(request);
-            responseObserver.onNext(io.github.will413028.hawkr.product.grpc.CreateProductFromImportInternalResponse.newBuilder()
-                    .setCode(GrpcResponseCode.SUCCESS.code())
-                    .setMessage("success")
-                    .setProductId(result.getProductId())
-                    .setIdempotencyStatus(result.getIdempotencyStatus())
-                    .build());
-            responseObserver.onCompleted();
-            log.info("ProductGrpcService.createProductFromImportInternal.success",
-                    "Import 商品轉正成功，product_id=" + result.getProductId()
-                            + "，import_item_id=" + request.getImportItemId()
-                            + "，status=" + result.getIdempotencyStatus());
-        } catch (IdempotencyConflictException e) {
-            log.warn("ProductGrpcService.createProductFromImportInternal.conflict",
-                    "冪等衝突: " + e.getMessage(), "key", request.getIdempotencyKey());
-            responseObserver.onNext(io.github.will413028.hawkr.product.grpc.CreateProductFromImportInternalResponse.newBuilder()
-                    .setCode(GrpcResponseCode.CONFLICT.code())
-                    .setMessage(e.getMessage())
-                    .build());
-            responseObserver.onCompleted();
-        } catch (ProductBusinessException e) {
-            log.warn("ProductGrpcService.createProductFromImportInternal.businessFailed",
-                    "code=" + e.code() + "，msg=" + e.getMessage()
-                            + "，import_item_id=" + request.getImportItemId());
-            responseObserver.onNext(io.github.will413028.hawkr.product.grpc.CreateProductFromImportInternalResponse.newBuilder()
-                    .setCode(e.code())
-                    .setMessage(e.getMessage())
-                    .build());
-            responseObserver.onCompleted();
-        } catch (IllegalArgumentException e) {
-            log.warn("ProductGrpcService.createProductFromImportInternal.invalidParam",
-                    "參數錯誤: " + e.getMessage());
-            responseObserver.onNext(io.github.will413028.hawkr.product.grpc.CreateProductFromImportInternalResponse.newBuilder()
-                    .setCode(GrpcResponseCode.INVALID_PARAM.code())
-                    .setMessage(e.getMessage())
-                    .build());
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(
-                    responseObserver,
-                    io.github.will413028.hawkr.product.grpc.CreateProductFromImportInternalResponse.newBuilder(),
-                    e, "ProductGrpcService", "createProductFromImportInternal");
-        }
-    }
-
-    /** 02 §9.5 — 批次偵測商品名稱是否與賣家既有商品重複（內部 RPC，免身份驗證）。 */
-    @Override
-    public void batchCheckSellerProductNames(
-            io.github.will413028.hawkr.product.grpc.BatchCheckSellerProductNamesRequest request,
-            io.grpc.stub.StreamObserver<io.github.will413028.hawkr.product.grpc.BatchCheckSellerProductNamesResponse> responseObserver) {
-        try {
-            List<io.github.will413028.hawkr.product.entity.projection.SellerProductNameProjection> existing =
-                    productImportService.batchCheckSellerProductNames(
-                            request.getStoreId(),
-                            request.getNamesList());
-
-            io.github.will413028.hawkr.product.grpc.BatchCheckSellerProductNamesResponse.Builder builder =
-                    io.github.will413028.hawkr.product.grpc.BatchCheckSellerProductNamesResponse.newBuilder()
-                            .setCode(GrpcResponseCode.SUCCESS.code())
-                            .setMessage("success");
-            for (io.github.will413028.hawkr.product.entity.projection.SellerProductNameProjection row : existing) {
-                builder.addExisting(io.github.will413028.hawkr.product.grpc.ExistingProductByName.newBuilder()
-                        .setName(row.name() != null ? row.name() : "")
-                        .setProductId(String.valueOf(row.id()))
-                        .setStatus(row.status() != null ? row.status() : "")
-                        .build());
-            }
-            responseObserver.onNext(builder.build());
-            responseObserver.onCompleted();
-            log.info("ProductGrpcService.batchCheckSellerProductNames.success",
-                    "store_id=" + request.getStoreId()
-                            + "，requested=" + request.getNamesCount()
-                            + "，matched=" + existing.size());
-        } catch (ProductBusinessException e) {
-            log.warn("ProductGrpcService.batchCheckSellerProductNames.businessFailed",
-                    "code=" + e.code() + "，msg=" + e.getMessage());
-            responseObserver.onNext(io.github.will413028.hawkr.product.grpc.BatchCheckSellerProductNamesResponse.newBuilder()
-                    .setCode(e.code())
-                    .setMessage(e.getMessage())
-                    .build());
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(
-                    responseObserver,
-                    io.github.will413028.hawkr.product.grpc.BatchCheckSellerProductNamesResponse.newBuilder(),
-                    e, "ProductGrpcService", "batchCheckSellerProductNames");
-        }
-    }
-
-    // ============================================================================
-    // 40 號設計書 §4.3a / §4.3b — Product Publish Validator + Brief Lookup
-    // ============================================================================
-
-    /** 40 §4.3a — 商品 draft 統一驗證（CSV_PARSE / IMPORT_UPDATE / IMPORT_COMMIT / PUBLISH 四時機點共用）。 */
-    @Override
-    public void validateProductDraft(
-            io.github.will413028.hawkr.product.grpc.ValidateProductDraftRequest request,
-            io.grpc.stub.StreamObserver<io.github.will413028.hawkr.product.grpc.ValidateProductDraftResponse> responseObserver) {
-        try {
-            io.github.will413028.hawkr.product.service.validator.ProductPublishValidator.ValidationResult result =
-                    productPublishValidator.validate(
-                            request.getStoreId(),
-                            request.getDraft(),
-                            request.getContext());
-
-            io.github.will413028.hawkr.product.grpc.ValidateProductDraftResponse.Builder builder =
-                    io.github.will413028.hawkr.product.grpc.ValidateProductDraftResponse.newBuilder()
-                            .setCode(GrpcResponseCode.SUCCESS.code())
-                            .setMessage("success")
-                            .setHasBlockingError(result.hasBlockingError());
-            for (io.github.will413028.hawkr.product.service.validator.ProductPublishValidator.Violation v : result.violations()) {
-                builder.addViolations(io.github.will413028.hawkr.product.grpc.DraftViolation.newBuilder()
-                        .setField(v.field() == null ? "" : v.field())
-                        .setCode(v.code() == null ? "" : v.code())
-                        .setSeverity(v.severity() == null ? "" : v.severity())
-                        .setMessage(v.message() == null ? "" : v.message())
-                        .setRawValue(v.rawValue() == null ? "" : v.rawValue())
-                        .build());
-            }
-            responseObserver.onNext(builder.build());
-            responseObserver.onCompleted();
-            log.info("ProductGrpcService.validateProductDraft.success",
-                    "store_id=" + request.getStoreId()
-                            + "，context=" + request.getContext().name()
-                            + "，violations=" + result.violations().size()
-                            + "，blocking=" + result.hasBlockingError());
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(
-                    responseObserver,
-                    io.github.will413028.hawkr.product.grpc.ValidateProductDraftResponse.newBuilder(),
-                    e, "ProductGrpcService", "validateProductDraft");
-        }
-    }
-
-    /** 40 §4.3b — 批次取商品輕量資訊（id/name/status），上限 200，查不到的 id 不出現。 */
-    @Override
-    public void getProductsBriefInternal(
-            io.github.will413028.hawkr.product.grpc.GetProductsBriefInternalRequest request,
-            io.grpc.stub.StreamObserver<io.github.will413028.hawkr.product.grpc.GetProductsBriefInternalResponse> responseObserver) {
-        try {
-            List<String> rawIds = request.getProductIdsList();
-            if (rawIds.size() > 200) {
-                throw new ProductBusinessException(GrpcResponseCode.INVALID_PARAM,
-                        "product_ids 上限為 200，當前=" + rawIds.size());
-            }
-            List<Long> ids = new java.util.ArrayList<>();
-            for (String s : rawIds) {
-                if (s == null || s.isBlank()) continue;
-                try {
-                    ids.add(Long.parseLong(s.trim()));
-                } catch (NumberFormatException e) {
-                    // 跳過格式錯誤的 id（per §4.3b：查不到的 id 不出現）
-                }
-            }
-
-            io.github.will413028.hawkr.product.grpc.GetProductsBriefInternalResponse.Builder builder =
-                    io.github.will413028.hawkr.product.grpc.GetProductsBriefInternalResponse.newBuilder()
-                            .setCode(GrpcResponseCode.SUCCESS.code())
-                            .setMessage("success");
-            if (!ids.isEmpty()) {
-                // #2819：刻意用**不濾 deleted_at** 的查詢。用 findBriefByIds 的話，已軟刪的
-                // 商品不在結果集 ⇒ 呼叫端的 map miss ⇒ 與「RPC 整支失敗」壓成同一個空字串，
-                // 而賣家的匯入紀錄無從區分（連結還會指向 404 / 3023 已永久移除的商品頁）。
-                // 「已移除」由 publication_state 表達，不塞進 status（那個 enum 沒有這個值）。
-                List<io.github.will413028.hawkr.product.entity.projection.ProductPublicationBriefProjection> rows =
-                        productRepository.findPublicationBriefByIdsIncludingDeleted(ids);
-                for (io.github.will413028.hawkr.product.entity.projection.ProductPublicationBriefProjection row : rows) {
-                    String statusValue = row.status() == null ? "" : row.status();
-                    String statusLabel = "";
-                    if (ProductStatus.isValidValue(statusValue)) {
-                        statusLabel = ProductStatus.fromValue(statusValue).label();
-                    }
-                    builder.addRecords(io.github.will413028.hawkr.product.grpc.ProductBriefInternal.newBuilder()
-                            .setProductId(String.valueOf(row.id()))
-                            .setName(row.name() == null ? "" : row.name())
-                            .setStatus(statusValue)
-                            .setStatusLabel(statusLabel)
-                            .setPublicationState(ProductPublicationPolicy.deriveState(
-                                    row.firstPublishedAt(), statusValue,
-                                    row.deletedAt(), row.sellerDeletedAt(), row.storeExposable()).value())
-                            .build());
-                }
-            }
-            responseObserver.onNext(builder.build());
-            responseObserver.onCompleted();
-            log.info("ProductGrpcService.getProductsBriefInternal.success",
-                    "caller_store_id=" + request.getCallerStoreId()
-                            + "，requested=" + rawIds.size()
-                            + "，returned=" + builder.getRecordsCount());
-        } catch (ProductBusinessException e) {
-            log.warn("ProductGrpcService.getProductsBriefInternal.businessFailed",
-                    "code=" + e.code() + "，msg=" + e.getMessage());
-            responseObserver.onNext(io.github.will413028.hawkr.product.grpc.GetProductsBriefInternalResponse.newBuilder()
-                    .setCode(e.code())
-                    .setMessage(e.getMessage())
-                    .build());
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(
-                    responseObserver,
-                    io.github.will413028.hawkr.product.grpc.GetProductsBriefInternalResponse.newBuilder(),
-                    e, "ProductGrpcService", "getProductsBriefInternal");
-        }
-    }
-
     // ==================== 農產品認證申請與審核（19 號設計書 §9 / §10.1） ====================
     //
     // 角色分離（§5.1 gRPC 設計）：賣家 3 支、Admin 7 支，各自獨立 RPC，
@@ -3089,8 +2836,8 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     /**
      * ADM 認證審核路徑補齊商品資訊。
      *
-     * <p>🔴 這裡**必須**用 {@code findPublicationBriefByIdsIncludingDeleted} 而不是
-     * {@code findBriefByIds}：後者帶 {@code WHERE deleted_at IS NULL}，而認證申請
+     * <p>🔴 這裡**必須**用 {@code findPublicationBriefByIdsIncludingDeleted}（不濾
+     * {@code deleted_at}）：認證申請
      * <b>結構上會指向已軟刪的商品</b>——V18 legacy migration 的 INSERT 不濾 deleted_at、
      * 賣家送件後可以刪掉自己的商品，而 {@code updateCertificationProjection} 也刻意不濾
      * （ADM 要能對已下架商品撤銷標章）。用公開視角的查詢會讓 ADM 拿到空白商品名（#2818），

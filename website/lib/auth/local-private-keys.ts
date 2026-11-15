@@ -48,7 +48,6 @@ export const LOCAL_PRIVATE_KEYS = {
 	sellerProductsUi: { key: "hawkr:seller-products:ui", in: ["local"] },
 	sellerDashboardUi: { key: "hawkr:seller-dashboard:ui", in: ["local"] },
 	sellerInventoryUi: { key: "hawkr:seller-inventory:ui", in: ["local"] },
-	productsImportUi: { key: "hawkr:products-import:ui", in: ["local"] },
 	marketListSnapshot: { key: "hk-market-list-snapshot", in: ["session"] },
 	feedListSnapshot: { key: "hk-feed-list-snapshot", in: ["session"] },
 	// 這兩把是補掃時才發現的帳號私有 key，正是

@@ -143,8 +143,7 @@ public interface LogisticsReceivableMapper extends BaseMapper<LogisticsReceivabl
      * <p>⚠️ {@code FOR UPDATE SKIP LOCKED} 讓並行的第二個 pod 直接跳過被壓住的列而不等待；
      * 少了它，兩個 pod 會排隊拿到同一批候選。
      *
-     * <p>⚠️ 用 {@code @Select} 執行 {@code UPDATE … RETURNING} 是本 repo 既有寫法
-     * （{@code ProductImportItemMapper.adjustBlockingErrorCount}）：PgJDBC 對它回 ResultSet。
+     * <p>⚠️ 用 {@code @Select} 執行 {@code UPDATE … RETURNING} 是本 repo 既有寫法：PgJDBC 對它回 ResultSet。
      */
     default List<LogisticsReceivableEntity> claimPendingForSubmit(int leaseSeconds, int batchSize) {
         return claimForSubmitByStatus(LogisticsReceivableStatus.PENDING.value(), leaseSeconds, batchSize);

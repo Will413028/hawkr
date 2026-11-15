@@ -47,9 +47,6 @@ const PUBLIC_ALLOWLIST = [
 	// away from `/seller/onboarding`.
 	"/login",
 	"/register",
-	// 賣家批次匯入精靈 → 商城模擬預覽（新 tab 開啟，刻意脫離 seller-center shell
-	// 讓賣家用「買家視角」看暫存商品；功能鎖在 previewMode，不會誤觸購買 / 收藏）
-	"/seller-product-import-preview",
 ];
 
 export default function SellerWorkspaceLock() {

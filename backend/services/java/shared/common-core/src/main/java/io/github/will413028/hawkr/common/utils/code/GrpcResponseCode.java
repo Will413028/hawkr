@@ -320,23 +320,6 @@ public enum GrpcResponseCode {
     // ===== Seller Membership 業務碼（9410~9419） =====
     SELLER_INVALID_PLAN_CODE(9410, "無此賣家方案代碼"),
 
-    // ===== Product Import 業務碼（1100~1199） =====
-    PRODUCT_IMPORT_JOB_NOT_FOUND(1101, "找不到匯入任務"),
-    PRODUCT_IMPORT_ITEM_NOT_FOUND(1102, "找不到匯入商品項"),
-    PRODUCT_IMPORT_FILE_TOO_LARGE(1103, "CSV 檔案超過大小上限（%s bytes）"),
-    PRODUCT_IMPORT_FILE_TOO_MANY_ROWS(1104, "CSV row 數超過上限（%s 筆）"),
-    PRODUCT_IMPORT_FILE_ENCODING_UNSUPPORTED(1105, "CSV 編碼非 UTF-8，請以 UTF-8 重新匯出"),
-    PRODUCT_IMPORT_FILE_HEADER_INVALID(1106, "CSV header 缺必要欄位：%s"),
-    PRODUCT_IMPORT_RATE_LIMITED(1107, "同時進行的匯入任務或每日上傳次數已達上限"),
-    PRODUCT_IMPORT_FILENAME_CONFLICT(1108, "同名 CSV 任務尚未結案，請先處理既有任務或更改檔名"),
-    PRODUCT_IMPORT_JOB_WRONG_STATUS(1109, "任務目前狀態不允許此操作（%s）"),
-    PRODUCT_IMPORT_ITEM_WRONG_STATUS(1110, "商品項目前狀態不允許編輯"),
-    PRODUCT_IMPORT_OPTIMISTIC_LOCK_FAILED(1111, "資料已被其他操作更新，請重新整理後再試"),
-    PRODUCT_IMPORT_NO_ELIGIBLE_ITEMS(1112, "沒有可上架的商品項，請先修正錯誤後再 commit"),
-    PRODUCT_IMPORT_CATEGORY_INVALID(1113, "商品分類非合法葉節點"),
-    PRODUCT_IMPORT_CONFIRMATION_TOKEN_INVALID(1114, "分類二次確認 token 無效或已過期，請重新選擇分類"),
-    PRODUCT_IMPORT_ITEM_ALREADY_COMMITTED(1115, "該匯入商品已併入正式商品，無法再編輯或移除"),
-
     // ===== AfterSales 業務碼（9001~9099） =====
     AFTERSALE_NOT_FOUND(9001, "售後單不存在"),
     AFTERSALE_DUPLICATE(9002, "該訂單已有進行中的售後申請"),

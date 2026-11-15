@@ -52,8 +52,7 @@
 			"includes": [
 				"app/(delegated)/**",
 				"features/delegated-operations/**",
-				"features/seller-center/**",
-				"!features/seller-center/products-import/**"
+				"features/seller-center/**"
 			],
 			"linter": {
 				"rules": {

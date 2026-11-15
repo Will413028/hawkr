@@ -69,17 +69,17 @@ func masked(visible BoolExpression, col Expression, empty Expression) Expression
 	return COALESCE(CASE().WHEN(visible).THEN(col), empty)
 }
 
-// topLevelComments 是貼文的頂層留言，含佔位項目：自己可見，或不可見但底下有可見的回覆（state 是 DELETED 或 HIDDEN）。
-// 容器的規則（貼文公開可讀，或店主讀自己的貼文）對父鍵 postID 只檢查一次，不是每個留言一次。
+// topLevelList 是頂層留言列表的共同形狀：範圍 scope（呼叫方給的條件，要包含「頂層」與貼文的範圍）、哪些項目出現 shown，與佔位項目的遮罩、keyset。
 // 觀看者的規則（被封鎖排除的作者）在入口的 Where：被排除的頂層整則不出現，不變成佔位項目；回覆裡被排除的列不進「有可見回覆」的判斷。
-func topLevelComments(postID uuid.UUID, v visibility.Viewer, pg CommentPage, container BoolExpression) SelectStatement {
+func topLevelList(v visibility.Viewer, pg CommentPage, scope func(c visibility.Comments) []BoolExpression, shown func(c, r visibility.Comments, visible BoolExpression) BoolExpression) SelectStatement {
 	c := visibility.CommentsOf("c", v)
 	r := visibility.CommentsOf("r", v)
 	s := table.CommentStats.AS("s")
 	vis := LATERAL(SELECT(c.Counted().AS("visible"))).AS("v")
 	visible := BoolColumn("visible").From(vis)
 	state := stateOf(visible, c.Gone())
-	hasVisibleReply := EXISTS(SELECT(r.T.ID).FROM(r.T).WHERE(r.Where(r.T.ParentID.EQ(c.T.ID), r.Counted())))
+	conds := scope(c)
+	conds = append(conds, shown(c, r, visible), afterComment(c.T.CreatedAt, c.T.ID, pg))
 	return SELECT(
 		c.T.ID.AS("id"), c.T.PostID.AS("post_id"), c.T.ParentID.AS("parent_id"), c.T.ReplyToID.AS("reply_to_id"),
 		state.AS("state"),
@@ -89,15 +89,54 @@ func topLevelComments(postID uuid.UUID, v visibility.Viewer, pg CommentPage, con
 		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), c.T.Version.AS("version"), s.LikeCount.AS("like_count"), s.ReplyCount.AS("reply_count"),
 	).
 		FROM(c.T.INNER_JOIN(s, s.CommentID.EQ(c.T.ID)).CROSS_JOIN(vis)).
-		WHERE(c.Where(
-			c.T.PostID.EQ(UUID(postID)),
-			c.T.ParentID.IS_NULL(),
-			container,
-			visible.OR(hasVisibleReply),
-			afterComment(c.T.CreatedAt, c.T.ID, pg),
-		)).
+		WHERE(c.Where(conds...)).
 		ORDER_BY(c.T.CreatedAt.ASC(), c.T.ID.ASC()).
 		LIMIT(pg.Limit)
+}
+
+// withVisibleReply 是「自己可見，或不可見但底下有可見的回覆」：頂層留言出現的條件，含佔位項目（state 是 DELETED 或 HIDDEN）。
+func withVisibleReply(c, r visibility.Comments, visible BoolExpression) BoolExpression {
+	hasVisibleReply := EXISTS(SELECT(r.T.ID).FROM(r.T).WHERE(r.Where(r.T.ParentID.EQ(c.T.ID), r.Counted())))
+	return visible.OR(hasVisibleReply)
+}
+
+// topLevelComments 是貼文的頂層留言，含佔位項目。容器的規則（貼文公開可讀，或店主讀自己的貼文）對父鍵 postID 只檢查一次，不是每個留言一次。
+func topLevelComments(postID uuid.UUID, v visibility.Viewer, pg CommentPage, container BoolExpression) SelectStatement {
+	return topLevelList(v, pg, func(c visibility.Comments) []BoolExpression {
+		return []BoolExpression{c.T.PostID.EQ(UUID(postID)), c.T.ParentID.IS_NULL(), container}
+	}, withVisibleReply)
+}
+
+// storeScope 是店主讀自己店的頂層留言的範圍：頂層，而且貼文是店家未刪除的貼文（任何狀態，不必公開）；postID 非 nil 時只那一篇。
+func storeScope(storeID int64, postID *uuid.UUID) func(c visibility.Comments) []BoolExpression {
+	return func(c visibility.Comments) []BoolExpression {
+		p := visibility.OwnerPosts("cp", storeID)
+		match := []BoolExpression{p.T.ID.EQ(c.T.PostID)}
+		if postID != nil {
+			match = append(match, p.T.ID.EQ(UUID(*postID)))
+		}
+		return []BoolExpression{c.T.ParentID.IS_NULL(), EXISTS(SELECT(p.T.ID).FROM(p.T).WHERE(p.Where(match...)))}
+	}
+}
+
+// ListStoreTopLevelComments 是店主讀自己店的頂層留言（含佔位項目）：範圍是店家所有未刪除的貼文（任何狀態，不必公開），postID 非 nil 時只那一篇；
+// 店主以店家身分讀，不套個人封鎖。
+func ListStoreTopLevelComments(storeID int64, postID *uuid.UUID, pg CommentPage) SelectStatement {
+	return topLevelList(visibility.Anonymous, pg, storeScope(storeID, postID), withVisibleReply)
+}
+
+// ListStoreUnrepliedComments 是店主的「未回覆」留言（業界基準：YouTube Studio 的「未回覆」）：範圍同 ListStoreTopLevelComments；作者不是本店、
+// 沒有刪除也沒有被隱藏（counted），而且底下沒有任何計入的本店回覆（已刪除或被隱藏的店家回覆不算回覆）；沒有佔位項目。本店自己寫的頂層留言不是待回覆的對象。
+func ListStoreUnrepliedComments(storeID int64, postID *uuid.UUID, pg CommentPage) SelectStatement {
+	shown := func(c, _ visibility.Comments, visible BoolExpression) BoolExpression {
+		authoredByStore := c.T.ActorKind.EQ(NewEnumValue("STORE")).AND(c.T.ActorID.EQ(Int64(storeID)))
+		sr := visibility.CommentsOf("sr", visibility.Anonymous)
+		storeReplied := EXISTS(SELECT(sr.T.ID).FROM(sr.T).WHERE(sr.Where(
+			sr.T.ParentID.EQ(c.T.ID), sr.Counted(), sr.T.ActorKind.EQ(NewEnumValue("STORE")), sr.T.ActorID.EQ(Int64(storeID)),
+		)))
+		return visible.AND(NOT(authoredByStore)).AND(NOT(storeReplied))
+	}
+	return topLevelList(visibility.Anonymous, pg, storeScope(storeID, postID), shown)
 }
 
 func postContainer(src visibility.Posts, postID uuid.UUID) BoolExpression {

@@ -15,7 +15,6 @@ const PRIVATE_ROUTES = [
 	"/cart",
 	"/account",
 	"/seller-center/dashboard",
-	"/seller-product-import-preview/test-job",
 ] as const;
 
 for (const route of PRIVATE_ROUTES) {

@@ -103,7 +103,7 @@ social-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 
 ## 傳輸層的沿用盤點
 
-舊 gateway 的 handler 與 gRPC 的機制，以機制為單位（認證與身分、錯誤、分頁、快取、請求大小、限流、trace、下游呼叫的逾時與重試）。新的對外 API 照〈API 設計規範（Connect）〉。A7-1a 沒有對外入口（舊 social-service 照常服務），這一節只記已知的對應，Connect 的宣告表與 handler 在 A7-2。
+舊 gateway 的 handler 與 gRPC 的機制，以機制為單位（認證與身分、錯誤、分頁、快取、請求大小、限流、trace、下游呼叫的逾時與重試）。新的對外 API 照〈API 設計規範（Connect）〉。A7-1a 沒有對外入口（舊 social-service 照常服務），這一節只記已知的對應，Connect 的宣告表與 handler 在 A7-2。A7-2c 的 `SocialAppService` 能力宣告表在 `internal/httpapi/social/declaration.go`（key 是生成的 procedure 常數，涵蓋全部方法；店主方法宣告 `seller.Cap*`，買家與店家共用的方法寫「依資源判斷」豁免與理由，`NewApp` 時雙向對照）。它只記錄與對照，不執行：能力的檢查維持在 social 模組內（`seller.Authorize`，帳號路徑與代行路徑同一個入口，step-1a-design），宣告與模組的實際檢查由 `TestOwnerDeclarationsMatchTheModuleChecks` 對齊；店主的讀取（自己的貼文、店家範圍的留言、動態數）要 `CapContentContract`（只要求店家營運中，停權時放行；ADR 修訂「收縮需要的讀取放行」）。
 
 | 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
 |---|---|---|---|---|
