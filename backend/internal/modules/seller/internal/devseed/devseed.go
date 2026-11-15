@@ -178,7 +178,7 @@ WHERE seller.stores.status = 'ACTIVE' AND seller.stores.pii_purged_at IS NULL`
 // 序號永遠不會倒退。
 const advanceSequenceSQL = `
 SELECT setval(seq, GREATEST(
-    COALESCE((SELECT p.last_value FROM pg_sequences p WHERE (quote_ident(p.schemaname) || '.' || quote_ident(p.sequencename))::regclass = seq::regclass), 0),
+    COALESCE(pg_sequence_last_value(seq::regclass), 0),
     COALESCE((SELECT max(store_id) FROM seller.stores), 0),
     9999))
 FROM (SELECT pg_get_serial_sequence('seller.stores', 'store_id') AS seq) s`
@@ -282,12 +282,14 @@ func check(ctx context.Context, conn db.DBTX, stores []Store, seedAccountIDs []i
 		return err
 	}
 	ids, codes := make([]int64, len(stores)), make([]int64, len(stores))
-	accountIDs := slices.Clone(seedAccountIDs)
+	for _, st := range stores {
+		if !slices.Contains(seedAccountIDs, st.AccountID) {
+			return fmt.Errorf("seller：種子店家 %d 的擁有者帳號 %d 不在種子帳號清單內", st.StoreID, st.AccountID)
+		}
+	}
+	accountIDs := seedAccountIDs
 	for i, st := range stores {
 		ids[i], codes[i] = st.StoreID, st.StoreCode
-		if !slices.Contains(accountIDs, st.AccountID) {
-			accountIDs = append(accountIDs, st.AccountID)
-		}
 	}
 	conflicts, err := lines(ctx, conn, conflictingStoresSQL, func(rows scanner) (string, error) {
 		var id, account, code int64
@@ -346,8 +348,8 @@ func check(ctx context.Context, conn db.DBTX, stores []Store, seedAccountIDs []i
 			"請重建本機資料庫；手動測試改用 make dev-token 不帶 -account 建立的新帳號（.agents/skills/backend-e2e-verify/SKILL.md §2），不要用種子的固定帳號")
 	}
 	if len(states) > 0 {
-		sections = append(sections, "種子店家有還在進行的生命週期狀態；它們有下游消費者（事件、停權期間、刪帳流程），種子不繞過它們去還原。\n"+strings.Join(states, "\n")+"\n"+
-			"處理：停權措施用後台 API 結束或撤銷（SellerGovernanceAdminService.EndMeasure、RevokeMeasure 或裁定申覆，"+
+		sections = append(sections, "種子店家或種子帳號（含只當買家的種子帳號）名下的店家有還在進行的生命週期狀態；它們有下游消費者（事件、停權期間、刪帳流程），種子不繞過它們去還原。\n"+strings.Join(states, "\n")+"\n"+
+			"處理：種子帳號名下的停權措施用後台 API 結束或撤銷（SellerGovernanceAdminService.EndMeasure、RevokeMeasure 或裁定申覆，"+
 			"到期的停權要等 worker 結束停權期間）；關店與等待刪除沒有還原的 API，請重建本機資料庫")
 	}
 	if len(mixed) > 0 {

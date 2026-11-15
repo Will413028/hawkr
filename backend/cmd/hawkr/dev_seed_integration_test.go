@@ -475,6 +475,7 @@ func TestDevSeedCheckRefusesSeedAccountsThatOwnOtherStores(t *testing.T) {
 	if _, err := d.Pool().Exec(ctx, `UPDATE seller.stores SET status = 'CLOSED' WHERE store_id = $1`, buyerStore); err != nil {
 		t.Fatal(err)
 	}
+	mustExec(t, d, `DELETE FROM identity.account_roles WHERE account_id = 2001 AND role = 'SELLER'`)
 	// 佔用種子 store_code 的非種子店家同樣擋下（unique 衝突會讓 upsert 失敗在半途）。
 	if _, err := d.Pool().Exec(ctx, `UPDATE seller.stores SET account_id = 60000, store_code = 9 WHERE store_id = $1`, other); err != nil {
 		t.Fatal(err)

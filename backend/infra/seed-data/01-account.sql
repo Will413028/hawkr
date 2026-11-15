@@ -2,7 +2,7 @@
 -- Hawkr 測試資料：帳號與買家（單體的 identity、buyer schema，資料庫 hawkr）
 -- ============================================================================
 -- 測試帳號 ID 約定：
---   賣家帳號: 9, 4；店家（seller 模組，由 backend 的 make dev-seed（infra/seed-test-data.sh）在本檔之後 upsert 成 fixture，不碰種子以外的店家；種子帳號 9、4 若擁有種子以外的未關閉店家，腳本在本檔之前就中止，見 make dev-seed-check）: store_id 1009, 1004，store_code 9, 4（merId HAWK9, HAWK4）
+--   賣家帳號: 9, 4；店家（seller 模組，由 backend 的 make dev-seed（infra/seed-test-data.sh）在本檔之後 upsert 成 fixture，不碰種子以外的店家；所有種子帳號（9、4、2001、2002、3001）若擁有種子以外的未關閉店家，腳本在本檔之前就中止，見 make dev-seed-check）: store_id 1009, 1004，store_code 9, 4（merId HAWK9, HAWK4）
 --   買家: 2001~2099（保留區間，fixture 只寫 2001、2002）
 --   還沒開店的買家: 3001~3099（保留區間，fixture 只寫 3001；沒有 SELLER 角色、沒有店）
 --   buyer_id: 50004、50009、52001~52099、53001~53099（見下方規則）
@@ -32,6 +32,10 @@
 -- ============================================================================
 
 BEGIN;
+
+-- 買家保留區間的上界（53001~53099 的 53099）；address_id = buyer_id * 100 + 序號（1..99）。
+CREATE TEMP TABLE seed_reserved (max_buyer_id BIGINT NOT NULL) ON COMMIT DROP;
+INSERT INTO seed_reserved VALUES (53099);
 
 CREATE TEMP TABLE seed_accounts (id BIGINT PRIMARY KEY, email TEXT NOT NULL, seller_store_id BIGINT) ON COMMIT DROP;
 INSERT INTO seed_accounts (id, email, seller_store_id) VALUES
@@ -108,7 +112,7 @@ BEGIN
   WHERE d.is_default AND d.buyer_id IN (SELECT buyer_id FROM seed_buyers)
     AND NOT EXISTS (SELECT 1 FROM seed_addresses a WHERE a.address_id = d.address_id);
   IF bad IS NOT NULL THEN
-    RAISE EXCEPTION '01-account.sql 中止，沒有寫入任何資料：種子買家 % 的預設地址不是種子地址（address_id 不在 fixture 內），種子不改使用者建立的地址。請把該預設地址改成非預設或刪除，或重建本機資料庫', bad;
+    RAISE EXCEPTION '01-account.sql 中止，沒有寫入任何資料：種子買家 % 有不在 fixture 內的預設地址（例如舊版種子以自動編號寫入的地址，或使用者建立的地址）；種子不改它們，也不搬移。請重建本機資料庫', bad;
   END IF;
 
   -- 上限是買家模組的 MaxAddresses（backend/internal/modules/buyer/internal/model/model.go）；dev_seed_test.go 檢查這個常數與它一致。
@@ -172,18 +176,17 @@ WHERE (buyer.shipping_addresses.receiver_name, buyer.shipping_addresses.receiver
        buyer.shipping_addresses.address_detail, buyer.shipping_addresses.is_default)
       IS DISTINCT FROM (EXCLUDED.receiver_name, EXCLUDED.receiver_phone, EXCLUDED.town_code, EXCLUDED.address_detail, EXCLUDED.is_default);
 
--- 序號只往前：不低於目前的 last_value（以 regclass 比對，不受引號與大小寫影響），也不低於表內最大的 ID 與 9999。
-SELECT setval(seq, GREATEST(
-  COALESCE((SELECT p.last_value FROM pg_sequences p WHERE (quote_ident(p.schemaname) || '.' || quote_ident(p.sequencename))::regclass = seq::regclass), 0),
+-- 序號只往前：不低於目前的 last_value（從未呼叫過是 NULL，以 0 計），也不低於表內最大的 ID 與 9999；
+-- 收件地址的序號另外墊高到整個保留區間之後（買家保留區間的上界 * 100 + 99），自動產生的 ID 不會落進種子 ID 空間。
+SELECT setval(seq, GREATEST(COALESCE(pg_sequence_last_value(seq::regclass), 0),
   COALESCE((SELECT max(id) FROM identity.accounts), 0), 9999))
 FROM (SELECT pg_get_serial_sequence('identity.accounts', 'id') AS seq) q;
-SELECT setval(seq, GREATEST(
-  COALESCE((SELECT p.last_value FROM pg_sequences p WHERE (quote_ident(p.schemaname) || '.' || quote_ident(p.sequencename))::regclass = seq::regclass), 0),
+SELECT setval(seq, GREATEST(COALESCE(pg_sequence_last_value(seq::regclass), 0),
   COALESCE((SELECT max(buyer_id) FROM buyer.buyers), 0), 9999))
 FROM (SELECT pg_get_serial_sequence('buyer.buyers', 'buyer_id') AS seq) q;
-SELECT setval(seq, GREATEST(
-  COALESCE((SELECT p.last_value FROM pg_sequences p WHERE (quote_ident(p.schemaname) || '.' || quote_ident(p.sequencename))::regclass = seq::regclass), 0),
-  COALESCE((SELECT max(address_id) FROM buyer.shipping_addresses), 0), 9999))
+SELECT setval(seq, GREATEST(COALESCE(pg_sequence_last_value(seq::regclass), 0),
+  COALESCE((SELECT max(address_id) FROM buyer.shipping_addresses), 0), 9999,
+  (SELECT max_buyer_id * 100 + 99 FROM seed_reserved)))
 FROM (SELECT pg_get_serial_sequence('buyer.shipping_addresses', 'address_id') AS seq) q;
 
 COMMIT;

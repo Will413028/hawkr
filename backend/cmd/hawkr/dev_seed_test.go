@@ -141,10 +141,22 @@ func TestAccountSeedAddressesMatchTheBuyerModule(t *testing.T) {
 	for _, r := range seedTable(t, sql, "seed_buyers (buyer_id, account_id, display_name, phone, gender, city)") {
 		buyers[mustInt(t, r[0])] = true
 	}
+	defaults := map[int64]int{}
 	for _, r := range seedTable(t, sql, "seed_addresses (address_id, buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default)") {
 		id, buyer := mustInt(t, r[0]), mustInt(t, r[1])
 		if !buyers[buyer] || id/100 != buyer {
 			t.Errorf("種子地址 %d 的買家 %d 不在種子買家內或不符 address_id = buyer_id * 100 + 序號", id, buyer)
+		}
+		if suffix := id % 100; suffix < 1 || suffix > 99 {
+			t.Errorf("種子地址 %d 的序號 %d 不在 1..99", id, suffix)
+		}
+		if r[6] == "true" {
+			defaults[buyer]++
+		}
+	}
+	for buyer, n := range defaults {
+		if n > 1 {
+			t.Errorf("種子買家 %d 有 %d 個預設地址，每個買家最多一個", buyer, n)
 		}
 	}
 }

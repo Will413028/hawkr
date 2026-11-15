@@ -1,11 +1,13 @@
 package devseed
 
 import (
+	"context"
 	"os"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // seller schema 的每一張表都要有種子的處理方式：只因使用而存在的店家子列由 clearChildrenSQL 清除，其餘（店家本身、公告列、media ref、不屬於店家的名單）
@@ -62,5 +64,13 @@ func TestDevSeedHasNoMeasureSQLOfItsOwn(t *testing.T) {
 	}
 	if !strings.Contains(string(src), "stint.EffectiveMany") {
 		t.Error("種子檢查要用 stint.EffectiveMany 判斷生效中的措施")
+	}
+}
+
+func TestCheckRefusesAStoreOwnerOutsideTheSeedAccounts(t *testing.T) {
+	st := Store{StoreID: 1009, StoreCode: 9, AccountID: 9, Name: "n", TownCode: "63000050", LogoKey: "k", LogoAssetID: "a"}
+	err := check(context.Background(), nil, []Store{st}, []int64{4, 2001}, time.Now())
+	if err == nil || !strings.Contains(err.Error(), "不在種子帳號清單內") {
+		t.Fatalf("擁有者不在種子帳號清單內時應該回錯誤，got %v", err)
 	}
 }
