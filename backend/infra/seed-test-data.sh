@@ -17,7 +17,7 @@ set -e
 #      - hawkr_coupon (coupon_templates, coupon_instances, seller_coupon_quotas)
 #      - hawkr_shipping (seller_shipment_settings)
 #
-# 順序: 前提檢查（dev-seed-check，種子帳號 9、4 擁有種子以外的未關閉店家、或種子帳號有刪帳申請就中止）→ 01 帳號與買家（冪等 upsert，不刪任何資料；有下游消費者的生命週期狀態不還原，遇到就中止）→ 賣家（backend 的 make dev-seed-stores：seller 模組把種子店家還原成 fixture（upsert，不碰種子以外的店家），KYC 識別欄位以執行中的金鑰加密）
+# 順序: 前提檢查（dev-seed-check，種子帳號（9、4、2001、2002、3001）擁有種子以外的未關閉店家、或有刪帳申請就中止）→ 01 帳號與買家（冪等 upsert，不刪任何資料；有下游消費者的生命週期狀態不還原，遇到就中止）→ 賣家（backend 的 make dev-seed-stores：seller 模組把種子店家還原成 fixture（upsert，不碰種子以外的店家），KYC 識別欄位以執行中的金鑰加密）
 #       → 04 商品 → 05 優惠券 → 06 配送設定 → 全量重新公告可曝光（make reannounce-exposures）。
 #       事件由 make worker 送到 RabbitMQ；沒有跑 worker 時事件留在資料庫，worker 啟動後送出。
 #       dev-seed-stores 與 reannounce-exposures 要連單體的資料庫：預設是 backend/Makefile 的 DATABASE_URL；要覆寫（例如本機的 Homebrew
@@ -77,7 +77,7 @@ if [ -n "${MONOLITH_DATABASE_URL:-}" ]; then
   MAKE_ARGS+=("DATABASE_URL=${MONOLITH_DATABASE_URL}")
 fi
 
-# 前提檢查（fail fast，在 01 之前）：種子帳號 9、4 若擁有種子店家以外的未關閉店家，種子店家寫入會撞上一帳號一家店與 SELLER 角色的 source_id；
+# 前提檢查（fail fast，在 01 之前）：種子帳號（9、4、2001、2002、3001）若擁有種子店家以外的未關閉店家，種子店家寫入會撞上一帳號一家店與 SELLER 角色的 source_id；
 # 種子帳號有刪帳申請也不能繼續。這裡擋下，不寫任何資料，也不自動刪店。
 echo -n -e "${BLUE}[前提檢查]${NC} make dev-seed-check..."
 if output=$(make -C "$BACKEND_DIR" dev-seed-check ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"} 2>&1); then

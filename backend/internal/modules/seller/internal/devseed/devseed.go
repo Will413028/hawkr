@@ -178,7 +178,7 @@ WHERE seller.stores.status = 'ACTIVE' AND seller.stores.pii_purged_at IS NULL`
 // 序號永遠不會倒退。
 const advanceSequenceSQL = `
 SELECT setval(seq, GREATEST(
-    COALESCE((SELECT last_value FROM pg_sequences WHERE schemaname || '.' || sequencename = seq), 0),
+    COALESCE((SELECT p.last_value FROM pg_sequences p WHERE (quote_ident(p.schemaname) || '.' || quote_ident(p.sequencename))::regclass = seq::regclass), 0),
     COALESCE((SELECT max(store_id) FROM seller.stores), 0),
     9999))
 FROM (SELECT pg_get_serial_sequence('seller.stores', 'store_id') AS seq) s`
@@ -271,17 +271,23 @@ ORDER BY 1`
 // Check 在不寫任何資料的前提下確認種子可以安全執行：種子帳號不擁有種子以外的未關閉店家，沒有種子以外的店家佔用種子的
 // store_code，而且種子店家沒有還在進行的生命週期狀態（停權措施、關閉、等待刪除）。不成立時回錯誤（列出店家與處理方式），不自動刪店、不還原狀態。
 // （種子帳號的刪帳申請由 accountdeletion 擁有，呼叫方在 cmd 另外檢查。）
-func (s *Service) Check(ctx context.Context, stores []Store) error {
-	return check(ctx, s.d.DB.Conn(ctx), stores, s.d.Now().UTC())
+func (s *Service) Check(ctx context.Context, stores []Store, seedAccountIDs []int64) error {
+	return check(ctx, s.d.DB.Conn(ctx), stores, seedAccountIDs, s.d.Now().UTC())
 }
 
-func check(ctx context.Context, conn db.DBTX, stores []Store, now time.Time) error {
+// seedAccountIDs 是種子的全部帳號（含沒有種子店家的買家帳號）：它們名下種子以外的未關閉店家與生效中的措施同樣擋下，
+// 因為 01-account.sql 以固定 ID 寫這些帳號、種子的帳號不能擁有種子不管的店。種子店家的擁有者必須在其中。
+func check(ctx context.Context, conn db.DBTX, stores []Store, seedAccountIDs []int64, now time.Time) error {
 	if err := validate(stores); err != nil {
 		return err
 	}
-	ids, codes, accountIDs := make([]int64, len(stores)), make([]int64, len(stores)), make([]int64, len(stores))
+	ids, codes := make([]int64, len(stores)), make([]int64, len(stores))
+	accountIDs := slices.Clone(seedAccountIDs)
 	for i, st := range stores {
-		ids[i], codes[i], accountIDs[i] = st.StoreID, st.StoreCode, st.AccountID
+		ids[i], codes[i] = st.StoreID, st.StoreCode
+		if !slices.Contains(accountIDs, st.AccountID) {
+			accountIDs = append(accountIDs, st.AccountID)
+		}
 	}
 	conflicts, err := lines(ctx, conn, conflictingStoresSQL, func(rows scanner) (string, error) {
 		var id, account, code int64
@@ -337,7 +343,7 @@ func check(ctx context.Context, conn db.DBTX, stores []Store, now time.Time) err
 	var sections []string
 	if len(conflicts) > 0 {
 		sections = append(sections, "下列店家是種子帳號名下種子以外的未關閉店家，或佔用種子的 store_code；種子店家寫入會撞上一帳號一家店與 SELLER 角色的 source_id。\n"+strings.Join(conflicts, "\n")+"\n"+
-			"請重建本機資料庫（01 的前提：改用這份 seed 前先重建本機 DB）；手動測試改用 make dev-token 不帶 -account 建立的新帳號（.agents/skills/backend-e2e-verify/SKILL.md §2），不要用種子的帳號區間")
+			"請重建本機資料庫；手動測試改用 make dev-token 不帶 -account 建立的新帳號（.agents/skills/backend-e2e-verify/SKILL.md §2），不要用種子的固定帳號")
 	}
 	if len(states) > 0 {
 		sections = append(sections, "種子店家有還在進行的生命週期狀態；它們有下游消費者（事件、停權期間、刪帳流程），種子不繞過它們去還原。\n"+strings.Join(states, "\n")+"\n"+
@@ -375,7 +381,7 @@ func lines(ctx context.Context, conn db.DBTX, query string, line func(scanner) (
 
 // Seed 在一個 transaction 內把種子店家還原成 fixture（upsert，見檔頭的說明）；先鎖店家列再做 Check，前提不成立時不寫任何資料。
 // 必須在 transaction 外呼叫。
-func (s *Service) Seed(ctx context.Context, stores []Store) error {
+func (s *Service) Seed(ctx context.Context, stores []Store, seedAccountIDs []int64) error {
 	if _, ok := db.TxFrom(ctx); ok {
 		return errors.New("seller：種子必須在 transaction 外開始")
 	}
@@ -396,7 +402,7 @@ func (s *Service) Seed(ctx context.Context, stores []Store) error {
 		if err != nil {
 			return fmt.Errorf("seller：鎖住種子店家：%w", err)
 		}
-		if err := check(ctx, conn, stores, now); err != nil {
+		if err := check(ctx, conn, stores, seedAccountIDs, now); err != nil {
 			return err
 		}
 		if err := lockApplications(ctx, conn, ids); err != nil {

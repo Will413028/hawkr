@@ -657,14 +657,14 @@ type DevSeedStore = devseed.Store
 // dev-seed 子命令使用：它直接寫列，繞過開店、送出、審核與綁定的狀態轉移；profile 有變時發 StoreProfileChanged，刪掉的證件與佐證經退場機制釋放
 // media 的引用；停權、關閉、等待刪除這些有下游消費者的生命週期狀態不還原，前提檢查發現就拒絕。寫完之後要 ReannounceExposures 讓下游知道可曝光。
 // 種子帳號名下有種子以外的未關閉店家時整個拒絕（見 CheckDevSeed）。必須在 transaction 外呼叫。
-func (m *Module) SeedDevStores(ctx context.Context, stores []DevSeedStore) error {
-	return m.devSeed.Seed(ctx, stores)
+func (m *Module) SeedDevStores(ctx context.Context, stores []DevSeedStore, seedAccountIDs []int64) error {
+	return m.devSeed.Seed(ctx, stores, seedAccountIDs)
 }
 
-// CheckDevSeed 不寫任何資料，確認 SeedDevStores 可以安全執行（在 01-account.sql 之前呼叫）：種子帳號名下沒有種子以外的未關閉店家，也沒有種子以外的店家
+// CheckDevSeed 不寫任何資料，確認 SeedDevStores 可以安全執行（在 01-account.sql 之前呼叫）：種子帳號（seedAccountIDs，含沒有店的買家帳號）名下沒有種子以外的未關閉店家，也沒有種子以外的店家
 // 佔用種子的 store_code，種子店家沒有生效中的停權或處分、停權期間，也不是 CLOSED 或 PENDING_DELETION。不成立時回的錯誤列出店家與處理方式。
-func (m *Module) CheckDevSeed(ctx context.Context, stores []DevSeedStore) error {
-	return m.devSeed.Check(ctx, stores)
+func (m *Module) CheckDevSeed(ctx context.Context, stores []DevSeedStore, seedAccountIDs []int64) error {
+	return m.devSeed.Check(ctx, stores, seedAccountIDs)
 }
 
 // ReannounceExposures 由 seller 全量重新公告可曝光：每一家店（含已關閉的）都以現在算出來的值更新公告並發 StoreExposureChanged，不比對

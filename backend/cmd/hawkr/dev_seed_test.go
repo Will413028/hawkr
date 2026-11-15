@@ -121,3 +121,30 @@ func TestAccountSeedNeverDeletesAndCreatesNoLoginIdentities(t *testing.T) {
 		t.Error("01-account.sql 不該插入 identity.account_identities")
 	}
 }
+
+// 01 的地址上限是買家模組 MaxAddresses 的複本；種子地址的固定 address_id 是 buyer_id * 100 加序號，且屬於種子買家。
+func TestAccountSeedAddressesMatchTheBuyerModule(t *testing.T) {
+	src, err := os.ReadFile("../../internal/modules/buyer/internal/model/model.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`const MaxAddresses = (\d+)`).FindSubmatch(src)
+	if m == nil {
+		t.Fatal("買家模組找不到 MaxAddresses")
+	}
+	sql := accountSeedSQL(t)
+	n := regexp.MustCompile(`max_addresses CONSTANT INT := (\d+);`).FindStringSubmatch(sql)
+	if n == nil || n[1] != string(m[1]) {
+		t.Errorf("01-account.sql 的 max_addresses %v 與買家模組的 MaxAddresses %s 不一致", n, m[1])
+	}
+	buyers := map[int64]bool{}
+	for _, r := range seedTable(t, sql, "seed_buyers (buyer_id, account_id, display_name, phone, gender, city)") {
+		buyers[mustInt(t, r[0])] = true
+	}
+	for _, r := range seedTable(t, sql, "seed_addresses (address_id, buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default)") {
+		id, buyer := mustInt(t, r[0]), mustInt(t, r[1])
+		if !buyers[buyer] || id/100 != buyer {
+			t.Errorf("種子地址 %d 的買家 %d 不在種子買家內或不符 address_id = buyer_id * 100 + 序號", id, buyer)
+		}
+	}
+}

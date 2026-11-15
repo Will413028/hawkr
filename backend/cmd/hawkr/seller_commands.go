@@ -147,7 +147,7 @@ func runDevSeed(ctx context.Context, args []string, out io.Writer) error {
 	// 刪帳申請由 accountdeletion 擁有：進行中的申請會把還原的店家再關掉、或在每小時的對帳刪掉種子帳號，種子不繞過它（沒有取消申請的 API）。
 	// 範圍是 01-account.sql upsert 的全部帳號，不只種子店家的擁有者；與店家的前提一起檢查、一起回報。
 	checkAll := func() error {
-		err := module.CheckDevSeed(ctx, stores)
+		err := module.CheckDevSeed(ctx, stores, devSeedAccountIDs)
 		open, derr := accountdeletion.NewReader(c.DB).AccountsWithOpenRequest(ctx, devSeedAccountIDs)
 		if derr != nil {
 			return errors.Join(err, derr)
@@ -167,7 +167,7 @@ func runDevSeed(ctx context.Context, args []string, out io.Writer) error {
 	if err := checkAll(); err != nil {
 		return err
 	}
-	if err := module.SeedDevStores(ctx, stores); err != nil {
+	if err := module.SeedDevStores(ctx, stores, devSeedAccountIDs); err != nil {
 		return err
 	}
 	ids := make([]int64, 0, len(stores))

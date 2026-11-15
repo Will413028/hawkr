@@ -16,14 +16,15 @@
 -- 前置：單體的 migration 已套用（backend 的 make migrate）。帳號與買家的主鍵是 IDENTITY，固定的測試 ID 以
 -- OVERRIDING SYSTEM VALUE 寫入，最後把序號推到這些範圍之後（只增不減），新註冊的帳號與買家不會撞到它們。
 --
--- 本檔是冪等的 upsert，不刪任何資料（開發種子資料改冪等 upsert 的規則：wiki/tech/dev-seed-idempotent-owned-entities.md R1）：
---   - 只寫固定 ID 的 fixture（帳號 9、4、2001、2002、3001 與它們的買家）；其他帳號、買家與使用者建立的列原封不動，
+-- 本檔是冪等的 upsert，不刪任何資料。開發種子的規則：冪等 upsert、只寫固定 ID 的種子實體、版本與序號只增不減、不刪非種子的資料、
+-- 有下游消費者的生命週期狀態不悄悄還原（遇到就中止並說明處理方式）：
+--   - 只寫固定 ID 的 fixture（帳號 9、4、2001、2002、3001、它們的買家與收件地址）；其他帳號、買家與使用者建立的列原封不動，
 --     也不碰登入身分、session、收藏、追蹤、瀏覽、補貨訂閱、會員與頭像；
 --   - 帳號的 email、買家的個資與收件地址收斂成 fixture：買家的版本只在欄位真的有變時加一；
---     收件地址以 (buyer_id, town_code, address_detail) 認定是種子的列，沒有種子以外的地址被刪；
+--     收件地址有固定的 address_id（buyer_id * 100 + 序號），只以 address_id 認定是種子的列，沒有種子以外的地址被刪；
 --   - 帳號與買家的個資變更本來就不發事件（登入更新 email、買家個資沒有事件），所以這裡也不發；
 --   - 有下游消費者的生命週期狀態不悄悄還原：種子帳號停權、刪除、等待刪除，種子買家不是 ACTIVE，帳號與買家的 ID 對不上 fixture，
---     種子的賣家角色指向別的店家，或種子買家已有種子以外的預設地址時，整個 transaction 中止，沒有寫入任何資料；
+--     種子的賣家角色指向別的店家，種子買家已有種子以外的預設地址，或補回種子地址會讓買家的地址數超過上限時，整個 transaction 中止，沒有寫入任何資料；
 --     處理方式是重建本機 DB（或改用 make dev-token 不帶 -account 建立的新帳號）。
 -- 本機登入不走外部 provider，也不建假的登入身分（account_identities）：dev 使用者以帳號 ID 識別，
 -- 以 make dev-token args='-account 2001' 之類的方式為帳號建 dev session。
@@ -53,15 +54,14 @@ INSERT INTO seed_buyers (buyer_id, account_id, display_name, phone, gender, city
 
 -- 收件地址（每個買家最多一個預設）
 CREATE TEMP TABLE seed_addresses (
-  buyer_id BIGINT NOT NULL, receiver_name TEXT NOT NULL, receiver_phone TEXT NOT NULL,
-  town_code TEXT NOT NULL, address_detail TEXT NOT NULL, is_default BOOLEAN NOT NULL,
-  PRIMARY KEY (buyer_id, town_code, address_detail)
+  address_id BIGINT PRIMARY KEY, buyer_id BIGINT NOT NULL, receiver_name TEXT NOT NULL, receiver_phone TEXT NOT NULL,
+  town_code TEXT NOT NULL, address_detail TEXT NOT NULL, is_default BOOLEAN NOT NULL
 ) ON COMMIT DROP;
-INSERT INTO seed_addresses (buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default) VALUES
-  (52001, '王小明', '0933111222', '63000020', '松仁路100號12樓',      true),
-  (52001, '王小明', '0933111222', '63000040', '南京東路三段50號8樓', false),
-  (52002, '林美玲', '0933333444', '65000010', '文化路一段200號5樓',  true),
-  (53001, '陳大偉', '0933555666', '66000060', '台灣大道四段300號',   true);
+INSERT INTO seed_addresses (address_id, buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default) VALUES
+  (5200101, 52001, '王小明', '0933111222', '63000020', '松仁路100號12樓',      true),
+  (5200102, 52001, '王小明', '0933111222', '63000040', '南京東路三段50號8樓', false),
+  (5200201, 52002, '林美玲', '0933333444', '65000010', '文化路一段200號5樓',  true),
+  (5300101, 53001, '陳大偉', '0933555666', '66000060', '台灣大道四段300號',   true);
 
 -- 與 accountdeletion 同一個鎖順序（帳號列先於買家列）；鎖到 transaction 結束，檢查與寫入之間不被改動。
 SELECT 1 FROM identity.accounts WHERE id IN (SELECT id FROM seed_accounts) ORDER BY id FOR UPDATE;
@@ -70,6 +70,7 @@ SELECT 1 FROM buyer.buyers WHERE buyer_id IN (SELECT buyer_id FROM seed_buyers) 
 DO $$
 DECLARE
   bad TEXT;
+  max_addresses CONSTANT INT := 20;
 BEGIN
   SELECT string_agg(a.id::text, ', ' ORDER BY a.id) INTO bad FROM identity.accounts a JOIN seed_accounts s ON s.id = a.id
   WHERE a.suspended_at IS NOT NULL OR a.deleted_at IS NOT NULL OR a.deletion_pending_at IS NOT NULL;
@@ -97,11 +98,29 @@ BEGIN
     RAISE EXCEPTION '01-account.sql 中止，沒有寫入任何資料：種子帳號 % 的 SELLER 角色指向種子以外的店家（或 3001 這類不該有店的帳號已開店）。請重建本機資料庫', bad;
   END IF;
 
+  SELECT string_agg(d.address_id || '（買家' || d.buyer_id || '）', ', ' ORDER BY d.address_id) INTO bad FROM buyer.shipping_addresses d
+  JOIN seed_addresses a ON a.address_id = d.address_id WHERE d.buyer_id <> a.buyer_id;
+  IF bad IS NOT NULL THEN
+    RAISE EXCEPTION '01-account.sql 中止，沒有寫入任何資料：種子地址的固定 address_id 已被別的買家的地址佔用：%。請重建本機資料庫', bad;
+  END IF;
+
   SELECT string_agg(DISTINCT d.buyer_id::text, ', ') INTO bad FROM buyer.shipping_addresses d
   WHERE d.is_default AND d.buyer_id IN (SELECT buyer_id FROM seed_buyers)
-    AND NOT EXISTS (SELECT 1 FROM seed_addresses a WHERE (a.buyer_id, a.town_code, a.address_detail) = (d.buyer_id, d.town_code, d.address_detail));
+    AND NOT EXISTS (SELECT 1 FROM seed_addresses a WHERE a.address_id = d.address_id);
   IF bad IS NOT NULL THEN
-    RAISE EXCEPTION '01-account.sql 中止，沒有寫入任何資料：種子買家 % 已有種子以外的預設地址，種子不改使用者建立的地址。請重建本機資料庫', bad;
+    RAISE EXCEPTION '01-account.sql 中止，沒有寫入任何資料：種子買家 % 的預設地址不是種子地址（address_id 不在 fixture 內），種子不改使用者建立的地址。請把該預設地址改成非預設或刪除，或重建本機資料庫', bad;
+  END IF;
+
+  -- 上限是買家模組的 MaxAddresses（backend/internal/modules/buyer/internal/model/model.go）；dev_seed_test.go 檢查這個常數與它一致。
+  SELECT string_agg(c.buyer_id || '（補回後 ' || c.total || ' 筆）', ', ' ORDER BY c.buyer_id) INTO bad FROM (
+    SELECT b.buyer_id,
+           (SELECT count(*) FROM buyer.shipping_addresses d WHERE d.buyer_id = b.buyer_id)
+         + (SELECT count(*) FROM seed_addresses a WHERE a.buyer_id = b.buyer_id
+              AND NOT EXISTS (SELECT 1 FROM buyer.shipping_addresses d WHERE d.address_id = a.address_id)) AS total
+    FROM seed_buyers b) c
+  WHERE c.total > max_addresses;
+  IF bad IS NOT NULL THEN
+    RAISE EXCEPTION '01-account.sql 中止，沒有寫入任何資料：補回被刪的種子地址會讓種子買家 % 的地址數超過上限 % 筆。請刪除該買家一些使用者建立的地址，或重建本機資料庫', bad, max_addresses;
   END IF;
 END $$;
 
@@ -138,32 +157,33 @@ INSERT INTO identity.account_roles (account_id, role, source_id)
 SELECT id, 'SELLER', seller_store_id FROM seed_accounts WHERE seller_store_id IS NOT NULL
 ON CONFLICT (account_id, role) DO NOTHING;
 
--- 先把 fixture 裡不是預設的地址降級，再更新與新增，預設地址的 partial UNIQUE 才不會在中途衝突。
+-- 先把 fixture 裡不是預設的地址降級，再 upsert，預設地址的 partial UNIQUE 才不會在中途衝突。
 UPDATE buyer.shipping_addresses d
 SET is_default = false, version = d.version + 1, updated_at = now()
 FROM seed_addresses a
-WHERE (a.buyer_id, a.town_code, a.address_detail) = (d.buyer_id, d.town_code, d.address_detail) AND d.is_default AND NOT a.is_default;
+WHERE a.address_id = d.address_id AND d.is_default AND NOT a.is_default;
 
-UPDATE buyer.shipping_addresses d
-SET receiver_name = a.receiver_name, receiver_phone = a.receiver_phone, is_default = a.is_default, version = d.version + 1, updated_at = now()
-FROM seed_addresses a
-WHERE (a.buyer_id, a.town_code, a.address_detail) = (d.buyer_id, d.town_code, d.address_detail)
-  AND (d.receiver_name, d.receiver_phone, d.is_default) IS DISTINCT FROM (a.receiver_name, a.receiver_phone, a.is_default);
+INSERT INTO buyer.shipping_addresses (address_id, buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default, created_at, updated_at) OVERRIDING SYSTEM VALUE
+SELECT address_id, buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default, now(), now() FROM seed_addresses
+ON CONFLICT (address_id) DO UPDATE
+SET receiver_name = EXCLUDED.receiver_name, receiver_phone = EXCLUDED.receiver_phone, town_code = EXCLUDED.town_code,
+    address_detail = EXCLUDED.address_detail, is_default = EXCLUDED.is_default, version = buyer.shipping_addresses.version + 1, updated_at = now()
+WHERE (buyer.shipping_addresses.receiver_name, buyer.shipping_addresses.receiver_phone, buyer.shipping_addresses.town_code,
+       buyer.shipping_addresses.address_detail, buyer.shipping_addresses.is_default)
+      IS DISTINCT FROM (EXCLUDED.receiver_name, EXCLUDED.receiver_phone, EXCLUDED.town_code, EXCLUDED.address_detail, EXCLUDED.is_default);
 
-INSERT INTO buyer.shipping_addresses (buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default, created_at, updated_at)
-SELECT a.buyer_id, a.receiver_name, a.receiver_phone, a.town_code, a.address_detail, a.is_default, now(), now() FROM seed_addresses a
-WHERE NOT EXISTS (
-  SELECT 1 FROM buyer.shipping_addresses d WHERE (d.buyer_id, d.town_code, d.address_detail) = (a.buyer_id, a.town_code, a.address_detail)
-);
-
--- 序號只往前：不低於目前的 last_value，也不低於固定 ID 與 9999。
+-- 序號只往前：不低於目前的 last_value（以 regclass 比對，不受引號與大小寫影響），也不低於表內最大的 ID 與 9999。
 SELECT setval(seq, GREATEST(
-  COALESCE((SELECT last_value FROM pg_sequences WHERE schemaname || '.' || sequencename = seq), 0),
+  COALESCE((SELECT p.last_value FROM pg_sequences p WHERE (quote_ident(p.schemaname) || '.' || quote_ident(p.sequencename))::regclass = seq::regclass), 0),
   COALESCE((SELECT max(id) FROM identity.accounts), 0), 9999))
 FROM (SELECT pg_get_serial_sequence('identity.accounts', 'id') AS seq) q;
 SELECT setval(seq, GREATEST(
-  COALESCE((SELECT last_value FROM pg_sequences WHERE schemaname || '.' || sequencename = seq), 0),
+  COALESCE((SELECT p.last_value FROM pg_sequences p WHERE (quote_ident(p.schemaname) || '.' || quote_ident(p.sequencename))::regclass = seq::regclass), 0),
   COALESCE((SELECT max(buyer_id) FROM buyer.buyers), 0), 9999))
 FROM (SELECT pg_get_serial_sequence('buyer.buyers', 'buyer_id') AS seq) q;
+SELECT setval(seq, GREATEST(
+  COALESCE((SELECT p.last_value FROM pg_sequences p WHERE (quote_ident(p.schemaname) || '.' || quote_ident(p.sequencename))::regclass = seq::regclass), 0),
+  COALESCE((SELECT max(address_id) FROM buyer.shipping_addresses), 0), 9999))
+FROM (SELECT pg_get_serial_sequence('buyer.shipping_addresses', 'address_id') AS seq) q;
 
 COMMIT;

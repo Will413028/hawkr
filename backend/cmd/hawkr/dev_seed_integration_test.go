@@ -466,6 +466,15 @@ func TestDevSeedCheckRefusesSeedAccountsThatOwnOtherStores(t *testing.T) {
 	if n := count(t, d, `SELECT count(*) FROM identity.account_roles WHERE account_id = 9 AND source_id = $1`, other); n != 1 {
 		t.Errorf("SELLER 角色被動過")
 	}
+	// 沒有種子店家的種子帳號（這裡是 2001）名下種子以外的未關閉店家同樣擋下。
+	newAccount(t, d, 2001)
+	buyerStore := openStore(t, 2001, "買家帳號的店")
+	if err := runDevSeed(ctx, []string{"-check"}, new(bytes.Buffer)); err == nil || !strings.Contains(err.Error(), "店家 "+strconv.FormatInt(buyerStore, 10)) {
+		t.Fatalf("種子買家帳號名下的店家應該被擋下：%v", err)
+	}
+	if _, err := d.Pool().Exec(ctx, `UPDATE seller.stores SET status = 'CLOSED' WHERE store_id = $1`, buyerStore); err != nil {
+		t.Fatal(err)
+	}
 	// 佔用種子 store_code 的非種子店家同樣擋下（unique 衝突會讓 upsert 失敗在半途）。
 	if _, err := d.Pool().Exec(ctx, `UPDATE seller.stores SET account_id = 60000, store_code = 9 WHERE store_id = $1`, other); err != nil {
 		t.Fatal(err)
@@ -475,7 +484,7 @@ func TestDevSeedCheckRefusesSeedAccountsThatOwnOtherStores(t *testing.T) {
 	}
 }
 
-// 01 不再重建 3001~3099 之類保留區間的帳號：區間內種子以外的帳號擁有的未關閉店家不擋前提檢查，種子照常執行、那家店原封不動。
+// 種子只寫固定 ID 的帳號：保留區間內種子以外的帳號（這裡是 3002）擁有的未關閉店家不擋前提檢查，種子照常執行、那家店原封不動。
 func TestDevSeedLeavesStoresOfNonSeedAccountsUntouched(t *testing.T) {
 	ctx := context.Background()
 	d := devSeedEnv(t)
@@ -834,7 +843,8 @@ func TestAccountSeedIsAnIdempotentUpsert(t *testing.T) {
 	mustExec(t, d, `INSERT INTO buyer.shipping_addresses (buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default, created_at, updated_at) VALUES (52001, 'u', '0900000000', '63000020', '使用者路2號', false, now(), now())`)
 	other := rowJSON(t, d, `SELECT jsonb_agg(to_jsonb(b))::text FROM buyer.buyers b WHERE buyer_id = 52050`)
 	mustExec(t, d, `UPDATE buyer.buyers SET display_name = '改過', version = version + 1 WHERE buyer_id = 52001`)
-	mustExec(t, d, `UPDATE buyer.shipping_addresses SET is_default = false WHERE buyer_id = 52001 AND town_code = '63000020' AND address_detail = '松仁路100號12樓'`)
+	mustExec(t, d, `UPDATE buyer.shipping_addresses SET is_default = false, address_detail = '改過的地址' WHERE address_id = 5200101`)
+	mustExec(t, d, `DELETE FROM buyer.shipping_addresses WHERE address_id = 5200102`)
 	var seqBefore int64
 	if err := d.Pool().QueryRow(context.Background(), `SELECT last_value FROM pg_sequences WHERE sequencename = 'buyers_buyer_id_seq'`).Scan(&seqBefore); err != nil {
 		t.Fatal(err)
@@ -848,6 +858,9 @@ func TestAccountSeedIsAnIdempotentUpsert(t *testing.T) {
 	}
 	if n := count(t, d, `SELECT count(*) FROM buyer.shipping_addresses WHERE buyer_id = 52001 AND is_default AND address_detail = '松仁路100號12樓'`); n != 1 {
 		t.Errorf("種子預設地址沒有還原")
+	}
+	if n := count(t, d, `SELECT count(*) FROM buyer.shipping_addresses WHERE address_id = 5200102 AND address_detail = '南京東路三段50號8樓'`); n != 1 {
+		t.Errorf("被刪的種子地址沒有補回")
 	}
 	if n := count(t, d, `SELECT count(*) FROM buyer.shipping_addresses WHERE address_detail LIKE '使用者路%'`); n != 2 {
 		t.Errorf("使用者建立的地址被刪或被改，剩 %d 筆", n)
@@ -873,7 +886,12 @@ func TestAccountSeedRefusesStateItWouldHaveToRevert(t *testing.T) {
 		{"買家等待刪除", `UPDATE buyer.buyers SET status = 'PENDING_DELETION' WHERE buyer_id = 52002`, "種子買家 52002"},
 		{"SELLER 角色指向別的店", `UPDATE identity.account_roles SET source_id = 7 WHERE account_id = 9`, "種子帳號 9"},
 		{"買家 ID 對不上", `UPDATE buyer.buyers SET account_id = 2999 WHERE buyer_id = 52001`, "52001"},
-		{"種子以外的預設地址", `UPDATE buyer.shipping_addresses SET address_detail = '別處' WHERE buyer_id = 52001 AND is_default`, "種子買家 52001"},
+		{"種子以外的預設地址", `UPDATE buyer.shipping_addresses SET is_default = false WHERE address_id = 5200101;
+			INSERT INTO buyer.shipping_addresses (buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default, created_at, updated_at) VALUES (52001, 'u', '0900000000', '63000020', '使用者預設路1號', true, now(), now())`, "種子買家 52001 的預設地址不是種子地址"},
+		{"補回種子地址會超過上限", `DELETE FROM buyer.shipping_addresses WHERE address_id = 5200102;
+			INSERT INTO buyer.shipping_addresses (buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default, created_at, updated_at)
+			SELECT 52001, 'u', '0900000000', '63000020', '使用者路' || g, false, now(), now() FROM generate_series(1, 19) g`, "種子買家 52001（補回後 21 筆）"},
+		{"種子地址 ID 被別的買家佔用", `UPDATE buyer.shipping_addresses SET buyer_id = 52002 WHERE address_id = 5200102`, "5200102（買家52002）"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d := devSeedEnv(t)
