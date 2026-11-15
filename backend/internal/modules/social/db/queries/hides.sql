@@ -29,8 +29,8 @@ WHERE forum_entry_id = sqlc.arg(forum_entry_id) AND restored_at IS NULL
 RETURNING *;
 
 -- name: InsertSanction :one
-INSERT INTO social.sanctions (id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at, ends_at)
-VALUES (sqlc.arg(id), sqlc.arg(buyer_id), sqlc.arg(kind), sqlc.arg(reason_category), sqlc.arg(reason_text), sqlc.narg(source_ref), sqlc.arg(admin_id), sqlc.arg(now), sqlc.narg(ends_at))
+INSERT INTO social.sanctions (id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(buyer_id), sqlc.arg(kind), sqlc.arg(reason_category), sqlc.arg(reason_text), sqlc.narg(source_ref), sqlc.arg(admin_id), sqlc.arg(now))
 RETURNING *;
 
 -- name: ListSanctions :many

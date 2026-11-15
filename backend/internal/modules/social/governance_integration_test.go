@@ -20,7 +20,7 @@ func TestSD11WarningIsARecordTheBuyerCanRead(t *testing.T) {
 	b, other := f.newBuyer(t), f.newBuyer(t)
 	w, err := f.module.Warn(ctx, social.WarnInput{BuyerID: b.BuyerID, Category: "HARASSMENT", Text: "請勿辱罵他人", SourceRef: "case-77", AdminID: 5})
 	must(t, err)
-	if w.Kind != social.SanctionWarning || w.EndsAt != nil || w.Category != "HARASSMENT" || w.SourceRef != "case-77" {
+	if w.Kind != social.SanctionWarning || w.Category != "HARASSMENT" || w.SourceRef != "case-77" {
 		t.Fatalf("%+v", w)
 	}
 	mustV[social.Sanction](t)(f.module.Warn(ctx, social.WarnInput{BuyerID: b.BuyerID, Category: "SPAM", AdminID: 5}))

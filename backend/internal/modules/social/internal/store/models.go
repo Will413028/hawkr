@@ -212,7 +212,6 @@ type SocialSanction struct {
 	SourceRef      *string
 	AdminID        int64
 	CreatedAt      time.Time
-	EndsAt         *time.Time
 }
 
 type SocialViewSalt struct {

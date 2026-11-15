@@ -351,7 +351,6 @@ type Sanction struct {
 	SourceRef string
 	AdminID   int64
 	CreatedAt time.Time
-	EndsAt    *time.Time
 }
 
 // SanctionCursor 是處分清單的排序鍵：(CreatedAt, ID) 由大到小。

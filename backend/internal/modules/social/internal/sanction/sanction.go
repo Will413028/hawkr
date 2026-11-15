@@ -261,7 +261,7 @@ func (s *Service) Warn(ctx context.Context, in model.WarnInput) (model.Sanction,
 }
 
 func toSanction(r store.SocialSanction) model.Sanction {
-	out := model.Sanction{ID: r.ID, BuyerID: r.BuyerID, Kind: model.SanctionKind(r.Kind), Category: r.ReasonCategory, Text: r.ReasonText, AdminID: r.AdminID, CreatedAt: r.CreatedAt, EndsAt: r.EndsAt}
+	out := model.Sanction{ID: r.ID, BuyerID: r.BuyerID, Kind: model.SanctionKind(r.Kind), Category: r.ReasonCategory, Text: r.ReasonText, AdminID: r.AdminID, CreatedAt: r.CreatedAt}
 	if r.SourceRef != nil {
 		out.SourceRef = *r.SourceRef
 	}

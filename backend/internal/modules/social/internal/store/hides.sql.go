@@ -106,9 +106,9 @@ func (q *Queries) InsertForumEntryHide(ctx context.Context, arg InsertForumEntry
 }
 
 const insertSanction = `-- name: InsertSanction :one
-INSERT INTO social.sanctions (id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at, ends_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at, ends_at
+INSERT INTO social.sanctions (id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at
 `
 
 type InsertSanctionParams struct {
@@ -120,7 +120,6 @@ type InsertSanctionParams struct {
 	SourceRef      *string
 	AdminID        int64
 	Now            time.Time
-	EndsAt         *time.Time
 }
 
 func (q *Queries) InsertSanction(ctx context.Context, arg InsertSanctionParams) (SocialSanction, error) {
@@ -133,7 +132,6 @@ func (q *Queries) InsertSanction(ctx context.Context, arg InsertSanctionParams) 
 		arg.SourceRef,
 		arg.AdminID,
 		arg.Now,
-		arg.EndsAt,
 	)
 	var i SocialSanction
 	err := row.Scan(
@@ -145,7 +143,6 @@ func (q *Queries) InsertSanction(ctx context.Context, arg InsertSanctionParams) 
 		&i.SourceRef,
 		&i.AdminID,
 		&i.CreatedAt,
-		&i.EndsAt,
 	)
 	return i, err
 }
@@ -228,7 +225,7 @@ func (q *Queries) ListHiddenContentOf(ctx context.Context, arg ListHiddenContent
 }
 
 const listSanctions = `-- name: ListSanctions :many
-SELECT id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at, ends_at FROM social.sanctions
+SELECT id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at FROM social.sanctions
 WHERE buyer_id = $1
   AND (created_at, id) < ($2::timestamptz, $3::uuid)
 ORDER BY created_at DESC, id DESC
@@ -266,7 +263,6 @@ func (q *Queries) ListSanctions(ctx context.Context, arg ListSanctionsParams) ([
 			&i.SourceRef,
 			&i.AdminID,
 			&i.CreatedAt,
-			&i.EndsAt,
 		); err != nil {
 			return nil, err
 		}
