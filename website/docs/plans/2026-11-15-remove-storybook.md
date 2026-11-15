@@ -70,11 +70,13 @@ knip 基線（2026-11-15 重做）：附件 `knip-baseline.json` 是 d69bbbbc（
   - 停止條件：某個 play 依賴 Storybook 專屬行為且無法等價改寫——回報，不刪弱斷言。
   - 延後：深色主題的測試只斷言 `data-theme=dark`（與原 play 相同，但該屬性由 render helper 設定，驗不到深色樣式；觸發條件：步驟 4 的 axe 或任何深色樣式回歸需要元件層證據時補樣式斷言）；只出現在 `*.browser.test.tsx` 的 Tailwind class 不會產生（`globals.css` 的 `@source not`；觸發條件：某個改寫需要 app 程式碼沒用過的外框 class，屆時讓 browser setup 掃描測試檔）。
   - 已決（Will 2026-11-15 選查清來源）：knip 基線。66 筆中 65 筆是原基線格式去重造成的假差異，1 筆 types 來自併入的 dev；基線與比對方法已改，見驗收基線段。
-- [ ] **3. Cart、DescriptionEditor 系列**（被擋於：步驟 1；與步驟 2 都會改 `website/vitest.config.ts` 的 browser project 與 `website/tests/browser/`，兩步依序合併，不並行）
+- [x] **3. Cart、DescriptionEditor 系列**（被擋於：步驟 1；與步驟 2 都會改 `website/vitest.config.ts` 的 browser project 與 `website/tests/browser/`，兩步依序合併，不並行）
   - 範圍：`inventory.md` §1 標「步驟 3 改寫」的 7 檔、57 個 play；msw service worker 與 `description-image-fixtures.ts` 搬到 `website/tests/browser/`。
   - 消費端：`rg -n 'description-image-fixtures|mockServiceWorker' website .github`
   - 不能動：`.github/workflows/website-e2e.yml` 第 86 行描述的圖片網域判定（fixture 攔的網域不變）。
   - 驗收：同步驟 2 的對照表與 CI；mutation：`DescriptionEditorDeletion` 與 `Cart` 各破壞一個被斷言的行為，job 要失敗。
+  - 實作發現（CI 實證）：vitest browser 預設視窗寬 414px，Editor.js 在 650px 以下視為手機版、不依滑鼠移動區塊工具列（`editorjs.mjs` 的 `be()` 與 `enableModuleBindings`），依賴 hover 的測試要先 `page.viewport(1280, 800)` 再掛載；`*Sync` matcher 只檢查一次，掛載或操作後的 DOM 斷言要包在 `waitFor`。
+  - 延後：`DescriptionEditorImage` 的 msw worker 啟動失敗時清理步驟丟 TypeError 蓋掉原錯誤、`Cart` 檔內手動 `cleanup()` 與 setup 重複並依賴 hook 順序（觸發條件：任一處造成難診斷的 CI 失敗，或步驟 5 整理 `tests/browser/` 時）；Cart 的 `--hk-text-scale` 斷言只驗到測試 helper 自己設的值（觸發條件：需要驗外層字級設定時，改由 app 的 layout 設定）。
 - [ ] **4. a11y 改用 axe 進 Playwright e2e**（被擋於：步驟 1；D1 已決）
   - 範圍：依 D1 加入套件，在既有 e2e（`website/tests/e2e/`）的主要頁面加 axe 掃描，規則等級對齊 Storybook 的 `a11y.test: "error"`（違規即失敗）；涵蓋原 story 的元件出現的頁面清單寫在 spec 開頭註解之外的 PR 描述。
   - 消費端：`rg -ln 'test\(' website/tests/e2e`
@@ -105,7 +107,7 @@ knip 基線（2026-11-15 重做）：附件 `knip-baseline.json` 是 d69bbbbc（
 |---|---|---|---|---|
 | 1 Browser runner 與試點 | 完成 | lint、test、knip（對 8494f0fa 逐筆無新增，2026-11-15 重測）本機；PR #377 新 job 8 測試綠（run 43672612523，含 8 個 e2e shard）；mutation 忽略 `disabled` 時只有 `is disabled when disabled is set` 失敗（run 43672321091），revert 後回綠 | — | 36649e77..a74318de |
 | 2 基礎元件改寫 | 完成 | lint、`test:unit` 本機；PR #377 在 dcd3f3bd 全部檢查綠（website-e2e run 43680495072：元件 browser job 25 檔 92 測試、8 個 e2e shard；website-ci run 43680495013）；mutation 各只有目標測試失敗後 revert 回綠：DatePicker 選日期不回報 onChange（run 43675932096）、ClarifyQuestionCard 描述不 trim（run 43679360536）、Tabs 非受控點擊不切換（run 43679556022）；play 對照表在 PR 描述；`/code-review` 2a 兩輪、2b 一輪，finding 全部修正或附理由駁回 | knip：0e4b2b02 對新基線（d69bbbbc）`knip-diff.py` new 0；原「多 66 筆」已查清，見驗收基線段 | e83cd330..dcd3f3bd |
-| 3 Cart、DescriptionEditor | 未開始 | | | |
+| 3 Cart、DescriptionEditor | 完成 | lint、`test:unit`、knip（`knip-diff.py` new 0）本機；PR #377 在 44284b2e 全部檢查綠（website-e2e run 43688865121：元件 browser job 32 檔 151 測試、8 個 e2e shard）；mutation（run 43688094850）拿掉存檔失敗後的重試時只有「最後一次存檔失敗 · 補存後 onChange 跟上」失敗、不可購買商品數量不停用時只有「disables quantity for an unavailable item…」失敗，revert 後回綠；play 對照表在 PR 描述；`/code-review` 兩輪加 Will 同意的第三輪，契約對照審查 1 項 should 已修 | — | 831991d8..44284b2e |
 | 4 axe 進 e2e | 未開始 | | | |
 | 5 確認並刪除 Storybook | 未開始 | | | |
 | 6 收尾 | 未開始 | | | |
