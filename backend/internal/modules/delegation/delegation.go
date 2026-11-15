@@ -64,12 +64,14 @@ type failureRecorder interface {
 }
 
 type Module struct {
-	seller        Seller
-	failures      failureRecorder
-	logger        *slog.Logger
-	authorization *authorization.Module
-	audit         *audit.Module
-	session       *session.Module
+	seller               Seller
+	cancelStoreSchedules func(ctx context.Context, storeID int64) error
+	failures             failureRecorder
+	operations           operationRunner
+	logger               *slog.Logger
+	authorization        *authorization.Module
+	audit                *audit.Module
+	session              *session.Module
 }
 
 // storeStateOf 讀店家此刻的狀態：只有 seller 回 NotFound 時才是找不到（Found 為 false）；已關閉的店家存在，Found 為 true、Closed 為 true。可營運與原因
@@ -139,18 +141,21 @@ func New(d Deps) *Module {
 	auditModule := audit.New(audit.Deps{
 		DB: d.DB, Events: d.Events, Session: s, NewID: d.NewID, Now: d.Now,
 	})
+	cancelStoreSchedules := func(ctx context.Context, storeID int64) error {
+		_, err := d.Social.CancelDelegatedSchedulesOfStore(ctx, storeID, social.CancelAuthorityLost)
+		return err
+	}
 	return &Module{
-		session:  s,
-		audit:    auditModule,
-		seller:   d.Seller,
-		failures: auditModule,
-		logger:   d.Logger,
+		cancelStoreSchedules: cancelStoreSchedules,
+		session:              s,
+		audit:                auditModule,
+		seller:               d.Seller,
+		failures:             auditModule,
+		operations:           auditModule,
+		logger:               d.Logger,
 		authorization: authorization.New(authorization.Deps{
 			DB: d.DB, Identity: d.Identity, Session: s, StoreState: storeState, NewID: d.NewID, Now: d.Now,
-			CancelSchedulesOfStore: func(ctx context.Context, storeID int64) error {
-				_, err := d.Social.CancelDelegatedSchedulesOfStore(ctx, storeID, social.CancelAuthorityLost)
-				return err
-			},
+			CancelSchedulesOfStore: cancelStoreSchedules,
 		}),
 	}
 }
@@ -418,15 +423,28 @@ func (m *Module) EndDelegationsOfAdmin(ctx context.Context, adminID int64) error
 	return m.session.EndDelegationsOfAdmin(ctx, adminID)
 }
 
-// OnStoreSuspended 訂閱 seller 的 StoreSuspended：在停權生效的同一個 transaction 內結束該店進行中的代行 session（第五個授權失效的觸發點；結束同後台登出：憑證立刻失效，
-// 不寫 REVOKED）。組裝點以 events.Subscribe 訂閱。
+// OnStoreSuspended 訂閱 seller 的 StoreSuspended：在停權生效的同一個 transaction 內，先取消該店待發布的代行排程、再結束進行中的代行 session
+// （第五個授權失效的觸發點；結束同後台登出：憑證立刻失效，不寫 REVOKED）。組裝點以 events.Subscribe 訂閱。
 func (m *Module) OnStoreSuspended(ctx context.Context, e seller.StoreSuspended) error {
-	return m.session.EndDelegationsOfStore(ctx, e.StoreID)
+	return m.storeNotDelegable(ctx, e.StoreID)
 }
 
-// OnStoreClosed 訂閱 seller 的 StoreClosed：與 OnStoreSuspended 相同，在關店的同一個 transaction 內結束該店進行中的代行 session。組裝點以 events.Subscribe 訂閱。
+// OnStoreClosed 訂閱 seller 的 StoreClosed：與 OnStoreSuspended 相同，在關店的同一個 transaction 內處理。組裝點以 events.Subscribe 訂閱。
 func (m *Module) OnStoreClosed(ctx context.Context, e seller.StoreClosed) error {
-	return m.session.EndDelegationsOfStore(ctx, e.StoreID)
+	return m.storeNotDelegable(ctx, e.StoreID)
+}
+
+// OnStorePendingDeletion 訂閱 seller 的 StorePendingDeletion：店家等待刪除不可代行，與 OnStoreSuspended 相同。組裝點以 events.Subscribe 訂閱。
+func (m *Module) OnStorePendingDeletion(ctx context.Context, e seller.StorePendingDeletion) error {
+	return m.storeNotDelegable(ctx, e.StoreID)
+}
+
+// storeNotDelegable 先取消該店待發布的代行排程（鎖 social 的列，必須在改 delegation 的列之前，單體規則 4），再結束進行中的 session。
+func (m *Module) storeNotDelegable(ctx context.Context, storeID int64) error {
+	if err := m.cancelStoreSchedules(ctx, storeID); err != nil {
+		return err
+	}
+	return m.session.EndDelegationsOfStore(ctx, storeID)
 }
 
 // OnPostPublished 訂閱 social 的 PostPublished：代行發起的排程到點發布時，在發布的同一個 transaction 內寫一列 SUCCEEDED 的稽核（單段，冪等鍵
@@ -475,7 +493,3 @@ func NewScheduleAuthorizer(d Deps) social.ScheduleAuthorizer {
 		DB: d.DB, Identity: d.Identity, StoreState: storeStateOf(d.Seller), Now: d.Now, Logger: d.Logger,
 	})}
 }
-
-// CheckDelegationSession 檢查代行 session 此刻還能用（ACTIVE，到期與已撤銷分別是 DenialSessionExpired、DenialSessionRevoked）並帶有能力 c（DenialCapabilityDenied）；
-// 代行 Connect 的 interceptor 與每個代行 use case 用的是同一個函式。
-func CheckDelegationSession(s DelegationSession, c Capability) error { return model.CheckSession(s, c) }

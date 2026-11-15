@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 	"uuid"
 
@@ -70,11 +71,6 @@ func NewDelegated(runner DelegationRunner, posts DelegatedPosts, buyers Buyers, 
 	return &Delegated{presenter: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin}, runner: runner, posts: posts}, nil
 }
 
-var (
-	delegatedCreatePaths   = rpc.FieldPaths{"Body": "body", "ImageToken": "image_staged_token", "ProductID": "product_id"}
-	delegatedSchedulePaths = rpc.FieldPaths{"PublishAt": "publish_time"}
-)
-
 // delegatedOperation 解析每個寫入共同的稽核資料：request_id 必填（UUIDv4）；操作原因 1 到 100 字；notify_seller 不設是通知。
 func delegatedOperation(op *pb.DelegatedOperation) (moddelegation.DelegatedOperation, error) {
 	if !op.ProtoReflect().IsValid() {
@@ -85,8 +81,8 @@ func delegatedOperation(op *pb.DelegatedOperation) (moddelegation.DelegatedOpera
 		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation.request_id", "operation.request_id 必填，而且必須是 UUIDv4")
 	}
 	reason := strings.TrimSpace(op.GetOperationReason())
-	if reason == "" || utf8.RuneCountInString(reason) > 100 {
-		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation.operation_reason", "operation.operation_reason 必填，去除首尾空白後 1 到 100 個字元")
+	if reason == "" || utf8.RuneCountInString(reason) > 100 || strings.ContainsFunc(reason, unicode.IsControl) {
+		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation.operation_reason", "operation.operation_reason 必填，去除首尾空白後 1 到 100 個字元，不得含控制字元")
 	}
 	return moddelegation.DelegatedOperation{RequestID: *id, Reason: reason, NotifySeller: op.NotifySeller == nil || op.GetNotifySeller()}, nil
 }
@@ -222,7 +218,7 @@ func (h *Delegated) CreateStorePost(ctx context.Context, req *connect.Request[pb
 		return p, nil, err
 	})
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, delegatedCreatePaths)
+		return nil, rpc.WithFieldPaths(err, createPostPaths)
 	}
 	out, err := h.ownPost(ctx, st, post)
 	if err != nil {
@@ -345,7 +341,7 @@ func (h *Delegated) ScheduleStorePost(ctx context.Context, req *connect.Request[
 		return s.Post, &sat, err
 	})
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, delegatedSchedulePaths)
+		return nil, rpc.WithFieldPaths(err, schedulePostPaths)
 	}
 	out, err := h.ownPost(ctx, st, post)
 	if err != nil {

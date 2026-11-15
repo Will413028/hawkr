@@ -434,7 +434,7 @@ func (m *Module) EndDelegationsOfAdmin(ctx context.Context, adminID int64) error
 	return nil
 }
 
-// EndDelegationsOfStore 結束這家店進行中的代行（憑證立刻失效，不寫 REVOKED，發起的排程不取消：到點的重驗會因為店家不可代行而取消）；店家停權或關店時呼叫。
+// EndDelegationsOfStore 結束這家店進行中的代行（憑證立刻失效，不寫 REVOKED）；店家停權、關店或等待刪除時呼叫，呼叫方要先取消該店的排程（social 的列在 delegation 之前鎖）。
 // 只有 UPDATE，在 seller 的 transaction 內呼叫時鎖順序是 seller 之後 delegation（由下往上）。
 func (m *Module) EndDelegationsOfStore(ctx context.Context, storeID int64) error {
 	now := m.d.Now()

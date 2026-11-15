@@ -572,7 +572,7 @@ func TestDelegatedReadsStayInTheTargetStoreAndTheReasonIsValidated(t *testing.T)
 	if n := f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND result = 'FAILED' AND action = 'POST_CREATE' AND biz_code = 9260`, sid); n != len(reasons) {
 		t.Fatalf("FAILED（9260）%d 列，預期 %d", n, len(reasons))
 	}
-	if n := f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND result = 'FAILED' AND operation_reason IS NOT NULL AND char_length(operation_reason) NOT BETWEEN 1 AND 100`, sid); n != 0 {
+	if n := f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND result = 'FAILED' AND operation_reason IS NOT NULL AND (char_length(operation_reason) NOT BETWEEN 1 AND 100 OR operation_reason ~ '[[:cntrl:]]')`, sid); n != 0 {
 		t.Fatalf("不合法的操作原因被寫進 FAILED 列 %d 列", n)
 	}
 }

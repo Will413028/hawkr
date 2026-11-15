@@ -24,6 +24,7 @@ func newDelegation(bus *events.Bus, d delegation.Deps) *delegation.Module {
 	events.Subscribe(bus, m.OnPostPublished)
 	events.Subscribe(bus, m.OnStoreSuspended)
 	events.Subscribe(bus, m.OnStoreClosed)
+	events.Subscribe(bus, m.OnStorePendingDeletion)
 	return m
 }
 

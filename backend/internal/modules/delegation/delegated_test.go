@@ -3,6 +3,7 @@ package delegation
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"uuid"
 
@@ -113,14 +114,13 @@ func TestAuthorizeDelegatedLeavesAnAllowedRequestUnrecorded(t *testing.T) {
 	}
 }
 
-// 讀取：被拒絕（能力、店家）都寫 FAILED 且不執行讀取；成功的讀取不寫。
+// 讀取：店家不可代行寫 FAILED（session 與能力由 interceptor 的 AuthorizeDelegated 檢查） 且不執行讀取；成功的讀取不寫。
 func TestDelegatedReadRecordsDenialsAndSkipsTheRead(t *testing.T) {
 	for name, tc := range map[string]struct {
 		c      DelegatedCaller
 		seller Seller
 		denial DelegationDenial
 	}{
-		"缺能力":   {caller(DelegationActive, readMethod, CapabilityPostsWrite), fixedSeller{store: openStore()}, DenialCapabilityDenied},
 		"店家已關閉": {caller(DelegationActive, readMethod, CapabilityPostsRead), fixedSeller{store: closedStore()}, DenialStoreClosed},
 		"店家不存在": {caller(DelegationActive, readMethod, CapabilityPostsRead), fixedSeller{err: notFound()}, DenialStoreNotDelegable},
 	} {
@@ -149,33 +149,137 @@ func TestDelegatedReadRecordsDenialsAndSkipsTheRead(t *testing.T) {
 	}
 }
 
-// 寫入：進 transaction 之前的拒絕（session、能力、店家）寫 FAILED，不執行寫入；請求的 request_id 與操作原因記在 FAILED 列上。
-func TestDelegatedWriteRecordsPreTransactionDenialsAndSkipsTheWrite(t *testing.T) {
+// operations 是單段稽核的替身：記下收到的輸入，像 RunOperation 一樣在「transaction 內」呼叫 do（do 失敗就整段失敗，不留 SUCCEEDED）。
+type operations struct {
+	got      []model.OperationAuditInput
+	replayed bool
+	ran      bool
+}
+
+func (o *operations) RunOperation(ctx context.Context, in model.OperationAuditInput, do func(context.Context) (model.OperationOutcome, error)) (model.AuditLog, bool, error) {
+	o.got = append(o.got, in)
+	if o.replayed {
+		id := "res-1"
+		return model.AuditLog{ResourceID: &id}, true, nil
+	}
+	o.ran = true
+	if _, err := do(ctx); err != nil {
+		return model.AuditLog{}, false, err
+	}
+	return model.AuditLog{}, false, nil
+}
+
+// 店家此刻不可代行在寫入的 transaction 內判斷（do 之前、同一個 RunOperation），被拒絕時 do 不執行並另寫一列 FAILED；
+// FAILED 列帶著請求已知的資源名稱、ID、request_id 與操作原因。
+func TestDelegatedWriteChecksTheStoreInsideTheOperationAndRecordsTheFailure(t *testing.T) {
 	op := DelegatedOperation{RequestID: uuid.New(), Reason: "店家要求"}
-	w := DelegatedWrite{Op: op, PayloadHash: "h"}
-	for name, tc := range map[string]struct {
-		c      DelegatedCaller
-		seller Seller
-		denial DelegationDenial
-	}{
-		"缺能力":   {caller(DelegationActive, writeMethod, CapabilityPostsRead), fixedSeller{store: openStore()}, DenialCapabilityDenied},
-		"已撤銷":   {caller(DelegationRevoked, writeMethod, CapabilityPostsWrite), fixedSeller{store: openStore()}, DenialSessionRevoked},
-		"店家已關閉": {caller(DelegationActive, writeMethod, CapabilityPostsWrite), fixedSeller{store: closedStore()}, DenialStoreClosed},
+	w := DelegatedWrite{Op: op, PayloadHash: "h", ResourceName: "預覽", ResourceID: "r-1"}
+	rec, ops := &recorder{}, &operations{}
+	m := &Module{seller: fixedSeller{store: closedStore()}, failures: rec, operations: ops}
+	did := false
+	_, err := m.DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsWrite), w, func(context.Context, seller.Store) (DelegatedOutcome, error) {
+		did = true
+		return DelegatedOutcome{}, nil
+	})
+	if denialOf(t, err) != DenialStoreClosed || did || !ops.ran {
+		t.Fatalf("err=%v do=%v 稽核=%v，預期 StoreClosed、do 不執行、店家檢查在 RunOperation 之內", err, did, ops.ran)
+	}
+	if len(rec.got) != 1 {
+		t.Fatalf("FAILED 紀錄 %d 筆", len(rec.got))
+	}
+	if in := rec.got[0]; in.RequestID != op.RequestID.String() || in.OperationReason != "店家要求" || in.Action != AuditPostCreate || in.ResourceName != "預覽" || in.ResourceID != "r-1" {
+		t.Errorf("FAILED 紀錄 = %+v", in)
+	}
+}
+
+// 重送：do 沒有被呼叫，店家仍要此刻可代行（拒絕就回拒絕）。
+func TestDelegatedWriteReplayStillRequiresAnOperableStore(t *testing.T) {
+	w := DelegatedWrite{Op: DelegatedOperation{RequestID: uuid.New(), Reason: "店家要求"}, PayloadHash: "h"}
+	c := caller(DelegationActive, writeMethod, CapabilityPostsWrite)
+	do := func(context.Context, seller.Store) (DelegatedOutcome, error) { return DelegatedOutcome{}, nil }
+	res, err := (&Module{seller: fixedSeller{store: openStore()}, failures: &recorder{}, operations: &operations{replayed: true}}).DelegatedWrite(t.Context(), c, w, do)
+	if err != nil || !res.Replayed || res.ResourceID != "res-1" || res.Store.StoreID != 5 {
+		t.Fatalf("重送：%+v %v", res, err)
+	}
+	if _, err := (&Module{seller: fixedSeller{store: closedStore()}, failures: &recorder{}, operations: &operations{replayed: true}}).DelegatedWrite(t.Context(), c, w, do); denialOf(t, err) != DenialStoreClosed {
+		t.Fatalf("店家已關閉的重送：%v", err)
+	}
+}
+
+// 內容雜湊綁定操作原因與 notify_seller：同一把 request_id 帶不同的原因或通知設定不是重送（AIP-155）。
+func TestAuditPayloadHashCoversTheReasonAndNotifySeller(t *testing.T) {
+	base := DelegatedWrite{Op: DelegatedOperation{RequestID: uuid.New(), Reason: "原因", NotifySeller: true}, PayloadHash: "h"}
+	h := auditPayloadHash(base)
+	for name, w := range map[string]DelegatedWrite{
+		"原因": {Op: DelegatedOperation{RequestID: base.Op.RequestID, Reason: "別的原因", NotifySeller: true}, PayloadHash: "h"},
+		"通知": {Op: DelegatedOperation{RequestID: base.Op.RequestID, Reason: "原因", NotifySeller: false}, PayloadHash: "h"},
+		"內容": {Op: base.Op, PayloadHash: "h2"},
 	} {
-		rec := &recorder{}
-		did := false
-		_, err := newTestModule(rec, tc.seller).DelegatedWrite(t.Context(), tc.c, w, func(context.Context, seller.Store) (DelegatedOutcome, error) {
-			did = true
-			return DelegatedOutcome{}, nil
-		})
-		if denialOf(t, err) != tc.denial || did {
-			t.Errorf("%s：%v（寫入執行 %v），預期 %v 且不執行", name, err, did, tc.denial)
+		if auditPayloadHash(w) == h {
+			t.Errorf("%s不同，雜湊卻相同", name)
 		}
-		if len(rec.got) != 1 {
-			t.Fatalf("%s：FAILED 紀錄 %d 筆", name, len(rec.got))
+	}
+	if auditPayloadHash(DelegatedWrite{Op: DelegatedOperation{RequestID: base.Op.RequestID, Reason: "  原因 ", NotifySeller: true}, PayloadHash: "h"}) != h {
+		t.Error("首尾空白不算不同的原因")
+	}
+	ops := &operations{}
+	m := &Module{seller: fixedSeller{store: openStore()}, failures: &recorder{}, operations: ops}
+	if _, err := m.DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsWrite), base, func(context.Context, seller.Store) (DelegatedOutcome, error) { return DelegatedOutcome{}, nil }); err != nil {
+		t.Fatal(err)
+	}
+	if len(ops.got) != 1 || ops.got[0].PayloadHash != h {
+		t.Fatalf("交給稽核的雜湊 = %+v，預期 %s", ops.got, h)
+	}
+}
+
+// 請求的 ctx 已取消仍要留下 FAILED 列：寫入時的 ctx 不帶取消，但有期限。
+func TestFailureIsRecordedEvenWhenTheRequestContextIsCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	var seen error
+	var hasDeadline bool
+	rec := &ctxRecorder{fn: func(c context.Context) { seen = c.Err(); _, hasDeadline = c.Deadline() }}
+	m := &Module{seller: fixedSeller{store: openStore()}, failures: rec}
+	m.recordFailure(ctx, caller(DelegationActive, writeMethod, CapabilityPostsWrite), DelegatedWrite{}, context.Canceled)
+	if !rec.called || seen != nil || !hasDeadline {
+		t.Fatalf("called=%v ctx.Err=%v deadline=%v，預期呼叫、未取消、有期限", rec.called, seen, hasDeadline)
+	}
+}
+
+type ctxRecorder struct {
+	fn     func(context.Context)
+	called bool
+}
+
+func (r *ctxRecorder) RecordFailure(ctx context.Context, _ model.FailureAuditInput) error {
+	r.called = true
+	r.fn(ctx)
+	return nil
+}
+
+// 店家不可代行的三個觸發點（停權、關店、等待刪除）先取消該店的排程，再動 delegation 的列：取消失敗時 session 不被碰（這裡的 session 是 nil，碰了就 panic）。
+func TestStoreTriggersCancelSchedulesBeforeTouchingSessions(t *testing.T) {
+	boom := errors.New("cancel failed")
+	for name, trigger := range map[string]func(*Module) error{
+		"StoreSuspended": func(m *Module) error { return m.OnStoreSuspended(t.Context(), seller.StoreSuspended{StoreID: 5}) },
+		"StoreClosed":    func(m *Module) error { return m.OnStoreClosed(t.Context(), seller.StoreClosed{StoreID: 5}) },
+		"StorePendingDeletion": func(m *Module) error {
+			return m.OnStorePendingDeletion(t.Context(), seller.StorePendingDeletion{StoreID: 5})
+		},
+	} {
+		var got int64
+		m := &Module{cancelStoreSchedules: func(_ context.Context, id int64) error { got = id; return boom }}
+		if err := trigger(m); !errors.Is(err, boom) || got != 5 {
+			t.Errorf("%s：err=%v 取消的店家=%d，預期取消先執行並回傳它的錯誤", name, err, got)
 		}
-		if in := rec.got[0]; in.RequestID != op.RequestID.String() || in.OperationReason != "店家要求" || in.Action != AuditPostCreate {
-			t.Errorf("%s：FAILED 紀錄 = %+v", name, in)
+	}
+}
+
+// 合法的操作原因：去除首尾空白後 1 到 100 字、不含控制字元；不合法的值 FAILED 列不寫。
+func TestLegalOperationReason(t *testing.T) {
+	for in, ok := range map[string]bool{"店家要求": true, "  店家要求 ": true, "": false, "   ": false, "a\x07b": false, "a\nb": false, strings.Repeat("字", 100): true, strings.Repeat("字", 101): false} {
+		if _, got := model.LegalOperationReason(in); got != ok {
+			t.Errorf("%q：%v，預期 %v", in, got, ok)
 		}
 	}
 }

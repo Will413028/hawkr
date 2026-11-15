@@ -14,13 +14,16 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// 正式組裝（newDelegation，serve、worker 與 CLI 共用；這裡經 newDelegationOffline 走到它）訂閱了 seller 的 StoreSuspended 與 StoreClosed：事件在 transaction 內
+// 正式組裝（newDelegation，serve、worker 與 CLI 共用；這裡經 newDelegationOffline 走到它）訂閱了 seller 的 StoreSuspended、StoreClosed 與 StorePendingDeletion：事件在 transaction 內
 // 結束該店進行中的代行 session（expires_at 拉回現在、不寫 REVOKED），別家店的 session 不受影響。拿掉 newDelegation 裡的 events.Subscribe(bus, m.OnStoreSuspended)
-// 或 events.Subscribe(bus, m.OnStoreClosed)，對應的子測試失敗。
+// 、events.Subscribe(bus, m.OnStoreClosed) 或 events.Subscribe(bus, m.OnStorePendingDeletion)，對應的子測試失敗。
 func TestNewDelegationEndsSessionsOfASuspendedOrClosedStore(t *testing.T) {
 	for name, publish := range map[string]func(ctx context.Context, bus *events.Bus, storeID int64) error{
 		"StoreSuspended": func(ctx context.Context, bus *events.Bus, storeID int64) error {
 			return events.Publish(ctx, bus, seller.StoreSuspended{EventID: uuid.NewV7(), OccurredAt: time.Now(), StoreID: storeID, AccountID: storeID + 100, PeriodID: 1})
+		},
+		"StorePendingDeletion": func(ctx context.Context, bus *events.Bus, storeID int64) error {
+			return events.Publish(ctx, bus, seller.StorePendingDeletion{EventID: uuid.NewV7(), OccurredAt: time.Now(), StoreID: storeID, StoreCode: storeID + 200, AccountID: storeID + 100})
 		},
 		"StoreClosed": func(ctx context.Context, bus *events.Bus, storeID int64) error {
 			return events.Publish(ctx, bus, seller.StoreClosed{EventID: uuid.NewV7(), OccurredAt: time.Now(), StoreID: storeID, StoreCode: storeID + 200, AccountID: storeID + 100})

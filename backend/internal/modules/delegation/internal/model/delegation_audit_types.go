@@ -3,7 +3,10 @@ package model
 import (
 	"encoding/json"
 	"slices"
+	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 	"uuid"
 )
 
@@ -294,7 +297,9 @@ type FailureAuditInput struct {
 	Action       AuditAction
 	ResourceType AuditResourceType
 	// ResourceID 與 ResourceVersionBefore 是請求指向的資源與它的版本；不知道（建立類、尚未解析）留空。
-	ResourceID            string
+	ResourceID string
+	// ResourceName 是請求已知的資源名稱（建立類的預覽）；不知道留空。
+	ResourceName          string
 	ResourceVersionBefore *int64
 	// OperationReason 只在值域合法時寫入（1–100 字）；寫入類的請求在驗證前就被拒絕時，理由可能是不合法的值，這時不寫。
 	OperationReason string
@@ -304,4 +309,19 @@ type FailureAuditInput struct {
 	UserAgent     string
 	// Cause 是失敗的原因：代行拒絕寫入對應的業務碼，其他錯誤的業務碼是 NULL。
 	Cause error
+}
+
+// OperationReasonMaxRunes 是操作原因的上限。
+const OperationReasonMaxRunes = 100
+
+// LegalOperationReason 回傳去除首尾空白後的操作原因，與它是否合法（1 到 OperationReasonMaxRunes 字、不含控制字元）。不合法的值不寫進稽核列。
+func LegalOperationReason(raw string) (string, bool) {
+	reason := strings.TrimSpace(raw)
+	if n := utf8.RuneCountInString(reason); n == 0 || n > OperationReasonMaxRunes {
+		return "", false
+	}
+	if strings.ContainsFunc(reason, unicode.IsControl) {
+		return "", false
+	}
+	return reason, true
 }

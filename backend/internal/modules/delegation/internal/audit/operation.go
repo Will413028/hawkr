@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 
@@ -136,15 +133,9 @@ func validateOperation(in model.OperationAuditInput) error {
 		return model.Deny(model.DenialInvalidCommand, "capability 不正確")
 	case in.RequestID == "" || in.PayloadHash == "":
 		return model.Deny(model.DenialInvalidCommand, "requestId 與請求內容雜湊為必填")
-	case in.OperationReason == "":
-		return model.Deny(model.DenialInvalidCommand, "請填寫本次操作的原因")
-	case utf8.RuneCountInString(in.OperationReason) > 100:
-		return model.Deny(model.DenialInvalidCommand, "操作原因不得超過 100 字")
 	}
-	for _, r := range in.OperationReason {
-		if unicode.IsControl(r) {
-			return model.Deny(model.DenialInvalidCommand, "操作原因不得包含控制字元")
-		}
+	if _, ok := model.LegalOperationReason(in.OperationReason); !ok {
+		return model.Deny(model.DenialInvalidCommand, "操作原因必須是去除首尾空白後 1 到 100 字、不含控制字元的文字")
 	}
 	return nil
 }
@@ -156,10 +147,7 @@ func (m *Module) RecordFailure(ctx context.Context, in model.FailureAuditInput) 
 		return fmt.Errorf("delegation：失敗稽核的動作、資源種類或能力不在登錄的值域內：%s %s %s", in.Action, in.ResourceType, in.Capability)
 	}
 	s := in.Session
-	reason := strings.TrimSpace(in.OperationReason)
-	if n := utf8.RuneCountInString(reason); n == 0 || n > 100 {
-		reason = ""
-	}
+	reason, _ := model.LegalOperationReason(in.OperationReason)
 	return m.d.DB.InTx(ctx, func(ctx context.Context) error {
 		_, err := m.q(ctx).InsertFailedAuditLog(ctx, store.InsertFailedAuditLogParams{
 			ID:                    m.d.NewID(),
@@ -173,6 +161,7 @@ func (m *Module) RecordFailure(ctx context.Context, in model.FailureAuditInput) 
 			Action:                string(in.Action),
 			ResourceType:          string(in.ResourceType),
 			ResourceID:            model.Optional(in.ResourceID),
+			ResourceName:          model.Optional(truncateRunes(in.ResourceName, model.ResourceNameMaxRunes)),
 			BizCode:               model.BizCodeOf(in.Cause),
 			OperationReason:       model.Optional(reason),
 			CaseReference:         s.CaseReference,

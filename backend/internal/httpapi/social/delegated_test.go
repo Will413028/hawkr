@@ -35,7 +35,7 @@ const (
 	delegatedSessID = int64(9)
 )
 
-// fakeSessions 以憑證回 session；沒有的憑證回模組的「憑證無效」拒絕。AuthorizeDelegated 用模組同一個檢查函式（CheckDelegationSession），並記下被拒絕的呼叫
+// fakeSessions 以憑證回 session；沒有的憑證回模組的「憑證無效」拒絕。AuthorizeDelegated 以同樣的規則（非 ACTIVE 或缺能力）拒絕，並記下被拒絕的呼叫
 // （模組為這些寫 FAILED 稽核；稽核本身由模組的 integration 測試守）。
 type fakeSessions struct {
 	sessions map[string]moddelegation.DelegationSession
@@ -55,7 +55,13 @@ func (f *fakeSessions) ResolveDelegation(_ context.Context, c string, activity b
 }
 
 func (f *fakeSessions) AuthorizeDelegated(_ context.Context, c moddelegation.DelegatedCaller) error {
-	err := moddelegation.CheckDelegationSession(c.Session, c.Method.Capability)
+	var err error
+	switch {
+	case c.Session.Status != moddelegation.DelegationActive:
+		err = apperr.FailedPrecondition("代行工作階段已結束")
+	case !slices.Contains(c.Session.Capabilities, c.Method.Capability):
+		err = apperr.PermissionDenied("此工作階段未取得執行該操作的能力")
+	}
 	if err != nil {
 		f.denied = append(f.denied, string(c.Method.Action))
 	}
@@ -308,9 +314,13 @@ func TestEveryDelegatedMethodReachesTheComponentWithAGoodSession(t *testing.T) {
 			t.Errorf("%s 交給元件的方法宣告 = %+v，預期 %+v", proc, e.runner.caller.Method, want)
 		}
 	}
-	for _, a := range e.sessions.activity {
-		if !a {
-			t.Fatal("代行資源的路由要算活動（順延閒置逾時）")
+	// 每個請求先唯讀解析（false），授權通過才再解析一次算活動（true，順延閒置逾時）。
+	if len(e.sessions.activity) != 2*len(all) {
+		t.Fatalf("解析 %d 次，預期每個請求 2 次", len(e.sessions.activity))
+	}
+	for i, a := range e.sessions.activity {
+		if a != (i%2 == 1) {
+			t.Fatalf("第 %d 次解析的 activity = %v：授權前要唯讀、授權後才算活動", i, a)
 		}
 	}
 	if len(e.sessions.denied) != 0 {
@@ -351,6 +361,9 @@ func TestEndedSessionsAreRejectedAndAudited(t *testing.T) {
 		}
 		if len(e.runner.calls) != 0 {
 			t.Fatalf("%s 的 session 不該到元件：%v", status, e.runner.calls)
+		}
+		if slices.Contains(e.sessions.activity, true) {
+			t.Fatalf("%s：被拒絕的請求不該算活動（順延閒置逾時）：%v", status, e.sessions.activity)
 		}
 		if len(e.sessions.denied) != len(DelegatedDeclaration.Methods) || !slices.Contains(e.sessions.denied, "POST_READ") {
 			t.Fatalf("%s：被拒絕的請求 %v，預期每個方法一次（含讀取的 POST_READ）", status, e.sessions.denied)
@@ -470,12 +483,18 @@ func TestWritesRequireAWellFormedOperation(t *testing.T) {
 		"沒有原因":          {RequestId: v4()},
 		"原因只有空白":        {RequestId: v4(), OperationReason: "   "},
 		"原因超過 100 字":    {RequestId: v4(), OperationReason: strings.Repeat("字", 101)},
+		"原因含控制字元":       {RequestId: v4(), OperationReason: "a\x07b"},
+		"原因含換行":         {RequestId: v4(), OperationReason: "a\nb"},
 	}
 	for name, o := range bad {
 		_, err := e.client.PublishStorePost(t.Context(), withCredential(&pb.PublishStorePostRequest{Operation: o, PostId: id, Etag: "1"}, goodSession))
 		if connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("%s：%v，預期 invalid_argument", name, err)
 		}
+	}
+	_, err := e.client.PublishStorePost(t.Context(), withCredential(&pb.PublishStorePostRequest{Operation: bad["原因含控制字元"], PostId: id, Etag: "1"}, goodSession))
+	if err == nil || !strings.Contains(err.Error(), "operation.operation_reason") {
+		t.Errorf("控制字元的錯誤沒有指向 operation.operation_reason：%v", err)
 	}
 	if len(e.runner.calls) != 0 {
 		t.Fatalf("不合法的 operation 不該到元件：%v", e.runner.calls)
