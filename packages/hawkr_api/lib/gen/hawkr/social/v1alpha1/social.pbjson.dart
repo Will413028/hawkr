@@ -15,6 +15,8 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
+import 'package:protobuf/well_known_types/google/protobuf/field_mask.pbjson.dart'
+    as $3;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
     as $2;
 
@@ -257,7 +259,7 @@ const Comment$json = {
       '8': {},
       '10': 'author'
     },
-    {'1': 'body', '3': 7, '4': 1, '5': 9, '8': {}, '10': 'body'},
+    {'1': 'body', '3': 7, '4': 1, '5': 9, '10': 'body'},
     {
       '1': 'create_time',
       '3': 8,
@@ -311,6 +313,7 @@ const Comment$json = {
       '8': {},
       '10': 'viewerCanReply'
     },
+    {'1': 'etag', '3': 17, '4': 1, '5': 9, '10': 'etag'},
   ],
   '8': [
     {'1': '_parent_id'},
@@ -324,16 +327,16 @@ final $typed_data.Uint8List commentDescriptor = $convert.base64Decode(
     '9zdElkEiUKCXBhcmVudF9pZBgDIAEoCUID4EEDSABSCHBhcmVudElkiAEBEigKC3JlcGx5X3Rv'
     'X2lkGAQgASgJQgPgQQNIAVIJcmVwbHlUb0lkiAEBEj4KBXN0YXRlGAUgASgOMiMuaGF3a3Iuc2'
     '9jaWFsLnYxYWxwaGExLkNvbW1lbnRTdGF0ZUID4EEDUgVzdGF0ZRI5CgZhdXRob3IYBiABKAsy'
-    'HC5oYXdrci5zb2NpYWwudjFhbHBoYTEuQWN0b3JCA+BBA1IGYXV0aG9yEhcKBGJvZHkYByABKA'
-    'lCA+BBA1IEYm9keRJACgtjcmVhdGVfdGltZRgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1l'
-    'c3RhbXBCA+BBA1IKY3JlYXRlVGltZRJACgt1cGRhdGVfdGltZRgJIAEoCzIaLmdvb2dsZS5wcm'
-    '90b2J1Zi5UaW1lc3RhbXBCA+BBA1IKdXBkYXRlVGltZRIiCgpsaWtlX2NvdW50GAogASgDQgPg'
-    'QQNSCWxpa2VDb3VudBIkCgtyZXBseV9jb3VudBgLIAEoA0ID4EEDUgpyZXBseUNvdW50EiYKDH'
-    'ZpZXdlcl9saWtlZBgMIAEoCEID4EEDUgt2aWV3ZXJMaWtlZBIcCgdpc19taW5lGA0gASgIQgPg'
-    'QQNSBmlzTWluZRIrCg92aWV3ZXJfY2FuX2VkaXQYDiABKAhCA+BBA1INdmlld2VyQ2FuRWRpdB'
-    'IvChF2aWV3ZXJfY2FuX2RlbGV0ZRgPIAEoCEID4EEDUg92aWV3ZXJDYW5EZWxldGUSLQoQdmll'
-    'd2VyX2Nhbl9yZXBseRgQIAEoCEID4EEDUg52aWV3ZXJDYW5SZXBseUIMCgpfcGFyZW50X2lkQg'
-    '4KDF9yZXBseV90b19pZA==');
+    'HC5oYXdrci5zb2NpYWwudjFhbHBoYTEuQWN0b3JCA+BBA1IGYXV0aG9yEhIKBGJvZHkYByABKA'
+    'lSBGJvZHkSQAoLY3JlYXRlX3RpbWUYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1w'
+    'QgPgQQNSCmNyZWF0ZVRpbWUSQAoLdXBkYXRlX3RpbWUYCSABKAsyGi5nb29nbGUucHJvdG9idW'
+    'YuVGltZXN0YW1wQgPgQQNSCnVwZGF0ZVRpbWUSIgoKbGlrZV9jb3VudBgKIAEoA0ID4EEDUgls'
+    'aWtlQ291bnQSJAoLcmVwbHlfY291bnQYCyABKANCA+BBA1IKcmVwbHlDb3VudBImCgx2aWV3ZX'
+    'JfbGlrZWQYDCABKAhCA+BBA1ILdmlld2VyTGlrZWQSHAoHaXNfbWluZRgNIAEoCEID4EEDUgZp'
+    'c01pbmUSKwoPdmlld2VyX2Nhbl9lZGl0GA4gASgIQgPgQQNSDXZpZXdlckNhbkVkaXQSLwoRdm'
+    'lld2VyX2Nhbl9kZWxldGUYDyABKAhCA+BBA1IPdmlld2VyQ2FuRGVsZXRlEi0KEHZpZXdlcl9j'
+    'YW5fcmVwbHkYECABKAhCA+BBA1IOdmlld2VyQ2FuUmVwbHkSEgoEZXRhZxgRIAEoCVIEZXRhZ0'
+    'IMCgpfcGFyZW50X2lkQg4KDF9yZXBseV90b19pZA==');
 
 @$core.Deprecated('Use getPostRequestDescriptor instead')
 const GetPostRequest$json = {
@@ -656,7 +659,7 @@ const ForumEntry$json = {
       '8': {},
       '10': 'author'
     },
-    {'1': 'body', '3': 7, '4': 1, '5': 9, '8': {}, '10': 'body'},
+    {'1': 'body', '3': 7, '4': 1, '5': 9, '10': 'body'},
     {
       '1': 'create_time',
       '3': 8,
@@ -701,6 +704,7 @@ const ForumEntry$json = {
       '8': {},
       '10': 'viewerCanReply'
     },
+    {'1': 'etag', '3': 15, '4': 1, '5': 9, '10': 'etag'},
   ],
   '8': [
     {'1': '_parent_id'},
@@ -714,14 +718,15 @@ final $typed_data.Uint8List forumEntryDescriptor = $convert.base64Decode(
     'NSB3N0b3JlSWQSJQoJcGFyZW50X2lkGAMgASgJQgPgQQNIAFIIcGFyZW50SWSIAQESKAoLcmVw'
     'bHlfdG9faWQYBCABKAlCA+BBA0gBUglyZXBseVRvSWSIAQESPgoFc3RhdGUYBSABKA4yIy5oYX'
     'drci5zb2NpYWwudjFhbHBoYTEuQ29tbWVudFN0YXRlQgPgQQNSBXN0YXRlEjkKBmF1dGhvchgG'
-    'IAEoCzIcLmhhd2tyLnNvY2lhbC52MWFscGhhMS5BY3RvckID4EEDUgZhdXRob3ISFwoEYm9keR'
-    'gHIAEoCUID4EEDUgRib2R5EkAKC2NyZWF0ZV90aW1lGAggASgLMhouZ29vZ2xlLnByb3RvYnVm'
-    'LlRpbWVzdGFtcEID4EEDUgpjcmVhdGVUaW1lEkAKC3VwZGF0ZV90aW1lGAkgASgLMhouZ29vZ2'
-    'xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgp1cGRhdGVUaW1lEiQKC3JlcGx5X2NvdW50GAog'
-    'ASgDQgPgQQNSCnJlcGx5Q291bnQSHAoHaXNfbWluZRgLIAEoCEID4EEDUgZpc01pbmUSKwoPdm'
-    'lld2VyX2Nhbl9lZGl0GAwgASgIQgPgQQNSDXZpZXdlckNhbkVkaXQSLwoRdmlld2VyX2Nhbl9k'
-    'ZWxldGUYDSABKAhCA+BBA1IPdmlld2VyQ2FuRGVsZXRlEi0KEHZpZXdlcl9jYW5fcmVwbHkYDi'
-    'ABKAhCA+BBA1IOdmlld2VyQ2FuUmVwbHlCDAoKX3BhcmVudF9pZEIOCgxfcmVwbHlfdG9faWQ=');
+    'IAEoCzIcLmhhd2tyLnNvY2lhbC52MWFscGhhMS5BY3RvckID4EEDUgZhdXRob3ISEgoEYm9keR'
+    'gHIAEoCVIEYm9keRJACgtjcmVhdGVfdGltZRgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1l'
+    'c3RhbXBCA+BBA1IKY3JlYXRlVGltZRJACgt1cGRhdGVfdGltZRgJIAEoCzIaLmdvb2dsZS5wcm'
+    '90b2J1Zi5UaW1lc3RhbXBCA+BBA1IKdXBkYXRlVGltZRIkCgtyZXBseV9jb3VudBgKIAEoA0ID'
+    '4EEDUgpyZXBseUNvdW50EhwKB2lzX21pbmUYCyABKAhCA+BBA1IGaXNNaW5lEisKD3ZpZXdlcl'
+    '9jYW5fZWRpdBgMIAEoCEID4EEDUg12aWV3ZXJDYW5FZGl0Ei8KEXZpZXdlcl9jYW5fZGVsZXRl'
+    'GA0gASgIQgPgQQNSD3ZpZXdlckNhbkRlbGV0ZRItChB2aWV3ZXJfY2FuX3JlcGx5GA4gASgIQg'
+    'PgQQNSDnZpZXdlckNhblJlcGx5EhIKBGV0YWcYDyABKAlSBGV0YWdCDAoKX3BhcmVudF9pZEIO'
+    'CgxfcmVwbHlfdG9faWQ=');
 
 @$core.Deprecated('Use listForumEntriesRequestDescriptor instead')
 const ListForumEntriesRequest$json = {
@@ -964,51 +969,65 @@ final $typed_data.Uint8List createCommentResponseDescriptor = $convert.base64Dec
 const UpdateCommentRequest$json = {
   '1': 'UpdateCommentRequest',
   '2': [
-    {'1': 'comment_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'commentId'},
-    {'1': 'body', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'body'},
+    {
+      '1': 'comment',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Comment',
+      '8': {},
+      '10': 'comment'
+    },
+    {
+      '1': 'update_mask',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.FieldMask',
+      '10': 'updateMask'
+    },
   ],
 };
 
 /// Descriptor for `UpdateCommentRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List updateCommentRequestDescriptor = $convert.base64Decode(
-    'ChRVcGRhdGVDb21tZW50UmVxdWVzdBIiCgpjb21tZW50X2lkGAEgASgJQgPgQQJSCWNvbW1lbn'
-    'RJZBIXCgRib2R5GAIgASgJQgPgQQJSBGJvZHk=');
+    'ChRVcGRhdGVDb21tZW50UmVxdWVzdBI9Cgdjb21tZW50GAEgASgLMh4uaGF3a3Iuc29jaWFsLn'
+    'YxYWxwaGExLkNvbW1lbnRCA+BBAlIHY29tbWVudBI7Cgt1cGRhdGVfbWFzaxgCIAEoCzIaLmdv'
+    'b2dsZS5wcm90b2J1Zi5GaWVsZE1hc2tSCnVwZGF0ZU1hc2s=');
 
 @$core.Deprecated('Use updateCommentResponseDescriptor instead')
 const UpdateCommentResponse$json = {
   '1': 'UpdateCommentResponse',
   '2': [
-    {'1': 'body', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'body'},
     {
-      '1': 'update_time',
-      '3': 2,
+      '1': 'comment',
+      '3': 1,
       '4': 1,
       '5': 11,
-      '6': '.google.protobuf.Timestamp',
-      '8': {},
-      '10': 'updateTime'
+      '6': '.hawkr.social.v1alpha1.Comment',
+      '10': 'comment'
     },
   ],
 };
 
 /// Descriptor for `UpdateCommentResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List updateCommentResponseDescriptor = $convert.base64Decode(
-    'ChVVcGRhdGVDb21tZW50UmVzcG9uc2USFwoEYm9keRgBIAEoCUID4EEDUgRib2R5EkAKC3VwZG'
-    'F0ZV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgp1cGRhdGVU'
-    'aW1l');
+    'ChVVcGRhdGVDb21tZW50UmVzcG9uc2USOAoHY29tbWVudBgBIAEoCzIeLmhhd2tyLnNvY2lhbC'
+    '52MWFscGhhMS5Db21tZW50Ugdjb21tZW50');
 
 @$core.Deprecated('Use deleteCommentRequestDescriptor instead')
 const DeleteCommentRequest$json = {
   '1': 'DeleteCommentRequest',
   '2': [
     {'1': 'comment_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'commentId'},
+    {'1': 'etag', '3': 2, '4': 1, '5': 9, '10': 'etag'},
   ],
 };
 
 /// Descriptor for `DeleteCommentRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List deleteCommentRequestDescriptor = $convert.base64Decode(
     'ChREZWxldGVDb21tZW50UmVxdWVzdBIiCgpjb21tZW50X2lkGAEgASgJQgPgQQJSCWNvbW1lbn'
-    'RJZA==');
+    'RJZBISCgRldGFnGAIgASgJUgRldGFn');
 
 @$core.Deprecated('Use deleteCommentResponseDescriptor instead')
 const DeleteCommentResponse$json = {
@@ -1084,45 +1103,59 @@ final $typed_data.Uint8List createForumEntryResponseDescriptor =
 const UpdateForumEntryRequest$json = {
   '1': 'UpdateForumEntryRequest',
   '2': [
-    {'1': 'entry_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'entryId'},
-    {'1': 'body', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'body'},
+    {
+      '1': 'entry',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.ForumEntry',
+      '8': {},
+      '10': 'entry'
+    },
+    {
+      '1': 'update_mask',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.FieldMask',
+      '10': 'updateMask'
+    },
   ],
 };
 
 /// Descriptor for `UpdateForumEntryRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List updateForumEntryRequestDescriptor =
-    $convert.base64Decode(
-        'ChdVcGRhdGVGb3J1bUVudHJ5UmVxdWVzdBIeCghlbnRyeV9pZBgBIAEoCUID4EECUgdlbnRyeU'
-        'lkEhcKBGJvZHkYAiABKAlCA+BBAlIEYm9keQ==');
+final $typed_data.Uint8List updateForumEntryRequestDescriptor = $convert.base64Decode(
+    'ChdVcGRhdGVGb3J1bUVudHJ5UmVxdWVzdBI8CgVlbnRyeRgBIAEoCzIhLmhhd2tyLnNvY2lhbC'
+    '52MWFscGhhMS5Gb3J1bUVudHJ5QgPgQQJSBWVudHJ5EjsKC3VwZGF0ZV9tYXNrGAIgASgLMhou'
+    'Z29vZ2xlLnByb3RvYnVmLkZpZWxkTWFza1IKdXBkYXRlTWFzaw==');
 
 @$core.Deprecated('Use updateForumEntryResponseDescriptor instead')
 const UpdateForumEntryResponse$json = {
   '1': 'UpdateForumEntryResponse',
   '2': [
-    {'1': 'body', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'body'},
     {
-      '1': 'update_time',
-      '3': 2,
+      '1': 'entry',
+      '3': 1,
       '4': 1,
       '5': 11,
-      '6': '.google.protobuf.Timestamp',
-      '8': {},
-      '10': 'updateTime'
+      '6': '.hawkr.social.v1alpha1.ForumEntry',
+      '10': 'entry'
     },
   ],
 };
 
 /// Descriptor for `UpdateForumEntryResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List updateForumEntryResponseDescriptor = $convert.base64Decode(
-    'ChhVcGRhdGVGb3J1bUVudHJ5UmVzcG9uc2USFwoEYm9keRgBIAEoCUID4EEDUgRib2R5EkAKC3'
-    'VwZGF0ZV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgp1cGRh'
-    'dGVUaW1l');
+final $typed_data.Uint8List updateForumEntryResponseDescriptor =
+    $convert.base64Decode(
+        'ChhVcGRhdGVGb3J1bUVudHJ5UmVzcG9uc2USNwoFZW50cnkYASABKAsyIS5oYXdrci5zb2NpYW'
+        'wudjFhbHBoYTEuRm9ydW1FbnRyeVIFZW50cnk=');
 
 @$core.Deprecated('Use deleteForumEntryRequestDescriptor instead')
 const DeleteForumEntryRequest$json = {
   '1': 'DeleteForumEntryRequest',
   '2': [
     {'1': 'entry_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'entryId'},
+    {'1': 'etag', '3': 2, '4': 1, '5': 9, '10': 'etag'},
   ],
 };
 
@@ -1130,7 +1163,7 @@ const DeleteForumEntryRequest$json = {
 final $typed_data.Uint8List deleteForumEntryRequestDescriptor =
     $convert.base64Decode(
         'ChdEZWxldGVGb3J1bUVudHJ5UmVxdWVzdBIeCghlbnRyeV9pZBgBIAEoCUID4EECUgdlbnRyeU'
-        'lk');
+        'lkEhIKBGV0YWcYAiABKAlSBGV0YWc=');
 
 @$core.Deprecated('Use deleteForumEntryResponseDescriptor instead')
 const DeleteForumEntryResponse$json = {
@@ -1340,6 +1373,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.common.v1alpha1.Image': $1.Image$json,
   '.google.protobuf.Timestamp': $2.Timestamp$json,
   '.hawkr.social.v1alpha1.UpdateCommentRequest': UpdateCommentRequest$json,
+  '.google.protobuf.FieldMask': $3.FieldMask$json,
   '.hawkr.social.v1alpha1.UpdateCommentResponse': UpdateCommentResponse$json,
   '.hawkr.social.v1alpha1.DeleteCommentRequest': DeleteCommentRequest$json,
   '.hawkr.social.v1alpha1.DeleteCommentResponse': DeleteCommentResponse$json,

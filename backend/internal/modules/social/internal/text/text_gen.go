@@ -49,6 +49,11 @@ func CommentReplyStoreOnly(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "只有貼文所屬的店家能回覆留言", Locale: uitext.ZhTW}
 }
 
+// CommentVersionConflict 是模組句子 comment.version_conflict；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentVersionConflict(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "這則內容已被修改，請對照最新的內容後再送出", Locale: uitext.ZhTW}
+}
+
 // CommentBodyCommunityRules 是模組句子 comment_body.community_rules；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func CommentBodyCommunityRules(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "留言不符社群守則", Locale: uitext.ZhTW}

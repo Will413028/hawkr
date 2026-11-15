@@ -15,47 +15,47 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'social.pb.dart' as $3;
+import 'social.pb.dart' as $4;
 import 'social.pbjson.dart';
 
 export 'social.pb.dart';
 
 abstract class SocialPublicServiceBase extends $pb.GeneratedService {
-  $async.Future<$3.GetPostResponse> getPost(
-      $pb.ServerContext ctx, $3.GetPostRequest request);
-  $async.Future<$3.ListPostsResponse> listPosts(
-      $pb.ServerContext ctx, $3.ListPostsRequest request);
-  $async.Future<$3.ListCommentsResponse> listComments(
-      $pb.ServerContext ctx, $3.ListCommentsRequest request);
-  $async.Future<$3.SuggestTrendingPostsResponse> suggestTrendingPosts(
-      $pb.ServerContext ctx, $3.SuggestTrendingPostsRequest request);
-  $async.Future<$3.SuggestTagsResponse> suggestTags(
-      $pb.ServerContext ctx, $3.SuggestTagsRequest request);
-  $async.Future<$3.SuggestTrendingTagsResponse> suggestTrendingTags(
-      $pb.ServerContext ctx, $3.SuggestTrendingTagsRequest request);
-  $async.Future<$3.ListForumEntriesResponse> listForumEntries(
-      $pb.ServerContext ctx, $3.ListForumEntriesRequest request);
-  $async.Future<$3.RecordPostViewResponse> recordPostView(
-      $pb.ServerContext ctx, $3.RecordPostViewRequest request);
+  $async.Future<$4.GetPostResponse> getPost(
+      $pb.ServerContext ctx, $4.GetPostRequest request);
+  $async.Future<$4.ListPostsResponse> listPosts(
+      $pb.ServerContext ctx, $4.ListPostsRequest request);
+  $async.Future<$4.ListCommentsResponse> listComments(
+      $pb.ServerContext ctx, $4.ListCommentsRequest request);
+  $async.Future<$4.SuggestTrendingPostsResponse> suggestTrendingPosts(
+      $pb.ServerContext ctx, $4.SuggestTrendingPostsRequest request);
+  $async.Future<$4.SuggestTagsResponse> suggestTags(
+      $pb.ServerContext ctx, $4.SuggestTagsRequest request);
+  $async.Future<$4.SuggestTrendingTagsResponse> suggestTrendingTags(
+      $pb.ServerContext ctx, $4.SuggestTrendingTagsRequest request);
+  $async.Future<$4.ListForumEntriesResponse> listForumEntries(
+      $pb.ServerContext ctx, $4.ListForumEntriesRequest request);
+  $async.Future<$4.RecordPostViewResponse> recordPostView(
+      $pb.ServerContext ctx, $4.RecordPostViewRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
       case 'GetPost':
-        return $3.GetPostRequest();
+        return $4.GetPostRequest();
       case 'ListPosts':
-        return $3.ListPostsRequest();
+        return $4.ListPostsRequest();
       case 'ListComments':
-        return $3.ListCommentsRequest();
+        return $4.ListCommentsRequest();
       case 'SuggestTrendingPosts':
-        return $3.SuggestTrendingPostsRequest();
+        return $4.SuggestTrendingPostsRequest();
       case 'SuggestTags':
-        return $3.SuggestTagsRequest();
+        return $4.SuggestTagsRequest();
       case 'SuggestTrendingTags':
-        return $3.SuggestTrendingTagsRequest();
+        return $4.SuggestTrendingTagsRequest();
       case 'ListForumEntries':
-        return $3.ListForumEntriesRequest();
+        return $4.ListForumEntriesRequest();
       case 'RecordPostView':
-        return $3.RecordPostViewRequest();
+        return $4.RecordPostViewRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -65,23 +65,23 @@ abstract class SocialPublicServiceBase extends $pb.GeneratedService {
       $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
       case 'GetPost':
-        return getPost(ctx, request as $3.GetPostRequest);
+        return getPost(ctx, request as $4.GetPostRequest);
       case 'ListPosts':
-        return listPosts(ctx, request as $3.ListPostsRequest);
+        return listPosts(ctx, request as $4.ListPostsRequest);
       case 'ListComments':
-        return listComments(ctx, request as $3.ListCommentsRequest);
+        return listComments(ctx, request as $4.ListCommentsRequest);
       case 'SuggestTrendingPosts':
         return suggestTrendingPosts(
-            ctx, request as $3.SuggestTrendingPostsRequest);
+            ctx, request as $4.SuggestTrendingPostsRequest);
       case 'SuggestTags':
-        return suggestTags(ctx, request as $3.SuggestTagsRequest);
+        return suggestTags(ctx, request as $4.SuggestTagsRequest);
       case 'SuggestTrendingTags':
         return suggestTrendingTags(
-            ctx, request as $3.SuggestTrendingTagsRequest);
+            ctx, request as $4.SuggestTrendingTagsRequest);
       case 'ListForumEntries':
-        return listForumEntries(ctx, request as $3.ListForumEntriesRequest);
+        return listForumEntries(ctx, request as $4.ListForumEntriesRequest);
       case 'RecordPostView':
-        return recordPostView(ctx, request as $3.RecordPostViewRequest);
+        return recordPostView(ctx, request as $4.RecordPostViewRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -94,53 +94,53 @@ abstract class SocialPublicServiceBase extends $pb.GeneratedService {
 }
 
 abstract class SocialAppServiceBase extends $pb.GeneratedService {
-  $async.Future<$3.SharePostResponse> sharePost(
-      $pb.ServerContext ctx, $3.SharePostRequest request);
-  $async.Future<$3.LikePostResponse> likePost(
-      $pb.ServerContext ctx, $3.LikePostRequest request);
-  $async.Future<$3.UnlikePostResponse> unlikePost(
-      $pb.ServerContext ctx, $3.UnlikePostRequest request);
-  $async.Future<$3.LikeCommentResponse> likeComment(
-      $pb.ServerContext ctx, $3.LikeCommentRequest request);
-  $async.Future<$3.UnlikeCommentResponse> unlikeComment(
-      $pb.ServerContext ctx, $3.UnlikeCommentRequest request);
-  $async.Future<$3.CreateCommentResponse> createComment(
-      $pb.ServerContext ctx, $3.CreateCommentRequest request);
-  $async.Future<$3.UpdateCommentResponse> updateComment(
-      $pb.ServerContext ctx, $3.UpdateCommentRequest request);
-  $async.Future<$3.DeleteCommentResponse> deleteComment(
-      $pb.ServerContext ctx, $3.DeleteCommentRequest request);
-  $async.Future<$3.CreateForumEntryResponse> createForumEntry(
-      $pb.ServerContext ctx, $3.CreateForumEntryRequest request);
-  $async.Future<$3.UpdateForumEntryResponse> updateForumEntry(
-      $pb.ServerContext ctx, $3.UpdateForumEntryRequest request);
-  $async.Future<$3.DeleteForumEntryResponse> deleteForumEntry(
-      $pb.ServerContext ctx, $3.DeleteForumEntryRequest request);
+  $async.Future<$4.SharePostResponse> sharePost(
+      $pb.ServerContext ctx, $4.SharePostRequest request);
+  $async.Future<$4.LikePostResponse> likePost(
+      $pb.ServerContext ctx, $4.LikePostRequest request);
+  $async.Future<$4.UnlikePostResponse> unlikePost(
+      $pb.ServerContext ctx, $4.UnlikePostRequest request);
+  $async.Future<$4.LikeCommentResponse> likeComment(
+      $pb.ServerContext ctx, $4.LikeCommentRequest request);
+  $async.Future<$4.UnlikeCommentResponse> unlikeComment(
+      $pb.ServerContext ctx, $4.UnlikeCommentRequest request);
+  $async.Future<$4.CreateCommentResponse> createComment(
+      $pb.ServerContext ctx, $4.CreateCommentRequest request);
+  $async.Future<$4.UpdateCommentResponse> updateComment(
+      $pb.ServerContext ctx, $4.UpdateCommentRequest request);
+  $async.Future<$4.DeleteCommentResponse> deleteComment(
+      $pb.ServerContext ctx, $4.DeleteCommentRequest request);
+  $async.Future<$4.CreateForumEntryResponse> createForumEntry(
+      $pb.ServerContext ctx, $4.CreateForumEntryRequest request);
+  $async.Future<$4.UpdateForumEntryResponse> updateForumEntry(
+      $pb.ServerContext ctx, $4.UpdateForumEntryRequest request);
+  $async.Future<$4.DeleteForumEntryResponse> deleteForumEntry(
+      $pb.ServerContext ctx, $4.DeleteForumEntryRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
       case 'SharePost':
-        return $3.SharePostRequest();
+        return $4.SharePostRequest();
       case 'LikePost':
-        return $3.LikePostRequest();
+        return $4.LikePostRequest();
       case 'UnlikePost':
-        return $3.UnlikePostRequest();
+        return $4.UnlikePostRequest();
       case 'LikeComment':
-        return $3.LikeCommentRequest();
+        return $4.LikeCommentRequest();
       case 'UnlikeComment':
-        return $3.UnlikeCommentRequest();
+        return $4.UnlikeCommentRequest();
       case 'CreateComment':
-        return $3.CreateCommentRequest();
+        return $4.CreateCommentRequest();
       case 'UpdateComment':
-        return $3.UpdateCommentRequest();
+        return $4.UpdateCommentRequest();
       case 'DeleteComment':
-        return $3.DeleteCommentRequest();
+        return $4.DeleteCommentRequest();
       case 'CreateForumEntry':
-        return $3.CreateForumEntryRequest();
+        return $4.CreateForumEntryRequest();
       case 'UpdateForumEntry':
-        return $3.UpdateForumEntryRequest();
+        return $4.UpdateForumEntryRequest();
       case 'DeleteForumEntry':
-        return $3.DeleteForumEntryRequest();
+        return $4.DeleteForumEntryRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -150,27 +150,27 @@ abstract class SocialAppServiceBase extends $pb.GeneratedService {
       $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
       case 'SharePost':
-        return sharePost(ctx, request as $3.SharePostRequest);
+        return sharePost(ctx, request as $4.SharePostRequest);
       case 'LikePost':
-        return likePost(ctx, request as $3.LikePostRequest);
+        return likePost(ctx, request as $4.LikePostRequest);
       case 'UnlikePost':
-        return unlikePost(ctx, request as $3.UnlikePostRequest);
+        return unlikePost(ctx, request as $4.UnlikePostRequest);
       case 'LikeComment':
-        return likeComment(ctx, request as $3.LikeCommentRequest);
+        return likeComment(ctx, request as $4.LikeCommentRequest);
       case 'UnlikeComment':
-        return unlikeComment(ctx, request as $3.UnlikeCommentRequest);
+        return unlikeComment(ctx, request as $4.UnlikeCommentRequest);
       case 'CreateComment':
-        return createComment(ctx, request as $3.CreateCommentRequest);
+        return createComment(ctx, request as $4.CreateCommentRequest);
       case 'UpdateComment':
-        return updateComment(ctx, request as $3.UpdateCommentRequest);
+        return updateComment(ctx, request as $4.UpdateCommentRequest);
       case 'DeleteComment':
-        return deleteComment(ctx, request as $3.DeleteCommentRequest);
+        return deleteComment(ctx, request as $4.DeleteCommentRequest);
       case 'CreateForumEntry':
-        return createForumEntry(ctx, request as $3.CreateForumEntryRequest);
+        return createForumEntry(ctx, request as $4.CreateForumEntryRequest);
       case 'UpdateForumEntry':
-        return updateForumEntry(ctx, request as $3.UpdateForumEntryRequest);
+        return updateForumEntry(ctx, request as $4.UpdateForumEntryRequest);
       case 'DeleteForumEntry':
-        return deleteForumEntry(ctx, request as $3.DeleteForumEntryRequest);
+        return deleteForumEntry(ctx, request as $4.DeleteForumEntryRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

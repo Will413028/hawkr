@@ -417,14 +417,14 @@ func (m *Module) CreateComment(ctx context.Context, c Caller, in CommentInput) (
 	return m.comment.Create(ctx, c, in)
 }
 
-// UpdateComment 修改自己的留言（被隱藏的不能修改）。
-func (m *Module) UpdateComment(ctx context.Context, c Caller, id uuid.UUID, body string) (Comment, error) {
-	return m.comment.Update(ctx, c, id, body)
+// UpdateComment 修改自己的留言（被隱藏的不能修改）；version 是讀取時的版本，不符回 VersionConflict；回傳修改後的完整留言。
+func (m *Module) UpdateComment(ctx context.Context, c Caller, id uuid.UUID, version int64, body string) (Comment, error) {
+	return m.comment.Update(ctx, c, id, version, body)
 }
 
-// DeleteComment 刪除留言：作者或貼文所屬的店；冪等。
-func (m *Module) DeleteComment(ctx context.Context, c Caller, id uuid.UUID) error {
-	return m.comment.Delete(ctx, c, id)
+// DeleteComment 刪除留言：作者或貼文所屬的店；冪等；version 有帶時要與目前的版本相符。
+func (m *Module) DeleteComment(ctx context.Context, c Caller, id uuid.UUID, version *int64) error {
+	return m.comment.Delete(ctx, c, id, version)
 }
 
 // ListComments 列出貼文的頂層留言（刪除或隱藏而底下有可見回覆的是佔位項目；與 c.BuyerID 任一方向有個人封鎖的買家的留言連同回覆整則不出現，不留佔位）；
@@ -443,14 +443,14 @@ func (m *Module) CreateForumEntry(ctx context.Context, c Caller, in ForumInput) 
 	return m.forum.Create(ctx, c, in)
 }
 
-// UpdateForumEntry 修改自己的討論區留言。
-func (m *Module) UpdateForumEntry(ctx context.Context, c Caller, id uuid.UUID, body string) (ForumEntry, error) {
-	return m.forum.Update(ctx, c, id, body)
+// UpdateForumEntry 修改自己的討論區留言；version 同 UpdateComment；回傳修改後的完整項目。
+func (m *Module) UpdateForumEntry(ctx context.Context, c Caller, id uuid.UUID, version int64, body string) (ForumEntry, error) {
+	return m.forum.Update(ctx, c, id, version, body)
 }
 
-// DeleteForumEntry 刪除討論區留言：作者或該店；冪等。
-func (m *Module) DeleteForumEntry(ctx context.Context, c Caller, id uuid.UUID) error {
-	return m.forum.Delete(ctx, c, id)
+// DeleteForumEntry 刪除討論區留言：作者或該店；冪等；version 有帶時要與目前的版本相符。
+func (m *Module) DeleteForumEntry(ctx context.Context, c Caller, id uuid.UUID, version *int64) error {
+	return m.forum.Delete(ctx, c, id, version)
 }
 
 // ListForumEntries 列出店家討論區的頂層留言（觀看者封鎖了這家店，或與作者任一方向有個人封鎖時，對應的內容不出現；店主讀自己的討論區不套個人封鎖）。
@@ -498,10 +498,10 @@ func (m *Module) RecordShare(ctx context.Context, buyerID int64, postID uuid.UUI
 	return m.engage.RecordShare(ctx, buyerID, postID)
 }
 
-// RecordView 記一次瀏覽（只計公開可讀的貼文；同一篇、同一個台北日、同一個觀看者只算一次；匿名沒有 IP 時不計）。回傳這次有沒有計入。
+// RecordView 記一次瀏覽（只計公開可讀的貼文；同一篇、同一個台北日、同一個觀看者只算一次；匿名沒有 IP 時不計；貼文所屬店家的店主不計）。回傳這次有沒有計入。
 // 店主與代行的讀取由呼叫方不呼叫。
-func (m *Module) RecordView(ctx context.Context, postID uuid.UUID, v Viewer) (bool, error) {
-	return m.engage.RecordView(ctx, postID, v)
+func (m *Module) RecordView(ctx context.Context, c Caller, postID uuid.UUID, v Viewer) (bool, error) {
+	return m.engage.RecordView(ctx, c, postID, v)
 }
 
 // ContentOwner 回傳內容的歸屬（存在、作者、所屬店家、是否公開可讀），給 moderation 在建立處分前驗證。

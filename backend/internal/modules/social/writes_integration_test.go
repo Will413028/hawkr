@@ -45,7 +45,7 @@ func TestSD4ReplyTargetMustBeReadableAndOnTheSamePost(t *testing.T) {
 		t.Fatalf("父是別篇的留言：%v", err)
 	}
 	// 已刪除與被隱藏的目標。
-	must(t, f.module.DeleteComment(ctx, store, r2.ID))
+	must(t, f.module.DeleteComment(ctx, store, r2.ID, nil))
 	if _, err := f.module.CreateComment(ctx, store, social.CommentInput{PostID: p1.ID, Body: "x", ParentID: &top.ID, ReplyToID: &r2.ID}); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("reply_to 已刪除：%v", err)
 	}
@@ -78,8 +78,8 @@ func TestSD5DeleteIsIdempotent(t *testing.T) {
 	c := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p.ID, Body: "留言"}))
 	e := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "討論"}))
 	for range 2 {
-		must(t, f.module.DeleteComment(ctx, f.asBuyer(b), c.ID))
-		must(t, f.module.DeleteForumEntry(ctx, f.asBuyer(b), e.ID))
+		must(t, f.module.DeleteComment(ctx, f.asBuyer(b), c.ID, nil))
+		must(t, f.module.DeleteForumEntry(ctx, f.asBuyer(b), e.ID, nil))
 		must(t, f.module.DeletePost(ctx, f.store(t, storeID), mustV[social.Post](t)(f.module.CreatePost(ctx, f.store(t, storeID), social.CreatePostInput{Body: "草稿"})).ID, 0))
 	}
 	if got := mustV[social.Post](t)(f.module.PublicPost(ctx, social.Caller{}, p.ID)); got.Stats.Comments != 0 {
@@ -95,10 +95,10 @@ func TestSD5DeleteIsIdempotent(t *testing.T) {
 	// 別人的留言不能刪；店家只能刪自己貼文底下的。
 	p2 := f.publishedPost(t, storeID, "二")
 	c2 := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p2.ID, Body: "x"}))
-	if err := f.module.DeleteComment(ctx, f.asBuyer(f.newBuyer(t)), c2.ID); kindOf(err) != apperr.KindPermissionDenied {
+	if err := f.module.DeleteComment(ctx, f.asBuyer(f.newBuyer(t)), c2.ID, nil); kindOf(err) != apperr.KindPermissionDenied {
 		t.Fatalf("別的買家：%v", err)
 	}
-	must(t, f.module.DeleteComment(ctx, f.asStore(t, storeID), c2.ID))
+	must(t, f.module.DeleteComment(ctx, f.asStore(t, storeID), c2.ID, nil))
 }
 
 // SD6：髒字詞典在所有寫入路徑（建立與編輯貼文、留言、討論區）都擋；長度與空白一併檢查。
@@ -121,14 +121,14 @@ func TestSD6ProfanityFilterCoversEveryWritePath(t *testing.T) {
 		t.Fatalf("建立留言：%v", err)
 	}
 	c := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p.ID, Body: "好吃"}))
-	if _, err := f.module.UpdateComment(ctx, f.asBuyer(b), c.ID, bad); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.UpdateComment(ctx, f.asBuyer(b), c.ID, 1, bad); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("編輯留言：%v", err)
 	}
 	if _, err := f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: bad}); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("建立討論區留言：%v", err)
 	}
 	e := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "問題"}))
-	if _, err := f.module.UpdateForumEntry(ctx, f.asBuyer(b), e.ID, bad); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.UpdateForumEntry(ctx, f.asBuyer(b), e.ID, 1, bad); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("編輯討論區留言：%v", err)
 	}
 	// 空白與長度。
@@ -403,7 +403,7 @@ func TestStoreWritesAreGatedByCapabilities(t *testing.T) {
 		t.Fatalf("停權的店對留言按讚：%v", err)
 	}
 	// 收縮型的動作停權時仍可：刪除別人的留言（貼文所屬的店）與下架自己的貼文。
-	must(t, f.module.DeleteComment(ctx, sc, c.ID))
+	must(t, f.module.DeleteComment(ctx, sc, c.ID, nil))
 	if _, err := f.module.UnpublishPost(ctx, suspended, p.ID, p.Version); err != nil {
 		t.Fatalf("停權時仍可下架自己的貼文：%v", err)
 	}

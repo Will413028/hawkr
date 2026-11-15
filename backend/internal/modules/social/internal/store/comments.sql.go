@@ -13,7 +13,7 @@ import (
 )
 
 const commentByRequest = `-- name: CommentByRequest :one
-SELECT id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, request_id, request_hash FROM social.comments
+SELECT id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, version, request_id, request_hash FROM social.comments
 WHERE actor_kind = $1 AND actor_id = $2 AND request_id = $3
 `
 
@@ -40,6 +40,7 @@ func (q *Queries) CommentByRequest(ctx context.Context, arg CommentByRequestPara
 		&i.DeletedAt,
 		&i.ThreadID,
 		&i.Counted,
+		&i.Version,
 		&i.RequestID,
 		&i.RequestHash,
 	)
@@ -47,7 +48,7 @@ func (q *Queries) CommentByRequest(ctx context.Context, arg CommentByRequestPara
 }
 
 const getComment = `-- name: GetComment :one
-SELECT c.id, c.post_id, c.parent_id, c.reply_to_id, c.actor_kind, c.actor_id, c.body, c.created_at, c.updated_at, c.deleted_at, c.thread_id, c.counted, c.request_id, c.request_hash, p.store_id AS post_store_id
+SELECT c.id, c.post_id, c.parent_id, c.reply_to_id, c.actor_kind, c.actor_id, c.body, c.created_at, c.updated_at, c.deleted_at, c.thread_id, c.counted, c.version, c.request_id, c.request_hash, p.store_id AS post_store_id
 FROM social.comments c
 JOIN social.posts p ON p.id = c.post_id
 WHERE c.id = $1
@@ -74,6 +75,7 @@ func (q *Queries) GetComment(ctx context.Context, id uuid.UUID) (GetCommentRow, 
 		&i.SocialComment.DeletedAt,
 		&i.SocialComment.ThreadID,
 		&i.SocialComment.Counted,
+		&i.SocialComment.Version,
 		&i.SocialComment.RequestID,
 		&i.SocialComment.RequestHash,
 		&i.PostStoreID,
@@ -105,7 +107,7 @@ VALUES (
     $7::text, $8, $8, $9, $10
 )
 ON CONFLICT (actor_kind, actor_id, request_id) DO NOTHING
-RETURNING id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, request_id, request_hash
+RETURNING id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, version, request_id, request_hash
 `
 
 type InsertCommentParams struct {
@@ -151,6 +153,7 @@ func (q *Queries) InsertComment(ctx context.Context, arg InsertCommentParams) (S
 		&i.DeletedAt,
 		&i.ThreadID,
 		&i.Counted,
+		&i.Version,
 		&i.RequestID,
 		&i.RequestHash,
 	)
@@ -158,7 +161,7 @@ func (q *Queries) InsertComment(ctx context.Context, arg InsertCommentParams) (S
 }
 
 const lockComment = `-- name: LockComment :one
-SELECT c.id, c.post_id, c.parent_id, c.reply_to_id, c.actor_kind, c.actor_id, c.body, c.created_at, c.updated_at, c.deleted_at, c.thread_id, c.counted, c.request_id, c.request_hash, p.store_id AS post_store_id
+SELECT c.id, c.post_id, c.parent_id, c.reply_to_id, c.actor_kind, c.actor_id, c.body, c.created_at, c.updated_at, c.deleted_at, c.thread_id, c.counted, c.version, c.request_id, c.request_hash, p.store_id AS post_store_id
 FROM social.comments c
 JOIN social.posts p ON p.id = c.post_id
 WHERE c.id = $1
@@ -187,6 +190,7 @@ func (q *Queries) LockComment(ctx context.Context, id uuid.UUID) (LockCommentRow
 		&i.SocialComment.DeletedAt,
 		&i.SocialComment.ThreadID,
 		&i.SocialComment.Counted,
+		&i.SocialComment.Version,
 		&i.SocialComment.RequestID,
 		&i.SocialComment.RequestHash,
 		&i.PostStoreID,
@@ -195,7 +199,7 @@ func (q *Queries) LockComment(ctx context.Context, id uuid.UUID) (LockCommentRow
 }
 
 const softDeleteComment = `-- name: SoftDeleteComment :execrows
-UPDATE social.comments SET deleted_at = $1, updated_at = $1
+UPDATE social.comments SET deleted_at = $1, version = version + 1, updated_at = $1
 WHERE id = $2 AND deleted_at IS NULL
 `
 
@@ -214,19 +218,26 @@ func (q *Queries) SoftDeleteComment(ctx context.Context, arg SoftDeleteCommentPa
 }
 
 const updateCommentBody = `-- name: UpdateCommentBody :one
-UPDATE social.comments SET body = $1::text, updated_at = $2
-WHERE id = $3 AND deleted_at IS NULL
-RETURNING id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, request_id, request_hash
+UPDATE social.comments SET body = $1::text, version = version + 1, updated_at = $2
+WHERE id = $3 AND deleted_at IS NULL AND version = $4
+RETURNING id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, version, request_id, request_hash
 `
 
 type UpdateCommentBodyParams struct {
-	Body string
-	Now  time.Time
-	ID   uuid.UUID
+	Body            string
+	Now             time.Time
+	ID              uuid.UUID
+	ExpectedVersion int64
 }
 
+// 版本不符回 0 列。
 func (q *Queries) UpdateCommentBody(ctx context.Context, arg UpdateCommentBodyParams) (SocialComment, error) {
-	row := q.db.QueryRow(ctx, updateCommentBody, arg.Body, arg.Now, arg.ID)
+	row := q.db.QueryRow(ctx, updateCommentBody,
+		arg.Body,
+		arg.Now,
+		arg.ID,
+		arg.ExpectedVersion,
+	)
 	var i SocialComment
 	err := row.Scan(
 		&i.ID,
@@ -241,6 +252,7 @@ func (q *Queries) UpdateCommentBody(ctx context.Context, arg UpdateCommentBodyPa
 		&i.DeletedAt,
 		&i.ThreadID,
 		&i.Counted,
+		&i.Version,
 		&i.RequestID,
 		&i.RequestHash,
 	)

@@ -68,6 +68,8 @@ type SocialComment struct {
 	ThreadID  uuid.UUID
 	// 此刻是否計入貼文的留言數與父留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_comments 求值）；只由 social.reevaluate_comments 維護，讀取直接用它，貼文的 comment_count 與留言的 reply_count 是這個旗標的加總
 	Counted bool
+	// 樂觀鎖的版本，對外是 etag；內文修改與刪除各加一
+	Version int64
 	// 建立時 client 帶的 request_id（AIP-155，選填）；範圍是 (互動者, request_id)，同一個互動者重送回這一列
 	RequestID *uuid.UUID
 	// 建立輸入（貼文、父留言、被回覆的留言、內文）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有
@@ -110,6 +112,8 @@ type SocialForumEntry struct {
 	ThreadID  uuid.UUID
 	// 此刻是否計入父討論區留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_forum_entries 求值）；只由 social.reevaluate_forum_entries 維護，讀取直接用它，父項的 reply_count 是這個旗標的加總
 	Counted bool
+	// 樂觀鎖的版本，對外是 etag；內文修改與刪除各加一
+	Version int64
 	// 建立時 client 帶的 request_id（AIP-155，選填）；範圍是 (互動者, request_id)，同一個互動者重送回這一列
 	RequestID *uuid.UUID
 	// 建立輸入（店家、父項、被回覆的項目、內文）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有

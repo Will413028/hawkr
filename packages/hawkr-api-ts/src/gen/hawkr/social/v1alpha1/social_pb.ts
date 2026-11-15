@@ -14,8 +14,8 @@ import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobu
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_google_api_field_behavior } from "../../../google/api/field_behavior_pb";
 import { file_google_api_field_info } from "../../../google/api/field_info_pb";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { FieldMask, Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_field_mask, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Image } from "../../common/v1alpha1/image_pb";
 import { file_hawkr_common_v1alpha1_image } from "../../common/v1alpha1/image_pb";
 import type { StoreCard } from "../../common/v1alpha1/store_card_pb";
@@ -26,7 +26,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/social/v1alpha1/social.proto.
  */
 export const file_hawkr_social_v1alpha1_social: GenFile = /*@__PURE__*/
-  fileDesc("CiJoYXdrci9zb2NpYWwvdjFhbHBoYTEvc29jaWFsLnByb3RvEhVoYXdrci5zb2NpYWwudjFhbHBoYTEiMgoHSGFzaHRhZxIRCgRuYW1lGAEgASgJQgPgQQMSFAoHZGlzcGxheRgCIAEoCUID4EEDIu8DCgRQb3N0Eg8KAmlkGAEgASgJQgPgQQgSNAoFc3RvcmUYAiABKAsyIC5oYXdrci5jb21tb24udjFhbHBoYTEuU3RvcmVDYXJkQgPgQQMSDAoEYm9keRgDIAEoCRIrCgVpbWFnZRgEIAEoCzIcLmhhd2tyLmNvbW1vbi52MWFscGhhMS5JbWFnZRIXCgpwcm9kdWN0X2lkGAUgASgJSACIAQESNQoIaGFzaHRhZ3MYBiADKAsyHi5oYXdrci5zb2NpYWwudjFhbHBoYTEuSGFzaHRhZ0ID4EEDEjUKDHB1Ymxpc2hfdGltZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxI0Cgt1cGRhdGVfdGltZRgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxIXCgpsaWtlX2NvdW50GAkgASgDQgPgQQMSGgoNY29tbWVudF9jb3VudBgKIAEoA0ID4EEDEhcKCnZpZXdfY291bnQYCyABKANCA+BBAxIYCgtzaGFyZV9jb3VudBgMIAEoA0ID4EEDEhAKA3VybBgNIAEoCUID4EEDEh8KEnZpZXdlcl9jYW5fY29tbWVudBgOIAEoCEID4EEDQg0KC19wcm9kdWN0X2lkIqEBCgVBY3RvchIzCgRraW5kGAEgASgOMiAuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkFjdG9yS2luZEID4EEDEg8KAmlkGAIgASgJQgPgQQMSFgoEbmFtZRgDIAEoCUID4EEDSACIAQESMQoGYXZhdGFyGAQgASgLMhwuaGF3a3IuY29tbW9uLnYxYWxwaGExLkltYWdlQgPgQQNCBwoFX25hbWUitgQKB0NvbW1lbnQSDwoCaWQYASABKAlCA+BBCBIUCgdwb3N0X2lkGAIgASgJQgPgQQMSGwoJcGFyZW50X2lkGAMgASgJQgPgQQNIAIgBARIdCgtyZXBseV90b19pZBgEIAEoCUID4EEDSAGIAQESNwoFc3RhdGUYBSABKA4yIy5oYXdrci5zb2NpYWwudjFhbHBoYTEuQ29tbWVudFN0YXRlQgPgQQMSMQoGYXV0aG9yGAYgASgLMhwuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkFjdG9yQgPgQQMSEQoEYm9keRgHIAEoCUID4EEDEjQKC2NyZWF0ZV90aW1lGAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjQKC3VwZGF0ZV90aW1lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEhcKCmxpa2VfY291bnQYCiABKANCA+BBAxIYCgtyZXBseV9jb3VudBgLIAEoA0ID4EEDEhkKDHZpZXdlcl9saWtlZBgMIAEoCEID4EEDEhQKB2lzX21pbmUYDSABKAhCA+BBAxIcCg92aWV3ZXJfY2FuX2VkaXQYDiABKAhCA+BBAxIeChF2aWV3ZXJfY2FuX2RlbGV0ZRgPIAEoCEID4EEDEh0KEHZpZXdlcl9jYW5fcmVwbHkYECABKAhCA+BBA0IMCgpfcGFyZW50X2lkQg4KDF9yZXBseV90b19pZCImCg5HZXRQb3N0UmVxdWVzdBIUCgdwb3N0X2lkGAEgASgJQgPgQQIiPAoPR2V0UG9zdFJlc3BvbnNlEikKBHBvc3QYASABKAsyGy5oYXdrci5zb2NpYWwudjFhbHBoYTEuUG9zdCJ/ChBMaXN0UG9zdHNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJEhUKCHN0b3JlX2lkGAMgASgJSACIAQESFAoHaGFzaHRhZxgEIAEoCUgBiAEBQgsKCV9zdG9yZV9pZEIKCghfaGFzaHRhZyJYChFMaXN0UG9zdHNSZXNwb25zZRIqCgVwb3N0cxgBIAMoCzIbLmhhd2tyLnNvY2lhbC52MWFscGhhMS5Qb3N0EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSJ4ChNMaXN0Q29tbWVudHNSZXF1ZXN0EhQKB3Bvc3RfaWQYASABKAlCA+BBAhIRCglwYWdlX3NpemUYAiABKAUSEgoKcGFnZV90b2tlbhgDIAEoCRIWCglwYXJlbnRfaWQYBCABKAlIAIgBAUIMCgpfcGFyZW50X2lkImEKFExpc3RDb21tZW50c1Jlc3BvbnNlEjAKCGNvbW1lbnRzGAEgAygLMh4uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkNvbW1lbnQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIjIKG1N1Z2dlc3RUcmVuZGluZ1Bvc3RzUmVxdWVzdBITCgttYXhfcmVzdWx0cxgBIAEoBSJKChxTdWdnZXN0VHJlbmRpbmdQb3N0c1Jlc3BvbnNlEioKBXBvc3RzGAEgAygLMhsuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlBvc3QiTwoSU3VnZ2VzdFRhZ3NSZXF1ZXN0EhIKBXF1ZXJ5GAEgASgJQgPgQQISEAoIY29udGFpbnMYAiABKAgSEwoLbWF4X3Jlc3VsdHMYAyABKAUiRAoTU3VnZ2VzdFRhZ3NSZXNwb25zZRItCgR0YWdzGAEgAygLMh8uaGF3a3Iuc29jaWFsLnYxYWxwaGExLlRhZ0NvdW50Io8BChpTdWdnZXN0VHJlbmRpbmdUYWdzUmVxdWVzdBIuCgpzdGFydF90aW1lGAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCghlbmRfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEwoLbWF4X3Jlc3VsdHMYAyABKAUiTAobU3VnZ2VzdFRyZW5kaW5nVGFnc1Jlc3BvbnNlEi0KBHRhZ3MYASADKAsyHy5oYXdrci5zb2NpYWwudjFhbHBoYTEuVGFnQ291bnQiNgoIVGFnQ291bnQSEQoEbmFtZRgBIAEoCUID4EEDEhcKCnBvc3RfY291bnQYAiABKANCA+BBAyKGBAoKRm9ydW1FbnRyeRIPCgJpZBgBIAEoCUID4EEIEhUKCHN0b3JlX2lkGAIgASgJQgPgQQMSGwoJcGFyZW50X2lkGAMgASgJQgPgQQNIAIgBARIdCgtyZXBseV90b19pZBgEIAEoCUID4EEDSAGIAQESNwoFc3RhdGUYBSABKA4yIy5oYXdrci5zb2NpYWwudjFhbHBoYTEuQ29tbWVudFN0YXRlQgPgQQMSMQoGYXV0aG9yGAYgASgLMhwuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkFjdG9yQgPgQQMSEQoEYm9keRgHIAEoCUID4EEDEjQKC2NyZWF0ZV90aW1lGAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjQKC3VwZGF0ZV90aW1lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEhgKC3JlcGx5X2NvdW50GAogASgDQgPgQQMSFAoHaXNfbWluZRgLIAEoCEID4EEDEhwKD3ZpZXdlcl9jYW5fZWRpdBgMIAEoCEID4EEDEh4KEXZpZXdlcl9jYW5fZGVsZXRlGA0gASgIQgPgQQMSHQoQdmlld2VyX2Nhbl9yZXBseRgOIAEoCEID4EEDQgwKCl9wYXJlbnRfaWRCDgoMX3JlcGx5X3RvX2lkIn0KF0xpc3RGb3J1bUVudHJpZXNSZXF1ZXN0EhUKCHN0b3JlX2lkGAEgASgJQgPgQQISEQoJcGFnZV9zaXplGAIgASgFEhIKCnBhZ2VfdG9rZW4YAyABKAkSFgoJcGFyZW50X2lkGAQgASgJSACIAQFCDAoKX3BhcmVudF9pZCJnChhMaXN0Rm9ydW1FbnRyaWVzUmVzcG9uc2USMgoHZW50cmllcxgBIAMoCzIhLmhhd2tyLnNvY2lhbC52MWFscGhhMS5Gb3J1bUVudHJ5EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSItChVSZWNvcmRQb3N0Vmlld1JlcXVlc3QSFAoHcG9zdF9pZBgBIAEoCUID4EECIhgKFlJlY29yZFBvc3RWaWV3UmVzcG9uc2UiKAoQU2hhcmVQb3N0UmVxdWVzdBIUCgdwb3N0X2lkGAEgASgJQgPgQQIiEwoRU2hhcmVQb3N0UmVzcG9uc2UiJwoPTGlrZVBvc3RSZXF1ZXN0EhQKB3Bvc3RfaWQYASABKAlCA+BBAiISChBMaWtlUG9zdFJlc3BvbnNlIikKEVVubGlrZVBvc3RSZXF1ZXN0EhQKB3Bvc3RfaWQYASABKAlCA+BBAiIUChJVbmxpa2VQb3N0UmVzcG9uc2UiLQoSTGlrZUNvbW1lbnRSZXF1ZXN0EhcKCmNvbW1lbnRfaWQYASABKAlCA+BBAiIVChNMaWtlQ29tbWVudFJlc3BvbnNlIi8KFFVubGlrZUNvbW1lbnRSZXF1ZXN0EhcKCmNvbW1lbnRfaWQYASABKAlCA+BBAiIXChVVbmxpa2VDb21tZW50UmVzcG9uc2UirQEKFENyZWF0ZUNvbW1lbnRSZXF1ZXN0EhQKB3Bvc3RfaWQYASABKAlCA+BBAhIRCgRib2R5GAIgASgJQgPgQQISFgoJcGFyZW50X2lkGAMgASgJSACIAQESGAoLcmVwbHlfdG9faWQYBCABKAlIAYgBARIcCgpyZXF1ZXN0X2lkGAUgASgJQgjijM/XCAIIAUIMCgpfcGFyZW50X2lkQg4KDF9yZXBseV90b19pZCJIChVDcmVhdGVDb21tZW50UmVzcG9uc2USLwoHY29tbWVudBgBIAEoCzIeLmhhd2tyLnNvY2lhbC52MWFscGhhMS5Db21tZW50IkIKFFVwZGF0ZUNvbW1lbnRSZXF1ZXN0EhcKCmNvbW1lbnRfaWQYASABKAlCA+BBAhIRCgRib2R5GAIgASgJQgPgQQIiYAoVVXBkYXRlQ29tbWVudFJlc3BvbnNlEhEKBGJvZHkYASABKAlCA+BBAxI0Cgt1cGRhdGVfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAyIvChREZWxldGVDb21tZW50UmVxdWVzdBIXCgpjb21tZW50X2lkGAEgASgJQgPgQQIiFwoVRGVsZXRlQ29tbWVudFJlc3BvbnNlIrEBChdDcmVhdGVGb3J1bUVudHJ5UmVxdWVzdBIVCghzdG9yZV9pZBgBIAEoCUID4EECEhEKBGJvZHkYAiABKAlCA+BBAhIWCglwYXJlbnRfaWQYAyABKAlIAIgBARIYCgtyZXBseV90b19pZBgEIAEoCUgBiAEBEhwKCnJlcXVlc3RfaWQYBSABKAlCCOKMz9cIAggBQgwKCl9wYXJlbnRfaWRCDgoMX3JlcGx5X3RvX2lkIkwKGENyZWF0ZUZvcnVtRW50cnlSZXNwb25zZRIwCgVlbnRyeRgBIAEoCzIhLmhhd2tyLnNvY2lhbC52MWFscGhhMS5Gb3J1bUVudHJ5IkMKF1VwZGF0ZUZvcnVtRW50cnlSZXF1ZXN0EhUKCGVudHJ5X2lkGAEgASgJQgPgQQISEQoEYm9keRgCIAEoCUID4EECImMKGFVwZGF0ZUZvcnVtRW50cnlSZXNwb25zZRIRCgRib2R5GAEgASgJQgPgQQMSNAoLdXBkYXRlX3RpbWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMiMAoXRGVsZXRlRm9ydW1FbnRyeVJlcXVlc3QSFQoIZW50cnlfaWQYASABKAlCA+BBAiIaChhEZWxldGVGb3J1bUVudHJ5UmVzcG9uc2UqUwoJQWN0b3JLaW5kEhoKFkFDVE9SX0tJTkRfVU5TUEVDSUZJRUQQABIUChBBQ1RPUl9LSU5EX0JVWUVSEAESFAoQQUNUT1JfS0lORF9TVE9SRRACKn0KDENvbW1lbnRTdGF0ZRIdChlDT01NRU5UX1NUQVRFX1VOU1BFQ0lGSUVEEAASGQoVQ09NTUVOVF9TVEFURV9WSVNJQkxFEAESGQoVQ09NTUVOVF9TVEFURV9ERUxFVEVEEAISGAoUQ09NTUVOVF9TVEFURV9ISURERU4QAzKmBwoTU29jaWFsUHVibGljU2VydmljZRJdCgdHZXRQb3N0EiUuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkdldFBvc3RSZXF1ZXN0GiYuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkdldFBvc3RSZXNwb25zZSIDkAIBEmMKCUxpc3RQb3N0cxInLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaXN0UG9zdHNSZXF1ZXN0GiguaGF3a3Iuc29jaWFsLnYxYWxwaGExLkxpc3RQb3N0c1Jlc3BvbnNlIgOQAgESbAoMTGlzdENvbW1lbnRzEiouaGF3a3Iuc29jaWFsLnYxYWxwaGExLkxpc3RDb21tZW50c1JlcXVlc3QaKy5oYXdrci5zb2NpYWwudjFhbHBoYTEuTGlzdENvbW1lbnRzUmVzcG9uc2UiA5ACARKEAQoUU3VnZ2VzdFRyZW5kaW5nUG9zdHMSMi5oYXdrci5zb2NpYWwudjFhbHBoYTEuU3VnZ2VzdFRyZW5kaW5nUG9zdHNSZXF1ZXN0GjMuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlN1Z2dlc3RUcmVuZGluZ1Bvc3RzUmVzcG9uc2UiA5ACARJpCgtTdWdnZXN0VGFncxIpLmhhd2tyLnNvY2lhbC52MWFscGhhMS5TdWdnZXN0VGFnc1JlcXVlc3QaKi5oYXdrci5zb2NpYWwudjFhbHBoYTEuU3VnZ2VzdFRhZ3NSZXNwb25zZSIDkAIBEoEBChNTdWdnZXN0VHJlbmRpbmdUYWdzEjEuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlN1Z2dlc3RUcmVuZGluZ1RhZ3NSZXF1ZXN0GjIuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlN1Z2dlc3RUcmVuZGluZ1RhZ3NSZXNwb25zZSIDkAIBEngKEExpc3RGb3J1bUVudHJpZXMSLi5oYXdrci5zb2NpYWwudjFhbHBoYTEuTGlzdEZvcnVtRW50cmllc1JlcXVlc3QaLy5oYXdrci5zb2NpYWwudjFhbHBoYTEuTGlzdEZvcnVtRW50cmllc1Jlc3BvbnNlIgOQAgESbQoOUmVjb3JkUG9zdFZpZXcSLC5oYXdrci5zb2NpYWwudjFhbHBoYTEuUmVjb3JkUG9zdFZpZXdSZXF1ZXN0Gi0uaGF3a3Iuc29jaWFsLnYxYWxwaGExLlJlY29yZFBvc3RWaWV3UmVzcG9uc2Uy1AkKEFNvY2lhbEFwcFNlcnZpY2USYwoJU2hhcmVQb3N0EicuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlNoYXJlUG9zdFJlcXVlc3QaKC5oYXdrci5zb2NpYWwudjFhbHBoYTEuU2hhcmVQb3N0UmVzcG9uc2UiA5ACAhJgCghMaWtlUG9zdBImLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaWtlUG9zdFJlcXVlc3QaJy5oYXdrci5zb2NpYWwudjFhbHBoYTEuTGlrZVBvc3RSZXNwb25zZSIDkAICEmYKClVubGlrZVBvc3QSKC5oYXdrci5zb2NpYWwudjFhbHBoYTEuVW5saWtlUG9zdFJlcXVlc3QaKS5oYXdrci5zb2NpYWwudjFhbHBoYTEuVW5saWtlUG9zdFJlc3BvbnNlIgOQAgISaQoLTGlrZUNvbW1lbnQSKS5oYXdrci5zb2NpYWwudjFhbHBoYTEuTGlrZUNvbW1lbnRSZXF1ZXN0GiouaGF3a3Iuc29jaWFsLnYxYWxwaGExLkxpa2VDb21tZW50UmVzcG9uc2UiA5ACAhJvCg1Vbmxpa2VDb21tZW50EisuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlVubGlrZUNvbW1lbnRSZXF1ZXN0GiwuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlVubGlrZUNvbW1lbnRSZXNwb25zZSIDkAICEmoKDUNyZWF0ZUNvbW1lbnQSKy5oYXdrci5zb2NpYWwudjFhbHBoYTEuQ3JlYXRlQ29tbWVudFJlcXVlc3QaLC5oYXdrci5zb2NpYWwudjFhbHBoYTEuQ3JlYXRlQ29tbWVudFJlc3BvbnNlEm8KDVVwZGF0ZUNvbW1lbnQSKy5oYXdrci5zb2NpYWwudjFhbHBoYTEuVXBkYXRlQ29tbWVudFJlcXVlc3QaLC5oYXdrci5zb2NpYWwudjFhbHBoYTEuVXBkYXRlQ29tbWVudFJlc3BvbnNlIgOQAgISbwoNRGVsZXRlQ29tbWVudBIrLmhhd2tyLnNvY2lhbC52MWFscGhhMS5EZWxldGVDb21tZW50UmVxdWVzdBosLmhhd2tyLnNvY2lhbC52MWFscGhhMS5EZWxldGVDb21tZW50UmVzcG9uc2UiA5ACAhJzChBDcmVhdGVGb3J1bUVudHJ5Ei4uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkNyZWF0ZUZvcnVtRW50cnlSZXF1ZXN0Gi8uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkNyZWF0ZUZvcnVtRW50cnlSZXNwb25zZRJ4ChBVcGRhdGVGb3J1bUVudHJ5Ei4uaGF3a3Iuc29jaWFsLnYxYWxwaGExLlVwZGF0ZUZvcnVtRW50cnlSZXF1ZXN0Gi8uaGF3a3Iuc29jaWFsLnYxYWxwaGExLlVwZGF0ZUZvcnVtRW50cnlSZXNwb25zZSIDkAICEngKEERlbGV0ZUZvcnVtRW50cnkSLi5oYXdrci5zb2NpYWwudjFhbHBoYTEuRGVsZXRlRm9ydW1FbnRyeVJlcXVlc3QaLy5oYXdrci5zb2NpYWwudjFhbHBoYTEuRGVsZXRlRm9ydW1FbnRyeVJlc3BvbnNlIgOQAgJiBnByb3RvMw", [file_google_api_field_behavior, file_google_api_field_info, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_image, file_hawkr_common_v1alpha1_store_card]);
+  fileDesc("CiJoYXdrci9zb2NpYWwvdjFhbHBoYTEvc29jaWFsLnByb3RvEhVoYXdrci5zb2NpYWwudjFhbHBoYTEiMgoHSGFzaHRhZxIRCgRuYW1lGAEgASgJQgPgQQMSFAoHZGlzcGxheRgCIAEoCUID4EEDIu8DCgRQb3N0Eg8KAmlkGAEgASgJQgPgQQgSNAoFc3RvcmUYAiABKAsyIC5oYXdrci5jb21tb24udjFhbHBoYTEuU3RvcmVDYXJkQgPgQQMSDAoEYm9keRgDIAEoCRIrCgVpbWFnZRgEIAEoCzIcLmhhd2tyLmNvbW1vbi52MWFscGhhMS5JbWFnZRIXCgpwcm9kdWN0X2lkGAUgASgJSACIAQESNQoIaGFzaHRhZ3MYBiADKAsyHi5oYXdrci5zb2NpYWwudjFhbHBoYTEuSGFzaHRhZ0ID4EEDEjUKDHB1Ymxpc2hfdGltZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxI0Cgt1cGRhdGVfdGltZRgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxIXCgpsaWtlX2NvdW50GAkgASgDQgPgQQMSGgoNY29tbWVudF9jb3VudBgKIAEoA0ID4EEDEhcKCnZpZXdfY291bnQYCyABKANCA+BBAxIYCgtzaGFyZV9jb3VudBgMIAEoA0ID4EEDEhAKA3VybBgNIAEoCUID4EEDEh8KEnZpZXdlcl9jYW5fY29tbWVudBgOIAEoCEID4EEDQg0KC19wcm9kdWN0X2lkIqEBCgVBY3RvchIzCgRraW5kGAEgASgOMiAuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkFjdG9yS2luZEID4EEDEg8KAmlkGAIgASgJQgPgQQMSFgoEbmFtZRgDIAEoCUID4EEDSACIAQESMQoGYXZhdGFyGAQgASgLMhwuaGF3a3IuY29tbW9uLnYxYWxwaGExLkltYWdlQgPgQQNCBwoFX25hbWUivwQKB0NvbW1lbnQSDwoCaWQYASABKAlCA+BBCBIUCgdwb3N0X2lkGAIgASgJQgPgQQMSGwoJcGFyZW50X2lkGAMgASgJQgPgQQNIAIgBARIdCgtyZXBseV90b19pZBgEIAEoCUID4EEDSAGIAQESNwoFc3RhdGUYBSABKA4yIy5oYXdrci5zb2NpYWwudjFhbHBoYTEuQ29tbWVudFN0YXRlQgPgQQMSMQoGYXV0aG9yGAYgASgLMhwuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkFjdG9yQgPgQQMSDAoEYm9keRgHIAEoCRI0CgtjcmVhdGVfdGltZRgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxI0Cgt1cGRhdGVfdGltZRgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxIXCgpsaWtlX2NvdW50GAogASgDQgPgQQMSGAoLcmVwbHlfY291bnQYCyABKANCA+BBAxIZCgx2aWV3ZXJfbGlrZWQYDCABKAhCA+BBAxIUCgdpc19taW5lGA0gASgIQgPgQQMSHAoPdmlld2VyX2Nhbl9lZGl0GA4gASgIQgPgQQMSHgoRdmlld2VyX2Nhbl9kZWxldGUYDyABKAhCA+BBAxIdChB2aWV3ZXJfY2FuX3JlcGx5GBAgASgIQgPgQQMSDAoEZXRhZxgRIAEoCUIMCgpfcGFyZW50X2lkQg4KDF9yZXBseV90b19pZCImCg5HZXRQb3N0UmVxdWVzdBIUCgdwb3N0X2lkGAEgASgJQgPgQQIiPAoPR2V0UG9zdFJlc3BvbnNlEikKBHBvc3QYASABKAsyGy5oYXdrci5zb2NpYWwudjFhbHBoYTEuUG9zdCJ/ChBMaXN0UG9zdHNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJEhUKCHN0b3JlX2lkGAMgASgJSACIAQESFAoHaGFzaHRhZxgEIAEoCUgBiAEBQgsKCV9zdG9yZV9pZEIKCghfaGFzaHRhZyJYChFMaXN0UG9zdHNSZXNwb25zZRIqCgVwb3N0cxgBIAMoCzIbLmhhd2tyLnNvY2lhbC52MWFscGhhMS5Qb3N0EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSJ4ChNMaXN0Q29tbWVudHNSZXF1ZXN0EhQKB3Bvc3RfaWQYASABKAlCA+BBAhIRCglwYWdlX3NpemUYAiABKAUSEgoKcGFnZV90b2tlbhgDIAEoCRIWCglwYXJlbnRfaWQYBCABKAlIAIgBAUIMCgpfcGFyZW50X2lkImEKFExpc3RDb21tZW50c1Jlc3BvbnNlEjAKCGNvbW1lbnRzGAEgAygLMh4uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkNvbW1lbnQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIjIKG1N1Z2dlc3RUcmVuZGluZ1Bvc3RzUmVxdWVzdBITCgttYXhfcmVzdWx0cxgBIAEoBSJKChxTdWdnZXN0VHJlbmRpbmdQb3N0c1Jlc3BvbnNlEioKBXBvc3RzGAEgAygLMhsuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlBvc3QiTwoSU3VnZ2VzdFRhZ3NSZXF1ZXN0EhIKBXF1ZXJ5GAEgASgJQgPgQQISEAoIY29udGFpbnMYAiABKAgSEwoLbWF4X3Jlc3VsdHMYAyABKAUiRAoTU3VnZ2VzdFRhZ3NSZXNwb25zZRItCgR0YWdzGAEgAygLMh8uaGF3a3Iuc29jaWFsLnYxYWxwaGExLlRhZ0NvdW50Io8BChpTdWdnZXN0VHJlbmRpbmdUYWdzUmVxdWVzdBIuCgpzdGFydF90aW1lGAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCghlbmRfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEwoLbWF4X3Jlc3VsdHMYAyABKAUiTAobU3VnZ2VzdFRyZW5kaW5nVGFnc1Jlc3BvbnNlEi0KBHRhZ3MYASADKAsyHy5oYXdrci5zb2NpYWwudjFhbHBoYTEuVGFnQ291bnQiNgoIVGFnQ291bnQSEQoEbmFtZRgBIAEoCUID4EEDEhcKCnBvc3RfY291bnQYAiABKANCA+BBAyKPBAoKRm9ydW1FbnRyeRIPCgJpZBgBIAEoCUID4EEIEhUKCHN0b3JlX2lkGAIgASgJQgPgQQMSGwoJcGFyZW50X2lkGAMgASgJQgPgQQNIAIgBARIdCgtyZXBseV90b19pZBgEIAEoCUID4EEDSAGIAQESNwoFc3RhdGUYBSABKA4yIy5oYXdrci5zb2NpYWwudjFhbHBoYTEuQ29tbWVudFN0YXRlQgPgQQMSMQoGYXV0aG9yGAYgASgLMhwuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkFjdG9yQgPgQQMSDAoEYm9keRgHIAEoCRI0CgtjcmVhdGVfdGltZRgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxI0Cgt1cGRhdGVfdGltZRgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxIYCgtyZXBseV9jb3VudBgKIAEoA0ID4EEDEhQKB2lzX21pbmUYCyABKAhCA+BBAxIcCg92aWV3ZXJfY2FuX2VkaXQYDCABKAhCA+BBAxIeChF2aWV3ZXJfY2FuX2RlbGV0ZRgNIAEoCEID4EEDEh0KEHZpZXdlcl9jYW5fcmVwbHkYDiABKAhCA+BBAxIMCgRldGFnGA8gASgJQgwKCl9wYXJlbnRfaWRCDgoMX3JlcGx5X3RvX2lkIn0KF0xpc3RGb3J1bUVudHJpZXNSZXF1ZXN0EhUKCHN0b3JlX2lkGAEgASgJQgPgQQISEQoJcGFnZV9zaXplGAIgASgFEhIKCnBhZ2VfdG9rZW4YAyABKAkSFgoJcGFyZW50X2lkGAQgASgJSACIAQFCDAoKX3BhcmVudF9pZCJnChhMaXN0Rm9ydW1FbnRyaWVzUmVzcG9uc2USMgoHZW50cmllcxgBIAMoCzIhLmhhd2tyLnNvY2lhbC52MWFscGhhMS5Gb3J1bUVudHJ5EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSItChVSZWNvcmRQb3N0Vmlld1JlcXVlc3QSFAoHcG9zdF9pZBgBIAEoCUID4EECIhgKFlJlY29yZFBvc3RWaWV3UmVzcG9uc2UiKAoQU2hhcmVQb3N0UmVxdWVzdBIUCgdwb3N0X2lkGAEgASgJQgPgQQIiEwoRU2hhcmVQb3N0UmVzcG9uc2UiJwoPTGlrZVBvc3RSZXF1ZXN0EhQKB3Bvc3RfaWQYASABKAlCA+BBAiISChBMaWtlUG9zdFJlc3BvbnNlIikKEVVubGlrZVBvc3RSZXF1ZXN0EhQKB3Bvc3RfaWQYASABKAlCA+BBAiIUChJVbmxpa2VQb3N0UmVzcG9uc2UiLQoSTGlrZUNvbW1lbnRSZXF1ZXN0EhcKCmNvbW1lbnRfaWQYASABKAlCA+BBAiIVChNMaWtlQ29tbWVudFJlc3BvbnNlIi8KFFVubGlrZUNvbW1lbnRSZXF1ZXN0EhcKCmNvbW1lbnRfaWQYASABKAlCA+BBAiIXChVVbmxpa2VDb21tZW50UmVzcG9uc2UirQEKFENyZWF0ZUNvbW1lbnRSZXF1ZXN0EhQKB3Bvc3RfaWQYASABKAlCA+BBAhIRCgRib2R5GAIgASgJQgPgQQISFgoJcGFyZW50X2lkGAMgASgJSACIAQESGAoLcmVwbHlfdG9faWQYBCABKAlIAYgBARIcCgpyZXF1ZXN0X2lkGAUgASgJQgjijM/XCAIIAUIMCgpfcGFyZW50X2lkQg4KDF9yZXBseV90b19pZCJIChVDcmVhdGVDb21tZW50UmVzcG9uc2USLwoHY29tbWVudBgBIAEoCzIeLmhhd2tyLnNvY2lhbC52MWFscGhhMS5Db21tZW50In0KFFVwZGF0ZUNvbW1lbnRSZXF1ZXN0EjQKB2NvbW1lbnQYASABKAsyHi5oYXdrci5zb2NpYWwudjFhbHBoYTEuQ29tbWVudEID4EECEi8KC3VwZGF0ZV9tYXNrGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFzayJIChVVcGRhdGVDb21tZW50UmVzcG9uc2USLwoHY29tbWVudBgBIAEoCzIeLmhhd2tyLnNvY2lhbC52MWFscGhhMS5Db21tZW50Ij0KFERlbGV0ZUNvbW1lbnRSZXF1ZXN0EhcKCmNvbW1lbnRfaWQYASABKAlCA+BBAhIMCgRldGFnGAIgASgJIhcKFURlbGV0ZUNvbW1lbnRSZXNwb25zZSKxAQoXQ3JlYXRlRm9ydW1FbnRyeVJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAhIRCgRib2R5GAIgASgJQgPgQQISFgoJcGFyZW50X2lkGAMgASgJSACIAQESGAoLcmVwbHlfdG9faWQYBCABKAlIAYgBARIcCgpyZXF1ZXN0X2lkGAUgASgJQgjijM/XCAIIAUIMCgpfcGFyZW50X2lkQg4KDF9yZXBseV90b19pZCJMChhDcmVhdGVGb3J1bUVudHJ5UmVzcG9uc2USMAoFZW50cnkYASABKAsyIS5oYXdrci5zb2NpYWwudjFhbHBoYTEuRm9ydW1FbnRyeSKBAQoXVXBkYXRlRm9ydW1FbnRyeVJlcXVlc3QSNQoFZW50cnkYASABKAsyIS5oYXdrci5zb2NpYWwudjFhbHBoYTEuRm9ydW1FbnRyeUID4EECEi8KC3VwZGF0ZV9tYXNrGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFzayJMChhVcGRhdGVGb3J1bUVudHJ5UmVzcG9uc2USMAoFZW50cnkYASABKAsyIS5oYXdrci5zb2NpYWwudjFhbHBoYTEuRm9ydW1FbnRyeSI+ChdEZWxldGVGb3J1bUVudHJ5UmVxdWVzdBIVCghlbnRyeV9pZBgBIAEoCUID4EECEgwKBGV0YWcYAiABKAkiGgoYRGVsZXRlRm9ydW1FbnRyeVJlc3BvbnNlKlMKCUFjdG9yS2luZBIaChZBQ1RPUl9LSU5EX1VOU1BFQ0lGSUVEEAASFAoQQUNUT1JfS0lORF9CVVlFUhABEhQKEEFDVE9SX0tJTkRfU1RPUkUQAip9CgxDb21tZW50U3RhdGUSHQoZQ09NTUVOVF9TVEFURV9VTlNQRUNJRklFRBAAEhkKFUNPTU1FTlRfU1RBVEVfVklTSUJMRRABEhkKFUNPTU1FTlRfU1RBVEVfREVMRVRFRBACEhgKFENPTU1FTlRfU1RBVEVfSElEREVOEAMypgcKE1NvY2lhbFB1YmxpY1NlcnZpY2USXQoHR2V0UG9zdBIlLmhhd2tyLnNvY2lhbC52MWFscGhhMS5HZXRQb3N0UmVxdWVzdBomLmhhd2tyLnNvY2lhbC52MWFscGhhMS5HZXRQb3N0UmVzcG9uc2UiA5ACARJjCglMaXN0UG9zdHMSJy5oYXdrci5zb2NpYWwudjFhbHBoYTEuTGlzdFBvc3RzUmVxdWVzdBooLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaXN0UG9zdHNSZXNwb25zZSIDkAIBEmwKDExpc3RDb21tZW50cxIqLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaXN0Q29tbWVudHNSZXF1ZXN0GisuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkxpc3RDb21tZW50c1Jlc3BvbnNlIgOQAgEShAEKFFN1Z2dlc3RUcmVuZGluZ1Bvc3RzEjIuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlN1Z2dlc3RUcmVuZGluZ1Bvc3RzUmVxdWVzdBozLmhhd2tyLnNvY2lhbC52MWFscGhhMS5TdWdnZXN0VHJlbmRpbmdQb3N0c1Jlc3BvbnNlIgOQAgESaQoLU3VnZ2VzdFRhZ3MSKS5oYXdrci5zb2NpYWwudjFhbHBoYTEuU3VnZ2VzdFRhZ3NSZXF1ZXN0GiouaGF3a3Iuc29jaWFsLnYxYWxwaGExLlN1Z2dlc3RUYWdzUmVzcG9uc2UiA5ACARKBAQoTU3VnZ2VzdFRyZW5kaW5nVGFncxIxLmhhd2tyLnNvY2lhbC52MWFscGhhMS5TdWdnZXN0VHJlbmRpbmdUYWdzUmVxdWVzdBoyLmhhd2tyLnNvY2lhbC52MWFscGhhMS5TdWdnZXN0VHJlbmRpbmdUYWdzUmVzcG9uc2UiA5ACARJ4ChBMaXN0Rm9ydW1FbnRyaWVzEi4uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkxpc3RGb3J1bUVudHJpZXNSZXF1ZXN0Gi8uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkxpc3RGb3J1bUVudHJpZXNSZXNwb25zZSIDkAIBEm0KDlJlY29yZFBvc3RWaWV3EiwuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlJlY29yZFBvc3RWaWV3UmVxdWVzdBotLmhhd2tyLnNvY2lhbC52MWFscGhhMS5SZWNvcmRQb3N0Vmlld1Jlc3BvbnNlMtQJChBTb2NpYWxBcHBTZXJ2aWNlEmMKCVNoYXJlUG9zdBInLmhhd2tyLnNvY2lhbC52MWFscGhhMS5TaGFyZVBvc3RSZXF1ZXN0GiguaGF3a3Iuc29jaWFsLnYxYWxwaGExLlNoYXJlUG9zdFJlc3BvbnNlIgOQAgISYAoITGlrZVBvc3QSJi5oYXdrci5zb2NpYWwudjFhbHBoYTEuTGlrZVBvc3RSZXF1ZXN0GicuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkxpa2VQb3N0UmVzcG9uc2UiA5ACAhJmCgpVbmxpa2VQb3N0EiguaGF3a3Iuc29jaWFsLnYxYWxwaGExLlVubGlrZVBvc3RSZXF1ZXN0GikuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlVubGlrZVBvc3RSZXNwb25zZSIDkAICEmkKC0xpa2VDb21tZW50EikuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkxpa2VDb21tZW50UmVxdWVzdBoqLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaWtlQ29tbWVudFJlc3BvbnNlIgOQAgISbwoNVW5saWtlQ29tbWVudBIrLmhhd2tyLnNvY2lhbC52MWFscGhhMS5Vbmxpa2VDb21tZW50UmVxdWVzdBosLmhhd2tyLnNvY2lhbC52MWFscGhhMS5Vbmxpa2VDb21tZW50UmVzcG9uc2UiA5ACAhJqCg1DcmVhdGVDb21tZW50EisuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkNyZWF0ZUNvbW1lbnRSZXF1ZXN0GiwuaGF3a3Iuc29jaWFsLnYxYWxwaGExLkNyZWF0ZUNvbW1lbnRSZXNwb25zZRJvCg1VcGRhdGVDb21tZW50EisuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlVwZGF0ZUNvbW1lbnRSZXF1ZXN0GiwuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlVwZGF0ZUNvbW1lbnRSZXNwb25zZSIDkAICEm8KDURlbGV0ZUNvbW1lbnQSKy5oYXdrci5zb2NpYWwudjFhbHBoYTEuRGVsZXRlQ29tbWVudFJlcXVlc3QaLC5oYXdrci5zb2NpYWwudjFhbHBoYTEuRGVsZXRlQ29tbWVudFJlc3BvbnNlIgOQAgIScwoQQ3JlYXRlRm9ydW1FbnRyeRIuLmhhd2tyLnNvY2lhbC52MWFscGhhMS5DcmVhdGVGb3J1bUVudHJ5UmVxdWVzdBovLmhhd2tyLnNvY2lhbC52MWFscGhhMS5DcmVhdGVGb3J1bUVudHJ5UmVzcG9uc2USeAoQVXBkYXRlRm9ydW1FbnRyeRIuLmhhd2tyLnNvY2lhbC52MWFscGhhMS5VcGRhdGVGb3J1bUVudHJ5UmVxdWVzdBovLmhhd2tyLnNvY2lhbC52MWFscGhhMS5VcGRhdGVGb3J1bUVudHJ5UmVzcG9uc2UiA5ACAhJ4ChBEZWxldGVGb3J1bUVudHJ5Ei4uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkRlbGV0ZUZvcnVtRW50cnlSZXF1ZXN0Gi8uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkRlbGV0ZUZvcnVtRW50cnlSZXNwb25zZSIDkAICYgZwcm90bzM", [file_google_api_field_behavior, file_google_api_field_info, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_image, file_hawkr_common_v1alpha1_store_card]);
 
 /**
  * Hashtag 是貼文的一個標籤。
@@ -232,6 +232,8 @@ export type Comment = Message<"hawkr.social.v1alpha1.Comment"> & {
   author?: Actor | undefined;
 
   /**
+   * 留言唯一可以修改的欄位（UpdateComment 的 update_mask 列 body）。
+   *
    * @generated from field: string body = 7;
    */
   body: string;
@@ -285,11 +287,18 @@ export type Comment = Message<"hawkr.social.v1alpha1.Comment"> & {
   viewerCanDelete: boolean;
 
   /**
-   * 觀看者能不能回覆：VISIBLE，而且觀看者能在這篇貼文留言（見 Post.viewer_can_comment）。
+   * 觀看者能不能回覆：VISIBLE，而且這篇貼文是觀看者此刻的店的（貼文留言的回覆只限貼文所屬的店，買家一律 false）。
    *
    * @generated from field: bool viewer_can_reply = 16;
    */
   viewerCanReply: boolean;
+
+  /**
+   * 只有 VISIBLE 的項目有；修改與刪除時帶回，client 視為不透明字串。
+   *
+   * @generated from field: string etag = 17;
+   */
+  etag: string;
 };
 
 /**
@@ -660,6 +669,8 @@ export type ForumEntry = Message<"hawkr.social.v1alpha1.ForumEntry"> & {
   author?: Actor | undefined;
 
   /**
+   * 項目唯一可以修改的欄位（UpdateForumEntry 的 update_mask 列 body）。
+   *
    * @generated from field: string body = 7;
    */
   body: string;
@@ -706,6 +717,13 @@ export type ForumEntry = Message<"hawkr.social.v1alpha1.ForumEntry"> & {
    * @generated from field: bool viewer_can_reply = 14;
    */
   viewerCanReply: boolean;
+
+  /**
+   * 只有 VISIBLE 的項目有；修改與刪除時帶回，client 視為不透明字串。
+   *
+   * @generated from field: string etag = 15;
+   */
+  etag: string;
 };
 
 /**
@@ -1000,7 +1018,7 @@ export type CreateCommentRequest = Message<"hawkr.social.v1alpha1.CreateCommentR
   replyToId?: string | undefined;
 
   /**
-   * 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回第一次建立的留言；內容不同回 invalid_argument。
+   * 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回這則留言目前的樣子；內容不同回 invalid_argument。
    *
    * @generated from field: string request_id = 5;
    */
@@ -1036,18 +1054,16 @@ export const CreateCommentResponseSchema: GenMessage<CreateCommentResponse> = /*
  */
 export type UpdateCommentRequest = Message<"hawkr.social.v1alpha1.UpdateCommentRequest"> & {
   /**
-   * 留言 ID。
+   * id 與 etag 必填；body 的規則同 CreateCommentRequest.body。留言只有內文可以修改，update_mask 要列 body。
    *
-   * @generated from field: string comment_id = 1;
+   * @generated from field: hawkr.social.v1alpha1.Comment comment = 1;
    */
-  commentId: string;
+  comment?: Comment | undefined;
 
   /**
-   * 新的內文，規則同 CreateCommentRequest.body。留言只有內文可以修改，所以沒有 update_mask。
-   *
-   * @generated from field: string body = 2;
+   * @generated from field: google.protobuf.FieldMask update_mask = 2;
    */
-  body: string;
+  updateMask?: FieldMask | undefined;
 };
 
 /**
@@ -1058,20 +1074,15 @@ export const UpdateCommentRequestSchema: GenMessage<UpdateCommentRequest> = /*@_
   messageDesc(file_hawkr_social_v1alpha1_social, 34);
 
 /**
- * UpdateCommentResponse 只帶修改的結果。留言的讚數與回覆數不在這裡，client 保留列表上原有的值。
+ * UpdateCommentResponse 的留言是修改後的完整資源（含讚數、回覆數與新的 etag）。
  *
  * @generated from message hawkr.social.v1alpha1.UpdateCommentResponse
  */
 export type UpdateCommentResponse = Message<"hawkr.social.v1alpha1.UpdateCommentResponse"> & {
   /**
-   * @generated from field: string body = 1;
+   * @generated from field: hawkr.social.v1alpha1.Comment comment = 1;
    */
-  body: string;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp update_time = 2;
-   */
-  updateTime?: Timestamp | undefined;
+  comment?: Comment | undefined;
 };
 
 /**
@@ -1091,6 +1102,13 @@ export type DeleteCommentRequest = Message<"hawkr.social.v1alpha1.DeleteCommentR
    * @generated from field: string comment_id = 1;
    */
   commentId: string;
+
+  /**
+   * 帶了就檢查版本；已經刪除的留言不檢查。
+   *
+   * @generated from field: string etag = 2;
+   */
+  etag: string;
 };
 
 /**
@@ -1146,7 +1164,7 @@ export type CreateForumEntryRequest = Message<"hawkr.social.v1alpha1.CreateForum
   replyToId?: string | undefined;
 
   /**
-   * 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回第一次建立的項目；內容不同回 invalid_argument。
+   * 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回這個項目目前的樣子；內容不同回 invalid_argument。
    *
    * @generated from field: string request_id = 5;
    */
@@ -1182,18 +1200,16 @@ export const CreateForumEntryResponseSchema: GenMessage<CreateForumEntryResponse
  */
 export type UpdateForumEntryRequest = Message<"hawkr.social.v1alpha1.UpdateForumEntryRequest"> & {
   /**
-   * 討論區項目 ID。
+   * id 與 etag 必填；body 的規則同 CreateCommentRequest.body。討論區項目只有內文可以修改，update_mask 要列 body。
    *
-   * @generated from field: string entry_id = 1;
+   * @generated from field: hawkr.social.v1alpha1.ForumEntry entry = 1;
    */
-  entryId: string;
+  entry?: ForumEntry | undefined;
 
   /**
-   * 新的內文，規則同 CreateCommentRequest.body。討論區項目只有內文可以修改，所以沒有 update_mask。
-   *
-   * @generated from field: string body = 2;
+   * @generated from field: google.protobuf.FieldMask update_mask = 2;
    */
-  body: string;
+  updateMask?: FieldMask | undefined;
 };
 
 /**
@@ -1204,20 +1220,15 @@ export const UpdateForumEntryRequestSchema: GenMessage<UpdateForumEntryRequest> 
   messageDesc(file_hawkr_social_v1alpha1_social, 40);
 
 /**
- * UpdateForumEntryResponse 只帶修改的結果。回覆數不在這裡，client 保留列表上原有的值。
+ * UpdateForumEntryResponse 的項目是修改後的完整資源（含回覆數與新的 etag）。
  *
  * @generated from message hawkr.social.v1alpha1.UpdateForumEntryResponse
  */
 export type UpdateForumEntryResponse = Message<"hawkr.social.v1alpha1.UpdateForumEntryResponse"> & {
   /**
-   * @generated from field: string body = 1;
+   * @generated from field: hawkr.social.v1alpha1.ForumEntry entry = 1;
    */
-  body: string;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp update_time = 2;
-   */
-  updateTime?: Timestamp | undefined;
+  entry?: ForumEntry | undefined;
 };
 
 /**
@@ -1237,6 +1248,13 @@ export type DeleteForumEntryRequest = Message<"hawkr.social.v1alpha1.DeleteForum
    * @generated from field: string entry_id = 1;
    */
   entryId: string;
+
+  /**
+   * 帶了就檢查版本；已經刪除的項目不檢查。
+   *
+   * @generated from field: string etag = 2;
+   */
+  etag: string;
 };
 
 /**
@@ -1486,7 +1504,7 @@ export const SocialAppService: GenService<{
     output: typeof UnlikeCommentResponseSchema;
   },
   /**
-   * CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回第一次建立的留言，不重複建立。
+   * CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回目前的留言（狀態與計數是此刻的），不重複建立。
    *
    * @generated from rpc hawkr.social.v1alpha1.SocialAppService.CreateComment
    */
@@ -1496,7 +1514,7 @@ export const SocialAppService: GenService<{
     output: typeof CreateCommentResponseSchema;
   },
   /**
-   * UpdateComment 修改自己的留言內文；被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
+   * UpdateComment 修改自己的留言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
    *
    * @generated from rpc hawkr.social.v1alpha1.SocialAppService.UpdateComment
    */
@@ -1506,7 +1524,7 @@ export const SocialAppService: GenService<{
     output: typeof UpdateCommentResponseSchema;
   },
   /**
-   * DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功。
+   * DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
    *
    * @generated from rpc hawkr.social.v1alpha1.SocialAppService.DeleteComment
    */
@@ -1516,7 +1534,7 @@ export const SocialAppService: GenService<{
     output: typeof DeleteCommentResponseSchema;
   },
   /**
-   * CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（回覆只限該店家）。帶 request_id 重送回第一次建立的項目，不重複建立。
+   * CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立，不重複建立。
    *
    * @generated from rpc hawkr.social.v1alpha1.SocialAppService.CreateForumEntry
    */
@@ -1526,7 +1544,7 @@ export const SocialAppService: GenService<{
     output: typeof CreateForumEntryResponseSchema;
   },
   /**
-   * UpdateForumEntry 修改自己的討論區發言內文；被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
+   * UpdateForumEntry 修改自己的討論區發言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
    *
    * @generated from rpc hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry
    */
@@ -1536,7 +1554,7 @@ export const SocialAppService: GenService<{
     output: typeof UpdateForumEntryResponseSchema;
   },
   /**
-   * DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功。
+   * DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
    *
    * @generated from rpc hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry
    */

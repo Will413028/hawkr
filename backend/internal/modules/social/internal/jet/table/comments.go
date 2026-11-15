@@ -28,9 +28,10 @@ type commentsTable struct {
 	UpdatedAt   postgres.ColumnTimestampz
 	DeletedAt   postgres.ColumnTimestampz
 	ThreadID    postgres.ColumnString
-	Counted     postgres.ColumnBool   // 此刻是否計入貼文的留言數與父留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_comments 求值）；只由 social.reevaluate_comments 維護，讀取直接用它，貼文的 comment_count 與留言的 reply_count 是這個旗標的加總
-	RequestID   postgres.ColumnString // 建立時 client 帶的 request_id（AIP-155，選填）；範圍是 (互動者, request_id)，同一個互動者重送回這一列
-	RequestHash postgres.ColumnBytea  // 建立輸入（貼文、父留言、被回覆的留言、內文）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有
+	Counted     postgres.ColumnBool    // 此刻是否計入貼文的留言數與父留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_comments 求值）；只由 social.reevaluate_comments 維護，讀取直接用它，貼文的 comment_count 與留言的 reply_count 是這個旗標的加總
+	RequestID   postgres.ColumnString  // 建立時 client 帶的 request_id（AIP-155，選填）；範圍是 (互動者, request_id)，同一個互動者重送回這一列
+	RequestHash postgres.ColumnBytea   // 建立輸入（貼文、父留言、被回覆的留言、內文）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有
+	Version     postgres.ColumnInteger // 樂觀鎖的版本，對外是 etag；內文修改與刪除各加一
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -86,9 +87,10 @@ func newCommentsTableImpl(schemaName, tableName, alias string) commentsTable {
 		CountedColumn     = postgres.BoolColumn("counted")
 		RequestIDColumn   = postgres.StringColumn("request_id")
 		RequestHashColumn = postgres.ByteaColumn("request_hash")
-		allColumns        = postgres.ColumnList{IDColumn, PostIDColumn, ParentIDColumn, ReplyToIDColumn, ActorKindColumn, ActorIDColumn, BodyColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn, ThreadIDColumn, CountedColumn, RequestIDColumn, RequestHashColumn}
-		mutableColumns    = postgres.ColumnList{PostIDColumn, ParentIDColumn, ReplyToIDColumn, ActorKindColumn, ActorIDColumn, BodyColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn, CountedColumn, RequestIDColumn, RequestHashColumn}
-		defaultColumns    = postgres.ColumnList{ThreadIDColumn, CountedColumn}
+		VersionColumn     = postgres.IntegerColumn("version")
+		allColumns        = postgres.ColumnList{IDColumn, PostIDColumn, ParentIDColumn, ReplyToIDColumn, ActorKindColumn, ActorIDColumn, BodyColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn, ThreadIDColumn, CountedColumn, RequestIDColumn, RequestHashColumn, VersionColumn}
+		mutableColumns    = postgres.ColumnList{PostIDColumn, ParentIDColumn, ReplyToIDColumn, ActorKindColumn, ActorIDColumn, BodyColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn, CountedColumn, RequestIDColumn, RequestHashColumn, VersionColumn}
+		defaultColumns    = postgres.ColumnList{ThreadIDColumn, CountedColumn, VersionColumn}
 	)
 
 	return commentsTable{
@@ -109,6 +111,7 @@ func newCommentsTableImpl(schemaName, tableName, alias string) commentsTable {
 		Counted:     CountedColumn,
 		RequestID:   RequestIDColumn,
 		RequestHash: RequestHashColumn,
+		Version:     VersionColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

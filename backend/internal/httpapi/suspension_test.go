@@ -186,7 +186,7 @@ func TestEveryDeclaredProcedureBehavesAsDeclaredForASuspendedAccount(t *testing.
 	}
 }
 
-// A7-2b：SocialAppService 的每支方法都是寫入，停權的帳號回 ACCOUNT_SUSPENDED、模組不被呼叫；RecordPostView 是公開方法，停權的帳號以訪客執行（計為匿名瀏覽）。
+// SocialAppService 的每支方法都是寫入，停權的帳號回 ACCOUNT_SUSPENDED、模組不被呼叫；RecordPostView 是公開方法，停權的帳號以訪客執行（計為匿名瀏覽）。
 func TestSuspendedAccountCannotWriteSocialButViewsAsAGuest(t *testing.T) {
 	h := suspendedEntry()
 	methods := socialv1alpha1.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialAppService").Methods()

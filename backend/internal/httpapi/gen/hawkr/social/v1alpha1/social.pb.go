@@ -19,6 +19,7 @@ import (
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -430,7 +431,8 @@ type Comment struct {
 	ReplyToId *string      `protobuf:"bytes,4,opt,name=reply_to_id,json=replyToId,proto3,oneof" json:"reply_to_id,omitempty"`
 	State     CommentState `protobuf:"varint,5,opt,name=state,proto3,enum=hawkr.social.v1alpha1.CommentState" json:"state,omitempty"`
 	// 只有 VISIBLE 的項目有作者與內文。
-	Author     *Actor                 `protobuf:"bytes,6,opt,name=author,proto3" json:"author,omitempty"`
+	Author *Actor `protobuf:"bytes,6,opt,name=author,proto3" json:"author,omitempty"`
+	// 留言唯一可以修改的欄位（UpdateComment 的 update_mask 列 body）。
 	Body       string                 `protobuf:"bytes,7,opt,name=body,proto3" json:"body,omitempty"`
 	CreateTime *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
@@ -444,10 +446,12 @@ type Comment struct {
 	ViewerCanEdit bool `protobuf:"varint,14,opt,name=viewer_can_edit,json=viewerCanEdit,proto3" json:"viewer_can_edit,omitempty"`
 	// 觀看者能不能刪除：VISIBLE 的自己的留言，或這篇貼文是自己的店的。
 	ViewerCanDelete bool `protobuf:"varint,15,opt,name=viewer_can_delete,json=viewerCanDelete,proto3" json:"viewer_can_delete,omitempty"`
-	// 觀看者能不能回覆：VISIBLE，而且觀看者能在這篇貼文留言（見 Post.viewer_can_comment）。
+	// 觀看者能不能回覆：VISIBLE，而且這篇貼文是觀看者此刻的店的（貼文留言的回覆只限貼文所屬的店，買家一律 false）。
 	ViewerCanReply bool `protobuf:"varint,16,opt,name=viewer_can_reply,json=viewerCanReply,proto3" json:"viewer_can_reply,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// 只有 VISIBLE 的項目有；修改與刪除時帶回，client 視為不透明字串。
+	Etag          string `protobuf:"bytes,17,opt,name=etag,proto3" json:"etag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Comment) Reset() {
@@ -590,6 +594,13 @@ func (x *Comment) GetViewerCanReply() bool {
 		return x.ViewerCanReply
 	}
 	return false
+}
+
+func (x *Comment) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
 }
 
 type GetPostRequest struct {
@@ -1295,7 +1306,8 @@ type ForumEntry struct {
 	ReplyToId *string      `protobuf:"bytes,4,opt,name=reply_to_id,json=replyToId,proto3,oneof" json:"reply_to_id,omitempty"`
 	State     CommentState `protobuf:"varint,5,opt,name=state,proto3,enum=hawkr.social.v1alpha1.CommentState" json:"state,omitempty"`
 	// 只有 VISIBLE 的項目有作者與內文。
-	Author     *Actor                 `protobuf:"bytes,6,opt,name=author,proto3" json:"author,omitempty"`
+	Author *Actor `protobuf:"bytes,6,opt,name=author,proto3" json:"author,omitempty"`
+	// 項目唯一可以修改的欄位（UpdateForumEntry 的 update_mask 列 body）。
 	Body       string                 `protobuf:"bytes,7,opt,name=body,proto3" json:"body,omitempty"`
 	CreateTime *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
@@ -1308,8 +1320,10 @@ type ForumEntry struct {
 	ViewerCanDelete bool `protobuf:"varint,13,opt,name=viewer_can_delete,json=viewerCanDelete,proto3" json:"viewer_can_delete,omitempty"`
 	// 觀看者能不能回覆：VISIBLE，而且觀看者在這家店的討論區沒有被封鎖（訪客是 false；店主讀自己的討論區是 true）。顯示用的提示，寫入時伺服器仍會檢查。
 	ViewerCanReply bool `protobuf:"varint,14,opt,name=viewer_can_reply,json=viewerCanReply,proto3" json:"viewer_can_reply,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// 只有 VISIBLE 的項目有；修改與刪除時帶回，client 視為不透明字串。
+	Etag          string `protobuf:"bytes,15,opt,name=etag,proto3" json:"etag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ForumEntry) Reset() {
@@ -1438,6 +1452,13 @@ func (x *ForumEntry) GetViewerCanReply() bool {
 		return x.ViewerCanReply
 	}
 	return false
+}
+
+func (x *ForumEntry) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
 }
 
 type ListForumEntriesRequest struct {
@@ -2059,7 +2080,7 @@ type CreateCommentRequest struct {
 	ParentId *string `protobuf:"bytes,3,opt,name=parent_id,json=parentId,proto3,oneof" json:"parent_id,omitempty"`
 	// 回覆針對的那一則留言，必須與 parent_id 同一串；只能在設了 parent_id 時設，不設是父留言。
 	ReplyToId *string `protobuf:"bytes,4,opt,name=reply_to_id,json=replyToId,proto3,oneof" json:"reply_to_id,omitempty"`
-	// 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回第一次建立的留言；內容不同回 invalid_argument。
+	// 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回這則留言目前的樣子；內容不同回 invalid_argument。
 	RequestId     string `protobuf:"bytes,5,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2176,10 +2197,9 @@ func (x *CreateCommentResponse) GetComment() *Comment {
 
 type UpdateCommentRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 留言 ID。
-	CommentId string `protobuf:"bytes,1,opt,name=comment_id,json=commentId,proto3" json:"comment_id,omitempty"`
-	// 新的內文，規則同 CreateCommentRequest.body。留言只有內文可以修改，所以沒有 update_mask。
-	Body          string `protobuf:"bytes,2,opt,name=body,proto3" json:"body,omitempty"`
+	// id 與 etag 必填；body 的規則同 CreateCommentRequest.body。留言只有內文可以修改，update_mask 要列 body。
+	Comment       *Comment               `protobuf:"bytes,1,opt,name=comment,proto3" json:"comment,omitempty"`
+	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2214,25 +2234,24 @@ func (*UpdateCommentRequest) Descriptor() ([]byte, []int) {
 	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{34}
 }
 
-func (x *UpdateCommentRequest) GetCommentId() string {
+func (x *UpdateCommentRequest) GetComment() *Comment {
 	if x != nil {
-		return x.CommentId
+		return x.Comment
 	}
-	return ""
+	return nil
 }
 
-func (x *UpdateCommentRequest) GetBody() string {
+func (x *UpdateCommentRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
 	if x != nil {
-		return x.Body
+		return x.UpdateMask
 	}
-	return ""
+	return nil
 }
 
-// UpdateCommentResponse 只帶修改的結果。留言的讚數與回覆數不在這裡，client 保留列表上原有的值。
+// UpdateCommentResponse 的留言是修改後的完整資源（含讚數、回覆數與新的 etag）。
 type UpdateCommentResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Body          string                 `protobuf:"bytes,1,opt,name=body,proto3" json:"body,omitempty"`
-	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	Comment       *Comment               `protobuf:"bytes,1,opt,name=comment,proto3" json:"comment,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2267,16 +2286,9 @@ func (*UpdateCommentResponse) Descriptor() ([]byte, []int) {
 	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{35}
 }
 
-func (x *UpdateCommentResponse) GetBody() string {
+func (x *UpdateCommentResponse) GetComment() *Comment {
 	if x != nil {
-		return x.Body
-	}
-	return ""
-}
-
-func (x *UpdateCommentResponse) GetUpdateTime() *timestamppb.Timestamp {
-	if x != nil {
-		return x.UpdateTime
+		return x.Comment
 	}
 	return nil
 }
@@ -2284,7 +2296,9 @@ func (x *UpdateCommentResponse) GetUpdateTime() *timestamppb.Timestamp {
 type DeleteCommentRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 留言 ID。
-	CommentId     string `protobuf:"bytes,1,opt,name=comment_id,json=commentId,proto3" json:"comment_id,omitempty"`
+	CommentId string `protobuf:"bytes,1,opt,name=comment_id,json=commentId,proto3" json:"comment_id,omitempty"`
+	// 帶了就檢查版本；已經刪除的留言不檢查。
+	Etag          string `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2322,6 +2336,13 @@ func (*DeleteCommentRequest) Descriptor() ([]byte, []int) {
 func (x *DeleteCommentRequest) GetCommentId() string {
 	if x != nil {
 		return x.CommentId
+	}
+	return ""
+}
+
+func (x *DeleteCommentRequest) GetEtag() string {
+	if x != nil {
+		return x.Etag
 	}
 	return ""
 }
@@ -2372,7 +2393,7 @@ type CreateForumEntryRequest struct {
 	ParentId *string `protobuf:"bytes,3,opt,name=parent_id,json=parentId,proto3,oneof" json:"parent_id,omitempty"`
 	// 回覆針對的那一則，必須與 parent_id 同一串；只能在設了 parent_id 時設，不設是父項。
 	ReplyToId *string `protobuf:"bytes,4,opt,name=reply_to_id,json=replyToId,proto3,oneof" json:"reply_to_id,omitempty"`
-	// 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回第一次建立的項目；內容不同回 invalid_argument。
+	// 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回這個項目目前的樣子；內容不同回 invalid_argument。
 	RequestId     string `protobuf:"bytes,5,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2489,10 +2510,9 @@ func (x *CreateForumEntryResponse) GetEntry() *ForumEntry {
 
 type UpdateForumEntryRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 討論區項目 ID。
-	EntryId string `protobuf:"bytes,1,opt,name=entry_id,json=entryId,proto3" json:"entry_id,omitempty"`
-	// 新的內文，規則同 CreateCommentRequest.body。討論區項目只有內文可以修改，所以沒有 update_mask。
-	Body          string `protobuf:"bytes,2,opt,name=body,proto3" json:"body,omitempty"`
+	// id 與 etag 必填；body 的規則同 CreateCommentRequest.body。討論區項目只有內文可以修改，update_mask 要列 body。
+	Entry         *ForumEntry            `protobuf:"bytes,1,opt,name=entry,proto3" json:"entry,omitempty"`
+	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2527,25 +2547,24 @@ func (*UpdateForumEntryRequest) Descriptor() ([]byte, []int) {
 	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{40}
 }
 
-func (x *UpdateForumEntryRequest) GetEntryId() string {
+func (x *UpdateForumEntryRequest) GetEntry() *ForumEntry {
 	if x != nil {
-		return x.EntryId
+		return x.Entry
 	}
-	return ""
+	return nil
 }
 
-func (x *UpdateForumEntryRequest) GetBody() string {
+func (x *UpdateForumEntryRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
 	if x != nil {
-		return x.Body
+		return x.UpdateMask
 	}
-	return ""
+	return nil
 }
 
-// UpdateForumEntryResponse 只帶修改的結果。回覆數不在這裡，client 保留列表上原有的值。
+// UpdateForumEntryResponse 的項目是修改後的完整資源（含回覆數與新的 etag）。
 type UpdateForumEntryResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Body          string                 `protobuf:"bytes,1,opt,name=body,proto3" json:"body,omitempty"`
-	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	Entry         *ForumEntry            `protobuf:"bytes,1,opt,name=entry,proto3" json:"entry,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2580,16 +2599,9 @@ func (*UpdateForumEntryResponse) Descriptor() ([]byte, []int) {
 	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{41}
 }
 
-func (x *UpdateForumEntryResponse) GetBody() string {
+func (x *UpdateForumEntryResponse) GetEntry() *ForumEntry {
 	if x != nil {
-		return x.Body
-	}
-	return ""
-}
-
-func (x *UpdateForumEntryResponse) GetUpdateTime() *timestamppb.Timestamp {
-	if x != nil {
-		return x.UpdateTime
+		return x.Entry
 	}
 	return nil
 }
@@ -2597,7 +2609,9 @@ func (x *UpdateForumEntryResponse) GetUpdateTime() *timestamppb.Timestamp {
 type DeleteForumEntryRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 討論區項目 ID。
-	EntryId       string `protobuf:"bytes,1,opt,name=entry_id,json=entryId,proto3" json:"entry_id,omitempty"`
+	EntryId string `protobuf:"bytes,1,opt,name=entry_id,json=entryId,proto3" json:"entry_id,omitempty"`
+	// 帶了就檢查版本；已經刪除的項目不檢查。
+	Etag          string `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2635,6 +2649,13 @@ func (*DeleteForumEntryRequest) Descriptor() ([]byte, []int) {
 func (x *DeleteForumEntryRequest) GetEntryId() string {
 	if x != nil {
 		return x.EntryId
+	}
+	return ""
+}
+
+func (x *DeleteForumEntryRequest) GetEtag() string {
+	if x != nil {
+		return x.Etag
 	}
 	return ""
 }
@@ -2679,7 +2700,7 @@ var File_hawkr_social_v1alpha1_social_proto protoreflect.FileDescriptor
 
 const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"\n" +
-	"\"hawkr/social/v1alpha1/social.proto\x12\x15hawkr.social.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\x1a&hawkr/common/v1alpha1/store_card.proto\"A\n" +
+	"\"hawkr/social/v1alpha1/social.proto\x12\x15hawkr.social.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\x1a&hawkr/common/v1alpha1/store_card.proto\"A\n" +
 	"\aHashtag\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\x12\x1d\n" +
 	"\adisplay\x18\x02 \x01(\tB\x03\xe0A\x03R\adisplay\"\xfc\x04\n" +
@@ -2710,15 +2731,15 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"\x02id\x18\x02 \x01(\tB\x03\xe0A\x03R\x02id\x12\x1c\n" +
 	"\x04name\x18\x03 \x01(\tB\x03\xe0A\x03H\x00R\x04name\x88\x01\x01\x129\n" +
 	"\x06avatar\x18\x04 \x01(\v2\x1c.hawkr.common.v1alpha1.ImageB\x03\xe0A\x03R\x06avatarB\a\n" +
-	"\x05_name\"\xe0\x05\n" +
+	"\x05_name\"\xef\x05\n" +
 	"\aComment\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1c\n" +
 	"\apost_id\x18\x02 \x01(\tB\x03\xe0A\x03R\x06postId\x12%\n" +
 	"\tparent_id\x18\x03 \x01(\tB\x03\xe0A\x03H\x00R\bparentId\x88\x01\x01\x12(\n" +
 	"\vreply_to_id\x18\x04 \x01(\tB\x03\xe0A\x03H\x01R\treplyToId\x88\x01\x01\x12>\n" +
 	"\x05state\x18\x05 \x01(\x0e2#.hawkr.social.v1alpha1.CommentStateB\x03\xe0A\x03R\x05state\x129\n" +
-	"\x06author\x18\x06 \x01(\v2\x1c.hawkr.social.v1alpha1.ActorB\x03\xe0A\x03R\x06author\x12\x17\n" +
-	"\x04body\x18\a \x01(\tB\x03\xe0A\x03R\x04body\x12@\n" +
+	"\x06author\x18\x06 \x01(\v2\x1c.hawkr.social.v1alpha1.ActorB\x03\xe0A\x03R\x06author\x12\x12\n" +
+	"\x04body\x18\a \x01(\tR\x04body\x12@\n" +
 	"\vcreate_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12@\n" +
 	"\vupdate_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
@@ -2732,7 +2753,8 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"\ais_mine\x18\r \x01(\bB\x03\xe0A\x03R\x06isMine\x12+\n" +
 	"\x0fviewer_can_edit\x18\x0e \x01(\bB\x03\xe0A\x03R\rviewerCanEdit\x12/\n" +
 	"\x11viewer_can_delete\x18\x0f \x01(\bB\x03\xe0A\x03R\x0fviewerCanDelete\x12-\n" +
-	"\x10viewer_can_reply\x18\x10 \x01(\bB\x03\xe0A\x03R\x0eviewerCanReplyB\f\n" +
+	"\x10viewer_can_reply\x18\x10 \x01(\bB\x03\xe0A\x03R\x0eviewerCanReply\x12\x12\n" +
+	"\x04etag\x18\x11 \x01(\tR\x04etagB\f\n" +
 	"\n" +
 	"_parent_idB\x0e\n" +
 	"\f_reply_to_id\".\n" +
@@ -2786,7 +2808,7 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"\bTagCount\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\x12\"\n" +
 	"\n" +
-	"post_count\x18\x02 \x01(\x03B\x03\xe0A\x03R\tpostCount\"\x99\x05\n" +
+	"post_count\x18\x02 \x01(\x03B\x03\xe0A\x03R\tpostCount\"\xa8\x05\n" +
 	"\n" +
 	"ForumEntry\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1e\n" +
@@ -2794,8 +2816,8 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"\tparent_id\x18\x03 \x01(\tB\x03\xe0A\x03H\x00R\bparentId\x88\x01\x01\x12(\n" +
 	"\vreply_to_id\x18\x04 \x01(\tB\x03\xe0A\x03H\x01R\treplyToId\x88\x01\x01\x12>\n" +
 	"\x05state\x18\x05 \x01(\x0e2#.hawkr.social.v1alpha1.CommentStateB\x03\xe0A\x03R\x05state\x129\n" +
-	"\x06author\x18\x06 \x01(\v2\x1c.hawkr.social.v1alpha1.ActorB\x03\xe0A\x03R\x06author\x12\x17\n" +
-	"\x04body\x18\a \x01(\tB\x03\xe0A\x03R\x04body\x12@\n" +
+	"\x06author\x18\x06 \x01(\v2\x1c.hawkr.social.v1alpha1.ActorB\x03\xe0A\x03R\x06author\x12\x12\n" +
+	"\x04body\x18\a \x01(\tR\x04body\x12@\n" +
 	"\vcreate_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12@\n" +
 	"\vupdate_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
@@ -2806,7 +2828,8 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"\ais_mine\x18\v \x01(\bB\x03\xe0A\x03R\x06isMine\x12+\n" +
 	"\x0fviewer_can_edit\x18\f \x01(\bB\x03\xe0A\x03R\rviewerCanEdit\x12/\n" +
 	"\x11viewer_can_delete\x18\r \x01(\bB\x03\xe0A\x03R\x0fviewerCanDelete\x12-\n" +
-	"\x10viewer_can_reply\x18\x0e \x01(\bB\x03\xe0A\x03R\x0eviewerCanReplyB\f\n" +
+	"\x10viewer_can_reply\x18\x0e \x01(\bB\x03\xe0A\x03R\x0eviewerCanReply\x12\x12\n" +
+	"\x04etag\x18\x0f \x01(\tR\x04etagB\f\n" +
 	"\n" +
 	"_parent_idB\x0e\n" +
 	"\f_reply_to_id\"\xa5\x01\n" +
@@ -2852,18 +2875,17 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"_parent_idB\x0e\n" +
 	"\f_reply_to_id\"Q\n" +
 	"\x15CreateCommentResponse\x128\n" +
-	"\acomment\x18\x01 \x01(\v2\x1e.hawkr.social.v1alpha1.CommentR\acomment\"S\n" +
-	"\x14UpdateCommentRequest\x12\"\n" +
-	"\n" +
-	"comment_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tcommentId\x12\x17\n" +
-	"\x04body\x18\x02 \x01(\tB\x03\xe0A\x02R\x04body\"r\n" +
-	"\x15UpdateCommentResponse\x12\x17\n" +
-	"\x04body\x18\x01 \x01(\tB\x03\xe0A\x03R\x04body\x12@\n" +
-	"\vupdate_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"updateTime\":\n" +
+	"\acomment\x18\x01 \x01(\v2\x1e.hawkr.social.v1alpha1.CommentR\acomment\"\x92\x01\n" +
+	"\x14UpdateCommentRequest\x12=\n" +
+	"\acomment\x18\x01 \x01(\v2\x1e.hawkr.social.v1alpha1.CommentB\x03\xe0A\x02R\acomment\x12;\n" +
+	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
+	"updateMask\"Q\n" +
+	"\x15UpdateCommentResponse\x128\n" +
+	"\acomment\x18\x01 \x01(\v2\x1e.hawkr.social.v1alpha1.CommentR\acomment\"N\n" +
 	"\x14DeleteCommentRequest\x12\"\n" +
 	"\n" +
-	"comment_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tcommentId\"\x17\n" +
+	"comment_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tcommentId\x12\x12\n" +
+	"\x04etag\x18\x02 \x01(\tR\x04etag\"\x17\n" +
 	"\x15DeleteCommentResponse\"\xe0\x01\n" +
 	"\x17CreateForumEntryRequest\x12\x1e\n" +
 	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\x12\x17\n" +
@@ -2876,16 +2898,16 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"_parent_idB\x0e\n" +
 	"\f_reply_to_id\"S\n" +
 	"\x18CreateForumEntryResponse\x127\n" +
-	"\x05entry\x18\x01 \x01(\v2!.hawkr.social.v1alpha1.ForumEntryR\x05entry\"R\n" +
-	"\x17UpdateForumEntryRequest\x12\x1e\n" +
-	"\bentry_id\x18\x01 \x01(\tB\x03\xe0A\x02R\aentryId\x12\x17\n" +
-	"\x04body\x18\x02 \x01(\tB\x03\xe0A\x02R\x04body\"u\n" +
-	"\x18UpdateForumEntryResponse\x12\x17\n" +
-	"\x04body\x18\x01 \x01(\tB\x03\xe0A\x03R\x04body\x12@\n" +
-	"\vupdate_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"updateTime\"9\n" +
+	"\x05entry\x18\x01 \x01(\v2!.hawkr.social.v1alpha1.ForumEntryR\x05entry\"\x94\x01\n" +
+	"\x17UpdateForumEntryRequest\x12<\n" +
+	"\x05entry\x18\x01 \x01(\v2!.hawkr.social.v1alpha1.ForumEntryB\x03\xe0A\x02R\x05entry\x12;\n" +
+	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
+	"updateMask\"S\n" +
+	"\x18UpdateForumEntryResponse\x127\n" +
+	"\x05entry\x18\x01 \x01(\v2!.hawkr.social.v1alpha1.ForumEntryR\x05entry\"M\n" +
 	"\x17DeleteForumEntryRequest\x12\x1e\n" +
-	"\bentry_id\x18\x01 \x01(\tB\x03\xe0A\x02R\aentryId\"\x1a\n" +
+	"\bentry_id\x18\x01 \x01(\tB\x03\xe0A\x02R\aentryId\x12\x12\n" +
+	"\x04etag\x18\x02 \x01(\tR\x04etag\"\x1a\n" +
 	"\x18DeleteForumEntryResponse*S\n" +
 	"\tActorKind\x12\x1a\n" +
 	"\x16ACTOR_KIND_UNSPECIFIED\x10\x00\x12\x14\n" +
@@ -2984,6 +3006,7 @@ var file_hawkr_social_v1alpha1_social_proto_goTypes = []any{
 	(*v1alpha1.StoreCard)(nil),           // 46: hawkr.common.v1alpha1.StoreCard
 	(*v1alpha1.Image)(nil),               // 47: hawkr.common.v1alpha1.Image
 	(*timestamppb.Timestamp)(nil),        // 48: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),        // 49: google.protobuf.FieldMask
 }
 var file_hawkr_social_v1alpha1_social_proto_depIdxs = []int32{
 	46, // 0: hawkr.social.v1alpha1.Post.store:type_name -> hawkr.common.v1alpha1.StoreCard
@@ -3011,52 +3034,56 @@ var file_hawkr_social_v1alpha1_social_proto_depIdxs = []int32{
 	48, // 22: hawkr.social.v1alpha1.ForumEntry.update_time:type_name -> google.protobuf.Timestamp
 	19, // 23: hawkr.social.v1alpha1.ListForumEntriesResponse.entries:type_name -> hawkr.social.v1alpha1.ForumEntry
 	5,  // 24: hawkr.social.v1alpha1.CreateCommentResponse.comment:type_name -> hawkr.social.v1alpha1.Comment
-	48, // 25: hawkr.social.v1alpha1.UpdateCommentResponse.update_time:type_name -> google.protobuf.Timestamp
-	19, // 26: hawkr.social.v1alpha1.CreateForumEntryResponse.entry:type_name -> hawkr.social.v1alpha1.ForumEntry
-	48, // 27: hawkr.social.v1alpha1.UpdateForumEntryResponse.update_time:type_name -> google.protobuf.Timestamp
-	6,  // 28: hawkr.social.v1alpha1.SocialPublicService.GetPost:input_type -> hawkr.social.v1alpha1.GetPostRequest
-	8,  // 29: hawkr.social.v1alpha1.SocialPublicService.ListPosts:input_type -> hawkr.social.v1alpha1.ListPostsRequest
-	10, // 30: hawkr.social.v1alpha1.SocialPublicService.ListComments:input_type -> hawkr.social.v1alpha1.ListCommentsRequest
-	12, // 31: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:input_type -> hawkr.social.v1alpha1.SuggestTrendingPostsRequest
-	14, // 32: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:input_type -> hawkr.social.v1alpha1.SuggestTagsRequest
-	16, // 33: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:input_type -> hawkr.social.v1alpha1.SuggestTrendingTagsRequest
-	20, // 34: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:input_type -> hawkr.social.v1alpha1.ListForumEntriesRequest
-	22, // 35: hawkr.social.v1alpha1.SocialPublicService.RecordPostView:input_type -> hawkr.social.v1alpha1.RecordPostViewRequest
-	24, // 36: hawkr.social.v1alpha1.SocialAppService.SharePost:input_type -> hawkr.social.v1alpha1.SharePostRequest
-	26, // 37: hawkr.social.v1alpha1.SocialAppService.LikePost:input_type -> hawkr.social.v1alpha1.LikePostRequest
-	28, // 38: hawkr.social.v1alpha1.SocialAppService.UnlikePost:input_type -> hawkr.social.v1alpha1.UnlikePostRequest
-	30, // 39: hawkr.social.v1alpha1.SocialAppService.LikeComment:input_type -> hawkr.social.v1alpha1.LikeCommentRequest
-	32, // 40: hawkr.social.v1alpha1.SocialAppService.UnlikeComment:input_type -> hawkr.social.v1alpha1.UnlikeCommentRequest
-	34, // 41: hawkr.social.v1alpha1.SocialAppService.CreateComment:input_type -> hawkr.social.v1alpha1.CreateCommentRequest
-	36, // 42: hawkr.social.v1alpha1.SocialAppService.UpdateComment:input_type -> hawkr.social.v1alpha1.UpdateCommentRequest
-	38, // 43: hawkr.social.v1alpha1.SocialAppService.DeleteComment:input_type -> hawkr.social.v1alpha1.DeleteCommentRequest
-	40, // 44: hawkr.social.v1alpha1.SocialAppService.CreateForumEntry:input_type -> hawkr.social.v1alpha1.CreateForumEntryRequest
-	42, // 45: hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry:input_type -> hawkr.social.v1alpha1.UpdateForumEntryRequest
-	44, // 46: hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry:input_type -> hawkr.social.v1alpha1.DeleteForumEntryRequest
-	7,  // 47: hawkr.social.v1alpha1.SocialPublicService.GetPost:output_type -> hawkr.social.v1alpha1.GetPostResponse
-	9,  // 48: hawkr.social.v1alpha1.SocialPublicService.ListPosts:output_type -> hawkr.social.v1alpha1.ListPostsResponse
-	11, // 49: hawkr.social.v1alpha1.SocialPublicService.ListComments:output_type -> hawkr.social.v1alpha1.ListCommentsResponse
-	13, // 50: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:output_type -> hawkr.social.v1alpha1.SuggestTrendingPostsResponse
-	15, // 51: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:output_type -> hawkr.social.v1alpha1.SuggestTagsResponse
-	17, // 52: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:output_type -> hawkr.social.v1alpha1.SuggestTrendingTagsResponse
-	21, // 53: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:output_type -> hawkr.social.v1alpha1.ListForumEntriesResponse
-	23, // 54: hawkr.social.v1alpha1.SocialPublicService.RecordPostView:output_type -> hawkr.social.v1alpha1.RecordPostViewResponse
-	25, // 55: hawkr.social.v1alpha1.SocialAppService.SharePost:output_type -> hawkr.social.v1alpha1.SharePostResponse
-	27, // 56: hawkr.social.v1alpha1.SocialAppService.LikePost:output_type -> hawkr.social.v1alpha1.LikePostResponse
-	29, // 57: hawkr.social.v1alpha1.SocialAppService.UnlikePost:output_type -> hawkr.social.v1alpha1.UnlikePostResponse
-	31, // 58: hawkr.social.v1alpha1.SocialAppService.LikeComment:output_type -> hawkr.social.v1alpha1.LikeCommentResponse
-	33, // 59: hawkr.social.v1alpha1.SocialAppService.UnlikeComment:output_type -> hawkr.social.v1alpha1.UnlikeCommentResponse
-	35, // 60: hawkr.social.v1alpha1.SocialAppService.CreateComment:output_type -> hawkr.social.v1alpha1.CreateCommentResponse
-	37, // 61: hawkr.social.v1alpha1.SocialAppService.UpdateComment:output_type -> hawkr.social.v1alpha1.UpdateCommentResponse
-	39, // 62: hawkr.social.v1alpha1.SocialAppService.DeleteComment:output_type -> hawkr.social.v1alpha1.DeleteCommentResponse
-	41, // 63: hawkr.social.v1alpha1.SocialAppService.CreateForumEntry:output_type -> hawkr.social.v1alpha1.CreateForumEntryResponse
-	43, // 64: hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry:output_type -> hawkr.social.v1alpha1.UpdateForumEntryResponse
-	45, // 65: hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry:output_type -> hawkr.social.v1alpha1.DeleteForumEntryResponse
-	47, // [47:66] is the sub-list for method output_type
-	28, // [28:47] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	5,  // 25: hawkr.social.v1alpha1.UpdateCommentRequest.comment:type_name -> hawkr.social.v1alpha1.Comment
+	49, // 26: hawkr.social.v1alpha1.UpdateCommentRequest.update_mask:type_name -> google.protobuf.FieldMask
+	5,  // 27: hawkr.social.v1alpha1.UpdateCommentResponse.comment:type_name -> hawkr.social.v1alpha1.Comment
+	19, // 28: hawkr.social.v1alpha1.CreateForumEntryResponse.entry:type_name -> hawkr.social.v1alpha1.ForumEntry
+	19, // 29: hawkr.social.v1alpha1.UpdateForumEntryRequest.entry:type_name -> hawkr.social.v1alpha1.ForumEntry
+	49, // 30: hawkr.social.v1alpha1.UpdateForumEntryRequest.update_mask:type_name -> google.protobuf.FieldMask
+	19, // 31: hawkr.social.v1alpha1.UpdateForumEntryResponse.entry:type_name -> hawkr.social.v1alpha1.ForumEntry
+	6,  // 32: hawkr.social.v1alpha1.SocialPublicService.GetPost:input_type -> hawkr.social.v1alpha1.GetPostRequest
+	8,  // 33: hawkr.social.v1alpha1.SocialPublicService.ListPosts:input_type -> hawkr.social.v1alpha1.ListPostsRequest
+	10, // 34: hawkr.social.v1alpha1.SocialPublicService.ListComments:input_type -> hawkr.social.v1alpha1.ListCommentsRequest
+	12, // 35: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:input_type -> hawkr.social.v1alpha1.SuggestTrendingPostsRequest
+	14, // 36: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:input_type -> hawkr.social.v1alpha1.SuggestTagsRequest
+	16, // 37: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:input_type -> hawkr.social.v1alpha1.SuggestTrendingTagsRequest
+	20, // 38: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:input_type -> hawkr.social.v1alpha1.ListForumEntriesRequest
+	22, // 39: hawkr.social.v1alpha1.SocialPublicService.RecordPostView:input_type -> hawkr.social.v1alpha1.RecordPostViewRequest
+	24, // 40: hawkr.social.v1alpha1.SocialAppService.SharePost:input_type -> hawkr.social.v1alpha1.SharePostRequest
+	26, // 41: hawkr.social.v1alpha1.SocialAppService.LikePost:input_type -> hawkr.social.v1alpha1.LikePostRequest
+	28, // 42: hawkr.social.v1alpha1.SocialAppService.UnlikePost:input_type -> hawkr.social.v1alpha1.UnlikePostRequest
+	30, // 43: hawkr.social.v1alpha1.SocialAppService.LikeComment:input_type -> hawkr.social.v1alpha1.LikeCommentRequest
+	32, // 44: hawkr.social.v1alpha1.SocialAppService.UnlikeComment:input_type -> hawkr.social.v1alpha1.UnlikeCommentRequest
+	34, // 45: hawkr.social.v1alpha1.SocialAppService.CreateComment:input_type -> hawkr.social.v1alpha1.CreateCommentRequest
+	36, // 46: hawkr.social.v1alpha1.SocialAppService.UpdateComment:input_type -> hawkr.social.v1alpha1.UpdateCommentRequest
+	38, // 47: hawkr.social.v1alpha1.SocialAppService.DeleteComment:input_type -> hawkr.social.v1alpha1.DeleteCommentRequest
+	40, // 48: hawkr.social.v1alpha1.SocialAppService.CreateForumEntry:input_type -> hawkr.social.v1alpha1.CreateForumEntryRequest
+	42, // 49: hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry:input_type -> hawkr.social.v1alpha1.UpdateForumEntryRequest
+	44, // 50: hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry:input_type -> hawkr.social.v1alpha1.DeleteForumEntryRequest
+	7,  // 51: hawkr.social.v1alpha1.SocialPublicService.GetPost:output_type -> hawkr.social.v1alpha1.GetPostResponse
+	9,  // 52: hawkr.social.v1alpha1.SocialPublicService.ListPosts:output_type -> hawkr.social.v1alpha1.ListPostsResponse
+	11, // 53: hawkr.social.v1alpha1.SocialPublicService.ListComments:output_type -> hawkr.social.v1alpha1.ListCommentsResponse
+	13, // 54: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:output_type -> hawkr.social.v1alpha1.SuggestTrendingPostsResponse
+	15, // 55: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:output_type -> hawkr.social.v1alpha1.SuggestTagsResponse
+	17, // 56: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:output_type -> hawkr.social.v1alpha1.SuggestTrendingTagsResponse
+	21, // 57: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:output_type -> hawkr.social.v1alpha1.ListForumEntriesResponse
+	23, // 58: hawkr.social.v1alpha1.SocialPublicService.RecordPostView:output_type -> hawkr.social.v1alpha1.RecordPostViewResponse
+	25, // 59: hawkr.social.v1alpha1.SocialAppService.SharePost:output_type -> hawkr.social.v1alpha1.SharePostResponse
+	27, // 60: hawkr.social.v1alpha1.SocialAppService.LikePost:output_type -> hawkr.social.v1alpha1.LikePostResponse
+	29, // 61: hawkr.social.v1alpha1.SocialAppService.UnlikePost:output_type -> hawkr.social.v1alpha1.UnlikePostResponse
+	31, // 62: hawkr.social.v1alpha1.SocialAppService.LikeComment:output_type -> hawkr.social.v1alpha1.LikeCommentResponse
+	33, // 63: hawkr.social.v1alpha1.SocialAppService.UnlikeComment:output_type -> hawkr.social.v1alpha1.UnlikeCommentResponse
+	35, // 64: hawkr.social.v1alpha1.SocialAppService.CreateComment:output_type -> hawkr.social.v1alpha1.CreateCommentResponse
+	37, // 65: hawkr.social.v1alpha1.SocialAppService.UpdateComment:output_type -> hawkr.social.v1alpha1.UpdateCommentResponse
+	39, // 66: hawkr.social.v1alpha1.SocialAppService.DeleteComment:output_type -> hawkr.social.v1alpha1.DeleteCommentResponse
+	41, // 67: hawkr.social.v1alpha1.SocialAppService.CreateForumEntry:output_type -> hawkr.social.v1alpha1.CreateForumEntryResponse
+	43, // 68: hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry:output_type -> hawkr.social.v1alpha1.UpdateForumEntryResponse
+	45, // 69: hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry:output_type -> hawkr.social.v1alpha1.DeleteForumEntryResponse
+	51, // [51:70] is the sub-list for method output_type
+	32, // [32:51] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_social_v1alpha1_social_proto_init() }

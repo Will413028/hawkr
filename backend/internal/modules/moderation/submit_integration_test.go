@@ -246,7 +246,7 @@ func TestSnapshotIsFrozenPerContentVersion(t *testing.T) {
 	if a.Report.SnapshotID == nil || b.Report.SnapshotID == nil || *a.Report.SnapshotID != *b.Report.SnapshotID {
 		t.Fatalf("內容沒變，兩筆引用同一份：%+v %+v", a.Report.SnapshotID, b.Report.SnapshotID)
 	}
-	mustV[social.Comment](t)(f.social.UpdateComment(context.Background(), social.Caller{BuyerID: w.author}, w.comment.ID, "改過的留言"))
+	mustV[social.Comment](t)(f.social.UpdateComment(context.Background(), social.Caller{BuyerID: w.author}, w.comment.ID, 1, "改過的留言"))
 	c := f.submit(t, r3, commentTarget(w.comment), policy.Spam)
 	if c.Report.SnapshotID == nil || *c.Report.SnapshotID == *a.Report.SnapshotID {
 		t.Fatal("內容改過，要多一份快照")

@@ -146,7 +146,7 @@ abstract final class SocialAppService {
     idempotency: connect.Idempotency.idempotent,
   );
 
-  /// CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回第一次建立的留言，不重複建立。
+  /// CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回目前的留言（狀態與計數是此刻的），不重複建立。
   static const createComment = connect.Spec(
     '/$name/CreateComment',
     connect.StreamType.unary,
@@ -154,7 +154,7 @@ abstract final class SocialAppService {
     hawkrsocialv1alpha1social.CreateCommentResponse.new,
   );
 
-  /// UpdateComment 修改自己的留言內文；被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
+  /// UpdateComment 修改自己的留言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
   static const updateComment = connect.Spec(
     '/$name/UpdateComment',
     connect.StreamType.unary,
@@ -163,7 +163,7 @@ abstract final class SocialAppService {
     idempotency: connect.Idempotency.idempotent,
   );
 
-  /// DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功。
+  /// DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
   static const deleteComment = connect.Spec(
     '/$name/DeleteComment',
     connect.StreamType.unary,
@@ -172,7 +172,7 @@ abstract final class SocialAppService {
     idempotency: connect.Idempotency.idempotent,
   );
 
-  /// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（回覆只限該店家）。帶 request_id 重送回第一次建立的項目，不重複建立。
+  /// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立，不重複建立。
   static const createForumEntry = connect.Spec(
     '/$name/CreateForumEntry',
     connect.StreamType.unary,
@@ -180,7 +180,7 @@ abstract final class SocialAppService {
     hawkrsocialv1alpha1social.CreateForumEntryResponse.new,
   );
 
-  /// UpdateForumEntry 修改自己的討論區發言內文；被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
+  /// UpdateForumEntry 修改自己的討論區發言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
   static const updateForumEntry = connect.Spec(
     '/$name/UpdateForumEntry',
     connect.StreamType.unary,
@@ -189,7 +189,7 @@ abstract final class SocialAppService {
     idempotency: connect.Idempotency.idempotent,
   );
 
-  /// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功。
+  /// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
   static const deleteForumEntry = connect.Spec(
     '/$name/DeleteForumEntry',
     connect.StreamType.unary,

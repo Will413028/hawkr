@@ -259,7 +259,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回第一次建立的留言，不重複建立。
+  /// CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回目前的留言（狀態與計數是此刻的），不重複建立。
   Future<hawkrsocialv1alpha1social.CreateCommentResponse> createComment(
     hawkrsocialv1alpha1social.CreateCommentRequest input, {
     connect.Headers? headers,
@@ -277,7 +277,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// UpdateComment 修改自己的留言內文；被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
+  /// UpdateComment 修改自己的留言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
   Future<hawkrsocialv1alpha1social.UpdateCommentResponse> updateComment(
     hawkrsocialv1alpha1social.UpdateCommentRequest input, {
     connect.Headers? headers,
@@ -295,7 +295,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功。
+  /// DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
   Future<hawkrsocialv1alpha1social.DeleteCommentResponse> deleteComment(
     hawkrsocialv1alpha1social.DeleteCommentRequest input, {
     connect.Headers? headers,
@@ -313,7 +313,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（回覆只限該店家）。帶 request_id 重送回第一次建立的項目，不重複建立。
+  /// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立，不重複建立。
   Future<hawkrsocialv1alpha1social.CreateForumEntryResponse> createForumEntry(
     hawkrsocialv1alpha1social.CreateForumEntryRequest input, {
     connect.Headers? headers,
@@ -331,7 +331,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// UpdateForumEntry 修改自己的討論區發言內文；被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
+  /// UpdateForumEntry 修改自己的討論區發言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
   Future<hawkrsocialv1alpha1social.UpdateForumEntryResponse> updateForumEntry(
     hawkrsocialv1alpha1social.UpdateForumEntryRequest input, {
     connect.Headers? headers,
@@ -349,7 +349,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功。
+  /// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
   Future<hawkrsocialv1alpha1social.DeleteForumEntryResponse> deleteForumEntry(
     hawkrsocialv1alpha1social.DeleteForumEntryRequest input, {
     connect.Headers? headers,

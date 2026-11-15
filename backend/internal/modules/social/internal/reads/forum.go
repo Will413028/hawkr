@@ -22,6 +22,7 @@ type EntryRow struct {
 	Body       string
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+	Version    int64
 	ReplyCount int64
 }
 
@@ -44,7 +45,7 @@ func ListTopLevelForumEntries(storeID int64, now time.Time, v visibility.Viewer,
 		masked(visible, c.T.ActorKind, String("")).AS("actor_kind"),
 		masked(visible, c.T.ActorID, Int64(0)).AS("actor_id"),
 		masked(visible, c.T.Body, String("")).AS("body"),
-		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), s.ReplyCount.AS("reply_count"),
+		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), c.T.Version.AS("version"), s.ReplyCount.AS("reply_count"),
 	).
 		FROM(c.T.INNER_JOIN(s, s.ForumEntryID.EQ(c.T.ID)).CROSS_JOIN(vis)).
 		WHERE(c.Where(
@@ -66,7 +67,7 @@ func ListForumReplies(parentID uuid.UUID, now time.Time, v visibility.Viewer, pg
 		c.T.ID.AS("id"), c.T.StoreID.AS("store_id"), c.T.ParentID.AS("parent_id"), c.T.ReplyToID.AS("reply_to_id"),
 		NewEnumValue(stateVisible).AS("state"),
 		c.T.ActorKind.AS("actor_kind"), c.T.ActorID.AS("actor_id"), c.T.Body.AS("body"),
-		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), s.ReplyCount.AS("reply_count"),
+		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), c.T.Version.AS("version"), s.ReplyCount.AS("reply_count"),
 	).
 		FROM(c.T.INNER_JOIN(s, s.ForumEntryID.EQ(c.T.ID))).
 		WHERE(c.Where(

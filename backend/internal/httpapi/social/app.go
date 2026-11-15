@@ -3,10 +3,12 @@ package social
 import (
 	"context"
 	"fmt"
+	"slices"
 	"uuid"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
@@ -15,20 +17,19 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
-// Writes 是互動寫入的來源（*social.Module）：分享、讚、留言與討論區。PublicPost 取新留言所屬貼文的店家，組回應的 viewer_* 欄位。
+// Writes 是互動寫入的來源（*social.Module）：分享、讚、留言與討論區。
 type Writes interface {
-	PublicPost(ctx context.Context, c social.Caller, id uuid.UUID) (social.Post, error)
 	RecordShare(ctx context.Context, buyerID int64, postID uuid.UUID) (bool, error)
 	LikePost(ctx context.Context, buyerID int64, postID uuid.UUID) (bool, error)
 	UnlikePost(ctx context.Context, buyerID int64, postID uuid.UUID) (bool, error)
 	LikeComment(ctx context.Context, c social.Caller, commentID uuid.UUID) (bool, error)
 	UnlikeComment(ctx context.Context, c social.Caller, commentID uuid.UUID) (bool, error)
 	CreateComment(ctx context.Context, c social.Caller, in social.CommentInput) (social.Comment, error)
-	UpdateComment(ctx context.Context, c social.Caller, id uuid.UUID, body string) (social.Comment, error)
-	DeleteComment(ctx context.Context, c social.Caller, id uuid.UUID) error
+	UpdateComment(ctx context.Context, c social.Caller, id uuid.UUID, version int64, body string) (social.Comment, error)
+	DeleteComment(ctx context.Context, c social.Caller, id uuid.UUID, version *int64) error
 	CreateForumEntry(ctx context.Context, c social.Caller, in social.ForumInput) (social.ForumEntry, error)
-	UpdateForumEntry(ctx context.Context, c social.Caller, id uuid.UUID, body string) (social.ForumEntry, error)
-	DeleteForumEntry(ctx context.Context, c social.Caller, id uuid.UUID) error
+	UpdateForumEntry(ctx context.Context, c social.Caller, id uuid.UUID, version int64, body string) (social.ForumEntry, error)
+	DeleteForumEntry(ctx context.Context, c social.Caller, id uuid.UUID, version *int64) error
 }
 
 // App 實作 SocialAppService。
@@ -48,8 +49,9 @@ func NewApp(writes Writes, buyers Buyers, stores Stores, images rpc.Images, webO
 }
 
 var (
-	createPaths     = rpc.FieldPaths{"Body": "body", "ReplyToID": "reply_to_id", "RequestID": "request_id"}
-	updateBodyPaths = rpc.FieldPaths{"Body": "body"}
+	createPaths        = rpc.FieldPaths{"Body": "body", "ReplyToID": "reply_to_id", "RequestID": "request_id"}
+	updateCommentPaths = rpc.FieldPaths{"Body": "comment.body"}
+	updateEntryPaths   = rpc.FieldPaths{"Body": "entry.body"}
 )
 
 // account 回傳呼叫者與他的互動身分；只有顧客帳號能呼叫，沒有登入由 interceptor 擋（unauthenticated），管理員回 permission_denied。
@@ -73,19 +75,39 @@ func optionalUUID(path string, raw *string) (*uuid.UUID, error) {
 	return &id, nil
 }
 
-// requestID 解析選填的 request_id：UUIDv4（API 契約 field_info.format = UUID4）；不設是 nil。
-func requestID(raw string) (*uuid.UUID, error) {
-	if raw == "" {
+// bodyUpdate 解析 Update 請求：資源的 id、必填的 etag、update_mask 要列 body（內文是唯一可以修改的欄位）；field 是資源在請求裡的欄位名。
+func bodyUpdate(field string, resource proto.Message, mask *fieldmaskpb.FieldMask, id, etag, body string) (uuid.UUID, int64, string, error) {
+	if !resource.ProtoReflect().IsValid() {
+		return uuid.UUID{}, 0, "", rpc.RequiredField(field, field+" 必填")
+	}
+	uid, err := rpc.ParseUUID(field+".id", id)
+	if err != nil {
+		return uuid.UUID{}, 0, "", err
+	}
+	version, err := rpc.RequiredVersionField(etag, field+".etag")
+	if err != nil {
+		return uuid.UUID{}, 0, "", err
+	}
+	paths, err := rpc.WritableFields(resource, mask)
+	if err != nil {
+		return uuid.UUID{}, 0, "", err
+	}
+	if !slices.Contains(paths, "body") {
+		return uuid.UUID{}, 0, "", rpc.RequiredField("update_mask", "update_mask 必須列 body（內文是唯一可以修改的欄位）")
+	}
+	return uid, version, body, nil
+}
+
+// optionalVersion 解析選填的 etag；沒帶是 nil。
+func optionalVersion(etag string) (*int64, error) {
+	if etag == "" {
 		return nil, nil
 	}
-	id, err := rpc.ParseUUID("request_id", raw)
+	v, err := rpc.VersionFromEtag(etag)
 	if err != nil {
 		return nil, err
 	}
-	if id[6]>>4 != 4 {
-		return nil, rpc.RequiredField("request_id", "request_id 必須是 UUIDv4")
-	}
-	return &id, nil
+	return &v, nil
 }
 
 func (h *App) SharePost(ctx context.Context, req *connect.Request[pb.SharePostRequest]) (*connect.Response[pb.SharePostResponse], error) {
@@ -177,7 +199,7 @@ func (h *App) CreateComment(ctx context.Context, req *connect.Request[pb.CreateC
 	if err != nil {
 		return nil, err
 	}
-	reqID, err := requestID(msg.GetRequestId())
+	reqID, err := rpc.ParseRequestID(msg.GetRequestId())
 	if err != nil {
 		return nil, err
 	}
@@ -189,11 +211,7 @@ func (h *App) CreateComment(ctx context.Context, req *connect.Request[pb.CreateC
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, createPaths)
 	}
-	post, err := h.writes.PublicPost(ctx, c, postID)
-	if err != nil {
-		return nil, err
-	}
-	comments, err := h.toComments(ctx, c, post.StoreID, []social.Comment{created})
+	comments, err := h.toComments(ctx, c, created.StoreID, []social.Comment{created})
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +219,8 @@ func (h *App) CreateComment(ctx context.Context, req *connect.Request[pb.CreateC
 }
 
 func (h *App) UpdateComment(ctx context.Context, req *connect.Request[pb.UpdateCommentRequest]) (*connect.Response[pb.UpdateCommentResponse], error) {
-	id, err := rpc.ParseUUID("comment_id", req.Msg.GetCommentId())
+	msg := req.Msg.GetComment()
+	id, version, body, err := bodyUpdate("comment", msg, req.Msg.GetUpdateMask(), msg.GetId(), msg.GetEtag(), msg.GetBody())
 	if err != nil {
 		return nil, err
 	}
@@ -209,11 +228,15 @@ func (h *App) UpdateComment(ctx context.Context, req *connect.Request[pb.UpdateC
 	if err != nil {
 		return nil, err
 	}
-	updated, err := h.writes.UpdateComment(ctx, c, id, req.Msg.GetBody())
+	updated, err := h.writes.UpdateComment(ctx, c, id, version, body)
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, updateBodyPaths)
+		return nil, rpc.WithFieldPaths(err, updateCommentPaths)
 	}
-	return connect.NewResponse(&pb.UpdateCommentResponse{Body: updated.Body, UpdateTime: timestamppb.New(updated.UpdatedAt)}), nil
+	comments, err := h.toComments(ctx, c, updated.StoreID, []social.Comment{updated})
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.UpdateCommentResponse{Comment: comments[0]}), nil
 }
 
 func (h *App) DeleteComment(ctx context.Context, req *connect.Request[pb.DeleteCommentRequest]) (*connect.Response[pb.DeleteCommentResponse], error) {
@@ -221,11 +244,15 @@ func (h *App) DeleteComment(ctx context.Context, req *connect.Request[pb.DeleteC
 	if err != nil {
 		return nil, err
 	}
+	version, err := optionalVersion(req.Msg.GetEtag())
+	if err != nil {
+		return nil, err
+	}
 	c, err := h.account(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err := h.writes.DeleteComment(ctx, c, id); err != nil {
+	if err := h.writes.DeleteComment(ctx, c, id, version); err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&pb.DeleteCommentResponse{}), nil
@@ -245,7 +272,7 @@ func (h *App) CreateForumEntry(ctx context.Context, req *connect.Request[pb.Crea
 	if err != nil {
 		return nil, err
 	}
-	reqID, err := requestID(msg.GetRequestId())
+	reqID, err := rpc.ParseRequestID(msg.GetRequestId())
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +292,8 @@ func (h *App) CreateForumEntry(ctx context.Context, req *connect.Request[pb.Crea
 }
 
 func (h *App) UpdateForumEntry(ctx context.Context, req *connect.Request[pb.UpdateForumEntryRequest]) (*connect.Response[pb.UpdateForumEntryResponse], error) {
-	id, err := rpc.ParseUUID("entry_id", req.Msg.GetEntryId())
+	msg := req.Msg.GetEntry()
+	id, version, body, err := bodyUpdate("entry", msg, req.Msg.GetUpdateMask(), msg.GetId(), msg.GetEtag(), msg.GetBody())
 	if err != nil {
 		return nil, err
 	}
@@ -273,11 +301,15 @@ func (h *App) UpdateForumEntry(ctx context.Context, req *connect.Request[pb.Upda
 	if err != nil {
 		return nil, err
 	}
-	updated, err := h.writes.UpdateForumEntry(ctx, c, id, req.Msg.GetBody())
+	updated, err := h.writes.UpdateForumEntry(ctx, c, id, version, body)
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, updateBodyPaths)
+		return nil, rpc.WithFieldPaths(err, updateEntryPaths)
 	}
-	return connect.NewResponse(&pb.UpdateForumEntryResponse{Body: updated.Body, UpdateTime: timestamppb.New(updated.UpdatedAt)}), nil
+	entries, err := h.toForumEntries(ctx, c, updated.StoreID, []social.ForumEntry{updated})
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.UpdateForumEntryResponse{Entry: entries[0]}), nil
 }
 
 func (h *App) DeleteForumEntry(ctx context.Context, req *connect.Request[pb.DeleteForumEntryRequest]) (*connect.Response[pb.DeleteForumEntryResponse], error) {
@@ -285,11 +317,15 @@ func (h *App) DeleteForumEntry(ctx context.Context, req *connect.Request[pb.Dele
 	if err != nil {
 		return nil, err
 	}
+	version, err := optionalVersion(req.Msg.GetEtag())
+	if err != nil {
+		return nil, err
+	}
 	c, err := h.account(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err := h.writes.DeleteForumEntry(ctx, c, id); err != nil {
+	if err := h.writes.DeleteForumEntry(ctx, c, id, version); err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&pb.DeleteForumEntryResponse{}), nil

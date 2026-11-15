@@ -103,9 +103,11 @@ CREATE TABLE social.comments (
     deleted_at  TIMESTAMPTZ,
     thread_id   UUID        NOT NULL GENERATED ALWAYS AS (COALESCE(parent_id, id)) STORED,
     counted     BOOLEAN     NOT NULL DEFAULT FALSE,
+    version     BIGINT      NOT NULL DEFAULT 1,
     request_id   UUID,
     request_hash BYTEA,
     CONSTRAINT comments_request_key UNIQUE (actor_kind, actor_id, request_id),
+    CONSTRAINT comments_version_check CHECK (version >= 1),
     CONSTRAINT comments_request_check CHECK ((request_id IS NULL) = (request_hash IS NULL)),
     CONSTRAINT comments_post_id_key UNIQUE (post_id, id),
     CONSTRAINT comments_thread_key UNIQUE (post_id, thread_id, id),
@@ -128,6 +130,7 @@ CREATE INDEX comments_actor ON social.comments (actor_kind, actor_id, id);
 
 COMMENT ON COLUMN social.comments.counted IS '此刻是否計入貼文的留言數與父留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_comments 求值）；只由 social.reevaluate_comments 維護，讀取直接用它，貼文的 comment_count 與留言的 reply_count 是這個旗標的加總';
 COMMENT ON COLUMN social.comments.body IS '內文；作者自己刪除時保留，買家刪帳的清除 job 之後設為 NULL（保留列讓討論串結構與佔位項目還在），所以 NULL 一定是已刪除的列（comments_scrubbed_check）';
+COMMENT ON COLUMN social.comments.version IS '樂觀鎖的版本，對外是 etag；內文修改與刪除各加一';
 COMMENT ON COLUMN social.comments.request_id IS '建立時 client 帶的 request_id（AIP-155，選填）；範圍是 (互動者, request_id)，同一個互動者重送回這一列';
 COMMENT ON COLUMN social.comments.request_hash IS '建立輸入（貼文、父留言、被回覆的留言、內文）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有';
 COMMENT ON COLUMN social.comments.actor_kind IS '互動者的種類：BUYER（actor_id 是 buyer_id）、STORE（actor_id 是 store_id）；買家與店家各自連號，同一個數值在兩邊是不同的人';
@@ -169,9 +172,11 @@ CREATE TABLE social.forum_entries (
     deleted_at  TIMESTAMPTZ,
     thread_id   UUID        NOT NULL GENERATED ALWAYS AS (COALESCE(parent_id, id)) STORED,
     counted     BOOLEAN     NOT NULL DEFAULT FALSE,
+    version     BIGINT      NOT NULL DEFAULT 1,
     request_id   UUID,
     request_hash BYTEA,
     CONSTRAINT forum_entries_request_key UNIQUE (actor_kind, actor_id, request_id),
+    CONSTRAINT forum_entries_version_check CHECK (version >= 1),
     CONSTRAINT forum_entries_request_check CHECK ((request_id IS NULL) = (request_hash IS NULL)),
     CONSTRAINT forum_entries_store_id_key UNIQUE (store_id, id),
     CONSTRAINT forum_entries_thread_key UNIQUE (store_id, thread_id, id),
@@ -187,6 +192,7 @@ CREATE TABLE social.forum_entries (
 );
 COMMENT ON COLUMN social.forum_entries.counted IS '此刻是否計入父討論區留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_forum_entries 求值）；只由 social.reevaluate_forum_entries 維護，讀取直接用它，父項的 reply_count 是這個旗標的加總';
 COMMENT ON COLUMN social.forum_entries.body IS '內文；作者自己刪除時保留，買家刪帳的清除 job 之後設為 NULL（保留列讓討論串結構與佔位項目還在），所以 NULL 一定是已刪除的列（forum_entries_scrubbed_check）';
+COMMENT ON COLUMN social.forum_entries.version IS '樂觀鎖的版本，對外是 etag；內文修改與刪除各加一';
 COMMENT ON COLUMN social.forum_entries.request_id IS '建立時 client 帶的 request_id（AIP-155，選填）；範圍是 (互動者, request_id)，同一個互動者重送回這一列';
 COMMENT ON COLUMN social.forum_entries.request_hash IS '建立輸入（店家、父項、被回覆的項目、內文）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有';
 CREATE INDEX forum_entries_top_level ON social.forum_entries (store_id, created_at, id) WHERE parent_id IS NULL;

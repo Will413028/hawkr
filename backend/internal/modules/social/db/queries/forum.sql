@@ -22,11 +22,15 @@ SELECT * FROM social.forum_entries WHERE id = sqlc.arg(id) FOR UPDATE;
 SELECT * FROM social.forum_entries WHERE id = sqlc.arg(id);
 
 -- name: UpdateForumEntryBody :one
-UPDATE social.forum_entries SET body = sqlc.arg(body)::text, updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id) AND deleted_at IS NULL
+-- 版本不符回 0 列。
+UPDATE social.forum_entries SET body = sqlc.arg(body)::text, version = version + 1, updated_at = sqlc.arg(now)
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND version = sqlc.arg(expected_version)
 RETURNING *;
 
 -- name: SoftDeleteForumEntry :execrows
-UPDATE social.forum_entries SET deleted_at = sqlc.arg(now), updated_at = sqlc.arg(now)
+UPDATE social.forum_entries SET deleted_at = sqlc.arg(now), version = version + 1, updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
+
+-- name: GetForumEntryReplyCount :one
+SELECT reply_count FROM social.forum_entry_stats WHERE forum_entry_id = sqlc.arg(id);

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"time"
-	"uuid"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -222,21 +221,6 @@ func optionalTime(t *timestamppb.Timestamp) *time.Time {
 	return &v
 }
 
-// requestID 解析選填的 request_id：UUIDv4（API 契約 field_info.format = UUID4）；不設是 nil。
-func requestID(raw string) (*uuid.UUID, error) {
-	if raw == "" {
-		return nil, nil
-	}
-	id, err := rpc.ParseUUID("request_id", raw)
-	if err != nil {
-		return nil, err
-	}
-	if id[6]>>4 != 4 {
-		return nil, rpc.RequiredField("request_id", "request_id 必須是 UUIDv4")
-	}
-	return &id, nil
-}
-
 // violationBasisFrom 轉換請求裡的違規依據；prefix 是它在請求裡的路徑（解析失敗時指出哪個欄位）。
 func violationBasisFrom(msg *adminpb.ViolationBasis, prefix string) (*model.ViolationBasis, error) {
 	v := &model.ViolationBasis{}
@@ -281,7 +265,7 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 	if err != nil {
 		return nil, err
 	}
-	reqID, err := requestID(msg.GetRequestId())
+	reqID, err := rpc.ParseRequestID(msg.GetRequestId())
 	if err != nil {
 		return nil, err
 	}

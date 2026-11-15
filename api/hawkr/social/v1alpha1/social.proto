@@ -11,6 +11,7 @@ package hawkr.social.v1alpha1;
 
 import "google/api/field_behavior.proto";
 import "google/api/field_info.proto";
+import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "hawkr/common/v1alpha1/image.proto";
 import "hawkr/common/v1alpha1/store_card.proto";
@@ -97,28 +98,28 @@ service SocialAppService {
     option idempotency_level = IDEMPOTENT;
   }
 
-  // CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回第一次建立的留言，不重複建立。
+  // CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回目前的留言（狀態與計數是此刻的），不重複建立。
   rpc CreateComment(CreateCommentRequest) returns (CreateCommentResponse);
 
-  // UpdateComment 修改自己的留言內文；被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
+  // UpdateComment 修改自己的留言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
   rpc UpdateComment(UpdateCommentRequest) returns (UpdateCommentResponse) {
     option idempotency_level = IDEMPOTENT;
   }
 
-  // DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功。
+  // DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
   rpc DeleteComment(DeleteCommentRequest) returns (DeleteCommentResponse) {
     option idempotency_level = IDEMPOTENT;
   }
 
-  // CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（回覆只限該店家）。帶 request_id 重送回第一次建立的項目，不重複建立。
+  // CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立，不重複建立。
   rpc CreateForumEntry(CreateForumEntryRequest) returns (CreateForumEntryResponse);
 
-  // UpdateForumEntry 修改自己的討論區發言內文；被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
+  // UpdateForumEntry 修改自己的討論區發言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
   rpc UpdateForumEntry(UpdateForumEntryRequest) returns (UpdateForumEntryResponse) {
     option idempotency_level = IDEMPOTENT;
   }
 
-  // DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功。
+  // DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
   rpc DeleteForumEntry(DeleteForumEntryRequest) returns (DeleteForumEntryResponse) {
     option idempotency_level = IDEMPOTENT;
   }
@@ -195,7 +196,8 @@ message Comment {
   CommentState state = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 只有 VISIBLE 的項目有作者與內文。
   Actor author = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
-  string body = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 留言唯一可以修改的欄位（UpdateComment 的 update_mask 列 body）。
+  string body = 7;
   google.protobuf.Timestamp create_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
   google.protobuf.Timestamp update_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
   int64 like_count = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -208,8 +210,10 @@ message Comment {
   bool viewer_can_edit = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 觀看者能不能刪除：VISIBLE 的自己的留言，或這篇貼文是自己的店的。
   bool viewer_can_delete = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 觀看者能不能回覆：VISIBLE，而且觀看者能在這篇貼文留言（見 Post.viewer_can_comment）。
+  // 觀看者能不能回覆：VISIBLE，而且這篇貼文是觀看者此刻的店的（貼文留言的回覆只限貼文所屬的店，買家一律 false）。
   bool viewer_can_reply = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 只有 VISIBLE 的項目有；修改與刪除時帶回，client 視為不透明字串。
+  string etag = 17;
 }
 
 message GetPostRequest {
@@ -304,7 +308,8 @@ message ForumEntry {
   CommentState state = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 只有 VISIBLE 的項目有作者與內文。
   Actor author = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
-  string body = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 項目唯一可以修改的欄位（UpdateForumEntry 的 update_mask 列 body）。
+  string body = 7;
   google.protobuf.Timestamp create_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
   google.protobuf.Timestamp update_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
   int64 reply_count = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -316,6 +321,8 @@ message ForumEntry {
   bool viewer_can_delete = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 觀看者能不能回覆：VISIBLE，而且觀看者在這家店的討論區沒有被封鎖（訪客是 false；店主讀自己的討論區是 true）。顯示用的提示，寫入時伺服器仍會檢查。
   bool viewer_can_reply = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 只有 VISIBLE 的項目有；修改與刪除時帶回，client 視為不透明字串。
+  string etag = 15;
 }
 
 message ListForumEntriesRequest {
@@ -384,7 +391,7 @@ message CreateCommentRequest {
   optional string parent_id = 3;
   // 回覆針對的那一則留言，必須與 parent_id 同一串；只能在設了 parent_id 時設，不設是父留言。
   optional string reply_to_id = 4;
-  // 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回第一次建立的留言；內容不同回 invalid_argument。
+  // 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回這則留言目前的樣子；內容不同回 invalid_argument。
   string request_id = 5 [(google.api.field_info).format = UUID4];
 }
 
@@ -393,21 +400,21 @@ message CreateCommentResponse {
 }
 
 message UpdateCommentRequest {
-  // 留言 ID。
-  string comment_id = 1 [(google.api.field_behavior) = REQUIRED];
-  // 新的內文，規則同 CreateCommentRequest.body。留言只有內文可以修改，所以沒有 update_mask。
-  string body = 2 [(google.api.field_behavior) = REQUIRED];
+  // id 與 etag 必填；body 的規則同 CreateCommentRequest.body。留言只有內文可以修改，update_mask 要列 body。
+  Comment comment = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
 }
 
-// UpdateCommentResponse 只帶修改的結果。留言的讚數與回覆數不在這裡，client 保留列表上原有的值。
+// UpdateCommentResponse 的留言是修改後的完整資源（含讚數、回覆數與新的 etag）。
 message UpdateCommentResponse {
-  string body = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-  google.protobuf.Timestamp update_time = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  Comment comment = 1;
 }
 
 message DeleteCommentRequest {
   // 留言 ID。
   string comment_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 帶了就檢查版本；已經刪除的留言不檢查。
+  string etag = 2;
 }
 
 message DeleteCommentResponse {}
@@ -421,7 +428,7 @@ message CreateForumEntryRequest {
   optional string parent_id = 3;
   // 回覆針對的那一則，必須與 parent_id 同一串；只能在設了 parent_id 時設，不設是父項。
   optional string reply_to_id = 4;
-  // 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回第一次建立的項目；內容不同回 invalid_argument。
+  // 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回這個項目目前的樣子；內容不同回 invalid_argument。
   string request_id = 5 [(google.api.field_info).format = UUID4];
 }
 
@@ -430,21 +437,21 @@ message CreateForumEntryResponse {
 }
 
 message UpdateForumEntryRequest {
-  // 討論區項目 ID。
-  string entry_id = 1 [(google.api.field_behavior) = REQUIRED];
-  // 新的內文，規則同 CreateCommentRequest.body。討論區項目只有內文可以修改，所以沒有 update_mask。
-  string body = 2 [(google.api.field_behavior) = REQUIRED];
+  // id 與 etag 必填；body 的規則同 CreateCommentRequest.body。討論區項目只有內文可以修改，update_mask 要列 body。
+  ForumEntry entry = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
 }
 
-// UpdateForumEntryResponse 只帶修改的結果。回覆數不在這裡，client 保留列表上原有的值。
+// UpdateForumEntryResponse 的項目是修改後的完整資源（含回覆數與新的 etag）。
 message UpdateForumEntryResponse {
-  string body = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-  google.protobuf.Timestamp update_time = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  ForumEntry entry = 1;
 }
 
 message DeleteForumEntryRequest {
   // 討論區項目 ID。
   string entry_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 帶了就檢查版本；已經刪除的項目不檢查。
+  string etag = 2;
 }
 
 message DeleteForumEntryResponse {}

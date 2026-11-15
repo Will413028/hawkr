@@ -420,17 +420,17 @@ type SocialAppServiceClient interface {
 	LikeComment(context.Context, *connect.Request[v1alpha1.LikeCommentRequest]) (*connect.Response[v1alpha1.LikeCommentResponse], error)
 	// UnlikeComment 取消留言的讚，沒有讚過也回成功。
 	UnlikeComment(context.Context, *connect.Request[v1alpha1.UnlikeCommentRequest]) (*connect.Response[v1alpha1.UnlikeCommentResponse], error)
-	// CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回第一次建立的留言，不重複建立。
+	// CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回目前的留言（狀態與計數是此刻的），不重複建立。
 	CreateComment(context.Context, *connect.Request[v1alpha1.CreateCommentRequest]) (*connect.Response[v1alpha1.CreateCommentResponse], error)
-	// UpdateComment 修改自己的留言內文；被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
+	// UpdateComment 修改自己的留言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
 	UpdateComment(context.Context, *connect.Request[v1alpha1.UpdateCommentRequest]) (*connect.Response[v1alpha1.UpdateCommentResponse], error)
-	// DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功。
+	// DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
 	DeleteComment(context.Context, *connect.Request[v1alpha1.DeleteCommentRequest]) (*connect.Response[v1alpha1.DeleteCommentResponse], error)
-	// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（回覆只限該店家）。帶 request_id 重送回第一次建立的項目，不重複建立。
+	// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立，不重複建立。
 	CreateForumEntry(context.Context, *connect.Request[v1alpha1.CreateForumEntryRequest]) (*connect.Response[v1alpha1.CreateForumEntryResponse], error)
-	// UpdateForumEntry 修改自己的討論區發言內文；被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
+	// UpdateForumEntry 修改自己的討論區發言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
 	UpdateForumEntry(context.Context, *connect.Request[v1alpha1.UpdateForumEntryRequest]) (*connect.Response[v1alpha1.UpdateForumEntryResponse], error)
-	// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功。
+	// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
 	DeleteForumEntry(context.Context, *connect.Request[v1alpha1.DeleteForumEntryRequest]) (*connect.Response[v1alpha1.DeleteForumEntryResponse], error)
 }
 
@@ -606,17 +606,17 @@ type SocialAppServiceHandler interface {
 	LikeComment(context.Context, *connect.Request[v1alpha1.LikeCommentRequest]) (*connect.Response[v1alpha1.LikeCommentResponse], error)
 	// UnlikeComment 取消留言的讚，沒有讚過也回成功。
 	UnlikeComment(context.Context, *connect.Request[v1alpha1.UnlikeCommentRequest]) (*connect.Response[v1alpha1.UnlikeCommentResponse], error)
-	// CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回第一次建立的留言，不重複建立。
+	// CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回目前的留言（狀態與計數是此刻的），不重複建立。
 	CreateComment(context.Context, *connect.Request[v1alpha1.CreateCommentRequest]) (*connect.Response[v1alpha1.CreateCommentResponse], error)
-	// UpdateComment 修改自己的留言內文；被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
+	// UpdateComment 修改自己的留言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
 	UpdateComment(context.Context, *connect.Request[v1alpha1.UpdateCommentRequest]) (*connect.Response[v1alpha1.UpdateCommentResponse], error)
-	// DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功。
+	// DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
 	DeleteComment(context.Context, *connect.Request[v1alpha1.DeleteCommentRequest]) (*connect.Response[v1alpha1.DeleteCommentResponse], error)
-	// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（回覆只限該店家）。帶 request_id 重送回第一次建立的項目，不重複建立。
+	// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立，不重複建立。
 	CreateForumEntry(context.Context, *connect.Request[v1alpha1.CreateForumEntryRequest]) (*connect.Response[v1alpha1.CreateForumEntryResponse], error)
-	// UpdateForumEntry 修改自己的討論區發言內文；被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
+	// UpdateForumEntry 修改自己的討論區發言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
 	UpdateForumEntry(context.Context, *connect.Request[v1alpha1.UpdateForumEntryRequest]) (*connect.Response[v1alpha1.UpdateForumEntryResponse], error)
-	// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功。
+	// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
 	DeleteForumEntry(context.Context, *connect.Request[v1alpha1.DeleteForumEntryRequest]) (*connect.Response[v1alpha1.DeleteForumEntryResponse], error)
 }
 

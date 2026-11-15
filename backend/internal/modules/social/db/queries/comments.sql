@@ -31,13 +31,14 @@ JOIN social.posts p ON p.id = c.post_id
 WHERE c.id = sqlc.arg(id);
 
 -- name: UpdateCommentBody :one
-UPDATE social.comments SET body = sqlc.arg(body)::text, updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id) AND deleted_at IS NULL
+-- 版本不符回 0 列。
+UPDATE social.comments SET body = sqlc.arg(body)::text, version = version + 1, updated_at = sqlc.arg(now)
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND version = sqlc.arg(expected_version)
 RETURNING *;
 
 -- name: SoftDeleteComment :execrows
 -- 軟刪；已經刪除的 0 列（呼叫方不做副作用）。
-UPDATE social.comments SET deleted_at = sqlc.arg(now), updated_at = sqlc.arg(now)
+UPDATE social.comments SET deleted_at = sqlc.arg(now), version = version + 1, updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: GetCommentCounts :one

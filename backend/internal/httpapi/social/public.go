@@ -65,7 +65,7 @@ type presenter struct {
 
 // Views 是瀏覽打點的寫入端（*social.Module）。
 type Views interface {
-	RecordView(ctx context.Context, postID uuid.UUID, v social.Viewer) (bool, error)
+	RecordView(ctx context.Context, c social.Caller, postID uuid.UUID, v social.Viewer) (bool, error)
 }
 
 // Public 實作 SocialPublicService。
@@ -131,7 +131,7 @@ func (h *Public) GetPost(ctx context.Context, req *connect.Request[pb.GetPostReq
 	return connect.NewResponse(&pb.GetPostResponse{Post: posts[0]}), nil
 }
 
-// RecordPostView 只計觀看者讀得到的貼文，而且店主看自己的貼文不計（模組要求呼叫方不呼叫）；讀不到與沒有計入都回成功，不洩漏貼文是否存在。
+// RecordPostView 只計觀看者讀得到的貼文，而且店主看自己的貼文不計（由模組依貼文的店家排除）；管理員代行的讀取不記錄（回成功、不寫入）；讀不到與沒有計入都回成功，不洩漏貼文是否存在。
 // 停權的帳號與無效的憑證在入口已經是訪客，這裡自然計為匿名瀏覽。每個來源 IP 的額度在入口（httpapi 的 tierPostView）。
 func (h *Public) RecordPostView(ctx context.Context, req *connect.Request[pb.RecordPostViewRequest]) (*connect.Response[pb.RecordPostViewResponse], error) {
 	id, err := rpc.ParseUUID("post_id", req.Msg.GetPostId())
@@ -143,21 +143,14 @@ func (h *Public) RecordPostView(ctx context.Context, req *connect.Request[pb.Rec
 		return nil, err
 	}
 	done := connect.NewResponse(&pb.RecordPostViewResponse{})
-	if c.Store != nil {
-		switch p, err := h.reads.PublicPost(ctx, c, id); {
-		case apperr.KindOf(err) == apperr.KindNotFound:
-			return done, nil
-		case err != nil:
-			return nil, err
-		case c.OwnsStore(p.StoreID):
+	v := social.Viewer{IP: rpc.ClientIPFrom(ctx), UserAgent: req.Header().Get("User-Agent")}
+	if p, ok := rpc.PrincipalFrom(ctx); ok {
+		if p.Kind != identity.PrincipalAccount {
 			return done, nil
 		}
-	}
-	v := social.Viewer{BuyerID: c.BuyerID, IP: rpc.ClientIPFrom(ctx), UserAgent: req.Header().Get("User-Agent")}
-	if p, ok := rpc.PrincipalFrom(ctx); ok && p.Kind == identity.PrincipalAccount {
 		v.AccountID = p.ID
 	}
-	if _, err := h.views.RecordView(ctx, id, v); err != nil {
+	if _, err := h.views.RecordView(ctx, c, id, v); err != nil {
 		return nil, err
 	}
 	return done, nil
@@ -414,6 +407,7 @@ func (h *presenter) toForumEntries(ctx context.Context, c social.Caller, storeID
 		item.ViewerCanEdit = item.IsMine
 		item.ViewerCanDelete = item.IsMine || c.OwnsStore(storeID)
 		item.ViewerCanReply = shared.replyAllowed
+		item.Etag = rpc.Etag(e.Version)
 		if item.Author, err = h.toActor(e.Actor, shared.display, shared.stores); err != nil {
 			return nil, err
 		}
@@ -610,7 +604,8 @@ func (h *presenter) toComments(ctx context.Context, c social.Caller, postStore i
 		item.IsMine = c.IsAuthor(m.Actor)
 		item.ViewerCanEdit = item.IsMine
 		item.ViewerCanDelete = item.IsMine || c.OwnsStore(postStore)
-		item.ViewerCanReply = shared.replyAllowed
+		item.ViewerCanReply = c.OwnsStore(postStore) && shared.replyAllowed
+		item.Etag = rpc.Etag(m.Version)
 		if item.Author, err = h.toActor(m.Actor, shared.display, shared.stores); err != nil {
 			return nil, err
 		}

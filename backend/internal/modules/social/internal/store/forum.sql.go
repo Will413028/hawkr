@@ -13,7 +13,7 @@ import (
 )
 
 const forumEntryByRequest = `-- name: ForumEntryByRequest :one
-SELECT id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, request_id, request_hash FROM social.forum_entries
+SELECT id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, version, request_id, request_hash FROM social.forum_entries
 WHERE actor_kind = $1 AND actor_id = $2 AND request_id = $3
 `
 
@@ -40,6 +40,7 @@ func (q *Queries) ForumEntryByRequest(ctx context.Context, arg ForumEntryByReque
 		&i.DeletedAt,
 		&i.ThreadID,
 		&i.Counted,
+		&i.Version,
 		&i.RequestID,
 		&i.RequestHash,
 	)
@@ -47,7 +48,7 @@ func (q *Queries) ForumEntryByRequest(ctx context.Context, arg ForumEntryByReque
 }
 
 const getForumEntry = `-- name: GetForumEntry :one
-SELECT id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, request_id, request_hash FROM social.forum_entries WHERE id = $1
+SELECT id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, version, request_id, request_hash FROM social.forum_entries WHERE id = $1
 `
 
 func (q *Queries) GetForumEntry(ctx context.Context, id uuid.UUID) (SocialForumEntry, error) {
@@ -66,10 +67,22 @@ func (q *Queries) GetForumEntry(ctx context.Context, id uuid.UUID) (SocialForumE
 		&i.DeletedAt,
 		&i.ThreadID,
 		&i.Counted,
+		&i.Version,
 		&i.RequestID,
 		&i.RequestHash,
 	)
 	return i, err
+}
+
+const getForumEntryReplyCount = `-- name: GetForumEntryReplyCount :one
+SELECT reply_count FROM social.forum_entry_stats WHERE forum_entry_id = $1
+`
+
+func (q *Queries) GetForumEntryReplyCount(ctx context.Context, id uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, getForumEntryReplyCount, id)
+	var reply_count int64
+	err := row.Scan(&reply_count)
+	return reply_count, err
 }
 
 const insertForumEntry = `-- name: InsertForumEntry :one
@@ -80,7 +93,7 @@ VALUES (
     $7::text, $8, $8, $9, $10
 )
 ON CONFLICT (actor_kind, actor_id, request_id) DO NOTHING
-RETURNING id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, request_id, request_hash
+RETURNING id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, version, request_id, request_hash
 `
 
 type InsertForumEntryParams struct {
@@ -125,6 +138,7 @@ func (q *Queries) InsertForumEntry(ctx context.Context, arg InsertForumEntryPara
 		&i.DeletedAt,
 		&i.ThreadID,
 		&i.Counted,
+		&i.Version,
 		&i.RequestID,
 		&i.RequestHash,
 	)
@@ -132,7 +146,7 @@ func (q *Queries) InsertForumEntry(ctx context.Context, arg InsertForumEntryPara
 }
 
 const lockForumEntry = `-- name: LockForumEntry :one
-SELECT id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, request_id, request_hash FROM social.forum_entries WHERE id = $1 FOR UPDATE
+SELECT id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, version, request_id, request_hash FROM social.forum_entries WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockForumEntry(ctx context.Context, id uuid.UUID) (SocialForumEntry, error) {
@@ -151,6 +165,7 @@ func (q *Queries) LockForumEntry(ctx context.Context, id uuid.UUID) (SocialForum
 		&i.DeletedAt,
 		&i.ThreadID,
 		&i.Counted,
+		&i.Version,
 		&i.RequestID,
 		&i.RequestHash,
 	)
@@ -158,7 +173,7 @@ func (q *Queries) LockForumEntry(ctx context.Context, id uuid.UUID) (SocialForum
 }
 
 const softDeleteForumEntry = `-- name: SoftDeleteForumEntry :execrows
-UPDATE social.forum_entries SET deleted_at = $1, updated_at = $1
+UPDATE social.forum_entries SET deleted_at = $1, version = version + 1, updated_at = $1
 WHERE id = $2 AND deleted_at IS NULL
 `
 
@@ -176,19 +191,26 @@ func (q *Queries) SoftDeleteForumEntry(ctx context.Context, arg SoftDeleteForumE
 }
 
 const updateForumEntryBody = `-- name: UpdateForumEntryBody :one
-UPDATE social.forum_entries SET body = $1::text, updated_at = $2
-WHERE id = $3 AND deleted_at IS NULL
-RETURNING id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, request_id, request_hash
+UPDATE social.forum_entries SET body = $1::text, version = version + 1, updated_at = $2
+WHERE id = $3 AND deleted_at IS NULL AND version = $4
+RETURNING id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at, thread_id, counted, version, request_id, request_hash
 `
 
 type UpdateForumEntryBodyParams struct {
-	Body string
-	Now  time.Time
-	ID   uuid.UUID
+	Body            string
+	Now             time.Time
+	ID              uuid.UUID
+	ExpectedVersion int64
 }
 
+// 版本不符回 0 列。
 func (q *Queries) UpdateForumEntryBody(ctx context.Context, arg UpdateForumEntryBodyParams) (SocialForumEntry, error) {
-	row := q.db.QueryRow(ctx, updateForumEntryBody, arg.Body, arg.Now, arg.ID)
+	row := q.db.QueryRow(ctx, updateForumEntryBody,
+		arg.Body,
+		arg.Now,
+		arg.ID,
+		arg.ExpectedVersion,
+	)
 	var i SocialForumEntry
 	err := row.Scan(
 		&i.ID,
@@ -203,6 +225,7 @@ func (q *Queries) UpdateForumEntryBody(ctx context.Context, arg UpdateForumEntry
 		&i.DeletedAt,
 		&i.ThreadID,
 		&i.Counted,
+		&i.Version,
 		&i.RequestID,
 		&i.RequestHash,
 	)

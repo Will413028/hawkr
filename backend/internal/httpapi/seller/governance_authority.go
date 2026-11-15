@@ -127,7 +127,7 @@ func (h *Governance) CreateAuthorityOrder(ctx context.Context, req *connect.Requ
 		return nil, err
 	}
 	msg := req.Msg
-	reqID, err := requestID(msg.GetRequestId())
+	reqID, err := rpc.ParseRequestID(msg.GetRequestId())
 	if err != nil {
 		return nil, err
 	}

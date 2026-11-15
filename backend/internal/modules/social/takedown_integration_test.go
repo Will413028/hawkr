@@ -425,7 +425,7 @@ func TestTakedownOfDeletedOwnContentSucceedsWithoutReplica(t *testing.T) {
 	deletedPost := f.publishedPost(t, w.storeID, "已刪除的貼文", "organic")
 	must(t, f.module.DeletePost(ctx, f.store(t, w.storeID), deletedPost.ID, deletedPost.Version))
 	deletedComment := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asStore(t, w.storeID), social.CommentInput{PostID: w.post.ID, Body: "待刪的留言"}))
-	must(t, f.module.DeleteComment(ctx, f.asStore(t, w.storeID), deletedComment.ID))
+	must(t, f.module.DeleteComment(ctx, f.asStore(t, w.storeID), deletedComment.ID, nil))
 	must(t, f.db.InTx(ctx, func(ctx context.Context) error {
 		return events.Publish(ctx, f.bus, seller.MeasureCreated{
 			MeasureID: uuid.NewV7(), StoreID: w.storeID, OccurredAt: f.clock(),

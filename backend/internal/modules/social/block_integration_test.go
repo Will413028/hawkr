@@ -168,7 +168,7 @@ func TestBlockedBuyersForumEntriesAreHiddenInBothDirections(t *testing.T) {
 	// 已刪除的頂層 D，底下只剩 B 的回覆。
 	eD := enter(c, social.ForumInput{Body: "D"})
 	bReplyToD := enter(b, social.ForumInput{Body: "B 回 D", ParentID: &eD.ID})
-	must(t, f.module.DeleteForumEntry(ctx, f.asBuyer(c), eD.ID))
+	must(t, f.module.DeleteForumEntry(ctx, f.asBuyer(c), eD.ID, nil))
 
 	f.blockBuyer(t, a, b)
 
@@ -225,7 +225,7 @@ func TestDeletedTopLevelCommentWithOnlyBlockedRepliesDisappears(t *testing.T) {
 	top := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(c), social.CommentInput{PostID: p.ID, Body: "C"}))
 	f.exec(t, `INSERT INTO social.comments (id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at)
 		VALUES ($1, $2, $3, $3, 'BUYER', $4, 'B 的回覆', $5, $5)`, uuidNew(), p.ID, top.ID, b.BuyerID, f.clock())
-	must(t, f.module.DeleteComment(ctx, f.asBuyer(c), top.ID))
+	must(t, f.module.DeleteComment(ctx, f.asBuyer(c), top.ID, nil))
 
 	if got := f.topLevel(t, f.asBuyer(a), p.ID); len(got.Comments) != 1 || got.Comments[0].State != social.CommentDeleted {
 		t.Fatalf("沒有封鎖時，已刪除的頂層因為有可見的回覆而是佔位項目：%+v", got.Comments)
@@ -360,7 +360,7 @@ func TestStoreBlockingABuyerLeavesPublicContentReadable(t *testing.T) {
 			return err
 		},
 		"留言的編輯": func() error {
-			_, err := f.module.UpdateComment(ctx, viewer, mine.ID, "改")
+			_, err := f.module.UpdateComment(ctx, viewer, mine.ID, 1, "改")
 			return err
 		},
 		"討論區的發言": func() error {
@@ -372,7 +372,7 @@ func TestStoreBlockingABuyerLeavesPublicContentReadable(t *testing.T) {
 			return err
 		},
 		"討論區的編輯": func() error {
-			_, err := f.module.UpdateForumEntry(ctx, viewer, entry.ID, "改")
+			_, err := f.module.UpdateForumEntry(ctx, viewer, entry.ID, 1, "改")
 			return err
 		},
 		"貼文讚": func() error {
@@ -412,13 +412,13 @@ func TestStoreBlockingABuyerLeavesPublicContentReadable(t *testing.T) {
 		if added, err := f.module.RecordShare(ctx, b.BuyerID, p.ID); err != nil || !added {
 			t.Fatalf("分享：%v %v", added, err)
 		}
-		if counted, err := f.module.RecordView(ctx, p.ID, social.Viewer{AccountID: 1}); err != nil || !counted {
+		if counted, err := f.module.RecordView(ctx, social.Caller{}, p.ID, social.Viewer{AccountID: 1}); err != nil || !counted {
 			t.Fatalf("瀏覽：%v %v", counted, err)
 		}
 	})
 	t.Run("不擋刪除自己的內容", func(t *testing.T) {
-		must(t, f.module.DeleteComment(ctx, viewer, mine.ID))
-		must(t, f.module.DeleteForumEntry(ctx, viewer, entry.ID))
+		must(t, f.module.DeleteComment(ctx, viewer, mine.ID, nil))
+		must(t, f.module.DeleteForumEntry(ctx, viewer, entry.ID, nil))
 	})
 }
 
@@ -677,17 +677,17 @@ func TestViewsFromABuyerBlockingTheStoreAreNotCounted(t *testing.T) {
 	p := f.publishedPost(t, storeID, "貼文")
 	f.blockStore(t, a, storeID)
 
-	if counted, err := f.module.RecordView(ctx, p.ID, social.Viewer{AccountID: 9001, BuyerID: a.BuyerID}); err != nil || counted {
+	if counted, err := f.module.RecordView(ctx, social.Caller{BuyerID: a.BuyerID}, p.ID, social.Viewer{AccountID: 9001}); err != nil || counted {
 		t.Fatalf("封鎖了這家店的買家不計入：%v %v", counted, err)
 	}
-	if counted, err := f.module.RecordView(ctx, p.ID, social.Viewer{AccountID: 9002, BuyerID: c.BuyerID}); err != nil || !counted {
+	if counted, err := f.module.RecordView(ctx, social.Caller{BuyerID: c.BuyerID}, p.ID, social.Viewer{AccountID: 9002}); err != nil || !counted {
 		t.Fatalf("沒封鎖的買家照計：%v %v", counted, err)
 	}
-	if counted, err := f.module.RecordView(ctx, p.ID, social.Viewer{IP: "203.0.113.5", UserAgent: "x"}); err != nil || !counted {
+	if counted, err := f.module.RecordView(ctx, social.Caller{}, p.ID, social.Viewer{IP: "203.0.113.5", UserAgent: "x"}); err != nil || !counted {
 		t.Fatalf("匿名照計：%v %v", counted, err)
 	}
 	f.unblockStore(t, a, storeID)
-	if counted, err := f.module.RecordView(ctx, p.ID, social.Viewer{AccountID: 9001, BuyerID: a.BuyerID}); err != nil || !counted {
+	if counted, err := f.module.RecordView(ctx, social.Caller{BuyerID: a.BuyerID}, p.ID, social.Viewer{AccountID: 9001}); err != nil || !counted {
 		t.Fatalf("解除封鎖後計入：%v %v", counted, err)
 	}
 }
@@ -729,8 +729,8 @@ func TestStoreCanDeleteExistingContentOfABuyerItBlocked(t *testing.T) {
 	f.storeBlocksBuyer(t, storeID, b)
 
 	store := f.asStore(t, storeID)
-	must(t, f.module.DeleteComment(ctx, store, cB.ID))
-	must(t, f.module.DeleteForumEntry(ctx, store, eB.ID))
+	must(t, f.module.DeleteComment(ctx, store, cB.ID, nil))
+	must(t, f.module.DeleteForumEntry(ctx, store, eB.ID, nil))
 	if got := f.topLevel(t, f.asBuyer(c), p.ID); len(got.Comments) != 0 {
 		t.Fatalf("留言已刪除：%v", commentIDs(got))
 	}

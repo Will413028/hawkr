@@ -23,7 +23,7 @@ func (f *fixture) snapshotRef(id uuid.UUID) media.Ref {
 
 func (f *fixture) deleteComment(t *testing.T, buyerID int64, id uuid.UUID) {
 	t.Helper()
-	must(t, f.social.DeleteComment(context.Background(), social.Caller{BuyerID: buyerID}, id))
+	must(t, f.social.DeleteComment(context.Background(), social.Caller{BuyerID: buyerID}, id, nil))
 }
 
 // 作者刪掉被檢舉的內容不能躲過警告與停權：處置用案件快照裡凍結的作者。

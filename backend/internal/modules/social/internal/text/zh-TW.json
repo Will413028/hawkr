@@ -32,6 +32,10 @@
       "message": "只有貼文所屬的店家能回覆留言",
       "description": "非貼文所屬的店家回覆留言（回覆是店家專屬的產品規則）。"
     },
+    "comment.version_conflict": {
+      "message": "這則內容已被修改，請對照最新的內容後再送出",
+      "description": "留言或討論區留言的 etag 版本與資料庫不同（樂觀鎖衝突）。"
+    },
     "comment_body.community_rules": {
       "message": "留言不符社群守則",
       "description": "留言命中髒字詞典（textfilter）。"

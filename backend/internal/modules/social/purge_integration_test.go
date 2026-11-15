@@ -174,8 +174,8 @@ func TestBuyerPurgeScrubsBodiesAndKeepsTombstones(t *testing.T) {
 	ftop := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(leaving), social.ForumInput{StoreID: storeID, Body: "SECRET討論"}))
 	mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asStore(t, storeID), social.ForumInput{StoreID: storeID, Body: "店家回討論", ParentID: &ftop.ID}))
 	fown := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(leaving), social.ForumInput{StoreID: storeID, Body: "SECRET自己刪掉的討論"}))
-	must(t, f.module.DeleteComment(ctx, f.asBuyer(leaving), own.ID))
-	must(t, f.module.DeleteForumEntry(ctx, f.asBuyer(leaving), fown.ID))
+	must(t, f.module.DeleteComment(ctx, f.asBuyer(leaving), own.ID, nil))
+	must(t, f.module.DeleteForumEntry(ctx, f.asBuyer(leaving), fown.ID, nil))
 	if n := f.scalar(t, "SELECT count(*) FROM social.comments WHERE id = $1 AND deleted_at IS NOT NULL AND body = 'SECRET自己刪掉的留言'", own.ID); n != 1 {
 		t.Fatal("作者自己刪除時內文仍然保留（一般刪除存的東西不變）")
 	}

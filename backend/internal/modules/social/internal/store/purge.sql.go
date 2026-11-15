@@ -374,7 +374,7 @@ func (q *Queries) PurgePostBatch(ctx context.Context, arg PurgePostBatchParams) 
 }
 
 const scrubBuyerCommentBodyBatch = `-- name: ScrubBuyerCommentBodyBatch :execrows
-UPDATE social.comments SET body = NULL
+UPDATE social.comments SET body = NULL, request_id = NULL, request_hash = NULL
 WHERE id IN (
     SELECT t.id FROM social.comments t
     WHERE t.actor_kind = 'BUYER' AND t.actor_id = $1 AND t.deleted_at IS NOT NULL AND t.body IS NOT NULL
@@ -390,7 +390,7 @@ type ScrubBuyerCommentBodyBatchParams struct {
 }
 
 // 買家刪帳的清除：把他已刪除的留言的內文設為 NULL（保留列，討論串結構與佔位項目還在；comments_scrubbed_check 保證 NULL 只出現在已刪除的列）。
-// 冪等：只處理還有內文的列，重跑只處理剩下的。不動 updated_at（不是使用者的修改）。
+// 冪等：只處理還有內文的列，重跑只處理剩下的。不動 updated_at（不是使用者的修改）。request_id 與 request_hash 一併清掉（未加鹽的內文雜湊可以字典還原內文）。
 func (q *Queries) ScrubBuyerCommentBodyBatch(ctx context.Context, arg ScrubBuyerCommentBodyBatchParams) (int64, error) {
 	result, err := q.db.Exec(ctx, scrubBuyerCommentBodyBatch, arg.BuyerID, arg.MaxRows)
 	if err != nil {
@@ -400,7 +400,7 @@ func (q *Queries) ScrubBuyerCommentBodyBatch(ctx context.Context, arg ScrubBuyer
 }
 
 const scrubBuyerForumEntryBodyBatch = `-- name: ScrubBuyerForumEntryBodyBatch :execrows
-UPDATE social.forum_entries SET body = NULL
+UPDATE social.forum_entries SET body = NULL, request_id = NULL, request_hash = NULL
 WHERE id IN (
     SELECT t.id FROM social.forum_entries t
     WHERE t.actor_kind = 'BUYER' AND t.actor_id = $1 AND t.deleted_at IS NOT NULL AND t.body IS NOT NULL

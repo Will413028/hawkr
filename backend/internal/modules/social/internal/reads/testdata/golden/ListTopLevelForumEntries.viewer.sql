@@ -12,6 +12,7 @@ SELECT c.id AS "id",
      COALESCE((CASE WHEN v.visible THEN c.body END), $3::text) AS "body",
      c.created_at AS "created_at",
      c.updated_at AS "updated_at",
+     c.version AS "version",
      s.reply_count AS "reply_count"
 FROM social.forum_entries AS c
      INNER JOIN social.forum_entry_stats AS s ON (s.forum_entry_id = c.id)

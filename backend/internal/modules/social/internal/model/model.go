@@ -2,13 +2,12 @@
 package model
 
 import (
-	"crypto/sha256"
-	"fmt"
 	"time"
 	"unicode/utf8"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/idempotency"
 )
 
 // 內容文字的長度上限（字元數，rune）。DB 的 CHECK 是第二道防線（schema.sql 的 posts_body_check、comments_body_check、
@@ -197,10 +196,13 @@ type Comment struct {
 	Body        string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	Version     int64
 	Likes       int64
 	ReplyCount  int64
 	LikedByMe   bool
 	HiddenState *HiddenInfo
+	// StoreID 是所屬貼文的店家；只有寫入的回傳會設（列表的店家在 CommentPage.StoreID）。
+	StoreID int64
 }
 
 // HiddenInfo 是作者讀自己被隱藏的內容時看到的理由。
@@ -279,6 +281,7 @@ type ForumEntry struct {
 	Body       string
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+	Version    int64
 	ReplyCount int64
 }
 
@@ -423,11 +426,7 @@ type ContentSnapshot struct {
 // RequestHash 是建立輸入的 SHA-256（欄位依固定順序、以長度前綴編碼，不會因串接而混淆）：冪等重送比對「內容是否相同」的唯一定義。
 // 呼叫方傳入正規化後的欄位（內文已去空白），沒有的選填欄位傳 "-"。
 func RequestHash(parts ...string) []byte {
-	h := sha256.New()
-	for _, p := range parts {
-		_, _ = fmt.Fprintf(h, "%d:%s|", len(p), p)
-	}
-	return h.Sum(nil)
+	return idempotency.Hash(parts...)
 }
 
 // OptionalID 把選填的 ID 編成 RequestHash 的欄位：沒有是 "-"。

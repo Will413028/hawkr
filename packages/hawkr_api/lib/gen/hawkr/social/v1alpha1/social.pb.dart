@@ -15,6 +15,8 @@ import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
+import 'package:protobuf/well_known_types/google/protobuf/field_mask.pb.dart'
+    as $3;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
     as $2;
 
@@ -441,6 +443,7 @@ class Comment extends $pb.GeneratedMessage {
     $core.bool? viewerCanEdit,
     $core.bool? viewerCanDelete,
     $core.bool? viewerCanReply,
+    $core.String? etag,
   }) {
     final result = Comment._();
     if (id != null) result.id = id;
@@ -459,6 +462,7 @@ class Comment extends $pb.GeneratedMessage {
     if (viewerCanEdit != null) result.viewerCanEdit = viewerCanEdit;
     if (viewerCanDelete != null) result.viewerCanDelete = viewerCanDelete;
     if (viewerCanReply != null) result.viewerCanReply = viewerCanReply;
+    if (etag != null) result.etag = etag;
     return result;
   }
 
@@ -496,6 +500,7 @@ class Comment extends $pb.GeneratedMessage {
     ..aOB(14, _omitFieldNames ? '' : 'viewerCanEdit')
     ..aOB(15, _omitFieldNames ? '' : 'viewerCanDelete')
     ..aOB(16, _omitFieldNames ? '' : 'viewerCanReply')
+    ..aOS(17, _omitFieldNames ? '' : 'etag')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -577,6 +582,7 @@ class Comment extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   Actor ensureAuthor() => $_ensure(5);
 
+  /// 留言唯一可以修改的欄位（UpdateComment 的 update_mask 列 body）。
   @$pb.TagNumber(7)
   $core.String get body => $_getSZ(6);
   @$pb.TagNumber(7)
@@ -666,7 +672,7 @@ class Comment extends $pb.GeneratedMessage {
   @$pb.TagNumber(15)
   void clearViewerCanDelete() => $_clearField(15);
 
-  /// 觀看者能不能回覆：VISIBLE，而且觀看者能在這篇貼文留言（見 Post.viewer_can_comment）。
+  /// 觀看者能不能回覆：VISIBLE，而且這篇貼文是觀看者此刻的店的（貼文留言的回覆只限貼文所屬的店，買家一律 false）。
   @$pb.TagNumber(16)
   $core.bool get viewerCanReply => $_getBF(15);
   @$pb.TagNumber(16)
@@ -675,6 +681,16 @@ class Comment extends $pb.GeneratedMessage {
   $core.bool hasViewerCanReply() => $_has(15);
   @$pb.TagNumber(16)
   void clearViewerCanReply() => $_clearField(16);
+
+  /// 只有 VISIBLE 的項目有；修改與刪除時帶回，client 視為不透明字串。
+  @$pb.TagNumber(17)
+  $core.String get etag => $_getSZ(16);
+  @$pb.TagNumber(17)
+  set etag($core.String value) => $_setString(16, value);
+  @$pb.TagNumber(17)
+  $core.bool hasEtag() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearEtag() => $_clearField(17);
 }
 
 class GetPostRequest extends $pb.GeneratedMessage {
@@ -1628,6 +1644,7 @@ class ForumEntry extends $pb.GeneratedMessage {
     $core.bool? viewerCanEdit,
     $core.bool? viewerCanDelete,
     $core.bool? viewerCanReply,
+    $core.String? etag,
   }) {
     final result = ForumEntry._();
     if (id != null) result.id = id;
@@ -1644,6 +1661,7 @@ class ForumEntry extends $pb.GeneratedMessage {
     if (viewerCanEdit != null) result.viewerCanEdit = viewerCanEdit;
     if (viewerCanDelete != null) result.viewerCanDelete = viewerCanDelete;
     if (viewerCanReply != null) result.viewerCanReply = viewerCanReply;
+    if (etag != null) result.etag = etag;
     return result;
   }
 
@@ -1679,6 +1697,7 @@ class ForumEntry extends $pb.GeneratedMessage {
     ..aOB(12, _omitFieldNames ? '' : 'viewerCanEdit')
     ..aOB(13, _omitFieldNames ? '' : 'viewerCanDelete')
     ..aOB(14, _omitFieldNames ? '' : 'viewerCanReply')
+    ..aOS(15, _omitFieldNames ? '' : 'etag')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1760,6 +1779,7 @@ class ForumEntry extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   Actor ensureAuthor() => $_ensure(5);
 
+  /// 項目唯一可以修改的欄位（UpdateForumEntry 的 update_mask 列 body）。
   @$pb.TagNumber(7)
   $core.String get body => $_getSZ(6);
   @$pb.TagNumber(7)
@@ -1839,6 +1859,16 @@ class ForumEntry extends $pb.GeneratedMessage {
   $core.bool hasViewerCanReply() => $_has(13);
   @$pb.TagNumber(14)
   void clearViewerCanReply() => $_clearField(14);
+
+  /// 只有 VISIBLE 的項目有；修改與刪除時帶回，client 視為不透明字串。
+  @$pb.TagNumber(15)
+  $core.String get etag => $_getSZ(14);
+  @$pb.TagNumber(15)
+  set etag($core.String value) => $_setString(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasEtag() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearEtag() => $_clearField(15);
 }
 
 class ListForumEntriesRequest extends $pb.GeneratedMessage {
@@ -2723,7 +2753,7 @@ class CreateCommentRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearReplyToId() => $_clearField(4);
 
-  /// 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回第一次建立的留言；內容不同回 invalid_argument。
+  /// 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回這則留言目前的樣子；內容不同回 invalid_argument。
   @$pb.TagNumber(5)
   $core.String get requestId => $_getSZ(4);
   @$pb.TagNumber(5)
@@ -2799,12 +2829,12 @@ class CreateCommentResponse extends $pb.GeneratedMessage {
 
 class UpdateCommentRequest extends $pb.GeneratedMessage {
   factory UpdateCommentRequest({
-    $core.String? commentId,
-    $core.String? body,
+    Comment? comment,
+    $3.FieldMask? updateMask,
   }) {
     final result = UpdateCommentRequest._();
-    if (commentId != null) result.commentId = commentId;
-    if (body != null) result.body = body;
+    if (comment != null) result.comment = comment;
+    if (updateMask != null) result.updateMask = updateMask;
     return result;
   }
 
@@ -2822,8 +2852,10 @@ class UpdateCommentRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
       createEmptyInstance: UpdateCommentRequest.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'commentId')
-    ..aOS(2, _omitFieldNames ? '' : 'body')
+    ..aOM<Comment>(1, _omitFieldNames ? '' : 'comment',
+        subBuilder: Comment.$_createMessage)
+    ..aOM<$3.FieldMask>(2, _omitFieldNames ? '' : 'updateMask',
+        subBuilder: $3.FieldMask.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2849,36 +2881,37 @@ class UpdateCommentRequest extends $pb.GeneratedMessage {
           UpdateCommentRequest.$_createMessage);
   static UpdateCommentRequest? _defaultInstance;
 
-  /// 留言 ID。
+  /// id 與 etag 必填；body 的規則同 CreateCommentRequest.body。留言只有內文可以修改，update_mask 要列 body。
   @$pb.TagNumber(1)
-  $core.String get commentId => $_getSZ(0);
+  Comment get comment => $_getN(0);
   @$pb.TagNumber(1)
-  set commentId($core.String value) => $_setString(0, value);
+  set comment(Comment value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasCommentId() => $_has(0);
+  $core.bool hasComment() => $_has(0);
   @$pb.TagNumber(1)
-  void clearCommentId() => $_clearField(1);
+  void clearComment() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Comment ensureComment() => $_ensure(0);
 
-  /// 新的內文，規則同 CreateCommentRequest.body。留言只有內文可以修改，所以沒有 update_mask。
   @$pb.TagNumber(2)
-  $core.String get body => $_getSZ(1);
+  $3.FieldMask get updateMask => $_getN(1);
   @$pb.TagNumber(2)
-  set body($core.String value) => $_setString(1, value);
+  set updateMask($3.FieldMask value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasBody() => $_has(1);
+  $core.bool hasUpdateMask() => $_has(1);
   @$pb.TagNumber(2)
-  void clearBody() => $_clearField(2);
+  void clearUpdateMask() => $_clearField(2);
+  @$pb.TagNumber(2)
+  $3.FieldMask ensureUpdateMask() => $_ensure(1);
 }
 
-/// UpdateCommentResponse 只帶修改的結果。留言的讚數與回覆數不在這裡，client 保留列表上原有的值。
+/// UpdateCommentResponse 的留言是修改後的完整資源（含讚數、回覆數與新的 etag）。
 class UpdateCommentResponse extends $pb.GeneratedMessage {
   factory UpdateCommentResponse({
-    $core.String? body,
-    $2.Timestamp? updateTime,
+    Comment? comment,
   }) {
     final result = UpdateCommentResponse._();
-    if (body != null) result.body = body;
-    if (updateTime != null) result.updateTime = updateTime;
+    if (comment != null) result.comment = comment;
     return result;
   }
 
@@ -2896,9 +2929,8 @@ class UpdateCommentResponse extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
       createEmptyInstance: UpdateCommentResponse.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'body')
-    ..aOM<$2.Timestamp>(2, _omitFieldNames ? '' : 'updateTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<Comment>(1, _omitFieldNames ? '' : 'comment',
+        subBuilder: Comment.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2926,32 +2958,25 @@ class UpdateCommentResponse extends $pb.GeneratedMessage {
   static UpdateCommentResponse? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.String get body => $_getSZ(0);
+  Comment get comment => $_getN(0);
   @$pb.TagNumber(1)
-  set body($core.String value) => $_setString(0, value);
+  set comment(Comment value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasBody() => $_has(0);
+  $core.bool hasComment() => $_has(0);
   @$pb.TagNumber(1)
-  void clearBody() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $2.Timestamp get updateTime => $_getN(1);
-  @$pb.TagNumber(2)
-  set updateTime($2.Timestamp value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasUpdateTime() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearUpdateTime() => $_clearField(2);
-  @$pb.TagNumber(2)
-  $2.Timestamp ensureUpdateTime() => $_ensure(1);
+  void clearComment() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Comment ensureComment() => $_ensure(0);
 }
 
 class DeleteCommentRequest extends $pb.GeneratedMessage {
   factory DeleteCommentRequest({
     $core.String? commentId,
+    $core.String? etag,
   }) {
     final result = DeleteCommentRequest._();
     if (commentId != null) result.commentId = commentId;
+    if (etag != null) result.etag = etag;
     return result;
   }
 
@@ -2970,6 +2995,7 @@ class DeleteCommentRequest extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
       createEmptyInstance: DeleteCommentRequest.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'commentId')
+    ..aOS(2, _omitFieldNames ? '' : 'etag')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3004,6 +3030,16 @@ class DeleteCommentRequest extends $pb.GeneratedMessage {
   $core.bool hasCommentId() => $_has(0);
   @$pb.TagNumber(1)
   void clearCommentId() => $_clearField(1);
+
+  /// 帶了就檢查版本；已經刪除的留言不檢查。
+  @$pb.TagNumber(2)
+  $core.String get etag => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set etag($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEtag() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEtag() => $_clearField(2);
 }
 
 class DeleteCommentResponse extends $pb.GeneratedMessage {
@@ -3152,7 +3188,7 @@ class CreateForumEntryRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearReplyToId() => $_clearField(4);
 
-  /// 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回第一次建立的項目；內容不同回 invalid_argument。
+  /// 選填，UUIDv4（AIP-155）：同一位互動者以同一個 request_id 重送回這個項目目前的樣子；內容不同回 invalid_argument。
   @$pb.TagNumber(5)
   $core.String get requestId => $_getSZ(4);
   @$pb.TagNumber(5)
@@ -3229,12 +3265,12 @@ class CreateForumEntryResponse extends $pb.GeneratedMessage {
 
 class UpdateForumEntryRequest extends $pb.GeneratedMessage {
   factory UpdateForumEntryRequest({
-    $core.String? entryId,
-    $core.String? body,
+    ForumEntry? entry,
+    $3.FieldMask? updateMask,
   }) {
     final result = UpdateForumEntryRequest._();
-    if (entryId != null) result.entryId = entryId;
-    if (body != null) result.body = body;
+    if (entry != null) result.entry = entry;
+    if (updateMask != null) result.updateMask = updateMask;
     return result;
   }
 
@@ -3252,8 +3288,10 @@ class UpdateForumEntryRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
       createEmptyInstance: UpdateForumEntryRequest.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'entryId')
-    ..aOS(2, _omitFieldNames ? '' : 'body')
+    ..aOM<ForumEntry>(1, _omitFieldNames ? '' : 'entry',
+        subBuilder: ForumEntry.$_createMessage)
+    ..aOM<$3.FieldMask>(2, _omitFieldNames ? '' : 'updateMask',
+        subBuilder: $3.FieldMask.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3280,36 +3318,37 @@ class UpdateForumEntryRequest extends $pb.GeneratedMessage {
           UpdateForumEntryRequest.$_createMessage);
   static UpdateForumEntryRequest? _defaultInstance;
 
-  /// 討論區項目 ID。
+  /// id 與 etag 必填；body 的規則同 CreateCommentRequest.body。討論區項目只有內文可以修改，update_mask 要列 body。
   @$pb.TagNumber(1)
-  $core.String get entryId => $_getSZ(0);
+  ForumEntry get entry => $_getN(0);
   @$pb.TagNumber(1)
-  set entryId($core.String value) => $_setString(0, value);
+  set entry(ForumEntry value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasEntryId() => $_has(0);
+  $core.bool hasEntry() => $_has(0);
   @$pb.TagNumber(1)
-  void clearEntryId() => $_clearField(1);
+  void clearEntry() => $_clearField(1);
+  @$pb.TagNumber(1)
+  ForumEntry ensureEntry() => $_ensure(0);
 
-  /// 新的內文，規則同 CreateCommentRequest.body。討論區項目只有內文可以修改，所以沒有 update_mask。
   @$pb.TagNumber(2)
-  $core.String get body => $_getSZ(1);
+  $3.FieldMask get updateMask => $_getN(1);
   @$pb.TagNumber(2)
-  set body($core.String value) => $_setString(1, value);
+  set updateMask($3.FieldMask value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasBody() => $_has(1);
+  $core.bool hasUpdateMask() => $_has(1);
   @$pb.TagNumber(2)
-  void clearBody() => $_clearField(2);
+  void clearUpdateMask() => $_clearField(2);
+  @$pb.TagNumber(2)
+  $3.FieldMask ensureUpdateMask() => $_ensure(1);
 }
 
-/// UpdateForumEntryResponse 只帶修改的結果。回覆數不在這裡，client 保留列表上原有的值。
+/// UpdateForumEntryResponse 的項目是修改後的完整資源（含回覆數與新的 etag）。
 class UpdateForumEntryResponse extends $pb.GeneratedMessage {
   factory UpdateForumEntryResponse({
-    $core.String? body,
-    $2.Timestamp? updateTime,
+    ForumEntry? entry,
   }) {
     final result = UpdateForumEntryResponse._();
-    if (body != null) result.body = body;
-    if (updateTime != null) result.updateTime = updateTime;
+    if (entry != null) result.entry = entry;
     return result;
   }
 
@@ -3327,9 +3366,8 @@ class UpdateForumEntryResponse extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
       createEmptyInstance: UpdateForumEntryResponse.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'body')
-    ..aOM<$2.Timestamp>(2, _omitFieldNames ? '' : 'updateTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<ForumEntry>(1, _omitFieldNames ? '' : 'entry',
+        subBuilder: ForumEntry.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3358,32 +3396,25 @@ class UpdateForumEntryResponse extends $pb.GeneratedMessage {
   static UpdateForumEntryResponse? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.String get body => $_getSZ(0);
+  ForumEntry get entry => $_getN(0);
   @$pb.TagNumber(1)
-  set body($core.String value) => $_setString(0, value);
+  set entry(ForumEntry value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasBody() => $_has(0);
+  $core.bool hasEntry() => $_has(0);
   @$pb.TagNumber(1)
-  void clearBody() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $2.Timestamp get updateTime => $_getN(1);
-  @$pb.TagNumber(2)
-  set updateTime($2.Timestamp value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasUpdateTime() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearUpdateTime() => $_clearField(2);
-  @$pb.TagNumber(2)
-  $2.Timestamp ensureUpdateTime() => $_ensure(1);
+  void clearEntry() => $_clearField(1);
+  @$pb.TagNumber(1)
+  ForumEntry ensureEntry() => $_ensure(0);
 }
 
 class DeleteForumEntryRequest extends $pb.GeneratedMessage {
   factory DeleteForumEntryRequest({
     $core.String? entryId,
+    $core.String? etag,
   }) {
     final result = DeleteForumEntryRequest._();
     if (entryId != null) result.entryId = entryId;
+    if (etag != null) result.etag = etag;
     return result;
   }
 
@@ -3402,6 +3433,7 @@ class DeleteForumEntryRequest extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
       createEmptyInstance: DeleteForumEntryRequest.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'entryId')
+    ..aOS(2, _omitFieldNames ? '' : 'etag')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3437,6 +3469,16 @@ class DeleteForumEntryRequest extends $pb.GeneratedMessage {
   $core.bool hasEntryId() => $_has(0);
   @$pb.TagNumber(1)
   void clearEntryId() => $_clearField(1);
+
+  /// 帶了就檢查版本；已經刪除的項目不檢查。
+  @$pb.TagNumber(2)
+  $core.String get etag => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set etag($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEtag() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEtag() => $_clearField(2);
 }
 
 class DeleteForumEntryResponse extends $pb.GeneratedMessage {
@@ -3589,37 +3631,37 @@ class SocialAppServiceApi {
       _client.invoke<UnlikeCommentResponse>(ctx, 'SocialAppService',
           'UnlikeComment', request, UnlikeCommentResponse());
 
-  /// CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回第一次建立的留言，不重複建立。
+  /// CreateComment 在貼文下留言，帶 parent_id 是回覆（回覆只限貼文所屬的店家）。帶 request_id 重送回目前的留言（狀態與計數是此刻的），不重複建立。
   $async.Future<CreateCommentResponse> createComment(
           $pb.ClientContext? ctx, CreateCommentRequest request) =>
       _client.invoke<CreateCommentResponse>(ctx, 'SocialAppService',
           'CreateComment', request, CreateCommentResponse());
 
-  /// UpdateComment 修改自己的留言內文；被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
+  /// UpdateComment 修改自己的留言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的留言不能修改（failed_precondition），已刪除的回 not_found。
   $async.Future<UpdateCommentResponse> updateComment(
           $pb.ClientContext? ctx, UpdateCommentRequest request) =>
       _client.invoke<UpdateCommentResponse>(ctx, 'SocialAppService',
           'UpdateComment', request, UpdateCommentResponse());
 
-  /// DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功。
+  /// DeleteComment 刪除留言：作者，或貼文所屬的店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
   $async.Future<DeleteCommentResponse> deleteComment(
           $pb.ClientContext? ctx, DeleteCommentRequest request) =>
       _client.invoke<DeleteCommentResponse>(ctx, 'SocialAppService',
           'DeleteComment', request, DeleteCommentResponse());
 
-  /// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（回覆只限該店家）。帶 request_id 重送回第一次建立的項目，不重複建立。
+  /// CreateForumEntry 在店家的討論區發言，帶 parent_id 是回覆（討論區的回覆不限身分，買家也能回覆）。帶 request_id 重送回目前的項目，不重複建立，不重複建立。
   $async.Future<CreateForumEntryResponse> createForumEntry(
           $pb.ClientContext? ctx, CreateForumEntryRequest request) =>
       _client.invoke<CreateForumEntryResponse>(ctx, 'SocialAppService',
           'CreateForumEntry', request, CreateForumEntryResponse());
 
-  /// UpdateForumEntry 修改自己的討論區發言內文；被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
+  /// UpdateForumEntry 修改自己的討論區發言內文（update_mask 列 body）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。被隱藏的不能修改（failed_precondition），已刪除的回 not_found。
   $async.Future<UpdateForumEntryResponse> updateForumEntry(
           $pb.ClientContext? ctx, UpdateForumEntryRequest request) =>
       _client.invoke<UpdateForumEntryResponse>(ctx, 'SocialAppService',
           'UpdateForumEntry', request, UpdateForumEntryResponse());
 
-  /// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功。
+  /// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
   $async.Future<DeleteForumEntryResponse> deleteForumEntry(
           $pb.ClientContext? ctx, DeleteForumEntryRequest request) =>
       _client.invoke<DeleteForumEntryResponse>(ctx, 'SocialAppService',

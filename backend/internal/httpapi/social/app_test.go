@@ -11,6 +11,7 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
@@ -26,6 +27,8 @@ type writeCall struct {
 	buyer  int64
 	id     uuid.UUID
 	body   string
+	ver    int64
+	delVer *int64
 	cin    social.CommentInput
 	fin    social.ForumInput
 }
@@ -37,10 +40,6 @@ type fakeWrites struct {
 }
 
 func (f *fakeWrites) rec(c writeCall) error { f.calls = append(f.calls, c); return f.err }
-
-func (f *fakeWrites) PublicPost(context.Context, social.Caller, uuid.UUID) (social.Post, error) {
-	return f.post, nil
-}
 
 func (f *fakeWrites) RecordShare(_ context.Context, b int64, id uuid.UUID) (bool, error) {
 	return true, f.rec(writeCall{op: "share", buyer: b, id: id})
@@ -69,17 +68,21 @@ func (f *fakeWrites) CreateComment(_ context.Context, c social.Caller, in social
 	at := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
 	return social.Comment{
 		ID: uuid.New(), PostID: in.PostID, ParentID: in.ParentID, ReplyToID: in.ReplyToID, State: social.CommentVisible,
-		Actor: social.Actor{Kind: social.ActorBuyer, ID: c.BuyerID}, Body: in.Body, CreatedAt: at, UpdatedAt: at,
+		Actor: social.Actor{Kind: social.ActorBuyer, ID: c.BuyerID}, Body: in.Body, CreatedAt: at, UpdatedAt: at, Version: 1, StoreID: f.post.StoreID,
 	}, nil
 }
 
-func (f *fakeWrites) UpdateComment(_ context.Context, c social.Caller, id uuid.UUID, body string) (social.Comment, error) {
-	err := f.rec(writeCall{op: "updateComment", caller: c, id: id, body: body})
-	return social.Comment{ID: id, Body: body, UpdatedAt: time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)}, err
+func (f *fakeWrites) UpdateComment(_ context.Context, c social.Caller, id uuid.UUID, version int64, body string) (social.Comment, error) {
+	err := f.rec(writeCall{op: "updateComment", caller: c, id: id, ver: version, body: body})
+	at := time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)
+	return social.Comment{
+		ID: id, PostID: f.post.ID, State: social.CommentVisible, Actor: social.Actor{Kind: social.ActorBuyer, ID: c.BuyerID},
+		Body: body, CreatedAt: at, UpdatedAt: at, Version: version + 1, Likes: 4, ReplyCount: 2, StoreID: f.post.StoreID,
+	}, err
 }
 
-func (f *fakeWrites) DeleteComment(_ context.Context, c social.Caller, id uuid.UUID) error {
-	return f.rec(writeCall{op: "deleteComment", caller: c, id: id})
+func (f *fakeWrites) DeleteComment(_ context.Context, c social.Caller, id uuid.UUID, version *int64) error {
+	return f.rec(writeCall{op: "deleteComment", caller: c, id: id, delVer: version})
 }
 
 func (f *fakeWrites) CreateForumEntry(_ context.Context, c social.Caller, in social.ForumInput) (social.ForumEntry, error) {
@@ -89,17 +92,21 @@ func (f *fakeWrites) CreateForumEntry(_ context.Context, c social.Caller, in soc
 	at := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
 	return social.ForumEntry{
 		ID: uuid.New(), StoreID: in.StoreID, ParentID: in.ParentID, State: social.CommentVisible,
-		Actor: social.Actor{Kind: social.ActorBuyer, ID: c.BuyerID}, Body: in.Body, CreatedAt: at, UpdatedAt: at,
+		Actor: social.Actor{Kind: social.ActorBuyer, ID: c.BuyerID}, Body: in.Body, CreatedAt: at, UpdatedAt: at, Version: 1,
 	}, nil
 }
 
-func (f *fakeWrites) UpdateForumEntry(_ context.Context, c social.Caller, id uuid.UUID, body string) (social.ForumEntry, error) {
-	err := f.rec(writeCall{op: "updateForum", caller: c, id: id, body: body})
-	return social.ForumEntry{ID: id, Body: body, UpdatedAt: time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)}, err
+func (f *fakeWrites) UpdateForumEntry(_ context.Context, c social.Caller, id uuid.UUID, version int64, body string) (social.ForumEntry, error) {
+	err := f.rec(writeCall{op: "updateForum", caller: c, id: id, ver: version, body: body})
+	at := time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)
+	return social.ForumEntry{
+		ID: id, StoreID: 5, State: social.CommentVisible, Actor: social.Actor{Kind: social.ActorBuyer, ID: c.BuyerID},
+		Body: body, CreatedAt: at, UpdatedAt: at, Version: version + 1, ReplyCount: 3,
+	}, err
 }
 
-func (f *fakeWrites) DeleteForumEntry(_ context.Context, c social.Caller, id uuid.UUID) error {
-	return f.rec(writeCall{op: "deleteForum", caller: c, id: id})
+func (f *fakeWrites) DeleteForumEntry(_ context.Context, c social.Caller, id uuid.UUID, version *int64) error {
+	return f.rec(writeCall{op: "deleteForum", caller: c, id: id, delVer: version})
 }
 
 type appEnv struct {
@@ -136,6 +143,8 @@ func newAppEnv(t *testing.T, w *fakeWrites, s *fakeStores) *appEnv {
 	t.Cleanup(srv.Close)
 	return &appEnv{w: w, stores: s, url: srv.URL, client: socialv1alpha1connect.NewSocialAppServiceClient(srv.Client(), srv.URL)}
 }
+
+func mask(paths ...string) *fieldmaskpb.FieldMask { return &fieldmaskpb.FieldMask{Paths: paths} }
 
 func signedIn[T any](msg *T) *connect.Request[T] {
 	req := connect.NewRequest(msg)
@@ -200,8 +209,8 @@ func TestSocialAppSuccessPaths(t *testing.T) {
 	if got := cc.Msg.GetComment(); got.GetBody() != "好吃" || !got.GetIsMine() || !got.GetViewerCanEdit() || !got.GetViewerCanDelete() || got.GetParentId() != pid || got.GetAuthor().GetId() != "7" {
 		t.Errorf("CreateComment 回應 = %v", got)
 	}
-	uc, err := e.client.UpdateComment(ctx, signedIn(&pb.UpdateCommentRequest{CommentId: id.String(), Body: "改過"}))
-	if err != nil || uc.Msg.GetBody() != "改過" || uc.Msg.GetUpdateTime() == nil {
+	uc, err := e.client.UpdateComment(ctx, signedIn(&pb.UpdateCommentRequest{Comment: &pb.Comment{Id: id.String(), Etag: "3", Body: "改過"}, UpdateMask: mask("body")}))
+	if got := uc.Msg.GetComment(); err != nil || got.GetBody() != "改過" || got.GetEtag() != "4" || got.GetLikeCount() != 4 || got.GetReplyCount() != 2 || got.GetUpdateTime() == nil || !got.GetIsMine() {
 		t.Fatal("UpdateComment", err, uc)
 	}
 	if _, err := e.client.DeleteComment(ctx, signedIn(&pb.DeleteCommentRequest{CommentId: id.String()})); err != nil {
@@ -214,11 +223,11 @@ func TestSocialAppSuccessPaths(t *testing.T) {
 	if got := cf.Msg.GetEntry(); got.GetBody() != "請問" || got.GetStoreId() != "5" || !got.GetIsMine() {
 		t.Errorf("CreateForumEntry 回應 = %v", got)
 	}
-	uf, err := e.client.UpdateForumEntry(ctx, signedIn(&pb.UpdateForumEntryRequest{EntryId: id.String(), Body: "改過"}))
-	if err != nil || uf.Msg.GetBody() != "改過" {
+	uf, err := e.client.UpdateForumEntry(ctx, signedIn(&pb.UpdateForumEntryRequest{Entry: &pb.ForumEntry{Id: id.String(), Etag: "5", Body: "改過"}, UpdateMask: mask("body")}))
+	if got := uf.Msg.GetEntry(); err != nil || got.GetBody() != "改過" || got.GetEtag() != "6" || got.GetReplyCount() != 3 {
 		t.Fatal("UpdateForumEntry", err)
 	}
-	if _, err := e.client.DeleteForumEntry(ctx, signedIn(&pb.DeleteForumEntryRequest{EntryId: id.String()})); err != nil {
+	if _, err := e.client.DeleteForumEntry(ctx, signedIn(&pb.DeleteForumEntryRequest{EntryId: id.String(), Etag: "6"})); err != nil {
 		t.Fatal("DeleteForumEntry", err)
 	}
 
@@ -236,6 +245,15 @@ func TestSocialAppSuccessPaths(t *testing.T) {
 	if c := w.calls[3]; c.caller.BuyerID != 7 || c.id != id {
 		t.Errorf("LikeComment 的呼叫者 = %+v", c)
 	}
+	if c := w.calls[6]; c.ver != 3 || c.body != "改過" || c.id != id {
+		t.Errorf("UpdateComment 的版本與內文 = %+v", c)
+	}
+	if c := w.calls[7]; c.delVer != nil {
+		t.Errorf("DeleteComment 沒帶 etag 卻傳了版本 %d", *c.delVer)
+	}
+	if c := w.calls[10]; c.delVer == nil || *c.delVer != 6 {
+		t.Errorf("DeleteForumEntry 的版本 = %+v", c)
+	}
 	cin := w.calls[5].cin
 	if cin.PostID != p.ID || cin.ParentID == nil || *cin.ParentID != parent || cin.ReplyToID != nil || cin.RequestID == nil || cin.RequestID.String() != rid {
 		t.Errorf("CreateComment 的輸入 = %+v", cin)
@@ -251,13 +269,22 @@ func TestSocialAppRejectsMalformedInput(t *testing.T) {
 	ctx := t.Context()
 	notV4 := uuid.New().String()
 	notV4 = notV4[:14] + "7" + notV4[15:]
+	wrongVariant := uuid.New().String()
+	wrongVariant = wrongVariant[:14] + "4" + wrongVariant[15:19] + "c" + wrongVariant[20:]
 	cases := map[string]error{}
 	_, cases["post_id"] = e.client.LikePost(ctx, signedIn(&pb.LikePostRequest{PostId: "x"}))
+	_, cases["request_id variant"] = e.client.CreateComment(ctx, signedIn(&pb.CreateCommentRequest{PostId: uuid.New().String(), Body: "a", RequestId: wrongVariant}))
 	_, cases["request_id"] = e.client.CreateComment(ctx, signedIn(&pb.CreateCommentRequest{PostId: uuid.New().String(), Body: "a", RequestId: notV4}))
 	_, cases["parent_id"] = e.client.CreateComment(ctx, signedIn(&pb.CreateCommentRequest{PostId: uuid.New().String(), Body: "a", ParentId: new("x")}))
 	_, cases["store_id"] = e.client.CreateForumEntry(ctx, signedIn(&pb.CreateForumEntryRequest{StoreId: "abc", Body: "a"}))
+	_, cases["update etag 缺"] = e.client.UpdateComment(ctx, signedIn(&pb.UpdateCommentRequest{Comment: &pb.Comment{Id: uuid.New().String(), Body: "a"}, UpdateMask: mask("body")}))
+	_, cases["update 沒帶資源"] = e.client.UpdateComment(ctx, signedIn(&pb.UpdateCommentRequest{UpdateMask: mask("body")}))
+	_, cases["update_mask 沒列 body"] = e.client.UpdateComment(ctx, signedIn(&pb.UpdateCommentRequest{Comment: &pb.Comment{Id: uuid.New().String(), Etag: "1", Body: "a"}, UpdateMask: mask("etag")}))
+	_, cases["update_mask 不認得的路徑"] = e.client.UpdateComment(ctx, signedIn(&pb.UpdateCommentRequest{Comment: &pb.Comment{Id: uuid.New().String(), Etag: "1", Body: "a"}, UpdateMask: mask("nope")}))
+	_, cases["forum etag 缺"] = e.client.UpdateForumEntry(ctx, signedIn(&pb.UpdateForumEntryRequest{Entry: &pb.ForumEntry{Id: uuid.New().String(), Body: "a"}, UpdateMask: mask("body")}))
+	_, cases["delete etag 格式錯"] = e.client.DeleteComment(ctx, signedIn(&pb.DeleteCommentRequest{CommentId: uuid.New().String(), Etag: "x"}))
 	for name, err := range cases {
-		if connect.CodeOf(err) != connect.CodeInvalidArgument {
+		if code := connect.CodeOf(err); code != connect.CodeInvalidArgument && !(name == "delete etag 格式錯" && code == connect.CodeAborted) {
 			t.Errorf("%s：err = %v，預期 invalid_argument", name, err)
 		}
 	}
@@ -282,7 +309,7 @@ func TestSocialAppPropagatesModuleRefusals(t *testing.T) {
 		t.Errorf("被封鎖者按讚：%v", err)
 	}
 	w.err = apperr.FailedPrecondition("hidden")
-	if _, err := e.client.UpdateComment(ctx, signedIn(&pb.UpdateCommentRequest{CommentId: pid, Body: "a"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+	if _, err := e.client.UpdateComment(ctx, signedIn(&pb.UpdateCommentRequest{Comment: &pb.Comment{Id: pid, Etag: "1", Body: "a"}, UpdateMask: mask("body")})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Errorf("被隱藏的留言：%v", err)
 	}
 	w.err = apperr.InvalidInputOn([]string{"RequestID"}, "%s", "reused")

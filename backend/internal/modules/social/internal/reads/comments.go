@@ -29,6 +29,7 @@ type CommentRow struct {
 	Body       string
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+	Version    int64
 	LikeCount  int64
 	ReplyCount int64
 }
@@ -69,7 +70,7 @@ func topLevelComments(postID uuid.UUID, v visibility.Viewer, pg CommentPage, con
 		masked(visible, c.T.ActorKind, String("")).AS("actor_kind"),
 		masked(visible, c.T.ActorID, Int64(0)).AS("actor_id"),
 		masked(visible, c.T.Body, String("")).AS("body"),
-		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), s.LikeCount.AS("like_count"), s.ReplyCount.AS("reply_count"),
+		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), c.T.Version.AS("version"), s.LikeCount.AS("like_count"), s.ReplyCount.AS("reply_count"),
 	).
 		FROM(c.T.INNER_JOIN(s, s.CommentID.EQ(c.T.ID)).CROSS_JOIN(vis)).
 		WHERE(c.Where(
@@ -107,7 +108,7 @@ func replies(parentID uuid.UUID, v visibility.Viewer, pg CommentPage, post visib
 		c.T.ID.AS("id"), c.T.PostID.AS("post_id"), c.T.ParentID.AS("parent_id"), c.T.ReplyToID.AS("reply_to_id"),
 		NewEnumValue(stateVisible).AS("state"),
 		c.T.ActorKind.AS("actor_kind"), c.T.ActorID.AS("actor_id"), c.T.Body.AS("body"),
-		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), s.LikeCount.AS("like_count"), s.ReplyCount.AS("reply_count"),
+		c.T.CreatedAt.AS("created_at"), c.T.UpdatedAt.AS("updated_at"), c.T.Version.AS("version"), s.LikeCount.AS("like_count"), s.ReplyCount.AS("reply_count"),
 	).
 		FROM(c.T.INNER_JOIN(post.T, post.T.ID.EQ(c.T.PostID)).INNER_JOIN(s, s.CommentID.EQ(c.T.ID))).
 		WHERE(c.Where(

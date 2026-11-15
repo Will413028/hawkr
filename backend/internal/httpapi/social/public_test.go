@@ -339,10 +339,10 @@ func TestListCommentsFlagsAndPlaceholders(t *testing.T) {
 			t.Fatal(err)
 		}
 		c := resp.Msg.GetComments()
-		if !c[0].GetIsMine() || !c[0].GetViewerCanEdit() || !c[0].GetViewerCanDelete() || !c[0].GetViewerCanReply() {
+		if !c[0].GetIsMine() || !c[0].GetViewerCanEdit() || !c[0].GetViewerCanDelete() || c[0].GetViewerCanReply() {
 			t.Errorf("自己的留言旗標 = %v", c[0])
 		}
-		if c[1].GetIsMine() || c[1].GetViewerCanEdit() || c[1].GetViewerCanDelete() || !c[1].GetViewerCanReply() || !c[1].GetViewerLiked() {
+		if c[1].GetIsMine() || c[1].GetViewerCanEdit() || c[1].GetViewerCanDelete() || c[1].GetViewerCanReply() || !c[1].GetViewerLiked() {
 			t.Errorf("別人的留言旗標 = %v", c[1])
 		}
 		if c[1].GetAuthor().GetName() != "buyer" || c[1].GetAuthor().GetKind() != pb.ActorKind_ACTOR_KIND_BUYER {
@@ -371,18 +371,26 @@ func TestListCommentsFlagsAndPlaceholders(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if c := resp.Msg.GetComments()[1]; !c.GetViewerCanDelete() || c.GetViewerCanEdit() {
+		if c := resp.Msg.GetComments()[1]; !c.GetViewerCanDelete() || c.GetViewerCanEdit() || !c.GetViewerCanReply() {
 			t.Errorf("店主對別人的留言：%v", c)
 		}
 	})
-	t.Run("被店家封鎖的買家不能回覆", func(t *testing.T) {
-		h := newPublic(t, reads, fakeBuyers{id: 7}, &fakeStores{blocking: map[int64]bool{5: true}})
-		resp, err := h.ListComments(asBuyer(t.Context()), connect.NewRequest(&pb.ListCommentsRequest{PostId: p.ID.String()}))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if c := resp.Msg.GetComments()[1]; c.GetViewerCanReply() {
-			t.Errorf("被封鎖仍可回覆：%v", c)
+	t.Run("只有貼文所屬的店能回覆，買家不能", func(t *testing.T) {
+		for name, stores := range map[string]*fakeStores{
+			"沒有被封鎖的買家": {},
+			"被店家封鎖的買家": {blocking: map[int64]bool{5: true}},
+			"別家店的店主":   {own: &seller.Store{StoreID: 6}},
+		} {
+			h := newPublic(t, reads, fakeBuyers{id: 7}, stores)
+			resp, err := h.ListComments(asBuyer(t.Context()), connect.NewRequest(&pb.ListCommentsRequest{PostId: p.ID.String()}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, c := range resp.Msg.GetComments() {
+				if c.GetViewerCanReply() {
+					t.Errorf("%s：viewer_can_reply 應為 false：%v", name, c)
+				}
+			}
 		}
 	})
 	t.Run("回覆：父留言不存在或屬於別篇貼文是 not_found，即使頁面是空的", func(t *testing.T) {
@@ -609,8 +617,9 @@ func codeOf(t *testing.T, err error) connect.Code {
 }
 
 type viewCall struct {
-	post uuid.UUID
-	v    social.Viewer
+	caller social.Caller
+	post   uuid.UUID
+	v      social.Viewer
 }
 
 type fakeViews struct {
@@ -618,8 +627,8 @@ type fakeViews struct {
 	err   error
 }
 
-func (f *fakeViews) RecordView(_ context.Context, postID uuid.UUID, v social.Viewer) (bool, error) {
-	f.calls = append(f.calls, viewCall{postID, v})
+func (f *fakeViews) RecordView(_ context.Context, c social.Caller, postID uuid.UUID, v social.Viewer) (bool, error) {
+	f.calls = append(f.calls, viewCall{c, postID, v})
 	return true, f.err
 }
 
@@ -663,38 +672,34 @@ func TestRecordPostViewBuildsTheViewer(t *testing.T) {
 		if _, err := h.RecordPostView(asBuyer(t.Context()), connect.NewRequest(&pb.RecordPostViewRequest{PostId: p.ID.String()})); err != nil {
 			t.Fatal(err)
 		}
-		if len(views.calls) != 1 || views.calls[0].v.AccountID != 7 || views.calls[0].v.BuyerID != 11 {
+		if len(views.calls) != 1 || views.calls[0].v.AccountID != 7 || views.calls[0].caller.BuyerID != 11 {
 			t.Fatalf("viewer = %+v", views.calls)
 		}
 	})
-	t.Run("店主看自己店的貼文不計", func(t *testing.T) {
+	t.Run("店主的店交給模組排除，handler 不預讀貼文", func(t *testing.T) {
 		views := &fakeViews{}
-		h := newPublicWithViews(t, &fakeReads{post: post(9)}, views, fakeBuyers{id: 7}, &fakeStores{own: &seller.Store{StoreID: 9}})
-		if _, err := h.RecordPostView(asBuyer(t.Context()), connect.NewRequest(&pb.RecordPostViewRequest{PostId: uuid.New().String()})); err != nil {
+		reads := &fakeReads{post: post(9)}
+		h := newPublicWithViews(t, reads, views, fakeBuyers{id: 7}, &fakeStores{own: &seller.Store{StoreID: 9}})
+		id := uuid.New()
+		if _, err := h.RecordPostView(asBuyer(t.Context()), connect.NewRequest(&pb.RecordPostViewRequest{PostId: id.String()})); err != nil {
+			t.Fatal(err)
+		}
+		if len(views.calls) != 1 || views.calls[0].post != id || !views.calls[0].caller.OwnsStore(9) {
+			t.Fatalf("模組應收到店主的 Caller：%+v", views.calls)
+		}
+		if reads.postReads != 0 {
+			t.Fatalf("handler 不該為了排除店主預讀貼文：%d 次", reads.postReads)
+		}
+	})
+	t.Run("管理員代行的讀取不記錄", func(t *testing.T) {
+		views := &fakeViews{}
+		h := newPublicWithViews(t, &fakeReads{post: p}, views, fakeBuyers{}, &fakeStores{})
+		ctx := rpc.WithPrincipal(rpc.WithClientIP(t.Context(), "203.0.113.9"), identity.Principal{Kind: identity.PrincipalAdmin, ID: 3})
+		if _, err := h.RecordPostView(ctx, connect.NewRequest(&pb.RecordPostViewRequest{PostId: p.ID.String()})); err != nil {
 			t.Fatal(err)
 		}
 		if len(views.calls) != 0 {
-			t.Fatalf("店主自己的瀏覽不該計：%v", views.calls)
-		}
-	})
-	t.Run("店主看別家店的貼文照計", func(t *testing.T) {
-		views := &fakeViews{}
-		h := newPublicWithViews(t, &fakeReads{post: post(5)}, views, fakeBuyers{id: 7}, &fakeStores{own: &seller.Store{StoreID: 9}})
-		if _, err := h.RecordPostView(asBuyer(t.Context()), connect.NewRequest(&pb.RecordPostViewRequest{PostId: uuid.New().String()})); err != nil {
-			t.Fatal(err)
-		}
-		if len(views.calls) != 1 {
-			t.Fatalf("應計一次：%v", views.calls)
-		}
-	})
-	t.Run("店主讀不到的貼文回成功、不計", func(t *testing.T) {
-		views := &fakeViews{}
-		h := newPublicWithViews(t, &fakeReads{postErr: apperr.NotFound("post")}, views, fakeBuyers{id: 7}, &fakeStores{own: &seller.Store{StoreID: 9}})
-		if _, err := h.RecordPostView(asBuyer(t.Context()), connect.NewRequest(&pb.RecordPostViewRequest{PostId: uuid.New().String()})); err != nil {
-			t.Fatal(err)
-		}
-		if len(views.calls) != 0 {
-			t.Fatalf("不該計：%v", views.calls)
+			t.Fatalf("管理員的瀏覽不該計：%v", views.calls)
 		}
 	})
 	t.Run("格式錯誤的 ID", func(t *testing.T) {
