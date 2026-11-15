@@ -20,3 +20,11 @@ type commentCursor struct {
 }
 
 func (c commentCursor) Valid() bool { return !c.CreatedAt.IsZero() && c.ID != uuid.UUID{} }
+
+// ownPostCursor 是店主清單的 page token 內容：(CreatedAt, ID)。
+type ownPostCursor struct {
+	CreatedAt time.Time
+	ID        uuid.UUID
+}
+
+func (c ownPostCursor) Valid() bool { return !c.CreatedAt.IsZero() && c.ID != uuid.UUID{} }

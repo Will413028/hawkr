@@ -29,6 +29,8 @@ type postsTable struct {
 	CreatedAt    postgres.ColumnTimestampz
 	UpdatedAt    postgres.ColumnTimestampz
 	DeletedAt    postgres.ColumnTimestampz
+	RequestID    postgres.ColumnString // 建立時 client 帶的 request_id（AIP-155，選填）；範圍是 (店家, request_id)，同一家店重送回這一列；貼文刪除後它仍占著，重送回原本那一列（刪除的貼文讀不到，回 not_found）
+	RequestHash  postgres.ColumnBytea  // 建立輸入（內文、圖片 token、商品、標籤、是否發布）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -82,8 +84,10 @@ func newPostsTableImpl(schemaName, tableName, alias string) postsTable {
 		CreatedAtColumn    = postgres.TimestampzColumn("created_at")
 		UpdatedAtColumn    = postgres.TimestampzColumn("updated_at")
 		DeletedAtColumn    = postgres.TimestampzColumn("deleted_at")
-		allColumns         = postgres.ColumnList{IDColumn, StoreIDColumn, BodyColumn, ImageKeyColumn, ImageAssetIDColumn, ProductIDColumn, StatusColumn, PublishedAtColumn, VersionColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
-		mutableColumns     = postgres.ColumnList{StoreIDColumn, BodyColumn, ImageKeyColumn, ImageAssetIDColumn, ProductIDColumn, StatusColumn, PublishedAtColumn, VersionColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
+		RequestIDColumn    = postgres.StringColumn("request_id")
+		RequestHashColumn  = postgres.ByteaColumn("request_hash")
+		allColumns         = postgres.ColumnList{IDColumn, StoreIDColumn, BodyColumn, ImageKeyColumn, ImageAssetIDColumn, ProductIDColumn, StatusColumn, PublishedAtColumn, VersionColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn, RequestIDColumn, RequestHashColumn}
+		mutableColumns     = postgres.ColumnList{StoreIDColumn, BodyColumn, ImageKeyColumn, ImageAssetIDColumn, ProductIDColumn, StatusColumn, PublishedAtColumn, VersionColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn, RequestIDColumn, RequestHashColumn}
 		defaultColumns     = postgres.ColumnList{BodyColumn, VersionColumn}
 	)
 
@@ -103,6 +107,8 @@ func newPostsTableImpl(schemaName, tableName, alias string) postsTable {
 		CreatedAt:    CreatedAtColumn,
 		UpdatedAt:    UpdatedAtColumn,
 		DeletedAt:    DeletedAtColumn,
+		RequestID:    RequestIDColumn,
+		RequestHash:  RequestHashColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

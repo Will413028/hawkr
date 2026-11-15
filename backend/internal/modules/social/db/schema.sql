@@ -33,6 +33,10 @@ CREATE TABLE social.posts (
     created_at     TIMESTAMPTZ NOT NULL,
     updated_at     TIMESTAMPTZ NOT NULL,
     deleted_at     TIMESTAMPTZ,
+    request_id     UUID,
+    request_hash   BYTEA,
+    CONSTRAINT posts_request_key UNIQUE (store_id, request_id),
+    CONSTRAINT posts_request_check CHECK ((request_id IS NULL) = (request_hash IS NULL)),
     CONSTRAINT posts_store_check CHECK (store_id > 0),
     CONSTRAINT posts_body_check CHECK (char_length(body) <= 2200 AND body !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT posts_image_check CHECK ((image_key IS NULL) = (image_asset_id IS NULL)),
@@ -51,6 +55,8 @@ CREATE INDEX posts_store_mine ON social.posts (store_id, created_at DESC, id DES
 COMMENT ON COLUMN social.posts.status IS '貼文狀態：DRAFT、PUBLISHED、UNPUBLISHED（儲存的代碼是 UPPER_SNAKE，舊的 publish_status 4401、4402、4403 依序對應）';
 COMMENT ON COLUMN social.posts.published_at IS '第一次發布的時間，之後不變（下架不清、再發布沿用）；DRAFT 沒有，發布過的一定有';
 COMMENT ON COLUMN social.posts.version IS '樂觀鎖的版本，對外是 etag；每次修改加一';
+COMMENT ON COLUMN social.posts.request_id IS '建立時 client 帶的 request_id（AIP-155，選填）；範圍是 (店家, request_id)，同一家店重送回這一列；貼文刪除後它仍占著，重送回原本那一列（刪除的貼文讀不到，回 not_found）';
+COMMENT ON COLUMN social.posts.request_hash IS '建立輸入（內文、圖片 token、商品、標籤、是否發布）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有';
 
 -- 貼文的排程發布：一次排程一列，永不重用；唯一的真相是這張表，River job 只帶 id、是到點的觸發器。state 是 PENDING → PUBLISHED 或 CANCELED，
 -- 取消原因凍結在列上（cancel_reason 只在 CANCELED 有值，resolved_at 在離開 PENDING 時寫）：貼文的狀態之後會變，事後反查會得到錯的答案。
@@ -122,6 +128,8 @@ CREATE TABLE social.comments (
 );
 -- 頂層留言的列表（keyset：created_at, id）：已刪除與被隱藏的頂層留言底下還有可見的回覆時要出現佔位項目，所以不排除 deleted_at。
 CREATE INDEX comments_top_level ON social.comments (post_id, created_at, id) WHERE parent_id IS NULL;
+-- 店家的「未回覆」留言：探測某則頂層留言底下有沒有仍計入的店家回覆（actor_kind = 'STORE'）；只收店家的回覆，所以很小。
+CREATE INDEX comments_store_replies ON social.comments (parent_id) WHERE counted AND actor_kind = 'STORE';
 -- 回覆的列表與「底下有沒有可見的回覆」的探測。述詞是旗標：讀取只看 counted（visibility.Counted），planner 無法從 counted 推出 deleted_at IS NULL，
 -- 索引的述詞若是 deleted_at IS NULL 就用不上（量測：熱門貼文頂層留言 p50 1.7 ms 變 196 ms，Seq Scan comments）。
 CREATE INDEX comments_replies ON social.comments (parent_id, created_at, id) WHERE counted;

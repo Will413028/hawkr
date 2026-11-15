@@ -197,4 +197,100 @@ abstract final class SocialAppService {
     hawkrsocialv1alpha1social.DeleteForumEntryResponse.new,
     idempotency: connect.Idempotency.idempotent,
   );
+
+  /// CreatePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
+  /// 草稿可以不完整。帶 request_id 重送回第一次建立的貼文目前的樣子（狀態與計數是此刻的），不重複建立；內容不同回 invalid_argument。需要賣家能力 CAP_MARKETING。
+  static const createPost = connect.Spec(
+    '/$name/CreatePost',
+    connect.StreamType.unary,
+    hawkrsocialv1alpha1social.CreatePostRequest.new,
+    hawkrsocialv1alpha1social.CreatePostResponse.new,
+  );
+
+  /// GetMyPost 讀呼叫者此刻的店自己的貼文：任何狀態（草稿、已發布、已下架），不含已刪除；別家的貼文與不存在一樣回 not_found。回應帶 status 與 etag。
+  /// 賣家能力 CAP_CONTENT_CONTRACT（停權時仍可讀，才能下架與刪除）。
+  static const getMyPost = connect.Spec(
+    '/$name/GetMyPost',
+    connect.StreamType.unary,
+    hawkrsocialv1alpha1social.GetMyPostRequest.new,
+    hawkrsocialv1alpha1social.GetMyPostResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
+  /// ListMyPosts 列出呼叫者此刻的店自己的貼文（含草稿與下架），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。賣家能力 CAP_CONTENT_CONTRACT。
+  static const listMyPosts = connect.Spec(
+    '/$name/ListMyPosts',
+    connect.StreamType.unary,
+    hawkrsocialv1alpha1social.ListMyPostsRequest.new,
+    hawkrsocialv1alpha1social.ListMyPostsResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
+  /// UpdatePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
+  /// 已發布或有待發布排程的貼文被修改後仍要滿足公開要件。需要賣家能力 CAP_MARKETING。
+  static const updatePost = connect.Spec(
+    '/$name/UpdatePost',
+    connect.StreamType.unary,
+    hawkrsocialv1alpha1social.UpdatePostRequest.new,
+    hawkrsocialv1alpha1social.UpdatePostResponse.new,
+    idempotency: connect.Idempotency.idempotent,
+  );
+
+  /// PublishPost 發布草稿或下架的貼文；etag 必填。已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
+  static const publishPost = connect.Spec(
+    '/$name/PublishPost',
+    connect.StreamType.unary,
+    hawkrsocialv1alpha1social.PublishPostRequest.new,
+    hawkrsocialv1alpha1social.PublishPostResponse.new,
+    idempotency: connect.Idempotency.idempotent,
+  );
+
+  /// UnpublishPost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
+  static const unpublishPost = connect.Spec(
+    '/$name/UnpublishPost',
+    connect.StreamType.unary,
+    hawkrsocialv1alpha1social.UnpublishPostRequest.new,
+    hawkrsocialv1alpha1social.UnpublishPostResponse.new,
+    idempotency: connect.Idempotency.idempotent,
+  );
+
+  /// DeletePost 刪除自己的貼文；已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
+  static const deletePost = connect.Spec(
+    '/$name/DeletePost',
+    connect.StreamType.unary,
+    hawkrsocialv1alpha1social.DeletePostRequest.new,
+    hawkrsocialv1alpha1social.DeletePostResponse.new,
+    idempotency: connect.Idempotency.idempotent,
+  );
+
+  /// SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
+  /// 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
+  static const schedulePost = connect.Spec(
+    '/$name/SchedulePost',
+    connect.StreamType.unary,
+    hawkrsocialv1alpha1social.SchedulePostRequest.new,
+    hawkrsocialv1alpha1social.SchedulePostResponse.new,
+    idempotency: connect.Idempotency.idempotent,
+  );
+
+  /// ListStoreComments 列出呼叫者此刻的店所有貼文（含草稿與下架的貼文）的頂層留言，依建立時間舊到新；post_id 選填，設了只列那一篇。
+  /// 刪除或隱藏而底下有可見回覆的頂層留言是佔位項目。unreplied 為真時只列「未回覆」的留言：本店貼文上、作者不是本店的頂層留言，沒有刪除、沒有被隱藏，
+  /// 而且底下沒有任何一則仍可見、作者是本店的回覆（已刪除或被隱藏的店家回覆不算回覆）；此時沒有佔位項目。賣家能力 CAP_CONTENT_CONTRACT。
+  static const listStoreComments = connect.Spec(
+    '/$name/ListStoreComments',
+    connect.StreamType.unary,
+    hawkrsocialv1alpha1social.ListStoreCommentsRequest.new,
+    hawkrsocialv1alpha1social.ListStoreCommentsResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
+  /// GetStoreSocialSummary 是賣家中心的動態數：呼叫者此刻的店的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數。數字由伺服器以資料庫計數，
+  /// 不是 client 以列表長度推算。賣家能力 CAP_CONTENT_CONTRACT。
+  static const getStoreSocialSummary = connect.Spec(
+    '/$name/GetStoreSocialSummary',
+    connect.StreamType.unary,
+    hawkrsocialv1alpha1social.GetStoreSocialSummaryRequest.new,
+    hawkrsocialv1alpha1social.GetStoreSocialSummaryResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
 }

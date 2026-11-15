@@ -366,4 +366,191 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
       onTrailer: onTrailer,
     );
   }
+
+  /// CreatePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
+  /// 草稿可以不完整。帶 request_id 重送回第一次建立的貼文目前的樣子（狀態與計數是此刻的），不重複建立；內容不同回 invalid_argument。需要賣家能力 CAP_MARKETING。
+  Future<hawkrsocialv1alpha1social.CreatePostResponse> createPost(
+    hawkrsocialv1alpha1social.CreatePostRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialAppService.createPost,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// GetMyPost 讀呼叫者此刻的店自己的貼文：任何狀態（草稿、已發布、已下架），不含已刪除；別家的貼文與不存在一樣回 not_found。回應帶 status 與 etag。
+  /// 賣家能力 CAP_CONTENT_CONTRACT（停權時仍可讀，才能下架與刪除）。
+  Future<hawkrsocialv1alpha1social.GetMyPostResponse> getMyPost(
+    hawkrsocialv1alpha1social.GetMyPostRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialAppService.getMyPost,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// ListMyPosts 列出呼叫者此刻的店自己的貼文（含草稿與下架），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。賣家能力 CAP_CONTENT_CONTRACT。
+  Future<hawkrsocialv1alpha1social.ListMyPostsResponse> listMyPosts(
+    hawkrsocialv1alpha1social.ListMyPostsRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialAppService.listMyPosts,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// UpdatePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
+  /// 已發布或有待發布排程的貼文被修改後仍要滿足公開要件。需要賣家能力 CAP_MARKETING。
+  Future<hawkrsocialv1alpha1social.UpdatePostResponse> updatePost(
+    hawkrsocialv1alpha1social.UpdatePostRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialAppService.updatePost,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// PublishPost 發布草稿或下架的貼文；etag 必填。已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
+  Future<hawkrsocialv1alpha1social.PublishPostResponse> publishPost(
+    hawkrsocialv1alpha1social.PublishPostRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialAppService.publishPost,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// UnpublishPost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
+  Future<hawkrsocialv1alpha1social.UnpublishPostResponse> unpublishPost(
+    hawkrsocialv1alpha1social.UnpublishPostRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialAppService.unpublishPost,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// DeletePost 刪除自己的貼文；已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
+  Future<hawkrsocialv1alpha1social.DeletePostResponse> deletePost(
+    hawkrsocialv1alpha1social.DeletePostRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialAppService.deletePost,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
+  /// 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
+  Future<hawkrsocialv1alpha1social.SchedulePostResponse> schedulePost(
+    hawkrsocialv1alpha1social.SchedulePostRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialAppService.schedulePost,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// ListStoreComments 列出呼叫者此刻的店所有貼文（含草稿與下架的貼文）的頂層留言，依建立時間舊到新；post_id 選填，設了只列那一篇。
+  /// 刪除或隱藏而底下有可見回覆的頂層留言是佔位項目。unreplied 為真時只列「未回覆」的留言：本店貼文上、作者不是本店的頂層留言，沒有刪除、沒有被隱藏，
+  /// 而且底下沒有任何一則仍可見、作者是本店的回覆（已刪除或被隱藏的店家回覆不算回覆）；此時沒有佔位項目。賣家能力 CAP_CONTENT_CONTRACT。
+  Future<hawkrsocialv1alpha1social.ListStoreCommentsResponse> listStoreComments(
+    hawkrsocialv1alpha1social.ListStoreCommentsRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialAppService.listStoreComments,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// GetStoreSocialSummary 是賣家中心的動態數：呼叫者此刻的店的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數。數字由伺服器以資料庫計數，
+  /// 不是 client 以列表長度推算。賣家能力 CAP_CONTENT_CONTRACT。
+  Future<hawkrsocialv1alpha1social.GetStoreSocialSummaryResponse> getStoreSocialSummary(
+    hawkrsocialv1alpha1social.GetStoreSocialSummaryRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialAppService.getStoreSocialSummary,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
 }

@@ -163,6 +163,18 @@ func (q *Queries) CancelPendingSchedulesOfStoreByKind(ctx context.Context, arg C
 	return items, nil
 }
 
+const countPendingSchedulesOfStore = `-- name: CountPendingSchedulesOfStore :one
+SELECT count(*)::bigint FROM social.post_schedules WHERE store_id = $1 AND state = 'PENDING'
+`
+
+// 店家有待發布排程的貼文篇數（一篇貼文最多一個 PENDING）。
+func (q *Queries) CountPendingSchedulesOfStore(ctx context.Context, storeID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countPendingSchedulesOfStore, storeID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const getPendingScheduleOfPost = `-- name: GetPendingScheduleOfPost :one
 SELECT id, post_id, store_id, publish_at, scheduled_by_kind, scheduled_by_ref, state, cancel_reason, created_at, resolved_at FROM social.post_schedules WHERE post_id = $1 AND state = 'PENDING'
 `

@@ -114,7 +114,7 @@ func TestSD6ProfanityFilterCoversEveryWritePath(t *testing.T) {
 		t.Fatalf("建立貼文：%v", err)
 	}
 	p := f.publishedPost(t, storeID, "乾淨的貼文")
-	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: bad}); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr(bad)}); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("編輯貼文：%v", err)
 	}
 	if _, err := f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p.ID, Body: bad}); kindOf(err) != apperr.KindInvalidInput {
@@ -203,7 +203,7 @@ func TestSD8PostPublishedFiresOnPublishNotOnDraft(t *testing.T) {
 	if _, err := f.module.UnpublishPost(ctx, st, d2.ID, d2.Version); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("草稿不能下架：%v", err)
 	}
-	if _, err := f.module.PublishPost(ctx, st, d2.ID, d2.Version); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.PublishPost(ctx, st, d2.ID, d2.Version); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("沒有圖不能發布：%v", err)
 	}
 	if _, err := f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "", ImageToken: "t2", Publish: true}); kindOf(err) != apperr.KindInvalidInput {
@@ -249,7 +249,7 @@ func TestSD24ProductIsVerifiedOnWrite(t *testing.T) {
 		if _, err := f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "x", ProductID: id(bad)}); kindOf(err) != apperr.KindInvalidInput {
 			t.Fatalf("商品 %d：%v", bad, err)
 		}
-		if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: "x", ProductID: id(bad)}); kindOf(err) != apperr.KindInvalidInput {
+		if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("x"), SetProduct: true, ProductID: id(bad)}); kindOf(err) != apperr.KindInvalidInput {
 			t.Fatalf("更新商品 %d：%v", bad, err)
 		}
 	}
@@ -305,17 +305,17 @@ func TestHashtagsAreAReplaceableValueSet(t *testing.T) {
 		t.Fatalf("正規化與去重（保留第一次出現的樣子與順序）：%+v", p.Hashtags)
 	}
 	// 不帶 Hashtags 保留；帶空集合清空；帶新集合取代。
-	p = mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: "改"}))
+	p = mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("改")}))
 	if len(p.Hashtags) != 2 {
 		t.Fatalf("nil 保留：%+v", p.Hashtags)
 	}
 	tags := []string{"蔬菜"}
-	p = mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: "改", Hashtags: &tags}))
+	p = mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("改"), Hashtags: &tags}))
 	if len(p.Hashtags) != 1 || p.Hashtags[0].Name != "蔬菜" {
 		t.Fatalf("取代：%+v", p.Hashtags)
 	}
 	none := []string{}
-	p = mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: "改", Hashtags: &none}))
+	p = mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("改"), Hashtags: &none}))
 	if len(p.Hashtags) != 0 {
 		t.Fatalf("空集合清空：%+v", p.Hashtags)
 	}
@@ -342,11 +342,11 @@ func TestPostWritesUseVersionCAS(t *testing.T) {
 	otherID, _ := f.exposableStore(t)
 	st := f.store(t, storeID)
 	p := f.publishedPost(t, storeID, "原文")
-	up := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: "新文"}))
+	up := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("新文")}))
 	if up.Version != p.Version+1 {
 		t.Fatalf("版本加一：%d → %d", p.Version, up.Version)
 	}
-	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: "過期"}); kindOf(err) != apperr.KindVersionConflict {
+	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("過期")}); kindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("過期的版本：%v", err)
 	}
 	if _, err := f.module.UnpublishPost(ctx, st, p.ID, p.Version); kindOf(err) != apperr.KindVersionConflict {
@@ -355,17 +355,17 @@ func TestPostWritesUseVersionCAS(t *testing.T) {
 	if got := mustV[social.Post](t)(f.module.OwnPost(ctx, storeID, p.ID)); got.Body != "新文" {
 		t.Fatalf("衝突不寫入：%q", got.Body)
 	}
-	if _, err := f.module.UpdatePost(ctx, f.store(t, otherID), social.UpdatePostInput{PostID: p.ID, Version: up.Version, Body: "偷改"}); kindOf(err) != apperr.KindNotFound {
+	if _, err := f.module.UpdatePost(ctx, f.store(t, otherID), social.UpdatePostInput{PostID: p.ID, Version: up.Version, Body: ptr("偷改")}); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("別家店：%v", err)
 	}
-	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Body: "沒帶版本"}); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Body: ptr("沒帶版本")}); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("沒帶版本：%v", err)
 	}
 	// 已發布的貼文被編輯後仍要滿足公開要件。
-	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: up.Version, Body: ""}); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: up.Version, Body: ptr("")}); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("已發布的貼文內文不能清空：%v", err)
 	}
-	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: up.Version, Body: "x", ClearImage: true}); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: up.Version, Body: ptr("x"), ClearImage: true}); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("已發布的貼文不能清圖：%v", err)
 	}
 }
@@ -386,7 +386,7 @@ func TestStoreWritesAreGatedByCapabilities(t *testing.T) {
 	if _, err := f.module.CreatePost(ctx, suspended, social.CreatePostInput{Body: "x"}); kindOf(err) != apperr.KindPermissionDenied {
 		t.Fatalf("停權建立貼文：%v", err)
 	}
-	if _, err := f.module.UpdatePost(ctx, suspended, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: "x"}); kindOf(err) != apperr.KindPermissionDenied {
+	if _, err := f.module.UpdatePost(ctx, suspended, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("x")}); kindOf(err) != apperr.KindPermissionDenied {
 		t.Fatalf("停權編輯貼文：%v", err)
 	}
 	if _, err := f.module.PublishPost(ctx, suspended, p.ID, p.Version); kindOf(err) != apperr.KindPermissionDenied {
@@ -459,7 +459,7 @@ func TestPostImageReplacementRetiresTheOldAsset(t *testing.T) {
 	if n := len(f.media.Referenced(ref)); n != 1 {
 		t.Fatalf("同步後有一個引用：%d", n)
 	}
-	up := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: "y", ImageToken: "second"}))
+	up := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("y"), ImageToken: "second"}))
 	if up.ImageKey == p.ImageKey {
 		t.Fatal("圖換了")
 	}
@@ -496,7 +496,7 @@ func TestHashtagPublishedAtIsACopyOfThePost(t *testing.T) {
 	// 已發布的貼文換一組標籤：新列帶入貼文的值。
 	tags := []string{"蔬菜", "fruit", "organic"}
 	f.advance(3600e9)
-	upd := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: pub.ID, Version: pub.Version, Body: "改", Hashtags: &tags}))
+	upd := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: pub.ID, Version: pub.Version, Body: ptr("改"), Hashtags: &tags}))
 	if n := f.scalar(t, `SELECT count(*) FROM social.post_hashtags WHERE post_id = $1`, pub.ID); n != 3 || mismatch() != 0 {
 		t.Fatalf("已發布貼文的新標籤列帶入貼文的 published_at：%d，不一致 %d", n, mismatch())
 	}

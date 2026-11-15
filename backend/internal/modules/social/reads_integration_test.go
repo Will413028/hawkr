@@ -56,6 +56,8 @@ func scansInto(oid uint32, t reflect.Type) bool {
 		return t.Kind() == reflect.String
 	case pgtype.Int2OID, pgtype.Int4OID, pgtype.Int8OID:
 		return slices.Contains([]reflect.Kind{reflect.Int16, reflect.Int32, reflect.Int64, reflect.Int}, t.Kind())
+	case pgtype.ByteaOID:
+		return t == reflect.TypeOf([]byte(nil))
 	case pgtype.BoolOID:
 		return t.Kind() == reflect.Bool
 	case pgtype.UUIDOID:

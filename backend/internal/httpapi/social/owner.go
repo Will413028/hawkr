@@ -1,0 +1,389 @@
+package social
+
+import (
+	"context"
+	"slices"
+	"strconv"
+	"uuid"
+
+	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
+)
+
+// Owner 是店主的貼文管理、店家範圍的留言與動態數的來源（*social.Module）：店家身分由 handler 以 seller.CurrentStore 推導後交給模組，
+// 賣家能力在模組內檢查（帳號路徑與代行路徑同一個入口），handler 不檢查。
+type Owner interface {
+	CreatePost(ctx context.Context, store seller.Store, in social.CreatePostInput) (social.Post, error)
+	UpdatePost(ctx context.Context, store seller.Store, in social.UpdatePostInput) (social.Post, error)
+	PublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (social.Post, error)
+	UnpublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (social.Post, error)
+	DeletePost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) error
+	SchedulePost(ctx context.Context, store seller.Store, in social.SchedulePostInput) (social.ScheduledPost, error)
+	MyPost(ctx context.Context, store seller.Store, id uuid.UUID) (social.Post, error)
+	ListMyPosts(ctx context.Context, store seller.Store, status social.PostStatus, after *social.OwnPostCursor, size int32) (social.OwnPostPage, error)
+	ListStoreComments(ctx context.Context, store seller.Store, postID *uuid.UUID, unreplied bool, after *social.CommentCursor, size int32) (social.CommentPage, error)
+	StoreSocialSummary(ctx context.Context, store seller.Store) (social.StoreSummary, error)
+}
+
+var (
+	createPostPaths = rpc.FieldPaths{
+		"Body": "body", "ImageToken": "image_staged_token", "ProductID": "product_id", "RequestID": "request_id",
+	}
+	updatePostPaths = rpc.FieldPaths{
+		"Body": "post.body", "ImageToken": "post.image_staged_token", "ClearImage": "post.image_staged_token", "ProductID": "post.product_id",
+	}
+	schedulePostPaths = rpc.FieldPaths{"PublishAt": "publish_time"}
+)
+
+// updatablePostFields 是 UpdatePost 的 update_mask 可以列的欄位（etag 列進去會略過：它是版本檢查，不是被修改的欄位）。
+var updatablePostFields = []string{"body", "image_staged_token", "product_id", "hashtag_inputs"}
+
+// store 回傳呼叫者此刻的店；只有顧客帳號能呼叫（沒有登入由 interceptor 擋），沒有店回 not_found（seller.CurrentStore 的結果）。
+// 能力不在這裡檢查：由模組檢查，宣告見 declarations。
+func (h *App) store(ctx context.Context) (seller.Store, error) {
+	p, ok := rpc.PrincipalFrom(ctx)
+	if !ok || p.Kind != identity.PrincipalAccount {
+		return seller.Store{}, rpc.Error(connect.CodePermissionDenied, "%s", "需要賣家身分")
+	}
+	return h.stores.CurrentStore(ctx, p.ID)
+}
+
+// ownPosts 把店主讀自己的貼文轉成回應：公開貼文的欄位加上 status、etag 與 create_time（只有店主讀自己的貼文才設）。
+func (h *App) ownPosts(ctx context.Context, st seller.Store, posts []social.Post) ([]*pb.Post, error) {
+	out, err := h.toPosts(ctx, social.Caller{Store: &st}, posts)
+	if err != nil {
+		return nil, err
+	}
+	for i, p := range posts {
+		out[i].Status = rpc.EnumToProto[pb.PostStatus](p.Status)
+		out[i].Etag = rpc.Etag(p.Version)
+		out[i].CreateTime = timestamppb.New(p.CreatedAt)
+	}
+	return out, nil
+}
+
+func (h *App) ownPost(ctx context.Context, st seller.Store, p social.Post) (*pb.Post, error) {
+	posts, err := h.ownPosts(ctx, st, []social.Post{p})
+	if err != nil {
+		return nil, err
+	}
+	return posts[0], nil
+}
+
+// optionalProductID 解析選填的商品 ID；沒設是 nil。
+func optionalProductID(path string, raw *string) (*int64, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	id, err := rpc.ParseID(path, *raw)
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
+}
+
+func (h *App) CreatePost(ctx context.Context, req *connect.Request[pb.CreatePostRequest]) (*connect.Response[pb.CreatePostResponse], error) {
+	msg := req.Msg
+	productID, err := optionalProductID("product_id", msg.ProductId)
+	if err != nil {
+		return nil, err
+	}
+	reqID, err := rpc.ParseRequestID(msg.GetRequestId())
+	if err != nil {
+		return nil, err
+	}
+	st, err := h.store(ctx)
+	if err != nil {
+		return nil, err
+	}
+	created, err := h.owner.CreatePost(ctx, st, social.CreatePostInput{
+		Body: msg.GetBody(), ImageToken: msg.GetImageStagedToken(), ProductID: productID, Hashtags: msg.GetHashtagInputs(),
+		Publish: msg.GetPublish(), RequestID: reqID,
+	})
+	if err != nil {
+		return nil, rpc.WithFieldPaths(err, createPostPaths)
+	}
+	post, err := h.ownPost(ctx, st, created)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.CreatePostResponse{Post: post}), nil
+}
+
+func (h *App) GetMyPost(ctx context.Context, req *connect.Request[pb.GetMyPostRequest]) (*connect.Response[pb.GetMyPostResponse], error) {
+	id, err := rpc.ParseUUID("post_id", req.Msg.GetPostId())
+	if err != nil {
+		return nil, err
+	}
+	st, err := h.store(ctx)
+	if err != nil {
+		return nil, err
+	}
+	p, err := h.owner.MyPost(ctx, st, id)
+	if err != nil {
+		return nil, err
+	}
+	post, err := h.ownPost(ctx, st, p)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.GetMyPostResponse{Post: post}), nil
+}
+
+func (h *App) ListMyPosts(ctx context.Context, req *connect.Request[pb.ListMyPostsRequest]) (*connect.Response[pb.ListMyPostsResponse], error) {
+	msg := req.Msg
+	var status social.PostStatus
+	if msg.GetStatus() != pb.PostStatus_POST_STATUS_UNSPECIFIED {
+		status = rpc.EnumFromProto[social.PostStatus](msg.GetStatus())
+		if !slices.Contains(social.PostStatusValues(), status) {
+			return nil, rpc.RequiredField("status", "status 不是有效的貼文狀態")
+		}
+	}
+	st, err := h.store(ctx)
+	if err != nil {
+		return nil, err
+	}
+	scope := rpc.FilterScope(socialv1alpha1connect.SocialAppServiceListMyPostsProcedure, strconv.FormatInt(st.StoreID, 10), string(status))
+	after, err := rpc.ValidCursor[ownPostCursor](scope, msg.GetPageToken())
+	if err != nil {
+		return nil, err
+	}
+	var cur *social.OwnPostCursor
+	if after != nil {
+		cur = &social.OwnPostCursor{CreatedAt: after.CreatedAt, ID: after.ID}
+	}
+	page, err := h.owner.ListMyPosts(ctx, st, status, cur, msg.GetPageSize())
+	if err != nil {
+		return nil, err
+	}
+	posts, err := h.ownPosts(ctx, st, page.Posts)
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.ListMyPostsResponse{Posts: posts}
+	if page.Next != nil {
+		out.NextPageToken = rpc.TokenFor(scope, ownPostCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
+	}
+	return connect.NewResponse(out), nil
+}
+
+func (h *App) UpdatePost(ctx context.Context, req *connect.Request[pb.UpdatePostRequest]) (*connect.Response[pb.UpdatePostResponse], error) {
+	msg := req.Msg.GetPost()
+	if !msg.ProtoReflect().IsValid() {
+		return nil, rpc.RequiredField("post", "post 必填")
+	}
+	id, err := rpc.ParseUUID("post.id", msg.GetId())
+	if err != nil {
+		return nil, err
+	}
+	version, err := rpc.RequiredVersionField(msg.GetEtag(), "post.etag")
+	if err != nil {
+		return nil, err
+	}
+	paths, err := rpc.WritableFields(msg, req.Msg.GetUpdateMask())
+	if err != nil {
+		return nil, err
+	}
+	paths = slices.DeleteFunc(paths, func(p string) bool { return p == "etag" })
+	for _, p := range paths {
+		if !slices.Contains(updatablePostFields, p) {
+			return nil, rpc.RequiredField("update_mask", "update_mask 的 "+p+" 不是可以修改的欄位（可以修改：body、image_staged_token、product_id、hashtag_inputs）")
+		}
+	}
+	if len(paths) == 0 {
+		return nil, rpc.RequiredField("update_mask", "update_mask 必須列至少一個可以修改的欄位（body、image_staged_token、product_id、hashtag_inputs）")
+	}
+	has := func(p string) bool { return slices.Contains(paths, p) }
+	var productID *int64
+	if has("product_id") {
+		if productID, err = optionalProductID("post.product_id", msg.ProductId); err != nil {
+			return nil, err
+		}
+	}
+	st, err := h.store(ctx)
+	if err != nil {
+		return nil, err
+	}
+	in := social.UpdatePostInput{PostID: id, Version: version, SetProduct: has("product_id"), ProductID: productID}
+	if has("body") {
+		body := msg.GetBody()
+		in.Body = &body
+	}
+	if has("image_staged_token") {
+		if msg.GetImageStagedToken() == "" {
+			in.ClearImage = true
+		} else {
+			in.ImageToken = msg.GetImageStagedToken()
+		}
+	}
+	if has("hashtag_inputs") {
+		tags := slices.Clone(msg.GetHashtagInputs())
+		if tags == nil {
+			tags = []string{}
+		}
+		in.Hashtags = &tags
+	}
+	updated, err := h.owner.UpdatePost(ctx, st, in)
+	if err != nil {
+		return nil, rpc.WithFieldPaths(err, updatePostPaths)
+	}
+	post, err := h.ownPost(ctx, st, updated)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.UpdatePostResponse{Post: post}), nil
+}
+
+// transition 是發布與下架共同的流程：貼文 ID、必填的 etag、店家，再由 do 呼叫模組。
+func (h *App) transition(ctx context.Context, postID, etag string, do func(context.Context, seller.Store, uuid.UUID, int64) (social.Post, error)) (*pb.Post, error) {
+	id, err := rpc.ParseUUID("post_id", postID)
+	if err != nil {
+		return nil, err
+	}
+	version, err := rpc.RequiredVersionField(etag, "etag")
+	if err != nil {
+		return nil, err
+	}
+	st, err := h.store(ctx)
+	if err != nil {
+		return nil, err
+	}
+	p, err := do(ctx, st, id, version)
+	if err != nil {
+		return nil, err
+	}
+	return h.ownPost(ctx, st, p)
+}
+
+func (h *App) PublishPost(ctx context.Context, req *connect.Request[pb.PublishPostRequest]) (*connect.Response[pb.PublishPostResponse], error) {
+	post, err := h.transition(ctx, req.Msg.GetPostId(), req.Msg.GetEtag(), h.owner.PublishPost)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.PublishPostResponse{Post: post}), nil
+}
+
+func (h *App) UnpublishPost(ctx context.Context, req *connect.Request[pb.UnpublishPostRequest]) (*connect.Response[pb.UnpublishPostResponse], error) {
+	post, err := h.transition(ctx, req.Msg.GetPostId(), req.Msg.GetEtag(), h.owner.UnpublishPost)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.UnpublishPostResponse{Post: post}), nil
+}
+
+func (h *App) DeletePost(ctx context.Context, req *connect.Request[pb.DeletePostRequest]) (*connect.Response[pb.DeletePostResponse], error) {
+	id, err := rpc.ParseUUID("post_id", req.Msg.GetPostId())
+	if err != nil {
+		return nil, err
+	}
+	version, err := rpc.VersionFromEtag(req.Msg.GetEtag())
+	if err != nil {
+		return nil, err
+	}
+	st, err := h.store(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.owner.DeletePost(ctx, st, id, version); err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.DeletePostResponse{}), nil
+}
+
+func (h *App) SchedulePost(ctx context.Context, req *connect.Request[pb.SchedulePostRequest]) (*connect.Response[pb.SchedulePostResponse], error) {
+	msg := req.Msg
+	id, err := rpc.ParseUUID("post_id", msg.GetPostId())
+	if err != nil {
+		return nil, err
+	}
+	version, err := rpc.RequiredVersionField(msg.GetEtag(), "etag")
+	if err != nil {
+		return nil, err
+	}
+	if msg.GetPublishTime() == nil || msg.GetPublishTime().CheckValid() != nil {
+		return nil, rpc.RequiredField("publish_time", "publish_time 必填，而且必須是有效的時間")
+	}
+	st, err := h.store(ctx)
+	if err != nil {
+		return nil, err
+	}
+	scheduled, err := h.owner.SchedulePost(ctx, st, social.SchedulePostInput{
+		PostID: id, Version: version, PublishAt: msg.GetPublishTime().AsTime(), By: social.ScheduledBy{Kind: social.ScheduleByOwner},
+	})
+	if err != nil {
+		return nil, rpc.WithFieldPaths(err, schedulePostPaths)
+	}
+	post, err := h.ownPost(ctx, st, scheduled.Post)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.SchedulePostResponse{Post: post, PublishTime: timestamppb.New(scheduled.Schedule.PublishAt)}), nil
+}
+
+func (h *App) ListStoreComments(ctx context.Context, req *connect.Request[pb.ListStoreCommentsRequest]) (*connect.Response[pb.ListStoreCommentsResponse], error) {
+	msg := req.Msg
+	postID, err := optionalUUID("post_id", msg.PostId)
+	if err != nil {
+		return nil, err
+	}
+	st, err := h.store(ctx)
+	if err != nil {
+		return nil, err
+	}
+	scopePost := ""
+	if postID != nil {
+		scopePost = postID.String()
+	}
+	scope := rpc.FilterScope(socialv1alpha1connect.SocialAppServiceListStoreCommentsProcedure, strconv.FormatInt(st.StoreID, 10), scopePost, boolKey(msg.GetUnreplied()))
+	after, err := rpc.ValidCursor[commentCursor](scope, msg.GetPageToken())
+	if err != nil {
+		return nil, err
+	}
+	var cur *social.CommentCursor
+	if after != nil {
+		cur = &social.CommentCursor{CreatedAt: after.CreatedAt, ID: after.ID}
+	}
+	page, err := h.owner.ListStoreComments(ctx, st, postID, msg.GetUnreplied(), cur, msg.GetPageSize())
+	if err != nil {
+		return nil, err
+	}
+	comments, err := h.toComments(ctx, social.Caller{Store: &st}, page.StoreID, page.Comments)
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.ListStoreCommentsResponse{Comments: comments}
+	if page.Next != nil {
+		out.NextPageToken = rpc.TokenFor(scope, commentCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
+	}
+	return connect.NewResponse(out), nil
+}
+
+func boolKey(b bool) string {
+	if b {
+		return "1"
+	}
+	return "0"
+}
+
+func (h *App) GetStoreSocialSummary(ctx context.Context, _ *connect.Request[pb.GetStoreSocialSummaryRequest]) (*connect.Response[pb.GetStoreSocialSummaryResponse], error) {
+	st, err := h.store(ctx)
+	if err != nil {
+		return nil, err
+	}
+	s, err := h.owner.StoreSocialSummary(ctx, st)
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.GetStoreSocialSummaryResponse{ScheduledPostCount: s.Scheduled}
+	for _, status := range social.PostStatusValues() {
+		out.PostCounts = append(out.PostCounts, &pb.PostStatusCount{Status: rpc.EnumToProto[pb.PostStatus](status), Count: s.Posts[status]})
+	}
+	return connect.NewResponse(out), nil
+}
