@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""步驟 4b 的一次性檢查：三端新色票的前景色 × 背景色 WCAG 對比。
+"""三端色票的前景色 × 背景色 WCAG 對比檢查，website CI 以 `pnpm run contrast:check` 當常駐閘門（任何不合格或解不出來的組合即 exit 1）。
+
+新增或改動 token 時，先看有沒有被現有的組合表（如 WEB_SURFACES、WEB_TEXT、STATUS_PAIRS）涵蓋，沒有就在對應的表加一組（以 token 名稱解析值，不寫死色碼）；掃描涵蓋的目錄改了，同步 website-ci.yml 的 paths。
 
 讀三端與 admin 的 token 值（不寫死色碼）：
   - website  styles/foundation/00-color-config.css、01-tokens-theme.css、styles/components/ui-kit.css

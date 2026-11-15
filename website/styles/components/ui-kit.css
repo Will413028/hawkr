@@ -1283,7 +1283,7 @@ body[data-hk-overlay-open="true"] .tsqd-open-btn-container {
 		var(--hkui-content1, #fff) 82%,
 		transparent
 	);
-	color: var(--hkui-primary, var(--color-brand-primary-strong));
+	color: var(--theme-text-accent-on-tint);
 	box-shadow:
 		0 0 0 1px
 		color-mix(
@@ -1297,9 +1297,6 @@ body[data-hk-overlay-open="true"] .tsqd-open-btn-container {
 			var(--hkui-primary, var(--color-brand-primary-strong)) 12%,
 			transparent
 		);
-}
-[data-theme="dark"] .hkui-calendar__jump-flag {
-	color: var(--theme-text-accent-on-tint);
 }
 .hkui-calendar__jump-select {
 	appearance: none;

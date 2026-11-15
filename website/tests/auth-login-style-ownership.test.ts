@@ -192,15 +192,15 @@ test("auth login owner preserves the exact unlayered semantic CSS", () => {
 	// stylesheet owner、media 與 keyframes 均未改動。
 	assert.equal(
 		semanticDigest(uiKit),
-		"144a7c0af4c5e4362c4e754c17c30e257322721a30e0da948804bd1847b1aed7",
+		"68a05a43006f44030c0a8caa58b24934f7dc618f2d1397aba31faf34b33077c4",
 	);
 	assert.deepEqual(inventory(uiKit), {
 		// 2026-10-27 刪除產地地圖（scope-cut 步驟 1）：整段 LOCATION PICKER MODAL
 		// 與 origin-seller-preview 規則一併移除，-42 rules、-42 selectors、
 		// -201 declarations、-1 media；其餘 owner 不變。
-		styleRules: 243,
-		selectors: 264,
-		declarations: 1068,
+		styleRules: 242,
+		selectors: 263,
+		declarations: 1067,
 		media: 16,
 		keyframes: 5,
 	});

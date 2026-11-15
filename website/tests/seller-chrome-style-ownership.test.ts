@@ -150,9 +150,9 @@ test("seller and auth owner CSS preserve the exact reviewed semantic AST", () =>
 		// 2026-10-27 刪除產地地圖（scope-cut 步驟 1）：整段 LOCATION PICKER MODAL
 		// 與 origin-seller-preview 規則一併移除，-42 rules、-42 selectors、
 		// -201 declarations、-1 media；其餘 owner 不變。
-		styleRules: 243,
-		selectors: 264,
-		declarations: 1068,
+		styleRules: 242,
+		selectors: 263,
+		declarations: 1067,
 		media: 16,
 		keyframes: 5,
 	});
@@ -242,7 +242,7 @@ test("seller and auth owner CSS preserve the exact reviewed semantic AST", () =>
 	// 2026-10-27 ui-kit 刪除 LOCATION PICKER MODAL 整段（產地地圖）；其餘 owner 與順序未變。
 	assert.equal(
 		digest(reconstructed),
-		"d8860578e6cccae84cb946bfc28a07fb657746f4c5996d3cf78ff552ebbd0a89",
+		"042d8200ab6d78016eccbcccdf2bb1c5b67901fdbb668fe0218509dc4d46841b",
 		"recombining every owner file at its original position must reproduce the reviewed ui-kit AST",
 	);
 	assert.deepEqual(
@@ -278,9 +278,9 @@ test("seller and auth owner CSS preserve the exact reviewed semantic AST", () =>
 			// +34 宣告，與上面單檔的差額相同（唯一的來源就是店家簡介那一刀）。
 			// auth-login 的刪除：-89 rule、-93 selector、-318 宣告，同上面單檔的差額。
 			// 2026-10-27 產地地圖刪除：同上面 ui-kit 單檔的差額。
-			styleRules: 424,
-			selectors: 446,
-			declarations: 1811,
+			styleRules: 423,
+			selectors: 445,
+			declarations: 1810,
 			media: 19,
 			keyframes: 5,
 		},
