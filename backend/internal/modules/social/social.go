@@ -170,6 +170,7 @@ const (
 	CancelAuthorityLost  = model.CancelAuthorityLost
 	CancelDeleted        = model.CancelDeleted
 	CancelTakenDown      = model.CancelTakenDown
+	CancelNotPublishable = model.CancelNotPublishable
 	CancelReplaced       = model.CancelReplaced
 	CancelOwnerCanceled  = model.CancelOwnerCanceled
 	OriginDirect         = model.OriginDirect

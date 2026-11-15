@@ -71,7 +71,7 @@ CREATE TABLE social.post_schedules (
     CONSTRAINT post_schedules_by_kind_check CHECK (scheduled_by_kind IN ('OWNER', 'DELEGATION')),
     CONSTRAINT post_schedules_by_ref_check CHECK (char_length(scheduled_by_ref) >= 1 AND char_length(scheduled_by_ref) <= 200 AND scheduled_by_ref !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT post_schedules_state_check CHECK (state IN ('PENDING', 'PUBLISHED', 'CANCELED')),
-    CONSTRAINT post_schedules_reason_check CHECK (cancel_reason IN ('AUTHORITY_LOST', 'DELETED', 'TAKEN_DOWN', 'REPLACED', 'OWNER_CANCELED')),
+    CONSTRAINT post_schedules_reason_check CHECK (cancel_reason IN ('AUTHORITY_LOST', 'DELETED', 'TAKEN_DOWN', 'REPLACED', 'OWNER_CANCELED', 'NOT_PUBLISHABLE')),
     CONSTRAINT post_schedules_reason_state_check CHECK ((state = 'CANCELED') = (cancel_reason IS NOT NULL)),
     CONSTRAINT post_schedules_resolved_check CHECK ((state = 'PENDING') = (resolved_at IS NULL))
 );
@@ -83,7 +83,7 @@ CREATE INDEX post_schedules_by_pending ON social.post_schedules (scheduled_by_ki
 CREATE INDEX post_schedules_store_pending ON social.post_schedules (store_id) WHERE state = 'PENDING';
 
 COMMENT ON COLUMN social.post_schedules.scheduled_by_ref IS '發起者擁有格式的不透明字串；DELEGATION 放代行 session 的 ID，OWNER 放店家帳號 ID 的十進位字串';
-COMMENT ON COLUMN social.post_schedules.cancel_reason IS '取消原因，凍結在列上：AUTHORITY_LOST 到點時授權已失效、DELETED 貼文被刪、TAKEN_DOWN 貼文被下架措施、REPLACED 被立即發布或新排程取代、OWNER_CANCELED 店主取消';
+COMMENT ON COLUMN social.post_schedules.cancel_reason IS '取消原因，凍結在列上：AUTHORITY_LOST 到點時授權已失效、DELETED 貼文被刪、TAKEN_DOWN 貼文被下架措施、REPLACED 被立即發布或新排程取代、OWNER_CANCELED 店主取消、NOT_PUBLISHABLE 到點時貼文不再滿足公開要件';
 
 -- 貼文的留言：兩層（回覆的父一律是頂層，由寫入端保證，DB 保證同篇與 reply_to 在同一串）。actor_kind、actor_id 是互動者 (kind, id)，由伺服器依資源歸屬推導
 -- （ADR 2026-10-17-social-actor-identity）：BUYER 的 actor_id 是 buyer_id，STORE 的是 store_id。不存作者名稱與頭像快照，讀取時由

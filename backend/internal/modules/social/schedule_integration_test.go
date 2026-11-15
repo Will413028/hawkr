@@ -341,6 +341,32 @@ func TestDueScheduleOfAGonePostIsCanceled(t *testing.T) {
 	f.wantSchedule(t, s.ID, "CANCELED", "DELETED")
 }
 
+// 到點時貼文不再滿足公開要件（直接寫 SQL 把內文清空，模擬編輯後的漏網）：轉 NOT_PUBLISHABLE、發 PostScheduleCanceled、不重試也不發布；
+// 再跑一次（sweep 或重送的 job）什麼都不做，不會回到 PENDING。
+func TestDueScheduleOfAnUnpublishablePostIsCanceledAndNotRetried(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	p := f.draft(t, storeID)
+	s := f.schedule(t, storeID, p, time.Hour, f.owner())
+	f.exec(t, "UPDATE social.posts SET body = '' WHERE id = $1", p.ID)
+	f.advance(time.Hour)
+	must(t, f.module.PublishScheduled(ctx, s.ID))
+	f.wantSchedule(t, s.ID, "CANCELED", "NOT_PUBLISHABLE")
+	if evs := f.events.canceledEvents(); len(evs) != 1 || evs[0].Reason != social.CancelNotPublishable || evs[0].PostID != p.ID || evs[0].ScheduleID != s.ID {
+		t.Fatalf("PostScheduleCanceled 要發一次、原因 NOT_PUBLISHABLE：%+v", evs)
+	}
+	if f.postStatus(t, p.ID) != "DRAFT" {
+		t.Fatal("不發布")
+	}
+	must(t, f.module.PublishScheduled(ctx, s.ID))
+	f.wantSchedule(t, s.ID, "CANCELED", "NOT_PUBLISHABLE")
+	if n := len(f.events.canceledEvents()); n != 1 {
+		t.Fatalf("重跑不再發事件：%d", n)
+	}
+}
+
 func TestPurgeOfAStoreCancelsItsSchedules(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

@@ -226,7 +226,8 @@ func (s *Service) resolveCanceled(ctx context.Context, q *store.Queries, id uuid
 
 // RunScheduled 是排程到點的 job 內容：同一個 transaction 先鎖貼文列、再鎖排程列（與手動發布、刪除、取消同一個順序，所以和它們序列化），不是 PENDING 就
 // 什麼都不做（重試、重複的 job 冪等）；先做 social 自己的檢查（貼文已刪或被下架就取消，原因 DELETED、TAKEN_DOWN），再問發起者種類的授權實作：
-// ErrScheduleDenied 把排程寫成 CANCELED（AUTHORITY_LOST）而且不重試，其他錯誤回傳讓 job 重試；通過才經手動發布的同一條路徑發布，排程轉 PUBLISHED。
+// ErrScheduleDenied 把排程寫成 CANCELED（AUTHORITY_LOST）而且不重試，其他錯誤回傳讓 job 重試；貼文不再滿足公開要件（內文或圖片被拿掉）取消為 NOT_PUBLISHABLE，同樣不重試（授權失效優先）；
+// 通過才經手動發布的同一條路徑發布，排程轉 PUBLISHED。
 func (s *Service) RunScheduled(ctx context.Context, scheduleID uuid.UUID) error {
 	now := s.d.Now().UTC()
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -276,6 +277,12 @@ func (s *Service) RunScheduled(ctx context.Context, scheduleID uuid.UUID) error 
 			return s.resolveCanceled(ctx, q, scheduleID, model.CancelAuthorityLost, now)
 		case err != nil:
 			return err
+		}
+		if err := checkPublishable(ctx, row.Body, row.ImageKey != nil); err != nil {
+			if apperr.KindOf(err) != apperr.KindInvalidInput {
+				return err
+			}
+			return s.resolveCanceled(ctx, q, scheduleID, model.CancelNotPublishable, now)
 		}
 		if model.PostStatus(row.Status) == model.StatusPublished {
 			return fmt.Errorf("social：排程 %s 的貼文 %s 已經是公開的", scheduleID, row.ID)

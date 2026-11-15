@@ -55,11 +55,13 @@ const (
 	CancelTakenDown     CancelReason = "TAKEN_DOWN"
 	CancelReplaced      CancelReason = "REPLACED"
 	CancelOwnerCanceled CancelReason = "OWNER_CANCELED"
+	// CancelNotPublishable 是到點時貼文不再滿足公開要件（內文或圖片被拿掉）：不重試，也不由授權實作判斷。
+	CancelNotPublishable CancelReason = "NOT_PUBLISHABLE"
 )
 
 // CancelReasonValues 回傳全部取消原因；DB 的 CHECK 與它一致。
 func CancelReasonValues() []CancelReason {
-	return []CancelReason{CancelAuthorityLost, CancelDeleted, CancelTakenDown, CancelReplaced, CancelOwnerCanceled}
+	return []CancelReason{CancelAuthorityLost, CancelDeleted, CancelTakenDown, CancelReplaced, CancelOwnerCanceled, CancelNotPublishable}
 }
 
 // ScheduledBy 是排程的發起者：Ref 是發起者擁有格式的不透明字串（代行放 session ID）。
