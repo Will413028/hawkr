@@ -11,7 +11,7 @@ dependencies:
     sdk: flutter
   hawkr_api:
     path: ../hawkr_api
-  package_info_plus: ^9.0.1
+  package_info_plus: ^10.2.2
 
 dev_dependencies:
   flutter_test:
