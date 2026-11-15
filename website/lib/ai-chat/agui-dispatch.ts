@@ -10,7 +10,8 @@
  * 明確失敗，而不是其中一條靜默少畫一列。
  */
 
-import { EventSchemas, type RunFinishedOutcome } from "@ag-ui/core";
+import type { RunFinishedOutcome } from "@ag-ui/core";
+import { EventSchemas } from "@ag-ui/core/schemas";
 
 /** AG-UI `RUN_FINISHED.outcome` 收斂成呼叫端要的扁平形狀。官方 schema 的
  * `interrupts` 是陣列（保留擴充成多個 interrupt 的彈性），但 v1 一次 run

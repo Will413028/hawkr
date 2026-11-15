@@ -14,8 +14,8 @@ dependencies:
   intl: 0.20.3
 
 dev_dependencies:
-  # 守門工具 tool/check_enum_text.dart 用；版本與兩支 App 的 pubspec.lock 相同。
-  analyzer: 8.4.0
+  # 守門工具 tool/check_enum_text.dart 用；只在本套件解析，與兩支 App 的 analyzer 版本無關。
+  analyzer: 14.7.0
   # 測試用：造出生成 enum 不認得的值（protobuf 版本與 hawkr_api 相同）。
   protobuf: 6.1.0
-  test: 1.31.1
+  test: 1.33.0
