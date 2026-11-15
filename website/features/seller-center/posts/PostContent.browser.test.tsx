@@ -82,14 +82,18 @@ async function getInput() {
 }
 
 function postElements(textarea: HTMLTextAreaElement) {
-	const wrapper = queryRequired<HTMLElement>(
-		textarea.ownerDocument.body,
-		'[data-slot="input-wrapper"]',
-	);
+	const wrapper = textarea.closest<HTMLElement>('[data-slot="input-wrapper"]');
+	expect(wrapper, "貼文輸入框必須在 input-wrapper 內").not.toBeNull();
 	return {
 		textarea,
-		backdrop: queryRequired<HTMLElement>(wrapper, '[data-slot="highlight"]'),
-		label: queryRequired<HTMLElement>(wrapper, '[data-slot="floating-label"]'),
+		backdrop: queryRequired<HTMLElement>(
+			wrapper as HTMLElement,
+			'[data-slot="highlight"]',
+		),
+		label: queryRequired<HTMLElement>(
+			wrapper as HTMLElement,
+			'[data-slot="floating-label"]',
+		),
 	};
 }
 

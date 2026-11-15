@@ -253,6 +253,7 @@ describe("ClarifyQuestionCard", () => {
 		await userEvent.click(button("其他（自己輸入）"));
 		await userEvent.type(textbox("品項描述"), "有機甘藍");
 		await userEvent.click(button("顯示等待狀態"));
+		await expect.element(button("顯示等待狀態")).not.toBeInTheDocument();
 		const inputs = page.getByRole("textbox");
 		const buttons = page.getByRole("button");
 		await expect.poll(() => inputs.elements().length).toBeGreaterThan(0);

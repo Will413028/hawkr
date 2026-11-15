@@ -53,10 +53,6 @@ export default defineConfig({
 								new URL("./tests/browser/next-image.tsx", import.meta.url),
 							),
 						},
-						{
-							find: "@",
-							replacement: fileURLToPath(new URL(".", import.meta.url)),
-						},
 					],
 				},
 				optimizeDeps: { include: ["framer-motion"], exclude: ["next/image"] },

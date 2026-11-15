@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 import { queryRequired } from "@/tests/browser/query";
 import { renderWithIntl } from "@/tests/browser/render";
@@ -98,15 +98,6 @@ function ProductTable({
 		</div>
 	);
 }
-
-const initialViewport = {
-	width: window.innerWidth,
-	height: window.innerHeight,
-};
-
-afterEach(async () => {
-	await page.viewport(initialViewport.width, initialViewport.height);
-});
 
 describe("Seller skeletons", () => {
 	it("renders the products skeleton with every column and a thumbnail", () => {
@@ -208,7 +199,7 @@ describe("Seller skeletons", () => {
 	});
 
 	it("keeps the phone disclosure skeleton the same size as the real row", async () => {
-		// .seller-mobile-disclosure-list 在 768px 以上隱藏：明確設成手機寬，afterEach 還原。
+		// .seller-mobile-disclosure-list 在 768px 以上隱藏：明確設成手機寬，tests/browser/setup.ts 的 afterEach 還原。
 		await page.viewport(390, 844);
 		const { container } = renderWithIntl(
 			<SellerShell>

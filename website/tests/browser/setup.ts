@@ -1,5 +1,6 @@
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
+import { page } from "vitest/browser";
 import "../../styles/globals.css";
 import "../../styles/components/product-modal.css";
 import "../../styles/components/ui-kit.css";
@@ -11,9 +12,16 @@ if (typeof globalThis.process === "undefined") {
 	Object.assign(globalThis, { process: { env: {} } });
 }
 
+// 測試中用 page.viewport 改過的視窗尺寸，每個測試後還原成載入時的值。
+const initialViewport = {
+	width: window.innerWidth,
+	height: window.innerHeight,
+};
+
 // 沒有開 vitest globals，@testing-library/react 不會自己註冊 cleanup。
-afterEach(() => {
+afterEach(async () => {
 	cleanup();
+	await page.viewport(initialViewport.width, initialViewport.height);
 	document.documentElement.style.removeProperty("font-size");
 	document.documentElement.style.removeProperty("--hk-text-scale");
 });

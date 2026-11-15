@@ -139,11 +139,10 @@ function setup(overrides: Partial<Props> = {}) {
 	// 付款入口的 <Link> 要有 root layout 的 ViewTransitions provider。
 	const view = renderWithIntl(
 		<ViewTransitions>
-			<div style={{ padding: 16 }}>
+			<div style={{ width: "100%", maxWidth: 1100, padding: 16 }}>
 				<BuyerQuoteComparison {...props} />
 			</div>
 		</ViewTransitions>,
-		{ frameMaxWidth: 1100 },
 	);
 	return { ...view, props };
 }

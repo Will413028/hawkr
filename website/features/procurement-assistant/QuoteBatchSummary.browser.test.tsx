@@ -75,9 +75,11 @@ function setup(overrides: Partial<Props> = {}) {
 		onCompareQuotes: vi.fn(),
 		...overrides,
 	};
-	return renderWithIntl(<QuoteBatchSummary {...props} />, {
-		frameMaxWidth: 1100,
-	});
+	return renderWithIntl(
+		<div style={{ width: "100%", maxWidth: 1100, padding: 16 }}>
+			<QuoteBatchSummary {...props} />
+		</div>,
+	);
 }
 
 const text = (value: string) => page.getByText(value, { exact: true });
