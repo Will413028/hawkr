@@ -428,6 +428,13 @@ type ContentOwner struct {
 	Readable bool
 }
 
+// ContentAuthor 是 ContentAuthorFor 的結果：Found 為真表示這位讀取者讀得到這則內容；Author 是作者 (kind, id)，StoreID 是所屬店家。
+type ContentAuthor struct {
+	Found   bool
+	Author  Actor
+	StoreID int64
+}
+
 // ContentSnapshot 是檢舉當下一則內容的唯讀快照，給 moderation 凍結並雜湊：作者 (kind, id)、所屬店家、此刻是不是公開可讀（同 ContentOwner）、本文與媒體參照。貼文的作者是它所屬的店家
 // （STORE），媒體參照是圖片資產 ID（沒有圖片為空）。內容不存在或已刪除時 Exists 為假，其餘欄位為零值。
 type ContentSnapshot struct {

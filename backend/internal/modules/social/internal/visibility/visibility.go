@@ -232,6 +232,15 @@ func (e ForumEntries) Admits(id StringExpression) BoolExpression {
 	return EXISTS(SELECT(a.T.ID).FROM(a.T).WHERE(a.Where(a.T.ID.EQ(id))))
 }
 
+// ParentAdmitted 同 Comments.ParentAdmitted：入口這一列若是回覆，它的父留言沒被觀看者的規則排除。
+func (e ForumEntries) ParentAdmitted() BoolExpression {
+	adm := e.Admits(e.T.ParentID)
+	if adm == nil {
+		return nil
+	}
+	return e.T.ParentID.IS_NULL().OR(adm)
+}
+
 // Counted 同 Comments.Counted（定義在 reevaluate_forum_entries）。
 func (e ForumEntries) Counted() BoolExpression { return e.T.Counted }
 

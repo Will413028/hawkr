@@ -101,6 +101,42 @@ func (s *Service) Owner(ctx context.Context, t model.Target) (model.ContentOwner
 	return model.ContentOwner{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())
 }
 
+// AuthorFor 回傳讀取者 c 讀得到的留言或討論區留言的作者（從內容封鎖作者用，A7-2e）：套用與列表相同的觀看者規則（入口的個人封鎖、
+// 父列沒被排除、容器可讀、內容計入）；c 的店擁有該內容所屬的貼文或討論區時，以店主身分讀（不必公開、不套個人封鎖）。讀不到回 Found 為假，不是錯誤。
+func (s *Service) AuthorFor(ctx context.Context, c model.Caller, t model.Target) (model.ContentAuthor, error) {
+	if t.Kind != model.TargetComment && t.Kind != model.TargetForumEntry {
+		return model.ContentAuthor{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())
+	}
+	now := s.d.Now().UTC()
+	conn := s.d.DB.Conn(ctx)
+	var queries []reads.Stmt
+	switch t.Kind {
+	case model.TargetComment:
+		if c.Store != nil {
+			queries = append(queries, reads.OwnerCommentAuthor(t.ID, c.Store.StoreID))
+		}
+		queries = append(queries, reads.ReadableCommentAuthor(t.ID, now, c.BuyerID))
+	case model.TargetForumEntry:
+		if c.Store != nil {
+			queries = append(queries, reads.OwnerForumEntryAuthor(t.ID, c.Store.StoreID))
+		}
+		queries = append(queries, reads.ReadableForumEntryAuthor(t.ID, now, c.BuyerID))
+	case model.TargetPost:
+		return model.ContentAuthor{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())
+	}
+	for _, q := range queries {
+		r, err := reads.One[reads.AuthorRow](ctx, conn, q)
+		if errors.Is(err, pgx.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return model.ContentAuthor{}, fmt.Errorf("social：讀取內容的作者 %s：%w", t.ID, err)
+		}
+		return model.ContentAuthor{Found: true, Author: model.Actor{Kind: model.ActorKind(r.ActorKind), ID: r.ActorID}, StoreID: r.StoreID}, nil
+	}
+	return model.ContentAuthor{}, nil
+}
+
 // Snapshot 回傳內容此刻的歸屬（存在、作者、所屬店家、是否公開可讀，同 Owner）、本文與媒體參照（給 moderation 在檢舉送出時凍結）：唯讀，不鎖；內容不存在或已刪除回
 // Exists 為假，不是錯誤。歸屬只查一次（Owner），本文與圖片另用一個查詢讀。
 func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSnapshot, error) {
