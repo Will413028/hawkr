@@ -79,8 +79,9 @@ env:
   NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:9/api/v1
 
 jobs:
-  verify:
-    name: Lint, test, build
+  # 三個 job 並行：彼此沒有相依，各自 install 的開銷小於依序跑的總時間。
+  lint:
+    name: Lint 與靜態檢查
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -94,7 +95,27 @@ jobs:
       - name: 色彩對比（contrast.py）
         run: pnpm run contrast:check
       - run: pnpm run test:unit
+
+  vitest:
+    name: vitest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
       - run: pnpm test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
       - run: pnpm run build
       # build 產出的檢查：分享圖在根 layout 之下的頁面是否還在（Next 的 metadata 合併只有 build 之後看得到）。
       - name: build 產出（分享圖）
