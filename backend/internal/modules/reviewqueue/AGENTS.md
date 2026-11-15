@@ -10,7 +10,7 @@
 
 ## 發布的讀取介面
 
-無。本模組不發布 `pub_*`，只讀 seller 發布的 `seller.pub_review_items(at)`、payment 發布的 `payment.pub_review_items(at)` 與 moderation 發布的 `moderation.pub_review_items(at)`（契約在兩者的 `db/pub.sql`；payment 的列沒有店名，由 `internal/httpapi/reviewqueue` 經 seller 補上）。對外是 `Module.List(ctx, now, kinds, after, limit)`，形狀見 `backend/docs/modules/reviewqueue.md` §1。
+無。本模組不發布 `pub_*`，只讀 seller 發布的 `seller.pub_review_items(at)`、payment 發布的 `payment.pub_review_items(at)` 與 moderation 發布的 `moderation.pub_review_items(at)`（契約在三者的 `db/pub.sql`；payment 的列沒有店名，由 `internal/httpapi/reviewqueue` 經 seller 補上）。對外是 `Module.List(ctx, now, kinds, after, limit)`，形狀見 `backend/docs/modules/reviewqueue.md` §1。
 
 ## 模組內部結構
 

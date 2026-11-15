@@ -6,14 +6,12 @@
 CREATE SCHEMA moderation;
 
 -- 後台待辦的一列：kind 是 UPPER_SNAKE 的種類（MODERATION_CASE），item_id 是同一種類內唯一、位元組順序穩定的鍵（案件 ID 的文字），
--- case_id 是案件，target_kind 是被檢舉的對象種類（POST、COMMENT、FORUM_ENTRY、BUYER），report_count 是案件的檢舉筆數（只供顯示），
+-- case_id 是案件，
 -- 開始時間與期限一定有值。真實的 pub_review_item 是複合型別。
 CREATE TABLE moderation.pub_review_item (
     kind         TEXT        NOT NULL,
     item_id      TEXT        NOT NULL,
     case_id      UUID        NOT NULL,
-    target_kind  TEXT        NOT NULL,
-    report_count BIGINT      NOT NULL,
     start_at     TIMESTAMPTZ NOT NULL,
     due_at       TIMESTAMPTZ NOT NULL
 );

@@ -28,7 +28,7 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// setup 給這支測試一個套用了 seller migration 的 database（本模組沒有自己的 schema，讀 seller 發布的 pub_review_items，函式建在 seller 的表上）。
+// setup 給這支測試一個套用了 seller、payment 與 moderation migration 的 database（本模組沒有自己的 schema，讀三者發布的 pub_review_items，函式建在它們的表上）。
 func setup(t *testing.T) (*db.DB, *reviewqueue.Module) {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "seller", Dir: seller.Migrations()}, migrate.Module{Name: "payment", Dir: payment.Migrations()}, migrate.Module{Name: "moderation", Dir: moderation.Migrations()}))
@@ -350,7 +350,7 @@ func TestKindsMatchTheSource(t *testing.T) {
 	}
 }
 
-// setupICU 給這支測試一個預設 collation 是 ICU 語言排序（en-US）的 database，套用了與 setup 相同的 migration（只有 seller 的）。
+// setupICU 給這支測試一個預設 collation 是 ICU 語言排序（en-US）的 database，套用了與 setup 相同的 migration（seller、payment、moderation）。
 // 測試用的 Postgres 預設是 C 系的 collation，位元組順序與資料庫的預設順序相同，COLLATE "C" 有沒有寫都看不出來。
 func setupICU(t *testing.T) (*db.DB, *reviewqueue.Module) {
 	t.Helper()
@@ -526,7 +526,7 @@ func moderationWorld(t *testing.T, d *db.DB) (open, other []modCase) {
 	return []modCase{openOne, openMany, reopened, buyerOpen, buyerReopened}, []modCase{closedViolation, closedNo, buyerClosed}
 }
 
-// 每種領域狀態進不進待辦，等於 moderation 的判定式（案件的 decision IS NULL）：進行中的（一筆或多筆檢舉、結案後同對象重開的新案件、買家對象）都在，
+// 每種領域狀態進不進待辦，等於 moderation 的判定式（案件的 closed_at IS NULL）：進行中的（一筆或多筆檢舉、結案後同對象重開的新案件、買家對象）都在，
 // 結案的（VIOLATION、NO_VIOLATION、買家的結案）都不在；期限是開案後 72 小時、開始是期限前 24 小時，kind 是 MODERATION_CASE，item_id 與 CaseID 是案件 ID，沒有店家。
 // mutation：moderation.review_moderation_case 漏掉一種進行中的狀態（例如 WHERE 加 AND target_kind <> 'BUYER'）→ 進行中的買家案件不在待辦，這裡失敗。
 func TestModerationCasesAreInTheQueueExactlyWhenOpen(t *testing.T) {

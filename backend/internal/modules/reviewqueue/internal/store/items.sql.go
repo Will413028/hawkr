@@ -46,7 +46,7 @@ type ListItemsParams struct {
 }
 
 // 後台待辦：各來源發布的 pub_*_review_items 依期限由急到緩（step10e-3d-design.md §2.2）。現在是 seller、payment（收款帳戶，收款開通 ADR D28）與 moderation（進行中的檢舉案件）。
-// moderation 的列只有案件 ID（case_id 欄；它的 target_kind、report_count 只供案件頁，待辦不投影）。payment 的列只有店家 ID，店名在這裡是 NULL，由後台的入口組裝（httpapi/reviewqueue）。
+// moderation 的列只有案件 ID（case_id 欄）。payment 的列只有店家 ID，店名在這裡是 NULL，由後台的入口組裝（httpapi/reviewqueue）。
 // 全序是 (due_at, start_at, kind, item_id)，kind 與 item_id 以位元組順序（COLLATE "C"）比，與資料庫的預設 collation 無關；
 // keyset 用同樣的 row-value 比較；第一頁沒有游標（四個 after_* 都是 NULL），照 repo 的慣例寫 IS NULL OR。
 // 整句是一個語句快照（READ COMMITTED 下每個語句一個快照），不需要 transaction。

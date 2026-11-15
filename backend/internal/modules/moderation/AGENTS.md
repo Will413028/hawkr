@@ -10,7 +10,7 @@ schema `moderation`（表在 `db/schema.sql`，發布的函式與複合型別在
 
 ## 發布的讀取介面
 
-`moderation.pub_review_items(at)`：後台待辦的 moderation 部分（reviewqueue 讀，契約在 `db/pub.sql`），一列一個進行中案件（`decision IS NULL`），種類 `MODERATION_CASE`。期限的時長只寫在 `objects.sql` 的 `review_moderation_case(at)`，規格見 `backend/docs/modules/moderation.md` §7。
+`moderation.pub_review_items(at)`：後台待辦的 moderation 部分（reviewqueue 讀，契約在 `db/pub.sql`），一列一個進行中案件（`closed_at IS NULL`），種類 `MODERATION_CASE`。期限的時長只寫在 `objects.sql` 的 `review_moderation_case(at)`，規格見 `backend/docs/modules/moderation.md` §7。
 
 ## 模組內部結構
 

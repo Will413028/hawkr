@@ -11,13 +11,11 @@ import (
 )
 
 type ModerationPubReviewItem struct {
-	Kind        string
-	ItemID      string
-	CaseID      uuid.UUID
-	TargetKind  string
-	ReportCount int64
-	StartAt     time.Time
-	DueAt       time.Time
+	Kind    string
+	ItemID  string
+	CaseID  uuid.UUID
+	StartAt time.Time
+	DueAt   time.Time
 }
 
 type PaymentPubReviewItem struct {
