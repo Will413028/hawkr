@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { requiredAccessForPath } from "@/lib/auth/redirect";
 import { discoverAppPageRoutes } from "./helpers/app-route-inventory";
+import { expectNoAxeViolations } from "./helpers/axe";
 import {
 	mockMyKyc,
 	mockMyStore,
@@ -314,6 +315,7 @@ async function assertProtectedRoute(
 	}
 	await assertNoResidualLoading(page, route);
 	await assertRenderedLinksSafe(page, route);
+	await expectNoAxeViolations(page, route);
 }
 
 test.describe("authenticated protected static route smoke", {
