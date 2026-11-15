@@ -168,10 +168,12 @@ describe("DescriptionEditor", () => {
 		const { container: canvasElement, args } = mount({});
 
 		const dialog = await waitForEditor(canvasElement);
-		await expect(
-			within(dialog).getByRole("toolbar", { name: "文字樣式" }),
-		).toBeVisibleSync();
-		await expect(within(dialog).getByText("商品資訊")).toBeVisibleSync();
+		await waitFor(() => {
+			expect(
+				within(dialog).getByRole("toolbar", { name: "文字樣式" }),
+			).toBeVisibleSync();
+			expect(within(dialog).getByText("商品資訊")).toBeVisibleSync();
+		});
 		await expect(args.uploadImageFile).not.toHaveBeenCalled();
 	});
 
@@ -219,14 +221,16 @@ describe("DescriptionEditor", () => {
 		await expect(dialog.getBoundingClientRect().width).toBeLessThanOrEqual(375);
 		const editor = within(dialog);
 		await userEvent.click(editor.getByRole("button", { name: "更多格式" }));
-		await expect(
-			editor.getByRole("button", { name: "置中" }),
-		).toBeVisibleSync();
+		await waitFor(() => {
+			expect(editor.getByRole("button", { name: "置中" })).toBeVisibleSync();
+		});
 		await userEvent.click(editor.getByRole("button", { name: "更多格式" }));
 		await userEvent.click(editor.getByRole("button", { name: "放大編輯" }));
-		await expect(
-			editor.getByRole("button", { name: "縮小編輯區" }),
-		).toHaveAttributeSync("aria-expanded", "true");
+		await waitFor(() => {
+			expect(
+				editor.getByRole("button", { name: "縮小編輯區" }),
+			).toHaveAttributeSync("aria-expanded", "true");
+		});
 		await userEvent.click(editor.getByRole("button", { name: "縮小編輯區" }));
 		await waitFor(() =>
 			expect(
@@ -253,7 +257,11 @@ describe("DescriptionEditor", () => {
 				{ text: "選取文字後即可調整格式", bold: true },
 			]);
 		});
-		await expect(boldButton).toHaveAttributeSync("aria-pressed", "true");
+		await waitFor(() => {
+			expect(
+				editor.getByRole("button", { name: "粗體（⌘B）" }),
+			).toHaveAttributeSync("aria-pressed", "true");
+		});
 		await userEvent.keyboard("{Control>}z{/Control}");
 		await waitFor(() => {
 			expect(args.onChange.mock.lastCall?.[0].blocks[0].runs).toEqual([
@@ -460,7 +468,9 @@ describe("DescriptionEditor", () => {
 		await waitFor(() =>
 			expect(editor.getByText("這一段改成清單")).toBeVisibleSync(),
 		);
-		await expect(editor.getByText("這一段維持內文")).toBeVisibleSync();
+		await waitFor(() => {
+			expect(editor.getByText("這一段維持內文")).toBeVisibleSync();
+		});
 		await userEvent.click(editor.getByText("這一段改成清單"));
 		await userEvent.click(
 			editor.getByRole("button", { name: /^套用編號清單/ }),

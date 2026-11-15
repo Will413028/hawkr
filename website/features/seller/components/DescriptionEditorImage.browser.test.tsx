@@ -138,7 +138,9 @@ describe("DescriptionEditorImage", () => {
 				within(dialog).getByRole("button", { name: /加入商品圖片/ }),
 			).toBeVisibleSync(),
 		);
-		await expect(fileInput(dialog)).toHaveAttributeSync("accept", "image/*");
+		await waitFor(() => {
+			expect(fileInput(dialog)).toHaveAttributeSync("accept", "image/*");
+		});
 		assertNoCaption(dialog);
 		await expect(args.uploadImageFile).not.toHaveBeenCalled();
 	});
@@ -274,7 +276,9 @@ describe("DescriptionEditorImage", () => {
 			.mockResolvedValueOnce(uploaded);
 		await assertDecodedImage(dialog, oldImage.alt);
 		await userEvent.upload(fileInput(dialog), file());
-		await expect(await ui.findByRole("alert")).toBeVisibleSync();
+		await waitFor(() => {
+			expect(ui.getByRole("alert")).toBeVisibleSync();
+		});
 		await expect(
 			images(args.onChange.mock.lastCall?.[0] ?? args.value),
 		).toEqual([
@@ -358,9 +362,9 @@ describe("DescriptionEditorImage", () => {
 				ui.getByRole("progressbar", { name: "圖片上傳進度" }),
 			).toHaveValueSync(42),
 		);
-		await expect(
-			ui.getByRole("button", { name: "移除圖片" }),
-		).toBeEnabledSync();
+		await waitFor(() => {
+			expect(ui.getByRole("button", { name: "移除圖片" })).toBeEnabledSync();
+		});
 		await userEvent.click(ui.getByRole("button", { name: "移除圖片" }));
 		await waitFor(() => {
 			expect(dialog).toHaveAttributeSync("aria-busy", "false");
@@ -425,12 +429,10 @@ describe("DescriptionEditorImage", () => {
 		await expect(dialog.scrollWidth).toBeLessThanOrEqual(
 			dialog.clientWidth + 1,
 		);
-		await expect(
-			ui.getByRole("button", { name: "更換圖片" }),
-		).toBeVisibleSync();
-		await expect(
-			ui.getByRole("button", { name: "移除圖片" }),
-		).toBeVisibleSync();
+		await waitFor(() => {
+			expect(ui.getByRole("button", { name: "更換圖片" })).toBeVisibleSync();
+			expect(ui.getByRole("button", { name: "移除圖片" })).toBeVisibleSync();
+		});
 		await expect(args.uploadImageFile).not.toHaveBeenCalled();
 	});
 });

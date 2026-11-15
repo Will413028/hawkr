@@ -145,9 +145,11 @@ describe("DescriptionEditorColor", () => {
 			args.onChange.mock.lastCall?.[0].blocks[0].runs?.[0].color,
 		).toBeUndefined();
 		picker = within(await openPalette(dialog));
-		await expect(
-			picker.getByRole("textbox", { name: "HEX 色碼" }),
-		).not.toHaveValueSync("#563a72");
+		await waitFor(() => {
+			expect(
+				picker.getByRole("textbox", { name: "HEX 色碼" }),
+			).not.toHaveValueSync("#563a72");
+		});
 		await userEvent.keyboard("{Escape}");
 		await userEvent.click(ui.getByRole("button", { name: /^粗體/ }));
 		await waitFor(() => {
@@ -189,9 +191,11 @@ describe("DescriptionEditorColor", () => {
 		);
 		selectText(ui.getByText("選取這段文字調整顏色"));
 		picker = within(await openPalette(dialog));
-		await expect(
-			picker.getByRole("textbox", { name: "HEX 色碼" }),
-		).toHaveValueSync("#b8441f");
+		await waitFor(() => {
+			expect(picker.getByRole("textbox", { name: "HEX 色碼" })).toHaveValueSync(
+				"#b8441f",
+			);
+		});
 		await userEvent.keyboard("{Escape}");
 		await expectAbsent(() => ui.queryByRole("dialog", { name: "文字顏色" }));
 		await waitFor(() =>
@@ -233,8 +237,10 @@ describe("DescriptionEditorColor", () => {
 				{ text: "調整顏色" },
 			]),
 		);
-		await expect(ui.getByText("這段文字")).toHaveStyleSync({
-			color: "rgb(104, 46, 14)",
+		await waitFor(() => {
+			expect(ui.getByText("這段文字")).toHaveStyleSync({
+				color: "rgb(104, 46, 14)",
+			});
 		});
 	});
 
