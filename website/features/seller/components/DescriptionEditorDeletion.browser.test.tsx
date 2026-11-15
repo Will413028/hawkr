@@ -1,6 +1,6 @@
 import { within } from "@testing-library/dom";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import type { ProductDescription } from "@/lib/products/seller-repo";
 import { mountEditor } from "@/tests/browser/description-editor";
 import {
@@ -125,24 +125,12 @@ async function deleteFromBlockMenu(
 		".ce-toolbar__settings-btn",
 	);
 	if (!settings) throw new Error("找不到區塊調整按鈕");
-	// Editor.js 只在 redactor 的 mousemove（target 在 .ce-block 內）才把工具列移到該區塊
-	// （editorjs.mjs watchBlockHoveredEvents → Toolbar.moveAndOpen，會設 wrapper.style.top 並加 ce-toolbar--opened）。
-	// 指標只移一次；之後等到工具列開啟、按鈕可見，且 top 離目標區塊最近。
 	const toolbar = settings.closest<HTMLElement>(".ce-toolbar");
 	if (!toolbar) throw new Error("找不到區塊工具列");
 	const blocks = Array.from(dialog.querySelectorAll<HTMLElement>(".ce-block"));
-	// 合成 mousemove：Editor.js 只聽 redactor 上冒泡的 mousemove，真實指標移動不保證觸發它。
-	const content =
-		block.querySelector<HTMLElement>(".ce-block__content") ?? block;
-	const rect = content.getBoundingClientRect();
-	const init = {
-		bubbles: true,
-		clientX: rect.left + rect.width / 2,
-		clientY: rect.top + rect.height / 2,
-	};
-	for (const type of ["mouseover", "mouseenter", "mousemove"]) {
-		content.dispatchEvent(new MouseEvent(type, init));
-	}
+	await user.hover(
+		block.querySelector<HTMLElement>(".ce-block__content") ?? block,
+	);
 	await waitFor(() => {
 		expect(toolbar.classList.contains("ce-toolbar--opened")).toBe(true);
 		expect(settings).toBeVisibleSync();
@@ -500,6 +488,8 @@ describe("DescriptionEditorDeletion", () => {
 	});
 
 	it("區塊選單 · 刪除滑鼠指向的段落", async () => {
+		// Editor.js 在 650px 以下視為手機版，不依滑鼠位置移動區塊工具列。
+		await page.viewport(1280, 800);
 		const { container: canvasElement, args } = mount({
 			value: {
 				version: "1.0",
