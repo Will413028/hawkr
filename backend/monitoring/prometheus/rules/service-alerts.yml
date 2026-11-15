@@ -30,7 +30,7 @@ groups:
       #     ⚠️ 一度誤加進下方 ProdOtlpServiceAbsent —— 那條要的是 server_start_total，而它來自
       #     pkgotel.InitMeterProvider，invoice-service 沒有呼叫（全 repo 只有那 11 個服務有）⇒
       #     absent() 恆為真 ⇒ 會讓整條 or 鏈永久 firing，把那 11 個服務的偵測一起毀掉。
-      #     判準：**看該服務是否只提供 gRPC（沒有 HTTP port）** —— 那才是 chart
+      #     判準：**看該服務的部署設定有沒有 `transportMode: grpc-only`** —— 那才是 chart
       #     決定要不要打 prometheus.io/scrape 的條件（deployment.yaml 的 $grpcOnly）。
       #     ⚠️ 不要用「有沒有 ports.http」當判準：chart 對 ports.http.containerPort 有預設值 8080，
       #     照字面永遠為真。今天兩者恰好同解（11 個 grpc-only 服務都沒顯式寫 ports），但下一個
