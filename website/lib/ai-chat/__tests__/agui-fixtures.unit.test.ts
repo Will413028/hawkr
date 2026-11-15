@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { EventSchemas } from "@ag-ui/core";
+import { EventSchemas } from "@ag-ui/core/schemas";
 import { describe, expect, it } from "vitest";
 
 // 這些 .sse 是 gateway 產生的 canonical frame，直接讀 gateway 的 golden fixture，不另存拷貝。
