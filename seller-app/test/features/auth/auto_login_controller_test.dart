@@ -72,7 +72,7 @@ void main() {
   Future<AutoLoginResult> check(ProviderContainer container) =>
       container.read(autoLoginControllerProvider.notifier).check();
 
-  test('session token 啟動失敗不重試 GetSession、不登出、不清快取', () async {
+  testWidgets('session token 啟動失敗不重試 GetSession、不登出、不清快取', (tester) async {
     await AuthStorage.restoreAccount('acc-1');
     await _saveCachedEditHistory();
     var calls = 0;
@@ -89,7 +89,7 @@ void main() {
       },
     );
     expect(await check(c), isA<AutoLoginSignedOut>());
-    await Future<void>.delayed(const Duration(milliseconds: 1600));
+    await tester.pump(const Duration(milliseconds: 1600));
     expect(calls, 0);
     expect(auth.calls, isEmpty);
     expect(await _cachedEditHistory(), '[]');

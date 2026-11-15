@@ -9,7 +9,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/hk_tokens.dart';
-import '../../../shared/utils/app_version_utils.dart';
+import 'package:hawkr_app_update/app_version_utils.dart';
 import '../../../shared/widgets/animated_orbs_background.dart';
 import '../../../shared/widgets/common_snackbar.dart';
 import '../../../core/analytics/analytics_providers.dart';

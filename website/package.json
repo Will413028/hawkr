@@ -34,6 +34,7 @@
 		"storybook:build": "storybook build --output-dir output/storybook --disable-telemetry",
 		"storybook:test": "vitest run --config vitest.storybook.config.ts",
 		"design:check": "node scripts/check-cross-platform-tokens.mjs",
+		"contrast:check": "python3 scripts/contrast.py",
 		"storybook:typecheck": "tsc --noEmit -p tsconfig.storybook.json",
 		"storybook:apps": "node scripts/build-app-catalogs.mjs",
 		"storybook:build:all": "pnpm storybook:apps && pnpm storybook:build",

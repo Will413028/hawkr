@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/networking/connect_provider.dart';
-import '../../../shared/utils/app_version_utils.dart';
+import 'package:hawkr_app_update/app_version_utils.dart';
 import '../../../shared/utils/hk_log.dart';
 
 part 'force_update_provider.g.dart';

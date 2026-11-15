@@ -16,6 +16,10 @@ on:
       # design:check 比對兩支 App 的 theme 與 web 的 token 契約。
       - 'buyer-app/lib/core/theme/**'
       - 'seller-app/lib/core/theme/**'
+      # contrast.py 掃這些目錄的使用處。
+      - 'admin/src/**'
+      - 'buyer-app/lib/**'
+      - 'seller-app/lib/**'
       # 根目錄的 pnpm workspace（兩個 app 共用一份 lockfile 與工具版本）。
       # workspace 層級的 audit 與 override 檢查在 workspace-ci.yml，不在這裡。
       - 'package.json'
@@ -41,6 +45,10 @@ on:
       # design:check 比對兩支 App 的 theme 與 web 的 token 契約。
       - 'buyer-app/lib/core/theme/**'
       - 'seller-app/lib/core/theme/**'
+      # contrast.py 掃這些目錄的使用處。
+      - 'admin/src/**'
+      - 'buyer-app/lib/**'
+      - 'seller-app/lib/**'
       # 根目錄的 pnpm workspace（兩個 app 共用一份 lockfile 與工具版本）。
       # workspace 層級的 audit 與 override 檢查在 workspace-ci.yml，不在這裡。
       - 'package.json'
@@ -85,6 +93,8 @@ jobs:
       - run: pnpm run lint
       - name: 三端 design token 與契約一致
         run: pnpm run design:check --apps-root ..
+      - name: 色彩對比（contrast.py）
+        run: pnpm run contrast:check
       - run: pnpm run test:unit
       - run: pnpm test
       - run: pnpm run build

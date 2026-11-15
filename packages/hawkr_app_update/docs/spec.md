@@ -6,7 +6,7 @@
 
 - 呼叫 `ContentPublicService.CheckAppVersion(app_type, client_version)`，只讀 `update_required`、`minimum_version`、`store_url`、`notice_title`、`notice_body`。版本比較只在後端，App 不實作任何比較邏輯。
 - 這個 service 是公開的，不帶身分：未登入、guest、token 過期、停權的賣家都可以呼叫，也都會被攔截。
-- `client_version` 是 bare semver（`1.0.3`），不含 build number。顯示用的版本字串（`1.0.3(7)`）不可送出：後端比對失敗會放行，強更靜默永不觸發。App 取得兩者的函式分開：`fetchRawAppVersion` 回 bare semver，`fetchAppVersion` 回顯示字串；兩支 App 的 `lib/shared/utils/app_version_utils.dart` 逐位元組相同。
+- `client_version` 是 bare semver（`1.0.3`），不含 build number。顯示用的版本字串（`1.0.3(7)`）不可送出：後端比對失敗會放行，強更靜默永不觸發。App 取得兩者的函式分開：`fetchRawAppVersion` 回 bare semver，`fetchAppVersion` 回顯示字串；兩個函式都在本套件的 `lib/app_version_utils.dart`（`package:hawkr_app_update/app_version_utils.dart`），兩支 App 直接 import，不各留一份。
 
 ## 2. 檢查規則（`VersionGate`）
 

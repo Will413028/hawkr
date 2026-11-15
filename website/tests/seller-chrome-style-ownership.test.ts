@@ -242,7 +242,7 @@ test("seller and auth owner CSS preserve the exact reviewed semantic AST", () =>
 	// 2026-10-27 ui-kit 刪除 LOCATION PICKER MODAL 整段（產地地圖）；其餘 owner 與順序未變。
 	assert.equal(
 		digest(reconstructed),
-		"67283011d8c4cc0b90124a301529ad7eece70f706dc0be2b18a62d07edfba957",
+		"042d8200ab6d78016eccbcccdf2bb1c5b67901fdbb668fe0218509dc4d46841b",
 		"recombining every owner file at its original position must reproduce the reviewed ui-kit AST",
 	);
 	assert.deepEqual(

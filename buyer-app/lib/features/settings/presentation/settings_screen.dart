@@ -14,7 +14,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../shared/utils/app_version_utils.dart';
+import 'package:hawkr_app_update/app_version_utils.dart';
 import '../../../core/session/session_model.dart';
 import '../../../core/session/session_provider.dart';
 import '../../../config/image_config.dart';
