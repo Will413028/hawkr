@@ -30,8 +30,6 @@
 		"test:reliability": "playwright test tests/e2e/reliability.spec.ts",
 		"build:seo": "NEXT_PUBLIC_FLAVOR=prod NEXT_PUBLIC_SEO_INDEXABLE=true NEXT_PUBLIC_HAWKR_AGENT_ENABLED=false NEXT_PUBLIC_WEB_ORIGIN=https://example.com NEXT_PUBLIC_ADM_ORIGIN=https://admin.example.com NEXT_PUBLIC_API_BASE_URL=/api/v1 API_BASE_URL=http://127.0.0.1:9/api/v1 next build",
 		"test:seo": "playwright test --config=playwright.seo.config.ts",
-		"lhci:desktop": "lhci autorun --config=lighthouserc.desktop.cjs",
-		"lhci:mobile": "lhci autorun --config=lighthouserc.mobile.cjs",
 		"storybook": "storybook dev --host 127.0.0.1 --port 6006 --no-open --disable-telemetry",
 		"storybook:build": "storybook build --output-dir output/storybook --disable-telemetry",
 		"storybook:test": "vitest run --config vitest.storybook.config.ts",
@@ -106,7 +104,6 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "catalog:",
-		"@lhci/cli": "^0.15.1",
 		"@next/bundle-analyzer": "^16.4.3",
 		"@next/env": "^16.4.3",
 		"@playwright/test": "~1.64.1",

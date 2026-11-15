@@ -232,7 +232,6 @@ N/A（無狀態服務）。
 
 SEO 的把關點在 **CI**，不在 runtime：
 
-- Lighthouse SEO score gate：`lighthouserc.mobile.cjs` / `lighthouserc.desktop.cjs`，`categories:seo` 門檻 `minScore: 0.9`。
 - Playwright SEO 契約測試套件：`tests/seo/`。
 
 **沒有 runtime 告警**：索引覆蓋率下滑、爬取錯誤率上升不會觸發任何通知。SEO 退化的偵測依賴人工查看搜尋引擎主控台。
@@ -260,7 +259,6 @@ SEO 的把關點在 **CI**，不在 runtime：
 
 | 指標 (SLI) | 目標 (SLO) | 量測點 |
 |---|---|---|
-| Lighthouse SEO score | ≥ 0.9（低於即 CI 失敗） | CI `lighthouserc.*.cjs` |
 
 ### 9.2 容量與規模 (Capacity & Scaling)
 
@@ -296,7 +294,6 @@ N/A。
 
 | 層級 | 覆蓋 | 關鍵場景 |
 |---|---|---|
-| CI gate | Lighthouse SEO score | `lighthouserc.mobile.cjs`/`lighthouserc.desktop.cjs`，門檻 `minScore: 0.9`，抽測首頁/市集/FAQ/商品頁/賣家頁 |
 | e2e (Playwright) | canonical、JSON-LD、img-alt、h1 唯一性、social title | `tests/seo/entity-templates.seo.spec.ts`、`tests/seo/h1-uniqueness.seo.spec.ts`、`tests/seo/social-title.seo.spec.ts`，獨立跑於 `playwright.seo.config.ts` |
 
 ---

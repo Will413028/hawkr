@@ -40,16 +40,6 @@ ignoreUntil = 2027-02-13
 reason = "基準：RubyGems addressable@2.8.8（buyer-app、seller-app 的 ios/Gemfile.lock；CVSS 5.9，MEDIUM，2026-11-15 發現；修正版 2.9.1）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-5pm8-86m8-9m6r"
-ignoreUntil = 2027-02-13
-reason = "基準：npm basic-ftp@5.3.1（CVSS 5.3，MEDIUM，2026-11-15 發現；修正版 6.2.4 是大版號升級）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-r4jh-29pc-gfqr"
-ignoreUntil = 2027-02-13
-reason = "基準：npm basic-ftp@5.3.1（CVSS 5.9，MEDIUM，2026-11-15 發現；修正版 6.2.4 是大版號升級）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-3g3m-2fjr-6pw4"
 ignoreUntil = 2027-01-29
 reason = "基準：npm glob@9.3.5, 12.0.0, 13.0.6（CVSS 6.3，MEDIUM，2026-10-31 發現；修正版 14.0.2 是大版號升級）；升級待核准"
@@ -255,19 +245,9 @@ ignoreUntil = 2027-01-28
 reason = "基準：RubyGems json@2.18.0（CVSS 3.7，LOW）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-22jq-vg5j-6vgg"
-ignoreUntil = 2027-01-28
-reason = "基準：npm ip-address@10.2.0（CVSS 6.9，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-27r3-jxmh-p828"
 ignoreUntil = 2026-11-29
 reason = "基準：npm body-parser@1.20.5, body-parser@2.3.0（CVSS 7.5，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-2883-xcg3-v3hh"
-ignoreUntil = 2026-11-29
-reason = "基準：npm js-yaml@3.14.2（CVSS 7.5，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-2gqq-gqf2-x968"
@@ -293,11 +273,6 @@ reason = "基準：npm nanoid@3.3.16（CVSS 8.2，HIGH）；升級待核准"
 id = "GHSA-2vc4-c4r6-p6v6"
 ignoreUntil = 2026-11-29
 reason = "基準：npm @opennextjs/cloudflare@1.20.0（CVSS 7.5，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-2vr4-cq9g-pvrc"
-ignoreUntil = 2027-01-28
-reason = "基準：npm ip-address@10.2.0（CVSS 6.9，MEDIUM）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-333x-w4r6-6crp"
@@ -345,21 +320,6 @@ ignoreUntil = 2027-01-28
 reason = "基準：npm vite@8.0.3（CVSS 6.3，MEDIUM）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-4xrf-jv44-h6hh"
-ignoreUntil = 2027-01-28
-reason = "基準：npm ip-address@10.2.0（CVSS 6.9，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-52cp-r559-cp3m"
-ignoreUntil = 2026-11-29
-reason = "基準：npm js-yaml@3.14.2（CVSS 7.5，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-52f5-9888-hmc6"
-ignoreUntil = 2027-01-28
-reason = "基準：npm tmp@0.0.33, tmp@0.1.0（CVSS 2.5，LOW）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-55wc-3pg8-jfw6"
 ignoreUntil = 2027-01-28
 reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 5.9，MEDIUM）；升級待核准"
@@ -368,11 +328,6 @@ reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 5.9，MEDIUM）�
 id = "GHSA-587h-7wmj-h5pm"
 ignoreUntil = 2026-11-29
 reason = "基準：npm vite@8.0.3, vite@8.1.4（CVSS 7.5，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-5p4m-2wfm-xmqj"
-ignoreUntil = 2026-11-29
-reason = "基準：npm js-yaml@3.14.2（CVSS 7.5，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-68fv-2mgg-jv7q"
@@ -393,11 +348,6 @@ reason = "基準：npm brace-expansion@2.1.1（CVSS 7.5，HIGH）；升級待核
 id = "GHSA-6pq8-jhm2-2vcw"
 ignoreUntil = 2027-01-28
 reason = "基準：npm qs@6.15.2（CVSS 6.3，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-7pqw-9j4j-h8q3"
-ignoreUntil = 2026-11-29
-reason = "基準：npm extract-zip@2.0.1（CVSS 8.1，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-7w5x-hrqm-74c2"
@@ -435,11 +385,6 @@ ignoreUntil = 2027-01-28
 reason = "基準：npm seroval@1.6.8（CVSS 4.7，MEDIUM）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-c475-qrg2-pj4r"
-ignoreUntil = 2026-11-29
-reason = "基準：npm basic-ftp@5.3.1（CVSS 8.2，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-f72v-6w45-q472"
 ignoreUntil = 2027-01-28
 reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 5.9，MEDIUM）；升級待核准"
@@ -470,26 +415,6 @@ ignoreUntil = 2027-01-28
 reason = "基準：npm esbuild@0.28.0（CVSS 2.5，LOW）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-h3mg-xc3c-68pw"
-ignoreUntil = 2027-01-28
-reason = "基準：npm ip-address@10.2.0（CVSS 6.3，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-h67p-54hq-rp68"
-ignoreUntil = 2027-01-28
-reason = "基準：npm js-yaml@3.14.2（CVSS 5.3，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-j6r3-76f7-8jcv"
-ignoreUntil = 2027-01-28
-reason = "基準：npm ip-address@10.2.0（CVSS 6.3，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-jmr9-qjv8-65gv"
-ignoreUntil = 2026-11-29
-reason = "基準：npm extract-zip@2.0.1（CVSS 8.6，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-jr45-8vmc-qm54"
 ignoreUntil = 2027-01-28
 reason = "基準：npm undici@7.28.0（CVSS 5.9，MEDIUM）；升級待核准"
@@ -510,19 +435,9 @@ ignoreUntil = 2026-11-29
 reason = "基準：npm zod@3.25.76, zod@4.4.3（CVSS 8.2，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-mwp4-54f8-5fhr"
-ignoreUntil = 2026-11-29
-reason = "基準：npm ip-address@10.2.0（CVSS 7.7，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-p9ff-h696-f583"
 ignoreUntil = 2026-11-29
 reason = "基準：npm vite@8.0.3（CVSS 8.2，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-ph9p-34f9-6g65"
-ignoreUntil = 2026-11-29
-reason = "基準：npm tmp@0.0.33, tmp@0.1.0（CVSS 7.7，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-pmjh-fq2x-6v4x"
@@ -580,11 +495,6 @@ ignoreUntil = 2026-11-29
 reason = "基準：npm brace-expansion@2.1.1（CVSS 7.5，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-rpw4-54j3-4h4q"
-ignoreUntil = 2027-01-28
-reason = "基準：npm ip-address@10.2.0（CVSS 6.3，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-rq7h-c2jc-7f22"
 ignoreUntil = 2027-01-28
 reason = "基準：npm vite@8.0.3, vite@8.1.4（CVSS 6.3，MEDIUM）；升級待核准"
@@ -593,11 +503,6 @@ reason = "基準：npm vite@8.0.3, vite@8.1.4（CVSS 6.3，MEDIUM）；升級待
 id = "GHSA-rx4f-c7p8-82vq"
 ignoreUntil = 2027-01-28
 reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 5.9，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-rxp7-6hxx-x8q5"
-ignoreUntil = 2027-01-28
-reason = "基準：npm ip-address@10.2.0（CVSS 6.3，MEDIUM）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-v2wj-q39q-566r"
@@ -610,29 +515,14 @@ ignoreUntil = 2027-01-28
 reason = "基準：npm undici@7.28.0（CVSS 4.8，MEDIUM）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-v422-hmwv-36x6"
-ignoreUntil = 2027-01-28
-reason = "基準：npm body-parser@1.20.5（CVSS 3.7，LOW）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-v6wh-96g9-6wx3"
 ignoreUntil = 2027-01-28
 reason = "基準：npm vite@8.0.3（CVSS 5.5，MEDIUM）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-vc2v-76pw-4v95"
-ignoreUntil = 2026-11-29
-reason = "基準：npm compression@1.8.1（CVSS 7.5，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-w293-vg96-wgc3"
 ignoreUntil = 2026-11-29
 reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 7.4，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-w5hq-g745-h8pq"
-ignoreUntil = 2026-11-29
-reason = "基準：npm uuid@8.3.2（CVSS 7.5，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-w74x-v6f9-j3xg"
