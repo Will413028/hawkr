@@ -19,6 +19,7 @@ import (
 
 // Writes 是互動寫入的來源（*social.Module）：分享、讚、留言與討論區。
 type Writes interface {
+	Authored
 	RecordShare(ctx context.Context, buyerID int64, postID uuid.UUID) (bool, error)
 	LikePost(ctx context.Context, buyerID int64, postID uuid.UUID) (bool, error)
 	UnlikePost(ctx context.Context, buyerID int64, postID uuid.UUID) (bool, error)

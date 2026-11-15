@@ -99,5 +99,53 @@ class PostStatus extends $pb.ProtobufEnum {
   const PostStatus._(super.value, super.name);
 }
 
+/// SanctionKind 是社群處分的種類。
+class SanctionKind extends $pb.ProtobufEnum {
+  static const SanctionKind SANCTION_KIND_UNSPECIFIED =
+      SanctionKind._(0, _omitEnumNames ? '' : 'SANCTION_KIND_UNSPECIFIED');
+
+  /// 警告。
+  static const SanctionKind SANCTION_KIND_WARNING =
+      SanctionKind._(1, _omitEnumNames ? '' : 'SANCTION_KIND_WARNING');
+
+  static const $core.List<SanctionKind> values = <SanctionKind>[
+    SANCTION_KIND_UNSPECIFIED,
+    SANCTION_KIND_WARNING,
+  ];
+
+  static final $core.List<SanctionKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 1);
+  static SanctionKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const SanctionKind._(super.value, super.name);
+}
+
+/// HiddenContentKind 是被隱藏的內容的種類。
+class HiddenContentKind extends $pb.ProtobufEnum {
+  static const HiddenContentKind HIDDEN_CONTENT_KIND_UNSPECIFIED =
+      HiddenContentKind._(
+          0, _omitEnumNames ? '' : 'HIDDEN_CONTENT_KIND_UNSPECIFIED');
+  static const HiddenContentKind HIDDEN_CONTENT_KIND_COMMENT =
+      HiddenContentKind._(
+          1, _omitEnumNames ? '' : 'HIDDEN_CONTENT_KIND_COMMENT');
+  static const HiddenContentKind HIDDEN_CONTENT_KIND_FORUM_ENTRY =
+      HiddenContentKind._(
+          2, _omitEnumNames ? '' : 'HIDDEN_CONTENT_KIND_FORUM_ENTRY');
+
+  static const $core.List<HiddenContentKind> values = <HiddenContentKind>[
+    HIDDEN_CONTENT_KIND_UNSPECIFIED,
+    HIDDEN_CONTENT_KIND_COMMENT,
+    HIDDEN_CONTENT_KIND_FORUM_ENTRY,
+  ];
+
+  static final $core.List<HiddenContentKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static HiddenContentKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const HiddenContentKind._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

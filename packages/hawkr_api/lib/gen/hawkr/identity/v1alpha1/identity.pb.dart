@@ -20,6 +20,7 @@ import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
     as $0;
 
 import '../../common/v1alpha1/image.pb.dart' as $2;
+import '../../common/v1alpha1/policy_category.pbenum.dart' as $3;
 import 'identity.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -1305,9 +1306,13 @@ class GetSessionResponse extends $pb.GeneratedMessage {
 class Suspension extends $pb.GeneratedMessage {
   factory Suspension({
     $0.Timestamp? suspendedAt,
+    $3.PolicyCategory? category,
+    $core.String? reason,
   }) {
     final result = Suspension._();
     if (suspendedAt != null) result.suspendedAt = suspendedAt;
+    if (category != null) result.category = category;
+    if (reason != null) result.reason = reason;
     return result;
   }
 
@@ -1327,6 +1332,9 @@ class Suspension extends $pb.GeneratedMessage {
       createEmptyInstance: Suspension.$_createMessage)
     ..aOM<$0.Timestamp>(1, _omitFieldNames ? '' : 'suspendedAt',
         subBuilder: $0.Timestamp.$_createMessage)
+    ..aE<$3.PolicyCategory>(2, _omitFieldNames ? '' : 'category',
+        enumValues: $3.PolicyCategory.values)
+    ..aOS(3, _omitFieldNames ? '' : 'reason')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1360,6 +1368,26 @@ class Suspension extends $pb.GeneratedMessage {
   void clearSuspendedAt() => $_clearField(1);
   @$pb.TagNumber(1)
   $0.Timestamp ensureSuspendedAt() => $_ensure(0);
+
+  /// 停權的政策分類；讀不到停權紀錄時不設（UNSPECIFIED）。
+  @$pb.TagNumber(2)
+  $3.PolicyCategory get category => $_getN(1);
+  @$pb.TagNumber(2)
+  set category($3.PolicyCategory value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCategory() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCategory() => $_clearField(2);
+
+  /// 給帳號擁有者看的停權理由；沒有補充說明或讀不到停權紀錄時是空字串。
+  @$pb.TagNumber(3)
+  $core.String get reason => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set reason($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasReason() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearReason() => $_clearField(3);
 }
 
 class DeleteAccountRequest extends $pb.GeneratedMessage {

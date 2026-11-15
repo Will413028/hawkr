@@ -114,6 +114,24 @@ const (
 	// BuyerAppServiceUnsubscribeRestockProcedure is the fully-qualified name of the BuyerAppService's
 	// UnsubscribeRestock RPC.
 	BuyerAppServiceUnsubscribeRestockProcedure = "/hawkr.buyer.v1alpha1.BuyerAppService/UnsubscribeRestock"
+	// BuyerAppServiceBlockAuthorProcedure is the fully-qualified name of the BuyerAppService's
+	// BlockAuthor RPC.
+	BuyerAppServiceBlockAuthorProcedure = "/hawkr.buyer.v1alpha1.BuyerAppService/BlockAuthor"
+	// BuyerAppServiceBlockStoreProcedure is the fully-qualified name of the BuyerAppService's
+	// BlockStore RPC.
+	BuyerAppServiceBlockStoreProcedure = "/hawkr.buyer.v1alpha1.BuyerAppService/BlockStore"
+	// BuyerAppServiceUnblockBuyerProcedure is the fully-qualified name of the BuyerAppService's
+	// UnblockBuyer RPC.
+	BuyerAppServiceUnblockBuyerProcedure = "/hawkr.buyer.v1alpha1.BuyerAppService/UnblockBuyer"
+	// BuyerAppServiceUnblockStoreProcedure is the fully-qualified name of the BuyerAppService's
+	// UnblockStore RPC.
+	BuyerAppServiceUnblockStoreProcedure = "/hawkr.buyer.v1alpha1.BuyerAppService/UnblockStore"
+	// BuyerAppServiceListBlockedBuyersProcedure is the fully-qualified name of the BuyerAppService's
+	// ListBlockedBuyers RPC.
+	BuyerAppServiceListBlockedBuyersProcedure = "/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedBuyers"
+	// BuyerAppServiceListBlockedStoresProcedure is the fully-qualified name of the BuyerAppService's
+	// ListBlockedStores RPC.
+	BuyerAppServiceListBlockedStoresProcedure = "/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedStores"
 )
 
 // BuyerAppServiceClient is a client for the hawkr.buyer.v1alpha1.BuyerAppService service.
@@ -173,6 +191,20 @@ type BuyerAppServiceClient interface {
 	SubscribeRestock(context.Context, *connect.Request[v1alpha1.SubscribeRestockRequest]) (*connect.Response[v1alpha1.SubscribeRestockResponse], error)
 	// UnsubscribeRestock 取消補貨通知；沒有訂閱時也成功。
 	UnsubscribeRestock(context.Context, *connect.Request[v1alpha1.UnsubscribeRestockRequest]) (*connect.Response[v1alpha1.UnsubscribeRestockResponse], error)
+	// BlockAuthor 封鎖一則留言或討論區留言的作者：作者是買家時封鎖那位買家（雙方互相看不到對方的留言，A7-1b），是店家時封鎖那家店
+	// （該店的貼文與討論區不再出現）。參照是呼叫者讀得到的內容；讀不到（不存在、已刪除、被隱藏、貼文不公開、已被雙方的封鎖排除）一律回
+	// not_found，不區分原因。作者是呼叫者自己、或是呼叫者自己的店，回 invalid_argument。已經封鎖時也成功，changed 為 false。
+	BlockAuthor(context.Context, *connect.Request[v1alpha1.BlockAuthorRequest]) (*connect.Response[v1alpha1.BlockAuthorResponse], error)
+	// BlockStore 從店面頁封鎖店家；已經封鎖時也成功，changed 為 false。店家不存在或從沒公開過回 not_found，封鎖自己的店回 invalid_argument。
+	BlockStore(context.Context, *connect.Request[v1alpha1.BlockStoreRequest]) (*connect.Response[v1alpha1.BlockStoreResponse], error)
+	// UnblockBuyer 解除對買家的封鎖；沒有封鎖時也成功，changed 為 false。
+	UnblockBuyer(context.Context, *connect.Request[v1alpha1.UnblockBuyerRequest]) (*connect.Response[v1alpha1.UnblockBuyerResponse], error)
+	// UnblockStore 解除對店家的封鎖；沒有封鎖時也成功，changed 為 false。
+	UnblockStore(context.Context, *connect.Request[v1alpha1.UnblockStoreRequest]) (*connect.Response[v1alpha1.UnblockStoreResponse], error)
+	// ListBlockedBuyers 列出呼叫者封鎖的買家，新到舊。
+	ListBlockedBuyers(context.Context, *connect.Request[v1alpha1.ListBlockedBuyersRequest]) (*connect.Response[v1alpha1.ListBlockedBuyersResponse], error)
+	// ListBlockedStores 列出呼叫者封鎖的店家，新到舊；已關閉的店家照樣在名單裡（store 的 status 是 CLOSED），好讓使用者解除。
+	ListBlockedStores(context.Context, *connect.Request[v1alpha1.ListBlockedStoresRequest]) (*connect.Response[v1alpha1.ListBlockedStoresResponse], error)
 }
 
 // NewBuyerAppServiceClient constructs a client for the hawkr.buyer.v1alpha1.BuyerAppService
@@ -356,6 +388,48 @@ func NewBuyerAppServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
+		blockAuthor: connect.NewClient[v1alpha1.BlockAuthorRequest, v1alpha1.BlockAuthorResponse](
+			httpClient,
+			baseURL+BuyerAppServiceBlockAuthorProcedure,
+			connect.WithSchema(buyerAppServiceMethods.ByName("BlockAuthor")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		blockStore: connect.NewClient[v1alpha1.BlockStoreRequest, v1alpha1.BlockStoreResponse](
+			httpClient,
+			baseURL+BuyerAppServiceBlockStoreProcedure,
+			connect.WithSchema(buyerAppServiceMethods.ByName("BlockStore")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		unblockBuyer: connect.NewClient[v1alpha1.UnblockBuyerRequest, v1alpha1.UnblockBuyerResponse](
+			httpClient,
+			baseURL+BuyerAppServiceUnblockBuyerProcedure,
+			connect.WithSchema(buyerAppServiceMethods.ByName("UnblockBuyer")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		unblockStore: connect.NewClient[v1alpha1.UnblockStoreRequest, v1alpha1.UnblockStoreResponse](
+			httpClient,
+			baseURL+BuyerAppServiceUnblockStoreProcedure,
+			connect.WithSchema(buyerAppServiceMethods.ByName("UnblockStore")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		listBlockedBuyers: connect.NewClient[v1alpha1.ListBlockedBuyersRequest, v1alpha1.ListBlockedBuyersResponse](
+			httpClient,
+			baseURL+BuyerAppServiceListBlockedBuyersProcedure,
+			connect.WithSchema(buyerAppServiceMethods.ByName("ListBlockedBuyers")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		listBlockedStores: connect.NewClient[v1alpha1.ListBlockedStoresRequest, v1alpha1.ListBlockedStoresResponse](
+			httpClient,
+			baseURL+BuyerAppServiceListBlockedStoresProcedure,
+			connect.WithSchema(buyerAppServiceMethods.ByName("ListBlockedStores")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -386,6 +460,12 @@ type buyerAppServiceClient struct {
 	listRestockSubscriptions *connect.Client[v1alpha1.ListRestockSubscriptionsRequest, v1alpha1.ListRestockSubscriptionsResponse]
 	subscribeRestock         *connect.Client[v1alpha1.SubscribeRestockRequest, v1alpha1.SubscribeRestockResponse]
 	unsubscribeRestock       *connect.Client[v1alpha1.UnsubscribeRestockRequest, v1alpha1.UnsubscribeRestockResponse]
+	blockAuthor              *connect.Client[v1alpha1.BlockAuthorRequest, v1alpha1.BlockAuthorResponse]
+	blockStore               *connect.Client[v1alpha1.BlockStoreRequest, v1alpha1.BlockStoreResponse]
+	unblockBuyer             *connect.Client[v1alpha1.UnblockBuyerRequest, v1alpha1.UnblockBuyerResponse]
+	unblockStore             *connect.Client[v1alpha1.UnblockStoreRequest, v1alpha1.UnblockStoreResponse]
+	listBlockedBuyers        *connect.Client[v1alpha1.ListBlockedBuyersRequest, v1alpha1.ListBlockedBuyersResponse]
+	listBlockedStores        *connect.Client[v1alpha1.ListBlockedStoresRequest, v1alpha1.ListBlockedStoresResponse]
 }
 
 // GetProfile calls hawkr.buyer.v1alpha1.BuyerAppService.GetProfile.
@@ -513,6 +593,36 @@ func (c *buyerAppServiceClient) UnsubscribeRestock(ctx context.Context, req *con
 	return c.unsubscribeRestock.CallUnary(ctx, req)
 }
 
+// BlockAuthor calls hawkr.buyer.v1alpha1.BuyerAppService.BlockAuthor.
+func (c *buyerAppServiceClient) BlockAuthor(ctx context.Context, req *connect.Request[v1alpha1.BlockAuthorRequest]) (*connect.Response[v1alpha1.BlockAuthorResponse], error) {
+	return c.blockAuthor.CallUnary(ctx, req)
+}
+
+// BlockStore calls hawkr.buyer.v1alpha1.BuyerAppService.BlockStore.
+func (c *buyerAppServiceClient) BlockStore(ctx context.Context, req *connect.Request[v1alpha1.BlockStoreRequest]) (*connect.Response[v1alpha1.BlockStoreResponse], error) {
+	return c.blockStore.CallUnary(ctx, req)
+}
+
+// UnblockBuyer calls hawkr.buyer.v1alpha1.BuyerAppService.UnblockBuyer.
+func (c *buyerAppServiceClient) UnblockBuyer(ctx context.Context, req *connect.Request[v1alpha1.UnblockBuyerRequest]) (*connect.Response[v1alpha1.UnblockBuyerResponse], error) {
+	return c.unblockBuyer.CallUnary(ctx, req)
+}
+
+// UnblockStore calls hawkr.buyer.v1alpha1.BuyerAppService.UnblockStore.
+func (c *buyerAppServiceClient) UnblockStore(ctx context.Context, req *connect.Request[v1alpha1.UnblockStoreRequest]) (*connect.Response[v1alpha1.UnblockStoreResponse], error) {
+	return c.unblockStore.CallUnary(ctx, req)
+}
+
+// ListBlockedBuyers calls hawkr.buyer.v1alpha1.BuyerAppService.ListBlockedBuyers.
+func (c *buyerAppServiceClient) ListBlockedBuyers(ctx context.Context, req *connect.Request[v1alpha1.ListBlockedBuyersRequest]) (*connect.Response[v1alpha1.ListBlockedBuyersResponse], error) {
+	return c.listBlockedBuyers.CallUnary(ctx, req)
+}
+
+// ListBlockedStores calls hawkr.buyer.v1alpha1.BuyerAppService.ListBlockedStores.
+func (c *buyerAppServiceClient) ListBlockedStores(ctx context.Context, req *connect.Request[v1alpha1.ListBlockedStoresRequest]) (*connect.Response[v1alpha1.ListBlockedStoresResponse], error) {
+	return c.listBlockedStores.CallUnary(ctx, req)
+}
+
 // BuyerAppServiceHandler is an implementation of the hawkr.buyer.v1alpha1.BuyerAppService service.
 type BuyerAppServiceHandler interface {
 	// GetProfile 回傳呼叫者的買家 profile。
@@ -570,6 +680,20 @@ type BuyerAppServiceHandler interface {
 	SubscribeRestock(context.Context, *connect.Request[v1alpha1.SubscribeRestockRequest]) (*connect.Response[v1alpha1.SubscribeRestockResponse], error)
 	// UnsubscribeRestock 取消補貨通知；沒有訂閱時也成功。
 	UnsubscribeRestock(context.Context, *connect.Request[v1alpha1.UnsubscribeRestockRequest]) (*connect.Response[v1alpha1.UnsubscribeRestockResponse], error)
+	// BlockAuthor 封鎖一則留言或討論區留言的作者：作者是買家時封鎖那位買家（雙方互相看不到對方的留言，A7-1b），是店家時封鎖那家店
+	// （該店的貼文與討論區不再出現）。參照是呼叫者讀得到的內容；讀不到（不存在、已刪除、被隱藏、貼文不公開、已被雙方的封鎖排除）一律回
+	// not_found，不區分原因。作者是呼叫者自己、或是呼叫者自己的店，回 invalid_argument。已經封鎖時也成功，changed 為 false。
+	BlockAuthor(context.Context, *connect.Request[v1alpha1.BlockAuthorRequest]) (*connect.Response[v1alpha1.BlockAuthorResponse], error)
+	// BlockStore 從店面頁封鎖店家；已經封鎖時也成功，changed 為 false。店家不存在或從沒公開過回 not_found，封鎖自己的店回 invalid_argument。
+	BlockStore(context.Context, *connect.Request[v1alpha1.BlockStoreRequest]) (*connect.Response[v1alpha1.BlockStoreResponse], error)
+	// UnblockBuyer 解除對買家的封鎖；沒有封鎖時也成功，changed 為 false。
+	UnblockBuyer(context.Context, *connect.Request[v1alpha1.UnblockBuyerRequest]) (*connect.Response[v1alpha1.UnblockBuyerResponse], error)
+	// UnblockStore 解除對店家的封鎖；沒有封鎖時也成功，changed 為 false。
+	UnblockStore(context.Context, *connect.Request[v1alpha1.UnblockStoreRequest]) (*connect.Response[v1alpha1.UnblockStoreResponse], error)
+	// ListBlockedBuyers 列出呼叫者封鎖的買家，新到舊。
+	ListBlockedBuyers(context.Context, *connect.Request[v1alpha1.ListBlockedBuyersRequest]) (*connect.Response[v1alpha1.ListBlockedBuyersResponse], error)
+	// ListBlockedStores 列出呼叫者封鎖的店家，新到舊；已關閉的店家照樣在名單裡（store 的 status 是 CLOSED），好讓使用者解除。
+	ListBlockedStores(context.Context, *connect.Request[v1alpha1.ListBlockedStoresRequest]) (*connect.Response[v1alpha1.ListBlockedStoresResponse], error)
 }
 
 // NewBuyerAppServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -749,6 +873,48 @@ func NewBuyerAppServiceHandler(svc BuyerAppServiceHandler, opts ...connect.Handl
 		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
+	buyerAppServiceBlockAuthorHandler := connect.NewUnaryHandler(
+		BuyerAppServiceBlockAuthorProcedure,
+		svc.BlockAuthor,
+		connect.WithSchema(buyerAppServiceMethods.ByName("BlockAuthor")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	buyerAppServiceBlockStoreHandler := connect.NewUnaryHandler(
+		BuyerAppServiceBlockStoreProcedure,
+		svc.BlockStore,
+		connect.WithSchema(buyerAppServiceMethods.ByName("BlockStore")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	buyerAppServiceUnblockBuyerHandler := connect.NewUnaryHandler(
+		BuyerAppServiceUnblockBuyerProcedure,
+		svc.UnblockBuyer,
+		connect.WithSchema(buyerAppServiceMethods.ByName("UnblockBuyer")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	buyerAppServiceUnblockStoreHandler := connect.NewUnaryHandler(
+		BuyerAppServiceUnblockStoreProcedure,
+		svc.UnblockStore,
+		connect.WithSchema(buyerAppServiceMethods.ByName("UnblockStore")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	buyerAppServiceListBlockedBuyersHandler := connect.NewUnaryHandler(
+		BuyerAppServiceListBlockedBuyersProcedure,
+		svc.ListBlockedBuyers,
+		connect.WithSchema(buyerAppServiceMethods.ByName("ListBlockedBuyers")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	buyerAppServiceListBlockedStoresHandler := connect.NewUnaryHandler(
+		BuyerAppServiceListBlockedStoresProcedure,
+		svc.ListBlockedStores,
+		connect.WithSchema(buyerAppServiceMethods.ByName("ListBlockedStores")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hawkr.buyer.v1alpha1.BuyerAppService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case BuyerAppServiceGetProfileProcedure:
@@ -801,6 +967,18 @@ func NewBuyerAppServiceHandler(svc BuyerAppServiceHandler, opts ...connect.Handl
 			buyerAppServiceSubscribeRestockHandler.ServeHTTP(w, r)
 		case BuyerAppServiceUnsubscribeRestockProcedure:
 			buyerAppServiceUnsubscribeRestockHandler.ServeHTTP(w, r)
+		case BuyerAppServiceBlockAuthorProcedure:
+			buyerAppServiceBlockAuthorHandler.ServeHTTP(w, r)
+		case BuyerAppServiceBlockStoreProcedure:
+			buyerAppServiceBlockStoreHandler.ServeHTTP(w, r)
+		case BuyerAppServiceUnblockBuyerProcedure:
+			buyerAppServiceUnblockBuyerHandler.ServeHTTP(w, r)
+		case BuyerAppServiceUnblockStoreProcedure:
+			buyerAppServiceUnblockStoreHandler.ServeHTTP(w, r)
+		case BuyerAppServiceListBlockedBuyersProcedure:
+			buyerAppServiceListBlockedBuyersHandler.ServeHTTP(w, r)
+		case BuyerAppServiceListBlockedStoresProcedure:
+			buyerAppServiceListBlockedStoresHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -908,4 +1086,28 @@ func (UnimplementedBuyerAppServiceHandler) SubscribeRestock(context.Context, *co
 
 func (UnimplementedBuyerAppServiceHandler) UnsubscribeRestock(context.Context, *connect.Request[v1alpha1.UnsubscribeRestockRequest]) (*connect.Response[v1alpha1.UnsubscribeRestockResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.buyer.v1alpha1.BuyerAppService.UnsubscribeRestock is not implemented"))
+}
+
+func (UnimplementedBuyerAppServiceHandler) BlockAuthor(context.Context, *connect.Request[v1alpha1.BlockAuthorRequest]) (*connect.Response[v1alpha1.BlockAuthorResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.buyer.v1alpha1.BuyerAppService.BlockAuthor is not implemented"))
+}
+
+func (UnimplementedBuyerAppServiceHandler) BlockStore(context.Context, *connect.Request[v1alpha1.BlockStoreRequest]) (*connect.Response[v1alpha1.BlockStoreResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.buyer.v1alpha1.BuyerAppService.BlockStore is not implemented"))
+}
+
+func (UnimplementedBuyerAppServiceHandler) UnblockBuyer(context.Context, *connect.Request[v1alpha1.UnblockBuyerRequest]) (*connect.Response[v1alpha1.UnblockBuyerResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.buyer.v1alpha1.BuyerAppService.UnblockBuyer is not implemented"))
+}
+
+func (UnimplementedBuyerAppServiceHandler) UnblockStore(context.Context, *connect.Request[v1alpha1.UnblockStoreRequest]) (*connect.Response[v1alpha1.UnblockStoreResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.buyer.v1alpha1.BuyerAppService.UnblockStore is not implemented"))
+}
+
+func (UnimplementedBuyerAppServiceHandler) ListBlockedBuyers(context.Context, *connect.Request[v1alpha1.ListBlockedBuyersRequest]) (*connect.Response[v1alpha1.ListBlockedBuyersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.buyer.v1alpha1.BuyerAppService.ListBlockedBuyers is not implemented"))
+}
+
+func (UnimplementedBuyerAppServiceHandler) ListBlockedStores(context.Context, *connect.Request[v1alpha1.ListBlockedStoresRequest]) (*connect.Response[v1alpha1.ListBlockedStoresResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.buyer.v1alpha1.BuyerAppService.ListBlockedStores is not implemented"))
 }

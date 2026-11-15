@@ -34,9 +34,25 @@ type writeCall struct {
 }
 
 type fakeWrites struct {
-	post  social.Post
-	calls []writeCall
-	err   error
+	post     social.Post
+	calls    []writeCall
+	err      error
+	sanction social.SanctionPage
+	hidden   social.HiddenPage
+	gotSize  int32
+	gotBuyer int64
+	gotSAft  *social.SanctionCursor
+	gotHAft  *social.HiddenCursor
+}
+
+func (f *fakeWrites) MySanctions(_ context.Context, b int64, after *social.SanctionCursor, size int32) (social.SanctionPage, error) {
+	f.gotBuyer, f.gotSize, f.gotSAft = b, size, after
+	return f.sanction, f.err
+}
+
+func (f *fakeWrites) MyHiddenContent(_ context.Context, b int64, after *social.HiddenCursor, size int32) (social.HiddenPage, error) {
+	f.gotBuyer, f.gotSize, f.gotHAft = b, size, after
+	return f.hidden, f.err
 }
 
 func (f *fakeWrites) rec(c writeCall) error { f.calls = append(f.calls, c); return f.err }

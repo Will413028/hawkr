@@ -71,6 +71,18 @@ abstract class BuyerAppServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $6.SubscribeRestockRequest request);
   $async.Future<$6.UnsubscribeRestockResponse> unsubscribeRestock(
       $pb.ServerContext ctx, $6.UnsubscribeRestockRequest request);
+  $async.Future<$6.BlockAuthorResponse> blockAuthor(
+      $pb.ServerContext ctx, $6.BlockAuthorRequest request);
+  $async.Future<$6.BlockStoreResponse> blockStore(
+      $pb.ServerContext ctx, $6.BlockStoreRequest request);
+  $async.Future<$6.UnblockBuyerResponse> unblockBuyer(
+      $pb.ServerContext ctx, $6.UnblockBuyerRequest request);
+  $async.Future<$6.UnblockStoreResponse> unblockStore(
+      $pb.ServerContext ctx, $6.UnblockStoreRequest request);
+  $async.Future<$6.ListBlockedBuyersResponse> listBlockedBuyers(
+      $pb.ServerContext ctx, $6.ListBlockedBuyersRequest request);
+  $async.Future<$6.ListBlockedStoresResponse> listBlockedStores(
+      $pb.ServerContext ctx, $6.ListBlockedStoresRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
@@ -124,6 +136,18 @@ abstract class BuyerAppServiceBase extends $pb.GeneratedService {
         return $6.SubscribeRestockRequest();
       case 'UnsubscribeRestock':
         return $6.UnsubscribeRestockRequest();
+      case 'BlockAuthor':
+        return $6.BlockAuthorRequest();
+      case 'BlockStore':
+        return $6.BlockStoreRequest();
+      case 'UnblockBuyer':
+        return $6.UnblockBuyerRequest();
+      case 'UnblockStore':
+        return $6.UnblockStoreRequest();
+      case 'ListBlockedBuyers':
+        return $6.ListBlockedBuyersRequest();
+      case 'ListBlockedStores':
+        return $6.ListBlockedStoresRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -185,6 +209,18 @@ abstract class BuyerAppServiceBase extends $pb.GeneratedService {
         return subscribeRestock(ctx, request as $6.SubscribeRestockRequest);
       case 'UnsubscribeRestock':
         return unsubscribeRestock(ctx, request as $6.UnsubscribeRestockRequest);
+      case 'BlockAuthor':
+        return blockAuthor(ctx, request as $6.BlockAuthorRequest);
+      case 'BlockStore':
+        return blockStore(ctx, request as $6.BlockStoreRequest);
+      case 'UnblockBuyer':
+        return unblockBuyer(ctx, request as $6.UnblockBuyerRequest);
+      case 'UnblockStore':
+        return unblockStore(ctx, request as $6.UnblockStoreRequest);
+      case 'ListBlockedBuyers':
+        return listBlockedBuyers(ctx, request as $6.ListBlockedBuyersRequest);
+      case 'ListBlockedStores':
+        return listBlockedStores(ctx, request as $6.ListBlockedStoresRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

@@ -3193,6 +3193,754 @@ func (*UnsubscribeRestockResponse) Descriptor() ([]byte, []int) {
 	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{58}
 }
 
+type BlockAuthorRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 要封鎖的作者所寫的內容。
+	//
+	// Types that are valid to be assigned to Source:
+	//
+	//	*BlockAuthorRequest_CommentId
+	//	*BlockAuthorRequest_ForumEntryId
+	Source        isBlockAuthorRequest_Source `protobuf_oneof:"source"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockAuthorRequest) Reset() {
+	*x = BlockAuthorRequest{}
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockAuthorRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockAuthorRequest) ProtoMessage() {}
+
+func (x *BlockAuthorRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockAuthorRequest.ProtoReflect.Descriptor instead.
+func (*BlockAuthorRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *BlockAuthorRequest) GetSource() isBlockAuthorRequest_Source {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
+func (x *BlockAuthorRequest) GetCommentId() string {
+	if x != nil {
+		if x, ok := x.Source.(*BlockAuthorRequest_CommentId); ok {
+			return x.CommentId
+		}
+	}
+	return ""
+}
+
+func (x *BlockAuthorRequest) GetForumEntryId() string {
+	if x != nil {
+		if x, ok := x.Source.(*BlockAuthorRequest_ForumEntryId); ok {
+			return x.ForumEntryId
+		}
+	}
+	return ""
+}
+
+type isBlockAuthorRequest_Source interface {
+	isBlockAuthorRequest_Source()
+}
+
+type BlockAuthorRequest_CommentId struct {
+	// 留言 ID。
+	CommentId string `protobuf:"bytes,1,opt,name=comment_id,json=commentId,proto3,oneof"`
+}
+
+type BlockAuthorRequest_ForumEntryId struct {
+	// 討論區留言 ID。
+	ForumEntryId string `protobuf:"bytes,2,opt,name=forum_entry_id,json=forumEntryId,proto3,oneof"`
+}
+
+func (*BlockAuthorRequest_CommentId) isBlockAuthorRequest_Source() {}
+
+func (*BlockAuthorRequest_ForumEntryId) isBlockAuthorRequest_Source() {}
+
+type BlockAuthorResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 封鎖的狀態是否因這次呼叫而改變；本來就封鎖時為 false。
+	Changed       bool `protobuf:"varint,1,opt,name=changed,proto3" json:"changed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockAuthorResponse) Reset() {
+	*x = BlockAuthorResponse{}
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockAuthorResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockAuthorResponse) ProtoMessage() {}
+
+func (x *BlockAuthorResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockAuthorResponse.ProtoReflect.Descriptor instead.
+func (*BlockAuthorResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *BlockAuthorResponse) GetChanged() bool {
+	if x != nil {
+		return x.Changed
+	}
+	return false
+}
+
+type BlockStoreRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StoreId       string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockStoreRequest) Reset() {
+	*x = BlockStoreRequest{}
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockStoreRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockStoreRequest) ProtoMessage() {}
+
+func (x *BlockStoreRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockStoreRequest.ProtoReflect.Descriptor instead.
+func (*BlockStoreRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{61}
+}
+
+func (x *BlockStoreRequest) GetStoreId() string {
+	if x != nil {
+		return x.StoreId
+	}
+	return ""
+}
+
+type BlockStoreResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 同 BlockAuthorResponse.changed。
+	Changed       bool `protobuf:"varint,1,opt,name=changed,proto3" json:"changed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockStoreResponse) Reset() {
+	*x = BlockStoreResponse{}
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockStoreResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockStoreResponse) ProtoMessage() {}
+
+func (x *BlockStoreResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockStoreResponse.ProtoReflect.Descriptor instead.
+func (*BlockStoreResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *BlockStoreResponse) GetChanged() bool {
+	if x != nil {
+		return x.Changed
+	}
+	return false
+}
+
+type UnblockBuyerRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BuyerId       string                 `protobuf:"bytes,1,opt,name=buyer_id,json=buyerId,proto3" json:"buyer_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnblockBuyerRequest) Reset() {
+	*x = UnblockBuyerRequest{}
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnblockBuyerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnblockBuyerRequest) ProtoMessage() {}
+
+func (x *UnblockBuyerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnblockBuyerRequest.ProtoReflect.Descriptor instead.
+func (*UnblockBuyerRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *UnblockBuyerRequest) GetBuyerId() string {
+	if x != nil {
+		return x.BuyerId
+	}
+	return ""
+}
+
+type UnblockBuyerResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 解除是否改變了狀態；本來就沒有封鎖時為 false。
+	Changed       bool `protobuf:"varint,1,opt,name=changed,proto3" json:"changed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnblockBuyerResponse) Reset() {
+	*x = UnblockBuyerResponse{}
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[64]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnblockBuyerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnblockBuyerResponse) ProtoMessage() {}
+
+func (x *UnblockBuyerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[64]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnblockBuyerResponse.ProtoReflect.Descriptor instead.
+func (*UnblockBuyerResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{64}
+}
+
+func (x *UnblockBuyerResponse) GetChanged() bool {
+	if x != nil {
+		return x.Changed
+	}
+	return false
+}
+
+type UnblockStoreRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StoreId       string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnblockStoreRequest) Reset() {
+	*x = UnblockStoreRequest{}
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[65]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnblockStoreRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnblockStoreRequest) ProtoMessage() {}
+
+func (x *UnblockStoreRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[65]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnblockStoreRequest.ProtoReflect.Descriptor instead.
+func (*UnblockStoreRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{65}
+}
+
+func (x *UnblockStoreRequest) GetStoreId() string {
+	if x != nil {
+		return x.StoreId
+	}
+	return ""
+}
+
+type UnblockStoreResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 同 UnblockBuyerResponse.changed。
+	Changed       bool `protobuf:"varint,1,opt,name=changed,proto3" json:"changed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnblockStoreResponse) Reset() {
+	*x = UnblockStoreResponse{}
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[66]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnblockStoreResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnblockStoreResponse) ProtoMessage() {}
+
+func (x *UnblockStoreResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[66]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnblockStoreResponse.ProtoReflect.Descriptor instead.
+func (*UnblockStoreResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{66}
+}
+
+func (x *UnblockStoreResponse) GetChanged() bool {
+	if x != nil {
+		return x.Changed
+	}
+	return false
+}
+
+type ListBlockedBuyersRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 預設 20，上限 100。
+	PageSize      int32  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBlockedBuyersRequest) Reset() {
+	*x = ListBlockedBuyersRequest{}
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[67]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBlockedBuyersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBlockedBuyersRequest) ProtoMessage() {}
+
+func (x *ListBlockedBuyersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[67]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBlockedBuyersRequest.ProtoReflect.Descriptor instead.
+func (*ListBlockedBuyersRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{67}
+}
+
+func (x *ListBlockedBuyersRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListBlockedBuyersRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListBlockedBuyersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BlockedBuyers []*BlockedBuyer        `protobuf:"bytes,1,rep,name=blocked_buyers,json=blockedBuyers,proto3" json:"blocked_buyers,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBlockedBuyersResponse) Reset() {
+	*x = ListBlockedBuyersResponse{}
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[68]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBlockedBuyersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBlockedBuyersResponse) ProtoMessage() {}
+
+func (x *ListBlockedBuyersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[68]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBlockedBuyersResponse.ProtoReflect.Descriptor instead.
+func (*ListBlockedBuyersResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{68}
+}
+
+func (x *ListBlockedBuyersResponse) GetBlockedBuyers() []*BlockedBuyer {
+	if x != nil {
+		return x.BlockedBuyers
+	}
+	return nil
+}
+
+func (x *ListBlockedBuyersResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+type ListBlockedStoresRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 預設 20，上限 100。
+	PageSize      int32  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBlockedStoresRequest) Reset() {
+	*x = ListBlockedStoresRequest{}
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBlockedStoresRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBlockedStoresRequest) ProtoMessage() {}
+
+func (x *ListBlockedStoresRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBlockedStoresRequest.ProtoReflect.Descriptor instead.
+func (*ListBlockedStoresRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{69}
+}
+
+func (x *ListBlockedStoresRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListBlockedStoresRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListBlockedStoresResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BlockedStores []*BlockedStore        `protobuf:"bytes,1,rep,name=blocked_stores,json=blockedStores,proto3" json:"blocked_stores,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBlockedStoresResponse) Reset() {
+	*x = ListBlockedStoresResponse{}
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[70]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBlockedStoresResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBlockedStoresResponse) ProtoMessage() {}
+
+func (x *ListBlockedStoresResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[70]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBlockedStoresResponse.ProtoReflect.Descriptor instead.
+func (*ListBlockedStoresResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{70}
+}
+
+func (x *ListBlockedStoresResponse) GetBlockedStores() []*BlockedStore {
+	if x != nil {
+		return x.BlockedStores
+	}
+	return nil
+}
+
+func (x *ListBlockedStoresResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+// BlockedBuyer 是呼叫者封鎖的買家。
+type BlockedBuyer struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	BuyerId string                 `protobuf:"bytes,1,opt,name=buyer_id,json=buyerId,proto3" json:"buyer_id,omitempty"`
+	// 對方已刪除帳號：不帶名稱與頭像，client 顯示「已刪除的帳號」，仍可解除。
+	Deleted       bool                   `protobuf:"varint,2,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	DisplayName   string                 `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Avatar        *v1alpha1.Image        `protobuf:"bytes,4,opt,name=avatar,proto3" json:"avatar,omitempty"`
+	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockedBuyer) Reset() {
+	*x = BlockedBuyer{}
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[71]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockedBuyer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockedBuyer) ProtoMessage() {}
+
+func (x *BlockedBuyer) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[71]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockedBuyer.ProtoReflect.Descriptor instead.
+func (*BlockedBuyer) Descriptor() ([]byte, []int) {
+	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{71}
+}
+
+func (x *BlockedBuyer) GetBuyerId() string {
+	if x != nil {
+		return x.BuyerId
+	}
+	return ""
+}
+
+func (x *BlockedBuyer) GetDeleted() bool {
+	if x != nil {
+		return x.Deleted
+	}
+	return false
+}
+
+func (x *BlockedBuyer) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *BlockedBuyer) GetAvatar() *v1alpha1.Image {
+	if x != nil {
+		return x.Avatar
+	}
+	return nil
+}
+
+func (x *BlockedBuyer) GetCreateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreateTime
+	}
+	return nil
+}
+
+// BlockedStore 是呼叫者封鎖的店家。
+type BlockedStore struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	StoreId string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	// 不設表示這家店不顯示（從沒公開過或不存在）；已關閉的店家有卡片，status 是 CLOSED。
+	Store         *v1alpha1.StoreCard    `protobuf:"bytes,2,opt,name=store,proto3" json:"store,omitempty"`
+	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockedStore) Reset() {
+	*x = BlockedStore{}
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[72]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockedStore) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockedStore) ProtoMessage() {}
+
+func (x *BlockedStore) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[72]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockedStore.ProtoReflect.Descriptor instead.
+func (*BlockedStore) Descriptor() ([]byte, []int) {
+	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{72}
+}
+
+func (x *BlockedStore) GetStoreId() string {
+	if x != nil {
+		return x.StoreId
+	}
+	return ""
+}
+
+func (x *BlockedStore) GetStore() *v1alpha1.StoreCard {
+	if x != nil {
+		return x.Store
+	}
+	return nil
+}
+
+func (x *BlockedStore) GetCreateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreateTime
+	}
+	return nil
+}
+
 var File_hawkr_buyer_v1alpha1_buyer_proto protoreflect.FileDescriptor
 
 const file_hawkr_buyer_v1alpha1_buyer_proto_rawDesc = "" +
@@ -3402,7 +4150,52 @@ const file_hawkr_buyer_v1alpha1_buyer_proto_rawDesc = "" +
 	"\x19UnsubscribeRestockRequest\x12\"\n" +
 	"\n" +
 	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"\x1c\n" +
-	"\x1aUnsubscribeRestockResponse*g\n" +
+	"\x1aUnsubscribeRestockResponse\"g\n" +
+	"\x12BlockAuthorRequest\x12\x1f\n" +
+	"\n" +
+	"comment_id\x18\x01 \x01(\tH\x00R\tcommentId\x12&\n" +
+	"\x0eforum_entry_id\x18\x02 \x01(\tH\x00R\fforumEntryIdB\b\n" +
+	"\x06source\"/\n" +
+	"\x13BlockAuthorResponse\x12\x18\n" +
+	"\achanged\x18\x01 \x01(\bR\achanged\"3\n" +
+	"\x11BlockStoreRequest\x12\x1e\n" +
+	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\".\n" +
+	"\x12BlockStoreResponse\x12\x18\n" +
+	"\achanged\x18\x01 \x01(\bR\achanged\"5\n" +
+	"\x13UnblockBuyerRequest\x12\x1e\n" +
+	"\bbuyer_id\x18\x01 \x01(\tB\x03\xe0A\x02R\abuyerId\"0\n" +
+	"\x14UnblockBuyerResponse\x12\x18\n" +
+	"\achanged\x18\x01 \x01(\bR\achanged\"5\n" +
+	"\x13UnblockStoreRequest\x12\x1e\n" +
+	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\"0\n" +
+	"\x14UnblockStoreResponse\x12\x18\n" +
+	"\achanged\x18\x01 \x01(\bR\achanged\"V\n" +
+	"\x18ListBlockedBuyersRequest\x12\x1b\n" +
+	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x02 \x01(\tR\tpageToken\"\x8e\x01\n" +
+	"\x19ListBlockedBuyersResponse\x12I\n" +
+	"\x0eblocked_buyers\x18\x01 \x03(\v2\".hawkr.buyer.v1alpha1.BlockedBuyerR\rblockedBuyers\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"V\n" +
+	"\x18ListBlockedStoresRequest\x12\x1b\n" +
+	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x02 \x01(\tR\tpageToken\"\x8e\x01\n" +
+	"\x19ListBlockedStoresResponse\x12I\n" +
+	"\x0eblocked_stores\x18\x01 \x03(\v2\".hawkr.buyer.v1alpha1.BlockedStoreR\rblockedStores\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xd9\x01\n" +
+	"\fBlockedBuyer\x12\x19\n" +
+	"\bbuyer_id\x18\x01 \x01(\tR\abuyerId\x12\x18\n" +
+	"\adeleted\x18\x02 \x01(\bR\adeleted\x12!\n" +
+	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\x124\n" +
+	"\x06avatar\x18\x04 \x01(\v2\x1c.hawkr.common.v1alpha1.ImageR\x06avatar\x12;\n" +
+	"\vcreate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"createTime\"\x9e\x01\n" +
+	"\fBlockedStore\x12\x19\n" +
+	"\bstore_id\x18\x01 \x01(\tR\astoreId\x126\n" +
+	"\x05store\x18\x02 \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05store\x12;\n" +
+	"\vcreate_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"createTime*g\n" +
 	"\vBuyerStatus\x12\x1c\n" +
 	"\x18BUYER_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13BUYER_STATUS_ACTIVE\x10\x01\x12!\n" +
@@ -3411,7 +4204,7 @@ const file_hawkr_buyer_v1alpha1_buyer_proto_rawDesc = "" +
 	"\x12GENDER_UNSPECIFIED\x10\x00\x12\x0f\n" +
 	"\vGENDER_MALE\x10\x01\x12\x11\n" +
 	"\rGENDER_FEMALE\x10\x02\x12\x10\n" +
-	"\fGENDER_OTHER\x10\x032\x83\x16\n" +
+	"\fGENDER_OTHER\x10\x032\xa0\x1b\n" +
 	"\x0fBuyerAppService\x12d\n" +
 	"\n" +
 	"GetProfile\x12'.hawkr.buyer.v1alpha1.GetProfileRequest\x1a(.hawkr.buyer.v1alpha1.GetProfileResponse\"\x03\x90\x02\x01\x12h\n" +
@@ -3440,7 +4233,14 @@ const file_hawkr_buyer_v1alpha1_buyer_proto_rawDesc = "" +
 	"\vClearVisits\x12(.hawkr.buyer.v1alpha1.ClearVisitsRequest\x1a).hawkr.buyer.v1alpha1.ClearVisitsResponse\"\x03\x90\x02\x02\x12\x8e\x01\n" +
 	"\x18ListRestockSubscriptions\x125.hawkr.buyer.v1alpha1.ListRestockSubscriptionsRequest\x1a6.hawkr.buyer.v1alpha1.ListRestockSubscriptionsResponse\"\x03\x90\x02\x01\x12v\n" +
 	"\x10SubscribeRestock\x12-.hawkr.buyer.v1alpha1.SubscribeRestockRequest\x1a..hawkr.buyer.v1alpha1.SubscribeRestockResponse\"\x03\x90\x02\x02\x12|\n" +
-	"\x12UnsubscribeRestock\x12/.hawkr.buyer.v1alpha1.UnsubscribeRestockRequest\x1a0.hawkr.buyer.v1alpha1.UnsubscribeRestockResponse\"\x03\x90\x02\x02B\xf5\x01\n" +
+	"\x12UnsubscribeRestock\x12/.hawkr.buyer.v1alpha1.UnsubscribeRestockRequest\x1a0.hawkr.buyer.v1alpha1.UnsubscribeRestockResponse\"\x03\x90\x02\x02\x12g\n" +
+	"\vBlockAuthor\x12(.hawkr.buyer.v1alpha1.BlockAuthorRequest\x1a).hawkr.buyer.v1alpha1.BlockAuthorResponse\"\x03\x90\x02\x02\x12d\n" +
+	"\n" +
+	"BlockStore\x12'.hawkr.buyer.v1alpha1.BlockStoreRequest\x1a(.hawkr.buyer.v1alpha1.BlockStoreResponse\"\x03\x90\x02\x02\x12j\n" +
+	"\fUnblockBuyer\x12).hawkr.buyer.v1alpha1.UnblockBuyerRequest\x1a*.hawkr.buyer.v1alpha1.UnblockBuyerResponse\"\x03\x90\x02\x02\x12j\n" +
+	"\fUnblockStore\x12).hawkr.buyer.v1alpha1.UnblockStoreRequest\x1a*.hawkr.buyer.v1alpha1.UnblockStoreResponse\"\x03\x90\x02\x02\x12y\n" +
+	"\x11ListBlockedBuyers\x12..hawkr.buyer.v1alpha1.ListBlockedBuyersRequest\x1a/.hawkr.buyer.v1alpha1.ListBlockedBuyersResponse\"\x03\x90\x02\x01\x12y\n" +
+	"\x11ListBlockedStores\x12..hawkr.buyer.v1alpha1.ListBlockedStoresRequest\x1a/.hawkr.buyer.v1alpha1.ListBlockedStoresResponse\"\x03\x90\x02\x01B\xf5\x01\n" +
 	"\x18com.hawkr.buyer.v1alpha1B\n" +
 	"BuyerProtoP\x01Z[github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/buyer/v1alpha1;buyerv1alpha1\xa2\x02\x03HBX\xaa\x02\x14Hawkr.Buyer.V1alpha1\xca\x02\x14Hawkr\\Buyer\\V1alpha1\xe2\x02 Hawkr\\Buyer\\V1alpha1\\GPBMetadata\xea\x02\x16Hawkr::Buyer::V1alpha1b\x06proto3"
 
@@ -3457,7 +4257,7 @@ func file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_buyer_v1alpha1_buyer_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes = make([]protoimpl.MessageInfo, 59)
+var file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes = make([]protoimpl.MessageInfo, 73)
 var file_hawkr_buyer_v1alpha1_buyer_proto_goTypes = []any{
 	(BuyerStatus)(0),                         // 0: hawkr.buyer.v1alpha1.BuyerStatus
 	(Gender)(0),                              // 1: hawkr.buyer.v1alpha1.Gender
@@ -3520,45 +4320,59 @@ var file_hawkr_buyer_v1alpha1_buyer_proto_goTypes = []any{
 	(*SubscribeRestockResponse)(nil),         // 58: hawkr.buyer.v1alpha1.SubscribeRestockResponse
 	(*UnsubscribeRestockRequest)(nil),        // 59: hawkr.buyer.v1alpha1.UnsubscribeRestockRequest
 	(*UnsubscribeRestockResponse)(nil),       // 60: hawkr.buyer.v1alpha1.UnsubscribeRestockResponse
-	(*date.Date)(nil),                        // 61: google.type.Date
-	(*v1alpha1.Image)(nil),                   // 62: hawkr.common.v1alpha1.Image
-	(*timestamppb.Timestamp)(nil),            // 63: google.protobuf.Timestamp
-	(*v1alpha1.PostalAddress)(nil),           // 64: hawkr.common.v1alpha1.PostalAddress
-	(*v1alpha1.StoreCard)(nil),               // 65: hawkr.common.v1alpha1.StoreCard
-	(*fieldmaskpb.FieldMask)(nil),            // 66: google.protobuf.FieldMask
+	(*BlockAuthorRequest)(nil),               // 61: hawkr.buyer.v1alpha1.BlockAuthorRequest
+	(*BlockAuthorResponse)(nil),              // 62: hawkr.buyer.v1alpha1.BlockAuthorResponse
+	(*BlockStoreRequest)(nil),                // 63: hawkr.buyer.v1alpha1.BlockStoreRequest
+	(*BlockStoreResponse)(nil),               // 64: hawkr.buyer.v1alpha1.BlockStoreResponse
+	(*UnblockBuyerRequest)(nil),              // 65: hawkr.buyer.v1alpha1.UnblockBuyerRequest
+	(*UnblockBuyerResponse)(nil),             // 66: hawkr.buyer.v1alpha1.UnblockBuyerResponse
+	(*UnblockStoreRequest)(nil),              // 67: hawkr.buyer.v1alpha1.UnblockStoreRequest
+	(*UnblockStoreResponse)(nil),             // 68: hawkr.buyer.v1alpha1.UnblockStoreResponse
+	(*ListBlockedBuyersRequest)(nil),         // 69: hawkr.buyer.v1alpha1.ListBlockedBuyersRequest
+	(*ListBlockedBuyersResponse)(nil),        // 70: hawkr.buyer.v1alpha1.ListBlockedBuyersResponse
+	(*ListBlockedStoresRequest)(nil),         // 71: hawkr.buyer.v1alpha1.ListBlockedStoresRequest
+	(*ListBlockedStoresResponse)(nil),        // 72: hawkr.buyer.v1alpha1.ListBlockedStoresResponse
+	(*BlockedBuyer)(nil),                     // 73: hawkr.buyer.v1alpha1.BlockedBuyer
+	(*BlockedStore)(nil),                     // 74: hawkr.buyer.v1alpha1.BlockedStore
+	(*date.Date)(nil),                        // 75: google.type.Date
+	(*v1alpha1.Image)(nil),                   // 76: hawkr.common.v1alpha1.Image
+	(*timestamppb.Timestamp)(nil),            // 77: google.protobuf.Timestamp
+	(*v1alpha1.PostalAddress)(nil),           // 78: hawkr.common.v1alpha1.PostalAddress
+	(*v1alpha1.StoreCard)(nil),               // 79: hawkr.common.v1alpha1.StoreCard
+	(*fieldmaskpb.FieldMask)(nil),            // 80: google.protobuf.FieldMask
 }
 var file_hawkr_buyer_v1alpha1_buyer_proto_depIdxs = []int32{
 	1,  // 0: hawkr.buyer.v1alpha1.Profile.gender:type_name -> hawkr.buyer.v1alpha1.Gender
-	61, // 1: hawkr.buyer.v1alpha1.Profile.birth_date:type_name -> google.type.Date
-	62, // 2: hawkr.buyer.v1alpha1.Profile.avatar:type_name -> hawkr.common.v1alpha1.Image
+	75, // 1: hawkr.buyer.v1alpha1.Profile.birth_date:type_name -> google.type.Date
+	76, // 2: hawkr.buyer.v1alpha1.Profile.avatar:type_name -> hawkr.common.v1alpha1.Image
 	0,  // 3: hawkr.buyer.v1alpha1.Profile.status:type_name -> hawkr.buyer.v1alpha1.BuyerStatus
-	63, // 4: hawkr.buyer.v1alpha1.Profile.create_time:type_name -> google.protobuf.Timestamp
-	63, // 5: hawkr.buyer.v1alpha1.Profile.update_time:type_name -> google.protobuf.Timestamp
-	64, // 6: hawkr.buyer.v1alpha1.Address.postal_address:type_name -> hawkr.common.v1alpha1.PostalAddress
-	63, // 7: hawkr.buyer.v1alpha1.Address.create_time:type_name -> google.protobuf.Timestamp
-	63, // 8: hawkr.buyer.v1alpha1.Address.update_time:type_name -> google.protobuf.Timestamp
-	62, // 9: hawkr.buyer.v1alpha1.ProductCard.image:type_name -> hawkr.common.v1alpha1.Image
-	65, // 10: hawkr.buyer.v1alpha1.ProductCard.store:type_name -> hawkr.common.v1alpha1.StoreCard
+	77, // 4: hawkr.buyer.v1alpha1.Profile.create_time:type_name -> google.protobuf.Timestamp
+	77, // 5: hawkr.buyer.v1alpha1.Profile.update_time:type_name -> google.protobuf.Timestamp
+	78, // 6: hawkr.buyer.v1alpha1.Address.postal_address:type_name -> hawkr.common.v1alpha1.PostalAddress
+	77, // 7: hawkr.buyer.v1alpha1.Address.create_time:type_name -> google.protobuf.Timestamp
+	77, // 8: hawkr.buyer.v1alpha1.Address.update_time:type_name -> google.protobuf.Timestamp
+	76, // 9: hawkr.buyer.v1alpha1.ProductCard.image:type_name -> hawkr.common.v1alpha1.Image
+	79, // 10: hawkr.buyer.v1alpha1.ProductCard.store:type_name -> hawkr.common.v1alpha1.StoreCard
 	4,  // 11: hawkr.buyer.v1alpha1.Favorite.product:type_name -> hawkr.buyer.v1alpha1.ProductCard
-	63, // 12: hawkr.buyer.v1alpha1.Favorite.create_time:type_name -> google.protobuf.Timestamp
-	65, // 13: hawkr.buyer.v1alpha1.Follow.store:type_name -> hawkr.common.v1alpha1.StoreCard
-	63, // 14: hawkr.buyer.v1alpha1.Follow.create_time:type_name -> google.protobuf.Timestamp
+	77, // 12: hawkr.buyer.v1alpha1.Favorite.create_time:type_name -> google.protobuf.Timestamp
+	79, // 13: hawkr.buyer.v1alpha1.Follow.store:type_name -> hawkr.common.v1alpha1.StoreCard
+	77, // 14: hawkr.buyer.v1alpha1.Follow.create_time:type_name -> google.protobuf.Timestamp
 	4,  // 15: hawkr.buyer.v1alpha1.Visit.product:type_name -> hawkr.buyer.v1alpha1.ProductCard
-	63, // 16: hawkr.buyer.v1alpha1.Visit.visit_time:type_name -> google.protobuf.Timestamp
+	77, // 16: hawkr.buyer.v1alpha1.Visit.visit_time:type_name -> google.protobuf.Timestamp
 	4,  // 17: hawkr.buyer.v1alpha1.RestockSubscription.product:type_name -> hawkr.buyer.v1alpha1.ProductCard
-	63, // 18: hawkr.buyer.v1alpha1.RestockSubscription.create_time:type_name -> google.protobuf.Timestamp
-	65, // 19: hawkr.buyer.v1alpha1.MemberCard.store:type_name -> hawkr.common.v1alpha1.StoreCard
-	63, // 20: hawkr.buyer.v1alpha1.SpendingRecord.order_time:type_name -> google.protobuf.Timestamp
+	77, // 18: hawkr.buyer.v1alpha1.RestockSubscription.create_time:type_name -> google.protobuf.Timestamp
+	79, // 19: hawkr.buyer.v1alpha1.MemberCard.store:type_name -> hawkr.common.v1alpha1.StoreCard
+	77, // 20: hawkr.buyer.v1alpha1.SpendingRecord.order_time:type_name -> google.protobuf.Timestamp
 	2,  // 21: hawkr.buyer.v1alpha1.GetProfileResponse.profile:type_name -> hawkr.buyer.v1alpha1.Profile
 	2,  // 22: hawkr.buyer.v1alpha1.UpdateProfileRequest.profile:type_name -> hawkr.buyer.v1alpha1.Profile
-	66, // 23: hawkr.buyer.v1alpha1.UpdateProfileRequest.update_mask:type_name -> google.protobuf.FieldMask
+	80, // 23: hawkr.buyer.v1alpha1.UpdateProfileRequest.update_mask:type_name -> google.protobuf.FieldMask
 	2,  // 24: hawkr.buyer.v1alpha1.UpdateProfileResponse.profile:type_name -> hawkr.buyer.v1alpha1.Profile
 	3,  // 25: hawkr.buyer.v1alpha1.ListAddressesResponse.addresses:type_name -> hawkr.buyer.v1alpha1.Address
 	3,  // 26: hawkr.buyer.v1alpha1.GetAddressResponse.address:type_name -> hawkr.buyer.v1alpha1.Address
 	3,  // 27: hawkr.buyer.v1alpha1.CreateAddressRequest.address:type_name -> hawkr.buyer.v1alpha1.Address
 	3,  // 28: hawkr.buyer.v1alpha1.CreateAddressResponse.address:type_name -> hawkr.buyer.v1alpha1.Address
 	3,  // 29: hawkr.buyer.v1alpha1.UpdateAddressRequest.address:type_name -> hawkr.buyer.v1alpha1.Address
-	66, // 30: hawkr.buyer.v1alpha1.UpdateAddressRequest.update_mask:type_name -> google.protobuf.FieldMask
+	80, // 30: hawkr.buyer.v1alpha1.UpdateAddressRequest.update_mask:type_name -> google.protobuf.FieldMask
 	3,  // 31: hawkr.buyer.v1alpha1.UpdateAddressResponse.address:type_name -> hawkr.buyer.v1alpha1.Address
 	5,  // 32: hawkr.buyer.v1alpha1.ListFavoritesResponse.favorites:type_name -> hawkr.buyer.v1alpha1.Favorite
 	6,  // 33: hawkr.buyer.v1alpha1.ListFollowsResponse.follows:type_name -> hawkr.buyer.v1alpha1.Follow
@@ -3566,61 +4380,79 @@ var file_hawkr_buyer_v1alpha1_buyer_proto_depIdxs = []int32{
 	10, // 35: hawkr.buyer.v1alpha1.ListSpendingRecordsResponse.records:type_name -> hawkr.buyer.v1alpha1.SpendingRecord
 	7,  // 36: hawkr.buyer.v1alpha1.ListVisitsResponse.visits:type_name -> hawkr.buyer.v1alpha1.Visit
 	8,  // 37: hawkr.buyer.v1alpha1.ListRestockSubscriptionsResponse.restock_subscriptions:type_name -> hawkr.buyer.v1alpha1.RestockSubscription
-	11, // 38: hawkr.buyer.v1alpha1.BuyerAppService.GetProfile:input_type -> hawkr.buyer.v1alpha1.GetProfileRequest
-	13, // 39: hawkr.buyer.v1alpha1.BuyerAppService.UpdateProfile:input_type -> hawkr.buyer.v1alpha1.UpdateProfileRequest
-	15, // 40: hawkr.buyer.v1alpha1.BuyerAppService.ListAddresses:input_type -> hawkr.buyer.v1alpha1.ListAddressesRequest
-	17, // 41: hawkr.buyer.v1alpha1.BuyerAppService.GetAddress:input_type -> hawkr.buyer.v1alpha1.GetAddressRequest
-	19, // 42: hawkr.buyer.v1alpha1.BuyerAppService.CreateAddress:input_type -> hawkr.buyer.v1alpha1.CreateAddressRequest
-	21, // 43: hawkr.buyer.v1alpha1.BuyerAppService.UpdateAddress:input_type -> hawkr.buyer.v1alpha1.UpdateAddressRequest
-	23, // 44: hawkr.buyer.v1alpha1.BuyerAppService.DeleteAddress:input_type -> hawkr.buyer.v1alpha1.DeleteAddressRequest
-	25, // 45: hawkr.buyer.v1alpha1.BuyerAppService.ListFavorites:input_type -> hawkr.buyer.v1alpha1.ListFavoritesRequest
-	27, // 46: hawkr.buyer.v1alpha1.BuyerAppService.CheckFavorite:input_type -> hawkr.buyer.v1alpha1.CheckFavoriteRequest
-	29, // 47: hawkr.buyer.v1alpha1.BuyerAppService.BatchCheckFavorites:input_type -> hawkr.buyer.v1alpha1.BatchCheckFavoritesRequest
-	31, // 48: hawkr.buyer.v1alpha1.BuyerAppService.AddFavorite:input_type -> hawkr.buyer.v1alpha1.AddFavoriteRequest
-	33, // 49: hawkr.buyer.v1alpha1.BuyerAppService.RemoveFavorite:input_type -> hawkr.buyer.v1alpha1.RemoveFavoriteRequest
-	35, // 50: hawkr.buyer.v1alpha1.BuyerAppService.ListFollows:input_type -> hawkr.buyer.v1alpha1.ListFollowsRequest
-	37, // 51: hawkr.buyer.v1alpha1.BuyerAppService.CheckFollow:input_type -> hawkr.buyer.v1alpha1.CheckFollowRequest
-	39, // 52: hawkr.buyer.v1alpha1.BuyerAppService.BatchCheckFollows:input_type -> hawkr.buyer.v1alpha1.BatchCheckFollowsRequest
-	41, // 53: hawkr.buyer.v1alpha1.BuyerAppService.FollowStore:input_type -> hawkr.buyer.v1alpha1.FollowStoreRequest
-	43, // 54: hawkr.buyer.v1alpha1.BuyerAppService.UnfollowStore:input_type -> hawkr.buyer.v1alpha1.UnfollowStoreRequest
-	45, // 55: hawkr.buyer.v1alpha1.BuyerAppService.ListMemberCards:input_type -> hawkr.buyer.v1alpha1.ListMemberCardsRequest
-	47, // 56: hawkr.buyer.v1alpha1.BuyerAppService.ListSpendingRecords:input_type -> hawkr.buyer.v1alpha1.ListSpendingRecordsRequest
-	49, // 57: hawkr.buyer.v1alpha1.BuyerAppService.ListVisits:input_type -> hawkr.buyer.v1alpha1.ListVisitsRequest
-	51, // 58: hawkr.buyer.v1alpha1.BuyerAppService.RecordVisit:input_type -> hawkr.buyer.v1alpha1.RecordVisitRequest
-	53, // 59: hawkr.buyer.v1alpha1.BuyerAppService.ClearVisits:input_type -> hawkr.buyer.v1alpha1.ClearVisitsRequest
-	55, // 60: hawkr.buyer.v1alpha1.BuyerAppService.ListRestockSubscriptions:input_type -> hawkr.buyer.v1alpha1.ListRestockSubscriptionsRequest
-	57, // 61: hawkr.buyer.v1alpha1.BuyerAppService.SubscribeRestock:input_type -> hawkr.buyer.v1alpha1.SubscribeRestockRequest
-	59, // 62: hawkr.buyer.v1alpha1.BuyerAppService.UnsubscribeRestock:input_type -> hawkr.buyer.v1alpha1.UnsubscribeRestockRequest
-	12, // 63: hawkr.buyer.v1alpha1.BuyerAppService.GetProfile:output_type -> hawkr.buyer.v1alpha1.GetProfileResponse
-	14, // 64: hawkr.buyer.v1alpha1.BuyerAppService.UpdateProfile:output_type -> hawkr.buyer.v1alpha1.UpdateProfileResponse
-	16, // 65: hawkr.buyer.v1alpha1.BuyerAppService.ListAddresses:output_type -> hawkr.buyer.v1alpha1.ListAddressesResponse
-	18, // 66: hawkr.buyer.v1alpha1.BuyerAppService.GetAddress:output_type -> hawkr.buyer.v1alpha1.GetAddressResponse
-	20, // 67: hawkr.buyer.v1alpha1.BuyerAppService.CreateAddress:output_type -> hawkr.buyer.v1alpha1.CreateAddressResponse
-	22, // 68: hawkr.buyer.v1alpha1.BuyerAppService.UpdateAddress:output_type -> hawkr.buyer.v1alpha1.UpdateAddressResponse
-	24, // 69: hawkr.buyer.v1alpha1.BuyerAppService.DeleteAddress:output_type -> hawkr.buyer.v1alpha1.DeleteAddressResponse
-	26, // 70: hawkr.buyer.v1alpha1.BuyerAppService.ListFavorites:output_type -> hawkr.buyer.v1alpha1.ListFavoritesResponse
-	28, // 71: hawkr.buyer.v1alpha1.BuyerAppService.CheckFavorite:output_type -> hawkr.buyer.v1alpha1.CheckFavoriteResponse
-	30, // 72: hawkr.buyer.v1alpha1.BuyerAppService.BatchCheckFavorites:output_type -> hawkr.buyer.v1alpha1.BatchCheckFavoritesResponse
-	32, // 73: hawkr.buyer.v1alpha1.BuyerAppService.AddFavorite:output_type -> hawkr.buyer.v1alpha1.AddFavoriteResponse
-	34, // 74: hawkr.buyer.v1alpha1.BuyerAppService.RemoveFavorite:output_type -> hawkr.buyer.v1alpha1.RemoveFavoriteResponse
-	36, // 75: hawkr.buyer.v1alpha1.BuyerAppService.ListFollows:output_type -> hawkr.buyer.v1alpha1.ListFollowsResponse
-	38, // 76: hawkr.buyer.v1alpha1.BuyerAppService.CheckFollow:output_type -> hawkr.buyer.v1alpha1.CheckFollowResponse
-	40, // 77: hawkr.buyer.v1alpha1.BuyerAppService.BatchCheckFollows:output_type -> hawkr.buyer.v1alpha1.BatchCheckFollowsResponse
-	42, // 78: hawkr.buyer.v1alpha1.BuyerAppService.FollowStore:output_type -> hawkr.buyer.v1alpha1.FollowStoreResponse
-	44, // 79: hawkr.buyer.v1alpha1.BuyerAppService.UnfollowStore:output_type -> hawkr.buyer.v1alpha1.UnfollowStoreResponse
-	46, // 80: hawkr.buyer.v1alpha1.BuyerAppService.ListMemberCards:output_type -> hawkr.buyer.v1alpha1.ListMemberCardsResponse
-	48, // 81: hawkr.buyer.v1alpha1.BuyerAppService.ListSpendingRecords:output_type -> hawkr.buyer.v1alpha1.ListSpendingRecordsResponse
-	50, // 82: hawkr.buyer.v1alpha1.BuyerAppService.ListVisits:output_type -> hawkr.buyer.v1alpha1.ListVisitsResponse
-	52, // 83: hawkr.buyer.v1alpha1.BuyerAppService.RecordVisit:output_type -> hawkr.buyer.v1alpha1.RecordVisitResponse
-	54, // 84: hawkr.buyer.v1alpha1.BuyerAppService.ClearVisits:output_type -> hawkr.buyer.v1alpha1.ClearVisitsResponse
-	56, // 85: hawkr.buyer.v1alpha1.BuyerAppService.ListRestockSubscriptions:output_type -> hawkr.buyer.v1alpha1.ListRestockSubscriptionsResponse
-	58, // 86: hawkr.buyer.v1alpha1.BuyerAppService.SubscribeRestock:output_type -> hawkr.buyer.v1alpha1.SubscribeRestockResponse
-	60, // 87: hawkr.buyer.v1alpha1.BuyerAppService.UnsubscribeRestock:output_type -> hawkr.buyer.v1alpha1.UnsubscribeRestockResponse
-	63, // [63:88] is the sub-list for method output_type
-	38, // [38:63] is the sub-list for method input_type
-	38, // [38:38] is the sub-list for extension type_name
-	38, // [38:38] is the sub-list for extension extendee
-	0,  // [0:38] is the sub-list for field type_name
+	73, // 38: hawkr.buyer.v1alpha1.ListBlockedBuyersResponse.blocked_buyers:type_name -> hawkr.buyer.v1alpha1.BlockedBuyer
+	74, // 39: hawkr.buyer.v1alpha1.ListBlockedStoresResponse.blocked_stores:type_name -> hawkr.buyer.v1alpha1.BlockedStore
+	76, // 40: hawkr.buyer.v1alpha1.BlockedBuyer.avatar:type_name -> hawkr.common.v1alpha1.Image
+	77, // 41: hawkr.buyer.v1alpha1.BlockedBuyer.create_time:type_name -> google.protobuf.Timestamp
+	79, // 42: hawkr.buyer.v1alpha1.BlockedStore.store:type_name -> hawkr.common.v1alpha1.StoreCard
+	77, // 43: hawkr.buyer.v1alpha1.BlockedStore.create_time:type_name -> google.protobuf.Timestamp
+	11, // 44: hawkr.buyer.v1alpha1.BuyerAppService.GetProfile:input_type -> hawkr.buyer.v1alpha1.GetProfileRequest
+	13, // 45: hawkr.buyer.v1alpha1.BuyerAppService.UpdateProfile:input_type -> hawkr.buyer.v1alpha1.UpdateProfileRequest
+	15, // 46: hawkr.buyer.v1alpha1.BuyerAppService.ListAddresses:input_type -> hawkr.buyer.v1alpha1.ListAddressesRequest
+	17, // 47: hawkr.buyer.v1alpha1.BuyerAppService.GetAddress:input_type -> hawkr.buyer.v1alpha1.GetAddressRequest
+	19, // 48: hawkr.buyer.v1alpha1.BuyerAppService.CreateAddress:input_type -> hawkr.buyer.v1alpha1.CreateAddressRequest
+	21, // 49: hawkr.buyer.v1alpha1.BuyerAppService.UpdateAddress:input_type -> hawkr.buyer.v1alpha1.UpdateAddressRequest
+	23, // 50: hawkr.buyer.v1alpha1.BuyerAppService.DeleteAddress:input_type -> hawkr.buyer.v1alpha1.DeleteAddressRequest
+	25, // 51: hawkr.buyer.v1alpha1.BuyerAppService.ListFavorites:input_type -> hawkr.buyer.v1alpha1.ListFavoritesRequest
+	27, // 52: hawkr.buyer.v1alpha1.BuyerAppService.CheckFavorite:input_type -> hawkr.buyer.v1alpha1.CheckFavoriteRequest
+	29, // 53: hawkr.buyer.v1alpha1.BuyerAppService.BatchCheckFavorites:input_type -> hawkr.buyer.v1alpha1.BatchCheckFavoritesRequest
+	31, // 54: hawkr.buyer.v1alpha1.BuyerAppService.AddFavorite:input_type -> hawkr.buyer.v1alpha1.AddFavoriteRequest
+	33, // 55: hawkr.buyer.v1alpha1.BuyerAppService.RemoveFavorite:input_type -> hawkr.buyer.v1alpha1.RemoveFavoriteRequest
+	35, // 56: hawkr.buyer.v1alpha1.BuyerAppService.ListFollows:input_type -> hawkr.buyer.v1alpha1.ListFollowsRequest
+	37, // 57: hawkr.buyer.v1alpha1.BuyerAppService.CheckFollow:input_type -> hawkr.buyer.v1alpha1.CheckFollowRequest
+	39, // 58: hawkr.buyer.v1alpha1.BuyerAppService.BatchCheckFollows:input_type -> hawkr.buyer.v1alpha1.BatchCheckFollowsRequest
+	41, // 59: hawkr.buyer.v1alpha1.BuyerAppService.FollowStore:input_type -> hawkr.buyer.v1alpha1.FollowStoreRequest
+	43, // 60: hawkr.buyer.v1alpha1.BuyerAppService.UnfollowStore:input_type -> hawkr.buyer.v1alpha1.UnfollowStoreRequest
+	45, // 61: hawkr.buyer.v1alpha1.BuyerAppService.ListMemberCards:input_type -> hawkr.buyer.v1alpha1.ListMemberCardsRequest
+	47, // 62: hawkr.buyer.v1alpha1.BuyerAppService.ListSpendingRecords:input_type -> hawkr.buyer.v1alpha1.ListSpendingRecordsRequest
+	49, // 63: hawkr.buyer.v1alpha1.BuyerAppService.ListVisits:input_type -> hawkr.buyer.v1alpha1.ListVisitsRequest
+	51, // 64: hawkr.buyer.v1alpha1.BuyerAppService.RecordVisit:input_type -> hawkr.buyer.v1alpha1.RecordVisitRequest
+	53, // 65: hawkr.buyer.v1alpha1.BuyerAppService.ClearVisits:input_type -> hawkr.buyer.v1alpha1.ClearVisitsRequest
+	55, // 66: hawkr.buyer.v1alpha1.BuyerAppService.ListRestockSubscriptions:input_type -> hawkr.buyer.v1alpha1.ListRestockSubscriptionsRequest
+	57, // 67: hawkr.buyer.v1alpha1.BuyerAppService.SubscribeRestock:input_type -> hawkr.buyer.v1alpha1.SubscribeRestockRequest
+	59, // 68: hawkr.buyer.v1alpha1.BuyerAppService.UnsubscribeRestock:input_type -> hawkr.buyer.v1alpha1.UnsubscribeRestockRequest
+	61, // 69: hawkr.buyer.v1alpha1.BuyerAppService.BlockAuthor:input_type -> hawkr.buyer.v1alpha1.BlockAuthorRequest
+	63, // 70: hawkr.buyer.v1alpha1.BuyerAppService.BlockStore:input_type -> hawkr.buyer.v1alpha1.BlockStoreRequest
+	65, // 71: hawkr.buyer.v1alpha1.BuyerAppService.UnblockBuyer:input_type -> hawkr.buyer.v1alpha1.UnblockBuyerRequest
+	67, // 72: hawkr.buyer.v1alpha1.BuyerAppService.UnblockStore:input_type -> hawkr.buyer.v1alpha1.UnblockStoreRequest
+	69, // 73: hawkr.buyer.v1alpha1.BuyerAppService.ListBlockedBuyers:input_type -> hawkr.buyer.v1alpha1.ListBlockedBuyersRequest
+	71, // 74: hawkr.buyer.v1alpha1.BuyerAppService.ListBlockedStores:input_type -> hawkr.buyer.v1alpha1.ListBlockedStoresRequest
+	12, // 75: hawkr.buyer.v1alpha1.BuyerAppService.GetProfile:output_type -> hawkr.buyer.v1alpha1.GetProfileResponse
+	14, // 76: hawkr.buyer.v1alpha1.BuyerAppService.UpdateProfile:output_type -> hawkr.buyer.v1alpha1.UpdateProfileResponse
+	16, // 77: hawkr.buyer.v1alpha1.BuyerAppService.ListAddresses:output_type -> hawkr.buyer.v1alpha1.ListAddressesResponse
+	18, // 78: hawkr.buyer.v1alpha1.BuyerAppService.GetAddress:output_type -> hawkr.buyer.v1alpha1.GetAddressResponse
+	20, // 79: hawkr.buyer.v1alpha1.BuyerAppService.CreateAddress:output_type -> hawkr.buyer.v1alpha1.CreateAddressResponse
+	22, // 80: hawkr.buyer.v1alpha1.BuyerAppService.UpdateAddress:output_type -> hawkr.buyer.v1alpha1.UpdateAddressResponse
+	24, // 81: hawkr.buyer.v1alpha1.BuyerAppService.DeleteAddress:output_type -> hawkr.buyer.v1alpha1.DeleteAddressResponse
+	26, // 82: hawkr.buyer.v1alpha1.BuyerAppService.ListFavorites:output_type -> hawkr.buyer.v1alpha1.ListFavoritesResponse
+	28, // 83: hawkr.buyer.v1alpha1.BuyerAppService.CheckFavorite:output_type -> hawkr.buyer.v1alpha1.CheckFavoriteResponse
+	30, // 84: hawkr.buyer.v1alpha1.BuyerAppService.BatchCheckFavorites:output_type -> hawkr.buyer.v1alpha1.BatchCheckFavoritesResponse
+	32, // 85: hawkr.buyer.v1alpha1.BuyerAppService.AddFavorite:output_type -> hawkr.buyer.v1alpha1.AddFavoriteResponse
+	34, // 86: hawkr.buyer.v1alpha1.BuyerAppService.RemoveFavorite:output_type -> hawkr.buyer.v1alpha1.RemoveFavoriteResponse
+	36, // 87: hawkr.buyer.v1alpha1.BuyerAppService.ListFollows:output_type -> hawkr.buyer.v1alpha1.ListFollowsResponse
+	38, // 88: hawkr.buyer.v1alpha1.BuyerAppService.CheckFollow:output_type -> hawkr.buyer.v1alpha1.CheckFollowResponse
+	40, // 89: hawkr.buyer.v1alpha1.BuyerAppService.BatchCheckFollows:output_type -> hawkr.buyer.v1alpha1.BatchCheckFollowsResponse
+	42, // 90: hawkr.buyer.v1alpha1.BuyerAppService.FollowStore:output_type -> hawkr.buyer.v1alpha1.FollowStoreResponse
+	44, // 91: hawkr.buyer.v1alpha1.BuyerAppService.UnfollowStore:output_type -> hawkr.buyer.v1alpha1.UnfollowStoreResponse
+	46, // 92: hawkr.buyer.v1alpha1.BuyerAppService.ListMemberCards:output_type -> hawkr.buyer.v1alpha1.ListMemberCardsResponse
+	48, // 93: hawkr.buyer.v1alpha1.BuyerAppService.ListSpendingRecords:output_type -> hawkr.buyer.v1alpha1.ListSpendingRecordsResponse
+	50, // 94: hawkr.buyer.v1alpha1.BuyerAppService.ListVisits:output_type -> hawkr.buyer.v1alpha1.ListVisitsResponse
+	52, // 95: hawkr.buyer.v1alpha1.BuyerAppService.RecordVisit:output_type -> hawkr.buyer.v1alpha1.RecordVisitResponse
+	54, // 96: hawkr.buyer.v1alpha1.BuyerAppService.ClearVisits:output_type -> hawkr.buyer.v1alpha1.ClearVisitsResponse
+	56, // 97: hawkr.buyer.v1alpha1.BuyerAppService.ListRestockSubscriptions:output_type -> hawkr.buyer.v1alpha1.ListRestockSubscriptionsResponse
+	58, // 98: hawkr.buyer.v1alpha1.BuyerAppService.SubscribeRestock:output_type -> hawkr.buyer.v1alpha1.SubscribeRestockResponse
+	60, // 99: hawkr.buyer.v1alpha1.BuyerAppService.UnsubscribeRestock:output_type -> hawkr.buyer.v1alpha1.UnsubscribeRestockResponse
+	62, // 100: hawkr.buyer.v1alpha1.BuyerAppService.BlockAuthor:output_type -> hawkr.buyer.v1alpha1.BlockAuthorResponse
+	64, // 101: hawkr.buyer.v1alpha1.BuyerAppService.BlockStore:output_type -> hawkr.buyer.v1alpha1.BlockStoreResponse
+	66, // 102: hawkr.buyer.v1alpha1.BuyerAppService.UnblockBuyer:output_type -> hawkr.buyer.v1alpha1.UnblockBuyerResponse
+	68, // 103: hawkr.buyer.v1alpha1.BuyerAppService.UnblockStore:output_type -> hawkr.buyer.v1alpha1.UnblockStoreResponse
+	70, // 104: hawkr.buyer.v1alpha1.BuyerAppService.ListBlockedBuyers:output_type -> hawkr.buyer.v1alpha1.ListBlockedBuyersResponse
+	72, // 105: hawkr.buyer.v1alpha1.BuyerAppService.ListBlockedStores:output_type -> hawkr.buyer.v1alpha1.ListBlockedStoresResponse
+	75, // [75:106] is the sub-list for method output_type
+	44, // [44:75] is the sub-list for method input_type
+	44, // [44:44] is the sub-list for extension type_name
+	44, // [44:44] is the sub-list for extension extendee
+	0,  // [0:44] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_buyer_v1alpha1_buyer_proto_init() }
@@ -3630,13 +4462,17 @@ func file_hawkr_buyer_v1alpha1_buyer_proto_init() {
 	}
 	file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[0].OneofWrappers = []any{}
 	file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[2].OneofWrappers = []any{}
+	file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[59].OneofWrappers = []any{
+		(*BlockAuthorRequest_CommentId)(nil),
+		(*BlockAuthorRequest_ForumEntryId)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_buyer_v1alpha1_buyer_proto_rawDesc), len(file_hawkr_buyer_v1alpha1_buyer_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   59,
+			NumMessages:   73,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

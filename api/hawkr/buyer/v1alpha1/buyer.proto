@@ -137,6 +137,38 @@ service BuyerAppService {
   rpc UnsubscribeRestock(UnsubscribeRestockRequest) returns (UnsubscribeRestockResponse) {
     option idempotency_level = IDEMPOTENT;
   }
+
+  // BlockAuthor 封鎖一則留言或討論區留言的作者：作者是買家時封鎖那位買家（雙方互相看不到對方的留言，A7-1b），是店家時封鎖那家店
+  // （該店的貼文與討論區不再出現）。參照是呼叫者讀得到的內容；讀不到（不存在、已刪除、被隱藏、貼文不公開、已被雙方的封鎖排除）一律回
+  // not_found，不區分原因。作者是呼叫者自己、或是呼叫者自己的店，回 invalid_argument。已經封鎖時也成功，changed 為 false。
+  rpc BlockAuthor(BlockAuthorRequest) returns (BlockAuthorResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // BlockStore 從店面頁封鎖店家；已經封鎖時也成功，changed 為 false。店家不存在或從沒公開過回 not_found，封鎖自己的店回 invalid_argument。
+  rpc BlockStore(BlockStoreRequest) returns (BlockStoreResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // UnblockBuyer 解除對買家的封鎖；沒有封鎖時也成功，changed 為 false。
+  rpc UnblockBuyer(UnblockBuyerRequest) returns (UnblockBuyerResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // UnblockStore 解除對店家的封鎖；沒有封鎖時也成功，changed 為 false。
+  rpc UnblockStore(UnblockStoreRequest) returns (UnblockStoreResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // ListBlockedBuyers 列出呼叫者封鎖的買家，新到舊。
+  rpc ListBlockedBuyers(ListBlockedBuyersRequest) returns (ListBlockedBuyersResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListBlockedStores 列出呼叫者封鎖的店家，新到舊；已關閉的店家照樣在名單裡（store 的 status 是 CLOSED），好讓使用者解除。
+  rpc ListBlockedStores(ListBlockedStoresRequest) returns (ListBlockedStoresResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 }
 
 // BuyerStatus 是買家的狀態。
@@ -476,3 +508,85 @@ message UnsubscribeRestockRequest {
 }
 
 message UnsubscribeRestockResponse {}
+
+message BlockAuthorRequest {
+  // 要封鎖的作者所寫的內容。
+  oneof source {
+    // 留言 ID。
+    string comment_id = 1;
+    // 討論區留言 ID。
+    string forum_entry_id = 2;
+  }
+}
+
+message BlockAuthorResponse {
+  // 封鎖的狀態是否因這次呼叫而改變；本來就封鎖時為 false。
+  bool changed = 1;
+}
+
+message BlockStoreRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message BlockStoreResponse {
+  // 同 BlockAuthorResponse.changed。
+  bool changed = 1;
+}
+
+message UnblockBuyerRequest {
+  string buyer_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UnblockBuyerResponse {
+  // 解除是否改變了狀態；本來就沒有封鎖時為 false。
+  bool changed = 1;
+}
+
+message UnblockStoreRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UnblockStoreResponse {
+  // 同 UnblockBuyerResponse.changed。
+  bool changed = 1;
+}
+
+message ListBlockedBuyersRequest {
+  // 預設 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListBlockedBuyersResponse {
+  repeated BlockedBuyer blocked_buyers = 1;
+  string next_page_token = 2;
+}
+
+message ListBlockedStoresRequest {
+  // 預設 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListBlockedStoresResponse {
+  repeated BlockedStore blocked_stores = 1;
+  string next_page_token = 2;
+}
+
+// BlockedBuyer 是呼叫者封鎖的買家。
+message BlockedBuyer {
+  string buyer_id = 1;
+  // 對方已刪除帳號：不帶名稱與頭像，client 顯示「已刪除的帳號」，仍可解除。
+  bool deleted = 2;
+  string display_name = 3;
+  hawkr.common.v1alpha1.Image avatar = 4;
+  google.protobuf.Timestamp create_time = 5;
+}
+
+// BlockedStore 是呼叫者封鎖的店家。
+message BlockedStore {
+  string store_id = 1;
+  // 不設表示這家店不顯示（從沒公開過或不存在）；已關閉的店家有卡片，status 是 CLOSED。
+  hawkr.common.v1alpha1.StoreCard store = 2;
+  google.protobuf.Timestamp create_time = 3;
+}

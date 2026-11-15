@@ -2,6 +2,7 @@ package characterization
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -23,6 +24,33 @@ type restDriver struct {
 var _ Driver = (*restDriver)(nil)
 
 func (d *restDriver) Legacy() bool { return true }
+
+// errNoLegacyBlocking：舊的封鎖是另一套（雙向、Redis、userId 不帶 kind；SD3、SD15、CD3），封鎖的情境在舊的一端一律跳過，不會呼叫到這些方法。
+var errNoLegacyBlocking = errors.New("舊的 social-service 沒有對應單體語意的封鎖入口（SD3、SD15、D2）")
+
+func (d *restDriver) BlockAuthor(context.Context, ch.Caller, string) (bool, error) {
+	return false, errNoLegacyBlocking
+}
+
+func (d *restDriver) BlockStore(context.Context, ch.Caller, string) (bool, error) {
+	return false, errNoLegacyBlocking
+}
+
+func (d *restDriver) UnblockStore(context.Context, ch.Caller, string) (bool, error) {
+	return false, errNoLegacyBlocking
+}
+
+func (d *restDriver) SellerBlockAuthor(context.Context, ch.Caller, string) (bool, error) {
+	return false, errNoLegacyBlocking
+}
+
+func (d *restDriver) SellerBlockedBuyers(context.Context, ch.Caller) ([]BlockedBuyer, error) {
+	return nil, errNoLegacyBlocking
+}
+
+func (d *restDriver) SellerUnblockBuyer(context.Context, ch.Caller, string) (bool, error) {
+	return false, errNoLegacyBlocking
+}
 
 type wirePost struct {
 	ID           string   `json:"id"`
