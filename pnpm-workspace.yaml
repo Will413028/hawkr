@@ -132,13 +132,6 @@ overrides:
   # fast-uri entry: an unbounded `>=` is a subscription, not a pin).
   # REMOVE-WHEN: requesters-demand >=4.28.7
   browserslist: ^4.28.7
-  # CVE-2026-96889 (GHSA-wq5f-xc86-pv6w)：sharp 內建的 librsvg 有漏洞，修補線 >=0.35.5。
-  # next 宣告 `^0.35.4`（含 0.35.5），miniflare 4.x／5.x 則各自把 sharp 釘死在
-  # 0.34.5／0.35.2（只在開發與 build 工具鏈，不進 prod 執行期）。0.x 的 caret 只允許
-  # 同一個 minor，所以 `^0.35.5` 有界；website 的派生圖腳本鎖定同一個版本。
-  # EXCEEDS-UPSTREAM: miniflare — 兩個 miniflare 版本都以精確版本釘住較舊的 sharp
-  # REMOVE-WHEN: requesters-demand >=0.35.5
-  sharp: ^0.35.5
   # GHSA-jp82-f5mq-hwhp 等（critical＋high）：seroval <=1.6.2。只經 admin 的
   # @tanstack/react-query-devtools>@tanstack/query-devtools>@kobalte/core>…>solid-js
   # 進 --prod；solid-js 1.9.15（latest）宣告 `~1.5.4`，沒有可升的上游，故以有界 override
