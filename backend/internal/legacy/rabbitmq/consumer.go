@@ -9,6 +9,9 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+// closeTimeout 是關閉連線時等 broker 回應的上限；關連線會一併關閉其上的 channel 與消費者。
+const closeTimeout = 5 * time.Second
+
 type Binding struct {
 	Queue, Exchange, Key string
 	Handle               func(context.Context, []byte) error
@@ -33,20 +36,13 @@ func runOnce(ctx context.Context, url string, bindings []Binding, isPermanent fu
 	if err != nil {
 		return fmt.Errorf("連線：%w", err)
 	}
-	defer func() { _ = conn.Close() }()
-	channels := make([]*amqp.Channel, 0, len(bindings))
-	defer func() {
-		for _, ch := range channels {
-			_ = ch.Close()
-		}
-	}()
+	defer func() { _ = conn.CloseDeadline(time.Now().Add(closeTimeout)) }()
 	errors := make(chan error, len(bindings))
 	for _, b := range bindings {
 		ch, err := conn.Channel()
 		if err != nil {
 			return fmt.Errorf("開 channel：%w", err)
 		}
-		channels = append(channels, ch)
 		if err := ch.Qos(1, 0, false); err != nil {
 			return err
 		}
@@ -70,8 +66,6 @@ func runOnce(ctx context.Context, url string, bindings []Binding, isPermanent fu
 		if err := ch.QueueBind(b.Queue, b.Key, b.Exchange, false, nil); err != nil {
 			return err
 		}
-		// 不用 ConsumeWithContext：它在 ctx 取消時另起 basic.cancel，和下面 defer 的 ch.Close 搶同一個 RPC 回應，
-		// Close 會等不到 close-ok 而卡住。消費者隨 channel 關閉一起取消。
 		deliveries, err := ch.Consume(b.Queue, b.Queue, false, false, false, false, nil)
 		if err != nil {
 			return err
