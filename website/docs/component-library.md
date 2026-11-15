@@ -52,11 +52,11 @@ App／三端 iframe 預覽標記 `!test`，共20個，不計入65個 React 預�
 
 商品描述編輯器後續修正、色盤操作與最新測試範圍，見 [商品描述編輯器驗證](./description-editor-validation.md)。
 
-Web 元件行為測試是各元件旁的 `*.browser.test.tsx`（`pnpm test:browser`），本機不跑，由 CI 的 `website e2e` workflow 的 `元件 browser 測試` job 執行；a11y 由 Playwright e2e 的 axe 掃描（`tests/e2e/helpers/axe.ts`）守。原有 `pnpm test` 維持單元測試，不含 browser project。兩 App 的元件目錄在各 App 目錄用 `flutter run` 獨立執行（見各 App 的 `docs/component-library.md`）。
+Web 元件行為測試是各元件旁的 `*.browser.test.tsx`（`pnpm test:browser`），本機不跑，由 CI 的 `website e2e` workflow 的 `元件 browser 測試` job 執行；a11y 由 Playwright e2e 的 axe 掃描（`tests/e2e/helpers/axe.ts`）守。原有 `pnpm test` 維持單元測試，不含 browser project。兩 App 的元件目錄在各 App 目錄以 `bash scripts/component-catalog.sh run` 獨立執行（見各 App 的 `docs/component-library.md`）。
 
 ```sh
 pnpm install --frozen-lockfile
-# 預設讀 monorepo 的 buyer-app、seller-app；其他位置設定 HAWKR_APPS_ROOT
+# 讀 monorepo 的 buyer-app、seller-app
 pnpm design:check --apps-root ..
 ```
 

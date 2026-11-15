@@ -50,7 +50,7 @@ node --test tests/check-cross-platform-tokens.test.mjs
 | 基本卡片圓角 | 共享 `Card` 預設 14 | Material `CardTheme` 16 | Material `CardTheme` 16 | 比較相同卡片責任；買家 `ProductCard` 另有 compact 12／wide 16 |
 | 對話框圓角 | `Dialog` 28 | `HkRadius.dialog` 24 | `HkRadius.dialog` 24 | 分別確認 modal 與 sheet 幾何，直接收斂既有 primitive |
 
-卡片與 Dialog 的 runtime 使用位置分別為 `components/ui/Card.tsx`、`components/ui/Dialog.tsx`，以及兩個 App 的 `lib/core/theme/app_theme.dart`。`radius.componentCard`／`radius.componentDialog` 檢查的是這些來源使用的 token；checker 不解析元件 props 是否仍選用該 token，這部分由元件 stories 與 UI 測試檢查。
+卡片與 Dialog 的 runtime 使用位置分別為 `components/ui/Card.tsx`、`components/ui/Dialog.tsx`，以及兩個 App 的 `lib/core/theme/app_theme.dart`。`radius.componentCard`／`radius.componentDialog` 檢查的是這些來源使用的 token；checker 不解析元件 props 是否仍選用該 token，目前沒有其他自動檢查涵蓋這部分。
 
 一般輸入欄位以兩個 App 的 `AppTheme.inputDecorationTheme` 為外觀參照：Web `Input`、`Textarea`、`Select` 預設為 bordered，md 採 16px 文字、16px 水平內距、12px 圓角與奶油表面，單行最小高度 48px；正常邊框 1px、聚焦 1.5px、錯誤且聚焦 2px，停用時保留表面與可讀文字。`floatingLabel` 可在空白未聚焦時置於欄內，聚焦或填入後縮至 12px 並停留在上邊框。Web 明確指定的 flat／faded／underlined 保留原有外觀，sm 精簡欄位保留滑鼠 32px／觸控至少 44px。這是共用欄位的收斂，不代表全部輸入表面或全域 control token 已統一：買家填色為不透明 `#fffdf7`、hint 為 `#72796e`；賣家填色為同色 245/255 透明度、hint 為 `#42493f`。Web 錯誤文字維持較深的 `danger-text` 可讀性角色，且沿用自己的深色 theme 與原生操作語意；App 專用手機欄位、dropdown 及平台字體仍需分別比較。
 

@@ -57,13 +57,13 @@ import {
 
 ## 瀏覽器測試與驗證狀態
 
-[`lib/navigation/recovery.browser.test.tsx`](../lib/navigation/recovery.browser.test.tsx) 使用正式導覽狀態機與共用 Button，替換文件導覽 I/O、縮短期限並驅動 router 開始／提交訊號。文件導覽只更新隔離預覽，沒有登入交換、真實 API 或交易。正式 Link 與登入 hook 的接線由 React 整合單元測試驗證；瀏覽器測試環境的 Link mock 會先取消點擊，不能拿它當正式 Next 路由的執行證據。
+[`lib/navigation/recovery.browser.test.tsx`](../lib/navigation/recovery.browser.test.tsx) 使用正式導覽狀態機與共用 Button，以 spy 替換文件導覽 I/O（`commitDocumentNavigation`）、把復原期限縮短為 800ms，並直接呼叫 `beginNavigationIntent` 等函式驅動 router 開始／提交訊號。文件導覽只更新隔離預覽，沒有登入交換、真實 API 或交易。正式 Link 與登入 hook 的接線由 React 整合單元測試驗證；此測試不經過正式 Link，不能拿它當正式 Next 路由的執行證據。
 
 | 測試情境 | 審查內容 |
 | --- | --- |
-| `UnstartedRecovery` | router 未啟動時只復原一次。 |
-| `LateRouterStart` | 延遲啟動仍正常到達，不被提早判失敗。 |
-| `LoginSupersedesPending` | 登入離頁接管舊等待，舊期限不能覆蓋目的地。 |
+| `falls back to a document navigation when the router never starts` | router 未啟動時只復原一次（整頁跳轉次數 1，replace）。 |
+| `keeps the document when the router starts late` | 延遲啟動仍正常到達，不被提早判失敗（整頁跳轉次數 0）。 |
+| `lets a completed login supersede a pending navigation` | 登入離頁接管舊等待，舊期限不能覆蓋目的地（push 到登入目的地，整頁跳轉次數 1）。 |
 
 預覽將復原等待縮短至 800ms，方便互動審查；正式 10／20 秒期限由 Node 單元測試驗證，不能拿測試的等待時間當成產品設定。
 

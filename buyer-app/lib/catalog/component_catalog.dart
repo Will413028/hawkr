@@ -36,7 +36,8 @@ import '../shared/widgets/quantity_stepper.dart';
 import '../shared/widgets/hk_brand_loader.dart';
 import '../shared/widgets/hk_skeleton_shimmer.dart';
 
-/// These IDs are also used by the seller catalog and embedded iframe hosts.
+/// These IDs are also used by the seller catalog. The embedded mode currently
+/// has no consumer; it is kept for a future web publication of the catalog.
 const buyerCatalogSections = <String, String>{
   'foundations': '基礎樣式',
   'buttons': '按鈕',

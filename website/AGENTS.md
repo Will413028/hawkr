@@ -64,7 +64,7 @@ docs/                       # 技術文件
 - UI 工作前先讀 `DESIGN.md`、`components/README.md` 與相關元件，重用既有品牌與語意 token。
 - 不自創元件 props，import 用實際的 `@/components/...`。
 - 共用 UI 改動同一次變更內更新該元件旁的 `*.browser.test.tsx`（Vitest browser mode）與 API 文件；`pnpm test:browser` 不在本機跑，交給 CI 的 `website e2e` 的 `元件 browser 測試` job，回報列為待 CI。a11y 由 Playwright e2e 的 axe 掃描（`tests/e2e/helpers/axe.ts`）守。
-- 跨平台改動看 `design-system/cross-platform.md`，跑 `pnpm design:check --apps-root ..`；App 的 API 文件在各 App 的 `docs/component-library.md`，以 App 的 API 文件與原始碼為準，widget 測試在各 App 目錄跑，Flutter 元件目錄用 `flutter run` 在各 App 目錄獨立執行。
+- 跨平台改動看 `design-system/cross-platform.md`，跑 `pnpm design:check --apps-root ..`；App 的 API 文件在各 App 的 `docs/component-library.md`，以 App 的 API 文件與原始碼為準，widget 測試在各 App 目錄跑，Flutter 元件目錄在各 App 目錄以 `bash scripts/component-catalog.sh run` 獨立執行。
 - 測試資料要 deterministic，不連真實交易。
 
 <!-- BEGIN:nextjs-agent-rules -->
