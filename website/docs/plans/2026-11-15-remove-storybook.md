@@ -57,7 +57,7 @@
   - 消費端：`rg -n 'vitest.config|VITEST_STORYBOOK|--project' website .github`
   - 不能動：`unit` project 的設定與 hermetic setup；storybook job 與 story 檔（步驟 5 才刪）。
   - 驗收：本機 `pnpm lint`、`pnpm test`、`pnpm knip` 通過；PR 上新 job 綠且 log 顯示 8 個以上測試通過；mutation：把 `Button` 的 disabled 處理改壞（mutation 流程見下）。
-  - spike 結論（CI 實跑證實）：(a) Vite 8 讀 tsconfig 的 `jsx: react-jsx` 轉 TSX，不需 `@vitejs/plugin-react`；沒開 vitest globals，`tests/browser/setup.ts` 自己註冊 `cleanup`。(b) 試點元件沒有用到 `next/*`；步驟 2、3 遇到時用 `vi.mock`。(c) 全域 CSS 在 setup 匯入與 `.storybook/preview.tsx` 相同的 4 檔。另外：瀏覽器沒有 `process`，browser project 以 `define` 替換 `process.env.NODE_ENV` 與 loopback 的 `NEXT_PUBLIC_API_BASE_URL`，setup 補空的 `process` 墊片（Next client 的行為）。改寫注意：`vitest/browser` 的 `toHaveTextContent` 傳字串是整段比對，不是 jest-dom 的子字串。
+  - spike 結論（CI 實跑證實）：(a) Vite 8 讀 tsconfig 的 `jsx: react-jsx` 轉 TSX，不需 `@vitejs/plugin-react`；沒開 vitest globals，`tests/browser/setup.ts` 自己註冊 `cleanup`。(b) 試點元件沒有用到 `next/*`；`vi.mock("next/navigation", importOriginal)` 對 Vite 預先打包的依賴會匯入失敗（CI 實證：does not provide an export named 't'）；步驟 2、3 需要 router 時改 mock 專案自己的 `@/lib/intl/use-router`（`importOriginal` 保留 `useLocalizedHref`，`useRouter` 換成 `tests/browser/static-router.ts` 的靜態 router），不 mock `next/*`。(c) 全域 CSS 在 setup 匯入與 `.storybook/preview.tsx` 相同的 4 檔。另外：瀏覽器沒有 `process`，browser project 以 `define` 替換 `process.env.NODE_ENV` 與 loopback 的 `NEXT_PUBLIC_API_BASE_URL`，setup 補空的 `process` 墊片（Next client 的行為）。改寫注意：`vitest/browser` 的 `toHaveTextContent` 傳字串是整段比對，不是 jest-dom 的子字串。
   - 延後：`.storybook/preview.css` 的字型與 body 顏色沒搬進 setup（觸發條件：改寫的斷言依賴字型、顏色或版面時，把需要的 token 搬進 `tests/browser/`）。
   - 停止條件：Next.js 模組的替代需要新依賴（例如 `@vitejs/plugin-react` 或 Storybook 以外的 Next 模擬套件）——列出套件與版本回報，等 Will 決定。
 - [ ] **2. 基礎元件改寫**（被擋於：步驟 1）

@@ -28,8 +28,15 @@ function Controlled({
 describe("Switch", () => {
 	it("turns on when clicked and reports true", async () => {
 		const onCheckedChange = vi.fn();
-		renderWithIntl(<Controlled onCheckedChange={onCheckedChange} />);
-		await userEvent.click(page.getByRole("switch"));
+		const { container } = renderWithIntl(
+			<Controlled onCheckedChange={onCheckedChange} />,
+		);
+		// role=switch 的 input 視覺上隱藏（react-aria），使用者點的是可見的軌道。
+		await userEvent.click(
+			page.elementLocator(
+				container.querySelector("[data-slot=switch-control]") as HTMLElement,
+			),
+		);
 		await expect.element(page.getByRole("switch")).toBeChecked();
 		expect(onCheckedChange).toHaveBeenCalledWith(true);
 	});

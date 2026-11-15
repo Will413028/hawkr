@@ -7,18 +7,12 @@ import { renderWithIntl } from "@/tests/browser/render";
 import { AssistantEntrySkeleton } from "./AssistantEntryLayout";
 import AssistantEntryLink from "./AssistantEntryLink";
 
-// 預覽不掛 App Router：next/navigation 的 useRouter 在它之外會丟錯，換成身分穩定的靜態 router。
-vi.mock("next/navigation", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("next/navigation")>();
-	const router = {
-		push: () => {},
-		replace: () => {},
-		prefetch: () => {},
-		back: () => {},
-		forward: () => {},
-		refresh: () => {},
-	};
-	return { ...actual, useRouter: () => router };
+// 預覽不掛 App Router：next/navigation 的 useRouter 在它之外會丟錯。mock 專案自己的
+// `@/lib/intl/use-router`（所有 router 出口都經過它），不 mock 預先打包的 next/navigation。
+vi.mock("@/lib/intl/use-router", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@/lib/intl/use-router")>();
+	const { staticRouter } = await import("@/tests/browser/static-router");
+	return { ...actual, useRouter: () => staticRouter };
 });
 
 const GUEST_SESSION = Promise.resolve<SessionState>({ status: "guest" });
