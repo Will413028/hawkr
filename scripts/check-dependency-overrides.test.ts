@@ -18,6 +18,8 @@ type Fixture = {
 	notes: unknown;
 	/** what "miniflare" declares for sharp in the lockfile */
 	declared: string | null;
+	/** replace package-lock.json with this raw text, or omit the file (null) */
+	rawLock?: string | null;
 };
 
 function run(f: Fixture): { code: number; out: string } {
@@ -38,16 +40,20 @@ function run(f: Fixture): { code: number; out: string } {
 		write(root, "node_modules/.pnpm/esbuild@1/node_modules/esbuild/package.json", { name: "esbuild", version: "1.0.0" });
 		const dir = "backend/workers/image-gateway";
 		write(root, `${dir}/package.json`, { name: "image-gateway", overrides: f.overrides, "//overrides": f.notes });
-		write(root, `${dir}/package-lock.json`, {
-			lockfileVersion: 3,
-			packages: {
-				"": {},
-				"node_modules/miniflare": {
-					version: "4.0.0",
-					dependencies: f.declared === null ? {} : { sharp: f.declared },
+		if (f.rawLock === undefined) {
+			write(root, `${dir}/package-lock.json`, {
+				lockfileVersion: 3,
+				packages: {
+					"": {},
+					"node_modules/miniflare": {
+						version: "4.0.0",
+						dependencies: f.declared === null ? {} : { sharp: f.declared },
+					},
 				},
-			},
-		});
+			});
+		} else if (f.rawLock !== null) {
+			write(root, `${dir}/package-lock.json`, f.rawLock);
+		}
 		const r = spawnSync("node", [script], { env: { ...process.env, CHECK_OVERRIDES_ROOT: root }, encoding: "utf8" });
 		return { code: r.status ?? -1, out: r.stdout + r.stderr };
 	} finally {
@@ -106,4 +112,36 @@ test("open-ended npm override value fails", () => {
 	const r = run({ overrides: { miniflare: { sharp: ">=0.35.5" } }, notes: note(good), declared: "0.34.5" });
 	assert.equal(r.code, 1);
 	assert.match(r.out, /open-ended/);
+});
+
+test("missing npm lockfile reports one error and skips the other npm checks", () => {
+	const r = run({ overrides: { sharp: "0.35.5" }, notes: {}, declared: null, rawLock: null });
+	assert.equal(r.code, 1);
+	assert.match(r.out, /package-lock\.json missing or unreadable/);
+	assert.doesNotMatch(r.out, /must be scoped under the requester/);
+});
+
+test("unparseable npm lockfile reports one error and skips the other npm checks", () => {
+	const r = run({ overrides, notes: note("Security floor."), declared: null, rawLock: "{not json" });
+	assert.equal(r.code, 1);
+	assert.match(r.out, /package-lock\.json missing or unreadable/);
+	assert.doesNotMatch(r.out, /missing REMOVE-WHEN/);
+});
+
+test("//overrides note without a matching override fails", () => {
+	const r = run({ overrides, notes: { ...note(good), "miniflare > gone": good }, declared: "0.34.5" });
+	assert.equal(r.code, 1);
+	assert.match(r.out, /note "miniflare > gone" matches no override/);
+});
+
+test("npm requester key with a version selector fails with a clear message", () => {
+	const r = run({ overrides: { "miniflare@^4": { sharp: "0.35.5" } }, notes: {}, declared: "0.34.5" });
+	assert.equal(r.code, 1);
+	assert.match(r.out, /version selector/);
+});
+
+test("npm self key `.` fails with a clear message", () => {
+	const r = run({ overrides: { ".": { sharp: "0.35.5" } }, notes: {}, declared: "0.34.5" });
+	assert.equal(r.code, 1);
+	assert.match(r.out, /self key/);
 });

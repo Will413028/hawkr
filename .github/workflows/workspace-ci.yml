@@ -15,6 +15,9 @@ on:
       - '.nvmrc'
       - 'patches/**'
       - 'scripts/check-dependency-overrides.ts'
+      - 'scripts/check-dependency-overrides.test.ts'
+      - 'backend/workers/image-gateway/package.json'
+      - 'backend/workers/image-gateway/package-lock.json'
       - '.github/actions/pnpm-install/**'
       - '.github/workflows/workspace-ci.yml'
   push:

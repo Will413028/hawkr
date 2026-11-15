@@ -96,6 +96,28 @@ type Override = {
 
 type Version = [number, number, number];
 
+/** Shared by the pnpm comments and the npm `//overrides` notes. */
+function parseNotes(text: string): {
+	removeWhen: string | null;
+	exceedsUpstream: string[] | null;
+} {
+	const removeWhen = text.match(
+		/REMOVE-WHEN:\s*requesters-demand\s*>=\s*([0-9][^\s.]*(?:\.[0-9][^\s.]*)*)/,
+	);
+	// Stop at the em dash so a trailing prose reason on the same line ("— the
+	// advisory covers the whole declared range") is not read as a package name.
+	const exceeds = text.match(/EXCEEDS-UPSTREAM:\s*([^—]*)/);
+	return {
+		removeWhen: removeWhen ? removeWhen[1] : null,
+		exceedsUpstream: exceeds
+			? exceeds[1]
+					.split(",")
+					.map((x) => x.trim())
+					.filter(Boolean)
+			: null,
+	};
+}
+
 function parseVersion(raw: string): Version | null {
 	const m = raw.match(/^(\d+)\.(\d+)\.(\d+)/);
 	return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
@@ -212,25 +234,14 @@ for (let i = 0; i < workspaceLines.length; i++) {
 	const name = scoped ? rawKey.slice(0, at) : rawKey;
 	const selector = scoped ? rawKey.slice(at + 1) : null;
 
-	const joined = pendingComments.join(" ");
-	const removeWhenLine = joined.match(
-		/REMOVE-WHEN:\s*requesters-demand\s*>=\s*([0-9][^\s]*)/,
-	);
-	// Stop at the em dash so a trailing prose reason on the same line ("— the
-	// advisory covers the whole declared range") is not read as a package name.
-	const exceedsLine = joined.match(/EXCEEDS-UPSTREAM:\s*([^—]*)/);
+	const notes = parseNotes(pendingComments.join(" "));
 
 	overrides.push({
 		name,
 		selector,
 		value,
-		removeWhen: removeWhenLine ? removeWhenLine[1] : null,
-		exceedsUpstream: exceedsLine
-			? exceedsLine[1]
-					.split(",")
-					.map((s) => s.trim())
-					.filter(Boolean)
-			: null,
+		removeWhen: notes.removeWhen,
+		exceedsUpstream: notes.exceedsUpstream,
 		line: i + 1,
 	});
 	pendingComments = [];
@@ -492,13 +503,18 @@ let npmCount = 0;
 	} catch {
 		// no npm project here (fixtures, or the worker was removed): nothing to check
 	}
+	let lockOk = true;
 	if (pkg?.overrides) {
 		let lock: { packages?: Record<string, { version?: string; dependencies?: Record<string, string>; optionalDependencies?: Record<string, string> }> } = {};
 		try {
 			lock = JSON.parse(readFileSync(lockPath, "utf8"));
 		} catch {
 			failures.push(`${npmDir}/package-lock.json missing or unreadable — run \`npm install\` there.`);
+			lockOk = false;
 		}
+		if (!lockOk) {
+			// one error is enough; the remaining npm checks all depend on the lockfile
+		} else {
 		const notes = (pkg["//overrides"] ?? {}) as Record<string, string>;
 		if (typeof pkg["//overrides"] !== "object" || pkg["//overrides"] === null) {
 			failures.push(
@@ -506,7 +522,15 @@ let npmCount = 0;
 					"    REMOVE-WHEN / EXCEEDS-UPSTREAM notes (same vocabulary as pnpm-workspace.yaml).",
 			);
 		}
+		const seenKeys = new Set<string>();
 		for (const [requester, scope] of Object.entries(pkg.overrides)) {
+			if (requester === "." || (requester.lastIndexOf("@") > 0)) {
+				failures.push(
+					`${npmDir}/package.json  overrides.${requester}\n    requester keys with a version selector (\`name@range\`) or the \`.\` self key are not supported by this gate;\n` +
+						"    scope the override under the plain package name.",
+				);
+				continue;
+			}
 			if (typeof scope !== "object" || scope === null) {
 				failures.push(
 					`${npmDir}/package.json  overrides.${requester}\n    must be scoped under the requester ({ "<requester>": { "<dep>": "<value>" } });\n` +
@@ -521,9 +545,9 @@ let npmCount = 0;
 					continue;
 				}
 				npmCount++;
+				seenKeys.add(`${requester} > ${dep}`);
 				const note = typeof notes[`${requester} > ${dep}`] === "string" ? notes[`${requester} > ${dep}`] : "";
-				const removeWhen = note.match(/REMOVE-WHEN:\s*requesters-demand\s*>=\s*([0-9][^\s.]*(?:\.[0-9][^\s.]*)*)/);
-				const exceeds = note.match(/EXCEEDS-UPSTREAM:\s*([^—]*)/);
+				const parsed = parseNotes(note);
 				const all: Requester[] = [];
 				for (const [key, entry] of Object.entries(lock.packages ?? {})) {
 					if (key.slice(key.lastIndexOf("node_modules/") + "node_modules/".length) !== requester) continue;
@@ -535,8 +559,8 @@ let npmCount = 0;
 						name: dep,
 						selector: null,
 						value,
-						removeWhen: removeWhen ? removeWhen[1] : null,
-						exceedsUpstream: exceeds ? exceeds[1].split(",").map((x) => x.trim()).filter(Boolean) : null,
+						removeWhen: parsed.removeWhen,
+						exceedsUpstream: parsed.exceedsUpstream,
 						line: 0,
 					},
 					where,
@@ -544,6 +568,14 @@ let npmCount = 0;
 					all.length > 0,
 				);
 			}
+		}
+		for (const key of Object.keys(notes)) {
+			if (!seenKeys.has(key)) {
+				failures.push(
+					`${npmDir}/package.json  \`//overrides\` note "${key}" matches no override.\n    Delete it, or fix the key to "<requester> > <dep>".`,
+				);
+			}
+		}
 		}
 	}
 }
