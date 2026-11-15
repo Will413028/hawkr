@@ -27,7 +27,7 @@
 
 步驟 1 開工時的結果（2026-11-15）：run 43667284291 每個 job 綠；`pnpm lint`、`pnpm test`、`pnpm design:check --apps-root ..` 通過；`pnpm knip` 在快照上就失敗（CI 不跑它），基線與比對方法見下一段；`pnpm architecture:check` 在快照上就失敗（`components/ui/Badge.tsx` 不存在）。
 
-knip 基線（2026-11-15 重做）：附件 `knip-baseline.json` 是 d69bbbbc（併入 origin/dev 後）的 `pnpm knip --reporter json` 經 `python3 knip-diff.py --normalize` 正規化，每筆以（分類、檔案、名稱）為鍵、不含行列位置。各步驟的 knip 驗收是在 `website/` 跑 `pnpm -s knip --reporter json | python3 docs/plans/2026-11-15-remove-storybook/knip-diff.py`，exit 0（沒有新增；消失的只計數）。換基線的理由：原基線只存名稱並去重，丟掉檔案，exports 475→434、types 447→427、unlisted 5→1，所以完整輸出和它比永遠多 65 筆；另 1 筆 types 與 15 筆 catalogReferences 是 d69bbbbc 併入的 dev 帶來的（922a4ccf→d69bbbbc 逐筆比對），不是本計畫的改動。8494f0fa、922a4ccf 的輸出逐筆相同，所以步驟 1 沒有新增；d69bbbbc 與 0e4b2b02 逐筆相同。腳本 mutation：在輸出加一筆假 export，exit 1。
+knip 基線（2026-11-15 重做）：附件 `knip-baseline.json` 是 d69bbbbc（併入 origin/dev 後）的 `pnpm knip --reporter json` 經 `python3 knip-diff.py --normalize` 正規化，每筆以（分類、檔案、名稱）為鍵、不含行列位置。各步驟的 knip 驗收是在 `website/` 跑 `pnpm -s knip --reporter json` 並把輸出交給 `python3 website/docs/plans/2026-11-15-remove-storybook/knip-diff.py`（從 website 目錄是 `../` 起算的同一個檔），exit 0（沒有新增；消失的只計數）。換基線的理由：原基線只存名稱並去重，丟掉檔案，exports 475→434、types 447→427、unlisted 5→1，所以完整輸出和它比永遠多 65 筆；另 1 筆 types 與 15 筆 catalogReferences 是 d69bbbbc 併入的 dev 帶來的（922a4ccf→d69bbbbc 逐筆比對），不是本計畫的改動。8494f0fa、922a4ccf 的輸出逐筆相同，所以步驟 1 沒有新增；d69bbbbc 與 0e4b2b02 逐筆相同。腳本 mutation：在輸出加一筆假 export，exit 1。
 
 ## 本階段依賴的不變量
 
