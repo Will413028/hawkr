@@ -2,6 +2,7 @@
 package model
 
 import (
+	"strconv"
 	"time"
 	"unicode/utf8"
 	"uuid"
@@ -118,6 +119,16 @@ type Post struct {
 	Stats     PostStats
 }
 
+// StoreReadCapability 是店主讀自己店的貼文、留言與動態數所需的賣家能力：收縮類的 CapContentContract（只要求店家營運中，停權時仍授予），
+// 因為停權時店家仍要能看到自己的貼文與留言才能下架與刪除（ADR 2026-09-29-seller-suspension-and-business-identity-in-monolith 修訂：收縮需要的讀取放行）。
+const StoreReadCapability = seller.CapContentContract
+
+// StoreSummary 是店主的動態數：Posts 每個 PostStatus 都有一項（沒有貼文是 0，不含已刪除），Scheduled 是有待發布排程的貼文篇數（它們也算在 DRAFT 或 UNPUBLISHED 裡）。
+type StoreSummary struct {
+	Posts     map[PostStatus]int64
+	Scheduled int64
+}
+
 // Hashtag 是貼文的一個標籤：Name 是正規化後的名稱，Display 是使用者輸入的樣子。
 type Hashtag struct {
 	Name    string
@@ -156,12 +167,15 @@ type OwnPostPage struct {
 
 // CreatePostInput 是新增貼文。ImageToken 是新上傳的圖的 staged token；Publish 為真時同一個動作發布，公開要件（恰好一張圖、內文
 // 必填）在轉為公開時驗證，草稿可以不完整。
+//
+// RequestID 是選填的冪等鍵（AIP-155）：同一家店以同一個 RequestID 重送，內容相同回傳第一次建立的那一篇、不重複建立（也不重發事件），內容不同是 InvalidInput。
 type CreatePostInput struct {
 	Body       string
 	ImageToken string
 	ProductID  *int64
 	Hashtags   []string
 	Publish    bool
+	RequestID  *uuid.UUID
 }
 
 // UpdatePostInput 是修改貼文：Version 是讀取時拿到的版本。ImageToken 空字串沿用現在的圖，非空換成新圖；ClearImage 清掉圖
@@ -427,6 +441,14 @@ type ContentSnapshot struct {
 // 呼叫方傳入正規化後的欄位（內文已去空白），沒有的選填欄位傳 "-"。
 func RequestHash(parts ...string) []byte {
 	return idempotency.Hash(parts...)
+}
+
+// OptionalInt 把選填的整數編成 RequestHash 的欄位：沒有是 "-"。
+func OptionalInt(v *int64) string {
+	if v == nil {
+		return "-"
+	}
+	return strconv.FormatInt(*v, 10)
 }
 
 // OptionalID 把選填的 ID 編成 RequestHash 的欄位：沒有是 "-"。

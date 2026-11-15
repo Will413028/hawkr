@@ -46,6 +46,8 @@ func Registry() []Entry {
 		}},
 		{Name: "ListTopLevelComments", Row: CommentRow{}, Keyset: true, Build: func(v visibility.Viewer) Statement { return ListTopLevelComments(sampleID, sampleNow, v, sampleCmt) }},
 		{Name: "ListOwnerTopLevelComments", Row: CommentRow{}, Keyset: true, Build: func(visibility.Viewer) Statement { return ListOwnerTopLevelComments(sampleID, 7, sampleCmt) }},
+		{Name: "ListStoreTopLevelComments", Row: CommentRow{}, Keyset: true, Build: func(visibility.Viewer) Statement { return ListStoreTopLevelComments(7, nil, sampleCmt) }},
+		{Name: "ListStoreUnrepliedComments", Row: CommentRow{}, Keyset: true, Build: func(visibility.Viewer) Statement { return ListStoreUnrepliedComments(7, &sampleID, sampleCmt) }},
 		{Name: "ListReplies", Row: CommentRow{}, Keyset: true, Build: func(v visibility.Viewer) Statement { return ListReplies(sampleID, sampleNow, v, sampleCmt) }},
 		{Name: "ListOwnerReplies", Row: CommentRow{}, Keyset: true, Build: func(visibility.Viewer) Statement { return ListOwnerReplies(sampleID, 7, sampleCmt) }},
 		{Name: "ReadableCommentPost", Row: StoreIDRow{}, Build: func(v visibility.Viewer) Statement { return ReadableCommentPost(sampleID, sampleNow, v) }},

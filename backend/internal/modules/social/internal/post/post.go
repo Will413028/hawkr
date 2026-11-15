@@ -4,10 +4,12 @@
 package post
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 	"uuid"
 
@@ -190,29 +192,56 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 			return model.Post{}, err
 		}
 	}
+	var hash []byte
+	if in.RequestID != nil {
+		hash = model.RequestHash("post", body, in.ImageToken, model.OptionalInt(in.ProductID), tagsKey(tags), fmt.Sprint(in.Publish))
+		if row, ok, err := s.replay(ctx, s.q(ctx), st.StoreID, in.RequestID, hash); err != nil || ok {
+			if err != nil {
+				return model.Post{}, err
+			}
+			return s.Own(ctx, st.StoreID, row.ID)
+		}
+	}
 	if err := s.verifyProduct(ctx, in.ProductID, st.StoreID); err != nil {
 		return model.Post{}, err
 	}
 	asset, err := s.finalizeImage(ctx, st, in.ImageToken)
 	if err != nil {
+		// 並行的重送已經用掉這個 staged token：回第一次建立的那一篇，不回 token 的錯誤。
+		if row, ok, rerr := s.replay(ctx, s.q(ctx), st.StoreID, in.RequestID, hash); rerr == nil && ok {
+			return s.Own(ctx, st.StoreID, row.ID)
+		}
 		return model.Post{}, err
 	}
 	id := s.d.NewID()
 	ref := mediaref.PostRef(id)
 	now := s.d.Now().UTC()
-	params := store.InsertPostParams{ID: id, StoreID: st.StoreID, Body: body, ProductID: in.ProductID, Status: string(model.StatusDraft), Now: now}
+	params := store.InsertPostParams{ID: id, StoreID: st.StoreID, Body: body, ProductID: in.ProductID, Status: string(model.StatusDraft), Now: now, RequestID: in.RequestID, RequestHash: hash}
 	if in.Publish {
 		params.Status, params.PublishedAt = string(model.StatusPublished), &now
 	}
 	if asset != nil {
 		params.ImageKey, params.ImageAssetID = &asset.ObjectKey, &asset.ID
 	}
+	var replayed *store.SocialPost
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		if err := mediaref.Reject(ctx, q, ref, candidates(asset)...); err != nil {
 			return err
 		}
 		row, err := q.InsertPost(ctx, params)
+		if errors.Is(err, pgx.ErrNoRows) {
+			// 同一家店的同一個 request_id 在上面的查詢之後才出現（並行的重送）：INSERT 等到對方 commit 才回 0 列，這時讀得到它；不發事件、不動圖片引用。
+			existing, ok, rerr := s.replay(ctx, q, st.StoreID, in.RequestID, hash)
+			if rerr != nil {
+				return rerr
+			}
+			if !ok {
+				return fmt.Errorf("social：貼文的 request_id %s 衝突，卻查不到原本那一篇", in.RequestID)
+			}
+			replayed = &existing
+			return nil
+		}
 		if err != nil {
 			return fmt.Errorf("social：新增貼文：%w", err)
 		}
@@ -235,7 +264,37 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 	if err != nil {
 		return model.Post{}, err
 	}
+	if replayed != nil {
+		return s.Own(ctx, st.StoreID, replayed.ID)
+	}
 	return s.Own(ctx, st.StoreID, id)
+}
+
+// tagsKey 是標籤集合進 RequestHash 的編碼：依輸入順序，名稱與顯示形式都算（顯示形式是使用者看得到的內容）。
+func tagsKey(tags []hashtag.Tag) string {
+	var b strings.Builder
+	for _, t := range tags {
+		fmt.Fprintf(&b, "%d:%s|%d:%s;", len(t.Name), t.Name, len(t.Display), t.Display)
+	}
+	return b.String()
+}
+
+// replay 查 (店家, request_id)：命中且內容相同回傳那一篇；內容不同是 InvalidInput；沒帶 request_id 或沒命中回 false。
+func (s *Service) replay(ctx context.Context, q *store.Queries, storeID int64, requestID *uuid.UUID, hash []byte) (store.SocialPost, bool, error) {
+	if requestID == nil {
+		return store.SocialPost{}, false, nil
+	}
+	row, err := q.PostByRequest(ctx, store.PostByRequestParams{StoreID: storeID, RequestID: requestID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return store.SocialPost{}, false, nil
+	}
+	if err != nil {
+		return store.SocialPost{}, false, fmt.Errorf("social：讀取貼文的 request_id %s：%w", requestID, err)
+	}
+	if !bytes.Equal(row.RequestHash, hash) {
+		return store.SocialPost{}, false, apperr.InvalidInputOn([]string{"RequestID"}, "%s", text.RequestIdReused(uitext.LocaleFrom(ctx)))
+	}
+	return row, true, nil
 }
 
 // lockOwned 鎖住貼文並確認屬於這家店；別家的貼文與不存在一樣回 NotFound。
