@@ -99,7 +99,7 @@
 
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
-| 1 Browser runner 與試點 | 完成 | lint、test、knip（對基線無新增）本機；PR #377 新 job 8 測試綠（run 43672612523，含 8 個 e2e shard）；mutation 忽略 `disabled` 時只有 `is disabled when disabled is set` 失敗（run 43672321091），revert 後回綠 | — | 36649e77..aecd731b |
+| 1 Browser runner 與試點 | 完成 | lint、test、knip（對基線無新增）本機；PR #377 新 job 8 測試綠（run 43672612523，含 8 個 e2e shard）；mutation 忽略 `disabled` 時只有 `is disabled when disabled is set` 失敗（run 43672321091），revert 後回綠 | — | 36649e77..a74318de |
 | 2 基礎元件改寫 | 未開始 | | | |
 | 3 Cart、DescriptionEditor | 未開始 | | | |
 | 4 axe 進 e2e | 未開始 | | | |
