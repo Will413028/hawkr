@@ -1,3 +1,5 @@
+//go:build gateway
+
 package characterization
 
 import (
