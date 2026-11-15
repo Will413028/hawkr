@@ -40,21 +40,22 @@ func Run(ctx context.Context, url string, bindings []Binding, isPermanent func(e
 }
 
 // runOnce 消費到 ctx 取消（關機）或連線、channel 出錯為止。不論哪一種，都先讓每個消費者停止取新訊息、等處理中的跑完，
-// 才關連線：返回時沒有 handler 還在執行。handler 拿到的 context 只在關機滿 drain 後取消；因出錯而結束時連線已不可用，
-// 等滿 drain 就關，未 ack 的訊息由 broker 重送。
+// 才關連線。handler 的 context 平常不取消，在關機或出錯後滿 drain 才取消，再多等 ackMargin 讓它 ack 或 nack；handler
+// 不理會 context 時照樣關連線，未 ack 的訊息由 broker 重送。
 func runOnce(ctx context.Context, url string, bindings []Binding, isPermanent func(error) bool, log *slog.Logger, drain time.Duration) error {
 	conn, err := amqp.DialConfig(url, amqp.Config{Dial: amqp.DefaultDial(5 * time.Second)})
 	if err != nil {
 		return fmt.Errorf("連線：%w", err)
 	}
 	handlerCtx, cancelHandlers := context.WithCancel(context.WithoutCancel(ctx))
-	stopDrainTimer := context.AfterFunc(ctx, func() { time.AfterFunc(drain, cancelHandlers) })
 	stop, cancel := context.WithCancel(ctx)
 	var consumers sync.WaitGroup
 	defer func() {
 		cancel()
+		// 關機或出錯都在這裡起算 drain：關機時 runOnce 立刻走到這裡。
+		drainTimer := time.AfterFunc(drain, cancelHandlers)
 		waitTimeout(&consumers, drain+ackMargin)
-		stopDrainTimer()
+		drainTimer.Stop()
 		cancelHandlers()
 		_ = conn.CloseDeadline(time.Now().Add(closeTimeout))
 	}()

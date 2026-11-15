@@ -224,7 +224,13 @@ func TestRunOnceCancelsHandlerAfterDrain(t *testing.T) {
 
 	started := make(chan struct{}, 1)
 	cancelledAt := make(chan time.Time, 1)
+	noDeadline := make(chan bool, 1)
 	handle := func(ctx context.Context, _ []byte) error {
+		_, has := ctx.Deadline()
+		select {
+		case noDeadline <- !has:
+		default:
+		}
 		select {
 		case started <- struct{}{}:
 		default:
@@ -260,13 +266,16 @@ func TestRunOnceCancelsHandlerAfterDrain(t *testing.T) {
 		t.Fatalf("關機前 handler 的 context 就被取消了（%v）", at)
 	case <-time.After(drain * 2):
 	}
+	if !<-noDeadline {
+		t.Fatal("平常運作時 handler 的 context 帶了 deadline")
+	}
 	shutdownAt := time.Now()
 	cancel()
 	select {
 	case at := <-cancelledAt:
 		// 下限：關機不能直接取消 handler；上限：是 drain 計時取消的，不是等消費者逾時後的收尾取消。
-		if d := at.Sub(shutdownAt); d < drain || d >= drain+ackMargin/2 {
-			t.Fatalf("handler 在關機後 %v 被取消，要在 [%v, %v) 內", d, drain, drain+ackMargin/2)
+		if d := at.Sub(shutdownAt); d < drain || d >= drain+ackMargin-100*time.Millisecond {
+			t.Fatalf("handler 在關機後 %v 被取消，要在 [%v, %v) 內", d, drain, drain+ackMargin-100*time.Millisecond)
 		}
 	case <-time.After(drain + 2*time.Second):
 		t.Fatal("關機滿 drain 後 handler 的 context 沒有被取消")
