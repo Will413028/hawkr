@@ -50,7 +50,7 @@ New third-party assets are added to the matching section (or a new section) in t
 
 ### Material Symbols (SVG paths)
 
-- Upstream: [marella/material-symbols](https://github.com/marella/material-symbols) (`@material-symbols/svg-400`, the SVG distribution of Google's Material Symbols), version 0.48.1.
+- Upstream: [marella/material-symbols](https://github.com/marella/material-symbols) (`@material-symbols/svg-400`, the SVG distribution of Google's Material Symbols), version 0.48.2.
 - License: Apache License 2.0. License text: [`packages/hawkr-icons-ts/LICENSE`](packages/hawkr-icons-ts/LICENSE).
 - Files: `packages/hawkr-icons-ts/src/material-symbols.gen.ts`, used by `website` and `admin` through `@hawkr/icons`.
 - Modification: only the icons listed in `packages/hawkr-icons-ts/src/names.ts` are taken, and only their path data (outlined and filled variants); the generator is `packages/hawkr-icons-ts/tools/gen.ts`.

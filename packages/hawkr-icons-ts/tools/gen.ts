@@ -12,7 +12,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { MATERIAL_SYMBOL_NAMES } from "../src/names";
 
 const UPSTREAM_PACKAGE = "@material-symbols/svg-400";
-const UPSTREAM_VERSION = "0.48.1";
+const UPSTREAM_VERSION = "0.48.2";
 const VIEW_BOX = "0 -960 960 960";
 
 const upstreamRoot = new URL(
