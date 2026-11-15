@@ -9,6 +9,7 @@ import {
 } from "./helpers/mock-gateway";
 import { assertNoResidualLoading } from "./helpers/page-stability";
 import { isKnownNonEnforcingConsoleError } from "./helpers/runtime-console";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 const ACTIVE_ROLE_KEY = "hkui:auth:active-role";
 const LOADER_KEY = "hawkr:initial-loader-seen";
@@ -245,8 +246,7 @@ async function assertProtectedRoute(
 ) {
 	const runtimeIssues = attachRuntimeMonitors(page, baseURL);
 	const target = `${route}${ROUTE_QUERY[route] ?? ""}`;
-	const response = await page.goto(target, {
-		waitUntil: "domcontentloaded",
+	const response = await gotoStreamed(page, target, {
 		timeout: 25_000,
 	});
 	expect(response, `${route} returned no document response`).toBeTruthy();

@@ -4,6 +4,7 @@ import {
 	seedStoredActiveRole,
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 /**
  * Legacy Hawkr Agent 入口的退場契約（設計書 v6 §V.10.12-4）。
@@ -65,9 +66,7 @@ test.describe("Hawkr Agent legacy 入口退場", { tag: ["@ui"] }, () => {
 			[HAWKR_AGENT_HANDOFF_STORAGE_KEY, SEARCH_DRAFT] as const,
 		);
 
-		const response = await page.goto(LEGACY_LIVE_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, LEGACY_LIVE_PATH);
 		expect(response?.status()).toBeLessThan(400);
 		// §V.10.12-4：不得再掛 legacy workspace，必須落在 procurement。
 		expect(new URL(page.url()).pathname).toBe(PROCUREMENT_PATH);
@@ -265,9 +264,7 @@ test.describe("Hawkr Agent legacy 入口退場", { tag: ["@ui"] }, () => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
 
-		const response = await page.goto(LEGACY_FIND_SELLERS_PATH, {
-			waitUntil: "domcontentloaded",
-		});
+		const response = await gotoStreamed(page, LEGACY_FIND_SELLERS_PATH);
 		expect(response?.status()).toBeLessThan(400);
 		expect(new URL(page.url()).pathname).toBe(PROCUREMENT_PATH);
 		expect(new URL(page.url()).search).toBe("");

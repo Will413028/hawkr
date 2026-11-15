@@ -3,6 +3,7 @@ import {
 	seedStoredActiveRole,
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 // V.11.1 對執行中的 composer 有兩條明文要求：停用時要講清楚為什麼不能輸入，
 // 以及右下角必須有一顆「停止處理」。稿 01 的像素逐字畫著 placeholder
@@ -111,7 +112,7 @@ test.describe("procurement composer — 執行中的停用態", { tag: ["@ui"] }
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
 
-		const response = await page.goto(PATH, { waitUntil: "domcontentloaded" });
+		const response = await gotoStreamed(page, PATH);
 		expect(response?.status()).toBeLessThan(400);
 		await expect(page.locator('[data-assistant-mode="live"]')).toBeVisible();
 
@@ -292,9 +293,9 @@ test.describe("procurement composer — 執行中的停用態", { tag: ["@ui"] }
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
 
-		const response = await page.goto(
+		const response = await gotoStreamed(
+			page,
 			`/account/messages/assistant/${CONVERSATION_ID}`,
-			{ waitUntil: "domcontentloaded" },
 		);
 		expect(response?.status()).toBeLessThan(400);
 		await expect(page.locator('[data-assistant-mode="live"]')).toBeVisible();

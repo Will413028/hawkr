@@ -17,6 +17,7 @@ import {
 	materializeDynamicRoute,
 	type PublicDynamicFixtureIds,
 } from "./helpers/dynamic-route-catalog";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 const STATIC_PAGE_ROUTES = discoverAppPageRoutes({ includeDynamic: false });
 const DYNAMIC_PAGE_ROUTES = discoverAppPageRoutes().filter((route) =>
@@ -315,7 +316,7 @@ async function collectRenderedLinks(
 	seed: string,
 	links: Map<string, LinkReference>,
 ) {
-	const response = await page.goto(seed, { waitUntil: "domcontentloaded" });
+	const response = await gotoStreamed(page, seed);
 	expect(response, `${seed} returned no document response`).toBeTruthy();
 	expect(
 		response?.status() ?? 0,

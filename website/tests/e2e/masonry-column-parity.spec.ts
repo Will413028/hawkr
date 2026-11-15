@@ -1,5 +1,6 @@
 import { expect, type Page, type Route, test } from "@playwright/test";
 import { fulfillConnectError, GET_SESSION_URL } from "./helpers/mock-gateway";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 /**
  * #423 — the SSR fallback grid and the measured (absolutely positioned) pass
@@ -134,7 +135,7 @@ async function waitForStableCardCount(page: Page) {
  * flight. Blanking first leaves nothing running that could do it.
  */
 const blankSlate = (page: Page) =>
-	page.goto("about:blank", { waitUntil: "domcontentloaded", timeout: 30_000 });
+	gotoStreamed(page, "about:blank", { timeout: 30_000 });
 
 /**
  * Navigates, and proves we arrived before a single number is read.
@@ -154,7 +155,7 @@ async function landOn(
 	width: number,
 	rendered?: string,
 ) {
-	await page.goto(route, { waitUntil: "domcontentloaded", timeout: 30_000 });
+	await gotoStreamed(page, route, { timeout: 30_000 });
 	expect(
 		new URL(page.url()).pathname,
 		`${route} @${width}: the navigation did not land on the route being graded (ended on ${page.url()}) — every number read after this would describe a different page`,
@@ -251,8 +252,7 @@ async function readSettledGeometry(
  * already the canonical storefront segments the app itself routes to.
  */
 async function discoverStorefront(page: Page): Promise<string> {
-	await page.goto("/market/products", {
-		waitUntil: "domcontentloaded",
+	await gotoStreamed(page, "/market/products", {
 		timeout: 30_000,
 	});
 	await page.waitForSelector(CARD, { timeout: 20_000 });
