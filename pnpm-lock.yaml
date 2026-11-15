@@ -227,6 +227,10 @@ overrides:
   browserslist: ^4.28.7
   seroval: ^1.6.3
   source-map-js: ^1.2.2
+  rolldown@~1.1.5: 1.1.5
+  '@rolldown/pluginutils@^1.0.0': 1.0.1
+  undici@^7.0.0: 7.30.1
+  brace-expansion@^2.0.0: 2.1.6
   brace-expansion@^1.0.0: ^1.1.21
   form-data@^4.0.0: ^4.0.6
   ws@^8.0.0: 8.22.1
@@ -311,8 +315,8 @@ importers:
         specifier: 'catalog:'
         version: 2.6.4
       '@opennextjs/cloudflare':
-        specifier: ^1.20.0
-        version: 1.20.0(patch_hash=014ce5bd7f6d4fffb3060d6250da413a74d45d09b5e7ae49086ba8f5d5fcba78)(next@16.4.1(patch_hash=5836b06757fff06059076ecc595605f595bcb7c75107e2fe3d2cb5a9a6420bda)(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@playwright/test@1.64.1)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(supports-color@10.2.2)(wrangler@4.156.0(@types/node@26.6.6))
+        specifier: 1.20.2
+        version: 1.20.2(patch_hash=014ce5bd7f6d4fffb3060d6250da413a74d45d09b5e7ae49086ba8f5d5fcba78)(next@16.4.1(patch_hash=5836b06757fff06059076ecc595605f595bcb7c75107e2fe3d2cb5a9a6420bda)(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@playwright/test@1.64.1)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(supports-color@10.2.2)(wrangler@4.156.0(@types/node@26.6.6))
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.3.3
@@ -2198,17 +2202,17 @@ packages:
   '@open-draft/until@2.1.0':
     resolution: {integrity: sha512-U69T3ItWHvLwGg5eJ0n3I62nWuE6ilHlmz7zM0npLBRvPRd7e6NYmg54vvRtP5mZG7kZqZCFVdsTWo7BPtBujg==}
 
-  '@opennextjs/aws@4.0.2':
-    resolution: {integrity: sha512-nXQPT8GZDV+NWMJV9mD/Ywxyo+tCZfFvrR6jpEOYNcxK/AqiEDlJzPybGOrHUDWAYdR1b6tmh+MoR3VbqIao3w==}
+  '@opennextjs/aws@4.1.0':
+    resolution: {integrity: sha512-GuKkdUbnJhLvtwTiJlytNtWIcSYN3+Dzi+OusUlRgf+Ur7dGoXdzBopd+VFiSdTBduPOvr9lPFDg6BYNjEV3wQ==}
     hasBin: true
     peerDependencies:
-      next: '>=15.5.18 <16 || >=16.2.6'
+      next: '>=15.5.21 <16 || >=16.2.11'
 
-  '@opennextjs/cloudflare@1.20.0':
-    resolution: {integrity: sha512-gbCIRNv4DYU5HgPQEsmyP/v+5zGZkMSGN2bYb04XfSibxiGjwNoTmtRxj/j0yOB70DLe3Xkh5f0eouXshXZtkw==}
+  '@opennextjs/cloudflare@1.20.2':
+    resolution: {integrity: sha512-iFBjABnaDk3be27F5EpxyMLMGPbVnnArFx5I3Y8Rf6BSx5nBV8h0UuJiMKrx3+whDU5ahIy4d8sfbvWvMiF1Kg==}
     hasBin: true
     peerDependencies:
-      next: '>=15.5.18 <16 || >=16.2.6'
+      next: '>=15.5.21 <16 || >=16.2.11'
       rclone.js: ^0.6.6
       wrangler: ^4.86.0
     peerDependenciesMeta:
@@ -4504,8 +4508,8 @@ packages:
   bowser@2.14.1:
     resolution: {integrity: sha512-tzPjzCxygAKWFOJP011oxFHs57HzIhOEracIgAePE4pqB3LikALKnSzUyU4MGs9/iCEUuHlAJTjTc5M+u7YEGg==}
 
-  brace-expansion@2.1.1:
-    resolution: {integrity: sha512-WR1cURNjuvBLMZBMbqM0UoE+WAfdUcEV1ccD8PVBVOI+Z3ND4+SZbN8RsfT2bMuG1qwz5RFvPukSZm5fF2D5eA==}
+  brace-expansion@2.1.6:
+    resolution: {integrity: sha512-pi/WFpBvCBmB/NsURt7hW5sDvuOqvJaDMDai7CrlT9xoehzWRzo/dhQRKqOhpPvlnicVaTzHCbzGnnTgpvMTFw==}
 
   brace-expansion@5.0.12:
     resolution: {integrity: sha512-YovQ3rzhaLMIrDjNDMkNS01tea93qhEhG5xy8f6+R0l+dw3Ki+5sCoIoI942iuLZTHWogWktgwVDhU09iNEimQ==}
@@ -8599,7 +8603,7 @@ snapshots:
 
   '@open-draft/until@2.1.0': {}
 
-  '@opennextjs/aws@4.0.2(next@16.4.1(patch_hash=5836b06757fff06059076ecc595605f595bcb7c75107e2fe3d2cb5a9a6420bda)(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@playwright/test@1.64.1)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(supports-color@10.2.2)':
+  '@opennextjs/aws@4.1.0(next@16.4.1(patch_hash=5836b06757fff06059076ecc595605f595bcb7c75107e2fe3d2cb5a9a6420bda)(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@playwright/test@1.64.1)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(supports-color@10.2.2)':
     dependencies:
       '@ast-grep/napi': 0.40.5
       '@aws-sdk/client-cloudfront': 3.984.0
@@ -8622,11 +8626,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@opennextjs/cloudflare@1.20.0(patch_hash=014ce5bd7f6d4fffb3060d6250da413a74d45d09b5e7ae49086ba8f5d5fcba78)(next@16.4.1(patch_hash=5836b06757fff06059076ecc595605f595bcb7c75107e2fe3d2cb5a9a6420bda)(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@playwright/test@1.64.1)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(supports-color@10.2.2)(wrangler@4.156.0(@types/node@26.6.6))':
+  '@opennextjs/cloudflare@1.20.2(patch_hash=014ce5bd7f6d4fffb3060d6250da413a74d45d09b5e7ae49086ba8f5d5fcba78)(next@16.4.1(patch_hash=5836b06757fff06059076ecc595605f595bcb7c75107e2fe3d2cb5a9a6420bda)(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@playwright/test@1.64.1)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(supports-color@10.2.2)(wrangler@4.156.0(@types/node@26.6.6))':
     dependencies:
       '@ast-grep/napi': 0.40.5
       '@dotenvx/dotenvx': 1.31.0
-      '@opennextjs/aws': 4.0.2(next@16.4.1(patch_hash=5836b06757fff06059076ecc595605f595bcb7c75107e2fe3d2cb5a9a6420bda)(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@playwright/test@1.64.1)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(supports-color@10.2.2)
+      '@opennextjs/aws': 4.1.0(next@16.4.1(patch_hash=5836b06757fff06059076ecc595605f595bcb7c75107e2fe3d2cb5a9a6420bda)(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@playwright/test@1.64.1)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(supports-color@10.2.2)
       ci-info: 4.4.0
       cloudflare: 4.5.0
       comment-json: 4.6.2
@@ -10604,7 +10608,7 @@ snapshots:
 
   bowser@2.14.1: {}
 
-  brace-expansion@2.1.1:
+  brace-expansion@2.1.6:
     dependencies:
       balanced-match: 1.0.2
 
@@ -11666,7 +11670,7 @@ snapshots:
 
   minimatch@8.0.7:
     dependencies:
-      brace-expansion: 2.1.1
+      brace-expansion: 2.1.6
 
   minimist@1.2.8: {}
 
