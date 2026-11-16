@@ -86,6 +86,19 @@ func validateAction(a model.BannerAction) error {
 	}
 }
 
+// canonicalPostTarget 把貼文目標轉成儲存用的正規形（去掉前後空白的 UUID 字串）；其他點擊行為原樣回傳。
+func canonicalPostTarget(a model.BannerAction) (model.BannerAction, error) {
+	if a.Type != model.BannerActionPost {
+		return a, nil
+	}
+	id, err := uuid.Parse(strings.TrimSpace(a.Target))
+	if err != nil {
+		return a, apperr.InvalidInputOn([]string{"Action.Target"}, "貼文 ID 格式不正確")
+	}
+	a.Target = id.String()
+	return a, nil
+}
+
 // checkPostTarget 在貼文目標寫入前確認貼文存在而且公開可讀（A7-D28 第 7 點）；其他點擊行為不檢查。
 func (m *Service) checkPostTarget(ctx context.Context, a model.BannerAction) error {
 	if a.Type != model.BannerActionPost {
@@ -181,32 +194,35 @@ func (m *Service) ListLiveBanners(ctx context.Context, after *model.BannerCursor
 // dropUnreadablePostTargets 去掉貼文目標已不公開可讀（下架、刪除、取消發布等）的 banner（A7-D23 O5）；一次問 social，不是每則一次。
 // 只過濾已切好的這一頁：游標與有沒有下一頁以過濾前為準，所以一頁可能少於 size 筆（甚至是空的），下一頁照常接續。
 func (m *Service) dropUnreadablePostTargets(ctx context.Context, banners []model.Banner) ([]model.Banner, error) {
-	targets := make(map[int]uuid.UUID)
-	var ids []uuid.UUID
-	for i, b := range banners {
-		if b.Action.Type != model.BannerActionPost {
-			continue
-		}
-		if id, err := uuid.Parse(b.Action.Target); err == nil {
-			targets[i] = id
-			ids = append(ids, id)
-		}
-	}
 	if !slices.ContainsFunc(banners, isPostBanner) {
 		return banners, nil
+	}
+	var ids []uuid.UUID
+	for _, b := range banners {
+		if id, ok := postBannerTarget(b); ok {
+			ids = append(ids, id)
+		}
 	}
 	readable, err := m.d.Social.PubliclyReadablePosts(ctx, ids)
 	if err != nil {
 		return nil, fmt.Errorf("content：確認 banner 的貼文目標：%w", err)
 	}
 	out := make([]model.Banner, 0, len(banners))
-	for i, b := range banners {
-		if isPostBanner(b) && !readable[targets[i]] {
-			continue
+	for _, b := range banners {
+		if isPostBanner(b) {
+			if id, ok := postBannerTarget(b); !ok || !readable[id] {
+				continue
+			}
 		}
 		out = append(out, b)
 	}
 	return out, nil
+}
+
+// postBannerTarget 解析貼文 banner 的目標；舊的非 UUID 目標回 false。
+func postBannerTarget(b model.Banner) (uuid.UUID, bool) {
+	id, err := uuid.Parse(b.Action.Target)
+	return id, err == nil
 }
 
 func isPostBanner(b model.Banner) bool { return b.Action.Type == model.BannerActionPost }
@@ -254,6 +270,11 @@ func (m *Service) CreateBanner(ctx context.Context, adminID int64, in model.Bann
 	if err := validateInput(in); err != nil {
 		return model.Banner{}, err
 	}
+	canonical, err := canonicalPostTarget(in.Action)
+	if err != nil {
+		return model.Banner{}, err
+	}
+	in.Action = canonical
 	if err := m.checkPostTarget(ctx, in.Action); err != nil {
 		return model.Banner{}, err
 	}
@@ -323,9 +344,16 @@ func (m *Service) UpdateBanner(ctx context.Context, input model.UpdateBannerInpu
 		return model.Banner{}, bannerConflict()
 	}
 	// 貼文目標只在換掉目標時檢查：目標沒變的 banner（例如貼文後來下架）仍可修改其他欄位或停用。
-	if action := input.Banner.Action; action != cur.Action {
-		if err := m.checkPostTarget(ctx, action); err != nil {
+	if input.Banner.Action != cur.Action {
+		canonical, err := canonicalPostTarget(input.Banner.Action)
+		if err != nil {
 			return model.Banner{}, err
+		}
+		input.Banner.Action = canonical
+		if canonical != cur.Action {
+			if err := m.checkPostTarget(ctx, canonical); err != nil {
+				return model.Banner{}, err
+			}
 		}
 	}
 	// 只有「上架」這個動作要檢查上限；已經上架的 banner 修改其他欄位不受影響。

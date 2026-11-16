@@ -826,3 +826,28 @@ func TestPublicReadHidesABannerWhoseTargetBecameNotReadable(t *testing.T) {
 		t.Errorf("貼文回到公開後前台看到 %d 則，預期 2", got)
 	}
 }
+
+// 目標前後有空白時存正規形的 UUID，前台讀取才找得到它。
+func TestCreateBannerStoresTheCanonicalPostTarget(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	post := uuid.New()
+	f.social.set(post, true)
+	in := postBannerInput(post)
+	in.Action.Target = "  " + post.String() + "\t"
+	b, err := f.m.CreateBanner(ctx, adminID, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Action.Target != post.String() {
+		t.Errorf("存的目標 = %q，預期 %q", b.Action.Target, post.String())
+	}
+	page, err := f.m.ListLiveBanners(ctx, nil, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Banners) != 1 {
+		t.Errorf("前台看到 %d 則，預期 1", len(page.Banners))
+	}
+}
