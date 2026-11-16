@@ -316,6 +316,20 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.moderation.v1alpha1.ReportOutcome",
+      "tsName": "ReportOutcome",
+      "tsModule": "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.moderation.v1alpha1.ReportTargetKind",
+      "tsName": "ReportTargetKind",
+      "tsModule": "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime",
       "tsName": "EmbeddedOnboardingRuntime",
       "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
