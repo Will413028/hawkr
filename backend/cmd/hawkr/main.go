@@ -53,7 +53,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
-	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -242,7 +241,9 @@ func runServe(ctx context.Context) error {
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
 	delegationDeps.Social = socialModule
-	subscribeModeration(bus, newModerationRetention(d, buyerModule, med, jc, log))
+	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
+	moderationModule, moderationRetention := newModeration(d, socialModule, sellerModule, buyerModule, suspension, med, jc, log)
+	subscribeModeration(bus, moderationRetention)
 	agentModule := newAgent(d, sellerModule)
 	subscribeAgent(bus, agentModule)
 	discoveryModule := newDiscovery(d, orders, products, reviews, sellerModule, log)
@@ -259,11 +260,6 @@ func runServe(ctx context.Context) error {
 		return err
 	}
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: buyerModule, Seller: sellerModule, Identity: id, Orders: orders, Now: time.Now, NewID: uuid.NewV7, Logger: log})
-	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
-	moderationModule := moderation.New(moderation.Deps{
-		DB: d, Social: socialModule, Seller: sellerModule, Buyer: buyerModule, Suspension: suspension,
-		Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log,
-	})
 	del := newDelegation(bus, delegationDeps)
 
 	h, err := httpapi.NewHandler(httpapi.Deps{
