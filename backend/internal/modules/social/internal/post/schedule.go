@@ -137,12 +137,8 @@ func (s *Service) Schedule(ctx context.Context, st seller.Store, in model.Schedu
 		if row.Version != in.Version {
 			return versionConflict(ctx)
 		}
-		down, err := q.PostIsTakenDown(ctx, &row.ID)
-		if err != nil {
-			return fmt.Errorf("social：讀取貼文的下架 %s：%w", row.ID, err)
-		}
-		if down {
-			return apperr.FailedPrecondition("%s", text.PostScheduleTakenDown(uitext.LocaleFrom(ctx)))
+		if err := rejectIfTakenDown(ctx, q, row.ID, text.PostScheduleTakenDown(uitext.LocaleFrom(ctx))); err != nil {
+			return err
 		}
 		if err := requirePublishable(ctx, row.Body, row.ImageKey != nil); err != nil {
 			return err

@@ -72,7 +72,35 @@ func (s *Service) Own(ctx context.Context, storeID int64, id uuid.UUID) (model.P
 	if err != nil {
 		return model.Post{}, err
 	}
+	if err := s.markTakedowns(ctx, posts); err != nil {
+		return model.Post{}, err
+	}
 	return posts[0], nil
+}
+
+// markTakedowns 填店主讀自己的貼文的 TakedownMeasureID（一次批次查複本 content_takedowns）。
+func (s *Service) markTakedowns(ctx context.Context, posts []model.Post) error {
+	if len(posts) == 0 {
+		return nil
+	}
+	ids := make([]uuid.UUID, len(posts))
+	for i, p := range posts {
+		ids[i] = p.ID
+	}
+	rows, err := s.q(ctx).TakedownMeasuresOfPosts(ctx, ids)
+	if err != nil {
+		return fmt.Errorf("social：讀取貼文的下架措施：%w", err)
+	}
+	byPost := make(map[uuid.UUID]uuid.UUID, len(rows))
+	for _, r := range rows {
+		byPost[*r.PostID] = r.MeasureID
+	}
+	for i := range posts {
+		if m, ok := byPost[posts[i].ID]; ok {
+			posts[i].TakedownMeasureID = &m
+		}
+	}
+	return nil
 }
 
 // viewerOf 是公開讀取的觀看者：呼叫者的買家身分；零值是未登入。
@@ -201,6 +229,9 @@ func (s *Service) ListOwn(ctx context.Context, storeID int64, status model.PostS
 	}
 	posts, err := s.withTags(ctx, pr)
 	if err != nil {
+		return model.OwnPostPage{}, err
+	}
+	if err := s.markTakedowns(ctx, posts); err != nil {
 		return model.OwnPostPage{}, err
 	}
 	out := model.OwnPostPage{Posts: posts}

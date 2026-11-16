@@ -59,7 +59,7 @@ func (h *App) store(ctx context.Context) (seller.Store, error) {
 	return h.stores.CurrentStore(ctx, p.ID)
 }
 
-// ownPosts 把店主讀自己的貼文轉成回應：公開貼文的欄位加上 status、etag 與 create_time（只有店主讀自己的貼文才設）。
+// ownPosts 把店主讀自己的貼文轉成回應：公開貼文的欄位加上 status、etag、create_time 與 takedown_measure_id（只有店主讀自己的貼文才設）。
 func (p *presenter) ownPosts(ctx context.Context, st seller.Store, posts []social.Post) ([]*pb.Post, error) {
 	out, err := p.toPosts(ctx, social.Caller{Store: &st}, posts)
 	if err != nil {
@@ -69,6 +69,10 @@ func (p *presenter) ownPosts(ctx context.Context, st seller.Store, posts []socia
 		out[i].Status = rpc.EnumToProto[pb.PostStatus](post.Status)
 		out[i].Etag = rpc.Etag(post.Version)
 		out[i].CreateTime = timestamppb.New(post.CreatedAt)
+		if post.TakedownMeasureID != nil {
+			id := post.TakedownMeasureID.String()
+			out[i].TakedownMeasureId = &id
+		}
 	}
 	return out, nil
 }

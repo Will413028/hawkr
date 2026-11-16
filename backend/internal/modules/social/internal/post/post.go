@@ -348,6 +348,19 @@ func (s *Service) lockOwned(ctx context.Context, q *store.Queries, storeID int64
 	return row, nil
 }
 
+// rejectIfTakenDown 是貼文被內容下架措施下架（複本 content_takedowns）時回 FailedPrecondition(msg)；排程、修改與發布共用這一個檢查。
+// 呼叫端已在同一個 transaction 鎖住貼文。
+func rejectIfTakenDown(ctx context.Context, q *store.Queries, postID uuid.UUID, msg uitext.Message) error {
+	down, err := q.PostIsTakenDown(ctx, &postID)
+	if err != nil {
+		return fmt.Errorf("social：讀取貼文的下架 %s：%w", postID, err)
+	}
+	if down {
+		return apperr.FailedPrecondition("%s", msg)
+	}
+	return nil
+}
+
 // foreignWriteError 是店家寫入別家貼文的錯誤：貼文對匿名觀看者公開可讀（同公開讀取的條件）回 PermissionDenied，否則 NotFound。
 func (s *Service) foreignWriteError(ctx context.Context, id uuid.UUID) error {
 	pub, err := reads.One[reads.BoolRow](ctx, s.d.DB.Conn(ctx), reads.PostIsPublic(id, s.d.Now().UTC(), visibility.Viewer{}))
@@ -402,6 +415,9 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 		q := s.q(ctx)
 		row, err := s.lockOwned(ctx, q, st.StoreID, in.PostID)
 		if err != nil {
+			return err
+		}
+		if err := rejectIfTakenDown(ctx, q, row.ID, text.PostUpdateTakenDown(uitext.LocaleFrom(ctx))); err != nil {
 			return err
 		}
 		if err := mediaref.Reject(ctx, q, ref, candidates(asset)...); err != nil {
@@ -483,6 +499,9 @@ func (s *Service) Publish(ctx context.Context, st seller.Store, postID uuid.UUID
 		q := s.q(ctx)
 		row, err := s.lockOwned(ctx, q, st.StoreID, postID)
 		if err != nil {
+			return err
+		}
+		if err := rejectIfTakenDown(ctx, q, row.ID, text.PostPublishTakenDown(uitext.LocaleFrom(ctx))); err != nil {
 			return err
 		}
 		if row.Status == string(model.StatusPublished) {

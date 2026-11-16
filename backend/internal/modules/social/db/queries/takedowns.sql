@@ -55,6 +55,12 @@ RETURNING post_id, comment_id, forum_entry_id;
 SELECT post_id, comment_id, forum_entry_id FROM social.content_takedowns
 WHERE measure_id = sqlc.arg(measure_id);
 
+-- name: TakedownMeasuresOfPosts :many
+-- 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：同時被多個措施下架時取最早建立的，同時間取措施 ID 小的。
+SELECT DISTINCT ON (post_id) post_id, measure_id FROM social.content_takedowns
+WHERE post_id = ANY(sqlc.arg(post_ids)::uuid[])
+ORDER BY post_id, created_at, measure_id;
+
 -- name: DeleteTakedownsOfMeasure :execrows
 DELETE FROM social.content_takedowns WHERE measure_id = sqlc.arg(measure_id);
 

@@ -514,9 +514,12 @@ type Post struct {
 	// 標籤的輸入（使用者輸入的樣子，可帶開頭的 #）；列進 update_mask 是整批取代（空清單是清掉所有標籤），沒有列進去保留原本的標籤。
 	HashtagInputs []string `protobuf:"bytes,19,rep,name=hashtag_inputs,json=hashtagInputs,proto3" json:"hashtag_inputs,omitempty"`
 	// 觀看者是否讚過；訪客是 false。店主讀自己店的貼文（GetMyPost、ListMyPosts 與店主寫入的回應）時不是買家身分，一律 false。
-	ViewerLiked   bool `protobuf:"varint,20,opt,name=viewer_liked,json=viewerLiked,proto3" json:"viewer_liked,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ViewerLiked bool `protobuf:"varint,20,opt,name=viewer_liked,json=viewerLiked,proto3" json:"viewer_liked,omitempty"`
+	// 下架這篇貼文的內容下架措施 ID（seller 的 `Measure.id`）；貼文沒有被內容下架時不設。只有店主讀自己的貼文才設，公開讀取不設。
+	// 下架理由不在這裡：用這個 ID 呼叫賣家的 `GetMyMeasure`。同時被多個措施下架時是最早建立的那一個。
+	TakedownMeasureId *string `protobuf:"bytes,21,opt,name=takedown_measure_id,json=takedownMeasureId,proto3,oneof" json:"takedown_measure_id,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *Post) Reset() {
@@ -687,6 +690,13 @@ func (x *Post) GetViewerLiked() bool {
 		return x.ViewerLiked
 	}
 	return false
+}
+
+func (x *Post) GetTakedownMeasureId() string {
+	if x != nil && x.TakedownMeasureId != nil {
+		return *x.TakedownMeasureId
+	}
+	return ""
 }
 
 // Actor 是留言的作者，名稱與頭像在讀取時由 buyer、seller 補。
@@ -5644,7 +5654,7 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"createTime\"A\n" +
 	"\aHashtag\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\x12\x1d\n" +
-	"\adisplay\x18\x02 \x01(\tB\x03\xe0A\x03R\adisplay\"\x9e\a\n" +
+	"\adisplay\x18\x02 \x01(\tB\x03\xe0A\x03R\adisplay\"\xf0\a\n" +
 	"\x04Post\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12;\n" +
 	"\x05store\x18\x02 \x01(\v2 .hawkr.common.v1alpha1.StoreCardB\x03\xe0A\x03R\x05store\x12\x12\n" +
@@ -5672,8 +5682,10 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"createTime\x121\n" +
 	"\x12image_staged_token\x18\x12 \x01(\tB\x03\xe0A\x04R\x10imageStagedToken\x12*\n" +
 	"\x0ehashtag_inputs\x18\x13 \x03(\tB\x03\xe0A\x04R\rhashtagInputs\x12&\n" +
-	"\fviewer_liked\x18\x14 \x01(\bB\x03\xe0A\x03R\vviewerLikedB\r\n" +
-	"\v_product_id\"\xb9\x01\n" +
+	"\fviewer_liked\x18\x14 \x01(\bB\x03\xe0A\x03R\vviewerLiked\x128\n" +
+	"\x13takedown_measure_id\x18\x15 \x01(\tB\x03\xe0A\x03H\x01R\x11takedownMeasureId\x88\x01\x01B\r\n" +
+	"\v_product_idB\x16\n" +
+	"\x14_takedown_measure_id\"\xb9\x01\n" +
 	"\x05Actor\x129\n" +
 	"\x04kind\x18\x01 \x01(\x0e2 .hawkr.social.v1alpha1.ActorKindB\x03\xe0A\x03R\x04kind\x12\x13\n" +
 	"\x02id\x18\x02 \x01(\tB\x03\xe0A\x03R\x02id\x12\x1c\n" +

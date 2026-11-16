@@ -139,6 +139,10 @@
       "message": "發布的貼文需要 1 張照片",
       "description": "發布貼文時沒有照片。"
     },
+    "post.publish_taken_down": {
+      "message": "被內容下架的貼文不能發布",
+      "description": "發布被內容下架措施下架的貼文（取消發布與刪除不受限）。"
+    },
     "post.schedule_cancel_etag_required": {
       "message": "取消排程必須帶讀取時的版本（etag）",
       "description": "店主取消貼文的排程沒有帶 etag。"
@@ -186,6 +190,10 @@
     "post.update_etag_required": {
       "message": "修改貼文必須帶讀取時的版本（etag）",
       "description": "修改貼文沒有帶 etag。"
+    },
+    "post.update_taken_down": {
+      "message": "被內容下架的貼文不能修改",
+      "description": "修改被內容下架措施下架的貼文（取消發布與刪除不受限）。"
     },
     "post.version_conflict": {
       "message": "這篇貼文已被其他人修改，請對照最新的內容後再送出",

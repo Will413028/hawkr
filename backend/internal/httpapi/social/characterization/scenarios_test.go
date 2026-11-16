@@ -73,28 +73,6 @@ func skipOnLegacy(t ch.T, d Driver, why string) bool {
 	return true
 }
 
-// skipOnMonolith 在單體的一端跳過情境：單體刻意沒有這個行為的 Connect 入口。回傳 true 時情境直接結束。
-func skipOnMonolith(t ch.T, d Driver, why string) bool {
-	if d.Legacy() {
-		return false
-	}
-	if s, ok := t.(interface{ Skipf(string, ...any) }); ok {
-		s.Skipf("單體沒有對應的 Connect 入口：%s", why)
-	}
-	return true
-}
-
-// partialOnMonolith 在單體的一端只跑情境的前半：後半在單體沒有 Connect 入口。把原因記進測試輸出，回傳 true 時呼叫端直接結束。
-func partialOnMonolith(t ch.T, d Driver, why string) bool {
-	if d.Legacy() {
-		return false
-	}
-	if l, ok := t.(interface{ Logf(string, ...any) }); ok {
-		l.Logf("單體只跑前半：%s", why)
-	}
-	return true
-}
-
 // absentID 是格式正確但不存在的 ID：舊的 ID 是整數，單體的 ID 是 UUID，格式不對會先被當成 invalid_argument。
 func absentID(d Driver) string {
 	if d.Legacy() {
@@ -317,9 +295,6 @@ func postListsAndPaging(ctx context.Context, t ch.T, d Driver) {
 }
 
 func postAdminHideAndRestore(ctx context.Context, t ch.T, d Driver) {
-	if skipOnMonolith(t, d, "A7-D5′：平台下架貼文是賣家措施（CreateMeasure ContentTakedown），沒有隱藏與還原的 Connect 入口，A7-2f 以措施的情境覆蓋") {
-		return
-	}
 	n := ch.Nonce()
 	tag := "hide" + n
 	p := newPost(ctx, t, d, ch.Seller, tag)
@@ -386,9 +361,6 @@ func sd1PublicDetailRequiresPublicPost(ctx context.Context, t ch.T, d Driver) {
 	if skipOnLegacy(t, d, "SD1：公開單篇不過濾下架與平台隱藏") {
 		return
 	}
-	if skipOnMonolith(t, d, "A7-D5′：情境的後半段要平台隱藏貼文，單體沒有 Connect 入口，A7-2f 以措施的情境覆蓋") {
-		return
-	}
 	p := newPost(ctx, t, d, ch.Seller)
 	wantNoError(t, d.UnpublishPost(ctx, ch.Seller, p.ID), "下架")
 	_, err := d.GetPost(ctx, ch.Anonymous, p.ID)
@@ -450,9 +422,6 @@ func sd6EditRejectsBannedWords(ctx context.Context, t ch.T, d Driver) {
 
 func sd7HiddenPostCannotBeEdited(ctx context.Context, t ch.T, d Driver) {
 	if skipOnLegacy(t, d, "SD7：舊的被隱藏的貼文仍能編輯") {
-		return
-	}
-	if skipOnMonolith(t, d, "A7-D5′：要先平台隱藏貼文，單體沒有 Connect 入口，A7-2f 以措施的情境覆蓋") {
 		return
 	}
 	p := newPost(ctx, t, d, ch.Seller)
@@ -611,9 +580,6 @@ func sd2CommentsFollowPostVisibility(ctx context.Context, t ch.T, d Driver) {
 	wantNoError(t, d.PublishPost(ctx, ch.Seller, p.ID), "重新發布")
 	if !hasComment(ch.Must(t, ch.Ret(d.ListComments(ctx, ch.Anonymous, p.ID))), c.ID) {
 		t.Errorf("重新發布之後留言要讀得到")
-	}
-	if partialOnMonolith(t, d, "A7-D5′：單體沒有平台隱藏貼文的 Connect 入口，只跑下架與重新發布的那一半，A7-2f 以措施的情境覆蓋") {
-		return
 	}
 	wantNoError(t, d.ModeratePost(ctx, ch.Admin, p.ID, true, "SD2"), "隱藏")
 	unreadable("貼文被隱藏")
