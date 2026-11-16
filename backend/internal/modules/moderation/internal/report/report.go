@@ -103,15 +103,17 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Submi
 
 func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.SubmitResult, error) {
 	q := store.New(s.d.DB.Conn(ctx))
+	var hash []byte
 	if in.RequestID != nil {
+		hash = requestHash(in)
 		// request_id 先於一切（A7-D28 第 3 點）：同一位檢舉人的同一個 request_id 一律回第一次的結果，不看案件現在是進行中還是已結案。
-		first, err := q.ReportByRequest(ctx, store.ReportByRequestParams{ReporterBuyerID: in.ReporterBuyerID, RequestID: in.RequestID})
+		first, err := q.ReportByRequest(ctx, store.ReportByRequestParams{ReporterBuyerID: in.ReporterBuyerID, RequestID: *in.RequestID})
 		switch {
 		case err == nil:
-			if !bytes.Equal(first.RequestHash, requestHash(in)) {
+			if !bytes.Equal(first.RequestHash, hash) {
 				return model.SubmitResult{}, apperr.InvalidInputOn([]string{"RequestID"}, "%s", moderationtext.ReportRequestIdReused(uitext.LocaleFrom(ctx)))
 			}
-			return s.replay(ctx, q, first)
+			return s.replay(ctx, q, first.ModerationReport)
 		case !errors.Is(err, pgx.ErrNoRows):
 			return model.SubmitResult{}, fmt.Errorf("moderation：查 request_id 的檢舉：%w", err)
 		}
@@ -121,6 +123,10 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.Subm
 	})
 	switch {
 	case err == nil:
+		// 併入進行中案件裡已有的那一筆：也記下這個 request_id，結案後同一個 request_id 重送才仍回這一筆。
+		if err := s.recordRequest(ctx, q, in, existing.ID, hash); err != nil {
+			return model.SubmitResult{}, err
+		}
 		return s.replay(ctx, q, existing)
 	case !errors.Is(err, pgx.ErrNoRows):
 		return model.SubmitResult{}, fmt.Errorf("moderation：查既有的檢舉：%w", err)
@@ -176,13 +182,9 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.Subm
 	if in.Description != "" {
 		desc = &in.Description
 	}
-	var hash []byte
-	if in.RequestID != nil {
-		hash = requestHash(in)
-	}
 	row, err := q.InsertReport(ctx, store.InsertReportParams{
 		ID: s.d.NewID(), CaseID: c.ID, ReporterBuyerID: in.ReporterBuyerID, Category: string(in.Category),
-		Description: desc, SnapshotID: &snapshotID, CreatedAt: now, RequestID: in.RequestID, RequestHash: hash,
+		Description: desc, SnapshotID: &snapshotID, CreatedAt: now,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.SubmitResult{}, errRetry
@@ -190,7 +192,26 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.Subm
 	if err != nil {
 		return model.SubmitResult{}, fmt.Errorf("moderation：寫入檢舉：%w", err)
 	}
+	if err := s.recordRequest(ctx, q, in, row.ID, hash); err != nil {
+		return model.SubmitResult{}, err
+	}
 	return model.SubmitResult{Report: view.Report(row, nil), Case: view.Case(attached), Created: true}, nil
+}
+
+// recordRequest 記下 request_id 對應的檢舉（沒帶 request_id 時什麼都不做）。同一個 (檢舉人, request_id) 已被並行的請求記下時回 errRetry：
+// 這一輪的交易整個放棄，重試時從頭讀到對方的紀錄並比對內容雜湊。
+func (s *Service) recordRequest(ctx context.Context, q *store.Queries, in model.SubmitInput, reportID uuid.UUID, hash []byte) error {
+	if in.RequestID == nil {
+		return nil
+	}
+	n, err := q.InsertReportRequest(ctx, store.InsertReportRequestParams{ReporterBuyerID: in.ReporterBuyerID, RequestID: *in.RequestID, ReportID: reportID, RequestHash: hash})
+	if err != nil {
+		return fmt.Errorf("moderation：記下 request_id：%w", err)
+	}
+	if n == 0 {
+		return errRetry
+	}
+	return nil
 }
 
 // requestHash 是送出輸入（對象、類別、說明；已正規化）的 SHA-256：同一個 request_id 重送時比對內容是否相同的唯一定義。

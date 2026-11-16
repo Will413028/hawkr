@@ -155,3 +155,41 @@ func TestMyReportsListsOnlyTheCallersReportsPagedWithDerivedOutcomes(t *testing.
 		t.Fatalf("別人只看到自己的：%+v", theirs)
 	}
 }
+
+// 先不帶 request_id 送出 A，再用 R2 對同一對象送出（併入進行中案件的 A）：R2 也要記下；結案後以 R2 重送仍回 A，不開新案件。
+func TestRequestIDOnADedupedReportIsRecordedAndSurvivesTheCaseClosing(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	reporter, _ := f.newBuyer(t)
+	r2 := uuid.New()
+	a := f.submitWith(t, reporter, commentTarget(w.comment), policy.Spam, nil)
+	deduped := f.submitWith(t, reporter, commentTarget(w.comment), policy.Spam, &r2)
+	if deduped.Created || deduped.Report.ID != a.Report.ID {
+		t.Fatalf("進行中重複檢舉要回 A：%+v", deduped)
+	}
+	must(t, errOf(f.module.DecideCase(context.Background(), DecideInput{CaseID: a.Case.ID, Version: a.Case.Version, AdminID: 9, Decision: DecisionNoViolation})))
+	again := f.submitWith(t, reporter, commentTarget(w.comment), policy.Spam, &r2)
+	if again.Created || again.Report.ID != a.Report.ID || again.Case.ID != a.Case.ID {
+		t.Fatalf("結案後以 R2 重送要回 A，不開新案件：%+v", again)
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.reports WHERE reporter_buyer_id = $1", reporter); n != 1 {
+		t.Fatalf("檢舉 %d 筆", n)
+	}
+}
+
+// 併入既有檢舉的路徑也比對內容：同一個 request_id 先用內容 X 記下，再用內容不同的 Y 重送是 InvalidInput，不是成功。
+func TestRequestIDWithDifferentContentIsRejectedOnTheDedupPathToo(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	reporter, _ := f.newBuyer(t)
+	rid := uuid.New()
+	f.submitWith(t, reporter, commentTarget(w.comment), policy.Spam, nil)
+	f.submitWith(t, reporter, commentTarget(w.comment), policy.Spam, &rid)
+	// 同一個對象（會走併入進行中案件的路徑），但類別不同：雜湊不同。
+	_, err := f.module.SubmitReport(context.Background(), SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(w.comment), Category: policy.Fraud, RequestID: &rid})
+	if kindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("內容不同要回 InvalidInput：%v", err)
+	}
+}

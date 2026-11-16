@@ -189,7 +189,7 @@ func (q *Queries) DeleteSnapshots(ctx context.Context, ids []uuid.UUID) (int64, 
 }
 
 const existingOpenReport = `-- name: ExistingOpenReport :one
-SELECT r.id, r.case_id, r.reporter_buyer_id, r.category, r.description, r.snapshot_id, r.created_at, r.request_id, r.request_hash FROM moderation.reports r
+SELECT r.id, r.case_id, r.reporter_buyer_id, r.category, r.description, r.snapshot_id, r.created_at FROM moderation.reports r
 JOIN moderation.cases c ON c.id = r.case_id
 WHERE c.target_kind = $1 AND c.closed_at IS NULL
   AND (c.content_id = $2 OR c.buyer_id = $3)
@@ -220,8 +220,6 @@ func (q *Queries) ExistingOpenReport(ctx context.Context, arg ExistingOpenReport
 		&i.Description,
 		&i.SnapshotID,
 		&i.CreatedAt,
-		&i.RequestID,
-		&i.RequestHash,
 	)
 	return i, err
 }
@@ -382,10 +380,10 @@ func (q *Queries) InsertContentCase(ctx context.Context, arg InsertContentCasePa
 }
 
 const insertReport = `-- name: InsertReport :one
-INSERT INTO moderation.reports (id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at, request_id, request_hash)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO moderation.reports (id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT DO NOTHING
-RETURNING id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at, request_id, request_hash
+RETURNING id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at
 `
 
 type InsertReportParams struct {
@@ -396,11 +394,9 @@ type InsertReportParams struct {
 	Description     *string
 	SnapshotID      *uuid.UUID
 	CreatedAt       time.Time
-	RequestID       *uuid.UUID
-	RequestHash     []byte
 }
 
-// 同一位檢舉人在同一個案件的第二筆、或同一個 (檢舉人, request_id) 的第二筆，什麼都不寫（沒有回傳列）。
+// 同一位檢舉人在同一個案件的第二筆，什麼都不寫（沒有回傳列）。
 func (q *Queries) InsertReport(ctx context.Context, arg InsertReportParams) (ModerationReport, error) {
 	row := q.db.QueryRow(ctx, insertReport,
 		arg.ID,
@@ -410,8 +406,6 @@ func (q *Queries) InsertReport(ctx context.Context, arg InsertReportParams) (Mod
 		arg.Description,
 		arg.SnapshotID,
 		arg.CreatedAt,
-		arg.RequestID,
-		arg.RequestHash,
 	)
 	var i ModerationReport
 	err := row.Scan(
@@ -422,10 +416,35 @@ func (q *Queries) InsertReport(ctx context.Context, arg InsertReportParams) (Mod
 		&i.Description,
 		&i.SnapshotID,
 		&i.CreatedAt,
-		&i.RequestID,
-		&i.RequestHash,
 	)
 	return i, err
+}
+
+const insertReportRequest = `-- name: InsertReportRequest :execrows
+INSERT INTO moderation.report_requests (reporter_buyer_id, request_id, report_id, request_hash)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING
+`
+
+type InsertReportRequestParams struct {
+	ReporterBuyerID int64
+	RequestID       uuid.UUID
+	ReportID        uuid.UUID
+	RequestHash     []byte
+}
+
+// 記下 (檢舉人, request_id) 對應的檢舉；同一個 (檢舉人, request_id) 已有紀錄時什麼都不寫（回 0 列，呼叫端重試並比對內容）。
+func (q *Queries) InsertReportRequest(ctx context.Context, arg InsertReportRequestParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertReportRequest,
+		arg.ReporterBuyerID,
+		arg.RequestID,
+		arg.ReportID,
+		arg.RequestHash,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const insertSnapshot = `-- name: InsertSnapshot :execrows
@@ -472,7 +491,7 @@ func (q *Queries) LatestSnapshotContent(ctx context.Context, caseID uuid.UUID) (
 }
 
 const listReportsOfReporter = `-- name: ListReportsOfReporter :many
-SELECT r.id, r.case_id, r.reporter_buyer_id, r.category, r.description, r.snapshot_id, r.created_at, r.request_id, r.request_hash, c.target_kind, c.content_id, c.buyer_id, c.decision, c.closed_at
+SELECT r.id, r.case_id, r.reporter_buyer_id, r.category, r.description, r.snapshot_id, r.created_at, c.target_kind, c.content_id, c.buyer_id, c.decision, c.closed_at
 FROM moderation.reports r
 JOIN moderation.cases c ON c.id = r.case_id
 WHERE r.reporter_buyer_id = $1
@@ -520,8 +539,6 @@ func (q *Queries) ListReportsOfReporter(ctx context.Context, arg ListReportsOfRe
 			&i.ModerationReport.Description,
 			&i.ModerationReport.SnapshotID,
 			&i.ModerationReport.CreatedAt,
-			&i.ModerationReport.RequestID,
-			&i.ModerationReport.RequestHash,
 			&i.TargetKind,
 			&i.ContentID,
 			&i.BuyerID,
@@ -626,27 +643,34 @@ func (q *Queries) RefSeq(ctx context.Context, arg RefSeqParams) (int64, error) {
 }
 
 const reportByRequest = `-- name: ReportByRequest :one
-SELECT id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at, request_id, request_hash FROM moderation.reports WHERE reporter_buyer_id = $1 AND request_id = $2
+SELECT r.id, r.case_id, r.reporter_buyer_id, r.category, r.description, r.snapshot_id, r.created_at, q.request_hash
+FROM moderation.report_requests q
+JOIN moderation.reports r ON r.id = q.report_id
+WHERE q.reporter_buyer_id = $1 AND q.request_id = $2
 `
 
 type ReportByRequestParams struct {
 	ReporterBuyerID int64
-	RequestID       *uuid.UUID
+	RequestID       uuid.UUID
 }
 
-// 這位檢舉人以這個 request_id 送出的檢舉（不看案件狀態，A7-D28 第 3 點）。
-func (q *Queries) ReportByRequest(ctx context.Context, arg ReportByRequestParams) (ModerationReport, error) {
+type ReportByRequestRow struct {
+	ModerationReport ModerationReport
+	RequestHash      []byte
+}
+
+// 這位檢舉人以這個 request_id 第一次得到的檢舉與當時的內容雜湊（不看案件狀態，A7-D28 第 3 點）。
+func (q *Queries) ReportByRequest(ctx context.Context, arg ReportByRequestParams) (ReportByRequestRow, error) {
 	row := q.db.QueryRow(ctx, reportByRequest, arg.ReporterBuyerID, arg.RequestID)
-	var i ModerationReport
+	var i ReportByRequestRow
 	err := row.Scan(
-		&i.ID,
-		&i.CaseID,
-		&i.ReporterBuyerID,
-		&i.Category,
-		&i.Description,
-		&i.SnapshotID,
-		&i.CreatedAt,
-		&i.RequestID,
+		&i.ModerationReport.ID,
+		&i.ModerationReport.CaseID,
+		&i.ModerationReport.ReporterBuyerID,
+		&i.ModerationReport.Category,
+		&i.ModerationReport.Description,
+		&i.ModerationReport.SnapshotID,
+		&i.ModerationReport.CreatedAt,
 		&i.RequestHash,
 	)
 	return i, err
@@ -683,7 +707,7 @@ func (q *Queries) ReportIDsOfCase(ctx context.Context, arg ReportIDsOfCaseParams
 }
 
 const reportWithOutcome = `-- name: ReportWithOutcome :one
-SELECT r.id, r.case_id, r.reporter_buyer_id, r.category, r.description, r.snapshot_id, r.created_at, r.request_id, r.request_hash, c.decision, c.decision_category, c.decision_action, c.closed_at
+SELECT r.id, r.case_id, r.reporter_buyer_id, r.category, r.description, r.snapshot_id, r.created_at, c.decision, c.decision_category, c.decision_action, c.closed_at
 FROM moderation.reports r
 JOIN moderation.cases c ON c.id = r.case_id
 WHERE r.id = $1
@@ -709,8 +733,6 @@ func (q *Queries) ReportWithOutcome(ctx context.Context, id uuid.UUID) (ReportWi
 		&i.ModerationReport.Description,
 		&i.ModerationReport.SnapshotID,
 		&i.ModerationReport.CreatedAt,
-		&i.ModerationReport.RequestID,
-		&i.ModerationReport.RequestHash,
 		&i.Decision,
 		&i.DecisionCategory,
 		&i.DecisionAction,
@@ -720,7 +742,7 @@ func (q *Queries) ReportWithOutcome(ctx context.Context, id uuid.UUID) (ReportWi
 }
 
 const reportsOfCase = `-- name: ReportsOfCase :many
-SELECT id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at, request_id, request_hash FROM moderation.reports WHERE case_id = $1 ORDER BY created_at, id
+SELECT id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at FROM moderation.reports WHERE case_id = $1 ORDER BY created_at, id
 `
 
 func (q *Queries) ReportsOfCase(ctx context.Context, caseID uuid.UUID) ([]ModerationReport, error) {
@@ -740,8 +762,6 @@ func (q *Queries) ReportsOfCase(ctx context.Context, caseID uuid.UUID) ([]Modera
 			&i.Description,
 			&i.SnapshotID,
 			&i.CreatedAt,
-			&i.RequestID,
-			&i.RequestHash,
 		); err != nil {
 			return nil, err
 		}

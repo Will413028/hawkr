@@ -92,20 +92,27 @@ CREATE TABLE moderation.reports (
     description       TEXT,
     snapshot_id       UUID        REFERENCES moderation.case_snapshots (id) ON DELETE SET NULL,
     created_at        TIMESTAMPTZ NOT NULL,
-    request_id        UUID,
-    request_hash      BYTEA,
     CONSTRAINT reports_case_reporter_key UNIQUE (case_id, reporter_buyer_id),
-    CONSTRAINT reports_request_key UNIQUE (reporter_buyer_id, request_id),
-    CONSTRAINT reports_request_check CHECK ((request_id IS NULL) = (request_hash IS NULL)),
     CONSTRAINT reports_reporter_check CHECK (reporter_buyer_id > 0),
     CONSTRAINT reports_category_check CHECK (category IN ('SPAM', 'HARASSMENT', 'HATE', 'SEXUAL_CONTENT', 'MISLEADING_INFO', 'FOOD_SAFETY', 'FRAUD', 'OTHER')),
     CONSTRAINT reports_description_check CHECK (description IS NULL OR (char_length(description) >= 1 AND char_length(description) <= 500 AND description !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'))
 );
-COMMENT ON COLUMN moderation.reports.request_id IS '送出時 client 帶的 request_id（AIP-155，選填）；範圍是 (檢舉人, request_id)，同一位檢舉人重送一律回這一筆，不看案件現在的狀態（A7-D28 第 3 點）';
-COMMENT ON COLUMN moderation.reports.request_hash IS '送出輸入（對象、類別、說明）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有';
 CREATE INDEX reports_case_time ON moderation.reports (case_id, created_at, id);
 CREATE INDEX reports_reporter_time ON moderation.reports (reporter_buyer_id, created_at DESC, id DESC);
 CREATE INDEX reports_snapshot ON moderation.reports (snapshot_id) WHERE snapshot_id IS NOT NULL;
+
+-- 檢舉的冪等紀錄（AIP-155，A7-D28 第 3 點）：(檢舉人, request_id) 對應第一次回傳的那一筆檢舉。檢舉可能是新建的，也可能是併入檢舉人在進行中案件裡已有的那一筆；
+-- 兩條路徑都記，所以案件結案後同一個 request_id 重送仍回第一次的結果。request_hash 是送出輸入（對象、類別、說明；已正規化）的 SHA-256，重送時比對內容是否相同。
+CREATE TABLE moderation.report_requests (
+    reporter_buyer_id BIGINT NOT NULL,
+    request_id        UUID   NOT NULL,
+    report_id         UUID   NOT NULL REFERENCES moderation.reports (id),
+    request_hash      BYTEA  NOT NULL,
+    PRIMARY KEY (reporter_buyer_id, request_id),
+    CONSTRAINT report_requests_reporter_check CHECK (reporter_buyer_id > 0),
+    CONSTRAINT report_requests_hash_check CHECK (octet_length(request_hash) = 32)
+);
+CREATE INDEX report_requests_report ON moderation.report_requests (report_id);
 
 -- 每位檢舉人每個台北日最多 20 筆：一人一列，day 是台北日（platform/twtime.Day）。送出時單一 upsert 原子地「換日重算、未達上限才加一」，
 -- 沒有先 count 再比較的空窗；upsert 鎖住這一列，同一檢舉人的並行送出自然序列化。

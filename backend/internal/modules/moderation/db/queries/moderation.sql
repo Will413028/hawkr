@@ -45,15 +45,24 @@ ON CONFLICT (case_id, content_sha256) DO NOTHING;
 SELECT id FROM moderation.case_snapshots WHERE case_id = sqlc.arg(case_id) AND content_sha256 = sqlc.arg(content_sha256);
 
 -- name: InsertReport :one
--- 同一位檢舉人在同一個案件的第二筆、或同一個 (檢舉人, request_id) 的第二筆，什麼都不寫（沒有回傳列）。
-INSERT INTO moderation.reports (id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at, request_id, request_hash)
-VALUES (sqlc.arg(id), sqlc.arg(case_id), sqlc.arg(reporter_buyer_id), sqlc.arg(category), sqlc.narg(description), sqlc.arg(snapshot_id), sqlc.arg(created_at), sqlc.narg(request_id), sqlc.narg(request_hash))
+-- 同一位檢舉人在同一個案件的第二筆，什麼都不寫（沒有回傳列）。
+INSERT INTO moderation.reports (id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(case_id), sqlc.arg(reporter_buyer_id), sqlc.arg(category), sqlc.narg(description), sqlc.arg(snapshot_id), sqlc.arg(created_at))
 ON CONFLICT DO NOTHING
 RETURNING *;
 
+-- name: InsertReportRequest :execrows
+-- 記下 (檢舉人, request_id) 對應的檢舉；同一個 (檢舉人, request_id) 已有紀錄時什麼都不寫（回 0 列，呼叫端重試並比對內容）。
+INSERT INTO moderation.report_requests (reporter_buyer_id, request_id, report_id, request_hash)
+VALUES (sqlc.arg(reporter_buyer_id), sqlc.arg(request_id), sqlc.arg(report_id), sqlc.arg(request_hash))
+ON CONFLICT DO NOTHING;
+
 -- name: ReportByRequest :one
--- 這位檢舉人以這個 request_id 送出的檢舉（不看案件狀態，A7-D28 第 3 點）。
-SELECT * FROM moderation.reports WHERE reporter_buyer_id = sqlc.arg(reporter_buyer_id) AND request_id = sqlc.arg(request_id);
+-- 這位檢舉人以這個 request_id 第一次得到的檢舉與當時的內容雜湊（不看案件狀態，A7-D28 第 3 點）。
+SELECT sqlc.embed(r), q.request_hash
+FROM moderation.report_requests q
+JOIN moderation.reports r ON r.id = q.report_id
+WHERE q.reporter_buyer_id = sqlc.arg(reporter_buyer_id) AND q.request_id = sqlc.arg(request_id);
 
 -- name: ListReportsOfReporter :many
 -- 檢舉人自己的檢舉，新的在前，帶所屬案件的對象與決定（結果由案件推導）。keyset：(created_at, id) 由大到小。
