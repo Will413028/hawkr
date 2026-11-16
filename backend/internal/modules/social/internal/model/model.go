@@ -117,7 +117,7 @@ type Post struct {
 	UpdatedAt time.Time
 	Hashtags  []Hashtag
 	Stats     PostStats
-	// TakedownMeasureID 是下架這篇貼文的內容下架措施（seller.measures 的 ID）；沒有被下架是 nil。只有店主讀自己的貼文（Own、ListOwn）才填，公開讀取不填；理由在 seller，social 不複製。
+	// TakedownMeasureID 是下架這篇貼文的內容下架措施（seller.measures 的 ID）；沒有被下架是 nil。只有店主讀自己的貼文（Own、ListOwn）與後台列表（ListAdmin）才填，公開讀取不填；理由在 seller，social 不複製。
 	TakedownMeasureID *uuid.UUID
 }
 
@@ -149,7 +149,7 @@ type PostCursor struct {
 	ID          uuid.UUID
 }
 
-// OwnPostCursor 是店主清單的排序鍵：(CreatedAt, ID) 由大到小。
+// OwnPostCursor 是店主清單與後台貼文清單的排序鍵：(CreatedAt, ID) 由大到小。
 type OwnPostCursor struct {
 	CreatedAt time.Time
 	ID        uuid.UUID
@@ -158,25 +158,13 @@ type OwnPostCursor struct {
 // AdminPostFilter 是後台列貼文的篩選：TakenDown 為真只列被內容下架的貼文，為假不篩選。
 type AdminPostFilter struct{ TakenDown bool }
 
-// AdminPostCursor 是後台貼文清單的排序鍵：(CreatedAt, ID) 由大到小。
-type AdminPostCursor struct {
-	CreatedAt time.Time
-	ID        uuid.UUID
-}
-
-// AdminPostPage 是後台的一頁貼文（含 TakedownMeasureID）。
-type AdminPostPage struct {
-	Posts []Post
-	Next  *AdminPostCursor
-}
-
 // PostPage 是一頁貼文。Next 為 nil 表示這是最後一頁。
 type PostPage struct {
 	Posts []Post
 	Next  *PostCursor
 }
 
-// OwnPostPage 是店主的一頁貼文。
+// OwnPostPage 是店主或後台的一頁貼文（按建立時間新到舊）。
 type OwnPostPage struct {
 	Posts []Post
 	Next  *OwnPostCursor

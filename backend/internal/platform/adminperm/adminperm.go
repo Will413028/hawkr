@@ -47,7 +47,6 @@ const (
 	PaymentAccountsRetryPurge         Permission = "payment.accounts.retry_purge"
 	PaymentAccountsDeleteMapping      Permission = "payment.accounts.delete_mapping"
 	ReviewQueueItemsList              Permission = "reviewqueue.items.list"
-	SocialPostsList                   Permission = "social.posts.list"
 	SellerStoresList                  Permission = "seller.stores.list"
 	SellerStoresGet                   Permission = "seller.stores.get"
 	SellerStoreStatsGet               Permission = "seller.store_stats.get"
@@ -111,6 +110,7 @@ const (
 	SellerProspectDuplicatesList      Permission = "seller.prospect_duplicates.list"
 	SellerProspectTaxIDMatchesList    Permission = "seller.prospect_tax_id_matches.list"
 	SellerProspectDistinctPairsCreate Permission = "seller.prospect_distinct_pairs.create"
+	SocialPostsList                   Permission = "social.posts.list"
 )
 
 // Catalog 回傳目錄裡的全部權限。
@@ -125,7 +125,6 @@ func Catalog() []Permission {
 		ModerationCasesList, ModerationCasesGet, ModerationCasesDecide,
 		PaymentAccountsGet, PaymentAccountsRefresh, PaymentAccountsRetryCreate, PaymentAccountsRetryPurge, PaymentAccountsDeleteMapping,
 		ReviewQueueItemsList,
-		SocialPostsList,
 		SellerStoresList, SellerStoresGet,
 		SellerStoreStatsGet, SellerStoreOnboardingGet,
 		SellerKYCApplicationsList, SellerKYCApplicationsGet, SellerKYCApplicationsApprove, SellerKYCApplicationsReject,
@@ -144,6 +143,7 @@ func Catalog() []Permission {
 		SellerProspectsList, SellerProspectsGet, SellerProspectsCreate, SellerProspectsPreview, SellerProspectsUpdate,
 		SellerProspectsArchive, SellerProspectsRestore, SellerProspectsMerge, SellerProspectsConvert,
 		SellerProspectDuplicatesList, SellerProspectTaxIDMatchesList, SellerProspectDistinctPairsCreate,
+		SocialPostsList,
 	}
 }
 

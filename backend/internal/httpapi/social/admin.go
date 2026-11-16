@@ -3,7 +3,6 @@ package social
 import (
 	"context"
 	"fmt"
-	"time"
 	"uuid"
 
 	"connectrpc.com/connect"
@@ -18,7 +17,7 @@ import (
 
 // AdminPosts 是後台貼文列表的來源（*social.Module）。
 type AdminPosts interface {
-	ListAdminPosts(ctx context.Context, f social.AdminPostFilter, after *social.AdminPostCursor, size int32) (social.AdminPostPage, error)
+	ListAdminPosts(ctx context.Context, f social.AdminPostFilter, after *social.OwnPostCursor, size int32) (social.OwnPostPage, error)
 }
 
 // OpenReportCounts 是貼文在進行中案件裡的檢舉數的來源（*moderation.Module）：沒有進行中檢舉的貼文不在結果裡。
@@ -31,37 +30,30 @@ type OpenReportCounts interface {
 type Admin struct {
 	posts   AdminPosts
 	reports OpenReportCounts
+	images  rpc.Images
 }
 
 var _ socialv1alpha1connect.SocialAdminServiceHandler = (*Admin)(nil)
 
 // NewAdmin 建立後台的 handler；兩個來源都必填。
-func NewAdmin(posts AdminPosts, reports OpenReportCounts) (*Admin, error) {
+func NewAdmin(posts AdminPosts, reports OpenReportCounts, images rpc.Images) (*Admin, error) {
 	if posts == nil || reports == nil {
 		return nil, fmt.Errorf("httpapi/social：SocialAdminService 需要貼文與檢舉數的來源")
 	}
-	return &Admin{posts: posts, reports: reports}, nil
+	return &Admin{posts: posts, reports: reports, images: images}, nil
 }
-
-// adminPostCursor 是後台貼文清單的 page token 內容：(CreatedAt, ID)。
-type adminPostCursor struct {
-	CreatedAt time.Time
-	ID        uuid.UUID
-}
-
-func (c adminPostCursor) Valid() bool { return !c.CreatedAt.IsZero() && c.ID != uuid.UUID{} }
 
 func (h *Admin) ListPosts(ctx context.Context, req *connect.Request[adminpb.ListPostsRequest]) (*connect.Response[adminpb.ListPostsResponse], error) {
 	msg := req.Msg
 	filter := social.AdminPostFilter{TakenDown: msg.GetTakenDownOnly()}
 	scope := rpc.FilterScope(socialv1alpha1connect.SocialAdminServiceListPostsProcedure, fmt.Sprint(filter.TakenDown))
-	after, err := rpc.ValidCursor[adminPostCursor](scope, msg.GetPageToken())
+	after, err := rpc.ValidCursor[ownPostCursor](scope, msg.GetPageToken())
 	if err != nil {
 		return nil, err
 	}
-	var cur *social.AdminPostCursor
+	var cur *social.OwnPostCursor
 	if after != nil {
-		cur = &social.AdminPostCursor{CreatedAt: after.CreatedAt, ID: after.ID}
+		cur = &social.OwnPostCursor{CreatedAt: after.CreatedAt, ID: after.ID}
 	}
 	page, err := h.posts.ListAdminPosts(ctx, filter, cur, msg.GetPageSize())
 	if err != nil {
@@ -81,22 +73,27 @@ func (h *Admin) ListPosts(ctx context.Context, req *connect.Request[adminpb.List
 			Id:              p.ID.String(),
 			StoreId:         rpc.FormatID(p.StoreID),
 			Body:            p.Body,
-			Status:          rpc.EnumToProto[pb.PostStatus](p.Status),
-			CreateTime:      timestamppb.New(p.CreatedAt),
 			UpdateTime:      timestamppb.New(p.UpdatedAt),
 			OpenReportCount: counts[p.ID],
 		}
+		item.Status, item.CreateTime, item.TakedownMeasureId = postState(p)
 		if p.PublishedAt != nil {
 			item.PublishTime = timestamppb.New(*p.PublishedAt)
 		}
-		if p.TakedownMeasureID != nil {
-			id := p.TakedownMeasureID.String()
-			item.TakedownMeasureId = &id
+		if p.ImageKey != "" {
+			if err := rpc.ObjectKey(p.ImageKey); err != nil {
+				return nil, err
+			}
+			item.Image = h.images.Image(p.ImageKey)
+		}
+		if p.ProductID != nil {
+			id := rpc.FormatID(*p.ProductID)
+			item.ProductId = &id
 		}
 		out.Posts[i] = item
 	}
 	if page.Next != nil {
-		out.NextPageToken = rpc.TokenFor(scope, adminPostCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
+		out.NextPageToken = rpc.TokenFor(scope, ownPostCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
 	}
 	return connect.NewResponse(out), nil
 }

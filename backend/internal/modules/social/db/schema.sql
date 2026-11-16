@@ -51,6 +51,8 @@ CREATE INDEX posts_feed ON social.posts (published_at DESC, id DESC) WHERE statu
 CREATE INDEX posts_store_feed ON social.posts (store_id, published_at DESC, id DESC) WHERE status = 'PUBLISHED' AND deleted_at IS NULL;
 -- 店主看自己的貼文（含草稿與下架）：最新建立的在前。
 CREATE INDEX posts_store_mine ON social.posts (store_id, created_at DESC, id DESC) WHERE deleted_at IS NULL;
+-- 後台貼文列表（不含草稿與刪除，跨店）：最新建立的在前；述詞與 ListAdminPosts 逐字一致，索引才用得上。
+CREATE INDEX posts_admin_list ON social.posts (created_at DESC, id DESC) WHERE deleted_at IS NULL AND status <> 'DRAFT';
 
 COMMENT ON COLUMN social.posts.status IS '貼文狀態：DRAFT、PUBLISHED、UNPUBLISHED（儲存的代碼是 UPPER_SNAKE，舊的 publish_status 4401、4402、4403 依序對應）';
 COMMENT ON COLUMN social.posts.published_at IS '第一次發布的時間，之後不變（下架不清、再發布沿用）；DRAFT 沒有，發布過的一定有';

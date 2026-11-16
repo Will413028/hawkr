@@ -59,19 +59,24 @@ func (h *App) store(ctx context.Context) (seller.Store, error) {
 }
 
 // ownPosts 把店主讀自己的貼文轉成回應：公開貼文的欄位加上 status、etag、create_time 與 takedown_measure_id（只有店主讀自己的貼文才設）。
+// postState 是店主與後台讀貼文才有的三個欄位：狀態、建立時間與下架措施 ID（沒有被下架是 nil）。
+func postState(post social.Post) (pb.PostStatus, *timestamppb.Timestamp, *string) {
+	var takedown *string
+	if post.TakedownMeasureID != nil {
+		id := post.TakedownMeasureID.String()
+		takedown = &id
+	}
+	return rpc.EnumToProto[pb.PostStatus](post.Status), timestamppb.New(post.CreatedAt), takedown
+}
+
 func (p *presenter) ownPosts(ctx context.Context, st seller.Store, posts []social.Post) ([]*pb.Post, error) {
 	out, err := p.toPosts(ctx, social.Caller{Store: &st}, posts)
 	if err != nil {
 		return nil, err
 	}
 	for i, post := range posts {
-		out[i].Status = rpc.EnumToProto[pb.PostStatus](post.Status)
+		out[i].Status, out[i].CreateTime, out[i].TakedownMeasureId = postState(post)
 		out[i].Etag = rpc.Etag(post.Version)
-		out[i].CreateTime = timestamppb.New(post.CreatedAt)
-		if post.TakedownMeasureID != nil {
-			id := post.TakedownMeasureID.String()
-			out[i].TakedownMeasureId = &id
-		}
 	}
 	return out, nil
 }

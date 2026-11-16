@@ -313,7 +313,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(socialv1alpha1connect.NewSocialAppServiceHandler(socialApp, opts...))
 	add(moderationv1alpha1connect.NewModerationAppServiceHandler(httpmoderation.NewApp(deps.Moderation, deps.Buyer), opts...))
 	add(adminmoderationconnect.NewModerationAdminServiceHandler(httpmoderation.NewAdmin(deps.Moderation), opts...))
-	socialAdmin, err := httpsocial.NewAdmin(deps.Social, deps.Moderation)
+	socialAdmin, err := httpsocial.NewAdmin(deps.Social, deps.Moderation, deps.Images)
 	if err != nil {
 		return nil, err
 	}

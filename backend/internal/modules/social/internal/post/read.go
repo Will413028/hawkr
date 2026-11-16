@@ -78,7 +78,7 @@ func (s *Service) Own(ctx context.Context, storeID int64, id uuid.UUID) (model.P
 	return posts[0], nil
 }
 
-// markTakedowns 填店主讀自己的貼文的 TakedownMeasureID（一次批次查複本 content_takedowns）。
+// markTakedowns 填店主讀自己的貼文與後台列表的 TakedownMeasureID（一次批次查複本 content_takedowns）。
 func (s *Service) markTakedowns(ctx context.Context, posts []model.Post) error {
 	if len(posts) == 0 {
 		return nil
@@ -243,7 +243,12 @@ func (s *Service) ListOwn(ctx context.Context, storeID int64, status model.PostS
 	for i, r := range rows {
 		pr[i] = postRow{r.SocialPost, r.SocialPostStat}
 	}
-	posts, err := s.withTags(ctx, pr)
+	return s.createdPage(ctx, pr, more)
+}
+
+// createdPage 把（已截到一頁的）列轉成建立時間排序的一頁：補標籤與下架措施，more 為真時帶下一頁游標。店主清單與後台清單共用。
+func (s *Service) createdPage(ctx context.Context, rows []postRow, more bool) (model.OwnPostPage, error) {
+	posts, err := s.withTags(ctx, rows)
 	if err != nil {
 		return model.OwnPostPage{}, err
 	}
@@ -252,41 +257,29 @@ func (s *Service) ListOwn(ctx context.Context, storeID int64, status model.PostS
 	}
 	out := model.OwnPostPage{Posts: posts}
 	if more {
-		last := rows[len(rows)-1].SocialPost
+		last := rows[len(rows)-1].post
 		out.Next = &model.OwnPostCursor{CreatedAt: last.CreatedAt, ID: last.ID}
 	}
 	return out, nil
 }
 
 // ListAdmin 是後台看的貼文（不含草稿與刪除，每篇帶 TakedownMeasureID）：最新建立的在前；f.TakenDown 為真只列被內容下架的。
-func (s *Service) ListAdmin(ctx context.Context, f model.AdminPostFilter, after *model.AdminPostCursor, size int32) (model.AdminPostPage, error) {
+func (s *Service) ListAdmin(ctx context.Context, f model.AdminPostFilter, after *model.OwnPostCursor, size int32) (model.OwnPostPage, error) {
 	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
 	if err != nil {
-		return model.AdminPostPage{}, err
+		return model.OwnPostPage{}, err
 	}
 	at, id := after.Key()
 	rows, err := s.q(ctx).ListAdminPosts(ctx, store.ListAdminPostsParams{TakenDown: f.TakenDown, AfterCreated: at, AfterID: id, MaxRows: size + 1})
 	if err != nil {
-		return model.AdminPostPage{}, fmt.Errorf("social：後台列出貼文：%w", err)
+		return model.OwnPostPage{}, fmt.Errorf("social：後台列出貼文：%w", err)
 	}
 	rows, more := page(rows, size)
 	pr := make([]postRow, len(rows))
 	for i, r := range rows {
 		pr[i] = postRow{r.SocialPost, r.SocialPostStat}
 	}
-	posts, err := s.withTags(ctx, pr)
-	if err != nil {
-		return model.AdminPostPage{}, err
-	}
-	if err := s.markTakedowns(ctx, posts); err != nil {
-		return model.AdminPostPage{}, err
-	}
-	out := model.AdminPostPage{Posts: posts}
-	if more {
-		last := rows[len(rows)-1].SocialPost
-		out.Next = &model.AdminPostCursor{CreatedAt: last.CreatedAt, ID: last.ID}
-	}
-	return out, nil
+	return s.createdPage(ctx, pr, more)
 }
 
 // Top 是「本週主題」：最近發布的 30 篇公開貼文中瀏覽數最高的 n 篇（n 最多 30；同分以發布時間、ID 排），不分頁。

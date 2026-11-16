@@ -14,6 +14,7 @@
 package socialv1alpha1
 
 import (
+	v1alpha11 "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	v1alpha1 "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -47,8 +48,12 @@ type AdminPost struct {
 	TakedownMeasureId *string `protobuf:"bytes,8,opt,name=takedown_measure_id,json=takedownMeasureId,proto3,oneof" json:"takedown_measure_id,omitempty"`
 	// 這篇貼文在進行中的案件裡的檢舉數；已結案案件的檢舉不算，沒有進行中的案件是 0。
 	OpenReportCount int64 `protobuf:"varint,9,opt,name=open_report_count,json=openReportCount,proto3" json:"open_report_count,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// 貼文的圖片，沒有圖時不設（與 hawkr.social.v1alpha1.Post.image 同形）。
+	Image *v1alpha11.Image `protobuf:"bytes,10,opt,name=image,proto3" json:"image,omitempty"`
+	// 貼文帶的商品 ID，沒有時不設（與 hawkr.social.v1alpha1.Post.product_id 同形）。
+	ProductId     *string `protobuf:"bytes,11,opt,name=product_id,json=productId,proto3,oneof" json:"product_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AdminPost) Reset() {
@@ -142,6 +147,20 @@ func (x *AdminPost) GetOpenReportCount() int64 {
 		return x.OpenReportCount
 	}
 	return 0
+}
+
+func (x *AdminPost) GetImage() *v1alpha11.Image {
+	if x != nil {
+		return x.Image
+	}
+	return nil
+}
+
+func (x *AdminPost) GetProductId() string {
+	if x != nil && x.ProductId != nil {
+		return *x.ProductId
+	}
+	return ""
 }
 
 type ListPostsRequest struct {
@@ -262,7 +281,7 @@ var File_hawkr_admin_social_v1alpha1_social_proto protoreflect.FileDescriptor
 
 const file_hawkr_admin_social_v1alpha1_social_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/admin/social/v1alpha1/social.proto\x12\x1bhawkr.admin.social.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\"hawkr/social/v1alpha1/social.proto\"\xe4\x03\n" +
+	"(hawkr/admin/social/v1alpha1/social.proto\x12\x1bhawkr.admin.social.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a!hawkr/common/v1alpha1/image.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\"hawkr/social/v1alpha1/social.proto\"\xd5\x04\n" +
 	"\tAdminPost\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1e\n" +
 	"\bstore_id\x18\x02 \x01(\tB\x03\xe0A\x03R\astoreId\x12\x17\n" +
@@ -274,8 +293,13 @@ const file_hawkr_admin_social_v1alpha1_social_proto_rawDesc = "" +
 	"\vupdate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x128\n" +
 	"\x13takedown_measure_id\x18\b \x01(\tB\x03\xe0A\x03H\x00R\x11takedownMeasureId\x88\x01\x01\x12/\n" +
-	"\x11open_report_count\x18\t \x01(\x03B\x03\xe0A\x03R\x0fopenReportCountB\x16\n" +
-	"\x14_takedown_measure_id\"v\n" +
+	"\x11open_report_count\x18\t \x01(\x03B\x03\xe0A\x03R\x0fopenReportCount\x127\n" +
+	"\x05image\x18\n" +
+	" \x01(\v2\x1c.hawkr.common.v1alpha1.ImageB\x03\xe0A\x03R\x05image\x12'\n" +
+	"\n" +
+	"product_id\x18\v \x01(\tB\x03\xe0A\x03H\x01R\tproductId\x88\x01\x01B\x16\n" +
+	"\x14_takedown_measure_idB\r\n" +
+	"\v_product_id\"v\n" +
 	"\x10ListPostsRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
@@ -307,20 +331,22 @@ var file_hawkr_admin_social_v1alpha1_social_proto_goTypes = []any{
 	(*ListPostsResponse)(nil),     // 2: hawkr.admin.social.v1alpha1.ListPostsResponse
 	(v1alpha1.PostStatus)(0),      // 3: hawkr.social.v1alpha1.PostStatus
 	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
+	(*v1alpha11.Image)(nil),       // 5: hawkr.common.v1alpha1.Image
 }
 var file_hawkr_admin_social_v1alpha1_social_proto_depIdxs = []int32{
 	3, // 0: hawkr.admin.social.v1alpha1.AdminPost.status:type_name -> hawkr.social.v1alpha1.PostStatus
 	4, // 1: hawkr.admin.social.v1alpha1.AdminPost.create_time:type_name -> google.protobuf.Timestamp
 	4, // 2: hawkr.admin.social.v1alpha1.AdminPost.publish_time:type_name -> google.protobuf.Timestamp
 	4, // 3: hawkr.admin.social.v1alpha1.AdminPost.update_time:type_name -> google.protobuf.Timestamp
-	0, // 4: hawkr.admin.social.v1alpha1.ListPostsResponse.posts:type_name -> hawkr.admin.social.v1alpha1.AdminPost
-	1, // 5: hawkr.admin.social.v1alpha1.SocialAdminService.ListPosts:input_type -> hawkr.admin.social.v1alpha1.ListPostsRequest
-	2, // 6: hawkr.admin.social.v1alpha1.SocialAdminService.ListPosts:output_type -> hawkr.admin.social.v1alpha1.ListPostsResponse
-	6, // [6:7] is the sub-list for method output_type
-	5, // [5:6] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	5, // 4: hawkr.admin.social.v1alpha1.AdminPost.image:type_name -> hawkr.common.v1alpha1.Image
+	0, // 5: hawkr.admin.social.v1alpha1.ListPostsResponse.posts:type_name -> hawkr.admin.social.v1alpha1.AdminPost
+	1, // 6: hawkr.admin.social.v1alpha1.SocialAdminService.ListPosts:input_type -> hawkr.admin.social.v1alpha1.ListPostsRequest
+	2, // 7: hawkr.admin.social.v1alpha1.SocialAdminService.ListPosts:output_type -> hawkr.admin.social.v1alpha1.ListPostsResponse
+	7, // [7:8] is the sub-list for method output_type
+	6, // [6:7] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_admin_social_v1alpha1_social_proto_init() }

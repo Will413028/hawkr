@@ -9,6 +9,7 @@ syntax = "proto3";
 package hawkr.admin.social.v1alpha1;
 
 import "google/api/field_behavior.proto";
+import "hawkr/common/v1alpha1/image.proto";
 import "google/protobuf/timestamp.proto";
 import "hawkr/social/v1alpha1/social.proto";
 
@@ -35,6 +36,10 @@ message AdminPost {
   optional string takedown_measure_id = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 這篇貼文在進行中的案件裡的檢舉數；已結案案件的檢舉不算，沒有進行中的案件是 0。
   int64 open_report_count = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 貼文的圖片，沒有圖時不設（與 hawkr.social.v1alpha1.Post.image 同形）。
+  hawkr.common.v1alpha1.Image image = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 貼文帶的商品 ID，沒有時不設（與 hawkr.social.v1alpha1.Post.product_id 同形）。
+  optional string product_id = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message ListPostsRequest {

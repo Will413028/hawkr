@@ -102,8 +102,6 @@ type (
 	PostPage        = model.PostPage
 	OwnPostPage     = model.OwnPostPage
 	AdminPostFilter = model.AdminPostFilter
-	AdminPostCursor = model.AdminPostCursor
-	AdminPostPage   = model.AdminPostPage
 	CreatePostInput = model.CreatePostInput
 	UpdatePostInput = model.UpdatePostInput
 	Actor           = model.Actor
@@ -431,7 +429,7 @@ func (m *Module) ListOwnPosts(ctx context.Context, storeID int64, status PostSta
 }
 
 // ListAdminPosts 是後台看的貼文（不含草稿與刪除）：最新建立的在前，每篇帶 TakedownMeasureID；f.TakenDown 為真只列被內容下架的。授權由呼叫端（後台的 interceptor）負責。
-func (m *Module) ListAdminPosts(ctx context.Context, f AdminPostFilter, after *AdminPostCursor, size int32) (AdminPostPage, error) {
+func (m *Module) ListAdminPosts(ctx context.Context, f AdminPostFilter, after *OwnPostCursor, size int32) (OwnPostPage, error) {
 	return m.post.ListAdmin(ctx, f, after, size)
 }
 

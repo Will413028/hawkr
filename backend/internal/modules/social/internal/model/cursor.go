@@ -35,13 +35,6 @@ func (c *OwnPostCursor) Key() (time.Time, uuid.UUID) {
 	return c.CreatedAt, c.ID
 }
 
-func (c *AdminPostCursor) Key() (time.Time, uuid.UUID) {
-	if c == nil {
-		return DescStart()
-	}
-	return c.CreatedAt, c.ID
-}
-
 func (c *SanctionCursor) Key() (time.Time, uuid.UUID) {
 	if c == nil {
 		return DescStart()
