@@ -19,26 +19,31 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
 // fakeOwner 記錄店主方法的呼叫並回固定的結果；它不判斷能力與去重，那些是模組的規則（見 TestOwnerDeclarationsMatchTheModuleChecks 與模組的 integration 測試）。
 type fakeOwner struct {
-	calls     []string
-	store     seller.Store
-	create    social.CreatePostInput
-	update    social.UpdatePostInput
-	version   int64
-	scheduled social.SchedulePostInput
-	postID    *uuid.UUID
-	unreplied bool
-	status    social.PostStatus
-	after     *social.OwnPostCursor
-	cafter    *social.CommentCursor
-	post      social.Post
-	page      social.OwnPostPage
-	comments  social.CommentPage
-	summary   social.StoreSummary
-	err       error
+	calls      []string
+	actors     []*delegatedactor.Actor
+	store      seller.Store
+	create     social.CreatePostInput
+	update     social.UpdatePostInput
+	version    int64
+	scheduled  social.SchedulePostInput
+	postID     *uuid.UUID
+	unreplied  bool
+	status     social.PostStatus
+	after      *social.OwnPostCursor
+	cafter     *social.CommentCursor
+	post       social.Post
+	page       social.OwnPostPage
+	comments   social.CommentPage
+	summary    social.StoreSummary
+	schedules  social.SchedulePage
+	schedAfter *social.ScheduleCursor
+	schedStore int64
+	err        error
 }
 
 func (f *fakeOwner) rec(op string, st seller.Store) error {
@@ -53,34 +58,49 @@ func (f *fakeOwner) current(id uuid.UUID, version int64) social.Post {
 	return p
 }
 
-func (f *fakeOwner) CreatePost(_ context.Context, st seller.Store, in social.CreatePostInput) (social.Post, error) {
+func (f *fakeOwner) CreatePost(_ context.Context, st seller.Store, in social.CreatePostInput, actor *delegatedactor.Actor) (social.Post, error) {
+	f.actors = append(f.actors, actor)
 	f.create = in
 	return f.post, f.rec("create", st)
 }
 
-func (f *fakeOwner) UpdatePost(_ context.Context, st seller.Store, in social.UpdatePostInput) (social.Post, error) {
+func (f *fakeOwner) UpdatePost(_ context.Context, st seller.Store, in social.UpdatePostInput, actor *delegatedactor.Actor) (social.Post, error) {
+	f.actors = append(f.actors, actor)
 	f.update = in
 	return f.current(in.PostID, in.Version+1), f.rec("update", st)
 }
 
-func (f *fakeOwner) PublishPost(_ context.Context, st seller.Store, id uuid.UUID, v int64) (social.Post, error) {
+func (f *fakeOwner) PublishPost(_ context.Context, st seller.Store, id uuid.UUID, v int64, actor *delegatedactor.Actor) (social.Post, error) {
+	f.actors = append(f.actors, actor)
 	f.version = v
 	return f.current(id, v+1), f.rec("publish", st)
 }
 
-func (f *fakeOwner) UnpublishPost(_ context.Context, st seller.Store, id uuid.UUID, v int64) (social.Post, error) {
+func (f *fakeOwner) UnpublishPost(_ context.Context, st seller.Store, id uuid.UUID, v int64, actor *delegatedactor.Actor) (social.Post, error) {
+	f.actors = append(f.actors, actor)
 	f.version = v
 	return f.current(id, v+1), f.rec("unpublish", st)
 }
 
-func (f *fakeOwner) DeletePost(_ context.Context, st seller.Store, _ uuid.UUID, v int64) error {
+func (f *fakeOwner) DeleteOwnPost(_ context.Context, st seller.Store, _ uuid.UUID, v int64) error {
 	f.version = v
 	return f.rec("delete", st)
 }
 
-func (f *fakeOwner) SchedulePost(_ context.Context, st seller.Store, in social.SchedulePostInput) (social.ScheduledPost, error) {
+func (f *fakeOwner) SchedulePost(_ context.Context, st seller.Store, in social.SchedulePostInput, actor *delegatedactor.Actor) (social.ScheduledPost, error) {
+	f.actors = append(f.actors, actor)
 	f.scheduled = in
 	return social.ScheduledPost{Schedule: social.Schedule{PublishAt: in.PublishAt}, PostVersion: in.Version + 1, Post: f.current(in.PostID, in.Version+1)}, f.rec("schedule", st)
+}
+
+func (f *fakeOwner) CancelPostSchedule(_ context.Context, st seller.Store, id uuid.UUID, v int64) (int64, error) {
+	f.postID, f.version = &id, v
+	return v + 1, f.rec("cancelSchedule", st)
+}
+
+func (f *fakeOwner) ListPendingSchedules(_ context.Context, storeID int64, after *social.ScheduleCursor, _ int32) (social.SchedulePage, error) {
+	f.schedAfter, f.schedStore = after, storeID
+	return f.schedules, f.rec("listSchedules", seller.Store{StoreID: storeID})
 }
 
 func (f *fakeOwner) MyPost(_ context.Context, st seller.Store, id uuid.UUID) (social.Post, error) {
@@ -177,6 +197,15 @@ func TestOwnerSuccessPaths(t *testing.T) {
 	sp, err := e.client.SchedulePost(ctx, signedIn(&pb.SchedulePostRequest{PostId: id.String(), Etag: "4", PublishTime: timestamppb.New(at)}))
 	if err != nil || f.scheduled.By.Kind != social.ScheduleByOwner || !f.scheduled.PublishAt.Equal(at) || f.scheduled.Version != 4 || !sp.Msg.GetPublishTime().AsTime().Equal(at) || sp.Msg.GetPost().GetId() != id.String() {
 		t.Fatal("SchedulePost", err, f.scheduled)
+	}
+	// A7-D27：店主的寫入明確傳 nil 代行者（不稽核）。
+	if len(f.actors) == 0 {
+		t.Fatal("沒有記到任何寫入")
+	}
+	for i, a := range f.actors {
+		if a != nil {
+			t.Errorf("店主的第 %d 個寫入帶著代行者 %+v", i, a)
+		}
 	}
 }
 
@@ -453,32 +482,32 @@ func (r *reaching) run(name string, f func() error) (err error) {
 	return f()
 }
 
-func (r *reaching) CreatePost(ctx context.Context, st seller.Store, in social.CreatePostInput) (p social.Post, err error) {
-	err = r.run("CreatePost", func() (e error) { p, e = r.m.CreatePost(ctx, st, in); return })
+func (r *reaching) CreatePost(ctx context.Context, st seller.Store, in social.CreatePostInput, actor *delegatedactor.Actor) (p social.Post, err error) {
+	err = r.run("CreatePost", func() (e error) { p, e = r.m.CreatePost(ctx, st, in, actor); return })
 	return
 }
 
-func (r *reaching) UpdatePost(ctx context.Context, st seller.Store, in social.UpdatePostInput) (p social.Post, err error) {
-	err = r.run("UpdatePost", func() (e error) { p, e = r.m.UpdatePost(ctx, st, in); return })
+func (r *reaching) UpdatePost(ctx context.Context, st seller.Store, in social.UpdatePostInput, actor *delegatedactor.Actor) (p social.Post, err error) {
+	err = r.run("UpdatePost", func() (e error) { p, e = r.m.UpdatePost(ctx, st, in, actor); return })
 	return
 }
 
-func (r *reaching) PublishPost(ctx context.Context, st seller.Store, id uuid.UUID, v int64) (p social.Post, err error) {
-	err = r.run("PublishPost", func() (e error) { p, e = r.m.PublishPost(ctx, st, id, v); return })
+func (r *reaching) PublishPost(ctx context.Context, st seller.Store, id uuid.UUID, v int64, actor *delegatedactor.Actor) (p social.Post, err error) {
+	err = r.run("PublishPost", func() (e error) { p, e = r.m.PublishPost(ctx, st, id, v, actor); return })
 	return
 }
 
-func (r *reaching) UnpublishPost(ctx context.Context, st seller.Store, id uuid.UUID, v int64) (p social.Post, err error) {
-	err = r.run("UnpublishPost", func() (e error) { p, e = r.m.UnpublishPost(ctx, st, id, v); return })
+func (r *reaching) UnpublishPost(ctx context.Context, st seller.Store, id uuid.UUID, v int64, actor *delegatedactor.Actor) (p social.Post, err error) {
+	err = r.run("UnpublishPost", func() (e error) { p, e = r.m.UnpublishPost(ctx, st, id, v, actor); return })
 	return
 }
 
-func (r *reaching) DeletePost(ctx context.Context, st seller.Store, id uuid.UUID, v int64) error {
-	return r.run("DeletePost", func() error { return r.m.DeletePost(ctx, st, id, v) })
+func (r *reaching) DeleteOwnPost(ctx context.Context, st seller.Store, id uuid.UUID, v int64) error {
+	return r.run("DeletePost", func() error { return r.m.DeleteOwnPost(ctx, st, id, v) })
 }
 
-func (r *reaching) SchedulePost(ctx context.Context, st seller.Store, in social.SchedulePostInput) (s social.ScheduledPost, err error) {
-	err = r.run("SchedulePost", func() (e error) { s, e = r.m.SchedulePost(ctx, st, in); return })
+func (r *reaching) SchedulePost(ctx context.Context, st seller.Store, in social.SchedulePostInput, actor *delegatedactor.Actor) (s social.ScheduledPost, err error) {
+	err = r.run("SchedulePost", func() (e error) { s, e = r.m.SchedulePost(ctx, st, in, actor); return })
 	return
 }
 
@@ -493,6 +522,16 @@ func (r *reaching) MyPost(ctx context.Context, st seller.Store, id uuid.UUID) (p
 
 func (r *reaching) ListMyPosts(ctx context.Context, st seller.Store, s social.PostStatus, a *social.OwnPostCursor, n int32) (p social.OwnPostPage, err error) {
 	err = r.run("ListMyPosts", func() (e error) { p, e = r.m.ListMyPosts(ctx, st, s, a, n); return })
+	return
+}
+
+func (r *reaching) CancelPostSchedule(ctx context.Context, st seller.Store, id uuid.UUID, v int64) (n int64, err error) {
+	err = r.run("CancelPostSchedule", func() (e error) { n, e = r.m.CancelPostSchedule(ctx, st, id, v); return })
+	return
+}
+
+func (r *reaching) ListPendingSchedules(ctx context.Context, storeID int64, a *social.ScheduleCursor, n int32) (p social.SchedulePage, err error) {
+	err = r.run("ListPendingSchedules", func() (e error) { p, e = r.m.ListPendingSchedules(ctx, storeID, a, n); return })
 	return
 }
 
@@ -561,6 +600,10 @@ func TestOwnerDeclarationsMatchTheModuleChecks(t *testing.T) {
 		}},
 		socialv1alpha1connect.SocialAppServiceSchedulePostProcedure: {"SchedulePost", func(e *appEnv) error {
 			_, err := e.client.SchedulePost(t.Context(), signedIn(&pb.SchedulePostRequest{PostId: id, Etag: "1", PublishTime: future}))
+			return err
+		}},
+		socialv1alpha1connect.SocialAppServiceCancelPostScheduleProcedure: {"CancelPostSchedule", func(e *appEnv) error {
+			_, err := e.client.CancelPostSchedule(t.Context(), signedIn(&pb.CancelPostScheduleRequest{PostId: id, Etag: "1"}))
 			return err
 		}},
 		socialv1alpha1connect.SocialAppServiceGetMyPostProcedure: {"MyPost", func(e *appEnv) error {
@@ -778,5 +821,68 @@ func TestNewAppRejectsADeclarationTableMissingARow(t *testing.T) {
 	}
 	if _, err := newApp(declarations, &fakeWrites{}, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, images, web); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestOwnerListPendingSchedulesReadsTheOwnStoreAndPages(t *testing.T) {
+	at := time.Date(2026, 12, 1, 3, 0, 0, 0, time.UTC)
+	first, second := uuid.New(), uuid.New()
+	f := &fakeOwner{schedules: social.SchedulePage{
+		Schedules: []social.Schedule{
+			{ID: first, PostID: uuid.New(), StoreID: 5, PublishAt: at, By: social.ScheduledBy{Kind: social.ScheduleByDelegation, Ref: "9"}, CreatedAt: at.Add(-time.Hour)},
+			{ID: second, PostID: uuid.New(), StoreID: 5, PublishAt: at.Add(time.Hour), By: social.ScheduledBy{Kind: social.ScheduleByOwner}, CreatedAt: at.Add(-time.Hour)},
+		},
+		Next: &social.ScheduleCursor{PublishAt: at.Add(time.Hour), ID: second},
+	}}
+	e := newAppEnvWith(t, &fakeWrites{}, f, &fakeStores{own: &seller.Store{StoreID: 5}})
+	resp, err := e.client.ListPendingSchedules(t.Context(), signedIn(&pb.ListPendingSchedulesRequest{PageSize: 2}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.schedStore != 5 || f.schedAfter != nil {
+		t.Fatalf("店家 %d、游標 %v：預期店家來自 CurrentStore、第一頁沒有游標", f.schedStore, f.schedAfter)
+	}
+	got := resp.Msg.GetSchedules()
+	if len(got) != 2 || got[0].GetScheduledBy() != pb.ScheduleKind_SCHEDULE_KIND_DELEGATION || got[1].GetScheduledBy() != pb.ScheduleKind_SCHEDULE_KIND_OWNER ||
+		got[0].GetId() != first.String() || !got[0].GetPublishTime().AsTime().Equal(at) {
+		t.Fatalf("schedules = %v", got)
+	}
+	if resp.Msg.GetNextPageToken() == "" {
+		t.Fatal("有下一頁卻沒有 next_page_token")
+	}
+	f.schedules.Next = nil
+	if _, err := e.client.ListPendingSchedules(t.Context(), signedIn(&pb.ListPendingSchedulesRequest{PageToken: resp.Msg.GetNextPageToken()})); err != nil {
+		t.Fatal(err)
+	}
+	if f.schedAfter == nil || f.schedAfter.ID != second || !f.schedAfter.PublishAt.Equal(at.Add(time.Hour)) {
+		t.Fatalf("第二頁的游標 = %v", f.schedAfter)
+	}
+	if _, err := e.client.ListPendingSchedules(t.Context(), signedIn(&pb.ListPendingSchedulesRequest{PageToken: "garbage"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("壞的 page_token：%v", err)
+	}
+}
+
+func TestOwnerCancelPostScheduleReturnsTheNextEtagAndRequiresOne(t *testing.T) {
+	f := &fakeOwner{}
+	e := newAppEnvWith(t, &fakeWrites{}, f, &fakeStores{own: &seller.Store{StoreID: 5}})
+	id := uuid.New()
+	resp, err := e.client.CancelPostSchedule(t.Context(), signedIn(&pb.CancelPostScheduleRequest{PostId: id.String(), Etag: "4"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Msg.GetEtag() != "5" || f.postID == nil || *f.postID != id || f.version != 4 || f.store.StoreID != 5 {
+		t.Fatalf("etag %q、貼文 %v、版本 %d、店家 %d", resp.Msg.GetEtag(), f.postID, f.version, f.store.StoreID)
+	}
+	f.calls = nil
+	for name, req := range map[string]*pb.CancelPostScheduleRequest{
+		"沒有 etag":   {PostId: id.String()},
+		"貼文 ID 不正確": {PostId: "x", Etag: "1"},
+	} {
+		if _, err := e.client.CancelPostSchedule(t.Context(), signedIn(req)); connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("%s：%v，預期 invalid_argument", name, err)
+		}
+	}
+	if len(f.calls) != 0 {
+		t.Fatalf("請求不合法不該到模組：%v", f.calls)
 	}
 }

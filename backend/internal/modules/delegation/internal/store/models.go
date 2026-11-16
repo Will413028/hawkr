@@ -30,6 +30,7 @@ type DelegationAdminOperationAuditLog struct {
 	ResourceName          *string
 	Result                string
 	BizCode               *int32
+	FailureReason         *string
 	OperationReason       *string
 	CaseReference         *string
 	RequestID             string

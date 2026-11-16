@@ -19,13 +19,13 @@ import "hawkr/common/v1alpha1/store_card.proto";
 
 // SocialPublicService 是任何人都能讀的貼文與留言，不需要登入。
 service SocialPublicService {
-  // GetPost 讀一篇觀看者可讀的貼文：已發布、沒有被下架或平台隱藏，而且店家不是被觀看者個人封鎖的。其他一律回 not_found，
+  // GetStorePost 讀一篇觀看者可讀的貼文：已發布、沒有被下架或平台隱藏，而且店家不是被觀看者個人封鎖的。其他一律回 not_found，
   // 不區分原因。店主讀自己店的貼文不套個人封鎖。這個方法不計瀏覽數，瀏覽由 RecordPostView 另外記錄。
   rpc GetPost(GetPostRequest) returns (GetPostResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  // ListPosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶篩選是全站動態牆，帶 store_id 是該店的貼文頁，
+  // ListStorePosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶篩選是全站動態牆，帶 store_id 是該店的貼文頁，
   // 帶 hashtag 是該標籤的貼文頁；兩個篩選不能同時帶（invalid_argument）。
   // 觀看者個人封鎖的店不出現在動態牆，過濾在分頁之前，所以一頁可以少於 page_size，結束只看 next_page_token。
   rpc ListPosts(ListPostsRequest) returns (ListPostsResponse) {
@@ -125,7 +125,7 @@ service SocialAppService {
     option idempotency_level = IDEMPOTENT;
   }
 
-  // CreatePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
+  // CreateStorePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
   // 草稿可以不完整。帶 request_id 重送回第一次建立的貼文目前的樣子（狀態與計數是此刻的），不重複建立；內容不同回 invalid_argument。需要賣家能力 CAP_MARKETING。
   rpc CreatePost(CreatePostRequest) returns (CreatePostResponse);
 
@@ -140,7 +140,7 @@ service SocialAppService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  // UpdatePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
+  // UpdateStorePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
   // 已發布或有待發布排程的貼文被修改後仍要滿足公開要件。需要賣家能力 CAP_MARKETING。
   rpc UpdatePost(UpdatePostRequest) returns (UpdatePostResponse) {
     option idempotency_level = IDEMPOTENT;
@@ -151,7 +151,7 @@ service SocialAppService {
     option idempotency_level = IDEMPOTENT;
   }
 
-  // UnpublishPost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
+  // UnpublishStorePost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
   rpc UnpublishPost(UnpublishPostRequest) returns (UnpublishPostResponse) {
     option idempotency_level = IDEMPOTENT;
   }
@@ -161,9 +161,21 @@ service SocialAppService {
     option idempotency_level = IDEMPOTENT;
   }
 
-  // SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
-  // 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
+  // ScheduleStorePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
+  // 需要賣家能力 CAP_MARKETING。排程的讀取與取消見 ListPendingSchedules、CancelPostSchedule。
   rpc SchedulePost(SchedulePostRequest) returns (SchedulePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // ListPendingSchedules 列出呼叫者此刻的店待發布的排程（含店主自己排的與代行營運排的），發布時間早的在前（同一時間以 ID 排序）。店主看得到代行排的貼文並能取消（CancelPostSchedule）。
+  // 只讀自己店的排程，店家由伺服器推導。
+  rpc ListPendingSchedules(ListPendingSchedulesRequest) returns (ListPendingSchedulesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CancelPostSchedule 店主取消貼文待發布的排程（不分發起者；取消原因記為店主取消）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT。貼文沒有待發布的排程時什麼都不做（不檢查 etag），回目前的 etag。
+  // 貼文不是這家店的回 not_found。需要賣家能力 CAP_MARKETING。
+  rpc CancelPostSchedule(CancelPostScheduleRequest) returns (CancelPostScheduleResponse) {
     option idempotency_level = IDEMPOTENT;
   }
 
@@ -220,6 +232,27 @@ enum PostStatus {
   POST_STATUS_UNPUBLISHED = 3;
 }
 
+// ScheduleKind 是排程的發起者種類。
+enum ScheduleKind {
+  SCHEDULE_KIND_UNSPECIFIED = 0;
+  // 店主自己排的。
+  SCHEDULE_KIND_OWNER = 1;
+  // 平台管理員代行營運時排的。
+  SCHEDULE_KIND_DELEGATION = 2;
+}
+
+// PostSchedule 是一篇貼文待發布的排程。
+message PostSchedule {
+  // 排程的 ID。
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 要發布的貼文。
+  string post_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 發布的時間點。
+  google.protobuf.Timestamp publish_time = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  ScheduleKind scheduled_by = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
 // Hashtag 是貼文的一個標籤。
 message Hashtag {
   // 正規化後的名稱，用來比對與連結。
@@ -261,6 +294,8 @@ message Post {
   string image_staged_token = 18 [(google.api.field_behavior) = INPUT_ONLY];
   // 標籤的輸入（使用者輸入的樣子，可帶開頭的 #）；列進 update_mask 是整批取代（空清單是清掉所有標籤），沒有列進去保留原本的標籤。
   repeated string hashtag_inputs = 19 [(google.api.field_behavior) = INPUT_ONLY];
+  // 觀看者是否讚過；訪客是 false。店主讀自己店的貼文（GetMyPost、ListMyPosts 與店主寫入的回應）時不是買家身分，一律 false。
+  bool viewer_liked = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Actor 是留言的作者，名稱與頭像在讀取時由 buyer、seller 補。
@@ -643,6 +678,29 @@ message SchedulePostResponse {
   google.protobuf.Timestamp publish_time = 2;
 }
 
+message ListPendingSchedulesRequest {
+  // 預設 20，上限 50。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListPendingSchedulesResponse {
+  repeated PostSchedule schedules = 1;
+  string next_page_token = 2;
+}
+
+message CancelPostScheduleRequest {
+  // 貼文 ID。
+  string post_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CancelPostScheduleResponse {
+  // 取消後貼文的 etag。
+  string etag = 1;
+}
+
 message ListStoreCommentsRequest {
   // 預設 20，上限 50。
   int32 page_size = 1;
@@ -671,6 +729,162 @@ message GetStoreSocialSummaryResponse {
 message PostStatusCount {
   PostStatus status = 1;
   int64 count = 2;
+}
+
+// SocialDelegatedService 是代行營運中的平台管理員讀寫代行店家的貼文：憑證是 X-HK-Operation-Session 標頭裡的代行 session（由 website 的 BFF 轉送，不放在請求訊息），
+// 不讀顧客或管理員的身分；目標店家是 session 建立當下綁定的那一家，請求不帶 store_id。商品與訂單由各自模組的 `<模組>DelegatedService` 在 A10 提供。
+// 回應一律不可快取（private, no-store）。
+//
+// 能力（posts.read、posts.write、posts.publish）依方法宣告：憑證缺少或無效回 unauthenticated；session 已結束、到期或撤銷回 failed_precondition；
+// session 沒有授予對應的能力回 permission_denied；店家此刻不可代行（不存在、已關閉、等待刪除、停權）回 failed_precondition，只拒絕、不撤銷 session。
+//
+// 稽核：成功的寫入在同一個 transaction 內留下一列 SUCCEEDED（寫入失敗時一併 rollback）；被拒絕的請求（含讀取）與寫入的業務失敗另開 transaction 留下一列 FAILED；
+// 成功的讀取不稽核。
+service SocialDelegatedService {
+  // ListStorePosts 列出代行店家自己的貼文（含草稿與下架，不含已刪除），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。需要能力 posts.read。
+  rpc ListStorePosts(ListStorePostsRequest) returns (ListStorePostsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetStorePost 讀代行店家的一篇貼文（任何狀態，不含已刪除）；別家的貼文與不存在一樣回 not_found。回應帶 status 與 etag。需要能力 posts.read。
+  rpc GetStorePost(GetStorePostRequest) returns (GetStorePostResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CreateStorePost 以代行店家建立草稿貼文（建立一律是草稿；要發布再呼叫 PublishStorePost）。同一個 session 以同一個 request_id 重送回第一次建立的貼文目前的樣子，
+  // 不重複建立、不重複寫稽核；內容不同回 failed_precondition。需要能力 posts.write。
+  rpc CreateStorePost(CreateStorePostRequest) returns (CreateStorePostResponse);
+
+  // UpdateStorePost 修改代行店家的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與
+  // VERSION_CONFLICT，不寫入也不留稽核。重送規則同 CreateStorePost。需要能力 posts.write。
+  rpc UpdateStorePost(UpdateStorePostRequest) returns (UpdateStorePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // PublishStorePost 立即發布草稿或下架的貼文；etag 必填。重送規則同 CreateStorePost。需要能力 posts.publish。
+  rpc PublishStorePost(PublishStorePostRequest) returns (PublishStorePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // UnpublishStorePost 下架已發布的貼文；etag 必填。重送規則同 CreateStorePost。需要能力 posts.publish。
+  rpc UnpublishStorePost(UnpublishStorePostRequest) returns (UnpublishStorePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // ScheduleStorePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天；貼文已有待發布的排程時，舊的被取代。排程屬於店家，session 結束後仍會
+  // 在到點時重驗授權並發布（授權已撤回則取消）。稽核寫 POST_SCHEDULE，到點發布時另寫一列 POST_PUBLISH。重送規則同 CreateStorePost。需要能力 posts.publish。
+  rpc ScheduleStorePost(ScheduleStorePostRequest) returns (ScheduleStorePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+// DelegatedOperation 是每個代行寫入都要帶的稽核資料。
+message DelegatedOperation {
+  // UUIDv4（AIP-155）：同一個代行 session 內以同一個 request_id 重送，回第一次的結果，不重做寫入也不再寫稽核；同一個 request_id 用在不同的請求內容回 failed_precondition。必填。
+  string request_id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  // 操作原因，去除首尾空白後 1 到 100 個字元，不得含控制字元；寫進稽核，必填。
+  string operation_reason = 2 [(google.api.field_behavior) = REQUIRED];
+  // 是否在完成後通知店主；不設是通知。
+  optional bool notify_seller = 3;
+}
+
+message ListStorePostsRequest {
+  // 預設 20，上限 50。
+  int32 page_size = 1;
+  string page_token = 2;
+  // 只列這個狀態的貼文；不設（UNSPECIFIED）是全部。page_token 只能用在同一個 status。
+  PostStatus status = 3;
+}
+
+message ListStorePostsResponse {
+  repeated Post posts = 1;
+  string next_page_token = 2;
+}
+
+message GetStorePostRequest {
+  // 貼文 ID。
+  string post_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetStorePostResponse {
+  Post post = 1;
+}
+
+message CreateStorePostRequest {
+  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // 內文，去除首尾空白後最多 2200 個字元；草稿可以是空的。
+  string body = 2;
+  // 圖片的 staged token（media 上傳完成後拿到的）。
+  string image_staged_token = 3 [(google.api.field_behavior) = INPUT_ONLY];
+  // 貼文帶的商品 ID；商品要存在、上架中而且屬於這家店。
+  optional string product_id = 4;
+  // 標籤（使用者輸入的樣子，可帶開頭的 #）。
+  repeated string hashtag_inputs = 5;
+}
+
+message CreateStorePostResponse {
+  Post post = 1;
+  // 這次寫入的稽核列 ID（重送時是第一次的）。
+  string audit_log_id = 2;
+}
+
+message UpdateStorePostRequest {
+  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // id 與 etag 必填。可以修改的欄位是 body、image_staged_token、product_id、hashtag_inputs，update_mask 要列至少一個；沒列的欄位保留目前的值。
+  Post post = 2 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 3;
+}
+
+message UpdateStorePostResponse {
+  Post post = 1;
+  string audit_log_id = 2;
+}
+
+message PublishStorePostRequest {
+  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // 貼文 ID。
+  string post_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message PublishStorePostResponse {
+  Post post = 1;
+  string audit_log_id = 2;
+}
+
+message UnpublishStorePostRequest {
+  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // 貼文 ID。
+  string post_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UnpublishStorePostResponse {
+  Post post = 1;
+  string audit_log_id = 2;
+}
+
+message ScheduleStorePostRequest {
+  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // 貼文 ID。
+  string post_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+  // 發布的時間點，距現在 5 分鐘到 90 天。
+  google.protobuf.Timestamp publish_time = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ScheduleStorePostResponse {
+  // 排程後的貼文（含新的 etag）。
+  Post post = 1;
+  // 排定的發布時間。
+  google.protobuf.Timestamp publish_time = 2;
+  string audit_log_id = 3;
 }
 
 // SanctionKind 是社群處分的種類。

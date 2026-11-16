@@ -88,7 +88,7 @@ func tiersOf(procedure string) []rateTier {
 		return []rateTier{tierPublic}
 	case rpc.AudienceInvitee:
 		return []rateTier{tierInvitee}
-	case rpc.AudienceApp, rpc.AudienceAdmin:
+	case rpc.AudienceApp, rpc.AudienceAdmin, rpc.AudienceDelegated:
 	}
 	return []rateTier{tierDefault}
 }

@@ -56,7 +56,12 @@ func newApp(table map[string]declaration, writes Writes, authored Authored, owne
 	if err := checkDeclarations(table, serviceDescriptor()); err != nil {
 		return nil, err
 	}
-	return &App{presenter: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin}, writes: writes, authored: authored, owner: owner}, nil
+	return &App{presenter: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin, liked: noViewerLikes}, writes: writes, authored: authored, owner: owner}, nil
+}
+
+// noViewerLikes 是店主路徑的 liked：店主的回應不帶買家的讚，永遠是空的。
+func noViewerLikes(context.Context, int64, []uuid.UUID) (map[uuid.UUID]bool, error) {
+	return nil, nil
 }
 
 var (

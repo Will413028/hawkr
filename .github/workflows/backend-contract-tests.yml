@@ -16,6 +16,8 @@ on:
       - 'backend/services/java/*/src/main/java/**/domain/event/**'
       - 'backend/services/java/*/src/main/java/**/service/dto/**'
       - 'backend/tests/contract/golden/**'
+      - 'backend/internal/legacy/rabbitmq/testdata/routes.json'
+      - 'backend/infra/mq/topology/topology.yaml'
       - '.github/workflows/backend-contract-tests.yml'
   push:
     branches: [main, dev]

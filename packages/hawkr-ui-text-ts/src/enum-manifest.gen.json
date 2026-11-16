@@ -547,8 +547,29 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.social.v1alpha1.HiddenContentKind",
+      "tsName": "HiddenContentKind",
+      "tsModule": "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.social.v1alpha1.PostStatus",
       "tsName": "PostStatus",
+      "tsModule": "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.social.v1alpha1.SanctionKind",
+      "tsName": "SanctionKind",
+      "tsModule": "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.social.v1alpha1.ScheduleKind",
+      "tsName": "ScheduleKind",
       "tsModule": "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb",
       "inCatalog": false,
       "serverOwned": false

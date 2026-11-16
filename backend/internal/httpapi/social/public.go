@@ -35,6 +35,7 @@ type Reads interface {
 	ListComments(ctx context.Context, c social.Caller, postID uuid.UUID, after *social.CommentCursor, size int32) (social.CommentPage, error)
 	ListReplies(ctx context.Context, c social.Caller, postID, parentID uuid.UUID, after *social.CommentCursor, size int32) (social.CommentPage, error)
 	TopPosts(ctx context.Context, c social.Caller, n int32) ([]social.Post, error)
+	PostsLikedBy(ctx context.Context, buyerID int64, postIDs []uuid.UUID) (map[uuid.UUID]bool, error)
 	ListHashtagPosts(ctx context.Context, c social.Caller, tag string, after *social.PostCursor, size int32) (social.PostPage, error)
 	SuggestHashtags(ctx context.Context, q string, contains bool, limit int32) ([]social.HashtagCount, error)
 	TrendingHashtags(ctx context.Context, from, to time.Time, limit int32) ([]social.HashtagCount, error)
@@ -61,6 +62,8 @@ type presenter struct {
 	stores    Stores
 	images    rpc.Images
 	webOrigin rpc.WebOrigin
+	// liked 查買家讚過哪些貼文，只在呼叫者有買家身分時呼叫；店主路徑（App）給 noViewerLikes。
+	liked func(ctx context.Context, buyerID int64, postIDs []uuid.UUID) (map[uuid.UUID]bool, error)
 }
 
 // Views 是瀏覽打點的寫入端（*social.Module）。
@@ -86,7 +89,7 @@ func NewPublic(reads Reads, views Views, buyers Buyers, stores Stores, images rp
 	if now == nil {
 		now = time.Now
 	}
-	return &Public{presenter: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin}, reads: reads, views: views, now: now}, nil
+	return &Public{presenter: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin, liked: reads.PostsLikedBy}, reads: reads, views: views, now: now}, nil
 }
 
 // caller 是請求的呼叫者此刻的兩個身分；訪客（沒有登入、停權帳號與無效 token 都以訪客執行）與管理員是零值。
@@ -470,6 +473,7 @@ func (h *presenter) buyerDisplays(ctx context.Context, buyerIDs []int64) (map[in
 type postStores struct {
 	cards    map[int64]seller.StoreCard
 	blocking map[int64]bool
+	liked    map[uuid.UUID]bool
 }
 
 func (h *presenter) storeCards(ctx context.Context, storeIDs []int64) (map[int64]seller.StoreCard, error) {
@@ -521,7 +525,11 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 	if err != nil {
 		return nil, err
 	}
-	stores := postStores{cards: cards, blocking: blocking}
+	liked, err := h.likedPosts(ctx, c, posts)
+	if err != nil {
+		return nil, err
+	}
+	stores := postStores{cards: cards, blocking: blocking, liked: liked}
 	out := make([]*pb.Post, len(posts))
 	for i, p := range posts {
 		if out[i], err = h.toPost(c, p, stores); err != nil {
@@ -529,6 +537,18 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 		}
 	}
 	return out, nil
+}
+
+// likedPosts 批次查呼叫者的買家身分讚過 posts 裡的哪幾篇；呼叫者沒有買家身分（訪客、店主）時是空的。
+func (h *presenter) likedPosts(ctx context.Context, c social.Caller, posts []social.Post) (map[uuid.UUID]bool, error) {
+	if c.BuyerID == 0 {
+		return nil, nil
+	}
+	ids := make([]uuid.UUID, len(posts))
+	for i, p := range posts {
+		ids[i] = p.ID
+	}
+	return h.liked(ctx, c.BuyerID, ids)
 }
 
 func (h *presenter) toPost(c social.Caller, p social.Post, stores postStores) (*pb.Post, error) {
@@ -539,7 +559,7 @@ func (h *presenter) toPost(c social.Caller, p social.Post, stores postStores) (*
 	out := &pb.Post{
 		Id: p.ID.String(), Body: p.Body, UpdateTime: timestamppb.New(p.UpdatedAt),
 		LikeCount: p.Stats.Likes, CommentCount: p.Stats.Comments, ViewCount: p.Stats.Views, ShareCount: p.Stats.Shares,
-		Url: postURL, ViewerCanComment: canComment(c, p.StoreID, stores.blocking),
+		Url: postURL, ViewerCanComment: canComment(c, p.StoreID, stores.blocking), ViewerLiked: stores.liked[p.ID],
 	}
 	if p.PublishedAt != nil {
 		out.PublishTime = timestamppb.New(*p.PublishedAt)

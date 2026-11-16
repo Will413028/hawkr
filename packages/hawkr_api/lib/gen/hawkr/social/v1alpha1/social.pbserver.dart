@@ -132,6 +132,10 @@ abstract class SocialAppServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $5.DeletePostRequest request);
   $async.Future<$5.SchedulePostResponse> schedulePost(
       $pb.ServerContext ctx, $5.SchedulePostRequest request);
+  $async.Future<$5.ListPendingSchedulesResponse> listPendingSchedules(
+      $pb.ServerContext ctx, $5.ListPendingSchedulesRequest request);
+  $async.Future<$5.CancelPostScheduleResponse> cancelPostSchedule(
+      $pb.ServerContext ctx, $5.CancelPostScheduleRequest request);
   $async.Future<$5.ListStoreCommentsResponse> listStoreComments(
       $pb.ServerContext ctx, $5.ListStoreCommentsRequest request);
   $async.Future<$5.GetStoreSocialSummaryResponse> getStoreSocialSummary(
@@ -181,6 +185,10 @@ abstract class SocialAppServiceBase extends $pb.GeneratedService {
         return $5.DeletePostRequest();
       case 'SchedulePost':
         return $5.SchedulePostRequest();
+      case 'ListPendingSchedules':
+        return $5.ListPendingSchedulesRequest();
+      case 'CancelPostSchedule':
+        return $5.CancelPostScheduleRequest();
       case 'ListStoreComments':
         return $5.ListStoreCommentsRequest();
       case 'GetStoreSocialSummary':
@@ -235,6 +243,11 @@ abstract class SocialAppServiceBase extends $pb.GeneratedService {
         return deletePost(ctx, request as $5.DeletePostRequest);
       case 'SchedulePost':
         return schedulePost(ctx, request as $5.SchedulePostRequest);
+      case 'ListPendingSchedules':
+        return listPendingSchedules(
+            ctx, request as $5.ListPendingSchedulesRequest);
+      case 'CancelPostSchedule':
+        return cancelPostSchedule(ctx, request as $5.CancelPostScheduleRequest);
       case 'ListStoreComments':
         return listStoreComments(ctx, request as $5.ListStoreCommentsRequest);
       case 'GetStoreSocialSummary':
@@ -253,4 +266,69 @@ abstract class SocialAppServiceBase extends $pb.GeneratedService {
   $core.Map<$core.String, $core.dynamic> get $json => SocialAppServiceBase$json;
   $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       get $messageJson => SocialAppServiceBase$messageJson;
+}
+
+abstract class SocialDelegatedServiceBase extends $pb.GeneratedService {
+  $async.Future<$5.ListStorePostsResponse> listStorePosts(
+      $pb.ServerContext ctx, $5.ListStorePostsRequest request);
+  $async.Future<$5.GetStorePostResponse> getStorePost(
+      $pb.ServerContext ctx, $5.GetStorePostRequest request);
+  $async.Future<$5.CreateStorePostResponse> createStorePost(
+      $pb.ServerContext ctx, $5.CreateStorePostRequest request);
+  $async.Future<$5.UpdateStorePostResponse> updateStorePost(
+      $pb.ServerContext ctx, $5.UpdateStorePostRequest request);
+  $async.Future<$5.PublishStorePostResponse> publishStorePost(
+      $pb.ServerContext ctx, $5.PublishStorePostRequest request);
+  $async.Future<$5.UnpublishStorePostResponse> unpublishStorePost(
+      $pb.ServerContext ctx, $5.UnpublishStorePostRequest request);
+  $async.Future<$5.ScheduleStorePostResponse> scheduleStorePost(
+      $pb.ServerContext ctx, $5.ScheduleStorePostRequest request);
+
+  $pb.GeneratedMessage createRequest($core.String methodName) {
+    switch (methodName) {
+      case 'ListStorePosts':
+        return $5.ListStorePostsRequest();
+      case 'GetStorePost':
+        return $5.GetStorePostRequest();
+      case 'CreateStorePost':
+        return $5.CreateStorePostRequest();
+      case 'UpdateStorePost':
+        return $5.UpdateStorePostRequest();
+      case 'PublishStorePost':
+        return $5.PublishStorePostRequest();
+      case 'UnpublishStorePost':
+        return $5.UnpublishStorePostRequest();
+      case 'ScheduleStorePost':
+        return $5.ScheduleStorePostRequest();
+      default:
+        throw $core.ArgumentError('Unknown method: $methodName');
+    }
+  }
+
+  $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx,
+      $core.String methodName, $pb.GeneratedMessage request) {
+    switch (methodName) {
+      case 'ListStorePosts':
+        return listStorePosts(ctx, request as $5.ListStorePostsRequest);
+      case 'GetStorePost':
+        return getStorePost(ctx, request as $5.GetStorePostRequest);
+      case 'CreateStorePost':
+        return createStorePost(ctx, request as $5.CreateStorePostRequest);
+      case 'UpdateStorePost':
+        return updateStorePost(ctx, request as $5.UpdateStorePostRequest);
+      case 'PublishStorePost':
+        return publishStorePost(ctx, request as $5.PublishStorePostRequest);
+      case 'UnpublishStorePost':
+        return unpublishStorePost(ctx, request as $5.UnpublishStorePostRequest);
+      case 'ScheduleStorePost':
+        return scheduleStorePost(ctx, request as $5.ScheduleStorePostRequest);
+      default:
+        throw $core.ArgumentError('Unknown method: $methodName');
+    }
+  }
+
+  $core.Map<$core.String, $core.dynamic> get $json =>
+      SocialDelegatedServiceBase$json;
+  $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
+      get $messageJson => SocialDelegatedServiceBase$messageJson;
 }

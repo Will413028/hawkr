@@ -335,7 +335,7 @@ func TestTakedownOfPurgedContentSucceedsWithoutReplica(t *testing.T) {
 	f.takedowns(t)
 	w := f.takedownWorld(t)
 	purged := f.publishedPost(t, w.storeID, "已清除的貼文", "organic")
-	must(t, f.module.DeletePost(ctx, f.store(t, w.storeID), purged.ID, purged.Version))
+	must(t, f.module.DeleteOwnPost(ctx, f.store(t, w.storeID), purged.ID, purged.Version))
 	f.exec(t, `WITH c AS (SELECT id FROM social.comments WHERE post_id = $1),
 a AS (DELETE FROM social.comment_likes WHERE comment_id IN (SELECT id FROM c)),
 b AS (DELETE FROM social.comment_stats WHERE comment_id IN (SELECT id FROM c)),
@@ -389,7 +389,7 @@ func TestTakedownRejectsContentThatIsNotTheMeasureStoresOwn(t *testing.T) {
 	buyerComment := mustV[social.Comment](t)(f.module.CreateComment(ctx, buyer, social.CommentInput{PostID: w.post.ID, Body: "買家在店家貼文下的留言"}))
 	buyerEntry := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, buyer, social.ForumInput{StoreID: w.storeID, Body: "買家的討論"}))
 	foreignDeleted := f.publishedPost(t, otherStore, "別家店已刪除的貼文", "organic")
-	must(t, f.module.DeletePost(ctx, f.store(t, otherStore), foreignDeleted.ID, foreignDeleted.Version))
+	must(t, f.module.DeleteOwnPost(ctx, f.store(t, otherStore), foreignDeleted.ID, foreignDeleted.Version))
 	for name, tc := range map[string]seller.ContentRef{
 		"別家店的貼文":    ref(seller.ContentPost, foreign.ID),
 		"買家的留言":     ref(seller.ContentComment, buyerComment.ID),
@@ -423,7 +423,7 @@ func TestTakedownOfDeletedOwnContentSucceedsWithoutReplica(t *testing.T) {
 	f.takedowns(t)
 	w := f.takedownWorld(t)
 	deletedPost := f.publishedPost(t, w.storeID, "已刪除的貼文", "organic")
-	must(t, f.module.DeletePost(ctx, f.store(t, w.storeID), deletedPost.ID, deletedPost.Version))
+	must(t, f.module.DeleteOwnPost(ctx, f.store(t, w.storeID), deletedPost.ID, deletedPost.Version))
 	deletedComment := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asStore(t, w.storeID), social.CommentInput{PostID: w.post.ID, Body: "待刪的留言"}))
 	must(t, f.module.DeleteComment(ctx, f.asStore(t, w.storeID), deletedComment.ID, 0))
 	must(t, f.db.InTx(ctx, func(ctx context.Context) error {

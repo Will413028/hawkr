@@ -109,6 +109,8 @@ var customerEffects = map[string]Effect{
 	"/hawkr.social.v1alpha1.SocialAppService/UnpublishPost":         EffectWrite,
 	"/hawkr.social.v1alpha1.SocialAppService/DeletePost":            EffectWrite,
 	"/hawkr.social.v1alpha1.SocialAppService/SchedulePost":          EffectWrite,
+	"/hawkr.social.v1alpha1.SocialAppService/ListPendingSchedules":  EffectRead,
+	"/hawkr.social.v1alpha1.SocialAppService/CancelPostSchedule":    EffectWrite,
 	"/hawkr.social.v1alpha1.SocialAppService/ListStoreComments":     EffectRead,
 	"/hawkr.social.v1alpha1.SocialAppService/GetStoreSocialSummary": EffectRead,
 	// 作者讀自己的處分與被隱藏內容的理由（A7-D9）：只讀，停權的帳號也要讀得到。
@@ -125,6 +127,15 @@ var customerEffects = map[string]Effect{
 	// VendorPortalPublicService
 	"/hawkr.agent.v1alpha1.VendorPortalPublicService/PreviewInvite":  EffectRead,
 	"/hawkr.agent.v1alpha1.VendorPortalPublicService/ExchangeInvite": EffectWrite,
+
+	// SocialDelegatedService：憑證是代行 session，不讀帳號，停權的帳號不受影響；宣告仍要誠實標示方法的性質。
+	"/hawkr.social.v1alpha1.SocialDelegatedService/ListStorePosts":     EffectRead,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/GetStorePost":       EffectRead,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/CreateStorePost":    EffectWrite,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/UpdateStorePost":    EffectWrite,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/PublishStorePost":   EffectWrite,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/UnpublishStorePost": EffectWrite,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/ScheduleStorePost":  EffectWrite,
 
 	// VendorPortalInviteeService
 	"/hawkr.agent.v1alpha1.VendorPortalInviteeService/GetSession":    EffectRead,

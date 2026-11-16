@@ -7,6 +7,7 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
@@ -15,17 +16,20 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
 // Owner 是店主的貼文管理、店家範圍的留言與動態數的來源（*social.Module）：店家身分由 handler 以 seller.CurrentStore 推導後交給模組，
 // 賣家能力在模組內檢查（帳號路徑與代行路徑同一個入口），handler 不檢查。
 type Owner interface {
-	CreatePost(ctx context.Context, store seller.Store, in social.CreatePostInput) (social.Post, error)
-	UpdatePost(ctx context.Context, store seller.Store, in social.UpdatePostInput) (social.Post, error)
-	PublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (social.Post, error)
-	UnpublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (social.Post, error)
-	DeletePost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) error
-	SchedulePost(ctx context.Context, store seller.Store, in social.SchedulePostInput) (social.ScheduledPost, error)
+	CreatePost(ctx context.Context, store seller.Store, in social.CreatePostInput, actor *delegatedactor.Actor) (social.Post, error)
+	UpdatePost(ctx context.Context, store seller.Store, in social.UpdatePostInput, actor *delegatedactor.Actor) (social.Post, error)
+	PublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64, actor *delegatedactor.Actor) (social.Post, error)
+	UnpublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64, actor *delegatedactor.Actor) (social.Post, error)
+	DeleteOwnPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) error
+	SchedulePost(ctx context.Context, store seller.Store, in social.SchedulePostInput, actor *delegatedactor.Actor) (social.ScheduledPost, error)
+	CancelPostSchedule(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (int64, error)
+	ListPendingSchedules(ctx context.Context, storeID int64, after *social.ScheduleCursor, size int32) (social.SchedulePage, error)
 	MyPost(ctx context.Context, store seller.Store, id uuid.UUID) (social.Post, error)
 	ListMyPosts(ctx context.Context, store seller.Store, status social.PostStatus, after *social.OwnPostCursor, size int32) (social.OwnPostPage, error)
 	ListStoreComments(ctx context.Context, store seller.Store, postID *uuid.UUID, unreplied bool, after *social.CommentCursor, size int32) (social.CommentPage, error)
@@ -56,21 +60,21 @@ func (h *App) store(ctx context.Context) (seller.Store, error) {
 }
 
 // ownPosts 把店主讀自己的貼文轉成回應：公開貼文的欄位加上 status、etag 與 create_time（只有店主讀自己的貼文才設）。
-func (h *App) ownPosts(ctx context.Context, st seller.Store, posts []social.Post) ([]*pb.Post, error) {
-	out, err := h.toPosts(ctx, social.Caller{Store: &st}, posts)
+func (p *presenter) ownPosts(ctx context.Context, st seller.Store, posts []social.Post) ([]*pb.Post, error) {
+	out, err := p.toPosts(ctx, social.Caller{Store: &st}, posts)
 	if err != nil {
 		return nil, err
 	}
-	for i, p := range posts {
-		out[i].Status = rpc.EnumToProto[pb.PostStatus](p.Status)
-		out[i].Etag = rpc.Etag(p.Version)
-		out[i].CreateTime = timestamppb.New(p.CreatedAt)
+	for i, post := range posts {
+		out[i].Status = rpc.EnumToProto[pb.PostStatus](post.Status)
+		out[i].Etag = rpc.Etag(post.Version)
+		out[i].CreateTime = timestamppb.New(post.CreatedAt)
 	}
 	return out, nil
 }
 
-func (h *App) ownPost(ctx context.Context, st seller.Store, p social.Post) (*pb.Post, error) {
-	posts, err := h.ownPosts(ctx, st, []social.Post{p})
+func (p *presenter) ownPost(ctx context.Context, st seller.Store, post social.Post) (*pb.Post, error) {
+	posts, err := p.ownPosts(ctx, st, []social.Post{post})
 	if err != nil {
 		return nil, err
 	}
@@ -87,6 +91,63 @@ func optionalProductID(path string, raw *string) (*int64, error) {
 		return nil, err
 	}
 	return &id, nil
+}
+
+// postStatusFilter 解析清單的 status 篩選；UNSPECIFIED 是全部（空字串）。
+func postStatusFilter(s pb.PostStatus) (social.PostStatus, error) {
+	if s == pb.PostStatus_POST_STATUS_UNSPECIFIED {
+		return "", nil
+	}
+	status := rpc.EnumFromProto[social.PostStatus](s)
+	if !slices.Contains(social.PostStatusValues(), status) {
+		return "", rpc.RequiredField("status", "status 不是有效的貼文狀態")
+	}
+	return status, nil
+}
+
+// updatePostInput 把 UpdatePost 的 post 與 update_mask 轉成模組的輸入：只有 mask 列出的欄位被修改，列了不能修改的欄位或沒有列任何欄位是錯誤。
+// 店主與代行的 UpdatePost 共用。
+func updatePostInput(msg *pb.Post, mask *fieldmaskpb.FieldMask, id uuid.UUID, version int64) (social.UpdatePostInput, error) {
+	paths, err := rpc.WritableFields(msg, mask)
+	if err != nil {
+		return social.UpdatePostInput{}, err
+	}
+	paths = slices.DeleteFunc(paths, func(p string) bool { return p == "etag" })
+	for _, p := range paths {
+		if !slices.Contains(updatablePostFields, p) {
+			return social.UpdatePostInput{}, rpc.RequiredField("update_mask", "update_mask 的 "+p+" 不是可以修改的欄位（可以修改：body、image_staged_token、product_id、hashtag_inputs）")
+		}
+	}
+	if len(paths) == 0 {
+		return social.UpdatePostInput{}, rpc.RequiredField("update_mask", "update_mask 必須列至少一個可以修改的欄位（body、image_staged_token、product_id、hashtag_inputs）")
+	}
+	has := func(p string) bool { return slices.Contains(paths, p) }
+	var productID *int64
+	if has("product_id") {
+		if productID, err = optionalProductID("post.product_id", msg.ProductId); err != nil {
+			return social.UpdatePostInput{}, err
+		}
+	}
+	in := social.UpdatePostInput{PostID: id, Version: version, SetProduct: has("product_id"), ProductID: productID}
+	if has("body") {
+		body := msg.GetBody()
+		in.Body = &body
+	}
+	if has("image_staged_token") {
+		if msg.GetImageStagedToken() == "" {
+			in.ClearImage = true
+		} else {
+			in.ImageToken = msg.GetImageStagedToken()
+		}
+	}
+	if has("hashtag_inputs") {
+		tags := slices.Clone(msg.GetHashtagInputs())
+		if tags == nil {
+			tags = []string{}
+		}
+		in.Hashtags = &tags
+	}
+	return in, nil
 }
 
 func (h *App) CreatePost(ctx context.Context, req *connect.Request[pb.CreatePostRequest]) (*connect.Response[pb.CreatePostResponse], error) {
@@ -106,7 +167,7 @@ func (h *App) CreatePost(ctx context.Context, req *connect.Request[pb.CreatePost
 	created, err := h.owner.CreatePost(ctx, st, social.CreatePostInput{
 		Body: msg.GetBody(), ImageToken: msg.GetImageStagedToken(), ProductID: productID, Hashtags: msg.GetHashtagInputs(),
 		Publish: msg.GetPublish(), RequestID: reqID,
-	})
+	}, nil)
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, createPostPaths)
 	}
@@ -139,12 +200,9 @@ func (h *App) GetMyPost(ctx context.Context, req *connect.Request[pb.GetMyPostRe
 
 func (h *App) ListMyPosts(ctx context.Context, req *connect.Request[pb.ListMyPostsRequest]) (*connect.Response[pb.ListMyPostsResponse], error) {
 	msg := req.Msg
-	var status social.PostStatus
-	if msg.GetStatus() != pb.PostStatus_POST_STATUS_UNSPECIFIED {
-		status = rpc.EnumFromProto[social.PostStatus](msg.GetStatus())
-		if !slices.Contains(social.PostStatusValues(), status) {
-			return nil, rpc.RequiredField("status", "status 不是有效的貼文狀態")
-		}
+	status, err := postStatusFilter(msg.GetStatus())
+	if err != nil {
+		return nil, err
 	}
 	st, err := h.store(ctx)
 	if err != nil {
@@ -187,50 +245,15 @@ func (h *App) UpdatePost(ctx context.Context, req *connect.Request[pb.UpdatePost
 	if err != nil {
 		return nil, err
 	}
-	paths, err := rpc.WritableFields(msg, req.Msg.GetUpdateMask())
+	in, err := updatePostInput(msg, req.Msg.GetUpdateMask(), id, version)
 	if err != nil {
 		return nil, err
-	}
-	paths = slices.DeleteFunc(paths, func(p string) bool { return p == "etag" })
-	for _, p := range paths {
-		if !slices.Contains(updatablePostFields, p) {
-			return nil, rpc.RequiredField("update_mask", "update_mask 的 "+p+" 不是可以修改的欄位（可以修改：body、image_staged_token、product_id、hashtag_inputs）")
-		}
-	}
-	if len(paths) == 0 {
-		return nil, rpc.RequiredField("update_mask", "update_mask 必須列至少一個可以修改的欄位（body、image_staged_token、product_id、hashtag_inputs）")
-	}
-	has := func(p string) bool { return slices.Contains(paths, p) }
-	var productID *int64
-	if has("product_id") {
-		if productID, err = optionalProductID("post.product_id", msg.ProductId); err != nil {
-			return nil, err
-		}
 	}
 	st, err := h.store(ctx)
 	if err != nil {
 		return nil, err
 	}
-	in := social.UpdatePostInput{PostID: id, Version: version, SetProduct: has("product_id"), ProductID: productID}
-	if has("body") {
-		body := msg.GetBody()
-		in.Body = &body
-	}
-	if has("image_staged_token") {
-		if msg.GetImageStagedToken() == "" {
-			in.ClearImage = true
-		} else {
-			in.ImageToken = msg.GetImageStagedToken()
-		}
-	}
-	if has("hashtag_inputs") {
-		tags := slices.Clone(msg.GetHashtagInputs())
-		if tags == nil {
-			tags = []string{}
-		}
-		in.Hashtags = &tags
-	}
-	updated, err := h.owner.UpdatePost(ctx, st, in)
+	updated, err := h.owner.UpdatePost(ctx, st, in, nil)
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, updatePostPaths)
 	}
@@ -242,7 +265,7 @@ func (h *App) UpdatePost(ctx context.Context, req *connect.Request[pb.UpdatePost
 }
 
 // transition 是發布與下架共同的流程：貼文 ID、必填的 etag、店家，再由 do 呼叫模組。
-func (h *App) transition(ctx context.Context, postID, etag string, do func(context.Context, seller.Store, uuid.UUID, int64) (social.Post, error)) (*pb.Post, error) {
+func (h *App) transition(ctx context.Context, postID, etag string, do func(context.Context, seller.Store, uuid.UUID, int64, *delegatedactor.Actor) (social.Post, error)) (*pb.Post, error) {
 	id, err := rpc.ParseUUID("post_id", postID)
 	if err != nil {
 		return nil, err
@@ -255,7 +278,7 @@ func (h *App) transition(ctx context.Context, postID, etag string, do func(conte
 	if err != nil {
 		return nil, err
 	}
-	p, err := do(ctx, st, id, version)
+	p, err := do(ctx, st, id, version, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +314,7 @@ func (h *App) DeletePost(ctx context.Context, req *connect.Request[pb.DeletePost
 	if err != nil {
 		return nil, err
 	}
-	if err := h.owner.DeletePost(ctx, st, id, version); err != nil {
+	if err := h.owner.DeleteOwnPost(ctx, st, id, version); err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&pb.DeletePostResponse{}), nil
@@ -316,7 +339,7 @@ func (h *App) SchedulePost(ctx context.Context, req *connect.Request[pb.Schedule
 	}
 	scheduled, err := h.owner.SchedulePost(ctx, st, social.SchedulePostInput{
 		PostID: id, Version: version, PublishAt: msg.GetPublishTime().AsTime(), By: social.ScheduledBy{Kind: social.ScheduleByOwner},
-	})
+	}, nil)
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, schedulePostPaths)
 	}

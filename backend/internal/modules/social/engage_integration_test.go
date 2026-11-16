@@ -183,7 +183,7 @@ func TestSD18ViewsAreDeduplicatedPerTaipeiDay(t *testing.T) {
 		}
 	}
 	// 不公開的貼文不計；清理 job 只刪舊的去重列與 salt，不扣瀏覽數。
-	draft := mustV[social.Post](t)(f.module.CreatePost(ctx, f.store(t, storeID), social.CreatePostInput{Body: "草稿"}))
+	draft := mustV[social.Post](t)(f.module.CreatePost(ctx, f.store(t, storeID), social.CreatePostInput{Body: "草稿"}, nil))
 	if mustV[bool](t)(f.module.RecordView(ctx, social.Caller{}, draft.ID, anon)) {
 		t.Fatal("草稿不計瀏覽")
 	}
@@ -215,7 +215,7 @@ func TestSharesAreDeduplicatedPerBuyer(t *testing.T) {
 	if got := mustV[social.Post](t)(f.module.PublicPost(ctx, social.Caller{}, p.ID)); got.Stats.Shares != 2 {
 		t.Fatalf("分享數 %d", got.Stats.Shares)
 	}
-	must(t, f.module.DeletePost(ctx, f.store(t, storeID), p.ID, 0))
+	must(t, f.module.DeleteOwnPost(ctx, f.store(t, storeID), p.ID, 0))
 	if _, err := f.module.RecordShare(ctx, a.BuyerID, p.ID); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("刪除的貼文不能分享：%v", err)
 	}
@@ -244,7 +244,7 @@ func TestTopPostsRanksTheLatestThirtyByViews(t *testing.T) {
 	if len(got) != 3 || got[0].ID != posts[2].ID || got[1].ID != posts[0].ID || got[2].ID != posts[1].ID {
 		t.Fatalf("依瀏覽數、同分較新的在前：%v", ids(got))
 	}
-	must(t, f.module.DeletePost(ctx, f.store(t, storeID), posts[2].ID, 0))
+	must(t, f.module.DeleteOwnPost(ctx, f.store(t, storeID), posts[2].ID, 0))
 	if got := mustV[[]social.Post](t)(f.module.TopPosts(ctx, social.Caller{}, 1)); got[0].ID != posts[0].ID {
 		t.Fatalf("刪除的不算：%v", ids(got))
 	}

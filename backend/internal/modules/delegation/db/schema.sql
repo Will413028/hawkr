@@ -235,6 +235,7 @@ CREATE TABLE delegation.admin_operation_audit_logs (
     resource_name            TEXT,
     result                   TEXT         NOT NULL,
     biz_code                 INTEGER,
+    failure_reason           TEXT,
     operation_reason         TEXT,
     case_reference           TEXT,
     request_id               TEXT         NOT NULL,
@@ -255,6 +256,10 @@ CREATE TABLE delegation.admin_operation_audit_logs (
     CONSTRAINT admin_operation_audit_logs_result_check CHECK (result::text IN ('PENDING', 'SUCCEEDED', 'FAILED')),
     CONSTRAINT admin_operation_audit_logs_confirmed_check CHECK ((result = 'PENDING') = (confirmed_at IS NULL)),
     CONSTRAINT admin_operation_audit_logs_biz_code_check CHECK (result = 'FAILED' OR biz_code IS NULL),
+    CONSTRAINT admin_operation_audit_logs_failure_reason_check CHECK (
+        (result = 'FAILED') = (failure_reason IS NOT NULL)
+        AND (failure_reason IS NULL OR (failure_reason ~ '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$' AND failure_reason <> 'UNSPECIFIED'))
+    ),
     CONSTRAINT admin_operation_audit_logs_notified_check CHECK (
         notified_at IS NULL OR (notify_seller AND result = 'SUCCEEDED')
     ),

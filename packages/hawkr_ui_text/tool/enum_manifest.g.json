@@ -316,8 +316,29 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.social.v1alpha1.HiddenContentKind",
+      "dartClass": "HiddenContentKind",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.social.v1alpha1.PostStatus",
       "dartClass": "PostStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.social.v1alpha1.SanctionKind",
+      "dartClass": "SanctionKind",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.social.v1alpha1.ScheduleKind",
+      "dartClass": "ScheduleKind",
       "dartLibrary": "package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart",
       "inCatalog": false,
       "serverOwned": false

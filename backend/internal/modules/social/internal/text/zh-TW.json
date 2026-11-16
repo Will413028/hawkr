@@ -105,7 +105,11 @@
     },
     "post.not_found": {
       "message": "找不到這篇貼文",
-      "description": "貼文不存在、不是呼叫者可見的，或不屬於呼叫者的店家。"
+      "description": "貼文不存在、已刪除，或是別家店未公開（草稿、下架）的貼文；別家已發布的貼文改用 post.owner_only。"
+    },
+    "post.owner_only": {
+      "message": "這篇貼文屬於其他店家，無法修改",
+      "description": "已發布（公開可讀）的貼文被其他店家寫入。"
     },
     "post.product_invalid": {
       "message": "商品不合法",

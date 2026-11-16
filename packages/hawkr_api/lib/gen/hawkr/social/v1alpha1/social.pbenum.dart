@@ -99,6 +99,33 @@ class PostStatus extends $pb.ProtobufEnum {
   const PostStatus._(super.value, super.name);
 }
 
+/// ScheduleKind 是排程的發起者種類。
+class ScheduleKind extends $pb.ProtobufEnum {
+  static const ScheduleKind SCHEDULE_KIND_UNSPECIFIED =
+      ScheduleKind._(0, _omitEnumNames ? '' : 'SCHEDULE_KIND_UNSPECIFIED');
+
+  /// 店主自己排的。
+  static const ScheduleKind SCHEDULE_KIND_OWNER =
+      ScheduleKind._(1, _omitEnumNames ? '' : 'SCHEDULE_KIND_OWNER');
+
+  /// 平台管理員代行營運時排的。
+  static const ScheduleKind SCHEDULE_KIND_DELEGATION =
+      ScheduleKind._(2, _omitEnumNames ? '' : 'SCHEDULE_KIND_DELEGATION');
+
+  static const $core.List<ScheduleKind> values = <ScheduleKind>[
+    SCHEDULE_KIND_UNSPECIFIED,
+    SCHEDULE_KIND_OWNER,
+    SCHEDULE_KIND_DELEGATION,
+  ];
+
+  static final $core.List<ScheduleKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static ScheduleKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ScheduleKind._(super.value, super.name);
+}
+
 /// SanctionKind 是社群處分的種類。
 class SanctionKind extends $pb.ProtobufEnum {
   static const SanctionKind SANCTION_KIND_UNSPECIFIED =

@@ -27,6 +27,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/blocks"
 	httpbuyer "github.com/Will413028/hawkr/backend/internal/httpapi/buyer"
 	httpcontent "github.com/Will413028/hawkr/backend/internal/httpapi/content"
+	httpdelegation "github.com/Will413028/hawkr/backend/internal/httpapi/delegation"
 	httpdiscovery "github.com/Will413028/hawkr/backend/internal/httpapi/discovery"
 	adminbuyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
 	admincontentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
@@ -371,6 +372,17 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	}
 	add(agentv1alpha1connect.NewVendorPortalPublicServiceHandler(httpagent.NewPublic(deps.Agent, deps.Now), opts...))
 	add(agentv1alpha1connect.NewVendorPortalInviteeServiceHandler(httpagent.NewInvitee(deps.Agent, deps.Identity, deps.Logger), append(slices.Clone(opts), connect.WithInterceptors(invitee))...))
+	// 代行工作區（SocialDelegatedService，A10 起各模組有自己的 <模組>DelegatedService）：憑證是 X-HK-Operation-Session 的代行 session，由 httpapi/delegation 的 interceptor 解析、
+	// 依該 service 的宣告表授權並稽核被拒絕的請求；每個 service 掛自己的一支，在 rpc.NewInterceptor 之內，全域的 adminauth 與顧客身分都不參與。限流與其他 service 一樣由 assemble 的 withRateLimit 包住。
+	socialDelegated, err := httpdelegation.NewInterceptor(deps.Delegation, deps.Logger, httpsocial.DelegatedDeclaration)
+	if err != nil {
+		return nil, err
+	}
+	delegatedSocial, err := httpsocial.NewDelegated(deps.Delegation, deps.Social, deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin)
+	if err != nil {
+		return nil, err
+	}
+	add(socialv1alpha1connect.NewSocialDelegatedServiceHandler(delegatedSocial, append(slices.Clone(opts), connect.WithInterceptors(socialDelegated))...))
 	if err := checkAdminDeclarations(out); err != nil {
 		return nil, err
 	}
@@ -426,7 +438,7 @@ func checkAdminDeclarations(services []service) error {
 func mount(mux *http.ServeMux, path string, h http.Handler) {
 	audience, ok := rpc.AudienceOf(path)
 	if !ok {
-		panic(fmt.Sprintf("httpapi：%s 不符合 service 的命名規則（<模組>PublicService、<模組>AppService、<模組>InviteeService、hawkr.admin.* 的 <模組>AdminService）", path))
+		panic(fmt.Sprintf("httpapi：%s 不符合 service 的命名規則（<模組>PublicService、<模組>AppService、<模組>InviteeService、<模組>DelegatedService、hawkr.admin.* 的 <模組>AdminService）", path))
 	}
 	mux.Handle(path, cachePolicy(audience, isViewerDependent, h))
 }
