@@ -4247,6 +4247,96 @@ func (*GetStoreSocialSummaryRequest) Descriptor() ([]byte, []int) {
 	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{67}
 }
 
+// SocialDelegatedServiceGetStoreSocialSummaryRequest 沒有欄位：店家由代行 session 決定。
+type SocialDelegatedServiceGetStoreSocialSummaryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SocialDelegatedServiceGetStoreSocialSummaryRequest) Reset() {
+	*x = SocialDelegatedServiceGetStoreSocialSummaryRequest{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[68]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SocialDelegatedServiceGetStoreSocialSummaryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SocialDelegatedServiceGetStoreSocialSummaryRequest) ProtoMessage() {}
+
+func (x *SocialDelegatedServiceGetStoreSocialSummaryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[68]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SocialDelegatedServiceGetStoreSocialSummaryRequest.ProtoReflect.Descriptor instead.
+func (*SocialDelegatedServiceGetStoreSocialSummaryRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{68}
+}
+
+// SocialDelegatedServiceGetStoreSocialSummaryResponse 與 GetStoreSocialSummaryResponse 的欄位與意義相同（buf 要求每個 RPC 有自己的訊息）。
+type SocialDelegatedServiceGetStoreSocialSummaryResponse struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	PostCounts         []*PostStatusCount     `protobuf:"bytes,1,rep,name=post_counts,json=postCounts,proto3" json:"post_counts,omitempty"`
+	ScheduledPostCount int64                  `protobuf:"varint,2,opt,name=scheduled_post_count,json=scheduledPostCount,proto3" json:"scheduled_post_count,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *SocialDelegatedServiceGetStoreSocialSummaryResponse) Reset() {
+	*x = SocialDelegatedServiceGetStoreSocialSummaryResponse{}
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SocialDelegatedServiceGetStoreSocialSummaryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SocialDelegatedServiceGetStoreSocialSummaryResponse) ProtoMessage() {}
+
+func (x *SocialDelegatedServiceGetStoreSocialSummaryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SocialDelegatedServiceGetStoreSocialSummaryResponse.ProtoReflect.Descriptor instead.
+func (*SocialDelegatedServiceGetStoreSocialSummaryResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{69}
+}
+
+func (x *SocialDelegatedServiceGetStoreSocialSummaryResponse) GetPostCounts() []*PostStatusCount {
+	if x != nil {
+		return x.PostCounts
+	}
+	return nil
+}
+
+func (x *SocialDelegatedServiceGetStoreSocialSummaryResponse) GetScheduledPostCount() int64 {
+	if x != nil {
+		return x.ScheduledPostCount
+	}
+	return 0
+}
+
 type GetStoreSocialSummaryResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 每個貼文狀態一項（DRAFT、PUBLISHED、UNPUBLISHED 都會有，沒有貼文時是 0），不含已刪除的貼文。
@@ -4259,7 +4349,7 @@ type GetStoreSocialSummaryResponse struct {
 
 func (x *GetStoreSocialSummaryResponse) Reset() {
 	*x = GetStoreSocialSummaryResponse{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[68]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4271,7 +4361,7 @@ func (x *GetStoreSocialSummaryResponse) String() string {
 func (*GetStoreSocialSummaryResponse) ProtoMessage() {}
 
 func (x *GetStoreSocialSummaryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[68]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4284,7 +4374,7 @@ func (x *GetStoreSocialSummaryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStoreSocialSummaryResponse.ProtoReflect.Descriptor instead.
 func (*GetStoreSocialSummaryResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{68}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *GetStoreSocialSummaryResponse) GetPostCounts() []*PostStatusCount {
@@ -4312,7 +4402,7 @@ type PostStatusCount struct {
 
 func (x *PostStatusCount) Reset() {
 	*x = PostStatusCount{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[69]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4324,7 +4414,7 @@ func (x *PostStatusCount) String() string {
 func (*PostStatusCount) ProtoMessage() {}
 
 func (x *PostStatusCount) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[69]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4337,7 +4427,7 @@ func (x *PostStatusCount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PostStatusCount.ProtoReflect.Descriptor instead.
 func (*PostStatusCount) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{69}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *PostStatusCount) GetStatus() PostStatus {
@@ -4369,7 +4459,7 @@ type DelegatedOperation struct {
 
 func (x *DelegatedOperation) Reset() {
 	*x = DelegatedOperation{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[70]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4381,7 +4471,7 @@ func (x *DelegatedOperation) String() string {
 func (*DelegatedOperation) ProtoMessage() {}
 
 func (x *DelegatedOperation) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[70]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4394,7 +4484,7 @@ func (x *DelegatedOperation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DelegatedOperation.ProtoReflect.Descriptor instead.
 func (*DelegatedOperation) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{70}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *DelegatedOperation) GetRequestId() string {
@@ -4431,7 +4521,7 @@ type ListStorePostsRequest struct {
 
 func (x *ListStorePostsRequest) Reset() {
 	*x = ListStorePostsRequest{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[71]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4443,7 +4533,7 @@ func (x *ListStorePostsRequest) String() string {
 func (*ListStorePostsRequest) ProtoMessage() {}
 
 func (x *ListStorePostsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[71]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4456,7 +4546,7 @@ func (x *ListStorePostsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListStorePostsRequest.ProtoReflect.Descriptor instead.
 func (*ListStorePostsRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{71}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *ListStorePostsRequest) GetPageSize() int32 {
@@ -4490,7 +4580,7 @@ type ListStorePostsResponse struct {
 
 func (x *ListStorePostsResponse) Reset() {
 	*x = ListStorePostsResponse{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[72]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4502,7 +4592,7 @@ func (x *ListStorePostsResponse) String() string {
 func (*ListStorePostsResponse) ProtoMessage() {}
 
 func (x *ListStorePostsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[72]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4515,7 +4605,7 @@ func (x *ListStorePostsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListStorePostsResponse.ProtoReflect.Descriptor instead.
 func (*ListStorePostsResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{72}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *ListStorePostsResponse) GetPosts() []*Post {
@@ -4542,7 +4632,7 @@ type GetStorePostRequest struct {
 
 func (x *GetStorePostRequest) Reset() {
 	*x = GetStorePostRequest{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[73]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4554,7 +4644,7 @@ func (x *GetStorePostRequest) String() string {
 func (*GetStorePostRequest) ProtoMessage() {}
 
 func (x *GetStorePostRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[73]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4567,7 +4657,7 @@ func (x *GetStorePostRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStorePostRequest.ProtoReflect.Descriptor instead.
 func (*GetStorePostRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{73}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *GetStorePostRequest) GetPostId() string {
@@ -4586,7 +4676,7 @@ type GetStorePostResponse struct {
 
 func (x *GetStorePostResponse) Reset() {
 	*x = GetStorePostResponse{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[74]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4598,7 +4688,7 @@ func (x *GetStorePostResponse) String() string {
 func (*GetStorePostResponse) ProtoMessage() {}
 
 func (x *GetStorePostResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[74]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4611,7 +4701,7 @@ func (x *GetStorePostResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStorePostResponse.ProtoReflect.Descriptor instead.
 func (*GetStorePostResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{74}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *GetStorePostResponse) GetPost() *Post {
@@ -4638,7 +4728,7 @@ type CreateStorePostRequest struct {
 
 func (x *CreateStorePostRequest) Reset() {
 	*x = CreateStorePostRequest{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[75]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4650,7 +4740,7 @@ func (x *CreateStorePostRequest) String() string {
 func (*CreateStorePostRequest) ProtoMessage() {}
 
 func (x *CreateStorePostRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[75]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4663,7 +4753,7 @@ func (x *CreateStorePostRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateStorePostRequest.ProtoReflect.Descriptor instead.
 func (*CreateStorePostRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{75}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *CreateStorePostRequest) GetOperation() *DelegatedOperation {
@@ -4712,7 +4802,7 @@ type CreateStorePostResponse struct {
 
 func (x *CreateStorePostResponse) Reset() {
 	*x = CreateStorePostResponse{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[76]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4724,7 +4814,7 @@ func (x *CreateStorePostResponse) String() string {
 func (*CreateStorePostResponse) ProtoMessage() {}
 
 func (x *CreateStorePostResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[76]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4737,7 +4827,7 @@ func (x *CreateStorePostResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateStorePostResponse.ProtoReflect.Descriptor instead.
 func (*CreateStorePostResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{76}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *CreateStorePostResponse) GetPost() *Post {
@@ -4766,7 +4856,7 @@ type UpdateStorePostRequest struct {
 
 func (x *UpdateStorePostRequest) Reset() {
 	*x = UpdateStorePostRequest{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[77]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4778,7 +4868,7 @@ func (x *UpdateStorePostRequest) String() string {
 func (*UpdateStorePostRequest) ProtoMessage() {}
 
 func (x *UpdateStorePostRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[77]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4791,7 +4881,7 @@ func (x *UpdateStorePostRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateStorePostRequest.ProtoReflect.Descriptor instead.
 func (*UpdateStorePostRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{77}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *UpdateStorePostRequest) GetOperation() *DelegatedOperation {
@@ -4825,7 +4915,7 @@ type UpdateStorePostResponse struct {
 
 func (x *UpdateStorePostResponse) Reset() {
 	*x = UpdateStorePostResponse{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[78]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4837,7 +4927,7 @@ func (x *UpdateStorePostResponse) String() string {
 func (*UpdateStorePostResponse) ProtoMessage() {}
 
 func (x *UpdateStorePostResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[78]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4850,7 +4940,7 @@ func (x *UpdateStorePostResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateStorePostResponse.ProtoReflect.Descriptor instead.
 func (*UpdateStorePostResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{78}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *UpdateStorePostResponse) GetPost() *Post {
@@ -4880,7 +4970,7 @@ type PublishStorePostRequest struct {
 
 func (x *PublishStorePostRequest) Reset() {
 	*x = PublishStorePostRequest{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[79]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4892,7 +4982,7 @@ func (x *PublishStorePostRequest) String() string {
 func (*PublishStorePostRequest) ProtoMessage() {}
 
 func (x *PublishStorePostRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[79]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4905,7 +4995,7 @@ func (x *PublishStorePostRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishStorePostRequest.ProtoReflect.Descriptor instead.
 func (*PublishStorePostRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{79}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *PublishStorePostRequest) GetOperation() *DelegatedOperation {
@@ -4939,7 +5029,7 @@ type PublishStorePostResponse struct {
 
 func (x *PublishStorePostResponse) Reset() {
 	*x = PublishStorePostResponse{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[80]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4951,7 +5041,7 @@ func (x *PublishStorePostResponse) String() string {
 func (*PublishStorePostResponse) ProtoMessage() {}
 
 func (x *PublishStorePostResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[80]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4964,7 +5054,7 @@ func (x *PublishStorePostResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishStorePostResponse.ProtoReflect.Descriptor instead.
 func (*PublishStorePostResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{80}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *PublishStorePostResponse) GetPost() *Post {
@@ -4994,7 +5084,7 @@ type UnpublishStorePostRequest struct {
 
 func (x *UnpublishStorePostRequest) Reset() {
 	*x = UnpublishStorePostRequest{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[81]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5006,7 +5096,7 @@ func (x *UnpublishStorePostRequest) String() string {
 func (*UnpublishStorePostRequest) ProtoMessage() {}
 
 func (x *UnpublishStorePostRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[81]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5019,7 +5109,7 @@ func (x *UnpublishStorePostRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnpublishStorePostRequest.ProtoReflect.Descriptor instead.
 func (*UnpublishStorePostRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{81}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *UnpublishStorePostRequest) GetOperation() *DelegatedOperation {
@@ -5053,7 +5143,7 @@ type UnpublishStorePostResponse struct {
 
 func (x *UnpublishStorePostResponse) Reset() {
 	*x = UnpublishStorePostResponse{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[82]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5065,7 +5155,7 @@ func (x *UnpublishStorePostResponse) String() string {
 func (*UnpublishStorePostResponse) ProtoMessage() {}
 
 func (x *UnpublishStorePostResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[82]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5078,7 +5168,7 @@ func (x *UnpublishStorePostResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnpublishStorePostResponse.ProtoReflect.Descriptor instead.
 func (*UnpublishStorePostResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{82}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *UnpublishStorePostResponse) GetPost() *Post {
@@ -5110,7 +5200,7 @@ type ScheduleStorePostRequest struct {
 
 func (x *ScheduleStorePostRequest) Reset() {
 	*x = ScheduleStorePostRequest{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[83]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5122,7 +5212,7 @@ func (x *ScheduleStorePostRequest) String() string {
 func (*ScheduleStorePostRequest) ProtoMessage() {}
 
 func (x *ScheduleStorePostRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[83]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5135,7 +5225,7 @@ func (x *ScheduleStorePostRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScheduleStorePostRequest.ProtoReflect.Descriptor instead.
 func (*ScheduleStorePostRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{83}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *ScheduleStorePostRequest) GetOperation() *DelegatedOperation {
@@ -5179,7 +5269,7 @@ type ScheduleStorePostResponse struct {
 
 func (x *ScheduleStorePostResponse) Reset() {
 	*x = ScheduleStorePostResponse{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[84]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5191,7 +5281,7 @@ func (x *ScheduleStorePostResponse) String() string {
 func (*ScheduleStorePostResponse) ProtoMessage() {}
 
 func (x *ScheduleStorePostResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[84]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5204,7 +5294,7 @@ func (x *ScheduleStorePostResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScheduleStorePostResponse.ProtoReflect.Descriptor instead.
 func (*ScheduleStorePostResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{84}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *ScheduleStorePostResponse) GetPost() *Post {
@@ -5239,7 +5329,7 @@ type ListMySanctionsRequest struct {
 
 func (x *ListMySanctionsRequest) Reset() {
 	*x = ListMySanctionsRequest{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[85]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5251,7 +5341,7 @@ func (x *ListMySanctionsRequest) String() string {
 func (*ListMySanctionsRequest) ProtoMessage() {}
 
 func (x *ListMySanctionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[85]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5264,7 +5354,7 @@ func (x *ListMySanctionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMySanctionsRequest.ProtoReflect.Descriptor instead.
 func (*ListMySanctionsRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{85}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *ListMySanctionsRequest) GetPageSize() int32 {
@@ -5291,7 +5381,7 @@ type ListMySanctionsResponse struct {
 
 func (x *ListMySanctionsResponse) Reset() {
 	*x = ListMySanctionsResponse{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[86]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5303,7 +5393,7 @@ func (x *ListMySanctionsResponse) String() string {
 func (*ListMySanctionsResponse) ProtoMessage() {}
 
 func (x *ListMySanctionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[86]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5316,7 +5406,7 @@ func (x *ListMySanctionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMySanctionsResponse.ProtoReflect.Descriptor instead.
 func (*ListMySanctionsResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{86}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *ListMySanctionsResponse) GetSanctions() []*Sanction {
@@ -5349,7 +5439,7 @@ type Sanction struct {
 
 func (x *Sanction) Reset() {
 	*x = Sanction{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[87]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5361,7 +5451,7 @@ func (x *Sanction) String() string {
 func (*Sanction) ProtoMessage() {}
 
 func (x *Sanction) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[87]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5374,7 +5464,7 @@ func (x *Sanction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Sanction.ProtoReflect.Descriptor instead.
 func (*Sanction) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{87}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *Sanction) GetId() string {
@@ -5423,7 +5513,7 @@ type ListMyHiddenContentRequest struct {
 
 func (x *ListMyHiddenContentRequest) Reset() {
 	*x = ListMyHiddenContentRequest{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[88]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5435,7 +5525,7 @@ func (x *ListMyHiddenContentRequest) String() string {
 func (*ListMyHiddenContentRequest) ProtoMessage() {}
 
 func (x *ListMyHiddenContentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[88]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5448,7 +5538,7 @@ func (x *ListMyHiddenContentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyHiddenContentRequest.ProtoReflect.Descriptor instead.
 func (*ListMyHiddenContentRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{88}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *ListMyHiddenContentRequest) GetPageSize() int32 {
@@ -5475,7 +5565,7 @@ type ListMyHiddenContentResponse struct {
 
 func (x *ListMyHiddenContentResponse) Reset() {
 	*x = ListMyHiddenContentResponse{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[89]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5487,7 +5577,7 @@ func (x *ListMyHiddenContentResponse) String() string {
 func (*ListMyHiddenContentResponse) ProtoMessage() {}
 
 func (x *ListMyHiddenContentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[89]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5500,7 +5590,7 @@ func (x *ListMyHiddenContentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyHiddenContentResponse.ProtoReflect.Descriptor instead.
 func (*ListMyHiddenContentResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{89}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *ListMyHiddenContentResponse) GetHiddenContents() []*HiddenContent {
@@ -5542,7 +5632,7 @@ type HiddenContent struct {
 
 func (x *HiddenContent) Reset() {
 	*x = HiddenContent{}
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[90]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5554,7 +5644,7 @@ func (x *HiddenContent) String() string {
 func (*HiddenContent) ProtoMessage() {}
 
 func (x *HiddenContent) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[90]
+	mi := &file_hawkr_social_v1alpha1_social_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5567,7 +5657,7 @@ func (x *HiddenContent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HiddenContent.ProtoReflect.Descriptor instead.
 func (*HiddenContent) Descriptor() ([]byte, []int) {
-	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{90}
+	return file_hawkr_social_v1alpha1_social_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *HiddenContent) GetId() string {
@@ -5943,7 +6033,12 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"\x19ListStoreCommentsResponse\x12:\n" +
 	"\bcomments\x18\x01 \x03(\v2\x1e.hawkr.social.v1alpha1.CommentR\bcomments\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x1e\n" +
-	"\x1cGetStoreSocialSummaryRequest\"\x9a\x01\n" +
+	"\x1cGetStoreSocialSummaryRequest\"4\n" +
+	"2SocialDelegatedServiceGetStoreSocialSummaryRequest\"\xb0\x01\n" +
+	"3SocialDelegatedServiceGetStoreSocialSummaryResponse\x12G\n" +
+	"\vpost_counts\x18\x01 \x03(\v2&.hawkr.social.v1alpha1.PostStatusCountR\n" +
+	"postCounts\x120\n" +
+	"\x14scheduled_post_count\x18\x02 \x01(\x03R\x12scheduledPostCount\"\x9a\x01\n" +
 	"\x1dGetStoreSocialSummaryResponse\x12G\n" +
 	"\vpost_counts\x18\x01 \x03(\v2&.hawkr.social.v1alpha1.PostStatusCountR\n" +
 	"postCounts\x120\n" +
@@ -6118,8 +6213,9 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"\x11ListStoreComments\x12/.hawkr.social.v1alpha1.ListStoreCommentsRequest\x1a0.hawkr.social.v1alpha1.ListStoreCommentsResponse\"\x03\x90\x02\x01\x12\x87\x01\n" +
 	"\x15GetStoreSocialSummary\x123.hawkr.social.v1alpha1.GetStoreSocialSummaryRequest\x1a4.hawkr.social.v1alpha1.GetStoreSocialSummaryResponse\"\x03\x90\x02\x01\x12u\n" +
 	"\x0fListMySanctions\x12-.hawkr.social.v1alpha1.ListMySanctionsRequest\x1a..hawkr.social.v1alpha1.ListMySanctionsResponse\"\x03\x90\x02\x01\x12\x81\x01\n" +
-	"\x13ListMyHiddenContent\x121.hawkr.social.v1alpha1.ListMyHiddenContentRequest\x1a2.hawkr.social.v1alpha1.ListMyHiddenContentResponse\"\x03\x90\x02\x012\xda\x06\n" +
-	"\x16SocialDelegatedService\x12r\n" +
+	"\x13ListMyHiddenContent\x121.hawkr.social.v1alpha1.ListMyHiddenContentRequest\x1a2.hawkr.social.v1alpha1.ListMyHiddenContentResponse\"\x03\x90\x02\x012\x90\b\n" +
+	"\x16SocialDelegatedService\x12\xb3\x01\n" +
+	"\x15GetStoreSocialSummary\x12I.hawkr.social.v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest\x1aJ.hawkr.social.v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse\"\x03\x90\x02\x01\x12r\n" +
 	"\x0eListStorePosts\x12,.hawkr.social.v1alpha1.ListStorePostsRequest\x1a-.hawkr.social.v1alpha1.ListStorePostsResponse\"\x03\x90\x02\x01\x12l\n" +
 	"\fGetStorePost\x12*.hawkr.social.v1alpha1.GetStorePostRequest\x1a+.hawkr.social.v1alpha1.GetStorePostResponse\"\x03\x90\x02\x01\x12p\n" +
 	"\x0fCreateStorePost\x12-.hawkr.social.v1alpha1.CreateStorePostRequest\x1a..hawkr.social.v1alpha1.CreateStorePostResponse\x12u\n" +
@@ -6142,276 +6238,281 @@ func file_hawkr_social_v1alpha1_social_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_social_v1alpha1_social_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_hawkr_social_v1alpha1_social_proto_msgTypes = make([]protoimpl.MessageInfo, 91)
+var file_hawkr_social_v1alpha1_social_proto_msgTypes = make([]protoimpl.MessageInfo, 93)
 var file_hawkr_social_v1alpha1_social_proto_goTypes = []any{
-	(ActorKind)(0),                        // 0: hawkr.social.v1alpha1.ActorKind
-	(CommentState)(0),                     // 1: hawkr.social.v1alpha1.CommentState
-	(PostStatus)(0),                       // 2: hawkr.social.v1alpha1.PostStatus
-	(ScheduleKind)(0),                     // 3: hawkr.social.v1alpha1.ScheduleKind
-	(SanctionKind)(0),                     // 4: hawkr.social.v1alpha1.SanctionKind
-	(HiddenContentKind)(0),                // 5: hawkr.social.v1alpha1.HiddenContentKind
-	(*PostSchedule)(nil),                  // 6: hawkr.social.v1alpha1.PostSchedule
-	(*Hashtag)(nil),                       // 7: hawkr.social.v1alpha1.Hashtag
-	(*Post)(nil),                          // 8: hawkr.social.v1alpha1.Post
-	(*Actor)(nil),                         // 9: hawkr.social.v1alpha1.Actor
-	(*Comment)(nil),                       // 10: hawkr.social.v1alpha1.Comment
-	(*GetPostRequest)(nil),                // 11: hawkr.social.v1alpha1.GetPostRequest
-	(*GetPostResponse)(nil),               // 12: hawkr.social.v1alpha1.GetPostResponse
-	(*ListPostsRequest)(nil),              // 13: hawkr.social.v1alpha1.ListPostsRequest
-	(*ListPostsResponse)(nil),             // 14: hawkr.social.v1alpha1.ListPostsResponse
-	(*ListCommentsRequest)(nil),           // 15: hawkr.social.v1alpha1.ListCommentsRequest
-	(*ListCommentsResponse)(nil),          // 16: hawkr.social.v1alpha1.ListCommentsResponse
-	(*SuggestTrendingPostsRequest)(nil),   // 17: hawkr.social.v1alpha1.SuggestTrendingPostsRequest
-	(*SuggestTrendingPostsResponse)(nil),  // 18: hawkr.social.v1alpha1.SuggestTrendingPostsResponse
-	(*SuggestTagsRequest)(nil),            // 19: hawkr.social.v1alpha1.SuggestTagsRequest
-	(*SuggestTagsResponse)(nil),           // 20: hawkr.social.v1alpha1.SuggestTagsResponse
-	(*SuggestTrendingTagsRequest)(nil),    // 21: hawkr.social.v1alpha1.SuggestTrendingTagsRequest
-	(*SuggestTrendingTagsResponse)(nil),   // 22: hawkr.social.v1alpha1.SuggestTrendingTagsResponse
-	(*TagCount)(nil),                      // 23: hawkr.social.v1alpha1.TagCount
-	(*ForumEntry)(nil),                    // 24: hawkr.social.v1alpha1.ForumEntry
-	(*ListForumEntriesRequest)(nil),       // 25: hawkr.social.v1alpha1.ListForumEntriesRequest
-	(*ListForumEntriesResponse)(nil),      // 26: hawkr.social.v1alpha1.ListForumEntriesResponse
-	(*RecordPostViewRequest)(nil),         // 27: hawkr.social.v1alpha1.RecordPostViewRequest
-	(*RecordPostViewResponse)(nil),        // 28: hawkr.social.v1alpha1.RecordPostViewResponse
-	(*SharePostRequest)(nil),              // 29: hawkr.social.v1alpha1.SharePostRequest
-	(*SharePostResponse)(nil),             // 30: hawkr.social.v1alpha1.SharePostResponse
-	(*LikePostRequest)(nil),               // 31: hawkr.social.v1alpha1.LikePostRequest
-	(*LikePostResponse)(nil),              // 32: hawkr.social.v1alpha1.LikePostResponse
-	(*UnlikePostRequest)(nil),             // 33: hawkr.social.v1alpha1.UnlikePostRequest
-	(*UnlikePostResponse)(nil),            // 34: hawkr.social.v1alpha1.UnlikePostResponse
-	(*LikeCommentRequest)(nil),            // 35: hawkr.social.v1alpha1.LikeCommentRequest
-	(*LikeCommentResponse)(nil),           // 36: hawkr.social.v1alpha1.LikeCommentResponse
-	(*UnlikeCommentRequest)(nil),          // 37: hawkr.social.v1alpha1.UnlikeCommentRequest
-	(*UnlikeCommentResponse)(nil),         // 38: hawkr.social.v1alpha1.UnlikeCommentResponse
-	(*CreateCommentRequest)(nil),          // 39: hawkr.social.v1alpha1.CreateCommentRequest
-	(*CreateCommentResponse)(nil),         // 40: hawkr.social.v1alpha1.CreateCommentResponse
-	(*UpdateCommentRequest)(nil),          // 41: hawkr.social.v1alpha1.UpdateCommentRequest
-	(*UpdateCommentResponse)(nil),         // 42: hawkr.social.v1alpha1.UpdateCommentResponse
-	(*DeleteCommentRequest)(nil),          // 43: hawkr.social.v1alpha1.DeleteCommentRequest
-	(*DeleteCommentResponse)(nil),         // 44: hawkr.social.v1alpha1.DeleteCommentResponse
-	(*CreateForumEntryRequest)(nil),       // 45: hawkr.social.v1alpha1.CreateForumEntryRequest
-	(*CreateForumEntryResponse)(nil),      // 46: hawkr.social.v1alpha1.CreateForumEntryResponse
-	(*UpdateForumEntryRequest)(nil),       // 47: hawkr.social.v1alpha1.UpdateForumEntryRequest
-	(*UpdateForumEntryResponse)(nil),      // 48: hawkr.social.v1alpha1.UpdateForumEntryResponse
-	(*DeleteForumEntryRequest)(nil),       // 49: hawkr.social.v1alpha1.DeleteForumEntryRequest
-	(*DeleteForumEntryResponse)(nil),      // 50: hawkr.social.v1alpha1.DeleteForumEntryResponse
-	(*CreatePostRequest)(nil),             // 51: hawkr.social.v1alpha1.CreatePostRequest
-	(*CreatePostResponse)(nil),            // 52: hawkr.social.v1alpha1.CreatePostResponse
-	(*GetMyPostRequest)(nil),              // 53: hawkr.social.v1alpha1.GetMyPostRequest
-	(*GetMyPostResponse)(nil),             // 54: hawkr.social.v1alpha1.GetMyPostResponse
-	(*ListMyPostsRequest)(nil),            // 55: hawkr.social.v1alpha1.ListMyPostsRequest
-	(*ListMyPostsResponse)(nil),           // 56: hawkr.social.v1alpha1.ListMyPostsResponse
-	(*UpdatePostRequest)(nil),             // 57: hawkr.social.v1alpha1.UpdatePostRequest
-	(*UpdatePostResponse)(nil),            // 58: hawkr.social.v1alpha1.UpdatePostResponse
-	(*PublishPostRequest)(nil),            // 59: hawkr.social.v1alpha1.PublishPostRequest
-	(*PublishPostResponse)(nil),           // 60: hawkr.social.v1alpha1.PublishPostResponse
-	(*UnpublishPostRequest)(nil),          // 61: hawkr.social.v1alpha1.UnpublishPostRequest
-	(*UnpublishPostResponse)(nil),         // 62: hawkr.social.v1alpha1.UnpublishPostResponse
-	(*DeletePostRequest)(nil),             // 63: hawkr.social.v1alpha1.DeletePostRequest
-	(*DeletePostResponse)(nil),            // 64: hawkr.social.v1alpha1.DeletePostResponse
-	(*SchedulePostRequest)(nil),           // 65: hawkr.social.v1alpha1.SchedulePostRequest
-	(*SchedulePostResponse)(nil),          // 66: hawkr.social.v1alpha1.SchedulePostResponse
-	(*ListPendingSchedulesRequest)(nil),   // 67: hawkr.social.v1alpha1.ListPendingSchedulesRequest
-	(*ListPendingSchedulesResponse)(nil),  // 68: hawkr.social.v1alpha1.ListPendingSchedulesResponse
-	(*CancelPostScheduleRequest)(nil),     // 69: hawkr.social.v1alpha1.CancelPostScheduleRequest
-	(*CancelPostScheduleResponse)(nil),    // 70: hawkr.social.v1alpha1.CancelPostScheduleResponse
-	(*ListStoreCommentsRequest)(nil),      // 71: hawkr.social.v1alpha1.ListStoreCommentsRequest
-	(*ListStoreCommentsResponse)(nil),     // 72: hawkr.social.v1alpha1.ListStoreCommentsResponse
-	(*GetStoreSocialSummaryRequest)(nil),  // 73: hawkr.social.v1alpha1.GetStoreSocialSummaryRequest
-	(*GetStoreSocialSummaryResponse)(nil), // 74: hawkr.social.v1alpha1.GetStoreSocialSummaryResponse
-	(*PostStatusCount)(nil),               // 75: hawkr.social.v1alpha1.PostStatusCount
-	(*DelegatedOperation)(nil),            // 76: hawkr.social.v1alpha1.DelegatedOperation
-	(*ListStorePostsRequest)(nil),         // 77: hawkr.social.v1alpha1.ListStorePostsRequest
-	(*ListStorePostsResponse)(nil),        // 78: hawkr.social.v1alpha1.ListStorePostsResponse
-	(*GetStorePostRequest)(nil),           // 79: hawkr.social.v1alpha1.GetStorePostRequest
-	(*GetStorePostResponse)(nil),          // 80: hawkr.social.v1alpha1.GetStorePostResponse
-	(*CreateStorePostRequest)(nil),        // 81: hawkr.social.v1alpha1.CreateStorePostRequest
-	(*CreateStorePostResponse)(nil),       // 82: hawkr.social.v1alpha1.CreateStorePostResponse
-	(*UpdateStorePostRequest)(nil),        // 83: hawkr.social.v1alpha1.UpdateStorePostRequest
-	(*UpdateStorePostResponse)(nil),       // 84: hawkr.social.v1alpha1.UpdateStorePostResponse
-	(*PublishStorePostRequest)(nil),       // 85: hawkr.social.v1alpha1.PublishStorePostRequest
-	(*PublishStorePostResponse)(nil),      // 86: hawkr.social.v1alpha1.PublishStorePostResponse
-	(*UnpublishStorePostRequest)(nil),     // 87: hawkr.social.v1alpha1.UnpublishStorePostRequest
-	(*UnpublishStorePostResponse)(nil),    // 88: hawkr.social.v1alpha1.UnpublishStorePostResponse
-	(*ScheduleStorePostRequest)(nil),      // 89: hawkr.social.v1alpha1.ScheduleStorePostRequest
-	(*ScheduleStorePostResponse)(nil),     // 90: hawkr.social.v1alpha1.ScheduleStorePostResponse
-	(*ListMySanctionsRequest)(nil),        // 91: hawkr.social.v1alpha1.ListMySanctionsRequest
-	(*ListMySanctionsResponse)(nil),       // 92: hawkr.social.v1alpha1.ListMySanctionsResponse
-	(*Sanction)(nil),                      // 93: hawkr.social.v1alpha1.Sanction
-	(*ListMyHiddenContentRequest)(nil),    // 94: hawkr.social.v1alpha1.ListMyHiddenContentRequest
-	(*ListMyHiddenContentResponse)(nil),   // 95: hawkr.social.v1alpha1.ListMyHiddenContentResponse
-	(*HiddenContent)(nil),                 // 96: hawkr.social.v1alpha1.HiddenContent
-	(*timestamppb.Timestamp)(nil),         // 97: google.protobuf.Timestamp
-	(*v1alpha1.StoreCard)(nil),            // 98: hawkr.common.v1alpha1.StoreCard
-	(*v1alpha1.Image)(nil),                // 99: hawkr.common.v1alpha1.Image
-	(*fieldmaskpb.FieldMask)(nil),         // 100: google.protobuf.FieldMask
-	(v1alpha1.PolicyCategory)(0),          // 101: hawkr.common.v1alpha1.PolicyCategory
+	(ActorKind)(0),                                              // 0: hawkr.social.v1alpha1.ActorKind
+	(CommentState)(0),                                           // 1: hawkr.social.v1alpha1.CommentState
+	(PostStatus)(0),                                             // 2: hawkr.social.v1alpha1.PostStatus
+	(ScheduleKind)(0),                                           // 3: hawkr.social.v1alpha1.ScheduleKind
+	(SanctionKind)(0),                                           // 4: hawkr.social.v1alpha1.SanctionKind
+	(HiddenContentKind)(0),                                      // 5: hawkr.social.v1alpha1.HiddenContentKind
+	(*PostSchedule)(nil),                                        // 6: hawkr.social.v1alpha1.PostSchedule
+	(*Hashtag)(nil),                                             // 7: hawkr.social.v1alpha1.Hashtag
+	(*Post)(nil),                                                // 8: hawkr.social.v1alpha1.Post
+	(*Actor)(nil),                                               // 9: hawkr.social.v1alpha1.Actor
+	(*Comment)(nil),                                             // 10: hawkr.social.v1alpha1.Comment
+	(*GetPostRequest)(nil),                                      // 11: hawkr.social.v1alpha1.GetPostRequest
+	(*GetPostResponse)(nil),                                     // 12: hawkr.social.v1alpha1.GetPostResponse
+	(*ListPostsRequest)(nil),                                    // 13: hawkr.social.v1alpha1.ListPostsRequest
+	(*ListPostsResponse)(nil),                                   // 14: hawkr.social.v1alpha1.ListPostsResponse
+	(*ListCommentsRequest)(nil),                                 // 15: hawkr.social.v1alpha1.ListCommentsRequest
+	(*ListCommentsResponse)(nil),                                // 16: hawkr.social.v1alpha1.ListCommentsResponse
+	(*SuggestTrendingPostsRequest)(nil),                         // 17: hawkr.social.v1alpha1.SuggestTrendingPostsRequest
+	(*SuggestTrendingPostsResponse)(nil),                        // 18: hawkr.social.v1alpha1.SuggestTrendingPostsResponse
+	(*SuggestTagsRequest)(nil),                                  // 19: hawkr.social.v1alpha1.SuggestTagsRequest
+	(*SuggestTagsResponse)(nil),                                 // 20: hawkr.social.v1alpha1.SuggestTagsResponse
+	(*SuggestTrendingTagsRequest)(nil),                          // 21: hawkr.social.v1alpha1.SuggestTrendingTagsRequest
+	(*SuggestTrendingTagsResponse)(nil),                         // 22: hawkr.social.v1alpha1.SuggestTrendingTagsResponse
+	(*TagCount)(nil),                                            // 23: hawkr.social.v1alpha1.TagCount
+	(*ForumEntry)(nil),                                          // 24: hawkr.social.v1alpha1.ForumEntry
+	(*ListForumEntriesRequest)(nil),                             // 25: hawkr.social.v1alpha1.ListForumEntriesRequest
+	(*ListForumEntriesResponse)(nil),                            // 26: hawkr.social.v1alpha1.ListForumEntriesResponse
+	(*RecordPostViewRequest)(nil),                               // 27: hawkr.social.v1alpha1.RecordPostViewRequest
+	(*RecordPostViewResponse)(nil),                              // 28: hawkr.social.v1alpha1.RecordPostViewResponse
+	(*SharePostRequest)(nil),                                    // 29: hawkr.social.v1alpha1.SharePostRequest
+	(*SharePostResponse)(nil),                                   // 30: hawkr.social.v1alpha1.SharePostResponse
+	(*LikePostRequest)(nil),                                     // 31: hawkr.social.v1alpha1.LikePostRequest
+	(*LikePostResponse)(nil),                                    // 32: hawkr.social.v1alpha1.LikePostResponse
+	(*UnlikePostRequest)(nil),                                   // 33: hawkr.social.v1alpha1.UnlikePostRequest
+	(*UnlikePostResponse)(nil),                                  // 34: hawkr.social.v1alpha1.UnlikePostResponse
+	(*LikeCommentRequest)(nil),                                  // 35: hawkr.social.v1alpha1.LikeCommentRequest
+	(*LikeCommentResponse)(nil),                                 // 36: hawkr.social.v1alpha1.LikeCommentResponse
+	(*UnlikeCommentRequest)(nil),                                // 37: hawkr.social.v1alpha1.UnlikeCommentRequest
+	(*UnlikeCommentResponse)(nil),                               // 38: hawkr.social.v1alpha1.UnlikeCommentResponse
+	(*CreateCommentRequest)(nil),                                // 39: hawkr.social.v1alpha1.CreateCommentRequest
+	(*CreateCommentResponse)(nil),                               // 40: hawkr.social.v1alpha1.CreateCommentResponse
+	(*UpdateCommentRequest)(nil),                                // 41: hawkr.social.v1alpha1.UpdateCommentRequest
+	(*UpdateCommentResponse)(nil),                               // 42: hawkr.social.v1alpha1.UpdateCommentResponse
+	(*DeleteCommentRequest)(nil),                                // 43: hawkr.social.v1alpha1.DeleteCommentRequest
+	(*DeleteCommentResponse)(nil),                               // 44: hawkr.social.v1alpha1.DeleteCommentResponse
+	(*CreateForumEntryRequest)(nil),                             // 45: hawkr.social.v1alpha1.CreateForumEntryRequest
+	(*CreateForumEntryResponse)(nil),                            // 46: hawkr.social.v1alpha1.CreateForumEntryResponse
+	(*UpdateForumEntryRequest)(nil),                             // 47: hawkr.social.v1alpha1.UpdateForumEntryRequest
+	(*UpdateForumEntryResponse)(nil),                            // 48: hawkr.social.v1alpha1.UpdateForumEntryResponse
+	(*DeleteForumEntryRequest)(nil),                             // 49: hawkr.social.v1alpha1.DeleteForumEntryRequest
+	(*DeleteForumEntryResponse)(nil),                            // 50: hawkr.social.v1alpha1.DeleteForumEntryResponse
+	(*CreatePostRequest)(nil),                                   // 51: hawkr.social.v1alpha1.CreatePostRequest
+	(*CreatePostResponse)(nil),                                  // 52: hawkr.social.v1alpha1.CreatePostResponse
+	(*GetMyPostRequest)(nil),                                    // 53: hawkr.social.v1alpha1.GetMyPostRequest
+	(*GetMyPostResponse)(nil),                                   // 54: hawkr.social.v1alpha1.GetMyPostResponse
+	(*ListMyPostsRequest)(nil),                                  // 55: hawkr.social.v1alpha1.ListMyPostsRequest
+	(*ListMyPostsResponse)(nil),                                 // 56: hawkr.social.v1alpha1.ListMyPostsResponse
+	(*UpdatePostRequest)(nil),                                   // 57: hawkr.social.v1alpha1.UpdatePostRequest
+	(*UpdatePostResponse)(nil),                                  // 58: hawkr.social.v1alpha1.UpdatePostResponse
+	(*PublishPostRequest)(nil),                                  // 59: hawkr.social.v1alpha1.PublishPostRequest
+	(*PublishPostResponse)(nil),                                 // 60: hawkr.social.v1alpha1.PublishPostResponse
+	(*UnpublishPostRequest)(nil),                                // 61: hawkr.social.v1alpha1.UnpublishPostRequest
+	(*UnpublishPostResponse)(nil),                               // 62: hawkr.social.v1alpha1.UnpublishPostResponse
+	(*DeletePostRequest)(nil),                                   // 63: hawkr.social.v1alpha1.DeletePostRequest
+	(*DeletePostResponse)(nil),                                  // 64: hawkr.social.v1alpha1.DeletePostResponse
+	(*SchedulePostRequest)(nil),                                 // 65: hawkr.social.v1alpha1.SchedulePostRequest
+	(*SchedulePostResponse)(nil),                                // 66: hawkr.social.v1alpha1.SchedulePostResponse
+	(*ListPendingSchedulesRequest)(nil),                         // 67: hawkr.social.v1alpha1.ListPendingSchedulesRequest
+	(*ListPendingSchedulesResponse)(nil),                        // 68: hawkr.social.v1alpha1.ListPendingSchedulesResponse
+	(*CancelPostScheduleRequest)(nil),                           // 69: hawkr.social.v1alpha1.CancelPostScheduleRequest
+	(*CancelPostScheduleResponse)(nil),                          // 70: hawkr.social.v1alpha1.CancelPostScheduleResponse
+	(*ListStoreCommentsRequest)(nil),                            // 71: hawkr.social.v1alpha1.ListStoreCommentsRequest
+	(*ListStoreCommentsResponse)(nil),                           // 72: hawkr.social.v1alpha1.ListStoreCommentsResponse
+	(*GetStoreSocialSummaryRequest)(nil),                        // 73: hawkr.social.v1alpha1.GetStoreSocialSummaryRequest
+	(*SocialDelegatedServiceGetStoreSocialSummaryRequest)(nil),  // 74: hawkr.social.v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest
+	(*SocialDelegatedServiceGetStoreSocialSummaryResponse)(nil), // 75: hawkr.social.v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse
+	(*GetStoreSocialSummaryResponse)(nil),                       // 76: hawkr.social.v1alpha1.GetStoreSocialSummaryResponse
+	(*PostStatusCount)(nil),                                     // 77: hawkr.social.v1alpha1.PostStatusCount
+	(*DelegatedOperation)(nil),                                  // 78: hawkr.social.v1alpha1.DelegatedOperation
+	(*ListStorePostsRequest)(nil),                               // 79: hawkr.social.v1alpha1.ListStorePostsRequest
+	(*ListStorePostsResponse)(nil),                              // 80: hawkr.social.v1alpha1.ListStorePostsResponse
+	(*GetStorePostRequest)(nil),                                 // 81: hawkr.social.v1alpha1.GetStorePostRequest
+	(*GetStorePostResponse)(nil),                                // 82: hawkr.social.v1alpha1.GetStorePostResponse
+	(*CreateStorePostRequest)(nil),                              // 83: hawkr.social.v1alpha1.CreateStorePostRequest
+	(*CreateStorePostResponse)(nil),                             // 84: hawkr.social.v1alpha1.CreateStorePostResponse
+	(*UpdateStorePostRequest)(nil),                              // 85: hawkr.social.v1alpha1.UpdateStorePostRequest
+	(*UpdateStorePostResponse)(nil),                             // 86: hawkr.social.v1alpha1.UpdateStorePostResponse
+	(*PublishStorePostRequest)(nil),                             // 87: hawkr.social.v1alpha1.PublishStorePostRequest
+	(*PublishStorePostResponse)(nil),                            // 88: hawkr.social.v1alpha1.PublishStorePostResponse
+	(*UnpublishStorePostRequest)(nil),                           // 89: hawkr.social.v1alpha1.UnpublishStorePostRequest
+	(*UnpublishStorePostResponse)(nil),                          // 90: hawkr.social.v1alpha1.UnpublishStorePostResponse
+	(*ScheduleStorePostRequest)(nil),                            // 91: hawkr.social.v1alpha1.ScheduleStorePostRequest
+	(*ScheduleStorePostResponse)(nil),                           // 92: hawkr.social.v1alpha1.ScheduleStorePostResponse
+	(*ListMySanctionsRequest)(nil),                              // 93: hawkr.social.v1alpha1.ListMySanctionsRequest
+	(*ListMySanctionsResponse)(nil),                             // 94: hawkr.social.v1alpha1.ListMySanctionsResponse
+	(*Sanction)(nil),                                            // 95: hawkr.social.v1alpha1.Sanction
+	(*ListMyHiddenContentRequest)(nil),                          // 96: hawkr.social.v1alpha1.ListMyHiddenContentRequest
+	(*ListMyHiddenContentResponse)(nil),                         // 97: hawkr.social.v1alpha1.ListMyHiddenContentResponse
+	(*HiddenContent)(nil),                                       // 98: hawkr.social.v1alpha1.HiddenContent
+	(*timestamppb.Timestamp)(nil),                               // 99: google.protobuf.Timestamp
+	(*v1alpha1.StoreCard)(nil),                                  // 100: hawkr.common.v1alpha1.StoreCard
+	(*v1alpha1.Image)(nil),                                      // 101: hawkr.common.v1alpha1.Image
+	(*fieldmaskpb.FieldMask)(nil),                               // 102: google.protobuf.FieldMask
+	(v1alpha1.PolicyCategory)(0),                                // 103: hawkr.common.v1alpha1.PolicyCategory
 }
 var file_hawkr_social_v1alpha1_social_proto_depIdxs = []int32{
-	97,  // 0: hawkr.social.v1alpha1.PostSchedule.publish_time:type_name -> google.protobuf.Timestamp
+	99,  // 0: hawkr.social.v1alpha1.PostSchedule.publish_time:type_name -> google.protobuf.Timestamp
 	3,   // 1: hawkr.social.v1alpha1.PostSchedule.scheduled_by:type_name -> hawkr.social.v1alpha1.ScheduleKind
-	97,  // 2: hawkr.social.v1alpha1.PostSchedule.create_time:type_name -> google.protobuf.Timestamp
-	98,  // 3: hawkr.social.v1alpha1.Post.store:type_name -> hawkr.common.v1alpha1.StoreCard
-	99,  // 4: hawkr.social.v1alpha1.Post.image:type_name -> hawkr.common.v1alpha1.Image
+	99,  // 2: hawkr.social.v1alpha1.PostSchedule.create_time:type_name -> google.protobuf.Timestamp
+	100, // 3: hawkr.social.v1alpha1.Post.store:type_name -> hawkr.common.v1alpha1.StoreCard
+	101, // 4: hawkr.social.v1alpha1.Post.image:type_name -> hawkr.common.v1alpha1.Image
 	7,   // 5: hawkr.social.v1alpha1.Post.hashtags:type_name -> hawkr.social.v1alpha1.Hashtag
-	97,  // 6: hawkr.social.v1alpha1.Post.publish_time:type_name -> google.protobuf.Timestamp
-	97,  // 7: hawkr.social.v1alpha1.Post.update_time:type_name -> google.protobuf.Timestamp
+	99,  // 6: hawkr.social.v1alpha1.Post.publish_time:type_name -> google.protobuf.Timestamp
+	99,  // 7: hawkr.social.v1alpha1.Post.update_time:type_name -> google.protobuf.Timestamp
 	2,   // 8: hawkr.social.v1alpha1.Post.status:type_name -> hawkr.social.v1alpha1.PostStatus
-	97,  // 9: hawkr.social.v1alpha1.Post.create_time:type_name -> google.protobuf.Timestamp
+	99,  // 9: hawkr.social.v1alpha1.Post.create_time:type_name -> google.protobuf.Timestamp
 	0,   // 10: hawkr.social.v1alpha1.Actor.kind:type_name -> hawkr.social.v1alpha1.ActorKind
-	99,  // 11: hawkr.social.v1alpha1.Actor.avatar:type_name -> hawkr.common.v1alpha1.Image
+	101, // 11: hawkr.social.v1alpha1.Actor.avatar:type_name -> hawkr.common.v1alpha1.Image
 	1,   // 12: hawkr.social.v1alpha1.Comment.state:type_name -> hawkr.social.v1alpha1.CommentState
 	9,   // 13: hawkr.social.v1alpha1.Comment.author:type_name -> hawkr.social.v1alpha1.Actor
-	97,  // 14: hawkr.social.v1alpha1.Comment.create_time:type_name -> google.protobuf.Timestamp
-	97,  // 15: hawkr.social.v1alpha1.Comment.update_time:type_name -> google.protobuf.Timestamp
+	99,  // 14: hawkr.social.v1alpha1.Comment.create_time:type_name -> google.protobuf.Timestamp
+	99,  // 15: hawkr.social.v1alpha1.Comment.update_time:type_name -> google.protobuf.Timestamp
 	8,   // 16: hawkr.social.v1alpha1.GetPostResponse.post:type_name -> hawkr.social.v1alpha1.Post
 	8,   // 17: hawkr.social.v1alpha1.ListPostsResponse.posts:type_name -> hawkr.social.v1alpha1.Post
 	10,  // 18: hawkr.social.v1alpha1.ListCommentsResponse.comments:type_name -> hawkr.social.v1alpha1.Comment
 	8,   // 19: hawkr.social.v1alpha1.SuggestTrendingPostsResponse.posts:type_name -> hawkr.social.v1alpha1.Post
 	23,  // 20: hawkr.social.v1alpha1.SuggestTagsResponse.tags:type_name -> hawkr.social.v1alpha1.TagCount
-	97,  // 21: hawkr.social.v1alpha1.SuggestTrendingTagsRequest.start_time:type_name -> google.protobuf.Timestamp
-	97,  // 22: hawkr.social.v1alpha1.SuggestTrendingTagsRequest.end_time:type_name -> google.protobuf.Timestamp
+	99,  // 21: hawkr.social.v1alpha1.SuggestTrendingTagsRequest.start_time:type_name -> google.protobuf.Timestamp
+	99,  // 22: hawkr.social.v1alpha1.SuggestTrendingTagsRequest.end_time:type_name -> google.protobuf.Timestamp
 	23,  // 23: hawkr.social.v1alpha1.SuggestTrendingTagsResponse.tags:type_name -> hawkr.social.v1alpha1.TagCount
 	1,   // 24: hawkr.social.v1alpha1.ForumEntry.state:type_name -> hawkr.social.v1alpha1.CommentState
 	9,   // 25: hawkr.social.v1alpha1.ForumEntry.author:type_name -> hawkr.social.v1alpha1.Actor
-	97,  // 26: hawkr.social.v1alpha1.ForumEntry.create_time:type_name -> google.protobuf.Timestamp
-	97,  // 27: hawkr.social.v1alpha1.ForumEntry.update_time:type_name -> google.protobuf.Timestamp
+	99,  // 26: hawkr.social.v1alpha1.ForumEntry.create_time:type_name -> google.protobuf.Timestamp
+	99,  // 27: hawkr.social.v1alpha1.ForumEntry.update_time:type_name -> google.protobuf.Timestamp
 	24,  // 28: hawkr.social.v1alpha1.ListForumEntriesResponse.entries:type_name -> hawkr.social.v1alpha1.ForumEntry
 	10,  // 29: hawkr.social.v1alpha1.CreateCommentResponse.comment:type_name -> hawkr.social.v1alpha1.Comment
 	10,  // 30: hawkr.social.v1alpha1.UpdateCommentRequest.comment:type_name -> hawkr.social.v1alpha1.Comment
-	100, // 31: hawkr.social.v1alpha1.UpdateCommentRequest.update_mask:type_name -> google.protobuf.FieldMask
+	102, // 31: hawkr.social.v1alpha1.UpdateCommentRequest.update_mask:type_name -> google.protobuf.FieldMask
 	10,  // 32: hawkr.social.v1alpha1.UpdateCommentResponse.comment:type_name -> hawkr.social.v1alpha1.Comment
 	24,  // 33: hawkr.social.v1alpha1.CreateForumEntryResponse.entry:type_name -> hawkr.social.v1alpha1.ForumEntry
 	24,  // 34: hawkr.social.v1alpha1.UpdateForumEntryRequest.entry:type_name -> hawkr.social.v1alpha1.ForumEntry
-	100, // 35: hawkr.social.v1alpha1.UpdateForumEntryRequest.update_mask:type_name -> google.protobuf.FieldMask
+	102, // 35: hawkr.social.v1alpha1.UpdateForumEntryRequest.update_mask:type_name -> google.protobuf.FieldMask
 	24,  // 36: hawkr.social.v1alpha1.UpdateForumEntryResponse.entry:type_name -> hawkr.social.v1alpha1.ForumEntry
 	8,   // 37: hawkr.social.v1alpha1.CreatePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
 	8,   // 38: hawkr.social.v1alpha1.GetMyPostResponse.post:type_name -> hawkr.social.v1alpha1.Post
 	2,   // 39: hawkr.social.v1alpha1.ListMyPostsRequest.status:type_name -> hawkr.social.v1alpha1.PostStatus
 	8,   // 40: hawkr.social.v1alpha1.ListMyPostsResponse.posts:type_name -> hawkr.social.v1alpha1.Post
 	8,   // 41: hawkr.social.v1alpha1.UpdatePostRequest.post:type_name -> hawkr.social.v1alpha1.Post
-	100, // 42: hawkr.social.v1alpha1.UpdatePostRequest.update_mask:type_name -> google.protobuf.FieldMask
+	102, // 42: hawkr.social.v1alpha1.UpdatePostRequest.update_mask:type_name -> google.protobuf.FieldMask
 	8,   // 43: hawkr.social.v1alpha1.UpdatePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
 	8,   // 44: hawkr.social.v1alpha1.PublishPostResponse.post:type_name -> hawkr.social.v1alpha1.Post
 	8,   // 45: hawkr.social.v1alpha1.UnpublishPostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	97,  // 46: hawkr.social.v1alpha1.SchedulePostRequest.publish_time:type_name -> google.protobuf.Timestamp
+	99,  // 46: hawkr.social.v1alpha1.SchedulePostRequest.publish_time:type_name -> google.protobuf.Timestamp
 	8,   // 47: hawkr.social.v1alpha1.SchedulePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	97,  // 48: hawkr.social.v1alpha1.SchedulePostResponse.publish_time:type_name -> google.protobuf.Timestamp
+	99,  // 48: hawkr.social.v1alpha1.SchedulePostResponse.publish_time:type_name -> google.protobuf.Timestamp
 	6,   // 49: hawkr.social.v1alpha1.ListPendingSchedulesResponse.schedules:type_name -> hawkr.social.v1alpha1.PostSchedule
 	10,  // 50: hawkr.social.v1alpha1.ListStoreCommentsResponse.comments:type_name -> hawkr.social.v1alpha1.Comment
-	75,  // 51: hawkr.social.v1alpha1.GetStoreSocialSummaryResponse.post_counts:type_name -> hawkr.social.v1alpha1.PostStatusCount
-	2,   // 52: hawkr.social.v1alpha1.PostStatusCount.status:type_name -> hawkr.social.v1alpha1.PostStatus
-	2,   // 53: hawkr.social.v1alpha1.ListStorePostsRequest.status:type_name -> hawkr.social.v1alpha1.PostStatus
-	8,   // 54: hawkr.social.v1alpha1.ListStorePostsResponse.posts:type_name -> hawkr.social.v1alpha1.Post
-	8,   // 55: hawkr.social.v1alpha1.GetStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	76,  // 56: hawkr.social.v1alpha1.CreateStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
-	8,   // 57: hawkr.social.v1alpha1.CreateStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	76,  // 58: hawkr.social.v1alpha1.UpdateStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
-	8,   // 59: hawkr.social.v1alpha1.UpdateStorePostRequest.post:type_name -> hawkr.social.v1alpha1.Post
-	100, // 60: hawkr.social.v1alpha1.UpdateStorePostRequest.update_mask:type_name -> google.protobuf.FieldMask
-	8,   // 61: hawkr.social.v1alpha1.UpdateStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	76,  // 62: hawkr.social.v1alpha1.PublishStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
-	8,   // 63: hawkr.social.v1alpha1.PublishStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	76,  // 64: hawkr.social.v1alpha1.UnpublishStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
-	8,   // 65: hawkr.social.v1alpha1.UnpublishStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	76,  // 66: hawkr.social.v1alpha1.ScheduleStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
-	97,  // 67: hawkr.social.v1alpha1.ScheduleStorePostRequest.publish_time:type_name -> google.protobuf.Timestamp
-	8,   // 68: hawkr.social.v1alpha1.ScheduleStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	97,  // 69: hawkr.social.v1alpha1.ScheduleStorePostResponse.publish_time:type_name -> google.protobuf.Timestamp
-	93,  // 70: hawkr.social.v1alpha1.ListMySanctionsResponse.sanctions:type_name -> hawkr.social.v1alpha1.Sanction
-	4,   // 71: hawkr.social.v1alpha1.Sanction.kind:type_name -> hawkr.social.v1alpha1.SanctionKind
-	101, // 72: hawkr.social.v1alpha1.Sanction.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	97,  // 73: hawkr.social.v1alpha1.Sanction.create_time:type_name -> google.protobuf.Timestamp
-	96,  // 74: hawkr.social.v1alpha1.ListMyHiddenContentResponse.hidden_contents:type_name -> hawkr.social.v1alpha1.HiddenContent
-	5,   // 75: hawkr.social.v1alpha1.HiddenContent.kind:type_name -> hawkr.social.v1alpha1.HiddenContentKind
-	97,  // 76: hawkr.social.v1alpha1.HiddenContent.create_time:type_name -> google.protobuf.Timestamp
-	101, // 77: hawkr.social.v1alpha1.HiddenContent.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	97,  // 78: hawkr.social.v1alpha1.HiddenContent.hide_time:type_name -> google.protobuf.Timestamp
-	11,  // 79: hawkr.social.v1alpha1.SocialPublicService.GetPost:input_type -> hawkr.social.v1alpha1.GetPostRequest
-	13,  // 80: hawkr.social.v1alpha1.SocialPublicService.ListPosts:input_type -> hawkr.social.v1alpha1.ListPostsRequest
-	15,  // 81: hawkr.social.v1alpha1.SocialPublicService.ListComments:input_type -> hawkr.social.v1alpha1.ListCommentsRequest
-	17,  // 82: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:input_type -> hawkr.social.v1alpha1.SuggestTrendingPostsRequest
-	19,  // 83: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:input_type -> hawkr.social.v1alpha1.SuggestTagsRequest
-	21,  // 84: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:input_type -> hawkr.social.v1alpha1.SuggestTrendingTagsRequest
-	25,  // 85: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:input_type -> hawkr.social.v1alpha1.ListForumEntriesRequest
-	27,  // 86: hawkr.social.v1alpha1.SocialPublicService.RecordPostView:input_type -> hawkr.social.v1alpha1.RecordPostViewRequest
-	29,  // 87: hawkr.social.v1alpha1.SocialAppService.SharePost:input_type -> hawkr.social.v1alpha1.SharePostRequest
-	31,  // 88: hawkr.social.v1alpha1.SocialAppService.LikePost:input_type -> hawkr.social.v1alpha1.LikePostRequest
-	33,  // 89: hawkr.social.v1alpha1.SocialAppService.UnlikePost:input_type -> hawkr.social.v1alpha1.UnlikePostRequest
-	35,  // 90: hawkr.social.v1alpha1.SocialAppService.LikeComment:input_type -> hawkr.social.v1alpha1.LikeCommentRequest
-	37,  // 91: hawkr.social.v1alpha1.SocialAppService.UnlikeComment:input_type -> hawkr.social.v1alpha1.UnlikeCommentRequest
-	39,  // 92: hawkr.social.v1alpha1.SocialAppService.CreateComment:input_type -> hawkr.social.v1alpha1.CreateCommentRequest
-	41,  // 93: hawkr.social.v1alpha1.SocialAppService.UpdateComment:input_type -> hawkr.social.v1alpha1.UpdateCommentRequest
-	43,  // 94: hawkr.social.v1alpha1.SocialAppService.DeleteComment:input_type -> hawkr.social.v1alpha1.DeleteCommentRequest
-	45,  // 95: hawkr.social.v1alpha1.SocialAppService.CreateForumEntry:input_type -> hawkr.social.v1alpha1.CreateForumEntryRequest
-	47,  // 96: hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry:input_type -> hawkr.social.v1alpha1.UpdateForumEntryRequest
-	49,  // 97: hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry:input_type -> hawkr.social.v1alpha1.DeleteForumEntryRequest
-	51,  // 98: hawkr.social.v1alpha1.SocialAppService.CreatePost:input_type -> hawkr.social.v1alpha1.CreatePostRequest
-	53,  // 99: hawkr.social.v1alpha1.SocialAppService.GetMyPost:input_type -> hawkr.social.v1alpha1.GetMyPostRequest
-	55,  // 100: hawkr.social.v1alpha1.SocialAppService.ListMyPosts:input_type -> hawkr.social.v1alpha1.ListMyPostsRequest
-	57,  // 101: hawkr.social.v1alpha1.SocialAppService.UpdatePost:input_type -> hawkr.social.v1alpha1.UpdatePostRequest
-	59,  // 102: hawkr.social.v1alpha1.SocialAppService.PublishPost:input_type -> hawkr.social.v1alpha1.PublishPostRequest
-	61,  // 103: hawkr.social.v1alpha1.SocialAppService.UnpublishPost:input_type -> hawkr.social.v1alpha1.UnpublishPostRequest
-	63,  // 104: hawkr.social.v1alpha1.SocialAppService.DeletePost:input_type -> hawkr.social.v1alpha1.DeletePostRequest
-	65,  // 105: hawkr.social.v1alpha1.SocialAppService.SchedulePost:input_type -> hawkr.social.v1alpha1.SchedulePostRequest
-	67,  // 106: hawkr.social.v1alpha1.SocialAppService.ListPendingSchedules:input_type -> hawkr.social.v1alpha1.ListPendingSchedulesRequest
-	69,  // 107: hawkr.social.v1alpha1.SocialAppService.CancelPostSchedule:input_type -> hawkr.social.v1alpha1.CancelPostScheduleRequest
-	71,  // 108: hawkr.social.v1alpha1.SocialAppService.ListStoreComments:input_type -> hawkr.social.v1alpha1.ListStoreCommentsRequest
-	73,  // 109: hawkr.social.v1alpha1.SocialAppService.GetStoreSocialSummary:input_type -> hawkr.social.v1alpha1.GetStoreSocialSummaryRequest
-	91,  // 110: hawkr.social.v1alpha1.SocialAppService.ListMySanctions:input_type -> hawkr.social.v1alpha1.ListMySanctionsRequest
-	94,  // 111: hawkr.social.v1alpha1.SocialAppService.ListMyHiddenContent:input_type -> hawkr.social.v1alpha1.ListMyHiddenContentRequest
-	77,  // 112: hawkr.social.v1alpha1.SocialDelegatedService.ListStorePosts:input_type -> hawkr.social.v1alpha1.ListStorePostsRequest
-	79,  // 113: hawkr.social.v1alpha1.SocialDelegatedService.GetStorePost:input_type -> hawkr.social.v1alpha1.GetStorePostRequest
-	81,  // 114: hawkr.social.v1alpha1.SocialDelegatedService.CreateStorePost:input_type -> hawkr.social.v1alpha1.CreateStorePostRequest
-	83,  // 115: hawkr.social.v1alpha1.SocialDelegatedService.UpdateStorePost:input_type -> hawkr.social.v1alpha1.UpdateStorePostRequest
-	85,  // 116: hawkr.social.v1alpha1.SocialDelegatedService.PublishStorePost:input_type -> hawkr.social.v1alpha1.PublishStorePostRequest
-	87,  // 117: hawkr.social.v1alpha1.SocialDelegatedService.UnpublishStorePost:input_type -> hawkr.social.v1alpha1.UnpublishStorePostRequest
-	89,  // 118: hawkr.social.v1alpha1.SocialDelegatedService.ScheduleStorePost:input_type -> hawkr.social.v1alpha1.ScheduleStorePostRequest
-	12,  // 119: hawkr.social.v1alpha1.SocialPublicService.GetPost:output_type -> hawkr.social.v1alpha1.GetPostResponse
-	14,  // 120: hawkr.social.v1alpha1.SocialPublicService.ListPosts:output_type -> hawkr.social.v1alpha1.ListPostsResponse
-	16,  // 121: hawkr.social.v1alpha1.SocialPublicService.ListComments:output_type -> hawkr.social.v1alpha1.ListCommentsResponse
-	18,  // 122: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:output_type -> hawkr.social.v1alpha1.SuggestTrendingPostsResponse
-	20,  // 123: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:output_type -> hawkr.social.v1alpha1.SuggestTagsResponse
-	22,  // 124: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:output_type -> hawkr.social.v1alpha1.SuggestTrendingTagsResponse
-	26,  // 125: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:output_type -> hawkr.social.v1alpha1.ListForumEntriesResponse
-	28,  // 126: hawkr.social.v1alpha1.SocialPublicService.RecordPostView:output_type -> hawkr.social.v1alpha1.RecordPostViewResponse
-	30,  // 127: hawkr.social.v1alpha1.SocialAppService.SharePost:output_type -> hawkr.social.v1alpha1.SharePostResponse
-	32,  // 128: hawkr.social.v1alpha1.SocialAppService.LikePost:output_type -> hawkr.social.v1alpha1.LikePostResponse
-	34,  // 129: hawkr.social.v1alpha1.SocialAppService.UnlikePost:output_type -> hawkr.social.v1alpha1.UnlikePostResponse
-	36,  // 130: hawkr.social.v1alpha1.SocialAppService.LikeComment:output_type -> hawkr.social.v1alpha1.LikeCommentResponse
-	38,  // 131: hawkr.social.v1alpha1.SocialAppService.UnlikeComment:output_type -> hawkr.social.v1alpha1.UnlikeCommentResponse
-	40,  // 132: hawkr.social.v1alpha1.SocialAppService.CreateComment:output_type -> hawkr.social.v1alpha1.CreateCommentResponse
-	42,  // 133: hawkr.social.v1alpha1.SocialAppService.UpdateComment:output_type -> hawkr.social.v1alpha1.UpdateCommentResponse
-	44,  // 134: hawkr.social.v1alpha1.SocialAppService.DeleteComment:output_type -> hawkr.social.v1alpha1.DeleteCommentResponse
-	46,  // 135: hawkr.social.v1alpha1.SocialAppService.CreateForumEntry:output_type -> hawkr.social.v1alpha1.CreateForumEntryResponse
-	48,  // 136: hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry:output_type -> hawkr.social.v1alpha1.UpdateForumEntryResponse
-	50,  // 137: hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry:output_type -> hawkr.social.v1alpha1.DeleteForumEntryResponse
-	52,  // 138: hawkr.social.v1alpha1.SocialAppService.CreatePost:output_type -> hawkr.social.v1alpha1.CreatePostResponse
-	54,  // 139: hawkr.social.v1alpha1.SocialAppService.GetMyPost:output_type -> hawkr.social.v1alpha1.GetMyPostResponse
-	56,  // 140: hawkr.social.v1alpha1.SocialAppService.ListMyPosts:output_type -> hawkr.social.v1alpha1.ListMyPostsResponse
-	58,  // 141: hawkr.social.v1alpha1.SocialAppService.UpdatePost:output_type -> hawkr.social.v1alpha1.UpdatePostResponse
-	60,  // 142: hawkr.social.v1alpha1.SocialAppService.PublishPost:output_type -> hawkr.social.v1alpha1.PublishPostResponse
-	62,  // 143: hawkr.social.v1alpha1.SocialAppService.UnpublishPost:output_type -> hawkr.social.v1alpha1.UnpublishPostResponse
-	64,  // 144: hawkr.social.v1alpha1.SocialAppService.DeletePost:output_type -> hawkr.social.v1alpha1.DeletePostResponse
-	66,  // 145: hawkr.social.v1alpha1.SocialAppService.SchedulePost:output_type -> hawkr.social.v1alpha1.SchedulePostResponse
-	68,  // 146: hawkr.social.v1alpha1.SocialAppService.ListPendingSchedules:output_type -> hawkr.social.v1alpha1.ListPendingSchedulesResponse
-	70,  // 147: hawkr.social.v1alpha1.SocialAppService.CancelPostSchedule:output_type -> hawkr.social.v1alpha1.CancelPostScheduleResponse
-	72,  // 148: hawkr.social.v1alpha1.SocialAppService.ListStoreComments:output_type -> hawkr.social.v1alpha1.ListStoreCommentsResponse
-	74,  // 149: hawkr.social.v1alpha1.SocialAppService.GetStoreSocialSummary:output_type -> hawkr.social.v1alpha1.GetStoreSocialSummaryResponse
-	92,  // 150: hawkr.social.v1alpha1.SocialAppService.ListMySanctions:output_type -> hawkr.social.v1alpha1.ListMySanctionsResponse
-	95,  // 151: hawkr.social.v1alpha1.SocialAppService.ListMyHiddenContent:output_type -> hawkr.social.v1alpha1.ListMyHiddenContentResponse
-	78,  // 152: hawkr.social.v1alpha1.SocialDelegatedService.ListStorePosts:output_type -> hawkr.social.v1alpha1.ListStorePostsResponse
-	80,  // 153: hawkr.social.v1alpha1.SocialDelegatedService.GetStorePost:output_type -> hawkr.social.v1alpha1.GetStorePostResponse
-	82,  // 154: hawkr.social.v1alpha1.SocialDelegatedService.CreateStorePost:output_type -> hawkr.social.v1alpha1.CreateStorePostResponse
-	84,  // 155: hawkr.social.v1alpha1.SocialDelegatedService.UpdateStorePost:output_type -> hawkr.social.v1alpha1.UpdateStorePostResponse
-	86,  // 156: hawkr.social.v1alpha1.SocialDelegatedService.PublishStorePost:output_type -> hawkr.social.v1alpha1.PublishStorePostResponse
-	88,  // 157: hawkr.social.v1alpha1.SocialDelegatedService.UnpublishStorePost:output_type -> hawkr.social.v1alpha1.UnpublishStorePostResponse
-	90,  // 158: hawkr.social.v1alpha1.SocialDelegatedService.ScheduleStorePost:output_type -> hawkr.social.v1alpha1.ScheduleStorePostResponse
-	119, // [119:159] is the sub-list for method output_type
-	79,  // [79:119] is the sub-list for method input_type
-	79,  // [79:79] is the sub-list for extension type_name
-	79,  // [79:79] is the sub-list for extension extendee
-	0,   // [0:79] is the sub-list for field type_name
+	77,  // 51: hawkr.social.v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse.post_counts:type_name -> hawkr.social.v1alpha1.PostStatusCount
+	77,  // 52: hawkr.social.v1alpha1.GetStoreSocialSummaryResponse.post_counts:type_name -> hawkr.social.v1alpha1.PostStatusCount
+	2,   // 53: hawkr.social.v1alpha1.PostStatusCount.status:type_name -> hawkr.social.v1alpha1.PostStatus
+	2,   // 54: hawkr.social.v1alpha1.ListStorePostsRequest.status:type_name -> hawkr.social.v1alpha1.PostStatus
+	8,   // 55: hawkr.social.v1alpha1.ListStorePostsResponse.posts:type_name -> hawkr.social.v1alpha1.Post
+	8,   // 56: hawkr.social.v1alpha1.GetStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	78,  // 57: hawkr.social.v1alpha1.CreateStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
+	8,   // 58: hawkr.social.v1alpha1.CreateStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	78,  // 59: hawkr.social.v1alpha1.UpdateStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
+	8,   // 60: hawkr.social.v1alpha1.UpdateStorePostRequest.post:type_name -> hawkr.social.v1alpha1.Post
+	102, // 61: hawkr.social.v1alpha1.UpdateStorePostRequest.update_mask:type_name -> google.protobuf.FieldMask
+	8,   // 62: hawkr.social.v1alpha1.UpdateStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	78,  // 63: hawkr.social.v1alpha1.PublishStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
+	8,   // 64: hawkr.social.v1alpha1.PublishStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	78,  // 65: hawkr.social.v1alpha1.UnpublishStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
+	8,   // 66: hawkr.social.v1alpha1.UnpublishStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	78,  // 67: hawkr.social.v1alpha1.ScheduleStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
+	99,  // 68: hawkr.social.v1alpha1.ScheduleStorePostRequest.publish_time:type_name -> google.protobuf.Timestamp
+	8,   // 69: hawkr.social.v1alpha1.ScheduleStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	99,  // 70: hawkr.social.v1alpha1.ScheduleStorePostResponse.publish_time:type_name -> google.protobuf.Timestamp
+	95,  // 71: hawkr.social.v1alpha1.ListMySanctionsResponse.sanctions:type_name -> hawkr.social.v1alpha1.Sanction
+	4,   // 72: hawkr.social.v1alpha1.Sanction.kind:type_name -> hawkr.social.v1alpha1.SanctionKind
+	103, // 73: hawkr.social.v1alpha1.Sanction.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	99,  // 74: hawkr.social.v1alpha1.Sanction.create_time:type_name -> google.protobuf.Timestamp
+	98,  // 75: hawkr.social.v1alpha1.ListMyHiddenContentResponse.hidden_contents:type_name -> hawkr.social.v1alpha1.HiddenContent
+	5,   // 76: hawkr.social.v1alpha1.HiddenContent.kind:type_name -> hawkr.social.v1alpha1.HiddenContentKind
+	99,  // 77: hawkr.social.v1alpha1.HiddenContent.create_time:type_name -> google.protobuf.Timestamp
+	103, // 78: hawkr.social.v1alpha1.HiddenContent.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	99,  // 79: hawkr.social.v1alpha1.HiddenContent.hide_time:type_name -> google.protobuf.Timestamp
+	11,  // 80: hawkr.social.v1alpha1.SocialPublicService.GetPost:input_type -> hawkr.social.v1alpha1.GetPostRequest
+	13,  // 81: hawkr.social.v1alpha1.SocialPublicService.ListPosts:input_type -> hawkr.social.v1alpha1.ListPostsRequest
+	15,  // 82: hawkr.social.v1alpha1.SocialPublicService.ListComments:input_type -> hawkr.social.v1alpha1.ListCommentsRequest
+	17,  // 83: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:input_type -> hawkr.social.v1alpha1.SuggestTrendingPostsRequest
+	19,  // 84: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:input_type -> hawkr.social.v1alpha1.SuggestTagsRequest
+	21,  // 85: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:input_type -> hawkr.social.v1alpha1.SuggestTrendingTagsRequest
+	25,  // 86: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:input_type -> hawkr.social.v1alpha1.ListForumEntriesRequest
+	27,  // 87: hawkr.social.v1alpha1.SocialPublicService.RecordPostView:input_type -> hawkr.social.v1alpha1.RecordPostViewRequest
+	29,  // 88: hawkr.social.v1alpha1.SocialAppService.SharePost:input_type -> hawkr.social.v1alpha1.SharePostRequest
+	31,  // 89: hawkr.social.v1alpha1.SocialAppService.LikePost:input_type -> hawkr.social.v1alpha1.LikePostRequest
+	33,  // 90: hawkr.social.v1alpha1.SocialAppService.UnlikePost:input_type -> hawkr.social.v1alpha1.UnlikePostRequest
+	35,  // 91: hawkr.social.v1alpha1.SocialAppService.LikeComment:input_type -> hawkr.social.v1alpha1.LikeCommentRequest
+	37,  // 92: hawkr.social.v1alpha1.SocialAppService.UnlikeComment:input_type -> hawkr.social.v1alpha1.UnlikeCommentRequest
+	39,  // 93: hawkr.social.v1alpha1.SocialAppService.CreateComment:input_type -> hawkr.social.v1alpha1.CreateCommentRequest
+	41,  // 94: hawkr.social.v1alpha1.SocialAppService.UpdateComment:input_type -> hawkr.social.v1alpha1.UpdateCommentRequest
+	43,  // 95: hawkr.social.v1alpha1.SocialAppService.DeleteComment:input_type -> hawkr.social.v1alpha1.DeleteCommentRequest
+	45,  // 96: hawkr.social.v1alpha1.SocialAppService.CreateForumEntry:input_type -> hawkr.social.v1alpha1.CreateForumEntryRequest
+	47,  // 97: hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry:input_type -> hawkr.social.v1alpha1.UpdateForumEntryRequest
+	49,  // 98: hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry:input_type -> hawkr.social.v1alpha1.DeleteForumEntryRequest
+	51,  // 99: hawkr.social.v1alpha1.SocialAppService.CreatePost:input_type -> hawkr.social.v1alpha1.CreatePostRequest
+	53,  // 100: hawkr.social.v1alpha1.SocialAppService.GetMyPost:input_type -> hawkr.social.v1alpha1.GetMyPostRequest
+	55,  // 101: hawkr.social.v1alpha1.SocialAppService.ListMyPosts:input_type -> hawkr.social.v1alpha1.ListMyPostsRequest
+	57,  // 102: hawkr.social.v1alpha1.SocialAppService.UpdatePost:input_type -> hawkr.social.v1alpha1.UpdatePostRequest
+	59,  // 103: hawkr.social.v1alpha1.SocialAppService.PublishPost:input_type -> hawkr.social.v1alpha1.PublishPostRequest
+	61,  // 104: hawkr.social.v1alpha1.SocialAppService.UnpublishPost:input_type -> hawkr.social.v1alpha1.UnpublishPostRequest
+	63,  // 105: hawkr.social.v1alpha1.SocialAppService.DeletePost:input_type -> hawkr.social.v1alpha1.DeletePostRequest
+	65,  // 106: hawkr.social.v1alpha1.SocialAppService.SchedulePost:input_type -> hawkr.social.v1alpha1.SchedulePostRequest
+	67,  // 107: hawkr.social.v1alpha1.SocialAppService.ListPendingSchedules:input_type -> hawkr.social.v1alpha1.ListPendingSchedulesRequest
+	69,  // 108: hawkr.social.v1alpha1.SocialAppService.CancelPostSchedule:input_type -> hawkr.social.v1alpha1.CancelPostScheduleRequest
+	71,  // 109: hawkr.social.v1alpha1.SocialAppService.ListStoreComments:input_type -> hawkr.social.v1alpha1.ListStoreCommentsRequest
+	73,  // 110: hawkr.social.v1alpha1.SocialAppService.GetStoreSocialSummary:input_type -> hawkr.social.v1alpha1.GetStoreSocialSummaryRequest
+	93,  // 111: hawkr.social.v1alpha1.SocialAppService.ListMySanctions:input_type -> hawkr.social.v1alpha1.ListMySanctionsRequest
+	96,  // 112: hawkr.social.v1alpha1.SocialAppService.ListMyHiddenContent:input_type -> hawkr.social.v1alpha1.ListMyHiddenContentRequest
+	74,  // 113: hawkr.social.v1alpha1.SocialDelegatedService.GetStoreSocialSummary:input_type -> hawkr.social.v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest
+	79,  // 114: hawkr.social.v1alpha1.SocialDelegatedService.ListStorePosts:input_type -> hawkr.social.v1alpha1.ListStorePostsRequest
+	81,  // 115: hawkr.social.v1alpha1.SocialDelegatedService.GetStorePost:input_type -> hawkr.social.v1alpha1.GetStorePostRequest
+	83,  // 116: hawkr.social.v1alpha1.SocialDelegatedService.CreateStorePost:input_type -> hawkr.social.v1alpha1.CreateStorePostRequest
+	85,  // 117: hawkr.social.v1alpha1.SocialDelegatedService.UpdateStorePost:input_type -> hawkr.social.v1alpha1.UpdateStorePostRequest
+	87,  // 118: hawkr.social.v1alpha1.SocialDelegatedService.PublishStorePost:input_type -> hawkr.social.v1alpha1.PublishStorePostRequest
+	89,  // 119: hawkr.social.v1alpha1.SocialDelegatedService.UnpublishStorePost:input_type -> hawkr.social.v1alpha1.UnpublishStorePostRequest
+	91,  // 120: hawkr.social.v1alpha1.SocialDelegatedService.ScheduleStorePost:input_type -> hawkr.social.v1alpha1.ScheduleStorePostRequest
+	12,  // 121: hawkr.social.v1alpha1.SocialPublicService.GetPost:output_type -> hawkr.social.v1alpha1.GetPostResponse
+	14,  // 122: hawkr.social.v1alpha1.SocialPublicService.ListPosts:output_type -> hawkr.social.v1alpha1.ListPostsResponse
+	16,  // 123: hawkr.social.v1alpha1.SocialPublicService.ListComments:output_type -> hawkr.social.v1alpha1.ListCommentsResponse
+	18,  // 124: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:output_type -> hawkr.social.v1alpha1.SuggestTrendingPostsResponse
+	20,  // 125: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:output_type -> hawkr.social.v1alpha1.SuggestTagsResponse
+	22,  // 126: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:output_type -> hawkr.social.v1alpha1.SuggestTrendingTagsResponse
+	26,  // 127: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:output_type -> hawkr.social.v1alpha1.ListForumEntriesResponse
+	28,  // 128: hawkr.social.v1alpha1.SocialPublicService.RecordPostView:output_type -> hawkr.social.v1alpha1.RecordPostViewResponse
+	30,  // 129: hawkr.social.v1alpha1.SocialAppService.SharePost:output_type -> hawkr.social.v1alpha1.SharePostResponse
+	32,  // 130: hawkr.social.v1alpha1.SocialAppService.LikePost:output_type -> hawkr.social.v1alpha1.LikePostResponse
+	34,  // 131: hawkr.social.v1alpha1.SocialAppService.UnlikePost:output_type -> hawkr.social.v1alpha1.UnlikePostResponse
+	36,  // 132: hawkr.social.v1alpha1.SocialAppService.LikeComment:output_type -> hawkr.social.v1alpha1.LikeCommentResponse
+	38,  // 133: hawkr.social.v1alpha1.SocialAppService.UnlikeComment:output_type -> hawkr.social.v1alpha1.UnlikeCommentResponse
+	40,  // 134: hawkr.social.v1alpha1.SocialAppService.CreateComment:output_type -> hawkr.social.v1alpha1.CreateCommentResponse
+	42,  // 135: hawkr.social.v1alpha1.SocialAppService.UpdateComment:output_type -> hawkr.social.v1alpha1.UpdateCommentResponse
+	44,  // 136: hawkr.social.v1alpha1.SocialAppService.DeleteComment:output_type -> hawkr.social.v1alpha1.DeleteCommentResponse
+	46,  // 137: hawkr.social.v1alpha1.SocialAppService.CreateForumEntry:output_type -> hawkr.social.v1alpha1.CreateForumEntryResponse
+	48,  // 138: hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry:output_type -> hawkr.social.v1alpha1.UpdateForumEntryResponse
+	50,  // 139: hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry:output_type -> hawkr.social.v1alpha1.DeleteForumEntryResponse
+	52,  // 140: hawkr.social.v1alpha1.SocialAppService.CreatePost:output_type -> hawkr.social.v1alpha1.CreatePostResponse
+	54,  // 141: hawkr.social.v1alpha1.SocialAppService.GetMyPost:output_type -> hawkr.social.v1alpha1.GetMyPostResponse
+	56,  // 142: hawkr.social.v1alpha1.SocialAppService.ListMyPosts:output_type -> hawkr.social.v1alpha1.ListMyPostsResponse
+	58,  // 143: hawkr.social.v1alpha1.SocialAppService.UpdatePost:output_type -> hawkr.social.v1alpha1.UpdatePostResponse
+	60,  // 144: hawkr.social.v1alpha1.SocialAppService.PublishPost:output_type -> hawkr.social.v1alpha1.PublishPostResponse
+	62,  // 145: hawkr.social.v1alpha1.SocialAppService.UnpublishPost:output_type -> hawkr.social.v1alpha1.UnpublishPostResponse
+	64,  // 146: hawkr.social.v1alpha1.SocialAppService.DeletePost:output_type -> hawkr.social.v1alpha1.DeletePostResponse
+	66,  // 147: hawkr.social.v1alpha1.SocialAppService.SchedulePost:output_type -> hawkr.social.v1alpha1.SchedulePostResponse
+	68,  // 148: hawkr.social.v1alpha1.SocialAppService.ListPendingSchedules:output_type -> hawkr.social.v1alpha1.ListPendingSchedulesResponse
+	70,  // 149: hawkr.social.v1alpha1.SocialAppService.CancelPostSchedule:output_type -> hawkr.social.v1alpha1.CancelPostScheduleResponse
+	72,  // 150: hawkr.social.v1alpha1.SocialAppService.ListStoreComments:output_type -> hawkr.social.v1alpha1.ListStoreCommentsResponse
+	76,  // 151: hawkr.social.v1alpha1.SocialAppService.GetStoreSocialSummary:output_type -> hawkr.social.v1alpha1.GetStoreSocialSummaryResponse
+	94,  // 152: hawkr.social.v1alpha1.SocialAppService.ListMySanctions:output_type -> hawkr.social.v1alpha1.ListMySanctionsResponse
+	97,  // 153: hawkr.social.v1alpha1.SocialAppService.ListMyHiddenContent:output_type -> hawkr.social.v1alpha1.ListMyHiddenContentResponse
+	75,  // 154: hawkr.social.v1alpha1.SocialDelegatedService.GetStoreSocialSummary:output_type -> hawkr.social.v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse
+	80,  // 155: hawkr.social.v1alpha1.SocialDelegatedService.ListStorePosts:output_type -> hawkr.social.v1alpha1.ListStorePostsResponse
+	82,  // 156: hawkr.social.v1alpha1.SocialDelegatedService.GetStorePost:output_type -> hawkr.social.v1alpha1.GetStorePostResponse
+	84,  // 157: hawkr.social.v1alpha1.SocialDelegatedService.CreateStorePost:output_type -> hawkr.social.v1alpha1.CreateStorePostResponse
+	86,  // 158: hawkr.social.v1alpha1.SocialDelegatedService.UpdateStorePost:output_type -> hawkr.social.v1alpha1.UpdateStorePostResponse
+	88,  // 159: hawkr.social.v1alpha1.SocialDelegatedService.PublishStorePost:output_type -> hawkr.social.v1alpha1.PublishStorePostResponse
+	90,  // 160: hawkr.social.v1alpha1.SocialDelegatedService.UnpublishStorePost:output_type -> hawkr.social.v1alpha1.UnpublishStorePostResponse
+	92,  // 161: hawkr.social.v1alpha1.SocialDelegatedService.ScheduleStorePost:output_type -> hawkr.social.v1alpha1.ScheduleStorePostResponse
+	121, // [121:162] is the sub-list for method output_type
+	80,  // [80:121] is the sub-list for method input_type
+	80,  // [80:80] is the sub-list for extension type_name
+	80,  // [80:80] is the sub-list for extension extendee
+	0,   // [0:80] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_social_v1alpha1_social_proto_init() }
@@ -6430,16 +6531,16 @@ func file_hawkr_social_v1alpha1_social_proto_init() {
 	file_hawkr_social_v1alpha1_social_proto_msgTypes[39].OneofWrappers = []any{}
 	file_hawkr_social_v1alpha1_social_proto_msgTypes[45].OneofWrappers = []any{}
 	file_hawkr_social_v1alpha1_social_proto_msgTypes[65].OneofWrappers = []any{}
-	file_hawkr_social_v1alpha1_social_proto_msgTypes[70].OneofWrappers = []any{}
-	file_hawkr_social_v1alpha1_social_proto_msgTypes[75].OneofWrappers = []any{}
-	file_hawkr_social_v1alpha1_social_proto_msgTypes[90].OneofWrappers = []any{}
+	file_hawkr_social_v1alpha1_social_proto_msgTypes[72].OneofWrappers = []any{}
+	file_hawkr_social_v1alpha1_social_proto_msgTypes[77].OneofWrappers = []any{}
+	file_hawkr_social_v1alpha1_social_proto_msgTypes[92].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_social_v1alpha1_social_proto_rawDesc), len(file_hawkr_social_v1alpha1_social_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   91,
+			NumMessages:   93,
 			NumExtensions: 0,
 			NumServices:   3,
 		},

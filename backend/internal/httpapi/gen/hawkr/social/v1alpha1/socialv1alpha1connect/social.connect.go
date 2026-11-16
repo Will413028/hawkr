@@ -143,6 +143,9 @@ const (
 	// SocialAppServiceListMyHiddenContentProcedure is the fully-qualified name of the
 	// SocialAppService's ListMyHiddenContent RPC.
 	SocialAppServiceListMyHiddenContentProcedure = "/hawkr.social.v1alpha1.SocialAppService/ListMyHiddenContent"
+	// SocialDelegatedServiceGetStoreSocialSummaryProcedure is the fully-qualified name of the
+	// SocialDelegatedService's GetStoreSocialSummary RPC.
+	SocialDelegatedServiceGetStoreSocialSummaryProcedure = "/hawkr.social.v1alpha1.SocialDelegatedService/GetStoreSocialSummary"
 	// SocialDelegatedServiceListStorePostsProcedure is the fully-qualified name of the
 	// SocialDelegatedService's ListStorePosts RPC.
 	SocialDelegatedServiceListStorePostsProcedure = "/hawkr.social.v1alpha1.SocialDelegatedService/ListStorePosts"
@@ -1285,6 +1288,9 @@ func (UnimplementedSocialAppServiceHandler) ListMyHiddenContent(context.Context,
 // SocialDelegatedServiceClient is a client for the hawkr.social.v1alpha1.SocialDelegatedService
 // service.
 type SocialDelegatedServiceClient interface {
+	// GetStoreSocialSummary 是代行工作區的動態數：代行店家的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數；內容與 SocialAppService.GetStoreSocialSummary 相同，
+	// 目標店家是 session 綁定的那一家。需要能力 posts.read。
+	GetStoreSocialSummary(context.Context, *connect.Request[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse], error)
 	// ListStorePosts 列出代行店家自己的貼文（含草稿與下架，不含已刪除），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。需要能力 posts.read。
 	ListStorePosts(context.Context, *connect.Request[v1alpha1.ListStorePostsRequest]) (*connect.Response[v1alpha1.ListStorePostsResponse], error)
 	// GetStorePost 讀代行店家的一篇貼文（任何狀態，不含已刪除）；別家的貼文與不存在一樣回 not_found。回應帶 status 與 etag。需要能力 posts.read。
@@ -1316,6 +1322,13 @@ func NewSocialDelegatedServiceClient(httpClient connect.HTTPClient, baseURL stri
 	baseURL = strings.TrimRight(baseURL, "/")
 	socialDelegatedServiceMethods := v1alpha1.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialDelegatedService").Methods()
 	return &socialDelegatedServiceClient{
+		getStoreSocialSummary: connect.NewClient[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest, v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse](
+			httpClient,
+			baseURL+SocialDelegatedServiceGetStoreSocialSummaryProcedure,
+			connect.WithSchema(socialDelegatedServiceMethods.ByName("GetStoreSocialSummary")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 		listStorePosts: connect.NewClient[v1alpha1.ListStorePostsRequest, v1alpha1.ListStorePostsResponse](
 			httpClient,
 			baseURL+SocialDelegatedServiceListStorePostsProcedure,
@@ -1369,13 +1382,19 @@ func NewSocialDelegatedServiceClient(httpClient connect.HTTPClient, baseURL stri
 
 // socialDelegatedServiceClient implements SocialDelegatedServiceClient.
 type socialDelegatedServiceClient struct {
-	listStorePosts     *connect.Client[v1alpha1.ListStorePostsRequest, v1alpha1.ListStorePostsResponse]
-	getStorePost       *connect.Client[v1alpha1.GetStorePostRequest, v1alpha1.GetStorePostResponse]
-	createStorePost    *connect.Client[v1alpha1.CreateStorePostRequest, v1alpha1.CreateStorePostResponse]
-	updateStorePost    *connect.Client[v1alpha1.UpdateStorePostRequest, v1alpha1.UpdateStorePostResponse]
-	publishStorePost   *connect.Client[v1alpha1.PublishStorePostRequest, v1alpha1.PublishStorePostResponse]
-	unpublishStorePost *connect.Client[v1alpha1.UnpublishStorePostRequest, v1alpha1.UnpublishStorePostResponse]
-	scheduleStorePost  *connect.Client[v1alpha1.ScheduleStorePostRequest, v1alpha1.ScheduleStorePostResponse]
+	getStoreSocialSummary *connect.Client[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest, v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse]
+	listStorePosts        *connect.Client[v1alpha1.ListStorePostsRequest, v1alpha1.ListStorePostsResponse]
+	getStorePost          *connect.Client[v1alpha1.GetStorePostRequest, v1alpha1.GetStorePostResponse]
+	createStorePost       *connect.Client[v1alpha1.CreateStorePostRequest, v1alpha1.CreateStorePostResponse]
+	updateStorePost       *connect.Client[v1alpha1.UpdateStorePostRequest, v1alpha1.UpdateStorePostResponse]
+	publishStorePost      *connect.Client[v1alpha1.PublishStorePostRequest, v1alpha1.PublishStorePostResponse]
+	unpublishStorePost    *connect.Client[v1alpha1.UnpublishStorePostRequest, v1alpha1.UnpublishStorePostResponse]
+	scheduleStorePost     *connect.Client[v1alpha1.ScheduleStorePostRequest, v1alpha1.ScheduleStorePostResponse]
+}
+
+// GetStoreSocialSummary calls hawkr.social.v1alpha1.SocialDelegatedService.GetStoreSocialSummary.
+func (c *socialDelegatedServiceClient) GetStoreSocialSummary(ctx context.Context, req *connect.Request[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse], error) {
+	return c.getStoreSocialSummary.CallUnary(ctx, req)
 }
 
 // ListStorePosts calls hawkr.social.v1alpha1.SocialDelegatedService.ListStorePosts.
@@ -1416,6 +1435,9 @@ func (c *socialDelegatedServiceClient) ScheduleStorePost(ctx context.Context, re
 // SocialDelegatedServiceHandler is an implementation of the
 // hawkr.social.v1alpha1.SocialDelegatedService service.
 type SocialDelegatedServiceHandler interface {
+	// GetStoreSocialSummary 是代行工作區的動態數：代行店家的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數；內容與 SocialAppService.GetStoreSocialSummary 相同，
+	// 目標店家是 session 綁定的那一家。需要能力 posts.read。
+	GetStoreSocialSummary(context.Context, *connect.Request[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse], error)
 	// ListStorePosts 列出代行店家自己的貼文（含草稿與下架，不含已刪除），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。需要能力 posts.read。
 	ListStorePosts(context.Context, *connect.Request[v1alpha1.ListStorePostsRequest]) (*connect.Response[v1alpha1.ListStorePostsResponse], error)
 	// GetStorePost 讀代行店家的一篇貼文（任何狀態，不含已刪除）；別家的貼文與不存在一樣回 not_found。回應帶 status 與 etag。需要能力 posts.read。
@@ -1442,6 +1464,13 @@ type SocialDelegatedServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewSocialDelegatedServiceHandler(svc SocialDelegatedServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	socialDelegatedServiceMethods := v1alpha1.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialDelegatedService").Methods()
+	socialDelegatedServiceGetStoreSocialSummaryHandler := connect.NewUnaryHandler(
+		SocialDelegatedServiceGetStoreSocialSummaryProcedure,
+		svc.GetStoreSocialSummary,
+		connect.WithSchema(socialDelegatedServiceMethods.ByName("GetStoreSocialSummary")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	socialDelegatedServiceListStorePostsHandler := connect.NewUnaryHandler(
 		SocialDelegatedServiceListStorePostsProcedure,
 		svc.ListStorePosts,
@@ -1492,6 +1521,8 @@ func NewSocialDelegatedServiceHandler(svc SocialDelegatedServiceHandler, opts ..
 	)
 	return "/hawkr.social.v1alpha1.SocialDelegatedService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case SocialDelegatedServiceGetStoreSocialSummaryProcedure:
+			socialDelegatedServiceGetStoreSocialSummaryHandler.ServeHTTP(w, r)
 		case SocialDelegatedServiceListStorePostsProcedure:
 			socialDelegatedServiceListStorePostsHandler.ServeHTTP(w, r)
 		case SocialDelegatedServiceGetStorePostProcedure:
@@ -1514,6 +1545,10 @@ func NewSocialDelegatedServiceHandler(svc SocialDelegatedServiceHandler, opts ..
 
 // UnimplementedSocialDelegatedServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedSocialDelegatedServiceHandler struct{}
+
+func (UnimplementedSocialDelegatedServiceHandler) GetStoreSocialSummary(context.Context, *connect.Request[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialDelegatedService.GetStoreSocialSummary is not implemented"))
+}
 
 func (UnimplementedSocialDelegatedServiceHandler) ListStorePosts(context.Context, *connect.Request[v1alpha1.ListStorePostsRequest]) (*connect.Response[v1alpha1.ListStorePostsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialDelegatedService.ListStorePosts is not implemented"))

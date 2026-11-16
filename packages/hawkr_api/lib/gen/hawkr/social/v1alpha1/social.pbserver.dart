@@ -269,6 +269,9 @@ abstract class SocialAppServiceBase extends $pb.GeneratedService {
 }
 
 abstract class SocialDelegatedServiceBase extends $pb.GeneratedService {
+  $async.Future<$5.SocialDelegatedServiceGetStoreSocialSummaryResponse>
+      getStoreSocialSummary($pb.ServerContext ctx,
+          $5.SocialDelegatedServiceGetStoreSocialSummaryRequest request);
   $async.Future<$5.ListStorePostsResponse> listStorePosts(
       $pb.ServerContext ctx, $5.ListStorePostsRequest request);
   $async.Future<$5.GetStorePostResponse> getStorePost(
@@ -286,6 +289,8 @@ abstract class SocialDelegatedServiceBase extends $pb.GeneratedService {
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
+      case 'GetStoreSocialSummary':
+        return $5.SocialDelegatedServiceGetStoreSocialSummaryRequest();
       case 'ListStorePosts':
         return $5.ListStorePostsRequest();
       case 'GetStorePost':
@@ -308,6 +313,9 @@ abstract class SocialDelegatedServiceBase extends $pb.GeneratedService {
   $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx,
       $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
+      case 'GetStoreSocialSummary':
+        return getStoreSocialSummary(ctx,
+            request as $5.SocialDelegatedServiceGetStoreSocialSummaryRequest);
       case 'ListStorePosts':
         return listStorePosts(ctx, request as $5.ListStorePostsRequest);
       case 'GetStorePost':

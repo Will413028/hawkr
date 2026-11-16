@@ -1797,6 +1797,50 @@ const GetStoreSocialSummaryRequest$json = {
 final $typed_data.Uint8List getStoreSocialSummaryRequestDescriptor =
     $convert.base64Decode('ChxHZXRTdG9yZVNvY2lhbFN1bW1hcnlSZXF1ZXN0');
 
+@$core.Deprecated(
+    'Use socialDelegatedServiceGetStoreSocialSummaryRequestDescriptor instead')
+const SocialDelegatedServiceGetStoreSocialSummaryRequest$json = {
+  '1': 'SocialDelegatedServiceGetStoreSocialSummaryRequest',
+};
+
+/// Descriptor for `SocialDelegatedServiceGetStoreSocialSummaryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List
+    socialDelegatedServiceGetStoreSocialSummaryRequestDescriptor =
+    $convert.base64Decode(
+        'CjJTb2NpYWxEZWxlZ2F0ZWRTZXJ2aWNlR2V0U3RvcmVTb2NpYWxTdW1tYXJ5UmVxdWVzdA==');
+
+@$core.Deprecated(
+    'Use socialDelegatedServiceGetStoreSocialSummaryResponseDescriptor instead')
+const SocialDelegatedServiceGetStoreSocialSummaryResponse$json = {
+  '1': 'SocialDelegatedServiceGetStoreSocialSummaryResponse',
+  '2': [
+    {
+      '1': 'post_counts',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.PostStatusCount',
+      '10': 'postCounts'
+    },
+    {
+      '1': 'scheduled_post_count',
+      '3': 2,
+      '4': 1,
+      '5': 3,
+      '10': 'scheduledPostCount'
+    },
+  ],
+};
+
+/// Descriptor for `SocialDelegatedServiceGetStoreSocialSummaryResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List
+    socialDelegatedServiceGetStoreSocialSummaryResponseDescriptor =
+    $convert.base64Decode(
+        'CjNTb2NpYWxEZWxlZ2F0ZWRTZXJ2aWNlR2V0U3RvcmVTb2NpYWxTdW1tYXJ5UmVzcG9uc2USRw'
+        'oLcG9zdF9jb3VudHMYASADKAsyJi5oYXdrci5zb2NpYWwudjFhbHBoYTEuUG9zdFN0YXR1c0Nv'
+        'dW50Ugpwb3N0Q291bnRzEjAKFHNjaGVkdWxlZF9wb3N0X2NvdW50GAIgASgDUhJzY2hlZHVsZW'
+        'RQb3N0Q291bnQ=');
+
 @$core.Deprecated('Use getStoreSocialSummaryResponseDescriptor instead')
 const GetStoreSocialSummaryResponse$json = {
   '1': 'GetStoreSocialSummaryResponse',
@@ -2843,6 +2887,14 @@ const $core.Map<$core.String, $core.dynamic> SocialDelegatedServiceBase$json = {
   '1': 'SocialDelegatedService',
   '2': [
     {
+      '1': 'GetStoreSocialSummary',
+      '2':
+          '.hawkr.social.v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest',
+      '3':
+          '.hawkr.social.v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse',
+      '4': {'34': 1},
+    },
+    {
       '1': 'ListStorePosts',
       '2': '.hawkr.social.v1alpha1.ListStorePostsRequest',
       '3': '.hawkr.social.v1alpha1.ListStorePostsResponse',
@@ -2889,6 +2941,11 @@ const $core.Map<$core.String, $core.dynamic> SocialDelegatedServiceBase$json = {
 @$core.Deprecated('Use socialDelegatedServiceDescriptor instead')
 const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
     SocialDelegatedServiceBase$messageJson = {
+  '.hawkr.social.v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest':
+      SocialDelegatedServiceGetStoreSocialSummaryRequest$json,
+  '.hawkr.social.v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse':
+      SocialDelegatedServiceGetStoreSocialSummaryResponse$json,
+  '.hawkr.social.v1alpha1.PostStatusCount': PostStatusCount$json,
   '.hawkr.social.v1alpha1.ListStorePostsRequest': ListStorePostsRequest$json,
   '.hawkr.social.v1alpha1.ListStorePostsResponse': ListStorePostsResponse$json,
   '.hawkr.social.v1alpha1.Post': Post$json,
@@ -2922,19 +2979,22 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
 
 /// Descriptor for `SocialDelegatedService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
 final $typed_data.Uint8List socialDelegatedServiceDescriptor = $convert.base64Decode(
-    'ChZTb2NpYWxEZWxlZ2F0ZWRTZXJ2aWNlEnIKDkxpc3RTdG9yZVBvc3RzEiwuaGF3a3Iuc29jaW'
-    'FsLnYxYWxwaGExLkxpc3RTdG9yZVBvc3RzUmVxdWVzdBotLmhhd2tyLnNvY2lhbC52MWFscGhh'
-    'MS5MaXN0U3RvcmVQb3N0c1Jlc3BvbnNlIgOQAgESbAoMR2V0U3RvcmVQb3N0EiouaGF3a3Iuc2'
-    '9jaWFsLnYxYWxwaGExLkdldFN0b3JlUG9zdFJlcXVlc3QaKy5oYXdrci5zb2NpYWwudjFhbHBo'
-    'YTEuR2V0U3RvcmVQb3N0UmVzcG9uc2UiA5ACARJwCg9DcmVhdGVTdG9yZVBvc3QSLS5oYXdrci'
-    '5zb2NpYWwudjFhbHBoYTEuQ3JlYXRlU3RvcmVQb3N0UmVxdWVzdBouLmhhd2tyLnNvY2lhbC52'
-    'MWFscGhhMS5DcmVhdGVTdG9yZVBvc3RSZXNwb25zZRJ1Cg9VcGRhdGVTdG9yZVBvc3QSLS5oYX'
-    'drci5zb2NpYWwudjFhbHBoYTEuVXBkYXRlU3RvcmVQb3N0UmVxdWVzdBouLmhhd2tyLnNvY2lh'
-    'bC52MWFscGhhMS5VcGRhdGVTdG9yZVBvc3RSZXNwb25zZSIDkAICEngKEFB1Ymxpc2hTdG9yZV'
-    'Bvc3QSLi5oYXdrci5zb2NpYWwudjFhbHBoYTEuUHVibGlzaFN0b3JlUG9zdFJlcXVlc3QaLy5o'
-    'YXdrci5zb2NpYWwudjFhbHBoYTEuUHVibGlzaFN0b3JlUG9zdFJlc3BvbnNlIgOQAgISfgoSVW'
-    '5wdWJsaXNoU3RvcmVQb3N0EjAuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlVucHVibGlzaFN0b3Jl'
-    'UG9zdFJlcXVlc3QaMS5oYXdrci5zb2NpYWwudjFhbHBoYTEuVW5wdWJsaXNoU3RvcmVQb3N0Um'
-    'VzcG9uc2UiA5ACAhJ7ChFTY2hlZHVsZVN0b3JlUG9zdBIvLmhhd2tyLnNvY2lhbC52MWFscGhh'
-    'MS5TY2hlZHVsZVN0b3JlUG9zdFJlcXVlc3QaMC5oYXdrci5zb2NpYWwudjFhbHBoYTEuU2NoZW'
-    'R1bGVTdG9yZVBvc3RSZXNwb25zZSIDkAIC');
+    'ChZTb2NpYWxEZWxlZ2F0ZWRTZXJ2aWNlErMBChVHZXRTdG9yZVNvY2lhbFN1bW1hcnkSSS5oYX'
+    'drci5zb2NpYWwudjFhbHBoYTEuU29jaWFsRGVsZWdhdGVkU2VydmljZUdldFN0b3JlU29jaWFs'
+    'U3VtbWFyeVJlcXVlc3QaSi5oYXdrci5zb2NpYWwudjFhbHBoYTEuU29jaWFsRGVsZWdhdGVkU2'
+    'VydmljZUdldFN0b3JlU29jaWFsU3VtbWFyeVJlc3BvbnNlIgOQAgEScgoOTGlzdFN0b3JlUG9z'
+    'dHMSLC5oYXdrci5zb2NpYWwudjFhbHBoYTEuTGlzdFN0b3JlUG9zdHNSZXF1ZXN0Gi0uaGF3a3'
+    'Iuc29jaWFsLnYxYWxwaGExLkxpc3RTdG9yZVBvc3RzUmVzcG9uc2UiA5ACARJsCgxHZXRTdG9y'
+    'ZVBvc3QSKi5oYXdrci5zb2NpYWwudjFhbHBoYTEuR2V0U3RvcmVQb3N0UmVxdWVzdBorLmhhd2'
+    'tyLnNvY2lhbC52MWFscGhhMS5HZXRTdG9yZVBvc3RSZXNwb25zZSIDkAIBEnAKD0NyZWF0ZVN0'
+    'b3JlUG9zdBItLmhhd2tyLnNvY2lhbC52MWFscGhhMS5DcmVhdGVTdG9yZVBvc3RSZXF1ZXN0Gi'
+    '4uaGF3a3Iuc29jaWFsLnYxYWxwaGExLkNyZWF0ZVN0b3JlUG9zdFJlc3BvbnNlEnUKD1VwZGF0'
+    'ZVN0b3JlUG9zdBItLmhhd2tyLnNvY2lhbC52MWFscGhhMS5VcGRhdGVTdG9yZVBvc3RSZXF1ZX'
+    'N0Gi4uaGF3a3Iuc29jaWFsLnYxYWxwaGExLlVwZGF0ZVN0b3JlUG9zdFJlc3BvbnNlIgOQAgIS'
+    'eAoQUHVibGlzaFN0b3JlUG9zdBIuLmhhd2tyLnNvY2lhbC52MWFscGhhMS5QdWJsaXNoU3Rvcm'
+    'VQb3N0UmVxdWVzdBovLmhhd2tyLnNvY2lhbC52MWFscGhhMS5QdWJsaXNoU3RvcmVQb3N0UmVz'
+    'cG9uc2UiA5ACAhJ+ChJVbnB1Ymxpc2hTdG9yZVBvc3QSMC5oYXdrci5zb2NpYWwudjFhbHBoYT'
+    'EuVW5wdWJsaXNoU3RvcmVQb3N0UmVxdWVzdBoxLmhhd2tyLnNvY2lhbC52MWFscGhhMS5VbnB1'
+    'Ymxpc2hTdG9yZVBvc3RSZXNwb25zZSIDkAICEnsKEVNjaGVkdWxlU3RvcmVQb3N0Ei8uaGF3a3'
+    'Iuc29jaWFsLnYxYWxwaGExLlNjaGVkdWxlU3RvcmVQb3N0UmVxdWVzdBowLmhhd2tyLnNvY2lh'
+    'bC52MWFscGhhMS5TY2hlZHVsZVN0b3JlUG9zdFJlc3BvbnNlIgOQAgI=');

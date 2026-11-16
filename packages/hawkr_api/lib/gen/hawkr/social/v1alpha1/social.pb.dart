@@ -5381,6 +5381,149 @@ class GetStoreSocialSummaryRequest extends $pb.GeneratedMessage {
   static GetStoreSocialSummaryRequest? _defaultInstance;
 }
 
+/// SocialDelegatedServiceGetStoreSocialSummaryRequest 沒有欄位：店家由代行 session 決定。
+class SocialDelegatedServiceGetStoreSocialSummaryRequest
+    extends $pb.GeneratedMessage {
+  factory SocialDelegatedServiceGetStoreSocialSummaryRequest() =>
+      SocialDelegatedServiceGetStoreSocialSummaryRequest._();
+
+  SocialDelegatedServiceGetStoreSocialSummaryRequest._();
+
+  factory SocialDelegatedServiceGetStoreSocialSummaryRequest.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SocialDelegatedServiceGetStoreSocialSummaryRequest()
+        ..mergeFromBuffer(data, registry);
+  factory SocialDelegatedServiceGetStoreSocialSummaryRequest.fromJson(
+          $core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SocialDelegatedServiceGetStoreSocialSummaryRequest()
+        ..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames
+          ? ''
+          : 'SocialDelegatedServiceGetStoreSocialSummaryRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance:
+          SocialDelegatedServiceGetStoreSocialSummaryRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SocialDelegatedServiceGetStoreSocialSummaryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SocialDelegatedServiceGetStoreSocialSummaryRequest copyWith(
+          void Function(SocialDelegatedServiceGetStoreSocialSummaryRequest)
+              updates) =>
+      super.copyWith((message) => updates(
+              message as SocialDelegatedServiceGetStoreSocialSummaryRequest))
+          as SocialDelegatedServiceGetStoreSocialSummaryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SocialDelegatedServiceGetStoreSocialSummaryRequest() / SocialDelegatedServiceGetStoreSocialSummaryRequest.new instead')
+  static SocialDelegatedServiceGetStoreSocialSummaryRequest create() =>
+      SocialDelegatedServiceGetStoreSocialSummaryRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      SocialDelegatedServiceGetStoreSocialSummaryRequest._();
+  @$core.override
+  SocialDelegatedServiceGetStoreSocialSummaryRequest createEmptyInstance() =>
+      SocialDelegatedServiceGetStoreSocialSummaryRequest._();
+  @$core.pragma('dart2js:noInline')
+  static SocialDelegatedServiceGetStoreSocialSummaryRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              SocialDelegatedServiceGetStoreSocialSummaryRequest>(
+          SocialDelegatedServiceGetStoreSocialSummaryRequest.$_createMessage);
+  static SocialDelegatedServiceGetStoreSocialSummaryRequest? _defaultInstance;
+}
+
+/// SocialDelegatedServiceGetStoreSocialSummaryResponse 與 GetStoreSocialSummaryResponse 的欄位與意義相同（buf 要求每個 RPC 有自己的訊息）。
+class SocialDelegatedServiceGetStoreSocialSummaryResponse
+    extends $pb.GeneratedMessage {
+  factory SocialDelegatedServiceGetStoreSocialSummaryResponse({
+    $core.Iterable<PostStatusCount>? postCounts,
+    $fixnum.Int64? scheduledPostCount,
+  }) {
+    final result = SocialDelegatedServiceGetStoreSocialSummaryResponse._();
+    if (postCounts != null) result.postCounts.addAll(postCounts);
+    if (scheduledPostCount != null)
+      result.scheduledPostCount = scheduledPostCount;
+    return result;
+  }
+
+  SocialDelegatedServiceGetStoreSocialSummaryResponse._();
+
+  factory SocialDelegatedServiceGetStoreSocialSummaryResponse.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SocialDelegatedServiceGetStoreSocialSummaryResponse()
+        ..mergeFromBuffer(data, registry);
+  factory SocialDelegatedServiceGetStoreSocialSummaryResponse.fromJson(
+          $core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SocialDelegatedServiceGetStoreSocialSummaryResponse()
+        ..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames
+          ? ''
+          : 'SocialDelegatedServiceGetStoreSocialSummaryResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance:
+          SocialDelegatedServiceGetStoreSocialSummaryResponse.$_createMessage)
+    ..pPM<PostStatusCount>(1, _omitFieldNames ? '' : 'postCounts',
+        subBuilder: PostStatusCount.$_createMessage)
+    ..aInt64(2, _omitFieldNames ? '' : 'scheduledPostCount')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SocialDelegatedServiceGetStoreSocialSummaryResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SocialDelegatedServiceGetStoreSocialSummaryResponse copyWith(
+          void Function(SocialDelegatedServiceGetStoreSocialSummaryResponse)
+              updates) =>
+      super.copyWith((message) => updates(
+              message as SocialDelegatedServiceGetStoreSocialSummaryResponse))
+          as SocialDelegatedServiceGetStoreSocialSummaryResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SocialDelegatedServiceGetStoreSocialSummaryResponse() / SocialDelegatedServiceGetStoreSocialSummaryResponse.new instead')
+  static SocialDelegatedServiceGetStoreSocialSummaryResponse create() =>
+      SocialDelegatedServiceGetStoreSocialSummaryResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      SocialDelegatedServiceGetStoreSocialSummaryResponse._();
+  @$core.override
+  SocialDelegatedServiceGetStoreSocialSummaryResponse createEmptyInstance() =>
+      SocialDelegatedServiceGetStoreSocialSummaryResponse._();
+  @$core.pragma('dart2js:noInline')
+  static SocialDelegatedServiceGetStoreSocialSummaryResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              SocialDelegatedServiceGetStoreSocialSummaryResponse>(
+          SocialDelegatedServiceGetStoreSocialSummaryResponse.$_createMessage);
+  static SocialDelegatedServiceGetStoreSocialSummaryResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<PostStatusCount> get postCounts => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get scheduledPostCount => $_getI64(1);
+  @$pb.TagNumber(2)
+  set scheduledPostCount($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasScheduledPostCount() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearScheduledPostCount() => $_clearField(2);
+}
+
 class GetStoreSocialSummaryResponse extends $pb.GeneratedMessage {
   factory GetStoreSocialSummaryResponse({
     $core.Iterable<PostStatusCount>? postCounts,
@@ -7606,6 +7749,18 @@ class SocialDelegatedServiceApi {
   final $pb.RpcClient _client;
 
   SocialDelegatedServiceApi(this._client);
+
+  /// GetStoreSocialSummary 是代行工作區的動態數：代行店家的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數；內容與 SocialAppService.GetStoreSocialSummary 相同，
+  /// 目標店家是 session 綁定的那一家。需要能力 posts.read。
+  $async.Future<SocialDelegatedServiceGetStoreSocialSummaryResponse>
+      getStoreSocialSummary($pb.ClientContext? ctx,
+              SocialDelegatedServiceGetStoreSocialSummaryRequest request) =>
+          _client.invoke<SocialDelegatedServiceGetStoreSocialSummaryResponse>(
+              ctx,
+              'SocialDelegatedService',
+              'GetStoreSocialSummary',
+              request,
+              SocialDelegatedServiceGetStoreSocialSummaryResponse());
 
   /// ListStorePosts 列出代行店家自己的貼文（含草稿與下架，不含已刪除），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。需要能力 posts.read。
   $async.Future<ListStorePostsResponse> listStorePosts(

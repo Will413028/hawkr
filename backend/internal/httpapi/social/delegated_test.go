@@ -148,6 +148,11 @@ func (f *fakePosts) seen(method string, a *delegatedactor.Actor) {
 	f.actors[method] = a
 }
 
+func (f *fakePosts) StoreSocialSummary(_ context.Context, st seller.Store) (social.StoreSummary, error) {
+	f.store = st
+	return social.StoreSummary{Posts: map[social.PostStatus]int64{social.StatusDraft: 2, social.StatusPublished: 5}, Scheduled: 1}, f.err
+}
+
 func (f *fakePosts) CreatePost(_ context.Context, st seller.Store, in social.CreatePostInput, actor *delegatedactor.Actor) (social.Post, error) {
 	f.seen("CreatePost", actor)
 	f.store, f.create = st, in
@@ -286,6 +291,10 @@ func delegatedCalls(t *testing.T, e *delegatedEnv, cred string) map[string]func(
 	ctx := t.Context()
 	future := timestamppb.New(time.Now().Add(24 * time.Hour))
 	return map[string]func() error{
+		socialv1alpha1connect.SocialDelegatedServiceGetStoreSocialSummaryProcedure: func() error {
+			_, err := e.client.GetStoreSocialSummary(ctx, withCredential(&pb.SocialDelegatedServiceGetStoreSocialSummaryRequest{}, cred))
+			return err
+		},
 		socialv1alpha1connect.SocialDelegatedServiceListStorePostsProcedure: func() error {
 			_, err := e.client.ListStorePosts(ctx, withCredential(&pb.ListStorePostsRequest{}, cred))
 			return err
@@ -421,13 +430,14 @@ func TestMissingCapabilityIsRejected(t *testing.T) {
 
 func TestCapabilitiesAndActionsAreDeclaredPerMethod(t *testing.T) {
 	want := map[string]moddelegation.DelegatedMethod{
-		"ListStorePosts":     postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
-		"GetStorePost":       postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
-		"CreateStorePost":    postMethod(moddelegation.CapabilityPostsWrite, moddelegation.AuditPostCreate),
-		"UpdateStorePost":    postMethod(moddelegation.CapabilityPostsWrite, moddelegation.AuditPostUpdate),
-		"PublishStorePost":   postMethod(moddelegation.CapabilityPostsPublish, moddelegation.AuditPostPublish),
-		"UnpublishStorePost": postMethod(moddelegation.CapabilityPostsPublish, moddelegation.AuditPostUnpublish),
-		"ScheduleStorePost":  postMethod(moddelegation.CapabilityPostsPublish, moddelegation.AuditPostSchedule),
+		"GetStoreSocialSummary": postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
+		"ListStorePosts":        postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
+		"GetStorePost":          postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
+		"CreateStorePost":       postMethod(moddelegation.CapabilityPostsWrite, moddelegation.AuditPostCreate),
+		"UpdateStorePost":       postMethod(moddelegation.CapabilityPostsWrite, moddelegation.AuditPostUpdate),
+		"PublishStorePost":      postMethod(moddelegation.CapabilityPostsPublish, moddelegation.AuditPostPublish),
+		"UnpublishStorePost":    postMethod(moddelegation.CapabilityPostsPublish, moddelegation.AuditPostUnpublish),
+		"ScheduleStorePost":     postMethod(moddelegation.CapabilityPostsPublish, moddelegation.AuditPostSchedule),
 	}
 	methods := DelegatedDeclaration.Service.Methods()
 	for i := range methods.Len() {
@@ -476,7 +486,7 @@ func TestStartupRejectsMissingOrExtraDeclarations(t *testing.T) {
 
 // 讀取方法標 NO_SIDE_EFFECTS（client 以 GET 呼叫），寫入方法不得標。
 func TestOnlyReadsAreNoSideEffects(t *testing.T) {
-	reads := []string{"ListStorePosts", "GetStorePost"}
+	reads := []string{"ListStorePosts", "GetStorePost", "GetStoreSocialSummary"}
 	methods := DelegatedDeclaration.Service.Methods()
 	seen := 0
 	for i := range methods.Len() {
@@ -736,5 +746,33 @@ func TestDelegatedCreateCannotPublish(t *testing.T) {
 		if n := string(fields.Get(i).Name()); strings.Contains(n, "publish") {
 			t.Errorf("CreateStorePostRequest 有欄位 %q：建立可以發布時，PostPublished 要帶代行者並要求 posts.publish", n)
 		}
+	}
+}
+
+// 動態數取自 session 綁定的店家，且與店主的回應同樣每個狀態一項；缺 posts.read 的 session 被攔在 handler 之外。
+func TestDelegatedSummaryIsReadForTheSessionStoreAndNeedsPostsRead(t *testing.T) {
+	e := newDelegatedEnv(t, goodSessions())
+	resp, err := e.client.GetStoreSocialSummary(t.Context(), withCredential(&pb.SocialDelegatedServiceGetStoreSocialSummaryRequest{}, goodSession))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.posts.store.StoreID != delegatedStore {
+		t.Fatalf("查的店 %d，預期 session 的 %d", e.posts.store.StoreID, delegatedStore)
+	}
+	got := map[pb.PostStatus]int64{}
+	for _, c := range resp.Msg.GetPostCounts() {
+		got[c.GetStatus()] = c.GetCount()
+	}
+	if got[pb.PostStatus_POST_STATUS_DRAFT] != 2 || got[pb.PostStatus_POST_STATUS_PUBLISHED] != 5 || resp.Msg.GetScheduledPostCount() != 1 {
+		t.Fatalf("回應 %v scheduled=%d", got, resp.Msg.GetScheduledPostCount())
+	}
+	if len(resp.Msg.GetPostCounts()) != len(social.PostStatusValues()) {
+		t.Fatalf("每個狀態一項，得到 %d 項", len(resp.Msg.GetPostCounts()))
+	}
+
+	noRead := newDelegatedEnv(t, map[string]moddelegation.DelegationSession{goodSession: delegatedSession(moddelegation.DelegationActive, moddelegation.CapabilityPostsWrite)})
+	_, err = noRead.client.GetStoreSocialSummary(t.Context(), withCredential(&pb.SocialDelegatedServiceGetStoreSocialSummaryRequest{}, goodSession))
+	if connect.CodeOf(err) != connect.CodePermissionDenied || len(noRead.runner.calls) != 0 {
+		t.Fatalf("缺 posts.read：%v calls=%v，預期 permission_denied 且不到元件", err, noRead.runner.calls)
 	}
 }

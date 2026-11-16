@@ -28,13 +28,14 @@ import (
 var DelegatedDeclaration = httpdelegation.Declaration{
 	Service: pb.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialDelegatedService"),
 	Methods: map[string]moddelegation.DelegatedMethod{
-		socialv1alpha1connect.SocialDelegatedServiceListStorePostsProcedure:     postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
-		socialv1alpha1connect.SocialDelegatedServiceGetStorePostProcedure:       postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
-		socialv1alpha1connect.SocialDelegatedServiceCreateStorePostProcedure:    writeMethod(social.PostCreated{}),
-		socialv1alpha1connect.SocialDelegatedServiceUpdateStorePostProcedure:    writeMethod(social.PostUpdated{}),
-		socialv1alpha1connect.SocialDelegatedServicePublishStorePostProcedure:   writeMethod(social.PostPublished{}),
-		socialv1alpha1connect.SocialDelegatedServiceUnpublishStorePostProcedure: writeMethod(social.PostUnpublished{}),
-		socialv1alpha1connect.SocialDelegatedServiceScheduleStorePostProcedure:  writeMethod(social.PostScheduled{}),
+		socialv1alpha1connect.SocialDelegatedServiceGetStoreSocialSummaryProcedure: postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
+		socialv1alpha1connect.SocialDelegatedServiceListStorePostsProcedure:        postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
+		socialv1alpha1connect.SocialDelegatedServiceGetStorePostProcedure:          postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
+		socialv1alpha1connect.SocialDelegatedServiceCreateStorePostProcedure:       writeMethod(social.PostCreated{}),
+		socialv1alpha1connect.SocialDelegatedServiceUpdateStorePostProcedure:       writeMethod(social.PostUpdated{}),
+		socialv1alpha1connect.SocialDelegatedServicePublishStorePostProcedure:      writeMethod(social.PostPublished{}),
+		socialv1alpha1connect.SocialDelegatedServiceUnpublishStorePostProcedure:    writeMethod(social.PostUnpublished{}),
+		socialv1alpha1connect.SocialDelegatedServiceScheduleStorePostProcedure:     writeMethod(social.PostScheduled{}),
 	},
 }
 
@@ -152,6 +153,28 @@ func (h *Delegated) delegatedWrite(ctx context.Context, w moddelegation.Delegate
 		}
 	}
 	return post, res.Store, res.AuditLogID.String(), publishAt, nil
+}
+
+// GetStoreSocialSummary 與店主的同名方法用同一個查詢（Owner.StoreSocialSummary），店家是 session 綁定的那一家。
+func (h *Delegated) GetStoreSocialSummary(ctx context.Context, _ *connect.Request[pb.SocialDelegatedServiceGetStoreSocialSummaryRequest]) (*connect.Response[pb.SocialDelegatedServiceGetStoreSocialSummaryResponse], error) {
+	c, err := httpdelegation.CallerFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.SocialDelegatedServiceGetStoreSocialSummaryResponse{}
+	err = h.runner.DelegatedRead(ctx, c, func(ctx context.Context, st seller.Store) error {
+		s, err := h.posts.StoreSocialSummary(ctx, st)
+		if err != nil {
+			return err
+		}
+		out.ScheduledPostCount = s.Scheduled
+		out.PostCounts = postStatusCounts(s)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(out), nil
 }
 
 func (h *Delegated) ListStorePosts(ctx context.Context, req *connect.Request[pb.ListStorePostsRequest]) (*connect.Response[pb.ListStorePostsResponse], error) {

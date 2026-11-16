@@ -721,6 +721,15 @@ message ListStoreCommentsResponse {
 
 message GetStoreSocialSummaryRequest {}
 
+// SocialDelegatedServiceGetStoreSocialSummaryRequest 沒有欄位：店家由代行 session 決定。
+message SocialDelegatedServiceGetStoreSocialSummaryRequest {}
+
+// SocialDelegatedServiceGetStoreSocialSummaryResponse 與 GetStoreSocialSummaryResponse 的欄位與意義相同（buf 要求每個 RPC 有自己的訊息）。
+message SocialDelegatedServiceGetStoreSocialSummaryResponse {
+  repeated PostStatusCount post_counts = 1;
+  int64 scheduled_post_count = 2;
+}
+
 message GetStoreSocialSummaryResponse {
   // 每個貼文狀態一項（DRAFT、PUBLISHED、UNPUBLISHED 都會有，沒有貼文時是 0），不含已刪除的貼文。
   repeated PostStatusCount post_counts = 1;
@@ -744,6 +753,12 @@ message PostStatusCount {
 // 稽核：成功的寫入在同一個 transaction 內留下一列 SUCCEEDED（寫入失敗時一併 rollback）；被拒絕的請求（含讀取）與寫入的業務失敗另開 transaction 留下一列 FAILED；
 // 成功的讀取不稽核。
 service SocialDelegatedService {
+  // GetStoreSocialSummary 是代行工作區的動態數：代行店家的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數；內容與 SocialAppService.GetStoreSocialSummary 相同，
+  // 目標店家是 session 綁定的那一家。需要能力 posts.read。
+  rpc GetStoreSocialSummary(SocialDelegatedServiceGetStoreSocialSummaryRequest) returns (SocialDelegatedServiceGetStoreSocialSummaryResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
   // ListStorePosts 列出代行店家自己的貼文（含草稿與下架，不含已刪除），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。需要能力 posts.read。
   rpc ListStorePosts(ListStorePostsRequest) returns (ListStorePostsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
