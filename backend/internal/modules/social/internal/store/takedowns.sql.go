@@ -410,6 +410,38 @@ func (q *Queries) TakedownForumStores(ctx context.Context, ids []uuid.UUID) ([]i
 	return items, nil
 }
 
+const takedownMeasuresOfPosts = `-- name: TakedownMeasuresOfPosts :many
+SELECT DISTINCT ON (post_id) post_id, measure_id FROM social.content_takedowns
+WHERE post_id = ANY($1::uuid[])
+ORDER BY post_id, created_at, measure_id
+`
+
+type TakedownMeasuresOfPostsRow struct {
+	PostID    *uuid.UUID
+	MeasureID uuid.UUID
+}
+
+// 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：同時被多個措施下架時取最早建立的，同時間取措施 ID 小的。
+func (q *Queries) TakedownMeasuresOfPosts(ctx context.Context, postIds []uuid.UUID) ([]TakedownMeasuresOfPostsRow, error) {
+	rows, err := q.db.Query(ctx, takedownMeasuresOfPosts, postIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TakedownMeasuresOfPostsRow{}
+	for rows.Next() {
+		var i TakedownMeasuresOfPostsRow
+		if err := rows.Scan(&i.PostID, &i.MeasureID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const takedownPostStores = `-- name: TakedownPostStores :many
 SELECT p.id, p.store_id FROM social.posts AS p WHERE p.id = ANY($1::uuid[])
 UNION

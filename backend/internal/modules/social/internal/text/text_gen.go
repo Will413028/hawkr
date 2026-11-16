@@ -244,6 +244,11 @@ func PostPublishImageRequired(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "發布的貼文需要 1 張照片", Locale: uitext.ZhTW}
 }
 
+// PostPublishTakenDown 是模組句子 post.publish_taken_down；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostPublishTakenDown(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "被內容下架的貼文不能發布", Locale: uitext.ZhTW}
+}
+
 // PostScheduleCancelEtagRequired 是模組句子 post.schedule_cancel_etag_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func PostScheduleCancelEtagRequired(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "取消排程必須帶讀取時的版本（etag）", Locale: uitext.ZhTW}
@@ -298,6 +303,11 @@ func PostUnpublishEtagRequired(l uitext.Locale) uitext.Message {
 // PostUpdateEtagRequired 是模組句子 post.update_etag_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func PostUpdateEtagRequired(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "修改貼文必須帶讀取時的版本（etag）", Locale: uitext.ZhTW}
+}
+
+// PostUpdateTakenDown 是模組句子 post.update_taken_down；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostUpdateTakenDown(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "被內容下架的貼文不能修改", Locale: uitext.ZhTW}
 }
 
 // PostVersionConflict 是模組句子 post.version_conflict；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。

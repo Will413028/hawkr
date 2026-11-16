@@ -117,6 +117,8 @@ type Post struct {
 	UpdatedAt time.Time
 	Hashtags  []Hashtag
 	Stats     PostStats
+	// TakedownMeasureID 是下架這篇貼文的內容下架措施（seller.measures 的 ID）；沒有被下架是 nil。只有店主讀自己的貼文（Own、ListOwn）才填，公開讀取不填；理由在 seller，social 不複製。
+	TakedownMeasureID *uuid.UUID
 }
 
 // StoreReadCapability 是店主讀自己店的貼文、留言與動態數所需的賣家能力：收縮類的 CapContentContract（只要求店家營運中，停權時仍授予），

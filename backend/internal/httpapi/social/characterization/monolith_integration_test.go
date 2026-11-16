@@ -99,9 +99,16 @@ func exposableStore(t *testing.T, d *db.DB, accountID int64) {
 	exec(`INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, now)
 }
 
-// TestMonolith 對單體的 Connect 入口跑同一份情境（D8）：handler 與 production 一樣由 httpapi.NewHandler 組出，資料庫是 testdb 的真實 Postgres。
-// 買家是 dev session，賣家是 dev session 加一家可曝光的店；全部情境共用一個資料庫，每個情境用自己的帳號與店家。
-func TestMonolith(t *testing.T) {
+// monolith 是單體的 Connect 入口加它的資料庫與 identity：handler 與 production 一樣由 httpapi.NewHandler 組出，資料庫是 testdb 的真實 Postgres。
+type monolith struct {
+	db         *db.DB
+	identity   *identity.Module
+	srv        *httptest.Server
+	adminToken string
+}
+
+func startMonolith(t *testing.T) *monolith {
+	t.Helper()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
 		migrate.Module{Name: "identity", Dir: identity.Migrations()},
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
@@ -153,21 +160,38 @@ func TestMonolith(t *testing.T) {
 	}
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
+	adminToken, err := dev.AdminToken("dev_admin_characterization")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch.GrantAdminOwner(t, id, adminToken)
+	return &monolith{db: d, identity: id, srv: srv, adminToken: adminToken}
+}
 
+// newCustomer 建立一個 dev session 帳號；withStore 為真時再為它開一家可曝光的店。
+func (m *monolith) newCustomer(t *testing.T, withStore bool) string {
+	t.Helper()
+	account, token, err := m.identity.DevNewSession(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if withStore {
+		exposableStore(t, m.db, account)
+	}
+	return token
+}
+
+// TestMonolith 對單體的 Connect 入口跑同一份情境（D8）。買家是 dev session，賣家是 dev session 加一家可曝光的店，管理員是 dev admin token（OWNER）；
+// 全部情境共用一個資料庫，每個情境用自己的帳號與店家。
+func TestMonolith(t *testing.T) {
+	m := startMonolith(t)
 	// 情境會留下封鎖等狀態，每個情境用自己的一組帳號與店家，彼此不影響。
 	for _, sc := range scenarios {
-		tokens := map[ch.Caller]string{}
+		tokens := map[ch.Caller]string{ch.Admin: m.adminToken}
 		for _, c := range []ch.Caller{ch.Buyer, ch.Buyer2, ch.Seller, ch.Seller2} {
-			account, token, err := id.DevNewSession(t.Context())
-			if err != nil {
-				t.Fatal(err)
-			}
-			tokens[c] = token
-			if c == ch.Seller || c == ch.Seller2 {
-				exposableStore(t, d, account)
-			}
+			tokens[c] = m.newCustomer(t, c == ch.Seller || c == ch.Seller2)
 		}
-		ch.Run[Driver](t, newConnectDriver(srv.Client(), srv.URL, tokens), []ch.Scenario[Driver]{sc})
+		ch.Run[Driver](t, newConnectDriver(m.srv.Client(), m.srv.URL, tokens), []ch.Scenario[Driver]{sc})
 	}
 }
 

@@ -240,6 +240,7 @@ class Post extends $pb.GeneratedMessage {
     $core.String? imageStagedToken,
     $core.Iterable<$core.String>? hashtagInputs,
     $core.bool? viewerLiked,
+    $core.String? takedownMeasureId,
   }) {
     final result = Post._();
     if (id != null) result.id = id;
@@ -262,6 +263,7 @@ class Post extends $pb.GeneratedMessage {
     if (imageStagedToken != null) result.imageStagedToken = imageStagedToken;
     if (hashtagInputs != null) result.hashtagInputs.addAll(hashtagInputs);
     if (viewerLiked != null) result.viewerLiked = viewerLiked;
+    if (takedownMeasureId != null) result.takedownMeasureId = takedownMeasureId;
     return result;
   }
 
@@ -306,6 +308,7 @@ class Post extends $pb.GeneratedMessage {
     ..aOS(18, _omitFieldNames ? '' : 'imageStagedToken')
     ..pPS(19, _omitFieldNames ? '' : 'hashtagInputs')
     ..aOB(20, _omitFieldNames ? '' : 'viewerLiked')
+    ..aOS(21, _omitFieldNames ? '' : 'takedownMeasureId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -518,6 +521,17 @@ class Post extends $pb.GeneratedMessage {
   $core.bool hasViewerLiked() => $_has(19);
   @$pb.TagNumber(20)
   void clearViewerLiked() => $_clearField(20);
+
+  /// 下架這篇貼文的內容下架措施 ID（seller 的 `Measure.id`）；貼文沒有被內容下架時不設。只有店主讀自己的貼文才設，公開讀取不設。
+  /// 下架理由不在這裡：用這個 ID 呼叫賣家的 `GetMyMeasure`。同時被多個措施下架時是最早建立的那一個。
+  @$pb.TagNumber(21)
+  $core.String get takedownMeasureId => $_getSZ(20);
+  @$pb.TagNumber(21)
+  set takedownMeasureId($core.String value) => $_setString(20, value);
+  @$pb.TagNumber(21)
+  $core.bool hasTakedownMeasureId() => $_has(20);
+  @$pb.TagNumber(21)
+  void clearTakedownMeasureId() => $_clearField(21);
 }
 
 /// Actor 是留言的作者，名稱與頭像在讀取時由 buyer、seller 補。

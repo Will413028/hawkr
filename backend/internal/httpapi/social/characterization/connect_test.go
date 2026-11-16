@@ -4,17 +4,21 @@ package characterization
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
+	"uuid"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
+	adminsellerpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1"
+	adminsellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
 	buyerpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/buyer/v1alpha1"
 	buyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/buyer/v1alpha1/buyerv1alpha1connect"
+	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	sellerpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
@@ -36,6 +40,9 @@ type connectDriver struct {
 	postOf  map[string]string
 	parent  map[string]string
 	storeOf map[string]string
+	// measureOf 與 measureEtag 是 ModeratePost 建立的內容下架措施（貼文 ID 對措施 ID、措施 ID 對最後一次回應的 etag），還原時撤銷它。
+	measureOf   map[string]string
+	measureEtag map[string]string
 }
 
 type connectClients struct {
@@ -43,6 +50,8 @@ type connectClients struct {
 	app    socialv1alpha1connect.SocialAppServiceClient
 	buyer  buyerconnect.BuyerAppServiceClient
 	seller sellerconnect.SellerAppServiceClient
+	// governance 是後台的措施 service（SellerGovernanceAdminService）：管理員以 CreateMeasure 的內容下架、RevokeMeasure 取代舊的隱藏與還原。
+	governance adminsellerconnect.SellerGovernanceAdminServiceClient
 }
 
 var _ Driver = (*connectDriver)(nil)
@@ -52,6 +61,7 @@ func newConnectDriver(httpClient *http.Client, base string, tokens map[ch.Caller
 	d := &connectDriver{
 		clients: map[ch.Caller]*connectClients{},
 		etag:    map[string]string{}, postOf: map[string]string{}, parent: map[string]string{}, storeOf: map[string]string{},
+		measureOf: map[string]string{}, measureEtag: map[string]string{},
 	}
 	for _, c := range []ch.Caller{ch.Anonymous, ch.Buyer, ch.Buyer2, ch.Seller, ch.Seller2, ch.Admin} {
 		token := tokens[c]
@@ -64,10 +74,11 @@ func newConnectDriver(httpClient *http.Client, base string, tokens map[ch.Caller
 			}
 		}))
 		d.clients[c] = &connectClients{
-			public: socialv1alpha1connect.NewSocialPublicServiceClient(httpClient, base, auth),
-			app:    socialv1alpha1connect.NewSocialAppServiceClient(httpClient, base, auth),
-			buyer:  buyerconnect.NewBuyerAppServiceClient(httpClient, base, auth),
-			seller: sellerconnect.NewSellerAppServiceClient(httpClient, base, auth),
+			public:     socialv1alpha1connect.NewSocialPublicServiceClient(httpClient, base, auth),
+			app:        socialv1alpha1connect.NewSocialAppServiceClient(httpClient, base, auth),
+			buyer:      buyerconnect.NewBuyerAppServiceClient(httpClient, base, auth),
+			seller:     sellerconnect.NewSellerAppServiceClient(httpClient, base, auth),
+			governance: adminsellerconnect.NewSellerGovernanceAdminServiceClient(httpClient, base, auth),
 		}
 	}
 	return d
@@ -80,12 +91,62 @@ func (d *connectDriver) of(c ch.Caller) *connectClients { return d.clients[c] }
 // pageSize 是 driver 走分頁時每頁的筆數。
 const pageSize = 50
 
-// errNoConnectEntry：平台下架貼文在單體是賣家措施（A7-D5′，CreateMeasure ContentTakedown），沒有 SocialAdminService 的隱藏入口，
-// 貼文也沒有隱藏理由欄位與「隱藏」狀態。依賴這些的情境在單體的一端以 skipOnMonolith 跳過；sd2_comments_follow_post_visibility 只跳過平台隱藏的那一半，不會呼叫到。
-var errNoConnectEntry = errors.New("單體沒有隱藏或還原貼文的 Connect 入口（A7-D5′）")
+// ModeratePost 是平台下架或還原貼文（A7-D5′：平台下架是賣家的內容下架措施，A7-D28 第 8 點）：hide 以 CreateMeasure 的內容下架建立措施
+// （statement 與註記是 reason），還原是撤銷這支 driver 建立的措施。呼叫者不是管理員時請求照送，由後台 service 的授權擋下。
+func (d *connectDriver) ModeratePost(ctx context.Context, c ch.Caller, postID string, hide bool, reason string) error {
+	g := d.of(c).governance
+	if !hide {
+		measureID, ok := d.lookup(d.measureOf, postID)
+		if !ok {
+			return fmt.Errorf("driver 沒有記錄貼文 %s 的下架措施", postID)
+		}
+		etag, _ := d.lookup(d.measureEtag, measureID)
+		_, err := g.RevokeMeasure(ctx, connect.NewRequest(&adminsellerpb.RevokeMeasureRequest{
+			Id: measureID, Reason: adminsellerpb.AdminRevokeReason_ADMIN_REVOKE_REASON_ADMIN_CORRECTION, Etag: etag,
+		}))
+		if err == nil {
+			d.forget(d.measureOf, postID)
+		}
+		return ch.ConnectKind(err)
+	}
+	storeID, ok := d.lookup(d.storeOf, postID)
+	if !ok {
+		return fmt.Errorf("driver 沒有記錄貼文 %s 的店家", postID)
+	}
+	res, err := g.CreateMeasure(ctx, connect.NewRequest(&adminsellerpb.CreateMeasureRequest{
+		RequestId: uuid.NewV4().String(), StoreId: storeID, Statement: reason, Note: reason,
+		Measure: &adminsellerpb.CreateMeasureRequest_ContentTakedown{ContentTakedown: &adminsellerpb.ContentTakedownInput{
+			Contents: []*sellerpb.ContentRef{{Kind: sellerpb.ContentKind_CONTENT_KIND_POST, Id: postID}},
+			Violation: &adminsellerpb.ViolationBasis{Finding: &adminsellerpb.NewFinding{
+				Category: commonpb.PolicyCategory_POLICY_CATEGORY_SPAM, Severity: sellerpb.ViolationSeverity_VIOLATION_SEVERITY_LOW,
+			}},
+		}},
+	}))
+	if err != nil {
+		return ch.ConnectKind(err)
+	}
+	m := res.Msg.GetMeasure()
+	d.remember(d.measureOf, postID, m.GetId())
+	d.remember(d.measureEtag, m.GetId(), m.GetEtag())
+	return nil
+}
 
-func (d *connectDriver) ModeratePost(context.Context, ch.Caller, string, bool, string) error {
-	return errNoConnectEntry
+func (d *connectDriver) forget(m map[string]string, k string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	delete(m, k)
+}
+
+// hiddenReason 是店主讀到的下架理由：貼文帶下架措施的 ID 時，經賣家的 GetMyMeasure 讀措施的 statement（理由不在 social，A7-D28 第 1 點）；沒被下架是空字串。
+func (d *connectDriver) hiddenReason(ctx context.Context, c ch.Caller, p *pb.Post) (string, error) {
+	if p.TakedownMeasureId == nil {
+		return "", nil
+	}
+	res, err := d.of(c).seller.GetMyMeasure(ctx, connect.NewRequest(&sellerpb.GetMyMeasureRequest{MeasureId: p.GetTakedownMeasureId()}))
+	if err != nil {
+		return "", ch.ConnectKind(err)
+	}
+	return res.Msg.GetMeasure().GetStatement(), nil
 }
 
 func (d *connectDriver) remember(m map[string]string, k, v string) {
@@ -130,6 +191,7 @@ func trimEnum(prefix, name string) string {
 
 func (d *connectDriver) post(p *pb.Post) Post {
 	d.remember(d.etag, p.GetId(), p.GetEtag())
+	d.remember(d.storeOf, p.GetId(), p.GetStore().GetId())
 	tags := make([]string, 0, len(p.GetHashtags()))
 	for _, h := range p.GetHashtags() {
 		tags = append(tags, h.GetName())
@@ -259,14 +321,18 @@ func (d *connectDriver) GetMyPost(ctx context.Context, c ch.Caller, id string) (
 	if err != nil {
 		return Post{}, ch.ConnectKind(err)
 	}
-	return d.post(res.Msg.GetPost()), nil
+	out := d.post(res.Msg.GetPost())
+	if out.HiddenReason, err = d.hiddenReason(ctx, c, res.Msg.GetPost()); err != nil {
+		return Post{}, err
+	}
+	return out, nil
 }
 
-// ListMyPosts 的 status 是 "" （全部）或 "published"；單體的貼文沒有「隱藏」狀態（A7-D5′），其他值是情境寫錯。
+// ListMyPosts 的 status 是 ""（全部）、"published" 或 "hidden"：單體的貼文沒有「隱藏」狀態，被平台隱藏是帶下架措施 ID 的貼文（A7-D5′、A7-D28 第 1 點）。
 func (d *connectDriver) ListMyPosts(ctx context.Context, c ch.Caller, status string) ([]Post, error) {
 	var filter pb.PostStatus
 	switch status {
-	case "":
+	case "", "hidden":
 	case "published":
 		filter = pb.PostStatus_POST_STATUS_PUBLISHED
 	default:
@@ -277,7 +343,11 @@ func (d *connectDriver) ListMyPosts(ctx context.Context, c ch.Caller, status str
 		if err != nil {
 			return nil, "", ch.ConnectKind(err)
 		}
-		return d.posts(res.Msg.GetPosts()), res.Msg.GetNextPageToken(), nil
+		posts := res.Msg.GetPosts()
+		if status == "hidden" {
+			posts = slices.DeleteFunc(slices.Clone(posts), func(p *pb.Post) bool { return p.TakedownMeasureId == nil })
+		}
+		return d.posts(posts), res.Msg.GetNextPageToken(), nil
 	})
 }
 
