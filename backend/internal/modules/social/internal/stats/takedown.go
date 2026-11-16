@@ -61,9 +61,10 @@ func (c contentSet) empty() bool { return len(c.posts)+len(c.comments)+len(c.ent
 // 鎖的順序同 MarkAuthorInactive：先依 id 鎖貼文列（排程發布的鎖順序是貼文列在前，與店家清除一致），再鎖留言與討論區留言的列，再核對，取消被下架貼文的待發布排程
 // （TAKEN_DOWN），再寫複本，再以兩次集合呼叫求值（函式依序鎖整批 stats），不另呼叫 Lock。貼文沒有計入旗標，公開讀取的述詞直接看複本。冪等：複本已經有的列不重複寫，沒有新增時不重新求值。
 func (s *Service) ApplyTakedowns(ctx context.Context, measureID uuid.UUID, storeID int64, at, measureCreatedAt time.Time, contents []Content) error {
-	return s.applyTakedowns(ctx, measureID, at, measureCreatedAt, contents, func(ctx context.Context, set contentSet) (contentSet, error) {
+	return s.applyTakedowns(ctx, measureID, at, contents, func(ctx context.Context, set contentSet) (contentSet, error) {
 		return s.checkTakedownOwnership(ctx, storeID, set)
 	}, func(ctx context.Context, q *store.Queries, p store.InsertTakedownsParams) (inserted, error) {
+		p.MeasureCreatedAt = measureCreatedAt
 		rows, err := q.InsertTakedowns(ctx, p)
 		return insertedOf(rows, func(r store.InsertTakedownsRow) *uuid.UUID { return r.PostID }), err
 	})
@@ -73,7 +74,7 @@ func (s *Service) ApplyTakedowns(ctx context.Context, measureID uuid.UUID, store
 // measure_created_at 取自 seller.pub_content_takedowns() 的措施建立時間，不是對帳時間；寫入的語句自己再看一次 seller.pub_content_takedowns()，所以讀到「缺」的清單之後才被撤銷的措施不會被寫回。撤銷的 transaction 若與這一句同時進行（尚未提交），
 // 仍可能寫入一次，由下一次對帳的「多」那一步刪除。
 func (s *Service) ApplyMissingTakedowns(ctx context.Context, measureID uuid.UUID, at time.Time, contents []Content) error {
-	return s.applyTakedowns(ctx, measureID, at, time.Time{}, contents, nil, func(ctx context.Context, q *store.Queries, p store.InsertTakedownsParams) (inserted, error) {
+	return s.applyTakedowns(ctx, measureID, at, contents, nil, func(ctx context.Context, q *store.Queries, p store.InsertTakedownsParams) (inserted, error) {
 		rows, err := q.InsertActiveTakedowns(ctx, store.InsertActiveTakedownsParams{
 			MeasureID: p.MeasureID, PostIds: p.PostIds, CommentIds: p.CommentIds, ForumEntryIds: p.ForumEntryIds,
 		})
@@ -98,7 +99,7 @@ func insertedOf[R any](rows []R, post func(R) *uuid.UUID) inserted {
 }
 
 // applyTakedowns 是 ApplyTakedowns 與對帳補漏共用的寫入：鎖內容列、check（建立入口核對歸屬；對帳不核對，措施已經生效）、insert 寫複本、求值。
-func (s *Service) applyTakedowns(ctx context.Context, measureID uuid.UUID, at, measureCreatedAt time.Time, contents []Content, check func(context.Context, contentSet) (contentSet, error), insert func(context.Context, *store.Queries, store.InsertTakedownsParams) (inserted, error)) error {
+func (s *Service) applyTakedowns(ctx context.Context, measureID uuid.UUID, at time.Time, contents []Content, check func(context.Context, contentSet) (contentSet, error), insert func(context.Context, *store.Queries, store.InsertTakedownsParams) (inserted, error)) error {
 	set, err := splitContents(contents)
 	if err != nil {
 		return err
@@ -127,7 +128,7 @@ func (s *Service) applyTakedowns(ctx context.Context, measureID uuid.UUID, at, m
 			}
 		}
 		rows, err := insert(ctx, q, store.InsertTakedownsParams{
-			MeasureID: measureID, MeasureCreatedAt: measureCreatedAt, PostIds: set.posts, CommentIds: set.comments, ForumEntryIds: set.entries,
+			MeasureID: measureID, PostIds: set.posts, CommentIds: set.comments, ForumEntryIds: set.entries,
 		})
 		if err != nil {
 			return fmt.Errorf("social：記下內容下架 %s：%w", measureID, err)

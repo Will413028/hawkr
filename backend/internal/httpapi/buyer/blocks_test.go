@@ -275,8 +275,8 @@ func TestEveryBlockEntryPointRequiresTheBuyerIdentity(t *testing.T) {
 	_, err2 := e.h.BlockAuthor(anon, connect.NewRequest(commentRef()))
 	_, err3 := e.h.ListBlockedBuyers(anon, connect.NewRequest(&pb.ListBlockedBuyersRequest{}))
 	for i, err := range []error{err1, err2, err3} {
-		if err == nil || connect.CodeOf(rpc.ConnectError(anon, err)) != connect.CodePermissionDenied {
-			t.Fatalf("入口 %d 沒有買家身分要 permission_denied：%v", i, err)
+		if err == nil || connect.CodeOf(rpc.ConnectError(anon, err)) != connect.CodeInternal {
+			t.Fatalf("入口 %d 沒有呼叫者要 internal（授權鏈壞了）：%v", i, err)
 		}
 	}
 }

@@ -136,8 +136,7 @@ func TestPublicReadHidesBannersWhosePostIsNoLongerReadable(t *testing.T) {
 	soc := &fakeSocial{readable: map[uuid.UUID]bool{postPublic: true}}
 	svc := New(Deps{Social: soc})
 	product := model.Banner{Action: model.BannerAction{Type: model.BannerActionProduct, Target: "42"}}
-	legacy := model.Banner{Action: model.BannerAction{Type: model.BannerActionPost, Target: "456"}}
-	got, err := svc.dropUnreadablePostTargets(context.Background(), []model.Banner{postBanner(postPublic), postBanner(postGone), product, legacy})
+	got, err := svc.dropUnreadablePostTargets(context.Background(), []model.Banner{postBanner(postPublic), postBanner(postGone), product})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,11 +161,7 @@ func TestPublicReadAsksSocialNothingWhenNoBannerTargetsAPost(t *testing.T) {
 
 func TestPostBannerTargetParsesTheStoredCanonicalTarget(t *testing.T) {
 	id := uuid.New()
-	got, ok := postBannerTarget(model.Banner{Action: model.BannerAction{Type: model.BannerActionPost, Target: id.String()}})
-	if !ok || got != id {
-		t.Fatalf("postBannerTarget = %v, %v，預期 %v", got, ok, id)
-	}
-	if _, ok := postBannerTarget(model.Banner{Action: model.BannerAction{Type: model.BannerActionPost, Target: "not-a-uuid"}}); ok {
-		t.Fatal("非 UUID 的目標不是貼文目標")
+	if got := postBannerTarget(model.Banner{Action: model.BannerAction{Type: model.BannerActionPost, Target: id.String()}}); got != id {
+		t.Fatalf("postBannerTarget = %v，預期 %v", got, id)
 	}
 }

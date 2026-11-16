@@ -192,8 +192,8 @@ func (m *Service) dropUnreadablePostTargets(ctx context.Context, banners []model
 	}
 	var ids []uuid.UUID
 	for _, b := range banners {
-		if id, ok := postBannerTarget(b); ok {
-			ids = append(ids, id)
+		if isPostBanner(b) {
+			ids = append(ids, postBannerTarget(b))
 		}
 	}
 	readable, err := m.d.Social.PubliclyReadablePosts(ctx, ids)
@@ -203,7 +203,7 @@ func (m *Service) dropUnreadablePostTargets(ctx context.Context, banners []model
 	out := make([]model.Banner, 0, len(banners))
 	for _, b := range banners {
 		if isPostBanner(b) {
-			if id, ok := postBannerTarget(b); !ok || !readable[id] {
+			if !readable[postBannerTarget(b)] {
 				continue
 			}
 		}
@@ -212,11 +212,8 @@ func (m *Service) dropUnreadablePostTargets(ctx context.Context, banners []model
 	return out, nil
 }
 
-// postBannerTarget 解析貼文 banner 的目標；儲存的目標一律是寫入時的正規形，不是 UUID 的回 false。
-func postBannerTarget(b model.Banner) (uuid.UUID, bool) {
-	id, err := uuid.Parse(b.Action.Target)
-	return id, err == nil
-}
+// postBannerTarget 解析貼文 banner 的目標；資料庫的 CHECK（banners_action_check）保證儲存的貼文目標是小寫 UUID。
+func postBannerTarget(b model.Banner) uuid.UUID { return uuid.MustParse(b.Action.Target) }
 
 func isPostBanner(b model.Banner) bool { return b.Action.Type == model.BannerActionPost }
 

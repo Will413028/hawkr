@@ -107,7 +107,7 @@ func TestCallerResolvesBuyerIDOnlyForAccounts(t *testing.T) {
 		{name: "帳號", ctx: account(), id: 5007, wantCalls: 1, wantID: 5007},
 		{name: "賣家也是買家", ctx: account(identity.RoleSeller), id: 5007, wantCalls: 1, wantID: 5007},
 		{name: "管理員", ctx: admin, wantCode: connect.CodePermissionDenied},
-		{name: "未登入", ctx: context.Background(), wantCode: connect.CodePermissionDenied},
+		{name: "未登入", ctx: context.Background(), wantErr: true, wantKind: apperr.KindInternal},
 		{name: "存活的帳號沒有買家", ctx: account(), err: apperr.NotFound("找不到買家資料"), wantCalls: 1, wantErr: true, wantKind: apperr.KindInternal},
 		{name: "查詢失敗", ctx: account(), err: apperr.Unavailable("暫時無法使用"), wantCalls: 1, wantErr: true, wantKind: apperr.KindUnavailable},
 	} {

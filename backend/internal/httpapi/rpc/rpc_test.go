@@ -532,3 +532,19 @@ func TestSnakeCase(t *testing.T) {
 		}
 	}
 }
+
+func TestRequireAccount(t *testing.T) {
+	ctx := context.Background()
+	if _, err := RequireAccount(ctx); !errors.Is(err, errNoPrincipal) || !toConnect(ctx, err).internal {
+		t.Errorf("沒有呼叫者：err = %v，預期沒有分類的 errNoPrincipal（internal）", err)
+	}
+	admin := WithPrincipal(ctx, identity.Principal{Kind: identity.PrincipalAdmin, ID: 1})
+	_, err := RequireAccount(admin)
+	if connect.CodeOf(toConnect(admin, err).err) != connect.CodePermissionDenied || !strings.Contains(err.Error(), "需要顧客帳號") {
+		t.Errorf("管理員：err = %v，預期 PermissionDenied「需要顧客帳號」", err)
+	}
+	acct := WithPrincipal(ctx, identity.Principal{Kind: identity.PrincipalAccount, ID: 7})
+	if p, err := RequireAccount(acct); err != nil || p.ID != 7 {
+		t.Errorf("顧客帳號：%+v, %v", p, err)
+	}
+}

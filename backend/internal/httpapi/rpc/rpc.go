@@ -4,6 +4,7 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -149,10 +150,16 @@ type BuyerLookup interface {
 	CurrentBuyerID(ctx context.Context, accountID int64) (int64, error)
 }
 
-// RequireAccount 回傳呼叫者的顧客帳號身分：只有顧客帳號能呼叫（沒有登入由 interceptor 擋，管理員等非帳號身分回 permission_denied）。
+// errNoPrincipal 是請求通過了授權卻沒有呼叫者：授權鏈壞了，沒有分類（internal），不是使用者的錯。
+var errNoPrincipal = errors.New("httpapi/rpc：ctx 裡沒有呼叫者")
+
+// RequireAccount 回傳呼叫者的顧客帳號身分：只有顧客帳號能呼叫（沒有登入由 interceptor 擋，ctx 裡沒有呼叫者是授權鏈壞了，回沒有分類的 internal；管理員等非帳號身分回 permission_denied）。
 func RequireAccount(ctx context.Context) (identity.Principal, error) {
 	p, ok := PrincipalFrom(ctx)
-	if !ok || p.Kind != identity.PrincipalAccount {
+	if !ok {
+		return identity.Principal{}, errNoPrincipal
+	}
+	if p.Kind != identity.PrincipalAccount {
 		return identity.Principal{}, Error(connect.CodePermissionDenied, "%s", "需要顧客帳號")
 	}
 	return p, nil
