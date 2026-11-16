@@ -192,10 +192,12 @@ type SubmitResult struct {
 
 // DecideInput 是處理案件的輸入。Version 是管理員讀到的案件版本。
 type DecideInput struct {
-	CaseID   uuid.UUID
-	Version  int64
-	AdminID  int64
-	Decision Decision
+	CaseID  uuid.UUID
+	Version int64
+	AdminID int64
+	// Procedure 是後台 RPC 的 procedure 名稱，寫進後台動作紀錄（platform/adminaudit）的動作欄。
+	Procedure string
+	Decision  Decision
 	// 以下只有 DecisionViolation 用：認定的類別、處置種類、給作者的理由；店家分支（ActionTakedown）另外要 StoreID（管理員確認的內容所屬店家，
 	// 向 social 核對）與 Severity（認定的嚴重度，字串值 seller.Severity）。
 	Category policy.Category
@@ -246,4 +248,50 @@ func (c *ReportCursor) Key() (time.Time, uuid.UUID) {
 type ReportPage struct {
 	Items []ReportItem
 	Next  *ReportCursor
+}
+
+// CaseState 是案件的狀態篩選：進行中（沒有結案）或已結案。
+type CaseState string
+
+const (
+	CaseOpen   CaseState = "OPEN"
+	CaseClosed CaseState = "CLOSED"
+)
+
+// CaseStates 回傳全部案件狀態。
+func CaseStates() []CaseState { return []CaseState{CaseOpen, CaseClosed} }
+
+// CaseFilter 是列案件的篩選；欄位空值是不篩。
+type CaseFilter struct {
+	State      CaseState
+	TargetKind TargetKind
+}
+
+const (
+	// DefaultCasePageSize 與 MaxCasePageSize 是後台列案件的每頁筆數（沿用檢舉人清單的預設與上限）。
+	DefaultCasePageSize = DefaultPageSize
+	MaxCasePageSize     = MaxPageSize
+)
+
+// CaseCursor 是案件清單的排序鍵：(OpenedAt, ID) 由大到小。
+type CaseCursor struct {
+	OpenedAt time.Time
+	ID       uuid.UUID
+}
+
+// Valid 說明 cursor 的內容是否合法（解自 client 回傳的 page token，不可信）。
+func (c CaseCursor) Valid() bool { return !c.OpenedAt.IsZero() && c.ID != uuid.UUID{} }
+
+// Key 回 SQL 的游標參數；nil（第一頁）回由大到小排序的極值，讓每一頁走同一個 query。
+func (c *CaseCursor) Key() (time.Time, uuid.UUID) {
+	if c == nil {
+		return time.Date(9999, 12, 31, 23, 59, 59, 999999000, time.UTC), uuid.UUID{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+	}
+	return c.OpenedAt, c.ID
+}
+
+// CasePage 是一頁案件（不含檢舉）；Next 是下一頁的游標（沒有下一頁是 nil）。
+type CasePage struct {
+	Cases []Case
+	Next  *CaseCursor
 }

@@ -21,22 +21,20 @@ schema `moderation`（表在 `db/schema.sql`，發布的函式與複合型別在
 ## 不變量
 
 - 一個對象至多一個進行中案件：partial UNIQUE `cases_one_open_content`、`cases_one_open_buyer`；開案用 `INSERT … ON CONFLICT DO NOTHING` 再讀（`TestThirtyReportsShareOneOpenCaseAndOutcomesFollowTheDecision`）。
-- 案件結案是終態，不重開、不改判；結案 UPDATE 以 `(id, version, closed_at IS NULL)` 轉移，0 列回 `VersionConflict` 並回滾處置（`TestDecideRollsBackTheActionWhenCloseLosesTheRace`）；新檢舉掛進既有案件讓 `version` 加一，管理員讀到之後才掛進來的檢舉讓結案衝突（`TestAReportAttachedAfterTheAdminReadMakesTheCloseConflict`）。決定只存在案件，檢舉的結果由案件推導，不存逐筆 outcome。
 - 去重是 `UNIQUE (case_id, reporter_buyer_id)`：進行中案件重送回傳既有檢舉、不吃額度、不論內容看不看得到，結案後可再檢舉（`TestResendAfterTheContentIsHiddenReturnsTheExistingReport`）。
 - 冪等：檢舉帶 `request_id` 時，`report_requests` 表以 `(reporter_buyer_id, request_id)` 為主鍵記下對應的檢舉與 `request_hash`（新建與併入既有檢舉都記，並行搶先時整輪重試）；同一位檢舉人的同一個 `request_id` 一律回第一次的檢舉，先於案件去重與每日額度，不看案件狀態（A7-D28 第 3 點）；內容不同是 InvalidInput。對外只回檢舉 ID 與收件時間，不露案件 ID。
 - 每日上限（`model.DailyReportLimit`）是單一 upsert（`BumpDailyCount`），重送已檢舉過的對象在扣額度之前回傳（`TestConcurrentSubmitsAreCappedAtTheDailyLimit`、`TestAtTheLimitAResendSucceedsButANewTargetIsRefused`）。
 - 快照每案每份內容一列，`UNIQUE (case_id, content_sha256)`；雜湊取 `snapshot.Encode` 正規化後的內容；結案滿 `model.SnapshotRetention` 後由 `moderation.purge_snapshots` 刪除（`TestSnapshotsArePurgedAfterTheRetentionAndCasesStay`）並清說明與冪等紀錄（`TestReportRequestsArePurgedWithTheDescriptions`），案件與檢舉列留著。
 - 快照引用的圖片在 media 有一筆以快照為 ref 的引用，引用只由同步 job 寫入，快照刪除才解除（`TestASnapshotHoldsItsImageUntilTheSnapshotIsPurged`）；檢舉人刪帳時同 transaction 清他的說明、冪等紀錄與每日計數列，檢舉列與 `reporter_buyer_id` 留著（`TestReporterDeletionClearsDescriptionsAndDailyCountButKeepsTheReports`）。
-- 內容已被刪除時，警告與停權用快照裡凍結的作者，隱藏與內容下架回 FailedPrecondition（`TestWarnAndBanUseTheFrozenAuthorWhenTheContentIsGone`）。
-- 處置與結案在同一個 transaction；案件列最後才寫：擁有處分的模組（social、identity、seller）的列都排在 moderation 之前，先呼叫它們、後寫自己的列（`internal/platform/lockorder`）；每次處理只走一條處置路徑。送出時依序鎖 `reporter_daily_counts`、`cases`、`case_snapshots`、`media_ref_sync`；刪帳訂閱者在 accountdeletion 鎖完買家與店家之後才鎖 `reports` 與 `reporter_daily_counts`。
-- 店家寫的內容只能走內容下架，內容必須經 social 驗證屬於管理員指定的店家；買家不能隱藏或警告店家，店家不能被停權。
 - 對象必須存在而且公開可讀，不能檢舉自己（含同一帳號的其他身分）；檢舉原因只能是 `policy.CommunityReporterSelectable()` 的八個值。
+- `Cases` 列案件新到舊（keyset `(opened_at, id)`），狀態與對象種類空值是不篩、不合法的值回 InvalidInput（`TestCasesFilterByStateAndTargetKind`、`TestCasesKeysetPagingHasNoDuplicatesOrGaps`）。
+- 案件處理（`internal/handle`）的不變量：結案終態與版本轉移、處置與結案同一個 transaction 與鎖順序、內容下架的店家核對、後台決定的稽核紀錄，見 `internal/handle/AGENTS.md`。
 
 ## 不負責
 
 - 處分的紀錄與效果：social（隱藏、警告）、identity（停權紀錄）、seller（措施與申覆）。
 - 店家與商品的通報、案件與分案：seller 的 governance。
-- 後台的待辦與逾期（A7-1e）、對外 API（A7-2）、通知（A8）、聊天與評價對象（A6）。
+- 後台的待辦與逾期（A7-1e）、Connect handler（`internal/httpapi/moderation`，App 與 Admin 兩個 service）、通知（A8）、聊天與評價對象（A6）。
 
 ## 決策紀錄
 

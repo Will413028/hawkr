@@ -17,6 +17,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
+	moderationv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/reviewqueue/v1alpha1/reviewqueuev1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
@@ -72,6 +73,10 @@ var declarations = map[string]declaration{
 	contentv1alpha1connect.ContentAdminServiceListAppVersionGatesProcedure:  requires(adminperm.ContentAppVersionGatesList, auditReadOnly),
 	contentv1alpha1connect.ContentAdminServiceCreateAppVersionGateProcedure: requires(adminperm.ContentAppVersionGatesCreate, auditPending),
 	contentv1alpha1connect.ContentAdminServiceUpdateAppVersionGateProcedure: requires(adminperm.ContentAppVersionGatesUpdate, auditPending),
+
+	moderationv1alpha1connect.ModerationAdminServiceListCasesProcedure:  requires(adminperm.ModerationCasesList, auditReadOnly),
+	moderationv1alpha1connect.ModerationAdminServiceGetCaseProcedure:    requires(adminperm.ModerationCasesGet, auditReadOnly),
+	moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure: requires(adminperm.ModerationCasesDecide, auditAudited),
 
 	paymentv1alpha1connect.PaymentAdminServiceGetPaymentAccountProcedure:           requires(adminperm.PaymentAccountsGet, auditReadOnly),
 	paymentv1alpha1connect.PaymentAdminServiceRefreshPaymentAccountProcedure:       requires(adminperm.PaymentAccountsRefresh, auditReadOnly),

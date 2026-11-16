@@ -32,6 +32,7 @@ import (
 	adminbuyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
 	admincontentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
 	adminidentityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
+	adminmoderationconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
 	adminpaymentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
 	adminreviewqueueconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/reviewqueue/v1alpha1/reviewqueuev1alpha1connect"
 	adminsellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
@@ -166,7 +167,7 @@ func NewHandler(deps Deps) (http.Handler, error) {
 		return nil, fmt.Errorf("httpapi：BuyerAppService 與 IdentityAppService.GetSession 需要 Buyer")
 	}
 	if deps.Moderation == nil {
-		return nil, fmt.Errorf("httpapi：ModerationAppService 需要 Moderation")
+		return nil, fmt.Errorf("httpapi：ModerationAppService 與 ModerationAdminService 需要 Moderation")
 	}
 	if deps.Now == nil {
 		deps.Now = time.Now
@@ -310,6 +311,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	}
 	add(socialv1alpha1connect.NewSocialAppServiceHandler(socialApp, opts...))
 	add(moderationv1alpha1connect.NewModerationAppServiceHandler(httpmoderation.NewApp(deps.Moderation, deps.Buyer), opts...))
+	add(adminmoderationconnect.NewModerationAdminServiceHandler(httpmoderation.NewAdmin(deps.Moderation), opts...))
 	blocking := blocks.Sources{Authors: deps.Social, Identities: blocks.Identities{Buyers: deps.Buyer, Stores: deps.Seller}}
 	buyerApp, err := httpbuyer.NewApp(deps.Buyer, deps.Images, deps.BuyerPorts, stats, blocking)
 	if err != nil {

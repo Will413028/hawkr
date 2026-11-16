@@ -4,7 +4,7 @@
 
 ## 1. 範圍與公開介面
 
-- 根套件公開 `Module`：`SubmitReport`、`DecideCase`、`Case`、`PurgeSnapshots`、`AddWorkers`、`PeriodicJobs`，以及只靠 DB、buyer、media 與 job 佇列的 `Retention`（`NewRetention`：快照與說明的保留期、快照圖片的 media 引用、買家刪除事件的訂閱者；worker 與事件組裝只組它，不組完整模組）。對外 API（Connect handler）與後台待辦在 A7-2、A7-1e。
+- 根套件公開 `Module`：`SubmitReport`、`MyReports`、`DecideCase`、`Case`、`Cases`（後台列案件：狀態與對象種類篩選、`(opened_at, id)` 由大到小的 keyset，預設 20、上限 50）、`PurgeSnapshots`、`AddWorkers`、`PeriodicJobs`，以及只靠 DB、buyer、media 與 job 佇列的 `Retention`（`NewRetention`：快照與說明的保留期、快照圖片的 media 引用、買家刪除事件的訂閱者；worker 與事件組裝只組它，不組完整模組）。對外 API 是 `httpapi/moderation`：`ModerationAppService`（買家）與 `ModerationAdminService`（`ListCases`、`GetCase`、`DecideCase`，權限 `moderation.cases.list`、`get`、`decide`）；`DecideCase` 在結案的同一個 transaction 寫後台動作紀錄（`platform/adminaudit`，對象 `moderation_case`，detail 只放決定、處置、類別、對象種類與版本，不放理由文字）。後台待辦在 A7-1e。
 - 依賴 social、seller、buyer、`accountsuspension`、media（快照圖片的引用）；不依賴 identity、不依賴 notification（A7-1d 不發事件，A8 依案件決定通知時再加）。
 - 擁有的資料：`moderation.cases`、`reports`、`case_snapshots`、`reporter_daily_counts`、`media_ref_sync`、`retired_assets`（快照圖片引用的同步，演算法在 media）；主鍵 UUIDv7，不建跨 schema FK。
 - 對象：貼文、留言、討論區留言（`content_id`）與買家（`buyer_id`）。聊天與評價對象在 A6-4。

@@ -220,3 +220,14 @@ FROM moderation.media_ref_sync
 WHERE synced_seq < seq AND updated_at < sqlc.arg(idle_before)
 ORDER BY updated_at
 LIMIT sqlc.arg(max_rows);
+
+-- name: ListCases :many
+-- 後台列案件，開案時間新的在前；state 空字串不篩、OPEN 是進行中（closed_at IS NULL）、CLOSED 是已結案；target_kind 空字串不篩。
+-- keyset：(opened_at, id) 由大到小。
+SELECT *
+FROM moderation.cases
+WHERE (sqlc.arg(state)::text = '' OR (sqlc.arg(state)::text = 'OPEN') = (closed_at IS NULL))
+  AND (sqlc.arg(target_kind)::text = '' OR target_kind = sqlc.arg(target_kind)::text)
+  AND (opened_at, id) < (sqlc.arg(after_opened)::timestamptz, sqlc.arg(after_id)::uuid)
+ORDER BY opened_at DESC, id DESC
+LIMIT sqlc.arg(max_rows)::int;

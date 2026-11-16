@@ -37,7 +37,7 @@ social-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 |---|---|---|---|---|
 | 檢舉人身分由 gateway 解析 principal，失敗退回原值（M18） | 跨服務時 gateway 才有身分 | 不成立：同一個程序，入口解析 session 後直接帶 buyer_id | 入口認證、模組收已解析的業務鍵 | 改：`SubmitReport` 收 `ReporterBuyerID`，由 A7-2 的 handler 從 session 解析 |
 | 錯誤用 CodeMeta 錯誤碼與字串訊息 | 舊契約 | 不成立：新 API 用 `apperr` 的 kind 與 `ErrorReason` | 結構化錯誤 | 改：`apperr`（InvalidInput、NotFound、FailedPrecondition、ResourceExhausted、VersionConflict）；伺服器句子在模組 `internal/text`（檢舉人受眾 zh-TW、en；管理員受眾只有 zh-TW），語系取自 context，`TestModerationApperrCallsCarryNoSentenceLiterals` 守門 |
-| 列表分頁 page／pageSize 加 `COUNT(*)`（M20） | client 顯示總頁數 | 不成立 | AIP-158 keyset | 後台待辦與案件列表在 A7-1e、A7-2 用 keyset；本步只有單一案件的讀取 |
+| 列表分頁 page／pageSize 加 `COUNT(*)`（M20） | client 顯示總頁數 | 不成立 | AIP-158 keyset | 後台待辦在 A7-1e、案件列表（`Cases`）在 A7-2f-4 用 keyset |
 | 每日 20 筆在入口限流（M24） | 防濫用 | 上限是業務規則，在模組內強制；入口另有一般限流 | 業務上限在資料層原子強制 | 改：上限在模組內單一 upsert 強制，入口限流不負責 |
 
 ## 與 social-service 的差異

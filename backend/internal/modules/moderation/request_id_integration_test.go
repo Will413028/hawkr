@@ -34,7 +34,7 @@ func TestRequestIDResendReturnsTheFirstResultEvenAfterTheCaseIsClosed(t *testing
 	if open.Created || open.Report.ID != first.Report.ID || !open.Report.CreatedAt.Equal(first.Report.CreatedAt) {
 		t.Fatalf("進行中重送要回第一次的結果：%+v", open)
 	}
-	must(t, errOf(f.module.DecideCase(context.Background(), DecideInput{CaseID: first.Case.ID, Version: 1, AdminID: 9, Decision: DecisionNoViolation})))
+	must(t, errOf(f.module.DecideCase(context.Background(), DecideInput{CaseID: first.Case.ID, Version: 1, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionNoViolation})))
 	closed := f.submitWith(t, reporter, commentTarget(w.comment), policy.Spam, &rid)
 	if closed.Created || closed.Report.ID != first.Report.ID || closed.Case.ID != first.Case.ID {
 		t.Fatalf("結案後重送也要回第一次的結果，不開新案件：%+v", closed)
@@ -78,7 +78,7 @@ func TestADifferentRequestIDKeepsTheOpenCaseRuleAndAClosedCaseOpensANewOne(t *te
 	if dup.Created || dup.Report.ID != first.Report.ID {
 		t.Fatalf("進行中重複檢舉要回原檢舉：%+v", dup)
 	}
-	must(t, errOf(f.module.DecideCase(context.Background(), DecideInput{CaseID: first.Case.ID, Version: 1, AdminID: 9, Decision: DecisionNoViolation})))
+	must(t, errOf(f.module.DecideCase(context.Background(), DecideInput{CaseID: first.Case.ID, Version: 1, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionNoViolation})))
 	next := f.submitWith(t, reporter, commentTarget(w.comment), policy.Spam, &r3)
 	if !next.Created || next.Case.ID == first.Case.ID || next.Report.ID == first.Report.ID {
 		t.Fatalf("結案後再檢舉要開新案件：%+v", next)
@@ -130,7 +130,7 @@ func TestMyReportsListsOnlyTheCallersReportsPagedWithDerivedOutcomes(t *testing.
 	f.advance(time.Second)
 	r3 := f.submit(t, reporter, commentTarget(w.comment), policy.Spam)
 	f.submit(t, other, commentTarget(w.comment), policy.Spam)
-	must(t, errOf(f.module.DecideCase(ctx, DecideInput{CaseID: r1.Case.ID, Version: r1.Case.Version, AdminID: 9, Decision: DecisionNoViolation})))
+	must(t, errOf(f.module.DecideCase(ctx, DecideInput{CaseID: r1.Case.ID, Version: r1.Case.Version, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionNoViolation})))
 	d, err := f.decideHide(t, r2.Case.ID, r2.Case.Version)
 	must(t, err)
 	if d.Case.ClosedAt == nil {
@@ -169,7 +169,7 @@ func TestRequestIDOnADedupedReportIsRecordedAndSurvivesTheCaseClosing(t *testing
 	if deduped.Created || deduped.Report.ID != a.Report.ID {
 		t.Fatalf("進行中重複檢舉要回 A：%+v", deduped)
 	}
-	must(t, errOf(f.module.DecideCase(context.Background(), DecideInput{CaseID: a.Case.ID, Version: a.Case.Version, AdminID: 9, Decision: DecisionNoViolation})))
+	must(t, errOf(f.module.DecideCase(context.Background(), DecideInput{CaseID: a.Case.ID, Version: a.Case.Version, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionNoViolation})))
 	again := f.submitWith(t, reporter, commentTarget(w.comment), policy.Spam, &r2)
 	if again.Created || again.Report.ID != a.Report.ID || again.Case.ID != a.Case.ID {
 		t.Fatalf("結案後以 R2 重送要回 A，不開新案件：%+v", again)

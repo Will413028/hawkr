@@ -25,6 +25,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/view"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
@@ -70,6 +71,14 @@ type (
 	ReportCursor = model.ReportCursor
 	// ReportPage 是一頁檢舉。
 	ReportPage = model.ReportPage
+	// CaseState 是案件的狀態篩選。
+	CaseState = model.CaseState
+	// CaseFilter 是列案件的篩選。
+	CaseFilter = model.CaseFilter
+	// CaseCursor 是案件清單的排序鍵。
+	CaseCursor = model.CaseCursor
+	// CasePage 是一頁案件。
+	CasePage = model.CasePage
 )
 
 const (
@@ -86,6 +95,8 @@ const (
 	OutcomePending      = model.OutcomePending
 	OutcomeViolation    = model.OutcomeViolation
 	OutcomeNoViolation  = model.OutcomeNoViolation
+	CaseOpen            = model.CaseOpen
+	CaseClosed          = model.CaseClosed
 	// DailyReportLimit 是每位檢舉人每個台北日最多新增的檢舉數。
 	DailyReportLimit = model.DailyReportLimit
 	// SnapshotRetention 是結案後保留內容快照的期間。
@@ -101,6 +112,7 @@ type Deps struct {
 	Seller     *seller.Module
 	Buyer      *buyer.Module
 	Suspension *accountsuspension.Module
+	Audit      *adminaudit.Log
 	Media      media.Media
 	Jobs       jobs.Enqueuer
 	NewID      func() uuid.UUID
@@ -119,14 +131,14 @@ type Module struct {
 
 // New 建立模組。
 func New(d Deps) *Module {
-	if d.DB == nil || d.Social == nil || d.Seller == nil || d.Buyer == nil || d.Suspension == nil || d.Media == nil || d.Jobs == nil || d.NewID == nil || d.Now == nil {
+	if d.DB == nil || d.Social == nil || d.Seller == nil || d.Buyer == nil || d.Suspension == nil || d.Audit == nil || d.Media == nil || d.Jobs == nil || d.NewID == nil || d.Now == nil {
 		panic("moderation: missing dependency")
 	}
 	ret := NewRetention(RetentionDeps{DB: d.DB, Buyer: d.Buyer, Media: d.Media, Jobs: d.Jobs, Now: d.Now, Logger: d.Logger})
 	return &Module{
 		d:         d,
 		report:    report.New(report.Deps{DB: d.DB, Social: d.Social, Seller: d.Seller, Buyer: d.Buyer, Holds: ret.svc.Holds(), NewID: d.NewID, Now: d.Now}),
-		handle:    handle.New(handle.Deps{DB: d.DB, Social: d.Social, Seller: d.Seller, Buyer: d.Buyer, Suspension: d.Suspension, Now: d.Now}),
+		handle:    handle.New(handle.Deps{DB: d.DB, Social: d.Social, Seller: d.Seller, Buyer: d.Buyer, Suspension: d.Suspension, Audit: d.Audit, Now: d.Now}),
 		retention: ret,
 		view:      view.Reader{DB: d.DB},
 	}
@@ -194,7 +206,7 @@ func (m *Module) MyReports(ctx context.Context, buyerID int64, after *ReportCurs
 }
 
 // DecideCase 處理案件並結案：違規要帶認定類別、處置種類與給作者的理由，處置（social 的隱藏或警告、停權、seller 的內容下架）與結案在同一個 transaction；
-// 結案是終態。案件已結案或 Version 過期回 VersionConflict，處置整個回滾。
+// 結案是終態；同 transaction 寫一筆後台動作紀錄（Procedure 是動作名稱）。案件已結案或 Version 過期回 VersionConflict，處置整個回滾。
 func (m *Module) DecideCase(ctx context.Context, in DecideInput) (CaseDetail, error) {
 	return m.handle.Decide(ctx, in)
 }
@@ -202,6 +214,11 @@ func (m *Module) DecideCase(ctx context.Context, in DecideInput) (CaseDetail, er
 // Case 讀一個案件與它的全部檢舉；每筆檢舉的結果由案件的決定推導。案件不存在回 NotFound。
 func (m *Module) Case(ctx context.Context, id uuid.UUID) (CaseDetail, error) {
 	return m.view.Case(ctx, id)
+}
+
+// Cases 列案件（不含檢舉），開案時間新的在前（keyset）：state 篩進行中或已結案、target kind 篩對象種類，空值是不篩，不合法的值回 InvalidInput。
+func (m *Module) Cases(ctx context.Context, f CaseFilter, after *CaseCursor, size int32) (CasePage, error) {
+	return m.view.Cases(ctx, f, after, size)
 }
 
 // Retention 回傳模組的保留期與檢舉人資料清除（serve 以它訂閱買家的刪除事件；給組裝與測試）。

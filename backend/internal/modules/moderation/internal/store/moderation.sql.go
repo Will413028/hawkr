@@ -529,6 +529,64 @@ func (q *Queries) LatestSnapshotContent(ctx context.Context, caseID uuid.UUID) (
 	return content, err
 }
 
+const listCases = `-- name: ListCases :many
+SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at
+FROM moderation.cases
+WHERE ($1::text = '' OR ($1::text = 'OPEN') = (closed_at IS NULL))
+  AND ($2::text = '' OR target_kind = $2::text)
+  AND (opened_at, id) < ($3::timestamptz, $4::uuid)
+ORDER BY opened_at DESC, id DESC
+LIMIT $5::int
+`
+
+type ListCasesParams struct {
+	State       string
+	TargetKind  string
+	AfterOpened time.Time
+	AfterID     uuid.UUID
+	MaxRows     int32
+}
+
+// 後台列案件，開案時間新的在前；state 空字串不篩、OPEN 是進行中（closed_at IS NULL）、CLOSED 是已結案；target_kind 空字串不篩。
+// keyset：(opened_at, id) 由大到小。
+func (q *Queries) ListCases(ctx context.Context, arg ListCasesParams) ([]ModerationCase, error) {
+	rows, err := q.db.Query(ctx, listCases,
+		arg.State,
+		arg.TargetKind,
+		arg.AfterOpened,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ModerationCase{}
+	for rows.Next() {
+		var i ModerationCase
+		if err := rows.Scan(
+			&i.ID,
+			&i.TargetKind,
+			&i.ContentID,
+			&i.BuyerID,
+			&i.Version,
+			&i.OpenedAt,
+			&i.Decision,
+			&i.DecisionCategory,
+			&i.DecisionAction,
+			&i.DecidedByAdminID,
+			&i.ClosedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReportsOfReporter = `-- name: ListReportsOfReporter :many
 SELECT r.id, r.case_id, r.reporter_buyer_id, r.category, r.description, r.snapshot_id, r.created_at, c.target_kind, c.content_id, c.buyer_id, c.decision, c.closed_at
 FROM moderation.reports r

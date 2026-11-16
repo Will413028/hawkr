@@ -4,6 +4,8 @@ package view
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 
 	"uuid"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
@@ -81,4 +84,38 @@ func (r Reader) Case(ctx context.Context, id uuid.UUID) (model.CaseDetail, error
 		return model.CaseDetail{}, apperr.NotFound("%s", text.CaseNotFound())
 	}
 	return d, err
+}
+
+// Cases 列案件（不含檢舉），開案時間新的在前（keyset，不回總數）。篩選的狀態或對象種類不是合法的值回 InvalidInput；size 依 pagination.PageSize。
+func (r Reader) Cases(ctx context.Context, f model.CaseFilter, after *model.CaseCursor, size int32) (model.CasePage, error) {
+	if f.State != "" && !slices.Contains(model.CaseStates(), f.State) {
+		return model.CasePage{}, apperr.InvalidInputOn([]string{"State"}, "%s", text.CaseListStateInvalid())
+	}
+	if f.TargetKind != "" && !f.TargetKind.Valid() {
+		return model.CasePage{}, apperr.InvalidInputOn([]string{"TargetKind"}, "%s", text.CaseListKindInvalid())
+	}
+	size, err := pagination.PageSize(size, model.DefaultCasePageSize, model.MaxCasePageSize)
+	if err != nil {
+		return model.CasePage{}, err
+	}
+	at, id := after.Key()
+	rows, err := store.New(r.DB.Conn(ctx)).ListCases(ctx, store.ListCasesParams{
+		State: string(f.State), TargetKind: string(f.TargetKind), AfterOpened: at, AfterID: id, MaxRows: size + 1,
+	})
+	if err != nil {
+		return model.CasePage{}, fmt.Errorf("moderation：列出案件：%w", err)
+	}
+	more := len(rows) > int(size)
+	if more {
+		rows = rows[:size]
+	}
+	out := model.CasePage{Cases: make([]model.Case, len(rows))}
+	for i, row := range rows {
+		out.Cases[i] = Case(row)
+	}
+	if more {
+		last := rows[len(rows)-1]
+		out.Next = &model.CaseCursor{OpenedAt: last.OpenedAt, ID: last.ID}
+	}
+	return out, nil
 }

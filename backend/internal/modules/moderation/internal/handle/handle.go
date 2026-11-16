@@ -27,6 +27,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/view"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
@@ -42,6 +43,7 @@ type Deps struct {
 	Seller     *seller.Module
 	Buyer      *buyer.Module
 	Suspension *accountsuspension.Module
+	Audit      *adminaudit.Log
 	Now        func() time.Time
 }
 
@@ -60,6 +62,8 @@ func Validate(in model.DecideInput) (model.DecideInput, error) {
 		return in, apperr.InvalidInputOn([]string{"Version"}, "%s", text.DecideVersionRequired())
 	case in.AdminID <= 0:
 		return in, apperr.InvalidInputOn([]string{"AdminID"}, "%s", text.DecideAdminRequired())
+	case in.Procedure == "":
+		return in, apperr.InvalidInputOn([]string{"Procedure"}, "%s", text.DecideProcedureRequired())
 	}
 	in.Text = trimtext.Trim(in.Text)
 	switch in.Decision {
@@ -128,10 +132,25 @@ func (s *Service) Decide(ctx context.Context, in model.DecideInput) (model.CaseD
 		if err := s.close(ctx, q, in); err != nil {
 			return err
 		}
+		if err := s.audit(ctx, c, in); err != nil {
+			return err
+		}
 		out, err = view.Detail(ctx, q, in.CaseID)
 		return err
 	})
 	return out, err
+}
+
+// audit 在結案的同一個 transaction 寫後台動作紀錄：決定、處置與類別（不放理由文字）。
+func (s *Service) audit(ctx context.Context, c model.Case, in model.DecideInput) error {
+	detail := map[string]any{"decision": string(in.Decision), "target_kind": string(c.Target.Kind), "version": in.Version}
+	if in.Decision == model.DecisionViolation {
+		detail["action"] = string(in.Action)
+		detail["category"] = string(in.Category)
+	}
+	return s.d.Audit.Record(ctx, adminaudit.Entry{
+		Actor: adminaudit.Actor{AdminID: in.AdminID, Action: in.Procedure}, TargetType: "moderation_case", TargetID: in.CaseID.String(), Detail: detail,
+	})
 }
 
 // close 是最後一步：結案轉移。

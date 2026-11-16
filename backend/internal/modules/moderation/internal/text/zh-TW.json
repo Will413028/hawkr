@@ -56,6 +56,14 @@
       "message": "案件已結案",
       "description": "處理的案件已經結案。"
     },
+    "case.list_kind_invalid": {
+      "message": "對象種類不合法",
+      "description": "列案件的對象種類篩選不是檢舉對象的種類。"
+    },
+    "case.list_state_invalid": {
+      "message": "案件狀態不合法",
+      "description": "列案件的狀態篩選不是進行中或已結案。"
+    },
     "case.not_found": {
       "message": "案件不存在",
       "description": "案件 ID 查無案件。"
@@ -99,6 +107,10 @@
     "decide.no_violation_shape": {
       "message": "不違規不帶類別、處置與理由",
       "description": "決定是不違規卻帶了類別、處置、理由、店家或嚴重度。"
+    },
+    "decide.procedure_required": {
+      "message": "後台動作紀錄需要動作名稱",
+      "description": "處理案件沒有帶後台 RPC 的 procedure 名稱（寫後台動作紀錄用）。"
     },
     "decide.reason_required": {
       "message": "給作者的理由必填",

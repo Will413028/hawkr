@@ -13,7 +13,7 @@ import (
 
 func violation(a model.Action) model.DecideInput {
 	return model.DecideInput{
-		CaseID: uuid.NewV7(), Version: 1, AdminID: 3, Decision: model.DecisionViolation, Category: policy.Spam, Action: a, Text: "理由",
+		CaseID: uuid.NewV7(), Version: 1, AdminID: 3, Procedure: "/test/Decide", Decision: model.DecisionViolation, Category: policy.Spam, Action: a, Text: "理由",
 	}
 }
 
@@ -62,7 +62,7 @@ func TestValidateViolationShapes(t *testing.T) {
 }
 
 func TestValidateNoViolationCarriesNothingElse(t *testing.T) {
-	ok := model.DecideInput{CaseID: uuid.NewV7(), Version: 2, AdminID: 1, Decision: model.DecisionNoViolation}
+	ok := model.DecideInput{CaseID: uuid.NewV7(), Version: 2, AdminID: 1, Procedure: "/test/Decide", Decision: model.DecisionNoViolation}
 	if _, err := Validate(ok); err != nil {
 		t.Fatal(err)
 	}

@@ -14,6 +14,16 @@ func CaseClosed() uitext.Message {
 	return uitext.Message{Text: "案件已結案", Locale: uitext.ZhTW}
 }
 
+// CaseListKindInvalid 是後台員工受眾的模組句子 case.list_kind_invalid（只有 zh-TW）。
+func CaseListKindInvalid() uitext.Message {
+	return uitext.Message{Text: "對象種類不合法", Locale: uitext.ZhTW}
+}
+
+// CaseListStateInvalid 是後台員工受眾的模組句子 case.list_state_invalid（只有 zh-TW）。
+func CaseListStateInvalid() uitext.Message {
+	return uitext.Message{Text: "案件狀態不合法", Locale: uitext.ZhTW}
+}
+
 // CaseNotFound 是後台員工受眾的模組句子 case.not_found（只有 zh-TW）。
 func CaseNotFound() uitext.Message {
 	return uitext.Message{Text: "案件不存在", Locale: uitext.ZhTW}
@@ -67,6 +77,11 @@ func DecideHideStoreContent() uitext.Message {
 // DecideNoViolationShape 是後台員工受眾的模組句子 decide.no_violation_shape（只有 zh-TW）。
 func DecideNoViolationShape() uitext.Message {
 	return uitext.Message{Text: "不違規不帶類別、處置與理由", Locale: uitext.ZhTW}
+}
+
+// DecideProcedureRequired 是後台員工受眾的模組句子 decide.procedure_required（只有 zh-TW）。
+func DecideProcedureRequired() uitext.Message {
+	return uitext.Message{Text: "後台動作紀錄需要動作名稱", Locale: uitext.ZhTW}
 }
 
 // DecideReasonRequired 是後台員工受眾的模組句子 decide.reason_required（只有 zh-TW）。

@@ -58,6 +58,15 @@ func target(t *pb.ReportTarget) (moderation.Target, error) {
 	return moderation.Target{Kind: kind, ContentID: id}, err
 }
 
+// targetPB 把模組的對象轉成契約的對象：內容用 UUID，買家用十進位整數字串。
+func targetPB(t moderation.Target) *pb.ReportTarget {
+	id := t.ContentID.String()
+	if t.Kind == moderation.TargetBuyer {
+		id = rpc.FormatID(t.BuyerID)
+	}
+	return &pb.ReportTarget{Kind: rpc.EnumToProto[pb.ReportTargetKind](t.Kind), Id: id}
+}
+
 func (h *App) SubmitReport(ctx context.Context, req *connect.Request[pb.SubmitReportRequest]) (*connect.Response[pb.SubmitReportResponse], error) {
 	buyerID, err := rpc.AccountBuyerID(ctx, h.buyers)
 	if err != nil {
@@ -103,13 +112,9 @@ func (h *App) ListMyReports(ctx context.Context, req *connect.Request[pb.ListMyR
 	}
 	out := &pb.ListMyReportsResponse{Reports: make([]*pb.ReportRecord, len(page.Items))}
 	for i, it := range page.Items {
-		id := it.Target.ContentID.String()
-		if it.Target.Kind == moderation.TargetBuyer {
-			id = rpc.FormatID(it.Target.BuyerID)
-		}
 		rec := &pb.ReportRecord{
 			Id:          it.Report.ID.String(),
-			Target:      &pb.ReportTarget{Kind: rpc.EnumToProto[pb.ReportTargetKind](it.Target.Kind), Id: id},
+			Target:      targetPB(it.Target),
 			Category:    rpc.EnumToProto[commonpb.PolicyCategory](it.Report.Category),
 			Description: it.Report.Description,
 			Outcome:     rpc.EnumToProto[pb.ReportOutcome](it.Report.Outcome),

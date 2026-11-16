@@ -11,6 +11,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
@@ -25,7 +26,7 @@ func newModerationRetention(d *db.DB, buyers *buyer.Module, med media.Media, jc 
 // newModeration 組裝 moderation 模組；serve 以 Module.Retention() 訂閱買家的刪除事件。
 func newModeration(d *db.DB, soc *social.Module, sel *seller.Module, buyers *buyer.Module, suspension *accountsuspension.Module, med media.Media, jc jobs.Enqueuer, log *slog.Logger) *moderation.Module {
 	return moderation.New(moderation.Deps{
-		DB: d, Social: soc, Seller: sel, Buyer: buyers, Suspension: suspension,
+		DB: d, Social: soc, Seller: sel, Buyer: buyers, Suspension: suspension, Audit: adminaudit.New(d, time.Now),
 		Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log,
 	})
 }
