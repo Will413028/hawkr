@@ -95,6 +95,8 @@ func exposableStore(t *testing.T, d *db.DB, accountID int64) {
 	if err := d.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID).Scan(&storeID); err != nil {
 		t.Fatal(err)
 	}
+	// 店家的公告列開店時與店家列一起建立；撤銷措施會重算停權並重新公告，沒有這一列會回 internal。
+	exec(`INSERT INTO seller.store_exposures (store_id) VALUES ($1)`, storeID)
 	exec(`INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
 		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, now, uuid.NewV7())
 	exec(`INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, now)

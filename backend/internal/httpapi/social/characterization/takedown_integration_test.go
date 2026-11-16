@@ -47,7 +47,7 @@ func newTakedownFixture(t *testing.T, m *monolith) *takedownFixture {
 		buyer:      socialv1alpha1connect.NewSocialPublicServiceClient(hc, m.srv.URL, bearer(m.newCustomer(t, false))),
 		governance: adminsellerconnect.NewSellerGovernanceAdminServiceClient(hc, m.srv.URL, bearer(m.adminToken)),
 	}
-	res, err := f.owner.CreatePost(ctx, connect.NewRequest(&pb.CreatePostRequest{Body: "下架測試 " + uuid.NewV4().String(), Publish: true}))
+	res, err := f.owner.CreatePost(ctx, connect.NewRequest(&pb.CreatePostRequest{Body: "下架測試 " + uuid.NewV4().String(), ImageStagedToken: image(), Publish: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
