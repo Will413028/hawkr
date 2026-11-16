@@ -355,7 +355,7 @@ func TestPostWritesUseVersionCAS(t *testing.T) {
 	if got := mustV[social.Post](t)(f.module.OwnPost(ctx, storeID, p.ID)); got.Body != "新文" {
 		t.Fatalf("衝突不寫入：%q", got.Body)
 	}
-	if _, err := f.module.UpdatePost(ctx, f.store(t, otherID), social.UpdatePostInput{PostID: p.ID, Version: up.Version, Body: ptr("偷改")}); kindOf(err) != apperr.KindNotFound {
+	if _, err := f.module.UpdatePost(ctx, f.store(t, otherID), social.UpdatePostInput{PostID: p.ID, Version: up.Version, Body: ptr("偷改")}); kindOf(err) != apperr.KindPermissionDenied { // SD26：別家已發布的貼文回 PermissionDenied
 		t.Fatalf("別家店：%v", err)
 	}
 	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Body: ptr("沒帶版本")}); kindOf(err) != apperr.KindInvalidInput {
