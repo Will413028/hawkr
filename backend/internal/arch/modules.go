@@ -17,7 +17,7 @@ var Dependencies = map[string][]string{
 	"payment":           {},
 	"buyer":             {"identity", "media"},
 	"seller":            {"identity", "media", "payment"},
-	"content":           {"media"},
+	"content":           {"media", "social"}, // banner 的貼文目標：建立時經 social 確認公開可讀，讀取時隱藏失效的（A7-D28、A7-D23 O5）；social 不得依賴 content。
 	"fulfillment":       {"buyer", "seller", "media"},
 	"catalog":           {"seller", "buyer", "media", "fulfillment"},
 	"invoice":           {"payment", "fulfillment", "buyer", "seller", "media"},

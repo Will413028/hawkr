@@ -56,6 +56,21 @@ func PostIsPublic(id uuid.UUID, now time.Time, v visibility.Viewer) SelectStatem
 	return SELECT(EXISTS(SELECT(src.T.ID).FROM(src.T).WHERE(src.Where(src.T.ID.EQ(UUID(id))))).AS("value"))
 }
 
+// IDRow 是只回一個貼文 ID 的 query 的列。
+type IDRow struct {
+	ID uuid.UUID `db:"id"`
+}
+
+// PublicPostIDs 回 ids 之中匿名觀看者讀得到的貼文 ID（同 PostIsPublic 的規則，一次查多篇）。
+func PublicPostIDs(ids []uuid.UUID, now time.Time) SelectStatement {
+	src := visibility.ReadablePosts("p", now, visibility.Anonymous)
+	in := make([]Expression, len(ids))
+	for i, id := range ids {
+		in[i] = UUID(id)
+	}
+	return SELECT(src.T.ID.AS("id")).FROM(src.T).WHERE(src.Where(src.T.ID.IN(in...)))
+}
+
 // ListFeedPosts 是動態牆：最新發布的在前。
 func ListFeedPosts(now time.Time, v visibility.Viewer, pg PostPage) SelectStatement {
 	src := visibility.ReadablePosts("p", now, v)

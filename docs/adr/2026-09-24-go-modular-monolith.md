@@ -61,7 +61,7 @@
 | payment | payment-service：PayUni 收款、退款、撥款 API，會員訂閱計費 | — |
 | buyer | buyer-service | identity, media |
 | seller | seller-service（推薦賣家排行、vendor portal 除外） | identity, media |
-| content | content-service | media |
+| content | content-service | media, social（banner 的貼文目標：建立時確認公開可讀，讀取時隱藏失效的；social 不得依賴 content，A7-D28、A7-D23 O5） |
 | fulfillment | shipping-service（含 Uber、假日） | buyer, seller, media |
 | catalog | product-service（含 category） | seller, buyer, media, fulfillment |
 | productimport | product-import-service | catalog, media, fulfillment |
