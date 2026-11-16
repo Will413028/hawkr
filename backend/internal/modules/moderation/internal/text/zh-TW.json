@@ -108,10 +108,6 @@
       "message": "不違規不帶類別、處置與理由",
       "description": "決定是不違規卻帶了類別、處置、理由、店家或嚴重度。"
     },
-    "decide.procedure_required": {
-      "message": "後台動作紀錄需要動作名稱",
-      "description": "處理案件沒有帶後台 RPC 的 procedure 名稱（寫後台動作紀錄用）。"
-    },
     "decide.reason_required": {
       "message": "給作者的理由必填",
       "description": "違規決定沒有給作者的理由。"

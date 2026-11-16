@@ -441,7 +441,7 @@ func TestAuditPendingIsFrozenAndOnlyShrinks(t *testing.T) {
 	}
 }
 
-// moderation 的後台方法一個方法對一個權限（A7-D28 第 5 點）；決定是寫入，要留後台動作紀錄。
+// moderation 的後台方法一個方法對一個權限；決定是寫入，要留後台動作紀錄。
 func TestModerationAdminMethodsDeclareTheirOwnPermission(t *testing.T) {
 	for procedure, want := range map[string]struct {
 		perm  adminperm.Permission

@@ -129,8 +129,8 @@ func TestAdminPurgeHandlersPassTheStoreAndTheCallingAdmin(t *testing.T) {
 	if _, err := h.DeletePaymentAccountMapping(ctx, connect.NewRequest(&adminpb.DeletePaymentAccountMappingRequest{StoreId: "11"})); err != nil || m.mappingDeleted != 11 || m.actors[len(m.actors)-1].AdminID != 77 {
 		t.Fatalf("delete mapping: %v %v %v", err, m.mappingDeleted, m.actors)
 	}
-	if _, err := h.DeletePaymentAccountMapping(context.Background(), connect.NewRequest(&adminpb.DeletePaymentAccountMappingRequest{StoreId: "11"})); !errors.Is(err, errNoPrincipal) {
-		t.Fatalf("沒有管理員 principal 時預期 errNoPrincipal：%v", err)
+	if _, err := h.DeletePaymentAccountMapping(context.Background(), connect.NewRequest(&adminpb.DeletePaymentAccountMappingRequest{StoreId: "11"})); !errors.Is(err, rpc.ErrNoPrincipal) {
+		t.Fatalf("沒有管理員 principal 時預期 rpc.ErrNoPrincipal：%v", err)
 	}
 	if _, err := h.DeletePaymentAccountMapping(ctx, connect.NewRequest(&adminpb.DeletePaymentAccountMappingRequest{StoreId: "0"})); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("壞的 store_id 不是 invalid argument：%v", err)

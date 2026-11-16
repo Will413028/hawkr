@@ -162,7 +162,7 @@ func setup(t *testing.T) *fixture {
 	})
 	f.deletion = accountdeletion.New(accountdeletion.Deps{DB: d, Identity: f.identity, Buyer: f.buyer, Seller: f.seller, Orders: noOrders{}, Now: f.clock})
 	f.suspend = accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: f.identity, Seller: f.seller, Logger: log})
-	f.module = New(Deps{DB: d, Social: f.social, Seller: f.seller, Buyer: f.buyer, Suspension: f.suspend, Audit: adminaudit.New(d, f.clock), Media: fm, Jobs: q, NewID: uuid.NewV7, Now: f.clock, Logger: log})
+	f.module = New(Deps{DB: d, Social: f.social, Seller: f.seller, Buyer: f.buyer, Suspension: f.suspend, Media: fm, Jobs: q, NewID: uuid.NewV7, Now: f.clock, Logger: log})
 	events.Subscribe(bus, f.buyer.OnAccountCreated)
 	events.Subscribe(bus, f.social.OnBuyerDeletionRequested)
 	events.Subscribe(bus, f.social.OnBuyerDeleted)

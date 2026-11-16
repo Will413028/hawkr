@@ -792,19 +792,19 @@ var File_hawkr_admin_moderation_v1alpha1_moderation_proto protoreflect.FileDescr
 
 const file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\n" +
-	"0hawkr/admin/moderation/v1alpha1/moderation.proto\x12\x1fhawkr.admin.moderation.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a*hawkr/moderation/v1alpha1/moderation.proto\x1a\"hawkr/seller/v1alpha1/seller.proto\"\xc0\x04\n" +
+	"0hawkr/admin/moderation/v1alpha1/moderation.proto\x12\x1fhawkr.admin.moderation.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a*hawkr/moderation/v1alpha1/moderation.proto\x1a\"hawkr/seller/v1alpha1/seller.proto\"\xe3\x04\n" +
 	"\x04Case\x12\x13\n" +
-	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x03R\x02id\x12?\n" +
-	"\x06target\x18\x02 \x01(\v2'.hawkr.moderation.v1alpha1.ReportTargetR\x06target\x12@\n" +
-	"\x05state\x18\x03 \x01(\x0e2*.hawkr.admin.moderation.v1alpha1.CaseStateR\x05state\x12;\n" +
-	"\vcreate_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"createTime\x12I\n" +
-	"\bdecision\x18\x05 \x01(\x0e2-.hawkr.admin.moderation.v1alpha1.CaseDecisionR\bdecision\x12A\n" +
-	"\bcategory\x18\x06 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryR\bcategory\x12C\n" +
-	"\x06action\x18\a \x01(\x0e2+.hawkr.admin.moderation.v1alpha1.CaseActionR\x06action\x12\"\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x03R\x02id\x12D\n" +
+	"\x06target\x18\x02 \x01(\v2'.hawkr.moderation.v1alpha1.ReportTargetB\x03\xe0A\x03R\x06target\x12E\n" +
+	"\x05state\x18\x03 \x01(\x0e2*.hawkr.admin.moderation.v1alpha1.CaseStateB\x03\xe0A\x03R\x05state\x12@\n" +
+	"\vcreate_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x12N\n" +
+	"\bdecision\x18\x05 \x01(\x0e2-.hawkr.admin.moderation.v1alpha1.CaseDecisionB\x03\xe0A\x03R\bdecision\x12F\n" +
+	"\bcategory\x18\x06 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x03R\bcategory\x12H\n" +
+	"\x06action\x18\a \x01(\x0e2+.hawkr.admin.moderation.v1alpha1.CaseActionB\x03\xe0A\x03R\x06action\x12\"\n" +
 	"\n" +
-	"decided_by\x18\b \x01(\tB\x03\xe0A\x03R\tdecidedBy\x12B\n" +
-	"\fresolve_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampH\x00R\vresolveTime\x88\x01\x01\x12\x17\n" +
+	"decided_by\x18\b \x01(\tB\x03\xe0A\x03R\tdecidedBy\x12G\n" +
+	"\fresolve_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03H\x00R\vresolveTime\x88\x01\x01\x12\x17\n" +
 	"\x04etag\x18\n" +
 	" \x01(\tB\x03\xe0A\x03R\x04etagB\x0f\n" +
 	"\r_resolve_time\"\xa8\x02\n" +

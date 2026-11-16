@@ -7,13 +7,14 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
 func violation(a model.Action) model.DecideInput {
 	return model.DecideInput{
-		CaseID: uuid.NewV7(), Version: 1, AdminID: 3, Procedure: "/test/Decide", Decision: model.DecisionViolation, Category: policy.Spam, Action: a, Text: "理由",
+		CaseID: uuid.NewV7(), Version: 1, Actor: adminaudit.Actor{AdminID: 3, Action: "/test/Decide"}, Decision: model.DecisionViolation, Category: policy.Spam, Action: a, Text: "理由",
 	}
 }
 
@@ -30,7 +31,7 @@ func TestValidateViolationShapes(t *testing.T) {
 	bad := map[string]func(*model.DecideInput){
 		"沒有案件":    func(in *model.DecideInput) { in.CaseID = uuid.UUID{} },
 		"版本為零":    func(in *model.DecideInput) { in.Version = 0 },
-		"沒有管理員":   func(in *model.DecideInput) { in.AdminID = 0 },
+		"沒有管理員":   func(in *model.DecideInput) { in.Actor.AdminID = 0 },
 		"沒有處置":    func(in *model.DecideInput) { in.Action = "" },
 		"處置不認得":   func(in *model.DecideInput) { in.Action = "DISMISS" },
 		"沒有類別":    func(in *model.DecideInput) { in.Category = "" },
@@ -62,7 +63,7 @@ func TestValidateViolationShapes(t *testing.T) {
 }
 
 func TestValidateNoViolationCarriesNothingElse(t *testing.T) {
-	ok := model.DecideInput{CaseID: uuid.NewV7(), Version: 2, AdminID: 1, Procedure: "/test/Decide", Decision: model.DecisionNoViolation}
+	ok := model.DecideInput{CaseID: uuid.NewV7(), Version: 2, Actor: adminaudit.Actor{AdminID: 1, Action: "/test/Decide"}, Decision: model.DecisionNoViolation}
 	if _, err := Validate(ok); err != nil {
 		t.Fatal(err)
 	}
@@ -82,5 +83,13 @@ func TestValidateNoViolationCarriesNothingElse(t *testing.T) {
 	in.Decision = ""
 	if _, err := Validate(in); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Errorf("空的決定：%v", err)
+	}
+}
+
+func TestValidateMissingActionIsAWiringErrorNotUserInput(t *testing.T) {
+	in := violation(model.ActionHide)
+	in.Actor.Action = ""
+	if _, err := Validate(in); err == nil || apperr.KindOf(err) != apperr.KindInternal {
+		t.Fatalf("沒有 procedure 名稱預期未分類的內部錯誤：%v", err)
 	}
 }

@@ -3,7 +3,6 @@ package payment
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"time"
 
 	"connectrpc.com/connect"
@@ -14,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
 	paymentpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
-	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 )
 
@@ -27,25 +25,13 @@ type AdminModule interface {
 	DeleteAccountMapping(ctx context.Context, actor payment.AdminActor, storeID int64) error
 }
 
-// errNoPrincipal 是請求通過了 rpc 的授權卻沒有管理員呼叫者：授權鏈壞了，沒有分類（internal），不是使用者的錯。
-var errNoPrincipal = errors.New("httpapi/payment：ctx 裡沒有管理員")
-
 // actorFrom 是後台紀錄的操作者：呼叫的管理員 ID 與這個 RPC 的 procedure 名稱（D62）。
 func actorFrom(ctx context.Context, procedure string) (payment.AdminActor, error) {
-	id, err := adminFrom(ctx)
+	id, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return payment.AdminActor{}, err
 	}
 	return payment.AdminActor{AdminID: id, Action: procedure}, nil
-}
-
-// adminFrom 取出呼叫的管理員 ID（interceptor 已經依 service 名稱擋下非管理員）。
-func adminFrom(ctx context.Context) (int64, error) {
-	p, ok := rpc.PrincipalFrom(ctx)
-	if !ok || p.Kind != identity.PrincipalAdmin {
-		return 0, errNoPrincipal
-	}
-	return p.ID, nil
 }
 
 // Admin 是 PaymentAdminService 的 handler。授權（只有管理員、各方法的權限）由 rpc 的 interceptor 與 adminauth 檢查。

@@ -7,6 +7,7 @@ import (
 
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
@@ -194,10 +195,9 @@ type SubmitResult struct {
 type DecideInput struct {
 	CaseID  uuid.UUID
 	Version int64
-	AdminID int64
-	// Procedure 是後台 RPC 的 procedure 名稱，寫進後台動作紀錄（platform/adminaudit）的動作欄。
-	Procedure string
-	Decision  Decision
+	// Actor 是下決定的管理員與後台 RPC 的 procedure 名稱（handler 組成，platform/adminaudit）；缺漏是接線錯誤，不是使用者的輸入。
+	Actor    adminaudit.Actor
+	Decision Decision
 	// 以下只有 DecisionViolation 用：認定的類別、處置種類、給作者的理由；店家分支（ActionTakedown）另外要 StoreID（管理員確認的內容所屬店家，
 	// 向 social 核對）與 Severity（認定的嚴重度，字串值 seller.Severity）。
 	Category policy.Category
@@ -214,7 +214,7 @@ type CaseDetail struct {
 }
 
 const (
-	// DefaultPageSize 與 MaxPageSize 是檢舉人讀自己檢舉清單的每頁筆數。
+	// DefaultPageSize 與 MaxPageSize 是檢舉人清單與後台案件清單的每頁筆數。
 	DefaultPageSize int32 = 20
 	MaxPageSize     int32 = 50
 )
@@ -225,6 +225,20 @@ type ReportItem struct {
 	Report   Report
 	Target   Target
 	ClosedAt *time.Time
+}
+
+// cursorTimeMax 與 cursorIDMax 是 keyset 第一頁的游標參數：由大到小排序的極值，讓每一頁走同一個 query（同 social 的 keyset 慣例）。
+var (
+	cursorTimeMax = time.Date(9999, 12, 31, 23, 59, 59, 999999000, time.UTC)
+	cursorIDMax   = uuid.UUID{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+)
+
+// TrimPage 把多讀一筆（size+1）的 keyset 結果截成一頁，more 為真表示還有下一頁。
+func TrimPage[T any](rows []T, size int32) (page []T, more bool) {
+	if len(rows) > int(size) {
+		return rows[:size], true
+	}
+	return rows, false
 }
 
 // ReportCursor 是檢舉清單的排序鍵：(CreatedAt, ID) 由大到小。
@@ -239,7 +253,7 @@ func (c ReportCursor) Valid() bool { return !c.CreatedAt.IsZero() && c.ID != uui
 // Key 回 SQL 的游標參數；nil（第一頁）回由大到小排序的極值，讓每一頁走同一個 query（同 social 的 keyset 慣例）。
 func (c *ReportCursor) Key() (time.Time, uuid.UUID) {
 	if c == nil {
-		return time.Date(9999, 12, 31, 23, 59, 59, 999999000, time.UTC), uuid.UUID{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+		return cursorTimeMax, cursorIDMax
 	}
 	return c.CreatedAt, c.ID
 }
@@ -267,12 +281,6 @@ type CaseFilter struct {
 	TargetKind TargetKind
 }
 
-const (
-	// DefaultCasePageSize 與 MaxCasePageSize 是後台列案件的每頁筆數（沿用檢舉人清單的預設與上限）。
-	DefaultCasePageSize = DefaultPageSize
-	MaxCasePageSize     = MaxPageSize
-)
-
 // CaseCursor 是案件清單的排序鍵：(OpenedAt, ID) 由大到小。
 type CaseCursor struct {
 	OpenedAt time.Time
@@ -285,7 +293,7 @@ func (c CaseCursor) Valid() bool { return !c.OpenedAt.IsZero() && c.ID != uuid.U
 // Key 回 SQL 的游標參數；nil（第一頁）回由大到小排序的極值，讓每一頁走同一個 query。
 func (c *CaseCursor) Key() (time.Time, uuid.UUID) {
 	if c == nil {
-		return time.Date(9999, 12, 31, 23, 59, 59, 999999000, time.UTC), uuid.UUID{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+		return cursorTimeMax, cursorIDMax
 	}
 	return c.OpenedAt, c.ID
 }

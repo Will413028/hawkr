@@ -529,29 +529,136 @@ func (q *Queries) LatestSnapshotContent(ctx context.Context, caseID uuid.UUID) (
 	return content, err
 }
 
-const listCases = `-- name: ListCases :many
+const listAllCases = `-- name: ListAllCases :many
 SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at
 FROM moderation.cases
-WHERE ($1::text = '' OR ($1::text = 'OPEN') = (closed_at IS NULL))
-  AND ($2::text = '' OR target_kind = $2::text)
-  AND (opened_at, id) < ($3::timestamptz, $4::uuid)
+WHERE ($1::text = '' OR target_kind = $1::text)
+  AND (opened_at, id) < ($2::timestamptz, $3::uuid)
 ORDER BY opened_at DESC, id DESC
-LIMIT $5::int
+LIMIT $4::int
 `
 
-type ListCasesParams struct {
-	State       string
+type ListAllCasesParams struct {
 	TargetKind  string
 	AfterOpened time.Time
 	AfterID     uuid.UUID
 	MaxRows     int32
 }
 
-// 後台列案件，開案時間新的在前；state 空字串不篩、OPEN 是進行中（closed_at IS NULL）、CLOSED 是已結案；target_kind 空字串不篩。
-// keyset：(opened_at, id) 由大到小。
-func (q *Queries) ListCases(ctx context.Context, arg ListCasesParams) ([]ModerationCase, error) {
-	rows, err := q.db.Query(ctx, listCases,
-		arg.State,
+// 後台列案件，開案時間新的在前（keyset：(opened_at, id) 由大到小）；不分狀態；target_kind 空字串不篩。
+func (q *Queries) ListAllCases(ctx context.Context, arg ListAllCasesParams) ([]ModerationCase, error) {
+	rows, err := q.db.Query(ctx, listAllCases,
+		arg.TargetKind,
+		arg.AfterOpened,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ModerationCase{}
+	for rows.Next() {
+		var i ModerationCase
+		if err := rows.Scan(
+			&i.ID,
+			&i.TargetKind,
+			&i.ContentID,
+			&i.BuyerID,
+			&i.Version,
+			&i.OpenedAt,
+			&i.Decision,
+			&i.DecisionCategory,
+			&i.DecisionAction,
+			&i.DecidedByAdminID,
+			&i.ClosedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listClosedCases = `-- name: ListClosedCases :many
+SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at
+FROM moderation.cases
+WHERE closed_at IS NOT NULL
+  AND ($1::text = '' OR target_kind = $1::text)
+  AND (opened_at, id) < ($2::timestamptz, $3::uuid)
+ORDER BY opened_at DESC, id DESC
+LIMIT $4::int
+`
+
+type ListClosedCasesParams struct {
+	TargetKind  string
+	AfterOpened time.Time
+	AfterID     uuid.UUID
+	MaxRows     int32
+}
+
+// 後台列案件，開案時間新的在前（keyset：(opened_at, id) 由大到小）；已結案的案件；target_kind 空字串不篩。
+func (q *Queries) ListClosedCases(ctx context.Context, arg ListClosedCasesParams) ([]ModerationCase, error) {
+	rows, err := q.db.Query(ctx, listClosedCases,
+		arg.TargetKind,
+		arg.AfterOpened,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ModerationCase{}
+	for rows.Next() {
+		var i ModerationCase
+		if err := rows.Scan(
+			&i.ID,
+			&i.TargetKind,
+			&i.ContentID,
+			&i.BuyerID,
+			&i.Version,
+			&i.OpenedAt,
+			&i.Decision,
+			&i.DecisionCategory,
+			&i.DecisionAction,
+			&i.DecidedByAdminID,
+			&i.ClosedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOpenCases = `-- name: ListOpenCases :many
+SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at
+FROM moderation.cases
+WHERE closed_at IS NULL
+  AND ($1::text = '' OR target_kind = $1::text)
+  AND (opened_at, id) < ($2::timestamptz, $3::uuid)
+ORDER BY opened_at DESC, id DESC
+LIMIT $4::int
+`
+
+type ListOpenCasesParams struct {
+	TargetKind  string
+	AfterOpened time.Time
+	AfterID     uuid.UUID
+	MaxRows     int32
+}
+
+// 列案件依狀態分三個查詢：狀態是述詞的常數而不是參數，OPEN 才證明得出 partial index cases_open_by_time 適用（參數化的 catch-all 述詞在 generic plan 下證明不了）。
+// 後台列案件，開案時間新的在前（keyset：(opened_at, id) 由大到小）；進行中的案件；target_kind 空字串不篩。
+func (q *Queries) ListOpenCases(ctx context.Context, arg ListOpenCasesParams) ([]ModerationCase, error) {
+	rows, err := q.db.Query(ctx, listOpenCases,
 		arg.TargetKind,
 		arg.AfterOpened,
 		arg.AfterID,

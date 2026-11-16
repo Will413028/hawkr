@@ -2,7 +2,6 @@ package moderation
 
 import (
 	"context"
-	"errors"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -13,8 +12,8 @@ import (
 	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
-	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
@@ -32,15 +31,6 @@ var _ moderationv1alpha1connect.ModerationAdminServiceHandler = (*Admin)(nil)
 
 // NewAdmin 建立後台的 handler。
 func NewAdmin(cases Cases) *Admin { return &Admin{cases: cases} }
-
-// adminID 是呼叫的管理員。interceptor 已確認 Admin 的 service 一定是管理員。
-func adminID(ctx context.Context) (int64, error) {
-	p, ok := rpc.PrincipalFrom(ctx)
-	if !ok || p.Kind != identity.PrincipalAdmin {
-		return 0, errors.New("httpapi/moderation：後台的請求沒有管理員，interceptor 沒有掛上")
-	}
-	return p.ID, nil
-}
 
 var (
 	listPaths   = rpc.FieldPaths{"State": "state", "TargetKind": "target_kind"}
@@ -87,7 +77,7 @@ func (h *Admin) GetCase(ctx context.Context, req *connect.Request[adminpb.GetCas
 }
 
 func (h *Admin) DecideCase(ctx context.Context, req *connect.Request[adminpb.DecideCaseRequest]) (*connect.Response[adminpb.DecideCaseResponse], error) {
-	admin, err := adminID(ctx)
+	admin, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +97,7 @@ func (h *Admin) DecideCase(ctx context.Context, req *connect.Request[adminpb.Dec
 		}
 	}
 	d, err := h.cases.DecideCase(ctx, moderation.DecideInput{
-		CaseID: id, Version: version, AdminID: admin, Procedure: req.Spec().Procedure,
+		CaseID: id, Version: version, Actor: adminaudit.Actor{AdminID: admin, Action: req.Spec().Procedure},
 		Decision: rpc.EnumFromProto[moderation.Decision](msg.GetDecision()),
 		Category: rpc.EnumFromProto[policy.Category](msg.GetCategory()),
 		Action:   rpc.EnumFromProto[moderation.Action](msg.GetAction()),

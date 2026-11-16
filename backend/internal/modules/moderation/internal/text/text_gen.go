@@ -79,11 +79,6 @@ func DecideNoViolationShape() uitext.Message {
 	return uitext.Message{Text: "不違規不帶類別、處置與理由", Locale: uitext.ZhTW}
 }
 
-// DecideProcedureRequired 是後台員工受眾的模組句子 decide.procedure_required（只有 zh-TW）。
-func DecideProcedureRequired() uitext.Message {
-	return uitext.Message{Text: "後台動作紀錄需要動作名稱", Locale: uitext.ZhTW}
-}
-
 // DecideReasonRequired 是後台員工受眾的模組句子 decide.reason_required（只有 zh-TW）。
 func DecideReasonRequired() uitext.Message {
 	return uitext.Message{Text: "給作者的理由必填", Locale: uitext.ZhTW}

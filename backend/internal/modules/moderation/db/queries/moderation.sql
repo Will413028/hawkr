@@ -221,13 +221,32 @@ WHERE synced_seq < seq AND updated_at < sqlc.arg(idle_before)
 ORDER BY updated_at
 LIMIT sqlc.arg(max_rows);
 
--- name: ListCases :many
--- 後台列案件，開案時間新的在前；state 空字串不篩、OPEN 是進行中（closed_at IS NULL）、CLOSED 是已結案；target_kind 空字串不篩。
--- keyset：(opened_at, id) 由大到小。
+-- 列案件依狀態分三個查詢：狀態是述詞的常數而不是參數，OPEN 才證明得出 partial index cases_open_by_time 適用（參數化的 catch-all 述詞在 generic plan 下證明不了）。
+-- name: ListOpenCases :many
+-- 後台列案件，開案時間新的在前（keyset：(opened_at, id) 由大到小）；進行中的案件；target_kind 空字串不篩。
 SELECT *
 FROM moderation.cases
-WHERE (sqlc.arg(state)::text = '' OR (sqlc.arg(state)::text = 'OPEN') = (closed_at IS NULL))
+WHERE closed_at IS NULL
   AND (sqlc.arg(target_kind)::text = '' OR target_kind = sqlc.arg(target_kind)::text)
+  AND (opened_at, id) < (sqlc.arg(after_opened)::timestamptz, sqlc.arg(after_id)::uuid)
+ORDER BY opened_at DESC, id DESC
+LIMIT sqlc.arg(max_rows)::int;
+
+-- name: ListClosedCases :many
+-- 後台列案件，開案時間新的在前（keyset：(opened_at, id) 由大到小）；已結案的案件；target_kind 空字串不篩。
+SELECT *
+FROM moderation.cases
+WHERE closed_at IS NOT NULL
+  AND (sqlc.arg(target_kind)::text = '' OR target_kind = sqlc.arg(target_kind)::text)
+  AND (opened_at, id) < (sqlc.arg(after_opened)::timestamptz, sqlc.arg(after_id)::uuid)
+ORDER BY opened_at DESC, id DESC
+LIMIT sqlc.arg(max_rows)::int;
+
+-- name: ListAllCases :many
+-- 後台列案件，開案時間新的在前（keyset：(opened_at, id) 由大到小）；不分狀態；target_kind 空字串不篩。
+SELECT *
+FROM moderation.cases
+WHERE (sqlc.arg(target_kind)::text = '' OR target_kind = sqlc.arg(target_kind)::text)
   AND (opened_at, id) < (sqlc.arg(after_opened)::timestamptz, sqlc.arg(after_id)::uuid)
 ORDER BY opened_at DESC, id DESC
 LIMIT sqlc.arg(max_rows)::int;

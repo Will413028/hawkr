@@ -14,7 +14,6 @@ import (
 	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
-	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
@@ -56,15 +55,6 @@ func NewAdmin(m AdminModule, images rpc.Images, payments PaymentReader, log *slo
 var (
 	listStoresPaths = rpc.FieldPaths{"Statuses": "status", "KYCStatus": "kyc_status"}
 )
-
-// adminFrom 取出呼叫的管理員；interceptor 已經依 service 名稱擋下非管理員，到這裡沒有是授權鏈壞了。
-func adminFrom(ctx context.Context) (int64, error) {
-	p, ok := rpc.PrincipalFrom(ctx)
-	if !ok || p.Kind != identity.PrincipalAdmin {
-		return 0, errNoPrincipal
-	}
-	return p.ID, nil
-}
 
 func (h *Admin) toStore(s model.Store) (*adminpb.Store, error) { return toAdminStore(h.images, s) }
 

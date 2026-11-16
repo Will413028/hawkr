@@ -20,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
@@ -34,19 +35,30 @@ type fakeCases struct {
 	gotSize   int32
 	gotID     uuid.UUID
 	decided   []moderation.DecideInput
+	calls     map[string]int
+}
+
+func (f *fakeCases) called(method string) {
+	if f.calls == nil {
+		f.calls = map[string]int{}
+	}
+	f.calls[method]++
 }
 
 func (f *fakeCases) Cases(_ context.Context, fl moderation.CaseFilter, after *moderation.CaseCursor, size int32) (moderation.CasePage, error) {
+	f.called("Cases")
 	f.gotFilter, f.gotAfter, f.gotSize = fl, after, size
 	return f.page, f.err
 }
 
 func (f *fakeCases) Case(_ context.Context, id uuid.UUID) (moderation.CaseDetail, error) {
+	f.called("Case")
 	f.gotID = id
 	return f.detail, f.err
 }
 
 func (f *fakeCases) DecideCase(_ context.Context, in moderation.DecideInput) (moderation.CaseDetail, error) {
+	f.called("DecideCase")
 	f.decided = append(f.decided, in)
 	return f.detail, f.err
 }
@@ -188,7 +200,7 @@ func TestDecideCaseSendsTheAdminProcedureAndTheFieldsToTheModule(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := moderation.DecideInput{
-		CaseID: caseID, Version: 4, AdminID: 42, Procedure: moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure,
+		CaseID: caseID, Version: 4, Actor: adminaudit.Actor{AdminID: 42, Action: moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure},
 		Decision: moderation.DecisionViolation, Category: moderationCategory(), Action: moderation.ActionTakedown, Text: "廣告", StoreID: 12, Severity: "HIGH",
 	}
 	if len(f.decided) != 1 || f.decided[0] != want {
@@ -291,13 +303,16 @@ func TestEveryMethodRequiresItsPermission(t *testing.T) {
 			t.Errorf("%s 沒有角色：err = %v，預期 PERMISSION_DENIED", name, err)
 		}
 	}
-	if f.gotID != (uuid.UUID{}) || len(f.decided) != 0 || f.gotSize != 0 {
-		t.Fatalf("被拒絕的請求不該到模組：%+v", f)
+	if len(f.calls) != 0 {
+		t.Fatalf("被拒絕的請求不該到模組（每個方法 0 次呼叫）：%v", f.calls)
 	}
 	for name, call := range calls {
 		if err := call(string(adminperm.RoleOwner)); err != nil {
 			t.Errorf("%s OWNER：err = %v", name, err)
 		}
+	}
+	if f.calls["Cases"] != 1 || f.calls["Case"] != 1 || f.calls["DecideCase"] != 1 {
+		t.Fatalf("OWNER 通過後每個方法恰好到模組一次：%v", f.calls)
 	}
 }
 

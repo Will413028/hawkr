@@ -368,7 +368,7 @@ func (h *Governance) GetReport(ctx context.Context, req *connect.Request[adminpb
 }
 
 func (h *Governance) TriageReport(ctx context.Context, req *connect.Request[adminpb.TriageReportRequest]) (*connect.Response[adminpb.TriageReportResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -396,7 +396,7 @@ func (h *Governance) TriageReport(ctx context.Context, req *connect.Request[admi
 }
 
 func (h *Governance) MarkReportSupplementsSeen(ctx context.Context, req *connect.Request[adminpb.MarkReportSupplementsSeenRequest]) (*connect.Response[adminpb.MarkReportSupplementsSeenResponse], error) {
-	if _, err := adminFrom(ctx); err != nil {
+	if _, err := rpc.RequireAdmin(ctx); err != nil {
 		return nil, err
 	}
 	msg := req.Msg
@@ -416,7 +416,7 @@ func (h *Governance) MarkReportSupplementsSeen(ctx context.Context, req *connect
 }
 
 func (h *Governance) ResolveReport(ctx context.Context, req *connect.Request[adminpb.ResolveReportRequest]) (*connect.Response[adminpb.ResolveReportResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -439,7 +439,7 @@ func (h *Governance) ResolveReport(ctx context.Context, req *connect.Request[adm
 }
 
 func (h *Governance) MoveReport(ctx context.Context, req *connect.Request[adminpb.MoveReportRequest]) (*connect.Response[adminpb.MoveReportResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -513,7 +513,7 @@ func (h *Governance) GetCase(ctx context.Context, req *connect.Request[adminpb.G
 }
 
 func (h *Governance) DecideCase(ctx context.Context, req *connect.Request[adminpb.DecideCaseRequest]) (*connect.Response[adminpb.DecideCaseResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -536,7 +536,7 @@ func (h *Governance) DecideCase(ctx context.Context, req *connect.Request[adminp
 }
 
 func (h *Governance) ChangeCaseSeverity(ctx context.Context, req *connect.Request[adminpb.ChangeCaseSeverityRequest]) (*connect.Response[adminpb.ChangeCaseSeverityResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -560,7 +560,7 @@ func (h *Governance) ChangeCaseSeverity(ctx context.Context, req *connect.Reques
 
 // CreateCaseNote 新增案件的內部註記：不帶 etag，也不改案件的任何 etag；severity_change 只由 ChangeCaseSeverity 寫，這裡不採用。
 func (h *Governance) CreateCaseNote(ctx context.Context, req *connect.Request[adminpb.CreateCaseNoteRequest]) (*connect.Response[adminpb.CreateCaseNoteResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}

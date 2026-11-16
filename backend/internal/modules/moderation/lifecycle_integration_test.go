@@ -13,6 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
@@ -87,7 +88,7 @@ func TestAReportAttachedAfterTheAdminReadMakesTheCloseConflict(t *testing.T) {
 		t.Fatalf("掛進同一個案件、版本加一：%+v", later.Case)
 	}
 	in := DecideInput{
-		CaseID: read.ID, Version: read.Version, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		CaseID: read.ID, Version: read.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
 		Text: "不實", StoreID: w.storeID, Severity: string(seller.SeverityValues()[0]),
 	}
 	if _, err := f.module.DecideCase(context.Background(), in); kindOf(err) != apperr.KindVersionConflict {
@@ -117,7 +118,7 @@ func TestTakedownNoteCountsEveryReportButCitesTheEarliestTwenty(t *testing.T) {
 		c = f.submit(t, r, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
 	}
 	mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), DecideInput{
-		CaseID: c.ID, Version: c.Version, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
 		Text: "不實", StoreID: w.storeID, Severity: string(seller.SeverityValues()[0]),
 	}))
 	if n := f.count(t, "SELECT count(*) FROM seller.finding_moderation_reports"); n != 20 {
@@ -176,7 +177,7 @@ func TestASnapshotHoldsItsImageUntilTheSnapshotIsPurged(t *testing.T) {
 		t.Fatal("貼文清除之後圖片仍要被快照引用")
 	}
 
-	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: r.Case.ID, Version: r.Case.Version, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionNoViolation}))
+	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: r.Case.ID, Version: r.Case.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation}))
 	f.advance(SnapshotRetention + time.Hour)
 	if n := mustV[int64](t)(f.module.PurgeSnapshots(ctx)); n != 1 {
 		t.Fatalf("刪了 %d 份快照", n)
@@ -206,7 +207,7 @@ func TestDescriptionsAreClearedWithTheSnapshots(t *testing.T) {
 	reporter, _ := f.newBuyer(t)
 	closed := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(w.comment), Category: policy.Spam, Description: "已結案的說明"}))
 	open := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(other), Category: policy.Spam, Description: "進行中的說明"}))
-	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: closed.Case.ID, Version: closed.Case.Version, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionNoViolation}))
+	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: closed.Case.ID, Version: closed.Case.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation}))
 	f.advance(SnapshotRetention - time.Hour)
 	mustV[int64](t)(f.module.PurgeSnapshots(ctx))
 	if n := f.count(t, "SELECT count(*) FROM moderation.reports WHERE description IS NOT NULL"); n != 2 {
@@ -268,7 +269,7 @@ func TestReportRequestsArePurgedWithTheDescriptions(t *testing.T) {
 	closedRID, openRID := uuid.New(), uuid.New()
 	closed := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(w.comment), Category: policy.Spam, Description: "已結案的說明", RequestID: &closedRID}))
 	mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(other), Category: policy.Spam, Description: "進行中的說明", RequestID: &openRID}))
-	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: closed.Case.ID, Version: closed.Case.Version, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionNoViolation}))
+	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: closed.Case.ID, Version: closed.Case.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation}))
 	f.advance(SnapshotRetention - time.Hour)
 	mustV[int64](t)(f.module.PurgeSnapshots(ctx))
 	if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_buyer_id = $1", reporter); n != 2 {
@@ -321,7 +322,7 @@ func TestTakedownOfDeletedStoreContentVerifiesAgainstTheSnapshotAndStillCreatesT
 	must(t, f.social.DeleteOwnPost(ctx, st, w.post.ID, 0))
 
 	in := DecideInput{
-		CaseID: c.ID, Version: c.Version, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
 		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]), StoreID: otherStore,
 	}
 	if _, err := f.module.DecideCase(ctx, in); kindOf(err) != apperr.KindFailedPrecondition {

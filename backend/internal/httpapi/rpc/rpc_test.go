@@ -535,8 +535,8 @@ func TestSnakeCase(t *testing.T) {
 
 func TestRequireAccount(t *testing.T) {
 	ctx := context.Background()
-	if _, err := RequireAccount(ctx); !errors.Is(err, errNoPrincipal) || !toConnect(ctx, err).internal {
-		t.Errorf("沒有呼叫者：err = %v，預期沒有分類的 errNoPrincipal（internal）", err)
+	if _, err := RequireAccount(ctx); !errors.Is(err, ErrNoPrincipal) || !toConnect(ctx, err).internal {
+		t.Errorf("沒有呼叫者：err = %v，預期沒有分類的 ErrNoPrincipal（internal）", err)
 	}
 	admin := WithPrincipal(ctx, identity.Principal{Kind: identity.PrincipalAdmin, ID: 1})
 	_, err := RequireAccount(admin)
@@ -546,5 +546,21 @@ func TestRequireAccount(t *testing.T) {
 	acct := WithPrincipal(ctx, identity.Principal{Kind: identity.PrincipalAccount, ID: 7})
 	if p, err := RequireAccount(acct); err != nil || p.ID != 7 {
 		t.Errorf("顧客帳號：%+v, %v", p, err)
+	}
+}
+
+func TestRequireAdmin(t *testing.T) {
+	ctx := context.Background()
+	if _, err := RequireAdmin(ctx); !errors.Is(err, ErrNoPrincipal) || !toConnect(ctx, err).internal {
+		t.Errorf("沒有呼叫者：err = %v，預期沒有分類的 ErrNoPrincipal（internal）", err)
+	}
+	acct := WithPrincipal(ctx, identity.Principal{Kind: identity.PrincipalAccount, ID: 7})
+	_, err := RequireAdmin(acct)
+	if connect.CodeOf(toConnect(acct, err).err) != connect.CodePermissionDenied || !strings.Contains(err.Error(), "需要管理員") {
+		t.Errorf("顧客帳號：err = %v，預期 PermissionDenied「需要管理員」", err)
+	}
+	admin := WithPrincipal(ctx, identity.Principal{Kind: identity.PrincipalAdmin, ID: 1})
+	if id, err := RequireAdmin(admin); err != nil || id != 1 {
+		t.Errorf("管理員：%d, %v", id, err)
 	}
 }

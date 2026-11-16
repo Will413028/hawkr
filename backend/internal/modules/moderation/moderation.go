@@ -112,7 +112,6 @@ type Deps struct {
 	Seller     *seller.Module
 	Buyer      *buyer.Module
 	Suspension *accountsuspension.Module
-	Audit      *adminaudit.Log
 	Media      media.Media
 	Jobs       jobs.Enqueuer
 	NewID      func() uuid.UUID
@@ -131,14 +130,14 @@ type Module struct {
 
 // New 建立模組。
 func New(d Deps) *Module {
-	if d.DB == nil || d.Social == nil || d.Seller == nil || d.Buyer == nil || d.Suspension == nil || d.Audit == nil || d.Media == nil || d.Jobs == nil || d.NewID == nil || d.Now == nil {
+	if d.DB == nil || d.Social == nil || d.Seller == nil || d.Buyer == nil || d.Suspension == nil || d.Media == nil || d.Jobs == nil || d.NewID == nil || d.Now == nil {
 		panic("moderation: missing dependency")
 	}
 	ret := NewRetention(RetentionDeps{DB: d.DB, Buyer: d.Buyer, Media: d.Media, Jobs: d.Jobs, Now: d.Now, Logger: d.Logger})
 	return &Module{
 		d:         d,
 		report:    report.New(report.Deps{DB: d.DB, Social: d.Social, Seller: d.Seller, Buyer: d.Buyer, Holds: ret.svc.Holds(), NewID: d.NewID, Now: d.Now}),
-		handle:    handle.New(handle.Deps{DB: d.DB, Social: d.Social, Seller: d.Seller, Buyer: d.Buyer, Suspension: d.Suspension, Audit: d.Audit, Now: d.Now}),
+		handle:    handle.New(handle.Deps{DB: d.DB, Social: d.Social, Seller: d.Seller, Buyer: d.Buyer, Suspension: d.Suspension, Audit: adminaudit.New(d.DB, d.Now), Now: d.Now}),
 		retention: ret,
 		view:      view.Reader{DB: d.DB},
 	}

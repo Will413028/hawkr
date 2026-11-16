@@ -94,21 +94,26 @@ func (r Reader) Cases(ctx context.Context, f model.CaseFilter, after *model.Case
 	if f.TargetKind != "" && !f.TargetKind.Valid() {
 		return model.CasePage{}, apperr.InvalidInputOn([]string{"TargetKind"}, "%s", text.CaseListKindInvalid())
 	}
-	size, err := pagination.PageSize(size, model.DefaultCasePageSize, model.MaxCasePageSize)
+	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
 	if err != nil {
 		return model.CasePage{}, err
 	}
 	at, id := after.Key()
-	rows, err := store.New(r.DB.Conn(ctx)).ListCases(ctx, store.ListCasesParams{
-		State: string(f.State), TargetKind: string(f.TargetKind), AfterOpened: at, AfterID: id, MaxRows: size + 1,
-	})
+	q := store.New(r.DB.Conn(ctx))
+	p := store.ListAllCasesParams{TargetKind: string(f.TargetKind), AfterOpened: at, AfterID: id, MaxRows: size + 1}
+	var rows []store.ModerationCase
+	switch f.State {
+	case model.CaseOpen:
+		rows, err = q.ListOpenCases(ctx, store.ListOpenCasesParams(p))
+	case model.CaseClosed:
+		rows, err = q.ListClosedCases(ctx, store.ListClosedCasesParams(p))
+	default:
+		rows, err = q.ListAllCases(ctx, p)
+	}
 	if err != nil {
 		return model.CasePage{}, fmt.Errorf("moderation：列出案件：%w", err)
 	}
-	more := len(rows) > int(size)
-	if more {
-		rows = rows[:size]
-	}
+	rows, more := model.TrimPage(rows, size)
 	out := model.CasePage{Cases: make([]model.Case, len(rows))}
 	for i, row := range rows {
 		out.Cases[i] = Case(row)

@@ -2,7 +2,6 @@ package content
 
 import (
 	"context"
-	"errors"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -12,7 +11,6 @@ import (
 	contentpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/content/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
-	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 )
 
 // Admin 實作 ContentAdminService。授權（只有管理員）由 rpc 的 interceptor 依 service 名稱檢查。
@@ -26,15 +24,6 @@ var _ contentv1alpha1connect.ContentAdminServiceHandler = (*Admin)(nil)
 // NewAdmin 建立後台的 handler。
 func NewAdmin(m *content.Module, images rpc.Images) *Admin {
 	return &Admin{m: m, images: images}
-}
-
-// adminID 是呼叫的管理員，告訴 media 圖片是誰上傳的。interceptor 已確認 Admin 的 service 一定是管理員。
-func adminID(ctx context.Context) (int64, error) {
-	p, ok := rpc.PrincipalFrom(ctx)
-	if !ok || p.Kind != identity.PrincipalAdmin {
-		return 0, errors.New("httpapi/content：後台的請求沒有管理員，interceptor 沒有掛上")
-	}
-	return p.ID, nil
 }
 
 // ==================== banner ====================
@@ -72,7 +61,7 @@ func (h *Admin) GetBanner(ctx context.Context, req *connect.Request[adminpb.GetB
 }
 
 func (h *Admin) CreateBanner(ctx context.Context, req *connect.Request[adminpb.CreateBannerRequest]) (*connect.Response[adminpb.CreateBannerResponse], error) {
-	admin, err := adminID(ctx)
+	admin, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +75,7 @@ func (h *Admin) CreateBanner(ctx context.Context, req *connect.Request[adminpb.C
 
 // UpdateBanner 把 update_mask 內的欄位套在目前的 banner 上，再整筆交給模組；版本由模組比對。
 func (h *Admin) UpdateBanner(ctx context.Context, req *connect.Request[adminpb.UpdateBannerRequest]) (*connect.Response[adminpb.UpdateBannerResponse], error) {
-	admin, err := adminID(ctx)
+	admin, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}

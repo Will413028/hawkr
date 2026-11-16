@@ -256,7 +256,7 @@ func violationBasisFrom(msg *adminpb.ViolationBasis, prefix string) (*model.Viol
 // CreateMeasure 的種類就是設定的是哪一支輸入（warning、suspension、termination）：每一支只有自己的欄位，所以轉換時種類與依據、結束時間、複審期限
 // 的對應是由結構保證，不需要跨欄位檢查；各支專屬的規則（停權依據認定必填結束時間、風險必填複審期限、終止事由的條件）由模組驗證。
 func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adminpb.CreateMeasureRequest]) (*connect.Response[adminpb.CreateMeasureResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -465,7 +465,7 @@ func (h *Governance) ListMeasures(ctx context.Context, req *connect.Request[admi
 // 處理（rpc.ApplyUpdateMask）。合併的基準是目前的措施；end_time 只在合併後與目前不同時才交給模組（警告沒有 end_time，原樣送回不算
 // 修改），mask 列了 end_time 卻沒有值是清除。
 func (h *Governance) UpdateMeasure(ctx context.Context, req *connect.Request[adminpb.UpdateMeasureRequest]) (*connect.Response[adminpb.UpdateMeasureResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -510,7 +510,7 @@ func sameInstant(before *time.Time, after *timestamppb.Timestamp) bool {
 }
 
 func (h *Governance) EndMeasure(ctx context.Context, req *connect.Request[adminpb.EndMeasureRequest]) (*connect.Response[adminpb.EndMeasureResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -530,7 +530,7 @@ func (h *Governance) EndMeasure(ctx context.Context, req *connect.Request[adminp
 }
 
 func (h *Governance) RevokeMeasure(ctx context.Context, req *connect.Request[adminpb.RevokeMeasureRequest]) (*connect.Response[adminpb.RevokeMeasureResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -553,7 +553,7 @@ func (h *Governance) RevokeMeasure(ctx context.Context, req *connect.Request[adm
 }
 
 func (h *Governance) ScheduleMeasureReview(ctx context.Context, req *connect.Request[adminpb.ScheduleMeasureReviewRequest]) (*connect.Response[adminpb.ScheduleMeasureReviewResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -578,7 +578,7 @@ func (h *Governance) ScheduleMeasureReview(ctx context.Context, req *connect.Req
 }
 
 func (h *Governance) DecideAppeal(ctx context.Context, req *connect.Request[adminpb.DecideAppealRequest]) (*connect.Response[adminpb.DecideAppealResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -601,7 +601,7 @@ func (h *Governance) DecideAppeal(ctx context.Context, req *connect.Request[admi
 }
 
 func (h *Governance) DecideRemediation(ctx context.Context, req *connect.Request[adminpb.DecideRemediationRequest]) (*connect.Response[adminpb.DecideRemediationResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -625,7 +625,7 @@ func (h *Governance) DecideRemediation(ctx context.Context, req *connect.Request
 
 // CreateMeasureNote 新增內部註記：不帶 etag，也不改措施的任何 etag。
 func (h *Governance) CreateMeasureNote(ctx context.Context, req *connect.Request[adminpb.CreateMeasureNoteRequest]) (*connect.Response[adminpb.CreateMeasureNoteResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -716,7 +716,7 @@ func (h *Governance) ListViolations(ctx context.Context, req *connect.Request[ad
 }
 
 func (h *Governance) MarkLinkedAccountReviewed(ctx context.Context, req *connect.Request[adminpb.MarkLinkedAccountReviewedRequest]) (*connect.Response[adminpb.MarkLinkedAccountReviewedResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}

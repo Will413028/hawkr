@@ -5,6 +5,7 @@ package moderation
 import (
 	"context"
 	"errors"
+	"strconv"
 	"sync"
 	"testing"
 	"uuid"
@@ -12,6 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
@@ -31,7 +33,7 @@ func (f *fixture) bumpVersion(t *testing.T, id uuid.UUID) {
 func (f *fixture) decide(t *testing.T, c Case, action Action, category policy.Category) (CaseDetail, error) {
 	t.Helper()
 	return f.module.DecideCase(context.Background(), DecideInput{
-		CaseID: c.ID, Version: c.Version, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionViolation, Category: category, Action: action, Text: "違反社群規範",
+		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: category, Action: action, Text: "違反社群規範",
 	})
 }
 
@@ -140,26 +142,26 @@ func TestActionsThatDoNotFitTheTargetAreRejected(t *testing.T) {
 	}
 	commentCase := f.openCase(t, commentTarget(w.comment))
 	_, err := f.module.DecideCase(context.Background(), DecideInput{
-		CaseID: commentCase.ID, Version: 1, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionViolation, Category: policy.Spam, Action: ActionTakedown,
+		CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.Spam, Action: ActionTakedown,
 		Text: "下架", StoreID: w.storeID, Severity: string(seller.SeverityValues()[0]),
 	})
 	if kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("買家寫的留言不能走內容下架：%v", err)
 	}
 	for name, in := range map[string]DecideInput{
-		"類別不適用社群":  {CaseID: commentCase.ID, Version: 1, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionViolation, Category: policy.Counterfeit, Action: ActionHide, Text: "x"},
-		"沒有理由":     {CaseID: commentCase.ID, Version: 1, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionViolation, Category: policy.Spam, Action: ActionHide},
-		"不違規帶了處置":  {CaseID: commentCase.ID, Version: 1, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionNoViolation, Action: ActionHide},
+		"類別不適用社群":  {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.Counterfeit, Action: ActionHide, Text: "x"},
+		"沒有理由":     {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.Spam, Action: ActionHide},
+		"不違規帶了處置":  {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation, Action: ActionHide},
 		"沒有管理員":    {CaseID: commentCase.ID, Version: 1, Decision: DecisionNoViolation},
-		"決定不合法":    {CaseID: commentCase.ID, Version: 1, AdminID: 9, Procedure: "/test/Decide", Decision: "MAYBE"},
-		"內容下架沒有店家": {CaseID: commentCase.ID, Version: 1, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionViolation, Category: policy.Spam, Action: ActionTakedown, Text: "x", Severity: string(seller.SeverityValues()[0])},
-		"非下架帶了店家":  {CaseID: commentCase.ID, Version: 1, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionViolation, Category: policy.Spam, Action: ActionHide, Text: "x", StoreID: 1},
+		"決定不合法":    {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: "MAYBE"},
+		"內容下架沒有店家": {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.Spam, Action: ActionTakedown, Text: "x", Severity: string(seller.SeverityValues()[0])},
+		"非下架帶了店家":  {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.Spam, Action: ActionHide, Text: "x", StoreID: 1},
 	} {
 		if _, err := f.module.DecideCase(context.Background(), in); kindOf(err) != apperr.KindInvalidInput {
 			t.Errorf("%s：%v，預期 InvalidInput", name, err)
 		}
 	}
-	if _, err := f.module.DecideCase(context.Background(), DecideInput{CaseID: uuid.NewV7(), Version: 1, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionNoViolation}); kindOf(err) != apperr.KindNotFound {
+	if _, err := f.module.DecideCase(context.Background(), DecideInput{CaseID: uuid.NewV7(), Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation}); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("不存在的案件：%v", err)
 	}
 	if n := f.count(t, "SELECT count(*) FROM moderation.cases WHERE closed_at IS NOT NULL"); n != 0 {
@@ -202,7 +204,7 @@ func TestTakedownVerifiesOwnershipThenCreatesTheMeasure(t *testing.T) {
 		c = f.submit(t, r, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
 	}
 	in := DecideInput{
-		CaseID: c.ID, Version: c.Version, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
 		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]),
 	}
 	wrong := in
@@ -231,6 +233,10 @@ func TestTakedownVerifiesOwnershipThenCreatesTheMeasure(t *testing.T) {
 	if f.readable(t, social.TargetPost, w.post.ID) {
 		t.Fatal("貼文要隨措施下架")
 	}
+	if n := f.count(t, "SELECT count(*) FROM adminaudit.records WHERE target_type = 'moderation_case' AND target_id = $1 AND detail->>'action' = 'TAKEDOWN' AND detail->>'store_id' = $2 AND detail->>'severity' = $3",
+		c.ID.String(), strconv.FormatInt(w.storeID, 10), in.Severity); n != 1 {
+		t.Fatalf("下架決定的稽核 detail 要有 store_id 與 severity：%d", n)
+	}
 }
 
 // 被檢舉的貼文在決議前已被清除：歸屬以案件快照核對，措施照常建立。
@@ -256,7 +262,7 @@ k AS (DELETE FROM social.post_shares WHERE post_id = $1),
 l AS (DELETE FROM social.comments WHERE post_id = $1)
 DELETE FROM social.posts WHERE id = $1`, w.post.ID)
 	d := mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), DecideInput{
-		CaseID: c.ID, Version: c.Version, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
 		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]), StoreID: w.storeID,
 	}))
 	if d.Case.ClosedAt == nil {
@@ -282,7 +288,7 @@ func TestTakedownAndAccountDeletionRunConcurrentlyWithoutDeadlock(t *testing.T) 
 		defer wg.Done()
 		<-start
 		_, decideErr = f.module.DecideCase(context.Background(), DecideInput{
-			CaseID: c.ID, Version: 1, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+			CaseID: c.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
 			Text: "不實", StoreID: w.storeID, Severity: string(seller.SeverityValues()[0]),
 		})
 	}()

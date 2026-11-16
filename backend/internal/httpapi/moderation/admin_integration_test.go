@@ -131,7 +131,7 @@ func startAdminStack(t *testing.T) *adminStack {
 	sellers := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: id, Media: fakeMedia, Orders: noOrders{}, KYCMAC: sealtest.MAC(t),
 		ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log,
-		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: time.Now, Logger: log}),
+		Payment: payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log}),
 	})
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: sellers, Orders: noOrders{}, Now: time.Now, Logger: log})
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellers, Now: time.Now, Logger: log}
@@ -145,7 +145,7 @@ func startAdminStack(t *testing.T) *adminStack {
 	events.Subscribe(bus, socialModule.OnMeasureRevoked)
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellers, Logger: log})
 	mod := moderation.New(moderation.Deps{
-		DB: d, Social: socialModule, Seller: sellers, Buyer: buyers, Suspension: suspension, Audit: adminaudit.New(d, time.Now),
+		DB: d, Social: socialModule, Seller: sellers, Buyer: buyers, Suspension: suspension,
 		Media: fakeMedia, Jobs: queue, NewID: uuid.NewV7, Now: time.Now, Logger: log,
 	})
 	images, err := rpc.NewImages("https://media.example.test")

@@ -236,10 +236,7 @@ func (s *Service) MyReports(ctx context.Context, buyerID int64, after *model.Rep
 	if err != nil {
 		return model.ReportPage{}, fmt.Errorf("moderation：列出我的檢舉：%w", err)
 	}
-	more := len(rows) > int(size)
-	if more {
-		rows = rows[:size]
-	}
+	rows, more := model.TrimPage(rows, size)
 	out := model.ReportPage{Items: make([]model.ReportItem, len(rows))}
 	for i, r := range rows {
 		t := model.Target{Kind: model.TargetKind(r.TargetKind)}

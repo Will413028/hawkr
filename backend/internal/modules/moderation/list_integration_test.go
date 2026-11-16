@@ -9,6 +9,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
@@ -31,7 +32,7 @@ func (f *fixture) listWorld(t *testing.T) listWorld {
 	f.advance(time.Minute)
 	lw.commentOpen = f.submit(t, reporter, commentTarget(w.comment), policy.Spam).Case
 	must(t, errOf(f.module.DecideCase(context.Background(), DecideInput{
-		CaseID: lw.postClosed.ID, Version: lw.postClosed.Version, AdminID: 9, Procedure: "/test/Decide", Decision: DecisionNoViolation,
+		CaseID: lw.postClosed.ID, Version: lw.postClosed.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation,
 	})))
 	return lw
 }
@@ -178,7 +179,18 @@ func TestDecideWritesTheAdminAuditRecordInTheSameTransaction(t *testing.T) {
 	if n := f.count(t, audit, c.ID.String()); n != 1 {
 		t.Fatalf("結案要留一筆紀錄：%d", n)
 	}
-	if _, err := f.module.DecideCase(context.Background(), DecideInput{CaseID: c.ID, Version: 1, AdminID: 9, Decision: DecisionNoViolation}); kindOf(err) != apperr.KindInvalidInput {
-		t.Fatalf("沒有 Procedure：err = %v", err)
+	if _, err := f.module.DecideCase(context.Background(), DecideInput{CaseID: c.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9}, Decision: DecisionNoViolation}); kindOf(err) != apperr.KindInternal {
+		t.Fatalf("沒有 Actor.Action 是接線錯誤（internal）：err = %v", err)
+	}
+}
+
+// 列案件三種狀態各有索引可用：進行中走 partial cases_open_by_time，不分狀態與已結案走全表 cases_by_time。
+func TestCaseListingHasAnIndexPerStateQuery(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	for _, name := range []string{"cases_open_by_time", "cases_by_time"} {
+		if n := f.count(t, "SELECT count(*) FROM pg_indexes WHERE schemaname = 'moderation' AND tablename = 'cases' AND indexname = $1", name); n != 1 {
+			t.Errorf("缺索引 %s", name)
+		}
 	}
 }

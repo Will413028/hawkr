@@ -60,10 +60,10 @@ func Validate(in model.DecideInput) (model.DecideInput, error) {
 		return in, apperr.InvalidInputOn([]string{"CaseID"}, "%s", text.DecideCaseRequired())
 	case in.Version < 1:
 		return in, apperr.InvalidInputOn([]string{"Version"}, "%s", text.DecideVersionRequired())
-	case in.AdminID <= 0:
+	case in.Actor.AdminID <= 0:
 		return in, apperr.InvalidInputOn([]string{"AdminID"}, "%s", text.DecideAdminRequired())
-	case in.Procedure == "":
-		return in, apperr.InvalidInputOn([]string{"Procedure"}, "%s", text.DecideProcedureRequired())
+	case in.Actor.Action == "":
+		return in, errors.New("moderation：處理案件的 Actor.Action 空白，handler 沒有帶 procedure 名稱")
 	}
 	in.Text = trimtext.Trim(in.Text)
 	switch in.Decision {
@@ -147,9 +147,13 @@ func (s *Service) audit(ctx context.Context, c model.Case, in model.DecideInput)
 	if in.Decision == model.DecisionViolation {
 		detail["action"] = string(in.Action)
 		detail["category"] = string(in.Category)
+		if in.Action == model.ActionTakedown {
+			detail["store_id"] = in.StoreID
+			detail["severity"] = in.Severity
+		}
 	}
 	return s.d.Audit.Record(ctx, adminaudit.Entry{
-		Actor: adminaudit.Actor{AdminID: in.AdminID, Action: in.Procedure}, TargetType: "moderation_case", TargetID: in.CaseID.String(), Detail: detail,
+		Actor: in.Actor, TargetType: "moderation_case", TargetID: in.CaseID.String(), Detail: detail,
 	})
 }
 
@@ -157,7 +161,7 @@ func (s *Service) audit(ctx context.Context, c model.Case, in model.DecideInput)
 func (s *Service) close(ctx context.Context, q *store.Queries, in model.DecideInput) error {
 	now := s.d.Now().UTC()
 	p := store.CloseCaseParams{
-		ID: in.CaseID, Version: in.Version, Decision: ptr(string(in.Decision)), AdminID: &in.AdminID, ClosedAt: &now,
+		ID: in.CaseID, Version: in.Version, Decision: ptr(string(in.Decision)), AdminID: &in.Actor.AdminID, ClosedAt: &now,
 	}
 	if in.Decision == model.DecisionViolation {
 		p.DecisionCategory, p.DecisionAction = ptr(string(in.Category)), ptr(string(in.Action))
@@ -191,14 +195,14 @@ func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in 
 		}
 		_, err := s.d.Social.Hide(ctx, social.HideInput{
 			Target:   social.Target{Kind: social.TargetKind(c.Target.Kind), ID: c.Target.ContentID},
-			Category: string(in.Category), Text: in.Text, SourceRef: ref, AdminID: in.AdminID,
+			Category: string(in.Category), Text: in.Text, SourceRef: ref, AdminID: in.Actor.AdminID,
 		})
 		return err
 	case model.ActionWarn:
 		if author.Kind != social.ActorBuyer {
 			return apperr.FailedPrecondition("%s", text.DecideWarnNotBuyer())
 		}
-		_, err := s.d.Social.Warn(ctx, social.WarnInput{BuyerID: author.ID, Category: string(in.Category), Text: in.Text, SourceRef: ref, AdminID: in.AdminID})
+		_, err := s.d.Social.Warn(ctx, social.WarnInput{BuyerID: author.ID, Category: string(in.Category), Text: in.Text, SourceRef: ref, AdminID: in.Actor.AdminID})
 		return err
 	case model.ActionBan:
 		if author.Kind != social.ActorBuyer {
@@ -259,7 +263,7 @@ func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, 
 		return fmt.Errorf("moderation：計算案件的檢舉數：%w", err)
 	}
 	_, err = s.d.Seller.CreateMeasureInTx(ctx, seller.CreateMeasureInput{
-		AdminID:           in.AdminID,
+		AdminID:           in.Actor.AdminID,
 		StoreID:           in.StoreID,
 		Kind:              seller.MeasureContentTakedown,
 		StatementToSeller: in.Text,

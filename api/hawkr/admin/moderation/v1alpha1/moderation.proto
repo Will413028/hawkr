@@ -66,20 +66,20 @@ enum CaseAction {
 // Case 是一個案件。
 message Case {
   string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-  hawkr.moderation.v1alpha1.ReportTarget target = 2;
-  CaseState state = 3;
+  hawkr.moderation.v1alpha1.ReportTarget target = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  CaseState state = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 開案時間。
-  google.protobuf.Timestamp create_time = 4;
+  google.protobuf.Timestamp create_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 決定；進行中不設（UNSPECIFIED）。
-  CaseDecision decision = 5;
+  CaseDecision decision = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 違規的認定類別；沒有違規決定時 UNSPECIFIED。
-  hawkr.common.v1alpha1.PolicyCategory category = 6;
+  hawkr.common.v1alpha1.PolicyCategory category = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 違規的處置；沒有違規決定時 UNSPECIFIED。
-  CaseAction action = 7;
+  CaseAction action = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 結案的管理員（帳號 ID）；進行中不設。
   string decided_by = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 結案時間；進行中不設。
-  optional google.protobuf.Timestamp resolve_time = 9;
+  optional google.protobuf.Timestamp resolve_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 樂觀鎖版本；DecideCase 必須帶讀到的值。
   string etag = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

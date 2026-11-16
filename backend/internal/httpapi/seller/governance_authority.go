@@ -122,7 +122,7 @@ func noticeInputFrom(n *adminpb.AuthorityTargetNotice) model.AuthorityNoticeInpu
 }
 
 func (h *Governance) CreateAuthorityOrder(ctx context.Context, req *connect.Request[adminpb.CreateAuthorityOrderRequest]) (*connect.Response[adminpb.CreateAuthorityOrderResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func (h *Governance) GetAuthorityOrder(ctx context.Context, req *connect.Request
 }
 
 func (h *Governance) CompleteAuthorityOrder(ctx context.Context, req *connect.Request[adminpb.CompleteAuthorityOrderRequest]) (*connect.Response[adminpb.CompleteAuthorityOrderResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func (h *Governance) CompleteAuthorityOrder(ctx context.Context, req *connect.Re
 }
 
 func (h *Governance) ExtendAuthorityOrderHold(ctx context.Context, req *connect.Request[adminpb.ExtendAuthorityOrderHoldRequest]) (*connect.Response[adminpb.ExtendAuthorityOrderHoldResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -262,7 +262,7 @@ func (h *Governance) ExtendAuthorityOrderHold(ctx context.Context, req *connect.
 }
 
 func (h *Governance) RecordAuthorityTargetNotice(ctx context.Context, req *connect.Request[adminpb.RecordAuthorityTargetNoticeRequest]) (*connect.Response[adminpb.RecordAuthorityTargetNoticeResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +285,7 @@ func (h *Governance) RecordAuthorityTargetNotice(ctx context.Context, req *conne
 }
 
 func (h *Governance) RevokeAuthorityOrder(ctx context.Context, req *connect.Request[adminpb.RevokeAuthorityOrderRequest]) (*connect.Response[adminpb.RevokeAuthorityOrderResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}

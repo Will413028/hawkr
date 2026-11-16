@@ -60,8 +60,10 @@ CREATE TABLE moderation.cases (
 -- 一個對象至多一個進行中案件。
 CREATE UNIQUE INDEX cases_one_open_content ON moderation.cases (target_kind, content_id) WHERE closed_at IS NULL AND content_id IS NOT NULL;
 CREATE UNIQUE INDEX cases_one_open_buyer ON moderation.cases (buyer_id) WHERE closed_at IS NULL AND buyer_id IS NOT NULL;
--- 待辦（A7-1e）依開案時間讀進行中的案件。
+-- 待辦（A7-1e）與後台列進行中案件依開案時間讀進行中的案件。
 CREATE INDEX cases_open_by_time ON moderation.cases (opened_at, id) WHERE closed_at IS NULL;
+-- 後台列案件不分狀態或只看已結案：全表索引，開案時間新的在前。
+CREATE INDEX cases_by_time ON moderation.cases (opened_at DESC, id DESC);
 -- 快照的保留 job 依結案時間找可以清的案件。
 CREATE INDEX cases_closed_by_time ON moderation.cases (closed_at) WHERE closed_at IS NOT NULL;
 
