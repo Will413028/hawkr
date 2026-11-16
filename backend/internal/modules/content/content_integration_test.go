@@ -62,12 +62,37 @@ func (f *fakeMedia) Finalize(ctx context.Context, u media.Uploader, token, refTy
 	return f.Fake.Finalize(ctx, u, token, refType)
 }
 
+// fakeSocial 以測試設定的集合回答「貼文公開可讀」（規則本身由 social 的整合測試守）。
+type fakeSocial struct {
+	mu       sync.Mutex
+	readable map[uuid.UUID]bool
+}
+
+func (s *fakeSocial) set(id uuid.UUID, ok bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.readable[id] = ok
+}
+
+func (s *fakeSocial) PubliclyReadablePosts(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[uuid.UUID]bool{}
+	for _, id := range ids {
+		if s.readable[id] {
+			out[id] = true
+		}
+	}
+	return out, nil
+}
+
 type fixture struct {
-	m     *content.Module
-	db    *db.DB
-	media *fakeMedia
-	now   time.Time
-	newID func() uuid.UUID
+	m      *content.Module
+	social *fakeSocial
+	db     *db.DB
+	media  *fakeMedia
+	now    time.Time
+	newID  func() uuid.UUID
 }
 
 const adminID = 9001
@@ -80,9 +105,10 @@ func setup(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := &fixture{db: d, media: &fakeMedia{Fake: media.NewFake()}, now: time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC), newID: uuid.NewV7}
+	f := &fixture{social: &fakeSocial{readable: map[uuid.UUID]bool{}}, db: d, media: &fakeMedia{Fake: media.NewFake()}, now: time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC), newID: uuid.NewV7}
 	f.m = content.New(content.Deps{
 		DB:     d,
+		Social: f.social,
 		Media:  f.media,
 		Jobs:   jc,
 		NewID:  func() uuid.UUID { return f.newID() },
@@ -727,4 +753,76 @@ func TestAppTargetChecksMatchTheGoTypes(t *testing.T) {
 // ReadSecure 實作 media.Media；這些測試不讀機敏資產。
 func (*fakeMedia) ReadSecure(context.Context, string, media.Ref) (media.SecureAsset, error) {
 	return media.SecureAsset{}, errors.New("not used")
+}
+
+func postBannerInput(postID uuid.UUID) content.BannerInput {
+	in := bannerInput()
+	in.Action = content.BannerAction{Type: content.BannerActionPost, Target: postID.String()}
+	return in
+}
+
+// A7-D28 第 7 點：貼文目標建立時要存在而且公開可讀；不存在、草稿、隱藏、下架、已刪除在 social 都是不可讀。
+func TestCreateBannerRequiresThePostToBePubliclyReadable(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	notReadable := uuid.New()
+	_, err := f.m.CreateBanner(ctx, adminID, postBannerInput(notReadable))
+	wantKind(t, err, apperr.KindInvalidInput)
+	if len(f.media.finalized) != 0 {
+		t.Errorf("被拒的建立轉正了 %d 張圖", len(f.media.finalized))
+	}
+	page, err := f.m.ListBanners(ctx, nil, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Banners) != 0 {
+		t.Errorf("被拒的建立留下 %d 則 banner", len(page.Banners))
+	}
+
+	readable := uuid.New()
+	f.social.set(readable, true)
+	b, err := f.m.CreateBanner(ctx, adminID, postBannerInput(readable))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Action.Target != readable.String() {
+		t.Errorf("目標 = %q", b.Action.Target)
+	}
+}
+
+// A7-D23 O5：前台讀取時，貼文目標已經不公開可讀的 banner 不顯示；貼文回到公開後再度出現；後台清單不過濾。
+func TestPublicReadHidesABannerWhoseTargetBecameNotReadable(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	post := uuid.New()
+	f.social.set(post, true)
+	if _, err := f.m.CreateBanner(ctx, adminID, postBannerInput(post)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.CreateBanner(ctx, adminID, bannerInput()); err != nil {
+		t.Fatal(err)
+	}
+	live := func() int {
+		page, err := f.m.ListLiveBanners(ctx, nil, 50)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(page.Banners)
+	}
+	if got := live(); got != 2 {
+		t.Fatalf("公開時前台看到 %d 則，預期 2", got)
+	}
+	f.social.set(post, false)
+	if got := live(); got != 1 {
+		t.Errorf("貼文不可讀後前台看到 %d 則，預期 1（商品 banner）", got)
+	}
+	if page, err := f.m.ListBanners(ctx, nil, 50); err != nil || len(page.Banners) != 2 {
+		t.Errorf("後台清單 = %d 則（err %v），預期 2", len(page.Banners), err)
+	}
+	f.social.set(post, true)
+	if got := live(); got != 2 {
+		t.Errorf("貼文回到公開後前台看到 %d 則，預期 2", got)
+	}
 }

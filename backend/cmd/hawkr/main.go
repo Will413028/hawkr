@@ -266,6 +266,7 @@ func runServe(ctx context.Context) error {
 		Social: socialModule,
 		Content: content.New(content.Deps{
 			DB:     d,
+			Social: socialModule,
 			Media:  med,
 			Jobs:   jc,
 			NewID:  uuid.NewV7,
@@ -425,7 +426,7 @@ func runWorker(ctx context.Context) error {
 	}
 	moderationModule := newModerationRetention(d, buyerModule, med, jc, log)
 	subscribeModeration(bus, moderationModule)
-	contentModule := content.New(content.Deps{DB: d, Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
+	contentModule := content.New(content.Deps{DB: d, Social: socialModule, Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))
 	contentModule.AddWorkers(workers)

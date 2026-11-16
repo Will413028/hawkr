@@ -396,6 +396,11 @@ func (m *Module) PublicPost(ctx context.Context, c Caller, id uuid.UUID) (Post, 
 	return m.post.Public(ctx, c, id)
 }
 
+// PubliclyReadablePosts 回 ids 之中匿名觀看者讀得到的貼文（規則同 PublicPost：已發布、沒有刪除、沒有被內容下架、店家可曝光），一次查多篇；不存在或讀不到的不在結果裡。
+func (m *Module) PubliclyReadablePosts(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
+	return m.post.PublicIDs(ctx, ids)
+}
+
 // ListFeed 是動態牆（觀看者可讀的貼文，最新發布的在前；c.BuyerID 封鎖的店不出現，過濾在分頁之前）。
 func (m *Module) ListFeed(ctx context.Context, c Caller, after *PostCursor, size int32) (PostPage, error) {
 	return m.post.ListFeed(ctx, c, after, size)

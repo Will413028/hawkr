@@ -36,6 +36,7 @@ func Registry() []Entry {
 	return []Entry{
 		{Name: "GetPublicPost", Row: PostRow{}, Build: func(v visibility.Viewer) Statement { return GetPublicPost(sampleID, sampleNow, v) }},
 		{Name: "PostIsPublic", Row: BoolRow{}, Build: func(v visibility.Viewer) Statement { return PostIsPublic(sampleID, sampleNow, v) }},
+		{Name: "PublicPostIDs", Row: IDRow{}, Build: func(visibility.Viewer) Statement { return PublicPostIDs([]uuid.UUID{sampleID, sampleID2}, sampleNow) }},
 		{Name: "ListFeedPosts", Row: PostRow{}, Keyset: true, Build: func(v visibility.Viewer) Statement { return ListFeedPosts(sampleNow, v, samplePost) }},
 		{Name: "ListStorePublicPosts", Row: PostRow{}, Keyset: true, Build: func(v visibility.Viewer) Statement { return ListStorePublicPosts(7, sampleNow, v, samplePost) }},
 		{Name: "ListHashtagPosts", Row: PostRow{}, Keyset: true, Build: func(v visibility.Viewer) Statement { return ListHashtagPosts("organic", sampleNow, v, samplePost) }},

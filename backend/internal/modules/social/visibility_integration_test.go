@@ -27,6 +27,12 @@ func (f *fixture) readable(t *testing.T, postID uuidT, storeID int64) readable {
 	} else if kindOf(err) != apperr.KindNotFound {
 		t.Fatal(err)
 	}
+	// 批次的公開可讀查詢與單篇讀取是同一條規則：每個情境都要一致，並且不存在的 ID 不在結果裡。
+	batch, err := f.module.PubliclyReadablePosts(ctx, []uuidT{postID, {}})
+	must(t, err)
+	if batch[postID] != r.post || batch[uuidT{}] {
+		t.Fatalf("PubliclyReadablePosts = %v，與 PublicPost 讀得到 = %v 不一致", batch, r.post)
+	}
 	if page, err := f.module.ListComments(ctx, social.Caller{}, postID, nil, 50); err == nil {
 		r.comments = len(page.Comments)
 	} else if kindOf(err) != apperr.KindNotFound {

@@ -94,6 +94,22 @@ func (s *Service) Public(ctx context.Context, c model.Caller, id uuid.UUID) (mod
 	return posts[0], nil
 }
 
+// PublicIDs 回 ids 之中匿名觀看者讀得到的貼文 ID（規則同 Public，一次查多篇）；不存在或讀不到的不在結果裡。
+func (s *Service) PublicIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
+	if len(ids) == 0 {
+		return map[uuid.UUID]bool{}, nil
+	}
+	rows, err := reads.Many[reads.IDRow](ctx, s.d.DB.Conn(ctx), reads.PublicPostIDs(ids, s.d.Now().UTC()))
+	if err != nil {
+		return nil, fmt.Errorf("social：批次讀取貼文的公開可讀性：%w", err)
+	}
+	out := make(map[uuid.UUID]bool, len(rows))
+	for _, r := range rows {
+		out[r.ID] = true
+	}
+	return out, nil
+}
+
 // page 把多取一筆的結果切成一頁。
 func page[R any](rows []R, size int32) ([]R, bool) {
 	if len(rows) > int(size) {

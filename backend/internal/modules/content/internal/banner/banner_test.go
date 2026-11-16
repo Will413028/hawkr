@@ -1,8 +1,11 @@
 package banner
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/content/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -17,7 +20,7 @@ func TestBannerActionMustBeComplete(t *testing.T) {
 		{model.BannerAction{Type: model.BannerActionURL, Target: "https://example.com/promo"}, true},
 		{model.BannerAction{Type: model.BannerActionURL, Target: "http://example.com"}, true},
 		{model.BannerAction{Type: model.BannerActionProduct, Target: "123"}, true},
-		{model.BannerAction{Type: model.BannerActionPost, Target: "456"}, true},
+		{model.BannerAction{Type: model.BannerActionPost, Target: "018f0000-0000-7000-8000-000000000001"}, true},
 		{model.BannerAction{}, false},                            // 被洗成 {} 的那種
 		{model.BannerAction{Type: model.BannerActionURL}, false}, // 選了 url 沒填網址
 		{model.BannerAction{Type: model.BannerActionURL, Target: " "}, false},
@@ -67,5 +70,92 @@ func TestBannerButtonTextIsLimitedTo12Characters(t *testing.T) {
 	in.ButtonText += "三"
 	if err := validateInput(in); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("13 個字應回 InvalidInput：%v", err)
+	}
+}
+
+// fakeSocial 以固定的集合回答「公開可讀」，並記下被問的次數。
+type fakeSocial struct {
+	readable map[uuid.UUID]bool
+	err      error
+	calls    int
+}
+
+func (f *fakeSocial) PubliclyReadablePosts(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
+	f.calls++
+	if f.err != nil {
+		return nil, f.err
+	}
+	out := map[uuid.UUID]bool{}
+	for _, id := range ids {
+		if f.readable[id] {
+			out[id] = true
+		}
+	}
+	return out, nil
+}
+
+var (
+	postPublic = uuid.UUID{0x01, 0x8f, 0, 0, 0, 0, 0x70, 0, 0x80, 0, 0, 0, 0, 0, 0, 0x01}
+	postGone   = uuid.UUID{0x01, 0x8f, 0, 0, 0, 0, 0x70, 0, 0x80, 0, 0, 0, 0, 0, 0, 0x02}
+)
+
+func postBanner(id uuid.UUID) model.Banner {
+	return model.Banner{ID: id, Action: model.BannerAction{Type: model.BannerActionPost, Target: postTarget(id)}}
+}
+
+func postTarget(id uuid.UUID) string { return id.String() }
+
+// CreateBanner 的貼文目標檢查在碰 DB 之前：Service 沒有 DB 時，被拒的建立仍回得出錯誤。
+func TestCreateBannerRejectsAPostTargetThatIsNotPubliclyReadable(t *testing.T) {
+	soc := &fakeSocial{readable: map[uuid.UUID]bool{postPublic: true}}
+	svc := New(Deps{Social: soc})
+	in := model.BannerInput{Title: "t", PreviewImageToken: "p", PopupImageToken: "q"}
+	for name, target := range map[string]string{
+		"不存在或不公開（草稿、隱藏、下架、已刪除都在 social 回不可讀）": postTarget(postGone),
+		"不是 UUID（舊的 TSID 格式）":                 "456",
+	} {
+		in.Action = model.BannerAction{Type: model.BannerActionPost, Target: target}
+		_, err := svc.CreateBanner(context.Background(), 1, in)
+		if apperr.KindOf(err) != apperr.KindInvalidInput {
+			t.Errorf("%s：err = %v，預期 InvalidInput", name, err)
+		}
+	}
+}
+
+func TestCreateBannerDoesNotSwallowASocialFailure(t *testing.T) {
+	boom := errors.New("boom")
+	svc := New(Deps{Social: &fakeSocial{err: boom}})
+	in := model.BannerInput{Title: "t", PreviewImageToken: "p", PopupImageToken: "q",
+		Action: model.BannerAction{Type: model.BannerActionPost, Target: postTarget(postPublic)}}
+	if _, err := svc.CreateBanner(context.Background(), 1, in); !errors.Is(err, boom) {
+		t.Errorf("err = %v，預期包著 social 的錯誤", err)
+	}
+}
+
+func TestPublicReadHidesBannersWhosePostIsNoLongerReadable(t *testing.T) {
+	soc := &fakeSocial{readable: map[uuid.UUID]bool{postPublic: true}}
+	svc := New(Deps{Social: soc})
+	product := model.Banner{Action: model.BannerAction{Type: model.BannerActionProduct, Target: "42"}}
+	legacy := model.Banner{Action: model.BannerAction{Type: model.BannerActionPost, Target: "456"}}
+	got, err := svc.dropUnreadablePostTargets(context.Background(), []model.Banner{postBanner(postPublic), postBanner(postGone), product, legacy})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].ID != postPublic || got[1].Action.Type != model.BannerActionProduct {
+		t.Errorf("留下 %+v，預期只剩公開貼文的 banner 與商品 banner", got)
+	}
+	if soc.calls != 1 {
+		t.Errorf("問了 social %d 次，預期一次（批次）", soc.calls)
+	}
+}
+
+func TestPublicReadAsksSocialNothingWhenNoBannerTargetsAPost(t *testing.T) {
+	soc := &fakeSocial{}
+	svc := New(Deps{Social: soc})
+	if _, err := svc.dropUnreadablePostTargets(context.Background(), []model.Banner{{Action: model.BannerAction{Type: model.BannerActionPopup}}}); err != nil {
+		t.Fatal(err)
+	}
+	if soc.calls != 0 {
+		t.Errorf("問了 social %d 次，預期 0", soc.calls)
 	}
 }
