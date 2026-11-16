@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+// moderation 模組給後台的 API：社群檢舉的案件（管理員處理的單位）列表、讀取與決定。前台的 API 在 hawkr.moderation.v1alpha1。
+//
+// 案件是一個對象（貼文、留言、討論區留言或買家）的進行中檢舉的集合；同一對象同時至多一個進行中案件。決定即結案，結案是終態，不重開、不改判
+// （更正在擁有處分的模組做）。決定以 etag 做樂觀鎖（ADR 2026-09-25-optimistic-concurrency-etag）：新的檢舉掛進案件會改 etag，
+// etag 過期或案件已結案回 ABORTED，detail 的 ErrorInfo.reason 是 VERSION_CONFLICT。
+// ID 是不透明的字串（案件、檢舉與社群內容是 UUID，買家是過渡期的十進位整數字串），client 不解析、不轉數字
+// （ADR 2026-09-25-row-identity-by-data-kind D5）。
+package hawkr.admin.moderation.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/policy_category.proto";
+import "hawkr/moderation/v1alpha1/moderation.proto";
+import "hawkr/seller/v1alpha1/seller.proto";
+
+// ModerationAdminService 只有管理員能呼叫。
+service ModerationAdminService {
+  // ListCases 列出案件，開案時間新到舊（同時間依案件 ID 由大到小）；依狀態與對象種類篩選。
+  rpc ListCases(ListCasesRequest) returns (ListCasesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetCase 讀一個案件與它的全部檢舉。案件不存在回 NOT_FOUND。
+  rpc GetCase(GetCaseRequest) returns (GetCaseResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // DecideCase 對進行中的案件下決定並結案：違規要帶認定的類別、處置與給作者的理由，處置（社群內容的隱藏或警告、買家停權、店家寫的內容的下架措施）
+  // 與結案在同一個 transaction，任何一步失敗都整個回滾；不違規不帶這些欄位。結案是終態，沒有重開。etag 必填。
+  rpc DecideCase(DecideCaseRequest) returns (DecideCaseResponse);
+}
+
+// CaseState 是案件的狀態。
+enum CaseState {
+  CASE_STATE_UNSPECIFIED = 0;
+  // 進行中：還沒有決定。
+  CASE_STATE_OPEN = 1;
+  // 已結案：已有決定。
+  CASE_STATE_CLOSED = 2;
+}
+
+// CaseDecision 是案件的決定。
+enum CaseDecision {
+  CASE_DECISION_UNSPECIFIED = 0;
+  // 違規：要帶 category、action 與 reason。
+  CASE_DECISION_VIOLATION = 1;
+  // 不違規：不帶其他欄位。
+  CASE_DECISION_NO_VIOLATION = 2;
+}
+
+// CaseAction 是違規的處置種類；能用在哪種對象由伺服器檢查（不適用回 INVALID_ARGUMENT）。
+enum CaseAction {
+  CASE_ACTION_UNSPECIFIED = 0;
+  // 隱藏買家寫的留言或討論區留言。
+  CASE_ACTION_HIDE = 1;
+  // 警告買家（作者是買家的留言、討論區留言，或被檢舉的買家）。
+  CASE_ACTION_WARN = 2;
+  // 停權買家帳號；帳號擁有店家時回 FAILED_PRECONDITION。
+  CASE_ACTION_BAN = 3;
+  // 店家寫的內容的下架措施（貼文、留言、討論區留言）；要帶 store_id 與 severity。
+  CASE_ACTION_TAKEDOWN = 4;
+}
+
+// Case 是一個案件。
+message Case {
+  string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.moderation.v1alpha1.ReportTarget target = 2;
+  CaseState state = 3;
+  // 開案時間。
+  google.protobuf.Timestamp create_time = 4;
+  // 決定；進行中不設（UNSPECIFIED）。
+  CaseDecision decision = 5;
+  // 違規的認定類別；沒有違規決定時 UNSPECIFIED。
+  hawkr.common.v1alpha1.PolicyCategory category = 6;
+  // 違規的處置；沒有違規決定時 UNSPECIFIED。
+  CaseAction action = 7;
+  // 結案的管理員（帳號 ID）；進行中不設。
+  string decided_by = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 結案時間；進行中不設。
+  optional google.protobuf.Timestamp resolve_time = 9;
+  // 樂觀鎖版本；DecideCase 必須帶讀到的值。
+  string etag = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// CaseReport 是案件裡的一筆檢舉。
+message CaseReport {
+  string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 檢舉人（買家 ID）。
+  string reporter_id = 2;
+  hawkr.common.v1alpha1.PolicyCategory category = 3;
+  // 送出時的說明；沒有或已超過保留期被清除時是空字串。
+  string description = 4;
+  // 結果由案件的決定推導：進行中是 PENDING。
+  hawkr.moderation.v1alpha1.ReportOutcome outcome = 5;
+  google.protobuf.Timestamp create_time = 6;
+}
+
+message ListCasesRequest {
+  // 每頁筆數：0 用預設值 20，上限 50，負數回 INVALID_ARGUMENT。
+  int32 page_size = 1;
+  string page_token = 2;
+  // 只列這個狀態的案件；UNSPECIFIED 不篩選。
+  CaseState state = 3;
+  // 只列這個種類對象的案件；UNSPECIFIED 不篩選。
+  hawkr.moderation.v1alpha1.ReportTargetKind target_kind = 4;
+}
+
+message ListCasesResponse {
+  repeated Case cases = 1;
+  string next_page_token = 2;
+}
+
+message GetCaseRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetCaseResponse {
+  Case case = 1;
+  // 全部檢舉，送出時間由舊到新。
+  repeated CaseReport reports = 2;
+}
+
+message DecideCaseRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 讀到的案件的 etag。
+  string etag = 2 [(google.api.field_behavior) = REQUIRED];
+  CaseDecision decision = 3 [(google.api.field_behavior) = REQUIRED];
+  // 違規必填：認定的類別，必須是該處置能用的類別。
+  hawkr.common.v1alpha1.PolicyCategory category = 4;
+  // 違規必填：處置。
+  CaseAction action = 5;
+  // 違規必填：給作者的理由，去除首尾空白後最多 500 個字元（以 Unicode 字元計）。
+  string reason = 6;
+  // TAKEDOWN 必填：管理員確認內容所屬的店家（伺服器向 social 核對）。
+  string store_id = 7;
+  // TAKEDOWN 必填：認定的嚴重度。
+  hawkr.seller.v1alpha1.ViolationSeverity severity = 8;
+}
+
+message DecideCaseResponse {
+  Case case = 1;
+  repeated CaseReport reports = 2;
+}

@@ -1,6 +1,27 @@
 {
   "enums": [
     {
+      "name": "hawkr.admin.moderation.v1alpha1.CaseAction",
+      "tsName": "CaseAction",
+      "tsModule": "@hawkr/api/gen/hawkr/admin/moderation/v1alpha1/moderation_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.admin.moderation.v1alpha1.CaseDecision",
+      "tsName": "CaseDecision",
+      "tsModule": "@hawkr/api/gen/hawkr/admin/moderation/v1alpha1/moderation_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.admin.moderation.v1alpha1.CaseState",
+      "tsName": "CaseState",
+      "tsModule": "@hawkr/api/gen/hawkr/admin/moderation/v1alpha1/moderation_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKind",
       "tsName": "ReviewQueueItemKind",
       "tsModule": "@hawkr/api/gen/hawkr/admin/reviewqueue/v1alpha1/review_queue_pb",
