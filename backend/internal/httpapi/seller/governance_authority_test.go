@@ -203,19 +203,20 @@ func TestAuthorityFieldErrorsPointToRequestPaths(t *testing.T) {
 	cases := []struct {
 		procedure string
 		call      call
+		req       proto.Message
 		fields    map[string]string
 	}{
 		{sellerv1alpha1connect.SellerGovernanceAdminServiceCreateAuthorityOrderProcedure, func(ctx context.Context) error {
 			_, err := h.CreateAuthorityOrder(ctx, connect.NewRequest(&adminpb.CreateAuthorityOrderRequest{}))
 			return err
-		}, map[string]string{
+		}, &adminpb.CreateAuthorityOrderRequest{}, map[string]string{
 			"Agency": "agency", "DocumentNo": "document_no", "ReceivedAt": "receive_time", "Kind": "kind", "Summary": "summary", "DueAt": "due_time", "RequestID": "request_id",
 			"Targets": "targets", "Targets[0].AccountID": "targets[0].account_id", "Targets[1].StoreID": "targets[1].store_id", "Targets[2].ProductIDs": "targets[2].product_ids",
 		}},
 		{sellerv1alpha1connect.SellerGovernanceAdminServiceCompleteAuthorityOrderProcedure, func(ctx context.Context) error {
 			_, err := h.CompleteAuthorityOrder(ctx, connect.NewRequest(&adminpb.CompleteAuthorityOrderRequest{Id: id, Etag: "1"}))
 			return err
-		}, map[string]string{
+		}, &adminpb.CompleteAuthorityOrderRequest{}, map[string]string{
 			"ResolutionSummary": "resolution_summary", "ProvideTime": "provide_time", "TargetNotices": "target_notices", "TargetNotices[1]": "target_notices[1]",
 			"TargetNotices[1].Notice.Kind": "target_notices[1].notice.kind", "TargetNotices[0].Notice.NotifiedAt": "target_notices[0].notice.notify_time",
 			"TargetNotices[0].Notice.RecheckOn": "target_notices[0].notice.recheck_date", "TargetNotices[0].Notice.Note": "target_notices[0].notice.note",
@@ -223,11 +224,11 @@ func TestAuthorityFieldErrorsPointToRequestPaths(t *testing.T) {
 		{sellerv1alpha1connect.SellerGovernanceAdminServiceExtendAuthorityOrderHoldProcedure, func(ctx context.Context) error {
 			_, err := h.ExtendAuthorityOrderHold(ctx, connect.NewRequest(&adminpb.ExtendAuthorityOrderHoldRequest{Id: id, Etag: "1", HoldUntil: timestamppb.New(governanceNow)}))
 			return err
-		}, map[string]string{"Reason": "reason", "HoldUntil": "hold_until"}},
+		}, &adminpb.ExtendAuthorityOrderHoldRequest{}, map[string]string{"Reason": "reason", "HoldUntil": "hold_until"}},
 		{sellerv1alpha1connect.SellerGovernanceAdminServiceRecordAuthorityTargetNoticeProcedure, func(ctx context.Context) error {
 			_, err := h.RecordAuthorityTargetNotice(ctx, connect.NewRequest(&adminpb.RecordAuthorityTargetNoticeRequest{Id: id, Etag: "1"}))
 			return err
-		}, map[string]string{
+		}, &adminpb.RecordAuthorityTargetNoticeRequest{}, map[string]string{
 			"TargetPosition": "target_position", "Notice.Kind": "notice.kind", "Notice.RecheckOn": "notice.recheck_date", "Notice.NotifiedAt": "notice.notify_time", "Notice.Note": "notice.note",
 		}},
 	}
@@ -238,7 +239,7 @@ func TestAuthorityFieldErrorsPointToRequestPaths(t *testing.T) {
 			wrapped := rpc.NewInterceptor(slog.New(slog.NewTextHandler(&logs, nil))).WrapUnary(func(ctx context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
 				return nil, c.call(ctx)
 			})
-			_, err := wrapped(adminCtx(42), fakeRequest{procedure: c.procedure})
+			_, err := wrapped(adminCtx(42), fakeRequest{procedure: c.procedure, msg: c.req})
 			if got := reportErrFields(t, err); !slices.Equal(got, []string{path}) || strings.Contains(logs.String(), "欄位沒有附給 client") {
 				t.Errorf("%s %s：BadRequest 的欄位 %v，要 [%s]；log=%s", c.procedure, module, got, path, logs.String())
 			}

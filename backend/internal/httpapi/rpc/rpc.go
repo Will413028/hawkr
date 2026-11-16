@@ -153,7 +153,7 @@ type BuyerLookup interface {
 func RequireAccount(ctx context.Context) (identity.Principal, error) {
 	p, ok := PrincipalFrom(ctx)
 	if !ok || p.Kind != identity.PrincipalAccount {
-		return identity.Principal{}, Error(connect.CodePermissionDenied, "%s", "需要買家身分")
+		return identity.Principal{}, Error(connect.CodePermissionDenied, "%s", "需要顧客帳號")
 	}
 	return p, nil
 }

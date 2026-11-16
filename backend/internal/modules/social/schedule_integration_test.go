@@ -337,7 +337,7 @@ func TestDueScheduleOfATakenDownPostIsCanceledWithoutAskingTheAuthorizer(t *test
 	p := f.draft(t, storeID)
 	s := f.schedule(t, storeID, p, time.Hour, f.delegated("sess"))
 	id := uuid.NewV7()
-	f.exec(t, `INSERT INTO social.content_takedowns (measure_id, post_id, created_at) VALUES ($1, $2, $3)`, id, p.ID, f.clock())
+	f.exec(t, `INSERT INTO social.content_takedowns (measure_id, post_id, measure_created_at) VALUES ($1, $2, $3)`, id, p.ID, f.clock())
 	f.advance(time.Hour)
 	must(t, f.module.PublishScheduled(ctx, s.ID))
 	f.wantSchedule(t, s.ID, "CANCELED", "TAKEN_DOWN")

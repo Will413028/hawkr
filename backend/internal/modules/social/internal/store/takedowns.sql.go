@@ -61,7 +61,7 @@ WHERE NOT EXISTS (
       AND ((t.content_kind = 'POST' AND c.post_id = t.content_id)
         OR (t.content_kind = 'COMMENT' AND c.comment_id = t.content_id)
         OR (t.content_kind = 'FORUM_ENTRY' AND c.forum_entry_id = t.content_id)))
-ORDER BY c.measure_id, c.created_at
+ORDER BY c.measure_id, c.post_id, c.comment_id, c.forum_entry_id
 `
 
 type ExtraTakedownsRow struct {
@@ -142,23 +142,22 @@ func (q *Queries) GoneTakedownContents(ctx context.Context, arg GoneTakedownCont
 }
 
 const insertActiveTakedowns = `-- name: InsertActiveTakedowns :many
-INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, created_at)
+INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, measure_created_at)
 SELECT t.measure_id,
        CASE WHEN t.content_kind = 'POST' THEN t.content_id END,
        CASE WHEN t.content_kind = 'COMMENT' THEN t.content_id END,
        CASE WHEN t.content_kind = 'FORUM_ENTRY' THEN t.content_id END,
-       $1::timestamptz
+       t.measure_created_at
 FROM seller.pub_content_takedowns() AS t
-WHERE t.measure_id = $2::uuid
-  AND ((t.content_kind = 'POST' AND t.content_id = ANY($3::uuid[]))
-    OR (t.content_kind = 'COMMENT' AND t.content_id = ANY($4::uuid[]))
-    OR (t.content_kind = 'FORUM_ENTRY' AND t.content_id = ANY($5::uuid[])))
+WHERE t.measure_id = $1::uuid
+  AND ((t.content_kind = 'POST' AND t.content_id = ANY($2::uuid[]))
+    OR (t.content_kind = 'COMMENT' AND t.content_id = ANY($3::uuid[]))
+    OR (t.content_kind = 'FORUM_ENTRY' AND t.content_id = ANY($4::uuid[])))
 ON CONFLICT DO NOTHING
 RETURNING post_id, comment_id, forum_entry_id
 `
 
 type InsertActiveTakedownsParams struct {
-	CreatedAt     time.Time
 	MeasureID     uuid.UUID
 	PostIds       []uuid.UUID
 	CommentIds    []uuid.UUID
@@ -174,7 +173,6 @@ type InsertActiveTakedownsRow struct {
 // 對帳補漏：只寫此刻 seller.pub_content_takedowns() 仍生效的列（在寫入的語句裡再看一次，讀到「缺」的清單之後措施才被撤銷時不寫回）。冪等：已有的列略過；回傳實際寫入的列。
 func (q *Queries) InsertActiveTakedowns(ctx context.Context, arg InsertActiveTakedownsParams) ([]InsertActiveTakedownsRow, error) {
 	rows, err := q.db.Query(ctx, insertActiveTakedowns,
-		arg.CreatedAt,
 		arg.MeasureID,
 		arg.PostIds,
 		arg.CommentIds,
@@ -200,7 +198,7 @@ func (q *Queries) InsertActiveTakedowns(ctx context.Context, arg InsertActiveTak
 
 const insertTakedowns = `-- name: InsertTakedowns :many
 
-INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, created_at)
+INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, measure_created_at)
 SELECT $1::uuid, p, NULL::uuid, NULL::uuid, $2::timestamptz FROM unnest($3::uuid[]) AS p
 UNION ALL
 SELECT $1::uuid, NULL::uuid, c, NULL::uuid, $2::timestamptz FROM unnest($4::uuid[]) AS c
@@ -211,11 +209,11 @@ RETURNING post_id, comment_id, forum_entry_id
 `
 
 type InsertTakedownsParams struct {
-	MeasureID     uuid.UUID
-	CreatedAt     time.Time
-	PostIds       []uuid.UUID
-	CommentIds    []uuid.UUID
-	ForumEntryIds []uuid.UUID
+	MeasureID        uuid.UUID
+	MeasureCreatedAt time.Time
+	PostIds          []uuid.UUID
+	CommentIds       []uuid.UUID
+	ForumEntryIds    []uuid.UUID
 }
 
 type InsertTakedownsRow struct {
@@ -229,7 +227,7 @@ type InsertTakedownsRow struct {
 func (q *Queries) InsertTakedowns(ctx context.Context, arg InsertTakedownsParams) ([]InsertTakedownsRow, error) {
 	rows, err := q.db.Query(ctx, insertTakedowns,
 		arg.MeasureID,
-		arg.CreatedAt,
+		arg.MeasureCreatedAt,
 		arg.PostIds,
 		arg.CommentIds,
 		arg.ForumEntryIds,
@@ -365,16 +363,22 @@ WHERE NOT EXISTS (
 ORDER BY t.measure_id, t.content_kind, t.content_id
 `
 
+type MissingTakedownsRow struct {
+	MeasureID   uuid.UUID
+	ContentKind string
+	ContentID   uuid.UUID
+}
+
 // seller 發布的「此刻生效中的內容下架」裡，複本還沒有、而且內容在 social 存在的（漂移）：每日對帳補上。內容不存在的略過（插入會違反外鍵）。
-func (q *Queries) MissingTakedowns(ctx context.Context) ([]SellerPubContentTakedown, error) {
+func (q *Queries) MissingTakedowns(ctx context.Context) ([]MissingTakedownsRow, error) {
 	rows, err := q.db.Query(ctx, missingTakedowns)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []SellerPubContentTakedown{}
+	items := []MissingTakedownsRow{}
 	for rows.Next() {
-		var i SellerPubContentTakedown
+		var i MissingTakedownsRow
 		if err := rows.Scan(&i.MeasureID, &i.ContentKind, &i.ContentID); err != nil {
 			return nil, err
 		}
@@ -413,7 +417,7 @@ func (q *Queries) TakedownForumStores(ctx context.Context, ids []uuid.UUID) ([]i
 const takedownMeasuresOfPosts = `-- name: TakedownMeasuresOfPosts :many
 SELECT DISTINCT ON (post_id) post_id, measure_id FROM social.content_takedowns
 WHERE post_id = ANY($1::uuid[])
-ORDER BY post_id, measure_id
+ORDER BY post_id, measure_created_at, measure_id
 `
 
 type TakedownMeasuresOfPostsRow struct {
@@ -421,8 +425,8 @@ type TakedownMeasuresOfPostsRow struct {
 	MeasureID uuid.UUID
 }
 
-// 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：同時被多個措施下架時取措施 ID 最小的，措施 ID 是 UUIDv7，最小的就是最早建立的措施。
-// 不用複本的 created_at 排序：每日對帳補漏重寫複本時會以對帳時間寫入，不是措施的建立時間。
+// 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：同時被多個措施下架時取措施建立時間最早的（measure_created_at 是 seller 措施的建立時間，
+// 來自 MeasureCreated 事件與對帳讀的 pub_content_takedowns()），建立時間相同再取措施 ID 最小的。
 func (q *Queries) TakedownMeasuresOfPosts(ctx context.Context, postIds []uuid.UUID) ([]TakedownMeasuresOfPostsRow, error) {
 	rows, err := q.db.Query(ctx, takedownMeasuresOfPosts, postIds)
 	if err != nil {

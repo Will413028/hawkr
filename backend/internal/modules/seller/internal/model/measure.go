@@ -1323,6 +1323,7 @@ type MeasurePage struct {
 // 結束時間；TerminationGround 是終止合作的事由。StoreSuspended 另由停權期間的變化發出（帳號已經停權時不會再發），預告終止生效時由
 // seller.termination_effect 發出，沒有獨立的「終止預告」事件。
 type MeasureCreated struct {
+	// OccurredAt 也是措施的建立時間（seller.measures.created_at 同一個值）。
 	OccurredAt         time.Time
 	EventID            uuid.UUID
 	MeasureID          uuid.UUID

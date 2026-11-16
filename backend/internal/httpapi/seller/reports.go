@@ -84,18 +84,15 @@ func (h *Reports) countSubmit(accountID int64) error {
 }
 
 var (
-	createReportPaths = rpc.FieldPaths{
-		"StoreID": "store_id", "Category": "category", "Description": "description", "ProductID": "product_id",
-		"OrderNo": "order_no", "EvidenceTokens[]": "evidence_staged_tokens[]",
-	}
-	foodSafetyReportPaths = rpc.FieldPaths{
-		"StoreID": "store_id", "Description": "description", "ProductID": "product_id", "OrderNo": "order_no",
-		"Phone": "phone", "Email": "email", "Name": "name",
-	}
+	createReportPaths     = rpc.FieldPaths{"EvidenceTokens[]": "evidence_staged_tokens[]"}
+	foodSafetyReportPaths = rpc.FieldPaths{}
 )
 
 // callerBuyer 是登入的帳號與它目前的買家；買家不存在是不變量被破壞（存活的帳號都是買家），沒有分類（internal）。
 func (h *Reports) callerBuyer(ctx context.Context) (accountID, buyerID int64, err error) {
+	if _, ok := rpc.PrincipalFrom(ctx); !ok {
+		return 0, 0, errNoPrincipal
+	}
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {
 		return 0, 0, err

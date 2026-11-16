@@ -497,3 +497,38 @@ func TestTransportTextComesFromTheCatalogWithTheResolvedLocale(t *testing.T) {
 		}
 	}
 }
+
+func TestSameNameFieldMapping(t *testing.T) {
+	withPageSize := (&adminpb.ListBannersRequest{}).ProtoReflect().Descriptor()
+	noMatch := (&timestamppb.Timestamp{}).ProtoReflect().Descriptor()
+	pageSize := func() error { return apperr.InvalidInputOn([]string{"PageSize"}, "不合法") }
+	cases := []struct {
+		name     string
+		err      error
+		want     []string
+		unmapped []string
+	}{
+		{"請求有同名欄位：自動對應", &requestError{err: pageSize(), desc: withPageSize}, []string{"page_size"}, nil},
+		{"請求沒有同名欄位：維持沒對應", &requestError{err: pageSize(), desc: noMatch}, nil, []string{"PageSize"}},
+		{"沒有請求訊息：維持沒對應", pageSize(), nil, []string{"PageSize"}},
+		{"明列的對應優先於自動規則", &requestError{err: WithFieldPaths(pageSize(), FieldPaths{"PageSize": "max_results"}), desc: withPageSize}, []string{"max_results"}, nil},
+		{"索引欄位不套用自動規則", &requestError{err: apperr.InvalidInputOn([]string{"PageSize[1]"}, "不合法"), desc: withPageSize}, nil, []string{"PageSize[1]"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := toConnect(context.Background(), c.err)
+			_, _, fields := detailsOf(t, got.err)
+			if fmt.Sprint(fields) != fmt.Sprint(c.want) || fmt.Sprint(got.unmapped) != fmt.Sprint(c.unmapped) {
+				t.Fatalf("欄位 = %v、沒對應到 %v，預期 %v、%v", fields, got.unmapped, c.want, c.unmapped)
+			}
+		})
+	}
+}
+
+func TestSnakeCase(t *testing.T) {
+	for in, want := range map[string]string{"PageSize": "page_size", "RequestID": "request_id", "ID": "id", "StoreID": "store_id", "Body": "body", "OrderNo": "order_no", "URLPath": "url_path"} {
+		if got := snakeCase(in); got != want {
+			t.Errorf("snakeCase(%q) = %q，預期 %q", in, got, want)
+		}
+	}
+}

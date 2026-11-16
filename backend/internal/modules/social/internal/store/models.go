@@ -25,9 +25,10 @@ type BuyerPubInactiveBuyer struct {
 }
 
 type SellerPubContentTakedown struct {
-	MeasureID   uuid.UUID
-	ContentKind string
-	ContentID   uuid.UUID
+	MeasureID        uuid.UUID
+	ContentKind      string
+	ContentID        uuid.UUID
+	MeasureCreatedAt time.Time
 }
 
 type SellerPubExposableStore struct {
@@ -90,11 +91,11 @@ type SocialCommentStat struct {
 }
 
 type SocialContentTakedown struct {
-	MeasureID    uuid.UUID
-	PostID       *uuid.UUID
-	CommentID    *uuid.UUID
-	ForumEntryID *uuid.UUID
-	CreatedAt    time.Time
+	MeasureID        uuid.UUID
+	PostID           *uuid.UUID
+	CommentID        *uuid.UUID
+	ForumEntryID     *uuid.UUID
+	MeasureCreatedAt time.Time
 }
 
 type SocialForumEntry struct {

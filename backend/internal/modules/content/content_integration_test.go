@@ -719,6 +719,30 @@ func TestBannerScheduleCheckMatchesTheGoRule(t *testing.T) {
 	}
 }
 
+// POST 目標的標準形式（小寫的 UUID）不只由模組的寫入守住：直接寫入非標準形式的列，DB 的 banners_action_check 也拒絕。
+func TestBannerPostTargetMustBeCanonicalInTheDatabase(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	canonical := uuid.NewV7().String()
+	for target, wantOK := range map[string]bool{
+		canonical:                              true,
+		strings.ToUpper(canonical):             false,
+		" " + canonical:                        false,
+		strings.ReplaceAll(canonical, "-", ""): false,
+		"not-a-uuid":                           false,
+	} {
+		_, err := f.db.Pool().Exec(context.Background(),
+			`INSERT INTO content.banners (id, title, preview_image_key, popup_image_key, preview_image_asset_id, popup_image_asset_id, action_type, action_target)
+			 VALUES ($1, '貼文', 'k', 'k', 'a', 'a', 'POST', $2)`, uuid.NewV7(), target)
+		if wantOK && err != nil {
+			t.Errorf("標準形式 %q 被拒絕：%v", target, err)
+		}
+		if !wantOK && (err == nil || !strings.Contains(err.Error(), "banners_action_check")) {
+			t.Errorf("非標準形式 %q 預期被 banners_action_check 拒絕：%v", target, err)
+		}
+	}
+}
+
 // 資料庫的 CHECK 與模組的值域一致（ADR 2026-09-25-codemeta-retirement D3）：值域只在 Go 與 CHECK 兩處，
 // 改了一邊沒改另一邊，這支測試就會失敗。
 func TestAppTargetChecksMatchTheGoTypes(t *testing.T) {

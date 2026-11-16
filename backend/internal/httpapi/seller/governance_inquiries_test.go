@@ -216,7 +216,7 @@ func TestCreateCaseInquiryUsesTheCallingAdminAndMapsTheInput(t *testing.T) {
 		call := rpc.NewInterceptor(slog.New(slog.NewTextHandler(&logs, nil))).WrapUnary(func(ctx context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
 			return h.CreateCaseInquiry(ctx, connect.NewRequest(&adminpb.CreateCaseInquiryRequest{CaseId: caseID.String()}))
 		})
-		_, err := call(adminCtx(42), fakeRequest{procedure: sellerv1alpha1connect.SellerGovernanceAdminServiceCreateCaseInquiryProcedure})
+		_, err := call(adminCtx(42), fakeRequest{procedure: sellerv1alpha1connect.SellerGovernanceAdminServiceCreateCaseInquiryProcedure, msg: &adminpb.CreateCaseInquiryRequest{}})
 		if got := reportErrFields(t, err); !slices.Equal(got, []string{path}) || strings.Contains(logs.String(), "欄位沒有附給 client") {
 			t.Errorf("%s：BadRequest 的欄位 %v，要 [%s]；log=%s", module, got, path, logs.String())
 		}

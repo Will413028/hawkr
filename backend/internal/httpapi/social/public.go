@@ -312,7 +312,7 @@ func (h *Public) SuggestTrendingTags(ctx context.Context, req *connect.Request[p
 	}
 	tags, err := h.reads.TrendingHashtags(ctx, from, to, msg.GetMaxResults())
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.FieldPaths{"PageSize": "max_results"})
 	}
 	return connect.NewResponse(&pb.SuggestTrendingTagsResponse{Tags: toTagCounts(tags)}), nil
 }

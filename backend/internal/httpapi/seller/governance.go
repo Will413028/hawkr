@@ -97,15 +97,16 @@ func NewGovernance(d GovernanceDeps) (*Governance, error) {
 	return &Governance{m: d.Module, images: d.Images, owners: d.ContentOwners}, nil
 }
 
-// 模組輸入的欄位對應到請求的路徑。
+// 模組輸入的欄位對應到請求的路徑。名稱與請求的頂層欄位同名（snake_case）的欄位由 rpc 自動對應，這裡只列其餘的；空的對應表
+// 表示全部由自動規則對應。
 var (
-	listReportsPaths       = rpc.FieldPaths{"State": "state", "Category": "category", "StoreID": "store_id", "CaseID": "case_id"}
+	listReportsPaths       = rpc.FieldPaths{}
 	triagePaths            = rpc.FieldPaths{"AssessedCategory": "assessed_category", "Target": "target", "ExpectedVersion": "etag"}
 	markSeenPaths          = rpc.FieldPaths{"ExpectedVersion": "etag"}
-	resolvePaths           = rpc.FieldPaths{"Outcome": "outcome", "Note": "note", "ExpectedVersion": "etag"}
-	listCasesPaths         = rpc.FieldPaths{"State": "state", "Category": "category", "StoreID": "store_id", "AwaitingSeller": "awaiting_seller"}
-	decideCasePaths        = rpc.FieldPaths{"Decision": "decision", "Note": "note", "ExpectedVersion": "etag"}
-	changeSeverityPaths    = rpc.FieldPaths{"Severity": "severity", "Note": "note", "ExpectedVersion": "etag"}
+	resolvePaths           = rpc.FieldPaths{"ExpectedVersion": "etag"}
+	listCasesPaths         = rpc.FieldPaths{}
+	decideCasePaths        = rpc.FieldPaths{"ExpectedVersion": "etag"}
+	changeSeverityPaths    = rpc.FieldPaths{"ExpectedVersion": "etag"}
 	createNotePaths        = rpc.FieldPaths{"Body": "note.body"}
 	createMeasureNotePaths = createNotePaths
 	createWarningPaths     = createMeasurePaths(violationPaths("Violation", "warning.violation"))
@@ -118,15 +119,12 @@ var (
 	})
 	updateMeasurePaths     = rpc.FieldPaths{"StatementToSeller": "measure.statement", "EndsAt": "measure.end_time", "ExpectedVersion": "measure.etag"}
 	endMeasurePaths        = rpc.FieldPaths{"ExpectedVersion": "etag"}
-	revokeMeasurePaths     = rpc.FieldPaths{"Reason": "reason", "RevokeFindings": "revoke_findings", "ExpectedVersion": "etag"}
-	scheduleReviewPaths    = rpc.FieldPaths{"ReviewBy": "review_by", "Note": "note", "ExpectedVersion": "etag"}
-	decideAppealPaths      = rpc.FieldPaths{"Reason": "reason", "Outcome": "decision", "RevokeFindings": "revoke_findings", "ExpectedVersion": "etag"}
-	decideRemediationPaths = rpc.FieldPaths{"Reason": "reason", "Outcome": "decision", "ExpectedVersion": "etag"}
-	listMeasuresPaths      = rpc.FieldPaths{
-		"StoreID": "store_id", "AccountID": "account_id", "State": "state", "Basis": "basis", "RequestState": "request_state", "RequestKind": "request_kind",
-		"SourceCaseID": "source_case_id", "SourceReportID": "source_report_id", "SourceAuthorityOrderID": "source_authority_order_id",
-	}
-	listViolationsPaths = rpc.FieldPaths{"StoreID": "store_id", "AccountID": "account_id", "Status": "status"}
+	revokeMeasurePaths     = rpc.FieldPaths{"ExpectedVersion": "etag"}
+	scheduleReviewPaths    = rpc.FieldPaths{"ExpectedVersion": "etag"}
+	decideAppealPaths      = rpc.FieldPaths{"Outcome": "decision", "ExpectedVersion": "etag"}
+	decideRemediationPaths = rpc.FieldPaths{"Outcome": "decision", "ExpectedVersion": "etag"}
+	listMeasuresPaths      = rpc.FieldPaths{}
+	listViolationsPaths    = rpc.FieldPaths{}
 )
 
 // reportEvidenceURI 與 requestEvidenceURI 是佐證的檢視網址（EvidenceReportRoute、EvidenceRequestRoute 的實例）。

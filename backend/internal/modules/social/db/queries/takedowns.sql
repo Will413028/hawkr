@@ -2,12 +2,12 @@
 
 -- name: InsertTakedowns :many
 -- 冪等：(措施, 內容) 已經有的列略過。內容不存在時外鍵失敗，措施的建立跟著回滾。回傳實際寫入的列（呼叫方只對這些貼文取消排程）。
-INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, created_at)
-SELECT sqlc.arg(measure_id)::uuid, p, NULL::uuid, NULL::uuid, sqlc.arg(created_at)::timestamptz FROM unnest(sqlc.arg(post_ids)::uuid[]) AS p
+INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, measure_created_at)
+SELECT sqlc.arg(measure_id)::uuid, p, NULL::uuid, NULL::uuid, sqlc.arg(measure_created_at)::timestamptz FROM unnest(sqlc.arg(post_ids)::uuid[]) AS p
 UNION ALL
-SELECT sqlc.arg(measure_id)::uuid, NULL::uuid, c, NULL::uuid, sqlc.arg(created_at)::timestamptz FROM unnest(sqlc.arg(comment_ids)::uuid[]) AS c
+SELECT sqlc.arg(measure_id)::uuid, NULL::uuid, c, NULL::uuid, sqlc.arg(measure_created_at)::timestamptz FROM unnest(sqlc.arg(comment_ids)::uuid[]) AS c
 UNION ALL
-SELECT sqlc.arg(measure_id)::uuid, NULL::uuid, NULL::uuid, f, sqlc.arg(created_at)::timestamptz FROM unnest(sqlc.arg(forum_entry_ids)::uuid[]) AS f
+SELECT sqlc.arg(measure_id)::uuid, NULL::uuid, NULL::uuid, f, sqlc.arg(measure_created_at)::timestamptz FROM unnest(sqlc.arg(forum_entry_ids)::uuid[]) AS f
 ON CONFLICT DO NOTHING
 RETURNING post_id, comment_id, forum_entry_id;
 
@@ -37,12 +37,12 @@ ORDER BY 1, 2;
 
 -- name: InsertActiveTakedowns :many
 -- 對帳補漏：只寫此刻 seller.pub_content_takedowns() 仍生效的列（在寫入的語句裡再看一次，讀到「缺」的清單之後措施才被撤銷時不寫回）。冪等：已有的列略過；回傳實際寫入的列。
-INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, created_at)
+INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, measure_created_at)
 SELECT t.measure_id,
        CASE WHEN t.content_kind = 'POST' THEN t.content_id END,
        CASE WHEN t.content_kind = 'COMMENT' THEN t.content_id END,
        CASE WHEN t.content_kind = 'FORUM_ENTRY' THEN t.content_id END,
-       sqlc.arg(created_at)::timestamptz
+       t.measure_created_at
 FROM seller.pub_content_takedowns() AS t
 WHERE t.measure_id = sqlc.arg(measure_id)::uuid
   AND ((t.content_kind = 'POST' AND t.content_id = ANY(sqlc.arg(post_ids)::uuid[]))
@@ -56,11 +56,11 @@ SELECT post_id, comment_id, forum_entry_id FROM social.content_takedowns
 WHERE measure_id = sqlc.arg(measure_id);
 
 -- name: TakedownMeasuresOfPosts :many
--- 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：同時被多個措施下架時取措施 ID 最小的，措施 ID 是 UUIDv7，最小的就是最早建立的措施。
--- 不用複本的 created_at 排序：每日對帳補漏重寫複本時會以對帳時間寫入，不是措施的建立時間。
+-- 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：同時被多個措施下架時取措施建立時間最早的（measure_created_at 是 seller 措施的建立時間，
+-- 來自 MeasureCreated 事件與對帳讀的 pub_content_takedowns()），建立時間相同再取措施 ID 最小的。
 SELECT DISTINCT ON (post_id) post_id, measure_id FROM social.content_takedowns
 WHERE post_id = ANY(sqlc.arg(post_ids)::uuid[])
-ORDER BY post_id, measure_id;
+ORDER BY post_id, measure_created_at, measure_id;
 
 -- name: DeleteTakedownsOfMeasure :execrows
 DELETE FROM social.content_takedowns WHERE measure_id = sqlc.arg(measure_id);
@@ -113,4 +113,4 @@ WHERE NOT EXISTS (
       AND ((t.content_kind = 'POST' AND c.post_id = t.content_id)
         OR (t.content_kind = 'COMMENT' AND c.comment_id = t.content_id)
         OR (t.content_kind = 'FORUM_ENTRY' AND c.forum_entry_id = t.content_id)))
-ORDER BY c.measure_id, c.created_at;
+ORDER BY c.measure_id, c.post_id, c.comment_id, c.forum_entry_id;

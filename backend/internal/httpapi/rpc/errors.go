@@ -70,7 +70,8 @@ func UserError(code connect.Code, text string) *connect.Error {
 }
 
 // ConnectError 把模組的錯誤（apperr）轉成 Connect 的錯誤，與 interceptor 的轉換相同；給入口中介層自己寫回應、
-// 又需要帶 ErrorInfo 的 reason 時用。
+// 又需要帶 ErrorInfo 的 reason 時用。這條路徑在 handler 之外，沒有請求訊息，所以欄位錯誤只有明列的 FieldPaths 能對應
+// （沒有自動的同名對應）；入口中介層的錯誤（session 解析）不是欄位錯誤，沒有缺口。
 func ConnectError(ctx context.Context, err error) *connect.Error {
 	return toConnect(ctx, err).err
 }
@@ -166,8 +167,8 @@ func fromAppErr(code connect.Code, ae *apperr.Error, paths FieldPaths, request p
 	var unmapped []string
 	for _, v := range ae.FieldViolations() {
 		path, ok := paths.path(v.Field)
-		if !ok && v.Field == pageSizeField && request != nil && request.Fields().ByName("page_size") != nil {
-			path, ok = "page_size", true
+		if !ok {
+			path, ok = sameNameField(request, v.Field)
 		}
 		if !ok {
 			unmapped = append(unmapped, v.Field)
@@ -202,9 +203,47 @@ func addDetail(ce *connect.Error, m proto.Message) {
 // （"Reason[2]"）或沒有對應的欄位對應不到，會被當成沒有對應的欄位記錄。
 type FieldPaths map[string]string
 
-// pageSizeField 是 pagination.PageSize 的錯誤欄位。請求訊息有 page_size 欄位時，轉換時自動對應到它，handler 不必列對應；
-// 請求欄位不叫 page_size 的清單 handler 自己以 WithFieldPaths 列對應。
-const pageSizeField = "PageSize"
+// sameNameField 是沒有明列對應時的自動規則：模組的欄位名是單純的識別字（沒有 []、沒有 .），而且它的 snake_case
+// 寫法（PageSize → page_size、RequestID → request_id）是請求訊息的頂層欄位，就對應到那個欄位。明列的 FieldPaths 優先；
+// 請求沒有同名欄位時不對應（例如請求欄位叫 max_results 的 PageSize），由 handler 以 WithFieldPaths 列對應。
+// 請求訊息未知（request 為 nil：沒有請求訊息可對照的路徑，例如入口中介層的 ConnectError）時不對應。
+func sameNameField(request protoreflect.MessageDescriptor, field string) (string, bool) {
+	if request == nil || field == "" {
+		return "", false
+	}
+	for _, r := range field {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
+			return "", false
+		}
+	}
+	name := snakeCase(field)
+	if request.Fields().ByName(protoreflect.Name(name)) == nil {
+		return "", false
+	}
+	return name, true
+}
+
+// snakeCase 把 Go 欄位名轉成 proto 欄位名：連續的大寫視為一個詞（RequestID → request_id）。
+func snakeCase(s string) string {
+	rs := []rune(s)
+	var b strings.Builder
+	for i, r := range rs {
+		upper := r >= 'A' && r <= 'Z'
+		if upper && i > 0 {
+			prev := rs[i-1]
+			prevLowerOrDigit := prev >= 'a' && prev <= 'z' || prev >= '0' && prev <= '9'
+			nextLower := i+1 < len(rs) && rs[i+1] >= 'a' && rs[i+1] <= 'z'
+			if prevLowerOrDigit || (prev >= 'A' && prev <= 'Z' && nextLower) {
+				b.WriteByte('_')
+			}
+		}
+		if upper {
+			r += 'a' - 'A'
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
 
 // requestError 讓轉換看得到請求訊息的 descriptor，由 interceptor 在 handler 回錯後附上。
 type requestError struct {

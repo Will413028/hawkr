@@ -41,9 +41,14 @@ func (f *fixture) takedowns(t *testing.T) takedowns {
 
 func (d takedowns) seed(t *testing.T, storeID int64, refs []seller.ContentRef) uuid.UUID {
 	t.Helper()
-	id := uuid.NewV7()
+	return d.seedAt(t, storeID, refs, uuid.NewV7(), d.f.clock())
+}
+
+// seedAt 以指定的 ID 與建立時間寫入 seller 的措施：ID 與建立時間的順序可以相反。
+func (d takedowns) seedAt(t *testing.T, storeID int64, refs []seller.ContentRef, id uuid.UUID, createdAt time.Time) uuid.UUID {
+	t.Helper()
 	d.f.exec(t, `INSERT INTO seller.measures (id, account_id, store_id, kind, basis, statement_to_seller, starts_at, status, current_revision, created_by_admin_id, created_at, updated_at)
-		SELECT $1, account_id, store_id, 'CONTENT_TAKEDOWN', 'VIOLATION', '下架', $3, 'ENFORCED', 1, 9, $3, $3 FROM seller.stores WHERE store_id = $2`, id, storeID, d.f.clock())
+		SELECT $1, account_id, store_id, 'CONTENT_TAKEDOWN', 'VIOLATION', '下架', $3, 'ENFORCED', 1, 9, $3, $3 FROM seller.stores WHERE store_id = $2`, id, storeID, createdAt)
 	for _, r := range refs {
 		d.f.exec(t, "INSERT INTO seller.measure_contents (measure_id, content_kind, content_id) VALUES ($1, $2, $3)", id, string(r.Kind), r.ID)
 	}
@@ -491,7 +496,7 @@ func TestReconcileInsertCancelsOnlyTheSchedulesOfInsertedTakedowns(t *testing.T)
 	f.wantSchedule(t, s.ID, "CANCELED", "TAKEN_DOWN")
 }
 
-// 同一篇貼文被兩個措施下架：店主讀到措施 ID 最小（UUIDv7，最早建立）的措施。較早措施的複本被對帳補漏以較晚的時間重寫後，結果不變。
+// 同一篇貼文被兩個措施下架：店主讀到建立時間最早的措施，即使它的 ID 較大；對帳補漏重寫複本後結果不變，補寫的 measure_created_at 是措施的建立時間。
 func TestOwnerReadsTheEarliestCreatedTakedownMeasure(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -499,30 +504,39 @@ func TestOwnerReadsTheEarliestCreatedTakedownMeasure(t *testing.T) {
 	td := f.takedowns(t)
 	w := f.takedownWorld(t)
 	refs := []seller.ContentRef{ref(seller.ContentPost, w.post.ID)}
-	older, newer := td.seed(t, w.storeID, refs), td.seed(t, w.storeID, refs)
-	if older.String() >= newer.String() {
-		t.Fatalf("seed 的 UUIDv7 應遞增：%s、%s", older, newer)
+	t0 := f.clock()
+	// ID 的順序與建立時間相反：idLater 的 ID 較小，但措施較晚建立。
+	idLater, idEarlier := uuid.NewV7(), uuid.NewV7()
+	if idLater.String() >= idEarlier.String() {
+		t.Fatalf("UUIDv7 應遞增：%s、%s", idLater, idEarlier)
 	}
-	publish := func(id uuid.UUID) {
+	later := td.seedAt(t, w.storeID, refs, idLater, t0.Add(time.Hour))
+	earlier := td.seedAt(t, w.storeID, refs, idEarlier, t0)
+	publish := func(id uuid.UUID, createdAt time.Time) {
 		must(t, f.db.InTx(ctx, func(ctx context.Context) error {
-			return events.Publish(ctx, f.bus, seller.MeasureCreated{MeasureID: id, StoreID: w.storeID, OccurredAt: f.clock(), Contents: refs})
+			return events.Publish(ctx, f.bus, seller.MeasureCreated{MeasureID: id, StoreID: w.storeID, OccurredAt: createdAt, Contents: refs})
 		}))
 	}
 	read := func() *uuid.UUID {
 		return mustV[social.Post](t)(f.module.OwnPost(ctx, w.storeID, w.post.ID)).TakedownMeasureID
 	}
-	publish(newer)
-	publish(older)
-	if got := read(); got == nil || *got != older {
-		t.Fatalf("TakedownMeasureID = %v，預期較早建立的 %s", got, older)
+	publish(later, t0.Add(time.Hour))
+	publish(earlier, t0)
+	if got := read(); got == nil || *got != earlier {
+		t.Fatalf("TakedownMeasureID = %v，預期建立時間較早的 %s（ID 較大）", got, earlier)
 	}
-	f.exec(t, "DELETE FROM social.content_takedowns WHERE measure_id = $1", older)
-	if got := read(); got == nil || *got != newer {
-		t.Fatalf("較早措施的複本漏掉時只剩較晚的 %s：%v", newer, got)
+	f.exec(t, "DELETE FROM social.content_takedowns WHERE measure_id = $1", earlier)
+	if got := read(); got == nil || *got != later {
+		t.Fatalf("較早措施的複本漏掉時只剩較晚的 %s：%v", later, got)
 	}
 	svc := stats.New(stats.Deps{DB: f.db, Logger: slog.New(slog.DiscardHandler), Now: f.clock, Cache: readcache.Cache{Jobs: f.jobs, Stores: f.sellers}, Cancel: schedule.Canceler{DB: f.db, Events: f.bus}})
-	must(t, svc.ApplyMissingTakedowns(ctx, older, f.clock().Add(48*time.Hour), []stats.Content{{Kind: contentkind.Post, ID: w.post.ID}}))
-	if got := read(); got == nil || *got != older {
-		t.Fatalf("對帳補漏以較晚的時間重寫複本後，TakedownMeasureID = %v，預期仍是較早建立的 %s", got, older)
+	must(t, svc.ApplyMissingTakedowns(ctx, earlier, f.clock().Add(48*time.Hour), []stats.Content{{Kind: contentkind.Post, ID: w.post.ID}}))
+	if got := read(); got == nil || *got != earlier {
+		t.Fatalf("對帳補漏重寫複本後，TakedownMeasureID = %v，預期仍是較早建立的 %s", got, earlier)
+	}
+	var stored time.Time
+	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT measure_created_at FROM social.content_takedowns WHERE measure_id = $1", earlier).Scan(&stored))
+	if !stored.Equal(t0) {
+		t.Fatalf("對帳補寫的 measure_created_at = %v，預期 seller 措施的建立時間 %v（不是對帳時間）", stored, t0)
 	}
 }

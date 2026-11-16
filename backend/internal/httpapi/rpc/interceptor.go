@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 )
@@ -67,11 +69,30 @@ func (i *interceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) co
 			markVary(conn.ResponseHeader())
 		}
 		err := authorize(ctx, procedure)
+		rc := &requestCapturingConn{StreamingHandlerConn: conn}
 		if err == nil {
-			err = next(ctx, conn)
+			err = next(ctx, rc)
+		}
+		if rc.desc != nil && err != nil {
+			err = &requestError{err: err, desc: rc.desc}
 		}
 		return i.finish(ctx, procedure, start, err)
 	}
+}
+
+// requestCapturingConn 記下 handler 收到的第一則請求訊息的 descriptor，讓串流 RPC 回錯時也能自動對應欄位。
+// 串流在收到第一則訊息之前（或 client 串流的請求不是單一訊息型別）沒有請求可對照，這時欄位不自動對應。
+type requestCapturingConn struct {
+	connect.StreamingHandlerConn
+	desc protoreflect.MessageDescriptor
+}
+
+func (c *requestCapturingConn) Receive(msg any) error {
+	err := c.StreamingHandlerConn.Receive(msg)
+	if m, ok := msg.(proto.Message); ok && c.desc == nil {
+		c.desc = m.ProtoReflect().Descriptor()
+	}
+	return err
 }
 
 // finish 把錯誤轉成 Connect 的錯誤，並為每個請求記一筆 log。沒有分類的錯誤只有 log 看得到原因。

@@ -624,7 +624,7 @@ func (m *Module) OnMeasureCreated(ctx context.Context, e seller.MeasureCreated) 
 	if len(e.Contents) == 0 {
 		return nil
 	}
-	return m.stats.ApplyTakedowns(ctx, e.MeasureID, e.StoreID, e.OccurredAt, takedownContents(e.Contents))
+	return m.stats.ApplyTakedowns(ctx, e.MeasureID, e.StoreID, e.OccurredAt, e.OccurredAt, takedownContents(e.Contents))
 }
 
 // OnMeasureRevoked 是 seller 撤銷措施時同 transaction 的訂閱者：刪除該措施的複本並讓內容重新求值，內容立即回到公開讀取。同一則內容被另一個未撤銷的措施
