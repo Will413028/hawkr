@@ -40,9 +40,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/content/v1alpha1/contentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1/discoveryv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	httpidentity "github.com/Will413028/hawkr/backend/internal/httpapi/identity"
+	httpmoderation "github.com/Will413028/hawkr/backend/internal/httpapi/moderation"
 	httppayment "github.com/Will413028/hawkr/backend/internal/httpapi/payment"
 	httpreviewqueue "github.com/Will413028/hawkr/backend/internal/httpapi/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -55,6 +57,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -85,6 +88,8 @@ type Deps struct {
 	Payment *payment.Module
 	// Social 給後台建立內容下架措施前核對內容歸屬（SellerGovernanceAdminService.CreateMeasure）。
 	Social *social.Module
+	// Moderation 是檢舉的送出與讀自己的檢舉（ModerationAppService）。
+	Moderation *moderation.Module
 	// Agent 是 vendor portal 的邀請與 session（VendorPortalPublicService、VendorPortalInviteeService）；Google 的 step-up 經 Identity。
 	Agent *agent.Module
 	// Stats 是店家統計與卡片評分的組裝（粉絲、評價；review 還在舊服務），必填：店面頁、賣家自己的店與所有店家卡片共用同一份，由組裝點以
@@ -159,6 +164,9 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	}
 	if deps.Buyer == nil {
 		return nil, fmt.Errorf("httpapi：BuyerAppService 與 IdentityAppService.GetSession 需要 Buyer")
+	}
+	if deps.Moderation == nil {
+		return nil, fmt.Errorf("httpapi：ModerationAppService 需要 Moderation")
 	}
 	if deps.Now == nil {
 		deps.Now = time.Now
@@ -301,6 +309,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(socialv1alpha1connect.NewSocialAppServiceHandler(socialApp, opts...))
+	add(moderationv1alpha1connect.NewModerationAppServiceHandler(httpmoderation.NewApp(deps.Moderation, deps.Buyer), opts...))
 	blocking := blocks.Sources{Authors: deps.Social, Identities: blocks.Identities{Buyers: deps.Buyer, Stores: deps.Seller}}
 	buyerApp, err := httpbuyer.NewApp(deps.Buyer, deps.Images, deps.BuyerPorts, stats, blocking)
 	if err != nil {

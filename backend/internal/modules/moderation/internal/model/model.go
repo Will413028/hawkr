@@ -178,6 +178,9 @@ type SubmitInput struct {
 	Target          Target
 	Category        policy.Category
 	Description     string
+	// RequestID 是選填的冪等鍵（AIP-155）：同一位檢舉人以同一個 RequestID 重送，內容相同一律回傳第一次的檢舉（不看案件現在的狀態、不吃每日額度），
+	// 內容不同是 InvalidInput。
+	RequestID *uuid.UUID
 }
 
 // SubmitResult 是送出檢舉的結果；Created 為假表示這位檢舉人對這個對象在進行中案件裡已經有檢舉，回傳的是既有的那一筆（不吃每日額度）。
@@ -206,4 +209,41 @@ type DecideInput struct {
 type CaseDetail struct {
 	Case    Case
 	Reports []Report
+}
+
+const (
+	// DefaultPageSize 與 MaxPageSize 是檢舉人讀自己檢舉清單的每頁筆數。
+	DefaultPageSize int32 = 20
+	MaxPageSize     int32 = 50
+)
+
+// ReportItem 是檢舉人讀自己檢舉時的一筆：檢舉、被檢舉的對象，以及案件結案的時間（進行中是 nil）。結果（Report.Outcome）由案件的決定推導，不存逐筆結果；
+// 不含案件 ID（A7-D28 第 4 點）。
+type ReportItem struct {
+	Report   Report
+	Target   Target
+	ClosedAt *time.Time
+}
+
+// ReportCursor 是檢舉清單的排序鍵：(CreatedAt, ID) 由大到小。
+type ReportCursor struct {
+	CreatedAt time.Time
+	ID        uuid.UUID
+}
+
+// Valid 說明 cursor 的內容是否合法（解自 client 回傳的 page token，不可信）。
+func (c ReportCursor) Valid() bool { return !c.CreatedAt.IsZero() && c.ID != uuid.UUID{} }
+
+// Key 回 SQL 的游標參數；nil（第一頁）回由大到小排序的極值，讓每一頁走同一個 query（同 social 的 keyset 慣例）。
+func (c *ReportCursor) Key() (time.Time, uuid.UUID) {
+	if c == nil {
+		return time.Date(9999, 12, 31, 23, 59, 59, 999999000, time.UTC), uuid.UUID{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+	}
+	return c.CreatedAt, c.ID
+}
+
+// ReportPage 是一頁檢舉；Next 是下一頁的游標（沒有下一頁是 nil）。
+type ReportPage struct {
+	Items []ReportItem
+	Next  *ReportCursor
 }

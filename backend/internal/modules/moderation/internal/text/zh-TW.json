@@ -34,6 +34,10 @@
       "message": "需要買家身分",
       "description": "檢舉人沒有買家身分（沒有買家 ID）。"
     },
+    "report.request_id_reused": {
+      "message": "這次送出的內容和同一個請求先前送出的不同，請重新整理頁面後再試。",
+      "description": "送出檢舉：同一位檢舉人的 request_id 已經用在內容不同的請求（AIP-155）。"
+    },
     "report.self_buyer": {
       "message": "不能檢舉自己",
       "description": "檢舉的買家是檢舉人自己（含同一帳號的其他買家身分）。"

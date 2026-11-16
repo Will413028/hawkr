@@ -15,7 +15,7 @@
 - 輸入：檢舉人 `ReporterBuyerID`、對象、原因類別、選填說明（去頭尾空白，最多 500 字）。原因只能是 `policy.CommunityReporterSelectable()` 的八個值（SPAM、HARASSMENT、HATE、SEXUAL_CONTENT、MISLEADING_INFO、FOOD_SAFETY、FRAUD、OTHER）；seller 通報用的 `ReporterSelectable()` 不變。
 - 對象必須存在而且公開可讀（social `ContentSnapshot` 的 `Exists` 與 `Readable`，歸屬只查一次；買家對象是 buyer 的公開顯示資料存在且沒有刪除），否則 NotFound（被隱藏的內容也回 NotFound，不洩漏）。
 - 不能檢舉自己：買家作者與買家對象比對帳號（同一帳號的歷史身分也算自己），店家作者比對店家所屬帳號；回 InvalidInput。
-- 順序：先查這位檢舉人在這個對象的進行中案件裡有沒有檢舉，有就回傳既有的（`Created` 為假，不吃額度，不管內容現在還看不看得到）→ 沒有才做不鎖列的讀取（對象、作者、快照）→ 扣每日額度 → 開案或取進行中案件 → 掛進既有案件時 `version` 加一並鎖住案件列（已結案就整個重來；自己開的案件版本是 1）→ 快照 get-or-create（新快照在同 transaction 登記圖片引用）→ 寫檢舉。同一位檢舉人並行重送在最後一步撞唯一鍵：整個 transaction 回滾（額度與版本退回）重來，第二次回傳既有的。
+- 順序：帶 `request_id` 時最先以 (檢舉人, `request_id`) 查（`reports_request_key`），查到就回第一次的檢舉，不看案件現在的狀態、不吃額度，內容（對象、類別、說明的雜湊）不同回 InvalidInput（A7-D28 第 3 點）→ 先查這位檢舉人在這個對象的進行中案件裡有沒有檢舉，有就回傳既有的（`Created` 為假，不吃額度，不管內容現在還看不看得到）→ 沒有才做不鎖列的讀取（對象、作者、快照）→ 扣每日額度 → 開案或取進行中案件 → 掛進既有案件時 `version` 加一並鎖住案件列（已結案就整個重來；自己開的案件版本是 1）→ 快照 get-or-create（新快照在同 transaction 登記圖片引用）→ 寫檢舉。同一位檢舉人並行重送在最後一步撞唯一鍵：整個 transaction 回滾（額度與版本退回）重來，第二次回傳既有的。
 - 每日上限：每位檢舉人每個台北日（`platform/twtime.Day`）最多新增 20 筆，單一 upsert 原子地換日重算、未達上限才加一；到上限且是新檢舉回 ResourceExhausted，重試時間是到下一個台北午夜。
 - 案件：`INSERT … ON CONFLICT DO NOTHING` 之後讀進行中的案件；一個對象至多一個進行中案件（內容與買家兩個 partial UNIQUE），檢舉掛進它。結案後新檢舉開新案件。
 - 快照：內容由擁有者模組提供（social 的本文、媒體參照與作者；buyer 的公開顯示名稱與頭像），`snapshot.Encode` 正規化（換行統一、去頭尾空白、媒體參照排序去重）後序列化成確定的 JSON，雜湊取 SHA-256；每案每份內容一列，內容改過才多一份；檢舉引用送出時的那份。快照引用的圖片資產（`asset_ids`）在 media 以 `(GOVERNANCE_EVIDENCE, 快照 ID)` 登記引用（A7-D21 證據保全）：引用只由同步 job 寫入，內容的作者換圖、刪貼文或店家退場釋放自己的引用時，圖片仍被快照引用，不會被 media 回收。買家頭像只存 object key，沒有 asset ID，不在保全範圍。

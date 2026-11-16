@@ -49,6 +49,10 @@ type ModerationReport struct {
 	Description     *string
 	SnapshotID      *uuid.UUID
 	CreatedAt       time.Time
+	// 送出時 client 帶的 request_id（AIP-155，選填）；範圍是 (檢舉人, request_id)，同一位檢舉人重送一律回這一筆，不看案件現在的狀態（A7-D28 第 3 點）
+	RequestID *uuid.UUID
+	// 送出輸入（對象、類別、說明）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有
+	RequestHash []byte
 }
 
 type ModerationReporterDailyCount struct {
