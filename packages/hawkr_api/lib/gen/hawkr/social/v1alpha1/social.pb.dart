@@ -241,6 +241,7 @@ class Post extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? hashtagInputs,
     $core.bool? viewerLiked,
     $core.String? takedownMeasureId,
+    Actor? viewerActor,
   }) {
     final result = Post._();
     if (id != null) result.id = id;
@@ -264,6 +265,7 @@ class Post extends $pb.GeneratedMessage {
     if (hashtagInputs != null) result.hashtagInputs.addAll(hashtagInputs);
     if (viewerLiked != null) result.viewerLiked = viewerLiked;
     if (takedownMeasureId != null) result.takedownMeasureId = takedownMeasureId;
+    if (viewerActor != null) result.viewerActor = viewerActor;
     return result;
   }
 
@@ -309,6 +311,8 @@ class Post extends $pb.GeneratedMessage {
     ..pPS(19, _omitFieldNames ? '' : 'hashtagInputs')
     ..aOB(20, _omitFieldNames ? '' : 'viewerLiked')
     ..aOS(21, _omitFieldNames ? '' : 'takedownMeasureId')
+    ..aOM<Actor>(22, _omitFieldNames ? '' : 'viewerActor',
+        subBuilder: Actor.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -532,6 +536,20 @@ class Post extends $pb.GeneratedMessage {
   $core.bool hasTakedownMeasureId() => $_has(20);
   @$pb.TagNumber(21)
   void clearTakedownMeasureId() => $_clearField(21);
+
+  /// 觀看者在這篇貼文留言時的身分，與 viewer_can_comment 用同一套觀看者判斷：觀看者此刻的店擁有這篇貼文時是店家（店名、店 logo），
+  /// 否則有買家身分時是買家（顯示名稱、頭像）；訪客不設。被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。
+  /// 名稱與頭像讀不到時（店家卡片讀不到、買家已刪除）只帶 kind 與 id。
+  @$pb.TagNumber(22)
+  Actor get viewerActor => $_getN(21);
+  @$pb.TagNumber(22)
+  set viewerActor(Actor value) => $_setField(22, value);
+  @$pb.TagNumber(22)
+  $core.bool hasViewerActor() => $_has(21);
+  @$pb.TagNumber(22)
+  void clearViewerActor() => $_clearField(22);
+  @$pb.TagNumber(22)
+  Actor ensureViewerActor() => $_ensure(21);
 }
 
 /// Actor 是留言的作者，名稱與頭像在讀取時由 buyer、seller 補。

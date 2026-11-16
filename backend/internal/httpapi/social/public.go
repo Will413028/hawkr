@@ -475,6 +475,8 @@ type postStores struct {
 	cards    map[int64]seller.StoreCard
 	blocking map[int64]bool
 	liked    map[uuid.UUID]bool
+	// buyerDisplay 是觀看者買家身分的顯示資料，只在這一頁有不是觀看者自己的店的貼文時才查。
+	buyerDisplay map[int64]buyer.Display
 }
 
 func (h *presenter) storeCards(ctx context.Context, storeIDs []int64) (map[int64]seller.StoreCard, error) {
@@ -531,6 +533,16 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 		return nil, err
 	}
 	stores := postStores{cards: cards, blocking: blocking, liked: liked}
+	if c.BuyerID != 0 {
+		for _, p := range posts {
+			if !c.OwnsStore(p.StoreID) {
+				if stores.buyerDisplay, err = h.buyerDisplays(ctx, []int64{c.BuyerID}); err != nil {
+					return nil, err
+				}
+				break
+			}
+		}
+	}
 	out := make([]*pb.Post, len(posts))
 	for i, p := range posts {
 		if out[i], err = h.toPost(c, p, stores); err != nil {
@@ -588,12 +600,26 @@ func (h *presenter) toPost(c social.Caller, p social.Post, stores postStores) (*
 	for _, t := range p.Hashtags {
 		out.Hashtags = append(out.Hashtags, &pb.Hashtag{Name: t.Name, Display: t.Display})
 	}
+	if out.ViewerActor, err = h.viewerActor(c, p.StoreID, stores); err != nil {
+		return nil, err
+	}
 	if card, ok := stores.cards[p.StoreID]; ok {
 		if out.Store, err = httpseller.ToStoreCard(h.images, card); err != nil {
 			return nil, err
 		}
 	}
 	return out, nil
+}
+
+// viewerActor 是觀看者在店 storeID 的貼文留言時的身分，與 canComment 用同一套判斷：此刻的店就是 storeID 時是店家，否則有買家身分時是買家，訪客是 nil。
+func (h *presenter) viewerActor(c social.Caller, storeID int64, stores postStores) (*pb.Actor, error) {
+	switch {
+	case c.OwnsStore(storeID):
+		return h.toActor(social.Actor{Kind: social.ActorStore, ID: storeID}, nil, stores)
+	case c.BuyerID != 0:
+		return h.toActor(social.Actor{Kind: social.ActorBuyer, ID: c.BuyerID}, stores.buyerDisplay, stores)
+	}
+	return nil, nil
 }
 
 func (h *presenter) toComments(ctx context.Context, c social.Caller, postStore int64, comments []social.Comment) ([]*pb.Comment, error) {

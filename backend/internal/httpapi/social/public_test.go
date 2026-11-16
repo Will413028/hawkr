@@ -762,3 +762,59 @@ func TestRecordPostViewBuildsTheViewer(t *testing.T) {
 		}
 	})
 }
+
+func TestPostViewerActorFollowsViewerIdentity(t *testing.T) {
+	own := &seller.Store{StoreID: 9}
+	cases := []struct {
+		name     string
+		guest    bool
+		store    *seller.Store
+		postShop int64
+		block    map[int64]bool
+		wantKind pb.ActorKind
+		wantID   string
+		wantName string
+	}{
+		{"訪客不設", true, nil, 5, nil, pb.ActorKind_ACTOR_KIND_UNSPECIFIED, "", ""},
+		{"買家是買家身分", false, nil, 5, nil, pb.ActorKind_ACTOR_KIND_BUYER, "7", "buyer"},
+		{"被封鎖的買家身分不變", false, nil, 5, map[int64]bool{5: true}, pb.ActorKind_ACTOR_KIND_BUYER, "7", "buyer"},
+		{"店主讀自己店的貼文是店家身分", false, own, 9, nil, pb.ActorKind_ACTOR_KIND_STORE, "9", "shop"},
+		{"店主讀別家店的貼文是買家身分", false, own, 5, nil, pb.ActorKind_ACTOR_KIND_BUYER, "7", "buyer"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			check := func(t *testing.T, got *pb.Post) {
+				t.Helper()
+				a := got.GetViewerActor()
+				if c.wantKind == pb.ActorKind_ACTOR_KIND_UNSPECIFIED {
+					if a != nil {
+						t.Errorf("viewer_actor = %v，預期不設", a)
+					}
+					return
+				}
+				if a.GetKind() != c.wantKind || a.GetId() != c.wantID || a.GetName() != c.wantName {
+					t.Errorf("viewer_actor = %v，預期 kind=%v id=%s name=%s", a, c.wantKind, c.wantID, c.wantName)
+				}
+			}
+			p := post(c.postShop)
+			ctx := t.Context()
+			if !c.guest {
+				ctx = asBuyer(ctx)
+			}
+			h := newPublic(t, &fakeReads{post: p, feed: social.PostPage{Posts: []social.Post{p}}}, fakeBuyers{id: 7}, &fakeStores{own: c.store, blocking: c.block})
+			single, err := h.GetPost(ctx, connect.NewRequest(&pb.GetPostRequest{PostId: p.ID.String()}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			check(t, single.Msg.GetPost())
+			list, err := h.ListPosts(ctx, connect.NewRequest(&pb.ListPostsRequest{}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(list.Msg.GetPosts()) != 1 {
+				t.Fatalf("posts = %d", len(list.Msg.GetPosts()))
+			}
+			check(t, list.Msg.GetPosts()[0])
+		})
+	}
+}
