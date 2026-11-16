@@ -21,10 +21,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/readcache"
+	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/reads"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/schedule"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/textcheck"
+	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/visibility"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -304,16 +306,32 @@ func (s *Service) replay(ctx context.Context, q *store.Queries, storeID int64, r
 	return row, true, nil
 }
 
-// lockOwned 鎖住貼文並確認屬於這家店；別家的貼文與不存在一樣回 NotFound。
+// lockOwned 鎖住貼文並確認屬於這家店。不存在、已刪除與別家未公開（草稿、下架）的貼文回 NotFound，不讓店家藉回應差異探測它的存在；
+// 別家已公開可讀的貼文（存在本身公開）回 PermissionDenied（SD26）。
 func (s *Service) lockOwned(ctx context.Context, q *store.Queries, storeID int64, id uuid.UUID) (store.SocialPost, error) {
 	row, err := q.LockPost(ctx, id)
-	if errors.Is(err, pgx.ErrNoRows) || err == nil && row.StoreID != storeID {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return store.SocialPost{}, notFound(ctx)
 	}
 	if err != nil {
 		return store.SocialPost{}, fmt.Errorf("social：鎖定貼文 %s：%w", id, err)
 	}
+	if row.StoreID != storeID {
+		return store.SocialPost{}, s.foreignWriteError(ctx, id)
+	}
 	return row, nil
+}
+
+// foreignWriteError 是店家寫入別家貼文的錯誤：貼文對匿名觀看者公開可讀（同公開讀取的條件）回 PermissionDenied，否則 NotFound。
+func (s *Service) foreignWriteError(ctx context.Context, id uuid.UUID) error {
+	pub, err := reads.One[reads.BoolRow](ctx, s.d.DB.Conn(ctx), reads.PostIsPublic(id, s.d.Now().UTC(), visibility.Viewer{}))
+	if err != nil {
+		return fmt.Errorf("social：判斷貼文 %s 是否公開：%w", id, err)
+	}
+	if pub.Value {
+		return apperr.PermissionDenied("%s", text.PostOwnerOnly(uitext.LocaleFrom(ctx)))
+	}
+	return notFound(ctx)
 }
 
 // Update 修改貼文：Version 與目前的不符回 VersionConflict、不寫入。已發布的貼文被編輯後仍要滿足公開要件。
@@ -495,13 +513,15 @@ func (s *Service) Unpublish(ctx context.Context, st seller.Store, postID uuid.UU
 	return s.Own(ctx, st.StoreID, postID)
 }
 
-// Delete 軟刪貼文（已經刪除的冪等：不做副作用）。version 為 0 表示不檢查版本。軟刪保留內容與圖片引用（保留期還沒訂，見 CARRYOVER）。
-func (s *Service) Delete(ctx context.Context, st seller.Store, postID uuid.UUID, version int64) error {
+// Delete 軟刪貼文，回傳這次是否真的刪了。不存在與已經刪除的貼文回 false、不做副作用（冪等）；別家的貼文依 lockOwned 的規則回錯。
+// version 為 0 表示不檢查版本。軟刪保留內容與圖片引用（保留期還沒訂，見 CARRYOVER）。
+func (s *Service) Delete(ctx context.Context, st seller.Store, postID uuid.UUID, version int64) (bool, error) {
 	if err := seller.Authorize(st, seller.CapContentContract); err != nil {
-		return err
+		return false, err
 	}
 	now := s.d.Now().UTC()
-	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+	deleted := false
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		row, err := q.LockPost(ctx, postID)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -511,7 +531,7 @@ func (s *Service) Delete(ctx context.Context, st seller.Store, postID uuid.UUID,
 			return fmt.Errorf("social：鎖定貼文 %s：%w", postID, err)
 		}
 		if row.StoreID != st.StoreID {
-			return notFound(ctx)
+			return s.foreignWriteError(ctx, postID)
 		}
 		if _, err := s.d.Cancel.FromLockedPosts(ctx, []uuid.UUID{postID}, model.CancelDeleted, now, schedule.CallerBumps); err != nil {
 			return err
@@ -523,8 +543,22 @@ func (s *Service) Delete(ctx context.Context, st seller.Store, postID uuid.UUID,
 		if n == 0 {
 			return versionConflict(ctx)
 		}
+		deleted = true
 		return s.d.Cache.BustPost(ctx, postID, st.StoreID)
 	})
+	return deleted && err == nil, err
+}
+
+// DeleteOwn 是對外的刪除：沒刪到（不存在、已刪除）回 NotFound（AIP-135），其餘同 Delete。
+func (s *Service) DeleteOwn(ctx context.Context, st seller.Store, postID uuid.UUID, version int64) error {
+	deleted, err := s.Delete(ctx, st, postID, version)
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return notFound(ctx)
+	}
+	return nil
 }
 
 func validStatus(s model.PostStatus) bool {

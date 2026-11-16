@@ -107,6 +107,10 @@
       "message": "找不到這篇貼文",
       "description": "貼文不存在、不是呼叫者可見的，或不屬於呼叫者的店家。"
     },
+    "post.owner_only": {
+      "message": "這篇貼文屬於其他店家，無法修改",
+      "description": "已發布（公開可讀）的貼文被其他店家寫入。"
+    },
     "post.product_invalid": {
       "message": "商品不合法",
       "description": "貼文掛的商品不存在或不屬於這家店。"

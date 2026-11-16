@@ -73,7 +73,7 @@ func (f *fakeOwner) UnpublishPost(_ context.Context, st seller.Store, id uuid.UU
 	return f.current(id, v+1), f.rec("unpublish", st)
 }
 
-func (f *fakeOwner) DeletePost(_ context.Context, st seller.Store, _ uuid.UUID, v int64) error {
+func (f *fakeOwner) DeleteOwnPost(_ context.Context, st seller.Store, _ uuid.UUID, v int64) error {
 	f.version = v
 	return f.rec("delete", st)
 }
@@ -473,8 +473,8 @@ func (r *reaching) UnpublishPost(ctx context.Context, st seller.Store, id uuid.U
 	return
 }
 
-func (r *reaching) DeletePost(ctx context.Context, st seller.Store, id uuid.UUID, v int64) error {
-	return r.run("DeletePost", func() error { return r.m.DeletePost(ctx, st, id, v) })
+func (r *reaching) DeleteOwnPost(ctx context.Context, st seller.Store, id uuid.UUID, v int64) error {
+	return r.run("DeletePost", func() error { return r.m.DeleteOwnPost(ctx, st, id, v) })
 }
 
 func (r *reaching) SchedulePost(ctx context.Context, st seller.Store, in social.SchedulePostInput) (s social.ScheduledPost, err error) {

@@ -92,7 +92,7 @@ func absentID(d Driver) string {
 	return uuid.NewV4().String()
 }
 
-// wantOwnerDenied 確認店主專屬方法被沒有店的帳號或別家店的賣家呼叫時的錯誤。SD26：舊的回權限不足；單體依〈API 設計規範（Connect）〉
+// wantOwnerDenied 確認店主專屬方法被沒有店的帳號呼叫時的錯誤。SD26：舊的回權限不足；單體依〈API 設計規範（Connect）〉
 // 的防列舉規則回 not_found（資源的存在與否不對無權者洩漏）。
 func wantOwnerDenied(t ch.T, d Driver, err error) {
 	t.Helper()
@@ -101,6 +101,13 @@ func wantOwnerDenied(t ch.T, d Driver, err error) {
 		return
 	}
 	ch.WantKind(t, err, ch.ErrNotFound)
+}
+
+// wantForeignPublishedDenied 是店家寫入別家已發布（公開可讀）貼文：舊的 permission_denied，單體照 SD26 也是 permission_denied；
+// 沒有店的帳號與未公開的貼文走 wantOwnerDenied（單體 not_found）。
+func wantForeignPublishedDenied(t ch.T, err error) {
+	t.Helper()
+	ch.WantKind(t, err, ch.ErrPermission)
 }
 
 func newPost(ctx context.Context, t ch.T, d Driver, c ch.Caller, tags ...string) Post {
@@ -232,10 +239,10 @@ func postUpdateReplacesContentAndTags(ctx context.Context, t ch.T, d Driver) {
 func postOtherSellerCannotModify(ctx context.Context, t ch.T, d Driver) {
 	p := newPost(ctx, t, d, ch.Seller)
 	_, err := d.UpdatePost(ctx, ch.Seller2, p.ID, PostInput{Content: "別人改的"})
-	wantOwnerDenied(t, d, err)
-	wantOwnerDenied(t, d, d.UnpublishPost(ctx, ch.Seller2, p.ID))
-	wantOwnerDenied(t, d, d.PublishPost(ctx, ch.Seller2, p.ID))
-	wantOwnerDenied(t, d, d.DeletePost(ctx, ch.Seller2, p.ID))
+	wantForeignPublishedDenied(t, err)
+	wantForeignPublishedDenied(t, d.UnpublishPost(ctx, ch.Seller2, p.ID))
+	wantForeignPublishedDenied(t, d.PublishPost(ctx, ch.Seller2, p.ID))
+	wantForeignPublishedDenied(t, d.DeletePost(ctx, ch.Seller2, p.ID))
 	wantOwnerDenied(t, d, d.DeletePost(ctx, ch.Buyer, p.ID))
 	mine := ch.Must(t, ch.Ret(d.GetMyPost(ctx, ch.Seller, p.ID)))
 	if mine.Content != p.Content || mine.Status != "PUBLISHED" {

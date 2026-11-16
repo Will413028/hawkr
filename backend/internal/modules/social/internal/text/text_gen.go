@@ -204,6 +204,11 @@ func PostNotFound(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "找不到這篇貼文", Locale: uitext.ZhTW}
 }
 
+// PostOwnerOnly 是模組句子 post.owner_only；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostOwnerOnly(l uitext.Locale) uitext.Message {
+	return uitext.Message{Text: "這篇貼文屬於其他店家，無法修改", Locale: uitext.ZhTW}
+}
+
 // PostProductInvalid 是模組句子 post.product_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func PostProductInvalid(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "商品不合法", Locale: uitext.ZhTW}

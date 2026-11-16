@@ -24,7 +24,7 @@ type Owner interface {
 	UpdatePost(ctx context.Context, store seller.Store, in social.UpdatePostInput) (social.Post, error)
 	PublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (social.Post, error)
 	UnpublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (social.Post, error)
-	DeletePost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) error
+	DeleteOwnPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) error
 	SchedulePost(ctx context.Context, store seller.Store, in social.SchedulePostInput) (social.ScheduledPost, error)
 	MyPost(ctx context.Context, store seller.Store, id uuid.UUID) (social.Post, error)
 	ListMyPosts(ctx context.Context, store seller.Store, status social.PostStatus, after *social.OwnPostCursor, size int32) (social.OwnPostPage, error)
@@ -291,7 +291,7 @@ func (h *App) DeletePost(ctx context.Context, req *connect.Request[pb.DeletePost
 	if err != nil {
 		return nil, err
 	}
-	if err := h.owner.DeletePost(ctx, st, id, version); err != nil {
+	if err := h.owner.DeleteOwnPost(ctx, st, id, version); err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&pb.DeletePostResponse{}), nil
