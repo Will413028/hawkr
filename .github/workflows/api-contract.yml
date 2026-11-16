@@ -56,6 +56,11 @@ jobs:
       - name: buf lint
         run: buf lint api
 
+      # 外掛指令缺席時不得先清空生成物（buf.gen.yaml 的 clean: true）。
+      - name: generate.sh 的行為測試
+        if: always()
+        run: bash api/test-generate.sh
+
       - name: googleapis 的版本一致
         if: always()
         run: |
