@@ -12,7 +12,8 @@
 // 不轉送：comment.updated、comment.deleted（只給 gateway 的留言 SSE，SSE 刪除）、counter.delta（計數與寫入同 transaction）。
 //
 // 封鎖雙方之間不送通知（留言、回覆、讚、追蹤的店家的新貼文）：worker 在送出前查 buyer、seller 的封鎖 API，是送出當下的狀態。
-// 貼文的讚在讚的買家與店家屬同一帳號時不送（自己讚自己的貼文）；留言與回覆的自我通知由 notification 略過，commenterPrincipalId 等欄位照填。
+// 互動者與收件店家（或被回覆、被按讚的對象）屬同一帳號時不送（自己留言、回覆、讚自己的內容；店主以買家身分追蹤自己的店也不收新貼文），
+// 一律在 relay 以帳號比對：notification 的自我略過拿原始的互動者 ID 比店家 ID，兩個 ID 空間不同，只當最後一道。
 // 留言與貼文在送出當下已不可見（刪除、隱藏、下架、不公開）時不送。
 //
 // 隨 notification 搬進單體而刪除。
@@ -222,7 +223,6 @@ type Stores interface {
 // Comments 是 relay 讀留言與可見性的 port；social.Module 實作它。
 type Comments interface {
 	CommentForRelay(context.Context, uuid.UUID) (social.Comment, error)
-	CommentLikeCount(context.Context, uuid.UUID) (int64, error)
 	// ContentOwner 的 Exists 與 Readable 是內容此刻存在且公開可讀（留言連同所屬貼文）。
 	ContentOwner(context.Context, social.Target) (social.ContentOwner, error)
 }
@@ -378,13 +378,27 @@ func (w *Worker) skipBlocked(ctx context.Context, event string, eventID string, 
 	return ok, nil
 }
 
-// visible 回報內容此刻是否還存在且公開可讀；不是的話記一筆並讓呼叫方略過。
-func (w *Worker) visible(ctx context.Context, kind social.TargetKind, id, event, eventID string) (bool, error) {
-	u, err := uuid.Parse(id)
+// parseID 解析 job 帶的 UUID；壞掉的 ID 重試也不會好，直接取消。
+func parseID(s string) (uuid.UUID, error) {
+	id, err := uuid.Parse(s)
 	if err != nil {
-		return false, river.JobCancel(err)
+		return uuid.UUID{}, river.JobCancel(fmt.Errorf("socialrelay：壞掉的 ID %q：%w", s, err))
 	}
-	o, err := w.Comments.ContentOwner(ctx, social.Target{Kind: kind, ID: u})
+	return id, nil
+}
+
+// selfAction 回報兩個互動者是否屬同一帳號（互動者在自己的內容上互動）；任一方沒有帳號（已刪除）不算。
+func (w *Worker) selfAction(ctx context.Context, event, eventID string, a, b who) bool {
+	if a.Account == 0 || a.Account != b.Account {
+		return false
+	}
+	w.warn(ctx, "socialrelay：自己對自己的內容互動，不送通知", "event", event, "event_id", eventID)
+	return true
+}
+
+// visible 回報內容此刻是否還存在且公開可讀；不是的話記一筆並讓呼叫方略過。
+func (w *Worker) visible(ctx context.Context, kind social.TargetKind, id uuid.UUID, event, eventID string) (bool, error) {
+	o, err := w.Comments.ContentOwner(ctx, social.Target{Kind: kind, ID: id})
 	if err != nil {
 		return false, err
 	}
@@ -407,7 +421,11 @@ type postCreated struct {
 }
 
 func (w *Worker) postPublished(ctx context.Context, a PostPublishedArgs) error {
-	if ok, err := w.visible(ctx, social.TargetPost, a.PostID, "post.created", a.EventID); err != nil || !ok {
+	postID, err := parseID(a.PostID)
+	if err != nil {
+		return err
+	}
+	if ok, err := w.visible(ctx, social.TargetPost, postID, "post.created", a.EventID); err != nil || !ok {
 		return err
 	}
 	store, err := w.identity(ctx, social.ActorStore, a.StoreID)
@@ -426,6 +444,13 @@ func (w *Worker) postPublished(ctx context.Context, a PostPublishedArgs) error {
 		if skip, err := w.skipBlocked(ctx, "post.created", a.EventID, social.ActorBuyer, f.ID, social.ActorStore, a.StoreID); err != nil {
 			return err
 		} else if skip {
+			continue
+		}
+		follower, err := w.identity(ctx, social.ActorBuyer, f.ID)
+		if err != nil {
+			return err
+		}
+		if w.selfAction(ctx, "post.created", a.EventID, follower, store) {
 			continue
 		}
 		id := derivedID(a.EventID, strconv.FormatInt(f.ID, 10))
@@ -463,15 +488,7 @@ type commentSnapshot struct {
 	UpdatedAt   string `json:"updatedAt"`
 }
 
-func (w *Worker) snapshot(ctx context.Context, commentID string, author who, replyToName string) (*commentSnapshot, error) {
-	id, err := uuid.Parse(commentID)
-	if err != nil {
-		return nil, err
-	}
-	c, err := w.Comments.CommentForRelay(ctx, id)
-	if err != nil {
-		return nil, err
-	}
+func snapshotOf(c social.Comment, author who, replyToName string) *commentSnapshot {
 	s := &commentSnapshot{
 		CommentID: c.ID.String(), PostID: c.PostID.String(), UserID: c.Actor.ID, UserName: author.Name, AvatarKey: author.Avatar,
 		Role: author.OldKind, Content: c.Body, ReplyToName: replyToName, LikeCount: count32(c.Likes), ReplyCount: count32(c.ReplyCount),
@@ -483,7 +500,7 @@ func (w *Worker) snapshot(ctx context.Context, commentID string, author who, rep
 	if c.ReplyToID != nil {
 		s.ReplyToID = c.ReplyToID.String()
 	}
-	return s, nil
+	return s
 }
 
 // commentCreated 是舊 CommentCreatedEvent。clientRequestId 不送：它是舊 SSE 的去重用欄位（omitempty），notification 不讀。
@@ -504,7 +521,11 @@ type commentCreated struct {
 }
 
 func (w *Worker) commentCreated(ctx context.Context, a CommentCreatedArgs) error {
-	if ok, err := w.visible(ctx, social.TargetComment, a.CommentID, "comment.created", a.EventID); err != nil || !ok {
+	commentID, err := parseID(a.CommentID)
+	if err != nil {
+		return err
+	}
+	if ok, err := w.visible(ctx, social.TargetComment, commentID, "comment.created", a.EventID); err != nil || !ok {
 		return err
 	}
 	kind := social.ActorKind(a.ActorKind)
@@ -520,10 +541,14 @@ func (w *Worker) commentCreated(ctx context.Context, a CommentCreatedArgs) error
 	if err != nil {
 		return err
 	}
-	snap, err := w.snapshot(ctx, a.CommentID, commenter, "")
+	if w.selfAction(ctx, "comment.created", a.EventID, commenter, author) {
+		return nil
+	}
+	c, err := w.Comments.CommentForRelay(ctx, commentID)
 	if err != nil {
 		return err
 	}
+	snap := snapshotOf(c, commenter, "")
 	return w.enqueuePublish(ctx, a.EventID, exchangeContent, "comment.created", commentCreated{
 		baseEvent: base(a.EventID, a.Occurred, "COMMENT_CREATED"), CommentID: a.CommentID, PostID: a.PostID,
 		CommenterID: a.ActorID, CommenterPrincipalID: commenter.Principal, CommenterName: commenter.Name,
@@ -549,7 +574,11 @@ type commentReplied struct {
 }
 
 func (w *Worker) commentReplied(ctx context.Context, a CommentRepliedArgs) error {
-	if ok, err := w.visible(ctx, social.TargetComment, a.CommentID, "comment.replied", a.EventID); err != nil || !ok {
+	commentID, err := parseID(a.CommentID)
+	if err != nil {
+		return err
+	}
+	if ok, err := w.visible(ctx, social.TargetComment, commentID, "comment.replied", a.EventID); err != nil || !ok {
 		return err
 	}
 	kind, to := social.ActorKind(a.ActorKind), social.ActorKind(a.ReplyToKind)
@@ -564,10 +593,14 @@ func (w *Worker) commentReplied(ctx context.Context, a CommentRepliedArgs) error
 	if err != nil {
 		return err
 	}
-	snap, err := w.snapshot(ctx, a.CommentID, replier, target.Name)
+	if w.selfAction(ctx, "comment.replied", a.EventID, replier, target) {
+		return nil
+	}
+	c, err := w.Comments.CommentForRelay(ctx, commentID)
 	if err != nil {
 		return err
 	}
+	snap := snapshotOf(c, replier, target.Name)
 	return w.enqueuePublish(ctx, a.EventID, exchangeContent, "comment.replied", commentReplied{
 		baseEvent:     base(a.EventID, a.Occurred, "COMMENT_REPLIED"),
 		ReplyToUserID: target.Principal, ReplyToUserStoreID: a.ReplyToID, ReplyToUserType: target.Space,
@@ -586,6 +619,13 @@ type postLiked struct {
 }
 
 func (w *Worker) postLiked(ctx context.Context, a PostLikedArgs) error {
+	postID, err := parseID(a.PostID)
+	if err != nil {
+		return err
+	}
+	if ok, err := w.visible(ctx, social.TargetPost, postID, "post.liked", a.EventID); err != nil || !ok {
+		return err
+	}
 	if skip, err := w.skipBlocked(ctx, "post.liked", a.EventID, social.ActorBuyer, a.BuyerID, social.ActorStore, a.StoreID); err != nil || skip {
 		return err
 	}
@@ -597,8 +637,10 @@ func (w *Worker) postLiked(ctx context.Context, a PostLikedArgs) error {
 	if err != nil {
 		return err
 	}
-	if liker.Account != 0 && liker.Account == author.Account {
-		w.warn(ctx, "socialrelay：自己讚自己的貼文，不送通知", "event_id", a.EventID)
+	if author.Account == 0 {
+		return river.JobCancel(fmt.Errorf("socialrelay：貼文的店家 %d 不存在，沒有收件帳號", a.StoreID))
+	}
+	if w.selfAction(ctx, "post.liked", a.EventID, liker, author) {
 		return nil
 	}
 	return w.enqueuePublish(ctx, a.EventID, exchangeContent, "post.liked", postLiked{
@@ -623,7 +665,11 @@ type commentLikeChanged struct {
 }
 
 func (w *Worker) commentLiked(ctx context.Context, a CommentLikedArgs) error {
-	if ok, err := w.visible(ctx, social.TargetComment, a.CommentID, "comment.like_changed", a.EventID); err != nil || !ok {
+	commentID, err := parseID(a.CommentID)
+	if err != nil {
+		return err
+	}
+	if ok, err := w.visible(ctx, social.TargetComment, commentID, "comment.like_changed", a.EventID); err != nil || !ok {
 		return err
 	}
 	kind, ak := social.ActorKind(a.ActorKind), social.ActorKind(a.AuthorKind)
@@ -638,16 +684,15 @@ func (w *Worker) commentLiked(ctx context.Context, a CommentLikedArgs) error {
 	if err != nil {
 		return err
 	}
-	id, err := uuid.Parse(a.CommentID)
-	if err != nil {
-		return river.JobCancel(err)
+	if w.selfAction(ctx, "comment.like_changed", a.EventID, liker, author) {
+		return nil
 	}
-	likes, err := w.Comments.CommentLikeCount(ctx, id)
+	c, err := w.Comments.CommentForRelay(ctx, commentID)
 	if err != nil {
 		return err
 	}
 	return w.enqueuePublish(ctx, a.EventID, exchangeContent, "comment.like_changed", commentLikeChanged{
-		baseEvent: base(a.EventID, a.Occurred, "COMMENT_LIKE_CHANGED"), CommentID: a.CommentID, PostID: a.PostID, LikeCount: count32(likes),
+		baseEvent: base(a.EventID, a.Occurred, "COMMENT_LIKE_CHANGED"), CommentID: a.CommentID, PostID: a.PostID, LikeCount: count32(c.Likes),
 		Action: "LIKE", UserID: a.ActorID, LikerKind: liker.OldKind, CommentAuthorID: author.Principal, CommentAuthorStoreID: a.AuthorID,
 		LikerPrincipalID: liker.Principal, LikerName: liker.Name, CommentAuthorType: author.Space,
 	})

@@ -256,7 +256,7 @@ func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, vers
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		// 鎖的順序 identity → buyer → seller → social：作者與歸屬在鎖之前用不加鎖的讀取確認（作者不會變），買家列的共享鎖先於留言列的鎖。
-		// 反過來（先鎖留言、再鎖買家）會與刪帳申請（持有買家列的排他鎖，再由訂閱者鎖作者的內容）互相等待而死結（A7-1a R3）。
+		// 反過來（先鎖留言、再鎖買家）會與刪帳申請（持有買家列的排他鎖，再由訂閱者鎖作者的內容）互相等待而死結。
 		pre, err := q.GetComment(ctx, id)
 		if errors.Is(err, pgx.ErrNoRows) || err == nil && pre.SocialComment.DeletedAt != nil {
 			return commentNotFound(ctx)
@@ -515,16 +515,4 @@ func (s *Service) ForRelay(ctx context.Context, id uuid.UUID) (model.Comment, er
 		return model.Comment{}, fmt.Errorf("social：讀取留言 %s：%w", id, err)
 	}
 	return s.withStats(ctx, q, model.Caller{}, visibleComment(row.SocialComment, row.PostStoreID))
-}
-
-// LikeCount 是留言此刻的讚數，不帶觀看者、不套可見性規則；不存在回 NotFound。
-func (s *Service) LikeCount(ctx context.Context, id uuid.UUID) (int64, error) {
-	counts, err := s.q(ctx).GetCommentCounts(ctx, id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return 0, commentNotFound(ctx)
-	}
-	if err != nil {
-		return 0, fmt.Errorf("social：讀取留言的計數 %s：%w", id, err)
-	}
-	return counts.LikeCount, nil
 }

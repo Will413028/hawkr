@@ -545,17 +545,12 @@ func (m *Module) CommentForRelay(ctx context.Context, id uuid.UUID) (Comment, er
 	return m.comment.ForRelay(ctx, id)
 }
 
-// CommentLikeCount 以 ID 讀一則留言此刻的讚數（不帶觀看者、不套可見性規則），只給 legacy relay；不存在回 NotFound。
-func (m *Module) CommentLikeCount(ctx context.Context, id uuid.UUID) (int64, error) {
-	return m.comment.LikeCount(ctx, id)
-}
-
-// ContentOwner 回傳內容的歸屬（存在、作者、所屬店家、是否公開可讀），給 moderation 在建立處分前驗證。
+// ContentOwner 回傳內容的歸屬（存在、作者、所屬店家、是否公開可讀），給 moderation 在建立處分前驗證；legacy relay 也在送出通知前用它的 Exists 與 Readable 確認內容此刻存在且公開可讀。
 func (m *Module) ContentOwner(ctx context.Context, t Target) (ContentOwner, error) {
 	return m.sanction.Owner(ctx, t)
 }
 
-// ContentAuthorFor 回傳讀取者讀得到的留言或討論區留言的作者與所屬店家（從內容封鎖作者，A7-2e）；讀不到回 Found 為假。唯讀，套用與列表相同的觀看者規則。
+// ContentAuthorFor 回傳讀取者讀得到的留言或討論區留言的作者與所屬店家（從內容封鎖作者）；讀不到回 Found 為假。唯讀，套用與列表相同的觀看者規則。
 func (m *Module) ContentAuthorFor(ctx context.Context, c Caller, t Target) (ContentAuthor, error) {
 	return m.sanction.AuthorFor(ctx, c, t)
 }

@@ -96,22 +96,24 @@ func (s *fakeStores) Measure(context.Context, uuid.UUID) (seller.Measure, error)
 	return s.measure, s.measureErr
 }
 
+// fakeComments 只認得 known 裡的內容：查別的目標（例如拿留言 ID 當貼文查）回不存在；owners 記下每次查的目標，reads 是留言讀取次數。
 type fakeComments struct {
 	c        social.Comment
 	notShown bool
 	gone     bool
+	known    map[social.Target]bool
+	owners   []social.Target
+	reads    int
 }
 
 func (f *fakeComments) CommentForRelay(context.Context, uuid.UUID) (social.Comment, error) {
+	f.reads++
 	return f.c, nil
 }
 
-func (f *fakeComments) CommentLikeCount(context.Context, uuid.UUID) (int64, error) {
-	return f.c.Likes, nil
-}
-
-func (f *fakeComments) ContentOwner(context.Context, social.Target) (social.ContentOwner, error) {
-	return social.ContentOwner{Exists: !f.gone, Readable: !f.notShown}, nil
+func (f *fakeComments) ContentOwner(_ context.Context, t social.Target) (social.ContentOwner, error) {
+	f.owners = append(f.owners, t)
+	return social.ContentOwner{Exists: f.known[t] && !f.gone, Readable: !f.notShown}, nil
 }
 
 var (
@@ -155,7 +157,10 @@ func newFixtureWithComments() (*Worker, *fakeBuyers, *fakeStores, *recordingJobs
 		ID: commentID, PostID: postID, Actor: social.Actor{Kind: social.ActorBuyer, ID: 301}, Body: "留言全文",
 		CreatedAt: createdAt, UpdatedAt: createdAt, Likes: 3, ReplyCount: 1,
 	}
-	fc := &fakeComments{c: comment}
+	fc := &fakeComments{c: comment, known: map[social.Target]bool{
+		{Kind: social.TargetComment, ID: commentID}: true,
+		{Kind: social.TargetPost, ID: postID}:       true,
+	}}
 	return NewWorker(b, s, fc, q, nil), b, s, q, fc
 }
 
@@ -294,11 +299,11 @@ func TestCommentCreatedWire(t *testing.T) {
 }
 
 func TestCommentRepliedWire(t *testing.T) {
-	w, _, _, _ := newFixture()
-	w.Comments = &fakeComments{c: social.Comment{
+	w, _, _, _, fc := newFixtureWithComments()
+	fc.c = social.Comment{
 		ID: commentID, PostID: postID, ParentID: &parentID, ReplyToID: &replyToID, Actor: social.Actor{Kind: social.ActorStore, ID: 91},
 		Body: "店家回覆", CreatedAt: createdAt, UpdatedAt: createdAt,
-	}}
+	}
 	got := run(t, w, OnCommentReplied, social.CommentReplied{
 		EventID: eventID, OccurredAt: occurredAt, CommentID: commentID, PostID: postID, StoreID: 91, ParentID: parentID, ReplyToID: replyToID,
 		Actor: social.Actor{Kind: social.ActorStore, ID: 91}, ReplyToActor: social.Actor{Kind: social.ActorBuyer, ID: 301}, Preview: "回覆預覽",
@@ -526,6 +531,9 @@ func TestNothingIsSentForContentThatIsNoLongerVisible(t *testing.T) {
 			"comment.like_changed": func(t *testing.T, w *Worker) int {
 				return len(run(t, w, OnCommentLiked, social.CommentLiked{EventID: eventID, OccurredAt: occurredAt, CommentID: commentID, PostID: postID, StoreID: 91, Actor: social.Actor{Kind: social.ActorStore, ID: 91}, Author: buyerActor}))
 			},
+			"post.liked": func(t *testing.T, w *Worker) int {
+				return len(run(t, w, OnPostLiked, social.PostLiked{EventID: eventID, OccurredAt: occurredAt, PostID: postID, StoreID: 91, BuyerID: 301}))
+			},
 			"post.created": func(t *testing.T, w *Worker) int {
 				w.Buyers.(*fakeBuyers).pages[0] = buyer.Page{Items: []buyer.Item{{ID: 301}}}
 				return len(run(t, w, OnPostPublished, social.PostPublished{EventID: eventID, OccurredAt: occurredAt, PostID: postID, StoreID: 91}))
@@ -584,5 +592,146 @@ func TestTakedownOfAMissingMeasureCancelsAndOtherErrorsRetry(t *testing.T) {
 	s.measureErr = errors.New("db down")
 	if err := w.contentTakedown(context.Background(), args); err == nil || isCancel(err) {
 		t.Fatalf("transient err=%v, want a retryable error", err)
+	}
+}
+
+type sendCase struct {
+	name string
+	// send 以給定的互動者送出事件，回傳送出的訊息數與留言讀取次數。
+	send func(t *testing.T, w *Worker, fc *fakeComments, actor, other social.Actor) int
+}
+
+func eventCases() []sendCase {
+	return []sendCase{
+		{"comment.created", func(t *testing.T, w *Worker, _ *fakeComments, actor, _ social.Actor) int {
+			return len(run(t, w, OnCommentCreated, social.CommentCreated{EventID: eventID, OccurredAt: occurredAt, CommentID: commentID, PostID: postID, StoreID: 91, Actor: actor}))
+		}},
+		{"comment.replied", func(t *testing.T, w *Worker, _ *fakeComments, actor, other social.Actor) int {
+			return len(run(t, w, OnCommentReplied, social.CommentReplied{EventID: eventID, OccurredAt: occurredAt, CommentID: commentID, PostID: postID, StoreID: 91, ParentID: parentID, ReplyToID: replyToID, Actor: actor, ReplyToActor: other}))
+		}},
+		{"comment.like_changed", func(t *testing.T, w *Worker, _ *fakeComments, actor, other social.Actor) int {
+			return len(run(t, w, OnCommentLiked, social.CommentLiked{EventID: eventID, OccurredAt: occurredAt, CommentID: commentID, PostID: postID, StoreID: 91, Actor: actor, Author: other}))
+		}},
+	}
+}
+
+// 店主（帳號 7001）以買家 303 的身分或以店 91 的身分，對自己店的內容互動，都不送；別人互動照送。
+func TestSelfInteractionIsSuppressedByAccountForEveryEvent(t *testing.T) {
+	store := social.Actor{Kind: social.ActorStore, ID: 91}
+	ownerAsBuyer := social.Actor{Kind: social.ActorBuyer, ID: 303}
+	other := social.Actor{Kind: social.ActorBuyer, ID: 301}
+	for _, c := range eventCases() {
+		// 留言與回覆的另一方是店家；按讚的另一方是留言作者。
+		for name, pair := range map[string][2]social.Actor{
+			"店主以買家互動店家": {ownerAsBuyer, store},
+			"店家互動店主買家":  {store, ownerAsBuyer},
+		} {
+			if c.name == "comment.created" && name == "店家互動店主買家" {
+				continue // 留言的收件人恆為店家
+			}
+			w, _, _, _, fc := newFixtureWithComments()
+			if n := c.send(t, w, fc, pair[0], pair[1]); n != 0 {
+				t.Errorf("%s（%s）：自己對自己仍送了 %d 則", c.name, name, n)
+			}
+		}
+		w, _, _, _, fc := newFixtureWithComments()
+		if n := c.send(t, w, fc, other, store); n != 1 {
+			t.Errorf("%s：別人互動應送 1 則，送了 %d", c.name, n)
+		}
+	}
+}
+
+func TestPostCreatedSkipsTheStoreOwnerWhoFollowsOwnStore(t *testing.T) {
+	w, b, _, _ := newFixture()
+	b.pages[0] = buyer.Page{Items: []buyer.Item{{ID: 301}, {ID: 303}}}
+	got := run(t, w, OnPostPublished, social.PostPublished{EventID: eventID, OccurredAt: occurredAt, PostID: postID, StoreID: 91})
+	if len(got) != 1 || body(t, got[0])["follower_id"] != float64(301) {
+		t.Fatalf("only the other follower may get the message: %+v", got)
+	}
+}
+
+// 每個事件查的目標是它的內容：留言事件查留言，貼文事件查貼文。
+func TestVisibilityIsCheckedOnTheContentTarget(t *testing.T) {
+	buyerActor := social.Actor{Kind: social.ActorBuyer, ID: 301}
+	comment := social.Target{Kind: social.TargetComment, ID: commentID}
+	post := social.Target{Kind: social.TargetPost, ID: postID}
+	cases := []struct {
+		name string
+		want social.Target
+		run  func(*testing.T, *Worker)
+	}{
+		{"comment.created", comment, func(t *testing.T, w *Worker) {
+			run(t, w, OnCommentCreated, social.CommentCreated{EventID: eventID, OccurredAt: occurredAt, CommentID: commentID, PostID: postID, StoreID: 91, Actor: buyerActor})
+		}},
+		{"comment.replied", comment, func(t *testing.T, w *Worker) {
+			run(t, w, OnCommentReplied, social.CommentReplied{EventID: eventID, OccurredAt: occurredAt, CommentID: commentID, PostID: postID, StoreID: 91, ParentID: parentID, ReplyToID: replyToID, Actor: buyerActor, ReplyToActor: social.Actor{Kind: social.ActorStore, ID: 91}})
+		}},
+		{"comment.like_changed", comment, func(t *testing.T, w *Worker) {
+			run(t, w, OnCommentLiked, social.CommentLiked{EventID: eventID, OccurredAt: occurredAt, CommentID: commentID, PostID: postID, StoreID: 91, Actor: buyerActor, Author: social.Actor{Kind: social.ActorStore, ID: 91}})
+		}},
+		{"post.liked", post, func(t *testing.T, w *Worker) {
+			run(t, w, OnPostLiked, social.PostLiked{EventID: eventID, OccurredAt: occurredAt, PostID: postID, StoreID: 91, BuyerID: 301})
+		}},
+		{"post.created", post, func(t *testing.T, w *Worker) {
+			w.Buyers.(*fakeBuyers).pages[0] = buyer.Page{Items: []buyer.Item{{ID: 301}}}
+			run(t, w, OnPostPublished, social.PostPublished{EventID: eventID, OccurredAt: occurredAt, PostID: postID, StoreID: 91})
+		}},
+	}
+	for _, c := range cases {
+		w, _, _, _, fc := newFixtureWithComments()
+		c.run(t, w)
+		if len(fc.owners) != 1 || fc.owners[0] != c.want {
+			t.Errorf("%s：查的目標 %+v，應是 %+v", c.name, fc.owners, c.want)
+		}
+	}
+}
+
+// 一則留言事件只讀一次留言（快照與讚數都從同一次讀取來）。
+func TestCommentJobsReadTheCommentOnce(t *testing.T) {
+	store := social.Actor{Kind: social.ActorStore, ID: 91}
+	for _, c := range eventCases() {
+		w, _, _, _, fc := newFixtureWithComments()
+		if n := c.send(t, w, fc, social.Actor{Kind: social.ActorBuyer, ID: 301}, store); n != 1 || fc.reads != 1 {
+			t.Errorf("%s：送 %d 則、讀留言 %d 次，應是 1、1", c.name, n, fc.reads)
+		}
+	}
+}
+
+func TestPostLikedForAMissingStoreSendsNothingAndCancels(t *testing.T) {
+	w, _, s, q := newFixture()
+	delete(s.stores, 91)
+	err := w.postLiked(context.Background(), PostLikedArgs{eventFields: fields(eventID, occurredAt), PostID: postID.String(), StoreID: 91, BuyerID: 301})
+	if !isCancel(err) || len(q.published()) != 0 {
+		t.Fatalf("err=%v published=%d, want a cancel and nothing sent", err, len(q.published()))
+	}
+}
+
+func TestMalformedIDsCancelEveryJob(t *testing.T) {
+	ctx := context.Background()
+	ev := fields(eventID, occurredAt)
+	good, bad := postID.String(), "not-a-uuid"
+	buyerKind := string(social.ActorBuyer)
+	jobs := map[string]func(w *Worker) error{
+		"post.created": func(w *Worker) error {
+			return w.postPublished(ctx, PostPublishedArgs{eventFields: ev, PostID: bad, StoreID: 91})
+		},
+		"post.liked": func(w *Worker) error {
+			return w.postLiked(ctx, PostLikedArgs{eventFields: ev, PostID: bad, StoreID: 91, BuyerID: 301})
+		},
+		"comment.created": func(w *Worker) error {
+			return w.commentCreated(ctx, CommentCreatedArgs{eventFields: ev, CommentID: bad, PostID: good, StoreID: 91, ActorKind: buyerKind, ActorID: 301})
+		},
+		"comment.replied": func(w *Worker) error {
+			return w.commentReplied(ctx, CommentRepliedArgs{eventFields: ev, CommentID: bad, PostID: good, StoreID: 91, ActorKind: buyerKind, ActorID: 301, ReplyToKind: buyerKind, ReplyToID: 302})
+		},
+		"comment.like_changed": func(w *Worker) error {
+			return w.commentLiked(ctx, CommentLikedArgs{eventFields: ev, CommentID: bad, PostID: good, StoreID: 91, ActorKind: buyerKind, ActorID: 301, AuthorKind: buyerKind, AuthorID: 302})
+		},
+	}
+	for name, job := range jobs {
+		w, _, _, q := newFixture()
+		if err := job(w); !isCancel(err) || len(q.published()) != 0 {
+			t.Errorf("%s：err=%v，壞 ID 應取消且不送", name, err)
+		}
 	}
 }
