@@ -413,7 +413,7 @@ func (q *Queries) TakedownForumStores(ctx context.Context, ids []uuid.UUID) ([]i
 const takedownMeasuresOfPosts = `-- name: TakedownMeasuresOfPosts :many
 SELECT DISTINCT ON (post_id) post_id, measure_id FROM social.content_takedowns
 WHERE post_id = ANY($1::uuid[])
-ORDER BY post_id, measure_id
+ORDER BY post_id, created_at, measure_id
 `
 
 type TakedownMeasuresOfPostsRow struct {
@@ -421,7 +421,8 @@ type TakedownMeasuresOfPostsRow struct {
 	MeasureID uuid.UUID
 }
 
-// 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：同時被多個措施下架時取最早建立的措施：措施 ID 是 UUIDv7（依建立時間排序），取最小的。
+// 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：同時被多個措施下架時取最早建立的措施：複本的 created_at 是措施建立事件的發生時間（seller.measures.created_at），
+// 同一時間點再以措施 ID 決定先後（確定的順序）。
 func (q *Queries) TakedownMeasuresOfPosts(ctx context.Context, postIds []uuid.UUID) ([]TakedownMeasuresOfPostsRow, error) {
 	rows, err := q.db.Query(ctx, takedownMeasuresOfPosts, postIds)
 	if err != nil {

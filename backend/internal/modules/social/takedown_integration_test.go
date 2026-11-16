@@ -490,3 +490,30 @@ func TestReconcileInsertCancelsOnlyTheSchedulesOfInsertedTakedowns(t *testing.T)
 	must(t, svc.ApplyMissingTakedowns(ctx, live, f.clock(), []stats.Content{{Kind: contentkind.Post, ID: p.ID}}))
 	f.wantSchedule(t, s.ID, "CANCELED", "TAKEN_DOWN")
 }
+
+// 同一篇貼文被兩個措施下架：店主讀到最早建立的措施（以複本的建立時間為準，同時間才以措施 ID 決定），不是 ID 最小的。
+func TestOwnerReadsTheEarliestCreatedTakedownMeasure(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	td := f.takedowns(t)
+	w := f.takedownWorld(t)
+	refs := []seller.ContentRef{ref(seller.ContentPost, w.post.ID)}
+	smallerID, largerID := td.seed(t, w.storeID, refs), td.seed(t, w.storeID, refs)
+	publish := func(id uuid.UUID, at time.Time) {
+		must(t, f.db.InTx(context.Background(), func(ctx context.Context) error {
+			return events.Publish(ctx, f.bus, seller.MeasureCreated{MeasureID: id, StoreID: w.storeID, OccurredAt: at, Contents: refs})
+		}))
+	}
+	publish(smallerID, f.clock().Add(time.Hour))
+	publish(largerID, f.clock())
+	got := mustV[social.Post](t)(f.module.OwnPost(context.Background(), w.storeID, w.post.ID))
+	if got.TakedownMeasureID == nil || *got.TakedownMeasureID != largerID {
+		t.Fatalf("TakedownMeasureID = %v，預期較早建立的 %s（不是 ID 較小的 %s）", got.TakedownMeasureID, largerID, smallerID)
+	}
+	tie := f.clock()
+	f.exec(t, "UPDATE social.content_takedowns SET created_at = $1 WHERE post_id = $2", tie, w.post.ID)
+	got = mustV[social.Post](t)(f.module.OwnPost(context.Background(), w.storeID, w.post.ID))
+	if got.TakedownMeasureID == nil || *got.TakedownMeasureID != smallerID {
+		t.Fatalf("建立時間相同時以措施 ID 較小的為準：%v，預期 %s", got.TakedownMeasureID, smallerID)
+	}
+}

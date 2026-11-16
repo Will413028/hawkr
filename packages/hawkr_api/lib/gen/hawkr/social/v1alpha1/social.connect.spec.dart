@@ -236,7 +236,7 @@ abstract final class SocialAppService {
     idempotency: connect.Idempotency.idempotent,
   );
 
-  /// PublishPost 發布草稿或下架的貼文；etag 必填。被內容下架的貼文一律回 failed_precondition，已經是已發布也一樣；沒被下架而已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
+  /// PublishPost 發布草稿或下架的貼文；etag 必填。被內容下架的貼文一律回 failed_precondition，已經是已發布也一樣（授權、etag 必填與貼文歸屬的檢查先於下架檢查，下架檢查先於重複發布的冪等與 etag 比對，所以被下架的貼文帶過期的 etag 也是 failed_precondition）；沒被下架而已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
   static const publishPost = connect.Spec(
     '/$name/PublishPost',
     connect.StreamType.unary,

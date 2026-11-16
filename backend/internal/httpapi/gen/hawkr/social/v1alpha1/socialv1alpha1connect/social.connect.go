@@ -508,7 +508,7 @@ type SocialAppServiceClient interface {
 	// UpdateStorePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
 	// 已發布或有待發布排程的貼文被修改後仍要滿足公開要件。需要賣家能力 CAP_MARKETING。
 	UpdatePost(context.Context, *connect.Request[v1alpha1.UpdatePostRequest]) (*connect.Response[v1alpha1.UpdatePostResponse], error)
-	// PublishPost 發布草稿或下架的貼文；etag 必填。被內容下架的貼文一律回 failed_precondition，已經是已發布也一樣；沒被下架而已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
+	// PublishPost 發布草稿或下架的貼文；etag 必填。被內容下架的貼文一律回 failed_precondition，已經是已發布也一樣（授權、etag 必填與貼文歸屬的檢查先於下架檢查，下架檢查先於重複發布的冪等與 etag 比對，所以被下架的貼文帶過期的 etag 也是 failed_precondition）；沒被下架而已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
 	PublishPost(context.Context, *connect.Request[v1alpha1.PublishPostRequest]) (*connect.Response[v1alpha1.PublishPostResponse], error)
 	// UnpublishStorePost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
 	UnpublishPost(context.Context, *connect.Request[v1alpha1.UnpublishPostRequest]) (*connect.Response[v1alpha1.UnpublishPostResponse], error)
@@ -913,7 +913,7 @@ type SocialAppServiceHandler interface {
 	// UpdateStorePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
 	// 已發布或有待發布排程的貼文被修改後仍要滿足公開要件。需要賣家能力 CAP_MARKETING。
 	UpdatePost(context.Context, *connect.Request[v1alpha1.UpdatePostRequest]) (*connect.Response[v1alpha1.UpdatePostResponse], error)
-	// PublishPost 發布草稿或下架的貼文；etag 必填。被內容下架的貼文一律回 failed_precondition，已經是已發布也一樣；沒被下架而已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
+	// PublishPost 發布草稿或下架的貼文；etag 必填。被內容下架的貼文一律回 failed_precondition，已經是已發布也一樣（授權、etag 必填與貼文歸屬的檢查先於下架檢查，下架檢查先於重複發布的冪等與 etag 比對，所以被下架的貼文帶過期的 etag 也是 failed_precondition）；沒被下架而已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
 	PublishPost(context.Context, *connect.Request[v1alpha1.PublishPostRequest]) (*connect.Response[v1alpha1.PublishPostResponse], error)
 	// UnpublishStorePost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
 	UnpublishPost(context.Context, *connect.Request[v1alpha1.UnpublishPostRequest]) (*connect.Response[v1alpha1.UnpublishPostResponse], error)

@@ -485,7 +485,7 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 }
 
 // Publish 發布貼文（草稿或下架的貼文轉為 PUBLISHED）。published_at 固定在第一次發布（動態牆的順序不能靠下架再發布來洗：
-// 下架後再發布沿用原值）；被內容下架的貼文一律拒絕（FailedPrecondition），已經是 PUBLISHED 也一樣，檢查在一切之前；
+// 下架後再發布沿用原值）；被內容下架的貼文一律拒絕（FailedPrecondition），已經是 PUBLISHED 也一樣，檢查在授權、etag 必填與貼文歸屬（lockOwned）之後、重複發布的冪等與 etag 比對之前；
 // 沒被下架而已經是 PUBLISHED 時是冪等的 no-op：不寫入、不發 PostPublished、不遞增 version、不清快取
 // （與 Unpublish 對已下架的冪等一致，所以也不檢查 version）。
 func (s *Service) Publish(ctx context.Context, st seller.Store, postID uuid.UUID, version int64, actor *delegatedactor.Actor) (model.Post, error) {
