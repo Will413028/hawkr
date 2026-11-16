@@ -69,7 +69,7 @@ class CommentState extends $pb.ProtobufEnum {
   const CommentState._(super.value, super.name);
 }
 
-/// PostStatus 是貼文的狀態：DRAFT → PUBLISHED → UNPUBLISHED → PUBLISHED。只有店主讀自己的貼文時看得到。
+/// PostStatus 是貼文的狀態：DRAFT → PUBLISHED → UNPUBLISHED → PUBLISHED。只有店主讀自己的貼文與後台貼文列表（hawkr.admin.social.v1alpha1）看得到。
 class PostStatus extends $pb.ProtobufEnum {
   static const PostStatus POST_STATUS_UNSPECIFIED =
       PostStatus._(0, _omitEnumNames ? '' : 'POST_STATUS_UNSPECIFIED');
