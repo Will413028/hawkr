@@ -67,7 +67,7 @@ func (h *Admin) ListAccounts(ctx context.Context, req *connect.Request[adminpb.L
 	}
 	page, err := h.m.ListAccounts(ctx, identity.ListAccountsInput{Filter: f, After: after, Size: req.Msg.GetPageSize()})
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
 	}
 	out := &adminpb.ListAccountsResponse{
 		Accounts:      make([]*adminpb.Account, len(page.Accounts)),

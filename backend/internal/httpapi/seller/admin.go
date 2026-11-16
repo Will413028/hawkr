@@ -54,7 +54,7 @@ func NewAdmin(m AdminModule, images rpc.Images, payments PaymentReader, log *slo
 
 // 模組輸入的欄位對應到請求的路徑。
 var (
-	listStoresPaths = rpc.FieldPaths{"Statuses": "status", "KYCStatus": "kyc_status"}
+	listStoresPaths = rpc.FieldPaths{"PageSize": "page_size", "Statuses": "status", "KYCStatus": "kyc_status"}
 )
 
 // adminFrom 取出呼叫的管理員；interceptor 已經依 service 名稱擋下非管理員，到這裡沒有是授權鏈壞了。

@@ -24,7 +24,7 @@ import (
 
 // 模組輸入的欄位對應到請求的路徑。
 var (
-	listKYCPaths    = rpc.FieldPaths{"Status": "status"}
+	listKYCPaths    = rpc.FieldPaths{"PageSize": "page_size", "Status": "status"}
 	approveKYCPaths = rpc.FieldPaths{"ExpectedVersion": "etag", "Comment": "comment"}
 	rejectKYCPaths  = rpc.FieldPaths{
 		"ExpectedVersion": "etag", "Reason": "reason", "InternalNote": "internal_note", "Issues": "issues",
@@ -159,7 +159,7 @@ func (h *Admin) ListKYCDocumentAccesses(ctx context.Context, req *connect.Reques
 	}
 	page, err := h.m.ListKYCDocumentAccesses(ctx, model.KYCAuditListInput{ApplicationID: id, PageSize: req.Msg.GetPageSize(), After: after})
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
 	}
 	out := &adminpb.ListKYCDocumentAccessesResponse{DocumentAccesses: make([]*adminpb.KYCDocumentAccess, len(page.Items))}
 	for i, acc := range page.Items {

@@ -149,12 +149,21 @@ type BuyerLookup interface {
 	CurrentBuyerID(ctx context.Context, accountID int64) (int64, error)
 }
 
+// RequireAccount 回傳呼叫者的顧客帳號身分：只有顧客帳號能呼叫（沒有登入由 interceptor 擋，管理員等非帳號身分回 permission_denied）。
+func RequireAccount(ctx context.Context) (identity.Principal, error) {
+	p, ok := PrincipalFrom(ctx)
+	if !ok || p.Kind != identity.PrincipalAccount {
+		return identity.Principal{}, Error(connect.CodePermissionDenied, "%s", "需要買家身分")
+	}
+	return p, nil
+}
+
 // AccountBuyerID 回傳呼叫者的買家 ID：只有顧客帳號能呼叫（沒有登入由 interceptor 擋，管理員等非帳號身分回 permission_denied）；
 // 存活的帳號查不到買家是不變量被破壞（BuyerInvariant）。
 func AccountBuyerID(ctx context.Context, buyers BuyerLookup) (int64, error) {
-	p, ok := PrincipalFrom(ctx)
-	if !ok || p.Kind != identity.PrincipalAccount {
-		return 0, Error(connect.CodePermissionDenied, "%s", "需要買家身分")
+	p, err := RequireAccount(ctx)
+	if err != nil {
+		return 0, err
 	}
 	id, err := buyers.CurrentBuyerID(ctx, p.ID)
 	if err != nil {

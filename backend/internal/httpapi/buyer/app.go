@@ -294,7 +294,7 @@ func (h *App) ListAddresses(ctx context.Context, req *connect.Request[pb.ListAdd
 	}
 	page, err := h.m.PageAddresses(ctx, model.AddressListInput{BuyerID: buyerID, PageSize: req.Msg.GetPageSize(), After: after})
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
 	}
 	out := &pb.ListAddressesResponse{Addresses: make([]*pb.Address, len(page.Items)), NextPageToken: encodeAddressCursor(scope, page.Next)}
 	for i, a := range page.Items {

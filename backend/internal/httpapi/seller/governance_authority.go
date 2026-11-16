@@ -183,7 +183,7 @@ func (h *Governance) ListAuthorityOrders(ctx context.Context, req *connect.Reque
 	in.After = after
 	page, err := h.m.AuthorityOrders(ctx, in)
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.FieldPaths{"State": "state", "AccountID": "account_id"})
+		return nil, rpc.WithFieldPaths(err, rpc.FieldPaths{"PageSize": "page_size", "State": "state", "AccountID": "account_id"})
 	}
 	out := &adminpb.ListAuthorityOrdersResponse{Orders: make([]*adminpb.AuthorityOrder, len(page.Items))}
 	for i, item := range page.Items {

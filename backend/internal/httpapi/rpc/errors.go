@@ -194,6 +194,9 @@ func addDetail(ce *connect.Error, m proto.Message) {
 // （"Reason[2]"）或沒有對應的欄位對應不到，會被當成沒有對應的欄位記錄。
 type FieldPaths map[string]string
 
+// PageSizePaths 是清單 RPC 的 page_size 對應：pagination.PageSize 的錯誤欄位是 "PageSize"。請求欄位不叫 page_size 的清單 handler 自己列對應。
+var PageSizePaths = FieldPaths{"PageSize": "page_size"}
+
 // WithFieldPaths 讓 err 裡的欄位錯誤以 paths 對應到請求的路徑。會回欄位錯誤的模組呼叫，handler 都要
 // 這樣包；對應不到的欄位不放進 BadRequest，interceptor 以 error 等級記錄。
 func WithFieldPaths(err error, paths FieldPaths) error {

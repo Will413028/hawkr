@@ -99,11 +99,11 @@ func NewGovernance(d GovernanceDeps) (*Governance, error) {
 
 // 模組輸入的欄位對應到請求的路徑。
 var (
-	listReportsPaths       = rpc.FieldPaths{"State": "state", "Category": "category", "StoreID": "store_id", "CaseID": "case_id"}
+	listReportsPaths       = rpc.FieldPaths{"PageSize": "page_size", "State": "state", "Category": "category", "StoreID": "store_id", "CaseID": "case_id"}
 	triagePaths            = rpc.FieldPaths{"AssessedCategory": "assessed_category", "Target": "target", "ExpectedVersion": "etag"}
 	markSeenPaths          = rpc.FieldPaths{"ExpectedVersion": "etag"}
 	resolvePaths           = rpc.FieldPaths{"Outcome": "outcome", "Note": "note", "ExpectedVersion": "etag"}
-	listCasesPaths         = rpc.FieldPaths{"State": "state", "Category": "category", "StoreID": "store_id", "AwaitingSeller": "awaiting_seller"}
+	listCasesPaths         = rpc.FieldPaths{"PageSize": "page_size", "State": "state", "Category": "category", "StoreID": "store_id", "AwaitingSeller": "awaiting_seller"}
 	decideCasePaths        = rpc.FieldPaths{"Decision": "decision", "Note": "note", "ExpectedVersion": "etag"}
 	changeSeverityPaths    = rpc.FieldPaths{"Severity": "severity", "Note": "note", "ExpectedVersion": "etag"}
 	createNotePaths        = rpc.FieldPaths{"Body": "note.body"}
@@ -123,10 +123,10 @@ var (
 	decideAppealPaths      = rpc.FieldPaths{"Reason": "reason", "Outcome": "decision", "RevokeFindings": "revoke_findings", "ExpectedVersion": "etag"}
 	decideRemediationPaths = rpc.FieldPaths{"Reason": "reason", "Outcome": "decision", "ExpectedVersion": "etag"}
 	listMeasuresPaths      = rpc.FieldPaths{
-		"StoreID": "store_id", "AccountID": "account_id", "State": "state", "Basis": "basis", "RequestState": "request_state", "RequestKind": "request_kind",
+		"PageSize": "page_size", "StoreID": "store_id", "AccountID": "account_id", "State": "state", "Basis": "basis", "RequestState": "request_state", "RequestKind": "request_kind",
 		"SourceCaseID": "source_case_id", "SourceReportID": "source_report_id", "SourceAuthorityOrderID": "source_authority_order_id",
 	}
-	listViolationsPaths = rpc.FieldPaths{"StoreID": "store_id", "AccountID": "account_id", "Status": "status"}
+	listViolationsPaths = rpc.FieldPaths{"PageSize": "page_size", "StoreID": "store_id", "AccountID": "account_id", "Status": "status"}
 )
 
 // reportEvidenceURI 與 requestEvidenceURI 是佐證的檢視網址（EvidenceReportRoute、EvidenceRequestRoute 的實例）。
@@ -591,7 +591,7 @@ func (h *Governance) ListCaseNotes(ctx context.Context, req *connect.Request[adm
 	}
 	page, err := h.m.CaseNotes(ctx, model.CaseNoteListInput{CaseID: id, PageSize: msg.GetPageSize(), After: after})
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
 	}
 	out := &adminpb.ListCaseNotesResponse{Notes: make([]*adminpb.GovernanceNote, len(page.Items))}
 	for i, n := range page.Items {

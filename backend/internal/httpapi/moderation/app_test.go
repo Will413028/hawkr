@@ -20,7 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
-	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
@@ -228,9 +228,10 @@ func TestOutcomeAndTargetEnumsMatchTheModule(t *testing.T) {
 	}
 }
 
-// 模組對頁大小的 InvalidInput 指到請求的 page_size（BadRequest 的欄位路徑）。
+// 模組對頁大小的 InvalidInput 指到請求的 page_size（BadRequest 的欄位路徑）；錯誤由模組實際呼叫的 pagination.PageSize 產生，不在測試裡自己組欄位。
 func TestListMyReportsPointsAtPageSizeWhenTheModuleRejectsIt(t *testing.T) {
-	r := &fakeReports{err: apperr.InvalidInputOn([]string{"PageSize"}, "page_size 不能是負數")}
+	_, pageSizeErr := pagination.PageSize(-1, 20, 100)
+	r := &fakeReports{err: pageSizeErr}
 	e := newEnv(t, r)
 	_, err := e.client.ListMyReports(context.Background(), signedIn(&pb.ListMyReportsRequest{PageSize: -1}))
 	if connect.CodeOf(err) != connect.CodeInvalidArgument {

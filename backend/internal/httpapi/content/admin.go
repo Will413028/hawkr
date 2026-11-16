@@ -47,7 +47,7 @@ func (h *Admin) ListBanners(ctx context.Context, req *connect.Request[adminpb.Li
 	}
 	page, err := h.m.ListBanners(ctx, after, req.Msg.GetPageSize())
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
 	}
 	out := &adminpb.ListBannersResponse{
 		Banners:       make([]*adminpb.Banner, len(page.Banners)),

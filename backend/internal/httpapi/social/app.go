@@ -13,7 +13,6 @@ import (
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
-	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
@@ -72,16 +71,10 @@ var (
 
 // account 回傳呼叫者與他的互動身分；只有顧客帳號能呼叫，沒有登入由 interceptor 擋（unauthenticated），管理員回 permission_denied。
 func (h *App) account(ctx context.Context) (social.Caller, error) {
-	p, ok := rpc.PrincipalFrom(ctx)
-	if !ok || p.Kind != identity.PrincipalAccount {
-		return social.Caller{}, rpc.Error(connect.CodePermissionDenied, "%s", "需要買家身分")
+	if _, err := rpc.RequireAccount(ctx); err != nil {
+		return social.Caller{}, err
 	}
 	return h.caller(ctx)
-}
-
-// buyerID 回傳呼叫者的買家 ID，不查店家身分；給只以買家身分讀寫的方法用。規則同 account。
-func (h *App) buyerID(ctx context.Context) (int64, error) {
-	return rpc.AccountBuyerID(ctx, h.buyers)
 }
 
 // optionalUUID 解析選填的 ID；沒設是 nil。

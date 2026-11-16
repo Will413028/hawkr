@@ -63,7 +63,7 @@ var (
 		"DisplayName": "display_name", "TaxID": "tax_id", "Contacts": "contacts", "Contacts[].Kind": "contacts[].kind", "Contacts[].Value": "contacts[].value",
 	}
 	listProspectsPaths = rpc.FieldPaths{
-		"Status": "status", "OutreachStatus": "outreach_status", "VendorType": "vendor_type",
+		"PageSize": "page_size", "Status": "status", "OutreachStatus": "outreach_status", "VendorType": "vendor_type",
 	}
 	archiveProspectPaths = rpc.FieldPaths{"ExpectedVersion": "etag"}
 	mergeProspectsPaths  = rpc.FieldPaths{"LoserID": "loser_id", "WinnerVersion": "winner_etag", "LoserVersion": "loser_etag"}
@@ -470,7 +470,7 @@ func (h *Prospects) ListProspectDuplicates(ctx context.Context, req *connect.Req
 	}
 	page, err := h.m.DuplicateProspects(ctx, req.Msg.GetPageSize(), after)
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
 	}
 	out := &adminpb.ListProspectDuplicatesResponse{Duplicates: make([]*adminpb.ProspectDuplicate, len(page.Items))}
 	for i, d := range page.Items {
@@ -501,7 +501,7 @@ func (h *Prospects) ListProspectTaxIDMatches(ctx context.Context, req *connect.R
 	}
 	page, err := h.m.ProspectTaxIDMatches(ctx, req.Msg.GetPageSize(), after)
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
 	}
 	out := &adminpb.ListProspectTaxIDMatchesResponse{Matches: make([]*adminpb.ProspectTaxIDMatch, len(page.Items))}
 	for i, m := range page.Items {

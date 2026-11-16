@@ -129,7 +129,7 @@ func (h *Public) ListStores(ctx context.Context, req *connect.Request[pb.ListSto
 	}
 	page, err := h.m.ListPublicStores(ctx, model.ListPublicStoresInput{PageSize: req.Msg.GetPageSize(), After: after})
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
 	}
 	out := &pb.ListStoresResponse{Stores: make([]*pb.PublicStore, len(page.Items))}
 	for i, s := range page.Items {

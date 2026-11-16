@@ -44,10 +44,6 @@ var submitPaths = rpc.FieldPaths{
 	"Target": "target", "Category": "category", "Description": "description", "RequestID": "request_id",
 }
 
-func (h *App) buyerID(ctx context.Context) (int64, error) {
-	return rpc.AccountBuyerID(ctx, h.buyers)
-}
-
 // target 把契約的對象轉成模組的 Target；種類沒給或 ID 的格式不對是呼叫方的錯（invalid_argument，指向 target 的欄位）。
 func target(t *pb.ReportTarget) (moderation.Target, error) {
 	kind := rpc.EnumFromProto[moderation.TargetKind](t.GetKind())
@@ -63,7 +59,7 @@ func target(t *pb.ReportTarget) (moderation.Target, error) {
 }
 
 func (h *App) SubmitReport(ctx context.Context, req *connect.Request[pb.SubmitReportRequest]) (*connect.Response[pb.SubmitReportResponse], error) {
-	buyerID, err := h.buyerID(ctx)
+	buyerID, err := rpc.AccountBuyerID(ctx, h.buyers)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +88,7 @@ func (h *App) SubmitReport(ctx context.Context, req *connect.Request[pb.SubmitRe
 }
 
 func (h *App) ListMyReports(ctx context.Context, req *connect.Request[pb.ListMyReportsRequest]) (*connect.Response[pb.ListMyReportsResponse], error) {
-	buyerID, err := h.buyerID(ctx)
+	buyerID, err := rpc.AccountBuyerID(ctx, h.buyers)
 	if err != nil {
 		return nil, err
 	}

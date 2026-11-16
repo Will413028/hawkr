@@ -20,7 +20,7 @@ type Authored interface {
 }
 
 func (h *App) ListMySanctions(ctx context.Context, req *connect.Request[pb.ListMySanctionsRequest]) (*connect.Response[pb.ListMySanctionsResponse], error) {
-	buyerID, err := h.buyerID(ctx)
+	buyerID, err := rpc.AccountBuyerID(ctx, h.buyers)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func (h *App) ListMySanctions(ctx context.Context, req *connect.Request[pb.ListM
 	}
 	page, err := h.authored.MySanctions(ctx, buyerID, after, req.Msg.GetPageSize())
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
 	}
 	out := &pb.ListMySanctionsResponse{Sanctions: make([]*pb.Sanction, len(page.Sanctions))}
 	for i, s := range page.Sanctions {
@@ -50,7 +50,7 @@ func (h *App) ListMySanctions(ctx context.Context, req *connect.Request[pb.ListM
 }
 
 func (h *App) ListMyHiddenContent(ctx context.Context, req *connect.Request[pb.ListMyHiddenContentRequest]) (*connect.Response[pb.ListMyHiddenContentResponse], error) {
-	buyerID, err := h.buyerID(ctx)
+	buyerID, err := rpc.AccountBuyerID(ctx, h.buyers)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (h *App) ListMyHiddenContent(ctx context.Context, req *connect.Request[pb.L
 	}
 	page, err := h.authored.MyHiddenContent(ctx, buyerID, after, req.Msg.GetPageSize())
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
 	}
 	out := &pb.ListMyHiddenContentResponse{HiddenContents: make([]*pb.HiddenContent, len(page.Items))}
 	for i, it := range page.Items {

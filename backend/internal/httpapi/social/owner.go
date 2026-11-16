@@ -223,7 +223,7 @@ func (h *App) ListMyPosts(ctx context.Context, req *connect.Request[pb.ListMyPos
 	}
 	page, err := h.owner.ListMyPosts(ctx, st, status, cur, msg.GetPageSize())
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
 	}
 	posts, err := h.ownPosts(ctx, st, page.Posts)
 	if err != nil {
@@ -379,7 +379,7 @@ func (h *App) ListStoreComments(ctx context.Context, req *connect.Request[pb.Lis
 	}
 	page, err := h.owner.ListStoreComments(ctx, st, postID, msg.GetUnreplied(), cur, msg.GetPageSize())
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
 	}
 	comments, err := h.toComments(ctx, social.Caller{Store: &st}, page.StoreID, page.Comments)
 	if err != nil {

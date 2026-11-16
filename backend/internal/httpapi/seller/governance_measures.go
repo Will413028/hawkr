@@ -654,7 +654,7 @@ func (h *Governance) ListMeasureNotes(ctx context.Context, req *connect.Request[
 	}
 	page, err := h.m.MeasureNotes(ctx, model.MeasureNoteListInput{MeasureID: id, PageSize: msg.GetPageSize(), After: after})
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
 	}
 	out := &adminpb.ListMeasureNotesResponse{Notes: make([]*adminpb.GovernanceNote, len(page.Items))}
 	for i, n := range page.Items {

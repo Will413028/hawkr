@@ -1,6 +1,7 @@
 package pagination
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -14,7 +15,12 @@ func TestPageSize(t *testing.T) {
 			t.Errorf("PageSize(%d) = %d, %v，預期 %d", c.size, got, err, c.want)
 		}
 	}
-	if _, err := PageSize(-1, 12, 50); apperr.KindOf(err) != apperr.KindInvalidInput {
-		t.Errorf("PageSize(-1) = %v，預期 InvalidInput", err)
+	_, err := PageSize(-1, 12, 50)
+	if apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("PageSize(-1) = %v，預期 InvalidInput", err)
+	}
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != "PageSize" {
+		t.Errorf("負數的錯誤要指到欄位 PageSize：%v", err)
 	}
 }

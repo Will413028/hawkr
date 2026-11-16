@@ -312,7 +312,7 @@ func (h *App) ListMyFollowers(ctx context.Context, req *connect.Request[pb.ListM
 	}
 	page, err := h.followers.Subscribers(ctx, buyer.SubscribersInput{StoreID: current.StoreID, PageSize: req.Msg.GetPageSize(), After: after})
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
 	}
 	buyerIDs := make([]int64, len(page.Items))
 	for i, item := range page.Items {
