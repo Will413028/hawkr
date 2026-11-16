@@ -159,3 +159,14 @@ func TestPublicReadAsksSocialNothingWhenNoBannerTargetsAPost(t *testing.T) {
 		t.Errorf("問了 social %d 次，預期 0", soc.calls)
 	}
 }
+
+func TestPostBannerTargetIgnoresSurroundingWhitespaceInAStoredTarget(t *testing.T) {
+	id := uuid.New()
+	got, ok := postBannerTarget(model.Banner{Action: model.BannerAction{Type: model.BannerActionPost, Target: " " + id.String() + "\t"}})
+	if !ok || got != id {
+		t.Fatalf("postBannerTarget = %v, %v，預期 %v", got, ok, id)
+	}
+	if _, ok := postBannerTarget(model.Banner{Action: model.BannerAction{Type: model.BannerActionPost, Target: "not-a-uuid"}}); ok {
+		t.Fatal("非 UUID 的目標不是貼文目標")
+	}
+}

@@ -851,3 +851,46 @@ func TestCreateBannerStoresTheCanonicalPostTarget(t *testing.T) {
 		t.Errorf("前台看到 %d 則，預期 1", len(page.Banners))
 	}
 }
+
+// 更新時換成貼文目標：目標前後有空白也存正規形的 UUID（前台讀取才找得到），換成不可讀的貼文被拒，目標沒變（只差空白）時不再檢查貼文。
+func TestUpdateBannerStoresTheCanonicalPostTarget(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	b, err := f.m.CreateBanner(ctx, adminID, bannerInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+	post := uuid.New()
+	in := bannerInput()
+	in.PreviewImageToken, in.PopupImageToken = "", ""
+	in.Action = content.BannerAction{Type: content.BannerActionPost, Target: "  " + post.String() + "\t"}
+	_, err = f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: b.ID, Version: b.Version, Banner: in})
+	wantKind(t, err, apperr.KindInvalidInput)
+
+	f.social.set(post, true)
+	b, err = f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: b.ID, Version: b.Version, Banner: in})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Action.Target != post.String() {
+		t.Fatalf("存的目標 = %q，預期 %q", b.Action.Target, post.String())
+	}
+	page, err := f.m.ListLiveBanners(ctx, nil, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Banners) != 1 {
+		t.Fatalf("前台看到 %d 則，預期 1", len(page.Banners))
+	}
+
+	f.social.set(post, false)
+	in.Action.Target = " " + post.String() + " "
+	b, err = f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: b.ID, Version: b.Version, Banner: in})
+	if err != nil {
+		t.Fatalf("目標沒變（只差空白）時不再檢查貼文：%v", err)
+	}
+	if b.Action.Target != post.String() {
+		t.Fatalf("存的目標 = %q，預期 %q", b.Action.Target, post.String())
+	}
+}

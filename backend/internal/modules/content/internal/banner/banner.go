@@ -86,28 +86,21 @@ func validateAction(a model.BannerAction) error {
 	}
 }
 
-// canonicalPostTarget 把貼文目標轉成儲存用的正規形（去掉前後空白的 UUID 字串）；其他點擊行為原樣回傳。
-func canonicalPostTarget(a model.BannerAction) (model.BannerAction, error) {
+// canonicalPostTarget 把貼文目標轉成儲存用的正規形（去掉前後空白的 UUID 字串），一併回傳解析出的貼文 ID；其他點擊行為原樣回傳、ID 是零值。
+func canonicalPostTarget(a model.BannerAction) (model.BannerAction, uuid.UUID, error) {
 	if a.Type != model.BannerActionPost {
-		return a, nil
+		return a, uuid.UUID{}, nil
 	}
 	id, err := uuid.Parse(strings.TrimSpace(a.Target))
 	if err != nil {
-		return a, apperr.InvalidInputOn([]string{"Action.Target"}, "貼文 ID 格式不正確")
+		return a, uuid.UUID{}, apperr.InvalidInputOn([]string{"Action.Target"}, "貼文 ID 格式不正確")
 	}
 	a.Target = id.String()
-	return a, nil
+	return a, id, nil
 }
 
-// checkPostTarget 在貼文目標寫入前確認貼文存在而且公開可讀（A7-D28 第 7 點）；其他點擊行為不檢查。
-func (m *Service) checkPostTarget(ctx context.Context, a model.BannerAction) error {
-	if a.Type != model.BannerActionPost {
-		return nil
-	}
-	id, err := uuid.Parse(strings.TrimSpace(a.Target))
-	if err != nil {
-		return apperr.InvalidInputOn([]string{"Action.Target"}, "貼文 ID 格式不正確")
-	}
+// checkPostTarget 在貼文目標寫入前確認貼文 id 存在而且公開可讀（A7-D28 第 7 點）。
+func (m *Service) checkPostTarget(ctx context.Context, id uuid.UUID) error {
 	readable, err := m.d.Social.PubliclyReadablePosts(ctx, []uuid.UUID{id})
 	if err != nil {
 		return fmt.Errorf("content：確認 banner 的貼文目標 %s：%w", id, err)
@@ -221,7 +214,7 @@ func (m *Service) dropUnreadablePostTargets(ctx context.Context, banners []model
 
 // postBannerTarget 解析貼文 banner 的目標；舊的非 UUID 目標回 false。
 func postBannerTarget(b model.Banner) (uuid.UUID, bool) {
-	id, err := uuid.Parse(b.Action.Target)
+	id, err := uuid.Parse(strings.TrimSpace(b.Action.Target))
 	return id, err == nil
 }
 
@@ -270,13 +263,15 @@ func (m *Service) CreateBanner(ctx context.Context, adminID int64, in model.Bann
 	if err := validateInput(in); err != nil {
 		return model.Banner{}, err
 	}
-	canonical, err := canonicalPostTarget(in.Action)
+	canonical, postID, err := canonicalPostTarget(in.Action)
 	if err != nil {
 		return model.Banner{}, err
 	}
 	in.Action = canonical
-	if err := m.checkPostTarget(ctx, in.Action); err != nil {
-		return model.Banner{}, err
+	if canonical.Type == model.BannerActionPost {
+		if err := m.checkPostTarget(ctx, postID); err != nil {
+			return model.Banner{}, err
+		}
 	}
 	if in.IsActive {
 		if err := m.checkActiveBannerLimit(ctx, uuid.UUID{}); err != nil {
@@ -345,13 +340,13 @@ func (m *Service) UpdateBanner(ctx context.Context, input model.UpdateBannerInpu
 	}
 	// 貼文目標只在換掉目標時檢查：目標沒變的 banner（例如貼文後來下架）仍可修改其他欄位或停用。
 	if input.Banner.Action != cur.Action {
-		canonical, err := canonicalPostTarget(input.Banner.Action)
+		canonical, postID, err := canonicalPostTarget(input.Banner.Action)
 		if err != nil {
 			return model.Banner{}, err
 		}
 		input.Banner.Action = canonical
-		if canonical != cur.Action {
-			if err := m.checkPostTarget(ctx, canonical); err != nil {
+		if canonical != cur.Action && canonical.Type == model.BannerActionPost {
+			if err := m.checkPostTarget(ctx, postID); err != nil {
 				return model.Banner{}, err
 			}
 		}
