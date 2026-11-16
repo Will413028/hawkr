@@ -21,8 +21,38 @@
   },
   {
     "exchange": "hawkr.content",
+    "routing_key": "comment.created",
+    "package": "internal/legacy/socialrelay"
+  },
+  {
+    "exchange": "hawkr.content",
+    "routing_key": "comment.like_changed",
+    "package": "internal/legacy/socialrelay"
+  },
+  {
+    "exchange": "hawkr.content",
+    "routing_key": "comment.replied",
+    "package": "internal/legacy/socialrelay"
+  },
+  {
+    "exchange": "hawkr.content",
     "routing_key": "follow.added",
     "package": "internal/legacy/buyerrelay"
+  },
+  {
+    "exchange": "hawkr.content",
+    "routing_key": "post.created",
+    "package": "internal/legacy/socialrelay"
+  },
+  {
+    "exchange": "hawkr.content",
+    "routing_key": "post.hidden_by_platform",
+    "package": "internal/legacy/socialrelay"
+  },
+  {
+    "exchange": "hawkr.content",
+    "routing_key": "post.liked",
+    "package": "internal/legacy/socialrelay"
   },
   {
     "exchange": "hawkr.content",

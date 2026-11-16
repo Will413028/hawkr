@@ -48,6 +48,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/reviewservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerserver"
+	"github.com/Will413028/hawkr/backend/internal/legacy/socialrelay"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
@@ -240,6 +241,7 @@ func runServe(ctx context.Context) error {
 	subscribeSellerRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
+	subscribeSocialRelay(bus, jc)
 	delegationDeps.Social = socialModule
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
 	moderationModule := newModeration(d, socialModule, sellerModule, buyerModule, suspension, med, jc, log)
@@ -407,6 +409,7 @@ func runWorker(ctx context.Context) error {
 	subscribeSellerRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
+	subscribeSocialRelay(bus, jc)
 	delegationDeps.Social = socialModule
 	newDelegation(bus, delegationDeps)
 	discoveryModule := newDiscovery(d, orders, products, reviews, sellerModule, log)
@@ -445,6 +448,7 @@ func runWorker(ctx context.Context) error {
 	river.AddWorker(workers, rabbitmq.NewWorker(pub))
 	buyerrelay.NewWorker(buyerModule, products, sellerModule, jc, log).AddWorkers(workers)
 	sellerrelay.NewWorker(sellerModule, jc, log).AddWorkers(workers)
+	socialrelay.NewWorker(buyerModule, sellerModule, socialModule, jc, log).AddWorkers(workers)
 	periodic := append(id.PeriodicJobs(), buyerModule.PeriodicJobs()...)
 	periodic = append(periodic, deletion.PeriodicJobs()...)
 	periodic = append(periodic, sellerModule.PeriodicJobs()...)
