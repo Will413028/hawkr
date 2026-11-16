@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { fromJson } from "@bufbuild/protobuf";
+import { UpdateStorePostRequestSchema } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import { getDelegatedCookieName } from "../features/delegated-operations/server/session";
 
 /**
@@ -142,55 +144,7 @@ const ROUTES: RouteCase[] = [
 		gateway: "/admin/sellers/4/products/77/unpublish",
 	},
 
-	// ── posts（6 支）──────────────────────────────────────────────────────
-	{
-		module: "posts/[storeId]",
-		method: "GET",
-		handler: "GET",
-		params: { storeId: "4" },
-		bff: "/adm/api/posts/4",
-		gateway: "/admin/sellers/4/posts",
-	},
-	{
-		module: "posts/[storeId]",
-		method: "POST",
-		handler: "POST",
-		params: { storeId: "4" },
-		bff: "/adm/api/posts/4",
-		gateway: "/admin/sellers/4/posts",
-	},
-	{
-		module: "posts/[storeId]/[postId]",
-		method: "GET",
-		handler: "GET",
-		params: { storeId: "4", postId: "88" },
-		bff: "/adm/api/posts/4/88",
-		gateway: "/admin/sellers/4/posts/88",
-	},
-	{
-		module: "posts/[storeId]/[postId]",
-		method: "PATCH",
-		handler: "PATCH",
-		params: { storeId: "4", postId: "88" },
-		bff: "/adm/api/posts/4/88",
-		gateway: "/admin/sellers/4/posts/88",
-	},
-	{
-		module: "posts/[storeId]/[postId]/publish",
-		method: "POST",
-		handler: "POST",
-		params: { storeId: "4", postId: "88" },
-		bff: "/adm/api/posts/4/88/publish",
-		gateway: "/admin/sellers/4/posts/88/publish",
-	},
-	{
-		module: "posts/[storeId]/[postId]/unpublish",
-		method: "POST",
-		handler: "POST",
-		params: { storeId: "4", postId: "88" },
-		bff: "/adm/api/posts/4/88/unpublish",
-		gateway: "/admin/sellers/4/posts/88/unpublish",
-	},
+	// ── posts：Connect（`SocialDelegatedService`），見檔尾的 CONNECT_POST_ROUTES ──
 
 	// ── orders（3 支，唯讀）───────────────────────────────────────────────
 	{
@@ -364,7 +318,7 @@ test("沒有 credential cookie：401 且一次都不打 gateway", async () => {
 
 test("非 GET 缺 X-Requested-With 或 Origin 不符：403，且不打 gateway", async () => {
 	const mutations = ROUTES.filter((route) => route.method !== "GET");
-	assert.ok(mutations.length >= 12, "mutation 路由數不對，這張表可能被改壞了");
+	assert.ok(mutations.length >= 10, "mutation 路由數不對，這張表可能被改壞了");
 	for (const route of mutations) {
 		const handler = await loadHandler(route);
 		for (const overrides of [
@@ -745,5 +699,311 @@ test("session/end：target 相符 → DELETE，且只有拿到終止證明才清
 		assert.equal(response.headers.get("set-cookie"), null);
 	} finally {
 		unproven.restore();
+	}
+});
+
+// ── posts：BFF 打單體的 Connect（SocialDelegatedService），不是 gateway 的 REST ─────────
+
+const SERVICE = "hawkr.social.v1alpha1.SocialDelegatedService";
+const POST_ID = "5f0c9a52-7a4e-4f0b-8d2e-3b7c2a1d9e11";
+/** 瀏覽器的 Idempotency-Key：UUIDv4 去掉連字號（delegated-repos 另加 `adm-` 前綴）。 */
+const KEY_HEX = "0a1b2c3d4e5f4a6b8c7d9e0f1a2b3c4d";
+const REQUEST_ID = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+
+interface ConnectCase {
+	name: string;
+	module: string;
+	method: "GET" | "POST" | "PATCH";
+	handler: "GET" | "POST" | "PATCH";
+	params: Record<string, string>;
+	bff: string;
+	procedure: string;
+	body?: Record<string, unknown>;
+	reply: Record<string, unknown>;
+}
+
+const POST_REPLY = {
+	post: { id: POST_ID, etag: "7", body: "內文", status: "POST_STATUS_DRAFT" },
+	auditLogId: "audit-1",
+};
+
+const CONNECT_POST_ROUTES: ConnectCase[] = [
+	{
+		name: "list",
+		module: "posts/[storeId]",
+		method: "GET",
+		handler: "GET",
+		params: { storeId: "4" },
+		bff: "/adm/api/posts/4?page_size=20",
+		procedure: "ListStorePosts",
+		reply: { posts: [], nextPageToken: "" },
+	},
+	{
+		name: "summary",
+		module: "posts/[storeId]/summary",
+		method: "GET",
+		handler: "GET",
+		params: { storeId: "4" },
+		bff: "/adm/api/posts/4/summary",
+		procedure: "GetStoreSocialSummary",
+		reply: { postCounts: [], scheduledPostCount: "0" },
+	},
+	{
+		name: "create",
+		module: "posts/[storeId]",
+		method: "POST",
+		handler: "POST",
+		params: { storeId: "4" },
+		bff: "/adm/api/posts/4",
+		procedure: "CreateStorePost",
+		body: { operationReason: "店家請我們代發", content: "內文" },
+		reply: POST_REPLY,
+	},
+	{
+		name: "get",
+		module: "posts/[storeId]/[postId]",
+		method: "GET",
+		handler: "GET",
+		params: { storeId: "4", postId: POST_ID },
+		bff: `/adm/api/posts/4/${POST_ID}`,
+		procedure: "GetStorePost",
+		reply: POST_REPLY,
+	},
+	{
+		name: "update",
+		module: "posts/[storeId]/[postId]",
+		method: "PATCH",
+		handler: "PATCH",
+		params: { storeId: "4", postId: POST_ID },
+		bff: `/adm/api/posts/4/${POST_ID}`,
+		procedure: "UpdateStorePost",
+		body: { operationReason: "修錯字", expectedVersion: "7", content: "新" },
+		reply: POST_REPLY,
+	},
+	{
+		name: "publish",
+		module: "posts/[storeId]/[postId]/publish",
+		method: "POST",
+		handler: "POST",
+		params: { storeId: "4", postId: POST_ID },
+		bff: `/adm/api/posts/4/${POST_ID}/publish`,
+		procedure: "PublishStorePost",
+		body: { operationReason: "發布", expectedVersion: "7" },
+		reply: POST_REPLY,
+	},
+	{
+		name: "schedule",
+		module: "posts/[storeId]/[postId]/publish",
+		method: "POST",
+		handler: "POST",
+		params: { storeId: "4", postId: POST_ID },
+		bff: `/adm/api/posts/4/${POST_ID}/publish`,
+		procedure: "ScheduleStorePost",
+		body: {
+			operationReason: "排程",
+			expectedVersion: "7",
+			publishMode: "scheduled",
+			scheduledPublishAt: "2030-01-01T00:00:00Z",
+		},
+		reply: POST_REPLY,
+	},
+	{
+		name: "unpublish",
+		module: "posts/[storeId]/[postId]/unpublish",
+		method: "POST",
+		handler: "POST",
+		params: { storeId: "4", postId: POST_ID },
+		bff: `/adm/api/posts/4/${POST_ID}/unpublish`,
+		procedure: "UnpublishStorePost",
+		body: { operationReason: "下架", expectedVersion: "7" },
+		reply: POST_REPLY,
+	},
+];
+
+function connectRequest(
+	route: ConnectCase,
+	extra: { cookie?: boolean; key?: string | null; body?: unknown } = {},
+): Request {
+	const headers = new Headers();
+	if (extra.cookie !== false) {
+		headers.set("cookie", `${getDelegatedCookieName()}=${CREDENTIAL}`);
+	}
+	if (route.method !== "GET") {
+		headers.set("x-requested-with", "XMLHttpRequest");
+		headers.set("origin", LOCAL_ORIGIN);
+		if (extra.key !== null) {
+			headers.set("idempotency-key", extra.key ?? `adm-${KEY_HEX}`);
+		}
+	}
+	return new Request(`${LOCAL_ORIGIN}${route.bff}`, {
+		method: route.method,
+		headers,
+		body:
+			route.method === "GET"
+				? undefined
+				: JSON.stringify(extra.body ?? route.body ?? {}),
+	});
+}
+
+async function loadConnectHandler(route: ConnectCase): Promise<Handler> {
+	const mod = (await import(
+		`../app/(delegated)/adm/api/${route.module}/route`
+	)) as Record<string, Handler>;
+	return mod[route.handler] as Handler;
+}
+
+function connectContext(route: ConnectCase) {
+	return { params: Promise.resolve(route.params) };
+}
+
+function connectReply(call: FetchCall, route: ConnectCase): Response {
+	assert.ok(
+		call.url.includes(`/${SERVICE}/${route.procedure}`),
+		`${route.name} → ${call.url}`,
+	);
+	return Response.json(route.reply);
+}
+
+test("代行貼文的 BFF 打的是 SocialDelegatedService 的 Connect 方法，憑證放 X-HK-Operation-Session", async () => {
+	assert.equal(CONNECT_POST_ROUTES.length, 8);
+	for (const route of CONNECT_POST_ROUTES) {
+		const handler = await loadConnectHandler(route);
+		const stub = stubFetch((call) => connectReply(call, route));
+		try {
+			const response = await handler(
+				connectRequest(route),
+				connectContext(route),
+			);
+			assert.equal(response.status, 200, route.name);
+			assert.equal(stub.calls.length, 1, `${route.name} 應該只打一次上游`);
+			const [call] = stub.calls;
+			assert.ok(
+				call.url.includes(`/${SERVICE}/${route.procedure}`),
+				`${route.name} → ${call.url}`,
+			);
+			assert.ok(!call.url.includes("/admin/sellers/"), route.name);
+			// 憑證只走這一個 header，絕不出現在 URL 或 body。
+			const sent = new Headers(call.init.headers);
+			assert.equal(sent.get("X-HK-Operation-Session"), CREDENTIAL, route.name);
+			assert.ok(!call.url.includes(CREDENTIAL), route.name);
+			assert.ok(!String(call.init.body ?? "").includes(CREDENTIAL), route.name);
+			const payload = (await response.json()) as { code: number };
+			assert.equal(payload.code, 0, route.name);
+		} finally {
+			stub.restore();
+		}
+	}
+});
+
+test("代行貼文寫入：Idempotency-Key 轉成 request_id、原因與 etag 進 Connect 請求", async () => {
+	const route = CONNECT_POST_ROUTES.find(
+		(r) => r.name === "update",
+	) as ConnectCase;
+	const stub = stubFetch((call) => connectReply(call, route));
+	try {
+		await (await loadConnectHandler(route))(
+			connectRequest(route),
+			connectContext(route),
+		);
+		const raw = stub.calls[0].init.body;
+		// Connect 的 JSON 編碼：請求本文是 JSON 文字的位元組。
+		const text =
+			raw instanceof Uint8Array ? new TextDecoder().decode(raw) : String(raw);
+		const sent = fromJson(
+			UpdateStorePostRequestSchema,
+			JSON.parse(text) as never,
+		);
+		assert.equal(sent.operation?.requestId, REQUEST_ID);
+		assert.equal(sent.operation?.operationReason, "修錯字");
+		assert.equal(sent.post?.id, POST_ID);
+		assert.equal(sent.post?.etag, "7");
+		assert.equal(sent.post?.body, "新");
+		assert.deepEqual(sent.updateMask?.paths, ["body"]);
+	} finally {
+		stub.restore();
+	}
+});
+
+test("代行貼文的送出前檢查：沒憑證 401、CSRF 403、缺 Idempotency-Key 或原因 400，三者都不打上游", async () => {
+	for (const route of CONNECT_POST_ROUTES) {
+		const handler = await loadConnectHandler(route);
+		const fail = () =>
+			stubFetch(() => {
+				throw new Error(`${route.name} 在檢查失敗時打了上游`);
+			});
+		let stub = fail();
+		try {
+			const response = await handler(
+				connectRequest(route, { cookie: false }),
+				connectContext(route),
+			);
+			assert.equal(response.status, 401, route.name);
+			assert.equal(await codeOf(response), "CREDENTIAL_MISSING", route.name);
+			assert.equal(stub.calls.length, 0, route.name);
+		} finally {
+			stub.restore();
+		}
+		if (route.method === "GET") continue;
+		stub = fail();
+		try {
+			const noKey = await handler(
+				connectRequest(route, { key: null }),
+				connectContext(route),
+			);
+			assert.equal(noKey.status, 400, `${route.name} 缺 Idempotency-Key`);
+			const noReason = await handler(
+				connectRequest(route, { body: { expectedVersion: "7" } }),
+				connectContext(route),
+			);
+			assert.equal(noReason.status, 400, `${route.name} 缺原因`);
+			const headers = new Headers({
+				cookie: `${getDelegatedCookieName()}=${CREDENTIAL}`,
+				"idempotency-key": `adm-${KEY_HEX}`,
+			});
+			const csrf = await handler(
+				new Request(`${LOCAL_ORIGIN}${route.bff}`, {
+					method: route.method,
+					headers,
+					body: JSON.stringify(route.body),
+				}),
+				connectContext(route),
+			);
+			assert.equal(csrf.status, 403, route.name);
+			assert.equal(stub.calls.length, 0, route.name);
+		} finally {
+			stub.restore();
+		}
+	}
+});
+
+test("代行貼文：Connect 的失敗對回瀏覽器認得的業務碼，不透傳訊息", async () => {
+	const route = CONNECT_POST_ROUTES.find(
+		(r) => r.name === "publish",
+	) as ConnectCase;
+	const cases: Array<[string, number, number]> = [
+		["permission_denied", 403, 9262],
+		["aborted", 409, 9266],
+		["not_found", 404, 9275],
+		["invalid_argument", 400, 9260],
+	];
+	for (const [connectCode, status, code] of cases) {
+		const stub = stubFetch(() =>
+			Response.json(
+				{ code: connectCode, message: "內部細節 secret-detail" },
+				{ status },
+			),
+		);
+		try {
+			const response = await (await loadConnectHandler(route))(
+				connectRequest(route),
+				connectContext(route),
+			);
+			assert.equal(response.status, status, connectCode);
+			const text = await response.text();
+			assert.equal((JSON.parse(text) as { code: number }).code, code);
+			assert.ok(!text.includes("secret-detail"), "訊息不得透傳");
+		} finally {
+			stub.restore();
+		}
 	}
 });

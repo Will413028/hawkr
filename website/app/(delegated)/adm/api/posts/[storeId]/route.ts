@@ -1,30 +1,51 @@
-import { forwardDelegated, numericSegment } from "../../_forward";
+import { forwardDelegatedConnect, numericSegment } from "../../_forward";
+import {
+	bodyRecord,
+	createFields,
+	listDto,
+	mutationDto,
+	operationOf,
+	pageSizeOf,
+	statusFilter,
+} from "../_post-wire";
 
 /**
- * 貼文列表與建立（§6.1.9）：
- * - `GET`  → `GET /admin/sellers/{storeId}/posts`（`posts.read`）
- * - `POST` → `POST /admin/sellers/{storeId}/posts`（`posts.write`）
+ * 貼文列表與建立：
+ * - `GET`  → `SocialDelegatedService.ListStorePosts`（`posts.read`）
+ * - `POST` → `SocialDelegatedService.CreateStorePost`（`posts.write`，建立一律是草稿）
  *
- * ⚠️ 列表走 admin 私有讀取，**不得**用公開貼文端點兜底：草稿與排程中的貼文在
- * public 路徑上根本查不到，而那正是代行要處理的那一批。
+ * `:storeId` 只做值域檢查：目標店家是代行 session 綁定的那一家，Connect 請求不帶 store_id。
+ * 列表是 page_token 分頁（`page_size`、`page_token`、`status`），沒有頁碼與總數。
  */
 
 type RouteContext = { params: Promise<{ storeId: string }> };
 
-/** Gateway `ListDelegatedPosts` 實際讀取的三個 key（沒有 `keyword`）。 */
-const LIST_QUERY = ["page", "page_size", "status"] as const;
+const LIST_QUERY = ["page_size", "page_token", "status"] as const;
 
 export async function GET(
 	request: Request,
 	context: RouteContext,
 ): Promise<Response> {
 	const { storeId } = await context.params;
-	return forwardDelegated(request, () => ({
-		method: "GET",
-		path: `/admin/sellers/${numericSegment(storeId)}/posts`,
-		timeout: "mutation",
-		query: LIST_QUERY,
-	}));
+	return forwardDelegatedConnect(request, () => {
+		numericSegment(storeId);
+		return {
+			method: "GET",
+			timeout: "mutation",
+			query: LIST_QUERY,
+			build: ({ query }) => {
+				const request = {
+					pageSize: pageSizeOf(query),
+					pageToken: query.get("page_token") ?? "",
+					status: statusFilter(query),
+				};
+				return async (client, options) => {
+					const message = await client.listStorePosts(request, options);
+					return listDto(message.posts, message.nextPageToken);
+				};
+			},
+		};
+	});
 }
 
 export async function POST(
@@ -32,9 +53,23 @@ export async function POST(
 	context: RouteContext,
 ): Promise<Response> {
 	const { storeId } = await context.params;
-	return forwardDelegated(request, () => ({
-		method: "POST",
-		path: `/admin/sellers/${numericSegment(storeId)}/posts`,
-		timeout: "mutation",
-	}));
+	return forwardDelegatedConnect(request, () => {
+		numericSegment(storeId);
+		return {
+			method: "POST",
+			timeout: "mutation",
+			build: (input) => {
+				const body = bodyRecord(input);
+				const operation = operationOf(input, body);
+				const fields = createFields(body);
+				return async (client, options) => {
+					const message = await client.createStorePost(
+						{ operation, ...fields },
+						options,
+					);
+					return mutationDto(message.post, message.auditLogId);
+				};
+			},
+		};
+	});
 }

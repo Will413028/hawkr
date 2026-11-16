@@ -1,23 +1,59 @@
-import { forwardDelegated, numericSegment } from "../../../../_forward";
+import { DelegatedRequestRejectedError } from "../../../../_csrf";
+import { forwardDelegatedConnect, numericSegment } from "../../../../_forward";
+import {
+	bodyRecord,
+	etagOf,
+	mutationDto,
+	operationOf,
+	scheduleOf,
+} from "../../../_post-wire";
 
 /**
- * `POST /adm/api/posts/{storeId}/{postId}/publish` →
- * `POST /admin/sellers/{storeId}/posts/{postId}/publish`（`posts.publish`，§6.1.9）。
- *
- * 排程發布（`scheduledPublishAt`）也走這一支；稽核 action 由後端依 body 決定
- * （`POST_PUBLISH`／`POST_SCHEDULE`），前端不區分端點。
+ * `POST /adm/api/posts/{storeId}/{postId}/publish`（`posts.publish`）：
+ * body 帶 `publishMode: "scheduled"` 與 `scheduledPublishAt` 時打 `ScheduleStorePost`（排程），否則打
+ * `PublishStorePost`（立即發布）；稽核動作由伺服器依呼叫的方法決定。
  */
 
 type RouteContext = { params: Promise<{ storeId: string; postId: string }> };
+
+const POST_ID =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export async function POST(
 	request: Request,
 	context: RouteContext,
 ): Promise<Response> {
 	const { storeId, postId } = await context.params;
-	return forwardDelegated(request, () => ({
-		method: "POST",
-		path: `/admin/sellers/${numericSegment(storeId)}/posts/${numericSegment(postId)}/publish`,
-		timeout: "mutation",
-	}));
+	return forwardDelegatedConnect(request, () => {
+		numericSegment(storeId);
+		if (!POST_ID.test(postId)) {
+			throw new DelegatedRequestRejectedError("INVALID_PATH_PARAM", 400);
+		}
+		return {
+			method: "POST",
+			timeout: "mutation",
+			build: (input) => {
+				const body = bodyRecord(input);
+				const operation = operationOf(input, body);
+				const etag = etagOf(body);
+				const publishTime = scheduleOf(body);
+				if (publishTime !== undefined) {
+					return async (client, options) => {
+						const message = await client.scheduleStorePost(
+							{ operation, postId, etag, publishTime },
+							options,
+						);
+						return mutationDto(message.post, message.auditLogId);
+					};
+				}
+				return async (client, options) => {
+					const message = await client.publishStorePost(
+						{ operation, postId, etag },
+						options,
+					);
+					return mutationDto(message.post, message.auditLogId);
+				};
+			},
+		};
+	});
 }

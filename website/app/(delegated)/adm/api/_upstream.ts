@@ -1,4 +1,12 @@
+import {
+	type Client,
+	Code,
+	ConnectError,
+	createClient,
+} from "@connectrpc/connect";
+import { SocialDelegatedService } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import { getEnv } from "@/lib/config/env";
+import { publicTransport } from "@/lib/connect/transport";
 
 /**
  * 代行 BFF 唯一的上游轉送點（56 號 §4.5 L1040）。
@@ -68,8 +76,9 @@ export class DelegatedUpstreamUnavailableError extends Error {
 		this.name = "DelegatedUpstreamUnavailableError";
 		this.cause = cause;
 		this.timedOut =
-			cause instanceof Error &&
-			(cause.name === "TimeoutError" || cause.name === "AbortError");
+			(cause instanceof ConnectError && cause.code === Code.DeadlineExceeded) ||
+			(cause instanceof Error &&
+				(cause.name === "TimeoutError" || cause.name === "AbortError"));
 	}
 }
 
@@ -162,4 +171,79 @@ export function delegatedJson(
 		},
 		{ status, headers: { "Cache-Control": "private, no-store" } },
 	);
+}
+
+/**
+ * 代行 BFF 對單體 Connect 的呼叫（`SocialDelegatedService`，A7-2d）：憑證是 `X-HK-Operation-Session` 標頭，
+ * 與 REST 一樣只在這一支檔案轉送。transport 是 `lib/connect/transport.ts` 的 `publicTransport`（server 端簽
+ * origin-auth、不帶 cookie、有逾時），代行 service 不讀顧客或管理員的身分。
+ *
+ * 回傳與 `callDelegatedUpstream` 同形（`DelegatedUpstreamResult`）：成功的 `data` 是呼叫端整形後的回應，
+ * 失敗依 Connect code 對回瀏覽器已認得的業務碼（見 `connectFailure`）。逾時與連不上丟
+ * `DelegatedUpstreamUnavailableError`，與 REST 同樣讓前端走「結果不明」。
+ */
+export async function callDelegatedConnect(request: {
+	/** 用 client 發出一個 unary 呼叫並把回應整形成瀏覽器看到的 `data`；`headers` 與 `timeoutMs` 由這裡填。 */
+	call: (
+		client: Client<typeof SocialDelegatedService>,
+		options: { headers: Headers; timeoutMs: number },
+	) => Promise<unknown>;
+	timeout: DelegatedUpstreamTimeout;
+	credential: string;
+	visitorIp?: string | null;
+}): Promise<DelegatedUpstreamResult> {
+	const client = createClient(
+		SocialDelegatedService,
+		publicTransport({
+			// 代行工作區只有 zh-TW（app/(delegated)）。
+			locale: "zh-TW",
+			visitorIp: request.visitorIp ?? undefined,
+		}),
+	);
+	const headers = new Headers({ "X-HK-Operation-Session": request.credential });
+	try {
+		const data = await request.call(client, {
+			headers,
+			timeoutMs: TIMEOUT_MS[request.timeout],
+		});
+		return { ok: true, status: 200, code: 0, data, traceId: null };
+	} catch (raw) {
+		const error = ConnectError.from(raw);
+		const failure = connectFailure(error);
+		if (failure === null) throw new DelegatedUpstreamUnavailableError(raw);
+		return { ok: false, data: null, traceId: null, ...failure };
+	}
+}
+
+/**
+ * Connect 的失敗 → 瀏覽器已認得的業務碼與 HTTP 狀態（`_forward.ts` 的 `respond` 原碼原狀態轉出）。
+ * 對照以 Connect code 為準（單體不給代行 session 終止的專屬 reason，所以 `failed_precondition`
+ * 不能分出「session 已結束」與其他前置條件，一律當暫時性的 9280；session 狀態由前端輪詢的
+ * `session/current` 判定終態）。連不上、逾時、取消回 null，由呼叫端當成「結果不明」。
+ */
+function connectFailure(
+	error: ConnectError,
+): { status: number; code: number } | null {
+	switch (error.code) {
+		case Code.Unauthenticated:
+			return { status: 401, code: 9271 };
+		case Code.PermissionDenied:
+			return { status: 403, code: 9262 };
+		case Code.NotFound:
+			return { status: 404, code: 9275 };
+		case Code.InvalidArgument:
+			return { status: 400, code: 9260 };
+		case Code.Aborted:
+			return { status: 409, code: 9266 };
+		case Code.ResourceExhausted:
+			return { status: 429, code: 9273 };
+		case Code.FailedPrecondition:
+			return { status: 409, code: 9280 };
+		case Code.Unavailable:
+		case Code.DeadlineExceeded:
+		case Code.Canceled:
+			return null;
+		default:
+			return { status: 502, code: 9280 };
+	}
 }
