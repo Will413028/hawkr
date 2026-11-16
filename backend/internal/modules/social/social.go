@@ -101,6 +101,9 @@ type (
 	OwnPostCursor   = model.OwnPostCursor
 	PostPage        = model.PostPage
 	OwnPostPage     = model.OwnPostPage
+	AdminPostFilter = model.AdminPostFilter
+	AdminPostCursor = model.AdminPostCursor
+	AdminPostPage   = model.AdminPostPage
 	CreatePostInput = model.CreatePostInput
 	UpdatePostInput = model.UpdatePostInput
 	Actor           = model.Actor
@@ -425,6 +428,11 @@ func NormalizeHashtag(raw string) (name string, ok bool) {
 // ListOwnPosts 是店主自己的貼文（含草稿與下架）；status 為空字串不篩選。
 func (m *Module) ListOwnPosts(ctx context.Context, storeID int64, status PostStatus, after *OwnPostCursor, size int32) (OwnPostPage, error) {
 	return m.post.ListOwn(ctx, storeID, status, after, size)
+}
+
+// ListAdminPosts 是後台看的貼文（不含草稿與刪除）：最新建立的在前，每篇帶 TakedownMeasureID；f.TakenDown 為真只列被內容下架的。授權由呼叫端（後台的 interceptor）負責。
+func (m *Module) ListAdminPosts(ctx context.Context, f AdminPostFilter, after *AdminPostCursor, size int32) (AdminPostPage, error) {
+	return m.post.ListAdmin(ctx, f, after, size)
 }
 
 // TopPosts 是「本週主題」：最近發布的 30 篇觀看者可讀的貼文中瀏覽數最高的 n 篇（n 最多 30，同分以發布時間、ID 排），不分頁。

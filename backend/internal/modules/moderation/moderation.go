@@ -220,6 +220,11 @@ func (m *Module) Cases(ctx context.Context, f CaseFilter, after *CaseCursor, siz
 	return m.view.Cases(ctx, f, after, size)
 }
 
+// OpenReportCounts 回每篇貼文在進行中案件裡的檢舉數（已結案案件的檢舉不算）；沒有進行中檢舉的貼文不在結果裡，讀的人當 0。後台貼文列表用。
+func (m *Module) OpenReportCounts(ctx context.Context, postIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
+	return m.view.OpenReportCounts(ctx, postIDs)
+}
+
 // Retention 回傳模組的保留期與檢舉人資料清除（serve 以它訂閱買家的刪除事件；給組裝與測試）。
 func (m *Module) Retention() *Retention { return m.retention }
 

@@ -258,6 +258,37 @@ func (s *Service) ListOwn(ctx context.Context, storeID int64, status model.PostS
 	return out, nil
 }
 
+// ListAdmin 是後台看的貼文（不含草稿與刪除，每篇帶 TakedownMeasureID）：最新建立的在前；f.TakenDown 為真只列被內容下架的。
+func (s *Service) ListAdmin(ctx context.Context, f model.AdminPostFilter, after *model.AdminPostCursor, size int32) (model.AdminPostPage, error) {
+	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
+	if err != nil {
+		return model.AdminPostPage{}, err
+	}
+	at, id := after.Key()
+	rows, err := s.q(ctx).ListAdminPosts(ctx, store.ListAdminPostsParams{TakenDown: f.TakenDown, AfterCreated: at, AfterID: id, MaxRows: size + 1})
+	if err != nil {
+		return model.AdminPostPage{}, fmt.Errorf("social：後台列出貼文：%w", err)
+	}
+	rows, more := page(rows, size)
+	pr := make([]postRow, len(rows))
+	for i, r := range rows {
+		pr[i] = postRow{r.SocialPost, r.SocialPostStat}
+	}
+	posts, err := s.withTags(ctx, pr)
+	if err != nil {
+		return model.AdminPostPage{}, err
+	}
+	if err := s.markTakedowns(ctx, posts); err != nil {
+		return model.AdminPostPage{}, err
+	}
+	out := model.AdminPostPage{Posts: posts}
+	if more {
+		last := rows[len(rows)-1].SocialPost
+		out.Next = &model.AdminPostCursor{CreatedAt: last.CreatedAt, ID: last.ID}
+	}
+	return out, nil
+}
+
 // Top 是「本週主題」：最近發布的 30 篇公開貼文中瀏覽數最高的 n 篇（n 最多 30；同分以發布時間、ID 排），不分頁。
 func (s *Service) Top(ctx context.Context, c model.Caller, n int32) ([]model.Post, error) {
 	if n < 0 {

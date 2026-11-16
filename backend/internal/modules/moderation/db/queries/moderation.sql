@@ -250,3 +250,11 @@ WHERE (sqlc.arg(target_kind)::text = '' OR target_kind = sqlc.arg(target_kind)::
   AND (opened_at, id) < (sqlc.arg(after_opened)::timestamptz, sqlc.arg(after_id)::uuid)
 ORDER BY opened_at DESC, id DESC
 LIMIT sqlc.arg(max_rows)::int;
+
+-- name: OpenReportCountsOfPosts :many
+-- 貼文在進行中案件裡的檢舉數（已結案案件的檢舉不算）；沒有進行中案件的貼文沒有列。
+SELECT c.content_id AS post_id, count(*)::bigint AS reports
+FROM moderation.reports r
+JOIN moderation.cases c ON c.id = r.case_id
+WHERE c.target_kind = 'POST' AND c.closed_at IS NULL AND c.content_id = ANY(sqlc.arg(post_ids)::uuid[])
+GROUP BY c.content_id;

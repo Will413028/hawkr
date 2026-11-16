@@ -155,6 +155,21 @@ type OwnPostCursor struct {
 	ID        uuid.UUID
 }
 
+// AdminPostFilter 是後台列貼文的篩選：TakenDown 為真只列被內容下架的貼文，為假不篩選。
+type AdminPostFilter struct{ TakenDown bool }
+
+// AdminPostCursor 是後台貼文清單的排序鍵：(CreatedAt, ID) 由大到小。
+type AdminPostCursor struct {
+	CreatedAt time.Time
+	ID        uuid.UUID
+}
+
+// AdminPostPage 是後台的一頁貼文（含 TakedownMeasureID）。
+type AdminPostPage struct {
+	Posts []Post
+	Next  *AdminPostCursor
+}
+
 // PostPage 是一頁貼文。Next 為 nil 表示這是最後一頁。
 type PostPage struct {
 	Posts []Post

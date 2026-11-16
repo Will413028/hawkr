@@ -9,6 +9,7 @@
 - migration 是兩支基線：`social_baseline`（Atlas 從 `schema.sql` 生成，含 `CREATE SCHEMA`）與手寫的 `social_objects`（`objects.sql` 的函式與 trigger）；部署後不得改已套用的 migration。
 - 模組事件 `PostPublished`（帶 `origin`：`DIRECT` 或 `SCHEDULED`，排程的另帶排程 ID 與發起者）、`PostScheduleCanceled{schedule_id, post_id, reason}`、貼文寫入事件 `PostCreated`、`PostUpdated`、`PostUnpublished`、`PostScheduled`（冪等 no-op 發 `PostPublishRepeated`、`PostUnpublishRepeated`；每個成功的寫入一次，店主與代行都發，選用的 Actor 是代行者，A7-D27）、`CommentCreated`、`CommentReplied`、`PostLiked` 只帶領域鍵。
 - 買家的社群處分（`sanctions`）與隱藏紀錄（`hides`）對 moderation 提供 `Hide`、`Restore`、`Warn`、`ContentOwner`，對作者提供 `MySanctions`、`MyHiddenContent`，對 httpapi 的封鎖入口提供 `ContentAuthorFor`（讀取者讀得到的留言或討論區留言的作者與所屬店家：套用列表的觀看者規則，含父列被封鎖排除；店主讀自己店的內容時不套個人封鎖；讀不到回 `Found` 為假，A7-2e）。
+- 後台貼文列表 `ListAdminPosts`（A7-2f-5）：不含草稿與已刪除的貼文，建立時間新到舊（keyset `(created_at, id)`，預設 20、上限 50），`AdminPostFilter.TakenDown` 為真只列有內容下架複本的貼文，每篇帶 `TakedownMeasureID`（同 `ListOwnPosts` 的規則）；授權在 `httpapi` 的後台 interceptor。貼文是店家的內容，沒有平台隱藏（A7-D5′）：解除下架走 seller 的措施撤銷。對外是 `httpapi/social` 的 `SocialAdminService.ListPosts`（權限 `social.posts.list`），handler 組合本方法與 moderation 的 `OpenReportCounts`。
 - 買家刪帳與店家退場各有實體清除 job；貼文的快取失效經 `platform/revalidate` 的 tag。
 - 依賴：`buyer`、`seller`、`media`；依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 

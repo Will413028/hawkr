@@ -27,6 +27,7 @@ schema `moderation`（表在 `db/schema.sql`，發布的函式與複合型別在
 - 快照每案每份內容一列，`UNIQUE (case_id, content_sha256)`；雜湊取 `snapshot.Encode` 正規化後的內容；結案滿 `model.SnapshotRetention` 後由 `moderation.purge_snapshots` 刪除（`TestSnapshotsArePurgedAfterTheRetentionAndCasesStay`）並清說明與冪等紀錄（`TestReportRequestsArePurgedWithTheDescriptions`），案件與檢舉列留著。
 - 快照引用的圖片在 media 有一筆以快照為 ref 的引用，引用只由同步 job 寫入，快照刪除才解除（`TestASnapshotHoldsItsImageUntilTheSnapshotIsPurged`）；檢舉人刪帳時同 transaction 清他的說明、冪等紀錄與每日計數列，檢舉列與 `reporter_buyer_id` 留著（`TestReporterDeletionClearsDescriptionsAndDailyCountButKeepsTheReports`）。
 - 對象必須存在而且公開可讀，不能檢舉自己（含同一帳號的其他身分）；檢舉原因只能是 `policy.CommunityReporterSelectable()` 的八個值。
+- `OpenReportCounts` 只算進行中案件（`closed_at IS NULL`）的檢舉，已結案案件的檢舉不算，沒有進行中檢舉的貼文不在結果裡（`TestOpenReportCountsCountsOnlyReportsInOpenCases`）；`SocialAdminService.ListPosts` 在 `httpapi/social` 組合它與 social 的 `ListAdminPosts`，moderation 不依賴 social 的後台讀取。
 - `Cases` 列案件新到舊（keyset `(opened_at, id)`），狀態與對象種類空值是不篩、不合法的值回 InvalidInput（`TestCasesFilterByStateAndTargetKind`、`TestCasesKeysetPagingHasNoDuplicatesOrGaps`）。
 - 案件處理（`internal/handle`）的不變量：結案終態與版本轉移、處置與結案同一個 transaction 與鎖順序、內容下架的店家核對、後台決定的稽核紀錄，見 `internal/handle/AGENTS.md`；送出路徑的鎖順序見 `internal/report/AGENTS.md`，刪帳訂閱者與保留期清除見 `internal/retention/AGENTS.md`。
 

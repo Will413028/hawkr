@@ -47,6 +47,7 @@ const (
 	PaymentAccountsRetryPurge         Permission = "payment.accounts.retry_purge"
 	PaymentAccountsDeleteMapping      Permission = "payment.accounts.delete_mapping"
 	ReviewQueueItemsList              Permission = "reviewqueue.items.list"
+	SocialPostsList                   Permission = "social.posts.list"
 	SellerStoresList                  Permission = "seller.stores.list"
 	SellerStoresGet                   Permission = "seller.stores.get"
 	SellerStoreStatsGet               Permission = "seller.store_stats.get"
@@ -124,6 +125,7 @@ func Catalog() []Permission {
 		ModerationCasesList, ModerationCasesGet, ModerationCasesDecide,
 		PaymentAccountsGet, PaymentAccountsRefresh, PaymentAccountsRetryCreate, PaymentAccountsRetryPurge, PaymentAccountsDeleteMapping,
 		ReviewQueueItemsList,
+		SocialPostsList,
 		SellerStoresList, SellerStoresGet,
 		SellerStoreStatsGet, SellerStoreOnboardingGet,
 		SellerKYCApplicationsList, SellerKYCApplicationsGet, SellerKYCApplicationsApprove, SellerKYCApplicationsReject,

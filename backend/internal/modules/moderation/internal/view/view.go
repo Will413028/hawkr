@@ -124,3 +124,19 @@ func (r Reader) Cases(ctx context.Context, f model.CaseFilter, after *model.Case
 	}
 	return out, nil
 }
+
+// OpenReportCounts 回每篇貼文在進行中案件裡的檢舉數；只算進行中案件，已結案案件的檢舉不算，沒有進行中檢舉的貼文不在結果裡（讀的人當 0）。
+func (r Reader) OpenReportCounts(ctx context.Context, postIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
+	out := make(map[uuid.UUID]int64, len(postIDs))
+	if len(postIDs) == 0 {
+		return out, nil
+	}
+	rows, err := store.New(r.DB.Conn(ctx)).OpenReportCountsOfPosts(ctx, postIDs)
+	if err != nil {
+		return nil, fmt.Errorf("moderation：計算貼文的進行中檢舉數：%w", err)
+	}
+	for _, row := range rows {
+		out[*row.PostID] = row.Reports
+	}
+	return out, nil
+}

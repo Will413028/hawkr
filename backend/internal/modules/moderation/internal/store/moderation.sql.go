@@ -814,6 +814,40 @@ func (q *Queries) OpenCaseByTarget(ctx context.Context, arg OpenCaseByTargetPara
 	return i, err
 }
 
+const openReportCountsOfPosts = `-- name: OpenReportCountsOfPosts :many
+SELECT c.content_id AS post_id, count(*)::bigint AS reports
+FROM moderation.reports r
+JOIN moderation.cases c ON c.id = r.case_id
+WHERE c.target_kind = 'POST' AND c.closed_at IS NULL AND c.content_id = ANY($1::uuid[])
+GROUP BY c.content_id
+`
+
+type OpenReportCountsOfPostsRow struct {
+	PostID  *uuid.UUID
+	Reports int64
+}
+
+// 貼文在進行中案件裡的檢舉數（已結案案件的檢舉不算）；沒有進行中案件的貼文沒有列。
+func (q *Queries) OpenReportCountsOfPosts(ctx context.Context, postIds []uuid.UUID) ([]OpenReportCountsOfPostsRow, error) {
+	rows, err := q.db.Query(ctx, openReportCountsOfPosts, postIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []OpenReportCountsOfPostsRow{}
+	for rows.Next() {
+		var i OpenReportCountsOfPostsRow
+		if err := rows.Scan(&i.PostID, &i.Reports); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const purgeRetired = `-- name: PurgeRetired :exec
 DELETE FROM moderation.retired_assets
 WHERE unlinked_at < $1 AND retired_at < $2
