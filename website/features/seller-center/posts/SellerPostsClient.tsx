@@ -78,7 +78,9 @@ function detailToListItem(d: MyPostDetail): PostListItem {
 		createdAt: d.createdAt,
 		hiddenAt: d.hiddenAt,
 		hiddenReason: d.hiddenReason,
+		takedownMeasureId: d.takedownMeasureId,
 		publishStatus: d.publishStatus,
+		etag: d.etag,
 	};
 }
 

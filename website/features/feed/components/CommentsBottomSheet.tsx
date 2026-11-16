@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import PostComments from "./PostComments";
 
 interface Props {
-	postId: number | string | null;
+	postId: string | null;
 	open: boolean;
 	onClose: () => void;
 }

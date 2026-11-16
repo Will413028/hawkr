@@ -14,8 +14,6 @@ import {
 	getCachedRecommendedSellers,
 	settled,
 } from "@/lib/api/cached";
-import type { Paginated, PostListItem } from "@/lib/api/openapi-types";
-import { fetchPublicPostsTyped } from "@/lib/api/posts";
 import type { HomeTabBootstrapV1 } from "@/lib/api/tab-bootstrap";
 import { homeBootstrapBudget } from "@/lib/config/env";
 import {
@@ -27,12 +25,12 @@ import {
 	type CategoryGroup,
 	categoryGroupsFromTree,
 } from "@/lib/market/categoryGroups";
+import { fetchPostsPage, type PostsPage } from "@/lib/posts/repo";
 import { PUBLIC_CACHE_TAGS } from "@/lib/seo/tags";
 
-const EMPTY_POSTS: Paginated<PostListItem> = {
-	page: 1,
+const EMPTY_POSTS: PostsPage = {
 	pageSize: 8,
-	total: 0,
+	nextPageToken: "",
 	records: [],
 };
 
@@ -163,7 +161,7 @@ async function readHomeDiscoveryBootstrap() {
 		async () => {
 			const [recommendedSellers, posts, categoryTree] = await Promise.all([
 				fetchRecommendedStores(24, { locale: defaultLocale }),
-				fetchPublicPostsTyped({ page: 1, pageSize: 8, strict: true }),
+				fetchPostsPage({ pageSize: 8, strict: true }),
 				fetchCategoryTree(true),
 			]);
 			return {
@@ -228,7 +226,7 @@ async function fallbackDiscoveryBootstrap(
 ): Promise<Degradable<HomeDiscoveryBootstrap>> {
 	const [recommendedSellers, posts, categoryGroups] = await Promise.allSettled([
 		withDeadline(getCachedRecommendedSellers(24), budgetMs, "sellers"),
-		withDeadline(getCachedPublicPosts(1, 8), budgetMs, "posts"),
+		withDeadline(getCachedPublicPosts(8), budgetMs, "posts"),
 		withDeadline(
 			getCachedCategoryTree().then(categoryGroupsFromTree),
 			budgetMs,

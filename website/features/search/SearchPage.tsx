@@ -5,8 +5,7 @@ import "@/styles/features/market-products-list.css";
  * Without this import the card chrome collapses to a plain block stack. */
 import "@/styles/features/feed-components.css";
 import "@/styles/features/search-agent-entry.css";
-import { getCachedHotProducts } from "@/lib/api/cached";
-import { fetchPublicPostsTyped } from "@/lib/api/posts";
+import { getCachedHotProducts, getCachedPublicPosts } from "@/lib/api/cached";
 import type { SearchProductHit } from "@/lib/search/repo";
 import RecommendedPostRail from "./components/RecommendedPostRail";
 import RecommendedProductRail from "./components/RecommendedProductRail";
@@ -25,10 +24,9 @@ export default async function SearchPage() {
 	// then ship inside the static HTML.
 	const [hotProducts, landingPosts] = await Promise.all([
 		getCachedHotProducts(8).catch(() => []),
-		fetchPublicPostsTyped({ page: 1, pageSize: 8 }).catch(() => ({
-			page: 1,
+		getCachedPublicPosts(8).catch(() => ({
 			pageSize: 8,
-			total: 0,
+			nextPageToken: "",
 			records: [],
 		})),
 	]);

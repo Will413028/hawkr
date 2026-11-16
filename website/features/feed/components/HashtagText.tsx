@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "@/components/shared/Link";
-import { normalizePostTag } from "@/lib/post-tags/repo";
+import { normalizePostTag } from "@/lib/posts/tags";
 
 interface HashtagTextProps {
 	content: string;

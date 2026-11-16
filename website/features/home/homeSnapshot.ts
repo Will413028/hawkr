@@ -15,7 +15,6 @@
 import type { HomeMerchantItem } from "@/features/home/components/HomeCompactMerchants";
 import type { MarketplaceProduct } from "@/lib/api";
 import type { PostListItem } from "@/lib/api/openapi-types";
-import { normalizePost } from "@/lib/api/posts";
 import type { HomeTabBootstrapV1 } from "@/lib/api/tab-bootstrap";
 import { formatUnitLabel } from "@/lib/codemeta/enums";
 import type { RecommendedStore } from "@/lib/discovery/recommended";
@@ -446,9 +445,7 @@ export function buildHomeSnapshot(bootstrap: HomeTabBootstrapV1): HomeSnapshot {
 	const mappedSellers: HomeMerchantItem[] = recommendedSellers
 		.slice(0, 8)
 		.map(toSeller);
-	const feedPosts: PostListItem[] = (posts.records ?? []).map((raw) =>
-		normalizePost(raw),
-	);
+	const feedPosts: PostListItem[] = posts.records ?? [];
 	const compactUpdates = feedPosts.slice(0, 5);
 	// A payload retained from before this field shipped has no `categoryGroups`;
 	// read it as "tree unsupplied" (empty shelves), not as a crash.

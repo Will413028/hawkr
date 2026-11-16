@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import InfiniteFeed from "@/features/feed/components/InfiniteFeed";
-import { getCachedSeller } from "@/lib/api/cached";
-import type { PostListItem } from "@/lib/api/openapi-types";
-import { fetchPublicPostsTyped } from "@/lib/api/posts";
+import { getCachedSeller, getCachedStorePosts } from "@/lib/api/cached";
 import { prerenderSafe } from "@/lib/api/prerender";
 import {
 	localeFromParam,
@@ -55,14 +53,18 @@ export default async function PostsPage({ params }: Props) {
 	// Posts is an infinite-scroll feed with no `?page` pagination UI, so the
 	// first page is the SEO/ISR body and InfiniteFeed loads more in place. The
 	// route therefore reads no request-time input and stays statically renderable.
-	const postsData = await fetchPublicPostsTyped({
-		page: 1,
-		pageSize: POSTS_PAGE_SIZE,
-		sellerId: id,
-	}).catch(prerenderSafe({ records: [], total: 0, totalPages: 0 }));
+	// The first page is the anonymous cached read, tagged `posts:list` and
+	// `seller:<id>`; a signed-in viewer's list differs (blocked stores), so
+	// `useFeedPosts` drops this seed for them and reads with their cookie.
+	const postsData = await getCachedStorePosts(id, POSTS_PAGE_SIZE).catch(
+		prerenderSafe({
+			records: [],
+			nextPageToken: "",
+			pageSize: POSTS_PAGE_SIZE,
+		}),
+	);
 
-	const posts = postsData.records as PostListItem[];
-
+	const posts = postsData.records;
 	// Chrome (profile header / banner / shell) lives in the persistent
 	// (storefront) layout — this page renders only the posts board.
 	return (
@@ -74,6 +76,7 @@ export default async function PostsPage({ params }: Props) {
 				<InfiniteFeed
 					initialPosts={posts}
 					initialPage={1}
+					initialNextPageToken={postsData.nextPageToken}
 					pageSize={POSTS_PAGE_SIZE}
 					sellerId={id}
 					// This page fetched page one for this exact seller, so the feed

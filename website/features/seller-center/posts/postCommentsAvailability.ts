@@ -20,7 +20,7 @@ export type PostCommentsAvailability =
 	| "platform-hidden";
 
 export function postCommentsAvailability(
-	post: Pick<PostListItem, "hiddenAt" | "publishStatus">,
+	post: Pick<PostListItem, "hiddenAt" | "publishStatus" | "takedownMeasureId">,
 	storePublic: boolean | undefined,
 ): PostCommentsAvailability {
 	if (isPostHidden(post)) return "platform-hidden";

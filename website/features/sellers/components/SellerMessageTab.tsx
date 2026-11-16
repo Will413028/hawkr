@@ -6,11 +6,11 @@ import Link from "@/components/shared/Link";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth/context";
 import { formatTaipeiDate } from "@/lib/date/taipei";
-import { useSellerForum } from "@/lib/hooks/useSellerForum";
 import type {
 	SellerForumComment,
 	SellerForumListResult,
-} from "@/lib/seller/forum-repo";
+} from "@/lib/forum/repo";
+import { useSellerForum } from "@/lib/hooks/useSellerForum";
 
 interface SellerMessageTabProps {
 	sellerId: string;
@@ -33,7 +33,7 @@ interface SellerMessageTabProps {
  *     reply lands inside the parent's `replies[]` immediately.
  *
  * Still deferred to later phases:
- *   - Like / edit / delete on each row (phase 4)
+ *   - Edit / delete on each row (phase 4)
  *   - Sticky mobile input, reply-line treatment, date polish (phase 5)
  */
 export default function SellerMessageTab({

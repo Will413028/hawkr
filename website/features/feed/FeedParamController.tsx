@@ -5,13 +5,12 @@ import AppIcon from "@/components/shared/AppIcon";
 import FeedClientShell from "@/features/feed/components/FeedClientShell";
 import type { StoryItem } from "@/features/feed/components/StoryRail";
 import type { PostDetail, PostListItem } from "@/lib/api/openapi-types";
+import { useUrlSearchParams } from "@/lib/hooks/useUrlSearchParams";
 import {
 	FALLBACK_POST_IMAGE,
-	fetchPostDetail,
-	normalizePost,
-} from "@/lib/api/posts";
-import { useUrlSearchParams } from "@/lib/hooks/useUrlSearchParams";
-import { normalizePostTag } from "@/lib/post-tags/repo";
+	fetchPostDetailForViewer,
+} from "@/lib/posts/repo";
+import { normalizePostTag } from "@/lib/posts/tags";
 
 const TOPIC_LABELS: Record<string, string> = {
 	following: "追蹤店家",
@@ -62,6 +61,8 @@ function postDetailToListItem(detail: PostDetail): PostListItem {
 interface FeedParamControllerProps {
 	/** Canonical (unscoped) page-1 posts, server-rendered into the ISR HTML. */
 	initialPosts: PostListItem[];
+	/** The page_token after `initialPosts`; empty when the seed is the whole list. */
+	initialNextPageToken: string;
 	stories: StoryItem[];
 	pageSize: number;
 	/** The canonical server seed timed out; let the client query recover. */
@@ -80,6 +81,7 @@ interface FeedParamControllerProps {
  */
 export default function FeedParamController({
 	initialPosts,
+	initialNextPageToken,
 	stories,
 	pageSize,
 	initialSeedFailed,
@@ -94,8 +96,12 @@ export default function FeedParamController({
 	const deepLinkQuery = useQuery<PostListItem | null>({
 		queryKey: ["feed", "deep-link-post", postId],
 		queryFn: async () => {
-			const detail = await fetchPostDetail(postId);
-			return detail ? normalizePost(postDetailToListItem(detail)) : null;
+			try {
+				return postDetailToListItem(await fetchPostDetailForViewer(postId));
+			} catch {
+				// 讀不到的貼文（不存在、未公開、被封鎖）不開檢視器。
+				return null;
+			}
 		},
 		enabled: Boolean(postId),
 		staleTime: 60_000,
@@ -126,6 +132,7 @@ export default function FeedParamController({
 				stories={stories}
 				initialPosts={initialPosts}
 				initialPage={1}
+				initialNextPageToken={initialNextPageToken}
 				pageSize={pageSize}
 				sellerId={sellerId || undefined}
 				hashtag={hashtag || undefined}

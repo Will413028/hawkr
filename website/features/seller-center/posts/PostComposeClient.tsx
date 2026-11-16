@@ -24,14 +24,13 @@ import {
 	normalizeGifUploadFile,
 } from "@/lib/media/gif";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
+import { type PostTagSuggestion, suggestPostTags } from "@/lib/posts/repo";
 import {
 	detectPostTaggingMode,
 	extractPostTags,
 	POST_TAG_LIMIT,
 	type PostTaggingMode,
-	type PostTagSuggestion,
-	suggestPostTags,
-} from "@/lib/post-tags/repo";
+} from "@/lib/posts/tags";
 import { queryKeys } from "@/lib/query/keys";
 import { storeIdOf } from "@/lib/seller/store";
 import {

@@ -8,20 +8,15 @@ import EmptyStatePanel from "@/components/shared/EmptyStatePanel";
 import { useSellerIdentity } from "@/components/shared/useSellerIdentity";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth/context";
-import { formatTaipeiShortDate } from "@/lib/date/taipei";
-import {
-	snapshotToComment,
-	useCommentReplies,
-	usePostComments,
-} from "@/lib/hooks/useSocial";
 import {
 	type Comment,
-	createReply,
+	createComment,
 	deleteComment,
-	toggleCommentLike,
+	setCommentLiked,
 	updateComment,
-} from "@/lib/social/repo";
-import { subscribeCommentEvents } from "@/lib/sse/commentEventBus";
+} from "@/lib/comments/repo";
+import { formatTaipeiShortDate } from "@/lib/date/taipei";
+import { useCommentReplies, usePostComments } from "@/lib/hooks/useSocial";
 import { canDeleteComment, canEditComment } from "./commentPermissions";
 
 function formatTime(unixSeconds: number): string {
@@ -100,7 +95,7 @@ function highlightComment(el: HTMLElement) {
 }
 
 interface PostCommentsProps {
-	postId: number | string;
+	postId: string;
 	/**
 	 * Grant the current viewer post-owner moderation rights — show 刪除 on
 	 * every comment / reply (not just one's own), matching the backend's
@@ -137,9 +132,9 @@ function ReplyComposer({
 	onSent,
 	onCancel,
 }: {
-	postId: number | string;
-	parentId: number | string;
-	replyToId: number | string;
+	postId: string;
+	parentId: string;
+	replyToId: string;
 	replyToName?: string;
 	avatar: ComposerAvatar;
 	onSent: (created: Comment) => void;
@@ -158,21 +153,15 @@ function ReplyComposer({
 		if (!content || submitting) return;
 		setSubmitting(true);
 		try {
-			// `createReply` already returns a normalised `Comment` (the repo
-			// runs the response through `mapServerComment`), so we can hand it
-			// straight to the parent — no optimistic merge needed. Fill in the
-			// replyToName display hint if the backend didn't echo it back.
-			const clientRequestId =
-				typeof crypto !== "undefined" && "randomUUID" in crypto
-					? crypto.randomUUID()
-					: `cri-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-			// 回覆走專屬 replies 端點（parent 在 path），postId/replyToId 為 TSID
-			// 一律以 string 傳；留言身分由伺服器依貼文歸屬決定。
-			const created = await createReply(parentId, {
+			// `createComment` returns a mapped `Comment`, handed straight to the
+			// parent. The server does not echo the replied-to name, so fill in
+			// the display hint from the row being replied to. The reply is
+			// identified by a UUIDv4 request_id so a retry returns the same row.
+			const created = await createComment(postId, {
 				content,
-				postId: postId,
-				replyToId: replyToId,
-				clientRequestId,
+				parentId,
+				replyToId,
+				requestId: crypto.randomUUID(),
 			});
 			setDraft("");
 			onSent({
@@ -260,13 +249,15 @@ function ReplyItem({
 }: {
 	reply: Comment;
 	canModerate: boolean;
-	onRemoved: (id: number | string) => void;
+	onRemoved: (id: string) => void;
 }) {
 	const [liked, setLiked] = React.useState(reply.isLiked === true);
 	const [likeCount, setLikeCount] = React.useState(reply.likeCount ?? 0);
 	// Local content mirror — optimistic edit shows immediately, refresh from
 	// parent list will overwrite if backend differs.
 	const [content, setContent] = React.useState(reply.content);
+	// 修改成功後伺服器換新版本：之後的修改與刪除要帶新的 etag。
+	const [etag, setEtag] = React.useState(reply.etag);
 	const [editing, setEditing] = React.useState(false);
 	const [editDraft, setEditDraft] = React.useState("");
 	const [savingEdit, setSavingEdit] = React.useState(false);
@@ -294,7 +285,7 @@ function ReplyItem({
 		setLiked(!wasLiked);
 		setLikeCount((c) => c + (wasLiked ? -1 : 1));
 		try {
-			const r = await toggleCommentLike(reply.id, wasLiked);
+			const r = await setCommentLiked(reply.id, !wasLiked);
 			setLiked(r.liked);
 		} catch {
 			setLiked(wasLiked);
@@ -311,7 +302,7 @@ function ReplyItem({
 		deletePendingRef.current = true;
 		setDeleting(true);
 		try {
-			await deleteComment(reply.id);
+			await deleteComment(reply.id, etag);
 			onRemoved(reply.id);
 		} catch (e) {
 			window.alert(e instanceof Error ? e.message : "刪除失敗");
@@ -340,7 +331,8 @@ function ReplyItem({
 		}
 		setSavingEdit(true);
 		try {
-			const updated = await updateComment(reply.id, next);
+			const updated = await updateComment(reply.id, next, etag ?? "");
+			setEtag(updated.etag);
 			setContent(updated.content || next);
 			setEditing(false);
 		} catch (e) {
@@ -490,14 +482,14 @@ function CommentItem({
 	onRemove,
 }: {
 	comment: Comment;
-	postId: number | string;
+	postId: string;
 	canModerate: boolean;
 	signedIn: boolean;
 	composerAvatar: ComposerAvatar;
-	onLike: (id: number | string) => Promise<void>;
-	onRemove: (id: number | string) => Promise<void>;
+	onLike: (id: string) => Promise<void>;
+	onRemove: (id: string) => Promise<void>;
 }) {
-	const replies = useCommentReplies(comment.id);
+	const replies = useCommentReplies(postId, comment.id, comment.userName);
 	const [replyOpen, setReplyOpen] = React.useState(false);
 	// Local mirror of replyCount so it bumps the moment we send a reply
 	// without waiting for the parent list to refetch.
@@ -508,6 +500,7 @@ function CommentItem({
 	const [pendingReplies, setPendingReplies] = React.useState<Comment[]>([]);
 	// Local content mirror — optimistic edit shows immediately
 	const [content, setContent] = React.useState(comment.content);
+	const [etag, setEtag] = React.useState(comment.etag);
 	const [editing, setEditing] = React.useState(false);
 	const [editDraft, setEditDraft] = React.useState("");
 	const [savingEdit, setSavingEdit] = React.useState(false);
@@ -522,40 +515,6 @@ function CommentItem({
 	React.useEffect(() => {
 		if (editing) editTextareaRef.current?.focus();
 	}, [editing]);
-
-	/* ── SSE reply inline sync ───────────────────────────────────────────
-	 * `usePostComments` already bumps our `replyCount` on `comment.replied`
-	 * for any post the realtime stream is open on (see
-	 * `useSocial.ts::handleReplied`). It also publishes the reply snapshot
-	 * to the per-postId comment bus so we can splice the new row into our
-	 * thread state without waiting for the user to collapse + re-expand.
-	 * Dedup by id against both the REST-loaded thread (`replies.items`) and
-	 * the local pending mirror — covers all three orderings of
-	 *   (a) own ReplyComposer onSent → SSE echo,
-	 *   (b) SSE echo → own onSent,
-	 *   (c) cross-tab peer reply.
-	 *
-	 * `replies.items` lives in a ref so the bus subscription survives a
-	 * thread expand / refresh (which mutates `items`) without re-binding —
-	 * an in-flight reply event during the resubscribe window would
-	 * otherwise be silently dropped.
-	 */
-	const replyItemsRef = React.useRef(replies.items);
-	replyItemsRef.current = replies.items;
-	React.useEffect(() => {
-		const myCommentId = String(comment.id);
-		return subscribeCommentEvents(postId, (event) => {
-			if (event.kind !== "reply_arrived") return;
-			if (event.parentCommentId !== myCommentId) return;
-			const replyId = event.reply.commentId;
-			setPendingReplies((prev) => {
-				if (prev.some((r) => String(r.id) === replyId)) return prev;
-				if (replyItemsRef.current.some((r) => String(r.id) === replyId))
-					return prev;
-				return [...prev, snapshotToComment(event.reply)];
-			});
-		});
-	}, [postId, comment.id]);
 
 	const canDelete = canDeleteComment(comment.isMine, canModerate);
 	// 編輯只開放給作者本人 — post owner 可刪不能改別人內容
@@ -605,7 +564,8 @@ function CommentItem({
 		}
 		setSavingEdit(true);
 		try {
-			const updated = await updateComment(comment.id, next);
+			const updated = await updateComment(comment.id, next, etag ?? "");
+			setEtag(updated.etag);
 			setContent(updated.content || next);
 			setEditing(false);
 		} catch (e) {
@@ -626,11 +586,7 @@ function CommentItem({
 	};
 
 	const handleReplySent = (created: Comment) => {
-		// Dedup: the SSE bus may deliver the same reply (server-echoed) before
-		// REST resolves. Whichever path runs first wins; the second one finds
-		// the id already in pending and short-circuits, so we never double-
-		// insert. Also check `replies.items` for the late-REST case where the
-		// thread was refreshed in the same window.
+		// Dedup against the thread loaded by a refresh in the same window.
 		setPendingReplies((prev) => {
 			const id = String(created.id);
 			if (prev.some((r) => String(r.id) === id)) return prev;
@@ -642,7 +598,7 @@ function CommentItem({
 		if (!replies.open) void replies.expand();
 	};
 
-	const handleReplyRemoved = (replyId: number | string) => {
+	const handleReplyRemoved = (replyId: string) => {
 		setPendingReplies((prev) =>
 			prev.filter((r) => String(r.id) !== String(replyId)),
 		);
@@ -975,17 +931,6 @@ export default function PostComments({
 					role="alert"
 				>
 					{list.error}
-				</p>
-			)}
-
-			{/* The SSE client stops for good on rate-limit/cap (design book
-			    §11.6) — without this banner the list just silently froze. */}
-			{list.streamStatus === "unavailable" && (
-				<p
-					className="my-[var(--hkui-space-3)] p-[var(--hkui-space-2)_var(--hkui-space-4)] rounded-[var(--hkui-radius-md)] bg-[var(--hkui-warning-50,rgba(216,180,87,0.14))] text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-small)]"
-					role="status"
-				>
-					即時更新暫停中，重新整理頁面可恢復。
 				</p>
 			)}
 

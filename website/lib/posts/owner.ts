@@ -1,0 +1,159 @@
+/**
+ * 店主自己的貼文（SocialAppService 的 owner 方法）：建立、讀、列出、修改、發布、下架、刪除。
+ * 寫入帶 etag（樂觀鎖）：呼叫端有就帶，沒有就先讀一次（GetMyPost）取得目前的版本。
+ */
+
+import { create } from "@bufbuild/protobuf";
+import type { Client } from "@connectrpc/connect";
+import {
+	type Post,
+	PostSchema,
+	PostStatus,
+	type SocialAppService,
+} from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
+import { fieldMask } from "@hawkr/api/proto/field-mask";
+import type { MyPostDetail, PostListItem } from "../api/openapi-types";
+import { PostPublishStatus } from "../codemeta/enums";
+import { imageUri } from "../media/image";
+import { postToDetail, postToListItem } from "./repo";
+
+export type OwnerPostClient = Client<typeof SocialAppService>;
+
+/** 貼文狀態 → 賣家中心畫面用的發布狀態碼（4401 未發布、4402 已發布、4403 已下架）。 */
+export function publishStatusOf(status: PostStatus): string | undefined {
+	switch (status) {
+		case PostStatus.DRAFT:
+			return PostPublishStatus.DRAFT;
+		case PostStatus.PUBLISHED:
+			return PostPublishStatus.PUBLISHED;
+		case PostStatus.UNPUBLISHED:
+			return PostPublishStatus.UNPUBLISHED;
+		default:
+			// 不認得的狀態不猜：畫面只在有值時畫狀態標籤。
+			return undefined;
+	}
+}
+
+export function ownerListItem(post: Post): PostListItem {
+	const item = postToListItem(post);
+	// 店主自己的列表：沒有圖就是沒有圖，不補預設圖（草稿可以沒有圖）。
+	const image = imageUri(post.image, "card");
+	const publishStatus = publishStatusOf(post.status);
+	return {
+		...item,
+		imageKeys: image ? [image] : [],
+		...(publishStatus ? { publishStatus } : {}),
+		...(post.takedownMeasureId
+			? { takedownMeasureId: post.takedownMeasureId }
+			: {}),
+	};
+}
+
+export function ownerDetail(post: Post): MyPostDetail {
+	const detail = postToDetail(post);
+	const publishStatus = publishStatusOf(post.status);
+	return {
+		...detail,
+		// 貼文只帶商品 ID（沒有名稱、價格與圖）；編輯頁用 ID 預選商品。
+		products: post.productId
+			? [{ id: post.productId, imageKey: "", name: "", price: "" }]
+			: [],
+		...(post.etag ? { etag: post.etag } : {}),
+		...(publishStatus ? { publishStatus } : {}),
+		...(post.takedownMeasureId
+			? { takedownMeasureId: post.takedownMeasureId }
+			: {}),
+	};
+}
+
+export interface OwnerCreateInput {
+	/** 店主的建立就是發布（賣家中心只有一種送出）；代行路徑建的是草稿，不走這裡。 */
+	content: string;
+	stagedToken?: string;
+	productId?: string;
+	tags?: string[];
+}
+
+export interface OwnerUpdateInput {
+	content: string;
+	/** 換新圖時的 staged token；沒帶就沿用目前的圖（update_mask 不含圖片）。 */
+	newStagedToken?: string;
+	productId?: string;
+	tags?: string[];
+}
+
+export function createOwnerPostApi(client: OwnerPostClient) {
+	async function currentEtag(id: string): Promise<string> {
+		const res = await client.getMyPost({ postId: id });
+		if (!res.post?.etag) throw new Error("post etag missing");
+		return res.post.etag;
+	}
+
+	return {
+		async create(body: OwnerCreateInput): Promise<{ id: string }> {
+			const res = await client.createPost({
+				body: body.content,
+				imageStagedToken: body.stagedToken ?? "",
+				...(body.productId ? { productId: body.productId } : {}),
+				hashtagInputs: body.tags ?? [],
+				publish: true,
+				requestId: crypto.randomUUID(),
+			});
+			if (!res.post) throw new Error("post missing");
+			return { id: res.post.id };
+		},
+
+		async update(
+			id: string,
+			body: OwnerUpdateInput,
+			etag?: string,
+		): Promise<void> {
+			const paths = ["body"];
+			if (body.newStagedToken) paths.push("image_staged_token");
+			if (body.productId !== undefined) paths.push("product_id");
+			if (body.tags) paths.push("hashtag_inputs");
+			await client.updatePost({
+				post: create(PostSchema, {
+					id,
+					body: body.content,
+					etag: etag ?? (await currentEtag(id)),
+					imageStagedToken: body.newStagedToken ?? "",
+					...(body.productId ? { productId: body.productId } : {}),
+					hashtagInputs: body.tags ?? [],
+				}),
+				updateMask: fieldMask(PostSchema, paths),
+			});
+		},
+
+		async setPublished(
+			id: string,
+			published: boolean,
+			etag?: string,
+		): Promise<void> {
+			const version = etag ?? (await currentEtag(id));
+			if (published) await client.publishPost({ postId: id, etag: version });
+			else await client.unpublishPost({ postId: id, etag: version });
+		},
+
+		async remove(id: string, etag?: string): Promise<void> {
+			await client.deletePost({ postId: id, etag: etag ?? "" });
+		},
+
+		async detail(id: string): Promise<MyPostDetail> {
+			const res = await client.getMyPost({ postId: id });
+			if (!res.post) throw new Error("post missing");
+			return ownerDetail(res.post);
+		},
+
+		/** 各狀態篇數加總（伺服器的 `GetStoreSocialSummary`，不含已刪除）。 */
+		async count(): Promise<number> {
+			const res = await client.getStoreSocialSummary({});
+			return res.postCounts.reduce((sum, c) => sum + Number(c.count), 0);
+		},
+
+		async list(pageSize: number): Promise<PostListItem[]> {
+			const res = await client.listMyPosts({ pageSize });
+			return res.posts.map(ownerListItem);
+		},
+	};
+}

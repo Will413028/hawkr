@@ -5,6 +5,8 @@ export interface FeedHeadPage {
 	page: number;
 	pageSize: number;
 	hasMore: boolean;
+	/** 這一頁之後的 page_token；空字串是沒有下一頁。 */
+	nextPageToken: string;
 }
 
 function dedupe(records: PostListItem[]) {

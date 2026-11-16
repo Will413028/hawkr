@@ -1,5 +1,5 @@
-import type { Paginated, PostListItem } from "@/lib/api/openapi-types";
 import type { ProductRecord } from "@/lib/market/listFilters";
+import type { PostsPage } from "@/lib/posts/repo";
 
 type MainTabPageEnvelope<T> = {
 	schemaVersion: "tab-page.v1";
@@ -9,11 +9,15 @@ type MainTabPageEnvelope<T> = {
 
 async function requestMainTabPage<T>(
 	tab: "feed" | "market",
-	page: number,
+	cursor: { page: number } | { pageToken: string },
 	signal?: AbortSignal,
 ): Promise<T> {
+	const query =
+		"page" in cursor
+			? `page=${cursor.page}`
+			: `pageToken=${encodeURIComponent(cursor.pageToken)}`;
 	const response = await fetch(
-		`/api/public/tab-bootstrap/v1/head?tab=${tab}&page=${page}`,
+		`/api/public/tab-bootstrap/v1/head?tab=${tab}&${query}`,
 		{
 			method: "GET",
 			credentials: "omit",
@@ -32,11 +36,12 @@ async function requestMainTabPage<T>(
 	return payload.data;
 }
 
+/** 匿名的 canonical 動態牆：第一頁 pageToken 是空字串，之後用上一頁回的 `nextPageToken`。 */
 export function fetchCanonicalFeedPage(
-	page: number,
+	pageToken: string,
 	signal?: AbortSignal,
-): Promise<Paginated<PostListItem>> {
-	return requestMainTabPage<Paginated<PostListItem>>("feed", page, signal);
+): Promise<PostsPage> {
+	return requestMainTabPage<PostsPage>("feed", { pageToken }, signal);
 }
 
 export async function fetchCanonicalMarketRecords(
@@ -46,6 +51,6 @@ export async function fetchCanonicalMarketRecords(
 	const envelope = await requestMainTabPage<{
 		data?: { records?: ProductRecord[] };
 		records?: ProductRecord[];
-	}>("market", page, signal);
+	}>("market", { page }, signal);
 	return envelope.data?.records ?? envelope.records ?? [];
 }

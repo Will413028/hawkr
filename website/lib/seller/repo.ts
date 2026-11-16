@@ -2,18 +2,12 @@
  * Seller-side repos.
  *
  * 店家資料走 Connect（`SellerAppService`）：GetMyStore、UpdateMyStore、CompleteMyStoreOnboarding、
- * ApplyStore、CloseMyStore；認證在 `kyc.ts`。儀表板在 `dashboard.ts`（`GetMyDashboard`），措施與申覆在 `measures.ts`。其餘端點仍是 REST（全部 authed）：
+ * ApplyStore、CloseMyStore；認證在 `kyc.ts`。儀表板在 `dashboard.ts`（`GetMyDashboard`），措施與申覆在 `measures.ts`。貼文走 Connect（`SocialAppService` 的 owner 方法，見 `createSellerPostRepo`）。其餘端點仍是 REST（全部 authed）：
  *   GET    /app/sellers/me/customers                customers list (CRM)
  *   GET    /app/coupon_templates                    my coupon templates
  *   POST   /app/coupon_templates                    create
  *   GET    /app/coupon_templates/{id}               detail
  *   POST   /app/coupon_templates/{id}/revoke        revoke
- *   POST   /app/sellers/posts                       create post
- *   GET    /app/sellers/posts/{id}                  detail (owner read, any publish state)
- *   PUT    /app/sellers/posts/{id}                  edit
- *   DELETE /app/sellers/posts/{id}                  delete
- *   POST   /app/sellers/posts/{id}/publish          publish (4402)
- *   POST   /app/sellers/posts/{id}/unpublish        unpublish (4403)
  *
  * Product endpoints under `/app/products` are shared with seller scope —
  * see `lib/products/seller-repo.ts`.
@@ -32,12 +26,13 @@ import { fieldMask } from "@hawkr/api/proto/field-mask";
 import { ApiClientError, type ApiEnvelope, authedFetch } from "../api/client";
 import type { DelegatedMutationMeta, RepoFetcher } from "../api/delegated";
 import type { MyPostDetail, PostListItem } from "../api/openapi-types";
-import { normalizePostDetail } from "../api/posts";
 import {
 	PostPublishStatus,
 	type PostPublishStatusValue,
 } from "../codemeta/enums";
 import { sellerAppClient } from "../connect/seller";
+import { socialAppClient } from "../connect/social";
+import { createOwnerPostApi, type OwnerPostClient } from "../posts/owner";
 import type { AgreementAcceptanceInput } from "./agreements";
 
 /* ===== Store (Connect) ===== */
@@ -891,7 +886,7 @@ export interface SellerPostRepo {
 	createSellerPost(
 		body: CreateSellerPostInput,
 		meta?: DelegatedMutationMeta,
-	): Promise<{ id?: number; version?: string }>;
+	): Promise<{ id?: string; version?: string }>;
 	updateSellerPost(
 		id: number | string,
 		body: UpdateSellerPostInput,
@@ -924,86 +919,64 @@ export interface SellerPostRepo {
 		sellerId?: number | string,
 		params?: { pageSize?: number },
 	): Promise<PostListItem[]>;
+	/**
+	 * 動態數（導覽徽章）：伺服器以資料庫計數的各狀態篇數加總，不含已刪除的貼文；
+	 * 不是列表長度（列表一頁有上限）。
+	 */
+	fetchPostCount(): Promise<number>;
 }
 
-export interface SellerPostRepoOptions {
-	/** 寫入根（賣家 `/app/sellers/posts`）。 */
-	root?: string;
-	/** 自己的貼文列表（賣家 `/app/sellers/me/posts`，與寫入根不同層）。 */
-	listRoot?: string;
-}
-
+/**
+ * 店主自己的貼文資料層（SocialAppService 的 owner 方法，Connect）。`clientFor` 可注入是為了測試；
+ * client 在每次呼叫時才建立，模組載入時不碰 transport。
+ */
 export function createSellerPostRepo(
-	fetcher: RepoFetcher,
-	options: SellerPostRepoOptions = {},
+	clientFor: () => OwnerPostClient = socialAppClient,
 ): SellerPostRepo {
-	const root = options.root ?? "/app/sellers/posts";
-	const listRoot = options.listRoot ?? "/app/sellers/me/posts";
-
+	const api = () => createOwnerPostApi(clientFor());
 	return {
-		async createSellerPost(
-			body: CreateSellerPostInput,
-		): Promise<{ id?: number; version?: string }> {
-			const env = await fetcher<{ id?: number }>(root, {
-				method: "POST",
-				json: body,
-			});
-			return env.data ?? {};
+		async createSellerPost(body: CreateSellerPostInput) {
+			return api().create(body);
 		},
 
-		async updateSellerPost(
-			id: number | string,
-			body: UpdateSellerPostInput,
-		): Promise<void> {
-			await fetcher(`${root}/${id}`, { method: "PUT", json: body });
+		async updateSellerPost(id: number | string, body: UpdateSellerPostInput) {
+			await api().update(String(id), body);
 		},
 
-		/** 兩支命令端點，body 為空（賣家路徑沒有 `expectedVersion`，見介面註解）。 */
 		async setSellerPostPublishStatus(
 			id: number | string,
 			target: PostPublishTarget,
-		): Promise<void> {
-			const command =
-				target === PostPublishStatus.PUBLISHED ? "publish" : "unpublish";
-			await fetcher(`${root}/${id}/${command}`, { method: "POST" });
+		) {
+			await api().setPublished(
+				String(id),
+				target === PostPublishStatus.PUBLISHED,
+			);
 		},
 
-		async deleteSellerPost(id: number | string): Promise<void> {
-			await fetcher(`${root}/${id}`, { method: "DELETE" });
+		async deleteSellerPost(id: number | string) {
+			await api().remove(String(id));
 		},
 
 		async fetchSellerPostDetail(id: number | string): Promise<MyPostDetail> {
-			const env = await fetcher<MyPostDetail>(
-				`${root}/${encodeURIComponent(String(id))}`,
-			);
-			if (!env.data) {
-				throw new ApiClientError("找不到這則動態", 404, 404);
-			}
-			return normalizePostDetail(env.data);
+			return api().detail(String(id));
 		},
 
-		/**
-		 * 賣家自己貼文列表。改走 authed `/app/sellers/me/posts`（ListMyPosts），
-		 * 回傳含被平台下架的貼文（hiddenAt/hiddenReason）——公開 feed 會被 server 濾掉。
-		 * sellerId 參數保留以相容既有呼叫點（useSellerPosts nav 徽章），現不使用。
-		 */
+		/** 店主自己的貼文列表，含草稿與被平台下架的（公開列表讀不到它們）。`sellerId` 保留以相容呼叫點，不使用。 */
 		async fetchSellerPosts(
 			_sellerId?: number | string,
 			params?: { pageSize?: number },
 		): Promise<PostListItem[]> {
-			const env = await fetcher<{ records?: PostListItem[] } | PostListItem[]>(
-				listRoot,
-				{ query: { page_size: String(params?.pageSize ?? 50) } },
-			);
-			const data = env.data;
-			if (Array.isArray(data)) return data;
-			return data?.records ?? [];
+			return api().list(params?.pageSize ?? 50);
+		},
+
+		async fetchPostCount(): Promise<number> {
+			return api().count();
 		},
 	};
 }
 
 /** 賣家路徑的預設實例；下面的具名匯出全部經由它。 */
-export const sellerPostRepo = createSellerPostRepo(authedFetch);
+export const sellerPostRepo = createSellerPostRepo();
 
 export const createSellerPost: SellerPostRepo["createSellerPost"] = (
 	body,
