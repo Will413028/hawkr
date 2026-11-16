@@ -7,7 +7,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
-// 模組事件只帶領域鍵（內容 ID、互動者 (kind, id)、store_id、以 rune 截斷的預覽），不帶名稱、頭像、account_id 或留言快照：A7-3 的
+// 模組事件只帶領域鍵（內容 ID、互動者 (kind, id)、store_id、以 rune 截斷的預覽），不帶名稱、頭像、account_id 或留言快照：legacy
 // relay 在自己的 job 裡經 buyer、seller、social 的 API 補 wire 需要的欄位。事件在寫入的 transaction 內發布，沒有訂閱者也照發；
 // 自己通知自己的略過由消費端判斷。
 

@@ -1,21 +1,21 @@
-// Package socialrelay 將 social 與 seller 的模組事件轉成 notification-service 還在消費的社群 RabbitMQ 訊息（A7-3，S4：留 relay，
-// notification 到 A8 才搬進單體）。
+// Package socialrelay 將 social 與 seller 的模組事件轉成 notification-service 還在消費的社群 RabbitMQ 訊息（notification 還沒搬進單體）。
 //
 // 對應（全部送到 hawkr.content，source 是 social-service，wire 與舊 publisher 的 pkg/mq/events.go 逐欄位相同，差別見 wire_test）：
 //
-//	social.PostPublished   → post.created，一個追蹤者一則（SD8：觸發點是發布，不是建立草稿）
+//	social.PostPublished   → post.created，一個追蹤者一則（觸發點是發布，不是建立草稿）
 //	social.CommentCreated  → comment.created
 //	social.CommentReplied  → comment.replied
 //	social.PostLiked       → post.liked
 //	social.CommentLiked    → comment.like_changed（只送 action=LIKE，舊 template 本來就只在 LIKE 通知）
-//	seller.MeasureCreated  → post.hidden_by_platform，內容下架措施的每則貼文一則；其他措施種類不送（P3）
+//	seller.MeasureCreated  → post.hidden_by_platform，內容下架措施的每則貼文一則；其他措施種類不送
 //
 // 不轉送：comment.updated、comment.deleted（只給 gateway 的留言 SSE，SSE 刪除）、counter.delta（計數與寫入同 transaction）。
 //
-// 封鎖雙方之間不送互動通知（留言、回覆、讚；A7-1b block-brief.md）：worker 在送出前查 buyer、seller 的封鎖 API，是送出當下的狀態。
-// 舊 publisher 一律送出、自我通知由 notification 略過，這裡同樣不略過自己（commenterPrincipalId 等欄位照填）。
+// 封鎖雙方之間不送通知（留言、回覆、讚、追蹤的店家的新貼文）：worker 在送出前查 buyer、seller 的封鎖 API，是送出當下的狀態。
+// 貼文的讚在讚的買家與店家屬同一帳號時不送（自己讚自己的貼文）；留言與回覆的自我通知由 notification 略過，commenterPrincipalId 等欄位照填。
+// 留言與貼文在送出當下已不可見（刪除、隱藏、下架、不公開）時不送。
 //
-// 隨 notification 搬進單體（A8）而刪除。
+// 隨 notification 搬進單體而刪除。
 package socialrelay
 
 import (
@@ -219,9 +219,12 @@ type Stores interface {
 	Measure(context.Context, uuid.UUID) (seller.Measure, error)
 }
 
-// Comments 是 relay 讀留言快照的 port；social.Module 實作它。
+// Comments 是 relay 讀留言與可見性的 port；social.Module 實作它。
 type Comments interface {
 	CommentForRelay(context.Context, uuid.UUID) (social.Comment, error)
+	CommentLikeCount(context.Context, uuid.UUID) (int64, error)
+	// ContentOwner 的 Exists 與 Readable 是內容此刻存在且公開可讀（留言連同所屬貼文）。
+	ContentOwner(context.Context, social.Target) (social.ContentOwner, error)
 }
 
 // Worker 組出舊 publisher 的 payload 並排入送出的 job。
@@ -304,6 +307,7 @@ type who struct {
 	Name, Avatar string
 	Space        string
 	Principal    int64
+	Account      int64
 	OldKind      int32
 }
 
@@ -320,7 +324,7 @@ func (w *Worker) identity(ctx context.Context, kind social.ActorKind, id int64) 
 		if err != nil {
 			return who{}, err
 		}
-		out := who{Name: s.StoreName, Space: typeSeller, Principal: s.AccountID, OldKind: oldActorKindStore}
+		out := who{Name: s.StoreName, Space: typeSeller, Principal: s.AccountID, Account: s.AccountID, OldKind: oldActorKindStore}
 		if s.LogoKey != nil {
 			out.Avatar = *s.LogoKey
 		}
@@ -334,13 +338,13 @@ func (w *Worker) identity(ctx context.Context, kind social.ActorKind, id int64) 
 		if err != nil {
 			return who{}, err
 		}
-		out := who{Name: p.DisplayName, Space: typeBuyer, Principal: id, OldKind: oldActorKindBuyer}
+		out := who{Name: p.DisplayName, Space: typeBuyer, Principal: id, Account: p.AccountID, OldKind: oldActorKindBuyer}
 		if p.Avatar != nil {
 			out.Avatar = *p.Avatar
 		}
 		return out, nil
 	}
-	return who{}, fmt.Errorf("socialrelay：不認得的互動者種類 %q", kind)
+	return who{}, river.JobCancel(fmt.Errorf("socialrelay：不認得的互動者種類 %q", kind))
 }
 
 // blocked 回報兩個互動者之間任一方向是否有封鎖：買家與買家（雙向）、買家封鎖店、店封鎖買家；店與店沒有封鎖。
@@ -374,7 +378,24 @@ func (w *Worker) skipBlocked(ctx context.Context, event string, eventID string, 
 	return ok, nil
 }
 
-// postCreated 是舊 PostCreatedEvent：id 是 JSON 數字，post_id 現在是貼文 UUID 字串（A7 不變量，計畫第 76 行）。
+// visible 回報內容此刻是否還存在且公開可讀；不是的話記一筆並讓呼叫方略過。
+func (w *Worker) visible(ctx context.Context, kind social.TargetKind, id, event, eventID string) (bool, error) {
+	u, err := uuid.Parse(id)
+	if err != nil {
+		return false, river.JobCancel(err)
+	}
+	o, err := w.Comments.ContentOwner(ctx, social.Target{Kind: kind, ID: u})
+	if err != nil {
+		return false, err
+	}
+	if !o.Exists || !o.Readable {
+		w.warn(ctx, "socialrelay：內容已不可見，不送通知", "event", event, "event_id", eventID)
+		return false, nil
+	}
+	return true, nil
+}
+
+// postCreated 是舊 PostCreatedEvent：id 是 JSON 數字，post_id 是貼文 UUID 字串。
 type postCreated struct {
 	baseEvent
 	PostID          string `json:"post_id"`
@@ -386,18 +407,12 @@ type postCreated struct {
 }
 
 func (w *Worker) postPublished(ctx context.Context, a PostPublishedArgs) error {
-	var name, avatar string
-	s, err := w.Stores.Store(ctx, a.StoreID)
-	switch {
-	case apperr.KindOf(err) == apperr.KindNotFound:
-		w.warn(ctx, "socialrelay：店家不存在，seller_name 留空", "store_id", a.StoreID)
-	case err != nil:
+	if ok, err := w.visible(ctx, social.TargetPost, a.PostID, "post.created", a.EventID); err != nil || !ok {
 		return err
-	default:
-		name = s.StoreName
-		if s.LogoKey != nil {
-			avatar = *s.LogoKey
-		}
+	}
+	store, err := w.identity(ctx, social.ActorStore, a.StoreID)
+	if err != nil {
+		return err
 	}
 	in := buyer.SubscribersInput{StoreID: a.StoreID, PageSize: followerPageSize}
 	if a.After != nil {
@@ -408,10 +423,15 @@ func (w *Worker) postPublished(ctx context.Context, a PostPublishedArgs) error {
 		return err
 	}
 	for _, f := range page.Items {
+		if skip, err := w.skipBlocked(ctx, "post.created", a.EventID, social.ActorBuyer, f.ID, social.ActorStore, a.StoreID); err != nil {
+			return err
+		} else if skip {
+			continue
+		}
 		id := derivedID(a.EventID, strconv.FormatInt(f.ID, 10))
 		if err := w.enqueuePublish(ctx, id, exchangeContent, "post.created", postCreated{
 			baseEvent: base(id, a.Occurred, "POST_CREATED"), PostID: a.PostID, StoreID: a.StoreID, FollowerID: f.ID,
-			SellerName: name, SellerAvatarKey: avatar, ContentPreview: a.Preview,
+			SellerName: store.Name, SellerAvatarKey: store.Avatar, ContentPreview: a.Preview,
 		}); err != nil {
 			return err
 		}
@@ -421,7 +441,7 @@ func (w *Worker) postPublished(ctx context.Context, a PostPublishedArgs) error {
 	}
 	next := a
 	next.After = &followerCursor{Time: page.Next.Time, ID: page.Next.ID}
-	return w.Jobs.Enqueue(ctx, next, nil)
+	return w.Jobs.Enqueue(ctx, next, &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}})
 }
 
 // commentSnapshot 是舊 CommentSnapshot：id 的 ,string 在 UUID 之下不再需要（字串本來就是 JSON 字串）；沒有的 parentId、replyToId 是空字串
@@ -484,6 +504,9 @@ type commentCreated struct {
 }
 
 func (w *Worker) commentCreated(ctx context.Context, a CommentCreatedArgs) error {
+	if ok, err := w.visible(ctx, social.TargetComment, a.CommentID, "comment.created", a.EventID); err != nil || !ok {
+		return err
+	}
 	kind := social.ActorKind(a.ActorKind)
 	if skip, err := w.skipBlocked(ctx, "comment.created", a.EventID, kind, a.ActorID, social.ActorStore, a.StoreID); err != nil || skip {
 		return err
@@ -526,6 +549,9 @@ type commentReplied struct {
 }
 
 func (w *Worker) commentReplied(ctx context.Context, a CommentRepliedArgs) error {
+	if ok, err := w.visible(ctx, social.TargetComment, a.CommentID, "comment.replied", a.EventID); err != nil || !ok {
+		return err
+	}
 	kind, to := social.ActorKind(a.ActorKind), social.ActorKind(a.ReplyToKind)
 	if skip, err := w.skipBlocked(ctx, "comment.replied", a.EventID, kind, a.ActorID, to, a.ReplyToID); err != nil || skip {
 		return err
@@ -571,6 +597,10 @@ func (w *Worker) postLiked(ctx context.Context, a PostLikedArgs) error {
 	if err != nil {
 		return err
 	}
+	if liker.Account != 0 && liker.Account == author.Account {
+		w.warn(ctx, "socialrelay：自己讚自己的貼文，不送通知", "event_id", a.EventID)
+		return nil
+	}
 	return w.enqueuePublish(ctx, a.EventID, exchangeContent, "post.liked", postLiked{
 		baseEvent: base(a.EventID, a.Occurred, "POST_LIKED"), SellerID: author.Principal, StoreID: a.StoreID, LikerName: liker.Name, PostID: a.PostID,
 	})
@@ -593,6 +623,9 @@ type commentLikeChanged struct {
 }
 
 func (w *Worker) commentLiked(ctx context.Context, a CommentLikedArgs) error {
+	if ok, err := w.visible(ctx, social.TargetComment, a.CommentID, "comment.like_changed", a.EventID); err != nil || !ok {
+		return err
+	}
 	kind, ak := social.ActorKind(a.ActorKind), social.ActorKind(a.AuthorKind)
 	if skip, err := w.skipBlocked(ctx, "comment.like_changed", a.EventID, kind, a.ActorID, ak, a.AuthorID); err != nil || skip {
 		return err
@@ -607,14 +640,14 @@ func (w *Worker) commentLiked(ctx context.Context, a CommentLikedArgs) error {
 	}
 	id, err := uuid.Parse(a.CommentID)
 	if err != nil {
-		return err
+		return river.JobCancel(err)
 	}
-	c, err := w.Comments.CommentForRelay(ctx, id)
+	likes, err := w.Comments.CommentLikeCount(ctx, id)
 	if err != nil {
 		return err
 	}
 	return w.enqueuePublish(ctx, a.EventID, exchangeContent, "comment.like_changed", commentLikeChanged{
-		baseEvent: base(a.EventID, a.Occurred, "COMMENT_LIKE_CHANGED"), CommentID: a.CommentID, PostID: a.PostID, LikeCount: count32(c.Likes),
+		baseEvent: base(a.EventID, a.Occurred, "COMMENT_LIKE_CHANGED"), CommentID: a.CommentID, PostID: a.PostID, LikeCount: count32(likes),
 		Action: "LIKE", UserID: a.ActorID, LikerKind: liker.OldKind, CommentAuthorID: author.Principal, CommentAuthorStoreID: a.AuthorID,
 		LikerPrincipalID: liker.Principal, LikerName: liker.Name, CommentAuthorType: author.Space,
 	})
@@ -632,9 +665,12 @@ type postHiddenByPlatform struct {
 func (w *Worker) contentTakedown(ctx context.Context, a ContentTakedownArgs) error {
 	id, err := uuid.Parse(a.MeasureID)
 	if err != nil {
-		return err
+		return river.JobCancel(err)
 	}
 	m, err := w.Stores.Measure(ctx, id)
+	if apperr.KindOf(err) == apperr.KindNotFound {
+		return river.JobCancel(fmt.Errorf("socialrelay：找不到措施 %s：%w", id, err))
+	}
 	if err != nil {
 		return err
 	}

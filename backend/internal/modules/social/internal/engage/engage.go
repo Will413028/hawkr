@@ -137,7 +137,7 @@ func (s *Service) LikeComment(ctx context.Context, c model.Caller, commentID uui
 		}
 		return events.Publish(ctx, s.d.Events, model.CommentLiked{
 			EventID: uuid.NewV7(), OccurredAt: now, CommentID: commentID, PostID: target.SocialComment.PostID, StoreID: storeID,
-			Actor: a, Author: model.Actor{Kind: model.ActorKind(target.SocialComment.ActorKind), ID: target.SocialComment.ActorID},
+			Actor: a, Author: model.ActorFrom(target.SocialComment.ActorKind, target.SocialComment.ActorID),
 		})
 	})
 	return added, err

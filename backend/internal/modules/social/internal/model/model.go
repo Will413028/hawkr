@@ -71,6 +71,9 @@ type Actor struct {
 	ID   int64
 }
 
+// ActorFrom 把資料列的 (kind, id) 欄位轉成 Actor。
+func ActorFrom(kind string, id int64) Actor { return Actor{Kind: ActorKind(kind), ID: id} }
+
 // Caller 是呼叫者此刻的兩個身分：買家（BuyerID，0 表示沒有）與店家（Store，nil 表示沒有）。互動者由伺服器依資源歸屬推導：
 // 呼叫者此刻的店擁有該貼文或討論區時是 STORE，否則是 BUYER（ADR 2026-10-17-social-actor-identity S2）。Store 是已解析、
 // 有推導過條件的店家（seller.CurrentStore 或 seller.Store 的結果），能力在 social 內以 seller.Authorize 檢查。

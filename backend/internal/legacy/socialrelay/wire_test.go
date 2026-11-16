@@ -91,7 +91,7 @@ func newFields(typ reflect.Type) map[string]wireField {
 	return out
 }
 
-// uuidKeys 是 A7 把 int64 改成 UUID 字串的 id 欄位（計畫不變量，第 76 行；notification 以 toStringVal 當字串用）：型別 int64 → string，
+// uuidKeys 是 int64 改成 UUID 字串的 id 欄位（notification 以 toStringVal 當字串用）：型別 int64 → string，
 // 舊的 ,string 選項不再需要（字串本來就是 JSON 字串）；json key、omitempty 都不變。
 var uuidKeys = map[string]bool{"post_id": true, "postId": true, "commentId": true, "parentCommentId": true, "parentId": true, "replyToId": true}
 

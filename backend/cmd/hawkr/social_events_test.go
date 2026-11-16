@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// subscribeSocialRelay 只訂閱發布、留言、回覆、兩種讚與措施建立：貼文建立（含草稿）、修改、排程等事件不訂閱，所以建立草稿不送 post.created（SD8）。
+// subscribeSocialRelay 只訂閱發布、留言、回覆、兩種讚與措施建立：貼文建立（含草稿）、修改、排程等事件不訂閱，所以建立草稿不送 post.created。
 func TestSocialRelaySubscribesOnlyTheNotificationEvents(t *testing.T) {
 	file, err := parser.ParseFile(token.NewFileSet(), "social_events.go", nil, 0)
 	if err != nil {

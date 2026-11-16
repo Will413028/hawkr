@@ -3,12 +3,14 @@ package socialrelay
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
 	"uuid"
 
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
@@ -19,10 +21,14 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-type recordingJobs struct{ args []river.JobArgs }
+type recordingJobs struct {
+	args []river.JobArgs
+	opts []*river.InsertOpts
+}
 
-func (q *recordingJobs) Enqueue(_ context.Context, args river.JobArgs, _ *river.InsertOpts) error {
+func (q *recordingJobs) Enqueue(_ context.Context, args river.JobArgs, opts *river.InsertOpts) error {
 	q.args = append(q.args, args)
+	q.opts = append(q.opts, opts)
 	return nil
 }
 
@@ -71,6 +77,7 @@ type fakeStores struct {
 	stores      map[int64]seller.Store
 	storeBlocks bool
 	measure     seller.Measure
+	measureErr  error
 }
 
 func (s *fakeStores) Store(_ context.Context, id int64) (seller.Store, error) {
@@ -86,13 +93,25 @@ func (s *fakeStores) StoreBlocksBuyer(context.Context, int64, int64) (bool, erro
 }
 
 func (s *fakeStores) Measure(context.Context, uuid.UUID) (seller.Measure, error) {
-	return s.measure, nil
+	return s.measure, s.measureErr
 }
 
-type fakeComments struct{ c social.Comment }
+type fakeComments struct {
+	c        social.Comment
+	notShown bool
+	gone     bool
+}
 
-func (f fakeComments) CommentForRelay(context.Context, uuid.UUID) (social.Comment, error) {
+func (f *fakeComments) CommentForRelay(context.Context, uuid.UUID) (social.Comment, error) {
 	return f.c, nil
+}
+
+func (f *fakeComments) CommentLikeCount(context.Context, uuid.UUID) (int64, error) {
+	return f.c.Likes, nil
+}
+
+func (f *fakeComments) ContentOwner(context.Context, social.Target) (social.ContentOwner, error) {
+	return social.ContentOwner{Exists: !f.gone, Readable: !f.notShown}, nil
 }
 
 var (
@@ -117,10 +136,16 @@ func newStore(storeID, accountID int64, name, logo string) seller.Store {
 }
 
 func newFixture() (*Worker, *fakeBuyers, *fakeStores, *recordingJobs) {
+	w, b, s, q, _ := newFixtureWithComments()
+	return w, b, s, q
+}
+
+func newFixtureWithComments() (*Worker, *fakeBuyers, *fakeStores, *recordingJobs, *fakeComments) {
 	b := &fakeBuyers{
 		profiles: map[int64]buyer.Profile{
 			301: {BuyerID: 301, DisplayName: "小明", Avatar: strp("avatars/301")},
 			302: {BuyerID: 302, DisplayName: "小華"},
+			303: {BuyerID: 303, AccountID: 7001, DisplayName: "店主本人"},
 		},
 		pages: map[int64]buyer.Page{},
 	}
@@ -130,7 +155,8 @@ func newFixture() (*Worker, *fakeBuyers, *fakeStores, *recordingJobs) {
 		ID: commentID, PostID: postID, Actor: social.Actor{Kind: social.ActorBuyer, ID: 301}, Body: "留言全文",
 		CreatedAt: createdAt, UpdatedAt: createdAt, Likes: 3, ReplyCount: 1,
 	}
-	return NewWorker(b, s, fakeComments{comment}, q, nil), b, s, q
+	fc := &fakeComments{c: comment}
+	return NewWorker(b, s, fc, q, nil), b, s, q, fc
 }
 
 // run 把模組事件交給 OnX，取出排入的 job，再交給 worker，回傳送出的訊息。
@@ -269,7 +295,7 @@ func TestCommentCreatedWire(t *testing.T) {
 
 func TestCommentRepliedWire(t *testing.T) {
 	w, _, _, _ := newFixture()
-	w.Comments = fakeComments{social.Comment{
+	w.Comments = &fakeComments{c: social.Comment{
 		ID: commentID, PostID: postID, ParentID: &parentID, ReplyToID: &replyToID, Actor: social.Actor{Kind: social.ActorStore, ID: 91},
 		Body: "店家回覆", CreatedAt: createdAt, UpdatedAt: createdAt,
 	}}
@@ -451,5 +477,112 @@ func TestDerivedIDIsStableDistinctAndAUUID(t *testing.T) {
 	}
 	if _, err := uuid.Parse(a); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSelfLikeOfOwnPostSendsNothing(t *testing.T) {
+	w, _, _, _ := newFixture()
+	ev := social.PostLiked{EventID: eventID, OccurredAt: occurredAt, PostID: postID, StoreID: 91, BuyerID: 303}
+	if got := run(t, w, OnPostLiked, ev); len(got) != 0 {
+		t.Fatalf("a store owner liking their own post sent %d messages", len(got))
+	}
+	ev.BuyerID = 301
+	if got := run(t, w, OnPostLiked, ev); len(got) != 1 {
+		t.Fatalf("another buyer's like sent %d messages", len(got))
+	}
+}
+
+func TestPostCreatedSkipsFollowersBlockedWithTheStore(t *testing.T) {
+	for name, set := range map[string]func(*fakeBuyers, *fakeStores){
+		"買家封鎖店": func(b *fakeBuyers, _ *fakeStores) { b.blockingStore = true },
+		"店封鎖買家": func(_ *fakeBuyers, s *fakeStores) { s.storeBlocks = true },
+	} {
+		w, b, s, _ := newFixture()
+		b.pages[0] = buyer.Page{Items: []buyer.Item{{ID: 301}}}
+		set(b, s)
+		got := run(t, w, OnPostPublished, social.PostPublished{EventID: eventID, OccurredAt: occurredAt, PostID: postID, StoreID: 91})
+		if len(got) != 0 {
+			t.Errorf("%s：封鎖中的追蹤者仍收到 %d 則", name, len(got))
+		}
+	}
+}
+
+func TestNothingIsSentForContentThatIsNoLongerVisible(t *testing.T) {
+	buyerActor := social.Actor{Kind: social.ActorBuyer, ID: 301}
+	for _, state := range []struct {
+		name string
+		set  func(*fakeComments)
+	}{
+		{"已刪除", func(c *fakeComments) { c.gone = true }},
+		{"不可讀", func(c *fakeComments) { c.notShown = true }},
+	} {
+		sends := map[string]func(*testing.T, *Worker) int{
+			"comment.created": func(t *testing.T, w *Worker) int {
+				return len(run(t, w, OnCommentCreated, social.CommentCreated{EventID: eventID, OccurredAt: occurredAt, CommentID: commentID, PostID: postID, StoreID: 91, Actor: buyerActor}))
+			},
+			"comment.replied": func(t *testing.T, w *Worker) int {
+				return len(run(t, w, OnCommentReplied, social.CommentReplied{EventID: eventID, OccurredAt: occurredAt, CommentID: commentID, PostID: postID, StoreID: 91, ParentID: parentID, ReplyToID: replyToID, Actor: social.Actor{Kind: social.ActorStore, ID: 91}, ReplyToActor: buyerActor}))
+			},
+			"comment.like_changed": func(t *testing.T, w *Worker) int {
+				return len(run(t, w, OnCommentLiked, social.CommentLiked{EventID: eventID, OccurredAt: occurredAt, CommentID: commentID, PostID: postID, StoreID: 91, Actor: social.Actor{Kind: social.ActorStore, ID: 91}, Author: buyerActor}))
+			},
+			"post.created": func(t *testing.T, w *Worker) int {
+				w.Buyers.(*fakeBuyers).pages[0] = buyer.Page{Items: []buyer.Item{{ID: 301}}}
+				return len(run(t, w, OnPostPublished, social.PostPublished{EventID: eventID, OccurredAt: occurredAt, PostID: postID, StoreID: 91}))
+			},
+		}
+		for name, send := range sends {
+			w, _, _, _, fc := newFixtureWithComments()
+			if n := send(t, w); n != 1 {
+				t.Fatalf("%s：可見時應送 1 則，送了 %d", name, n)
+			}
+			state.set(fc)
+			if n := send(t, w); n != 0 {
+				t.Errorf("%s（%s）：仍送了 %d 則", name, state.name, n)
+			}
+		}
+	}
+}
+
+func TestNextFollowerPageIsEnqueuedUniquelyByArgs(t *testing.T) {
+	w, b, _, q := newFixture()
+	b.pages[0] = buyer.Page{Items: []buyer.Item{{ID: 301}}, Next: &buyer.Cursor{Time: createdAt, ID: 301}}
+	if err := w.postPublished(context.Background(), PostPublishedArgs{eventFields: fields(eventID, occurredAt), PostID: postID.String(), StoreID: 91}); err != nil {
+		t.Fatal(err)
+	}
+	for i, a := range q.args {
+		if _, ok := a.(PostPublishedArgs); ok {
+			if q.opts[i] == nil || !q.opts[i].UniqueOpts.ByArgs {
+				t.Fatalf("next page opts=%+v, want UniqueOpts.ByArgs", q.opts[i])
+			}
+			return
+		}
+	}
+	t.Fatal("no next page enqueued")
+}
+
+func isCancel(err error) bool {
+	var c *rivertype.JobCancelError
+	return errors.As(err, &c)
+}
+
+func TestUnknownActorKindCancelsTheJob(t *testing.T) {
+	w, _, _, _ := newFixture()
+	err := w.commentCreated(context.Background(), CommentCreatedArgs{eventFields: fields(eventID, occurredAt), CommentID: commentID.String(), PostID: postID.String(), StoreID: 91, ActorKind: "ROBOT", ActorID: 1})
+	if !isCancel(err) {
+		t.Fatalf("err=%v, want a cancel", err)
+	}
+}
+
+func TestTakedownOfAMissingMeasureCancelsAndOtherErrorsRetry(t *testing.T) {
+	w, _, s, _ := newFixture()
+	args := ContentTakedownArgs{eventFields: fields(eventID, occurredAt), MeasureID: measureID.String(), StoreID: 91, AccountID: 7001, PostIDs: []string{postID.String()}}
+	s.measureErr = apperr.NotFound("no measure")
+	if err := w.contentTakedown(context.Background(), args); !isCancel(err) {
+		t.Fatalf("not found err=%v, want a cancel", err)
+	}
+	s.measureErr = errors.New("db down")
+	if err := w.contentTakedown(context.Background(), args); err == nil || isCancel(err) {
+		t.Fatalf("transient err=%v, want a retryable error", err)
 	}
 }

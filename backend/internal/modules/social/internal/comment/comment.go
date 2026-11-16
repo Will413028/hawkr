@@ -60,9 +60,7 @@ func postNotFound(ctx context.Context) error {
 	return apperr.NotFound("%s", text.PostNotFound(uitext.LocaleFrom(ctx)))
 }
 
-func authorOf(c store.SocialComment) model.Actor {
-	return model.Actor{Kind: model.ActorKind(c.ActorKind), ID: c.ActorID}
-}
+func authorOf(c store.SocialComment) model.Actor { return model.ActorFrom(c.ActorKind, c.ActorID) }
 
 func visibleComment(c store.SocialComment, postStore int64) model.Comment {
 	return model.Comment{
@@ -508,14 +506,25 @@ func (s *Service) ListReplies(ctx context.Context, c model.Caller, postID, paren
 // ForRelay 以 ID 讀一則留言此刻的內容與計數，不帶觀看者、不套可見性規則（已刪除或被隱藏的也讀得到，由呼叫方決定）；
 // 給 legacy relay 補通知 payload 的留言快照。不存在回 NotFound。
 func (s *Service) ForRelay(ctx context.Context, id uuid.UUID) (model.Comment, error) {
-	row, err := s.q(ctx).GetCommentWithStats(ctx, id)
+	q := s.q(ctx)
+	row, err := q.GetComment(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return model.Comment{}, apperr.NotFound("%s", text.CommentNotFound(uitext.LocaleFrom(ctx)))
+		return model.Comment{}, commentNotFound(ctx)
 	}
 	if err != nil {
 		return model.Comment{}, fmt.Errorf("social：讀取留言 %s：%w", id, err)
 	}
-	c := visibleComment(row.SocialComment, row.PostStoreID)
-	c.Likes, c.ReplyCount = row.LikeCount, row.ReplyCount
-	return c, nil
+	return s.withStats(ctx, q, model.Caller{}, visibleComment(row.SocialComment, row.PostStoreID))
+}
+
+// LikeCount 是留言此刻的讚數，不帶觀看者、不套可見性規則；不存在回 NotFound。
+func (s *Service) LikeCount(ctx context.Context, id uuid.UUID) (int64, error) {
+	counts, err := s.q(ctx).GetCommentCounts(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, commentNotFound(ctx)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("social：讀取留言的計數 %s：%w", id, err)
+	}
+	return counts.LikeCount, nil
 }
