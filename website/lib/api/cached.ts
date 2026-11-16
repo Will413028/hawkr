@@ -556,13 +556,13 @@ async function readTrendingPostTags(limit: number) {
 		() => fetchTrendingPostTags({ limit, signal: upstreamSignal() }),
 		{
 			key: ["trending-post-tags", String(limit)],
-			endpoint: "/public/tags/trending",
+			endpoint: "SocialPublicService/SuggestTrendingTags",
 		},
 	);
 }
 
 /**
- * Trending post tags (`/public/tags/trending`) — the footer's 熱門話題 column,
+ * Trending post tags (`SocialPublicService.SuggestTrendingTags`) — the footer's 熱門話題 column,
  * which renders on every public page. Distinct from `getCachedPopularHashtags`:
  * that one is product hashtags for the megamenu, these are post tags that link
  * into `/feed`. Tagged "posts" because trending-ness is recomputed from post
