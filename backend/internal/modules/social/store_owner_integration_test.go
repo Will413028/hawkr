@@ -191,7 +191,7 @@ func TestStoreSocialSummaryCountsPostsByStatus(t *testing.T) {
 	unpublished := f.publishedPost(t, storeID, "下架")
 	_, err := f.module.UnpublishPost(ctx, st, unpublished.ID, f.current(t, storeID, unpublished).Version)
 	must(t, err)
-	must(t, f.module.DeletePost(ctx, st, deletedDraft.ID, 0))
+	must(t, f.module.DeleteOwnPost(ctx, st, deletedDraft.ID, 0))
 	f.publishedPost(t, otherStore, "別家")
 	f.draft(t, otherStore)
 	f.schedule(t, storeID, scheduledDraft, time.Hour, f.owner())
@@ -253,7 +253,7 @@ func TestPostRequestIDReplayReturnsTheFirstResultWithoutDuplicating(t *testing.T
 	}
 
 	// 貼文刪除後 request_id 仍占著：重送回原本那一篇，而它讀不到。
-	must(t, f.module.DeletePost(ctx, st, first.ID, 0))
+	must(t, f.module.DeleteOwnPost(ctx, st, first.ID, 0))
 	if _, err := f.module.CreatePost(ctx, st, in); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("刪除後重送：%v，預期 not_found", err)
 	}

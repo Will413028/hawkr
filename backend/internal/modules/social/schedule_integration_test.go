@@ -290,7 +290,7 @@ func TestDeleteCancelsTheSchedule(t *testing.T) {
 	storeID, _ := f.exposableStore(t)
 	p := f.draft(t, storeID)
 	s := f.schedule(t, storeID, p, time.Hour, f.owner())
-	must(t, f.module.DeletePost(ctx, f.store(t, storeID), p.ID, 0))
+	must(t, f.module.DeleteOwnPost(ctx, f.store(t, storeID), p.ID, 0))
 	f.wantSchedule(t, s.ID, "CANCELED", "DELETED")
 	if evs := f.events.canceledEvents(); len(evs) != 1 || evs[0].Reason != social.CancelDeleted {
 		t.Fatalf("%+v", evs)

@@ -292,12 +292,6 @@ func (m *Module) UnpublishPost(ctx context.Context, store seller.Store, postID u
 	return m.post.Unpublish(ctx, store, postID, version)
 }
 
-// DeletePost 軟刪貼文（冪等：不存在與已刪除的什麼都不做）；店家要有 CapContentContract。version 為 0 表示不檢查版本。
-func (m *Module) DeletePost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) error {
-	_, err := m.post.Delete(ctx, store, postID, version)
-	return err
-}
-
 // DeleteOwnPost 是店主對外的刪除：沒刪到（不存在、已刪除、別家未公開的貼文）回 NotFound，別家已公開的貼文回 PermissionDenied；
 // 店家要有 CapContentContract。version 為 0 表示不檢查版本。
 func (m *Module) DeleteOwnPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) error {

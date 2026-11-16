@@ -62,7 +62,7 @@ type presenter struct {
 	stores    Stores
 	images    rpc.Images
 	webOrigin rpc.WebOrigin
-	// liked 查買家讚過哪些貼文，只在呼叫者有買家身分時呼叫；店主路徑（App）的呼叫者沒有買家身分，不設。
+	// liked 查買家讚過哪些貼文，只在呼叫者有買家身分時呼叫；店主路徑（App）給 noViewerLikes。
 	liked func(ctx context.Context, buyerID int64, postIDs []uuid.UUID) (map[uuid.UUID]bool, error)
 }
 

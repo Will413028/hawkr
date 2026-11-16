@@ -84,6 +84,17 @@ func skipOnMonolith(t ch.T, d Driver, why string) bool {
 	return true
 }
 
+// partialOnMonolith 在單體的一端只跑情境的前半：後半在單體沒有 Connect 入口。把原因記進測試輸出，回傳 true 時呼叫端直接結束。
+func partialOnMonolith(t ch.T, d Driver, why string) bool {
+	if d.Legacy() {
+		return false
+	}
+	if l, ok := t.(interface{ Logf(string, ...any) }); ok {
+		l.Logf("單體只跑前半：%s", why)
+	}
+	return true
+}
+
 // absentID 是格式正確但不存在的 ID：舊的 ID 是整數，單體的 ID 是 UUID，格式不對會先被當成 invalid_argument。
 func absentID(d Driver) string {
 	if d.Legacy() {
@@ -601,10 +612,7 @@ func sd2CommentsFollowPostVisibility(ctx context.Context, t ch.T, d Driver) {
 	if !hasComment(ch.Must(t, ch.Ret(d.ListComments(ctx, ch.Anonymous, p.ID))), c.ID) {
 		t.Errorf("重新發布之後留言要讀得到")
 	}
-	if !d.Legacy() {
-		if l, ok := t.(interface{ Logf(string, ...any) }); ok {
-			l.Logf("A7-D5′：單體沒有平台隱藏貼文的 Connect 入口，只跑下架與重新發布的那一半，A7-2f 以措施的情境覆蓋")
-		}
+	if partialOnMonolith(t, d, "A7-D5′：單體沒有平台隱藏貼文的 Connect 入口，只跑下架與重新發布的那一半，A7-2f 以措施的情境覆蓋") {
 		return
 	}
 	wantNoError(t, d.ModeratePost(ctx, ch.Admin, p.ID, true, "SD2"), "隱藏")

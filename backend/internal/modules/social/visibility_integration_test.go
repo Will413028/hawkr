@@ -70,7 +70,7 @@ func TestSD1SD2PublicReadabilityPredicate(t *testing.T) {
 			}},
 		{name: "貼文刪除", want: readable{forum: 1},
 			apply: func(t *testing.T, f *fixture, p social.Post, _ social.Comment, _ social.ForumEntry, _ buyerP) {
-				must(t, f.module.DeletePost(ctx, f.store(t, p.StoreID), p.ID, 0))
+				must(t, f.module.DeleteOwnPost(ctx, f.store(t, p.StoreID), p.ID, 0))
 			}},
 		{name: "留言被隱藏", want: readable{post: true, forum: 1, feed: true},
 			apply: func(t *testing.T, f *fixture, _ social.Post, c social.Comment, _ social.ForumEntry, _ buyerP) {

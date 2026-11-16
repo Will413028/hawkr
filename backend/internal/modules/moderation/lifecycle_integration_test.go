@@ -281,7 +281,7 @@ func TestTakedownOfDeletedStoreContentVerifiesAgainstTheSnapshotAndStillCreatesT
 	if err != nil {
 		t.Fatal(err)
 	}
-	must(t, f.social.DeletePost(ctx, st, w.post.ID, 0))
+	must(t, f.social.DeleteOwnPost(ctx, st, w.post.ID, 0))
 
 	in := DecideInput{
 		CaseID: c.ID, Version: c.Version, AdminID: 9, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,

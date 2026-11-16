@@ -19,15 +19,33 @@ func TestSD27DeleteOwnPostReportsNotFound(t *testing.T) {
 	storeID, _ := f.exposableStore(t)
 	b := f.newBuyer(t)
 	p := f.publishedPost(t, storeID, "貼文")
-	must(t, mustErr(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p.ID, Body: "留言"})))
+	cm := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p.ID, Body: "留言"}))
 	st := f.store(t, storeID)
+	live := func() int64 {
+		return f.scalar(t, `SELECT count(*) FROM social.posts WHERE store_id = $1 AND deleted_at IS NULL`, storeID)
+	}
+	versionOf := func() int64 { return f.scalar(t, `SELECT version FROM social.posts WHERE id = $1`, p.ID) }
+	if live() != 1 {
+		t.Fatalf("刪除前店內貼文數：%d", live())
+	}
+	v0 := versionOf()
+	f.jobs.reset()
 	must(t, f.module.DeleteOwnPost(ctx, st, p.ID, 0))
+	if live() != 0 || versionOf() != v0+1 || len(f.jobs.revalidations()) != 1 {
+		t.Fatalf("第一次刪除：店內貼文數 %d、版本 %d→%d、revalidation %d", live(), v0, versionOf(), len(f.jobs.revalidations()))
+	}
 	f.jobs.reset()
 	if err := f.module.DeleteOwnPost(ctx, st, p.ID, 0); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("第二次刪除：%v", err)
 	}
+	if live() != 0 || versionOf() != v0+1 {
+		t.Fatalf("第二次刪除不能再改計數與版本：店內貼文數 %d、版本 %d", live(), versionOf())
+	}
 	if len(f.jobs.revalidations()) != 0 {
 		t.Fatal("沒刪到不做副作用")
+	}
+	if n := f.scalar(t, `SELECT count(*) FROM social.comments WHERE id = $1 AND deleted_at IS NULL`, cm.ID); n != 1 {
+		t.Fatalf("軟刪貼文不動留言：%d", n)
 	}
 	if err := f.module.DeleteOwnPost(ctx, st, f.draft(t, storeID).ID, 0); err != nil {
 		t.Fatalf("草稿可刪：%v", err)
@@ -35,7 +53,6 @@ func TestSD27DeleteOwnPostReportsNotFound(t *testing.T) {
 	if err := f.module.DeleteOwnPost(ctx, st, p.ID, 0); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("已刪除：%v", err)
 	}
-	must(t, f.module.DeletePost(ctx, st, p.ID, 0))
 }
 
 // SD26：沒有店的帳號回 NotFound；別家未公開（草稿、下架、已刪除）的貼文 NotFound；別家已發布的貼文，Update、Publish、
@@ -54,7 +71,7 @@ func TestSD26ForeignWriteOnPublishedIsDenied(t *testing.T) {
 	unpub := f.publishedPost(t, owner, "下架")
 	unpub = mustV[social.Post](t)(f.module.UnpublishPost(ctx, f.store(t, owner), unpub.ID, unpub.Version))
 	gone := f.publishedPost(t, owner, "已刪除")
-	must(t, f.module.DeletePost(ctx, f.store(t, owner), gone.ID, 0))
+	must(t, f.module.DeleteOwnPost(ctx, f.store(t, owner), gone.ID, 0))
 
 	calls := map[string]func(p social.Post) error{
 		"Update": func(p social.Post) error {
@@ -69,8 +86,7 @@ func TestSD26ForeignWriteOnPublishedIsDenied(t *testing.T) {
 			_, err := f.module.UnpublishPost(ctx, o, p.ID, p.Version)
 			return err
 		},
-		"Delete":    func(p social.Post) error { return f.module.DeleteOwnPost(ctx, o, p.ID, 0) },
-		"DeleteOld": func(p social.Post) error { return f.module.DeletePost(ctx, o, p.ID, 0) },
+		"Delete": func(p social.Post) error { return f.module.DeleteOwnPost(ctx, o, p.ID, 0) },
 		"Schedule": func(p social.Post) error {
 			_, err := f.module.SchedulePost(ctx, o, social.SchedulePostInput{PostID: p.ID, Version: p.Version, PublishAt: f.clock().Add(time.Hour), By: f.owner()})
 			return err

@@ -332,11 +332,11 @@ func (d *connectDriver) ListSellerPosts(ctx context.Context, c ch.Caller, seller
 	return out, nil
 }
 
-// ToggleLike 先以呼叫者的身分讀 viewer_liked，再按讚或取消；讀不到貼文時當作沒按過，寫入那一步回出原因。
+// ToggleLike 先以呼叫者的身分讀 viewer_liked，再按讚或取消；讀不到貼文就回出讀取的原因。
 func (d *connectDriver) ToggleLike(ctx context.Context, c ch.Caller, postID string) (bool, error) {
 	cur, err := d.GetPost(ctx, c, postID)
 	if err != nil {
-		cur = Post{}
+		return false, err
 	}
 	if cur.Liked {
 		_, err = d.of(c).app.UnlikePost(ctx, connect.NewRequest(&pb.UnlikePostRequest{PostId: postID}))

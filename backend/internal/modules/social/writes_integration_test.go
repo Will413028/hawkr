@@ -80,15 +80,17 @@ func TestSD5DeleteIsIdempotent(t *testing.T) {
 	for range 2 {
 		must(t, f.module.DeleteComment(ctx, f.asBuyer(b), c.ID, 0))
 		must(t, f.module.DeleteForumEntry(ctx, f.asBuyer(b), e.ID, 0))
-		must(t, f.module.DeletePost(ctx, f.store(t, storeID), mustV[social.Post](t)(f.module.CreatePost(ctx, f.store(t, storeID), social.CreatePostInput{Body: "草稿"})).ID, 0))
+		must(t, f.module.DeleteOwnPost(ctx, f.store(t, storeID), mustV[social.Post](t)(f.module.CreatePost(ctx, f.store(t, storeID), social.CreatePostInput{Body: "草稿"})).ID, 0))
 	}
 	if got := mustV[social.Post](t)(f.module.PublicPost(ctx, social.Caller{}, p.ID)); got.Stats.Comments != 0 {
 		t.Fatalf("連刪兩次只扣一次，不會變負數：%d", got.Stats.Comments)
 	}
 	// 貼文重複刪除。
-	must(t, f.module.DeletePost(ctx, f.store(t, storeID), p.ID, 0))
+	must(t, f.module.DeleteOwnPost(ctx, f.store(t, storeID), p.ID, 0))
 	f.jobs.reset()
-	must(t, f.module.DeletePost(ctx, f.store(t, storeID), p.ID, 0))
+	if err := f.module.DeleteOwnPost(ctx, f.store(t, storeID), p.ID, 0); kindOf(err) != apperr.KindNotFound {
+		t.Fatalf("重複刪除貼文：%v", err)
+	}
 	if len(f.jobs.revalidations()) != 0 {
 		t.Fatal("重複刪除貼文不做副作用")
 	}

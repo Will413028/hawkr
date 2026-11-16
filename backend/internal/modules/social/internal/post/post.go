@@ -513,25 +513,17 @@ func (s *Service) Unpublish(ctx context.Context, st seller.Store, postID uuid.UU
 	return s.Own(ctx, st.StoreID, postID)
 }
 
-// Delete 軟刪貼文，回傳這次是否真的刪了。不存在與已經刪除的貼文回 false、不做副作用（冪等）；別家的貼文依 lockOwned 的規則回錯。
-// version 為 0 表示不檢查版本。軟刪保留內容與圖片引用（保留期還沒訂，見 CARRYOVER）。
-func (s *Service) Delete(ctx context.Context, st seller.Store, postID uuid.UUID, version int64) (bool, error) {
+// DeleteOwn 軟刪貼文。不存在、已刪除與別家未公開的貼文回 NotFound（AIP-135），別家已公開的貼文回 PermissionDenied（lockOwned 的規則）；
+// 沒刪到不做副作用。version 為 0 表示不檢查版本。軟刪保留內容與圖片引用（保留期還沒訂，見 CARRYOVER）。
+func (s *Service) DeleteOwn(ctx context.Context, st seller.Store, postID uuid.UUID, version int64) error {
 	if err := seller.Authorize(st, seller.CapContentContract); err != nil {
-		return false, err
+		return err
 	}
 	now := s.d.Now().UTC()
-	deleted := false
-	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		row, err := q.LockPost(ctx, postID)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("social：鎖定貼文 %s：%w", postID, err)
-		}
-		if row.StoreID != st.StoreID {
-			return s.foreignWriteError(ctx, postID)
+		if _, err := s.lockOwned(ctx, q, st.StoreID, postID); err != nil {
+			return err
 		}
 		if _, err := s.d.Cancel.FromLockedPosts(ctx, []uuid.UUID{postID}, model.CancelDeleted, now, schedule.CallerBumps); err != nil {
 			return err
@@ -543,22 +535,8 @@ func (s *Service) Delete(ctx context.Context, st seller.Store, postID uuid.UUID,
 		if n == 0 {
 			return versionConflict(ctx)
 		}
-		deleted = true
 		return s.d.Cache.BustPost(ctx, postID, st.StoreID)
 	})
-	return deleted && err == nil, err
-}
-
-// DeleteOwn 是對外的刪除：沒刪到（不存在、已刪除）回 NotFound（AIP-135），其餘同 Delete。
-func (s *Service) DeleteOwn(ctx context.Context, st seller.Store, postID uuid.UUID, version int64) error {
-	deleted, err := s.Delete(ctx, st, postID, version)
-	if err != nil {
-		return err
-	}
-	if !deleted {
-		return notFound(ctx)
-	}
-	return nil
 }
 
 func validStatus(s model.PostStatus) bool {

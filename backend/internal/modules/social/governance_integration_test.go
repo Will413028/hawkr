@@ -156,7 +156,7 @@ func TestRevalidateIsEnqueuedInTheSameTransaction(t *testing.T) {
 	f.jobs.reset()
 	up := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("改")}))
 	mustV[social.Post](t)(f.module.UnpublishPost(ctx, st, p.ID, up.Version))
-	must(t, f.module.DeletePost(ctx, st, p.ID, 0))
+	must(t, f.module.DeleteOwnPost(ctx, st, p.ID, 0))
 	if got := f.jobs.revalidations(); len(got) != 3 {
 		t.Fatalf("編輯已發布的貼文、下架、刪除各一個：%v", got)
 	}
